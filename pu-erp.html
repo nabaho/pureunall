@@ -194,6 +194,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 기업정보함 → 업체관리 담당자 메일 (대표 요청 2026-08-27).
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
+<script src="js/pu-co-mismatch.js?v=1"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
@@ -9163,6 +9164,174 @@ function CoAddrModal(props){
                   h('button', { type:'button', style:bs,
                     onClick:function(){ save(r.co, { addrKeep: r.co.address }, '이대로 둡니다 — ' + (r.co.name || '')); } }, '이대로 둠')));
             }))))));
+}
+/* 🔍 업체 정보 대조 (대표 지시 2026-10-03 「근본적으로」 → 1단계, 목업 승인 「진행」)
+   ★ «읽기만» 한다 — 이 창에는 저장 단추가 하나도 없다. 고치는 곳은 「업체 열기」(업체 상세)·
+     「🔗 업체 연결」 — 이미 있는 자리로 보낸다. 두 벌의 고치는 길을 만들지 않는다.
+   ★ 판정은 js/pu-co-mismatch.js 한 곳(검사가 그 파일을 돌린다). 짝은 사업자번호로만.
+   ⚠ 색인(1.36MB)은 이 창을 «열 때» 받는다(usePucardsIdxReady) — 업체관리를 연다고 받지 않는다. */
+var CO_MIS_TIP = '업체관리 · 기업정보함 사업자등록증 · 진행 중 계약에 적힌 회사 정보가 서로 다른 곳을 모아 봅니다(읽기만)';
+var CO_MIS_FIELD = { name:'상호', ceo:'대표자', addr:'주소', tel:'대표전화', contact:'담당자' };
+function coMismatchBuild(){
+  var M = window.PuCoMismatch, K = window.PuCoKey, PA = window.PuAddr;
+  if(!M || !K || !PA || !coAddrIdxLoaded()) return null;
+  return M.build(dbGet('companies', []) || [], dbGet('contracts', []) || [], window.pucardsIdx || {},
+    { keyOf:K.key, looksLikeBizNo:K.looksLikeBizNo, normName:pcNormCo, addrSame:PA.same });
+}
+function CoMismatchModal(props){
+  useEscClose(props.onClose);
+  usePucardsIdxReady();
+  var tabS = useState('all'); var tab = tabS[0]; var setTab = tabS[1];
+  var openS = useState(''); var openId = openS[0]; var setOpenId = openS[1];
+  var r = coMismatchBuild();
+  var td = { padding:'6px 8px', borderBottom:'1px solid #f8fafc', fontSize:'12px', whiteSpace:'nowrap',
+             overflow:'hidden', textOverflow:'ellipsis', maxWidth:0 };
+  var th = { textAlign:'left', padding:'6px 8px', fontSize:'11px', color:'#64748b', borderBottom:'1px solid #e2e8f0',
+             position:'sticky', top:0, background:'#fff', whiteSpace:'nowrap' };
+  var bs = { padding:'3px 9px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', color:'#1e40af',
+             fontSize:'11px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap', marginLeft:'4px' };
+  var none = function(t){ return h('span', { style:{ color:'#94a3b8' } }, t); };
+  function tag(kind, text){
+    var red = kind === 'diff';
+    return h('span', { key:text, style:{ display:'inline-block', borderRadius:'4px', padding:'0 6px', marginRight:'4px',
+      fontSize:'11px', fontWeight:700, background: red ? '#fef2f2' : '#fffbeb', color: red ? '#991b1b' : '#854d0e',
+      border:'1px solid ' + (red ? '#fecaca' : '#fde68a') } }, text);
+  }
+  function chip(key, label, n, red){
+    var on = tab === key;
+    return h('button', { key:key, type:'button', onClick:function(){ setTab(key); setOpenId(''); },
+      style:{ padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
+        border:'1px solid ' + (on ? '#1e293b' : '#e2e8f0'), background: on ? '#1e293b' : '#fff',
+        color: on ? '#fff' : '#1e293b', fontWeight: on ? 700 : 400 } },
+      label + ' ', h('b', { style:{ color: on ? '#fff' : (red ? '#991b1b' : '#854d0e') } }, n));
+  }
+  function openCo(co){ props.onClose(); if(props.onOpenCo) props.onOpenCo(co); }
+  function openCards(x){
+    try { PuAppBar.goApp('pu-cards.html?sso=1&q=' + encodeURIComponent(x.cert.c || x.cert.bz || '')); } catch(e){}
+  }
+  var mineOf = function(co, f){ return f === 'name' ? co.name : f === 'ceo' ? [co.ceo, co.ceo2].filter(Boolean).join(', ')
+    : f === 'addr' ? co.address : co.phone; };
+  var certOf = function(c, f){ return f === 'name' ? c.c : f === 'ceo' ? c.ceo : f === 'addr' ? c.ad : c.ct; };
+  var empty = function(t){ return h('div', { style:{ padding:'20px', color:'#166534', fontSize:'12.5px' } }, t); };
+  var table = function(cols, rows){
+    return h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+      h('thead', null, h('tr', null, cols.map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
+      h('tbody', null, rows));
+  };
+  var body;
+  if(!r){
+    body = h('div', { style:{ padding:'20px', color:'#64748b', fontSize:'12.5px' } }, '기업정보함 목록을 받는 중…');
+  } else if(tab === 'nokey'){
+    body = !r.noKey.length ? empty('✓ 모든 업체가 사업자번호로 이어집니다')
+      : table(['업체', '사업자번호', '까닭', ''], r.noKey.map(function(x){
+          return h('tr', { key:x.co.id },
+            h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:x.co.name }, x.co.name || '(이름 없음)'),
+            h('td', { style:td }, x.co.bizNo || '—'),
+            h('td', { style:td }, tag('empty', x.why === 'bad' ? '번호 검산 틀림 — 한 자리 오타일 수 있음' : '사업자번호 없음')),
+            h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }) },
+              h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기')));
+        }));
+  } else if(tab === 'ct'){
+    body = !r.ctRows.length ? empty('✓ 진행 중 계약의 회사 정보가 업체관리와 같습니다')
+      : table(['계약', '업체', '다른 칸', '계약에 적힌 값', '업체관리 값', ''], r.ctRows.map(function(x){
+          var cc = x.ct.company || {};
+          var val = function(fromCt, f){
+            if(f === 'contact') return fromCt ? (((cc.contacts || [])[0] || {}).name || '') : (x.co.primaryContactName || '');
+            if(f === 'ceo') return fromCt ? (cc.ceo || '') : mineOf(x.co, 'ceo');
+            var o = fromCt ? cc : x.co;
+            return f === 'addr' ? (o.address || '') : (o.phone || '');
+          };
+          var a = x.diffs.map(function(f){ return CO_MIS_FIELD[f] + ': ' + val(true, f); }).join(' · ');
+          var b = x.diffs.map(function(f){ return CO_MIS_FIELD[f] + ': ' + val(false, f); }).join(' · ');
+          return h('tr', { key:x.ct.id },
+            h('td', { style:td }, x.ct.contractNo || ''),
+            h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:x.co.name }, x.co.name || ''),
+            h('td', { style:td }, x.diffs.map(function(f){ return tag('diff', CO_MIS_FIELD[f]); })),
+            h('td', { style:td, title:a }, a),
+            h('td', { style:td, title:b }, b),
+            h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }) },
+              h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기')));
+        }));
+  } else {
+    var list = r.rows.filter(function(x){
+      if(tab === 'all') return x.diffs.length > 0;
+      if(tab === 'empty') return x.empties.length > 0;
+      if(tab === 'near') return x.near;
+      return x.f[tab] === 'diff';
+    });
+    body = !list.length ? empty('✓ 해당하는 업체가 없습니다')
+      : h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+        h('colgroup', null, h('col', { style:{ width:'28px' } }), h('col', { style:{ width:'20%' } }), h('col', { style:{ width:'20%' } }),
+          h('col', null), h('col', null), h('col', { style:{ width:'150px' } })),
+        h('thead', null, h('tr', null, ['', '업체', '어긋난 칸', '업체관리', '사업자등록증(기업정보함)', ''].map(function(t, i){ return h('th', { key:i, style:th }, t); }))),
+        h('tbody', null, list.reduce(function(acc, x){
+          var first = x.diffs.concat(x.empties).concat(x.near ? ['name'] : [])[0];
+          var isOpen = openId === x.co.id;
+          acc.push(h('tr', { key:x.co.id, style:{ cursor:'pointer', background: isOpen ? '#f8fafc' : undefined },
+              onClick:function(){ setOpenId(isOpen ? '' : x.co.id); } },
+            h('td', { style:Object.assign({}, td, { color:'#94a3b8', padding:'6px 4px 6px 10px', textOverflow:'clip' }) }, isOpen ? '▾' : '▸'),
+            h('td', { style:Object.assign({}, td, { fontWeight:600 }), title:x.co.name }, x.co.name || '(이름 없음)'),
+            h('td', { style:td },
+              x.diffs.map(function(f){ return tag('diff', CO_MIS_FIELD[f]); }),
+              x.empties.map(function(f){ return tag('empty', CO_MIS_FIELD[f] + ' 빈칸'); }),
+              x.near ? tag('empty', '상호 표기') : null),
+            h('td', { style:td, title:mineOf(x.co, first) || '' }, mineOf(x.co, first) || none('(비어 있음)')),
+            h('td', { style:td, title:certOf(x.cert, first) || '' }, certOf(x.cert, first) || ''),
+            h('td', { style:Object.assign({}, td, { textAlign:'right', maxWidth:'none' }), onClick:function(e){ e.stopPropagation(); } },
+              h('button', { type:'button', style:bs, onClick:function(){ openCo(x.co); } }, '업체 열기'),
+              h('button', { type:'button', style:bs, onClick:function(){ openCards(x); } }, '등록증'))));
+          if(isOpen){
+            acc.push(h('tr', { key:x.co.id + '-d' }, h('td', { colSpan:6, style:{ padding:'4px 8px 10px 30px', background:'#f8fafc' } },
+              h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed' } },
+                h('thead', null, h('tr', null, ['칸', '업체관리', '사업자등록증(기업정보함)', '판정'].map(function(t, i){
+                  return h('th', { key:i, style:Object.assign({}, th, { background:'#f8fafc', position:'static' }) }, t); }))),
+                h('tbody', null, ['name', 'ceo', 'addr', 'tel'].map(function(f){
+                  var j = x.f[f];
+                  var verdict = j === 'diff' ? h('span', { style:{ color:'#991b1b', fontWeight:700 } }, '다름')
+                    : j === 'empty' ? h('span', { style:{ color:'#854d0e', fontWeight:700 } }, '업체 쪽 빈칸')
+                    : j === 'near' ? h('span', { style:{ color:'#854d0e', fontWeight:700 } }, '표기만 다름')
+                    : h('span', { style:{ color:'#166534' } }, '같음');
+                  return h('tr', { key:f },
+                    h('td', { style:Object.assign({}, td, { width:'70px', maxWidth:'none', color:'#64748b' }) }, CO_MIS_FIELD[f]),
+                    h('td', { style:td, title:mineOf(x.co, f) || '' }, mineOf(x.co, f) || none('—')),
+                    h('td', { style:td, title:certOf(x.cert, f) || '' }, certOf(x.cert, f) || none('—')),
+                    h('td', { style:Object.assign({}, td, { width:'90px', maxWidth:'none' }) }, verdict));
+                }))),
+              x.certN > 1 ? h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'4px' } },
+                '이 번호의 등록증이 ' + x.certN + '장 있습니다 — 「📍 주소 대조」와 같은 한 장과 견줬습니다') : null)));
+          }
+          return acc;
+        }, [])));
+  }
+  var c = r ? r.count : null;
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) props.onClose(); } },
+    h('div', { className:'modal', style:{ maxWidth:'1080px', width:'96vw' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '🔍 업체 정보 대조 ',
+          h('span', { style:{ marginLeft:'6px', fontSize:'11px', fontWeight:700, color:'#166534', background:'#f0fdf4',
+            border:'1px solid #bbf7d0', borderRadius:'10px', padding:'1px 8px' } }, '읽기만 · 고치지 않음'),
+          h('span', { style:{ marginLeft:'6px', fontSize:'12px', color:'#64748b', cursor:'help', fontWeight:400 },
+            title:'업체관리와 기업정보함 사업자등록증을 «사업자번호»로 짝지어 상호·대표자·주소·대표전화를 견줍니다.\n'
+              + '이름으로는 짝짓지 않습니다 — 번호가 없거나 틀린 업체는 「번호로 못 잇는 업체」에 따로 모읍니다.\n'
+              + '주소는 「📍 주소 대조」와 같은 잣대(도로명·번호)로 봅니다. ㈜·주식회사 같은 표기 차이는 같다고 봅니다.\n'
+              + '이 창에서는 아무것도 바뀌지 않습니다. 「업체 열기」로 업체 상세에 가서 고치세요.' }, 'ⓘ')),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      c && h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', padding:'8px 14px', borderBottom:'1px solid #e2e8f0', background:'#f8fafc' } },
+        chip('all', '어긋난 업체', c.diff, true),
+        chip('ceo', '대표자 다름', c.ceo, true),
+        chip('addr', '주소 다름', c.addr, true),
+        chip('name', '상호 다름', c.name, true),
+        chip('tel', '대표전화 다름', c.tel, true),
+        chip('empty', '업체 쪽 빈칸', r.rows.filter(function(x){ return x.empties.length; }).length, false),
+        chip('near', '상호 표기만 다름', c.near, false),
+        chip('nokey', '번호로 못 잇는 업체', c.noKey, false),
+        chip('ct', '계약 사본 다름', c.contract, true),
+        props.linkCount > 0 && h('button', { type:'button', onClick:function(){ props.onClose(); if(props.onOpenLink) props.onOpenLink(); },
+          style:{ padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
+            border:'1px solid #bfdbfe', background:'#eff6ff', color:'#2563eb' } }, '🔗 이름으로만 이어진 기록 ' + props.linkCount + ' →')),
+      h('div', { className:'modal-b', style:{ maxHeight:'68vh', overflowY:'auto', padding:0 } }, body),
+      c && h('div', { style:{ padding:'6px 14px', fontSize:'11px', color:'#64748b', borderTop:'1px solid #e2e8f0' } },
+        '등록증과 짝지어진 업체 ' + c.paired + '곳 · 등록증이 기업정보함에 없는 업체 ' + c.noCert + '곳')));
 }
 function CoLinkModal(props){
   useEscClose(props.onClose);
@@ -26464,6 +26633,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   var linkCount = lkcS[0]; var setLinkCount = lkcS[1];
   // 📍 기업정보함과 주소가 다른 업체 — 색인을 이미 받았을 때만 센다(받게 만들지 않는다)
   var adoS = useState(false); var addrOpen = adoS[0]; var setAddrOpen = adoS[1];
+  var misS = useState(false); var misOpen = misS[0]; var setMisOpen = misS[1];   // 🔍 업체 정보 대조(읽기만)
   var adtS = useState(0);
   useEffect(function(){
     function on(){ adtS[1](function(n){ return n + 1; }); }
@@ -27280,6 +27450,11 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             style:{ padding:'9px 12px', background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
             '🔗 업체 연결 ' + linkCount),
+          h('button', { onClick:function(){ setMisOpen(true); },
+            className:'erp-tip', 'data-tip':CO_MIS_TIP,
+            style:{ padding:'9px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
+              borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
+            '🔍 정보 대조'),
           addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
             className:'erp-tip', 'data-tip':CO_ADDR_TIP,
             style:{ padding:'9px 12px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a',
@@ -27484,6 +27659,12 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           whiteSpace:'nowrap', marginRight:'6px' } },
         '🔗 업체 연결 ' + linkCount),
       // 기업정보함과 주소가 다른 업체 — 다 정리하면 사라진다(아직 안 셌으면 「주소 대조」)
+      h('button', { onClick:function(){ setMisOpen(true); },
+        className:'erp-tip', 'data-tip':CO_MIS_TIP,
+        style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
+          background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', cursor:'pointer',
+          whiteSpace:'nowrap', marginRight:'6px' } },
+        '🔍 정보 대조'),
       addrMisN !== 0 && h('button', { onClick:function(){ setAddrOpen(true); },
         className:'erp-tip', 'data-tip':CO_ADDR_TIP,
         style:{ padding:'6px 12px', fontSize:'11.5px', fontWeight:700, borderRadius:'5px',
@@ -28184,6 +28365,12 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
       onClose: function(){ setMergeOpen(false); refreshCompanies(); recountDup(); }
     }),
     // 업체 연결(ID 백필) 모달
+    misOpen && h(CoMismatchModal, {
+      linkCount: linkCount,
+      onOpenCo: function(co){ setDetailModal(co); },
+      onOpenLink: function(){ setLinkOpen(true); },
+      onClose: function(){ setMisOpen(false); }
+    }),
     addrOpen && h(CoAddrModal, {
       onChanged: function(){ refreshCompanies(); },
       onClose: function(){ setAddrOpen(false); refreshCompanies(); }
