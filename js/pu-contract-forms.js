@@ -298,6 +298,30 @@
      ⚠ 글자 하나까지 이알피와 같아야 한다(가운뎃점 U+00B7). */
   var FUND_GROUPS = ['계약서', '제안서·견적서'];
   var PROPOSAL_GROUP = FUND_GROUPS[1];
+  /* ── 이알피 계약 → 고를 양식 (설계 2026-10-03-계약서류-표준-기록 §4) ──
+     이알피 「계약서 출력」 자동 체크(pu-erp.html initSelMap)와 «같은 규칙»: 업체 자문·급여는 묶음 번호, 사건은 사건유형 이름,
+     나머지는 그 종류 전부. 제안서·견적서 묶음과 꺼진 양식은 고르지 않는다.
+     ⚠ 묶음 번호는 이알피와 글자가 같아야 한다(tests/erp-contract-fill.test.js 가 견준다). */
+  var CONTRACT_SETS = { advisory: ['fm-pr-advisory', 'fm-pr-cms'], payroll: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] };
+  function contractPick(forms, info) {
+    info = info || {};
+    var out = [];
+    (info.kinds || []).forEach(function (kv) {
+      var list = (forms || []).filter(function (f) { return f && f.enabled !== false && f.kind === kv && groupOf(f) !== PROPOSAL_GROUP; });
+      var ids = list.map(function (f) { return f.id; }), pick = ids;
+      var set = kv === 'company' ? (info.typeCode === '자문' ? CONTRACT_SETS.advisory : info.typeCode === '급여' ? CONTRACT_SETS.payroll : null) : null;
+      if (set) { var a = ids.filter(function (id) { return set.indexOf(id) >= 0; }); if (a.length) pick = a; }
+      else if (kv === 'case' && info.caseName) {
+        var cn = String(info.caseName);
+        var m = list.filter(function (f) { var g = f.groupName || ''; return g && (g === cn || cn.indexOf(g) >= 0 || g.indexOf(cn) >= 0); }).map(function (f) { return f.id; });
+        if (m.length) pick = m;
+      }
+      pick.forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
+    });
+    return out;
+  }
+  /* 계약 값이 «이기는» 칸 — 계약에서만 아는 값. 회사·담당자·근로자 칸은 채우기 창에서 고른 것이 먼저(비면 계약 값) */
+  var CONTRACT_WINS = /^(계약|성공보수$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
   function hasGroups(kind) { return kind === 'case' || kind === 'fund'; }
   /* 측 — 사건계약에만. 적힌 값이 먼저, 없으면 본문 칸으로 짐작한다(근로자 칸이 있으면 근로자측:
      근로자측 양식도 상대 회사 {{회사명}} 을 적는 일이 흔하다). */
@@ -885,6 +909,15 @@
     function values() {
       var co = st.co ? Object.assign({}, st.coX, st.co) : {};
       var V = CF.valuesFrom({ co: co, contact: st.contact, worker: st.worker });
+      /* 이알피 계약 → 서류 묶음 (설계 2026-10-03 §4) — 계약 칸은 계약 값이, 나머지는 비었을 때만 */
+      if (host.contractCtx && host.contractCtx.vals) {
+        var cv = host.contractCtx.vals;
+        Object.keys(cv).forEach(function (k) {
+          var x = cv[k];
+          if (x == null || x === '') return;
+          if (CONTRACT_WINS.test(k) || !V[k]) V[k] = x;
+        });
+      }
       if (st.pv.on) {
         var me = host.me ? host.me() : null;
         var P = CF.proposalValues(V, { orgType: st.pv.orgType, amount: st.pv.amount, vat: st.pv.vat,
@@ -1287,9 +1320,10 @@
     drawContacts(); drawVals();
     /* 기업정보함 「📨 제안서 보내기」로 왔으면 그 회사를 골라 둔다 (설계 2026-09-29 §8).
        ⚠ «회사» 줄만 — 사람(명함·담당자) 줄도 같은 회사 이름을 가져 먼저 걸리면 회사 칸이 비뚤어진다. */
-    if (host.propose) withRows(function (rows) {
+    var preKey = host.propose || (host.contractCtx && host.contractCtx.coKey) || '';
+    if (preKey) withRows(function (rows) {
       if (st.co) return;
-      var r = rows.filter(function (x) { return (x.k === 'biz' || x.k === 'erp' || x.k === 'card-co') && CF.sentKeys(x, {}).indexOf(host.propose) >= 0; })[0];
+      var r = rows.filter(function (x) { return (x.k === 'biz' || x.k === 'erp' || x.k === 'card-co') && CF.sentKeys(x, {}).indexOf(preKey) >= 0; })[0];
       if (r) pickCo(r);
       else note.textContent = '기업정보함에서 고른 회사를 업체 목록에서 찾지 못했습니다 — 위 ① 에서 찾아 고르세요';
     });
@@ -1418,6 +1452,22 @@
     function saveView() { try { localStorage.setItem('pcf_view', S.view); } catch (_) {} }
     /* 기업정보함 「📨 제안서 보내기」로 왔을 때 (설계 2026-09-29 §8) — 기금관리 › 제안서·견적서 로 가고,
        제안서가 하나면 채우기 창을 바로 연다(회사는 openFill 이 host.propose 로 골라 둔다). 처음 한 번만. */
+    /* 이알피 「📦 문서관리에서 묶음 채우기」로 왔을 때 (설계 2026-10-03 §4) — 계약을 읽어 값(PuContractVars)을 host.contractCtx 에 두고,
+       이알피 계약서 출력과 같은 규칙으로 양식을 체크해 아래 묶음 막대를 띄운다. 채우기는 사람이 막대를 눌러서. */
+    function openContract() {
+      if (!host.contractLoad) return;
+      toast('이알피 계약 자료를 읽는 중…');
+      host.contractLoad(host.contract).then(function (info) {
+        host.contractCtx = { vals: info.vals, coKey: info.coKey, label: '계약 ' + (info.contractNo || info.id) };
+        var ids = contractPick(S.forms, info);
+        if (!ids.length) { drawMain(); toast('이 계약 종류의 양식이 아직 없습니다 — 계약 자료는 「찾아서 채우기」에 그대로 쓰입니다'); return; }
+        var first = S.forms.filter(function (f) { return f.id === ids[0]; })[0];
+        S.kind = first.kind; resetFilters();
+        S.checked = ids.slice(); S.setId = null;
+        select(first.id);
+        toast('📦 ' + host.contractCtx.label + ' — 양식 ' + ids.length + '개를 골라 두었습니다. 아래 막대에서 「채워서 받기」를 누르세요');
+      }, function (e) { toast('⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
+    }
     function openPropose() {
       S.kind = 'fund'; S.side = 'all'; S.grp = PROPOSAL_GROUP; S.q = '';
       var list = filterForms(S.forms, { kind: 'fund', grp: PROPOSAL_GROUP });
@@ -1445,6 +1495,7 @@
         else { var f0 = shown()[0]; S.sel = f0 ? f0.id : null; }
         drawTree(); drawMain();
         if (host.propose && !S.proposed) { S.proposed = true; openPropose(); }
+        if (host.contract && !S.contractTried) { S.contractTried = true; openContract(); }
         /* 세트는 따로 받는다 — 못 받아도 양식 화면은 그대로 쓴다(기본 세트만 보인다) */
         db.ref(PATH_SETS).once('value').then(function (s) { S.sets = setsOf(s.val()); drawMain(); }, function () {});
       }).catch(function (e) { S.err = (e && e.message) || String(e); drawTree(); drawMain(); });
@@ -1794,6 +1845,8 @@
        넓은 화면에서는 한 줄, 좁으면 줄바꿈한다(한 화면에 보이게, 2026-09-27) */
     function filterBar() {
       var kind = S.kind, row = [setPicker()];
+      if (host.contractCtx) row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '계약 자료' }, [
+        chip('📄 ' + host.contractCtx.label + ' 자료로 채움 ✕', true, function () { host.contractCtx = null; drawMain(); toast('계약 자료를 풀었습니다 — 이제 기업정보함 값만으로 채웁니다'); })]));
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
         row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '측' },
@@ -1920,7 +1973,7 @@
       if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: saveAsSet }));
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
       if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
-        onclick: function () { openFill(checkedForms(), host, st ? st.name : '고른 양식'); } }));
+        onclick: function () { openFill(checkedForms(), host, st ? st.name : (host.contractCtx ? host.contractCtx.label : '고른 양식')); } }));
       fitHeight();
     }
     function listCol(list) {
@@ -2016,7 +2069,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,

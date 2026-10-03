@@ -90,7 +90,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=18"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=15"></script>
+<script src="js/pu-contract-forms.js?v=16"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -38322,6 +38322,11 @@ function ContractFormPrintModal(props){
     h('div', { className:'modal', style:{ width:'720px' }, onClick:function(e){ e.stopPropagation(); } },
       h('div', { className:'modal-h' },
         h('div', { className:'t' }, '📄 계약서 출력 - ' + (contract.companyName || '')),
+        /* 📦 문서관리에서 묶음 채우기 (설계 2026-10-03-계약서류-표준-기록 §4) — 한글·엑셀 원본에 계약 자료를 채워 받기·메일까지.
+           ⚠ 계약 «id» 만 넘긴다(금액·이름은 주소에 안 싣는다). 문서관리가 계약을 읽어 같은 한 벌(PuContractVars)로 채운다. */
+        contract.id && h('button', { type:'button', style:{ marginLeft:'auto', marginRight:'8px', background:'#166534', color:'#fff', border:0, borderRadius:'6px', padding:'5px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' },
+          title:'문서관리에서 이 계약 자료로 한글·엑셀 원본 서류 묶음을 채웁니다(받기·메일·보낸 기록까지)',
+          onClick:function(){ window.open('docs-esign.html#forms:contract=' + encodeURIComponent(contract.id), '_blank'); } }, '📦 문서관리에서 묶음 채우기'),
         h('button', { className:'x', onClick:props.onClose }, '×')
       ),
       // 종류 탭 (계약 종류 N개)
