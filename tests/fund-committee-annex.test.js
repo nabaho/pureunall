@@ -38,7 +38,7 @@ function 상자() {
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
     grabFn('_siteWrep'), grabFn('_siteUrep'),
     grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
-    grabFn('_cmAnnexNeeded'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
+    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
     'this.prep=_prepCommittee; this.over=_cmOver; this.need=_cmAnnexNeeded;',
     'this.see=_cmSeeAnnex; this.annex=committeeAnnexHTML; this.ROWS=COMMITTEE_ROWS;',
     'this.fromSites=_siteCommittee; this.urep=_siteUrep;'
@@ -76,7 +76,11 @@ test('★★ ② 격자 줄 수는 «한 곳»에 적혀 있다 — 서식과 �
   assert.equal(상자().ROWS, 3);
   /* 그리는 쪽이 그 값을 «쓰는지» — 3 을 손으로 박아 두면 격자가 바뀔 때 어긋난다 */
   assert.match(코드만(grabFn('fillCommittee')), /k<COMMITTEE_ROWS/, '★ 줄 수를 손으로 박았습니다.');
-  assert.match(코드만(grabFn('docBody')), /list\.length>COMMITTEE_ROWS/, '★ 초안이 다른 잣대를 씁니다.');
+  /* 2026-10-03 측마다 별지로 보낼지는 _cmToAnnex 한 곳 — 초안(docBody)·격자(fillCommittee)·한글(_hwpInkaValues)이 같이 쓴다 */
+  assert.match(코드만(grabFn('docBody')), /_cmToAnnex\(f,side,sites\)/, '★ 초안이 다른 잣대를 씁니다.');
+  assert.match(코드만(grabFn('fillCommittee')), /_cmToAnnex\(f,side,sites\)/, '★ 격자가 다른 잣대를 씁니다.');
+  assert.match(코드만(grabFn('_hwpInkaValues')), /_cmToAnnex\(f,sd\[0\],sites\)/, '★ 한글 서식이 다른 잣대를 씁니다.');
+  assert.match(코드만(grabFn('_cmToAnnex')), /COMMITTEE_ROWS/, '★ 줄 수를 손으로 박았습니다.');
 });
 
 test('★ ③ 넘치는지 아는 길이 하나다', () => {
@@ -208,7 +212,7 @@ function 격자채우기(f) {
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
     grabFn('_siteWrep'), grabFn('_siteUrep'),
     grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
-    grabFn('_cmAnnexNeeded'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
+    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('committeeAnnexHTML'),
     grabFn('fillCommittee'),
     'fillCommittee(root,f,(f&&f._sites)||[]);'
   ].join('\n')).call(box, doc, root, f);

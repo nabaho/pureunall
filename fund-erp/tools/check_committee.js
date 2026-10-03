@@ -35,7 +35,7 @@ global.esc = v => String(v==null?'':v).replace(/[&<>"]/g, ch => ({'&':'&amp;','<
 /* 2026-09-14: 위원이 예순을 넘는 일이 흔하다 — 격자(세 줄)를 넘으면 이름을 별지로 뺀다.
    ⚠ COMMITTEE_ROWS 는 «그냥 숫자»라 gV(괄호를 세어 끝을 찾는다)로는 못 가져온다 — 줄째로 읽는다. */
 (0, eval)((/var COMMITTEE_ROWS=\d+;/.exec(src) || ['var COMMITTEE_ROWS=0;'])[0]);
-['_cmOver', '_cmAnnexNeeded', '_cmSeeAnnex', 'committeeAnnexHTML'].forEach((n) => (0, eval)(gF(n)));
+['_cmOver', '_cmAnnexNeeded', '_cmToAnnex', 'isRegionFund', '_cmSeeAnnex', 'committeeAnnexHTML'].forEach((n) => (0, eval)(gF(n)));
 (0, eval)(gF('_siteWrep'));
 
 const F = { name: '가나공동근로복지기금', chairman: '홍길동', fund_type: '공동',
