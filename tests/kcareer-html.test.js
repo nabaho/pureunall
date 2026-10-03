@@ -1137,7 +1137,9 @@ test('회의·기타비용 행에 📨 동의서 버튼이 있다', () => {
      줄마다 «자기 저장소»를 넘기게 바뀌었다. 여기서 보는 것은 «동의서를 부르는가»와
      «그 줄의 저장소를 함께 넘기는가»다. */
   /* 줄에서 부르는 자리만 본다(함수 «정의»는 빼야 한다 — 거기엔 r.id 가 없다) */
-  const calls = (source.match(/feeConsentDoc\([^)]*\)/g) || []).filter((c) => c.indexOf('${') >= 0);
+  /* ⚠ 끝을 「첫 닫는 괄호」로 잡지 않는다 — 값을 _jsAttr(…) 로 감싸 안쪽 괄호가 생겼다(2026-10-03).
+     줄의 onclick 속성은 «큰따옴표»로 닫히므로 거기까지(한 줄 안에서)를 한 부름으로 본다. */
+  const calls = (source.match(/feeConsentDoc\([^"\n]*\)"/g) || []).filter((c) => c.indexOf('${') >= 0);
   assert.ok(calls.length >= 2, '두 비용 화면 모두에 동의서 단추가 있어야 합니다');
   calls.forEach((c) => assert.match(c, /r\.id/, '어느 건인지 넘겨야 합니다'));
   assert.ok(calls.some((c) => /_st|etcfee/.test(c)),
