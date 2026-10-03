@@ -164,3 +164,12 @@ test('ⓔ 화면 — 기금관리에서도 묶음 칩 줄과 수정 창 묶음 �
   assert.match(md, /f\.kind === 'fund'/, '기금 양식 수정 창에 묶음 칸이 없습니다');
   assert.match(md, /FUND_GROUPS\.map/, '묶음 고르기 목록이 FUND_GROUPS 가 아닙니다');
 });
+
+test('ⓔ 이알피 계약서 출력 — 제안서·견적서 묶음은 자동 체크하지 않는다(글자 같음)', () => {
+  const P = loadCF();
+  const i = ERP.indexOf('var PROPOSAL_GROUP_NAME');
+  assert.ok(i > 0 && i < ERP.indexOf('var initSelMap = {};'), '제안서 묶음 이름이 initSelMap 바로 위에 없습니다');
+  const blk = ERP.slice(i, ERP.indexOf('var sm = useState(initSelMap)', i));
+  assert.ok(blk.includes("'" + P.PROPOSAL_GROUP + "'"), '이알피가 제안서 묶음 이름을 모릅니다 — 글자가 같아야 합니다');
+  assert.match(blk, /initSelMap\[kv\] = initSelMap\[kv\]\.filter\(notProposal\)/, '자동 체크에서 제안서를 빼는 거르기가 없습니다');
+});
