@@ -88,7 +88,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- Daum 우편번호 서비스 (무료, 가입 불필요) -->
 <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
-<script src="js/pu-hwp-engine.js?v=17"></script>
+<script src="js/pu-hwp-engine.js?v=18"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
 <script src="js/pu-contract-forms.js?v=13"></script>
 <script src="hwpx_gen.js?v=14"></script>
@@ -37828,7 +37828,7 @@ function openContractHwpAttachment(att){
   var modal=document.createElement('div'); modal.className='modal'; modal.style.cssText='width:min(900px,96vw);max-height:94vh;display:flex;flex-direction:column';
   var head=document.createElement('div'); head.className='modal-h';
   var title=document.createElement('div'); title.className='t'; title.textContent='📕 한글 열기 · '+(att.name||'첨부파일');
-  var close=document.createElement('button'); close.className='x'; close.textContent='×'; close.onclick=function(){overlay.remove();};
+  var close=document.createElement('button'); close.className='x'; close.textContent='×'; close.onclick=function(){shut();};
   head.appendChild(title); head.appendChild(close);
   var body=document.createElement('div'); body.className='modal-b'; body.style.cssText='flex:1;overflow:auto;background:#e2e8f0';
   var host=document.createElement('div'); host.id='contractHwpEditor'; host.className='erp-hwp-preview';
@@ -37836,10 +37836,12 @@ function openContractHwpAttachment(att){
   var foot=document.createElement('div'); foot.className='modal-f contract-hwp-actions';
   var save=document.createElement('button'); save.className='btn-secondary'; save.textContent='원본 저장';
   save.onclick=function(){PureunHwp.download(buf,att.name);};
-  var done=document.createElement('button'); done.className='btn-primary'; done.textContent='닫기'; done.onclick=function(){overlay.remove();};
+  /* 닫을 때 편집기가 브라우저에 남긴 서류(복구본·최근 문서·이력)를 비운다 — 다른 회사 계약서가 「문서 복구」 창으로 끼어들지 않게(PureunHwp.clearStudioStores) */
+  var shut=function(){ overlay.remove(); try{ PureunHwp.clearStudioStores(); }catch(e){} };
+  var done=document.createElement('button'); done.className='btn-primary'; done.textContent='닫기'; done.onclick=function(){shut();};
   foot.appendChild(save); foot.appendChild(done);
   modal.appendChild(head); modal.appendChild(body); modal.appendChild(foot); overlay.appendChild(modal); document.body.appendChild(overlay);
-  overlay.onclick=function(e){if(e.target===overlay) overlay.remove();};
+  overlay.onclick=function(e){if(e.target===overlay) shut();};
 
   PureunHwp.createEditor('#contractHwpEditor',buf,att.name)
     .catch(function(){ return PureunHwp.renderPreview(host,buf,att.name); })
