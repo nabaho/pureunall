@@ -4956,13 +4956,22 @@ function payItemOf(site){
    ⚠ 못 찾으면 예전처럼 비워 둔다. 아무나 넣으면 «남의 업무»가 된다.
    ⚠ 이름표(사번→이름)를 못 읽었으면 넣지 않는다 — 사번만 있으면 화면에서 못 알아본다.
      읽을 수 있는 사람이 한 번 열면 그때 채워진다(_peU2NKnown 과 같은 결). */
-function payMgrOf(site){
+/* ⚠ 급여데이터함의 사업장에는 이름밖에 없다 — 그래서 «하나로 정해질 때만» 잇는다(대표 지시 2026-10-03 2단계).
+     예전에는 이름이 같은 «첫» 업체를 집었다. 이 집은 같은 회사를 자문·급여·기금마다 한 줄씩 두므로
+     첫 줄이 «자문» 줄이면 자문 담당이 급여 업무를 받았다. 종료·지운 줄도 가리지 않았다.
+     → 살아 있는 같은 이름 줄이 하나면 그것, 여럿이면 «급여» 줄이 딱 하나일 때만. 아니면 비운다(담당 미지정). */
+function payCoOf(site){
   var n=_payKey(site);
   if(!n||!coSrc||!coSrc.length) return null;
-  var hit=null;
-  coSrc.forEach(function(c){
-    if(!hit&&c&&_payKey(c.name||c.companyName)===n) hit=c;
+  var live=coSrc.filter(function(c){
+    return c&&!c._deleted&&String(c.status||'')!=='closed'&&_payKey(c.name||c.companyName)===n;
   });
+  if(live.length===1) return live[0];
+  var pay=live.filter(function(c){ return String(c.typeCode||'')==='급여'; });
+  return pay.length===1?pay[0]:null;
+}
+function payMgrOf(site){
+  var hit=payCoOf(site);
   if(!hit) return null;
   var sid=String(hit.managerMain||'');
   var nm=(sid&&_peU2N&&_peU2N[sid])||'';
