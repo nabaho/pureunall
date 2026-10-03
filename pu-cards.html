@@ -948,8 +948,6 @@ body.mailview #pu-backup-admin-button{display:none!important}
    ⚠ auto-fit 이라 창이 좁으면 저절로 한 줄로 돌아간다. */
 .msin{display:grid;grid-template-columns:repeat(auto-fit,minmax(390px,1fr));
   gap:0 20px;align-items:start}
-.msec h4{font-size:13.5px;margin:0 0 4px;color:#1e293b;padding-bottom:5px;
-  border-bottom:1px solid #e2e8f0}
 /* ── 📦 지난 메일 (대표 지시 2026-09-06) ──
    ⚠ 두 칸으로 갈리는 .msin 안이지만 이 덩이는 «한 칸을 다 쓴다» — 표가 들어가서
      반 칸에 넣으면 줄이 접힌다(grid-column:1/-1). */
@@ -1864,17 +1862,11 @@ table.sbox.tight td.none{padding:26px 8px}
 /* 선택한 탭 내용 — 버튼을 2열로 */
 .setpanel{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:8px;align-items:start}
 .setnote{grid-column:1/-1;font-size:12px;color:#94a3b8;line-height:1.6;margin:0 2px 4px}
-.setcard{break-inside:avoid;-webkit-column-break-inside:avoid;display:inline-block;width:100%;
-  background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:11px 12px 5px;margin:0 0 12px;
-  box-shadow:0 1px 6px rgba(20,30,60,.04)}
-.setcard h3{margin:0 0 8px;font-size:13px;color:#1e293b;display:flex;align-items:center;gap:6px;font-weight:800}
 .setbtn{display:flex;align-items:center;gap:8px;width:100%;text-align:left;background:#f8fafc;border:1px solid #e2e8f0;
   border-radius:8px;padding:7px 10px;margin-bottom:6px;font-size:13px;font-weight:600;color:#1e293b;cursor:pointer;font-family:inherit}
 .setbtn:hover{background:#f8fafc;border-color:#bfdbfe}
 .setbtn .sdesc{margin-left:auto;font-size:11px;color:#94a3b8;font-weight:500;white-space:nowrap;
   min-width:0;overflow:hidden;text-overflow:ellipsis}   /* 2026-08-23: 긴 설명이 칸 밖으로 새 나갔다 */
-.setcard.danger{border-color:#fecaca;background:#f8fafc}
-.setcard.danger h3{color:#dc2626}
 .setbtn.danger{background:#fff;border-color:#fecaca;color:#dc2626}
 .setbtn.danger:hover{background:#e2e8f0;border-color:#f87171}
 .sidetab{display:flex;gap:5px;margin:8px 0 12px}
@@ -1883,13 +1875,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .sidetab button.on{background:#1e293b;color:#fff;border-color:#1e40af}
 .sidetab button span{font-size:11px;background:#1e40af;color:#bfdbfe;border-radius:99px;padding:1px 7px;font-weight:700}
 .sidetab button.on span{background:#1e40af;color:#fff}
-/* 셋으로 늘어나 한 줄이 좁아졌다. 이름과 숫자를 **위아래로 쌓는다** —
-   옆으로 붙이면 「사 / 업자」처럼 이름이 두 줄로 접혀 지저분했다(대표 지시 2026-08-10). */
-.sidetab3 button{flex-direction:column;gap:3px;padding:9px 2px 8px;font-size:12.5px;line-height:1.2}
-.sidetab3 button span{background:none;color:#60a5fa;padding:0;font-size:15px;font-weight:800;line-height:1.1}
-.sidetab3 button.on span{background:none;color:#fff}
-/* 숫자 자리가 비는 갈래(메일)도 높이를 맞춘다 — 안 맞추면 단추 하나만 짧아 삐뚤어 보인다 */
-.sidetab3 button i{font-style:normal;font-size:15px;font-weight:800;line-height:1.1;visibility:hidden}
 /* ── 갈래를 한 줄씩 세로로 (대표 지시 2026-08-12) ──
    옆으로 셋을 붙이니 칸이 좁아 이름이 접혔고, 갈래를 더 늘릴 자리도 없었다.
    한 줄씩 두면 이름·숫자가 넉넉하고 갈래를 더해도 모양이 안 무너진다. */
@@ -1930,12 +1915,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .coselbar button:hover{background:#eff6ff}
 .coselbar .comore{border-color:#d97706;color:#854d0e;background:#f8fafc}
 .coselbar .comore:hover{background:#fffbeb}
-/* 삭제 — 옆 단추들과 «다르게» 보여야 한다. 같은 회색이면 손이 미끄러진다.
-   ⚠ 반드시 .coselbar 안으로 한정한다 — 밖에 두면 다른 화면의 같은 이름까지 물든다. */
-.coselbar .codel{border-color:#fecaca;color:#991b1b;background:#fff}
-.coselbar .codel:hover{background:#f8fafc}
-.coselbar .coclear{border-color:#fecaca;color:#dc2626;background:#fff;margin-left:auto}
-.coselbar .coclear:hover{background:#e2e8f0}
 /* ★ 2026-08-31 정리 — 겉 단추를 넷으로 줄이면서 들어온 둘.
    가름선과 ✕(선택 해제). ✕ 는 «끄는» 것이라 다른 단추와 나란히 두지 않고 선 뒤에 세운다. */
 .coselbar .cosep{width:1px;height:18px;background:#bfdbfe;flex:none;margin:0 2px}
@@ -1968,9 +1947,6 @@ table.sbox.tight td.none{padding:26px 8px}
 /* ⚠ 폴더 안의 ＃탭 모양(#pcSide .coftab/.coftabadd)은 없앴다 — 탭은 이제 옆줄이 아니라
      윗줄(#pcErpTabs)에 명함·사업자의 탭 칩과 «같은 모양»으로 나온다(대표 지시 2026-08-17). */
 /* 기업 상세 나눠 보기 — 「몇 개씩」 칸과 쪽 옮기기 (명함 표의 #pcPageSize·#pcPager 와 같은 결) */
-.copgbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 8px;font-size:12.5px;color:#64748b}
-.copgbar .cnt b{color:#1e40af}
-.copgbar .sp{flex:1}
 .copgsize{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:5px 9px;
   font-family:inherit;font-size:12.5px;color:#1e293b;cursor:pointer}
 /* ── 기업 상세: 표만 구르고 쪽넘김은 화면에 붙는다 (대표 지시 2026-08-26) ──
@@ -2018,9 +1994,6 @@ table.sbox.tight td.none{padding:26px 8px}
   border:1px solid #fde68a;border-radius:9px;padding:1px 8px;font-weight:700;cursor:pointer;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 #pcCo td.cofd{white-space:nowrap;overflow:hidden}
-.coq{width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-size:13.5px;font-family:inherit;margin:0 0 12px}
-.coq:focus{outline:0;border-color:#1e40af}
-.colist{border:1px solid #e2e8f0;border-radius:11px;background:#fff;overflow:hidden}
 /* 기업정보함 목록과 같은 결 — 한 줄에 한 회사, 왼쪽에 네모와 번호 */
 .cotbl{width:100%;border-collapse:collapse;background:#fff;border:1px solid #e2e8f0;border-radius:11px;table-layout:fixed}
 .cotbl thead th.cosort{cursor:pointer;user-select:none}
@@ -2104,10 +2077,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .corow .bits i.miss{background:#fef2f2;color:#991b1b;border-radius:7px;padding:2px 7px;
   display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
 .corow .mgr{margin-left:auto;font-size:11.5px;color:#64748b;white-space:nowrap}
-.codet{border:1px solid #e2e8f0;border-radius:11px;background:#fff;padding:6px 13px 13px}
-.codet .h{display:flex;align-items:center;gap:9px;padding:10px 0;border-bottom:1px solid #f8fafc;margin-bottom:6px}
-.codet .h b{font-size:16px;color:#1e293b}
-.codet .h .ty{font-size:11px;background:#e2e8f0;color:#1e40af;border:1px solid #bfdbfe;border-radius:9px;padding:1px 8px}
 .cof{display:flex;gap:12px;padding:7px 2px;border-bottom:1px solid #f8fafc;font-size:13.5px;align-items:flex-start}
 .cof:last-child{border-bottom:0}
 .cof span{flex:0 0 116px;color:#64748b;font-size:12.5px;padding-top:1px}
@@ -2232,20 +2201,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .pcitem.dropover{outline:2px dashed #60a5fa}
 .pchintside{font-size:11.5px;color:#60a5fa;line-height:1.7;padding:4px 8px}
 #pcMain{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
-/* 오른쪽 분류 패널 — 왼쪽과 같은 240px, 더 연한 색 */
-#pcRight{width:240px;flex-shrink:0;background:#f8fafc;color:#1e293b;border-left:1px solid #e2e8f0;overflow-y:auto;padding:18px 14px}
-#pcRight .rsec{font-size:11.5px;color:#64748b;letter-spacing:1px;margin:4px 4px 10px;font-weight:700}
-#pcRight .radd{display:flex;gap:6px;margin-bottom:12px}
-#pcRight .radd input{flex:1;min-width:0;padding:8px 10px;border:1px solid #bfdbfe;border-radius:8px;background:#fff;font-size:13px}
-#pcRight .radd button{flex-shrink:0;background:#1e40af;color:#fff;border-radius:8px;padding:8px 12px;font-size:13px;font-weight:700}
-#pcRight .ritem{display:flex;align-items:center;gap:8px;padding:9px 11px;border-radius:9px;font-size:13.5px;cursor:pointer;background:#fff;border:1px solid #e2e8f0;margin-bottom:6px}
-#pcRight .ritem:hover{border-color:#60a5fa;background:#f8fafc}
-#pcRight .ritem.on{background:#bfdbfe;border-color:#60a5fa;font-weight:700;color:#1e293b}
-#pcRight .ritem .cnt{margin-left:auto;font-size:11.5px;color:#94a3b8}
-#pcRight .ritem .edit{margin-left:6px;font-size:12px;color:#60a5fa;padding:2px 5px;border-radius:6px}
-#pcRight .ritem .edit:hover{background:#e2e8f0;color:#1e40af}
-#pcRight .ritem.dropover{outline:2px dashed #2563eb;background:#bfdbfe}
-#pcRight .rhint{font-size:11.5px;color:#60a5fa;line-height:1.7;padding:6px 4px}
 #pcTop{display:flex;gap:12px;padding:16px 24px;background:#fff;border-bottom:1px solid #f8fafc;align-items:center}
 /* 오른쪽 끝 묶음 — margin-left:auto 로 밀어 붙인다. 검색칸이 8cm 로 고정이라
    가운데 남는 자리를 이 묶음이 먹지 않게 flex 로 늘리지 않는다. */
@@ -2270,7 +2225,6 @@ table.sbox.tight td.none{padding:26px 8px}
 #pcSearch:focus{outline:none;border-color:#1e293b;background-color:#fff}
 .pcbtn-primary{background:#1e293b;color:#fff;border-radius:12px;padding:11px 18px;font-size:13.5px;font-weight:600}
 .pcbtn-primary:hover{background:#1e293b}
-.pcbtn-ghost{background:#fff;border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;font-size:15px;color:#64748b}
 /* 상단 한 줄: 제목 · 탭 · 도구 (좁으면 뒤쪽 도구부터 다음 줄로 내려감) */
 /* ── 머리줄 키는 «데이터 한 줄»과 같다 (대표 지시 2026-08-29) ──
    "사업분류 박스 행 위아래 넓다 줄여달라" → "데이터 넣은 크기하고 같게 해라"
@@ -2316,7 +2270,6 @@ table.sbox.tight td.none{padding:26px 8px}
 .bulkmove{display:flex;gap:8px;align-items:flex-start;margin-top:12px;padding-top:10px;border-top:1px solid #e2e8f0;cursor:pointer}
 .bulkmove em{display:block;color:#94a3b8;font-size:12.5px;font-style:normal}
 #pcPageSize{border:1px solid #e2e8f0;border-radius:11px;padding:8px 10px;font-size:13px;color:#1e293b;background:#fff;cursor:pointer}
-.pchint{font-size:12.5px;color:#94a3b8;padding:6px 22px 10px}
 /* 선택 도구 — 목록을 밀지 않게 화면 아래에 띄운다 (대표 승인 2026-08-08).
    예전에는 표 위에 한 줄이 끼어들어, 방금 고른 줄이 아래로 밀려 눈에서 사라졌다.
    자주 쓰는 넷만 겉에 두고 나머지는 ⋯ 안에 넣는다 — 특히 삭제를 「선택 해제」
@@ -2331,7 +2284,6 @@ table.sbox.tight td.none{padding:26px 8px}
 #pcSel .bar button{flex:none;border:1px solid #e2e8f0;background:#fff;border-radius:9px;
   padding:6px 11px;font-size:12.5px;font-weight:600;color:#1e293b;white-space:nowrap}
 #pcSel .bar button:hover{background:#f8fafc;border-color:#bfdbfe}
-#pcSel .bar button.red{color:#dc2626;border-color:#fecaca}
 #pcSel .bar button.icon{border:none;padding:6px 9px;font-size:15px;color:#94a3b8}
 #pcSel .bar button.icon:hover{background:#f8fafc;color:#1e293b}
 #pcTableWrap{flex:1;overflow:auto;padding:0 22px 26px}
@@ -2801,10 +2753,7 @@ body.pc #pcDetail{display:flex}
 .pkbar{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin:0 0 10px;padding:8px 11px;
   border:1px solid #e2e8f0;border-radius:9px;background:#f8fafc;font-size:12.5px;color:#64748b}
 .pkbar.on{border-color:#bfdbfe;background:#f8fafc}
-.pkbar .pkall{display:flex;align-items:center;gap:6px;font-weight:700;color:#1e293b;cursor:pointer}
-.pkbar .pkall input{width:15px;height:15px;margin:0;cursor:pointer}
 .pkbar .pkn{color:#1e40af;font-weight:700}
-.pkbar .pkhint{color:#94a3b8;font-size:11.5px}
 .pkbar button{border:1px solid #e2e8f0;background:#fff;border-radius:8px;padding:6px 11px;
   font-size:12px;font-weight:700;color:#1e293b;cursor:pointer;font-family:inherit}
 .pkbar button:hover{background:#f8fafc}
@@ -2858,18 +2807,8 @@ body.pc #pcDetail{display:flex}
 #pcDetail .pdacts button:hover{background:#e2e8f0;color:#1e40af;border-color:#bfdbfe}
 #pcDetail .pdacts button.danger{color:#dc2626}
 #pcDetail .pdmemo{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:11px;font-size:13px;color:#475569;white-space:pre-wrap;line-height:1.6}
-/* ★ 최종 전체 리뷰(2026-08-16) I5 — 밝은 바탕(#f8fafc)인데 글자색을 안 정해 두면
-   기본 팔레트(--ink:#f8fafc, 어두운 화면용)를 그대로 물려받아 **흰 바탕에 흰 글씨**가 된다.
-   폰에는 body.pc .modal 같은 밝은 테마 덮기가 없어 이알피 이력 칸이 통째로 안 보였다.
-   칸 자체에 어두운 색을 정해 제목 span(font-weight:700)과 .erphist-fee 가 물려받게 한다
-   — .erphist-meta/.erphist-brief 는 제 색이 있어 그대로다. */
-.erphist-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:9px;padding:10px 12px;margin-bottom:8px;font-size:13px;color:#1e293b}
-.erphist-badge{background:#f8fafc;color:#1e40af;font-size:10.5px;padding:1px 7px;border-radius:6px}
-.erphist-meta{font-size:11.5px;color:#94a3b8;margin-top:4px}
-.erphist-fee{font-size:13px;margin-top:6px;font-weight:700}
-.erphist-brief{font-size:12.5px;color:#475569;margin-top:4px}
 /* ══════ 이 회사에서 한 일 — 깔때기·정렬 (대표 승인 목업 2026-08-24) ══════
-   ⚠ 위 .erphist-card 와 같은 까닭으로 **글자색을 반드시 정한다** — 안 정하면 폰에서
+   ⚠ **글자색을 반드시 정한다**(최종 전체 리뷰 2026-08-16 I5) — 밝은 바탕인데 안 정하면 폰에서
      어두운 팔레트를 물려받아 흰 바탕에 흰 글씨가 된다(2026-08-16 에 겪은 그 일).
    ⚠ 금액은 tabular-nums 로 자릿수를 고정한다. 안 하면 위아래 숫자가 어긋나 눈으로
      견줄 수 없다 — 이 칸의 존재 이유가 「얼마였나」를 보는 것이다. */
@@ -3036,12 +2975,6 @@ body.pc #pcDetail{display:flex}
 #cardsLogin .cl-mark{width:44px;height:44px;border-radius:12px;background:#1e293b;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:800}
 #cardsLogin .cl-name{font-size:18px;font-weight:800;color:#1e293b}
 #cardsLogin .cl-sub{font-size:12px;color:#94a3b8;margin-top:2px}
-#cardsLogin .cl-field{margin-bottom:14px}
-#cardsLogin .cl-field label{display:block;font-size:12.5px;color:#64748b;margin-bottom:6px}
-#cardsLogin .cl-field input{width:100%;padding:11px 14px;border:1px solid #e2e8f0;border-radius:11px;font-size:14px;box-sizing:border-box}
-#cardsLogin .cl-field input:focus{outline:none;border-color:#1e293b}
-#cardsLogin .cl-remember{display:flex;align-items:center;gap:7px;font-size:13px;color:#64748b;margin-bottom:16px;cursor:pointer}
-#cardsLogin .cl-err{background:#e2e8f0;color:#dc2626;font-size:13px;padding:9px 12px;border-radius:10px;margin-bottom:12px}
 #cardsLogin .cl-btn{width:100%;padding:13px;background:#1e293b;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
 #cardsLogin .cl-btn:hover{background:#1e293b}
 #cardsLogin .cl-btn:disabled{opacity:.6;cursor:default}
@@ -3063,9 +2996,6 @@ body.pc #pcDetail{display:flex}
 .sm-sinfo{flex:1;min-width:0}
 .sm-sinfo .n{font-size:14px;font-weight:600;color:#1e293b}
 .sm-sinfo .f{font-size:12px;color:#94a3b8;margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.sm-up{font-size:12px;color:#1e40af;border:1px solid #bfdbfe;border-radius:8px;padding:6px 11px;cursor:pointer;background:#fff;white-space:nowrap;flex-shrink:0}
-.sm-up:hover{background:#e2e8f0}
-.sm-hold{display:flex;align-items:center;gap:8px;padding:12px;border:1px dashed #cbd5e1;border-radius:10px;margin-bottom:16px;color:#94a3b8;font-size:13px}
 .sm-to{display:flex;gap:8px;align-items:center;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:11px 12px;margin-bottom:16px;font-size:13px;color:#64748b}
 .sm-send{width:100%;padding:13px;background:#1e293b;color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer}
 .sm-send:hover{background:#1e293b}
@@ -3871,7 +3801,7 @@ function backfillIdx(){
   }catch(_){}
 }
 
-const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', erpMgr:'', sort:'date', sortKey:null, sortDir:'desc', page:0, pageSize:100, selMode:false, sel:{}, collapsed:{}, colFilter:{}, hiddenCols:{}, colW:{}, colOrder:{}, onlyPhone:false, onlyEmail:false, onlyDup:false, onlyIncomplete:false, onlyPrivate:false, unlocked:{}, items:{}, groups:{}, trash:{}, views:{}, rules:{}, mailBlock:{},
+const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', erpMgr:'', sort:'date', sortKey:null, sortDir:'desc', page:0, pageSize:100, selMode:false, sel:{}, colFilter:{}, hiddenCols:{}, colW:{}, colOrder:{}, onlyPhone:false, onlyEmail:false, onlyDup:false, onlyIncomplete:false, onlyPrivate:false, unlocked:{}, items:{}, groups:{}, trash:{}, views:{}, rules:{}, mailBlock:{},
   isAdmin:false, privOpen:false, priv:{items:{},groups:{},trash:{}},
   /* 자료함 — 찾는 말·메일틀 갈래는 화면에만 쓰고 저장하지 않는다.
      sendLog 는 명함을 열 때만 그 명함 것을 읽어 담는다. */
@@ -3884,7 +3814,7 @@ const state = { tab:'card', group:'all', owner:'all', region:'', erpFilter:'', e
   coPage:0, coPageSize:200, coFTab:'',
   /* 👷 근로자 정보함 (대표 지시 2026-09-01) — 기업 상세와 같은 «화면» 방식이다.
      wkFolder 는 옆줄 갈래(''·group·case·doc), wkQ 는 이 화면의 찾기말. */
-  wkQ:'', wkPick:'', wkFolder:'', wkPage:0,
+  wkQ:'', wkFolder:'', wkPage:0,
   /* wkCase 는 지금 고른 «사건 탭»의 사건 열쇠(빈 값이면 전체), wkTabDone 은
      🚪 끝난 사건 탭을 펼쳐 뒀는지. 둘 다 화면에만 쓰고 저장하지 않는다. */
   wkCase:'', wkTabDone:false,
@@ -7504,7 +7434,7 @@ function mgTableHtml(b){
   return h;
 }
 
-function mgFit(el){ el.style.height='auto'; el.style.height=(el.scrollHeight+2)+'px'; }
+function mgFit(el){ heFit(el); }   /* 같은 일 — 규칙은 heFit 한 곳에 둔다 */
 function mgFitAll(){ const b=$('mgedBody'); if(b) b.querySelectorAll('textarea').forEach(mgFit); }
 
 /* 화면을 다시 그리지 않는다 — 그리면 글 쓰던 자리를 잃는다 */
@@ -11199,49 +11129,6 @@ window.pucardsMoveThumbs = async function(){
   } finally { _quiet = false; render(); }
 };
 
-/* ── 한 번만 실행: 이미 쌓인 원본 사진을 800px 로 줄인다 ──
-   원본은 1600px 로 담겨 있어 장당 약 0.4MB × 4,400장 ≈ 1.7GB — 무료 저장 한도(1GB)를 이것 하나로 넘긴다.
-   파일 창고를 못 쓰는 계정이라(신규 버킷은 유료 전용) 줄이는 것 말고는 길이 없다.
-   ⚠ 화질은 되돌릴 수 없다. 한 장씩 받아 다시 만들어 덮어쓴다.
-   이미 800px 이하면 건드리지 않으므로 중간에 끊겨도 다시 실행하면 이어서 한다. */
-window.pucardsShrinkPhotos = async function(){
-  if(Store.mode!=='firebase'){ console.log('실시간 공유 모드에서만 됩니다'); return; }
-  /* 되돌릴 수 없는 작업이라 한 번 묻는다.
-     유료(Blaze)로 올려 사진을 파일 창고로 옮길 생각이면 **깎을 이유가 없다** —
-     창고로 가면 원본 화질 그대로 옮길 수 있다. 그 전에 깎으면 원본이 영영 사라진다. */
-  const yes = confirm(
-    '명함 사진을 800px(사업자등록증은 1400px)로 줄입니다.\n\n' +
-    '⚠ 화질은 되돌릴 수 없습니다. 원본 1600px 이 사라집니다.\n\n' +
-    '유료 요금제로 올려 파일 창고를 쓸 계획이라면 지금 줄이지 마세요 —\n' +
-    '창고로 옮기면 원본 화질 그대로 용량 문제가 해결됩니다.\n\n' +
-    '그래도 지금 줄이시겠습니까?');
-  if(!yes){ console.log('취소했습니다 — 사진은 그대로입니다.'); return; }
-  const ids = [];
-  Object.keys(state.items).forEach(id=>{ ids.push(id); ids.push(id+'_b'); });
-  console.log(`[기업정보함] 사진 줄이기 시작 — 확인할 자리 ${ids.length}곳. 오래 걸립니다(수 분). 창을 닫지 마세요.`);
-  let looked=0, shrunk=0, before=0, after=0, err=0;
-  for(const pid of ids){
-    looked++;
-    try{
-      const snap = await Store.db.ref(`${DB_ROOT}/photos/${pid}`).once('value');
-      const cur = snap.val();
-      if(!cur) continue;
-      const small = await shrinkForStore(cur, photoKeepMax(pid));   /* 사업자등록증은 덜 줄인다 */
-      if(small.length >= cur.length) continue;          /* 이미 작다 — 쓰지 않는다 */
-      await Store.db.ref(`${DB_ROOT}/photos/${pid}`).set(small);
-      Store.photoCache[pid] = small;
-      shrunk++; before += cur.length; after += small.length;
-    }catch(e){ err++; }
-    if(looked % 200 === 0){
-      console.log(`  ${looked} / ${ids.length} 확인 · ${shrunk}장 줄임 · ` +
-        `${(before/1048576).toFixed(0)}MB → ${(after/1048576).toFixed(0)}MB`);
-      toast(`사진 줄이는 중… ${looked}/${ids.length}`, 4000);
-    }
-  }
-  const saved = ((before-after)/1048576).toFixed(0);
-  console.log(`[기업정보함] 끝 — ${shrunk}장을 줄여 약 ${saved}MB 를 비웠습니다.` + (err?` (실패 ${err}건)`:''));
-  toast(`사진 ${shrunk}장 줄임 — 약 ${saved}MB 비움`);
-};
 
 /* ── ✎ 일괄 선택 모드 ── */
 /* ⚠ Task 5 리뷰(2026-08-15) — #subbar 의 「✎ 편집」 단추는 기업 상세 화면에서도
@@ -11955,12 +11842,6 @@ function enhance(dataUrl){
 const PHOTO_KEEP_MAX = 800;         // 명함
 const PHOTO_KEEP_MAX_DOC = 1400;    // 사업자등록증 등 A4 서류
 const PHOTO_KEEP_Q = 0.8;
-/* 그 사진이 붙은 항목이 사업자등록증이면 큰 쪽을 쓴다. id 뒤의 '_b'(뒷면)는 떼고 본다. */
-function photoKeepMax(photoId){
-  const base = String(photoId||'').replace(/_b$/, '');
-  const it = (typeof state !== 'undefined' && state.items) ? state.items[base] : null;
-  return (it && it.kind === 'biz') ? PHOTO_KEEP_MAX_DOC : PHOTO_KEEP_MAX;
-}
 function shrinkForStore(dataUrl, max){
   const MAX = max || PHOTO_KEEP_MAX;
   return new Promise(res=>{
@@ -25482,8 +25363,6 @@ function loadColPrefs(){
     if(p.colOrder) state.colOrder=p.colOrder;
   }catch(e){}
 }
-function toggleCollapse(id){ state.collapsed[id]=!state.collapsed[id]; render(); }
-
 /* 새 폴더 만들기 — 메일함식 팝업 (부모 지정 가능) */
 function openFolderDialog(parent){
   $('folderDlg').innerHTML = `
@@ -25500,7 +25379,6 @@ function openFolderDialog(parent){
 function confirmNewFolder(parent){
   const name=$('newFolderName').value.trim(); if(!name) return toast('폴더 이름을 입력하세요');
   Store.putGroup({id:uid(), name, parent:parent||'', kind:state.tab, order:Date.now()});
-  if(parent) state.collapsed[parent]=false;
   $('folderDlgBg').classList.remove('open');
   toast('폴더를 만들었습니다');
 }
@@ -34675,7 +34553,7 @@ const WK_DOC_ICON = { idcard:'🪪', resident:'📃', mandate:'✍', consent:'�
   wcontract:'📝' };
 
 function enterWkView(){
-  state.view='wk'; state.wkPick=''; state.wkPage=0;
+  state.view='wk'; state.wkPage=0;
   _wkRrnOpen = {};                       /* 화면을 나서면 드러낸 주민번호는 다시 가려진다 */
   render();
   loadWkInfo();
@@ -34937,7 +34815,6 @@ function wkDetailHtml(p){
 
 function openWkDetail(key){
   const p = wkList().filter(x=>x.key===key)[0]; if(!p) return;
-  state.wkPick = key;
   $('pcDetail').innerHTML = `
     <div class="pdhead"><span class="ttl">👷 ${esc(p.name)}</span>
       <button class="x" onclick="closeWkDetail()">✕</button></div>
@@ -34945,7 +34822,7 @@ function openWkDetail(key){
   $('pcDetail').classList.add('open');
   const ov=$('pcDetailOverlay'); if(ov) ov.style.display='block';
 }
-function closeWkDetail(){ state.wkPick=''; closeDetail(); }
+function closeWkDetail(){ closeDetail(); }
 
 function wkHeadHtml(){
   const n = wkVisible().length;

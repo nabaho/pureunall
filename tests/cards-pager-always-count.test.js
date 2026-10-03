@@ -159,11 +159,14 @@ test('고른 줄 도구줄이 마지막 줄을 덮지 않는다 — 흐름 안�
 
 /* ── 삭제 단추 모양이 도구줄 «안»으로 한정돼 있다 ── */
 
-test('삭제 단추 모양이 도구줄 안으로 한정돼 있다', () => {
-  /* ⚠ .coselbar 없이 .codel 만 두면 다른 화면의 같은 이름까지 물든다.
-       실제로 선택자 중간에 주석이 끼어들어 .coclear 가 밖으로 새 있었다. */
-  assert.ok(HTML.includes('.coselbar .codel{'), '도구줄 안으로 한정해야 한다');
-  assert.ok(HTML.includes('.coselbar .coclear{'), '.coclear 도 한정돼 있어야 한다');
+test('삭제 모양이 제 자리 안으로 한정돼 있다 — 밖으로 안 샌다', () => {
+  /* ⚠ 자리 없이 이름표만 두면 다른 화면의 같은 이름까지 물든다.
+       실제로 선택자 중간에 주석이 끼어들어 .coclear 가 밖으로 새 있었다.
+     ⚠ 2026-09-27 다시 겨눔: 삭제는 ⋯ 메뉴 줄(#folderMenu .fmi.danger)로 옮겨졌고,
+       도구줄의 .codel·.coclear 모양은 붙을 단추가 없어 걷었다. 예전 검사는 그 빈 규칙이
+       «있는지»를 봤다 — 없앤 단추의 모양을 지키고 있었던 셈이다. */
+  assert.ok(HTML.includes('#folderMenu .fmi.danger{'), '메뉴 안으로 한정해야 한다');
+  assert.ok(!/^\.danger\{/m.test(HTML), '밖으로 새는 .danger 가 있으면 안 된다 — 온 화면이 빨개진다');
   assert.ok(!/^\.codel\{/m.test(HTML), '밖으로 새는 .codel 이 있으면 안 된다');
   assert.ok(!/^\.coclear\{/m.test(HTML), '밖으로 새는 .coclear 가 있으면 안 된다');
 });
