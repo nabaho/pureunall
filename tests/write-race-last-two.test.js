@@ -134,3 +134,47 @@ test('⑦★ 기록은 «덮어쓴 뒤»에 남긴다 — 막혔는데 기록만
   assert.equal(성공.기록.length, 1, '★ 덮어썼는데 되돌릴 기록이 안 남는다');
   assert.match(성공.기록[0].path, /homepage\/history\//);
 });
+
+/* ══════ 2026-10-03 검토 ⑤ — 막이의 구멍 둘 ══════ */
+test('⑧★★ 내 사본의 시각이 0 이어도 «서버가 바뀌었으면» 막는다', async () => {
+  /* 처음 들여온 사람·새로 넣은 사람·되돌린 직후는 사본에 시각이 없었다.
+     전에는 「바탕 &&」 때문에 그때 검사를 통째로 건너뛰어 남의 고침을 덮었다. */
+  const r = await 저장해보기({ updatedAt: 2000, updatedBy: '최기운' }, 0);
+  assert.equal(r.ok, false, '★★ 사본 시각이 0 이라고 검사를 건너뛰었다 — 남의 고침을 덮는다');
+  assert.equal(r.쓴것.length, 0);
+});
+
+test('⑨★★ 남의 PC 시계가 늦어도 막는다 — «더 새로운가»가 아니라 «달라졌나»를 본다', async () => {
+  const r = await 저장해보기({ updatedAt: 900, updatedBy: '최기운' }, 1000);
+  assert.equal(r.ok, false, '★★ 서버 시각이 내 것보다 «작다»고 덮었다 — 시계가 늦은 PC 의 고침이 사라진다');
+});
+
+test('⑪★★ 저장을 부르는 곳은 모두 «돌려준 판»을 화면 사본에 담는다', () => {
+  /* 부르는 쪽이 Date.now() 로 따로 찍거나 시각 없이 담으면, 다음 저장의 「달라졌나」가
+     제 고침을 남의 것으로 보고 막는다(또는 시각 0 으로 남아 검사가 헐거워진다). */
+  const bare = stripJs(HOME);
+  const 부름 = bare.split('\n').filter(l => /saveRecord\(/.test(l) && !/function saveRecord\(/.test(l));
+  assert.ok(부름.length >= 5, '★ 저장을 부르는 곳을 못 찾았다(' + 부름.length + ')');
+  부름.forEach(l => assert.match(l, /=\s*await saveRecord\(/,
+    '★★ 돌려준 판을 안 담는 곳이 있다: ' + l.trim()));
+});
+
+test('⑩★ 저장은 «실제로 쓴 판»을 돌려준다 — 화면 사본에 그대로 담아야 다음 저장이 안 막힌다', async () => {
+  const 쓴것 = [];
+  const ctx = {
+    console, Object, Number, Date, Error, Promise, String,
+    App: { members: { m1: { updatedAt: 1000 } }, pages: {} },
+    currentUserName: () => '권형하', histStamp: () => 'T1',
+    db: { ref() { return {
+      transaction(fn) { const out = fn({ updatedAt: 1000 }); 쓴것.push(out);
+        return Promise.resolve({ committed: true, snapshot: { val: () => out } }); },
+      set() { return Promise.resolve(); }
+    }; } }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(SAVE, ctx);
+  const 돌려준것 = await ctx.saveRecord('member', 'm1', { text: '새 글' });
+  assert.equal(돌려준것.updatedAt, 쓴것[0].updatedAt,
+    '★★ 돌려준 시각이 서버에 쓴 시각과 다르다 — 다음 저장이 「남이 고쳤다」로 막힌다');
+  assert.equal(돌려준것.text, '새 글');
+});

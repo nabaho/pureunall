@@ -1421,6 +1421,10 @@ function loadAll() {
     App.loading = false;
     App.pick = firstPickOf(App.group);
     loadDraft();
+    /* ★ 배포 뒤 저절로 새로 열렸으면, 저장 안 한 고침을 되살린다(바탕이 그대로일 때만) */
+    if (이어쓰기되살리기()) {
+      setTimeout(() => toast('저장하지 않은 고침을 되살렸습니다 — 「저장」을 눌러야 남습니다.'), 0);
+    }
     /* ⚠ 여기서는 「저절로 읽기」를 걸지 «않는다» — 첫 화면은 구성원 소개라 읽을 쪽이 없고,
        이 함수를 떼어다 돌리는 검사 넷이 서버를 부를 수 없어 한꺼번에 깨진다.
        주요업무로 가는 길은 App.go 이고, 거기에 걸려 있다. */
@@ -2225,6 +2229,59 @@ function leaveDraft() {
     '지금 고친 내용은 사라집니다. 버리고 옮길까요?', '버리고 옮기기');
 }
 
+/* ══════ 저장 안 한 고침을 «새로 열려도» 잇는다 (2026-10-03 검토 ⑥) ══════
+   배포가 하루 열다섯 번쯤 있고, 그때마다 js/pu-version.js 가 30초 손을 놓은 탭을 새로 연다.
+   고치다 전화를 받고 돌아오면 쓰던 경력·사진 안내·쪽에서 고친 줄이 통째로 사라져 있었다.
+   ★ pu-version 을 붙잡지 않는다 — 스물두 앱이 싣고, 「저장 중」 신호는 공용 스위치라 붙잡기로
+     못 쓴다. 대신 «끊겨도 이어지게» 한다(사진첩 판독과 같은 길).
+   ★ 이 탭 안에만 둔다(sessionStorage) — 다른 탭·다른 PC 로 새지 않는다.
+   ⚠ 되살릴 때 «그 사이 서버가 바뀌었으면» 되살리지 않는다. 바뀐 위에 옛 초안을 얹으면
+     저장 막이(saveRecord)가 새 바탕을 기준으로 보아 «남의 고침을 덮는» 길이 된다. */
+const 이어쓰기열쇠 = 'pu-home:unsaved';
+function 이어쓰기남기기() {
+  try {
+    const 고친줄 = {};
+    Object.keys(App.pageFix || {}).forEach(m => {
+      if (Object.keys(App.pageFix[m] || {}).length) 고친줄[m] = App.pageFix[m];
+    });
+    const d = (App.dirty && App.draft && App.draft.kind !== 'partner') ? App.draft : null;
+    if (!d && !Object.keys(고친줄).length) { sessionStorage.removeItem(이어쓰기열쇠); return; }
+    const 원본 = d ? (((d.kind === 'member') ? App.members : App.pages) || {})[d.key] : null;
+    sessionStorage.setItem(이어쓰기열쇠, JSON.stringify({
+      at: Date.now(), group: App.group, filter: App.filter || '', 초안: d,
+      바탕: 원본 ? Number(원본.updatedAt || 0) : 0, 있었나: !!원본, 고친줄: 고친줄 }));
+  } catch (e) { /* 저장소를 못 쓰는 창(사생활 모드 등)이면 예전처럼 사라질 뿐이다 */ }
+}
+window.addEventListener('pagehide', 이어쓰기남기기);
+
+/* 자료를 다 읽은 뒤(loadAll) 한 번 부른다. 되살렸으면 참. */
+function 이어쓰기되살리기() {
+  let s = null;
+  try { s = JSON.parse(sessionStorage.getItem(이어쓰기열쇠) || 'null'); sessionStorage.removeItem(이어쓰기열쇠); }
+  catch (e) { return false; }
+  if (!s || !(Date.now() - Number(s.at || 0) < 12 * 3600 * 1000)) return false;
+  /* 쪽에서 고친 줄 — 열쇠에 «원래 글자와 몇 번째»가 들어 있어, 쪽을 다시 읽을 때
+     keepPageHtml 이 이제 없는 자리의 고침을 스스로 버린다. 그대로 되돌려 놓아도 된다. */
+  Object.keys(s.고친줄 || {}).forEach(m => {
+    App.pageFix[m] = Object.assign({}, s.고친줄[m], App.pageFix[m] || {});
+  });
+  const d = s.초안;
+  if (!d || !d.key) return false;
+  const 원본 = (((d.kind === 'member') ? App.members : App.pages) || {})[d.key];
+  const 이름 = d.name || PAGE_LABEL[d.key] || d.key;
+  if ((!!원본) !== !!s.있었나 || Number((원본 || {}).updatedAt || 0) !== Number(s.바탕 || 0)) {
+    App.saveErr = '저장하지 않은 고침(' + 이름 + ')이 있었는데, 그 사이 다른 곳에서 이 줄이 고쳐져 '
+      + '되살리지 않았습니다 — 그 고침을 덮지 않으려고요. 지금 내용을 보고 다시 고쳐 주십시오.';
+    return false;
+  }
+  App.group = s.group || App.group;
+  App.filter = s.filter || '';
+  App.pick = d.key;
+  App.draft = d;
+  App.dirty = true;
+  return true;
+}
+
 function fieldEdit(name, value) {
   if (!App.draft) return;
   App.draft[name] = value;
@@ -2462,17 +2519,25 @@ async function saveRecord(kind, key, next) {
        그러니 그 updatedAt 이 곧 「내가 고치기 시작한 판」이다 — 새로 만들 것이 없다.
      ⚠ 막기만 하고 말없이 끝내지 않는다. 무엇이 일어났는지 말해야 사람이 손쓸 수 있다. */
   const 바탕 = Number((((kind === 'member') ? App.members : App.pages)[key] || {}).updatedAt || 0);
-  let 남이고침 = null, 이전 = null;
+  let 남이고침 = null, 이전 = null, 쓴것 = null;
   const r = await ref.transaction(cur => {
-    if (cur && 바탕 && Number(cur.updatedAt || 0) > 바탕) {
+    /* ⚠★ 「서버가 더 새로운가(>)」가 아니라 «내가 본 판과 다른가(!==)»로 본다 (2026-10-03 검토 ⑤).
+         ① 「바탕 &&」 때문에 수정 시각이 0 인 줄(처음 들여온 사람·새로 넣은 사람·되돌린 직후)은
+            검사를 «통째로» 건너뛰었다.
+         ② 시각은 PC 마다 제 시계로 찍는다 — 남의 PC 시계가 늦으면 「더 새로운가」가 거짓이 된다.
+         「달라졌나」는 시계와 상관없다. 그래서 아래 쓴것(실제로 쓴 판)을 화면 사본에 그대로 담는다.
+       ⚠ cur 가 null 인 첫 부름(찬 자리)에서는 접지 않는다 — 서버에 묻지도 않고 끝난다. */
+    if (cur && Number(cur.updatedAt || 0) !== 바탕) {
       남이고침 = cur;            // 그 사이 누군가 고쳤다 — 덮지 않는다
       return;
     }
+    남이고침 = null;
     /* ★ 「고치기 전」은 «덮기 직전의 서버 값»이다. 화면이 들고 있던 사본으로 적으면,
        사본이 낡은 날 기록에 엉뚱한 판이 「고치기 전」으로 남는다.
        ⚠ 트랜잭션 몸통은 여러 번 불릴 수 있다 — 마지막 것이 실제로 덮은 그 판이다. */
     이전 = cur;
-    return Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+    쓴것 = Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+    return 쓴것;
   });
   if (남이고침 || (r && r.committed === false)) {
     const 누가 = (남이고침 && 남이고침.updatedBy) || '다른 사람';
@@ -2487,7 +2552,9 @@ async function saveRecord(kind, key, next) {
     await db.ref('homepage/history/' + histKey + '/' + histStamp())
       .set({ before: 이전, updatedBy: currentUserName() }).catch(() => {});
   }
-  return next;
+  /* ★ «실제로 쓴 판»을 돌려준다 — 부르는 쪽은 이것을 화면 사본에 그대로 담는다.
+       Date.now() 로 따로 찍으면 서버 값과 몇 ms 어긋나, 다음 저장이 「남이 고쳤다」로 막힌다. */
+  return 쓴것 || Object.assign({}, next);
 }
 
 async function saveDraft() {
@@ -2507,18 +2574,16 @@ async function saveDraft() {
          경력 한 줄 고칠 때마다 예외가 조용히 사라지고, 퇴사 경고가 다시 쏟아진다. */
       const kept = (App.members[d.key] || {}).keepOnSite;
       if (kept) next.keepOnSite = kept;
-      await saveRecord('member', d.key, next);
-      App.members[d.key] = Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+      App.members[d.key] = await saveRecord('member', d.key, next);
     } else {
       const next = { text: d.text };
-      await saveRecord('page', d.key, next);
-      App.pages[d.key] = Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+      App.pages[d.key] = await saveRecord('page', d.key, next);
     }
     App.dirty = false;
     /* 고친 뒤에는 홈페이지와 달라졌다 — 「같음」 딱지를 그대로 두면 안 올린 것을 올린 줄 안다. */
     markChanged(d.kind, d.key);
     App.render();
-    toast('저장했습니다. 홈페이지는 붙여넣어야 바뀝니다.');
+    toast('저장했습니다. 홈페이지는 「지금 홈페이지에 고치기」를 눌러야 바뀝니다.');
   } catch (e) {
     console.warn('[저장]', e);
     await say('저장하지 못했습니다', esc((e && e.message) || e));
@@ -2672,8 +2737,7 @@ async function addFromRoster(name, title) {
         intro: '', srl: '', careers: [], duties: [] };
   const key = 'new-' + Date.now();
   try {
-    await saveRecord('member', key, rec);
-    App.members[key] = Object.assign({}, rec);
+    App.members[key] = await saveRecord('member', key, rec);
     App.group = 'members'; App.pick = key;
     closeModal();
     loadDraft(); App.render();
@@ -2702,8 +2766,7 @@ async function addMemberByHand() {
   try {
     const rec = { name: name, position1: '', position2: '',
                   intro: '', srl: '', careers: [], duties: [] };
-    await saveRecord('member', key, rec);
-    App.members[key] = Object.assign({}, rec);
+    App.members[key] = await saveRecord('member', key, rec);
     App.group = 'members'; App.pick = key;
     closeModal();
     loadDraft(); App.render();
@@ -2733,8 +2796,7 @@ async function writeKeepOnSite(key, mark) {
   delete next.updatedAt; delete next.updatedBy;   // saveRecord 가 새로 찍는다
   if (mark) next.keepOnSite = mark; else delete next.keepOnSite;
   try {
-    await saveRecord('member', key, next);
-    App.members[key] = Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+    App.members[key] = await saveRecord('member', key, next);
     App.render();
     toast(mark
       ? '홈페이지에 남기기로 표시했습니다. 「대조」를 누르면 퇴사 딱지를 달지 않습니다.'
@@ -2796,6 +2858,9 @@ async function checkHomepage() {
   if (App.checking) return;
   App.checking = true; App.checkMsg = ''; App.checkBad = false;
   App.render();
+  /* ★ 읽기 «전»에 찍는다 (2026-10-03 검토 ③) — 이 대조가 «알고 시작한» 「안 올라감」 딱지들.
+       전에는 끝난 뒤(applyStatus)에 시각을 찍어, 읽는 동안 남이 찍은 딱지까지 「같음」으로 덮었다. */
+  const 시작 = { at: Date.now(), 본것: 본딱지(App.check) };
   try {
     const token = await firebase.auth().currentUser.getIdToken();
     const ask = async (path) => {
@@ -2838,7 +2903,7 @@ async function checkHomepage() {
       keepPageHtml(mid, html);
     }
 
-    await applyStatus(live, livePages, failed);
+    await applyStatus(live, livePages, failed, 시작);
     App.checkBad = failed.length > 0;
     App.checkMsg = failed.length
       ? ('일부 쪽을 읽지 못했습니다(' + failed.map(m => PAGE_LABEL[m] || m).join(', ') + ') — 그 쪽은 지난 결과를 그대로 둡니다')
@@ -2871,8 +2936,23 @@ function showCheckFailed(msg) {
   // 자료도 지난 대조 결과도 건드리지 않는다.
 }
 
+/* 대조가 «시작할 때» 이 화면이 알던 「안 올라감」 딱지 — 「갈래/열쇠」 → 찍힌 시각.
+   ★ 시계로 견주지 않으려고 둔다. 끝날 때 서버에 있는 「안 올라감」 가운데 여기 «똑같이» 없는 것은
+     이 대조가 못 본 고침이다 — 그것은 덮지 않는다. PC 마다 시계가 달라도 어긋나지 않는다. */
+function 본딱지(check) {
+  const 본것 = {};
+  ['members', 'pages'].forEach(kind => {
+    const 칸 = (check && check[kind]) || {};
+    Object.keys(칸).forEach(k => {
+      const e = 칸[k];
+      if (e && e.status === 'pending') 본것[kind + '/' + k] = (typeof e.at === 'number') ? e.at : null;
+    });
+  });
+  return 본것;
+}
+
 /* 딱지 붙이기 — 못 읽은 쪽은 지난 결과를 그대로 물려받는다 */
-async function applyStatus(live, livePages, failed) {
+async function applyStatus(live, livePages, failed, 시작) {
   /* ★ srl(홈페이지 글 번호)을 «그대로 함께» 넘긴다. 짝짓기는 부품(PuHomeDiff)이
      글 번호로 하고, 돌려주는 열쇠는 우리 RTDB 열쇠 그대로다 — 편집·저장이 그 열쇠를 쓴다.
      key 를 뒤에 두는 것도 일부러다: 자료에 key 칸이 섞여 들어와도 우리 열쇠를 덮지 못한다. */
@@ -2880,7 +2960,10 @@ async function applyStatus(live, livePages, failed) {
   const list = PuHomeDiff.memberStatus(ours, live, App.staff, todayString());
 
   const prev = App.check || {};
-  const next = { at: Date.now(), members: {}, pages: {}, duplicates: [], leftovers: {} };
+  /* ★ at 은 이 대조가 «시작한» 시각이다 — 아래 주석이 말하는 그대로. 부르는 쪽이 안 넘기면(검사 등)
+       지금 시각으로 둔다. */
+  const next = { at: (시작 && 시작.at) || Date.now(), members: {}, pages: {}, duplicates: [], leftovers: {} };
+  const 본것 = (시작 && 시작.본것) || {};
 
   /* fields — «어느 칸이» 다른지. 채우기 단추는 경력사항만 채우므로, 직책이 다르면
      단추를 눌러도 딱지가 안 바뀐다. 그 사실을 화면이 말할 수 있어야 한다. */
@@ -2945,7 +3028,13 @@ async function applyStatus(live, livePages, failed) {
         const 옛 = cur[kind] || {};
         Object.keys(옛).forEach(k => {
           const e = 옛[k];
-          if (e && e.status === 'pending' && typeof e.at === 'number' && e.at > next.at) {
+          if (!e || e.status !== 'pending') return;
+          /* ★ «시작할 때 본 그 딱지»가 아니면 살린다 (2026-10-03 검토 ③).
+               전에는 「e.at > next.at」 으로 시각을 견줬다 — 그런데 next.at 이 끝난 뒤에 찍혀
+               읽는 동안 찍힌 딱지를 다 지웠고, 남의 PC 시계가 늦어도 지웠다. */
+          const 시작때 = 본것[kind + '/' + k];
+          const 보던것 = 시작때 !== undefined && 시작때 === (typeof e.at === 'number' ? e.at : null);
+          if (!보던것) {
             if (!next[kind]) next[kind] = {};
             next[kind][k] = e;
           }
@@ -3197,6 +3286,14 @@ async function 홈페이지바로고치기() {
       '이 구성원은 홈페이지에 아직 글이 없습니다. <b>글 번호</b> 칸에 번호를 적어 주세요.');
     return;
   }
+  /* ★ 단추를 그릴 때만 잠그면 모자란다 — 글 번호 칸을 고쳐도 화면을 다시 안 그린다.
+       서버로 보내기 «직전»에 다시 본다 (2026-10-03 검토 ⑦). */
+  const 겹친사람 = srlConflict(d.key, srl);
+  if (겹친사람.length) {
+    await say('고치지 않았습니다', '글 번호 ' + srl + ' 을(를) <b>' + esc(겹친사람.join(', '))
+      + '</b> 님도 씁니다 — 남의 글을 덮을 수 있습니다. 글 번호부터 바로잡아 주십시오.');
+    return;
+  }
   if (App.dirty && !await askYes('저장하지 않은 것이 있습니다',
     '지금 화면에 있는 내용으로 홈페이지를 고칩니다. 그래도 할까요?', '그대로 고치기')) return;
 
@@ -3249,25 +3346,41 @@ window.홈페이지바로고치기 = 홈페이지바로고치기;
    ★ 여기서도 두 걸음이다 — 누구를 내리는지 먼저 보여 주고, 「예」 해야 보낸다.
    ★ 한 사람이 막혀도 나머지는 계속 간다. 그리고 «누가 됐고 누가 안 됐는지»를
      끝에 다 적는다 — 조용히 삼키면 안 내려간 사람이 그대로 남는다. */
-function 내릴사람들() {
+/* ★ 「내릴 것」을 «보낼 사람»과 «건너뛸 사람»으로 가른다 (2026-10-03 검토 ①).
+     대조 결과(App.check)는 «그때» 찍힌 것이다. 그 뒤에 「남기기」로 바꾼 사람도 결과에는
+     아직 「내릴 것」으로 남아 있어, 대조 없이 누르면 그분 글이 휴지통으로 갔다.
+     목록(memberRows)은 이 조합을 이미 «지난 딱지»로 거른다 — 내리는 길도 같은 규칙을 쓴다.
+   ★ 글 번호를 다른 사람도 쓰면 안 보낸다 — 그 번호의 글은 «남의 글»일 수 있다. */
+function 내릴사람갈래() {
   const 잡힌것 = ((App.check && App.check.members) || {});
-  return Object.keys(잡힌것)
+  const 갈래 = { 갈것: [], 남김: [], 번호없음: [], 겹침: [] };
+  Object.keys(잡힌것)
     .filter(k => 잡힌것[k] && 잡힌것[k].status === 'toRemove')
-    .map(k => ({ key: k, name: ((App.members || {})[k] || {}).name || k,
-                 srl: Number(((App.members || {})[k] || {}).srl || 0) }))
-    .filter(x => x.srl > 0);
+    .forEach(k => {
+      const rec = (App.members || {})[k] || {};
+      const x = { key: k, name: rec.name || k, srl: Number(rec.srl || 0) };
+      if (keptOf(rec)) 갈래.남김.push(x);
+      else if (!(x.srl > 0)) 갈래.번호없음.push(x);
+      else if (srlConflict(k, x.srl).length) 갈래.겹침.push(x);
+      else 갈래.갈것.push(x);
+    });
+  return 갈래;
 }
+function 내릴사람들() { return 내릴사람갈래().갈것; }
 
 async function 퇴사자한번에내리기() {
-  const 사람 = 내릴사람들();
+  const 갈래 = 내릴사람갈래();
+  const 사람 = 갈래.갈것;
+  const 건너뜀 = (목록, 까닭) => 목록.length
+    ? '<div style="margin-top:6px">※ ' + esc(목록.map(x => x.name).join(', ')) + ' — ' + 까닭 + '</div>' : '';
+  const 건너뜀말 = 건너뜀(갈래.남김, '«홈페이지에 남기기»로 두셔서 건너뜁니다.')
+    + 건너뜀(갈래.번호없음, '글 번호가 없어 건너뜁니다 — 홈페이지 글과 이어져 있지 않습니다.')
+    + 건너뜀(갈래.겹침, '같은 글 번호를 다른 사람도 써서 건너뜁니다 — 남의 글이 내려갈 수 있습니다.');
   if (!사람.length) {
     await say('내릴 사람이 없습니다',
-      '먼저 <b>「지금 홈페이지」 대조</b>를 눌러 누가 남아 있는지 확인해 주십시오.');
+      (건너뜀말 || '먼저 <b>「지금 홈페이지」 대조</b>를 눌러 누가 남아 있는지 확인해 주십시오.'));
     return;
   }
-  const 번호없음 = Object.keys(((App.check && App.check.members) || {}))
-    .filter(k => (((App.check.members) || {})[k] || {}).status === 'toRemove')
-    .length - 사람.length;
 
   if (!await askYes('이 ' + 사람.length + '명을 홈페이지에서 내립니다',
     '<ul style="margin:6px 0 0;padding-left:18px">'
@@ -3276,8 +3389,7 @@ async function 퇴사자한번에내리기() {
          사람에게 «있는 그대로» 말한다. 「비공개로 바꿉니다」라고 하면 거짓말이 된다. */
     + '<div style="margin-top:8px"><b>지우지 않습니다 — 홈페이지 «휴지통»으로 옮깁니다.</b> '
     + '글도 얼굴 사진도 경력도 그대로 남고, 라이믹스 관리자 휴지통에서 되살릴 수 있습니다.</div>'
-    + (번호없음 ? '<div style="margin-top:6px">※ 글 번호가 없는 ' + 번호없음
-        + '명은 건너뜁니다 — 홈페이지 글과 이어져 있지 않습니다.</div>' : ''),
+    + 건너뜀말,
     '내리기')) return;
 
   const 됨 = [], 안됨 = [];
@@ -3327,6 +3439,19 @@ async function 한사람내리기(key) {
   if (!srl) {
     await say('홈페이지 글 번호가 없습니다',
       esc(이름) + ' 님은 홈페이지 글과 이어져 있지 않습니다. <b>글 번호</b> 칸을 채워 주십시오.');
+    return;
+  }
+  /* ★ 단추를 감추는 것만으로 막지 않는다 — 화면이 낡았거나 다른 길로 불려도 여기서 멈춘다
+       (2026-10-03 검토 ①·⑦). 「남기기」는 사람이 «안 내린다»고 정한 것이다. */
+  if (keptOf(rec)) {
+    await say('내리지 않았습니다', esc(이름) + ' 님은 <b>홈페이지에 남기기</b>로 두셨습니다. '
+      + '내리시려면 먼저 ⋯ 의 「퇴사 경고 되살리기」를 누르십시오.');
+    return;
+  }
+  const 겹친사람 = srlConflict(key, srl);
+  if (겹친사람.length) {
+    await say('내리지 않았습니다', '글 번호 ' + srl + ' 을(를) <b>' + esc(겹친사람.join(', '))
+      + '</b> 님도 씁니다 — 남의 글이 내려갈 수 있습니다. 글 번호부터 바로잡아 주십시오.');
     return;
   }
   if (!await askYes(esc(이름) + ' 님을 홈페이지에서 내립니다',
@@ -3543,6 +3668,13 @@ async function 사진넣기() {
     return;
   }
   const 보낼것 = { 사진: { 종류: 고른것.종류, 바이트64: 고른것.바이트64 } };
+  /* ★ 보내기 직전에 글 번호 겹침을 다시 본다 — 겹치면 남의 글 사진이 바뀐다 (2026-10-03 검토 ⑦) */
+  const 겹친사람 = srlConflict(d.key, d.srl);
+  if (겹친사람.length) {
+    await say('사진을 넣지 않았습니다', '글 번호 ' + esc(d.srl) + ' 을(를) <b>' + esc(겹친사람.join(', '))
+      + '</b> 님도 씁니다 — 남의 사진이 바뀔 수 있습니다. 글 번호부터 바로잡아 주십시오.');
+    return;
+  }
   try {
     const 봄 = await 서버에게물어보기('보기', Number(d.srl), 보낼것);
     if (!봄.ok) { await say('사진을 넣지 않았습니다', 걸린것글자(봄)); return; }
@@ -3759,6 +3891,12 @@ async function 사진여럿보내기() {
   const 됨 = [], 안됨 = [];
   for (const r of 갈것) {
     const p = 사람들.filter(x => x.key === r.주인)[0];
+    /* ★ 글 번호를 다른 사람도 쓰면 건너뛴다 — 남의 사진이 바뀐다 (2026-10-03 검토 ⑦) */
+    const 겹친사람 = srlConflict(p.key, p.srl);
+    if (겹친사람.length) {
+      안됨.push(p.name + ' — 같은 글 번호를 ' + 겹친사람.join(', ') + ' 님도 써서 건너뜀');
+      continue;
+    }
     try {
       const 답 = await 서버에게물어보기('쓰기', p.srl,
         { 사진: { 종류: r.종류, 바이트64: r.바이트64 } });
@@ -3870,7 +4008,7 @@ function openHistory() {
     const ts = Object.keys(v).sort((a, b) => (histTs(b) - histTs(a)) || String(b).localeCompare(String(a)));
     let h = '<h2>되돌리기 — ' + esc(d.kind === 'member' ? d.name : (PAGE_LABEL[d.key] || d.key)) + '</h2>';
     h += '<div class="bar info">고른 시점의 내용을 <b>통합시스템 자료로만</b> 되살립니다. '
-      + '홈페이지는 그대로입니다 — 되살린 뒤 <b>다시 붙여넣어야</b> 홈페이지가 바뀝니다.<br>'
+      + '홈페이지는 그대로입니다 — 되살린 뒤 <b>「지금 홈페이지에 고치기」</b>를 눌러야 홈페이지가 바뀝니다.<br>'
       + '되살리기도 저장이라 <b>되살리기 직전 값도 이력에 남습니다.</b></div>';
     if (!ts.length) {
       h += '<div class="empty">남아 있는 이전 내용이 없습니다. 한 번도 덮어쓴 적이 없습니다.</div>';
@@ -3911,13 +4049,17 @@ const Log = { open: false, rows: null, err: '', kind: '', q: '', 더: 0 };
 /* 한 칸이 어떻게 불리는가 — 자료 이름이 그대로 뜨면 사람이 못 읽는다 */
 const LOG_FIELD = {
   name: '이름', position1: '직책1', position2: '직책2', intro: '메인 설명',
-  srl: '글 번호', careers: '경력사항', duties: '담당 업무', mkind: '구분',
+  /* ⚠ 자료 칸 이름은 «kind» 다 (saveDraft 가 kind 로 저장한다). 화면 초안은 mkind 라 부르지만
+       기록은 저장된 자료를 견준다 — mkind 로 적어 두어 노무사↔직원 바뀜이 기록에 안 떴다
+       (2026-10-03 검토 ④). */
+  srl: '글 번호', careers: '경력사항', duties: '담당 업무', kind: '구분',
   offSite: '새 홈페이지에', keepOnSite: '퇴사 경고', text: '대조 기준 글자'
 };
 /* 보기 좋은 값으로 — true/false 가 그대로 뜨면 무슨 말인지 모른다 */
 function logVal(칸, v) {
   if (v === undefined || v === null || v === '') return '(비어 있음)';
   if (칸 === 'offSite') return v ? '빼기' : '넣기';
+  if (칸 === 'kind') return (MEMBER_KINDS.find(m => m.key === v) || {}).label || String(v);
   if (칸 === 'keepOnSite') return (v && v.why) ? ('끔 — ' + v.why) : (v ? '끔' : '켬');
   if (Array.isArray(v)) return v.length + '줄';
   return String(v);
@@ -4120,11 +4262,33 @@ function renderChangeLog() {
   openModal(h, true);
 }
 
+/* 되살릴 구성원 자료를 짓는다 (2026-10-03 검토 ② — 전에는 여섯 칸만 새로 지어 «통째로» 덮어,
+   담당 업무·구분·「새 홈페이지에서 빼기」가 사라졌다).
+   ★ «지금 자료»에서 출발한다 — 되살리기가 모르는 칸은 하나도 안 잃는다.
+   ★ 내용은 그때 것으로: 이름·직책·메인 설명·글 번호·경력·담당 업무·구분.
+   ★ 사람이 내린 판단은 지금 것 그대로: 홈페이지에 남기기(keepOnSite)·새 홈페이지 빼기(offSite).
+     되살리기 한 번에 예외가 사라지면 퇴사 경고가 다시 쏟아지고 왜 그런지 알 길이 없다.
+   ⚠ 실시간DB 는 «빈 배열을 저장하지 않는다». 그래서 그때 판에 경력 칸이 없으면 «비어 있었다»는
+     뜻이다(경력은 처음부터 있던 칸). 담당 업무·구분은 2026-09-02 에 생긴 칸이라, 그때 판에
+     없으면 «칸이 생기기 전»일 수 있다 — 그때는 지금 것을 둔다(지우는 쪽으로 짐작하지 않는다). */
+function restoredMember(now, before) {
+  const b = before || {};
+  const next = Object.assign({}, now || {});
+  delete next.updatedAt; delete next.updatedBy;   // saveRecord 가 새로 찍는다
+  ['name', 'position1', 'position2', 'intro', 'srl'].forEach(k => { next[k] = b[k] || ''; });
+  next.careers = (b.careers || []).slice();
+  if (Object.prototype.hasOwnProperty.call(b, 'duties')) next.duties = (b.duties || []).slice();
+  if (Object.prototype.hasOwnProperty.call(b, 'kind')) next.kind = b.kind;
+  return next;
+}
+
 async function restoreFrom(histKey, ts) {
   const d = App.draft;
   if (!d) return;
   const yes = await askYes('이 시점의 내용으로 되살릴까요?',
-    '지금 내용은 이력에 남습니다. 홈페이지는 그대로이며, 되살린 뒤 <b>다시 붙여넣어야</b> 바뀝니다.',
+    '지금 내용은 이력에 남습니다. 홈페이지는 그대로이며, 되살린 뒤 <b>「지금 홈페이지에 고치기」</b>를 '
+    + '눌러야 바뀝니다.<br><span class="sub">「홈페이지에 남기기」·「새 홈페이지에 넣기/빼기」는 '
+    + '사람이 정한 것이라 지금 그대로 둡니다.</span>',
     '되살리기');
   if (!yes) return;
   try {
@@ -4133,25 +4297,16 @@ async function restoreFrom(histKey, ts) {
     if (!before) { await say('되살릴 내용을 찾지 못했습니다', '이 시점의 이력이 비어 있습니다.'); return; }
     // 되살리기도 저장이다 — saveRecord 를 그대로 써서 되살리기 «직전» 값도 이력에 남긴다.
     if (d.kind === 'member') {
-      const next = { name: before.name || '', position1: before.position1 || '', position2: before.position2 || '',
-                     intro: before.intro || '', srl: before.srl || '', careers: (before.careers || []).slice() };
-      /* 되돌리기는 «내용»을 되살리는 것이다. 「홈페이지에 남기기」는 내용이 아니라 사람이
-         내린 판단이므로 «지금 것»을 그대로 둔다 — 되살리기 한 번에 예외가 사라지면
-         퇴사 경고가 다시 쏟아지고, 왜 그런지 알 길이 없다. */
-      const kept = (App.members[d.key] || {}).keepOnSite;
-      if (kept) next.keepOnSite = kept;
-      await saveRecord('member', d.key, next);
-      App.members[d.key] = Object.assign({}, next);
+      App.members[d.key] = await saveRecord('member', d.key, restoredMember(App.members[d.key], before));
     } else {
       const next = { text: before.text || '' };
-      await saveRecord('page', d.key, next);
-      App.pages[d.key] = Object.assign({}, next);
+      App.pages[d.key] = await saveRecord('page', d.key, next);
     }
     markChanged(d.kind, d.key);
     loadDraft();
     closeModal();
     App.render();
-    toast('되살렸습니다. 홈페이지는 다시 붙여넣어야 바뀝니다.');
+    toast('되살렸습니다. 홈페이지는 「지금 홈페이지에 고치기」를 눌러야 바뀝니다.');
   } catch (e) {
     await say('되살리지 못했습니다', esc((e && e.message) || e));
   }
@@ -6170,7 +6325,8 @@ function memberEdit(d) {
      숨기면 명부상 퇴사자인데 왜 「내릴 것」 경고가 없는지 알 길이 없다. */
   const kept = keptOf(rec);
   /* ★ 「내릴 것(퇴사)」일 때만 내리는 단추를 준다 — 늘 보이면 잘못 누른다 */
-  const 내릴것 = (((App.check && App.check.members) || {})[d.key] || {}).status === 'toRemove';
+  /* ★ 「남기기」면 내리기 단추를 안 낸다 — 대조 결과가 남기기 «전»에 찍힌 것일 수 있다 */
+  const 내릴것 = !kept && (((App.check && App.check.members) || {})[d.key] || {}).status === 'toRemove';
   /* ══ 아래 띠 — «고른 사람 하나»에 대한 것만 (대표 결정 2026-09-06 ㉯) ══
      ★ 이름표를 붙인다. 위 띠는 화면 전체, 여기는 이 사람 하나다 — 그 갈림이 안 보여
        「누르면 무엇이 올라가나」가 흐렸다.
@@ -6484,15 +6640,23 @@ function drawPartnerLogos() {
   openModal(h);
 }
 
-/* 차례·숨김은 «자료»에 남긴다 — 화면을 닫아도, 다른 PC 에서도 그대로다 */
-async function savePartnerLogos() {
-  await db.ref(PARTNER_LOGO_PATH).set(App.partnerLogos);
+/* 차례·숨김은 «자료»에 남긴다 — 화면을 닫아도, 다른 PC 에서도 그대로다.
+   ⚠★ 통째로 쓰지 않는다 (2026-10-03 검토 ⑧). 전에는 화면을 열 때 읽은 사본(App.partnerLogos)을
+     homepage/partnerLogos 에 «통째로» set 했다. 탭 둘·관리자 둘이면 한쪽이 담은 로고가 목록에서
+     빠졌다(파일만 남는다). 이제 칸마다 제 몫만 쓴다:
+       숨김 — 그 로고 한 칸만(숨김/{번호})
+       차례 — 차례 칸만(차례는 본래 «한 줄 전부»다)
+       추가 — 서버 목록에 «붙이기»(트랜잭션) · 올린 뒤에는 «올린 것만» 뺀다 */
+function 로고칸(칸) { return db.ref(PARTNER_LOGO_PATH + '/' + 칸); }
+function 로고목록(v) {
+  if (Array.isArray(v)) return v.filter(Boolean);
+  return (v && typeof v === 'object') ? Object.keys(v).map(k => v[k]).filter(Boolean) : [];
 }
 
 async function hidePartnerLogo(srl, 숨길까) {
   App.partnerLogos.숨김 = App.partnerLogos.숨김 || {};
   if (숨길까) App.partnerLogos.숨김[srl] = true; else delete App.partnerLogos.숨김[srl];
-  await savePartnerLogos();
+  await 로고칸('숨김/' + srl).set(숨길까 ? true : null);
   drawPartnerLogos();
 }
 window.hidePartnerLogo = hidePartnerLogo;
@@ -6506,7 +6670,7 @@ async function movePartnerLogo(srl, 어디로) {
   if (i < 0 || j < 0 || j >= 지금.length) return;
   지금.splice(j, 0, 지금.splice(i, 1)[0]);
   App.partnerLogos.차례 = 지금;
-  await savePartnerLogos();
+  await 로고칸('차례').set(지금);
   drawPartnerLogos();
 }
 window.movePartnerLogo = movePartnerLogo;
@@ -6686,9 +6850,15 @@ async function 로고담기(base64, 끝, 사연) {
   });
   const 답 = await up.json().catch(() => ({}));
   if (!up.ok) throw new Error(답.error || ('서버가 ' + up.status + ' 을 돌려줬습니다'));
-  App.partnerLogos.추가 = (App.partnerLogos.추가 || [])
-    .concat([{ srl: 열쇠, 그림: '../files/logo/' + 이름 }]);
-  await savePartnerLogos();
+  const 새것 = { srl: 열쇠, 그림: '../files/logo/' + 이름 };
+  /* ★ 서버 목록에 «붙인다» — 다른 탭이 방금 담은 것이 있어도 함께 남는다.
+       ⚠ 찬 자리(null)로 먼저 불려도 접지 않는다 — [새것] 을 내면 서버가 진짜 값으로 다시 부른다. */
+  const r = await 로고칸('추가').transaction(cur => {
+    const 목록 = 로고목록(cur);
+    return 목록.some(x => x.srl === 열쇠) ? 목록 : 목록.concat([새것]);
+  });
+  App.partnerLogos.추가 = 로고목록(r && r.snapshot && r.snapshot.val());
+  if (!App.partnerLogos.추가.some(x => x.srl === 열쇠)) App.partnerLogos.추가.push(새것);
   return 답;
 }
 
@@ -6812,11 +6982,15 @@ async function publishPartner() {
       await 올리기('site/index.html', 새메인, '메인 로고 띠 ' + 고른것.갈것.length + '장');
       올린쪽++;
     }
-    /* ★ 올리고 나면 «새로 넣은 것» 목록을 비운다. 이제 쪽에서 읽히므로,
-       안 비우면 다음에 열 때 같은 로고가 한 번 더 붙는다. */
-    if ((App.partnerLogos.추가 || []).length) {
-      App.partnerLogos.추가 = [];
-      await savePartnerLogos();
+    /* ★ 올리고 나면 «새로 넣은 것» 가운데 «이번에 쪽에 실린 것»만 뺀다. 이제 쪽에서 읽히므로,
+       안 빼면 다음에 열 때 같은 로고가 한 번 더 붙는다.
+       ⚠ 통째로 비우지 않는다 (2026-10-03 검토 ⑧) — 올리는 동안 다른 탭이 담은 로고,
+         숨겨 두어 쪽에 안 실린 로고는 아직 쪽에 없다. 비우면 그 로고가 목록에서 사라진다. */
+    const 실린것 = {};
+    고른것.갈것.forEach(x => { if (x && x.srl) 실린것[String(x.srl)] = 1; });
+    if (로고목록(App.partnerLogos.추가).some(x => 실린것[String(x.srl)])) {
+      const r = await 로고칸('추가').transaction(cur => 로고목록(cur).filter(x => !실린것[String(x.srl)]));
+      App.partnerLogos.추가 = 로고목록(r && r.snapshot && r.snapshot.val());
     }
     toast(올린쪽 + '쪽을 올렸습니다 — 1~2분 뒤 홈페이지에 뜹니다');
   } catch (e) {
