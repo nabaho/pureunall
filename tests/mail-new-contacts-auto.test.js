@@ -87,8 +87,8 @@ function box(o) {
   vm.createContext(ctx);
   vm.runInContext(consts, ctx);
   ['mbNewAskable', 'mnewSentTo', 'mnewSkipFolder', 'mnewDomCo', 'mnewDomTable', 'mnewRows', 'mnewBust',
-    'mnewInqTag', 'mnewAutoFill', 'erpUnfillContact', 'mnewUndo', 'mnewLink', 'mnewRow']
-    .forEach((n) => vm.runInContext(sliceFn(app, (/^(mnewAutoFill|erpUnfillContact|mnewUndo|mnewLink)$/.test(n) ? 'async ' : '') + 'function ' + n + '('), ctx));
+    'mnewInqTag', 'mnewAutoFill', 'erpUnfillContact', 'mnewUndoOne', 'mnewUndo', 'mnewLink', 'mnewRow']
+    .forEach((n) => vm.runInContext(sliceFn(app, (/^(mnewAutoFill|erpUnfillContact|mnewUndoOne|mnewUndo|mnewLink)$/.test(n) ? 'async ' : '') + 'function ' + n + '('), ctx));
   vm.runInContext('var _mnewAutoBusy = false;', ctx);
   return ctx;
 }
@@ -239,4 +239,80 @@ test('★★ 한 줄로 — 넘치면 「…」', () => {
   assert.match(css, /white-space:nowrap/);
   assert.match((app.match(/\.mn-r \.sj\{[^}]*\}/) || [''])[0], /text-overflow:ellipsis/);
   assert.match((app.match(/\.mn-sec\{white-space[^}]*\}/) || [''])[0], /text-overflow:ellipsis/);
+});
+
+/* ══════ ☐ 네모·번호 · 골라서 한꺼번에 (대표 지시 2026-10-03 「왼쪽에 ㅁ 와 넘버링」) ══════ */
+function uiBox(o) {
+  const c = box(o);
+  c.esc = (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
+  c.mnewHitsHtml = () => '';
+  ['mnewPicked', 'mnewPick', 'mnewPickAll', 'mnewPickClear', 'mnewAutoList', 'mnewSecKeys', 'mnewPickedSplit',
+    'mnewBulkSkip', 'mnewCkHtml', 'mnewSecCkHtml', 'mnewHtml']
+    .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), c));
+  vm.runInContext(sliceFn(app, 'async function mnewBulkUndo('), c);
+  return c;
+}
+const AUTO = { 'a1': { em: 'p1@dara.co.kr', co: 'co2', coName: '다라물류', name: '박민수', at: D - 1000, added: true },
+  'a2': { em: 'p2@dara.co.kr', co: 'co2', coName: '다라물류', name: '최민지', at: D - 2000, added: true } };
+
+test('★★★ 줄마다 왼쪽에 네모와 번호 — 번호는 갈래마다 1부터', () => {
+  const c = uiBox({ log: AUTO });
+  const h = c.mnewHtml();
+  const rows = h.split('<div class="mn-r');
+  assert.ok(rows.slice(1).every((r) => /class="mn-ck"/.test(r) && /class="mn-no">\d+</.test(r)), '★★★ 네모·번호가 없는 줄이 있습니다');
+  /* 저절로 채움 둘 → 1, 2 · 답장한 상대 둘 → 1, 2 · 신규 문의 넷 → 1..4 */
+  const nums = (h.match(/class="mn-no">(\d+)</g) || []).map((x) => Number(x.replace(/\D/g, '')));
+  assert.deepEqual(nums, [1, 2, 1, 2, 1, 2, 3, 4], '★★ 번호가 갈래마다 1부터 안 매겨집니다');
+});
+
+test('★★ 고르면 띠에 «할 수 있는 것만» 단추가 뜬다', () => {
+  const c = uiBox({ log: AUTO });
+  assert.doesNotMatch(c.mnewHtml(), /class="mn-bulk"/, '★ 아무것도 안 골랐는데 띠가 뜹니다');
+  c.mnewPick('kim@mabatech,co,kr');
+  let h = c.mnewHtml();
+  assert.match(h, /class="mn-bulk"><b>1개 고름<\/b>/);
+  assert.match(h, /넘어가기 1/);
+  assert.doesNotMatch(h, /되돌리기 \d/, '★★ 되돌릴 것이 없는데 되돌리기 단추가 뜹니다');
+  c.mnewPick('a1');
+  h = c.mnewHtml();
+  assert.match(h, /2개 고름/);
+  assert.match(h, /되돌리기 1/);
+  c.mnewPick('kim@mabatech,co,kr');
+  assert.doesNotMatch(c.mnewHtml(), /넘어가기 \d/);
+});
+
+test('★★ 갈래 머리의 네모는 그 갈래를 통째로 — 다 골라져 있으면 푼다', () => {
+  const c = uiBox();
+  c.mnewPickAll('inq');
+  assert.equal(Object.keys(c.mnewPicked()).length, 4);
+  assert.match(c.mnewHtml(), /4개 고름/);
+  c.mnewPickAll('inq');
+  assert.equal(Object.keys(c.mnewPicked()).length, 0);
+});
+
+test('★★★ 한꺼번에 넘어가기 — 한 번 묻고, 한 번에 적고, 저절로 채운 줄은 안 건드린다', () => {
+  const c = uiBox({ log: AUTO });
+  const ups = [];
+  c.Store = { mode: 'firebase' };
+  c.firebase = { database: () => ({ ref: () => ({ update: async (u) => { ups.push(u); } }) }) };
+  let asked = 0; c.confirm = () => { asked++; return true; };
+  c.mnewPick('kim@mabatech,co,kr'); c.mnewPick('choi77@gmail,com'); c.mnewPick('a1');
+  c.mnewBulkSkip();
+  assert.equal(asked, 1, '★★ 줄마다 묻습니다');
+  assert.equal(ups.length, 1, '★★ 줄마다 따로 적습니다');
+  assert.deepEqual(Object.keys(ups[0]).sort(),
+    ['pucards/config/mailNewSkip/choi77@gmail,com', 'pucards/config/mailNewSkip/kim@mabatech,co,kr']);
+  assert.ok(c.mnewPicked().a1, '★★★ 저절로 채운 줄을 넘어가기로 함께 처리합니다');
+});
+
+test('★★ 한꺼번에 되돌리기 — 한 번 묻고, 되돌릴 것만', async () => {
+  const c = uiBox({ log: JSON.parse(JSON.stringify(AUTO)) });
+  const order = []; let asked = 0;
+  c.confirm = () => { asked++; return true; };
+  c.mnewUndoOne = async (k) => { order.push(k); return true; };
+  c.mnewPick('a1'); c.mnewPick('a2'); c.mnewPick('kim@mabatech,co,kr');
+  await c.mnewBulkUndo();
+  assert.equal(asked, 1);
+  assert.deepEqual(order.slice().sort(), ['a1', 'a2'], '★★ 되돌릴 것이 아닌 줄까지 되돌립니다');
+  assert.ok(c.mnewPicked()['kim@mabatech,co,kr'], '(대조) 넘어갈 줄은 그대로 골라져 있다');
 });

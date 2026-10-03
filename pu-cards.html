@@ -766,7 +766,18 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .mn-r.off{color:#94a3b8}
 .mn-r .nm{flex:none;width:96px;overflow:hidden;text-overflow:ellipsis;color:#1e293b}
 .mn-r .em{flex:none;width:190px;overflow:hidden;text-overflow:ellipsis;color:#64748b;font-size:12px}
-.mn-r .sj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mn-r .sj{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#475569}
+/* ☐ 네모·번호 (2026-10-03) — 번호는 갈래마다 1부터 */
+.mn-ck{flex:none;width:15px;height:15px;margin:0;cursor:pointer;accent-color:#2563eb}
+.mn-ck0{flex:none;width:15px}
+.mn-no{flex:none;width:22px;text-align:right;color:#94a3b8;font-size:12px;font-variant-numeric:tabular-nums}
+.mn-r.on{background:#eff6ff}
+.mn-sec .mn-ck{vertical-align:-2px;margin-right:8px}
+.mn-bulk{display:flex;align-items:center;gap:8px;padding:8px 10px;margin-top:4px;background:#eff6ff;
+  border:1px solid #bfdbfe;border-radius:6px;font-size:13px;color:#1e40af}
+.mn-bulk button{font-family:inherit;font-size:12px;border:1px solid #bfdbfe;background:#ffffff;color:#1e40af;
+  border-radius:4px;padding:3px 10px;cursor:pointer}
+.mn-bulk button:hover{background:#bfdbfe}
 .mn-r .dt{flex:none;color:#94a3b8;font-size:12px}
 .mn-r button,.mn-find button{flex:none;font-family:inherit;font-size:12px;border:1px solid #cbd5e1;background:#ffffff;
   color:#475569;border-radius:4px;padding:3px 9px;cursor:pointer}
@@ -23323,15 +23334,22 @@ async function erpUnfillContact(coId, email){
   if(typeof ErpMatch!=='undefined' && ErpMatch.load) ErpMatch.load();
   return { ok:true, removed:true };
 }
+/* 하나 되돌리기 — 묻지 않는다(묻는 것은 부르는 쪽). 성공하면 true */
+async function mnewUndoOne(key){
+  const rec = (_mnewAutoLog||{})[key];
+  if(!rec || rec.undone) return false;
+  const r = await erpUnfillContact(rec.co, rec.em);
+  if(!r.ok) throw new Error(r.why || '되돌리지 못했습니다');
+  rec.undone = Date.now();
+  await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
+  return true;
+}
 async function mnewUndo(key){
   const rec = (_mnewAutoLog||{})[key];
   if(!rec || rec.undone) return;
   if(!confirm(`「${rec.coName}」 담당자에서 ${rec.em} 을 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소는 다시 저절로 채우지 않습니다.`)) return;
   try{
-    const r = await erpUnfillContact(rec.co, rec.em);
-    if(!r.ok) return toast(r.why, 8000);
-    rec.undone = Date.now();
-    await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
+    try{ await mnewUndoOne(key); }catch(e){ return toast((e&&e.message)||String(e), 8000); }
     mnewBust(); mbNewBust();
     toast('↩ 되돌렸습니다 — ' + rec.em, 6000);
     renderPCSide(); renderMailPage();
@@ -23420,14 +23438,87 @@ function mnewCount(){
 function mnewLsCount(){
   try{ const n = Number(localStorage.getItem(MNEW_CNT_LS) || 0); return n > 0 ? n : 0; }catch(_){ return 0; }
 }
+/* ── ☐ 골라서 한꺼번에 (대표 지시 2026-10-03 「왼쪽에 ㅁ 와 넘버링」) ──
+   ⚠ 고른 것은 이 창에만 산다(state) — 저장하지 않는다. 화면을 다시 그려도 그대로 남는다.
+   ⚠ 한꺼번에 할 수 있는 것은 «되돌릴 수 있는» 둘뿐이다 — 넘어가기(점검에서 되살림)·되돌리기.
+     업체 잇기는 줄마다 업체가 달라 한꺼번에 하지 않는다. */
+function mnewPicked(){ return state.mnewPick || (state.mnewPick = {}); }
+function mnewPick(key){
+  const p = mnewPicked();
+  if(p[key]) delete p[key]; else p[key] = 1;
+  renderMailPage();
+}
+/* 한 갈래를 통째로 — 다 골라져 있으면 푼다 */
+function mnewPickAll(sec){
+  const keys = mnewSecKeys(sec);
+  const p = mnewPicked();
+  const all = keys.length && keys.every(k=>p[k]);
+  keys.forEach(k=>{ if(all) delete p[k]; else p[k] = 1; });
+  renderMailPage();
+}
+function mnewPickClear(){ state.mnewPick = {}; renderMailPage(); }
+function mnewAutoList(){
+  const log = _mnewAutoLog || {};
+  return Object.keys(log).map(k=>Object.assign({ key:k }, log[k]))
+    .filter(x=>x && x.added).sort((a,b)=>Number(b.at||0) - Number(a.at||0)).slice(0, 30);
+}
+function mnewSecKeys(sec){
+  if(sec === 'auto') return mnewAutoList().filter(x=>!x.undone).map(x=>x.key);
+  return mnewRows().filter(r=>r.kind === sec).map(r=>r.key);
+}
+/* 고른 것 가운데 «넘어갈 수 있는 것»(답장한 상대·신규 문의) · «되돌릴 수 있는 것»(저절로 채운 것) */
+function mnewPickedSplit(){
+  const p = mnewPicked();
+  const rows = mnewRows().filter(r=>p[r.key] && r.kind !== 'dom');
+  const auto = mnewAutoList().filter(x=>p[x.key] && !x.undone);
+  return { rows:rows, auto:auto };
+}
+/* 넘어가기 — 한 번에 적고 한 번만 알린다(줄마다 알리면 스무 번 뜬다) */
+function mnewBulkSkip(){
+  const rows = mnewPickedSplit().rows;
+  if(!rows.length) return toast('넘어갈 줄을 고르지 않았습니다');
+  if(!confirm(rows.length + '곳을 넘어갑니다 — 다시 안 나옵니다(전 직원 공용).\n「🔎 메일함 점검 → 👤 처음 보는 주소」에서 되살릴 수 있습니다.')) return;
+  const set = mbNewSkipSet(), up = {};
+  rows.forEach(r=>{ set[r.key] = 1; up[DB_ROOT + '/config/mailNewSkip/' + r.key] = 1; });
+  if(typeof Store!=='undefined' && Store.mode==='firebase') firebase.database().ref().update(up).catch(()=>{});
+  rows.forEach(r=>{ delete mnewPicked()[r.key]; });
+  mnewBust(); mbNewBust();
+  toast(rows.length + '곳을 넘어갔습니다', 6000);
+  renderPCSide(); renderMailPage();
+}
+/* 되돌리기 — 한 번 묻고 차례로(같은 업체를 동시에 쓰면 한쪽이 사라진다) */
+async function mnewBulkUndo(){
+  const auto = mnewPickedSplit().auto;
+  if(!auto.length) return toast('되돌릴 줄을 고르지 않았습니다');
+  if(!confirm(auto.length + '곳을 업체 담당자에서 뺍니다.\n\n저절로 채운 줄만 뺍니다 — 사람이 넣은 것은 그대로 둡니다.\n이 주소들은 다시 저절로 채우지 않습니다.')) return;
+  let done = 0, fail = 0;
+  for(const x of auto){
+    try{ if(await mnewUndoOne(x.key)) done++; else fail++; }catch(_){ fail++; }
+    delete mnewPicked()[x.key];
+  }
+  mnewBust(); mbNewBust();
+  toast('↩ ' + done + '곳을 되돌렸습니다' + (fail ? ' · ' + fail + '곳은 못 했습니다(다시 눌러 주세요)' : ''), 8000);
+  renderPCSide(); renderMailPage();
+}
+/* 줄 맨 앞 — 네모와 번호 */
+function mnewCkHtml(key, n){
+  const on = !!mnewPicked()[key];
+  return `<input type="checkbox" class="mn-ck" ${on ? 'checked' : ''} onclick="mnewPick('${esc(key)}')"
+    title="골라서 한꺼번에 넘어가기·되돌리기"><span class="mn-no">${n}</span>`;
+}
+/* 갈래 머리 맨 앞 — 그 갈래 통째로 */
+function mnewSecCkHtml(sec){
+  const keys = mnewSecKeys(sec);
+  if(!keys.length) return '';
+  const p = mnewPicked(), on = keys.every(k=>p[k]);
+  return `<input type="checkbox" class="mn-ck" ${on ? 'checked' : ''} onclick="mnewPickAll('${sec}')" title="이 갈래 모두 고르기">`;
+}
 function mnewHtml(){
   const rows = mnewRows();
-  const log = _mnewAutoLog || {};
-  const auto = Object.keys(log).map(k=>Object.assign({ key:k }, log[k]))
-    .filter(x=>x && x.added).sort((a,b)=>Number(b.at||0) - Number(a.at||0)).slice(0, 30);
+  const auto = mnewAutoList();
   const day = t => { const d = new Date(Number(t||0)); return isNaN(d) ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
   const Q = state.mnewQ || {};
-  const line = (r, acts) => `<div class="mn-r">
+  const line = (r, n, acts) => `<div class="mn-r${mnewPicked()[r.key] ? ' on' : ''}">${mnewCkHtml(r.key, n)}
     <span class="nm" title="${esc((r.name ? r.name + ' · ' : '') + r.em)}">${esc(r.name || r.em.split('@')[0])}</span>
     <span class="em" title="${esc(r.em)}">${esc(r.em)}</span>
     ${acts.pre || ''}
@@ -23444,8 +23535,15 @@ function mnewHtml(){
     <button onclick="mbNewNo('${esc(r.em)}');mnewBust()" title="다시 안 나옵니다(전 직원 공용)">넘어가기</button>`;
   let h = `<div class="mn-head"><b>📥 메일에서 온 연락처</b>
     <span>스팸·광고·공공기관·기계발신은 빼고, 우리가 답장한 상대 · 회사 도메인이 같은 곳 · 문의 메일만 모았습니다</span></div>`;
-  h += `<div class="mn-sec">✔ 저절로 채웠습니다 <small>회사 도메인이 업체 한 곳과 같아 그 업체 담당자 칸에 — 빈 칸만, 있는 값은 안 덮음${state.isAdmin ? '' : ' · 대표님 PC 에서 채웁니다'}</small></div>`;
-  h += auto.length ? auto.map(x=>`<div class="mn-r${x.undone ? ' off' : ''}">
+  /* ☐ 고른 것이 있을 때만 — 할 수 있는 것만 단추로 */
+  const pk = mnewPickedSplit(), pn = pk.rows.length + pk.auto.length;
+  if(pn) h += `<div class="mn-bulk"><b>${pn}개 고름</b>
+    ${pk.rows.length ? `<button onclick="mnewBulkSkip()">넘어가기 ${pk.rows.length}</button>` : ''}
+    ${pk.auto.length ? `<button onclick="mnewBulkUndo()">되돌리기 ${pk.auto.length}</button>` : ''}
+    <button onclick="mnewPickClear()">고르기 풀기</button></div>`;
+  h += `<div class="mn-sec">${mnewSecCkHtml('auto')}✔ 저절로 채웠습니다 <small>회사 도메인이 업체 한 곳과 같아 그 업체 담당자 칸에 — 빈 칸만, 있는 값은 안 덮음${state.isAdmin ? '' : ' · 대표님 PC 에서 채웁니다'}</small></div>`;
+  h += auto.length ? auto.map((x, i)=>`<div class="mn-r${x.undone ? ' off' : ''}${mnewPicked()[x.key] ? ' on' : ''}">
+      ${x.undone ? `<span class="mn-ck0"></span><span class="mn-no">${i+1}</span>` : mnewCkHtml(x.key, i+1)}
       <span class="nm" title="${esc(x.name)}">${esc(x.name || String(x.em).split('@')[0])}</span>
       <span class="em" title="${esc(x.em)}">${esc(x.em)}</span>
       <span class="mn-got">${x.undone ? '↩ 되돌림' : '✔ ' + esc(x.coName) + ' 담당자'}</span>
@@ -23455,23 +23553,22 @@ function mnewHtml(){
   const waitDom = rows.filter(r=>r.kind === 'dom');
   if(waitDom.length) h += `<div class="mn-none">채울 차례 ${waitDom.length}곳 — ${state.isAdmin ? '곧 저절로 채웁니다' : '대표님 PC 에서 메일 창이 열리면 채웁니다'}</div>`;
   const rep = rows.filter(r=>r.kind === 'replied');
-  h += `<div class="mn-sec">📇 답장한 상대 — 어느 업체인지 골라 주세요 <small>우리가 답장·발송한 주소라 스팸이 아닙니다</small></div>`;
-  h += rep.length ? rep.map(r=>line(r, {
+  h += `<div class="mn-sec">${mnewSecCkHtml('replied')}📇 답장한 상대 — 어느 업체인지 골라 주세요 <small>우리가 답장·발송한 주소라 스팸이 아닙니다</small></div>`;
+  h += rep.length ? rep.map((r, i)=>line(r, i+1, {
       pre: r.co ? `<span class="mn-gs" title="${esc(r.why)}으로 짚었습니다 — 짐작이라 누르셔야 잇습니다">${esc(r.why)}: ${esc(r.co.name||'')}</span>`
                 : '<span class="mn-gs none">짚이는 업체 없음</span>',
       btn: (r.co ? `<button class="pri" onclick="mnewLink('${esc(r.key)}','${esc(String(r.co.id))}')">${esc(r.co.name||'')}에 잇기</button>` : '')
         + `<button onclick="mnewFindToggle('${esc(r.key)}')">${r.co ? '다른 업체…' : '업체 찾기…'}</button>` + common(r)
     }) + findBox(r)).join('') : '<div class="mn-none">없습니다</div>';
   const inq = rows.filter(r=>r.kind === 'inq');
-  h += `<div class="mn-sec">🆕 신규 문의 — 아직 답장 안 함 <small>처음 보는 주소 · 제목에 문의·상담·견적·의뢰 · 답장하면 위로 옮겨 갑니다</small></div>`;
-  h += inq.length ? inq.map(r=>line(r, {
+  h += `<div class="mn-sec">${mnewSecCkHtml('inq')}🆕 신규 문의 — 아직 답장 안 함 <small>처음 보는 주소 · 제목에 문의·상담·견적·의뢰 · 답장하면 위로 옮겨 갑니다</small></div>`;
+  h += inq.length ? inq.map((r, i)=>line(r, i+1, {
       btn: `<button class="pri" onclick="mnewOpenMail('${esc(r.key)}')">메일 열기</button>` + common(r)
     })).join('') : '<div class="mn-none">없습니다</div>';
   h += `<div class="mn-foot">위 세 갈래에 안 걸린 나머지(한 번만 온 개인 주소 등)는
     <a href="javascript:void(0)" onclick="openMailBox('*all');mbCheckOpen('new')">🔎 메일함 점검 → 👤 처음 보는 주소</a>에서 훑으십시오.</div>`;
   return `<div class="mn">${h}</div>`;
 }
-
 /* ══════════════════════════════════════════════════════════════════════════
    👤 처음 보는 주소 — 한 화면에 모아 담는다 (대표 지시 2026-09-16)
    ══════════════════════════════════════════════════════════════════════════
