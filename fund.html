@@ -3684,7 +3684,9 @@ function _openHwpBuf(buf,label,saveKind){
       +'<div id="hwpStat" style="background:#1e293b;color:#f0fdf4;font-size:11px;padding:5px 12px;border-radius:0 0 9px 9px">편집기 불러오는 중… (처음 한 번은 조금 걸립니다)</div>';
     document.body.appendChild(m);
     var stat=function(t){ var s=$('hwpStat'); if(s)s.textContent=t; };
-    import('./vendor/rhwp-editor/index.js').then(function(mod){
+    /* 편집기를 띄우기 «전»에 브라우저에 남은 복구본·최근 문서·이력을 비운다(_hwpClearStudioStores 참고) —
+       편집기가 시작하자마자 복구본을 찾아 「문서 복구」 창을 띄우기 때문에, 띄운 «뒤»에 비우면 늦다 */
+    _hwpClearStudioStores().then(function(){ return import('./vendor/rhwp-editor/index.js'); }).then(function(mod){
       return mod.createEditor('#hwpHost',{
         studioUrl:'vendor/rhwp-studio/index.html',   // ⚠ 우리 것 — 이 줄을 지우지 말 것(위 경고 참고)
         renderer:'canvas2d',                         // ⚠ 그림 엔진(canvaskit)을 저장소에 안 넣었다
@@ -3766,7 +3768,31 @@ function hwpExport(fmt){
 function hwpDownloadOriginal(){ if(!_hwpOriginalBuf){toast('보관된 원본이 없습니다','warn');return;}
   PureunHwp.download(_hwpOriginalBuf,_hwpName+'_원본.'+_hwpOriginalFormat,_hwpOriginalFormat); toast('원본 문서를 내려받았습니다'); }
 function closeHwp(){ if(_hwpEditor){ try{_hwpEditor.destroy();}catch(e){} _hwpEditor=null; }
-  _hwpOriginalBuf=null; _hwpSaveKind=null; var m=$('hwpModal'); if(m)m.remove(); }
+  _hwpOriginalBuf=null; _hwpSaveKind=null; var m=$('hwpModal'); if(m)m.remove();
+  _hwpClearStudioStores(); }                 // 닫은 뒤에도 — 이 기금 서류가 브라우저에 남아 다음 사람·다음 기금에게 안 보이게
+/* ★ 편집기(rhwp-studio)가 브라우저에 몰래 쌓는 서류를 비운다 (대표 지시 2026-10-03 「문서복구창 막아」)
+   ─ 편집기는 쓰는 중인 문서를 브라우저 저장소(IndexedDB)에 «자동 저장»했다가, 다음에 «아무» 문서나 열면
+     「문서 복구 — 저장되지 않은 문서 복구본이 있습니다」를 띄운다. [복구]를 누르면 지금 연 서식 대신
+     «예전에 쓰던 다른 문서»가 들어온다 — 2026-09-27 설립인가신청서에 엉뚱한 개인정보 동의서·직원 이름이
+     나온 화면이 이것으로 보인다(틀에도, 기금 보관본에도 그 내용이 없었다).
+   ─ 같은 종류가 둘 더 있다: 「최근 문서」(최근 20개)·「문서 이력」(문서 내용 24벌). 서식 이름이 기금마다
+     같아서(「설립인가신청서(별지 제7호)」) 다른 기금의 서류가 이력에 섞여 보일 수 있다.
+   ─ 셋 다 편집기를 열기 «전»과 닫은 «뒤»에 비운다. 한 번 연 창 안에서의 되돌리기·이력은 그대로 되고,
+     기금별 보관은 「💾 이 기금에 보관」(서버 hwp_docs)이 맡는다.
+   ⚠ 「끼워 넣기 모드」(?chrome=embed)는 복구 창을 안 띄우지만 편집기의 인쇄·PDF로 인쇄·문서 비교까지
+     없앤다 — 그래서 쓰지 않았다(문서 비교는 대표가 원한 기능이다).
+   ⚠ 편집기는 이 앱과 같은 주소에서 돌아 저장소를 함께 쓴다 — 같은 주소의 다른 앱(경력관리·문서관리 등)의
+     편집기 복구본·이력도 함께 비워진다(서버 자료는 건드리지 않는다).
+   ⚠ 다른 탭에서 편집기가 열려 있으면 브라우저가 지우기를 미룬다 — 오래 기다리지 않고 넘어간다(1.5초). */
+var HWP_STUDIO_DBS=['rhwpStudioAutosave','rhwpStudioRecent','rhwpStudioDocHistory'];
+function _hwpClearStudioStores(){
+  if(typeof indexedDB==='undefined'||!indexedDB||!indexedDB.deleteDatabase) return Promise.resolve();
+  return Promise.all(HWP_STUDIO_DBS.map(function(n){ return new Promise(function(res){
+    var done=false, fin=function(){ if(!done){ done=true; res(); } };
+    try{ var r=indexedDB.deleteDatabase(n); r.onsuccess=fin; r.onerror=fin; r.onblocked=fin; }catch(e){ fin(); }
+    setTimeout(fin,1500);
+  }); }));
+}
 
 /* ══════════ 🤖 AI로 서식 고치기 — 채팅으로 자유롭게 지시 ══════════ (대표 결정 2026-09-26)
    대표가 스레드에서 본 남의 서비스(InkPad — 한글 파일을 올리면 AI가 고쳐 준다)를 보고
