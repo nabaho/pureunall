@@ -50,3 +50,16 @@ test('★★ ③ 함수 자신이 묶는다 — 그리기 맨 앞에서 거른�
   assert.match(cutFn(SRC, 'function renderPCSide('),
     /^function renderPCSide\(\)\{\s*mbMemoClear\(\);[^\n]*\n\s*if\(typeof pcSideBurst === 'function' && pcSideBurst\(\)\) return;/);
 });
+
+test('★★ 예약이 그 자리에서 바로 돌아도 자기 자신을 끝없이 부르지 않는다', () => {
+  let n = 0;
+  const ctx = { Date: { now: () => 5000 }, setTimeout: fn => { fn(); return 0; } };
+  vm.createContext(ctx);
+  vm.runInContext([
+    SRC.match(/^const PC_SIDE_GAP = \d+;$/m)[0].replace('const', 'var'),
+    'var _pcSideAt = 0, _pcSideT = null;', cutFn(SRC, 'function pcSideBurst('),
+    'function renderPCSide(){ if(pcSideBurst()) return; _n(); }'].join('\n'), ctx);
+  ctx._n = () => n++;
+  ctx.renderPCSide(); ctx.renderPCSide();
+  assert.equal(n, 2, '★ 바로 도는 예약에서 그리기를 놓쳤거나 겹쳤다');
+});
