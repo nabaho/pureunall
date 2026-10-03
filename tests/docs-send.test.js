@@ -67,3 +67,18 @@ test('ⓖ 보내기 창 — 누를 때만 보내고, 잠그고, 성공 뒤에만
   assert.match(s, /host\.mail\.keep\(/);
   assert.ok(!/db\.ref|changeForms/.test(s), '보내기 창이 db 를 직접 만집니다 — host 를 거칠 것');
 });
+
+/* 2026-10-03 — 미리보기·PDF 가 엔진의 「줄 다시 나누기」 때문에 머리 부분이 벌어져 보이던 것.
+   한글 프로그램은 채운 파일을 바르게 보이지만, 앱의 그림 엔진은 다시 나눈 줄을 비뚤게 그린다(실제 v8 로 확인).
+   그래서 «채운 문단의 줄 정보만 걷은» 사본(다시 나누기 전)을 미리보기·PDF 에 쓴다. 받기·메일 첨부 한글 파일은 그대로. */
+test('ⓗ 채우기 — 다시 나누기 전 사본(preview)을 함께 돌려주고, 미리보기·PDF 가 그것을 쓴다', () => {
+  const rl = fnOf('async function formRelayout(');
+  assert.match(rl, /if \(keep\) keep\.preview = bytes;/);
+  const fill = fnOf('async function formHwpFill(');
+  assert.match(fill, /r\.preview = keep\.preview \|\| null;/);
+  const f = cutFn(stripJs(CFJ), 'function openFill(');
+  assert.match(f, /host\.hwpShow\(prevBox, r\.preview \|\| r\.bytes,/);
+  assert.match(f, /pdfSrc: r\.preview \|\| null/);
+  const s = cutFn(stripJs(CFJ), 'function openSend(');
+  assert.match(s, /host\.hwpPdf\(o\.pdfSrc \|\| o\.bytes,/);
+});
