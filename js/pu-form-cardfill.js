@@ -163,6 +163,32 @@
     return V;
   }
 
+  /* ── 제안서·견적서 자동 값 (설계 2026-09-29 §5) — 받는 곳 종류(기업/기관)·금액·부가세로 만든다.
+     ⚠ 저장하지 않는다. 창에서 고칠 수 있고, 고친 값이 이긴다(openFill 의 edits). */
+  var PROPOSAL_KEYS = ['수신자', '참조', '호칭', '송부일자', '담당노무사', '노무사연락처', '견적금액', '부가세', '비용합계'];
+  var WEEK = ['일', '월', '화', '수', '목', '금', '토'];
+  function sendDate(d) { d = d || new Date(); return d.getFullYear() + '. ' + (d.getMonth() + 1) + '. ' + d.getDate() + '. (' + WEEK[d.getDay()] + ')'; }
+  function won(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '원'; }
+  function proposalValues(V, o) {
+    V = V || {}; o = o || {};
+    var org = o.orgType === 'org';
+    var person = [V.담당자부서, V.담당자, V.담당자직급].filter(Boolean).join(' ');
+    var n = String(o.amount == null ? '' : o.amount).replace(/[,\s원]/g, '');
+    var amt = /^\d{1,13}$/.test(n) ? +n : null;
+    var total = amt == null ? null : (o.vat === 'excl' ? Math.round(amt * 1.1) : amt);
+    return {
+      수신자: org ? [V.회사명, person].filter(Boolean).join(' ') + (V.담당자 ? '님' : '') : String(V.회사명 || ''),
+      참조: org ? '-' : (V.담당자 ? person + '님' : '담당자'),
+      호칭: org ? '귀 기관' : '귀사',
+      송부일자: sendDate(o.today),
+      담당노무사: String(o.staffName || ''),
+      노무사연락처: String(o.staffTel || '041-556-0035'),
+      견적금액: amt == null ? '' : won(amt),
+      부가세: amt == null ? '' : (o.vat === 'excl' ? '10% 별도' : '포함'),
+      비용합계: total == null ? '' : won(total)
+    };
+  }
+
   var RE = /\x7b\x7b([^\x7b\x7d\n]{1,30})\x7d\x7d/g;
   /* 글자 본문에 든 표지 이름(나온 차례, 겹침 없이) */
   function markersIn(text) {
@@ -291,18 +317,38 @@
     if (n != null) return '<c' + attrs + '><v>' + n + '</v></c>';
     return '<c' + attrs + ' t="inlineStr"><is><t xml:space="preserve">' + xmlEsc(value) + '</t></is></c>';
   }
+  /* 병합 영역의 «왼쪽 위가 아닌» 칸 — 엑셀은 이 칸 값을 그리지 않는다(쓰면 안 보이는 값만 남는다) */
+  function colNum(s) { var n = 0; for (var i = 0; i < s.length; i++) n = n * 26 + (s.charCodeAt(i) - 64); return n; }
+  function colName(n) { var s = ''; while (n > 0) { var m = (n - 1) % 26; s = String.fromCharCode(65 + m) + s; n = Math.floor((n - 1) / 26); } return s; }
+  function mergedInner(xml) {
+    var out = {};
+    String(xml || '').replace(/<mergeCell ref="([A-Z]+)(\d+):([A-Z]+)(\d+)"\s*\/>/g, function (all, c1, r1, c2, r2) {
+      for (var c = colNum(c1); c <= colNum(c2); c++) for (var r = +r1; r <= +r2; r++) {
+        if (c === colNum(c1) && r === +r1) continue;
+        out[colName(c) + r] = 1;
+      }
+      return all;
+    });
+    return out;
+  }
   function xlsxFillParts(names, xmls, V) {
     var out = (xmls || []).slice(), filled = 0, si = (names || []).indexOf('xl/sharedStrings.xml');
+    /* ⚠ 표지가 하나라도 있으면 «표지 틀»이다 — 이름표 짐작을 하지 않는다(2026-10-03 6종 틀에서 18칸에 더 들어갔다) */
+    var marked = xlsxMarkers(out).length > 0;
     out = out.map(function (x) { var r = xlsxFill(x, V); filled += r.filled; return r.xml; });
+    if (marked) return { xmls: out, filled: filled };
     var shared = sharedTexts(si >= 0 ? out[si] : '');
     (names || []).forEach(function (name, ni) {
       if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) return;
+      var inner = mergedInner(out[ni]);
       out[ni] = out[ni].replace(/<row\b[^>]*>[\s\S]*?<\/row>/g, function (row) {
-        var cells = row.match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) || [], changed = false;
+        var cells = row.match(/<c\b[^>]*\/>|<c\b[^>]*>[\s\S]*?<\/c>/g) || [];
         for (var i = 0; i + 1 < cells.length; i++) {
           var key = xlLabel(cellText(cells[i], shared)), value = key && V && V[key] != null ? String(V[key]) : '';
           if (!key || !value || !blankCell(cells[i + 1])) continue;
-          var newer = putCell(cells[i + 1], value); row = row.replace(cells[i + 1], newer); cells[i + 1] = newer; filled++; changed = true;
+          var ref = (/\sr="([A-Z]+\d+)"/.exec(cells[i + 1]) || [])[1];
+          if (ref && inner[ref]) continue;
+          var newer = putCell(cells[i + 1], value); row = row.replace(cells[i + 1], newer); cells[i + 1] = newer; filled++;
         }
         return row;
       });
@@ -311,6 +357,7 @@
   }
   function xlsxMarkersParts(names, xmls) {
     var out = xlsxMarkers(xmls), seen = {}; out.forEach(function (k) { seen[k] = 1; });
+    if (out.length) return out;   // 표지 틀 — 이름표 짐작 키를 더하지 않는다(채우기와 같은 판정)
     var si = (names || []).indexOf('xl/sharedStrings.xml'), shared = sharedTexts(si >= 0 ? xmls[si] : '');
     (names || []).forEach(function (name, ni) {
       if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(name)) return;
@@ -327,7 +374,8 @@
     searchPeople: searchPeople, searchContacts: searchContacts,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
-    xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate
+    xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
+    proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;

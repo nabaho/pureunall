@@ -90,7 +90,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=16"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=9"></script>
+<script src="js/pu-contract-forms.js?v=10"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -37946,6 +37946,13 @@ function ContractFormPrintModal(props){
   // 종류별로 선택된 양식 ID 배열 (다중 체크)
   // 초기값: typeCode(자문/급여)에 따라 해당 계약서만 자동 선택
   var _typeCode = (contract.typeCodes && contract.typeCodes['company']) || contract.typeCode || '';
+  // 문서관리 기금관리 «제안서·견적서» 묶음은 계약서가 아니다 — 목록에는 두되 자동 체크하지 않는다(2026-10-03)
+  //   ⚠ 글자는 js/pu-contract-forms.js PROPOSAL_GROUP 과 같아야 한다(tests/office-forms-filter.test.js)
+  var PROPOSAL_GROUP_NAME = '제안서·견적서';
+  function notProposal(id){
+    var f = allForms.filter(function(x){ return x.id === id; })[0];
+    return !(f && String(f.groupName||'').trim() === PROPOSAL_GROUP_NAME);
+  }
   var initSelMap = {};
   kindsArr.forEach(function(kv){
     var allIds = formsForKind(kv).map(function(f){return f.id;});
@@ -37973,6 +37980,7 @@ function ContractFormPrintModal(props){
       initSelMap[kv] = allIds;
     }
   });
+  Object.keys(initSelMap).forEach(function(kv){ initSelMap[kv] = initSelMap[kv].filter(notProposal); });
   var sm = useState(initSelMap); var selMap = sm[0]; var setSelMap = sm[1];
   var selectedIds = selMap[kindTab] || [];
   var selectedForms = formsInTab.filter(function(f){return selectedIds.indexOf(f.id) >= 0;});

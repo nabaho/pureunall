@@ -294,6 +294,11 @@
   var CASE_TYPES = ['인사', '부해등', '체불', '체당금', '산재등', '산안', '노사', '지원', '교육', '조사', '행심', '징계', '기타'];
   var SIDES = [{ v: 'worker', label: '근로자측' }, { v: 'employer', label: '사용자측' }, { v: 'both', label: '공통' }];
   var NO_GROUP = '(미지정)';
+  /* 기금관리 안의 묶음 (설계 2026-09-29 §3) — 이알피 계약서 출력은 「제안서·견적서」를 자동 체크하지 않는다(pu-erp.html).
+     ⚠ 글자 하나까지 이알피와 같아야 한다(가운뎃점 U+00B7). */
+  var FUND_GROUPS = ['계약서', '제안서·견적서'];
+  var PROPOSAL_GROUP = FUND_GROUPS[1];
+  function hasGroups(kind) { return kind === 'case' || kind === 'fund'; }
   /* 측 — 사건계약에만. 적힌 값이 먼저, 없으면 본문 칸으로 짐작한다(근로자 칸이 있으면 근로자측:
      근로자측 양식도 상대 회사 {{회사명}} 을 적는 일이 흔하다). */
   function sideOf(f) {
@@ -304,25 +309,29 @@
     if (/\{\{(회사명|대표자)\}\}/.test(b)) return 'employer';
     return 'both';
   }
-  function groupOf(f) { return (f && String(f.groupName || '').trim()) || NO_GROUP; }
-  function groupRank(g) {
-    var i = CASE_TYPES.indexOf(g);
+  function groupOf(f) {
+    var g = (f && String(f.groupName || '').trim()) || '';
+    if (g) return g;
+    return f && f.kind === 'fund' ? FUND_GROUPS[0] : NO_GROUP;   // 기금: 묶음이 없으면 계약서(시드 fm-5)
+  }
+  function groupRank(g, kind) {
+    var list = kind === 'fund' ? FUND_GROUPS : CASE_TYPES, i = list.indexOf(g);
     return i >= 0 ? i : (g === NO_GROUP ? 1000 : 500);
   }
   /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어 } */
   function filterForms(forms, o) {
     o = o || {};
     var q = String(o.q || '').trim().toLowerCase();
-    var isCase = o.kind === 'case';
+    var isCase = o.kind === 'case', grouped = hasGroups(o.kind);
     return (forms || []).filter(function (f) {
       if (f.kind !== o.kind) return false;
       if (isCase && o.side && o.side !== 'all' && sideOf(f) !== o.side) return false;
-      if (isCase && o.grp && o.grp !== 'all' && groupOf(f) !== o.grp) return false;
+      if (grouped && o.grp && o.grp !== 'all' && groupOf(f) !== o.grp) return false;
       if (q && String(f.name || '').toLowerCase().indexOf(q) < 0) return false;
       return true;
     }).sort(function (a, b) {
-      if (isCase) {
-        var ga = groupOf(a), gb = groupOf(b), d = groupRank(ga) - groupRank(gb);
+      if (grouped) {
+        var ga = groupOf(a), gb = groupOf(b), d = groupRank(ga, o.kind) - groupRank(gb, o.kind);
         if (d) return d;
         if (ga !== gb) return ga.localeCompare(gb);
       }
@@ -334,15 +343,16 @@
     var list = (forms || []).filter(function (f) { return f.kind === kind; });
     var sides = { all: list.length, worker: 0, employer: 0, both: 0 };
     var by = {};
+    if (kind === 'fund') FUND_GROUPS.forEach(function (g) { by[g] = 0; });   // 0개 묶음도 칩으로 보인다
     list.forEach(function (f) {
       var s = sideOf(f);
       if (s) sides[s]++;
-      if (kind !== 'case') return;
-      if (side && side !== 'all' && s !== side) return;
+      if (!hasGroups(kind)) return;
+      if (kind === 'case' && side && side !== 'all' && s !== side) return;
       var g = groupOf(f);
       by[g] = (by[g] || 0) + 1;
     });
-    var groups = Object.keys(by).sort(function (a, b) { return (groupRank(a) - groupRank(b)) || a.localeCompare(b); })
+    var groups = Object.keys(by).sort(function (a, b) { return (groupRank(a, kind) - groupRank(b, kind)) || a.localeCompare(b); })
       .map(function (g) { return { name: g, count: by[g] }; });
     return { sides: sides, groups: groups };
   }
@@ -557,6 +567,10 @@
     + '.pcf-muted{color:#94a3b8}'
     /* 채워서 받기 창 */
     + '.pcf-fcols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr);gap:16px}'
+    + '.pcf-prop{border:1px solid #bfdbfe;background:#f8fbff;border-radius:8px;padding:8px 10px;margin-bottom:10px}'
+    + '.pcf-seg{display:inline-flex;border:1px solid #cbd5e1;border-radius:6px;overflow:hidden}'
+    + '.pcf-seg button{border:0;background:#fff;padding:5px 10px;font:inherit;font-size:12.5px;cursor:pointer}'
+    + '.pcf-seg button.on{background:#1e293b;color:#fff}'
     + '.pcf-fcols input[type=search],.pcf-frow input{width:100%;padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;font-family:inherit}'
     + '.pcf-fh{font-size:12px;color:#64748b;font-weight:700;margin:10px 0 4px}'
     + '.pcf-fl{display:flex;flex-direction:column;gap:2px;margin-top:4px;max-height:180px;overflow:auto}'
@@ -667,6 +681,11 @@
         return el('label', { style: 'display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12.5px;cursor:pointer' }, [r, s.label]);
       }).concat(sideTouched ? [] : [el('span', { style: 'font-size:11.5px;color:#64748b', text: '지금은 본문 칸으로 짐작한 값입니다 — 누르면 정해집니다' })]));
     }
+    if (f.kind === 'fund') {
+      /* 기금관리 묶음 — 「제안서·견적서」는 이알피 계약서 출력이 자동 체크하지 않는다 */
+      grpIn = el('select', { 'aria-label': '묶음' }, FUND_GROUPS.map(function (g) { return el('option', { value: g, text: g }); }));
+      grpIn.value = groupOf(f);
+    }
     var onIn = el('input', { type: 'checkbox' }); onIn.checked = f.enabled !== false;
     var bodyIn = el('textarea', { placeholder: '예시:\n━━━━━━━━━━━━━━━━━━━━\n        사건위임계약서\n━━━━━━━━━━━━━━━━━━━━\n\n위임인: {{회사명}} (대표 {{대표자}})\n계약금액: {{계약금액}}원' });
     bodyIn.value = f.body || '';
@@ -751,8 +770,8 @@
       el('div', { 'class': 'pcf-mb' }, [
         el('div', { style: 'display:grid;grid-template-columns:' + (grpIn ? '1fr 180px' : '1fr') + ';gap:10px' }, [
           el('div', null, [el('label', { 'class': 'l', text: '양식 이름 *' }), nameIn]),
-          grpIn ? el('div', null, [el('label', { 'class': 'l', text: '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
-            el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); }))]) : null
+          grpIn ? el('div', null, [el('label', { 'class': 'l', text: f.kind === 'fund' ? '묶음' : '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
+            f.kind === 'case' ? el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); })) : null]) : null
         ]),
         sideBox ? el('div', null, [el('label', { 'class': 'l', text: '측 (누가 의뢰하는 계약인가)' }), sideBox]) : null,
         el('label', { style: 'display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px;font-size:12.5px' }, [onIn, '활성 (계약서 출력 때 고를 수 있음)']),
@@ -815,7 +834,10 @@
       var srcs = hwpSources(fm);
       return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
     });
-    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0 };
+    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0,
+      pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' } };
+    try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
+    var propBox = el('div', { 'class': 'pcf-prop', hidden: true });
     var bg = el('div', { 'class': 'pcf-mbg' });
     function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
     function onKey(e) { if (e.key === 'Escape') close(); }
@@ -835,6 +857,12 @@
     function values() {
       var co = st.co ? Object.assign({}, st.coX, st.co) : {};
       var V = CF.valuesFrom({ co: co, contact: st.contact, worker: st.worker });
+      if (st.pv.on) {
+        var me = host.me ? host.me() : null;
+        var P = CF.proposalValues(V, { orgType: st.pv.orgType, amount: st.pv.amount, vat: st.pv.vat,
+          staffName: me && me.name, staffTel: st.pv.tel });
+        Object.keys(P).forEach(function (k) { V[k] = P[k]; });
+      }
       Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
       return V;
     }
@@ -846,9 +874,42 @@
     function allMarkers() {
       return bundleMarkers(items.map(function (it) { return { name: it.fm.name || '양식', markers: markersOf(it) }; }));
     }
+    /* 제안서 칸 — 받는 곳 종류·금액·부가세·연락처 (설계 2026-09-29 §5). valBox 와 따로 그려야
+       금액을 칠 때 커서가 안 사라진다(drawVals 는 valBox 만 다시 그린다). */
+    function seg(opts, cur, fn) {
+      return el('span', { 'class': 'pcf-seg', role: 'group' }, opts.map(function (o) {
+        return el('button', { type: 'button', 'class': cur === o.v ? 'on' : '', 'aria-pressed': cur === o.v ? 'true' : 'false', text: o.t,
+          onclick: function () { fn(o.v); drawProp(); drawVals(); } });
+      }));
+    }
+    function drawProp() {
+      propBox.innerHTML = '';
+      propBox.hidden = !st.pv.on;
+      if (!st.pv.on) return;
+      var amt = el('input', { type: 'text', inputmode: 'numeric', placeholder: '예: 5,000,000', 'aria-label': '견적 금액' });
+      amt.value = st.pv.amount;
+      amt.addEventListener('input', function () { st.pv.amount = amt.value; drawVals(); });
+      var tel = el('input', { type: 'text', placeholder: '041-556-0035', 'aria-label': '노무사 연락처' });
+      tel.value = st.pv.tel;
+      tel.addEventListener('input', function () {
+        st.pv.tel = tel.value; drawVals();
+        try { w.localStorage.setItem('pcf-staff-tel', tel.value); } catch (e) {}
+      });
+      propBox.appendChild(el('div', { 'class': 'pcf-fh', text: '제안서 — 받는 곳 종류와 견적' }));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '받는 곳' }),
+        seg([{ v: 'co', t: '기업' }, { v: 'org', t: '기관·지자체' }], st.pv.orgType, function (v) { st.pv.orgType = v; })]));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '견적 금액' }), amt]));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '부가세' }),
+        seg([{ v: 'incl', t: '부가세 포함' }, { v: 'excl', t: '별도(10%)' }], st.pv.vat, function (v) { st.pv.vat = v; })]));
+      propBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { text: '노무사 연락처' }), tel]));
+      propBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '⚠ 원본의 「비용 산출 내역」 표와 금액이 다르면, 받은 뒤 한글에서 고치거나 빼세요.' }));
+    }
     function drawVals() {
       valBox.innerHTML = '';
-      var V = values(), ks = allMarkers();
+      var ks = allMarkers();
+      var wantProp = ks.some(function (x) { return CF.PROPOSAL_KEYS.indexOf(x.key) >= 0; });
+      if (wantProp !== st.pv.on) { st.pv.on = wantProp; drawProp(); }
+      var V = values();
       if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: one ? '이 양식에는 채울 자리가 없습니다' : '이 양식들에는 채울 자리가 없습니다' })); return; }
       var blank = ks.filter(function (x) { return !V[x.key]; }).length;
       valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳' + (one ? '' : ' (양식 ' + items.length + '개 합쳐서)') + (blank ? ' · 빈 칸 ' + blank + '곳' : '') + ' — 고칠 수 있습니다' }));
@@ -1100,7 +1161,7 @@
             el('div', { 'class': 'pcf-fh', text: '② 담당자 — 기업정보함에서 찾아오기' }), ctQ, ctBox,
             el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
           ]),
-          valBox
+          el('div', null, [propBox, valBox])
         ]),
         note, prevBox
       ]),
@@ -1384,6 +1445,13 @@
             return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
           }))));
       }
+      if (kind === 'fund') {
+        var ff = facetCounts(S.forms, 'fund');
+        row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '묶음' },
+          [chip('전체 ' + ff.sides.all, S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(ff.groups.map(function (g) {
+            return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
+          }))));
+      }
       var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 이름 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
       /* 글자를 칠 때마다 본문만 다시 그린다 — 칩 줄까지 그리면 찾기 칸 커서가 사라진다 */
       q.addEventListener('input', function () { S.q = q.value; drawBody(); });
@@ -1587,7 +1655,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,
