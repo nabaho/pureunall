@@ -23,10 +23,44 @@
   var PATH = 'rules_mgmt/lawwatch';
   var FAIL = { '누락': 1, '위반의심': 1, '시행예정': 1 };
 
+  /* ══════ 법 조문 «본문만» — 견줄 때 쓰는 잣대 ══════
+     법령 원문에는 본문이 아닌 «안내»가 붙어 있다 —
+       · 날짜 꼬리표   <개정 2018.3.20> · <신설 2014.1.14, 2026.5.26> · 삭제 <2020.1.1>
+       · 안내 줄       [시행일] … (뒤따르는 「1\. …」 호까지) · [본조신설 …] · [전문개정 …] · [제목개정 …] · [종전 …]
+     이것이 붙거나 빠져도 조문은 안 바뀐 것이다.
+     2026-10-01 감시가 근로기준법 제55조(휴일)를 「개정」으로 적었는데, 실제로는 2022년에
+     끝난 단계 시행 안내([시행일] 300명 이상 2020년 …)가 법령 자료에서 빠진 것뿐이었다.
+     ⚠ 안내 «줄»만 뗀다 — [시행일] 뒤를 통째로 자르면 그 뒤에 오는 항이 바뀌어도 못 본다.
+     ⚠⚠ 이 함수는 «두 벌»이다: functions/rules-lawwatch.js(서버) · js/pu-rules-lawwatch.js(화면).
+       functions/ 는 따로 올라가 js/ 를 못 부른다. 한쪽을 고치면 다른 쪽도 «글자 그대로» 고친다 —
+       tests/rules-lawwatch-noise.test.js 가 둘이 같은지 지킨다. */
+  function lawBody(t) {
+    var out = [], inNote = false;
+    String(t || '').split('\n').forEach(function (line) {
+      var s = line.trim();
+      if (/^\[(?:시행일|본조신설|전문개정|제목개정|본조삭제|종전)/.test(s)) { inNote = /^\[시행일/.test(s); return; }
+      if (inNote && /^\d+\\?\.\s/.test(s)) return;
+      inNote = false;
+      out.push(s);
+    });
+    return out.join('')
+      .replace(/<(?:개정|신설|전문개정|본조신설|타법개정)?\s*\d{4}\.[\d.,\s]*>/g, '')
+      .replace(/\\(?=\.)/g, '')
+      .replace(/\s+/g, '');
+  }
+  var MAX_TEXT = 4000;      // 서버(functions/rules-lawwatch.js)가 조 하나에 적는 글자 상한
+  /* 이미 DB 에 적힌 거짓 사건을 거른다 — 서버를 고쳐 올려도 옛 사건은 그대로 남는다.
+     ⚠ 모르는 것은 숨기지 않는다: 앞 글 모름 · 신설 · 삭제 · 상한에 걸려 잘린 글(뒤쪽이 다를 수 있다). */
+  function noise(a) {
+    var b = String(a.before || ''), f = String(a.after || '');
+    if (a.beforeUnknown || !b || !f) return false;
+    if (b.length >= MAX_TEXT || f.length >= MAX_TEXT) return false;
+    return lawBody(b) === lawBody(f);
+  }
   function list(v) { return v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []; }
   function artsOf(ev) {
     var num = function (a) { var m = /^(\d+)(?:의(\d+))?$/.exec(a); return m ? (+m[1]) * 100 + (+(m[2] || 0)) : 0; };
-    return list(ev && ev.arts).sort(function (x, y) { return num(x.art) - num(y.art); });
+    return list(ev && ev.arts).filter(function (a) { return a && !noise(a); }).sort(function (x, y) { return num(x.art) - num(y.art); });
   }
   function daysTo(ymd, today) {
     var a = Date.UTC(+ymd.slice(0, 4), +ymd.slice(5, 7) - 1, +ymd.slice(8, 10));
@@ -117,7 +151,7 @@
 
   /* 사건 목록 — 가까운 시행일 순. 「지난 것」 = 걸린 사업장이 모두 반영된 사건 */
   function sortEvents(events) {
-    return list(events).filter(function (e) { return e && e.id && e.arts; })
+    return list(events).filter(function (e) { return e && e.id && e.arts && (!list(e.arts).length || artsOf(e).length > 0); })   // 조가 «다» 거짓이었던 사건만 뺀다
       .sort(function (a, b) { return String(a.firstEffective || a.effective).localeCompare(String(b.firstEffective || b.effective)); });
   }
   function counts(rows, uid) {
@@ -146,7 +180,7 @@
 
   root.PuRulesLawWatch = {
     PATH: PATH, criteria: criteria, latestSites: latestSites, sitesFor: sitesFor,
-    sortEvents: sortEvents, counts: counts, artsOf: artsOf, artLabel: artLabel, daysTo: daysTo,
+    sortEvents: sortEvents, counts: counts, artsOf: artsOf, lawBody: lawBody, artLabel: artLabel, daysTo: daysTo,
     load: load, _cache: function () { return cache; }, _seed: function (v) { cache = v; return v; }
   };
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

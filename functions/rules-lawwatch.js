@@ -127,14 +127,41 @@ function effectiveDates(parsed) {
   return out;
 }
 
-/* 앞뒤 판을 견준다 — 감시하는 조만 글자로, 나머지는 개수만 */
+/* ══════ 법 조문 «본문만» — 견줄 때 쓰는 잣대 ══════
+   법령 원문에는 본문이 아닌 «안내»가 붙어 있다 —
+     · 날짜 꼬리표   <개정 2018.3.20> · <신설 2014.1.14, 2026.5.26> · 삭제 <2020.1.1>
+     · 안내 줄       [시행일] … (뒤따르는 「1\. …」 호까지) · [본조신설 …] · [전문개정 …] · [제목개정 …] · [종전 …]
+   이것이 붙거나 빠져도 조문은 안 바뀐 것이다.
+   2026-10-01 감시가 근로기준법 제55조(휴일)를 「개정」으로 적었는데, 실제로는 2022년에
+   끝난 단계 시행 안내([시행일] 300명 이상 2020년 …)가 법령 자료에서 빠진 것뿐이었다.
+   ⚠ 안내 «줄»만 뗀다 — [시행일] 뒤를 통째로 자르면 그 뒤에 오는 항이 바뀌어도 못 본다.
+   ⚠⚠ 이 함수는 «두 벌»이다: functions/rules-lawwatch.js(서버) · js/pu-rules-lawwatch.js(화면).
+     functions/ 는 따로 올라가 js/ 를 못 부른다. 한쪽을 고치면 다른 쪽도 «글자 그대로» 고친다 —
+     tests/rules-lawwatch-noise.test.js 가 둘이 같은지 지킨다. */
+function lawBody(t) {
+  var out = [], inNote = false;
+  String(t || '').split('\n').forEach(function (line) {
+    var s = line.trim();
+    if (/^\[(?:시행일|본조신설|전문개정|제목개정|본조삭제|종전)/.test(s)) { inNote = /^\[시행일/.test(s); return; }
+    if (inNote && /^\d+\\?\.\s/.test(s)) return;
+    inNote = false;
+    out.push(s);
+  });
+  return out.join('')
+    .replace(/<(?:개정|신설|전문개정|본조신설|타법개정)?\s*\d{4}\.[\d.,\s]*>/g, '')
+    .replace(/\\(?=\.)/g, '')
+    .replace(/\s+/g, '');
+}
+
+/* 앞뒤 판을 견준다 — 감시하는 조만 글자로, 나머지는 개수만.
+   ★ 같은가는 lawBody 로 본다(안내문은 개정이 아니다). 사건에는 «원문 그대로» 적는다. */
 function diffWatched(prev, next, watch) {
   const arts = {};
   const dates = effectiveDates(next);
   const watchSet = new Set(watch || []);
   (watch || []).forEach(a => {
     const b = (prev.arts[a] || {}).text || '', f = (next.arts[a] || {}).text || '';
-    if (b === f) return;
+    if (b === f || (b && f && lawBody(b) === lawBody(f))) return;
     const kind = !b ? '신설' : (!f || /^삭제\b|^삭제\s*</.test(f)) ? '삭제' : '개정';
     const eff = dates.byArt[a] || dates.base || next.effective;
     const o = { art: a, title: (next.arts[a] || prev.arts[a] || {}).title || '', kind: kind,
@@ -146,7 +173,8 @@ function diffWatched(prev, next, watch) {
   const all = new Set(Object.keys(prev.arts).concat(Object.keys(next.arts)));
   all.forEach(a => {
     if (watchSet.has(a)) return;
-    if (((prev.arts[a] || {}).text || '') !== ((next.arts[a] || {}).text || '')) other++;
+    const b = (prev.arts[a] || {}).text || '', f = (next.arts[a] || {}).text || '';
+    if (!(b === f || (b && f && lawBody(b) === lawBody(f)))) other++;
   });
   return { arts: arts, otherChanged: other };
 }
@@ -279,4 +307,4 @@ function updatesOf(result, existing, nowIso) {
   return upd;
 }
 
-module.exports = { REPO, UA, parseLawMd, effectiveDates, afterPeriod, diffWatched, baseOf, fromBase, markerDiff, eventOf, run, updatesOf, rawUrl, commitsUrl };
+module.exports = { REPO, UA, lawBody, parseLawMd, effectiveDates, afterPeriod, diffWatched, baseOf, fromBase, markerDiff, eventOf, run, updatesOf, rawUrl, commitsUrl };
