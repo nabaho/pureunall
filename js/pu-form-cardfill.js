@@ -163,6 +163,45 @@
     return V;
   }
 
+  /* ── 위임계약서 고르기 값 (설계 2026-10-03 §2.2·2.3, 목업 승인) ──
+     사용자측 틀: {{위임분야}}과 관련하여 … {{위임사무}} · 금 {{계약금액}}원 ({{부가세처리}}) · ② {{기간연장}}
+     근로자측 틀: 위임내용 : {{위임내용}} · 착수금 ({{부가세처리}}) · 성공한 때에는 {{성공보수}}을 성공보수로
+     ⚠ 위임분야는 「…과 관련하여」 앞에 들어간다 — 받침 있는 말로 끝나야 한다(컨설팅·대응·교섭·신청). */
+  var CASE_TASKS = [
+    { v: 'consult', t: '인사노무컨설팅', area: '인사노무컨설팅', task: '1. 인사노무 진단 및 취업규칙·근로계약서 등 규정 정비에 관한 사항' },
+    { v: 'dismiss', t: '부당해고 대응', area: '부당해고 대응', task: '1. 부당해고 구제신청 사건 대응에 관한 일체의 사항' },
+    { v: 'harass', t: '직장 내 괴롭힘 대응', area: '직장 내 괴롭힘 대응', task: '1. 직장 내 괴롭힘 대응에 관한 일체의 사항' },
+    { v: 'inspect', t: '근로감독 대응', area: '근로감독 대응', task: '1. 근로감독 대응에 관한 일체의 사항' },
+    { v: 'bargain', t: '단체교섭', area: '단체교섭', task: '1. 단체교섭 및 노사협의에 관한 자문' },
+    { v: 'fund', t: '기금 지원금 신청', area: '근로복지기금 지원금 신청', task: '1. 근로복지기금 지원금 신청에 관한 일체의 사항' },
+    { v: 'own', t: '직접 적기', area: '', task: '' }
+  ];
+  var WORKER_TASKS = [
+    { v: 'arrears', t: '임금·퇴직금 체불', text: '미지급임금 및 퇴직금 체불 처리에 대한 일체의 사항 위임' },
+    { v: 'dismiss', t: '부당해고 구제신청', text: '부당해고 구제신청 사건 처리에 대한 일체의 사항 위임' },
+    { v: 'suspend', t: '부당정직 구제신청', text: '부당정직 구제신청 사건 처리에 대한 일체의 사항 위임' },
+    { v: 'injury', t: '산재 신청', text: '산업재해보상보험 급여 신청에 대한 일체의 사항 위임' },
+    { v: 'own', t: '직접 적기', text: '' }
+  ];
+  var CASE_KEYS = ['위임분야', '위임사무', '위임내용', '부가세처리', '기간연장', '성공보수'];
+  var EXT_TEXT = {
+    agree: '당사자 간 위임사무의 원활한 수행을 위해 필요한 경우 당사자 간 합의로 위 기간을 연장할 수 있다.',
+    auto: '제1항의 기간이 만료되더라도 위임사무가 종료되지 아니한 경우, 그 사무가 실질적으로 종결될 때까지 본 계약기간은 자동 연장되는 것으로 한다.'
+  };
+  function caseValues(wi) {
+    wi = wi || {};
+    var t = CASE_TASKS.filter(function (x) { return x.v === wi.task; })[0];
+    var w = WORKER_TASKS.filter(function (x) { return x.v === wi.wtask; })[0];
+    var amt = String(wi.succAmt == null ? '' : wi.succAmt).trim();
+    var vatTxt = wi.vat === 'incl' ? '부가세 포함' : '부가세 별도';
+    var succ = '';
+    if (amt) succ = wi.succ === 'rate' ? '총 수령금액의 ' + amt.replace(/%$/, '') + '%(' + vatTxt + ')' : '금 ' + amt + '원(' + vatTxt + ')';
+    return {
+      위임분야: t ? t.area : '', 위임사무: t ? t.task : '', 위임내용: w ? w.text : '',
+      부가세처리: vatTxt, 기간연장: EXT_TEXT[wi.ext === 'auto' ? 'auto' : 'agree'], 성공보수: succ
+    };
+  }
+
   /* ── 제안서·견적서 자동 값 (설계 2026-09-29 §5) — 받는 곳 종류(기업/기관)·금액·부가세로 만든다.
      ⚠ 저장하지 않는다. 창에서 고칠 수 있고, 고친 값이 이긴다(openFill 의 edits). */
   var PROPOSAL_KEYS = ['수신자', '참조', '호칭', '송부일자', '담당노무사', '노무사연락처', '견적금액', '부가세', '비용합계'];
@@ -410,6 +449,7 @@
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
+    CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,
     mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
