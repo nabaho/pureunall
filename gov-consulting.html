@@ -10361,13 +10361,17 @@ function buildStampExtraSlots(n){
 /* 시 칸에 숫자 두 개를 넣으면 분 칸으로 저절로 넘어간다 (대표 지시 2026-09-30)
    — 추가 사진 줄(mh2~)은 나중에 생기므로 #spTimes 에 한 번만 걸어 둔다
    분 칸도 두 자리면 다음 줄 시 칸으로, 마지막 줄이면 그 줄 「적용」 단추로 (Enter 로 적용).
-   한 장 모드처럼 숨은 줄(offsetParent 없음)은 건너뛴다 */
+   한 장 모드처럼 숨은 줄(offsetParent 없음)은 건너뛴다
+   (2026-10-03) 두 자리가 될 수 없는 첫 숫자 — 시 3~9 · 분 6~9 — 는 한 자리에서 바로 넘긴다.
+   지울 때(inputType 이 insert… 가 아닐 때)는 넘어가지 않는다 */
 document.addEventListener('input',e=>{
   const t=e.target;
   if(!t||!t.matches||!t.matches('#spTimes input.tminput[id^="mh"], #spTimes input.tminput[id^="mm"]'))return;
-  if(String(t.value).length<2)return;
+  if(e.inputType&&!e.inputType.startsWith('insert'))return;
+  const v=String(t.value), isH=t.id.startsWith('mh');
+  if(v.length<2&&!(v.length===1&&+v>=(isH?3:6)))return;
   const n=+t.id.slice(2);
-  if(t.id.startsWith('mh')){
+  if(isH){
     const mm=document.getElementById('mm'+n);
     if(mm){ mm.focus(); mm.select(); }
     return;
