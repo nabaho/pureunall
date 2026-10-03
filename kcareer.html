@@ -609,6 +609,42 @@ html.dark .empty{color:var(--text-mute)}
 #page-resume-hub .dropzone,#page-docbox .dropzone{padding:11px 14px}
 /* 「구분」 칩 — 회의비용·기타비용을 한 화면으로 합치고 여기서 가른다(2026-08-29) */
 .fee-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.fd-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.fd-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.fd-kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;cursor:pointer;text-align:left}
+.fd-kpi:hover{border-color:var(--navy)}
+.fd-kpi .l{font-size:11.5px;color:var(--text-mute)}
+.fd-kpi .v{font-size:20px;font-weight:800;color:var(--navy);white-space:nowrap}
+.fd-kpi.warn .v{color:var(--amber)}
+.fd-two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;margin-bottom:10px}
+.fd-box{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 14px;min-width:0}
+.fd-box h4{margin:0 0 8px;font-size:13px;color:var(--navy)}
+.fd-bar{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer;font-size:12px}
+.fd-bar .k{width:34px;color:var(--text-sub);flex:none}
+.fd-bar .t{flex:1;height:12px;background:var(--soft);border-radius:4px;overflow:hidden}
+.fd-bar .t i{display:block;height:100%;background:var(--navy);border-radius:4px}
+.fd-bar .a{width:92px;text-align:right;white-space:nowrap;flex:none}
+.fd-bar:hover .k{color:var(--navy);font-weight:700}
+.fd-months{display:flex;align-items:flex-end;gap:5px;height:110px}
+.fd-months button{flex:1;border:0;padding:0;background:none;display:flex;flex-direction:column;justify-content:flex-end;height:100%;cursor:pointer}
+.fd-months i{display:block;background:#bfdbfe;border-radius:3px 3px 0 0;min-height:2px}
+.fd-months button.now i{background:var(--navy)}
+.fd-mlab{display:flex;gap:5px;font-size:10.5px;color:var(--text-mute)}
+.fd-mlab span{flex:1;text-align:center}
+.fd-row{display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;cursor:pointer;white-space:nowrap}
+.fd-row:last-child{border-bottom:0}
+.fd-row .c{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.fd-row:hover .c{color:var(--navy);text-decoration:underline}
+.fd-miss{color:var(--amber);font-weight:700}
+.fd-empty{color:var(--text-mute);font-size:12px;padding:6px 0}
+.fs-tbl{width:100%;border-collapse:collapse;font-size:12.5px;background:var(--card);border:1px solid var(--border);border-radius:10px;overflow:hidden}
+.fs-tbl th{font-size:11.5px;color:var(--text-mute);font-weight:600;text-align:left;padding:8px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.fs-tbl td{padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap}
+.fs-tbl tr.r{cursor:pointer}.fs-tbl tr.r:hover td{background:var(--soft)}
+.fs-tbl .n{text-align:right}
+.fs-pill{font-size:11px;padding:1px 8px;border-radius:9px;background:#f0fdf4;color:var(--teal)}
+.fs-pill.no{background:#fffbeb;color:#854d0e}
+@media(max-width:820px){ .fd-kpis{grid-template-columns:repeat(2,minmax(0,1fr))} .fd-two{grid-template-columns:minmax(0,1fr)} }
 .fee-chip{font-size:12px;padding:5px 12px;border:1px solid var(--border);border-radius:20px;
   background:#fff;color:var(--text-mute);cursor:pointer;font-family:inherit}
 .fee-chip:hover{background:var(--hover)}
@@ -1876,6 +1912,19 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn primary" data-act="new">+ 새 신청</button>
         </div>
         <div class="dt"></div>
+      </div></section>
+      <!-- 📊 회의·비용 한눈에 (목업 A) — 숫자·막대·줄을 누르면 비용 목록으로 가서 그 조건으로 거른다 -->
+      <section class="page-view" id="page-feedash"><div class="page">
+        <div class="fd-head"><div class="page-title">📊 회의·비용 한눈에</div>
+          <select class="tb-select" id="feeDashYear" onchange="renderFeeDash()" title="볼 해"></select>
+          <span style="flex:1"></span><button class="btn primary" onclick="feeNew()">+ 새 신청</button></div>
+        <div id="feeDashBody"></div>
+      </div></section>
+      <!-- 💰 정산 (목업 C) — 지출처·수령인별로 건수·합계, 동의서를 만들었나·입금계좌가 있나 -->
+      <section class="page-view" id="page-feesettle"><div class="page">
+        <div class="fd-head"><div class="page-title">💰 정산</div><div class="fee-chips" id="feeSettleWhen" style="margin:0"></div>
+          <span style="flex:1"></span><span id="feeSettleSum" style="font-size:12px;color:var(--text-mute)"></span></div>
+        <div id="feeSettleBody"></div>
       </div></section>
       <section class="page-view" id="page-etcfee" ondragover="pageDropOver(event,'etcfee')" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,'etcfee')"><div class="page"><div class="page-drop-overlay" id="ovl-page-etcfee"><span>📎 기타비용 영수증을 놓으면 OCR 자동 등록</span></div>
         <div class="page-head"><div class="page-title">🧾 기타비용신청</div><div class="page-desc">기타 비용 신청·기록</div></div>
@@ -5144,7 +5193,9 @@ let NAV=[
   {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함']]},
   /* 회의비용·기타비용을 한 화면으로 합쳤다(2026-08-29) — 「구분」이 이미 가른다.
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
-  {g:'회의·비용관리', items:[['page-meetfee','비용관리']]},
+  /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
+     「한눈에」가 첫 자리 — 상위를 누르면 첫 화면이 열린다(navPick). 기록은 그대로 meetfee·etcfee 두 통이다. */
+  {g:'회의·비용관리', items:[['page-feedash','📊 한눈에'],['page-meetfee','🧾 비용 목록'],['page-feesettle','💰 정산']]},
   {g:'경력관리', items:[['page-wiccok','위촉장'],['page-license','자격증'],['page-complete','수료증'],['page-award','표창 및 포상'],['page-edu','학력'],['page-work','기업경력']]},
   {g:'실적관리', items:[['page-case','사건실적'],['page-consult','컨설팅실적'],['page-fund','기금실적'],['page-lecture','강의실적'],['page-etc','기타실적'],['page-advisory','자문·고문'],['page-puagency','외부기관 실적'],['page-submission','제출서류']]},
   {g:null, items:[['page-settings','환경설정']]},
@@ -5481,6 +5532,8 @@ function nav_to(id,label,grp){
   /* 허브는 «지금 켜져 있는 탭»을 다시 그린다 — 빠른 이력서·올리기 줄이 여기서 맞춰진다 */
   if(id==='page-resume-hub') _safe(function(){ var b=document.querySelector('#rh-tabrow .tab.active'); if(b) rhTab(b.dataset.tab,b); });
   if(id==='page-docbox') _safe(function(){ dbTab(_dbDomain); });
+  if(id==='page-feedash') _safe(renderFeeDash);
+  if(id==='page-feesettle') _safe(renderFeeSettle);
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
   if(id==='page-certdoc' && typeof renderDocStore==='function') renderDocStore('certdoc');
   if(id==='page-settings'){ _safe(renderPersonal); _safe(renderAccounts); _safe(initIDSecurity); _safe(renderPubBox);
@@ -12542,7 +12595,153 @@ function feeConsentDoc(store, id){
   catch(e){ toast('동의서 만들기 실패: '+((e&&e.message)||'알 수 없는 오류')); return; }
   var nm='개인정보동의서_'+String(who||'수령인').replace(/[\\/:*?"<>|]/g,'')+'_'+(formatDate(r.date)||'').replace(/\./g,'')+'.hwpx';
   openHwpViewer(bytes, nm);
+  /* ★ 만든 날을 그 건에 남긴다 — 💰 정산이 「동의서 만듦」을 여기서 읽는다.
+     ⚠ «받았는지»는 모른다(사람이 받아 온다) — 그래서 «만듦»이라고만 쓴다. */
+  _safe(function(){ var arr=get(store)||[], x=arr.find(function(y){ return y.id===id; });
+    if(x){ x.consentAt=new Date().toISOString(); set(store, arr); } });
   toast('동의서를 만들었습니다 — 🖨 PDF로 뽑거나 ⬇ 저장해 전달하세요');
+}
+
+/* ── 📊 한눈에 · 💰 정산 (대표 지시 2026-10-03 → 목업 A+C 승인) ──
+   ⚠ 기록을 옮기거나 새 통을 만들지 않는다 — 비용 목록과 «같은 두 통»(meetfee·etcfee)을 읽기만 한다.
+   ⚠ 거르기는 비용 목록의 고르개를 움직여서 한다(feeGo) — 여기서 따로 거르면 숫자와 목록이 어긋난다. */
+var FEE_KINDS=['회의','출장','식대','교통','기타'];
+function feeAll(){
+  return ['meetfee','etcfee'].reduce(function(a,st){
+    return a.concat((get(st)||[]).map(function(r){ return Object.assign({_st:st}, r); })); }, []);
+}
+function _feeAmt(r){ var n=Number(String((r&&r.amt)||'').replace(/[^\d.-]/g,'')); return isFinite(n)?n:0; }
+function _feeYear(r){ return String((r&&(r.year||r.date))||'').slice(0,4); }
+function _feeMon(r){ return String((r&&r.date)||'').slice(0,7); }
+function _won(n){ return Math.round(n).toLocaleString('ko-KR')+'원'; }
+/* 빠진 것 — 회의(수당)만 입금계좌를 본다. 식대·교통은 가게에 낸 돈이라 계좌가 없는 게 맞다 */
+function feeMissing(r){
+  var m=[];
+  if(!_feeAmt(r)) m.push('금액 없음');
+  if(!String(r.org||'').trim()) m.push('지출처 없음');
+  if((r.type||'')==='회의' && !r.acct) m.push('입금계좌 없음');
+  return m;
+}
+function feeOpen(st, id){ if(typeof openEditDrawer==='function') openEditDrawer(st, id); }
+function feeNew(){
+  navTile('page-meetfee');
+  var b=document.querySelector('#page-meetfee [data-act="new"]'); if(b) b.click();
+}
+/* 비용 목록으로 가서 그 조건으로 거른다 — 목록의 고르개를 움직인다(거르는 규칙은 한 곳) */
+function feeGo(o){
+  o=o||{};
+  navTile('page-meetfee');
+  var sec=document.getElementById('page-meetfee'); if(!sec) return;
+  var put=function(f,v){ var el=sec.querySelector('[data-f="'+f+'"]'); if(el) el.value=v||''; };
+  put('q', o.q); put('type', o.type); put('year', o.year);
+  renderCareer('meetfee');
+}
+function _feeDashYear(all){
+  var sel=document.getElementById('feeDashYear');
+  var yrs=[...new Set(all.map(_feeYear).filter(Boolean))].sort().reverse();
+  var 올해=String(new Date().getFullYear());
+  if(yrs.indexOf(올해)<0) yrs.unshift(올해);
+  var cur=sel&&sel.value!==undefined&&sel.dataset.set?sel.value:올해;
+  if(sel){ sel.innerHTML=yrs.map(function(y){ return '<option'+(y===cur?' selected':'')+'>'+y+'</option>'; }).join('')+'<option value=""'+(cur===''?' selected':'')+'>전체</option>';
+    sel.dataset.set='1'; }
+  return cur;
+}
+function renderFeeDash(){
+  var body=document.getElementById('feeDashBody'); if(!body) return;
+  var all=feeAll(), yr=_feeDashYear(all);
+  var rows=yr?all.filter(function(r){ return _feeYear(r)===yr; }):all;
+  var 합=rows.reduce(function(a,r){ return a+_feeAmt(r); },0);
+  var d=new Date(), 이달=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2);
+  var 이달합=all.filter(function(r){ return _feeMon(r)===이달; }).reduce(function(a,r){ return a+_feeAmt(r); },0);
+  var 빠짐=rows.filter(function(r){ return feeMissing(r).length; });
+  var Y=_jsAttr(yr||'');
+  var html='<div class="fd-kpis">'
+    +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+Y+'\'})"><div class="l">'+(yr?yr+'년 합계':'전체 합계')+'</div><div class="v">'+_won(합)+'</div></button>'
+    +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+d.getFullYear()+'\'})"><div class="l">이번 달 ('+(d.getMonth()+1)+'월)</div><div class="v">'+_won(이달합)+'</div></button>'
+    +'<button type="button" class="fd-kpi" onclick="feeGo({year:\''+Y+'\'})"><div class="l">건수</div><div class="v">'+rows.length+'건</div></button>'
+    +'<button type="button" class="fd-kpi'+(빠짐.length?' warn':'')+'" onclick="document.getElementById(\'fdMiss\').scrollIntoView({behavior:\'smooth\',block:\'center\'})"><div class="l">확인할 것</div><div class="v">'+빠짐.length+'건</div></button>'
+    +'</div>';
+  /* 구분별 */
+  var 구분={}; rows.forEach(function(r){ var k=FEE_KINDS.indexOf(r.type)>=0?r.type:'기타'; 구분[k]=(구분[k]||0)+_feeAmt(r); });
+  var 큰=Math.max.apply(null, FEE_KINDS.map(function(k){ return 구분[k]||0; }).concat([1]));
+  var 막대=FEE_KINDS.map(function(k){ var v=구분[k]||0;
+    return '<div class="fd-bar" onclick="feeGo({year:\''+Y+'\',type:\''+k+'\'})" title="'+k+'만 목록으로"><span class="k">'+k+'</span>'
+      +'<span class="t"><i style="width:'+Math.round(v/큰*100)+'%"></i></span><span class="a">'+_won(v)+'</span></div>'; }).join('');
+  /* 월별 — 고른 해(전체면 올해) */
+  var my=yr||String(d.getFullYear()), 달=[]; for(var i=1;i<=12;i++) 달.push(0);
+  all.forEach(function(r){ var m=_feeMon(r); if(m.slice(0,4)===my){ var k=Number(m.slice(5,7)); if(k>=1&&k<=12) 달[k-1]+=_feeAmt(r); } });
+  var 큰달=Math.max.apply(null, 달.concat([1]));
+  var 월=달.map(function(v,i){ var now=(my===String(d.getFullYear()) && i===d.getMonth());
+    return '<button type="button" class="'+(now?'now':'')+'" title="'+my+'년 '+(i+1)+'월 '+_won(v)+'" onclick="feeGo({year:\''+my+'\'})"><i style="height:'+Math.round(v/큰달*100)+'%"></i></button>'; }).join('');
+  var 월글=달.map(function(v,i){ return '<span>'+(i+1)+'</span>'; }).join('');
+  html+='<div class="fd-two"><div class="fd-box"><h4>구분별</h4>'+막대+'</div>'
+    +'<div class="fd-box"><h4>월별 <span style="font-weight:400;font-size:11px;color:var(--text-mute)">'+my+'년</span></h4><div class="fd-months">'+월+'</div><div class="fd-mlab">'+월글+'</div></div></div>';
+  /* 확인할 것 · 최근 내역 */
+  var 줄=function(r, 앞){ return '<div class="fd-row" onclick="feeOpen(\''+r._st+'\',\''+_jsAttr(r.id)+'\')">'+앞
+      +'<span class="c" title="'+escapeHtml(r.content||'')+'">'+escapeHtml(r.content||'(내용 없음)')+'</span>'
+      +'<span>'+(_feeAmt(r)?_won(_feeAmt(r)):'-')+'</span></div>'; };
+  var 날=function(r){ return '<span style="color:var(--text-mute)">'+escapeHtml(String(r.date||'').slice(5).replace('-','.'))+'</span>'; };
+  var 최근=all.slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); }).slice(0,6);
+  html+='<div class="fd-two"><div class="fd-box" id="fdMiss"><h4>확인할 것 <span class="fd-miss">'+빠짐.length+'</span></h4>'
+    +(빠짐.length?빠짐.slice(0,8).map(function(r){ return 줄(r, 날(r)+'<span class="fd-miss">'+feeMissing(r).join(' · ')+'</span>'); }).join('')
+      +(빠짐.length>8?'<div class="fd-empty">외 '+(빠짐.length-8)+'건</div>':''):'<div class="fd-empty">빠진 것이 없습니다</div>')+'</div>'
+    +'<div class="fd-box"><h4>최근 내역</h4>'
+    +(최근.length?최근.map(function(r){ return 줄(r, 날(r)+'<span class="tag navy">'+escapeHtml(r.type||'기타')+'</span>'); }).join(''):'<div class="fd-empty">아직 기록이 없습니다 — 「+ 새 신청」으로 넣으세요</div>')
+    +'</div></div>';
+  body.innerHTML=html;
+}
+/* 💰 정산 — 지출처·수령인별 */
+var _feeSettleWhen='year';
+function feeSettleWhen(w){ _feeSettleWhen=w; renderFeeSettle(); }
+function _feeInWhen(r, w){
+  var d=new Date(), y=String(d.getFullYear()), m=y+'-'+('0'+(d.getMonth()+1)).slice(-2);
+  var p=new Date(d.getFullYear(), d.getMonth()-1, 1), pm=p.getFullYear()+'-'+('0'+(p.getMonth()+1)).slice(-2);
+  if(w==='year') return _feeYear(r)===y;
+  if(w==='month') return _feeMon(r)===m;
+  if(w==='prev') return _feeMon(r)===pm;
+  return true;
+}
+function feeSettleGroups(all, w){
+  var g={};
+  all.filter(function(r){ return _feeInWhen(r, w); }).forEach(function(r){
+    var k=String(r.org||'').trim()||'(지출처 없음)';
+    var x=g[k]||(g[k]={ who:k, n:0, sum:0, last:'', consent:'', acct:false, rows:[] });
+    x.n++; x.sum+=_feeAmt(r); x.rows.push(r);
+    if(String(r.date||'')>x.last) x.last=String(r.date||'');
+    if(r.consentAt && String(r.consentAt)>x.consent) x.consent=String(r.consentAt);
+    if(r.acct) x.acct=true;
+  });
+  return Object.keys(g).map(function(k){ return g[k]; }).sort(function(a,b){ return b.sum-a.sum; });
+}
+function feeSettleConsent(ev, who){
+  if(ev) ev.stopPropagation();
+  var gs=feeSettleGroups(feeAll(), _feeSettleWhen), x=gs.find(function(z){ return z.who===who; });
+  if(!x || !x.rows.length) return;
+  var r=x.rows.slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })[0];
+  feeConsentDoc(r._st, r.id);
+  setTimeout(renderFeeSettle, 300);
+}
+function renderFeeSettle(){
+  var body=document.getElementById('feeSettleBody'); if(!body) return;
+  var w=_feeSettleWhen, 칩=document.getElementById('feeSettleWhen');
+  if(칩) 칩.innerHTML=[['year','올해'],['month','이번 달'],['prev','지난 달'],['all','전체']].map(function(o){
+    return '<button type="button" class="fee-chip'+(w===o[0]?' on':'')+'" onclick="feeSettleWhen(\''+o[0]+'\')">'+o[1]+'</button>'; }).join('');
+  var gs=feeSettleGroups(feeAll(), w);
+  var 합=gs.reduce(function(a,x){ return a+x.sum; },0), 건=gs.reduce(function(a,x){ return a+x.n; },0);
+  var sum=document.getElementById('feeSettleSum'); if(sum) sum.textContent='합계 '+_won(합)+' · '+건+'건 · '+gs.length+'곳';
+  if(!gs.length){ body.innerHTML='<div class="fd-empty" style="padding:20px 4px">이 기간에 기록이 없습니다</div>'; return; }
+  body.innerHTML='<table class="fs-tbl"><thead><tr><th>지출처·수령인</th><th class="n">건수</th><th class="n">합계</th><th>마지막</th><th>동의서</th><th>입금계좌</th></tr></thead><tbody>'
+    +gs.map(function(x){
+      var 없음=(x.who==='(지출처 없음)');
+      var W=_jsAttr(x.who);
+      return '<tr class="r" onclick="feeGo({q:\''+(없음?'':W)+'\'})" title="이 곳의 건만 비용 목록으로">'
+        +'<td>'+(없음?'<span class="fd-miss">'+escapeHtml(x.who)+'</span>':'<b>'+escapeHtml(x.who)+'</b>')+'</td>'
+        +'<td class="n">'+x.n+'</td><td class="n">'+_won(x.sum)+'</td>'
+        +'<td style="color:var(--text-mute)">'+escapeHtml(x.last.slice(0,10).replace(/-/g,'.'))+'</td>'
+        +'<td>'+(없음?'-':(x.consent?'<span class="fs-pill" title="만든 날 — 받았는지는 따로 확인">만듦 '+escapeHtml(x.consent.slice(5,10).replace('-','.'))+'</span>'
+            :'<button class="btn sm" onclick="feeSettleConsent(event,\''+W+'\')" title="가장 최근 건으로 동의서를 만듭니다">📨 만들기</button>'))+'</td>'
+        +'<td>'+(없음?'-':'<span class="fs-pill'+(x.acct?'':' no')+'">'+(x.acct?'있음':'없음')+'</span>')+'</td></tr>';
+    }).join('')+'</tbody></table>';
 }
 
 /* ===== 이력서 생성·보관 — 내 정보로 채우기 + 임시저장 =====
