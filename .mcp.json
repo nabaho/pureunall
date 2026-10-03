@@ -9,7 +9,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "korean-law-mcp"
+        "korean-law-mcp@4.15.5"
       ],
       "env": {
         "LAW_OC": "${LAW_OC:-}"
@@ -39,10 +39,6 @@
     "korean-patent": {
       "type": "http",
       "url": "https://mcp.gomdori.app/patent"
-    },
-    "schoolinfo": {
-      "type": "http",
-      "url": "https://mcp.gomdori.app/school"
     },
     "korean-dart": {
       "type": "stdio",
