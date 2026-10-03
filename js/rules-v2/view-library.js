@@ -214,8 +214,9 @@
     var M = model(st);
     var shown = M.items.filter(function (it) { return passes(it, st, M); });
     var body = O().byMail(shown).map(function (g) {
-      var m = g.mail || {}, ids = g.items.map(function (it) { return it.id; }).filter(function (id) {
-        return (st.data.docs[id] || {}).status !== '보류'; });
+      /* 메일 한 통의 첨부를 한 번에 — 이미 이어진 메일에는 단추를 안 단다(바꿀 때는 ☐ 로 골라 「사업장 확정…」) */
+      var m = g.mail || {}, ids = g.items.filter(function (it) {
+        return it.status !== '보류' && flags(it, M).unlinked; }).map(function (it) { return it.id; });
       var head = '✉ ' + (m.subject || '(제목 없음)');
       var meta = ymd(m.date) + ' · ' + (g.items[0].dir || '') + ' · 첨부 ' + g.items.length;
       var rows = '<tr class="mail"><td></td>' + '<td colspan="8" title="' + esc(head + ' · ' + meta) + '">✉ <b>' + esc(m.subject || '(제목 없음)') + '</b> · ' + esc(meta)
