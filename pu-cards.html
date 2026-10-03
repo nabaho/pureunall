@@ -34437,6 +34437,12 @@ async function coSentBatchUndo(){
   closeCoSentBatch();
   toast('되돌렸습니다 — 남긴 기록을 다시 지웠습니다', 5000);
 }
+/* 📨 제안서 보내기 (설계 2026-09-29 §8) — 문서관리를 «이 회사 열쇠»만 들고 새 탭으로 연다.
+   ⚠ 기업정보함은 양식 목록을 읽지 않는다 — 양식은 문서관리 한 곳에만 있다. */
+function openProposeFor(k){
+  if(!k) return;
+  window.open('docs-esign.html#forms:propose=' + encodeURIComponent(k), '_blank', 'noopener');
+}
 function coSentHtml(o){
   const cards = (o && o.cards) || [];
   const rows = coSentList(cards, state.sendLog, _coSent[(o && o.key) || '']);
@@ -34445,10 +34451,10 @@ function coSentHtml(o){
        세 마디를 한 줄에 늘어놓으니 정작 봐야 할 기록이 아래로 밀렸다.
      ⚠ 자른 것은 «2걸음 앞»의 기록뿐이다 — 그 뒤로는 회사에 바로 쌓여 사람 수와
        상관없다. 그렇게 적어야 「30명 밖은 안 보인다」로 오해하지 않는다. */
-  const note = '자료함에서 보낸 것만 잡힙니다';
+  const note = '자료함·문서관리에서 보낸 것만 잡힙니다';
   const noteFull = '취업규칙 회차는 위 「이 회사에서 한 일」에 있습니다. 단체 메일과 전 사업장 배포도 여기 함께 나옵니다.'
     + (cut ? ` 2026-09-03 앞의 기록은 이 회사 사람 ${cards.length}명 가운데 최근 ${CO_SENT_MAX_CARDS}명분만 읽었습니다.` : '');
-  return `<div class="pcsec" style="margin:16px 4px 8px">📤 보낸 서류 ${rows.length}건</div>
+  return `<div class="pcsec" style="margin:16px 4px 8px;display:flex;align-items:center;gap:8px">📤 보낸 서류 ${rows.length}건<span style="flex:1"></span>${o && o.key ? `<button type="button" class="btn ghost" style="font-size:12px;padding:3px 9px" title="문서관리에서 이 회사로 채운 제안서·견적서를 메일로 보냅니다" data-k="${esc(o.key)}" onclick="openProposeFor(this.dataset.k)">📨 제안서 보내기</button>` : ''}</div>
     ${hintLine(note, noteFull)}
     ${rows.length ? rows.map(r=>`<div class="cof">
       <span>${r.kind && r.kind!=='자료' ? `<b>${esc(r.kind)}</b> · ` : ''}${r.set?`<b>📦 ${esc(r.set)}</b> — `:''}${esc(r.what)}</span>
