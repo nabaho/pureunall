@@ -16145,6 +16145,45 @@ function pcTableBurst(){
   _pcTableAt = now;
   return false;
 }
+/* ⚡ 기업 상세 목록 (대표 지시 2026-10-03 「기업상세도 확인」 → 「진행」)
+   대표 크롬 실측: 회사 하나 열기 6ms · 「읽는 중」 0.1~0.2초로 빠른데, 목록으로 «들어갈 때» 5초 중 519ms.
+   쪼개 보니 계산은 20ms, 회사 200줄 표를 «화면에 놓는 데» 115ms(20줄 10ms · 100줄 83ms · 200줄 121ms),
+   그것을 들어갈 때 두 번(바로 + 딸림정보 도착 뒤). 칸 고정·가두기 같은 CSS 손질은 거의 안 줄었다.
+   ① 몰려오면 끝에 한 번 — 옆줄·명함 표와 같은 규칙.
+   ② 나눠 놓기 — 글자는 200줄 다 만들되(13ms) 놓기 «전»에 41번째부터 떼어 두고, 앞 40줄만 먼저 놓는다.
+      나머지는 곧이어 40줄씩 붙인다. 표는 칸 너비가 고정(.cotbl table-layout:fixed)이라 붙여도 앞줄을 다시 안 잰다.
+   ⚠ 고르기·전체 고르기는 화면이 아니라 자료(state.coSel·coPage)로 한다 — 덜 붙은 사이에 눌러도 맞다.
+   ⚠ 새로 그리면 붙이던 것은 멈춘다(옛 표는 화면에서 떨어져 나가 isConnected 가 거짓이 된다). */
+let _coPageAt = 0, _coPageT = null;
+function coPageBurst(){
+  const now = Date.now();
+  if(_coPageT) return true;
+  const gap = now - _coPageAt;
+  if(gap >= 0 && gap < PC_SIDE_GAP){
+    _coPageT = true;
+    const t = setTimeout(()=>{ _coPageT = null; _coPageAt = 0; if(state.view === 'co') renderCoPage(); }, PC_SIDE_GAP - gap);
+    if(_coPageT) _coPageT = t || true;
+    return true;
+  }
+  _coPageAt = now;
+  return false;
+}
+const CO_DRIP_FIRST = 40, CO_DRIP_STEP = 40;
+function coRowsDripStart(root){
+  const tb = root && root.querySelector && root.querySelector('table.cotbl > tbody');
+  if(!tb || !tb.rows || tb.rows.length <= CO_DRIP_FIRST) return 0;
+  const rest = Array.prototype.slice.call(tb.rows, CO_DRIP_FIRST);
+  rest.forEach(r=>r.remove());                 /* 놓기 «전»에 뗀다 — 아직 아무도 크기를 안 쟀다 */
+  const step = ()=>{
+    if(!tb.isConnected || !rest.length) return;
+    const f = document.createDocumentFragment();
+    rest.splice(0, CO_DRIP_STEP).forEach(r=>f.appendChild(r));
+    tb.appendChild(f);
+    if(rest.length) setTimeout(step, 0);
+  };
+  setTimeout(step, 0);
+  return rest.length;
+}
 function renderPCSide(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
   if(typeof pcSideBurst === 'function' && pcSideBurst()) return;   /* ⚡ 몰려오면 끝에 한 번 */
@@ -30745,6 +30784,7 @@ function coListShapeKey(){
 }
 function renderCoPage(){
   const el=$('pcCo'); if(!el) return;
+  if(typeof coPageBurst === 'function' && coPageBurst()) return;   /* ⚡ 몰려오면 끝에 한 번 */
   if(typeof _coWatch!=='undefined' && _coWatch) _coWatch.renders++;
   const all = coList();
   const tags = coTagList(all);
@@ -30792,6 +30832,9 @@ function renderCoPage(){
     + `<div class="cofoot">${coPagerHtml(info)}</div>`;
   /* 새로 만들어진 칸에 자리를 되꽂는다. 목록이 짧아졌으면 브라우저가 알아서 끝까지만
      내려 준다 — 우리가 자를 필요가 없다. */
+  /* ⚡ 나눠 그리기 — 처음·목록이 바뀔 때·아직 안 굴렸을 때만. 굴려 둔 같은 목록은 자리를 지켜야
+     해서 예전처럼 한 번에 놓는다(나눠 놓으면 짧아진 칸에서 자리가 잘린다). */
+  if((!sameList || !keepTop) && typeof coRowsDripStart === 'function') coRowsDripStart(el);
   const body = el.querySelector('.cobody');
   if(body) body.scrollTop = sameList ? keepTop : 0;
 }
