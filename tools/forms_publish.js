@@ -88,6 +88,22 @@ function publishPlan(forms, approvals, existing, review) {
   return { index, files, added, removed, refused };
 }
 
+// 검토표 파일들 → { id: 'O'|'X' }. 뒤 파일이 앞 파일을 덮는다(차수별 파일과 전체 파일을 함께 줘도 같은 ID 는 하나).
+// ⚠ vendor 의 SheetJS 는 브라우저판이라 Node 에서 XLSX.readFile 이 «Cannot access file» 로 실패한다(2026-10-04 실측) —
+//   바이트를 직접 읽어 XLSX.read 에 넘긴다.
+function readApprovals(paths) {
+  const XLSX = require(path.join(ROOT, 'vendor', 'xlsx.full.min.js'));
+  const approvals = {};
+  (paths || []).forEach(p => {
+    const wb = XLSX.read(fs.readFileSync(p), { type: 'buffer' });
+    wb.SheetNames.forEach(sn => {
+      const a = approvalsFromRows(XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' }));
+      Object.keys(a).forEach(id => { approvals[id] = a[id]; });
+    });
+  });
+  return approvals;
+}
+
 function readExisting() {
   if (!fs.existsSync(PUB_DIR)) return [];
   const out = [];
@@ -105,16 +121,8 @@ function main(argv) {
   const snapPath = path.join(OUT_DIR, 'forms_snapshot.json');
   if (!fs.existsSync(snapPath)) { console.error('묶음 사본이 없습니다 — 먼저: node tools/forms_report.js'); process.exit(1); }
   const snap = JSON.parse(fs.readFileSync(snapPath, 'utf8'));
-  const XLSX = require(path.join(ROOT, 'vendor', 'xlsx.full.min.js'));
   const sheets = args.length ? args : fs.readdirSync(OUT_DIR).filter(n => /^서식집_검토.*\.xlsx$/.test(n)).map(n => path.join(OUT_DIR, n));
-  const approvals = {};
-  sheets.forEach(p => {
-    const wb = XLSX.readFile(p);
-    wb.SheetNames.forEach(sn => {
-      const a = approvalsFromRows(XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, defval: '' }));
-      Object.keys(a).forEach(id => { approvals[id] = a[id]; });
-    });
-  });
+  const approvals = readApprovals(sheets);
   const nO = Object.keys(approvals).filter(k => approvals[k] === 'O').length;
   const nX = Object.keys(approvals).length - nO;
   console.log('검토표 %d개 · 승인 O %d · 반려 X %d', sheets.length, nO, nX);
@@ -133,4 +141,4 @@ function main(argv) {
 }
 
 if (require.main === module) main(process.argv);
-module.exports = { approvalsFromRows, publicForm, publishPlan, DOMAIN_FILE };
+module.exports = { approvalsFromRows, readApprovals, publicForm, publishPlan, DOMAIN_FILE };
