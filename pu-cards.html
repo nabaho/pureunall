@@ -807,17 +807,24 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .mn-foot a{color:#2563eb}
 /* 📥 연락처 정리 (대표 승인 목업 v2 2026-10-03) — 한 칸 한 줄 · 맨 앞 ☐·# */
 .cn{padding:14px 18px 40px}
-.cn-head{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+/* 머리 한 줄 (대표 지시 2026-10-04 「틀고정과 KPI 너무 크다 … 간략하게」)
+   예전: 제목 줄 + 큰 숫자 칸 셋(설명 글 포함) + 「보낼 곳」 줄 = 세 줄, 내리면 사라졌다.
+   지금: 제목·세 갈래·일괄 단추를 «한 줄»에 두고, 그 줄과 표 머리를 위에 붙인다.
+   ⚠ 설명 글(아직 저장 안 됨 등)은 지우지 않고 갈래 단추의 title 로 옮겼다.
+   ⚠ 표 머리의 top 은 이 줄 높이(--cnTop)와 같아야 한다 — 줄이 두 줄로 늘면 머리가 겹친다. */
+.cn-head{display:flex;align-items:center;gap:8px;margin-bottom:8px;min-height:32px;flex-wrap:nowrap}
 .cn-head b{font-size:17px;color:#1e293b}
 .cn-i{cursor:help;color:#94a3b8;font-size:13px}
-.cn-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-bottom:10px}
-.cn-card{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;font-family:inherit;cursor:pointer;
-  background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;padding:9px 12px}
-.cn-card.on{border:2px solid #2563eb;padding:8px 11px;background:#eff6ff}
+.cn-cards{display:flex;gap:4px;margin-left:10px}
+.cn-card{display:inline-flex;align-items:center;gap:6px;font-family:inherit;cursor:pointer;white-space:nowrap;
+  background:#ffffff;border:1px solid #e2e8f0;border-radius:6px;padding:3px 10px;font-size:12.5px;color:#475569}
+.cn-card.on{border-color:#2563eb;background:#eff6ff;color:#1e40af}
 .cn-card .l{font-size:12px;color:#64748b}
-.cn-card b{font-size:21px;color:#1e293b}
-.cn-card .s{font-size:11px;color:#94a3b8}
-.cn-legend{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:12px;color:#64748b;margin-bottom:8px}
+.cn-card b{font-size:13px;color:#1e293b}
+/* #pcMail 위쪽 여백(16px)만큼 끌어올려 붙인다 — 안 그러면 붙은 줄 위 16px 틈으로 아래 줄이 비친다 */
+#pcMail .cn{--cnTop:40px;padding-top:0}
+#pcMail .cn-head{position:sticky;top:-16px;z-index:7;background:#fff;margin:-16px 0 0;padding-top:16px;height:calc(var(--cnTop) + 16px)}
+#pcMail .cn-t th{position:sticky;top:var(--cnTop);z-index:6;box-shadow:inset 0 -1px 0 #e2e8f0}
 .cn .go{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle;white-space:nowrap;
   border-radius:4px;padding:1px 8px;font-size:12px}
 .cn .go.co{background:#eff6ff;color:#1e40af;border:1px solid #bfdbfe}
@@ -826,7 +833,7 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .cn a.go{cursor:pointer;text-decoration:none}
 .cn a.go:hover{border-color:#2563eb}
 .cn-auto{font-size:10.5px;color:#94a3b8}
-.cn-bulk{display:flex;align-items:center;gap:6px;padding:6px 10px;margin-bottom:6px;background:#f8fafc;border:1px solid #e2e8f0;
+.cn-bulk{display:flex;align-items:center;gap:6px;padding:3px 8px;margin-left:auto;background:#f8fafc;border:1px solid #e2e8f0;white-space:nowrap;
   border-radius:6px;font-size:12.5px;color:#1e293b}
 .cn-bulk button,.cn-t button{font-family:inherit;font-size:12px;border:1px solid #cbd5e1;background:#ffffff;color:#475569;
   border-radius:4px;padding:3px 9px;cursor:pointer;white-space:nowrap}
@@ -24321,11 +24328,11 @@ function cntHtml(){
   const busy = cntLoading();
   const todo = busy ? [] : cntTodo(), done = cntDone(), skip = cntSkips();
   const day = t => { const d = new Date(Number(t||0)); return isNaN(d) || !t ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
-  const card = (t, ic, label, n, sub) => `<button class="cn-card${tab===t?' on':''}" onclick="cntTabSet('${t}')">
-      <span class="l">${ic} ${label}</span><b>${busy && t==='todo' ? '…' : n.toLocaleString()}</b><span class="s">${sub}</span></button>`;
-  let h = `<div class="cn-head"><b>📥 연락처 정리</b><span class="cn-i" title="메일함에서 처음 온 상대를 모았습니다 — 스팸·광고·공공기관·기계발신은 뺐습니다.&#10;정리할 것은 아직 아무 데도 저장되지 않았습니다. 단추를 누르면 그 자리에 들어갑니다.&#10;들어간 곳은 「정리한 것」에서 보고, 되돌릴 수 있습니다.">ⓘ</span></div>`;
+  const card = (t, ic, label, n, sub) => `<button class="cn-card${tab===t?' on':''}" onclick="cntTabSet('${t}')" title="${sub}">
+      ${ic} ${label} <b>${busy && t==='todo' ? '…' : n.toLocaleString()}</b></button>`;
+  /* 제목·세 갈래·일괄 단추가 한 줄(.cn-head) — 위에 붙는다 */
+  let h = `<div class="cn-head"><b>📥 연락처 정리</b><span class="cn-i" title="메일함에서 처음 온 상대를 모았습니다 — 스팸·광고·공공기관·기계발신은 뺐습니다.&#10;정리할 것은 아직 아무 데도 저장되지 않았습니다. 단추를 누르면 그 자리에 들어갑니다.&#10;들어간 곳은 「정리한 것」에서 보고, 되돌릴 수 있습니다.&#10;단추: 🏢 이알피 업체관리 담당자로 잇기 · 📇 기업정보함 명함으로 · 🙈 넘어가기">ⓘ</span>`;
   h += `<div class="cn-cards">${card('todo','📥','정리할 것',todo.length,'아직 저장 안 됨')}${card('done','✅','정리한 것',done.filter(x=>!x.undone).length,'업체·명함에 들어감')}${card('skip','🙈','넘어간 것',skip.length,'다시 안 물음')}</div>`;
-  h += `<div class="cn-legend">보낼 곳 <span class="go co">🏢 업체 담당자 · 이알피 업체관리</span><span class="go cd">📇 명함 · 기업정보함</span><span class="go no">🙈 넘어가기</span></div>`;
   const list = tab === 'todo' ? todo : tab === 'done' ? done : skip;
   const keys = list.map(r=>r.key);
   const nSel = keys.filter(k=>sel[k]).length;
@@ -24333,6 +24340,7 @@ function cntHtml(){
       tab === 'todo' ? `<button onclick="cntBulk('card')">📇 명함으로</button><button onclick="cntBulk('skip')">🙈 넘어가기</button>`
     : tab === 'skip' ? `<button onclick="cntBulk('unskip')">↩ 다시 살리기</button>`
     : `<button onclick="cntBulk('undo')">↩ 되돌리기</button>`}<button onclick="cntSelAll(false)">선택 풀기</button></div>`;
+  h += '</div>';
   const allOn = keys.length && nSel === keys.length;
   const th = cols => `<tr><th class="ck"><input type="checkbox" ${allOn?'checked':''} onchange="cntSelAll(this.checked)" title="모두 고르기"></th><th class="no">#</th>${cols}</tr>`;
   const ck = k => `<td class="ck"><input type="checkbox" ${sel[k]?'checked':''} onchange="cntSel('${esc(k)}',this.checked)"></td>`;
