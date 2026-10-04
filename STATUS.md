@@ -183,24 +183,18 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 
 ## 2. 지금 손이 필요한 것
 
-### ⚠ 구글 콘솔 — 푸른 캘린더 «구글 늘 연결» (2026-09-20 → 2026-10-04 넓힘)
+### ✅ 구글 «늘 연결» — 켜졌다 (2026-10-04)
 
 대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다」 — 사람마다 처음 한 번만 연결하면
-서버(functions/gcal-link.js)가 갱신 열쇠를 들고 늘 이어 준다.
+서버(functions/gcal-link.js)가 갱신 열쇠를 들고 늘 이어 준다. **다 끝났다.**
 
-**끝난 것 (2026-10-04)**
-- 동의 화면(브랜딩) 만듦 · 승인된 도메인 nabaho.github.io · PUREUN-ERP 에 Google Calendar API 켬
-- 서버 비밀값 GCAL_OAUTH_SECRET (3번 판 — GOCSPX 모양 확인, 잘못 들어간 1·2번 판은 지움)
-- 서버 함수 5개 배포(asia-northeast3) · 공개 호출은 처음부터 됐다(401 JSON 확인 — 따로 할 일 없음)
+- 구글 콘솔(authuser=2 · PUREUN-ERP): 동의 화면 · 승인된 도메인 · Calendar API · 리디렉션 pu-cal.html · **프로덕션 게시**
+- 서버 비밀값 GCAL_OAUTH_SECRET 3번 판 · 함수 5개 배포 · 처리방침 https://nabaho.github.io/pureunall/policy/gcal-privacy.html
+- 대표님 첫 연결 성공(gcalLink 200, 연결 1명)
+- ⚠ 대표님 연결은 «테스트 중»에 한 것 — 7일 뒤 끊길 수 있어 한 번 끊고 다시 연결하시라고 안내함.
+  끊기면 화면이 «구글 연결 끊김 — 눌러서 다시 연결»로 알려 준다(조용히 실패하지 않는다).
+- 직원이 처음 연결할 때 «확인되지 않은 앱» → 계속 (구글 검수 안 받음 · 100명 한도)
 
-**남은 것 — 이것이 끝나야 직원 모두가 쓴다**
-1. **개인정보처리방침 공개** — 초안은 만들었다(policy/gcal-privacy.html 로 올릴 것).
-   대표님이 정해 주실 것: 개인정보 보호책임자 성명·직위 · 연락처 · 시행일.
-   브랜딩의 처리방침 링크는 이미 `https://nabaho.github.io/pureunall/policy/gcal-privacy.html` 로 넣어 둠.
-2. **대상 → 「앱 게시」(프로덕션)** — ⚠ «테스트 중»이면 테스트 사용자만 연결되고, 구글이 **7일마다** 끊는다.
-3. 클라이언트의 **승인된 리디렉션 URI** 에 `https://nabaho.github.io/pureunall/pu-cal.html` 이 있는지 — 없으면 redirect_uri_mismatch.
-
-**파이어베이스 콘솔이 아니라 구글 클라우드 콘솔입니다**(authuser=2 계정, 프로젝트 PUREUN-ERP).
 상세: status/2026-10-04-cal-gcal-keep.md
 
 
