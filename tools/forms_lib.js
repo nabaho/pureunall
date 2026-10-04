@@ -184,17 +184,36 @@ function stripTags(s) {
 const MIN_BODY_STRONG = 1;
 const MIN_BODY_WEAK = 120;
 
+// 표 «밖»의 문단(<p …>) 앞에서만 자른다.
+// ⚠★ 2026-10-04 실측 — hwp2html.py 가 가운데맞춤·줄간격을 되살리면서(2c2b30b8) 문단이 <p style="…"> 로 나온다.
+//   예전 잣대(맨 <p> 만)로는 6,942조각 중 261개만 제목을 찾았다(서식 3,501종 중 제목 113종).
+//   또 칸 안 문단을 <p> 로 내는 문서가 88건 생겨, 표 안에서 자르면 서식이 칸 한가운데서 갈린다.
+//   그래서 «속성이 붙은 <p>»도 받고, 표(<table>) 안의 <p> 에서는 자르지 않는다.
+function topLevelParts(src) {
+  const cuts = [];
+  let depth = 0, m;
+  const re = /<(\/?)(table|p)\b[^>]*>/gi;
+  while ((m = re.exec(src))) {
+    const tag = m[2].toLowerCase();
+    if (tag === 'table') { depth += m[1] ? -1 : 1; if (depth < 0) depth = 0; continue; }
+    if (!m[1] && depth === 0 && m.index > 0) cuts.push(m.index);
+  }
+  const parts = [];
+  let at = 0;
+  cuts.forEach(c => { parts.push(src.slice(at, c)); at = c; });
+  parts.push(src.slice(at));
+  return parts.filter(p => p !== '');
+}
+const P_HEAD = /^<p\b[^>]*>([\s\S]*?)<\/p>/i;
+
 function splitSegments(html) {
   const src = String(html || '');
-  // 문자열의 모든 <p> 앞에서 자르므로 중첩된 <p>도 경계가 된다.
-  // hwp2html.py가 <td> 안에 <p>를 만들지 않아(셀 여러 줄은 <br>로 연결, 1×1 레이아웃 표는 최상위 <p>로 펼침) 실무상 안전하다.
-  // 다른 변환기를 붙이면 이 가정을 다시 확인해야 한다.
-  const parts = src.split(/(?=<p>)/);
+  const parts = topLevelParts(src);
   const raw = [];
   let cur = null;
   let preamble = '';
   for (const part of parts) {
-    const m = /^<p>([\s\S]*?)<\/p>/.exec(part);
+    const m = P_HEAD.exec(part);
     const rank = m ? titleRank(stripTags(m[1])) : 0;
     if (rank) {
       cur = { title: stripTags(m[1]).replace(/\s/g, ''), html: part, rank };
@@ -213,7 +232,7 @@ function splitSegments(html) {
   // 무르는 방식이라 어떤 낱말이 제목인지 알아맞힐 필요가 없다.
   const segs = [];
   for (const s of raw) {
-    const body = stripTags(s.html.replace(/^<p>[\s\S]*?<\/p>/, ''));
+    const body = stripTags(s.html.replace(P_HEAD, ''));
     if (body.length >= (s.rank >= 2 ? MIN_BODY_STRONG : MIN_BODY_WEAK)) { segs.push(s); continue; }
     if (segs.length) { segs[segs.length - 1].html += s.html; continue; }
     // 앞에 붙일 조각이 없다. 약한 제목이면 머리말로 흘려보내고,
