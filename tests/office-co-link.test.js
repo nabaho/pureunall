@@ -24,17 +24,17 @@ test('ⓐ 사업자번호 짐작 — 이름이 같을 때만, 이알피 먼저',
   const D = load();
   const cos = [
     { key: '가나상사', name: '(주)가나상사', bz: '', n: 1, r: 0 },
-    { key: '다라산업', name: '다라산업', bz: '987-65-43210', n: 0, r: 2 },
+    { key: '다라산업', name: '다라산업', bz: '123-45-67891', n: 0, r: 2 },
     { key: '마바상회', name: '마바상회', bz: '', n: 1, r: 0 },
     { key: '사아물산', name: '사아물산', bz: '', n: 1, r: 0 }];
   const refs = [
-    { k: 'biz', c: '가나상사', bz: '111-11-11111' },
+    { k: 'biz', c: '가나상사', bz: '123-11-11111' },
     { k: 'erp', c: '가나상사 주식회사', bz: '123-45-67890' },
-    { k: 'card', c: '마바상회', bz: '222-22-22222' },
+    { k: 'card', c: '마바상회', bz: '123-22-22222' },
     { k: 'erp', c: '사아물산', bz: '12345' }];
   const p = plain(D.linkPlan(cos, refs));
   assert.deepStrictEqual(p[0], { key: '가나상사', name: '(주)가나상사', bz: '1234567890', state: 'found', refName: '가나상사 주식회사', from: '이알피 업체' });
-  assert.deepStrictEqual(p[1], { key: '다라산업', name: '다라산업', bz: '9876543210', state: 'have' });
+  assert.deepStrictEqual(p[1], { key: '다라산업', name: '다라산업', bz: '1234567891', state: 'have' });
   assert.strictEqual(p[2].state, 'none', '명함 줄의 번호는 쓰지 않는다');
   assert.strictEqual(p[3].state, 'none', '10자리가 아닌 번호는 쓰지 않는다');
   assert.strictEqual(D.fmtBz('1234567890'), '123-45-67890');
@@ -44,10 +44,10 @@ test('ⓑ 같은 번호 묶음 — 둘 이상, 이알피 이름과 같은 회사
   const cos = [
     { key: 'a', name: '(주)가나상사', bz: '1234567890', n: 1, r: 0 },
     { key: 'b', name: '가나상사(천안)', bz: '123-45-67890', n: 3, r: 2 },
-    { key: 'c', name: '다라산업', bz: '9876543210', n: 1, r: 0 },
+    { key: 'c', name: '다라산업', bz: '1234567891', n: 1, r: 0 },
     { key: 'd', name: '번호없음', bz: '', n: 9, r: 9 }];
   assert.deepStrictEqual(plain(D.bzGroups(cos)).map(x => [x.bz, x.cos.map(c => c.key)]), [['1234567890', ['b', 'a']]], '이알피 이름을 모르면 줄 많은 쪽');
-  const names = plain(D.refNames([{ k: 'biz', c: '가나(등록증)', bz: '1234567890' }, { k: 'erp', c: '가나상사 주식회사', bz: '123-45-67890' }, { k: 'card', c: '명함', bz: '9876543210' }]));
+  const names = plain(D.refNames([{ k: 'biz', c: '가나(등록증)', bz: '1234567890' }, { k: 'erp', c: '가나상사 주식회사', bz: '123-45-67890' }, { k: 'card', c: '명함', bz: '1234567891' }]));
   assert.deepStrictEqual(names, { '1234567890': '가나상사 주식회사' });
   const g = plain(D.bzGroups(cos, names));
   assert.deepStrictEqual(g.map(x => [x.official, x.cos.map(c => c.key)]), [['가나상사 주식회사', ['a', 'b']]]);
