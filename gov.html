@@ -193,6 +193,7 @@ table.cmp td{white-space:nowrap}
       <button class="btn" onclick="recAddOrg()">＋ 기관 더하기</button>
     </div>
     <div id="recBan"></div>
+    <div id="recWatch"></div>
     <div class="scroll"><table>
       <thead><tr><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
       <tbody id="recTb"></tbody>
@@ -664,7 +665,7 @@ function cloudPush(){
     try{ fbDb.ref('gov/'+fbUid).set({ feed:get('feed'), kw:lsGet('kw'),
       key_data:keyData(), key_biz:keyBiz(), last:lsGet('last'),
       recruit:{ scan:get('recruit_scan'), at:lsGet('recruit_at'), log:recObj('recruit_log'),
-        url:recObj('recruit_url'), custom:get('recruit_custom') }, at:Date.now() })
+        url:recObj('recruit_url'), custom:get('recruit_custom'), seen:recObj('recruit_seen') }, at:Date.now() })
       .then(function(){ _cloudFail=0; })
       .catch(function(e){ cloudFailSay('저장', e); }); }catch(e){ cloudFailSay('저장', e); }
   },1200);
@@ -695,6 +696,7 @@ async function cloudPull(){
     if(rc.log && !Object.keys(recObj('recruit_log')).length) lsSet('recruit_log', JSON.stringify(rc.log));
     if(rc.url && !Object.keys(recObj('recruit_url')).length) lsSet('recruit_url', JSON.stringify(rc.url));
     if(Array.isArray(rc.custom) && !get('recruit_custom').length) lsSet('recruit_custom', JSON.stringify(rc.custom));
+    if(rc.seen && !Object.keys(recObj('recruit_seen')).length) lsSet('recruit_seen', JSON.stringify(rc.seen));
   }catch(e){ cloudFailSay('불러오기', e); }
 }
 
@@ -718,7 +720,7 @@ function setTab(t){
   $('tbFeed').className='tb'+(t==='feed'?' on':'');
   $('tbRec').className ='tb'+(t==='rec'?' on':'');
   $('tbMat').className ='tb'+(t==='mat'?' on':'');
-  if(t==='rec') recDraw();
+  if(t==='rec'){ recDraw(); recWatchPull(); }
   lsSet('tab', t);                       /* ⚠ 클라우드로 내보내지 않는다(lsSet 은 안 밀어낸다) */
   /* 처음 들어오면 저절로 한 번 받아온다 — 빈 화면을 내놓지 않는다 */
   if(t==='mat' && !_mat) matPull();
@@ -816,6 +818,7 @@ function recDraw(){
   var scan=get('recruit_scan'), today=recToday(), y=String(today.getFullYear());
   var at=Number(lsGet('recruit_at'));
   $('recAt').textContent = at ? '· 서류 폴더 읽은 때 '+new Date(at).toLocaleString('ko-KR') : '';
+  if($('recWatch')) $('recWatch').innerHTML=recWatchHtml();   /* ⚠ 폴더를 안 읽었어도 새 모집 글은 보인다 */
   if(!scan.length){
     $('recBan').innerHTML='<div class="recban calm">📂 아직 서류 폴더를 읽지 않았습니다. <b>📂 서류 폴더에서 읽기</b>를 눌러 '
       +'<b>'+esc(REC_DIR)+'</b> 폴더(또는 그 위 서류 폴더)를 골라 주세요.<br>'
@@ -842,6 +845,7 @@ function recDraw(){
       : '<button class="btn sm" onclick="recSetUrl(\''+esc(o.id)+'\')">🔗 링크 넣기</button>';
     return '<tr class="'+(ah<=1&&o.month?'rec-now':'')+'"><td class="rn">'+(i+1)+'</td>'
       +'<td><b style="color:var(--navy)">'+esc(o.name)+'</b>'+(o.custom?' <span class="tag navy">직접 더함</span>':'')
+        +(recNewFor(o.id)?' <span class="tag red" title="기관 게시판에 새 모집 글 — 위 「새 모집 글」 칸">🆕 새 글</span>':'')
         +'<div class="sml">'+esc(o.what)+'</div></td>'
       +'<td style="white-space:nowrap">'+(o.month?o.month+'월'+(ah===0?' <span class="tag amber">이번 달</span>':ah===1?' <span class="tag amber">다음 달</span>':''):'<span class="sml">—</span>')+'</td>'
       +'<td>'+(yrs||'<span class="sml">아직 없음</span>')+'<span class="sml"> '+o.years.length+'해</span></td>'
@@ -854,6 +858,56 @@ function recDraw(){
     +'<span class="sml">한 번만 낸 곳·모집과 무관한 서류가 섞여 있습니다. 해마다 내는 곳이면 ＋ 기관 더하기로 묶으세요.</span></summary>'
     +'<div class="body note">'+rest.slice().sort(function(a,b){ return String(b.y).localeCompare(String(a.y)); })
       .map(function(e){ return '<span class="yr">'+esc(String(e.y).slice(2))+'</span>'+esc(e.name); }).join('<br>')+'</div></details>' : '';
+}
+
+/* ═══ 🆕 기관 게시판 새 모집 글 — 서버(recruitWatch)가 매일 07:20 남긴 것 (대표 결정 2026-10-04) ═══
+   ⚠ 서버 결과 gov_watch 는 «관리자만» 읽힌다. 못 읽으면 조용히 비우지 않고 까닭을 말한다.
+   ⚠ 「봤음」은 대표 개인 자리(recruit_seen)에만 — 서버 결과를 고치지 않는다(쓰기 권한도 없다). */
+var _recWatch=null, _recWatchErr='';
+async function recWatchPull(){
+  if(!fbDb||!fbUid) return;
+  try{ var s=await fbDb.ref('gov_watch').once('value'); _recWatch=s.val()||{}; _recWatchErr=''; }
+  catch(e){ _recWatch=null; _recWatchErr=/permission/i.test(String(e&&(e.code||e.message)||e)) ? '읽을 권한이 없습니다(관리자만 봅니다)' : '불러오지 못했습니다 — 인터넷을 확인해 주세요'; }
+  recDraw();
+}
+function recWatchHits(){
+  var h=(_recWatch&&_recWatch.hits)||{};
+  return Object.keys(h).map(function(k){ var x=h[k]||{}; x.key=x.key||k; return x; })
+    .filter(function(x){ return x && x.title; })
+    .sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
+}
+function recNewFor(orgId){ var seen=recObj('recruit_seen');
+  return recWatchHits().some(function(x){ return x.org===orgId && !seen[x.key]; }); }
+function recWatchHtml(){
+  if(_recWatchErr) return '<div class="recban calm">🛰 기관 게시판 감시 결과를 '+esc(_recWatchErr)+'</div>';
+  if(!_recWatch) return '';
+  var last=_recWatch.last||{}, seen=recObj('recruit_seen'), hits=recWatchHits();
+  var fresh=hits.filter(function(x){ return !seen[x.key]; });
+  var errs=(last.errors||[]).map(function(e){ return e.board; });
+  var head='<b>🛰 기관 게시판 새 모집 글</b> <span class="sml">— 서버가 매일 아침 7시 20분에 '+(last.checked||0)+'곳 게시판을 읽습니다'
+    +(last.at?' · 마지막 '+esc(new Date(last.at).toLocaleString('ko-KR')):' · 아직 한 번도 안 돌았습니다')
+    +(errs.length?' · <span style="color:var(--red)">못 읽은 곳 '+errs.length+'('+esc(errs.join(', '))+')</span>':'')+'</span>';
+  if(!hits.length) return '<div class="recban calm">'+head+'<br>아직 걸린 모집 글이 없습니다.</div>';
+  var row=function(x){ var nw=!seen[x.key];
+    return '<tr'+(nw?' class="rec-now"':'')+'><td style="white-space:nowrap" class="sml">'+esc(x.date||'')+'</td>'
+      +'<td style="white-space:nowrap">'+esc(x.boardName||x.board||'')+'</td>'
+      +'<td style="white-space:normal">'+(nw?'<span class="tag red">새 글</span> ':'')+esc(x.title)+'</td>'
+      +'<td style="white-space:nowrap">'+(/^https:\/\//.test(x.href||'')?'<a class="btn sm" href="'+esc(x.href)+'" target="_blank" rel="noopener">🔗 열기</a> ':'')
+      +'<button class="btn sm" onclick="recWatchCal(\''+esc(x.key)+'\')">📅 마감일</button> '
+      +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
+  return '<div class="recban'+(fresh.length?'':' calm')+'">'+head+(fresh.length?'<br>새 글 <b>'+fresh.length+'건</b>':'')+'</div>'
+    +'<div class="scroll" style="margin-bottom:10px"><table><tbody>'+hits.slice(0,30).map(row).join('')+'</tbody></table></div>';
+}
+function recSeen(key){ var s=recObj('recruit_seen'); s[key]=Date.now(); recObjSet('recruit_seen', s); recDraw(); }
+function recWatchCal(key){
+  var x=recWatchHits().filter(function(h){ return h.key===key; })[0]; if(!x) return;
+  var v=prompt('「'+x.title+'」\n\n마감일을 넣어 주세요 (예: 2027-01-20)\n공고를 열어 접수 마감일을 확인하세요.', '');
+  if(v===null) return; v=v.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ toast('2027-01-20 꼴로 넣어 주세요'); return; }
+  var u=GovRecruit.gcalUrl({ title:'[마감] '+x.title, date:v,
+    details:(x.boardName||'')+(/^https:\/\//.test(x.href||'')?'\n공고: '+x.href:'')+'\n(정부사업신청 › 컨설턴트 모집 › 새 모집 글)' });
+  if(!u){ toast('날짜를 읽지 못했습니다'); return; }
+  window.open(u, '_blank', 'noopener');
 }
 
 function recSetSt(id, v){

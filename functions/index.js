@@ -50,6 +50,7 @@ const NasBackupExport = require("./nas-backup-export");
 const TypeSafeEvaluate = require("./typesafe-evaluate");
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
+const RecruitWatch = require("./recruit-watch");
 
 if (!getApps().length) initializeApp();
 
@@ -1094,6 +1095,36 @@ exports.rulesLawWatch = functions
     const upd = RulesLawWatch.updatesOf(result, eSnap.val() || {}, nowIso);
     await root.update(upd);
     console.log("[법 개정 감시]", { checked: result.checked, events: result.events.length, errors: result.errors });
+    return null;
+  });
+
+/* 컨설턴트 모집 감시 — 기관 게시판 11곳에 «사람을 뽑는» 새 글이 올라오면 gov_watch/hits 에 남긴다.
+   대표 결정 2026-10-04 「기관 게시판 새 글 자동 감지 서버 — 지금 만든다」.
+   ⚠ 기관 누리집에는 «읽기만» 한다(목록 첫 쪽 한 번씩). 신청·로그인은 하지 않는다.
+   ⚠ 남기는 것은 기관 공지 «제목·날짜·주소»뿐(공개 정보). 대표 지원 이력은 여기 없다.
+   ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › gov_watch). 화면은 정부사업신청 › 컨설턴트 모집.
+   07:20 — 다른 아침 일들(06:00 법 감시·07:00·07:10)과 겹치지 않게. */
+exports.recruitWatch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("every day 07:20")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const root = getDatabase().ref("gov_watch");
+    const hSnap = await root.child("hits").once("value");
+    const existing = hSnap.val() || {};
+    const nowIso = new Date().toISOString();
+    const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
+    const result = await RecruitWatch.run({
+      existing, today, nowIso,
+      fetchText: async (u) => {
+        const res = await fetch(u, { headers: { "User-Agent": RecruitWatch.UA }, signal: AbortSignal.timeout(30000) });
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return RecruitWatch.decode(new Uint8Array(await res.arrayBuffer()), res.headers.get("content-type"));
+      },
+    });
+    await root.update(RecruitWatch.updatesOf(result, existing, nowIso));
+    console.log("[컨설턴트 모집 감시]", { checked: result.checked, added: result.hits.length, errors: result.errors });
     return null;
   });
 

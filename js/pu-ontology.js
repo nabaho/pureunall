@@ -113,7 +113,7 @@
        빌려 읽는 곳: data/user_dir(대표인지 확인) · uid_roles(권한). 쓰지는 않는다. */
     /* ⚠ kcareer/{uid}/ls 는 «읽기만» 한다 — 원본은 경력관리다(2026-09-10 「신청 재료」 탭).
        ⚠ 노드를 통째로 읽지 않는다: 밑에 API 열쇠(_secrets)와 첨부 조각(수 MB)이 있다. */
-    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}'],
+    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */],
       sharedRoots:['data/user_dir','uid_roles','kcareer/{uid}/ls'],
       entityTypes:['Organization','Project','Document'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
