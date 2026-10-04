@@ -56,7 +56,7 @@
     { key: 'home',    name: '홈페이지 관리', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },
     /* 뉴스레터 — 경력관리·홈페이지 관리와 «같이» 총괄관리자 전용이다.
        포털 타일(enter.html)과 잣대를 맞춘다 — 한쪽만 보이면 눌러도 막히는 문이 된다. */
-    { key: 'news',    name: '뉴스레터 관리', icon: '📰', url: 'pu-news.html',        desc: '주간뉴스레터 짓기·보내기', adminOnly: true }
+    { key: 'news',    name: '뉴스레터', icon: '📰', url: 'pu-news.html',        desc: '주간뉴스레터 짓기·보내기', adminOnly: true }
   ];
 
   /* 단추에 적는 말 — 한 곳에서만 정한다. 바꾸려면 여기 한 줄. */

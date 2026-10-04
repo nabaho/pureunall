@@ -1445,7 +1445,7 @@ exports.newsletterWatchRetry = functions
     console.log("[감시꾼] 금요일 준비", JSON.stringify(판));
     if (판.포기) {
       const 알린 = await db.ref("newsletter/watch/" + 열쇠 + "/포기알림").transaction((v) => (v ? undefined : now));
-      if (알린.committed) await 뉴스레터경보(열쇠, "포기", "금요일 준비를 여러 번 다시 했지만 AI 초안을 못 채웠습니다 — 뉴스레터 관리에서 확인해 주십시오");
+      if (알린.committed) await 뉴스레터경보(열쇠, "포기", "금요일 준비를 여러 번 다시 했지만 AI 초안을 못 채웠습니다 — 뉴스레터 화면에서 확인해 주십시오");
       return null;
     }
     if (!판.할까) return null;
@@ -1547,7 +1547,7 @@ exports.newsletterWatchDelivery = functions
     const 셈 = NWatch.전달셈(줄들, ready.batchId);
     await db.ref("newsletter/watch/" + ready.회차열쇠 + "/전달").set(Object.assign({ 때: Date.now(), 받는수: ready.받는수 || 0 }, 셈));
     if (셈.실패 || 셈.확인필요) {
-      await 뉴스레터경보(ready.회차열쇠, "전달경보", "뉴스레터 " + (셈.실패 + 셈.확인필요) + "통이 못 나갔거나 확인이 필요합니다 — 뉴스레터 관리 › 보낸 결과에서 주소를 보십시오");
+      await 뉴스레터경보(ready.회차열쇠, "전달경보", "뉴스레터 " + (셈.실패 + 셈.확인필요) + "통이 못 나갔거나 확인이 필요합니다 — 뉴스레터 › 보낸 결과에서 주소를 보십시오");
     }
     console.log("[감시꾼] 전달", JSON.stringify(셈));
     return null;
