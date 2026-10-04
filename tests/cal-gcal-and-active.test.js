@@ -129,6 +129,8 @@ function 구글칩(ev, 자료) {
     함수몸(캘린더원문, 'function gcalSidByMail(mail){'),
     함수몸(캘린더원문, 'function gcalPalette(){'),
     함수몸(캘린더원문, 'function gcalMailColor(mail){'),
+    /* 새벽 구글 시각 대신 제목 앞 시각을 믿는 셈(2026-10-04) — gcalToEvent 가 부른다 */
+    함수몸(캘린더원문, 'function 제목시각(title, 구글시각){'),
     함수몸(캘린더원문, 'function gcalToEvent(ev){'),
     'var __r = gcalToEvent(' + JSON.stringify(ev) + ');'
   ].join('\n'), 상자);
@@ -184,8 +186,12 @@ test('★ 메일을 열쇠로 바꾸는 셈 — 바뀌면 이어 둔 사람이 �
 test('종일 일정은 시각을 안 적고, 시각 일정은 구글처럼 「14:30」 꼴로 적는다', () => {
   const a = 구글칩({ id: 'g5', summary: '연차', start: { date: '2026-09-11' } });
   assert.strictEqual(a.time, '', '종일 일정에 시각이 붙었습니다');
-  const b = 구글칩({ id: 'g6', summary: '0930 일터', start: { dateTime: '2026-09-11T00:00:00+09:00' } });
+  const b = 구글칩({ id: 'g6', summary: '가나상사 일터', start: { dateTime: '2026-09-11T00:00:00+09:00' } });
   assert.strictEqual(b.time, '00:00', '구글은 자정 시작 일정에도 「00:00」을 적습니다');
+  /* ⚠ 2026-10-04 대표 결정(㉮) — 새벽 구글 시각인데 제목이 「0930」으로 시작하면 제목 시각을 쓴다.
+     (직원들이 구글 시각 칸을 새벽에 아무렇게나 두는 습관 — tests/cal-title-time.test.js) */
+  const 제목시각칩 = 구글칩({ id: 'g7', summary: '0930 일터', start: { dateTime: '2026-09-11T00:00:00+09:00' } });
+  assert.strictEqual(제목시각칩.time, '09:30', '제목 앞 「0930」을 안 믿습니다 — 목록에 「00:00 · 0930 …」이 뜹니다');
   const c = 구글칩({ id: 'g7', summary: '상담', start: { dateTime: '2026-09-11T14:30:00+09:00' } });
   assert.match(c.time, /^\d{2}:\d{2}$/, '시각을 구글처럼 「14:30」 꼴로 안 적습니다: ' + c.time);
 });
