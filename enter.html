@@ -2316,12 +2316,23 @@ body.portal-mode #moreFab{display:flex;}
     out.sort();                                  // 차례가 달라도 같은 화면이다
     return out.join('&');
   }
+  // 같은 앱의 다른 화면 파일 — 취업규칙 타일은 rules-v2.html(🏢 사업장)로 열지만, 그 창이 지금
+  // rules.html(✏️ 검토·개정, 작업 중)에 가 있으면 «같은 앱»이다. 주소가 다르다고 replace 하면
+  // 하던 개정 화면을 잃는다. 그래서 같은 앱 식구 파일은 한 이름으로 견준다(포커스만).
+  // ⚠ 식구를 늘릴 땐 js/pu-appbar.js 의 SAME_APP_FILES 와 «같이» 고친다.
+  var PORTAL_SAME_APP_FILES = { 'rules-v2.html': 'rules.html' };
+  function portalAppPathKey(pathname){
+    var p = String(pathname || '');
+    var i = p.lastIndexOf('/');
+    var dir = p.slice(0, i + 1), f = p.slice(i + 1).toLowerCase();
+    return dir + (Object.prototype.hasOwnProperty.call(PORTAL_SAME_APP_FILES, f) ? PORTAL_SAME_APP_FILES[f] : f);
+  }
   function portalAppUrlMatches(ref, url){
     try {
       var current = new URL(ref.location.href, location.href);
       var expected = new URL(url, location.href);
       return current.origin === expected.origin
-          && current.pathname === expected.pathname
+          && portalAppPathKey(current.pathname) === portalAppPathKey(expected.pathname)
           && portalAppUrlKey(current) === portalAppUrlKey(expected);
     } catch(e){
       return false;

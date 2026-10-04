@@ -99,3 +99,30 @@ test('포털을 새로고침해도 이미 열린 기금관리 창을 이름으�
   assert.equal(fund.state.navigations, 0);
   assert.equal(fund.state.focuses, 1);
 });
+
+/* 취업규칙은 한 앱·두 화면 파일 — 타일은 rules-v2.html(🏢 사업장)이지만, 그 창이 지금
+   rules.html(✏️ 검토·개정, 작업 중)에 가 있으면 «같은 앱»이다. replace 하면 하던 화면을 잃는다. */
+test('★ 취업규칙 창이 rules.html(개정 작업 중)이어도 타일(rules-v2.html)은 포커스만 — 화면을 갈아엎지 않는다', () => {
+  const rules = appWindow('https://nabaho.github.io/pureunall/rules.html?v=3#open=abc');
+  const context = loadWindowManager(() => rules.ref);
+  context.openPortalApp({ key: 'rules' }, 'rules-v2.html?sso=1&v=9');
+  assert.equal(rules.state.navigations, 0, '★★ 개정 작업 중인 rules.html 창을 사업장 화면으로 갈아엎었다');
+  assert.equal(rules.state.focuses, 1);
+});
+
+test('같은 앱 식구 견주기는 취업규칙 둘뿐 — 다른 앱·다른 폴더·다른 파일은 그대로 «다른 화면»', () => {
+  const base = 'https://nabaho.github.io/pureunall/';
+  const ctx = loadWindowManager(() => null);
+  const same = (cur, url) => ctx.portalAppUrlMatches({ location: { href: cur } }, url);
+  assert.equal(same(base + 'rules-v2.html#sites', 'rules-v2.html?sso=1&v=1'), true);
+  assert.equal(same(base + 'rules.html', 'rules-v2.html?sso=1&v=1'), true);
+  assert.equal(same(base + 'rules-v2.html', 'rules.html?sso=1&v=1'), true);
+  // 다른 앱은 영향 없음 — 기금관리 창에 취업규칙 타일을 눌러도 «같은 화면» 이 아니다
+  assert.equal(same(base + 'fund.html', 'rules-v2.html?sso=1&v=1'), false);
+  assert.equal(same(base + 'pu-cards.html', 'pu-photos.html'), false);
+  // 다른 폴더의 같은 이름은 같은 앱이 아니다
+  assert.equal(same('https://nabaho.github.io/other/rules.html', 'rules-v2.html'), false);
+  // Object.prototype 이름이 식구로 읽히면 안 된다(hasOwnProperty)
+  assert.equal(same(base + 'constructor', 'rules-v2.html'), false);
+  assert.equal(same(base + 'constructor', base + 'constructor'), true);
+});

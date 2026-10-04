@@ -361,6 +361,7 @@
     return lastScreen();
   }
 
+  // ⚠ enter.html 의 PORTAL_SAME_APP_FILES 와 «같은 식구»를 말한다 — 늘릴 땐 같이 고친다.
   var SAME_APP_FILES = { 'rules.html': 'rules' };
 
   /* 주소로 지금 어느 프로그램인지 알아낸다 — 앱이 따로 알려 주지 않아도 되게 */
@@ -372,7 +373,7 @@
     }
     /* 같은 앱의 다른 화면 파일 — 타일 주소(rules-v2.html)와 다른 쪽(rules.html ✏️ 검토·개정)에서도
        「지금 앱」이 취업규칙으로 잡혀야 한다(안 그러면 보던 화면 기록·켜짐 표시가 빠진다). */
-    if (SAME_APP_FILES[f]) return SAME_APP_FILES[f];
+    if (Object.prototype.hasOwnProperty.call(SAME_APP_FILES, f)) return SAME_APP_FILES[f];
     return '';
   }
 

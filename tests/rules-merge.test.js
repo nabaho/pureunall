@@ -153,3 +153,9 @@ test('⑥★ 취업규칙 앱 식구 두 파일 어느 쪽에서든 지금 앱�
     assert.equal(앱바열기(p).whoAmI(), 'rules', '★★ ' + p + ' 에서 지금 앱을 못 알아낸다 — 보던 화면 기록·켜짐 표시가 빠진다');
   });
 });
+
+test('⑥★ 앱바 식구 견주기는 Object.prototype 이름을 식구로 읽지 않는다 / 다른 앱은 그대로', () => {
+  assert.equal(앱바열기('/pureunall/constructor').whoAmI(), '');
+  assert.equal(앱바열기('/pureunall/toString').whoAmI(), '');
+  assert.equal(앱바열기('/pureunall/fund.html').whoAmI(), 'fund');
+});
