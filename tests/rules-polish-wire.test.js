@@ -562,3 +562,43 @@ test('⑦ rules.html 안 스크립트는 구문이 맞다', () => {
   while ((m = re.exec(HTML))) { assert.doesNotThrow(() => new vm.Script(m[1]), '스크립트 ' + n + ' 구문 오류'); n++; }
   assert.ok(n >= 1);
 });
+
+/* ★★ 이번 달 요금 한도 — 사람이 누른 다듬기는 «물어본 뒤» 부를 수 있다 (2026-10-04 · rules-polish 가 남긴 일)
+   서버(readDoc)는 manual 이 없는 부름을 «자동»으로 보고 한도에 걸리면 막는다 — 사람이 누른 것은
+   «화면이 먼저 묻고, 그때만 manual 을 실어» 통과시킨다(대표 결정 ⓵㉮). ✨ 는 늘 사람이 누르는데 manual 을
+   안 실어, 한도가 차면 「관리자에게 알려 주세요」로 끝났다. */
+test('★★ 달 한도에 걸리면 묻는다 — 예면 manual 을 실어 한 번 더, 아니오면 부르지 않고 한 줄', async () => {
+  await kordoc();
+  const over = () => { const e = new Error('이번 달 AI 판독 한도(₩30,000)를 다 썼습니다'); e.status = 429; e.overBudget = true; return Promise.reject(e); };
+  const run = async (yes) => {
+    const H = harness({ ask: (parts, opts, n) => (n === 1 ? over() : Promise.resolve(replyOf({ text: sentBody(parts[0].text), why: '그대로' }))) });
+    H.calls.yes = yes;
+    H.t.polMenu(); H.click('tidy'); await H.settle();
+    return H;
+  };
+  let H = await run(true);
+  assert.equal(H.calls.ask.length, 2, '★★ 예라고 했는데 다시 부르지 않았다');
+  assert.ok(!H.calls.ask[0].opts.manual, '처음 부름은 자동(manual 없음)이어야 한다 — 한도 안이면 묻지 않고 지나간다');
+  assert.equal(H.calls.ask[1].opts.manual, true, '★★ 다시 부를 때 manual 을 안 실었다 — 서버가 또 막는다');
+  assert.ok(H.calls.confirms.some((m) => /한도/.test(m)), '묻지 않고 통과시켰다');
+  assert.doesNotMatch(H.box(), /한도에 걸렸습니다/);
+  H = await run(false);
+  assert.equal(H.calls.ask.length, 1, '아니오인데 또 불렀다');
+  assert.match(H.box(), /이번 달 AI 한도에 걸렸습니다/);
+});
+
+test('호출기는 manual 을 «받을 때만» 싣고, 한도 거절을 overBudget 으로 알려 준다', async () => {
+  const sent = [];
+  const ctx = { Promise, JSON, Error, String, Object };
+  ctx.window = ctx; ctx.globalThis = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(AI_SRC, ctx);
+  const auth = { currentUser: { getIdToken: () => Promise.resolve('토큰') } };
+  const ok = (url, init) => { sent.push(JSON.parse(init.body)); return Promise.resolve({ ok: true, json: () => Promise.resolve({ ok: true, reply: {} }) }); };
+  await ctx.PuAiCall.ask([{ text: '가' }], { auth, fetch: ok, app: 'rules' });
+  await ctx.PuAiCall.ask([{ text: '가' }], { auth, fetch: ok, app: 'rules', manual: true });
+  assert.equal(sent[0].manual, undefined, '안 받았는데 manual 을 실었다 — 자동 부름이 한도를 뚫는다');
+  assert.equal(sent[1].manual, true);
+  const no = () => Promise.resolve({ ok: false, status: 429, json: () => Promise.resolve({ ok: false, overBudget: true, error: '한도' }) });
+  await assert.rejects(ctx.PuAiCall.ask([{ text: '가' }], { auth, fetch: no }), (e) => e.status === 429 && e.overBudget === true);
+});

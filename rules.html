@@ -47,7 +47,7 @@
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
 <script src="js/rules-v2/view-recommend.js?v=3"></script>
 <!-- ✨ AI 다듬기 — 호출기(서버 readDoc 를 부르는 얇은 층)·셈·상자. lib-polish 는 lib-topics·pu-rules-filecmp 를 쓴다(위에서 싣는다) -->
-<script src="js/pu-ai-call.js?v=3"></script>
+<script src="js/pu-ai-call.js?v=4"></script>
 <script src="js/rules-v2/lib-polish.js?v=2"></script>
 <script src="js/rules-v2/view-polish.js?v=2"></script>
 <script src="xlsx_gen.js?v=3"></script>
@@ -439,6 +439,10 @@ table.daejo thead th{position:sticky;top:-18px;z-index:3;
 .rmode a.on{background:#1e40af;color:#ffffff;font-weight:700}
 .rmode a:not(.on):hover{background:#eff6ff}
 @media(max-width:1200px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
+/* 701~900px — 갈래 단추·단계 막대·⚖·⋯·← 가 한 줄에 다 들어오게 (2026-10-04 실측: 715px 에서 51px 넘쳐
+   「← 포털로」가 머리줄 밖으로 밀렸다). 단계 사이 › 를 걷고 단추 옆 여백을 줄인다. 700px 아래는 두 줄 배치가 따로 있다. */
+@media(min-width:701px) and (max-width:900px){#stepbar .sep{display:none}#stepbar{gap:3px}#stepbar button{padding-left:7px;padding-right:7px}}
+@media(min-width:701px) and (max-width:780px){header .rmode a{padding-left:6px;padding-right:6px}}
 /* 단계 막대 — 흐름 넷. 못 가는 단계는 «막지 않고» 흐리게 두고 까닭을 말한다. */
 #stepbar{display:flex;align-items:center;gap:3px;flex:0 0 auto}
 #stepbar button{font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;cursor:pointer;
@@ -1849,8 +1853,10 @@ function consentDoc(site,asof,summary,hits){
    의견서·동의서: 순번·직책·성명·(의견)·서명날인 표 + 대상총인원 집계 + "○○ 대표 귀하"
    변경신고서: 근로기준법 시행규칙 별지 제15호서식 레이아웃
    ERP(SITE_INFO)에서 사업장명·대표자·소재지·업종·사업자번호를 자동으로 채운다. */
+/* 이름의 꾸밈(📄·🏢·〔샘플〕)만 걷는다 — 다른 업체 정보(SITE_INFO)는 안 본다 */
+function plainSiteName(s){ return String(s||"").replace(/^[📄🏢]\s*/u,"").replace(/〔샘플〕/g,"").trim(); }
 function siteName(fallback){
-  return (SITE_INFO&&SITE_INFO.name)||String(fallback||"").replace(/^[📄🏢]\s*/u,"").replace(/〔샘플〕/g,"");
+  return (SITE_INFO&&SITE_INFO.name)||plainSiteName(fallback);
 }
 /* 서명 행 수 — ERP 근로자수가 있으면 그에 맞추고(여유 10%), 없으면 20행.
    과반수 서명이 필요하므로 인원보다 모자라면 안 된다. */
@@ -7507,8 +7513,18 @@ async function polSend(mode){
     const masked=String(red.text);   // 보낸 그대로 — parse 가 «보낸 가림 자리가 남았는가»를 이것으로 가른다
     const lines=finds.map(f=>({title:f.rule.name+(f.rule.law?" ("+f.rule.law+")":""),desc:f.rule.criterion||"",note:f.note||""}));
     const auth=(window.firebase&&firebase.auth)?firebase.auth():null;
-    const reply=await PuAiCall.ask([{text:P.prompt(st.mode,masked,lines)}],
-      {auth,app:"rules",generationConfig:{temperature:0.2}});
+    const call=(manual)=>PuAiCall.ask([{text:P.prompt(st.mode,masked,lines)}],
+      {auth,app:"rules",generationConfig:{temperature:0.2},manual});
+    let reply;
+    try{ reply=await call(false); }
+    catch(e){
+      /* 이번 달 요금 한도 — ✨ 는 늘 사람이 누른다. 서버 결정(⓵㉮)대로 «물어본 뒤» manual 을 실어 한 번 더.
+         아니오면 그대로 실패 한 줄(polErr). (2026-10-04) */
+      if(!(e&&e.overBudget)||!mine())throw e;
+      if(!confirm("이번 달 AI 한도에 걸렸습니다.\n사람이 직접 누른 다듬기라 그래도 부를 수 있습니다 — 부를까요?"))throw e;
+      if(!mine())return;
+      reply=await call(true);
+    }
     if(!mine())return;
     const r=P.parse(PuAiCall.textOf(reply),masked);
     if(!r.ok)throw new Error(r.why);
@@ -7879,7 +7895,8 @@ async function startNextRevision(id,opts){
   if(!txt){alert("이 회차에는 전문을 만들 조문이 없습니다.");return;}
   // 새 원본으로 등록 → 사업장 선택 → 검토 실행 (업로드와 같은 경로)
   const key="NX_"+Date.now();
-  SAMPLES[key]=txt; SITE_MAP[key]="🏢 "+siteName(r.site); SITE_BIZNO[key]=r.bizno||"";
+  /* ⚠ siteName 은 앞서 본 «다른» 업체(SITE_INFO)를 먼저 본다 — 완료본의 이름을 그대로 쓴다(2026-10-04) */
+  SAMPLES[key]=txt; SITE_MAP[key]="🏢 "+plainSiteName(r.site); SITE_BIZNO[key]=r.bizno||"";
   delete HWP_BUFS[key];
   const opt=document.createElement("option"); opt.value=key; opt.textContent=SITE_MAP[key];
   siteSel.appendChild(opt); siteSel.value=key;
