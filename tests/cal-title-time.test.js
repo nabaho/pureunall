@@ -43,7 +43,7 @@ function 상자() {
   };
   vm.createContext(ctx);
   vm.runInContext(함수몸('function 제목시각(') + '\n' + 함수몸('function gcalToEvent(ev){') + '\n'
-    + 함수몸('function 구글상세(id){'), ctx);
+    + 함수몸('function 구글상세(id){') + '\n' + 함수몸('function 언제적(iso){'), ctx);
   return ctx;
 }
 function 구글(summary, s, e) {

@@ -6137,6 +6137,16 @@ const GARCH = require("./gcal-archive")({ functions, getDatabase, MAIL_REGION,
   contractVersion: OntologyServerWrite.CONTRACT_VERSION, schemaVersion: 3 });
 exports.gcalArchiveDaily = GARCH.gcalArchiveDaily;
 
+/* 🔗 구글 캘린더 «늘 연결» (대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다」) —
+   서버가 사람마다 갱신 열쇠를 들고, 화면은 한 시간짜리 표만 받아 간다. 실제 코드는 gcal-link.js.
+   ⚠ 여기 줄을 안 적으면 배포가 안 된다. 갱신 열쇠 자리(gcal_tokens)는 보안규칙에 «일부러» 없다. */
+const _gcalLink = require("./gcal-link");
+exports.gcalAuthUrl    = _gcalLink.gcalAuthUrl;
+exports.gcalLink       = _gcalLink.gcalLink;
+exports.gcalToken      = _gcalLink.gcalToken;
+exports.gcalUnlink     = _gcalLink.gcalUnlink;
+exports.gcalTokenSweep = _gcalLink.gcalTokenSweep;
+
 /* ══ 취업규칙 모으기 (2026-10-03 설계 docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md §4) ══
    메일함의 취업규칙 첨부를 가려 rules_mgmt/library 에 담는다. 원본은 이 함수 메모리에서만 산다.
    ⚠ 매일 한 번 + 관리자 신호(ask) — 둘 다 한 몸통. 한 번에 60통, 7분 넘으면 멈춘다.
