@@ -79,7 +79,9 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
   const all = (FIDX + FSYNC).match(/\.pubsub\.schedule\(/g) || [];
   /* 2026-10-04 공인노무사회 자료 매일 가져오기(아침 7:20, dailyIlaborCollect)가 늘어 열여덟 — 하루 셈 +1 */
   /* 2026-10-04 뉴스레터 일요일 보충(일 17:00, newsletterSundayRefill) — 주 1회라 하루 셈엔 안 든다 */
-  assert.strictEqual(all.length, 19, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  /* 2026-10-04 «오늘만» 23시 보충(newsletterRefillOnce20261004) — 10/4 하루만 일하고 다음 날 지운다.
+       지우면 이 수도 19 로 되돌린다. 한 번뿐이라 하루 셈·화면 설명엔 안 넣는다. */
+  assert.strictEqual(all.length, 20, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
