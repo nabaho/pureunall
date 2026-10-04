@@ -2666,7 +2666,10 @@ function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나
    받는다 — 새 이름이 생기면 저절로 포함되게 만들어 두었다. 전달함은 표가 아니라 사람별 쪽지함이라
    그 길로 들어오면 온 직원이 남의 쪽지까지 매번 내려받는다. 여기 넣으면 fbShouldSync 가 걸러 준다.
    전달함은 자기 몫만 따로 구독한다(_handoffWatch). */
-var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours'];
+var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours','audit_log'];
+/* ⚠ audit_log(수정 기록) — 2026-10-04 부터 «한 줄씩 따로» 적는다(AuditLog.write → data/audit_log/v/{id}).
+   통째로 받고 통째로 올리는 동기화에 태우면, 재무 권한 기기가 옛 사본을 한 번 올리는 순간 그 사이 다른 직원이 적은 줄이 지워진다.
+   그래서 받지도 올리지도 않는다 — 보는 화면(AuditLogSection)이 열 때 서버에서 바로 읽는다. */
 /* ⚠ presence_hours — 접속 시간대 기록(포털 「누가 일했나」가 서버에서 직접 읽는다). 이알피 화면은 안 읽는다.
    받으면 한 시간에 한 번 내가 쓴 한 칸 때문에 그 표 전체가 «바뀜»으로 돌아와 화면 전체를 다시 그렸다
    (대표 지시 2026-10-03 「이알피도 확인」). 쓰는 길(_markPresenceHour)은 그대로 — 받지만 않는다. */
@@ -2678,7 +2681,9 @@ function fbShouldSync(k){
 // ── [보안규칙 대비] 재무·급여 키 목록 (Firebase 규칙의 fin 전용 항목과 1:1 동일) ──
 var FB_FIN_KEYS = ['finance_income','finance_expense','finance_invoice','payroll_monthly','payroll_irregular','funds','mgr_rates','pay_items','dc_contributions','retirement_settlements','recurring_expenses','expense_budget','finance_bank_fee',
   /* 2026-10-04 규칙에서 재무 권한자만으로 좁힌 자리 — 재무 권한 없는 기기에 남은 사본도 지운다 */
-  'payroll_audit_log','cms_ledger','bank_processed','ledger_held','ledger_picks','ledger_split_recipes','payer_aliases','finance_bank_fee_last','accounts','trash_fin'];
+  'payroll_audit_log','cms_ledger','bank_processed','ledger_held','ledger_picks','ledger_split_recipes','payer_aliases','finance_bank_fee_last','accounts','trash_fin',
+  /* 2026-10-04 (대표 「2」) 연차 대장 · 수정 기록 — 규칙에서 재무 권한자만 읽게 했다 */
+  'leave_ledger','audit_log'];
 
 /* ── 부팅 때 「볼 수 있는 것만」 받기 (설계서 2026-08-16-부팅-받기-줄이기) ──
    실측: 계정 10개 중 재무 권한(fin)은 2개뿐인데, 나머지 8명도 전 직원 급여
@@ -2697,7 +2702,7 @@ var FB_FIN_GATED = ['finance_income','finance_expense','finance_invoice','payrol
   'recurring_expenses','expense_budget','finance_bank_fee',
   'cms_ledger','ledger_batches','bank_processed','ledger_held','payer_aliases',
   'ledger_picks','ledger_split_recipes','finance_bank_fee_last','accounts',   /* 2026-10-04 규칙과 함께 */
-  'trash_fin'];
+  'trash_fin','leave_ledger'];
 
 /* 부팅 때 아무에게도 안 받는 키(로그류). 보는·쓰는 화면이 그때 erpEnsureKeys 로 받는다.
    ⚠ payroll_audit_log(133KB)만 넣었다 — closed_archive·audit_log 등은 크기가 작아(합 60KB)
@@ -10068,17 +10073,18 @@ var TrashBin = {
 
 // ============ Audit Log: 핵심 데이터 변경 추적 (#E + B안) ============
 // 사용 예: AuditLog.write('case', caseId, 'retainerFee', 1000000, 1500000, '오류 정정')
-//          AuditLog.list({entity:'case', entityId:'c-001'}) → 변경 이력 조회
+//          AuditLog.readAll() → 서버에서 바로 읽기(재무 권한자만) — 이 기기엔 사본을 두지 않는다
+/* ★ 2026-10-04 (대표 「2」) — 수정 기록은 «재무 권한자만 읽고», 적기는 재직 직원 누구나 «새 줄 하나씩만».
+     예전에는 통째로 읽고(dbGet) 한 줄 붙여 통째로 올렸다(dbSet). 읽기를 막으면 못 읽은 기기가 빈 목록에 한 줄 붙여
+     올려 «다 지운다» — 그래서 막지 못하고 미뤄 뒀던 자리다. 이제는 줄마다 data/audit_log/v/{id} 에 따로 적는다
+     (규칙: 없는 줄만 새로 쓸 수 있다). 이 기기에 사본을 두지 않는다 — 보는 화면이 서버에서 바로 읽는다. */
 var AuditLog = {
   KEY: 'audit_log',
-  MAX_ITEMS: 5000,  // 5000건 초과 시 오래된 것부터 자동 삭제
-  // 변경 이력 기록
+  // 변경 이력 기록 — 한 줄만 서버에 따로 적는다(읽지 않는다)
   write: function(entity, entityId, field, before, after, reason){
     try {
-      var arr = dbGet(this.KEY, []) || [];
-      if(!Array.isArray(arr)) arr = [];
       var actor = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER : null;
-      arr.unshift({
+      var entry = {
         id: 'al-' + Date.now().toString(36) + Math.random().toString(36).slice(2,5),
         ts: Date.now(),
         actorSid: actor ? actor.sid : '',
@@ -10086,34 +10092,23 @@ var AuditLog = {
         entity: entity,                  // 'case'·'consulting'·'fund'·'other'·'company'·'payroll'
         entityId: entityId,
         field: field,                    // 변경된 필드명
-        before: before,                  // 이전 값
-        after: after,                    // 새 값
+        before: (before === undefined ? null : before),   // 이전 값 (undefined 는 파이어베이스가 물린다)
+        after: (after === undefined ? null : after),       // 새 값
         reason: reason || ''             // 변경 사유
-      });
-      // 용량 제한: 오래된 것부터 잘라냄
-      if(arr.length > this.MAX_ITEMS) arr = arr.slice(0, this.MAX_ITEMS);
-      dbSet(this.KEY, arr);
+      };
+      if(typeof fbDb === 'undefined' || !fbDb || !fbDb.ref) return false;
+      fbDb.ref('data/' + this.KEY + '/v/' + entry.id).set(entry)
+        .catch(function(e){ try { console.warn('[수정 기록] 못 적음', e && e.message); } catch(_){} });
       return true;
     } catch(e){ return false; }
   },
-  // 조회 (필터): { entity, entityId, actorSid, dateFrom, dateTo }
-  list: function(filter){
-    var arr = dbGet(this.KEY, []) || [];
-    if(!Array.isArray(arr)) return [];
-    if(!filter) return arr;
-    return arr.filter(function(x){
-      if(filter.entity && x.entity !== filter.entity) return false;
-      if(filter.entityId && x.entityId !== filter.entityId) return false;
-      if(filter.actorSid && x.actorSid !== filter.actorSid) return false;
-      if(filter.dateFrom){
-        var fromTs = new Date(filter.dateFrom).getTime();
-        if(!isNaN(fromTs) && x.ts < fromTs) return false;
-      }
-      if(filter.dateTo){
-        var toTs = new Date(filter.dateTo).getTime() + 86400000;  // 종일
-        if(!isNaN(toTs) && x.ts > toTs) return false;
-      }
-      return true;
+  /* 서버에서 바로 읽는다(재무 권한자만 된다) → 최근 것부터 배열 */
+  readAll: function(){
+    if(typeof fbDb === 'undefined' || !fbDb || !fbDb.ref) return Promise.reject(new Error('서버에 연결되지 않았습니다'));
+    return fbDb.ref('data/' + this.KEY + '/v').once('value').then(function(s){
+      var v = s.val() || {};
+      var arr = Array.isArray(v) ? v.filter(Boolean) : Object.keys(v).map(function(k){ return v[k]; }).filter(Boolean);
+      return arr.sort(function(a, b){ return (Number(b.ts) || Date.parse(b.ts) || 0) - (Number(a.ts) || Date.parse(a.ts) || 0); });
     });
   }
 };
@@ -40877,68 +40872,61 @@ function BackupSection(){
 }
 
 function AuditLogSection(){
-  var existing = dbGet('audit_log', []);
-  var a = useState(existing); var logs = a[0]; var setLogs = a[1];
+  /* ★ 2026-10-04 — 서버에서 «열 때» 바로 읽는다(재무 권한자만 된다). 이 기기 사본(dbGet)은 쓰지 않는다 — AuditLog 머리말 참고.
+     ⚠ 예전 화면은 «샘플» 칸(action·user·detail)으로 그려, 실제 기록(actorName·field·before·after·reason)은 빈칸으로 보였다. */
+  var a = useState(null); var logs = a[0]; var setLogs = a[1];      // null = 읽는 중
+  var es = useState(''); var err = es[0]; var setErr = es[1];
   var q = useState(''); var query = q[0]; var setQuery = q[1];
-
+  function load(){
+    setErr(''); setLogs(null);
+    AuditLog.readAll().then(function(arr){ setLogs(arr); }).catch(function(e){ setLogs([]); setErr((e && e.message) || '못 읽었습니다'); });
+  }
+  useEffect(function(){ load(); }, []);
   async function clearAll(){
     if(!(await popConfirm('감사 로그 전체를 삭제합니다. 진행하시겠습니까?'))) return;
-    setLogs([]); dbSet('audit_log', []); showToast('감사 로그 삭제됨');
+    fbDb.ref('data/' + AuditLog.KEY).set(null).then(function(){ setLogs([]); showToast('감사 로그 삭제됨'); })
+      .catch(function(e){ showToast('❌ 삭제하지 못했습니다 — ' + ((e && e.message) || e)); });
   }
-  function addSample(){
-    var samples = [
-      { ts:new Date().toISOString(), action:'create', entity:'Case',     user:'권형하', detail:'사건 등록 (부해-2026-001)' },
-      { ts:new Date(Date.now()-3600000).toISOString(), action:'update', entity:'MonthlyPay', user:'신욱임', detail:'4월 급여 수정' },
-      { ts:new Date(Date.now()-7200000).toISOString(), action:'delete', entity:'LeaveRequest', user:'권형하', detail:'휴가 신청 취소' }
-    ];
-    var next = samples.concat(logs);
-    setLogs(next); dbSet('audit_log', next);
-    showToast('샘플 3건 추가');
-  }
-
-  var filtered = logs.filter(function(x){
+  var all = logs || [];
+  function txt(v){ return v == null ? '' : (typeof v === 'object' ? JSON.stringify(v) : String(v)); }
+  var filtered = all.filter(function(x){
     if(!query) return true;
-    var qq = query.toLowerCase();
-    return (x.entity||'').toLowerCase().indexOf(qq)>=0
-        || (x.action||'').toLowerCase().indexOf(qq)>=0
-        || (x.user||'').indexOf(query)>=0
-        || (x.detail||'').indexOf(query)>=0;
+    var hay = [x.entity, x.entityId, x.field, x.action, x.actorName, x.user, x.reason, x.detail, txt(x.before), txt(x.after)].join(' ').toLowerCase();
+    return hay.indexOf(query.toLowerCase()) >= 0;
   });
-
-  function actionTag(a){
-    var color = a==='create' ? 'tag-active' : a==='update' ? 'tag-member' : a==='delete' ? 'tag-admin' : 'tag-delegate';
-    return h('span', { className:'tag ' + color }, a);
-  }
-
+  var td = { whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', maxWidth:0 };
   return h(PolicyCard, { title:'감사 로그', icon:'📜', headBg:'#fffbeb', headFg:'#854d0e', collapseId:'sys_audit', defaultOpen:false },
     h('div', { style:{ display:'flex', gap:'8px', marginBottom:'10px', alignItems:'center' } },
-      h('input', { type:'search', className:'dt-search', placeholder:'🔍 엔터티·작업·사용자·내용 검색',
+      h('input', { type:'search', className:'dt-search', placeholder:'🔍 대상·칸·사용자·값·사유 검색',
         value:query, onChange:function(e){ setQuery(e.target.value); }, style:{ width:'280px' } }),
-      h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'11px', padding:'3px 10px', borderRadius:'10px', fontWeight:600 } }, '총 ' + logs.length + '건'),
+      h('span', { style:{ background:'#fffbeb', color:'#854d0e', fontSize:'11px', padding:'3px 10px', borderRadius:'10px', fontWeight:600 } },
+        logs === null ? '읽는 중…' : '총 ' + all.length + '건'),
+      h('button', { onClick:load, style:{ background:'#fff', color:'#475569', padding:'5px 10px', borderRadius:'4px', fontSize:'11.5px', cursor:'pointer', border:'1px solid #cbd5e1' } }, '↻ 다시 읽기'),
       h('div', { style:{ flex:1 } }),
-      logs.length === 0 && h('button', { onClick:addSample,
-        style:{ background:'#eff6ff', color:'#1e40af', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', cursor:'pointer', border:'1px solid #bfdbfe' } }, '샘플 추가'),
-      logs.length > 0 && h('button', { onClick:clearAll,
+      all.length > 0 && h('button', { onClick:clearAll,
         style:{ background:'#fef2f2', color:'#dc2626', padding:'6px 12px', borderRadius:'4px', fontSize:'11.5px', cursor:'pointer', border:'1px solid #fecaca' } }, '전체 삭제')
     ),
-    filtered.length === 0
+    err ? h('div', { style:{ color:'#991b1b', fontSize:'12px', padding:'10px', background:'#fef2f2', borderRadius:'4px' } },
+        '감사 로그를 못 읽었습니다 — 재무 권한이 있는 계정만 볼 수 있습니다 (' + err + ')')
+    : filtered.length === 0
       ? h('div', { style:{ color:'#94a3b8', fontSize:'12px', textAlign:'center', padding:'30px', background:'#f8fafc', borderRadius:'4px' } },
-          logs.length === 0 ? '감사 로그 없음 (모든 변경 이력 자동 기록)' : '검색 결과가 없습니다')
-      : h('table', { className:'dt' },
+          logs === null ? '읽는 중…' : all.length === 0 ? '감사 로그 없음 (금액·급여 등 바뀐 값이 자동 기록됩니다)' : '검색 결과가 없습니다')
+      : h('table', { className:'dt', style:{ tableLayout:'fixed', width:'100%' } },
           h('thead', null, h('tr', null,
-            h('th', null, '시각'),
-            h('th', null, '작업'),
-            h('th', null, '엔터티'),
-            h('th', null, '사용자'),
-            h('th', null, '내용')
+            h('th', { style:{ width:'130px' } }, '시각'), h('th', { style:{ width:'80px' } }, '사용자'), h('th', { style:{ width:'18%' } }, '대상'),
+            h('th', { style:{ width:'14%' } }, '칸'), h('th', null, '바뀐 값'), h('th', { style:{ width:'20%' } }, '사유')
           )),
-          h('tbody', null, filtered.slice(0, 30).map(function(r, i){
-            return h('tr', { key:i },
-              h('td', { style:{ fontFamily:'monospace', fontSize:'11.5px' } }, fmtDate(r.ts)),
-              h('td', null, actionTag(r.action)),
-              h('td', { style:{ fontWeight:600 } }, r.entity),
-              h('td', null, r.user),
-              h('td', { style:{ fontSize:'12px', color:'#475569' } }, r.detail)
+          h('tbody', null, filtered.slice(0, 50).map(function(r, i){
+            var chg = (r.before != null || r.after != null) ? txt(r.before) + ' → ' + txt(r.after) : '';
+            var who = r.actorName || r.user || r.actorSid || '';
+            var what = [r.entity, r.entityId].filter(Boolean).join(' · ');
+            return h('tr', { key: r.id || i },
+              h('td', { style:Object.assign({ fontFamily:'monospace', fontSize:'11.5px' }, td) }, fmtDate(r.ts)),
+              h('td', { style:td, title:who }, who),
+              h('td', { style:Object.assign({ fontWeight:600 }, td), title:what }, what),
+              h('td', { style:td, title:r.field || r.action || '' }, r.field || r.action || ''),
+              h('td', { style:Object.assign({ fontSize:'12px', color:'#475569' }, td), title:chg || r.detail || '' }, chg || r.detail || ''),
+              h('td', { style:Object.assign({ fontSize:'12px', color:'#64748b' }, td), title:r.reason || '' }, r.reason || '')
             );
           }))
         )
@@ -74732,14 +74720,15 @@ function LeaveManagement(){
 
     // 탭 바 (#1 연차 / 휴직 / 보상휴가)
     h('div', { style:{display:'flex',gap:'4px',marginBottom:'6px',borderBottom:'1px solid #e2e8f0',overflowX:'auto',WebkitOverflowScrolling:'touch'} },
-      ['annual','loa','comp','aledger'].map(function(t){
+      /* 📋 연차대장은 재무 권한자만(규칙 leave_ledger: finOnly, 대표 「2」 2026-10-04) — 동료 실명·잔여·육아휴직 사유가 다 보이고 고칠 수도 있었다 */
+      ['annual','loa','comp'].concat(_erpCanFin() ? ['aledger'] : []).map(function(t){
         var label = t==='annual' ? '🏖️ 연차/반차' : t==='loa' ? '🏠 휴직' : t==='comp' ? '💎 보상휴가' : '📋 연차대장';
         var on = tab===t;
         return h('button', { key:t, onClick:function(){setTab(t);},
           style:{padding:'5px 10px',background:'transparent',border:'none',borderBottom:'2px solid '+(on?'#1e40af':'transparent'),color:on?'#1e40af':'#64748b',fontWeight:on?700:500,fontSize:'13px',cursor:'pointer',marginBottom:'-1px',flexShrink:0,whiteSpace:'nowrap'} }, label);
       })
     ),
-    tab==='aledger' && h(LeaveLedgerTab, null),
+    tab==='aledger' && _erpCanFin() && h(LeaveLedgerTab, null),
     tab==='annual' && h('div',{style:_isAdminView?{display:'grid',gridTemplateColumns:'1fr 1.6fr',gap:'10px',alignItems:'start'}:{}},
 
       // ─ 좌: 직원별 연차 현황 테이블
