@@ -84608,7 +84608,7 @@ document.addEventListener('keydown', function(e){
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
-  function shouldPauseIdle(){ return persistentAutoLogin() && document.hidden; }
+  function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   var WARN  = 2*60*1000;      // 종료 2분 전 경고
   var AKEY  = 'pu_last_active';
   var badge = null, warnBox = null, tick = null, warned = false;

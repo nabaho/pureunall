@@ -9236,7 +9236,7 @@ try{
 (function(){
   var LIMIT=60*60*1000, WARN=2*60*1000, AKEY='pu_last_active';
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
-  function shouldPauseIdle(){ return persistentAutoLogin() && document.hidden; }
+  function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   /* 포털 공용 설정의 자동 로그아웃 시간 반영 — 10~480분만 인정, 그 밖이면 기본값 유지 */
   function _applyIdleCfg(c){
     var m = c && parseInt(c.idleMinutes, 10);
@@ -9245,7 +9245,7 @@ try{
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
-  function shouldPauseIdle(){ return persistentAutoLogin() && document.hidden; }
+  function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   var warnBox=null, tick=null;
   function loggedIn(){ try{ var u=firebase.auth().currentUser; return !!(u&&u.email); }catch(e){ return false; } }
   function now(){ return Date.now(); }
