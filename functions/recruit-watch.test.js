@@ -1,0 +1,141 @@
+/* 컨설턴트 모집 감시(서버) — recruit-watch.js
+   가짜 게시판으로 돌린다. 네트워크를 안 쓴다.
+   제목들은 2026-10-04 실제 게시판 11곳에서 읽은 것을 그대로 옮겼다(공개 공지 제목). */
+'use strict';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const W = require('./recruit-watch');
+
+const BOARD_TR = `<table><thead><tr><th>번호</th><th>제목</th><th>작성일</th></tr></thead><tbody>
+<tr><td>12</td><td class="tit"><a href="javascript:fn_view('77')">2026년 하반기 지방공기업평가원 정책연구 및 컨설팅 외부연구진 풀(Pool) 공개 모집</a></td><td>2026-06-09</td></tr>
+<tr><td>11</td><td><a href="/bbs/list.do?cat=7">[공지사항 게시판]</a> <a href="/bbs/view.do?id=76&amp;m=1">지방공기업평가원 위촉직이사 모집 재공고</a> <a href="/f/1.hwp">첨부</a></td><td>2026.07.08</td></tr>
+<tr><td>10</td><td><a href="/bbs/view.do?id=75">2026년 지방공공기관 혁신 우수사례 공모 결과</a></td><td>2026-09-16</td></tr>
+<tr><td>9</td><td><a href="/bbs/view.do?id=74">충남지식산업센터 입주기업 모집공고</a></td><td>2026-09-22</td></tr>
+</tbody></table>`;
+const BOARD_LI = `<ul class="list"><li><a href="view.cs?no=5"><span>[모집]</span> 2027년 농촌융복합산업 현장코칭 전문위원 모집</a><span class="date">2026년 12월 3일</span></li>
+<li><a href="view.cs?no=4">2026년 농촌융복합산업 우수사례 경진대회 참여자 모집</a><span>2026.06.05</span></li>
+<li><a href="#">메뉴</a></li>
+<li><a href="/menu/recruit">컨설턴트 모집 안내 바로가기</a></li></ul>`;
+
+test('★ 표 줄에서 제목·날짜를 뽑는다 — 머리줄은 버리고, 가장 긴 링크 글자가 제목', () => {
+  const r = W.parseRows(BOARD_TR, 'https://www.erc.re.kr/usr/com/prm/BBSList.do');
+  assert.equal(r.length, 4);
+  assert.equal(r[1].title, '지방공기업평가원 위촉직이사 모집 재공고', '앞의 분류 링크·뒤의 「첨부」가 아니라 «가장 긴» 제목');
+  assert.equal(r[1].date, '2026-07-08', '2026.07.08 → 2026-07-08');
+  assert.equal(r[1].href, 'https://www.erc.re.kr/bbs/view.do?id=76&m=1', '상대 주소를 풀고 &amp; 를 되돌린다');
+  assert.equal(r[0].href, '', 'javascript: 는 비운다(서버가 열 주소가 아니다)');
+});
+
+test('★ 목록(<li>) 줄과 「2026년 12월 3일」 꼴 날짜도 읽는다', () => {
+  const r = W.parseRows(BOARD_LI, 'https://xn--980b99s59h34f6tl.com/home/board/B0030.cs');
+  assert.equal(r.length, 2, '날짜 없는 메뉴 줄은 버린다 — 제목이 «모집 안내»처럼 길어도');
+  assert.equal(r[0].date, '2026-12-03');
+  assert.match(r[0].title, /현장코칭 전문위원 모집/);
+});
+
+test('날짜가 말이 안 되면 버린다', () => {
+  assert.equal(W.parseRows('<tr><td><a href="/x">아무개 전문가 모집 공고</a></td><td>2026-13-40</td></tr>', 'https://a.b/').length, 0);
+});
+
+test('★★ 사람을 뽑는 글만 — 실측 제목으로', () => {
+  [
+    '2026년 하반기 지방공기업평가원 정책연구 및 컨설팅 외부연구진 풀(Pool) 공개 모집',
+    '지방공기업평가원 위촉직이사 모집 재공고',
+    '직업능력개발사업 외부전문가 모집분야 및 신청자격 안내',
+    '2027년 농촌융복합산업 현장코칭 전문위원 모집',
+    '2026년 노동전환 컨설팅 수행 컨설턴트 모집 공고',
+    '충청남도일자리경제진흥원 비상임이사 공개 모집',
+    '2026년 소상공인 역량강화사업 전문가 POOL 모집'
+  ].forEach((t) => assert.equal(W.isRecruit(t), true, t));
+});
+test('★★ 사람을 안 뽑는 글은 거른다 — 실측 잡음 그대로', () => {
+  [
+    '충남지식산업센터 입주기업 모집공고',
+    "(붙임1)'26.10월행복주택예비입주자통합정례모집사전안내문.hwpx (96.44KB)",
+    '2026년 지방공공기관 혁신 우수사례 공모 결과',
+    '한국농촌경제연구원 원장후보자심사위원회 개최결과',
+    '[공모전] 2026년 노인 일자리 및 사회활동 지원사업 수행기관 안전관리 우수사례 공모전',
+    '2026년 4기 신체활동 대상자 모집 (10.12. ~ 10.16.)',
+    '2026년 마이데이터 컨설팅 및 교육 지원 사업 공모',
+    '2026년 제3차 이사회 개최 안내',
+    '외부전문가 최종 선정 결과 안내',
+    '2026년 노동전환 컨설턴트 모집 결과 안내',      // 누구+뽑는다가 다 있어도 «결과»면 끝난 글
+    '외부전문가 간담회 안내',                        // 누구는 있는데 뽑는다가 없다
+    '신임 이사장 초빙 공고'                          // «맨 이사»는 이사장까지 걸린다 — 위촉직·비상임·사외만
+  ].forEach((t) => assert.equal(W.isRecruit(t), false, t));
+});
+
+const BOARDS = [{ id: 'erc', org: 'erc', name: '평가원', url: 'https://www.erc.re.kr/list' },
+  { id: 'agri6', org: 'agri6', name: '6차', url: 'https://x.example/b' },
+  { id: 'dead', org: 'lh', name: '죽은 곳', url: 'https://dead.example/' },
+  { id: 'empty', org: 'tp', name: '빈 곳', url: 'https://empty.example/' }];
+function fake(u) {
+  if (u.indexOf('erc') >= 0) return Promise.resolve(BOARD_TR);
+  if (u.indexOf('x.example') >= 0) return Promise.resolve(BOARD_LI);
+  if (u.indexOf('empty') >= 0) return Promise.resolve('<html>프로그램으로 그리는 쪽</html>');
+  return Promise.reject(new Error('HTTP 503'));
+}
+
+test('★★ 한 번 돈다 — 모집 글만 남기고, 고장 난 게시판은 «무엇이» 고장인지 남긴다', async () => {
+  const r = await W.run({ boards: BOARDS, fetchText: fake, today: '2026-10-20', nowIso: 'T' });
+  const titles = r.hits.map((h) => h.title).sort();
+  assert.deepEqual(titles, ['[모집] 2027년 농촌융복합산업 현장코칭 전문위원 모집', '지방공기업평가원 위촉직이사 모집 재공고'],
+    '6월 외부연구진 글은 133일 지나 빠지고, 입주기업·공모 결과·경진대회는 걸러진다');
+  const h = r.hits.find((x) => x.board === 'erc');
+  assert.equal(h.org, 'erc'); assert.equal(h.href, 'https://www.erc.re.kr/bbs/view.do?id=76&m=1');
+  assert.deepEqual(r.errors.map((e) => e.board).sort(), ['dead', 'empty']);
+  assert.match(r.errors.find((e) => e.board === 'empty').why, /모양이 바뀌었을/);
+  assert.equal(r.checked, 4);
+});
+
+test('★ 주소를 모르는 글은 게시판 주소로 보낸다 — 막다른 링크 금지', async () => {
+  const r = await W.run({ boards: BOARDS.slice(0, 1), fetchText: fake, today: '2026-07-10' });
+  const pool = r.hits.find((x) => /외부연구진/.test(x.title));
+  assert.equal(pool.href, 'https://www.erc.re.kr/list');
+});
+
+test('★ 오래된 글(120일 넘음)은 처음 봐도 안 남긴다 — 첫날 과거 글이 쏟아지지 않게', async () => {
+  const r = await W.run({ boards: BOARDS.slice(0, 1), fetchText: fake, today: '2026-12-10' });
+  assert.ok(!r.hits.some((x) => /외부연구진/.test(x.title)), '6월 글은 12월에 새로 안 남긴다');
+});
+
+test('★★ 이미 본 글은 다시 안 남긴다 — 열쇠는 게시판+제목+날짜', async () => {
+  const a = await W.run({ boards: BOARDS, fetchText: fake, today: '2026-10-20' });
+  const have = {}; a.hits.forEach((h) => { have[h.key] = h; });
+  const b = await W.run({ boards: BOARDS, fetchText: fake, today: '2026-10-20', existing: have });
+  assert.ok(a.hits.length >= 2, '처음엔 남긴다');
+  assert.equal(b.hits.length, 0);
+  assert.equal(W.keyOf('erc', { title: 'a', date: '2026-01-02' }), W.keyOf('erc', { title: 'a', date: '2026-01-02' }));
+  assert.notEqual(W.keyOf('erc', { title: 'a', date: '2026-01-02' }), W.keyOf('erc', { title: 'a', date: '2026-01-03' }));
+  assert.match(W.keyOf('erc', { title: 'a.b#c$[d]/', date: '2026-01-02' }), /^[A-Za-z0-9_]+$/, 'RTDB 열쇠에 못 쓰는 글자 없음');
+});
+
+test('★ 쓸 것 — 새 글만 더하고, 넘치면 오래된 것부터 지운다(있던 글은 고치지 않는다)', () => {
+  const existing = {}; for (let i = 0; i < W.MAX_KEEP; i++) existing['k' + i] = { date: '2025-01-' + String(1 + (i % 28)).padStart(2, '0') };
+  const res = { hits: [{ key: 'new1', date: '2026-10-01', title: 't' }], errors: [], counts: { erc: 3 }, checked: 1 };
+  const u = W.updatesOf(res, existing, 'NOW');
+  assert.equal(u['hits/new1'].title, 't');
+  const removed = Object.keys(u).filter((k) => u[k] === null);
+  assert.equal(removed.length, 1, '하나 넘쳤으니 하나만 지운다');
+  assert.equal(existing[removed[0].slice(5)].date, '2025-01-01', '가장 오래된 것');
+  assert.deepEqual(u.last, { at: 'NOW', checked: 1, added: 1, errors: [], counts: { erc: 3 } });
+  const few = W.updatesOf(res, { a: { date: '2020-01-01' } }, 'NOW');
+  assert.equal(Object.values(few).filter((v) => v === null).length, 0, '안 넘치면 안 지운다');
+});
+
+test('★ euc-kr 게시판도 글자가 안 깨진다', () => {
+  const html = '<meta charset="euc-kr"><a>';
+  const bytes = Buffer.concat([Buffer.from(html, 'latin1'), Buffer.from([0xb8, 0xf0, 0xc1, 0xfd])]); // 「모집」
+  assert.match(W.decode(bytes, 'text/html'), /모집/);
+  assert.equal(W.decode(Buffer.from('모집', 'utf8'), 'text/html; charset=utf-8'), '모집');
+});
+
+test('★★ 게시판 목록 — https 만, 기관 번호가 화면 사전과 맞는다, 번호 안 겹침', () => {
+  const R = require('../js/gov-recruit.js');
+  const orgs = R.ORGS.map((o) => o.id);
+  W.BOARDS.forEach((b) => {
+    assert.match(b.url, /^https:\/\//, b.id);
+    assert.ok(orgs.indexOf(b.org) >= 0, b.id + ' → ' + b.org + ' 가 화면 사전에 없다');
+  });
+  assert.equal(new Set(W.BOARDS.map((b) => b.id)).size, W.BOARDS.length);
+});

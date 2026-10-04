@@ -72,9 +72,12 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
      2026-10-04 뉴스레터 감시꾼 셋(newsletterWatchRetry 3시간마다 · newsletterWatchSunday 일 18:00 ·
        newsletterWatchDelivery 월 12:00)이 늘어 열여섯이 됐다 — 대표 지시 「자동화에 에러가 나면 검증도
        자동화 … 자동으로 고치는기능」. 3시간마다 도는 것은 날마다라 아래 하루 셈에 +8.
+     2026-10-04 컨설턴트 모집 감시(아침 7:20, recruitWatch)가 늘어 열일곱이 됐다 —
+       대표 결정 「기관 게시판 새 글 자동 감지 서버 — 지금 만든다」. 게시판 11곳을 읽기만 한다.
+       하루 한 번이라 아래 하루 셈에 +1.
      화면 문구도 같이 고쳤다. 다음에 또 늘면 여기와 화면을 함께 고쳐야 한다. */
   const all = (FIDX + FSYNC).match(/\.pubsub\.schedule\(/g) || [];
-  assert.strictEqual(all.length, 16, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  assert.strictEqual(all.length, 17, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
@@ -99,6 +102,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '취업규칙 모으기 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.newsletterWatchRetry') >= 0 && ENTER.indexOf('뉴스레터 감시꾼 3시간마다') >= 0,
     '뉴스레터 감시꾼 일정이 화면 설명에 없습니다');
+  assert.ok(FIDX.indexOf('exports.recruitWatch ') >= 0 && ENTER.indexOf('컨설턴트 모집 감시 하루 한 번') >= 0,
+    '컨설턴트 모집 감시 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -158,7 +163,7 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
     + Math.round(60 / sync.every) * sync.hours
-    + 5    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기 — 각 하루 한 번
+    + 6    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기·컨설턴트 모집 감시 — 각 하루 한 번
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
   /* ⚠ 숫자를 박지 않는다 — 코드에서 셈한 값이 화면에 그대로 있는가만 본다 */

@@ -40,7 +40,7 @@ function runApp(seed, opt) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
-    + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,'
+    + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, opened, toasts };
@@ -275,4 +275,92 @@ test('★ 서류 준비 창에 캘린더 칸이 있다', () => {
   assert.match(b, /해마다 12월 1일 준비 알림/);
   assert.match(b, /id="recDue"/); assert.match(b, /recCalDue\('erc'\)/);
   assert.match(b, /저장은 대표님이 누르십니다/);
+});
+
+/* ═══ 🛰 기관 게시판 새 모집 글 — 서버 recruitWatch 결과 (2026-10-04) ═══ */
+const WATCH = {
+  last: { at: '2026-10-04T22:20:00Z', checked: 11, added: 2, errors: [{ board: 'lh', why: 'HTTP 503' }], counts: { erc: 11 } },
+  hits: {
+    k1: { key: 'k1', board: 'erc', org: 'erc', boardName: '지방공기업평가원 공지', title: '2027년 외부연구진 풀 공개 모집', date: '2026-12-01', href: 'https://www.erc.re.kr/v?1' },
+    k2: { key: 'k2', board: 'agri6', org: 'agri6', boardName: '6차 공지', title: '현장코칭 전문위원 모집', date: '2026-11-20', href: 'javascript:alert(1)' }
+  }
+};
+function fbWith(val, fail) {
+  return { ref: (p) => ({ once: () => (fail ? Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }))
+    : Promise.resolve({ val: () => (p === 'gov_watch' ? val : null) })), set: () => Promise.resolve() }) };
+}
+test('★★ 서버가 찾은 새 모집 글을 날짜 내림차순으로 보여 주고, 기관 줄에 🆕', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.ok(w.indexOf('외부연구진') < w.indexOf('현장코칭'), '최근 글이 위');
+  assert.match(w, /새 글 <b>2건<\/b>/);
+  assert.match(w, /11곳/); assert.match(w, /못 읽은 곳 1\(lh\)/, '고장 난 게시판을 숨기지 않는다');
+  assert.match(r.el('recTb').innerHTML, /🆕 새 글/);
+  assert.equal(r.api.recNewFor('erc'), true);
+});
+test('★ javascript: 주소는 링크로 안 그린다', async () => {
+  const r = runApp({}, {});
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.doesNotMatch(w, /javascript:alert/);
+  assert.match(w, /href="https:\/\/www\.erc\.re\.kr\/v\?1"/);
+});
+test('★ 폴더를 안 읽었어도 새 모집 글은 보인다', async () => {
+  const r = runApp({});
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  assert.match(r.el('recWatch').innerHTML, /외부연구진/);
+  assert.match(r.el('recBan').innerHTML, /서류 폴더에서 읽기/);
+});
+test('★★ ✓ 봤음 — 대표 자리에만 적고 🆕 가 사라진다, 클라우드로 간다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  let pushed = null;
+  const db = fbWith(WATCH);
+  db.ref = ((orig) => (p) => Object.assign(orig(p), { set: (v) => { pushed = v; return Promise.resolve(); } }))(db.ref);
+  r.api.setFb(db, 'U1');
+  await r.api.recWatchPull();
+  r.api.recSeen('k1');
+  assert.equal(r.api.recNewFor('erc'), false);
+  assert.doesNotMatch(r.el('recTb').innerHTML, /🆕 새 글/);
+  assert.match(r.el('recWatch').innerHTML, /새 글 <b>1건<\/b>/);
+  await new Promise((res) => setTimeout(res, 1400));
+  assert.ok(pushed && pushed.recruit.seen.k1, '다른 기기에서도 봤음이 보여야 한다');
+});
+test('★ 권한이 없으면 조용히 비우지 않고 까닭을 말한다', async () => {
+  const r = runApp({});
+  r.api.setFb(fbWith(null, true), 'U1');
+  await r.api.recWatchPull();
+  assert.match(r.el('recWatch').innerHTML, /읽을 권한이 없습니다/);
+});
+test('★ 서버가 아직 한 번도 안 돌았으면 그렇다고 말한다', async () => {
+  const r = runApp({});
+  r.api.setFb(fbWith({}), 'U1');
+  await r.api.recWatchPull();
+  assert.match(r.el('recWatch').innerHTML, /아직 한 번도 안 돌았습니다/);
+  assert.match(r.el('recWatch').innerHTML, /아직 걸린 모집 글이 없습니다/);
+});
+test('★ 📅 마감일 — 날짜 꼴이 맞을 때만 구글 일정 창을 연다', async () => {
+  const r = runApp({}, { prompts: ['다음주', '2027-01-20'] });
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  r.api.recWatchCal('k1');
+  assert.equal(r.opened.length, 0);
+  assert.ok(r.toasts.some((t) => /2027-01-20 꼴로/.test(t)), '무엇을 넣어야 하는지 말한다');
+  r.api.recWatchCal('k1');
+  assert.equal(r.opened.length, 1);
+  assert.match(r.opened[0], /dates=20270120\/20270121/);
+  assert.match(decodeURIComponent(r.opened[0]), /\[마감\] 2027년 외부연구진 풀 공개 모집/);
+});
+test('★★ 서버 결과(gov_watch)에 화면이 «쓰지» 않는다', () => {
+  assert.doesNotMatch(src, /ref\('gov_watch[^)]*'\)\s*\.(set|update|push|remove)/);
+});
+test('★ 컨설턴트 모집 탭을 열면 서버 결과를 받아 온다', async () => {
+  const r = runApp({});
+  r.api.setFb(fbWith(WATCH), 'U1');
+  r.api.setTab('rec');
+  await new Promise((res) => setTimeout(res, 20));
+  assert.match(r.el('recWatch').innerHTML, /외부연구진/);
 });
