@@ -8603,7 +8603,7 @@ function erpMappableTypes(){
   const list=ERP.types.map(t=>({code:t.code,short:t.short||'',name:t.name||'',agency:t.agency||'',cnt:0,extra:false}));
   const idx={}; list.forEach(x=>idx[x.code]=x);
   ERP.consultings.forEach(c=>{
-    if(c&&(c.closedDate||c.closedAt))return;
+    if(erpIsClosed(c))return;
     const code=erpConsCode(c); if(!code)return;
     if(idx[code]){ idx[code].cnt++; return; }
     const raw=erpConsRawType(c)||erpTypeLabel(code);
@@ -9025,7 +9025,7 @@ function erpConsByCo(){
   /* 이음표는 한 번만 읽는다 — 안 그러면 컨설팅 수만큼 JSON 을 다시 푼다 */
   const tmap=getErpTypeMap();
   ERP.consultings.forEach(c=>{
-    if(!c||!c.id||c.closedDate||c.closedAt)return;      // 종료된 건은 맞추지 않는다
+    if(!c||!c.id||erpIsClosed(c))return;                // 종료된 건은 맞추지 않는다
     const nm=String(c.companyName||'').trim();
     if(!nm)return;
     const code=erpConsCode(c);
@@ -9162,12 +9162,21 @@ async function coAddSubsFromSched(coId,added){
      이알피 재개 한 번에 조용히 되돌아온다 — 끝낸 일이 살아나는 쪽이 훨씬 나쁘다.
    ⚠ 옛 사본으로 읽은 판에서는 하지 않는다(부르는 자리에서 막는다) —
      몇 달 전 사본으로 지금 도는 컨설팅을 끝내 버리면 회차가 통째로 멈춘다.        */
-/* 언제 끝났나. 안 끝났으면 빈 글자.
-   ⚠ 이알피 「종료」는 status:closed + closedAt 을 적고 closedDate 는 «안 적는다» —
-     셋 다 봐야 한다(erpBuildPlan 이 빼는 잣대와 같게 맞췄다). */
+/* 이알피에서 «끝난» 컨설팅인가 — 끝난 건을 거르는 곳이 «모두 이 잣대 하나»를 쓴다.
+   ⚠ 이알피 「종료」 단추는 status:closed + closedAt 을 적고 closedDate 는 «안 적는다».
+     목록의 상태 칸을 「종료」로 바꾸면 status 만 바뀌고 날짜는 둘 다 «빈 채»다
+     (배경건설 현클-2026-004, 2026-10-04 — 상태만 종료라 «새 사업장»으로 가져오기에 떴다).
+     그래서 셋 중 하나만 있어도 끝난 것이다. 날짜 칸만 보고 거르면 상태만 바꾼 건이 샌다.
+   ⚠ 가져오기 목록·연결표 건수·사업장 짝짓기(erpBuildPlan·erpMappableTypes·erpConsByCo)와
+     일정관리 자동 종료(erpClosedOn)가 «같은 잣대»여야 한다 — 따로 두면 «가져오라는 건이
+     자동 종료 대상»이 되어 서로 어긋난다. */
+function erpIsClosed(c){
+  return !!(c&&(c.status==='closed'||c.closedDate||c.closedAt));
+}
+/* 언제 끝났나. 안 끝났으면 빈 글자. */
 function erpClosedOn(c){
   if(!c)return '';
-  if(!(c.status==='closed'||c.closedDate||c.closedAt))return '';
+  if(!erpIsClosed(c))return '';
   const s=String(c.endDate||c.closedDate||c.closedAt||'').slice(0,10);
   /* 날짜가 없거나 알아볼 수 없으면 오늘로 적는다 — 끝난 것은 분명하니 안 끝낼 수는 없다 */
   return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:todayStr();
@@ -9324,7 +9333,7 @@ function erpBuildPlan(){
   ERP.consultings.forEach(c=>{
     const nm=String(c.companyName||'').trim();
     if(!nm)return;
-    if(c.closedDate||c.closedAt)return;                 // 종료 건 제외
+    if(erpIsClosed(c))return;                           // 종료 건 제외
     const code=erpConsCode(c);
     /* ⚠ 이어 있어도 「일정관리 진행」이 꺼져 있으면 «안 이어진 것처럼» 본다 —
        그래야 가져오기 목록·새 컨설팅 알림에 안 뜬다(대표 지시 2026-09-06). */

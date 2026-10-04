@@ -56,7 +56,7 @@ function world(cons, cos, map) {
   vm.runInContext([
     grabLine('const CO_CORP_RE='), grabLine('const _en='),
     grab('coKey'), grab('coKeyLoose'), grab('findCoForErp'),
-    grab('erpConsCode'), grab('erpClosedOn'), grab('erpSyncClosedDown'),
+    grab('erpConsCode'), grab('erpIsClosed'), grab('erpClosedOn'), grab('erpSyncClosedDown'),
   ].join('\n'), ctx);
   return ctx;
 }
