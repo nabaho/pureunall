@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>홈페이지 관리</title>
+<title>홈페이지</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🌐</text></svg>">
 <!--
   홈페이지 관리 — 회사 홈페이지(라이믹스)의 구성원 소개·주요업무·오시는길·인사말 글을
@@ -34,7 +34,7 @@
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 앱바가 관리자 전용 줄(경력관리·홈페이지 관리)을 가리려면 신원을 알아야 한다 — 앱바보다 먼저 -->
 <script src="js/pu-whoami.js?v=2"></script>
-<script src="js/pu-appbar.js?v=18"></script>
+<script src="js/pu-appbar.js?v=19"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script>
 <!-- 이 앱은 머리줄에 스스로 이름을 그린다 — 부품이 표를 또 띄우면 겹친다.
@@ -809,7 +809,7 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 </head>
 <body>
 <header>
-  <div class="brand" onclick="location.reload()">푸 홈페이지 관리</div>
+  <div class="brand" onclick="location.reload()">푸 홈페이지</div>
   <div class="who"><span id="whoami"></span>
     <button class="out" onclick="App.logout()">로그아웃</button></div>
 </header>
@@ -4914,7 +4914,7 @@ function railHtml() {
 function appbarHtml() {
   const at = App.check && App.check.at;
   return '<div class="appbar">'
-    + '<div class="ttl">홈페이지 관리</div>'
+    + '<div class="ttl">홈페이지</div>'
     + '<span class="when">홈페이지 확인 ' + esc(at ? stampShort(at) : '아직 안 함') + '</span>'
     + '<div class="sp"></div>'
     /* ★ 이 띠가 «무엇에 대한 것인지» 이름표로 못 박는다 (대표 결정 2026-09-06 ㉯).
