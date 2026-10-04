@@ -362,6 +362,9 @@ body:has(.modalbg.open) #pu-version-fab{display:none!important}
   .edit-split .photo-pane img{max-height:none;width:100%}
 }
 .mfoot{display:flex;gap:8px;margin-top:14px}
+/* 명함 상세 아래 단추 — 글이 「원 / 본」 두 줄로 쪼개지지 않게. 많으면(대표·사진첩 원본) 단추째 다음 줄로 */
+#detailM .mfoot,#cardErpM .mfoot{flex-wrap:wrap}
+#detailM .mfoot .btn,#cardErpM .mfoot .btn{white-space:nowrap;padding:13px 8px;flex:1 1 auto}
 .btn{padding:13px;border-radius:12px;font-size:14.5px;font-weight:700;flex:1}
 .btn.primary{background:var(--orange);color:#fff}
 .btn.ghost{background:#1e293b;color:var(--ink)}
@@ -2809,6 +2812,8 @@ body.pc #pcDetail{display:flex}
 #pcDetail .pdsec{font-size:11.5px;font-weight:700;color:#94a3b8;letter-spacing:1px;margin:12px 0 6px}
 #pcDetail .pdrow{display:flex;padding:6px 0;border-bottom:1px solid #f8fafc;font-size:13px}
 #pcDetail .pdrow .k{width:66px;flex-shrink:0;color:#94a3b8;font-size:11.5px;padding-top:1px}
+/* 이름표도 한 줄 — 「회사 대표번호」·「사업자등록번호」가 66px 에 안 들어가 두 줄로 접혔다 */
+#pcDetail .pdgrid .pdrow .k{width:auto;min-width:66px;white-space:nowrap;margin-right:6px}
 /* ⚠ 이름표 폭은 «가장 긴 이름표»가 정한다 (대표 화면 2026-08-31 「정리가 안 되어 있다」).
    66px 이던 때는 「법인등록번호」(69)·「직전년도 매출액」(85)·「세금계산서 이메일」(97)이
    두 줄로 접혀, 이름표가 값보다 어수선해 보였다. 실측 97 로 못 박고 접지 않는다.
@@ -2816,7 +2821,12 @@ body.pc #pcDetail{display:flex}
      명함 쪽에서 값 자리를 빼앗는다(실제로 그렇게 만들어 검사가 잡았다). */
 #pcDetail .cogrid .pdrow{gap:8px}
 #pcDetail .cogrid .pdrow .k{width:97px;white-space:nowrap}
-#pcDetail .pdrow .v{flex:1;color:#1e293b;word-break:break-all}
+#pcDetail .pdrow .v{flex:1;min-width:0;color:#1e293b;word-break:break-all}
+/* 이메일은 «한 줄» — 넘치면 … 으로 접고 전문은 말풍선에(대표 지시 2026-08-30 「2줄로 절대 만들지마라」).
+   ⚠ 두 칸 표의 칸이 글 길이만큼 늘지 않게 칸(.pdrow)에 min-width:0 를 둔다 — 없으면 … 이 안 생기고
+     칸이 이메일 길이만큼 넓어진다(2026-10-04 실제로 재 봄: 있으면 두 칸 184px 씩 그대로) */
+#pcDetail .pdgrid>.pdrow{min-width:0}
+#pcDetail .pdrow .v .pd1{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* 📍 주소 확인 (목업 B, 2026-10-02) — 경고는 팔레트의 주황 */
 .addrchk{display:inline-block;margin-left:6px;padding:0 7px;border-radius:4px;background:#fffbeb;color:#854d0e;border:1px solid #fde68a;font-size:11px;white-space:nowrap;cursor:help}
 .addrfix{margin-left:6px;padding:1px 8px;border:1px solid #fbbf24;border-radius:4px;background:#fff;color:#854d0e;font-size:11px;font-weight:600;cursor:pointer;white-space:nowrap}
@@ -10999,7 +11009,9 @@ function renderList(){
           return `<div class="erpmgr">🏢 ${esc(body)}${more?`<span class="mgx" title="부담당 ${esc(all.slice(1).join(', '))}">+${more}</span>`:''}${rh}</div>`;
         })()}
         ${l1?`<div class="l1">${esc(l1)}</div>`:''}
-        ${l2?`<div class="l2">${esc(l2)}</div>`:''}</div>
+        ${/* 🔗 — PC 표 회사 칸과 «같은 함수». 확정 업체 이름이 명함과 다를 때만 붙는다
+             (2026-10-04 폰 목업에서 폰에만 빠진 것을 봄). 어느 업체인지는 눌러 연 상세의 🏢 줄에 있다. */''}
+        ${l2?`<div class="l2">${isCard?cardPinMark(it):''}${esc(l2)}</div>`:''}</div>
       <div class="thumb"${needFetch?` data-th="${it.id}"`:''}>${th}</div></div>`;
   }
   /* 이 쪽에 보일 것만 그린다 — 6,270장을 통째로 그리면 조각이 37,625개가 되어
@@ -12789,7 +12801,7 @@ function openPcDetail(id, backCo){
     let v=esc(it[k]);
     if (k==='bizno') v=esc(fmtBizno(it[k]));
     if (['mobile','tel','fax'].includes(k)) v=`<a href="tel:${esc(digits(it[k]))}">${v}</a>`;
-      if (k==='email') v=`<a href="#" onclick="openMailWindow('${it.id}');return false" title="딴 창에서 메일을 씁니다 — 보던 화면은 그대로 남습니다">${v}</a>`;
+      if (k==='email') v=`<span class="pd1" title="${esc(it[k])}"><a href="#" onclick="openMailWindow('${it.id}');return false" title="${esc(it[k])} — 딴 창에서 메일을 씁니다(보던 화면은 그대로 남습니다)">${v}</a></span>`;
     /* 폰 상세와 «같은 줄»을 붙인다 — 한쪽에만 있으면 화면에 따라 둘째가 사라진다 */
     if (k==='mobile' || k==='email') v += pcMoreLine(it, k);
     v += addrNoteHtml(it, k);

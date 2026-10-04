@@ -66,6 +66,7 @@ function row(it, opt){
     } };
   vm.createContext(ctx);
   vm.runInContext(fnAt('function cardLacks('), ctx);
+  vm.runInContext(fnAt('function cardPinMark('), ctx);   /* 회사 줄 🔗 (2026-10-04) — 확정 열쇠가 없으면 빈 값 */
   vm.runInContext(fnAt('  function rowHtml(it){'), ctx);
   ctx.IT = it;
   return vm.runInContext('rowHtml(IT)', ctx);

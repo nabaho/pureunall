@@ -327,6 +327,40 @@ test('★ 목록 회사 칸 🔗 — 확정 업체 이름이 «다를 때만», 
   assert.equal(w.ctx.cardPinMark(same), '', '이름이 같으면 굳이 안 그린다(칸이 좁다)');
   assert.match(CARDS, /col-company" ondblclick="startCellEdit\(event,'\$\{it\.id\}','company'\)">\$\{cardPinMark\(it\)\}/,
     '★ 목록 회사 칸이 🔗 를 안 그립니다');
+  /* 폰 목록도 «같은 함수»로 — 2026-10-04 폰 목업에서 폰에만 빠진 것을 봤다 */
+  const rl = cutFn(CARDS, 'function renderList(').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(rl, /class="l2">\$\{isCard\s*\?\s*cardPinMark\(it\)/, '★ 폰 명함 목록 회사 줄이 🔗 를 안 그립니다');
+});
+
+/* 화면 머리 스타일에서 «그 선택자가 든» 규칙들의 몸을 모은다 — 선택자를 몇 개 묶어 써도 찾는다 */
+function cssFor(sel) {
+  const head = CARDS.slice(0, CARDS.indexOf('</head>')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const out = [];
+  head.replace(/([^{}]+)\{([^{}]*)\}/g, (m, sels, body) => {
+    if (sels.split(',').some((s) => s.trim() === sel)) out.push(body);
+    return m;
+  });
+  return out.join(';');
+}
+
+test('★ 명함 상세 아래 단추 글은 «한 줄» — 「원 / 본」으로 쪼개지지 않는다', () => {
+  /* 2026-10-04 폰 화면(375px)을 실제로 그려 보니 「📥 원본」·「📤 공유」가 두 줄로 쪼개졌다 */
+  assert.match(cssFor('#detailM .mfoot .btn'), /white-space:\s*nowrap/, '★ 상세 아래 단추 글이 두 줄로 쪼개집니다');
+  assert.match(cssFor('#detailM .mfoot'), /flex-wrap:\s*wrap/, '★ 단추가 많을 때(대표·사진첩 원본) 넘칠 자리가 없습니다');
+});
+
+test('★ 🏢 창 아래 단추 · PC 상세 이메일·이름표도 «한 줄»', () => {
+  /* 2026-10-04 PC 화면을 실제로 띄워 보니 「업체관리에 / 올리기」·「hong@gana.exampl / e」·
+     「회사 대표번 / 호」가 두 줄로 접혔다 (대표 지시 「한줄로」) */
+  assert.match(cssFor('#cardErpM .mfoot .btn'), /white-space:\s*nowrap/, '★ 🏢 창 단추 글이 두 줄로 쪼개집니다');
+  assert.match(cssFor('#cardErpM .mfoot'), /flex-wrap:\s*wrap/, '★ 🏢 창 단추가 넘칠 자리가 없습니다(폰)');
+  const pd1 = cssFor('#pcDetail .pdrow .v .pd1');
+  assert.match(pd1, /white-space:\s*nowrap/, '★ PC 상세 이메일이 두 줄로 접힙니다');
+  assert.match(pd1, /text-overflow:\s*ellipsis/, '넘치면 … 으로 접어야 합니다(전문은 말풍선)');
+  const pc = cutFn(CARDS, 'function openPcDetail(').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(pc, /k==='email'\)\s*v=`<span class="pd1" title="\$\{esc\(it\[k\]\)\}">/, '★ PC 상세 이메일이 한 줄 칸(.pd1)에 안 담깁니다 — 전문 말풍선도 함께');
+  assert.match(cssFor('#pcDetail .pdgrid>.pdrow'), /min-width:\s*0/, '★ 두 칸 표가 긴 이메일만큼 늘어나 … 이 안 생깁니다');
+  assert.match(cssFor('#pcDetail .pdgrid .pdrow .k'), /white-space:\s*nowrap/, '★ PC 상세 이름표(회사 대표번호)가 두 줄로 접힙니다');
 });
 
 test('★★★ ✏ 수정 저장이 확정한 업체 열쇠를 «지우지 않는다» — 저장이 명함을 통째로 덮는다', () => {
