@@ -22,7 +22,7 @@ const A = (() => {
     gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'), gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'),
     gF('_cmSeeAnnex'), gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('_docRok'), gF('siteContribNow'), gF('partyNames'), gF('partyJoin'),
     gF('_dotDate'), gF('_hwpKoDate'), gF('_hwpTodayIso'), gF('_hwpSignRows'),
-    gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
+    gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_shortBirth'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
     gF('_hwpInkaValues'), gF('_hwpAgreementValues'), gF('_hwpCharterValues'), gF('_hwpContribValues'),
     gV('HWP_TPL_KINDS'), gV('HWP_TPL_STRICT'), gF('_dkKeyOf'), gF('_hwpTplKey'), gF('_hwpTplFits'),
     gS('GRID_BLANK'), gF('_hwpCharterSaneValues'),
@@ -159,7 +159,7 @@ test('★★ 출연확인서 — 사업장마다 한 장, 금액은 siteContribN
 test('★ 별지 명단 — 사업장마다 한 줄, 근로자측 왼쪽·사용자측 오른쪽(2026-10-03 A안), 모르는 칸은 빈칸, 인원수', () => {
   const box = {};
   new Function(['var S={year:2026};', gS('COMMITTEE_ROWS'), gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'),
-    gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'), gF('estabSites'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
+    gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'), gF('estabSites'), gF('_shortBirth'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
     'this.ax=_hwpInkaAnnexValues; this.pair=_cmPairRows;'].join(String.fromCharCode(10))).call(box);
   const v = box.ax(F, SITES);
   assert.equal(v.기금명, F.name);

@@ -4264,10 +4264,7 @@ function _hwpInkaValues(f,sites){
 function _hwpInkaAnnexValues(f,sites){
   f=f||{}; sites=sites||[];
   var g=function(o,k){ return o&&String(o[k]||'')||' '; };
-  /* 생년월일은 «67.09.18» 꼴로 줄인다(2026-10-04) — 별지 표의 생년월일 칸이 좁아 「1967-09-1 / 8」로
-     꺾였다. 충남 1~3호 제출본이 쓰던 모양이다. 알아볼 수 없는 값은 그대로 둔다. */
-  var b=function(o){ var v=g(o,'birth'), m=/^(?:19|20)(\d{2})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/.exec(v);
-    return m?(m[1]+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):v; };
+  var b=function(o){ return _shortBirth(g(o,'birth')); };
   var rows=_cmPairRows(f,sites).map(function(r,i){
     return {순번:String(i+1), 소속:r.co||' ', 근성명:g(r.w,'name'), 근생년월일:b(r.w), 근직책:g(r.w,'title'),
       사성명:g(r.u,'name'), 사생년월일:b(r.u), 사직책:g(r.u,'title')};
@@ -5810,6 +5807,12 @@ function _cmSeeAnnex(f,side,sites){ return '별지 명단과 같음('+side+' '+_
    · 한 회사에서 한 측이 둘 이상이면 줄을 더 연다 — 사람을 버리지 않는다.
    · 소속이 없는 위원은 소속 없는 줄끼리 순서대로 짝짓는다.
    ⚠ 한글 별지(_hwpInkaAnnexValues)와 HTML 별지(committeeAnnexHTML)가 이 한 곳을 본다. */
+/* 별지 생년월일은 «67.09.18» 꼴로 줄인다(2026-10-04) — 별지 표의 생년월일 칸이 좁아 「1967-09-1 / 8」로
+   꺾였다. 충남 1~3호 제출본이 쓰던 모양이다. 알아볼 수 없는 값은 그대로 둔다. 한글·HTML 별지가 함께 쓴다. */
+function _shortBirth(v){
+  v=String(v==null?'':v); var m=/^(?:19|20)(\d{2})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/.exec(v);
+  return m?(m[1]+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):v;
+}
 function _cmPairRows(f,sites){
   var key=function(c){ return String(c||'').replace(/\s|\(주\)|㈜|주식회사/g,''); };
   var rows=[];
@@ -5828,7 +5831,7 @@ function _cmPairRows(f,sites){
      지어내지 않는다. 이 명단이 그대로 노동청에 나간다. */
 function committeeAnnexHTML(f,sites){
   var rows=_cmPairRows(f,sites);
-  var 칸=function(o){ return o?"<td class='center'>"+esc(o.name||'')+"</td><td class='center'>"+esc(o.birth||'')+"</td><td class='center'>"+esc(o.title||'')+"</td>"
+  var 칸=function(o){ return o?"<td class='center'>"+esc(o.name||'')+"</td><td class='center'>"+esc(_shortBirth(o.birth))+"</td><td class='center'>"+esc(o.title||'')+"</td>"
     :"<td></td><td></td><td></td>"; };
   var 계=function(side){ var n=_prepCommittee(f,side,sites).length;
     return n?n+'명':"<span class='muted'>명부에 등록된 위원이 없습니다</span>"; };
@@ -6526,10 +6529,14 @@ function fillSignGrid(root,f,sites){
 }
 /* 자리표로 남은 날짜 — 「○○○○. ○○. ○○」(협의회 개최일)·「20  년 ○○월 ○○일」(작성일).
    ⚠ 값이 없으면 손대지 않는다. 오늘 날짜를 협의회 개최일 자리에 넣으면 «없던 회의»가 생긴다. */
-function fillPartyDates(root,f){
-  var md=String((f||{}).meeting_date||'').slice(0,10), n=0;
+function fillPartyDates(root,f,kind){
+  /* ★ 설립합의서는 «설립합의일»이 먼저(없으면 회의일) — 한글 합의서(_hwpAgreementValues)와 같은 날짜.
+       끝 날짜(작성일)도 합의한 날이다 — 모를 때만 오늘(2026-10-04 검토: HTML 만 회의일·오늘이었다) */
+  var ag=kind==='agreement'&&String((f||{}).agree_date||'').slice(0,10);
+  var md=(ag&&/^\d{4}-\d{2}-\d{2}$/.test(ag))?ag:String((f||{}).meeting_date||'').slice(0,10), n=0;
   var dot=(md&&/^\d{4}-\d{2}-\d{2}$/.test(md))?_dotDate(md):'';
   var td=new Date(), ko=td.getFullYear()+'년 '+(td.getMonth()+1)+'월 '+td.getDate()+'일';
+  if(kind==='agreement'&&dot){ var p=md.split('-'); ko=p[0]+'년 '+Number(p[1])+'월 '+Number(p[2])+'일'; }
   var walk=document.createTreeWalker(root,4,null,false), tn, nodes=[];
   while((tn=walk.nextNode())) nodes.push(tn);
   nodes.forEach(function(x){
@@ -7137,7 +7144,7 @@ function hwpFormHTML(kind,f,sites){
     /* 사내 정관은 서명란이 «이미 표»다(열은 맞아 있고 이름만 비어 있다) — 그 격자를 채운다.
        공동 정관·설립합의서는 글줄이라 아래 fillSignTable 이 표로 다시 짠다. */
     if(kind==='charter') fillSignGrid(d,f,sites);
-    fillSignTable(d,f,sites); fillPartyList(d,f,sites); fillPartyDates(d,f);
+    fillSignTable(d,f,sites); fillPartyList(d,f,sites); fillPartyDates(d,f,kind);
   }
   /* 회의록 뒤쪽 참석위원 서명표 — 쪽을 나누기 «전»에 갈아 끼운다(줄이 늘어나므로) */
   if(kind==='minutes'){ fillAttendSign(d,f,sites); fillMinutesPages(d); }
