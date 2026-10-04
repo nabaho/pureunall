@@ -1425,12 +1425,16 @@ function 구글끊기(){
   }, function(e){ toast("⚠ " + ((e && e.message) || e)); });
 }
 /* 머리줄 표시 — 연결됨(초록) · 안 됨/고장(빨강, 누르면 연결·다시) · 꺼짐이면 아무것도 */
+/* ★ 짧게 — 「● 구글」 (대표 지시 2026-10-04 「구글 연결 너무길다」).
+     메일 주소·설명은 마우스를 올렸을 때(title)만. 머리줄 자리를 먹지 않는다.
+     빨간 것(안 됨·끊김·고장)은 «누르면 무엇이 되는지»까지 두세 글자로 남긴다 — 점만 두면 무엇을 하라는지 모른다. */
 function 구글표시Html(){
-  if(GLINK.st === "on") return '<span class="gst" title="구글 캘린더와 늘 이어져 있습니다 — 끊으려면 내 동그라미 창에서">'
-    + '<i class="gd on"></i>구글 연결됨' + (GLINK.email ? ' · ' + esc(GLINK.email) : '') + '</span>';
-  if(GLINK.st === "need" && GLINK.why !== "inactive") return '<button class="gst bad" data-glogin="1" title="한 번만 연결하면 늘 이어집니다">'
-    + '<i class="gd"></i>' + (GLINK.busy ? '구글로 가는 중…' : GLINK.why === "revoked" ? '구글 연결 끊김 — 눌러서 다시 연결' : '구글 연결 안 됨 — 눌러서 연결') + '</button>';
-  if(GLINK.st === "err") return '<button class="gst bad" data-glretry="1" title="' + esc(GLINK.err) + '"><i class="gd"></i>구글 연결 고장 — 다시</button>';
+  if(GLINK.st === "on") return '<span class="gst" title="구글 연결됨' + (GLINK.email ? ' · ' + esc(GLINK.email) : '')
+    + ' — 늘 이어져 있습니다. 끊으려면 내 동그라미 창에서"><i class="gd on"></i>구글</span>';
+  if(GLINK.st === "need" && GLINK.why !== "inactive") return '<button class="gst bad" data-glogin="1" title="'
+    + (GLINK.why === "revoked" ? '구글 연결이 끊겼습니다 — 눌러서 다시 연결' : '구글 연결 안 됨 — 한 번만 연결하면 늘 이어집니다') + '">'
+    + '<i class="gd"></i>' + (GLINK.busy ? '구글…' : GLINK.why === "revoked" ? '구글 다시 연결' : '구글 연결') + '</button>';
+  if(GLINK.st === "err") return '<button class="gst bad" data-glretry="1" title="구글 연결 고장 — ' + esc(GLINK.err) + ' (누르면 다시)"><i class="gd"></i>구글 ⟳</button>';
   return '';
 }
 /* 처음 연결 창 — 연결 안 된 사람이 캘린더를 열면. 닫을 수 있다(달력은 연결 전에도 보인다).
