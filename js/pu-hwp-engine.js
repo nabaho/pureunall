@@ -16,6 +16,21 @@
      쪽수·글자는 50개가 같았고, 다른 둘은 0.8.6 이 한글에 가까웠다(쪽 넘김에서 합친 칸 이름을
      되풀이하지 않음 · 거의 빈 한 쪽이 없어짐). 한글 편집기(vendor/rhwp-studio)는 이미 0.8.6 이다. */
   var CORE_VERSION = '0.8.6';
+  /* 저장소 사본(vendor/rhwp-core)의 판 — 주소 꼬리(?v=)에 붙여 «글(rhwp.js)과 엔진(rhwp_bg.wasm)이 같은 판»으로만 실리게 한다.
+     ⚠★ 꼬리를 떼지 말 것 (2026-10-04 실측): 사본을 0.7 → 0.8.6 으로 바꾸자 브라우저가 «옛 rhwp.js(캐시)»와
+       «새 rhwp_bg.wasm»을 섞어 실어 LinkError(__wbg_push… requires a callable)로 입력판이 통째로 멎었다.
+     ⚠ 사본을 바꾸면 이 숫자도 «함께» 올린다 — 안 올리면 같은 사고가 또 난다. */
+  var VENDOR_VERSION = '0.8.6';
+  /* 엔진 글(rhwp.js) 주소에 붙은 꼬리를 엔진(wasm) 주소에도 그대로 — 같은 판이 짝으로 실린다 */
+  function wasmArgFor(url) {
+    try { var u = new URL(url); return { module_or_path: new URL('rhwp_bg.wasm' + u.search, u).href }; }
+    catch (e) { return undefined; }
+  }
+  function vendorUrl(coreUrl, base) {
+    var u = new URL(coreUrl, base);
+    if (!u.search) u.search = '?v=' + VENDOR_VERSION;
+    return u.href;
+  }
 
   /* 저장된 판과 기본 판 중 «더 새것»을 고른다.
      예전에는 저장값이 있으면 무조건 그것을 썼다. 자동 갱신은 같은 minor 안에서만
@@ -132,7 +147,7 @@
     var cfg = config(extra);
     var out = [];
     if (cfg.cdnBase) out.push(cfg.cdnBase + '@' + activeVersion() + '/rhwp.js');
-    out.push(new URL(cfg.coreUrl, baseHref()).href);
+    out.push(vendorUrl(cfg.coreUrl, baseHref()));
     return out;
   }
 
@@ -144,7 +159,7 @@
       return chain.catch(function (prev) {
         if (i && global.console) global.console.warn('rhwp 로드 실패 → 다음 자리로:', url, prev);
         return dynamicImport(url).then(function (mod) {
-          return mod.default().then(function () { return mod; });
+          return mod.default(wasmArgFor(url)).then(function () { return mod; });
         });
       });
     }, Promise.reject(new Error('시작')))
@@ -301,6 +316,9 @@
 
   var api = {
     CORE_VERSION: CORE_VERSION,
+    VENDOR_VERSION: VENDOR_VERSION,
+    vendorUrl: vendorUrl,
+    wasmArgFor: wasmArgFor,
     activeVersion: activeVersion,
     coreCandidates: coreCandidates,
     pickVer: pickVer,

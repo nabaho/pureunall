@@ -32,7 +32,7 @@
 <script src="vendor/pdf.min.js"></script>
 <script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc="vendor/pdf.worker.min.js";</script>
 <script src="hwp_extract.js?v=5"></script>
-<script src="js/pu-hwp-engine.js?v=19"></script>
+<script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="std_2026.js?v=2"></script>
 <script src="xlsx_gen.js?v=3"></script>
@@ -8682,8 +8682,10 @@ try{
     await mod.default();
   }catch(cdnErr){
     console.warn("rhwp CDN 로드 실패 → 저장소 사본 사용:", cdnErr);
-    mod=await import("./vendor/rhwp-core/rhwp.js");
-    await mod.default({module_or_path:new URL("./vendor/rhwp-core/rhwp_bg.wasm",import.meta.url)});
+    /* ⚠ 판 꼬리(?v=)를 글·엔진에 함께 — 섞여 실리면 LinkError(js/pu-hwp-engine.js VENDOR_VERSION 참고) */
+    const VV=(window.PureunHwp&&PureunHwp.VENDOR_VERSION)||"0.8.6";
+    mod=await import("./vendor/rhwp-core/rhwp.js?v="+VV);
+    await mod.default({module_or_path:new URL("./vendor/rhwp-core/rhwp_bg.wasm?v="+VV,import.meta.url)});
   }
   const {HwpDocument}=mod;
   /* 원본 살려 고치기(js/pu-hwp-keep.js)가 같은 엔진으로 원본을 열어 고친다 — 엔진을 두 번 싣지 않는다 */
