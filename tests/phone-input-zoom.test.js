@@ -124,6 +124,46 @@ test('★ 폰 규칙 안에서 글자 칸을 도로 16px 아래로 내리지 않
     '이 자리는 폰에서 손대면 화면이 확대된다 — 앱 전체를 16px 로 올려도 여기서 도로 내려간다');
 });
 
+/* 폰에서 «누르는 것»이 손가락 크기인가 — 눌러야 하는 것 가운데 가장 큰 벽이다.
+   ⚠ 2026-10-04: 정부사업신청(gov.html)만 폰 전용 규칙이 «하나도» 없어 딱지가 43×24,
+     단추가 31 높이였다. 손가락 끝은 44 쯤이라 옆 것이 같이 눌린다.
+     집 안의 기준은 푸른이알피의 min-height:38px 다(css/pu-erp.css 폰 보강 한 벌).
+   ★ 보는 것은 «규칙»이다 — 폰 크기에서 단추에 최소 높이를 주는 자리가 있는가.
+     38 이든 40 이든, 어느 선택자로 적든 통과한다. */
+function 단추최소높이있나(css, 무엇) {
+  const 겨냥 = 무엇 || /\bbutton\b|\.kw\b/i;
+  const 미디어 = /@media([^{]*)\{/g;
+  let m;
+  while ((m = 미디어.exec(css))) {
+    const 폭 = (m[1].match(/max-width\s*:\s*(\d+)px/) || [])[1];
+    if (!폭 || Number(폭) > 768) continue;
+    let i = m.index + m[0].length, 깊이 = 1, 시작 = i;
+    while (i < css.length && 깊이 > 0) {
+      if (css[i] === '{') 깊이++;
+      else if (css[i] === '}') 깊이--;
+      i++;
+    }
+    const 규칙 = /([^{}]+)\{([^{}]*)\}/g;
+    let r;
+    while ((r = 규칙.exec(css.slice(시작, i - 1)))) {
+      if (!겨냥.test(r[1])) continue;
+      const 높이 = (r[2].match(/min-height\s*:\s*(\d+(?:\.\d+)?)px/) || [])[1];
+      if (높이 && Number(높이) >= 36) return true;
+    }
+  }
+  return false;
+}
+
+test('★ 정부사업신청에도 폰에서 «누를 수 있는 크기»가 있다 — 혼자만 폰 규칙이 없었다', () => {
+  const gov = 앱의CSS('gov.html');
+  assert.ok(단추최소높이있나(gov, /\bbutton\b/i),
+    'gov.html 폰 규칙에서 «단추» 최소 높이가 사라졌다 — 31px 로 돌아간다');
+  assert.ok(단추최소높이있나(gov, /\.kw\b/i),
+    'gov.html 폰 규칙에서 «딱지(찾는 말)» 최소 높이가 사라졌다 — 43×24 로 돌아간다');
+  assert.ok(단추최소높이있나(앱의CSS('pu-erp.html')),
+    '푸른이알피의 폰 보강 한 벌(min-height:38px)이 사라졌다 — 이 집의 기준이다');
+});
+
 test('★ 확대를 «막아서» 고치지 않는다 — 손가락으로 키울 길을 뺏으면 안 된다', () => {
   const 막은것 = 폰화면들().filter((f) => {
     const vp = (읽기(f).match(/<meta[^>]+name=["']viewport["'][^>]*>/i) || [''])[0];
