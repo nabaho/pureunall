@@ -36,6 +36,87 @@
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
   function msg(e) { return (e && e.message) || String(e); }
+  /* ══ 회사 맞추기·합치기 (설계 2026-09-27 사무관리서류 §8 후속, 대표 「진행」 2026-10-04) — 순수 함수 ══
+     기업별 계약서의 회사(pu_docs/co/{열쇠})는 «이름»으로만 묶여 있다 — 「가나상사」와 「가나상사(천안)」은 다른 회사가 된다.
+     ① 사업자번호가 없는 회사에 이알피 업체·기업정보함 사업자등록증의 번호를 «이름이 같을 때» 짐작해 넣는다(사람이 확인).
+     ② 사업자번호가 같은 회사들은 하나로 합칠 수 있다. 회사 화면에서 손으로 고른 회사와도 합칠 수 있다. */
+  function bzDigits(s) { return String(s == null ? '' : s).replace(/\D/g, ''); }
+  function fmtBz(s) { var d = bzDigits(s); return d.length === 10 ? d.slice(0, 3) + '-' + d.slice(3, 5) + '-' + d.slice(5) : d; }
+  function nameKey(s) {
+    return String(s || '').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사/g, '').replace(/\s+/g, '').toLowerCase();
+  }
+  /* cos: listCo 줄, refs: PuFormCardFill.mergeRows 줄({k:'erp'|'biz'|'card', c, bz}) → 사업자번호 짐작.
+     state: 'have'(이미 있음) | 'found'(이름이 같은 이알피·사업자등록증 줄) | 'none' */
+  function linkPlan(cos, refs) {
+    var byName = {};
+    (refs || []).forEach(function (r) {
+      if (!r || (r.k !== 'erp' && r.k !== 'biz') || bzDigits(r.bz).length !== 10) return;
+      var n = nameKey(r.c);
+      if (n && (!byName[n] || (byName[n].k !== 'erp' && r.k === 'erp'))) byName[n] = r;
+    });
+    return (cos || []).map(function (c) {
+      if (bzDigits(c.bz).length === 10) return { key: c.key, name: c.name, bz: bzDigits(c.bz), state: 'have' };
+      var hit = byName[nameKey(c.name)];
+      if (!hit) return { key: c.key, name: c.name, bz: '', state: 'none' };
+      return { key: c.key, name: c.name, bz: bzDigits(hit.bz), state: 'found', refName: String(hit.c || ''), from: hit.k === 'erp' ? '이알피 업체' : '사업자등록증' };
+    });
+  }
+  /* 사업자번호 → 이알피 업체 이름(없으면 사업자등록증 이름) — 합칠 때 «남길 이름»의 기준 */
+  function refNames(refs) {
+    var out = {};
+    (refs || []).forEach(function (r) {
+      var d = r && bzDigits(r.bz);
+      if (!d || d.length !== 10 || (r.k !== 'erp' && r.k !== 'biz')) return;
+      if (!out[d] || (r.k === 'erp' && out[d].k !== 'erp')) out[d] = { k: r.k, c: String(r.c || '') };
+    });
+    Object.keys(out).forEach(function (d) { out[d] = out[d].c; });
+    return out;
+  }
+  /* 사업자번호가 같은 회사 묶음(둘 이상). 묶음 맨 앞 = 합칠 때 남는 쪽:
+     ⓐ 이름이 이알피 업체 이름과 같은 회사(앞으로 앱에서 보내고 올리는 서류는 그 이름으로 들어온다 — 다른 쪽을 남기면 다시 따로 생긴다)
+     ⓑ 그다음 줄이 많은 회사 */
+  function bzGroups(cos, names) {
+    var by = {};
+    names = names || {};
+    (cos || []).forEach(function (c) { var d = bzDigits(c.bz); if (d.length === 10) (by[d] = by[d] || []).push(c); });
+    return Object.keys(by).filter(function (d) { return by[d].length > 1; }).map(function (d) {
+      var official = nameKey(names[d] || '');
+      function rank(c) { return official && nameKey(c.name) === official ? 1 : 0; }
+      return { bz: d, official: names[d] || '', cos: by[d].slice().sort(function (a, b) {
+        return rank(b) - rank(a) || ((b.n || 0) + (b.r || 0)) - ((a.n || 0) + (a.r || 0)) || String(a.name).localeCompare(String(b.name)); }) };
+    });
+  }
+  /* 합치기 한 번에 — pu_docs 아래 «여러 자리 한 번 쓰기»(update) 모양. 반쯤 합쳐진 채로 남지 않게 한 번에 쓴다.
+     ⚠ 규칙상 줄의 by 는 «지금 쓰는 사람»이어야 한다 — 옮긴 줄은 합친 사람 이름으로 바뀐다(at·나머지 값은 그대로).
+     ⚠ 파일(originals)은 건드리지 않는다. 계약 기록의 docId(파일 줄 번호)는 줄 번호를 그대로 쓰므로 이어진다. */
+  var DOC_FIELDS = ['fileId', 'title', 'date', 'src', 'secret', 'at'];
+  var REC_FIELDS = ['date', 'kind', 'amount', 'payDay', 'tax', 'edi', 'staff', 'contact', 'bizNo', 'note', 'docId', 'src', 'at'];
+  function pick(o, keys) { var r = {}; keys.forEach(function (k) { if (o && o[k] != null && o[k] !== '') r[k] = o[k]; }); return r; }
+  function mergePlan(fromKey, toKey, d, me, now) {
+    if (!fromKey || !toKey || fromKey === toKey) throw new Error('합칠 두 회사가 같습니다');
+    d = d || {}; me = me || {};
+    if (!d.to) throw new Error('남길 회사를 찾지 못했습니다');
+    if (!me.uid) throw new Error('로그인한 계정을 알 수 없습니다');
+    var up = {}, by = { by: me.uid, byName: String(me.name || '').slice(0, 60) };
+    var fd = d.fromDocs || {}, fr = d.fromRecs || {};
+    Object.keys(fd).forEach(function (id) {
+      if (!fd[id] || !fd[id].fileId) return;
+      var x = Object.assign(pick(fd[id], DOC_FIELDS), by);
+      if (x.secret !== true) delete x.secret;
+      up['co_docs/' + toKey + '/' + id] = x;
+    });
+    Object.keys(fr).forEach(function (id) { if (fr[id]) up['co_recs/' + toKey + '/' + id] = Object.assign(pick(fr[id], REC_FIELDS), by); });
+    up['co_docs/' + fromKey] = null;
+    up['co_recs/' + fromKey] = null;
+    up['co/' + fromKey] = null;
+    var n = Object.keys(d.toDocs || {}).length + Object.keys(fd).filter(function (id) { return fd[id] && fd[id].fileId; }).length;
+    var r = Object.keys(d.toRecs || {}).length + Object.keys(fr).filter(function (id) { return fr[id]; }).length;
+    var co = { name: String(d.name || d.to.name || toKey).slice(0, 120), n: n, r: r, lastAt: now || Date.now() };
+    var bz = bzDigits(d.to.bz) || bzDigits(d.from && d.from.bz);
+    if (bz) co.bz = bz.slice(0, 12);
+    up['co/' + toKey] = co;
+    return up;
+  }
   /* 보낸 서류 — 열쇠(사업자번호·이름)마다 읽은 줄을 합친다. 한 번 보낼 때 열쇠마다 같은 at 으로 적으므로
      at·종류·서류 이름이 같으면 한 줄. 최근 위, 50줄까지 */
   function sentRows(lists) {
@@ -529,7 +610,98 @@
         });
     }
 
-    /* ── 🔒 이미 올린 것 서명본으로 옮기기 (2026-10-04 대표 「네») ──
+    /* ── 🔗 이알피 업체와 맞추기 — ① 사업자번호 넣기 ② 같은 번호 회사 합치기 ── */
+    function openLink() {
+      if (!host.coLink) { toast('맞추기 길이 연결되지 않았습니다'); return; }
+      var box = el('div', { 'class': 'pod-empty', text: '이알피 업체·기업정보함과 맞춰 보는 중…' });
+      var st = { plan: [], on: {}, names: {}, busy: false }, go = null;
+      function draw2() {
+        box.innerHTML = ''; box.className = '';
+        var found = st.plan.filter(function (p) { return p.state === 'found'; });
+        var have = st.plan.filter(function (p) { return p.state === 'have'; }).length, none = st.plan.filter(function (p) { return p.state === 'none'; }).length;
+        box.appendChild(el('div', { style: 'font-size:12.5px;color:#475569;margin-bottom:8px', text: '회사 ' + st.plan.length + '곳 — 사업자번호 있음 ' + have + ' · 이름으로 찾음 ' + found.length + ' · 못 찾음 ' + none }));
+        if (found.length) {
+          var tb = el('tbody');
+          found.forEach(function (p) {
+            var cb = el('input', { type: 'checkbox', 'aria-label': p.name, checked: !!st.on[p.key], onchange: function () { st.on[p.key] = cb.checked; sync(); } });
+            tb.appendChild(el('tr', null, [el('td', null, [cb]), el('td', { text: p.name }), el('td', { text: p.refName }), el('td', { text: fmtBz(p.bz) }), el('td', { 'class': 'muted', text: p.from })]));
+          });
+          box.appendChild(el('b', { style: 'display:block;font-size:13px;margin:6px 0', text: '① 사업자번호 넣기 — 이름이 같은 곳' }));
+          box.appendChild(el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '' }), el('th', { text: '기업별 계약서' }),
+            el('th', { text: '찾은 이름' }), el('th', { text: '사업자번호' }), el('th', { text: '어디서' })])]), tb])]));
+        }
+        var groups = bzGroups(S.cos, st.names);
+        box.appendChild(el('b', { style: 'display:block;font-size:13px;margin:10px 0 6px', text: '② 사업자번호가 같은 회사 — 하나로 합치기' }));
+        if (!groups.length) box.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:10px', text: '사업자번호가 겹치는 회사가 없습니다.' + (found.length ? ' (① 을 넣은 뒤 다시 봅니다)' : '') }));
+        groups.forEach(function (g) {
+          var keepSel = el('select', { 'aria-label': '남길 회사' }, g.cos.map(function (c, i) {
+            return el('option', { value: String(i), text: c.name + ' (' + ((c.n || 0) + (c.r || 0)) + ')' + (g.official && nameKey(c.name) === nameKey(g.official) ? ' · 이알피 이름' : '') });
+          }));
+          var b = el('button', { type: 'button', 'class': 'pod-b', text: '이 이름으로 합치기', onclick: function () {
+            if (st.busy) return;
+            var keep = g.cos[+keepSel.value || 0], rest = g.cos.filter(function (c) { return c !== keep; });
+            if (!w.confirm(rest.map(function (c) { return '「' + c.name + '」'; }).join(', ') + ' 의 계약 기록·파일 줄을 「' + keep.name + '」로 옮기고 그 회사들은 목록에서 없앱니다.\n(파일은 원본 보관함에 그대로 남습니다)\n합칠까요?')) return;
+            st.busy = true; b.disabled = true; b.textContent = '합치는 중…';
+            rest.reduce(function (p, c) { return p.then(function () { return host.coMerge(c.key, keep.key); }); }, Promise.resolve()).then(function () {
+              toast('✅ 「' + keep.name + '」로 합쳤습니다'); st.busy = false; return load(true).then(refresh);
+            }, function (e) { st.busy = false; toast('❌ 합치지 못했습니다 — ' + msg(e)); load(true).then(refresh); });
+          } });
+          box.appendChild(el('div', { 'class': 'pod-note', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px' }, [
+            el('span', { style: 'flex:1;min-width:200px', text: fmtBz(g.bz) + (g.official ? ' · 이알피 「' + g.official + '」' : '') + ' — ' + g.cos.map(function (c) { return c.name; }).join(' · ') }),
+            el('span', { style: 'font-size:12px;color:#64748b', text: '남길 이름' }), keepSel, b]));
+        });
+        sync();
+      }
+      function picked() { return st.plan.filter(function (p) { return p.state === 'found' && st.on[p.key]; }); }
+      function sync() { if (!go) return; var n = picked().length; go.disabled = st.busy || !n; go.textContent = n ? '① 사업자번호 ' + n + '곳 넣기' : '① 넣을 곳 없음'; }
+      modalShell('🔗 이알피 업체와 맞추기', [el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '기업별 계약서의 회사는 이름으로만 묶여 있습니다. 사업자번호를 넣어 두면 같은 회사가 다른 이름으로 들어온 것을 찾아 합칠 수 있습니다. 짐작은 «이름이 같을 때»만 합니다 — 확인하고 넣으세요.' }), box],
+        function (close) {
+          go = el('button', { type: 'button', 'class': 'pod-b p', text: '맞춰 보는 중…', disabled: true, onclick: function () {
+            var list = picked(); if (!list.length) return;
+            st.busy = true; sync();
+            list.reduce(function (p, x) { return p.then(function () { return host.coLink(x.key, x.bz); }); }, Promise.resolve()).then(function () {
+              toast('✅ 사업자번호 ' + list.length + '곳 넣었습니다'); st.busy = false;
+              return load(true).then(function () { return refresh(); });
+            }, function (e) { st.busy = false; sync(); toast('❌ ' + msg(e)); });
+          } });
+          return [el('button', { type: 'button', 'class': 'pod-b', text: '닫기', onclick: function () { if (!st.busy) close(); } }), go];
+        });
+      function refresh() {
+        return (host.cards ? host.cards.rows().catch(function () { return []; }) : Promise.resolve([])).then(function (refs) {
+          st.plan = linkPlan(S.cos, refs); st.on = {}; st.names = refNames(refs);
+          st.plan.forEach(function (p) { if (p.state === 'found') st.on[p.key] = true; });
+          draw2();
+        });
+      }
+      refresh().catch(function (e) { box.textContent = msg(e); });
+    }
+    /* 이 회사로 다른 회사 합치기 — 이름이 달라 사업자번호로 못 묶이는 경우(지점명·옛 이름) */
+    function openMerge() {
+      var key = S.sel, me = S.cos.filter(function (c) { return c.key === key; })[0];
+      if (!me || !host.coMerge) return;
+      var others = S.cos.filter(function (c) { return c.key !== key; });
+      if (!others.length) { toast('합칠 다른 회사가 없습니다'); return; }
+      var sel = el('select', { style: 'width:100%' }, [el('option', { value: '', text: '— 합칠 회사를 고르세요 —' })].concat(others.map(function (c) {
+        return el('option', { value: c.key, text: c.name + (c.bz ? ' · ' + fmtBz(c.bz) : '') + ' (기록 ' + (c.r || 0) + ' · 파일 ' + (c.n || 0) + ')' });
+      })));
+      modalShell('🔗 「' + me.name + '」로 합치기', [
+        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '고른 회사의 계약 기록·파일 줄을 「' + me.name + '」로 옮기고, 고른 회사는 목록에서 없앱니다. 파일은 원본 보관함에 그대로 남습니다. 옮긴 줄의 «올린 사람»은 합친 사람으로 바뀝니다.' }),
+        el('label', { text: '합칠 회사' }), sel],
+        function (close) {
+          var go = el('button', { type: 'button', 'class': 'pod-b p', text: '합치기', onclick: function () {
+            var from = others.filter(function (c) { return c.key === sel.value; })[0];
+            if (!from) { toast('합칠 회사를 고르세요'); return; }
+            if (from.bz && me.bz && bzDigits(from.bz) !== bzDigits(me.bz) && !w.confirm('사업자번호가 다릅니다 (' + fmtBz(from.bz) + ' ≠ ' + fmtBz(me.bz) + ').\n그래도 합칠까요?')) return;
+            if (!w.confirm('「' + from.name + '」를 「' + me.name + '」로 합칠까요?')) return;
+            go.disabled = true; go.textContent = '합치는 중…';
+            host.coMerge(from.key, key).then(function () { close(); toast('✅ 「' + me.name + '」로 합쳤습니다'); load(true); },
+              function (e) { go.disabled = false; go.textContent = '합치기'; toast('❌ 합치지 못했습니다 — ' + msg(e)); });
+          } });
+          return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: close }), go];
+        });
+    }
+
+    /* ── 🔒 이미 올린 것 서명본으로 옮기기 (2026-10-04 대표 「네」) ──
        2026-10-03 전에 사진첩에서 가져온 계약서, 줄은 🔒 인데 원본은 보통 자리인 것(같은 파일 다시 쓰기)이 후보.
        후보 고르기·옮기기는 서버(puDocSecretMove, 총괄관리자만)가 한다 — 화면은 목록을 보여 주고 번호만 넘긴다.
        옮기면 보통 자리 파일은 지워진다(예전 내려받기 주소도 죽는다). 20개씩 나눠 보낸다. */
@@ -757,6 +929,7 @@
         el('button', { type: 'button', 'class': 'pod-b', text: '📥 엑셀 명단 가져오기', title: '「업체명단」 시트가 있는 엑셀에서 계약 기록을 가져옵니다', onclick: openRosterImport }),
         el('button', { type: 'button', 'class': 'pod-b', text: '📂 PC 폴더 가져오기', title: '회사별 폴더에서 계약서류만 골라 올립니다(기본 🔒 서명본)', onclick: openFolderImport }),
         el('button', { type: 'button', 'class': 'pod-b g', text: '🖼 사진첩에서 가져오기', onclick: openPhotoImport }),
+        host.coLink ? el('button', { type: 'button', 'class': 'pod-b', text: '🔗 이알피 업체와 맞추기', title: '사업자번호를 넣고, 같은 회사가 다른 이름으로 들어온 것을 합칩니다', onclick: openLink }) : null,
         host.secretMove ? el('button', { type: 'button', 'class': 'pod-b', text: '🔒 서명본으로 옮기기', title: '이미 올린 사진첩 계약서 중 직원 누구나 여는 것을 🔒 서명본으로 옮깁니다(대표·관리자)', onclick: openSecretMove }) : null,
         el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
       if (S.denied) { wrap.appendChild(deniedBanner()); root.appendChild(wrap); return; }
@@ -792,7 +965,11 @@
           th.textContent = ''; th.appendChild(el('img', { src: u.url, alt: '', loading: 'lazy' }));
         }).catch(function () {});
       });
-      wrap.appendChild(el('div', { style: 'font-weight:700;margin-bottom:8px' }, [coName(S.sel), el('span', { style: 'font-weight:400;color:#64748b;font-size:12px;margin-left:6px', text: '계약 기록 ' + S.recs.length + '건 · 보낸 서류 ' + S.sent.length + '건 · 계약서 파일 ' + S.docs.length + '건' })]));
+      var selCo = S.cos.filter(function (c) { return c.key === S.sel; })[0] || {};
+      wrap.appendChild(el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px' }, [el('b', null, [coName(S.sel)]),
+        selCo.bz ? el('span', { 'class': 'pod-tag', title: '사업자번호', text: fmtBz(selCo.bz) }) : null,
+        el('span', { style: 'flex:1;min-width:160px;font-weight:400;color:#64748b;font-size:12px', text: '계약 기록 ' + S.recs.length + '건 · 보낸 서류 ' + S.sent.length + '건 · 계약서 파일 ' + S.docs.length + '건' }),
+        host.coMerge ? el('button', { type: 'button', 'class': 'pod-b', text: '🔗 다른 회사를 여기로 합치기', onclick: openMerge }) : null]));
       /* 계약 기록 표 — ☐·# 맨 앞, 선택 지우기 (목록 관례) */
       var recBox = el('div');
       if (S.recsDenied) recBox.appendChild(el('div', { 'class': 'pod-note pod-warn', text: '⚠ 계약 기록 규칙이 아직 게시되지 않았습니다 — 파일 카드만 보입니다.' }));
@@ -853,6 +1030,7 @@
 
   w.PuOfficeDocs = {
     archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
+    linkPlan: linkPlan, bzGroups: bzGroups, refNames: refNames, mergePlan: mergePlan, fmtBz: fmtBz,
     mountArchive: mountArchive, mountCompanies: mountCompanies,
     _el: el, _toast: toast, _fmtSize: fmtSize, _ymd: ymd, _css: css, _deniedBanner: deniedBanner
   };
