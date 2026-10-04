@@ -118,9 +118,11 @@ test('★★★ 찍는 쪽이 «적어 둔 값»을 쓴다 — 숫자를 다시 
      규칙은 그대로, 겨누는 자리만 옮겼다. */
   const st = cutFn(CODE, 'async function rhStampZip(');
   assert.match(st, /stampFit\(st\)/, '★ 적어 둔 크기·자리를 안 읽습니다');
-  assert.match(st, /showHU:맞춤\.size/, '★ 크기를 안 씁니다');
-  assert.match(st, /offX:맞춤\.dx/, '★ 좌우를 안 씁니다');
-  assert.match(st, /offY:맞춤\.dy/, '★ 위아래를 안 씁니다');
+  /* 2026-10-04 — 자리마다 «그 도장»으로 찍으므로 값도 «그 도장»의 것(g.fit = stampFit(st)) */
+  assert.match(st, /fit:stampFit\(st\)/, '★ 도장마다 적어 둔 값을 안 읽습니다');
+  assert.match(st, /showHU:g\.fit\.size/, '★ 크기를 안 씁니다');
+  assert.match(st, /offX:g\.fit\.dx/, '★ 좌우를 안 씁니다');
+  assert.match(st, /offY:g\.fit\.dy/, '★ 위아래를 안 씁니다');
   assert.ok(!/showHU:3400/.test(st), '★ 크기가 아직 코드에 박혀 있습니다');
   assert.ok(!/offY:-700/.test(st), '★ 자리가 아직 코드에 박혀 있습니다');
 });

@@ -68,7 +68,9 @@
          <hp:t>(</hp:t> … <hp:t>서명</hp:t> … <hp:t>)</hp:t>
        처럼 태그를 사이에 두고 흩어져 있다(「충남 천안시 무슨」이 네 조각으로 오던 것과 같다).
        그래서 «보이는 글자»만 이어 붙여 찾고, 찾은 자리를 XML 자리로 되짚는다. */
-  var MARKS = /[（(]\s*(인|서명|날인)\s*[)）]|서명\s*(?:또는|및)\s*인|서명란|날인란|印/;
+  /* 괄호 없는 「서명」 — 「서약자:  권 형 하  서명」(한국기계연구원 서약서 실측, 2026-10-04).
+     ⚠ 맨 「서명」은 본문에도 흔하다(「서명 또는 날인하여」) — «쌍점 + 이름(2~4자, 띄어 써도) + 서명» 꼴만 잡는다. */
+  var MARKS = /[（(]\s*(인|서명|날인)\s*[)）]|서명\s*(?:또는|및)\s*인|서명란|날인란|印|(?:[:：]\s*(?:[가-힣]\s*){2,4})서명(?![가-힣])/;
   /* <hp:t>…</hp:t> 안의 글자와 그 XML 자리를 모은다 */
   function 글자조각(s) {
     var re = /<hp:t(?:\s[^>]*)?>([\s\S]*?)<\/hp:t>/g, m, out = [];
@@ -126,6 +128,9 @@
     for (i = 0; i < 조각.length; i++) {
       t = 엔티티풀기(조각[i].text);
       for (j = 0; j < t.length; j++) { 글 += t[j]; 지도.push(i); }
+      /* 조각 사이에 줄바꿈 한 자 — 안 넣으면 「… 서명」과 다음 줄 「한국기계연구원장」이 붙어
+         괄호 없는 「서명」을 못 가른다. 줄바꿈도 그 조각 것으로 적어 자리 되짚기가 안 밀린다. */
+      글 += '\n'; 지도.push(i);
     }
     var re = new RegExp(MARKS.source, 'g'), m, 앞끝 = 0;
     while ((m = re.exec(글))) {
@@ -133,10 +138,31 @@
       var end = s.indexOf('</hp:run>', 조각[끝조각].end);
       if (end < 0) break;
       var 앞 = 글.slice(Math.max(앞끝, m.index - 28), m.index).replace(/\s+/g, ' ').trim();
-      out.push({ index: end + '</hp:run>'.length, label: (앞 ? 앞 + ' ' : '') + m[0] });
+      var at = end + '</hp:run>'.length;
+      out.push({ index: at, label: (앞 ? 앞 + ' ' : '') + m[0], who: whoOf(앞 + ' ' + m[0]), sealed: sealedNear(s, at) });
       앞끝 = m.index + m[0].length;
     }
     return out;
+  }
+  /* ★ 서명 줄의 «사람 이름» — 「신 청 인 :  박 한 별」 → 박한별 (대표 승인 2026-10-04 목업 A).
+     쌍점 뒤 마지막 한글 2~4자. 띄어 쓴 이름(박 한 별)도 붙여 읽는다. 못 찾으면 빈 글자. */
+  function whoOf(앞) {
+    /* 끝의 자리표(「(인)」·「서명」 등)는 떼고 본다 — 이름이 자리표 «안»에 걸려 들어온 꼴도 있다 */
+    var 글 = String(앞 || '').replace(/\s*([（(]\s*(인|서명|날인)\s*[)）]|서명\s*(또는|및)\s*인|서명란|날인란|印|서명)\s*$/, '');
+    var 뒤 = 글.split(/[:：]/).pop().replace(/\s+/g, '');
+    var m = /([가-힣]{2,4})$/.exec(뒤);
+    if (!m) return '';
+    /* 「서명」「귀하」 같은 서식 말은 이름이 아니다 */
+    return /^(서명|귀하|날인|성명|대표|대표자|신청인|서약자|작성자)$/.test(m[1]) ? '' : m[1];
+  }
+  /* ★ 이미 도장이 있는 자리인가 — 서명 줄 문단과 그 앞 세 문단 안에 그림(hp:pic)이 있으면.
+     올린 서식에 이미 찍힌 도장은 «서명 줄 바로 위 빈 문단»에 매달린 경우가 많다(한국기계연구원 동의서 실측).
+     ⚠ 이것으로 «찍지 말라»고 정하지 않는다 — 창이 처음에 꺼 둘 뿐, 사람이 켤 수 있다. */
+  function sealedNear(s, at) {
+    var a = at;
+    for (var k = 0; k < 4; k++) { var p = s.lastIndexOf('<hp:p ', a - 1); if (p < 0) break; a = p; }
+    var b = s.indexOf('</hp:p>', at); if (b < 0) b = s.length;
+    return /<hp:pic\b/.test(s.slice(a, b));
   }
 
   function insertPic(sectionXml, pic, at) {
@@ -174,7 +200,7 @@
     return 'image999';
   }
 
-  var api = { PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot, findSpots: findSpots,
+  var api = { PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot, findSpots: findSpots, whoOf: whoOf,
               insertPic: insertPic, addToManifest: addToManifest, nextImageId: nextImageId };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerHwpStamp = api;
