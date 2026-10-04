@@ -252,7 +252,8 @@ test('★★ 아직 하나도 안 담겼어도 «시작」 단추가 나온다',
 
 const DONE_ST = { done:true, got:3316, days:365, oldest:1757203200000 };
 /* 3년치까지 다 찬 상태 — 더 갈 데가 없다 */
-const FULL_ST = { done:true, got:9800, days:1095, oldest:1694044800000 };
+const GOAL = Number(bare.match(/const MB_OLD_GOAL = (\d+)/)[1]);
+const FULL_ST = { done:true, got:9800, days:GOAL, oldest:1694044800000 };
 
 test('★★★ 다 찼으면 «어디까지» 찼는지 알린다 — 새로 열어도 남아야 한다', () => {
   const h = oldBlock({}, DONE_ST);
@@ -287,9 +288,9 @@ test('★★★ 목표까지 찼으면 «이어서 채우기»는 안 그린다 
 
 test('★★★ 목표를 채웠어도 «더 깊이» 갈 자리가 남았으면 그 길을 준다', () => {
   const h = oldBlock({}, DONE_ST);              /* 365일까지만 찼다 */
-  assert.match(h, /mbBackfillRun\(1095\)/,
+  assert.match(h, new RegExp('mbBackfillRun\\(' + GOAL + '\\)'),
     '더 깊이 채울 길이 없습니다 — 998개 규칙을 판단할 근거가 1년에 묶입니다');
-  assert.match(h, /3년치까지 더 채우기/, '단추에 무엇을 하는 것인지 안 적혀 있습니다');
+  assert.match(h, new RegExp(Math.round(GOAL/365) + '년치까지 더 채우기'), '단추에 무엇을 하는 것인지 안 적혀 있습니다');
   /* ⚠ 「또 처음부터 3만 통을 받나」가 가장 먼저 드는 걱정이다 — 미리 답한다 */
   assert.match(h, /다시 안 받습니다/, '이미 담은 것을 또 받는지 안 알려 줍니다');
 });
@@ -298,7 +299,7 @@ test('★★★ 그 깊이까지 다 찼으면 단추가 «아예» 없다 — �
   const h = oldBlock({}, FULL_ST);
   assert.ok(!/mbBackfillRun\(/.test(h),
     '3년치까지 찼는데 채우기 단추가 남아 있습니다');
-  assert.match(h, /1,095일/, '어디까지 채운 것인지 안 알려 줍니다');
+  assert.match(h, new RegExp(GOAL.toLocaleString() + '일'), '어디까지 채운 것인지 안 알려 줍니다');
 });
 
 test('★★★ 깊이를 늘리면 화면이 «따라간다» — 3년을 못 박아 두지 않았다', () => {
@@ -367,4 +368,40 @@ test('★★ 새로 지은 이름이 «한 번만» 선언돼 있다', () => {
     const c = (bare.match(new RegExp('function\\s+' + n + '\\s*\\(', 'g')) || []).length;
     assert.equal(c, 1, n + ' 이 ' + c + '번 선언돼 있습니다');
   });
+});
+
+/* ══════ ⑩ 10년치 (대표 지시 2026-10-04 「10년치도 가지고 올 수 있나」) ══════ */
+
+test('★★ 깊이는 10년이다 — 3년으로 되돌리지 않는다', () => {
+  /* 검사고정-허용: 3650 은 «지금 값»이 아니라 대표가 정한 깊이(10년)다 */
+  assert.ok(GOAL >= 3650, '깊이가 ' + GOAL + '일입니다 — 대표께서 10년치를 말씀하셨습니다');
+});
+
+function fillMsg(fill, oldState){
+  const ctx = { Object, String, Number, Math, Date, isFinite, console,
+    esc: s => String(s == null ? '' : s),
+    state: { isAdmin:true, mbPop:null, mbFill:fill },
+    _mbSync: {}, _mbFolders: {}, _mbMsgs: {}, _mbOldState: oldState || null,
+    mbSyncLoad(){}, renderMailPage(){}, renderPCSide(){} };
+  vm.createContext(ctx);
+  ['MB_OLD_DAY','MB_OLD_ID','MB_OLD_GOAL'].forEach(n=>
+    vm.runInContext(bare.match(new RegExp('const ' + n + ' = [^\\n]*'))[0], ctx));
+  ['mbOldSpans','mbOldCount','mbOldHtml'].forEach(n=>
+    vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
+  return ctx.mbOldHtml();
+}
+
+test('★★★ 다음메일 목록의 «바닥»에 닿으면 「더 없다」고 말한다 — 끝없이 누르게 두지 않는다', () => {
+  /* 서버는 목록 맨 끝까지 걸어도 done 을 안 세운다(목표 날짜에 못 닿았으니까).
+     그러면 다음 회차는 한 통도 안 보고 돌아온다 — 그것이 바닥의 표시다. */
+  const ST = { done:false, got:20000, days:GOAL, oldest:1600000000000 };
+  const h = fillMsg({ ok:true, done:false, uidl:30000, seen:0, already:0, got:0 }, ST);
+  assert.match(h, /가장 옛 메일까지 다 받았습니다/, '바닥에 닿았는데 「한 번 더 눌러」라고 합니다');
+  assert.ok(!/한 번 더 눌러/.test(h), '바닥인데 계속 누르라고 합니다');
+  assert.match(h, /2020-09-13/, '어디까지 거슬러 갔는지 안 알려 줍니다');
+  /* 뒤집힌 쪽 — 아직 걷는 중(이미 담은 것을 지나갔을 뿐)이면 바닥이 아니다 */
+  const h2 = fillMsg({ ok:true, done:false, uidl:30000, seen:0, already:4000, got:0 }, ST);
+  assert.match(h2, /한 번 더 눌러/, '이미 담은 것만 지나간 회차를 바닥으로 읽습니다');
+  const h3 = fillMsg({ ok:true, done:false, uidl:30000, seen:500, already:0, got:300 }, ST);
+  assert.ok(!/가장 옛 메일까지/.test(h3), '담는 중인데 바닥이라고 합니다');
 });
