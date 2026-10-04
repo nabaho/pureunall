@@ -58,7 +58,7 @@ function 상자(옵션) {
   vm.createContext(box);
   ['function 구글상세(id){', 'function 층상세(ymd, id){', 'function 공휴일상세(ymd){',
    'function detailHtml(){', 'function 긴날짜(ymd){', 'function 시분(ms){',
-   'function holidayOf(ymd){'].forEach((h) => vm.runInContext(함수몸(h), box));
+   'function holidayOf(ymd){', 'function 언제적(iso){'].forEach((h) => vm.runInContext(함수몸(h), box));
   return box;
 }
 

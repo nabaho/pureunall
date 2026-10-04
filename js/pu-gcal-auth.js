@@ -266,8 +266,137 @@
       .then(function () { return { deleted: true }; });
   }
 
+  /* 일정 한 건을 «통째로» 받는다 — 상세 창이 참석자·첨부·회의·알림을 보여 주려고 (2026-10-04).
+     ⚠ 열쇠(API key)로 읽으면 구글이 이 칸들을 안 준다 — 로그인 표로만 온다. */
+  function getEvent(calId, eventId, opt) {
+    if (!calId || !eventId) return Promise.reject(new Error('받을 일정을 모릅니다'));
+    return apiCall('GET', '/calendars/' + encodeURIComponent(calId) + '/events/' + encodeURIComponent(eventId), null, opt);
+  }
+
+  /* ══ «늘 연결» — 서버가 갱신 열쇠를 들고, 여기서는 한 시간짜리 표만 받는다 (2026-10-04) ══
+     대표 지시 「항상 구글로 로그인되어 있어야 한다 그래야 혼란이 없다」.
+     ★ 예전 길(signInUrl·capture — 주소 꼬리로 표를 받는 길)은 «한 시간»·«창 하나»뿐이었다.
+       새 길: 처음 한 번 linkStart → 구글 동의 → 돌아와 linkFinish(서버가 갱신 열쇠를 둔다)
+              그 뒤로는 화면이 열릴 때마다 fromServer, 끝나기 5분 전에 keepAlive 가 다시 받는다.
+     ⚠ 표는 여전히 «창 메모리»에만 둔다(위 store) — 저장소에 넣지 않는 규칙은 그대로다.
+     ⚠ 서버 함수가 아직 없으면(배포 전) «꺼짐(off)» 으로 답한다 — 연결하라는 창을 띄우지 않는다.
+     tests/gcal-auth-keep.test.js 가 지킨다. */
+  var FN = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/';
+  function 서버(이름, idToken, body, opt) {
+    var o = opt || {};
+    var f = o.fetch || (typeof fetch !== 'undefined' ? fetch : null);
+    if (!f) return Promise.reject(new Error('부를 길이 없습니다'));
+    return f(FN + 이름, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + idToken },
+      body: JSON.stringify(body || {})
+    }).then(function (r) {
+      /* 함수가 아직 배포 전이면 404 — «꺼짐». 고장(500 등)과 가른다 */
+      if (r.status === 404) return { off: true };
+      return r.json().then(function (j) {
+        if (!r.ok || !j) throw new Error((j && j.error) || ('HTTP ' + r.status));
+        return j;
+      }, function () {
+        /* 403 인데 본문이 우리 JSON 이 아니면 — 함수는 올렸는데 «공개 호출 권한(allUsers)»을 아직 안 켠 것.
+           그 사이에 직원 모두에게 «고장» 빨간 표시를 띄우지 않는다 */
+        if (r.status === 403) return { off: true };
+        throw new Error('HTTP ' + r.status);
+      });
+    }, function () {
+      /* 그물이 끊긴 것과 «함수가 없어 CORS 가 막힌 것»을 화면에서는 못 가른다 — 둘 다 «꺼짐»으로 본다.
+         ⚠ 여기서 «연결하세요» 를 띄우면 배포 전 모든 직원에게 헛 창이 뜬다. */
+      return { off: true };
+    });
+  }
+  function 표받음(j) {
+    var w = store();
+    w._gcalToken = j.access_token;
+    w._gcalExpiry = Number(j.expires_at) || (Date.now() + 3500 * 1000);
+    if (j.email) w._gcalEmail = j.email;
+    return { ok: true, email: j.email || w._gcalEmail || '' };
+  }
+  /* 돌려주는 것: {ok:true,email} · {need:'link',why} · {off:true}. 고장이면 거절. */
+  function 답풀기(j) {
+    if (j && j.off) return { off: true };
+    if (j && j.ok && j.access_token) return 표받음(j);
+    if (j && j.need === 'link') return { need: 'link', why: j.why || '' };
+    throw new Error((j && j.error) || '구글 연결 답을 못 읽었습니다');
+  }
+  function fromServer(idToken, opt) {
+    return 서버('gcalToken', idToken, {}, opt).then(답풀기);
+  }
+  /* 처음 연결 — 서버가 서명한 요청표를 붙인 구글 주소로 보낸다 */
+  function linkStart(idToken, opt) {
+    return 서버('gcalAuthUrl', idToken, {}, opt).then(function (j) {
+      if (j && j.off) throw new Error('구글 연결 기능이 아직 준비되지 않았습니다');
+      if (!j || !/^https:\/\/accounts\.google\.com\//.test(j.url || '')) throw new Error('구글 연결 주소를 못 받았습니다');
+      var loc = (opt && opt.location) || (typeof location !== 'undefined' ? location : null);
+      if (loc) loc.href = j.url;
+      return j.url;
+    });
+  }
+  /* 구글에서 돌아왔을 때 — 주소의 ?code=&state= 를 꺼내고 주소는 깨끗이 지운다(번호가 방문기록에 안 남게) */
+  function captureCode(loc, hist) {
+    loc = loc || (typeof location !== 'undefined' ? location : null);
+    if (!loc || !loc.search || !/[?&](code|error)=/.test(loc.search)) return null;
+    try {
+      var p = new URLSearchParams(loc.search);
+      var code = p.get('code'), state = p.get('state') || '';
+      /* 우리 요청표(gl.…)가 아니면 남의 것이다 — 손대지 않는다(다른 기능이 같은 주소를 쓸 수 있다) */
+      if (state.indexOf('gl.') !== 0) return null;
+      hist = hist || (typeof history !== 'undefined' ? history : null);
+      if (hist && hist.replaceState) hist.replaceState(null, '', loc.pathname);
+      /* 동의 화면에서 «취소» 하면 code 대신 error 가 온다 */
+      if (!code) return { error: p.get('error') || 'cancelled' };
+      return { code: code, state: state };
+    } catch (e) { return null; }
+  }
+  function linkFinish(idToken, code, state, opt) {
+    return 서버('gcalLink', idToken, { code: code, state: state }, opt).then(function (j) {
+      if (j && j.off) throw new Error('구글 연결 기능이 아직 준비되지 않았습니다');
+      return 답풀기(j);
+    });
+  }
+  function unlink(idToken, opt) {
+    var w = store();
+    w._gcalToken = ''; w._gcalExpiry = 0; w._gcalEmail = '';
+    return 서버('gcalUnlink', idToken, {}, opt);
+  }
+  function email() { return store()._gcalEmail || ''; }
+
+  /* 끝나기 5분 전에 다시 받는다 — 화면을 켜 둔 채 하루를 보내도 안 풀리게.
+     잠든 탭(폰 화면 꺼짐 등)은 타이머가 늦게 돈다 — 다시 보일 때(visibilitychange) 한 번 더 본다.
+     getIdToken: 푸른 로그인 증표를 돌려주는 함수(Promise) · 알림: 상태가 바뀌면 부른다 */
+  var _살림 = null;
+  function keepAlive(getIdToken, 알림, opt) {
+    var o = opt || {};
+    var 앞당김 = o.leadMs || 5 * 60 * 1000;
+    function 다시() {
+      return getIdToken().then(function (t) { return fromServer(t, o); })
+        .then(function (r) { if (알림) 알림(r); 걸기(); return r; },
+              function (e) { if (알림) 알림({ err: (e && e.message) || String(e) }); 걸기(60 * 1000); });
+    }
+    function 걸기(뒤) {
+      if (_살림) clearTimeout(_살림);
+      var 남음 = (store()._gcalExpiry || 0) - Date.now() - 앞당김;
+      if (!hasToken() && !뒤) return;   /* 표가 없으면(연결 안 됨·꺼짐) 타이머를 안 건다 */
+      _살림 = setTimeout(다시, Math.max(30 * 1000, 뒤 || 남음));
+    }
+    걸기();
+    if (typeof document !== 'undefined' && !keepAlive._bound) {
+      keepAlive._bound = true;
+      document.addEventListener('visibilitychange', function () {
+        if (!document.hidden && store()._gcalToken && !hasToken()) 다시();
+      });
+    }
+    return 다시;
+  }
+
   return {
     hasToken: hasToken, token: token, capture: capture,
-    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent
+    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent,
+    getEvent: getEvent,
+    fromServer: fromServer, linkStart: linkStart, captureCode: captureCode, linkFinish: linkFinish,
+    unlink: unlink, email: email, keepAlive: keepAlive
   };
 });
