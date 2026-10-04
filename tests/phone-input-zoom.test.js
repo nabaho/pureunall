@@ -86,6 +86,44 @@ test('★ 폰에서는 입력칸 글씨가 16px 이상이다 — 아니면 누�
     + 'input,select,textarea{font-size:16px} 를 넣으십시오');
 });
 
+/* 폰 규칙 «안에서» 글자 칸을 도로 16px 아래로 내리는 자리를 모은다.
+   ⚠ 2026-10-04: 푸른이알피 환경설정이 그랬다 — 앱 전체는 16px 로 올려 놓고
+     `.env-section input{font-size:12px!important}` 로 다시 내려, 더 «센» 규칙이 이겼다.
+     그래서 「16px 규칙이 있다」만 봐서는 못 잡는다. 내리는 자리도 함께 본다.
+   ⚠ `select` 는 뺀다 — 손대면 자판이 아니라 고르개가 뜨고, 좁은 띠(앱바·연장 막대)에
+     일부러 작게 맞춰 둔 자리가 일곱 군데 있다(대표 판단 대기). 자판이 뜨는
+     input·textarea 만 본다. */
+function 도로내린자리(css) {
+  const 걸린것 = [];
+  const 미디어 = /@media([^{]*)\{/g;
+  let m;
+  while ((m = 미디어.exec(css))) {
+    const 폭 = (m[1].match(/max-width\s*:\s*(\d+)px/) || [])[1];
+    if (!폭 || Number(폭) > 768) continue;
+    let i = m.index + m[0].length, 깊이 = 1, 시작 = i;
+    while (i < css.length && 깊이 > 0) {
+      if (css[i] === '{') 깊이++;
+      else if (css[i] === '}') 깊이--;
+      i++;
+    }
+    const 규칙 = /([^{}]+)\{([^{}]*)\}/g;
+    let r;
+    while ((r = 규칙.exec(css.slice(시작, i - 1)))) {
+      if (!/\b(input|textarea)\b/i.test(r[1])) continue;      // select 는 뺀다
+      const 글씨 = (r[2].match(/font-size\s*:\s*(\d+(?:\.\d+)?)px/) || [])[1];
+      if (글씨 && Number(글씨) < 16) 걸린것.push(r[1].trim().replace(/\s+/g, ' ').slice(0, 56) + ' = ' + 글씨 + 'px');
+    }
+  }
+  return [...new Set(걸린것)];
+}
+
+test('★ 폰 규칙 안에서 글자 칸을 도로 16px 아래로 내리지 않는다 — 더 «센» 규칙이 이긴다', () => {
+  const 걸린것 = [];
+  폰화면들().forEach((f) => 도로내린자리(앱의CSS(f)).forEach((x) => 걸린것.push(f + ' — ' + x)));
+  assert.deepEqual(걸린것, [],
+    '이 자리는 폰에서 손대면 화면이 확대된다 — 앱 전체를 16px 로 올려도 여기서 도로 내려간다');
+});
+
 test('★ 확대를 «막아서» 고치지 않는다 — 손가락으로 키울 길을 뺏으면 안 된다', () => {
   const 막은것 = 폰화면들().filter((f) => {
     const vp = (읽기(f).match(/<meta[^>]+name=["']viewport["'][^>]*>/i) || [''])[0];
