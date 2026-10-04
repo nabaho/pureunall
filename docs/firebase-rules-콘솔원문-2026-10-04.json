@@ -155,6 +155,10 @@
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
         ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
       },
+      "trash_fin": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
       "payroll_audit_log": {
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
         ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
