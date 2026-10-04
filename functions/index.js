@@ -715,6 +715,7 @@ const NR = require("./news-ready");
 /* 금요일 13시 자동 준비 · 월요일 다시 봉인 (대표 지시 2026-09-27) — functions/news-friday.js */
 const NF = require("./news-friday");
 const NWatch = require("./news-watch");
+const NCore = require("./news-lib/pu-news-core.js");   /* 화면과 같은 한 벌(사본) — 일요일 보충이 고르개를 쓴다 */
 
 exports.sendBulkMail = functions
   .region(MAIL_REGION)
@@ -1425,6 +1426,7 @@ exports.newsletterWatchSunday = functions
       db.ref("newsletter/config").once("value"), db.ref("newsletter/weeklyReady").once("value"),
       db.ref("newsletter/fridayLog/" + 금).once("value"), db.ref("newsletter/watch/" + 열쇠 + "/고침").once("value"),
       db.ref("homepage/newsBrief/모은날").once("value"), db.ref("homepage/newsBrief/off").once("value")]);
+    const 보충 = (await db.ref("newsletter/watch/" + 열쇠 + "/보충").once("value")).val();
     const 설정 = 설정s.val() || {};
     /* 뉴스레터를 통째로 쉬는 중이면(자동발송·금요일 준비 둘 다 꺼짐) 아무 말도 안 한다 */
     if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
@@ -1436,7 +1438,7 @@ exports.newsletterWatchSunday = functions
       db.ref("ilabor/meta").once("value")]);
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
-      판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val() });
+      판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
     await db.ref("newsletter/watch/" + 열쇠 + "/점검").set(Object.assign({ 때: now }, 점검));
     const 이름 = ((회차 || {}).회차 || {}).이름 || 열쇠;
     const m = NWatch.점검표메일짓기(점검, 이름, NF.관리화면, NF.보내는시각말);
@@ -1448,6 +1450,64 @@ exports.newsletterWatchSunday = functions
       await 뉴스레터경보(열쇠, "점검경보", "내일 뉴스레터가 안 나갑니다 — " + (첫 ? 첫.제목 : ""));
     }
     console.log("[감시꾼] 일요일 점검", JSON.stringify({ 열쇠, 판정: 점검.판정, 항목: 점검.항목들.length, 메일: r && r.ok }));
+    return null;
+  });
+
+/* 일요일 17시 — 한 번 더 가져오고, 편지의 «지난 회차와 겹친 줄 · 빈 칸»만 새것으로
+   (대표 물음 「자료가지고오기는 일요일 18 시에 가지고 오면 안되나?」 → 셋 중 「3」, 2026-10-04)
+   ⚠ 매일 가져오기는 그대로다 — 신문 RSS 는 이틀치뿐이라 주 1회로는 월~목 기사를 놓친다.
+   ⚠ 판단은 news-watch.js(보충할까·보충하기), 고르기는 Core.거리고르기 — 여기는 읽고 쓰기만.
+   ⚠ 확정본이 자동이면 바로 다시 봉인한다 — 18시 점검과 월요일 발송이 «바뀐 편지»를 본다. */
+exports.newsletterSundayRefill = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
+  .pubsub.schedule("every sunday 17:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const now = Date.now();
+    /* ① 한 번 더 가져오기 — 하나가 막혀도 나머지는 한다 */
+    await 뉴스모으기한번().catch((e) => console.warn("[일요일 보충] 기사", e.message));
+    await 자료판례모아담기({}).catch((e) => console.warn("[일요일 보충] 자료·판례", e.message));
+    await 노무사회모으기("full", 10, "일요일 보충").catch((e) => console.warn("[일요일 보충] 공인노무사회", e.message));
+
+    /* ② 보충 */
+    const 열쇠 = NWatch.이번열쇠(now);
+    const 기록자리 = db.ref("newsletter/watch/" + 열쇠 + "/보충");
+    const [설정, 확정본] = await Promise.all([
+      db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
+      db.ref("newsletter/weeklyReady").once("value").then((x) => x.val())]);
+    const 회차 = await 감시용회차(db, 열쇠);
+    const 판 = NWatch.보충할까({ 설정, 확정본, 회차, 열쇠 });
+    if (!판.할까) {
+      await 기록자리.set({ 때: now, 안함: 판.까닭 });
+      console.log("[일요일 보충] 안 함 — " + 판.까닭);
+      return null;
+    }
+    const [자료모음, 판례모음, 노무사회, 지난것] = await Promise.all([
+      db.ref("homepage/newsDocs/모음").once("value").then((x) => x.val() || {}),
+      db.ref("homepage/newsPrec/모음").once("value").then((x) => x.val() || {}),
+      db.ref("ilabor/items").once("value").then((x) => x.val() || {}),
+      db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value").then((x) => x.val() || {})]);
+    const 거리 = NCore.거리고르기({ 자료모음, 판례모음, 노무사회, 회차들: 지난것, 지금열쇠: 열쇠, 뺄안: 회차.안 });
+    const 후보안 = NCore.자동으로담기({}, { 법령: [], 자료: 거리.자료, 판례: 거리.판례 }, 회차.회차 || {});
+    const r = NWatch.보충하기({ 안: 회차.안, 후보안, 지난표: NCore.지난것들(지난것, 열쇠) });
+    if (!r.바꾼.length && !r.채운.length) {
+      await 기록자리.set({ 때: now, 바꾼: [], 채운: [] });
+      console.log("[일요일 보충] 바꿀 것 없음");
+      return null;
+    }
+    const 회차자리 = db.ref("newsletter/issues/" + 열쇠);
+    await 회차자리.child("판").transaction((v) => (Number(v) || 0) + 1);
+    await 회차자리.update({ 안: r.안, 고친이: NWatch.일요일보충이름, 고친때: now });
+    /* 자동 확정본이면 «지금 내용»으로 다시 봉인 — 월요일이 하는 것을 미리 한다(전문도 함께 새로 짓는다) */
+    if (확정본 && 확정본.회차열쇠 === 열쇠 && 확정본.자동 === true && 확정본.상태 === "준비") {
+      const 새 = await NF.확정본다시짓기({ db, 회차열쇠: 열쇠, 보낼날: 확정본.보낼날, now });
+      if (새.ok) await db.ref("newsletter/weeklyReady").set(새.확정본);
+      else console.warn("[일요일 보충] 다시 봉인 못 함 — " + (새.까닭 || ""));
+    }
+    await 기록자리.set({ 때: now, 바꾼: r.바꾼, 채운: r.채운 });
+    console.log("[일요일 보충]", JSON.stringify({ 바꾼: r.바꾼.length, 채운: r.채운.length }));
     return null;
   });
 

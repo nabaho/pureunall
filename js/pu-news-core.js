@@ -2236,11 +2236,13 @@
   function 거리고르기(o) {
     var x = o || {};
     var 보낸 = 보낸것들(x.회차들, x.지금열쇠), 지난 = 지난것들(x.회차들, x.지금열쇠);
+    /* 뺄안 — 지금 회차에 이미 든 것(일요일 보충이 같은 것을 또 고르지 않게, 2026-10-04) */
+    var 뺄 = x.뺄안 ? _회차들에서({ 지금: { 안: x.뺄안 } }, function () { return true; }) : {};
     var 옛인가 = function (y) { return _들었나(y, 지난); };
     var 값 = function (y) { var v = Number(y && y.값어치); return isFinite(v) ? v : 0; };
     var 모든자료 = _한번씩(값어치순(보낸것빼기(x.자료모음, 보낸), 9999)
       .concat(노무사회자료들(x.노무사회).filter(function (y) { return !_들었나(y, 보낸); })))
-      .filter(function (y) { return 값(y) >= 0; });
+      .filter(function (y) { return 값(y) >= 0 && !_들었나(y, 뺄); });
     var 꼭지키 = function (y) { var g = 꼭지찾기(y && y.꼭지); return g ? g.키 : 'policy'; };
     var 자료 = [];
     꼭지들.forEach(function (g) {
@@ -2258,7 +2260,7 @@
       }
       자료 = 자료.concat(고른.slice(0, g.몇개 || 2));
     });
-    var 판례 = _한번씩(최근것(보낸것빼기(x.판례모음, 보낸), 9999));
+    var 판례 = _한번씩(최근것(보낸것빼기(x.판례모음, 보낸), 9999)).filter(function (y) { return !_들었나(y, 뺄); });
     return { 자료: 자료, 판례: 새것먼저(판례, 지난).slice(0, x.판례몇 || 6) };
   }
 
