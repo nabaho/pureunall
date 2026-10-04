@@ -12208,6 +12208,23 @@ function sitesTab(){
   var sites=S.sites||{};
   var arr=Object.keys(sites).map(function(k){var o=Object.assign({},sites[k]);o._id=k;return o;})
     .filter(function(s){return s.status!=='closed';});
+  /* 탈퇴한 곳 — 평소엔 숨기고 [탈퇴한 사업장 보기]로 아래에 펼친다(2026-10-04 목업 승인). 눌러서 편집·되돌리기 */
+  var 탈퇴=Object.keys(sites).map(function(k){var o=Object.assign({},sites[k]);o._id=k;return o;})
+    .filter(function(s){return s.status==='closed';})
+    .sort(function(a,b){ return String(a.seq_label||'').localeCompare(String(b.seq_label||''),'ko',{numeric:true}); });
+  var 탈퇴칸=탈퇴.length
+    ? '<div style="margin-top:10px"><button onclick="S.showClosedSites=!S.showClosedSites;renderFund()" style="font-size:12px">'
+      +(S.showClosedSites?'탈퇴한 사업장 숨기기':'탈퇴한 사업장 보기')+' ('+탈퇴.length+')</button>'
+      +(S.showClosedSites
+        ? '<div style="overflow-x:auto;margin-top:6px"><table><thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>상호</th><th class="ph">대표자</th><th class="ph">사업자번호</th><th>상태</th></tr></thead><tbody>'
+          +탈퇴.map(function(s,i){ return '<tr onclick="editSite(\''+s._id+'\')" style="color:var(--sub)" title="눌러서 편집 — 참여로 되돌릴 수도 있습니다">'
+            +'<td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox"></td><td class="no">'+(i+1)+'</td>'
+            +'<td style="text-decoration:line-through">'+esc(s.name||'—')+'</td><td class="ph">'+esc(s.ceo||'—')+'</td><td class="ph">'+esc(s.biz_no||'—')+'</td>'
+            +'<td>'+_siteStatusChips(s)+'</td></tr>'; }).join('')
+          +'</tbody></table></div>'
+        : '')
+      +'</div>'
+    : '';
   /* 정렬 — 「한눈에 보는 방법」(대표 물음 2026-09-02)은 «큰 사업장부터»다.
      연번순은 엑셀에서 들어온 차례일 뿐이라, 열여섯 개사를 끝까지 읽어야 규모를 안다. */
   var bySize=(S.siteSort==='size');
@@ -12338,7 +12355,7 @@ function sitesTab(){
     +엑셀+'</div></div>';
   return '<div class="panel" style="padding:10px 14px">'+머리+고르는줄
     +(isYr ? sitesYearBody(arr) : isPpl ? sitesPeopleBody(arr)
-      : (있음 ? '<div id="siteXlsxOut"></div>'+tbl : 빈안내))
+      : (있음 ? '<div id="siteXlsxOut"></div>'+tbl : 빈안내)+탈퇴칸)
     +'</div>';
 }
 /* 도구 서랍 — 가끔 쓰는 입구 넷을 한 단추 뒤로 넣는다(대표 지시 「너무 혼란스럽다」).
@@ -12544,6 +12561,46 @@ function fdAddrSearch(){
     toast('주소를 채웠습니다 — 확인 후 저장');
   }, cur?cur.value:'');
 }
+/* ★ 참여 상태 — 탈퇴·폐업 (대표 지시 2026-10-04 「폐업으로 체크할 수 있는 항목도 만들어라」, 목업 승인).
+     탈퇴(status:'closed')한 곳은 해마다 쓰는 서류(지원금·예산)에서 빠지고, 설립 서류에는 남는다(estabSites).
+     폐업은 «탈퇴한 곳만» 고를 수 있다 — 참여 중인데 폐업이면 먼저 탈퇴 처리를 해야 한다.
+     칸: status · leave_date(탈퇴일) · biz_closed(폐업) · biz_closed_date(폐업일) */
+function _siteStatusBox(s){
+  s=s||{}; var closed=(s.status||'active')==='closed', bz=!!s.biz_closed;
+  var lab='style="display:flex;align-items:center;gap:5px;font-weight:400;cursor:pointer"';
+  return '<div class="gridw">'
+    +'<div class="fld full" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">'
+      +'<label '+lab+'><input type="radio" name="se-st" id="se-st-active"'+(closed?'':' checked')+' onchange="siteStatusToggle()"> 참여 중</label>'
+      +'<label '+lab+'><input type="radio" name="se-st" id="se-st-closed"'+(closed?' checked':'')+' onchange="siteStatusToggle()"> 탈퇴</label>'
+      +'<span class="muted">탈퇴일</span><input id="se-leave_date" type="date" value="'+esc(s.leave_date||'')+'" style="width:150px"'+(closed?'':' disabled')+'>'
+    +'</div>'
+    +'<div class="fld full" id="se-bizbox" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--danger-bg)'+(closed?'':';opacity:.55')+'">'
+      +'<label '+lab+' title="폐업은 탈퇴한 사업장만 고를 수 있습니다"><input type="checkbox" id="se-biz_closed"'+(bz?' checked':'')+(closed?'':' disabled')+' onchange="siteStatusToggle()"> <span style="color:var(--danger)">폐업</span></label>'
+      +'<span style="color:var(--danger)">폐업일</span><input id="se-biz_closed_date" type="date" value="'+esc(s.biz_closed_date||'')+'" style="width:150px"'+(closed&&bz?'':' disabled')+'>'
+    +'</div></div>';
+}
+function siteStatusToggle(){
+  var c=$('se-st-closed'), on=!!(c&&c.checked), b=$('se-biz_closed'), box=$('se-bizbox'), ld=$('se-leave_date'), bd=$('se-biz_closed_date');
+  if(ld) ld.disabled=!on;
+  if(b){ b.disabled=!on; if(!on) b.checked=false; }
+  if(bd) bd.disabled=!(on&&b&&b.checked);
+  if(box) box.style.opacity=on?'1':'.55';
+}
+/* 화면 → 저장할 값. 비운 칸은 null(실시간DB 에서 지워진다) — 참여로 되돌리면 탈퇴일·폐업도 함께 걷는다 */
+function _siteStatusRead(obj){
+  var c=$('se-st-closed'); if(!c) return obj;
+  var on=!!c.checked, ld=$('se-leave_date'), b=$('se-biz_closed'), bd=$('se-biz_closed_date'), bz=on&&!!(b&&b.checked);
+  obj.status=on?'closed':'active';
+  obj.leave_date=(on&&ld&&ld.value)?ld.value:null;
+  obj.biz_closed=bz?true:null;
+  obj.biz_closed_date=(bz&&bd&&bd.value)?bd.value:null;
+  return obj;
+}
+function _siteStatusChips(s){
+  s=s||{}; if((s.status||'active')!=='closed') return '<span class="chip ok" style="font-size:10px">참여</span>';
+  return '<span class="chip warn" style="font-size:10px">탈퇴'+(s.leave_date?' '+esc(String(s.leave_date).slice(2)):'')+'</span>'
+    +(s.biz_closed?' <span class="chip dg" style="font-size:10px">폐업'+(s.biz_closed_date?' '+esc(String(s.biz_closed_date).slice(2)):'')+'</span>':'');
+}
 function editSite(sid,prefill){
   var isNew=!sid; if(isNew&&prefill){_sitePrefill=prefill;} else if(isNew){_sitePrefill=null;}
   _siteEditSid=sid||'';
@@ -12641,6 +12698,7 @@ function editSite(sid,prefill){
       +usame+repTbl2+_wrepDocRow(sid,s)+'</div>'
     +'<div class="secbox"><div class="bh">🏷️ 중소기업 <span class="d">— 지원금 심사에 씁니다</span>'+hlp('site.smecert')+'</div>'
       +'<div class="gridw">'+sflds+'</div></div>'
+    +'<div class="secbox"><div class="bh">🚪 참여 상태 <span class="d">— 탈퇴·폐업</span>'+hlp('site.status')+'</div>'+_siteStatusBox(s)+'</div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:16px">'
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
@@ -12670,6 +12728,7 @@ function saveSite(sid){
   var _us=$('su-urep_same');
   if(_us&&_us.checked){ obj.urep_same=true; obj.urep_name=''; } else { delete obj.urep_same; }
   SME_FIELDS.forEach(function(c){var el=$('sm-'+c[0]);if(el)obj[c[0]]=el.value.trim();});
+  _siteStatusRead(obj);                                  // 참여 상태(탈퇴·폐업)
   /* 도로명과 짝인 지번 — 검색으로 고른 것만 남는다. 주소를 손으로 바꿨는데 지번이 그대로면 옛 지번이라 지운다 */
   [['se-','address'],['sw-','wrep_addr'],['su-','urep_addr']].forEach(function(p){ var el=$(p[0]+p[1]+'_alt'); if(!el) return;
     var alt=el.value.trim(); if(String(obj[p[1]]||'')!==String(base[p[1]]||'')&&alt===String(base[p[1]+'_alt']||'')) alt='';
@@ -12701,6 +12760,7 @@ function saveSite(sid){
     /* ⚠ wrep_doc 은 여기 목록에 없다 — update 는 적힌 칸만 건드리므로 연결이 살아남는다.
        set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다. */
     if(obj.status) patch.status=obj.status;
+    ['leave_date','biz_closed','biz_closed_date'].forEach(function(k){ if(Object.prototype.hasOwnProperty.call(obj,k)) patch[k]=obj[k]; });
     fbDb.ref(NS+'/sites/'+_fid+'/'+sid).update(patch).then(done).catch(err);
   }else{
     fbDb.ref(NS+'/sites/'+_fid).push().set(obj).then(done).catch(err);
@@ -17985,6 +18045,9 @@ var HELP={
    +'<p>내용은 <b>기금 정보 · 참여사업장 · 임원 명부</b>에서 옵니다.</p>'
    +'<p>★ <b>맨 위의 표가 「아직 안 적은 자료」</b>를 알려 줍니다 — 무엇이 비었는지, <b>어디에 적는지</b>, 그것을 <b>어느 서식이 읽는지</b>까지. 빈칸이 많으면 그 표부터 채우세요. 한 곳을 적으면 여러 서식이 함께 따라옵니다.</p>'
    +'<p>다섯 단계 <b>모두</b>에 있습니다 — ①인가 ②법인설립 ③고유번호증 ④운영 ⑤근복지원금. ④⑤에는 <b>장부를 읽어야</b> 채워지는 서식이 있어(재산목록표·출연확인서·체크리스트) 그리기 전에 회계 자료를 먼저 읽습니다.</p>'},
+ 'site.status':{t:'참여 상태 — 탈퇴·폐업',h:'<p><b>탈퇴</b>로 바꾸면 그 해부터 쓰는 서류(지원금 신청·예산·사업계획)에서 빠집니다. 참여사업장 목록에서도 숨겨지고, 아래 [탈퇴한 사업장 보기]로 다시 볼 수 있습니다.</p>'
+   +'<p><b>설립 서류</b>(인가신청서·합의서·정관·설립 출연확인서·별지 위원 명단)에는 그대로 남습니다 — 설립 때 함께한 회사이기 때문입니다.</p>'
+   +'<p><b>폐업</b>은 탈퇴한 사업장만 고를 수 있습니다. 회사가 문을 닫은 경우에 표시해 두세요.</p>'},
  'site.reps':{t:'한 사업장에 나오는 사람 넷',h:'<p>설립 서류를 쓰려면 <b>네 사람</b>을 갈라 적어야 합니다. 넷이 다 다른 사람인 일이 흔합니다.</p>'
    +'<p><b>대표자</b> — 등기부·사업자등록증에 적힌 사람입니다.<br><b>담당자</b> — 실무 연락처입니다.<br>'
    +'<b>사용자대표</b> — 협의회에 <b>사용자측으로 나오는</b> 사람입니다. 대표이사가 다 나오지 못해 공장장·관리부장이 나오는 일이 많습니다.<br>'

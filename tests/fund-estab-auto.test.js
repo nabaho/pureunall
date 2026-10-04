@@ -485,7 +485,7 @@ test('사업장 편집 창을 «정말 그리면» 칸만 있고 서류 판독 �
     'function showModal(h){ OUT.html+=h; }',
     'function bindSiteDocIntake(){}',
     grabFn('dropZoneSlim'), grabFn('_primaryContact'), grabFn('_wrepDocRow'),
-    grabFn('_repTable'), grabFn('_addrStack'), grabFn('editSite'),
+    grabFn('_repTable'), grabFn('_addrStack'), grabFn('_siteStatusBox'), grabFn('editSite'),
     'this.run=editSite;',
   ].join('\n');
   new Function('OUT', code).call(box, out);
