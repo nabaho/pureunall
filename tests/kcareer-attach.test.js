@@ -29,7 +29,7 @@ test('① 실적 표만 읽는다 · 칸 뜻은 머리 줄에서', () => {
   assert.equal(rows.length, 2, '빈 줄과 기관 칸 없는 표는 빠진다');
   assert.equal(rows[0].period, '2022~ 현재');
   assert.equal(rows[0].kind, '공공기관 고문');
-  assert.equal(rows[0].org, '서산시설관리공단 아산시시설관리공단');
+  assert.equal(rows[0].org, '서산시설관리공단 / 아산시시설관리공단', '문단마다 적은 기관은 « / » 로 갈라 둔다');
   assert.equal(rows[0].content, '고문노무사');
 });
 
@@ -50,19 +50,73 @@ test('③ 한 칸에 기관 여럿 — 각각으로 짝을 찾는다', () => {
   assert.equal(A.orgHit('서산시설관리공단', '아산시시설관리공단'), false, '★ 비슷한 이름을 같은 곳으로 보면 남의 증빙이 붙는다');
 });
 
-test('④★ 미리 체크는 «기관·기간이 다 맞는 후보가 딱 하나»일 때만', () => {
-  const row = A.pickRows(A.readTables(실적표))[0];
-  const 하나 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2022' }, page: 'wiccok' }]);
+test('④★ 미리 체크 — 줄에 적힌 기관마다 하나, 기간·내용이 맞을 때만', () => {
+  const row = A.pickRows(A.readTables(실적표))[0];   // 2022~현재 · 서산시설관리공단 / 아산시시설관리공단 · 고문노무사
+  const 하나 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2022', titleVal: '고문노무사' }, page: 'wiccok' }]);
   assert.equal(하나.length, 1); assert.equal(하나[0].먼저, true);
-  const 둘 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2022' }, page: 'wiccok' }, { r: { org: '아산시시설관리공단', period: '2023~2024' }, page: 'advisory' }]);
-  assert.equal(둘.length, 2);
-  assert.ok(둘.every((c) => !c.먼저), '★ 맞는 후보가 둘이면 사람이 고른다');
-  const 기간다름 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2015' }, page: 'wiccok' }]);
+  /* 기관이 둘이면 «기관마다» 하나씩 */
+  const 둘 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2022', titleVal: '고문노무사' }, page: 'wiccok' },
+    { r: { org: '아산시시설관리공단', period: '2023~2024', titleVal: '고문노무사' }, page: 'advisory' }]);
+  assert.equal(둘.filter((c) => c.먼저).length, 2, '기관마다 하나씩');
+  /* 같은 기관에 «다른» 위촉이 둘 — 줄 내용과 낱말이 다 맞는 쪽만 체크(「설립심의」는 줄에 없는 말) */
+  const 갈래 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2022', titleVal: '고문노무사' }, page: 'wiccok' },
+    { r: { org: '서산시설관리공단', year: '2023', titleVal: '고문노무사 설립심의' }, page: 'wiccok' }]);
+  assert.deepEqual(갈래.filter((c) => c.먼저).map((c) => c.r.titleVal), ['고문노무사'], '★ 줄에 없는 일(설립심의)은 사람이 보고 고른다');
+  const 기간다름 = A.candidates(row, [{ r: { org: '서산시설관리공단', year: '2015', titleVal: '고문노무사' }, page: 'wiccok' }]);
   assert.equal(기간다름.length, 0, '기간이 겹치지 않는 같은 기관 기록은 후보에서 뺀다');
-  const 기간모름 = A.candidates(row, [{ r: { org: '서산시설관리공단' }, page: 'wiccok' }]);
+  const 기간모름 = A.candidates(row, [{ r: { org: '서산시설관리공단', titleVal: '고문노무사' }, page: 'wiccok' }]);
   assert.equal(기간모름.length, 1); assert.ok(!기간모름[0].먼저, '기간을 모르면 체크하지 않는다');
   assert.deepEqual(A.years('2022~ 현재')[0], 2022);
   assert.equal(A.years('2022~ 현재')[1], new Date().getFullYear());
+});
+
+/* ── 짝짓기 다듬기 (대표 «추천대로» 2026-10-04 — 캡처: 후보 37개 · 해마다 받은 위촉장 8개) ── */
+test('⑦ 같은 곳 — 이름이 같거나 지사·본부·지청·청 꼬리만 다를 때', () => {
+  assert.equal(A.samePlace('충청남도', '충청남도청'), true);
+  assert.equal(A.samePlace('한국전력공사', '한국전력공사경기본부'), true);
+  assert.equal(A.samePlace('대전지방고용노동청', '대전지방고용노동청서산지청'), true);
+  assert.equal(A.samePlace('충청남도', '충청남도경제진흥원'), false, '★ 이것을 같게 보면 「충청남도」 줄에 후보가 37개 붙는다');
+  assert.equal(A.samePlace('서산시', '서산시시설관리공단'), false);
+  assert.equal(A.orgHit('충청남도', '충남연구원'), false);
+});
+
+test('⑦ 내용 낱말이 맞는 위촉장이 위로 · 해마다 받은 같은 위촉은 가장 최근 하나만 체크', () => {
+  const row = { period: '2018~현재', org: '충청남도', content: '노사분쟁 조정·중재단 위원' };
+  const c = A.candidates(row, [
+    { r: { org: '충청남도', year: '2022', titleVal: '제4기 노사분쟁 조정·중재단 위원' }, page: 'wiccok' },
+    { r: { org: '충청남도', year: '2024', titleVal: '제5기 노사분쟁 조정·중재단 위원' }, page: 'wiccok' },
+    { r: { org: '충청남도청', year: '2023', titleVal: '공무직 인사위원회 위원' }, page: 'wiccok' },
+    { r: { org: '충청남도경제진흥원', year: '2023', titleVal: '노사분쟁 자문' }, page: 'consult' }]);
+  assert.equal(c.length, 3, '진흥원은 다른 곳');
+  assert.match(c[0].r.titleVal, /노사분쟁/, '내용이 맞는 것이 위');
+  const 체크 = c.filter((x) => x.먼저);
+  assert.equal(체크.length, 1);
+  assert.match(체크[0].r.titleVal, /제5기/, '★ 해마다 받은 같은 위촉은 가장 최근 것');
+  /* 한 줄에 맡은 일이 둘이면 «일마다» 가장 최근 하나 */
+  const 두일 = A.candidates({ period: '2018~현재', org: '충청남도', content: '노사분쟁 조정·중재단 위원, 공무직 인사위원회 위원' }, [
+    { r: { org: '충청남도', year: '2026', titleVal: '제5기 충청남도 노사분쟁 조정·중재단 위원' }, page: 'wiccok' },
+    { r: { org: '충청남도', year: '2022', titleVal: '제4기 노사분쟁 조정·중재단 위원' }, page: 'wiccok' },
+    { r: { org: '충청남도청', year: '2023', titleVal: '공무직 인사위원회 위원' }, page: 'wiccok' }]);
+  assert.deepEqual(두일.filter((x) => x.먼저).map((x) => x.r.year).sort(), ['2023', '2026']);
+});
+
+test('⑦ 이름 변형 — 가운데 몇 자만 다른 같은 곳', () => {
+  assert.equal(A.samePlace('서산시비정규직지원센터', '서산시비정규직근로자지원센터'), true);
+  assert.equal(A.samePlace('서산시시설관리공단', '아산시시설관리공단'), false);
+  assert.equal(A.samePlace('충청남도', '충청남도경제진흥원'), false);
+  assert.equal(A.samePlace('한국전력공사', '한국가스공사'), false);
+  assert.equal(A.samePlace('청소년상담복지센터협의회', '한국청소년상담복지센터협의회'), true, '머리의 「한국」만 다른 이름');
+  assert.equal(A.samePlace('전력공사', '한국전력공사'), false, '다섯 자 안 되는 이름은 머리 떼기로 맞추지 않는다');
+});
+
+test('⑦ 경력(재직) 표 줄은 표시가 붙는다 — 화면이 맨 아래에 접어 둔다', () => {
+  const 인적 = TBL(TR(TC('성 명'), TC('권형하')), TR(TC('경 력')), TR(TC('연 도'), TC('기 관 명'), TC('직 위')),
+    TR(TC('2017.10～현재'), TC('푸른노무법인'), TC('대표')));
+  const rows = A.pickRows(A.readTables(인적 + 실적표));
+  assert.equal(rows[0].career, true);
+  assert.ok(rows.slice(1).every((r) => !r.career), '실적 표 줄은 경력이 아니다');
+  const SRCs = SRC.slice(SRC.indexOf('function rhAttachDraw('));
+  assert.match(SRCs.slice(0, 4000), /showCareer/, '경력 줄은 접었다 펼친다');
 });
 
 test('⑤ 번호 — 고른 것만, 놓인 차례대로', () => {
