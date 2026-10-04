@@ -750,6 +750,7 @@ const NL = require("./news-lock");
 const NR = require("./news-ready");
 /* 금요일 13시 자동 준비 · 월요일 다시 봉인 (대표 지시 2026-09-27) — functions/news-friday.js */
 const NF = require("./news-friday");
+const NWatch = require("./news-watch");
 
 exports.sendBulkMail = functions
   .region(MAIL_REGION)
@@ -1122,6 +1123,9 @@ exports.weeklyNewsletterSend = functions
     const gate = NewsletterWeekly.check(config, ready, today);
     if (!gate.ok) {
       console.log("[뉴스레터 자동발송] 건너뜀 — " + gate.reason);
+      /* ★ 감시꾼 — 막혔으면 관리자 알림판에 한 줄 (꺼짐은 안 알린다 — 일부러 끈 것이다) */
+      const 말 = NWatch.발송막힘말(gate, ready, today);
+      if (말) await 뉴스레터경보(ready.회차열쇠, "발송", 말);
       return null;
     }
 
@@ -1187,6 +1191,7 @@ exports.weeklyNewsletterSend = functions
           봉인도장: 볼까.봉인 || "", 지금도장: 볼까.지금 || ""
         });
         console.log("[뉴스레터 자동발송] 보내지 않음 — " + 볼까.까닭);
+        await 뉴스레터경보(ready.회차열쇠, "발송", "오늘 뉴스레터가 안 나갔습니다 — " + String(볼까.까닭 || "").slice(0, 160));
         return null;
       }
       issueClaim = await issueRef.child("발송잠금").transaction(
@@ -1197,6 +1202,7 @@ exports.weeklyNewsletterSend = functions
           상태: "오류", 오류때: Date.now(), 오류: "회차가 이미 발송됐거나 다른 관리자가 발송 중입니다."
         });
         console.log("[뉴스레터 자동발송] 회차 발송잠금 실패");
+        await 뉴스레터경보(ready.회차열쇠, "발송", "오늘 뉴스레터가 안 나갔습니다 — 다른 관리자가 보내는 중이거나 이미 보냈습니다");
         return null;
       }
 
@@ -1231,6 +1237,8 @@ exports.weeklyNewsletterSend = functions
       /* 대기열·회차 상태·열람표를 한 번에 쓴다. 중간 실패로 절반만 발송되는 일을 막는다. */
       await db.ref().update(upd);
       console.log("[뉴스레터 자동발송] " + rows.length + "곳 예약 완료");
+      await db.ref("newsletter/watch/" + ready.회차열쇠 + "/발송").set({ 때: now, 상태: "ok", 받는수: rows.length, batchId })
+        .catch(() => null);
       return null;
     } catch (e) {
       if (issueClaim && issueClaim.committed) await db.ref("newsletter/issues/" + ready.회차열쇠 + "/발송잠금").transaction((v) => {
@@ -1240,9 +1248,48 @@ exports.weeklyNewsletterSend = functions
       await db.ref("newsletter/weeklyReady").update({
         상태: "오류", 오류때: Date.now(), 오류: String((e && e.message) || e).slice(0, 300)
       });
+      await 뉴스레터경보(ready.회차열쇠, "발송", "오늘 뉴스레터가 안 나갔습니다 — " + String((e && e.message) || e).slice(0, 160))
+        .catch(() => null);
       throw e;
     }
   });
+
+/* ── 금요일 준비가 쓰는 AI·메일 — 감시꾼(newsletterWatchRetry)도 «같은 것»을 쓴다 ──
+   ⚠ AI 는 readDoc 과 같은 문 — 같은 열쇠 · 같은 달 한도 · 같은 셈(app:news). */
+async function 뉴스레터AI(글, cfg) {
+  const 몫 = await aiMonthSpend();
+  if (몫.known && 몫.over) throw new Error("이번 달 AI 한도를 다 썼습니다");
+  const key = await readGeminiKey();
+  if (!key) throw new Error("AI 키가 없습니다");
+  const r = await DR.callGemini(fetch, key, [{ text: 글 }], null, cfg || {});
+  await bumpReadTally("news", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+  if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
+  const parts = (r.json && r.json.candidates && r.json.candidates[0]
+    && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
+  return parts.map((p) => (p && p.text) || "").join("").replace(/```json|```/g, "").trim();
+}
+async function 뉴스레터메일(편) {
+  const MBhere = require("./mail-bulk");
+  const 계정주소 = await mailUserAsync();
+  const 설정 = (await getDatabase().ref("newsletter/config").once("value")).val() || {};
+  const from = MBhere.보내는주소고르기(설정.보내는주소, 계정주소);
+  return MD.deliver({ db: getDatabase(), body: 편, from, pass: mailPass(from),
+    envId: process.env.DAUM_MAIL_ID, byEmail: NF.준비한이,
+    deps: { getStorage: getStorage }, uid: "" });
+}
+/* 한 줄 기록 — 화면이 「금요일 준비가 돌았나」를 볼 수 있게. 글·주소는 안 남긴다.
+   ⚠ 감시꾼이 다시 했으면 «그 금요일 날짜» 줄을 덮는다(다시한때가 붙는다) —
+     안 덮으면 감시꾼이 「아직 안 돌았다」로 읽고 또 다시 한다. */
+async function 금요일기록쓰기(db, 날, 보고, 더) {
+  await db.ref("newsletter/fridayLog/" + 날).set(Object.assign({
+    때: Date.now(), 회차: 보고.열쇠, 보낼날: 보고.보낼날,
+    건너뜀: 보고.건너뜀 || null, 확정본: 보고.확정본됨 === true, 받는수: 보고.받는수 || 0,
+    AI기사: 보고.AI기사 || 0, AI한마디: 보고.AI한마디 === true,
+    자동발송켜짐: 보고.자동발송켜짐 === true, 알림: (보고.알림들 || []).slice(0, 5),
+    못한까닭: 보고.못한까닭 || null,
+    메일: 보고.메일 ? (보고.메일.ok ? "보냄" : String(보고.메일.error || "실패").slice(0, 200)) : null
+  }, 더 || {})).catch((e) => console.warn("[금요일 준비] 기록 못 남김", e.message));
+}
 
 /* ══════════════════════════════════════════════════════════════════════════
    금요일 13시 — 월요일 뉴스레터를 서버가 준비하고 대표님께 검토 메일 (2026-09-27)
@@ -1263,39 +1310,137 @@ exports.weeklyNewsletterPrepare = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     const db = getDatabase();
-    const ai = async (글, cfg) => {
-      const 몫 = await aiMonthSpend();
-      if (몫.known && 몫.over) throw new Error("이번 달 AI 한도를 다 썼습니다");
-      const key = await readGeminiKey();
-      if (!key) throw new Error("AI 키가 없습니다");
-      const r = await DR.callGemini(fetch, key, [{ text: 글 }], null, cfg || {});
-      await bumpReadTally("news", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
-      if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
-      const parts = (r.json && r.json.candidates && r.json.candidates[0]
-        && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
-      return parts.map((p) => (p && p.text) || "").join("").replace(/```json|```/g, "").trim();
-    };
-    const 메일 = async (편) => {
-      const MBhere = require("./mail-bulk");
-      const 계정주소 = await mailUserAsync();
-      const 설정 = (await db.ref("newsletter/config").once("value")).val() || {};
-      const from = MBhere.보내는주소고르기(설정.보내는주소, 계정주소);
-      return MD.deliver({ db, body: 편, from, pass: mailPass(from),
-        envId: process.env.DAUM_MAIL_ID, byEmail: NF.준비한이,
-        deps: { getStorage: getStorage }, uid: "" });
-    };
-    const 보고 = await NF.금요일준비({ db, ai, 메일, now: Date.now() });
-    /* 한 줄 기록 — 화면이 「금요일 준비가 돌았나」를 볼 수 있게. 글·주소는 안 남긴다. */
-    await db.ref("newsletter/fridayLog/" + 보고.오늘).set({
-      때: Date.now(), 회차: 보고.열쇠, 보낼날: 보고.보낼날,
-      건너뜀: 보고.건너뜀 || null, 확정본: 보고.확정본됨 === true, 받는수: 보고.받는수 || 0,
-      AI기사: 보고.AI기사 || 0, AI한마디: 보고.AI한마디 === true,
-      자동발송켜짐: 보고.자동발송켜짐 === true, 알림: (보고.알림들 || []).slice(0, 5),
-      못한까닭: 보고.못한까닭 || null,
-      메일: 보고.메일 ? (보고.메일.ok ? "보냄" : String(보고.메일.error || "실패").slice(0, 200)) : null
-    }).catch((e) => console.warn("[금요일 준비] 기록 못 남김", e.message));
+    const 보고 = await NF.금요일준비({ db, ai: 뉴스레터AI, 메일: 뉴스레터메일, now: Date.now() });
+    await 금요일기록쓰기(db, 보고.오늘, 보고);
     console.log("[금요일 준비]", JSON.stringify({ 회차: 보고.열쇠, 건너뜀: 보고.건너뜀, 확정본: 보고.확정본됨,
       받는수: 보고.받는수, AI기사: 보고.AI기사, AI한마디: 보고.AI한마디, 메일: 보고.메일 && 보고.메일.ok }));
+    return null;
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   뉴스레터 «감시꾼» (대표 지시 2026-10-04 「검증하고 문제가 되면 자동으로 고치는기능」)
+   ══════════════════════════════════════════════════════════════════════════
+   판단은 모두 functions/news-watch.js 에 있다 — 여기는 읽고 쓰고 부르기만 한다.
+   ⚠⚠ 발송은 스스로 다시 하지 않는다. 알리기만 한다(두 번 나갈 위험).
+   ⚠ 배포는 이름을 찍어서:
+     firebase deploy --only functions:newsletterWatchRetry,functions:newsletterWatchSunday,functions:newsletterWatchDelivery,functions:weeklyNewsletterSend,functions:weeklyNewsletterPrepare,functions:dailyNewsCollect */
+async function 뉴스레터경보(열쇠, 자리, 말) {
+  const db = getDatabase();
+  if (/^\d{4}-\d{2}-w\d{1,2}$/.test(String(열쇠 || ""))) {
+    await db.ref("newsletter/watch/" + 열쇠 + "/" + 자리).set({ 때: Date.now(), 상태: "block", 말: String(말).slice(0, 300) })
+      .catch(() => null);
+  }
+  /* 관리자 알림판 — 칸은 로그인 알림·취업규칙 모으기와 같게(kind·message) */
+  const roles = (await db.ref("uid_roles").once("value")).val() || {};
+  await Promise.all(Object.keys(roles)
+    .filter((u) => roles[u] && roles[u].isAdmin === true && roles[u].status !== "resigned")
+    .map((u) => db.ref("systemAlerts/" + u).push({ createdAt: Date.now(), kind: "newsletter",
+      message: "📰 " + String(말).slice(0, 200) })));
+}
+/* 회차 한 벌 중 «감시꾼이 볼 칸»만 — 25,000자 전문과 받는 분 주소는 안 읽는다 */
+async function 감시용회차(db, 열쇠) {
+  const 칸 = ["상태", "고친이", "우리글", "안", "회차"];
+  const v = await Promise.all(칸.map((k) => db.ref("newsletter/issues/" + 열쇠 + "/" + k).once("value")));
+  const o = {}; let 있음 = false;
+  v.forEach((s, i) => { const x = s.val(); if (x != null) { o[칸[i]] = x; 있음 = true; } });
+  return 있음 ? o : null;
+}
+
+exports.newsletterWatchRetry = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["GEMINI_KEY"] })
+  .pubsub.schedule("every 3 hours")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const now = Date.now();
+    /* ① 기사 모으기 — 오늘 못 모았으면 다시 */
+    const [모은날, 끔] = await Promise.all([
+      db.ref("homepage/newsBrief/모은날").once("value"), db.ref("homepage/newsBrief/off").once("value")]);
+    if (NWatch.모으기다시할까({ 모은날: 모은날.val(), off: 끔.val() }, now)) {
+      const r = await 뉴스모으기한번().catch((e) => ({ ok: false, 까닭: e.message }));
+      console.log("[감시꾼] 모으기 다시", JSON.stringify(r));
+    }
+    /* ② 금요일 준비 — 금 16시 ~ 일 15시, 빠진 것이 있으면 다시 */
+    const 금 = NWatch.그금요일(NWatch.서울때(now));
+    if (!금) return null;
+    const 열쇠 = NWatch.이번열쇠(now);
+    const [설정, 확정본, 기록, 고침] = await Promise.all([
+      db.ref("newsletter/config").once("value"), db.ref("newsletter/weeklyReady").once("value"),
+      db.ref("newsletter/fridayLog/" + 금).once("value"), db.ref("newsletter/watch/" + 열쇠 + "/고침").once("value")]);
+    const 판 = NWatch.다시할까({ now, 열쇠, 설정: 설정.val(), 확정본: 확정본.val(), 회차: await 감시용회차(db, 열쇠),
+      금요일기록: 기록.val(), 고친수: Object.keys(고침.val() || {}).length });
+    console.log("[감시꾼] 금요일 준비", JSON.stringify(판));
+    if (판.포기) {
+      const 알린 = await db.ref("newsletter/watch/" + 열쇠 + "/포기알림").transaction((v) => (v ? undefined : now));
+      if (알린.committed) await 뉴스레터경보(열쇠, "포기", "금요일 준비를 여러 번 다시 했지만 AI 초안을 못 채웠습니다 — 뉴스레터 관리에서 확인해 주십시오");
+      return null;
+    }
+    if (!판.할까) return null;
+    /* ⚠ 검토 메일은 다시 안 보낸다 — 일요일 점검표가 한 장으로 말한다 */
+    const 보고 = await NF.금요일준비({ db, ai: 뉴스레터AI, 메일: null, now });
+    await 금요일기록쓰기(db, 판.금요일, 보고, { 다시한때: now });
+    const 남은 = (보고.알림들 || []).filter((m) => /AI 정리를 못 했|한마디를 못 지었/.test(m));
+    const 됨 = !보고.건너뜀 && 보고.확정본됨 === true && !남은.length;
+    await db.ref("newsletter/watch/" + 열쇠 + "/고침").push({ 때: now, 됨,
+      무엇: 판.까닭 + " → 다시 함",
+      결과: 됨 ? "됨" + (보고.AI기사 ? " — AI 기사 " + 보고.AI기사 + "건" : "") + (보고.AI한마디 ? " · 한마디" : "")
+        : "아직 — " + String(보고.건너뜀 || 보고.못한까닭 || 남은[0] || "").slice(0, 160) });
+    return null;
+  });
+
+exports.newsletterWatchSunday = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
+  .pubsub.schedule("every sunday 18:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const now = Date.now();
+    const 열쇠 = NWatch.이번열쇠(now);
+    const 금 = NWatch.그금요일(NWatch.서울때(now));
+    const [설정s, 확정본, 기록, 고침, 모은날, 끔] = await Promise.all([
+      db.ref("newsletter/config").once("value"), db.ref("newsletter/weeklyReady").once("value"),
+      db.ref("newsletter/fridayLog/" + 금).once("value"), db.ref("newsletter/watch/" + 열쇠 + "/고침").once("value"),
+      db.ref("homepage/newsBrief/모은날").once("value"), db.ref("homepage/newsBrief/off").once("value")]);
+    const 설정 = 설정s.val() || {};
+    /* 뉴스레터를 통째로 쉬는 중이면(자동발송·금요일 준비 둘 다 꺼짐) 아무 말도 안 한다 */
+    if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
+    const 회차 = await 감시용회차(db, 열쇠);
+    const 링크결과 = await NWatch.링크재기(NWatch.편지링크들(회차), fetch);
+    const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
+      금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() } });
+    await db.ref("newsletter/watch/" + 열쇠 + "/점검").set(Object.assign({ 때: now }, 점검));
+    const 이름 = ((회차 || {}).회차 || {}).이름 || 열쇠;
+    const m = NWatch.점검표메일짓기(점검, 이름, NF.관리화면, NF.보내는시각말);
+    const r = await 뉴스레터메일({ to: [NF.검토받는곳], subject: m.subject, body: m.body, html: m.html })
+      .catch((e) => ({ ok: false, error: e.message }));
+    await db.ref("newsletter/watch/" + 열쇠 + "/점검/메일").set(r && r.ok ? "보냄" : String((r && r.error) || "실패").slice(0, 200));
+    if (점검.판정 === "block") {
+      const 첫 = 점검.항목들.find((x) => x.수준 === "block");
+      await 뉴스레터경보(열쇠, "점검경보", "내일 뉴스레터가 안 나갑니다 — " + (첫 ? 첫.제목 : ""));
+    }
+    console.log("[감시꾼] 일요일 점검", JSON.stringify({ 열쇠, 판정: 점검.판정, 항목: 점검.항목들.length, 메일: r && r.ok }));
+    return null;
+  });
+
+exports.newsletterWatchDelivery = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .pubsub.schedule("every monday 12:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const ready = (await db.ref("newsletter/weeklyReady").once("value")).val() || {};
+    const today = NewsletterWeekly.todaySeoul(Date.now());
+    if (ready.상태 !== "완료" || ready.보낼날 !== today || !ready.batchId) return null;
+    const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled").once("value")).val() || {};
+    const 셈 = NWatch.전달셈(줄들, ready.batchId);
+    await db.ref("newsletter/watch/" + ready.회차열쇠 + "/전달").set(Object.assign({ 때: Date.now(), 받는수: ready.받는수 || 0 }, 셈));
+    if (셈.실패 || 셈.확인필요) {
+      await 뉴스레터경보(ready.회차열쇠, "전달경보", "뉴스레터 " + (셈.실패 + 셈.확인필요) + "통이 못 나갔거나 확인이 필요합니다 — 뉴스레터 관리 › 보낸 결과에서 주소를 보십시오");
+    }
+    console.log("[감시꾼] 전달", JSON.stringify(셈));
     return null;
   });
 
@@ -4184,6 +4329,32 @@ function 서울오늘() {
   return new Date(Date.now() + 9 * 3600 * 1000).toISOString().slice(0, 10);
 }
 
+/* 한 번 모으기 — 매일 07시와 감시꾼(3시간마다, 오늘 못 모았으면)이 «같은 것»을 부른다 */
+async function 뉴스모으기한번() {
+  const 자리 = getDatabase().ref("homepage/newsBrief");
+  const 설정 = (await 자리.once("value")).val() || {};
+  if (설정.off === true) { console.log("[모으기] 꺼져 있습니다"); return { ok: false, 까닭: "꺼짐" }; }
+
+  const 오늘 = 서울오늘();
+  let 거리;
+  try {
+    거리 = await 브리핑거리모으기();
+  } catch (e) {
+    /* ★ 못 읽은 날이 있어도 그냥 넘어간다 — 모아 둔 것은 그대로 남는다 */
+    console.warn("[모으기] 오늘은 못 읽었습니다", e.message);
+    return { ok: false, 까닭: String(e.message || e).slice(0, 160) };
+  }
+
+  const 모아둔것 = (await 자리.child("모음").once("value")).val() || {};
+  const 결과 = 브리핑부품.모으기(모아둔것, 거리.뉴스, 오늘);
+  const 남길것 = 브리핑부품.오래된것털기(결과.모음, 오늘, 14);
+
+  await 자리.child("모음").set(남길것);
+  await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length });
+  console.log("[모으기] 새로 " + 결과.새로 + "건 · 쌓인 것 " + Object.keys(남길것).length + "건");
+  return { ok: true, 새로: 결과.새로 };
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    ① 날마다 «모으기» — 올리지는 않는다
    ══════════════════════════════════════════════════════════════════════════
@@ -4198,27 +4369,7 @@ exports.dailyNewsCollect = functions
   .pubsub.schedule("every day 07:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
-    const 자리 = getDatabase().ref("homepage/newsBrief");
-    const 설정 = (await 자리.once("value")).val() || {};
-    if (설정.off === true) { console.log("[모으기] 꺼져 있습니다"); return null; }
-
-    const 오늘 = 서울오늘();
-    let 거리;
-    try {
-      거리 = await 브리핑거리모으기();
-    } catch (e) {
-      /* ★ 못 읽은 날이 있어도 그냥 넘어간다 — 모아 둔 것은 그대로 남는다 */
-      console.warn("[모으기] 오늘은 못 읽었습니다", e.message);
-      return null;
-    }
-
-    const 모아둔것 = (await 자리.child("모음").once("value")).val() || {};
-    const 결과 = 브리핑부품.모으기(모아둔것, 거리.뉴스, 오늘);
-    const 남길것 = 브리핑부품.오래된것털기(결과.모음, 오늘, 14);
-
-    await 자리.child("모음").set(남길것);
-    await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length });
-    console.log("[모으기] 새로 " + 결과.새로 + "건 · 쌓인 것 " + Object.keys(남길것).length + "건");
+    await 뉴스모으기한번();
     return null;
   });
 

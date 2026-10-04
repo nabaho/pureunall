@@ -327,6 +327,33 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .item .x:hover{color:var(--bad)}
 .empty{padding:16px 15px;font-size:13px;color:var(--faint)}
 .pad{padding:12px 15px}
+/* ── 자동화 점검 탭 (2026-10-04) — 줄은 «한 줄», 넘치면 … ── */
+.wdot:not(:empty){display:inline-block;min-width:18px;text-align:center;font-size:11px;font-weight:800;
+  border-radius:9px;padding:0 5px;background:var(--bad);color:#fff;margin-left:3px}
+.wflow{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--line)}
+.wst{padding:9px 6px;text-align:center;border-right:1px solid var(--line);font-size:12px;min-width:0}
+.wst:last-child{border-right:0}
+.wst .w{font-size:11px;color:var(--faint);white-space:nowrap}
+.wst .n{font-weight:800;white-space:nowrap}
+.wst .s{font-size:11.5px;font-weight:800;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wst.ok .s{color:var(--ok)} .wst.fix .s{color:var(--navy)} .wst.wait .s{color:var(--faint)}
+.wst.warn{background:#fffbeb} .wst.warn .s{color:#92400e}
+.wrow{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+.wrow .pill{font-size:11px;font-weight:800;border-radius:20px;padding:2px 9px;flex:0 0 auto}
+.wrow .p-you{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.wrow .p-fix{background:var(--paper);color:var(--navy);border:1px solid var(--line)}
+.wrow .p-ok{background:#f0fdf4;color:var(--ok);border:1px solid #bbf7d0}
+.wrow .t{font-weight:700;overflow:hidden;text-overflow:ellipsis;min-width:0;flex:0 1 auto}
+.wrow .d{color:var(--faint);font-size:12px;overflow:hidden;text-overflow:ellipsis;flex:1;min-width:0}
+.wbox{overflow:hidden;min-width:0}
+.whd{display:flex;align-items:center;gap:8px;margin:0;padding:11px 14px;border-bottom:1px solid var(--line);
+  font-size:14px;white-space:nowrap;min-width:0}
+.whd .wwhen{margin:0;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.wsect{font-size:12px;font-weight:800;color:var(--brown);background:var(--brown-soft);
+  padding:5px 14px;border-bottom:1px solid var(--line)}
+/* 폰 — 흐름은 세 칸씩, 줄의 덧말은 접는다(전문은 «이번 회차»에서 본다). 옆으로 굴러가지 않게 */
+@media(max-width:640px){ .wflow{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .wrow .d{display:none} .whd .wwhen{display:none} }
 textarea,input[type=text],input[type=url],select{width:100%;border:1px solid var(--line);
   border-radius:9px;padding:9px 11px;line-height:1.7}
 textarea{resize:vertical}
@@ -886,6 +913,8 @@ table.list tr:hover td{background:#fcfcfd}
          「주소가 없어 못보내는곳은 별도로 탭을 만들어 달라. 거기서 정리하고 찾을 수 있게」) -->
     <button data-t="noaddr">주소 없는 곳 <span id="cNoaddr" style="color:var(--faint)"></span></button>
     <button data-t="res">보낸 결과 <span id="cRes" style="color:var(--faint)"></span></button>
+    <!-- ★ 자동화 점검 — 감시꾼이 남긴 것 (대표 지시 2026-10-04 「검증하고 … 자동으로 고치는기능」) -->
+    <button data-t="watch">자동화 점검 <span id="cWatch" class="wdot"></span></button>
     <button data-t="cfg">설정</button>
   </div>
 </div><!-- /top -->
@@ -1331,6 +1360,9 @@ function render(){
   if(App.tab==='who'){ 명함읽기(); m.innerHTML = 명단화면(); }
   if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 주소없는곳화면(); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
+  if(App.tab==='watch') m.innerHTML = 감시화면();
+  /* 탭 숫자(사람이 볼 것)는 처음 한 번 읽어 둔다 — 탭을 안 눌러도 빨간 숫자가 보여야 한다 */
+  if(App.감시 === undefined){ App.감시 = null; setTimeout(감시읽기, 0); }
   if(App.tab==='cfg')  m.innerHTML = 설정화면();
   /* 안내문이 하나도 없어도 «보내기 전 실제 모양»을 보여 준다. 빈 화면에서는 무엇을
      만드는지 판단할 수 없고, 자료 놓는 자리도 찾지 못했다(대표 지시 2026-09-29). */
@@ -5742,6 +5774,82 @@ async function 노무사회가져오기(방식){
     if(바쁨) 바쁨.textContent = '';
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   「자동화 점검」 탭 — 감시꾼이 남긴 것을 «읽기만» 한다 (대표 지시 2026-10-04)
+   ══════════════════════════════════════════════════════════════════════════
+   「자동화에 에러가 나면 검증도 자동화 … 문제가 되면 자동으로 고치는기능」 → 「추천대로」
+   ★ 판단은 서버(functions/news-watch.js)가 한다. 여기는 그 기록을 한 화면으로 보일 뿐이다.
+   ⚠ 여기서 고치지 않는다 — 고칠 곳은 «이번 회차» 탭이다. 단추는 그리로 데려간다.
+   ⚠ 서버가 쓴 글이다 — 반드시 씻는다(esc). */
+async function 감시읽기(){
+  if(App._감시읽는중) return;
+  App._감시읽는중 = true;
+  try{
+    const v = (await db.ref('newsletter/watch').orderByKey().limitToLast(1).once('value')).val() || {};
+    const k = Object.keys(v).sort().pop();
+    App.감시 = k ? Object.assign({ 열쇠: k }, v[k]) : { 열쇠: '' };
+  }catch(e){ App.감시 = { 열쇠: '', 탈: (e && e.message) || String(e) }; }
+  App._감시읽는중 = false;
+  const el = $('cWatch'); if(el) el.textContent = 감시볼것수() || '';
+  if(App.tab === 'watch') render();
+}
+/* 사람이 볼 것 — 탭 숫자. 점검의 block·you + 서버가 남긴 막힘(발송·전달·포기) */
+function 감시볼것수(){
+  const w = App.감시 || {};
+  const 점 = ((w.점검 || {}).항목들 || []).filter(x => x && (x.수준 === 'block' || x.수준 === 'you')).length;
+  const 막 = ['발송','전달경보','포기'].filter(k => w[k] && w[k].상태 === 'block').length;
+  return 점 + 막;
+}
+function 감시화면(){
+  if(!App.감시){ if(!App._감시읽는중) setTimeout(감시읽기, 0); return '<div class="note">점검 기록을 읽는 중…</div>'; }
+  const w = App.감시;
+  if(w.탈) return '<div class="note" style="color:var(--bad)">점검 기록을 못 읽었습니다 — ' + esc(w.탈) + '</div>';
+  const 오늘날 = 오늘();
+  const 어제 = (function(){ const d = new Date(오늘날 + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1); return d.toISOString().slice(0,10); })();
+  const b = App.금요일기록, 모은날 = String((App.브리핑||{}).모은날||'');
+  const AI탈 = b && (b.알림||[]).some(m => /AI 정리를 못 했|한마디를 못 지었/.test(String(m)));
+  const 칸 = (때, 이름, 말, 꼴) => `<div class="wst ${꼴}"><div class="w">${때}</div><div class="n">${이름}</div><div class="s">${말}</div></div>`;
+  const 점 = w.점검 || null, 발 = w.발송 || null, 전 = w.전달 || null;
+  const 흐름 = [
+    칸('매일 07:00', '기사 모으기', 모은날 >= 어제 ? '✓ 정상' : '⚠ ' + (모은날 || '없음') + ' 뒤로 멈춤', 모은날 >= 어제 ? 'ok' : 'warn'),
+    칸('금 13:00', 'AI 초안', !b ? '기다림' : AI탈 ? '⚠ 빠짐' : b.다시한때 ? '↻ 다시 해서 됨' : '✓ 정상',
+      !b ? 'wait' : AI탈 ? 'warn' : b.다시한때 ? 'fix' : 'ok'),
+    칸('일 18:00', '보내기 전 점검', !점 ? '기다림' : 점.판정 === 'ok' ? '✓ 이상 없음'
+      : 점.판정 === 'block' ? '⛔ 안 나감' : '⚠ 확인 ' + 감시볼것수() + '건',
+      !점 ? 'wait' : 점.판정 === 'ok' ? 'ok' : 'warn'),
+    칸('월 06:00', '발송', !발 ? '기다림' : 발.상태 === 'ok' ? '✓ ' + Number(발.받는수||0) + '곳' : '⛔ 막힘',
+      !발 ? 'wait' : 발.상태 === 'ok' ? 'ok' : 'warn'),
+    칸('월 12:00', '전달 결과', !전 ? '—' : (전.실패 || 전.확인필요) ? '⚠ ' + (전.실패 + 전.확인필요) + '통 못 감'
+      : 전.남음 ? '… ' + 전.남음 + '통 남음' : '✓ 다 나감', !전 ? 'wait' : (전.실패 || 전.확인필요) ? 'warn' : 'ok')
+  ].join('');
+  const 표 = { block:['p-you','⛔ 안 나감'], you:['p-you','확인 필요'], fix:['p-fix','↻ 자동'], ok:['p-ok','✓ 정상'] };
+  const 줄 = x => `<div class="wrow"><span class="pill ${표[x.수준][0]}">${표[x.수준][1]}</span>`
+    + `<span class="t">${esc(x.제목)}</span><span class="d" title="${esc(x.설명||'')}">${esc(x.설명||'')}</span>`
+    + (x.수준 === 'block' || x.수준 === 'you'
+        ? `<button class="mini" onclick="App.tab='now';render()">이번 회차로</button>` : '') + '</div>';
+  const 항목 = (점 && 점.항목들) || [];
+  /* 서버가 그 자리에서 남긴 막힘 — 점검표보다 뒤에 생긴 일이라 따로 붙인다 */
+  const 막힘 = ['발송','전달경보','포기'].filter(k => w[k] && w[k].상태 === 'block')
+    .map(k => ({ 수준:'block', 제목: k === '포기' ? 'AI 초안을 끝내 못 채웠습니다' : k === '발송' ? '월요일 발송이 막혔습니다' : '전달 실패',
+      설명: String(w[k].말 || '') }));
+  const 볼것 = 막힘.concat(항목.filter(x => x.수준 === 'block' || x.수준 === 'you'));
+  const 고친 = 항목.filter(x => x.수준 === 'fix');
+  const 정상 = 항목.filter(x => x.수준 === 'ok');
+  const 묶음 = (제목, 것) => 것.length ? `<div class="wsect">${제목} ${것.length}</div>` + 것.map(줄).join('') : '';
+  const 점검때 = 점 && 점.때 ? new Date(점.때) : null;
+  return `<div class="box wbox">
+    <h3 class="whd">
+      🛡 ${esc(w.열쇠 ? 회차로부터(w.열쇠).이름 || w.열쇠 : '아직 기록 없음')}
+      <span class="hint wwhen">${점검때 ? '점검 ' + (점검때.getMonth()+1) + '/' + 점검때.getDate() + ' · 점검표 메일 ' + esc(String(점.메일 || '—')) : ''}</span>
+      <span style="flex:1"></span><button class="mini" onclick="App.감시=null;render()">↻ 다시 읽기</button></h3>
+    <div class="wflow">${흐름}</div>
+    ${묶음('사람이 볼 것', 볼것)}${묶음('스스로 고친 것', 고친)}${묶음('정상', 정상)}
+    ${!볼것.length && !고친.length && !정상.length ? '<div class="note" style="margin:12px 14px">아직 점검이 돌지 않았습니다 — 일요일 오후 6시에 처음 돕니다.</div>' : ''}
+    <div class="hint" style="padding:9px 14px">⚠ 발송은 스스로 다시 하지 않습니다 — 두 번 나갈 위험이 있어 알림만 드립니다.
+      기사 모으기와 금요일 AI 초안은 3시간마다 다시 해 봅니다.</div>
+  </div>`;
+}
+
 /* ★ 금요일 자동 준비 «마지막 한 번»을 한 줄로 (대표 지시 2026-09-27).
      서버가 혼자 도는 일이다 — 여기서 말해 주지 않으면 「돌았나? 왜 안 왔지?」를 알 길이 없다.
    ⚠ 기록은 서버가 쓴 값이다. 그대로 심지 말고 반드시 씻는다(esc). */
