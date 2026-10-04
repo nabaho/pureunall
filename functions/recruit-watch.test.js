@@ -257,3 +257,61 @@ test('★ 노사발전재단 — 서버는 틀(iframe) 주소를 읽고, 링크 
   assert.equal(r.hits.length, 1);
   assert.equal(r.hits[0].href, b.page, '틀 주소(맨 목록)로 보내면 사람이 길을 잃는다');
 });
+
+/* ═══ 공인노무사회 회원 공지 — 로그인해야 보인다 (2026-10-04 「회원 공지 진행」) ═══ */
+
+test('★★ 로그인 게시판만 로그인한 손으로 읽고, 로그인은 한 번만 한다', async () => {
+  let 로그인 = 0; const 읽은 = [];
+  const f = W.makeFetcher({
+    plain: async (u) => { 읽은.push('plain ' + u); return 'P'; },
+    login: async (kind) => { 로그인++; assert.equal(kind, 'kcplaa'); return async (u) => { 읽은.push('login ' + u); return 'L'; }; }
+  });
+  const 회원 = W.BOARDS.find((b) => b.id === 'kcplaa_m');
+  assert.ok(회원 && 회원.login === 'kcplaa' && 회원.org === '' && /kcplaa\.or\.kr\/bbs\/news\/list$/.test(회원.url), '회원 공지 게시판이 빠졌다');
+  assert.equal(await f('https://a/1', { id: 'erc' }), 'P');
+  assert.equal(await f(회원.url, 회원), 'L');
+  assert.equal(await f(회원.url + '?page=2', 회원), 'L');
+  assert.equal(await f('https://a/2'), 'P', '게시판을 안 넘기면(옛 부르는 쪽) 그냥 읽는다');
+  assert.equal(로그인, 1, '로그인을 여러 번 했다');
+  assert.deepEqual(읽은, ['plain https://a/1', 'login ' + 회원.url, 'login ' + 회원.url + '?page=2', 'plain https://a/2']);
+});
+
+test('★★ 로그인이 실패하면 그 게시판만 오류 — 나머지는 돈다, 같은 날 비밀번호를 다시 안 보낸다', async () => {
+  let 로그인 = 0;
+  const f = W.makeFetcher({
+    plain: async () => '<table><tr><td><a href="/v?1">2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고</a></td><td>2026-12-20</td></tr></table>',
+    login: async () => { 로그인++; throw new Error('로그인 실패: 비밀번호'); }
+  });
+  const 회원 = W.BOARDS.find((b) => b.login);
+  const 둘 = [회원, { id: 'kcplaa', org: '', name: '공지', url: 'https://www.kcplaa.or.kr/bbs/notice/list' }, Object.assign({}, 회원, { id: 'kcplaa_m2' })];
+  const r = await W.run({ boards: 둘, existing: {}, today: '2026-12-22', fetchText: f });
+  assert.deepEqual(r.errors.map((e) => e.board), ['kcplaa_m', 'kcplaa_m2']);
+  assert.match(r.errors[0].why, /로그인 실패/);
+  assert.equal(r.hits.length, 1, '로그인 없는 게시판까지 멈췄다');
+  assert.equal(r.hits[0].org, 'nosa');
+  assert.equal(로그인, 1, '실패한 로그인을 또 시도했다 — 남의 서버에 비밀번호를 거듭 보낸다');
+});
+
+test('★ 처음 훑기 — 여러 쪽을 읽어 줄 수·기간·모집 글을 남기고, 쪽이 안 넘어가면 멈춘다', async () => {
+  const 회원 = W.BOARDS.find((b) => b.login);
+  const 쪽 = {
+    1: [['2026-09-30', '2027년도 공무직 노사협력 프로그램 사업 컨설턴트 모집공고'], ['2026-09-01', '회원 연수 일정 안내']],
+    2: [['2025-02-03', '2025년 NCS 기업활용 컨설팅 사업 컨설턴트 모집 공고'], ['2025-01-02', '제5기 고용노사관계 전문가과정 교육생 모집']],
+    3: [['2025-02-03', '2025년 NCS 기업활용 컨설팅 사업 컨설턴트 모집 공고']]   // 2쪽과 같은 첫 줄이 아니면 계속
+  };
+  const html = (rows) => '<table>' + rows.map(([d, t], i) => '<tr><td><a href="/v?' + i + '">' + t + '</a></td><td>' + d + '</td></tr>').join('') + '</table>';
+  const 부른 = [];
+  const r = await W.probeBoard({ board: 회원, pages: 5, fetchText: async (u, b) => {
+    assert.equal(b, 회원, '로그인 손으로 읽으려면 게시판을 넘겨야 한다');
+    부른.push(u); const p = Number(/page=(\d+)/.exec(u)[1]); return 쪽[p] ? html(쪽[p]) : '<p>끝</p>';
+  } });
+  assert.equal(r.board, 'kcplaa_m');
+  assert.equal(r.pages, 3); assert.equal(r.rows, 5);
+  assert.equal(r.to, '2026-09-30'); assert.equal(r.from, '2025-02-03');
+  assert.deepEqual(r.recruit.map((x) => x.org + ':' + x.date), ['nosa:2026-09-30', 'hrdk:2025-02-03', 'hrdk:2025-02-03']);
+  assert.equal(부른.length, 4, '빈 쪽에서 멈춰야 한다');
+  assert.match(부른[0], /news\/list\?page=1$/);
+  /* 쪽 번호를 무시하는 게시판 — 같은 첫 줄이 되풀이되면 멈춘다(끝없이 읽지 않는다) */
+  const 늘같음 = await W.probeBoard({ board: 회원, pages: 5, fetchText: async () => html(쪽[1]) });
+  assert.equal(늘같음.pages, 1); assert.equal(늘같음.rows, 2);
+});
