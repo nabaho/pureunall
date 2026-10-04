@@ -502,6 +502,22 @@ test('★ 화면 부품 — goLogin({ask}) 은 prompt=login 을 서버에 부탁
 const 기록들 = (key) => Object.values((world.data.login_events || {})[key] || {});
 const 모든기록키 = () => Object.keys(world.data.login_events || {});
 
+/* 기록에 실린 «글자»만 모은다 — 열쇠와 글자값, 숫자는 뺀다.
+   ⚠ 2026-10-04: 여기서 JSON.stringify(기록).includes('111') 로 보다가 CI 가 통째로 멎었다.
+     기록에는 시각(Date.now())이 숫자로 들어 있는데, 2026-10-04 10:33~13:20(UTC) 동안
+     그 숫자가 1791110… 이라 «111» 을 품는다. 회원번호와 아무 상관없는 우연이다.
+     이 창은 되풀이해서 돌아온다(시각 숫자에 111 이 드는 동안마다) — 그때마다 모든
+     PR 이 막힌다. 그래서 «숫자»가 아니라 «글자»만 본다: 회원번호가 샌다면 반드시
+     글자값이나 열쇠로 샌다. */
+function 기록속글자들(값, 모은것) {
+  모은것 = 모은것 || [];
+  if (값 === null || 값 === undefined) return 모은것;
+  if (typeof 값 === 'string') { 모은것.push(값); return 모은것; }
+  if (typeof 값 !== 'object') return 모은것;          // 숫자·참거짓은 안 본다
+  Object.keys(값).forEach((k) => { 모은것.push(k); 기록속글자들(값[k], 모은것); });
+  return 모은것;
+}
+
 test('★★ 연결 안 된 카카오로 들어오려 하면 기록이 남는다 — 회원번호 원문은 안 남는다', async () => {
   const K = fresh();
   const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
@@ -512,7 +528,8 @@ test('★★ 연결 안 된 카카오로 들어오려 하면 기록이 남는다
   const ev = 기록들(keys[0])[0];
   assert.equal(ev.ok, false);
   assert.equal(ev.code, 'kakao-unlinked');
-  assert.ok(!JSON.stringify(world.data.login_events).includes('111'), '★ 카카오 회원번호 원문이 기록에 남았습니다');
+  const 샌곳 = 기록속글자들(world.data.login_events).filter((s) => s.includes('111'));
+  assert.deepEqual(샌곳, [], '★ 카카오 회원번호 원문이 기록에 남았습니다');
   assert.equal(world.data.systemAlerts, undefined, '연결 전 새 직원도 이 길을 지난다 — 알림까지 울리면 잔소리가 된다');
 });
 
