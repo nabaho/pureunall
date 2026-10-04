@@ -68,7 +68,9 @@ test('⑤ 자리가 둘 이상일 때만 고르기 창 · 조용히 부를 때�
   assert.match(fn, /자리\.length>=2[\s\S]*rhStampPickAsk\(/);
   assert.match(html, /id="modalStampPick"/);
   const ask = /function rhStampPickAsk\(spots, preset\)\{[\s\S]*?\n\}/.exec(html)[0];
-  assert.match(ask, /preset\?preset\.indexOf\(s\.key\)>=0:true/, '처음엔 모두 체크(승인 목업)');
+  /* 2026-10-04 목업 A — 처음 켜 두는 것: 이미 도장이 있으면 끄고, 그 사람 도장이 없으면 끈다(남의 도장이 찍히면 안 된다) */
+  assert.match(ask, /var on=p\?true:\(!s\.sealed && !!고른\)/);
+  assert.match(ask, /stampOfWho\(s\.who\)/, '서명 줄 이름과 같은 도장을 먼저 고른다');
   assert.match(ask, /escapeHtml\(s\.label/, '서식 글자를 그대로 넣지 않는다');
 });
 

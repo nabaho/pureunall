@@ -1325,7 +1325,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=20"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
-<script src="js/kcareer-hwpstamp.js?v=7"></script>
+<script src="js/kcareer-hwpstamp.js?v=8"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -15836,7 +15836,12 @@ async function rhStampDoc(quiet){
     var 고른=await rhStampPickAsk(자리, null);
     if(!고른||!고른.length) return false;
     _rhStampPick=고른;
-  } else if(!quiet) _rhStampPick=자리.length?[자리[0].key]:null;
+  } else if(!quiet && 자리.length===1 && 자리[0].who && !stampOfWho(자리[0].who)){
+    /* 자리는 하나지만 «다른 사람 이름» — 기본 도장을 몰래 찍지 않고 고르게 한다 */
+    var 하나=await rhStampPickAsk(자리, null);
+    if(!하나||!하나.length) return false;
+    _rhStampPick=하나;
+  } else if(!quiet) _rhStampPick=자리.length?[자리[0].key+(stampOfWho(자리[0].who)?'='+stampOfWho(자리[0].who).id:'')]:null;
   _rhStampOn=true;
   var bytes=null;
   try{ bytes=await rhComposeBytes(); }catch(e){ bytes=null; }
@@ -15866,7 +15871,8 @@ async function rhStampSpotsNow(){
     var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
     for(const n of names){
       var spots=KcareerHwpStamp.findSpots(await zip.file(n).async('string'));
-      spots.forEach(function(s,k){ out.push({ key:n+'#'+k, label:String(s.label||'').replace(/^[\s.·,:;]+/,'') }); });
+      spots.forEach(function(s,k){ out.push({ key:n+'#'+k, label:String(s.label||'').replace(/^[\s.·,:;]+/,''),
+        who:s.who||'', sealed:!!s.sealed }); });
     }
   }catch(e){ console.warn('도장 자리 찾기', e); }
   finally{ _rhStampOn=켜둠; }
@@ -15874,22 +15880,56 @@ async function rhStampSpotsNow(){
 }
 /* 🖋 자리 고르기 창 — 고른 key 들을 돌려준다 · 취소면 null.
    처음엔 «모두 체크»(대표 승인 목업) · 이미 골라 둔 것이 있으면 그것을 체크해 연다. */
+/* 고른 것 한 줄 — 「자리key」 또는 「자리key=도장id」(누구 도장인지). 옛 기록(자리만)은 기본 도장이다 */
+function _rhPickSplit(v){ var t=String(v||''), k=t.lastIndexOf('='); return k>0?{ key:t.slice(0,k), sid:t.slice(k+1) }:{ key:t, sid:'' }; }
+/* 그 사람의 도장 — 도장 이름(라벨·파일 이름)에 사람 이름이 들어 있으면 그것.
+   ⚠ 못 찾으면 null — 남의 이름 자리에 «기본 도장»을 몰래 찍지 않는다(창이 꺼 두고 알린다). */
+function stampOfWho(who){
+  who=String(who||'').replace(/\s+/g,''); if(!who) return null;
+  var arr=get('stamps')||[];
+  return arr.filter(function(st){ return String((st.who||'')+' '+(st.label||'')+' '+(st.name||'')).replace(/\s+/g,'').indexOf(who)>=0; })[0]||null;
+}
+/* 🖋 자리 고르기 창 (대표 승인 2026-10-04 목업 A) — 자리마다 «누구 도장»을 고른다.
+   돌려주는 것: ['자리key=도장id', …] · 취소면 null.
+   ⚠ 처음 켜 두는 것: 이미 도장이 있는 자리는 끄고, 이름이 있는데 그 사람 도장이 없으면 끈다(남의 도장이 찍히면 안 된다). */
 function rhStampPickAsk(spots, preset){
   return new Promise(function(res){
     var ov=document.getElementById('modalStampPick'), body=document.getElementById('stampPickBody');
+    var 기본=getDefaultStamp(), arr=get('stamps')||[];
     if(!ov||!body){ res(spots.map(function(s){ return s.key; })); return; }
-    body.innerHTML='<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">이 서식에 도장 자리가 <b>'+spots.length+'곳</b> 있습니다 — 찍을 곳만 체크하세요</div>'
+    var 전=(preset||[]).map(_rhPickSplit), 전에=function(k){ return 전.filter(function(p){ return p.key===k; })[0]||null; };
+    var 켤=0;
+    body.innerHTML='<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">도장 자리 <b>'+spots.length+'곳</b> · 서명 줄의 이름과 같은 도장을 먼저 골라 둡니다</div>'
       +spots.map(function(s,i){
-        var on=preset?preset.indexOf(s.key)>=0:true;
-        return '<label style="display:flex;gap:10px;align-items:flex-start;padding:9px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px;cursor:pointer">'
-          +'<input type="checkbox" data-k="'+escapeHtml(s.key)+'"'+(on?' checked':'')+' style="margin-top:2px">'
-          +'<span><span style="font-size:11px;color:var(--text-mute)">'+(i+1)+'번째 자리</span><br>'+escapeHtml(s.label||'(인)')+'</span></label>';
+        var 그사람=stampOfWho(s.who), p=전에(s.key);
+        var 고른=p?(p.sid||(기본&&기본.id)||''):((그사람&&그사람.id)||(!s.who&&기본?기본.id:''));
+        var on=p?true:(!s.sealed && !!고른);
+        if(on) 켤++;
+        var 말=s.sealed?'<span style="color:var(--text-mute)">이미 도장 있음 — 꺼 둠</span>'
+          :(s.who && !그사람)?'<span style="color:#854d0e">'+escapeHtml(s.who)+' 도장 없음 — <a href="#" onclick="document.getElementById(\'modalStampPick\').classList.remove(\'open\');navTile(\'page-settings\');return false">＋ 도장 올리기</a></span>'
+          :(그사람?'<span style="color:var(--teal)">이름 맞음</span>':'');
+        var opts=arr.map(function(st){ return '<option value="'+escapeHtml(st.id)+'"'+(st.id===고른?' selected':'')+'>'+escapeHtml(st.label||st.name||'도장')+(st.def?' ★':'')+'</option>'; }).join('');
+        return '<div class="sp-row" style="display:grid;grid-template-columns:22px minmax(0,1fr) 150px;gap:8px;align-items:center;padding:8px 10px;border:1px solid var(--border);border-radius:8px;margin-bottom:6px">'
+          +'<input type="checkbox" data-k="'+escapeHtml(s.key)+'"'+(on?' checked':'')+'>'
+          +'<span style="min-width:0"><span style="font-size:11px;color:var(--text-mute)">'+(i+1)+'번째 자리</span> '+말+'<br>'
+            +'<span style="display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="'+escapeHtml(s.label||'')+'">'+escapeHtml(String(s.label||'(인)').replace(/^.*?([가-힣]{2,6}\s*[:：])/,'$1').slice(-26))+'</span></span>'
+          +'<select class="tb-select" data-s="'+escapeHtml(s.key)+'" style="min-width:0">'+(고른?'':'<option value="" selected>— 도장 고르기 —</option>')+opts+'</select></div>';
       }).join('')
       +(preset?'<div style="font-size:11px;color:var(--text-mute)">모두 끄고 「찍기」를 누르면 도장을 뺍니다</div>':'');
     var ok=document.getElementById('stampPickOk'), no=document.getElementById('stampPickCancel');
-    function 닫기(v){ ov.classList.remove('open'); ok.onclick=null; no.onclick=null; res(v); }
+    var 셈=function(){ var n=[].filter.call(body.querySelectorAll('input[type=checkbox]'),function(c){ return c.checked; }).length; if(ok) ok.textContent=n?('찍기 ('+n+'곳)'):'찍기'; };
+    body.querySelectorAll('input[type=checkbox]').forEach(function(c){ c.onchange=셈; });
+    /* 도장을 고르면 그 자리를 켠다 — 고르고도 체크를 안 해 «안 찍혔다»가 되지 않게 */
+    body.querySelectorAll('select[data-s]').forEach(function(sel){ sel.onchange=function(){
+      var c=body.querySelector('input[data-k="'+sel.getAttribute('data-s').replace(/"/g,'\\"')+'"]'); if(c && sel.value) c.checked=true; 셈(); }; });
+    셈();
+    function 닫기(v){ ov.classList.remove('open'); ok.onclick=null; no.onclick=null; ok.textContent='찍기'; res(v); }
     ok.onclick=function(){
-      var ks=[].slice.call(body.querySelectorAll('input[type=checkbox]')).filter(function(c){ return c.checked; }).map(function(c){ return c.getAttribute('data-k'); });
+      var 빠짐=[], ks=[].slice.call(body.querySelectorAll('input[type=checkbox]')).filter(function(c){ return c.checked; }).map(function(c){
+        var k=c.getAttribute('data-k'), sel=[].filter.call(body.querySelectorAll('select[data-s]'),function(x){ return x.getAttribute('data-s')===k; })[0];
+        var sid=sel?sel.value:''; if(!sid) 빠짐.push(k);
+        return sid?(k+'='+sid):k; });
+      if(빠짐.length){ toast('체크한 자리에 찍을 도장을 골라 주세요'); return; }
       if(!ks.length && !preset){ toast('찍을 자리를 하나 이상 골라 주세요'); return; }
       닫기(ks);
     };
@@ -15914,36 +15954,41 @@ async function _rhStampPx(id, png){
 /* 짓고 있는 문서(zip)에 도장을 찍는다 — 짓는 길(rhFinishZip) 한 곳만 부른다.
    돌려주는 것 = { ok, why } */
 async function rhStampZip(zip){
-  var st=(typeof getDefaultStamp==='function')?getDefaultStamp():null;
-  if(!st) return { ok:false, why:'먼저 환경설정 › 도장(직인) 보관함에 도장을 올려주세요' };
-  var f=await getFileAsync(st.id);
-  if(!f||!f.base64) return { ok:false, why:'도장 그림을 찾을 수 없습니다' };
-  var png=String(f.base64).replace(/^data:[^,]*,/,'');
-  /* 그림의 «본래 크기»를 재 둔다 — 이걸 안 맞추면 도장이 잘려 조각만 그려진다 */
-  var px=await _rhStampPx(st.id, png);
-  /* ⚠ 그림 이름은 «반드시» image1·image2… — 엔진이 이름 규칙으로 찾는다.
-     뜻이 담긴 이름을 쓰면 목록에 href 를 적어 줘도 깨진 상자가 그려진다(실측). */
-  var imgId=KcareerHwpStamp.nextImageId(Object.keys(zip.files));
-  var href='BinData/'+imgId+'.png';
+  var 기본=(typeof getDefaultStamp==='function')?getDefaultStamp():null;
+  /* ★ 고른 자리(_rhStampPick)에만 · 자리마다 «그 도장»으로 (대표 승인 2026-10-04 목업 A).
+     「자리key=도장id」 · 도장id 가 없으면(옛 기록·조용히 찍기) 기본 도장.
+     ⚠ 고른 것이 없으면(null) 옛 방식 그대로 «맨 처음 한 곳»에 기본 도장 — 채우기 뒤 저절로 찍을 때가 이 길이다. */
+  var 고름=Array.isArray(_rhStampPick)?_rhStampPick.map(_rhPickSplit):null;
+  var 도장들=(get('stamps')||[]);
+  var 도장of=function(sid){ return (sid&&도장들.filter(function(x){ return x.id===sid; })[0])||기본; };
+  if(!기본 && !(고름&&고름.some(function(p){ return p.sid; }))) return { ok:false, why:'먼저 환경설정 › 도장(직인) 보관함에 도장을 올려주세요' };
+  /* 도장마다 그림 하나 — 처음 쓸 때 싣는다(이름은 «반드시» image1·image2… — 엔진이 이름 규칙으로 찾는다) */
+  var 실린={}, 쓴이름=Object.keys(zip.files).slice();
+  async function 그림(st){
+    if(실린[st.id]) return 실린[st.id];
+    var f=await getFileAsync(st.id);
+    if(!f||!f.base64) throw new Error('도장 그림을 찾을 수 없습니다 — '+(st.label||st.name||''));
+    var png=String(f.base64).replace(/^data:[^,]*,/,'');
+    var imgId=KcareerHwpStamp.nextImageId(쓴이름); 쓴이름.push('BinData/'+imgId+'.png');
+    실린[st.id]={ imgId:imgId, href:'BinData/'+imgId+'.png', png:png, px:await _rhStampPx(st.id, png), fit:stampFit(st), 씀:false };
+    return 실린[st.id];
+  }
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
   var done=0;
-  /* ★ 고른 자리(_rhStampPick)에만 찍는다 (대표 승인 2026-09-29 목업).
-     ⚠ 고른 것이 없으면(null) 옛 방식 그대로 «맨 처음 한 곳»만 — 채우기 뒤 저절로 찍을 때가 이 길이다.
-     ⚠ 한 구역 안에서는 «뒤에서부터» 넣는다 — 앞에 넣으면 뒤 자리 번호가 밀린다. */
-  var 고름=Array.isArray(_rhStampPick)?_rhStampPick:null;
-  /* ★ 크기·자리는 «환경설정 › 도장 보관함»에 적어 둔 값을 쓴다(2026-09-27).
-     ⚠ 여기 숫자를 다시 박지 말 것 — 박으면 대표가 맞춰 둔 자리가 무시된다. */
-  var 맞춤=stampFit(st);
   for(const n of names){
     var xml=await zip.file(n).async('string');
     var spots=KcareerHwpStamp.findSpots(xml);
-    var 찍을=spots.map(function(s,k){ return { at:s, key:n+'#'+k }; })
-      .filter(function(o){ return 고름 ? 고름.indexOf(o.key)>=0 : (done===0 && o.key===n+'#0'); });
+    var 찍을=spots.map(function(s,k){ var key=n+'#'+k, p=고름?고름.filter(function(x){ return x.key===key; })[0]:null;
+        return { at:s, key:key, sid:p?p.sid:'' , on:고름?!!p:(done===0 && k===0) }; })
+      .filter(function(o){ return o.on; });
     if(!고름) 찍을=찍을.slice(0,1);
     if(!찍을.length) continue;
+    /* ⚠ 한 구역 안에서는 «뒤에서부터» 넣는다 — 앞에 넣으면 뒤 자리 번호가 밀린다 */
     for(var q=찍을.length-1;q>=0;q--){
-      var pic=KcareerHwpStamp.picXml({ id:imgId, orgPx:px, picId:9100+done+q,
-        showHU:맞춤.size, offX:맞춤.dx, offY:맞춤.dy });
+      var st=도장of(찍을[q].sid); if(!st) continue;
+      var g=await 그림(st); g.씀=true;
+      var pic=KcareerHwpStamp.picXml({ id:g.imgId, orgPx:g.px, picId:9100+done+q,
+        showHU:g.fit.size, offX:g.fit.dx, offY:g.fit.dy });
       xml=KcareerHwpStamp.insertPic(xml, pic, 찍을[q].at);
     }
     zip.file(n, xml);
@@ -15952,9 +15997,10 @@ async function rhStampZip(zip){
   }
   if(!done) return { ok:false, why:'도장 자리(「(인)」·「(서명)」)를 못 찾았습니다 — 한글에서 직접 넣어 주세요' };
   /* ⚠ 그림은 자리를 «찾은 뒤»에 넣는다 — 못 찾았는데 넣으면 쓰지도 않는 그림이 파일에 남는다 */
-  zip.file(href, png, {base64:true});
   var hpf=await zip.file('Contents/content.hpf').async('string');
-  zip.file('Contents/content.hpf', KcareerHwpStamp.addToManifest(hpf, imgId, href));
+  Object.keys(실린).forEach(function(k){ var g=실린[k]; if(!g.씀) return;
+    zip.file(g.href, g.png, {base64:true}); hpf=KcareerHwpStamp.addToManifest(hpf, g.imgId, g.href); });
+  zip.file('Contents/content.hpf', hpf);
   return { ok:true };
 }
 

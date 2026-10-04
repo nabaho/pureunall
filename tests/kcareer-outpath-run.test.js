@@ -125,7 +125,7 @@ function 세상(opt) {
   ['async function rhComposeBytes(', 'async function rhFinishZip(', 'function rhPicksFor(',
    'function rhParaFill(', 'function rhOutTail(', 'async function rhOutRefresh(',
    'async function rhTidyZip(', 'function rhTidyReset(', 'async function rhStampDoc(',
-   'async function _rhStampPx(', 'async function rhStampZip(', 'function stampFit(',
+   'async function _rhStampPx(', 'async function rhStampZip(', 'function stampFit(', 'function _rhPickSplit(', 'function stampOfWho(',
    'async function rhStampSpotsNow(', 'function rhStampPickAsk(',
    'function rhCleanName(', 'async function rhPagesOpen(', 'function rhPagesRender(',
    'async function rhPagesApply(', 'async function rhPagesRestore(',
