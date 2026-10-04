@@ -1244,6 +1244,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-c-from{width:140px}
 .dm-c-box{width:124px}
 .dm-c + .dm-c{margin-left:4px}
+.dm-c-rest{gap:4px}
 .dm-row .at{flex:none;width:112px;text-align:right;color:#64748b;font-size:13.5px;
   padding-right:4px;white-space:nowrap}
 /* 안 읽은 것은 굵게 — 다음메일과 같다 */
@@ -22764,29 +22765,49 @@ function mbTagW(html){
   const h = String(html || '');
   if(!h.trim()) return 0;
   const txt = h.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+    .replace(/&quot;/g, String.fromCharCode(34)).replace(/&#39;/g, String.fromCharCode(39)).replace(/\s+/g, ' ').trim();
   let w = 0;
   for(const ch of txt){
     const c = ch.codePointAt(0);
     w += (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x3130 && c <= 0x318F) ? 10.5
        : c > 0x2000 ? 13 : 6.4;
   }
-  const spans = Math.max(1, (h.match(/<span class="(dm-|mn-|box)/g) || []).length);
+  const spans = Math.max(1, (h.match(/<span class=.(dm-|mn-|box)/g) || []).length);   /* class=. — 따옴표를 안 쓴다(검사가 함수를 잘라 읽을 때 글자열로 잘못 본다) */
   return Math.ceil(w + spans * 14 + (spans - 1) * 4);
 }
+/* ⚡ «제 열»을 지키는 것은 담당(who)과 칸 이름(box) 둘뿐이다 (대표 지시 2026-10-04 「그래도 너무 넓게 차지한다」)
+   나머지(📁 건 · 급여자료/퇴사 · 📋 데이터함 · 🆕 문의 · 👁 열어봄 · 봤음 · 다음:)는 «한 무리»로 이어 붙인다.
+   갈래마다 열을 따로 세우니 드물게 나오는 딱지(🆕·👁) 하나 때문에 줄마다 빈 열이 생겨 오른쪽이 한없이 넓었다.
+   무리의 너비는 이 쪽에서 «가장 긴 무리»에 맞춘다 — 무리의 시작 자리는 줄마다 같다. */
+const MB_TAG_ALONE = { who:1, box:1 };
+const MB_TAG_REST_MAX = 280;
 function mbTagCols(rows){
   const parts = (rows || []).map(mbTagParts);
   const used = MB_TAG_SLOTS.map((_, j)=>parts.some(p=>p[j].trim() !== ''));
   /* ⚠ 칸 이름(box)은 글자가 더 커서 어림이 모자란다 — 그 열은 예전 너비(CSS) 그대로 둔다 */
-  const widths = MB_TAG_SLOTS.map((k, j)=> (used[j] && k !== 'box')
+  const widths = MB_TAG_SLOTS.map((k, j)=> (used[j] && k === 'who')
     ? Math.min(MB_TAG_MAX[k] || 140, Math.max(24, ...parts.map(p=>mbTagW(p[j])))) : 0);
-  return { parts:parts, used:used, widths:widths };
+  const rest = MB_TAG_SLOTS.map((k, j)=>j).filter(j=>!MB_TAG_ALONE[MB_TAG_SLOTS[j]]);
+  let restW = 0;
+  parts.forEach(p=>{
+    const ws = rest.map(j=>mbTagW(p[j])).filter(w=>w > 0);
+    const w = ws.reduce((a, b)=>a + b, 0) + Math.max(0, ws.length - 1) * 4;
+    if(w > restW) restW = w;
+  });
+  return { parts:parts, used:used, widths:widths, rest:rest, restW: Math.min(MB_TAG_REST_MAX, restW) };
 }
-/* 줄 하나의 열들 — 쓰이는 열은 비어 있어도 자리를 지킨다(그래야 세로줄이 맞는다) */
+/* 줄 하나 — 담당 열 · 나머지 무리 · 칸 이름 열. 쓰이는 열은 비어 있어도 자리를 지킨다(세로줄이 맞게) */
 function mbTagColsHtml(t, i){
-  const p = (t && t.parts && t.parts[i]) || [];
-  return MB_TAG_SLOTS.map((k, j)=> (t && t.used[j])
-    ? `<span class="dm-c dm-c-${k}"${t.widths && t.widths[j] ? ` style="width:${t.widths[j]}px"` : ''}>${p[j] || ''}</span>` : '').join('');
+  if(!t) return '';
+  const p = (t.parts && t.parts[i]) || [];
+  const at = (k)=>MB_TAG_SLOTS.indexOf(k);
+  let h = '';
+  const w = at('who');
+  if(t.used[w]) h += `<span class="dm-c dm-c-who"${t.widths[w] ? ` style="width:${t.widths[w]}px"` : ''}>${p[w] || ''}</span>`;
+  if(t.restW) h += `<span class="dm-c dm-c-rest" style="width:${t.restW}px">${(t.rest || []).map(j=>p[j] || '').join('')}</span>`;
+  const b = at('box');
+  if(t.used[b]) h += `<span class="dm-c dm-c-box">${p[b] || ''}</span>`;
+  return h;
 }
 function mbHrTag(v){
   /* ⚠ window 를 직접 짚지 않는다 — 검사 몇은 window 없는 상자에서 이 목록을 그린다 */
