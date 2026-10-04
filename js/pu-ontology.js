@@ -171,7 +171,7 @@
        ★ 2026-09-13 바로잡음: 여기에 「명단은 여기가 정본이고 기업정보함을 실시간으로
          끌어오지 않는다」고 «거꾸로» 적혀 있었다. 어긋난 안내는 없는 것보다 나쁘다 —
          읽은 사람이 안심하고 틀린다. */
-    news:{ name:'뉴스레터 관리', file:'pu-news.html', primaryRoots:['newsletter','ilabor'],
+    news:{ name:'뉴스레터', file:'pu-news.html', primaryRoots:['newsletter','ilabor'],
       sharedRoots:['data/companies','homepage/newsBrief','pucards/scheduled','mailbox'],
       entityTypes:['Organization','Person','Message','Document'] }
   };

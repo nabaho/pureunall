@@ -247,7 +247,7 @@ function 점검하기(o) {
   } else if (이번확정본.상태 !== '준비') {
     넣('block', '확정본이 «' + 이번확정본.상태 + '» 상태입니다', String(이번확정본.오류 || '').slice(0, 160));
   }
-  if (설정.자동발송 !== true) 넣('block', '자동발송이 꺼져 있어 월요일에 안 나갑니다', '뉴스레터 관리 › 설정에서 켜 주십시오');
+  if (설정.자동발송 !== true) 넣('block', '자동발송이 꺼져 있어 월요일에 안 나갑니다', '뉴스레터 › 설정에서 켜 주십시오');
   if (회차 && 회차.상태 === '발송') 넣('block', '이미 보낸 회차입니다', '');
 
   /* ── 내용 ── */
@@ -363,7 +363,7 @@ function 점검표메일짓기(점검, 이름, 관리화면, 보내는시각말)
     + '<div style="font-size:17px;font-weight:bold;margin-bottom:6px">' + _e(이름) + ' 보내기 전 점검</div>'
     + '<div style="font-size:14px;margin-bottom:10px">' + _e(머리말) + '</div>'
     + '<table role="presentation" cellpadding="0" cellspacing="0" border="0">' + 줄 + '</table>'
-    + '<div style="margin-top:14px"><a href="' + 관리화면 + '" style="color:#1b3a6b;font-weight:bold;">뉴스레터 관리 › 자동화 점검</a></div>'
+    + '<div style="margin-top:14px"><a href="' + 관리화면 + '" style="color:#1b3a6b;font-weight:bold;">뉴스레터 › 자동화 점검</a></div>'
     + '</td></tr></table>';
   const body = [제목, '', 머리말, ''].concat(점검.항목들.map((x) => '- ' + x.제목 + (x.설명 ? ' — ' + x.설명 : '')))
     .concat(['', '관리 화면: ' + 관리화면]).join('\n');

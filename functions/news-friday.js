@@ -213,7 +213,7 @@ function 검토메일짓기(보고) {
       + '곳</b>으로 자동으로 나갑니다. 아래 편지를 검토해 주십시오.'));
   } else if (b.확정본됨) {
     칸들.push(줄('⚠ 설정의 <b>「월요일 ' + 보내는시각말 + ' 자동발송」이 꺼져 있어</b> 이대로는 안 나갑니다. '
-      + '보내시려면 뉴스레터 관리 › 설정에서 켜 주십시오.', '#b45309'));
+      + '보내시려면 뉴스레터 › 설정에서 켜 주십시오.', '#b45309'));
   } else {
     칸들.push(줄('⚠ <b>월요일에 안 나갑니다</b> — ' + _e(b.못한까닭 || ''), '#b91c1c'));
   }
@@ -230,9 +230,9 @@ function 검토메일짓기(보고) {
       + '. <b>사람이 아직 안 읽었습니다</b> — 날짜·사건번호를 꼭 확인해 주십시오.', '#1b3a6b'));
   }
   (b.알림들 || []).forEach((m) => 칸들.push(줄('⚠ ' + _e(m), '#b45309')));
-  칸들.push(줄('<b>고치시려면</b> — <a href="' + 관리화면 + '" style="color:#1b3a6b;font-weight:bold;">뉴스레터 관리</a>'
+  칸들.push(줄('<b>고치시려면</b> — <a href="' + 관리화면 + '" style="color:#1b3a6b;font-weight:bold;">뉴스레터</a>'
     + '에서 고치시면 됩니다. 월요일 보내기 직전에 <b>고치신 내용으로 다시 지어</b> 나갑니다.'));
-  칸들.push(줄('<b>멈추시려면</b> — 뉴스레터 관리 › 설정 › 「월요일 ' + 보내는시각말 + ' 자동발송」을 «꺼짐»으로 바꾸십시오.'));
+  칸들.push(줄('<b>멈추시려면</b> — 뉴스레터 › 설정 › 「월요일 ' + 보내는시각말 + ' 자동발송」을 «꺼짐»으로 바꾸십시오.'));
   const 머리 = '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
     + ' style="background-color:#fdf8ee;border:2px solid #d9c9a8;"><tr><td style="padding:18px 22px;">'
     + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">' + 칸들.join('')
