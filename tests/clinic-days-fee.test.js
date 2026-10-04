@@ -163,6 +163,8 @@ function kboxWithDayFee(dayFee, days) {
     setBriefFor() { return function () {}; },
     setF() {}, vatIncludedHint() {}, vatFocusHint() {}, vatAmountHint() {},
     consTypeDayFee() { return dayFee; },
+    /* 단위·부가세 — 현장클리닉은 일·부가세 별도(기술보호의 회·부가세 없음은 gisul-round-count.test.js 가 본다) */
+    consTypeDayOpt() { return { fee: dayFee, unit: '일', noVat: false }; },
     h(tag, props) { return { tag, props: props || {}, kids: Array.prototype.slice.call(arguments, 2) }; }
   };
   vm.createContext(ctx);
@@ -207,7 +209,8 @@ test('⑧-3 ★ 일수 칸에 3을 넣으면 셈 띠가 실제로 뜬다 (그리
 test('⑨ 잔금에 넣을 때 「부가세포함」도 함께 켠다 — 안 켜면 뒤에서 또 붙는다', () => {
   const apply = cutFn(ERP, 'function _applyDayCalc(');
   assert.match(apply, /successFee:\s*calc\.total/);
-  assert.match(apply, /balanceFeeVatIncluded:\s*true/);
+  /* 부가세 별도(현장클리닉)는 켜고, 부가세 없음(기술보호)은 켜지 않는다 — 켜는 쪽 값은 calc.noVat 의 반대다 */
+  assert.match(apply, /balanceFeeVatIncluded:\s*!calc\.noVat/);
   assert.match(apply, /dayCalc:\s*calc/, '근거를 함께 남긴다');
 });
 
@@ -232,13 +235,15 @@ test('⑫ 씨앗 — 현장클리닉에 1일 단가가 들어 있다 (검사고�
   const seed = ERP_C.slice(ERP_C.indexOf('var BIZ_CONS_SEED = ['),
                            ERP_C.indexOf('var BIZ_FUND_SEED = ['));
   assert.match(seed, /code:'cons-clinic'[^}]*dayFee:350000/, '현장클리닉 1일 350,000원');
-  const others = seed.split('\n').filter(l => /dayFee/.test(l));
-  assert.equal(others.length, 1, '지금 하루 단위로 받는 사업은 현장클리닉 하나뿐이다');
+  /* 2026-10-04 기술보호(1회 300,000원·부가세 없음)가 같은 셈을 쓰게 됐다 — 단가가 있는 씨앗은 «이 둘»뿐이다 */
+  const others = seed.split('\n').filter(l => /dayFee:/.test(l) && !/^\s*\/?\*/.test(l));
+  assert.equal(others.length, 2, '단가가 있는 사업은 현장클리닉(일)과 기술보호(회) 둘뿐이다');
+  assert.match(seed, /code:'cons-techguard'[^}]*dayFee:300000[^}]*dayUnit:'회'[^}]*dayVat:'none'/, '기술보호 1회 300,000원·부가세 없음');
 });
 
 test('⑬ 설정에서 단가를 고칠 수 있다 — 코드에 박아 두지 않았다', () => {
   const ed = stripJs(cutFn(ERP, 'function editType('));
-  assert.match(ed, /df = window\.prompt\('1일 단가/, '✏ 에서 «실제로» 묻는다');
+  assert.match(ed, /df = window\.prompt\('1일(\(또는 1회\))? 단가/, '✏ 에서 «실제로» 묻는다');
   assert.match(ed, /if\(df !== null\) nx\.dayFee = parseInt\(String\(df\)\.replace\(\/\[\^\\d\]\/g, ''\), 10\) \|\| 0;/,
     '비우면 «0 을 적는다» — 칸을 지우면 「안 정했다」가 되어 씨앗 기본값이 다시 올라온다');
   assert.match(ed, /cat\.key === 'consulting'/, '컨설팅 유형에만 묻는다');

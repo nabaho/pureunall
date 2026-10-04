@@ -95,7 +95,7 @@ test('★ 이관된 계약은 예정에서 빠진다 — 컨설팅관리 쪽과 
 });
 test('화면: 컨설팅관리에만 카드가 붙고, 카드는 셈 함수 하나를 쓴다', () => {
   assert.match(src, /props\.sourceKind === 'consulting' && h\(ClinicDayCards,/);
-  assert.match(cutFn('function ClinicDayCards('), /clinicDayCards\(props\.items, dbGet\('contracts', \[\]\), types, fy, consTypeDayFee\)/);
+  assert.match(cutFn('function ClinicDayCards('), /clinicDayCards\(props\.items, dbGet\('contracts', \[\]\), types, fy, consTypeDayFee, prog\.isType, prog\.max\)/);
   assert.match(cutFn('function ClinicDayCards('), /app\.fiscalYearStart/, '회계연도는 앱 설정에서');
 });
 

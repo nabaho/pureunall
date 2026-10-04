@@ -8238,8 +8238,12 @@ function erpDaysForCoType(coId, tid){
 function erpDaysNote(tid, appliedRounds){
   const d = erpDaysForCoType(co_editId, tid);
   if(!d || d === appliedRounds) return '';
+  /* 단위 — 현장클리닉은 «일»(3일 = 3회차), 기술보호는 «회»(3회 = 3회차)로 적혀 있다(2026-10-04).
+     ⚠ 기술보호 계약에 「3일」이라고 읽히면 거짓말이다 — 종류 이름으로 가른다. */
+  const _t = getTypes().find(x=>x.id===tid);
+  const _u = /기술보호/.test((_t && (_t.fullName||_t.name)) || '') ? '회' : '일';
   return `<div class="erp-days-note">
-    📥 푸른이알피 계약에 <b>${d}일</b>이라고 적혀 있습니다 — 지금 이 사업장은 ${appliedRounds>0?appliedRounds+'회차':'무제한'}입니다.
+    📥 푸른이알피 계약에 <b>${d}${_u}</b>${_u==='회'?'라고':'이라고'} 적혀 있습니다 — 지금 이 사업장은 ${appliedRounds>0?appliedRounds+'회차':'무제한'}입니다.
     <button type="button" class="erp-days-btn" onclick="co_rounds['${tid}']=${d};renderCoTypes();">${d}회차로 맞추기</button>
   </div>`;
 }
