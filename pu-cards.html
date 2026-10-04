@@ -16764,10 +16764,12 @@ function mbPopProbe(){
 /* 지난 메일을 실제로 채운다 — 한 번에 다 안 되므로 «이어서» 누르게 된다.
    ⚠ 끝나면 담아 둔 것을 다시 읽는다(_mbOldLoaded 를 풀어서) — 안 그러면 채워 놓고도
      옆줄 통수가 그대로라 「아무 일도 안 했나」가 된다. */
-/* ⚠★ 얼마나 «깊이» 채울지 — 3년(대표 결정 2026-09-10 「3년치까지 채운다」).
-     까닭은 다음메일 자동분류 998/1,000 정리다. 「이 주소는 몇 년째 한 통도 안 왔다」를
-     우리 자료로 말할 수 있어야 잘못 안 지운다. 1년치만으로는 1년에 한 번 오는 곳을 잡는다. */
-const MB_OLD_GOAL = 1095;
+/* ⚠★ 얼마나 «깊이» 채울지 — 10년(대표 지시 2026-10-04 「10년치도 가지고 올 수 있나」).
+     처음에는 3년이었다(2026-09-10) — 다음메일 자동분류 998/1,000 정리 때문이었다.
+     서버는 이미 3650일까지 받는다(backfillMailbox 의 days 한도) — 화면만 3년에 묶여 있었다.
+   ⚠ 10년이 «다 온다»는 약속이 아니다. 다음메일 POP3 가 내주는 것은 3만 통(STAT 실측)이다.
+     그 바닥에 먼저 닿으면 거기가 끝이다 — 그때는 「더 없다」를 그대로 말한다(mbOldHtml). */
+const MB_OLD_GOAL = 3650;
 let _mbFillBusy = false;
 function mbBackfillRun(days){
   if(_mbFillBusy) return;
@@ -16909,6 +16911,13 @@ function mbOldHtml(){
       ${b && !b.busy ? (b.ok
         ? `<div class="mshint" style="padding:8px 0 0">
              ${b.done ? `✅ <b>${Number(b.days||365).toLocaleString()}일까지 채웠습니다.</b>`
+               /* ⚠★ 다음메일이 내주는 목록의 «바닥»에 닿았다 (2026-10-04 10년치) —
+                    한 통도 안 보고(seen·already 0) 아무것도 안 담았는데 목록은 있다.
+                    서버는 done 을 안 세우므로 여기서 안 가르면 「한 번 더 눌러」가
+                    끝없이 나온다. 목표(10년)에 못 미쳐도 거기가 끝이라고 그대로 말한다. */
+               : (Number(b.uidl) > 0 && !Number(b.seen) && !Number(b.already) && !Number(b.got))
+               ? `✅ <b>다음메일이 내주는 가장 옛 메일까지 다 받았습니다.</b>
+                  더 누르셔도 늘지 않습니다${st.oldest ? ` — 가장 오래된 것 <b>${fd(st.oldest)}</b>` : ''}.`
                : '⏸ 예산이 다해 멈췄습니다 — <b>한 번 더 눌러 주세요.</b>'}
              이번에 ${Number(b.got||0).toLocaleString()}통을 담았습니다
              (겹쳐서 건너뛴 것 ${Number(b.skip||0).toLocaleString()}통${
