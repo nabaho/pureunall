@@ -177,6 +177,8 @@ rules.data = {
      법인카드 전체 번호(accounts) · 직원별 급여 바뀌기 전·후 값(payroll_audit_log) · CMS 출금 장부 · 통장 입금 처리 기록 ·
      거래내역 보류·고름·나눔 · 입금자 별칭 · 이체수수료 기억. 자문료 수입은 막혀 있는데 이것들은 열려 있었다.
      쓰는 화면은 모두 이알피 재무·급여 화면뿐이다(2026-10-04 코드 전수 확인) — 재무 권한 없는 직원 일은 안 멈춘다. */
+  /* 재무 전용 휴지통 — 지운 돈 기록(자문료 수입 등)은 여기로. 일반 휴지통(trash_bin)은 업체 기록만 (2026-10-04 보안 점검 — 일반 휴지통(trash_bin, 재직 직원 누구나 읽음)에 지운 자문료 수입 270건이 통째로 있었다) */
+  trash_fin: finOnly,
   payroll_audit_log: finOnly, cms_ledger: finOnly, bank_processed: finOnly, ledger_held: finOnly, ledger_picks: finOnly, ledger_split_recipes: finOnly, payer_aliases: finOnly, finance_bank_fee_last: finOnly, accounts: finOnly,
 
   /* 직원 명부 — 모두 보고, 관리자·위임관리인만 고친다 */

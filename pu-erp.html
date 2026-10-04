@@ -2678,7 +2678,7 @@ function fbShouldSync(k){
 // ── [보안규칙 대비] 재무·급여 키 목록 (Firebase 규칙의 fin 전용 항목과 1:1 동일) ──
 var FB_FIN_KEYS = ['finance_income','finance_expense','finance_invoice','payroll_monthly','payroll_irregular','funds','mgr_rates','pay_items','dc_contributions','retirement_settlements','recurring_expenses','expense_budget','finance_bank_fee',
   /* 2026-10-04 규칙에서 재무 권한자만으로 좁힌 자리 — 재무 권한 없는 기기에 남은 사본도 지운다 */
-  'payroll_audit_log','cms_ledger','bank_processed','ledger_held','ledger_picks','ledger_split_recipes','payer_aliases','finance_bank_fee_last','accounts'];
+  'payroll_audit_log','cms_ledger','bank_processed','ledger_held','ledger_picks','ledger_split_recipes','payer_aliases','finance_bank_fee_last','accounts','trash_fin'];
 
 /* ── 부팅 때 「볼 수 있는 것만」 받기 (설계서 2026-08-16-부팅-받기-줄이기) ──
    실측: 계정 10개 중 재무 권한(fin)은 2개뿐인데, 나머지 8명도 전 직원 급여
@@ -2696,7 +2696,8 @@ var FB_FIN_GATED = ['finance_income','finance_expense','finance_invoice','payrol
   'payroll_irregular','pay_items','dc_contributions','retirement_settlements',
   'recurring_expenses','expense_budget','finance_bank_fee',
   'cms_ledger','ledger_batches','bank_processed','ledger_held','payer_aliases',
-  'ledger_picks','ledger_split_recipes','finance_bank_fee_last','accounts'];   /* 2026-10-04 규칙과 함께 */
+  'ledger_picks','ledger_split_recipes','finance_bank_fee_last','accounts',   /* 2026-10-04 규칙과 함께 */
+  'trash_fin'];
 
 /* 부팅 때 아무에게도 안 받는 키(로그류). 보는·쓰는 화면이 그때 erpEnsureKeys 로 받는다.
    ⚠ payroll_audit_log(133KB)만 넣었다 — closed_archive·audit_log 등은 크기가 작아(합 60KB)
@@ -2710,7 +2711,7 @@ var FB_ALL_SYNC_KEYS = [
   'finance_income','payroll_monthly','attendance_records','my_schedules',
   'leave_grants','leave_of_absence','leave_ledger','mgr_rates','policy_access',
   'biz_case_types','biz_cons_types','biz_fund_types','biz_other_types',
-  'activity_log','trash_bin','consult_logs',
+  'activity_log','trash_bin','trash_fin','consult_logs',
   'user_accounts','user_dir','finance_expense','company_info','my_work_items','my_todos','closed_archive',
   'retirement_settlements','employment_contracts','finance_invoice',
   'recurring_expenses','pay_items','accounts','external_staff',
@@ -3353,7 +3354,7 @@ window.erpBackup = function(){
       'finance_income','payroll_monthly','attendance_records','my_schedules',
       'leave_grants','leave_of_absence','leave_ledger','mgr_rates','policy_access',
       'biz_case_types','biz_cons_types','biz_fund_types','biz_other_types',
-      'activity_log','trash_bin','consult_logs'
+      'activity_log','trash_bin','trash_fin','consult_logs'
     ];
     var backup = { exportedAt: new Date().toISOString(), version: 'v6', data: {} };
     BACKUP_KEYS.forEach(function(k){
@@ -3506,7 +3507,7 @@ var SERVER_BACKUP_KEYS = [
   'finance_income','payroll_monthly','attendance_records','my_schedules',
   'leave_grants','leave_of_absence','mgr_rates','policy_access',
   'biz_case_types','biz_cons_types','biz_fund_types','biz_other_types',
-  'activity_log','trash_bin','consult_logs'
+  'activity_log','trash_bin','trash_fin','consult_logs'
 ];
 /* ── 백업·내보내기에 «담지 않는» 비밀 (2026-09-10 대표 지시 「나스 연결 검토」) ──
    NAS 비밀번호·API 열쇠는 어느 백업에도 안 담는다. 담기면 그 파일을 볼 수 있는 사람이
@@ -3715,7 +3716,7 @@ function _backupKnownKeys(){
      그래서 «백업에 담기는 칸»과 «여기»는 반드시 같이 움직여야 한다.
      2026-09-20 「다담아라」로 co_*_log 를 백업에 담기 시작했는데 여기 없었다 —
      돌연변이 검사가 그 자리에서 잡았다. tests/backup-covers-sync-keys.test.js ⑦ 이 지킨다. */
-  ['bank_ledger_draft','cms_ledger','bank_processed','payer_aliases','activity_log','trash_bin',
+  ['bank_ledger_draft','cms_ledger','bank_processed','payer_aliases','activity_log','trash_bin','trash_fin',
    'consult_logs','my_work_items','my_todos','closed_archive','finance_expense','finance_invoice',
    'user_accounts','user_dir','employment_contracts','payroll_irregular',
    'co_merge_log','co_link_log','co_vat_log'].forEach(function(k){ names[k] = 1; });
@@ -3992,7 +3993,7 @@ async function erpScanLostRecords(){
   });
   // 휴지통(trash_bin)에 담긴 원본 id — 의도적으로 버린 것이므로 "유실"이 아니다
   var trashIds = {};
-  (dbGet('trash_bin', []) || []).forEach(function(t){
+  trashAllRows().forEach(function(t){
     if(t && t.item && t.item.id) trashIds[t.item.id] = true;
   });
 
@@ -4386,7 +4387,7 @@ async function erpDataForensics(keyword){
     });
     // 휴지통 — 의도적 삭제이지만 "어디로 갔나"의 답이 될 수 있으므로 함께 보여준다
     var trash = [];
-    try { trash = dbGet('trash_bin', []) || []; } catch(e){ trash = []; }
+    try { trash = trashAllRows(); } catch(e){ trash = []; }
     (Array.isArray(trash) ? trash : []).forEach(function(t){
       if(!t || !t.item) return;
       var s = '';
@@ -4836,6 +4837,38 @@ window.erpRepairFinanceIncomeIds = function(opts){
      아무도 안 쓰는 표이기도 하다(진짜 일정은 구글에서 온다).
    ⚠ 번호 없는 항목이 하나라도 섞이면 지도형 전환이 꺼지고 통째 저장으로 떨어진다 —
      그래서 dbSet 첫머리의 «번호 붙이기 그물»이 이 표에도 함께 걸리게 된다(그게 맞다). */
+/* ══ 재무 전용 휴지통 (2026-10-04 보안 점검 — 일반 휴지통(trash_bin, 재직 직원 누구나 읽음)에 지운 자문료 수입 270건이 통째로 있었다) ══
+   돈 기록(FB_FIN_KEYS 의 표)을 지울 때는 trash_fin(규칙: 재무 권한자만)에 담는다. trash_bin 에는 업체 기록 등만.
+   ★ 휴지통은 «통째로 읽고-덧붙여-쓰는» 표라 읽기를 막으면 덮어 지운다 — 그래서 막지 않고 «나눈다».
+   ⚠ 재무 권한이 없는 기기는 trash_fin 에 못 쓴다 — 그때는 돈 기록을 trash_bin 에 «그대로 둔다»(잃지 않게).
+     재무 권한 기기가 다음에 열릴 때(fb_initial_done) 옮긴다. */
+var TRASH_FIN_KEY = 'trash_fin';
+function trashKeyFor(storeKey){ return (typeof FB_FIN_KEYS !== 'undefined' && FB_FIN_KEYS.indexOf(storeKey) >= 0) ? TRASH_FIN_KEY : 'trash_bin'; }
+function _trashIsFin(t){ return !!(t && trashKeyFor(t.storeKey) === TRASH_FIN_KEY); }
+function _erpCanFin(){
+  try {
+    var u = (typeof CURRENT_USER !== 'undefined') ? CURRENT_USER : null;
+    if(!u || !u.sid) return false;
+    if(u.isAdmin || u.isSubAdmin) return true;
+    var mine = (dbGet('security_perms', {}) || {})[u.sid] || [];
+    return mine.some(function(id){ return String(id).indexOf('fin/') === 0; });
+  } catch(e){ return false; }
+}
+function _trashFinSplit(v){
+  var fin = v.filter(_trashIsFin);
+  if(!fin.length || !_erpCanFin()) return v;
+  var cur = dbGet(TRASH_FIN_KEY, []) || [];
+  var have = {}; cur.forEach(function(t){ if(t && t.id) have[t.id] = 1; });
+  var add = fin.filter(function(t){ return !have[t.id]; });
+  if(add.length && !dbSet(TRASH_FIN_KEY, add.concat(cur))) return v;   // 못 옮기면 그대로 둔다
+  return v.filter(function(t){ return !_trashIsFin(t); });
+}
+/* 휴지통 두 곳을 함께 — 읽기만 하는 곳(유실 검사·찾기·입금관리 휴지통 목록)이 쓴다 */
+function trashAllRows(){ return [].concat(dbGet('trash_bin', []) || [], dbGet(TRASH_FIN_KEY, []) || []); }
+/* 재무 권한 기기가 열리면 일반 휴지통에 남은 돈 기록을 옮긴다(옛 판 기기가 다시 써 넣은 것까지) */
+try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){
+  try { var tb = dbGet('trash_bin', []) || []; if(_erpCanFin() && tb.some(_trashIsFin)) dbSet('trash_bin', tb); } catch(e){}
+}, 4000); }); } catch(e){}
 var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules'];
 function dbSet(k, v){
   /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
@@ -4856,6 +4889,8 @@ function dbSet(k, v){
   /* 지운 명단 — 합쳐서 없앤 업체는 다시 올리지 않는다(되살림 막기, 2026-09-29, CO_TOMB 머리글).
      ⚠ 이 기기 사본에서도 함께 빠진다 — 저장 «전» 에 걷으므로 로컬·서버가 같은 목록을 본다. */
   if(k === 'companies' && Array.isArray(v) && typeof _coTombStrip === 'function') v = _coTombStrip(k, v);
+  /* 일반 휴지통에 돈 기록이 섞이면 재무 전용 휴지통으로 옮긴다(재무 권한 기기만 — 아니면 그대로 둔다, 잃지 않게) */
+  if(k === 'trash_bin' && Array.isArray(v) && typeof _trashFinSplit === 'function') v = _trashFinSplit(v);
   if(Array.isArray(v) && DIFF_KEYS.indexOf(k) >= 0){
     var _noId = 0;
     v = v.map(function(x){
@@ -27491,7 +27526,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     // 미입금 자문료 정리 (휴지통 이동)
     var cleanupCount = 0;
     if(doCleanup && pendingForCo.length > 0){
-      var trash = dbGet('trash_bin', []);
+      var trash = dbGet(TRASH_FIN_KEY, []) || [];   // 돈 기록 → 재무 전용 휴지통
       var pendingIds = {};
       pendingForCo.forEach(function(fi){ pendingIds[fi.id] = 1; });
       var remaining = allIncomes.filter(function(fi){
@@ -27510,7 +27545,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
         return true;
       });
       dbSet('finance_income', remaining);
-      dbSet('trash_bin', trash);
+      dbSet(TRASH_FIN_KEY, trash);
     }
     setCloseModal(null);
     showToast('종료 처리'+(cleanupCount>0 ? ' / 미입금 '+cleanupCount+'건 정리' : ''));
@@ -53458,11 +53493,12 @@ function IncomePendingTab(props){
   var _pbBox = { border:'1px solid #e2e8f0', borderRadius:'10px', overflow:'auto', background:'#fff',
     maxHeight:(_pbFill.max || 'calc(100vh - 340px)') };
   var tm = useState(false); var trashModalOpen = tm[0]; var setTrashModalOpen = tm[1];
-  var trashItems = dbGet('trash_bin', []);
+  var trashItems = trashAllRows().filter(_trashIsFin);   // 입금관리 휴지통 — 돈 기록만(두 곳 함께)
 
   // ── 휴지통 ──
   function trashAdd(storeKey, item, reason){
-    var trash = dbGet('trash_bin', []);
+    var _tk = trashKeyFor(storeKey);
+    var trash = dbGet(_tk, []) || [];
     trash.unshift({
       id: 'trash-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5) + '-' + Math.random().toString(36).slice(2,5),
       storeKey: storeKey,
@@ -53471,10 +53507,13 @@ function IncomePendingTab(props){
       deletedBy: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.sid : '',
       reason: reason || ''
     });
-    dbSet('trash_bin', trash);
+    dbSet(_tk, trash);
   }
+  /* 이 휴지통 항목이 어느 곳에 있나 — 옮기기 전 옛 자리(trash_bin)에 남아 있을 수도 있다 */
+  function trashWhere(trashId){ var fin = dbGet(TRASH_FIN_KEY, []) || []; return fin.some(function(x){ return x && x.id === trashId; }) ? TRASH_FIN_KEY : 'trash_bin'; }
   function trashRestore(trashId){
-    var trash = dbGet('trash_bin', []);
+    var _tk = trashWhere(trashId);
+    var trash = dbGet(_tk, []) || [];
     var t = trash.find(function(x){return x.id===trashId;});
     if(!t){ showToast('휴지통 항목을 찾을 수 없음'); return; }
     var arr = dbGet(t.storeKey, []);
@@ -53484,14 +53523,15 @@ function IncomePendingTab(props){
     }
     arr.unshift(restored);
     dbSet(t.storeKey, arr);
-    dbSet('trash_bin', trash.filter(function(x){return x.id!==trashId;}));
+    dbSet(_tk, trash.filter(function(x){return x.id!==trashId;}));
     showToast('✓ 복원됨: ' + (restored.companyName || restored.name || '-'));
     refresh();
   }
   async function trashPermanentDelete(trashId){
     if(!(await popConfirm('영구 삭제하시겠습니까? 복원할 수 없습니다.'))) return;
-    var trash = dbGet('trash_bin', []);
-    dbSet('trash_bin', trash.filter(function(x){return x.id!==trashId;}));
+    var _tk = trashWhere(trashId);
+    var trash = dbGet(_tk, []) || [];
+    dbSet(_tk, trash.filter(function(x){return x.id!==trashId;}));
     showToast('🗑️ 영구 삭제됨');
     refresh();
   }

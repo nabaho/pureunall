@@ -33,6 +33,9 @@ const SRC = [
   (app.match(/var LOST_STORE_LABELS = \{[^}]*\};/) || [''])[0],
   (app.match(/var LOST_SCAN_MAX_DAILY = [^;]*;/) || [''])[0],
   (app.match(/var LOST_SCAN_MAX_RECENT = [^;]*;/) || [''])[0],
+  // 휴지통은 두 곳이다(일반 trash_bin · 재무 전용 trash_fin, 2026-10-04) — 유실 검사는 둘 다 «버린 것»으로 본다
+  (app.match(/var TRASH_FIN_KEY = [^;]*;/) || [''])[0],
+  (app.match(/function trashAllRows\(\)\{[^\n]*\}/) || [''])[0],
   fnSlice('function _snapIdIndex(', 'async function _lostLoadSnapKeys('),
   fnSlice('async function _lostLoadSnapKeys(', 'async function _lostSnapEnsureIds('),
   fnSlice('async function _lostSnapEnsureIds(', 'function _lostSnapTs('),
