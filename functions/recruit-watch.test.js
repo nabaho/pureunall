@@ -352,3 +352,81 @@ test('★★ 한 번 돌 때 공인노무사회도 같은 열쇠·같은 자리�
   assert.equal(r.hits[0].org, 'kcplaa');
   assert.equal(r.hits[0].href, 'https://www.kcplaa.or.kr/worker/view/22797?scd=1');
 });
+
+/* ── 시간 셈 (검토 2026-10-04) — 서버는 300초에 끊기고, 끊기면 그날 읽은 것을 하나도 못 남긴다 ── */
+const 한줄 = (t) => '<table><tr><td><a href="/v?1">' + t + '</a></td><td>2026-10-01</td></tr></table>';
+const 판 = (id) => ({ id, org: 'x', name: id, url: 'https://' + id + '.kr/' });
+const 멈춤 = () => new Promise(() => {});   // 영영 답이 없는 게시판
+
+test('★★★ 한 게시판이 «영영» 답이 없어도 나머지는 남는다 — 그 곳만 «너무 오래 걸림»', async () => {
+  const boards = [판('a'), 판('b'), 판('c')];
+  const r = await W.run({ boards, today: '2026-10-02', boardMs: 60, totalMs: 5000,
+    fetchText: (u, b) => b.id === 'b' ? 멈춤() : Promise.resolve(한줄(b.id + ' 컨설턴트 모집 공고')) });
+  assert.deepEqual(r.hits.map((h) => h.board), ['a', 'c']);
+  assert.equal(r.errors.length, 1); assert.equal(r.errors[0].board, 'b');
+  assert.match(r.errors[0].why, /오래 걸려/);
+});
+
+test('★★★ 전체 마감을 넘기면 «못 읽은 곳»은 오류로 적고 끝낸다 — 읽은 것은 남는다', async () => {
+  let 시계 = 0;
+  const boards = [판('a'), 판('b'), 판('c'), 판('d')];
+  const r = await W.run({ boards, today: '2026-10-02', together: 1, totalMs: 100, now: () => 시계,
+    fetchText: async (u, b) => { 시계 += 60; return 한줄(b.id + ' 컨설턴트 모집 공고'); } });
+  /* a(0→60) b(60→120) 는 읽고, c 는 시작할 때 이미 120 > 100 → 못 읽음, d 도 */
+  assert.deepEqual(r.hits.map((h) => h.board), ['a', 'b']);
+  assert.deepEqual(r.errors.map((e) => e.board), ['c', 'd']);
+  r.errors.forEach((e) => assert.match(e.why, /시간이 모자라/));
+  assert.equal(r.checked, 4, '몇 곳을 보려 했는지는 그대로');
+});
+
+test('★★ 몇 곳씩 «함께» 읽는다 — 하나씩 차례로면 17곳이 다 느릴 때 5분을 넘긴다', async () => {
+  let 지금 = 0, 최대 = 0;
+  const boards = ['a', 'b', 'c', 'd', 'e', 'f'].map(판);
+  await W.run({ boards, today: '2026-10-02', together: 3,
+    fetchText: async (u, b) => { 지금++; 최대 = Math.max(최대, 지금); await new Promise((ok) => setTimeout(ok, 15)); 지금--; return 한줄(b.id + ' 모집'); } });
+  assert.equal(최대, 3, '함께 읽는 수가 정한 만큼이어야 한다');
+  assert.ok(W.LIMITS.together >= 2 && W.LIMITS.together <= 6, '기본값은 몇 곳씩');
+  assert.ok(W.LIMITS.totalMs <= 240000, '전체 마감은 300초보다 넉넉히 앞서야 쓸 시간이 남는다');
+});
+
+test('★★ 함께 읽어도 결과 차례는 «게시판 차례» 그대로 — 날마다 같은 답', async () => {
+  const boards = [판('a'), 판('b'), 판('c')];
+  const 늦게 = { a: 30, b: 0, c: 10 };
+  const r = await W.run({ boards, today: '2026-10-02', together: 3,
+    fetchText: async (u, b) => { await new Promise((ok) => setTimeout(ok, 늦게[b.id])); return 한줄(b.id + ' 컨설턴트 모집'); } });
+  assert.deepEqual(r.hits.map((h) => h.board), ['a', 'b', 'c']);
+});
+
+test('★★ 시간이 지나 그만둔 게시판이 «다른 곳을 읽는 사이» 끝나도 그 글은 안 섞인다', async () => {
+  /* ⚠ 윈도 시계는 15ms 단위로 튄다 — 여유를 넉넉히(그만두기 100ms · 빠른 곳 20ms · 늦은 곳 200ms) */
+  const 쉼 = (ms) => new Promise((ok) => setTimeout(ok, ms));
+  /* 차례로(together 1): a 는 100ms 에 그만두고 200ms 에 답 · b 는 그 뒤 100~400ms 동안 돈다 → 모을 때 a 의 답은 이미 왔다 */
+  const r = await W.run({ boards: [판('a'), 판('b')], today: '2026-10-02', together: 1, boardMs: 100,
+    fetchText: async (u, b) => { if (b.id === 'a') { await 쉼(200); } else { await 쉼(20); await 쉼(250); return 멈춤(); } return 한줄(b.id + ' 컨설턴트 모집'); },
+  });
+  assert.deepEqual(r.hits.map((h) => h.board), [], '그만둔 게시판의 늦은 답이 섞였다');
+  assert.deepEqual(r.errors.map((e) => e.board), ['a', 'b']);
+  /* 함께(together 2): a 그만둠(늦은 답 200ms) · b 는 20ms 에 제때 · c 는 300ms 뒤 그만둠 */
+  const r2 = await W.run({ boards: [판('a'), 판('b'), 판('c')], today: '2026-10-02', together: 2, boardMs: 100,
+    fetchText: async (u, b) => { await 쉼(b.id === 'a' ? 200 : b.id === 'b' ? 20 : 300); return 한줄(b.id + ' 컨설턴트 모집'); },
+  });
+  assert.deepEqual(r2.hits.map((h) => h.board), ['b']);
+  assert.deepEqual(r2.errors.map((e) => e.board), ['a', 'c']);
+});
+
+test('★ 제목 «뒤»에 붙는 딱지(마감)·[모집중]도 뗀다 — 같은 글이 두 번 안 들어온다', () => {
+  assert.equal(W.parseRows(한줄('2027년 공정채용 컨설턴트 모집 (마감)'), 'https://a.kr/')[0].title, '2027년 공정채용 컨설턴트 모집');
+  assert.equal(W.parseRows(한줄('2027년 공정채용 컨설턴트 모집[모집중]'), 'https://a.kr/')[0].title, '2027년 공정채용 컨설턴트 모집');
+  /* 괄호 안이 딱지가 아니면 남긴다 */
+  assert.equal(W.parseRows(한줄('강사 모집 (재공고)'), 'https://a.kr/')[0].title, '강사 모집 (재공고)');
+});
+
+test('★★ 서버 — 처음 훑기는 남은 시간이 있을 때만, 그것도 시간 제한을 걸고', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8');
+  const i = src.indexOf('exports.recruitWatch'); const body = src.slice(i, src.indexOf('exports.', i + 30));
+  assert.match(body, /const 시작 = Date\.now\(\)/);
+  assert.match(body, /남은 > 60000/);
+  assert.match(body, /Promise\.race\(\[\s*RecruitWatch\.probeBoard/);
+  /* 읽은 것은 훑기보다 «먼저» 쓴다 — 훑다 끊겨도 그날 결과는 남는다 */
+  assert.ok(body.indexOf('root.update(RecruitWatch.updatesOf') < body.indexOf('probeBoard'), '쓰기가 훑기보다 뒤에 있다');
+});

@@ -99,7 +99,8 @@ function stripTag(t) {
     prev = x;
     x = x.replace(/^(?:새\s*글|NEW|HOT|N)\s+/i, '')
       .replace(/^\[(?:모집\s*중|모집\s*마감|마감|접수\s*중|진행\s*중|종료|공지)\]\s*/, '')
-      .replace(/\s+(?:NEW|N|새\s*글)$/i, '').trim();
+      .replace(/\s+(?:NEW|N|새\s*글)$/i, '')
+      .replace(/\s*[\[(](?:모집\s*중|모집\s*마감|마감|접수\s*중|진행\s*중|종료)[\])]$/, '').trim();
   } while (x !== prev);
   return x;
 }
@@ -175,29 +176,64 @@ function daysBetween(a, b) {
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5);
 }
 
+/* 시간 셈 — 서버는 5분(300초)에 끊긴다. 끊기면 «그날 읽은 것을 하나도 못 남긴다»(쓰기가 맨 끝에 있다).
+   ⚠ 그래서 ①몇 곳씩 함께 읽고 ②한 게시판이 오래 붙잡지 못하게 하고 ③전체 마감을 넘기면 남은 곳은
+     «못 읽음»으로 적고 끝낸다 — 읽은 만큼은 반드시 남는다(검토 2026-10-04). */
+const LIMITS = { together: 4, boardMs: 45000, totalMs: 200000 };
+function 늦으면(ms, why) {
+  let t; const p = new Promise((_, no) => { t = setTimeout(() => no(new Error(why)), Math.max(0, ms)); });
+  return { p, stop: () => clearTimeout(t) };
+}
+
 /* 한 번 돈다. fetchText(url, board) → Promise<string>. 네트워크는 부르는 쪽이 준다(검사에선 가짜) */
 async function run(o) {
   const boards = o.boards || BOARDS, have = o.existing || {}, today = o.today, nowIso = o.nowIso || '';
-  const hits = [], errors = [], counts = {};
-  for (const b of boards) {
-    try {
+  const now = o.now || Date.now, t0 = now();
+  const together = Math.max(1, o.together || LIMITS.together);
+  const boardMs = o.boardMs || LIMITS.boardMs, totalMs = o.totalMs || LIMITS.totalMs;
+  const per = boards.map(() => ({ hits: [], error: null, count: undefined }));
+  let next = 0;
+  async function 일꾼() {
+    while (next < boards.length) {
+      const i = next++;
+      const left = totalMs - (now() - t0);
+      if (left <= 0) { per[i].error = '시간이 모자라 이번엔 못 읽었습니다(다음 날 다시 읽습니다)'; continue; }
+      const 시계 = 늦으면(Math.min(boardMs, left), Math.min(boardMs, left) >= boardMs
+        ? '너무 오래 걸려 그만 읽었습니다(' + Math.round(boardMs / 1000) + '초)'
+        : '시간이 모자라 중간에 그만 읽었습니다');
+      /* ⚠ 결과는 «제때 끝났을 때만» 받아 담는다 — 시간이 지나 그만둔 게시판이 나중에 끝나도 아무 데도 못 쓴다 */
+      try { per[i] = await Promise.race([한곳(boards[i]), 시계.p]); }
+      catch (e) { per[i] = { hits: [], error: String(e && e.message || e).slice(0, 120), count: undefined }; }
+      finally { 시계.stop(); }
+    }
+  }
+  async function 한곳(b) {
+    const out = { hits: [], error: null, count: undefined };
+    {
       const html = await o.fetchText(b.url, b);
       const rows = parseRows(html, b.url);
-      counts[b.id] = rows.length;
-      if (!rows.length) { errors.push({ board: b.id, why: '줄을 하나도 못 뽑았습니다(게시판 모양이 바뀌었을 수 있음)' }); continue; }
+      out.count = rows.length;
+      if (!rows.length) { out.error = '줄을 하나도 못 뽑았습니다(게시판 모양이 바뀌었을 수 있음)'; return out; }
       rows.forEach((r) => {
         if (!pass(b, r.title)) return;
         if (today && daysBetween(r.date, today) > MAX_AGE_DAYS) return;
         const key = keyOf(b.id, r);
         if (have[key]) return;
-        hits.push({ key, board: b.id, org: b.org || orgHint(r.title), boardName: b.name, title: r.title, date: r.date,
+        out.hits.push({ key, board: b.id, org: b.org || orgHint(r.title), boardName: b.name, title: r.title, date: r.date,
           href: r.href || b.page || b.url, at: nowIso });
       });
-    } catch (e) {
-      errors.push({ board: b.id, why: String(e && e.message || e).slice(0, 120) });
     }
+    return out;
   }
-  return { hits, errors, counts, checked: boards.length };
+  await Promise.all(Array.from({ length: Math.min(together, boards.length) }, 일꾼));
+  /* ⚠ 모으는 차례는 «게시판 차례» 그대로 — 함께 읽어도 결과가 날마다 같아야 한다 */
+  const hits = [], errors = [], counts = {};
+  boards.forEach((b, i) => {
+    if (per[i].count !== undefined) counts[b.id] = per[i].count;
+    if (per[i].error) errors.push({ board: b.id, why: per[i].error });
+    else per[i].hits.forEach((h) => hits.push(h));   // (오류 난 곳은 글이 비어 있지만 한 번 더 막아 둔다)
+  });
+  return { hits, errors, counts, checked: boards.length, ms: now() - t0 };
 }
 
 /* 게시판에 맞는 «읽는 손»을 고른다 — login 이 붙은 게시판만 로그인한 손으로.
@@ -254,4 +290,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
+module.exports = { LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
