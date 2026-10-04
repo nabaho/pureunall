@@ -295,6 +295,10 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tile b{display:block;font-size:.84rem;font-weight:600;margin-bottom:2px;line-height:1.2;}
 .tile span{font-size:.7rem;color:var(--mute);line-height:1.3;}
 .tile .newtab{display:none;}
+/* 뉴스레터 경고 (2026-10-04 대표 지시 「뉴스레터 앱에 문제 발생등에 대한 경고 표시」) — 문제가 있을 때만 그린다 */
+.tile .nl-warn{position:absolute;top:6px;right:12px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;
+  background:#dc2626;color:#fff;font-size:.66rem;font-weight:800;line-height:20px;display:flex;align-items:center;
+  justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2);white-space:nowrap}
 /* ── 타일에 붙는 알림 표시 (대표 지시 2026-08-24, 다안) ─────────────────
    ★ 예전에는 화면 왼쪽 «아래 구석» 에 빨간 알약으로 띄웠다. 타일과 떨어져 있어
      어느 프로그램 일인지 바로 안 보였고, 구석을 한 칸 차지했다.
@@ -1386,6 +1390,28 @@ body.portal-mode #moreFab{display:flex;}
   firebase.initializeApp(FB_CONFIG);
   var auth = firebase.auth();
   var db = firebase.database();
+  /* ── 뉴스레터 칸 경고 (대표 지시 2026-10-04 「문제가 발생하면 푸른 통합로그인에 들어갔을때 뉴스레터 앱에
+       문제 발생등에 대한 경고 표시를 해서 검토 할 수 있게 해라」) ──
+     서버 감시꾼이 newsletter/watch/현재 에 «지금 사람이 볼 것»을 세어 둔다. 여기는 그 한 칸만 읽는다(한 번).
+     ⚠ 문제가 없으면 아무것도 안 그린다 — 늘 떠 있는 표시는 곧 아무도 안 본다.
+     ⚠ 관리자만 읽을 수 있는 자리다. 읽기가 막히면(직원) 조용히 넘어간다 — 칸도 관리자에게만 보인다. */
+  function 뉴스레터경고달기(){
+    var t = document.querySelector('a.tile[data-key="news"]');
+    if(!t) return;
+    db.ref('newsletter/watch/현재').once('value').then(function(s){
+      var v = s.val() || {};
+      var n = Number(v.경고수) || 0;
+      var old = t.querySelector('.nl-warn'); if(old) old.remove();
+      if(!n){ delete t.dataset.warnTab; return; }
+      var b = document.createElement('span');
+      b.className = 'nl-warn';
+      b.textContent = '⚠ ' + n;
+      t.appendChild(b);
+      t.dataset.warnTab = 'watch';
+      t.title = '⚠ 뉴스레터 — 확인할 것 ' + n + '건\n· ' + (v.말들 || []).join('\n· ') + '\n\n누르면 「자동화 점검」으로 갑니다';
+      if(t.href && t.href.indexOf('tab=') < 0 && t.href.slice(-1) !== '#') t.href += '&tab=watch';
+    }).catch(function(){});
+  }
   /* 포털 공용 설정(data/app_config) — 대표가 포털 설정에서 넣은 값을 각 앱이 함께 쓴다 */
   try{ db.ref("data/app_config").once("value").then(function(s){
     window.PU_CFG = s.val() || {};
@@ -2708,7 +2734,8 @@ body.portal-mode #moreFab{display:flex;}
         a.addEventListener('click', function(ev){
           ev.preventDefault();
           var _v = Math.floor(Date.now() / 600000);  // 10분 버킷 캐시 우회
-          var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&v=' + _v + extra;
+          var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&v=' + _v + extra
+            + (a.dataset.warnTab ? '&tab=' + a.dataset.warnTab : '');   /* 경고가 있으면 바로 점검 화면으로 */
           openPortalApp(app, url);
         });
       }
@@ -2718,6 +2745,7 @@ body.portal-mode #moreFab{display:flex;}
     // (직원 관리 잠금 타일은 제거 — 기금관리 타일이 그 자리를 대신. 직원 관리 기능은 ERP 내부에 있음)
 
     hideEmptyRows();
+    뉴스레터경고달기();
 
     // 타일 드래그 재배치 + 순서 고정 (사용자별 저장)
     initTileOrder();

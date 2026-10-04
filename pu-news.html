@@ -1046,7 +1046,10 @@ const Core = window.PuNewsCore, Tpl = window.PuNewsTpl, Show = window.PuNewsShow
   지역출처 = window.PuNewsRegionalSources, 지역검토 = window.PuNewsReview;
 var db = null;
 var App = {
-  me: null, isAdmin: false, tab: 'now',
+  me: null, isAdmin: false,
+  /* ★ 포털의 «⚠» 칸을 누르면 ?tab=watch 로 온다 — 자동화 점검부터 연다 (2026-10-04) */
+  tab: (function(){ try{ var t = new URLSearchParams(location.search).get('tab');
+    return ['now','past','note','who','noaddr','res','watch','cfg'].indexOf(t) >= 0 ? t : 'now'; }catch(_){ return 'now'; } })(),
   설정: {}, 회차들: {}, 사업장들: {}, 막은주소: {}, 브리핑: {}, 지역후보: {},
   /* 「따로 더한 분」 — newsletter/더한분들 (대표 지시 2026-09-09).
      ⚠ 사업장 명단과 달리 «사본»이다. 계약이 끝나도 저절로 안 빠진다. */
