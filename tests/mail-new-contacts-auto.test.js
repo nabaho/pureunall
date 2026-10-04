@@ -86,7 +86,7 @@ function box(o) {
   };
   vm.createContext(ctx);
   vm.runInContext(consts, ctx);
-  ['mbNewAskable', 'mnewSentTo', 'mnewSkipFolder', 'mnewDomCo', 'mnewDomTable', 'mnewRows', 'mnewBust',
+  ['mbAutoOther', 'mbNewAskable', 'mnewSentTo', 'mnewSkipFolder', 'mnewDomCo', 'mnewDomTable', 'mnewRows', 'mnewBust',
     'mnewInqTag', 'mnewAutoFill', 'erpUnfillContact', 'mnewUndoOne', 'mnewUndo', 'mnewLink', 'mnewRow']
     .forEach((n) => vm.runInContext(sliceFn(app, (/^(mnewAutoFill|erpUnfillContact|mnewUndoOne|mnewUndo|mnewLink)$/.test(n) ? 'async ' : '') + 'function ' + n + '('), ctx));
   vm.runInContext('var _mnewAutoBusy = false;', ctx);

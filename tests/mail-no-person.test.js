@@ -83,13 +83,15 @@ function load() {
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
 
   /* 칸 둘 — 하나는 업무, 하나는 경조사 */
+  /* ⚠ 경조사 보낸이를 공공(or.kr)·자동발송(service@) 주소로 두지 말 것 — 그런 주소는
+       칸과 상관없이 저절로 「그 밖」이라(2026-10-04) 이 칸이 하는 일을 못 잰다. */
   vm.runInContext([
     "_mbFolders = { inbox:{slug:'inbox',name:'받은메일함',kind:'inbox',total:3},",
     "               gyeong:{slug:'gyeong',name:'13. 경조사·뉴스레터',kind:'custom',total:2} };",
     "_mbMsgs = { inbox:{ '1':{u:1,s:'업무 메일',e:'a@hanbit.co.kr',f:'김민근',d:2,r:1},",
     "                    '2':{u:2,s:'또 하나',e:'b@x.co.kr',f:'홍길동',d:1,r:0} },",
-    "            gyeong:{ '10':{u:10,s:'[결혼] 결혼 알림',e:'service@kcplaa.or.kr',f:'노무사회',d:2,r:0},",
-    "                     '11':{u:11,s:'[訃音] 부고',e:'service@kcplaa.or.kr',f:'노무사회',d:1,r:1} } };",
+    "            gyeong:{ '10':{u:10,s:'[결혼] 결혼 알림',e:'hong@gana-assoc.kr',f:'노무사회',d:2,r:0},",
+    "                     '11':{u:11,s:'[訃音] 부고',e:'hong@gana-assoc.kr',f:'노무사회',d:1,r:1} } };",
     "_mbBins = { b1:{ n:'업무', l:'inbox' }, b2:{ n:'경조사·광고', l:'gyeong' } };",
     '_mbNoWho = {}; _mbPut = {}; _mbHide = {}; _mbOwner = {}; _mbSucc = {};',
     '_mbCo = {}; _mbNotCo = {}; _mbWhoMsg = {}; _mbBizSubs = {}; _mbMeta = {at:1, ok:true};'

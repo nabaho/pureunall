@@ -109,7 +109,7 @@ function load(over){
     ? { 'labor@moel,go,kr':1, 'kcomwel@comwel,or,kr':1, 'fix@moel,go,kr':1 } : o.notco;
   vm.runInContext(
     '_mbFolders = ' + JSON.stringify(FOLDERS) + ';' +
-    '_mbMsgs = ' + JSON.stringify(MSGS) + ';' +
+    '_mbMsgs = ' + JSON.stringify(o.msgs || MSGS) + ';' +
     '_mbBins = {}; _mbPut = {}; _mbHide = {}; _mbSucc = {}; _mbCo = {};' +
     '_mbOwner = ' + JSON.stringify(o.owner || { 'fix@moel,go,kr':'권형하' }) + ';' +
     '_mbNotCo = ' + JSON.stringify(notco) + ';' +
@@ -197,17 +197,54 @@ test('★★ 업무 칸에는 «그대로» 있다 — 담당자 칸은 자리�
 /* ══════ ⑥ 되돌리기 ══════ */
 
 test('★★ 치운 것을 되돌리면 «곧바로» 담당 모름으로 돌아간다', () => {
-  const c = load({ notco:{} });          /* 아무것도 안 치웠다 */
-  assert.equal(c.mbOtherCount().n, 0, '안 치웠는데 「그 밖」에 있습니다');
-  /* 노동청 둘 + 공단 하나 + 모르는곳 하나 = 넷 (박아 둔 것은 담당자 칸으로) */
-  assert.equal(c.mbWhoNoneCount().n, 4,
+  /* 손으로 치울 것은 «공공기관이 아닌» 주소다 — 공공기관은 저절로 「그 밖」이라 */
+  const hid = load({ notco:{ 'who@nowhere,kr':1 } });
+  assert.equal(hid.mbWhoNoneCount().n, 0, '치웠는데 담당 모름에 남았습니다');
+  assert.equal(hid.mbOtherCount().n, 4, '치운 것이 「그 밖」에 안 왔습니다');
+  const c = load({ notco:{} });          /* 되돌렸다 */
+  assert.equal(c.mbWhoNoneCount().n, 1,
     '되돌렸는데 담당 모름으로 안 돌아왔습니다 (' + c.mbWhoNoneCount().n + '통)');
+});
+
+/* ══════ ⑦ 공공기관·자동발송은 «저절로» 그 밖 (대표 승인 2026-10-04) ══════
+   실측 — 담당 모름 4,496통 가운데 공공·협회·학교 1,341 · 자동발송 298. */
+
+test('★★ 공공기관·협회·학교는 «치우지 않아도» 「그 밖」이다', () => {
+  const c = load({ notco:{} });
+  /* 노동청 둘 + 공단 하나 — 박아 둔 fix@moel.go.kr 는 담당자 칸 */
+  assert.equal(c.mbOtherCount().n, 3, '공공기관이 저절로 안 갔습니다 (' + c.mbOtherCount().n + '통)');
+  assert.equal(inBox(c, '@#'), 3, '「그 밖」 칸을 열면 다릅니다');
+  assert.equal(inBox(c, '@?'), 1, '공공기관이 담당 모름에 남았습니다');
+});
+
+test('★★ no-reply 같은 자동발송도 「그 밖」 — 사람 주소는 담당 모름에 남는다', () => {
+  const msgs = { B1: { '1':M(1,'no-reply@gana.kr'), '2':M(2,'newsletter@gana.kr'),
+                       '3':M(3,'hong@gana.kr'), '4':M(4,'reply.hong@gana.kr') } };
+  const c = load({ notco:{}, owner:{}, msgs:msgs });
+  assert.equal(c.mbOtherCount().n, 2, '자동발송이 안 갔습니다');
+  assert.equal(c.mbWhoNoneCount().n, 2, '사람 주소까지 「그 밖」으로 갔습니다 — 고객 메일이 숨습니다');
+});
+
+test('★★ 공공기관이라도 담당자를 정해 두면 «그 사람 칸»이 먼저다', () => {
+  const c = load({ notco:{} });
+  /* fix@moel.go.kr — 사람이 권형하 담당으로 박았다 */
+  assert.ok(inBox(c, '@권형하') >= 1, '정해 둔 담당자 칸에 안 들어갔습니다');
+  const both = c.mbCkRows().filter(v => c.mbRowFits(v, '@권형하') && c.mbRowFits(v, '@#'));
+  assert.equal(both.length, 0, '한 통이 담당자 칸과 「그 밖」에 겹칩니다');
+});
+
+test('★ 📥 새 연락처와 «같은 잣대»다 — 거기서 안 묻는 주소는 이을 길이 없다', () => {
+  const i = src.indexOf('function mbNewAskable(');
+  assert.ok(i > 0, 'mbNewAskable 이 없습니다');
+  const body = src.slice(i, src.indexOf('\nfunction ', i + 10));
+  assert.ok(body.indexOf('mbAutoOther(') > 0, '📥 새 연락처가 다른 잣대를 씁니다 — 두 곳이 어긋납니다');
 });
 
 /* ══════ 화면 ══════ */
 
 test('★★ 옆줄에 「그 밖」 줄이 있다 — 0통이어도 남는다(되돌릴 자리가 여기뿐이다)', () => {
-  const c = load({ notco:{} });          /* 0통 */
+  const c = load({ notco:{}, msgs:{ B1:{ '6':M(6,'who@nowhere.kr') } } });   /* 0통 */
+  assert.equal(c.mbOtherCount().n, 0, '밑그림이 0통이 아닙니다');
   const h = c.mailSideHtml();
   assert.ok(h.indexOf('그 밖') >= 0, '0통이라고 줄이 사라졌습니다 — 되돌릴 자리가 없어집니다');
   assert.ok(h.indexOf(">openMailBox('@#')") >= 0 || h.indexOf("openMailBox('@#')") >= 0,
