@@ -42,8 +42,30 @@ const BOARDS = [
   { id: 'cepa',    org: 'cepa',    name: '충남경제진흥원 공지',       url: 'https://www.cepa.or.kr/notice/notice.do?pm=6&ms=32' },
   /* 목록 머리에 오래된 «고정 공지»가 먼저 온다 — 새 글은 그 아래에 있다(그래도 첫 쪽 안이다) */
   { id: 'sinbo',   org: 'sinbo',   name: '충남신용보증재단 공지',     url: 'https://www.cnsinbo.co.kr/boardCnts/list.do?boardID=134&m=030101&s=cnsinbo' },
-  { id: 'keli',    org: 'keli',    name: '한국고용노동교육원 공지',   url: 'https://www.keli.kr/home/cmmn/bbs/228/list.do' }
+  { id: 'keli',    org: 'keli',    name: '한국고용노동교육원 공지',   url: 'https://www.keli.kr/home/cmmn/bbs/228/list.do' },
+  /* 노사발전재단 — 사업공고/모집 목록은 화면 안 «틀(iframe)» 이 따로 불러온다. 서버는 그 틀 주소를 읽고,
+     사람은 바깥 화면(page)으로 보낸다(틀 주소만 열면 머리·메뉴 없는 맨 목록이 뜬다). */
+  { id: 'nosa',    org: 'nosa',    name: '노사발전재단 사업공고/모집', url: 'https://www.nosa.or.kr/board/bltnMngr?boardId=nosa05&',
+    page: 'https://www.nosa.or.kr/portal/nosa/FoundNews/bizNotice' },
+  /* ★ 공인노무사회 일반 공지 — 노사발전재단 컨설턴트 모집(일터혁신·공무직·공공부문 고용개선·고용구조개선·
+     노동전환)은 재단 게시판이 아니라 «공문»으로 와서 여기 실린다(대표님 서류 폴더의 공문0157·0229 가 그것).
+     실측 2026-10-04: 2015~2026 150건 중 사람 뽑는 글 37건. ⚠ 회원 공지(/bbs/news)는 로그인이 있어야 해 안 읽는다.
+     ⚠ 여러 기관 글이 섞인 게시판이라 org 를 비우고 제목으로 정한다(ORG_HINTS). */
+  { id: 'kcplaa',  org: '',        name: '공인노무사회 공지(기관 모집 공문)', url: 'https://www.kcplaa.or.kr/bbs/notice/list' }
 ];
+
+/* 여러 기관 글이 섞인 게시판(org 가 빈 것)에서 제목으로 기관을 정한다.
+   ⚠ 찾는 말은 js/gov-recruit.js 의 같은 기관과 «글자 하나까지» 같아야 한다 — 다르면 화면의 🆕 가 엉뚱한 줄에 붙는다.
+     functions/recruit-watch.test.js 가 두 쪽 source 를 맞대 본다. 기관을 더할 때도 거기서 그대로 옮긴다. */
+const ORG_HINTS = [
+  ['nosa', /노사발전|고용구조개선|일터혁신|근무혁신|공무직\s*노사|공공부문\s*고용개선|노사협의회\s*구축|고용차별/],
+  ['hrdk', /NCS|공정채용|산업인력공단|HRD\s*전문가/]
+];
+function orgHint(title) {
+  const t = String(title || '');
+  for (const [id, re] of ORG_HINTS) if (re.test(t)) return id;
+  return '';
+}
 
 function clean(s) {
   return String(s == null ? '' : s)
@@ -55,6 +77,20 @@ function clean(s) {
 }
 const DATE = /(20\d{2})\s?[.\-\/년]\s?(\d{1,2})\s?[.\-\/월]\s?(\d{1,2})/;
 function pad(n) { return String(n).padStart(2, '0'); }
+const FILE_NAME = /\.(pdf|hwpx?|xlsx?|docx?|pptx?|jpe?g|png|gif|zip)\s*$/i;
+const FILE_LINK = /href\s*=\s*["'][^"']*(?:cmd=down|filedown|fileMngr|download)/i;
+/* ⚠ 제목 앞뒤에 «잠깐 붙는 딱지»는 뗀다 — 「새글」(LH)·「[모집중]」(신보)·「NEW」는 며칠 뒤 사라지거나 바뀐다.
+     제목이 글의 열쇠(keyOf)에 들어가므로, 떼지 않으면 딱지가 바뀔 때 같은 글이 «새 글»로 또 들어온다. */
+function stripTag(t) {
+  let x = String(t || ''), prev;
+  do {
+    prev = x;
+    x = x.replace(/^(?:새\s*글|NEW|HOT|N)\s+/i, '')
+      .replace(/^\[(?:모집\s*중|모집\s*마감|마감|접수\s*중|진행\s*중|종료|공지)\]\s*/, '')
+      .replace(/\s+(?:NEW|N|새\s*글)$/i, '').trim();
+  } while (x !== prev);
+  return x;
+}
 
 /* 목록 한 쪽 → [{title, date:'YYYY-MM-DD', href}]
    ⚠ 줄 = 표 한 줄(<tr>) 또는 목록 한 칸(<li>). 날짜가 없는 줄(머리줄·메뉴)은 버린다.
@@ -66,12 +102,17 @@ function parseRows(html, base) {
   blocks.forEach((b) => {
     const d = DATE.exec(clean(b)); if (!d) return;
     const mo = +d[2], da = +d[3]; if (mo < 1 || mo > 12 || da < 1 || da > 31) return;
-    let best = null;
+    /* ⚠ 첨부 파일 링크는 제목이 아니다 — 노사발전재단은 줄마다 첨부 목록이 붙고 그 이름이 제목보다 길다
+       (실측: 제목 대신 「붙임. …명단.xlsx」를 잡았다). 파일이 아닌 링크가 «하나도 없을 때만» 파일 이름을 쓴다. */
+    let best = null, bestFile = null;
     for (const m of b.matchAll(/<a\s([^>]*)>([\s\S]*?)<\/a>/gi)) {
-      const t = clean(m[2]).replace(/^제목\s+/, '');
+      const t = stripTag(clean(m[2]).replace(/^제목\s+/, ''));
       if (t.length < 6 || t.length > 160) continue;
+      const file = FILE_NAME.test(t) || FILE_LINK.test(m[1]);
+      if (file) { if (!bestFile || t.length > bestFile.t.length) bestFile = { t, attrs: m[1] }; continue; }
       if (!best || t.length > best.t.length) best = { t, attrs: m[1] };
     }
+    best = best || bestFile;
     if (!best) return;
     let href = '';
     const h = /href\s*=\s*["']([^"']*)["']/i.exec(best.attrs);
@@ -91,9 +132,12 @@ function parseRows(html, base) {
 const WHO = /컨설턴트|전문가|전문위원|자문위원|평가위원|심사위원|외부위원|운영위원|조정위원|인력\s*풀|인력풀|\bpool\b|강사|멘토|현장\s*코치|코칭|외부\s*연구진|연구진|자문단|지원단|상담위원|노무사|위촉직\s*이사|비상임\s*이사|사외\s*이사|임원/i;
 const PICK = /모집|공모|선발|위촉|등록|구성|신청|추천|초빙/;
 const DONE = /결과|명단|합격|발표|개최|선정\s*안내|최종\s*선정|공모전/;
+/* ⚠ 배우러 오는 사람·자리 채우는 사람을 모으는 글 — 공인노무사회 공지에 많다(실측: 「고용노사관계 전문가과정
+     교육생 모집」·「국제심포지엄 참가신청」·「위험성평가 컨설팅 전문가과정 강좌 신청 독려」). */
+const LEARN = /교육생|수강생|참가\s*신청|참석자|심포지엄|세미나|강좌|양성\s*과정|전문가\s*과정|기본\s*과정|시상|자격증|서식/;
 function isRecruit(title) {
   const t = String(title || '');
-  return WHO.test(t) && PICK.test(t) && !DONE.test(t);
+  return WHO.test(t) && PICK.test(t) && !DONE.test(t) && !LEARN.test(t);
 }
 
 function keyOf(board, row) {
@@ -122,8 +166,8 @@ async function run(o) {
         if (today && daysBetween(r.date, today) > MAX_AGE_DAYS) return;
         const key = keyOf(b.id, r);
         if (have[key]) return;
-        hits.push({ key, board: b.id, org: b.org, boardName: b.name, title: r.title, date: r.date,
-          href: r.href || b.url, at: nowIso });
+        hits.push({ key, board: b.id, org: b.org || orgHint(r.title), boardName: b.name, title: r.title, date: r.date,
+          href: r.href || b.page || b.url, at: nowIso });
       });
     } catch (e) {
       errors.push({ board: b.id, why: String(e && e.message || e).slice(0, 120) });
@@ -154,4 +198,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { UA, BOARDS, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, keyOf, run, updatesOf, decode, clean };
+module.exports = { UA, BOARDS, ORG_HINTS, orgHint, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, keyOf, run, updatesOf, decode, clean };
