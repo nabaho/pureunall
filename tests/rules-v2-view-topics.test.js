@@ -326,7 +326,7 @@ test('⑧ 📥 에서 저장(reload)하면 조별 문안에 표시하고, #topic
   assert.ok(route && /topicsCtl\.enter\(\)/.test(route[0]), '★ #topics 에 들어올 때 enter() 로 다시 셈할 길이 없다');
 });
 
-test('⑧ 주소 #topics 는 조별 문안, 그 밖은 모은 자료 — 같은 창, 뒤로가기는 깃발을 든다', () => {
+test('⑧ 주소 #topics 는 조별 문안, #lib 는 모은 자료, 빈 주소는 🏢 사업장 — 같은 창, 뒤로가기는 깃발을 든다', () => {
   // 가르는 함수를 그대로 돌려 본다
   const head = HTML.match(/<script>\s*(window\.RV2_MODE[\s\S]*?)<\/script>/);
   assert.ok(head, '머리에 화면 가르기 손잡이가 있어야 한다');
@@ -334,18 +334,20 @@ test('⑧ 주소 #topics 는 조별 문안, 그 밖은 모은 자료 — 같은 
   ctx.window = ctx; vm.createContext(ctx);
   vm.runInContext(head[1], ctx);
   assert.equal(ctx.RV2_MODE('#topics'), 'topics');
-  assert.equal(ctx.RV2_MODE(''), 'lib');
+  // 빈 주소(타일로 들어옴)는 🏢 사업장 — 대표 결정 2026-10-04 ③-ⓐⓑ 목업 「추천대로」
+  assert.equal(ctx.RV2_MODE(''), 'sites');
   assert.equal(ctx.RV2_MODE('#lib'), 'lib');
   // 뒤로가기 손잡이는 공통 층(pu-back.js)보다 먼저 달린다 — 그래야 깃발이 먼저 선다
   assert.ok(HTML.indexOf("addEventListener('popstate'") < HTML.indexOf('js/pu-back.js'));
   assert.match(head[1], /__puBackNav = true/);
   assert.match(head[1], /addEventListener\('hashchange'/);
-  // 갈래 자리 하나 — 세 갈래 단추(Task 5)에 이 파일의 두 화면 길이 다 있다
+  // 갈래 자리 하나 — 갈래 단추(Task 5)에 이 파일의 화면 길이 다 있다
   //   (두 화면이 같은 단추를 드는지는 tests/rules-merge.test.js 가 본다)
   const nav = HTML.match(/<nav class="rmode"[^>]*>([\s\S]*?)<\/nav>/);
   assert.ok(nav, '머리줄에 갈래 단추가 있어야 한다');
   assert.match(nav[1], /href="rules-v2\.html#lib"/);
   assert.match(nav[1], /href="rules-v2\.html#topics"/);
+  assert.match(nav[1], /href="rules-v2\.html#sites"/);
 });
 
 test('⑧ 화면의 인라인 스크립트는 모두 구문이 맞다', () => {

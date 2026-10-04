@@ -27,6 +27,7 @@
 <script src="js/pu-hwp-keep.js?v=1"></script>
 <script src="js/pu-kordoc-text.js?v=2"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
+<script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
 <script src="vendor/pdf.min.js"></script>
@@ -91,7 +92,7 @@ header .hdr-nav{display:contents}
   header>*{min-width:0}
   header .logo{order:0;width:28px;height:28px;font-size:14px;border-radius:8px}
   header .spacer{display:none}
-  /* 세 갈래 단추(.rmode)가 로고 옆에 들어온 뒤로(2026-10-04) 단계 막대는 «둘째 줄» 몫이다.
+  /* 갈래 단추(.rmode)가 로고 옆에 들어온 뒤로(2026-10-04) 단계 막대는 «둘째 줄» 몫이다.
      안 미루면 둘째 줄에서 단계 막대가 바로가기 띠(.hdr-nav)를 15px 로 짓눌러 ⚖·⋯·← 가 안 보인다(375px 실측). */
   header #stepbar{order:3}
   header .hdr-nav{order:2;display:flex;flex:1 1 0;min-width:0;max-width:100%;
@@ -413,16 +414,17 @@ table.daejo thead th{position:sticky;top:-18px;z-index:3;
   padding:2px 8px 2px 6px;border-radius:8px;background:#f8fafc;border:1px solid var(--line)}
 .tgroup+.tgroup{margin-left:2px}
 .tglbl{font-size:10px;color:var(--mute);letter-spacing:-.2px;flex:0 0 auto;padding-right:1px}
-/* 세 갈래 단추 — rules-v2.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04).
-   ⚠ 1100px 아래에서는 이름을 접고 그림만 남긴다 — 이름까지 펴면 단추 셋이 290px 가까이 먹어
-     머리줄이 가로로 밀린다(1110px 에서 이름 편 채로 딱 맞았다, 실측). 이름은 title 에 있다.
+/* 갈래 단추 — rules-v2.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04, 🏢 사업장을 더해 넷).
+   ⚠ 1200px 아래에서는 이름을 접고 그림만 남긴다 — 이름까지 펴면 단추 셋이 290px 가까이 먹어
+     머리줄이 가로로 밀린다(셋일 때 1110px 에서 이름 편 채로 딱 맞았다, 실측). 이름은 title 에 있다.
+     넷이 되며 «사업장» 한 칸(약 80px, 어림)만큼 접는 폭을 올렸다 — rules-v2.html 은 머리줄이 짧아 1100px 그대로.
      폰에서는 머리줄이 «두 줄만» 쓴다(위 .hdr-nav 주석) — ① 로고·갈래·바로가기 ② 단계 막대. */
 .rmode{display:inline-flex;flex:0 0 auto;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#ffffff}
 .rmode a{padding:5px 12px;font-size:12.5px;color:#475569;white-space:nowrap;text-decoration:none}
 .rmode a+a{border-left:1px solid #cbd5e1}
 .rmode a.on{background:#1e40af;color:#ffffff;font-weight:700}
 .rmode a:not(.on):hover{background:#eff6ff}
-@media(max-width:1100px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
+@media(max-width:1200px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
 /* 단계 막대 — 흐름 넷. 못 가는 단계는 «막지 않고» 흐리게 두고 까닭을 말한다. */
 #stepbar{display:flex;align-items:center;gap:3px;flex:0 0 auto}
 #stepbar button{font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;cursor:pointer;
@@ -815,7 +817,7 @@ table.daejo td.dj2{padding:0}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=16"></script>
+  <script src="js/pu-appbar.js?v=18"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -844,11 +846,11 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
   <div class="logo">푸</div>
   <div class="wm">푸른노무법인<small>PUREUN · LLF</small></div>
   <span class="crumb">› 취업규칙 · 검토·개정</span>
-  <!-- 세 갈래 단추 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
+  <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
        코드는 두 파일(rules.html · rules-v2.html)이지만 사람 눈에는 이 단추 하나로 오간다.
        ⚠ rules-v2.html 머리줄에 «같은 단추»가 있다 — 한쪽만 고치면 오가다 단추가 바뀐다
          (tests/rules-merge.test.js 가 두 벌을 견준다). 같은 창으로 간다(새 창 금지). -->
-  <nav class="rmode" aria-label="취업규칙 갈래"><a href="rules.html" class="on" aria-current="page" title="사업장 규칙 넣기 → 비교 → 고치기 → 신구대조표·신고서류">✏️<span class="rm-t"> 검토·개정</span></a><a href="rules-v2.html#topics" title="조 주제별로 «같은 글끼리» 묶은 문안">📚<span class="rm-t"> 조별 문안</span></a><a href="rules-v2.html#lib" title="메일로 모은 취업규칙 자료(가린 사본)">📥<span class="rm-t"> 모은 자료</span></a></nav>
+  <nav class="rmode" aria-label="취업규칙 갈래"><a href="rules-v2.html#sites" title="거래처마다 취업규칙 이력 — 고르면 그 사업장 개정을 바로 시작">🏢<span class="rm-t"> 사업장</span></a><a href="rules.html" class="on" aria-current="page" title="사업장 규칙 넣기 → 비교 → 고치기 → 신구대조표·신고서류">✏️<span class="rm-t"> 검토·개정</span></a><a href="rules-v2.html#topics" title="조 주제별로 «같은 글끼리» 묶은 문안">📚<span class="rm-t"> 조별 문안</span></a><a href="rules-v2.html#lib" title="메일로 모은 취업규칙 자료(가린 사본)">📥<span class="rm-t"> 모은 자료</span></a></nav>
   <!-- 흐름 넷 — 「내가 어디에 있나」를 말하는 유일한 자리(설계서 §3).
        편집 창 안의 갈래(신구대조·변경 결과…)는 번호를 떼어 이 단계 «안»으로 낮췄다. -->
   <div id="stepbar"></div>
@@ -2219,6 +2221,7 @@ function confirmSwitchDoc(what){
    파일을 올리면 보관함 기록·원본(공용 Firebase)·임시저장·드롭다운 항목이 한꺼번에 생긴다.
    실수로 올렸을 때 그 다섯 가지를 한 번에 지워 올리기 전 상태로 되돌린다. */
 let LAST_UPLOAD=null;   // {key, prevKey, name, id} — id는 첫 보관 시 doSaveArchive가 채운다
+let PENDING_CO=null;    // {site, bizno} — 🏢 사업장의 「파일 올려 개정」(#co=)이 다음 파일 하나에 정해 둔 사업장
 function showUploadUndo(key){
   const pv=$("preview"); if(!pv)return;
   const old=document.getElementById("up-undo"); if(old)old.remove();
@@ -2256,8 +2259,14 @@ async function cancelUpload(){
   resetReviewUI(); updateWorkBadge(); renderDash(); await renderPreview();
   alert("업로드를 취소했습니다.");
 }
-async function loadFile(file){
+/* opts={site,bizno} — 🏢 사업장에서 «사업장이 정해진 채로» 열 때(#open= · #co=).
+   ⚠ 없으면 옛날 그대로 본문에서 사업장명을 찾는다. 성공하면 목록 열쇠를 돌려준다. */
+async function loadFile(file,opts){
   if(!confirmSwitchDoc("새 취업규칙 열기"))return;
+  /* #co= 로 미리 정한 사업장은 «다음 파일 하나»에만 — 쓰고 바로 비운다(다음 파일까지 따라가면 남의 회사로 저장된다).
+     「다른 문서로 바꿀까요」에서 취소했으면 아직 안 쓴 것이니 남겨 둔다(그래서 확인 «뒤»에서 꺼낸다). */
+  opts=opts||PENDING_CO; PENDING_CO=null;
+  { const n=document.getElementById("co-pending"); if(n)n.remove(); }
   const name=file.name, ext=name.toLowerCase().split(".").pop();
   const prevKey=siteSel.value;
   try{
@@ -2290,8 +2299,8 @@ async function loadFile(file){
       if(셈.붙임||셈.띄움)text=lineJoinApply(text,줄표);
       LJ_LEFT=셈.물음;
     }catch(e){ console.warn("줄 정리 건너뜀:",e); }
-    const site=detectSiteName(text);   // 본문에서 사업장명 인식
-    SAMPLES[key]=text; CMT_BY[key]=CMT_CUT; READ_VIA[key]=READ_LAST; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]="";
+    const site=(opts&&opts.site)||detectSiteName(text);   // 정해 온 사업장 → 없으면 본문에서 사업장명 인식
+    SAMPLES[key]=text; CMT_BY[key]=CMT_CUT; READ_VIA[key]=READ_LAST; SITE_MAP[key]=(site?"🏢 "+site:"📄 "+name); SITE_BIZNO[key]=(opts&&opts.bizno)||"";
     SITE_FILE[key]=name; SITE_NAME[key]=site;
     if(pdf){ PDF_URLS[key]=URL.createObjectURL(new Blob([buf],{type:"application/pdf"})); }
     else if(buf) HWP_BUFS[key]=buf;
@@ -2302,11 +2311,13 @@ async function loadFile(file){
     resetReviewUI();await renderPreview();
     autoSaveArchive("업로드");   // 보관함에 자동 저장(검토 전이라도 원본·사업장 보존)
     showUploadUndo(key);         // 실수 되돌리기 안내 — 원본 미리보기 위에 한 줄
+    return key;
   }catch(e){
     if(e instanceof TypeError && ext==="txt"){ // cp949 재시도
       try{ const raw=await file.arrayBuffer();
         const text=new TextDecoder("euc-kr").decode(raw);
-        const key="U"+(++upSeq); SAMPLES[key]=text; SITE_MAP[key]="📄 "+name; SITE_BIZNO[key]="";
+        const key="U"+(++upSeq); SAMPLES[key]=text; SITE_MAP[key]=(opts&&opts.site)?"🏢 "+opts.site:"📄 "+name; SITE_BIZNO[key]=(opts&&opts.bizno)||"";
+        if(opts&&opts.site)SITE_NAME[key]=opts.site;
         const o=document.createElement("option");o.value=key;o.textContent=SITE_MAP[key];
         siteSel.appendChild(o); siteSel.value=key; saveWorkFromUpload(key,null,false); resetReviewUI();renderPreview(); return;
       }catch(_){}
@@ -7832,6 +7843,105 @@ function openRevFromHash(){
 }
 window.addEventListener("hashchange",openRevFromHash);
 openRevFromHash();
+
+/* ══════ 🏢 사업장에서 바로 열기 — #open= · #co= (③-ⓐⓑ 2026-10-04) ══════
+   rules-v2.html 🏢 사업장 화면이 같은 창으로 부른다.
+     · #open=<자료 id>(&nf=1) — 📥 모은 자료의 «메일 원본»을 서버에서 받아, 모을 때 적어 둔 지문(sha)과
+       같을 때만 연다(js/rules-v2/mail-orig.js). 업체가 «확정»(linked)된 자료면 그 업체로 사업장을 정한 채로.
+     · #co=<업체 id>          — 다음에 올리는 파일 하나에 그 사업장을 정해 둔다(PENDING_CO → loadFile).
+   ⚠ 업체는 «id 로만» 찾는다 — 이름으로 맞추지 않는다. 후보(확정 전)면 사업장을 정하지 않고 연다.
+   ⚠ 끝나면 주소의 #… 를 지운다 — 새로고침할 때마다 메일을 다시 받지 않게. */
+const MAIL_FN_BASE="https://asia-northeast3-pureun-erp.cloudfunctions.net/";
+/* openRevFromHash 와 같은 «잠깐 기다리기» — 될 때까지 n번 × ms 마다 다시 본다. 끝내 안 되면 false */
+function libWait(ok,n,ms){
+  return new Promise(res=>{ let t=0;
+    const tick=()=>{ if(ok())return res(true); if(++t>n)return res(false); setTimeout(tick,ms); };
+    tick(); });
+}
+/* 원본 자리 «위»에 한 줄 — #preview 바깥에 단다(미리보기를 다시 그려도 안 지워지게).
+   html 이 비면 그 줄을 걷기만 한다. 글은 부르는 쪽이 escapeH 로 막아 넘긴다. */
+function libNote(id,html,warn){
+  const old=document.getElementById(id); if(old)old.remove();
+  const pv=$("preview"); if(!pv||!html)return null;
+  const n=document.createElement("div"); n.id=id; n.className="sample-banner";
+  n.style.cssText=(warn?"background:#fffbeb;border-color:#fbbf24;color:#854d0e;":"background:#eff6ff;border-color:#bfdbfe;color:#1e40af;")
+    +"display:flex;align-items:center;gap:8px;white-space:nowrap;overflow:hidden";
+  n.innerHTML=html;
+  pv.parentNode.insertBefore(n,pv);
+  return n;
+}
+/* 최종본이 아닌 판을 열었을 때 — showUploadUndo 가 단 줄 바로 아래, 같은 꼴 */
+function showNotFinalNote(){
+  const pv=$("preview"); if(!pv)return;
+  const old=document.getElementById("not-final"); if(old)old.remove();
+  const note=document.createElement("div");
+  note.id="not-final"; note.className="sample-banner";
+  note.style.cssText="background:#fffbeb;border-color:#fbbf24;color:#854d0e;display:flex;align-items:center;gap:8px;flex-wrap:wrap";
+  note.innerHTML=`<span>⚠ 최종본 아님 — 이 회차의 가장 최근 판을 열었습니다(🏢 사업장에서 ★최종본을 정하면 다음부터 그것을 엽니다)</span>
+    <span class="x" id="not-final-x" title="닫기" style="cursor:pointer;color:var(--mute);margin-left:auto">×</span>`;
+  const u=document.getElementById("up-undo");
+  pv.insertBefore(note,(u&&u.parentNode===pv)?u.nextSibling:pv.firstChild);
+  $("not-final-x").onclick=()=>note.remove();
+}
+async function openFromLibrary(hash){
+  const m=/#open=([^&]+)(&nf=1)?/.exec(hash||"");
+  if(!m||openFromLibrary.busy)return;          // 처음 열 때와 hashchange 가 겹쳐도 한 번만 받는다
+  openFromLibrary.busy=true;
+  const clear=()=>history.replaceState(null,"",location.pathname+location.search);
+  try{
+    let id=""; try{ id=decodeURIComponent(m[1]); }catch(_){}
+    if(!await libWait(()=>FBDB&&FBUSER,20,300)){
+      clear(); alert("로그인한 뒤에 열 수 있습니다 — 포털에서 접속해 🏢 사업장에서 다시 눌러 주세요."); return;
+    }
+    let doc=null, human=null;
+    if(id&&!/[.#$\[\]\/]/.test(id)){             // 파이어베이스 열쇠로 못 쓰는 글자면 찾지 않는다
+      const L="rules_mgmt/library/";
+      try{
+        const s=await Promise.all([FBDB.ref(L+"docs/"+id).once("value"),FBDB.ref(L+"human/"+id).once("value")]);
+        doc=s[0].val(); human=s[1].val();
+      }catch(e){ console.warn("모은 자료 읽기 실패:",e); }
+    }
+    if(!doc){ clear(); alert('그 자료를 찾지 못했습니다 — 📥 모은 자료에서 다시 열어 주세요.'); return; }
+    let opts={};
+    if(human&&human.companyLinkStatus==="linked"&&human.companyId){
+      await libWait(()=>ERP_COS.length>0,20,300);   // 업체 목록이 끝내 안 오면 사업장 없이 연다(못 여는 것보다 낫다)
+      const co=ERP_COS.find(c=>String(c.id)===String(human.companyId));
+      if(co)opts={site:co.name||"",bizno:co.bizNo||""};
+    }
+    libNote("lib-fetching","<span>📨 메일에서 원본을 받는 중…</span>");
+    let r=null;
+    try{
+      r=await PuRulesMailOrig.fetchOriginal({doc,
+        call:PuRulesMailOrig.makeCall({base:MAIL_FN_BASE,getToken:()=>firebase.auth().currentUser.getIdToken(),fetch:fetch.bind(window)}),
+        sha256:PuRulesMailOrig.sha256Hex});
+    }finally{ libNote("lib-fetching",""); }
+    clear();
+    // ★ 지문이 맞아 «받았을 때만» 연다 — 이름만 같은 다른 첨부를 원본으로 열지 않는다
+    if(!r||!r.ok){ alert((r&&r.why)||"메일에서 원본을 못 받았습니다."); return; }
+    const key=await loadFile(new File([r.bytes],r.name),opts);
+    if(key&&m[2])showNotFinalNote();
+  }finally{ openFromLibrary.busy=false; }
+}
+async function presetCoFromHash(hash){
+  const m=/#co=([^&]+)/.exec(hash||"");
+  if(!m)return;
+  let id=""; try{ id=decodeURIComponent(m[1]); }catch(_){}
+  history.replaceState(null,"",location.pathname+location.search);
+  await libWait(()=>FBUSER&&ERP_COS.length>0,20,300);
+  const co=id?ERP_COS.find(c=>String(c.id)===id):null;
+  if(!co){ libNote("co-pending","<span>그 사업장을 업체 목록에서 찾지 못했습니다 — 파일을 올리면 본문에서 사업장명을 찾습니다</span>",true); return; }
+  PENDING_CO={site:co.name||"",bizno:co.bizNo||""};
+  const n=libNote("co-pending",`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeH(co.name||"")} 개정 — 파일을 올리세요">🏢 <b>${escapeH(co.name||"")}</b> 개정 — 파일을 올리세요</span>
+    <button class="stbtn" id="co-pending-up" style="margin-left:auto;flex:0 0 auto" title="이 사업장으로 정한 채 파일을 고릅니다(끌어다 놓아도 됩니다)">📂 파일 고르기</button>
+    <span class="x" id="co-pending-x" title="사업장 정하기 그만" style="cursor:pointer;color:var(--mute);flex:0 0 auto">×</span>`);
+  if(n){
+    $("co-pending-up").onclick=()=>$("upload-input").click();
+    $("co-pending-x").onclick=()=>{ PENDING_CO=null; n.remove(); };
+  }
+}
+window.addEventListener("hashchange",()=>{ openFromLibrary(location.hash); presetCoFromHash(location.hash); });
+openFromLibrary(location.hash);
+presetCoFromHash(location.hash);
 
 /* ══════ 조문 검색 — 보관함 전체를 조문 단위로 찾아 비교 ══════
    보관함 한 칸 검색(dashMatch)은 원문을 통짜 문자열로 훑어 '사업장 이름'만 알려주고,

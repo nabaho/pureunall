@@ -2,14 +2,14 @@
 /* 취업규칙 두 앱 합치기 — Task 5 (대표 승인 목업 2026-10-04 「추천대로」)
    ─────────────────────────────────────────────────────────────────────────
    「취업규칙 관리」(rules.html)와 「취업규칙(새)」(rules-v2.html)는 사람 눈에 «한 앱»이다.
-   포털 타일은 「취업규칙」 하나, 앱 머리줄의 «세 갈래 단추»로 오간다.
+   포털 타일은 「취업규칙」 하나, 앱 머리줄의 «갈래 단추»로 오간다(2026-10-04 🏢 사업장을 더해 넷).
    코드는 두 파일로 남는다(그래야 고치기 쉽다) — 그래서 두 파일이 «같은 단추»를 따로 들고 있다.
 
    ★ 못 박는 것 — 값이 아니라 규칙
      ① 포털에는 취업규칙 타일이 «하나» — 둘이면 같은 앱 문이 둘이라 사람이 어느 쪽인지 헷갈린다
      ② 즐겨찾기 목록에도 하나 — 포털과 즐겨찾기가 어긋나면 눌러도 못 가는 줄이 생긴다
      ③ rulesv2 는 «등록은 남고» 타일이 없음을 밝힌다(portal:false) — 등록을 지우면 관문이 저장을 거절한다
-     ④ 두 화면의 세 갈래 단추가 «같다» — 한쪽만 고치면 오가다 단추가 바뀌어 다른 앱처럼 보인다
+     ④ 두 화면의 갈래 단추가 «같다» — 한쪽만 고치면 오가다 단추가 바뀌어 다른 앱처럼 보인다
      ⑤ 준비중 문의 이름이 포털 타일 이름과 짝이다
    ⚠ 단추 글자를 «이 값»으로 박지 않는다 — 두 파일이 서로 «같은가»를 본다. */
 const test = require('node:test');
@@ -43,7 +43,10 @@ test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은
   const 줄 = 취업규칙줄(list);
   assert.equal(줄.length, 1, '★★ 취업규칙 타일이 ' + 줄.length + '개다 — 한 앱의 문이 둘이면 어느 쪽인지 헷갈린다');
   assert.equal(줄[0].key, 'rules');
-  assert.equal(줄[0].url, 'rules.html', '★ 타일은 검토·개정(rules.html)으로 들어온다');
+  // 첫 화면은 🏢 사업장(rules-v2.html) — 타일 주소는 «취업규칙 앱 식구(rules.html·rules-v2.html)» 중 하나여야 한다
+  // (프로그램 등록은 rules.html 그대로 — 갈래 단추가 두 화면을 오간다)
+  assert.equal(줄[0].url, 'rules-v2.html', '★ 타일은 첫 화면 🏢 사업장(rules-v2.html)으로 들어온다'); // 검사고정-허용 — 대표 결정 2026-10-04 「추천」: 첫 화면 = 사업장
+  assert.match(줄[0].url, /^rules(-v2)?\.html(#|\?|$)/, '★ 타일 주소가 취업규칙 앱 식구가 아니다');
   assert.equal(줄[0].name, '취업규칙', '★ 대표 결정 — 포털 타일 이름은 「취업규칙」'); // 검사고정-허용 — 대표 결정 2026-10-04 타일 이름
   assert.ok(!list.some((a) => a.key === 'rulesv2'), '★★ rulesv2 타일이 남았다');
 });
@@ -51,9 +54,11 @@ test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은
 test('②★ 즐겨찾기 목록에도 rulesv2 가 없다 — 포털과 짝', () => {
   const list = 앱바();
   assert.ok(list.length >= 10, '★ 즐겨찾기 목록이 너무 짧다 — 검사가 헛돈다');
-  assert.ok(!list.some((a) => a.key === 'rulesv2' || a.url === 'rules-v2.html'), '★★ 즐겨찾기에 rulesv2 가 남았다');
+  assert.ok(!list.some((a) => a.key === 'rulesv2'), '★★ 즐겨찾기에 rulesv2 가 남았다');
   const 줄 = 취업규칙줄(list);
   assert.equal(줄.length, 1);
+  assert.equal(줄[0].key, 'rules');
+  assert.equal(줄[0].url, 포털().find((a) => a.key === 'rules').url, '★ 포털 타일과 즐겨찾기가 다른 화면으로 간다');
   assert.equal(줄[0].name, 포털().find((a) => a.key === 'rules').name, '★ 포털 타일과 즐겨찾기의 이름이 다르다');
 });
 
@@ -65,11 +70,11 @@ test('③★★ rulesv2 는 등록부에 남고, 타일이 없음을 밝힌다',
   assert.notEqual(O.PROGRAMS.rules.portal, false, '★ 포털 타일인 rules 까지 숨겼다');
 });
 
-/* ── 세 갈래 단추 ── */
+/* ── 갈래 단추 ── */
 function 단추(f) {
   const s = stripComments(R(f));
   const m = s.match(/<nav class="rmode"[^>]*>([\s\S]*?)<\/nav>/);
-  assert.ok(m, '★★ ' + f + ' 머리줄에 세 갈래 단추(nav.rmode)가 없다');
+  assert.ok(m, '★★ ' + f + ' 머리줄에 갈래 단추(nav.rmode)가 없다');
   const links = [...m[1].matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map((x) => ({
     href: (x[1].match(/href="([^"]+)"/) || [])[1],
     on: /class="[^"]*\bon\b/.test(x[1]),
@@ -78,10 +83,10 @@ function 단추(f) {
   return { raw: m[0], links };
 }
 
-test('④★★ 두 화면 머리줄에 세 갈래 단추가 «같게» 있다 — 주소 셋, 이름도 같다', () => {
+test('④★★ 두 화면 머리줄에 갈래 단추가 «같게» 있다 — 주소, 이름, 차례도 같다', () => {
   const a = 단추('rules.html'), b = 단추('rules-v2.html');
   const 주소 = (x) => x.links.map((l) => l.href);
-  ['rules.html', 'rules-v2.html#topics', 'rules-v2.html#lib'].forEach((u) => {
+  ['rules-v2.html#sites', 'rules.html', 'rules-v2.html#topics', 'rules-v2.html#lib'].forEach((u) => {
     assert.ok(주소(a).includes(u), '★★ rules.html 단추에 ' + u + ' 가 없다');
     assert.ok(주소(b).includes(u), '★★ rules-v2.html 단추에 ' + u + ' 가 없다');
   });
@@ -122,4 +127,35 @@ test('⑤★ rules-v2 앱바는 rules 타일을 «지금 앱»으로 켠다', ()
   assert.ok(m, '★ rules-v2 가 앱바에 지금 앱을 알려 주지 않는다');
   assert.ok(앱바().some((a) => a.key === m[1]), '★★ 앱바 목록에 없는 열쇠(' + m[1] + ')로 켠다 — 아무 줄도 안 켜진다');
   assert.equal(m[1], 'rules');
+});
+
+/* ⑥ 타일 주소가 rules-v2.html 이 되어도, ✏️ 검토·개정(rules.html)에서도 「지금 앱」은 취업규칙이다.
+   whoAmI 가 «파일 이름 == 타일 주소» 로만 알아내면 rules.html 쪽이 «어느 앱도 아님» 이 된다. */
+function 앱바열기(pathname) {
+  const win = {};
+  const el = () => ({ style: {}, setAttribute() {}, appendChild() {}, addEventListener() {}, remove() {}, textContent: '' });
+  const ctx = {
+    window: win,
+    document: { createElement: el, querySelector: () => null, readyState: 'loading',
+                body: { appendChild() {} }, addEventListener() {} },
+    localStorage: { getItem: () => null, setItem() {} },
+    setInterval: () => 0, clearInterval() {}, setTimeout: () => 0
+  };
+  win.location = { pathname: pathname, search: '' };
+  ctx.location = win.location;
+  vm.createContext(ctx);
+  vm.runInContext(R('js/pu-appbar.js'), ctx);
+  return win.PuAppBar;
+}
+
+test('⑥★ 취업규칙 앱 식구 두 파일 어느 쪽에서든 지금 앱은 rules', () => {
+  ['/pureunall/rules.html', '/pureunall/rules-v2.html'].forEach((p) => {
+    assert.equal(앱바열기(p).whoAmI(), 'rules', '★★ ' + p + ' 에서 지금 앱을 못 알아낸다 — 보던 화면 기록·켜짐 표시가 빠진다');
+  });
+});
+
+test('⑥★ 앱바 식구 견주기는 Object.prototype 이름을 식구로 읽지 않는다 / 다른 앱은 그대로', () => {
+  assert.equal(앱바열기('/pureunall/constructor').whoAmI(), '');
+  assert.equal(앱바열기('/pureunall/toString').whoAmI(), '');
+  assert.equal(앱바열기('/pureunall/fund.html').whoAmI(), 'fund');
 });

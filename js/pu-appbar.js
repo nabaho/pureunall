@@ -49,8 +49,8 @@
     { key: 'paydata', name: '급여데이터함',  icon: '💼', url: 'pu-paydata.html',     desc: '급여자료 사업장별' },
     { key: 'fund',    name: '기금관리',     icon: '🏦', url: 'fund.html',           desc: '근로복지기금 운영' },
     /* 취업규칙은 한 줄 — 조별 문안·모은 자료(rules-v2.html)는 앱 머리줄의 세 갈래 단추로 간다
-       (두 앱 합치기 2026-10-04). 포털 타일과 짝이다. */
-    { key: 'rules',   name: '취업규칙',      icon: '📋', url: 'rules.html',          desc: '작성·검토·개정·신고' },
+       (두 앱 합치기 2026-10-04). 포털 타일과 짝이다. 첫 화면은 🏢 사업장(2026-10-04 대표 「추천」). */
+    { key: 'rules',   name: '취업규칙',      icon: '📋', url: 'rules-v2.html',       desc: '작성·검토·개정·신고' },
     { key: 'docs',    name: '문서관리',     icon: '📄', url: 'docs-esign.html',     desc: '사건 위임장 · 계약서 양식' },
     { key: 'payroll', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱' },
     { key: 'home',    name: '홈페이지 관리', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },
@@ -361,6 +361,9 @@
     return lastScreen();
   }
 
+  // ⚠ enter.html 의 PORTAL_SAME_APP_FILES 와 «같은 식구»를 말한다 — 늘릴 땐 같이 고친다.
+  var SAME_APP_FILES = { 'rules.html': 'rules' };
+
   /* 주소로 지금 어느 프로그램인지 알아낸다 — 앱이 따로 알려 주지 않아도 되게 */
   function whoAmI() {
     var f = '';
@@ -368,6 +371,9 @@
     for (var i = 0; i < APPS.length; i++) {
       if (APPS[i].url.toLowerCase() === f) return APPS[i].key;
     }
+    /* 같은 앱의 다른 화면 파일 — 타일 주소(rules-v2.html)와 다른 쪽(rules.html ✏️ 검토·개정)에서도
+       「지금 앱」이 취업규칙으로 잡혀야 한다(안 그러면 보던 화면 기록·켜짐 표시가 빠진다). */
+    if (Object.prototype.hasOwnProperty.call(SAME_APP_FILES, f)) return SAME_APP_FILES[f];
     return '';
   }
 
