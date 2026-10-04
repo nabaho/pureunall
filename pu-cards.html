@@ -362,6 +362,9 @@ body:has(.modalbg.open) #pu-version-fab{display:none!important}
   .edit-split .photo-pane img{max-height:none;width:100%}
 }
 .mfoot{display:flex;gap:8px;margin-top:14px}
+/* 명함 상세 아래 단추 — 글이 「원 / 본」 두 줄로 쪼개지지 않게. 많으면(대표·사진첩 원본) 단추째 다음 줄로 */
+#detailM .mfoot{flex-wrap:wrap}
+#detailM .mfoot .btn{white-space:nowrap;padding:13px 8px;flex:1 1 auto}
 .btn{padding:13px;border-radius:12px;font-size:14.5px;font-weight:700;flex:1}
 .btn.primary{background:var(--orange);color:#fff}
 .btn.ghost{background:#1e293b;color:var(--ink)}
@@ -10999,7 +11002,9 @@ function renderList(){
           return `<div class="erpmgr">🏢 ${esc(body)}${more?`<span class="mgx" title="부담당 ${esc(all.slice(1).join(', '))}">+${more}</span>`:''}${rh}</div>`;
         })()}
         ${l1?`<div class="l1">${esc(l1)}</div>`:''}
-        ${l2?`<div class="l2">${esc(l2)}</div>`:''}</div>
+        ${/* 🔗 — PC 표 회사 칸과 «같은 함수». 확정 업체 이름이 명함과 다를 때만 붙는다
+             (2026-10-04 폰 목업에서 폰에만 빠진 것을 봄). 어느 업체인지는 눌러 연 상세의 🏢 줄에 있다. */''}
+        ${l2?`<div class="l2">${isCard?cardPinMark(it):''}${esc(l2)}</div>`:''}</div>
       <div class="thumb"${needFetch?` data-th="${it.id}"`:''}>${th}</div></div>`;
   }
   /* 이 쪽에 보일 것만 그린다 — 6,270장을 통째로 그리면 조각이 37,625개가 되어

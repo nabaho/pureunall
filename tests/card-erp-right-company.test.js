@@ -327,6 +327,16 @@ test('★ 목록 회사 칸 🔗 — 확정 업체 이름이 «다를 때만», 
   assert.equal(w.ctx.cardPinMark(same), '', '이름이 같으면 굳이 안 그린다(칸이 좁다)');
   assert.match(CARDS, /col-company" ondblclick="startCellEdit\(event,'\$\{it\.id\}','company'\)">\$\{cardPinMark\(it\)\}/,
     '★ 목록 회사 칸이 🔗 를 안 그립니다');
+  /* 폰 목록도 «같은 함수»로 — 2026-10-04 폰 목업에서 폰에만 빠진 것을 봤다 */
+  const rl = cutFn(CARDS, 'function renderList(').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.match(rl, /class="l2">\$\{isCard\s*\?\s*cardPinMark\(it\)/, '★ 폰 명함 목록 회사 줄이 🔗 를 안 그립니다');
+});
+
+test('★ 명함 상세 아래 단추 글은 «한 줄» — 「원 / 본」으로 쪼개지지 않는다', () => {
+  /* 2026-10-04 폰 화면(375px)을 실제로 그려 보니 「📥 원본」·「📤 공유」가 두 줄로 쪼개졌다 */
+  const rule = (CARDS.match(/#detailM \.mfoot \.btn\{([^}]*)\}/) || [])[1] || '';
+  assert.match(rule, /white-space:\s*nowrap/, '★ 상세 아래 단추 글이 두 줄로 쪼개집니다');
+  assert.match(CARDS, /#detailM \.mfoot\{[^}]*flex-wrap:\s*wrap/, '★ 단추가 많을 때(대표·사진첩 원본) 넘칠 자리가 없습니다');
 });
 
 test('★★★ ✏ 수정 저장이 확정한 업체 열쇠를 «지우지 않는다» — 저장이 명함을 통째로 덮는다', () => {
