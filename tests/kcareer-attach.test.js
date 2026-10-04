@@ -85,3 +85,41 @@ test('화면 — 기둥 단추 · 창 · PDF 는 목록표+머리표 · 보관�
   assert.match(o.slice(0, 2500), /hasOriginal\(x\.r\)/, '원본 파일이 있는 기록만 후보');
   assert.match(o.slice(0, 2500), /on:!!c\.먼저/, '미리 체크는 셈이 정한 «딱 하나»만');
 });
+
+/* ── 「(첨부 n)」 적기 (대표 «추천대로» 2026-10-04) ── */
+test('⑥ 「(첨부 n)」은 그 줄 «내용» 칸 끝에 — 다른 칸·다른 줄은 안 건드린다', () => {
+  const rows = A.pickRows(A.readTables(실적표));
+  const r = A.markRows(실적표, [{ sig: rows[1].sig, text: '(첨부 2, 3)' }]);
+  assert.equal(r.n, 1);
+  const 다시 = A.pickRows(A.readTables(r.xml));
+  assert.equal(다시[1].content, '단체협약 자문 (첨부 2, 3)');
+  assert.equal(다시[0].content, '고문노무사', '다른 줄은 그대로');
+  assert.equal(다시[1].org, '충청남도청 · 세종시교육청 등', '기관 칸은 그대로');
+});
+
+test('⑥ 두 번 지어도 한 번만 · 예전 번호는 떼고 새 번호', () => {
+  const rows = A.pickRows(A.readTables(실적표));
+  const 한번 = A.markRows(실적표, [{ sig: rows[0].sig, text: '(첨부 1)' }]).xml;
+  const 두번 = A.markRows(한번, [{ sig: rows[0].sig, text: '(첨부 4)' }]).xml;
+  assert.equal(A.pickRows(A.readTables(두번))[0].content, '고문노무사 (첨부 4)', '★ 번호가 쌓이면 「(첨부 1) (첨부 4)」가 됩니다');
+});
+
+test('⑥ 못 찾는 줄 · 빈 표지 → 손대지 않는다', () => {
+  assert.equal(A.markRows(실적표, [{ sig: '1999|없는기관', text: '(첨부 9)' }]).xml, 실적표);
+  assert.equal(A.markRows(실적표, []).xml, 실적표);
+});
+
+test('⑥ 화면 — 창에 「표에 적기」 · 지을 때마다 얹는 표시로 남긴다(도장과 같은 길)', () => {
+  assert.match(SRC, /id="atMark"[^>]*checked/);
+  assert.match(SRC, /function rhAttachMarkZip\(/);
+  const fin = SRC.slice(SRC.indexOf('async function rhFinishZip('), SRC.indexOf('async function rhFinishZip(') + 600);
+  assert.match(fin, /rhAttachMarkZip\(zip\)/, '짓는 길 한 곳에서 얹어야 다시 채워도 남는다');
+  assert.match(SRC, /attachMarks:\(typeof _rhAttachMarks!=='undefined' && _rhAttachMarks\)\|\|null/, '작성 중에 담겨야 이어서 할 때 남는다');
+  assert.match(SRC, /_rhAttachMarks=null;/, '바탕이 바뀌면 놓는다');
+});
+
+test('① 「기관명」 칸만 있는 일반 현황 표는 실적 표가 아니다 (2026-10-04 실측 — 35줄이 잡혔다)', () => {
+  const 현황 = TBL(TR(TC('기 관 명'), TC('푸른노무법인'), TC('사업자 등록번호'), TC('312-81-52792')),
+    TR(TC('대표자명'), TC('권형하'), TC('법인등록번호'), TC('000000-0000000')));
+  assert.equal(A.pickRows(A.readTables(현황 + 실적표)).length, 2, '실적 표 두 줄만');
+});
