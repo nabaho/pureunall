@@ -181,7 +181,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-office-store.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=7"></script>
+<script src="js/pu-office-docs.js?v=8"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -310,7 +310,7 @@ function downloadOriginal(fileId, name) {
 function officeHost() {
   return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
     cards: formCards(),  /* 엑셀 명단 가져오기 — 이알피 업체·기업정보함과 맞춰 보기(읽기만) */
-    download: downloadOriginal, attKey: PuContractForms.attKey, secretMove: secretMoveCall, sentFor: formSentFor,
+    download: downloadOriginal, attKey: PuContractForms.attKey, secretMove: secretMoveCall, sentFor: formSentFor, coLink: formCoLink, coMerge: formCoMerge,
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
@@ -499,6 +499,21 @@ function formSentFor(coName, bz) {
       return Object.keys(v).map(function (id) { return v[id]; });
     });
   }));
+}
+/* 🔗 회사 맞추기·합치기 (기업별 계약서) — 사업자번호 넣기, 두 회사를 한 번에 합치기(PuOfficeDocs.mergePlan) */
+function formCoLink(key, bz) {
+  var d = String(bz || '').replace(/\D/g, '');
+  if (!key || d.length !== 10) return Promise.reject(new Error('사업자번호가 올바르지 않습니다'));
+  return trackedWrite(db.ref('pu_docs/co/' + key + '/bz').set(d));
+}
+async function formCoMerge(fromKey, toKey) {
+  var got = await Promise.all(['co/' + fromKey, 'co/' + toKey, 'co_docs/' + fromKey, 'co_docs/' + toKey, 'co_recs/' + fromKey, 'co_recs/' + toKey].map(function (p) {
+    return db.ref('pu_docs/' + p).once('value').then(function (s) { return s.val(); });
+  }));
+  if (!got[0]) throw new Error('합칠 회사를 찾지 못했습니다 — 이미 합쳐졌을 수 있습니다');
+  var plan = PuOfficeDocs.mergePlan(fromKey, toKey, { from: got[0], to: got[1], fromDocs: got[2] || {}, toDocs: got[3] || {}, fromRecs: got[4] || {}, toRecs: got[5] || {} },
+    { uid: curUser ? curUser.uid : '', name: curUser && curUser.email ? curUser.email.split('@')[0] : '' });
+  return trackedWrite(db.ref('pu_docs').update(plan));
 }
 /* 보낸 사본 — 기업별 서류. 규칙 안의 값만(kind:'co', src:'upload') */
 function formMailKeep(V, file, title) {
