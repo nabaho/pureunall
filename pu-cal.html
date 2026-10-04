@@ -16,7 +16,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=45"></script>
+<script src="js/pu-ontology.js?v=46"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -28,6 +28,8 @@
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
+<script src="js/gov-recruit.js?v=2"></script>
+<script src="js/pu-cal-recruit.js?v=1"></script>
 <script src="js/pu-cal-write.js?v=8"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
@@ -1769,6 +1771,19 @@ function eventsOn(ymd, eumOnly){
         sid:c.sid, text:c.text, time:"", color:c.color, tip:c.tip, movable:false });
     });
   }
+  /* ⑤ 🧑‍💼 컨설턴트 모집 — 대표 «혼자»만 보는 층 (대표 결정 2026-10-04 「구글과 푸른 둘 다」)
+     ⚠ 대표로 로그인했을 때만 gov/{uid}/recruit 를 읽어 둔다(모집받기) — 다른 사람에겐 층이 비어 있다.
+     ⚠ 이알피 일정 표에 쓰지 않는다. 얹어 보이기만 한다(movable:false).
+     ⚠ 이음·구글만 거르개에서는 안 넣는다(④와 같은 까닭). 🔒 개인 거르개에서는 보인다(onlyMe).
+       (아래 사람 거르개도 gcal·eumwork 를 걸러 낸다 — 사번이 아니니까. 겹쳐 두는 것은 뜻을 밝히려는 것이다) */
+  if(!eumOnly && S.filter !== "gcal" && S.filter !== "eumwork" && typeof 모집칩 === "function"){
+    모집칩(ymd).forEach(function(c){
+      if(S.filter && S.filter !== "pureun" && S.filter !== "priv" && S.filter !== "shared" && c.sid !== S.filter) return;
+      out.push({ kind:c.kind, store:"", id:c.kind + ":" + c.date + ":" + c.key, onlyMe:true,
+        rows:c.rows || [], hint:c.hint || [], link:c.url || "",
+        sid:c.sid, text:c.text, time:"", color:c.color, tip:c.tip, movable:false });
+    });
+  }
   if(eumOnly) out = out.filter(function(e){ return e.kind === "eum"; });
   return out;
 }
@@ -1790,8 +1805,8 @@ function passFilter(ev){
   if(f === 'gcal')    return ev.kind === 'gcal';
   if(f === 'eumwork') return ev.kind === 'eum';
   /* 🔒 개인 · 👥 공용 (대표 지시 2026-09-27 「폰에서도 개인과 공용으로 나눠달라」) */
-  if(f === 'priv')    return ev.kind === 'priv';
-  if(f === 'shared')  return ev.kind !== 'priv';
+  if(f === 'priv')    return ev.kind === 'priv' || ev.onlyMe === true;
+  if(f === 'shared')  return ev.kind !== 'priv' && ev.onlyMe !== true;
   return ev.sid === f;
 }
 
@@ -2531,6 +2546,35 @@ function 기한칩(ymd){
   }
   return _기한칩.표[ymd] || [];
 }
+/* 🧑‍💼 컨설턴트 모집 칩 — 대표 개인 클라우드(gov/{uid}/recruit)를 «읽기만» 한다.
+   ⚠ 기관 묶기·모집 달·준비 날 셈은 GovRecruit(js/gov-recruit.js) 한 곳이다 —
+     PuCalRecruit 는 그것을 불러 칩으로 바꿀 뿐이다. 여기서 다시 셈하지 말 것.
+   ⚠ 대표가 아니면 읽지도 않는다. 못 읽으면(권한·그물) 조용히 빈 층 — 달력은 멀쩡해야 한다. */
+var RECRUIT = { data:null, rev:0 };
+var _모집칩 = { 열쇠:"", 표:{} };
+function 모집칩(ymd){
+  if(!RECRUIT.data || typeof PuCalRecruit === "undefined" || typeof GovRecruit === "undefined") return [];
+  var r = 보이는범위();
+  var 열쇠 = r.from + "~" + r.to + "|" + RECRUIT.rev;
+  if(_모집칩.열쇠 !== 열쇠){
+    var 표 = {};
+    try{
+      PuCalRecruit.chips({ recruit:RECRUIT.data, GovRecruit:GovRecruit, from:r.from, to:r.to,
+        sid:(typeof ME !== "undefined" && ME && ME.sid) || "" })
+        .forEach(function(c){ (표[c.date] = 표[c.date] || []).push(c); });
+    }catch(e){ console.warn("[모집 일정] 셈 실패", e && e.message); }
+    _모집칩 = { 열쇠:열쇠, 표:표 };
+  }
+  return _모집칩.표[ymd] || [];
+}
+function 모집받기(){
+  if(!fbDb || !S.uid || typeof PuCalRecruit === "undefined") return Promise.resolve();
+  if(!PuCalRecruit.isOwner(typeof ME !== "undefined" ? ME : null)) return Promise.resolve();
+  return fbDb.ref("gov/" + S.uid + "/recruit").once("value").then(function(snap){
+    RECRUIT.data = snap.val() || null; RECRUIT.rev++;
+    render();
+  })["catch"](function(e){ console.warn("[모집 일정] 못 읽음", e && e.message); });
+}
 
 function monthDates(){
   if(S.view === "day") return [S.date];
@@ -2850,7 +2894,7 @@ function 층상세(ymd, id){
   eventsOn(ymd).forEach(function(x){ if(!것 && x.store === "" && x.id === id) 것 = x; });
   if(!것) return null;
   return { kind:것.kind, title:것.text, color:것.color, date:ymd, end:"",
-    time:"", endAt:0, rows:것.rows || [], hint:것.hint || [], url:"" };
+    time:"", endAt:0, rows:것.rows || [], hint:것.hint || [], url:"", link:것.link || "" };
 }
 /* 공휴일 한 날 → 상세 창에 낼 것 */
 function 공휴일상세(ymd){
@@ -2879,6 +2923,8 @@ function detailHtml(){
     + (d.hint || []).map(function(h){ return '<div class="dhint">' + esc(h) + '</div>'; }).join("")
     + '<div class="mbtns"><span class="sp"></span>'
     + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
+    /* 모집 공지 — http(s) 만(PuCalRecruit.safeUrl 이 거른 값) */
+    + (/^https?:\/\//i.test(d.link || "") ? '<a class="btn ghost" href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a>' : "")
     + '<button class="btn" data-close="1">닫기</button></div></div>';
 }
 /* 「2026-09-16 (수)」 — 상세 창 머리에 쓰는 긴 날짜 */
@@ -3881,6 +3927,10 @@ function start(user){
     S.uid = user.uid;
     try{ S.showGone = localStorage.getItem("pu_cal_gone") === "1"; }catch(_){}
     개인받기();
+    모집받기();
+    /* 정부사업신청에서 고치고 돌아오면 다시 받는다(대표일 때만 — 모집받기 안에서 거른다) */
+    if(!RECRUIT.bound){ RECRUIT.bound = true;
+      document.addEventListener("visibilitychange", function(){ if(!document.hidden) 모집받기(); }); }
     /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
        ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */
     gcalLoad();
