@@ -12567,14 +12567,15 @@ function fdAddrSearch(){
      칸: status · leave_date(탈퇴일) · biz_closed(폐업) · biz_closed_date(폐업일) */
 function _siteStatusBox(s){
   s=s||{}; var closed=(s.status||'active')==='closed', bz=!!s.biz_closed;
-  var lab='style="display:flex;align-items:center;gap:5px;font-weight:400;cursor:pointer"';
+  /* ⚠ .fld 는 세로(column)·작은 글씨(11px) — 여기선 한 줄로 늘어놓는다(목업대로) */
+  var lab='style="display:flex;align-items:center;gap:5px;font-weight:400;cursor:pointer;font-size:13px;color:inherit;margin:0"';
   return '<div class="gridw">'
-    +'<div class="fld full" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center">'
+    +'<div class="fld full" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px">'
       +'<label '+lab+'><input type="radio" name="se-st" id="se-st-active"'+(closed?'':' checked')+' onchange="siteStatusToggle()"> 참여 중</label>'
       +'<label '+lab+'><input type="radio" name="se-st" id="se-st-closed"'+(closed?' checked':'')+' onchange="siteStatusToggle()"> 탈퇴</label>'
       +'<span class="muted">탈퇴일</span><input id="se-leave_date" type="date" value="'+esc(s.leave_date||'')+'" style="width:150px"'+(closed?'':' disabled')+'>'
     +'</div>'
-    +'<div class="fld full" id="se-bizbox" style="display:flex;flex-wrap:wrap;gap:14px;align-items:center;padding:8px 10px;border-radius:8px;background:var(--danger-bg)'+(closed?'':';opacity:.55')+'">'
+    +'<div class="fld full" id="se-bizbox" style="display:flex;flex-direction:row;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px;padding:8px 10px;border-radius:8px;background:rgba(220,38,38,.07)'+(closed?'':';opacity:.55')+'">'
       +'<label '+lab+' title="폐업은 탈퇴한 사업장만 고를 수 있습니다"><input type="checkbox" id="se-biz_closed"'+(bz?' checked':'')+(closed?'':' disabled')+' onchange="siteStatusToggle()"> <span style="color:var(--danger)">폐업</span></label>'
       +'<span style="color:var(--danger)">폐업일</span><input id="se-biz_closed_date" type="date" value="'+esc(s.biz_closed_date||'')+'" style="width:150px"'+(closed&&bz?'':' disabled')+'>'
     +'</div></div>';
