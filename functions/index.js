@@ -1439,8 +1439,12 @@ exports.newsletterWatchSunday = functions
     if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
     const 회차 = await 감시용회차(db, 열쇠);
     const 링크결과 = await NWatch.링크재기(NWatch.편지링크들(회차), fetch);
+    const [판례모음, 지난것] = await Promise.all([
+      db.ref("homepage/newsPrec/모음").once("value"),
+      db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value")]);
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
-      금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() } });
+      금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
+      판례모음: 판례모음.val(), 지난회차들: 지난것.val() });
     await db.ref("newsletter/watch/" + 열쇠 + "/점검").set(Object.assign({ 때: now }, 점검));
     const 이름 = ((회차 || {}).회차 || {}).이름 || 열쇠;
     const m = NWatch.점검표메일짓기(점검, 이름, NF.관리화면, NF.보내는시각말);
@@ -4572,7 +4576,7 @@ async function 자료거리모으기(몇개) {
      편지 짓는 층을 안 고쳐도 되고, 한 꼭지에 섞여 나란히 실린다. */
 const 해석찾을말 = ["근로기준법", "근로자퇴직급여", "산업안전보건법", "노동조합"];
 
-async function 해석거리모으기(몇개) {
+async function 해석거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(6, Number(몇개) || 2));
   let 다 = [];
   for (const w of 해석찾을말) {
@@ -4580,7 +4584,7 @@ async function 해석거리모으기(몇개) {
     catch (e) { console.warn("[해석] " + w + " 를 못 읽었습니다: " + e.message); }
   }
   const out = [];
-  for (const c of 판례부품.해석추리기(다, 몇 * 3)) {
+  for (const c of 판례부품.해석추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
     try {
       const one = 판례부품.해석한건읽기(await 쪽받기(판례부품.해석한건주소(c.일련번호)));
@@ -4596,7 +4600,7 @@ async function 해석거리모으기(몇개) {
 }
 
 /* 법제처에서 노무 판례를 모은다 — 판시사항이 있는 것만 */
-async function 판례거리모으기(몇개) {
+async function 판례거리모으기(몇개, 모아둔것) {
   const 몇 = Math.max(1, Math.min(8, Number(몇개) || 4));
   let 다 = [];
   for (const w of 판례찾을말) {
@@ -4604,7 +4608,7 @@ async function 판례거리모으기(몇개) {
     catch (e) { console.warn("[판례] " + w + " 를 못 읽었습니다: " + e.message); }
   }
   const out = [];
-  for (const c of 판례부품.판례추리기(다, 몇 * 3)) {
+  for (const c of 판례부품.판례추리기(판례부품.안모은것만(다, 모아둔것), 몇 * 3)) {
     if (out.length >= 몇) break;
     try {
       const one = 판례부품.한건읽기(await 쪽받기(판례부품.한건주소(c.일련번호)));
@@ -4706,17 +4710,20 @@ async function 자료판례모아담기(옵션) {
        모양도 같다(갈래:'판례'). 자리를 갈라 두면 화면이 두 곳을 읽어야 한다.
      ⚠ 해석을 먼저 담지 않는다 — 판례가 그 꼭지의 주인이다. 해석은 «보태는» 것이다. */
   try {
-    const 판 = await 판례거리모으기(O.판례몇 || 4);
-    let 해 = [];
-    try { 해 = await 해석거리모으기(O.해석몇 || 2); }
-    catch (e) { console.warn("[해석] 오늘은 못 모았습니다: " + e.message); }
-    const 것들 = 판.concat(해);
+    /* ★ 모아 둔 것을 «먼저» 읽는다 — 이미 있는 것을 빼고 골라야 새 판례에 차례가 온다 */
     const 자리 = db.ref("homepage/newsPrec");
     const 모아둔것 = (await 자리.child("모음").once("value")).val() || {};
+    const 판 = await 판례거리모으기(O.판례몇 || 4, 모아둔것);
+    let 해 = [];
+    try { 해 = await 해석거리모으기(O.해석몇 || 2, 모아둔것); }
+    catch (e) { console.warn("[해석] 오늘은 못 모았습니다: " + e.message); }
+    const 것들 = 판.concat(해);
     const 결과 = 판례부품.모으기(모아둔것, 것들, 오늘);
     const 남길것 = 판례부품.오래된것털기(결과.모음, 오늘, 90);
     await 자리.child("모음").set(남길것);
-    await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length });
+    /* 새것날 — 마지막으로 «새 판례가 들어온 날». 감시꾼이 몇 주째 0건인지 이것으로 본다 */
+    await 자리.update(Object.assign({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length },
+      결과.새로 ? { 새것날: 오늘 } : {}));
     셈.판례새로 = 결과.새로;
     셈.판례쌓임 = Object.keys(남길것).length;
   } catch (e) {
