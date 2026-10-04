@@ -44,6 +44,8 @@ function runApp(seed, opt) {
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
+    + 'kwTog,star,recSeenAll,recFold,popClose,recWatchHits,matPull,get,'
+    + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, opened, toasts };
@@ -290,7 +292,7 @@ test('★★ 마감일 — 적어 두고 그 날 일정 창을 연다, 상태를
   r.api.recSetSt('alio', '');
   assert.equal(r.api.recObj('recruit_log').alio['2026'].due, '2027-01-20', '상태를 비워도 마감일은 남는다');
   r.api.recSetDue('alio', '');
-  assert.equal(r.api.recObj('recruit_log').alio['2026'], undefined, '둘 다 비면 칸을 지운다');
+  assert.equal(r.api.recObj('recruit_log').alio, undefined, '둘 다 비면 칸을 지운다 — 기관 껍데기도 남기지 않는다');
 });
 test('마감일을 안 골랐으면 열지 않고 말한다', () => {
   const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
@@ -326,7 +328,7 @@ test('★★ 서버가 찾은 새 모집 글을 날짜 내림차순으로 보여
   await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
   assert.ok(w.indexOf('외부연구진') < w.indexOf('현장코칭'), '최근 글이 위');
-  assert.match(w, /새 글 <b>2건<\/b>/);
+  assert.match(w, /새 글 2</);
   assert.match(w, /11곳/); assert.match(w, /못 읽은 곳 1\(lh\)/, '고장 난 게시판을 숨기지 않는다');
   assert.match(r.el('recTb').innerHTML, /🆕 새 글/);
   assert.equal(r.api.recNewFor('erc'), true);
@@ -355,8 +357,13 @@ test('★★ ✓ 봤음 — 대표 자리에만 적고 🆕 가 사라진다, �
   await r.api.recWatchPull();
   r.api.recSeen('k1');
   assert.equal(r.api.recNewFor('erc'), false);
-  assert.doesNotMatch(r.el('recTb').innerHTML, /🆕 새 글/);
-  assert.match(r.el('recWatch').innerHTML, /새 글 <b>1건<\/b>/);
+  /* 지방공기업평가원 줄의 🆕 는 사라지고, 아직 안 본 6차산업(agri6) 줄에만 남는다 */
+  const tb = r.el('recTb').innerHTML;
+  const ercRow = tb.split('</tr>').filter((x) => /지방공기업평가원/.test(x))[0] || '';
+  assert.ok(ercRow, '지방공기업평가원 줄이 있어야 한다');
+  assert.doesNotMatch(ercRow, /🆕 새 글/);
+  assert.equal((tb.match(/🆕 새 글/g) || []).length, 1);
+  assert.match(r.el('recWatch').innerHTML, /새 글 1</);
   await new Promise((res) => setTimeout(res, 2800));
   assert.ok(pushed && pushed['recruit/seen'].k1, '다른 기기에서도 봤음이 보여야 한다');
 });
@@ -371,7 +378,8 @@ test('★ 서버가 아직 한 번도 안 돌았으면 그렇다고 말한다', 
   r.api.setFb(fbWith({}), 'U1');
   await r.api.recWatchPull();
   assert.match(r.el('recWatch').innerHTML, /아직 한 번도 안 돌았습니다/);
-  assert.match(r.el('recWatch').innerHTML, /아직 걸린 모집 글이 없습니다/);
+  assert.match(r.el('recWatch').innerHTML, /첫 실행\(아침 7시 20분\) 뒤에 채워집니다/);
+  assert.doesNotMatch(r.el('recWatch').innerHTML, /0곳/, '돌기 전에 「0곳 게시판을 읽습니다」라 하지 않는다');
 });
 test('★ 📅 마감일 — 날짜 꼴이 맞을 때만 구글 일정 창을 연다', async () => {
   const r = runApp({}, { prompts: ['다음주', '2027-01-20'] });
@@ -632,4 +640,124 @@ test('★★★ 받은 «뒤»에 다른 기기가 고친 것도 지킨다 — �
   assert.equal(pushed['recruit/log'].erc && pushed['recruit/log'].erc['2026'].st, '선정', 'PC 가 적은 「선정」을 덮어 지웠다');
   assert.equal(pushed['recruit/log'].alio['2026'].st, '지원함');
   assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '선정', '이 기기에도 들여온다');
+});
+
+/* ═══ 화면 정리 (검토 2026-10-04 ③) — 고친 것마다 «돌려 본다» ═══ */
+test('★★ 한 번도 안 낸 기관이라도 새 모집 글이 걸리면 목록에 보인다 — 🆕 가 갈 자리가 있다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  assert.doesNotMatch(r.el('recTb').innerHTML || (r.api.recDraw(), r.el('recTb').innerHTML), /6차산업|농촌융복합/);
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  const row = r.el('recTb').innerHTML.split('</tr>').filter((x) => /recPrep\('agri6'\)/.test(x))[0] || '';
+  assert.ok(row, '새 글이 걸린 agri6 가 목록에 없다');
+  assert.match(row, /🆕 새 글/);
+  r.api.recSeen('k2');
+  assert.doesNotMatch(r.el('recTb').innerHTML, /recPrep\('agri6'\)/, '본 뒤에는 이력 없는 기관은 다시 빠진다');
+});
+test('★★ 서버가 기관을 못 정한 글은 제목으로 정한다(직접 더한 기관도)', async () => {
+  const w = { last: { at: 'x', checked: 1 }, hits: { a: { key: 'a', board: 'kcplaa', org: '', title: '2027년 대전지방법원 조정위원 모집', date: '2026-12-01' } } };
+  const r = runApp({ recruit_scan: SCAN, recruit_custom: [{ id: 'Cx', name: '대전지방법원', kw: '대전지방법원', what: '조정위원' }] }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(w), 'U1');
+  await r.api.recWatchPull();
+  assert.equal(r.api.recWatchHits()[0].org, 'Cx');
+  assert.equal(r.api.recNewFor('Cx'), true);
+  assert.equal(w.hits.a.org, '', '서버 자료를 고쳐 쓰지 않는다');
+});
+test('★★ 새 글은 30건이 넘어도 «모두» 보이고, 「모두 봤음」 한 번에 다 적힌다', async () => {
+  const hits = {};
+  for (let i = 0; i < 40; i++) hits['h' + i] = { key: 'h' + i, board: 'erc', org: 'erc', title: '모집 글 ' + i, date: '2026-11-' + String(10 + (i % 18)).padStart(2, '0') };
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith({ last: { at: 'x', checked: 1 }, hits }), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.equal((w.match(/<tr/g) || []).length, 40, '새 글 40건이 다 보여야 한다');
+  assert.match(w, /새 글 40건 모두 봤음/);
+  r.api.recSeenAll();
+  assert.equal(r.api.recNewFor('erc'), false);
+  assert.ok(r.toasts.some((t) => /40건을 봤음/.test(t)));
+  const w2 = r.el('recWatch').innerHTML;
+  assert.equal((w2.match(/<tr/g) || []).length, 30, '본 옛 글은 30건까지만');
+  assert.match(w2, /옛 글 10건은 줄였습니다/);
+});
+test('★★ 접는 칸 — 새 글이 있으면 열리고, 사람이 접으면 다시 그려도 접힌 채', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  assert.match(r.el('recWatch').innerHTML, /<details class="recban" open/);
+  r.api.recFold('watch', false); r.api.recDraw();
+  assert.match(r.el('recWatch').innerHTML, /<details class="recban"(?! open)/);
+  r.api.recSeenAll();
+  assert.match(r.el('recWatch').innerHTML, /<details class="recban calm"(?! open)/, '볼 것이 없으면 처음부터 접혀 있다');
+  /* 메일 칸 머리의 「다시 찾기」는 칸을 접지 않는다 */
+  assert.match(require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8'), /event\.preventDefault\(\);event\.stopPropagation\(\);recMailScan\(true\)/);
+});
+test('★★ 올해 칸 — 서류 폴더에 올해 것이 있어도 «고를 수» 있다(선정·탈락을 적는 길)', () => {
+  const scan = SCAN.concat([{ y: '2026', yd: '2026년', name: '2026 경영평가위원모집', dir: true, t: T(2026, 12) }]);
+  const r = runApp({ recruit_scan: scan }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recDraw();
+  const row = r.el('recTb').innerHTML.split('</tr>').filter((x) => /recPrep\('alio'\)/.test(x))[0];
+  assert.match(row, /✓ 폴더에 있음/);
+  assert.match(row, /<select onchange="recSetSt\('alio'/);
+  r.api.recSetSt('alio', '선정');
+  const row2 = r.el('recTb').innerHTML.split('</tr>').filter((x) => /recPrep\('alio'\)/.test(x))[0];
+  assert.match(row2, /<option selected value="선정">/);
+});
+test('★★ 찾는 말을 바꾸면 이미 받은 공고에도 곧바로 댄다 — 알림은 하나', () => {
+  /* 「보관창고 용역」은 어느 찾는 말에도 안 맞는다 — 찾는 말을 바꾸는 순간 걸러져 숨겨져야 한다(예전엔 새로 받기 전까지 그대로) */
+  const r = runApp({ feed: [{ id: 'G1', no: 'A', nm: '보관창고 용역', org: '어느 기관', type: '새 공고' }] });
+  r.api.kwTog('조직진단');
+  const a = r.api.get('feed')[0];
+  assert.equal(a.hidden, true); assert.equal(a.ruleOut, true);
+  assert.equal(r.toasts.length, 1, '알림이 둘 뜨면 안 된다'); assert.match(r.toasts[0], /숨겼습니다/);
+  /* 바뀐 것이 없을 때는 «새로 받기부터 새 기준»이라 말한다 */
+  r.api.kwTog('조직진단');
+  assert.equal(r.toasts.length, 2); assert.match(r.toasts[1], /찾는 말이 바뀌었습니다/);
+  assert.match(r.el('cnt').textContent, /숨김 1건/, '목록도 곧바로 다시 그린다');
+});
+
+test('★★ ★ 를 풀면 «원래 상태»로 — 「지원함」이 「새 공고」로 바뀌지 않는다', () => {
+  const r = runApp({ feed: [{ id: 'G1', no: 'A', nm: 'x', type: '지원함' }, { id: 'G2', no: 'B', nm: 'y', type: '새 공고' }] });
+  r.api.star('G1'); assert.equal(r.api.get('feed')[0].type, '관심');
+  r.api.star('G1'); assert.equal(r.api.get('feed')[0].type, '지원함');
+  assert.equal(r.api.get('feed')[0].prevType, undefined, '표시를 남기지 않는다');
+  r.api.star('G2'); r.api.star('G2'); assert.equal(r.api.get('feed')[1].type, '새 공고');
+});
+test('★★ 서류 준비 — 늦게 끝난 점검은 «다른 기관 창»에 그려지지 않고, 다시 열면 보인다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recPrep('erc');
+  let 풀기;
+  const file = { name: '이력서.txt', size: 10, arrayBuffer: () => new Promise((ok) => { 풀기 = () => ok(new TextEncoder().encode('이력서 권형하').buffer); }) };
+  const p = r.api.recCheckRun('erc', [file]);
+  r.api.popClose(); r.api.recPrep('alio');          /* 읽는 사이 다른 기관 창을 연다 */
+  r.el('recChkOut').innerHTML = '';
+  풀기(); await p;
+  assert.equal(r.el('recChkOut').innerHTML, '', '지방공기업평가원 점검이 경영평가 창에 그려졌다');
+  r.api.popClose(); r.api.recPrep('erc');
+  assert.match(r.el('recChkOut').innerHTML, /이력서\.txt/, '다시 열면 지난 점검이 보여야 한다');
+  /* 같은 파일을 다시 고를 수 있게 고르개를 비운다 */
+  assert.match(r.el('popBody').innerHTML, /recCheckRun\('erc',this\.files\);this\.value=''/);
+});
+test('★ 마감일을 고르면 적었다고 말한다 — 캘린더 단추로 적을 때는 조용히', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recSetDue('alio', '2027-01-20');
+  assert.ok(r.toasts.some((t) => /2027-01-20로 적었습니다/.test(t)));
+  const n = r.toasts.length;
+  r.el('recDue').value = '2027-01-21'; r.api.recCalDue('alio');
+  assert.equal(r.toasts.length, n);
+});
+test('★ 서류 준비 창의 폴더 단추는 「📂 폴더 열기」', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recPrep('erc');
+  assert.match(r.el('popBody').innerHTML, /📂 폴더 열기/);
+  assert.doesNotMatch(r.el('popBody').innerHTML, /안 보기/);
+});
+test('★★ 신청 재료를 다시 받으면 고른 것·쪽을 비운다 — 줄 번호가 바뀌어 엉뚱한 줄이 골라진다', async () => {
+  const r = runApp({});
+  r.api.matSet({ cert: { 3: 1 } }, { cert: 2 });
+  const db = { ref: () => ({ once: () => Promise.resolve({ val: () => null }) }) };
+  r.api.setFb(db, 'U1');
+  await r.api.matPull();
+  const st = r.api.matState();
+  assert.equal(Object.keys(st.sel).length, 0, '옛 줄 번호로 고른 것이 남았다');   /* vm 안 객체라 deepEqual 대신 열쇠 수 */
+  assert.equal(st.page.cert, undefined, '옛 쪽 번호가 남았다');
 });
