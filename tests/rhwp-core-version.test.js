@@ -21,20 +21,22 @@ const Hwp = require(path.join(root, 'js', 'pu-hwp-engine.js'));
 const rules = fs.readFileSync(path.join(root, 'rules.html'), 'utf8');
 const erp = fs.readFileSync(path.join(root, 'pu-erp.html'), 'utf8');
 
+const D = Hwp.CORE_VERSION;
 test('★ 판 번호는 한 곳에만 적는다', () => {
-  assert.equal(Hwp.CORE_VERSION, '0.8.4');
+  assert.equal(Hwp.CORE_VERSION, '0.8.6');   // 검사고정-허용: 0.8.4 는 표 칸 안 도장을 칸 맨 위에 그렸다(2026-10-04) — 낮추면 그 버그가 돌아온다
 });
 
 test('★ 브라우저에 적힌 것이 없으면 기본 판을 쓴다', () => {
-  assert.equal(Hwp.pickVer(null), '0.8.4');
-  assert.equal(Hwp.pickVer(undefined), '0.8.4');
-  assert.equal(Hwp.pickVer(''), '0.8.4');
+  assert.equal(Hwp.pickVer(null), D);
+  assert.equal(Hwp.pickVer(undefined), D);
+  assert.equal(Hwp.pickVer(''), D);
 });
 
 test('★ 브라우저에 옛 판이 적혀 있어도 기본 판으로 올라간다 — 이게 핵심이다', () => {
-  assert.equal(Hwp.pickVer('0.7.19'), '0.8.4',
+  assert.equal(Hwp.pickVer('0.7.19'), D,
     '저장값을 그대로 쓰면 한 번 0.7.19 가 적힌 브라우저는 영영 · 를 못 봅니다');
-  assert.equal(Hwp.pickVer('0.6.0'), '0.8.4');
+  assert.equal(Hwp.pickVer('0.6.0'), D);
+  assert.equal(Hwp.pickVer('0.8.4'), D, '도장 자리가 틀리던 판이 적혀 있어도 올라간다');
 });
 
 test('★ 브라우저 쪽이 더 새것이면 그것을 지킨다 — 자동 갱신을 되돌리지 않는다', () => {
@@ -43,7 +45,7 @@ test('★ 브라우저 쪽이 더 새것이면 그것을 지킨다 — 자동 �
 });
 
 test('같은 판이면 그대로', () => {
-  assert.equal(Hwp.pickVer('0.8.4'), '0.8.4');
+  assert.equal(Hwp.pickVer(D), D);
 });
 
 test('★ 자리별 숫자로 견준다 — 글자로 견주면 0.10.0 이 0.9.9 보다 낮아진다', () => {
@@ -54,7 +56,7 @@ test('★ 자리별 숫자로 견준다 — 글자로 견주면 0.10.0 이 0.9.9
 
 test('이상한 값이 적혀 있으면 기본 판으로 물러난다', () => {
   ['최신', 'v0.8.4', '0.8.4-beta', '  ', 'null'].forEach(bad => {
-    assert.equal(Hwp.pickVer(bad), '0.8.4', '이상한 값: ' + JSON.stringify(bad));
+    assert.equal(Hwp.pickVer(bad), D, '이상한 값: ' + JSON.stringify(bad));
   });
 });
 

@@ -38,7 +38,7 @@ test.afterEach(() => { delete global.localStorage; delete global.PureunHwp; });
 test('★ CDN 을 먼저, 저장소 사본을 나중에 — 순서가 뒤바뀌면 옛 판을 계속 쓴다', () => {
   const c = freshEngine().coreCandidates();
   assert.equal(c.length, 2);
-  assert.match(c[0], /cdn\.jsdelivr\.net\/npm\/@rhwp\/core@0\.8\.4\/rhwp\.js$/);
+  assert.equal(c[0], 'https://cdn.jsdelivr.net/npm/@rhwp/core@' + freshEngine().CORE_VERSION + '/rhwp.js');
   assert.match(c[1], /vendor\/rhwp-core\/rhwp\.js$/);
 });
 
@@ -54,7 +54,7 @@ test('★ 브라우저에 더 새 판이 적혀 있으면 그 판을 CDN 에서 
 
 test('★ 브라우저에 옛 판이 적혀 있어도 기본 판을 받는다 — pickVer 와 같은 규칙', () => {
   const c = freshEngine('0.7.19').coreCandidates();
-  assert.match(c[0], /@rhwp\/core@0\.8\.4\//);
+  assert.ok(c[0].indexOf('@rhwp/core@' + freshEngine().CORE_VERSION + '/') > 0, c[0]);
 });
 
 test('★ CDN 을 끄면 저장소 사본만 쓴다 — CDN 이 응답을 물고 늘어지는 망을 위한 탈출구', () => {
@@ -65,13 +65,14 @@ test('★ CDN 을 끄면 저장소 사본만 쓴다 — CDN 이 응답을 물고
 
 test('CDN 주소를 갈아끼울 수 있다', () => {
   const c = freshEngine().coreCandidates({ cdnBase: 'https://unpkg.com/@rhwp/core' });
-  assert.match(c[0], /^https:\/\/unpkg\.com\/@rhwp\/core@0\.8\.4\/rhwp\.js$/);
+  assert.equal(c[0], 'https://unpkg.com/@rhwp/core@' + freshEngine().CORE_VERSION + '/rhwp.js');
 });
 
 test('★ 쓰는 판을 물어볼 수 있다 — 화면에 무엇으로 그렸는지 밝힐 수 있어야 한다', () => {
-  assert.equal(freshEngine().activeVersion(), '0.8.4');
+  const D = freshEngine().CORE_VERSION;
+  assert.equal(freshEngine().activeVersion(), D);
   assert.equal(freshEngine('0.9.2').activeVersion(), '0.9.2');
-  assert.equal(freshEngine('0.7.19').activeVersion(), '0.8.4');
+  assert.equal(freshEngine('0.7.19').activeVersion(), D);
 });
 
 /* ── 배선 ── */
