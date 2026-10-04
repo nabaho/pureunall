@@ -261,6 +261,18 @@
     });
   }
 
+  /* 「모두 처리 완료」 한 번에 쓸 칸들 — 한 건씩 누르던 것과 «같은 세 칸»(status·resolvedAt·resolvedBy)만 바꾼다.
+     ⚠ 알림 자체는 지우지 않는다(기록은 남는다). */
+  function resolveAllPatch(items, now, me) {
+    var up = {};
+    (items || []).forEach(function (it) {
+      if (!it || !it.uid || !it.id) return;
+      var p = 'systemAlerts/' + it.uid + '/' + it.id + '/';
+      up[p + 'status'] = 'resolved'; up[p + 'resolvedAt'] = now; up[p + 'resolvedBy'] = me;
+    });
+    return up;
+  }
+
   function renderAdminPanel(app) {
     var old = window.document.getElementById('pu-health-panel');
     if (old) old.remove();
@@ -271,9 +283,32 @@
     box.style.cssText = 'width:min(680px,100%);max-height:min(720px,90vh);overflow:auto;background:#fff;border-radius:16px;padding:18px;color:#172033;box-shadow:0 20px 60px #0005;';
     var title = window.document.createElement('div');
     title.style.cssText = 'display:flex;justify-content:space-between;align-items:center;font-weight:900;font-size:17px;margin-bottom:12px;';
-    title.innerHTML = '<span></span><button type="button" aria-label="닫기" style="border:0;background:#eef2f7;border-radius:8px;padding:6px 10px;cursor:pointer">닫기</button>';
+    title.innerHTML = '<span></span><span style="display:flex;gap:6px;align-items:center">'
+      + '<button type="button" data-all="1" style="border:0;background:#17365f;color:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;font-weight:700">모두 처리 완료</button>'
+      + '<button type="button" aria-label="닫기" style="border:0;background:#eef2f7;border-radius:8px;padding:6px 10px;cursor:pointer">닫기</button></span>';
     var titleText = title.querySelector('span');
-    title.querySelector('button').onclick = function () { panel.remove(); };
+    title.querySelector('[aria-label="닫기"]').onclick = function () { panel.remove(); };
+    /* 「모두 처리 완료」 — 한 건씩 누르던 것을 한 번에 (대표 지시 2026-10-04 「처리완료 한번에 모두 클릭하는 버튼 만들어라」).
+       ★ 창에 그린 30건이 아니라 «열린 장애 알림 전부»를 바꾼다 — 화면 밖 것이 남으면 빨간불이 그대로다.
+       ★ 한 번의 update 로 쓴다 — 반쯤 되고 멈추는 일이 없다(전부 되거나 전부 안 된다).
+       ⚠ 지우지 않는다 — 한 건씩과 같이 status 만 resolved 로 바꾼다. 기록은 남는다. */
+    var allBtn = title.querySelector('[data-all]');
+    if (!adminAlerts.length) allBtn.style.display = 'none';
+    allBtn.onclick = function () {
+      var items = adminAlerts.slice();
+      if (!items.length) return;
+      if (!window.confirm('장애 알림 ' + items.length + '건을 모두 «처리 완료»로 바꿉니다.\n(지우지 않습니다 — 기록은 남습니다)')) return;
+      allBtn.disabled = true; allBtn.textContent = '처리 중…';
+      app.database().ref().update(resolveAllPatch(items, Date.now(), app.auth().currentUser.uid)).then(function () {
+        adminAlerts = adminAlerts.filter(function (x) { return !items.some(function (y) { return y.uid === x.uid && y.id === x.id; }); });
+        knownOpen = adminAlerts.length;
+        paintAdminBadge(window.document.getElementById('pu-health-admin-badge'));
+        panel.remove();
+      }).catch(function () {
+        // 못 바꿨으면 다시 누를 수 있어야 한다 — 영영 잠긴 단추를 남기지 않는다
+        allBtn.disabled = false; allBtn.textContent = '처리 실패 — 다시';
+      });
+    };
     box.appendChild(title);
     if (!adminAlerts.length) {
       var empty = window.document.createElement('p'); empty.textContent = '처리할 장애 알림이 없습니다.'; box.appendChild(empty);
@@ -356,6 +391,6 @@
 
   /* openAdminPanel — 늘 떠 있는 단추 없이도 관리자가 들여다볼 수 있는 유일한 문.
      포털 [⚙ 설정] 안의 「시스템 장애 알림」 줄이 이것을 부른다. */
-  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _readAdminAlerts: readAdminAlerts, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
+  window.PUHealth = { install: install, report: enqueue, flush: flush, openAdminPanel: showAdminPanel, _readAdminAlerts: readAdminAlerts, _resolveAllPatch: resolveAllPatch, _flattenAlerts: flattenAlerts, _isNoise: isNoise };
   install();
 })(typeof window !== 'undefined' ? window : null);

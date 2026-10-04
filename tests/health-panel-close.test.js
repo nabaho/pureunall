@@ -41,7 +41,8 @@ t('실패한 줄을 지우지 않는다 — row.remove() 는 성공했을 때만
   /\.then\(function \(\) \{\n\s*row\.remove\(\);/.test(src), true);
 
 console.log('\n■ 닫기 단추는 그대로');
-t('닫기로도 닫힌다', /title\.querySelector\('button'\)\.onclick = function \(\) \{ panel\.remove\(\); \};/.test(src), true);
+// 닫기 단추를 «첫 단추»로 찾든 이름표로 찾든 — 눌러서 닫히면 된다(2026-10-04 「모두 처리 완료」 단추가 앞에 생김)
+t('닫기로도 닫힌다', /title\.querySelector\((?:'button'|'\[aria-label="닫기"\]')\)\.onclick = function \(\) \{ panel\.remove\(\); \};/.test(src), true);
 t('바깥을 눌러도 닫힌다', /if \(event\.target === panel\) panel\.remove\(\);/.test(src), true);
 t('처리할 게 없으면 그렇다고 적는다', /처리할 장애 알림이 없습니다/.test(src), true);
 
