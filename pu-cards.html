@@ -1243,7 +1243,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-c-seen{width:110px}
 .dm-c-from{width:140px}
 .dm-c-box{width:124px}
-.dm-c + .dm-c{margin-left:6px}
+.dm-c + .dm-c{margin-left:4px}
 .dm-row .at{flex:none;width:112px;text-align:right;color:#64748b;font-size:13.5px;
   padding-right:4px;white-space:nowrap}
 /* 안 읽은 것은 굵게 — 다음메일과 같다 */
@@ -22754,16 +22754,39 @@ function mbTagParts(v){
   ].map(x=>String(x || ''));
 }
 /* 이 쪽의 줄마다 딱지를 한 번 뽑고, 어느 열이 «쓰이는지» 센다 */
+/* ⚡ 열 너비는 «이 쪽에서 가장 긴 딱지»에 맞춘다 (대표 지시 2026-10-04 「너무 공간이 넓게 분리 되어 있다」)
+   예전에는 갈래마다 «가장 길 수 있는 딱지»에 맞춘 고정 너비라, 「👤 권형하」 처럼 짧은 딱지만 있는 쪽에서도
+   빈자리가 컸다. 이 쪽의 딱지 글자를 재어 그 갈래의 너비를 정한다 — 세로줄은 그대로 맞는다.
+   ⚠ 글자 폭은 «어림»이다(한글 10.5 · 영문 6.4 · 그림 글자 13px, 딱지마다 안쪽 여백 14). 모자라면 「…」로 줄고,
+     전부는 마우스를 올리면 보인다. 넘치지 않게 갈래마다 상한이 있다(CSS .dm-c-○○ 의 너비). */
+const MB_TAG_MAX = { who:150, work:170, hrk:120, hrgo:90, inq:100, open:120, seen:120, from:150, box:124 };
+function mbTagW(html){
+  const h = String(html || '');
+  if(!h.trim()) return 0;
+  const txt = h.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/\s+/g, ' ').trim();
+  let w = 0;
+  for(const ch of txt){
+    const c = ch.codePointAt(0);
+    w += (c >= 0xAC00 && c <= 0xD7A3) || (c >= 0x3130 && c <= 0x318F) ? 10.5
+       : c > 0x2000 ? 13 : 6.4;
+  }
+  const spans = Math.max(1, (h.match(/<span class="(dm-|mn-|box)/g) || []).length);
+  return Math.ceil(w + spans * 14 + (spans - 1) * 4);
+}
 function mbTagCols(rows){
   const parts = (rows || []).map(mbTagParts);
   const used = MB_TAG_SLOTS.map((_, j)=>parts.some(p=>p[j].trim() !== ''));
-  return { parts:parts, used:used };
+  /* ⚠ 칸 이름(box)은 글자가 더 커서 어림이 모자란다 — 그 열은 예전 너비(CSS) 그대로 둔다 */
+  const widths = MB_TAG_SLOTS.map((k, j)=> (used[j] && k !== 'box')
+    ? Math.min(MB_TAG_MAX[k] || 140, Math.max(24, ...parts.map(p=>mbTagW(p[j])))) : 0);
+  return { parts:parts, used:used, widths:widths };
 }
 /* 줄 하나의 열들 — 쓰이는 열은 비어 있어도 자리를 지킨다(그래야 세로줄이 맞는다) */
 function mbTagColsHtml(t, i){
   const p = (t && t.parts && t.parts[i]) || [];
   return MB_TAG_SLOTS.map((k, j)=> (t && t.used[j])
-    ? `<span class="dm-c dm-c-${k}">${p[j] || ''}</span>` : '').join('');
+    ? `<span class="dm-c dm-c-${k}"${t.widths && t.widths[j] ? ` style="width:${t.widths[j]}px"` : ''}>${p[j] || ''}</span>` : '').join('');
 }
 function mbHrTag(v){
   /* ⚠ window 를 직접 짚지 않는다 — 검사 몇은 window 없는 상자에서 이 목록을 그린다 */

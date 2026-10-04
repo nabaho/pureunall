@@ -137,11 +137,13 @@ test('★★ 메일 창 옆줄·본문·시계에 걸려 있다 — 견주어 �
 
 /* ══════ ⑤ 오른쪽 딱지 열 ══════ */
 function colBox(parts) {
-  const ctx = { String, Array, esc: (s) => String(s) };
+  const ctx = { String, Array, Math, esc: (s) => String(s) };
   vm.createContext(ctx);
   const m = app.match(/^const MB_TAG_SLOTS = [^\n]*;/m); assert.ok(m);
   vm.runInContext(m[0].replace(/^const /, 'var '), ctx);
-  ['mbTagCols', 'mbTagColsHtml'].forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
+  const mx = app.match(/^const MB_TAG_MAX = [^\n]*;/m); assert.ok(mx);
+  vm.runInContext(mx[0].replace(/^const /, 'var '), ctx);
+  ['mbTagW', 'mbTagCols', 'mbTagColsHtml'].forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   ctx.mbTagParts = (v) => parts[v];
   return ctx;
 }
@@ -186,4 +188,19 @@ test('★★ 바뀐 것에 «누가 바꿨는지» — 이알피 이력의 마�
   const byCo = {}; d.changes.forEach((x) => { byCo[x.co] = x; });
   assert.equal(byCo.co1.by, '김보람 요청 · 권형하 승인', '★★ 누가 바꿨는지 안 적습니다');
   assert.equal(byCo.co2.by, undefined, '★ 다른 바꿈의 이력을 갖다 붙입니다');
+});
+
+test('★★★ 열 너비는 이 쪽에서 가장 긴 딱지에 맞춘다 — 짧으면 좁게 · 줄마다 같게 · 상한은 넘지 않게', () => {
+  const E = ['', '', '', '', '', '', '', '', ''];
+  const a = E.slice(); a[0] = '<span class="dm-who">👤 권형하</span>';
+  const b = E.slice(); b[0] = '<span class="dm-who">👤 신욱임</span>';
+  const c = colBox([a, b]);
+  const t = c.mbTagCols([0, 1]);
+  const w = (h) => Number((h.match(/dm-c-who" style="width:(\d+)px"/) || [])[1]);
+  const w1 = w(c.mbTagColsHtml(t, 0)), w2 = w(c.mbTagColsHtml(t, 1));
+  assert.ok(w1 > 0 && w1 === w2, '★★★ 줄마다 너비가 달라 세로줄이 안 맞습니다');
+  assert.ok(w1 < 100, '★★★ 짧은 딱지만 있는데 열이 넓습니다: ' + w1 + 'px');
+  const long = E.slice(); long[0] = '<span class="dm-who">' + '가'.repeat(60) + '</span>';
+  const d = colBox([long]);
+  assert.ok(w(d.mbTagColsHtml(d.mbTagCols([0]), 0)) <= 150, '★★ 긴 딱지 하나가 열을 끝없이 넓힙니다');
 });
