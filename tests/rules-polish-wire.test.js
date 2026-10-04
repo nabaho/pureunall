@@ -74,7 +74,7 @@ function harness(o) {
     focus() { this.focused++; }, addEventListener() {} });
   $('size').value = '10인이상';
   $('ae-after').value = o.after != null ? o.after : AFTER;
-  const calls = { ask: [], alerts: [], warns: [] };
+  const calls = { ask: [], alerts: [], warns: [], confirms: [] };
   const auth = { currentUser: o.noUser ? null : { getIdToken: () => Promise.resolve('토큰') } };
   const ctx = {
     $, console: { warn() {}, info() {}, log() {} }, Promise, Date, Object, Array, String, Number, Set, Map, JSON, Math, RegExp, Error, Uint8Array,
@@ -82,6 +82,7 @@ function harness(o) {
     ALL_FINDINGS: o.findings || [],
     SITE_INFO: null, LAST: { site: '📄 ' + CO }, SITE_MAP: {}, siteSel: { value: 'A' },
     alert: (m) => calls.alerts.push(m),
+    confirm: (m) => { calls.confirms.push(m); return calls.yes !== false; },
     fetch: () => { calls.fetch = (calls.fetch || 0) + 1; return Promise.reject(new Error('부르면 안 된다')); },
     firebase: { auth: () => auth },
     PuRulesPolish: P, PuRulesPolishView: PV, PuRulesV2RecommendView: RV, PuRulesCriteria: CR, PuKordocText: KT,
@@ -180,6 +181,16 @@ test('③ 실패 글 — 하루 몫 · 로그인 · 그 밖은 까닭째 (어떤
   assert.match(H.box(), /오늘 AI 몫이 다 찼습니다 — 내일 다시 해 주세요/);
   H = await run({ ask: fail(429, 'You exceeded your current quota') });
   assert.match(H.box(), /오늘 AI 몫이 다 찼습니다/);
+  // 분당 몫 — quota 낱말이 함께 있어도 «내일 다시»가 아니다(1분 뒤면 된다)
+  for (const msg of ['Quota exceeded for metric: generate_content_free_tier_requests, quotaId: GenerateRequestsPerMinutePerProjectPerModel-FreeTier',
+    'Resource has been exhausted: quota per minute']) {
+    H = await run({ ask: fail(429, msg) });
+    assert.match(H.box(), /AI 가 잠시 바쁩니다 — 1분 뒤 다시 해 주세요/, msg);
+    assert.doesNotMatch(H.box(), /오늘 AI 몫|내일/, '분당 몫을 하루 몫이라고 했다: ' + msg);
+  }
+  // 하루 몫 — PerDay 글은 하루 몫
+  H = await run({ ask: fail(429, 'Quota exceeded, quotaId: GenerateRequestsPerDayPerProjectPerModel-FreeTier') });
+  assert.match(H.box(), /오늘 AI 몫이 다 찼습니다/);
   // 429 라도 하루 몫이 아니면 까닭째
   H = await run({ ask: fail(429, '잠시 바쁩니다') });
   assert.doesNotMatch(H.box(), /오늘 AI 몫/);
@@ -211,8 +222,12 @@ test('④ 「이 판으로 바꾸기」 — 열람 전용을 먼저 본다 · �
   assert.match(H.box(), /AI 가 고친 판/, '열람 전용에서 상자를 닫았다');
   H.ctx.READONLY = false;
   H.click('use');
-  assert.equal(H.after.value, '제20조【연차유급휴가】 ① 가나상사는 1년간 80퍼센트 이상 출근한 사원에게 15일의 유급휴가를 준다.\n② 가나상사가 휴가를 관리한다.');
+  assert.ok(H.after.value.startsWith('제20조【연차유급휴가】 '), '【】 머리를 안 지켰다: ' + H.after.value);
+  assert.equal((H.after.value.match(/제\s*\d+\s*조/g) || []).length, 1, '머리가 겹쳤다');
+  assert.ok(H.after.value.includes('가나상사가'), '{회사} 를 이 회사 이름(조사째)으로 안 되돌렸다');
+  assert.ok(H.after.value.includes('\n② '), '줄바꿈이 사라졌다');
   assert.doesNotMatch(H.after.value, /\{회사\}/);
+  assert.equal(H.calls.confirms.length, 0, '고친 것이 없는데 물었다');
   assert.equal(H.box(), '', '넣은 뒤 상자를 닫는다');
   assert.ok(H.after.focused > 0, '손을 「변경 후」 칸에');
 
@@ -227,6 +242,57 @@ test('④ 「이 판으로 바꾸기」 — 열람 전용을 먼저 본다 · �
   H3.click('drop');
   assert.equal(H3.after.value, AFTER);
   assert.equal(H3.box(), '');
+});
+
+test('④ 보낸 뒤 「변경 후」를 고쳤으면 바꾸기 전에 묻는다 — 아니오면 그대로, 예면 AI 판으로', async () => {
+  await kordoc();
+  const ANS = { text: '① {회사}는 15일의 유급휴가를 준다.', why: '' };
+  const H = harness({ ask: () => Promise.resolve(replyOf(ANS)) });
+  H.t.polMenu(); H.click('tidy'); await H.settle();
+  const typed = AFTER + '\n③ 기다리는 사이 사람이 덧붙인 항.';
+  H.after.value = typed;
+  H.calls.yes = false;
+  H.click('use');
+  assert.equal(H.calls.confirms.length, 1, '고친 것이 있는데 묻지 않았다');
+  assert.match(H.calls.confirms[0], /고친 것을 버리고 AI 판으로 바꿀까요/);
+  assert.equal(H.after.value, typed, '아니오인데 고친 것을 버렸다');
+  assert.match(H.box(), /AI 가 고친 판/, '아니오인데 상자를 닫았다');
+  H.calls.yes = true;
+  H.click('use');
+  assert.equal(H.calls.confirms.length, 2);
+  assert.ok(H.after.value.startsWith('제20조(연차유급휴가) ') && H.after.value.includes('가나상사는 15일'), H.after.value);
+  assert.ok(!H.after.value.includes('덧붙인 항'));
+  assert.equal(H.box(), '');
+  // 머리만 바꾼 것은 고친 것이 아니다(머리는 어차피 지금 것을 지킨다)
+  const H2 = harness({ ask: () => Promise.resolve(replyOf(ANS)) });
+  H2.t.polMenu(); H2.click('tidy'); await H2.settle();
+  H2.after.value = AFTER.replace('제20조(연차유급휴가)', '제20조【연차유급휴가】');
+  H2.click('use');
+  assert.equal(H2.calls.confirms.length, 0, '본문은 그대로인데 물었다');
+  assert.ok(H2.after.value.startsWith('제20조【연차유급휴가】 '));
+});
+
+test('④ 열람 전용이면 부르지 않는다 — 넣을 수 없는 판에 회사 공동 하루 몫을 쓰지 않게', async () => {
+  await kordoc();
+  const H = harness();
+  H.ctx.READONLY = true;
+  H.t.polMenu();
+  assert.ok(H.calls.alerts.some((m) => /열람 전용/.test(m)), '열람 전용을 알리지 않았다');
+  assert.equal(H.box(), '', '열람 전용인데 고르기 상자를 열었다');
+  H.click('tidy'); H.click('fix'); await H.t.polSend('tidy'); await H.settle();
+  assert.equal(H.calls.ask.length, 0, '열람 전용인데 AI 를 불렀다');
+  // 열람 전용으로 들어서면 단추를 숨긴다(풀리면 다시 보인다)
+  const ro = cutFn(BARE, 'setReadOnly');
+  assert.match(ro, /\$\(\s*["']ae-polish["']\s*\)/, '열람 전용 전환이 ✨ 단추를 다루지 않는다');
+  const els = {};
+  const $ = (id) => els[id] || (els[id] = { style: {}, disabled: false });
+  const ctx = { $, LAST: null, escapeH: (x) => x, updateDoneBtn() {}, READONLY: false };
+  vm.createContext(ctx);
+  vm.runInContext(ro + '\nthis.f=setReadOnly;', ctx);
+  ctx.f(true);
+  assert.equal($('ae-polish').style.display, 'none');
+  ctx.f(false);
+  assert.notEqual($('ae-polish').style.display, 'none');
 });
 
 test('⑤ 조를 바꾼 뒤 늦게 온 답은 버린다 · 조를 열면 상자가 빈다', async () => {

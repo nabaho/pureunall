@@ -4768,6 +4768,7 @@ function setReadOnly(on,rec){
   const ready=!!(LAST&&LAST.arts&&LAST.arts.length);
   const sv=$("save"); if(sv)sv.disabled=on?true:!ready;      // 해제하면 담당자 권한을 되돌려 준다
   const ae=$("ae-apply"); if(ae)ae.disabled=on;              // 대조표 보기는 되지만 조문 수정은 막는다
+  const ap=$("ae-polish"); if(ap)ap.style.display=on?"none":"";   // ✨ AI 다듬기 — 넣을 수 없는 판에 회사 공동 하루 몫을 쓰지 않게
   if(on){ const d=$("save-done"); if(d)d.disabled=true; } else updateDoneBtn();
 }
 /* ══════ 저장 위치 ══════
@@ -7362,19 +7363,23 @@ function polBody(){
   return (hd?s.slice(hd.length):s).replace(/^\s+/,"");
 }
 function polMenu(){
+  if(READONLY){ alert("열람 전용입니다."); return; }   // 넣을 수 없는 판에 회사 공동 하루 몫을 쓰지 않는다
   if(POL.busy)return;   // 부르는 중에는 그대로 둔다(답이 오면 그 상자에 그린다)
   const n=polFindings().length;
   POL.st={state:"menu",hasFindings:n>0,nFindings:n};
   polDraw();
 }
-/* 실패 글 — 하루 몫(429 + quota·free_tier 낱말)·로그인·그 밖은 까닭째 */
+/* 실패 글 — 분당 몫(429 + PerMinute)·하루 몫(429 + quota·free_tier 낱말)·로그인·그 밖은 까닭째.
+   ⚠ 분당 몫을 먼저 본다 — 분당 한도 글에도 quota 낱말이 들어 있어, 순서가 바뀌면 «내일 다시»라고 잘못 말한다 */
 function polErr(e){
   const code=e&&e.status, m=String((e&&e.message)||e||"알 수 없는 오류");
   if(code===401||(!code&&/로그인/.test(m)))return "로그인을 확인해 주세요";
+  if(code===429&&/PerMinute|per\s*minute/i.test(m))return "AI 가 잠시 바쁩니다 — 1분 뒤 다시 해 주세요";
   if(code===429&&/quota|free_tier|PerDay|RESOURCE_EXHAUSTED/i.test(m))return "오늘 AI 몫이 다 찼습니다 — 내일 다시 해 주세요";
   return "AI 다듬기를 못 했습니다 — "+m;
 }
 async function polSend(mode){
+  if(READONLY)return;   // 열람 전용 — 부르지 않는다(polMenu 가 알린다)
   if(POL.busy)return;
   const P=PuRulesPolish, label=AE_LABEL, title=AE_TITLE;
   if(!label)return;
@@ -7411,6 +7416,8 @@ function polUse(){
   if(READONLY){ alert("열람 전용입니다."); return; }
   const st=POL.st; if(!st||st.state!=="ready"||!st.got)return;
   const ta=$("ae-after");
+  // 보낸 뒤 사람이 「변경 후」를 고쳤으면 묻는다 — AI 판은 보낸 글 기준이라, 그대로 바꾸면 고친 것이 조용히 사라진다
+  if(polBody()!==st.cur&&!confirm("AI 에게 보낸 뒤 「변경 후」를 고쳤습니다. 고친 것을 버리고 AI 판으로 바꿀까요?"))return;
   ta.value=PuRulesV2RecommendView.insertText(ta.value,st.got.text,{headOf:artHeadOf,own:aeOwnHead()});
   POL.st=null; polDraw();
   ta.focus();
