@@ -36,10 +36,14 @@ firebase.messaging().onBackgroundMessage(function (payload) {
 self.addEventListener('notificationclick', function (e) {
   e.notification.close();
   var url = (e.notification.data && e.notification.data.url) || PORTAL_URL;
+  /* ⚠ «그 알림이 가리키는 화면»이 열려 있을 때만 그 탭으로 간다 (2026-10-04).
+       예전에는 포털 탭이 있으면 무엇이든 거기로 갔다 — 메일 신규 문의 알림을 눌러도
+       포털 건의함이 떴다. 주소의 경로(? 앞)로 견준다. */
+  var path = String(url).split('?')[0];
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
       for (var i = 0; i < list.length; i++) {
-        if (list[i].url.indexOf('/pureunall/enter.html') >= 0 && 'focus' in list[i]) return list[i].focus();
+        if (list[i].url.indexOf(path) >= 0 && 'focus' in list[i]) return list[i].focus();
       }
       return self.clients.openWindow(url);
     })
