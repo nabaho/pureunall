@@ -1262,6 +1262,7 @@ exports.weeklyNewsletterSend = functions
       console.log("[뉴스레터 자동발송] " + rows.length + "곳 예약 완료");
       await db.ref("newsletter/watch/" + ready.회차열쇠 + "/발송").set({ 때: now, 상태: "ok", 받는수: rows.length, batchId })
         .catch(() => null);
+      await 뉴스레터경고판갱신(db).catch(() => null);
       return null;
     } catch (e) {
       if (issueClaim && issueClaim.committed) await db.ref("newsletter/issues/" + ready.회차열쇠 + "/발송잠금").transaction((v) => {
@@ -1359,6 +1360,16 @@ async function 뉴스레터경보(열쇠, 자리, 말) {
     .filter((u) => roles[u] && roles[u].isAdmin === true && roles[u].status !== "resigned")
     .map((u) => db.ref("systemAlerts/" + u).push({ createdAt: Date.now(), kind: "newsletter",
       message: "📰 " + String(말).slice(0, 200) })));
+  await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
+}
+/* 포털 경고판 — newsletter/watch/현재 (대표 지시 2026-10-04 「푸른 통합로그인 … 뉴스레터 앱에 경고 표시」)
+   가장 최근 회차의 감시 기록에서 «지금 사람이 볼 것»을 세어 둔다. 포털이 이 한 칸만 읽는다.
+   ⚠ 3시간마다(감시꾼) · 점검 · 경보 · 발송 · 전달 뒤에 늘 새로 쓴다 — 고치면 저절로 사라진다. */
+async function 뉴스레터경고판갱신(db) {
+  const v = (await db.ref("newsletter/watch").orderByKey().limitToLast(4).once("value")).val() || {};
+  const 열쇠 = Object.keys(v).filter((k) => /^\d{4}-\d{2}-w\d{1,2}$/.test(k)).sort().pop();
+  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null);
+  await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
 /* 회차 한 벌 중 «감시꾼이 볼 칸»만 — 25,000자 전문과 받는 분 주소는 안 읽는다 */
 async function 감시용회차(db, 열쇠) {
@@ -1426,6 +1437,8 @@ exports.newsletterWatchRetry = functions
   .onRun(async () => {
     const db = getDatabase();
     const now = Date.now();
+    /* ⓪ 포털 경고판을 새로 — 고치신 것이 3시간 안에 사라진다 */
+    await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
     /* ① 기사 모으기 — 오늘 못 모았으면 다시 */
     const [모은날, 끔] = await Promise.all([
       db.ref("homepage/newsBrief/모은날").once("value"), db.ref("homepage/newsBrief/off").once("value")]);
@@ -1489,6 +1502,7 @@ exports.newsletterWatchSunday = functions
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
       판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
     await db.ref("newsletter/watch/" + 열쇠 + "/점검").set(Object.assign({ 때: now }, 점검));
+    await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
     const 이름 = ((회차 || {}).회차 || {}).이름 || 열쇠;
     const m = NWatch.점검표메일짓기(점검, 이름, NF.관리화면, NF.보내는시각말);
     const r = await 뉴스레터메일({ to: [NF.검토받는곳], subject: m.subject, body: m.body, html: m.html })
@@ -1542,6 +1556,13 @@ exports.newsletterWatchDelivery = functions
     const db = getDatabase();
     const ready = (await db.ref("newsletter/weeklyReady").once("value")).val() || {};
     const today = NewsletterWeekly.todaySeoul(Date.now());
+    /* ★ 06시 발송이 «아예 안 돈» 경우 — 함수가 죽으면 아무 기록도 없이 조용하다 (2026-10-04 대표 「반드시 검토해라」).
+         오늘 보낼 확정본이 아직 준비·거는중이고 자동발송이 켜져 있으면 알린다. */
+    const 켜짐 = (await db.ref("newsletter/config/자동발송").once("value")).val() === true;
+    if (켜짐 && ready.보낼날 === today && (ready.상태 === "준비" || ready.상태 === "거는중")) {
+      await 뉴스레터경보(ready.회차열쇠, "발송", "오늘 오전 6시 발송이 돌지 않았습니다 — 확정본이 아직 «" + ready.상태 + "» 입니다");
+      return null;
+    }
     if (ready.상태 !== "완료" || ready.보낼날 !== today || !ready.batchId) return null;
     const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled").once("value")).val() || {};
     const 셈 = NWatch.전달셈(줄들, ready.batchId);
@@ -1549,6 +1570,7 @@ exports.newsletterWatchDelivery = functions
     if (셈.실패 || 셈.확인필요) {
       await 뉴스레터경보(ready.회차열쇠, "전달경보", "뉴스레터 " + (셈.실패 + 셈.확인필요) + "통이 못 나갔거나 확인이 필요합니다 — 뉴스레터 › 보낸 결과에서 주소를 보십시오");
     }
+    await 뉴스레터경고판갱신(db).catch(() => null);
     console.log("[감시꾼] 전달", JSON.stringify(셈));
     return null;
   });
