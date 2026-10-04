@@ -4278,7 +4278,7 @@ function _hwpInkaAnnexValues(f,sites){
 /* 인가신청서 옆 [⬇ 별지 명단] — 받는 것만(편집·보관은 인가신청서와 같은 길로 하지 않는다: 명단은 명부에서 다시 뽑는 것이 맞다) */
 function hwpAnnexDownload(){
   var f=curForm(); if(!f||f._sample){ toast('기금을 먼저 고르세요','warn'); return; }
-  _loadSites(S.formFund).then(function(sites){ return hwpTplFill('inka_annex',f,sites); }).then(function(r){
+  _loadSites(S.formFund,{withClosed:true}).then(function(sites){ return hwpTplFill('inka_annex',f,sites); }).then(function(r){
     PureunHwp.download(r.bytes,(f.short_name||f.name||'기금')+'_별지_설립준비위원회_위원명단.hwpx','hwpx');
   }).catch(function(e){ toast('별지 명단을 채우지 못했습니다: '+((e&&e.message)||e),'err'); });
 }
@@ -4797,6 +4797,8 @@ function _fundFill(f,sites){
 }
 /* 틀 채우기 — 결과는 HWPX 바이트(한글이 바로 연다). 채운 문단만 줄을 새로 나눈다 */
 function hwpTplFill(kind,f,sites){
+  /* 설립 서류(_estabKind 와 같은 규칙)가 아니면 탈퇴한 곳은 뺀다 — 검사 틀이 이 함수만 실어도 돌게 한 줄로 */
+  if(!/^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''))) sites=(sites||[]).filter(function(s){ return s&&(s.status||'active')!=='closed'; });
   var key=_hwpTplKey(kind,f);                          // 사내 기금의 정관 → charter_sane 틀
   return _hwpTplRef(key).once('value').then(function(sn){
     var t=sn.val();
@@ -4829,7 +4831,7 @@ function hwpOpenFilled(kind){
     return pick.then(function(useKept){
       if(useKept){ _openHwpBuf(_b64ToBytes(kept.b64),label,kind); return; }
       toast('한글 틀에 기금 자료를 채우는 중…');
-      return _loadSites(fid).catch(function(){ return []; }).then(function(sites){
+      return _loadSites(fid,{withClosed:_estabKind(kind)}).catch(function(){ return []; }).then(function(sites){
         return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
       }).then(function(r){
         if(r.unknown.length) toast('틀에 모르는 표지 '+r.unknown.length+'가지 — 그대로 두었습니다: '+r.unknown.join(', '),'warn');
@@ -4884,10 +4886,19 @@ function dlBuf(buf,fname){ var blob=new Blob([buf],{type:'application/vnd.openxm
 function _siteContacts(s){ var c={name:'',phone:'',mobile:'',email:''}; try{ var cts=s.contacts; if(typeof cts==='string')cts=JSON.parse(cts);
   if(Array.isArray(cts)&&cts.length){ var p=cts.filter(function(x){return x&&x.isPrimary;})[0]||cts[0];
     c.name=p.name||''; c.mobile=p.mobile||p.phone||''; c.phone=p.phone||p.mobile||''; c.email=p.email||''; } }catch(e){} return c; }
-function _loadSites(fid){ return fbDb.ref(NS+'/sites/'+fid).once('value').then(function(s){
+/* opt.withClosed — 탈퇴한 사업장도 «뒤에» 붙여 돌려준다(설립 서류만, 2026-10-04 대표 지시 「탈퇴한 회사를 설립 서류에 남겨라」).
+   그 밖의 길(운영·지원금·결산·엑셀)은 지금처럼 참여 중인 곳만. */
+function _loadSites(fid,opt){ return fbDb.ref(NS+'/sites/'+fid).once('value').then(function(s){
   var v=s.val()||{}; var a=Object.keys(v).map(function(k){var o=Object.assign({},v[k]);o._id=k;return o;});
-  a=a.filter(function(x){return (x.status||'active')==='active';});
-  a.sort(function(x,y){return String(x.seq_label||'').localeCompare(String(y.seq_label||''),'ko',{numeric:true});}); return a; }); }
+  var by=function(x,y){return String(x.seq_label||'').localeCompare(String(y.seq_label||''),'ko',{numeric:true});};
+  var live=a.filter(function(x){return (x.status||'active')==='active';}).sort(by);
+  if(!(opt&&opt.withClosed)) return live;
+  return live.concat(a.filter(function(x){return (x.status||'active')==='closed';}).sort(by)); }); }
+/* 설립 서류인가 — 인가·합의서·정관·회의록·설립 출연확인서·별지·등기·세무. 사업계획서(해마다)는 아니다. */
+function _estabKind(kind){
+  /* ⚠ DOC_KINDS·DOC_REG·DOC_TAX 와 같아야 한다(tests/fund-estab-closed.test.js 가 맞대 본다) */
+  return /^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''));
+}
 function setC(ws,addr,val){ var c=ws.getCell(addr); if(c.type!==ExcelJS.ValueType.Formula) c.value=(val===''||val==null)?null:val; }
 function clearRange(ws,r1,r2,c1,c2){ for(var r=r1;r<=r2;r++)for(var c=c1;c<=c2;c++){ var cell=ws.getCell(r,c);
   if(cell.type!==ExcelJS.ValueType.Formula && cell.value!=null) cell.value=null; } }
@@ -7581,6 +7592,8 @@ function _closeFigures(yr){
      글자 그대로 'note docnote' 를 쓴다. */
 function docBody(kind,f,sites){
   sites=sites||[];
+  /* 설립 서류(_estabKind 와 같은 규칙)만 탈퇴한 곳도 — 그 밖은 뺀다 */
+  if(!/^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''))) sites=sites.filter(function(s){ return s&&(s.status||'active')!=='closed'; });
   var _real=hwpFormHTML(kind,f,sites); if(_real) return _real;   // 원본 변환본 우선
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
@@ -8492,7 +8505,7 @@ function _loadDocInto(kind){ var c=_docCtx(kind), f=c.f;
   var token=(S._docToken=(S._docToken||0)+1);          // 최신 요청만 화면에 반영(늦은 응답 무시)
   var mine=function(){ return S._docToken===token && S._docKind===kind; };
   S._docKind=kind; S._docLayer=null;
-  var sitesP=f._sample?Promise.resolve([]):_loadSites(S.formFund);
+  var sitesP=f._sample?Promise.resolve([]):_loadSites(S.formFund,{withClosed:_estabKind(kind)});
   return Promise.all([sitesP,_docExtra(kind,f)]).then(function(_a){
     var sites=_a[0];
     if(!mine())return;
@@ -8557,7 +8570,7 @@ function hwpSidePreview(kind){
       note('전에 한글로 고쳐 보관한 것입니다 — 틀에서 새로 채우려면 [✏ 한글로 고치기]에서 고르세요');
       return _b64ToBytes(kept.b64);
     }
-    return _loadSites(fid).catch(function(){ return []; }).then(function(sites){
+    return _loadSites(fid,{withClosed:_estabKind(kind)}).catch(function(){ return []; }).then(function(sites){
       S._hwpSideSites=sites;
       return _docExtra(kind,f).catch(function(){ return null; }).then(function(){ return hwpTplFill(kind,f,sites); });
     }).then(function(r){
@@ -8744,7 +8757,7 @@ function estabBundle(phase){
   var _pre=_need ? _docExtra(docsFor(ph[2](),f.fund_type||'공동').filter(function(d){ return DOC_NEEDS_LEDGER[d[0]]; })[0][0], f)
                  : Promise.resolve(null);
   _pre.catch(function(){ return null; }).then(function(){
-  return (f._sample?Promise.resolve([]):_loadSites(S.formFund));
+  return (f._sample?Promise.resolve([]):_loadSites(S.formFund,{withClosed:true}));
   }).then(function(sites){
     /* 빈칸이 «왜» 비는지 먼저 말한다 — 날인은 되돌릴 수 없어서, 찍기 전에 알아야 한다 */
     var gp=$('bundleGap'); if(gp) gp.innerHTML=estabGapHTML(f,sites);
@@ -8790,7 +8803,7 @@ function estabBundleHwp(phase){
   var say=function(t){ if(btn) btn.textContent=t; };
   if(btn) btn.disabled=true;
   var fail=[], got=0;
-  Promise.all([_loadSites(S.formFund),_loadJsZip()]).then(function(r){
+  Promise.all([_loadSites(S.formFund,{withClosed:true}),_loadJsZip()]).then(function(r){
     var sites=r[0], z=new r[1]();
     return plan.use.reduce(function(p,u,k){ return p.then(function(){
       say('⏳ '+(k+1)+'/'+plan.use.length+' 채우는 중…');
