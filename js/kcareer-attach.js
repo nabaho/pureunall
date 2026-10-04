@@ -23,7 +23,7 @@
   function 맨(s) { return String(s || '').replace(/[\s　]/g, ''); }
 
   /* ① 표를 편다 — 칸 안 글자는 문단마다 한 칸 띄워 잇는다. 표 속 표는 «그 표대로» 따로 나온다 */
-  function readTables(xml) {
+  function readTablesPos(xml) {
     var s = String(xml || ''), out = [], 쌓 = [], m;
     var re = /<hp:tbl\b[^>]*>|<\/hp:tbl>|<hp:tr\b[^>]*>|<\/hp:tr>|<hp:tc\b[^>]*>|<\/hp:tc>|<\/hp:p>|<hp:t(?:\s[^>]*)?>([\s\S]*?)<\/hp:t>/g;
     while ((m = re.exec(s))) {
@@ -33,12 +33,16 @@
       if (!top) continue;
       if (/^<hp:tr\b/.test(t)) { top.row = []; continue; }
       if (t === '</hp:tr>') { if (top.row) top.rows.push(top.row); top.row = null; continue; }
-      if (/^<hp:tc\b/.test(t)) { top.cell = ''; continue; }
-      if (t === '</hp:tc>') { if (top.row && top.cell != null) top.row.push(top.cell.replace(/\s+/g, ' ').trim()); top.cell = null; continue; }
-      if (t === '</hp:p>') { if (top.cell != null) top.cell += ' '; continue; }
-      if (top.cell != null) top.cell += 풀기(m[1]);
+      if (/^<hp:tc\b/.test(t)) { top.cell = { text: '', tStart: -1, tEnd: -1 }; continue; }
+      if (t === '</hp:tc>') { if (top.row && top.cell) { top.cell.text = top.cell.text.replace(/\s+/g, ' ').trim(); top.row.push(top.cell); } top.cell = null; continue; }
+      if (t === '</hp:p>') { if (top.cell) top.cell.text += ' '; continue; }
+      /* 칸의 «마지막 글자 조각» 자리도 적는다 — 「(첨부 n)」을 거기 붙인다(markRows) */
+      if (top.cell) { top.cell.text += 풀기(m[1]); top.cell.tStart = m.index + t.indexOf('>') + 1; top.cell.tEnd = m.index + t.length - 7; }
     }
     return out;
+  }
+  function readTables(xml) {
+    return readTablesPos(xml).map(function (rs) { return rs.map(function (r) { return r.map(function (c) { return c.text; }); }); });
   }
 
   /* ② 머리 줄에서 칸 뜻을 읽는다 — 「기관」이 있어야 실적 표다 */
@@ -57,7 +61,10 @@
       else if (h.kind == null && COL.kind.test(k)) h.kind = i;
       else if (h.content == null && COL.content.test(k)) h.content = i;
     });
-    return h.org != null ? h : null;
+    /* ⚠ 「기관」만으로는 모자란다 — 신청서 첫 장의 「기관명 | 푸른노무법인 | 사업자등록번호…」 같은
+         «일반 현황» 표도 기관이란 말이 있다(2026-10-04 실측: 35줄이 실적으로 잡혔다).
+         기간이나 내용 칸이 «함께» 있어야 실적 표다. */
+    return (h.org != null && (h.period != null || h.content != null)) ? h : null;
   }
   function pickRows(tables) {
     var out = [];
@@ -69,10 +76,41 @@
         var org = g('org');
         if (!맨(org) && !맨(g('content'))) return;   /* 빈 줄 */
         out.push({ table: ti, row: ri, period: g('period'), org: org, kind: g('kind'), content: g('content'),
-          text: row.join(' · ') });
+          text: row.join(' · '), contentCol: h.content != null ? h.content : row.length - 1, sig: sigOf(g('period'), org) });
       });
     });
     return out;
+  }
+
+  /* 줄의 «이름표» — 기간·기관 글자. 「(첨부 n)」을 어느 줄에 붙일지 이것으로 다시 찾는다 */
+  function sigOf(period, org) { return 맨(period) + '|' + 맨(org); }
+
+  /* ⑤ 「(첨부 n)」 적기 — 지을 때마다 «원본에서 새로» 붙인다(그래서 두 번 적히지 않는다).
+     marks: [{ sig, text:'(첨부 1, 2)' }] — 그 줄 «내용» 칸의 마지막 글자 뒤에 한 칸 띄워 붙인다.
+     ⚠ 이미 「(첨부 …)」가 붙어 있으면(예전에 저장한 파일을 다시 올린 경우) 떼고 새로 붙인다.
+     ⚠ 줄을 못 찾거나 글자가 없는 칸이면 손대지 않는다 — 엉뚱한 칸에 번호가 박히면 안 된다. */
+  var MARK_OLD = /\s*\(첨부\s*[\d,\s]+\)\s*$/;
+  function escXml(t) { return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function markRows(xml, marks) {
+    var s = String(xml || '');
+    if (!marks || !marks.length) return { xml: s, n: 0 };
+    var bySig = {};
+    marks.forEach(function (k) { if (k && k.sig && k.text) bySig[k.sig] = k.text; });
+    var pos = readTablesPos(s);
+    var rows = pickRows(pos.map(function (rs) { return rs.map(function (r) { return r.map(function (c) { return c.text; }); }); }));
+    var edits = [];
+    rows.forEach(function (row) {
+      var 글 = bySig[row.sig]; if (!글) return;
+      var cell = (pos[row.table][row.row] || [])[row.contentCol];
+      if (!cell || cell.tEnd < 0) return;
+      edits.push({ a: cell.tStart, b: cell.tEnd, 글: 글 });
+    });
+    edits.sort(function (x, y) { return y.a - x.a; });
+    edits.forEach(function (e) {
+      var 안 = s.slice(e.a, e.b).replace(MARK_OLD, '');
+      s = s.slice(0, e.a) + 안 + ' ' + escXml(e.글) + s.slice(e.b);
+    });
+    return { xml: s, n: edits.length };
   }
 
   /* ③ 짝 후보 — 원본 파일이 있는 기록만 받는다(부르는 쪽이 거른다) */
@@ -121,7 +159,7 @@
     return n;
   }
 
-  var api = { readTables: readTables, pickRows: pickRows, candidates: candidates, number: number,
+  var api = { readTables: readTables, pickRows: pickRows, candidates: candidates, number: number, markRows: markRows, sigOf: sigOf,
     years: years, recYears: recYears, orgTokens: orgTokens, orgHit: orgHit };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else global.KcareerAttach = api;

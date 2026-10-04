@@ -118,7 +118,7 @@ function 세상(opt) {
   vm.runInContext('var _rhFilled=false,_rhColMap=null,_rhStampOn=false,_rhStampDone=false,_rhStampPick=null,'
     + '_rhStampWhy="",_rhDropped=null,_rhPages=null,_rhMode="in",_rhHwpEd=null,_rhEdLeaving=false,'
     + '_rhwp=null,_rhMap=null,_rhPicks={},_rhVals={},_rhListPlan=null,_rhBase=null,_rhDoc=null,'
-    + '_rhUndo=null,_rhEdBigWant=true,_rhPhotoOn=false,_rhPhotoDone=false,_rhPhotoWhy="",_rhPhotoNoCell=false,'
+    + '_rhUndo=null,_rhEdBigWant=true,_rhPhotoOn=false,_rhPhotoDone=false,_rhPhotoWhy="",_rhPhotoNoCell=false,_rhAttachMarks=null,'
     + '_rhTidy={drop:{},ph:false,italic:false,rows:false};', ctx);
   vm.runInContext(RAW.match(/var STAMP_FIT_DEF = \{[^}]*\};/)[0], ctx);
   vm.runInContext(RAW.match(/var _rhStampPxMemo=\{[^}]*\};/)[0], ctx);
@@ -355,7 +355,7 @@ test('★ 임시저장에 표시도 담는다 — 안 담으면 이어서 연 �
   const ctx = await 올린세상();
   ctx._rhFilled = true; ctx._rhStampOn = true; ctx._rhPhotoOn = true; ctx._rhTidy.drop = { [SEC]: [0] }; ctx._rhTidy.ph = true;
   const p = JSON.parse(JSON.stringify(vm.runInContext('_rhOutPack()', ctx)));
-  assert.deepEqual(p, { filled: true, colMap: null, stamp: true, stampPick: null, photo: true,
+  assert.deepEqual(p, { filled: true, colMap: null, stamp: true, stampPick: null, photo: true, attachMarks: null,
     tidy: { drop: { [SEC]: [0] }, ph: true, italic: false, rows: false } });
   assert.equal(vm.runInContext('_rhInEd()', ctx), false);
   ctx._rhHwpEd = {}; ctx._rhMode = 'edit';
