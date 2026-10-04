@@ -89,7 +89,7 @@ test('★★ ④ 멈췄을 때만 이름을 대고, 코드 밖 시간을 따로 
   assert.ok(!멀쩡.some(l => /🐌/.test(l)), '★ 멀쩡할 때 이름을 대면 늘 무언가가 범인처럼 보인다');
 });
 
-test('★★ ⑤ 처음 뜰 때(로그인 직후)도 10초 본다', () => {
-  assert.match(SRC, /window\.addEventListener\('load', function\(\)\{ try\{ coWatchStart\('처음 뜰 때'\); \}catch\(_\)\{\} \}\);/);
+test('★★ ⑤ 처음 뜰 때 진단은 ?prof=1 일 때만 10초 본다', () => {
+  assert.match(SRC, /if\(coProfWanted\(location\.search, window\.localStorage\)\) coWatchStart\('처음 뜰 때'\);/);
   assert.match(cutFn(SRC, 'function coWatchStart('), /언제 === '처음 뜰 때' \? 10 : 5/);
 });

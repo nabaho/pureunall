@@ -204,7 +204,9 @@ test('오래 멈춰 있었으면 몇 ms 인지 말한다', () => {
   assert.ok(v.some(x => /2400ms/.test(x)));
 });
 
-test('기업 상세를 열면 지켜보기가 켜진다', () => {
+test('기업 상세 진단은 개발자가 ?prof=1 로 요청한 때만 켜진다', () => {
   const i = src.indexOf('function openCoPage()');
-  assert.ok(src.slice(i, i + 700).includes('coWatchStart()'), '열어도 안 지켜본다');
+  const body = src.slice(i, i + 900);
+  assert.match(body, /if\(coProfWanted\(location\.search\)\) coWatchStart\('기업 상세'\)/,
+    '일반 직원 화면에도 진단을 붙이거나, 개발 진단 길을 없앴다');
 });
