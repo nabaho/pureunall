@@ -46,7 +46,7 @@ function build(parts, extra) {
   return new Function('return (function(){' + (extra || '') + parts.join('\n') +
     ';return {' + PICK.join(',') + '};})()')();
 }
-const PICK = ['estabSites', 'siteContribOf', 'foundContribOf', 'foundContrib',
+const PICK = ['estabSites', 'estabLiveSites', 'siteContribOf', 'foundContribOf', 'foundContrib', 'foundContribLive',
   'partyNames', 'partyJoin', '_blankCount', 'parseBizReg'];
 
 const NUM = `function num(v){ if(v==null||v==='')return ''; if(typeof v==='number')return Math.round(v);
@@ -54,7 +54,7 @@ const NUM = `function num(v){ if(v==null||v==='')return ''; if(typeof v==='numbe
 
 const API = build([
   NUM,
-  grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
+  grabFn('estabSites'), grabFn('estabLiveSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'), grabFn('foundContribLive'),
   grabFn('partyNames'), grabFn('partyJoin'), grabFn('_stripSample'), grabFn('_blankCount'),
   grabFn('_flat'), grabFn('_loose'), grabFn('_cleanAddr'), grabFn('_cleanCoName'),
   grabFn('_cleanBizWord'), grabFn('parseBizReg'),
@@ -91,11 +91,12 @@ test('아무것도 없으면 0 — 지어내지 않는다', () => {
   assert.equal(r.from, 'none');
 });
 
-test('탈퇴한 사업장은 빼고 센다 — 나간 회사의 출연 약정을 설립 서류에 적을 수 없다', () => {
-  const sites = [{ name: '가나다', contrib: '3000000' },
-                 { name: '라마바', contrib: '9000000', status: 'closed' }];
-  assert.equal(API.foundContrib({}, sites), 3000000);
-  assert.equal(API.estabSites(sites).length, 1);
+test('★ 탈퇴한 사업장도 설립 서류에 남는다 — 해마다 쓰는 서류(foundContribLive)만 뺀다 (대표 지시 2026-10-04)', () => {
+  const sites = [{ name: '라마바', contrib: '9000000', status: 'closed' },
+                 { name: '가나다', contrib: '3000000' }];
+  assert.equal(API.foundContrib({}, sites), 12000000, '설립 출연금 합계엔 탈퇴한 곳도');
+  assert.equal(API.foundContribLive({}, sites), 3000000, '예산·사업계획·지원금은 지금 참여 중인 곳만');
+  assert.deepEqual(API.estabSites(sites).map((s) => s.name), ['가나다', '라마바'], '탈퇴한 곳은 뒤로 — 맨 앞이 대표 사업장');
 });
 
 test('사업장 한 곳 — 적어 둔 값이 먼저, 없으면 사람수 × 단가', () => {
@@ -176,9 +177,9 @@ test('회사 이름 열거 — 「가, 나 및 다」', () => {
   assert.equal(API.partyJoin(['가나', '다라', '마바']), '가나, 다라 및 마바');
 });
 
-test('열거 대상은 탈퇴하지 않은 사업장의 «이름 있는» 것만', () => {
+test('열거 대상은 «이름 있는» 사업장 — 탈퇴한 곳도 뒤에 (설립 서류, 2026-10-04)', () => {
   const sites = [{ name: '가나' }, { name: '' }, { name: '다라', status: 'closed' }, { name: '마바' }];
-  assert.deepEqual(API.partyNames(sites), ['가나', '마바']);
+  assert.deepEqual(API.partyNames(sites), ['가나', '마바', '다라']);
 });
 
 test('자리표 채우기가 걷어내기보다 «먼저» 돈다', () => {

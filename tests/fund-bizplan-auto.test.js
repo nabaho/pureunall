@@ -49,7 +49,7 @@ const API = (() => {
     'function num(v){if(v===""||v==null)return "";var n=Number(String(v).replace(/,/g,""));return isFinite(n)?n:"";}',
     'var S={fundId:"X",year:2026}; var funds={};',
     grabDecl('BIZ_SPLIT'), 'var BIZ_RATE_DEFAULT=2.0;',
-    grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
+    grabFn('estabSites'), grabFn('estabLiveSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'), grabFn('foundContribLive'),
     grabFn('useRate'), grabFn('bizRate'), grabFn('autoBudget'), grabFn('isSetupFund'),
     'this.useRate=useRate; this.bizRate=bizRate; this.auto=autoBudget; this.setup=isSetupFund;',
   ].join('\n')).call(box);

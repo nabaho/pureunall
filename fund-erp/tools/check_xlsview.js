@@ -78,7 +78,7 @@ global.S = { year: 2026 };
 /* 2026-09-14: 설립·신청 엑셀이 「대표회사·사무국」을 repOrg 하나에서 가져간다
    (명부의 ★ 대표사업장 → 손으로 적은 칸) — 그 길도 실어야 채움이 돈다 */
 ['isRegionFund', '_leadSite', 'repOrg',
- 'estabSites', 'siteContribOf', 'foundContribOf', 'foundContrib',
+ 'estabSites', 'estabLiveSites', 'siteContribOf', 'foundContribOf', 'foundContrib', 'foundContribLive',
  'setC', 'clearRange', 'fillSetup', '_officersOf',
  /* 2026-09-14: 참여사업장의 사용자대표·근로자대표도 위원이다 */
  '_siteWrep', '_siteUrep', '_isCommittee', '_siteCommittee', '_prepCommittee',

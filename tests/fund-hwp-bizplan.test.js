@@ -23,7 +23,7 @@ const V = (() => {
     gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gF('korWon'),
     gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'), gF('isSetupFund'), gF('_bizFinZero'), gF('_bizFinOf'),
     gF('bizplanRows'), gF('bizplanBS'),
-    gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+    gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
     gF('_hwpBizplanValues'),
     'this.v=_hwpBizplanValues; this.setBudget=function(fid,b){ _BUDGET[fid]=b; }; this.S=S;',
   ].join('\n')).call(box);

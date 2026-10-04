@@ -18,7 +18,7 @@ const A = (() => {
   new Function([
     'var S={year:2026, formFund:"X", _docR:null};',
     'function num(v){ if(v===""||v==null) return ""; var n=Number(String(v).replace(/,/g,"")); return isFinite(n)?n:""; }',
-    SRC.match(/var _K=[^\n]*/)[0], gF('_officersOf'), gF('_boss'), gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+    SRC.match(/var _K=[^\n]*/)[0], gF('_officersOf'), gF('_boss'), gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
     gF('_hwpKoDate'), gF('_hwpKoDate2'), gF('_hwpTodayIso'), gF('_dashPhone'), gF('_hwpTaxValues'), gV('HWP_TPL_KINDS'),
     'this.tax=_hwpTaxValues; this.K=HWP_TPL_KINDS; this.today=_hwpTodayIso;',
   ].join('\n')).call(box);
