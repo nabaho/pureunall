@@ -98,10 +98,10 @@ test('③★ 둘째 인자가 없으면 옛날 그대로 — 본문에서 찾은
 
 /* ── ⑤ 미리 정한 사업장은 한 번만 ── */
 test('⑤★★ #co= 로 미리 정한 사업장은 다음 파일 «하나»에만 쓰이고 비워진다', async () => {
-  const box = loadFileBox({ PENDING_CO: { site: '나다물산', bizno: '220-81-12345' } });
+  const box = loadFileBox({ PENDING_CO: { site: '나다물산', bizno: '123-81-12345' } });
   const k1 = await box.loadFile(글파일('첫째.txt'));
   assert.equal(box.SITE_NAME[k1], '나다물산');
-  assert.equal(box.SITE_BIZNO[k1], '220-81-12345');
+  assert.equal(box.SITE_BIZNO[k1], '123-81-12345');
   assert.equal(box.PENDING_CO, null, '★★ 쓰고 나서도 남아 있다 — 다음 파일이 남의 회사로 저장된다');
   const k2 = await box.loadFile(글파일('둘째.txt'));
   assert.equal(box.SITE_NAME[k2], '본문에서찾은회사');
