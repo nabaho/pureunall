@@ -1467,12 +1467,13 @@ exports.newsletterWatchSunday = functions
     if (설정.자동발송 !== true && 설정.금요일준비 === false) return null;
     const 회차 = await 감시용회차(db, 열쇠);
     const 링크결과 = await NWatch.링크재기(NWatch.편지링크들(회차), fetch);
-    const [판례모음, 지난것] = await Promise.all([
+    const [판례모음, 지난것, 노무사회메타] = await Promise.all([
       db.ref("homepage/newsPrec/모음").once("value"),
-      db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value")]);
+      db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value"),
+      db.ref("ilabor/meta").once("value")]);
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
-      판례모음: 판례모음.val(), 지난회차들: 지난것.val() });
+      판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val() });
     await db.ref("newsletter/watch/" + 열쇠 + "/점검").set(Object.assign({ 때: now }, 점검));
     const 이름 = ((회차 || {}).회차 || {}).이름 || 열쇠;
     const m = NWatch.점검표메일짓기(점검, 이름, NF.관리화면, NF.보내는시각말);
@@ -5142,6 +5143,115 @@ async function 노무사회로그인(아이디, 암호, 옵션) {
   return { 그릇들: 그릇들, 걸음: 걸음 };
 }
 
+/* ── 공인노무사회 한 번 가져오기 — 손 단추(ilaborPull)와 매일 아침(dailyIlaborCollect)이 «같은 것»을 부른다 ──
+   (대표 물음 2026-10-04 「공인노무사회 도 연결해서 자료가지고 온거 맞나?」 — 아니었다.
+    손 단추만 있었고 마지막으로 가져온 것이 9/5 였다. 금요일 자동 준비도 이 자료를 안 썼다.)
+   ⚠ 두 벌로 두지 않는다 — 브리핑에서 이미 겪었다(한쪽만 낡는다). */
+async function 노무사회모으기(방식, 상한, 누가) {
+  const db = getDatabase();
+  const 아이디 = process.env.ILABOR_ID, 암호 = process.env.ILABOR_PW;
+  if (!아이디 || !암호) {
+    const e = new Error("아이디·비밀번호가 서버에 없습니다. 대표님이 한 번만 넣어 주세요:\n" +
+      "firebase functions:secrets:set ILABOR_ID\nfirebase functions:secrets:set ILABOR_PW");
+    e.status = 400; throw e;
+  }
+  const 든것 = await 노무사회로그인(아이디, 암호);
+  const 그릇 = 든것.그릇들;
+  const 로그인걸음 = 든것.걸음;
+  /* ⚠ 열쇠가 안 붙은 주소로 들어갔으면 «손님»이다 — 목록은 보이지만 상세가 막힌다.
+       그 사실을 조용히 넘기지 않고 답에 실어 사람에게 보여 준다. */
+  const 손님인가 = !(로그인걸음.find(x=>/③/.test(x.걸음)) || {}).열쇠붙음;
+
+  /* ── 목록 ── */
+  const 목록쪽 = await (await 노무사회부르기(노무사회.사이트 + "sub09_01.php?cate1=100&page=1", 그릇)).text();
+  if (노무사회.막혔나(목록쪽)) throw new Error("목록이 막혔다 — 로그인이 풀렸다");
+  const 목록 = 노무사회.목록읽기(목록쪽);
+  if (!목록.length) throw new Error("목록에서 한 줄도 못 읽었다 — 쪽 모양이 바뀐 듯하다");
+
+  const 가진것 = (await db.ref("ilabor/items").once("value")).val() || {};
+  const 새것 = 노무사회.새것고르기(목록, 가진것, 상한);
+
+  /* ── 엿보기: 상세 원본을 남겨 사람이 눈으로 맞춘다 ── */
+  if (방식 === "peek") {
+    const 하나 = 새것[0] || 목록[0];
+    const 원본 = await (await 노무사회부르기(하나.주소, 그릇)).text();
+    const 읽음 = 노무사회.상세읽기(원본);
+    await db.ref("ilabor/peek").set({
+      sid: 하나.sid, 제목: 하나.제목, 주소: 하나.주소,
+      크기: 원본.length, 막혔나: 노무사회.막혔나(원본),
+      읽음: 읽음, 원본조각: 원본.slice(0, 12000),
+      로그인걸음: 로그인걸음, 손님인가: 손님인가,
+      본때: Date.now(), 본이: 누가
+    });
+    /* ⚠ 걸음을 함께 준다 — 로그인이 «어디까지» 갔는지 보여야 고칠 수 있다.
+         처음에는 이것이 없어 「로그인 실패」 한 줄만 보고 엉뚱한 문을
+         두드리고 있다는 것을 몰랐다(2026-09-03). */
+    return { ok: true, mode: "peek", sid: 하나.sid, 크기: 원본.length,
+      읽음: 읽음, 목록수: 목록.length, 쪽수: 노무사회.쪽수(목록쪽),
+      로그인걸음: 로그인걸음, 손님인가: 손님인가 };
+  }
+
+  /* ── 목록만 ── */
+  const 담기 = {};
+  목록.forEach((x) => {
+    담기[x.sid] = Object.assign({}, 가진것[x.sid] || {}, {
+      고유번호: x.고유번호, sid: x.sid, 제목: x.제목, 기관: x.기관, 날짜: x.날짜,
+      주소: x.주소, 본때: Date.now()
+    });
+  });
+  await db.ref("ilabor/items").update(담기);
+
+  if (방식 === "list") {
+    await db.ref("ilabor/meta").update({ 마지막: Date.now(), 마지막이: 누가,
+      쪽수: 노무사회.쪽수(목록쪽), 목록수: 목록.length });
+    return { ok: true, mode: "list", 목록수: 목록.length, 새것: 새것.length,
+      쪽수: 노무사회.쪽수(목록쪽), 손님인가: 손님인가 };
+  }
+
+  /* ── 상세 + 첨부 ── */
+  const bucket = getStorage().bucket();
+  const 결과 = [];
+  for (const 하나 of 새것) {
+    await 잠깐(700);                       /* 남의 서버를 몰아치지 않는다 */
+    const 원본 = await (await 노무사회부르기(하나.주소, 그릇)).text();
+    const 읽음 = 노무사회.상세읽기(원본);
+    if (!읽음.ok) { 결과.push({ sid: 하나.sid, ok: false, 까닭: 읽음.까닭 }); continue; }
+
+    const 담은첨부 = [];
+    for (const 첨 of 노무사회.첨부거르기(읽음.첨부)) {
+      try {
+        await 잠깐(400);
+        const r = await 노무사회부르기(첨.주소, 그릇);
+        const 길이 = Number(r.headers.get("content-length") || 0);
+        if (노무사회.너무크나(길이)) { 담은첨부.push({ 이름: 첨.이름, 건너뜀: "너무 크다(" + 길이 + "B)" }); continue; }
+        const buf = Buffer.from(await r.arrayBuffer());
+        if (노무사회.너무크나(buf.length)) { 담은첨부.push({ 이름: 첨.이름, 건너뜀: "너무 크다" }); continue; }
+        const 자리 = 노무사회.창고자리(하나.sid, 첨.이름 || 노무사회.파일이름(첨.주소));
+        const 파일 = bucket.file(자리);
+        const 토큰 = crypto.randomUUID();
+        await 파일.save(buf, { metadata: {
+          contentType: r.headers.get("content-type") || "application/octet-stream",
+          metadata: { firebaseStorageDownloadTokens: 토큰 }
+        } });
+        담은첨부.push({ 이름: 첨.이름, 크기: buf.length, 자리: 자리,
+          주소: "https://firebasestorage.googleapis.com/v0/b/" + bucket.name
+            + "/o/" + encodeURIComponent(자리) + "?alt=media&token=" + 토큰 });
+      } catch (e) {
+        담은첨부.push({ 이름: 첨.이름, 건너뜀: String((e && e.message) || e).slice(0, 120) });
+      }
+    }
+
+    await db.ref("ilabor/items/" + 하나.sid).update({
+      본문: 읽음.본문 || "", 첨부: 담은첨부, 가져온때: Date.now()
+    });
+    결과.push({ sid: 하나.sid, ok: true, 제목: 하나.제목, 첨부: 담은첨부.length });
+  }
+
+  await db.ref("ilabor/meta").update({ 마지막: Date.now(), 마지막이: 누가,
+    쪽수: 노무사회.쪽수(목록쪽), 목록수: 목록.length });
+  return { ok: true, mode: "full", 목록수: 목록.length, 가져온것: 결과, 손님인가: 손님인가 };
+}
+
 exports.ilaborPull = functions
   .region(MAIL_REGION)
   .runWith({ secrets: ["ILABOR_ID", "ILABOR_PW"], timeoutSeconds: 540, memory: "512MB" })
@@ -5165,119 +5275,16 @@ exports.ilaborPull = functions
        full = 새 자료의 상세와 첨부까지 */
     const 방식 = ["peek", "list", "full"].indexOf(String(몸.mode || "list")) >= 0 ? String(몸.mode || "list") : "list";
     const 상한 = Math.max(1, Math.min(30, Number(몸.limit) || 10));
-    const 아이디 = process.env.ILABOR_ID, 암호 = process.env.ILABOR_PW;
-    if (!아이디 || !암호) {
-      res.status(400).json({ ok: false, error:
-        "아이디·비밀번호가 서버에 없습니다. 대표님이 한 번만 넣어 주세요:\n" +
-        "firebase functions:secrets:set ILABOR_ID\nfirebase functions:secrets:set ILABOR_PW" });
-      return;
-    }
-
     try {
-      const 든것 = await 노무사회로그인(아이디, 암호);
-      const 그릇 = 든것.그릇들;
-      const 로그인걸음 = 든것.걸음;
-      /* ⚠ 열쇠가 안 붙은 주소로 들어갔으면 «손님»이다 — 목록은 보이지만 상세가 막힌다.
-           그 사실을 조용히 넘기지 않고 답에 실어 사람에게 보여 준다. */
-      const 손님인가 = !(로그인걸음.find(x=>/③/.test(x.걸음)) || {}).열쇠붙음;
-
-      /* ── 목록 ── */
-      const 목록쪽 = await (await 노무사회부르기(노무사회.사이트 + "sub09_01.php?cate1=100&page=1", 그릇)).text();
-      if (노무사회.막혔나(목록쪽)) throw new Error("목록이 막혔다 — 로그인이 풀렸다");
-      const 목록 = 노무사회.목록읽기(목록쪽);
-      if (!목록.length) throw new Error("목록에서 한 줄도 못 읽었다 — 쪽 모양이 바뀐 듯하다");
-
-      const 가진것 = (await db.ref("ilabor/items").once("value")).val() || {};
-      const 새것 = 노무사회.새것고르기(목록, 가진것, 상한);
-
-      /* ── 엿보기: 상세 원본을 남겨 사람이 눈으로 맞춘다 ── */
-      if (방식 === "peek") {
-        const 하나 = 새것[0] || 목록[0];
-        const 원본 = await (await 노무사회부르기(하나.주소, 그릇)).text();
-        const 읽음 = 노무사회.상세읽기(원본);
-        await db.ref("ilabor/peek").set({
-          sid: 하나.sid, 제목: 하나.제목, 주소: 하나.주소,
-          크기: 원본.length, 막혔나: 노무사회.막혔나(원본),
-          읽음: 읽음, 원본조각: 원본.slice(0, 12000),
-          로그인걸음: 로그인걸음, 손님인가: 손님인가,
-          본때: Date.now(), 본이: sender.email || ""
-        });
-        /* ⚠ 걸음을 함께 준다 — 로그인이 «어디까지» 갔는지 보여야 고칠 수 있다.
-             처음에는 이것이 없어 「로그인 실패」 한 줄만 보고 엉뚱한 문을
-             두드리고 있다는 것을 몰랐다(2026-09-03). */
-        res.json({ ok: true, mode: "peek", sid: 하나.sid, 크기: 원본.length,
-          읽음: 읽음, 목록수: 목록.length, 쪽수: 노무사회.쪽수(목록쪽),
-          로그인걸음: 로그인걸음, 손님인가: 손님인가 });
-        return;
-      }
-
-      /* ── 목록만 ── */
-      const 담기 = {};
-      목록.forEach((x) => {
-        담기[x.sid] = Object.assign({}, 가진것[x.sid] || {}, {
-          고유번호: x.고유번호, sid: x.sid, 제목: x.제목, 기관: x.기관, 날짜: x.날짜,
-          주소: x.주소, 본때: Date.now()
-        });
-      });
-      await db.ref("ilabor/items").update(담기);
-
-      if (방식 === "list") {
-        await db.ref("ilabor/meta").update({ 마지막: Date.now(), 마지막이: sender.email || "",
-          쪽수: 노무사회.쪽수(목록쪽), 목록수: 목록.length });
-        res.json({ ok: true, mode: "list", 목록수: 목록.length, 새것: 새것.length,
-          쪽수: 노무사회.쪽수(목록쪽), 손님인가: 손님인가 });
-        return;
-      }
-
-      /* ── 상세 + 첨부 ── */
-      const bucket = getStorage().bucket();
-      const 결과 = [];
-      for (const 하나 of 새것) {
-        await 잠깐(700);                       /* 남의 서버를 몰아치지 않는다 */
-        const 원본 = await (await 노무사회부르기(하나.주소, 그릇)).text();
-        const 읽음 = 노무사회.상세읽기(원본);
-        if (!읽음.ok) { 결과.push({ sid: 하나.sid, ok: false, 까닭: 읽음.까닭 }); continue; }
-
-        const 담은첨부 = [];
-        for (const 첨 of 노무사회.첨부거르기(읽음.첨부)) {
-          try {
-            await 잠깐(400);
-            const r = await 노무사회부르기(첨.주소, 그릇);
-            const 길이 = Number(r.headers.get("content-length") || 0);
-            if (노무사회.너무크나(길이)) { 담은첨부.push({ 이름: 첨.이름, 건너뜀: "너무 크다(" + 길이 + "B)" }); continue; }
-            const buf = Buffer.from(await r.arrayBuffer());
-            if (노무사회.너무크나(buf.length)) { 담은첨부.push({ 이름: 첨.이름, 건너뜀: "너무 크다" }); continue; }
-            const 자리 = 노무사회.창고자리(하나.sid, 첨.이름 || 노무사회.파일이름(첨.주소));
-            const 파일 = bucket.file(자리);
-            const 토큰 = crypto.randomUUID();
-            await 파일.save(buf, { metadata: {
-              contentType: r.headers.get("content-type") || "application/octet-stream",
-              metadata: { firebaseStorageDownloadTokens: 토큰 }
-            } });
-            담은첨부.push({ 이름: 첨.이름, 크기: buf.length, 자리: 자리,
-              주소: "https://firebasestorage.googleapis.com/v0/b/" + bucket.name
-                + "/o/" + encodeURIComponent(자리) + "?alt=media&token=" + 토큰 });
-          } catch (e) {
-            담은첨부.push({ 이름: 첨.이름, 건너뜀: String((e && e.message) || e).slice(0, 120) });
-          }
-        }
-
-        await db.ref("ilabor/items/" + 하나.sid).update({
-          본문: 읽음.본문 || "", 첨부: 담은첨부, 가져온때: Date.now()
-        });
-        결과.push({ sid: 하나.sid, ok: true, 제목: 하나.제목, 첨부: 담은첨부.length });
-      }
-
-      await db.ref("ilabor/meta").update({ 마지막: Date.now(), 마지막이: sender.email || "",
-        쪽수: 노무사회.쪽수(목록쪽), 목록수: 목록.length });
-      res.json({ ok: true, mode: "full", 목록수: 목록.length, 가져온것: 결과, 손님인가: 손님인가 });
+      const 답 = await 노무사회모으기(방식, 상한, sender.email || "");
+      res.json(답);
     } catch (e) {
       /* ⚠ 조용히 넘기지 않는다 — 왜 아무것도 안 왔는지 말해 준다 */
       /* ⚠ 「fetch failed」 한 줄만 돌려주면 사람이 고칠 수가 없다.
            어느 걸음까지 갔는지 · 어느 주소에서 · 무슨 까닭으로 막혔는지를 함께 준다.
            ★ 2026-09-04 에 실제로 이것이 없어 헤맸다. */
       console.warn("[노무사회]", e && e.message, (e && e.코드) || "");
-      res.status(500).json({
+      res.status(e.status || 500).json({
         ok: false,
         error: String((e && e.message) || e),
         막힌주소: (e && e.주소) || "",
@@ -5286,6 +5293,27 @@ exports.ilaborPull = functions
         로그인걸음: (e && e.걸음) || null
       });
     }
+  });
+
+/* 매일 아침 7:20 — 공인노무사회 새 자료를 상세·첨부까지 (대표 물음 2026-10-04 → 「모두진행」)
+   ★ 자료모으기(7:10) 뒤 십 분. 남의 서버라 하루 한 번 · 열 건까지만(손 단추와 같은 상한).
+   ⚠ 실패해도 조용히 넘기지 않는다 — ilabor/meta 에 까닭을 남기고, 감시꾼이 며칠째인지 본다. */
+exports.dailyIlaborCollect = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["ILABOR_ID", "ILABOR_PW"], timeoutSeconds: 540, memory: "512MB" })
+  .pubsub.schedule("every day 07:20")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    try {
+      const 답 = await 노무사회모으기("full", 10, "매일 자동");
+      await getDatabase().ref("ilabor/meta").update({ 자동때: Date.now(), 자동탈: null });
+      console.log("[노무사회 자동]", JSON.stringify({ 목록수: 답.목록수, 가져온것: (답.가져온것 || []).length }));
+    } catch (e) {
+      await getDatabase().ref("ilabor/meta").update({ 자동때: Date.now(), 자동탈: String((e && e.message) || e).slice(0, 200) })
+        .catch(() => null);
+      console.warn("[노무사회 자동] 못 가져왔습니다", e && e.message);
+    }
+    return null;
   });
 
 exports.publishSite = functions
