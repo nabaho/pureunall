@@ -498,6 +498,15 @@ details.fold>summary .act{font-size:11px;font-weight:800;color:var(--brown);
   background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 9px;
   white-space:nowrap}
 details.fold[open]>summary .act:after{content:'접기'}
+/* 자동 가져오기 현황 (2026-10-04) — 한 줄씩, 넘치면 … */
+.arow2{display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap;min-width:0}
+.arow2 .when{font-size:12px;color:var(--sub)}
+.arow2 .ok{font-size:12px;font-weight:800;color:var(--ok)}
+.arow2 .warn{font-size:12px;font-weight:800;color:#92400e}
+.arow2 .wait{font-size:12px;font-weight:800;color:var(--faint)}
+.arow2 .st{font-size:12px;color:var(--faint);overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1}
+.arow{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px}
+.arow b{font-size:12.5px;margin-right:4px}
 details.fold:not([open])>summary .act:after{content:'펼치기'}
 /* 안에 «넣을 것이 남았는지»를 접힌 채로도 알려 준다 — 열어 보지 않고도 안다 */
 details.fold>summary .num{font-size:11px;font-weight:700;color:var(--sub);
@@ -5683,51 +5692,90 @@ function 설정화면(){
     </div>
    </div>
 
-   <!-- ══ 오른쪽 — 가져오기 ══ -->
+   <!-- ══ 오른쪽 — 자동 가져오기 ══
+        ★ 대표 지시 2026-10-04 「이부분 내가 안받고 자동으로 가지고 오게해라」 → 목업 → 「1 접어두고 2 빼라」
+          서버가 매일 아침 저절로 가져온다(기사 7:00 · 자료·판례 7:10 · 공인노무사회 7:20).
+          단추 상자 둘이 «눌러야 받는 곳»처럼 보였다 — 이제 «언제 무엇을 가져왔나»만 보이고,
+          손 단추는 맨 아래에 접어 둔다(급할 때만). 개발용 「엿보기」는 뺐다(서버 길은 남아 있다). -->
    <div>
     <div class="box">
-     <h3>📥 발간자료·판례 지금 가져오기</h3>
-     <div class="pad">
-      <div class="note" style="margin-top:0;margin-bottom:10px">
-       <b>고용노동부</b>(정책자료실·보도자료)와 <b>한국노동연구원</b>에서 발간자료를,
-       <b>법제처</b>에서 노무 판례와 <b>행정해석</b>을 가져옵니다.
-       서버가 <b>아침 7:10 에 저절로</b> 하니 보통은 누르실 일이 없습니다 —
-       이 단추는 <b>지금 당장</b> 새로 받고 싶을 때만.<br>
-       첨부는 <b>실제로 내려받아</b> 크기를 재고 우리 창고에 사본을 둡니다.
-       그래서 편지에 「내려받기 (PDF · 756KB)」라고 적히고, 죽은 링크가 안 나갑니다.
-      </div>
-      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center">
-       <button class="btn pri" onclick="자료가져오기(true)">📥 자료·판례 받기 (첨부까지)</button>
-       <button class="btn" onclick="자료가져오기(false)">📋 목록만 (빠름)</button>
-       <span id="docsBusy" style="font-size:12px;color:var(--sub)"></span>
-       <span class="hint" style="margin-left:auto">자료 6건 · 판례 4건 · 첨부 25MB까지</span>
-      </div>
-      <div id="docsOut" class="hint" style="white-space:pre-wrap;margin-top:9px"></div>
-     </div>
-    </div>
-
-    <div class="box">
-     <h3>📥 공인노무사회 자료 가져오기</h3>
-     <div class="pad">
-      <div style="display:flex;gap:9px;flex-wrap:wrap;align-items:center">
-       <button class="btn" onclick="노무사회가져오기('peek')">🔍 엿보기</button>
-       <button class="btn" onclick="노무사회가져오기('list')">📋 목록만</button>
-       <button class="btn pri" onclick="노무사회가져오기('full')">📥 상세+첨부</button>
-       ${도움(
-         '<b>엿보기</b>를 먼저 한 번 — 자료 한 건의 «원본»을 남겨 상세 모양을 맞춥니다. '
-         + '상세·첨부 읽개는 로그인한 화면을 못 보고 지은 것이라 첫 회는 눈으로 맞추는 것이 맞습니다.<br>'
-         + '<b>목록만</b> 제목·기관·날짜만 (첨부 안 내려받음)<br>'
+     <h3>🤖 자료 자동 가져오기 <span class="badge b-sent">자동</span><span class="sp"></span>
+      <button class="mini" onclick="자동현황읽기()" title="마지막 결과를 다시 읽습니다">⟳</button></h3>
+     <div id="autoRows">${자동현황줄()}</div>
+     <div class="note one" style="margin:0;border-radius:0;border-left:0;border-right:0">
+      누르실 것 없습니다 — 금요일 13시 자동 준비가 이 중 <b>새것을 먼저</b> 골라 담습니다.
+      막히면 「자동화 점검」에 뜹니다.</div>
+     <div class="pad" style="padding-top:4px">
+     <details class="fold">
+      <summary>지금 한 번 더 가져오기 <span style="font-weight:600;color:var(--sub)">(급할 때만)</span><span class="sp"></span><span class="act"></span></summary>
+      <div style="padding:4px 13px 12px">
+       <div class="arow"><b>📑 발간자료·판례 지금 가져오기</b>
+        <button class="btn pri" onclick="자료가져오기(true)">📥 첨부까지</button>
+        <button class="btn" onclick="자료가져오기(false)">📋 목록만 (빠름)</button>
+        <span id="docsBusy" style="font-size:12px;color:var(--sub)"></span></div>
+       <div id="docsOut" class="hint" style="white-space:pre-wrap"></div>
+       <div class="arow"><b>🏛 공인노무사회 자료 가져오기</b>
+        <button class="btn" onclick="노무사회가져오기('list')">📋 목록만</button>
+        <button class="btn pri" onclick="노무사회가져오기('full')">📥 상세+첨부</button>
+        ${도움('<b>목록만</b> 제목·기관·날짜만 (첨부 안 내려받음)<br>'
          + '<b>상세+첨부</b> 새 자료 10건까지 첨부까지 받아 창고에 담습니다<br>'
          + '⚠ 남의 서버라 천천히 부릅니다(한 건마다 0.7초). 10건이면 10초쯤.')}
-       <span id="ilaborBusy" style="font-size:12px;color:var(--sub)"></span>
-       <span class="hint" style="margin-left:auto">첨부 20MB · 자료당 5개까지</span>
+        <span id="ilaborBusy" style="font-size:12px;color:var(--sub)"></span></div>
+       <div id="ilaborOut" class="hint" style="white-space:pre-wrap"></div>
       </div>
-      <div id="ilaborOut" class="hint" style="white-space:pre-wrap;margin-top:9px"></div>
+     </details>
      </div>
     </div>
    </div>
 
   </div>`;
+}
+
+/* ── 자동 가져오기 현황 (2026-10-04) ──
+   서버가 남긴 «마지막 결과»만 읽는다 — 모음 통째가 아니라 날짜·수·탈 몇 칸.
+   ⚠ 날짜는 «서울» 날로 견준다 — 오늘() 은 UTC 라 아침 9시 전에는 어제가 된다. */
+function 서울날(t){
+  return new Intl.DateTimeFormat('en-CA', { timeZone:'Asia/Seoul', year:'numeric', month:'2-digit', day:'2-digit' })
+    .format(t ? new Date(t) : new Date());
+}
+async function 자동현황읽기(){
+  const 칸 = (p) => db.ref(p).once('value').then(s => s.val()).catch(() => null);
+  const [뉴날, 뉴수, 뉴탈, 자날, 자수, 자탈, 판날, 판수, 판쌓, 판탈, 노] = await Promise.all([
+    칸('homepage/newsBrief/모은날'), 칸('homepage/newsBrief/모은수'), 칸('homepage/newsBrief/탈'),
+    칸('homepage/newsDocs/모은날'), 칸('homepage/newsDocs/모은수'), 칸('homepage/newsDocs/탈'),
+    칸('homepage/newsPrec/모은날'), 칸('homepage/newsPrec/모은수'), 칸('homepage/newsPrec/쌓인수'), 칸('homepage/newsPrec/탈'),
+    칸('ilabor/meta')]);
+  App.자동현황 = {
+    뉴스: { 날: 뉴날, 수: 뉴수, 탈: 뉴탈 }, 자료: { 날: 자날, 수: 자수, 탈: 자탈 },
+    판례: { 날: 판날, 수: 판수, 쌓: 판쌓, 탈: 판탈 }, 노무: 노 || {} };
+  const el = $('autoRows'); if(el) el.innerHTML = 자동현황줄();
+}
+/* 한 줄 = 무엇 · 언제 · 마지막 결과. 한 칸은 한 줄(넘치면 … + title) */
+function 자동현황줄(){
+  const h = App.자동현황;
+  if(!h){ setTimeout(자동현황읽기, 0); return '<div class="arow2"><span class="st">마지막 결과를 읽는 중…</span></div>'; }
+  const 오늘날 = 서울날(), 어제날 = 서울날(Date.now() - 864e5);
+  const 날말 = (d) => d === 오늘날 ? '오늘' : d === 어제날 ? '어제' : (d ? Number(d.slice(5,7)) + '/' + Number(d.slice(8,10)) : '');
+  const 시 = Number(new Intl.DateTimeFormat('en-GB', { timeZone:'Asia/Seoul', hour:'2-digit', hourCycle:'h23' }).format(new Date()));
+  /* 아침에 돌기 전이면 어제 것도 «제때»다 */
+  const 제때 = (d, 시각) => d === 오늘날 || (d === 어제날 && 시 < 시각);
+  const 줄 = (아이콘, 이름, 언제, 상태, 꼴, 덧) =>
+    '<div class="arow2"><span>' + 아이콘 + '</span><b>' + 이름 + '</b><span class="when">' + 언제 + '</span>'
+    + '<span class="' + 꼴 + '">' + 상태 + '</span><span class="st" title="' + esc(덧) + '">' + esc(덧) + '</span></div>';
+  const 보통 = (아이콘, 이름, 언제, 시각, x, 덧) => x.탈
+    ? 줄(아이콘, 이름, 언제, '⚠ 막힘', 'warn', String(x.탈))
+    : 제때(x.날, 시각) ? 줄(아이콘, 이름, 언제, '✓ ' + 날말(x.날), 'ok', 덧)
+    : 줄(아이콘, 이름, 언제, '⚠ 마지막 ' + (날말(x.날) || '없음'), 'warn', '아침에 못 가져왔습니다 — 다음 회에 다시 합니다');
+  const n = h.노무 || {};
+  const 노날 = n.자동때 ? 서울날(n.자동때) : '';
+  const 노줄 = n.자동탈 ? 줄('🏛', '공인노무사회', '매일 07:20', '⚠ 막힘', 'warn', String(n.자동탈))
+    : !n.자동때 ? 줄('🏛', '공인노무사회', '매일 07:20', '첫 회 기다림', 'wait', '다음 아침 7:20 에 처음 돕니다')
+    : 제때(노날, 8) ? 줄('🏛', '공인노무사회', '매일 07:20', '✓ ' + 날말(노날), 'ok', '목록 ' + (n.목록수 || 0) + '건 확인')
+    : 줄('🏛', '공인노무사회', '매일 07:20', '⚠ 마지막 ' + 날말(노날), 'warn', '아침에 못 가져왔습니다');
+  return 보통('📰', '신문 기사', '매일 07:00', 8, h.뉴스, '새로 ' + (h.뉴스.수 || 0) + '건')
+    + 보통('📑', '고용노동부·연구원·기업마당', '매일 07:10', 8, h.자료, '새로 ' + (h.자료.수 || 0) + '건')
+    + 보통('⚖', '판례·행정해석 (법제처)', '매일 07:10', 8, h.판례, '새로 ' + (h.판례.수 || 0) + '건 · 모아 둔 것 ' + (h.판례.쌓 || 0))
+    + 노줄;
 }
 
 /* 서버에 「가져와라」고 시킨다.
@@ -5761,6 +5809,7 @@ async function 자료가져오기(첨부까지){
       err.답 = j || null; throw err;
     }
     if(칸) 칸.textContent = JSON.stringify(j, null, 2).slice(0, 3000);
+    자동현황읽기();
     toast(`📥 자료 ${j.자료새로||0}건(첨부 받은 것 ${j.받은것||0}) · 판례 ${j.판례새로||0}건 새로 담았습니다`
       + ' — 「이 주차로 채우기」를 누르시면 회차에 들어갑니다', 12000);
   }catch(e){
@@ -5802,6 +5851,7 @@ async function 노무사회가져오기(방식){
       throw err;
     }
     if(칸) 칸.textContent = JSON.stringify(j, null, 2).slice(0, 4000);
+    자동현황읽기();
     toast(방식==='peek' ? '🔍 엿보기 끝 — 아래에 결과가 있습니다'
         : ('✅ ' + (j.목록수||0) + '건 훑고 ' + ((j.가져온것||[]).length || j.새것 || 0) + '건 담았습니다'), 9000);
   }catch(e){

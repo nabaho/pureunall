@@ -4369,6 +4369,8 @@ async function 뉴스모으기한번() {
   } catch (e) {
     /* ★ 못 읽은 날이 있어도 그냥 넘어간다 — 모아 둔 것은 그대로 남는다 */
     console.warn("[모으기] 오늘은 못 읽었습니다", e.message);
+    /* 실패를 남긴다 — 설정 화면 «자동 가져오기» 줄이 ⚠ 로 보인다 (2026-10-04) */
+    await 자리.update({ 탈: String(e.message || e).slice(0, 160), 탈때: Date.now() }).catch(() => null);
     return { ok: false, 까닭: String(e.message || e).slice(0, 160) };
   }
 
@@ -4377,7 +4379,7 @@ async function 뉴스모으기한번() {
   const 남길것 = 브리핑부품.오래된것털기(결과.모음, 오늘, 14);
 
   await 자리.child("모음").set(남길것);
-  await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length });
+  await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length, 탈: null });
   console.log("[모으기] 새로 " + 결과.새로 + "건 · 쌓인 것 " + Object.keys(남길것).length + "건");
   return { ok: true, 새로: 결과.새로 };
 }
@@ -4689,12 +4691,13 @@ async function 자료판례모아담기(옵션) {
     const 결과 = 자료부품.모으기(모아둔것, 것들, 오늘);
     const 남길것 = 자료부품.오래된것털기(결과.모음, 오늘, 60);
     await 자리.child("모음").set(남길것);
-    await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length });
+    await 자리.update({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length, 탈: null });
     셈.자료새로 = 결과.새로;
     셈.자료쌓임 = Object.keys(남길것).length;
   } catch (e) {
     console.warn("[자료] 오늘은 못 모았습니다: " + e.message);
     셈.자료탈 = String(e.message || e).slice(0, 160);
+    await db.ref("homepage/newsDocs").update({ 탈: 셈.자료탈, 탈때: Date.now() }).catch(() => null);
   }
 
   /* ── 판례 «그리고» 행정해석 ──
@@ -4714,13 +4717,14 @@ async function 자료판례모아담기(옵션) {
     const 남길것 = 판례부품.오래된것털기(결과.모음, 오늘, 90);
     await 자리.child("모음").set(남길것);
     /* 새것날 — 마지막으로 «새 판례가 들어온 날». 감시꾼이 몇 주째 0건인지 이것으로 본다 */
-    await 자리.update(Object.assign({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length },
+    await 자리.update(Object.assign({ 모은날: 오늘, 모은수: 결과.새로, 쌓인수: Object.keys(남길것).length, 탈: null },
       결과.새로 ? { 새것날: 오늘 } : {}));
     셈.판례새로 = 결과.새로;
     셈.판례쌓임 = Object.keys(남길것).length;
   } catch (e) {
     console.warn("[판례] 오늘은 못 모았습니다: " + e.message);
     셈.판례탈 = String(e.message || e).slice(0, 160);
+    await db.ref("homepage/newsPrec").update({ 탈: 셈.판례탈, 탈때: Date.now() }).catch(() => null);
   }
 
   return 셈;
