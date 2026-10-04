@@ -57,7 +57,13 @@ const BOARDS = [
      ⚠ 로그인은 뉴스레터가 쓰는 서버 비밀값(ILABOR_ID·ILABOR_PW)을 빌린다 — 코드는 값을 못 본다.
      ⚠ login 이 붙은 게시판은 부르는 쪽이 «로그인한 그릇»으로 읽는다(makeFetcher). 로그인이 안 되면
        이 게시판만 오류로 남기고 나머지는 그대로 돈다. */
-  { id: 'kcplaa_m', org: '',      name: '공인노무사회 회원 공지(로그인)', url: 'https://www.kcplaa.or.kr/bbs/news/list', login: 'kcplaa' }
+  { id: 'kcplaa_m', org: '',      name: '공인노무사회 회원 공지(로그인)', url: 'https://www.kcplaa.or.kr/bbs/news/list', login: 'kcplaa' },
+  /* ★ 공인노무사회 «채용 정보» (대표 지시 2026-10-04 「공인노무사회에서 컨설턴트 모집 또는 고문 자문 노무사 모집등 공고도 수집」)
+     로그인 없이 읽힌다. 기관이 노무사에게 «맡기는» 글(외부 조사자 선임·고문·자문)이 여기에도 올라온다.
+     ⚠ 대부분은 노무법인의 직원·수습 채용이라 일반 잣대(isRecruit)를 쓰면 「노무사 모집」이 다 걸린다 —
+       그래서 전용 잣대(rule:'kcplaa' → isKcplaa)를 쓴다. 실측: 「직장 내 괴롭힘 사건 외부 조사자 선임 공고」를 잡고
+       노무법인 채용 10여 건을 거른다. */
+  { id: 'kcplaa_job', org: 'kcplaa', name: '공인노무사회 채용 정보', url: 'https://www.kcplaa.or.kr/worker/list?scd=1', rule: 'kcplaa' }
 ];
 
 /* 여러 기관 글이 섞인 게시판(org 가 빈 것)에서 제목으로 기관을 정한다.
@@ -146,6 +152,18 @@ function isRecruit(title) {
   return WHO.test(t) && PICK.test(t) && !DONE.test(t) && !LEARN.test(t);
 }
 
+/* 공인노무사회 «채용 정보» 잣대 — 노무사에게 «맡기는» 글만(고문·자문·위원·외부 조사자·컨설턴트·강사).
+   ⚠ 노무법인·사무소의 직원·수습 채용, 공무원 채용시험(임기제·경력경쟁)은 뺀다 — 대표 법인이 «뽑히는» 쪽이 아니다. */
+const KC_WHO = /고문|자문|외부\s*조사|조사자|조사위원|위원|컨설턴트|전문가|강사|인력\s*풀|\bpool\b|멘토|코치|지원단|자문단/i;
+const KC_PICK = /모집|선임|위촉|추천|공모|초빙|구함|모십니다|구인/;
+const KC_NOT = /노무법인|노무사무소|법률사무소|노동법률|인사노무컨설팅|수습|직원|직무보조|채용시험|경력경쟁|임기제|결과|명단|개최|교육\s*안내/;
+function isKcplaa(title) {
+  const t = String(title || '');
+  return KC_WHO.test(t) && KC_PICK.test(t) && !KC_NOT.test(t);
+}
+/* 게시판마다 잣대를 고른다 — rule 이 없으면 일반 잣대 */
+function pass(board, title) { return board && board.rule === 'kcplaa' ? isKcplaa(title) : isRecruit(title); }
+
 function keyOf(board, row) {
   /* RTDB 열쇠에 못 쓰는 글자를 피한다 — 짧은 지문으로 */
   const s = board + '|' + row.title + '|' + row.date;
@@ -168,7 +186,7 @@ async function run(o) {
       counts[b.id] = rows.length;
       if (!rows.length) { errors.push({ board: b.id, why: '줄을 하나도 못 뽑았습니다(게시판 모양이 바뀌었을 수 있음)' }); continue; }
       rows.forEach((r) => {
-        if (!isRecruit(r.title)) return;
+        if (!pass(b, r.title)) return;
         if (today && daysBetween(r.date, today) > MAX_AGE_DAYS) return;
         const key = keyOf(b.id, r);
         if (have[key]) return;
@@ -207,7 +225,7 @@ async function probeBoard(o) {
     if (rows.length && got[0].title === rows[0].title && got[0].date === rows[0].date) break;   // 쪽이 안 넘어간다
     read = p; got.forEach((r) => rows.push(r));
   }
-  const recruit = rows.filter((r) => isRecruit(r.title))
+  const recruit = rows.filter((r) => pass(b, r.title))
     .map((r) => ({ date: r.date, title: r.title, org: b.org || orgHint(r.title) }));
   return { board: b.id, pages: read, rows: rows.length,
     from: rows.length ? rows[rows.length - 1].date : '', to: rows.length ? rows[0].date : '',
@@ -236,4 +254,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, keyOf, run, updatesOf, decode, clean };
+module.exports = { UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };

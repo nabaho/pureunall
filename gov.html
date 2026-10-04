@@ -194,6 +194,7 @@ table.cmp td{white-space:nowrap}
     </div>
     <div id="recBan"></div>
     <div id="recWatch"></div>
+    <div id="recMail"></div>
     <div class="scroll"><table>
       <thead><tr><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
       <tbody id="recTb"></tbody>
@@ -254,7 +255,10 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-g2b.js?v=6"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
-<script src="js/gov-recruit.js?v=2"></script>
+<script src="js/gov-recruit.js?v=3"></script>
+<script src="js/gov-submit.js?v=1"></script>
+<!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
+<script src="js/pu-kordoc-text.js?v=2"></script>
 <script>
 /* ⚠ 경력관리와 «같은 파이어베이스 집»이다. 설정값은 공개용 웹 키다(규칙이 지킨다). */
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -665,7 +669,9 @@ function cloudPush(){
     try{ fbDb.ref('gov/'+fbUid).set({ feed:get('feed'), kw:lsGet('kw'),
       key_data:keyData(), key_biz:keyBiz(), last:lsGet('last'),
       recruit:{ scan:get('recruit_scan'), at:lsGet('recruit_at'), log:recObj('recruit_log'),
-        url:recObj('recruit_url'), custom:get('recruit_custom'), seen:recObj('recruit_seen') }, at:Date.now() })
+        url:recObj('recruit_url'), custom:get('recruit_custom'), seen:recObj('recruit_seen'),
+        mailitems:get('recruit_mailitems'), mail_at:lsGet('recruit_mail_at'), mailfolders:lsGet('recruit_mailfolders'),
+        mailmap:recObj('recruit_mailmap'), mailskip:recObj('recruit_mailskip'), need:recObj('recruit_need') }, at:Date.now() })
       .then(function(){ _cloudFail=0; })
       .catch(function(e){ cloudFailSay('저장', e); }); }catch(e){ cloudFailSay('저장', e); }
   },1200);
@@ -697,6 +703,11 @@ async function cloudPull(){
     if(rc.url && !Object.keys(recObj('recruit_url')).length) lsSet('recruit_url', JSON.stringify(rc.url));
     if(Array.isArray(rc.custom) && !get('recruit_custom').length) lsSet('recruit_custom', JSON.stringify(rc.custom));
     if(rc.seen && !Object.keys(recObj('recruit_seen')).length) lsSet('recruit_seen', JSON.stringify(rc.seen));
+    if(Array.isArray(rc.mailitems) && !get('recruit_mailitems').length) lsSet('recruit_mailitems', JSON.stringify(rc.mailitems));
+    if(rc.mail_at && !lsGet('recruit_mail_at')) lsSet('recruit_mail_at', rc.mail_at);
+    if(rc.mailfolders && !lsGet('recruit_mailfolders')) lsSet('recruit_mailfolders', rc.mailfolders);
+    ['mailmap','mailskip','need'].forEach(function(k){
+      if(rc[k] && !Object.keys(recObj('recruit_'+k)).length) lsSet('recruit_'+k, JSON.stringify(rc[k])); });
   }catch(e){ cloudFailSay('불러오기', e); }
 }
 
@@ -720,7 +731,7 @@ function setTab(t){
   $('tbFeed').className='tb'+(t==='feed'?' on':'');
   $('tbRec').className ='tb'+(t==='rec'?' on':'');
   $('tbMat').className ='tb'+(t==='mat'?' on':'');
-  if(t==='rec'){ recDraw(); recWatchPull(); }
+  if(t==='rec'){ recDraw(); recWatchPull(); recMailScan(false); }
   lsSet('tab', t);                       /* ⚠ 클라우드로 내보내지 않는다(lsSet 은 안 밀어낸다) */
   /* 처음 들어오면 저절로 한 번 받아온다 — 빈 화면을 내놓지 않는다 */
   if(t==='mat' && !_mat) matPull();
@@ -819,6 +830,7 @@ function recDraw(){
   var at=Number(lsGet('recruit_at'));
   $('recAt').textContent = at ? '· 서류 폴더 읽은 때 '+new Date(at).toLocaleString('ko-KR') : '';
   if($('recWatch')) $('recWatch').innerHTML=recWatchHtml();   /* ⚠ 폴더를 안 읽었어도 새 모집 글은 보인다 */
+  if($('recMail')) $('recMail').innerHTML=recMailHtml();
   if(!scan.length){
     $('recBan').innerHTML='<div class="recban calm">📂 아직 서류 폴더를 읽지 않았습니다. <b>📂 서류 폴더에서 읽기</b>를 눌러 '
       +'<b>'+esc(REC_DIR)+'</b> 폴더(또는 그 위 서류 폴더)를 골라 주세요.<br>'
@@ -849,7 +861,7 @@ function recDraw(){
         +'<div class="sml">'+esc(o.what)+'</div></td>'
       +'<td style="white-space:nowrap">'+(o.month?o.month+'월'+(ah===0?' <span class="tag amber">이번 달</span>':ah===1?' <span class="tag amber">다음 달</span>':''):'<span class="sml">—</span>')+'</td>'
       +'<td>'+(yrs||'<span class="sml">아직 없음</span>')+'<span class="sml"> '+o.years.length+'해</span></td>'
-      +'<td>'+stHtml+'</td>'
+      +'<td>'+stHtml+recMailMark(o.id, y)+'</td>'
       +'<td style="white-space:nowrap">'+link+' <button class="btn sm" onclick="recPrep(\''+esc(o.id)+'\')">📋 서류 준비</button>'
         +(o.month?' <button class="btn sm" onclick="recCal(\''+esc(o.id)+'\')" title="해마다 '+(o.month===1?12:o.month-1)+'월 1일에 준비 알림 — 구글 캘린더">📅</button>':'')+'</td></tr>';
   }).join('') : '<tr><td colspan="6" class="empty">기관에 묶인 지원 이력이 없습니다 — ＋ 기관 더하기로 찾는 말을 넣어 보세요</td></tr>';
@@ -908,6 +920,208 @@ function recWatchCal(key){
     details:(x.boardName||'')+(/^https:\/\//.test(x.href||'')?'\n공고: '+x.href:'')+'\n(정부사업신청 › 컨설턴트 모집 › 새 모집 글)' });
   if(!u){ toast('날짜를 읽지 못했습니다'); return; }
   window.open(u, '_blank', 'noopener');
+}
+
+/* ═══ 📬 메일에서 찾은 것 — 「냈나·됐나」 (대표 지시 2026-10-04 「제출한 경우 자동으로 정리」, 선택 「① 정리」) ═══
+   ⚠ 푸른 메일 목록(mailbox/msgs)을 «읽기만» 한다 — 메일함을 고치지 않는다. 본문·첨부는 안 읽는다(제목·날짜·첨부 수뿐).
+   ⚠ 「지원함」만 저절로 적는다(via:'mail' — ↩ 되돌리기가 있다). 선정·탈락은 «묻는다» —
+     제목만 보고 틀리게 적으면 지원 이력이 거짓이 된다. 사람이 적은 상태는 덮지 않는다(GovSubmit.plan).
+   ⚠ 하루 한 번만 저절로 읽는다(폴더 몇 개 × 400통). 「📬 다시 찾기」로 언제든. */
+var REC_MAIL_RE=/컨설팅|공공기관|노무사회|이력서|개인메일|사무실업무/;
+var REC_MAIL_EVERY=12*3600e3;
+var _recMailBusy=false, _recMailErr='';
+function recMailFolders(all){
+  return Object.keys(all||{}).map(function(k){ var f=all[k]||{}; return { slug:f.slug||k, name:String(f.name||k), kind:String(f.kind||'') }; })
+    .filter(function(f){ return f.kind==='inbox'||f.kind==='sent'||f.kind==='archive'||(f.kind==='custom'&&REC_MAIL_RE.test(f.name)); });
+}
+function recMatches(t){ return GovRecruit.matches(t, get('recruit_custom')); }
+async function recMailScan(force){
+  if(!fbDb||!fbUid||_recMailBusy) return;
+  var last=Number(lsGet('recruit_mail_at'))||0;
+  if(!force && last && Date.now()-last<REC_MAIL_EVERY){ if(recMailApply(true)) recDraw(); return; }
+  _recMailBusy=true; _recMailErr=''; recDraw();
+  try{
+    var fsv=(await fbDb.ref('mailbox/folders').once('value')).val()||{};
+    var pick=recMailFolders(fsv), folders=[];
+    for(var i=0;i<pick.length;i++){
+      var v=(await fbDb.ref('mailbox/msgs/'+pick[i].slug).once('value')).val()||{};
+      folders.push({ folder:pick[i].name, sent:pick[i].kind==='sent', rows:v });
+    }
+    var items=GovSubmit.collect(folders, recMatches).slice(0,300);
+    lsSet('recruit_mailitems', JSON.stringify(items)); lsSet('recruit_mail_at', String(Date.now()));
+    lsSet('recruit_mailfolders', String(pick.length));
+    if(!recMailApply(true)) cloudPush();
+  }catch(e){
+    _recMailErr=/permission/i.test(String(e&&(e.code||e.message)||e)) ? '메일함을 읽을 권한이 없습니다(재직 직원 계정으로 열어 주세요)' : '메일함을 읽지 못했습니다 — 인터넷을 확인해 주세요';
+  }
+  _recMailBusy=false; recDraw();
+}
+function recMailPlan(){ return GovSubmit.plan(get('recruit_mailitems'), recObj('recruit_log'), recObj('recruit_mailmap'), recObj('recruit_mailskip')); }
+/* 지원 메일을 찾으면 「지원함」으로 — 몇 건 적었는지 돌려준다 */
+function recMailApply(say){
+  var p=recMailPlan(); if(!p.auto.length) return 0;
+  recObjSet('recruit_log', GovSubmit.applyAuto(recObj('recruit_log'), p.auto, Date.now()));
+  if(say) toast('📬 메일에서 지원 '+p.auto.length+'건을 찾아 「지원함」으로 적었습니다 — 틀렸으면 ↩ 되돌리기');
+  return p.auto.length;
+}
+function recOrgName(id){ var o=GovRecruit.allOrgs(get('recruit_custom')).filter(function(x){ return x.id===id; })[0]; return o?o.name:id; }
+function recMailMark(id, y){
+  var c=((recObj('recruit_log')[id]||{})[y]||{});
+  if(c.via==='mail' && c.mail) return ' <span title="메일에서 찾음: '+esc(c.mail.date+' 「'+c.mail.subject+'」')+'">📨</span>';
+  if(c.result) return ' <span title="메일: '+esc(c.result.date+' 「'+c.result.subject+'」')+'">📩</span>';
+  return '';
+}
+function recMailUndo(org, y){
+  var lg=recObj('recruit_log'), c=(lg[org]||{})[y]; if(!c||c.via!=='mail') return;
+  var sk=recObj('recruit_mailskip'); if(c.mail&&c.mail.key) sk[c.mail.key]=1; recObjSet('recruit_mailskip', sk);
+  delete c.st; delete c.via; delete c.mail;
+  if(c.due) lg[org][y]=c; else delete lg[org][y];
+  if(!Object.keys(lg[org]||{}).length) delete lg[org];   /* 빈 껍데기를 남기지 않는다 */
+  recObjSet('recruit_log', lg); recDraw(); toast('되돌렸습니다 — 이 메일은 다시 적지 않습니다');
+}
+function recMailItem(key){ return get('recruit_mailitems').filter(function(x){ return x.key===key; })[0]; }
+/* 결과 적기 — 사람이 누른 것만 */
+function recMailResult(key, org, st){
+  var it=recMailItem(key); if(!it||!org) return;
+  var y=it.date.slice(0,4), lg=recObj('recruit_log'); lg[org]=lg[org]||{};
+  var c=lg[org][y]||{}; c.st=st; c.at=Date.now(); c.result={ key:key, date:it.date, subject:it.subject.slice(0,120) };
+  delete c.via; lg[org][y]=c;
+  recObjSet('recruit_log', lg); recDraw(); toast(recOrgName(org)+' '+y+'년을 「'+st+'」로 적었습니다');
+}
+function recMailSkip(key){ var sk=recObj('recruit_mailskip'); sk[key]=1; recObjSet('recruit_mailskip', sk); recDraw(); }
+/* 기관을 모르는 메일 — 사람이 기관을 고르면 기억하고(같은 메일은 다시 안 묻는다) 지원이면 저절로 적는다 */
+function recMailPick(key, org){
+  if(!org) return; var m=recObj('recruit_mailmap'); m[key]=org; recObjSet('recruit_mailmap', m);
+  recMailApply(true); recDraw();
+}
+function recCalAsk(title, sub, href){
+  var v=prompt('「'+title+'」\n\n마감일을 넣어 주세요 (예: 2027-01-20)\n메일·공고에서 접수 마감일을 확인하세요.', '');
+  if(v===null) return; v=v.trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(v)){ toast('2027-01-20 꼴로 넣어 주세요'); return; }
+  var u=GovRecruit.gcalUrl({ title:'[마감] '+title, date:v,
+    details:(sub||'')+(/^https:\/\//.test(href||'')?'\n공고: '+href:'')+'\n(정부사업신청 › 컨설턴트 모집)' });
+  if(u) window.open(u,'_blank','noopener');
+}
+function recMailNoticeCal(key){ var it=recMailItem(key); if(it) recCalAsk(it.subject, '메일로 온 모집 공고 · '+it.date, ''); }
+function recMailNoticeSeen(key){ var s=recObj('recruit_seen'); s['m|'+key]=Date.now(); recObjSet('recruit_seen', s); recDraw(); }
+function recMailHtml(){
+  var at=Number(lsGet('recruit_mail_at'))||0, nf=lsGet('recruit_mailfolders')||0;
+  var head='<b>📬 메일에서 찾은 것</b> <span class="sml">— 푸른 메일 '+nf+'개 폴더의 «제목»만 읽습니다(폴더마다 최근 400통, 메일함은 안 고칩니다)'
+    +(at?' · 마지막 '+esc(new Date(at).toLocaleString('ko-KR')):'')+'</span> '
+    +'<button class="btn sm" onclick="recMailScan(true)">'+(_recMailBusy?'읽는 중…':'📬 다시 찾기')+'</button>';
+  if(_recMailErr) return '<div class="recban calm">'+head+'<br>'+esc(_recMailErr)+'</div>';
+  if(!at) return '<div class="recban calm">'+head+'<br>'+(_recMailBusy?'메일함을 읽고 있습니다…':'아직 안 읽었습니다.')+'</div>';
+  var p=recMailPlan(), lg=recObj('recruit_log'), seen=recObj('recruit_seen'), parts=[];
+  var orgs=GovRecruit.allOrgs(get('recruit_custom'));
+  var opt=function(key){ return '<select onchange="recMailPick(\''+esc(key)+'\',this.value)" style="padding:2px 5px;font-size:11.5px"><option value="">기관 고르기…</option>'
+    + orgs.map(function(o){ return '<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>'; }).join('')+'</select>'; };
+  /* 저절로 적은 것 */
+  var done=[]; Object.keys(lg).forEach(function(o){ Object.keys(lg[o]||{}).forEach(function(y){ var c=lg[o][y]; if(c&&c.via==='mail'&&c.mail) done.push({o:o,y:y,c:c}); }); });
+  done.sort(function(a,b){ return String(b.c.mail.date).localeCompare(String(a.c.mail.date)); });
+  if(done.length) parts.push('<div class="pop-sub" style="margin:8px 0 4px">✅ 「지원함」으로 저절로 적은 것 '+done.length+'</div>'
+    + done.slice(0,10).map(function(d){ return '<div class="note">'+esc(d.c.mail.date)+' · <b>'+esc(recOrgName(d.o))+'</b> '+esc(d.y)+'년 — 「'+esc(d.c.mail.subject)+'」'
+      +(d.c.mail.att?' <span class="sml">첨부 '+d.c.mail.att+'</span>':'')+' <button class="btn sm" onclick="recMailUndo(\''+esc(d.o)+'\',\''+esc(d.y)+'\')">↩ 되돌리기</button></div>'; }).join(''));
+  /* 결과 — 묻는다 */
+  if(p.ask.length) parts.push('<div class="pop-sub" style="margin:8px 0 4px">🏅 결과 메일 '+p.ask.length+' <span class="sml">— 열어 보고 고르세요(저절로 적지 않습니다)</span></div>'
+    + p.ask.slice(0,12).map(function(a){ var k=a.item.key;
+      return '<div class="note">'+esc(a.item.date)+' · <b>'+esc(recOrgName(a.org))+'</b> — 「'+esc(a.item.subject)+'」'
+        +(a.guess?' <span class="tag teal">'+esc(a.guess)+' 같음</span>':' <span class="tag amber">열어 봐야 앎</span>')
+        +' <button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'선정\')">✓ 선정</button>'
+        +' <button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'탈락\')">✗ 탈락</button>'
+        +' <button class="btn sm" onclick="recMailSkip(\''+esc(k)+'\')">무시</button></div>'; }).join(''));
+  /* 기관 모름 */
+  if(p.pick.length) parts.push('<div class="pop-sub" style="margin:8px 0 4px">❓ 기관을 모르는 지원·결과 메일 '+p.pick.length+' <span class="sml">— 한 번 고르면 기억합니다</span></div>'
+    + p.pick.slice(0,12).map(function(it){
+      return '<div class="note">'+esc(it.date)+' · '+(it.kind==='submit'?'📨 지원':'🏅 결과')+' — 「'+esc(it.subject)+'」 '+opt(it.key)
+        +' <button class="btn sm" onclick="recMailSkip(\''+esc(it.key)+'\')">무시</button></div>'; }).join(''));
+  /* 메일로 온 모집 공고 */
+  var nts=p.notices.filter(function(n){ return !seen['m|'+n.key]; });
+  if(nts.length) parts.push('<details class="sec" style="margin-top:8px"><summary><span class="nm">✉ 메일로 온 모집 공고 '+nts.length+'</span>'
+    +'<span class="sml">게시판 감시가 못 읽는 기관도 메일로 알려 옵니다</span></summary><div class="body">'
+    + nts.slice(0,30).map(function(n){ return '<div class="note">'+esc(n.date)+' — 「'+esc(n.subject)+'」 '
+      +'<button class="btn sm" onclick="recMailNoticeCal(\''+esc(n.key)+'\')">📅 마감일</button> '
+      +'<button class="btn sm" onclick="recMailNoticeSeen(\''+esc(n.key)+'\')">✓ 봤음</button></div>'; }).join('')+'</div></details>');
+  if(!parts.length) parts.push('<div class="note">지원·결과·모집 메일을 찾지 못했습니다.</div>');
+  return '<div class="recban'+(p.ask.length||p.pick.length?'':' calm')+'">'+head+'</div><div style="margin:-4px 0 10px">'+parts.join('')+'</div>';
+}
+
+/* ═══ 📤 내기 전에 점검 (대표 선택 「②-가 — 정부사업신청 안에」) ═══
+   ⚠ 파일은 이 브라우저 안에서만 읽는다 — 서버·AI 로 보내지 않는다(주민번호가 들어 있을 수 있다).
+   ⚠ 한글·워드는 kordoc(PuKordocText, 1.4MB — 처음 고를 때 한 번 싣는다), PDF 는 pdf.js(쓸 때만 받는다).
+   ⚠ 그림 파일·스캔 PDF 는 글자가 없다 — 「못 읽었다」고 밝히고 눈으로 보라고 한다(통과로 치지 않는다). */
+var _recChk={};
+function recNeedOf(id){ var n=recObj('recruit_need')[id]; return Array.isArray(n)&&n.length?n:GovSubmit.NEED_DEFAULT.slice(); }
+function recNeedChips(id){
+  var need=recNeedOf(id);
+  return GovSubmit.KINDS.map(function(k){ var on=need.indexOf(k.k)>=0;
+    return '<button class="kw'+(on?' on':'')+'" onclick="recNeedTog(\''+esc(id)+'\',\''+k.k+'\')">'+(on?'✓ ':'+ ')+esc(k.name)+'</button>'; }).join('');
+}
+function recNeedTog(id, k){
+  var all=recObj('recruit_need'), need=recNeedOf(id), i=need.indexOf(k);
+  if(i>=0) need.splice(i,1); else need.push(k);
+  all[id]=need; recObjSet('recruit_need', all);
+  if($('recNeed')) $('recNeed').innerHTML=recNeedChips(id);
+  if(_recChk[id]) recCheckDraw(id);
+}
+function recPdfLib(){
+  if(window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+  return new Promise(function(res, rej){
+    var sc=document.createElement('script');
+    sc.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    sc.onload=function(){ try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; }catch(e){}
+      res(window.pdfjsLib); };
+    sc.onerror=function(){ rej(new Error('pdf.js 를 받지 못했습니다')); };
+    document.head.appendChild(sc);
+  });
+}
+/* 파일 → 글자 (못 읽으면 {text:null, why}) */
+async function recFileText(name, buf){
+  var ext=String(name||'').toLowerCase().split('.').pop();
+  try{
+    if(/^(hwp|hwpx|docx|xlsx)$/.test(ext)){
+      if(!window.PuKordocText) return { text:null, why:'한글 읽개를 싣지 못했습니다 — 눈으로 확인하세요' };
+      var r=await PuKordocText.read(buf);
+      return r&&r.text ? { text:r.text } : { text:null, why:'글자를 읽지 못했습니다 — 눈으로 확인하세요' };
+    }
+    if(ext==='pdf'){
+      var L=await recPdfLib(), doc=await L.getDocument({ data:new Uint8Array(buf) }).promise, out=[];
+      for(var p=1;p<=Math.min(doc.numPages,40);p++){
+        var tc=await (await doc.getPage(p)).getTextContent();
+        out.push(tc.items.map(function(x){ return x.str; }).join(' '));
+      }
+      var t=out.join('\n');
+      return t.replace(/\s/g,'').length>=20 ? { text:t } : { text:null, why:'스캔(그림) PDF 같아 글자가 없습니다 — 눈으로 확인하세요' };
+    }
+    if(ext==='txt') return { text:new TextDecoder('utf-8').decode(buf) };
+  }catch(e){ return { text:null, why:'읽다가 멈췄습니다('+String(e&&e.message||e).slice(0,60)+') — 눈으로 확인하세요' }; }
+  return { text:null, why:'그림·기타 파일 — 글자를 못 읽습니다. 눈으로 확인하세요' };
+}
+async function recCheckRun(id, files){
+  var list=Array.prototype.slice.call(files||[]); if(!list.length) return;
+  if($('recChkOut')) $('recChkOut').innerHTML='<div class="note">'+list.length+'개 파일을 읽는 중…</div>';
+  var rows=[];
+  for(var i=0;i<list.length;i++){
+    var f=list[i], buf=await f.arrayBuffer(), r=await recFileText(f.name, buf);
+    rows.push({ name:f.name, size:f.size, text:r.text, textErr:r.why||'' });
+  }
+  _recChk[id]={ files:rows };
+  recCheckDraw(id);
+}
+function recYmd(d){ var p=function(n){ return (n<10?'0':'')+n; }; return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate()); }
+function recCheckDraw(id){
+  var o=recFind(id), c=_recChk[id]; if(!o||!c||!$('recChkOut')) return;
+  var t=recToday(), y=String(t.getFullYear());
+  var r=GovSubmit.checkFiles(c.files, { need:recNeedOf(id), year:y, due:recDue(o,y), today:recYmd(t) });
+  var head = r.ok ? '<div class="recban calm" style="border-color:var(--teal);color:var(--teal)">✅ 빠진 서류·주민번호·작년 파일이 없습니다 — 서명·도장만 눈으로 확인하세요</div>'
+    : '<div class="recban">'+(r.top.length?r.top.map(esc).join('<br>'):'아래 파일별 ⚠ 를 확인하세요')+'</div>';
+  var tb=r.rows.map(function(x){
+    return '<tr><td style="white-space:normal">'+esc(x.name)+'<div class="sml">'+Math.max(1,Math.round(x.size/1024))+'KB</div></td>'
+      +'<td style="white-space:nowrap">'+(x.kind?esc(x.kindName):'<span class="sml">모름</span>')+'</td>'
+      +'<td style="white-space:normal">'+(x.warn.map(function(w){ return '<div style="color:var(--red)">⚠ '+esc(w)+'</div>'; }).join('')
+        +x.info.map(function(w){ return '<div class="sml">ℹ '+esc(w)+'</div>'; }).join('')||'<span style="color:var(--teal)">✓</span>')+'</td></tr>'; }).join('');
+  $('recChkOut').innerHTML=head+'<div class="scroll"><table><thead><tr><th>파일</th><th>종류</th><th>점검</th></tr></thead><tbody>'+tb+'</tbody></table></div>'
+    +'<div class="bar" style="margin-top:8px"><a class="btn sm primary" href="pu-cards.html?view=mail" target="_blank" rel="noopener">✉ 푸른 메일 열기</a>'
+    +'<span class="sml">점검한 파일을 메일 쓰기 창에 붙여 보내세요. 보낸 뒤에는 📬 메일에서 찾은 것이 「지원함」으로 적습니다.</span></div>';
 }
 
 function recSetSt(id, v){
@@ -985,15 +1199,22 @@ function recPrep(id){
     +'<div class="pop-sub">① 올해 공고를 확인한다</div><div class="note">위 <b>공지</b>에서 '+y+'년 모집 공고를 찾고, 공고문·서식(한글 파일)을 내려받으세요.</div>'
     +'<div class="pop-sub">② 서식을 채운다</div><div class="note">경력관리 「기관 양식 채우기」에서 내려받은 서식을 올리면 내 정보가 채워집니다. '
       +'<button class="btn sm primary" onclick="recToForm(\''+esc(id)+'\')">📝 경력관리에서 서식 채우기</button></div>'
-    +'<div class="pop-sub">③ 그동안 낸 서류 ('+o.items.length+'건) <span class="sml">— 서류 폴더 7번, 읽기만 합니다</span></div>'
+    +'<div class="pop-sub">③ 내기 전에 점검한다 <span class="sml">— 파일은 이 브라우저 안에서만 읽습니다(어디에도 보내지 않습니다)</span></div>'
+    +'<div class="note" style="margin-bottom:4px">이번 공고가 요구하는 서류를 고르세요(누르면 켜고 끕니다)</div>'
+    +'<div class="bar" id="recNeed">'+recNeedChips(id)+'</div>'
+    +'<div class="bar"><input type="file" id="recChkFiles" multiple onchange="recCheckRun(\''+esc(id)+'\',this.files)">'
+      +'<span class="sml">보낼 파일(이력서·경력증명서·동의서·자격증 사본 …)을 «모두» 고르세요</span></div>'
+    +'<div id="recChkOut"></div>'
+    +'<div class="pop-sub">④ 그동안 낸 서류 ('+o.items.length+'건) <span class="sml">— 서류 폴더 7번, 읽기만 합니다</span></div>'
     +(items?'<div class="scroll"><table class="cmp"><tbody>'+items+'</tbody></table></div>':'<div class="note">아직 없습니다</div>')
     +'<div id="recFiles" style="margin-top:8px"></div>'
-    +'<div class="pop-sub">④ 캘린더에 넣는다 <span class="sml">— 구글 캘린더 일정 창이 채워져 열립니다. 저장은 대표님이 누르십니다</span></div>'
+    +'<div class="pop-sub">⑤ 캘린더에 넣는다 <span class="sml">— 구글 캘린더 일정 창이 채워져 열립니다. 저장은 대표님이 누르십니다</span></div>'
     +'<div class="bar">'
       +(o.month?'<button class="btn sm" onclick="recCal(\''+esc(id)+'\')">📅 해마다 '+(o.month===1?12:o.month-1)+'월 1일 준비 알림</button>':'<span class="sml">모집 달을 몰라 해마다 알림은 못 넣습니다</span>')
       +'<span class="sml" style="margin-left:8px">올해 마감일</span><input type="date" id="recDue" value="'+esc(recDue(o,y))+'" onchange="recSetDue(\''+esc(id)+'\',this.value)">'
       +'<button class="btn sm" onclick="recCalDue(\''+esc(id)+'\')">📅 마감일 넣기</button></div>'
-    +'<div class="pop-sub">⑤ 냈으면 적어 둔다</div><div class="note">목록의 「올해」 칸에서 지원함·선정·탈락을 고르면 내년에 참고합니다.</div>'
+    +'<div class="pop-sub">⑥ 냈으면 적어 둔다</div><div class="note">메일로 보냈으면 <b>📬 메일에서 찾은 것</b>이 저절로 「지원함」으로 적습니다. '
+      +'다른 길로 냈으면 목록의 「올해」 칸에서 고르세요.</div>'
     +(o.custom?'<div style="margin-top:12px"><button class="btn sm" onclick="recDelOrg(\''+esc(id)+'\')">🗑 직접 더한 기관 빼기</button></div>':''));
 }
 function recToForm(id){
