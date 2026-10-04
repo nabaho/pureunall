@@ -30,7 +30,11 @@ function load(opts) {
   let opener = function () { return { focus() { } }; };
   const nav = [];
   win.open = function (u, n) { return opener(u, n); };
-  win.location = { get href() { return 'about:blank'; }, set href(v) { nav.push(v); } };
+  /* pathname·search 를 주면 «그 주소에 떠 있는 화면»이 된다(whoAmI 가 본다) */
+  win.location = {
+    pathname: o.pathname || '', search: o.search || '',
+    get href() { return 'about:blank'; }, set href(v) { nav.push(v); }
+  };
   win.focus = function () { };
 
   const ctx = {
