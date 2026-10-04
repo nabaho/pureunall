@@ -61,3 +61,25 @@ test('도메인별 파일 이름', () => {
     { 'wa-0123456789': 'O', 'ia-0000000001': 'O' }, [], REV);
   assert.deepStrictEqual(Object.keys(plan.files).sort(), ['industrial-accident', 'wage-arrears']);
 });
+
+test('검토표 «파일»을 실제로 읽는다 — xlsx_gen 으로 만든 표에 O/X 를 적고 다시 읽기(Node 의 SheetJS readFile 함정)', () => {
+  const fs = require('fs'), os = require('os'), path = require('path');
+  const XG = require('../xlsx_gen.js');
+  const XLSX = require('../vendor/xlsx.full.min.js');
+  const Rp = require('../tools/forms_report.js');
+  const t = Rp.reviewRows([F({}), F({ id: 'wa-abcdefabcd', title: '동의서' })]);
+  const iId = t.headers.indexOf('ID');   // 표는 서식명 차례라 줄 차례로 짚지 않고 ID 로 짚는다
+  t.rows.forEach(r => { r[0] = r[iId] === 'wa-0123456789' ? 'O' : 'X'; });
+  const u8 = XG.build({ sheet: '임금체불', title: '서식집 검토표 1차', sub: '시험', headers: t.headers, colRatios: t.colRatios, rows: t.rows, landscape: true });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'forms-'));
+  const p = path.join(dir, '서식집_검토_1차_임금체불.xlsx');
+  fs.writeFileSync(p, Buffer.from(u8));
+  try {
+    assert.deepStrictEqual(P.readApprovals([p]), { 'wa-0123456789': 'O', 'wa-abcdefabcd': 'X' });
+    // 엑셀에서 고쳐 저장한 꼴(SheetJS 가 다시 쓴 파일)도 읽는다
+    const wb = XLSX.read(fs.readFileSync(p), { type: 'buffer' });
+    const p2 = path.join(dir, '고쳐저장.xlsx');
+    fs.writeFileSync(p2, XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' }));
+    assert.deepStrictEqual(P.readApprovals([p2]), { 'wa-0123456789': 'O', 'wa-abcdefabcd': 'X' });
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+});
