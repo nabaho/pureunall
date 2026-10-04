@@ -39,12 +39,12 @@ test('★ CDN 을 먼저, 저장소 사본을 나중에 — 순서가 뒤바뀌�
   const c = freshEngine().coreCandidates();
   assert.equal(c.length, 2);
   assert.equal(c[0], 'https://cdn.jsdelivr.net/npm/@rhwp/core@' + freshEngine().CORE_VERSION + '/rhwp.js');
-  assert.match(c[1], /vendor\/rhwp-core\/rhwp\.js$/);
+  assert.match(c[1], /vendor\/rhwp-core\/rhwp\.js\?v=\d+\.\d+\.\d+$/);
 });
 
 test('★ 저장소 사본은 언제나 마지막에 남는다 — 오프라인의 마지막 보루다', () => {
   const c = freshEngine().coreCandidates();
-  assert.match(c[c.length - 1], /vendor\/rhwp-core\/rhwp\.js$/);
+  assert.match(c[c.length - 1], /vendor\/rhwp-core\/rhwp\.js\?v=\d+\.\d+\.\d+$/);
 });
 
 test('★ 브라우저에 더 새 판이 적혀 있으면 그 판을 CDN 에서 받는다', () => {
@@ -60,7 +60,7 @@ test('★ 브라우저에 옛 판이 적혀 있어도 기본 판을 받는다 �
 test('★ CDN 을 끄면 저장소 사본만 쓴다 — CDN 이 응답을 물고 늘어지는 망을 위한 탈출구', () => {
   const c = freshEngine().coreCandidates({ cdnBase: '' });
   assert.equal(c.length, 1);
-  assert.match(c[0], /vendor\/rhwp-core\/rhwp\.js$/);
+  assert.match(c[0], /vendor\/rhwp-core\/rhwp\.js\?v=\d+\.\d+\.\d+$/);
 });
 
 test('CDN 주소를 갈아끼울 수 있다', () => {
@@ -94,4 +94,17 @@ test('DEFAULTS 에 CDN 밑동이 있다', () => {
 
 test('저장소 사본 경로는 그대로 남아 있다', () => {
   assert.match(srcText, /coreUrl:\s*'vendor\/rhwp-core\/rhwp\.js'/);
+});
+
+
+/* ── 사본은 «판 꼬리»와 함께 (2026-10-04 실측 — 옛 rhwp.js 캐시 + 새 wasm 이 섞여 LinkError) ── */
+test('★★ 저장소 사본 주소에 판 꼬리가 붙고, wasm 주소도 같은 꼬리를 쓴다', () => {
+  const E = freshEngine();
+  const c = E.coreCandidates();
+  const 사본 = c[c.length - 1];
+  assert.ok(사본.endsWith('rhwp.js?v=' + E.VENDOR_VERSION), 사본);
+  assert.equal(E.wasmArgFor(사본).module_or_path, 사본.replace('rhwp.js?', 'rhwp_bg.wasm?'));
+  /* CDN 은 판이 주소 길에 이미 들어 있다 — 꼬리 없이 그 판의 wasm */
+  assert.ok(E.wasmArgFor(c[0]).module_or_path.endsWith('@' + E.CORE_VERSION + '/rhwp_bg.wasm'));
+  assert.match(srcText, /mod\.default\(wasmArgFor\(url\)\)/, '★ 짝 없이 mod.default() 만 부르면 옛 wasm 이 섞인다');
 });

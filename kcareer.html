@@ -1290,7 +1290,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   @page{size:A4;margin:14mm}
 }
 </style>
-<script src="js/pu-hwp-engine.js?v=19"></script>
+<script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
@@ -14631,9 +14631,11 @@ async function _rhLayout(bytes, withCanvas){
 var _rhEngineMod=null;
 async function _rhEngine(){
   if(_rhEngineMod) return _rhEngineMod;
-  var url=new URL((PureunHwp.config().coreUrl||"vendor/rhwp-core/rhwp.js"), location.href).href;
+  /* ⚠ 저장소 사본을 «판 꼬리»와 함께 — 글과 엔진(wasm)이 다른 판으로 섞이면 LinkError 로 입력판이 멎는다(2026-10-04) */
+  var raw=(PureunHwp.config().coreUrl||"vendor/rhwp-core/rhwp.js");
+  var url=(typeof PureunHwp.vendorUrl==='function')?PureunHwp.vendorUrl(raw, location.href):new URL(raw, location.href).href;
   var mod=await (Function("u","return import(u)")(url));
-  await mod.default();
+  await mod.default((typeof PureunHwp.wasmArgFor==='function')?PureunHwp.wasmArgFor(url):undefined);
   _rhEngineMod=mod; return mod;
 }
 
