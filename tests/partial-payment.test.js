@@ -135,7 +135,7 @@ has('미수금관리가 받은 돈을 뺀다', /function _remain\(item, fee, kin
 has('미수금 배지도 같은 셈', /function _left\(item, fee, kindLabel, legacyField\)/);
 has('자문료를 금액으로 센다', /paidAmt\[_k\] = \(paidAmt\[_k\] \|\| 0\) \+ \(parseInt\(i\.amount, 10\) \|\| 0\)/);
 has('자문료 잔금은 받을 달로 기록', /advisoryYm: isAdv \? \(pItem\.ym \|\| String\(paidDate\)\.slice\(0,7\)\)/);
-has('업체 월 표가 부분입금을 가려낸다', /function paidInfo\(name, month, fee\)/);
+has('업체 월 표가 부분입금을 가려낸다', /function paidInfo\(\w+, month, fee\)/);   // 첫 칸은 업체 기록 또는 이름(2026-10-04)
 has('부분입금 달은 ◐ 로 보인다', /pInf\.partial[\s\S]{0,400}?'◐'/);
 has('부분입금 달은 색으로도 구분된다', /pInf\.partial \? '#fffbeb'/);
 has('◐ 에 얼마 받고 얼마 남았는지 붙는다', /약정 '\+pInf\.fee\.toLocaleString\(\)\+'원 중 '\+pInf\.got\.toLocaleString\(\)\+'원 받음/);

@@ -31,7 +31,11 @@ function sliceFn(head) {
 function load(incomes) {
   const ctx = { incomes, selYear: 2026 };
   vm.createContext(ctx);
-  vm.runInContext(sliceFn('function isPaid(') + '\n' + sliceFn('function getItem('), ctx);
+  /* 「그 회사 줄인가」는 incomeIsCo 한 곳이 정한다(2026-10-04 업체 번호로 견주기) — 탭 밖 함수라 따로 싣는다 */
+  const ic = erp.indexOf('function incomeIsCo(');
+  let j = erp.indexOf('{', ic), d = 0;
+  for (; j < erp.length; j++) { if (erp[j] === '{') d++; else if (erp[j] === '}' && --d === 0) break; }
+  vm.runInContext(erp.slice(ic, j + 1) + '\n' + sliceFn('function isPaid(') + '\n' + sliceFn('function getItem('), ctx);
   return ctx;
 }
 

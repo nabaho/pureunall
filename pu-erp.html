@@ -8120,16 +8120,28 @@ function erpAutoTidyOk(sug, memo, txnAmt){
 
 // 통장 입금내역 ↔ 자문료(업체입금) 자동 대조 — 저장은 하지 않고 후보만 반환
 // companies: [{name, fee, payDay, mainSid, mainName}]
+/* ══ 자문료 수입 줄이 «그 회사» 것인가 — 업체 번호가 있으면 번호로 (대표 「추천대로」 2026-10-04, 가 단계) ══
+   상호가 바뀌면 이름으로는 지난 입금이 떨어져 나가 «안 냄»으로 보이고, 같은 달 자문료를 또 만들라고 했다.
+   ★ 둘 다 업체 번호가 있으면 번호만 본다 — 이름이 달라도 같은 회사, 이름이 같아도 번호가 다르면 남이다.
+   ★ 번호가 없는 옛 줄(2026-10-04 기준 527줄)은 지금처럼 이름으로 본다 — 그 줄에 번호를 붙이는 일(나 단계)은 미뤘다.
+   co 는 업체 기록 또는 이름 글자 — 이름만 오면 이름으로 본다. */
+function incomeIsCo(i, co){
+  if(!i || !co) return false;
+  var id = (typeof co === 'object') ? (co.id || '') : '';
+  var nm = (typeof co === 'object') ? (co.name || '') : String(co);
+  if(id && i.companyId) return i.companyId === id;
+  return i.companyName === nm;
+}
 function erpAutoMarkCompanyIncome(txns, year, companies){
   var res = { applied:[], review:[] };
   var yStr = String(year);
   var incomes = dbGet('finance_income', []) || [];
   var claimed = {}; // 같은 실행 안에서 업체+월 중복 적용 방지
 
-  function alreadyPaid(name, month){
+  function alreadyPaid(co, month){
     var ym = yStr + '-' + ('0'+month).slice(-2);
     return incomes.some(function(i){
-      return i.companyName === name && i.sourceKind === 'company' && (i.date||'').slice(0,7) === ym;
+      return incomeIsCo(i, co) && i.sourceKind === 'company' && (i.date||'').slice(0,7) === ym;
     });
   }
 
@@ -8169,7 +8181,7 @@ function erpAutoMarkCompanyIncome(txns, year, companies){
     });
     // 이미 입금표시된 업체+월은 제외
     cands = cands.filter(function(c){
-      return !alreadyPaid(c.co.name, month) && !claimed[c.co.name + '|' + month];
+      return !alreadyPaid(c.co, month) && !claimed[c.co.name + '|' + month];
     });
     if(!cands.length) return;
     cands.sort(function(a,b){ return b.score - a.score; });
@@ -44785,13 +44797,13 @@ function erpAddCompanyIncome(co, month, year, date, note, kind, amount){
     }
     // 중복 방지 2차 관문 — 같은 업체+월이 이미 있으면 만들지 않는다
     var exists = (dbGet('finance_income', []) || []).some(function(i){
-      return i && i.sourceKind==='company' && i.companyName===co.name && String(i.date||'').slice(0,7)===ym;
+      return i && i.sourceKind==='company' && incomeIsCo(i, co) && String(i.date||'').slice(0,7)===ym;
     });
     if(exists) return false;
     return dbUpsert('finance_income', {
       id:'fi-adv-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
       date:date, amount:(amount != null ? (parseInt(amount,10)||0) : (co.fee||0)),
-      sourceKind:'company', sourceId:'',
+      sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
       companyName:co.name, kind:(kind || '자문료'), payDay:co.payDay||'',
       managerSid:co.mainSid||'', managerName:co.mainName||'',
       note:note||'', perfShares:[], createdAt:(new Date()).toISOString()
@@ -55438,7 +55450,7 @@ function IncomeCompanyTab(){
     })
     .filter(function(c){
       if(!showUnpaidOnly) return true;
-      return !isPaid(c.name, nowMonth);
+      return !isPaid(c, nowMonth);
     })
     .map(function(c){
       // cmsPayDay: 숫자만 추출
@@ -55480,7 +55492,7 @@ function IncomeCompanyTab(){
   var todayCMSList = SOURCE_LIST.filter(function(co){
     return co.isCMS && co.cmsPayDay === nowDay && co.fee > 0;
   });
-  var todayCMSUnpaid = todayCMSList.filter(function(co){ return !isPaid(co.name, nowMonth); });
+  var todayCMSUnpaid = todayCMSList.filter(function(co){ return !isPaid(co, nowMonth); });
 
   // 마운트 시 당일 CMS 알림 (한 번만)
   React.useEffect(function(){
@@ -55500,17 +55512,17 @@ function IncomeCompanyTab(){
     return ym+'-'+('0'+num).slice(-2);
   }
 
-  function isPaid(name,month){
+  function isPaid(who,month){   /* who = 업체 기록(번호로 견줌) 또는 이름 — incomeIsCo */
     var ym=selYear+'-'+('0'+month).slice(-2);
-    return incomes.some(function(i){return i.companyName===name&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
+    return incomes.some(function(i){return incomeIsCo(i, who)&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
   }
   /* 그 달 자문료를 얼마나 받았는지 — 부분입금(20만 중 15만)을 가려내려고 금액을 더한다.
      잔금이 다음 달에 들어와도 advisoryYm 이 가리키는 «받을 달» 로 센다. */
-  function paidInfo(name, month, fee){
+  function paidInfo(who, month, fee){
     var ym=selYear+'-'+('0'+month).slice(-2);
     var got=0, n=0;
     incomes.forEach(function(i){
-      if(i.companyName!==name || i.sourceKind!=='company') return;
+      if(!incomeIsCo(i, who) || i.sourceKind!=='company') return;
       if((i.advisoryYm||(i.date||'').slice(0,7))!==ym) return;
       got += parseInt(i.amount,10)||0; n++;
     });
@@ -55552,15 +55564,15 @@ function IncomeCompanyTab(){
   /* ⚠ isPaid·paidInfo 와 «같은 잣대»(advisoryYm 먼저, 없으면 입금일의 달)로 찾는다 (2026-10-02 입금관리 멈춤).
      예전엔 입금일의 달로만 찾아서, 9월 자문료가 10월 1일에 들어오면(advisoryYm 2026-09)
      isPaid 는 「9월 받음」인데 getItem 은 못 찾아 item.date 에서 화면 전체가 멈췄다. */
-  function getItem(name,month){
+  function getItem(who,month){
     var ym=selYear+'-'+('0'+month).slice(-2);
-    return incomes.find(function(i){return i.companyName===name&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
+    return incomes.find(function(i){return incomeIsCo(i, who)&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
   }
 
   /* kind — 안 주면 자문료 (CMS 나누기에서 해지 업체 종류를 넘겨준다) */
   /* amount — 실제로 적을 금액 (위 erpAddCompanyIncome 과 같은 규칙) */
   function addIncome(co, month, date, note, kind, amount){
-    var existing=getItem(co.name,month);
+    var existing=getItem(co,month);
     if(existing){
       if(!incomeLockGuard(existing) || !incomeLockGuard({date:date})) return;
       if(dbPatch('finance_income', existing.id, { date:date, note:note||'' })){ refreshIncomes(); showToast('수정됨'); }
@@ -55568,7 +55580,7 @@ function IncomeCompanyTab(){
       persistOneIncome({
         id:'fi-adv-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
         date:date, amount:(amount != null ? (parseInt(amount,10)||0) : (co.fee||0)),
-        sourceKind:'company', sourceId:'',
+        sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
         companyName:co.name, kind:(kind || '자문료'), payDay:co.payDay||'',
         managerSid:co.mainSid, managerName:co.mainName,
         note:note||'', perfShares: [], createdAt:(new Date()).toISOString()
@@ -55623,7 +55635,7 @@ function IncomeCompanyTab(){
     // 입금표시됐을 수 있어 쓰기 직전에 한 번 더 확인한다 (중복 방지 2차 관문)
     autoMarkModal.applied.forEach(function(a,i){
       if(!autoMarkModal.checked[i]) return;
-      if(isPaid(a.co.name, a.month)){ skip++; return; }
+      if(isPaid(a.co, a.month)){ skip++; return; }
       addIncome(a.co, a.month, a.date, '통장 자동 매칭');
       n++;
     });
@@ -55635,7 +55647,7 @@ function IncomeCompanyTab(){
   function openCellModal(co, month, event){
     event.stopPropagation();
     var ym=selYear+'-'+('0'+month).slice(-2);
-    var existing=getItem(co.name,month);
+    var existing=getItem(co,month);
     var autoDate=co.payDay?calcDate(ym,co.payDay):ym+'-15';
     // 클릭 위치 계산 (뷰포트 기준)
     var rect=event.currentTarget.getBoundingClientRect();
@@ -55656,7 +55668,7 @@ function IncomeCompanyTab(){
 
   function isMonthAllPaid(month){
     // 자문료가 안 나오는 달(계약 전·중단 뒤)은 「다 받았나」에서 뺀다 — 안 빼면 영영 다 못 받는다
-    return SOURCE_LIST.length > 0 && SOURCE_LIST.every(function(co){ return feeMonthOff(co, month) || isPaid(co.name, month); });
+    return SOURCE_LIST.length > 0 && SOURCE_LIST.every(function(co){ return feeMonthOff(co, month) || isPaid(co, month); });
   }
 
   function toggleMonthAll(month, checked){
@@ -55664,13 +55676,13 @@ function IncomeCompanyTab(){
     if(!checked){
       // 전체 해제
       var _rmIds = dbGet('finance_income', []).filter(function(i){
-        return i.sourceKind==='company'&&(i.date||'').slice(0,7)===ym&&SOURCE_LIST.some(function(co){return co.name===i.companyName;});
+        return i.sourceKind==='company'&&(i.date||'').slice(0,7)===ym&&SOURCE_LIST.some(function(co){return incomeIsCo(i, co);});
       }).map(function(i){ return i.id; });
       if(!removeManyIncome(_rmIds)) return;
       showToast(month+'월 '+_rmIds.length+'건 해제');
     } else {
       // 미납 전체 확정 (fee=0 업체 포함)
-      var unpaid=SOURCE_LIST.filter(function(co){return !isPaid(co.name,month) && !feeMonthOff(co,month);});
+      var unpaid=SOURCE_LIST.filter(function(co){return !isPaid(co,month) && !feeMonthOff(co,month);});
       if(!unpaid.length){showToast(month+'월 이미 전체 완료');return;}
       var base=Date.now();
       var toAdd=unpaid.map(function(co,i){
@@ -55678,7 +55690,7 @@ function IncomeCompanyTab(){
           id:'fi-adv-'+(base+i).toString(36)+Math.random().toString(36).slice(2,5),
           /* «그 달» 자문료로 — 이력이 없으면 지금 자문료 그대로다 */
           date:calcDate(ym,co.payDay), amount:(erpFeeForMonth(co, ym) || co.fee || 0),
-          sourceKind:'company', sourceId:'',
+          sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
           companyName:co.name, kind:'자문료', payDay:co.payDay||'',
           managerSid:co.mainSid, managerName:co.mainName,
           note:'', perfShares:[], createdAt:(new Date()).toISOString()
@@ -55690,7 +55702,7 @@ function IncomeCompanyTab(){
   }
 
   function toggleRow(co){
-    var unpaid=MONTHS.filter(function(m){return !isPaid(co.name,m) && !feeMonthOff(co,m);});
+    var unpaid=MONTHS.filter(function(m){return !isPaid(co,m) && !feeMonthOff(co,m);});
     if(!unpaid.length){showToast('이미 전월 완료');return;}
     customConfirm(co.name+'의 미납 '+unpaid.length+'개월을\n일괄 입금 확정하시겠습니까?\n\n금액: '+
       /* 달마다 금액이 다를 수 있다 — 보여주는 합계도 달별로 더한다
@@ -55702,7 +55714,7 @@ function IncomeCompanyTab(){
         return { id:'fi-adv-'+(base+i).toString(36)+Math.random().toString(36).slice(2,5),
           /* «그 달» 자문료로 — 이력이 없으면 지금 자문료 그대로다 */
           date:calcDate(ym,co.payDay), amount:(erpFeeForMonth(co, ym) || co.fee || 0),
-          sourceKind:'company', sourceId:'',
+          sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
           companyName:co.name, kind:'자문료', payDay:co.payDay||'',
           managerSid:co.mainSid, managerName:co.mainName,
           note:'', perfShares: [], createdAt:(new Date()).toISOString() };
@@ -55714,14 +55726,14 @@ function IncomeCompanyTab(){
 
   function registerCMS(){
     var ym=selYear+'-'+('0'+cmsMonth).slice(-2);
-    var unpaid=SOURCE_LIST.filter(function(co){return co.isCMS&&co.fee>0&&!isPaid(co.name,cmsMonth)&&!feeMonthOff(co,cmsMonth);});
+    var unpaid=SOURCE_LIST.filter(function(co){return co.isCMS&&co.fee>0&&!isPaid(co,cmsMonth)&&!feeMonthOff(co,cmsMonth);});
     if(!unpaid.length){showToast('CMS 미납 없음');setCmsOpen(false);return;}
     customConfirm('CMS 자동이체 '+unpaid.length+'건을\n'+ym+' 입금 확정하시겠습니까?', function(){
       var toAdd=unpaid.map(function(co){
         return { id:'fi-cms-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
           /* «그 달» 자문료로 — 이력이 없으면 지금 자문료 그대로다 */
           date:calcDate(ym,co.payDay), amount:(erpFeeForMonth(co, ym) || co.fee || 0),
-          sourceKind:'company', sourceId:'',
+          sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
           companyName:co.name, kind:'자문료', payDay:co.payDay||'',
           managerSid:co.mainSid, managerName:co.mainName,
           note:'CMS자동이체', perfShares: [], createdAt:(new Date()).toISOString() };
@@ -55736,11 +55748,11 @@ function IncomeCompanyTab(){
     var toAdd=[];
     SOURCE_LIST.forEach(function(co){
       if(feeMonthOff(co, nowMonth)) return;
-      if(isPaid(co.name,nowMonth)||!co.fee) return;
+      if(isPaid(co,nowMonth)||!co.fee) return;
       toAdd.push({ id:'fi-adv-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
         /* «그 달» 자문료로 만든다 — 이력이 없으면 지금 자문료 그대로다 */
         date:calcDate(ym,co.payDay), amount:(erpFeeForMonth(co, ym) || co.fee),
-        sourceKind:'company', sourceId:'',
+        sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
         companyName:co.name, kind:'자문료', payDay:co.payDay||'',
         managerSid:co.mainSid, managerName:co.mainName,
         note:'', perfShares: [], createdAt:(new Date()).toISOString() });
@@ -55759,12 +55771,12 @@ function IncomeCompanyTab(){
         var ym = selYear+'-'+('0'+m).slice(-2);
         SOURCE_LIST.forEach(function(co){
           if(feeMonthOff(co, m)) return;
-          if(isPaid(co.name, m) || !co.fee) return;
+          if(isPaid(co, m) || !co.fee) return;
           toAdd.push({ id:'fi-adv-'+(base+counter).toString(36)+Math.random().toString(36).slice(2,5),
             /* ★ 한 해치를 한꺼번에 만들 때가 가장 크게 어긋났다 — 지난 달까지
                «지금» 자문료로 만들어 버렸다. 달마다 그 달 금액으로 만든다. */
             date:calcDate(ym, co.payDay), amount:(erpFeeForMonth(co, ym) || co.fee),
-            sourceKind:'company', sourceId:'',
+            sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
             companyName:co.name, kind:'자문료', payDay:co.payDay||'',
             managerSid:co.mainSid, managerName:co.mainName,
             note:'', perfShares: [], createdAt:(new Date()).toISOString() });
@@ -56119,7 +56131,7 @@ function IncomeCompanyTab(){
   },0);
   // 이번달 입금: 이번달에 자문료가 나오는 회사 기준
   var nowActiveList = SOURCE_LIST.filter(function(c){ return !feeMonthOff(c, nowMonth); });
-  var paidThis = nowActiveList.filter(function(c){return isPaid(c.name,nowMonth);}).length;
+  var paidThis = nowActiveList.filter(function(c){return isPaid(c,nowMonth);}).length;
   // 연 합계: 회사별 (자문료가 나오는 월수 × fee)
   var yearTotal = SOURCE_LIST.reduce(function(s, c){
     var activeMonths = 0;
@@ -56140,7 +56152,7 @@ function IncomeCompanyTab(){
     var ds=useState(cellModal.date); var dv=ds[0]; var setDv=ds[1];
     var ns=useState(cellModal.note); var nv=ns[0]; var setNv=ns[1];
     var cs=useState(false); var confirming=cs[0]; var setConfirming=cs[1];
-    var existing=getItem(co.name,cellModal.month);
+    var existing=getItem(co,cellModal.month);
     var W=220, H=240;
     // 뷰포트 경계 조정
     var left=Math.min(Math.max(cellModal.px-W/2, 6), window.innerWidth-W-6);
@@ -56209,7 +56221,7 @@ function IncomeCompanyTab(){
   function CMSPanel(){
     if(!cmsOpen) return null;
     var cmsList=SOURCE_LIST.filter(function(co){return co.isCMS&&co.fee>0;});
-    var unpaidCnt=cmsList.filter(function(co){return !isPaid(co.name,cmsMonth);}).length;
+    var unpaidCnt=cmsList.filter(function(co){return !isPaid(co,cmsMonth);}).length;
     return h('div',{style:{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.4)',zIndex:9200,display:'flex',alignItems:'center',justifyContent:'center'}},
       h('div',{onClick:function(e){e.stopPropagation();},style:{background:'#fff',borderRadius:'10px',padding:'22px',minWidth:'360px',maxWidth:'460px',boxShadow:'0 12px 40px rgba(0,0,0,0.2)'}},
         h('div',{style:{fontWeight:700,fontSize:'15px',marginBottom:'12px'}},'🏦 CMS 자동이체 등록'),
@@ -56226,7 +56238,7 @@ function IncomeCompanyTab(){
           h('div',{style:{fontWeight:600,marginBottom:'5px',color:'#1e293b'}},'CMS 업체 ('+cmsList.length+'개)'),
           cmsList.length===0?h('div',{style:{color:'#94a3b8'}},'CMS 업체 없음')
           :cmsList.map(function(co,i){
-            var pd=isPaid(co.name,cmsMonth);
+            var pd=isPaid(co,cmsMonth);
             return h('div',{key:i,style:{display:'flex',justifyContent:'space-between',padding:'2px 0',borderBottom:'1px solid #f8fafc'}},
               h('span',{style:{color:pd?'#94a3b8':'#1e293b',fontWeight:pd?400:600}},co.name),
               h('span',{style:{color:pd?'#16a34a':'#dc2626',fontSize:'10.5px'}},pd?'✓ 완료':'미납 · '+co.payDay)
@@ -56543,7 +56555,7 @@ function IncomeCompanyTab(){
           SOURCE_LIST.length===0
             ?h('tr',null,h('td',{colSpan:21,style:{textAlign:'center',color:'#94a3b8',padding:'40px'}},curTab.label+' 업체가 없습니다'))
             :SOURCE_LIST.map(function(co,idx){
-              var paidCnt=MONTHS.filter(function(m){return isPaid(co.name,m);}).length;
+              var paidCnt=MONTHS.filter(function(m){return isPaid(co,m);}).length;
               var tcColor=TYPE_COLOR[co.typeCode]||'#64748b';
               return h('tr',{key:co.name,style:{background:paidCnt===0&&co.fee>0?'#fffbeb':'',borderBottom:'1px solid #f8fafc'}},
                 h('td',{style:{textAlign:'center',color:'#94a3b8',padding:'2px 2px',fontSize:'10px'}},idx+1),
@@ -56578,9 +56590,9 @@ function IncomeCompanyTab(){
                 MONTHS.map(function(m){
                   var beforeContract = isBeforeContract(co, m);
                   var afterSuspend = isAfterSuspend(co, m);
-                  var paid=isPaid(co.name,m);
-                  var item=paid?getItem(co.name,m):null;
-                  var pInf=paidInfo(co.name,m,co.fee);      // 부분입금(20만 중 15만)을 가려낸다
+                  var paid=isPaid(co,m);
+                  var item=paid?getItem(co,m):null;
+                  var pInf=paidInfo(co,m,co.fee);      // 부분입금(20만 중 15만)을 가려낸다
                   var isNow=m===nowMonth&&selYear===nowYear;
                   var dateStr=item?(item.date||'').slice(5).replace('-','/'):null;
                   var hasNote=item&&item.note;
@@ -56708,7 +56720,7 @@ function IncomeCompanyTab(){
           onMouseEnter:function(e){e.currentTarget.style.background='#f8fafc';},
           onMouseLeave:function(e){e.currentTarget.style.background='';} }, '📝 날짜·메모 편집'),
         cellCtxMenu.paid && h('div', { onClick:function(){
-            var item = getItem(cellCtxMenu.co.name, cellCtxMenu.m);
+            var item = getItem(cellCtxMenu.co, cellCtxMenu.m);
             if(item){
               if(removeManyIncome([item.id])) showToast(cellCtxMenu.co.name + ' ' + cellCtxMenu.m + '월 해제');
             }
@@ -56764,7 +56776,7 @@ function IncomeCompanyTab(){
               var ym=nowYear+'-'+('0'+nowMonth).slice(-2);
               var toAdd=todayCMSUnpaid.map(function(co){
                 return {id:'fi-cms-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-                  date:ym+'-'+('0'+nowDay).slice(-2), amount:co.fee, sourceKind:'company', sourceId:'',
+                  date:ym+'-'+('0'+nowDay).slice(-2), amount:co.fee, sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
                   companyName:co.name, kind:'자문료', payDay:co.payDay||'',
                   managerSid:co.mainSid, managerName:co.mainName,
                   note:'CMS자동이체', perfShares: [], createdAt:(new Date()).toISOString()};
@@ -60491,19 +60503,19 @@ function PersonalCalendar(props){
         var qStart = year+'-'+String((q-1)*3+1).padStart(2,'0');
         var qEnd   = year+'-'+String(q*3).padStart(2,'0');
         paid = allIncomes.some(function(i){
-          if(i.kind!=='자문료' || (i.sourceId!==co.id && i.companyName!==co.name)) return false;
+          if(i.kind!=='자문료' || !(i.sourceId===co.id || incomeIsCo(i, co))) return false;
           var ym = (i.date||'').slice(0,7);
           return ym >= qStart && ym <= qEnd;
         });
       } else if(isPrepaid){
         var yearStr = String(year);
         paid = allIncomes.some(function(i){
-          return i.kind==='자문료' && (i.sourceId===co.id || i.companyName===co.name)
+          return i.kind==='자문료' && (i.sourceId===co.id || incomeIsCo(i, co))
             && (i.date||'').startsWith(yearStr);
         });
       } else {
         paid = allIncomes.some(function(i){
-          return i.kind==='자문료' && (i.sourceId===co.id || i.companyName===co.name)
+          return i.kind==='자문료' && (i.sourceId===co.id || incomeIsCo(i, co))
             && (i.date||'').startsWith(calYm);
         });
       }
