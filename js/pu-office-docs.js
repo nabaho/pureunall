@@ -36,6 +36,22 @@
     return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
   }
   function msg(e) { return (e && e.message) || String(e); }
+  /* 보낸 서류 — 열쇠(사업자번호·이름)마다 읽은 줄을 합친다. 한 번 보낼 때 열쇠마다 같은 at 으로 적으므로
+     at·종류·서류 이름이 같으면 한 줄. 최근 위, 50줄까지 */
+  function sentRows(lists) {
+    var seen = {}, out = [];
+    (lists || []).forEach(function (l) {
+      (l || []).forEach(function (r) {
+        if (!r || !r.at) return;
+        var names = Array.isArray(r.names) ? r.names.map(String) : [];
+        var k = r.at + '|' + (r.kind || '') + '|' + names.join('/');
+        if (seen[k]) return;
+        seen[k] = 1;
+        out.push({ at: +r.at, kind: String(r.kind || '그 밖'), names: names, who: String(r.who || ''), by: String(r.by || '').split('@')[0] });
+      });
+    });
+    return out.sort(function (a, b) { return b.at - a.at; }).slice(0, 50);
+  }
 
   var CSS = ''
     + '.pod,.pod *{box-sizing:border-box}.pod{font-size:13px;color:#1e293b}'
@@ -75,7 +91,7 @@
     + '.pod-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}'
     + '.pod-pick .pod-card.sel{outline:3px solid #2563eb}'
     /* 계약 기록 표 (2026-10-03) */
-    + '.pod-rt{width:100%;border-collapse:collapse;table-layout:auto;margin-bottom:12px}'
+    + '.pod .pod-rt,.pod-m .pod-rt{width:100%;border-collapse:collapse;table-layout:auto;margin-bottom:12px}'
     + '.pod-rt th,.pod-rt td{padding:6px 8px;border-bottom:1px solid #e5e7eb;font-size:12.5px;text-align:left;white-space:nowrap}'
     + '.pod-rt th{color:#64748b;font-weight:600;background:#f8fafc}'
     + '.pod-rt tr.click td{cursor:pointer}.pod-rt tr.click:hover td{background:#eff6ff}'
@@ -238,7 +254,7 @@
   function mountCompanies(root, host) {
     css();
     var store = host.store;
-    var S = { cos: [], sel: null, docs: [], recs: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false };
+    var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false };
 
     function load(keepSel) {
       S.err = null;
@@ -254,13 +270,16 @@
     }
     function loadDocs() {
       var key = S.sel;
-      if (!key) { S.docs = []; S.recs = []; draw(); return Promise.resolve(); }
+      if (!key) { S.docs = []; S.recs = []; S.sent = []; draw(); return Promise.resolve(); }
       S.picked = {};
+      /* 보낸 서류는 곁들이 — 못 읽어도 파일·계약 기록은 그대로 보인다 */
+      var co = S.cos.filter(function (c) { return c.key === key; })[0] || {};
+      var sentP = host.sentFor ? host.sentFor(co.name || '', co.bz || '').then(sentRows, function () { return []; }) : Promise.resolve([]);
       /* 계약 기록은 규칙이 아직 없으면 막힌다 — 그래도 파일 카드는 보인다 */
       var recsP = store.listCoRecs ? store.listCoRecs(key).then(function (r) { S.recsDenied = false; return r; },
         function (e) { S.recsDenied = !!(store.isDenied && store.isDenied(e)); return []; }) : Promise.resolve([]);
-      return Promise.all([store.listCoDocs(key), recsP]).then(function (r) { if (key !== S.sel) return; S.docs = r[0]; S.recs = r[1]; draw(); },
-        function (e) { if (key !== S.sel) return; S.docs = []; S.recs = []; draw(); toast('❌ 이 회사 계약서를 불러오지 못했습니다 — ' + msg(e)); });
+      return Promise.all([store.listCoDocs(key), recsP, sentP]).then(function (r) { if (key !== S.sel) return; S.docs = r[0]; S.recs = r[1]; S.sent = r[2]; draw(); },
+        function (e) { if (key !== S.sel) return; S.docs = []; S.recs = []; S.sent = []; draw(); toast('❌ 이 회사 계약서를 불러오지 못했습니다 — ' + msg(e)); });
     }
     function coName(key) { var c = S.cos.filter(function (x) { return x.key === key; })[0]; return c ? c.name : ''; }
     function coList() { return el('datalist', { id: 'pod-cos' }, S.cos.map(function (c) { return el('option', { value: c.name }); })); }
@@ -773,7 +792,7 @@
           th.textContent = ''; th.appendChild(el('img', { src: u.url, alt: '', loading: 'lazy' }));
         }).catch(function () {});
       });
-      wrap.appendChild(el('div', { style: 'font-weight:700;margin-bottom:8px' }, [coName(S.sel), el('span', { style: 'font-weight:400;color:#64748b;font-size:12px;margin-left:6px', text: '계약 기록 ' + S.recs.length + '건 · 계약서 파일 ' + S.docs.length + '건' })]));
+      wrap.appendChild(el('div', { style: 'font-weight:700;margin-bottom:8px' }, [coName(S.sel), el('span', { style: 'font-weight:400;color:#64748b;font-size:12px;margin-left:6px', text: '계약 기록 ' + S.recs.length + '건 · 보낸 서류 ' + S.sent.length + '건 · 계약서 파일 ' + S.docs.length + '건' })]));
       /* 계약 기록 표 — ☐·# 맨 앞, 선택 지우기 (목록 관례) */
       var recBox = el('div');
       if (S.recsDenied) recBox.appendChild(el('div', { 'class': 'pod-note pod-warn', text: '⚠ 계약 기록 규칙이 아직 게시되지 않았습니다 — 파일 카드만 보입니다.' }));
@@ -800,7 +819,22 @@
             el('th', { text: '종류' }), el('th', { text: '금액' }), el('th', { text: '지급일·EDI' }), el('th', { text: '담당' }), el('th', { text: '출처' })])]), tb]));
         } else recBox.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '계약 기록이 없습니다' }));
       }
-      var right = el('div', null, [recBox, el('b', { style: 'display:block;font-size:13px;margin:4px 0 6px', text: '계약서 파일' }),
+      /* ✉ 보낸 서류 (설계 2026-10-03 §3 (라)) — 이 앱·기업정보함에서 보낸 것. 받는 주소는 기록에 없다(원칙) */
+      var sentBox = null;
+      if (S.sent.length) {
+        var stb = el('tbody');
+        S.sent.forEach(function (r) {
+          var d = new Date(r.at);
+          stb.appendChild(el('tr', null, [el('td', { style: 'overflow:visible', text: ymd(r.at) + ' ' + ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2) }),
+            el('td', { style: 'overflow:visible' }, [el('span', { 'class': 'pod-kd', text: r.kind })]),
+            el('td', { style: 'white-space:normal;min-width:160px;word-break:keep-all;overflow-wrap:anywhere', text: r.names.join(', ') || '—' }),
+            el('td', { text: r.who || '' }), el('td', { 'class': 'muted', text: r.by })]));
+        });
+        sentBox = el('div', null, [el('b', { style: 'display:block;font-size:13px;margin:4px 0 6px', text: '✉ 보낸 서류' }),
+          el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '보낸 때' }), el('th', { text: '종류' }),
+            el('th', { text: '서류' }), el('th', { text: '받는 분' }), el('th', { text: '보낸 이' })])]), stb])])]);
+      }
+      var right = el('div', null, [recBox, sentBox, el('b', { style: 'display:block;font-size:13px;margin:4px 0 6px', text: '계약서 파일' }),
         S.docs.length ? grid : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '올린 계약서 파일이 없습니다' })]);
       wrap.appendChild(el('div', { 'class': 'pod-co' }, [el('div', { 'class': 'pod-cl' }, [search, listBox]), right]));
       root.appendChild(wrap);
@@ -818,7 +852,7 @@
   }
 
   w.PuOfficeDocs = {
-    archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates,
+    archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
     mountArchive: mountArchive, mountCompanies: mountCompanies,
     _el: el, _toast: toast, _fmtSize: fmtSize, _ymd: ymd, _css: css, _deniedBanner: deniedBanner
   };
