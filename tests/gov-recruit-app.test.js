@@ -40,7 +40,7 @@ function runApp(seed, opt) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
-    + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,'
+    + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, opened, toasts };
@@ -226,4 +226,53 @@ test('★ 클라우드에서 받을 때 컨설턴트 모집 자료도 되살린�
   const f = src.slice(src.indexOf('async function cloudPull'), src.indexOf('/* ═══ 신청 재료'));
   ['recruit_scan', 'recruit_at', 'recruit_log', 'recruit_url', 'recruit_custom'].forEach((k) =>
     assert.ok(f.indexOf("lsSet('" + k + "'") >= 0, k + ' 를 안 받는다'));
+});
+
+/* ═══ 📅 구글 캘린더 (대표 결정 2026-10-04 「둘 다」) ═══ */
+test('★★ 📅 — 해마다 도는 «모집 준비» 일정 창을 연다(앞 달 1일)', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.recCal('erc');
+  assert.equal(r.opened.length, 1);
+  const u = r.opened[0];
+  assert.match(u, /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE/);
+  assert.match(u, /dates=20261201\/20261202/, '1월 모집이면 12월 1일');
+  assert.match(u, /recur=RRULE%3AFREQ%3DYEARLY/);
+  assert.match(decodeURIComponent(u), /\[모집 준비\] 지방공기업평가원/);
+});
+test('★ 목록 줄에 📅 단추가 있다 — 모집 달을 모르면 없다', () => {
+  const r = runApp({ recruit_scan: SCAN.concat([{ y: '2023', yd: '2023년', name: '2023충남사회서비스원 이사', dir: true, t: 0 }]) },
+    { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.recDraw();
+  const h = r.el('recTb').innerHTML;
+  assert.match(h, /recCal\('erc'\)/);
+  assert.doesNotMatch(h, /recCal\('pass'\)/, '날짜를 모르면 알림 날을 지어내지 않는다');
+});
+test('★★ 마감일 — 적어 두고 그 날 일정 창을 연다, 상태를 바꿔도 마감일이 남는다', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.el('recDue').value = '2027-01-20';
+  r.api.recCalDue('alio');
+  assert.equal(r.api.recDue({ id: 'alio' }, '2026'), '2027-01-20');
+  assert.match(r.opened[0], /dates=20270120\/20270121/);
+  assert.match(decodeURIComponent(r.opened[0]), /\[마감\] 공공기관 경영평가/);
+  r.api.recSetSt('alio', '지원함');
+  assert.equal(r.api.recObj('recruit_log').alio['2026'].due, '2027-01-20', '상태를 적어도 마감일은 남는다');
+  r.api.recSetSt('alio', '');
+  assert.equal(r.api.recObj('recruit_log').alio['2026'].due, '2027-01-20', '상태를 비워도 마감일은 남는다');
+  r.api.recSetDue('alio', '');
+  assert.equal(r.api.recObj('recruit_log').alio['2026'], undefined, '둘 다 비면 칸을 지운다');
+});
+test('마감일을 안 골랐으면 열지 않고 말한다', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.el('recDue').value = '';
+  r.api.recCalDue('alio');
+  assert.equal(r.opened.length, 0);
+  assert.ok(r.toasts.some((t) => /마감일을 먼저/.test(t)));
+});
+test('★ 서류 준비 창에 캘린더 칸이 있다', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recPrep('erc');
+  const b = r.el('popBody').innerHTML;
+  assert.match(b, /해마다 12월 1일 준비 알림/);
+  assert.match(b, /id="recDue"/); assert.match(b, /recCalDue\('erc'\)/);
+  assert.match(b, /저장은 대표님이 누르십니다/);
 });

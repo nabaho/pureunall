@@ -253,7 +253,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-g2b.js?v=6"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
-<script src="js/gov-recruit.js?v=1"></script>
+<script src="js/gov-recruit.js?v=2"></script>
 <script>
 /* ⚠ 경력관리와 «같은 파이어베이스 집»이다. 설정값은 공개용 웹 키다(규칙이 지킨다). */
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -846,7 +846,8 @@ function recDraw(){
       +'<td style="white-space:nowrap">'+(o.month?o.month+'월'+(ah===0?' <span class="tag amber">이번 달</span>':ah===1?' <span class="tag amber">다음 달</span>':''):'<span class="sml">—</span>')+'</td>'
       +'<td>'+(yrs||'<span class="sml">아직 없음</span>')+'<span class="sml"> '+o.years.length+'해</span></td>'
       +'<td>'+stHtml+'</td>'
-      +'<td style="white-space:nowrap">'+link+' <button class="btn sm" onclick="recPrep(\''+esc(o.id)+'\')">📋 서류 준비</button></td></tr>';
+      +'<td style="white-space:nowrap">'+link+' <button class="btn sm" onclick="recPrep(\''+esc(o.id)+'\')">📋 서류 준비</button>'
+        +(o.month?' <button class="btn sm" onclick="recCal(\''+esc(o.id)+'\')" title="해마다 '+(o.month===1?12:o.month-1)+'월 1일에 준비 알림 — 구글 캘린더">📅</button>':'')+'</td></tr>';
   }).join('') : '<tr><td colspan="6" class="empty">기관에 묶인 지원 이력이 없습니다 — ＋ 기관 더하기로 찾는 말을 넣어 보세요</td></tr>';
   var rest=g.rest;
   $('recRest').innerHTML = rest.length ? '<details class="sec"><summary><span class="nm">어느 기관에도 묶이지 않은 것 '+rest.length+'건</span>'
@@ -858,8 +859,35 @@ function recDraw(){
 function recSetSt(id, v){
   var lg=recObj('recruit_log'), y=String(recToday().getFullYear());
   lg[id]=lg[id]||{};
-  if(v) lg[id][y]={ st:v, at:Date.now() }; else delete lg[id][y];
+  /* ⚠ 마감일(due)은 같은 칸에 산다 — 상태를 바꿀 때 통째로 덮으면 마감일이 사라진다 */
+  var cur=lg[id][y]||{};
+  if(v){ cur.st=v; cur.at=Date.now(); lg[id][y]=cur; }
+  else { delete cur.st; if(cur.due) lg[id][y]=cur; else delete lg[id][y]; }
   recObjSet('recruit_log', lg); toast(v?'올해 상태를 「'+v+'」로 적었습니다':'올해 상태를 비웠습니다');
+}
+/* ═══ 📅 구글 캘린더 (대표 결정 2026-10-04 「둘 다」 중 구글 쪽) ═══
+   ⚠ 일정을 우리가 넣지 않는다 — 구글 캘린더의 «일정 만들기 창»을 채워 열 뿐, 저장은 대표님이 누른다.
+   ⚠ 주소에 싣는 것은 기관 이름·하는 일·공지 링크뿐이다. */
+function recDue(o, y){ var lg=recObj('recruit_log'); return ((lg[o.id]||{})[y]||{}).due||''; }
+function recSetDue(id, v){
+  var lg=recObj('recruit_log'), y=String(recToday().getFullYear());
+  lg[id]=lg[id]||{}; var cur=lg[id][y]||{};
+  if(v) cur.due=v; else delete cur.due;
+  if(cur.st||cur.due) lg[id][y]=cur; else delete lg[id][y];
+  recObjSet('recruit_log', lg);
+}
+function recCal(id){
+  var o=recFind(id); if(!o) return;
+  var u=GovRecruit.prepEvent(o, recToday());
+  if(!u){ toast('모집 달을 몰라 알림을 넣을 수 없습니다 — 서류 폴더를 먼저 읽어 주세요'); return; }
+  window.open(u, '_blank', 'noopener');
+}
+function recCalDue(id){
+  var o=recFind(id); if(!o) return;
+  var el=$('recDue'), v=(el&&el.value)||recDue(o, String(recToday().getFullYear()));
+  if(!v){ toast('올해 마감일을 먼저 골라 주세요 (공지에서 확인)'); return; }
+  recSetDue(id, v);
+  window.open(GovRecruit.dueEvent(o, v), '_blank', 'noopener');
 }
 function recSetUrl(id){
   var o=recFind(id); if(!o) return;
@@ -906,7 +934,12 @@ function recPrep(id){
     +'<div class="pop-sub">③ 그동안 낸 서류 ('+o.items.length+'건) <span class="sml">— 서류 폴더 7번, 읽기만 합니다</span></div>'
     +(items?'<div class="scroll"><table class="cmp"><tbody>'+items+'</tbody></table></div>':'<div class="note">아직 없습니다</div>')
     +'<div id="recFiles" style="margin-top:8px"></div>'
-    +'<div class="pop-sub">④ 냈으면 적어 둔다</div><div class="note">목록의 「올해」 칸에서 지원함·선정·탈락을 고르면 내년에 참고합니다.</div>'
+    +'<div class="pop-sub">④ 캘린더에 넣는다 <span class="sml">— 구글 캘린더 일정 창이 채워져 열립니다. 저장은 대표님이 누르십니다</span></div>'
+    +'<div class="bar">'
+      +(o.month?'<button class="btn sm" onclick="recCal(\''+esc(id)+'\')">📅 해마다 '+(o.month===1?12:o.month-1)+'월 1일 준비 알림</button>':'<span class="sml">모집 달을 몰라 해마다 알림은 못 넣습니다</span>')
+      +'<span class="sml" style="margin-left:8px">올해 마감일</span><input type="date" id="recDue" value="'+esc(recDue(o,y))+'" onchange="recSetDue(\''+esc(id)+'\',this.value)">'
+      +'<button class="btn sm" onclick="recCalDue(\''+esc(id)+'\')">📅 마감일 넣기</button></div>'
+    +'<div class="pop-sub">⑤ 냈으면 적어 둔다</div><div class="note">목록의 「올해」 칸에서 지원함·선정·탈락을 고르면 내년에 참고합니다.</div>'
     +(o.custom?'<div style="margin-top:12px"><button class="btn sm" onclick="recDelOrg(\''+esc(id)+'\')">🗑 직접 더한 기관 빼기</button></div>':''));
 }
 function recToForm(id){
