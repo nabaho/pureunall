@@ -46,6 +46,10 @@
 <script src="js/rules-v2/view-topics.js?v=4"></script>
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
 <script src="js/rules-v2/view-recommend.js?v=3"></script>
+<!-- ✨ AI 다듬기 — 호출기(서버 readDoc 를 부르는 얇은 층)·셈·상자. lib-polish 는 lib-topics·pu-rules-filecmp 를 쓴다(위에서 싣는다) -->
+<script src="js/pu-ai-call.js?v=3"></script>
+<script src="js/rules-v2/lib-polish.js?v=1"></script>
+<script src="js/rules-v2/view-polish.js?v=1"></script>
 <script src="xlsx_gen.js?v=3"></script>
 <style>
 :root{
@@ -628,6 +632,22 @@ table.daejo .rreason{color:var(--sub);font-size:11px}
 .ae-rec .rec-put{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:700}
 .ae-rec .rec-who{border-top:1px solid #e2e8f0;padding:4px 0}
 .ae-rec .rec-who-r{padding:1px 8px;color:#475569;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* ✨ AI 다듬기 — 💡 상자와 같은 모양. 한 줄 칸(머리 옆 방식·알림·까닭·⚠·오류)은 넘치면 … , 전문은 title.
+   AI 가 넣은 곳은 초록(<ins>), 뺀 곳은 흐리게 줄을 긋는다(<del> — 넣으면 사라질 곳) */
+.ae-pol{margin-top:10px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;padding:8px 10px;font-size:12px}
+.ae-pol:empty{display:none}
+.ae-pol .pol-h{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
+.ae-pol .pol-hm,.ae-pol .pol-note,.ae-pol .pol-why,.ae-pol .pol-err{display:block;min-width:0;color:#475569;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ae-pol .pol-note,.ae-pol .pol-why{margin-top:6px}
+.ae-pol .pol-err{color:#991b1b;font-size:12px}
+.ae-pol .pol-msg{color:#475569;margin-top:4px;min-width:0}
+.ae-pol .pol-menu{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.ae-pol .pol-body{background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;margin-top:6px;padding:6px 8px;line-height:1.7;max-height:220px;overflow:auto;color:#1e293b}
+.ae-pol .pol-body ins{background:#f0fdf4;color:#166534;text-decoration:none;border-bottom:2px solid #bbf7d0}
+.ae-pol .pol-body del{color:#94a3b8;text-decoration:line-through}
+.ae-pol .pol-warn{margin-top:6px;padding:3px 8px;border-radius:6px;background:#fffbeb;color:#854d0e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ae-pol .pol-foot{display:flex;gap:6px;margin-top:6px}
+.ae-pol .pol-use{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:700}
 .sample-banner{background:#fffbeb;border:1px solid #fbbf24;color:#854d0e;font-size:11.5px;font-weight:600;border-radius:8px;padding:7px 11px;margin-bottom:10px;line-height:1.55;white-space:normal}
 .panel-card{background:var(--card);border:1px solid var(--card-bd);border-radius:12px;padding:8px 12px;margin-bottom:10px;box-shadow:0 4px 16px rgba(30,58,138,.05)}
 /* 상태 점 — 이제 단추 앞과 전체 보기 목록에서 쓴다.
@@ -1032,9 +1052,11 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
         <textarea id="ae-after"></textarea>
         <div class="ae-btns">
           <button class="stbtn" id="ae-bank" title="과거 컨설팅에서 쓴 우리 법인 문안을 찾아 넣습니다">📚 우리 법인 문안</button>
+          <button class="stbtn" id="ae-polish" title="「변경 후」 글을 AI 에게 다듬게 하고, 고친 판을 견줘 본 뒤 고릅니다">✨ 다듬기</button>
           <button class="stbtn" id="ae-revert" title="변경 후를 현행 그대로 되돌림">현행으로 되돌리기</button>
           <button class="btn" id="ae-apply" style="height:32px;font-size:12.5px;padding:0 16px">신구대조표에 반영</button>
         </div>
+        <div class="ae-pol" id="ae-pol"></div>
         <div class="ae-rec" id="ae-rec"></div>
       </div>
       <div id="fs-bar" style="display:none;align-items:center;gap:8px;padding:6px 12px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--sub);flex-wrap:wrap">
@@ -2499,6 +2521,7 @@ function openArtEdit(a){
   $("art-edit").style.display="block";
   document.querySelectorAll("#artbox-list .pick-art").forEach(b=>b.classList.toggle("editing",b.dataset.label===a.label));
   recRender(a);   // 💡 우리 문안 — 실패해도 편집은 그대로(안에서 한 줄로 끝난다)
+  POL.st=null; polDraw();   // ✨ AI 다듬기 — 조를 열 때마다 비운다(앞 조의 판이 남으면 안 된다)
 }
 /* ── 조문 선택 모드: 원본 조문을 점선 박스로 표시 → 클릭 선택 → 신구대조표에 검토·수정 대상으로 추가 ── */
 function renderArticlePicker(){
@@ -7310,6 +7333,98 @@ function recClick(ev){
   }catch(e){ recFail(e); }
 }
 $("ae-rec").addEventListener("click",recClick);
+
+/* ══════ ✨ AI 다듬기 — 조문 편집 카드 (설계 §9 · 2026-10-04 목업 세 물음 「추천대로」) ══════
+   「변경 후」의 이 조 하나를 AI 에게 다듬게 하고(✍️ 뜻 그대로 · ⚖️ 검토 지적 반영), 고친 판을 지금 글에 견줘 보인 뒤
+   사람이 「이 판으로 바꾸기」를 눌러야 「변경 후」 칸에 들어간다(반영·저장은 지금처럼 사람이 누른다).
+   셈은 lib-polish, 그리기는 view-polish, 부르기는 pu-ai-call(서버 readDoc — 열쇠는 서버만 안다).
+   ★ 보내기 전에 «둘 다» 가린다 — 회사 이름은 {회사}(toSend), 주민번호·전화·계좌 등은 kordoc(redactFile).
+     가림이 실패하면 보내지 않는다(그 오류로 끝난다). 무료 등급이라 구글이 보낸 글을 학습에 쓸 수 있어서다.
+   ⚠ 한 번 누르면 한 번 부른다(POL.busy) — 하루 몫은 회사 전체가 함께 쓴다.
+   ⚠ 답이 오는 사이 다른 조를 열면(닫으면) 그 답은 버린다 — 다른 조에 앞 조의 글이 들어가면 안 된다.
+   ⚠ 읽기·쓰기 모두 서버 저장소에 닿지 않는다. AI 판은 어디에도 저장하지 않는다. */
+const POL={st:null,busy:false};
+const POL_ASK=["위반의심","누락","수동확인"];   // 「지적 반영」에 넘길 지적 — 시행예정·적합은 고칠 거리가 아니다
+function polDraw(){
+  const el=$("ae-pol"); if(!el)return;
+  try{ el.innerHTML=POL.st?PuRulesPolishView.boxHtml(POL.st):""; }
+  catch(e){ el.innerHTML='<div class="pol-msg">✨ AI 다듬기를 그리지 못했습니다 — '+escapeH(String((e&&e.message)||e||"알 수 없는 오류"))+'</div>'; }
+}
+/* 이 조의 지적 — 검토 결과 가운데 자리(loc)가 지금 연 조인 것 */
+function polFindings(){
+  return (ALL_FINDINGS||[]).filter(f=>f&&f.loc===AE_LABEL&&POL_ASK.indexOf(f.status)>=0);
+}
+/* 회사 이름 — 💡 우리 문안(recFill·recTerms)과 같은 고르기 */
+function polCoName(){ return siteName((LAST&&LAST.site)||SITE_MAP[siteSel.value]); }
+/* 「변경 후」에서 조 머리(artHeadOf — 💡·📖 와 한 벌)를 뗀 본문 */
+function polBody(){
+  const s=String($("ae-after").value||"").replace(/^\s+/,""), hd=artHeadOf(s);
+  return (hd?s.slice(hd.length):s).replace(/^\s+/,"");
+}
+function polMenu(){
+  if(POL.busy)return;   // 부르는 중에는 그대로 둔다(답이 오면 그 상자에 그린다)
+  const n=polFindings().length;
+  POL.st={state:"menu",hasFindings:n>0,nFindings:n};
+  polDraw();
+}
+/* 실패 글 — 하루 몫(429 + quota·free_tier 낱말)·로그인·그 밖은 까닭째 */
+function polErr(e){
+  const code=e&&e.status, m=String((e&&e.message)||e||"알 수 없는 오류");
+  if(code===401||(!code&&/로그인/.test(m)))return "로그인을 확인해 주세요";
+  if(code===429&&/quota|free_tier|PerDay|RESOURCE_EXHAUSTED/i.test(m))return "오늘 AI 몫이 다 찼습니다 — 내일 다시 해 주세요";
+  return "AI 다듬기를 못 했습니다 — "+m;
+}
+async function polSend(mode){
+  if(POL.busy)return;
+  const P=PuRulesPolish, label=AE_LABEL, title=AE_TITLE;
+  if(!label)return;
+  const finds=mode==="fix"?polFindings():[];
+  if(mode==="fix"&&!finds.length)return;   // 없는 지적을 «반영»하라고 시킬 수는 없다
+  const cur=polBody(), co=polCoName();
+  const st=POL.st={state:"sending",mode:mode==="fix"?"fix":"tidy"};
+  POL.busy=true; polDraw();
+  const mine=()=>POL.st===st&&AE_LABEL===label;
+  try{
+    if(!cur.trim())throw new Error("다듬을 글이 없습니다 — 「변경 후」를 먼저 채우세요");
+    const red=await PuKordocText.redactFile(new Uint8Array(0),P.toSend(cur,co).text);
+    const masked=String(red.text);   // 보낸 그대로 — parse 가 «보낸 가림 자리가 남았는가»를 이것으로 가른다
+    const lines=finds.map(f=>({title:f.rule.name+(f.rule.law?" ("+f.rule.law+")":""),desc:f.rule.criterion||"",note:f.note||""}));
+    const auth=(window.firebase&&firebase.auth)?firebase.auth():null;
+    const reply=await PuAiCall.ask([{text:P.prompt(st.mode,masked,lines)}],
+      {auth,app:"rules",generationConfig:{temperature:0.2,responseMimeType:"application/json"}});
+    if(!mine())return;
+    const r=P.parse(PuAiCall.textOf(reply),masked);
+    if(!r.ok)throw new Error(r.why);
+    const text=P.restore(r.text,co);
+    const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+    // 검토 기준으로 다시 판정 — 이 조(라벨·제목)·고친 글·지금 고른 규모(#size)
+    const warns=PuRulesV2TopicsView.warnsOf({members:[{label,title,body:text}]},{criteria:PuRulesCriteria,today},$("size").value);
+    Object.assign(st,{state:"ready",cur,got:{text,why:r.why,maskLeft:r.maskLeft},warns});
+  }catch(e){
+    if(!mine())return;
+    st.state="error"; st.err=polErr(e);
+  }finally{ POL.busy=false; }
+  polDraw();
+}
+/* 이 판으로 바꾸기 — 머리는 💡 넣기와 같은 규칙(insertText: 지금 머리 → 없으면 연 조의 머리) */
+function polUse(){
+  if(READONLY){ alert("열람 전용입니다."); return; }
+  const st=POL.st; if(!st||st.state!=="ready"||!st.got)return;
+  const ta=$("ae-after");
+  ta.value=PuRulesV2RecommendView.insertText(ta.value,st.got.text,{headOf:artHeadOf,own:aeOwnHead()});
+  POL.st=null; polDraw();
+  ta.focus();
+}
+function polClick(ev){
+  const b=ev&&ev.target&&ev.target.closest&&ev.target.closest("[data-pol]"); if(!b)return;
+  const k=b.dataset.pol;
+  if(k==="tidy"||k==="fix")polSend(k);
+  else if(k==="use")polUse();
+  else if(k==="menu")polMenu();
+  else if(k==="drop"){ POL.st=null; polDraw(); }   // 부르는 중이면 그 답은 mine() 에서 버려진다
+}
+$("ae-pol").addEventListener("click",polClick);
+$("ae-polish").addEventListener("click",polMenu);
 
 /* ══════ 표준취업규칙 (고용노동부, 연도별) ══════
    chwieop/standard/{연도} — 법인 공동 자산. 브라우저 사본과 병행. */
