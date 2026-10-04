@@ -32,6 +32,15 @@
   .done{text-align:center;padding:40px 0}
   .done .ic{font-size:52px}.done h2{font-size:19px;margin:14px 0 8px}
   .fatal{text-align:center;padding:60px 20px;color:#64748b}
+/* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
+     (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
+   ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
+     한 칸 칠 때마다 손으로 다시 줄여야 했다. 폰에서만 커지고 PC 는 그대로다.
+   ⚠ 앱마다 .srch input{font-size:11.5px} 처럼 더 «센» 규칙이 있어 !important 가 필요하다.
+   ⚠ 지우면 그 증상이 그대로 돌아온다 — tests/phone-input-zoom.test.js 가 지킨다. */
+@media (max-width: 760px){
+  input, select, textarea{ font-size: 16px !important; }
+}
 </style>
 </head>
 <body>
@@ -147,7 +156,15 @@ function showStep(n) {
   $(n === 'err' ? 'stepErr' : 'step' + n).classList.add('on');
   window.scrollTo(0, 0);
 }
-function fatal(msg) { $('fatalMsg').textContent = msg; showStep('err'); }
+/* ⚠ 윗줄(머리말)도 «함께» 고친다 — 안 고치면 근로자 폰에 서로 반대되는 말이 같이 뜬다.
+     아래: 「잘못된 접속 주소입니다」 · 위: 「사건 정보를 불러오는 중…」
+     그러면 받는 분은 아직 불러오는 줄 알고 그대로 기다린다(2026-10-04 폰 화면 점검). */
+function fatal(msg) {
+  $('fatalMsg').textContent = msg;
+  var 머리말 = $('caseTitle');
+  if (머리말) 머리말.textContent = '열 수 없는 링크입니다';
+  showStep('err');
+}
 
 // ── 사건 정보 로드 ──
 if (!caseId || !linkToken) {

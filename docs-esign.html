@@ -62,6 +62,15 @@
     .modal input,.modal select{max-width:100%}.btn{padding:9px 12px}
     .hwp-preview{min-height:300px;max-height:none}.hwp-actions{display:grid!important;grid-template-columns:1fr 1fr}.hwp-actions .btn{width:100%}
   }
+/* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
+     (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
+   ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
+     한 칸 칠 때마다 손으로 다시 줄여야 했다. 폰에서만 커지고 PC 는 그대로다.
+   ⚠ 앱마다 .srch input{font-size:11.5px} 처럼 더 «센» 규칙이 있어 !important 가 필요하다.
+   ⚠ 지우면 그 증상이 그대로 돌아온다 — tests/phone-input-zoom.test.js 가 지킨다. */
+@media (max-width: 760px){
+  input, select, textarea{ font-size: 16px !important; }
+}
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 이 한 줄이 빠져 있어서
      문서관리에만 오른쪽 「즐겨찾기」 손잡이가 없었다(대표 보고 2026-08-13) -->
