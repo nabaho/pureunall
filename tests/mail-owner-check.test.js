@@ -143,6 +143,10 @@ function colBox(parts) {
   vm.runInContext(m[0].replace(/^const /, 'var '), ctx);
   const mx = app.match(/^const MB_TAG_MAX = [^\n]*;/m); assert.ok(mx);
   vm.runInContext(mx[0].replace(/^const /, 'var '), ctx);
+  ['MB_TAG_ALONE', 'MB_TAG_REST_MAX'].forEach((k) => {
+    const r = app.match(new RegExp('^const ' + k + ' = [^\\n]*;', 'm')); assert.ok(r, k);
+    vm.runInContext(r[0].replace(/^const /, 'var '), ctx);
+  });
   ['mbTagW', 'mbTagCols', 'mbTagColsHtml'].forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   ctx.mbTagParts = (v) => parts[v];
   return ctx;
@@ -155,9 +159,14 @@ test('★★★ 쓰이는 열은 비어 있어도 자리를 지킨다 · 안 쓰
   const t = c.mbTagCols([0, 1]);
   const h1 = c.mbTagColsHtml(t, 0), h2 = c.mbTagColsHtml(t, 1);
   const cols = (h) => (h.match(/dm-c-[a-z]+/g) || []).join(',');
-  assert.equal(cols(h1), 'dm-c-who,dm-c-hrk');
+  /* 담당 열 + 나머지는 «한 무리»(2026-10-04 「그래도 너무 넓게 차지한다」) */
+  assert.equal(cols(h1), 'dm-c-who,dm-c-rest');
   assert.equal(cols(h2), cols(h1), '★★★ 줄마다 열이 달라 세로줄이 안 맞습니다');
-  assert.doesNotMatch(h1 + h2, /dm-c-work|dm-c-box/, '★★ 아무도 안 쓰는 열이 자리만 먹습니다');
+  const rw = (h) => (h.match(/dm-c-rest" style="width:(\d+)px/) || [])[1];
+  assert.ok(rw(h1) && rw(h1) === rw(h2), '★★★ 무리의 너비가 줄마다 달라 시작 자리가 안 맞습니다');
+  assert.doesNotMatch(h1 + h2, /dm-c-work|dm-c-box|dm-c-hrk/, '★★ 갈래마다 열을 따로 세워 줄이 넓어집니다');
+  const d = colBox([E.slice()]);
+  assert.equal(d.mbTagColsHtml(d.mbTagCols([0]), 0), '', '★★ 아무 딱지도 없는데 자리를 잡습니다');
 });
 
 test('★★ 급여데이터함 딱지는 «갈래»와 «📋 데이터함» 두 열로 가른다 · 열 너비는 CSS 한 곳', () => {
