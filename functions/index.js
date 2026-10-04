@@ -1106,7 +1106,9 @@ exports.rulesLawWatch = functions
    07:20 — 다른 아침 일들(06:00 법 감시·07:00·07:10)과 겹치지 않게. */
 exports.recruitWatch = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  /* ILABOR_ID·ILABOR_PW — 공인노무사회 «회원 공지»를 읽으려고 뉴스레터의 로그인 비밀값을 빌린다(2026-10-04).
+     코드는 값을 못 본다. 로그인은 하루 한 번, 읽기만 한다. */
+  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
   .pubsub.schedule("every day 07:20")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1115,15 +1117,41 @@ exports.recruitWatch = functions
     const existing = hSnap.val() || {};
     const nowIso = new Date().toISOString();
     const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
-    const result = await RecruitWatch.run({
-      existing, today, nowIso,
-      fetchText: async (u) => {
+    const fetchText = RecruitWatch.makeFetcher({
+      plain: async (u) => {
         const res = await fetch(u, { headers: { "User-Agent": RecruitWatch.UA }, signal: AbortSignal.timeout(30000) });
         if (!res.ok) throw new Error("HTTP " + res.status);
         return RecruitWatch.decode(new Uint8Array(await res.arrayBuffer()), res.headers.get("content-type"));
       },
+      /* 공인노무사회 로그인 — 뉴스레터의 노무사회로그인 ①② 걸음만 쓴다(ilabor 로 넘어가지 않는다) */
+      login: async () => {
+        const 아이디 = process.env.ILABOR_ID, 암호 = process.env.ILABOR_PW;
+        if (!아이디 || !암호) throw new Error("공인노무사회 아이디·비밀번호가 서버에 없습니다");
+        const 든것 = await 노무사회로그인(아이디, 암호, { 회원만: true });
+        return async (u) => {
+          const r = await 노무사회부르기(u, 든것.그릇들);
+          const 곳 = r.headers.get("location") || "";
+          if (r.status >= 300 && r.status < 400) throw new Error("로그인이 안 먹었다 — " + r.status + " → " + 곳.slice(0, 60));
+          if (!r.ok) throw new Error("HTTP " + r.status);
+          const 글 = await r.text();
+          if (노무사회.막혔나(글)) throw new Error("회원 공지가 막혔다 — 로그인이 풀렸다");
+          return 글;
+        };
+      },
     });
+    const result = await RecruitWatch.run({ existing, today, nowIso, fetchText });
     await root.update(RecruitWatch.updatesOf(result, existing, nowIso));
+    /* 처음 한 번만 — 회원 공지에 모집 공문이 정말 오는지 다섯 쪽을 훑어 남긴다(대표 확인용, 관리자만 읽힌다).
+       ⚠ 로그인이 안 됐으면 남기지 않는다 — 다음 날 다시 해 본다. */
+    try {
+      const 회원판 = RecruitWatch.BOARDS.find((b) => b.login);
+      const 있나 = (await root.child("member_probe").once("value")).exists();
+      if (회원판 && !있나 && !result.errors.some((e) => e.board === 회원판.id)) {
+        const 본 = await RecruitWatch.probeBoard({ board: 회원판, pages: 5, fetchText });
+        await root.child("member_probe").set(Object.assign({ at: nowIso }, 본));
+        console.log("[컨설턴트 모집 감시] 회원 공지 첫 훑기", { 쪽: 본.pages, 줄: 본.rows, 모집: 본.recruit.length });
+      }
+    } catch (e) { console.warn("[컨설턴트 모집 감시] 회원 공지 첫 훑기 실패", String(e && e.message || e)); }
     console.log("[컨설턴트 모집 감시]", { checked: result.checked, added: result.hits.length, errors: result.errors });
     return null;
   });
@@ -5058,7 +5086,8 @@ async function 따라가며부르기(주소, 그릇들, 더할것, 남은) {
      「로그인 정보가 존재하지 않습니다」가 돌아왔다. 아이디가 틀린 게 아니었다.
    ⚠ 걸음마다 «무엇을 받았는지» 적어 돌려준다. 실패했을 때 어느 걸음에서
      막혔는지 모르면 고칠 수가 없다(실제로 그것 때문에 하루를 썼다). */
-async function 노무사회로그인(아이디, 암호) {
+/* 옵션.회원만 — ②까지만 하고 돌려준다(공인노무사회 회원 공지만 읽을 때. 컨설턴트 모집 감시가 쓴다) */
+async function 노무사회로그인(아이디, 암호, 옵션) {
   const 그릇들 = { 회원: 쿠키그릇(), 자료: 쿠키그릇() };
   const 걸음 = [];
 
@@ -5089,6 +5118,8 @@ async function 노무사회로그인(아이디, 암호) {
     e.걸음 = 걸음;
     throw e;
   }
+
+  if (옵션 && 옵션.회원만) return { 그릇들: 그릇들, 걸음: 걸음 };
 
   /* ③ ilabor 로 넘겨받기 */
   const c = await 노무사회부르기(노무사회.SSO주소, 그릇들);

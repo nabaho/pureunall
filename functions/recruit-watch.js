@@ -51,7 +51,13 @@ const BOARDS = [
      노동전환)은 재단 게시판이 아니라 «공문»으로 와서 여기 실린다(대표님 서류 폴더의 공문0157·0229 가 그것).
      실측 2026-10-04: 2015~2026 150건 중 사람 뽑는 글 37건. ⚠ 회원 공지(/bbs/news)는 로그인이 있어야 해 안 읽는다.
      ⚠ 여러 기관 글이 섞인 게시판이라 org 를 비우고 제목으로 정한다(ORG_HINTS). */
-  { id: 'kcplaa',  org: '',        name: '공인노무사회 공지(기관 모집 공문)', url: 'https://www.kcplaa.or.kr/bbs/notice/list' }
+  { id: 'kcplaa',  org: '',        name: '공인노무사회 공지(기관 모집 공문)', url: 'https://www.kcplaa.or.kr/bbs/notice/list' },
+  /* ★ 공인노무사회 «회원» 공지 — 로그인해야 보인다(대표 지시 2026-10-04 「회원 공지 진행」).
+     2024년 3월 뒤 일반 공지에 모집 공문이 뜸해져, 회원 공지로 옮겼는지 보려고 더했다.
+     ⚠ 로그인은 뉴스레터가 쓰는 서버 비밀값(ILABOR_ID·ILABOR_PW)을 빌린다 — 코드는 값을 못 본다.
+     ⚠ login 이 붙은 게시판은 부르는 쪽이 «로그인한 그릇»으로 읽는다(makeFetcher). 로그인이 안 되면
+       이 게시판만 오류로 남기고 나머지는 그대로 돈다. */
+  { id: 'kcplaa_m', org: '',      name: '공인노무사회 회원 공지(로그인)', url: 'https://www.kcplaa.or.kr/bbs/news/list', login: 'kcplaa' }
 ];
 
 /* 여러 기관 글이 섞인 게시판(org 가 빈 것)에서 제목으로 기관을 정한다.
@@ -151,13 +157,13 @@ function daysBetween(a, b) {
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5);
 }
 
-/* 한 번 돈다. fetchText(url) → Promise<string>. 네트워크는 부르는 쪽이 준다(검사에선 가짜) */
+/* 한 번 돈다. fetchText(url, board) → Promise<string>. 네트워크는 부르는 쪽이 준다(검사에선 가짜) */
 async function run(o) {
   const boards = o.boards || BOARDS, have = o.existing || {}, today = o.today, nowIso = o.nowIso || '';
   const hits = [], errors = [], counts = {};
   for (const b of boards) {
     try {
-      const html = await o.fetchText(b.url);
+      const html = await o.fetchText(b.url, b);
       const rows = parseRows(html, b.url);
       counts[b.id] = rows.length;
       if (!rows.length) { errors.push({ board: b.id, why: '줄을 하나도 못 뽑았습니다(게시판 모양이 바뀌었을 수 있음)' }); continue; }
@@ -174,6 +180,38 @@ async function run(o) {
     }
   }
   return { hits, errors, counts, checked: boards.length };
+}
+
+/* 게시판에 맞는 «읽는 손»을 고른다 — login 이 붙은 게시판만 로그인한 손으로.
+   o.plain(url) → 글자 · o.login() → 로그인한 손(fetch(url) → 글자) · 로그인은 «한 번만» 한다.
+   ⚠ 로그인이 실패하면 그 실패를 기억해 같은 날 다시 두드리지 않는다(남의 서버에 비밀번호를 거듭 보내지 않는다). */
+function makeFetcher(o) {
+  let 손 = null;
+  return async function fetchText(url, board) {
+    if (!board || !board.login) return o.plain(url);
+    if (!손) 손 = Promise.resolve().then(() => o.login(board.login));
+    const h = await 손;
+    return h(url);
+  };
+}
+
+/* 처음 한 번만 — 로그인 게시판을 여러 쪽 읽어 «모집 공문이 정말 거기 오는가»를 남긴다(대표 확인용).
+   pages 쪽까지 읽고, 줄 수·사람 뽑는 글(제목·날짜·기관)을 돌려준다. 120일 제한 없이 본다. */
+async function probeBoard(o) {
+  const b = o.board, pages = o.pages || 5, rows = [];
+  let read = 0;
+  for (let p = 1; p <= pages; p++) {
+    const url = b.url + (b.url.indexOf('?') >= 0 ? '&' : '?') + 'page=' + p;
+    const got = parseRows(await o.fetchText(url, b), url);
+    if (!got.length) break;
+    if (rows.length && got[0].title === rows[0].title && got[0].date === rows[0].date) break;   // 쪽이 안 넘어간다
+    read = p; got.forEach((r) => rows.push(r));
+  }
+  const recruit = rows.filter((r) => isRecruit(r.title))
+    .map((r) => ({ date: r.date, title: r.title, org: b.org || orgHint(r.title) }));
+  return { board: b.id, pages: read, rows: rows.length,
+    from: rows.length ? rows[rows.length - 1].date : '', to: rows.length ? rows[0].date : '',
+    recruit: recruit.slice(0, 40) };
 }
 
 /* RTDB 에 쓸 것 — 새 글만 더하고, 넘치면 «오래된 것부터» 지운다(있던 글을 고치지 않는다) */
@@ -198,4 +236,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { UA, BOARDS, ORG_HINTS, orgHint, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, keyOf, run, updatesOf, decode, clean };
+module.exports = { UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, keyOf, run, updatesOf, decode, clean };
