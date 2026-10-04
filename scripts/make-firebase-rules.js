@@ -966,7 +966,13 @@ rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write
       (cloudPush/cloudPull 이 .catch 로 삼켰다). 그래서 한 브라우저에서 넣은 인증키가
       다른 브라우저로 안 넘어왔다 — 실측 permission_denied at /gov/{uid}.
    ⚠ 읽기·쓰기 모두 «본인만» — 인증키가 들어 있다. 관리자에게도 열지 않는다(kcareer 와 같은 집 모양). */
-rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+/* ⚠★ sv(쓰기 판) ≥ 2 만 받는다 (2026-10-04 사고). 옛 판 화면은 gov/{uid} 를 «통째로» set() 했고
+     그 판이 모르는 「컨설턴트 모집」 칸(recruit)을 통째로 지웠다(실측: 오후 3시 276건 → 4시 55분 없음).
+     새 판은 칸마다 update() 하면서 sv:2 를 함께 쓴다(js/gov-sync.js). 옛 판의 통째 set() 에는 sv 가 없어
+     이 규칙에 막힌다 — 그 화면은 「클라우드 저장 실패 — 권한」을 보이고 새로고침하면 새 판이 된다.
+   ⚠ 지우기(newData 없음)는 그대로 받는다 — 대표가 자기 자리를 비울 길은 남긴다. */
+rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+  '.validate': "!newData.exists() || newData.child('sv').val() >= 2" } };
 
 /* ══ 컨설턴트 모집 감시(서버 recruitWatch) — 기관 게시판 새 모집 글 (2026-10-04) ══
    대표 결정 「기관 게시판 새 글 자동 감지 서버 — 지금 만든다」.

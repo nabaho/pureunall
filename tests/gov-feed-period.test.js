@@ -41,7 +41,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: opt.fetch || (() => Promise.reject(new Error('no net'))),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
@@ -110,11 +110,12 @@ test('★★ 「새로 받기」가 받은 때·범위를 남긴다 — 그래�
 test('★ 받은 때를 클라우드에도 싣는다 — 다른 기기에서도 같은 범위를 말하게', async () => {
   const r = runApp({ last: '2026-10-04', last_at: '2026-10-04T06:20:00.000Z' });
   let 실은 = null;
-  r.api.setFb({ ref: () => ({ set: (v) => { 실은 = v; return Promise.resolve(); }, once: () => Promise.resolve({ val: () => null }) }) }, 'U1');
+  r.api.setFb({ ref: () => ({ update: (v) => { 실은 = Object.assign(실은 || {}, v); return Promise.resolve(); }, once: () => Promise.resolve({ val: () => null }) }) }, 'U1');
   r.api.cloudPush();
-  await new Promise((ok) => setTimeout(ok, 1400));
+  await new Promise((ok) => setTimeout(ok, 2800));   /* 받기(1.2초) → 보내기(1.2초) */
   assert.ok(실은, '클라우드에 쓰지 않았다');
   assert.equal(실은.last_at, '2026-10-04T06:20:00.000Z');
+  assert.ok(require('../js/gov-sync.js').field('last_at'), '받은 때가 합치기 칸 목록에 있어야 기기 사이로 간다');
 });
 
 test('★★ 틀고정 — 머리줄과 탭이 «한 덩어리»(#head)로 붙는다', () => {

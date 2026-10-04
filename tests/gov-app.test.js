@@ -137,7 +137,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,rejudge,pullAll,PAGE_MAX,matGo,matPageTo,matTog,matSelPage,matSelAll,matSelClear,matList,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,matPer,matRowClick,'
-    + 'setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
+    + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
 
@@ -658,4 +658,24 @@ test('★ 신청 재료도 몇 건씩 볼지 고르고, 줄을 누르면 팝업'
   assert.equal(r.el('pop').className, 'pop on');
   assert.match(r.el('popBody').innerHTML, /과제3/);
   assert.match(r.el('popTtl').textContent, /3번/);
+});
+
+/* ═══ 「새로 받기」 사이에 누른 ★·숨김 — 다 받은 «뒤» 목록에 더한다 (검토 2026-10-04) ═══ */
+test('★★ 받는 사이 누른 ★ 이 되돌아가지 않는다 · 두 번 눌러도 한 번만 받는다', async () => {
+  const r = runApp({ feed: [{ id: 'G0001', src: '나라장터', type: '새 공고', no: 'OLD-1', nm: '노무자문 용역', org: 'A', closeDt: '2099-12-31' }],
+    key_data: 'K' });
+  let release; const gate = new Promise((res) => { release = res; });
+  let calls = 0;
+  r.api.setPull(async () => { calls++; await gate;
+    return { response: { header: { resultCode: '00' }, body: { totalCount: 1,
+      items: [{ bidNtceNo: 'NEW-1', bidNtceOrd: '000', bidNtceNm: '임금체계 개편 노무 컨설팅 용역', ntceInsttNm: 'B', bidClseDt: '2099-12-31 10:00' }] } } }; });
+  const p1 = r.api.fetchAll();
+  const p2 = r.api.fetchAll();               // 두 번 눌러도
+  r.api.star('G0001');                       // 받는 사이 ★
+  release(); await p1; await p2;
+  const feed = JSON.parse(r.store.gov3_feed);
+  assert.equal(feed.find((x) => x.no === 'OLD-1').type, '관심', '받는 사이 누른 ★ 이 지워졌다');
+  assert.ok(feed.some((x) => x.no === 'NEW-1-000'), '새 공고는 들어온다');
+  assert.equal(feed.filter((x) => x.no === 'NEW-1-000').length, 1, '두 번 받으면 안 된다');
+  assert.equal(calls, 2, '한 번 받기 = 나라장터 한 번 + 알리오 한 번 — 두 번 눌러도 그대로');
 });
