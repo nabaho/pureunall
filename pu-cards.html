@@ -1261,6 +1261,15 @@ table.mstab2 tr:last-child td{border-bottom:none}
   background:#fff;color:#991b1b;border-radius:6px;cursor:pointer}
 .dm-spam button:hover{background:#fef2f2}
 .dm-row.spam{background:#f8fafc}
+/* ── 📥 새 문의 띠 (대표 승인 목업 2026-10-04) — 한 줄, 넘치면 … ── */
+.dm-inq{display:flex;align-items:center;gap:8px;padding:6px 12px;white-space:nowrap;
+  background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1e293b}
+.dm-inq b{color:#1e40af}
+.dm-inq .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.dm-inq .nm{cursor:pointer;text-decoration:underline;text-underline-offset:2px}
+.dm-inq button{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:12px;
+  padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
+.dm-inq button:hover{background:#eff6ff}
 /* ── 📤 보낸 메일을 사람마다 갈라 보는 칩 줄 (대표 지시 2026-09-16) ── */
 .dm-sentwho{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 12px;
   background:#f8fafc;border-top:1px solid #cbd5e1;border-bottom:1px solid #e2e8f0}
@@ -17470,9 +17479,12 @@ function loadMailFolders(cb){
   if(Store.mode!=='firebase'){ _mbFolders = _mbFolders||{}; if(cb) cb(); return; }
   Promise.all([
     firebase.database().ref(MB_ROOT+'/folders').once('value'),
-    firebase.database().ref(MB_ROOT+'/meta').once('value')
-  ]).then(([f,m])=>{
-    _mbFolders = f.val()||{}; _mbMeta = m.val()||{}; _mbErr=''; if(cb) cb();
+    firebase.database().ref(MB_ROOT+'/meta').once('value'),
+    mbInqRead()        /* 📥 신규 문의 기록 — 못 읽어도 메일함은 멀쩡해야 한다 */
+  ]).then(([f,m,q])=>{
+    _mbFolders = f.val()||{}; _mbMeta = m.val()||{}; _mbErr='';
+    _mbInq = (q && q.val()) || {};
+    if(cb) cb();
   }).catch(e=>{
     _mbErr = (e&&e.code)||(e&&e.message)||'읽지 못했습니다';
     /* ⚠ 로그인이 없어 거절당한 것이면 «다 읽었다»로 표시하지 않는다 — {} 로 굳히면
@@ -18092,6 +18104,50 @@ function mbSpamRows(){
      (「🔎 점검」 칩과 같은 규칙).
    ⚠ 조용히 빼지 않는다. 이 한 줄이 없으면 「우리 시스템이 메일을 먹었다」가 되고,
      그다음부터 대표께서 이 메일함을 못 믿으신다. */
+/* ══════════════════════════════════════════════════════════════════════════
+   📥 새 문의 띠 (대표 승인 목업 2026-10-04 — 「폰 알림 + 메일함 띠」·「들어오면 바로」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 고르는 것은 «서버»다(functions/mail-new-inquiry.js) — 새로 온 받은메일 가운데
+     제목에 문의·상담·견적·의뢰가 있고 처음 보는 곳. 같은 순간 관리자 폰에도 알린다.
+     화면은 그 기록(mailbox/inq)을 읽어 띠로만 보인다 — 여기서 다시 고르지 않는다.
+   ⚠ 누군가 그 메일을 열면(읽음) 띠에서 빠진다 — 따로 「확인」 단추를 두지 않는다.
+     메일함은 직원 공용이라 «읽음»이 곧 «누가 봤다»다.
+   ⚠ 메일 줄을 아직 못 받았으면(그 칸을 안 열었으면) 읽음 여부를 몰라 그대로 보인다.
+   ⚠ 0건이면 띠 자체가 없다 — 「🚫 스팸」 띠·「🔎 점검」 칩과 같은 규칙. */
+let _mbInq = {};
+const MB_INQ_READ = 30;        /* 서버에서 읽어 오는 최근 기록 수 */
+const MB_INQ_DAYS = 3;         /* 이보다 오래된 문의는 띠에 안 올린다 */
+const MB_INQ_NAMES = 3;        /* 띠에 이름으로 적는 수 — 나머지는 「외 n건」 */
+/* 최근 것만 가볍게 읽는다(열쇠 앞이 시각). ⚠ 무슨 일이 있어도 «던지지 않는다» —
+   메일함 폴더 읽기와 나란히 묶여 있어, 여기서 넘어지면 메일함 전체가 안 열린다. */
+function mbInqRead(){
+  try{
+    return firebase.database().ref(MB_ROOT+'/inq').orderByKey().limitToLast(MB_INQ_READ).once('value')
+      .catch(()=>null);
+  }catch(_){ return Promise.resolve(null); }
+}
+function mbInqRows(now0){
+  const cut = (now0 || Date.now()) - MB_INQ_DAYS * 86400000;
+  return Object.keys(_mbInq||{}).map(k=>_mbInq[k])
+    .filter(x => x && x.slug && x.u != null && Number(x.d||0) >= cut)
+    .filter(x => { const row = (_mbMsgs[x.slug]||{})[String(x.u)];
+                   return !row || !Number(row.r||0); })
+    .sort((a,b)=> Number(b.d||0) - Number(a.d||0));
+}
+function mbInqLineHtml(){
+  if(mbSentBox()) return '';               /* 우리가 낸 칸에서는 안 보인다 */
+  const rows = mbInqRows();
+  if(!rows.length) return '';
+  const a = x => `<span class="nm" onclick="mbOpenMsg('${esc(x.slug)}','${esc(String(x.u))}')"
+    title="${esc(x.e||'')} · ${esc(x.s||'')}">${esc(x.f||x.e||'(이름 없음)')}</span>`;
+  const more = rows.length > MB_INQ_NAMES ? ` 외 ${rows.length - MB_INQ_NAMES}건` : '';
+  const f = rows[0];
+  return `<div class="dm-inq">📥 <b>새 문의 ${rows.length}건</b>
+    <span class="who">— 처음 연락 온 곳입니다 · ${rows.slice(0, MB_INQ_NAMES).map(a).join(' · ')}${more}</span>
+    <button onclick="mbOpenMsg('${esc(f.slug)}','${esc(String(f.u))}')"
+      title="가장 최근 문의를 엽니다 — 열면(읽음) 이 띠에서 빠집니다">보기</button></div>`;
+}
+
 function mbSpamLineHtml(){
   if(!mbSpamOn()) return '';
   const n = mbSpamRows().length;
@@ -23292,6 +23348,7 @@ function mbListHtml(){
            [새로고침 ↻] 을 누르면 그때 알려 준다.
          ⚠ 되살리려면 이 자리에 dm-hint 한 줄을 도로 넣으면 된다(git 에 있다). */''}
     </div>
+    ${mbInqLineHtml()}
     ${mbSpamLineHtml()}
     ${mbSentWhoLineHtml()}
     <div class="dm-list ${mbDense()}">${body}</div>

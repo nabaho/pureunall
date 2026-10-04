@@ -27,6 +27,7 @@ const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
         올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
+const PUSH = require("./push-admins");   /* 관리자 폰 알림 — 건의·메일 신규 문의가 함께 쓴다 */
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
 const 지역뉴스부품 = require("./news-region");
@@ -527,29 +528,8 @@ exports.notifySuggestion = functions.database
     const meta = snap.val() || {};
     const db = getDatabase();
 
-    // 1) 관리자 UID 모으기
-    const rolesSnap = await db.ref("uid_roles").once("value");
-    const adminUids = [];
-    rolesSnap.forEach((child) => {
-      const v = child.val() || {};
-      if (v.isAdmin === true && v.status !== "resigned") adminUids.push(child.key);
-    });
-    if (!adminUids.length) return null;
-
-    // 2) 관리자들이 등록해 둔 기기 토큰 모으기 (본인이 올린 건의는 본인에게 안 보냄)
-    const authorUid = String(meta.authorUid || "");
-    const targets = [];
-    await Promise.all(adminUids.map(async (uid) => {
-      if (uid === authorUid) return;
-      const ts = await db.ref(`fcm_tokens/${uid}`).once("value");
-      ts.forEach((t) => { targets.push({ uid, token: t.key }); });
-    }));
-    if (!targets.length) {
-      console.log("notifySuggestion: 등록된 관리자 기기가 없습니다", { id: context.params.id });
-      return null;
-    }
-
-    // 3) 발송
+    // 관리자 기기로 보낸다 — 모으기·보내기·죽은 토큰 정리는 push-admins.js 한 곳
+    // (본인이 올린 건의는 본인에게 안 보냄)
     const cat = SG_CAT_NAME[meta.cat] || SG_CAT_NAME.etc;
     const payload = {
       title: `💬 새 건의 · ${cleanText(meta.author || "이름 없음", 20)}`,
@@ -557,30 +537,13 @@ exports.notifySuggestion = functions.database
       tag: "pu-suggestion",
       url: "/pureunall/enter.html?sg=1",
     };
-    const res = await getMessaging().sendEachForMulticast({
-      tokens: targets.map((t) => t.token),
-      data: payload,
-      webpush: { headers: { Urgency: "high", TTL: "86400" } },
-    });
-
-    // 4) 죽은 토큰 정리 — 안 지우면 기기를 바꿀 때마다 쓰레기가 쌓여 발송이 계속 실패한다
-    const dead = [];
-    res.responses.forEach((r, i) => {
-      const code = r.error && r.error.code;
-      if (code === "messaging/registration-token-not-registered" ||
-          code === "messaging/invalid-registration-token" ||
-          code === "messaging/invalid-argument") {
-        dead.push(`fcm_tokens/${targets[i].uid}/${targets[i].token}`);
-      }
-    });
-    if (dead.length) {
-      const updates = {};
-      dead.forEach((p) => { updates[p] = null; });
-      await db.ref().update(updates).catch((e) => console.warn("죽은 토큰 정리 실패", e));
+    const r = await PUSH.pushAdmins(db, getMessaging(), payload, { exceptUid: meta.authorUid });
+    if (!r.targets) {
+      console.log("notifySuggestion: 등록된 관리자 기기가 없습니다", { id: context.params.id });
+      return null;
     }
-
     console.log("notifySuggestion", {
-      id: context.params.id, sent: res.successCount, failed: res.failureCount, cleaned: dead.length,
+      id: context.params.id, sent: r.sent, failed: r.failed, cleaned: r.cleaned,
     });
     return null;
   });
