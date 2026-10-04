@@ -98,7 +98,7 @@ function harness(o) {
       warnsOf(g, M, size) { calls.warns.push({ g, M, size }); return V.warnsOf(g, M, size); },
       judgeWarns(g, M, size) {
         calls.warns.push({ g, M, size });
-        if (o.judgeThrows) throw new Error('판정 고장');
+        if (o.judgeThrows && o.judgeThrows(calls.warns.length)) throw new Error('판정 고장');   // n 번째 판정에서 넘어진다
         return V.judgeWarns(g, M, size);
       },
     },
@@ -337,43 +337,57 @@ test('⑥ 다시 판정 — 이 조(라벨·제목)·AI 가 고친 글·#size �
   await kordoc();
   const H = harness({ ask: () => Promise.resolve(replyOf({ text: '① {회사}는 15일을 준다.', why: '' })) });
   H.t.polMenu(); H.click('tidy'); await H.settle();
-  assert.equal(H.calls.warns.length, 1);
-  const { g, M, size } = H.calls.warns[0];
-  assert.equal(g.members[0].label, '제20조');
-  assert.equal(g.members[0].title, '연차유급휴가');
-  assert.equal(g.members[0].body, '① 가나상사는 15일을 준다.', '되돌려 채운 글로 판정해야 한다');
-  assert.equal(M.criteria, CR);
-  assert.match(String(M.today), /^\d{4}-\d{2}-\d{2}$/);
-  assert.equal(size, '10인이상');
-  assert.match(H.box(), new RegExp('위반 의심 0 → ' + H.t.POL.st.warns.length + '(?!\\d)'));
+  // 두 번 잰다 — 보낸 «지금 글»과 AI 글을, 같은 조·같은 기준·같은 날·같은 규모로
+  assert.equal(H.calls.warns.length, 2);
+  const [was, now] = H.calls.warns;
+  for (const { g, M, size } of [was, now]) {
+    assert.equal(g.members[0].label, '제20조');
+    assert.equal(g.members[0].title, '연차유급휴가');
+    assert.equal(M.criteria, CR);
+    assert.match(String(M.today), /^\d{4}-\d{2}-\d{2}$/);
+    assert.equal(size, '10인이상');
+  }
+  assert.equal(was.M.today, now.M.today);
+  assert.equal(was.g.members[0].body, H.t.POL.st.cur, '«전» 은 보낸 지금 글(머리 뗀 것)로 재야 한다');
+  assert.equal(now.g.members[0].body, '① 가나상사는 15일을 준다.', '«후» 는 되돌려 채운 AI 글로 재야 한다');
 });
 
 /* ── 최종 검토 지적 반영 (2026-10-04) ── */
 test('⑥ 다시 판정 — 「위반 의심 전 → 후」 · 누락·수동확인은 다시 안 봤다고 · 못 하면 0 이 아니라 「못 함」', async () => {
   await kordoc();
-  const ANS = () => Promise.resolve(replyOf({ text: '① {회사}는 15일을 준다.', why: '' }));
-  // 이 조의 위반의심 둘(다른 조 하나는 안 센다) · 누락 하나
-  const fs3 = [finding('제20조', '위반의심', '가'), finding('제20조', '위반의심', '나'), finding('제20조', '누락', '다'), finding('제3조', '위반의심', '딴 조')];
-  let H = harness({ findings: fs3, ask: ANS });
-  H.t.polMenu(); H.click('tidy'); await H.settle();
-  const n = H.t.POL.st.warns.length;
-  assert.match(H.box(), new RegExp('위반 의심 2 → ' + n + '(?!\\d)'), '전·후 수를 안 밝혔다');
-  assert.match(H.box(), /누락·수동확인은 다시 판정하지 않음/);
-  // 위반의심만 있던 조 — 덧말 없음
-  H = harness({ findings: [finding('제20조', '위반의심')], ask: ANS });
-  H.t.polMenu(); H.click('tidy'); await H.settle();
-  assert.match(H.box(), /위반 의심 1 → /);
-  assert.doesNotMatch(H.box(), /다시 판정하지 않음/);
-  // 수동확인만 있던 조 — 덧말 있음
-  H = harness({ findings: [finding('제20조', '수동확인')], ask: ANS });
-  H.t.polMenu(); H.click('tidy'); await H.settle();
-  assert.match(H.box(), /위반 의심 0 → .*누락·수동확인은 다시 판정하지 않음/);
-  // 판정이 넘어지면 숫자를 쓰지 않는다
-  H = harness({ findings: [finding('제20조', '위반의심')], ask: ANS, judgeThrows: true });
-  H.t.polMenu(); H.click('tidy'); await H.settle();
-  assert.match(H.box(), /다시 판정 못 함/);
-  assert.doesNotMatch(H.box(), /→\s*0|지적 0건/, '판정을 못 했는데 0 이라고 했다');
-  assert.match(H.box(), /이 판으로 바꾸기/, '판정을 못 해도 고친 판은 보인다');
+  // 진짜 판정으로 — 연차 «10일»은 위반 의심, «15일»은 아니다(검토 기준이 실제로 그렇게 가르는지 먼저 본다)
+  const BAD = '제20조(연차유급휴가) ① 가나상사는 1년간 80퍼센트 이상 출근한 사원에게 10일의 유급휴가를 준다.';
+  const GOOD = BAD.replace('10일', '15일');
+  const judge = (t) => V.judgeWarns({ members: [{ label: '제20조', title: '연차유급휴가', body: t.replace(/^제20조\(연차유급휴가\)\s*/, '') }] }, { criteria: CR, today: '2026-10-04' }, '10인이상').length;
+  assert.ok(judge(BAD) >= 1 && judge(GOOD) === 0, '검토 기준이 10일/15일을 가르지 않는다 — 검사 글을 바꿀 것');
+  const echo = (parts) => Promise.resolve(replyOf({ text: sentBody(parts[0].text), why: '' }));
+  const fixed = () => Promise.resolve(replyOf({ text: GOOD.replace(/^.*?①/, '①').replace('가나상사', '{회사}'), why: '' }));
+  const run = async (o) => { const H = harness(o); H.t.polMenu(); H.click('tidy'); await H.settle(); return H; };
+
+  // AI 가 위반을 «그대로 둔» 판 — 1 → 1 (본문에만 있는 위반이 0 으로 보이면 안 된다)
+  let H = await run({ after: BAD, ask: echo });
+  assert.match(H.box(), new RegExp('위반 의심 ' + judge(BAD) + ' → ' + judge(BAD) + '(?!\\d)'), 'AI 가 그대로 둔 위반이 사라진 것처럼 보인다');
+  // AI 가 고친 판 — n → 0
+  H = await run({ after: BAD, ask: fixed });
+  assert.match(H.box(), new RegExp('위반 의심 ' + judge(BAD) + ' → 0(?!\\d)'));
+  // «전» 은 검토 결과(ALL_FINDINGS)가 아니라 보내는 순간의 지금 글로 — 검토 때 위반의심이 둘 있었어도 지금 글이 깨끗하면 0
+  H = await run({ after: GOOD, ask: echo, findings: [finding('제20조', '위반의심', '가'), finding('제20조', '위반의심', '나')] });
+  assert.match(H.box(), /위반 의심 0 → 0(?!\d)/, '«전» 을 검토 결과에서 셌다');
+  assert.doesNotMatch(H.box(), /다시 판정하지 않음/, '위반의심만 있던 조에 덧말이 붙었다');
+  // 누락·수동확인이 이 조에 있었으면(다른 조의 것은 안 본다) 다시 안 봤다고 덧붙인다
+  for (const s of ['누락', '수동확인']) {
+    H = await run({ after: BAD, ask: fixed, findings: [finding('제20조', s)] });
+    assert.match(H.box(), /위반 의심 \d+ → 0 · 누락·수동확인은 다시 판정하지 않음/, s);
+  }
+  H = await run({ after: BAD, ask: fixed, findings: [finding('제3조', '누락')] });
+  assert.doesNotMatch(H.box(), /다시 판정하지 않음/, '다른 조의 누락을 이 조에 붙였다');
+  // 판정이 넘어지면(전·후 어느 쪽이든) 숫자를 쓰지 않는다
+  for (const judgeThrows of [() => true, (n) => n === 1, (n) => n === 2]) {
+    H = await run({ after: BAD, ask: fixed, judgeThrows });
+    assert.match(H.box(), /다시 판정 못 함/, String(judgeThrows));
+    assert.doesNotMatch(H.box(), /→/, '판정을 못 했는데 수를 적었다: ' + judgeThrows);
+    assert.match(H.box(), /이 판으로 바꾸기/, '판정을 못 해도 고친 판은 보인다');
+  }
 });
 
 test('⑥ judgeWarns 는 못 하면 던지고, warnsOf(📚·💡)는 그대로 [] 로 삼킨다', () => {
@@ -393,7 +407,8 @@ test('① 회사 이름은 보내는 그 순간 ERP 에서 — 앞 문서(A)의 
   // A 를 검토했다(LAST·SITE_INFO 가 A) → B 를 올려 골랐다 → ✨
   const H = harness({
     sel: 'B', last: { key: 'A', site: '🏢 ' + A, bizno: '123-81-00002' }, siteInfo: { id: 2, name: A, bizNo: '123-81-00002' },
-    siteMap: { A: '🏢 ' + A, B: '📄 ' + B + ' 취업규칙.hwp' }, siteBizno: { A: '123-81-00002', B: '' },
+    // B 는 파일로 올렸지만 사업자번호를 정해 왔다 — 그것으로 ERP 업체를 «확실히» 찾는다
+    siteMap: { A: '🏢 ' + A, B: '📄 ' + B + ' 취업규칙.hwp' }, siteBizno: { A: '123-81-00002', B: '123-81-00001' },
     erp: [{ id: 2, name: A, bizNo: '123-81-00002' }, { id: 1, name: B, bizNo: '123-81-00001' }],
     ask: (parts) => Promise.resolve(replyOf({ text: sentBody(parts[0].text), why: '' })),
   });
@@ -427,6 +442,41 @@ test('① ERP 에서 회사를 못 찾으면 묻는다 — 아니오면 안 부�
     assert.ok(body.includes('원본 서류'), site + ' — 본문의 「원본」을 {회사} 로 바꿨다: ' + body);
     assert.ok(!body.includes('{회사}'), site + ' — 회사 이름을 모르는데 무엇인가를 {회사} 로 바꿨다: ' + body);
   }
+});
+
+test('① 이름이 «통째로» 같거나 사업자번호가 같을 때만 그 업체 — ERP 의 짧은 이름이 파일 이름에 «들어 있다»고 고르지 않는다', async () => {
+  await kordoc();
+  const AFT = '제20조(연차유급휴가) ① 한국다온테크는 15일을 준다.';
+  const file = '📄 한국다온테크 취업규칙.hwp';
+  // ERP 에 짧은 이름 「한국」 — 파일 이름에 들어 있지만 같은 회사가 아니다 → 묻는다(조용히 보내지 않는다)
+  const H = harness({ after: AFT, erp: [{ id: 9, name: '한국', bizNo: '123-81-00009' }], last: { key: 'A', site: file, bizno: '' }, siteMap: { A: file } });
+  H.calls.yes = false;
+  H.t.polMenu(); H.click('tidy'); await H.settle();
+  assert.equal(H.calls.confirms.length, 1, '«포함» 맞추기로 엉뚱한 업체를 골라 묻지 않았다');
+  assert.equal(H.calls.ask.length, 0);
+  // 이름이 통째로 같으면(🏢·꼬리표·띄어쓰기·확장자는 떼고) 그 업체 — 묻지 않는다
+  for (const site of ['🏢 한국다온테크', '🏢 ㈜한국 다온테크', '📄 한국다온테크.hwp']) {
+    const E = harness({ after: AFT, erp: [{ id: 9, name: '한국', bizNo: '123-81-00009' }, { id: 7, name: '한국다온테크', bizNo: '123-81-00007' }],
+      last: { key: 'A', site, bizno: '' }, siteMap: { A: site } });
+    E.t.polMenu(); E.click('tidy'); await E.settle();
+    assert.equal(E.calls.confirms.length, 0, site + ' — 이름이 같은데 물었다');
+    assert.ok(!/한국\s*다온테크/.test(E.calls.ask[0].parts[0].text), site + ' — 회사 이름이 나갔다');
+  }
+  // 사업자번호가 같으면 이름이 달라도 그 업체
+  const N = harness({ after: AFT, erp: [{ id: 7, name: '한국다온테크', bizNo: '123-81-00007' }], last: { key: 'A', site: file, bizno: '123-81-00007' }, siteMap: { A: file } });
+  N.t.polMenu(); N.click('tidy'); await N.settle();
+  assert.equal(N.calls.confirms.length, 0);
+  assert.ok(!/한국\s*다온테크/.test(N.calls.ask[0].parts[0].text));
+});
+
+test('① 빈 글이면 회사 이름을 묻기 전에 끝낸다', async () => {
+  await kordoc();
+  const H = harness({ after: '제20조(연차유급휴가)  ', erp: [] });
+  H.t.polMenu(); H.click('tidy'); await H.settle();
+  assert.equal(H.calls.confirms.length, 0, '보낼 글이 없는데 회사 이름을 물었다');
+  assert.equal(H.calls.ask.length, 0);
+  assert.match(H.box(), /다듬을 글이 없습니다/);
+  assert.equal(H.t.POL.busy, false);
 });
 
 test('① 사업자번호도 가린다 — 기본 가림 묶음에 더해', async () => {

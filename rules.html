@@ -7360,10 +7360,17 @@ function polFindings(){
      SITE_INFO 는 A 다). 그 이름으로 가리면 B 의 이름은 그대로 나가고, 답의 {회사} 는 A 의 이름으로 채워진다.
    ⚠ LAST 도 지금 문서(siteSel)의 것일 때만 믿는다 — 다른 문서를 고르면 LAST 는 앞 문서 그대로 남는다.
    ⚠ 파일 이름·「원본」·「작업 문서」 같은 자리 글은 이름이 아니다 — 그것으로 가리면 본문의 「원본」이 {회사} 가 된다.
-     ERP 에서 못 찾으면 "" (보내기 전에 묻는다). */
+     ERP 에서 못 찾으면 "" (보내기 전에 묻는다).
+   ⚠⚠ findErpCompany 의 «이름 포함» 맞추기는 쓰지 않는다 — 사업자번호가 같거나 이름이 «통째로» 같을 때만.
+     ERP 에 짧은 이름(「한국」)이 있으면 파일 「한국다온테크 취업규칙.hwp」 가 그 업체로 잡혀, 「한국」만 가리고
+     진짜 회사 이름은 묻지도 않고 나간다. 못 믿으면 "" 로 돌려 묻게 한다. (공용 findErpCompany 는 그대로 둔다) */
 function polCoName(){
   const key=siteSel.value, L=(LAST&&LAST.key===key)?LAST:null;
-  const c=findErpCompany(L?L.site:SITE_MAP[key],L?L.bizno:SITE_BIZNO[key]);
+  const site=String((L?L.site:SITE_MAP[key])||"").replace(/^[📄🏢]\s*/u,"").replace(/〔샘플〕/g,"")
+    .replace(/\.(?:hwpx?|pdf|docx?|odt|txt)$/i,"").trim();
+  const b=_digits(L?L.bizno:SITE_BIZNO[key]), n=_norm(site);
+  const c=(b.length>=10&&ERP_COS.find(x=>x&&_digits(x.bizNo)===b))
+    ||(n.length>=2&&ERP_COS.find(x=>x&&_norm(x.name)===n))||null;
   return c?String(c.name||"").trim():"";
 }
 /* 조 머리(artHeadOf — 💡·📖 와 한 벌)와 앞 빈칸을 뗀 본문 */
@@ -7400,6 +7407,11 @@ async function polSend(mode){
   const finds=mode==="fix"?polFindings():[];
   if(mode==="fix"&&!finds.length)return;   // 없는 지적을 «반영»하라고 시킬 수는 없다
   const cur=polBody(), menu=POL.st;
+  // 빈 글이면 회사 이름을 묻기 전에 끝낸다 — 물어 놓고 «보낼 글이 없다»고 하면 헛물음이다
+  if(!cur.trim()){
+    POL.st={state:"error",err:polErr(new Error("다듬을 글이 없습니다 — 「변경 후」를 먼저 채우세요"))};
+    polDraw(); return;
+  }
   POL.busy=true;
   // 회사 이름은 «지금» ERP 에서 — 업체 목록이 아직 없으면 한 번 받아 온다(실패해도 loadErpCompanies 가 삼킨다)
   let co="";
@@ -7413,8 +7425,14 @@ async function polSend(mode){
   const st=POL.st={state:"sending",mode:mode==="fix"?"fix":"tidy"};
   polDraw();
   const mine=()=>POL.st===st&&AE_LABEL===label;
+  // 다시 판정의 잣대 — 보내는 순간의 «지금 글»과 AI 글을 «같은» 판정(judgeWarns)·같은 규모·같은 날로 잰다.
+  // ⚠ 검토 결과(ALL_FINDINGS)는 문서 전체를 본문 낱말까지 본 판정이라 잣대가 다르다 — 그것과 견주면
+  //   AI 가 그대로 둔 위반이 「1 → 0」으로 보인다. 그리고 그것은 원본 기준이지 지금 「변경 후」 기준이 아니다.
+  const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10), size=$("size").value;
+  const judge=(body)=>PuRulesV2TopicsView.judgeWarns({members:[{label,title,body}]},{criteria:PuRulesCriteria,today},size);
+  let before=null;
+  try{ before=judge(cur); }catch(e){ console.warn("✨ 다시 판정 못 함(지금 글):",e); }
   try{
-    if(!cur.trim())throw new Error("다듬을 글이 없습니다 — 「변경 후」를 먼저 채우세요");
     // 가림 — 기본 묶음(주민·계좌·카드·전화·전자우편·여권·면허)에 사업자번호까지. 서고와 달리 여기선 사업장 열쇠로 쓸 일이 없다
     const KT=PuKordocText, groups=KT.PII_GROUPS.filter(g=>g.on).map(g=>g.key).concat("brn");
     const red=await KT.redactFile(new Uint8Array(0),P.toSend(cur,co).text,groups);
@@ -7428,15 +7446,14 @@ async function polSend(mode){
     if(!r.ok)throw new Error(r.why);
     // 시켜도 AI 가 조 머리(「제25조(연차휴가)」)를 붙여 올 때가 있다 — 떼고 견주고 넣는다(넣을 때 머리는 지금 것을 지킨다)
     const text=polNoHead(P.restore(r.text,co));
-    const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
-    // 검토 기준으로 다시 판정 — 이 조(라벨·제목)·고친 글·지금 고른 규모(#size). «위반의심»만 다시 본다.
-    // 못 했으면(던지면) 숫자 대신 «다시 판정 못 함» — 못 한 것을 0 이라고 하면 «다 고쳤다»로 읽힌다
-    const was=(ALL_FINDINGS||[]).filter(f=>f&&f.loc===label);
+    // 검토 기준으로 다시 판정 — 이 조(라벨·제목)·고친 글. «위반의심»만 다시 본다.
+    // 둘 중 하나라도 못 했으면(던지면) 숫자 대신 «다시 판정 못 함» — 못 한 것을 0 이라고 하면 «다 고쳤다»로 읽힌다
     let warns=null;
-    try{ warns=PuRulesV2TopicsView.judgeWarns({members:[{label,title,body:text}]},{criteria:PuRulesCriteria,today},$("size").value); }
-    catch(e){ console.warn("✨ 다시 판정 못 함:",e); }
-    Object.assign(st,{state:"ready",cur,got:{text,why:r.why,maskLeft:r.maskLeft},warns,judgeFail:!warns,
-      before:was.filter(f=>f.status==="위반의심").length,
+    try{ warns=judge(text); }catch(e){ console.warn("✨ 다시 판정 못 함(AI 글):",e); }
+    // 누락·수동확인은 다시 판정하지 않는다 — 그런 지적이 이 조에 있었는지만 검토 결과에서 본다
+    const was=(ALL_FINDINGS||[]).filter(f=>f&&f.loc===label);
+    Object.assign(st,{state:"ready",cur,got:{text,why:r.why,maskLeft:r.maskLeft},
+      warns:before?warns:null,judgeFail:!before||!warns,before:before?before.length:0,
       unjudged:was.some(f=>f.status==="누락"||f.status==="수동확인")});
   }catch(e){
     if(!mine())return;
