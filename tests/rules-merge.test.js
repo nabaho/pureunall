@@ -81,18 +81,11 @@ function 단추(f) {
 test('④★★ 두 화면 머리줄에 갈래 단추가 «같게» 있다 — 주소, 이름, 차례도 같다', () => {
   const a = 단추('rules.html'), b = 단추('rules-v2.html');
   const 주소 = (x) => x.links.map((l) => l.href);
-  ['rules.html', 'rules-v2.html#topics', 'rules-v2.html#lib'].forEach((u) => {
+  ['rules-v2.html#sites', 'rules.html', 'rules-v2.html#topics', 'rules-v2.html#lib'].forEach((u) => {
     assert.ok(주소(a).includes(u), '★★ rules.html 단추에 ' + u + ' 가 없다');
     assert.ok(주소(b).includes(u), '★★ rules-v2.html 단추에 ' + u + ' 가 없다');
   });
-  /* 🏢 사업장(③-ⓐⓑ, 2026-10-04)은 rules-v2.html 에 먼저 달렸다 — rules.html 머리줄은 다음 단계(Task 4)에서 단다.
-     ⚠ 그 사이만 rules.html 쪽에 🏢 가 없어도 «나머지가 같은지»를 본다.
-       rules.html 에 🏢 가 달리는 순간 빼기 없이 «통째로 같은지»를 본다(저절로 조여진다).
-       Task 4 를 마치면 이 빼기 자체를 걷어 낼 것. */
-  const 사업장 = 'rules-v2.html#sites';
-  assert.ok(주소(b).includes(사업장), '★★ rules-v2.html 단추에 🏢 사업장이 없다');
-  const bb = 주소(a).includes(사업장) ? b.links : b.links.filter((l) => l.href !== 사업장);
-  assert.deepEqual(a.links.map((l) => [l.href, l.text]), bb.map((l) => [l.href, l.text]),
+  assert.deepEqual(a.links.map((l) => [l.href, l.text]), b.links.map((l) => [l.href, l.text]),
     '★★ 두 화면의 단추가 다르다 — 오가다 단추가 바뀌면 다른 앱처럼 보인다');
   a.links.forEach((l) => assert.ok(l.text.length > 1, '★ 이름 없는 단추: ' + l.href));
   // 같은 창으로 간다 — 새 창을 열면 «한 앱 한 창»이 깨진다
