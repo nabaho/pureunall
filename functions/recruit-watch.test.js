@@ -139,3 +139,29 @@ test('★★ 게시판 목록 — https 만, 기관 번호가 화면 사전과 �
   });
   assert.equal(new Set(W.BOARDS.map((b) => b.id)).size, W.BOARDS.length);
 });
+
+/* 2026-10-04 더한 넷 — 이 파일의 parseRows·isRecruit 로 실제 게시판을 재어 본 제목 그대로 */
+test('★ 더한 게시판 넷 — 들어 있고, 실제 제목에서 «사람 뽑는 글»만 고른다', () => {
+  ['semas', 'cepa', 'sinbo', 'keli'].forEach((id) =>
+    assert.ok(W.BOARDS.some((b) => b.id === id && b.org === id), id + ' 게시판이 빠졌다'));
+  [
+    '「산업·일자리전환 지원센터」컨설턴트 추가 모집 공고',
+    '충남 국적 Dream 사업 강사·멘토 인력풀(POOL) 모집 재공고',
+    '소상공인시장진흥공단 비상임이사 모집공고'
+  ].forEach((t) => assert.equal(W.isRecruit(t), true, '놓친다: ' + t));
+  [
+    '[모집중] 충남신용보증재단 10월 소상공인 교육생 모집 공고',
+    '2026년 충청남도 도시재생 주민참여 경진대회 참가단체 모집공고',
+    '2026년 생애주기별 노동교육 전문가 양성과정 선발 결과 공고'
+  ].forEach((t) => assert.equal(W.isRecruit(t), false, '잡음을 잡는다: ' + t));
+});
+
+test('★ 신보처럼 제목 링크가 «#contents + onclick» 이어도 제목은 읽고, 주소는 비운다', () => {
+  const html = '<table><tbody><tr><td>공지</td><td class="link"><a href="#contents" title="x" onclick="goView(\'134\',\'33908\')">'
+    + '<strong>[모집중] 2027년 컨설턴트 모집 공고</strong></a></td><td>2026-09-02</td></tr></tbody></table>';
+  const rows = W.parseRows(html, 'https://www.cnsinbo.co.kr/boardCnts/list.do?boardID=134');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].title, '[모집중] 2027년 컨설턴트 모집 공고');
+  assert.equal(rows[0].date, '2026-09-02');
+  assert.equal(rows[0].href, '', '#contents 는 열 주소가 아니다 — 화면이 게시판 주소로 보낸다');
+});

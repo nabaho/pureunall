@@ -12,7 +12,9 @@
      ③ 사람을 뽑는 글만 남긴다(isRecruit — 「컨설턴트·전문가·위원 + 모집」, 「결과」는 뺀다)
      ④ 처음 보는 글만 hits 에 더한다(열쇠 = 게시판 + 제목 + 날짜). 있던 글은 건드리지 않는다.
 
-   ⚠ 게시판 주소는 2026-10-04 에 «실제로 줄이 뽑히는 것을 잰» 11곳만 넣었다.
+   ⚠ 게시판 주소는 2026-10-04 에 «실제로 줄이 뽑히는 것을 잰» 곳만 넣었다(11곳 → 15곳).
+     더한 넷(semas·cepa·sinbo·keli)도 이 파일의 parseRows·isRecruit 로 직접 재어 보았다 —
+     충남경제진흥원 「산업·일자리전환 지원센터 컨설턴트 추가 모집」·소진공 「비상임이사 모집」을 잡는다.
      나머지 기관은 첫 화면이 프로그램으로 그려져 이 방법으로 안 읽힌다 —
      화면은 그 기관을 「손으로 확인」으로 밝힌다. 주소를 지어 넣지 말 것.
    ⚠ 이 파일은 공개 저장소다. 대표님의 «지원 이력»은 여기 없다(기관 게시판 주소뿐).
@@ -35,7 +37,12 @@ const BOARDS = [
   { id: 'family',  org: 'family',  name: '가족친화 지원사업 알림',    url: 'https://www.ffsb.kr/ffsbbod/bs/boardList.do?boardSeq=1&menuSeq=5190' },
   { id: 'kfcc',    org: 'kfcc',    name: '새마을금고 MG공지',         url: 'https://www.kfcc.co.kr/mgNotice/mgNoticeList.do' },
   { id: 'voucher', org: 'voucher', name: '데이터산업진흥원 알림',     url: 'https://kdata.or.kr/kr/board/notice_01/boardList.do' },
-  { id: 'nrc',     org: 'nrc',     name: '경제·인문사회연구회 공지',  url: 'https://www.nrc.re.kr/board.es?mid=a12101000000&bid=0001' }
+  { id: 'nrc',     org: 'nrc',     name: '경제·인문사회연구회 공지',  url: 'https://www.nrc.re.kr/board.es?mid=a12101000000&bid=0001' },
+  { id: 'semas',   org: 'semas',   name: '소상공인시장진흥공단 공지', url: 'https://www.semas.or.kr/web/board/webBoardList.kmdc?bCd=1&pNm=BOA0101' },
+  { id: 'cepa',    org: 'cepa',    name: '충남경제진흥원 공지',       url: 'https://www.cepa.or.kr/notice/notice.do?pm=6&ms=32' },
+  /* 목록 머리에 오래된 «고정 공지»가 먼저 온다 — 새 글은 그 아래에 있다(그래도 첫 쪽 안이다) */
+  { id: 'sinbo',   org: 'sinbo',   name: '충남신용보증재단 공지',     url: 'https://www.cnsinbo.co.kr/boardCnts/list.do?boardID=134&m=030101&s=cnsinbo' },
+  { id: 'keli',    org: 'keli',    name: '한국고용노동교육원 공지',   url: 'https://www.keli.kr/home/cmmn/bbs/228/list.do' }
 ];
 
 function clean(s) {
