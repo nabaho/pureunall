@@ -117,6 +117,42 @@
     up['co/' + toKey] = co;
     return up;
   }
+  /* ══ 파일 골라 다시 보내기 (대표 「파일 골라 다시 보내기」 2026-10-04 — 2026-09-23 미뤄 둔 「계약서/견적서 찾아 메일로 보내기」) ══ */
+  /* 받는 사람 후보 — 기업정보함·이알피 줄(PuFormCardFill.mergeRows)에서 그 회사의 명함(메일 있는 사람)과 대표 메일 */
+  function mailTargets(rows, coName, bz) {
+    rows = rows || [];
+    var d = bzDigits(bz), nk = nameKey(coName), co = null;
+    if (d.length === 10) co = rows.filter(function (r) { return (r.k === 'erp' || r.k === 'biz') && bzDigits(r.bz) === d; })[0] || null;
+    if (!co && nk) co = rows.filter(function (r) { return (r.k === 'erp' || r.k === 'biz') && nameKey(r.c) === nk; })[0] || null;
+    var keys = {}; keys[nk] = 1; if (co) keys[nameKey(co.c)] = 1;
+    var to = [], seen = {};
+    function add(v, label, who) {
+      v = String(v || '').trim();
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v) || seen[v.toLowerCase()]) return;
+      seen[v.toLowerCase()] = 1; to.push({ v: v, label: label + ' · ' + v, who: who || '' });
+    }
+    rows.forEach(function (r) {
+      if (r.k === 'card' && r.n && keys[nameKey(r.c)]) add(r.e, r.n + (r.ti ? ' ' + r.ti : ''), r.n);
+    });
+    if (co) add(co.e, '대표 메일', '');
+    return { co: co, to: to };
+  }
+  /* 보낸 기록의 종류 — 기업정보함 「보낸 서류」 종류(SENT_KINDS) 안에서 */
+  function sentKindOf(titles) {
+    var t = (titles || []).join(' ');
+    if (/제안서|견적서/.test(t)) return '제안서';
+    if (/계약|약정|위임|CMS|EDI|신청서/i.test(t)) return '계약서';
+    return '그 밖';
+  }
+  function resendMail(coName, who, titles) {
+    var list = (titles || []).filter(Boolean);
+    return {
+      subject: '[푸른노무법인] ' + (list.length <= 1 ? (list[0] || '서류') : list[0] + ' 외 ' + (list.length - 1) + '건') + (coName ? ' — ' + coName : ''),
+      body: [(who ? who + '님' : '담당자님') + ', 안녕하십니까.', '푸른노무법인입니다.', '', '요청하신 서류를 보내드립니다.']
+        .concat(list.map(function (t) { return '- ' + t; }))
+        .concat(['', '검토하시고 궁금하신 점은 편하게 연락 주십시오.', '', '푸른노무법인 드림']).join('\n')
+    };
+  }
   /* 보낸 서류 — 열쇠(사업자번호·이름)마다 읽은 줄을 합친다. 한 번 보낼 때 열쇠마다 같은 at 으로 적으므로
      at·종류·서류 이름이 같으면 한 줄. 최근 위, 50줄까지 */
   function sentRows(lists) {
@@ -610,6 +646,107 @@
         });
     }
 
+    /* ── ✉ 파일 골라 보내기 — 이 회사 계약서 파일을 메일로. 보내는 길·보낸 기록은 계약서 양식 보내기와 같은 것(host.mail) ──
+       ⚠ 「✉ 보내기」를 누르기 전엔 아무것도 나가지 않는다. 받는 주소는 기록하지 않는다.
+       ⚠ 🔒 서명본은 서버가 대표·관리자에게만 내준다 — 그 밖의 사람은 붙이지 못한다. 붙이면 한 번 더 묻는다. */
+    function openResend() {
+      if (!host.mail || !host.fileBytes) { toast('메일 보내는 길이 연결되지 않았습니다'); return; }
+      var key = S.sel, co = S.cos.filter(function (c) { return c.key === key; })[0] || {};
+      var docs = S.docs.slice(), on = {}, busy = false, mode = 'auto', targets = { co: null, to: [] };
+      var MAX = 18 * 1024 * 1024;
+      var listBox = el('div', { style: 'max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px' });
+      docs.forEach(function (d) {
+        var cb = el('input', { type: 'checkbox', 'aria-label': d.title || '파일', onchange: function () { on[d.id] = cb.checked; fill(); } });
+        listBox.appendChild(el('label', { style: 'display:flex;gap:6px;align-items:center;font-size:12.5px;padding:3px 0' }, [cb,
+          el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: d.title || '(제목 없음)' }),
+          el('span', { 'class': 'muted', style: 'color:#94a3b8;font-size:11.5px', text: d.date || '' }),
+          d.secret ? el('span', { 'class': 'pod-tag', text: '🔒 서명본' }) : null]));
+      });
+      var toSel = el('select', { 'aria-label': '받는 사람', style: 'width:100%' }, [el('option', { value: '', text: '직접 적기…' })]);
+      var toIn = el('input', { type: 'email', placeholder: '받는 메일 주소', 'aria-label': '받는 메일 주소', style: 'width:100%;margin-top:4px' });
+      toSel.addEventListener('change', function () { toIn.hidden = !!toSel.value; fill(true); });
+      var ccIn = el('input', { type: 'text', placeholder: '(선택) 참조 메일', 'aria-label': '참조 메일', style: 'width:100%' });
+      var subIn = el('input', { type: 'text', 'aria-label': '제목', style: 'width:100%' });
+      var bodyIn = el('textarea', { 'aria-label': '본문', rows: 8, style: 'width:100%;font:inherit;font-size:12.5px' });
+      var note = el('div', { style: 'font-size:12px;color:#64748b;min-height:16px;margin-top:6px' });
+      var touched = false;
+      subIn.addEventListener('input', function () { touched = true; }); bodyIn.addEventListener('input', function () { touched = true; });
+      function picked() { return docs.filter(function (d) { return on[d.id]; }); }
+      function who() { var t = targets.to.filter(function (x) { return x.v === toSel.value; })[0]; return t ? t.who : ''; }
+      /* 제목·본문은 손대기 전까지만 고른 파일·받는 사람을 따라간다 */
+      function fill() {
+        if (!touched) { var m = resendMail(co.name || '', who(), picked().map(function (d) { return d.title || '서류'; })); subIn.value = m.subject; bodyIn.value = m.body; }
+        if (go) { var n = picked().length; go.disabled = busy || !n; go.textContent = n ? '✉ ' + n + '개 보내기' : '보낼 파일을 고르세요'; }
+      }
+      function addr() { return String(toSel.value || toIn.value || '').trim(); }
+      function gather() {
+        var list = picked(), out = [];
+        return list.reduce(function (p, d, i) {
+          return p.then(function () {
+            note.textContent = '파일 가져오는 중… (' + (i + 1) + '/' + list.length + ')';
+            return host.fileBytes(d.fileId).then(function (f) { out.push(f); });
+          });
+        }, Promise.resolve()).then(function () { return out; });
+      }
+      function record(fs) {
+        return Promise.resolve().then(function () {
+          return host.mail.record({ bz: co.bz || '' }, { 회사명: co.name || '', 사업자번호: co.bz || '' },
+            { kind: sentKindOf(picked().map(function (d) { return d.title; })), names: fs.map(function (f) { return f.name; }), who: who() });
+        }).then(function () { return ''; }, function (e) { return msg(e); });
+      }
+      var go = null;
+      modalShell('✉ 파일 골라 보내기 — ' + (co.name || ''), [
+        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:6px', text: '이 회사 계약서 파일을 골라 메일로 보냅니다. 보내면 「✉ 보낸 서류」에 남습니다(받는 주소는 남기지 않음).' }),
+        el('b', { style: 'display:block;font-size:12.5px;margin:4px 0', text: '보낼 파일' }), docs.length ? listBox : el('div', { 'class': 'pod-empty', text: '올린 계약서 파일이 없습니다' }),
+        el('label', { text: '받는 사람' }), toSel, toIn, el('label', { text: '참조' }), ccIn, el('label', { text: '제목' }), subIn, el('label', { text: '본문' }), bodyIn, note],
+        function (cl) {
+          go = el('button', { type: 'button', 'class': 'pod-b p', text: '보낼 파일을 고르세요', disabled: true, onclick: function () {
+            if (busy) return;
+            var to = addr(), list = picked();
+            if (!list.length) return;
+            if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(to)) { note.textContent = '⚠ 받는 메일 주소를 확인하세요'; return; }
+            if (!subIn.value.trim() || !bodyIn.value.trim()) { note.textContent = '⚠ 제목과 본문을 적어 주세요'; return; }
+            var sec = list.filter(function (d) { return d.secret; });
+            if (sec.length && !w.confirm('🔒 서명본 ' + sec.length + '개를 회사 밖(' + to + ')으로 보냅니다.\n주민번호·계좌가 들어 있을 수 있습니다. 받는 주소가 맞습니까?')) return;
+            busy = true; fill();
+            gather().then(function (fs) {
+              var total = fs.reduce(function (n, f) { return n + f.bytes.length; }, 0);
+              if (total > MAX) throw new Error('첨부가 18MB를 넘어 보낼 수 없습니다 — 파일을 나눠 보내세요');
+              if (mode !== 'auto') {
+                fs.forEach(function (f) {
+                  var a = w.document.createElement('a'); a.href = w.URL.createObjectURL(new Blob([f.bytes])); a.download = f.name;
+                  w.document.body.appendChild(a); a.click(); setTimeout(function () { w.URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+                });
+                w.location.href = 'mailto:' + encodeURIComponent(to) + '?subject=' + encodeURIComponent(subIn.value) + '&body=' + encodeURIComponent(bodyIn.value);
+                if (!w.confirm('메일 창에서 보내셨으면 「보낸 서류」에 기록을 남길까요?')) return 'none';
+                return record(fs).then(function (err) { return err ? '기록 실패: ' + err : 'mailto'; });
+              }
+              note.textContent = '보내는 중…';
+              return host.mail.send({ to: to, cc: ccIn.value.trim(), subject: subIn.value.trim(), body: bodyIn.value, toName: who() }, fs)
+                .then(function () { return record(fs).then(function (err) { return err ? 'sent-noted:' + err : 'sent'; }); });
+            }).then(function (r) {
+              busy = false; cl();
+              if (r === 'sent') toast('✉ 보냈습니다 — 보낸 서류에 기록했습니다');
+              else if (String(r).indexOf('sent-noted:') === 0) toast('✉ 보냈습니다 — ⚠ 기록 저장 실패: ' + String(r).slice(11));
+              else if (r === 'mailto') toast('기록했습니다');
+              loadDocs();
+            }, function (e) { busy = false; fill(); note.textContent = '⚠ ' + msg(e); });
+          } });
+          return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: function () { if (!busy) cl(); } }), go];
+        });
+      fill();
+      host.mail.mode().then(function (md) {
+        mode = md;
+        if (md !== 'auto') note.textContent = '회사 메일 자동 발송이 꺼져 있습니다 — 파일을 받아 메일 창에서 붙여 보냅니다.';
+      }, function () {});
+      (host.cards ? host.cards.rows().catch(function () { return []; }) : Promise.resolve([])).then(function (rows) {
+        targets = mailTargets(rows, co.name || '', co.bz || '');
+        targets.to.forEach(function (t) { toSel.insertBefore(el('option', { value: t.v, text: t.label }), toSel.lastChild); });
+        if (targets.to.length) { toSel.value = targets.to[0].v; toIn.hidden = true; }
+        fill();
+      });
+    }
+
     /* ── 🔗 이알피 업체와 맞추기 — ① 사업자번호 넣기 ② 같은 번호 회사 합치기 ── */
     function openLink() {
       if (!host.coLink) { toast('맞추기 길이 연결되지 않았습니다'); return; }
@@ -1011,7 +1148,8 @@
           el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '보낸 때' }), el('th', { text: '종류' }),
             el('th', { text: '서류' }), el('th', { text: '받는 분' }), el('th', { text: '보낸 이' })])]), stb])])]);
       }
-      var right = el('div', null, [recBox, sentBox, el('b', { style: 'display:block;font-size:13px;margin:4px 0 6px', text: '계약서 파일' }),
+      var right = el('div', null, [recBox, sentBox, el('div', { 'class': 'pod-bar', style: 'margin:4px 0 6px' }, [el('b', { style: 'font-size:13px', text: '계약서 파일' }),
+        host.mail && S.docs.length ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 파일 골라 보내기', onclick: openResend }) : null]),
         S.docs.length ? grid : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '올린 계약서 파일이 없습니다' })]);
       wrap.appendChild(el('div', { 'class': 'pod-co' }, [el('div', { 'class': 'pod-cl' }, [search, listBox]), right]));
       root.appendChild(wrap);
@@ -1031,6 +1169,7 @@
   w.PuOfficeDocs = {
     archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
     linkPlan: linkPlan, bzGroups: bzGroups, refNames: refNames, mergePlan: mergePlan, fmtBz: fmtBz,
+    mailTargets: mailTargets, sentKindOf: sentKindOf, resendMail: resendMail,
     mountArchive: mountArchive, mountCompanies: mountCompanies,
     _el: el, _toast: toast, _fmtSize: fmtSize, _ymd: ymd, _css: css, _deniedBanner: deniedBanner
   };
