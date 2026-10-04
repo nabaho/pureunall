@@ -12437,29 +12437,9 @@ function Sidebar(props){
   var allOpened = props.allOpened;
   var onCollapse = props.onCollapse || function(){};
   var onLogout = props.onLogout || function(){};
-  // 배포 결과 팝업(관리자만) — X 클릭 시 영구히 다시 안 뜸(이후 모든 빌드). SEQ125
-  //   되돌리려면 콘솔에서: localStorage.removeItem('pu_build_popup_off')
-  var bpS = useState(function(){
-    try{ return localStorage.getItem('pu_build_popup_off') !== '1'; }catch(e){ return true; }
-  }); var showBuildPopup = bpS[0]; var setShowBuildPopup = bpS[1];
-  function dismissBuildPopup(){
-    setShowBuildPopup(false);
-    try{ localStorage.setItem('pu_build_popup_off', '1'); }catch(e){}
-  }
-
-  /* 「달력 어디 갔나」 안내 — 2026-09-21, 옆 메뉴에서 「푸른 캘린더」를 뺀 날.
-     ⚠ 배포 팝업(위)에 얹지 않는다. 그것은 ①관리자만 보고 ②한 번 닫으면 그 뒤
-       모든 빌드에서 영영 안 뜬다 — 달력을 쓰던 «모든 직원»에게 가야 하는 말이다.
-     ⚠ 이 안내는 «닫으면 끝»이다. 자리를 계속 먹으면 그것대로 잔소리가 된다.
-     ⚠ 다 알려진 뒤에는 이 덩이를 지운다 — 남겨 두면 새로 온 사람이
-       「있었던 적 없는 것」을 찾게 된다. */
-  var calMovedS = useState(function(){
-    try{ return localStorage.getItem('pu_cal_moved_off') !== '1'; }catch(e){ return true; }
-  }); var showCalMoved = calMovedS[0]; var setShowCalMoved = calMovedS[1];
-  function dismissCalMoved(){
-    setShowCalMoved(false);
-    try{ localStorage.setItem('pu_cal_moved_off', '1'); }catch(e){}
-  }
+  /* 옆줄 맨 위 파란 안내 상자 둘(「🆕 이번 업데이트」·「📅 달력이 옮겨졌습니다」)은 걷었다 —
+     대표 지시 2026-10-04 「파란색 네모 박스 뜨는것 안보이게 해라 필요없다」.
+     ⚠ 옆줄에 안내 상자를 다시 띄우지 말 것 — 메뉴를 밀어내고 자리만 먹는다(tests/erp-menu-no-app-jump.test.js ④). */
 
   // 검색
   var sq = useState(''); var sbQuery = sq[0]; var setSbQuery = sq[1];
@@ -12657,17 +12637,6 @@ function Sidebar(props){
         allOpened ? '📁' : '📂'
       )
     ),
-    // 🆕 배포 결과 팝업 — 관리자에게만, X 클릭 시 이 버전은 다시 안 뜸
-    (isAdminByUser(CURRENT_USER) && showBuildPopup) && h('div', {
-      style:{ position:'relative', margin:'0 12px 10px', padding:'10px 32px 10px 12px', background:'#1e40af',
-        border:'1px solid #2563eb', borderRadius:'8px', fontSize:'11px', color:'#bfdbfe', lineHeight:'1.5' } },
-      h('div', { style:{ fontWeight:800, color:'#bfdbfe', marginBottom:'3px' } }, '🆕 이번 업데이트'),
-      h('div', null, ERP_BUILD),
-      h('button', { onClick:dismissBuildPopup, title:'닫기',
-        style:{ position:'absolute', top:'6px', right:'6px', width:'20px', height:'20px', border:'none', borderRadius:'5px',
-          background:'transparent', color:'#bfdbfe', fontSize:'14px', fontWeight:700, cursor:'pointer', lineHeight:'1',
-          display:'flex', alignItems:'center', justifyContent:'center' } }, '✕')
-    ),
     // 검색 input 제거됨 (사용자 요청)
     // ── 상단 탭: 전체 ⇄ ⭐즐겨찾기 ──
     h('div', { style:{ display:'flex', gap:'4px', padding:'6px 10px 4px', flexShrink:0 } },
@@ -12679,26 +12648,6 @@ function Sidebar(props){
             background: on ? '#2563eb' : '#1e293b', color: on ? '#fff' : '#94a3b8',
             border:'1px solid ' + (on ? '#2563eb' : '#1e293b') } }, t.label);
       })
-    ),
-    /* 달력이 어디로 갔는지 — 한 번만. 누르면 바로 그리로 간다(말만 하고 끝내지 않는다) */
-    showCalMoved && h('div', {
-      style:{ position:'relative', margin:'2px 10px 8px', padding:'9px 28px 9px 10px',
-        /* 바로 위 「이번 업데이트」 알림과 «같은 색»이다 — 같은 자리의 같은 결의 말이라
-           새 색을 만들 까닭이 없다(팔레트 27색 밖으로 나가면 tests/color-palette 가 막는다). */
-        background:'#1e40af', border:'1px solid #2563eb', borderRadius:'8px',
-        fontSize:'11px', color:'#bfdbfe', lineHeight:1.55 } },
-      h('div', { style:{ fontWeight:800, marginBottom:'2px' } }, '📅 달력이 옮겨졌습니다'),
-      h('div', null, '「푸른 캘린더」는 이제 따로 선 프로그램입니다. ',
-        h('b', null, '오른쪽 가장자리의 파란 「즐겨찾기」 탭'), ' 에서 열 수 있고, ',
-        '거기서 ☆ 를 눌러 두면 맨 위로 올라옵니다.'),
-      h('button', { onClick:function(){ dismissCalMoved(); try{ PuAppBar.goApp('pu-cal.html?sso=1'); }catch(e){} },
-        style:{ marginTop:'7px', padding:'5px 10px', border:'1px solid #2563eb', borderRadius:'6px',
-          background:'#1e40af', color:'#fff', fontSize:'11px', fontWeight:700, cursor:'pointer' } },
-        '📅 지금 열어 보기'),
-      h('button', { onClick:dismissCalMoved, title:'다시 안 보기',
-        style:{ position:'absolute', top:'5px', right:'5px', width:'20px', height:'20px', border:'none',
-          borderRadius:'5px', background:'transparent', color:'#bfdbfe', fontSize:'13px', fontWeight:700,
-          cursor:'pointer', lineHeight:1, display:'flex', alignItems:'center', justifyContent:'center' } }, '✕')
     ),
     h('nav', { className:'sb-nav', style:{ flex:'1 1 auto', minHeight:0, overflowY:'auto' } },
       // ⭐ 즐겨찾기 뷰: 즐겨찾기만 세로 목록(드래그 순서변경·우클릭 해제)
