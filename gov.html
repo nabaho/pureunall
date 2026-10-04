@@ -147,6 +147,19 @@ table.cmp td{white-space:nowrap}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ── 폰: 누를 것을 손가락 크기로 (대표 「추천대로」 2026-10-04) ──────────────
+   이 앱만 폰 전용 규칙이 «하나도» 없었다 — 포털에 실린 16개 가운데 혼자다.
+   그래서 딱지가 43×24, 단추가 31 높이였다. 손가락 끝이 닿는 넓이(44)보다 한참 작아
+   옆 것이 같이 눌린다. 푸른이알피가 이미 쓰는 기준(min-height:38px)을 그대로 옮긴다
+   (css/pu-erp.css 551~560 의 폰 보강 한 벌 — 새로 짓지 않는다).
+   ★ 배포본에서 재고 넣었다: 작은 단추 21개 → 3개 · 가로 넘침 0 ·
+     딱지 줄 수 그대로 · 화면 길이 +66px.
+   ⚠ 표에는 손대지 않는다 — 표는 이미 .scroll(overflow-x:auto) 안에 있어서
+     표에 또 스크롤을 주면 상자 안에 상자가 생긴다(재서 확인했다). */
+@media (max-width: 768px){
+  button{ min-height: 38px; }
+  .kw{ min-height: 38px; display: inline-flex; align-items: center; }
+}
 </style>
 </head>
 <body>
