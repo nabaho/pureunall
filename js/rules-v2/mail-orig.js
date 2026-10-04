@@ -57,7 +57,8 @@
     var key = String(mail.key);
     try {
       // 1) 메일의 첨부 목록
-      var head = imap ? await call('readMailMessage', { slug: mail.box, uid: key })
+      // ⚠ peek:true — 열어 보기만 한다. 고객 메일을 «읽음»(Seen·r=1)으로 바꾸지 않는다(서버: peek 이면 아무것도 안 건드림, 첨부 목록은 그대로 온다)
+      var head = imap ? await call('readMailMessage', { slug: mail.box, uid: key, peek: true })
                       : await call('readOldMail', { key: key });
       var same = (head.atts || []).map(function (a, idx) {
         return { i: a.i == null ? idx : a.i, part: a.part || '', name: a.name };

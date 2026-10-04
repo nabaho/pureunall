@@ -41,7 +41,8 @@ test('IMAP: 같은 이름 둘 중 둘째가 지문과 맞으면 그것을 돌려
   assert.equal(r.name, NAME);
   assert.deepEqual(Buffer.from(r.bytes), second);
   assert.deepEqual(call.calls.map((c) => c.fn), ['readMailMessage', 'readMailAttachment', 'readMailAttachment']);
-  assert.deepEqual(call.calls[0].body, { slug: 'INBOX', uid: '77' });
+  assert.equal(call.calls[0].body.peek, true, '★ 고객 메일을 읽음으로 바꾼다 — peek 없이 열면 공용 메일함의 \Seen·r=1 이 바뀐다');
+  assert.deepEqual(call.calls[0].body, { slug: 'INBOX', uid: '77', peek: true });
   assert.deepEqual(call.calls[1].body, { slug: 'INBOX', uid: '77', index: 0, part: '2' });
   assert.deepEqual(call.calls[2].body, { slug: 'INBOX', uid: '77', index: 2, part: '4' });
 });

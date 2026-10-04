@@ -27,7 +27,7 @@
 <script src="js/pu-hwp-keep.js?v=1"></script>
 <script src="js/pu-kordoc-text.js?v=2"></script>
 <script src="js/pu-rules-casebook.js?v=13"></script>
-<script src="js/rules-v2/mail-orig.js?v=1"></script>
+<script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="vendor/xlsx.full.min.js"></script>
 <script src="vendor/pako.min.js"></script>
 <script src="vendor/pdf.min.js"></script>
@@ -7931,9 +7931,9 @@ async function presetCoFromHash(hash){
   const co=id?ERP_COS.find(c=>String(c.id)===id):null;
   if(!co){ libNote("co-pending","<span>그 사업장을 업체 목록에서 찾지 못했습니다 — 파일을 올리면 본문에서 사업장명을 찾습니다</span>",true); return; }
   PENDING_CO={site:co.name||"",bizno:co.bizNo||""};
-  const n=libNote("co-pending",`<span>🏢 <b>${escapeH(co.name||"")}</b> 개정 — 파일을 올리세요</span>
-    <button class="stbtn" id="co-pending-up" style="margin-left:auto" title="이 사업장으로 정한 채 파일을 고릅니다(끌어다 놓아도 됩니다)">📂 파일 고르기</button>
-    <span class="x" id="co-pending-x" title="사업장 정하기 그만" style="cursor:pointer;color:var(--mute)">×</span>`);
+  const n=libNote("co-pending",`<span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeH(co.name||"")} 개정 — 파일을 올리세요">🏢 <b>${escapeH(co.name||"")}</b> 개정 — 파일을 올리세요</span>
+    <button class="stbtn" id="co-pending-up" style="margin-left:auto;flex:0 0 auto" title="이 사업장으로 정한 채 파일을 고릅니다(끌어다 놓아도 됩니다)">📂 파일 고르기</button>
+    <span class="x" id="co-pending-x" title="사업장 정하기 그만" style="cursor:pointer;color:var(--mute);flex:0 0 auto">×</span>`);
   if(n){
     $("co-pending-up").onclick=()=>$("upload-input").click();
     $("co-pending-x").onclick=()=>{ PENDING_CO=null; n.remove(); };

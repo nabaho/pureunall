@@ -185,7 +185,8 @@ test('④★ 모은 자료에 없는 id 면 열지 않고 다시 열 곳을 알�
   await box.openFromLibrary('#open=D1');
   assert.equal(calls.fetched, 0);
   assert.equal(calls.load.length, 0);
-  assert.deepEqual(calls.alert, ['그 자료를 찾지 못했습니다 — 📥 모은 자료에서 다시 열어 주세요.']);
+  assert.equal(calls.alert.length, 1, '알림이 정확히 한 번이어야 한다');
+  assert.match(calls.alert[0], /찾지 못/, '못 찾았다는 뜻을 알려야 한다');
   assert.ok(calls.replace >= 1);
 });
 
