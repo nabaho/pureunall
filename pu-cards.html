@@ -16774,7 +16774,7 @@ function mbPopProbe(){
      그 바닥에 먼저 닿으면 거기가 끝이다 — 그때는 「더 없다」를 그대로 말한다(mbOldHtml). */
 const MB_OLD_GOAL = 3650;
 let _mbFillBusy = false;
-function mbBackfillRun(days){
+function mbBackfillRun(days, fresh){
   if(_mbFillBusy) return;
   const u = firebase.auth().currentUser;
   if(!u) return toast('로그인이 필요합니다');
@@ -16783,15 +16783,19 @@ function mbBackfillRun(days){
        누르는 순간 문턱이 1년으로 돌아가 그 자리에서 「다 됐습니다」가 된다. */
   const goal = Math.max(365, Math.min(3650,
     Number(days) || Number((_mbOldState||{}).days) || 365));
+  /* 🔁 다시 훑기(fresh) — 맨 새것부터 다시 걷는다(2026-10-04 검토). 이미 담은 것은 서버가
+     이름표로 «받아 보지 않고» 지나가므로 빠진 것만 받는다. 7분에 못 끝나면 그 자리가
+     적히고, 그다음은 보통 「이어서 채우기」가 이어 간다 — fresh 는 «한 번»만 보낸다. */
+  const again = !!fresh;
   _mbFillBusy = true;
-  state.mbFill = { busy:true };
+  state.mbFill = { busy:true, fresh:again };
   renderMailPage();
   u.getIdToken()
     .then(tok=>fetch(MB_FN+'backfillMailbox', { method:'POST',
       headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
-      body: JSON.stringify({ days:goal, again:true }) }))
+      body: JSON.stringify(again ? { days:goal, again:true, fresh:true } : { days:goal, again:true }) }))
     .then(r=>r.json().catch(()=>({})))
-    .then(j=>{ state.mbFill = Object.assign({ busy:false, at:Date.now() }, j); })
+    .then(j=>{ state.mbFill = Object.assign({ busy:false, at:Date.now(), fresh:again }, j); })
     .catch(e=>{ state.mbFill = { busy:false, ok:false, error:(e&&e.message)||String(e) }; })
     .then(()=>{
       _mbFillBusy = false;
@@ -16911,14 +16915,38 @@ function mbOldHtml(){
       </div>
       <button class="msbtn" ${b&&b.busy?'disabled':''} onclick="mbBackfillRun()">${
         b && b.busy ? '채우는 중… (최대 7분)' : (oldN ? '📦 이어서 채우기' : '📦 지난 메일 채우기 시작')}</button>`}
+      ${/* ── 🔁 빠진 지난 메일 다시 훑기 (2026-10-04 검토) ──
+           ⚠★ 2026-10-04 까지 서버에 구멍이 둘 있었다 — ① 연결이 끊기면 남은 통을 다 지나가
+             바닥을 「끝난 자리」로 적었고 ② 목표를 넓힐 때 문턱 언저리 옛것 예순 통을 다시
+             안 봤다. 그렇게 빠진 메일은 「이어서」로는 다시 안 온다(자리가 이미 지나갔다).
+           ★ 맨 새것부터 다시 걷는다(fresh). 이미 담은 것은 이름표로 «받지 않고» 지나간다.
+           ⚠ 담은 것이 있을 때만 — 하나도 없으면 「채우기 시작」과 같은 일이다. */''}
+      ${oldN ? `
+      <div class="mshint" style="padding:12px 0 6px;border-top:1px dashed #e2e8f0;margin-top:12px">
+        <b>🔁 빠진 지난 메일 다시 훑기</b> — 예전(2026-10-04 이전)에는 다음메일 연결이 중간에
+        끊기면 남은 메일을 <b>건너뛴 채</b> 끝난 것으로 적은 일이 있었습니다.
+        맨 새것부터 다시 훑어 <b>빠진 것만</b> 받습니다 — 이미 담은
+        <b>${oldN.toLocaleString()}통</b>은 이름표로 지나가고 또 받지 않습니다.<br>
+        한 번에 최대 7분입니다. 다 못 훑으면 멈춘 자리가 적히고, 그다음은
+        「📦 이어서 채우기」가 그 자리부터 이어 갑니다.
+      </div>
+      <button class="msbtn" ${b&&b.busy?'disabled':''} onclick="mbBackfillRun(${MB_OLD_GOAL}, true)">${
+        b && b.busy && b.fresh ? '다시 훑는 중… (최대 7분)' : '🔁 빠진 지난 메일 다시 훑기'}</button>` : ''}
       ${b && !b.busy ? (b.ok
         ? `<div class="mshint" style="padding:8px 0 0">
-             ${b.done ? `✅ <b>${Number(b.days||365).toLocaleString()}일까지 채웠습니다.</b>`
+             ${b.fresh ? '🔁 <b>다시 훑기</b> — ' : ''}${
+               /* ⚠★ 연결이 끊겼거나(lost) 다음메일이 연달아 머리글을 안 줬다(stalled).
+                    서버는 «끝난 데»까지만 자리를 적었으니 다시 누르면 거기서 이어 간다.
+                    바닥이라고 하면 안 된다 — 남은 메일이 있다. */''}${
+             (b.lost || b.stalled) ? `⚠ <b>${esc(b.note || '다음메일 연결이 끊겨 멈췄습니다')}.</b>
+                  멈춘 자리를 적어 두었으니 <b>한 번 더 눌러 주세요.</b>`
+             : b.done ? `✅ <b>${Number(b.days||365).toLocaleString()}일까지 채웠습니다.</b>`
                /* ⚠★ 다음메일이 내주는 목록의 «바닥»에 닿았다 (2026-10-04 10년치) —
                     한 통도 안 보고(seen·already 0) 아무것도 안 담았는데 목록은 있다.
                     서버는 done 을 안 세우므로 여기서 안 가르면 「한 번 더 눌러」가
-                    끝없이 나온다. 목표(10년)에 못 미쳐도 거기가 끝이라고 그대로 말한다. */
-               : (Number(b.uidl) > 0 && !Number(b.seen) && !Number(b.already) && !Number(b.got))
+                    끝없이 나온다. 목표(10년)에 못 미쳐도 거기가 끝이라고 그대로 말한다.
+                  ⚠ 2026-10-04 — 서버가 바닥까지 다 걸으면 bottom 을 돌려준다(끊김 없이 다 본 때만). */
+               : (b.bottom || (Number(b.uidl) > 0 && !Number(b.seen) && !Number(b.already) && !Number(b.got)))
                ? `✅ <b>다음메일이 내주는 가장 옛 메일까지 다 받았습니다.</b>
                   더 누르셔도 늘지 않습니다${st.oldest ? ` — 가장 오래된 것 <b>${fd(st.oldest)}</b>` : ''}.`
                : '⏸ 예산이 다해 멈췄습니다 — <b>한 번 더 눌러 주세요.</b>'}
@@ -16927,7 +16955,7 @@ function mbOldHtml(){
                /* ⚠ 이미 담아서 «받아 보지도 않고» 지나간 것 — 이 줄이 없으면 이어 채우기
                     첫 회차가 늘 「0통 담음」으로 보여 고장으로 읽힌다 */''}${
                b.already?' · 이미 담아 지나간 것 '+Number(b.already).toLocaleString()+'통':''}${
-               b.bad?' · 못 읽은 것 '+Number(b.bad).toLocaleString()+'통':''}).
+               b.bad?' · 못 읽은 것 '+Number(b.bad).toLocaleString()+'통 — 이름표를 적어 두었고 다시 훑기 때 다시 받아 봅니다':''}).
              <br>지금 「📦 지난 메일」 칸에 <b>${oldN.toLocaleString()}통</b> 있습니다.
            </div>`
         : `<div class="mshint" style="padding:8px 0 0;color:#991b1b">
