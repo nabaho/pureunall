@@ -1545,7 +1545,7 @@ function 보관받기(){
 function 보관칩(r, 지워짐){
   var sid = gcalSidByMail(r.creator || "");
   return { kind: 지워짐 ? "gone" : "gcal", store:"", id:"arch:" + r.id, sid: sid || "GCAL",
-    date:r.date, end:r.end || r.date, time: r.allDay ? "" : (r.time || ""), endTime:r.endTime || "",
+    date:r.date, end:r.end || r.date, time: r.allDay ? "" : (제목시각(r.summary, r.time) || r.time || ""), endTime:r.endTime || "",
     text: r.summary || "(제목 없음)", movable:false,
     color: (sid ? colorOf(sid) : "") || gcalMailColor(r.creator || "") || "#94a3b8",
     tip: (지워짐 ? "🗄 구글에서 지워진 일정 (보관함)" + (r.googleDeletedSeenAt ? " · " + new Date(r.googleDeletedSeenAt).toISOString().slice(0,10) + " 무렵" : "") + "\n" : "🗄 보관본 (구글을 못 받아 보관함에서 보여 줍니다)\n")
@@ -1590,9 +1590,28 @@ function gcalLoad(force){
    ★ 색 고르는 차례 — 앞이 있으면 뒤로 안 넘어간다(이알피와 같다):
      ①구글에서 그 일정에 «고른» 색  ②만든이가 이어져 있으면 그 직원 색
      ③제목에 현직 이름이 있으면 그 직원 색  ④만든이 메일로 늘 같은 색  ⑤기본 */
+/* ★ 제목에 적은 시각을 믿는 때 (대표 결정 2026-10-04 「추천대로」 — ㉮)
+   왜: 직원들은 시각을 «제목 앞에» 적는다(「0930 가나상사 방문」). 구글 시각 칸은 아무렇게나 둔다.
+     2026년 9월 공용 달력을 재 보니 시각 일정 41건 중 36건이 «새벽 0~5시»에 들어 있었고,
+     제목 앞 시각과 구글 시각이 맞는 것은 0건이었다. 그래서 목록에 「00:30 · 0930 …」이 떴다.
+   언제만: 구글 시각이 새벽(00:00~05:59) «이고» 제목이 네 자리 시각(0930·09:30)으로 시작할 때만.
+     ⚠ 둘 중 하나라도 아니면 구글 시각 그대로다 — 낮 시각은 사람이 일부러 넣은 것이다.
+     ⚠ 구글 원본은 안 고친다(보이는 것만). 옮기기(moveEvent)는 구글 시각을 그대로 지킨다.
+   돌려주는 것: 「HH:MM」 또는 ""(믿을 것 없음) */
+function 제목시각(title, 구글시각){
+  var g = /^([01]\d|2[0-3]):[0-5]\d$/.exec(String(구글시각 || ""));
+  if(!g || +g[1] > 5) return "";
+  /* ⚠ 뒤에 「년 . /」나 「-10」(줄표 + 한두 자리)이 오면 연도·날짜다
+       (「2026년 계획」「2026-10 점검」을 20:26 으로 읽으면 안 된다).
+     ⚠ 「1300-1600」(줄표 + 네 자리)은 시각 범위다 — 실제 제목에 흔하다(10월에만 8건).
+     띄어쓰기는 안 따진다 — 「1000가나…」처럼 붙여 쓴 것이 많다. */
+  var m = /^\s*([01]\d|2[0-3]):?([0-5]\d)(?![\d년.\/]|-\d{1,2}(?!\d))/.exec(String(title || ""));
+  return m ? m[1] + ":" + m[2] : "";
+}
 function gcalToEvent(ev){
   var date = (ev.start.date || ev.start.dateTime || "").slice(0,10);
   var timeStr = ev.start.dateTime ? ev.start.dateTime.slice(11,16) : "";
+  var 구글시각 = timeStr;
   var title = (ev.summary || "").trim()
     || (ev.description || "").replace(/<[^>]+>/g, "").slice(0,20).trim();
   if(!title && timeStr) title = timeStr + " 일정";
@@ -1626,11 +1645,22 @@ function gcalToEvent(ev){
   }
   if(!끝 || 끝 < date) 끝 = date;
   var 끝시각 = (ev.end && ev.end.dateTime) ? Date.parse(ev.end.dateTime) : 0;
+  /* 제목 시각을 믿으면 «끝»도 같은 길이만큼 옮긴다 — 안 옮기면 새벽에 끝난 것으로 쳐서
+     아침 6시에 벌써 «지난 일정»(옅은 색)이 된다 */
+  var 제목에서 = ev.start.dateTime ? 제목시각(title, timeStr) : "";
+  if(제목에서){
+    var 원시작 = Date.parse(ev.start.dateTime);
+    var 새시작 = Date.parse(date + "T" + 제목에서 + ":00+09:00");
+    if(끝시각 > 0 && 원시작 > 0) 끝시각 = 새시작 + Math.max(0, 끝시각 - 원시작);
+    timeStr = 제목에서;
+  }
   /* ⚠ 아이콘을 안 붙인다 — 구글 화면에는 없다(kind 로 이미 갈린다) */
   return { kind:"gcal", store:"gcal", id:ev.id, sid:sid, date:date, end:끝,
     endAt: 끝시각 > 0 ? 끝시각 : 0,
     /* 시각은 구글 화면처럼 「10:30」 — 제목에 사람이 적은 「1030」과 갈려 보여야 한다 */
     text:title, time: ev.start.dateTime ? timeStr : "",
+    /* 구글 칸에 실제로 든 시각 — 제목 시각을 대신 보여 줄 때만 남긴다(상세 창에서 밝힌다) */
+    gTime: 제목에서 ? 구글시각 : "",
     /* 만든이 메일을 남긴다 — 「계정 잇기」 창이 «아직 안 이은 사람»을 여기서 센다 */
     mail:mail, mailSid:mailSid || "",
     color:color, gcalUrl:ev.htmlLink || "",
@@ -2885,6 +2915,8 @@ function 구글상세(id){
   if(e.place) rows.push({ i:"📍", t:e.place });
   if(e.desc) rows.push({ i:"≡", t:e.desc });
   if(e.mail) rows.push({ i:"✉", t:e.mail + " 이 만듦" });
+  /* 제목 시각을 대신 보여 주었으면 그렇다고 말한다 — 구글에서 열면 다른 시각이 보이므로 */
+  if(e.gTime) rows.push({ i:"⏱", t:"구글에는 " + e.gTime + " 으로 들어 있습니다 — 제목에 적힌 시각을 보여 드립니다" });
   return { kind:"gcal", title:e.text, color:e.color, date:e.date, end:e.end || "",
     time:e.time || "", endAt:e.endAt || 0, rows:rows, hint:[], url:e.gcalUrl || "" };
 }
@@ -2934,7 +2966,10 @@ function 긴날짜(ymd){
   var 요일 = ["일","월","화","수","목","금","토"][new Date(+m[1], +m[2]-1, +m[3]).getDay()];
   return (+m[2]) + "월 " + (+m[3]) + "일 (" + 요일 + ")";
 }
-function 시분(분){ return String(Math.floor(분/60)).padStart(2,"0") + ":" + String(분%60).padStart(2,"0"); }
+/* 끝 시각(endAt) → 「HH:MM」(서울).
+   ⚠ endAt 은 «밀리초»(Date.parse)다 — 처음에 «분»으로 셈해 상세 창에 「09:30 – 29854170000:00」이
+     떴다(2026-09-27~10-04). 검사가 가짜 값(960분)을 써서 못 잡았다 — 검사도 실제 꼴로 바꿨다. */
+function 시분(ms){ return new Date(+ms + 9 * 3600000).toISOString().slice(11, 16); }
 function closeModal(){ S.modal = null; S.busy = false; render(); }
 function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
 

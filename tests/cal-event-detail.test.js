@@ -57,7 +57,7 @@ function 상자(옵션) {
   };
   vm.createContext(box);
   ['function 구글상세(id){', 'function 층상세(ymd, id){', 'function 공휴일상세(ymd){',
-   'function detailHtml(){', 'function 긴날짜(ymd){', 'function 시분(분){',
+   'function detailHtml(){', 'function 긴날짜(ymd){', 'function 시분(ms){',
    'function holidayOf(ymd){'].forEach((h) => vm.runInContext(함수몸(h), box));
   return box;
 }
@@ -119,7 +119,7 @@ test('③★ 장소·설명을 «통째로» 들고 온다 — 전엔 두 줄만
 
 test('③-2 상세 창이 장소·설명·만든이를 낸다', () => {
   const b = 상자({ 구글: [{ id: 'g1', text: '가나상사 방문', color: '#039be5', date: '2026-09-16',
-    time: '14:00', endAt: 960, place: '천안시 서북구', desc: '설문지 지참', mail: 'hong@example.com', mailSid: 'P-001',
+    time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), place: '천안시 서북구', desc: '설문지 지참', mail: 'hong@example.com', mailSid: 'P-001',
     gcalUrl: 'https://x' }] });
   const d = vm.runInContext('구글상세("g1")', b);
   /* ⚠ 상자 안에서 «만들어진» 배열은 겉보기가 같아도 deepEqual 이 튕긴다 —
@@ -193,7 +193,7 @@ test('★ 상세 창이 그려진다 — 제목·언제·줄·안내·닫기', (
 
 test('★ 시각이 있으면 «몇 시부터 몇 시까지»를 적는다', () => {
   const b = 상자({ 상세: { kind: 'gcal', title: '방문', color: '#039be5', date: '2026-09-16',
-    end: '', time: '14:00', endAt: 960, rows: [], hint: [], url: 'https://x' } });
+    end: '', time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), rows: [], hint: [], url: 'https://x' } });
   const html = vm.runInContext('detailHtml()', b);
   assert.match(html, /14:00 – 16:00/, '★ 끝 시각을 안 적습니다');
   assert.match(html, /data-dgo="1"/, '★ 구글 일정인데 「구글에서 열기」가 없습니다');
