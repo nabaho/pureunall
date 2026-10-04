@@ -43,7 +43,10 @@ test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은
   const 줄 = 취업규칙줄(list);
   assert.equal(줄.length, 1, '★★ 취업규칙 타일이 ' + 줄.length + '개다 — 한 앱의 문이 둘이면 어느 쪽인지 헷갈린다');
   assert.equal(줄[0].key, 'rules');
-  assert.equal(줄[0].url, 'rules.html', '★ 타일은 검토·개정(rules.html)으로 들어온다');
+  // 첫 화면은 🏢 사업장(rules-v2.html) — 타일 주소는 «취업규칙 앱 식구(rules.html·rules-v2.html)» 중 하나여야 한다
+  // (프로그램 등록은 rules.html 그대로 — 갈래 단추가 두 화면을 오간다)
+  assert.equal(줄[0].url, 'rules-v2.html', '★ 타일은 첫 화면 🏢 사업장(rules-v2.html)으로 들어온다'); // 검사고정-허용 — 대표 결정 2026-10-04 「추천」: 첫 화면 = 사업장
+  assert.match(줄[0].url, /^rules(-v2)?\.html(#|\?|$)/, '★ 타일 주소가 취업규칙 앱 식구가 아니다');
   assert.equal(줄[0].name, '취업규칙', '★ 대표 결정 — 포털 타일 이름은 「취업규칙」'); // 검사고정-허용 — 대표 결정 2026-10-04 타일 이름
   assert.ok(!list.some((a) => a.key === 'rulesv2'), '★★ rulesv2 타일이 남았다');
 });
@@ -51,9 +54,11 @@ test('①★ 포털에 취업규칙 타일은 하나 — 열쇠 rules, 이름은
 test('②★ 즐겨찾기 목록에도 rulesv2 가 없다 — 포털과 짝', () => {
   const list = 앱바();
   assert.ok(list.length >= 10, '★ 즐겨찾기 목록이 너무 짧다 — 검사가 헛돈다');
-  assert.ok(!list.some((a) => a.key === 'rulesv2' || a.url === 'rules-v2.html'), '★★ 즐겨찾기에 rulesv2 가 남았다');
+  assert.ok(!list.some((a) => a.key === 'rulesv2'), '★★ 즐겨찾기에 rulesv2 가 남았다');
   const 줄 = 취업규칙줄(list);
   assert.equal(줄.length, 1);
+  assert.equal(줄[0].key, 'rules');
+  assert.equal(줄[0].url, 포털().find((a) => a.key === 'rules').url, '★ 포털 타일과 즐겨찾기가 다른 화면으로 간다');
   assert.equal(줄[0].name, 포털().find((a) => a.key === 'rules').name, '★ 포털 타일과 즐겨찾기의 이름이 다르다');
 });
 
@@ -122,4 +127,29 @@ test('⑤★ rules-v2 앱바는 rules 타일을 «지금 앱»으로 켠다', ()
   assert.ok(m, '★ rules-v2 가 앱바에 지금 앱을 알려 주지 않는다');
   assert.ok(앱바().some((a) => a.key === m[1]), '★★ 앱바 목록에 없는 열쇠(' + m[1] + ')로 켠다 — 아무 줄도 안 켜진다');
   assert.equal(m[1], 'rules');
+});
+
+/* ⑥ 타일 주소가 rules-v2.html 이 되어도, ✏️ 검토·개정(rules.html)에서도 「지금 앱」은 취업규칙이다.
+   whoAmI 가 «파일 이름 == 타일 주소» 로만 알아내면 rules.html 쪽이 «어느 앱도 아님» 이 된다. */
+function 앱바열기(pathname) {
+  const win = {};
+  const el = () => ({ style: {}, setAttribute() {}, appendChild() {}, addEventListener() {}, remove() {}, textContent: '' });
+  const ctx = {
+    window: win,
+    document: { createElement: el, querySelector: () => null, readyState: 'loading',
+                body: { appendChild() {} }, addEventListener() {} },
+    localStorage: { getItem: () => null, setItem() {} },
+    setInterval: () => 0, clearInterval() {}, setTimeout: () => 0
+  };
+  win.location = { pathname: pathname, search: '' };
+  ctx.location = win.location;
+  vm.createContext(ctx);
+  vm.runInContext(R('js/pu-appbar.js'), ctx);
+  return win.PuAppBar;
+}
+
+test('⑥★ 취업규칙 앱 식구 두 파일 어느 쪽에서든 지금 앱은 rules', () => {
+  ['/pureunall/rules.html', '/pureunall/rules-v2.html'].forEach((p) => {
+    assert.equal(앱바열기(p).whoAmI(), 'rules', '★★ ' + p + ' 에서 지금 앱을 못 알아낸다 — 보던 화면 기록·켜짐 표시가 빠진다');
+  });
 });
