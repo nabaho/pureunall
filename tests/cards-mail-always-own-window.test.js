@@ -68,8 +68,9 @@ test('★★★ 화면 코드가 openSendMaterials 를 «바로» 부르지 않�
 });
 
 test('★★★ 네 문이 «모두» openMailWindow 로 간다', () => {
-  /* 이메일 «줄»(상세 두 곳) — 폰과 PC 가 같은 글귀를 쓴다 */
-  const rows = SRC.split('\n').filter(ln => /k==='email'\) v=`<a href="#"/.test(ln));
+  /* 이메일 «줄»(상세 두 곳) — 폰과 PC 가 같은 글귀를 쓴다.
+     PC 는 한 줄로 접는 칸(<span class="pd1">)에 싸여 있다(2026-10-04) — 감싸개는 따지지 않는다 */
+  const rows = SRC.split('\n').filter(ln => /k==='email'\) v=`(<span\b[^>]*>)?<a href="#"/.test(ln));
   assert.equal(rows.length, 2, '★ 이메일 줄을 그리는 자리가 둘이 아니다 (' + rows.length + ')');
   rows.forEach(ln => assert.match(ln, /openMailWindow\('\$\{it\.id\}'\)/,
     '★★★ 상세의 이메일 줄이 아직 이 창에서 열린다'));
