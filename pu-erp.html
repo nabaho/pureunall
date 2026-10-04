@@ -4865,6 +4865,16 @@ function _trashFinSplit(v){
 }
 /* 휴지통 두 곳을 함께 — 읽기만 하는 곳(유실 검사·찾기·입금관리 휴지통 목록)이 쓴다 */
 function trashAllRows(){ return [].concat(dbGet('trash_bin', []) || [], dbGet(TRASH_FIN_KEY, []) || []); }
+/* ══ 휴지통은 「데이터 급감 차단」에서 뺀다 (대표 지시 2026-10-04 「고쳐라」) ══
+   위 분리(돈 기록 270건 → trash_fin)로 서버 trash_bin 이 271건 → 1건이 되자, 옛 목록을 든 PC 마다
+   「서버에서 받은 trash_bin 데이터가 크게 줄었습니다」 창이 떴다. 직원 PC 에서는 고르기도 어렵고,
+   「현재 데이터 유지」를 누르면 옛 돈 기록을 든 채로 남아 나중에 일반 휴지통에 다시 올릴 수 있다.
+   ⚠ 휴지통은 «원본 표의 사본»이라 줄어드는 것이 정상이다(되살리기·영구 삭제·분리) — 급감이 곧 사고가 아니다.
+   ⚠ 빼는 것은 «이 기기의 건수 비교» 둘뿐이다 — 받을 때(_fbApplyRecordInner)와 이 기기가 보낼 때(dbSet).
+     옛 데이터가 서버를 덮는 것을 막는 «서버 건수 대비» 검사(근본 급감 차단)는 그대로 둔다.
+   ⚠ 다른 표를 여기 넣지 말 것 — 이 경고가 지켜 주는 것은 «표 원본»이다. */
+var SHRINK_EXEMPT_KEYS = ['trash_bin'];
+function _shrinkExempt(k){ return SHRINK_EXEMPT_KEYS.indexOf(k) >= 0; }
 /* 재무 권한 기기가 열리면 일반 휴지통에 남은 돈 기록을 옮긴다(옛 판 기기가 다시 써 넣은 것까지) */
 try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){
   try { var tb = dbGet('trash_bin', []) || []; if(_erpCanFin() && tb.some(_trashIsFin)) dbSet('trash_bin', tb); } catch(e){}
@@ -5112,7 +5122,7 @@ function dbSet(k, v){
         }
         // ── 대량 급감 차단 (10건 이상이 절반 이하로 줄면 서버 푸시 차단 + 경고. 로컬은 저장됨) ──
         //    의도한 대량 삭제는 콘솔에서 erpAllowBulk() 실행 후 15초 내 저장 시 통과
-        if(Array.isArray(v) && Array.isArray(prev) && prev.length >= 10 && v.length < prev.length * 0.5){
+        if(Array.isArray(v) && Array.isArray(prev) && prev.length >= 10 && v.length < prev.length * 0.5 && !_shrinkExempt(k)){
           var _bulkOk = window._bulkDeleteIntent && (Date.now() - window._bulkDeleteIntent < 15000);
           if(!_bulkOk){
             console.warn('[데이터보호] '+k+': '+prev.length+'건 → '+v.length+'건 절반 이하 급감 — Firebase 푸시 차단(로컬만 저장)');
@@ -10883,7 +10893,7 @@ function _fbApplyRecordInner(k, v, opts){
       }
       try { // [버그수정] 정규식 근사 제거 — 최상위 항목 수만 비교 (_fbLocalCountForShrink 참고)
         var _oldN = _fbLocalCountForShrink(k);
-        if(_oldN !== null && Array.isArray(arrValue) && _oldN >= 10 && arrValue.length < _oldN * 0.5){
+        if(_oldN !== null && Array.isArray(arrValue) && _oldN >= 10 && arrValue.length < _oldN * 0.5 && !_shrinkExempt(k)){
           // 급감 차단: 자동 저장하지 않고 사용자 선택(현재 유지 / 서버값 교체). 승인 시엔 항상 리렌더.
           //   적용 콜백은 버전 가드 — 대기 중 더 새 값이 이미 반영됐으면(meta 진행) 옛 급감을 쓰지 않는다(되돌림 방지).
           _handleShrinkSync(k, _oldN, arrValue.length, function(){
