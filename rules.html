@@ -36,6 +36,16 @@
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="std_2026.js?v=2"></script>
+<!-- 「💡 우리 문안」(✏️ 조문 편집 아래) — 📚 조별 문안과 «같은 부품». 캐시 번호는 rules-v2.html 과 같게.
+     lib-sites 는 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
+<script src="js/rules-v2/lib-order.js?v=1"></script>
+<script src="js/rules-v2/lib-topics.js?v=1"></script>
+<script src="js/rules-v2/lib-sites.js?v=1"></script>
+<script src="js/rules-v2/store.js?v=2"></script>
+<script src="js/rules-v2/text-cache.js?v=1"></script>
+<script src="js/rules-v2/view-topics.js?v=4"></script>
+<script src="js/rules-v2/lib-recommend.js?v=1"></script>
+<script src="js/rules-v2/view-recommend.js?v=1"></script>
 <script src="xlsx_gen.js?v=3"></script>
 <style>
 :root{
@@ -599,6 +609,25 @@ table.daejo .rreason{color:var(--sub);font-size:11px}
 .artedit .ae-before{font-size:12px;line-height:1.6;background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px 10px;max-height:140px;overflow:auto;white-space:pre-wrap}
 .artedit textarea{width:100%;min-height:130px;font-family:inherit;font-size:12.5px;line-height:1.6;border:1px solid #4ade80;border-radius:8px;padding:8px 10px;box-sizing:border-box;resize:vertical;background:#fff}
 .artedit .ae-btns{display:flex;gap:8px;justify-content:flex-end;margin-top:8px;align-items:center}
+/* 💡 우리 문안 — 한 줄 칸(머리·흐린 줄·⚠·회사 줄·끝 줄)은 넘치면 … , 전문은 title */
+.ae-rec{margin-top:10px;border:1px solid #bfdbfe;border-radius:10px;background:#eff6ff;padding:8px 10px;font-size:12px}
+.ae-rec:empty{display:none}
+.ae-rec .rec-h{display:flex;align-items:center;gap:8px;white-space:nowrap;min-width:0}
+.ae-rec .rec-hm,.ae-rec .rec-meta,.ae-rec .rec-foot{display:block;min-width:0;color:#475569;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ae-rec .rec-foot{margin-top:6px}
+.ae-rec .rec-msg{color:#475569;margin-top:4px}
+.ae-rec .rec-opt{background:#ffffff;border:1px solid #e2e8f0;border-radius:8px;margin-top:6px;overflow:hidden}
+.ae-rec .rec-oh{display:flex;align-items:center;gap:6px;padding:4px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap;min-width:0}
+.ae-rec .rec-tag{flex:0 0 auto;font-size:10.5px;padding:1px 7px;border-radius:8px;border:1px solid #bfdbfe;background:#eff6ff;color:#1e40af;font-weight:700}
+.ae-rec .rec-tag.similar{border-color:#bbf7d0;background:#f0fdf4;color:#166534}
+.ae-rec .rec-tag.most{border-color:#fde68a;background:#fffbeb;color:#854d0e}
+.ae-rec .rec-ob{padding:6px 8px;line-height:1.7;max-height:180px;overflow:auto;color:#1e293b}
+.ae-rec .rec-ob ins{background:#f0fdf4;color:#166534;text-decoration:none;border-bottom:2px solid #bbf7d0}
+.ae-rec .rec-warn{margin:0 8px 6px;padding:3px 8px;border-radius:6px;background:#fffbeb;color:#854d0e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ae-rec .rec-of{display:flex;gap:6px;padding:0 8px 6px}
+.ae-rec .rec-put{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:700}
+.ae-rec .rec-who{border-top:1px solid #e2e8f0;padding:4px 0}
+.ae-rec .rec-who-r{padding:1px 8px;color:#475569;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sample-banner{background:#fffbeb;border:1px solid #fbbf24;color:#854d0e;font-size:11.5px;font-weight:600;border-radius:8px;padding:7px 11px;margin-bottom:10px;line-height:1.55;white-space:normal}
 .panel-card{background:var(--card);border:1px solid var(--card-bd);border-radius:12px;padding:8px 12px;margin-bottom:10px;box-shadow:0 4px 16px rgba(30,58,138,.05)}
 /* 상태 점 — 이제 단추 앞과 전체 보기 목록에서 쓴다.
@@ -1006,6 +1035,7 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
           <button class="stbtn" id="ae-revert" title="변경 후를 현행 그대로 되돌림">현행으로 되돌리기</button>
           <button class="btn" id="ae-apply" style="height:32px;font-size:12.5px;padding:0 16px">신구대조표에 반영</button>
         </div>
+        <div class="ae-rec" id="ae-rec"></div>
       </div>
       <div id="fs-bar" style="display:none;align-items:center;gap:8px;padding:6px 12px;background:#f8fafc;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--sub);flex-wrap:wrap">
         <span id="fs-txt"></span>
@@ -2467,6 +2497,7 @@ function openArtEdit(a){
   $("ae-after").value=it.after;
   $("art-edit").style.display="block";
   document.querySelectorAll("#artbox-list .pick-art").forEach(b=>b.classList.toggle("editing",b.dataset.label===a.label));
+  recRender(a);   // 💡 우리 문안 — 실패해도 편집은 그대로(안에서 한 줄로 끝난다)
 }
 /* ── 조문 선택 모드: 원본 조문을 점선 박스로 표시 → 클릭 선택 → 신구대조표에 검토·수정 대상으로 추가 ── */
 function renderArticlePicker(){
@@ -7147,6 +7178,108 @@ $("ae-bank").addEventListener("click",()=>{
   if(!q){ const m2=String($("ae-after").value||"").match(/^제\s*\d+\s*조[^\((]*[\((]([^\))]+)[\))]/); if(m2)q=m2[1].trim(); }
   bankPickOpen(q);
 });
+
+/* ══════ 💡 우리 문안 — 조문 편집 카드 아래 (2026-10-04 대표 「추천대로」) ══════
+   모은 자료(rules_mgmt/library — 가린 사본)에서 «같은 조 주제»의 문안을 세 갈래(가장 최근·비슷한 회사·가장 많이 씀)로
+   많아야 셋 보이고, 「이 문안 넣기」는 「변경 후」 칸까지만 채운다(반영·저장은 사람이 누른다).
+   덩어리는 📚 조별 문안과 «같은 부품»(view-topics model), 고르기는 lib-recommend, 그리기는 view-recommend.
+   ⚠ 읽기만 한다 — 서버에 아무것도 쓰지 않는다. 저장소 관문(gateway)은 늘 거절하는 대역을 넘긴다.
+   ⚠ 처음 조를 열 때 «한 번만» 읽는다(진행 중이면 같은 약속). 실패하면 다음에 조를 열 때 다시.
+   ⚠ 어떤 실패도 #ae-rec 한 줄로 끝난다 — 편집은 그대로 돈다.
+   ⚠ 규모 말이 둘이다 — 비슷한 회사 띠는 lib-sites 말('10~29인'), 위반 판정 규모는 #size 말('10인이상'). 섞지 말 것. */
+const REC={M:null,loading:null,st:{state:"idle"}};
+function recLoad(){
+  if(REC.M)return Promise.resolve(REC.M);
+  if(REC.loading)return REC.loading;
+  if(!FBDB)return Promise.reject(new Error("로그인 뒤에 보입니다"));
+  const p=(async()=>{
+    // 업체 목록이 아직이면 잠깐 기다린다 — 덩어리의 회사 이름·비슷한 회사가 업체 목록에서 온다(끝내 안 오면 없이)
+    if(!ERP_COS.length){ loadErpCompanies(); await libWait(()=>ERP_COS.length>0,20,300); }
+    const S=PuRulesV2Store.make({db:FBDB,gateway:{save:()=>Promise.reject(new Error("읽기 전용"))},
+      companies:()=>ERP_COS,actor:()=>"",now:Date.now});
+    const data=(await S.load())||{};
+    const docs={};
+    PuRulesV2Order.merge(data.docs||{},data.human||{}).forEach(it=>{ if(it.kind==="규칙본문"&&it.status==="담김")docs[it.id]=it.doc; });
+    let idb=null; try{ idb=window.indexedDB||null; }catch(e){ idb=null; }
+    const r=await S.texts(docs,PuRulesV2TextCache.make(idb),(n,m)=>{
+      const st=REC.st; if(st.state!=="loading")return;
+      st.done=n; st.total=m; recDraw();
+    });
+    const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+    REC.M=PuRulesV2TopicsView.model(data,(r&&r.texts)||{},ERP_COS,(window.STD_2026||{}).text||"",today,window.PuRulesCriteria);
+    return REC.M;
+  })();
+  REC.loading=p;
+  p.catch(()=>{ if(REC.loading===p)REC.loading=null; });   // 실패하면 다음에 조를 열 때 다시 읽는다
+  return p;
+}
+/* 넣을 때 채울 말 — {회사}는 이 사업장 이름, {근로자}는 이 규칙이 쓰는 호칭 */
+function recTerms(){
+  const co=siteName((LAST&&LAST.site)||SITE_MAP[siteSel.value]);
+  return {회사:co||"회사",근로자:detectTerms(SAMPLES[siteSel.value]||"").근로자};
+}
+function recDraw(){
+  const el=$("ae-rec"); if(!el)return;
+  try{ el.innerHTML=PuRulesV2RecommendView.boxHtml(REC.st); }catch(e){ recFail(e); }
+}
+function recFail(e){
+  const el=$("ae-rec"); if(!el)return;
+  try{ console.warn("우리 문안:",e); }catch(_){ /* 알림 실패는 무시 */ }
+  el.innerHTML='<div class="rec-msg">💡 우리 문안을 못 읽었습니다 — '+escapeH(String((e&&e.message)||e||"알 수 없는 오류"))+'</div>';
+}
+/* 덩어리 고르기 — 모델은 이미 있다. 지금 사업장(SITE_INFO)으로 비슷한 회사를 가른다 */
+function recFill(st,a,M){
+  const it=CUR_ITEMS.find(x=>x.id==="art_"+a.label);
+  const co=siteName((LAST&&LAST.site)||SITE_MAP[siteSel.value]);
+  const bz=_digits(SITE_INFO&&SITE_INFO.bizNo);
+  const mine=bz.length>=10?ERP_COS.find(c=>_digits(c.bizNo)===bz):null;
+  const coById={}; ERP_COS.forEach(c=>{ if(c&&c.id!=null)coById[String(c.id)]=c; });
+  const key=PuRulesV2Topics.topicKey(a.title);
+  st.curBody=String(it?it.orig:"").replace(RE_HEAD_STRIP,"");
+  st.curCoName=co;
+  st.band=PuRulesV2Sites.band(SITE_INFO&&SITE_INFO.empTotal);   // lib-sites 띠 말
+  st.bizType=(SITE_INFO&&SITE_INFO.bizType)||"";
+  st.terms=recTerms();
+  st.picks=PuRulesV2Recommend.pick(M.byTopic[key]||[],{curBody:st.curBody,curCoName:co,
+    companyId:mine?String(mine.id):"",band:st.band,bizType:st.bizType,coById});
+  const size=$("size").value;   // 검토 기준 규모 말(#size)
+  st.warns={}; st.picks.forEach(p=>{ st.warns[p.group.key]=PuRulesV2TopicsView.warnsOf(p.group,M,size); });
+  const t=(M.topics||[]).find(x=>x.key===key);
+  st.docs=M.docs; st.places=t?t.count:0;
+  st.state="ready";
+}
+function recRender(a){
+  try{
+    const st=REC.st={state:"loading",done:0,total:0,picks:[],warns:{},open:{}};
+    if(!a||!String(a.title||"").trim()){ st.state="notitle"; recDraw(); return; }
+    recDraw();
+    const label=a.label;
+    // 읽는 사이 다른 조를 열면(닫으면) 이 약속은 손을 뗀다 — 지금 연 조는 그 조의 recRender 가 같은 약속으로 그린다
+    const mine=()=>REC.st===st&&AE_LABEL===label;
+    recLoad().then(M=>{
+      if(!mine())return;
+      recFill(st,a,M); recDraw();
+    }).catch(e=>{
+      if(!mine())return;
+      st.state="error"; st.err=String((e&&e.message)||e||"알 수 없는 오류"); recDraw();
+    });
+  }catch(e){ recFail(e); }
+}
+function recClick(ev){
+  try{
+    const b=ev&&ev.target&&ev.target.closest&&ev.target.closest("[data-rec]"); if(!b)return;
+    const k=b.dataset.k, p=(REC.st.picks||[]).find(x=>x.group.key===k); if(!p)return;
+    if(b.dataset.rec==="put"){
+      if(READONLY){ alert("열람 전용입니다."); return; }
+      const ta=$("ae-after");
+      ta.value=PuRulesV2RecommendView.insertText(ta.value,p.group.text,recTerms(),fillTpl);
+      ta.focus();
+    }else if(b.dataset.rec==="who"){
+      REC.st.open[k]=!REC.st.open[k]; recDraw();
+    }
+  }catch(e){ recFail(e); }
+}
+$("ae-rec").addEventListener("click",recClick);
 
 /* ══════ 표준취업규칙 (고용노동부, 연도별) ══════
    chwieop/standard/{연도} — 법인 공동 자산. 브라우저 사본과 병행. */
