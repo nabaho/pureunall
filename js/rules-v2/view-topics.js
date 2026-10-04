@@ -115,18 +115,24 @@
   function warnsOf(g, M, size) {
     var C = M.criteria;
     if (!C || !C.evaluate || !g.members.length) return [];
+    try { return judgeWarns(g, M, size); } catch (e) { return []; }
+  }
+  /* 판정 그 자체 — 못 하면 «던진다». warnsOf 는 이것을 [] 로 삼키고(📚·💡 는 판정이 없으면 띠를 안 그릴 뿐이다),
+     ✨ AI 다듬기는 이것을 바로 불러 «0건» 과 «판정 못 함» 을 가른다(못 했는데 0 이라고 하면 안 된다). */
+  function judgeWarns(g, M, size) {
+    var C = M && M.criteria;
+    if (!C || !C.evaluate) throw new Error('검토 기준을 싣지 못했습니다');
+    if (!g || !g.members || !g.members.length) return [];
     var rep = g.members[0], body = String(rep.body || '');
     var art = { label: rep.label, title: rep.title, body: body, bodyNs: body.replace(/\s+/g, '') };
-    try {
-      // ⚠ 한 조짜리 문서라 loc 는 늘 이 조다 — 그것만으로는 «다른 조의 기준»(출산전후휴가 조에 임신기 근로시간 단축)이 붙는다.
-      //   기준의 낱말(규칙집의 낱말 넓히기 그대로)이 이 조의 «제목»에 있을 때만 이 조의 기준으로 본다.
-      var tNs = String(rep.title || '').replace(/\s+/g, '');
-      return C.evaluate([art], size || SIZE, new Set(), M.today).filter(function (f) {
-        if (f.status !== '위반의심' || f.loc !== rep.label) return false;
-        var ks = C.expandKw ? C.expandKw(f.rule.keywords || []) : (f.rule.keywords || []);
-        return ks.some(function (k) { k = String(k || '').replace(/\s+/g, ''); return k && tNs.indexOf(k) >= 0; });
-      });
-    } catch (e) { return []; }
+    // ⚠ 한 조짜리 문서라 loc 는 늘 이 조다 — 그것만으로는 «다른 조의 기준»(출산전후휴가 조에 임신기 근로시간 단축)이 붙는다.
+    //   기준의 낱말(규칙집의 낱말 넓히기 그대로)이 이 조의 «제목»에 있을 때만 이 조의 기준으로 본다.
+    var tNs = String(rep.title || '').replace(/\s+/g, '');
+    return C.evaluate([art], size || SIZE, new Set(), M.today).filter(function (f) {
+      if (f.status !== '위반의심' || f.loc !== rep.label) return false;
+      var ks = C.expandKw ? C.expandKw(f.rule.keywords || []) : (f.rule.keywords || []);
+      return ks.some(function (k) { k = String(k || '').replace(/\s+/g, ''); return k && tNs.indexOf(k) >= 0; });
+    });
   }
   /* 그 주제를 처음 열 때 한 번 — 아래 덩어리 견주기와 위반 판정을 모델에 담아 둔다 */
   function prepare(M, key) {
@@ -320,7 +326,7 @@
   }
 
   var api = { model: model, listHtml: listHtml, topicHtml: topicHtml, copyText: copyText, mount: mount,
-    places: places, warnsOf: warnsOf, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER };
+    places: places, warnsOf: warnsOf, judgeWarns: judgeWarns, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER };
   if (root) root.PuRulesV2TopicsView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

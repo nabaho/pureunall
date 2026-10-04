@@ -5,7 +5,9 @@
    여기서는 «글»을 만들기만 한다(DOM 을 만지지 않는다 — 검사가 그린 글을 본다). 부르기·넣기는 rules.html.
 
    st = { state:'menu'|'sending'|'ready'|'error', mode:'tidy'|'fix', hasFindings, nFindings,
-          cur(지금 변경 후 본문 — 머리 뗀 것), got({text, why, maskLeft} — restore 뒤 글), warns(다시 판정 위반 의심 배열), err }
+          cur(지금 변경 후 본문 — 머리 뗀 것), got({text, why, maskLeft} — restore 뒤 글), err,
+          before(검토 때 이 조의 위반의심 수), warns(다시 판정 위반 의심 배열 — 못 했으면 null), judgeFail(다시 판정 못 함),
+          unjudged(이 조에 누락·수동확인 지적이 있었나 — 그것은 다시 판정하지 않는다) }
 
    ★ 지키는 것
      · 글은 모두 esc — AI 가 쓴 글·지금 글의 꺾쇠가 태그가 되면 안 된다.
@@ -43,18 +45,27 @@
       + line('pol-note', 'AI 에게는 이 조 하나만, 회사 이름·개인정보를 가리고 보냅니다 — 하루 몫은 회사 전체가 함께 씁니다');
   }
 
+  /* 다시 판정 한 줄 — 무엇을 견줬는지 밝힌다.
+     before: 검토 때 이 조의 위반의심 수 · warns: AI 글을 다시 판정한 위반의심(못 했으면 judgeFail).
+     다시 판정은 «위반의심»만 한다 — 누락·수동확인이 있던 조라면 그것은 다시 안 봤다고 말한다(0 이 «다 고쳤다»로 읽히지 않게).
+     ⚠ 판정을 못 했으면 숫자를 쓰지 않는다 — 못 한 것을 0 이라고 하면 «다 고쳤다»로 읽힌다. */
+  function judgeLine(st) {
+    if (st.judgeFail || !st.warns) return '검토 기준으로 다시 판정 못 함';
+    return '검토 기준으로 다시 판정: 위반 의심 ' + (Number(st.before) || 0) + ' → ' + st.warns.length
+      + (st.unjudged ? ' · 누락·수동확인은 다시 판정하지 않음' : '');
+  }
   function readyHtml(st) {
     var got = st.got || {};
     var segs = FC().wordDiff(String(st.cur || ''), String(got.text || '')) || [];
     var body = segs.map(function (s) {
       return s.t === '+' ? '<ins>' + h(s.s) + '</ins>' : s.t === '-' ? '<del>' + h(s.s) + '</del>' : h(s.s);
     }).join('');
-    var n = (st.warns || []).length;
-    var warn1 = '⚠ AI 가 쓴 글입니다 — 법 조항 번호·일수는 꼭 확인하세요. 검토 기준으로 다시 판정: 지적 ' + n + '건';
+    var warn1 = '⚠ AI 가 쓴 글입니다 — 법 조항 번호·일수는 꼭 확인하세요';
     var out = head(line('pol-hm', P().MODES[st.mode] || ''), '✨ AI 가 고친 판')
       + '<div class="pol-body">' + body + '</div>';
     if (got.why) out += line('pol-why', '바꾼 까닭(AI): ' + got.why);
     out += '<div class="pol-warn" title="' + esc(warn1) + '">' + esc(warn1) + '</div>';
+    out += line('pol-why', judgeLine(st));
     if (got.maskLeft) {
       var w2 = '⚠ 가린 자리가 남아 있습니다 — 넣은 뒤 손으로 채우세요';
       out += '<div class="pol-warn" title="' + esc(w2) + '">' + esc(w2) + '</div>';

@@ -4,7 +4,7 @@
      ② prompt — 두 방식에서 갈리는 열쇠말이 «있다/없다» · 〈조문〉은 자료라는 말 · 답은 JSON · fix 에만 지적 줄
      ③ parse — 껍데기·잡글을 걷는다 · 못 읽으면 ok:false · 가림 표시는 «진짜 kordoc 가림 글»로 본다
      ④ restore — 조사는 rules.html fillWord 를 «잘라 와» 같은 결과인지 견준다(베끼지 않는다)
-     ⑤ boxHtml — 상태 넷 · fix 는 지적 있을 때만 · ins/del · esc · 줄바꿈 <br> · 다시 판정 수 */
+     ⑤ boxHtml — 상태 넷 · fix 는 지적 있을 때만 · ins/del · esc · 줄바꿈 <br> · 다시 판정 «전 → 후»(못 하면 수 없이) */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -131,6 +131,16 @@ test('③ parse — 못 읽으면 ok:false 와 같은 한 줄', () => {
   }
   assert.equal(seen.size, 1, '실패 안내는 한 가지');
 });
+test('③ parse — 지시문의 보기 글을 되풀이한 것은 답이 아니다 · 그 뒤의 진짜 답을 읽는다', () => {
+  // 지시문이 보여 준 답 모양 그대로 — 지시문에서 떼어 온다(문장을 베끼지 않는다)
+  const p = P.prompt('tidy', '① 쉰다.', []);
+  const sample = p.split('\n').find((l) => /^\{"text":/.test(l));
+  assert.ok(sample, '지시문에 답 모양 보기가 없다');
+  assert.equal(P.parse(sample, '').ok, false, '보기 글을 답으로 읽었다');
+  const r = P.parse(sample + '\n' + JSON.stringify({ text: '① 쉰다.', why: '그대로' }), '');
+  assert.equal(r.ok, true);
+  assert.equal(r.text, '① 쉰다.');
+});
 test('③ parse — why 가 없어도 읽는다 · CRLF 는 \\n 으로', () => {
   const r = P.parse('{"text":"가\\r\\n나"}', '');
   assert.equal(r.ok, true);
@@ -234,9 +244,17 @@ test('⑤ boxHtml ready — AI 글·지금 글의 꺾쇠는 태그가 되지 않
   assert.match(del, /<del>[^<]*&lt;b&gt;나&lt;\/b&gt;/);
 });
 test('⑤ boxHtml ready — 다시 판정 수를 밝히고, 가림이 남았을 때만 그 줄이 나온다', () => {
-  const two = PV.boxHtml(READY({ warns: [{ rule: { id: 'a' } }, { rule: { id: 'b' } }] }));
-  assert.match(two, /다시 판정: 지적 2건/);
-  assert.match(PV.boxHtml(READY()), /다시 판정: 지적 0건/);
+  const two = PV.boxHtml(READY({ before: 3, warns: [{ rule: { id: 'a' } }, { rule: { id: 'b' } }] }));
+  assert.match(two, /다시 판정: 위반 의심 3 → 2(?!\d)/);
+  assert.doesNotMatch(two, /다시 판정하지 않음/);
+  assert.match(PV.boxHtml(READY()), /다시 판정: 위반 의심 0 → 0(?!\d)/);
+  assert.match(PV.boxHtml(READY({ before: 1, unjudged: true })), /위반 의심 1 → 0 · 누락·수동확인은 다시 판정하지 않음/);
+  // 판정을 못 했으면 숫자를 쓰지 않는다
+  for (const bad of [{ judgeFail: true, warns: null }, { judgeFail: true, warns: [] }, { warns: null }]) {
+    const f = PV.boxHtml(READY(Object.assign({ before: 2 }, bad)));
+    assert.match(f, /다시 판정 못 함/, JSON.stringify(bad));
+    assert.doesNotMatch(f, /→/, '못 한 판정에 수를 적었다');
+  }
   const m = PV.boxHtml(READY({ got: { text: '010-●●●●-5678', why: '', maskLeft: true } }));
   assert.match(m, /가린 자리가 남아 있습니다 — 넣은 뒤 손으로 채우세요/);
   assert.ok(!/바꾼 까닭/.test(m), 'why 가 비면 까닭 줄은 없다');

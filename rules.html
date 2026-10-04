@@ -43,13 +43,13 @@
 <script src="js/rules-v2/lib-sites.js?v=1"></script>
 <script src="js/rules-v2/store.js?v=2"></script>
 <script src="js/rules-v2/text-cache.js?v=1"></script>
-<script src="js/rules-v2/view-topics.js?v=4"></script>
+<script src="js/rules-v2/view-topics.js?v=5"></script>
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
 <script src="js/rules-v2/view-recommend.js?v=3"></script>
 <!-- ✨ AI 다듬기 — 호출기(서버 readDoc 를 부르는 얇은 층)·셈·상자. lib-polish 는 lib-topics·pu-rules-filecmp 를 쓴다(위에서 싣는다) -->
 <script src="js/pu-ai-call.js?v=3"></script>
-<script src="js/rules-v2/lib-polish.js?v=1"></script>
-<script src="js/rules-v2/view-polish.js?v=1"></script>
+<script src="js/rules-v2/lib-polish.js?v=2"></script>
+<script src="js/rules-v2/view-polish.js?v=2"></script>
 <script src="xlsx_gen.js?v=3"></script>
 <style>
 :root{
@@ -7355,25 +7355,39 @@ function polDraw(){
 function polFindings(){
   return (ALL_FINDINGS||[]).filter(f=>f&&f.loc===AE_LABEL&&POL_ASK.indexOf(f.status)>=0);
 }
-/* 회사 이름 — 💡 우리 문안(recFill·recTerms)과 같은 고르기 */
-function polCoName(){ return siteName((LAST&&LAST.site)||SITE_MAP[siteSel.value]); }
-/* 「변경 후」에서 조 머리(artHeadOf — 💡·📖 와 한 벌)를 뗀 본문 */
-function polBody(){
-  const s=String($("ae-after").value||"").replace(/^\s+/,""), hd=artHeadOf(s);
+/* 가릴 회사 이름 — «보내는 그 순간» ERP 업체 목록(ERP_COS)에서 지금 문서의 업체를 다시 찾는다.
+   ⚠ SITE_INFO 를 쓰지 않는다 — 앞서 검토한 «다른 문서»의 업체가 남아 있을 수 있다(A 를 검토하고 B 를 열면
+     SITE_INFO 는 A 다). 그 이름으로 가리면 B 의 이름은 그대로 나가고, 답의 {회사} 는 A 의 이름으로 채워진다.
+   ⚠ LAST 도 지금 문서(siteSel)의 것일 때만 믿는다 — 다른 문서를 고르면 LAST 는 앞 문서 그대로 남는다.
+   ⚠ 파일 이름·「원본」·「작업 문서」 같은 자리 글은 이름이 아니다 — 그것으로 가리면 본문의 「원본」이 {회사} 가 된다.
+     ERP 에서 못 찾으면 "" (보내기 전에 묻는다). */
+function polCoName(){
+  const key=siteSel.value, L=(LAST&&LAST.key===key)?LAST:null;
+  const c=findErpCompany(L?L.site:SITE_MAP[key],L?L.bizno:SITE_BIZNO[key]);
+  return c?String(c.name||"").trim():"";
+}
+/* 조 머리(artHeadOf — 💡·📖 와 한 벌)와 앞 빈칸을 뗀 본문 */
+function polNoHead(t){
+  const s=String(t||"").replace(/^\s+/,""), hd=artHeadOf(s);
   return (hd?s.slice(hd.length):s).replace(/^\s+/,"");
 }
+/* 「변경 후」의 본문 */
+function polBody(){ return polNoHead($("ae-after").value); }
+function polMenuSt(){ const n=polFindings().length; return {state:"menu",hasFindings:n>0,nFindings:n}; }
 function polMenu(){
   if(READONLY){ alert("열람 전용입니다."); return; }   // 넣을 수 없는 판에 회사 공동 하루 몫을 쓰지 않는다
   if(POL.busy)return;   // 부르는 중에는 그대로 둔다(답이 오면 그 상자에 그린다)
-  const n=polFindings().length;
-  POL.st={state:"menu",hasFindings:n>0,nFindings:n};
+  POL.st=polMenuSt();
   polDraw();
 }
-/* 실패 글 — 분당 몫(429 + PerMinute)·하루 몫(429 + quota·free_tier 낱말)·로그인·그 밖은 까닭째.
-   ⚠ 분당 몫을 먼저 본다 — 분당 한도 글에도 quota 낱말이 들어 있어, 순서가 바뀌면 «내일 다시»라고 잘못 말한다 */
+/* 실패 글 — 달 한도(429 + 한도 낱말)·분당 몫(429 + PerMinute)·하루 몫(429 + quota·free_tier 낱말)·로그인·그 밖은 까닭째.
+   ⚠ 달 한도는 서버(readDoc)가 «이번 달 AI 판독 한도…를 다 썼습니다 … 사진을 열어 직접 눌러 주세요» 로 막는다 —
+     사진첩에 맞춘 글이라 그대로 보이면 안 된다(여기엔 사진이 없다). 낱말로 알아보고 우리 글로 바꾼다.
+   ⚠ 분당 몫을 하루 몫보다 먼저 본다 — 분당 한도 글에도 quota 낱말이 들어 있어, 순서가 바뀌면 «내일 다시»라고 잘못 말한다 */
 function polErr(e){
   const code=e&&e.status, m=String((e&&e.message)||e||"알 수 없는 오류");
   if(code===401||(!code&&/로그인/.test(m)))return "로그인을 확인해 주세요";
+  if((code===429&&/한도/.test(m))||/사진을 열어/.test(m))return "이번 달 AI 한도에 걸렸습니다 — 관리자에게 알려 주세요";
   if(code===429&&/PerMinute|per\s*minute/i.test(m))return "AI 가 잠시 바쁩니다 — 1분 뒤 다시 해 주세요";
   if(code===429&&/quota|free_tier|PerDay|RESOURCE_EXHAUSTED/i.test(m))return "오늘 AI 몫이 다 찼습니다 — 내일 다시 해 주세요";
   return "AI 다듬기를 못 했습니다 — "+m;
@@ -7385,26 +7399,45 @@ async function polSend(mode){
   if(!label)return;
   const finds=mode==="fix"?polFindings():[];
   if(mode==="fix"&&!finds.length)return;   // 없는 지적을 «반영»하라고 시킬 수는 없다
-  const cur=polBody(), co=polCoName();
+  const cur=polBody(), menu=POL.st;
+  POL.busy=true;
+  // 회사 이름은 «지금» ERP 에서 — 업체 목록이 아직 없으면 한 번 받아 온다(실패해도 loadErpCompanies 가 삼킨다)
+  let co="";
+  try{
+    if(!ERP_COS.length)await loadErpCompanies();
+    co=polCoName();
+  }catch(e){ co=""; }
+  // 기다리는 사이 조를 바꿨거나 상자를 닫았으면 그만둔다(부르지 않는다)
+  if(AE_LABEL!==label||POL.st!==menu){ POL.busy=false; return; }
+  if(!co&&!confirm("회사 이름을 몰라 가리지 못합니다 — 그래도 보낼까요?")){ POL.busy=false; return; }
   const st=POL.st={state:"sending",mode:mode==="fix"?"fix":"tidy"};
-  POL.busy=true; polDraw();
+  polDraw();
   const mine=()=>POL.st===st&&AE_LABEL===label;
   try{
     if(!cur.trim())throw new Error("다듬을 글이 없습니다 — 「변경 후」를 먼저 채우세요");
-    const red=await PuKordocText.redactFile(new Uint8Array(0),P.toSend(cur,co).text);
+    // 가림 — 기본 묶음(주민·계좌·카드·전화·전자우편·여권·면허)에 사업자번호까지. 서고와 달리 여기선 사업장 열쇠로 쓸 일이 없다
+    const KT=PuKordocText, groups=KT.PII_GROUPS.filter(g=>g.on).map(g=>g.key).concat("brn");
+    const red=await KT.redactFile(new Uint8Array(0),P.toSend(cur,co).text,groups);
     const masked=String(red.text);   // 보낸 그대로 — parse 가 «보낸 가림 자리가 남았는가»를 이것으로 가른다
     const lines=finds.map(f=>({title:f.rule.name+(f.rule.law?" ("+f.rule.law+")":""),desc:f.rule.criterion||"",note:f.note||""}));
     const auth=(window.firebase&&firebase.auth)?firebase.auth():null;
     const reply=await PuAiCall.ask([{text:P.prompt(st.mode,masked,lines)}],
-      {auth,app:"rules",generationConfig:{temperature:0.2,responseMimeType:"application/json"}});
+      {auth,app:"rules",generationConfig:{temperature:0.2}});
     if(!mine())return;
     const r=P.parse(PuAiCall.textOf(reply),masked);
     if(!r.ok)throw new Error(r.why);
-    const text=P.restore(r.text,co);
+    // 시켜도 AI 가 조 머리(「제25조(연차휴가)」)를 붙여 올 때가 있다 — 떼고 견주고 넣는다(넣을 때 머리는 지금 것을 지킨다)
+    const text=polNoHead(P.restore(r.text,co));
     const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
-    // 검토 기준으로 다시 판정 — 이 조(라벨·제목)·고친 글·지금 고른 규모(#size)
-    const warns=PuRulesV2TopicsView.warnsOf({members:[{label,title,body:text}]},{criteria:PuRulesCriteria,today},$("size").value);
-    Object.assign(st,{state:"ready",cur,got:{text,why:r.why,maskLeft:r.maskLeft},warns});
+    // 검토 기준으로 다시 판정 — 이 조(라벨·제목)·고친 글·지금 고른 규모(#size). «위반의심»만 다시 본다.
+    // 못 했으면(던지면) 숫자 대신 «다시 판정 못 함» — 못 한 것을 0 이라고 하면 «다 고쳤다»로 읽힌다
+    const was=(ALL_FINDINGS||[]).filter(f=>f&&f.loc===label);
+    let warns=null;
+    try{ warns=PuRulesV2TopicsView.judgeWarns({members:[{label,title,body:text}]},{criteria:PuRulesCriteria,today},$("size").value); }
+    catch(e){ console.warn("✨ 다시 판정 못 함:",e); }
+    Object.assign(st,{state:"ready",cur,got:{text,why:r.why,maskLeft:r.maskLeft},warns,judgeFail:!warns,
+      before:was.filter(f=>f.status==="위반의심").length,
+      unjudged:was.some(f=>f.status==="누락"||f.status==="수동확인")});
   }catch(e){
     if(!mine())return;
     st.state="error"; st.err=polErr(e);

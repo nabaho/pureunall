@@ -26,6 +26,8 @@
   var MASK = '●';
   var BAD_REPLY = 'AI 답을 읽지 못했습니다';
   var PLACE = '{회사}';
+  /* 지시문에 보여 주는 답 모양의 «보기 글» — AI 가 이것을 그대로 되풀이하면 답이 아니다(parse 가 건너뛴다) */
+  var SAMPLE = { text: '고친 본문', why: '바꾼 까닭 한두 문장' };
 
   function str(v) { return v == null ? '' : String(v); }
   function reEsc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -81,7 +83,7 @@
     }
     L.push('');
     L.push('답은 JSON 하나만 쓴다. 다른 글은 붙이지 않는다.');
-    L.push('{"text": "고친 본문", "why": "바꾼 까닭 한두 문장"}');
+    L.push('{"text": "' + SAMPLE.text + '", "why": "' + SAMPLE.why + '"}');
     L.push('');
     L.push('〈조문〉');
     // 조문 속에 울타리 글자(〈조문〉·〈/조문〉·〈지적〉)가 있으면 «자료의 끝»을 흉내 낼 수 있다 — 꺾쇠를 소괄호로 눌러 둔다
@@ -112,13 +114,14 @@
     }
     return null;
   }
-  /* 답에서 {text} 를 가진 첫 JSON 객체 — ```json 껍데기·앞뒤 잡글(그 속의 { 도)을 지나쳐 뒤의 { 에서 다시 해 본다 */
+  /* 답에서 {text} 를 가진 첫 JSON 객체 — ```json 껍데기·앞뒤 잡글(그 속의 { 도)을 지나쳐 뒤의 { 에서 다시 해 본다.
+     지시문의 보기 글을 되풀이한 것(text 가 「고친 본문」)은 답이 아니다 — 건너뛰고 다음 것을 본다 */
   function findReply(s) {
     for (var a = s.indexOf('{'); a >= 0; a = s.indexOf('{', a + 1)) {
       var raw = objectAt(s, a), o = null;
       if (!raw) continue;
       try { o = JSON.parse(raw); } catch (e) { continue; }
-      if (o && typeof o === 'object' && typeof o.text === 'string') return o;
+      if (o && typeof o === 'object' && typeof o.text === 'string' && o.text.trim() !== SAMPLE.text) return o;
     }
     return null;
   }
