@@ -24,7 +24,6 @@
   var MODES = { tidy: '✍️ 뜻 그대로 다듬기', fix: '⚖️ 검토 지적 반영' };
   /* kordoc redactText 가 가린 자리에 찍는 글자 — 한 곳에서만 정한다(검사는 실제 redactText 결과로 이것과 맞는지 본다) */
   var MASK = '●';
-  var MASK_RUN = new RegExp(MASK + '{2,}');
   var BAD_REPLY = 'AI 답을 읽지 못했습니다';
   var PLACE = '{회사}';
 
@@ -39,10 +38,13 @@
     var t = str(body).replace(/\r\n?/g, '\n');
     var core = coCore(coName), n = 0;
     if (core.length >= 2) {
-      // 이름 글자 사이의 띄어쓰기(「가나 상사」)도 같은 이름이다 — 단, 줄바꿈은 건너지 않는다(줄 모양을 지킨다)
+      // 이름 글자 사이의 띄어쓰기(「가나 상사」)도 같은 이름이다 — 단, 줄바꿈은 건너지 않는다(줄 모양을 지킨다).
+      // ⚠ 줄이 접혀 이름이 두 줄에 걸친 것은 일부러 못 잡는다 — 줄 모양을 지키는 쪽이 먼저다.
+      // ⚠ 영문 이름은 대소문자를 가리지 않는다(abc물산 = ABC물산) — 이름이 «하나도» 안 나가야 한다.
+      // ⚠ 뒤 꼬리표(㈜)는 이름에 «붙은» 것만 — 띄어 쓴 이웃 회사의 (주) 를 먹지 않는다.
       var gap = '[ \\t\\u00a0]*';
       var name = core.split('').map(reEsc).join(gap);
-      var re = new RegExp('(?:' + CO_TAG + gap + ')?' + name + '(?:' + gap + CO_TAG + ')?', 'g');
+      var re = new RegExp('(?:' + CO_TAG + gap + ')?' + name + '(?:' + CO_TAG + ')?', 'gi');
       t = t.replace(re, function () { n++; return PLACE; });
     }
     return { text: t, coSwapped: n };
@@ -82,23 +84,61 @@
     L.push('{"text": "고친 본문", "why": "바꾼 까닭 한두 문장"}');
     L.push('');
     L.push('〈조문〉');
-    L.push(str(maskedText));
+    // 조문 속에 울타리 글자(〈조문〉·〈/조문〉·〈지적〉)가 있으면 «자료의 끝»을 흉내 낼 수 있다 — 꺾쇠를 소괄호로 눌러 둔다
+    L.push(str(maskedText).replace(/〈\s*(\/?\s*(?:조문|지적))\s*〉/g, '($1)'));
     L.push('〈/조문〉');
     return L.join('\n');
   }
 
   /* ── 답 읽기 ── */
-  function parse(replyText, maskedSent) {   // maskedSent: 보낸 글 — 지금은 읽는 데 쓰지 않지만 자리를 지킨다(가림 표시는 답 쪽만 본다)
-    void maskedSent;
+  /* s[start] 의 { 에서 «짝이 맞는» } 까지 한 덩어리를 떼며, 글자(문자열) 속의 줄바꿈·제어문자를 \n 따위로 바꾼다.
+     AI 가 JSON 문자열 안에 줄바꿈을 그대로 적는 일이 흔하다 — 그대로면 JSON.parse 가 거절한다.
+     글자 속의 { } 는 세지 않는다(「{회사}」). 짝이 안 맞으면 null. */
+  function objectAt(s, start) {
+    var out = '', depth = 0, inStr = false, esc = false;
+    for (var i = start; i < s.length; i++) {
+      var c = s.charAt(i), code = s.charCodeAt(i);
+      if (inStr) {
+        if (esc) { esc = false; out += c; continue; }
+        if (c === '\\') { esc = true; out += c; continue; }
+        if (c === '"') { inStr = false; out += c; continue; }
+        if (code < 0x20) { out += c === '\n' ? '\\n' : c === '\r' ? '\\r' : c === '\t' ? '\\t' : '\\u' + ('0000' + code.toString(16)).slice(-4); continue; }
+        out += c; continue;
+      }
+      out += c;
+      if (c === '"') inStr = true;
+      else if (c === '{') depth++;
+      else if (c === '}' && --depth === 0) return out;
+    }
+    return null;
+  }
+  /* 답에서 {text} 를 가진 첫 JSON 객체 — ```json 껍데기·앞뒤 잡글(그 속의 { 도)을 지나쳐 뒤의 { 에서 다시 해 본다 */
+  function findReply(s) {
+    for (var a = s.indexOf('{'); a >= 0; a = s.indexOf('{', a + 1)) {
+      var raw = objectAt(s, a), o = null;
+      if (!raw) continue;
+      try { o = JSON.parse(raw); } catch (e) { continue; }
+      if (o && typeof o === 'object' && typeof o.text === 'string') return o;
+    }
+    return null;
+  }
+  /* 가린 자리 꼴의 덩어리 — 숫자·영문·@·.·- 에 «붙은» ● 덩어리(010-●●●●-5678 · h●●●@a.com).
+     띄어 쓴 글머리표(「●● 항목」)는 가림이 아니다. */
+  function maskRuns(t) {
+    var out = [], re = new RegExp(MASK + '+', 'g'), m, near = /[0-9A-Za-z@.\-]/;
+    while ((m = re.exec(t))) {
+      if (near.test(t.charAt(m.index - 1) || '') || near.test(t.charAt(m.index + m[0].length) || '')) out.push(m[0]);
+    }
+    return out;
+  }
+  function parse(replyText, maskedSent) {   // maskedSent: 보낸 글 — «보낸 가림 자리가 답에 남았는가» 를 가르는 데 쓴다
     var fail = { ok: false, why: BAD_REPLY };
-    var s = str(replyText);
-    var a = s.indexOf('{'), b = s.lastIndexOf('}');   // ```json 껍데기·앞뒤 잡글은 처음 { ~ 마지막 } 로 걷는다
-    if (a < 0 || b <= a) return fail;
-    var o;
-    try { o = JSON.parse(s.slice(a, b + 1)); } catch (e) { return fail; }
-    if (!o || typeof o !== 'object' || typeof o.text !== 'string' || !o.text.trim()) return fail;
+    var o = findReply(str(replyText));
+    if (!o || !o.text.trim()) return fail;
     var text = o.text.replace(/\r\n?/g, '\n').replace(/\s+$/, '');
-    return { ok: true, text: text, why: typeof o.why === 'string' ? o.why.trim() : '', maskLeft: MASK_RUN.test(text) };
+    var sent = maskRuns(str(maskedSent));
+    var left = maskRuns(text).some(function (r) { return sent.indexOf(r) >= 0; });
+    return { ok: true, text: text, why: typeof o.why === 'string' ? o.why.trim() : '', maskLeft: left };
   }
 
   /* ── 되돌려 채우기 — rules.html 의 JOSA·fillWord 와 «같은» 규칙(검사가 그 함수를 잘라 와 견준다) ── */
