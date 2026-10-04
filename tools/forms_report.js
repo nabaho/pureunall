@@ -33,10 +33,16 @@ const RATIOS  = [0.4, 0.5, 0.8, 2.2, 0.8, 0.6, 0.6, 0.5, 1.4, 2.0, 1.0, 0.5, 3.6
 // 각 덩어리 안에서는 도메인 → 서식명 순 — 같은 도메인의 서식이 붙어 있어야
 // 비슷한 서식을 잇달아 보며 판단할 수 있다. 마지막 id 비교는 동점 처리용이라
 // 같은 corpus면 순서가 항상 같다.
+// 승인 순서 (설계 2026-08-06 법인 서식집 §6 「승인 순서」) — 노무사가 이 차례로 검토한다.
+// 예전에는 도메인 이름 가나다순이라 임금체불이 교섭·기금·산재 뒤에 섰다(대표 「서식집 노무사 검토한다」 2026-10-04).
+const DOMAIN_ORDER = ['wageArrears', 'laborCommission', 'industrialAccident', 'consulting', 'fund', 'bargaining', 'other'];
+function domainRank(d) { const i = DOMAIN_ORDER.indexOf(d); return i < 0 ? DOMAIN_ORDER.length : i; }
+
 function sortForReview(forms) {
   const label = f => DOMAIN_LABEL[f.domain] || f.domain || '';
   return (forms || []).slice().sort((a, b) =>
     (a.titleDetected ? 0 : 1) - (b.titleDetected ? 0 : 1) ||
+    domainRank(a.domain) - domainRank(b.domain) ||
     label(a).localeCompare(label(b), 'ko') ||
     String(a.title || '').localeCompare(String(b.title || ''), 'ko') ||
     String(a.id || '').localeCompare(String(b.id || '')));
@@ -64,6 +70,15 @@ function reviewRows(forms) {
     L.stripTags(f.body).slice(0, 200),
   ]);
   return { headers: HEADERS.slice(), colRatios: RATIOS.slice(), rows };
+}
+
+// 차수별 검토 묶음 — 한 번에 3천 종을 다 볼 수 없다. 승인 순서대로 도메인 하나씩 따로 낸다.
+// 제목 미검출 서식도 그 도메인 묶음의 맨 뒤에 함께 넣는다(사람이 제목을 붙일 일감).
+function reviewBatches(forms) {
+  const by = {};
+  (forms || []).forEach(f => { (by[f.domain] = by[f.domain] || []).push(f); });
+  return Object.keys(by).sort((a, b) => domainRank(a) - domainRank(b) || a.localeCompare(b))
+    .map((d, i) => ({ n: i + 1, domain: d, label: DOMAIN_LABEL[d] || d, forms: by[d] }));
 }
 
 function esc(s) {
@@ -157,6 +172,23 @@ function main() {
   const htmlPath = path.join(OUT_DIR, '서식집_검토.html');
   fs.writeFileSync(htmlPath, reviewHtml(forms), 'utf8');
 
+  // 차수별 — 노무사는 1차(임금체불)부터 연다. 전체 파일은 41MB 라 열기도 버겁다.
+  const batchPaths = [];
+  reviewBatches(forms).forEach(b => {
+    const bt = reviewRows(b.forms);
+    const nT = b.forms.filter(f => f.titleDetected).length;
+    const bx = XG.build({
+      sheet: b.label, title: '서식집 검토표 ' + b.n + '차 — ' + b.label,
+      sub: '생성 ' + new Date().toISOString().slice(0, 10) + ' · ' + b.forms.length + '종(제목 ' + nT + ' · 미검출 ' + (b.forms.length - nT) + ')'
+        + ' · 승인 칸에 O/X',
+      headers: bt.headers, colRatios: bt.colRatios, rows: bt.rows, landscape: true,
+    });
+    const base = '서식집_검토_' + b.n + '차_' + b.label;
+    fs.writeFileSync(path.join(OUT_DIR, base + '.xlsx'), Buffer.from(bx));
+    fs.writeFileSync(path.join(OUT_DIR, base + '.html'), reviewHtml(b.forms), 'utf8');
+    batchPaths.push(base + ' (' + b.forms.length + '종)');
+  });
+
   // 요약
   const byDomain = {};
   forms.forEach(f => (byDomain[f.domain] = (byDomain[f.domain] || 0) + 1));
@@ -181,7 +213,8 @@ function main() {
     forms.filter(f => f.source.pickedBy === 'anonymized-latest').length,
     forms.filter(f => f.review.flags.length).length);
   console.log('\n산출물:\n  %s\n  %s', xlsxPath, htmlPath);
+  console.log('\n차수별 (승인 순서):\n  ' + batchPaths.join('\n  '));
 }
 
 if (require.main === module) main();
-module.exports = { reviewRows, reviewHtml, HEADERS, DOMAIN_LABEL };
+module.exports = { reviewRows, reviewHtml, reviewBatches, HEADERS, DOMAIN_LABEL, DOMAIN_ORDER };

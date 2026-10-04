@@ -132,12 +132,24 @@ test('reviewRows: 제목 미검출 행은 모두 맨 뒤에 모인다', () => {
   assert.ok(cells.slice(0, 2).every(c => !c.includes('제목 미검출')));
 });
 
-test('reviewRows: 제목 검출 행은 도메인 → 서식명 순으로 늘어선다', () => {
+test('reviewRows: 제목 검출 행은 «승인 순서» 도메인 → 서식명 순으로 늘어선다(임금체불이 맨 앞)', () => {
+  // 설계 §6 승인 순서: 임금체불 → 노동위 → 산재 → 컨설팅 → 기금 → 교섭 (2026-10-04 가나다순에서 바꿈)
   const t = R.reviewRows(MIXED);
   const dom = t.headers.indexOf('도메인');
   const name = t.headers.indexOf('서식명');
   assert.deepStrictEqual(t.rows.slice(0, 2).map(r => [r[dom], r[name]]),
-    [['산재', '요양급여신청서'], ['임금체불', '위임약정서']]);
+    [['임금체불', '위임약정서'], ['산재', '요양급여신청서']]);
+});
+
+test('reviewBatches: 승인 순서대로 도메인 하나씩 — 1차 임금체불, 미검출도 그 도메인 묶음에', () => {
+  const forms = MIXED.concat([{ ...FORMS[0], id: 'bg-1', title: '단체협약', domain: 'bargaining' },
+    { ...FORMS[0], id: 'lc-1', title: '구제신청서', domain: 'laborCommission' },
+    { ...FORMS[0], id: 'zz-1', title: '모름', domain: 'other' }]);
+  const b = R.reviewBatches(forms);
+  assert.deepStrictEqual(b.map(x => [x.n, x.label, x.forms.length]),
+    [[1, '임금체불', 2], [2, '노동위원회', 1], [3, '산재', 2], [4, '교섭', 1], [5, '기타', 1]]);
+  assert.deepStrictEqual(R.DOMAIN_ORDER.slice(0, 6),
+    ['wageArrears', 'laborCommission', 'industrialAccident', 'consulting', 'fund', 'bargaining']);
 });
 
 test('reviewRows: 정렬이 입력 배열을 뒤집지 않는다', () => {
