@@ -297,7 +297,9 @@ test('★★★ 목표를 채웠어도 «더 깊이» 갈 자리가 남았으면
 
 test('★★★ 그 깊이까지 다 찼으면 단추가 «아예» 없다 — 눌러도 아무 일이 없다', () => {
   const h = oldBlock({}, FULL_ST);
-  assert.ok(!/mbBackfillRun\(/.test(h),
+  /* ⚠ 2026-10-04 — 「🔁 다시 훑기」(mbBackfillRun(…, true))는 남는다. 그것은 «이어서»가 아니라
+       빠진 것을 맨 새것부터 다시 찾는 일이라, 다 찬 뒤에도 할 일이 있다(⑪ 참고). */
+  assert.ok(!/mbBackfillRun\((?!\d+, true\))/.test(h),
     '3년치까지 찼는데 채우기 단추가 남아 있습니다');
   assert.match(h, new RegExp(GOAL.toLocaleString() + '일'), '어디까지 채운 것인지 안 알려 줍니다');
 });
@@ -404,4 +406,73 @@ test('★★★ 다음메일 목록의 «바닥»에 닿으면 「더 없다」�
   assert.match(h2, /한 번 더 눌러/, '이미 담은 것만 지나간 회차를 바닥으로 읽습니다');
   const h3 = fillMsg({ ok:true, done:false, uidl:30000, seen:500, already:0, got:300 }, ST);
   assert.ok(!/가장 옛 메일까지/.test(h3), '담는 중인데 바닥이라고 합니다');
+});
+
+/* ══════ ⑪ 끊김 · 바닥 · 다시 훑기 (2026-10-04 검토) ══════
+   ⚠★ 서버가 연결이 끊긴 것을 «한 통 실패»로 세고 남은 통을 다 지나가 바닥을 적었다 —
+     화면은 「가장 옛 메일까지 다 받았습니다」라고 했지만 몇 천 통이 빠져 있었다.
+     서버는 이제 끊기면 멈추고(lost/stalled) 끝난 데까지만 적는다. 화면은
+     ① 끊긴 회차를 바닥으로 읽지 않고 ② 이미 빠진 것을 되찾을 «다시 훑기»를 준다. */
+
+test('★★★ 연결이 끊겨 멈춘 회차를 «바닥»으로 읽지 않는다', () => {
+  const ST = { done:false, got:20000, days:GOAL, oldest:1600000000000 };
+  const h = fillMsg({ ok:true, done:false, uidl:30000, seen:31, already:0, got:30, lost:true,
+    note:'다음메일(POP3) 연결이 끊겨 멈췄습니다 — 멈춘 자리부터 이어 갑니다' }, ST);
+  assert.match(h, /연결이 끊겨 멈췄습니다/, '끊긴 것을 안 알려 줍니다');
+  assert.match(h, /한 번 더 눌러/, '끊겼는데 다시 누르라는 말이 없습니다');
+  assert.ok(!/가장 옛 메일까지/.test(h), '끊겼는데 바닥이라고 합니다 — 남은 메일이 영영 빠집니다');
+  /* 첫 통에서 끊겨 «한 통도 못 본» 회차도 바닥이 아니다 */
+  const h2 = fillMsg({ ok:true, uidl:30000, seen:0, already:0, got:0, lost:true }, ST);
+  assert.ok(!/가장 옛 메일까지/.test(h2), '첫 통에서 끊긴 회차를 바닥으로 읽습니다');
+  const h3 = fillMsg({ ok:true, uidl:30000, seen:20, already:0, got:0, bad:20, stalled:true,
+    note:'다음메일이 20통 연달아 머리글을 안 줍니다 — 멈춘 자리부터 이어 갑니다' }, ST);
+  assert.match(h3, /연달아 머리글을 안 줍니다/, '연달아 못 읽어 멈춘 것을 안 알려 줍니다');
+  assert.ok(!/가장 옛 메일까지/.test(h3));
+});
+
+test('★★ 서버가 «바닥까지 다 걸었다»(bottom)고 하면 그 회차에서 바로 말한다', () => {
+  const ST = { done:false, got:20000, days:GOAL, oldest:1600000000000 };
+  const h = fillMsg({ ok:true, done:false, uidl:30000, seen:400, already:9000, got:120, bottom:true }, ST);
+  assert.match(h, /가장 옛 메일까지 다 받았습니다/, '바닥까지 걸었는데 「한 번 더 눌러」라고 합니다');
+});
+
+test('★★★ 담은 것이 있으면 「🔁 빠진 지난 메일 다시 훑기」가 있다 — 맨 새것부터(fresh)', () => {
+  [DONE_ST, FULL_ST, { done:false, got:1478 }].forEach((st)=>{
+    const h = oldBlock({}, st);
+    assert.match(h, /빠진 지난 메일 다시 훑기/, '다시 훑을 길이 없습니다 — 이미 빠진 메일을 되찾을 수 없습니다');
+    assert.ok(h.indexOf('mbBackfillRun(' + GOAL + ', true)') > 0, '다시 훑기가 맨 새것부터(fresh) 안 걷습니다');
+    assert.match(h, /또 받지 않습니다/, '이미 담은 것을 또 받는지 안 알려 줍니다');
+  });
+  /* 하나도 안 담겼으면 「채우기 시작」과 같은 일이다 — 안 그린다 */
+  const h0 = oldBlock({}, { got:0 });
+  assert.ok(!/다시 훑기/.test(h0), '담은 것이 없는데 다시 훑기를 그립니다');
+});
+
+test('★★★ 다시 훑기는 fresh 를 «그 한 번만» 보낸다 — 이어서는 멈춘 자리부터', () => {
+  const f = sliceFn(app, 'function mbBackfillRun(').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.match(f, /function mbBackfillRun\(days, fresh\)/, '다시 훑기를 가를 길이 없습니다');
+  assert.match(f, /again \? \{ days:goal, again:true, fresh:true \} : \{ days:goal, again:true \}/,
+    'fresh 를 늘 보내거나(이어 가기가 늘 맨 앞부터 다시 걷습니다) 아예 안 보냅니다');
+  /* 실제로 불러 본다 — 보낸 몸통을 잡는다 */
+  const sent = [];
+  const ctx = { Object, String, Number, Math, Date, JSON, console, Promise,
+    state:{}, _mbOldState:{ days:GOAL }, _mbOldLoaded:true, MB_FN:'https://fn.example.com/',
+    toast(){}, renderMailPage(){}, mbOldStateLoad(){}, mbOldLoad(){},
+    firebase:{ auth:()=>({ currentUser:{ getIdToken:()=>Promise.resolve('tok') } }) },
+    fetch:(u, o)=>{ sent.push(JSON.parse(o.body)); return Promise.resolve({ json:()=>Promise.resolve({ ok:true }) }); } };
+  vm.createContext(ctx);
+  vm.runInContext('let _mbFillBusy = false;\n' + sliceFn(app, 'function mbBackfillRun('), ctx);
+  ctx.mbBackfillRun(GOAL, true);
+  return new Promise((r)=>setTimeout(r, 20)).then(()=>{
+    /* 끝나면 화면이 old/state 를 다시 읽는다(mbOldStateLoad) — 그 값이 돌아온 셈으로 둔다 */
+    ctx._mbOldState = { days:GOAL };
+    ctx.mbBackfillRun();
+    return new Promise((r)=>setTimeout(r, 20));
+  }).then(()=>{
+    assert.equal(sent.length, 2);
+    assert.equal(sent[0].fresh, true, '다시 훑기가 fresh 를 안 보냅니다 — 멈춘 자리부터 걸어 빠진 것을 못 찾습니다');
+    assert.equal(sent[0].days, GOAL);
+    assert.ok(!sent[1].fresh, '이어서 채우기가 fresh 를 보냅니다 — 누를 때마다 맨 앞부터 다시 걷습니다');
+    assert.equal(sent[1].days, GOAL, '이어서 채우기가 정해 둔 깊이를 잃었습니다');
+  });
 });

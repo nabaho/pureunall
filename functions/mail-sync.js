@@ -1038,6 +1038,190 @@ function mailFp(fromAddr, dateMs, subject) {
   const s = String(subject || '').replace(/\s+/g, ' ').trim().slice(0, 120);
   return e + '|' + d + '|' + s;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   📦 지난 메일 채우기 «한 회차» — backfillMailbox 의 몸통
+   ══════════════════════════════════════════════════════════════════════════
+   2026-10-04 검토에서 떼어 냈다 — 가짜 POP3 로 «돌려 봐야» 잡히는 구멍이 둘 있었다.
+   (tests/mail-backfill-walk.test.js 가 돌려 본다.)
+
+   ★ 이어 갈 자리(curId)의 약속 — «여기부터 새것 쪽은 다 끝났다».
+     다음 회차는 curId 바로 옛것부터 본다. 그러니 «안 끝난» 통을 curId 너머에 두면
+     그 통은 영영 다시 안 본다. «끝났다» = 담았다 · 이미 담았다(이름표) · IMAP 에 있다(지문)
+     · 못 읽어서 이름표를 old/bad 에 적어 두었다(다시 훑기 때 다시 받아 본다).
+
+   ⚠★ 구멍 ① — 연결이 끊긴 것을 «한 통 못 읽음»으로 셌다.
+     popOpen 은 끊긴 뒤에는 모든 명령을 그 자리에서 거절한다. 그런데 한 통 실패처럼
+     `bad++; continue` 하니, 끊긴 순간부터 남은 몇 천 통을 눈 깜짝할 새 «다 지나가고»
+     맨 바닥(list[0])을 curId 로 적었다. 다음 회차는 한 통도 안 보고 돌아와 화면이
+     「가장 옛 메일까지 다 받았습니다」라고 했다 — 그 몇 천 통은 영영 빠졌다.
+     → 끊기면(답이 아니라 연결이 없으면) 그 자리에서 «멈추고», 끝난 데까지만 적는다.
+       답(-ERR)이 연달아 BAD_STREAK 통 오면 그것도 서버 탈로 보고 멈춘다.
+   ⚠★ 구멍 ② — 목표를 넓힐 때 문턱 언저리를 건너뛰었다.
+     문턱보다 옛것은 «안 담고» 지나갔는데, 예순 통 연달아 옛것이면 끝내면서 그 예순 통
+     너머를 curId 로 적었다. 1년→3년→10년으로 넓힐 때마다 그 예순 통(과 그 앞에 섞여
+     지나간 옛것)은 다시 안 봤다.
+     → 문턱보다 옛것도 «담는다». 이미 머리글을 받았으니 담는 값은 거의 없고, 담으면
+       «끝난» 통이 되어 curId 약속이 깨지지 않는다. 문턱은 «어디서 멈출지»만 정한다.
+
+   ⚠ DELE 는 여기에도 없다(popOpen 머리글). TOP 으로 머리글만 받는다. */
+const BAD_STREAK = 20;     // 한 통씩 못 읽은 것이 이만큼 «연달아» 오면 서버 탈로 보고 멈춘다
+const OLD_STREAK = 60;     // 문턱보다 옛것이 이만큼 연달아 오면 목표에 닿은 것으로 본다
+async function runBackfill(o) {
+  const db = o.db, pop = o.pop, b = o.body || {}, st = o.state || {};
+  const days = o.days, cutoff = o.cutoff, deadline = o.deadline;
+  const parse = o.parse || require('mailparser').simpleParser;
+
+  /* ── 이미 든 메일의 지문 ── 한 번만 읽는다(이 일은 배치라 그래도 된다) */
+  const fps = Object.create(null);
+  {
+    const held = (await db.ref(ROOT + '/msgs').once('value')).val() || {};
+    Object.keys(held).forEach((slug) => {
+      const box = held[slug] || {};
+      Object.keys(box).forEach((k) => {
+        const r = box[k]; if (!r) return;
+        fps[mailFp(r.e, r.d, r.s)] = 1;
+      });
+    });
+  }
+  /* ── 이미 «여기» 담은 것의 이름표 ── (대표 지시 2026-09-10 「3년치까지」)
+     ⚠★ 지문(fps)만으로는 못 거른다 — 지문을 보려면 TOP 으로 받아 봐야 안다.
+       이름표(UIDL)는 목록에 이미 들어 있어 «받아 보기 전에» 거를 수 있다.
+       1년치를 담은 뒤 3년치로 넓히면 앞의 3,316통을 다시 받게 되는데,
+       한 번에 420초뿐이라 그 되받기만으로 예산이 다 간다 — 더 깊이 못 간다.
+     ⚠ 값은 안 읽고 «열쇠»만 쓴다. */
+  const havePop = Object.create(null);
+  let haveN = 0;
+  {
+    const oldMsgs = (await db.ref(ROOT + '/old/msgs').once('value')).val() || {};
+    Object.keys(oldMsgs).forEach((k) => { havePop[k] = 1; haveN++; });
+  }
+  /* ── 전에 못 읽어 적어 둔 것 ── 이번에 읽히면 그 적바림을 지운다 */
+  const badHave = (await db.ref(ROOT + '/old/bad').once('value')).val() || {};
+
+  const out = { ok: true, got: 0, skip: 0, seen: 0, done: false, days: days,
+    have: haveN, already: 0, bad: 0, oldest: Number(st.oldest || 0) };
+  const stat = await pop.cmd('STAT', false);
+  out.total = Number((String(stat.head).match(/\+OK\s+(\d+)/) || [])[1] || 0);
+  const list = popUidlList((await pop.cmd('UIDL', true)).body);
+  out.uidl = list.length;
+
+  /* 어디부터 이어 갈까 — 이름표로 찾는다(번호는 회차마다 흔들린다) */
+  let i = list.length - 1;                      /* 뒤가 새것이다 */
+  if (st.curId && !b.fresh) {
+    const at = list.findIndex((x) => x.id === st.curId);
+    if (at >= 0) i = at - 1;                    /* 그 다음(더 옛것)부터 */
+  }
+  /* ★ safe — 여기부터 새것 쪽은 «다 끝났다». 이어 갈 자리는 늘 이것에서만 나온다.
+     ⚠ 못 읽은 것이 연달아 오는 동안(badRun > 0)에는 안 내린다 — 그 줄이 BAD_STREAK 에
+       닿아 멈추면 다음 회차가 그 줄 «첫 통»부터 다시 봐야 한다. */
+  let safe = i + 1;
+  const idAt = (k) => (k >= 0 && k < list.length) ? list[k].id : '';
+
+  let batch = {}, nBatch = 0, oldStreak = 0, badRun = 0;
+  const popSeen = Object.create(null);
+  const flush = async () => {
+    if (!nBatch) return;
+    await db.ref().update(batch);
+    batch = {}; nBatch = 0;
+  };
+  for (; i >= 0; i--) {
+    if (nowMs() > deadline) break;
+    const one = list[i];
+    const key = popKey(one.id);
+    /* ⚠★ 이미 담은 것은 «받아 보기 전에» 지나간다 — 이름표로 안다.
+         여기서 안 거르면 3년치로 넓힐 때 앞의 1년치를 통째로 다시 받는다.
+       ⚠ 「연달아 옛것」 셈(oldStreak)은 건드리지 않는다. */
+    if (havePop[key]) { out.already++; if (!badRun) safe = i; continue; }
+    out.seen++;
+    let p = null, why = '';
+    try {
+      const head = (await pop.cmd('TOP ' + one.n + ' 20', true)).body;
+      try { p = await parse(Buffer.from(head, 'binary')); }
+      catch (e) { why = '풀지 못함: ' + String((e && e.message) || e); }
+    } catch (e) {
+      /* ⚠★ 답(-ERR)이 아니면 «연결»이 없는 것이다 — 그 자리에서 멈춘다(구멍 ①).
+           끊긴 뒤에는 모든 명령이 곧장 거절되므로, 여기서 지나가면 남은 통을 다 건너뛴다. */
+      if (!(e && e.pop)) {
+        out.lost = true;
+        out.note = '다음메일(POP3) 연결이 끊겨 멈췄습니다 — 멈춘 자리부터 이어 갑니다';
+        break;
+      }
+      why = String((e && e.message) || e);
+    }
+    if (!p) {
+      /* 한 통을 못 읽었다 — 이름표를 적어 두고(다시 훑기 때 다시 받는다) 다음 통을 본다 */
+      out.bad++;
+      badRun++;
+      batch[ROOT + '/old/bad/' + key] = { id: String(one.id).slice(0, 200),
+        why: why.slice(0, 100), at: nowMs() };
+      nBatch++;
+      if (badRun >= BAD_STREAK) {
+        out.stalled = true;
+        out.note = '다음메일이 ' + BAD_STREAK + '통 연달아 머리글을 안 줍니다 — 멈춘 자리부터 이어 갑니다';
+        break;
+      }
+      continue;
+    }
+    /* 여기부터는 읽힌 통이다 — 담든 건너뛰든 «끝났다» */
+    badRun = 0;
+    safe = i;
+    if (badHave[key]) { batch[ROOT + '/old/bad/' + key] = null; nBatch++; }
+    const when = p.date ? new Date(p.date).getTime() : 0;
+    /* ⚠ 첫 옛 메일에서 바로 멈추지 않는다 — 번호가 늘 시간 차례는 아니다.
+         연달아 예순 통이 문턱보다 옛것이면 그때 끝으로 본다.
+       ⚠★ 옛것도 아래에서 «담는다»(구멍 ②) — 안 담고 지나가면 목표를 넓힐 때 영영 안 본다. */
+    if (when && when < cutoff) oldStreak++;
+    else oldStreak = 0;
+    const from = (p.from && p.from.value && p.from.value[0]) || {};
+    const fp = mailFp(from.address, when, p.subject);
+    if (fps[fp]) { out.skip++; } /* 이미 IMAP 으로 들었다 */
+    else {
+      /* POP3 안에서 겹친 것(같은 메일이 두 칸에 있는 등)은 Message-ID 로 가린다.
+         ⚠ 지문으로 가리면 «같은 사람·같은 분·같은 제목»의 다른 메일(자동 알림 등)이 빠진다. */
+      const mid = String(p.messageId || '').trim();
+      const dk = mid ? 'm|' + mid : 'f|' + fp;
+      if (popSeen[dk]) { out.skip++; }
+      else {
+        popSeen[dk] = 1;
+        const to = (p.to && p.to.value) || [];
+        const row = {
+          u: 0, o: 1,                                 /* o — POP3 로 온 줄 */
+          f: String(from.name || '').slice(0, 120),
+          e: String(from.address || '').slice(0, 160),
+          t: to.map((x) => x && x.address).filter(Boolean).slice(0, 8).join(','),
+          tn: String((to[0] && to[0].name) || '').slice(0, 120),
+          s: String(p.subject || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 300),
+          d: (Number.isFinite(when) && when > 0) ? when : 0,
+          r: 1, g: 0, w: 0, a: 0, z: 0,               /* 읽음으로 둔다 — 지난 메일이다 */
+          p: String(p.text || '').replace(/\s+/g, ' ').trim().slice(0, MB.PREVIEW_MAX),
+        };
+        batch[ROOT + '/old/msgs/' + key] = row;
+        nBatch++;
+        out.got++;
+        if (when && (!out.oldest || when < out.oldest)) out.oldest = when;
+      }
+    }
+    if (nBatch >= WRITE_BATCH) {
+      await flush();
+      await db.ref(ROOT + '/old/state').update({ curId: idAt(safe), at: nowMs() });
+    }
+    if (oldStreak >= OLD_STREAK) { out.done = true; break; }
+  }
+  await flush();
+  /* 목록 바닥까지 다 걸었다 — 목표(날짜)에 못 닿아도 더 볼 것이 없다 */
+  if (i < 0 && !out.done && !badRun) out.bottom = true;
+  /* ⚠★ 이어 갈 자리는 «끝난 데»까지만 — 멈춘 까닭이 무엇이든(예산·끊김·옛것 예순 통).
+     ⚠★ 끝났어도 «어디까지 갔는지»를 지우지 않는다 (대표 지시 2026-09-10).
+       예전에는 done 이면 curId 를 비웠다. 그래서 1년치를 마친 뒤 3년치로 넓히면
+       «맨 앞부터» 다시 걸어야 했다. 자리를 남겨 두면 그 자리에서 이어 간다.
+     ⚠ 처음부터 다시 걷고 싶으면 fresh 를 켠다 — 「🔁 빠진 지난 메일 다시 훑기」. */
+  const lastId = idAt(safe);
+  await db.ref(ROOT + '/old/state').update({
+    curId: lastId, done: !!out.done, bottom: !!out.bottom, at: nowMs(),
+    got: Number(st.got || 0) + out.got, oldest: out.oldest, days: days,
+  });
+  return out;
+}
 
 module.exports = function build(deps) {
   const F = deps.functions;
@@ -1754,118 +1938,12 @@ module.exports = function build(deps) {
           return;
         }
 
-        /* ── 이미 든 메일의 지문 ── 한 번만 읽는다(이 일은 배치라 그래도 된다) */
-        const fps = Object.create(null);
-        {
-          const held = (await db.ref(ROOT + '/msgs').once('value')).val() || {};
-          Object.keys(held).forEach((slug) => {
-            const box = held[slug] || {};
-            Object.keys(box).forEach((k) => {
-              const r = box[k]; if (!r) return;
-              fps[mailFp(r.e, r.d, r.s)] = 1;
-            });
-          });
-        }
-        /* ── 이미 «여기» 담은 것의 이름표 ── (대표 지시 2026-09-10 「3년치까지」)
-           ⚠★ 지문(fps)만으로는 못 거른다 — 지문을 보려면 TOP 으로 받아 봐야 안다.
-             이름표(UIDL)는 목록에 이미 들어 있어 «받아 보기 전에» 거를 수 있다.
-             1년치를 담은 뒤 3년치로 넓히면 앞의 3,316통을 다시 받게 되는데,
-             한 번에 420초뿐이라 그 되받기만으로 예산이 다 간다 — 더 깊이 못 간다.
-           ⚠ 값은 안 읽고 «열쇠»만 쓴다. */
-        const havePop = Object.create(null);
-        let haveN = 0;
-        {
-          const oldMsgs = (await db.ref(ROOT + '/old/msgs').once('value')).val() || {};
-          Object.keys(oldMsgs).forEach((k) => { havePop[k] = 1; haveN++; });
-        }
-
+        /* ⚠ 걷는 몸통은 runBackfill(이 파일 위) — 가짜 POP3 로 돌려 보는 검사가 있다 */
         const pop = await popOpen(user, pass, 60000);
-        const out = { ok: true, got: 0, skip: 0, seen: 0, done: false, days: days,
-          have: haveN, already: 0, oldest: Number(st.oldest || 0) };
+        let out;
         try {
-          const stat = await pop.cmd('STAT', false);
-          out.total = Number((String(stat.head).match(/\+OK\s+(\d+)/) || [])[1] || 0);
-          const list = popUidlList((await pop.cmd('UIDL', true)).body);
-          out.uidl = list.length;
-
-          /* 어디부터 이어 갈까 — 이름표로 찾는다(번호는 회차마다 흔들린다) */
-          let i = list.length - 1;                      /* 뒤가 새것이다 */
-          if (st.curId && !b.fresh) {
-            const at = list.findIndex((x) => x.id === st.curId);
-            if (at >= 0) i = at - 1;                    /* 그 다음(더 옛것)부터 */
-          }
-
-          const { simpleParser } = require('mailparser');
-          let batch = {}, nBatch = 0, oldStreak = 0;
-          const flush = async () => {
-            if (!nBatch) return;
-            await db.ref().update(batch);
-            batch = {}; nBatch = 0;
-          };
-          for (; i >= 0; i--) {
-            if (nowMs() > deadline) break;
-            const one = list[i];
-            /* ⚠★ 이미 담은 것은 «받아 보기 전에» 지나간다 — 이름표로 안다.
-                 여기서 안 거르면 3년치로 넓힐 때 앞의 1년치를 통째로 다시 받는다.
-               ⚠ 「연달아 옛것」 셈(oldStreak)은 건드리지 않는다 — 담은 것은 문턱보다
-                 «새것»이라 셈에 넣을 값이 아니다. */
-            if (havePop[popKey(one.id)]) { out.already++; continue; }
-            out.seen++;
-            let head;
-            try {
-              head = (await pop.cmd('TOP ' + one.n + ' 20', true)).body;
-            } catch (e) {
-              /* 한 통을 못 읽었다고 멈추지 않는다 — 지나가고 다음 통을 본다 */
-              out.bad = Number(out.bad || 0) + 1;
-              continue;
-            }
-            let p;
-            try { p = await simpleParser(Buffer.from(head, 'binary')); }
-            catch (e) { out.bad = Number(out.bad || 0) + 1; continue; }
-            const when = p.date ? new Date(p.date).getTime() : 0;
-            /* ⚠ 첫 옛 메일에서 바로 멈추지 않는다 — 번호가 늘 시간 차례는 아니다.
-                 연달아 예순 통이 문턱보다 옛것이면 그때 끝으로 본다. */
-            if (when && when < cutoff) {
-              oldStreak++;
-              if (oldStreak >= 60) { out.done = true; break; }
-              continue;
-            }
-            oldStreak = 0;
-            const from = (p.from && p.from.value && p.from.value[0]) || {};
-            const fp = mailFp(from.address, when, p.subject);
-            if (fps[fp]) { out.skip++; continue; }       /* 이미 IMAP 으로 들었다 */
-            fps[fp] = 1;
-            const to = (p.to && p.to.value) || [];
-            const row = {
-              u: 0, o: 1,                                 /* o — POP3 로 온 줄 */
-              f: String(from.name || '').slice(0, 120),
-              e: String(from.address || '').slice(0, 160),
-              t: to.map((x) => x && x.address).filter(Boolean).slice(0, 8).join(','),
-              tn: String((to[0] && to[0].name) || '').slice(0, 120),
-              s: String(p.subject || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 300),
-              d: (Number.isFinite(when) && when > 0) ? when : 0,
-              r: 1, g: 0, w: 0, a: 0, z: 0,               /* 읽음으로 둔다 — 지난 메일이다 */
-              p: String(p.text || '').replace(/\s+/g, ' ').trim().slice(0, MB.PREVIEW_MAX),
-            };
-            batch[ROOT + '/old/msgs/' + popKey(one.id)] = row;
-            nBatch++;
-            out.got++;
-            if (when && (!out.oldest || when < out.oldest)) out.oldest = when;
-            if (nBatch >= WRITE_BATCH) {
-              await flush();
-              await db.ref(ROOT + '/old/state').update({ curId: one.id, at: nowMs() });
-            }
-          }
-          await flush();
-          const lastId = (i >= 0 && list[i + 1]) ? list[i + 1].id : (list[0] ? list[0].id : '');
-          /* ⚠★ 끝났어도 «어디까지 갔는지»를 지우지 않는다 (대표 지시 2026-09-10).
-               예전에는 done 이면 curId 를 비웠다. 그래서 1년치를 마친 뒤 3년치로 넓히면
-               «맨 앞부터» 다시 걸어야 했다. 자리를 남겨 두면 그 자리에서 이어 간다.
-             ⚠ 처음부터 다시 걷고 싶으면 fresh 를 켠다 — 그 길도 남겨 둔다. */
-          await db.ref(ROOT + '/old/state').update({
-            curId: lastId, done: !!out.done, at: nowMs(),
-            got: Number(st.got || 0) + out.got, oldest: out.oldest, days: days,
-          });
+          out = await runBackfill({ db: db, pop: pop, body: b, state: st,
+            days: days, cutoff: cutoff, deadline: deadline });
         } finally {
           try { await pop.close(); } catch (_) { /* 이미 끊겼다 */ }
         }
@@ -1983,6 +2061,7 @@ module.exports.mailFp = mailFp;
 module.exports.BODY_PART_ATT = BODY_PART_ATT;
 module.exports.BODY_FULL_MAX = BODY_FULL_MAX;
 module.exports.runSync = runSync;
+module.exports.runBackfill = runBackfill;
 /* 「붙어 둔 것 다시 쓰기」를 돌려 보려고 함께 내보낸다 — 이 결은 글자로는 못 지킨다.
    ⚠ 붙어 둔 것은 모듈 자리(_warm)에 산다. 검사는 회마다 require 를 새로 해서
      («require.cache 를 지워») 깨끗한 자리에서 시작한다. */

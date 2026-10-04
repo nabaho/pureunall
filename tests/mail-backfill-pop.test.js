@@ -26,7 +26,10 @@ const cut = (from, to) => {
   const j = sync.indexOf(to, i);
   return sync.slice(i, j > i ? j : i + 6000);
 };
-const fill = cut('backfillMailbox:', 'readOldMail:');
+/* ⚠ 2026-10-04 — 걷는 몸통을 runBackfill 로 떼어 냈다(가짜 POP3 로 돌려 보려고 —
+     tests/mail-backfill-walk.test.js). 창구와 몸통을 «함께» 본다. */
+const fill = cut('backfillMailbox:', 'readOldMail:')
+  + '\n' + cut('async function runBackfill(', 'module.exports = function build(');
 const open = cut('function popOpen(', 'function popUidlList(');
 
 /* ══════ ① 지우지 않는다 — 가장 중요한 자리 ══════ */
@@ -86,7 +89,7 @@ test('★★★ 이미 담은 것은 «받아 보기 전에» 지나간다 — �
        이름표(UIDL)는 목록에 이미 있어 받기 «전»에 거를 수 있다.
      ⚠ 그래서 «자리»가 곧 규칙이다 — TOP 보다 앞에 있어야 뜻이 있다. */
   assert.match(fill, /old\/msgs['"]\)\.once/, '이미 담은 것을 안 읽어 옵니다');
-  const iHave = fill.search(/havePop\[popKey\(one\.id\)\]/);
+  const iHave = fill.search(/havePop\[(popKey\(one\.id\)|key)\]/);
   const iTop  = fill.search(/TOP '\s*\+\s*one\.n/);
   assert.ok(iHave > 0, '이미 담은 것을 안 거릅니다');
   assert.ok(iTop > 0, '머리글을 받는 자리를 못 찾았습니다');
@@ -110,20 +113,34 @@ test('★ 얼마나 깊이 채웠는지 «돌려준다» — 안 알려 주면 �
 
 test('★★ 첫 «옛 메일»에서 바로 안 멈춘다 — 번호가 늘 시간 차례는 아니다', () => {
   assert.match(fill, /oldStreak\+\+/, '옛 메일을 연달아 세지 않습니다');
-  assert.match(fill, /oldStreak >= \d\d/,
+  assert.match(fill, /oldStreak >= OLD_STREAK/, '연달아 센 값을 안 봅니다');
+  assert.match(sync, /const OLD_STREAK = \d\d;/,
     '한 통만 옛것이어도 끝으로 봅니다 — 그 뒤 몇 천 통을 놓칩니다');
 });
 
 test('★★ 한 통을 못 읽어도 «멈추지 않는다» — 만 통 가운데 하나는 늘 이상하다', () => {
-  const n = (fill.match(/out\.bad = Number\(out\.bad \|\| 0\) \+ 1;\s*continue;/g) || []).length;
-  assert.ok(n >= 2, '못 읽은 통에서 통째로 멈춥니다(' + n + '자리) — 받기·풀기 둘 다 걸러야 합니다');
+  /* ⚠ 2026-10-04 — 받기·풀기 실패를 한 자리(if (!p))로 모았다. 그 자리는 이름표를
+       적어 두고 «다음 통으로» 간다. (끊긴 연결은 다르다 — 바로 아래 검사) */
+  assert.match(fill, /if \(!p\) \{[\s\S]{0,400}out\.bad\+\+;[\s\S]{0,400}continue;\s*\}/,
+    '못 읽은 통에서 통째로 멈춥니다 — 한 통 실패는 지나가야 합니다');
+  assert.match(fill, /ROOT \+ '\/old\/bad\/' \+ key\] = \{/,
+    '못 읽은 통의 이름표를 안 적습니다 — 다시 받아 볼 길이 없습니다');
+});
+
+test('★★★ «연결이 끊긴 것»은 한 통 실패가 아니다 — 멈춘다 (2026-10-04 검토)', () => {
+  /* ★ 끊긴 뒤에는 popOpen 이 모든 명령을 그 자리에서 거절한다. 그것을 한 통 실패로
+       세고 지나가면 남은 몇 천 통을 눈 깜짝할 새 건너뛰고 바닥을 curId 로 적는다.
+       답(-ERR, e.pop)과 끊김(e.pop 없음)을 가른다. 돌려 보는 검사는 mail-backfill-walk. */
+  assert.match(fill, /if \(!\(e && e\.pop\)\) \{[\s\S]{0,200}out\.lost = true;[\s\S]{0,200}break;/,
+    '끊긴 연결을 한 통 실패로 세고 지나갑니다 — 남은 메일이 영영 빠집니다');
+  assert.match(open, /\{ pop: true \}/, 'popOpen 이 답(-ERR)에 표시를 안 붙입니다 — 끊김과 못 가릅니다');
 });
 
 /* ══════ ③ 겹치지 않게 ══════ */
 
 test('★★ 이미 IMAP 으로 든 메일은 «안 담는다» — 안 그러면 전체메일에 두 줄로 보인다', () => {
   assert.match(fill, /mailFp\(/, '지문을 안 만듭니다');
-  assert.match(fill, /if \(fps\[fp\]\) \{ out\.skip\+\+; continue; \}/, '겹친 것을 그대로 담습니다');
+  assert.match(fill, /if \(fps\[fp\]\) \{ out\.skip\+\+; \}\s*else \{/, '겹친 것을 그대로 담습니다');
 });
 
 test('★★ 지문은 «푼 제목»과 «분»으로 만든다', () => {
