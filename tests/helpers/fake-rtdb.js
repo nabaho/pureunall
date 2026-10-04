@@ -62,6 +62,14 @@ function 만들기(처음) {
         return { committed: true, snapshot: { val: () => 복사(읽기(자리)) } };
       },
       child: (k) => ref(자리 + '/' + k),
+      /* 뒤에서 n 개 — 진짜 DB 처럼 열쇠 순으로 */
+      orderByKey: () => ({ limitToLast: (n) => ({ once: async () => {
+        const v = 읽기(자리);
+        if (!v || typeof v !== 'object') return { val: () => null };
+        const o = {};
+        Object.keys(v).sort().slice(-n).forEach((k) => { o[k] = 복사(v[k]); });
+        return { val: () => (Object.keys(o).length ? o : null) };
+      } }) }),
       push: () => ({ key: 'k' + (++번호) })
     };
   }
