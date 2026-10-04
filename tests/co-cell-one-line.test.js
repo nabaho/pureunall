@@ -181,7 +181,8 @@ test('★★ 컨설팅·기금·기타 표는 칸마다 줄바꿈을 막는다(.
   assert.match(bare, /h\('table',\s*\{\s*className:'dt proj-1line'\s*\}/, '★★ 표에 한 줄 규칙이 없습니다');
   assert.match(css, /\.dt\.proj-1line th,\s*\.dt\.proj-1line td\s*\{[^}]*white-space:\s*nowrap/, '★★ CSS 가 줄바꿈을 막아야 합니다');
   assert.match(css, /\.dt\.proj-1line td\.proj-co\s*\{[^}]*text-overflow:\s*ellipsis/, '★ 긴 업체명은 … 로');
-  assert.match(bare, /className:'proj-co', title:it\.companyName/, '★ 잘린 업체명은 말풍선에');
+  // 업체명은 업체관리 값(coShown)이든 베낀 값이든 «말풍선에 같은 이름»이면 된다 (2026-10-04 3단계)
+  assert.match(bare, /className:'proj-co', title:(?:it\.companyName|coShown\(it, 'name'\))/, '★ 잘린 업체명은 말풍선에');
 });
 test('★ 컨설팅 담당자 칸 — 이름과 번호를 위아래로 쌓지 않는다', () => {
   assert.doesNotMatch(bare, /h\('div', \{ style:\{ fontWeight:600 \} \}, primary\.name\)/, '★★ 이름을 따로 한 줄(div)로 내렸습니다');

@@ -9093,6 +9093,69 @@ function coLinkCandidates(){
 }
 function coLinkCount(){ var c = coLinkCandidates(); return c.biz.length + c.name.length; }
 
+/* ══ 업무 기록의 회사 정보는 «업체관리(주인)»에서 읽는다 — 업체 정보 근본 해결 3단계
+   (대표 지시 2026-10-04 「마지막으로 진행해라」, 목업 co-read-from-owner 3-가·3-나)
+   ── 왜
+     사건·컨설팅·기금·기타는 만들 때 회사 정보를 통째로 베껴 둔다(대표자·주소·전화·담당자…).
+     업체관리를 고쳐도 베낀 쪽은 그대로라, 상세 창이 떠난 담당자·옛 주소를 보여 줬다
+     (2026-10-03 실측: 업체로 이어진 36건에서 42칸이 업체관리와 달랐다).
+   ★ 주인은 «업체 번호(companyId)»로만 찾는다 — 이름으로 찾지 않는다(2단계 규칙).
+   ★ 보여 주기만 바꾼다. 베낀 값은 지우지도 덮어쓰지도 않는다 — 업체가 지워져도
+     그 기록이 «그때 무엇이었는지» 남아야 한다. */
+var CO_OWNER_FIELDS = ['name','bizNo','ceo','ceo2','bizType','bizCategory','companySize','zipcode','address',
+  'phone','fax','email','employmentInsuredCount','injuryInsuredCount',
+  'primaryContactName','primaryContactPhone','primaryContactEmail'];
+var _coOwnerSrc = null, _coOwnerMap = null;
+function coOwnerOf(rec){
+  if(!rec || !rec.companyId) return null;
+  var cos = dbGet('companies', []) || [];
+  if(cos !== _coOwnerSrc){      // 업체 목록이 바뀌었을 때만 다시 편다
+    _coOwnerSrc = cos; _coOwnerMap = {};
+    cos.forEach(function(co){ if(co && co.id && !co._deleted) _coOwnerMap[co.id] = co; });
+  }
+  return _coOwnerMap[rec.companyId] || null;
+}
+function _coOwnerNorm(k, v){
+  var t = String(v == null ? '' : v);
+  if(/phone|Phone|fax|bizNo|InsuredCount|zipcode/.test(k)) return t.replace(/\D/g, '');
+  return t.replace(/\s+/g, '').replace(/[()㈜.,·-]/g, '').toLowerCase();
+}
+function _coOwnerHas(x){ return x !== undefined && x !== null && String(x).trim() !== ''; }
+/* 화면에 보일 회사 정보 — 주인 값이 있으면 그것, 비었으면 베낀 값.
+   둘 다 있는데 다르면 베낀 옛 값을 old 에 남긴다(화면이 흐리게 보여 준다). */
+function coOwnerView(rec){
+  rec = rec || {};
+  var co = coOwnerOf(rec);
+  var v = { linked: !!co, co: co, val: {}, old: {}, contacts: null };
+  CO_OWNER_FIELDS.forEach(function(k){
+    var copy = (k === 'name') ? rec.companyName : rec[k];
+    var own = co ? co[k] : undefined;
+    if(co && _coOwnerHas(own)){
+      v.val[k] = own;
+      if(_coOwnerHas(copy) && _coOwnerNorm(k, own) !== _coOwnerNorm(k, copy)) v.old[k] = copy;
+    } else v.val[k] = copy;
+  });
+  if(co && Array.isArray(co.contacts)){
+    var cc = co.contacts.filter(Boolean);
+    if(cc.length) v.contacts = cc;    // null 이면 화면이 대표 담당자(primaryContact*) → 베낀 목록 차례로 쓴다
+  }
+  return v;
+}
+/* 목록 칸 한 개 — 이어졌으면 주인 값, 아니면 베낀 값 */
+function coShown(rec, k){ return coOwnerView(rec).val[k]; }
+/* 업체관리와 이어지지 않은 기록 — 「🔗 업체 연결」이 이을 수 있나(biz·name), 아니면 못 잇나(none) */
+function coLinkStateOf(rec){
+  if(!rec || !rec.id || coOwnerOf(rec)) return null;
+  var c = coLinkCandidates();
+  var pick = function(arr){ for(var i = 0; i < arr.length; i++) if(arr[i].id === rec.id) return arr[i]; return null; };
+  var r = pick(c.biz); if(r) return { state:'biz', row:r };
+  r = pick(c.name); if(r) return { state:'name', row:r };
+  r = pick(c.none); if(r) return { state:'none', why:r.why || '업체관리에 없음' };
+  return { state:'none', why:'「아님」으로 표시했거나 회사명이 없음' };
+}
+/* 회사가 아닌 근로자 의뢰 사건은 «연결 안 됨»이 아니다 — 이을 회사가 없다 */
+function coNeedsOwner(rec){ return !!(rec && String(rec.companyName || '').trim() && rec.clientType !== 'worker'); }
+
 // 연결 실행. 건의 사업자번호가 비어 있으면 업체 것으로 채운다 — 다음부터 사업자번호로 확실히 잡힌다.
 function coLinkApply(rows){
   if(!rows || !rows.length) return { n:0 };
@@ -32057,11 +32120,13 @@ function CaseManagement(props){
                               ? ('👤 ' + c.workers[0].name + ((c.workers.length > 1) ? ' 외 '+(c.workers.length-1)+'명' : ''))
                               : '👤 -'),
                           h('div', { style:{ color:'#64748b', fontSize:'11px', marginTop:'2px' } },
-                            '🏢 ' + (c.companyName||'-'))
+                            '🏢 ' + (coShown(c, 'name')||'-'),
+                            coNeedsOwner(c) && !coOwnerOf(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗'))
                         )
                       : (c.clientType === 'worker' && (c.workers||[]).length > 0 && (c.workers[0].name||'').trim().length > 0)
                         ? (c.workers[0].name + ((c.workers.length > 1) ? ' 외 '+(c.workers.length-1)+'명' : ''))
-                        : (c.companyName||'-'))
+                        : h('span', { style:{ whiteSpace:'nowrap' } }, coShown(c, 'name')||'-',
+                            coNeedsOwner(c) && !coOwnerOf(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗')))
                 ),
 
                 // 상대방 (근로자 사건은 사업장명, 그 외는 별도 입력값)
@@ -32808,34 +32873,68 @@ function UnifiedDetailModal(props){
   }
   function section(opts){
     return h('div', { key:opts.title, style:{ marginBottom:'14px', background:opts.bg, border:'1px solid '+opts.border, borderRadius:'6px', padding:'10px 12px' } },
-      h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:opts.headColor, marginBottom:'6px', borderBottom:'2px solid '+opts.headBorder, paddingBottom:'4px' } }, opts.icon + ' ' + opts.title),
+      h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:opts.headColor, marginBottom:'6px', borderBottom:'2px solid '+opts.headBorder, paddingBottom:'4px',
+        display:'flex', alignItems:'center', gap:'6px', whiteSpace:'nowrap' } },
+        h('span', null, opts.icon + ' ' + opts.title), opts.right || null),
       opts.rows.map(function(r){ return row(r[0], r[1]); })
     );
   }
 
-  // 회사정보 섹션 (계약관리와 동기화)
+  /* ★ 회사 정보는 «업체관리(주인)»에서 읽는다 — 3단계 (대표 지시 2026-10-04, 목업 co-read-from-owner).
+     업체 번호로 이어진 기록만 주인 값을 쓰고, 베낀 값과 다르면 옛 값을 흐리게 남긴다. 저장은 안 바꾼다. */
+  var _ov = coOwnerView(c);
+  var V = _ov.val;
+  var _coOpS = useState(false); var _coOpen = _coOpS[0]; var _setCoOpen = _coOpS[1];
+  var _lkOpS = useState(false); var _linkOpen = _lkOpS[0]; var _setLinkOpen = _lkOpS[1];
+  var _needOwner = coNeedsOwner(c);
+  var _lk = (!_ov.linked && _needOwner) ? coLinkStateOf(c) : null;
+  function ovCell(k, shown){
+    var old = _ov.old[k];
+    return h('span', null, shown,
+      old ? h('span', { title:'이 기록에 베껴 둔 옛 값입니다 — 지금 값은 업체관리 값입니다',
+        style:{ marginLeft:'6px', color:'#94a3b8', fontSize:'11px', textDecoration:'line-through' } }, String(old)) : null);
+  }
+  var _chip = function(bg, fg, bd, t){ return h('span', { style:{ fontSize:'10.5px', fontWeight:700, padding:'1px 7px', borderRadius:'99px', background:bg, color:fg, border:'1px solid '+bd } }, t); };
+  var _btn = function(t, fn, title){ return h('button', { onClick:fn, title:title,
+    style:{ fontSize:'11px', fontWeight:700, padding:'2px 9px', borderRadius:'5px', border:'1px solid #bfdbfe', background:'#fff', color:'#1e40af', cursor:'pointer' } }, t); };
+  var companyRight = _ov.linked
+    ? h('span', { style:{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:'6px' } },
+        _chip('#f0fdf4', '#166534', '#bbf7d0', '업체관리 기준'),
+        _btn('업체 열기 ›', function(){ _setCoOpen(true); }, '업체관리의 이 회사를 엽니다 — 회사 정보는 거기서 고칩니다'))
+    : (_needOwner ? h('span', { style:{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:'6px' } },
+        _chip('#fffbeb', '#854d0e', '#fde68a', '🔗 업체관리와 연결 안 됨'),
+        (_lk && (_lk.state === 'biz' || _lk.state === 'name'))
+          ? _btn('연결하기 ›', function(){ _setLinkOpen(true); },
+              _lk.state === 'biz' ? '사업자번호가 같은 업체가 있습니다 — 「🔗 업체 연결」에서 잇습니다'
+                                  : '이름이 같은 업체가 있습니다 — 「🔗 업체 연결」에서 하나씩 확인하고 잇습니다')
+          : h('span', { style:{ fontSize:'11px', color:'#854d0e', fontWeight:600 } }, (_lk && _lk.why) || '업체관리에 없음'))
+      : null);
+
+  // 회사정보 섹션 — 이어졌으면 업체관리 값, 아니면 이 기록에 베껴 둔 값
   var companySection = {
-    icon:'🔄', title:'회사정보 (계약관리 동기화)',
+    icon:'🏢', title: _ov.linked ? '회사정보' : '회사정보 (이 기록에 베껴 둔 값)', right: companyRight,
     bg:'#eff6ff', border:'#bfdbfe', headColor:'#1e40af', headBorder:'#2563eb',
     rows:[
-      ['업체명', h('strong', null, c.companyName || '-')],
-      ['사업자번호', h('span', { style:{ fontFamily:'monospace' } }, c.bizNo || '-')],
-      ['대표자', c.ceo2 ? (c.ceo || '-') + ', ' + c.ceo2 : c.ceo],
-      ['업태 / 종목', (c.bizType || '-') + ' / ' + (c.bizCategory || '-')],
-      ['규모', c.companySize],
-      ['우편번호', c.zipcode ? h('span', { style:{ fontFamily:'monospace' } }, c.zipcode) : '-'],
-      ['주소', c.address],
-      ['전화 / 팩스', (c.phone || '-') + ' / ' + (c.fax || '-')],
-      ['대표 이메일', c.email],
-      ['4대보험', '고용 ' + (c.employmentInsuredCount||0) + '명 / 산재 ' + (c.injuryInsuredCount||0) + '명']
+      ['업체명', ovCell('name', h('strong', null, V.name || '-'))],
+      ['사업자번호', ovCell('bizNo', h('span', { style:{ fontFamily:'monospace' } }, V.bizNo || '-'))],
+      ['대표자', ovCell('ceo', V.ceo2 ? (V.ceo || '-') + ', ' + V.ceo2 : V.ceo)],
+      ['업태 / 종목', (V.bizType || '-') + ' / ' + (V.bizCategory || '-')],
+      ['규모', V.companySize],
+      ['우편번호', V.zipcode ? h('span', { style:{ fontFamily:'monospace' } }, V.zipcode) : '-'],
+      ['주소', ovCell('address', V.address)],
+      ['전화 / 팩스', ovCell('phone', (V.phone || '-') + ' / ' + (V.fax || '-'))],
+      ['대표 이메일', ovCell('email', V.email)],
+      ['4대보험', '고용 ' + (V.employmentInsuredCount||0) + '명 / 산재 ' + (V.injuryInsuredCount||0) + '명']
     ]
   };
 
-  // 담당자정보 섹션 (계약관리에서 입력한 contacts 배열)
-  var contacts = c.contacts || [];
-  if(contacts.length === 0 && (c.primaryContactName || c.primaryContactPhone || c.primaryContactEmail)){
-    contacts = [{ name:c.primaryContactName, phone:c.primaryContactPhone, email:c.primaryContactEmail, isPrimary:true }];
+  // 담당자정보 — 이어졌으면 업체관리의 담당자 목록 → 업체관리의 대표 담당자 → (그래도 없으면) 이 기록에 베껴 둔 목록
+  var contacts = _ov.contacts || [];
+  if(contacts.length === 0 && !_ov.linked) contacts = c.contacts || [];
+  if(contacts.length === 0 && (V.primaryContactName || V.primaryContactPhone || V.primaryContactEmail)){
+    contacts = [{ name:V.primaryContactName, phone:V.primaryContactPhone, email:V.primaryContactEmail, isPrimary:true }];
   }
+  if(contacts.length === 0) contacts = c.contacts || [];
 
   // 근로자(의뢰인) 섹션 - 사건의 핵심
   var workers = c.workers || [];
@@ -32888,7 +32987,7 @@ function UnifiedDetailModal(props){
         // 담당자 정보 (다수)
         contacts.length > 0 && h('div', { style:{ marginBottom:'14px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'10px 12px' } },
           h('div', { style:{ fontSize:'12.5px', fontWeight:700, color:'#475569', marginBottom:'8px', borderBottom:'2px solid #94a3b8', paddingBottom:'4px' } },
-            '👤 담당자 정보 (' + contacts.length + ')'),
+            '👤 담당자 정보 (' + contacts.length + ')' + (_ov.linked && _ov.old.primaryContactName ? ' — 업체관리 기준 · 이 기록의 옛 담당자: ' + _ov.old.primaryContactName : '')),
           contacts.map(function(p, i){
             return h('div', { key:i, style:{ background:p.isPrimary ? '#eff6ff' : '#f8fafc', border:'1px solid '+(p.isPrimary ? '#bfdbfe' : '#e2e8f0'), borderRadius:'4px', padding:'8px 10px', marginBottom:'4px', fontSize:'11.5px' } },
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'4px' } },
@@ -32983,7 +33082,12 @@ function UnifiedDetailModal(props){
         h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'),
         props.onEdit && h('button', { className:'btn-primary', onClick:props.onEdit }, '✏️ 수정')
       ),
-      _contractPrint && h(ContractFormPrintModal, { contract:_contractPrint, onClose:function(){ _setContractPrint(null); } })
+      _contractPrint && h(ContractFormPrintModal, { contract:_contractPrint, onClose:function(){ _setContractPrint(null); } }),
+      /* 업체 열기 — 읽기만. 고치는 곳은 업체관리 하나다(여기서 고치면 다시 어긋난다) */
+      _coOpen && _ov.co && h(CompanyDetailModal, { cur:_ov.co,
+        onEdit:function(){ _setCoOpen(false); showToast('✏️ 회사 정보는 사무관리 › 업체관리에서 고칩니다 — 고치면 이 화면에도 바로 보입니다'); },
+        onClose:function(){ _setCoOpen(false); } }),
+      _linkOpen && h(CoLinkModal, { onChanged:function(){}, onClose:function(){ _setLinkOpen(false); } })
     )
   );
 }
@@ -66024,16 +66128,17 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                                   fontSize:'10.5px', padding:'2px 7px', borderRadius:'10px',
                                   fontWeight:700, cursor:'pointer' } },
                           t ? t.name : '⚠️ 미설정')),
-                  colVis.company && h('td', { className:'proj-co', title:it.companyName || '' },
+                  colVis.company && h('td', { className:'proj-co', title:coShown(it, 'name') || '' },
                     h('span', { onClick:function(){ setDetailModal(it); },
-                      style:{ cursor:'pointer', color:'#1e40af', textDecoration:'underline', fontWeight:600 } }, it.companyName || '-')),
+                      style:{ cursor:'pointer', color:'#1e40af', textDecoration:'underline', fontWeight:600 } }, coShown(it, 'name') || '-'),
+                    coNeedsOwner(it) && !coOwnerOf(it) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗')),
                   colVis.bizNo && h('td', { style:{ fontFamily:'monospace', fontSize:'11px' } }, it.bizNo || '-'),
-                  colVis.ceo && h('td', null, it.ceo2
+                  colVis.ceo && h('td', null, coShown(it, 'ceo2')
                     ? h('div', { style:{ fontSize:'11.5px', lineHeight:'1.4' } },
                     h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
-                        h('span', null, it.ceo || '-'),
-                        h('span', { style:{ color:'#64748b' } }, it.ceo2)))
-                    : (it.ceo || '-')),
+                        h('span', null, coShown(it, 'ceo') || '-'),
+                        h('span', { style:{ color:'#64748b' } }, coShown(it, 'ceo2'))))
+                    : (coShown(it, 'ceo') || '-')),
                   colVis.contact && h('td', null, (function(){
                     var contacts = it.contacts || [];
                     var primary = contacts.find(function(c){return c.isPrimary;}) || contacts[0];
