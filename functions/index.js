@@ -1076,6 +1076,7 @@ exports.recruitWatch = functions
   .pubsub.schedule("every day 07:20")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
+    const 시작 = Date.now();   // 서버는 300초에 끊긴다 — 처음 훑기는 남은 시간이 넉넉할 때만
     const root = getDatabase().ref("gov_watch");
     const hSnap = await root.child("hits").once("value");
     const existing = hSnap.val() || {};
@@ -1110,8 +1111,13 @@ exports.recruitWatch = functions
     try {
       const 회원판 = RecruitWatch.BOARDS.find((b) => b.login);
       const 있나 = (await root.child("member_probe").once("value")).exists();
-      if (회원판 && !있나 && !result.errors.some((e) => e.board === 회원판.id)) {
-        const 본 = await RecruitWatch.probeBoard({ board: 회원판, pages: 5, fetchText });
+      const 남은 = 280000 - (Date.now() - 시작);
+      if (회원판 && !있나 && !result.errors.some((e) => e.board === 회원판.id) && 남은 > 60000) {
+        let 멈춤;
+        const 본 = await Promise.race([
+          RecruitWatch.probeBoard({ board: 회원판, pages: 5, fetchText }),
+          new Promise((_, no) => { 멈춤 = setTimeout(() => no(new Error("시간이 모자라 다음 날 다시 훑습니다")), 남은 - 10000); }),
+        ]).finally(() => clearTimeout(멈춤));
         await root.child("member_probe").set(Object.assign({ at: nowIso }, 본));
         console.log("[컨설턴트 모집 감시] 회원 공지 첫 훑기", { 쪽: 본.pages, 줄: 본.rows, 모집: 본.recruit.length });
       }
