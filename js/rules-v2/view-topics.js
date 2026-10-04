@@ -109,9 +109,10 @@
   }
 
   /* 덩어리 하나에 검토 기준 — 대표 문서의 그 조를 «한 조짜리 문서»로 판정한다.
+     size 는 «그 회사 규모»('5인미만'…) — 없으면 SIZE('10인이상'). 📚 는 안 넘겨 늘 10인이상.
      ⚠ 자리표시({근로자}·{회사})가 든 비교용 글이 아니라 대표 문서의 가린 글 그대로를 쓴다 —
        기준의 낱말(근로자대표·사원 …)이 자리표시에 가려 못 맞는 일이 없게. 같은 덩어리는 낱말이 같다. */
-  function warnsOf(g, M) {
+  function warnsOf(g, M, size) {
     var C = M.criteria;
     if (!C || !C.evaluate || !g.members.length) return [];
     var rep = g.members[0], body = String(rep.body || '');
@@ -120,7 +121,7 @@
       // ⚠ 한 조짜리 문서라 loc 는 늘 이 조다 — 그것만으로는 «다른 조의 기준»(출산전후휴가 조에 임신기 근로시간 단축)이 붙는다.
       //   기준의 낱말(규칙집의 낱말 넓히기 그대로)이 이 조의 «제목»에 있을 때만 이 조의 기준으로 본다.
       var tNs = String(rep.title || '').replace(/\s+/g, '');
-      return C.evaluate([art], SIZE, new Set(), M.today).filter(function (f) {
+      return C.evaluate([art], size || SIZE, new Set(), M.today).filter(function (f) {
         if (f.status !== '위반의심' || f.loc !== rep.label) return false;
         var ks = C.expandKw ? C.expandKw(f.rule.keywords || []) : (f.rule.keywords || []);
         return ks.some(function (k) { k = String(k || '').replace(/\s+/g, ''); return k && tNs.indexOf(k) >= 0; });
@@ -319,7 +320,7 @@
   }
 
   var api = { model: model, listHtml: listHtml, topicHtml: topicHtml, copyText: copyText, mount: mount,
-    places: places, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER };
+    places: places, warnsOf: warnsOf, esc: esc, FIRST_CHAPTER: FIRST_CHAPTER, OTHER_CHAPTER: OTHER_CHAPTER };
   if (root) root.PuRulesV2TopicsView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
