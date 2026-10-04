@@ -181,7 +181,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-office-store.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=8"></script>
+<script src="js/pu-office-docs.js?v=9"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -311,6 +311,7 @@ function officeHost() {
   return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
     cards: formCards(),  /* 엑셀 명단 가져오기 — 이알피 업체·기업정보함과 맞춰 보기(읽기만) */
     download: downloadOriginal, attKey: PuContractForms.attKey, secretMove: secretMoveCall, sentFor: formSentFor, coLink: formCoLink, coMerge: formCoMerge,
+    fileBytes: formFileBytes, mail: { mode: formMailMode, send: formMailSend, record: formMailRecord },
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
@@ -499,6 +500,18 @@ function formSentFor(coName, bz) {
       return Object.keys(v).map(function (id) { return v[id]; });
     });
   }));
+}
+/* ✉ 파일 골라 보내기 (기업별 계약서) — 보관함 파일 바이트. 🔒 서명본은 서버(puDocSecret)가 대표·관리자에게만 */
+async function formFileBytes(fileId) {
+  var rec = await PuOfficeStore.getOriginal(fileId);
+  if (!rec) throw new Error('보관함에 없는 파일입니다');
+  if (PuOfficeStore.isSecret(rec)) {
+    var blob = await PuOfficeStore.secretBlob(fileId);
+    return { name: rec.name, bytes: new Uint8Array(await blob.arrayBuffer()) };
+  }
+  var r = await fetch(await PuOfficeStore.fileUrl(rec));
+  if (!r.ok) throw new Error('파일을 받지 못했습니다 (HTTP ' + r.status + ')');
+  return { name: rec.name, bytes: new Uint8Array(await r.arrayBuffer()) };
 }
 /* 🔗 회사 맞추기·합치기 (기업별 계약서) — 사업자번호 넣기, 두 회사를 한 번에 합치기(PuOfficeDocs.mergePlan) */
 function formCoLink(key, bz) {
