@@ -4252,9 +4252,13 @@ function _hwpInkaValues(f,sites){
 function _hwpInkaAnnexValues(f,sites){
   f=f||{}; sites=sites||[];
   var g=function(o,k){ return o&&String(o[k]||'')||' '; };
+  /* 생년월일은 «67.09.18» 꼴로 줄인다(2026-10-04) — 별지 표의 생년월일 칸이 좁아 「1967-09-1 / 8」로
+     꺾였다. 충남 1~3호 제출본이 쓰던 모양이다. 알아볼 수 없는 값은 그대로 둔다. */
+  var b=function(o){ var v=g(o,'birth'), m=/^(?:19|20)(\d{2})[.\-\/]\s*(\d{1,2})[.\-\/]\s*(\d{1,2})/.exec(v);
+    return m?(m[1]+'.'+('0'+m[2]).slice(-2)+'.'+('0'+m[3]).slice(-2)):v; };
   var rows=_cmPairRows(f,sites).map(function(r,i){
-    return {순번:String(i+1), 소속:r.co||' ', 근성명:g(r.w,'name'), 근생년월일:g(r.w,'birth'), 근직책:g(r.w,'title'),
-      사성명:g(r.u,'name'), 사생년월일:g(r.u,'birth'), 사직책:g(r.u,'title')};
+    return {순번:String(i+1), 소속:r.co||' ', 근성명:g(r.w,'name'), 근생년월일:b(r.w), 근직책:g(r.w,'title'),
+      사성명:g(r.u,'name'), 사생년월일:b(r.u), 사직책:g(r.u,'title')};
   });
   return {기금명:String(f.name||''), 위원:rows, 근로자측수:String(_prepCommittee(f,'근로자측',sites).length),
     사용자측수:String(_prepCommittee(f,'사용자측',sites).length)};

@@ -169,6 +169,11 @@ test('★ 별지 명단 — 사업장마다 한 줄, 근로자측 왼쪽·사용
   assert.ok(v.위원.every((r) => ['소속', '근성명', '근생년월일', '근직책', '사성명', '사생년월일', '사직책'].every((k) => typeof r[k] === 'string' && r[k].length > 0)),
     '빈 값은 밑줄이 아니라 빈칸(" ")');
   assert.ok(!('번호' in v.위원[0]), '엔진이 매기는 {{번호}}(전체 차례)와 겹치지 않게 순번');
+  /* 생년월일은 좁은 칸에서 꺾이지 않게 «YY.MM.DD» (2026-10-04) */
+  const bx = box.ax({ prep_committee: [{ side: '근로자측', name: '홍길동', company: '가나', birth: '1980-02-02' },
+    { side: '사용자측', name: '이담당', company: '가나', birth: '1965.1.5' }] }, []);
+  assert.equal(bx.위원[0].근생년월일, '80.02.02'); assert.equal(bx.위원[0].사생년월일, '65.01.05');
+  assert.equal(box.ax({ prep_committee: [{ side: '근로자측', name: '홍길동', birth: '모름' }] }, []).위원[0].근생년월일, '모름', '알아볼 수 없는 값은 그대로');
   /* 짝짓기 — (주)·㈜·주식회사·빈칸은 같은 회사, 한쪽뿐이면 반대편 빈칸, 한 회사 두 사람은 줄을 더 연다, 소속 없는 사람끼리는 순서대로 */
   const f = { prep_committee: [
     { side: '근로자측', name: '홍길동', company: '(주)가나' }, { side: '근로자측', name: '김철수', company: '다라' },
