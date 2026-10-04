@@ -360,7 +360,7 @@ function boot() {
     gV('_K'), gF('_siteWrep'), gF('_isCommittee'),
     gF('_siteUrep'), gF('_siteCommittee'), gF('_prepCommittee'),
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
-    gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('_cmPairRows'), gF('committeeAnnexHTML'),
+    gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('_shortBirth'), gF('_cmPairRows'), gF('committeeAnnexHTML'),
     gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
     gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
     gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),

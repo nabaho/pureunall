@@ -38,7 +38,7 @@ function 상자() {
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
     grabFn('_siteWrep'), grabFn('_siteUrep'),
     grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
-    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('_cmPairRows'), grabFn('committeeAnnexHTML'),
+    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('_shortBirth'), grabFn('_cmPairRows'), grabFn('committeeAnnexHTML'),
     'this.prep=_prepCommittee; this.over=_cmOver; this.need=_cmAnnexNeeded;',
     'this.see=_cmSeeAnnex; this.annex=committeeAnnexHTML; this.ROWS=COMMITTEE_ROWS;',
     'this.fromSites=_siteCommittee; this.urep=_siteUrep;'
@@ -215,7 +215,7 @@ function 격자채우기(f) {
     (/var COMMITTEE_ROWS=\d+;/.exec(SRC) || [''])[0],
     grabFn('_siteWrep'), grabFn('_siteUrep'),
     grabFn('_isCommittee'), grabFn('_siteCommittee'), grabFn('_prepCommittee'), grabFn('_cmOver'),
-    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('_cmPairRows'), grabFn('committeeAnnexHTML'),
+    grabFn('_cmAnnexNeeded'), grabFn('_cmToAnnex'), grabFn('isRegionFund'), grabFn('_cmSeeAnnex'), grabFn('_shortBirth'), grabFn('_cmPairRows'), grabFn('committeeAnnexHTML'),
     grabFn('fillCommittee'),
     'fillCommittee(root,f,(f&&f._sites)||[]);'
   ].join('\n')).call(box, doc, root, f);
