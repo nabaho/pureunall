@@ -1369,6 +1369,55 @@ async function 감시용회차(db, 열쇠) {
   return 있음 ? o : null;
 }
 
+/* 일요일 보충 한 번 — 일요일 17시(newsletterSundayRefill)와 «오늘만 23시»가 함께 부른다.
+   판단은 news-watch.js(보충할까·보충하기), 고르기는 Core.거리고르기 — 여기는 읽고 쓰기만. */
+async function 일요일보충한번(누가) {
+  const db = getDatabase();
+  const now = Date.now();
+  /* ① 한 번 더 가져오기 — 하나가 막혀도 나머지는 한다 */
+  await 뉴스모으기한번().catch((e) => console.warn("[일요일 보충] 기사", e.message));
+  await 자료판례모아담기({}).catch((e) => console.warn("[일요일 보충] 자료·판례", e.message));
+  await 노무사회모으기("full", 10, 누가).catch((e) => console.warn("[일요일 보충] 공인노무사회", e.message));
+
+  /* ② 보충 */
+  const 열쇠 = NWatch.이번열쇠(now);
+  const 기록자리 = db.ref("newsletter/watch/" + 열쇠 + "/보충");
+  const [설정, 확정본] = await Promise.all([
+    db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
+    db.ref("newsletter/weeklyReady").once("value").then((x) => x.val())]);
+  const 회차 = await 감시용회차(db, 열쇠);
+  const 판 = NWatch.보충할까({ 설정, 확정본, 회차, 열쇠 });
+  if (!판.할까) {
+    await 기록자리.set({ 때: now, 안함: 판.까닭 });
+    console.log("[일요일 보충] 안 함 — " + 판.까닭);
+    return;
+  }
+  const [자료모음, 판례모음, 노무사회, 지난것] = await Promise.all([
+    db.ref("homepage/newsDocs/모음").once("value").then((x) => x.val() || {}),
+    db.ref("homepage/newsPrec/모음").once("value").then((x) => x.val() || {}),
+    db.ref("ilabor/items").once("value").then((x) => x.val() || {}),
+    db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value").then((x) => x.val() || {})]);
+  const 거리 = NCore.거리고르기({ 자료모음, 판례모음, 노무사회, 회차들: 지난것, 지금열쇠: 열쇠, 뺄안: 회차.안 });
+  const 후보안 = NCore.자동으로담기({}, { 법령: [], 자료: 거리.자료, 판례: 거리.판례 }, 회차.회차 || {});
+  const r = NWatch.보충하기({ 안: 회차.안, 후보안, 지난표: NCore.지난것들(지난것, 열쇠) });
+  if (!r.바꾼.length && !r.채운.length) {
+    await 기록자리.set({ 때: now, 바꾼: [], 채운: [] });
+    console.log("[일요일 보충] 바꿀 것 없음");
+    return;
+  }
+  const 회차자리 = db.ref("newsletter/issues/" + 열쇠);
+  await 회차자리.child("판").transaction((v) => (Number(v) || 0) + 1);
+  await 회차자리.update({ 안: r.안, 고친이: NWatch.일요일보충이름, 고친때: now });
+  /* 자동 확정본이면 «지금 내용»으로 다시 봉인 — 월요일이 하는 것을 미리 한다(전문도 함께 새로 짓는다) */
+  if (확정본 && 확정본.회차열쇠 === 열쇠 && 확정본.자동 === true && 확정본.상태 === "준비") {
+    const 새 = await NF.확정본다시짓기({ db, 회차열쇠: 열쇠, 보낼날: 확정본.보낼날, now });
+    if (새.ok) await db.ref("newsletter/weeklyReady").set(새.확정본);
+    else console.warn("[일요일 보충] 다시 봉인 못 함 — " + (새.까닭 || ""));
+  }
+  await 기록자리.set({ 때: now, 바꾼: r.바꾼, 채운: r.채운 });
+  console.log("[일요일 보충]", JSON.stringify({ 바꾼: r.바꾼.length, 채운: r.채운.length }));
+}
+
 exports.newsletterWatchRetry = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["GEMINI_KEY"] })
@@ -1458,56 +1507,29 @@ exports.newsletterWatchSunday = functions
    ⚠ 매일 가져오기는 그대로다 — 신문 RSS 는 이틀치뿐이라 주 1회로는 월~목 기사를 놓친다.
    ⚠ 판단은 news-watch.js(보충할까·보충하기), 고르기는 Core.거리고르기 — 여기는 읽고 쓰기만.
    ⚠ 확정본이 자동이면 바로 다시 봉인한다 — 18시 점검과 월요일 발송이 «바뀐 편지»를 본다. */
+
 exports.newsletterSundayRefill = functions
   .region(MAIL_REGION)
   .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
   .pubsub.schedule("every sunday 17:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
-    const db = getDatabase();
-    const now = Date.now();
-    /* ① 한 번 더 가져오기 — 하나가 막혀도 나머지는 한다 */
-    await 뉴스모으기한번().catch((e) => console.warn("[일요일 보충] 기사", e.message));
-    await 자료판례모아담기({}).catch((e) => console.warn("[일요일 보충] 자료·판례", e.message));
-    await 노무사회모으기("full", 10, "일요일 보충").catch((e) => console.warn("[일요일 보충] 공인노무사회", e.message));
+    await 일요일보충한번("일요일 보충");
+    return null;
+  });
 
-    /* ② 보충 */
-    const 열쇠 = NWatch.이번열쇠(now);
-    const 기록자리 = db.ref("newsletter/watch/" + 열쇠 + "/보충");
-    const [설정, 확정본] = await Promise.all([
-      db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
-      db.ref("newsletter/weeklyReady").once("value").then((x) => x.val())]);
-    const 회차 = await 감시용회차(db, 열쇠);
-    const 판 = NWatch.보충할까({ 설정, 확정본, 회차, 열쇠 });
-    if (!판.할까) {
-      await 기록자리.set({ 때: now, 안함: 판.까닭 });
-      console.log("[일요일 보충] 안 함 — " + 판.까닭);
-      return null;
-    }
-    const [자료모음, 판례모음, 노무사회, 지난것] = await Promise.all([
-      db.ref("homepage/newsDocs/모음").once("value").then((x) => x.val() || {}),
-      db.ref("homepage/newsPrec/모음").once("value").then((x) => x.val() || {}),
-      db.ref("ilabor/items").once("value").then((x) => x.val() || {}),
-      db.ref("newsletter/issues").orderByKey().limitToLast(9).once("value").then((x) => x.val() || {})]);
-    const 거리 = NCore.거리고르기({ 자료모음, 판례모음, 노무사회, 회차들: 지난것, 지금열쇠: 열쇠, 뺄안: 회차.안 });
-    const 후보안 = NCore.자동으로담기({}, { 법령: [], 자료: 거리.자료, 판례: 거리.판례 }, 회차.회차 || {});
-    const r = NWatch.보충하기({ 안: 회차.안, 후보안, 지난표: NCore.지난것들(지난것, 열쇠) });
-    if (!r.바꾼.length && !r.채운.length) {
-      await 기록자리.set({ 때: now, 바꾼: [], 채운: [] });
-      console.log("[일요일 보충] 바꿀 것 없음");
-      return null;
-    }
-    const 회차자리 = db.ref("newsletter/issues/" + 열쇠);
-    await 회차자리.child("판").transaction((v) => (Number(v) || 0) + 1);
-    await 회차자리.update({ 안: r.안, 고친이: NWatch.일요일보충이름, 고친때: now });
-    /* 자동 확정본이면 «지금 내용»으로 다시 봉인 — 월요일이 하는 것을 미리 한다(전문도 함께 새로 짓는다) */
-    if (확정본 && 확정본.회차열쇠 === 열쇠 && 확정본.자동 === true && 확정본.상태 === "준비") {
-      const 새 = await NF.확정본다시짓기({ db, 회차열쇠: 열쇠, 보낼날: 확정본.보낼날, now });
-      if (새.ok) await db.ref("newsletter/weeklyReady").set(새.확정본);
-      else console.warn("[일요일 보충] 다시 봉인 못 함 — " + (새.까닭 || ""));
-    }
-    await 기록자리.set({ 때: now, 바꾼: r.바꾼, 채운: r.채운 });
-    console.log("[일요일 보충]", JSON.stringify({ 바꾼: r.바꾼.length, 채운: r.채운.length }));
+/* ★ 오늘만 — 2026-10-04(일) 23:00 한 번 (대표 지시 「오늘꺼 만 예외로 23시에 모아달라. 그리고 내일 오전 06시에 보내라」)
+   일요일 17시 보충이 배포되기 전에 17시가 지나, 10/5 편지에 새것을 넣으려고 오늘 밤만 한 번 더 돈다.
+   ⚠ 날짜 문지기 — 서울 날이 2026-10-04 가 아니면 아무것도 안 한다(크론이 해마다 10/4 에 다시 부르기 때문).
+   ⚠ 다 돌고 나면 지워도 된다: firebase functions:delete newsletterRefillOnce20261004 --region asia-northeast3 */
+exports.newsletterRefillOnce20261004 = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
+  .pubsub.schedule("0 23 4 10 *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    if (서울오늘() !== "2026-10-04") { console.log("[오늘만 보충] 날짜가 지나 아무것도 안 함"); return null; }
+    await 일요일보충한번("오늘만 23시 보충");
     return null;
   });
 
