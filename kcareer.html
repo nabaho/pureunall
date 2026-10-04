@@ -1321,7 +1321,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
 <!-- 📎 첨부서류 만들기의 셈(표 읽기·짝 후보·번호) — 화면·파일은 kcareer.html 이 만진다 -->
-<script src="js/kcareer-attach.js?v=2"></script>
+<script src="js/kcareer-attach.js?v=3"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=20"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
@@ -13379,7 +13379,9 @@ async function rhAttachOpen(){
     if(!cs.length){ items.push({ row:k, miss:true, on:false }); return; }
     cs.forEach(function(c){ items.push({ row:k, r:c.r, page:c.page, on:!!c.먼저, 기간맞음:c.기간맞음 }); });
   });
-  _att={ rows:줄, items:items };
+  /* 경력(재직) 표 줄은 맨 아래로 — 대개 증빙을 안 붙인다(붙이면 재직증명서). 화면이 접어 둔다 */
+  items=items.filter(function(x){ return !줄[x.row].career; }).concat(items.filter(function(x){ return 줄[x.row].career; }));
+  _att={ rows:줄, items:items, showCareer:false };
   rhAttachDraw();
   document.getElementById('modalAttach').classList.add('open');
 }
@@ -13388,13 +13390,22 @@ function rhAttachDraw(){
   KcareerAttach.number(_att.items);
   var 앞줄=-1;
   var html='<table class="at-tbl"><thead><tr><th>☐</th><th>#</th><th></th><th>첨부번호</th><th>신청서 표 줄</th><th>붙일 증빙</th><th>짝</th></tr></thead><tbody>';
+  var 경력줄=_att.rows.filter(function(r){ return r.career; }).length, 접힘표=false;
   _att.items.forEach(function(it, i){
-    var row=_att.rows[it.row], 새줄=(it.row!==앞줄); 앞줄=it.row;
+    var row=_att.rows[it.row];
+    /* 경력(재직) 줄 — 처음엔 접어 둔다. 재직증명서를 붙일 때만 펼친다 */
+    if(row.career && !접힘표){ 접힘표=true;
+      html+='<tr><td colspan="7" style="background:var(--soft);cursor:pointer;color:var(--text-sub)" onclick="_att.showCareer=!_att.showCareer;rhAttachDraw()">'
+        +(_att.showCareer?'▾':'▸')+' 경력(재직) 줄 '+경력줄+'개 — 재직증명서를 붙일 때만 펼치세요</td></tr>'; }
+    if(row.career && !_att.showCareer) return;
+    var 새줄=(it.row!==앞줄); 앞줄=it.row;
     var 줄글=새줄?escapeHtml([row.period,row.org,row.content].filter(Boolean).join(' · ')):'<span style="color:var(--text-mute)">〃</span>';
     var 증빙, 짝;
     if(it.file){ 증빙='📄 '+escapeHtml(it.file.name)+' <span class="at-ok">(직접 넣음)</span>'; 짝='<span class="at-ok">직접 넣음</span>'; }
     else if(it.miss){ 증빙='<span class="at-miss">증빙 없음</span> <button class="btn sm" type="button" onclick="rhAttachPutFile('+i+')">＋ 파일 넣기</button>'; 짝='-'; }
-    else { 증빙='📄 '+escapeHtml(_attRecName(it.r,it.page))+' <span style="color:var(--text-mute)">· '+escapeHtml(_attFileName(it.r))+'</span>';
+    else { /* 해마다 받은 같은 위촉장이 줄지어 나온다 — 해를 맨 앞에 두어야 서로 가른다 */
+      var 해=String(it.r.year||it.r.issueDate||it.r.date||it.r.period||'').match(/(19|20)\d{2}/);
+      증빙='📄 '+(해?'<b>'+해[0]+'</b> · ':'')+escapeHtml(_attRecName(it.r,it.page))+' <span style="color:var(--text-mute)">· '+escapeHtml(_attFileName(it.r))+'</span>';
       /* 한 줄에 후보가 여럿인데 아무것도 안 골랐으면 «고르라»고 말한다 — 다 맞아 보여도 사람이 정한다 */
       var 같은줄=_att.items.filter(function(y){ return y.row===it.row && y.r; });
       짝=(같은줄.length>1 && !같은줄.some(function(y){ return y.on; }))?'<span class="at-warn">후보 '+같은줄.length+' — 골라 주세요</span>':it.기간맞음===true?'<span class="at-ok">기관·기간 맞음</span>':(it.기간맞음===false?'<span class="at-warn">기간 다름 — 확인</span>':'<span class="at-warn">기관만 맞음 — 확인</span>'); }
@@ -13406,11 +13417,11 @@ function rhAttachDraw(){
   });
   body.innerHTML=html+'</tbody></table>';
   var 고른=_att.items.filter(function(x){ return x.on; }).length;
-  var 없음=_att.rows.filter(function(r,k){ return !_att.items.some(function(x){ return x.row===k && (x.r||x.file); }); }).length;
+  var 없음=_att.rows.filter(function(r,k){ return !r.career && !_att.items.some(function(x){ return x.row===k && (x.r||x.file); }); }).length;
   /* 짝 확인 필요 = 후보가 있는데 하나도 안 고른 줄 + 기간이 다르거나 모르는 채 고른 것 */
   var 확인=_att.rows.filter(function(r,k){ var c=_att.items.filter(function(x){ return x.row===k && x.r; });
     return c.length && (!c.some(function(x){ return x.on; }) || c.some(function(x){ return x.on && x.기간맞음!==true; })); }).length;
-  var sum=document.getElementById('atSum'); if(sum) sum.textContent='표 줄 '+_att.rows.length+' · 고른 증빙 '+고른+' · 증빙 없음 '+없음+' · 짝 확인 필요 '+확인;
+  var sum=document.getElementById('atSum'); if(sum) sum.textContent='표 줄 '+_att.rows.filter(function(r){ return !r.career; }).length+' · 고른 증빙 '+고른+' · 증빙 없음 '+없음+' · 짝 확인 필요 '+확인;
   /* 끌어서 차례 바꾸기 — 놓인 자리 «앞»으로 옮긴다 */
   var 잡은=null;
   body.querySelectorAll('tr[data-i]').forEach(function(tr){
