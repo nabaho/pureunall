@@ -45,7 +45,7 @@
 <script src="js/rules-v2/text-cache.js?v=1"></script>
 <script src="js/rules-v2/view-topics.js?v=4"></script>
 <script src="js/rules-v2/lib-recommend.js?v=1"></script>
-<script src="js/rules-v2/view-recommend.js?v=1"></script>
+<script src="js/rules-v2/view-recommend.js?v=2"></script>
 <script src="xlsx_gen.js?v=3"></script>
 <style>
 :root{
@@ -5066,13 +5066,20 @@ function erpCompaniesFrom(raw){
   if(v&&!Array.isArray(v)&&typeof v==="object")v=Object.values(v);
   return Array.isArray(v)?v.filter(c=>c&&typeof c==="object"&&!Array.isArray(c)):[];
 }
+/* 읽는 중이면 같은 약속을 돌려준다 — 로그인·🏢 열기·💡 우리 문안이 겹쳐 불러도 업체 목록을 두 번 받지 않게 */
+let ERP_COS_LOADING=null;
 function loadErpCompanies(){
-  if(!FBDB)return;
-  FBDB.ref("data/companies").once("value").then(s=>{
+  if(!FBDB)return Promise.resolve(ERP_COS);
+  if(ERP_COS_LOADING)return ERP_COS_LOADING;
+  const p=FBDB.ref("data/companies").once("value").then(s=>{
     ERP_COS=erpCompaniesFrom(s.val());
     console.info("ERP 업체",ERP_COS.length,"건 로드");
     if(LAST)matchErpSite();       // 이미 검토 중이면 즉시 매칭
-  }).catch(e=>console.warn("ERP 업체 로드 실패:",e));
+    return ERP_COS;
+  }).catch(e=>{ console.warn("ERP 업체 로드 실패:",e); return ERP_COS; })
+    .then(v=>{ if(ERP_COS_LOADING===p)ERP_COS_LOADING=null; return v; });
+  ERP_COS_LOADING=p;
+  return p;
 }
 /* 현재 사업장에 맞는 ERP 업체 찾기 (사업자번호 우선 → 상호명) */
 function findErpCompany(name,bizNo){
@@ -7187,13 +7194,21 @@ $("ae-bank").addEventListener("click",()=>{
    ⚠ 처음 조를 열 때 «한 번만» 읽는다(진행 중이면 같은 약속). 실패하면 다음에 조를 열 때 다시.
    ⚠ 어떤 실패도 #ae-rec 한 줄로 끝난다 — 편집은 그대로 돈다.
    ⚠ 규모 말이 둘이다 — 비슷한 회사 띠는 lib-sites 말('10~29인'), 위반 판정 규모는 #size 말('10인이상'). 섞지 말 것. */
-const REC={M:null,loading:null,st:{state:"idle"}};
+const REC={M:null,raw:null,coN:0,loading:null,st:{state:"idle"}};
+/* 모델 짓기 — 받은 자료(raw)로만. 업체 목록 없이 지은 것이면, 목록이 온 뒤 «한 번 더» 짓는다(다시 받지 않는다) */
+function recModel(){
+  const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+  REC.M=PuRulesV2TopicsView.model(REC.raw.data,REC.raw.texts,ERP_COS,(window.STD_2026||{}).text||"",today,window.PuRulesCriteria);
+  REC.coN=ERP_COS.length;
+  return REC.M;
+}
 function recLoad(){
-  if(REC.M)return Promise.resolve(REC.M);
+  if(REC.M){ if(!REC.coN&&ERP_COS.length)recModel(); return Promise.resolve(REC.M); }
   if(REC.loading)return REC.loading;
   if(!FBDB)return Promise.reject(new Error("로그인 뒤에 보입니다"));
   const p=(async()=>{
-    // 업체 목록이 아직이면 잠깐 기다린다 — 덩어리의 회사 이름·비슷한 회사가 업체 목록에서 온다(끝내 안 오면 없이)
+    // 업체 목록이 아직이면 잠깐 기다린다 — 덩어리의 회사 이름·비슷한 회사가 업체 목록에서 온다
+    // (끝내 안 오면 없이 짓고, 목록이 온 뒤 조를 열 때 recModel 이 다시 짓는다. 읽는 중이면 loadErpCompanies 가 같은 약속)
     if(!ERP_COS.length){ loadErpCompanies(); await libWait(()=>ERP_COS.length>0,20,300); }
     const S=PuRulesV2Store.make({db:FBDB,gateway:{save:()=>Promise.reject(new Error("읽기 전용"))},
       companies:()=>ERP_COS,actor:()=>"",now:Date.now});
@@ -7205,9 +7220,8 @@ function recLoad(){
       const st=REC.st; if(st.state!=="loading")return;
       st.done=n; st.total=m; recDraw();
     });
-    const today=new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
-    REC.M=PuRulesV2TopicsView.model(data,(r&&r.texts)||{},ERP_COS,(window.STD_2026||{}).text||"",today,window.PuRulesCriteria);
-    return REC.M;
+    REC.raw={data,texts:(r&&r.texts)||{}};
+    return recModel();
   })();
   REC.loading=p;
   p.catch(()=>{ if(REC.loading===p)REC.loading=null; });   // 실패하면 다음에 조를 열 때 다시 읽는다
@@ -7240,6 +7254,7 @@ function recFill(st,a,M){
   st.band=PuRulesV2Sites.band(SITE_INFO&&SITE_INFO.empTotal);   // lib-sites 띠 말
   st.bizType=(SITE_INFO&&SITE_INFO.bizType)||"";
   st.terms=recTerms();
+  st.fill=fillTpl;   // 몸도 넣을 때와 같은 채우개로 — 보이는 글 = 넣을 글
   st.picks=PuRulesV2Recommend.pick(M.byTopic[key]||[],{curBody:st.curBody,curCoName:co,
     companyId:mine?String(mine.id):"",band:st.band,bizType:st.bizType,coById});
   const size=$("size").value;   // 검토 기준 규모 말(#size)
@@ -7268,7 +7283,8 @@ function recRender(a){
 function recClick(ev){
   try{
     const b=ev&&ev.target&&ev.target.closest&&ev.target.closest("[data-rec]"); if(!b)return;
-    const k=b.dataset.k, p=(REC.st.picks||[]).find(x=>x.group.key===k); if(!p)return;
+    const p=(REC.st.picks||[])[Number(b.dataset.i)]; if(!p)return;   // 그린 차례 그대로(같은 REC.st 로 그렸다)
+    const k=p.group.key;
     if(b.dataset.rec==="put"){
       if(READONLY){ alert("열람 전용입니다."); return; }
       const ta=$("ae-after");

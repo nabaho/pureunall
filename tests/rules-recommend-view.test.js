@@ -78,7 +78,7 @@ function readySt(extra) {
   const m = M(), picks = R.pick(m.byTopic[K], CTX(m));
   return Object.assign({ state: 'ready', picks, curBody: CUR, curCoName: '하나상사', warns: {}, open: {},
     docs: m.docs, places: m.topics.filter((t) => t.key === K)[0].count, band: S.band(20), bizType: '제조업',
-    terms: { 회사: '하나상사', 근로자: '사원' } }, extra || {});
+    terms: { 회사: '하나상사', 근로자: '사원' }, fill: FILL.fillTpl }, extra || {});
 }
 /* 덩어리 카드로 쪼갠다 — 차례는 picks 차례 */
 const cards = (h) => h.split('data-rec-card').slice(1);
@@ -160,6 +160,26 @@ test('③ 초록은 «지금 글에 없는 곳»만 — 지금 글에만 있는 
   assert.doesNotMatch(bodyOf(cards(h)[0]), /<ins>[^<]*회사/);
 });
 
+test('③ 몸은 «넣을 글» 그대로 — 자리표시를 채워 보이고, 초록은 여전히 새 곳만 · 조사도 맞게', () => {
+  const st = readySt(), h = RV.boxHtml(st);
+  assert.doesNotMatch(h, /\{근로자\}|\{회사\}/, '채울 말이 있는데 자리표시가 보인다');
+  cards(h).forEach((c) => {
+    const b = bodyOf(c);
+    assert.match(b, /출근한 사원에게/, '호칭이 이 회사 것으로 채워져야 한다');
+    (b.match(/<ins>([^<]*)<\/ins>/g) || []).forEach((x) => assert.doesNotMatch(x, /사원|출근한/, '같은 곳을 초록으로 칠했다'));
+  });
+  // 조사 — 자리표시 바로 뒤 조사가 받침에 맞는다(지금 글과 같은 곳이든, 새 곳이든)
+  const g = (text) => ({ key: text, text, members: [{ companyId: 'co2', companyName: '나다물산', date: T0 }], places: 1, finals: 0, last: T0 });
+  const one = (cur, text) => bodyOf(cards(RV.boxHtml(readySt({ curBody: cur, picks: [{ why: 'most', group: g(text), rep: g(text).members[0] }] })))[0]);
+  const same = one('사원이 청구하면 14일을 준다.', '{근로자}가 청구하면 15일을 준다.');
+  assert.match(same, /^사원이 청구하면 <ins>15<\/ins>일을 준다\.$/);
+  const fresh = one('회사가 쉰다.', '{근로자}가 쉰다.');
+  assert.match(fresh, /<ins>사원이<\/ins>/);
+  assert.doesNotMatch(fresh, /사원가/);
+  const co = one('하나상사는 14일을 준다.', '{회사}는 15일을 준다.');
+  assert.match(co, /^하나상사는 <ins>15<\/ins>일을 준다\.$/, '{회사}는 이 회사 이름으로, 같은 곳은 그대로');
+});
+
 test('④ 회사 이름은 글자로만 · ⑤ 펼친 회사 줄', () => {
   const st = readySt(), rec = st.picks.findIndex((p) => p.why === 'recent');
   assert.ok(rec >= 0);
@@ -186,7 +206,11 @@ test('⑤ ⚠ 줄 — 위반 의심이 있는 덩어리에만, 첫 기준 이름
   cs.slice(1).forEach((c) => assert.doesNotMatch(c, /⚠/));
   // 끝의 흐린 한 줄 — 넣을 때 무엇으로 바뀌는지
   const h = RV.boxHtml(st);
-  assert.match(h, /초록 = 지금 글에 없는 곳\. 넣을 때 \{회사\}·\{근로자\}는 이 회사 이름·호칭\(사원\)으로 바뀝니다\./);
+  assert.match(h, /초록 = 지금 글에 없는 곳\./);
+  assert.match(h.match(/class="rec-foot"[^>]*>([^<]*)</)[1], /하나상사·사원/, '무엇으로 채워 보이는지');
+  // 채우개가 없으면(자리표시 그대로 보일 때) 넣을 때 바뀐다고 알린다
+  assert.match(RV.boxHtml(Object.assign(st, { fill: undefined })),
+    /넣을 때 \{회사\}·\{근로자\}는 이 회사 이름·호칭\(사원\)으로 바뀝니다\./);
 });
 
 test('② 한 줄 칸은 모두 title 을 달고, 화면 CSS 가 넘침을 … 로 자른다', () => {
@@ -290,7 +314,7 @@ function harness(o) {
   const $ = (id) => els[id] || (els[id] = { id, innerHTML: '', value: '', textContent: '', style: {}, focused: 0,
     focus() { this.focused++; }, addEventListener() {} });
   $('size').value = '10인이상';
-  const calls = { make: 0, load: 0, texts: 0, alerts: [] };
+  const calls = { make: 0, load: 0, texts: 0, alerts: [], erp: 0 };
   const store = { make(cfg) {
     calls.make++; calls.cfg = cfg;
     return {
@@ -300,7 +324,7 @@ function harness(o) {
   } };
   const ctx = {
     $, console: { warn() {}, info() {}, log() {} }, Promise, Date, Object, Array, String, Number, Set, Map, JSON, Math, RegExp, Error,
-    FBDB: o.noDb ? null : {}, ERP_COS: COS, SITE_INFO: { name: '하나상사', bizNo: '123-45-67890', bizType: '제조업', empTotal: 20 },
+    FBDB: o.noDb ? null : {}, ERP_COS: o.cos || COS, SITE_INFO: { name: '하나상사', bizNo: '123-45-67890', bizType: '제조업', empTotal: 20 },
     LAST: { site: '하나상사' }, SITE_MAP: {}, siteSel: { value: 'A' }, SAMPLES: { A: '사원 사원 사원 근로자' },
     CUR_ITEMS: [{ id: 'art_제20조', orig: '제20조(연차유급휴가) ' + CUR }, { id: 'art_제1조', orig: '제1조(목적) 이 규칙은 하나상사 사원의 복무를 정한다.' }],
     AE_LABEL: '제20조', READONLY: false,
@@ -310,7 +334,7 @@ function harness(o) {
     detectTerms: () => ({ 회사: '회사', 근로자: '사원' }),
     fillTpl: FILL.fillTpl,
     _digits: (s) => String(s || '').replace(/[^0-9]/g, ''),
-    libWait: () => Promise.resolve(true), loadErpCompanies() {},
+    libWait: (ok) => Promise.resolve(!!ok()), loadErpCompanies() { calls.erp++; },
     alert: (m) => calls.alerts.push(m),
     PuRulesV2Store: store, PuRulesV2TextCache: TC, PuRulesV2TopicsView: V, PuRulesV2Recommend: R, PuRulesV2Topics: T,
     PuRulesV2Sites: S, PuRulesV2Order: O, PuRulesV2RecommendView: RV, PuRulesCriteria: CR, STD_2026: { text: STD },
@@ -331,6 +355,8 @@ test('⑧ 처음 한 번만 읽는다 — 다시 열어도 모델을 다시 쓴�
   await H.settle();
   assert.match(H.box(), /data-rec-card/);
   assert.match(H.box(), new RegExp(R.LABELS.recent));
+  assert.doesNotMatch(H.box(), /\{근로자\}|\{회사\}/, '화면의 몸은 넣을 글 그대로(채운 글)여야 한다');
+  assert.match(H.box(), /사원에게/);
   H.t.recRender(ART); await H.settle();
   H.ctx.AE_LABEL = '제1조'; H.t.recRender({ label: '제1조', title: '목적' }); await H.settle();
   assert.equal(H.calls.load, 1, '조를 열 때마다 자료를 다시 읽는다');
@@ -363,7 +389,7 @@ test('⑧ 실패는 한 줄 — 로그인 전 · 읽기 실패(다음에 다시)
   const H2 = harness({ noView: true });
   assert.doesNotThrow(() => H2.t.recRender(ART)); await H2.settle();
   assert.match(H2.box(), /우리 문안을 못 읽었습니다/);
-  assert.doesNotThrow(() => H2.t.recClick({ target: { closest: () => ({ dataset: { rec: 'put', k: 'x' } }) } }));
+  assert.doesNotThrow(() => H2.t.recClick({ target: { closest: () => ({ dataset: { rec: 'put', i: '0' } }) } }));
 
   const H3 = harness();
   H3.t.recRender({ label: '제20조', title: '' }); await H3.settle();
@@ -375,7 +401,7 @@ test('⑨ 넣기 — 열람 전용이면 막고, 아니면 머리 지켜 채워 
   const H = harness();
   H.t.recRender(ART); await H.settle();
   const p = H.t.REC.st.picks[0];
-  const btn = (rec) => ({ target: { closest: () => ({ dataset: { rec, k: p.group.key } }) } });
+  const btn = (rec) => ({ target: { closest: () => ({ dataset: { rec, i: '0' } }) } });
   H.after.value = '제20조(연차유급휴가) 지금 고치던 글';
   H.ctx.READONLY = true;
   H.t.recClick(btn('put'));
@@ -392,4 +418,41 @@ test('⑨ 넣기 — 열람 전용이면 막고, 아니면 머리 지켜 채워 
   assert.match(H.box(), /rec-who-r/);
   H.t.recClick(btn('who'));
   assert.doesNotMatch(H.box(), /rec-who-r/);
+});
+
+test('⑧ 업체 목록이 늦게 오면 — 목록 없이 지은 모델에 머물지 않고, 온 뒤 한 번 더 짓는다(자료는 다시 안 받는다)', async () => {
+  const H = harness({ cos: [] });
+  H.t.recRender(ART); await H.settle();
+  assert.equal(H.calls.erp, 1, '업체 목록이 비었으면 한 번 부른다');
+  assert.match(H.box(), /\(지운 업체\)/, '목록 없이 지으면 이름을 모른다');
+  H.ctx.ERP_COS = COS;   // 목록이 왔다
+  H.t.recRender(ART); await H.settle();
+  assert.match(H.box(), /&lt;b&gt;가나&lt;\/b&gt;상사/, '목록이 온 뒤에도 옛 모델(이름 없음)을 쓴다');
+  assert.equal(H.calls.load, 1, '모델만 다시 짓고 자료는 다시 받지 않는다');
+  assert.equal(H.calls.texts, 1);
+});
+
+test('⑧ 업체 목록을 읽는 중이면 두 번 읽지 않는다 — 로그인·🏢·💡 가 겹쳐 불러도 같은 약속', async () => {
+  const a = BARE.indexOf('let ERP_COS_LOADING=');
+  assert.ok(a > 0, '읽는 중 표시가 없다');
+  const load = cutFn(BARE, 'loadErpCompanies'), end = BARE.indexOf(load) + load.length;
+  assert.ok(end > a);
+  const src = cutFn(BARE, 'erpCompaniesFrom') + '\n' + BARE.slice(a, end);
+  let reads = 0, fail = false;
+  const pend = [];
+  const ctx = { console: { info() {}, warn() {} }, ERP_COS: [], LAST: null, matchErpSite() {}, Object, Array, Promise,
+    FBDB: { ref() { return { once() { reads++; return new Promise((ok, no) => pend.push(() => (fail ? no(new Error('막힘')) : ok({ val: () => ({ v: { a: { id: 'co2', name: '나다물산' } } }) })))); } }; } } };
+  vm.createContext(ctx);
+  vm.runInContext(src + '\nthis.__l=loadErpCompanies;', ctx);
+  const p1 = ctx.__l(), p2 = ctx.__l();
+  assert.equal(reads, 1, '읽는 중인데 또 읽는다');
+  assert.equal(p1, p2);
+  pend.shift()(); await p1;
+  assert.equal(ctx.ERP_COS.length, 1);
+  const p3 = ctx.__l();
+  assert.equal(reads, 2, '다 읽은 뒤에는 다시 부를 수 있어야 한다');
+  fail = true; pend.shift()();
+  assert.equal((await p3).length, 1, '실패해도 던지지 않고 있는 목록을 돌려준다');
+  ctx.__l();
+  assert.equal(reads, 3, '실패한 뒤 읽는 중 표시가 남아 다시 못 읽는다');
 });

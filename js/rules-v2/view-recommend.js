@@ -8,7 +8,8 @@
    st = { state:'idle'|'loading'|'ready'|'error'|'notitle', done, total, err,
           picks(lib-recommend pick 결과), curBody(지금 글 — 머리 뗀 것), curCoName,
           warns:{[g.key]:[finding]}, open:{[g.key]:true},
-          docs(모은 자료 규칙 본문 수), places(이 주제 곳 수), band, bizType, terms:{회사, 근로자} }
+          docs(모은 자료 규칙 본문 수), places(이 주제 곳 수), band, bizType, terms:{회사, 근로자},
+          fill(넣기와 같은 채우개 — rules.html 의 fillTpl. 없으면 자리표시 그대로) }
 
    ★ 지키는 것
      · 글은 모두 esc — 회사 이름·문안·오류 글의 꺾쇠가 태그가 되면 안 된다.
@@ -65,10 +66,14 @@
     return (g.places || 0) + '곳' + star + ' · 최근 ' + ym(g.last);
   }
 
-  /* 몸 — 지금 글에 견줘 덩어리에만 있는 곳을 초록으로. 지금 글에만 있는 곳은 그리지 않는다 */
+  /* 몸 — 지금 글에 견줘 덩어리에만 있는 곳을 초록으로. 지금 글에만 있는 곳은 그리지 않는다.
+     ★ 보이는 글은 «넣을 때 들어갈 글» 그대로 — {회사}·{근로자}를 넣기와 같은 채우개(st.fill)·같은 말(st.terms)로 채운다.
+       두 글을 «통째로» 채운 뒤 견준다: 조각마다 채우면 자리표시와 조사(가/이)가 조각 경계에서 갈려 조사가 틀린다.
+       두 글이 같은 말로 채워지므로 같은 곳은 같게, 다른 곳만 다르게 남는다. */
   function bodyHtml(g, st) {
-    var cur = T().normText(st.curBody || '', st.curCoName || '');
-    return (FC().wordDiff(cur, g.text) || []).map(function (s) {
+    var fill = typeof st.fill === 'function' ? function (s) { return st.fill(s, st.terms || {}); } : function (s) { return s; };
+    var cur = fill(T().normText(st.curBody || '', st.curCoName || ''));
+    return (FC().wordDiff(cur, fill(g.text)) || []).map(function (s) {
       return s.t === '+' ? '<ins>' + esc(s.s) + '</ins>' : s.t === '=' ? esc(s.s) : '';
     }).join('');
   }
@@ -84,15 +89,16 @@
       return '<div class="rec-who-r" title="' + esc(t) + '">' + esc(t) + '</div>';
     }).join('') + '</div>';
   }
-  function cardHtml(p, st) {
-    var g = p.group, k = esc(g.key), on = !!(st.open && st.open[g.key]);
+  /* 단추는 picks 의 «몇째»(data-i)로 — 덩어리 열쇠는 자리표시가 든 긴 글이라 화면에 싣지 않는다 */
+  function cardHtml(p, st, i) {
+    var g = p.group, on = !!(st.open && st.open[g.key]);
     return '<div class="rec-opt" data-rec-card>'
       + '<div class="rec-oh"><span class="rec-tag ' + esc(p.why) + '">' + esc(R().LABELS[p.why] || p.why) + '</span>'
       + line('rec-meta', metaText(p, st)) + '</div>'
       + '<div class="rec-ob">' + bodyHtml(g, st) + '</div>'
       + warnHtml(st.warns && st.warns[g.key])
-      + '<div class="rec-of"><button class="stbtn rec-put" data-rec="put" data-k="' + k + '" title="「변경 후」 칸에 넣습니다 — 조 머리는 지금 것을 지킵니다">이 문안 넣기</button>'
-      + '<button class="stbtn" data-rec="who" data-k="' + k + '">쓴 회사 ' + (g.places || 0) + '곳 ' + (on ? '▾' : '▸') + '</button></div>'
+      + '<div class="rec-of"><button class="stbtn rec-put" data-rec="put" data-i="' + i + '" title="「변경 후」 칸에 넣습니다 — 조 머리는 지금 것을 지킵니다">이 문안 넣기</button>'
+      + '<button class="stbtn" data-rec="who" data-i="' + i + '">쓴 회사 ' + (g.places || 0) + '곳 ' + (on ? '▾' : '▸') + '</button></div>'
       + (on ? whoHtml(g) : '')
       + '</div>';
   }
@@ -108,10 +114,17 @@
     if (st.state === 'notitle') return msg('이 조는 제목이 없어 주제로 찾을 수 없습니다');
     var picks = st.picks || [];
     if (!picks.length) return msg('이 주제로 모은 다른 문안이 없습니다');
-    var w = (st.terms && st.terms.근로자) || '';
-    var who = w ? '(' + w + ')' + (batchimNotL(w) ? '으로' : '로') : '으로';   // 호칭(사원)으로 · 호칭(근로자)로
-    return head + picks.map(function (p) { return cardHtml(p, st); }).join('')
-      + line('rec-foot', '초록 = 지금 글에 없는 곳. 넣을 때 {회사}·{근로자}는 이 회사 이름·호칭' + who + ' 바뀝니다.');
+    var tm = st.terms || {}, w = tm.근로자 || '';
+    var foot;
+    if (typeof st.fill === 'function') {
+      // 몸은 이미 채워 보인다 — 자리표시({회사}·{근로자})를 화면에 내놓지 않는다
+      var both = [tm.회사, w].filter(Boolean).join('·');
+      foot = '초록 = 지금 글에 없는 곳. 회사 이름·호칭은 이 회사 것' + (both ? '(' + both + ')' : '') + '으로 채워 보이며, 보이는 그대로 넣습니다.';
+    } else {
+      var who = w ? '(' + w + ')' + (batchimNotL(w) ? '으로' : '로') : '으로';   // 호칭(사원)으로 · 호칭(근로자)로
+      foot = '초록 = 지금 글에 없는 곳. 넣을 때 {회사}·{근로자}는 이 회사 이름·호칭' + who + ' 바뀝니다.';
+    }
+    return head + picks.map(function (p, i) { return cardHtml(p, st, i); }).join('') + line('rec-foot', foot);
   }
 
   /* 넣을 글 — 머리(제N조(…))는 지금 「변경 후」의 것을 지키고, 본문은 덩어리 글을 채워서.
