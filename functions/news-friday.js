@@ -148,7 +148,7 @@ function 확정본만들기(d, 자료, 보낼날, now, 무작위) {
 async function 자료읽기(db, 열쇠) {
   const 읽 = (p, 없으면) => db.ref(p).once('value')
     .then((s) => s.val()).catch(() => 없으면).then((v) => (v == null ? 없으면 : v));
-  const [설정, 회차, 사업장들, 막1, 막2, 브리핑, 더한분들, 예약본, 법령, 자료모음, 판례모음] =
+  const [설정, 회차, 사업장들, 막1, 막2, 브리핑, 더한분들, 예약본, 법령, 자료모음, 판례모음, 노무사회] =
     await Promise.all([
       읽('newsletter/config', {}),
       읽('newsletter/issues/' + 열쇠, null),
@@ -160,14 +160,16 @@ async function 자료읽기(db, 열쇠) {
       읽('newsletter/weeklyReady', null),
       읽('homepage/newsBrief/법령', []),
       읽('homepage/newsDocs/모음', {}),
-      읽('homepage/newsPrec/모음', {})
+      읽('homepage/newsPrec/모음', {}),
+      /* ★ 공인노무사회 받아 둔 것 (2026-10-04) — 매일 아침 dailyIlaborCollect 가 채운다 */
+      읽('ilabor/items', {})
     ]);
   /* ★ 지난 회차 — 보낸 편지에 실렸던 자료·판례를 다시 안 담으려고(Core.보낸것들).
        ⚠ 회차 통째에는 25,000자 전문이 있다 — 뒤에서 아홉 개(두 달치)만 읽는다. */
   const 지난회차들 = await db.ref('newsletter/issues').orderByKey().limitToLast(9).once('value')
     .then((s) => s.val() || {}).catch(() => ({}));
   return { 설정, 회차, 사업장들, 막은주소: Object.assign({}, 막1 || {}, 막2 || {}), 브리핑, 지난회차들,
-    더한분들, 예약본, 법령: Array.isArray(법령) ? 법령 : [], 자료모음, 판례모음 };
+    더한분들, 예약본, 법령: Array.isArray(법령) ? 법령 : [], 자료모음, 판례모음, 노무사회 };
 }
 
 /* 회차 저장 — 화면의 회차저장() 과 같은 칸. 판은 거래로 올린다(동시에 고치면 한쪽만). */
@@ -272,12 +274,12 @@ async function 금요일준비(o) {
   const 예 = 자료.예약본 || {};
   if (예.상태 === '거는중') { 보고.건너뜀 = '자동발송이 거는 중'; return 보고; }
 
-  /* ① 담기 — 이미 담긴 것은 그대로, 빈 자리만. 보낸 편지에 실렸던 것은 빼고 */
-  const 보낸 = Core.보낸것들(자료.지난회차들, 회.열쇠);
+  /* ① 담기 — 이미 담긴 것은 그대로, 빈 자리만.
+       보낸 편지에 실렸던 것은 빼고, 지난 회차에 담겼던 것은 뒤로 — Core.거리고르기 한 곳에서 */
+  const 거리 = Core.거리고르기({ 자료모음: 자료.자료모음, 판례모음: 자료.판례모음, 노무사회: 자료.노무사회,
+    회차들: 자료.지난회차들, 지금열쇠: 회.열쇠 });
   const 새것 = Core.자동으로담기(자료.브리핑 || {}, {
-    법령: 자료.법령,
-    자료: 값어치순(Core.보낸것빼기(자료.자료모음, 보낸), 8),
-    판례: 최근것(Core.보낸것빼기(자료.판례모음, 보낸), 6)
+    법령: 자료.법령, 자료: 거리.자료, 판례: 거리.판례
   }, d.회차);
   d.안 = Core.합쳐담기(d.안, 새것);
   d.안.hr = (d.안.hr && d.안.hr.length) ? d.안.hr : [];

@@ -95,8 +95,8 @@ test('③ 금요일 자동 준비 — 보낸 편지의 판례는 안 담고 새�
 });
 
 test('③ 화면 «채우기»도 같은 잣대', () => {
-  assert.match(화면, /Core\.값어치순\(Core\.보낸것빼기\(/);
-  assert.match(화면, /Core\.최근것\(Core\.보낸것빼기\(/);
+  /* 2026-10-04 부터 한 고르개(Core.거리고르기)가 보낸 것 빼기까지 한다 */
+  assert.match(화면, /Core\.거리고르기\(/);
   assert.match(화면, /js\/pu-news-core\.js\?v=\d+/);
 });
 

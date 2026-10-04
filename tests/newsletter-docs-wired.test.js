@@ -187,11 +187,14 @@ test('★★ 화면이 자료를 «값어치 순»으로 줄 세운다 — 모�
   const i = news.indexOf('function 자동담기(');
   assert.ok(i > 0, '자동담기 를 못 찾음');
   const fn = news.slice(i, i + 2400);
-  assert.ok(fn.indexOf('값어치순(') >= 0,
+  /* ★ 2026-10-04 부터 줄 세우기는 Core.거리고르기 한 곳(금요일 자동 준비와 같은 고르개) */
+  assert.ok(fn.indexOf('Core.거리고르기(') >= 0, '★★ 화면이 한 고르개를 안 부른다');
+  const 고르개 = core.slice(core.indexOf('function 거리고르기('), core.indexOf('function 거리고르기(') + 3000);
+  assert.ok(고르개.indexOf('값어치순(') >= 0,
     '★★ 자료를 값어치로 안 세운다 — 홍보성 보도자료가 가이드를 밀어낸다');
   assert.ok(core.indexOf('function 값어치순(') >= 0, '값어치순 이 없다(Core 한 벌 — 2026-09-28)');
   /* 판례는 그대로 최근 순 — 거기는 값어치 잣대가 없고 새 판결이 곧 값이다 */
-  assert.ok(/판례 = (Core\.)?최근것\(/.test(fn), '판례까지 값어치로 세우고 있다');
+  assert.ok(/판례 = _한번씩\(최근것\(/.test(고르개), '판례까지 값어치로 세우고 있다');
 });
 
 test('★ 값어치를 «적어 두는» 쪽이 있다 — 화면만 고치면 늘 0 이 된다', () => {

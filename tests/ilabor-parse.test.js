@@ -332,8 +332,11 @@ test('★ 총괄관리자만 부를 수 있다 — 회원 계정으로 남의 �
 
 test('★ 남의 서버를 몰아치지 않는다 — 부를 때마다 쉰다', () => {
   const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
-  const 덩이 = /exports\.ilaborPull[\s\S]*?\n  \}\);/.exec(idx)[0];
+  /* ★ 2026-10-04 부터 몸통은 노무사회모으기() 한 곳 — 손 단추와 매일 아침이 함께 부른다 */
+  const 덩이 = /async function 노무사회모으기[\s\S]*?\n\}\n/.exec(idx.replace(/\r\n/g, '\n'))[0];
   assert.ok(/잠깐\(\d+\)/.test(덩이), '쉬지 않고 잇달아 부른다');
+  const 손 = /exports\.ilaborPull[\s\S]*?\n  \}\);/.exec(idx)[0];
+  assert.ok(/노무사회모으기\(/.test(손), '손 단추가 한 몸통을 안 부른다');
 });
 
 /* ══════ ⑧ 상세는 «라벨»로 읽는다 (2026-09-04 — 엿보기로 진짜 화면을 처음 봤다) ══════

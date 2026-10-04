@@ -305,7 +305,10 @@ test('★★★ 화면과 서버가 «같은 한 벌»을 부른다 — 베낀 �
     assert.ok(NF[n] !== undefined, 'NF.' + n + ' 가 없다');
     assert.strictEqual(NF[n], 사본[n], '★★★ 서버의 ' + n + ' 이 Core 한 벌이 아니다 — 또 베꼈다');
     /* ⚠ \b 는 한글 이름 뒤에서 안 먹는다(한글은 «낱말 글자»가 아니다) — 경계를 손으로 적는다 */
-    assert.ok(new RegExp('Core\\.' + n + '(?![가-힣A-Za-z0-9_$])').test(화면), '★★ 화면이 Core.' + n + ' 를 안 부른다');
+    /* ★ 2026-10-04 부터 자료·판례 줄 세우기는 Core.거리고르기 «안»에서 — 화면은 그것을 부른다 */
+    const 고르개로 = (n === '값어치순' || n === '최근것') && /Core\.거리고르기\(/.test(화면)
+      && new RegExp('function 거리고르기[\\s\\S]*?' + n + '\\(').test(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-news-core.js'), 'utf8'));
+    assert.ok(고르개로 || new RegExp('Core\\.' + n + '(?![가-힣A-Za-z0-9_$])').test(화면), '★★ 화면이 Core.' + n + ' 를 안 부른다');
     assert.ok(!new RegExp('function ' + n + '\\(').test(화면), '★★ 화면에 ' + n + ' 가 또 한 벌 있다');
   });
   const 서버글 = fs.readFileSync(path.join(__dirname, '..', 'functions', 'news-friday.js'), 'utf8');
