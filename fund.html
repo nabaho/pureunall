@@ -493,6 +493,9 @@ var FIELDS=[['name','기금법인 명칭','text'],['short_name','약칭','text']
   ['contribution_total','설립 출연금 총액(원)','text'],['contrib_per_worker','1인당 출연단가(원)','text'],
   ['rep_org','대표회사·사무국','text'],['estab_date','출연 예정일','date'],
   ['meeting_date','설립준비위원회 회의일','date'],['meeting_place','회의 장소','text'],
+  /* 설립합의일 — 노사가 «설립 합의서»에 합의한 날(2026-10-04). 준비위원회 회의일과 다른 기금이 있다
+     (제출본에서 대흥·이비·참살이: 합의 → 며칠 뒤 준비위원회). 비면 회의일을 그대로 쓴다. */
+  ['agree_date','설립합의일','date'],
   ['rep_position','대표자 직책','text'],['worker_rep','근로자대표','text'],
   /* ── 첫해 예산을 출연금에서 세우는 데 쓰는 두 칸(2026-09-12, 대표 판단) ──
      ⚠ sme 는 «사내»기금에서만 뜻이 있다 — 중소기업에 설치된 사내기금은 그해 쓸 수 있는 몫이
@@ -4266,9 +4269,10 @@ function hwpAnnexDownload(){
 function _hwpAgreementValues(f,sites){
   f=f||{}; sites=sites||[];
   var wk=_prepCommittee(f,'근로자측',sites).length, er=_prepCommittee(f,'사용자측',sites).length;
-  var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(f.meeting_date||''));
+  /* 합의서 날짜는 «설립합의일»이 먼저 — 없으면 준비위원회 회의일(대부분 같은 날이다) */
+  var ad=String(f.agree_date||f.meeting_date||''), m=/^(\d{4})-(\d{2})-(\d{2})/.exec(ad);
   return {기금명:String(f.name||''), 참여회사:partyJoin(partyNames(sites)),
-    회의일:m?_dotDate(f.meeting_date):'', 합의일:m?(m[1]+' 년 '+m[2]+' 월 '+m[3]+' 일'):'',
+    회의일:m?_dotDate(ad):'', 합의일:m?(m[1]+' 년 '+m[2]+' 월 '+m[3]+' 일'):'',
     위원수:(wk&&wk===er)?String(wk):'', 서명:_hwpSignRows(sites)};
 }
 function _hwpCharterValues(f,sites){
