@@ -95,6 +95,16 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .subtabs button.on{background:var(--brown);border-color:var(--brown);color:#fff}
 .subtabs button .n{color:var(--faint);font-weight:800}
 .subtabs button.on .n{color:#fff}
+/* 설명·단추를 함께 실은 작은 탭 줄 — 흰 상자 한 줄. 좁으면 설명이 … 로 줄고, 더 좁으면 내려간다 */
+.subtabs.bar{align-items:center;background:#fff;border:1px solid var(--line);border-radius:12px;
+  padding:8px 12px;flex-wrap:nowrap;min-width:0}
+.subtabs.bar .cut{width:1px;height:18px;background:var(--line);flex:0 0 auto;margin:0 4px}
+.subtabs.bar .stat{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto}
+.subtabs.bar .sp{flex:1 1 auto;min-width:4px}
+.subtabs.bar .badge,.subtabs.bar .mini,.subtabs.bar .btn{flex:0 0 auto}
+.chips .k{font-size:11.5px;font-weight:800;color:var(--sub);align-self:center;white-space:nowrap;cursor:help}
+.chips .sp1{flex:1 1 auto;min-width:4px}
+@media(max-width:900px){ .subtabs.bar{flex-wrap:wrap} .subtabs.bar .stat{flex-basis:100%;order:9} }
 
 /* ← 1180px 에서 넓혔다(2026-09-02). 좌우를 5:5 로 «나누기만» 하면 각 칸이 570px 밖에
      안 되어 예전 오른쪽 칸(420px)보다 조금 나은 정도가 된다. 넓히지 않으면 5:5 가 손해다. */
@@ -1352,15 +1362,23 @@ const 작은탭들 = {
   cfg: [ { t:'cfg', 이름:'설정' },
          { t:'watch', 이름:'자동화 점검', 수: () => 감시볼것수(), 빨강: true } ]
 };
-function 작은탭(){
+/* ★ 가운데·오른쪽을 주면 그 줄 «하나»에 설명과 단추까지 싣는다 (대표 지시 2026-10-04
+     「불필요한게 셀줄이 나눠져 있다 이부분정리」 → 목업 → 「추천대로»).
+   받는 곳 머리가 다섯 줄이었다 — 작은 탭 · 제목(「받는 곳 164곳」, 탭과 같은 말) · 거르개 · 명함 안내 · 표.
+   제목을 빼고 그 설명·단추를 작은 탭 줄 오른쪽 빈자리로 올렸다. */
+function 작은탭(가운데, 오른쪽){
   const 큰 = 탭묶음[App.tab] || App.tab;
   const 줄 = 작은탭들[큰]; if(!줄) return '';
-  return '<div class="subtabs">' + 줄.map(function(x){
+  const 덧 = (가운데 || 오른쪽)
+    ? '<span class="cut"></span><span class="stat one" title="' + esc(String(가운데 || '').replace(/<[^>]+>/g, '')) + '">'
+      + (가운데 || '') + '</span><span class="sp"></span>' + (오른쪽 || '')
+    : '';
+  return '<div class="subtabs' + (덧 ? ' bar' : '') + '">' + 줄.map(function(x){
     const n = x.수 ? x.수() : 0;
     const 수 = n ? (x.빨강 ? ' <span class="wdot">' + n + '</span>' : ' <span class="n">' + n + '</span>') : '';
     return '<button class="' + (x.t === App.tab ? 'on' : '') + '" onclick="App.tab=\'' + x.t + '\';render()">'
       + x.이름 + 수 + '</button>';
-  }).join('') + '</div>';
+  }).join('') + 덧 + '</div>';
 }
 function render(){
   document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===(탭묶음[App.tab] || App.tab)));
@@ -1385,8 +1403,9 @@ function render(){
   if(App.tab==='past') m.innerHTML = 지난회차화면();
   if(App.tab==='note') m.innerHTML = 안내문화면();
   { const el = $('cNote'); if(el) el.textContent = Object.keys(App.안내문들||{}).length || ''; }
-  if(App.tab==='who'){ 명함읽기(); m.innerHTML = 작은탭() + 명단화면(); }
-  if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 작은탭() + 주소없는곳화면(); }
+  /* 받는 곳 두 화면은 작은 탭 줄을 «제 손으로» 그린다 — 그 줄에 제 설명·단추를 싣는다 */
+  if(App.tab==='who'){ 명함읽기(); m.innerHTML = 명단화면(); }
+  if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 주소없는곳화면(); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
   if(App.tab==='watch') m.innerHTML = 작은탭() + 감시화면();
   /* 탭 숫자(사람이 볼 것)는 처음 한 번 읽어 둔다 — 탭을 안 눌러도 빨간 숫자가 보여야 한다 */
@@ -4621,23 +4640,32 @@ function 명단화면(){
           + 누구표시[k] + ' ' + esc(누구이름[k]) + ' ' + n + '</button>';
       }).join('');
 
+  /* ★ 명함 단추 — 한 줄을 통째 쓰던 안내를 거르개 줄 «끝»으로 (대표 지시 2026-10-04 「추천대로」).
+       ⚠ 「저절로 담지 않는다」는 말은 버리지 않는다 — 글자 위에 올리면 보인다(title). */
+  const 명함단추 = 후보 && (후보.대표자.length + 후보.담당자.length) ? '<span class="sp1"></span>'
+    + '<span class="k" title="명함에는 있는데 받는 명단에 없는 주소 — 회사 이름으로 맞춘 것이라 저절로 담지 않습니다">📇 명함에만</span>'
+    + '<button class="mini" onclick="명함창열기(\'대표자\')" title="회사 이름으로 맞춘 것입니다 — 한 곳씩 보고 고르십시오">👔 대표자 ' + 후보.대표자.length + '</button>'
+    + '<button class="mini" onclick="명함창열기(\'담당자\')" title="회사 이름으로 맞춘 것입니다 — 한 곳씩 보고 고르십시오">🧑‍💼 담당자 ' + 후보.담당자.length + '</button>'
+    : '';
   /* 두 축을 한 줄로 — 칸막이로 가른다 */
   const 칩묶음 = '<div class="chips tight">' + 칩
-    + '<span class="cut"></span>' + 누구칩 + '</div>';
+    + '<span class="cut"></span>' + 누구칩 + 명함단추 + '</div>';
+  /* 작은 탭 줄의 설명·단추 — 예전 제목줄(「받는 곳 164곳」)이 하던 말 «그대로»
+     ⚠ 거르개를 눌렀을 때만 «몇 곳으로 줄었나»를 앞에 붙인다 — 그때는 탭의 164 와 다르다 */
+  const 거른말 = (App.유형||App.누구)
+    ? '<b style="color:var(--brown)">' + esc([App.유형,App.누구].filter(Boolean).join(' · ')) + ' '
+      + r.셈.보낼곳.toLocaleString() + '곳</b> / 전체 ' + (r.전체||[]).length.toLocaleString() + '곳 · '
+    : '';
+  const 머리설명 = 거른말 + '기업정보함 ' + (r.본곳||0).toLocaleString() + '곳에서 · 수신거부 ' + r.셈.수신거부
+    + ' · 겹침 ' + r.셈.겹침 + ' · 형식틀림 ' + r.셈.주소없음;
+  const 머리단추 = '<span class="badge ' + (광고?'b-test':'b-sent') + '">' + esc(App.설정.범위||'자문중')
+      + (광고?' · (광고) 켜짐':'') + '</span>'
+    + '<button class="mini" onclick="다시읽기()">⟳ 다시 읽기</button>'
+    + '<button class="mini" onclick="명단내보내기()">↧ CSV</button>'
+    + '<button class="btn pri" onclick="노무사회엑셀()">↧ 공인노무사회 엑셀</button>';
 
   return `
-  <div class="hdbar">
-    <span class="no">받는 곳 ${r.셈.보낼곳.toLocaleString()}곳${App.유형||App.누구 ? ' <span style="font-size:13px;color:var(--brown)">('+esc([App.유형,App.누구].filter(Boolean).join(' · '))+')</span>' : ''}</span>
-    <span style="font-size:12px;color:var(--sub)">
-      ${App.유형||App.누구 ? '전체 '+(r.전체||[]).length.toLocaleString()+'곳 중 · ' : ''}기업정보함 ${(r.본곳||0).toLocaleString()}곳에서 ·
-      수신거부 ${r.셈.수신거부} · 겹침 ${r.셈.겹침} · 형식틀림 ${r.셈.주소없음}</span>
-    <span class="sp"></span>
-    <button class="btn pri" onclick="노무사회엑셀()">↧ 공인노무사회 엑셀</button>
-    <button class="mini" onclick="명단내보내기()">↧ CSV</button>
-    <button class="mini" onclick="다시읽기()">⟳ 다시 읽기</button>
-    <span class="badge ${광고?'b-test':'b-sent'}">
-      ${esc(App.설정.범위||'자문중')}${광고?' · (광고) 켜짐':''}</span>
-  </div>
+  ${작은탭(머리설명, 머리단추)}
 
   ${칩묶음}
 
@@ -4649,18 +4677,7 @@ function 명단화면(){
     <button class="mini" onclick="고름지우기()">✕ 선택 풀기</button>
    </div>` : ''}
 
-  ${/* ★ 넉 줄이던 안내를 «한 줄»로 (대표 지시 2026-09-13 「줄을 줄여라」).
-        ⚠ 「저절로 담지 않는다」는 말은 남긴다 — 그것이 이 안내의 알맹이다.
-          긴 설명은 단추의 title 로 옮겼다. 뜻을 버린 것이 아니라 자리를 옮겼다. */''}
-  ${후보 && (후보.대표자.length + 후보.담당자.length) ? `<div class="note one">
-    <b>📇 명함에 «명단에 없는» 주소</b>
-    <span class="t2">회사 이름으로 맞춘 것이라 저절로 담지 않습니다</span>
-    <span class="sp1"></span>
-    <button class="mini" onclick="명함창열기('대표자')"
-      title="회사 이름으로 맞춘 것입니다 — 한 곳씩 보고 고르십시오">👔 대표자 ${후보.대표자.length}</button>
-    <button class="mini" onclick="명함창열기('담당자')"
-      title="회사 이름으로 맞춘 것입니다 — 한 곳씩 보고 고르십시오">🧑‍💼 담당자 ${후보.담당자.length}</button>
-   </div>` : ''}
+  ${/* 명함 안내 한 줄은 거르개 줄 끝(명함단추)으로 옮겼다 (2026-10-04) */''}
 
   <div class="whorest">
   ${!r.ok.length ? (App.유형 || App.누구
@@ -4835,14 +4852,8 @@ function 주소없는곳화면(){
       + ' onclick="빈곳칩(\'' + v + '\')" title="' + 뜻 + '">' + 글 + '</button>';
   };
   return `
-  <div class="hdbar">
-    <span class="no">⚠ 주소 없는 곳 ${모두.length}곳</span>
-    <span style="font-size:12px;color:var(--sub)">받는 명단 범위(${esc(App.설정.범위||'자문중')}) 안에서
-      담당자·대표자 주소가 하나도 없는 곳 · 주소를 채우면 저절로 받는 명단으로 넘어갑니다</span>
-    <span class="sp"></span>
-    <button class="mini" onclick="빈곳엑셀(false)">↧ 엑셀</button>
-    <button class="mini" onclick="다시읽기()">⟳ 다시 읽기</button>
-  </div>
+  ${작은탭('받는 명단 범위(' + esc(App.설정.범위||'자문중') + ') 안에서 담당자·대표자 주소가 하나도 없는 곳 · 주소를 채우면 저절로 받는 명단으로 넘어갑니다',
+    '<button class="mini" onclick="다시읽기()">⟳ 다시 읽기</button><button class="mini" onclick="빈곳엑셀(false)">↧ 엑셀</button>')}
   ${겹침말}
 
   <div class="chips tight">
