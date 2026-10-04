@@ -2,14 +2,14 @@
 /* 취업규칙 두 앱 합치기 — Task 5 (대표 승인 목업 2026-10-04 「추천대로」)
    ─────────────────────────────────────────────────────────────────────────
    「취업규칙 관리」(rules.html)와 「취업규칙(새)」(rules-v2.html)는 사람 눈에 «한 앱»이다.
-   포털 타일은 「취업규칙」 하나, 앱 머리줄의 «세 갈래 단추»로 오간다.
+   포털 타일은 「취업규칙」 하나, 앱 머리줄의 «갈래 단추»로 오간다(2026-10-04 🏢 사업장을 더해 넷).
    코드는 두 파일로 남는다(그래야 고치기 쉽다) — 그래서 두 파일이 «같은 단추»를 따로 들고 있다.
 
    ★ 못 박는 것 — 값이 아니라 규칙
      ① 포털에는 취업규칙 타일이 «하나» — 둘이면 같은 앱 문이 둘이라 사람이 어느 쪽인지 헷갈린다
      ② 즐겨찾기 목록에도 하나 — 포털과 즐겨찾기가 어긋나면 눌러도 못 가는 줄이 생긴다
      ③ rulesv2 는 «등록은 남고» 타일이 없음을 밝힌다(portal:false) — 등록을 지우면 관문이 저장을 거절한다
-     ④ 두 화면의 세 갈래 단추가 «같다» — 한쪽만 고치면 오가다 단추가 바뀌어 다른 앱처럼 보인다
+     ④ 두 화면의 갈래 단추가 «같다» — 한쪽만 고치면 오가다 단추가 바뀌어 다른 앱처럼 보인다
      ⑤ 준비중 문의 이름이 포털 타일 이름과 짝이다
    ⚠ 단추 글자를 «이 값»으로 박지 않는다 — 두 파일이 서로 «같은가»를 본다. */
 const test = require('node:test');
@@ -65,11 +65,11 @@ test('③★★ rulesv2 는 등록부에 남고, 타일이 없음을 밝힌다',
   assert.notEqual(O.PROGRAMS.rules.portal, false, '★ 포털 타일인 rules 까지 숨겼다');
 });
 
-/* ── 세 갈래 단추 ── */
+/* ── 갈래 단추 ── */
 function 단추(f) {
   const s = stripComments(R(f));
   const m = s.match(/<nav class="rmode"[^>]*>([\s\S]*?)<\/nav>/);
-  assert.ok(m, '★★ ' + f + ' 머리줄에 세 갈래 단추(nav.rmode)가 없다');
+  assert.ok(m, '★★ ' + f + ' 머리줄에 갈래 단추(nav.rmode)가 없다');
   const links = [...m[1].matchAll(/<a\b([^>]*)>([\s\S]*?)<\/a>/g)].map((x) => ({
     href: (x[1].match(/href="([^"]+)"/) || [])[1],
     on: /class="[^"]*\bon\b/.test(x[1]),
@@ -78,14 +78,21 @@ function 단추(f) {
   return { raw: m[0], links };
 }
 
-test('④★★ 두 화면 머리줄에 세 갈래 단추가 «같게» 있다 — 주소 셋, 이름도 같다', () => {
+test('④★★ 두 화면 머리줄에 갈래 단추가 «같게» 있다 — 주소, 이름, 차례도 같다', () => {
   const a = 단추('rules.html'), b = 단추('rules-v2.html');
   const 주소 = (x) => x.links.map((l) => l.href);
   ['rules.html', 'rules-v2.html#topics', 'rules-v2.html#lib'].forEach((u) => {
     assert.ok(주소(a).includes(u), '★★ rules.html 단추에 ' + u + ' 가 없다');
     assert.ok(주소(b).includes(u), '★★ rules-v2.html 단추에 ' + u + ' 가 없다');
   });
-  assert.deepEqual(a.links.map((l) => [l.href, l.text]), b.links.map((l) => [l.href, l.text]),
+  /* 🏢 사업장(③-ⓐⓑ, 2026-10-04)은 rules-v2.html 에 먼저 달렸다 — rules.html 머리줄은 다음 단계(Task 4)에서 단다.
+     ⚠ 그 사이만 rules.html 쪽에 🏢 가 없어도 «나머지가 같은지»를 본다.
+       rules.html 에 🏢 가 달리는 순간 빼기 없이 «통째로 같은지»를 본다(저절로 조여진다).
+       Task 4 를 마치면 이 빼기 자체를 걷어 낼 것. */
+  const 사업장 = 'rules-v2.html#sites';
+  assert.ok(주소(b).includes(사업장), '★★ rules-v2.html 단추에 🏢 사업장이 없다');
+  const bb = 주소(a).includes(사업장) ? b.links : b.links.filter((l) => l.href !== 사업장);
+  assert.deepEqual(a.links.map((l) => [l.href, l.text]), bb.map((l) => [l.href, l.text]),
     '★★ 두 화면의 단추가 다르다 — 오가다 단추가 바뀌면 다른 앱처럼 보인다');
   a.links.forEach((l) => assert.ok(l.text.length > 1, '★ 이름 없는 단추: ' + l.href));
   // 같은 창으로 간다 — 새 창을 열면 «한 앱 한 창»이 깨진다

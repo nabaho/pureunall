@@ -9,7 +9,8 @@
      이 화면은 그것을 보고, 사람이 사업장을 잇고 회차마다 ★최종본을 정한다.
      ⚠ 옛 규정관리(rules.html)와 «나란히» 둔다 — 옛 앱의 자리는 건드리지 않는다.
      2026-10-04 두 앱 합치기 — 포털 타일은 「취업규칙」(rules.html) 하나다. 이 화면은 그 앱의
-     📚 조별 문안(#topics)·📥 모은 자료(#lib) 갈래이고, 머리줄 세 갈래 단추로 들어온다. -->
+     📚 조별 문안(#topics)·📥 모은 자료(#lib) 갈래이고, 머리줄 갈래 단추로 들어온다.
+     2026-10-04 ③-ⓐⓑ 「🏢 사업장」(#sites) 갈래를 더했다 — 빈 주소의 첫 화면이 이것이다(목업 「추천대로」). -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
@@ -24,12 +25,12 @@
 <script src="js/pu-health.js?v=5"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script>
-/* 화면 가르기 — 주소가 #topics 면 「📚 조별 문안」, 아니면(빈 것·#lib) 「📥 모은 자료」.
+/* 화면 가르기 — 주소가 #topics 면 「📚 조별 문안」, #lib 면 「📥 모은 자료」, 그 밖(빈 것·#sites)은 「🏢 사업장」.
    ⚠ 이 손잡이는 pu-back.js «앞»에 단다 — 뒤로가기(popstate)를 공통 층보다 먼저 받아야
      「이 걸음은 우리 화면 바꾸기였다」는 깃발(__puBackNav)을 세울 수 있다.
      안 세우면 공통 층이 「열린 층 없음」으로 읽고 앱을 통째로 나간다.
    ⚠ 깃발은 «화면이 실제로 바뀔 때만» 세운다 — 조건 없이 세우면 앱을 영영 못 나간다. */
-window.RV2_MODE = function (h) { return String(h || '') === '#topics' ? 'topics' : 'lib'; };
+window.RV2_MODE = function (h) { h = String(h || ''); return h === '#topics' ? 'topics' : h === '#lib' ? 'lib' : 'sites'; };
 window.addEventListener('popstate', function () {
   if (window.__rv2Mode && window.RV2_MODE(location.hash) !== window.__rv2Mode) window.__puBackNav = true;
   if (window.rv2Route) window.rv2Route();
@@ -40,8 +41,11 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/pu-kordoc-text.js?v=2"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=1"></script>
+<!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
+<script src="js/rules-v2/lib-sites.js?v=1"></script>
 <script src="js/rules-v2/store.js?v=2"></script>
 <script src="js/rules-v2/view-library.js?v=2"></script>
+<script src="js/rules-v2/view-sites.js?v=1"></script>
 <!-- 「📚 조별 문안」 — 검토 기준은 규정관리와 «같은 한 벌»(pu-rules-criteria.js), 주제 차례는 표준취업규칙(std_2026.js) -->
 <script src="js/pu-rules-criteria.js?v=1"></script>
 <script src="std_2026.js?v=2"></script>
@@ -54,7 +58,7 @@ body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;background:#e2e8f0
 button{font:inherit;cursor:pointer}
 .top{display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff;position:sticky;top:0;z-index:5}
 .logo{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:#1e40af;color:#ffffff;display:grid;place-items:center;font-weight:800}
-/* 세 갈래 단추 — rules.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04).
+/* 갈래 단추 — rules.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04).
    좁으면 이름을 접고 그림만 — 이름은 title 에 있다. */
 .rmode{display:inline-flex;flex:0 0 auto;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#ffffff;margin-left:10px}
 .rmode a{padding:5px 12px;font-size:12.5px;color:#475569;white-space:nowrap;text-decoration:none}
@@ -178,17 +182,71 @@ button{font:inherit;cursor:pointer}
 #topics .who .w{margin-left:auto;flex-shrink:0}
 @media (max-width:900px){#topics .tpx{grid-template-columns:1fr}#topics .left{position:static;max-height:40vh;border-right:0;border-bottom:1px solid #e2e8f0}}
 @media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}}
+/* ── 「🏢 사업장」 (③-ⓐⓑ 목업 승인본) — 왼쪽 거래처 표, 오른쪽 그 사업장의 이력·개정 시작.
+   표의 칸은 한 줄, 넘치면 … 과 title. 이름은 .side·.flow 와 겹치지 않게 따로 짓는다(📥 와 한 파일이다) ── */
+#sites{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
+#sites .msg{padding:60px 20px;text-align:center;color:#475569}
+#sites .chip.warn:not(.on){background:#fffbeb;border-color:#fde68a;color:#854d0e}
+#sites .flt .q{width:240px}
+#sites .flt .btn{margin-left:2px}
+#sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
+#sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
+.sites{width:100%;border-collapse:collapse;table-layout:fixed;min-width:800px}
+.sites th{font-size:11.5px;color:#475569;font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
+.sites th.c{text-align:center}
+.sites td{padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffff}
+.sites td.no{color:#475569;text-align:right;font-variant-numeric:tabular-nums}
+.sites td.empty{padding:40px 8px;text-align:center;color:#475569}
+.sites tbody tr{cursor:pointer}
+.sites tbody tr:hover td{background:#f8fafc}
+.sites tr.sel td{background:#eff6ff}
+#sites .k{font-size:11px;padding:1px 7px;border-radius:8px;white-space:nowrap}
+#sites .k.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
+#sites .k.cand{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
+#sites .k.none{color:#94a3b8;padding:0}
+#sites .fin{color:#166534;font-weight:700}
+#sites .sside{padding:14px 16px;min-width:0;background:#ffffff}
+#sites .sside.empty{color:#475569;padding:30px 16px}
+#sites .sside h3{margin:0;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sites .sub{color:#475569;font-size:12px;margin:2px 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#sites .start{border:1px solid #bfdbfe;background:#eff6ff;border-radius:12px;padding:12px;margin-bottom:14px}
+#sites .start .btn.p{height:34px;font-size:13px;padding:0 14px}
+#sites .start small{display:block;color:#475569;margin-top:6px;line-height:1.6}
+#sites .start small.warn{color:#854d0e}
+#sites .round{border:1px solid #e2e8f0;border-radius:12px;background:#ffffff;margin-bottom:10px;overflow:hidden}
+#sites .round.cand{border-color:#fde68a}
+#sites .rh{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
+#sites .rh b{font-size:13px}
+#sites .rh .m{color:#475569}
+#sites .rh .k,#sites .rh .btn{margin-left:auto}
+#sites .rflow{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px;font-size:12px;color:#475569}
+#sites .rflow i{font-style:normal;padding:2px 8px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
+#sites .rflow i.f{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:700}
+#sites .items div{display:flex;align-items:center;gap:8px;padding:5px 12px;border-top:1px dashed #e2e8f0;font-size:12px;white-space:nowrap}
+#sites .items .nm{overflow:hidden;text-overflow:ellipsis;min-width:0;flex:1 1 auto}
+#sites .items .nm.f{color:#166534;font-weight:700}
+#sites .items .d{color:#475569;flex-shrink:0}
+#sites .items .why{color:#854d0e;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:40%}
+#sites .items .lnk{flex-shrink:0}
+#sites .none{padding:10px 2px;color:#475569}
+@media (max-width:900px){#sites .swrap{grid-template-columns:1fr}#sites .stbl{border-right:0;border-bottom:1px solid #e2e8f0}#sites .flt .q{width:100%;margin-left:0}}
 /* ── 틀 고정 (대표 지시 2026-10-04 「틀고정」·「대시보드 고정」) ──
    엑셀의 틀 고정처럼: 위쪽(모으기 요약·거르개·표 머리)과 📚 의 조 주제 목록은 «서 있고»,
    목록·오른쪽 칸만 «제 상자 안에서» 스크롤한다.
-   ⚠ 바깥 상자(#lib·#topics)에 overflow:hidden 을 두면 안쪽 sticky 가 «통째로» 죽는다 —
+   🏢 사업장(#sites)도 같다 — 거르개는 서 있고, 거래처 표·오른쪽 이력이 제 상자에서 스크롤한다.
+   ⚠ 바깥 상자(#lib·#topics·#sites)에 overflow:hidden 을 두면 안쪽 sticky 가 «통째로» 죽는다 —
      hidden 은 스크롤 상자를 만들어 sticky 가 그 안(움직이지 않는 곳)에 붙기 때문이다.
      둥근 모서리는 overflow:clip 으로 지킨다(스크롤 상자를 만들지 않는다).
    ⚠ 높이는 «머리줄 아래 남은 화면»이다 — 머리줄 높이(--toph)는 아래 스크립트가 재서 넣는다.
    폰(900px 이하)은 예전처럼 한 줄로 내려 쓴다(좁은 화면에 상자 둘을 겹치면 오히려 못 본다). */
-#lib,#topics{overflow:clip}
+#lib,#topics,#sites{overflow:clip}
 @media (min-width:901px){
-  #lib,#topics{display:flex;flex-direction:column;height:calc(100vh - var(--toph,53px) - 36px);min-height:420px}
+  #lib,#topics,#sites{display:flex;flex-direction:column;height:calc(100vh - var(--toph,53px) - 36px);min-height:420px}
+  #sites>.flt{flex:0 0 auto}
+  #sites>.swrap{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr)}
+  #sites .stbl{overflow:auto;min-height:0}
+  #sites .sites th{position:sticky;top:0;z-index:2}
+  #sites .sside{overflow:auto;min-height:0}
   #lib>.run,#lib>.flt,#lib>.bulk{flex:0 0 auto}
   #lib>.wrap{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
   #lib>.wrap.two{grid-template-columns:minmax(0,1fr) 420px}
@@ -204,16 +262,18 @@ button{font:inherit;cursor:pointer}
 <body>
 <div class="top">
   <div class="logo">규</div><b style="font-size:16px;white-space:nowrap">취업규칙</b>
-  <!-- 세 갈래 단추 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
-       ✏️ 검토·개정은 rules.html 로 «같은 창»에서 간다. 📚·📥 는 이 파일 안 갈래라 주소 해시만 바꾼다(아래 rv2Route).
+  <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
+       🏢 사업장(③-ⓐⓑ 목업 2026-10-04)이 맨 앞 — 타일을 누르면 처음 나오는 화면이다.
+       ✏️ 검토·개정은 rules.html 로 «같은 창»에서 간다. 🏢·📚·📥 는 이 파일 안 갈래라 주소 해시만 바꾼다(아래 rv2Route).
        ⚠ rules.html 머리줄에 «같은 단추»가 있다 — 한쪽만 고치면 오가다 단추가 바뀐다
          (tests/rules-merge.test.js 가 두 벌을 견준다). 켜짐(on)은 rv2Route 가 주소를 따라 다시 단다. -->
-  <nav class="rmode" aria-label="취업규칙 갈래"><a href="rules.html" title="사업장 규칙 넣기 → 비교 → 고치기 → 신구대조표·신고서류">✏️<span class="rm-t"> 검토·개정</span></a><a href="rules-v2.html#topics" title="조 주제별로 «같은 글끼리» 묶은 문안">📚<span class="rm-t"> 조별 문안</span></a><a href="rules-v2.html#lib" class="on" aria-current="page" title="메일로 모은 취업규칙 자료(가린 사본)">📥<span class="rm-t"> 모은 자료</span></a></nav>
+  <nav class="rmode" aria-label="취업규칙 갈래"><a href="rules-v2.html#sites" class="on" aria-current="page" title="거래처마다 취업규칙 이력 — 고르면 그 사업장 개정을 바로 시작">🏢<span class="rm-t"> 사업장</span></a><a href="rules.html" title="사업장 규칙 넣기 → 비교 → 고치기 → 신구대조표·신고서류">✏️<span class="rm-t"> 검토·개정</span></a><a href="rules-v2.html#topics" title="조 주제별로 «같은 글끼리» 묶은 문안">📚<span class="rm-t"> 조별 문안</span></a><a href="rules-v2.html#lib" title="메일로 모은 취업규칙 자료(가린 사본)">📥<span class="rm-t"> 모은 자료</span></a></nav>
   <span class="r"><span id="whoslot"></span><span id="appslot"></span></span>
 </div>
 <script>/* 틀 고정 — 머리줄 높이를 재서 아래 상자 높이에 쓴다(머리줄이 두 줄이 되는 폭에서도 맞게) */
 (function(){function fit(){var t=document.querySelector(".top");if(t)document.documentElement.style.setProperty("--toph",t.offsetHeight+"px");}fit();window.addEventListener("resize",fit);window.addEventListener("load",fit);})();</script>
-<div id="lib"><div class="msg">불러오는 중…</div></div>
+<div id="sites"><div class="msg">불러오는 중…</div></div>
+<div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
 <script src="js/pu-appbar.js?v=16"></script>
@@ -233,15 +293,27 @@ var FB_CONFIG = {apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'h
 /* 가린 파일은 서고와 같은 창고(국내 서울) — 서버가 rules_lib/{docId}.{ext} 에 담는다 */
 var LIB_BUCKET = 'gs://pureun-erp-hrphotos';
 
-var $lib = document.getElementById('lib');
-function libMsg(t) { $lib.innerHTML = '<div class="msg">' + PuRulesV2Lib.esc(t) + '</div>'; }
+var $lib = document.getElementById('lib'), $sites = document.getElementById('sites');
+/* 못 읽었다는 말은 🏢·📥 두 상자 모두에 — 첫 화면(🏢)이 「불러오는 중…」에 영영 머물지 않게 */
+function libMsg(t) { $lib.innerHTML = $sites.innerHTML = '<div class="msg">' + PuRulesV2Lib.esc(t) + '</div>'; }
 
 /* 화면 상태 — 한 곳에만 둔다. 저장 뒤에는 다시 읽어 그린다(실시간 구독 안 함 · 「새로고침」 단추) */
 var ST = { data: { docs: {}, human: {}, rounds: {}, run: null }, view: 'mail', filt: {}, picked: new Set(), sel: '',
-  text: null, diff: {}, companies: [], isAdmin: false, picker: null, busy: '' };
+  text: null, diff: {}, companies: [], isAdmin: false, picker: null, busy: '',
+  /* 🏢 사업장 — 거르개(has·wait·all)·찾기·고른 사업장 id. 다시 읽어도(reload) 그대로 둔다 */
+  sites: { f: 'has', q: '', sel: '' } };
 var S = null, qTimer = 0;
 
-function draw() { PuRulesV2Lib.render($lib, ST, H); }
+/* 지금 보이는 갈래를 그린다 — 🏢 면 사업장, 아니면 📥 모은 자료(📚 는 제 부품이 따로 그린다).
+   안 보이는 갈래는 그 갈래로 들어갈 때 rv2Route 가 새로 그린다. 사업장 줄 셈은 그릴 때 한 번(가볍다). */
+function draw() {
+  if (window.__rv2Mode === 'sites') PuRulesV2SitesView.render($sites, ST, H);
+  else PuRulesV2Lib.render($lib, ST, H);
+}
+/* 사업장 한 줄 — 손잡이가 단추의 업체 id 로 찾는다(이름으로 찾지 않는다) */
+function siteRow(co) {
+  return PuRulesV2Sites.model(ST.data, ST.companies).filter(function (r) { return r.id === co; })[0];
+}
 function busy(t, p) {
   ST.busy = t; draw();
   return Promise.resolve(p).then(function (v) { ST.busy = ''; return v; }, function (e) {
@@ -354,18 +426,49 @@ var H = {
   unsetFinal: function (d) {
     if (!confirm('이 회차의 최종본을 풉니다. (지우지 않고 «미정»으로 돌립니다)')) return;
     busy('최종본을 푸는 중…', S.setFinal(d.co, d.round, null)).then(reload);
+  },
+  /* ── 🏢 사업장 ── */
+  siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' ? d.f : 'has'; draw(); },
+  sq: function (v) {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function () {
+      ST.sites.q = v; draw();
+      var q = $sites.querySelector('[data-role="sq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    }, 200);
+  },
+  siteSel: function (d) { ST.sites.sel = d.co || ''; draw(); },
+  /* 후보를 한 번에 확정 — 그 사업장의 열린 후보 «전부»(메일 단위로 모인 것)를 이 업체 id 로 잇는다 */
+  siteLink: function (d) {
+    var row = siteRow(d.co);
+    if (!row || !row.cand) return;
+    if (!confirm(row.name + ' 자료로 ' + row.cand + '건(메일 ' + row.candMails + '통) 확정합니다.')) return;
+    busy('사업장을 잇는 중…', S.linkCompany(row.candIds, row.id)).then(reload);
+  },
+  /* 개정 시작 — 같은 창에서 검토·개정(rules.html)으로. 그쪽이 메일 원본을 받아 지문을 맞춰 본 뒤 연다 */
+  siteStart: function (d) {
+    location.href = 'rules.html#open=' + encodeURIComponent(d.id) + (d.nf === '1' ? '&nf=1' : '');
+  },
+  siteUpload: function (d) {
+    location.href = 'rules.html#co=' + encodeURIComponent(d.co);
+  },
+  /* 서류 한 건을 📥 모은 자료에서 — 갈래를 바꾸고(뒤로가기로 🏢 에 돌아온다) 그 줄의 오른쪽 칸을 연다 */
+  siteDoc: function (d) {
+    history.pushState(null, '', '#lib'); rv2Route(); openSide(d.id);
   }
 };
 
-/* ── 두 화면 가르기 (손잡이는 머리의 RV2_MODE·popstate 와 짝) ──
-   「📚 조별 문안」은 처음 열 때 한 번만 꽂는다 — 글을 받고 모델을 셈하는 일은 그때 한 번뿐이다. */
+/* ── 세 화면 가르기 (손잡이는 머리의 RV2_MODE·popstate 와 짝) ──
+   「📚 조별 문안」은 처음 열 때 한 번만 꽂는다 — 글을 받고 모델을 셈하는 일은 그때 한 번뿐이다.
+   🏢·📥 는 draw() 가 «보이는 쪽»만 그리므로, 갈래가 바뀌면 새로 보이는 쪽을 여기서 그린다. */
 var $topics = document.getElementById('topics'), topicsCtl = null, FIX_LOAD = null;
 function rv2Route() {
-  var mode = window.RV2_MODE(location.hash);
+  var mode = window.RV2_MODE(location.hash), was = window.__rv2Mode;
   window.__rv2Mode = mode;
-  $lib.style.display = mode === 'topics' ? 'none' : '';
+  $sites.style.display = mode === 'sites' ? '' : 'none';
+  $lib.style.display = mode === 'lib' ? '' : 'none';
   $topics.style.display = mode === 'topics' ? '' : 'none';
-  /* 세 갈래 단추의 켜짐 — 이 파일 안 갈래(📚·📥)만 켤 수 있다. ✏️ 는 rules.html 에서만 켜진다 */
+  if (S && mode !== 'topics' && mode !== was) draw();
+  /* 갈래 단추의 켜짐 — 이 파일 안 갈래(🏢·📚·📥)만 켤 수 있다. ✏️ 는 rules.html 에서만 켜진다 */
   document.querySelectorAll('.top .rmode a').forEach(function (a) {
     var on = a.getAttribute('href') === 'rules-v2.html#' + mode;
     a.classList.toggle('on', on);
