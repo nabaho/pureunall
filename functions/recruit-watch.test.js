@@ -135,7 +135,8 @@ test('★★ 게시판 목록 — https 만, 기관 번호가 화면 사전과 �
   const orgs = R.ORGS.map((o) => o.id);
   W.BOARDS.forEach((b) => {
     assert.match(b.url, /^https:\/\//, b.id);
-    assert.ok(orgs.indexOf(b.org) >= 0, b.id + ' → ' + b.org + ' 가 화면 사전에 없다');
+    /* 빈 org = 여러 기관 글이 섞인 게시판(공인노무사회) — 제목으로 정한다(ORG_HINTS) */
+    assert.ok(b.org === '' || orgs.indexOf(b.org) >= 0, b.id + ' → ' + b.org + ' 가 화면 사전에 없다');
   });
   assert.equal(new Set(W.BOARDS.map((b) => b.id)).size, W.BOARDS.length);
 });
@@ -161,7 +162,98 @@ test('★ 신보처럼 제목 링크가 «#contents + onclick» 이어도 제목
     + '<strong>[모집중] 2027년 컨설턴트 모집 공고</strong></a></td><td>2026-09-02</td></tr></tbody></table>';
   const rows = W.parseRows(html, 'https://www.cnsinbo.co.kr/boardCnts/list.do?boardID=134');
   assert.equal(rows.length, 1);
-  assert.equal(rows[0].title, '[모집중] 2027년 컨설턴트 모집 공고');
+  assert.equal(rows[0].title, '2027년 컨설턴트 모집 공고', '[모집중] 딱지는 뗀다(딱지가 바뀌면 같은 글이 또 들어온다)');
   assert.equal(rows[0].date, '2026-09-02');
   assert.equal(rows[0].href, '', '#contents 는 열 주소가 아니다 — 화면이 게시판 주소로 보낸다');
+});
+
+/* ═══ 노사발전재단 (2026-10-04 대표 지시 「노발 진행」) ═══ */
+
+/* 노사발전재단 사업공고/모집 한 줄 — 실측 모양 그대로(제목 링크 + 첨부 목록) */
+const NOSA_TR = `<table><tbody><tr> <td class="table_con cf"> <div class="table_num">1236</div> <div class="table_top"> <div class="table_title">
+<p class="txt_title"><a style="cursor:pointer;" class="txt_ellipsis" onclick="ebList.readBulletin('nosa05','11790646998545')">[선정공고] 2026년 재취업지원서비스 기업컨설팅 6차 지원사업장 선정공고</a></p> </div>
+<div class="table_tiny cf"> <div class="table_day">2026.09.29</div> <div class="table_writer">기업고용지원팀 </div> </div> </div>
+<div class="table_bottom cf"> <ul class="table_file"> <li class="xlsx"><a href='fileMngr?cmd=down&boardId=nosa05&bltnNo=11790646998545&fileSeq=1&subId=sub06' target='download'>붙임. (선정공고) 2026년 재취업지원서비스 기업컨설팅 6차 지원사업장 명단.xlsx</a></li> </ul> </div> </td> </tr></tbody></table>`;
+
+test('★★ 첨부 파일 이름을 제목으로 잡지 않는다 — 노사발전재단·LH 실측', () => {
+  const rows = W.parseRows(NOSA_TR, 'https://www.nosa.or.kr/board/bltnMngr?boardId=nosa05&');
+  const 제목들 = rows.map((r) => r.title);
+  assert.ok(제목들.includes('[선정공고] 2026년 재취업지원서비스 기업컨설팅 6차 지원사업장 선정공고'), JSON.stringify(제목들));
+  assert.ok(!제목들.some((t) => /\.xlsx$/.test(t)), '첨부 이름이 제목이 됐다: ' + JSON.stringify(제목들));
+  /* LH 꼴 — 파일 이름이 링크 주소가 아니라 «글자»에만 드러나도 거른다 */
+  const lh = '<table><tr><td><a href="/board.es?act=view&list_no=1">2026년도 수급조절용 비축토지 매입 공고</a> '
+    + '<a href="/attach/1">붙임2. 2026년도 「수급조절용 비축토지」 매입 공고문_.pdf</a></td><td>2026-09-30</td></tr></table>';
+  assert.equal(W.parseRows(lh, 'https://www.lh.or.kr/')[0].title, '2026년도 수급조절용 비축토지 매입 공고');
+  /* 파일 링크밖에 없는 줄은 그래도 파일 이름을 쓴다(줄을 통째로 버리지 않는다) */
+  const only = '<table><tr><td><a href="/fileMngr?cmd=down&x=1">2025년도 강사 풀(Pool) 참여 신청서.pdf</a></td><td>2025-02-11</td></tr></table>';
+  assert.equal(W.parseRows(only, 'https://www.nosa.or.kr/board/')[0].title, '2025년도 강사 풀(Pool) 참여 신청서.pdf');
+});
+
+test('★★ 잠깐 붙는 딱지(새글·[모집중]·NEW)는 떼어 — 딱지가 바뀌어도 같은 글이 또 안 들어온다', async () => {
+  const 줄 = (t) => '<table><tr><td><a href="/v?1">' + t + '</a></td><td>2026-10-01</td></tr></table>';
+  const 처음 = W.parseRows(줄('[모집중] 2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고'), 'https://a.kr/')[0];
+  const 나중 = W.parseRows(줄('[모집마감] 2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고'), 'https://a.kr/')[0];
+  assert.equal(처음.title, '2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고');
+  assert.equal(W.keyOf('kcplaa', 처음), W.keyOf('kcplaa', 나중), '딱지가 바뀌면 열쇠가 달라져 같은 글이 두 번 들어온다');
+  assert.equal(W.parseRows(줄('새글 2027년 공정채용 컨설턴트 모집'), 'https://a.kr/')[0].title, '2027년 공정채용 컨설턴트 모집');
+  assert.equal(W.parseRows(줄('2027년 공정채용 컨설턴트 모집 NEW'), 'https://a.kr/')[0].title, '2027년 공정채용 컨설턴트 모집');
+  /* 「[모집공고]」는 딱지가 아니라 글의 종류다 — 남긴다 */
+  assert.equal(W.parseRows(줄('[모집공고] 2027년 컨설턴트 모집'), 'https://a.kr/')[0].title, '[모집공고] 2027년 컨설턴트 모집');
+  /* 그리고 run 이 실제로 그 열쇠로 거른다 */
+  const 있던 = {}; 있던[W.keyOf('kcplaa', 처음)] = { date: '2026-10-01' };
+  const r = await W.run({ boards: [{ id: 'kcplaa', org: '', name: 'x', url: 'https://a.kr/' }], existing: 있던, today: '2026-10-02',
+    fetchText: async () => 줄('[모집마감] 2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고') });
+  assert.equal(r.hits.length, 0, '딱지만 바뀐 글이 새 글로 들어왔다');
+});
+
+test('★★ 공인노무사회 공지 — 기관 모집 공문은 잡고, 교육생·시상·서식은 거른다 (실측 제목)', () => {
+  [
+    '2023년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고',
+    '2022년도 공무직 노사협력 프로그램 사업 컨설턴트 모집공고',
+    '2022년도 공공부문 고용개선 컨설팅 컨설턴트 모집',
+    '2023년도 비정규직 고용구조개선 지원단 컨설팅 사업 프로젝트 매니저(PM) 모집 공고',
+    '2023년 NCS 기업활용 컨설팅 사업 컨설턴트 모집 공고',
+    '2024년 공정채용 컨설팅 사업 컨설턴트 모집',
+    '2023년 근로조건 자율개선 지원사업(기초노동질서 자율점검 지원) 수행노무사 모집 공고'
+  ].forEach((t) => assert.equal(W.isRecruit(t), true, '놓친다: ' + t));
+  [
+    '제3기 고용노사관계 전문가과정 교육생 모집안내',
+    '한국공인노무사회 국제심포지엄 안내 및 참가신청',
+    '위험성평가 컨설팅 전문가과정 대전 강좌 신청 독려',
+    '우수 공인노무사 시상 추천 접수',
+    '공인노무사 자격증(발급,재발급) 신청서식',
+    '[갈등조정전문가 기본과정8기 모집안내]',
+    '2026년 생애주기별 노동교육 전문가 양성과정 대상자 모집'
+  ].forEach((t) => assert.equal(W.isRecruit(t), false, '잡음을 잡는다: ' + t));
+});
+
+test('★★ 여러 기관이 섞인 게시판은 제목으로 기관을 정한다 — 찾는 말은 화면 사전(js/gov-recruit.js)과 글자 하나까지 같다', async () => {
+  const R = require('../js/gov-recruit.js');
+  W.ORG_HINTS.forEach(([id, re]) => {
+    const o = R.ORGS.find((x) => x.id === id);
+    assert.ok(o, id + ' 가 화면 사전에 없다');
+    assert.equal(re.source, o.re.source, id + ' 의 찾는 말이 화면 사전과 다르다 — 🆕 가 엉뚱한 줄에 붙는다');
+  });
+  assert.equal(W.orgHint('2023년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고'), 'nosa');
+  assert.equal(W.orgHint('2023년 NCS 기업활용 컨설팅 사업 컨설턴트 모집 공고'), 'hrdk');
+  assert.equal(W.orgHint('2022년 노동시간 단축 전문가 컨설팅 PM 모집 안내'), '', '모르면 지어내지 않는다');
+  /* run 이 실제로 쓴다 — 기관이 정해진 게시판(org)이 이기고, 빈 게시판만 제목으로 */
+  const html = '<table><tr><td><a href="/v?1">2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고</a></td><td>2026-12-20</td></tr>'
+    + '<tr><td><a href="/v?2">2027년 NCS 기업활용 컨설팅 사업 컨설턴트 모집 공고</a></td><td>2026-12-21</td></tr></table>';
+  const r = await W.run({ boards: [{ id: 'kcplaa', org: '', name: '공인노무사회', url: 'https://www.kcplaa.or.kr/bbs/notice/list' },
+    { id: 'erc', org: 'erc', name: '평가원', url: 'https://e.kr/' }], existing: {}, today: '2026-12-22', fetchText: async () => html });
+  const 기관 = r.hits.map((h) => h.board + ':' + h.org).sort();
+  assert.deepEqual(기관, ['erc:erc', 'erc:erc', 'kcplaa:hrdk', 'kcplaa:nosa']);
+});
+
+test('★ 노사발전재단 — 서버는 틀(iframe) 주소를 읽고, 링크 없는 글은 사람이 보는 바깥 화면으로 보낸다', async () => {
+  const b = W.BOARDS.find((x) => x.id === 'nosa');
+  assert.ok(b && /boardId=nosa05/.test(b.url), '노사발전재단 게시판이 빠졌다');
+  assert.equal(b.page, 'https://www.nosa.or.kr/portal/nosa/FoundNews/bizNotice');
+  const k = W.BOARDS.find((x) => x.id === 'kcplaa');
+  assert.ok(k && k.org === '' && /kcplaa\.or\.kr\/bbs\/notice\/list$/.test(k.url), '공인노무사회 공지가 빠졌다');
+  const html = '<table><tr><td><a onclick="ebList.readBulletin(\'nosa05\',\'1\')">2026년 상생파트너십 현장지원 코칭 전문가 모집 공고</a></td><td>2026-09-26</td></tr></table>';
+  const r = await W.run({ boards: [b], existing: {}, today: '2026-10-01', fetchText: async () => html });
+  assert.equal(r.hits.length, 1);
+  assert.equal(r.hits[0].href, b.page, '틀 주소(맨 목록)로 보내면 사람이 길을 잃는다');
 });
