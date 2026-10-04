@@ -4,6 +4,26 @@ const test = require('node:test');
 const assert = require('node:assert');
 const R = require('../js/gov-recruit.js');
 
+test('준비 알림 날 — 모집 달의 앞 달 1일, 오늘 이후 가장 가까운 것', () => {
+  const loc = (d) => d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  assert.equal(loc(R.prepDate(1, '2026-10-04T09:00:00')), '2026-12-01');
+  assert.equal(loc(R.prepDate(10, '2026-10-04T09:00:00')), '2027-09-01', '이미 지난 앞 달이면 내년');
+  assert.equal(loc(R.prepDate(11, '2026-10-01T09:00:00')), '2026-10-01', '오늘이 그날이면 오늘');
+  assert.equal(R.prepDate(0, '2026-10-04'), null, '달을 모르면 지어내지 않는다');
+});
+test('★ 구글 캘린더 창 주소 — 하루짜리, 해마다는 RRULE, 틀린 날짜는 빈 값', () => {
+  const u = R.gcalUrl({ title: 'A B', date: '2027-01-31', details: 'x' });
+  assert.match(u, /^https:\/\/calendar\.google\.com\/calendar\/render\?action=TEMPLATE&text=A%20B&dates=20270131\/20270201&details=x$/);
+  assert.match(R.gcalUrl({ title: 'A', date: '2027-01-31', yearly: true }), /&recur=RRULE%3AFREQ%3DYEARLY$/);
+  assert.equal(R.gcalUrl({ title: 'A', date: 'nope' }), '');
+  assert.equal(R.dueEvent({ name: 'X' }, '2027/01/31'), '', '날짜 꼴이 아니면 안 만든다');
+});
+test('★ 캘린더 주소에 싣는 것은 기관 이름·하는 일·공지뿐이다', () => {
+  const u = decodeURIComponent(R.prepEvent({ name: '기관', what: '컨설턴트', url: 'https://a.example/', month: 3, items: [{ name: '비밀 서류.hwp' }] }, '2026-10-04'));
+  assert.doesNotMatch(u, /비밀 서류/, '폴더 이름(지원 이력)을 구글로 보내지 않는다');
+  assert.match(u, /기관/); assert.match(u, /https:\/\/a\.example\//);
+});
+
 const T = (y, m) => new Date(y, m - 1, 15).getTime();
 const E = [
   { y: '2024', name: '2024 공기업평가원 상시자문위원모집공고', t: T(2024, 1) },

@@ -167,12 +167,56 @@
     return (o && o.years || []).indexOf(y) >= 0;
   }
 
+  /* ═══ 구글 캘린더 (대표 결정 2026-10-04 「둘 다」 중 구글 쪽) ═══
+     ⚠ 일정을 «우리가» 넣지 않는다 — 구글 캘린더의 «일정 만들기 창»을 채워 열 뿐이고,
+       저장은 대표님이 누른다(로그인·권한을 우리가 쥐지 않는다). 그래서 서버도 열쇠도 필요 없다.
+     ⚠ 싣는 것은 기관 이름·공지 링크뿐이다 — 개인정보를 주소에 싣지 않는다. */
+  function pad(n) { return (n < 10 ? '0' : '') + n; }
+  function ymd(d) { return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()); }
+  /* 준비 알림 날 — 모집 달의 «앞 달 1일», 오늘 이후로 가장 가까운 것.
+     ⚠ 모집 달 1일에 알리면 이미 공고가 나와 있을 수 있다 — 서류 준비할 한 달을 번다. */
+  function prepDate(month, today) {
+    if (!month) return null;
+    var t = today ? new Date(today) : new Date();
+    var pm = month === 1 ? 12 : month - 1;
+    var d = new Date(t.getFullYear(), pm - 1, 1);
+    var t0 = new Date(t.getFullYear(), t.getMonth(), t.getDate());
+    if (d < t0) d = new Date(t.getFullYear() + 1, pm - 1, 1);
+    return d;
+  }
+  /* o: {title, date:Date|'YYYY-MM-DD', details, yearly} → 하루짜리 일정 만들기 창 주소 */
+  function gcalUrl(o) {
+    var d = o.date instanceof Date ? o.date : new Date(String(o.date) + 'T00:00:00');
+    if (isNaN(d)) return '';
+    var e = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+    var q = 'action=TEMPLATE&text=' + encodeURIComponent(s(o.title))
+      + '&dates=' + ymd(d) + '/' + ymd(e)
+      + '&details=' + encodeURIComponent(s(o.details));
+    if (o.yearly) q += '&recur=' + encodeURIComponent('RRULE:FREQ=YEARLY');
+    return 'https://calendar.google.com/calendar/render?' + q;
+  }
+  /* 해마다 도는 «모집 준비» 일정 */
+  function prepEvent(org, today) {
+    var d = prepDate(org && org.month, today); if (!d) return '';
+    return gcalUrl({ title: '[모집 준비] ' + org.name + ' — 보통 ' + org.month + '월 모집', date: d, yearly: true,
+      details: (org.what ? org.what + '\n' : '') + '모집 공지를 확인하고 서류를 준비하세요.'
+        + (org.url ? '\n공지: ' + org.url : '') + '\n(정부사업신청 › 컨설턴트 모집에서 넣은 일정)' });
+  }
+  /* 올해 «마감일» 일정 */
+  function dueEvent(org, due) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(s(due))) return '';
+    return gcalUrl({ title: '[마감] ' + org.name + ' 컨설턴트 지원', date: due,
+      details: (org.what ? org.what + '\n' : '') + (org.url ? '공지: ' + org.url + '\n' : '')
+        + '(정부사업신청 › 컨설턴트 모집에서 넣은 일정)' });
+  }
+
   /* 이 이름에 걸리는 사전 기관 번호들 — 겹침 검사용 */
   function matches(name, custom) {
     var nm = s(name);
     return allOrgs(custom).filter(function (o) { return orgTest(o, nm); }).map(function (o) { return o.id; });
   }
 
-  return { ORGS: ORGS, group: group, matches: matches, typicalMonth: typicalMonth, monthsAhead: monthsAhead,
+  return { ORGS: ORGS, group: group, matches: matches, prepDate: prepDate, gcalUrl: gcalUrl,
+    prepEvent: prepEvent, dueEvent: dueEvent, typicalMonth: typicalMonth, monthsAhead: monthsAhead,
     order: order, soon: soon, appliedThisYear: appliedThisYear, allOrgs: allOrgs };
 });
