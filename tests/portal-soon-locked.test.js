@@ -73,7 +73,8 @@ function 그려보기(role) {
   return { 타일: m, 외침 };
 }
 
-const 준비중앱 = ['rules', 'payroll', 'docs', 'mail', 'paydata'];
+/* 문서관리(docs)는 2026-10-04 대표 「직원도 문서관리 모두 본다」로 열었다 — tests/app-soon-gate.test.js ⑦ */
+const 준비중앱 = ['rules', 'payroll', 'mail', 'paydata'];
 
 test('①★★ 대표가 지목한 다섯에 표가 붙어 있다', () => {
   const A = SRC.indexOf('var APPS = [');
