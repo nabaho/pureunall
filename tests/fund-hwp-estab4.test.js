@@ -97,6 +97,13 @@ test('설립합의서 — 참여회사 이어 쓰기·회의일(본문과 끝 �
   assert.equal(A.agr(Object.assign({}, F, { meeting_date: '' }), SITES).합의일, '', '회의일을 모르면 비운다');
 });
 
+test('설립합의서 — 설립합의일이 따로 있으면 그 날짜(준비위원회 회의일보다 먼저인 기금)', () => {
+  const v = A.agr(Object.assign({}, F, { agree_date: '2026-02-25' }), SITES);
+  assert.equal(v.회의일, '2026. 2. 25.'); assert.equal(v.합의일, '2026 년 02 월 25 일');
+  const w = A.agr(Object.assign({}, F, { meeting_date: '', agree_date: '2026-02-25' }), SITES);
+  assert.equal(w.합의일, '2026 년 02 월 25 일', '회의일이 비어도 합의일로');
+});
+
 test('정관 — 인가 전에는 원본처럼 빈 날짜 줄, 인가일이 있으면 그 날 · 정관일은 회의일', () => {
   assert.equal(A.charter(F, SITES).인가일.trim(), '년    월    일');
   assert.equal(A.charter(Object.assign({}, F, { inka_date: '2026-05-20' }), SITES).인가일, '2026년    5월    20일');
