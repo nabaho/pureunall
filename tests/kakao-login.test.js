@@ -356,7 +356,8 @@ test('★ 서버 — 연결 안 된 카카오면 needLink 표시만 주고 회�
   const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
   assert.equal(r.status, 400);
   assert.equal(r.body.needLink, true);
-  assert.ok(!JSON.stringify(r.body).includes('111'), '카카오 회원번호가 화면으로 나갔다');
+  /* 글자만 본다 — 응답에 시각 같은 숫자가 들어와도 «111» 에 우연히 걸리지 않게(아래 기록속글자들 설명 참고) */
+  assert.deepEqual(기록속글자들(r.body).filter((s) => s.includes('111')), [], '카카오 회원번호가 화면으로 나갔다');
   assert.equal(issued.length, 0);
 });
 
