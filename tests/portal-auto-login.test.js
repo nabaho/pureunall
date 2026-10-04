@@ -135,11 +135,19 @@ for (const file of integratedPages) {
     );
   });
 
-  test(`${file}: background timers cannot sign out a remembered session`, () => {
+  /* 2026-10-04 대표 「로그인 화면이 갑자기 나온다 — 완전히 안 나오게」.
+     예전 규칙은 «화면이 뒤에 있을 때만» 멈췄다 — 화면을 띄워 둔 채 1시간 자리를 비우면
+     로그인 유지를 켠 PC 도 로그아웃됐다. 이제 유지를 켠 기기는 보이든 안 보이든 멈춘다.
+     유지를 안 켠 기기(공용 PC)는 그대로 60분 뒤 로그아웃 — persistentAutoLogin() 이 가른다. */
+  test(`${file}: idle timers never sign out a remembered session, visible or hidden`, () => {
     const block = idleBlock(readPage(file), file);
     const pauseBody = functionBody(block, 'shouldPauseIdle');
     assert.match(pauseBody, /persistentAutoLogin\(\)/);
-    assert.match(pauseBody, /document\.hidden/);
+    assert.doesNotMatch(
+      pauseBody,
+      /document\.hidden/,
+      `${file}: 로그인 유지를 켠 기기가 «화면이 보일 때»는 다시 자동 로그아웃된다`,
+    );
 
     const timerStart = block.indexOf('setInterval(');
     assert.notEqual(timerStart, -1, `${file}: idle interval is missing`);

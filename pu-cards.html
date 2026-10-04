@@ -37311,7 +37311,7 @@ document.addEventListener('keydown', e=>{
   try{ _applyIdleCfg(window.PU_CFG); }catch(e){}            /* 이미 로드됐으면 즉시 */
   try{ window.addEventListener('pu-cfg', function(ev){ _applyIdleCfg(ev.detail); }); }catch(e){}
   function persistentAutoLogin(){ try{ return localStorage.getItem('pu_portal_auto') === '1'; }catch(e){ return false; } }
-  function shouldPauseIdle(){ return persistentAutoLogin() && document.hidden; }
+  function shouldPauseIdle(){ return persistentAutoLogin(); }   // 로그인 유지를 켠 기기는 화면이 보여도 자동 로그아웃 안 함(대표 2026-10-04)
   var warnBox=null, tick=null;
   function loggedIn(){ try{ var u=firebase.auth().currentUser; return !!(u&&u.email); }catch(e){ return false; } }
   function now(){ return Date.now(); }
