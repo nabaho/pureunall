@@ -180,6 +180,15 @@ rules.data = {
   /* 재무 전용 휴지통 — 지운 돈 기록(자문료 수입 등)은 여기로. 일반 휴지통(trash_bin)은 업체 기록만 (2026-10-04 보안 점검 — 일반 휴지통(trash_bin, 재직 직원 누구나 읽음)에 지운 자문료 수입 270건이 통째로 있었다) */
   trash_fin: finOnly,
   payroll_audit_log: finOnly, cms_ledger: finOnly, bank_processed: finOnly, ledger_held: finOnly, ledger_picks: finOnly, ledger_split_recipes: finOnly, payer_aliases: finOnly, finance_bank_fee_last: finOnly, accounts: finOnly,
+  /* ★ 2026-10-04 (대표 「2」 — 지난 점검에서 «구조를 바꿔야» 해서 미뤘던 둘)
+     연차 대장 — 직원 16명 실명·부여·사용·잔여·비고(육아휴직·출산휴가 사유까지). 읽는 화면은 급여(재무)와
+       휴가관리 「📋 연차대장」 탭뿐이고, 그 탭은 재무 권한자에게만 보이게 했다. 직원 본인의 연차 안내는 이 자리를 안 읽는다. */
+  leave_ledger: finOnly,
+  /* 수정 기록 — 사건·컨설팅 금액, 급여 정리, 퇴사 정산, 수입 확정 해제 등 «바뀌기 전·후 값».
+     읽기는 재무 권한자. 적기는 재직 직원 누구나 «새 줄 하나씩만»(있는 줄을 고치거나 지울 수 없다) —
+     화면(AuditLog.write)이 줄마다 v/{id} 로 따로 적는다. 통째로 덮어 쓰기·지우기는 재무 권한자만. */
+  audit_log: { '.read': FIN, '.write': FIN,
+    v: { $id: { '.write': `(${LOGIN}) && !data.exists() && newData.hasChildren(['id','ts'])` } } },
 
   /* 직원 명부 — 모두 보고, 관리자·위임관리인만 고친다 */
   user_dir: { '.read': LOGIN, '.write': `${ADMIN} || ${SUB}` },

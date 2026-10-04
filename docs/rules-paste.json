@@ -195,6 +195,19 @@
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
         ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
       },
+      "leave_ledger": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "audit_log": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        "v": {
+          "$id": {
+            ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists() && newData.hasChildren(['id','ts'])"
+          }
+        }
+      },
       "user_dir": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true"
