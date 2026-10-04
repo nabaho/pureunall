@@ -88,7 +88,8 @@
        제 것은 «보던 자리»뿐이다(어느 탭·어느 거르개였나) — data 아래 곁방에 둔다. */
     cal:{ name:'푸른 캘린더', file:'pu-cal.html', primaryRoots:['data/cal_view','cal_private'],
       /* pucards/idx — 미팅 넣을 때 기업정보함 명함 «가벼운 색인»을 읽기만 한다(2026-09-27) */
-      sharedRoots:['data','pucards/idx'],
+      /* gov/{uid}/recruit — 대표일 때만 «컨설턴트 모집» 일정을 얹어 보인다(읽기만, 2026-10-04) */
+      sharedRoots:['data','pucards/idx','gov/{uid}/recruit'],
       entityTypes:['ScheduleEvent','Person'],
       /* ⚠ 여기 적힌 자리 «말고는» 이 앱이 아무것도 못 쓴다(새 프로그램은 기본이 차단이다).
          ⚠★ 아래 둘은 «이알피의 칸»이다 — 주인이 우리가 아니다. 그래서 규칙이 하나 더 붙는다:
