@@ -18337,9 +18337,26 @@ function mbEndedOfRow(v, idx0){
 /* 이 메일이 「그 밖」인가 — 「자문사 아님」으로 치운 주소에서 왔나.
    ⚠ 판정을 «한 자리»에서만 한다. 세는 곳(mbWhoTally)과 거르는 곳(mbRowFits)이
      따로 셈하면 「12통이라는데 열면 3통」이 된다 — 담당자 칸에서 이미 겪은 일이다. */
+/* ── 공공기관·협회·학교와 자동발송은 «저절로» 「그 밖」 (대표 승인 2026-10-04) ──
+   실측 2026-10-04 — 「담당 모름」 4,496통 가운데 공공기관·협회·학교가 1,341통,
+   no-reply 같은 자동발송이 298통이었다. 손으로 치우기 전에는 영영 담당 모름에 쌓여
+   정작 이어야 할 고객 메일이 묻혔다.
+   ⚠ 기준은 📥 새 연락처가 «묻지 않는» 주소(mbNewAskable)와 «같은 두 줄»이다 —
+     거기서 안 묻는 주소는 이을 길이 없어 담당 모름에서 빠질 날이 안 온다.
+   ⚠ 담당자가 잡히면 그 사람 칸이 먼저다(사건에 적힌 노동청 주소 등) — 부르는 쪽이
+     «!w 일 때만» 묻는다. 메일은 감추지 않는다(업무 칸·전체메일에 그대로). */
+function mbAutoOther(em){
+  const e = String(em||'').trim().toLowerCase();
+  const at = e.indexOf('@'); if(at < 1) return false;
+  const d = mbDomOf(e);
+  if(d && MB_PUB_TAIL.test(d)) return true;                 /* 공공·협회·학교 */
+  return MB_BOT_RE.test(e.slice(0, at));                     /* 자동발송 */
+}
 function mbOtherOfRow(v){
   const em = String((v&&v.e)||'').trim().toLowerCase();
-  return !!(em && typeof mbNotCo === 'function' && mbNotCo(em));
+  if(!em) return false;
+  if(typeof mbNotCo === 'function' && mbNotCo(em)) return true;   /* 손으로 치운 곳 */
+  return mbAutoOther(em);
 }
 function mbOtherCount(){ return mbWhoTally().other; }
 function mbEndedCount(){ return mbWhoTally().ended; }
@@ -20838,7 +20855,7 @@ function mailSideHtml(){
          사라지면 되돌릴 자리를 못 찾는다(자문종료 줄과 같은 셈). */
     const ot = mbOtherCount();
     h += `<div class="dm-f sub othbin ${now===MB_WHO_OTH?'on':''}" onclick="openMailBox('${MB_WHO_OTH}')"
-      title="「자문사 아님」으로 치운 곳에서 온 메일 — 노동청·근로복지공단·상공회의소 같은 곳입니다. 담당자 칸과 「담당 모름」에서는 빠지고, 업무 칸에는 그대로 있습니다.${
+      title="「자문사 아님」으로 치운 곳, 그리고 공공기관·협회·학교(go.kr·or.kr 등)와 no-reply 같은 자동발송에서 온 메일입니다. 담당자 칸과 「담당 모름」에서는 빠지고, 업무 칸에는 그대로 있습니다. 담당자를 정해 둔 주소는 그 사람 칸으로 갑니다.${
         ot.n ? ' · '+ot.n.toLocaleString()+'통' : ' (아직 없습니다)'}">
       <span class="ic">📭</span><span class="grip ghost">⋮⋮</span><span class="nm">그 밖</span>
       ${ot.un?`<span class="nu">${ot.un}</span>`:''}
@@ -24555,8 +24572,7 @@ function mbNewAskable(em){
   if((_mbOwner||{})[mbWhoKey(e)]) return false;                                 /* 사람이 정함 */
   if(typeof mbCoOf === 'function' && mbCoOf(e)) return false;                    /* 자문사 이음 */
   const d = mbDomOf(e);
-  if(d && MB_PUB_TAIL.test(d)) return false;                                     /* 공공·협회·학교 */
-  if(MB_BOT_RE.test(e.slice(0, e.indexOf('@')))) return false;                   /* 기계발신 */
+  if(mbAutoOther(e)) return false;              /* 공공·협회·학교·기계발신 — 「그 밖」과 같은 잣대 */
   /* 우리 도메인은 뺀다.
      ⚠★ 다만 «무료메일은 빼지 않는다» — 우리 메일함이 daum.net 이라서, 이 줄이
        무료메일까지 재면 다음을 쓰는 거래처 담당자가 통째로 안 보인다.

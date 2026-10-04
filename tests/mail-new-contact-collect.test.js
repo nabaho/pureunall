@@ -60,7 +60,7 @@ function run(msgs, opt){
     renderMailPage(){}
   };
   vm.createContext(ctx);
-  ['mbGotFolder','mbNewAskable','mbNewCoOf','mbNewList','mbNewBust','mbNewFind','mbNewHits']
+  ['mbGotFolder','mbAutoOther','mbNewAskable','mbNewCoOf','mbNewList','mbNewBust','mbNewFind','mbNewHits']
     .forEach(n => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   ['MB_PUB_TAIL','MB_BOT_RE','MB_NEW_DAYS'].forEach(n =>
     vm.runInContext(bare.match(new RegExp('const ' + n + ' = [^\\n]*'))[0], ctx));
