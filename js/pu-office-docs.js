@@ -40,7 +40,7 @@
   var CSS = ''
     + '.pod,.pod *{box-sizing:border-box}.pod{font-size:13px;color:#1e293b}'
     + '.pod-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}'
-    + '.pod-bar b{flex:1;font-size:15px;min-width:0}'
+    + '.pod-bar b{flex:1 1 auto;font-size:15px;white-space:nowrap}'
     + '.pod-bar input[type=search]{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;width:200px;max-width:100%}'
     + '.pod-b{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}'
     + '.pod-b.p{background:#1e40af;color:#fff;border-color:#1e40af}.pod-b.g{background:#f0fdf4;color:#166534;border-color:#bbf7d0}'
@@ -510,6 +510,59 @@
         });
     }
 
+    /* ── 🔒 이미 올린 것 서명본으로 옮기기 (2026-10-04 대표 「네») ──
+       2026-10-03 전에 사진첩에서 가져온 계약서, 줄은 🔒 인데 원본은 보통 자리인 것(같은 파일 다시 쓰기)이 후보.
+       후보 고르기·옮기기는 서버(puDocSecretMove, 총괄관리자만)가 한다 — 화면은 목록을 보여 주고 번호만 넘긴다.
+       옮기면 보통 자리 파일은 지워진다(예전 내려받기 주소도 죽는다). 20개씩 나눠 보낸다. */
+    function openSecretMove() {
+      if (!host.secretMove) { toast('서명본으로 옮기는 길이 연결되지 않았습니다'); return; }
+      var box = el('div', { 'class': 'pod-empty', text: '옮길 것을 찾는 중…' });
+      var go = null, items = [], on = {}, busy = false;
+      function drawItems() {
+        box.innerHTML = ''; box.className = '';
+        if (!items.length) { box.className = 'pod-empty'; box.textContent = '옮길 것이 없습니다 — 보통 자리에 남은 사진첩 계약서가 없습니다.'; go.disabled = true; return; }
+        items.forEach(function (c) {
+          var cb = el('input', { type: 'checkbox', checked: !!on[c.fileId], onchange: function () { on[c.fileId] = cb.checked; count(); } });
+          box.appendChild(el('label', { style: 'display:flex;gap:6px;align-items:center;font-size:12.5px;padding:3px 0;border-bottom:1px solid #f1f5f9' }, [cb,
+            el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: (c.coName ? c.coName + ' · ' : '') + (c.title || c.name) }),
+            el('span', { 'class': 'pod-tag', text: c.why === 'photo' ? '사진첩' : '줄만 🔒' })]));
+        });
+        count();
+      }
+      function picked() { return items.filter(function (c) { return on[c.fileId]; }).map(function (c) { return c.fileId; }); }
+      function count() { var n = picked().length; go.disabled = busy || !n; go.textContent = n ? '🔒 ' + n + '개 서명본으로 옮기기' : '옮길 것을 고르세요'; }
+      modalShell('🔒 이미 올린 것 서명본으로 옮기기 (대표·관리자)', [
+        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '사진첩에서 가져와 직원 누구나 열 수 있는 계약서를 🔒 서명본 자리로 옮깁니다. 옮기면 목록 줄은 그대로 보이고, 파일 열기는 대표·관리자만 됩니다. 예전 자리의 파일과 내려받기 주소는 없어집니다.' }),
+        box],
+        function (close) {
+          go = el('button', { type: 'button', 'class': 'pod-b p', text: '찾는 중…', disabled: true, onclick: function () {
+            var ids = picked();
+            if (!ids.length || !w.confirm(ids.length + '개를 🔒 서명본으로 옮길까요?\n(직원은 더 이상 파일을 열 수 없습니다)')) return;
+            busy = true; count();
+            var moved = 0, failed = 0, oldLeft = 0, chunks = [];
+            for (var i = 0; i < ids.length; i += 20) chunks.push(ids.slice(i, i + 20));
+            chunks.reduce(function (p, ch) {
+              return p.then(function () {
+                go.textContent = '옮기는 중… ' + moved + '/' + ids.length;
+                return host.secretMove({ mode: 'move', fileIds: ch }).then(function (j) {
+                  moved += (j.moved || []).length; failed += (j.failed || []).length;
+                  (j.moved || []).forEach(function (m) { if (!m.oldGone) oldLeft++; });
+                });
+              });
+            }, Promise.resolve()).then(function () {
+              close(); urlCache = {}; load(true);
+              toast('✅ ' + moved + '개를 🔒 서명본으로 옮겼습니다' + (failed ? ' · 못 옮김 ' + failed + '개' : '') + (oldLeft ? ' · 예전 자리 파일 ' + oldLeft + '개는 못 지움(다시 시도하세요)' : ''));
+            }, function (e) { busy = false; count(); urlCache = {}; toast('❌ ' + msg(e) + (moved ? ' (' + moved + '개는 옮겼습니다)' : '')); load(true); });
+          } });
+          return [el('button', { type: 'button', 'class': 'pod-b', text: '닫기', onclick: function () { if (!busy) close(); } }), go];
+        });
+      host.secretMove({ mode: 'list' }).then(function (j) {
+        items = j.items || [];
+        items.forEach(function (c) { on[c.fileId] = true; });
+        drawItems();
+      }, function (e) { box.textContent = msg(e); go.textContent = '옮길 수 없습니다'; });
+    }
+
     /* ── 📂 PC 폴더 가져오기 (설계 2026-10-03 §3 (나), 목업 승인) ──
        폴더를 끌어다 놓거나 고르면 파일 이름·폴더 이름으로 «우리와 맺은 계약서류»만 고르고 회사·종류·날짜를 짐작한다(PuCoRoster.folderRows).
        고객사 직원 자료(근로계약서·급여대장 등)는 기본으로 뺀다. 기본은 🔒 서명본으로 올린다(대표·관리자만 연다).
@@ -685,6 +738,7 @@
         el('button', { type: 'button', 'class': 'pod-b', text: '📥 엑셀 명단 가져오기', title: '「업체명단」 시트가 있는 엑셀에서 계약 기록을 가져옵니다', onclick: openRosterImport }),
         el('button', { type: 'button', 'class': 'pod-b', text: '📂 PC 폴더 가져오기', title: '회사별 폴더에서 계약서류만 골라 올립니다(기본 🔒 서명본)', onclick: openFolderImport }),
         el('button', { type: 'button', 'class': 'pod-b g', text: '🖼 사진첩에서 가져오기', onclick: openPhotoImport }),
+        host.secretMove ? el('button', { type: 'button', 'class': 'pod-b', text: '🔒 서명본으로 옮기기', title: '이미 올린 사진첩 계약서 중 직원 누구나 여는 것을 🔒 서명본으로 옮깁니다(대표·관리자)', onclick: openSecretMove }) : null,
         el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
       if (S.denied) { wrap.appendChild(deniedBanner()); root.appendChild(wrap); return; }
       if (S.err) { wrap.appendChild(el('div', { 'class': 'pod-empty', style: 'color:#991b1b', text: '불러오지 못했습니다 — ' + S.err })); root.appendChild(wrap); return; }

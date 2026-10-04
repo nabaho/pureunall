@@ -6088,3 +6088,70 @@ exports.puDocSecret = functions
       res.status(500).json({ ok: false, error: "서명본을 열지 못했습니다." });
     }
   });
+
+/* ══ 문서관리 🔒 서명본으로 옮기기 — puDocSecretMove (2026-10-04 대표 「네」) ══
+   2026-10-03 전에 사진첩에서 가져온 계약서는 원본 보관함 «보통 자리»에 있어 직원 누구나 연다.
+   원본 보관함 규칙은 «새로 쓰기만»(지우기·고치기 없음)이라 화면은 못 옮긴다 — 이 함수가 관리자 SDK 로 옮긴다.
+   ⚠ 총괄관리자만. 후보는 서버가 다시 고른다(doc-secret-move.candidates) — 화면이 보낸 번호를 그대로 믿지 않는다.
+   순서: ① 서명본 자리로 복사 ② 복사본의 내려받기 토큰 지우기(★ 복사는 토큰까지 따라온다 — 예전 주소의 토큰을
+   아는 직원이 새 자리를 열 수 있다) ③ 기록 path·secret, 기업별 서류 줄 secret 을 한 번에 ④ 보통 자리 파일 지우기
+   (예전 토큰 주소도 같이 죽는다) ⑤ secret_log 에 «옮김» 한 줄.
+   mode:'list' → 후보 목록, mode:'move' + fileIds(최대 20) → 옮기기. */
+const DocSecretMove = require("./doc-secret-move");
+exports.puDocSecretMove = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireStaff(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const db = getDatabase();
+    try {
+      const roleSnap = await db.ref("uid_roles/" + me.uid).once("value");
+      if (((roleSnap && roleSnap.val()) || {}).isAdmin !== true) {
+        res.status(403).json({ ok: false, error: "🔒 서명본으로 옮기기는 대표·관리자만 할 수 있습니다." });
+        return;
+      }
+      const [origSnap, coSnap] = await Promise.all([
+        db.ref("pu_docs/originals").once("value"), db.ref("pu_docs/co_docs").once("value")]);
+      const originals = origSnap.val() || {}, coDocs = coSnap.val() || {};
+      const list = DocSecretMove.candidates(originals, coDocs);
+      const mode = String((req.body && req.body.mode) || "list");
+      if (mode === "list") { res.status(200).json({ ok: true, items: list }); return; }
+      if (mode !== "move") { res.status(400).json({ ok: false, error: "mode 가 올바르지 않습니다." }); return; }
+      const want = Array.isArray(req.body.fileIds) ? req.body.fileIds.map(String).slice(0, 20) : [];
+      const ok = {}; list.forEach(function (c) { ok[c.fileId] = true; });
+      const bucket = getStorage().bucket(PHOTO_BUCKET);
+      const moved = [], failed = [];
+      for (const id of want) {
+        if (!ok[id]) { failed.push({ fileId: id, error: "옮길 후보가 아닙니다(이미 서명본이거나 없음)." }); continue; }
+        const rec = originals[id], to = DocSecretMove.secretPath(id, rec);
+        try {
+          const dest = bucket.file(to);
+          await bucket.file(rec.path).copy(dest);
+          await dest.setMetadata({ metadata: { firebaseStorageDownloadTokens: null } });
+          const up = {};
+          up["pu_docs/originals/" + id + "/path"] = to;
+          up["pu_docs/originals/" + id + "/secret"] = true;
+          DocSecretMove.coDocPaths(coDocs, id).forEach(function (p) { up[p] = true; });
+          await db.ref().update(up);
+        } catch (e) {
+          console.error("puDocSecretMove copy", id, String((e && e.message) || e));
+          failed.push({ fileId: id, error: "옮기지 못했습니다 — 원본은 그대로입니다." });
+          continue;
+        }
+        let oldGone = true;
+        try { await bucket.file(rec.path).delete({ ignoreNotFound: true }); }
+        catch (e) { oldGone = false; console.error("puDocSecretMove delete", id, String((e && e.message) || e)); }
+        await db.ref("pu_docs/secret_log").push({ fileId: id, by: me.uid, at: Date.now(), act: "move" });
+        moved.push({ fileId: id, oldGone: oldGone });
+      }
+      res.status(200).json({ ok: true, moved: moved, failed: failed, left: list.length - moved.length });
+    } catch (e) {
+      console.error("puDocSecretMove", String((e && e.message) || e));
+      res.status(500).json({ ok: false, error: "서명본으로 옮기지 못했습니다." });
+    }
+  });
