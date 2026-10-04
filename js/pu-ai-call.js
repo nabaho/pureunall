@@ -32,10 +32,12 @@
 
   /* 서버에 판독을 맡긴다.
        parts : [{ inline_data:{mime_type,data} } | { text }]  — 구글이 받는 그 모양
-       opts  : { auth, fetch, generationConfig }
+       opts  : { auth, fetch, generationConfig, app, manual }
      돌려주는 것은 **구글 응답 그대로**다 — 부르는 쪽이 제 방식으로 뜯어 쓴다.
      ⚠ 실패하면 status 를 담아 던진다. 429(잠시 바쁨)·403(열쇠 문제)에 따라
-       부르는 쪽의 대응이 갈리므로 숫자를 뭉개면 안 된다. */
+       부르는 쪽의 대응이 갈리므로 숫자를 뭉개면 안 된다.
+     ⚠ manual — «사람이 누르고, 한도에 걸렸다고 물었을 때 예라고 한» 부름에만 싣는다(대표 결정 ⓵㉮).
+       서버는 manual 없는 부름을 자동으로 보고 이번 달 한도에 걸리면 막는다(e.overBudget). (2026-10-04) */
   function ask(parts, opts) {
     opts = opts || {};
     var f = opts.fetch || (typeof global.fetch === 'function' ? global.fetch.bind(global) : null);
@@ -47,6 +49,7 @@
       var body = { parts: parts };
       if (opts.app) body.app = String(opts.app);
       if (opts.generationConfig) body.generationConfig = opts.generationConfig;
+      if (opts.manual === true) body.manual = true;
       return f(URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },
@@ -59,6 +62,7 @@
           var status = (j && j.status) || (r && r.status) || 0;
           var e = new Error((j && j.error) || ('AI가 응답하지 않습니다 (오류 ' + status + ')'));
           e.status = status;
+          if (j && j.overBudget) e.overBudget = true;   // 이번 달 요금 한도 — 부르는 쪽이 «그래도?»를 물을 수 있게
           throw e;
         });
     });
