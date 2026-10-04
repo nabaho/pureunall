@@ -41,7 +41,8 @@ function 볼파일() {
   const out = [];
   const 훑기 = (dir, depth) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (e.name.startsWith('.') || e.name === 'node_modules') continue;
+      /* _forms_out — 서식집 검토 산출물(gitignore, 로컬 전용·실제 서식 원문). 저장소 코드가 아니다 */
+      if (e.name.startsWith('.') || e.name === 'node_modules' || e.name === '_forms_out') continue;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) {
         if (['tests', 'docs', 'harness', '_scan_out', 'vendor', 'reference'].includes(e.name)) continue;
