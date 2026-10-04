@@ -30,7 +30,8 @@ const 잠글앱 = {
   /* 취업규칙은 «한 앱 두 파일»(두 앱 합치기 2026-10-04) — 타일은 하나라도 문은 두 파일에 다 단다.
      한 파일만 달면 그 파일 주소를 직접 친 사람에게 열린다. */
   'rules.html': '취업규칙', 'payroll-os.html': '급여관리',
-  'docs-esign.html': '문서관리', 'pu-paydata.html': '급여데이터함',
+  /* 문서관리는 2026-10-04 대표 「직원도 문서관리 모두 본다」로 열었다 — ⑦ 이 지킨다 */
+  'pu-paydata.html': '급여데이터함',
   'pu-cards.html': '푸른 메일', 'rules-v2.html': '취업규칙'
 };
 
@@ -128,4 +129,13 @@ test('⑥★★ 공용 파일을 고쳤으면 «싣는 모든 곳»의 캐시 �
   assert.equal(번호.size, 1,
     '★★ 캐시 번호가 갈렸다(' + [...번호].join(', ') + ') — 낮은 쪽 앱은 옛 파일을 쓴다.\n' +
     '  그 앱에는 준비중 문이 «없다».');
+});
+
+test('⑦★ 문서관리는 직원에게 열려 있다 — 대표 「직원도 문서관리 모두 본다」(2026-10-04)', () => {
+  const s = stripJs(R('docs-esign.html'));
+  assert.doesNotMatch(s, /PuGate\.soonUnlessAdmin\(/, '★ 문서관리에 준비중 문이 다시 생겼다 — 직원이 못 들어온다');
+  const portal = R('enter.html');
+  const 줄 = portal.split('\n').find(l => l.indexOf("key:'docs'") >= 0);
+  assert.ok(줄, '★ 포털에 문서관리 타일이 없다');
+  assert.doesNotMatch(줄, /soon:\s*true/, '★ 포털 문서관리 타일이 다시 준비중이다');
 });
