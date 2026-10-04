@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>홈페이지 관리</title>
+<title>홈페이지</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>🌐</text></svg>">
 <!--
   홈페이지 관리 — 회사 홈페이지(라이믹스)의 구성원 소개·주요업무·오시는길·인사말 글을
@@ -809,7 +809,7 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 </head>
 <body>
 <header>
-  <div class="brand" onclick="location.reload()">푸 홈페이지 관리</div>
+  <div class="brand" onclick="location.reload()">푸 홈페이지</div>
   <div class="who"><span id="whoami"></span>
     <button class="out" onclick="App.logout()">로그아웃</button></div>
 </header>
@@ -4914,7 +4914,7 @@ function railHtml() {
 function appbarHtml() {
   const at = App.check && App.check.at;
   return '<div class="appbar">'
-    + '<div class="ttl">홈페이지 관리</div>'
+    + '<div class="ttl">홈페이지</div>'
     + '<span class="when">홈페이지 확인 ' + esc(at ? stampShort(at) : '아직 안 함') + '</span>'
     + '<div class="sp"></div>'
     /* ★ 이 띠가 «무엇에 대한 것인지» 이름표로 못 박는다 (대표 결정 2026-09-06 ㉯).
