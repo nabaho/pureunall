@@ -191,18 +191,14 @@ test('④ most — 쓴 곳(회사 수)이 가장 많은 것, rep 은 members[0]'
 });
 
 test('④ most — 회사 수로 센다(문서 수가 아니다)', () => {
-  // P: 한 회사의 판 넷(문서 4개, 한 곳) / Q: 두 회사(문서 2개, 두 곳) — 밴드를 모르게 해 recent·most 만 본다
-  const gs = groups([mem('c3', 13, 10), mem('c3', 13, 20), mem('c3', 13, 30), mem('c3', 13, 40),
-    mem('c1', 14, 5), mem('c2', 14, 6)]);
-  const r = R.pick(gs, ctx({ band: '' }));
-  // recent 가 P(마지막 날짜 40) 를 가져가므로 most 는 남은 Q — 순서를 뒤집어 most 가 정말 «곳»으로 가르는지 본다
+  // 13일: 한 회사의 판 넷(문서 4개, 한 곳) / 14일: 두 회사(문서 2개, 두 곳) / 16일: 가장 최근(recent 가 가져감)
+  // — 밴드를 모르게 해 recent·most 만 본다. most 가 문서 수가 아니라 «곳»으로 가르는지 본다
   const gs2 = groups([mem('c3', 13, 100), mem('c3', 13, 90), mem('c3', 13, 80), mem('c3', 13, 70),
     mem('c1', 14, 5), mem('c2', 14, 6), mem('c4', 16, 200)]);
   const r2 = R.pick(gs2, ctx({ band: '' }));
   assert.equal(r2.find((x) => x.why === 'recent').group.places, 1);          // 16일(c4, 200)이 최근
   const most = r2.find((x) => x.why === 'most');
   assert.equal(most.group.places, 2);                                         // 문서가 많은 13일이 아니라 두 곳이 쓴 14일
-  assert.ok(r.length >= 1);
 });
 
 test('④ most — 곳이 같으면 ★최종본 → 마지막 날짜', () => {

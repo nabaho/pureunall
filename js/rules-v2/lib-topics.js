@@ -63,6 +63,7 @@
       .replace(new RegExp(T + '(과|와)(?![가-힣])', 'g'), tag + '와');
   }
   // 회사 이름 — (주)·㈜·주식회사·유한회사와 띄어쓰기를 걷어 낸 뒤 두 글자 이상일 때만 쓴다.
+  // 💡 우리 문안(view-recommend)이 대표 글의 회사 이름을 이 회사 이름으로 바꿀 때도 «같은 잣대»로 쓴다 — 그래서 내보낸다.
   function coCore(name) {
     return str(name).replace(/\(\s*[주유]\s*\)|[㈜㈲]|주식회사|유한회사|유한책임회사/g, '').replace(/\s+/g, '');
   }
@@ -101,7 +102,7 @@
     return '바뀐 곳 ' + Math.max(del.length, add.length);
   }
   var api = { splitArticles: splitArticles, topicKey: topicKey, topicOrder: topicOrder, normText: normText,
-    normKey: normKey, groupVariants: groupVariants, diffSummary: diffSummary };
+    normKey: normKey, groupVariants: groupVariants, diffSummary: diffSummary, coCore: coCore };
   if (root) root.PuRulesV2Topics = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
