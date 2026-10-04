@@ -21,9 +21,11 @@ const DOMAIN_LABEL = {
 // 열을 하나 더 만들면 노무사가 둘을 비교하다가 뜻을 헷갈린다. 그래서 열을
 // 새로 만들지 않고 이 열을 재사용한다 — 노무사는 이 열이 큰 행에서
 // '판본이 여러 벌 쌓인 서식 유형'을 바로 알아본다.
+// ⚠ 'ID' 는 맨 끝 — 노무사가 적은 승인(O/X)을 서식에 되짚는 열쇠다(서식명은 겹칠 수 있다).
+//   지우거나 고치지 말아 달라고 검토 안내에 적는다. (2026-10-04 노무사 검토 시작 전에 넣음)
 const HEADERS = ['승인', '육안확인', '도메인', '서식명', '분류', '전자서명', '서명자',
-                 '관할', '트랙', '변수', '플래그', '중복', '대표본 경로', '본문 미리보기'];
-const RATIOS  = [0.4, 0.5, 0.8, 2.2, 0.8, 0.6, 0.6, 0.5, 1.4, 2.0, 1.0, 0.5, 3.6, 4.0];
+                 '관할', '트랙', '변수', '플래그', '중복', '대표본 경로', '본문 미리보기', 'ID'];
+const RATIOS  = [0.4, 0.5, 0.8, 2.2, 0.8, 0.6, 0.6, 0.5, 1.4, 2.0, 1.0, 0.5, 3.6, 4.0, 1.1];
 
 // ── 검토 순서 ──
 // 제목이 검출된 서식이 앞, 미검출이 뒤(의뢰인 결정). 미검출 서식은 사람이 제목을
@@ -68,6 +70,7 @@ function reviewRows(forms) {
     (f.source.cluster || []).length,
     f.source.file,
     L.stripTags(f.body).slice(0, 200),
+    String(f.id || ''),
   ]);
   return { headers: HEADERS.slice(), colRatios: RATIOS.slice(), rows };
 }
@@ -167,6 +170,11 @@ function main() {
   });
   const xlsxPath = path.join(OUT_DIR, '서식집_검토표.xlsx');
   fs.writeFileSync(xlsxPath, Buffer.from(u8));
+
+  // 묶음 사본 — Phase 1(승인한 것만 익명화해 싣기)은 «검토표를 만든 그 묶음»을 읽는다.
+  // corpus 를 다시 돌리면 바탕 화면이 바뀐 만큼 대표본·id 가 달라질 수 있다 — 검토한 것과 싣는 것이 어긋나면 안 된다.
+  fs.writeFileSync(path.join(OUT_DIR, 'forms_snapshot.json'),
+    JSON.stringify({ at: new Date().toISOString(), records: records.length, forms }), 'utf8');
 
   // HTML
   const htmlPath = path.join(OUT_DIR, '서식집_검토.html');

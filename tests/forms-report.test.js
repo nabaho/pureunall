@@ -91,6 +91,13 @@ test('reviewRows: titleDetected가 false면 서식명 칸에 (제목 미검출)�
   assert.ok(cell.startsWith('(제목 미검출)'));
 });
 
+test('reviewRows: 맨 끝 열은 ID — 승인(O/X)을 서식에 되짚는 열쇠', () => {
+  const t = R.reviewRows(FORMS);
+  assert.strictEqual(t.headers[t.headers.length - 1], 'ID');
+  assert.strictEqual(t.rows[0][t.headers.length - 1], 'wa-abc1234567');
+  assert.strictEqual(t.headers[0], '승인');
+});
+
 test('reviewRows: titleDetected가 true면 (제목 미검출) 표시가 붙지 않는다', () => {
   const h = R.reviewRows(FORMS).headers;
   const row = R.reviewRows(FORMS).rows[0];
