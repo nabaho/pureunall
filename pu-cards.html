@@ -21535,6 +21535,8 @@ function whoUnknownSenders(opt){
       if(mbEndedOfRow(v)) return;              /* 끝난 업체는 종료 칸으로만 간다 */
       if(mbWhoOfRow(v)) return;
       const em = String(v.e||'').trim().toLowerCase(); if(!em) return;
+      /* 공공기관·자동발송은 저절로 「그 밖」이다(2026-10-04) — 이을 것이 아니라 목록에서도 뺀다 */
+      if(mbAutoOther(em)) return;
       const o = by[em] = by[em] || { e:em, n:0, name:'', last:'', at:0, box:'' };
       o.n++;
       if(!o.name && v.f) o.name = String(v.f);
@@ -21554,6 +21556,95 @@ function whoUnknownSenders(opt){
       return o;
     })
     .sort((a,b)=> b.n - a.n || b.at - a.at);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   🏢 많이 오는 회사 — 담당 모름을 «회사 메일 주소 끝(@회사.kr)»으로 묶는다
+   (대표 승인 목업 2026-10-04)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 실측 2026-10-04 — 처음 보는 회사 메일 1,144통이 110개 도메인에서 왔고, 그 가운데
+     10곳이 823통이었다. 주소별 목록에서는 한 회사가 여러 줄로 흩어져 안 보인다.
+   ★ 잇는 길은 «있던 것»이다 — mbCoSet / mbNotCoSet 의 byDomain. 새 저장 자리 없음.
+   ⚠ 개인 메일(MB_PUB_DOM)은 묶지 않는다 — 네이버 하나를 이으면 온 세상이 한 회사가 된다.
+   ⚠ 2통 이상만 — 한 통짜리 도메인은 주소별 목록에서 보는 것과 다를 게 없다.
+   ⚠ 짐작(💡)은 명함 이름으로만 짚고 «누르셔야» 이어진다(mbCoGuess 와 같은 규칙). */
+const WHO_DOM_MIN = 2;
+const WHO_DOM_TOP = 10;
+function whoDomGroups(list0){
+  const list = list0 || whoUnknownSenders({ all: true });
+  const by = {};
+  list.forEach(o=>{
+    const d = mbDomOf(o.e);
+    if(!d || MB_PUB_DOM.indexOf(d) >= 0) return;
+    const g = by[d] = by[d] || { d:d, n:0, addrs:[], names:[], at:0, last:'', co:'', hid:false };
+    g.n += o.n;
+    g.addrs.push(o.e);
+    if(o.name && g.names.indexOf(o.name) < 0) g.names.push(o.name);
+    if(o.at > g.at){ g.at = o.at; g.last = o.last; }
+  });
+  const set = _mbNotCo || {}, co = _mbCo || {};
+  return Object.values(by)
+    .filter(g => g.n >= WHO_DOM_MIN)
+    .map(g => {
+      const k = mbWhoKey('@' + g.d);
+      g.hid = !!set[k];                              /* 회사째 치웠나 */
+      g.co  = mbCoValName(co[k]);                    /* 회사째 이었나(담당이 없어 아직 여기 있는 것) */
+      return g;
+    })
+    .sort((a,b)=> b.n - a.n || b.at - a.at);
+}
+function whoDomMore(){ state.whoDomAll = !state.whoDomAll; renderMailPage(); }
+function whoDomHtml(list0, gidx){
+  const all = whoDomGroups(list0);
+  if(!all.length) return '';
+  const top = all.slice(0, WHO_DOM_TOP);
+  const sum = top.reduce((s,g)=>s+g.n, 0);
+  const shown = state.whoDomAll ? all : top;
+  let h = `<div style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px;margin:0 0 12px">
+    <div style="font-weight:700;font-size:14px">🏢 많이 오는 회사
+      <span style="font-size:11px;background:#eff6ff;color:#1e40af;border-radius:4px;padding:0 6px;margin-left:6px">${
+        top.length}곳 · ${sum.toLocaleString()}통</span></div>
+    <div style="color:#475569;font-size:12px;line-height:1.6;margin:4px 0 6px">
+      담당 모름 메일을 <b>회사 메일 주소 끝(@회사.kr)</b>으로 묶었습니다. 한 번 고르면
+      <b>그 회사 사람 전부</b>가 이어집니다 — 앞으로 새 직원이 보내도 저절로 갑니다.
+      네이버·다음 같은 개인 메일과 공공기관은 여기 안 나옵니다.</div>`;
+  shown.forEach(g=>{
+    const a0 = g.addrs[0];
+    const ppl = g.names.length
+      ? g.names.slice(0,2).join(' · ') + (g.addrs.length > 2 ? ` 외 ${g.addrs.length-2}명` : '')
+      : g.addrs.length + '명';
+    let guess = null;
+    if(!g.hid && !g.co) for(let i=0; i<g.addrs.length && !guess; i++) guess = mbCoGuess(g.addrs[i], gidx);
+    const tail = g.hid
+      ? `<span style="color:#16a34a;font-size:12px">✓ 자문사 아님으로 치움</span>
+         <span class="dm-who na" onclick="mbNotCoSet('${esc(a0)}',false,true)" title="회사째 치운 것을 되돌립니다">↩ 되돌리기</span>`
+      : g.co
+      ? `<span style="color:#854d0e;font-size:12px" title="이 자문사에 이알피 담당자가 없어 아직 담당 모름에 있습니다">✓ ${esc(g.co)} 로 이음 · 담당 없음</span>
+         <span class="dm-who na" onclick="mbCoSet('${esc(a0)}','',true)" title="회사째 이은 것을 지웁니다">↩ 되돌리기</span>`
+      : `${guess?`<span class="dm-who na" style="background:#fffbeb;border-color:#fde68a;color:#854d0e"
+            onclick="mbCoSet('${esc(a0)}','${esc(guess.name)}',true)"
+            title="명함의 「${esc(guess.from)}」 — 이 회사 전체를 이 자문사로 잇습니다">💡 ${esc(guess.name)} 로</span>`:''}
+         <input list="mbCoDL" placeholder="자문사 이름을 치세요"
+           onchange="mbCoSet('${esc(a0)}',this.value,true)"
+           title="고르면 @${esc(g.d)} 전체가 그 자문사로 이어집니다 — 목록에 있는 자문사만 이어집니다"
+           style="flex:none;width:170px;font-family:inherit;font-size:12px;padding:4px 6px;border:1px solid #cbd5e1;border-radius:6px">
+         <span class="dm-who na" onclick="mbNotCoSet('${esc(a0)}',true,true)"
+           title="@${esc(g.d)} 전체를 잇기 목록에서 치웁니다 — 메일은 그대로 있습니다">✕ 자문사 아님</span>`;
+    h += `<div class="dm-row" style="white-space:nowrap${g.hid||g.co?';opacity:.6':''}">
+      <span class="st" style="width:52px;text-align:center;color:#2563eb;font-weight:700">${g.n}통</span>
+      <span class="who" style="width:170px;font-weight:600;overflow:hidden;text-overflow:ellipsis" title="${esc(g.addrs.join(' · '))}">@${esc(g.d)}</span>
+      <span style="flex:none;width:170px;color:#475569;font-size:12px;overflow:hidden;text-overflow:ellipsis" title="${esc(g.names.join(' · '))}">${esc(ppl)}</span>
+      <span class="sub" style="overflow:hidden;text-overflow:ellipsis" title="${esc(g.last||'')}">${esc(g.last||'(제목 없음)')}</span>
+      ${tail}
+    </div>`;
+  });
+  if(all.length > WHO_DOM_TOP) h += `<div style="color:#2563eb;font-size:12px;margin-top:6px;cursor:pointer"
+    onclick="whoDomMore()">${state.whoDomAll ? '▴ 위 ' + WHO_DOM_TOP + '곳만 보기'
+      : `▾ 나머지 ${(all.length - WHO_DOM_TOP).toLocaleString()}곳 더 보기`}</div>`;
+  h += `</div>
+  <div style="font-weight:700;font-size:13px;margin:2px 0 4px">📧 주소별
+    <span style="font-weight:400;color:#475569;font-size:12px">— 회사째 이은 주소는 빠집니다 · 개인 메일은 여기서 한 사람씩 잇습니다</span></div>`;
+  return h;
 }
 
 /* 이 회사(도메인·이름)에 이미 이어 둔 주소가 몇 개인가
@@ -21643,6 +21734,7 @@ function whoPageHtml(){
             <span style="color:#94a3b8">— 이름은 메일에서 가져오고, <b>빈 칸만</b> 채웁니다</span>
           </label>
         </div>
+        ${whoDomHtml(all, gidx)}
         <div class="dm-list">`;
     if(!hide) body += dl;   /* 자문사 목록은 «한 벌만» — 줄마다 넣으면 화면이 2MB 가 된다 */
     if(!shown.length) body += `<div class="dm-none">${hide
