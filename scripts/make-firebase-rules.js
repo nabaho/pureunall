@@ -173,6 +173,11 @@ rules.data = {
   retirement_settlements: finOnly, recurring_expenses: finOnly,
   expense_budget: finOnly, finance_bank_fee: finOnly, user_accounts: finOnly,
   ledger_batches: finOnly,
+  /* ★ 2026-10-04 — 이름 없이 $other(재직 직원 누구나 읽고 쓰기)로 떨어지던 돈·급여 자리를 재무 권한자만으로.
+     법인카드 전체 번호(accounts) · 직원별 급여 바뀌기 전·후 값(payroll_audit_log) · CMS 출금 장부 · 통장 입금 처리 기록 ·
+     거래내역 보류·고름·나눔 · 입금자 별칭 · 이체수수료 기억. 자문료 수입은 막혀 있는데 이것들은 열려 있었다.
+     쓰는 화면은 모두 이알피 재무·급여 화면뿐이다(2026-10-04 코드 전수 확인) — 재무 권한 없는 직원 일은 안 멈춘다. */
+  payroll_audit_log: finOnly, cms_ledger: finOnly, bank_processed: finOnly, ledger_held: finOnly, ledger_picks: finOnly, ledger_split_recipes: finOnly, payer_aliases: finOnly, finance_bank_fee_last: finOnly, accounts: finOnly,
 
   /* 직원 명부 — 모두 보고, 관리자·위임관리인만 고친다 */
   user_dir: { '.read': LOGIN, '.write': `${ADMIN} || ${SUB}` },

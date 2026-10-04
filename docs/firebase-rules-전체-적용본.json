@@ -155,6 +155,42 @@
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
         ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
       },
+      "payroll_audit_log": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "cms_ledger": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "bank_processed": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "ledger_held": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "ledger_picks": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "ledger_split_recipes": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "payer_aliases": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "finance_bank_fee_last": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
+      "accounts": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
       "user_dir": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true"
