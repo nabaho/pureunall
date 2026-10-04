@@ -315,3 +315,40 @@ test('★ 처음 훑기 — 여러 쪽을 읽어 줄 수·기간·모집 글을 
   const 늘같음 = await W.probeBoard({ board: 회원, pages: 5, fetchText: async () => html(쪽[1]) });
   assert.equal(늘같음.pages, 1); assert.equal(늘같음.rows, 2);
 });
+
+/* ═══ 공인노무사회 (대표 지시 2026-10-04 「공인노무사회에서 컨설턴트 모집 또는 고문 자문 노무사 모집등 공고도 수집」) ═══
+   제목은 2026-10-04 실제 «채용 정보»에서 옮겼다(공개 게시판). */
+test('★★ 공인노무사회 — 노무사에게 «맡기는» 글만, 노무법인 직원 채용·공무원 채용시험은 거른다', () => {
+  ['직장 내 괴롭힘 사건 외부 조사자 선임 공고',
+    'AI 노동법 상담서비스 개선지원단 DB작성 담당자 모집의 건',
+    '○○공사 고문노무사 모집 공고',
+    '△△시 노동권익센터 자문위원 추천 요청'
+  ].forEach((t) => assert.equal(W.isKcplaa(t), true, t));
+  ['[ 노무법인 청파 본사 ] 경력 노무사 모집공고 (포항)',
+    '[노무법인 이산] 공인노무사 모집(법률센터/서울)',
+    '경기도청 임기제(공인노무사) 채용 공고',
+    '충남대학교 국가공무원(전문경력관 나군(노무 담당)) 경력경쟁채용시험 공고',
+    '[인사노무컨설팅 율] 임금·4대보험 아웃소싱 담당자 채용',
+    '[홍익노무법인 부산지사] 수습노무사 및 경력노무사 초빙',
+    '한국공인노무사회 유튜브 토크쇼 출연 참여자 모집 안내',
+    '청년위원회「퍼스널 브랜딩·마케팅 전략 코칭 프로그램」 2회차 개최 안내',
+    '[노무법인 가나] 산재 전문 컨설턴트 모집',      // 누구·뽑는다가 다 있어도 노무법인의 직원 채용
+    '2026년 공인노무사 직무교육 강사 모집 결과'     // 끝난 글
+  ].forEach((t) => assert.equal(W.isKcplaa(t), false, t));
+});
+test('★ 게시판마다 잣대를 고른다 — 공인노무사회는 rule, 나머지는 isRecruit', () => {
+  const kc = { rule: 'kcplaa' }, other = { id: 'erc' };
+  assert.equal(W.pass(kc, '직장 내 괴롭힘 사건 외부 조사자 선임 공고'), true);
+  assert.equal(W.pass(other, '직장 내 괴롭힘 사건 외부 조사자 선임 공고'), false, '일반 잣대엔 「조사자·선임」이 없다');
+  assert.equal(W.pass(kc, '[노무법인 이산] 공인노무사 모집(법률센터/서울)'), false);
+  assert.equal(W.pass(other, '[노무법인 이산] 공인노무사 모집(법률센터/서울)'), true, '일반 잣대는 「노무사 모집」을 잡는다 — 그래서 공인노무사회엔 따로 쓴다');
+});
+test('★★ 한 번 돌 때 공인노무사회도 같은 열쇠·같은 자리에 남는다', async () => {
+  const kcHtml = '<table><tbody>'
+    + '<tr><td><a href="/worker/view/22797?scd=1">직장 내 괴롭힘 사건 외부 조사자 선임 공고</a></td><td>2026-09-30</td></tr>'
+    + '<tr><td><a href="/worker/view/22796?scd=1">[노무법인 이산] 공인노무사 모집(법률센터/서울)</a></td><td>2026-09-30</td></tr></tbody></table>';
+  const r = await W.run({ boards: W.BOARDS.filter((b) => b.id === 'kcplaa_job'), fetchText: () => Promise.resolve(kcHtml), today: '2026-10-04' });
+  assert.deepEqual(r.hits.map((h) => h.title), ['직장 내 괴롭힘 사건 외부 조사자 선임 공고']);
+  assert.equal(r.hits[0].org, 'kcplaa');
+  assert.equal(r.hits[0].href, 'https://www.kcplaa.or.kr/worker/view/22797?scd=1');
+});

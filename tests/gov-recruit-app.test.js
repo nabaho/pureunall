@@ -30,17 +30,20 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
+    GovSubmit: require('../js/gov-submit.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
     prompt: () => answers.shift(), confirm: () => (opt.confirm !== false),
-    open: (u) => { opened.push(u); }
+    open: (u) => { opened.push(u); },
+    TextDecoder, Uint8Array, PuKordocText: opt.kordoc
   };
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
+    + 'recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, opened, toasts };
@@ -363,4 +366,173 @@ test('★ 컨설턴트 모집 탭을 열면 서버 결과를 받아 온다', asy
   r.api.setTab('rec');
   await new Promise((res) => setTimeout(res, 20));
   assert.match(r.el('recWatch').innerHTML, /외부연구진/);
+});
+
+/* ═══ 📬 메일에서 찾은 것 + 📤 내기 전에 점검 (2026-10-04) ═══ */
+const DM = (y, m, d) => new Date(y, m - 1, d, 10).getTime();
+const MFOLD = {
+  'INBOX-1': { slug: 'INBOX-1', name: 'INBOX', kind: 'inbox' },
+  'Sent-2': { slug: 'Sent-2', name: 'Sent Messages', kind: 'sent' },
+  'c3-3': { slug: 'c3-3', name: '3.컨설팅(정부사업)', kind: 'custom' },
+  'pay-4': { slug: 'pay-4', name: '2.급여+사무대행', kind: 'custom' },
+  'shop-5': { slug: 'shop-5', name: '쇼핑', kind: 'custom' }
+};
+const MSGS = {
+  'Sent-2': { 1: { u: 1, s: '[권형하노무사] 지원서 입니다.', d: DM(2026, 9, 29), a: 3 } },
+  'c3-3': {
+    7: { u: 7, s: 'Re: [푸른노무법인] 2026년 지방공기업평가원 자문위원_인사노무 부문 응모서류 제출의 건', d: DM(2026, 1, 24), a: 0 },
+    8: { u: 8, s: '2026년 지방공기업 경영평가 평가위원 선정 안내', d: DM(2026, 2, 6), a: 0 },
+    9: { u: 9, s: '[세종농촌융복합산업지원센터] 농촌융복합산업 전문상담 및 현장코칭 모집 공고(~26.02.25까지)', d: DM(2026, 2, 11), a: 1 } },
+  'INBOX-1': {}
+};
+function mailDb(o) {
+  o = o || {};
+  const reads = [], writes = [];
+  return { reads, writes, db: { ref: (p) => ({
+    once: () => { reads.push(p);
+      if (o.fail) return Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }));
+      let v = null;
+      if (p === 'mailbox/folders') v = MFOLD;
+      else if (p.indexOf('mailbox/msgs/') === 0) v = MSGS[p.slice(13)] || {};
+      return Promise.resolve({ val: () => v }); },
+    set: () => { writes.push(p); return Promise.resolve(); } }) } };
+}
+
+test('★★ 메일함 폴더는 «관련된 것만» 읽는다 — 급여·쇼핑 폴더는 안 연다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  const m = mailDb(); r.api.setFb(m.db, 'U1');
+  await r.api.recMailScan(true);
+  assert.ok(m.reads.indexOf('mailbox/msgs/Sent-2') >= 0 && m.reads.indexOf('mailbox/msgs/c3-3') >= 0);
+  assert.equal(m.reads.indexOf('mailbox/msgs/pay-4'), -1, '급여 폴더는 열지 않는다');
+  assert.equal(m.reads.indexOf('mailbox/msgs/shop-5'), -1);
+});
+test('★★ 지원 메일을 찾으면 「지원함」으로 저절로 — 무엇을 근거로 적었는지 남긴다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  const m = mailDb(); r.api.setFb(m.db, 'U1');
+  await r.api.recMailScan(true);
+  const c = r.api.recObj('recruit_log').erc['2026'];
+  assert.equal(c.st, '지원함'); assert.equal(c.via, 'mail'); assert.equal(c.mail.date, '2026-01-24');
+  assert.ok(r.toasts.some((t) => /지원 1건을 찾아 「지원함」/.test(t)));
+  assert.match(r.api.recMailMark('erc', '2026'), /📨/);
+  const h = r.el('recMail').innerHTML;
+  assert.match(h, /저절로 적은 것 1/); assert.match(h, /recMailUndo\('erc','2026'\)/);
+});
+test('★★ 결과는 저절로 안 적는다 — 묻고, 누르면 적는다(마감일은 남긴다)', async () => {
+  const r = runApp({ recruit_log: { erc: { 2026: { due: '2026-02-01' } } } }, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  const h = r.el('recMail').innerHTML;
+  assert.match(h, /🏅 결과 메일 1/); assert.match(h, /선정 같음/);
+  const key = (h.match(/recMailResult\('([^']+)','erc','선정'\)/) || [])[1];
+  assert.ok(key, '선정 단추가 있어야 한다');
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '지원함', '결과는 아직 안 적었다');
+  r.api.recMailResult(key, 'erc', '선정');
+  const c = r.api.recObj('recruit_log').erc['2026'];
+  assert.equal(c.st, '선정'); assert.equal(c.due, '2026-02-01'); assert.equal(c.via, undefined);
+  assert.doesNotMatch(r.el('recMail').innerHTML, /🏅 결과 메일/, '적고 나면 다시 안 묻는다');
+});
+test('★ 기관 모르는 지원 메일 — 고르면 기억하고 지원함으로 적는다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  const h = r.el('recMail').innerHTML;
+  assert.match(h, /기관을 모르는 지원·결과 메일 1/);
+  const key = (h.match(/recMailPick\('([^']+)',this\.value\)/) || [])[1];
+  r.api.recMailPick(key, 'cepa');
+  assert.equal(r.api.recObj('recruit_mailmap')[key], 'cepa');
+  assert.equal(r.api.recObj('recruit_log').cepa['2026'].st, '지원함');
+});
+test('★★ ↩ 되돌리기 — 지우고, 같은 메일로 다시 적지 않는다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  r.api.recMailUndo('erc', '2026');
+  assert.equal(r.api.recObj('recruit_log').erc, undefined);
+  await r.api.recMailScan(true);
+  assert.equal((r.api.recObj('recruit_log').erc || {})['2026'], undefined, '되돌린 메일을 또 적으면 되돌리기가 소용없다');
+});
+test('★ 되돌려도 사람이 넣은 마감일은 남긴다', async () => {
+  const r = runApp({ recruit_log: { erc: { 2026: { due: '2026-01-20' } } } }, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '지원함');
+  r.api.recMailUndo('erc', '2026');
+  const c = r.api.recObj('recruit_log').erc['2026'];
+  assert.equal(c.due, '2026-01-20'); assert.equal(c.st, undefined); assert.equal(c.via, undefined);
+});
+test('★ 사람이 적은 「탈락」은 메일이 덮지 않는다', async () => {
+  const r = runApp({ recruit_log: { erc: { 2026: { st: '탈락' } } } }, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '탈락');
+});
+test('★ 하루 한 번만 저절로 읽는다 — 12시간 안에 탭을 다시 열면 안 읽는다', async () => {
+  const r = runApp({ recruit_mail_at: String(new Date('2026-10-04T08:00:00').getTime()), recruit_mailitems: [] }, { Date: FixedDate('2026-10-04T09:00:00') });
+  const m = mailDb(); r.api.setFb(m.db, 'U1');
+  await r.api.recMailScan(false);
+  assert.equal(m.reads.length, 0);
+  await r.api.recMailScan(true);
+  assert.ok(m.reads.length > 0, '「다시 찾기」는 언제든 읽는다');
+});
+test('★★ 메일함에는 아무것도 쓰지 않는다 — 쓰는 곳은 대표 자리(gov/)뿐', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  const m = mailDb(); r.api.setFb(m.db, 'U1');
+  await r.api.recMailScan(true);
+  await new Promise((res) => setTimeout(res, 1400));
+  assert.ok(m.writes.length >= 1);
+  m.writes.forEach((p) => assert.match(p, /^gov\/U1$/, p));
+  assert.doesNotMatch(src, /ref\('mailbox[^)]*\)\s*\.(set|update|push|remove)/);
+});
+test('★ 권한이 없으면 까닭을 말한다', async () => {
+  const r = runApp({});
+  r.api.setFb(mailDb({ fail: true }).db, 'U1');
+  await r.api.recMailScan(true);
+  assert.match(r.el('recMail').innerHTML, /메일함을 읽을 권한이 없습니다/);
+});
+test('★ 메일로 온 모집 공고 — 접어 두고 보여 준다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  assert.match(r.el('recMail').innerHTML, /메일로 온 모집 공고 1/);
+});
+
+function fakeFile(name, text, size) {
+  const b = Buffer.from(text || '', 'utf8');
+  return { name, size: size || b.length, arrayBuffer: () => Promise.resolve(b.buffer.slice(b.byteOffset, b.byteOffset + b.length)) };
+}
+const kordocFake = { read: async (buf) => ({ text: Buffer.from(buf).toString('utf8') }) };
+test('★★ 내기 전에 점검 — 브라우저 안에서 읽어 빠진 서류·주민번호·작년 파일을 짚는다', async () => {
+  const r = runApp({ recruit_scan: SCAN, recruit_log: { erc: { 2026: { due: '2026-12-31' } } } }, { Date: FixedDate('2026-12-05T09:00:00'), kordoc: kordocFake });
+  r.api.recPrep('erc');
+  assert.match(r.el('popBody').innerHTML, /③ 내기 전에 점검한다/);
+  assert.match(r.el('popBody').innerHTML, /어디에도 보내지 않습니다/);
+  await r.api.recCheckRun('erc', [fakeFile('지원서.hwp', '지원서 주민등록번호 800101-1234567 (서명)'),
+    fakeFile('2025_이력서.txt', '이력서'), fakeFile('자격증.jpg', '')]);
+  const h = r.el('recChkOut').innerHTML;
+  assert.match(h, /빠진 서류: 경력증명서, 개인정보 동의서/);
+  assert.match(h, /주민번호 1곳/);
+  assert.match(h, /2025년이 적혀 있습니다/);
+  assert.match(h, /그림·기타 파일/, '그림은 못 읽었다고 밝힌다');
+  assert.match(h, /pu-cards\.html\?view=mail/);
+});
+test('★ 요구 서류를 바꾸면 점검을 다시 그린다 — 기관마다 기억한다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00'), kordoc: kordocFake });
+  r.api.recPrep('erc');
+  await r.api.recCheckRun('erc', [fakeFile('지원서.hwp', '지원서'), fakeFile('이력서.hwp', '이력서')]);
+  assert.match(r.el('recChkOut').innerHTML, /빠진 서류/);
+  ['career', 'consent', 'license'].forEach((k) => r.api.recNeedTog('erc', k));
+  assert.deepEqual(r.api.recNeedOf('erc').slice().sort(), ['apply', 'resume']);
+  assert.match(r.el('recChkOut').innerHTML, /✅ 빠진 서류·주민번호·작년 파일이 없습니다/);
+  assert.deepEqual(r.api.recObj('recruit_need').erc.slice().sort(), ['apply', 'resume']);
+});
+test('★ 한글 읽개가 없으면 «못 읽었다»고 말한다 — 통과로 치지 않는다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recPrep('erc');
+  await r.api.recCheckRun('erc', [fakeFile('지원서.hwp', '지원서')]);
+  assert.match(r.el('recChkOut').innerHTML, /한글 읽개를 싣지 못했습니다/);
+});
+test('★★ 점검은 파일을 «아무 데도» 보내지 않는다 — fetch·업로드·AI 없음', () => {
+  const body = src.slice(src.indexOf('═══ 📤 내기 전에 점검'), src.indexOf('function recSetSt('));
+  assert.ok(body.length > 1000);
+  assert.doesNotMatch(body, /fetch\(|XMLHttpRequest|\.ref\(|readDoc|PuAiCall|storage\(/);
 });
