@@ -62,11 +62,11 @@ test('splitSegments: 제목 뒤 표는 새 조각을 만들지 않는다', () =>
   assert.strictEqual(segs.length, 1);
 });
 
-test('splitSegments: 표 셀의 중첩 <p>는 경계를 만든다 (알려진 한계)', () => {
+test('splitSegments: 표 셀의 중첩 <p>는 경계를 만들지 않는다 (예전 한계를 2026-10-04 고침)', () => {
   const html = '<p>위   임   장</p><table><tr><td><p>동의서</p></td><td>내용</td></tr></table>';
   const segs = L.splitSegments(html);
-  // 현재 구현은 <td> 안의 <p>도 경계로 삼는다. hwp2html.py 출력이 이런 구조를 만들지 않아 문제없다.
-  assert.strictEqual(segs.length, 2);
+  // 예전에는 <td> 안의 <p>도 경계로 삼았다(「hwp2html 이 이런 구조를 안 만든다」는 전제). 이제는 만든다(88건) — 표 밖에서만 자른다.
+  assert.strictEqual(segs.length, 1);
 });
 
 // ── Finding D 회귀: 자간을 벌린 '기입란 라벨'이 서식 제목으로 둔갑하던 문제 ──
@@ -185,4 +185,25 @@ test('splitSegments: 취업규칙 장절 제목은 세그먼트를 나누지 않
   assert.strictEqual(segs.length, 1);
   assert.strictEqual(segs[0].title, '취업규칙');
   assert.ok(segs[0].html.includes('제 2 장'));
+});
+
+// ── 2026-10-04: 변환기가 <p style="…"> 를 내고, 칸 안에도 <p> 를 낸다 ──
+test('splitSegments: 속성 붙은 <p style> 제목도 찾는다', () => {
+  const html = '<p style="text-align:center;line-height:200%">위 임 약 정 서</p>'
+    + '<p style="line-height:160%">' + '위임인은 수임인에게 아래 사건을 위임합니다. '.repeat(4) + '</p>'
+    + '<p style="text-align:center">개인정보 수집·이용 동의서</p>'
+    + '<p style="line-height:160%">' + '수집하는 개인정보 항목과 이용 목적은 다음과 같습니다. '.repeat(4) + '</p>';
+  const segs = L.splitSegments(html);
+  assert.strictEqual(segs.length, 2);
+  assert.ok(segs[0].title, '제목을 못 찾았다');
+  assert.ok(segs[1].title, '두 번째 제목을 못 찾았다');
+});
+
+test('splitSegments: 표 안의 <p> 에서는 자르지 않는다', () => {
+  const html = '<p style="text-align:center">위 임 약 정 서</p>'
+    + '<table><tr><td><p>위 임 장</p><p>칸 안 문단</p></td></tr></table>'
+    + '<p>' + '위임인은 수임인에게 아래 사건을 위임합니다. '.repeat(4) + '</p>';
+  const segs = L.splitSegments(html);
+  assert.strictEqual(segs.length, 1, '표 한가운데서 서식이 갈렸다');
+  assert.ok(segs[0].html.includes('<table>') && segs[0].html.includes('</table>'));
 });
