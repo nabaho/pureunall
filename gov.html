@@ -25,8 +25,12 @@
 *{box-sizing:border-box}
 body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;
   background:var(--bg);color:var(--text);font-size:14px}
+/* ★ 틀고정 (대표 지시 2026-10-04 「틀고정」) — 머리줄과 탭을 «한 덩어리»(#head)로 붙인다.
+   ⚠ 둘을 따로 붙이면 좁은 화면에서 머리줄이 두 줄로 접힐 때 탭이 그 밑으로 숨는다(높이를 재야 한다).
+     한 덩어리면 높이가 바뀌어도 함께 움직인다 — 재는 코드가 필요 없다. */
+#head{position:sticky;top:0;z-index:20;background:var(--card);box-shadow:0 1px 3px rgba(15,23,42,.06)}
 #top{display:flex;align-items:center;gap:10px;padding:10px 16px;background:var(--card);
-  border-bottom:1px solid var(--border);flex-wrap:wrap;position:sticky;top:0;z-index:20}
+  border-bottom:1px solid var(--border);flex-wrap:wrap}
 #top .ttl{font-size:16px;font-weight:700;color:var(--navy)}
 #top .sub{font-size:11px;color:var(--text-mute)}
 .sp{flex:1}
@@ -57,8 +61,11 @@ td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:top}
 .note{font-size:12.5px;line-height:1.8;color:var(--text-mute)}
 .empty{padding:34px 12px;text-align:center;color:var(--text-mute);font-size:13px}
 /* ── 「공고」·「신청 재료」 두 문 ──
-   ⚠ 붙박이(sticky)로 두지 않는다 — 위 머리줄이 좁은 화면에서 두 줄로 접히면
-     그만큼 어긋나고, 그걸 맞추려면 높이를 재는 코드가 또 필요해진다. */
+   ⚠ 탭 «혼자» 붙박이로 두지 않는다 — 머리줄이 두 줄로 접히면 어긋난다.
+     붙이는 것은 위 #head(머리줄+탭 한 덩어리)가 한다. */
+/* 📅 받은 범위 — 목록이 «언제부터 언제까지»의 공고인지 (대표 지시 2026-10-04 「기간 표시」) */
+#period{font-size:12px;color:var(--text-mute);margin:-2px 0 8px;line-height:1.7}
+#period b{color:var(--navy)}
 #tabs{display:flex;gap:6px;padding:0 16px;background:var(--card);
   border-bottom:1px solid var(--border)}
 #tabs .tb{padding:9px 14px;border:0;background:none;font-family:inherit;font-size:13px;
@@ -135,6 +142,7 @@ table.cmp td{white-space:nowrap}
 </head>
 <body>
 
+<div id="head">
 <div id="top">
   <div>
     <div class="ttl">정부사업신청</div>
@@ -153,6 +161,7 @@ table.cmp td{white-space:nowrap}
   <button class="tb" id="tbRec" onclick="setTab('rec')">🧑‍💼 컨설턴트 모집</button>
   <button class="tb" id="tbMat" onclick="setTab('mat')">👤 신청 재료</button>
 </div>
+</div>
 
 <div class="wrap" id="pgFeed">
   <div class="card">
@@ -170,6 +179,7 @@ table.cmp td{white-space:nowrap}
       <button class="btn" onclick="expCsv()">📤 CSV</button>
     </div>
     <div class="bar" id="kwBox"></div>
+    <div id="period"></div>
     <div id="note" style="font-size:12.5px;margin-bottom:9px"></div>
     <div id="feedSel"></div>
     <div class="scroll"><table>
@@ -391,6 +401,9 @@ async function fetchAll(){
   var m=GovG2b.merge(buf, got, kws(), today);
   m.adds.forEach(function(r){ r.id=nextId(buf); r.savedAt=new Date().toISOString(); buf.unshift(r); });
   if(m.adds.length) set('feed',buf);
+  /* 받은 때·범위를 남긴다 — 화면이 「언제까지의 공고인가」를 말할 수 있게(feedPeriod) */
+  lsSet('last_at', new Date().toISOString());
+  lsSet('last_win', ymdOf(from)+'~'+ymdOf(to));
   ageOut(); lsSet('last',today); draw();
   note('받은 공고 '+got.length+'건 중 <b>'+m.adds.length+'건</b>이 새로 걸렸습니다 '
     +'<span class="sub">(이미 있어 건너뜀 '+m.skipped+' · 낱말에 안 걸림 '+m.unmatched+')</span>'
@@ -454,8 +467,37 @@ function _pager(p, pages, from, shown, n, fn){
   return h+'<button class="btn sm" '+(p>=pages-1?'disabled':'')+' onclick="'+fn+'('+(p+1)+')">▶</button>'
     +'<span class="sml">'+(from+1)+'–'+(from+shown)+' / '+n+'건</span></div>';
 }
+/* ═══ 📅 받은 범위 (대표 지시 2026-10-04 「기간 표시 언제까지인지 기간 확인필요」) ═══
+   목록이 «언제부터 언제까지»의 공고인지 — 공고일 범위 · 마감이 가장 늦은 날 · 마지막으로 받은 때.
+   ⚠ 숨긴 것도 센다 — 「전체 0건 · 숨김 32건」일 때 범위가 비면 «받은 게 없다»로 읽힌다.
+   ⚠ 나라장터는 받을 때마다 «지난 7일치»만 온다(fetchAll) — 그 앞은 쌓인 것이다. 그렇게 밝힌다. */
+function ymdOf(d){ var x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+function feedPeriod(rows, lastAt, lastDay){
+  var open=[], close=[];
+  (rows||[]).forEach(function(r){ if(!r) return;
+    var o=String(r.openDt||'').slice(0,10), c=String(r.closeDt||'').slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(o)) open.push(o);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(c)) close.push(c); });
+  open.sort(); close.sort();
+  var at=String(lastAt||'');
+  var atTxt = at ? (function(){ var d=new Date(at); return isNaN(d)?'':ymdOf(d)+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })()
+    : (lastDay||'');
+  return { from: open[0]||'', to: open[open.length-1]||'', closeTo: close[close.length-1]||'', lastAt: atTxt, n: (rows||[]).length };
+}
+function periodHtml(){
+  var every=get('feed'), pr=feedPeriod(every, lsGet('last_at'), lsGet('last'));
+  if(!pr.n && !pr.lastAt) return '';
+  var h='📅 ';
+  h += pr.from ? '공고일 <b>'+esc(pr.from)+'</b> ~ <b>'+esc(pr.to)+'</b>' : '공고일 모름';
+  if(pr.closeTo) h += ' · 마감은 <b>'+esc(pr.closeTo)+'</b>까지';
+  h += ' · 마지막으로 받은 때 <b>'+esc(pr.lastAt||'아직 없음')+'</b>';
+  h += '<br><span class="sml">나라장터는 받을 때마다 «지난 7일치»가 오고(그 앞은 쌓인 것), 알리오·기업마당은 «지금 진행 중»인 공고입니다.'
+    + ' 숨긴 공고도 범위에 넣어 셉니다.</span>';
+  return h;
+}
 function draw(){
   var v=feedVisible(), all=v.all, rows=v.rows;
+  var pdv=$('period'); if(pdv) pdv.innerHTML=periodHtml();
   var vis={}; rows.forEach(function(r){ vis[r.id]=1; });
   Object.keys(_feedSel).forEach(function(id){ if(!vis[id]) delete _feedSel[id]; });
   var sn=Object.keys(_feedSel).length, hiddenN=v.every.length-all.length;
@@ -667,7 +709,7 @@ function cloudPush(){
   clearTimeout(_pushT);
   _pushT=setTimeout(function(){
     try{ fbDb.ref('gov/'+fbUid).set({ feed:get('feed'), kw:lsGet('kw'),
-      key_data:keyData(), key_biz:keyBiz(), last:lsGet('last'),
+      key_data:keyData(), key_biz:keyBiz(), last:lsGet('last'), last_at:lsGet('last_at'),
       recruit:{ scan:get('recruit_scan'), at:lsGet('recruit_at'), log:recObj('recruit_log'),
         url:recObj('recruit_url'), custom:get('recruit_custom'), seen:recObj('recruit_seen'),
         mailitems:get('recruit_mailitems'), mail_at:lsGet('recruit_mail_at'), mailfolders:lsGet('recruit_mailfolders'),
@@ -696,6 +738,7 @@ async function cloudPull(){
     if(v.key_data && !keyData()) lsSet('key_data', v.key_data);
     if(v.key_biz && !keyBiz()) lsSet('key_biz', v.key_biz);
     if(v.last && !lsGet('last')) lsSet('last', v.last);
+    if(v.last_at && !lsGet('last_at')) lsSet('last_at', v.last_at);
     var rc=v.recruit||{};
     if(Array.isArray(rc.scan) && !get('recruit_scan').length) lsSet('recruit_scan', JSON.stringify(rc.scan));
     if(rc.at && !lsGet('recruit_at')) lsSet('recruit_at', rc.at);
