@@ -41,9 +41,9 @@
     { key: 'career',  name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
     { key: 'govbid',  name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기', adminOnly: true },
     { key: 'cards',   name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
-    /* ⚠ 메일은 기업정보함과 같은 파일이고 주소만 다르다. whoAmI() 는 파일 이름만
-       견주므로(물음표 뒤는 안 본다) 메일 창에서도 「지금 앱」은 기업정보함으로 잡힌다 —
-       그래서 이 줄이 늘어도 지금 앱 표시가 흔들리지 않는다. */
+    /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
+       whoAmI() 는 주소 꼬리까지 보고 메일을 먼저 가른다 · go() 는 «&» 로 잇는다(2026-10-04).
+       tests/appbar-every-link.test.js 가 모든 줄이 «제 앱»으로 가는지 돌려 본다. */
     { key: 'mail',    name: '메일',        icon: '✉️', url: 'pu-cards.html?view=mail', desc: '자료 붙여 보내기·예약' },
     { key: 'photos',  name: '사진첩',       icon: '🖼️', url: 'pu-photos.html',      desc: '사진·서류' },
     { key: 'paydata', name: '급여데이터함',  icon: '💼', url: 'pu-paydata.html',     desc: '급여자료 사업장별' },
@@ -171,7 +171,11 @@
   function go(app) {
     if (!app) return;
     var back = lastScreen(app.key);
-    var url = app.url + '?' + bust() + (back ? '&back=' + encodeURIComponent(back) : '');
+    /* ⚠ 주소에 이미 물음표가 있으면(메일 = pu-cards.html?view=mail) «&» 로 잇는다.
+       물음표를 하나 더 붙이면 view=mail?v=… 가 되어 메일 대신 기업정보함이 열렸다
+       (대표 보고 2026-10-04 「메일을 눌렀는데 기업정보함으로 간다」). 포털 타일은 원래 이렇게 했다. */
+    var sep = app.url.indexOf('?') >= 0 ? '&' : '?';
+    var url = app.url + sep + bust() + (back ? '&back=' + encodeURIComponent(back) : '');
     navTo(url, app);
   }
 
@@ -366,8 +370,22 @@
 
   /* 주소로 지금 어느 프로그램인지 알아낸다 — 앱이 따로 알려 주지 않아도 되게 */
   function whoAmI() {
-    var f = '';
+    var f = '', q = '';
     try { f = (global.location.pathname || '').split('/').pop().toLowerCase(); } catch (e) {}
+    try { q = String(global.location.search || ''); } catch (e) {}
+    /* 같은 파일이라도 주소 꼬리로 갈리는 프로그램(메일 = pu-cards.html?view=mail)을 «먼저» 본다.
+       예전에는 파일 이름만 봐서 메일 창의 「지금」이 기업정보함에 붙었고, 그래서 메일에서
+       기업정보함 줄을 누를 수가 없었다(2026-10-04). 주소 꼬리의 조각이 «전부» 있어야 그 앱이다. */
+    for (var j = 0; j < APPS.length; j++) {
+      var u = APPS[j].url, qi = u.indexOf('?');
+      if (qi < 0 || u.slice(0, qi).toLowerCase() !== f) continue;
+      var pairs = u.slice(qi + 1).split('&'), all = true;
+      for (var k = 0; k < pairs.length && all; k++) {
+        var esc = pairs[k].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        all = new RegExp('(^|[?&])' + esc + '(&|$)').test(q);
+      }
+      if (all) return APPS[j].key;
+    }
     for (var i = 0; i < APPS.length; i++) {
       if (APPS[i].url.toLowerCase() === f) return APPS[i].key;
     }
@@ -441,6 +459,8 @@
     // 검사용 — 관리자 전용 줄이 실제로 빠지는지 본다
     _ordered: ordered,
     _isAdminNow: isAdminNow,
+    // 검사용 — 목록에서 한 줄을 «누른 것»과 같다(tests/appbar-every-link.test.js)
+    _go: go,
     mount: mount,
     auto: auto,
     open: open,
