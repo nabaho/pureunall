@@ -20,7 +20,7 @@ const A = (() => {
     'function num(v){ if(v===""||v==null) return ""; var n=Number(String(v).replace(/,/g,"")); return isFinite(n)?n:""; }',
     gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gF('korWon'), gS('COMMITTEE_ROWS'),
     gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'), gF('_isCommittee'), gF('_siteCommittee'), gF('_prepCommittee'),
-    gF('_cmSeeAnnex'), gF('estabSites'), gF('siteContribOf'), gF('_docRok'), gF('siteContribNow'), gF('partyNames'), gF('partyJoin'),
+    gF('_cmSeeAnnex'), gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('_docRok'), gF('siteContribNow'), gF('partyNames'), gF('partyJoin'),
     gF('_dotDate'), gF('_hwpKoDate'), gF('_hwpTodayIso'), gF('_hwpSignRows'),
     gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmPairRows'), gF('_hwpInkaAnnexValues'),
     gF('_hwpInkaValues'), gF('_hwpAgreementValues'), gF('_hwpCharterValues'), gF('_hwpContribValues'),

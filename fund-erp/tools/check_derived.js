@@ -54,7 +54,7 @@ global.funds = {};
      여기 없으면 「foundContrib is not defined」로 이 검사가 통째로 죽는다.
      ⚠ gV 는 {·[ 로 시작하는 값만 잡는다. 글자 하나짜리 상수는 줄째로 꺼낸다. */
   gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
-  gF('estabSites'), gF('siteContribOf'), gF('siteContribNow'), gF('foundContribOf'), gF('foundContrib'),
+  gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('siteContribNow'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
   gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
   /* 원본 줄맞춤 자국 걷어내기 + 이름 자리표(2026-09-14) — hwpFormHTML 이 부른다.
      여기 없으면 「fillFlowText is not defined」로 이 검사가 통째로 죽는다. */
@@ -141,7 +141,7 @@ console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
    제목은 이제 자간을 CSS(.fmtitle)로 벌리고 글자 사이엔 공백을 안 둔다.
    그래서 페이지 수는 옛 스페이스 낀 제목이 아니라 「기금출연확인서」 자체를 센다. */
 { const t = draw('contrib', F, SITES);
-  ok('사업장마다 한 장 (닫은 곳은 뺀다)', (t.match(/기금출연확인서/g) || []).length === 2, (t.match(/기금출연확인서/g) || []).length + '장');
+  ok('사업장마다 한 장 — 탈퇴한 곳도 설립 출연확인서에 선다(대표 지시 2026-10-04)', (t.match(/기금출연확인서/g) || []).length === 3, (t.match(/기금출연확인서/g) || []).length + '장');
   ok('금액이 한글·숫자로 선다', /육백만원정\(￦ 6,000,000\)/.test(t) && /사백만원정\(￦ 4,000,000\)/.test(t), t.slice(0, 200));
   ok('사업장·대표자가 선다', /가나기계 대표이사 김가나/.test(t) && /다라전자 대표이사 이다라/.test(t));
   ok('원본 자리표 「0000(주) 대표이사 0 0 0」이 안 남는다', !/0000\(주\)|0 0 0/.test(t));
@@ -162,7 +162,7 @@ console.log('\n■ 기금출연확인서 — 사업장마다 한 장');
   /* ★ 한 장의 «짜임» (대표 지시 2026-09-20 「줄간격 글자크기 회사이름 날인 위치를 조정」) —
      목업대로 제목은 fmtitle, 본문 덩이는 지면 가운데(cbwrap), 회사 이름·도장 자리가
      따로 도드라져야 한다. 텍스트만 보면 이 넷을 구별할 수 없어 원소를 직접 본다. */
-  const el = drawEl('contrib', F, SITES);
+  const el = drawEl('contrib', F, SITES.filter((x) => x.status !== 'closed'));   /* 짜임만 본다 — 지금 참여 중인 두 곳 */
   const wraps = [].slice.call(el.querySelectorAll('.cbwrap'));
   ok('회사마다 지면 가운데로 내리는 덩이(.cbwrap)가 선다', wraps.length === 2, wraps.length + '개');
   ok('제목은 fmtitle(굵게·자간)을 쓴다 — 다른 서식과 통일', el.querySelectorAll('.cbwrap .fmtitle').length === 2);
@@ -331,8 +331,8 @@ console.log('\n■ 정관·설립합의서 — 참여사업장이 이름으로 �
     const t = draw(k, F, SITES);
     live.forEach(s => ok(k + ' 에 ' + s.name + ' 이 선다', t.indexOf(s.name) >= 0));
     ok(k + ' 에 자리표 ○○주식회사·○○회사가 안 남는다', !/(?:○○|XX)\s*(?:주식회사|회사)/.test(t), t.slice(0, 120));
-    /* 탈퇴한 사업장은 설립 서류에 설 수 없다 — 나간 회사의 출연 약정을 적을 수 없다 */
-    ok(k + ' 에 탈퇴한 사업장은 안 선다', t.indexOf('닫은곳') < 0);
+    /* ★ 탈퇴한 사업장도 설립 서류에 선다(대표 지시 2026-10-04 「탈퇴한 회사를 설립 서류에 남겨라」) */
+    ok(k + ' 에 탈퇴한 사업장도 선다', t.indexOf('닫은곳') >= 0);
   });
   /* 서명란은 회사마다 한 줄이어야 한다 — 날인을 회사마다 받기 때문이다 */
   const ag = draw('agreement', F, SITES);

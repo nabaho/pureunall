@@ -63,7 +63,7 @@ const API = (() => {
     grabDecl('_K'),
     grabFn('_officersOf'), grabFn('_siteWrep'), grabFn('_siteUrep'), grabFn('_isCommittee'),
     grabFn('_siteCommittee'), grabFn('_prepCommittee'),
-    grabFn('estabSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'),
+    grabFn('estabSites'), grabFn('estabLiveSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'), grabFn('foundContribLive'),
     grabFn('partyNames'), grabFn('partyJoin'), grabFn('useRate'),
     grabDecl('FTYPE_PAIRS'), grabDecl('FTYPE_GONG_ONLY'),
     grabDecl('HWP_TPL_KINDS'), grabLine('HWP_TPL_BLANK'), grabLine('HWP_TPL_MAXLIST'),

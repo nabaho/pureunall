@@ -48,7 +48,7 @@ const API = (() => {
        여기 없으면 「siteContribNow is not defined」로 이 검사가 통째로 죽는다.
        장부는 이 검사에서 안 읽으므로 _docRok 은 늘 null 을 돌려준다(약정액으로 내려간다). */
     'function _docRok(){ return null; }',
-    grabFn('estabSites'), grabFn('siteContribOf'), grabFn('siteContribNow'),
+    grabFn('estabSites'), grabFn('estabLiveSites'), grabFn('siteContribOf'), grabFn('siteContribNow'),
     grabDecl('ESTAB_NEED'), grabDecl('ESTAB_NEED_SITE'),
     grabFn('estabGaps'), grabFn('estabGapHTML'),
     'this.gaps=estabGaps; this.html=estabGapHTML;',

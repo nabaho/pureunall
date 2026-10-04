@@ -720,8 +720,17 @@ function _siteSme(s,today){
      없을 때만 사람수 × 단가로 어림하며, 그것도 없을 때만 손으로 적은 총액을 쓴다.
    ⚠ 어림한 것인지(from:'rate') 함께 돌려준다 — 서식에 「어림」이라 적을 수는 없지만
      화면에서는 무엇을 근거로 한 숫자인지 보여 줘야 한다.
-   ⚠ 탈퇴한 사업장은 빼고 센다 — 나간 회사의 출연 약정을 설립 서류에 적을 수 없다. */
+   ★ 탈퇴한 사업장도 «설립 서류»에는 남긴다(대표 지시 2026-10-04 「탈퇴한 회사를 설립 서류에 남겨라」) —
+     설립 때 함께 출연·합의한 회사다. 다시 뽑은 설립 서류에서 사라지면 제출본과 달라진다.
+     ⚠ 탈퇴한 곳은 «뒤로» 보낸다 — 맨 앞 사업장을 대표 사업장으로 읽는 서식(estabSites(...)[0])이 있다.
+     ⚠ 해마다 내는 서류(지원금 신청·체크리스트·출연확인서)는 저마다 탈퇴한 곳을 따로 거른다 — 여기와 무관.
+     ⚠ 설립 «준비» 빈칸 점검(estabGaps)은 탈퇴한 곳을 세지 않는다 — estabLiveSites. */
 function estabSites(sites){
+  var a=(sites||[]).filter(function(s){ return !!s; });
+  return a.filter(function(s){ return (s.status||'active')!=='closed'; })
+    .concat(a.filter(function(s){ return (s.status||'active')==='closed'; }));
+}
+function estabLiveSites(sites){
   return (sites||[]).filter(function(s){ return s && (s.status||'active')!=='closed'; });
 }
 /* 사업장 한 곳의 출연 약정액 — 적어 둔 값이 먼저, 없으면 사람수 × 단가.
@@ -756,6 +765,9 @@ function foundContribOf(f,sites){
   return man>0 ? {amt:man,n:0,of:list.length,from:'manual'} : {amt:0,n:0,of:list.length,from:'none'};
 }
 function foundContrib(f,sites){ return foundContribOf(f,sites).amt; }
+/* 해마다 쓰는 서류(예산·사업계획서·운영상황·지원금)는 «지금» 참여 중인 곳만 — 탈퇴한 회사의 출연은
+   설립 서류에만 남는다(estabSites). 2026-10-04 */
+function foundContribLive(f,sites){ return foundContrib(f,estabLiveSites(sites)); }
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function $(id){return document.getElementById(id);}
@@ -4153,7 +4165,7 @@ function _hwpBizplanValues(f,sites){
   f=f||{}; sites=sites||[];
   var yr=(typeof S!=='undefined'&&S.year)||new Date().getFullYear(), V={};
   var W=function(v){ var n=Math.round((v||0)/1000); if(!n) return '0'; return (n<0?'△':'')+Math.abs(n).toLocaleString(); };
-  var c=0; try{ c=Math.round(foundContrib(f,sites)||0); }catch(e){}
+  var c=0; try{ c=Math.round(foundContribLive(f,sites)||0); }catch(e){}
   var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(f.meeting_date||''));
   V.사업연도=String(yr||''); V.기금명=String(f.name||''); V.빈칸='';
   V.작성일=m?(m[1]+'년 '+m[2]+'월 '+m[3]+'일'):'';
@@ -4391,7 +4403,7 @@ function _hwpTaxValues(f,sites){
    재산목록(둘째 장)의 금액 칸은 비운다 — HTML 도 「따로 만들어 붙이세요」다. */
 function _hwpOpsValues(f,sites){
   f=f||{}; sites=sites||[];
-  var b=_boss(f), amt=0; try{ amt=Math.round(foundContrib(f,sites)||0); }catch(e){}
+  var b=_boss(f), amt=0; try{ amt=Math.round(foundContribLive(f,sites)||0); }catch(e){}
   var today=_hwpTodayIso(), bf=S._docBf, ok=!!(bf&&bf.fid===S.formFund&&bf.yr===S.year), note='';
   var W=function(v){ return Number(Math.round(v||0)).toLocaleString(); };
   var dot=function(iso){ var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso||'')); return m?m[1]+'. '+m[2]+'. '+m[3]+'.':''; };
@@ -6576,7 +6588,7 @@ function bizRate(f){
   return (r===''||r<0||r>20) ? BIZ_RATE_DEFAULT : r;
 }
 function autoBudget(f,sites){
-  var c=Math.round(foundContrib(f,sites)||0);
+  var c=Math.round(foundContribLive(f,sites)||0);
   if(c<=0) return null;                         // 출연금이 없으면 «지어내지 않는다»
   var use=Math.round(c*useRate(f)), basic=c-use;
   var pur=Math.round(use*BIZ_SPLIT.purpose), adm=Math.round(use*BIZ_SPLIT.admin);
@@ -6695,7 +6707,7 @@ var BIZ_BS_ROWS=[
    원본:  - 20  년도 신규 출연기금 : ＿＿＿＿＿원( ＿＿＿＿＿)
           4. 기금예치 계획 … 00 은행 | ＿＿＿＿＿ | 20 . 00. 00    ← 예치금액은 «천원» 단위다 */
 function fillBizplanHead(root,f,sites,yr){
-  var c=Math.round(foundContrib(f,sites)||0);
+  var c=Math.round(foundContribLive(f,sites)||0);
   if(c<=0) return;
   var won=c.toLocaleString();
   /* ⚠ 이 줄은 <p>·<td> 안이 아니라 «맨 글자»로 떠 있다 — 원본의 1×1 표를 펼친 자국이라
@@ -8658,7 +8670,7 @@ var ESTAB_NEED_SITE=[
 ];
 /* 이 기금에서 «비어 있는» 것을 모은다 — 서식을 그리지 않고 자료만 본다(빠르다) */
 function estabGaps(f,sites){
-  var out=[], live=estabSites(sites);
+  var out=[], live=estabLiveSites(sites);
   ESTAB_NEED.forEach(function(c){
     if(c[4](f||{})) out.push({k:c[0], label:c[1], where:c[2], docs:c[3], n:1, of:1, site:false});
   });
@@ -9218,7 +9230,7 @@ function fillSubsidy(wb,f,sites){
   var yrs=f.years||{}, sub={};
   Object.keys(yrs).sort().reverse().some(function(y){ if(yrs[y]&&yrs[y].subsidy){sub=yrs[y].subsidy;return true;} return false; });
   var workerTotal=num(sub.worker_count)||sites.reduce(function(s,x){return s+(num(x.company_size)||0);},0)||'';
-  var contribution=foundContrib(f,sites)||num(sub.contribution)||'';
+  var contribution=foundContribLive(f,sites)||num(sub.contribution)||'';
   /* ⚠ 예전에는 sub.apply_amount 만 봤다 — SUB_FIELDS 에 «없는 칸»이라 늘 비었고,
      결국 설립 출연금이 신청액으로 공단에 나갔다. 사람이 적은 신청액을 먼저 쓴다.
      옛 이름도 뒤에 남겨 둔다(예전 자료에 그 이름으로 들어간 값이 있을 수 있다). */

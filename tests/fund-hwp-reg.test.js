@@ -19,7 +19,7 @@ const A = (() => {
     'var S={year:2026, formFund:"X", _docR:null};',
     'function num(v){ if(v===""||v==null) return ""; var n=Number(String(v).replace(/,/g,"")); return isFinite(n)?n:""; }',
     gS('COMMITTEE_ROWS'), gF('_officersOf'), gF('_boss'), gF('_siteWrep'), gF('_siteUrep'), gF('_isCommittee'), gF('_siteCommittee'),
-    gF('_prepCommittee'), gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+    gF('_prepCommittee'), gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
     gF('_hwpKoDate'), gF('_hwpKoDate2'), gF('_hwpTodayIso'), gF('_dashPhone'), gF('_prepDirectors'), gF('_hwpRegValues'),
     gV('HWP_TPL_KINDS'), gV('FTYPE_SKIP'), gF('ftypeSkipDoc'),
     'this.reg=_hwpRegValues; this.K=HWP_TPL_KINDS; this.skip=ftypeSkipDoc;',

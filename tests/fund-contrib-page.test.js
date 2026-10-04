@@ -90,7 +90,7 @@ function 확인서그리기(fn名, f, sites) {
     'var _KOR_D=' + (SRC.match(/var _KOR_D=\[[^\]]*\]/) || [])[0].slice(9) + ';',
     'var _KOR_P=' + (SRC.match(/var _KOR_P=\[[^\]]*\]/) || [])[0].slice(9) + ';',
     'var _KOR_U=' + (SRC.match(/var _KOR_U=\[[^\]]*\]/) || [])[0].slice(9) + ';',
-    grabFn('korWon'), grabFn('_docRok'), grabFn('_siteUrep'), grabFn('estabSites'),
+    grabFn('korWon'), grabFn('_docRok'), grabFn('_siteUrep'), grabFn('estabSites'), grabFn('estabLiveSites'),
     grabFn('siteContribOf'), grabFn('siteContribNow'), grabFn('contribCertHTML'),
     grabFn(fn名),
     'var S={formFund:"X",year:2026};',

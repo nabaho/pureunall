@@ -363,7 +363,7 @@ function boot() {
     gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('_cmPairRows'), gF('committeeAnnexHTML'),
     gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
     gS('PARTY_ONE_SRC'), gS('PARTY_RUN_SRC'),
-    gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+    gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
     gF('partyNames'), gF('partyJoin'), gF('_fillWho'), gF('fillPartyList'), gF('fillPartyDates'),
     gS('PARTY_WHO_SRC'), gS('FLOW_MIN'), gS('FLOW_KEEP'), gS('FLOW_TAIL'), gF('_flowText'), gF('fillFlowText'),
     gS('DATE_CTX'), gF('_dateSlot'), gV('WREP_LBL'), gF('fillWrepLabel'), gF('_stripSample'),

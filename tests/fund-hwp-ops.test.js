@@ -18,7 +18,7 @@ const A = (() => {
     'var S={year:2026, formFund:"X", _docBf:null};',
     'function num(v){ if(v===""||v==null) return ""; var n=Number(String(v).replace(/,/g,"")); return isFinite(n)?n:""; }',
     'function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }',
-    gF('_officersOf'), gF('_boss'), gF('estabSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'),
+    gF('_officersOf'), gF('_boss'), gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
     gF('_hwpKoDate2'), gF('_hwpTodayIso'), gF('_dashPhone'), gV('BF_KINDS'), gF('bfDays'), gF('bfReason'), gF('_hwpOpsValues'),
     gV('HWP_TPL_KINDS'),
     'this.ops=_hwpOpsValues; this.S=S; this.bfDays=bfDays; this.bfReason=bfReason; this.K=HWP_TPL_KINDS;',
