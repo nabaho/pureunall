@@ -1188,14 +1188,17 @@ module.exports = function build(deps) {
   }
 
   return {
-    /* ══════ 자동 — 10분마다 ══════
-       보낸 메일까지 함께 따라오게 하려면 자주 봐야 한다. 붙는 값이 싸다(목록만). */
+    /* ══════ 자동 — 업무 시간 10분마다 (2026-10-04 비용 점검) ══════
+       보낸 메일까지 함께 따라오게 하려면 업무 중에는 자주 봐야 한다.
+       ⚠ 밤 22:00~06:59에는 직원이 보지 않는데도 32개 폴더를 매번 훑고, 실측으로
+          새 메일 0건인 실행도 8~10초 걸렸다. 밤에는 멈추고 오전 7시에 다시 받는다.
+       마지막 실행은 21:50, 첫 실행은 07:00 이다. 업무 중 10분 반영 속도는 그대로다. */
     syncMailbox: F
       .region(REGION)
       /* ⚠ TYPESAFE_API_KEY — 받은메일함 자동분류(mail-ai-classify)가 쓴다.
            config/mailAiClassify.on 이 꺼져 있으면 이 열쇠는 «읽히기만 하고 안 쓰인다». */
       .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY'], timeoutSeconds: 540, memory: '512MB' })
-      .pubsub.schedule('every 10 minutes')
+      .pubsub.schedule('*/10 7-21 * * *')
       .timeZone('Asia/Seoul')
       .onRun(async () => {
         const r = await runSync(deps, { deadlineMs: 460000 });

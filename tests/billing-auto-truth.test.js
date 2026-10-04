@@ -27,9 +27,12 @@ function scheduleOf(src, exportName) {
   if (i < 0) i = src.indexOf('\n    ' + exportName + ': F');
   assert.ok(i >= 0, exportName + ' 을 못 찾음');
   const seg = src.slice(i, i + 900);
-  const m = seg.match(/\.pubsub\.schedule\(['"]every (\d+) minutes['"]\)/);
-  assert.ok(m, exportName + ' 의 주기를 못 읽음');
-  return parseInt(m[1], 10);
+  const every = seg.match(/\.pubsub\.schedule\(['"]every (\d+) minutes['"]\)/);
+  if (every) return { every: parseInt(every[1], 10), hours: 24 };
+  const daytime = seg.match(/\.pubsub\.schedule\(['"]\*\/(\d+) (\d+)-(\d+) \* \* \*['"]\)/);
+  assert.ok(daytime, exportName + ' 의 주기를 못 읽음');
+  return { every: +daytime[1], hours: +daytime[3] - +daytime[2] + 1,
+    first: +daytime[2], last: +daytime[3] };
 }
 
 test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드가 같다', () => {
@@ -121,13 +124,14 @@ test('★★ 화면에 적힌 주기가 «코드와 같다»', () => {
   const send = scheduleOf(FIDX, 'sendScheduledMail');
   const pay = scheduleOf(FIDX, 'receivePaydataMail');
   const sync = scheduleOf(FSYNC, 'syncMailbox');
-  assert.strictEqual(send, 15, '메일 보내기 주기가 바뀌었다');
-  assert.strictEqual(pay, 30, '급여자료 주기가 바뀌었다');
-  assert.strictEqual(sync, 10, '메일 받기 주기가 바뀌었다');
+  assert.strictEqual(send.every, 15, '메일 보내기 주기가 바뀌었다');
+  assert.strictEqual(pay.every, 30, '급여자료 주기가 바뀌었다');
+  assert.deepStrictEqual(sync, { every:10, hours:15, first:7, last:21 },
+    '메일 받기가 밤에도 돌거나 업무 중 10분 주기가 바뀌었다');
 
-  assert.ok(ENTER.indexOf('메일 받기 10분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번') >= 0,
+  assert.ok(ENTER.indexOf('메일 받기 07~21시 10분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번') >= 0,
     '뜻풀이의 주기가 코드와 다르다');
-  assert.ok(ENTER.indexOf('메일 받기 10분마다 · 메일 보내기 15분마다 · 급여자료 30분마다') >= 0,
+  assert.ok(ENTER.indexOf('메일 받기 07~21시 10분마다 · 메일 보내기 15분마다 · 급여자료 30분마다') >= 0,
     '줄 설명의 주기가 코드와 다르다');
   assert.ok(ENTER.indexOf('홈페이지 뉴스 모으기 하루 한 번') >= 0,
     '줄 설명의 주기가 코드와 다르다');
@@ -137,12 +141,15 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const send = scheduleOf(FIDX, 'sendScheduledMail');
   const pay = scheduleOf(FIDX, 'receivePaydataMail');
   const sync = scheduleOf(FSYNC, 'syncMailbox');
-  const perDay = Math.round(1440 / send) + Math.round(1440 / pay) + Math.round(1440 / sync)
+  const perDay = Math.round(60 / send.every) * send.hours
+    + Math.round(60 / pay.every) * pay.hours
+    + Math.round(60 / sync.every) * sync.hours
     + 5;   // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기 — 각 하루 한 번
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
-  assert.strictEqual(perDay, 293, '셈이 바뀌었다');
-  assert.ok(ENTER.indexOf('하루 <b>293번</b>') >= 0, '뜻풀이에 하루 횟수가 없거나 틀렸다');
-  assert.ok(ENTER.indexOf('하루 293번, 밤낮 같이 돕니다') >= 0, '줄 설명에 하루 횟수가 없거나 틀렸다');
+  assert.strictEqual(perDay, 239, '셈이 바뀌었다');
+  assert.ok(ENTER.indexOf('하루 <b>239번</b>') >= 0, '뜻풀이에 하루 횟수가 없거나 틀렸다');
+  assert.ok(ENTER.indexOf('하루 239번 · 메일 받기는 밤 22시~오전 7시 전 중지') >= 0,
+    '줄 설명에 하루 횟수나 야간 중지 시간이 없거나 틀렸다');
 });
 
 test('★★ 옛 «틀린» 숫자가 어디에도 안 남아 있다', () => {
