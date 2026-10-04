@@ -19,6 +19,9 @@ vm.createContext(ctx);
 ['function consNameKey(', 'function clinicFyRange(', 'function clinicIsType(',
  'function clinicFeeDays(', 'function clinicDaysOf(', 'function clinicDayCards('].forEach((h) => vm.runInContext(cutFn(h), ctx));
 vm.runInContext("var CLINIC_PLAN_STATUS = ['consult','review','negotiate','confirmed','signed','progress'];", ctx);
+/* 「미수행 종료」 글자는 원본의 한 줄을 그대로 싣는다 — 여기서 다시 적으면 두 벌이 된다 */
+vm.runInContext((src.match(/^var CLINIC_SKIP_REASON = .*$/m) || [''])[0], ctx);
+vm.runInContext(cutFn('function clinicGovHint('), ctx);
 
 const TYPES = [
   { code: 'consulting-x1', name: '현장클리닉', dayFee: 350000 },
@@ -136,4 +139,87 @@ test('끝난 건 수를 따로 센다 — 표에는 안 나오고 「📦 종료
 });
 test('★ 사람을 눌러도 상태 거르개는 그대로 — 고르개에 없는 값(all)을 넣지 않는다', () => {
   assert.equal(src.indexOf("setStatusFilter(sid ? 'all'"), -1);
+});
+
+/* ══ 수행 안 하고 끝난 건 · 확인 필요 (대표 지시 2026-10-04 「날짜와 진행 일수가 안 맞다 · 수행 안 하고 종료된 것도」
+     + 「담당자들이 정부사업일정에 사진이나 일정 안 넣고 진행하는 경우도 많다 — 반영해라」) ══ */
+const C = (o) => Object.assign({ typeCode: 'consulting-x1', managerMain: 'P-1', startDate: '2026-06-01' }, o);
+test('★★ 「미수행 종료」 건은 수행 건수·일수에서 빠지고 따로 센다', () => {
+  const r = ctx.clinicDayCards([
+    C({ id: 'a', consultDays: 3, status: 'closed', closedReason: '정상 종료' }),
+    C({ id: 'b', consultDays: 3, status: 'closed', closedReason: ctx.CLINIC_SKIP_REASON }),
+  ], [], TYPES, FY26, fee);
+  assert.equal(r.by['P-1'].cnt, 1);
+  assert.equal(r.by['P-1'].days, 3);
+  assert.equal(r.by['P-1'].skip, 1);
+  assert.equal(r.total.skip, 1);
+  assert.equal(ctx.CLINIC_SKIP_REASON, '미수행 종료');
+});
+test('★ 다른 종료 사유(계약 해지 등)는 «했는지»를 말하지 않으므로 그대로 센다', () => {
+  const r = ctx.clinicDayCards([C({ id: 'a', consultDays: 2, status: 'closed', closedReason: '계약 해지' })], [], TYPES, FY26, fee);
+  assert.equal(r.by['P-1'].days, 2);
+});
+test('★★ 확인 필요 = 끝났는데 «종료 사유 없음» 또는 «일수를 안 적어 금액으로만 짐작»', () => {
+  const r = ctx.clinicDayCards([
+    C({ id: 'noReason', consultDays: 3, status: 'closed' }),
+    C({ id: 'est', balanceFee: 1155000, balanceFeeVatIncluded: true, status: 'closed', closedReason: '정상 종료' }),
+    C({ id: 'ok', consultDays: 3, status: 'closed', closedReason: '정상 종료' }),
+    C({ id: 'running', balanceFee: 1155000, balanceFeeVatIncluded: true, status: 'pending' }),
+    C({ id: 'skipped', status: 'closed', closedReason: '미수행 종료' }),
+  ], [], TYPES, FY26, fee);
+  const ids = Array.from(r.check, (x) => x.rec.id).sort();
+  assert.equal(ids.join(','), 'est,noReason', '확인 필요가 어긋났다: ' + ids.join(','));
+  assert.equal(r.check.find((x) => x.rec.id === 'noReason').noReason, true);
+  const es = r.check.find((x) => x.rec.id === 'est');
+  assert.equal(es.est, true);
+  assert.equal(es.days, 3);
+});
+
+const SCAL = {
+  types: [{ id: 't3', name: '현장클리닉' }, { id: 't1', name: '일터혁신' }],
+  cos: {
+    g1: { id: 'g1', name: '㈜가나상사', erpId: 'erp-1' },
+    g2: { id: 'g2', name: '다라테크' },
+    g3: { id: 'g3', name: '마바산업' }, g4: { id: 'g4', name: '마바산업' },
+    g5: { id: 'g5', name: '사아물산', mergedInto: 'g2' },
+    g6: { id: 'g6', name: '자차', deleted: true },
+  },
+  scheds: [
+    { coId: 'g1', typeId: 't3', date: '2026-06-05' }, { coId: 'g1', typeId: 't3', date: '2026-06-01' },
+    { coId: 'g1', typeId: 't3', date: '2026-06-01' }, { coId: 'g1', typeId: 't1', date: '2026-06-09' },
+    { coId: 'g2', typeId: 't3', date: '2026-07-01' }, { coId: 'g5', typeId: 't3', date: '2026-06-20' },
+    { coId: 'g3', typeId: 't3', date: '2026-08-01' },
+  ],
+};
+const norm = (s) => String(s || '').replace(/㈜|\s/g, '');
+test('★ 정부사업일정 참고 — 이어진 사업장 먼저, 현장클리닉 일정만, 같은 날은 하루', () => {
+  const g = ctx.clinicGovHint({ id: 'erp-1', companyName: '전혀 다른 이름' }, SCAL, norm);
+  assert.equal(g.how, 'id');
+  assert.deepEqual(Array.from(g.dates), ['2026-06-01', '2026-06-05']);
+});
+test('★ 정부사업일정 참고 — 이름은 «딱 하나»일 때만, 합쳐진 사업장 일정도', () => {
+  const g = ctx.clinicGovHint({ id: 'x', companyName: '다라테크' }, SCAL, norm);
+  assert.equal(g.how, 'name');
+  assert.deepEqual(Array.from(g.dates), ['2026-06-20', '2026-07-01']);
+  assert.equal(ctx.clinicGovHint({ id: 'x', companyName: '마바산업' }, SCAL, norm), null, '같은 이름이 둘인데 하나를 골랐다');
+  assert.equal(ctx.clinicGovHint({ id: 'x', companyName: '자차' }, SCAL, norm), null, '지운 사업장을 봤다');
+});
+
+/* ── 화면 ── */
+const bare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
+test('★★ 확인 창은 직접 저장하지 않는다 — 컨설팅관리 저장 길(itemPatch)로만, 정부사업일정엔 안 쓴다', () => {
+  const m = bare(cutFn('function ClinicCheckModal('));
+  for (const w of ['dbPatch', 'dbUpsert', 'dbSet', '.update(', '.set(', '.remove(', '.push(']) {
+    assert.ok(!m.includes(w), '확인 창 안에 「' + w + '」 가 있다');
+  }
+  assert.match(m, /props\.onPatch\(x\.rec\.id, patch\)/);
+  assert.match(m, /props\.canEdit/, '고칠 수 있는 사람을 안 가린다');
+  assert.match(src, /onPatch: itemPatch/, '컨설팅관리가 저장 길을 안 넘긴다');
+  assert.match(bare(cutFn('function ClinicDayCards(')), /canEdit: canCloseDirect/);
+});
+test('★ 종료 창에서 「미수행 종료」를 고를 수 있다', () => {
+  assert.match(src, /h\('option', \{ value:CLINIC_SKIP_REASON \}/);
+});
+test('★ 띠에 「⚠ 확인 필요」 칩 — 셈 함수가 고른 건 수를 그대로', () => {
+  assert.match(bare(cutFn('function ClinicDayCards(')), /'⚠ 확인 필요 ' \+ r\.check\.length/);
 });
