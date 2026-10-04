@@ -52,6 +52,8 @@
   function isReply(s) { return /^\s*(?:\[?\s*re\s*\]?\s*:?|회신|답장)/i.test(String(s || '')); }
 
   function s(v) { return v == null ? '' : String(v); }
+  /* js/gov-sync.js 의 safeKey 와 같은 잣대 — 검사가 맞댄다 */
+  function safeKey(k) { return s(k).replace(/[.#$\/\[\]]/g, '_') || '_'; }
   function ymd(ms) {
     var d = new Date(Number(ms) || 0); if (!(+d)) return '';
     var p = function (n) { return (n < 10 ? '0' : '') + n; };
@@ -70,7 +72,9 @@
   function classify(row, o) {
     if (!row) return null;
     var subj = s(row.s), sent = !!o.sent, reply = isReply(subj);
-    var base = { key: s(o.folder) + '|' + s(row.u), subject: subj, date: ymd(row.d), att: Number(row.a) || 0,
+    /* ⚠★ 이 열쇠는 클라우드 자리 이름(mailskip·mailmap·seen 의 열쇠)으로 쓰인다 — RTDB 는 . # $ / [ ] 를 못 받는다.
+         폴더 「3.컨설팅(정부사업)」의 «.» 하나로 클라우드 저장이 통째로 멈췄다(검토 2026-10-04) → safeKey */
+    var base = { key: safeKey(o.folder) + '|' + s(row.u), subject: subj, date: ymd(row.d), att: Number(row.a) || 0,
       sent: sent, folder: s(o.folder) };
     var orgs = (o.matches ? o.matches(subj) : []) || [];
     base.org = orgs[0] || '';
@@ -104,8 +108,9 @@
     log = log || {}; map = map || {}; skip = skip || {};
     var auto = [], ask = [], pick = [], notices = [], doneAuto = {};
     (items || []).forEach(function (it) {
-      if (skip[it.key]) return;
-      var org = map[it.key] || it.org, y = it.date.slice(0, 4);
+      var k = safeKey(it.key);   /* 옛 판이 담아 둔 열쇠(«.» 든 것)도 같은 자리로 */
+      if (skip[k] || skip[it.key]) return;
+      var org = map[k] || map[it.key] || it.org, y = it.date.slice(0, 4);
       var cur = ((log[org] || {})[y] || {});
       if (it.kind === 'notice') { notices.push(it); return; }
       /* ⚠ 기관을 모르는 결과도 버리지 않는다 — 고르게 한다(한전 지정노무사 위촉 등, 실측) */
@@ -132,8 +137,10 @@
     (auto || []).forEach(function (a) {
       out[a.org] = out[a.org] || {};
       var cur = out[a.org][a.year] || {};
+      /* ⚠ 덮기 «전» 상태(지원 예정)를 남긴다 — ↩ 되돌리기가 그 상태로 돌려놓는다(검토 2026-10-04) */
+      var prev = cur.st || '';
       cur.st = '지원함'; cur.at = nowMs || 0; cur.via = 'mail';
-      cur.mail = { key: a.item.key, date: a.item.date, subject: a.item.subject.slice(0, 120), att: a.item.att };
+      cur.mail = { key: safeKey(a.item.key), date: a.item.date, subject: a.item.subject.slice(0, 120), att: a.item.att, prev: prev };
       out[a.org][a.year] = cur;
     });
     return out;
@@ -225,7 +232,7 @@
       ok: !missing.length && !warnN && !top.length };
   }
 
-  return { WHO: WHO, PICK: PICK, DONE: DONE, LEARN: LEARN, isRecruit: isRecruit, isMailNotice: isMailNotice, isReply: isReply, outcome: outcome,
+  return { safeKey: safeKey, WHO: WHO, PICK: PICK, DONE: DONE, LEARN: LEARN, isRecruit: isRecruit, isMailNotice: isMailNotice, isReply: isReply, outcome: outcome,
     classify: classify, collect: collect, plan: plan, applyAuto: applyAuto,
     KINDS: KINDS, NEED_DEFAULT: NEED_DEFAULT, kindOf: kindOf, kindName: kindName,
     rrnCount: rrnCount, signSpots: signSpots, blankSpots: blankSpots, oldYear: oldYear, checkFiles: checkFiles };

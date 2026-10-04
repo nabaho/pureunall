@@ -55,7 +55,7 @@ function runApp() {
     location: { protocol: 'https:' }, navigator: {},
     GovG2b: require('../js/gov-g2b.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovCareer: require('../js/gov-career.js'),
-    KcareerAdvSummary: require('../js/kcareer-adv-summary.js'),
+    KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort=()=>{}; this.signal=null; },
     URL: { createObjectURL: () => 'blob:x' }, Blob: function(){}
@@ -63,28 +63,30 @@ function runApp() {
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
-  vm.runInNewContext(code + '\n;globalThis.__api={cloudPush,cloudPull,'
+  vm.runInNewContext(code + '\n;globalThis.__api={cloudPush,cloudPull,lsSet,'
     + 'setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
-  return { api: ctx.__api, el, timers };
+  return { api: ctx.__api, el, timers, store };
 }
 
 /* 가짜 파이어베이스 — 'deny' 면 규칙이 막은 것처럼, 'ok' 면 받아 준다 */
 function fakeDb(mode) {
   const err = Object.assign(new Error('permission_denied at /gov/U1'), { code: 'PERMISSION_DENIED' });
-  return { writes: 0, ref() { const self = this; return {
-    set() { self.writes++; return mode === 'deny' ? Promise.reject(err) : Promise.resolve(); },
+  return { writes: 0, sets: 0, ref() { const self = this; return {
+    set() { self.sets++; return mode === 'deny' ? Promise.reject(err) : Promise.resolve(); },
+    update() { self.writes++; return mode === 'deny' ? Promise.reject(err) : Promise.resolve(); },
     once() { return mode === 'deny' ? Promise.reject(err) : Promise.resolve({ val: () => null }); }
   }; } };
 }
 const tick = () => new Promise((r) => setImmediate(r));
+/* 1.2초 기다림을 건너뛰며 «다 끝날 때까지» 돌린다(받기 → 보내기가 이어진다) */
+async function drain(r) { for (let i = 0; i < 8; i++) { r.timers.splice(0).forEach((f) => f()); await tick(); await tick(); } }
 
 test('★★ 저장이 막히면 «조용히» 넘기지 않는다 — 화면이 알린다', async () => {
   const r = runApp();
   r.api.setFb(fakeDb('deny'), 'U1');
-  r.api.cloudPush();
-  r.timers.splice(0).forEach((f) => f());       // 1.2초 기다림을 건너뛴다
-  await tick(); await tick();
-  assert.match(r.el('toast').textContent, /클라우드 저장 실패/);
+  r.api.lsSet('kw', '["노무"]');                // 보낼 것이 생긴다
+  await drain(r);
+  assert.match(r.el('toast').textContent, /클라우드 (저장|불러오기) 실패/);
   assert.match(r.el('toast').textContent, /권한/, '무엇이 막혔는지 말해야 합니다');
   assert.match(r.el('toast').textContent, /이 기기에만/, '어디에 남았는지 말해야 합니다');
 });
@@ -92,21 +94,21 @@ test('★★ 저장이 막히면 «조용히» 넘기지 않는다 — 화면이
 test('★ 알림은 «처음 한 번»만 — 1.2초마다 뜨면 일을 못 한다', async () => {
   const r = runApp();
   r.api.setFb(fakeDb('deny'), 'U1');
-  for (let i = 0; i < 3; i++) { r.api.cloudPush(); r.timers.splice(0).forEach((f) => f()); await tick(); await tick(); }
+  for (let i = 0; i < 3; i++) { r.api.lsSet('kw', '["x' + i + '"]'); await drain(r); }
   r.el('toast').textContent = '';
-  r.api.cloudPush(); r.timers.splice(0).forEach((f) => f()); await tick(); await tick();
+  r.api.lsSet('kw', '["y"]'); await drain(r);
   assert.equal(r.el('toast').textContent, '', '같은 알림이 되풀이됩니다');
 });
 
 test('★ 다시 되면 표시를 놓는다 — 다음에 또 막히면 다시 알린다', async () => {
   const r = runApp();
   r.api.setFb(fakeDb('deny'), 'U1');
-  r.api.cloudPush(); r.timers.splice(0).forEach((f) => f()); await tick(); await tick();
+  r.api.lsSet('kw', '["a"]'); await drain(r);
   r.api.setFb(fakeDb('ok'), 'U1');
-  r.api.cloudPush(); r.timers.splice(0).forEach((f) => f()); await tick(); await tick();
+  r.api.lsSet('kw', '["b"]'); await drain(r);
   r.el('toast').textContent = '';
   r.api.setFb(fakeDb('deny'), 'U1');
-  r.api.cloudPush(); r.timers.splice(0).forEach((f) => f()); await tick(); await tick();
+  r.api.lsSet('kw', '["c"]'); await drain(r);
   assert.match(r.el('toast').textContent, /클라우드 저장 실패/, '한 번 되살아난 뒤엔 다시 알려야 합니다');
 });
 
@@ -121,8 +123,36 @@ test('잘 되면 아무 말도 하지 않는다', async () => {
   const r = runApp();
   const db = fakeDb('ok');
   r.api.setFb(db, 'U1');
-  r.api.cloudPush(); r.timers.splice(0).forEach((f) => f()); await tick(); await tick();
-  await r.api.cloudPull();
-  assert.equal(db.writes, 1);
+  r.api.lsSet('kw', '["노무"]'); await drain(r);
+  assert.equal(db.writes, 1, '고친 칸을 한 번 보낸다');
+  assert.equal(db.sets, 0, '통째로 덮어쓰지 않는다');
   assert.equal(r.el('toast').textContent, '');
+});
+
+/* ═══ 2026-10-04 사고 — 옛 판 화면의 통째 set() 이 「컨설턴트 모집」 칸을 지웠다 ═══ */
+test('★★★ 규칙이 sv ≥ 2 인 쓰기만 받는다 — 옛 판의 통째 set() 을 막는다', () => {
+  const v = rules.gov.$uid['.validate'];
+  assert.ok(v, 'gov/{uid} 에 .validate 가 없습니다 — 옛 판이 다시 통째로 지웁니다');
+  assert.match(v, /newData\.child\('sv'\)\.val\(\) >= 2/);
+  assert.match(v, /!newData\.exists\(\)/, '지우기는 받아야 합니다');
+});
+test('★★★ 화면은 gov/{uid} 를 «통째로» 쓰지 않는다 — update 에 sv 를 싣는다', () => {
+  assert.doesNotMatch(src, /ref\('gov\/'\s*\+\s*fbUid\)\.set\(/, '통째 set() 이 되살아났습니다');
+  assert.match(src, /upd=\{ sv:GovSync\.SV, at:Date\.now\(\) \}/);
+  assert.match(src, /fbDb\.ref\(base\)\.update\(upd\)/);
+  assert.ok(require('../js/gov-sync.js').SV >= 2);
+});
+test('★★ 받기가 한 번 성공하기 «전»에는 아무것도 안 올린다 — 빈 기기가 클라우드를 덮지 못하게', async () => {
+  const r = runApp();
+  const reads = [], writes = [];
+  let deny = true;
+  const db = { ref(p) { return {
+    once() { reads.push(p); return deny ? Promise.reject(new Error('net')) : Promise.resolve({ val: () => null }); },
+    update(u) { writes.push(u); return Promise.resolve(); } }; } };
+  r.api.setFb(db, 'U1');
+  r.api.lsSet('kw', '["노무"]'); await drain(r);
+  assert.equal(writes.length, 0, '받기에 실패했는데 올렸습니다');
+  deny = false;
+  r.api.lsSet('kw', '["노무","인사"]'); await drain(r);
+  assert.equal(writes.length, 1, '받기가 되면 그때 올린다');
 });

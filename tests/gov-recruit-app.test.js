@@ -30,7 +30,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
@@ -43,7 +43,7 @@ function runApp(seed, opt) {
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
-    + 'recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
+    + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   return { api: ctx.__api, el, store, opened, toasts };
@@ -112,18 +112,21 @@ test('★ 올해 폴더에 있으면 「✓ 폴더에 있음」, 없으면 상�
 test('★★ 올해 상태를 적으면 «그 해»에 남고 클라우드로 간다', () => {
   const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
   let pushed = null;
-  r.api.setFb({ ref: () => ({ set: (v) => { pushed = v; return Promise.resolve(); } }) }, 'U1');
+  r.api.setFb({ ref: () => ({ once: () => Promise.resolve({ val: () => null }),
+    update: (u) => { pushed = Object.assign(pushed || {}, u); return Promise.resolve(); } }) }, 'U1');
   r.api.recSetSt('alio', '지원함');
   assert.equal(r.api.recObj('recruit_log').alio['2026'].st, '지원함');
   return new Promise((res) => setTimeout(() => {
     assert.ok(pushed, '클라우드에 올려야 다른 기기에서 보인다');
-    assert.equal(pushed.recruit.log.alio['2026'].st, '지원함');
-    assert.equal(pushed.recruit.scan.length, SCAN.length);
-    assert.ok(Array.isArray(pushed.feed), '⚠ 통째로 덮으므로 공고도 함께 실어야 한다');
+    assert.equal(pushed['recruit/log'].alio['2026'].st, '지원함');
+    assert.equal(pushed['recruit/scan'].length, SCAN.length);
+    assert.equal(pushed.sv, 2, '보안규칙이 sv 없는 쓰기를 막는다');
+    assert.equal(pushed.feed, undefined, '⚠ 통째로 덮지 않는다 — 안 고친 공고는 안 보낸다(2026-10-04 사고)');
+    assert.ok(pushed['stamp/recruit_log'].alio > 0, '고친 줄에 시각을 찍는다 — 다른 기기와 합칠 잣대');
     r.api.recSetSt('alio', '');
-    assert.equal(r.api.recObj('recruit_log').alio['2026'], undefined, '비우면 지운다');
+    assert.equal((r.api.recObj('recruit_log').alio || {})['2026'], undefined, '비우면 지운다');
     res();
-  }, 1400));
+  }, 2800));
 });
 
 test('★ 링크 고치기 — https 만 받고, 비우면 사전 주소로 되돌린다', () => {
@@ -225,11 +228,36 @@ test('★ 경력관리 폴더 열쇠는 «빌리기만» 한다 — 그 자리�
   assert.match(src, /_recIdb\('gov_fs'\)/);
 });
 
-test('★ 클라우드에서 받을 때 컨설턴트 모집 자료도 되살린다', () => {
-  const f = src.slice(src.indexOf('async function cloudPull'), src.indexOf('/* ═══ 신청 재료'));
-  ['recruit_scan', 'recruit_at', 'recruit_log', 'recruit_url', 'recruit_custom'].forEach((k) =>
-    assert.ok(f.indexOf("lsSet('" + k + "'") >= 0, k + ' 를 안 받는다'));
+test('★★ 받기 — 클라우드의 컨설턴트 모집 자료를 빈 기기에 되살린다', async () => {
+  const r = runApp({});
+  const cloud = { sv: 2, recruit: { scan: SCAN, log: { erc: { 2026: { st: '선정', at: 5 } } }, url: { erc: 'https://x.example/' },
+    custom: [{ id: 'Cabc', name: '가나', kw: '가나' }], seen: { k1: 1 }, mailmap: { 'Sent Messages|1': 'cepa' }, need: { erc: ['apply'] } } };
+  r.api.setFb({ ref: (p) => ({ once: () => Promise.resolve({ val: () => (p === 'gov/U1' ? cloud : null) }), update: () => Promise.resolve() }) }, 'U1');
+  await r.api.cloudPull();
+  assert.equal(JSON.parse(r.store.gov3_recruit_scan).length, SCAN.length);
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '선정');
+  assert.equal(r.api.recObj('recruit_url').erc, 'https://x.example/');
+  assert.equal(JSON.parse(r.store.gov3_recruit_custom)[0].id, 'Cabc');
+  assert.equal(r.api.recObj('recruit_mailmap')['Sent Messages|1'], 'cepa');
 });
+test('★★★ 낡은 기기가 새 자료를 덮지 못한다 — 2026-10-04 사고(옛 판·낡은 기기가 「컨설턴트 모집」을 지웠다)', async () => {
+  /* 이 기기: 어제 적은 「지원함」(시각 100). 클라우드: 오늘 PC 가 적은 「선정」(시각 200) + 마감일 */
+  const r = runApp({ recruit_log: { erc: { 2026: { st: '지원함' } } },
+    _stamps: { recruit_log: { erc: 100 } } });
+  const cloud = { sv: 2, recruit: { log: { erc: { 2026: { st: '선정', due: '2026-12-01' } } }, scan: SCAN },
+    stamp: { recruit_log: { erc: 200 }, recruit_scan: { _: 150 } } };
+  const writes = [];
+  r.api.setFb({ ref: (p) => ({
+    once: () => Promise.resolve({ val: () => (p === 'gov/U1' ? cloud : p === 'gov/U1/recruit/log' ? cloud.recruit.log
+      : p === 'gov/U1/stamp/recruit_log' ? cloud.stamp.recruit_log : null) }),
+    update: (u) => { writes.push(u); return Promise.resolve(); } }) }, 'U1');
+  await r.api.cloudPull();
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '선정', '더 나중에 고친 클라우드 쪽이 이긴다');
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].due, '2026-12-01');
+  assert.equal(JSON.parse(r.store.gov3_recruit_scan).length, SCAN.length, '이 기기에 없던 칸은 받아 온다');
+  writes.forEach((u) => { assert.notEqual(u['recruit/log'] && u['recruit/log'].erc['2026'].st, '지원함', '낡은 것을 올리면 안 된다'); });
+});
+
 
 /* ═══ 📅 구글 캘린더 (대표 결정 2026-10-04 「둘 다」) ═══ */
 test('★★ 📅 — 해마다 도는 «모집 준비» 일정 창을 연다(앞 달 1일)', () => {
@@ -290,7 +318,7 @@ const WATCH = {
 };
 function fbWith(val, fail) {
   return { ref: (p) => ({ once: () => (fail ? Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' }))
-    : Promise.resolve({ val: () => (p === 'gov_watch' ? val : null) })), set: () => Promise.resolve() }) };
+    : Promise.resolve({ val: () => (p === 'gov_watch' ? val : null) })), update: () => Promise.resolve() }) };
 }
 test('★★ 서버가 찾은 새 모집 글을 날짜 내림차순으로 보여 주고, 기관 줄에 🆕', async () => {
   const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
@@ -322,15 +350,15 @@ test('★★ ✓ 봤음 — 대표 자리에만 적고 🆕 가 사라진다, �
   const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
   let pushed = null;
   const db = fbWith(WATCH);
-  db.ref = ((orig) => (p) => Object.assign(orig(p), { set: (v) => { pushed = v; return Promise.resolve(); } }))(db.ref);
+  db.ref = ((orig) => (p) => Object.assign(orig(p), { update: (u) => { pushed = Object.assign(pushed || {}, u); return Promise.resolve(); } }))(db.ref);
   r.api.setFb(db, 'U1');
   await r.api.recWatchPull();
   r.api.recSeen('k1');
   assert.equal(r.api.recNewFor('erc'), false);
   assert.doesNotMatch(r.el('recTb').innerHTML, /🆕 새 글/);
   assert.match(r.el('recWatch').innerHTML, /새 글 <b>1건<\/b>/);
-  await new Promise((res) => setTimeout(res, 1400));
-  assert.ok(pushed && pushed.recruit.seen.k1, '다른 기기에서도 봤음이 보여야 한다');
+  await new Promise((res) => setTimeout(res, 2800));
+  assert.ok(pushed && pushed['recruit/seen'].k1, '다른 기기에서도 봤음이 보여야 한다');
 });
 test('★ 권한이 없으면 조용히 비우지 않고 까닭을 말한다', async () => {
   const r = runApp({});
@@ -395,7 +423,7 @@ function mailDb(o) {
       if (p === 'mailbox/folders') v = MFOLD;
       else if (p.indexOf('mailbox/msgs/') === 0) v = MSGS[p.slice(13)] || {};
       return Promise.resolve({ val: () => v }); },
-    set: () => { writes.push(p); return Promise.resolve(); } }) } };
+    update: () => { writes.push(p); return Promise.resolve(); } }) } };
 }
 
 test('★★ 메일함 폴더는 «관련된 것만» 읽는다 — 급여·쇼핑 폴더는 안 연다', async () => {
@@ -478,7 +506,7 @@ test('★★ 메일함에는 아무것도 쓰지 않는다 — 쓰는 곳은 대
   const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
   const m = mailDb(); r.api.setFb(m.db, 'U1');
   await r.api.recMailScan(true);
-  await new Promise((res) => setTimeout(res, 1400));
+  await new Promise((res) => setTimeout(res, 2800));
   assert.ok(m.writes.length >= 1);
   m.writes.forEach((p) => assert.match(p, /^gov\/U1$/, p));
   assert.doesNotMatch(src, /ref\('mailbox[^)]*\)\s*\.(set|update|push|remove)/);
@@ -535,4 +563,73 @@ test('★★ 점검은 파일을 «아무 데도» 보내지 않는다 — fetch
   const body = src.slice(src.indexOf('═══ 📤 내기 전에 점검'), src.indexOf('function recSetSt('));
   assert.ok(body.length > 1000);
   assert.doesNotMatch(body, /fetch\(|XMLHttpRequest|\.ref\(|readDoc|PuAiCall|storage\(/);
+});
+
+test('★★ 메일이 적은 것을 손으로 「선정」으로 바꾸면 — ↩ 되돌리기가 «선정»을 지우지 않는다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  r.el('recDue').value = '';
+  /* 2026 년 기록을 손으로 — recSetSt 는 «올해»(2026)를 고친다 */
+  r.api.recSetSt('erc', '선정');
+  const c = r.api.recObj('recruit_log').erc['2026'];
+  assert.equal(c.st, '선정'); assert.equal(c.via, undefined, '손으로 정하면 «메일이 적었다» 표시를 뗀다');
+  r.api.recMailUndo('erc', '2026');
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '선정');
+  assert.doesNotMatch(r.el('recMail').innerHTML, /저절로 적은 것/);
+});
+test('★★ 메일이 적은 것을 손으로 «비우면» — 탭을 다시 열어도 「지원함」으로 안 되살아난다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  r.api.recSetSt('erc', '');
+  await r.api.recMailScan(true);
+  assert.equal((r.api.recObj('recruit_log').erc || {})['2026'], undefined);
+});
+test('★ 덮기 전이 「지원 예정」이면 되돌리기가 그 상태로 돌려놓는다', async () => {
+  const r = runApp({ recruit_log: { erc: { 2026: { st: '지원 예정' } } } }, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '지원함');
+  r.api.recMailUndo('erc', '2026');
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '지원 예정');
+});
+test('★★ 메일 열쇠에 «.» 이 없다 — 「3.컨설팅」 폴더 하나로 클라우드 저장이 통째로 멈췄다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
+  r.api.setFb(mailDb().db, 'U1');
+  await r.api.recMailScan(true);
+  const items = JSON.parse(r.store.gov3_recruit_mailitems);
+  assert.ok(items.length);
+  items.forEach((it) => assert.doesNotMatch(it.key, /[.#$\/\[\]]/, it.key));
+  r.api.recMailSkip('3.컨설팅(정부사업)|9');
+  Object.keys(r.api.recObj('recruit_mailskip')).forEach((k) => assert.doesNotMatch(k, /[.#$\/\[\]]/, k));
+});
+test('★ 직접 더한 기관 — 지운 기관의 번호를 다시 쓰지 않고, 지울 때 딸린 상태·링크도 지운다', () => {
+  const r = runApp({ recruit_scan: SCAN }, { prompts: ['가나기관', '가나', '', '', '다라기관', '다라', '', ''] });
+  r.api.recAddOrg();
+  const id1 = JSON.parse(r.store.gov3_recruit_custom)[0].id;
+  r.api.recSetSt(id1, '선정');
+  r.api.recDelOrg(id1);
+  assert.equal(r.api.recObj('recruit_log')[id1], undefined, '지운 기관의 상태가 남으면 새 기관이 물려받는다');
+  r.api.recAddOrg();
+  const id2 = JSON.parse(r.store.gov3_recruit_custom)[0].id;
+  assert.notEqual(id2, id1);
+});
+test('★★★ 받은 «뒤»에 다른 기기가 고친 것도 지킨다 — 쓰기 직전에 클라우드와 다시 합친다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  const cloud = { log: {}, stamp: {} };
+  let pushed = null;
+  r.api.setFb({ ref: (p) => ({
+    once: () => Promise.resolve({ val: () => (p === 'gov/U1' ? null
+      : p === 'gov/U1/recruit/log' ? cloud.log : p === 'gov/U1/stamp/recruit_log' ? cloud.stamp : null) }),
+    update: (u) => { pushed = Object.assign(pushed || {}, u); return Promise.resolve(); } }) }, 'U1');
+  await r.api.cloudPull();                                   // 이 기기가 받았다(그땐 클라우드 비었다)
+  cloud.log = { erc: { 2026: { st: '선정' } } };              // 그 뒤 PC 가 「선정」을 적었다
+  cloud.stamp = { erc: Date.now() + 60000 };
+  r.api.recSetSt('alio', '지원함');                          // 이 기기는 다른 기관을 고친다
+  await new Promise((res) => setTimeout(res, 1500));
+  assert.ok(pushed && pushed['recruit/log'], '보냈어야 한다');
+  assert.equal(pushed['recruit/log'].erc && pushed['recruit/log'].erc['2026'].st, '선정', 'PC 가 적은 「선정」을 덮어 지웠다');
+  assert.equal(pushed['recruit/log'].alio['2026'].st, '지원함');
+  assert.equal(r.api.recObj('recruit_log').erc['2026'].st, '선정', '이 기기에도 들여온다');
 });
