@@ -101,3 +101,41 @@ test('⑥ ★★ 상세 창·목록이 이 길로 읽고, 연결 안 된 기록�
   // 연결 상태 판정은 기존 「🔗 업체 연결」 후보를 그대로 쓴다 — 두 벌이면 어긋난다
   assert.match(fn('coLinkStateOf'), /coLinkCandidates\(\)/, '★ 연결 판정을 따로 셉니다 — 업체 연결 창과 말이 달라집니다');
 });
+
+/* ⑦ 업체관리에 «없는» 회사는 재촉하지 않는다 (대표 결정 2026-10-04 「안 넣고 표시만 조용히」)
+   목록의 🔗 와 노란 칩은 «이을 수 있는» 기록에만 — 업체관리 밖 회사는 회색 「업체관리 밖」. */
+test('⑦ ★★ 🔗 는 이을 수 있는 기록에만 — 업체관리에 없는 회사는 조용히', () => {
+  let 센수 = 0;
+  const 저장 = { companies: [{ id: 'co1', name: '가나상사' }], co_link_skip: {}, consultings: [], cases: [] };
+  const ctx = {
+    dbGet: (k, d) => (k in 저장 ? 저장[k] : d), String, Array, Object,
+    CO_LINK_SKIP: 'co_link_skip',
+    CO_LINK_STORES: [{ k: 'cases' }, { k: 'consultings' }],
+    coLinkCandidates() { 센수++; return { biz: [{ id: 'k1' }], name: [{ id: 'k2' }], none: [{ id: 'k3' }] }; }
+  };
+  vm.createContext(ctx);
+  vm.runInContext([varLine('CO_OWNER_FIELDS'), 'var _coOwnerSrc = null, _coOwnerMap = null;',
+    fn('coOwnerOf'), fn('coNeedsOwner'), 'var _coLinkableSrc = null, _coLinkableSet = null;', fn('coLinkable')].join('\n'), ctx);
+  const r = (id, extra) => Object.assign({ id, companyName: '다라상회' }, extra || {});
+  assert.equal(ctx.coLinkable(r('k1')), true, '사업자번호로 이을 수 있는데 🔗 가 없습니다');
+  assert.equal(ctx.coLinkable(r('k2')), true, '이름으로 이을 수 있는데 🔗 가 없습니다');
+  assert.equal(ctx.coLinkable(r('k3')), false, '★★ 업체관리에 없는 회사를 재촉합니다 — 대표가 「조용히」로 정했습니다');
+  assert.equal(ctx.coLinkable(r('k1', { companyId: 'co1' })), false, '이미 이어진 기록에 🔗');
+  assert.equal(ctx.coLinkable(r('k1', { clientType: 'worker' })), false, '근로자 의뢰 사건에 🔗');
+  const 처음 = 센수;
+  for (let i = 0; i < 50; i++) ctx.coLinkable(r('k1'));
+  assert.equal(센수, 처음, '★ 목록 칸마다 후보를 다시 셉니다 — 목록이 느려집니다');
+  저장.consultings = [{ id: 'new' }];          // 자료가 바뀌면 다시 센다
+  ctx.coLinkable(r('k1'));
+  assert.equal(센수, 처음 + 1, '★ 자료가 바뀌었는데 낡은 답을 씁니다');
+});
+
+test('⑦ 상세 창은 업체관리 밖 회사에 노란 칩 대신 회색 「업체관리 밖」, 목록은 coLinkable', () => {
+  const D = fn('UnifiedDetailModal');
+  assert.match(D, /'업체관리 밖'/, '업체관리 밖 회사 표시가 없습니다');
+  const i = D.indexOf("'🔗 업체관리와 연결 안 됨'");
+  const j = D.indexOf("_lk.state === 'biz' || _lk.state === 'name'");
+  assert.ok(j > 0 && i > j, '★★ 노란 칩이 «이을 수 있을 때»의 갈래 밖에 있습니다 — 업체관리 밖 회사도 재촉합니다');
+  assert.doesNotMatch(B, /coNeedsOwner\((?:c|it)\) && !coOwnerOf\((?:c|it)\) && h\('span'/, '★ 목록이 업체관리 밖 회사에도 🔗 를 답니다');
+  assert.ok((B.match(/coLinkable\((?:c|it)\) && h\('span'/g) || []).length >= 2, '목록의 🔗 가 coLinkable 을 안 씁니다');
+});

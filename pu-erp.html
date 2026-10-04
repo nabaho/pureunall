@@ -9155,6 +9155,22 @@ function coLinkStateOf(rec){
 }
 /* 회사가 아닌 근로자 의뢰 사건은 «연결 안 됨»이 아니다 — 이을 회사가 없다 */
 function coNeedsOwner(rec){ return !!(rec && String(rec.companyName || '').trim() && rec.clientType !== 'worker'); }
+/* 「🔗 업체 연결」이 이을 수 있는 기록인가(사업자번호·이름 하나로 업체관리에 있는 회사) — 목록의 🔗 는 이것에만 단다.
+   업체관리에 «없는» 회사(끝난 단발 컨설팅·사건 등)는 노랗게 재촉하지 않는다 — 대표 결정 2026-10-04 「안 넣고 표시만 조용히」.
+   (2026-10-04 실측: 안 이어진 회사 83곳 모두 업체관리에 없음 · 75곳은 끝난 일. 업체관리는 계약처 명부라 넣지 않는다.)
+   ⚠ 목록이 칸마다 부르므로 «자료가 바뀔 때만» 다시 센다 — 업체·다섯 업무 표·「아님」 표시가 같으면 지난 답. */
+var _coLinkableSrc = null, _coLinkableSet = null;
+function coLinkable(rec){
+  if(!rec || !rec.id || !coNeedsOwner(rec) || coOwnerOf(rec)) return false;
+  var src = [dbGet('companies', []), dbGet(CO_LINK_SKIP, {})].concat(CO_LINK_STORES.map(function(s){ return dbGet(s.k, []); }));
+  var same = _coLinkableSrc && _coLinkableSrc.length === src.length && src.every(function(x, i){ return x === _coLinkableSrc[i]; });
+  if(!same){
+    var c = coLinkCandidates(), set = {};
+    c.biz.concat(c.name).forEach(function(r){ set[r.id] = 1; });
+    _coLinkableSrc = src; _coLinkableSet = set;
+  }
+  return !!_coLinkableSet[rec.id];
+}
 
 // 연결 실행. 건의 사업자번호가 비어 있으면 업체 것으로 채운다 — 다음부터 사업자번호로 확실히 잡힌다.
 function coLinkApply(rows){
@@ -32070,12 +32086,12 @@ function CaseManagement(props){
                               : '👤 -'),
                           h('div', { style:{ color:'#64748b', fontSize:'11px', marginTop:'2px' } },
                             '🏢 ' + (coShown(c, 'name')||'-'),
-                            coNeedsOwner(c) && !coOwnerOf(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗'))
+                            coLinkable(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗'))
                         )
                       : (c.clientType === 'worker' && (c.workers||[]).length > 0 && (c.workers[0].name||'').trim().length > 0)
                         ? (c.workers[0].name + ((c.workers.length > 1) ? ' 외 '+(c.workers.length-1)+'명' : ''))
                         : h('span', { style:{ whiteSpace:'nowrap' } }, coShown(c, 'name')||'-',
-                            coNeedsOwner(c) && !coOwnerOf(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗')))
+                            coLinkable(c) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗')))
                 ),
 
                 // 상대방 (근로자 사건은 사업장명, 그 외는 별도 입력값)
@@ -32851,12 +32867,14 @@ function UnifiedDetailModal(props){
         _chip('#f0fdf4', '#166534', '#bbf7d0', '업체관리 기준'),
         _btn('업체 열기 ›', function(){ _setCoOpen(true); }, '업체관리의 이 회사를 엽니다 — 회사 정보는 거기서 고칩니다'))
     : (_needOwner ? h('span', { style:{ marginLeft:'auto', display:'inline-flex', alignItems:'center', gap:'6px' } },
-        _chip('#fffbeb', '#854d0e', '#fde68a', '🔗 업체관리와 연결 안 됨'),
         (_lk && (_lk.state === 'biz' || _lk.state === 'name'))
-          ? _btn('연결하기 ›', function(){ _setLinkOpen(true); },
-              _lk.state === 'biz' ? '사업자번호가 같은 업체가 있습니다 — 「🔗 업체 연결」에서 잇습니다'
-                                  : '이름이 같은 업체가 있습니다 — 「🔗 업체 연결」에서 하나씩 확인하고 잇습니다')
-          : h('span', { style:{ fontSize:'11px', color:'#854d0e', fontWeight:600 } }, (_lk && _lk.why) || '업체관리에 없음'))
+          ? [ _chip('#fffbeb', '#854d0e', '#fde68a', '🔗 업체관리와 연결 안 됨'),
+              _btn('연결하기 ›', function(){ _setLinkOpen(true); },
+                _lk.state === 'biz' ? '사업자번호가 같은 업체가 있습니다 — 「🔗 업체 연결」에서 잇습니다'
+                                    : '이름이 같은 업체가 있습니다 — 「🔗 업체 연결」에서 하나씩 확인하고 잇습니다') ]
+          /* 업체관리에 없는 회사 — 재촉하지 않는다(대표 결정 2026-10-04 「안 넣고 표시만 조용히」) */
+          : h('span', { title:'업체관리(계약처 명부)에 없는 회사입니다 — 이 기록에 적어 둔 회사 정보를 보여 줍니다' + ((_lk && _lk.why) ? ' (' + _lk.why + ')' : ''),
+              style:{ fontSize:'10.5px', fontWeight:600, padding:'1px 7px', borderRadius:'99px', background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0' } }, '업체관리 밖'))
       : null);
 
   // 회사정보 섹션 — 이어졌으면 업체관리 값, 아니면 이 기록에 베껴 둔 값
@@ -66080,7 +66098,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
                   colVis.company && h('td', { className:'proj-co', title:coShown(it, 'name') || '' },
                     h('span', { onClick:function(){ setDetailModal(it); },
                       style:{ cursor:'pointer', color:'#1e40af', textDecoration:'underline', fontWeight:600 } }, coShown(it, 'name') || '-'),
-                    coNeedsOwner(it) && !coOwnerOf(it) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗')),
+                    coLinkable(it) && h('span', { title:'업체관리와 연결 안 됨 — 상세에서 「연결하기」', style:{ marginLeft:'4px', fontSize:'10px' } }, '🔗')),
                   colVis.bizNo && h('td', { style:{ fontFamily:'monospace', fontSize:'11px' } }, it.bizNo || '-'),
                   colVis.ceo && h('td', null, coShown(it, 'ceo2')
                     ? h('div', { style:{ fontSize:'11.5px', lineHeight:'1.4' } },
