@@ -3,8 +3,8 @@
    ⚠ 원본 바이트는 이 함수 안에서만 산다. 담는 것은 redactOne 이 돌려준 가린 것뿐.
    ⚠ 다시 시도할 실패(연결·시간)는 seen 에 안 적는다 — 적으면 영영 다시 안 본다.
    ⚠ 겹침은 원본 지문(sha256)으로 — 답장마다 같은 파일이 붙어 온다.
-   ⚠ 파일(창고)은 규칙 본문·신구대조표만 둔다. 동의서·신고서·의견청취·기타에는 도장·서명 그림이
-     붙는데 kordoc 는 그림을 보지 않는다 — 글만 담고 file 은 null 로 둔다.
+   ⚠ 담는 것은 규칙 본문·신구대조표뿐(글 + 한글이면 파일). 동의서·신고서·의견청취·기타는
+     근로자 이름·서명이 들거나 취업규칙 서류가 아니라 글도 파일도 안 담는다 — 보류 줄만(NO_TEXT_KINDS).
    ⚠ 사업장은 후보 목록을 «그대로» 담는다. 첫 후보를 사업장으로 고르지 않는다(확정은 사람). */
 'use strict';
 const crypto = require('crypto');
@@ -13,6 +13,14 @@ const X = require('./rules-collect-redact');
 const MR = require('./mail-receive');
 const LIB = 'rules_mgmt/library';
 const FILE_KINDS = ['규칙본문', '신구대조표'];
+/* 글도 안 담는 갈래 → 보류 까닭. 담는 것은 규칙본문·신구대조표뿐이다(조별 문안·우리 문안이 쓰는 것도 그 둘). */
+const NAMES = '근로자 이름·서명이 든 서류';
+const NO_TEXT_KINDS = {
+  '기타': '취업규칙 서류가 아님(갈래 「기타」) — 담지 않음',
+  '동의서': NAMES + '(동의서) — 담지 않음',
+  '신고서': NAMES + '(신고서) — 담지 않음',
+  '의견청취': NAMES + '(의견청취) — 담지 않음',
+};
 
 const val = async (db, p) => (await db.ref(p).once('value')).val();
 function isRetry(e) {
@@ -101,11 +109,15 @@ async function run(o) {
            본문에 「취업규칙」 이 든 메일이면 첨부를 다 받으므로, 징계 통지서·회의록처럼
            근로자 이름이 그대로 든 인사 기록이 섞여 들어왔다(47건 중 23건이 「기타」).
            이름은 가리지 않기로 했으므로(헛잡기) 담는 순간 재직 직원 전체에 열린다.
-           → 보류 줄(까닭·셈만). 틀리게 갈랐으면 원본은 메일함에 있다. */
-        if (kind === '기타') {
+           → 보류 줄(까닭·셈만). 틀리게 갈랐으면 원본은 메일함에 있다.
+           ★★★ 동의서·신고서·의견청취도 같다 (2026-10-04 대표 결정 「둘다 26 지움」).
+           근로자 이름·서명이 든 서류다. 결정은 첫 회차 것을 «손으로» 지우는 데만 쓰였고 여기엔 안 들어와,
+           10-04 새벽 회차가 신고서 1건을 또 담았다. 결정은 손이 아니라 이 자리에 둔다. */
+        const HOLD = NO_TEXT_KINDS[kind];
+        if (HOLD) {
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
             { kind, sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
-              status: '보류', holdWhy: '취업규칙 서류가 아님(갈래 「기타」) — 담지 않음' }) });
+              status: '보류', holdWhy: HOLD }) });
           staged[id] = 1; c.held++; ids.push(id);
           continue;
         }
@@ -141,4 +153,4 @@ async function run(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, isRetry, errTag, LIB, FILE_KINDS };
+module.exports = { run, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };

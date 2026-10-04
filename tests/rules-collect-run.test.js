@@ -1,7 +1,7 @@
 /* 한 회차를 가짜 DB·창고·메일로 «실제로» 돌린다 (메일 동기화 검사와 같은 방식).
    지키는 것: 고르기→받기→가리기→담기, 겹침 거르기, 한도, 다시 시도 가르기,
    ★ DB·창고에 쓰인 어디에도 원래 번호가 없다, ★ 보류는 아무것도 안 담는다,
-   ★ 도장·서명 그림이 붙는 갈래(동의서 등)는 글만 담고 파일은 창고에 안 둔다. */
+   ★ 근로자 이름·서명이 드는 갈래(동의서·신고서·의견청취)는 글도 파일도 안 담는다(2026-10-04 대표 결정). */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const H = require('../hwpx_gen.js');
@@ -78,19 +78,40 @@ test('담고, 겹침은 한 번만, PDF 는 보류 줄만 — 원래 번호는 �
   assert.equal(lib.run.stored, 1);
 });
 
-test('동의서는 글만 담는다 — 파일은 창고에 안 둔다(도장·서명 그림을 kordoc 이 안 본다)', async () => {
+/* ★★★ 동의서·신고서·의견청취는 «글도 담지 않는다» (2026-10-04 대표 결정 「둘다 26 지움」)
+   근로자 이름·서명이 든 서류다. 이름은 가리지 않기로 했으므로(헛잡기) 담는 순간 재직 직원 전체에 열린다.
+   대표가 첫 회차의 동의서 2·신고서 1 글을 «손으로» 지우게 했는데 수집기는 그대로 담고 있었다 —
+   10-04 새벽 회차가 신고서 1건(918자)을 또 담았다. 결정이 코드에 안 들어가 있었던 것이다. */
+['동의서', '신고서', '의견청취'].forEach((kind) => {
+  test('★★★ ' + kind + '는 글도 파일도 안 담는다 — 근로자 이름·서명이 든 서류', async () => {
+    const name = { '동의서': '근로자 동의서.hwpx', '신고서': '취업규칙 변경신고서.hwpx', '의견청취': '의견청취서.hwpx' }[kind];
+    const db = fakeDb(MAIL), bucket = fakeBucket();
+    const s = await C.run(base(db, bucket, { limit: 1, fetchAtts: async () =>
+      [{ name, data: gana('근로자 홍길동 서명 · 김철수 서명 · 주민 ' + RRN) }] }));
+    const lib = db.store.rules_mgmt.library;
+    const d = Object.values(lib.docs)[0];
+    assert.equal(d.kind, kind);
+    assert.equal(s.stored, 0, '★★★ 담았다');
+    assert.equal(s.held, 1);
+    assert.equal(d.status, '보류');
+    assert.match(d.holdWhy, /근로자 이름·서명/);
+    assert.equal((lib.text || {})[d.id], undefined, '★★★ 글을 담았다');
+    assert.equal(d.textLen, 0);
+    assert.equal(d.file, null);
+    assert.deepEqual(Object.keys(bucket.files), []);
+    assert.ok(!JSON.stringify(db.store.rules_mgmt).includes('홍길동'), '★★★ 이름이 어딘가 남았다');
+    assert.ok(!JSON.stringify(db.store.rules_mgmt).includes(RRN));
+  });
+});
+
+test('규칙 본문·신구대조표는 여전히 담는다 — 거르개가 너무 넓어지면 안 된다', async () => {
   const db = fakeDb(MAIL), bucket = fakeBucket();
   const s = await C.run(base(db, bucket, { limit: 1, fetchAtts: async () =>
-    [{ name: '동의서.hwpx', data: gana('동의자 서명 주민 ' + RRN) }] }));
+    [{ name: '가나상사_신구대조표.hwpx', data: gana('제1조 변경 전 · 변경 후') }] }));
   assert.equal(s.stored, 1);
-  const lib = db.store.rules_mgmt.library;
-  const d = Object.values(lib.docs)[0];
-  assert.equal(d.kind, '동의서');
+  const d = Object.values(db.store.rules_mgmt.library.docs)[0];
+  assert.equal(d.kind, '신구대조표');
   assert.equal(d.status, '담김');
-  assert.equal(d.file, null, '★ 도장·서명이 든 갈래의 파일을 창고에 뒀다');
-  assert.deepEqual(Object.keys(bucket.files), [], '★ 창고에 뭔가 올라갔다');
-  assert.ok(typeof lib.text[d.id] === 'string' && lib.text[d.id].length > 0, '글은 담긴다');
-  assert.ok(!JSON.stringify(db.store.rules_mgmt).includes(RRN));
 });
 
 test('다시 돌리면 본 메일은 안 본다', async () => {
