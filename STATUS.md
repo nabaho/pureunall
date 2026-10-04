@@ -186,27 +186,21 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 ### ⚠ 구글 콘솔 — 푸른 캘린더 «구글 늘 연결» (2026-09-20 → 2026-10-04 넓힘)
 
 대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다」 — 사람마다 처음 한 번만 연결하면
-서버(functions/gcal-link.js)가 갱신 열쇠를 들고 늘 이어 준다. **아래 넷이 끝나야 켜진다.**
-그 전에는 화면이 «꺼짐»으로 보고 아무것도 안 띄운다(지금과 같다 — 안전).
+서버(functions/gcal-link.js)가 갱신 열쇠를 들고 늘 이어 준다.
 
-**① 구글 클라우드 콘솔 → API 및 서비스 → 사용자 인증 정보 → OAuth 클라이언트(30712196914-…)**
-> **승인된 리디렉션 URI** 에 이것이 있는지(없으면 추가):
-> ```
-> https://nabaho.github.io/pureunall/pu-cal.html
-> ```
-> 같은 화면의 **「클라이언트 보안 비밀번호」**(GOCSPX- 로 시작)를 ② 에 씁니다.
+**끝난 것 (2026-10-04)**
+- 동의 화면(브랜딩) 만듦 · 승인된 도메인 nabaho.github.io · PUREUN-ERP 에 Google Calendar API 켬
+- 서버 비밀값 GCAL_OAUTH_SECRET (3번 판 — GOCSPX 모양 확인, 잘못 들어간 1·2번 판은 지움)
+- 서버 함수 5개 배포(asia-northeast3) · 공개 호출은 처음부터 됐다(401 JSON 확인 — 따로 할 일 없음)
 
-**② 대표님 PC 터미널에서 (값은 붙여 넣기 — 채팅·파일에 남기지 않는다)**
-> ```
-> firebase functions:secrets:set GCAL_OAUTH_SECRET --project pureun-erp
-> ```
+**남은 것 — 이것이 끝나야 직원 모두가 쓴다**
+1. **개인정보처리방침 공개** — 초안은 만들었다(policy/gcal-privacy.html 로 올릴 것).
+   대표님이 정해 주실 것: 개인정보 보호책임자 성명·직위 · 연락처 · 시행일.
+   브랜딩의 처리방침 링크는 이미 `https://nabaho.github.io/pureunall/policy/gcal-privacy.html` 로 넣어 둠.
+2. **대상 → 「앱 게시」(프로덕션)** — ⚠ «테스트 중»이면 테스트 사용자만 연결되고, 구글이 **7일마다** 끊는다.
+3. 클라이언트의 **승인된 리디렉션 URI** 에 `https://nabaho.github.io/pureunall/pu-cal.html` 이 있는지 — 없으면 redirect_uri_mismatch.
 
-**③ OAuth 동의 화면 → 게시 상태가 «프로덕션»인지** — ⚠ «테스트»면 구글이 연결을 **7일마다** 끊는다.
-
-**④ 함수를 올린 뒤(제가 한다) 공개 호출 권한** — gcalAuthUrl·gcalLink·gcalToken·gcalUnlink 넷에 allUsers
-(카카오 때와 같은 일. 안 켜면 403 → 화면은 «꺼짐»으로 보고 조용히 있는다).
-
-**파이어베이스 콘솔이 아니라 구글 클라우드 콘솔입니다** — 제가 들어갈 수 없는 곳입니다.
+**파이어베이스 콘솔이 아니라 구글 클라우드 콘솔입니다**(authuser=2 계정, 프로젝트 PUREUN-ERP).
 상세: status/2026-10-04-cal-gcal-keep.md
 
 
