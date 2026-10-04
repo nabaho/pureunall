@@ -306,6 +306,15 @@ test('★ 「이 회사예요」 단추는 «제 크기만» — 창 안의 단�
   assert.match(rule, /flex:\s*none/, '★ 단추가 칸을 채워 후보의 회사 정보·까닭을 짓누릅니다');
 });
 
+test('★ 「함께 잇기」 글은 «한 덩이» — 칸이 flex 라 맨 글과 <b> 가 따로 기둥이 된다', () => {
+  /* 2026-10-04 폰 화면을 실제로 그려 보니 「1장」이 「1 / 장」 두 줄로 찌그러져 있었다 */
+  const w = world({ card: { erpCoId: 'co-9' }, items: { c2: { id: 'c2', kind: 'card', company: '가나시스템즈 (손' } } });
+  const lab = (w.els.cardErpM.innerHTML.match(/<label class="cerp-sib">([\s\S]*?)<\/label>/) || [])[1];
+  assert.ok(lab, '같은 이름 명함이 있는데 「함께 잇기」 칸이 안 그려졌습니다');
+  const rest = lab.replace(/<input\b[^>]*>/, '').replace(/^\s*<span>[\s\S]*<\/span>\s*$/, '');
+  assert.equal(rest, '', '★ 체크 칸 옆 글이 <span> 하나로 안 감싸였습니다 — 폰에서 「N장」이 두 줄로 찌그러집니다');
+});
+
 /* ══════════ 목록 · ✏ 수정 저장 ══════════ */
 
 test('★ 목록 회사 칸 🔗 — 확정 업체 이름이 «다를 때만», 무엇인지는 말풍선에', () => {

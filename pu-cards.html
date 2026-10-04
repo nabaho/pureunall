@@ -13227,9 +13227,11 @@ function cardErpWhoHtml(it, m, biz){
     : `업체관리에 <b>${esc(r.company || '')}</b> (${esc(r.type || '유형 없음')}) 로 이미 있습니다.<br>`
       + '새로 만들지 않고 그 업체에 이어 붙입니다 — 빈 칸과 담당자만 더합니다.';
   const sib = cardErpSiblings(it, items);
+  /* ⚠ 글은 <span> 하나로 감싼다 — 칸이 flex 라 맨 글과 <b> 가 따로 기둥이 되어
+     폰에서 「1장」이 「1 / 장」 두 줄로 찌그러졌다(2026-10-04 폰 화면에서 봄). */
   const sibBox = sib.length
     ? `<label class="cerp-sib"><input type="checkbox" id="cardErpSib" checked>
-        같은 이름(「${esc(it.company || '')}」)으로 적힌 다른 명함 <b>${sib.length}장</b>도 함께 잇기</label>` : '';
+        <span>같은 이름(「${esc(it.company || '')}」)으로 적힌 다른 명함 <b>${sib.length}장</b>도 함께 잇기</span></label>` : '';
   const keep = `<div class="cerp-note">명함에 적힌 이름 「${esc(it.company || '')}」 은 <b>그대로</b> 둡니다 —
       회사는 업체 열쇠로 이어져, 이름이 달라도 안 끊깁니다.</div>`;
 
