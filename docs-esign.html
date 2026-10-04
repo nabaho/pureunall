@@ -181,7 +181,7 @@ try { PuGate.soonUnlessAdmin('문서관리'); } catch(_){}
 <script src="js/pu-office-store.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=5"></script>
+<script src="js/pu-office-docs.js?v=6"></script>
 <script>
 'use strict';
 var FB_CONFIG = {
@@ -288,6 +288,21 @@ function fetchSecretDoc(fileId) {
     return r.json().catch(function () { return {}; }).then(function (j) { throw new Error(j.error || ('서명본을 열지 못했습니다 (' + r.status + ')')); });
   });
 }
+/* 🔒 서명본으로 옮기기 — 서버 함수 puDocSecretMove(총괄관리자만). 원본 보관함 규칙이 «새로 쓰기만»이라 화면은 못 옮긴다 */
+function secretMoveCall(body) {
+  var u = firebase.auth().currentUser;
+  if (!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  return u.getIdToken().then(function (tok) {
+    return fetch('https://asia-northeast3-pureun-erp.cloudfunctions.net/puDocSecretMove', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok },
+      body: JSON.stringify(body) });
+  }).then(function (r) {
+    return r.json().catch(function () { return {}; }).then(function (j) {
+      if (r.ok && j.ok) return j;
+      throw new Error(j.error || ('서명본으로 옮기지 못했습니다 (' + r.status + ')'));
+    });
+  });
+}
 function archiveOriginal(file, from) { return trackedWrite(PuOfficeStore.putOriginal(file, from)); }
 function downloadOriginal(fileId, name) {
   return PuOfficeStore.download(fileId, name).catch(function (e) { showToast('내려받지 못했습니다 — ' + ((e && e.message) || e)); });
@@ -295,7 +310,7 @@ function downloadOriginal(fileId, name) {
 function officeHost() {
   return { store: PuOfficeStore, photos: window.PuPhotoStore || null, photosReady: photosReady, uid: curUser ? curUser.uid : '',
     cards: formCards(),  /* 엑셀 명단 가져오기 — 이알피 업체·기업정보함과 맞춰 보기(읽기만) */
-    download: downloadOriginal, attKey: PuContractForms.attKey,
+    download: downloadOriginal, attKey: PuContractForms.attKey, secretMove: secretMoveCall,
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
