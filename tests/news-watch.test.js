@@ -180,8 +180,12 @@ test('⑧ 전달 셈 — 이 회차 통만, 주소 없이 수만', () => {
 });
 
 test('화면 — 「자동화 점검」 탭이 있고, 고치는 단추 없이 «이번 회차»로 데려간다', () => {
-  assert.match(화면, /data-t="watch"/);
-  assert.match(화면, /App\.tab==='watch'\) m\.innerHTML = 감시화면\(\)/);
+  /* ★ 2026-10-04 부터 «설정» 안의 작은 탭이다(대표 지시 「자동화 점검을 설정 안에 넣어라 탭으로」) */
+  assert.match(화면, /\{ t:'watch', 이름:'자동화 점검'/);
+  assert.match(화면, /watch:'cfg'/);
+  assert.match(화면, /App\.tab==='watch'\) m\.innerHTML = 작은탭\(\) \+ 감시화면\(\)/);
+  /* 볼 것이 있다는 빨간 숫자는 «설정» 큰 탭에 붙는다 */
+  assert.match(화면, /<button data-t="cfg">설정 <span id="cWatch"/);
   const i = 화면.indexOf('function 감시화면');
   const 몸 = 화면.slice(i, 화면.indexOf('\nfunction ', i + 10));
   assert.ok(!/db\.ref\([^)]*\)\.(set|update|push|remove|transaction)/.test(몸), '점검 탭이 DB 에 쓴다');

@@ -242,8 +242,10 @@ test('★ 명함을 아직 못 읽었으면 「명함 없음」이라 하지 않
 });
 
 test('★ 탭이 있고, 받는 명단과 같은 껍데기(위를 얼리고 .whorest 만 구른다)를 쓴다', () => {
-  assert.match(화면, /<button data-t="noaddr">/, '주소 없는 곳 탭 단추가 없다');
-  assert.match(화면, /if\(App\.tab==='noaddr'\)\{[^}]*주소없는곳화면\(\)/, 'render 가 탭을 안 그린다');
+  /* ★ 2026-10-04 부터 «받는 곳» 안의 작은 탭이다(대표 지시 「합쳐서 하나로 … 탭을 다르게」) */
+  assert.match(화면, /\{ t:'noaddr', 이름:'주소 없는 곳'/, '주소 없는 곳 작은 탭이 없다');
+  assert.match(화면, /noaddr:'who'/, '주소 없는 곳이 «받는 곳» 묶음 아래가 아니다');
+  assert.match(화면, /if\(App\.tab==='noaddr'\)\{[^}]*작은탭\(\) \+ 주소없는곳화면\(\)/, 'render 가 탭을 안 그린다');
   assert.match(화면, /classList\.toggle\('who', App\.tab==='who' \|\| App\.tab==='noaddr'\)/,
     '얼리는 껍데기를 안 쓴다 — 표가 잘리거나 위가 사라진다');
   const 명단 = cutFn(화면, 'function 명단화면(');

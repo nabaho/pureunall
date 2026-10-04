@@ -88,6 +88,13 @@ input,select,textarea{font-family:inherit;font-size:14px}
 #tabs button{padding:11px 15px;font-size:15px;font-weight:700;color:var(--sub);
   border:0;background:none;border-bottom:3px solid transparent;white-space:nowrap}
 #tabs button.on{color:var(--ink);border-bottom-color:var(--brown)}
+/* ── 작은 탭 (2026-10-04) — 큰 탭과 «다르게» 보이도록 알약 모양 ── */
+.subtabs{display:flex;gap:6px;margin:12px 0 0;flex-wrap:wrap}
+.subtabs button{font-size:13px;font-weight:700;padding:6px 14px;border-radius:99px;
+  border:1px solid var(--line);background:#fff;color:var(--sub);white-space:nowrap}
+.subtabs button.on{background:var(--brown);border-color:var(--brown);color:#fff}
+.subtabs button .n{color:var(--faint);font-weight:800}
+.subtabs button.on .n{color:#fff}
 
 /* ← 1180px 에서 넓혔다(2026-09-02). 좌우를 5:5 로 «나누기만» 하면 각 칸이 570px 밖에
      안 되어 예전 오른쪽 칸(420px)보다 조금 나은 정도가 된다. 넓히지 않으면 5:5 가 손해다. */
@@ -755,7 +762,7 @@ table.list tr:hover td{background:#fcfcfd}
      지금 무슨 유형을 보고 있는지 · 몇 곳인지를 잃는다.
      ⚠ .whorest 가 없으면 표가 잘린다 — render() 가 who 표를 붙일 때 함께 봐야 한다. */
   #shell>.wrap.who{overflow:hidden;display:flex;flex-direction:column}
-  .wrap.who>.hdbar,.wrap.who>.chips,.wrap.who>.picked{flex:0 0 auto}
+  .wrap.who>.hdbar,.wrap.who>.chips,.wrap.who>.picked,.wrap.who>.subtabs{flex:0 0 auto}
   .wrap.who>.whorest{flex:1;min-height:0;overflow-y:auto;padding-right:4px}
 }
 
@@ -908,14 +915,14 @@ table.list tr:hover td{background:#fcfcfd}
     <button data-t="past">지난 회차 <span id="cPast" style="color:var(--faint)"></span></button>
     <!-- ★ 안내문 — 뉴스레터가 아닌 «한 건 집중» 편지 (대표 지시 2026-09-23) -->
     <button data-t="note">안내문 <span id="cNote" style="color:var(--faint)"></span></button>
-    <button data-t="who">받는 명단 <span id="cWho" style="color:var(--faint)"></span></button>
-    <!-- ★ 주소 없는 곳 — 받는 명단 맨 아래 상자였던 것을 제 탭으로 (대표 지시 2026-09-27
-         「주소가 없어 못보내는곳은 별도로 탭을 만들어 달라. 거기서 정리하고 찾을 수 있게」) -->
-    <button data-t="noaddr">주소 없는 곳 <span id="cNoaddr" style="color:var(--faint)"></span></button>
+    <!-- ★★ 받는 곳 — 「받는 명단」과 「주소 없는 곳」을 한 탭으로 묶고 안에서 작은 탭으로 가른다
+         (대표 지시 2026-10-04 「받는명단 주소 없는곳 합쳐서 하나로 정리하고 탭을 다르게 해라」).
+         주소 없는 곳은 2026-09-27 에 제 탭이 됐다 — 지금은 «받는 곳» 안의 작은 탭이다. -->
+    <button data-t="who">받는 곳 <span id="cWho" style="color:var(--faint)"></span></button>
     <button data-t="res">보낸 결과 <span id="cRes" style="color:var(--faint)"></span></button>
-    <!-- ★ 자동화 점검 — 감시꾼이 남긴 것 (대표 지시 2026-10-04 「검증하고 … 자동으로 고치는기능」) -->
-    <button data-t="watch">자동화 점검 <span id="cWatch" class="wdot"></span></button>
-    <button data-t="cfg">설정</button>
+    <!-- ★ 자동화 점검은 «설정» 안의 작은 탭이다 (대표 지시 2026-10-04 「자동화 점검을 설정 안에 넣어라 탭으로」).
+         빨간 숫자(사람이 볼 것)는 설정 탭에 붙는다 — 묶어 넣어도 «볼 것이 있다»는 보여야 한다. -->
+    <button data-t="cfg">설정 <span id="cWatch" class="wdot"></span></button>
   </div>
 </div><!-- /top -->
 
@@ -1334,8 +1341,29 @@ async function 회차저장(자료){
 /* ══════════════════════════════════════════════════════════════════════════
    그리기
    ══════════════════════════════════════════════════════════════════════════ */
+/* ── 큰 탭 · 작은 탭 (대표 지시 2026-10-04) ──
+   받는 곳 = 받는 명단 · 주소 없는 곳 / 설정 = 설정 · 자동화 점검
+   ⚠ App.tab 값은 그대로다(who · noaddr · cfg · watch) — 다른 곳의 「App.tab='noaddr'」 길이 안 끊긴다.
+     큰 탭의 불만 «묶음»으로 켠다. */
+const 탭묶음 = { noaddr:'who', watch:'cfg' };
+const 작은탭들 = {
+  who: [ { t:'who', 이름:'받는 명단', 수: () => (명단셈().전체 || []).length },
+         { t:'noaddr', 이름:'주소 없는 곳', 수: () => (명단셈().주소없는곳 || []).length } ],
+  cfg: [ { t:'cfg', 이름:'설정' },
+         { t:'watch', 이름:'자동화 점검', 수: () => 감시볼것수(), 빨강: true } ]
+};
+function 작은탭(){
+  const 큰 = 탭묶음[App.tab] || App.tab;
+  const 줄 = 작은탭들[큰]; if(!줄) return '';
+  return '<div class="subtabs">' + 줄.map(function(x){
+    const n = x.수 ? x.수() : 0;
+    const 수 = n ? (x.빨강 ? ' <span class="wdot">' + n + '</span>' : ' <span class="n">' + n + '</span>') : '';
+    return '<button class="' + (x.t === App.tab ? 'on' : '') + '" onclick="App.tab=\'' + x.t + '\';render()">'
+      + x.이름 + 수 + '</button>';
+  }).join('') + '</div>';
+}
 function render(){
-  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===App.tab));
+  document.querySelectorAll('#tabs button').forEach(b=>b.classList.toggle('on', b.dataset.t===(탭묶음[App.tab] || App.tab)));
   $('cPast').textContent = Object.keys(App.회차들).length || '';
   /* ⚠ 탭 숫자는 «거르기 전» 전체다. 걸러낸 수를 쓰면 자문 칩을 눌렀을 때 탭이 27 로
        바뀌어 «전체가 27 인 줄로» 보인다(실제로는 114). 탭은 늘 같은 것을 말해야 한다.
@@ -1357,13 +1385,13 @@ function render(){
   if(App.tab==='past') m.innerHTML = 지난회차화면();
   if(App.tab==='note') m.innerHTML = 안내문화면();
   { const el = $('cNote'); if(el) el.textContent = Object.keys(App.안내문들||{}).length || ''; }
-  if(App.tab==='who'){ 명함읽기(); m.innerHTML = 명단화면(); }
-  if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 주소없는곳화면(); }
+  if(App.tab==='who'){ 명함읽기(); m.innerHTML = 작은탭() + 명단화면(); }
+  if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 작은탭() + 주소없는곳화면(); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
-  if(App.tab==='watch') m.innerHTML = 감시화면();
+  if(App.tab==='watch') m.innerHTML = 작은탭() + 감시화면();
   /* 탭 숫자(사람이 볼 것)는 처음 한 번 읽어 둔다 — 탭을 안 눌러도 빨간 숫자가 보여야 한다 */
   if(App.감시 === undefined){ App.감시 = null; setTimeout(감시읽기, 0); }
-  if(App.tab==='cfg')  m.innerHTML = 설정화면();
+  if(App.tab==='cfg')  m.innerHTML = 작은탭() + 설정화면();
   /* 안내문이 하나도 없어도 «보내기 전 실제 모양»을 보여 준다. 빈 화면에서는 무엇을
      만드는지 판단할 수 없고, 자료 놓는 자리도 찾지 못했다(대표 지시 2026-09-29). */
   if(App.tab==='note') 안내검토미리보기그리기();
