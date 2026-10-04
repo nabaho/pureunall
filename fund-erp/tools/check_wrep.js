@@ -84,7 +84,7 @@ global.bindSiteDocIntake = () => {};
 (0, eval)(gF('_smeChip'));
 (0, eval)(gF('_repTable'));
 (0, eval)(gF('_addrStack'));
-(0, eval)(gF('editSite'));
+(0, eval)(gF('_siteStatusBox')); (0, eval)(gF('editSite'));
 try {
   editSite('S1');
   ok('근로자대표 칸을 그린다',

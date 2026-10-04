@@ -157,20 +157,21 @@ function renderEditSite(sid, s) {
     'function showModal(h){ OUT.html=h; }',
     'function bindSiteDocIntake(){}',
     grabFn('dropZoneSlim'), grabFn('_primaryContact'), grabFn('_wrepDocRow'),
-    grabFn('_repTable'), grabFn('_addrStack'), grabFn('editSite'),
+    grabFn('_repTable'), grabFn('_addrStack'), grabFn('_siteStatusBox'), grabFn('editSite'),
     'this.run=editSite;',
   ].join('\n')).call(box, out, s || {});
   box.run(sid);
   return out.html;
 }
 
-test('★★ ⑥ 네 상자가 모두 그려진다', () => {
+test('★★ ⑥ 다섯 상자가 모두 그려진다', () => {
   const h = renderEditSite('S1', {});
-  ['기업정보', '대표자', '담당자', '사용자 대표', '근로자 대표', '중소기업'].forEach((t) => {
+  ['기업정보', '대표자', '담당자', '사용자 대표', '근로자 대표', '중소기업', '참여 상태'].forEach((t) => {
     assert.ok(h.includes(t), '★ 「' + t + '」가 화면에 없습니다.');
   });
   const boxCount = (h.match(/class="secbox"/g) || []).length;
-  assert.equal(boxCount, 4, '★ 상자가 4개가 아닙니다(기업정보·대표자담당자·사용자대표근로자대표·중소기업) — ' + boxCount + '개');
+  /* 2026-10-04: 다섯째 상자 「참여 상태(탈퇴·폐업)」 — 대표 지시·목업 승인 */
+  assert.equal(boxCount, 5, '★ 상자가 5개가 아닙니다(기업정보·대표자담당자·사용자대표근로자대표·중소기업·참여 상태) — ' + boxCount + '개');
 });
 
 test('★★ ⑦ 대표자·담당자 — 대표자는 이름만, 나머지는 빈 자리(rmiss)로 보인다', () => {
