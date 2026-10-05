@@ -16726,6 +16726,25 @@ function renderPCSide(){
           <span class="gcount">${_nf.toLocaleString()}</span>
         </div>`;
     h += `</div>`;
+    /* ── 「사업」 — 컨설팅 사업 탭만 옆줄에 (대표 지시 2026-10-05 「추천대로 해라」) ──
+       현장클리닉·기술보호울타리처럼 «이 회사와 무슨 사업을 했나»로 한 번에 모아 본다.
+       폴더는 회사마다 하나뿐이라(업체관리·계약해지 등) 사업 구분에 못 쓴다 —
+       탭은 겹쳐 붙는다(coInfo/{회사}/tags/{이름}).
+       ⚠ 아래 「서류 탭」(서류 종류 딱지)은 여전히 접어 둔다. 여기에는 «사업 이름»만 둔다 —
+         목록에 없는 탭은 안 나온다. 새 사업을 넣을 때 이 목록에 이름을 더한다.
+       ⚠ 이 함수 안에 둔다 — 검사들이 이 함수를 떠서 돌린다(밖의 상수는 그 자리에 없다). */
+    const CO_BIZ_TABS = ['현장클리닉', '기술보호울타리'];
+    const bizTabs = (typeof coTagList === 'function' ? coTagList(cos) : [])
+      .filter(x => CO_BIZ_TABS.indexOf(x.t) >= 0);
+    if(bizTabs.length){
+      h += `<div class="pcsec">사업</div>`;
+      bizTabs.forEach(x=>{ h += `<div class="pcitem folderrow ${state.coTag===x.t?'on':''}" style="padding-left:11px"
+          title="「${esc(x.t)}」 사업을 한 회사만 봅니다 — 한 번 더 누르면 풀립니다">
+          <span style="width:13px;display:inline-block"></span>
+          <span class="gname" onclick="pickCoFolder(state.coTag==='${esc(x.t)}' ? '' : 't:${esc(x.t)}')">🏷 ${esc(x.t)}</span>
+          <span class="gcount">${x.n}</span>
+        </div>`; });
+    }
     /* ── 「서류 탭」을 접는다 (대표 지시 2026-08-26) ──
        "기업상세에 사업자등록증 고유번호증으로 다시 나눌 필요가 없다."
 
