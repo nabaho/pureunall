@@ -30,7 +30,9 @@
     return (nameKey !== 'n' && nameKey !== key) ? [nameKey, key] : [key];
   }
   var CO_KEYMAP = [['bizno', 'bz'], ['ceo', 'ceo'], ['corpno', 'cno'], ['address', 'ad'], ['companyTel', 'ct'],
-    ['email', 'e'], ['bizType', 'bt'], ['bizItem', 'bi'], ['smeType', 'sme'], ['workers', 'wk']];
+    ['email', 'e'], ['bizType', 'bt'], ['bizItem', 'bi'], ['smeType', 'sme'], ['workers', 'wk'],
+    /* 국세청 상태 — 기업정보함이 «물어본 날»과 함께 적어 둔 값(pu-cards.html 🏛 국세청 사업자 상태). 읽기만 */
+    ['ntsState', 'ns'], ['ntsAt', 'na'], ['ntsEndDt', 'ne']];
   function mergeCoInfo(vals) {
     var out = {};
     (vals || []).forEach(function (v) {
@@ -104,6 +106,33 @@
     }
     var p = String(a || '').replace(/\s/g, ''), q = String(b || '').replace(/\s/g, '');
     return p === q || (!!p && !!q && (p.indexOf(q) >= 0 || q.indexOf(p) >= 0));   // 공동대표 「홍길동,김철수」 ⊃ 「홍길동」
+  }
+  /* ══ 🏛 국세청 상태 (대표 「추천대로」 2026-10-05 — 오래된 등록증 경고 대신) ══
+     ⚠ 기업정보함 coNtsCls 와 «같은 답»이어야 한다(검사가 두 쪽을 견준다). 우리가 정하지 않는다 — 국세청 말 그대로. */
+  function ntsCls(word) {
+    var w = String(word || '');
+    if (!w) return '';
+    if (w.indexOf('폐업') >= 0) return 'gone';
+    if (w.indexOf('휴업') >= 0) return 'soon';
+    if (w.indexOf('계속') >= 0) return 'ok';
+    if (w.indexOf('등록되지 않은') >= 0) return 'none';
+    return 'dim';
+  }
+  /* 국세청 한 줄(b_stt·tax_type·end_dt) → 말 */
+  function ntsWordOf(row) { return String((row && row.b_stt) || '').trim() || String((row && row.tax_type) || '').trim(); }
+  function ntsEndOf(row) { var d = digits(row && row.end_dt); return d.length === 8 ? d.slice(0, 4) + '-' + d.slice(4, 6) + '-' + d.slice(6) : ''; }
+  var NTS_STALE_DAYS = 90;
+  /* x: {word, at, end} → 화면 한 줄. stale = 물어본 지 90일 넘음(또는 날짜 없음) — 상태는 «그때의 사실»이다 */
+  function ntsView(x, today) {
+    x = x || {};
+    var word = String(x.word || '').trim(), at = String(x.at || '').slice(0, 10), cls = ntsCls(word);
+    var t = today || new Date(), days = at ? Math.floor((Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) - Date.parse(at + 'T00:00:00Z')) / 864e5) : null;
+    var stale = !word || days == null || !(days <= NTS_STALE_DAYS);
+    var bad = cls === 'gone' || cls === 'soon' || cls === 'none';
+    var say = cls === 'none' ? '국세청에 없는 번호' : word;
+    var text = !word ? '국세청 확인 기록 없음'
+      : '국세청: ' + say + (x.end ? ' (' + x.end + ' 폐업)' : '') + (at ? ' · ' + at + ' 확인' + (days > NTS_STALE_DAYS ? '(' + days + '일 전)' : '') : ' · 확인 날짜 모름');
+    return { word: word, at: at, cls: cls, bad: bad, stale: stale, text: text };
   }
   /* co: 고른 회사 줄(이알피 줄이면 _biz 가 붙어 있을 수 있다) → [{f, key, erp, biz}] */
   function coConflicts(co) {
@@ -513,7 +542,7 @@
 
   var api = {
     BLANK: BLANK, coNorm: coNorm, cardNorm: cardNorm, sameCo: sameCo, coInfoKeys: coInfoKeys, mergeCoInfo: mergeCoInfo,
-    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, coConflicts: coConflicts, fieldSource: fieldSource, sameField: sameField, CO_FIELD_OF: CO_FIELD_OF, searchCompanies: searchCompanies, contactsOf: contactsOf,
+    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, coConflicts: coConflicts, ntsCls: ntsCls, ntsWordOf: ntsWordOf, ntsEndOf: ntsEndOf, ntsView: ntsView, fieldSource: fieldSource, sameField: sameField, CO_FIELD_OF: CO_FIELD_OF, searchCompanies: searchCompanies, contactsOf: contactsOf,
     searchPeople: searchPeople, searchContacts: searchContacts,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,
