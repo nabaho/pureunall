@@ -68,8 +68,9 @@ test('★ 공동기금은 그해 90%를 쓴다', () => {
   assert.equal(API.useRate({}), 0.9, '유형이 비면 공동으로 본다');
 });
 
-test('★ 사내기금은 50%, 중소기업에 설치된 사내기금은 80%다', () => {
-  assert.equal(API.useRate({ fund_type: '사내' }), 0.5);
+/* 대표 지시 2026-10-06 — 사내기금은 80%가 기본, 「중소기업 아님」이라고 적어 둔 곳만 50% */
+test('★ 사내기금은 80%, 「중소기업 아님」이라고 적은 사내기금만 50%다', () => {
+  assert.equal(API.useRate({ fund_type: '사내' }), 0.8, '비어 있으면 80% — 비어 있다고 절반만 설정하면 결손이 난다');
   assert.equal(API.useRate({ fund_type: '사내', sme: '중소기업' }), 0.8);
   assert.equal(API.useRate({ fund_type: '사내', sme: '중소기업 아님' }), 0.5);
 });
