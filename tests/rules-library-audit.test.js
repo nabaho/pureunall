@@ -29,3 +29,8 @@ test('빈 것·null 에 안 터진다', () => {
   assert.deepEqual(A.scan(null), { docs: 0, hits: [] });
   assert.deepEqual(A.scan({ rd_1: null }).hits, []);
 });
+
+test('유선 전화(지역번호)는 «전화»로 센다 — 계좌로 세지 않는다', () => {
+  const r = A.scan({ rd_1: '담당 031-123-4567 · 팩스 02-555-1234 · 휴대 01012345678' });
+  assert.deepEqual(r.hits, [{ id: 'rd_1', kind: '전화', n: 3 }]);
+});

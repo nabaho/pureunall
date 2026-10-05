@@ -35,9 +35,20 @@ async function redactOne(buf, ext, impl) {
   if (r.unscanned > 0) return { ok: false, holdWhy: '검사 못 한 부분 있음 ' + r.unscanned, count: r.count, total: r.total };
   if (RAW_RE.test(r.text)) return { ok: false, holdWhy: '가린 글에 주민번호 꼴이 남음', count: r.count, total: r.total };
   const isHwp = ext === 'hwp' || ext === 'hwpx';
+  /* 마지막 그물이 다시 읽은 글에서 더 찾았으면(leak) — 파일(가린 것이든 원본이든)을 믿지 않는다. 가린 «글만» 담는다 (2026-10-05).
+     ⚠ 전에는 파일째 가리기가 아무것도 못 찾으면 «원본 파일»을 그대로 내보냈다 — 표 칸 속 번호가 원본째 창고에 들어갔다. */
+  if (r.leak) return { ok: true, format: ext, text: r.text, data: null, count: r.count, total: r.total, leak: r.leak };
   /* 찾았는데 가린 파일을 못 받았으면 원본을 내보낼 수 없다 — 보류 */
   if (isHwp && r.total && !r.data) return { ok: false, holdWhy: '가린 파일을 만들지 못함', count: r.count, total: r.total };
   const data = !isHwp ? null : (r.total ? r.data : bytes);
   return { ok: true, format: ext, text: r.text, data, count: r.count, total: r.total };
 }
-module.exports = { redactOne, RAW_RE, load };
+/* 이미 담긴 글을 다시 훑는다 (2026-10-05) — 같은 규칙 한 벌(T.rulesOf 기본)로 글 가림만.
+   돌려주는 것: { leak(새로 찾은 수), count, text(가린 글 — 찾은 것이 없으면 그대로) } */
+async function recheck(text) {
+  const K = await load();
+  const p = K.redactText(String(text || ''), { rules: T.rulesOf() });
+  const t = T.tally(p.hits);
+  return { leak: t.total, count: t.count, text: t.total ? p.text : String(text || '') };
+}
+module.exports = { redactOne, recheck, RAW_RE, load };

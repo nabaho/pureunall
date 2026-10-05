@@ -43,6 +43,45 @@ function docRecord(o) {
    ⚠ 두 회차가 동시에 돌면 같은 메일을 둘이 받는다 — 잠금. 함수 한도(9분)보다 조금 길게 잡고, 지나면 죽은 회차로 보고 이어받는다.
    ⚠ 끝나면(터져도) 잠금을 푼다. */
 const LOCK_MS = 10 * 60 * 1000;
+/* ══════ 담긴 글 다시 훑기 (2026-10-05 대표 「추천대로」 — 유선 번호를 놓친 규칙본문 1건을 다시 가려 담기) ══════
+   새 그물(다시 읽은 글을 한 번 더 훑기)은 «앞으로» 담는 것만 지킨다. 이미 담긴 것은 회차가 스스로 고친다.
+   판(RECHECK_V)마다 한 번씩만 — 가림 규칙을 고치면 판을 올려 다시 훑게 한다.
+   걸리면 글을 가려 다시 쓰고, 그 파일은 믿지 않는다(창고에서 지우고 file 을 비운다 — 글만).
+   ⚠ 못 지우면 fileOrphan 에 자리를 적는다 — 이어 두면 안 되고, 자리를 잃으면 아무도 못 지운다. */
+const RECHECK_V = 1;
+async function heal(o, db, bucket, docs) {
+  const ids = Object.keys(docs || {}).filter((id) => docs[id] && docs[id].status === '담김'
+    && Number(docs[id].recheckV || 0) < RECHECK_V);
+  if (!ids.length) return 0;
+  const texts = (await val(db, LIB + '/text')) || {};
+  const recheck = o.recheck || X.recheck;
+  let n = 0;
+  for (const id of ids) {
+    const d = docs[id], t = texts[id];
+    const P0 = LIB + '/docs/' + id + '/';
+    const up = { [P0 + 'recheckV']: RECHECK_V };
+    const r = t ? await recheck(t) : { leak: 0 };
+    if (r.leak) {
+      const now = o.now();
+      const count = Object.assign({}, (d.pii && d.pii.count) || {});
+      Object.keys(r.count || {}).forEach((k) => { count[k] = (count[k] || 0) + r.count[k]; });
+      up[LIB + '/text/' + id] = r.text;
+      up[P0 + 'textLen'] = r.text.length;
+      up[P0 + 'pii/count'] = count;
+      up[P0 + 'revision'] = Number(d.revision || 1) + 1;
+      up[P0 + 'updatedAt'] = now;
+      up[P0 + 'healedAt'] = now;
+      up[P0 + 'file'] = null;
+      if (d.file && d.file.path) {
+        try { await bucket.file(d.file.path).delete(); }
+        catch (e) { up[P0 + 'fileOrphan'] = d.file.path; }
+      }
+      n++;
+    }
+    await db.ref().update(up);
+  }
+  return n;
+}
 const MAX_CHAIN = 150;            // 한 줄로 이어 달리는 회차 수 한도 — 고장 난 고리가 끝없이 돌지 않게
 function shouldChain(sum, chain) {
   if (!sum || sum.skipped) return false;
@@ -66,6 +105,7 @@ async function runOnce(o) {
     val(db, 'mailbox/msgs'), val(db, 'mailbox/old/msgs'), val(db, LIB + '/seen'),
     val(db, LIB + '/docs'), val(db, 'data/companies'), val(db, LIB + '/run'),
   ]);
+  const healed = await heal(o, db, bucket, docs || {});
   const have = Object.assign({}, docs || {});
   const coIndex = MR.buildCompanyIndex(companies || {});
   const domIndex = P.buildDomainIndex(companies || {});
@@ -169,7 +209,8 @@ async function runOnce(o) {
     sum.stored += c.stored; sum.held += c.held; sum.dup += c.dup;
   }
   sum.errors = sum.errors.slice(0, 10);
-  sum.left = Math.max(0, allLeft.length - (sum.mails - sum.retry));   // 다시 시도할 것은 남은 것으로 센다
+  sum.left = Math.max(0, allLeft.length - (sum.mails - sum.retry));
+  sum.healed = healed;   // 다시 시도할 것은 남은 것으로 센다
   /* 설계 §4-5 — 「담음 0, 오류 있음」이 사흘 이어지면 관리자에게 알린다(부르는 쪽이 systemAlerts 에 쓴다) */
   const bad = sum.stored === 0 && (sum.retry > 0 || sum.errors.length > 0);
   sum.zeroStreak = bad ? Number((prevRun && prevRun.zeroStreak) || 0) + 1 : 0;
@@ -178,4 +219,4 @@ async function runOnce(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, shouldChain, MAX_CHAIN, LOCK_MS, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
