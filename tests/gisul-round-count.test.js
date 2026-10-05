@@ -48,11 +48,11 @@ function 세상(types, extra) {
   vm.createContext(ctx);
   vm.runInContext(SEED_SRC, ctx);
   /* clinicDayCards 가 쓰는 두 상수 — 소스의 한 줄을 그대로 싣는다(값을 여기 다시 적지 않는다) */
-  ['var CLINIC_PLAN_STATUS = ', 'var CLINIC_SKIP_REASON = '].forEach((k) => {
+  ['var CLINIC_PLAN_STATUS = ', 'var CLINIC_SKIP_REASON = ', 'var CONS_ROLE_SEED = '].forEach((k) => {
     const a = ERP_RAW.indexOf(k); assert.ok(a >= 0, k + ' 를 못 찾았습니다');
     vm.runInContext(ERP_RAW.slice(a, ERP_RAW.indexOf('\n', a)), ctx);
   });
-  vm.runInContext(['consNameKey', 'consTypeDayFee', 'consTypeDayOpt', 'consDayAmount', 'clinicIsType', 'techIsType',
+  vm.runInContext(['consNameKey', 'consTypeRole', 'consRoleOf', 'consTypeDayFee', 'consTypeDayOpt', 'consDayAmount', 'clinicIsType', 'techIsType',
     'clinicFeeDays', 'clinicDaysOf', 'clinicFyRange', 'clinicDayCards', 'clinicGovHint'].map(fn).join('\n'), ctx);
   return ctx;
 }

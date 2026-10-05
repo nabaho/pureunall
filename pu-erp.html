@@ -7397,7 +7397,12 @@ function erpContractHint(txn){
 function erpIsClinicItem(cand){
   try {
     var it = (cand && cand.item) || {};
-    if(it.typeCode === 'cons-clinic') return true;
+    /* 유형 번호가 있으면 사전의 역할(consRoleOf)로만 본다 — 이름을 고쳐도 알아본다(2026-10-05).
+       번호가 사전에 없을 때만(옛 기록) 이름 글자로 짐작한다. */
+    if(it.typeCode){
+      var _types = dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
+      if(it.typeCode === 'cons-clinic' || _types.some(function(x){ return x && x.code === it.typeCode; })) return consRoleOf(it.typeCode, _types) === 'clinic';
+    }
     return /현장\s*클리닉|현클/.test(String(it.typeName || it.type || cand.label || ''));
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
 }
@@ -15469,9 +15474,12 @@ function consTypeDayFee(code){
        0 은 「쓰지 않는다」는 뜻이고, 여기까지 오지 않는다. */
   var s = BIZ_CONS_SEED.find(function(x){ return x.code === code; });
   if(!s && t) s = BIZ_CONS_SEED.find(function(x){ return consNameKey(x.name) === consNameKey(t.name); });
-  /* 기술보호 — 서버 유형 이름이 「통합기술보호지원단」이라 위 이름 대조(같은 이름)로는 못 찾는다.
-     이름에 「기술보호」가 들면 기술보호 씨앗으로 본다. */
-  if(!s && t && /기술보호/.test(consNameKey(t.name))) s = BIZ_CONS_SEED.find(function(x){ return x.code === 'cons-techguard'; });
+  /* 역할(consTypeRole)로 씨앗을 찾는다 — 이름을 고쳐도 현장클리닉·기술보호 기본 단가가 따라온다 */
+  if(!s && t){
+    var _role = consTypeRole(t);
+    var _sc = _role === 'clinic' ? 'cons-clinic' : (_role === 'tech' ? 'cons-techguard' : '');
+    if(_sc) s = BIZ_CONS_SEED.find(function(x){ return x.code === _sc; });
+  }
   return (s && parseInt(s.dayFee, 10)) || 0;
 }
 /* 단가가 «하루»에 붙는가(현장클리닉) «한 회»에 붙는가(기술보호), 부가세를 얹는가 — 단가(consTypeDayFee) 곁에 둔다.
@@ -15482,7 +15490,7 @@ function consTypeDayOpt(code){
   if(!fee) return o;
   var list = dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
   var t = list.find(function(x){ return x && x.code === code; });
-  var tech = code === 'cons-techguard' || (!!t && /기술보호/.test(consNameKey(t.name)));
+  var tech = consRoleOf(code, list) === 'tech';
   var own = !!t && t.dayFee !== undefined && t.dayFee !== null && t.dayFee !== '';
   var src = own ? t
     : (BIZ_CONS_SEED.find(function(x){ return x.code === code; })
@@ -15549,20 +15557,44 @@ function clinicFyRange(fyStartMMDD, today, offset){
   var end = e.getUTCFullYear() + '-' + ('0' + (e.getUTCMonth() + 1)).slice(-2) + '-' + ('0' + e.getUTCDate()).slice(-2);
   return { year:y, start: y + '-' + mmdd, end: end };
 }
-function clinicIsType(code, types){
-  if(!code) return false;
-  if(code === 'cons-clinic') return true;
-  var t = (types || []).find(function(x){ return x && x.code === code; });
-  return !!t && consNameKey(t.name) === '현장클리닉';
+/* ══ 컨설팅 유형의 «역할» — 이름 글자가 아니라 유형에 적힌 칸(role)으로 알아본다 (업무유형 정리 2단계, 2026-10-05) ══
+   대표 질문 「유형을 고치면 진행 중인 업무가 바뀌지 않나」.
+   예전에는 현장클리닉 일수·기술보호 회차·단가를 «이름»으로 알아봤다 — 이름을 「클리닉」으로 고치면
+   그 셈이 그 유형을 조용히 못 찾았다. 이제 유형마다 role 칸('clinic' · 'tech' · 'none')을 둔다.
+   ■ 옛 사전에는 role 이 없다 → 씨앗 번호, 그다음 «이름으로 한 번만» 짐작한다.
+     그 짐작은 사전을 저장할 때 role 칸으로 굳는다(bizTypeStampRoles — bizTypeApply 가 «고치기 전» 사전에 찍는다).
+     그래서 이름을 바꾸는 바로 그 저장에서도 역할은 옛 이름으로 먼저 굳고, 새 이름과 상관없이 남는다.
+   ⚠ 'none' 은 「이 유형은 어느 셈에도 안 든다」는 사람의 결정이다 — 이름이 비슷해도 짐작하지 않는다. */
+var CONS_ROLE_SEED = { 'cons-clinic':'clinic', 'cons-techguard':'tech' };
+var CONS_ROLE_LABEL = { clinic:'현장클리닉', tech:'기술보호' };
+function consTypeRole(t){
+  if(!t) return '';
+  if(t.role === 'clinic' || t.role === 'tech') return t.role;
+  if(t.role === 'none') return '';
+  if(CONS_ROLE_SEED[t.code]) return CONS_ROLE_SEED[t.code];
+  var nk = consNameKey(t.name);
+  if(nk === '현장클리닉') return 'clinic';
+  if(/기술보호/.test(nk)) return 'tech';
+  return '';
 }
-/* 기술보호 — 같은 «단가 × 단위 수» 셈을 «회» 단위로 쓴다(대표 지시 2026-10-04: 1회차 30만원, 총 몇 회 했나).
-   ⚠ 서버 유형 이름이 「통합기술보호지원단」이라 «같다»가 아니라 «기술보호가 든다»로 알아본다. */
-function techIsType(code, types){
-  if(!code) return false;
-  if(code === 'cons-techguard') return true;
-  var t = (types || []).find(function(x){ return x && x.code === code; });
-  return !!t && /기술보호/.test(consNameKey(t.name));
+function consRoleOf(code, types){
+  if(!code) return '';
+  var list = types || dbGet('biz_cons_types', BIZ_CONS_SEED) || [];
+  var t = list.find(function(x){ return x && x.code === code; });
+  if(t) return consTypeRole(t);
+  return CONS_ROLE_SEED[code] || '';
 }
+/* 사전을 저장하기 «전» 역할을 굳힌다 — role 칸이 없고 짐작이 서는 항목만. 새 배열을 돌려준다. */
+function bizTypeStampRoles(list){
+  return (list || []).map(function(x){
+    if(!x || x.role) return x;
+    var r = consTypeRole(x);
+    return r ? Object.assign({}, x, { role:r }) : x;
+  });
+}
+function clinicIsType(code, types){ return consRoleOf(code, types || []) === 'clinic'; }
+/* 기술보호 — 같은 «단가 × 단위 수» 셈을 «회» 단위로 쓴다(대표 지시 2026-10-04: 1회차 30만원, 총 몇 회 했나). */
+function techIsType(code, types){ return consRoleOf(code, types || []) === 'tech'; }
 /* 금액으로 일수 짐작 (2026-10-02 대표 보고 「7건이면 21일일 수 있는데 왜 15일인가」)
    ★ 실측: 현장클리닉 23건 중 22건이 일수 칸이 비어 금액으로만 셌는데, 셋 꼴에서 «0일»이 됐다.
      ① 잔금 1,150,000원 — 3×385,000(=1,155,000)과 5,000원 차이라 «딱 떨어지지 않아» 버렸다
@@ -36883,8 +36915,8 @@ window.caseSyncStageCode= caseSyncStageCode;
      ④ 누가 언제 무엇을 바꿨는지 남지 않았다. → 항목마다 hist 에 전→후를 남긴다(최근 20개).
      ⑤ 화면이 들고 있던 목록을 통째로 저장해 다른 사람이 그 사이 고친 것을 지웠다.
         → 저장 직전 «지금 사전»을 다시 읽어 그 위에 내 한 가지만 얹는다(bizTypeApply).
-   ⚠ 이름 글자로 유형을 알아보는 곳이 아직 있다(현장클리닉 일수·기술보호 단가 등 — 2단계에서 번호로 바꾼다).
-     그 전까지는 그 이름을 바꿀 때 묻는다(bizTypeNameGuard). */
+   ★ 2단계(2026-10-05): 현장클리닉 일수·기술보호 회차·단가는 이제 이름이 아니라 유형의 역할(role) 칸으로
+     알아본다(consTypeRole) — 이름을 고쳐도 셈이 안 깨진다. 그래서 이름 변경 경고(옛 bizTypeNameGuard)는 걷었다. */
 var BIZ_TYPE_STORE = { company:'companies', case:'cases', consulting:'consultings', fund:'funds', other:'other_projects' };
 var BIZ_TYPE_HIST_MAX = 20;
 function bizTypeNorm(s){ return String(s == null ? '' : s).replace(/[\s·.,()\-_/]/g, '').toLowerCase(); }
@@ -36946,19 +36978,14 @@ function bizTypeRead(storageKey, seed){
   return v.filter(function(x){ return x != null; }).map(function(x){ return Object.assign({}, x); });
 }
 function bizTypeApply(storageKey, seed, fn){
-  var next = fn(bizTypeRead(storageKey, seed));
+  var cur = bizTypeRead(storageKey, seed);
+  /* 컨설팅 사전은 «고치기 전» 역할(role)을 굳힌다 — 이름을 바꾸는 이 저장에서도 역할은 옛 이름으로 먼저 정해진다 */
+  if(storageKey === 'biz_cons_types' && typeof bizTypeStampRoles === 'function') cur = bizTypeStampRoles(cur);
+  var next = fn(cur);
   if(!Array.isArray(next)) return null;
   next.sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0); });
   dbSet(storageKey, next);
   return next;
-}
-/* 이름 글자로 알아보는 유형 — 바꾸면 그 기능이 그 유형을 못 찾는다(2단계 전까지의 경고). */
-function bizTypeNameGuard(kindKey, oldName, newName){
-  if(kindKey !== 'consulting') return '';
-  var o = bizTypeNorm(oldName), n = bizTypeNorm(newName);
-  if(o.indexOf('현장클리닉') >= 0 && n.indexOf('현장클리닉') < 0) return '현장클리닉 일수·단가 계산';
-  if(o.indexOf('기술보호') >= 0 && n.indexOf('기술보호') < 0) return '기술보호 회차·단가 계산';
-  return '';
 }
 function bizTypeLastHist(x){
   var h = x && x.hist && x.hist[x.hist.length - 1];
@@ -37061,15 +37088,12 @@ function BizTypeCard(props){
       showToast('⚠ 「' + dupE.short + ' ' + dupE.name + '」 와 약어나 이름이 겹칩니다 — 고치지 않았습니다. 같은 사업이면 합치기로 정리합니다', 8000);
       return;
     }
-    /* 이름 글자로 알아보는 기능이 있는 유형 — 이름에서 그 말이 빠지면 묻는다 */
-    var guard = bizTypeNameGuard(cat.key, x.name, nm);
-    if(guard && !(await showConfirm('「' + x.name + '」 → 「' + nm + '」\n\n이 이름으로 ' + guard + '을(를) 알아보는 기능이 있습니다.\n이름에서 그 말이 빠지면 그 계산이 이 유형을 못 찾습니다.\n\n그래도 바꿀까요?', { title:'이름 변경 주의', confirmText:'그래도 바꾸기', danger:true }))) return;
     /* 약어를 바꾸면 번호가 두 갈래가 된다 — 몇 건이 옛 약어로 남는지 보여 주고 묻는다 */
     if(bizTypeNorm(sh) !== bizTypeNorm(x.short)){
       var usedE = countUsage(x.code);
       if(usedE > 0 && !(await showConfirm('약어 「' + (x.short || '') + '」 → 「' + sh + '」\n\n이미 붙은 관리번호(' + usedE + '건 사용 중)는 「' + (x.short || '') + '-」 그대로 남고,\n새로 만드는 것부터 「' + sh + '-」 가 붙습니다 — 같은 사업의 번호가 두 갈래가 됩니다.\n\n그래도 바꿀까요?', { title:'약어 변경 주의', confirmText:'그래도 바꾸기', danger:true }))) return;
     }
-    var ag = null, df = null, unitIn = '', vatIn = '';
+    var ag = null, df = null, unitIn = '', vatIn = '', roleIn = '';
     if(cat.key === 'consulting'){
       ag = window.prompt('기관 (없으면 비워두기)', x.agency || ''); if(ag === null) ag = x.agency || '';
       /* 🏥 1일 단가 (대표 지시 2026-09-18) — 현장클리닉처럼 «하루 나가면 얼마»인 사업.
@@ -37086,6 +37110,14 @@ function BizTypeCard(props){
         if(un !== null && (un.trim() === '일' || un.trim() === '회')) unitIn = un.trim();
         var vt = window.prompt('부가세 — 「별도」(단가에 +10%) 또는 「없음」(단가 그대로 받음)', x.dayVat === 'none' ? '없음' : (x.dayVat === 'add' ? '별도' : ''));
         if(vt !== null && (vt.trim() === '별도' || vt.trim() === '없음')) vatIn = vt.trim() === '없음' ? 'none' : 'add';
+        /* 셈 묶음(역할) — 현장클리닉 일수표·기술보호 회차표에 이 유형을 넣을지. 이름이 아니라 이 칸으로 알아본다(consTypeRole).
+           ⚠ 비우거나 취소하면 지금 역할 그대로 둔다. */
+        var curRole = consTypeRole(x);
+        var rl = window.prompt('셈 묶음 — 「현장클리닉」(일수표) · 「기술보호」(회차표) · 「없음」', CONS_ROLE_LABEL[curRole] || (x.role === 'none' ? '없음' : ''));
+        if(rl !== null){
+          var rv = rl.trim();
+          if(rv === '현장클리닉') roleIn = 'clinic'; else if(rv === '기술보호') roleIn = 'tech'; else if(rv === '없음') roleIn = 'none';
+        }
       }
     }
     persistWith(function(cur){
@@ -37098,6 +37130,7 @@ function BizTypeCard(props){
         if(df !== null) nx.dayFee = parseInt(String(df).replace(/[^\d]/g, ''), 10) || 0;
         if(unitIn) nx.dayUnit = unitIn;
         if(vatIn) nx.dayVat = vatIn;
+        if(roleIn) nx.role = roleIn;
         return bizTypeHist(nx, '수정', it, who());
       });
     });
@@ -37195,7 +37228,10 @@ function BizTypeCard(props){
                 cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
                 /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지
                    여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
-                cat.key === 'consulting' && x.dayFee > 0 ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && /기술보호/.test(consNameKey(x.name))) ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null
+                cat.key === 'consulting' && x.dayFee > 0 ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#166534', background:'#f0fdf4', border:'1px solid #bbf7d0', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '1' + (x.dayUnit === '회' || (x.dayUnit !== '일' && consTypeRole(x) === 'tech') ? '회' : '일') + ' ' + Number(x.dayFee).toLocaleString() + '원') : null,
+                /* 셈 묶음(역할)이 있는 유형은 칩으로 — 이름이 아니라 이 칸으로 일수표·회차표에 든다 */
+                cat.key === 'consulting' && consTypeRole(x) ? h('span', { title:'이 유형은 「' + CONS_ROLE_LABEL[consTypeRole(x)] + '」 셈에 듭니다 — 이름을 고쳐도 그대로입니다(✏ 에서 바꿈)',
+                  style:{ marginLeft:'6px', fontSize:'10.5px', color:'#1e40af', background:'#eff6ff', border:'1px solid #bfdbfe', padding:'1px 7px', borderRadius:'10px', fontWeight:700 } }, '셈: ' + CONS_ROLE_LABEL[consTypeRole(x)]) : null
               ),
               h('button', { onClick:function(){ editType(x); }, className:'erp-tip', 'data-tip':'✏ 수정 가능 (코드 유지 — 연결 안 끊김)',
                 style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'5px', width:'18px', flexShrink:0, height:'22px', fontSize:'11px', cursor:'pointer' } }, '✏'),

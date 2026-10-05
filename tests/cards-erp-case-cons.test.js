@@ -65,7 +65,8 @@ function loadErpCaseConsBlock(){
    ⚠ 이 목록은 «손으로» 적는다. ERP_HIST_KINDS 에서 뽑아 만들면 무엇을 더해도 저절로
      맞아떨어져 검사가 아무것도 안 지키게 된다 — 자리가 느는 것은 요금이 느는 일이라
      사람이 한 번 더 보고 적어야 한다. */
-const ERP_READ_PATHS = ['data/biz_cons_types','data/biz_fund_types','data/biz_other_types',
+/* ⚠ 2026-10-05: 사건 사전(data/biz_case_types)을 더했다 — 환경설정에서 고친 사건 이름이 따라오게(1KB 남짓) */
+const ERP_READ_PATHS = ['data/biz_case_types','data/biz_cons_types','data/biz_fund_types','data/biz_other_types',
                         'data/cases/v','data/consultings/v','data/contracts/v',
                         'data/funds/v','data/other_projects/v'];
 

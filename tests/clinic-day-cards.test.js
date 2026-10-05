@@ -16,7 +16,9 @@ function cutFn(head) {
 }
 const ctx = { console, Object, Array, String, JSON, Math, Date, parseInt, window: {} };
 vm.createContext(ctx);
-['function consNameKey(', 'function clinicFyRange(', 'function clinicIsType(',
+/* 유형의 역할(role) — 2026-10-05 부터 현장클리닉은 이름 글자가 아니라 이 칸으로 알아본다 */
+vm.runInContext((src.match(/^var CONS_ROLE_SEED = .*$/m) || [''])[0], ctx);
+['function consNameKey(', 'function consTypeRole(', 'function consRoleOf(', 'function clinicFyRange(', 'function clinicIsType(',
  'function clinicFeeDays(', 'function clinicDaysOf(', 'function clinicDayCards('].forEach((h) => vm.runInContext(cutFn(h), ctx));
 vm.runInContext("var CLINIC_PLAN_STATUS = ['consult','review','negotiate','confirmed','signed','progress'];", ctx);
 /* 「미수행 종료」 글자는 원본의 한 줄을 그대로 싣는다 — 여기서 다시 적으면 두 벌이 된다 */

@@ -29710,7 +29710,9 @@ async function pushTaxInvoiceToErp(keys, opt){
      안 나온 까닭이다. 이름 다듬기는 업체관리 맞추기(_norm)와 **같은 규칙**을 쓴다. */
 const ERP_HIST_KINDS = [
   { kind:'consulting',    store:'consultings',    types:'biz_cons_types',  label:'컨설팅' },
-  { kind:'case',          store:'cases',          types:'',                label:'사건' },
+  /* 사건도 사전(biz_case_types)을 읽는다 (2026-10-05 업무유형 정리 2단계) — 기록에 복사된 typeName 은
+     만들 때의 이름이라, 환경설정에서 이름을 고쳐도 여기만 옛 이름이 남았다. 번호로 찾고, 못 찾으면 복사본. */
+  { kind:'case',          store:'cases',          types:'biz_case_types',  label:'사건' },
   { kind:'fund',          store:'funds',          types:'biz_fund_types',  label:'기금' },
   { kind:'other',         store:'other_projects', types:'biz_other_types', label:'기타' },
   /* ── 계약 (점검 C1, 2026-08-31) ────────────────────────────────────────
@@ -29918,7 +29920,13 @@ function erpHistVisible(rec){
 /* 이 기록의 유형 이름. 사건만 레코드에 박혀 있고 나머지는 사전을 찾아야 한다. */
 function erpHistName(rec, typesByKind){
   const kind = (rec && rec._kind) || 'consulting';
-  if(kind === 'case') return String((rec && rec.typeName) || '').trim();
+  if(kind === 'case'){
+    /* 사전에 그 번호가 있으면 «지금 이름» — 없으면(옛 기록·사전 못 읽음) 기록에 복사된 이름 */
+    const code = erpTypeCodeOf(rec, 'case');
+    const t = code ? ((typesByKind || {}).case || []).find(x=>x && String(x.code)===code) : null;
+    if(t && t.name) return String(t.name).trim();
+    return String((rec && rec.typeName) || '').trim();
+  }
   /* 계약도 사전을 안 쓴다 — 제 안의 갈래 글자를 사람 말로 바꿔 준다 (점검 C1) */
   if(kind === 'contract'){
     const k = String((rec && rec.kind) || '').trim();
