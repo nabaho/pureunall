@@ -2341,11 +2341,13 @@ table.sbox.tight td.none{padding:26px 8px}
 .regstrip .btn{flex:none;padding:8px 12px;white-space:nowrap}
 /* 👷 근로자 「＋ 정보등록」 — 들어갈 사건 고르기. 줄마다 한 줄, 넘치면 … */
 .wrcases{max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;padding:4px}
-.wrcases .wrcase{display:flex;gap:10px;align-items:center;padding:7px 8px;margin:0;font-weight:400;color:#1e293b;border-radius:8px;cursor:pointer;white-space:nowrap;font-size:13px;min-width:0}
-.wrcases .wrcase.on,.wrcases .wrcase:hover{background:#eff6ff}
+.wrcases .wrcase{display:flex;gap:10px;align-items:center;padding:7px 8px;margin:0;font-weight:400;color:var(--ink);border-radius:8px;cursor:pointer;white-space:nowrap;font-size:13px;min-width:0}
+/* 폰은 어두운 바탕 — 밝은 칠을 하면 글자가 묻힌다. 고른 줄은 테두리로, 칠은 PC 에서만 */
+.wrcases .wrcase.on{outline:2px solid var(--orange);outline-offset:-2px}
+body.pc .wrcases .wrcase.on,body.pc .wrcases .wrcase:hover{background:#eff6ff;outline:none}
 .wrcases .wrcase input{flex:none;width:auto;margin:0;padding:0}
 .wrcases .wrcase b{flex:none;max-width:180px;overflow:hidden;text-overflow:ellipsis}
-.wrcases .wrcase span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#475569}
+.wrcases .wrcase span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--sub)}
 .wrcases .wrcase em{flex:none;font-style:normal;color:#94a3b8;font-size:12px}
 /* 🔎 전체에서 찾기 — 찾기 칸 바로 아래 펼침 (대표 지시 2026-10-05). 줄마다 «한 줄», 넘치면 … */
 #gsBox{position:absolute;top:calc(100% + 6px);left:0;width:640px;max-width:calc(100vw - 300px);background:#fff;
@@ -2363,6 +2365,19 @@ table.sbox.tight td.none{padding:26px 8px}
 #gsBox .gsrow .gsmid{flex:1;min-width:0;color:#475569;overflow:hidden;text-overflow:ellipsis}
 #gsBox .gsrow .gsend{flex:none;color:#94a3b8;font-size:12px}
 #gsBox .gsnone{padding:14px 12px;font-size:13px;color:#64748b}
+/* 폰 🔎 전체에서 찾기 띠 — 어두운 바탕. 줄마다 한 줄, 넘치면 … */
+#gsBoxM{background:#1e293b;border-bottom:1px solid var(--line);color:var(--ink);flex-shrink:0;max-height:55vh;overflow:auto}
+#gsBoxM .gshead{padding:8px 14px;font-size:12.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#gsBoxM .gsgrp{border-top:1px solid var(--line)}
+#gsBoxM .gsgh{display:flex;align-items:center;padding:9px 14px 2px;font-size:12.5px;font-weight:700;color:var(--sub);white-space:nowrap}
+#gsBoxM .gsgh em{font-style:normal;margin-left:6px;font-weight:600}
+#gsBoxM .gsgh a{margin-left:auto;color:var(--orange);font-weight:700}
+#gsBoxM .gsrow{display:flex;gap:9px;align-items:center;padding:9px 14px;font-size:14px;white-space:nowrap;min-width:0}
+#gsBoxM .gsrow b{flex:none;max-width:110px;overflow:hidden;text-overflow:ellipsis}
+#gsBoxM .gsrow .gsmid{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:var(--sub);font-size:12.5px}
+#gsBoxM .gsrow .gsend{flex:none;color:#94a3b8;font-size:11.5px}
+#gsBoxM .gsnone,#gsBoxM .gsfoot{padding:9px 14px;font-size:12px;color:#94a3b8;border-top:1px solid var(--line)}
+body.pc #gsBoxM{display:none}
 .pcbtn-primary:hover{background:#1e293b}
 /* 상단 한 줄: 제목 · 탭 · 도구 (좁으면 뒤쪽 도구부터 다음 줄로 내려감) */
 /* ── 머리줄 키는 «데이터 한 줄»과 같다 (대표 지시 2026-08-29) ──
@@ -3460,7 +3475,7 @@ try {
        그러면 🔍·🚪·☰ 를 덮어 뒤가 안 보인다(대표 화면 2026-08-20). 자리를 준다. -->
   <span id="pcWhoM" class="pcwho"></span>
   <span class="logoutTimer" style="display:none"></span>
-  <button class="iconbtn" onclick="searchbar.classList.toggle('open');if(searchbar.classList.contains('open'))search.focus()">🔍</button>
+  <button class="iconbtn" onclick="searchbar.classList.toggle('open');if(searchbar.classList.contains('open'))search.focus();gsPaintMobile()">🔍</button>
   <button class="iconbtn" onclick="doLogoutCards()" title="로그아웃">🚪</button>
   <button class="iconbtn" onclick="openMenu()">☰</button>
 </div>
@@ -3478,7 +3493,7 @@ try {
   <button class="subact" onclick="toggleSelMode()">✎ <span id="selLabel">편집</span></button>
 </div>
 
-<div id="searchbar"><input id="search" placeholder="이름·회사·전화번호 검색" oninput="onMobileSearchInput(this.value)"></div>
+<div id="searchbar"><input id="search" placeholder="이름·회사·번호로 전체에서 찾기" oninput="onMobileSearchInput(this.value)"></div>
 
 <div id="main">
   <div id="sidebar"></div>
@@ -3502,7 +3517,6 @@ try {
 <!-- 급여담당자 엑셀 — 담당자별 파일을 한꺼번에 고를 수 있다 (대표 2026-08-30) -->
 <input type="file" id="payXlsInput" accept=".xlsx,.xls" multiple hidden onchange="onPayXlsFiles(this.files);this.value=''">
 
-<div class="modalbg" id="addBg" onclick="if(event.target===this)this.classList.remove('open')"><div class="modal" id="addM"></div></div>
 <div class="modalbg" id="groupSheetBg" onclick="if(event.target===this)this.classList.remove('open')"><div class="modal" id="groupSheetM"></div></div>
 <div class="modalbg" id="folderSheetBg" onclick="if(event.target===this)this.classList.remove('open')"><div class="modal" id="folderSheetM"></div></div>
 <div class="modalbg" id="editorBg" onclick="if(event.target===this)tryCloseEditor()"><div class="modal" id="editorM"></div></div>
@@ -10399,7 +10413,8 @@ function syncMobileSearchFor(view){
     s.placeholder = '상호·사업자번호·대표자로 찾기';
     s.value = state.coQ || '';
   }else{
-    s.placeholder = state.tab==='card' ? '이름·회사·전화번호 검색' : '상호·대표자·사업자번호 검색';
+    /* 화면마다 제 안내 — 명함 칸에는 «전체에서»를 적는다(🔎 아래 띠가 명함·사업자·기업·근로자를 함께 찾는다) */
+    s.placeholder = state.tab==='card' ? '이름·회사·번호로 전체에서 찾기' : '상호·대표자·사업자번호 검색';
     s.value = state.q || '';
   }
 }
@@ -11981,18 +11996,11 @@ function regRead(how, kind){
   _regKind = kind;
   fileInput.click();
 }
-function openAddSheet(){
-  $('addM').innerHTML = `
-    <div class="mhead"><b>${state.tab==='card'?'명함':'사업자등록증'} 추가</b>
-      <button class="iconbtn" onclick="addBg.classList.remove('open')">✕</button></div>
-    <button class="sheetbtn" onclick="addBg.classList.remove('open');openCamera()">📷 카메라로 촬영</button>
-    <button class="sheetbtn" onclick="addBg.classList.remove('open');fileInput.click()">📁 사진·PDF 파일 선택</button>
-    <button class="sheetbtn" onclick="addBg.classList.remove('open');openEditor(null)">✏️ 직접 입력</button>`;
-  $('addBg').classList.add('open');
-}
-
-/* ── ＋ FAB: 한 번 누르면 바로 촬영 (파일·직접 입력은 길게 누르기) ──
-   이제 촬영은 사진첩 카메라 한 곳으로 간다(openCamera 가 넘긴다). */
+/* ── ＋ FAB: 한 번 누르면 바로 촬영 · 길게 누르면 「＋ 정보등록」 ──
+   이제 촬영은 사진첩 카메라 한 곳으로 간다(openCamera 가 넘긴다).
+   ⚠ 길게 누르면 예전에는 작은 창(촬영·파일·직접 입력)이 떴다. 2026-10-05 폰 목업 뒤 대표 결정
+     「길게 눌러 정보등록(추천)」 — PC 「＋ 정보등록」과 «같은 문»(openRegister)으로 지금 탭의 입력 칸이
+     바로 뜬다. 촬영·파일로 읽기는 그 창 맨 위 줄에 있다. 작은 창은 쓰는 곳이 없어져 걷었다. */
 (function(){
   const fab = $('fab'); if(!fab) return;
   let timer = null, longFired = false;
@@ -12000,7 +12008,7 @@ function openAddSheet(){
   fab.addEventListener('pointerdown', () => {
     longFired = false;
     clear();
-    timer = setTimeout(() => { longFired = true; openAddSheet(); }, 550);
+    timer = setTimeout(() => { longFired = true; openRegister(); }, 550);
   });
   ['pointerup','pointerleave','pointercancel'].forEach(ev => fab.addEventListener(ev, clear));
   fab.addEventListener('contextmenu', e => e.preventDefault());   /* 길게 누를 때 뜨는 브라우저 메뉴 차단 */
@@ -37830,6 +37838,8 @@ function onMobileSearchInput(v){
   if(state.view==='co'){ state.coQ = v; state.coPage = 0; }
   else { state.q = v; state.page = 0; }
   render();
+  /* 🔎 전체에서 찾기 — 찾기 칸 아래 띠(목록은 위에서 지금 탭을 거른다) */
+  gsPaintMobile();
 }
 /* 기업 상세는 PC(표)·폰(카드 목록) 두 갈래로 그려진다. 저장 후 다시 그릴 때
    "지금 보고 있는 쪽"만 정확히 다시 그리려면 이 함수 하나를 거쳐야 한다 —
@@ -38448,19 +38458,8 @@ function gsRowHtml(kind, r, i){
     title="${esc([a, mid, end].filter(Boolean).join(' · '))}"><span>${icon}</span><b>${esc(a)}</b>
     <span class="gsmid">${esc(mid)}</span><span class="gsend">${esc(end)}</span></div>`;
 }
-function gsPaint(){
-  const p = $('pcSearch'); const w = $('pcSearchWrap'); if(!p || !w) return;
-  let box = $('gsBox');
-  const q = p.value.trim();
-  if(!q || document.activeElement !== p){ if(box) box.remove(); _gsRows = []; return; }
-  /* 근로자는 이알피 사건을 읽어야 나온다 — 아직이면 «한 번만» 읽고 다시 그린다.
-     ⚠ 한 번만이다: 못 읽는 때(로그인 전 등)는 읽개가 곧바로 빈손으로 돌아오는데,
-       다시 그리기가 또 읽으러 가면 끝없이 맴돈다(2026-10-05 실제로 화면이 멎었다). */
-  if(!_gsErpAsked && typeof _erpCaseCons !== 'undefined' && !_erpCaseCons && typeof loadErpCaseCons === 'function'){
-    _gsErpAsked = true;
-    loadErpCaseCons(() => { try{ wkListBust(); }catch(_){} gsPaint(); });
-  }
-  const got = gsCollect(q);
+/* 펼침 «몸» — PC 드롭다운과 폰 띠가 «같은 것»을 그린다(따로 두면 한쪽만 고쳐진다) */
+function gsBodyHtml(q, got, keys){
   _gsRows = [];
   let n = 0;
   const groups = GS_KINDS.filter(g => got[g.k].length).map(g => {
@@ -38469,14 +38468,57 @@ function gsPaint(){
       <a onmousedown="event.preventDefault()" onclick="gsAll('${g.k}')">모두 보기 ›</a></div>${rows}</div>`;
   }).join('');
   const sum = GS_KINDS.map(g => g.label.replace(/^\S+\s/,'') + ' ' + got[g.k].length.toLocaleString()).join(' · ');
-  if(!box){ box = document.createElement('div'); box.id = 'gsBox'; w.appendChild(box); }
-  box.innerHTML = `<div class="gshead"><span>「<b>${esc(q)}</b>」 — ${esc(sum)}</span>
-      <span class="gskeys">↑↓ 고르기 · Enter 열기 · Esc 닫기</span></div>`
+  return `<div class="gshead"><span>「<b>${esc(q)}</b>」 — ${esc(sum)}</span>${keys ? `<span class="gskeys">${keys}</span>` : ''}</div>`
     + (groups || '<div class="gsnone">찾은 것이 없습니다 — 이름·회사·사업자번호·전화번호(숫자 셋 이상)·초성으로 찾습니다</div>');
 }
-function gsClose(){ const b = $('gsBox'); if(b) b.remove(); _gsSel = -1; _gsRows = []; }
+/* 근로자는 이알피 사건을 읽어야 나온다 — 아직이면 «한 번만» 읽고 다시 그린다.
+   ⚠ 한 번만이다: 못 읽는 때(로그인 전 등)는 읽개가 곧바로 빈손으로 돌아오는데,
+     다시 그리기가 또 읽으러 가면 끝없이 맴돈다(2026-10-05 실제로 화면이 멎었다). */
+function gsAskErp(again){
+  if(!_gsErpAsked && typeof _erpCaseCons !== 'undefined' && !_erpCaseCons && typeof loadErpCaseCons === 'function'){
+    _gsErpAsked = true;
+    loadErpCaseCons(() => { try{ wkListBust(); }catch(_){} again(); });
+  }
+}
+const gsIsPc = () => document.body.classList.contains('pc');
+function gsPaint(){
+  const p = $('pcSearch'); const w = $('pcSearchWrap'); if(!p || !w) return;
+  const q = p.value.trim();
+  if(!q || document.activeElement !== p){ const b0 = $('gsBox'); if(b0) b0.remove(); _gsRows = []; return; }
+  gsAskErp(gsPaint);
+  /* ⚠ 상자는 «물은 뒤에» 찾는다 — 읽개가 곧바로 답하면 그 안에서 이미 한 번 그려 상자가 생겨 있다.
+       앞에서 찾아 두면 «없다»고 알고 하나 더 만든다(2026-10-05 폰에서 띠가 두 겹으로 보였다) */
+  let box = $('gsBox');
+  const html = gsBodyHtml(q, gsCollect(q), '↑↓ 고르기 · Enter 열기 · Esc 닫기');
+  if(!box){ box = document.createElement('div'); box.id = 'gsBox'; w.appendChild(box); }
+  box.innerHTML = html;
+}
+/* 폰 — 🔍 찾기 칸 바로 아래 «띠»로 (대표 결정 2026-10-05 폰 목업 «둘 다»).
+   폰은 마우스 오버·커서가 없어 «칸이 열려 있고 글자가 있으면» 보인다. 아래 목록은 예전처럼 지금 탭을 거른다. */
+function gsPaintMobile(){
+  if(gsIsPc()) return;
+  const sb = $('searchbar'), s = $('search'); if(!sb || !s) return;
+  const q = s.value.trim();
+  if(!q || !sb.classList.contains('open')){ const b0 = $('gsBoxM'); if(b0) b0.remove(); return; }
+  gsAskErp(gsPaintMobile);
+  let box = $('gsBoxM');   /* «물은 뒤에» 찾는다 — gsPaint 의 ⚠ 와 같다 */
+  const html = gsBodyHtml(q, gsCollect(q), '');
+  if(!box){ box = document.createElement('div'); box.id = 'gsBoxM'; sb.insertAdjacentElement('afterend', box); }
+  box.innerHTML = html + '<div class="gsfoot">아래 목록은 지금 탭에서 「' + esc(q) + '」로 거른 것 ↓</div>';
+}
+function gsClose(){ ['gsBox','gsBoxM'].forEach(id => { const b = $(id); if(b) b.remove(); }); _gsSel = -1; _gsRows = []; }
 /* 그 화면으로 — 찾는 글자를 «그 화면의 찾기»에도 넣어 간다. 안 그러면 가서 표가 다른 글자로 걸러져 있다 */
 function gsEnter(kind, q){
+  if(!gsIsPc()){
+    /* 폰 — 탭·기업 상세·근로자로 옮기고, 그 화면의 찾기말을 같은 글자로 */
+    const s = $('search');
+    if(kind==='card' || kind==='biz'){ setTab(kind); state.q = q; state.page = 0; }
+    else if(kind==='co'){ openCoMobile(); state.coQ = q; state.coPage = 0; }
+    else { openWkPage(); state.wkQ = q; state.wkPage = 0; }
+    if(s) s.value = q;
+    render();
+    return;
+  }
   if(kind==='card' || kind==='biz'){
     const s = $('search'); if(s) s.value = q;
     if(state.view!=='list' || state.tab!==kind){ setTab(kind); }
@@ -38491,18 +38533,22 @@ function gsEnter(kind, q){
   const p = $('pcSearch'); if(p) p.value = q;
   try{ _syncSearchX(); }catch(_){}
 }
+function gsQuery(){
+  const el = gsIsPc() ? $('pcSearch') : $('search');
+  return el ? el.value.trim() : '';
+}
 function gsAll(kind){
-  const p = $('pcSearch'); const q = p ? p.value.trim() : '';
-  gsClose(); if(p) p.blur();
+  const q = gsQuery();
+  gsClose(); const p = $('pcSearch'); if(p && gsIsPc()) p.blur();
   gsEnter(kind, q);
 }
 function gsGo(kind, key){
-  const p = $('pcSearch'); const q = p ? p.value.trim() : '';
-  gsClose(); if(p) p.blur();
+  const q = gsQuery();
+  gsClose(); const p = $('pcSearch'); if(p && gsIsPc()) p.blur();
   gsEnter(kind, q);
   if(kind==='card' || kind==='biz') openDetail(key);
-  else if(kind==='co') openCoDetailPanel(key);
-  else openWkDetail(key);
+  else if(kind==='co'){ if(gsIsPc()) openCoDetailPanel(key); else pickCo(key); }
+  else if(gsIsPc()) openWkDetail(key);
 }
 function gsKey(e){
   const box = $('gsBox'); if(!box || !_gsRows.length) return false;
