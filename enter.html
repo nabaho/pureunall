@@ -129,6 +129,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script type="module" src="js/pu-mfa.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -732,6 +733,13 @@ body.portal-mode #moreFab{display:flex;}
 #kkModal .hd b{font-size:1rem;font-weight:800;}
 #kkModal .hd .x{cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;}
 #kkModal .bd{padding:14px 18px;overflow-y:auto;}
+#mfaLoginModal,#mfaEnrollModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:90;align-items:center;justify-content:center;padding:16px;}
+#mfaLoginModal .box,#mfaEnrollModal .box{background:#fff;border-radius:16px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
+#mfaLoginModal .hd,#mfaEnrollModal .hd{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #f8fafc;flex-shrink:0;}
+#mfaLoginModal .hd .x,#mfaEnrollModal .hd .x{cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;}
+#mfaLoginModal .bd,#mfaEnrollModal .bd{padding:16px 18px;overflow-y:auto;}
+#mfaLoginModal .ft,#mfaEnrollModal .ft{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid #f8fafc;background:#f8fafc;}
+#mfaLoginModal input,#mfaEnrollModal input{width:100%;box-sizing:border-box;border:1.5px solid #cbd5e1;border-radius:9px;padding:10px;font-family:inherit;}
 #kkAdminModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:75;align-items:center;justify-content:center;padding:16px;}
 #kkAdminModal .box{background:#fff;border-radius:16px;width:560px;max-width:100%;max-height:82vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
 #kkAdminModal .hd{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #f8fafc;flex-shrink:0;}
@@ -1388,6 +1396,36 @@ body.portal-mode #moreFab{display:flex;}
 
 <div id="kkToast" role="status" aria-live="polite"></div>
 
+<!-- 인증 앱 2단계 로그인 — 등록된 계정에서만 비밀번호 다음에 열린다. -->
+<div id="mfaLoginModal" role="dialog" aria-modal="true" aria-labelledby="mfaLoginTitle" style="display:none">
+  <div class="box" style="width:430px">
+    <div class="hd"><b id="mfaLoginTitle">🔐 2단계 인증</b></div>
+    <div class="bd">
+      <p style="margin:0 0 12px;font-size:.86rem">휴대폰 인증 앱에 표시된 <b>숫자 6자리</b>를 입력하세요.</p>
+      <input id="mfaLoginCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" style="font-size:1.3rem;letter-spacing:.3em;text-align:center">
+      <p id="mfaLoginErr" style="display:none;color:#dc2626;font-size:.78rem;margin:8px 0 0"></p>
+    </div>
+    <div class="ft"><button class="sg-btn ghost" id="mfaLoginCancel" type="button">취소</button><button class="sg-btn" id="mfaLoginOk" type="button">확인</button></div>
+  </div>
+</div>
+
+<!-- 내 정보에서 인증 앱을 처음 등록하는 창. 비밀키는 서버나 DB에 따로 저장하지 않는다. -->
+<div id="mfaEnrollModal" role="dialog" aria-modal="true" aria-labelledby="mfaEnrollTitle" style="display:none">
+  <div class="box" style="width:500px">
+    <div class="hd"><b id="mfaEnrollTitle">🔐 인증 앱 등록</b><button class="x" id="mfaEnrollClose" type="button">✕</button></div>
+    <div class="bd">
+      <p style="margin-top:0;font-size:.84rem">Google Authenticator 또는 Microsoft Authenticator에서 <b>설정 키 입력</b>을 선택하고 아래 키를 넣으세요.</p>
+      <div id="mfaSecret" style="padding:12px;border:1px solid #cbd5e1;border-radius:9px;font:700 1rem monospace;word-break:break-all;background:#f8fafc"></div>
+      <p style="font-size:.76rem;color:#64748b">이 키는 다른 사람에게 보내거나 캡처하지 마세요.</p>
+      <a id="mfaOpenApp" href="#" style="display:inline-block;margin-bottom:12px;font-weight:700;color:#1e40af">휴대폰 인증 앱으로 열기</a>
+      <label for="mfaEnrollCode">앱에 나온 숫자 6자리</label>
+      <input id="mfaEnrollCode" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="000000" style="font-size:1.2rem;letter-spacing:.25em;text-align:center">
+      <p id="mfaEnrollErr" style="display:none;color:#dc2626;font-size:.78rem;margin:8px 0 0"></p>
+    </div>
+    <div class="ft"><button class="sg-btn" id="mfaEnrollOk" type="button">등록 완료</button></div>
+  </div>
+</div>
+
 <script>
 (function(){
   "use strict";
@@ -2004,13 +2042,35 @@ body.portal-mode #moreFab{display:flex;}
         + (linked ? ('연결됨 · ' + new Date(v.at).toLocaleDateString('ko-KR') + ' 부터') : '연결하면 다음부터 비밀번호 없이 카카오로 들어옵니다')
         + '</span></div>'
         + '<button type="button" id="kkLinkBtn">' + (linked ? '연결 끊기' : '카카오 연결') + '</button>'
-        + '</div>';
+        + '</div>'
+        + '<div class="cfg-tool" style="margin:10px 0 0"><div><b>🔐 인증 앱 2단계 인증</b>'
+        + '<span id="mfaProfileState">등록 여부를 확인하는 중…</span></div>'
+        + '<button type="button" id="mfaEnrollBtn" disabled>확인 중</button></div>';
       $('kkLinkBtn').addEventListener('click', function(){
         if(linked) kkUnlinkSelf(); else kkStartLink();
       });
+      mfaRefreshProfile();
     }).catch(function(){
       body.innerHTML = '<p style="color:#dc2626;font-size:.82rem;margin:0">불러오지 못했습니다. 다시 열어 주세요.</p>';
     });
+  }
+  function mfaRefreshProfile(){
+    var btn=$('mfaEnrollBtn'), st=$('mfaProfileState');
+    if(!btn || !st) return;
+    if(!window.PuMFA){ st.textContent='2단계 인증 모듈을 불러오지 못했습니다'; btn.textContent='새로고침'; btn.disabled=false; btn.onclick=function(){ location.reload(); }; return; }
+    PuMFA.status().then(function(s){
+      if(s.enrolled){ st.textContent='등록됨 — 다음 비밀번호 로그인부터 숫자 6자리를 확인합니다'; btn.textContent='등록 완료'; btn.disabled=true; }
+      else { st.textContent='미등록 — 등록해도 다른 직원 로그인에는 영향이 없습니다'; btn.textContent='인증 앱 등록'; btn.disabled=false; btn.onclick=mfaBeginEnrollment; }
+    }).catch(function(e){ st.textContent=(e&&e.message)||'확인하지 못했습니다'; btn.textContent='다시 확인'; btn.disabled=false; btn.onclick=mfaRefreshProfile; });
+  }
+  function mfaBeginEnrollment(){
+    var btn=$('mfaEnrollBtn'); if(btn) btn.disabled=true;
+    PuMFA.beginEnrollment().then(function(v){
+      $('mfaSecret').textContent=v.secretKey; $('mfaOpenApp').href=v.uri;
+      $('mfaEnrollCode').value=''; $('mfaEnrollErr').style.display='none';
+      $('mfaEnrollModal').style.display='flex'; $('mfaEnrollCode').focus();
+    }).catch(function(e){ alert((e&&e.message)||'인증 앱 등록을 시작하지 못했습니다.'); })
+      .finally(function(){ if(btn) btn.disabled=false; });
   }
   function kkStartLink(){
     auth.currentUser.getIdToken().then(function(){        // 세션이 살아 있는지만 미리 확인
@@ -2214,6 +2274,10 @@ body.portal-mode #moreFab{display:flex;}
       _settled = true; clearTimeout(_watchdog);
       $('loginBtn').disabled = false;
       var code = (err && err.code) || '';
+      if(code === 'auth/multi-factor-auth-required' && window.PuMFA){
+        mfaOpenLogin(email, pw, wantsAutoLogin);
+        return;
+      }
       reportLogin(email, false, code || (err && err.puPersistence ? 'persistence' : 'unknown'));
       if(err && err.puPersistence){
         showErr(wantsAutoLogin
@@ -2241,6 +2305,30 @@ body.portal-mode #moreFab{display:flex;}
       }
     });
   }
+
+  function mfaOpenLogin(email, pw, keep){
+    $('mfaLoginErr').style.display='none'; $('mfaLoginCode').value='';
+    $('mfaLoginModal').style.display='flex'; $('mfaLoginOk').disabled=true;
+    PuMFA.beginLogin(email, pw, keep).then(function(v){
+      if(v.credential){ location.reload(); return; }
+      $('mfaLoginOk').disabled=false; $('mfaLoginCode').focus();
+    }).catch(function(e){ $('mfaLoginErr').textContent=(e&&e.message)||'2단계 인증을 시작하지 못했습니다'; $('mfaLoginErr').style.display='block'; });
+  }
+  $('mfaLoginCancel').addEventListener('click',function(){ $('mfaLoginModal').style.display='none'; $('loginPw').value=''; });
+  $('mfaLoginOk').addEventListener('click',function(){
+    var b=this; b.disabled=true; $('mfaLoginErr').style.display='none';
+    PuMFA.finishLogin($('mfaLoginCode').value).then(function(cred){
+      return cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email||'',true,'',tok); location.reload(); });
+    }).catch(function(e){ $('mfaLoginErr').textContent='번호가 맞지 않거나 만료되었습니다. 새 번호를 입력하세요.'; $('mfaLoginErr').style.display='block'; b.disabled=false; });
+  });
+  $('mfaEnrollClose').addEventListener('click',function(){ $('mfaEnrollModal').style.display='none'; });
+  $('mfaEnrollOk').addEventListener('click',function(){
+    var b=this; b.disabled=true; $('mfaEnrollErr').style.display='none';
+    PuMFA.finishEnrollment($('mfaEnrollCode').value).then(function(){
+      $('mfaEnrollModal').style.display='none'; alert('인증 앱 등록이 완료되었습니다.\n다음 비밀번호 로그인부터 숫자 6자리를 확인합니다.'); mfaRefreshProfile();
+    }).catch(function(e){ $('mfaEnrollErr').textContent=(e&&e.message)||'번호를 확인하지 못했습니다'; $('mfaEnrollErr').style.display='block'; })
+      .finally(function(){ b.disabled=false; });
+  });
 
   // 표준 form 제출 → 브라우저·삼성패스가 비번 저장/지문 자동입력을 인식 (버튼 클릭·Enter 모두 여기로)
   $('loginForm').addEventListener('submit', function(e){ e.preventDefault(); doLogin(); });
