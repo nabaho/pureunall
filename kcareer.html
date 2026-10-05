@@ -1318,6 +1318,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
+<script src="js/kcareer-cases.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
@@ -1456,6 +1457,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="topbar"><button class="hamburger" id="hamburger" aria-label="메뉴">☰</button><span id="tbTitle">홈</span><span class="crumb" id="tbCrumb"></span><span style="flex:1"></span><!-- 지금 로그인한 사람 — 머리줄 «안»에 둔다. 떠 있는 딱지로 두면 화면 위 안내글을 덮는다(대표 지시 2026-08-17 "화면 중복 안 되게"). --><span id="kcWho" class="kc-who"></span><button class="btn" id="themeBtn" style="font-size:12px" onclick="toggleTheme()">🌙</button><button class="btn" id="searchBtn" style="font-size:12px">🔍 전체검색</button><button class="btn" id="fbBtn" style="font-size:12px" onclick="fbOpenModal()">☁ 클라우드</button><button class="btn" id="fbLogoutBtn" style="font-size:12px;display:none" onclick="fbLogoutConfirm()">🚪 로그아웃</button><button class="btn" id="printBtn" style="font-size:12px">🖨 인쇄</button></div>
     <div id="groupTabs" style="display:none"></div>
     <main class="main" id="main">
+      <div id="caseBannerTop"></div>
       <section class="page-view active" id="page-home"><div class="page">
         <div id="noJsNotice" style="background:#f8fafc;border:1px solid #fbbf24;border-radius:10px;padding:18px 16px;margin-bottom:18px;color:#854d0e;font-size:14px;line-height:1.7">
           <div style="font-size:18px;font-weight:700;margin-bottom:8px">⚠️ 브라우저에서 열어주세요</div>
@@ -2308,10 +2310,12 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <div id="puagBody"></div>
       </div></section>
       <section class="page-view" id="page-submission"><div class="page">
-        <div class="page-head"><div class="page-title">📥 제출서류</div><div class="page-desc">신청서·제출서류를 건 단위로 보관 — 위촉장 › ⋯ 더보기 › 서류 폴더 스캔으로 등록됩니다</div></div>
+        <div class="page-head"><div class="page-title">📥 제출서류</div><div class="page-desc">신청서·제출서류를 건 단위로 보관 — 서류 폴더 «7. 컨설턴트,위원신청등 › 연도 › 건» 폴더를 만들면 그 건만 등록됩니다</div></div>
+        <div id="caseBanner"></div>
         <div class="toolbar">
           <input class="tb-input" data-f="q" placeholder="기관·건 이름 검색" style="min-width:220px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
+          <button class="btn fs-ui" type="button" onclick="caseCheck({ask:true,changed:true})" title="7번 폴더에서 새로 생기거나 바뀐 지원 건만 찾습니다 — 위촉장·표창은 건드리지 않습니다">🔍 새 지원 건 찾기</button>
           <div class="tb-spacer"></div>
           <span class="cnt" style="font-size:11px;color:var(--text-mute)"></span>
           <button class="btn" data-act="csv">📤 CSV</button>
@@ -4477,6 +4481,13 @@ function openSubmissionFiles(id){
   var head = '<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">'
     + escapeHtml([s.year, s.org].filter(Boolean).join(' · ')) + ' · 서류 ' + (s.fileCount || 0) + '개'
     + (s.caseDir ? '<div style="margin-top:4px;word-break:break-all">' + escapeHtml(s.caseDir) + '</div>' : '')
+    + '</div>'
+    /* 제출·결과 — 표 칸과 같은 값을 여기서도 고친다(목업 ①) */
+    + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;margin-bottom:10px">'
+    + '<span style="color:var(--text-mute)">제출</span>'
+    + '<input type="date" class="tb-input" style="width:140px" value="' + escapeHtml(String(s.sentAt||'').slice(0,10)) + '" onchange="subSetField(\'' + _jsAttr(s.id) + '\',\'sentAt\',this.value)">'
+    + '<input class="tb-input" style="width:110px" placeholder="메일·방문·우편" value="' + escapeHtml(s.sentHow||'') + '" onchange="subSetField(\'' + _jsAttr(s.id) + '\',\'sentHow\',this.value)">'
+    + '<span style="color:var(--text-mute);margin-left:6px">결과</span>' + subResultSel(s)
     + '</div>';
   var list = (s.files || []).map(function(f){
     var isP = promoted.indexOf(f.relPath) >= 0;
@@ -4492,6 +4503,139 @@ function openSubmissionFiles(id){
   $('modalSub').classList.add('open');
 }
 function closeSub(){ $('modalSub').classList.remove('open'); }
+
+/* ═══ 📥 새 지원 건 자동 알아보기 (대표 승인 2026-10-05 목업 ①) ═══
+   7. 컨설턴트,위원신청등 › 연도 › 건 폴더만 본다. 새 건이면 띠를 띄우고, 누르면 «그 건만» 넣는다.
+   ⚠ 전체 스캔(openScanPreview)을 부르지 말 것 — 그동안 안 넣은 위촉장·표창 수백 건이 함께 들어온다.
+   ⚠ 승격을 하지 않는다. 판정·기록 모양은 js/kcareer-cases.js «한 곳»에서 정한다.
+   ⚠ 앱을 열 때는 «이미 허락된» 폴더만 조용히 본다. 허락을 묻는 창은 사람이 단추를 눌렀을 때만 띄운다
+      (누르지도 않았는데 창이 뜨면 놀란다 — 브라우저도 막는다). */
+var _caseFound = { fresh: [], changed: [] };
+function _caseDismissed(){ try{ return JSON.parse(LS.get(NS+'case_dismissed')||'[]'); }catch(e){ return []; } }
+async function _caseRootQuiet(){
+  var h = _fsRoot || await fsLoadRoot();
+  if(!h) return null;
+  try{ if(await h.queryPermission({mode:'read'}) === 'granted'){ _fsRoot = h; return h; } }catch(e){}
+  return null;
+}
+/* 7번 › 연도 › 건 폴더 이름만 — 파일은 읽지 않는다(가볍다) */
+async function fsCaseDirs(root){
+  var out = [], top;
+  try{ top = await root.getDirectoryHandle(KcareerCases.CASE_ROOT); }catch(e){ return null; }   /* 폴더가 없다 */
+  for await (var y of top.entries()){
+    if(y[1].kind !== 'directory' || !KcareerCases.YEAR_DIR.test(y[0])) continue;
+    for await (var c of y[1].entries()){
+      if(c[1].kind === 'directory') out.push({ yearDir: y[0], name: c[0], handle: c[1] });
+    }
+  }
+  return out;
+}
+/* 건 폴더 하나의 파일(아래 폴더 포함) — 이름·크기·수정일만. 내용은 읽지 않는다(OneDrive 가 통째로 내려온다) */
+async function fsCaseFiles(handle, prefix){
+  var files = [];
+  async function walk(dir, pre){
+    for await (var ent of dir.entries()){
+      var p = pre + '/' + ent[0];
+      if(ent[1].kind === 'directory'){ await walk(ent[1], p); continue; }
+      try{ var f = await ent[1].getFile(); files.push({ name: ent[0], relPath: p, size: f.size, mtime: new Date(f.lastModified).toISOString() }); }
+      catch(e){ console.warn('건 파일 건너뜀', p, e); }
+    }
+  }
+  await walk(handle, prefix);
+  return files;
+}
+/* opts.ask = 단추로 불렀다(허락을 물어도 된다) · opts.changed = 있는 건의 파일 바뀜도 본다 */
+async function caseCheck(opts){
+  opts = opts || {};
+  if(!fsSupported()){ if(opts.ask) toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
+  var root = opts.ask ? await fsRoot() : await _caseRootQuiet();
+  if(!root){ if(opts.ask) toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var dirs = await fsCaseDirs(root);
+  if(!dirs){ if(opts.ask) toast('연결한 폴더 안에 「' + KcareerCases.CASE_ROOT + '」 폴더가 없습니다'); return; }
+  var subs = get('submission');
+  var fresh = KcareerCases.freshCases(dirs, subs, _caseDismissed(), { withDismissed: !!opts.ask });
+  var byKey = {}; dirs.forEach(function(d){ byKey[KcareerCases.caseDirOf(d.yearDir, d.name)] = d; });
+  for(var i = 0; i < fresh.length; i++){
+    fresh[i].files = await fsCaseFiles(byKey[fresh[i].caseDir].handle, fresh[i].caseDir);
+  }
+  var changed = [];
+  if(opts.changed){
+    if(opts.ask) toast('지원 건 폴더 살피는 중…');
+    for(var j = 0; j < subs.length; j++){
+      var r = subs[j], d = r.caseDir && byKey[r.caseDir];
+      if(!d) continue;
+      var fl = await fsCaseFiles(d.handle, r.caseDir);
+      if(KcareerCases.filesChanged(r, fl)) changed.push({ id: r.id, caseDir: r.caseDir, files: fl });
+    }
+  }
+  _caseFound = { fresh: fresh, changed: changed };
+  caseBannerDraw();
+  if(opts.ask && !fresh.length && !changed.length) toast('✅ 새로 생기거나 바뀐 지원 건이 없습니다');
+}
+function caseBannerDraw(){
+  var f = _caseFound.fresh, c = _caseFound.changed;
+  var html = '';
+  if(f.length || c.length){
+    var names = f.slice(0, 3).map(function(x){ return escapeHtml(x.name) + ' · 파일 ' + (x.files || []).length + '개'; }).join(' / ')
+      + (f.length > 3 ? ' 외 ' + (f.length - 3) + '건' : '');
+    html = '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--card,#fff);border:1px solid var(--teal);border-radius:8px;padding:8px 12px;margin:0 0 10px;font-size:12.5px">'
+      + '<span>📥</span><span style="flex:1;min-width:200px">'
+      + (f.length ? '<b>새 지원 ' + f.length + '건</b> <span style="color:var(--text-mute)">— ' + names + '</span>' : '')
+      + (c.length ? (f.length ? ' · ' : '') + '<b>파일이 바뀐 건 ' + c.length + '개</b>' : '')
+      + '</span>'
+      + '<button class="btn sm primary" onclick="caseRegister()">' + (f.length ? '등록' : '고치기') + '</button>'
+      + '<button class="btn sm" onclick="caseLater()" title="이번에 찾은 건은 다시 띄우지 않습니다 — 제출서류 › 🔍 새 지원 건 찾기로 언제든 다시 찾을 수 있습니다">나중에</button>'
+      + '</div>';
+  }
+  ['caseBannerTop', 'caseBanner'].forEach(function(id){ var el = $(id); if(el) el.innerHTML = html; });
+}
+function caseRegister(){
+  var f = _caseFound.fresh, c = _caseFound.changed;
+  var subs = get('submission'), n = 0, m = 0;
+  var scanId = 'C' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Date.now()).slice(-4);
+  f.forEach(function(x){
+    var rec = KcareerCases.buildCaseRecord(x.caseDir, x.files, { scanId: scanId });
+    rec.id = kcNextNo('SB', 4, 'submission', subs);
+    rec.savedAt = new Date().toISOString();
+    subs.unshift(rec); n++;
+  });
+  c.forEach(function(x){
+    var i = subs.findIndex(function(r){ return r.id === x.id; });
+    if(i >= 0){ subs[i] = KcareerCases.refreshCaseRecord(subs[i], x.files); m++; }
+  });
+  set('submission', subs);
+  /* 등록한 건은 «나중에» 목록에서도 뺀다 — 지웠다가 다시 만들면 다시 알려야 한다 */
+  var done = {}; f.forEach(function(x){ done[x.caseDir] = 1; });
+  LS.set(NS+'case_dismissed', JSON.stringify(_caseDismissed().filter(function(d){ return !done[d]; })));
+  _caseFound = { fresh: [], changed: [] };
+  caseBannerDraw();
+  try{ renderCareer('submission'); }catch(e){}
+  toast('✅ 제출서류에 ' + (n ? '새 건 ' + n + '개 등록' : '') + (n && m ? ' · ' : '') + (m ? '바뀐 건 ' + m + '개 고침' : ''));
+}
+function caseLater(){
+  var d = _caseDismissed();
+  _caseFound.fresh.forEach(function(x){ if(d.indexOf(x.caseDir) < 0) d.push(x.caseDir); });
+  LS.set(NS+'case_dismissed', JSON.stringify(d));
+  _caseFound = { fresh: [], changed: [] };
+  caseBannerDraw();
+}
+/* 결과 고르개 — 표 칸과 건 서랍이 같은 것을 쓴다 */
+function subResultSel(r){
+  var v = KcareerCases.normResult(r.result);
+  return '<select class="tb-select" style="font-size:11px;padding:1px 4px;height:auto' + (v==='선정'?';color:var(--teal);font-weight:700':v==='탈락'?';color:var(--text-mute)':'') + '" onclick="event.stopPropagation()" onchange="subSetField(\'' + _jsAttr(r.id) + '\',\'result\',this.value)">'
+    + '<option value=""' + (v?'':' selected') + '>-</option>'
+    + KcareerCases.RESULTS.map(function(x){ return '<option' + (x===v?' selected':'') + '>' + x + '</option>'; }).join('')
+    + '</select>';
+}
+function subSetField(id, key, val){
+  var subs = get('submission'), s = subs.find(function(x){ return x.id === id; });
+  if(!s){ toast('건을 찾을 수 없습니다'); return; }
+  if(key === 'result') val = KcareerCases.normResult(val);
+  else val = String(val == null ? '' : val).trim();
+  if(val) s[key] = val; else delete s[key];
+  set('submission', subs);
+  try{ renderCareer('submission'); }catch(e){}
+}
 
 /* 제출서류 안의 파일 1개를 위촉장 목록으로 올린다 (판정이 놓친 결과물을 손으로 구제) */
 function promoteSubmissionFile(subId, relPath){
@@ -8371,12 +8515,15 @@ const CAREER_CFG={
       <td onclick="event.stopPropagation()">${rowActions(r.id,'etc',r.org,p,r)}</td></tr>`},
   /* 제출서류 — 7번 폴더의 '건' 단위. 스캔으로만 등록되고 원본은 경로 참조다. */
   submission:{store:'submission',qFields:['org','title','caseDir'],
-    cols:['ID','연도','기관·사업','건 이름','서류','승격','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openSubmissionFiles('${_jsAttr(r.id)}')"><td><span class="id-chip">${r.id}</span></td>
+    /* 제출·결과 칸 (대표 승인 2026-10-05 목업 ①) — 지원 이력이 한 줄로 보이게 */
+    cols:['ID','연도','기관·사업','건 이름','서류','제출','결과','승격','관리'],
+    row:(r,p)=>`<tr style="cursor:pointer" onclick="openSubmissionFiles('${_jsAttr(r.id)}')"><td><span class="id-chip">${r.id}</span>${r.autoCase&&!r.sentAt&&!r.result?' <span class="tag navy" style="font-size:10px">새로</span>':''}</td>
       <td>${r.year||'-'}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${escapeHtml(r.org||'-')}</strong></td>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.title||'-')}</td>
       <td style="white-space:nowrap">${r.fileCount||0}개</td>
+      <td style="white-space:nowrap;font-size:11px">${escapeHtml([r.sentAt?formatDate(r.sentAt):'',r.sentHow||''].filter(Boolean).join(' ')||'-')}</td>
+      <td onclick="event.stopPropagation()">${subResultSel(r)}</td>
       <td style="font-size:11px;color:var(--teal)">${(r.promoted||[]).length?('승격 '+(r.promoted||[]).length):'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'submission',r.title,p,r)}</td></tr>`},
   meetfee:{store:'meetfee',stores:['meetfee','etcfee'],qFields:['content','org','type'],
@@ -18627,6 +18774,8 @@ _safe(function(){
   if(n){ set('wiccok',a); console.log('유형 '+n+'건을 탭에 맞게 다듬었습니다'); }
 });
 _safe(loadSeed); _safe(_cdNormalize); _safe(_tplMerge); _safe(_puBackfill); _safe(loadCustomNav); _safe(buildNav); _safe(initTabs); _safe(()=>initDocCreate('resume')); _safe(()=>initDocStore('resume')); _safe(()=>initDocCreate('profile')); _safe(()=>initDocStore('profile')); _safe(()=>initDocCreate('certdoc')); _safe(()=>initDocStore('certdoc')); _safe(()=>initDocStore('feedoc')); _safe(bindCareer); _safe(initApiTab); _safe(initSettings); _safe(seedStamps); _safe(fbInit);
+/* 📥 새 지원 건 — 앱을 열고 조금 뒤, «이미 허락된» 서류 폴더만 조용히 본다(목업 ①) */
+_safe(function(){ setTimeout(function(){ caseCheck({}).catch(function(e){ console.warn('caseCheck',e); }); }, 6000); });
 /* ⚠ checkBackupReminder는 만들어만 놓고 아무도 부르지 않아 백업 재촉이 한 번도 안 떴다.
    그래서 마지막 백업이 두 달 넘도록 아무도 몰랐다 — 반드시 부팅 때 부른다. */
 _safe(checkBackupReminder);
