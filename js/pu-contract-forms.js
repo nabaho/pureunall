@@ -680,6 +680,9 @@
     + '.pcf-vpick{grid-column:3/6;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-2px 0 6px 42px}'
     + '.pcf-vpick button{font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:6px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pcf-vpick a{font-size:11.5px;color:#1d4ed8;cursor:pointer}'
+    + '.pcf-nts{display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 9px;border-radius:6px;margin-bottom:6px;background:#eff6ff;color:#1e40af}'
+    + '.pcf-nts.bad{background:#fef2f2;color:#991b1b;font-weight:700}.pcf-nts.dim{background:#f8fafc;color:#64748b}'
+    + '.pcf-nts button{margin-left:auto;white-space:nowrap;flex:none;font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid #93c5fd;background:#fff;color:#1d4ed8;border-radius:6px;cursor:pointer}'
     + '.pcf-vsum{font-size:12px;padding:6px 9px;border-radius:6px;margin-bottom:6px;background:#fef3c7;color:#92400e}.pcf-vsum.ok{background:#dcfce7;color:#166534}'
     + '.pcf-fprev{margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;max-height:60vh;overflow:auto;background:#e2e8f0;padding:12px}'
     + '@media(max-width:700px){.pcf-fcols{grid-template-columns:1fr}}'
@@ -932,7 +935,7 @@
       var srcs = hwpSources(fm);
       return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
     });
-    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0, srcPick: {}, ok: {},
+    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0, srcPick: {}, ok: {}, ntsLive: null, ntsBusy: false,
       pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
       wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
@@ -1067,6 +1070,15 @@
       var blank = ks.filter(function (x) { return !V[x.key]; }).length;
       var open = openConflicts(ks);
       valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳' + (one ? '' : ' (양식 ' + items.length + '개 합쳐서)') + (blank ? ' · 빈 칸 ' + blank + '곳' : '') + ' — 고칠 수 있습니다' }));
+      var nv = ntsNow();
+      if (nv) {
+        var bzD = String((st.co && st.co.bz) || '').replace(/\D/g, '');
+        var ask = (nv.stale || nv.bad) && host.ntsCheck && bzD.length === 10 && !(st.ntsLive && st.ntsLive.at);
+        valBox.appendChild(el('div', { 'class': 'pcf-nts' + (nv.bad ? ' bad' : (!nv.word || nv.stale) ? ' dim' : '') }, [
+          el('span', { text: (nv.bad ? '⚠ ' : '🏛 ') + nv.text + (st.ntsLive ? ' (지금 물어봄 · 저장 안 함)' : '') }),
+          ask ? el('button', { type: 'button', text: st.ntsBusy ? '묻는 중…' : '지금 국세청에 묻기', title: '사업자번호만 국세청에 보냅니다', onclick: function () { askNts(bzD); } }) : null
+        ]));
+      }
       var conf = CF.coConflicts(st.co).filter(function (c) { return ks.some(function (x) { return CF.CO_FIELD_OF[x.key] === c.f; }); });
       if (conf.length) valBox.appendChild(el('div', { 'class': 'pcf-vsum' + (open.length ? '' : ' ok'),
         text: open.length ? '⚠ 이알피와 사업자등록증 값이 다른 칸 ' + open.length + '곳 — 어느 쪽을 쓸지 고르세요' : '✓ 다른 칸 ' + conf.length + '곳 모두 골랐습니다' }));
@@ -1123,7 +1135,29 @@
         return !st.srcPick[c.f] && ks.some(function (x) { return CF.CO_FIELD_OF[x.key] === c.f && !Object.prototype.hasOwnProperty.call(st.edits, x.key); });
       });
     }
+    /* 국세청 상태 — 방금 물어본 값이 먼저, 아니면 기업정보함이 적어 둔 값 */
+    function ntsNow() {
+      if (!st.co) return null;
+      var x = st.ntsLive || { word: st.coX.ns, at: st.coX.na, end: st.coX.ne };
+      return CF.ntsView(x);
+    }
+    function askNts(bz) {
+      if (st.ntsBusy) return;
+      st.ntsBusy = true; drawVals();
+      var co = st.co;
+      host.ntsCheck(bz).then(function (row) {
+        if (st.co !== co) return;
+        var word = CF.ntsWordOf(row);
+        /* 못 물어봤는데 물어본 척 하지 않는다 */
+        if (!word) throw new Error('국세청이 아무 말도 주지 않았습니다');
+        var t = new Date();
+        st.ntsLive = { word: word, end: CF.ntsEndOf(row), at: t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0') };
+      }).catch(function (e) { toast('⚠ 국세청에 못 물어봤습니다 — ' + ((e && e.message) || e)); })
+        .then(function () { st.ntsBusy = false; if (st.co === co) drawVals(); });
+    }
     function conflictsOkToGo() {
+      var nv = ntsNow();
+      if (nv && nv.bad && !w.confirm('⚠ ' + nv.text + '\n\n이 회사로 서류를 채워 그대로 받을까요?')) return false;
       var open = openConflicts();
       if (!open.length) return true;
       return w.confirm('⚠ 이알피와 사업자등록증 값이 다른 칸 ' + open.length + '곳을 아직 고르지 않았습니다:\n  '
@@ -1155,7 +1189,7 @@
       return [r.bz ? CF.valuesFrom({ co: r }).사업자번호 : '', r.ceo ? '대표 ' + r.ceo : '', r.k === 'card-co' ? '명함에만 있는 회사' : ''].filter(Boolean).join(' · ');
     }
     function pickCo(r, chosenContact) {
-      st.co = r; st.coX = {}; st.srcPick = {}; st.ok = {}; st.contact = chosenContact || null; ctQ.value = st.contact ? st.contact.n : '';
+      st.co = r; st.coX = {}; st.srcPick = {}; st.ok = {}; st.ntsLive = null; st.contact = chosenContact || null; ctQ.value = st.contact ? st.contact.n : '';
       clearEdits(['회사명', '사업자번호', '대표자', '대표자전체', '주소', '대표전화', '대표팩스', '대표이메일', '업태', '종목', '법인등록번호', '규모', '담당자', '담당자연락처', '담당자이메일', '담당자직급', '담당자부서', '담당자휴대폰', '담당자전화', '담당자주소']);
       coList.innerHTML = ''; coQ.value = '';
       coPicked.innerHTML = '';

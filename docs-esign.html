@@ -193,8 +193,8 @@
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=9"></script>
-<script src="js/pu-contract-forms.js?v=19"></script>
+<script src="js/pu-form-cardfill.js?v=10"></script>
+<script src="js/pu-contract-forms.js?v=20"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
 <script src="js/pu-office-store.js?v=6"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
@@ -358,6 +358,20 @@ function formCards() {
       }));
     }
   };
+}
+/* 🏛 지금 국세청에 묻기 — 기업정보함·사진첩과 같은 열쇠(포털 환경설정 › data/app_config/ntsKey)·같은 주소.
+   사업자번호만 나간다. ⚠ 받은 값은 «적지 않는다» — 기업정보함은 남의 자료다(그 화면이 열면 스스로 묻고 적는다). */
+var NTS_STATUS_URL = 'https://api.odcloud.kr/api/nts-businessman/v1/status?serviceKey=';
+function formNtsCheck(bz) {
+  return db.ref('data/app_config/ntsKey').once('value').then(function (s) {
+    var key = s.val();
+    if (!key) throw new Error('국세청 조회 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」');
+    return fetch(NTS_STATUS_URL + encodeURIComponent(key), { method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ b_no: [String(bz).replace(/\D/g, '')] }) });
+  }).then(function (r) {
+    if (!r.ok) throw new Error('응답 ' + r.status);
+    return r.json();
+  }).then(function (j) { var row = j && j.data && j.data[0]; if (!row) throw new Error('국세청에 자료가 없습니다'); return row; });
 }
 async function formHwpBytes(src) {
   if (src.data) return PuOfficeStore.dataUrlToBytes(src.data);
@@ -646,7 +660,7 @@ function showPane(name) {
     formsMounted = true;
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
-      cards: formCards(), hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
+      cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }

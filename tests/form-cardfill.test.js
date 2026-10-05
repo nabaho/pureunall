@@ -387,3 +387,37 @@ test('ⓓ 확인표 배선 — 고른 값이 채우기에 들어가고, 안 고�
   });
   assert.match(s, /st\.srcPick = \{\}; st\.ok = \{\};/, '회사를 바꾸면 고른 것이 지워져야 한다');
 });
+
+/* ══ 🏛 국세청 상태 (대표 「추천대로」 2026-10-05) ══ */
+test('ⓔ 국세청 — 기업정보함 coNtsCls 와 같은 답, 물어본 날과 함께', () => {
+  const src = read('pu-cards.html');
+  const m = /function coNtsCls\(word\)\{[\s\S]*?\n\}/.exec(src);
+  assert.ok(m, 'pu-cards.html 에서 coNtsCls 를 못 찾았습니다');
+  const theirs = new Function(m[0] + '; return coNtsCls;')();
+  ['계속사업자', '휴업자', '폐업자', '국세청에 등록되지 않은 사업자등록번호입니다.', '', '알 수 없음'].forEach((w) =>
+    assert.equal(CF.ntsCls(w), theirs(w), '「' + w + '」 판정이 기업정보함과 다릅니다'));
+  assert.deepEqual(CF.mergeCoInfo([{ ntsState: '계속사업자', ntsAt: '2026-09-30' }]), { ns: '계속사업자', na: '2026-09-30' });
+  const T = new Date(2026, 9, 5);
+  const ok = CF.ntsView({ word: '계속사업자', at: '2026-09-30' }, T);
+  assert.equal(ok.bad, false); assert.equal(ok.stale, false); assert.equal(ok.text, '국세청: 계속사업자 · 2026-09-30 확인');
+  const old = CF.ntsView({ word: '계속사업자', at: '2026-01-02' }, T);
+  assert.equal(old.stale, true, '90일 넘으면 다시 물어볼 것'); assert.match(old.text, /\(276일 전\)/);
+  const gone = CF.ntsView({ word: '폐업자', at: '2026-10-01', end: '2025-03-01' }, T);
+  assert.equal(gone.bad, true); assert.equal(gone.text, '국세청: 폐업자 (2025-03-01 폐업) · 2026-10-01 확인');
+  assert.equal(CF.ntsView({}, T).text, '국세청 확인 기록 없음');
+  assert.equal(CF.ntsView({}, T).stale, true);
+  assert.equal(CF.ntsWordOf({ b_stt: '', tax_type: '국세청에 등록되지 않은 사업자등록번호입니다.' }), '국세청에 등록되지 않은 사업자등록번호입니다.');
+  assert.equal(CF.ntsEndOf({ end_dt: '20250301' }), '2025-03-01');
+});
+
+test('ⓔ 국세청 배선 — 번호만 보내고 기업정보함에 쓰지 않으며, 휴·폐업이면 받기 전에 묻는다', () => {
+  const html = read('docs-esign.html');
+  const i = html.indexOf('function formNtsCheck');
+  assert.ok(i > 0); const fn = html.slice(i, html.indexOf('\n}', i));
+  assert.match(fn, /data\/app_config\/ntsKey/); assert.match(fn, /b_no: \[/);
+  assert.ok(!/pucards|\.set\(|\.update\(/.test(fn), '기업정보함은 남의 자료 — 쓰면 안 된다');
+  assert.match(html, /ntsCheck: formNtsCheck/);
+  const s = read('js/pu-contract-forms.js');
+  assert.match(s, /function conflictsOkToGo\(\) \{\s*var nv = ntsNow\(\);\s*if \(nv && nv\.bad && !w\.confirm/);
+  assert.match(s, /st\.ntsLive = null;/, '회사를 바꾸면 방금 물어본 값이 지워져야 한다');
+});
