@@ -129,7 +129,7 @@
     var t = today || new Date(), days = at ? Math.floor((Date.UTC(t.getFullYear(), t.getMonth(), t.getDate()) - Date.parse(at + 'T00:00:00Z')) / 864e5) : null;
     var stale = !word || days == null || !(days <= NTS_STALE_DAYS);
     var bad = cls === 'gone' || cls === 'soon' || cls === 'none';
-    var say = cls === 'none' ? '국세청에 없는 번호' : word;
+    var say = cls === 'none' ? '등록되지 않은 번호' : word;
     var text = !word ? '국세청 확인 기록 없음'
       : '국세청: ' + say + (x.end ? ' (' + x.end + ' 폐업)' : '') + (at ? ' · ' + at + ' 확인' + (days > NTS_STALE_DAYS ? '(' + days + '일 전)' : '') : ' · 확인 날짜 모름');
     return { word: word, at: at, cls: cls, bad: bad, stale: stale, text: text };

@@ -405,6 +405,7 @@ test('ⓔ 국세청 — 기업정보함 coNtsCls 와 같은 답, 물어본 날�
   const gone = CF.ntsView({ word: '폐업자', at: '2026-10-01', end: '2025-03-01' }, T);
   assert.equal(gone.bad, true); assert.equal(gone.text, '국세청: 폐업자 (2025-03-01 폐업) · 2026-10-01 확인');
   assert.equal(CF.ntsView({}, T).text, '국세청 확인 기록 없음');
+  assert.equal(CF.ntsView({ word: '국세청에 등록되지 않은 사업자등록번호입니다.', at: '2026-10-05' }, T).text, '국세청: 등록되지 않은 번호 · 2026-10-05 확인');
   assert.equal(CF.ntsView({}, T).stale, true);
   assert.equal(CF.ntsWordOf({ b_stt: '', tax_type: '국세청에 등록되지 않은 사업자등록번호입니다.' }), '국세청에 등록되지 않은 사업자등록번호입니다.');
   assert.equal(CF.ntsEndOf({ end_dt: '20250301' }), '2025-03-01');
