@@ -1319,6 +1319,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=1"></script>
+<script src="js/kcareer-pack.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
@@ -1707,6 +1708,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
                 <!-- ★ 📎 첨부서류 만들기 (대표 승인 2026-10-03 목업) — 신청서 실적 표의 줄마다 경력·실적 기록의 원본을 붙여
                      첨부 1, 2, 3 … 번호를 매기고 PDF 한 파일(맨 앞 목록표 + 장마다 머리표)로 만든다 -->
                 <button class="btn" onclick="rhAttachOpen()" title="실적 표의 줄마다 증빙(위촉장·계약서·표창장)을 붙여 번호를 매기고 PDF 한 파일로 만듭니다">📎 첨부서류 만들기</button>
+                <!-- ★ 📦 제출 꾸러미 (대표 승인 2026-10-05 목업 ②) — 공고문 «제출서류» 순서대로 번호를 매겨 묶고, 서류 폴더·제출서류에 남긴다 -->
+                <button class="btn" onclick="packOpen()" title="공고문의 제출서류 목록대로 1, 2, 3-1 … 번호를 매기고 점검한 뒤 zip 으로 묶어 서류 폴더와 제출서류에 남깁니다">📦 제출 꾸러미</button>
                 <button class="btn" id="rcDocxSaveBtn" style="display:none" onclick="exportDocxFile()">💾 DOCX 저장</button>
                 <details class="rh-more rh-noed">
                   <summary>추가 작업</summary>
@@ -2311,11 +2314,11 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       </div></section>
       <section class="page-view" id="page-submission"><div class="page">
         <div class="page-head"><div class="page-title">📥 제출서류</div><div class="page-desc">신청서·제출서류를 건 단위로 보관 — 서류 폴더 «7. 컨설턴트,위원신청등 › 연도 › 건» 폴더를 만들면 그 건만 등록됩니다</div></div>
-        <div id="caseBanner"></div>
         <div class="toolbar">
           <input class="tb-input" data-f="q" placeholder="기관·건 이름 검색" style="min-width:220px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
           <button class="btn fs-ui" type="button" onclick="caseCheck({ask:true,changed:true})" title="7번 폴더에서 새로 생기거나 바뀐 지원 건만 찾습니다 — 위촉장·표창은 건드리지 않습니다">🔍 새 지원 건 찾기</button>
+          <button class="btn" type="button" onclick="packOpen()" title="공고문 제출서류 목록대로 번호를 매겨 묶습니다">📦 제출 꾸러미 만들기</button>
           <div class="tb-spacer"></div>
           <span class="cnt" style="font-size:11px;color:var(--text-mute)"></span>
           <button class="btn" data-act="csv">📤 CSV</button>
@@ -2646,6 +2649,36 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     </div>
     <div class="modal-foot"><button class="btn" type="button" onclick="document.getElementById('modalAttach').classList.remove('open')">닫기</button>
       <button class="btn primary" type="button" id="atMake" onclick="rhAttachBuild()">📎 PDF 한 파일로 만들기</button></div>
+  </div>
+</div>
+<!-- ★ 📦 제출 꾸러미 만들기 (대표 승인 2026-10-05 목업 ②) — 공고문 → 번호표 → 점검 → 저장·등록.
+     2026-10-04 한국기계연구원 신청을 손으로 한 그대로다. 판정은 js/kcareer-pack.js 한 곳. -->
+<div class="modal-ov" id="modalPack">
+  <div class="modal" style="width:min(1120px,96vw)">
+    <div class="modal-h">📦 제출 꾸러미 만들기 <span id="pkSteps" style="font-size:12px;font-weight:400;margin-left:8px"></span></div>
+    <div class="modal-b">
+      <div class="at-bar" style="flex-wrap:wrap;gap:6px">
+        <button class="btn sm" type="button" onclick="document.getElementById('pkNotice').click()" title="공고문(한글·PDF)에서 「제출서류」 줄을 읽어 번호표를 짭니다">📄 공고문 넣기</button>
+        <span id="pkNoticeName" class="at-sum"></span>
+        <input class="tb-input" id="pkTitle" placeholder="건 이름 — 예: 한국기계연구원 고문노무사" style="min-width:230px">
+        <input class="tb-input" id="pkYear" placeholder="연도" style="width:64px">
+        <input class="tb-input" id="pkPeople" placeholder="참여자(쉼표) — 책임자 먼저" style="min-width:200px">
+        <button class="btn sm" type="button" onclick="packReplan()" title="참여자를 바꿨으면 눌러 번호표를 다시 짭니다">↻ 번호표 다시</button>
+        <button class="btn sm" type="button" onclick="packAddRow()">＋ 줄 더하기</button>
+        <span style="flex:1"></span><span id="pkSum" class="at-sum"></span>
+      </div>
+      <div id="pkBody" class="at-body"></div>
+      <input type="file" id="pkNotice" accept=".hwp,.hwpx,.pdf,.txt" style="display:none" onchange="packNoticeFile(this)">
+      <input type="file" id="pkFile" accept=".pdf,.hwp,.hwpx,.jpg,.jpeg,.png" multiple style="display:none">
+    </div>
+    <div class="modal-foot" style="flex-wrap:wrap;gap:8px">
+      <label class="at-sum" style="display:inline-flex;align-items:center;gap:4px"><input type="checkbox" id="pkWhole" checked> 0. 전체합본 PDF도</label>
+      <label class="at-sum" style="display:inline-flex;align-items:center;gap:4px" title="서류 폴더 «7. 컨설턴트,위원신청등 › 연도 › 건 › 접수서류»에 저장하고 제출서류에 등록합니다 — 폴더가 없으면 zip 을 내려받습니다"><input type="checkbox" id="pkSave" checked> 서류 폴더에 저장·제출서류 등록</label>
+      <span style="flex:1"></span>
+      <button class="btn" type="button" onclick="document.getElementById('modalPack').classList.remove('open')">닫기</button>
+      <button class="btn" type="button" id="pkCheckBtn" onclick="packCheck()">🔎 점검</button>
+      <button class="btn primary" type="button" id="pkMake" onclick="packBuild()">📦 꾸러미 만들기</button>
+    </div>
   </div>
 </div>
 <div class="modal-ov" id="modalStampPick">
@@ -4587,7 +4620,8 @@ function caseBannerDraw(){
       + '<button class="btn sm" onclick="caseLater()" title="이번에 찾은 건은 다시 띄우지 않습니다 — 제출서류 › 🔍 새 지원 건 찾기로 언제든 다시 찾을 수 있습니다">나중에</button>'
       + '</div>';
   }
-  ['caseBannerTop', 'caseBanner'].forEach(function(id){ var el = $(id); if(el) el.innerHTML = html; });
+  /* 띠는 맨 위 «한 곳» — 제출서류 화면에도 맨 위 띠가 보인다(두 곳에 그리면 한 화면에 두 번 뜬다) */
+  var el = $('caseBannerTop'); if(el) el.innerHTML = html;
 }
 function caseRegister(){
   var f = _caseFound.fresh, c = _caseFound.changed;
@@ -13703,6 +13737,343 @@ async function rhAttachBuild(){
     toast(못.length?('📎 만들었습니다 — 못 붙인 것 '+못.length+'건: '+못.join(' / ')):('📎 첨부서류 '+고른.length+'건을 PDF 한 파일로 만들어 서류 보관함에 담았습니다'), 못.length?9000:5000);
   }catch(e){ console.error(e); toast('첨부서류 만들기 실패: '+((e&&e.message)||e)); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='📎 PDF 한 파일로 만들기'; } }
+}
+/* ═══ 📦 제출 꾸러미 만들기 (대표 승인 2026-10-05 목업 ② — 「1부터하고 2도한다」) ═══
+   공고문 「제출서류」 → 번호표(1, 2, 3-1 …) → 점검 → zip·전체합본 → 서류 폴더 «7번 › 연도 › 건 › 접수서류» + 제출서류 등록.
+   2026-10-04~05 한국기계연구원 신청 때 손으로 한 일이다. 그때 실제로 걸린 것을 점검에 넣었다:
+     · 남의 PDF 에 딸린 «서명칸»(전자 타임스탬프) — 잘라 붙이면 Acrobat 이 「유효성 검사가 필요한 서명」을 띄운다
+     · 글꼴이 안 들어 있는 쪽 — 받는 컴퓨터에 그 글꼴이 없으면 경고·깨짐 → 보이는 그대로 그림으로
+     · 메일 일반첨부 10MB
+   ⚠ 판정(번호·이름·점검 문구)은 js/kcareer-pack.js «한 곳». 여기는 파일을 읽고 쓰는 일만 한다.
+   ⚠ 원본은 건드리지 않는다 — 새 파일을 만들 뿐이다. 서류 폴더에서도 있는 파일을 덮지 않는다(fsFreeName). */
+var _pk = { notice:null, noticeText:'', items:[], rows:[], checked:false, done:{} };
+var PK_STRONG = ['사업자등록','등기','자격','징계','동의서','서약서','신청서','경력','실적','재직','졸업','위촉','이력'];
+function _pkSteps(){
+  var s=[['notice','1 공고문'],['plan','2 번호표'],['check','3 점검'],['save','4 저장·등록']];
+  var el=document.getElementById('pkSteps'); if(!el) return;
+  el.innerHTML=s.map(function(x){ var on=_pk.done[x[0]];
+    return '<span style="padding:2px 9px;border-radius:6px;margin-right:4px;'+(on?'border:1px solid var(--teal);color:var(--teal);font-weight:700':'border:1px solid var(--border);color:var(--text-mute)')+'">'+x[1]+'</span>'; }).join('');
+}
+function packOpen(){
+  var y=document.getElementById('pkYear'); if(y && !y.value) y.value=String(new Date().getFullYear());
+  var pp=document.getElementById('pkPeople'); if(pp && !pp.value) pp.value=LS.get(NS+'pack_people')||'';
+  packDraw();
+  document.getElementById('modalPack').classList.add('open');
+}
+async function _pkPdfText(bytes){
+  if(!(await _pdfLoadLib())) return '';
+  var doc=await window._pdfjs.getDocument({data:bytes.slice()}).promise, out=[];
+  for(var i=1;i<=doc.numPages;i++){
+    var tc=await (await doc.getPage(i)).getTextContent(), line='', lastY=null;
+    tc.items.forEach(function(it){ var y=Math.round(it.transform[5]); if(lastY!==null && Math.abs(y-lastY)>3){ out.push(line); line=''; } line+=it.str; lastY=y; });
+    out.push(line);
+  }
+  return out.join('\n');
+}
+function _pkGuessTitle(name, text){
+  var t=String(name||'').replace(/\.[^.]+$/,'').replace(/\([^)]*\)/g,' ').replace(/공고문?|최종|붙임|\d{6}/g,' ').replace(/\s+/g,' ').trim();
+  return t.replace(/^\s*[‘'’]?\d{2,4}\s*년?\s*/,'').trim();
+}
+async function packNoticeFile(inp){
+  var f=inp.files&&inp.files[0]; if(!f) return;
+  toast('⏳ 공고문을 읽는 중…');
+  var bytes=new Uint8Array(await f.arrayBuffer()), ext=(f.name.split('.').pop()||'').toLowerCase(), text='';
+  try{
+    if(/^hwpx?$/.test(ext)) text=await _hwpTextOf(bytes, f.name)||'';
+    else if(ext==='pdf') text=await _pkPdfText(bytes);
+    else text=new TextDecoder('utf-8').decode(bytes);
+  }catch(e){ console.warn('공고문 읽기', e); }
+  _pk.notice=f; _pk.noticeText=text;
+  _pk.items=KcareerPack.extractRequired(text);
+  var nm=document.getElementById('pkNoticeName'); if(nm) nm.textContent='📄 '+f.name+' · 제출서류 '+_pk.items.length+'줄';
+  var ti=document.getElementById('pkTitle'); if(ti && !ti.value) ti.value=_pkGuessTitle(f.name, text);
+  var yr=String(text).match(/(20\d{2})\s*[.년]/); var ye=document.getElementById('pkYear'); if(ye && yr) ye.value=yr[1];
+  if(!_pk.items.length) toast('공고문에서 「제출서류」 절을 못 찾았습니다 — ＋ 줄 더하기로 직접 적어 주세요', 6000);
+  else _pk.done.notice=true;
+  packReplan();
+}
+function _pkPeople(){
+  var v=(document.getElementById('pkPeople')||{}).value||'';
+  LS.set(NS+'pack_people', v);
+  return v.split(/[,，·\/\s]+/).map(function(x){ return x.trim(); }).filter(Boolean);
+}
+function packReplan(){
+  var old={}; _pk.rows.forEach(function(r){ old[r.no+'|'+r.who]=r; });
+  var people=_pkPeople();
+  _pk.rows=KcareerPack.buildPlan(_pk.items, people).map(function(r){
+    var o=old[r.no+'|'+r.who]; return Object.assign(r, { on:true, files:o?o.files:[], checks:null });
+  });
+  _pk.rows.forEach(function(r){ if(!r.files.length) _pkSuggest(r, people[0]||''); });
+  if(_pk.rows.length) _pk.done.plan=true;
+  _pk.checked=false; _pk.done.check=false;
+  packDraw();
+}
+function packAddRow(){
+  _pk.rows.push({ no:String(_pk.rows.length+1), title:'', who:'', line:'', perPerson:false, on:true, files:[], checks:null });
+  packDraw();
+}
+/* 붙일 수 있는 것 — 원본이 있는 경력·실적 기록 + 만든 서류(보관함) */
+function _pkCands(){
+  return allRecords().filter(function(x){ return x && x.r && x.page!=='feebox' && (x.page==='docbox' ? !!(x.r.genFileId||x.r.origFileId) : hasOriginal(x.r)); });
+}
+function _pkText(o){ var r=o.r; return [r.type,r.kind,r.title,r.titleVal,r.name,r.org,r.memo,r.fname,r.genName,r.origName].filter(Boolean).join(' '); }
+function _pkScore(row, o){
+  var t=_pkText(o), w=String(row.title||'').split(/[\s·,()]+/).filter(function(x){ return x.length>=2 && !/^(소정|양식|사본|서류|증명하는|위한|기타|노무사|각)$/.test(x); });
+  var s=0; w.forEach(function(x){ if(t.indexOf(x)>=0) s+=1; });
+  PK_STRONG.forEach(function(k){ if(row.title.indexOf(k)>=0 && t.indexOf(k)>=0) s+=3; });
+  if(row.title.indexOf('자격')>=0 && /노무사/.test(t)) s+=2;
+  return s;
+}
+/* 자동 추천 — 책임자(첫 사람) 줄과 사람이 없는 줄만. 경력관리 기록은 대개 책임자 것이다 */
+function _pkSuggest(row, owner){
+  if(row.who && row.who!==owner) return;
+  if(/신청서/.test(row.title) && _rhDoc && _rhDoc.bytes){ row.files=[{ kind:'cur', name:_rhDoc.name||'지금 쓰는 서류', auto:true }]; return; }
+  var best=null, bs=0;
+  _pkCands().forEach(function(o){ var s=_pkScore(row,o); if(s>bs){ bs=s; best=o; } });
+  if(best && bs>=4) row.files=[{ kind:'rec', rec:best.r, page:best.page, name:_attFileName(best.r), auto:true }];
+}
+function packDraw(){
+  _pkSteps();
+  var body=document.getElementById('pkBody'); if(!body) return;
+  if(!_pk.rows.length){ body.innerHTML='<div class="empty" style="padding:18px">📄 공고문을 넣으면 「제출서류」 목록대로 번호표를 짭니다 — 공고문이 없으면 ＋ 줄 더하기</div>'; _pkSum(); return; }
+  var cands=_pkCands();
+  var html='<table class="at-tbl"><thead><tr><th><input type="checkbox" checked onchange="_pk.rows.forEach(function(r){r.on=this.checked;},this);packDraw()"></th><th>#</th><th>번호</th><th>서류</th><th>사람</th><th>넣은 파일</th><th>점검</th></tr></thead><tbody>';
+  _pk.rows.forEach(function(r,i){
+    var 칩=r.files.map(function(f,k){ return '<span class="tag navy" style="margin:1px 3px 1px 0;font-size:11px">'+(f.auto?'추천 · ':'')+escapeHtml(f.name||'파일')+' <a href="#" onclick="event.preventDefault();_pk.rows['+i+'].files.splice('+k+',1);_pk.checked=false;packDraw()" title="빼기">✕</a></span>'; }).join('');
+    var opts=cands.map(function(o,ci){ return {ci:ci,s:_pkScore(r,o),o:o}; }).sort(function(a,b){ return b.s-a.s; }).slice(0,40)
+      .map(function(x){ var y=String(x.o.r.year||x.o.r.issueDate||x.o.r.date||'').slice(0,4);
+        return '<option value="'+x.ci+'">'+escapeHtml((y?y+' · ':'')+_attRecName(x.o.r,x.o.page)+' · '+_attFileName(x.o.r))+'</option>'; }).join('');
+    var 점검=r.checks?r.checks.map(function(c){ var col=c.level==='ok'?'var(--teal)':c.level==='miss'?'var(--red)':c.level==='fix'?'var(--text)':'var(--amber)'; return '<div style="color:'+col+';font-size:11px;white-space:nowrap">'+escapeHtml(c.text)+'</div>'; }).join(''):'<span style="color:var(--text-mute);font-size:11px">-</span>';
+    html+='<tr><td><input type="checkbox" '+(r.on?'checked':'')+' onchange="_pk.rows['+i+'].on=this.checked;_pkSum()"></td><td>'+(i+1)+'</td>'
+      +'<td><input class="tb-input" style="width:52px;padding:2px 4px" value="'+escapeHtml(r.no)+'" onchange="_pk.rows['+i+'].no=this.value.trim()"></td>'
+      +'<td><input class="tb-input" style="width:100%;min-width:180px;padding:2px 4px" value="'+escapeHtml(r.title)+'" title="'+escapeHtml(r.line||'')+'" onchange="_pk.rows['+i+'].title=this.value.trim()"></td>'
+      +'<td><input class="tb-input" style="width:64px;padding:2px 4px" value="'+escapeHtml(r.who||'')+'" onchange="_pk.rows['+i+'].who=this.value.trim()"></td>'
+      +'<td style="min-width:230px">'+칩+'<button class="btn sm" type="button" onclick="packPutFile('+i+')">＋ 파일</button> '
+      +'<select class="tb-select" style="max-width:150px;font-size:11px" onchange="packPickRec('+i+',this.value);this.value=\'\'"><option value="">보관함에서…</option>'+(_rhDoc&&_rhDoc.bytes?'<option value="cur">✍️ 지금 쓰는 서류(한글 → PDF)</option>':'')+opts+'</select></td>'
+      +'<td>'+점검+'</td></tr>';
+  });
+  body.innerHTML=html+'</tbody></table>';
+  _pkSum();
+}
+function _pkSum(){
+  var el=document.getElementById('pkSum'); if(!el) return;
+  var on=_pk.rows.filter(function(r){ return r.on; }), 빈=on.filter(function(r){ return !r.files.length; }).length;
+  el.textContent=on.length?('번호 '+on.length+' · 파일 없는 줄 '+빈+(_pk.total?' · '+KcareerPack.sizeCheck(_pk.total).text:'')):'';
+}
+function packPutFile(i){
+  var inp=document.getElementById('pkFile'); if(!inp) return;
+  inp.value=''; inp.onchange=function(){ [].slice.call(inp.files||[]).forEach(function(f){ _pk.rows[i].files.push({ kind:'file', file:f, name:f.name }); }); _pk.checked=false; packDraw(); };
+  inp.click();
+}
+function packPickRec(i, ci){
+  if(ci==='') return;
+  if(ci==='cur'){ _pk.rows[i].files.push({ kind:'cur', name:(_rhDoc&&_rhDoc.name)||'지금 쓰는 서류.hwpx' }); _pk.checked=false; packDraw(); return; }
+  var o=_pkCands()[Number(ci)]; if(!o) return;
+  _pk.rows[i].files.push({ kind:'rec', rec:o.r, page:o.page, name:_attFileName(o.r) });
+  _pk.checked=false; packDraw();
+}
+/* 파일 한 개의 바이트 */
+async function _pkBytes(f){
+  if(f.kind==='file') return { bytes:new Uint8Array(await f.file.arrayBuffer()), name:f.file.name };
+  /* 지금 쓰는 서류 — 친 값·도장까지 넣어 새로 지은 한글(HWPX). 꾸러미에서는 PDF 쪽으로 바뀐다 */
+  if(f.kind==='cur'){
+    if(!_rhDoc||!_rhDoc.bytes) throw new Error('지금 열린 서류가 없습니다');
+    var hb=null; try{ hb=await exportEditedHwpx(); }catch(e){}
+    if(hb&&hb.length) return { bytes:hb, name:String(_rhDoc.name||'서류.hwpx').replace(/\.hwp$/i,'.hwpx') };
+    return { bytes:_rhDoc.bytes, name:String(_rhDoc.name||'서류.hwp') };   /* 새로 못 지으면 올린 그대로(이름도 그대로) */
+  }
+  var r=f.rec, x=null;
+  if(f.page==='docbox') x=await getFileAsync(r.genFileId||r.origFileId||r.id);
+  else x=await recFileAsync(r);
+  if(!x||!x.base64) throw new Error('이 기기에 원본이 없습니다');
+  return { bytes:new Uint8Array(b64ToAb(x.base64)), name:x.name||f.name };
+}
+/* PDF 살피기 — 쪽 수·암호·서명칸·입력칸·글꼴 없는 쪽 */
+var PK_STD14=/^(Times|Helvetica|Courier|Symbol|ZapfDingbats)/;
+function _pkFontlessPages(doc){
+  var P=PDFLib, N=function(n){ return P.PDFName.of(n); }, bad=[];
+  doc.getPages().forEach(function(pg, idx){
+    try{
+      var res=pg.node.Resources(); if(!res) return;
+      var fonts=res.lookup(N('Font')); if(!fonts || !fonts.keys) return;
+      var miss=fonts.keys().some(function(k){
+        var fd=fonts.lookup(k); if(!fd || !fd.lookup) return false;
+        var st=String(fd.lookup(N('Subtype'))||'');
+        if(/Type3/.test(st)) return false;
+        var d=fd;
+        if(/Type0/.test(st)){ var arr=fd.lookup(N('DescendantFonts')); d=arr&&arr.lookup?arr.lookup(0):null; if(!d) return false; }
+        var desc=d.lookup(N('FontDescriptor'));
+        if(!desc){ return !PK_STD14.test(String(d.lookup(N('BaseFont'))||'').replace(/^\//,'')); }
+        return !(desc.lookup(N('FontFile'))||desc.lookup(N('FontFile2'))||desc.lookup(N('FontFile3')));
+      });
+      if(miss) bad.push(idx);
+    }catch(e){}
+  });
+  return bad;
+}
+async function _pkPdfInfo(bytes){
+  var P=PDFLib, doc=await P.PDFDocument.load(bytes,{ignoreEncryption:true,updateMetadata:false});
+  var sig=0, form=0;
+  /* ⚠ 갈래 «이름»(생성자 이름 글자)으로 가르지 말 것 — pdf-lib.min.js 는 이름이 줄어 있다 */
+  try{ doc.getForm().getFields().forEach(function(fl){ if(P.PDFSignature && fl instanceof P.PDFSignature) sig++; else form++; }); }catch(e){}
+  return { doc:doc, pages:doc.getPageCount(), encrypted:!!doc.isEncrypted, sigFields:sig, formFields:form, fontless:_pkFontlessPages(doc) };
+}
+async function packCheck(){
+  if(!_pk.rows.length){ toast('번호표가 없습니다'); return false; }
+  var btn=document.getElementById('pkCheckBtn'); if(btn){ btn.disabled=true; btn.textContent='⏳ 점검 중…'; }
+  try{
+    await _loadPdfLib();
+    var total=0;
+    for(var i=0;i<_pk.rows.length;i++){
+      var r=_pk.rows[i]; if(!r.on){ r.checks=null; continue; }
+      var infos=[];
+      for(var k=0;k<r.files.length;k++){
+        var f=r.files[k], info={ name:f.name, ext:(String(f.name).split('.').pop()||'').toLowerCase() };
+        try{
+          var b=await _pkBytes(f); info.size=b.bytes.length; total+=b.bytes.length;
+          if(info.ext==='pdf'){ var p=await _pkPdfInfo(b.bytes); info.pdf={ pages:p.pages, encrypted:p.encrypted, sigFields:p.sigFields, formFields:p.formFields, noFontPages:p.fontless.length }; }
+        }catch(e){ info.pdf={ pages:0 }; info.err=(e&&e.message)||'못 읽음'; }
+        infos.push(info);
+      }
+      r.checks=KcareerPack.checkRow(r, infos);
+      infos.forEach(function(x){ if(x.err) r.checks.unshift({ level:'miss', text:x.name+' — '+x.err }); });
+    }
+    _pk.total=total; _pk.checked=true; _pk.done.check=true;
+    packDraw();
+    return true;
+  }catch(e){ console.error(e); toast('점검 실패: '+((e&&e.message)||e)); return false; }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='🔎 점검'; } }
+}
+/* 쪽을 보이는 그대로 그림으로 (글꼴 없는 쪽) — 150dpi */
+async function _pkRasterPages(bytes, idxs){
+  if(!(await _pdfLoadLib())) throw new Error('PDF 그리기 도구를 못 받았습니다');
+  var doc=await window._pdfjs.getDocument({data:bytes.slice()}).promise, out={};
+  for(var i=0;i<idxs.length;i++){
+    var pg=await doc.getPage(idxs[i]+1), vp=pg.getViewport({scale:150/72}), c=document.createElement('canvas');
+    c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
+    var g=c.getContext('2d'); g.fillStyle='#fff'; g.fillRect(0,0,c.width,c.height);
+    await pg.render({canvasContext:g, viewport:vp}).promise;
+    out[idxs[i]]={ jpg:await _attJpgOf(c), w:vp.width*72/150, h:vp.height*72/150 };
+  }
+  return out;
+}
+/* 한 줄(번호)의 파일들 → PDF 한 파일. 손볼 것이 없는 PDF 한 개면 «원본 바이트 그대로»(글자·크기 보존) */
+async function _pkRowPdf(r){
+  var P=PDFLib, A4=[595.28,841.89], parts=[];
+  for(var k=0;k<r.files.length;k++){ var b=await _pkBytes(r.files[k]); b.ext=(String(b.name).split('.').pop()||'').toLowerCase(); parts.push(b); }
+  if(parts.length===1 && parts[0].ext==='pdf'){
+    var i0=await _pkPdfInfo(parts[0].bytes);
+    if(!i0.sigFields && !i0.formFields && !i0.fontless.length) return { bytes:parts[0].bytes, ext:'pdf' };
+  }
+  if(parts.length===1 && !/^(pdf|jpe?g|png|hwpx?)$/.test(parts[0].ext)) return { bytes:parts[0].bytes, ext:parts[0].ext };   /* 그대로 넣는다 */
+  var out=await P.PDFDocument.create();
+  for(var j=0;j<parts.length;j++){
+    var x=parts[j];
+    if(x.ext==='pdf'){
+      var info=await _pkPdfInfo(x.bytes), src=info.doc, ras=info.fontless.length?await _pkRasterPages(x.bytes, info.fontless):{};
+      for(var q=0;q<src.getPageCount();q++){
+        if(ras[q]){ var im=await out.embedJpg(ras[q].jpg), np=out.addPage([ras[q].w, ras[q].h]); np.drawImage(im,{x:0,y:0,width:ras[q].w,height:ras[q].h}); continue; }
+        var cp=(await out.copyPages(src,[q]))[0];
+        /* 서명칸·입력칸(위젯) 걷기 — 남으면 Acrobat 이 「유효성 검사가 필요한 서명」을 띄운다 */
+        try{ var an=cp.node.Annots(); if(an){ var keep=[]; for(var a=0;a<an.size();a++){ var d=an.lookup(a); if(!(d && d.lookup && String(d.lookup(P.PDFName.of('Subtype')))==='/Widget')) keep.push(an.get(a)); }
+          cp.node.set(P.PDFName.of('Annots'), out.context.obj(keep)); } }catch(e){}
+        out.addPage(cp);
+      }
+    } else if(/^(jpe?g|png)$/.test(x.ext)){
+      var img=/png/.test(x.ext)?await out.embedPng(x.bytes):await out.embedJpg(x.bytes);
+      var p1=out.addPage(A4), sc=Math.min((A4[0]-60)/img.width,(A4[1]-60)/img.height,1.5);
+      p1.drawImage(img,{x:(A4[0]-img.width*sc)/2,y:(A4[1]-img.height*sc)/2,width:img.width*sc,height:img.height*sc});
+    } else if(/^hwpx?$/.test(x.ext) && window.PureunHwp && PureunHwp.renderPreview){
+      var tmp=document.createElement('div'); await PureunHwp.renderPreview(tmp, x.bytes, x.name);
+      var cvs=[].slice.call(tmp.querySelectorAll('canvas')); if(!cvs.length) throw new Error(x.name+' — 한글 쪽을 못 그렸습니다');
+      for(var c2=0;c2<cvs.length;c2++){ var jm=await out.embedJpg(await _attJpgOf(cvs[c2])), p2=out.addPage(A4); p2.drawImage(jm,{x:0,y:0,width:A4[0],height:A4[1]}); }
+    } else throw new Error(x.name+' — 한 줄에 여럿일 때는 PDF·그림·한글만 합칠 수 있습니다');
+  }
+  return { bytes:await out.save(), ext:'pdf' };
+}
+async function packBuild(){
+  var rows=_pk.rows.filter(function(r){ return r.on && r.files.length; })
+    .sort(function(a,b){ return KcareerPack.noKey(a.no).localeCompare(KcareerPack.noKey(b.no)); });
+  if(!rows.length){ toast('파일을 넣은 줄이 없습니다'); return; }
+  var title=((document.getElementById('pkTitle')||{}).value||'').trim();
+  if(!title){ toast('건 이름을 적어 주세요 — 서류 폴더의 건 폴더 이름이 됩니다'); return; }
+  /* ★ 쓰기 허락은 «누른 그 자리에서» 먼저 받는다 — 만들기가 몇 초 걸리면 브라우저가 허락 창을 막는다 */
+  var saveRoot=null;
+  if((document.getElementById('pkSave')||{}).checked) saveRoot=await _pkRootForSave();
+  if(!_pk.checked && !(await packCheck())) return;
+  var btn=document.getElementById('pkMake'); if(btn){ btn.disabled=true; btn.textContent='⏳ 만드는 중…'; }
+  var 못=[];
+  try{
+    await _loadPdfLib(); await _loadJSZip();
+    var made=[];
+    for(var i=0;i<rows.length;i++){
+      try{ var o=await _pkRowPdf(rows[i]); made.push({ name:KcareerPack.fileName(rows[i], o.ext), bytes:o.bytes, ext:o.ext }); }
+      catch(e){ console.warn('꾸러미', rows[i], e); 못.push(rows[i].no+' '+((e&&e.message)||'못 만들었습니다')); }
+    }
+    if(!made.length) throw new Error('만든 파일이 없습니다');
+    var whole=null;
+    if((document.getElementById('pkWhole')||{}).checked){
+      var w=await PDFLib.PDFDocument.create();
+      for(var j=0;j<made.length;j++){ if(made[j].ext!=='pdf') continue; var s=await PDFLib.PDFDocument.load(made[j].bytes,{ignoreEncryption:true}); (await w.copyPages(s,s.getPageIndices())).forEach(function(p){ w.addPage(p); }); }
+      whole={ name:'0. 전체합본_'+title.replace(/[\\/:*?"<>|]/g,'·')+'.pdf', bytes:await w.save() };
+    }
+    var zip=new JSZip(); made.forEach(function(m){ zip.file(m.name, m.bytes); });
+    var zipBytes=await zip.generateAsync({type:'uint8array', compression:'DEFLATE'});
+    var zipName='제출서류_'+title.replace(/[\\/:*?"<>|]/g,'·')+'.zip';
+    var size=KcareerPack.sizeCheck(zipBytes.length);
+    var saved=false;
+    if(saveRoot) saved=await _pkSaveToFolder(saveRoot, title, made, whole, zipName, zipBytes);
+    if(!saved){
+      var url=URL.createObjectURL(new Blob([zipBytes],{type:'application/zip'})), a=document.createElement('a');
+      a.href=url; a.download=zipName; a.click(); setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
+    }
+    _pk.done.save=true; _pkSteps();
+    toast((saved?'📦 서류 폴더에 저장하고 제출서류에 등록했습니다':'📦 zip 을 내려받았습니다')+' · '+made.length+'개 · '+size.text+(못.length?' · 못 만든 것: '+못.join(' / '):''), 9000);
+  }catch(e){ console.error(e); toast('꾸러미 만들기 실패: '+((e&&e.message)||e)); }
+  finally{ if(btn){ btn.disabled=false; btn.textContent='📦 꾸러미 만들기'; } }
+}
+/* 서류 폴더 «7. 컨설턴트,위원신청등 › 2026년 › 2026 ○○ › 접수서류» 에 쓰고 제출서류에 남긴다.
+   ⚠ 7번 폴더가 없으면 만들지 않는다(엉뚱한 폴더를 연결한 것이다) — 그때는 zip 을 내려받는다.
+   ⚠ 연도·건·접수서류 폴더만 새로 만든다. 있는 파일은 덮지 않는다(fsFreeName). */
+/* 쓸 자리 고르기 — 저장 폴더·서류 폴더 가운데 «7번 폴더가 있는» 것. 없으면 null(→ zip 내려받기) */
+async function _pkRootForSave(){
+  if(!fsSupported()) return null;
+  var hs=[], a=null, b=null;
+  try{ a=await fsSaveDirGet(); }catch(e){}
+  try{ b=_fsRoot || await fsLoadRoot(); }catch(e){}
+  [a,b].forEach(function(h){ if(h && hs.indexOf(h)<0) hs.push(h); });
+  if(!hs.length){ toast('서류 폴더가 연결돼 있지 않아 zip 을 내려받습니다 — 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결'); return null; }
+  for(var i=0;i<hs.length;i++){
+    if(!await fsEnsureWrite(hs[i])) continue;
+    try{ return { root:hs[i], top:await hs[i].getDirectoryHandle(KcareerCases.CASE_ROOT) }; }catch(e){}
+  }
+  toast('연결한 폴더에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없거나 쓰기를 허락받지 못해 zip 을 내려받습니다', 6000);
+  return null;
+}
+async function _pkSaveToFolder(saveRoot, title, made, whole, zipName, zipBytes){
+  try{
+    var top=saveRoot.top;
+    var yr=((document.getElementById('pkYear')||{}).value||'').trim(), cf=KcareerPack.caseFolderName(yr, title);
+    var yd=await top.getDirectoryHandle(cf.yearDir,{create:true}), cd=await yd.getDirectoryHandle(cf.caseName,{create:true}), sd=await cd.getDirectoryHandle('접수서류',{create:true});
+    var caseDir=KcareerCases.caseDirOf(cf.yearDir, cf.caseName), now=new Date().toISOString(), files=[];
+    async function put(dir, pre, name, bytes){
+      var nm=await fsFreeName(dir, name), fh=await dir.getFileHandle(nm,{create:true}), w=await fh.createWritable();
+      await w.write(new Blob([bytes])); await w.close();
+      files.push({ name:nm, relPath:pre+'/'+nm, size:bytes.length, mtime:now });
+    }
+    for(var i=0;i<made.length;i++) await put(sd, caseDir+'/접수서류', made[i].name, made[i].bytes);
+    if(whole) await put(sd, caseDir+'/접수서류', whole.name, whole.bytes);
+    await put(cd, caseDir, zipName, zipBytes);
+    if(_pk.notice) await put(cd, caseDir, _pk.notice.name, new Uint8Array(await _pk.notice.arrayBuffer()));
+    /* 제출서류 — 같은 건이 있으면 파일 목록만 갈고(제출·결과는 그대로), 없으면 새로 */
+    var subs=get('submission'), hit=subs.findIndex(function(s){ return s.caseDir===caseDir; });
+    var all=await fsCaseFiles(cd, caseDir).catch(function(){ return files; });
+    if(hit>=0) subs[hit]=KcareerCases.refreshCaseRecord(subs[hit], all);
+    else { var rec=KcareerCases.buildCaseRecord(caseDir, all, { scanId:'P'+now.slice(0,10).replace(/-/g,'') }); rec.id=kcNextNo('SB',4,'submission',subs); rec.savedAt=now; rec.packAt=now; subs.unshift(rec); }
+    set('submission', subs);
+    _safe(function(){ renderCareer('submission'); });
+    return true;
+  }catch(e){ console.warn('꾸러미 저장', e); toast('서류 폴더에 못 써서 zip 을 내려받습니다 — '+((e&&e.message)||'')); return false; }
 }
 function openPdfBlob(bytes, name){
   var url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
