@@ -2328,6 +2328,14 @@ table.sbox.tight td.none{padding:26px 8px}
   border:1px dashed #94a3b8;border-radius:10px}
 .regstrip span{font-size:12.5px;color:var(--sub);white-space:nowrap}
 .regstrip .btn{flex:none;padding:8px 12px;white-space:nowrap}
+/* 👷 근로자 「＋ 정보등록」 — 들어갈 사건 고르기. 줄마다 한 줄, 넘치면 … */
+.wrcases{max-height:240px;overflow:auto;border:1px solid #e2e8f0;border-radius:10px;padding:4px}
+.wrcases .wrcase{display:flex;gap:10px;align-items:center;padding:7px 8px;margin:0;font-weight:400;color:#1e293b;border-radius:8px;cursor:pointer;white-space:nowrap;font-size:13px;min-width:0}
+.wrcases .wrcase.on,.wrcases .wrcase:hover{background:#eff6ff}
+.wrcases .wrcase input{flex:none;width:auto;margin:0;padding:0}
+.wrcases .wrcase b{flex:none;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+.wrcases .wrcase span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#475569}
+.wrcases .wrcase em{flex:none;font-style:normal;color:#94a3b8;font-size:12px}
 /* 🔎 전체에서 찾기 — 찾기 칸 바로 아래 펼침 (대표 지시 2026-10-05). 줄마다 «한 줄», 넘치면 … */
 #gsBox{position:absolute;top:calc(100% + 6px);left:0;width:640px;max-width:calc(100vw - 300px);background:#fff;
   border:1px solid #cbd5e1;border-radius:12px;box-shadow:0 12px 32px rgba(30,41,59,.18);z-index:80;
@@ -29798,6 +29806,8 @@ async function pushTaxInvoiceToErp(keys, opt){
    회사 상세 팝업에 이력을 보여주고, 폴더를 이알피 사업 유형에서 골라 만들 때 쓴다
    (대표 지시 2026-08-14). ⚠ data/cases, data/consultings 등은 이알피(pu-erp.html)의
    원장이다 — 여기서는 절대 쓰지 않는다, 읽기만 한다.
+   ⚠ 단 «하나»의 예외: 근로자 「＋ 정보등록」이 고른 사건의 workers 끝에 사람을 더한다
+     (wkAddToCase, 대표 결정 2026-10-05). 그 밖은 여전히 읽기만 — tests/cards-wk-register 가 지킨다.
    ⚠ 사건관리는 레코드마다 typeName 이 이미 박혀 있지만, 나머지는 typeCode 만
      있고 사람이 읽는 이름은 별도 사전(data/biz_cons_types 등, 통째 배열 자리 — 레코드별
      자리가 아니다)에서 찾아야 한다.
@@ -35983,6 +35993,136 @@ function wkAllCases(erp){
   }));
   eat(erp.byBiz); eat(erp.byName);
   return out;
+}
+
+/* ══════ 👷 근로자 「＋ 정보등록」 — 고른 이알피 사건에 사람을 더한다 (대표 결정 2026-10-05) ══════
+   목업 「근로자 화면의 ＋ 정보등록은?」 → «사건에 더하기(추천)».
+   ⚠⚠ 기업정보함이 이알피 사건 원장(data/cases)에 쓰는 «유일한» 자리다. 다른 곳은 여전히 읽기만 한다
+     (loadErpCaseCons 등 — tests/cards-co-hist-funnel 이 지킨다). 사람을 만드는 곳은 여전히 «사건»이다 —
+     여기서도 사건을 고르지 않으면 아무것도 안 만든다.
+   ⚠⚠ 주민번호·주소·연락처·계좌는 «받지 않는다»(대표 결정 2026-09-01 그대로). 칸은 이알피 편집기와
+     같은 꼴로 비워 둔다 — 이알피 사건 창에서 채운다.
+   ★ 쓰는 법 — 이알피를 깨지 않으려고 지키는 것:
+     ① 사건이 서버에 «있고» 지워지지 않았는지 먼저 본다 — 없는 자리에 쓰면 번호 없는 껍데기가 생긴다
+     ② workers 는 «배열»일 때만 더한다 — 이알피 편집기는 배열만 견딘다(지도꼴이면 창이 깨진다)
+     ③ 새 사람은 «맨 끝»에, 고유 id 를 붙여 — 이알피 지급 확인이 순번·id 로 사람을 찾는다
+     ④ workers «한 칸»만 거래(transaction)로 — 그사이 남이 더한 사람을 덮지 않는다. 다른 칸은 안 건드린다
+     ⑤ 사건의 updatedAt·updatedBy 와 표의 시각(data/cases/u)을 올린다 — 이알피 다른 기기가 다시 받고,
+        그 사건 편집 창을 열어 둔 사람에게는 이알피가 「다른 사람이 먼저 고쳤다」고 알린다 */
+const WK_BAD = /[.#$\[\]\/]/;
+function wkRegCaseHit(c, q){
+  const s = String(q||'').trim().toLowerCase();
+  if(!s) return true;
+  return [c.title, c.company, c.caseNo].join(' ').toLowerCase().indexOf(s) >= 0;
+}
+/* 고를 사건 목록 — 진행중(run)을 앞에, 최근 접수부터. 취소·지운 것은 wkAllCases 가 이미 뺀다 */
+function wkRegCases(erp, types){
+  return wkAllCases(erp).filter(r => r && r.id && !r._deleted && !WK_BAD.test(String(r.id)))
+    .map(r => Object.assign(wkCaseRow(r, types), { id: String(r.id), rec: r }))
+    .sort((a, b) => (a.stat === 'run' ? 0 : 1) - (b.stat === 'run' ? 0 : 1)
+      || String((b.rec.receiveDate||b.rec.createdAt||'')).localeCompare(String((a.rec.receiveDate||a.rec.createdAt||''))));
+}
+/* 새 사람 — 이알피 사건 편집기(CaseEditModal)와 «같은 꼴». 받지 않는 칸은 빈 글자로 둔다 */
+function wkNewWorker(f, now){
+  let r = '';
+  while(r.length < 6) r += Math.random().toString(36).slice(2);
+  const w = { id: 'w-' + (now || Date.now()).toString(36) + r.slice(0, 6),
+    name: String(f.name||'').trim(), pos: String(f.pos||'').trim(),
+    phone:'', rrn:'', addr:'', bank:'', account:'', holder:'' };
+  const hd = String(f.hireDate||'').trim();
+  if(hd) w.hireDate = hd;
+  return w;
+}
+/* ④ 거래 안의 셈 — 서버의 지금 목록 끝에 한 사람. 배열이 아니면 «안 쓴다»(undefined = 그만둠) */
+function wkAppendWorker(cur, w){
+  if(cur == null) return [w];
+  if(!Array.isArray(cur)) return undefined;
+  if(cur.some(x => x && x.id === w.id)) return cur;
+  return cur.concat([w]);
+}
+async function wkAddToCase(db, caseId, w, me){
+  if(!db) return { ok:false, msg:'서버에 아직 안 붙었습니다' };
+  if(!caseId || WK_BAD.test(caseId)) return { ok:false, msg:'사건 번호가 이상합니다 — 푸른이알피에서 넣어 주세요' };
+  if(!w || !w.name) return { ok:false, msg:'이름을 적어 주세요' };
+  const base = 'data/cases/v/' + caseId;
+  /* ① 있는 사건인가 */
+  const snap = await db.ref(base).once('value');
+  const rec = snap.val();
+  if(!rec || typeof rec !== 'object' || String(rec.id||'') !== caseId) return { ok:false, msg:'그 사건을 서버에서 찾지 못했습니다 — 지워졌을 수 있습니다' };
+  if(rec._deleted) return { ok:false, msg:'지운 사건입니다 — 다른 사건을 골라 주세요' };
+  if(rec.workers != null && !Array.isArray(rec.workers)) return { ok:false, msg:'이 사건의 근로자 목록이 옛 꼴입니다 — 푸른이알피 사건 창에서 넣어 주세요' };
+  /* ②③④ */
+  const tx = await db.ref(base + '/workers').transaction(cur => wkAppendWorker(cur, w));
+  if(!tx || !tx.committed) return { ok:false, msg:'근로자 목록이 옛 꼴이라 더하지 않았습니다 — 푸른이알피 사건 창에서 넣어 주세요' };
+  /* ⑤ */
+  const now = Date.now(), up = {};
+  up[base + '/id'] = caseId;
+  up[base + '/updatedAt'] = now;
+  if(me) up[base + '/updatedBy'] = me;
+  up['data/cases/u'] = now;
+  await db.ref().update(up);
+  return { ok:true, workers: tx.snapshot && tx.snapshot.val ? tx.snapshot.val() : null };
+}
+let _wkReg = null;   /* 열린 창의 상태 — { q, pick } */
+function openWkRegister(){
+  if(Store.mode !== 'firebase'){ toast('로그인한 뒤에 넣을 수 있습니다'); return; }
+  _wkReg = { q: '', pick: '' };
+  $('editorM').innerHTML = `<div class="mhead"><b>＋ 정보등록 — 근로자</b>
+      <button class="iconbtn" onclick="closeWkRegister()">✕</button></div>
+    <div class="fgrid">
+      <div class="field"><label>이름 *</label><input id="wr_name" placeholder="홍길동"></div>
+      <div class="field"><label>직책·부서</label><input id="wr_pos" placeholder="생산팀 / 사원"></div>
+      <div class="field"><label>입사일</label><input id="wr_hire" placeholder="2024.03.02"></div>
+      <div class="field"><label>사건 찾기 (사업장·사건 이름·사건번호)</label>
+        <input id="wr_q" placeholder="가나상사" oninput="_wkReg.q=this.value;wkRegPaint()"></div>
+      <div class="field" style="grid-column:1/3"><label>들어갈 이알피 사건 *</label><div id="wr_cases" class="wrcases">사건을 불러오는 중…</div></div>
+    </div>
+    <div class="cerp-note" style="margin-top:10px"><b>주민번호·주소·연락처·계좌는 여기서 받지 않습니다</b> — 이알피 사건 안에만 둡니다.
+      저장하면 고른 사건의 근로자 «맨 끝»에 이 사람이 더해지고, 나머지 칸은 푸른이알피 사건 창에서 채웁니다.</div>
+    <div class="mfoot"><button class="btn ghost" onclick="closeWkRegister()">취소</button>
+      <button class="btn primary" id="wr_save" onclick="wkRegSave()">💾 사건에 더하기</button></div>`;
+  editing = null;
+  $('editorBg').classList.add('open');
+  setTimeout(() => { try{ $('wr_name').focus(); }catch(_){} }, 50);
+  loadErpCaseCons(() => wkRegPaint());
+}
+function closeWkRegister(){ _wkReg = null; $('editorBg').classList.remove('open'); }
+function wkRegPaint(){
+  const box = $('wr_cases'); if(!box || !_wkReg) return;
+  if(!_erpCaseCons){ box.innerHTML = '<span class="dim">이알피 사건을 읽지 못했습니다 — 잠시 뒤 다시 열어 주세요</span>'; return; }
+  const all = wkRegCases(_erpCaseCons, _erpHistTypes).filter(c => wkRegCaseHit(c, _wkReg.q));
+  const show = all.slice(0, 30);
+  box.innerHTML = show.length ? show.map(c => `<label class="wrcase${_wkReg.pick===c.id?' on':''}" title="${esc([c.title, c.company, c.caseNo].filter(Boolean).join(' · '))}">
+      <input type="radio" name="wr_case" value="${esc(c.id)}" ${_wkReg.pick===c.id?'checked':''} onchange="_wkReg.pick=this.value">
+      <b>${esc(c.company || '(사업장 없음)')}</b><span>${esc(c.title)}</span><em>${esc([ERP_HIST_STAT_LABEL[c.stat] || '', c.caseNo, '근로자 ' + c.n].filter(Boolean).join(' · '))}</em></label>`).join('')
+    + (all.length > show.length ? `<div class="dim">… ${(all.length - show.length).toLocaleString()}건 더 — 위 칸에 사업장이나 사건번호를 더 적어 좁혀 주세요</div>` : '')
+    : '<span class="dim">맞는 사건이 없습니다 — 새 사건은 푸른이알피에서 먼저 만들어 주세요</span>';
+}
+async function wkRegSave(){
+  if(!_wkReg) return;
+  const f = { name: $('wr_name').value, pos: $('wr_pos').value, hireDate: $('wr_hire').value };
+  if(!String(f.name).trim()) return toast('이름을 적어 주세요');
+  const pick = _wkReg.pick;
+  if(!pick) return toast('들어갈 사건을 골라 주세요');
+  const c = wkRegCases(_erpCaseCons, _erpHistTypes).filter(x => x.id === pick)[0];
+  /* 같은 이름이 이미 그 사건에 있으면 한 번 묻는다 — 두 번 누른 것일 수 있다 */
+  const same = c && wkCaseWorkers(c.rec).some(x => _norm(x.name) === _norm(f.name));
+  if(same && !confirm('「' + f.name.trim() + '」 님이 이 사건에 이미 있습니다.\n\n그래도 한 사람 더 넣을까요?')) return;
+  let me = '';
+  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); me = (w && w.name) || ''; }catch(_){}
+  const btn = $('wr_save'); if(btn) btn.disabled = true;
+  const w = wkNewWorker(f);
+  let r;
+  try{ r = await wkAddToCase(firebase.database(), pick, w, me); }
+  catch(e){ r = { ok:false, msg:'서버가 받지 않았습니다 — ' + ((e && e.message) || e) }; }
+  if(btn) btn.disabled = false;
+  if(!r.ok){ toast(r.msg, 7000); return; }
+  /* 화면 사본에도 같은 것을 — 다음 읽기를 기다리지 않고 근로자 목록에 바로 나온다 */
+  if(c && c.rec){ c.rec.workers = Array.isArray(r.workers) ? r.workers : (wkCaseWorkers(c.rec).concat([w])); }
+  wkListBust();
+  closeWkRegister();
+  toast('「' + w.name + '」 님을 ' + ((c && c.company) || '그 사건') + ' 사건에 더했습니다 — 나머지 칸은 푸른이알피 사건 창에서', 6000);
+  renderWkSoon();
 }
 
 /* ── 사람 목록을 «조립»한다 ──
