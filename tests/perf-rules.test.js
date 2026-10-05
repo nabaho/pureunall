@@ -70,6 +70,9 @@ const baseTop = ['uid_roles','sid_roles','data','payroll_os','fund_erp','work_er
    ★ 최상위를 일부러 늘렸다면 여기에 적어라. 적지 않으면 아래 검사가 막는다
      (실수로 늘어난 것을 잡는 덫이라 자동으로 넘기지 않는다) */
 const allowTop = ['gov' /* 정부사업신청 대표 개인 자리 — 2026-10-03 */,'gov_watch' /* 컨설턴트 모집 감시(서버) — 관리자만 읽기 2026-10-04 */,'systemAlerts','systemBackups','systemBackupsIndex','systemRestoreLog',
+  /* 2026-10-05 홈택스 세금계산서 아카이브 — PC 마다 IndexedDB 에만 있던 것을 모든 PC 가 같게(대표 지시
+     「데이터가 분리되지 않게」). 재무 권한자만. data 밑이면 부팅 때 수만 건을 통째로 받아서 뿌리에 둔다. */
+  'invoice_arc',
   /* 2026-09-27 푸른 캘린더 «나만 보기» 일정 — 본인만 읽고 쓴다(data 아래는 재무 권한자가 다 읽어서 안 된다) */
   'cal_private',
   /* 2026-09-06 정부컨설팅 「이어는 두되 일정관리에서 진행할지는 따로」 스위치(대표 지시).

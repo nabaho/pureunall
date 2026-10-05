@@ -42,6 +42,8 @@ function list(name) {
 
 /* 기다리기 */
 const tick = () => new Promise((r) => setTimeout(r, 0));
+/* 상자 안의 console 은 조용히 — 검사 실행기는 표준 출력을 보고 통로로 쓴다(뒤늦은 출력이 통로를 깬다) */
+const quiet = { log() {}, warn() {}, info() {}, error() {} };
 async function settle() { for (let i = 0; i < 20; i++) await tick(); }
 
 /* ══════ ⓐ ⓑ 그림 ══════ */
@@ -49,7 +51,7 @@ function imgBox(opts) {
   const idb = Object.assign({}, opts.idb || {});
   const calls = { put: 0, del: [], uploaded: [], fetched: 0 };
   const ctx = {
-    Promise, Date, Math, String, Object, Error, JSON, console,
+    Promise, Date, Math, String, Object, Error, JSON, console: quiet,
     localStorage: { removeItem() {}, setItem() {}, getItem() { return null; } },
     idbBulkPut(store, recs) { recs.forEach((r) => { idb[r.id] = Object.assign({}, r); }); calls.put++; return Promise.resolve(recs.length); },
     idbDelete(store, id) { calls.del.push(id); delete idb[id]; return Promise.resolve(); },
@@ -165,7 +167,7 @@ function memoBox(state) {
   const calls = { dbSet: 0 };
   let n = 0;
   const ctx = {
-    JSON, Object, Array, String, Date, console, window: {},
+    JSON, Object, Array, String, Date, console: quiet, window: {},
     KEY: 'pureun_v6_', _fbSynced: state.synced !== false,
     localStorage: {
       get length() { return Object.keys(ls).length; },
@@ -267,7 +269,7 @@ test('ⓓ★ 업체별 집계는 올리지 않고 «줄로부터 다시 센다»
 /* ══════ ⓔ 못 보낸 변경 ══════ */
 function pendBox(store, who) {
   const ctx = {
-    JSON, Object, Array, String, Date, console,
+    JSON, Object, Array, String, Date, console: quiet,
     window: {},
     DIFF_KEYS: ['cases', 'case_memos'],
     FB_PEND_LS: 'pu_erp_fb_pending_v1',
