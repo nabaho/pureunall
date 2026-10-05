@@ -51,8 +51,9 @@ const DIR = { v: [{ sid: 'A-003', name: '나사람' }, { sid: 'A-004', name: '�
 /* 급여관리 쪽 — 이름표로 번호를 잇는다 */
 const RECS = {
   '다온원_급여자료': [
-    { 월: '8월', 파일: '2026년 8월 급여대장_다온원.xlsx', 신호: 'green' },
-    { 월: '9월', 파일: '2026년 9월 급여대장_다온원.xlsx', 신호: 'orange' },
+    { id: 'r1', 월: '8월', 파일: '2026년 8월 급여대장_다온원.xlsx', 신호: 'green', 직원수: 2 },
+    { id: 'r1b', 월: '8월', 파일: '2026년 8월 일용직 급여대장_다온원.xlsx', 신호: 'green', 직원수: 2 },
+    { id: 'r2', 월: '9월', 파일: '2026년 9월 급여대장_다온원.xlsx', 신호: 'orange', 직원수: 2 },
   ],
   '두레가축약품': [{ 월: '8월', 파일: '2026년 8월 급여대장_두레가축약품.xlsx', 신호: 'green' }],
   '가온기술': [{ 월: '1월', 파일: '2025년 1월 급여대장_가온기술.xlsx', 신호: 'green' }],
@@ -95,13 +96,18 @@ function load(o) {
     /* 원래 화면 — 불렸는지, 어느 사업장으로 불렸는지 적는다 */
     ['screenPayroll', 'screenAttend', 'screenLeave', 'screenSever', 'screenSlip', 'screenReport'].map(n =>
       'function ' + n + '(){ CALLS.push(["' + n + '", App.site]); return "<!--' + n + ':" + App.site + "-->"; }').join('\n'),
-    터진다('siteEmployees'), 터진다('ensureEmps'),
+    터진다('siteEmployees'),
+    'var EMPS = ' + JSON.stringify(o.emps || {}) + '; var EMP_CALLS = [];',
+    'function empsOf(r){ return EMPS[r.id] || null; }',
+    'function ensureEmps(r){ EMP_CALLS.push(r.id); }',
+    'function won(n){ return (n==null)?"-":Number(n).toLocaleString(); }',
+    cutVar('DED_KEYS_'), cut('dedupeEmps'), cut('empScore'), cut('slipRows'),
     cut('monthNum'), cut('guessMonth'), cut('ymOf'), cut('hubCounts'), cut('nameState'), cut('linkStats'), cut('staffOf'),
     cutVar('TABS'), cutVar('TOOLS'), cutVar('TAB_FN'),
     ['ymNow', 'ymParts', 'ymText', 'inboxYm', 'coArrivals', 'coState', 'sitesHaveSever', 'byKoName', 'shellModel', 'curView',
-      'viewbarHtml', 'toolRow', 'colistHtml', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
+      'viewbarHtml', 'toolRow', 'colistHtml', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'monthRecsFor', 'coMoney', 'manwon', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
     'globalThis.M = function(){ return shellModel(); };',
-    'globalThis.peek = function(){ return { App: App, CALLS: CALLS }; };',
+    'globalThis.peek = function(){ return { App: App, CALLS: CALLS, EMP_CALLS: EMP_CALLS }; };',
   ].join('\n')).runInContext(sandbox);
   return sandbox;
 }
@@ -185,6 +191,7 @@ test('찾기는 목록만 거른다', () => {
 test('★ 세 칸을 다 그리는 동안 직원 표를 받지 않는다', () => {
   const s = load({ App: { coId: 'c1', tab: 'sum' } });
   assert.doesNotThrow(() => { const m = s.M(); s.viewbarHtml(m); s.colistHtml(m); s.shellMainHtml(m); });
+  assert.equal(s.peek().EMP_CALLS.length, 0, '목록·본문을 그리다 직원 표를 받았습니다');
 });
 
 test('이름순은 법인 표기를 빼고 — ㈜가 붙은 곳이 맨 위로 몰리지 않는다', () => {
@@ -238,4 +245,57 @@ test('고른 회사가 없거나 도구 화면이면 맨 위 줄은 비어 있�
   assert.equal(s.coBarHtml(s.M()), '');
   const t = load({ App: { screen: 'cards', coId: 'c1' } });
   assert.equal(t.coBarHtml(t.M()), '');
+});
+
+/* ══════ 윗줄 금액 지표 — 대표 지시 2026-10-05 「직원 수·이번 달 총 지급액」 ══════ */
+const EMPS = {
+  /* 상용 대장 둘 + 일용 대장 — 「갑」은 두 대장에 다 있다(이름으로 한 사람) */
+  r1: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000, 기본급: 2000000 },
+       { 성명: '을', 실수령: 2700000, 공제총액: 300000, 기본급: 2800000 }],   // 을: 비과세 20만 → 임금총액 300만(실수령+공제)
+  r1b: [{ 성명: '병', 일당: 100000, 근무일수: 5, 실수령: 495500, 공제총액: 4500 },
+        { 성명: '갑', 실수령: 1800000, 공제총액: 200000, 기본급: 2000000 }],
+  r2: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000 }],
+};
+
+test('★★ 직원 수·지급·실수령 — 명세서와 같은 셈(임금총액 = 실수령 + 공제), 한 사람은 한 번', () => {
+  const s = load({ App: { coId: 'c1' }, emps: EMPS });
+  const b = s.coBarHtml(s.M());
+  assert.match(b, /직원 3명/, '두 대장에 다 있는 사람을 두 번 셌습니다');
+  /* 갑 200만 + 을 300만(기본급 280만이 아니라 실수령+공제) + 병 50만 = 550만 */
+  assert.match(b, /지급 550만원/);
+  assert.match(b, /실수령 500만원/);
+  assert.match(b, /지급총액 5,500,000원 · 공제 504,500원 · 실수령 4,995,500원/, '정확한 값이 알약 설명에 없습니다');
+});
+
+test('★ 직원 표는 «고른 회사·그 달»만 받는다 — 받는 동안은 그렇다고 보인다', () => {
+  const s = load({ App: { coId: 'c1' } });          // 직원 표 아직 없음
+  const b = s.coBarHtml(s.M());
+  assert.match(b, /지급 불러오는 중/);
+  assert.match(b, /직원 약 4명/, '받기 전에는 목록의 직원수로 어림한다');
+  assert.deepEqual(Array.from(s.peek().EMP_CALLS).sort(), ['r1', 'r1b'], '그 달(8월) 기록만 받아야 합니다');
+});
+
+test('★ 기준 달에 기록이 없으면 앞의 가장 가까운 달로 — 그 달이라고 밝힌다', () => {
+  const s = load({ App: { coId: 'c1', ym: '2026-12' }, emps: EMPS });
+  const b = s.coBarHtml(s.M());
+  assert.match(b, /2026년 9월 기준/);
+  assert.match(b, /직원 1명/);
+  const f = load({ App: { coId: 'c1', ym: '2026-07' }, emps: EMPS });   // 그보다 앞에는 기록이 없다
+  assert.equal(f.coBarHtml(f.M()).indexOf('직원 '), -1, '없는 달을 지어내면 안 됩니다');
+});
+
+test('금액을 못 읽은 직원이 있으면 「?」로 표시하고 그 수를 알려 준다', () => {
+  const s = load({ App: { coId: 'c1' }, emps: { r1: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000 }, { 성명: '정' }], r1b: [] } });
+  const b = s.coBarHtml(s.M());
+  assert.match(b, /지급 200만원 \?/);
+  assert.match(b, /금액을 못 읽은 1명은 빠짐/);
+});
+
+test('대장에 원 미만 값이 섞이면 원 단위로 반올림해 보이고 그렇다고 밝힌다', () => {
+  const s = load({ App: { coId: 'c1' }, emps: { r1: [{ 성명: '갑', 실수령: 436897.14285714284, 공제총액: 63102.857142857145 }], r1b: [] } });
+  const b = s.coBarHtml(s.M());
+  assert.match(b, /지급총액 500,000원/);
+  assert.match(b, /원 미만 값이 있어/);
+  const ok = load({ App: { coId: 'c1' }, emps: EMPS });
+  assert.equal(ok.coBarHtml(ok.M()).indexOf('원 미만'), -1, '깨끗한 자료에 경고를 붙였습니다');
 });
