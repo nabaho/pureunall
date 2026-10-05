@@ -414,3 +414,17 @@ test('★★ 사람을 «새로 저장하지» 않는다 — 조립해서 보여
   assert.match(load2, /workerInfo/, '읽는 자리가 없습니다');
   assert.doesNotMatch(load2, /\.update\(|\.set\(/, '★ 읽기만 해야 하는 자리에서 씁니다');
 });
+
+/* ── 걸린 사건 칸 «열 정리» (대표 지시 2026-10-05 「열정리 해라」) ──
+   상태 딱지가 이름 «끝»에 붙어 줄마다 딱지 자리가 들쭉날쭉했다. 이제 맨 앞에 같은 너비로 선다. */
+test('★★ 걸린 사건 칸은 상태 딱지가 «맨 앞»이다 — 줄마다 같은 자리에 선다', () => {
+  const c = load();
+  const h = c.wkCasesSummary({ cases: [{ title: '임금체불 진정', stat: 'run' }, { title: '산재', stat: 'wait' }] });
+  assert.match(h, /^<span class="wkchip wkst"[^>]*>진행중<\/span>임금체불 진정/, '★★ 딱지가 이름 앞에 안 섰다');
+});
+
+test('★ 상태가 없어도 딱지 «자리»는 남는다 — 안 그러면 그 줄만 이름이 왼쪽으로 붙는다', () => {
+  const c = load();
+  const h = c.wkCasesSummary({ cases: [{ title: '임금체불 진정' }] });
+  assert.match(h, /^<span class="wkchip wkst wkst0">/, '★ 빈 자리가 없다');
+});
