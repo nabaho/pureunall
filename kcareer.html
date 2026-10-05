@@ -1327,7 +1327,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=37"></script>
+<script src="js/kcareer-hwpxfill.js?v=38"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
@@ -17316,8 +17316,13 @@ function _cvFillData(){
     .slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); });
   const 어학목록=_자격.filter(_isLangCert)
     .map(function(r){ return { certName:r.title||'', grade:r.grade||'', gotAt:formatDate(r.date)||'' }; });
-  const 자격목록=_자격.filter(function(r){ return !_isLangCert(r); })
-    .map(function(r){ return { certName:r.title||'', gotAt:formatDate(r.date)||'' }; });
+  /* ★ 자격 표 (2026-10-05 대표 제보) — 줄이 셋뿐인 서식에서 최신순이면 2010년 «공인노무사»가 잘렸다.
+     국가자격·면허를 맨 앞에, 그 다음 최신순. 기관(인가·발급기관) 칸도 채운다.
+     ⚠ 「과정·양성·교육」은 수료다 — 제목에 「수료」가 없어도 자격 표에 넣지 않는다. */
+  const _국가=function(r){ return /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|산업기사|기능사|지도사/.test(r.title||'') || /고용노동부|한국산업인력공단/.test(r.org||''); };
+  const 자격목록=_자격.filter(function(r){ return !_isLangCert(r) && !/과정|양성|교육/.test(r.title||''); })
+    .sort(function(a,b){ return (_국가(b)?1:0)-(_국가(a)?1:0); })
+    .map(function(r){ return { certName:r.title||'', gotAt:formatDate(r.date)||'', org:r.org||'' }; });
   const 상벌목록=get('wiccok').filter(function(r){ return typeof isAwardType==='function' && isAwardType(r.type); })
     .slice().sort(function(a,b){ return String(b.issueDate||'').localeCompare(String(a.issueDate||'')); })
     .map(function(r){ return { awardWhat:r.titleVal||r.type||'', awardOrg:r.org||'' }; });
@@ -17325,8 +17330,9 @@ function _cvFillData(){
   for(var ci=0; ci<Math.max(자격목록.length, 상벌목록.length); ci++){
     certaward.push(Object.assign({}, 자격목록[ci]||{}, 상벌목록[ci]||{}));
   }
+  /* ⚠ 직위 칸에 「위촉장」 같은 «종류 이름»을 붙이지 않는다(2026-10-05 「위촉장 임원추천위원회 위원」) */
   const wic=get('wiccok').map(function(r){ return { period:r.period||r.issueDate||r.year||'',
-    org:r.org||'', role:(r.type||'')+(r.titleVal?' '+r.titleVal:'') }; });
+    org:r.org||'', role:r.titleVal||r.type||'' }; });
   const acts=[].concat(
     get('consult').map(function(r){ return { period:r.date||r.period||r.year||'', org:r.org||r.client||'', role:'[컨설팅] '+(r.title||r.content||'') }; }),
     get('case').map(function(r){ return { period:r.date||r.period||r.year||'', org:r.org||'', role:'[사건] '+(r.title||r.content||'') }; }),

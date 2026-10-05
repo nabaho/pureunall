@@ -124,8 +124,9 @@ test('★★ 자격 표에는 «자격증만» 간다 — 수료증은 자격이
   assert.equal(자격들.indexOf('중대재해처벌법 실무과정 수료증'), -1,
     '자격 표에 수료증이 섞였습니다: ' + JSON.stringify(자격들));
   assert.equal(자격들.length, 2, '자격증 두 건이어야 합니다: ' + JSON.stringify(자격들));
-  /* 최근 것부터 — 이력서는 최근 자격을 위에 적는다 */
-  assert.equal(자격들[0], '직업상담사 2급', '취득일 최근 순이 아닙니다: ' + JSON.stringify(자격들));
+  /* ★ 본업 자격(국가 전문자격)이 먼저, 그 다음 최근 순 (대표 제보 2026-10-05).
+     자격 칸이 셋뿐인 이력서에서 «최근 순»으로만 세우면 2010년 공인노무사가 잘려 나갔다. */
+  assert.equal(자격들[0], '공인노무사', '★ 공인노무사가 맨 앞이 아닙니다 — 줄이 모자라면 잘립니다: ' + JSON.stringify(자격들));
   /* 상벌은 표창·포상만 — 위촉장이 섞이면 안 된다 */
   assert.equal(d.certaward[0].awardWhat, '장관 표창', '상벌이 안 들어갔습니다');
   const 상벌들 = Array.prototype.map.call(d.certaward, (r) => r.awardWhat).filter(Boolean);
