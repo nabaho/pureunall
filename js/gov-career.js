@@ -32,7 +32,8 @@
 
   /* ── 어느 창고를 읽나 ── (경력관리 localStorage 열쇠 = 클라우드 ls 의 칸 이름) */
   var STORES = ['edu', 'cert', 'wiccok', 'advisory', 'work',
-                'consult', 'case', 'fund', 'etc', 'lecture'];
+                'consult', 'case', 'fund', 'etc', 'lecture',
+                'resume', 'profile', 'certdoc'];   /* 서류 보관함 — «이름·날짜만» 쓴다(2026-10-05 필요서류 견주기) */
 
   function paths(uid) {
     return STORES.map(function (s) { return { store: s, path: 'kcareer/' + uid + '/ls/' + s }; });
@@ -178,6 +179,25 @@
     return o;
   }
 
+  /* ── 서류 보관함 → 서류 종류 (필요서류 견주기, 2026-10-05) ──
+     ⚠ build(신청 재료) 에 섞지 않는다 — 섞으면 신청 재료 건수가 바뀐다. 이름·해·제출처만 돌린다(파일 알맹이는 없다).
+     종류 열쇠는 js/gov-submit.js KINDS 와 같다: resume(이력서·프로필) · career(경력증명) · perf(실적 증명) */
+  function docbox(ls) {
+    ls = ls || {};
+    /* ⚠ 배열은 map·concat 으로만 만든다 — 이 모듈엔 «쓰기처럼 보이는» 글자를 두지 않는다(검사가 막는다) */
+    var a = parseStore(ls.resume).map(function (r) {
+      return { kind: 'resume', name: s(r.genName || r.origName || r.kind || '이력서'), year: s(r.year), org: s(r.org), from: '이력서 보관함' };
+    });
+    var b = parseStore(ls.profile).map(function (r) {
+      return { kind: 'resume', name: s(r.genName || r.origName || r.kind || '프로필'), year: s(r.year), org: s(r.org), from: '프로필 보관함' };
+    });
+    var c = parseStore(ls.certdoc).map(function (r) {
+      return { kind: r.certKind === 'ext' ? 'perf' : 'career', name: s(r.genName || r.origName || r.fname || r.kind || r.title || '증명서'),
+        year: s(r.year) || yearOf(r.date), org: s(r.issuer || r.org), from: '경력증명서 보관함' };
+    });
+    return a.concat(b, c).filter(function (x) { return !!x.name; });
+  }
+
   /* ── 붙여넣기용 문장 ──
      ⚠ 없는 것을 지어내지 않는다. 비면 «빈 글자»를 돌리고, 부르는 쪽이 「없습니다」라 쓴다. */
   function line(parts) { return parts.filter(Boolean).join(' '); }
@@ -242,7 +262,7 @@
     try { return A.maskRows(rows || []); } catch (e) { return []; }
   }
 
-  var api = { STORES: STORES, paths: paths, parseStore: parseStore,
+  var api = { STORES: STORES, paths: paths, parseStore: parseStore, docbox: docbox,
               isAward: isAward, isComplete: isComplete, ymd: ymd, splitPeriod: splitPeriod,
               build: build, counts: counts, sentence: sentence,
               advisorySentence: advisorySentence, advisoryForExport: advisoryForExport };

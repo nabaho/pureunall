@@ -47,7 +47,7 @@ function runApp(seed, opt) {
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
-    + 'matchOpen,matchMark,matchSel,matchBulk,'
+    + 'matchOpen,matchMark,matchSel,matchBulk,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
     + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
@@ -833,8 +833,8 @@ test('★★ 열 맞춤 — 새 모집 글·메일 표는 칸 너비를 못박�
   r.api.setFb(fbWith(MIX), 'U1');
   await r.api.recWatchPull();
   const kc = r.el('recWatchKc').innerHTML;
-  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:150px"><col style="width:168px"><\/colgroup>/);
-  assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th[^>]*>이력<\/th><th>기간<\/th>/);
+  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:86px"><col style="width:150px"><col style="width:168px"><\/colgroup>/);
+  assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th[^>]*>이력<\/th><th[^>]*>서류<\/th><th>기간<\/th>/);
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /\.rec-fixed\{table-layout:fixed;width:100%\}/);
   assert.match(src, /var mtable=function/, '메일 묶음도 같은 열 표');
@@ -1057,4 +1057,77 @@ test('★★ 공고 모아보기 표에도 「이력」 칸', async () => {
   const { r } = await openMatch({ feed });
   r.api.draw();
   assert.match(r.el('tb').innerHTML, /matchOpen\('f\|N1'\)"><span class="same">🟢 동일 1/);
+});
+
+/* ═══ 📄 필요서류 ↔ 갖고 있는 서류 (대표 지시 2026-10-05) ═══ */
+const DSCAN = [
+  { y: '2025', yd: '2025년', name: '2025 지방공기업평가원 자문위원 응모', dir: true, t: T(2025, 1), files: ['지원서_권형하.hwp', '이력서.hwp', '개인정보동의서.pdf'] },
+  { y: '2024', yd: '2024년', name: '2024 경영평가위원모집', dir: true, t: T(2024, 12), files: ['경력증명서_푸른.pdf', '직무수행계획서.hwp'] }
+];
+const DW = { last: { at: 'x', checked: 19, errors: [] }, hits: {
+  e1: { key: 'e1', board: 'erc', org: 'erc', boardName: '지방공기업평가원 공지', title: '지방공기업평가원 위촉직이사 모집 재공고', date: '2026-07-08', docs: ['consent', 'apply', 'resume', 'plan', 'license'] },
+  e2: { key: 'e2', board: 'cepa', org: 'cepa', boardName: '충남경제진흥원 공지', title: '컨설턴트 추가 모집 공고', date: '2026-06-22', docsNone: true },
+  e3: { key: 'e3', board: 'semas', org: 'semas', boardName: '소진공 공지', title: '비상임이사 모집공고', date: '2026-09-09' } } };
+async function openDocs(seed) {
+  const r = runApp(Object.assign({ recruit_scan: DSCAN }, seed || {}), { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.setFb(fbWith(DW), 'U1'); await r.api.recWatchPull();
+  r.api.recSub('pub');
+  return r;
+}
+test('★★★ 「서류」 칸 — 갖고 있는 것/필요한 것 · 본문에 없음 · 아직 안 읽음', async () => {
+  const r = await openDocs();
+  const w = r.el('recWatch').innerHTML;
+  assert.match(rowOf(w, '위촉직이사'), /onclick="event\.stopPropagation\(\);docsOpen\('e1'\)">📄 <span class="sim">4\/5<\/span><\/button>/);
+  assert.match(rowOf(w, '컨설턴트 추가 모집'), /본문에 없음/);
+  assert.match(rowOf(w, '비상임이사'), /<td><span class="sml" title="서버가 아직 본문을 읽지 않았습니다[^"]*">…<\/span><\/td>/);
+});
+test('★★★ 판정 — 이 기관에 낸 것 ✅동일, 다른 곳에 낸 것 🟡유사, 없으면 ❌', async () => {
+  const r = await openDocs();
+  const j = Object.fromEntries(r.api.docsJudge(r.api.recWatchHits().find((x) => x.key === 'e1')).map((d) => [d.k, d.level]));
+  assert.deepEqual(j, { consent: 'same', apply: 'same', resume: 'same', plan: 'similar', license: 'none' });
+  r.api.docsOpen('e1');
+  const b = r.el('popBody').innerHTML;
+  assert.match(b, /<td class="rn">1<\/td><td><b>개인 정보 동의서|<td class="rn">1<\/td><td><b>개인정보 동의서/);
+  assert.match(b, /✅ 동일[\s\S]*이 기관에 낸 것: <br>2025 지원서_권형하\.hwp/);
+  assert.match(b, /🟡 유사[\s\S]*\[공공기관 경영평가\(알리오\)\] 직무수행계획서\.hwp/);
+  assert.match(b, /❌ 없음<\/span><\/td><td class="sml" style="white-space:normal">새로 만들어야 합니다/);
+});
+test('★★ 경력관리 보관함 이력서도 «유사»로 센다', async () => {
+  const r = await openDocs({ recruit_scan: [] });
+  r.api.setMatDocs([{ kind: 'resume', name: '2026_이력서.hwpx', year: '2026', org: '', from: '이력서 보관함' }]);
+  const j = r.api.docsJudge(r.api.recWatchHits().find((x) => x.key === 'e1'));
+  const res = j.find((d) => d.k === 'resume');
+  assert.equal(res.level, 'similar'); assert.equal(res.ev[0].org, '이력서 보관함');
+});
+test('★★ 서류 폴더를 «파일까지» 안 읽었으면 다시 읽으라고 알린다', async () => {
+  const r = await openDocs({ recruit_scan: SCAN });
+  r.api.docsOpen('e1');
+  assert.match(r.el('popBody').innerHTML, /폴더 안 파일까지» 읽은 적이 없습니다/);
+});
+test('★★★ 요구 서류로 넘기기 — 서류 준비 창이 공고 본문의 목록으로 채워지고, 사람이 고른 것이 먼저', async () => {
+  const r = await openDocs();
+  assert.deepEqual([...r.api.recNeedOf('erc')], ['consent', 'apply', 'resume', 'plan', 'license'], '고른 것이 없으면 공고 본문에서 읽은 것');
+  r.api.recPrep('erc');
+  assert.match(r.el('popBody').innerHTML, /공고 본문에서 읽은 것으로 채웠습니다/);
+  r.api.docsSel('e1', 'apply', true); r.api.docsSel('e1', 'resume', true);
+  r.api.docsToNeed('e1', true);
+  assert.deepEqual([...r.api.recObj('recruit_need').erc], ['apply', 'resume']);
+  assert.deepEqual([...r.api.recNeedOf('erc')], ['apply', 'resume'], '사람이 정한 것이 먼저');
+  r.api.docsToNeed('e1', false);
+  assert.equal(r.api.recObj('recruit_need').erc.length, 5);
+});
+test('★ 서류 폴더 읽기 — 폴더 안 «파일 이름»만 모은다(80개까지)', async () => {
+  const r = runApp({});
+  const files = Array.from({ length: 90 }, (_, i) => ({ kind: 'file', name: 'f' + i + '.hwp', getFile: async () => ({ lastModified: 1000 + i }) }));
+  const dir = { values: async function* () { yield { kind: 'directory', name: 'sub' }; for (const f of files) yield f; } };
+  const info = await r.api.recDirInfo(dir);
+  assert.equal(info.files.length, 80); assert.equal(info.files[0], 'f0.hwp'); assert.equal(info.t, 1000);
+});
+
+test('★ 첨부 서식에서 읽은 목록은 그렇다고 밝힌다', async () => {
+  const w = JSON.parse(JSON.stringify(DW)); w.hits.e1.docsFrom = 'attach';
+  const r = runApp({ recruit_scan: DSCAN }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.setFb(fbWith(w), 'U1'); await r.api.recWatchPull();
+  r.api.docsOpen('e1');
+  assert.match(r.el('popBody').innerHTML, /첨부 서식 이름에서 읽은 5가지/);
 });

@@ -487,7 +487,8 @@ test('★★ 이미 있던 글도 하루 몇 건씩 기간을 채운다 — 이�
   const k = W.keyOf('tst', { title: '옛 글', date: '2026-09-01' });
   const have = {
     [k]: { board: 'tst', title: '옛 글', date: '2026-09-01', href: 'https://t.kr/v?9' },
-    x1: { board: 'tst', title: '본 글', date: '2026-09-01', href: 'https://t.kr/v?8', per: { none: true } },
+    x1: { board: 'tst', title: '본 글', date: '2026-09-01', href: 'https://t.kr/v?8', per: { none: true }, docsNone: true },
+    x3: { board: 'tst', title: '기간만 본 글', date: '2026-09-01', href: 'https://t.kr/v?7', per: { to: '2026-09-20' } },
     x2: { board: 'tst', title: '목록뿐', date: '2026-09-01', href: B1.url }
   };
   const opened = [];
@@ -495,6 +496,7 @@ test('★★ 이미 있던 글도 하루 몇 건씩 기간을 채운다 — 이�
     fetchText: async (u) => { opened.push(u); return u === B1.url ? '<table></table>' : BODY1; } });
   assert.deepEqual(r.pers[k], { from: '2026-10-02', to: '2026-10-16', rolling: false });
   assert.ok(!opened.includes('https://t.kr/v?8'), '이미 본 글을 또 열었다');
+  assert.ok(opened.includes('https://t.kr/v?7'), '기간만 보고 서류는 안 본 글은 다시 연다(2026-10-05 필요서류)');
   assert.ok(!opened.includes(B1.url + '#') && r.pers.x2 === undefined, '목록 주소는 본문이 아니다');
   const u = W.updatesOf(r, have, 'T');
   assert.deepEqual(u['hits/' + k + '/per'], r.pers[k]);
@@ -536,4 +538,54 @@ test('★ 본문 읽기도 전체 마감 안에서만 — 시간이 없으면 �
 test('★ 서버는 본문 읽기를 켠다', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8');
   assert.match(src, /RecruitWatch\.run\(\{ existing, today, nowIso, fetchText, details: true \}\)/);
+});
+
+/* ── 필요서류 읽기 (대표 지시 2026-10-05 「필요서류 ↔ 갖고 있는 서류」) ── */
+const ERC_BODY = '1부 □ 제출서류 ○ 지원서 1부, 이력서(사진 부착) 1부, 자기소개서 및 직무수행계획서 1부, 개인정보제공 동의서 1부 □ 제출기간 및 방법 ○ 제출기간 : 2026. 7. 8.(수) ~ 2026. 7. 20.(월)';
+test('★★★ 본문 「제출서류」 단락에서 서류 종류를 뽑는다 — 지방공기업평가원 실제 문구', () => {
+  assert.deepEqual(W.docsOf(ERC_BODY), ['consent', 'apply', 'resume', 'plan']);
+  assert.deepEqual(W.docsOf('구비서류: 이력서, 경력증명서, 자격증 사본, 실적증명서 각 1부 ※ 문의: 042-000-0000'), ['career', 'resume', 'license', 'perf']);
+});
+test('★★ 단락 밖은 안 본다 — 뒤의 개인정보 안내·다른 단락을 «동의서»로 읽지 않는다', () => {
+  const t = '제출서류 : 지원서, 이력서 □ 접수방법 : 이메일 … 개인정보 수집·이용에 동의하지 않으면 … 사업자등록증 사본은 선정 후 제출';
+  assert.deepEqual(W.docsOf(t), ['apply', 'resume']);
+});
+test('★★ 단락이 없으면 null, 단락은 있는데 아는 서류가 없으면 []', () => {
+  assert.equal(W.docsOf('외부 조사자를 선임하고자 합니다. 이메일로 접수'), null);
+  assert.deepEqual(W.docsOf('제출서류 접수방법 이메일 접수 접수마감일 채용시 마감'), []);
+});
+test('★★ 서버와 화면의 서류 종류 낱말은 «같다» — 내기 전 점검과 같은 말로 견준다', () => {
+  const S = require('../js/gov-submit.js');
+  assert.deepEqual(W.DOC_KINDS.map((d) => d.k), S.KINDS.map((d) => d.k));
+  W.DOC_KINDS.forEach((d, i) => assert.equal(String(d.re), String(S.KINDS[i].re), d.k));
+});
+test('★★★ 새 글은 본문을 열어 docs 를, 못 찾으면 docsNone 을 붙인다', async () => {
+  const L = '<table><tr><td><a href="/v?1">외부 컨설턴트 모집 공고</a></td><td>2026-10-01</td></tr><tr><td><a href="/v?2">강사 모집 공고</a></td><td>2026-10-01</td></tr></table>';
+  const r = await W.run({ boards: [B1], today: '2026-10-05', details: true,
+    fetchText: async (u) => (u === B1.url ? L : /v\?1/.test(u) ? ERC_BODY : '<p>안내</p>') });
+  const by = Object.fromEntries(r.hits.map((h) => [h.title, h]));
+  assert.deepEqual(by['외부 컨설턴트 모집 공고'].docs, ['consent', 'apply', 'resume', 'plan']);
+  assert.equal(by['강사 모집 공고'].docsNone, true); assert.equal(by['강사 모집 공고'].docs, undefined);
+});
+test('★★ 옛 글에 붙인 서류는 hits/키/docs(또는 docsNone) 로 쓴다 — 빈 배열은 쓰지 않는다', () => {
+  const have = { a: { date: '2026-09-01' }, b: { date: '2026-09-01' } };
+  const u = W.updatesOf({ hits: [], errors: [], counts: {}, checked: 0, pers: {}, docs: { a: { docs: ['apply'] }, b: { docsNone: true } } }, have, 'T');
+  assert.deepEqual(u['hits/a/docs'], ['apply']); assert.equal(u['hits/b/docsNone'], true); assert.equal(u['hits/b/docs'], undefined);
+});
+
+test('★★ 본문에 단락이 없으면 «첨부 서식 이름»에서 — 충남경제진흥원 실측 꼴, 공고문 자체는 빼고', () => {
+  const t = '작성자 : 일자리전략팀 / 조회 : 1251 첨부 | 1. 산업·일자리전환 지원센터 컨설턴트 추가 모집공고.pdf 2. 2026년 산업·일자리전환 지원센터 컨설턴트 지원서 및 개인정보 수집 이용 동의서.hwp';
+  assert.deepEqual(W.docsFromAttach(t), ['consent', 'apply']);
+  assert.deepEqual(W.docsFromAttach('첨부 | 2026 모집 공고문.pdf'), [], '공고문은 낼 서식이 아니다');
+  assert.deepEqual(W.docsFromAttach('첨부 | 2026 공인노무사 자격증 소지자 우대 모집 공고.pdf'), [], '공고문 이름 안의 「자격증」을 낼 서류로 읽었다');
+  assert.deepEqual(W.docsFromAttach('첨부 파일 없음 — 이력서를 이메일로'), [], '파일 이름(확장자)만 본다');
+});
+test('★★ 서버 — 단락이 없고 첨부 서식이 있으면 docs + docsFrom:attach', async () => {
+  const L = '<table><tr><td><a href="/v?1">외부 컨설턴트 모집 공고</a></td><td>2026-10-01</td></tr></table>';
+  const body = '공고 안내 첨부 | 1. 모집공고.pdf 2. 지원서 및 개인정보 동의서.hwp';
+  const r = await W.run({ boards: [B1], today: '2026-10-05', details: true, fetchText: async (u) => (u === B1.url ? L : body) });
+  assert.deepEqual(r.hits[0].docs, ['consent', 'apply']); assert.equal(r.hits[0].docsFrom, 'attach');
+  const have = { a: { date: '2026-09-01' } };
+  const u = W.updatesOf({ hits: [], errors: [], counts: {}, checked: 0, docs: { a: { docs: ['apply'], docsFrom: 'attach' } } }, have, 'T');
+  assert.equal(u['hits/a/docsFrom'], 'attach');
 });
