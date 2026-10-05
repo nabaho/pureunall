@@ -1292,6 +1292,18 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mbw-chip.on .n{color:#bfdbfe}
 .mbw-chip.na{border-style:dashed;color:#854d0e;background:#f8fafc;border-color:#fde68a}
 .mbw-chip.na.on{background:#854d0e;border-color:#854d0e;color:#fff}
+/* ── 👁 열어 본 것 거르개 (대표 승인 목업 2026-10-05) — 초록 한 갈래 ── */
+.mbw-chip.open{border-color:#bbf7d0;color:#166534;background:#f0fdf4}
+.mbw-chip.open.on{background:#166534;border-color:#166534;color:#fff}
+.mbw-chip.open.on .n{color:#bbf7d0}
+.dm-f .pill.openf,.dmm-f .pill.openf{cursor:pointer}
+.dm-f .pill.openf:hover,.dmm-f .pill.openf:hover{border-color:#bbf7d0;color:#166534}
+.dm-f .pill.openf.on,.dmm-f .pill.openf.on{background:#f0fdf4;border-color:#16a34a;color:#166534;font-weight:700}
+.dm-openonly{display:flex;align-items:center;gap:8px;padding:6px 12px;white-space:nowrap;
+  background:#f0fdf4;border-bottom:1px solid #bbf7d0;font-size:13px;color:#166534}
+.dm-openonly .who{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#475569}
+.dm-openonly button{flex:none;border:1px solid #bbf7d0;background:#fff;color:#166534;border-radius:12px;
+  padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 .dm-sentgap{padding:8px 12px;background:#fff;border-bottom:1px solid #e2e8f0;font-size:12.5px}
 .dm-sentgap .hd{color:#475569;margin-bottom:6px}
 .dm-sentgap .r{display:flex;align-items:center;gap:10px;padding:3px 0;
@@ -16757,6 +16769,59 @@ function mbOpenOf(v){
   }
   return null;
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   👁 열어 본 것만 — 보낸메일함 거르개 (대표 승인 목업 2026-10-05)
+   ══════════════════════════════════════════════════════════════════════════
+   「보낸메일함과 수신확인을 별도로 하는게 좋은건가 아니면 같이 보는게 좋은건가?」
+   → 같이 본다(한 줄에 보낸 시각·연 시각). 옆줄의 누를 수 없던 「수신확인」 글자를
+     «누르면 켜지는 거르개»로 바꿨다.
+   ⚠★ 「안 연 것만」은 «만들지 않는다» — 그림을 막아 두면 읽어도 안 찍힌다(mbOpenTag 주석).
+     그 칸을 만들면 읽은 사람을 「안 읽음」으로 오해하게 된다.
+   ⚠ 걸러 내는 자리는 mbMatchedRows 하나다 — 목록·쪽수·「모두 고르기」가 함께 맞는다.
+     「누가 보냈나」 칩과 «함께» 걸린다.
+   ⚠ 켜고 끈 것은 이 기계에만 담는다(localStorage) — 남의 화면을 바꾸지 않는다. */
+const MB_OPEN_ONLY_LS = 'pucards_mb_openonly';
+function mbOpenOnly(){
+  if(state.mbOpenOnly === undefined){
+    try{ state.mbOpenOnly = localStorage.getItem(MB_OPEN_ONLY_LS) === '1'; }catch(_){ state.mbOpenOnly = false; }
+  }
+  return !!state.mbOpenOnly;
+}
+function mbOpenOnlySet(on){
+  state.mbOpenOnly = !!on;
+  state.mbPage = 1;
+  try{ localStorage.setItem(MB_OPEN_ONLY_LS, on ? '1' : '0'); }catch(_){ }
+  /* ⚠ 열람 기록을 여기서 «읽지 않는다» — 보낸메일함을 여는 자리(openMailBox)가 이미 읽는다.
+       읽는 자리를 늘리면 그릴 때마다 서버를 두드리는 길이 생긴다(tests/mail-open-track). */
+}
+/* 옆줄의 단추 — 딴 칸을 보고 있으면 «보낸메일함을 열고 켠다», 보낸메일함이면 켜고 끈다 */
+function mbOpenToggle(slug){
+  if(slug && mbNow() !== slug){ mbOpenOnlySet(true); openMailBox(slug); return; }
+  mbOpenOnlySet(!mbOpenOnly());
+  renderPCSide(); renderMailPage();
+}
+/* 지금 보는 칸에서 «열어 본 것» 수 — 알 수 없으면(아직 못 읽었으면) null */
+function mbOpenCount(){
+  if(!_mbOpen) return null;
+  return mbAllRows().filter(v=>!!mbOpenOf(v)).length;
+}
+/* 켜져 있을 때 목록 위 띠 — 무엇을 보고 있는지와 끄는 길 */
+function mbOpenOnlyLineHtml(){
+  if(!mbSentBox() || !mbOpenOnly()) return '';
+  const n = _mbOpen ? mbMatchedRows().length : null;
+  return `<div class="dm-openonly">👁 <b>${n === null ? '열어 본 것을 읽고 있습니다…'
+      : '열어 본 것만 ' + n.toLocaleString() + '통'}</b>
+    <span class="who">— 상대가 연 것으로 보이는 메일입니다(그림을 막아 두면 읽어도 안 찍힙니다)</span>
+    <button onclick="mbOpenToggle()" title="거르기를 끄고 보낸 메일을 모두 봅니다">모두 보기</button></div>`;
+}
+/* 옆줄 보낸메일함 옆 단추 — PC·폰 서랍이 같은 것을 쓴다 */
+function mbOpenPillHtml(slug, after){
+  const on = mbOpenOnly() && mbNow() === slug;
+  return `<span class="pill openf ${on?'on':''}"
+    onclick="event.stopPropagation();mbOpenToggle('${esc(slug)}')${after||''}"
+    title="상대가 연 것으로 보이는 메일만 봅니다 — 한 번 더 누르면 모두 봅니다.
+⚠ 다음메일의 수신확인이 아니라 «우리가» 잰 값입니다. 그림을 막아 두면 읽어도 안 찍힙니다.">👁 열어 본 것</span>`;
+}
 function mbOldCount(){
   const held = Object.keys(_mbMsgs[MB_OLD_ID] || {}).length;
   if(held) return held;
@@ -19382,6 +19447,12 @@ function mbSentWhoLineHtml(){
     ${chip('', '전체', t.n)}
     ${list.map(w=>chip(w.name, w.name, w.n)).join('')}
     ${t.none ? chip(MB_SENT_NA, '모름', t.none, 'na') : ''}
+    ${/* 👁 열어 본 것 — 오른쪽 끝. 사람 칩과 «함께» 걸린다 (대표 승인 목업 2026-10-05) */''}
+    <span class="sp" style="flex:1"></span>
+    ${(()=>{ const on = mbOpenOnly(), n = mbOpenCount();
+      return `<span class="mbw-chip open ${on?'on':''}" onclick="mbOpenToggle()"
+        title="상대가 연 것으로 보이는 메일만 봅니다 — 다음메일 수신확인이 아니라 우리가 잰 값입니다">👁 열어 본 것${
+        n === null ? '' : `<span class="n">${n.toLocaleString()}</span>`}</span>`; })()}
     </div>${gap}`;
 }
 
@@ -20553,7 +20624,9 @@ function mbMatchedRows(){
        그리기 없이 묻는 자리(검사·단축키)에서 조용히 틀린다. */
   const m = mbMemoOf();
   const tag = String(mbNow()) + '|' + String(state.mbFilter||'') + '|' + String(state.mbQ||'')
-    + '|' + (state.mbSpamShow?'s':'') + '|' + String(state.mbSentWho||'');
+    + '|' + (state.mbSpamShow?'s':'') + '|' + String(state.mbSentWho||'')
+    /* 👁 열어 본 것 — 켜고 끌 때, 그리고 열람 기록이 늦게 왔을 때 다시 센다 */
+    + '|' + (mbOpenOnly() ? 'o' + (_mbOpen ? Object.keys(_mbOpen).length : '-') : '');
   if(m.matched && m.matchedTag === tag) return m.matched;
   m.matchedTag = tag;
   let rows = mbAllRows();
@@ -20576,6 +20649,8 @@ function mbMatchedRows(){
       ? rows.filter(v=>!mbSentWho(v, idx).who)
       : rows.filter(v=>mbSentWho(v, idx).who === sw);
   }
+  /* 👁 열어 본 것만 — 보낸 칸에서만, 사람 칩과 함께 걸린다 (대표 승인 2026-10-05) */
+  if(mbOpenOnly() && mbSentBox()) rows = rows.filter(v=>!!mbOpenOf(v));
   const f = state.mbFilter||'';
   if(f==='unread') rows = rows.filter(v=>!Number(v.r||0));
   else if(f==='flag') rows = rows.filter(v=>Number(v.g||0));
@@ -20854,7 +20929,8 @@ function mailSideHtml(){
   const tome = mbFolderOf('tome');
   if(tome.length) tome.forEach(f=>{ h += row(f.slug,'↗','내게쓴메일함'); });
   else h += row('*tome','↗','내게쓴메일함');
-  mbFolderOf('sent').forEach(f=>{ h += row(f.slug,'✈','보낸메일함','<span class="pill" title="상대가 읽었는지(수신확인)는 다음메일에만 있습니다 — 메일 규약(IMAP)으로는 안 옵니다. 우리 화면이 보여 주는 것은 «우리가 답장했는가»입니다(봉투에 ↩ 표시).">수신확인</span>'); });
+  /* 👁 열어 본 것 — 누르면 걸러 본다 (대표 승인 목업 2026-10-05, 예전 「수신확인」 글자 자리) */
+  mbFolderOf('sent').forEach(f=>{ h += row(f.slug,'✈','보낸메일함', mbOpenPillHtml(f.slug)); });
   mbFolderOf('drafts').forEach(f=>{ h += row(f.slug,'🗂','임시보관함'); });
   const sch = mbFolderOf('sched');
   if(sch.length) sch.forEach(f=>{ h += row(f.slug,'🕐','예약메일함'); });
@@ -22776,7 +22852,7 @@ function mbDrawerHtml(){
   const tome = mbFolderOf('tome');
   if(tome.length) tome.forEach(f=>{ h += row(f.slug,'📝','내게쓴메일함','<span class="pill">내게쓰기</span>'); });
   else h += row('*tome','📝','내게쓴메일함','<span class="pill">내게쓰기</span>');
-  mbFolderOf('sent').forEach(f=>{ h += row(f.slug,'➤','보낸메일함','<span class="pill" title="상대가 읽었는지(수신확인)는 다음메일에만 있습니다 — 메일 규약(IMAP)으로는 안 옵니다. 우리 화면이 보여 주는 것은 «우리가 답장했는가»입니다(봉투에 ↩ 표시).">수신확인</span>'); });
+  mbFolderOf('sent').forEach(f=>{ h += row(f.slug,'➤','보낸메일함', mbOpenPillHtml(f.slug, ';mbDrawer(false)')); });
   mbFolderOf('drafts').forEach(f=>{ h += row(f.slug,'📁','임시보관함'); });
   const sch = mbFolderOf('sched');
   if(sch.length) sch.forEach(f=>{ h += row(f.slug,'🕐','예약메일함'); });
@@ -23407,6 +23483,7 @@ function mbListHtml(){
     ${mbInqLineHtml()}
     ${mbSpamLineHtml()}
     ${mbSentWhoLineHtml()}
+    ${mbOpenOnlyLineHtml()}
     <div class="dm-list ${mbDense()}">${body}</div>
     ${/* ── 아래 영역 — 쪽번호와 보기설정 (대표 지시 2026-08-30, 다음메일 캡처3·4) ──
          예전에는 「이전 메일 더 보기」 단추 하나였다. 몇 쪽인지도, 지금 몇 쪽인지도
