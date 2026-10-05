@@ -61,11 +61,81 @@
   function mergeRows(idx, companies) {
     var cards = rowsOf(idx), erp = erpRows(companies), out = erp.slice(), claimed = {};
     erp.forEach(function (r) { var b = digits(r.bz), n = sameCo(r.c); if (b) claimed['b' + b] = 1; if (n) claimed['n' + n] = 1; });
+    /* 같은 회사의 사업자등록증은 검색목록에서 빠지지만(한 회사 한 줄) 이알피 줄에 _biz 로 붙여 둔다 —
+       채우기 전 확인표가 둘을 견준다(대표 「추천대로」 2026-10-05: 같은 번호 111곳 중 대표자 23·주소 약 27곳이 달랐다) */
+    var byBz = {}, byName = {};
+    erp.forEach(function (r) { var b = digits(r.bz), n = sameCo(r.c); if (b && !byBz[b]) byBz[b] = r; if (n && !byName[n]) byName[n] = r; });
     cards.forEach(function (r) {
-      if (r.k === 'biz' && (claimed['b' + digits(r.bz)] || claimed['n' + sameCo(r.c)])) return;
+      if (r.k === 'biz' && (claimed['b' + digits(r.bz)] || claimed['n' + sameCo(r.c)])) {
+        var twin = (digits(r.bz) && byBz[digits(r.bz)]) || byName[sameCo(r.c)];
+        if (twin && !twin._biz && (!digits(twin.bz) || !digits(r.bz) || digits(twin.bz) === digits(r.bz))) twin._biz = r;
+        return;
+      }
       out.push(r);
     });
     return out;
+  }
+
+  /* ══ 채우기 전 확인표 (대표 「추천대로」 2026-10-05, 목업 승인) ══
+     이알피 값과 사업자등록증 값이 다른 칸을 찾는다. 같은 뜻의 다른 적기(충청남도/충남, 띄어쓰기, 우편번호)는 같다고 본다. */
+  var CHECK_FIELDS = [['회사명', 'c'], ['대표자', 'ceo'], ['주소', 'ad'], ['대표전화', 'ct']];
+  /* 표지 → 회사 칸 — 둘 이상이 한 칸을 쓴다(대표자·대표자전체, 주소·우편주소) */
+  var CO_FIELD_OF = { 회사명: 'c', 사업자번호: 'bz', 대표자: 'ceo', 대표자전체: 'ceo', 주소: 'ad', 우편주소: 'ad', 대표전화: 'ct',
+    대표팩스: 'cfx', 대표이메일: 'e', 업태: 'bt', 종목: 'bi', 법인등록번호: 'cno', 규모: 'sme' };
+  var PROVINCE = [[/^서울특별시/, '서울'], [/^부산광역시/, '부산'], [/^대구광역시/, '대구'], [/^인천광역시/, '인천'], [/^광주광역시/, '광주'],
+    [/^대전광역시/, '대전'], [/^울산광역시/, '울산'], [/^세종특별자치시/, '세종'], [/^경기도/, '경기'], [/^강원(특별자치)?도/, '강원'],
+    [/^충청북도/, '충북'], [/^충청남도/, '충남'], [/^전(라북|북특별자치)도/, '전북'], [/^전라남도/, '전남'], [/^경상북도/, '경북'],
+    [/^경상남도/, '경남'], [/^제주특별자치도/, '제주']];
+  function addrNorm(s) {
+    var t = String(s || '').replace(/^\s*\(\s*\d{5}\s*\)\s*/, '').replace(/\([^)]*\)/g, '').trim();
+    PROVINCE.forEach(function (p) { t = t.replace(p[0], p[1]); });
+    return t.replace(/[\s,.\-·]/g, '');
+  }
+  /* 도로명 + 건물번호(「호서로79번길 20」) — 층·호수·괄호 속 동 이름 적기가 달라도 같은 곳으로 본다 */
+  function roadOf(s) { var m = /([가-힣A-Za-z0-9]+(?:로|길))\s*(\d+(?:-\d+)?)/.exec(String(s || '').replace(/\([^)]*\)/g, ' ').replace(/(\d)\s+(?=[가-힣])/g, '$1')); return m ? m[1] + ' ' + m[2] : ''; }
+  function nameCore(s) { return sameCo(String(s || '').replace(/\([^)]*\)/g, '').replace(/-\d+$/, '').replace(/신용협동조합/g, '신협').replace(/농업회사법인|사회복지법인|재단법인|사단법인|영농조합법인/g, '')); }
+  function sameField(f, a, b) {
+    if (f === 'c') { var m = nameCore(a), n = nameCore(b); return m === n || (m.length >= 2 && n.length >= 2 && (m.indexOf(n) >= 0 || n.indexOf(m) >= 0)); }
+    if (f === 'ct') { var da = digits(a), db = digits(b); return da === db || /^01/.test(da) !== /^01/.test(db); }   // 휴대폰↔사무실 전화는 견주지 않는다
+    if (f === 'ad') {
+      var ra = roadOf(a), rb = roadOf(b);
+      if (ra && rb) return ra === rb;
+      var x = addrNorm(a), y = addrNorm(b); return x === y || (x.length >= 6 && y.length >= 6 && (x.indexOf(y) === 0 || y.indexOf(x) === 0));
+    }
+    var p = String(a || '').replace(/\s/g, ''), q = String(b || '').replace(/\s/g, '');
+    return p === q || (!!p && !!q && (p.indexOf(q) >= 0 || q.indexOf(p) >= 0));   // 공동대표 「홍길동,김철수」 ⊃ 「홍길동」
+  }
+  /* co: 고른 회사 줄(이알피 줄이면 _biz 가 붙어 있을 수 있다) → [{f, key, erp, biz}] */
+  function coConflicts(co) {
+    var b = co && co._biz;
+    if (!b || co.k !== 'erp') return [];
+    var s = function (v) { return v == null ? '' : String(v).trim(); };
+    return CHECK_FIELDS.filter(function (p) { var x = s(co[p[1]]), y = s(b[p[1]]); return x && y && !sameField(p[1], x, y); })
+      .map(function (p) { return { f: p[1], key: p[0], erp: s(co[p[1]]), biz: s(b[p[1]]) }; });
+  }
+  /* 칸마다 출처 이름표 — o: {co, coX, contact, worker, edits, contract, contractWins, picks, conflicts} */
+  function fieldSource(key, o) {
+    o = o || {};
+    if (o.edits && Object.prototype.hasOwnProperty.call(o.edits, key)) return { label: '직접' };
+    var cv = o.contract && o.contract[key];
+    if (cv != null && cv !== '' && (o.contractWins || !(o.co && CO_FIELD_OF[key] && o.co[CO_FIELD_OF[key]]))) return { label: '이알피 계약' };
+    var f = CO_FIELD_OF[key], co = o.co || {};
+    if (f) {
+      var c = (o.conflicts || []).filter(function (x) { return x.f === f; })[0], pk = (o.picks || {})[f];
+      if (c) return pk ? { label: (pk === 'biz' ? '등록증' : '이알피') + ' (고름)', picked: pk } : { label: '⚠ 다름', warn: true, conflict: c };
+      var has = function (r) { return r && r[f] != null && String(r[f]).trim() !== ''; };
+      if (has(co)) {
+        if (co.k === 'erp') return { label: has(co._biz) ? '이알피·등록증' : '이알피' };
+        if (co.k === 'biz') return { label: '등록증' };
+        return { label: '명함' };
+      }
+      if (has(o.coX)) return { label: '기업정보함' };
+      return { label: '없음', miss: true };
+    }
+    if (/^담당자/.test(key)) return o.contact ? { label: o.contact.k === 'card' ? '명함' : '이알피' } : { label: '없음', miss: true };
+    if (/^근로자|^이름$/.test(key)) return o.worker ? { label: '근로자' } : { label: '없음', miss: true };
+    if (/^(오늘날짜|오늘|작성일|계약일)$/.test(key)) return { label: '오늘' };
+    return { label: '' };
   }
 
   /* idx 객체({id: 줄}) → 배열. 사업자등록증(biz)·명함(card)과 ERP 변환줄(erp) */
@@ -443,7 +513,7 @@
 
   var api = {
     BLANK: BLANK, coNorm: coNorm, cardNorm: cardNorm, sameCo: sameCo, coInfoKeys: coInfoKeys, mergeCoInfo: mergeCoInfo,
-    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, searchCompanies: searchCompanies, contactsOf: contactsOf,
+    rowsOf: rowsOf, erpRows: erpRows, mergeRows: mergeRows, coConflicts: coConflicts, fieldSource: fieldSource, sameField: sameField, CO_FIELD_OF: CO_FIELD_OF, searchCompanies: searchCompanies, contactsOf: contactsOf,
     searchPeople: searchPeople, searchContacts: searchContacts,
     valuesFrom: valuesFrom, markersIn: markersIn, fillText: fillText, hwpValues: hwpValues, safeName: safeName,
     stripLinesegsFor: stripLinesegsFor, xlsxMarkers: xlsxMarkers, xlsxFill: xlsxFill,

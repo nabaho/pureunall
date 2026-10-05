@@ -346,3 +346,44 @@ test('ⓒ 위임계약 칸 배선 — 표지가 있으면 고르기 칸이 열�
   assert.ok(vi > 0 && ei > vi, '사람이 고친 값(edits)이 고르기 값보다 나중에 와야 합니다');
   assert.match(forms, /\[propBox, caseBox, valBox\]/);
 });
+
+/* ══ 채우기 전 확인표 (대표 「추천대로」 2026-10-05, 목업 승인) ══ */
+test('ⓓ 확인표 — 이알피 줄에 같은 회사 등록증을 붙이고, 다른 칸만 찾는다', () => {
+  const idx = { b1: { k: 'biz', c: '㈜가나시험상사', bz: '1234567890', ceo: '김철수', ad: '충청남도 천안시 서북구 시험로 12, 3층(시험동)', ct: '041-000-0001' } };
+  const rows = CF.mergeRows(idx, { v: { co1: { id: 'co1', name: '가나시험상사(천안)', bizNo: '123-45-67890', ceo: '홍길동',
+    zipcode: '31000', address: '충남 천안시 서북구 시험로 12', phone: '010-0000-9999' } } });
+  assert.equal(rows.length, 1, '등록증 줄이 검색목록에 다시 나오면 안 된다(한 회사 한 줄)');
+  assert.equal(rows[0]._biz.ceo, '김철수');
+  const c = CF.coConflicts(rows[0]);
+  assert.deepEqual(c.map((x) => x.key), ['대표자'], '주소(시·도 줄임·층수)·이름(괄호)·전화(휴대폰↔사무실)는 같은 것으로 봐야 한다');
+  assert.deepEqual(CF.coConflicts(CF.rowsOf(idx)[0]), [], '등록증 줄 자체는 견줄 것이 없다');
+  assert.equal(CF.sameField('ad', '충남 천안시 동남구 남부대로 118', '충청남도 천안시 동남구 천안천변길 223'), false);
+  assert.equal(CF.sameField('ad', '천안시 수신면 5산단로 253', '천안시 수신면 5 산단로 253'), true);
+  assert.equal(CF.sameField('c', '주식회사코엘이엔지', '주식회사 코웰이엔지'), false, '한 글자 다른 상호는 잡아야 한다');
+  assert.equal(CF.sameField('ceo', '홍길동, 김철수', '홍길동'), true, '공동대표');
+});
+
+test('ⓓ 확인표 — 칸마다 출처, 고른 쪽 표시', () => {
+  const rows = CF.mergeRows({ b1: { k: 'biz', c: '가나시험상사', bz: '1234567890', ceo: '김철수', ad: '천안시 시험로 1' } },
+    { v: { co1: { id: 'co1', name: '가나시험상사', bizNo: '1234567890', ceo: '홍길동', address: '천안시 시험로 1' } } });
+  const co = rows[0], conflicts = CF.coConflicts(co);
+  const src = (k, o) => CF.fieldSource(k, Object.assign({ co, conflicts }, o)).label;
+  assert.equal(src('회사명'), '이알피·등록증');
+  assert.equal(src('대표자'), '⚠ 다름'); assert.equal(src('대표자전체'), '⚠ 다름');
+  assert.equal(src('대표자', { picks: { ceo: 'biz' } }), '등록증 (고름)');
+  assert.equal(src('대표자', { edits: { 대표자: '직접' } }), '직접');
+  assert.equal(src('계약금액', { contract: { 계약금액: '300,000' }, contractWins: true }), '이알피 계약');
+  assert.equal(src('법인등록번호'), '없음');
+  assert.equal(src('담당자', { contact: { k: 'card', n: '이영희' } }), '명함');
+});
+
+test('ⓓ 확인표 배선 — 고른 값이 채우기에 들어가고, 안 고르고 받으면 한 번 묻는다', () => {
+  const s = read('js/pu-contract-forms.js');
+  assert.match(s, /CF\.coConflicts\(st\.co\)\.forEach\(function \(c\) \{ if \(st\.srcPick\[c\.f\] === 'biz'\) co\[c\.f\] = c\.biz; \}\);\s*var V = CF\.valuesFrom/,
+    '등록증을 고른 값이 valuesFrom 전에 들어가야 대표자전체·우편주소도 같이 바뀐다');
+  ['doDownload', 'doMail', 'doEdit'].forEach((fn) => {
+    const i = s.indexOf('function ' + fn + '()');
+    assert.ok(i > 0 && s.slice(i, i + 600).indexOf('conflictsOkToGo()') > 0, fn + ' 가 다른 칸을 묻지 않습니다');
+  });
+  assert.match(s, /st\.srcPick = \{\}; st\.ok = \{\};/, '회사를 바꾸면 고른 것이 지워져야 한다');
+});
