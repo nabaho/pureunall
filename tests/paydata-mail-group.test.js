@@ -140,7 +140,7 @@ test('★ 길면 묶음만 보인다 — 한 곳에 한 줄', () => {
   const h = W.screenMail();
   assert.equal((h.match(/class="grp/g) || []).length, 5);
   assert.equal((h.match(/class="gl[" ]/g) || []).length, 0, '★ 접어 둔 줄이 그려집니다');
-  assert.match(h, /5<\/b>곳 · <b>7<\/b>건/, '머리에 몇 곳·몇 건이 없습니다');
+  assert.match(h, /5<\/b>곳 · <b>8<\/b>건/, '머리에 몇 곳·몇 건이 없습니다');
 });
 
 test('★ 빼기로 한 군더더기가 돌아오지 않는다', () => {
@@ -194,13 +194,16 @@ test('★ 모르는 주소 묶음에는 「✉ 잇기」 — 같은 주소 여�
 test('★ 「모두 고르기」가 실제로 고른다 — 예전엔 메일 화면에서 아무것도 안 골랐다', () => {
   const W = load({ mail: bigMail(), companies: COS, allCompanies: COS });
   W.pickToggleAll('mail');
-  assert.equal(Object.keys(W.App.pick.mail || {}).length, 7, '★ 모두 고르기가 빈손입니다');
+  assert.equal(Object.keys(W.App.pick.mail || {}).length, Object.keys(bigMail()).length,
+    '★ 모두 고르기가 빈손이거나 일부만 고릅니다');
 });
 
 test('「모르는 주소」 탭에서 모두 고르면 그 탭 것만', () => {
   const W = load({ mail: bigMail(), companies: COS, allCompanies: COS, mailTab: 'unk' });
   W.pickToggleAll('mail');
-  assert.deepEqual(Object.keys(W.App.pick.mail).sort().join(','), 't1,t2,t3,u1');
+  /* c1(마바물산)은 업체관리(COS)에 주소가 없어 «모르는 주소»다 — 이름이 적혀 있어도
+     주소로 못 찾으면 모르는 곳이다(서버가 사업장을 적어 주지 않은 줄) */
+  assert.deepEqual(Object.keys(W.App.pick.mail).sort().join(','), 'c1,t1,t2,t3,u1');
 });
 
 test('묶음 ☐ 는 그 묶음의 자료를 한꺼번에 고르고 푼다', () => {
