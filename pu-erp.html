@@ -10249,6 +10249,36 @@ var AuditLog = {
   }
 };
 
+// ============ 서버 자료가 내려오면 목록을 다시 읽는다 (공통 훅) ============
+/* 대표 신고 2026-10-05 「상담접수·계약확정 사라졌다」 — 계약관리는 목록을 처음 열 때 한 번 dbGet 으로 받아
+   useState 에 얼려 두어, 그 순간 자료가 덜 와 있으면 화면이 그 사진에 멈췄다(36건 · 실제 167건). 계약관리만
+   고쳤고(#1989), 같은 꼴의 화면이 더 있었다 — 업체·사건·컨설팅·기금·기타사업·수입·지출·종료·근태·휴가·급여.
+   ★ 그 화면의 열쇠(keys)가 바뀌었거나, 첫 받기가 끝났거나(fb_initial_done), 묶음·수동일 때만 reread 를 부른다.
+     다른 표가 바뀔 때마다 다시 그리지 않는다.
+   ★ reread 는 «저장된 것»을 다시 읽는 함수여야 한다 — 저장 안 된 손질을 들고 있는 상태에는 쓰지 말 것.
+   ⚠ reread 는 매 그림마다 새로 만들어지므로 ref 로 붙든다(마지막 것을 부른다). */
+function useDbReread(keys, reread){
+  var ref = useRef(reread); ref.current = reread;
+  var kRef = useRef(keys); kRef.current = keys;
+  useEffect(function(){
+    function again(e){
+      var k = e && e.detail;
+      if(e && e.type === 'pureun-saved') k = k && k.key;
+      var ks = kRef.current || [];
+      if(e && e.type !== 'fb_initial_done' && k && k !== 'batch' && k !== 'manual' && ks.indexOf(k) < 0) return;
+      try { ref.current(); } catch(err){ if(window._erpErrLog) window._erpErrLog(err); }
+    }
+    window.addEventListener('pureun-saved', again);
+    window.addEventListener('fb_data_changed', again);
+    window.addEventListener('fb_initial_done', again);
+    return function(){
+      window.removeEventListener('pureun-saved', again);
+      window.removeEventListener('fb_data_changed', again);
+      window.removeEventListener('fb_initial_done', again);
+    };
+  }, []);
+}
+
 // ============ ESC 키로 모달 닫기 (공통 훅) ============
 // 사용: 모달 컴포넌트 시작부에 useEscClose(props.onClose) 한 줄 추가
 function useEscClose(onClose){
@@ -27364,6 +27394,8 @@ function CompanyManagement(){
   // Firebase 동기화가 끝나면 목록이 채워진다.
   if(!existing){ existing = []; }
   var c = useState(existing); var companies = c[0]; var setCompanies = c[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['companies'], function(){ refreshCompanies(); });
 
   // ── 보수총액신고: 연도별 데이터 (wage_reports[연도][업체id] = {filed,taxReq,taxReply,eiSi,health,memo}) ──
   var _wrYS = useState(String(new Date().getFullYear()));
@@ -32040,6 +32072,8 @@ function CaseManagement(props){
   var existing = dbGet('cases', null);
   if(!existing){ dbSet('cases', []); existing = []; }
   var c = useState(existing); var cases = c[0]; var setCases = c[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['cases'], function(){ refreshCases(); });
 
   var q = useState(''); var query = q[0]; var setQuery = q[1];
   var sf = usePersistedState('case_status_filter', 'open'); var statusFilter = sf[0]; var setStatusFilter = sf[1];
@@ -56583,6 +56617,8 @@ function IncomeListTab(){
   var _fill3 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 380px)
   var existing = dbGet('finance_income', []);
   var s = useState(existing); var incomes = s[0]; var setIncomes = s[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['finance_income'], function(){ refreshIncomes(); });
   var q = useState(''); var query = q[0]; var setQuery = q[1];
   var src = useState('all'); var sourceFilter = src[0]; var setSourceFilter = src[1];
   var ym = usePersistedState('income_list_month', todayYM()); var monthFilter = ym[0]; var setMonthFilter = ym[1];  // 기본=이번 월, 'YYYY' = 연도, '' = 전체
@@ -56886,6 +56922,8 @@ function IncomeCompanyTab(){
   var _fill4 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 240px)
   var rawIncomes = dbGet('finance_income', []);
   var inc = useState(rawIncomes); var incomes = inc[0]; var setIncomes = inc[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['finance_income'], function(){ refreshIncomes(); });
   var tt = useState('all'); var typeTab = tt[0]; var setTypeTab = tt[1];
   var yr = usePersistedState('income_company_year', (new Date()).getFullYear()); var selYear = yr[0]; var setSelYear = yr[1];
   var q = useState(''); var query = q[0]; var setQuery = q[1];
@@ -58989,6 +59027,8 @@ if(typeof window !== 'undefined') window.erpExpenseFrom = erpExpenseFrom;
 function FinanceExpense(){
   var existing = dbGet('finance_expense', []);
   var s = useState(existing); var expensesReal = s[0]; var setExpenses = s[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['finance_expense'], function(){ refreshExpenses(); });
   // 지점 필터: 'all'|'cheonan'|'seosan'|'common'
   var bf = usePersistedState('expense_branch_filter', 'all'); var branchFilter = bf[0]; var setBranchFilter = bf[1];
   // 직원 SID → 지점 코드 매핑 (월별급여 가상 항목에 사용)
@@ -67133,6 +67173,8 @@ function ProjectManagementShared(props){
      refreshItems 는 거르는데 «처음 상태»만 안 걸러서, 휴지통으로 간 이음센터-2026-001 옛 줄이
      다른 일로 목록이 다시 읽힐 때까지 표에 두 줄로 보였다. ⚠ existing 은 그대로 둔다 — 위 이관·dbSet 이 쓴다. */
   var s = useState(function(){ return existing.filter(function(x){ return !(x && x._deleted === true); }); }); var items = s[0]; var setItems = s[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread([props.storageKey], function(){ refreshItems(); });
   var q = useState(''); var query = q[0]; var setQuery = q[1];
   var sf = usePersistedState('proj_'+props.sourceKind+'_status', 'open'); var statusFilter = sf[0]; var setStatusFilter = sf[1];
   var ty = usePersistedState('proj_'+props.sourceKind+'_type', 'all'); var typeFilter = ty[0]; var setTypeFilter = ty[1];
@@ -68457,6 +68499,8 @@ function ClosedManagement(){
   var _fill14 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 310px)
   var existing = dbGet('closed_archive', []);
   var s = useState(existing); var archive = s[0]; var setArchive = s[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['closed_archive'], function(){ setArchive(dbGet('closed_archive', []) || []); });
 
   var tb = useState('all'); var activeTab = tb[0]; var setActiveTab = tb[1];
   var yr = usePersistedState('closed_year', String(new Date().getFullYear())); var yearFilter = yr[0]; var setYearFilter = yr[1];
@@ -73856,6 +73900,8 @@ function getPayrollAuditFor(empSid, ym){
 function AttendanceManagement(){
   var users = getActiveUsers();
   var rs = useState(dbGet('attendance_records', [])); var records = rs[0]; var setRecords = rs[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['attendance_records'], function(){ refreshAtt(); });
   var atzS = usePersistedState('attendance_zoom', 100); var attZoom = atzS[0]; var setAttZoom = atzS[1];
   // ── Phase 4: 건별 저장 (과거회귀 방지) — 병합 로직 불필요 (그 건만 서버 반영, 외부 추가 자동 보존) ──
   function refreshAtt(){ setRecords(dbGet('attendance_records', []).slice()); }
@@ -75847,6 +75893,10 @@ function LeaveManagement(){
   var rfS = useState(0); var compRefresh = rfS[0]; var setCompRefresh = rfS[1]; // 강제 리렌더
   // 사용촉진 통보 기록 (연차/반차 목록 인라인 기록용 — 사용촉진 탭과 동일 데이터)
   var lpS = useState(dbGet('leave_promotion', []) || []); var leavePromo = lpS[0]; var setLeavePromo = lpS[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['attendance_records', 'leave_promotion'], function(){
+    setAttendance(dbGet('attendance_records', []) || []); setLeavePromo(dbGet('leave_promotion', []) || []);
+  });
   function promoRecOf(sid){
     for(var i=0;i<leavePromo.length;i++){ if(leavePromo[i].sid===sid && Number(leavePromo[i].year)===Number(selYear)) return leavePromo[i]; }
     return null;
@@ -78788,6 +78838,8 @@ function PayrollLedger(props){
     return false;
   }));
   var rs = useState(rawRecs); var recs = rs[0]; var setRecs = rs[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['payroll_monthly'], function(){ refreshRecs(); });
   var bm = useState(false); var bulkModal = bm[0]; var setBulkModal = bm[1];
   // ★ 급여 겹친 달 정리 — 같은 사람의 같은 달 줄이 둘 이상일 때만 버튼이 보인다
   var duS = useState(false); var dupOpen = duS[0]; var setDupOpen = duS[1];
@@ -81188,6 +81240,8 @@ var IRREGULAR_TYPES = [
 
 function PayrollIrregular(props){
   var rs = useState(dbGet('payroll_irregular', [])); var recs = rs[0]; var setRecs = rs[1];
+  /* 서버 자료가 내려오면 다시 읽는다 — useDbReread 머리말 */
+  useDbReread(['payroll_irregular'], function(){ refreshIrr(); });
   var fs = useState('all'); var typeFilter = fs[0]; var setTypeFilter = fs[1];
   var ms = useState(null); var modal = ms[0]; var setModal = ms[1];
   // 명세서 모달
