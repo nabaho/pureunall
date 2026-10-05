@@ -205,3 +205,16 @@ test('★ 업체 명단이 «번호 → 업체» 객체로 와도 읽는다 — 
   assert.equal(S.staffFor('두레', { companies: box, dir: DIR, links: {} }).coId, 'co_b', '칸에 id 가 없으면 열쇠가 번호다');
   assert.equal(S.candidates('두레', box)[0].id, 'co_b');
 });
+
+test('★ 지점까지 같은 이름이 먼저다 — 괄호 안을 버리면 다른 지점에 붙는다', () => {
+  /* 묶음 폴더를 지점별로 나눈 뒤(2026-10-05) 「(모종점)」이 「(배방점)」에 붙던 자리 */
+  const cos = [
+    { id: 'b1', name: '새별반찬(배방점)', typeCode: '급여', status: 'active', managerMain: 'A-005' },
+    { id: 'b2', name: '새별반찬(모종점)', typeCode: '급여', status: 'active', managerMain: 'A-005' },
+  ];
+  const a = S.staffFor('새별반찬(모종점)', { companies: cos, dir: DIR, links: {} });
+  assert.equal(a.coId, 'b2');
+  assert.equal(a.정확, true, '지점까지 같으면 한꺼번에 확정해도 되는 것이다');
+  assert.equal(S.staffFor('새별반찬(배방점)', { companies: cos, dir: DIR, links: {} }).coId, 'b1');
+  assert.equal(S.fullName('㈜ 새별반찬 (모종점)'), '새별반찬모종점');
+});

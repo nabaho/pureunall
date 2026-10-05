@@ -37,7 +37,7 @@ import sys
 import json
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from build_site_cards import raw_site, site_base          # 이름 뽑는 규칙 한 곳
+from build_site_cards import site_of                       # 이름 뽑는 규칙 한 곳(묶음 폴더 나누기 포함)
 from build_pilot import signal, OUT_DIR                   # 3색 신호 규칙 한 곳
 
 DRAFT = ["(안)", "(안 ", "초안", "검토용", "비교", "(수정전"]   # 확정본만
@@ -108,7 +108,7 @@ def main():
     for r in res:
         if not r.get("ok"):
             continue
-        site = site_base(raw_site(r["path"]))
+        site = site_of(r["path"])
         if not site:
             nosite += 1
             continue
