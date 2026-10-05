@@ -3292,7 +3292,14 @@ body.pc #pcDetail{display:flex}
   border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   position:sticky;top:0;z-index:2}
 /* #pcWk 는 위 여백이 14px 이다 — top:0 이면 그 틈으로 줄이 비친다. 맨 위 끝에 붙인다 */
-#pcWk .wktbl th{top:-14px}
+/* 「👷 근로자 n명」 줄도 함께 붙인다 (대표 지시 2026-10-05 「틀고정」)
+   그 줄이 위 여백(14px)까지 덮고 높이를 --wkBar 로 못 박는다 — 표 머리는 그 바로 밑에 붙는다.
+   ⚠ 줄이 두 줄로 늘면 머리가 겹친다 → nowrap, 넘치는 안내 글은 … 로 자른다. */
+#pcWk{--wkBar:58px}
+#pcWk .wkbar{position:sticky;top:-14px;z-index:3;background:#f8fafc;margin:-14px 0 0;padding:14px 0 10px;
+  height:var(--wkBar);flex-wrap:nowrap}
+#pcWk .wkhint{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pcWk .wktbl th{top:calc(var(--wkBar) - 14px)}
 .wktbl thead th:first-child{border-top-left-radius:12px}
 .wktbl thead th:last-child{border-top-right-radius:12px}
 .wktbl td{padding:9px 10px;border-bottom:1px solid #f8fafc;color:#475569;
@@ -3312,6 +3319,10 @@ body.pc #pcDetail{display:flex}
 .wkchip.wkgc{background:#bfdbfe;color:#1e40af}
 .wkchip.wkok{background:#bbf7d0;color:#166534}
 .wkchip.wkwait{background:#fde68a;color:#854d0e}
+/* 걸린 사건 칸 «열 정리» (대표 지시 2026-10-05) — 상태 딱지를 맨 앞 같은 너비로 세운다.
+   예전엔 이름 끝에 붙어 줄마다 딱지 자리가 들쭉날쭉했다. 상태가 없으면 빈 자리만 남긴다. */
+.wkchip.wkst{margin:0 8px 0 0;min-width:48px;text-align:center}
+.wkchip.wkst0{visibility:hidden}
 .wkmore{font-style:normal;font-size:11px;color:#64748b;background:#f8fafc;border-radius:99px;padding:1px 6px}
 .wktbl .dim,.pdbody .dim{color:#94a3b8}
 .conone{color:#94a3b8;font-size:13px;padding:22px 6px;line-height:1.75}
@@ -36146,14 +36157,14 @@ function wkCasesSummary(p){
   /* ⚠ 이름이 없으면 «사건번호»를 적는다 — 「이름 없는 사건」만 적으면 그 사건을
      이알피에서 되찾을 길이 없다(wkCaseRow 가 이미 그렇게 채워 준다). */
   const nm = first.title || (first.caseNo ? '사건 ' + first.caseNo : '');
-  return (nm ? esc(nm) : '<span class="dim">이름 없는 사건</span>')
-    + ' ' + wkStatChip(first.stat) + more;
+  return (wkStatChip(first.stat, 'wkst') || '<span class="wkchip wkst wkst0">-</span>')
+    + (nm ? esc(nm) : '<span class="dim">이름 없는 사건</span>') + more;
 }
-function wkStatChip(stat){
+function wkStatChip(stat, cls){
   const M = { wait:['대기','#854d0e','#fde68a'], run:['진행중','#1e40af','#bfdbfe'],
               done:['완료','#166534','#bbf7d0'], cancel:['취소','#991b1b','#fecaca'] };
   const m = M[stat]; if(!m) return '';
-  return `<span class="wkchip" style="color:${m[1]};background:${m[2]}">${m[0]}</span>`;
+  return `<span class="wkchip${cls ? ' ' + cls : ''}" style="color:${m[1]};background:${m[2]}">${m[0]}</span>`;
 }
 
 function wkRowHtml(r, i){
@@ -36168,7 +36179,7 @@ function wkRowHtml(r, i){
       <td class="nm"><span class="wkfold" onclick="wkFoldToggle('${esc(String(r.caseKey).replace(/'/g,"\\'"))}')">${open?'▾':'▸'}</span>
         <b>${esc(cs.title) || '<span class="dim">이름 없는 사건</span>'}</b> <span class="wkchip wkgc">집단 ${r.members.length}명</span></td>
       <td>${esc(cs.company)}</td>
-      <td>${wkStatChip(cs.stat)} <span class="dim">수금 ${paid}/${r.members.length}</span></td>
+      <td>${wkStatChip(cs.stat, 'wkst') || '<span class="wkchip wkst wkst0">-</span>'}<span class="dim">수금 ${paid}/${r.members.length}</span></td>
       <td>${esc(cs.mgr)}</td>
       <td></td>
       <td class="dim">${esc(cs.caseNo)}</td>
