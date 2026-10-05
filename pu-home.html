@@ -43,7 +43,7 @@
 (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
-<script src="js/pu-home-parse.js?v=4"></script>
+<script src="js/pu-home-parse.js?v=5"></script>
 <script src="js/pu-home-career.js?v=2"></script>
 <script src="js/pu-home-export.js?v=3"></script>
 <script src="js/pu-home-diff.js?v=10"></script>
@@ -177,6 +177,16 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .mini.dash{background:#fff;color:var(--faint);border:1px dashed #cbd5e1}
 
 /* 할 일 — 안내 띠를 여기 모은다. 위에 쌓아 두면 몸통 높이를 최대 34% 까지 먹었다 */
+/* 월간 자동 연결 카드 (2026-10-05) — 한 줄 = 말 · 숫자. 팔레트 밖 색을 쓰지 않는다(변수만). */
+.autocard{flex:none;margin:6px 8px 0;border:1px solid var(--line);border-radius:9px;background:#fff;padding:6px 10px}
+.autocard .ath{font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.autocard .arow{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;white-space:nowrap;overflow:hidden}
+.autocard .arow span{overflow:hidden;text-overflow:ellipsis}
+.autocard .ago{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.atab{width:100%;border-collapse:collapse;font-size:12.5px}
+.atab th,.atab td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;white-space:nowrap;
+  max-width:420px;overflow:hidden;text-overflow:ellipsis}
+.atab th{color:var(--sub);font-weight:700}
 .todo{flex:1;min-height:0;display:flex;flex-direction:column}
 .todo .th{flex:none;display:flex;align-items:center;gap:7px;padding:7px 13px;background:#fff;
   border-bottom:1px solid var(--line);font-size:12.5px;font-weight:800}
@@ -1355,6 +1365,9 @@ function readRoster() { return readRosterSource().then(r => r.list); }
    user_dir 에도 그 status 만 실려 온다(pu-erp.html _syncUserDir). 짐작이 아니라 확인한 값이다. */
 function staffFromRoster(list, source) {
   const staff = (list || []).map(u => ({
+    /* ★ 직원 번호(sid) — 구성원 글을 이 사람과 «잇는» 열쇠다 (자동 연결 2026-10-05).
+         이름은 열쇠가 아니다(동명이인·오타). 공개 명부에 늘 실려 온다. */
+    sid: String((u && u.sid) || ''),
     name: (u && u.name) || '',
     /* ★ 직급 — 명부에서 «이름과 함께» 당겨 넣을 때 쓴다 (대표 지시 2026-09-03).
        없으면 빈 값이고, 고르는 창이 「직급 모름」으로 적어 사람이 채우게 한다.
@@ -1402,8 +1415,14 @@ function loadAll() {
     /* 자문사현황 — 업체관리는 «읽기만» 한다. 표시(올림/안 올림)만 우리 자리에 쓴다. */
     read('data/companies', '푸른ERP 업체관리', null),
     read(PARTNER_PATH, '자문사 표시', null),
-    read(PARTNER_LOGO_PATH, '자문사 로고 차례', null)
-  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg]) => {
+    read(PARTNER_LOGO_PATH, '자문사 로고 차례', null),
+    /* 월간 자동 연결 기록 (2026-10-05) — 못 읽어도 화면은 뜬다. 못 읽은 것은 카드가 따로 말한다
+       («아직 돈 적 없음»과 «못 읽음»을 가른다). 그래서 failed(전체 띠)에 넣지 않는다. */
+    db.ref('homepage/auto/runs').once('value').then(s => ({ v: s.val() || {} }),
+      e => ({ err: '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')' }))
+  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg, autoRuns]) => {
+    App.autoRuns = (autoRuns && autoRuns.v) || null;
+    App.autoErr = (autoRuns && autoRuns.err) || '';
     App.members = members || {};
     App.partnerLogos = logoCfg || { 숨김: {}, 차례: [] };
     App.pages = pages || {};
@@ -1542,8 +1561,10 @@ async function setPosted(id, value, why) {
                 by: currentUserName(), at: todayString(), updatedAt: Date.now() };
   App.saveErr = '';
   try {
-    await db.ref(PARTNER_PATH + '/' + id).set(rec);
-    App.partners[id] = rec;
+    /* ★ update — 업체 자리를 통째로 set 하면 «이은 로고 번호(boardSrl)·남기기(keep)·
+         자동으로 내린 표시(takenDown)»가 조용히 지워진다 (월간 자동 연결 2026-10-05). */
+    await db.ref(PARTNER_PATH + '/' + id).update(rec);
+    App.partners[id] = Object.assign({}, App.partners[id] || {}, rec);
     App.dirty = false;
     App.render();
     toast(value === true ? '「올림」으로 표시했습니다.'
@@ -1683,6 +1704,15 @@ function pickAllVisible(on) {
 window.pickToggle = pickToggle; window.pickFind = pickFind;
 window.pickType = pickType; window.pickAllVisible = pickAllVisible;
 
+/* {업체: {칸: 값}} → {'업체/칸': 값} — update 가 업체 자리를 통째로 갈지 않게 */
+function partnerPatch(고침) {
+  const out = {};
+  Object.keys(고침 || {}).forEach(k => {
+    Object.keys(고침[k] || {}).forEach(f => { out[k + '/' + f] = 고침[k][f]; });
+  });
+  return out;
+}
+
 async function pickSave() {
   if (Pick.saving) return;
   if (!App.isAdmin) { await say('총괄관리자만 표시할 수 있습니다', ''); return; }
@@ -1697,8 +1727,10 @@ async function pickSave() {
   try {
     /* ⚠ PARTNER_PATH 를 «통째로 set 하지 않는다» — 적은 열쇠만 바꾸는 update 다.
        통째로 덮으면 지금 이 창에 없는 회사(거래 끝난 곳)의 표시가 통째로 지워진다. */
-    await db.ref(PARTNER_PATH).update(고침);
-    열쇠.forEach(k => { App.partners[k] = 고침[k]; });
+    /* ★ 칸 단위로 쓴다(「C1/posted」…) — {C1: {...}} 로 update 하면 그 업체 자리가
+         통째로 갈려 이은 로고 번호·남기기가 지워진다 (월간 자동 연결 2026-10-05). */
+    await db.ref(PARTNER_PATH).update(partnerPatch(고침));
+    열쇠.forEach(k => { App.partners[k] = Object.assign({}, 옛것[k] || {}, 고침[k]); });
     Pick.open = false;
     closeModal();
     App.render();
@@ -1843,8 +1875,15 @@ async function clearPosted() {
   if (!d || d.kind !== 'partner') return;
   App.saveErr = '';
   try {
-    await db.ref(PARTNER_PATH + '/' + d.key).remove();
-    delete App.partners[d.key];
+    /* ★ 표시 칸만 지운다 — 업체 자리를 통째로 remove 하면 이은 로고 번호·남기기까지
+         사라진다 (월간 자동 연결 2026-10-05). */
+    const 지울칸 = ['posted', 'why', 'by', 'at', 'updatedAt'];
+    const 빈칸 = {};
+    지울칸.forEach(f => { 빈칸[f] = null; });
+    await db.ref(PARTNER_PATH + '/' + d.key).update(빈칸);
+    const 남은 = Object.assign({}, App.partners[d.key] || {});
+    지울칸.forEach(f => { delete 남은[f]; });
+    if (Object.keys(남은).length) App.partners[d.key] = 남은; else delete App.partners[d.key];
     App.render();
     toast('표시를 지웠습니다.');
   } catch (e) {
@@ -1854,6 +1893,171 @@ async function clearPosted() {
   }
 }
 window.clearPosted = clearPosted;
+
+/* ══════ 로고 글 ↔ 업체 잇기 (월간 자동 연결 2026-10-05) ══════
+   대표 지시 「계약종료시 로고 삭제하고 완전자동으로」 → 「1개월에 1번씩만」.
+   ★ 매달 1일 자동 내리기는 «이어 둔» 로고만 휴지통으로 보낸다. 로고 그림의 이름(alt)은
+     열쇠가 아니다 — 사람이 «이 로고 = 이 업체»를 한 번 골라 둔다. 저절로 고르지 않는다.
+   ★ 한 자리씩만 쓴다(boardSrl · keep). 업체 자리를 통째로 덮으면 올림 표시가 지워진다.
+   ⚠ 같은 로고 글 번호를 두 회사가 쓸 수 없다 — 그 번호의 글은 «남의 로고»일 수 있다. */
+async function 로고잇기(companyId, srl) {
+  const n = Number(srl);
+  if (!companyId || !(Number.isInteger(n) && n > 0)) return false;
+  const 겹친 = Object.keys(App.partners || {})
+    .filter(id => id !== companyId && Number((App.partners[id] || {}).boardSrl) === n);
+  if (겹친.length) {
+    await say('잇지 않았습니다', '그 로고 글(번호 ' + n + ')은 이미 다른 회사와 이어져 있습니다. 그쪽을 먼저 푸십시오.');
+    return false;
+  }
+  try {
+    await db.ref(PARTNER_PATH + '/' + companyId + '/boardSrl').set(n);
+    (App.partners[companyId] = App.partners[companyId] || {}).boardSrl = n;
+    App.render();
+    return true;
+  } catch (e) {
+    await say('잇지 못했습니다', esc((e && e.code) || String(e)));
+    return false;
+  }
+}
+/* 잇기 풀기 — 잘못 이었을 때. 번호 한 자리만 지운다. */
+async function 로고잇기풀기(companyId) {
+  if (!companyId) return false;
+  try {
+    await db.ref(PARTNER_PATH + '/' + companyId + '/boardSrl').set(null);
+    if (App.partners[companyId]) delete App.partners[companyId].boardSrl;
+    App.render();
+    return true;
+  } catch (e) {
+    await say('풀지 못했습니다', esc((e && e.code) || String(e)));
+    return false;
+  }
+}
+/* 계약이 끝나도 로고를 남긴다 — 실적으로 남겨 두는 곳(2026-09-03 대표 말씀). 사유가 있어야 한다. */
+async function 로고남기기(companyId, why) {
+  const w = String(why || '').trim();
+  if (!companyId) return false;
+  if (!w) {
+    await say('사유를 적어 주십시오', '사유 없는 남기기는 나중에 왜 남겼는지 알 수 없습니다.');
+    return false;
+  }
+  const rec = { why: w, by: currentUserName(), at: todayString() };
+  try {
+    await db.ref(PARTNER_PATH + '/' + companyId + '/keep').set(rec);
+    (App.partners[companyId] = App.partners[companyId] || {}).keep = rec;
+    App.render();
+    return true;
+  } catch (e) {
+    await say('저장하지 못했습니다', esc((e && e.code) || String(e)));
+    return false;
+  }
+}
+async function 로고남기기풀기(companyId) {
+  try {
+    await db.ref(PARTNER_PATH + '/' + companyId + '/keep').set(null);
+    if (App.partners[companyId]) delete App.partners[companyId].keep;
+    App.render();
+  } catch (e) { await say('풀지 못했습니다', esc((e && e.code) || String(e))); }
+}
+window.로고잇기 = 로고잇기; window.로고잇기풀기 = 로고잇기풀기;
+window.로고남기기 = 로고남기기; window.로고남기기풀기 = 로고남기기풀기;
+
+/* 지금 홈페이지 자문사현황의 로고 목록 — 서버(readHomepage)로 «읽기만» 한다.
+   ★ 못 읽으면 null(「로고가 없다」와 다르다). */
+async function 홈로고목록() {
+  App.siteLogoErr = '';
+  try {
+    const token = await firebase.auth().currentUser.getIdToken();
+    const res = await fetch(READ_HOMEPAGE_URL, { method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: 'partner' }) });
+    if (!res.ok) throw new Error('홈페이지 응답 ' + res.status);
+    const data = await res.json();
+    const list = PuHomeParse.parsePartners(data.html);
+    if (!list.length) throw new Error('로고를 하나도 못 찾았습니다 — 홈페이지 모양이 바뀐 것 같습니다');
+    App.siteLogoList = list;
+    return list;
+  } catch (e) {
+    App.siteLogoErr = '자문사현황 로고를 읽지 못했습니다 — ' + ((e && e.message) || e);
+    return null;
+  }
+}
+function 로고그림주소(img) {
+  const s = String(img || '');
+  return /^https?:\/\//.test(s) ? s : PuHomeExport.ORIGIN + (s.charAt(0) === '/' ? '' : '/') + s;
+}
+/* 로고 하나에 이어진 업체 */
+function 로고의업체(srl) {
+  return Object.keys(App.partners || {}).filter(id => Number((App.partners[id] || {}).boardSrl) === Number(srl))[0] || '';
+}
+
+/* 로고 잇기 창 — 지금 홈페이지의 로고를 한 줄씩, 업체를 골라 잇는다.
+   ★ 로고 이름과 같은 업체를 «위로» 올려 주기만 한다. 미리 골라 두지 않는다. */
+async function 로고잇기창() {
+  if (!App.isAdmin) { await say('총괄관리자만 할 수 있습니다', ''); return; }
+  openModal(modalHead('로고와 업체 잇기') + '<div class="sub">자문사현황 로고를 읽고 있습니다…</div>');
+  if (!App.siteLogoList) await 홈로고목록();
+  로고잇기창그리기();
+}
+function 로고잇기창그리기() {
+  const list = App.siteLogoList;
+  let h = modalHead('로고와 업체 잇기 — 이어 둔 로고만 계약 종료 때 저절로 내려갑니다');
+  if (!list) {
+    h += '<div class="bar bad">' + esc(App.siteLogoErr || '로고를 읽지 못했습니다') + '</div>' + modalFoot('');
+    openModal(h); return;
+  }
+  const 업체들 = (App.companies || []).slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name), 'ko'));
+  const 이은수 = list.filter(x => 로고의업체(x.srl)).length;
+  h += '<div class="sub" style="margin-bottom:8px">지금 홈페이지 로고 ' + list.length + '장 · 이음 ' + 이은수
+    + (list.length - 이은수 ? ' · <b>안 이음 ' + (list.length - 이은수) + '</b>' : '') + '</div>';
+  h += '<div class="rows">';
+  list.forEach(x => {
+    const 이은 = 로고의업체(x.srl);
+    const c = 이은 ? (App.companies || []).filter(c => c.id === 이은)[0] : null;
+    const 같은이름 = 업체들.filter(c => x.alt && String(c.name).trim() === x.alt);
+    const 나머지 = 업체들.filter(c => 같은이름.indexOf(c) < 0);
+    const 고르개id = 'logoPick' + x.srl;
+    h += '<div class="l" style="display:flex;gap:8px;align-items:center;white-space:nowrap;overflow:hidden">'
+      + '<img src="' + esc(로고그림주소(x.img)) + '" alt="" style="height:28px;max-width:90px;object-fit:contain">'
+      + '<span class="sub" style="flex:0 0 auto">번호 ' + x.srl + '</span>'
+      + (이은
+          ? '<span style="overflow:hidden;text-overflow:ellipsis"><b>' + esc(c ? c.name : '(업체관리에 없음 ' + 이은 + ')') + '</b></span>'
+            + '<span style="flex:1"></span><button class="btn sm" onclick="로고잇기풀기(\'' + esc(이은) + '\').then(로고잇기창그리기)">풀기</button>'
+          : '<select id="' + 고르개id + '" style="max-width:280px"><option value="">— 업체를 고르십시오 —</option>'
+            + 같은이름.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + ' (로고 이름과 같음)</option>').join('')
+            + 나머지.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name)
+                + (String(c.status || '') === 'closed' ? ' (거래 종료)' : '') + '</option>').join('')
+            + '</select><button class="btn sm" onclick="로고잇기(document.getElementById(\'' + 고르개id + '\').value,'
+            + x.srl + ').then(로고잇기창그리기)">잇기</button>')
+      + '</div>';
+  });
+  h += '</div>' + modalFoot('로고 이름이 같아도 저절로 잇지 않습니다 — 동명 회사가 있을 수 있습니다.');
+  openModal(h, true);
+}
+window.로고잇기창 = 로고잇기창; window.로고잇기창그리기 = 로고잇기창그리기;
+
+/* 자문사 편집칸의 «자동 연결» 줄 — 로고 잇기 · 계약이 끝나도 남기기.
+   ★ 이어 두지 않았으면 «자동으로 안 내려간다»고 있는 그대로 말한다. */
+function 로고연결칸Html(d) {
+  const mk = partnerMark(d.key) || {};
+  const n = Number(mk.boardSrl) || 0;
+  const 남김 = mk.keep && String(mk.keep.why || '').trim() ? mk.keep : null;
+  let h = '<div class="fld"><label>자동 연결 — 계약이 끝나면 다음 달 1일에 로고를 휴지통으로</label>';
+  h += '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden">'
+    + (n ? '<span>홈페이지 로고 글 <b>번호 ' + n + '</b>와 이어져 있습니다</span>'
+           + '<button class="btn sm" onclick="로고잇기풀기(\'' + esc(d.key) + '\')">풀기</button>'
+         : '<span><b>아직 로고와 안 이었습니다</b> — 계약이 끝나도 자동으로 안 내려갑니다</span>'
+           + '<button class="btn sm" onclick="로고잇기창()">로고와 잇기</button>')
+    + '</div>';
+  h += '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px">'
+    + (남김 ? '<span>계약이 끝나도 <b>남김</b> — ' + esc(남김.why) + '</span>'
+              + '<button class="btn sm" onclick="로고남기기풀기(\'' + esc(d.key) + '\')">풀기</button>'
+            : '<span>계약이 끝나도 남기기</span>'
+              + '<input id="keepWhy" placeholder="사유 (예: 실적으로 남김)" style="max-width:220px">'
+              + '<button class="btn sm" onclick="로고남기기(\'' + esc(d.key) + '\', document.getElementById(\'keepWhy\').value)">남기기</button>')
+    + '</div></div>';
+  return h;
+}
 
 /* ══════ 관리 대상 쪽 목록 (2차 설계 §3) ══════
    목록이 코드에 박혀 있으면 홈페이지에 쪽을 새로 만들 때마다 코드를 고쳐 함수를 다시
@@ -3384,6 +3588,77 @@ async function 홈페이지바로고치기() {
   }
 }
 window.홈페이지바로고치기 = 홈페이지바로고치기;
+
+/* ══════ 연결 확인 — 구성원 글 ↔ 푸른ERP 직원(sid) (월간 자동 연결 2026-10-05) ══════
+   대표 지시 「입퇴사 자동으로 니가 정리하고 … 1개월에 1번씩만」.
+   ★ 매달 1일 자동 내리기는 «이어 둔» 글만 움직인다. 이름은 열쇠가 아니다(온톨로지 규칙) —
+     동명이인·오타면 기계가 남의 글을 내린다.
+   ★ 이름이 한 사람과만 맞아도 «사람이 확인하고» 잇는다. 저절로 채우지 않는다.
+   ⚠ sid «한 자리»만 쓴다 — 구성원 자료를 통째로 set 하면 다른 칸(경력·사진 표시)을 덮는다. */
+function 잇기후보(rec) {
+  const n = String((rec && rec.name) || '').trim();
+  if (!n) return [];
+  return (App.staff || []).filter(s => s && s.sid && String(s.name || '').trim() === n);
+}
+function 이름하나만맞는것() {
+  return Object.keys(App.members || {}).map(k => {
+    const rec = App.members[k] || {};
+    if (rec.sid || !(Number(rec.srl) > 0)) return null;
+    const 후보 = 잇기후보(rec);
+    return 후보.length === 1 ? { key: k, sid: 후보[0].sid } : null;
+  }).filter(Boolean);
+}
+async function 직원잇기(key, sid) {
+  const s = String(sid || '').trim();
+  if (!key || !s) return false;
+  try {
+    await db.ref('homepage/members/' + key + '/sid').set(s);
+    (App.members[key] = App.members[key] || {}).sid = s;
+    App.render();
+    return true;
+  } catch (e) {
+    await say('잇지 못했습니다', esc((e && e.code) || String(e)));
+    return false;
+  }
+}
+async function 한번에잇기() {
+  const 줄 = 이름하나만맞는것();
+  if (!줄.length) {
+    await say('한 번에 이을 것이 없습니다',
+      '이름이 한 사람과만 맞는 글이 없습니다. 남은 것은 편집칸의 «푸른ERP 직원» 줄에서 한 사람씩 고르십시오.');
+    return;
+  }
+  if (!await askYes(줄.length + '명을 푸른ERP 직원과 잇습니다',
+    '<ul style="margin:6px 0 0;padding-left:18px">' + 줄.map(x => '<li>'
+      + esc((App.members[x.key] || {}).name || x.key) + ' — 직원 번호 ' + esc(x.sid) + '</li>').join('') + '</ul>'
+    + '<div style="margin-top:8px">이어 두면 그분이 푸른ERP 에서 퇴사 처리될 때 '
+    + '<b>다음 달 1일에 저절로 휴지통으로</b> 내려갑니다. 휴직은 내리지 않습니다.</div>', '잇기')) return;
+  for (const x of 줄) { if (!await 직원잇기(x.key, x.sid)) return; }
+  toast(줄.length + '명을 이었습니다.');
+}
+window.한번에잇기 = 한번에잇기;
+window.직원잇기 = 직원잇기;
+
+/* 편집칸의 «푸른ERP 직원» 한 줄 — 글 번호가 있을 때만(자동 내리기는 글 번호가 있어야 한다).
+   ★ 동명이인이면 고르개를 «비워 두고» 사람이 고르게 한다. 하나를 미리 골라 두면 그냥 누른다. */
+function 직원연결칸Html(d) {
+  if (!(Number(String((d && d.srl) || '').trim()) > 0) || !Array.isArray(App.staff)) return '';
+  const rec = (App.members || {})[d.key] || {};
+  const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;'
+    + 'overflow:hidden;text-overflow:ellipsis;margin-top:6px"><b>푸른ERP 직원</b>' + 안 + '</div>';
+  if (rec.sid) {
+    const 이은 = (App.staff || []).filter(s => s && s.sid === rec.sid)[0];
+    return 줄('<span>' + esc(이은 ? 이은.name + (이은.title ? ' · ' + 이은.title : '') : '명부에 없음')
+      + ' · 번호 ' + esc(rec.sid) + '</span><span>— 퇴사 처리되면 다음 달 1일에 저절로 내려갑니다</span>');
+  }
+  const 후보 = 잇기후보(rec).length ? 잇기후보(rec) : (App.staff || []).filter(s => s && s.sid);
+  return 줄('<select id="sidPick" style="max-width:260px"><option value="">— 고르십시오 —</option>'
+    + 후보.map(s => '<option value="' + esc(s.sid) + '">' + esc(s.name)
+      + (s.title ? ' · ' + esc(s.title) : '') + ' · ' + esc(s.sid) + '</option>').join('')
+    + '</select><button class="btn" style="padding:3px 9px;font-size:11.5px" '
+    + 'onclick="직원잇기(\'' + esc(d.key) + '\', document.getElementById(\'sidPick\').value)">잇기</button>'
+    + '<span>이어 두어야 퇴사 때 저절로 내려갑니다</span>');
+}
 
 /* ══════ 퇴사자를 «한 번에» 내린다 (대표 지시 2026-09-13) ══════
    「퇴사자는 퇴사로 내리게 한 번에 하고 싶은데… 한 번에 수정할 수 있게 하고 싶다」
@@ -4916,6 +5191,10 @@ function closeModal() {
   Log.open = false;
 }
 function modalBackdrop(e) { if (e.target === $('modal')) closeModal(); }
+/* 창 제목 — 「구성원 넣기」·「푸른ERP 채우기」·「자문사 로고」가 이것을 부른다.
+   ⚠ 2026-10-05 에 보니 «한 번도 정의된 적이 없었다» — 세 창이 누르면 오류로 안 열렸다.
+     검사가 가짜(modalHead)를 넣어 돌려서 못 잡았다. tests/home-partner-link.test.js 가 지킨다. */
+function modalHead(title) { return '<h2>' + esc(title) + '</h2>'; }
 function modalFoot(note) {
   return '<div class="foot">' + (note ? '<span class="sub">' + esc(note) + '</span>' : '')
     + '<span style="flex:1"></span><button class="btn" onclick="closeModal()">닫기</button></div>';
@@ -4955,10 +5234,189 @@ function screen() {
 
 /* 왼쪽 기둥 — «무엇을 볼까»(대시보드 카드)와 «무엇을 해야 하나»(할 일)를 한 기둥에 둔다.
    눈이 왼쪽에서 오른쪽으로만 움직인다: 갈래 고르기 → 줄 고르기 → 고치기. */
+/* ══════ 월간 자동 연결 카드 (대표 지시 2026-10-05 「1개월에 1번씩만 자동화」) ══════
+   매달 1일 08:00 서버(monthlyHomepageAuto)가 퇴사·계약 종료 글을 휴지통으로 내린다.
+   이 카드는 «마지막에 무엇을 했나 · 다음은 언제 · 지금 한 번 돌리기»만 보여 준다.
+   ★ 무엇을 내릴지는 서버의 homepage-auto.js 한 곳이 고른다. 화면은 서버에 «물어» 그 답을 보인다
+     (미리 보기 = mode 보기). 화면에서 따로 고르면 규칙이 두 벌이 된다.
+   ★ 기록(homepage/auto/runs)에는 이름이 없다 — sid·companyId 로 화면이 이름을 붙인다. */
+const HOME_AUTO_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/homepageAuto';
+
+/* 다음 돌 때 — 매달 1일. 서버 일정(0 8 1 * *)과 같은 말을 한다. */
+function 다음자동날(오늘) {
+  const 칸 = String(오늘 || '').split('-').map(Number);
+  const y = 칸[0], m = 칸[1];
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  return ny + '-' + String(nm).padStart(2, '0') + '-01';
+}
+function 마지막자동() {
+  let 끝 = null;
+  Object.keys(App.autoRuns || {}).forEach(달 => Object.keys(App.autoRuns[달] || {}).forEach(k => {
+    const r = App.autoRuns[달][k];
+    if (r && (!끝 || Number(r.at) > Number(끝.at))) 끝 = r;
+  }));
+  return 끝;
+}
+/* 한 줄 = 말 · 숫자. 숫자가 없으면(0·빈 값) 그 줄을 안 그린다 — 빈 값은 자리만 차지한다. */
+function 자동카드Html() {
+  const r = 마지막자동();
+  const 줄 = (t, v) => v ? '<div class="arow"><span>' + t + '</span><b>' + v + '</b></div>' : '';
+  return '<div class="autocard"><div class="ath">자동 연결 <span class="sub">매달 1일 08:00</span></div>'
+    + (App.autoErr ? '<div class="arow"><span class="sub">' + esc(App.autoErr) + '</span></div>' : '')
+    + (r
+        ? 줄('마지막', esc(stampShort(r.at)))
+          + 줄('자동으로 내림', (r.내림 || []).length || '')
+          + 줄('못 내림', (r.못내림 || []).length || '')
+          + (r.멈춤 ? 줄('멈춤', '확인 필요') : '')
+        : '<div class="arow"><span class="sub">아직 돈 적 없음</span></div>')
+    + 줄('다음', 다음자동날(todayString()) + ' 08:00')
+    + '<div class="ago">'
+    + '<button class="btn sm" onclick="자동미리보기()">미리 보기</button>'
+    /* ★ 「지금 한 번 돌리기」는 기둥 폭(276px)에서 단추가 두 줄로 넘쳤다 — 짧게 쓴다 */
+    + '<button class="btn sm" onclick="자동지금돌리기()">지금 돌리기</button>'
+    + '<button class="btn sm" onclick="자동기록창()">기록</button>'
+    + '</div></div>';
+}
+/* 내린 것·내릴 것의 이름 — 우리 자료(직원 명부·업체관리)에서 붙인다. 모르면 글 번호라도. */
+function 자동대상이름(x) {
+  const r = x || {};
+  if (r.key) {
+    const m = (App.members || {})[r.key];
+    return ((m && m.name) || r.key) + ' · 구성원 소개';
+  }
+  if (r.sid) {
+    const s = (App.staff || []).filter(p => p && p.sid === r.sid)[0];
+    return (s ? s.name : '직원 ' + r.sid) + ' · 구성원 소개';
+  }
+  if (r.companyId) {
+    const c = (App.companies || []).filter(c => c && c.id === r.companyId)[0];
+    return (c ? c.name : '업체 ' + r.companyId) + ' · 자문사현황';
+  }
+  return '글 번호 ' + (r.srl || '?');
+}
+async function 자동부르기(mode, 지문) {
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HOME_AUTO_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: mode, 지문: 지문 || '' })
+  });
+  const 답 = await res.json().catch(() => ({ ok: false, error: '답을 읽지 못했습니다 (' + res.status + ')' }));
+  if (!res.ok) throw new Error(답.error || ('서버 ' + res.status));
+  return 답;
+}
+async function 자동기록다시읽기() {
+  try {
+    const s = await db.ref('homepage/auto/runs').once('value');
+    App.autoRuns = s.val() || {};
+    App.autoErr = '';
+  } catch (e) {
+    App.autoErr = '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')';
+  }
+  App.render();
+}
+function 자동줄목록(목록, 까닭도) {
+  if (!(목록 || []).length) return '';
+  return '<ul style="margin:4px 0 0;padding-left:18px">' + 목록.map(x => '<li>' + esc(자동대상이름(x))
+    + (까닭도 && x.까닭 ? ' <span class="sub">— ' + esc(x.까닭) + '</span>' : '') + '</li>').join('') + '</ul>';
+}
+/* 미리 보기 — 서버에 «보기»로 묻는다. 아무것도 쓰지 않는다. */
+async function 자동미리보기() {
+  openModal(modalHead('자동 연결 — 미리 보기') + '<div class="sub">서버에 묻고 있습니다…</div>');
+  let r = null;
+  try { r = await 자동부르기('보기'); }
+  catch (e) { openModal(modalHead('자동 연결 — 미리 보기') + '<div class="bar bad">' + esc((e && e.message) || e) + '</div>' + modalFoot('')); return; }
+  let h = modalHead('자동 연결 — 지금 돌리면 이렇게 됩니다 (아직 아무것도 안 했습니다)');
+  if (r.꺼짐) h += '<div class="bar warn">자동 연결이 <b>꺼져</b> 있습니다.</div>';
+  if (r.실패) h += '<div class="bar bad">' + esc(r.실패) + ' — 아무것도 내리지 않습니다.</div>';
+  if (r.멈춤) h += '<div class="bar bad">' + esc(r.멈춤) + '</div>';
+  const 판 = {};
+  (r.게시판확인 || []).forEach(x => { 판[x.게시판 + ':' + x.srl] = x.판; });
+  const 내릴것 = (r.내릴것 || []).map(x => Object.assign({}, x,
+    판[x.게시판 + ':' + x.srl] && 판[x.게시판 + ':' + x.srl] !== 'ok' ? { 까닭: '게시판 확인 ' + 판[x.게시판 + ':' + x.srl] } : {}));
+  h += '<div class="fld"><label>내릴 것 ' + 내릴것.length + '건</label>'
+    + (내릴것.length ? 자동줄목록(내릴것, true) : '<div class="sub">없습니다.</div>') + '</div>';
+  if (r.게시판확인막힘) h += '<div class="bar warn">게시판 확인을 못 했습니다: ' + esc(r.게시판확인막힘) + '</div>';
+  if ((r.연결확인 || []).length) {
+    h += '<div class="fld"><label>이어지지 않아 자동으로 안 움직이는 것 ' + r.연결확인.length + '건</label>'
+      + 자동줄목록(r.연결확인, true) + '</div>';
+  }
+  h += modalFoot('미리 보기는 홈페이지를 바꾸지 않습니다.');
+  openModal(h);
+}
+async function 자동지금돌리기() {
+  if (!await askYes('자동 연결을 지금 한 번 돌립니다',
+    '매달 1일에 하는 일을 지금 합니다 — 퇴사 처리된 직원의 구성원 글, 계약이 끝난 업체의 로고 글 가운데 '
+    + '<b>이어 둔 것만</b> 홈페이지 <b>휴지통</b>으로 옮깁니다(지우지 않습니다, 되살릴 수 있습니다).<br>'
+    + '한 번에 너무 많으면 하나도 안 내리고 멈춥니다. 먼저 «미리 보기»로 보실 수 있습니다.', '돌리기')) return;
+  let r = null;
+  try { r = await 자동부르기('돌리기'); }
+  catch (e) { await say('돌리지 못했습니다', esc((e && e.message) || e)); return; }
+  await 자동결과알리기(r);
+}
+/* 멈춘 목록 «그대로»를 내린다 — 서버가 다시 세어 목록이 바뀌었으면 또 멈춘다(지문). */
+async function 자동승인() {
+  const r = 마지막자동();
+  if (!r || !r.멈춤 || !r.지문) { await say('멈춘 것이 없습니다', '마지막 자동 연결은 멈추지 않았습니다.'); return; }
+  if (!await askYes((r.후보 || []).length + '건을 모두 내립니다',
+    자동줄목록(r.후보 || [], false)
+    + '<div style="margin-top:8px"><b>지우지 않습니다 — 홈페이지 휴지통으로 옮깁니다.</b> 되살릴 수 있습니다.<br>'
+    + '그사이 목록이 바뀌었으면(예: 퇴사 처리를 되돌림) 서버가 다시 멈추고 아무것도 안 내립니다.</div>', '모두 내리기')) return;
+  let 답 = null;
+  try { 답 = await 자동부르기('승인', r.지문); }
+  catch (e) { await say('내리지 못했습니다', esc((e && e.message) || e)); return; }
+  await 자동결과알리기(답);
+}
+async function 자동결과알리기(r) {
+  const 내림 = (r && r.내림) || [], 못 = (r && r.못내림) || [];
+  await say((r && (r.ok === false || r.멈춤)) ? '자동 연결이 멈췄습니다' : '자동 연결을 돌렸습니다',
+    (r && r.실패 ? '<div class="bar bad">' + esc(r.실패) + '</div>' : '')
+    + (r && r.멈춤 ? '<div class="bar bad">' + esc(r.멈춤) + '</div>' : '')
+    + '<b>내림 ' + 내림.length + '건</b>' + 자동줄목록(내림, false)
+    + (못.length ? '<div style="margin-top:8px;color:var(--bad)"><b>못 내림 ' + 못.length + '건</b>' + 자동줄목록(못, true) + '</div>' : ''));
+  자동기록다시읽기();
+}
+/* 기록 — 때 · 한 일 · 누구/어디. 되살리기는 라이믹스 관리자 휴지통에서 한다(서버 되살리기는 아직 없다). */
+function 자동기록창() {
+  const 줄들 = [];
+  Object.keys(App.autoRuns || {}).forEach(달 => Object.keys(App.autoRuns[달] || {}).forEach(k => {
+    const r = App.autoRuns[달][k];
+    if (r) 줄들.push(r);
+  }));
+  줄들.sort((a, b) => Number(b.at) - Number(a.at));
+  let h = modalHead('자동 연결 기록');
+  if (!줄들.length) h += '<div class="sub">아직 돈 적이 없습니다.</div>';
+  else {
+    h += '<table class="atab"><tr><th>때</th><th>방식</th><th>한 일</th><th>누구·어디</th></tr>';
+    줄들.slice(0, 60).forEach(r => {
+      const 한것 = [];
+      (r.내림 || []).forEach(x => 한것.push(['내림(휴지통)', 자동대상이름(x)]));
+      (r.못내림 || []).forEach(x => 한것.push(['못 내림', 자동대상이름(x) + (x.까닭 ? ' — ' + x.까닭 : '')]));
+      if (r.멈춤) 한것.push(['멈춤', r.멈춤]);
+      if (r.실패) 한것.push(['못 돎', r.실패]);
+      if (!한것.length) 한것.push(['할 것 없음', '']);
+      한것.forEach((x, i) => {
+        h += '<tr><td>' + (i ? '' : esc(stampShort(r.at))) + '</td><td>' + (i ? '' : esc(r.방식 || ''))
+          + '</td><td>' + esc(x[0]) + '</td><td title="' + esc(x[1]) + '">' + esc(x[1]) + '</td></tr>';
+      });
+    });
+    h += '</table>';
+  }
+  h += '<div class="foot"><span class="sub">내린 글은 라이믹스 관리자 «휴지통»에서 되살릴 수 있습니다.</span>'
+    + '<span style="flex:1"></span>'
+    + '<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="'
+    + esc(PuHomeExport.ORIGIN + '/index.php?module=admin&act=dispTrashAdminList') + '">휴지통 열기</a>'
+    + '<button class="btn" onclick="closeModal()">닫기</button></div>';
+  openModal(h, true);
+}
+window.자동미리보기 = 자동미리보기; window.자동지금돌리기 = 자동지금돌리기;
+window.자동승인 = 자동승인; window.자동기록창 = 자동기록창;
+
 function railHtml() {
   return '<div class="rail">'
     + '<div class="rh">무엇을 볼까</div>'
     + '<div class="dash">' + dashHtml() + '</div>'
+    + 자동카드Html()
     + todoHtml()
     + '</div>';
 }
@@ -5101,6 +5559,33 @@ function jobsOf() {
   const jobs = [];
   const add = j => { if (j) jobs.push(j); };
 
+  /* ── 월간 자동 연결이 멈췄다·못 돌았다 (2026-10-05) — 가장 먼저 알린다 ──
+     ★ 도우미 함수를 부르지 않고 여기서 바로 센다 — 이 함수를 떼어 돌리는 검사 상자가 많아
+       새 함수를 부르면 그 상자들이 한꺼번에 죽는다(이 화면에서 여섯 번 겪었다). */
+  let 끝자동 = null;
+  Object.keys(App.autoRuns || {}).forEach(달 => Object.keys(App.autoRuns[달] || {}).forEach(k => {
+    const r = App.autoRuns[달][k];
+    if (r && (!끝자동 || Number(r.at) > Number(끝자동.at))) 끝자동 = r;
+  }));
+  if (끝자동 && 끝자동.멈춤) {
+    add({ cls: '', t: '자동 내리기를 멈췄습니다', n: (끝자동.후보 || []).length,
+      who: esc(끝자동.멈춤),
+      go: '<button class="btn pri sm" onclick="자동승인()">모두 내려도 됩니다</button>'
+        + '<button class="btn sm" onclick="자동미리보기()">하나씩 보기</button>',
+      why: '한 번에 내릴 것이 너무 많아 <b>하나도 내리지 않았습니다</b>. 푸른ERP 자료가 한꺼번에 '
+         + '바뀐 것일 수 있습니다. «하나씩 보기»로 맞는지 보시고, 맞으면 «모두 내려도 됩니다»를 누르십시오. '
+         + '그대로 두면 다음 달 1일에 다시 셉니다.' });
+  } else if (끝자동 && 끝자동.ok === false && 끝자동.실패) {
+    add({ cls: 'warn', t: '자동 연결이 이번에 못 돌았습니다', who: esc(끝자동.실패),
+      go: '<button class="btn sm" onclick="자동지금돌리기()">지금 한 번 돌리기</button>',
+      why: '푸른ERP 자료를 못 읽으면 «아무것도 내리지 않고» 멈춥니다 — 홈페이지는 그대로입니다.' });
+  }
+  if (끝자동 && (끝자동.못내림 || []).length) {
+    add({ cls: 'warn', t: '자동으로 못 내린 것이 있습니다', n: 끝자동.못내림.length,
+      go: '<button class="btn sm" onclick="자동기록창()">기록 보기</button>',
+      why: '홈페이지가 받아 주지 않았거나, 그 글이 이어 둔 게시판 것이 아니었습니다. 기록에 까닭이 있습니다.' });
+  }
+
   /* ── 사고: 못 읽음·못 함·저장 실패 ── */
   if (App.checkMsg) {
     add({ cls: App.checkBad ? '' : 'warn', t: '홈페이지 확인이 끝까지 못 갔습니다',
@@ -5185,6 +5670,18 @@ function jobsOf() {
       why: '퇴사가 아닙니다. 복직인지 퇴사인지 <b>푸른ERP 직원관리</b>에서 확인하십시오 — '
          + '퇴사로 처리하면 그때 「내릴 것」으로 바뀝니다. <b>자동으로 내리지 않습니다.</b>' });
   }
+  /* ★ 월간 자동 연결(2026-10-05) — 직원과 «안 이은» 구성원 글은 퇴사해도 저절로 안 내려간다.
+       명부를 못 읽었으면(App.staff 가 없으면) 권하지 않는다 — 고를 사람 목록이 없다. */
+  const 안이은 = Object.keys(App.members || {}).filter(k => {
+    const r = (App.members || {})[k] || {};
+    return !r.sid && Number(r.srl) > 0 && !r.takenDown;
+  });
+  if (Array.isArray(App.staff) && App.staff.length && 안이은.length) {
+    add({ cls: 'info', t: '자동 연결 — 푸른ERP 직원과 아직 안 이은 구성원 글', n: 안이은.length,
+      go: '<button class="btn sm" onclick="한번에잇기()">이름이 하나만 맞는 사람 한 번에 잇기</button>',
+      why: '이어 둔 글만 퇴사 처리 때 <b>다음 달 1일에 저절로</b> 휴지통으로 내려갑니다. '
+         + '동명이인은 편집칸의 «푸른ERP 직원» 줄에서 한 사람씩 고르십시오.' });
+  }
   if (ms.own.none) {
     add({ cls: 'info', t: '명부에 없는 사람', n: ms.own.none,
       go: '<button class="btn sm" onclick="App.filt(\'own:none\',\'members\')">보기</button>',
@@ -5248,8 +5745,18 @@ function jobsOf() {
       /* ★ 2026-09-03 대표 지시 「업체 종료된 곳은 모두 자동으로 명단 빼라」로 뜻이 바뀌었다.
          전에는 «알리기만» 했다. 이제 우리 명단에서는 자동으로 빠지지만, 지금 홈페이지는
          우리가 못 고치므로 «거기서 내리는 일»만 사람 손에 남는다 — 그 한 가지를 말한다. */
-      why: '우리 명단에서는 자동으로 뺐습니다. 다만 지금 홈페이지는 우리가 고칠 수 없어 '
-         + '로고가 그대로 걸려 있습니다 — 홈페이지 관리자 화면에서 내려 주십시오.' });
+      /* ★ 2026-10-05 월간 자동 연결 — 이제 «이어 둔» 로고는 서버가 다음 달 1일에 내린다 */
+      why: '우리 명단에서는 자동으로 뺐습니다. 지금 홈페이지의 로고는 <b>로고와 이어 둔 것만</b> '
+         + '다음 달 1일에 저절로 휴지통으로 내려갑니다 — 안 이은 것은 «로고와 잇기»부터 해 주십시오.' });
+  }
+  /* ★ 월간 자동 연결(2026-10-05) — 업체관리를 읽었는데 로고와 이은 업체가 «하나도» 없으면
+       계약이 끝나도 아무것도 안 내려간다. 그 사실을 할 일로 알린다. */
+  const 이은로고 = Object.keys(App.partners || {}).filter(id => Number((App.partners[id] || {}).boardSrl) > 0);
+  if ((App.companies || []).length && !App.companiesErr && !이은로고.length) {
+    add({ cls: 'info', t: '자동 연결 — 자문사현황 로고를 업체와 아직 안 이었습니다',
+      go: '<button class="btn sm" onclick="로고잇기창()">로고와 잇기</button>',
+      why: '이어 둔 로고만 계약이 끝났을 때 <b>다음 달 1일에 저절로</b> 휴지통으로 내려갑니다. '
+         + '로고 이름이 같아도 저절로 잇지 않습니다 — 한 번만 골라 두시면 됩니다.' });
   }
 
   /* ── 아직 대조를 안 눌렀다 ── */
@@ -6030,8 +6537,11 @@ function partnerEdit(d) {
     h += '<div class="band rm"><b>업체관리에서 거래가 끝난 업체입니다</b>'
       + (c.closedDate ? ' (' + esc(c.closedDate) + ')' : '')
       + ' — 홈페이지에는 <b>올림</b>으로 표시돼 있습니다.<br>'
-      + '<span class="sm">내릴지는 사람이 판단합니다 — 자문이 끝난 뒤에도 실적으로 남겨 두는 곳이 있습니다. '
-      + '알리기만 하고 자동으로 고치지 않습니다.</span></div>';
+      /* ★ 월간 자동 연결(2026-10-05) 뒤로는 «이어 둔» 로고가 다음 달 1일에 저절로 내려간다.
+           안 이었거나 남기기로 둔 것은 그대로 — 사람에게 있는 그대로 말한다. */
+      + '<span class="sm">' + (Number(mk.boardSrl) > 0 && !(mk.keep && String(mk.keep.why || '').trim())
+          ? '로고와 이어져 있어 <b>다음 달 1일에 저절로 휴지통으로</b> 내려갑니다. 남기려면 아래 «남기기»를 쓰십시오.'
+          : '로고와 안 이었거나 «남기기»로 두어 자동으로는 안 내려갑니다.') + '</span></div>';
   }
   h += '</div><div class="esc">';
   /* 회사 자료는 «보여주기만» 한다. 고칠 수 있게 두면 두 곳에 서로 다른 이름이 남는다. */
@@ -6052,6 +6562,9 @@ function partnerEdit(d) {
     + '<div class="sub" style="margin-top:5px">'
     + (mk.by || mk.at ? '표시: ' + esc(mk.by || '(누구인지 모름)') + ' · ' + esc(mk.at || '(날짜 모름)')
                       : '아직 아무도 표시하지 않았습니다') + '</div></div>';
+
+  /* ★ 월간 자동 연결(2026-10-05) — 로고 잇기 · 계약이 끝나도 남기기 */
+  h += 로고연결칸Html(d);
 
   h += '<div class="fld"><label>메모 (왜 올렸는지·왜 안 올렸는지) — 단추를 다시 누르면 함께 저장됩니다</label>'
     + '<textarea rows="2" oninput="fieldEdit(\'why\',this.value)">' + esc(d.why) + '</textarea></div>';
@@ -6264,6 +6777,8 @@ function memberEdit(d) {
          그래서 「저장」이 아니라 제 단추로 보낸다. 무엇이 바뀌는지 먼저 보여 준다.
        ⚠ 글 번호가 없으면 보낼 자리가 없다 — 아예 안 그린다. */
   붙은칸 += 사진칸Html(d);
+  /* ★ 푸른ERP 직원과 잇기 (월간 자동 연결 2026-10-05) — 이어 둔 글만 퇴사 때 저절로 내려간다 */
+  붙은칸 += 직원연결칸Html(d);
   /* ⚠ 붙은 칸은 여기서 끝나지 «않는다» — 대표 지시 2026-09-03 「이 부분 전체 틀고정해야
      한다」로 경력 목록 «위 전부»(구분·이름줄·메인 설명·담당 업무·경력사항 이름줄)를
      붙였다. 붙는 것은 모두 «붙은칸» 에 담긴다 — 담기지 않은 것은 구른다.

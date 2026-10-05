@@ -88,7 +88,10 @@ function box(extra) {
     noConst(constLine('직원쪽')), fnSource('직원줄'), fnSource('쪽으로가기'),
     /* 얼굴 사진 칸 — 편집칸(memberEdit)의 «붙은 칸»이 이것을 지난다 (2026-09-14).
        ⚠★ 상자에 새 함수를 안 실어 검사가 한꺼번에 죽은 것이 이번이 여섯 번째다. */
-    fnSource('사진칸Html')].join('\n'), ctx);
+    fnSource('사진칸Html'),
+    /* 푸른ERP 직원과 잇는 줄 — 편집칸의 «붙은 칸»이 이것을 지난다 (월간 자동 연결 2026-10-05).
+       ⚠★ 상자에 새 함수를 안 실어 검사가 한꺼번에 죽는 일이 일곱 번째가 되지 않게 여기에 싣는다. */
+    fnSource('잇기후보'), fnSource('직원연결칸Html')].join('\n'), ctx);
   return ctx;
 }
 function run(ctx, code) { vm.runInContext(code, ctx); return ctx; }
@@ -186,7 +189,8 @@ test('★ 바깥으로 나가는 길은 «이름 붙은 우리 주소»뿐이다
      2026-08-31: 홈페이지를 새로 만들기로 하면서 «올리기»와 «새 쪽 읽기»가 늘었다.
      늘어난 것도 모두 «이름 붙은 상수»여야 한다 — 주소를 그 자리에 박으면 걸린다. */
   /* 2026-09-13: 서버가 «지금 홈페이지»를 직접 고치는 길(HOME_WRITE_URL)이 늘었다. */
-  const 허용 = ['READ_HOMEPAGE_URL', 'PUBLISH_URL', 'SITE_BASE', 'HOME_WRITE_URL'];
+  /* 2026-10-05: 월간 자동 연결(HOME_AUTO_URL — 미리 보기·지금 돌리기·승인)이 늘었다. */
+  const 허용 = ['READ_HOMEPAGE_URL', 'PUBLISH_URL', 'SITE_BASE', 'HOME_WRITE_URL', 'HOME_AUTO_URL'];
   const targets = [...html.matchAll(/\bfetch\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g)].map(m => m[1]);
   assert.ok(targets.length > 0, 'fetch 를 하나도 찾지 못했습니다 — 홈페이지로 가는 길이 사라졌습니다');
   targets.forEach(t => assert.ok(허용.indexOf(t) >= 0,

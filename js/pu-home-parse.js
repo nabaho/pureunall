@@ -112,7 +112,31 @@
     return withBreaks.split('\n').map(tidy).filter(Boolean);
   }
 
+  /* 자문사현황 로고 목록 — 로고 칸(bh_item) 하나마다 그림과 «글 번호»(data-srl)가 붙어 있다
+     (2026-10-05 읽기만 해서 본 모양: 글 번호는 주석 속 <a data-srl> 에 있다).
+     ★ 월간 자동 연결에서 «이 로고 = 이 업체»를 사람이 고를 때 쓴다. 읽기만 한다.
+     ★ 같은 번호가 두 번 나오면 한 번만 — 홈페이지가 같은 로고를 두 번 보여 줄 때가 있다.
+     ⚠ 로고 칸 밖의 그림(머리·발의 아이콘)은 안 든다 — 칸 단위로 잘라 본다. */
+  function parsePartners(html) {
+    const src = String(html || '');
+    const out = [];
+    const 본것 = {};
+    const 칸들 = src.split(/<div class="bh bh_item item /).slice(1);
+    칸들.forEach(function (칸) {
+      const 번호 = /data-srl="(\d+)"/.exec(칸) || /partner_board\/(\d+)/.exec(칸);
+      const 그림 = /<img[^>]+src="([^"]+)"/.exec(칸);
+      if (!번호 || !그림) return;
+      const srl = Number(번호[1]);
+      if (!(srl > 0) || 본것[srl]) return;
+      본것[srl] = true;
+      const alt = /<img[^>]+alt="([^"]*)"/.exec(칸);
+      out.push({ srl: srl, img: 그림[1], alt: alt ? tidy(alt[1]) : '' });
+    });
+    return out;
+  }
+
   global.PuHomeParse = {
+    parsePartners: parsePartners,
     tidy: tidy,
     parseMembers: parseMembers,
     parsePageText: parsePageText,

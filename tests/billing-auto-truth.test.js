@@ -82,7 +82,9 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
   /* 2026-10-04 «오늘만» 23시 보충(newsletterRefillOnce20261004) — 10/4 하루만 일하고 다음 날 지운다.
        지우면 이 수도 19 로 되돌린다. 한 번뿐이라 하루 셈·화면 설명엔 안 넣는다. */
   /* 2026-10-05 뉴스레터 반송 확인(매일 9:00, newsletterBounceScan) — 하루 셈 +1 */
-  assert.strictEqual(all.length, 21, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  /* 2026-10-05 홈페이지 월간 자동 연결(매달 1일 8:00, monthlyHomepageAuto) — 달마다라 하루 셈·화면
+       설명엔 안 든다(반출 기록 정리와 같다). 주기는 tests/homepage-auto-server.test.js 가 지킨다. */
+  assert.strictEqual(all.length, 22, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
