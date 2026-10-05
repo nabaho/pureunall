@@ -1,49 +1,76 @@
 # -*- coding: utf-8 -*-
 """
-핵심루프용 파일럿 급여 데이터 생성 — 다온원·나라앤드씨·새별 3곳
+핵심루프용 파일럿 급여 데이터 생성 — 파일럿 3그룹(이름 표는 자료 폴더의 pilot_branches.json)
 - parser_output(직원별) → 사업장/월(시트)별로 묶고, 엔진 규칙으로 신호(3색) 부여.
 - 앱(payroll-os.html)이 payroll_os/payroll 에 올려 급여 처리 화면에 표시.
 - 주민번호 없음(성명만). 결과: _harness_out/pilot_payroll.json
 """
-import os, json, re
+import os, json, re, sys
 DATA_ROOT = os.environ.get("PAYROLL_DATA_ROOT",
     r"C:\Users\fair0\OneDrive\바탕 화면\급여아웃소싱 서류들")
 OUT_DIR = os.path.join(DATA_ROOT, "_harness_out")
-PILOTS = ["다온원", "나라앤드씨", "나라앤씨", "새별"]
 
 # ── 지점 분리 (2026-09-05) ──────────────────────────────────────────
-# 다온원(서산·아산·천안)·새별(매장 3곳)·나라앤드씨(나비미야·삼산회관)는
-# 사업장관리번호가 각각 다른 **별개 사업장**이다. 예전엔 이름 앞부분만 보고
-# 한 덩어리로 묶었는데, 그러면 어느 지점 파일이 한 달 빠졌을 때 그 지점 직원이
-# 전원 퇴사한 것처럼 보였다(상실추정 노이즈). 신고·연차·퇴직정산은 모두
-# 사업장 단위라 여기서 갈라 두어야 한다.
-# ⚠ 이름은 설정카드(site_cards)와 맞춘다 — 「다온원」은 아산점(급여일 10일),
-#   서산점·천안점은 말일. 이름이 어긋나면 급여일·수신함 매칭이 끊긴다.
-# ⚠ **파일명을 먼저** 본다 — 「나라앤드씨 (삼산회관)」 폴더 안에 나비미야 자료가
-#   섞여 있어, 경로부터 보면 나비미야가 삼산회관으로 잡힌다.
-BRANCHES = [
-    ("다온원 서산점",       ["다온원 서산", "서산점"]),
-    ("다온원 천안점",       ["다온원 천안", "천안점"]),
-    ("다온원",              ["다온원 아산", "아산점", "다온원 (10일)"]),   # 아산점 = 카드의 「다온원」
-    ("새별반찬 배방월천점", ["배방월천", "배방"]),
-    ("새별반찬 모종점",     ["모종"]),
-    ("하나로마트(새별)",    ["하나로마트"]),
-    ("사계절찬",            ["사계절찬"]),
-    ("나비미야",            ["나비미야"]),
-    ("삼산회관",            ["삼산회관"]),
-    ("나라앤드씨",          ["나라앤드씨", "나라앤씨"]),
-]
+# 파일럿 3그룹은 지점·매장마다 사업장관리번호가 각각 다른 **별개 사업장**이다.
+# 예전엔 이름 앞부분만 보고 한 덩어리로 묶었는데, 그러면 어느 지점 파일이 한 달
+# 빠졌을 때 그 지점 직원이 전원 퇴사한 것처럼 보였다(상실추정 노이즈).
+# 신고·연차·퇴직정산은 모두 사업장 단위라 여기서 갈라 두어야 한다.
+# ⚠ 이름은 설정카드(site_cards)와 맞춘다 — 이름이 어긋나면 급여일·수신함 매칭이 끊긴다.
+# ⚠ **파일명을 먼저** 본다 — 한 가게 폴더 안에 다른 가게 자료가 섞여 있어,
+#   경로부터 보면 엉뚱한 가게로 잡힌다.
+#
+# ⚠ 가르는 표는 **저장소 밖** 자료 폴더의 pilot_branches.json 에 둔다 (2026-10-05).
+#   열쇠말은 **실제 파일 경로**와 맞춰 보는 글자라 실제 업체 이름이어야 한다. 표가
+#   코드에 있을 때 보안 정리(업체·사람 이름 걷어내기, 2026-09)가 가짜 이름으로 바꿔
+#   하나도 안 맞게 됐다. 저장소엔 장치만, 이름은 자료 폴더에 둔다
+#   (build_site_cards 의 folder_split.json 과 같은 꼴). 꼴:
+#     {"pilots": ["경로에 이 말이 있으면 파일럿", ...],
+#      "branches": [["사업장 이름", ["열쇠말", ...]], ...]}
+#   · branches 는 위에서부터 본다 — 먼저 적은 것이 이긴다(「OO 서산점」을 묶음 이름보다 먼저).
+#   · 표가 없거나 깨졌거나 아무것도 안 걸리면 **결과 파일을 덮어쓰지 않고 멈춘다** —
+#     빈 결과로 조용히 덮으면 급여 화면에서 파일럿 사업장이 통째로 사라진다.
+BRANCH_FILE = os.path.join(DATA_ROOT, "pilot_branches.json")
+
+
+def _load_branches():
+    """(pilots, branches). 표가 없거나 깨졌으면 까닭을 알리고 ([], [])."""
+    if not os.path.exists(BRANCH_FILE):
+        print("[주의] 지점 표가 없습니다:", BRANCH_FILE)
+        return [], []
+    try:
+        raw = json.load(open(BRANCH_FILE, encoding="utf-8"))
+        pilots = [str(k) for k in raw.get("pilots") or [] if k]
+        branches = [(str(n), [str(k) for k in keys if k]) for n, keys in raw.get("branches") or []]
+    except Exception as e:
+        print("[주의] pilot_branches.json 을 못 읽었습니다:", e)
+        return [], []
+    if not pilots or not branches:
+        print("[주의] pilot_branches.json 의 pilots·branches 가 비어 있습니다:", BRANCH_FILE)
+        return [], []
+    return pilots, branches
+
+
+_TABLE = None
+
+
+def _table():
+    # 처음 쓸 때 읽는다 — build_payroll_all 은 signal·OUT_DIR 만 가져가므로 표를 안 읽고 주의도 안 뜬다.
+    global _TABLE
+    if _TABLE is None:
+        _TABLE = _load_branches()
+    return _TABLE
 
 
 def pilot_of(path):
     """파일 하나가 어느 사업장 것인지. 지점까지 갈라서 돌려준다."""
-    if not any(k in path for k in PILOTS):
+    pilots, branches = _table()
+    if not any(k in path for k in pilots):
         return None                      # 파일럿 3그룹 밖이면 대상 아님
     base = os.path.basename(path)
-    for name, keys in BRANCHES:          # ① 파일명 우선(폴더에 딴 업체가 섞여 있다)
+    for name, keys in branches:          # ① 파일명 우선(폴더에 딴 업체가 섞여 있다)
         if any(k in base for k in keys):
             return name
-    for name, keys in BRANCHES:          # ② 파일명에 없으면 경로로
+    for name, keys in branches:          # ② 파일명에 없으면 경로로
         if any(k in path for k in keys):
             return name
     return None
@@ -73,6 +100,10 @@ def signal(emps):
 
 
 def main():
+    if not _table()[0]:
+        print("[멈춤] 지점 표가 없어 어느 파일도 파일럿 사업장으로 못 가릅니다 — "
+              "pilot_payroll.json 을 덮어쓰지 않았습니다. 꼴은 이 파일 위쪽 설명을 보세요.")
+        sys.exit(1)
     res = json.load(open(os.path.join(OUT_DIR, "parser_output.json"), encoding="utf-8"))
     # 사업장 → [{월, 직원[], 신호, 이슈}]
     out = {}
@@ -122,6 +153,10 @@ def main():
     # 사업장별 정렬(직원수 큰 시트 먼저)
     for site in out:
         out[site].sort(key=lambda x: -x["직원수"])
+    if not out:                          # 표는 있는데 하나도 안 걸렸다 — 열쇠말이 실제 경로와 어긋난 것
+        print("[멈춤] 지점 표의 열쇠말에 걸린 파일이 하나도 없습니다 — "
+              "pilot_payroll.json 을 덮어쓰지 않았습니다:", BRANCH_FILE)
+        sys.exit(1)
 
     payload = {"pilots": list(out.keys()),
                "sites": out,
