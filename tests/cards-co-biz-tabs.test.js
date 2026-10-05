@@ -12,7 +12,7 @@ const { test } = require('node:test');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
 
 test('사업 탭 목록에 현장클리닉·기술보호울타리가 있고, 목록에 있는 것만 거른다', () => {
-  assert.match(SRC, /const CO_BIZ_TABS = \['현장클리닉', '기술보호울타리'\];/);
+  assert.match(SRC, /const CO_BIZ_TABS = \['현장클리닉', '기술보호울타리', '일터상생혁신컨설팅'\];/);
   assert.match(SRC, /\.filter\(x => CO_BIZ_TABS\.indexOf\(x\.t\) >= 0\)/);
   assert.match(SRC, /<div class="pcsec">사업<\/div>/);
 });

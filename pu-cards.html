@@ -16733,7 +16733,9 @@ function renderPCSide(){
        ⚠ 아래 「서류 탭」(서류 종류 딱지)은 여전히 접어 둔다. 여기에는 «사업 이름»만 둔다 —
          목록에 없는 탭은 안 나온다. 새 사업을 넣을 때 이 목록에 이름을 더한다.
        ⚠ 이 함수 안에 둔다 — 검사들이 이 함수를 떠서 돌린다(밖의 상수는 그 자리에 없다). */
-    const CO_BIZ_TABS = ['현장클리닉', '기술보호울타리'];
+    /* 2026-10-05 폴더 정리(대표 지시 「폴더 정리좀 해라 … 중복된다」) — 사업 이름이던 폴더
+       「통합기술보호지원단」·「일터상생혁신컨설팅」을 걷고 이 칸으로 옮겼다. 폴더는 거래 관계만 남긴다. */
+    const CO_BIZ_TABS = ['현장클리닉', '기술보호울타리', '일터상생혁신컨설팅'];
     const bizTabs = (typeof coTagList === 'function' ? coTagList(cos) : [])
       .filter(x => CO_BIZ_TABS.indexOf(x.t) >= 0);
     if(bizTabs.length){
@@ -16857,21 +16859,10 @@ function renderPCSide(){
   groups.forEach(g=> h += folderRow(g));
   h += `</div>`;
 
-  h += `<div class="pcsec">담당자별 (직원)</div>`;
-  /* 퇴사자는 뺀다(대표 지시 2026-09-08) — 「담당 전체」 고르개와 «같은 잣대»다.
-     한쪽만 빼면 옆줄에는 있고 위 목록에는 없어 「어디는 되고 어디는 안 되나」가 된다. */
-  const owners=nonRetiredPicks(
-    [...new Set(kindArr.map(it=>String(it.owner||'').trim()).filter(Boolean))]
-      .sort((a,b)=>a.localeCompare(b,'ko')), state.owner);
-  if (!owners.length)
-    h += `<div class="pchintside">명함에 담당자를 입력하면<br>여기에 자동으로 분류됩니다</div>`;
-  owners.forEach(o=>{
-    h += pcItem(`onclick="state.view='list';state.owner='${esc(o)}';state.group='all';state.region='';state.page=0;render()"`,
-      '👤 '+esc(o), kindArr.filter(it=>String(it.owner||'').trim()===o).length, state.owner===o);
-  });
-  /* 👤 담당자 채우기로 가는 문 (대표 지시 2026-10-05) —
-     ⚠ 「여기에 자동으로 분류됩니다」 바로 아래다. 안내를 읽은 그 자리에 손이 가야 한다.
-       따로 들어가야 하는 화면이면 아무도 안 간다(「📄 담당 모름 한 번에 나누기」와 같은 결).
+  /* ── 「담당자별 (직원)」 목록을 걷었다 (대표 지시 2026-10-05 「이 부분 필요없다. 삭제 해라」) ──
+     담당자로 거르는 길은 위 «담당 전체» 고르개(state.owner)가 그대로 한다 — 같은 일을 하는
+     자리가 둘이었다. ⚠ 담당자 자료(it.owner)는 지우지 않는다 — 메일 담당자 찾기·고르개가 쓴다.
+     ⚠ 「👤 담당자 채우기」 문은 남긴다(같은 날 대표 지시로 만든 기능 — 목록과 따로 쓴다).
      ⚠ 채울 것이 하나도 없으면 안 그린다 — 눌러도 아무 일 없는 단추는 두지 않는다. */
   /* ⚠ typeof 로 감싼다 — 이 함수만 잘라 돌리는 검사에서 cardOwnPlan 이 없어도 죽지 않게.
        옆줄이 통째로 안 그려지는 것보다 문 하나가 없는 편이 낫다. */
