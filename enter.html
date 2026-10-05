@@ -129,6 +129,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
+<script src="js/pu-logout-why.js?v=1"></script>
 <script type="module" src="js/pu-mfa.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
@@ -1042,6 +1044,8 @@ body.portal-mode #moreFab{display:flex;}
       <div class="err" id="errMsg"></div>
       </form>
     </div>
+    <!-- 지난번에 왜 풀렸나 — 다시 생기면 이 줄을 찍어 보내 주시면 원인을 바로 짚는다 -->
+    <div id="logoutWhy" style="display:none;margin:10px auto 0;max-width:420px;font-size:11.5px;line-height:1.5;color:#64748b;text-align:center"></div>
     <div class="foot">© 2026 푸른노무법인 · 통합 포털 · 안전한 인증 연결</div>
   </div>
 
@@ -1818,6 +1822,7 @@ body.portal-mode #moreFab{display:flex;}
       if(user && user.email){
         window._puAuthAt = Date.now();
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
+        try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         if(!_handled){ _handled = true; enterPortal(user); }
       } else if(_handled){
         // 로그아웃됨(유휴 60분·다른 탭 로그아웃 포함) → 화면 바꿔치기 대신 '완전 새로고침'.
@@ -1836,6 +1841,7 @@ body.portal-mode #moreFab{display:flex;}
         //   사람이 로그아웃 질문을 받게 된다. 앞 사람 카카오 문제는 «처음 쓰는 기기면 다시 묻기»(kkLogin)와
         //   포털 「로그아웃」 단추(kkLogoutFlow)가 맡는다. 대표 선택: 「바로 들어가게」.
         if(!window.__kkReturning) _rmBootSplash();
+        try { var _lw=$('logoutWhy'), _lt=window.PuLogoutWhy?PuLogoutWhy.text():''; if(_lw&&_lt){ _lw.textContent=_lt; _lw.style.display=''; } } catch(_w){}
         // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
         try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
         if(_persistenceBootError){
@@ -3722,7 +3728,7 @@ body.portal-mode #moreFab{display:flex;}
     if(document.hidden) return;
     try {
       var t = Number(localStorage.getItem('pu_auth_logout_at') || 0);
-      if(t && window._puAuthAt && t > window._puAuthAt && auth.currentUser){ auth.signOut(); }
+      if(t && window._puAuthAt && t > window._puAuthAt && auth.currentUser){ try{ window.PuLogoutWhy&&PuLogoutWhy.why('다른 창 로그아웃을 따라 나감'); }catch(_w){} auth.signOut(); }
     } catch(e){}
   }, { passive:true });
 
@@ -3756,7 +3762,7 @@ body.portal-mode #moreFab{display:flex;}
       var last = 0;
       try{ last = parseInt(localStorage.getItem(AKEY)||'0', 10); }catch(e){}
       if(!last){ mark(); return; }
-      if(Date.now() - last >= LIMIT){ broadcastLogout(); auth.signOut(); }   // 유휴 로그아웃도 «전체»다
+      if(Date.now() - last >= LIMIT){ broadcastLogout(); try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃('+Math.round(LIMIT/60000)+'분)'); }catch(_w){} auth.signOut(); }   // 유휴 로그아웃도 «전체»다
     }, 30000);
   })();
 

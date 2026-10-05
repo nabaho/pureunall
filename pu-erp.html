@@ -160,7 +160,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=21"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
-  <script src="js/pu-authsync.js?v=2"></script>
+  <script src="js/pu-authsync.js?v=3"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=3"></script>
   <script>
@@ -83519,7 +83519,7 @@ function LoginScreen(props){
           var any2 = users2.find(_matches);
           if(any2 && !_canLogin(any2)){
             // 비활성 계정으로 '확정'된 경우에만 세션 종료 (보안)
-            try { firebase.auth().signOut(); } catch(_){}
+            try { window.PuLogoutWhy&&PuLogoutWhy.why('재직 상태 아님(이알피)'); firebase.auth().signOut(); } catch(_){}
             var st2 = any2.status==='leave'?'휴직':any2.status==='retired'?'퇴직':any2.status==='standby'?'대기':any2.status==='scheduled'?'입사예정':'비활성';
             setErr('재직 상태가 아니어서 로그인할 수 없습니다. (현재: '+st2+')');
           } else {
@@ -85666,7 +85666,7 @@ function App(){
     try {
       var _fu = firebase && firebase.auth && firebase.auth().currentUser;
       _hadPortal = !!(_fu && _fu.email);
-      if(_hadPortal){ firebase.auth().signOut(); }
+      if(_hadPortal){ try{ window.PuLogoutWhy&&PuLogoutWhy.why('이알피 로그아웃'+(opts&&opts.reason?'('+opts.reason+')':'')); }catch(_w){} firebase.auth().signOut(); }
     } catch(_){}
     // CURRENT_USER 게스트화
     CURRENT_USER.sid = ''; CURRENT_USER.name = ''; CURRENT_USER.role = '';
@@ -86018,7 +86018,7 @@ document.addEventListener('keydown', function(e){
     try{
       var hadPortal=false;
       var _so=null;
-      try{ var u=firebase.auth().currentUser; hadPortal=!!(u&&u.email); if(hadPortal) _so=firebase.auth().signOut(); }catch(_){}
+      try{ var u=firebase.auth().currentUser; hadPortal=!!(u&&u.email); if(hadPortal){ try{ window.PuLogoutWhy&&PuLogoutWhy.why('자동 로그아웃(이알피)'); }catch(_w){} _so=firebase.auth().signOut(); } }catch(_){}
       try{ sessionStorage.removeItem('pureun_v6_session_sid'); }catch(_){}
       var ov=document.createElement('div'); ov.style.cssText='position:fixed;inset:0;background:#f8fafc;z-index:2147483647;'; document.body.appendChild(ov);
       /* ★ 로그아웃이 «끝난 뒤에» 포털로 간다 (2026-09-30). 전에는 시작만 하고 0.2초 뒤에 떠났다 —

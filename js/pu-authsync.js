@@ -93,6 +93,7 @@
   }
   /* 이 탭의 파이어베이스도 끊고 나간다 — 메모리에 남은 사용자가 토큰을 계속 새로 받지 않게 */
   function forceOut() {
+    try { if (global.PuLogoutWhy) global.PuLogoutWhy.why('다른 창 로그아웃을 따라 나감'); } catch (e) { }
     try { var a = global.firebase && global.firebase.auth && global.firebase.auth(); if (a && a.signOut) a.signOut(); } catch (e) { }
     return kick('signedout');
   }
