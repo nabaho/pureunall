@@ -67129,7 +67129,10 @@ function ProjectManagementShared(props){
     return it;
   });
   if(migrated) dbSet(props.storageKey, existing);
-  var s = useState(existing); var items = s[0]; var setItems = s[1];
+  /* ★ 처음 열 때도 삭제표시(_deleted) 줄을 뺀다 (2026-10-05 대표 「동일건이다 하나 삭제해라」).
+     refreshItems 는 거르는데 «처음 상태»만 안 걸러서, 휴지통으로 간 이음센터-2026-001 옛 줄이
+     다른 일로 목록이 다시 읽힐 때까지 표에 두 줄로 보였다. ⚠ existing 은 그대로 둔다 — 위 이관·dbSet 이 쓴다. */
+  var s = useState(function(){ return existing.filter(function(x){ return !(x && x._deleted === true); }); }); var items = s[0]; var setItems = s[1];
   var q = useState(''); var query = q[0]; var setQuery = q[1];
   var sf = usePersistedState('proj_'+props.sourceKind+'_status', 'open'); var statusFilter = sf[0]; var setStatusFilter = sf[1];
   var ty = usePersistedState('proj_'+props.sourceKind+'_type', 'all'); var typeFilter = ty[0]; var setTypeFilter = ty[1];
