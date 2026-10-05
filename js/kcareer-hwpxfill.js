@@ -906,7 +906,7 @@
          근무처·직위·주요업무를 묻는 표는 «다닌 곳»을 묻는 것이다 — 위촉·활동으로 메우지 않는다.
          ⚠ 「기간|기관|내용」처럼 직위·부서가 없는 표는 예전대로 위촉·활동까지 넣는다.
          ⚠ 근무경력이 하나도 없으면 예전대로(빈 표보다 낫다는 지난 결정을 뒤집지 않는다). */
-      if (head.kind === 'career' && data.work && data.work.length
+      if (head.kind === 'career' && data.work && data.work.length && !data.careerAll
           && (head.map.indexOf('title') >= 0 || head.map.indexOf('dept') >= 0)) items = data.work;
       var put = 0, donePick = {}, 상벌칸 = {};
       /* 이 구역의 끝까지만 — 다음 머리행이나 소제목을 만나면 남의 자리다 */

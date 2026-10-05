@@ -355,7 +355,7 @@ test('★★ 어학 시험 가르기(_isLangCert) — 성적이 있거나 시험
   const cv = app.slice(시작, app.indexOf('\nasync function ', 시작));
   assert.match(cv, /const 어학목록=_자격\.filter\(_isLangCert\)/, '어학 목록이 가르개를 안 씁니다');
   /* ⚠ 2026-10-05: 같은 거름에 「과정·양성·교육」 빼기가 더해졌다 — 어학을 빼는지만 본다 */
-  assert.match(cv, /const 자격목록=_자격\.filter\(function\(r\)\{ return !_isLangCert\(r\)/,
+  assert.match(cv, /const 자격목록=(?:_골라\()?_자격\.filter\(function\(r\)\{ return !_isLangCert\(r\)/,
     '★★ 토익이 자격 표와 어학 표에 두 번 적힙니다');
   assert.match(cv, /lang:어학목록/, '채우기에 어학 재료를 안 넘깁니다');
 });
