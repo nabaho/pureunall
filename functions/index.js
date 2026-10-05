@@ -1378,6 +1378,35 @@ async function 뉴스레터경고판갱신(db) {
   const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null, 반송들);
   await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
+/* 법제처 원문 조문 읽기 (대표 결정 2026-10-05 「추천대로」 — 서버가 원문을 직접 읽어 AI 에게 넘긴다)
+   ⚠ 공개 열쇠(OC=test) — 판례 모으개(news-prec.js)와 같은 문. 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다). */
+async function 법조문원문(조목록) {
+  const 밑 = "https://www.law.go.kr/DRF/";
+  const 받기 = async (u) => {
+    const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
+    try { const r = await fetch(u, { signal: ac.signal }); return r.ok ? await r.text() : ""; }
+    catch (_) { return ""; } finally { clearTimeout(t); }
+  };
+  const 결과 = [];
+  for (const c of (조목록 || []).slice(0, 5)) {
+    const 찾음 = await 받기(밑 + "lawSearch.do?OC=test&target=law&type=XML&display=20&query=" + encodeURIComponent(c.법.replace(/[·・]/g, "ㆍ")));
+    /* ⚠ 한 법령씩 잘라 읽는다 — 목록은 «일련번호가 이름보다 앞»이라, 이름 뒤의 번호를 잡으면
+         다음 법령(시행령)의 번호를 가져온다(2026-10-05 근로기준법 제60조가 시행령 제60조로 왔다). */
+    const 줄 = [...찾음.matchAll(/<law [^>]*>([\s\S]*?)<\/law>/g)].map((m) => [m[0],
+      ((m[1].match(/<법령명한글><!\[CDATA\[(.*?)\]\]>/) || [])[1] || ""),
+      ((m[1].match(/<법령일련번호>(\d+)<\/법령일련번호>/) || [])[1] || "")]);
+    const 같게 = (t) => String(t).replace(/[\s·ㆍ・]/g, "");   /* 가운뎃점 모양(· ㆍ)이 법마다 다르다 */
+    const 맞음 = 줄.find((m) => m[2] && 같게(m[1]) === 같게(c.법)) || null;
+    if (!맞음) continue;
+    const JO = String(c.조).padStart(4, "0") + String(c.의 || 0).padStart(2, "0");
+    const 글 = await 받기(밑 + "lawService.do?OC=test&target=law&type=XML&MST=" + 맞음[2] + "&JO=" + JO);
+    const 조 = 글.replace(/<!\[CDATA\[|\]\]>/g, "").match(/<조문내용>[\s\S]*?<\/조문단위>/);
+    if (!조) continue;
+    결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""),
+      원문: 조[0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
+  }
+  return 결과;
+}
 /* 회차 한 벌 중 «감시꾼이 볼 칸»만 — 25,000자 전문과 받는 분 주소는 안 읽는다 */
 async function 감시용회차(db, 열쇠) {
   const 칸 = ["상태", "고친이", "우리글", "안", "회차"];
@@ -1483,7 +1512,7 @@ exports.newsletterWatchRetry = functions
 
 exports.newsletterWatchSunday = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
   .pubsub.schedule("every sunday 18:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1508,6 +1537,20 @@ exports.newsletterWatchSunday = functions
     const 점검 = NWatch.점검하기({ now, 열쇠, 설정, 확정본: 확정본.val(), 회차, 링크결과,
       금요일기록: 기록.val(), 고침: 고침.val(), 브리핑: { 모은날: 모은날.val(), off: 끔.val() },
       판례모음: 판례모음.val(), 지난회차들: 지난것.val(), 노무사회메타: 노무사회메타.val(), 보충 });
+    /* ★ AI 교정 (2026-10-05) — 우리 말·한마디를 원문(판례 사건번호·선고일·판시사항, 법제처 조문)과 대조.
+         AI 는 «확인할 것»만 올린다. 실패하면 그 줄만 빠지고 규칙 점검은 그대로 간다. */
+    try {
+      const 거리글 = NWatch.교정거리(회차);
+      if (거리글.trim()) {
+        const 조문 = await 법조문원문(NWatch.조문들뽑기(거리글));
+        const 교정 = NWatch.교정답읽기(await 뉴스레터AI(NWatch.교정지시(거리글, 조문), { temperature: 0, maxOutputTokens: 2048 }));
+        교정.forEach((x) => 점검.항목들.push({ 수준: "you", 제목: "🤖 " + x.제목, 설명: x.설명, ai: true }));
+        if (!교정.length) 점검.항목들.push({ 수준: "ok", 제목: "🤖 AI 교정 — 확인할 것 없음", 설명: "원문 조문 " + 조문.length + "개와 대조", ai: true });
+        if (교정.length && 점검.판정 === "ok") 점검.판정 = "warn";
+      }
+    } catch (e) {
+      점검.항목들.push({ 수준: "ok", 제목: "🤖 AI 교정을 못 했습니다", 설명: String((e && e.message) || e).slice(0, 120), ai: true });
+    }
     await db.ref("newsletter/watch/" + 열쇠 + "/점검").set(Object.assign({ 때: now }, 점검));
     await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
     const 이름 = ((회차 || {}).회차 || {}).이름 || 열쇠;
@@ -1563,7 +1606,7 @@ exports.newsletterRefillOnce20261004 = functions
    ⚠ 보낸 지 14일이 지나면 안 본다(그 뒤 반송은 다음 회차가 잡는다). */
 exports.newsletterBounceScan = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["GEMINI_KEY"] })
   .pubsub.schedule("every day 09:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1587,6 +1630,19 @@ exports.newsletterBounceScan = functions
     /* 명단은 «막은 주소까지» — 이미 막은 주소의 반송도 기록은 남긴다 */
     const 명단 = (NF.명단짓기({ 설정, 사업장들, 더한분들, 막은주소: {} }).ok || []);
     const r = NWatch.반송모으기({ 메일들, 명단, 보낸때: Number(회차들[보낸].보낸때), 회차: 보낸, 기존, now });
+    /* ★ 까닭 모를 반송 — AI 가 원문을 읽고 갈래를 «제안»만 (확정은 사람이 화면에서). 한 번에 다섯 통까지 */
+    let AI수 = 0;
+    for (const k of Object.keys(r.쓸)) {
+      const b = r.쓸[k];
+      if (b.갈래 !== "모름" || b.AI || AI수 >= 5) continue;
+      const 마지막 = Object.keys(b.메일 || {}).pop();
+      const m = 메일들[마지막] || {};
+      try {
+        const 답 = await 뉴스레터AI(NWatch.반송AI지시(b, m), { temperature: 0, maxOutputTokens: 256 });
+        b.AI = Object.assign(NWatch.반송AI답읽기(답, String(m.s || "") + " " + String(m.p || "")), { 때: now });
+        AI수++;
+      } catch (e) { console.warn("[반송 AI]", e.message); break; }
+    }
     const upd = {};
     Object.keys(r.쓸).forEach((k) => { upd["newsletter/bounces/" + k] = r.쓸[k]; });
     Object.keys(r.막을).forEach((k) => { upd["newsletter/blocked/" + k] = r.막을[k]; });
@@ -1599,7 +1655,7 @@ exports.newsletterBounceScan = functions
 
 exports.newsletterWatchDelivery = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 120, memory: "512MB" })
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
   .pubsub.schedule("every monday 12:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1621,6 +1677,26 @@ exports.newsletterWatchDelivery = functions
       await 뉴스레터경보(ready.회차열쇠, "전달경보", "뉴스레터 " + (셈.실패 + 셈.확인필요) + "통이 못 나갔거나 확인이 필요합니다 — 뉴스레터 › 보낸 결과에서 주소를 보십시오");
     }
     await 뉴스레터경고판갱신(db).catch(() => null);
+    /* ★ 결과 보고 메일 (2026-10-05 「추천대로」) — 숫자는 서버가 세고, AI 는 세 줄 요약만. 요약을 못 붙여도 메일은 간다 */
+    try {
+      const 회차들 = (await db.ref("newsletter/issues").orderByKey().limitToLast(6).once("value")).val() || {};
+      const 지난키 = Object.keys(회차들).filter((k) => k < ready.회차열쇠 && 회차들[k] && 회차들[k].상태 === "발송").sort().pop();
+      const [열람표, 지난열람표, 반송들, 설정, 사업장들] = await Promise.all([
+        db.ref("newsletter/opens/" + ready.회차열쇠).once("value").then((x) => x.val() || {}),
+        지난키 ? db.ref("newsletter/opens/" + 지난키).once("value").then((x) => x.val()) : Promise.resolve(null),
+        db.ref("newsletter/bounces").once("value").then((x) => x.val() || {}),
+        db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
+        db.ref("data/companies/v").once("value").then((x) => x.val() || {})]);
+      const 명단 = NF.명단짓기({ 설정, 사업장들, 더한분들: {}, 막은주소: {} }).ok || [];
+      const 결과 = NWatch.결과셈하기({ 회차: ready.회차열쇠, 받는수: ready.받는수, 전달: 셈, 반송들, 열람표, 지난열람표, 명단 });
+      let 요약 = [];
+      try { 요약 = NWatch.결과요약읽기(await 뉴스레터AI(NWatch.결과요약지시(결과), { temperature: 0.2, maxOutputTokens: 512 })); }
+      catch (e) { console.warn("[결과 요약 AI]", e.message); }
+      const 이름 = ((회차들[ready.회차열쇠] || {}).회차 || {}).이름 || ready.회차열쇠;
+      const m = NWatch.결과메일짓기(결과, 요약, 이름, NF.관리화면);
+      const r = await 뉴스레터메일({ to: [NF.검토받는곳], subject: m.subject, body: m.body, html: m.html }).catch((e) => ({ ok: false, error: e.message }));
+      await db.ref("newsletter/watch/" + ready.회차열쇠 + "/결과").set({ 때: Date.now(), 셈: 결과, 요약, 메일: r && r.ok ? "보냄" : String((r && r.error) || "실패").slice(0, 200) });
+    } catch (e) { console.warn("[결과 보고]", e.message); }
     console.log("[감시꾼] 전달", JSON.stringify(셈));
     return null;
   });
