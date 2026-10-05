@@ -670,6 +670,17 @@
     + '.pcf-fu{display:block;font-size:10.5px;color:#94a3b8;font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.pcf-frow span{color:#1e40af;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcf-frow span.miss{color:#854d0e}'
     + '.pcf-fnote{font-size:12px;color:#854d0e;margin-top:10px;min-height:1em}'
+    /* 채우기 전 확인표 (2026-10-05) — ☐ · # · 칸 · 값 · 출처 */
+    + '.pcf-vrow{display:grid;grid-template-columns:16px 20px 104px minmax(0,1fr) 86px;gap:6px;align-items:center;margin-bottom:5px;font-size:12px}'
+    + '.pcf-vrow>span.k{color:#1e40af;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pcf-vrow>span.k.miss{color:#b91c1c}'
+    + '.pcf-vrow>i{font-style:normal;color:#94a3b8;font-size:11px;text-align:right}'
+    + '.pcf-vrow input[type=text]{width:100%;padding:6px 9px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;font-family:inherit}'
+    + '.pcf-src{font-size:10.5px;padding:2px 5px;border-radius:5px;background:#f1f5f9;color:#475569;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.pcf-src.w{background:#fef3c7;color:#92400e;font-weight:700}.pcf-src.miss{color:#b91c1c}.pcf-src.p{background:#dcfce7;color:#166534}'
+    + '.pcf-vpick{grid-column:3/6;display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:-2px 0 6px 42px}'
+    + '.pcf-vpick button{font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid #f59e0b;background:#fffbeb;color:#92400e;border-radius:6px;cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.pcf-vpick a{font-size:11.5px;color:#1d4ed8;cursor:pointer}'
+    + '.pcf-vsum{font-size:12px;padding:6px 9px;border-radius:6px;margin-bottom:6px;background:#fef3c7;color:#92400e}.pcf-vsum.ok{background:#dcfce7;color:#166534}'
     + '.pcf-fprev{margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;max-height:60vh;overflow:auto;background:#e2e8f0;padding:12px}'
     + '@media(max-width:700px){.pcf-fcols{grid-template-columns:1fr}}'
     + '.pcf-msel{display:none;gap:6px;margin-bottom:10px}.pcf-msel select{flex:1;min-width:0;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}'
@@ -921,7 +932,7 @@
       var srcs = hwpSources(fm);
       return { fm: fm, srcs: srcs, src: srcs[0] || null, hwp: null, text: CF.markersIn(fm.body), err: '' };
     });
-    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0,
+    var st = { rows: null, co: null, coX: {}, contact: null, worker: null, edits: {}, pick: 0, srcPick: {}, ok: {},
       pv: { on: false, orgType: 'co', amount: '', vat: 'incl', tel: '' }, edited: null,
       wi: { on: false, task: '', wtask: '', vat: 'excl', ext: 'agree', succ: 'fixed', succAmt: '' } };
     try { st.pv.tel = w.localStorage.getItem('pcf-staff-tel') || ''; } catch (e) {}
@@ -945,6 +956,8 @@
 
     function values() {
       var co = st.co ? Object.assign({}, st.coX, st.co) : {};
+      /* 확인표에서 「등록증」을 고른 칸은 등록증 값으로 — 대표자·대표자전체, 주소·우편주소가 함께 바뀐다 */
+      CF.coConflicts(st.co).forEach(function (c) { if (st.srcPick[c.f] === 'biz') co[c.f] = c.biz; });
       var V = CF.valuesFrom({ co: co, contact: st.contact, worker: st.worker });
       /* 이알피 계약 → 서류 묶음 (설계 2026-10-03 §4) — 계약 칸은 계약 값이, 나머지는 비었을 때만 */
       if (host.contractCtx && host.contractCtx.vals) {
@@ -1052,15 +1065,70 @@
       var V = values();
       if (!ks.length) { valBox.appendChild(el('div', { 'class': 'pcf-muted', text: one ? '이 양식에는 채울 자리가 없습니다' : '이 양식들에는 채울 자리가 없습니다' })); return; }
       var blank = ks.filter(function (x) { return !V[x.key]; }).length;
+      var open = openConflicts(ks);
       valBox.appendChild(el('div', { 'class': 'pcf-fh', text: '채울 자리 ' + ks.length + '곳' + (one ? '' : ' (양식 ' + items.length + '개 합쳐서)') + (blank ? ' · 빈 칸 ' + blank + '곳' : '') + ' — 고칠 수 있습니다' }));
-      ks.forEach(function (x) {
+      var conf = CF.coConflicts(st.co).filter(function (c) { return ks.some(function (x) { return CF.CO_FIELD_OF[x.key] === c.f; }); });
+      if (conf.length) valBox.appendChild(el('div', { 'class': 'pcf-vsum' + (open.length ? '' : ' ok'),
+        text: open.length ? '⚠ 이알피와 사업자등록증 값이 다른 칸 ' + open.length + '곳 — 어느 쪽을 쓸지 고르세요' : '✓ 다른 칸 ' + conf.length + '곳 모두 골랐습니다' }));
+      var allBox = el('input', { type: 'checkbox', 'aria-label': '모두 확인', title: '모두 확인' });
+      allBox.checked = ks.every(function (x) { return isOk(x.key, V); });
+      allBox.addEventListener('change', function () { ks.forEach(function (x) { st.ok[x.key] = allBox.checked; }); drawVals(); });
+      valBox.appendChild(el('div', { 'class': 'pcf-vrow', style: 'color:#94a3b8;font-size:11px' }, [allBox, el('span', { text: '#' }), el('span', { text: '칸' }), el('span', { text: '들어갈 값' }), el('span', { text: '출처', style: 'text-align:center' })]));
+      var shown = {};
+      ks.forEach(function (x, i) {
         var k = x.key;
-        var inp = el('input', { type: 'text', 'aria-label': k, placeholder: CF.BLANK + ' (비워 두면 밑줄)' });
+        var inp = el('input', { type: 'text', 'aria-label': k, placeholder: '비워 두면 밑줄 — 손으로 적게 됩니다' });
         inp.value = V[k] == null ? '' : V[k];
         inp.addEventListener('input', function () { st.edits[k] = inp.value; });
         var used = one ? null : el('small', { 'class': 'pcf-fu', title: x.forms.join(', '), text: x.forms.length === items.length ? '모든 양식' : x.forms[0] + (x.forms.length > 1 ? ' 외 ' + (x.forms.length - 1) : '') });
-        valBox.appendChild(el('label', { 'class': 'pcf-frow' }, [el('span', { 'class': V[k] ? '' : 'miss' }, [k, used]), inp]));
+        var src = srcOf(k);
+        var box = el('input', { type: 'checkbox', 'aria-label': k + ' 확인' });
+        box.checked = isOk(k, V);
+        box.addEventListener('change', function () { st.ok[k] = box.checked; allBox.checked = ks.every(function (y) { return isOk(y.key, V); }); });
+        valBox.appendChild(el('label', { 'class': 'pcf-vrow' }, [box, el('i', { text: String(i + 1) }),
+          el('span', { 'class': 'k' + (V[k] ? '' : ' miss') }, [k, used]), inp,
+          el('span', { 'class': 'pcf-src' + (src.warn ? ' w' : (src.miss && !V[k]) ? ' miss' : src.picked ? ' p' : ''), title: src.label, text: src.label || '—' })]));
+        /* 다른 칸 — 같은 회사 칸(대표자·대표자전체)은 처음 나온 줄에만 고르기 단추 */
+        if (src.conflict && !shown[src.conflict.f]) {
+          shown[src.conflict.f] = 1;
+          var c = src.conflict;
+          valBox.appendChild(el('div', { 'class': 'pcf-vpick' }, [
+            el('button', { type: 'button', title: c.erp, text: '이알피: ' + c.erp, onclick: function () { choose(c, 'erp'); } }),
+            el('button', { type: 'button', title: c.biz, text: '등록증: ' + c.biz, onclick: function () { choose(c, 'biz'); } }),
+            el('a', { title: '이알피 업체관리를 새 탭에서 엽니다', text: '이알피에서 고치기 ↗', onclick: function () { w.open('pu-erp.html#menu=biz/company', '_blank'); } })
+          ]));
+        }
       });
+    }
+    /* 출처 이름표 — 계약 칸이 이기는지는 values() 와 같은 규칙 */
+    function srcOf(k) {
+      var cv = host.contractCtx && host.contractCtx.vals;
+      return CF.fieldSource(k, { co: st.co, coX: st.coX, contact: st.contact, worker: st.worker, edits: st.edits,
+        contract: cv, contractWins: CONTRACT_WINS.test(k), picks: st.srcPick, conflicts: CF.coConflicts(st.co) });
+    }
+    /* ☐ 확인 — 사람이 누른 것이 먼저, 아니면 «값이 있고 다르지 않은 칸» */
+    function isOk(k, V) {
+      if (Object.prototype.hasOwnProperty.call(st.ok, k)) return !!st.ok[k];
+      return !!V[k] && !srcOf(k).warn;
+    }
+    function choose(c, side) {
+      st.srcPick[c.f] = side;
+      Object.keys(CF.CO_FIELD_OF).forEach(function (k) { if (CF.CO_FIELD_OF[k] === c.f) { delete st.edits[k]; delete st.ok[k]; } });
+      drawVals();
+    }
+    /* 이 양식들이 쓰는 칸 가운데 아직 안 고른 다른 칸(손으로 고쳐 적은 칸은 고른 것으로 본다) */
+    function openConflicts(ks) {
+      ks = ks || allMarkers();
+      return CF.coConflicts(st.co).filter(function (c) {
+        return !st.srcPick[c.f] && ks.some(function (x) { return CF.CO_FIELD_OF[x.key] === c.f && !Object.prototype.hasOwnProperty.call(st.edits, x.key); });
+      });
+    }
+    function conflictsOkToGo() {
+      var open = openConflicts();
+      if (!open.length) return true;
+      return w.confirm('⚠ 이알피와 사업자등록증 값이 다른 칸 ' + open.length + '곳을 아직 고르지 않았습니다:\n  '
+        + open.map(function (c) { return c.key + ' — 이알피 「' + c.erp + '」 / 등록증 「' + c.biz + '」'; }).join('\n  ')
+        + '\n\n이알피 값으로 채워 그대로 받을까요?');
     }
     function rowBtn(label, sub, on, fn) {
       return el('button', { type: 'button', 'class': 'pcf-fi' + (on ? ' on' : ''), onclick: fn }, [el('b', { text: label }), sub ? el('span', { text: sub }) : null]);
@@ -1087,7 +1155,7 @@
       return [r.bz ? CF.valuesFrom({ co: r }).사업자번호 : '', r.ceo ? '대표 ' + r.ceo : '', r.k === 'card-co' ? '명함에만 있는 회사' : ''].filter(Boolean).join(' · ');
     }
     function pickCo(r, chosenContact) {
-      st.co = r; st.coX = {}; st.contact = chosenContact || null; ctQ.value = st.contact ? st.contact.n : '';
+      st.co = r; st.coX = {}; st.srcPick = {}; st.ok = {}; st.contact = chosenContact || null; ctQ.value = st.contact ? st.contact.n : '';
       clearEdits(['회사명', '사업자번호', '대표자', '대표자전체', '주소', '대표전화', '대표팩스', '대표이메일', '업태', '종목', '법인등록번호', '규모', '담당자', '담당자연락처', '담당자이메일', '담당자직급', '담당자부서', '담당자휴대폰', '담당자전화', '담당자주소']);
       coList.innerHTML = ''; coQ.value = '';
       coPicked.innerHTML = '';
@@ -1245,6 +1313,7 @@
       var it = items[0];
       if (busy || !it.src || isXl(it) || !host.hwpEdit) return;
       if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다'; return; }
+      if (!conflictsOkToGo()) return;
       busy = true; refresh(); note.textContent = '채우는 중…';
       var base = st.edited ? Promise.resolve({ bytes: st.edited.bytes, ext: st.edited.ext }) : fillOne(it);
       base.then(function (r) {
@@ -1260,6 +1329,7 @@
       var it = items[0];
       if (busy) return;
       if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다'; return; }
+      if (!conflictsOkToGo()) return;
       busy = true; refresh(); note.textContent = '채우는 중…';
       fillOne(it, it.state === 'fail').then(function (r) {
         busy = false; refresh(); note.textContent = '';
@@ -1270,6 +1340,7 @@
     function doDownload() {
       if (busy) return;
       if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다 — 끝나면 받을 수 있습니다'; return; }
+      if (!conflictsOkToGo()) return;
       if (one) {
         var it = items[0];
         busy = true; refresh(); note.textContent = '채우는 중…';
