@@ -188,8 +188,9 @@ test('창에서 고친 값이 «그대로» 아래 칸에 들어간다', () => {
   const a = grabFn('applyDocConfirm');
   assert.ok(a.includes("$('dcv-'+k)"), '고친 값을 안 읽는다');
   assert.match(a, /_docFound\[k\]=String\(el\.value/, '판독 원값을 그대로 넣는다');
-  assert.match(a, /applyDocFound\(\)/, '기존 반영 경로를 안 탄다');
-  const i = a.indexOf('_docFound[k]='), j = a.indexOf('applyDocFound()');
+  /* 2026-10-05: 확인 창에서 넣었다는 것(원본 옆에서 보고 고침)을 출처로 넘긴다 — applyDocFound('dialog') */
+  assert.match(a, /applyDocFound\('dialog'\)/, '기존 반영 경로를 안 탄다');
+  const i = a.indexOf('_docFound[k]='), j = a.indexOf("applyDocFound('dialog')");
   assert.ok(i > 0 && i < j, '반영한 뒤에 값을 고치면 소용이 없다');
 });
 

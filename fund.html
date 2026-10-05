@@ -2424,7 +2424,10 @@ function _impApply(){
   if(!r.plan.length){ closeM(); toast('반영할 항목이 없습니다','warn'); return; }
   var up={};
   r.plan.forEach(function(p){ Object.keys(p.set).forEach(function(f){ up[p.fid+'/'+f]=p.set[f]; }); });
+  var _cells=[]; r.plan.forEach(function(p){ Object.keys(p.set).forEach(function(f){
+    _cells.push({path:'funds/'+p.fid+'/'+f, a:p.set[f], b:(funds[p.fid]||{})[f]}); }); });
   fbDb.ref(NS+'/funds').update(up).then(function(){
+    if(typeof _track==='function') _track(_cells,{what:'기금정보 가져오기', src:'import:fundinfo', m:1, how:'list'});
     r.plan.forEach(function(p){ Object.assign(funds[p.fid], p.set); });
     window._impData=null; closeM(); renderHome();
     toast(r.plan.length+'개 기금 · '+r.cells+'칸 반영 완료');
@@ -2474,7 +2477,7 @@ function bulkOffices(){
     +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">취소</button><button class="primary" onclick="applyBulkOffices()">'+plan.length+'칸 채우기</button></div>');
   window._offPlan=plan;
 }
-function applyBulkOffices(){ _applyBulkOffice(window._offPlan,null,'관할 기관',function(){window._offPlan=null;}); }
+function applyBulkOffices(){ _applyBulkOffice(window._offPlan,null,'관할 기관',function(){window._offPlan=null;},'guess:office'); }
 
 /* ══ 미완비 일괄 — 기업정보함에 있는 값을 당겨온다 ══
    기업정보함(사업자등록증)이 채울 수 있는 것은 셋뿐이다:
@@ -2549,10 +2552,10 @@ function bulkFromCards(){
     +'<button class="primary" onclick="applyBulkCards()">'+plan.length+'칸 채우기</button></div>',{width:820});
   window._cardPlan=plan;
 }
-function applyBulkCards(){ _applyBulkOffice(window._cardPlan,null,'기업정보함 값',function(){window._cardPlan=null;}); }
+function applyBulkCards(){ _applyBulkOffice(window._cardPlan,null,'기업정보함 값',function(){window._cardPlan=null;},'card'); }
 /* 공용 적용기 — 적용 직전 서버 현재값 재확인해 '아직 빈 칸'만 채움(그 사이 입력분 보호).
    field 를 안 주면 줄마다 제 칸(p.key)에 넣는다 — 노동청·세무서·등기소를 한 번에 채울 때. */
-function _applyBulkOffice(plan,field,label,clearPlan){
+function _applyBulkOffice(plan,field,label,clearPlan,src){
   plan=plan||[]; if(!plan.length){ closeM(); return; }
   var fld=function(p){ return field||p.key; };
   fbDb.ref(NS+'/funds').once('value').then(function(s){
@@ -2562,6 +2565,7 @@ function _applyBulkOffice(plan,field,label,clearPlan){
       updates[p.id+'/'+fld(p)]=p.office; n++; });
     if(!n){ closeM(); toast('채울 대상이 없습니다(이미 입력됨 '+skip+'건)','warn'); return; }
     return fbDb.ref(NS+'/funds').update(updates).then(function(){
+      if(typeof _trackUp==='function') _trackUp('funds',updates,{what:label+' 한꺼번에 채우기', src:src||'guess:office', m:1, how:'list'});
       plan.forEach(function(p){ if(funds[p.id]&&updates[p.id+'/'+fld(p)]!==undefined) funds[p.id][fld(p)]=p.office; });
       if(clearPlan)clearPlan(); closeM(); renderHome();
       toast(n+'개 '+label+' 채움'+(skip?' · '+skip+'건은 이미 입력돼 건너뜀':'')+' — 확인 필요');
@@ -2581,6 +2585,7 @@ function fillOfficesAll(){
     if(String(el.value||'').trim()){ kept.push(j[1]); return; }
     var g=j[2](addr); if(!g){ miss.push(j[1]); return; }
     el.value=g; put.push(j[1]+' '+g);
+    if(typeof _provMark==='function') _provMark(el,'guess:office','');
   });
   if(put.length) markDirty();
   toast((put.length?'추정해 넣음: '+put.join(' · ')+' — 확인 후 저장':'새로 넣은 칸이 없습니다')
@@ -2713,6 +2718,7 @@ function _subImpApply2(d,curSites,curSY){
   });
   if(!n){ closeM(); toast('반영할 항목이 없습니다','warn'); return; }
   fbDb.ref(NS).update(up).then(function(){
+    if(typeof _trackUp==='function') _trackUp('',up,{what:'지원금 자료 가져오기', src:'import:subsidy', m:1, how:'list'});
     // 로컬 캐시 반영 — funds의 연도값만(사업장·체크는 다음 화면 진입 때 다시 읽는다)
     Object.keys(d.subsidy||{}).forEach(function(fid){ var t=funds[fid]; if(!t)return;
       Object.keys(d.subsidy[fid]).forEach(function(yr){
@@ -2728,7 +2734,9 @@ function _subImpApply2(d,curSites,curSY){
 }
 function patchFund(id,field,val){
   val=val.trim?val.trim():val;
+  var _b=(funds[id]||{})[field];
   fbDb.ref(NS+'/funds/'+id+'/'+field).set(val).then(function(){
+    if(typeof _track==='function') _track([{path:'funds/'+id+'/'+field, a:val, b:_b, m:0}],{what:'정보 채우기(목록)'});
     funds[id][field]=val; var b=$('lc-'+id); if(b){var n=nDone(funds[id]);b.textContent=n+'/5';b.className='chip '+(n===5?'ok':n>=3?'warn':'dg');} toast('저장됨');
   }).catch(function(e){toast('저장 실패: '+e.message,'err');});
 }
@@ -10740,12 +10748,13 @@ function bizregBulkSave(){
     +'\n출연 약정액은 사업자등록증에 없는 값이라 따로 넣으셔야 합니다.',
     {ok:make.length+'곳 만들기'}).then(function(ok){
     if(!ok) return;
-    var done=0, fail=0;
+    var done=0, fail=0, _cells=[];
     make.reduce(function(p,x){
       return p.then(function(){
         var ref=fbDb.ref(NS+'/sites/'+fid).push();
         return ref.set(x.o).then(function(){
           done++;
+          if(typeof _trackNewCells==='function') _cells=_cells.concat(_trackNewCells('sites/'+fid,ref.key,x.o));
           /* 원본 잇기는 «곁다리»다 — 실패해도 사업장은 이미 만들어졌다 */
           return fbDb.ref(NS+'/subsidy_chk/'+fid+'/'+yr).update((function(){
             var up={}, o=Object.assign({at:ymd(),by:(S.user||'')},x.ref);
@@ -10758,6 +10767,7 @@ function bizregBulkSave(){
       if(S.sitesFor===fid) S.sitesFor=null;
       S.subChk=null; S.subChkFor=null;
       closeM();
+      if(typeof _track==='function') _track(_cells,{what:'사업자등록증으로 사업장 만들기', detail:done+'곳', src:'scan:bizreg', m:1, how:'list'});
       if(S.view==='fund'&&S.fundId===fid) renderFund();
       toast(done+'곳을 만들었습니다'+(fail?(' · '+fail+'곳 실패'):'')+' — 출연 약정액을 넣어 주세요',fail?'warn':'');
     });
@@ -10903,7 +10913,8 @@ function wrepBulkApply(){
   if(!n){ toast('채울 빈 칸이 없습니다','warn'); return; }
   fbDb.ref(NS+'/sites/'+B.fid).update(up).then(function(){
     Object.keys(up).forEach(function(k){ var q=k.split('/'); if(S.sites&&S.sites[q[0]]) S.sites[q[0]][q[1]]=up[k]; });
-    _audit(B.fid,'재직증명서 한꺼번에 읽기',n+'곳 · '+Object.keys(up).length+'칸 (빈 칸만)');
+    var _bid=(typeof _trackUp==='function')?_trackUp('sites/'+B.fid,up,{what:'재직증명서 한꺼번에 읽기', src:'scan:wrep', m:1, how:'list', audit:false}):'';
+    _audit(B.fid,'재직증명서 한꺼번에 읽기',n+'곳 · '+Object.keys(up).length+'칸 (빈 칸만)',_bid);
     _wrepBulk=null; closeM(); renderFund(); toast(n+'곳 · '+Object.keys(up).length+'칸을 채웠습니다');
   }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
@@ -11061,7 +11072,10 @@ function cmImportApply(){
   Promise.all([n?fbDb.ref(NS+'/sites/'+fid).update(up):null, extra?fbDb.ref(NS+'/funds/'+fid+'/prep_committee').set(extra):null]).then(function(){
     Object.keys(up).forEach(function(k){ var q=k.split('/'); if(S.sites&&S.sites[q[0]]) S.sites[q[0]][q[1]]=up[k]; });
     if(extra&&funds[fid]) funds[fid].prep_committee=extra;
-    _audit(fid,'설립준비위원 명단 읽기',n+'곳 · '+Object.keys(up).length+'칸 (빈 칸만)'+(add.length?' · 사업장 밖 위원 '+add.length+'명 담음':''));
+    var _cm=Object.keys(up).map(function(k){ return {path:'sites/'+fid+'/'+k, a:up[k]}; });
+    if(extra) _cm.push({path:'funds/'+fid+'/prep_committee', a:extra, b:(f.prep_committee||null)});
+    var _bid=(typeof _track==='function')?_track(_cm,{what:'설립준비위원 명단 읽기', src:'scan:committee', m:1, how:'list', audit:false}):'';
+    _audit(fid,'설립준비위원 명단 읽기',n+'곳 · '+Object.keys(up).length+'칸 (빈 칸만)'+(add.length?' · 사업장 밖 위원 '+add.length+'명 담음':''),_bid);
     _cmImp=null; closeM(); renderFund(); toast(n+'곳 · '+Object.keys(up).length+'칸을 채웠습니다'+(add.length?' · 위원 '+add.length+'명 담음':''));
   }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
@@ -11276,7 +11290,8 @@ function applyBulkSites(){
     if(!n){ closeM(); toast('그 사이 모두 채워져 넣을 것이 없습니다','warn'); return; }
     return fbDb.ref(NS+'/sites/'+fid).update(up).then(function(){
       S.sitesFor=null; closeM();
-      _audit(fid,'참여사업장 일괄 채움','기업정보함 '+n+'칸'+(skip?' (건너뜀 '+skip+')':''));
+      var _bid=(typeof _trackUp==='function')?_trackUp('sites/'+fid,up,{what:'참여사업장 일괄 채움', src:'card', m:1, how:'list', audit:false}):'';
+      _audit(fid,'참여사업장 일괄 채움','기업정보함 '+n+'칸'+(skip?' (건너뜀 '+skip+')':''),_bid);
       if(S.fundId===fid) renderFund();
       toast(n+'칸을 채웠습니다'+(skip?' · '+skip+'칸은 이미 있어 그대로':''));
     });
@@ -11524,7 +11539,7 @@ function applyCardsMulti(){
     {ok:rows.length+'곳 만들기'}).then(function(ok){
     if(!ok) return;
     var body=$('cardbody'); if(body) body.innerHTML=loadingHTML('기업 상세까지 읽는 중…');
-    var fid=_cardPick.fid, made=0, fail=0;
+    var fid=_cardPick.fid, made=0, fail=0, _cells=[];
     /* ⚠ 한 곳씩 차례로 읽는다 — 한꺼번에 부르면 기업정보함에 스무 번이 동시에 나간다 */
     rows.reduce(function(p,r){
       return p.then(function(){
@@ -11532,12 +11547,15 @@ function applyCardsMulti(){
           var rec=_cardIntoRec(T,e,{status:'active'});
           if(!String(rec.name||'').trim()) rec.name=String(r.c||'').trim();
           if(!rec.name) { fail++; return; }
-          return fbDb.ref(NS+'/sites/'+fid).push(rec).then(function(){ made++; });
+          var _ref=fbDb.ref(NS+'/sites/'+fid).push();
+          return _ref.set(rec).then(function(){ made++;
+            if(typeof _trackNewCells==='function') _cells=_cells.concat(_trackNewCells('sites/'+fid,_ref.key,rec)); });
         }).catch(function(){ fail++; });
       });
     }, Promise.resolve()).then(function(){
       S.sitesFor=null; _allSites=null; _allSitesTried=false;   /* 새로 읽는다 — 지자체도 다시 센다 */
       closeM();
+      if(typeof _track==='function') _track(_cells,{what:'기업정보함으로 사업장 만들기', detail:made+'곳', src:'card', m:1, how:'list'});
       toast(made+'곳을 만들었습니다'+(fail?(' · '+fail+'곳 실패'):'') , fail?'warn':'');
       renderFund();
     });
@@ -11560,14 +11578,15 @@ function _cardIntoRec(T,e,base){
   Object.keys(base||{}).forEach(function(k){ rec[k]=base[k]; });
   var pc=_primaryContact(rec).c;
   Object.keys(pc).forEach(function(k){ con[k]=pc[k]; });
+  var keys=[];   // 기업정보함에서 채운 칸 — 편집 창이 열린 뒤 «기계» 표시를 다는 데 쓴다
   T.map.forEach(function(m){
     var v=String(e[m[0]]||'').trim(); if(!v) return;
     if(m[1].indexOf('_c_')===0){ var ck=m[1].slice(3);
-      if(!String(con[ck]||'').trim()){ con[ck]=v; got++; } }
-    else if(!String(rec[m[1]]||'').trim()){ rec[m[1]]=v; got++; }
+      if(!String(con[ck]||'').trim()){ con[ck]=v; got++; if(keys.indexOf('contacts')<0) keys.push('contacts'); } }
+    else if(!String(rec[m[1]]||'').trim()){ rec[m[1]]=v; got++; keys.push(m[1]); }
   });
   if(con.name||con.mobile||con.email||con.position) rec.contacts=[Object.assign({isPrimary:true},con)];
-  return {rec:rec,got:got};
+  return {rec:rec,got:got,keys:keys};
 }
 function _applyCardValues(r,e){
   var T=CARD_TARGETS[_cardPick.key]||CARD_TARGETS.info;
@@ -11579,6 +11598,7 @@ function _applyCardValues(r,e){
     if(!mk.got){ toast('가져올 값이 없는 카드입니다','warn'); renderCardPick(); return; }
     mk.rec.pucard_id=r._id;                       // 어디서 왔는지 남긴다(나중에 되짚기용)
     _cardPick.back=null; closeM();
+    if(typeof _provPend==='function') _provPend(mk.keys||[],'card','');
     editSite('',mk.rec);
     toast('기업정보함에서 '+mk.got+'칸 채웠습니다 — 확인하고 [저장]');
     return;
@@ -11589,6 +11609,7 @@ function _applyCardValues(r,e){
     var _rd=_cardFn(T.read), _op=_cardFn(T.open);
     var rf=_cardIntoRec(T,e,_rd?_rd():{});
     _cardPick.back=null; closeM();
+    if(_cardPick.key==='siteedit'&&typeof _provPend==='function') _provPend(rf.keys||[],'card','');
     if(_op) _op(rf.rec);
     toast(rf.got?('기업정보함에서 '+rf.got+'칸 채웠습니다 — 확인하고 [저장]')
                 :'채울 빈 칸이 없습니다(이미 다 적혀 있음)');
@@ -11623,6 +11644,7 @@ function _applyCardValues(r,e){
     var el=$(m[1]); if(!el) return;
     if(String(el.value||'').trim()){ skipped.push(m[2]); return; }   // 이미 적힌 값은 건드리지 않는다
     el.value=v; filled.push(m[2]);
+    if(typeof _provMark==='function') _provMark(el,'card','');
   });
   _cardPick.back=null; closeM();
   if(filled.length){ markDirty();
@@ -11968,7 +11990,7 @@ function applyDocConfirm(){
   });
   closeM();
   renderDocIntake();
-  applyDocFound();
+  applyDocFound('dialog');      // 원본 옆에서 보고 고친 값이다
 }
 function docRawText(){
   var b=$('dcRaw'), d=_docSrc; if(!b||!d) return;
@@ -12002,7 +12024,9 @@ function renderDocIntake(){
       +'<span class="muted">'+esc(LBL[k]||k)+'</span> <b style="user-select:all">'+esc(_docFound[k])+'</b></span>'; }).join('')
     +'</div></div>';
 }
-function applyDocFound(){
+function applyDocFound(how){
+  how=(how==='dialog')?'dialog':'list';    // 판독 띠의 [반영]은 값 목록만 보고 누른 것
+  var _src='scan:'+String((typeof _docSrc!=='undefined'&&_docSrc&&_docSrc.kind)||'doc');
   if(_docFid&&_docFid!==S.fundId){ toast('다른 기금에서 판독한 결과입니다 — 다시 올려주세요','warn'); return; }
   /* 참여사업장 갈래 — 편집 창은 이미 닫혀 있다(창은 겹쳐 뜨지 않는다). 칸에 넣는 대신
      걷어 둔 값 위에 판독값을 얹어 편집 창을 «다시 연다». 기업정보함에서 돌아오는 길과 같다.
@@ -12017,6 +12041,7 @@ function applyDocFound(){
     got=got.filter(function(k){ return !확인용(k); });
     var _sid=_siteEditSid||'';
     _siteDocKeep=null; _docScopeFund();
+    if(typeof _provPend==='function') _provPend(got,_src,how);
     editSite(_sid,pre);
     toast(got.length?(got.length+'개 항목을 채워 편집 창을 다시 열었습니다 — 확인 후 [저장]')
                     :'반영할 값이 없습니다', got.length?'':'warn');
@@ -12026,6 +12051,7 @@ function applyDocFound(){
   Object.keys(_docFound).forEach(function(k){
     var el=$(_docScope.pre+k); if(!el||!_docFound[k]) return;
     el.value=_docFound[k]; n++;
+    if(typeof _provMark==='function') _provMark(el,_src,how);
     el.style.background='#f8fafc'; setTimeout(function(){el.style.background='';},1400);
   });
   if(_docScope.pre==='fd-') markDirty();   // 사업장 편집은 창 안이라 이탈 경고를 걸지 않는다
@@ -12042,12 +12068,102 @@ function applyDocFound(){
    ⚠ 실패해도 «하던 일을 막지 않는다». 기록은 곁다리다 — 이것 때문에 저장이 안 되면
      주객이 뒤바뀐다. */
 function _nowStamp(){ return new Date().toISOString().slice(0,19).replace('T',' '); }
-function _audit(fid,what,detail){
+function _audit(fid,what,detail,bid){
   try{
     if(!fid) return;
-    fbDb.ref(NS+'/audit/'+fid).push().set({at:_nowStamp(),
-      by:(S.user||'?'), what:String(what||''), detail:String(detail||'').slice(0,300)});
+    var rec={at:_nowStamp(), by:(S.user||'?'), what:String(what||''), detail:String(detail||'').slice(0,300)};
+    if(bid) rec.bid=bid;                       // 칸별 출처 묶음(batches/{bid})과 잇는다
+    fbDb.ref(NS+'/audit/'+fid).push().set(rec);
   }catch(e){}
+}
+/* ══ 바닥 공사 ② — 칸마다 «누가·어디서·언제» (대표 지시 2026-10-05 「바닥공사부터진행」) ══
+   지금까지는 기계가 넣은 값(서류 판독·기업정보함·가져오기·추정)과 사람이 쓴 값이 똑같이 저장돼
+   «사람이 확인했는지»를 화면에서도 서식에서도 알 수 없었다. 저장이 끝난 뒤 곁에 따로 적는다.
+     prov/{기금}/{칸열쇠} = {m:1 기계|0 사람, src, how, by, at, bid}
+       칸열쇠 — f|칸(기금) · s|사업장|칸 · y|연도|사업장|칸 · c|…(지원금 서류 체크)
+                 · s|사업장 처럼 칸 없이 끝나면 «그 사업장 통째»(JSON 가져오기)
+       src  — hand 사람 · scan:종류 서류 판독 · card 기업정보함 · guess:office 소재지로 추정
+              · import:… 가져오기 · rule:… 규칙 · copy:prev 작년 값 · calc:budget 계산
+       how  — dialog 원본 옆에서 보고 넣음 · list 값 목록만 보고 넣음 · '' 사람이 따로 보지 않음
+     batches/{bid} = {meta:{at,by,what,src,n}, cells:{기금|칸열쇠:{b 전 값, a 새 값}}} — 묶음째 되돌리기 바탕
+   ⚠ 곁다리다 — 실패해도 하던 저장을 막지 않는다(_audit 과 같다).
+   ⚠ 부르는 쪽은 typeof 로 감싸 부른다 — 함수만 떼어 돌리는 검사들이 이 도우미 없이도 돌아가게. */
+var PROV_ROOT={funds:'f',sites:'s',site_years:'y',subsidy_chk:'c'};
+function _provKey(path){
+  var p=String(path||'').split('/'), r=PROV_ROOT[p[0]];
+  if(!r||!p[1]||p.length<3) return null;
+  return {fid:p[1], key:(r+'|'+p.slice(2).join('|')).replace(/[.#$\[\]]/g,'_')};
+}
+function _provBid(){ return 'b'+Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function _provEmpty(v){ return v==null||v===''||(Array.isArray(v)&&!v.length); }
+/* cells = [{path, a 새 값, b 전 값, m, src, how}] — path 는 NS 아래 경로. meta = {what, detail, src, m, how, audit} */
+function _track(cells,meta){
+  meta=meta||{};
+  try{
+    var at=_nowStamp(), by=(S.user||''), bid=_provBid(), up={}, per={}, n=0;
+    (cells||[]).forEach(function(c){
+      var k=_provKey(c.path); if(!k) return;
+      var m=(c.m!=null?c.m:meta.m)?1:0;
+      var src=String(c.src||meta.src||(m?'auto':'hand')), how=String((c.how!=null?c.how:meta.how)||'');
+      var empty=_provEmpty(c.a);
+      up['prov/'+k.fid+'/'+k.key]= empty ? null : {m:m, src:src, how:how, by:by, at:at, bid:bid};
+      var cell={}; if(!_provEmpty(c.b)) cell.b=c.b; if(!empty) cell.a=c.a;
+      if(!cell.hasOwnProperty('a')&&!cell.hasOwnProperty('b')) cell.x=1;
+      up['batches/'+bid+'/cells/'+k.fid+'|'+k.key]=cell;
+      (per[k.fid]=per[k.fid]||[]).push(k.key.split('|').pop()); n++;
+    });
+    if(!n) return '';
+    up['batches/'+bid+'/meta']={at:at, by:by, what:String(meta.what||''), src:String(meta.src||''), n:n};
+    if(meta.audit!==false) Object.keys(per).forEach(function(fid){
+      var names=per[fid].filter(function(v,i,a){ return a.indexOf(v)===i; });
+      var ak=fbDb.ref(NS+'/audit/'+fid).push().key;
+      up['audit/'+fid+'/'+ak]={at:at, by:(by||'?'), what:String(meta.what||''), bid:bid,
+        detail:(String(meta.detail||'')+(meta.detail?' · ':'')+per[fid].length+'칸: '
+          +names.slice(0,12).join('·')+(names.length>12?' 외':'')).slice(0,300)};
+    });
+    fbDb.ref(NS).update(up).catch(function(){});
+    return bid;
+  }catch(e){ return ''; }
+}
+/* update 지도 한 벌(기준 경로 + 상대 열쇠) → 칸 목록. before(k) 를 주면 전 값을 담는다. */
+function _trackUp(base,rel,meta,before){
+  var cells=Object.keys(rel||{}).map(function(k){
+    return {path:base+'/'+k, a:rel[k], b:before?before(k):undefined};
+  });
+  return _track(cells,meta);
+}
+/* 새로 만든 기록(사업장 등) 한 벌 → 칸마다 */
+function _trackNewCells(base,id,rec){
+  return Object.keys(rec||{}).filter(function(k){ return !_provEmpty(rec[k]); })
+    .map(function(k){ return {path:base+'/'+id+'/'+k, a:rec[k]}; });
+}
+/* 화면 칸에 «기계가» 넣은 값 표시 — 저장할 때 그 값 그대로면 기계 출처, 사람이 고쳤으면 사람 것 */
+function _provMark(el,src,how){
+  if(!el) return;
+  try{ el.setAttribute('data-prov',JSON.stringify({s:src,h:how||'',v:String(el.value==null?'':el.value).trim()})); }catch(e){}
+}
+function _provOf(el){
+  try{
+    var d=el&&el.getAttribute&&el.getAttribute('data-prov');
+    if(d){ var o=JSON.parse(d); if(String(el.value==null?'':el.value).trim()===o.v) return {m:1, src:o.s, how:o.h}; }
+  }catch(e){}
+  return {m:0, src:'hand', how:''};
+}
+/* 창을 «다시 열며» 채우는 길(서류 판독·기업정보함) — 창이 열린 뒤 그 칸들에 표시를 단다 */
+var _provPendForm=null;
+function _provPend(keys,src,how){ _provPendForm={keys:(keys||[]).slice(), src:src, how:how||''}; }
+var SITE_PREFIXES=['se-','sw-','su-','sm-'];
+function _siteFieldEl(k){
+  if(k==='contacts') return $('sc-name')||$('sc-mobile');
+  for(var i=0;i<SITE_PREFIXES.length;i++){ var el=$(SITE_PREFIXES[i]+k); if(el) return el; }
+  return null;
+}
+function _provApplyPend(){
+  var P=_provPendForm; _provPendForm=null; if(!P) return;
+  P.keys.forEach(function(k){
+    if(k==='contacts'){ ['name','mobile','email','position'].forEach(function(c){ var el=$('sc-'+c); if(el&&String(el.value||'').trim()) _provMark(el,P.src,P.how); }); return; }
+    _provMark(_siteFieldEl(k),P.src,P.how);
+  });
 }
 function openAudit(){
   var fid=S.fundId, f=funds[fid]||{};
@@ -12181,9 +12297,16 @@ function saveInfo(){
     pre.then(function(r){
       if(!r.ok){ toast('이름을 바꾸지 못했습니다 — '+r.why,'err'); renderFund(); return; }
       var rest = Object.keys(patch).length ? fbDb.ref(NS+'/funds/'+_fid).update(patch) : Promise.resolve();
+      /* 칸마다 누가·어디서 — 판독·기업정보함·추정으로 들어온 값을 그대로 저장했으면 기계 출처 */
+      var _cells=Object.keys(patch).map(function(k){
+        var pv=(typeof _provOf==='function')?_provOf($('fd-'+k)):{m:0,src:'hand',how:''};
+        return {path:'funds/'+_fid+'/'+k, a:patch[k], b:cur[k], m:pv.m, src:pv.src, how:pv.how};
+      });
+      if(_newName!==null&&!r.same) _cells.push({path:'funds/'+_fid+'/name', a:_newName, b:r.from, m:0});
       return rest.then(function(){
+        var _bid=(typeof _track==='function')?_track(_cells,{what:'기금 정보 저장',audit:false}):'';
         if(funds[_fid]) Object.assign(funds[_fid],patch);
-        _audit(_fid,'기금 정보 저장',_lbl.join(' · ')||Object.keys(patch).join(' · '));
+        _audit(_fid,'기금 정보 저장',_lbl.join(' · ')||Object.keys(patch).join(' · '),_bid);
         if(S.fundId===_fid){ clearDirty(); renderFund(); }
         /* 이름과 유형을 한꺼번에 바꿨으면 «이름» 쪽 창을 띄운다 — 창은 겹쳐 뜨지 않는다 */
         if(!r.same) afterRename(_fid,r.from,r.to);      // 손봐야 할 곳을 세어 알려 준다
@@ -12494,7 +12617,9 @@ function saveSitePerson(sid,field,val){
   var ok=['urep_name','urep_title','wrep_name','wrep_title'];
   if(ok.indexOf(field)<0) return;                    /* 아무 칸이나 쓰게 두지 않는다 */
   var fid=S.fundId, o={}; o[field]=String(val||'').trim();
+  var _b=((S.sites||{})[sid]||{})[field];
   fbDb.ref(NS+'/sites/'+fid+'/'+sid).update(o).then(function(){
+    if(typeof _track==='function') _track([{path:'sites/'+fid+'/'+sid+'/'+field, a:o[field], b:_b, m:0}],{what:'사람 보기 입력',audit:false});
     if(S.sitesFor===fid&&S.sites&&S.sites[sid]) S.sites[sid][field]=o[field];
     toast('저장했습니다');
     renderFund();                                    /* 위 「몇/몇 적혀 있다」를 다시 센다 */
@@ -12741,6 +12866,7 @@ function editSite(sid,prefill){
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
     ,{after:bindSiteDocIntake});
+  if(typeof _provApplyPend==='function') _provApplyPend();   // 판독·기업정보함으로 채워 연 칸에 «기계» 표시
 }
 /* 「대표자와 같은 사람」을 켜고 끌 때 성명 칸을 즉시 맞춘다 — 저장해 봐야 아는 것이 아니라
    켠 순간 무엇이 들어가는지 보여야 한다. 끄면 손으로 적을 수 있게 도로 연다. */
@@ -12786,6 +12912,17 @@ function saveSite(sid){
   var done=function(){ _sitePrefill=null; if(S.sitesFor===_fid)S.sitesFor=null; closeM();
     if(S.view==='fund'&&S.fundId===_fid)renderFund(); toast('사업장이 저장되었습니다'); };
   var err=function(e){ toast('저장 실패: '+(e&&e.message||e),'err'); };
+  /* 칸마다 누가·어디서 — 화면 칸의 기계 표시(data-prov)를 본다. 바뀐 칸만 */
+  var _pv=(typeof _provOf==='function')?function(k){ return _provOf(_siteFieldEl(k)); }:function(){ return {m:0,src:'hand',how:''}; };
+  var _same=function(a,b){ return JSON.stringify(_provEmpty(a)?null:a)===JSON.stringify(_provEmpty(b)?null:b); };
+  var _siteCells=function(id,rec,before){
+    return Object.keys(rec).filter(function(k){ return k!=='_id'&&!_same(rec[k],before[k]); }).map(function(k){
+      var pv=_pv(k); return {path:'sites/'+_fid+'/'+id+'/'+k, a:rec[k], b:before[k], m:pv.m, src:pv.src, how:pv.how};
+    });
+  };
+  var _trk=function(id,rec,before,what){
+    if(typeof _track==='function') _track(_siteCells(id,rec,before),{what:what, detail:String(obj.name||'')});
+  };
   if(sid){
     /* 기존 사업장은 set(전체 덮어쓰기)이 아니라 update(이 화면에서 다룬 항목만)로 저장한다.
        다른 세션이 이 화면에 없는 필드를 고쳐 놨어도 그 값이 지워지지 않게 하기 위함. */
@@ -12799,9 +12936,10 @@ function saveSite(sid){
        set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다. */
     if(obj.status) patch.status=obj.status;
     ['leave_date','biz_closed','biz_closed_date'].forEach(function(k){ if(Object.prototype.hasOwnProperty.call(obj,k)) patch[k]=obj[k]; });
-    fbDb.ref(NS+'/sites/'+_fid+'/'+sid).update(patch).then(done).catch(err);
+    fbDb.ref(NS+'/sites/'+_fid+'/'+sid).update(patch).then(function(){ _trk(sid,patch,base,'사업장 저장'); done(); }).catch(err);
   }else{
-    fbDb.ref(NS+'/sites/'+_fid).push().set(obj).then(done).catch(err);
+    var _nref=fbDb.ref(NS+'/sites/'+_fid).push();
+    _nref.set(obj).then(function(){ _trk(_nref.key,obj,{},'사업장 추가'); done(); }).catch(err);
   }
 }
 /* 「푸른이알피 업체 연결」은 2025년에 «불필요»로 단추를 뗐고(4d7937b), 그 뒤로
@@ -12840,6 +12978,7 @@ function repSameAll(){
     if(!ok) return;
     var up={}; hit.forEach(function(k){ up[k+'/urep_same']=true; });
     fbDb.ref(NS+'/sites/'+fid).update(up).then(function(){
+      if(typeof _trackUp==='function') _trackUp('sites/'+fid,up,{what:'사용자대표 = 대표자 (한번에)', src:'rule:urep_same', m:1, how:'list'});
       hit.forEach(function(k){ if(S.sitesFor===fid&&S.sites&&S.sites[k]) S.sites[k].urep_same=true; });
       toast(hit.length+'곳을 켰습니다 — 서식에 대표자 이름이 섭니다'); renderFund();
     }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
@@ -12847,7 +12986,9 @@ function repSameAll(){
 }
 function sySet(sid,k,v){
   var fid=S.fundId, yr=S.year, val=num(v)||0;
+  var _b=((S.sy||{})[sid]||{})[k];
   fbDb.ref(NS+'/site_years/'+fid+'/'+yr+'/'+sid+'/'+k).set(val||null).then(function(){
+    if(typeof _track==='function') _track([{path:'site_years/'+fid+'/'+yr+'/'+sid+'/'+k, a:val||null, b:_b, m:0}],{what:'연도별 기록',audit:false});
     S.sy=S.sy||{}; S.sy[sid]=S.sy[sid]||{}; S.sy[sid][k]=val;
     S.f15For=null; toast('저장됨');
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
@@ -12866,6 +13007,7 @@ function syCopyPrev(){
       });
       if(!n){ toast((yr-1)+'년에 가져올 값이 없습니다','warn'); return; }
       fbDb.ref(NS+'/site_years/'+fid+'/'+yr).update(up).then(function(){
+        if(typeof _trackUp==='function') _trackUp('site_years/'+fid+'/'+yr,up,{what:(yr-1)+'년 값 불러오기', src:'copy:prev', m:1, how:''});
         S.syFor=null; S.f15For=null; renderFund(); toast(n+'개 값을 불러왔습니다');
       });
     });
@@ -13071,6 +13213,10 @@ function commitSiteXlsx(){
       });
       if(!n){ toast('추가할 사업장이 없습니다(모두 중복)','warn'); return null; }
       return fbDb.ref(NS+'/sites/'+fid).update(add).then(function(){
+        if(typeof _track==='function'){
+          var _cells=[]; Object.keys(add).forEach(function(id){ _cells=_cells.concat(_trackNewCells('sites/'+fid,id,add[id])); });
+          _track(_cells,{what:'엑셀로 사업장 등록', detail:n+'곳 · '+String(nm).slice(0,40), src:'import:xlsx', m:1, how:'list'});
+        }
         _sitePend=null;
         if(S.sitesFor===fid) S.sitesFor=null;                       // 해당 기금 캐시만 무효화
         if(S.view==='fund'&&S.fundId===fid&&S.tab==='sites') renderFund();
@@ -13085,7 +13231,12 @@ function importSites(){
     var rd=new FileReader(); rd.onload=function(){
       try{ var data=JSON.parse(rd.result);
         confirmM('사업장 데이터를 Firebase로 가져올까요?\n(기금별 사업장 전체 덮어쓰기)',{ok:'가져오기'}).then(function(ok){ if(!ok)return;
-          fbDb.ref(NS+'/sites').update(data).then(function(){ toast('가져오기 완료'); S.sitesFor=null; renderFund(); })
+          fbDb.ref(NS+'/sites').update(data).then(function(){
+              /* 사업장 «통째» 덮어쓰기다 — 칸이 아니라 사업장 단위로 출처를 남기고 기금마다 기록 한 줄 */
+              var _cells=[]; Object.keys(data||{}).forEach(function(fid){ Object.keys(data[fid]||{}).forEach(function(sid){
+                _cells.push({path:'sites/'+fid+'/'+sid, a:data[fid][sid]}); }); });
+              if(typeof _track==='function') _track(_cells,{what:'사업장 JSON 가져오기(통째 덮어쓰기)', detail:String(f.name||'').slice(0,40), src:'import:json', m:1, how:''});
+              toast('가져오기 완료'); S.sitesFor=null; renderFund(); })
             .catch(function(e){ toast('가져오기 실패: '+e.message,'err'); }); });
       }catch(e){ toast('JSON 파싱 실패: '+e.message,'err'); }
     }; rd.readAsText(f);
@@ -14513,8 +14664,11 @@ function budgetFromContrib(){
       if(!ok) return;
       var up={};
       ['rev_contrib','rev_interest','exp_purpose','exp_admin','exp_etc'].forEach(function(k){ up[k]=b[k]||null; });
+      var _bud=((((f||{}).years||{})[yr]||{}).budget)||{};
       fbDb.ref(NS+'/funds/'+fid+'/years/'+yr+'/budget').update(up)
-        .then(function(){ toast(yr+'년 예산을 세웠습니다 — 숫자는 칸에서 고칠 수 있습니다'); })
+        .then(function(){
+          if(typeof _trackUp==='function') _trackUp('funds/'+fid+'/years/'+yr+'/budget',up,{what:yr+'년 예산 자동 세우기', src:'calc:budget', m:1, how:'list'},function(k){ return _bud[k]; });
+          toast(yr+'년 예산을 세웠습니다 — 숫자는 칸에서 고칠 수 있습니다'); })
         .catch(function(e){ toast('저장 실패: '+e.message,'err'); });
     });
   }).catch(function(e){ toast('참여사업장을 읽지 못했습니다: '+((e&&e.message)||e),'err'); });
@@ -17854,8 +18008,9 @@ var HELP={
    +'<p><b>짝짓는 방법</b> — 이미 아는 번호(고유번호·법인등록번호)가 맞으면 그것으로, 없으면 <b>이름이 완전히 같을 때만</b> 짝짓습니다. 「충남 4호」와 「충남 40호」를 섞지 않기 위해 부분일치는 쓰지 않습니다.</p>'
    +'<p>후보가 둘 이상인 기금은 <b>건너뛰고</b> 몇 개를 건너뛰었는지 알려 줍니다. 넣기 전에 표로 보여 주고, 넣는 순간 서버 값을 다시 확인해 그 사이 채워진 칸은 건드리지 않습니다.</p>'},
  'audit.log':{t:'변경 기록',h:'<p>이 기금을 <b>누가 언제 무엇을</b> 고쳤는지 남깁니다. 노동청·공단에 내는 숫자라 되짚을 수 있어야 합니다.</p>'
-   +'<p><b>남기는 것</b> — 기금 정보 저장(어느 칸인지) · 결산 확정·해제 · 월마감·해제 · 대부 추가·수정·삭제</p>'
-   +'<p><b>안 남기는 것</b> — 거래 승인, 예산 칸처럼 <b>자주 일어나는 일</b>입니다. 다 남기면 기록이 기금 자료보다 커지고 정작 중요한 것이 파묻힙니다.</p>'
+   +'<p><b>남기는 것</b> — 기금 정보 저장(어느 칸인지) · 사업장 추가·저장 · 결산 확정·해제 · 월마감·해제 · 대부 추가·수정·삭제 · 통장 가져오기·이체 상계 · 한꺼번에 들이는 일(서류 판독·기업정보함·엑셀·JSON·관할 추정·예산 자동 세우기)</p>'
+   +'<p><b>안 남기는 것</b> — 거래 승인, 예산 칸처럼 <b>자주 일어나는 일</b>입니다. 다 남기면 기록이 기금 자료보다 커지고 정작 중요한 것이 파묻힙니다. 거래 승인은 그 줄에 누가·언제가 따로 남습니다.</p>'
+   +'<p><b>칸마다 출처</b>(2026-10-05~) — 저장할 때 칸마다 «사람이 썼는지, 기계가 넣었는지(서류 판독·기업정보함·가져오기·추정)»와 누가·언제를 따로 적어 둡니다. 나중에 «기계가 넣고 아직 아무도 확인 안 한 값»을 모아 보는 확인함의 바탕입니다. 그 전에 들어간 값은 출처를 모릅니다.</p>'
    +'<p>최근 80건까지 보여 줍니다. 기록이 실패해도 <b>하던 일은 그대로 저장됩니다</b> — 기록은 곁다리입니다.</p>'},
  'close.budget':{t:'예산·집행',h:'<p>연간 일정의 <b>「차기연도 사업계획·예산 수립」</b> 결과를 넣는 곳입니다. 여태 넣을 자리가 없었습니다.</p>'
    +'<p><b>예산은 사람이 정하고, 실적은 장부가 말합니다.</b> 실적 칸은 손으로 못 고칩니다 — 고칠 수 있게 두면 집행률이 곧 의미가 없어집니다.</p>'
