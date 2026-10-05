@@ -33,6 +33,11 @@ const { cutFn } = require('./cut-fn');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
 const fn = (decl) => cutFn(SRC, decl);
+/* 못 보낸 변경을 «디스크에도» 적는 손 (2026-10-05) — 다시 보내는 함수들이 부른다.
+   ⚠ 이 검사 상자에서는 적는 곳(localStorage)이 빈 껍데기다. 디스크에 적는지는 tests/data-same-every-device.test.js 가 본다. */
+const PEND_FNS = ['function _fbPendLsKey(', 'function _fbPendPick(', 'function _fbPendSave(',
+  'function _fbPendFlight(', 'function _fbPendLand('];
+const PEND_CTX = { FB_PEND_LS: 'pend' };
 
 /* 순수 셈들을 한 방에 싣는다 */
 function pure() {
@@ -140,7 +145,8 @@ function flushWith(opts) {
     fbDb: { ref() { return { update(u) { calls.update.push(u); return Promise.resolve(); } }; } },
     _fbSynced: true,
     KEY: 'k_',
-    localStorage: { setItem() {} },
+    localStorage: { setItem() {}, removeItem() {} },
+    FB_PEND_LS: PEND_CTX.FB_PEND_LS,
     _dbCache: {},
     fbShouldSync() { return true; },
     _erpStoreGet(k) { return store[k] || null; },
@@ -155,7 +161,7 @@ function flushWith(opts) {
   ctx.window.erpAlert = ctx.erpAlert;
   vm.createContext(ctx);
   ['function _fbOpsEmpty(', 'function _fbOpsApply(', 'function _fbOpsUpdates(', 'function _fbReplayOps(',
-   'function _flushPendingLocalNewer('].forEach((d) => vm.runInContext(fn(d), ctx));
+   'function _flushPendingLocalNewer('].concat(PEND_FNS).forEach((d) => vm.runInContext(fn(d), ctx));
   ctx._flushPendingLocalNewer();
   return { calls, store };
 }
@@ -221,7 +227,8 @@ function flushLegacy(opts) {
       },
     },
     _fbSynced: true, KEY: 'k_',
-    localStorage: { setItem() {} },
+    localStorage: { setItem() {}, removeItem() {} },
+    FB_PEND_LS: PEND_CTX.FB_PEND_LS,
     _dbCache: {},
     fbShouldSync() { return true; },
     _erpStoreGet(k) { return store[k] || null; },
@@ -237,7 +244,7 @@ function flushLegacy(opts) {
   ['function _fbOpsEmpty(', 'function _fbOpsApply(', 'function _fbOpsUpdates(', 'function _fbReplayOps(',
    'function _fbReplayOpsTxn(', 'function _fbReplayMapOps(', 'function _fbOpsPutBack(', 'function _fbTakeServer(',
    'function _erpNameMap(', 'function erpObjIsMap(', 'function erpObjMerge(', 'function normalizeFbValue(',
-   'function arrayToIdMap(', 'function _fbStableId(', 'function _flushPendingLocalNewer('].forEach((d) => vm.runInContext(fn(d), ctx));
+   'function arrayToIdMap(', 'function _fbStableId(', 'function _flushPendingLocalNewer('].concat(PEND_FNS).forEach((d) => vm.runInContext(fn(d), ctx));
   ctx._flushPendingLocalNewer();
   return { calls, server, store, ctx };
 }

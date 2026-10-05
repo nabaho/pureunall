@@ -59,7 +59,8 @@ const 쓰는자리 = [
   ['rules_lib/rd_x.hwpx', '취업규칙 모은 자료'],
   ['erp_docs/UID/D123/reason.hwp', '옛 서면함 자리 — 화면은 2026-09-14 에 뺐고 규칙만 남겼다'],
   ['gov_evidence/SID/F.png', '자문관리 증빙'],
-  ['kcareer_forms/UID/CVFORM123.hwpx', '경력관리 기관 양식 (kcareer.html kcFormPath)']
+  ['kcareer_forms/UID/CVFORM123.hwpx', '경력관리 기관 양식 (kcareer.html kcFormPath)'],
+  ['erp_img/img_mfx1abc_k2j9q', '이알피 레코드 그림 — 명함·사업자등록증·직인 (pu-erp.html erpImgCloudPath)']
 ];
 
 /* 규칙 한 칸이 «이 길»에 맞나 — 창고 규칙의 짝짓기를 그대로 흉내낸다.
