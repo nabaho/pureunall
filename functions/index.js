@@ -1623,12 +1623,15 @@ exports.newsletterBounceScan = functions
     }
     const 폴더 = (await db.ref("mailbox/folders").once("value")).val() || {};
     const 받은 = Object.keys(폴더).find((k) => 폴더[k] && 폴더[k].kind === "inbox") || "INBOX";
-    const [메일들, 설정, 사업장들, 더한분들, 기존] = await Promise.all([
+    const [받은메일, 대기열, 설정, 사업장들, 더한분들, 기존] = await Promise.all([
       db.ref("mailbox/msgs/" + 받은).orderByKey().limitToLast(800).once("value").then((x) => x.val() || {}),
+      db.ref(MD.CARDS_ROOT + "/scheduled").once("value").then((x) => x.val() || {}),
       db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
       db.ref("data/companies/v").once("value").then((x) => x.val() || {}),
       db.ref("newsletter/더한분들").once("value").then((x) => x.val() || {}),
       db.ref("newsletter/bounces").once("value").then((x) => x.val() || {})]);
+    /* ★ 받은메일함의 반송 + «보내는 순간 거절된 것»(대기열 error) — 같은 잣대로 가른다 (2026-10-05) */
+    const 메일들 = Object.assign({}, 받은메일, NWatch.대기열실패를메일로(대기열, 회차들[보낸].batchId));
     /* 명단은 «막은 주소까지» — 이미 막은 주소의 반송도 기록은 남긴다 */
     const 명단 = (NF.명단짓기({ 설정, 사업장들, 더한분들, 막은주소: {} }).ok || []);
     const r = NWatch.반송모으기({ 메일들, 명단, 보낸때: Number(회차들[보낸].보낸때), 회차: 보낸, 기존, now });

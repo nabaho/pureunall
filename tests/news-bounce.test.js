@@ -145,3 +145,21 @@ test('⑦ 보낸 결과·서버 모두 «진짜 받은메일함»(폴더 kind:in
   assert.match(b, /kind === "inbox"/);
   assert.match(b, /\.pubsub\.schedule\("every day 09:00"\)/);
 });
+
+test('⑧ «보내는 순간 거절된 것»(대기열 error)도 같은 잣대로 — 이 회차 것만', () => {
+  const 대기열 = {
+    a: { bulk: 'b1', payload: { to: 'old@gana.example' }, error: '메일 서버가 받지 않았습니다: Message failed: 550 5.2.1 Inactive mailbox', failedAt: 보낸때 + 10 },
+    b: { bulk: 'b1', payload: { to: 'ceo@dara.example' }, error: 'Message failed: 554 5.7.3 )', failedAt: 보낸때 + 10 },
+    c: { bulk: 'b1', payload: { to: 'yju@maba.example' }, error: 'Message failed: 451 4.4.0 domain dns query fail for maba.example', failedAt: 보낸때 + 10 },
+    d: { bulk: 'other', payload: { to: 'hr@saa.example' }, error: '550 5.1.1 No such user', failedAt: 보낸때 + 10 },
+    e: { bulk: 'b1', payload: { to: 'hr@aja.example' }, failedAt: 보낸때 + 10 } };
+  const 메일 = W.대기열실패를메일로(대기열, 'b1');
+  assert.deepStrictEqual(Object.keys(메일).sort(), ['q_a', 'q_b', 'q_c'], '다른 회차·오류 없는 줄까지 읽었다');
+  const r = W.반송모으기({ 메일들: 메일, 명단, 보낸때, 회차: '2026-10-w1', 기존: {}, now: 1 });
+  assert.strictEqual(r.쓸[C.주소열쇠('old@gana.example')].갈래, '없는주소');
+  assert.ok(r.막을[C.주소열쇠('old@gana.example')], '보낼 때 «없는 주소»로 거절된 곳을 명단에서 안 뺐다');
+  assert.strictEqual(r.쓸[C.주소열쇠('ceo@dara.example')].갈래, '서버거부');
+  assert.strictEqual(r.쓸[C.주소열쇠('yju@maba.example')].갈래, '일시');
+  /* 서버가 받은메일함과 «함께» 읽는다 */
+  assert.match(몸('newsletterBounceScan'), /Object\.assign\(\{\}, 받은메일, NWatch\.대기열실패를메일로\(대기열, 회차들\[보낸\]\.batchId\)\)/);
+});
