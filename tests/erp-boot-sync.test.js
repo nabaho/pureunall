@@ -633,6 +633,7 @@ test('★ 지운 건은 빠진다', async () => {
   await env.sync();
   await tick();
   env.recListeners.contracts.child_removed.cb({ key: 'a', val: () => null });
+  await new Promise(r => setTimeout(r, 160));
   const arr = JSON.parse(env.sandbox.localStorage.getItem('pureun_v6_contracts'));
   assert.deepEqual(arr.map(x => x.id), ['b']);
 });
@@ -656,9 +657,28 @@ test('★ 한꺼번에 절반 넘게 지워지면 사람에게 묻는다 — 안
   for (let i = 0; i < 12; i++) {
     env.recListeners.contracts.child_removed.cb({ key: 'r' + i, val: () => null });
   }
+  await new Promise(r => setTimeout(r, 160));
   const arr = JSON.parse(env.sandbox.localStorage.getItem('pureun_v6_contracts'));
-  assert.ok(arr.length > 8,
-    '★ 「아니오」인데도 지웠습니다 — 요금 아끼려다 자료가 조용히 사라집니다(남은 ' + arr.length + '건)');
+  assert.equal(arr.length, 20,
+    '★ 「아니오」인데 묻기 전의 지움까지 반영했습니다(남은 ' + arr.length + '건)');
+});
+
+test('★★ 지웠다 같은 id가 다시 오면 「목록 모양 바꿈」이다 — 삭제 경고도 자료 변경도 없다', async () => {
+  const rows = manyRecords(20);
+  let asked = 0;
+  const env = makeEnv({
+    fin: true, serverKeys: ['contracts'], serverU: { contracts: 900 }, ls: withCache(['contracts'], 1),
+    records: { contracts: rows }, confirmDelete: false
+  });
+  env.sandbox.confirm = () => { asked++; return false; };
+  await env.sync();
+  await tick();
+  rows.forEach(r => env.recListeners.contracts.child_removed.cb({ key:r.id, val:() => null }));
+  rows.forEach(r => env.recListeners.contracts.child_added.cb({ key:r.id, val:() => r }));
+  await new Promise(r => setTimeout(r, 160));
+  const arr = JSON.parse(env.sandbox.localStorage.getItem('pureun_v6_contracts'));
+  assert.equal(arr.length, 20);
+  assert.equal(asked, 0, '같은 자료를 다시 받았는데 대량 삭제로 물었습니다');
 });
 
 test('한두 건 지우는 것은 안 묻는다 — 매번 물으면 사람이 그냥 눌러 버린다', async () => {
@@ -671,6 +691,7 @@ test('한두 건 지우는 것은 안 묻는다 — 매번 물으면 사람이 �
   await env.sync();
   await tick();
   env.recListeners.contracts.child_removed.cb({ key: 'r0', val: () => null });
+  await new Promise(r => setTimeout(r, 160));
   const arr = JSON.parse(env.sandbox.localStorage.getItem('pureun_v6_contracts'));
   assert.equal(arr.length, 19, '한 건 지움이 막혔습니다');
 });

@@ -8,7 +8,7 @@ const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
-const code = ['_fbLocalArr','_fbWriteArr','_fbApplyMany','_fbLiveRecords']
+const code = ['_fbLocalArr','_fbWriteArr','_fbApplyMany','_fbCancelQueuedRemove','_fbFlushRemoves','_fbRemoveOne','_fbLiveRecords']
   .map(name => cutFn(src, 'function ' + name + '(')).join('\n');
 
 function world(initial) {
@@ -23,7 +23,7 @@ function world(initial) {
     _erpStoreGet(){ return null; },
     _scheduleFbChanged(){},
     _fbRepairLedgerBatches(){ return Promise.resolve(0); },
-    _fbRemoveOne(k, id){ removals.push(id); ctx._dbCache[k] = ctx._dbCache[k].filter(x => x.id !== id); },
+    _FB_DEL_SETTLE_MS:120, _fbDelQueue:{}, confirm(){ return true; },
     setTimeout(fn, ms){ const id=next++; timers.set(id,{fn,ms}); return id; },
     clearTimeout(id){ timers.delete(id); },
     fbDb:{ ref(){ return {
@@ -56,8 +56,9 @@ test('동일 id의 마지막 변경을 보존하고 삭제 전 대기분을 먼�
   w.listeners.child_added(w.snap('r1',{id:'r1',amount:1}));
   w.listeners.child_changed(w.snap('r1',{id:'r1',amount:2}));
   w.listeners.child_removed(w.snap('r1',null));
+  assert.equal(w.ctx._dbCache.contracts.length,1, '잠깐 대기하기 전에 지우면 재추가와 상쇄할 수 없다');
+  w.tick();
   assert.equal(w.ctx._dbCache.contracts.length,0);
-  assert.deepEqual(w.removals,['r1']);
   w.listeners.child_added(w.snap('r2',{id:'r2',amount:3}));
   w.finish(); await p;
   assert.equal(w.ctx._dbCache.contracts.length,1);

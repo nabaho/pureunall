@@ -11454,33 +11454,46 @@ function _fbRepairLedgerBatches(serverValue){
 }
 
 /* ── 건별 지우기 + 급감 차단 ──
-   ⚠ 칸 단위였을 때는 「항목 수가 절반 아래로 줄면 묻는다」로 막았다. 건별로 오면
-     한 건씩 들어와 그 장치가 **한 번도 안 걸린다** — 요금 아끼려다 자료가 조용히
-     사라지는 것이 훨씬 나쁘다. 그래서 **짧은 창 안에 몇 건이 지워졌는지** 세어
-     절반을 넘으면 그때 사람에게 묻는다. */
-var _FB_DEL_WINDOW_MS = 3000;
-var _fbDelWatch = {};
-function _fbRemoveOne(k, id){
-  var arr = _fbLocalArr(k);
-  var before = arr.length;
-  arr = arr.filter(function(x){ return !(x && String(x.id) === String(id)); });
-  if(arr.length === before) return;                 // 없던 건 — 할 일 없다
+   서버가 예전 목록 꼴(배열)을 아이디 지도로 바꾸면 Firebase는 같은 자료를
+   `child_removed` 여러 개 뒤 `child_added` 여러 개로 알린다. 크롬·엣지·다른 계정이
+   열릴 때 이 순간을 「96건 삭제」로 잘못 보면 경고가 반복되고, 예전 코드는
+   묻기 전 절반을 이미 로컬에서 지워 취소를 눌러도 자료가 갈라졌다.
 
-  var w = _fbDelWatch[k];
-  var now = Date.now();
-  if(!w || now - w.at > _FB_DEL_WINDOW_MS) w = _fbDelWatch[k] = { at: now, n: 0, base: before };
-  w.n++;
-  /* 열 건 미만인 작은 칸은 묻지 않는다 — 정상적으로 다 지우는 일이 있다(칸 단위와 같은 기준) */
-  if(w.base >= 10 && w.n >= Math.ceil(w.base * 0.5)){
-    _fbDelWatch[k] = { at: now, n: 0, base: arr.length };   // 한 번 물었으면 다시 세기
+   → 지움을 짧게 묶어 두고, 같은 id가 다시 오면 지움을 취소한다.
+   → 실제로 남은 지움만 한 번에 반영한다. 대량 삭제는 묻기 전에는 한 건도 지우지 않는다. */
+var _FB_DEL_SETTLE_MS = 120;
+var _fbDelQueue = {};
+function _fbCancelQueuedRemove(k, id){
+  var q = _fbDelQueue[k];
+  if(!q) return;
+  delete q.ids[String(id)];
+}
+function _fbFlushRemoves(k){
+  var q = _fbDelQueue[k];
+  if(!q) return;
+  delete _fbDelQueue[k];
+  var ids = q.ids || {};
+  var arr = _fbLocalArr(k), before = arr.length;
+  var actual = arr.filter(function(x){ return x && ids[String(x.id)]; }).length;
+  if(!actual) return;                                // 같은 id가 다시 왔거나 원래 없던 건
+  var left = before - actual;
+  if(q.base >= 10 && actual >= Math.ceil(q.base * 0.5)){
     var okDel = false;
     try {
-      okDel = confirm('「' + k + '」에서 ' + w.n + '건이 한꺼번에 지워졌습니다(남은 ' + arr.length + '건).\n\n' +
+      okDel = confirm('「' + k + '」에서 ' + actual + '건이 한꺼번에 지워졌습니다(남은 ' + left + '건).\n\n' +
         '다른 PC 에서 지운 것일 수도, 잘못된 것일 수도 있습니다.\n이 지움을 이 PC 에도 반영할까요?');
     } catch(_c){ okDel = false; }
-    if(!okDel) return;                              // 반영 안 함 — 다음에 켤 때 서버와 맞춘다
+    if(!okDel) return;                               // 취소면 처음 목록을 그대로 두는다
   }
+  arr = arr.filter(function(x){ return !(x && ids[String(x.id)]); });
   _fbWriteArr(k, arr, _fbServerU[k]);
+}
+function _fbRemoveOne(k, id){
+  var q = _fbDelQueue[k];
+  if(!q) q = _fbDelQueue[k] = { base:_fbLocalArr(k).length, ids:Object.create(null), timer:null };
+  q.ids[String(id)] = true;
+  if(q.timer) clearTimeout(q.timer);
+  q.timer = setTimeout(function(){ _fbFlushRemoves(k); }, _FB_DEL_SETTLE_MS);
 }
 
 /* 건별 구독 — 바뀐 건만 내려온다.
@@ -11500,6 +11513,7 @@ function _fbLiveRecords(k, opts){
       _fbApplyMany(k, batch);
     }
     function queue(id, val){
+      _fbCancelQueuedRemove(k, id);                 // 모양 바꿈으로 지웠다 다시 온 같은 줄
       if(hydrating) pending[String(id)] = val;
       else _fbApplyOne(k, id, val); // 첫 적재 뒤 실시간 한 건은 즉시 보인다
     }
