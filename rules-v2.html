@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>취업규칙</title>
+<!-- 글꼴 — rules.html 과 같은 웹글꼴. 안 실으면 PC 글꼴로 그려져 같은 글자도 폭이 달라지고, 갈래 단추가 오갈 때 튄다(2026-10-05 실측 15px) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <!-- 취업규칙 새로 짓기 ① — 「📥 모은 자료」 (설계 docs/superpowers/specs/2026-10-03-취업규칙-새로짓기-design.md)
      서버(collectRulesMail)가 매일 새벽 메일함에서 취업규칙 첨부를 골라 «개인정보를 가린 사본만» 담는다.
      이 화면은 그것을 보고, 사람이 사업장을 잇고 회차마다 ★최종본을 정한다.
@@ -58,14 +61,7 @@ body{margin:0;font-family:"Noto Sans KR",system-ui,sans-serif;background:#e2e8f0
 button{font:inherit;cursor:pointer}
 .top{display:flex;align-items:center;gap:14px;padding:10px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff;position:sticky;top:0;z-index:5}
 .logo{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:#1e40af;color:#ffffff;display:grid;place-items:center;font-weight:800}
-/* 갈래 단추 — rules.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04).
-   좁으면 이름을 접고 그림만 — 이름은 title 에 있다. */
-.rmode{display:inline-flex;flex:0 0 auto;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#ffffff;margin-left:10px}
-.rmode a{padding:5px 12px;font-size:12.5px;color:#475569;white-space:nowrap;text-decoration:none}
-.rmode a+a{border-left:1px solid #cbd5e1}
-.rmode a.on{background:#1e40af;color:#ffffff;font-weight:700}
-.rmode a:not(.on):hover{background:#eff6ff}
-@media(max-width:1100px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
+/* 갈래 단추(.rmode)·머리줄 왼쪽 묶음의 모양은 css/rules-shell.css 한 벌에 있다(2026-10-05) — 여기 다시 두지 말 것 */
 .top .r{margin-left:auto;display:flex;align-items:center;gap:10px;color:#475569;font-size:12px}
 #lib{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
 #lib .msg{padding:60px 20px;text-align:center;color:#475569}
@@ -267,10 +263,11 @@ button{font:inherit;cursor:pointer}
   input, select, textarea{ font-size: 16px !important; }
 }
 </style>
+<link rel="stylesheet" href="css/rules-shell.css?v=1">
 </head>
 <body>
-<div class="top">
-  <div class="logo">규</div><b style="font-size:16px;white-space:nowrap">취업규칙</b>
+<div class="top rs-head">
+  <div class="logo rs-logo">규</div><b class="rs-name">취업규칙</b>
   <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
        🏢 사업장(③-ⓐⓑ 목업 2026-10-04)이 맨 앞 — 타일을 누르면 처음 나오는 화면이다.
        ✏️ 검토·개정은 rules.html 로 «같은 창»에서 간다. 🏢·📚·📥 는 이 파일 안 갈래라 주소 해시만 바꾼다(아래 rv2Route).

@@ -123,12 +123,12 @@ test('두 판은 ①②에서 늘 보인다 — 넣으면서 원본을 봐야 �
 
 /* ── 배선 ── */
 test('★ 단계 막대가 머리줄에 있다', () => {
-  const h = src.slice(src.indexOf('<header>'), src.indexOf('</header>'));
+  const h = src.slice(src.indexOf('<header'), src.indexOf('</header>'));
   assert.match(h, /id="stepbar"/, '흐름이 안 보이면 정리한 뜻이 없습니다');
 });
 
 test('★ 설정 줄이 머리줄 밖으로 나왔다', () => {
-  const h = src.slice(src.indexOf('<header>'), src.indexOf('</header>'));
+  const h = src.slice(src.indexOf('<header'), src.indexOf('</header>'));
   assert.ok(!h.includes('id="site"'), '사업장 고르기가 아직 머리줄에 있습니다');
   assert.ok(!h.includes('id="asof"'), '기준일이 아직 머리줄에 있습니다');
   assert.match(src, /id="setup"/, '설정 줄을 담을 자리가 필요합니다');
