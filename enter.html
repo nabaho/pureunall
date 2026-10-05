@@ -129,7 +129,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script type="module" src="js/pu-mfa.js?v=1"></script>
+<script type="module" src="js/pu-mfa.js?v=2"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -733,8 +733,8 @@ body.portal-mode #moreFab{display:flex;}
 #kkModal .hd b{font-size:1rem;font-weight:800;}
 #kkModal .hd .x{cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;}
 #kkModal .bd{padding:14px 18px;overflow-y:auto;}
-#mfaLoginModal,#mfaEnrollModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:90;align-items:center;justify-content:center;padding:16px;}
-#mfaLoginModal .box,#mfaEnrollModal .box{background:#fff;border-radius:16px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
+#mfaLoginModal,#mfaEnrollModal,#mfaOfferModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:90;align-items:center;justify-content:center;padding:16px;}
+#mfaLoginModal .box,#mfaEnrollModal .box,#mfaOfferModal .box{background:#fff;border-radius:16px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
 #mfaLoginModal .hd,#mfaEnrollModal .hd{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid #f8fafc;flex-shrink:0;}
 #mfaLoginModal .hd .x,#mfaEnrollModal .hd .x{cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;}
 #mfaLoginModal .bd,#mfaEnrollModal .bd{padding:16px 18px;overflow-y:auto;}
@@ -1425,6 +1425,15 @@ body.portal-mode #moreFab{display:flex;}
     <div class="ft"><button class="sg-btn" id="mfaEnrollOk" type="button">등록 완료</button></div>
   </div>
 </div>
+<div id="mfaOfferModal" role="dialog" aria-modal="true" aria-labelledby="mfaOfferTitle" style="display:none">
+  <div class="box" style="width:440px">
+    <div class="hd"><b id="mfaOfferTitle">🔐 로그인 보호 등록 요청</b></div>
+    <div class="bd">
+      <p id="mfaOfferText" style="margin:0;line-height:1.7;color:#334155"></p>
+    </div>
+    <div class="ft"><button class="sg-btn ghost" id="mfaOfferLater" type="button">나중에</button><button class="sg-btn" id="mfaOfferNow" type="button">지금 등록</button></div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -2072,6 +2081,22 @@ body.portal-mode #moreFab{display:flex;}
     }).catch(function(e){ alert((e&&e.message)||'인증 앱 등록을 시작하지 못했습니다.'); })
       .finally(function(){ if(btn) btn.disabled=false; });
   }
+  function mfaOfferAfterLogin(role, via){
+    if(via !== 'login' || role === 'admin' || !window.PuMFA || !auth.currentUser) return;
+    var u=auth.currentUser, key='pu_mfa_offer:'+u.uid;
+    try { if(sessionStorage.getItem(key)==='1') return; sessionStorage.setItem(key,'1'); } catch(_e){}
+    Promise.all([PuMFA.status(), u.getIdTokenResult()]).then(function(all){
+      if(all[0] && all[0].enrolled) return;
+      var kakao=!!(all[1] && all[1].claims && all[1].claims.kakao===true);
+      $('mfaOfferText').textContent = kakao
+        ? '카카오 로그인은 연결되어 있습니다. 인증 앱까지 추가하려면 다음 한 번은 아이디·비밀번호로 로그인한 뒤 등록해 주세요.'
+        : '계정 도용을 막기 위해 휴대전화 인증 앱을 등록해 주세요. 문자요금은 들지 않으며 다음 로그인부터 숫자 6자리를 확인합니다.';
+      $('mfaOfferNow').textContent = kakao ? '내 정보에서 확인' : '지금 등록';
+      $('mfaOfferNow').onclick = function(){ $('mfaOfferModal').style.display='none'; if(kakao) kkOpenProfile(); else mfaBeginEnrollment(); };
+      $('mfaOfferModal').style.display='flex';
+    }).catch(function(){ /* 등록 확인 실패는 다음 로그인에 다시 묻는다 */ });
+  }
+  $('mfaOfferLater').addEventListener('click',function(){ $('mfaOfferModal').style.display='none'; });
   function kkStartLink(){
     auth.currentUser.getIdToken().then(function(){        // 세션이 살아 있는지만 미리 확인
       return PuKakao.goLink(window.__myKakaoSid || '');
@@ -2903,6 +2928,7 @@ body.portal-mode #moreFab{display:flex;}
     if(window.sgSetUser) window.sgSetUser(acct);
     initPortalHanaAlerts(role);
     initPortalExpAlerts();
+    mfaOfferAfterLogin(role, info.via);
     /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
        다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
     portalHanaPaintBadge();
