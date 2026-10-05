@@ -9,7 +9,8 @@
   세 개가 다 맞으면 그 직원 데이터는 '내부 정합' = 믿을 수 있음.
 - 사람이 할 일: 원본 엑셀을 열어 직원 2~3명 숫자를 명세서와 눈으로 대조.
 - 개인정보: 성명만. 결과물은 자료폴더 _harness_out(깃 밖).
-사용: python engine/verify_month.py "나라앤드씨" "7월" "(주)나라앤드씨 25년 7월 급여대장.xlsx"
+사용: python engine/verify_month.py "<사업장>" "7월" "<그 달 급여대장 파일 이름>.xlsx"
+      인자를 빼면 자료 폴더 engine_defaults.json 의 기본값으로 돈다(아래 main 참고).
 """
 import os, sys, json, math
 
@@ -141,10 +142,32 @@ def gen(site, month, fname=None):
     print(f"직원 {len(emps)}명 / 지방세 {rate('지방세')} · 공제합 {rate('공제합')} · 실수령 {rate('실수령')}")
 
 
+# 인자 없이 돌릴 때의 기본 사업장·월은 **저장소 밖** 자료 폴더의 engine_defaults.json 에 둔다
+# (실제 업체 이름이라서 — 보안 정리 2026-09 뒤 가짜 이름이 박혀 아무것도 못 찾았다, 2026-10-05).
+#   {"verify_month": {"site": "사업장", "month": "7월"}}
+# 표가 없으면 가짜로 돌지 않고 사용법을 알리고 멈춘다.
+DEFAULTS_FILE = os.path.join(DATA_ROOT, "engine_defaults.json")
+
+
+def _defaults():
+    try:
+        return json.load(open(DEFAULTS_FILE, encoding="utf-8")).get("verify_month") or {}
+    except FileNotFoundError:
+        return {}
+    except Exception as e:
+        print("[주의] engine_defaults.json 을 못 읽었습니다:", e)
+        return {}
+
+
 def main():
-    site = sys.argv[1] if len(sys.argv) > 1 else "나라앤드씨"
-    month = sys.argv[2] if len(sys.argv) > 2 else "7월"
+    d = _defaults() if len(sys.argv) < 3 else {}
+    site = sys.argv[1] if len(sys.argv) > 1 else d.get("site")
+    month = sys.argv[2] if len(sys.argv) > 2 else d.get("month")
     fname = sys.argv[3] if len(sys.argv) > 3 else None
+    if not site or not month:
+        print('사용: python engine/verify_month.py "<사업장>" "<월>" ["<파일 이름>"]')
+        print("     (인자 없이 돌리려면 기본값을 여기에:", DEFAULTS_FILE, ")")
+        sys.exit(1)
     gen(site, month, fname)
 
 
