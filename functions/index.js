@@ -1158,9 +1158,9 @@ exports.weeklyNewsletterSend = functions
       return null;
     }
 
-    /* transaction 으로 먼저 찜한다. 함수가 겹쳐 실행돼도 한 쪽만 통과한다. */
-    const lock = await db.ref("newsletter/weeklyReady/상태").transaction((v) =>
-      v === "준비" ? "거는중" : undefined);
+    /* transaction 으로 먼저 찜한다. 함수가 겹쳐 실행돼도 한 쪽만 통과한다.
+       ⚠ 찬 자리(null)에서 접으면 서버에 묻지도 않고 끝난다 — 2026-10-05 첫 자동발송이 그렇게 안 나갔다(NewsletterWeekly.자동발송찜). */
+    const lock = await db.ref("newsletter/weeklyReady/상태").transaction(NewsletterWeekly.자동발송찜);
     if (!lock.committed) {
       console.log("[뉴스레터 자동발송] 이미 처리 중이거나 완료됨");
       return null;
@@ -1272,7 +1272,9 @@ exports.weeklyNewsletterSend = functions
       return null;
     } catch (e) {
       if (issueClaim && issueClaim.committed) await db.ref("newsletter/issues/" + ready.회차열쇠 + "/발송잠금").transaction((v) => {
-        if (!v || v.요청열쇠 !== weeklyRequestId || v.상태 !== "거는중") return undefined;
+        /* ⚠ 찬 자리(null)에서 접지 않는다 — 접으면 잠금이 «거는중»에 묶여 손으로도 못 보낸다. 진짜 값으로 다시 불린다 */
+        if (v == null) return NL.틀어졌다({ 요청열쇠: weeklyRequestId, 상태: "거는중" }, Date.now(), (e && e.message) || e);
+        if (v.요청열쇠 !== weeklyRequestId || v.상태 !== "거는중") return undefined;
         return NL.틀어졌다(v, Date.now(), (e && e.message) || e);
       }, undefined, false).catch(() => null);
       await db.ref("newsletter/weeklyReady").update({
