@@ -39,7 +39,8 @@
     { ls: 'recruit_mailmap',    path: 'recruit/mailmap',    kind: 'map' },
     { ls: 'recruit_mailskip',   path: 'recruit/mailskip',   kind: 'map' },
     { ls: 'recruit_need',       path: 'recruit/need',       kind: 'map' },
-    { ls: 'recruit_due',        path: 'recruit/due',        kind: 'map' }    /* 글마다 사람이 넣은 마감일 (2026-10-05) */
+    { ls: 'recruit_due',        path: 'recruit/due',        kind: 'map' },   /* 글마다 사람이 넣은 마감일 (2026-10-05) */
+    { ls: 'recruit_match',      path: 'recruit/match',      kind: 'map' }    /* 지난 이력 견주기 — 맞음·아님 (2026-10-05) */
   ];
   var SV = 2;   /* 이 판의 쓰기 표 — 보안규칙이 이 값 이상만 받는다 */
   var byLs = {};

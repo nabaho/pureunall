@@ -30,7 +30,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'), GovSync: require('../js/gov-sync.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
@@ -47,6 +47,7 @@ function runApp(seed, opt) {
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
+    + 'matchOpen,matchMark,matchSel,matchBulk,'
     + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
@@ -832,8 +833,8 @@ test('★★ 열 맞춤 — 새 모집 글·메일 표는 칸 너비를 못박�
   r.api.setFb(fbWith(MIX), 'U1');
   await r.api.recWatchPull();
   const kc = r.el('recWatchKc').innerHTML;
-  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:150px"><col style="width:168px"><\/colgroup>/);
-  assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th>기간<\/th>/);
+  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:150px"><col style="width:168px"><\/colgroup>/);
+  assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th[^>]*>이력<\/th><th>기간<\/th>/);
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /\.rec-fixed\{table-layout:fixed;width:100%\}/);
   assert.match(src, /var mtable=function/, '메일 묶음도 같은 열 표');
@@ -953,4 +954,107 @@ test('★ 팝업이 열리면 링크로 새 탭을 또 열지 않는다(false)',
   r.api.setOpen((u, n, f) => ({ focus(){}, u, n, f }));
   assert.equal(r.api.recOpenPost('k1'), false);
   assert.equal(r.opened[0].n, 'recPost'); assert.match(r.opened[0].f, /popup=yes/);
+});
+
+/* ═══ 📚 지난 이력과 견주기 (대표 지시 2026-10-05) ═══ */
+const KC_LS = {
+  wiccok: JSON.stringify([
+    { org: '재단법인 충남경제진흥원', titleVal: '컨설턴트', issueDate: '2026-03-01', type: '위촉' },
+    { org: '한국공인노무사회', titleVal: '이사', issueDate: '2026-01-01', type: '위촉' },
+    { org: '대전지방고용노동청 서산지청', titleVal: '직장 내 괴롭힘 판단 전문위원회 위원', issueDate: '2026-02-01', type: '위촉' }
+  ]),
+  consult: JSON.stringify([
+    { project: '일자리전환컨설팅', org: '비밀고객가', agency: '충남경제진흥원', type: '구조혁신', year: '2026' },
+    { project: '일자리전환컨설팅', org: '비밀고객나', agency: '충남경제진흥원', type: '구조혁신', year: '2025' }
+  ]),
+  'case': JSON.stringify([{ project: '홍길동 유족급여', type: '성희롱및직장내괴롭힘조사', year: '2026' }])
+};
+const MW = {
+  last: { at: '2026-10-05T22:20:00Z', checked: 19, errors: [] },
+  hits: {
+    m1: { key: 'm1', board: 'cepa', org: 'cepa', boardName: '충남경제진흥원 공지', title: '「산업·일자리전환 지원센터」컨설턴트 추가 모집 공고', date: '2026-10-01', href: 'https://www.cepa.or.kr/1' },
+    m2: { key: 'm2', board: 'kcplaa_job', org: 'kcplaa', boardName: '공인노무사회 채용 정보', title: '직장 내 괴롭힘 사건 외부 조사자 선임 공고', date: '2026-09-30', href: 'https://www.kcplaa.or.kr/w/1' },
+    m3: { key: 'm3', board: 'semas', org: 'semas', boardName: '소상공인시장진흥공단 공지', title: '스마트상점 기술보급 지원 안내', date: '2026-09-09' }
+  }
+};
+function fbKc(opt) {
+  opt = opt || {}; const calls = { kc: 0 };
+  return { calls, db: { ref: (p) => ({
+    once: () => {
+      if (/^kcareer\//.test(p)) { calls.kc++; if (opt.failKc) return Promise.reject(new Error('net')); const st = p.split('/').pop(); return Promise.resolve({ val: () => (KC_LS[st] || null) }); }
+      return Promise.resolve({ val: () => (p === 'gov_watch' ? MW : null) });
+    },
+    update: () => Promise.resolve() }) } };
+}
+const tick = () => new Promise((ok) => setTimeout(ok, 30));
+async function openMatch(seed) {
+  const r = runApp(Object.assign({ recruit_scan: SCAN }, seed || {}), { Date: FixedDate('2026-10-05T09:00:00') });
+  const f = fbKc(); r.api.setFb(f.db, 'U1');
+  await r.api.recWatchPull(); await tick(); await tick();
+  return { r, f };
+}
+test('★★★ 모집 글 줄에 「이력」 — 같은 기관·같은 종류 실적이 «동일»', async () => {
+  const { r } = await openMatch();
+  r.api.recSub('pub');
+  const row = rowOf(r.el('recWatch').innerHTML, '산업·일자리전환');
+  assert.match(row, /<button class="mtb"[^>]*onclick="event\.stopPropagation\(\);matchOpen\('h\|m1'\)"><span class="same">🟢 동일 1<\/span> · <span class="sim">🟡 유사 1<\/span><\/button>/);
+  assert.match(rowOf(r.el('recWatch').innerHTML, '스마트상점'), /<td class="mt"><span class="sml"[^>]*>—<\/span><\/td>/, '견줄 것이 없으면 —');
+});
+test('★★★ 팝업 — 까닭·건수가 보이고 고객사·당사자 이름은 안 보인다', async () => {
+  const { r } = await openMatch();
+  r.api.matchOpen('h|m1');
+  const b = r.el('popBody').innerHTML;
+  assert.match(b, /동일<\/span><\/td><td class="sml">컨설팅<\/td><td[^>]*>구조혁신 · 일자리전환컨설팅 · 충남경제진흥원 <span class="sml">× 2건<\/span>/);
+  assert.match(b, /기관 같음 · 같은 종류: 산업·일자리 전환 · 2025~2026/);
+  ['비밀고객가', '비밀고객나', '홍길동'].forEach((n) => assert.ok(!b.includes(n), n + ' 가 보인다'));
+  assert.match(b, /<td class="chk"><input type="checkbox" class="row-chk"[^>]*><\/td><td class="rn">1<\/td>/, 'ㅁ·№');
+});
+test('★★★ 공인노무사회 게시판 글은 공인노무사회 위촉과 «기관 같음»이 아니다 — 글을 낸 곳이 아니다', async () => {
+  const { r } = await openMatch();
+  r.api.matchOpen('h|m2');
+  const b = r.el('popBody').innerHTML;
+  assert.ok(!/한국공인노무사회 · 이사/.test(b), '공인노무사회 이사 위촉이 걸렸다');
+  assert.match(b, /직장 내 괴롭힘 판단 전문위원회/); assert.match(b, /같은 종류: 직장 내 괴롭힘/);
+});
+test('★★★ 확인 — ✓ 맞음은 기억되고 칸에 ✓, ✗ 아님은 숨고 「아니라고 한 것」에서 되살린다', async () => {
+  const { r } = await openMatch();
+  r.api.recSub('pub');
+  const f = r.api.recObj; const recId = 'perf|구조혁신 · 일자리전환컨설팅 · 충남경제진흥원';
+  r.api.matchMark('h|m1', recId, 'y');
+  const k = Object.keys(f('recruit_match'))[0];
+  assert.equal(f('recruit_match')[k], 'y');
+  assert.match(rowOf(r.el('recWatch').innerHTML, '산업·일자리전환'), /🟡 유사 1<\/span> ✓<\/button>/);
+  assert.match(r.el('popBody').innerHTML, /<span class="tag teal">✓ 맞음<\/span>/);
+  r.api.matchMark('h|m1', recId, 'n');
+  assert.match(rowOf(r.el('recWatch').innerHTML, '산업·일자리전환'), /🟡 유사 1<\/span><\/button>/, '아님은 동일 수에서 빠진다');
+  assert.match(r.el('popBody').innerHTML, /✗ 아니라고 한 것 1/);
+  r.api.matchMark('h|m1', recId, '');
+  assert.equal(Object.keys(f('recruit_match')).length, 0, '되살리면 표시를 지운다');
+  assert.ok(require('../js/gov-sync.js').field('recruit_match'), '맞음·아님은 기기 사이로 간다');
+});
+test('★★ 팝업에서 ㅁ 로 골라 한꺼번에 맞음', async () => {
+  const { r } = await openMatch();
+  r.api.matchSel('h|m1', 'perf|구조혁신 · 일자리전환컨설팅 · 충남경제진흥원', true);
+  r.api.matchSel('h|m1', 'wiccok|재단법인 충남경제진흥원 · 컨설턴트', true);
+  assert.match(r.el('popBody').innerHTML, /✔ <b>2건<\/b> 선택/);
+  r.api.matchBulk('h|m1', 'y');
+  assert.equal(Object.values(r.api.recObj('recruit_match')).filter((v) => v === 'y').length, 2);
+  assert.ok(r.toasts.some((t) => /고른 2건을 「맞음」/.test(t)));
+});
+test('★★ 경력관리 자료를 못 읽으면 칸을 비우고 한 줄로 알린다 — 다시 받으러 끝없이 가지 않는다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00') });
+  const f = fbKc({ failKc: true }); r.api.setFb(f.db, 'U1');
+  await r.api.recWatchPull(); await tick(); await tick();
+  r.api.recDraw(); r.api.recDraw(); await tick();
+  assert.match(r.el('matchNoteR').innerHTML, /경력관리 자료를 못 읽어/);
+  assert.match(r.el('recWatch').innerHTML, /<td class="mt"><span class="sml">—<\/span><\/td>/);
+  const n = f.calls.kc;
+  r.api.recDraw(); await tick();
+  assert.equal(f.calls.kc, n, '실패한 뒤 또 받으러 갔다');
+});
+test('★★ 공고 모아보기 표에도 「이력」 칸', async () => {
+  const feed = [{ id: 'G1', no: 'N1', src: '나라장터', nm: '2027년 산업·일자리전환 컨설팅 용역', org: '충남경제진흥원', type: '새 공고', kw: '컨설팅' }];
+  const { r } = await openMatch({ feed });
+  r.api.draw();
+  assert.match(r.el('tb').innerHTML, /matchOpen\('f\|N1'\)"><span class="same">🟢 동일 1/);
 });

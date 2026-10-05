@@ -122,7 +122,7 @@ function runApp(seed) {
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }) },
     location: { protocol: 'https:' },
     GovG2b: require('../js/gov-g2b.js'),
-    GovCareer: require('../js/gov-career.js'),
+    GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'),
     Promise, navigator: {},
     GovAlio: require('../js/gov-alio.js'),

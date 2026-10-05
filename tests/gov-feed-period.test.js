@@ -41,7 +41,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'), GovSync: require('../js/gov-sync.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: opt.fetch || (() => Promise.reject(new Error('no net'))),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
