@@ -65762,9 +65762,9 @@ function ClinicDayCards(props){
   var navS = { border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'0 7px', cursor:'pointer', color:'#475569', flex:'0 0 auto', lineHeight:'20px' };
   /* 담당자별 한 해 목록 (listMode) — 번호·업체·구분·시작일·일수. 금액은 넣지 않는다(대표 2026-10-05). */
   var openSlot = props.listMode && openSid ? r.by[openSid] : null;
-  var ST_TAG = { 'do':['수행','#dcfce7','#166534'], end:['종료','#f1f5f9','#64748b'], plan:['예정','#fef3c7','#854d0e'], skip:['미수행 종료','#fef2f2','#991b1b'] };
+  var ST_TAG = { 'do':['수행','#f0fdf4','#166534'], end:['종료','#f8fafc','#64748b'], plan:['예정','#fffbeb','#854d0e'], skip:['미수행 종료','#fef2f2','#991b1b'] };
   var thS = { textAlign:'left', padding:'4px 6px', background:'#f8fafc', color:'#64748b', fontWeight:600, borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap' };
-  var tdS = { padding:'4px 6px', borderBottom:'1px solid #f1f5f9', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
+  var tdS = { padding:'4px 6px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
   var listBox = openSlot && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'6px 10px', marginTop:'-4px', marginBottom:'8px' } },
     h('div', { style:{ display:'flex', alignItems:'baseline', gap:'8px', whiteSpace:'nowrap' } },
       h('b', { style:{ fontSize:'12.5px' } }, props.userName(openSid) + ' · ' + prog.icon + ' ' + prog.name + ' · ' + fyLabel),

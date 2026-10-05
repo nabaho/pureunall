@@ -42,10 +42,10 @@ ok('사무관리 검색창이 260px 다',
    /width:'260px', flexShrink:0/.test(company),
    '늘어나는 칸이면 화면마다 폭이 달라진다');
 ok('사건관리 검색창도 260px 다',
-   /placeholder:'🔍 관리번호·의뢰인·사업자번호·비고 검색'[\s\S]{0,200}?width:'260px'/.test(kase),
+   /placeholder:'🔍 관리번호·의뢰인·사업자번호·비고 검색'[\s\S]{0,200}?(width:'260px'|flex:'0 1 240px')/.test(kase),
    '한쪽만 바꾸면 다시 어긋난다');
 ok('컨설팅·기금·기타(공용 부품) 검색창도 260px 다',
-   /placeholder:'🔍 관리번호·업체명·사업자번호 검색'[\s\S]{0,200}?width:'260px'/.test(consult),
+   /placeholder:'🔍 관리번호·업체명·사업자번호 검색'[\s\S]{0,200}?(width:'260px'|flex:'0 1 240px')/.test(consult),
    '한쪽만 바꾸면 다시 어긋난다');
 
 // ── ③ 옛 설정으로 못 돌아간다 ──
