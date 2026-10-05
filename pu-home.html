@@ -3804,7 +3804,9 @@ window.직원잇기 = 직원잇기;
 /* 편집칸의 «푸른ERP 직원» 한 줄 — 글 번호가 있을 때만(자동 내리기는 글 번호가 있어야 한다).
    ★ 동명이인이면 고르개를 «비워 두고» 사람이 고르게 한다. 하나를 미리 골라 두면 그냥 누른다. */
 function 직원연결칸Html(d) {
-  if (!(Number(String((d && d.srl) || '').trim()) > 0) || !Array.isArray(App.staff)) return '';
+  /* 글 번호가 있는 글(퇴사 때 내려감) 또는 글 번호 없는 «새 노무사»(3단계 — 올릴 때 직원 번호가 열쇠다) */
+  const 글있음 = Number(String((d && d.srl) || '').trim()) > 0;
+  if ((!글있음 && !(d && d.mkind === 'labor')) || !Array.isArray(App.staff)) return '';
   const rec = (App.members || {})[d.key] || {};
   const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;'
     + 'overflow:hidden;text-overflow:ellipsis;margin-top:6px"><b>푸른ERP 직원</b>' + 안 + '</div>';
@@ -3820,6 +3822,112 @@ function 직원연결칸Html(d) {
     + '</select><button class="btn" style="padding:3px 9px;font-size:11.5px" '
     + 'onclick="직원잇기(\'' + esc(d.key) + '\', document.getElementById(\'sidPick\').value)">잇기</button>'
     + '<span>이어 두어야 퇴사 때 저절로 내려갑니다</span>');
+}
+
+/* ══════ 3단계 — 새 노무사 «올리기» (월간 자동 연결 2026-10-05) ══════
+   대표 지시 「입퇴사 자동으로 니가 정리하고」 → 「다음 순서대로 모두 해라」.
+   ★ 홈페이지에 아직 글이 없는(글 번호 없는) 노무사에게 «사진»과 «올리기 허락»을 넣어 두면
+     다음 달 1일에 서버가 구성원 소개에 새 글로 올리고, 받은 글 번호를 이 사람에게 잇는다.
+   ★ 사람 소개는 공개되는 글이다 — 대표가 «허락»한 것만 올린다. 허락할 때의 경력 글을 함께 담는다
+     (서버는 그 글을 그대로 올린다). 허락한 뒤 경력을 고치면 «다시 허락»을 받는다.
+   ⚠ 한 자리씩만 쓴다(photo · publishOk) — 구성원 자료를 통째로 덮지 않는다. */
+function 새사진넣기(key, file) {
+  return new Promise(function (resolve) {
+    if (!App.isAdmin || !key || !file) { resolve(false); return; }
+    사진줄이기(file, async function (된것, 탈) {
+      if (!된것) { await say('사진을 읽지 못했습니다', esc(탈 || '')); resolve(false); return; }
+      const 바이트 = Math.round(String(된것.바이트64 || '').length * 3 / 4);
+      const 지금 = { at: todayString(), by: currentUserName() };
+      const 표시 = Object.assign({ bytes: 바이트, 크기말: 된것.크기말 || '' }, 지금);
+      try {
+        await db.ref('homepage/memberPhotos/' + key).set(Object.assign({ b64: 된것.바이트64, type: 된것.종류 }, 지금));
+        await db.ref('homepage/members/' + key + '/photo').set(표시);
+        (App.members[key] = App.members[key] || {}).photo = 표시;
+        App.render();
+        toast('사진을 넣었습니다.');
+        resolve(true);
+      } catch (e) {
+        await say('사진을 저장하지 못했습니다', esc((e && e.code) || String(e)));
+        resolve(false);
+      }
+    });
+  });
+}
+/* 이 사람이 올라갈 준비가 됐나 — 빠진 것과 «허락이 낡았는지»를 함께 돌려준다 */
+function 새노무사준비(rec) {
+  const r = rec || {};
+  const 경력 = (r.careers || []).map(s => String(s || '').trim()).filter(Boolean);
+  const 지금글 = 경력.length ? PuHomeExport.careersText(경력, App.lineFormat) : '';
+  const 허락 = r.publishOk && String(r.publishOk.경력글 || '').trim() ? r.publishOk : null;
+  const 낡은허락 = !!(허락 && 지금글 && 허락.경력글 !== 지금글);
+  const 빠진것 = [];
+  if (!r.sid) 빠진것.push('푸른ERP 직원 연결');
+  if (!(r.photo && Number(r.photo.bytes) > 0)) 빠진것.push('사진');
+  if (!경력.length) 빠진것.push('경력');
+  if (!허락) 빠진것.push('올리기 허락');
+  return { 준비: !빠진것.length && !낡은허락, 빠진것: 빠진것, 낡은허락: 낡은허락, 지금글: 지금글 };
+}
+async function 올리기허락(key) {
+  if (!App.isAdmin) { await say('총괄관리자만 허락할 수 있습니다', ''); return false; }
+  if (App.dirty && App.draft && App.draft.key === key) {
+    await say('먼저 저장해 주십시오', '저장하지 않은 고침이 있습니다 — 저장한 내용으로 허락해야 그대로 올라갑니다.');
+    return false;
+  }
+  const r = (App.members || {})[key] || {};
+  if (String(r.srl || '').trim()) { await say('이미 홈페이지에 있습니다', '글 번호가 있는 분은 «지금 홈페이지 바로 고치기»로 고칩니다.'); return false; }
+  const 준비 = 새노무사준비(r);
+  const 빠짐 = 준비.빠진것.filter(x => x !== '올리기 허락');
+  if (빠짐.length) { await say('아직 허락할 수 없습니다', '빠진 것: ' + esc(빠짐.join(' · '))); return false; }
+  const 허락 = { at: todayString(), by: currentUserName(), 경력글: 준비.지금글 };
+  try {
+    await db.ref('homepage/members/' + key + '/publishOk').set(허락);
+    (App.members[key] = App.members[key] || {}).publishOk = 허락;
+    App.render();
+    toast('허락했습니다 — 다음 달 1일에 구성원 소개에 올라갑니다.');
+    return true;
+  } catch (e) {
+    await say('저장하지 못했습니다', esc((e && e.code) || String(e)));
+    return false;
+  }
+}
+async function 올리기허락풀기(key) {
+  try {
+    await db.ref('homepage/members/' + key + '/publishOk').set(null);
+    if (App.members[key]) delete App.members[key].publishOk;
+    App.render();
+  } catch (e) { await say('풀지 못했습니다', esc((e && e.code) || String(e))); }
+}
+window.새사진넣기 = 새사진넣기; window.올리기허락 = 올리기허락; window.올리기허락풀기 = 올리기허락풀기;
+
+/* 홈페이지에 아직 없는 노무사 — 할 일과 카드가 센다 */
+function 새노무사목록() {
+  return Object.keys(App.members || {}).map(k => {
+    const r = App.members[k] || {};
+    if (String(r.srl || '').trim() || r.offSite || r.uploadedAt || r.takenDown) return null;
+    if (memberKind(r) !== 'labor') return null;
+    return Object.assign({ key: k, name: r.name || k }, 새노무사준비(r));
+  }).filter(Boolean);
+}
+
+/* 구성원 편집칸의 «새로 올리기» — 글 번호 없는 노무사에게만 */
+function 새노무사칸Html(d) {
+  if (!d || String(d.srl || '').trim() || d.mkind === 'staff') return '';
+  const rec = (App.members || {})[d.key] || {};
+  const 준비 = 새노무사준비(rec);
+  const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;margin-top:6px">' + 안 + '</div>';
+  let h = '<div class="fld"><label>새로 올리기 — 사진과 «올리기 허락»이 있으면 다음 달 1일에 구성원 소개에 올라갑니다</label>';
+  h += 줄('<b>얼굴 사진</b>' + (rec.photo && Number(rec.photo.bytes) > 0
+      ? '<span>있음 · ' + esc(rec.photo.크기말 || '') + '</span>' : '<span>없음</span>')
+    + '<input type="file" accept="image/jpeg,image/png,image/webp" style="max-width:230px" '
+    + 'onchange="새사진넣기(\'' + esc(d.key) + '\', this.files[0])">');
+  h += 줄('<b>올리기 허락</b>' + (rec.publishOk
+      ? '<span>' + esc(rec.publishOk.at || '') + ' · ' + esc(rec.publishOk.by || '') + '</span>'
+        + '<button class="btn sm" onclick="올리기허락풀기(\'' + esc(d.key) + '\')">풀기</button>'
+        + (준비.낡은허락 ? '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">경력이 바뀜 — 다시 허락</button>' : '')
+      : '<button class="btn sm" onclick="올리기허락(\'' + esc(d.key) + '\')">다음 달 1일에 올리기 허락</button>'));
+  h += 줄(준비.준비 ? '<b>다음 달 1일에 저절로 올라갑니다</b>'
+    : '<span>' + (준비.낡은허락 ? '허락한 뒤 경력을 고쳤습니다 — 다시 허락해 주십시오' : '빠진 것: ' + esc(준비.빠진것.join(' · '))) + '</span>');
+  return h + '</div>';
 }
 
 /* ══════ 퇴사자를 «한 번에» 내린다 (대표 지시 2026-09-13) ══════
@@ -5484,12 +5592,15 @@ async function 자동기록다시읽기() {
      정찰이 없으면 서버가 «올리는 길이 아직 없습니다»로 따로 알린다.
    ⚠ 이레에 한 번만 — 화면을 열 때마다 홈페이지 관리자로 들어가지 않게. */
 const 자동정찰간격 = 7 * 24 * 60 * 60 * 1000;
+/* 정찰 판 — 서버(functions/homepage-auto.js 정찰판)와 «같아야» 한다. 다르면 이레가 안 지났어도 다시 정찰한다. */
+const 자동정찰판 = 2;
 async function 자동정찰저절로() {
   if (!App.isAdmin) return false;
   try {
     const s = await db.ref('homepage/auto/recon/at').once('value');
     const 지난 = Number(s.val() || 0);
-    if (지난 && Date.now() - 지난 < 자동정찰간격) return false;
+    const 판 = Number((await db.ref('homepage/auto/recon/판').once('value')).val() || 0);
+    if (지난 && 판 === 자동정찰판 && Date.now() - 지난 < 자동정찰간격) return false;
     await 자동부르기('보기');
     return true;
   } catch (e) {
@@ -5941,6 +6052,17 @@ function jobsOf() {
       /* ★ 2026-10-05 월간 자동 연결 — 이제 «이어 둔» 로고는 서버가 다음 달 1일에 내린다 */
       why: '우리 명단에서는 자동으로 뺐습니다. 지금 홈페이지의 로고는 <b>로고와 이어 둔 것만</b> '
          + '다음 달 1일에 저절로 휴지통으로 내려갑니다 — 안 이은 것은 «로고와 잇기»부터 해 주십시오.' });
+  }
+  /* ★ 3단계(2026-10-05) — 홈페이지에 아직 없는 노무사: 사진·올리기 허락을 넣어 달라고 알린다 */
+  const 새사람 = (typeof 새노무사목록 === 'function') ? 새노무사목록().filter(x => !x.준비) : [];
+  if (새사람.length) {
+    add({ cls: 'info', t: '새 노무사 — 사진·올리기 허락을 넣어 주십시오', n: 새사람.length,
+      who: esc(새사람.slice(0, 3).map(x => x.name + (x.낡은허락 ? '(다시 허락)' : '')).join(', ')
+        + (새사람.length > 3 ? ' 외' : '')),
+      go: 새사람.slice(0, 3).map(x => '<button class="btn sm" onclick="App.jump(\'members\',\''
+          + esc(x.key) + '\')">' + esc(x.name) + '</button>').join(''),
+      why: '사진을 넣고 «다음 달 1일에 올리기 허락»을 누르시면 <b>다음 달 1일에 저절로</b> 구성원 소개에 올라갑니다. '
+         + '올리지 않을 분은 «새 홈페이지에 빼기»로 두십시오.' });
   }
   /* ★ 2단계(2026-10-05) — 새 거래처: 로고·공개 동의를 넣어 달라고 알린다.
        ⚠ typeof 로 감싼다 — 이 함수를 떼어 돌리는 검사 상자에 새 부품이 없어도 죽지 않게. */
@@ -6985,6 +7107,9 @@ function memberEdit(d) {
   붙은칸 += 사진칸Html(d);
   /* ★ 푸른ERP 직원과 잇기 (월간 자동 연결 2026-10-05) — 이어 둔 글만 퇴사 때 저절로 내려간다 */
   붙은칸 += 직원연결칸Html(d);
+  /* ★ (3단계) 글 번호 없는 노무사 — 사진·올리기 허락을 넣으면 다음 달 1일에 올라간다.
+       ⚠ typeof 로 감싼다 — 편집칸을 떼어 돌리는 검사 상자에 새 부품이 없어도 죽지 않게. */
+  if (typeof 새노무사칸Html === 'function') 붙은칸 += 새노무사칸Html(d);
   /* ⚠ 붙은 칸은 여기서 끝나지 «않는다» — 대표 지시 2026-09-03 「이 부분 전체 틀고정해야
      한다」로 경력 목록 «위 전부»(구분·이름줄·메인 설명·담당 업무·경력사항 이름줄)를
      붙였다. 붙는 것은 모두 «붙은칸» 에 담긴다 — 담기지 않은 것은 구른다.

@@ -4408,23 +4408,88 @@ async function 홈자동정찰(그릇) {
     if (m) 로고글번호 = Number(m[1]);
   } catch (e) { /* 공개 쪽을 못 읽으면 옛 로고 글 정찰만 빠진다 */ }
   const 자리 = HW.자동정찰자리(로고글번호);
-  const 결과 = { at: Date.now(), 대상: {} };
+  /* 2차 정찰(판 2) — 구성원 쪽 본문에서 «직원 이름이 놓인 모양»을 보려고 일반직원 이름을 쓴다.
+     ⚠ 이름은 기록에 안 남는다(HW.이름자리모양 이 몇 번째 이름인지만 남긴다). */
+  let 직원이름들 = [];
+  try {
+    const ms = (await getDatabase().ref("homepage/members").once("value")).val() || {};
+    직원이름들 = Object.keys(ms).map((k) => ms[k] || {})
+      .filter((m) => m.kind === "staff" || (m.kind !== "labor" && !/노무사/.test(String(m.position1 || "") + String(m.position2 || ""))))
+      .map((m) => String(m.name || "").trim()).filter(Boolean).slice(0, 20);
+  } catch (e) { /* 이름을 못 읽으면 이름 자리만 빠진다 */ }
+  const 결과 = { at: Date.now(), 판: HA.정찰판, 대상: {} };
   for (const 이름 of Object.keys(자리)) {
     try {
       const g = await 홈부르기(자리[이름], 그릇);
       const 화면 = await g.text();
       const 본 = HW.정찰(화면);
       const 채움 = HW.채운칸들(화면);
+      const 본문값 = String((HW.칸읽기(화면).칸 || {}).content || "");
       결과.대상[이름] = { 상태: g.status, 옮김: (g.headers.get("location") || "").replace(HW.ORIGIN, ""),
         크기: 본.크기, 글칸: 본.글칸, 넓은칸: 본.넓은칸, 파일칸: 본.파일칸, 딸깍칸: 본.딸깍칸,
         고르개: 본.고르개, 숨은칸: 본.숨은칸, 이름표: 본.이름표, 행위들: 본.행위들,
-        번호값: 본.번호값, 확인표있나: 본.확인표있나, 채운칸: 채움.채운칸, 본문에그림: 채움.본문에그림 };
+        번호값: 본.번호값, 확인표있나: 본.확인표있나, 채운칸: 채움.채운칸, 본문에그림: 채움.본문에그림,
+        편집기: HW.편집기단서(화면), 본문: HW.본문모양(본문값),
+        이름자리: 이름 === "구성원쪽고치기" ? HW.이름자리모양(본문값, 직원이름들) : undefined };
     } catch (e) {
       결과.대상[이름] = { 막힘: String((e && e.message) || e) };
     }
   }
   await getDatabase().ref("homepage/auto/recon").set(결과);
   return 결과;
+}
+
+/* 자동 올리기 — 3단계 새 노무사(구성원 게시판 새 글). 2단계 로고는 편집기 파일 올리기 정찰 뒤에 붙인다.
+   ★ 받은 «새 글 쓰기» 화면 칸을 그대로 되돌려 보내고 아는 칸만 채운다(HW.새구성원몸통 이 막는다).
+   ★ 보낸 뒤 받은 글 번호가 정말 구성원 게시판 글인지 한 번 더 연다(HW.게시판확인). */
+async function 홈자동올리기(그릇, 목록) {
+  const db = getDatabase();
+  const 답 = [];
+  for (const x of 목록) {
+    if (x.종류 !== "새구성원") {
+      답.push(Object.assign({}, x, { 됐나: false, 까닭: "로고 올리는 길은 아직 짓는 중입니다(편집기 파일 올리기 정찰)" }));
+      continue;
+    }
+    try {
+      const m = (await db.ref("homepage/members/" + x.key).once("value")).val() || {};
+      const f = (await db.ref("homepage/memberPhotos/" + x.key).once("value")).val() || {};
+      let 바이트 = null;
+      try { 바이트 = Buffer.from(String(f.b64 || ""), "base64"); } catch (e) { 바이트 = null; }
+      const 화면주소 = HW.자동정찰자리().구성원새글;
+      const g = await 홈부르기(화면주소, 그릇);
+      const 화면 = await g.text();
+      const 지음 = HW.새구성원몸통(화면, {
+        이름: m.name, 직책1: m.position1, 직책2: m.position2, 메인설명: m.intro,
+        경력글: (m.publishOk && m.publishOk.경력글) || ""
+      }, { 종류: f.type, 바이트: 바이트 });
+      if (!지음.ok) { 답.push(Object.assign({}, x, { 됐나: false, 까닭: 지음.why })); continue; }
+      const p = await 홈부르기(HW.보낼주소(), 그릇, {
+        method: "POST",
+        body: 지음.몸통,
+        headers: {
+          "User-Agent": HW.브라우저표시,
+          "Content-Type": "multipart/form-data; boundary=" + 지음.경계,
+          "Content-Length": String(지음.몸통.length),
+          "Referer": 화면주소,
+          "Cookie": 그릇.글자(),
+          "X-CSRF-Token": 지음.확인표
+        }
+      });
+      const p답 = await p.text();
+      const 됐나 = p.status >= 200 && p.status < 400 && !/<error>\s*-?[1-9]/.test(p답);
+      let 새번호 = 됐나 ? HW.새글번호(p.status, p.headers.get("location") || "", p답) : 0;
+      if (새번호) {
+        const q = await 홈부르기(HW.게시판글주소(x.게시판, 새번호), 그릇);
+        await q.text();
+        if (HW.게시판확인(q.status, q.headers.get("location") || "") !== "ok") 새번호 = 0;
+      }
+      답.push(Object.assign({}, x, { 됐나: 됐나, srl: 새번호,
+        까닭: 됐나 ? (새번호 ? "" : "글 번호를 못 받음 — 홈페이지에서 확인 필요") : "홈페이지가 받아 주지 않음" }));
+    } catch (e) {
+      답.push(Object.assign({}, x, { 됐나: false, 까닭: String((e && e.message) || e) }));
+    }
+  }
+  return 답;
 }
 
 async function 홈자동한번(방식, 받은지문, 누가) {
@@ -4445,6 +4510,13 @@ async function 홈자동한번(방식, 받은지문, 누가) {
     덧붙이기: (p, v) => db.ref(p).push(v),
     내리기: async (목록) => {
       try { return await 홈자동내리기(await 들어가기(), 목록); }
+      catch (e) {
+        const 까닭 = String((e && e.message) || e);
+        return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: 까닭 }));
+      }
+    },
+    올리기: async (목록) => {
+      try { return await 홈자동올리기(await 들어가기(), 목록); }
       catch (e) {
         const 까닭 = String((e && e.message) || e);
         return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: 까닭 }));

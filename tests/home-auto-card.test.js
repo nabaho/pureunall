@@ -169,12 +169,26 @@ test('할 일 — 못 올렸거나 올리는 길이 없으면 알린다(조용�
   assert.match(몸, /못올림/);
 });
 
-function 정찰상자(지난, 관리자) {
-  const ctx = 상자({ db: { ref: (p) => ({ once: async () => ({ val: () => (p === 'homepage/auto/recon/at' ? 지난 : null) }) }) } });
+const 서버판 = require('../functions/homepage-auto.js').정찰판;
+function 정찰상자(지난, 관리자, 판) {
+  const 값 = { 'homepage/auto/recon/at': 지난, 'homepage/auto/recon/판': 판 === undefined ? 서버판 : 판 };
+  const ctx = 상자({ db: { ref: (p) => ({ once: async () => ({ val: () => (p in 값 ? 값[p] : null) }) }) } });
   ctx.App.isAdmin = 관리자 !== false;
-  vm.runInContext(constLine('자동정찰간격') + '\n' + fnSource('자동정찰저절로'), ctx);
+  vm.runInContext(constLine('자동정찰간격') + '\n' + constLine('자동정찰판') + '\n' + fnSource('자동정찰저절로'), ctx);
   return ctx;
 }
+
+test('정찰 저절로 — 판이 다르면 이레가 안 지났어도 다시 묻는다', async () => {
+  const ctx = 정찰상자(Date.now() - 60 * 1000, true, 서버판 - 1);
+  assert.strictEqual(await ctx.자동정찰저절로(), true);
+});
+
+test('정찰 판 — 화면과 서버의 판 번호가 같다(다르면 화면을 열 때마다 정찰한다)', () => {
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(constLine('자동정찰판'), ctx);
+  assert.strictEqual(ctx.자동정찰판, 서버판);
+});
 
 test('정찰 저절로 — 지난 정찰이 없으면 «보기»로 한 번 묻는다', async () => {
   const ctx = 정찰상자(null);
