@@ -112,7 +112,7 @@ test('자동 올리기 — 몸통을 «안전 확인(새구성원몸통)»으로
   assert.ok(!/휴지통몸통|["'](delete|move|copy)["']/.test(b), '올리기에서 지우는 길을 부릅니다');
 });
 
-test('자동 올리기 — 아직 길이 없는 종류(로고)는 보내지 않고 까닭을 남긴다', () => {
+test('자동 올리기 — 모르는 종류는 보내지 않고 까닭을 남긴다', () => {
   const b = 함수몸('홈자동올리기');
   const i = b.indexOf('x.종류 !== "새구성원"');
   assert.ok(i > 0);
@@ -126,4 +126,12 @@ test('정찰 기록은 «undefined» 를 거른 뒤 적는다 — 데이터베�
   const b = 함수몸('홈자동정찰');
   assert.ok(!/:\s*undefined\b/.test(b), '기록에 undefined 칸을 넣습니다');
   assert.match(b, /ref\("homepage\/auto\/recon"\)\.set\(JSON\.parse\(JSON\.stringify\(/, '적기 전에 거르지 않습니다');
+});
+test('로고 올리기 — 짓기·확인을 하나씩 거친 뒤에만 보낸다(올리기 → 답 확인 → 새 글 → 게시판 확인)', () => {
+  const b = 함수몸('홈로고올리기');
+  const 차례 = ['HW.로고올리기몸통(', 'HW.올리기답풀기(', 'HW.로고새글몸통(', 'HW.게시판확인('].map(s => b.indexOf(s));
+  차례.forEach((i, n) => assert.ok(i > 0, n + '번째 걸음이 없습니다'));
+  for (let n = 1; n < 차례.length; n++) assert.ok(차례[n] > 차례[n - 1], '걸음 차례가 바뀌었습니다');
+  ['올몸', '올림', '글몸'].forEach(v => assert.match(b, new RegExp('if \\(!' + v + '\\.ok\\) return'), v + ' 가 안 됐는데 계속 갑니다'));
+  assert.ok(!/휴지통몸통|["'](delete|move|copy)["']/.test(b));
 });

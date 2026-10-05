@@ -497,6 +497,73 @@ function 새글번호(상태, 위치, 답) {
   return 찾기(위치) || 찾기(답);
 }
 
+/* ── 2단계: 새 거래처 로고 글 짓기 (월간 자동 연결 2026-10-05) ──────────────
+   자문사현황 로고 글 = 제목 + «본문 속 첨부 그림»(2차 정찰: img[alt,data-file-srl,editor_component,src]).
+   절차는 라이믹스 공개 파일(common/js/plugins/jquery.fileupload/js/main.js)이 하는 그대로다 —
+     ① 새 글 화면의 편집기 번호(data-editor-sequence)
+     ② procFileUpload: editor_sequence · upload_target_srl(새 글은 0) · mid · Filedata
+     ③ 답으로 온 upload_target_srl 을 글 번호(document_srl)로 새 글 저장 —
+        본문은 라이믹스가 짓는 꼴 그대로: <img src=download_url alt editor_component="image_link" data-file-srl>
+   ⚠ 짐작한 칸을 만들지 않는다. 받은 새 글 화면의 칸은 그대로 보낸다. */
+const 로고게시판 = "partner_board";
+function 편집기번호(html) {
+  const m = /data-editor-sequence=["'](\d{1,12})["']/.exec(String(html || ""));
+  return m ? Number(m[1]) : 0;
+}
+function 로고올리기몸통(편집기, mid, 그림, 확인표) {
+  const n = Number(편집기);
+  if (mid !== 로고게시판) return { ok: false, why: "자문사현황 게시판이 아닙니다" };
+  if (!Number.isInteger(n) || n <= 0) return { ok: false, why: "편집기 번호를 못 받았습니다" };
+  if (!확인표) return { ok: false, why: "확인표가 없습니다" };
+  const 받을까 = 사진받을까(그림 && 그림.종류, 그림 && 그림.바이트 ? 그림.바이트.length : 0);
+  if (!받을까.ok) return { ok: false, why: 받을까.why };
+  const 경계 = "----pureunlogo" + Date.now().toString(16) + Math.random().toString(16).slice(2, 10);
+  const 글 = (s) => Buffer.from(String(s), "utf8");
+  const 칸 = { editor_sequence: String(n), upload_target_srl: "0", mid: mid, act: "procFileUpload", _rx_csrf_token: 확인표 };
+  const 조각 = Object.keys(칸).map((k) => 글("--" + 경계 + "\r\nContent-Disposition: form-data; name=\"" + k + "\"\r\n\r\n" + 칸[k] + "\r\n"));
+  const 확장 = 사진종류[String(그림.종류).toLowerCase()] || "png";
+  조각.push(글("--" + 경계 + "\r\nContent-Disposition: form-data; name=\"Filedata\"; filename=\"logo-" + Date.now() + "." + 확장
+    + "\"\r\nContent-Type: " + String(그림.종류).toLowerCase() + "\r\n\r\n"));
+  조각.push(Buffer.isBuffer(그림.바이트) ? 그림.바이트 : Buffer.from(그림.바이트 || []));
+  조각.push(글("\r\n--" + 경계 + "--\r\n"));
+  return { ok: true, 경계: 경계, 몸통: Buffer.concat(조각) };
+}
+/* 올리기 답 — 파일 번호·글 번호가 숫자이고, 그림 주소가 «우리 첨부 자리»일 때만 믿는다(본문에 그대로 들어간다) */
+function 올리기답풀기(답) {
+  let j = null;
+  try { j = JSON.parse(String(답 || "")); } catch (e) { return { ok: false, why: "답이 JSON 이 아닙니다" }; }
+  if (!j || Number(j.error || 0) !== 0) return { ok: false, why: "홈페이지가 그림을 안 받았습니다" + (j && j.message ? "(" + String(j.message).slice(0, 80) + ")" : "") };
+  const 파일 = Number(j.file_srl), 글번호 = Number(j.upload_target_srl);
+  const 주소 = String(j.download_url || "").replace(/^https?:\/\/(xn--o80bs5mdnbm0bf80anms\.kr|푸른노무법인\.kr)/, "");
+  if (!Number.isInteger(파일) || 파일 <= 0 || !Number.isInteger(글번호) || 글번호 <= 0) return { ok: false, why: "번호를 못 받았습니다" };
+  if (!/^\/?(\.\/)?files\/attach\/images\/[A-Za-z0-9/_.-]+\.(png|jpe?g|webp)$/i.test(주소)) return { ok: false, why: "그림 주소가 우리 첨부 자리가 아닙니다" };
+  return { ok: true, file_srl: 파일, upload_target_srl: 글번호, download_url: 주소 };
+}
+function 로고새글몸통(화면, 회사이름, 올림) {
+  const 원 = String(화면 || "");
+  const 폼 = 폼떼기(원, "procBoardInsertDocument") || 원;
+  const 읽은것 = 칸읽기(폼);
+  const 칸 = Object.assign({}, 읽은것.칸);
+  const 확인표 = 확인표뽑기(원);
+  const 이름 = String(회사이름 || "").trim();
+  if (칸.mid !== 로고게시판) return { ok: false, why: "자문사현황 게시판의 새 글 화면이 아닙니다" };
+  if (String(칸.document_srl || "").trim()) return { ok: false, why: "새 글 화면이 아니라 고치는 화면입니다" };
+  if (!Object.prototype.hasOwnProperty.call(칸, "title") || !Object.prototype.hasOwnProperty.call(칸, "content")) {
+    return { ok: false, why: "제목·본문 칸이 없습니다 — 로그인이 풀렸거나 홈페이지 화면이 바뀌었습니다" };
+  }
+  if (!확인표) return { ok: false, why: "확인표가 없습니다" };
+  if (!이름) return { ok: false, why: "회사 이름이 없습니다" };
+  if (!올림 || !올림.upload_target_srl || !올림.file_srl || !올림.download_url) return { ok: false, why: "올린 그림이 없습니다" };
+  const 거른이름 = 이름.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  칸.title = 이름;
+  칸.document_srl = String(올림.upload_target_srl);
+  칸.content = "<p><img src=\"" + 올림.download_url + "\" alt=\"" + 거른이름 + "\" editor_component=\"image_link\" data-file-srl=\""
+    + Number(올림.file_srl) + "\" /></p>";
+  칸.act = 저장할act();
+  칸._rx_csrf_token = 확인표;
+  return { ok: true, 몸통: 몸통(칸, 읽은것.여럿), 확인표: 확인표 };
+}
+
 /* ── 2차 정찰 (2026-10-05) — 2단계(로고 = 본문 첨부 그림)·4단계(구성원 쪽 위젯 본문)를 지을 «모양»만 ──
    ⚠ 값은 안 남긴다. 하는 동작의 «이름», 편집기·올리기에 쓰는 «숫자», 태그·속성의 «이름»,
      주소의 «모양»(숫자는 9, 파일 이름은 w)만. */
@@ -806,7 +873,7 @@ module.exports = {
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
   내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리, 새구성원몸통, 새글번호,
-  편집기단서, 본문모양, 이름자리모양,
+  편집기단서, 본문모양, 이름자리모양, 편집기번호, 로고올리기몸통, 올리기답풀기, 로고새글몸통,
   파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
 };
