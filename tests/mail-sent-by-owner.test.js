@@ -39,6 +39,7 @@ function run(opt){
     _mbOwner: o.owner || {},
     _mbWhoMsg: o.msgWho || {},
     _mbWork: null,
+    _mbWorkLink: o.workLink || {},   /* 손으로 이은 주소 → 건 (2026-10-05) */
     _mbOpen: null,
     MB_SENT_NA: '*na',
     MB_SENT_GAP_MAX: 8,
@@ -63,7 +64,7 @@ function run(opt){
   ctx.mbMemoOf = () => ctx._memo;
   vm.createContext(ctx);
   /* mbWhoWhy ①-3(사건·컨설팅 주소)도 «진짜»를 싣는다 — 자료가 없으면(_mbWork=null) 아무 일도 안 한다 */
-  ['mbWhoLive','mbWhoWhy','mbWhoWhyOf','mbWorkMgrOfAddr','mbSentTo','mbSentBox','mbSentWho','mbSentTally',
+  ['mbWhoLive','mbWhoWhy','mbWhoWhyOf','mbWorkHandOf','mbWorkMgrOfAddr','mbSentTo','mbSentBox','mbSentWho','mbSentTally',
    'mbSentWhoList','mbSentGapList','mbSentPick','mbSentWhoLineHtml','mbSentGapHtml',
    'mbOpenOnly','mbOpenCount']   /* 👁 열어 본 것 칩 — 열람 기록(_mbOpen)이 없으면 수를 안 적는다 */
     .forEach(n => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));

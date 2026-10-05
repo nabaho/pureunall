@@ -33,6 +33,8 @@ function box(o) {
     esc: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'),
     _mbOwner: o.owner || {},
     _mbWork: null,
+    /* 사람이 손으로 이은 주소 → 건 (대표 승인 목업 2026-10-05) — config/mailWork */
+    _mbWorkLink: o.workLink || {},
     MB_RAW_P: '~', MB_WHO_P: '@',
     mbNow: () => (o.now === undefined ? '#bin' : o.now),
     mbSentBox: () => !!o.sent,
@@ -45,10 +47,15 @@ function box(o) {
     mbWhoIndex: () => ({ byAddr: o.byAddr || {}, byDom: {}, coAddr: o.coAddr || {} }),
   };
   vm.createContext(ctx);
-  ['mbWhoLive', 'mbWhoWhy','mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkMgrOfAddr', 'mbWorkOfRow',
-    'mbWorkMgrs', 'mbWorkTag', 'mbSubsOfRow', 'mbCoNameOf']
+  ['mbWhoLive', 'mbWhoWhy','mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkHandOf',
+    'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbWorkMgrs', 'mbWorkTag', 'mbSubsOfRow', 'mbCoNameOf',
+    'mbWorkLinkedKeys', 'mbWorkTodo']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
-  vm.runInContext("var MB_WORK_KIND = { case:'사건', consulting:'컨설팅' };", ctx);
+  /* ⚠ 갈래 목록을 여기 «베껴 두지 않는다». 베껴 두면 앱이 갈래를 늘려도 검사만 옛 목록을
+       보고 통과해, 「검사는 파란데 화면에는 안 나오는」 자리가 생긴다(2026-10-05 기금·기타). */
+  const kindSrc = app.match(/const MB_WORK_KIND = \{[^}]*\};/);
+  assert.ok(kindSrc, 'MB_WORK_KIND 를 앱에서 찾지 못했습니다 — 이름이 바뀌었는지 보십시오');
+  vm.runInContext('var ' + kindSrc[0].slice('const '.length), ctx);
   /* 메일 담당 — 실제 앱처럼 mbWhoWhy 를 그대로 쓴다 */
   ctx.mbWhoOfRow = (v) => ctx.mbWhoWhy(String((v && v.e) || ''), null).who;
   ctx.mbPerson = (s) => s;
@@ -107,9 +114,15 @@ test('★★★ 끝난 건은 안 본다 — 종료·완료·closedDate·지운 
   assert.equal(who(c, 'lee@naver.com').who, '');
 });
 
-test('★★ 기금·기타는 이번 일이 아니다 — 사건·컨설팅만', () => {
-  const c = box({ recs: [{ _kind: 'fund', id: 'f1', status: 'open', managerMain: 'P-001', email: 'hong@naver.com' }] });
-  assert.equal(who(c, 'hong@naver.com').who, '');
+/* 2026-09-28 에는 사건·컨설팅만 봤다. 대표께서 2026-10-05 「사건관리 컨설팅관리 «등등»」
+   이라 하셨고 목업에도 기금·기타 칸이 있어 넓혔다 — 진행 중인 기금 3건·기타 1건이다. */
+test('★★ 기금·기타도 본다 (대표 지시 2026-10-05 「등등」) — 계약은 안 본다', () => {
+  const mk = (kind) => box({ recs: [{ _kind: kind, id: kind + '1', status: 'open',
+    managerMain: 'P-001', email: 'hong@naver.com' }] });
+  assert.equal(who(mk('fund'), 'hong@naver.com').who, '권형하', '기금 담당이 메일 담당이어야 한다');
+  assert.equal(who(mk('other'), 'hong@naver.com').who, '권형하', '기타 담당도 마찬가지다');
+  /* ⚠ 계약은 «받은 업무»가 아니라 문서다 — 넣으면 계약 담당이 그 회사 메일을 통째로 본다 */
+  assert.equal(who(mk('contract'), 'hong@naver.com').who, '', '계약은 보지 않는다');
 });
 
 test('★★ 퇴사자가 담당이면 이어받은 사람 — 없으면 정하지 않는다', () => {

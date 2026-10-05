@@ -17629,6 +17629,7 @@ function mbSeedSave(){
   const rec = { at: Date.now(), folders: _mbFolders, meta: _mbMeta || {}, msgs: msgs,
     cfg: { bins:_mbBins, put:_mbPut, putBy:_mbPutBy, hide:_mbHide, owner:_mbOwner, succ:_mbSucc,
            co:_mbCo, notCo:_mbNotCo, whoMsg:_mbWhoMsg, noWho:_mbNoWho, notSpam:_mbNotSpam,
+           workLink:_mbWorkLink,
            spamOff:_mbSpamOff } };
   mbSeedIdb('readwrite', (st, close)=>{ try{ if(st) st.put(rec, MB_SEED_KEY); }catch(_){ } setTimeout(close, 800); });
 }
@@ -17646,6 +17647,9 @@ function mbSeedApply(s){
     _mbBins = c.bins||{}; _mbPut = c.put||{}; _mbPutBy = c.putBy||{}; _mbHide = c.hide||{};
     _mbOwner = c.owner||{}; _mbSucc = c.succ||{}; _mbCo = c.co||{}; _mbNotCo = c.notCo||{};
     _mbWhoMsg = c.whoMsg||{}; _mbNoWho = c.noWho||{}; _mbNotSpam = c.notSpam||{};
+    /* ⚠ 옛 씨앗에는 이 칸이 없다 — 그러면 빈 표로 두고 서버가 채운다(없는 채로 두면
+         mbWorkHandOf 가 null 을 읽어 터진다). */
+    _mbWorkLink = c.workLink||{};
     _mbSpamOff = (c.spamOff === true);
     _mbBinsFromSeed = true;
   }
@@ -17878,11 +17882,15 @@ function mbEnsureBins(cb){
        ⚠ 둘 다 전 직원 공용이다. 한 사람이 되돌린 주소는 모두에게 다시 보여야 한다 —
          스팸이 아닌 것을 저마다 따로 되돌리게 하면 같은 일을 열 번 한다. */
     firebase.database().ref(DB_ROOT+'/config/mailNotSpam').once('value'),
-    firebase.database().ref(DB_ROOT+'/config/mailSpamOff').once('value')
-  ]).then(([b,p,pb,h,w,sc,co,nc,wm,nw,ns,so])=>{
+    firebase.database().ref(DB_ROOT+'/config/mailSpamOff').once('value'),
+    /* 📁 주소 ↔ 사건·컨설팅 (대표 승인 목업 2026-10-05) — 전 직원 공용.
+       한 사람이 이어 두면 모두의 화면에서 그 담당자 칸으로 간다. */
+    firebase.database().ref(DB_ROOT+'/config/mailWork').once('value')
+  ]).then(([b,p,pb,h,w,sc,co,nc,wm,nw,ns,so,wk])=>{
     _mbBinsFromSeed = false;
     _mbBins = b.val()||{}; _mbPut = p.val()||{}; _mbPutBy = pb.val()||{}; _mbHide = h.val()||{}; _mbOwner = w.val()||{};
     _mbSucc = sc.val()||{}; _mbCo = co.val()||{}; _mbNotCo = nc.val()||{}; _mbWhoMsg = wm.val()||{}; _mbNoWho = nw.val()||{};
+    _mbWorkLink = wk.val()||{};
     /* ⚠ 안 적혀 있으면 «켠 것»이다 — 대표께서 「자동으로 거르게」라 하셨다.
          빈 값을 「꺼짐」으로 읽으면 만들어 놓고 아무 일도 안 하는 기능이 된다. */
     _mbNotSpam = ns.val()||{}; _mbSpamOff = (so.val() === true);
@@ -17893,6 +17901,7 @@ function mbEnsureBins(cb){
     if(!(denied && !mbAuthOk())){
       _mbBins = _mbBins||{}; _mbPut = _mbPut||{}; _mbPutBy = _mbPutBy||{}; _mbHide = _mbHide||{}; _mbOwner = _mbOwner||{};
       _mbSucc = _mbSucc||{}; _mbCo = _mbCo||{}; _mbNotCo = _mbNotCo||{}; _mbWhoMsg = _mbWhoMsg||{}; _mbNoWho = _mbNoWho||{};
+      _mbWorkLink = _mbWorkLink||{};
       /* ⚠ 못 읽었으면 스팸 거르기를 «끈 채로» 둔다 — 「스팸 아님」 목록을 못 읽은 채로
            거르면, 대표께서 이미 되돌려 둔 주소를 도로 잡는다. 모르면 안 거른다. */
       if(_mbNotSpam === null){ _mbNotSpam = {}; _mbSpamOff = true; }
@@ -20079,8 +20088,14 @@ function mbWhoAllOfRow(v, idx0){
        그래서 «주소»가 가장 많이 닿는다.
    ⚠ 「진행 중」만 본다. 끝난 건은 저절로 빠져야 사람이 잊어도 안전하다.
    ⚠ 이알피 원장은 «읽기만» 한다 — 여기서 아무것도 쓰지 않는다. */
-let _mbWork = null;       /* {byAddr:{주소:[건]}, byCo: Map(업체 기록 → [건])} */
-const MB_WORK_KIND = { case:'사건', consulting:'컨설팅' };
+let _mbWork = null;       /* {byAddr:{주소:[건]}, byCo: Map(업체 기록 → [건]), byKey, all} */
+/* 사람이 «손으로» 이은 주소 → 건 (대표 승인 목업 2026-10-05) — config/mailWork
+   {주소열쇠: {kind, id, at, by}}. 이알피에 주소가 안 적힌 건(사건 27건 중 21건)이
+   메일함까지 닿는 유일한 길이다. ⚠ 이알피 원장에는 한 글자도 안 쓴다. */
+let _mbWorkLink = null;
+/* ⚠ 기금·기타도 본다 (대표 지시 2026-10-05 「사건관리 컨설팅관리 등등」).
+     계약(contract)은 안 넣는다 — 그것은 «받은 업무»가 아니라 문서다. */
+const MB_WORK_KIND = { case:'사건', consulting:'컨설팅', fund:'기금', other:'기타' };
 /* 끝난 건인가 — 사업마다 낱말이 조금씩 다르다(closed·done, 종료·완료) */
 function mbWorkLive(r){
   if(!r || r._deleted || r.permanentArchived || r.closedDate) return false;
@@ -20093,7 +20108,10 @@ function mbWorkLive(r){
      나중에 메일 쪽에서 찾은 업체 기록과 그대로 맞춰진다(이름을 거치지 않는다). */
 function mbWorkBuild(m, nameBySid, byId, byBiz){
   const byAddr = {}, byCo = new Map();
-  if(!m) return { byAddr, byCo };
+  /* byKey — 「kind:id」로 건 하나를 바로 집는다. 손으로 이은 것(config/mailWork)이
+     가리키는 자리가 여기다. all — 고르는 창과 「안 이어진 건」 표가 훑는 목록. */
+  const byKey = {}, all = [];
+  if(!m) return { byAddr, byCo, byKey, all };
   const seen = {};
   const recs = [];
   [m.byBiz, m.byName].forEach(g=>{
@@ -20110,21 +20128,41 @@ function mbWorkBuild(m, nameBySid, byId, byBiz){
     const w = { kind:r._kind, id:id, mgr:person(r.managerMain),
       co:String(r.companyName||r.company||''),
       title:String(r.title||r.typeName||r.brief||r.programName||'') };
+    let hasAddr = false;
     [r.email, r.primaryContactEmail].concat((r.contacts||[]).filter(c=>c && !c.left).map(c=>c.email))
       .forEach(e=>{
         e = String(e||'').trim().toLowerCase();
         if(e.indexOf('@') < 1 || /@pureun\.kr$/.test(e)) return;   /* 우리 주소는 아니다 */
+        hasAddr = true;
         push(byAddr, e, w);
       });
     const coRec = (r.companyId && (byId||{})[String(r.companyId)])
       || (digits(r.bizNo).length >= 10 ? (byBiz||{})[digits(r.bizNo)] : null);
     if(coRec){ const a = byCo.get(coRec) || []; if(!a.some(x=>x.kind===w.kind && x.id===w.id)) a.push(w); byCo.set(coRec, a); }
+    /* ★ 「왜 안 닿나」를 여기서 적어 둔다 — 나중에 다시 셈하면 잣대가 두 벌이 된다.
+         addr: 주소가 적혀 있다 · co: 업체로 이어졌다. 둘 다 없으면 손으로 이어야 한다. */
+    w.has = { addr:hasAddr, co:!!coRec };
+    if(id) byKey[w.kind + ':' + id] = w;
+    all.push(w);
   });
-  return { byAddr, byCo };
+  return { byAddr, byCo, byKey, all };
+}
+/* 사람이 손으로 이어 둔 건 — config/mailWork (대표 승인 목업 2026-10-05).
+   ⚠ 끝난 건을 가리키면 «없는 것»으로 본다. byKey 에는 진행 중인 것만 담긴다 —
+     사건이 종료되면 이은 것을 지우지 않아도 저절로 빠진다(사람이 잊어도 안전하다).
+   ⚠ 이름으로 찾지 않는다. 열쇠는 「kind:id」, 곧 그 건의 영구 번호다(온톨로지 규칙). */
+function mbWorkHandOf(em){
+  const v = (_mbWorkLink || {})[mbWhoKey(em)];
+  if(!v || !v.kind || !v.id) return null;
+  return ((_mbWork && _mbWork.byKey) || {})[String(v.kind) + ':' + String(v.id)] || null;
 }
 /* 주소가 사건·컨설팅에 «그대로» 적혀 있으면 그 건의 주담당 — mbWhoWhy ①-3.
    ⚠ 담당이 둘로 갈리면(두 건 두 사람) 정하지 않는다 — 딱지만 둘 다 보여 준다. */
 function mbWorkMgrOfAddr(em){
+  /* ★ 사람이 고른 것이 «먼저»다 — 이알피에 적힌 주소보다 세다. 손으로 잇는 까닭이
+       「기계가 못 찾아서」 또는 「잘못 찾아서」라, 기계가 덮으면 그 단추가 뜻이 없어진다. */
+  const hand = mbWorkHandOf(em);
+  if(hand){ const h = mbWhoLive(hand.mgr); if(h) return h; }
   const a = ((_mbWork && _mbWork.byAddr) || {})[em] || [];
   const ms = [];
   a.forEach(w=>{ const n = mbWhoLive(w.mgr); if(n && ms.indexOf(n) < 0) ms.push(n); });
@@ -20138,9 +20176,13 @@ function mbWorkOfRow(v, idx0, rec0){
   const em = String((v&&v.e)||'').trim().toLowerCase();
   if(!em) return [];
   const hit = _mbWork.byAddr[em];
+  /* ★ 손으로 이은 건을 «맨 앞»에 둔다 — 📁 딱지가 그것부터 보여 준다 (2026-10-05) */
+  const hand = mbWorkHandOf(em);
+  const seed = hand ? [hand].concat((hit||[]).filter(w=>!(w.kind===hand.kind && w.id===hand.id)))
+                    : (hit || []);
   /* 업체로 이어진 건이 하나도 없으면 업체를 찾을 까닭이 없다 */
-  if(!_mbWork.byCo.size) return hit ? hit.slice() : [];
-  const out = (hit || []).slice();
+  if(!_mbWork.byCo.size) return seed.slice();
+  const out = seed.slice();
   /* 업체는 mbSubsOfRow 와 «같은 길»로 찾는다 — 사람이 이은 자문사가 먼저 */
   let rec = rec0 !== undefined ? rec0 : mbCoRec(mbCoOf(em));
   if(rec0 === undefined && !rec){
@@ -20152,6 +20194,220 @@ function mbWorkOfRow(v, idx0, rec0){
     if(!out.some(x=>x.kind===w.kind && x.id===w.id)) out.push(w);
   });
   return out;
+}
+/* ══════════════════════════════════════════════════════════════════════════
+   📁 이 주소를 «손으로» 사건·컨설팅에 잇는다 (대표 승인 목업 2026-10-05)
+   ══════════════════════════════════════════════════════════════════════════
+   「사건관리 컨설팅관리 등등 의 관리에서 본인이 받은 업무를 자동으로 담당자에게」
+
+   ★ 실측 2026-10-05 — 진행 중인 건 87건 가운데 메일함까지 «저절로» 닿는 것 60건(69%).
+       · 컨설팅 51/56 (91%)   · 사건 6/27 (22%) ← 여기가 막혔다   · 기금·기타 3/4
+     사건이 안 닿는 까닭은 상대가 «개인(근로자)»이라 업체가 없고, 이알피 사건 기록에
+     메일 주소도 안 적혀 있어서다. 잇는 열쇠가 주소·업체id·사업자번호 셋뿐이라 닿을 길이 없다.
+   ★ 그래서 사람이 «한 번» 고르게 한다. 고른 뒤로는 그 주소 메일이 지난 것도 앞으로 올
+     것도 그 담당자 칸으로 저절로 간다 — 자문사 잇기(mbCoSet)와 똑같은 결이다.
+   ⚠ 이름으로 잇지 않는다. 담는 것은 「kind:id」 — 그 건의 영구 번호다(온톨로지 규칙).
+     「오철진」이라는 이름이 메일에 있다고 그 사건에 붙이면 동명이인에게 남의 사건이 간다.
+   ⚠ 이알피 원장에는 한 글자도 안 쓴다 — 메일함은 지금도 이알피를 «읽기만» 한다.
+   ⚠ 끝난 건을 가리키면 저절로 빠진다(byKey 에 진행 중인 것만 담긴다) — 지우지 않아도 된다. */
+/* 손으로 이어 둔 것이 가리키는 건 열쇠들 — 「안 이어진 건」 표가 이것을 뺀다 */
+function mbWorkLinkedKeys(){
+  const out = {};
+  Object.keys(_mbWorkLink || {}).forEach(k=>{
+    const v = (_mbWorkLink||{})[k];
+    if(v && v.kind && v.id) out[String(v.kind) + ':' + String(v.id)] = true;
+  });
+  return out;
+}
+/* 아직 메일함까지 «닿지 않는» 건 — 주소도 업체연결도 없고 손으로도 안 이은 것.
+   ⚠ 잣대를 여기서 새로 셈하지 않는다. mbWorkBuild 가 적어 둔 w.has 를 그대로 읽는다 —
+     두 곳에서 따로 셈하면 표가 「안 닿는다」는데 실제로는 닿는 일이 생긴다. */
+function mbWorkTodo(){
+  const all = (_mbWork && _mbWork.all) || [];
+  const linked = mbWorkLinkedKeys();
+  return all.filter(w => !(w.has && w.has.addr) && !(w.has && w.has.co)
+    && !linked[w.kind + ':' + w.id]);
+}
+/* 「왜 안 닿나」 — 표에 그대로 적는다. 사람이 「내가 뭘 안 했나」를 찾느라 헤매지 않게. */
+function mbWorkWhyNot(w){
+  if(!w) return '';
+  if(w.has && w.has.addr) return '';
+  if(w.has && w.has.co) return '';
+  return '주소도 업체연결도 없음';
+}
+function mbWorkMe(){
+  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); return (w && w.name) || ''; }
+  catch(_){ return ''; }
+}
+/* 고르는 창을 연다 — 「담당자 ˅」 창에서 한 줄로 부른다 */
+function mbWorkLinkOpen(em, ev){
+  state.mbWkEm = String(em||'').trim().toLowerCase();
+  state.mbWkQ = ''; state.mbWkKind = '';
+  mbWorkLinkDraw(ev);
+}
+/* ⚠ 글자를 칠 때 창을 통째로 다시 그리지 않는다 — 다시 그리면 칸이 새로 생겨 커서를
+     잃는다. 목록만 갈아 끼운다(갈래 딱지도 같다). */
+function mbWorkLinkQ(q){ state.mbWkQ = String(q||''); mbWorkLinkFill(); }
+function mbWorkLinkKind(k){ state.mbWkKind = String(k||''); mbWorkLinkFill(); }
+function mbWorkLinkRows(){
+  const all = (_mbWork && _mbWork.all) || [];
+  const kind = state.mbWkKind || '';
+  const q = String(state.mbWkQ||'').trim().toLowerCase();
+  return all.filter(w=>{
+    if(kind && w.kind !== kind) return false;
+    if(!q) return true;
+    return (w.co + ' ' + w.title + ' ' + w.mgr).toLowerCase().indexOf(q) >= 0;
+  });
+}
+/* ⚠ 5계열 27색 밖으로 나가지 말 것 — 전체 실행에서만 걸린다(2026-10-05 일곱 색이 걸렸다) */
+const MB_WORK_CHIP = { consulting:'#166534', case:'#1e40af', fund:'#854d0e', other:'#475569' };
+const MB_WORK_CHIPBG = { consulting:'#f0fdf4', case:'#eff6ff', fund:'#fffbeb', other:'#f8fafc' };
+function mbWorkChip(kind){
+  return '<span style="font-size:10.5px;border-radius:4px;padding:2px 6px;font-weight:700;'
+    + 'white-space:nowrap;color:' + (MB_WORK_CHIP[kind]||'#475569') + ';background:'
+    + (MB_WORK_CHIPBG[kind]||'#f8fafc') + '">' + esc(MB_WORK_KIND[kind]||kind) + '</span>';
+}
+/* 목록 한 토막 — 창을 그릴 때와 글자를 칠 때가 «같은 글»을 쓴다 */
+function mbWorkLinkListHtml(){
+  const rows = mbWorkLinkRows();
+  if(!rows.length) return '<div class="fmi" style="color:#64748b">'
+    + (((_mbWork && _mbWork.all) || []).length ? '찾는 말과 맞는 건이 없습니다'
+      : '푸른이알피에서 사건·컨설팅을 불러오는 중입니다…') + '</div>';
+  /* ⚠ 한 줄에 다 넣는다 — 넘치면 … 로 자르고 전문은 title 에 담는다(한 칸은 한 줄). */
+  return rows.slice(0, 200).map(w=>{
+    const nm = w.co || w.title || '(이름 없음)';
+    const sub = (w.co && w.title) ? w.title : '';
+    return '<div class="fmi" title="' + esc(nm + (sub ? ' — ' + sub : '')) + '"'
+      + ' onclick="mbWorkLinkSet(\'' + esc(w.kind) + '\',\'' + esc(w.id) + '\')">'
+      + mbWorkChip(w.kind)
+      + '<span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'
+      +   '<b>' + esc(nm) + '</b>'
+      +   (sub ? ' <small style="color:#64748b">' + esc(sub) + '</small>' : '') + '</span>'
+      + '<span style="color:#2563eb;font-weight:700;font-size:11.5px;white-space:nowrap">'
+      +   esc(w.mgr || '담당 없음') + '</span></div>';
+  }).join('')
+    + (rows.length > 200 ? '<div class="fmi" style="color:#64748b">… ' + (rows.length-200)
+        + '건 더 있습니다 — 찾는 말을 적어 주세요</div>' : '');
+}
+function mbWorkLinkFill(){
+  const box = $('mbWkList'); if(box) box.innerHTML = mbWorkLinkListHtml();
+  const tb = $('mbWkTabs'); if(tb) tb.innerHTML = mbWorkLinkTabsHtml();
+}
+function mbWorkLinkTabsHtml(){
+  const all = (_mbWork && _mbWork.all) || [];
+  const n = (k)=> k ? all.filter(w=>w.kind===k).length : all.length;
+  const cur = state.mbWkKind || '';
+  return [['','모두'],['consulting','컨설팅'],['case','사건'],['fund','기금'],['other','기타']]
+    .map(([k,label])=>{
+      const on = cur === k;
+      return '<span onclick="mbWorkLinkKind(\'' + k + '\')" style="cursor:pointer;padding:3px 10px;'
+        + 'border-radius:12px;font-size:11.5px;border:1px solid ' + (on?'#2563eb':'#e2e8f0') + ';'
+        + 'background:' + (on?'#2563eb':'#fff') + ';color:' + (on?'#fff':'#1e293b') + ';'
+        + (on?'font-weight:700;':'') + '">' + label + ' ' + n(k) + '</span>';
+    }).join('');
+}
+function mbWorkLinkDraw(ev){
+  const m = $('folderMenu'); if(!m) return;
+  const em = state.mbWkEm;
+  const cur = mbWorkHandOf(em);
+  const todo = mbWorkTodo().length;
+  m.innerHTML = '<div class="fmhead">「' + esc(em) + '」 을 어느 건에'
+    + '<span>진행 중인 것만 보입니다 — 끝난 건은 저절로 빠집니다</span></div>'
+    + (cur ? '<div class="fmi" style="background:#eff6ff" onclick="mbWorkUnlink()">'
+        + '<span>✖</span><span>지금 <b>' + esc(cur.co || cur.title) + '</b> 에 이어져 있습니다'
+        + '<small style="display:block;color:#64748b;font-size:11px">눌러서 풀기 — 그러면 다시 원래 규칙대로 잡힙니다</small>'
+        + '</span></div>' : '')
+    + '<div class="fmform"><input id="mbWkQ" placeholder="업체·의뢰인·건 이름으로 찾기"'
+    +   ' autocomplete="off" oninput="mbWorkLinkQ(this.value)"'
+    +   ' onkeydown="if(event.key===\'Escape\')closeFolderMenu()"></div>'
+    + '<div id="mbWkTabs" style="display:flex;gap:6px;flex-wrap:wrap;padding:8px 12px;'
+    +   'border-bottom:1px solid #e2e8f0;background:#f8fafc">' + mbWorkLinkTabsHtml() + '</div>'
+    + '<div class="fmlist" id="mbWkList">' + mbWorkLinkListHtml() + '</div>'
+    + (todo ? '<div class="fmi" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px"'
+        + ' onclick="mbWorkTodoOpen()">📁 아직 안 이어진 건 ' + todo + '건 ›'
+        + '<small>어느 건이 왜 안 닿는지 한 화면에 모아 보여 드립니다</small></div>' : '');
+  mbPlaceMenu(m, ev);
+  const q = $('mbWkQ'); if(q){ q.value = state.mbWkQ || ''; try{ q.focus(); }catch(_){} }
+}
+/* 이 주소를 그 건에 잇는다 */
+function mbWorkLinkSet(kind, id){
+  const em = String(state.mbWkEm||'').trim().toLowerCase();
+  if(!em) return toast('어느 주소인지 잃었습니다 — 다시 열어 주세요', 8000);
+  const w = ((_mbWork && _mbWork.byKey) || {})[String(kind) + ':' + String(id)];
+  if(!w) return toast('그 건을 찾지 못했습니다 — 화면을 새로 고쳐 주세요', 8000);
+  closeFolderMenu();
+  const key = mbWhoKey(em);
+  _mbWorkLink = _mbWorkLink || {};
+  const before = _mbWorkLink[key];
+  const val = { kind:String(kind), id:String(id), at:Date.now(), by:mbWorkMe() };
+  _mbWorkLink[key] = val;
+  mbWhoBust(); renderPCSide(); renderMailPage();
+  const nm = w.co || w.title || '';
+  const done = ()=> toast('📁 「' + em + '」 을 ' + (MB_WORK_KIND[kind]||'') + ' 「' + nm + '」 에 이었습니다'
+    + (w.mgr ? ' — 담당 ' + w.mgr + ' 칸으로 갑니다' : ' — ⚠ 그 건에 담당이 적혀 있지 않습니다'), 9000);
+  if(typeof Store==='undefined' || Store.mode!=='firebase') return done();
+  firebase.database().ref(DB_ROOT + '/config/mailWork/' + key).set(val).then(done).catch(e=>{
+    /* ⚠ 못 썼으면 화면도 통째로 되돌린다 — 안 그러면 이 기기에서만 이어진 것처럼 보인다 */
+    if(before === undefined) delete _mbWorkLink[key]; else _mbWorkLink[key] = before;
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    toast('잇지 못했습니다 — ' + ((e&&e.message)||e), 9000);
+  });
+}
+/* 이은 것을 푼다 — 원래 규칙(주소·업체)으로 돌아간다 */
+function mbWorkUnlink(){
+  const em = String(state.mbWkEm||'').trim().toLowerCase();
+  if(!em) return;
+  closeFolderMenu();
+  const key = mbWhoKey(em);
+  _mbWorkLink = _mbWorkLink || {};
+  const before = _mbWorkLink[key];
+  if(before === undefined) return;
+  delete _mbWorkLink[key];
+  mbWhoBust(); renderPCSide(); renderMailPage();
+  const done = ()=> toast('📁 「' + em + '」 의 이은 것을 풀었습니다', 7000);
+  if(typeof Store==='undefined' || Store.mode!=='firebase') return done();
+  firebase.database().ref(DB_ROOT + '/config/mailWork/' + key).remove().then(done).catch(e=>{
+    _mbWorkLink[key] = before;
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    toast('풀지 못했습니다 — ' + ((e&&e.message)||e), 9000);
+  });
+}
+/* ── 아직 안 이어진 건 표 (㉠-2) — ㉯ 창과 «같은 겉모양»을 쓴다 ── */
+function mbWorkTodoOpen(){ closeFolderMenu(); state.mbWkTodo = true; renderMailPage(); }
+function mbWorkTodoClose(){ state.mbWkTodo = false; renderMailPage(); }
+function mbWorkTodoHtml(){
+  if(!state.mbWkTodo) return '';
+  const rows = mbWorkTodo();
+  const all = (_mbWork && _mbWork.all) || [];
+  const H = rows.map(w=>'<tr>'
+    + '<td>' + mbWorkChip(w.kind) + '</td>'
+    + '<td><span class="t">' + esc(w.co || '(업체 없음)') + '</span></td>'
+    + '<td class="co">' + esc(w.title || '(제목 없음)') + '</td>'
+    + '<td class="co">' + esc(w.mgr || '담당 없음') + '</td>'
+    + '<td class="em">' + esc(mbWorkWhyNot(w)) + '</td></tr>').join('');
+  const table = rows.length
+    ? '<table><tr><th style="width:9%">갈래</th><th style="width:26%">업체·의뢰인</th>'
+      + '<th style="width:28%">건</th><th style="width:12%">담당</th><th>왜 안 닿나</th></tr>'
+      + H + '</table>'
+    : '<div class="mck-empty"><b>모두 이어져 있습니다</b>'
+      + '진행 중인 건 ' + all.length + '건이 전부 메일함까지 닿습니다.</div>';
+  return '<div class="mck-dim" onclick="if(event.target===this)mbWorkTodoClose()">'
+    + '<div class="mck">'
+    + '<header><span>📁</span><h2>아직 안 이어진 건</h2>'
+    + '<span class="x" onclick="mbWorkTodoClose()" title="닫기">✕</span></header>'
+    + '<div class="body"><div class="why">'
+    + '이 건들은 <b>메일함까지 닿지 않습니다</b> — 담당이 이알피에 적혀 있어도 '
+    + '메일이 그 사람 칸으로 안 갑니다.<br>'
+    + '메일함이 건을 잇는 열쇠는 <b>주소·업체id·사업자번호 셋뿐</b>입니다. '
+    + '업체 «이름»으로는 잇지 않습니다 — 같은 이름 다른 회사에 붙습니다.<br>'
+    + '메우는 길은 둘입니다. <b>①</b> 푸른이알피에서 그 건에 상대 <b>메일 주소</b>를 적거나, '
+    + '<b>②</b> 메일함에서 그 사람 메일을 열고 「담당자 ˅ → 📁 사건·컨설팅에 잇기」 를 누릅니다.'
+    + '</div>' + table + '</div>'
+    + '<footer><span>진행 중인 건 ' + all.length + '건 가운데 '
+    + (all.length - rows.length) + '건은 닿고, <b>' + rows.length + '건이 안 닿습니다</b></span>'
+    + '<span class="sp"></span>'
+    + '<button onclick="mbWorkTodoClose()">닫기</button>'
+    + '</footer></div></div>';
 }
 /* 그 건을 맡은 사람들(살아 있는 사람만, 퇴사자는 이어받은 사람) */
 function mbWorkMgrs(ws){
@@ -23598,6 +23854,7 @@ function mbListHtml(){
     ${mbPagerHtml()}
     ${mbCheckHtml()}
     ${mbGuessHtml()}
+    ${mbWorkTodoHtml()}
     ${mbPvHtml()}
     ${mbNewHtml()}`;
 }
@@ -26723,6 +26980,14 @@ function mbOwnerMove(ev, only){
     ${one ? `<div class="fmi" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px"
       onclick="closeFolderMenu();openWhoPage()">🔗 자문사로 잇기 ›
       <small>담당자가 «회사에서» 따라옵니다 — 담당이 바뀌어도 안 어긋납니다</small></div>` : ''}
+    ${/* ── 📁 사건·컨설팅에 잇기 (대표 승인 목업 2026-10-05) ──
+         ⚠ 한 보낸이일 때만 보인다 — 여러 주소를 한 건에 이으면 뒤에 푸는 사람이
+           어느 것이 왜 이어졌는지 알 길이 없다(자문사 잇기와 같은 잣대).
+         ★ 자문사 잇기 «바로 아래»에 둔다. 둘은 같은 일(「이 주소는 어디 것인가」)의
+           두 갈래라, 떨어뜨려 두면 하나만 찾고 다른 하나는 없는 줄 안다. */''}
+    ${one ? `<div class="fmi" onclick="mbWorkLinkOpen('${esc(one)}', event)" style="border-top:1px solid #e2e8f0;color:#2563eb;font-size:12px">📁 사건·컨설팅에 잇기 ›
+      <small>이 주소가 그 건의 것이면 담당이 «건에서» 따라옵니다${
+        mbWorkHandOf(one) ? ' — 지금 이어져 있습니다' : ''}</small></div>` : ''}
     ${/* ── ㉯ 로 가는 문 (대표 승인 목업 2026-09-05) ──
          ⚠ 한 통씩으로는 1,600통을 못 줄인다. 「이 창에서 한 통 정했다」의 다음 손이
            여기 있어야 한다 — 따로 들어가야 하는 화면이면 아무도 안 간다. */''}
