@@ -97,8 +97,20 @@ async function loadTables(db) {
     if (v.sid && String(v.status || "") !== "resigned") uidBySid[String(v.sid)] = uid;
   });
 
-  /* 업체 — id 와 이름 둘 다로 찾을 수 있게 */
-  const coById = {}, coByName = {}, coByBiz = {};
+  /* 업체 — id 와 이름 둘 다로 찾을 수 있게.
+     ★ 업체관리에 «적힌 주소»도 함께 담는다 (2026-10-05 실측 뒤 보탬).
+       화면의 ② 가 명함이 아니라 «이것»이 먼저다(mbWhoIndex 의 put 차례).
+       서버는 이미 data/companies 를 읽으므로 새로 읽는 자리가 «없다».
+       실측 2026-10-05 — 최근 30일 549통 가운데 서버가 집는 것이 47통(9%)이었는데,
+       이것을 더하니 169통(31%)이 된다. 같은 날 명함 6,716장 가운데 담당자가 적힌
+       것은 «0장»이라, 무거운 명함 색인은 지금 한 통도 더 잡지 못한다.
+     ⚠ 주소가 «세 군데»에 흩어져 있다 — 업체 메일·대표담당 메일·담당자 줄.
+       하나만 보면 대부분을 놓친다(화면도 셋 다 본다).
+     ⚠ 끝난 업체는 «안 담는다». 화면은 담되 그 메일을 「자문종료」 칸으로 보낸다 —
+       담당자 칸에 안 들어가는 메일로 폰을 울리면 안 된다.
+     ⚠ 먼저 넣은 것이 이긴다 — 화면과 같은 규칙이다. */
+  const coById = {}, coByName = {}, coByBiz = {}, erpAddr = {};
+  const okMail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e || "").trim());
   arr(cos.val()).forEach((c) => {
     if (!c) return;
     const rec = { main: c.managerMain ? (nameBySid[c.managerMain] || c.managerMain) : "",
@@ -108,6 +120,14 @@ async function loadTables(db) {
     if (n && !coByName[n]) coByName[n] = rec;
     const b = digits(c.bizNo);
     if (b.length >= 10) coByBiz[b] = rec;
+    if (!rec.main || rec.left) return;
+    [c.email, c.primaryContactEmail]
+      .concat((c.contacts || []).filter((x) => x && !x.left).map((x) => x.email))
+      .forEach((e0) => {
+        const e = String(e0 || "").trim().toLowerCase();
+        if (!okMail(e) || /@pureun\.kr$/.test(e)) return;   /* 우리 주소는 아니다 */
+        if (!erpAddr[e]) erpAddr[e] = rec.main;
+      });
   });
 
   /* 진행 중인 사건·컨설팅 — 주소로 · 번호로 */
@@ -134,7 +154,8 @@ async function loadTables(db) {
 
   return { hand: hand.val() || {}, co: co.val() || {}, workLink: workLink.val() || {},
     succ: succ.val() || {}, pushCfg: pushCfg.val() || {},
-    nameBySid, sidByName, retired, uidBySid, coById, coByName, coByBiz, workByAddr, workByKey };
+    nameBySid, sidByName, retired, uidBySid, coById, coByName, coByBiz, erpAddr,
+    workByAddr, workByKey };
 }
 
 /* 퇴사자면 이어받은 사람 — 화면의 mbWhoLive 와 같다 */
@@ -182,6 +203,13 @@ function whoOf(em0, T) {
   ws.forEach((w) => { const n = live(w.mgr, T); if (n && ms.indexOf(n) < 0) ms.push(n); });
   /* 담당이 둘로 갈리면 정하지 않는다 — 틀린 사람에게 보내는 것이 안 보내는 것보다 나쁘다 */
   if (ms.length === 1) return { who: ms[0], why: "work", work: ws[0] };
+
+  /* ② 업체관리에 «적힌» 주소 → 그 업체 주담당 (화면 mbWhoIndex 의 byAddr 와 같은 자료).
+     ⚠ 건(①-3)보다 «뒤»다 — 화면과 같은 차례여야 한다. 앞으로 당기면 같은 주소에서
+       화면은 건 담당, 알림은 업체 담당이 되어 둘이 어긋난다. */
+  const a1 = live(T.erpAddr[em], T);
+  if (a1) return { who: a1, why: "erp", work: null };
+
   return none;
 }
 

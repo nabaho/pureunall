@@ -29,8 +29,15 @@ const DIR = [
   { sid: 'P-009', name: '라마바', status: 'retired' },
 ];
 const COS = [
-  { id: 'co-1', name: '가나상사', managerMain: 'P-001', status: 'active', bizNo: '123-45-67890' },
-  { id: 'co-2', name: '다라무역', managerMain: 'P-002', status: 'inactive' },
+  { id: 'co-1', name: '가나상사', managerMain: 'P-001', status: 'active', bizNo: '123-45-67890',
+    email: 'info@gana.kr', primaryContactEmail: 'hong2@naver.com',
+    contacts: [{ name: '홍길동', email: 'gil@gana.kr' }, { name: '떠난이', email: 'gone@gana.kr', left: true }] },
+  { id: 'co-2', name: '다라무역', managerMain: 'P-002', status: 'inactive', email: 'end@dara.kr' },
+  /* 같은 주소가 두 업체에 적혀 있다 — «먼저 넣은 것»이 이긴다(화면과 같은 규칙).
+     세무사무소 한 주소가 여러 자문사에 적히는 일이 실제로 흔하다. */
+  { id: 'co-3', name: '마바유통', managerMain: 'P-002', status: 'active', email: 'info@gana.kr',
+    /* 담당자가 업체 연락처에 «제 회사 주소»를 적어 둔 것 — 이것으로 울리면 안 된다 */
+    primaryContactEmail: 'p002@pureun.kr' },
 ];
 const WORKS = {
   consultings: [{ id: 'c1', status: '진행', managerMain: 'P-002', companyName: '가나상사',
@@ -82,9 +89,26 @@ function appBox(cfg) {
     mbDomOf: (e) => { const i = String(e).lastIndexOf('@'); return i < 0 ? '' : String(e).slice(i + 1); },
     mbRetired: (w) => !!retired[w],
     mbSuccOf: (w) => (cfg.succ || {})[w] || '',
-    /* 명함 색인은 «비워 둔다» — 서버가 안 보는 칸이라, 여기서도 비워야 두 길이
-       같은 자리에서 멈춘다. 명함으로만 잡히는 메일은 따로 검사한다(아래 ★). */
-    mbWhoIndex: () => ({ byAddr: cfg.cardByAddr || {}, byDom: cfg.cardByDom || {}, coAddr: {} }),
+    /* ② 는 «업체관리에 적힌 주소»가 먼저고 명함이 나중이다(화면 mbWhoIndex 의 put 차례).
+       서버도 앞의 것은 본다 — 그래서 여기서도 같은 차례로 쌓는다.
+       ⚠ 끝난 업체도 화면은 담는다(그 메일은 「자문종료」 칸으로 간다). 서버는 안 담는다 —
+         담당자 칸에 안 들어가는 메일로 폰을 울리면 안 되기 때문이다. */
+    mbWhoIndex: () => {
+      const byAddr = {};
+      COS.forEach((c) => {
+        const main = nameBySid[c.managerMain] || '';
+        if (!main) return;
+        [c.email, c.primaryContactEmail]
+          .concat((c.contacts || []).map((x) => x && x.email))
+          .forEach((e0) => {
+            const e = String(e0 || '').trim().toLowerCase();
+            if (e.indexOf('@') < 1 || byAddr[e]) return;
+            byAddr[e] = main;
+          });
+      });
+      Object.keys(cfg.cardByAddr || {}).forEach((e) => { if (!byAddr[e]) byAddr[e] = cfg.cardByAddr[e]; });
+      return { byAddr: byAddr, byDom: cfg.cardByDom || {}, coAddr: {} };
+    },
     mbCoOf: (em) => {
       const v = (cfg.co || {})[SRV.whoKey(em)];
       if (!v) return '';
@@ -128,6 +152,15 @@ const CASES = [
   ['퇴사자는 이어받은 사람', { hand: { 'hong@naver,com': '라마바' }, succ: { '라마바': '권형하' } },
     'hong@naver.com', '권형하'],
   ['이어받을 사람이 없으면 아무에게도 안 간다', { hand: { 'hong@naver,com': '라마바' } }, 'hong@naver.com', ''],
+  /* ② 업체관리에 «적힌» 주소 — 셋 다 본다(업체 메일·대표담당 메일·담당자 줄).
+     실측 2026-10-05: 이것 하나로 최근 30일 47통 → 169통이 된다. */
+  /* ⚠ info@gana.kr 은 두 업체에 적혀 있다 — 먼저 만난 가나상사(권형하)가 이긴다 */
+  ['업체관리의 업체 메일 · 두 업체에 겹치면 먼저 것', {}, 'info@gana.kr', '권형하'],
+  ['업체관리의 대표담당 메일', {}, 'hong2@naver.com', '권형하'],
+  ['업체관리의 담당자 줄', {}, 'gil@gana.kr', '권형하'],
+  ['사람이 정한 것이 업체관리 주소보다 세다', { hand: { 'info@gana,kr': '박한별' } }, 'info@gana.kr', '박한별'],
+  ['건이 업체관리 주소보다 세다',
+    { workLink: { 'info@gana,kr': { kind: 'case', id: 's3' } } }, 'info@gana.kr', '박한별'],
   ['아무 데도 없는 주소', {}, 'nobody@x.kr', ''],
   ['우리 주소는 건에 적혀 있어도 안 잇는다', {}, 'p001@pureun.kr', ''],
 ];
@@ -141,6 +174,25 @@ CASES.forEach(([label, cfg, em, want]) => {
     assert.equal(scr, want, '화면이 바라는 답과 다르다');
     assert.equal(srv.who, scr, '서버와 화면이 어긋났다 — 「알림은 왔는데 메일함에는 남의 것」이 된다');
   });
+});
+
+/* ★ 끝난 업체 — 서버는 «덜 집는다». 화면은 집지만 그 메일을 「자문종료」 칸으로 보낸다 */
+test('★★★ 끝난 업체에 적힌 주소로는 폰을 안 울린다 — 담당자 칸에 안 들어가는 메일이다', async () => {
+  const T = await srvTables({});
+  assert.equal(SRV.whoOf('end@dara.kr', T).who, '', '서버는 안 울려야 한다');
+});
+
+test('★★ 떠난 담당자 줄의 주소는 안 쓴다', async () => {
+  const T = await srvTables({});
+  assert.equal(SRV.whoOf('gone@gana.kr', T).who, '');
+});
+
+test('★★★ 우리 주소(@pureun.kr)로는 안 울린다 — 업체 칸에 우리 직원 주소가 적혀 있어도', async () => {
+  /* 담당자가 업체 연락처에 제 회사 주소를 적어 두는 일이 있다. 그것으로 울리면
+     우리끼리 주고받은 메일에 폰이 울린다. */
+  const T = await srvTables({});
+  assert.equal(T.erpAddr['p002@pureun.kr'], undefined, '표에 담지도 말아야 한다');
+  assert.equal(SRV.whoOf('p002@pureun.kr', T).who, '');
 });
 
 /* ★ 서버가 «일부러» 안 보는 칸 — 어긋남이 아니라 «덜 집는» 것이어야 한다 */
