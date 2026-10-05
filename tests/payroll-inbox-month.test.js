@@ -28,15 +28,22 @@ function cut(name) {
 }
 
 /* inbox 칸만 갈아 끼우고 arrivalFor 를 그대로 돌린다 */
-function load(inbox, siteNames) {
+/* 2026-10-05: 도착 판정 규칙은 js/pu-site-staff.js(arrivalMatches) 한 곳으로 옮겼다 —
+   그 파일을 함께 불러 «화면이 실제로 쓰는 규칙»을 돌린다. 이름표(site_co_link)도 갈아 끼운다. */
+const STAFF = fs.readFileSync(path.join(R, 'js', 'pu-site-staff.js'), 'utf8');
+function load(inbox, siteNames, links) {
   const sandbox = { console, Date };
   sandbox.globalThis = sandbox;
   vm.createContext(sandbox);
   new vm.Script([
+    STAFF,
+    'var PuSiteStaff = globalThis.PuSiteStaff;',
     'var INBOX = ' + JSON.stringify(inbox || {}) + ';',
     'var NAMES = ' + JSON.stringify(siteNames || []) + ';',
+    'var LINKS = ' + JSON.stringify(links || {}) + ';',
     'function inboxLog(){ return INBOX; }',
     'function dbGet(){ return null; }',
+    'function lmap(k){ return k === "site_co_link" ? LINKS : {}; }',
     'function siteNamesFor(){ return NAMES; }',
     cut('monthNum'), cut('siteKey'), cut('arrivalFor'),
     'globalThis.monthNum = monthNum; globalThis.arrivalFor = arrivalFor;'
@@ -123,4 +130,28 @@ test('기준 월을 못 읽으면 달을 안 가린다 (예전 그대로)', () =
 test('수신 기록이 없으면 미도착이다', () => {
   const { arrivalFor } = load({}, ['다온원']);
   assert.equal(arrivalFor('다온원', '8월'), false);
+});
+
+/* ══════ 업체번호로 붙이기 (대표 지시 2026-10-05 「연결성을 강하게」) ══════
+   데이터함은 업체관리 «정식 이름», 급여관리는 «폴더 이름»을 쓴다 — 글자로는 44곳 중
+   20곳이 안 붙었다. 대표가 확정한 이름표의 번호와 알림의 번호를 견준다. */
+
+test('★★ 이름 글자가 전혀 달라도 번호가 같으면 「도착」이다', () => {
+  const inbox = { m1: Object.assign({}, HANDOFF.m1, { 사업장: '농업회사법인 주식회사 다온원', companyId: 'co_7' }) };
+  const links = { '다온원_급여자료10일': { coId: 'co_7', coName: '농업회사법인 주식회사 다온원' } };
+  const { arrivalFor } = load(inbox, ['다온원_급여자료10일'], links);
+  assert.equal(arrivalFor('다온원_급여자료10일', '8월'), true);
+});
+
+test('★★ 번호가 다르면 이름이 똑같아도 「도착」이 아니다 — 같은 이름의 지점', () => {
+  const inbox = { m1: Object.assign({}, HANDOFF.m1, { 사업장: '다온원', companyId: 'co_8' }) };
+  const links = { '다온원': { coId: 'co_7', coName: '다온원' } };
+  const { arrivalFor } = load(inbox, ['다온원'], links);
+  assert.equal(arrivalFor('다온원', '8월'), false);
+});
+
+test('이름표가 없으면 예전처럼 이름으로 본다 — 확정 전에도 끊기지 않는다', () => {
+  const inbox = { m1: Object.assign({}, HANDOFF.m1, { companyId: 'co_7' }) };
+  const { arrivalFor } = load(inbox, ['다온원'], {});
+  assert.equal(arrivalFor('다온원', '8월'), true);
 });

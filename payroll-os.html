@@ -22,7 +22,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-labor-core.js?v=4"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
-<script src="js/pu-site-staff.js?v=1"></script>
+<script src="js/pu-site-staff.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -219,6 +219,9 @@ var FB_APPCHECK_KEY = "6Ldu1hEtAAAAABB9lH9EMEyd7uBLEy9H5HxJoua_";
 var FB_APPCHECK_ON = false;
 var ROOT = "payroll_os";
 var cache = {}, fbDb = null, me = null, ready = false;
+/* 관리자인가 — 이름표 맞추기(대표 지시 2026-10-05 「이름표 맞추기는 내가」)를 누가 하나 가른다.
+   ⚠ 화면에서 단추를 감추는 것일 뿐이다. 실제로 막는 것은 콘솔 규칙이다. */
+var isAdminUser = false;
 
 firebase.initializeApp(FB_CONFIG);
 try { if(firebase.appCheck) FB_APPCHECK_ON && firebase.appCheck().activate(new firebase.appCheck.ReCaptchaV3Provider(FB_APPCHECK_KEY), true); } catch(e){}
@@ -256,6 +259,7 @@ function afterLogin(){
   if(window.PuWhoami&&!window.__payWhoHooked){ window.__payWhoHooked=true; PuWhoami.onChange(function(){ drawWho(); }); }
   fbDb.ref('uid_roles/'+me.uid).once('value').then(function(s){
     var r=s.val()||{}; whoRole=r.isAdmin?'관리자':(r.fin?'재무/급여':'일반');
+    isAdminUser=!!r.isAdmin; if(ready) render();
     drawWho();
   }).catch(function(){ drawWho(); });
   /* ⚠ 예전에는 payroll_os **전체**를 한 번에 읽고, 같은 자리에 구독까지 걸었다.
@@ -303,6 +307,15 @@ function afterLogin(){
     fbDb.ref(ROOT+'/payroll_locked').on('value',function(ss){
       if(ready){ cache.payroll_locked=ss.val()||{}; render(); }
     });
+    /* ★★ 도착 알림(payroll_os/inbox)을 **시작할 때 아예 안 읽고 있었다** (2026-10-05 발견).
+       「얇은 것만 읽는다」로 바꿀 때 목록에서 빠진 것이다. 그래서 급여데이터함이
+       「📤 급여관리에 알리기」를 눌러도 이 화면은 영영 「미도착」이었다 — 두 앱을
+       잇는 단 하나의 고리가 끊겨 있었다. 넘긴 알림이 0건이라 아무도 몰랐다.
+       ⚠ 구독으로 건다 — 알림은 «다른 앱»에서 오므로, 열어 둔 사이에 와도 보여야 한다.
+         한 사업장·한 달에 한 줄(같은 자리에 덮어쓴다)이라 얇다. */
+    fbDb.ref(ROOT+'/inbox').on('value',function(ss){
+      cache.inbox=ss.val()||{}; if(ready) render();
+    },function(e){ console.warn('[수신함 알림]', e&&e.code); });
   }).catch(function(e){
     document.getElementById('main').innerHTML='<div class="empty">DB 접근 거부: '+e.code+'<br>규칙에 payroll_os 블록이 있는지, 재무/관리자 권한이 있는지 확인하세요.</div>'; });
 }
@@ -1356,15 +1369,24 @@ function guessMonth(text){
 }
 function siteKey(s){ return String(s||'').replace(/\(.*?\)|㈜|주식회사|\s/g,''); }
 
+/* 이 사업장에 그 달 자료가 왔나.
+   ★ 2026-10-05: 데이터함은 업체관리 «정식 이름»을, 여기는 급여대장 «폴더 이름»을 쓴다.
+     글자로만 견주면 44곳 중 20곳이 안 붙었다. 이제 알림에 실려 오는 업체번호를
+     대표가 확정한 이름표(site_co_link)의 번호와 견준다 — 규칙은 PuSiteStaff.arrivalMatches 한 곳.
+   ⚠ 모듈을 못 불러온 때만 예전 글자 비교로 물러선다(화면이 통째로 비면 안 된다). */
 function arrivalFor(site, mLabel){
-  var map=inboxLog(), mn=monthNum(mLabel), key=siteKey(site);
+  var map=inboxLog(), mn=monthNum(mLabel), key=siteKey(site), links=lmap('site_co_link');
+  var S=(typeof PuSiteStaff!=='undefined')?PuSiteStaff:null;
   return Object.keys(map).some(function(id){ var a=map[id];
-    var s=a.사업장, mo=a.월;   /* 급여데이터함이 확정해 넘긴 값 */
-    if(!s) return false;
-    var same=(s===site)||(!!key&&siteKey(s)===key);
-    return same && (mn==null||monthNum(mo)===mn); });
+    if(!a) return false;
+    var same=S ? S.arrivalMatches(a, site, links)
+               : (!!a.사업장&&((a.사업장===site)||(!!key&&siteKey(a.사업장)===key)));
+    return same && (mn==null||monthNum(a.월)===mn); });
 }
-function delArrival(id){ var map=inboxLog(); if(map[id]&&confirm('이 수신 기록을 삭제할까요?')){ delete map[id]; dbSet('inbox', map); } }
+/* ⚠ 한 줄만 지운다. 예전엔 수신함 «통째로»를 다시 써서, 그 사이 데이터함이 넘긴
+   알림을 지울 수 있었다(다른 앱이 같은 칸에 쓴다). 구독이 걸려 있어 화면은 저절로 따라온다. */
+function delArrival(id){ var map=inboxLog(); if(!map[id]||!confirm('이 수신 기록을 삭제할까요?')) return;
+  fbDb.ref(ROOT+'/inbox/'+id).remove().catch(function(e){ alert('삭제 실패: '+((e&&e.code)||e)); }); }
 window.delArrival=delArrival;   /* 등록·수정은 급여데이터함에서 — 여기선 잘못 온 알림 치우기만 */
 function screenInbox(){
   var now=new Date();
@@ -1426,6 +1448,8 @@ function screenCards(){
   var cards=dbGet('site_cards',[]);
   var h='<h1>설정 카드</h1><div class="sub">푸른통합시스템 · payroll_os · '+cards.length+'곳</div>';
   h+='<button class="btn sec" onclick="importCards()">설정 카드(JSON) 가져와 서버 저장</button>';
+  /* 🏷 이름표 맞추기 — 급여관리 사업장 이름을 업체관리 업체번호에 잇는 곳(2026-10-05) */
+  h+=' <button class="btn" onclick="navTo({screen:\'names\',site:null,month:null,emp:null,day:null})">\ud83c\udff7 이름표 맞추기</button>';
   /* 간이세액표 — 없으면 소득세를 계산할 수 없다(국세청이 산식을 공개하지 않아
      표 자체가 법적 기준이다). 그래서 있는지 없는지를 눈에 보이게 둔다. */
   h+=' <button class="btn sec" onclick="importTaxTable()">간이세액표(JSON) 가져오기</button>';
@@ -1884,7 +1908,8 @@ function screenHub(){
     +'</div>'
     +'<div style="font-size:12px;color:var(--sub);margin-top:4px">급여일 '+((card&&card.급여일)||'미지정')+' \u00b7 산정기간 '+((card&&card.산정기간)||'미지정')+'</div>'
     +(st&&st.경고?('<div style="font-size:12px;color:var(--warn);margin-top:6px">\u26a0 '+st.경고+'</div>'):'')
-    +(st&&st.짐작&&st.업체?('<div style="margin-top:8px"><button class="btn" onclick="linkCo(\''+esc(site)+'\')">이 업체가 맞습니다 \u2014 확정</button></div>'):'')
+    +(st&&st.짐작&&st.업체&&isAdminUser?('<div style="margin-top:8px"><button class="btn" onclick="linkCo(\''+esc(site)+'\')">이 업체가 맞습니다 \u2014 확정</button> '
+      +'<a href="#" onclick="navTo({screen:\'names\',site:null,month:null,emp:null,day:null});return false" style="font-size:12px">다른 업체면 \ud83c\udff7 이름표에서 고르기</a></div>'):'')
     +'</div>';
 
   /* 일곱 칸 — 순서는 실제로 일하는 차례다(자료가 와야 급여, 급여가 끝나야 명세서·신고) */
@@ -1906,10 +1931,146 @@ function linkCo(site){
   var st=staffOf(site);
   if(!st||!st.업체){ alert('이을 업체를 아직 못 찾았습니다.'); return; }
   if(!confirm(site+' 을(를) 업체관리 「'+st.업체+'」로 확정할까요?\n(담당 '+(st.담당||'미확인')+') \u2014 나중에 바꿀 수 있습니다.')) return;
-  var m=lmap('site_co_link'); m[site]={coName:st.업체, by:(me&&me.email)||'', at:Date.now()};
-  dbSet('site_co_link', m);
+  saveLink(site, linkVal(st.coId, st.업체));
 }
 window.linkCo=linkCo;
+
+/* ══════════════════════════════════════════════════════════════════════
+   🏷 이름표 맞추기 — 대표 지시 2026-10-05 「1단계 진행, 이름표 맞추기는 내가」
+   ──────────────────────────────────────────────────────────────────────
+   급여관리는 사업장을 급여대장 «폴더 이름»으로 부르고(꼬리표·찌꺼기 포함),
+   급여데이터함·업체관리는 «업체번호»로 부른다. 둘을 한 번 이어 두면
+   ① 데이터함이 넘긴 도착 알림이 번호로 붙고 ② 담당자가 이알피를 따라가고
+   ③ 이름 짐작이 남의 회사를 고르는 일이 없어진다.
+   ⚠ 짐작은 미리 채워 둔다 — 대표는 「맞음」만 누르면 된다. 이름 알맹이가
+     똑같은 것(꼬리표만 다름)은 한꺼번에 확정할 수 있다. 이름이 다른 짐작은
+     반드시 한 곳씩 본다(실제로 남의 회사·다른 지점을 고른 적이 있다).
+   ⚠ 담는 곳: payroll_os/site_co_link — 꼴은 js/pu-site-staff.js 머리말.
+   ══════════════════════════════════════════════════════════════════════ */
+function linkVal(coId, coName){
+  var v={coName:String(coName||''), by:(me&&me.email)||'', at:Date.now()};
+  if(coId) v.coId=String(coId);
+  return v;
+}
+function saveLink(site, val){
+  var m=lmap('site_co_link'), k=String(site||'');
+  if(!k) return;
+  if(val==null) delete m[k]; else m[k]=val;
+  dbSet('site_co_link', m);
+}
+/* 사업장 하나가 이름표 어디쯤에 있나 — done(확정) · same(이름이 같은 짐작) · check(꼭 볼 짐작) · none(못 찾음) */
+function nameState(st){
+  if(!st) return 'none';
+  if(st.확정) return 'done';
+  if(!st.업체) return 'none';
+  if(st.정확&&!st.경고) return 'same';
+  return 'check';
+}
+function linkStats(sites){
+  var n={done:0,same:0,check:0,none:0,all:0};
+  if(!coData) return null;
+  (sites||[]).forEach(function(s){ n[nameState(staffOf(s))]++; n.all++; });
+  return n;
+}
+function namesBanner(sites){
+  var n=linkStats(sites); if(!n) return '';
+  var left=n.all-n.done;
+  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:'+(left?'#fffbeb':'#f0fdf4')
+    +';border:1px solid var(--line);border-radius:12px;padding:9px 14px;margin:6px 0 4px;font-size:12.5px">'
+    +'<b>\ud83c\udff7 이름표</b> 확정 '+n.done+' / '+n.all+'곳'
+    +(left?(' \u00b7 남은 '+left+'곳 <span style="color:var(--sub)">(이름 같음 '+n.same+' \u00b7 꼭 볼 것 '+n.check+' \u00b7 못 찾음 '+n.none+')</span>'):' \u2014 다 맞췄습니다')
+    +' <a href="#" onclick="navTo({screen:\'names\',site:null,month:null,emp:null,day:null});return false">이름표 맞추기 \u203a</a></div>';
+}
+function screenNames(){
+  ensureCo();
+  var sites=siteCardsList();
+  var h='<h1>\ud83c\udff7 이름표 맞추기</h1><div class="sub"><a href="#" onclick="goBack();return false">\u2190 돌아가기</a> \u00b7 급여관리 사업장 이름 \u2194 업체관리 업체(번호). 한 번 이어 두면 데이터함 알림\u00b7담당자가 번호로 붙습니다</div>';
+  if(!isAdminUser) h+='<div class="note">이름표는 대표(관리자)가 맞춥니다 \u2014 여기서는 보기만 됩니다.</div>';
+  if(!sites.length) return h+'<div class="empty">급여 데이터가 없습니다.</div>';
+  if(!coData) return h+'<div class="empty">'+(coErr?('업체 명단을 못 읽었습니다: '+coErr):'업체 명단을 불러오는 중\u2026')+'</div>';
+  var rows=sites.map(function(s){ var st=staffOf(s); return {site:s, st:st, k:nameState(st)}; });
+  var ORDER={none:0,check:1,same:2,done:3};
+  rows.sort(function(a,b){ return (ORDER[a.k]-ORDER[b.k])||String(a.site).localeCompare(String(b.site),'ko'); });
+  var n=linkStats(sites);
+  h+='<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'
+    +'<span class="badge">확정 '+n.done+' / '+n.all+'</span>'
+    +'<span class="badge warn">못 찾음 '+n.none+'</span>'
+    +'<span class="badge warn">꼭 볼 것 '+n.check+'</span>'
+    +'<span class="badge">이름 같음 '+n.same+'</span>'
+    +(isAdminUser&&n.same?' <button class="btn" onclick="linkAllSame()">이름이 같은 '+n.same+'곳 한꺼번에 확정</button>':'')
+    +'</div>';
+  var TAG={none:['못 찾음','var(--warn)'],check:['이름 다름 \u2014 꼭 확인','var(--warn)'],same:['이름 같음','var(--sub)'],done:['확정','#166534']};
+  h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
+  rows.forEach(function(r){
+    var st=r.st, s=esc(r.site), months=(payRecs(r.site)||[]).length, link=lmap('site_co_link')[r.site]||{};
+    h+='<div style="padding:11px 16px;border-bottom:1px solid var(--line)">'
+      +'<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'
+      +'<span style="font-size:11px;color:#fff;background:'+TAG[r.k][1]+';border-radius:99px;padding:2px 8px">'+TAG[r.k][0]+'</span>'
+      +'<b>'+r.site+'</b><span style="font-size:12px;color:var(--sub)">자료 '+months+'개월</span>'
+      +'<span style="color:var(--sub)">\u2192</span>'
+      +(st.업체아님?'<span style="color:var(--sub)">업체 아님(정리 대상)</span>'
+        :(st.업체?('<span><b>'+st.업체+'</b> <span style="font-size:12px;color:var(--sub)">'
+            +(st.담당?('담당 '+st.담당):'담당 없음')+' \u00b7 '+(st.유형||'-')+'/'+(st.상태||'-')+'</span></span>')
+          :'<span style="color:var(--warn)">후보 없음</span>'))
+      +'<span style="flex:1"></span>';
+    if(isAdminUser){
+      if(r.k==='done') h+='<span style="font-size:11.5px;color:var(--sub)">'+(link.by||'')+'</span> <button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="unlinkSite(\''+s+'\')">바꾸기</button>';
+      else h+=(st.업체?'<button class="btn" style="padding:4px 10px;font-size:12px" onclick="linkCo(\''+s+'\')">맞음</button> ':'')
+        +'<button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="namesEdit(\''+s+'\')">다른 업체</button> '
+        +'<button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="markNotCo(\''+s+'\')">업체 아님</button>';
+    }
+    h+='</div>';
+    if(st.경고&&r.k!=='done') h+='<div style="font-size:12px;color:var(--warn);margin-top:4px">\u26a0 '+st.경고+'</div>';
+    if(isAdminUser&&App.namesEdit===r.site){
+      var q=(App.namesQ!=null)?App.namesQ:PuSiteStaff.stripTag(r.site);
+      h+='<div style="margin-top:8px;background:var(--paper);border-radius:10px;padding:10px">'
+        +'업체 찾기 <input id="namesQ" value="'+esc(q)+'" oninput="namesFind(this.value)" style="width:220px;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-family:inherit"> '
+        +'<button class="btn sec" style="padding:4px 9px;font-size:12px" onclick="namesEdit(null)">닫기</button>'
+        +'<div id="namesCand" style="margin-top:8px">'+namesCandHtml(r.site,q)+'</div></div>';
+    }
+    h+='</div>';
+  });
+  h+='</div>';
+  h+='<div class="note">\u2022 <b>맞음</b> = 짐작한 업체로 확정 \u2022 <b>다른 업체</b> = 업체관리 전체에서 골라 확정 \u2022 <b>업체 아님</b> = 폴더 꼬리표 같은 찌꺼기 이름(목록 맨 뒤로 모읍니다). '
+    +'유형이 「자문」이거나 계약 종료라 담당이 안 이어지는 곳은 <b>이알피 업체관리</b>에서 고치면 저절로 따라옵니다.</div>';
+  return h;
+}
+function namesCandHtml(site, q){
+  var list=PuSiteStaff.candidates(q, coData&&coData.companies, 30);
+  if(!list.length) return '<div style="font-size:12px;color:var(--sub)">찾는 이름이 없습니다 \u2014 글자를 줄여 보세요</div>';
+  var dir=PuSiteStaff.nameBySid(coData.dir);
+  return list.map(function(c){
+    var pay=PuSiteStaff.isPayrollCo(c);
+    return '<div style="display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--line);font-size:12.5px">'
+      +'<b style="'+(pay?'':'color:var(--sub)')+'">'+c.name+'</b>'
+      +'<span style="color:var(--sub)">'+(c.typeCode||'-')+'/'+(c.status||'-')+(c.managerMain?(' \u00b7 담당 '+(dir[c.managerMain]||c.managerMain)):'')+'</span>'
+      +'<span style="flex:1"></span>'
+      +'<button class="btn" style="padding:3px 9px;font-size:12px" onclick="pickCo(\''+esc(site)+'\',\''+esc(c.id||'')+'\',\''+esc(c.name)+'\')">이 업체로</button></div>';
+  }).join('');
+}
+function namesEdit(site){ App.namesEdit=site; App.namesQ=null; render(); }
+function namesFind(q){ App.namesQ=q; var el=document.getElementById('namesCand'); if(el&&App.namesEdit) el.innerHTML=namesCandHtml(App.namesEdit,q); }
+function pickCo(site, coId, coName){
+  if(!confirm(site+' \u2192 「'+coName+'」 로 확정할까요?')) return;
+  App.namesEdit=null; App.namesQ=null;
+  saveLink(site, linkVal(coId, coName));
+}
+function markNotCo(site){
+  if(!confirm('「'+site+'」 은(는) 업체가 아닌 이름(폴더 꼬리표 등)으로 정리할까요?\n자료는 지우지 않습니다 \u2014 목록 맨 뒤 「업체 아님」으로만 모읍니다.')) return;
+  var v=linkVal('',''); delete v.coName; v.none=true; saveLink(site, v);
+}
+function unlinkSite(site){ if(confirm('「'+site+'」 의 이름표를 풀까요? (다시 짐작으로 돌아갑니다)')) saveLink(site, null); }
+function linkAllSame(){
+  var sites=siteCardsList().filter(function(s){ return nameState(staffOf(s))==='same'; });
+  if(!sites.length) return;
+  var lines=sites.map(function(s){ return '\u2022 '+s+' \u2192 '+staffOf(s).업체; }).join('\n');
+  if(!confirm('이름 알맹이가 똑같은 '+sites.length+'곳을 한꺼번에 확정할까요?\n\n'+lines)) return;
+  var m=lmap('site_co_link');
+  sites.forEach(function(s){ var st=staffOf(s); m[s]=linkVal(st.coId, st.업체); });
+  dbSet('site_co_link', m);
+}
+window.namesEdit=namesEdit; window.namesFind=namesFind; window.pickCo=pickCo;
+window.markNotCo=markNotCo; window.unlinkSite=unlinkSite; window.linkAllSame=linkAllSame;
 
 /* 회사 고르기 — 담당자별로 묶어서 보여 준다. 이것이 대표가 말한 「담당자별 정리」다. */
 function hubPickHtml(){
@@ -1929,14 +2090,16 @@ function hubPickHtml(){
      (2026-09-13 실측: 업체관리 급여 113곳 · 급여관리 자료 46곳) */
   var coAll=PuSiteStaff.payrollCos(coData.companies||[]).length;
   h+='<div style="font-size:12px;color:var(--sub);margin-bottom:4px">업체관리 급여 업체 '+coAll+'곳 중 급여관리에 자료가 있는 곳 '+sites.length+'곳</div>';
+  h+=namesBanner(sites);
   groups.forEach(function(g){
     h+='<div style="margin:18px 0 8px;font-size:13.5px"><b>'+g.담당+'</b> <span style="color:var(--sub)">'+g.rows.length+'곳</span>'
-      +(g.미확인?' <span style="font-size:12px;color:var(--warn)">\u2014 업체관리에서 유형\u00b7담당을 고쳐야 이어집니다</span>':'')+'</div>';
+      +(g.미확인?' <span style="font-size:12px;color:var(--warn)">\u2014 업체관리에서 유형\u00b7담당을 고치거나 이름표에서 골라 주세요</span>':'')
+      +(g.업체아님?' <span style="font-size:12px;color:var(--sub)">\u2014 이름표에서 「업체 아님」으로 정리한 이름(정리 대상)</span>':'')+'</div>';
     h+='<div class="cards">';
     g.rows.forEach(function(row){
       var c=hubCounts(row.site);
       h+='<div class="c" style="cursor:pointer" onclick="navTo({site:\''+esc(row.site)+'\'})">'
-        +'<div class="t">'+row.site+'</div>'
+        +'<div class="t">'+row.site+(row.역할==='부'?' <span style="font-size:11px;color:var(--sub);font-weight:400">부담당</span>':'')+'</div>'
         +'<div class="m">'+c.months+'개월 \u00b7 확정 '+c.lock+(c.review?(' \u00b7 <span style="color:var(--warn)">검토 '+c.review+'건</span>'):'')+'</div>'
         +(row.staff.경고?('<div class="m" style="color:var(--warn)">\u26a0 '+row.staff.경고+'</div>'):'')
         +'</div>';
@@ -2576,6 +2739,7 @@ function render(){
   var m=document.getElementById('main');
   if(App.screen==='cards') m.innerHTML=screenCards();
   else if(App.screen==='hub') m.innerHTML=screenHub();
+  else if(App.screen==='names') m.innerHTML=screenNames();
   else if(App.screen==='payroll') m.innerHTML=screenPayroll();
   else if(App.screen==='attend') m.innerHTML=screenAttend();
   else if(App.screen==='leave') m.innerHTML=screenLeave();

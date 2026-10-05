@@ -75,6 +75,8 @@ test('★ 급여관리 수신함 자리에 그 모양대로 적힌다', () => {
   return S.handoffToPayroll({ companyId: 'co_1', companyName: '다온원', month: '2026-08', at: 1000 }).then(inboxId => {
     const rec = getAtPath(db._tree, S.payrollInboxPath(inboxId));
     assert.equal(rec.사업장, '다온원');
+    /* ★ 업체번호가 함께 가야 급여관리가 이름 글자 대신 번호로 붙인다(2026-10-05) */
+    assert.equal(rec.companyId, 'co_1');
     assert.equal(rec.월, '2026-08');
     assert.equal(rec.상태, '대기');
     assert.equal(rec.출처, '급여데이터함');

@@ -106,11 +106,102 @@ test('담당을 못 찾은 사업장도 목록에서 사라지지 않는다', ()
   const last = g[g.length - 1];
   assert.equal(last.담당, '담당 미확인');
   assert.equal(last.rows[0].site, '세창ENG');
-  const all = g.reduce((n, x) => n + x.rows.length, 0);
+  /* 부담당이 있는 곳은 두 사람 묶음에 다 들어간다(2026-10-05) — 그래서 줄 수가 아니라
+     «서로 다른 사업장 수»를 센다. */
+  const all = new Set(g.flatMap(x => x.rows.map(r => r.site))).size;
   assert.equal(all, 3);                 // 셋 다 어딘가에는 있다
+});
+
+/* ══════ 이름표 — 번호가 열쇠다 (대표 지시 2026-10-05 「이름표 맞추기는 내가」) ══════ */
+const COS_ID = COS.map((c, i) => Object.assign({ id: 'co_' + (i + 1) }, c));
+const ID_OF = n => COS_ID.find(c => c.name === n).id;
+
+test('★ 이름표의 번호가 이름보다 먼저다 — 업체관리에서 이름을 고쳐도 이어진다', () => {
+  const renamed = COS_ID.map(c => c.name === '두레' ? Object.assign({}, c, { name: '두레 본점' }) : c);
+  const links = { '두레': { coId: ID_OF('두레'), coName: '두레' } };
+  const r = S.staffFor('두레', { companies: renamed, dir: DIR, links });
+  assert.equal(r.업체, '두레 본점');
+  assert.equal(r.coId, ID_OF('두레'));
+  assert.equal(r.확정, true);
+});
+
+test('★ 짐작이 남의 회사를 고르면 이름표로 바로잡힌다 — 「정확」이 아니라고 알려 준다', () => {
+  /* 급여 명단에 같은 알맹이 이름이 없으면 «품고 있는» 다른 회사를 고른다 — 실제로 겪은 꼴 */
+  const onlyLong = COS_ID.filter(c => c.name !== '두레');
+  const g = S.staffFor('두레', { companies: onlyLong, dir: DIR, links: {} });
+  assert.equal(g.업체, '두레가축약품');
+  assert.equal(g.정확, false, '이름이 다른데 「정확」이라 하면 한꺼번에 확정에 섞인다');
+  const fixed = S.staffFor('두레', { companies: COS_ID, dir: DIR,
+    links: { '두레': { coId: ID_OF('두레'), coName: '두레' } } });
+  assert.equal(fixed.업체, '두레');
+});
+
+test('꼬리표만 다른 짐작은 「정확」이다 — 한꺼번에 확정해도 되는 것', () => {
+  const r = S.staffFor('나라앤드씨_급여자료10일', { companies: COS_ID, dir: DIR, links: {} });
+  assert.equal(r.업체, '㈜나라앤드씨');
+  assert.equal(r.정확, true);
+});
+
+test('「업체 아님」으로 정리한 이름은 따로 모이고, 담당 묶음에 섞이지 않는다', () => {
+  const links = { '이전 파일': { none: true } };
+  const r = S.staffFor('이전 파일', { companies: COS_ID, dir: DIR, links });
+  assert.equal(r.업체아님, true);
+  const g = S.groupByStaff(['이전 파일', '두레'], { companies: COS_ID, dir: DIR, links });
+  assert.equal(g[g.length - 1].담당, '업체 아님');
+  assert.equal(g.filter(x => !x.업체아님).some(x => x.rows.some(r => r.site === '이전 파일')), false);
+});
+
+test('★ 부담당도 자기 묶음에서 그 회사를 본다 — 급여데이터함과 같은 규칙', () => {
+  const g = S.groupByStaff(['나라앤드씨'], { companies: COS_ID, dir: DIR, links: {} });
+  const names = g.map(x => x.담당);
+  assert.deepEqual(names, ['최기운', '주민정']);          // 사번 순(A-001 → A-004)
+  assert.equal(g[0].rows[0].역할, '부');
+  assert.equal(g[1].rows[0].역할, '주');
+});
+
+/* ══════ 도착 알림 붙이기 ══════ */
+
+test('★ 번호가 같으면 이름 글자가 달라도 도착이다', () => {
+  const links = { '다온원 아산': { coId: 'co_1', coName: '다온원' } };
+  const rec = { 사업장: '농업회사법인 주식회사 다온원', companyId: 'co_1', 월: '2026-10' };
+  assert.equal(S.arrivalMatches(rec, '다온원 아산', links), true);
+});
+
+test('★ 번호가 다르면 이름이 같아도 도착이 아니다 — 같은 이름의 지점이 있다', () => {
+  const links = { '다온원': { coId: 'co_1', coName: '다온원' } };
+  const rec = { 사업장: '다온원', companyId: 'co_2', 월: '2026-10' };
+  assert.equal(S.arrivalMatches(rec, '다온원', links), false);
+});
+
+test('번호가 없는 옛 알림은 이름표의 업체 이름으로도 붙는다', () => {
+  const links = { '나라앤드씨_급여자료10일': { coId: 'co_6', coName: '㈜나라앤드씨' } };
+  assert.equal(S.arrivalMatches({ 사업장: '㈜나라앤드씨' }, '나라앤드씨_급여자료10일', links), true);
+  assert.equal(S.arrivalMatches({ 사업장: '두레' }, '나라앤드씨_급여자료10일', links), false);
+});
+
+test('「업체 아님」 이름에는 아무 알림도 붙지 않는다', () => {
+  assert.equal(S.arrivalMatches({ 사업장: '이전 파일' }, '이전 파일', { '이전 파일': { none: true } }), false);
+});
+
+test('고르기 후보는 지금 급여를 하는 곳이 먼저다', () => {
+  const c = S.candidates('두레', COS_ID);
+  assert.equal(c[0].name, '두레');
+  assert.ok(c.some(x => x.name === '두레가축약품'));
+  const all = S.candidates('', COS_ID);
+  assert.ok(all.every(x => S.isPayrollCo(x)), '빈 검색은 급여 업체만 보여 줍니다');
 });
 
 test('사번을 이메일로 바꾸는 규칙이 이알피와 같다', () => {
   assert.equal(S.sidToEmail('A-004'), 'a004@pureun.kr');
   assert.equal(S.sidToEmail('P-001'), 'p001@pureun.kr');
+});
+
+test('★ 업체 명단이 «번호 → 업체» 객체로 와도 읽는다 — 2026-10 실데이터의 꼴', () => {
+  /* 9월엔 배열이었다. 배열만 믿고 .filter 를 부르면 회사 화면이 통째로 죽는다. */
+  const box = { v: { co_a: { id: 'co_a', name: '다온원', typeCode: '급여', status: 'active', managerMain: 'A-004' },
+                     co_b: { name: '두레', typeCode: '급여', status: 'active', managerMain: 'A-003' } } };
+  assert.equal(S.payrollCos(box).length, 2);
+  assert.equal(S.staffFor('다온원', { companies: box, dir: DIR, links: {} }).coId, 'co_a');
+  assert.equal(S.staffFor('두레', { companies: box, dir: DIR, links: {} }).coId, 'co_b', '칸에 id 가 없으면 열쇠가 번호다');
+  assert.equal(S.candidates('두레', box)[0].id, 'co_b');
 });
