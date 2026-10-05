@@ -35,7 +35,7 @@ function 지문(목록) {
   return (목록 || []).map((x) => x.게시판 + ":" + x.srl).sort().join(",");
 }
 function 빈결과(실패) {
-  return { ok: false, 실패: 실패, 내릴것: [], 보낼것: [], 연결확인: [], 멈춤: "", 지문: "" };
+  return { ok: false, 실패: 실패, 내릴것: [], 보낼것: [], 연결확인: [], 멈춤: "", 지문: "", 올릴것: [] };
 }
 /* 같은 글 번호를 몇 곳이 쓰나 — 둘 이상이면 그 번호의 글은 «남의 글»일 수 있다 */
 function 번호셈(묶음, 칸) {
@@ -97,8 +97,24 @@ function 고르기(자료) {
   내릴것.sort((a, b) => (a.게시판 < b.게시판 ? -1 : a.게시판 > b.게시판 ? 1 : a.srl - b.srl));
   const 멈춤 = 내릴것.length > 멈춤문턱
     ? "한 번에 " + 내릴것.length + "건 — " + 멈춤문턱 + "건이 넘어 하나도 내리지 않았습니다" : "";
+
+  /* ══ 2단계 — 새 거래처 로고 «올리기» (2026-10-05) ══
+     네 가지가 «다» 있어야 올린다: 사람이 «올림»으로 표시 · 공개 동의(날짜) · 로고 그림 · 거래 중.
+     ★ 공개 동의가 먼저다 — 고객사 이름·로고를 홈페이지에 싣는 것은 그 회사가 허락한 뒤의 일이다.
+     ★ 이미 로고와 이었거나(boardSrl) 한 번 내린 회사는 다시 올리지 않는다 — 두 장이 걸린다. */
+  const 올릴것 = [];
+  Object.keys(partners).forEach((id) => {
+    const p = partners[id] || {};
+    if (p.posted !== true || 번호(p.boardSrl) || p.takenDown) return;
+    if (!(p.consent && typeof p.consent === "object" && String(p.consent.date || "").trim())) return;
+    if (!(p.logo && Number(p.logo.bytes) > 0)) return;
+    const c = 회사[String(id)];
+    if (!c || String(c.status || "") !== "active") return;
+    올릴것.push({ 종류: "새거래처", 게시판: 게시판.자문사, companyId: String(id) });
+  });
+
   return { ok: true, 실패: "", 내릴것: 내릴것, 보낼것: 멈춤 ? [] : 내릴것.slice(),
-           연결확인: 연결확인, 멈춤: 멈춤, 지문: 지문(내릴것) };
+           연결확인: 연결확인, 멈춤: 멈춤, 지문: 지문(내릴것), 올릴것: 올릴것 };
 }
 
 /* 기록에 남기는 한 줄 — 이름은 «안» 담는다. sid·companyId·글 번호만.
@@ -117,7 +133,7 @@ async function 돌기(방식, 받은지문, 도구) {
   const 지금 = 도구.지금(), 달 = 도구.달(지금);
   const 설정 = (await 도구.읽기("homepage/auto/config")) || {};
   /* ⚠ 끄면 «아무것도» 하지 않는다 — 세지도, 기록하지도 않는다 */
-  if (설정.off === true) return { ok: true, 방식: 방식, 달: 달, 꺼짐: true, 내림: [], 못내림: [] };
+  if (설정.off === true) return { ok: true, 방식: 방식, 달: 달, 꺼짐: true, 내림: [], 못내림: [], 올림: [], 못올림: [] };
 
   const 고른것 = 고르기({
     roster: await 도구.읽기("data/user_dir"),
@@ -125,7 +141,7 @@ async function 돌기(방식, 받은지문, 도구) {
     members: await 도구.읽기("homepage/members"),
     partners: await 도구.읽기("homepage/partners")
   });
-  const 결과 = Object.assign({ 방식: 방식, 달: 달, 내림: [], 못내림: [] }, 고른것);
+  const 결과 = Object.assign({ 방식: 방식, 달: 달, 내림: [], 못내림: [], 올림: [], 못올림: [] }, 고른것);
   if (방식 === "보기") return 결과;
 
   let 보낼것 = 고른것.보낼것;
@@ -157,11 +173,39 @@ async function 돌기(방식, 받은지문, 도구) {
       }
     }
   }
+  /* ── 올리기 (2단계 새 거래처 · 3단계 새 노무사) ──
+     ★ 매달 «돌리기»에서만 올린다. «승인»은 멈춘 내리기를 허락하는 것이지 올리기가 아니다.
+     ★ 올린 뒤 받은 «새 글 번호»를 그 회사(boardSrl)·그 사람(srl)에 이어 둔다 —
+       그래야 다음에 계약이 끝나거나 퇴사하면 같은 길로 저절로 내려간다.
+     ⚠ 글 번호를 못 받았으면 «올림»으로 치지 않는다. 잇지 못한 글은 나중에 못 내린다. */
+  const 올릴것 = 고른것.올릴것 || [];
+  if (방식 === "돌리기" && 고른것.ok && 올릴것.length) {
+    if (typeof 도구.올리기 !== "function") {
+      결과.올리기안됨 = "올릴 것이 " + 올릴것.length + "건 있으나 올리는 길이 아직 없습니다";
+    } else {
+      const 답 = await 도구.올리기(올릴것);
+      for (const x of 답) {
+        const 새번호 = 번호(x.srl);
+        if (x.됐나 && 새번호) {
+          const 줄 = Object.assign(기록줄(x), { srl: 새번호 });
+          결과.올림.push(줄);
+          if (x.companyId) await 도구.쓰기("homepage/partners/" + x.companyId + "/boardSrl", 새번호);
+          if (x.key) await 도구.쓰기("homepage/members/" + x.key + "/srl", String(새번호));
+          await 도구.덧붙이기("homepage/writeLog/" + 새번호, { at: 지금, by: 도구.누가, 저장됨: true,
+            바뀐것: [{ 이름: "홈페이지에", 옛: "없음", 새: "새 글로 올림" }], 까닭: x.종류 });
+        } else {
+          결과.못올림.push(Object.assign(기록줄(x), { 까닭: x.됐나 ? "새 글 번호를 못 받음" : (x.까닭 || "까닭 모름") }));
+        }
+      }
+    }
+  }
+
   await 도구.덧붙이기("homepage/auto/runs/" + 달, {
     at: 지금, by: 도구.누가, 방식: 방식, ok: 고른것.ok, 실패: 고른것.실패 || "",
     멈춤: 결과.멈춤 || "", 지문: 고른것.지문 || "",
     후보: 고른것.내릴것.map(기록줄),
-    내림: 결과.내림, 못내림: 결과.못내림, 연결확인수: 고른것.연결확인.length
+    내림: 결과.내림, 못내림: 결과.못내림, 연결확인수: 고른것.연결확인.length,
+    올림: 결과.올림, 못올림: 결과.못올림, 올리기안됨: 결과.올리기안됨 || ""
   });
   return 결과;
 }
