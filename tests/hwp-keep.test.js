@@ -232,3 +232,37 @@ test('원본 형식 — .hwp 는 .hwp, .hwpx 는 .hwpx 로만 저장한다', () 
   K.exportSame(fake, 'hwp'); K.exportSame(fake, 'hwpx');
   assert.deepEqual(calls, ['hwp', 'hwpx'], '★ .hwp 를 .hwpx 로 바꿔 저장하면 띄어쓰기가 160줄 어긋났다(2026-09-26 실측)');
 });
+
+/* ★★ 조 제목을 【】로 쓰는 원본 (2026-10-05 실측 — 사업장 원본 7개 중 1개가 「제1조【목적】」 꼴이라 조를 하나도 못 찾았다)
+   규정관리는 이미 괄호 여럿(BR_OPEN: ( （ [ 【 〔 〈 《 「 『 { ｛)을 알아보는데, 원본 살려 고치기만 ( （ 만 봤다 — 잣대가 둘이었다.
+   ★ 고친 조·새 조의 머리는 «원본 문서의 괄호»를 따른다 — 검토 화면은 「제5조(목적)」 으로 짓는다. 그대로 넣으면 그 조만 괄호가 바뀐다. */
+function bracketDoc() {
+  return new FakeDoc([[
+    para('제1장 총칙'),
+    para('제1조【목적】 이 규칙은 가나상사 사원의 근로조건을 정한다.', HEAD, PH),
+    para('제2조【휴게】 ① 휴게시간은 12:00부터 13:00까지로 한다.', HEAD, PH),
+    para('  ② 휴게시간은 자유롭게 이용할 수 있다.', BODY, PI),
+    para('제3조【연차】 ① 회사는 15일의 연차를 준다.', HEAD, PH),
+    para('부  칙'),
+    para('1. 이 규칙은 2020년 1월 1일부터 시행한다.', 5, 50)
+  ]]);
+}
+test('★★ 【】 머리도 찾는다 — 제목까지', () => {
+  const run = K.pickRun(K.scan(bracketDoc()), []);
+  assert.deepEqual(run.map((c) => c.key + ':' + c.title), ['1:목적', '2:휴게', '3:연차'], '★★ 【】 조를 못 찾는다');
+});
+test('★★ 고친 조·새 조의 머리는 원본의 괄호를 따른다 — 그 조만 () 로 바뀌지 않게', () => {
+  const doc = bracketDoc(), run = K.pickRun(K.scan(doc), []);
+  const rows = K.plan(run, [
+    { id: 'a', kind: '개정', num: 2, sub: 0, title: '휴게',
+      lines: ['제2조(휴게) ① 휴게시간은 12:30부터 13:30까지로 한다.', '  ② 휴게시간은 자유롭게 이용할 수 있다.'],
+      orig: '제2조【휴게】 ① 휴게시간은 12:00부터 13:00까지로 한다.  ② 휴게시간은 자유롭게 이용할 수 있다.' },
+    { id: 'b', kind: '신설', newNo: '제2조의2', title: '휴게 선택', anchor: { num: 2, sub: 0 }, lines: ['제2조의2(휴게 선택) 4시간 근로자는 휴게를 고를 수 있다.'] }
+  ]);
+  assert.deepEqual(rows.map((r) => r.state), ['ok', 'place'], rows.map((r) => r.why).join(' / '));
+  assert.equal(rows[0].lines[0], '제2조【휴게】 ① 휴게시간은 12:30부터 13:30까지로 한다.', '★★ 고친 조의 괄호가 () 로 바뀌었다');
+  assert.equal(rows[1].lines[0], '제2조의2【휴게 선택】 4시간 근로자는 휴게를 고를 수 있다.', '★★ 새 조가 문서와 다른 괄호로 들어간다');
+  K.apply(doc, rows, null);
+  const check = K.verify(run, K.pickRun(K.scan(doc), rows), rows);
+  assert.ok(check.ok, JSON.stringify(check.issues));
+});
