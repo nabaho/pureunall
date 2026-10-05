@@ -39,6 +39,7 @@ import json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from build_site_cards import site_of                       # 이름 뽑는 규칙 한 곳(묶음 폴더 나누기 포함)
 from build_pilot import signal, OUT_DIR                   # 3색 신호 규칙 한 곳
+from won_round import round_emp, WON_FIELDS               # 원 미만 반올림 규칙 한 곳(대표 결정 2026-10-05)
 
 DRAFT = ["(안)", "(안 ", "초안", "검토용", "비교", "(수정전"]   # 확정본만
 SKIP_SHEET = ("서식", "양식", "견본", "샘플", "sample")        # 샘플로 명세서 나가는 사고 방지
@@ -104,6 +105,8 @@ def main():
     dropped = 0
     nosite = 0
     seq = 0
+    rounded = 0         # 원 미만을 반올림한 금액 칸 수
+    refit = 0           # 반올림 뒤 지급−공제=실수령 을 맞춘 사람 수(실측 0 — 안전장치)
 
     for r in res:
         if not r.get("ok"):
@@ -124,6 +127,15 @@ def main():
             if not raw:
                 continue
             emps = best_per_name(raw)
+            # ⚠ 원 미만 반올림은 **여기 한 곳**에서 — 신호·목록·직원 표가 모두 반올림한 값을 본다.
+            #   화면(slipRows·coMoney)에서 따로 끊으면 화면마다 셈이 달라진다.
+            out = []
+            for e in emps:
+                r, fixed = round_emp(e)
+                rounded += sum(1 for k in WON_FIELDS if k in e and r[k] != e[k])
+                refit += 1 if fixed else 0
+                out.append(r)
+            emps = out
             sig, iss = signal(emps)
             cut = max(0, len(emps) - CAP)
             dropped += cut
@@ -179,6 +191,7 @@ def main():
               % (CAP, dropped))
     if nosite:
         print("[주의] 경로에서 사업장을 못 뽑은 파일 %d건" % nosite)
+    print("원 미만 반올림: 금액 칸 %d개 · 지급−공제=실수령 을 1원 맞춘 사람 %d명" % (rounded, refit))
 
 
 if __name__ == "__main__":
