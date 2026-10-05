@@ -4361,6 +4361,8 @@ async function 홈자동내리기(그릇, 목록) {
     const g = await 홈부르기(주소, 그릇);
     await g.text();
     const 판 = HW.게시판확인(g.status, g.headers.get("location") || "");
+    /* 이미 없는 글(손으로 내림) — 보내지 않고 «이미 없음»으로 돌려준다. 돌기가 표시만 남긴다. */
+    if (판 === "없음") { 답.push(Object.assign({}, x, { 됐나: true, 이미: true, 까닭: "이미 홈페이지에 없음" })); continue; }
     if (판 !== "ok") { 답.push(Object.assign({}, x, { 됐나: false, 까닭: "게시판 확인 실패(" + 판 + ")" })); continue; }
     const 지음 = HW.휴지통몸통([x.srl], 확인표);
     if (!지음.ok) { 답.push(Object.assign({}, x, { 됐나: false, 까닭: 지음.why })); continue; }

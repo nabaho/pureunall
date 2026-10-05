@@ -163,7 +163,7 @@ async function 돌기(방식, 받은지문, 도구) {
     members: await 도구.읽기("homepage/members"),
     partners: await 도구.읽기("homepage/partners")
   });
-  const 결과 = Object.assign({ 방식: 방식, 달: 달, 내림: [], 못내림: [], 올림: [], 못올림: [] }, 고른것);
+  const 결과 = Object.assign({ 방식: 방식, 달: 달, 내림: [], 못내림: [], 이미: [], 올림: [], 못올림: [] }, 고른것);
   if (방식 === "보기") return 결과;
 
   let 보낼것 = 고른것.보낼것;
@@ -182,7 +182,14 @@ async function 돌기(방식, 받은지문, 도구) {
   if (고른것.ok && 보낼것.length) {
     const 답 = await 도구.내리기(보낼것);
     for (const x of 답) {
-      if (x.됐나) {
+      if (x.됐나 && x.이미) {
+        /* ★ 이미 홈페이지에 없는 글(손으로 내림) — 표시만 남긴다. 휴지통으로 옮겼다고 적지 않는다
+             (옮기지 않았다). 표시가 없으면 매달 같은 글을 또 내리려 한다. */
+        (결과.이미 = 결과.이미 || []).push(기록줄(x));
+        const 표시 = { at: 지금, by: 도구.누가, 달: 달, 까닭: "이미 홈페이지에 없음" };
+        if (x.key) await 도구.쓰기("homepage/members/" + x.key + "/takenDown", 표시);
+        if (x.companyId) await 도구.쓰기("homepage/partners/" + x.companyId + "/takenDown", 표시);
+      } else if (x.됐나) {
         결과.내림.push(기록줄(x));
         const 표시 = { at: 지금, by: 도구.누가, 달: 달 };
         if (x.key) await 도구.쓰기("homepage/members/" + x.key + "/takenDown", 표시);
@@ -233,7 +240,7 @@ async function 돌기(방식, 받은지문, 도구) {
     at: 지금, by: 도구.누가, 방식: 방식, ok: 고른것.ok, 실패: 고른것.실패 || "",
     멈춤: 결과.멈춤 || "", 지문: 고른것.지문 || "",
     후보: 고른것.내릴것.map(기록줄),
-    내림: 결과.내림, 못내림: 결과.못내림, 연결확인수: 고른것.연결확인.length,
+    내림: 결과.내림, 못내림: 결과.못내림, 이미: 결과.이미, 연결확인수: 고른것.연결확인.length,
     올림: 결과.올림, 못올림: 결과.못올림, 올리기안됨: 결과.올리기안됨 || ""
   });
   return 결과;

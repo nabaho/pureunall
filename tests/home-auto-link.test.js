@@ -159,6 +159,31 @@ test('명부에서 넣을 때 직원 번호를 함께 남긴다 — 그 번호�
   assert.match(fnSource('openRosterAdd'), /esc\(s\.sid\)/);
 });
 
+function 표시상자(members) {
+  const 쓴것 = [];
+  const ctx = { console: { warn() {} }, App: { members: members },
+    todayString: () => '2026-10-05', currentUserName: () => '관리자',
+    db: { ref: (p) => ({ set: async (v) => { 쓴것.push([p, v]); } }) } };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource('내린표시남기기'), ctx);
+  ctx.쓴것 = 쓴것;
+  return ctx;
+}
+
+test('★ 내린 표시 — 이어 둔 글에, 표시가 없을 때만, 그 칸 하나만 쓴다', async () => {
+  const ctx = 표시상자({ a: { sid: 'S1', srl: 193 }, b: { srl: 194 }, c: { sid: 'S3', takenDown: { at: 1 } } });
+  assert.strictEqual(await ctx.내린표시남기기('a', '대조'), true);
+  assert.strictEqual(await ctx.내린표시남기기('b', '대조'), false, '안 이은 글에 표시를 남겼습니다');
+  assert.strictEqual(await ctx.내린표시남기기('c', '대조'), false, '이미 있는 표시를 덮었습니다');
+  assert.deepStrictEqual(ctx.쓴것.map(x => x[0]), ['homepage/members/a/takenDown']);
+});
+
+test('★ 손으로 내리거나 대조가 «퇴사·홈페이지에 없음»을 보면 내린 표시를 남긴다 — 다음 달에 또 안 내리게', () => {
+  assert.match(fnSource('applyStatus'), /'done'[\s\S]{0,80}내린표시남기기\(/);
+  assert.match(fnSource('한사람내리기'), /내린표시남기기\(key/);
+  assert.match(fnSource('퇴사자한번에내리기'), /내린표시남기기\(x\.key/);
+});
+
 test('공개 명부를 읽을 때 sid 를 함께 싣는다 — 잇기의 열쇠다', () => {
   const ctx = { console: { warn() {} } };
   vm.createContext(ctx);
