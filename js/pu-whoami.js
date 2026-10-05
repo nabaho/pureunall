@@ -86,11 +86,17 @@
       .catch(function () { return null; });
   }
 
+  /* ⚠ 같은 사번이어도 «이름·직책»이 바뀌었으면 알린다 (2026-10-05 기금관리 방).
+     finish() 는 이메일만으로 먼저 빈 이름을 알리고(set), 명부를 읽은 뒤 이름을 채워 다시 set 한다.
+     예전에는 «사번이 같으면» 두 번째를 알리지 않아, onChange 로 이름을 받는 앱(기금관리 S.user·S.role,
+     전자서명·뉴스 머리 이름)은 늘 빈 이름만 받았다 — 기금관리 변경 기록의 «누가»가 «?»로 남았다. */
   function set(next) {
-    var was = me ? me.sid : '';
+    var prev = me;
     me = next;
-    if ((next ? next.sid : '') === was && next && was) { draw(); return; }
     draw();
+    var same = !!(prev && next && prev.sid === next.sid && prev.name === next.name
+      && prev.title === next.title && prev.role === next.role);
+    if (same) return;
     listeners.forEach(function (fn) { try { fn(me); } catch (e) { } });
   }
 
