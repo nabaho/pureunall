@@ -60,7 +60,7 @@ function load(state, cos, erpReady){
   vm.createContext(ctx);
   vm.runInContext(src.match(/^const CO_CORE = [\s\S]*?\];/m)[0].replace(/^const /, 'var ') + '\n'
     + fnBody('coVal') + '\n' + fnBody('coMissing') + '\n' + fnBody('coCares') + '\n'
-    + fnBody('coLacks') + '\n' + fnBody('coFilteredList') + '\n' + fnBody('coVisible') + '\n'
+    + fnBody('coLacks') + '\n' + fnBody('coQueryHit') + '\n' + fnBody('coFilteredList') + '\n' + fnBody('coVisible') + '\n'
     + fnBody('coScopeCounts'), ctx);
   return ctx;
 }

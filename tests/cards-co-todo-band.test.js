@@ -81,6 +81,7 @@ function ctx(extra) {
     esc: s => String(s == null ? '' : s)
   };
   vm.createContext(b);
+  vm.runInContext(fn('coQueryHit'), b);   /* 찾는 잣대 — 🔎 전체 찾기와 함께 쓴다(2026-10-05) */
   vm.runInContext(fn('coFilteredList'), b);
   return b;
 }
