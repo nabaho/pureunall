@@ -155,6 +155,8 @@ function cmsCtx(isCMS, extra){
     console, Object, JSON, Array, String, Number,
     f: Object.assign({ isCMS: isCMS }, extra || {}),
     setF(){},
+    /* 👤 개인입금 사업(2026-10-05) — 개인입금 칸이 유형 규칙을 읽는다. 이 검사는 CMS 줄 모양만 보므로 «꺼짐»으로 둔다. */
+    erpPersonalDepositInfo(){ return { on:false, why:'', typeOn:false }; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       const node = { tag, props: props || {}, kids };
