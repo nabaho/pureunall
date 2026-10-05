@@ -41,7 +41,7 @@ async function 찾기(지금, ask) {
   const 고정 = new Date(지금);
   class 시계 extends Date { constructor(...a) { if (a.length) super(...a); else super(고정.getTime()); } static now() { return 고정.getTime(); } }
   const ctx = { Date: 시계, console, JSON, KcareerCases: C,
-    fsSupported: () => true, fsRoot: async () => ({}), _caseRootQuiet: async () => ({}),
+    fsSupported: () => true, fsRoot: async () => ({}), fsRootOrConnect: async () => ({}), _caseRootQuiet: async () => ({}),
     fsCaseDirs: async () => 폴더.map((d) => Object.assign({ handle: {} }, d)),
     get: () => [], _caseDismissed: () => [], fsCaseFiles: async () => [], toast() {},
     caseBannerDraw() { 본.fresh = ctx._caseFound.fresh.map((x) => x.yearDir); }, _caseFound: null };

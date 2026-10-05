@@ -3934,6 +3934,32 @@ async function fsSaveToFolder(fileRec, store, type, rec){
   return sub+'/'+name;
 }
 
+/* ★ 단추를 «누른 그 자리에서» 폴더를 잇는다 (대표 화면 2026-10-05 — 사업 고르기를 눌렀더니
+   「먼저 위촉장 › ⋯ 더보기 › 서류 폴더 연결」 안내만 뜨고 멈췄다. 화면을 건너가 다시 오라는 것은 길이 없는 것과 같다).
+   이미 이어 둔 폴더가 있으면 그것(허락만 다시) · 없으면 바로 폴더 고르기 창을 연다.
+   ⚠ 고르기 창은 «누른 직후»에만 열린다(브라우저 규칙) — 그래서 묻는 창(confirm)을 끼우지 않는다.
+   ⚠ 무엇을 골라야 하는지는 고르기 전에 알린다 — «7. 컨설턴트,위원신청등» 이 들어 있는 윗폴더다. */
+/* need = 그 안에 있어야 할 하위 폴더 이름. 엉뚱한 폴더를 이어 두면 다음에 눌러도 또 막히므로 «다시 고르기»로 돌린다 */
+var _fsRepick=false;
+async function _fsHas(root, name){ try{ await root.getDirectoryHandle(name); return true; }catch(e){ return false; } }
+async function fsRootOrConnect(need){
+  var root=_fsRepick ? null : await fsRoot();
+  if(root && need && !(await _fsHas(root, need))){
+    toast('지금 이어 둔 폴더 «'+root.name+'» 에는 «'+need+'» 가 없습니다 — 맞는 윗폴더를 다시 골라 주세요', 8000);
+    root=null;
+  }
+  if(root) return root;
+  if(!_fsRepick) toast('📁 서류 폴더를 이어 주세요 — «'+(need||KcareerCases.CASE_ROOT)+'» 이 들어 있는 윗폴더를 고릅니다', 8000);
+  var h=await fsConnectFolder();
+  _fsRepick=false;
+  if(!h){ return null; }
+  if(need && !(await _fsHas(h, need))){
+    _fsRepick=true;   /* 다음에 누르면 묻지 않고 곧장 고르기 창 */
+    toast('고른 폴더 «'+h.name+'» 에도 «'+need+'» 가 없습니다 — 단추를 다시 누르면 다시 고릅니다', 9000);
+    return null;
+  }
+  return h;
+}
 async function fsConnectFolder(){
   if(!fsSupported()){ toast('이 브라우저는 폴더 연결을 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return null; }
   try{
@@ -4702,8 +4728,8 @@ async function fsCaseFiles(handle, prefix){
 async function caseCheck(opts){
   opts = opts || {};
   if(!fsSupported()){ if(opts.ask) toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
-  var root = opts.ask ? await fsRoot() : await _caseRootQuiet();
-  if(!root){ if(opts.ask) toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var root = opts.ask ? await fsRootOrConnect(KcareerCases.CASE_ROOT) : await _caseRootQuiet();
+  if(!root) return;   /* 앱을 열 때는 조용히 · 단추로 눌렀다가 고르기를 취소했으면 그대로 멈춘다 */
   var dirs = await fsCaseDirs(root);
   if(!dirs){ if(opts.ask) toast('연결한 폴더 안에 「' + KcareerCases.CASE_ROOT + '」 폴더가 없습니다'); return; }
   var subs = get('submission');
@@ -4779,8 +4805,8 @@ function caseRegister(){
 var _casePast=null;
 async function caseImportPast(){
   if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
-  var root=await fsRoot();
-  if(!root){ toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var root=await fsRootOrConnect(KcareerCases.CASE_ROOT);
+  if(!root) return;   /* 고르기를 취소했다 — 조용히 멈춘다 */
   var dirs=await fsCaseDirs(root);
   if(!dirs){ toast('연결한 폴더 안에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없습니다'); return; }
   var fresh=KcareerCases.freshCases(dirs, get('submission'), [], { withDismissed:true });
@@ -6971,8 +6997,8 @@ function docFolderPlan(files, have){
 }
 async function docImportResumeFolder(){
   if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
-  var root=await fsRoot();
-  if(!root){ toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var root=await fsRootOrConnect(fsFolderFor('resume'));
+  if(!root) return;   /* 고르기를 취소했다 — 조용히 멈춘다 */
   var 폴더명=fsFolderFor('resume'), dir=null;
   try{ dir=await root.getDirectoryHandle(폴더명); }catch(e){ toast('연결한 폴더 안에 「'+폴더명+'」 폴더가 없습니다'); return; }
   var 목록=[];
@@ -14833,8 +14859,8 @@ async function bizPickCase(opts){
   opts=opts||{};
   if(opts.into && (!_bizCur || !_bizEnsureSaved())) return;
   if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
-  var root=await fsRoot();
-  if(!root){ toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var root=await fsRootOrConnect(KcareerCases.CASE_ROOT);
+  if(!root) return;   /* 고르기를 취소했다 — 조용히 멈춘다 */
   var dirs=await fsCaseDirs(root);
   if(!dirs){ toast('연결한 폴더 안에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없습니다'); return; }
   var 쓴={}; bizAll().forEach(function(r){ if(r.caseDir) 쓴[r.caseDir]=r.title||r.id; });
