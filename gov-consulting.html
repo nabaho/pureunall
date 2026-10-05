@@ -1050,6 +1050,75 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   .mc{min-height:54px;}
 }
 
+/* ══ 폰 정리 (대표 지시 2026-10-05 「폰화면에 정부컨설팅일정 너무 정리가 안된다 깔끔하게 불필요한 부분은
+     정리하고 볼수 있게」 → 목업 승인 「이대로 고쳐라」) ══
+   ① 머리 세 줄 → 한 줄(제목·저장 점·🔔·⋯·나) + 탭 한 줄
+   ② 🔑·로그아웃·📊·환경설정·백업·새로보기·즐겨찾기·🏠 는 ⋯ 펼침 메뉴로
+   ③ 사업장 목록은 맨 아래 손잡이 → 올라오는 판. 달력이 화면의 주인
+   ④ 고르는 칸 한 줄(월·주·일 + 담당 + 사업), 연도는 「2026년 10월」 글자를 눌러
+   ⑤ 요약 4칸은 한 줄 딱지
+   ⚠ PC 는 그대로다 — .m-only 는 넓은 화면에서 안 보이고, 아래 규칙은 768px 이하에서만 산다. */
+.m-only,.m-lbl,.ub-short,.dash-m-risk,#dashMDim,#mAddFab{display:none;}
+@media (max-width:768px){
+  /* ⋯ 펼침 메뉴가 머리줄 밖으로 나와야 한다 — 숨김(overflow:hidden)이면 머리줄 안에 갇혀 잘린다 */
+  .hdr{gap:6px;padding:7px 10px;overflow:visible!important;}
+  .hdr .logo{order:1;flex:1 1 auto;font-size:0!important;}
+  .hdr .logo .logo-app{font-size:14px!important;opacity:1!important;color:#fff;font-weight:900!important;}
+  .hdr-r{order:2;width:auto;flex:0 0 auto;margin-left:auto;border-top:0;padding-top:0;flex-wrap:nowrap;position:relative;}
+  #hdrUser{order:3;}
+  .hdr .sep{display:none;}
+  /* 탭 앞에서 줄을 꺾는다 — .sep 은 div 라 :first-of-type 으로는 못 고른다(제목 div 가 먼저다) */
+  .hdr::after{content:"";order:4;flex:1 0 100%;height:0;}
+  .hdr .hdr-tab{order:5;}
+  #hdrLogout,#statsBtn,#fbStatus{display:none!important;}
+  /* 저장 상태는 점 하나 — 아래에 떠 있던 것(600px 이하 규칙)을 머리줄로 되돌린다 */
+  .hdr-r .save-state{position:static;min-width:0;padding:0 3px;background:transparent!important;border:0!important;box-shadow:none!important;}
+  .hdr-r .save-state #saveStateText{display:none;}
+  .user-badge{width:30px;height:30px;padding:0;border-radius:50%;justify-content:center;}
+  .user-badge-dot{display:none;}
+  .ub-full{display:none;}
+  .ub-short{display:inline;font-size:13px;}
+  /* ⋯ = 오른쪽 위 펼침 메뉴 */
+  .hdr-r.x-on .hdr-extra{position:fixed;top:48px;right:8px;z-index:480;display:flex!important;flex-direction:column;align-items:stretch;
+    min-width:220px;margin:0;padding:4px 0;gap:0;background:#fff;border:1px solid #e2e8f0;border-radius:12px;box-shadow:0 12px 30px rgba(15,23,42,.22);}
+  .hdr-r.x-on .hdr-extra .notif-btn{display:flex;justify-content:flex-start;gap:4px;width:100%;padding:9px 14px!important;border:0;border-radius:0;
+    background:#fff!important;color:#1e293b!important;font-size:13.5px!important;font-weight:600;text-align:left;}
+  .hdr-r.x-on .hdr-extra .m-out{color:#991b1b!important;}
+  .m-only{display:initial;}
+  .m-lbl{display:inline;}
+  .m-grp{display:block;padding:7px 14px 2px;font-size:11px;font-weight:700;color:#64748b;}
+  /* 화면을 덮던 떠 있는 것들 — ⋯ 안에 같은 일이 있다 */
+  #pu-backup-admin-button,#pu-version-fab,#mHomeFab,[data-pu-appbar-tab]{display:none!important;}
+  /* 고르는 칸 한 줄 */
+  #mobileCtrlBar #calControls{flex-wrap:nowrap;}
+  #calControls .flt-wrap{flex:1 1 0;min-width:0;}
+  #calControls .flt-wrap select{width:100%;min-width:0;}
+  #calControls .year-wrap{display:none!important;}
+  #calControls .year-wrap.m-open{display:inline-flex!important;position:fixed;left:-9999px;}
+  #calTitle{cursor:pointer;}
+  /* 요약 한 줄 딱지 */
+  .pc-only{display:none;}
+  .summary-bar .sum-card{flex:0 1 auto;flex-direction:row;gap:4px;border-radius:14px;padding:3px 9px!important;}
+  .summary-bar .sum-num{font-size:13px;}
+  .summary-bar .sum-lbl{font-size:11px!important;white-space:nowrap;}
+  .summary-bar{flex-wrap:wrap;}
+  /* 사업장 목록 → 맨 아래 손잡이 · 올라오는 판 (모달 .mb 500 보다 아래) */
+  .body{grid-template-rows:1fr!important;}
+  .cal-area{padding-bottom:50px;}
+  .dash{position:fixed;left:0;right:0;bottom:0;z-index:420;max-height:64vh;display:flex;flex-direction:column;
+    border:0;border-top:1px solid var(--dash-border);border-radius:14px 14px 0 0;box-shadow:0 -8px 24px rgba(15,23,42,.18);background:var(--dash-sf);}
+  .dash .dash-body{flex:1 1 auto;overflow-y:auto;}
+  .dash.m-collapsed{max-height:none;box-shadow:0 -4px 12px rgba(15,23,42,.08);}
+  .dash-settings{display:none!important;}
+  .dash-m-toggle{border-radius:14px 14px 0 0;}
+  .dash-m-risk:empty{display:none!important;}
+  .dash-m-risk{display:inline-block;margin:0 6px 0 auto;padding:1px 8px;border-radius:10px;font-size:11px;font-weight:800;
+    background:#fef2f2;color:#991b1b;border:1px solid #fecaca;}
+  body.m-sheet-open #dashMDim{display:block;position:fixed;inset:0;z-index:410;background:rgba(15,23,42,.35);}
+  #mAddFab{display:flex;position:fixed;right:14px;bottom:62px;z-index:415;width:46px;height:46px;border-radius:50%;border:0;
+    background:#2563eb;color:#fff;font-size:24px;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(37,99,235,.4);cursor:pointer;}
+  body.m-sheet-open #mAddFab{display:none;}
+}
 /* ===== 풀스크린 로그인 화면 ===== */
 #mbLogin{z-index:1000;}
 .login-screen{position:fixed;inset:0;overflow:auto;display:flex;flex-direction:column;font-family:inherit;}
@@ -1170,7 +1239,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
 <!-- HEADER -->
 <header class="hdr">
-  <div class="logo" id="brandLogo" data-tip="클릭하면 캘린더로 이동" style="cursor:pointer;">푸른<span>노무법인</span> <span style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
+  <div class="logo" id="brandLogo" data-tip="클릭하면 캘린더로 이동" style="cursor:pointer;">푸른<span>노무법인</span> <span class="logo-app" style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
   <div id="hdrUser" style="display:flex;align-items:center;gap:6px;flex-shrink:0;"></div>
   <div class="sep"></div>
   <button class="hdr-tab hdr-home active" id="tabMain" data-tip="캘린더 — 월·주·일 일정 보기">🏠 캘린더</button>
@@ -1183,9 +1252,9 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
       <button class="mode-btn" data-mode="week" data-tip="주간 보기">주</button>
       <button class="mode-btn" data-mode="day" data-tip="일간 보기">일</button>
     </div>
-    <span data-tip="담당 노무사별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="attFilter"></select></span>
-    <span data-tip="사업(컨설팅 종류)별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="typeFilter"></select></span>
-    <span data-tip="연도 이동 — 선택한 해로 점프" style="display:inline-flex;"><select class="att-filter" id="yearSel"></select></span>
+    <span class="flt-wrap" data-tip="담당 노무사별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="attFilter"></select></span>
+    <span class="flt-wrap" data-tip="사업(컨설팅 종류)별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="typeFilter"></select></span>
+    <span class="year-wrap" data-tip="연도 이동 — 선택한 해로 점프" style="display:inline-flex;"><select class="att-filter" id="yearSel"></select></span>
     <span data-tip="날짜 직접 선택" style="display:inline-flex;"><input type="date" id="calDayPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
     <span data-tip="주 직접 선택" style="display:inline-flex;"><input type="week" id="calWeekPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
   </div>
@@ -1204,8 +1273,23 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
          · 💾 백업 저장 — 환경설정 「JSON 파일로 내보내기」와 **같은 함수**(exportJson)였다.
            같은 일을 두 자리에 두면 한쪽만 고치는 날이 온다. -->
     <span class="hdr-extra">
-      <button class="notif-btn" id="helpBtn" data-tip="키보드 단축키 안내 ( ? )">⌨️</button>
-      <button class="notif-btn" id="photoLogBtn" data-tip="사진 변경 이력 (등록·교체·삭제)">🕘</button>
+      <!-- ★ 폰 정리 (대표 지시 2026-10-05 「너무 정리가 안된다 … 깔끔하게」 목업 승인) —
+           머리줄·화면 위에 늘 떠 있던 것을 ⋯ 안으로 모은다. 기능은 그대로, 자리만 옮긴다.
+           ⚠ 원래 단추(📊·환경설정·백업·새로보기·🔑·로그아웃)는 지우지 않고 «눌러 준다» —
+             같은 일을 두 벌 만들면 한쪽만 고치는 날이 온다. -->
+      <span class="m-only m-grp">자주</span>
+      <button class="notif-btn m-only" type="button" onclick="mMenu('stats')">📊 노무사별 통계</button>
+      <button class="notif-btn m-only" type="button" onclick="mMenu('settings')">⚙️ 환경설정</button>
+      <button class="notif-btn m-only" type="button" id="mMenuBackup" onclick="mMenu('backup')">💾 백업·복구</button>
+      <span class="m-only m-grp">가끔</span>
+      <button class="notif-btn" id="helpBtn" data-tip="키보드 단축키 안내 ( ? )">⌨️<span class="m-lbl"> 단축키</span></button>
+      <button class="notif-btn" id="photoLogBtn" data-tip="사진 변경 이력 (등록·교체·삭제)">🕘<span class="m-lbl"> 사진 변경 이력</span></button>
+      <button class="notif-btn m-only" type="button" onclick="mMenu('version')">🔄 최신인지 확인</button>
+      <button class="notif-btn m-only" type="button" onclick="mMenu('fav',this)">⭐ 즐겨찾기 (다른 프로그램)</button>
+      <button class="notif-btn m-only" type="button" onclick="mMenu('portal')">🏠 포털로</button>
+      <span class="m-only m-grp">나</span>
+      <button class="notif-btn m-only" type="button" onclick="mMenu('pw')">🔑 비밀번호 변경</button>
+      <button class="notif-btn m-only m-out" type="button" onclick="mMenu('logout')">로그아웃</button>
     </span>
     <button class="notif-btn hdr-more" id="hdrMoreBtn" type="button" aria-expanded="false" data-tip="사진·백업·단축키">⋯</button>
   </div>
@@ -1255,7 +1339,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 
   <!-- LEFT DASHBOARD -->
   <aside class="dash">
-    <button id="dashMToggle" class="dash-m-toggle">📋 사업장 목록 <span id="dashMArrow">▾</span></button>
+    <button id="dashMToggle" class="dash-m-toggle">📋 사업장 목록 <span id="dashMRisk" class="dash-m-risk"></span><span id="dashMArrow">▾</span></button>
     <div class="dash-top">
       <div class="dash-top-row">
         <input class="dash-search" id="dashSearch" placeholder="🔍 검색">
@@ -4852,8 +4936,8 @@ function renderSummaryBar(){
   });
   q('#summaryBar').innerHTML=`<div class="summary-bar">
     <div class="sum-card"><div class="sum-num" style="color:var(--info)">${active}</div><div class="sum-lbl">진행중</div></div>
-    <div class="sum-card"><div class="sum-num" style="color:var(--danger)">${warn}</div><div class="sum-lbl">마감 14일내<br>⚠️ 주의</div></div>
-    <div class="sum-card"><div class="sum-num" style="color:#d97706">${mfail}</div><div class="sum-lbl">회차·방문<br>부족 ⚠️</div></div>
+    <div class="sum-card"><div class="sum-num" style="color:var(--danger)">${warn}</div><div class="sum-lbl">마감 14일<span class="pc-only">내<br>⚠️ 주의</span></div></div>
+    <div class="sum-card"><div class="sum-num" style="color:#d97706">${mfail}</div><div class="sum-lbl">회차·방문<span class="pc-only"><br></span> 부족<span class="pc-only"> ⚠️</span></div></div>
     <div class="sum-card"><div class="sum-num" style="color:var(--ok)">${done}</div><div class="sum-lbl">완료/종료</div></div>
     <div class="summary-nav" style="display:flex;align-items:center;gap:6px;margin-left:6px;">
       <button class="cal-nav" id="calPrev" data-tip="이전 기간으로" style="color:var(--t2);border-color:var(--border);background:var(--surface);">◀</button>
@@ -4866,8 +4950,26 @@ function renderSummaryBar(){
   bindCalNav();
   renderNotifBadge();
 }
+/* ⋯ 메뉴의 줄 — 원래 단추를 «눌러 준다»(같은 일을 두 벌 두지 않는다). 2026-10-05 폰 정리 */
+function mMenu(k,el){
+  const r=q('.hdr-r'); if(r) r.classList.remove('x-on');
+  const click=id=>{ const b=document.getElementById(id); if(b) b.click(); return !!b; };
+  if(k==='stats') click('statsBtn');
+  else if(k==='settings') click('dashSettingsBtn');
+  else if(k==='backup'){ if(!click('pu-backup-admin-button')) toast('백업·복구는 관리자만 씁니다'); }
+  else if(k==='version'){ if(!click('pu-version-fab')) location.reload(); }
+  else if(k==='fav'){ if(window.PuAppBar&&PuAppBar.open) PuAppBar.open(el||q('#hdrMoreBtn')); }
+  else if(k==='portal'){ try{sessionStorage.setItem('pu_skip_home','1');}catch(e){} location.href='enter.html?v='+Math.floor(Date.now()/600000); }
+  else if(k==='pw') openPwChange();
+  else if(k==='logout') doLogout();
+}
+window.mMenu=mMenu;
 function bindCalNav(){
   const p=q('#calPrev'),n=q('#calNext'),t=q('#calTodayBtn');
+  /* 폰: 연도 칸을 따로 두지 않는다 — 「2026년 10월」 글자를 누르면 연도 고르개가 열린다 */
+  const ct=q('#calTitle'); if(ct&&!ct._yr){ ct._yr=1; ct.onclick=()=>{ if(window.innerWidth>768) return; const ys=q('#yearSel'), w=q('.year-wrap'); if(!ys) return;
+    if(w) w.classList.add('m-open'); try{ ys.showPicker(); }catch(e){ ys.focus(); }
+    ys.addEventListener('change',()=>{ if(w) w.classList.remove('m-open'); },{once:true}); }; }
   if(p)p.onclick=()=>{
     if(S.calMode==='month'){S.calM--;if(S.calM<0){S.calM=11;S.calY--;}}
     else if(S.calMode==='week'){const d=new Date(S.calWk);d.setDate(d.getDate()-7);S.calWk=d.toISOString().slice(0,10);}
@@ -5613,7 +5715,7 @@ function applySession(){
   q('#hdrUser').innerHTML=`
     <div class="user-badge" style="background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.3);">
       <div class="user-badge-dot" style="background:${sess.color}"></div>
-      <div class="user-badge-name" style="color:#fff;">${sess.name}${sess.isAdmin?' 👑':''}</div>
+      <div class="user-badge-name" style="color:#fff;"><span class="ub-full">${sess.name}${sess.isAdmin?' 👑':''}</span><span class="ub-short">${String(sess.name||'').slice(0,1)}</span></div>
     </div>`;
   const lo=q('#hdrLogout');
   if(lo)lo.innerHTML=`<button class="logout-btn" onclick="openPwChange()" data-tip="비밀번호 변경" style="margin-right:4px;">🔑</button><button class="logout-btn" onclick="doLogout()" title="로그아웃" style="margin-right:4px;">로그아웃</button>`;
@@ -6858,6 +6960,8 @@ function renderDash(){
   cards.forEach((card,i)=>{const n=card.querySelector('.dcard-no');if(n)n.textContent=i+1;});
   const dc=q('#dashCount');if(dc)dc.textContent=cards.length?`총 ${cards.length}곳`:'';
   const dmt=q('#dashMToggle');if(dmt)dmt.firstChild.textContent=`📋 사업장 목록 ${cards.length?cards.length+'곳 ':''}`;
+  /* 폰 손잡이의 빨간 딱지 — 목록을 접어 두어도 «급한 곳이 몇 곳인지»는 늘 보이게(2026-10-05) */
+  const dmr=q('#dashMRisk');if(dmr){const nr=activeItems.filter(x=>x.risk&&x.risk.isRisk).length;dmr.textContent=nr?`마감·주의 ${nr}`:'';dmr.style.display=nr?'':'none';}
 
   const toggleCard=card=>{
     const willOpen=!card.classList.contains('open');
@@ -11965,7 +12069,16 @@ function bind(){
   q('#helpBtn').onclick=showShortcutHelp;
   /* ⋯ — 폰에서 접어 둔 사진·백업·단축키 단추를 펼친다 (PC 에서는 ⋯ 자체가 안 보인다) */
   (function(){ const b=q('#hdrMoreBtn'), r=q('.hdr-r'); if(!b||!r) return;
-    b.onclick=function(){ const on=r.classList.toggle('x-on'); b.setAttribute('aria-expanded', on?'true':'false'); }; })();
+    b.onclick=function(){ const on=r.classList.toggle('x-on'); b.setAttribute('aria-expanded', on?'true':'false');
+      /* 백업·복구는 관리자에게만 있다(공용 백업 단추가 있을 때만 줄을 보인다) */
+      const bk=q('#mMenuBackup'); if(bk) bk.style.display=document.getElementById('pu-backup-admin-button')?'':'none'; };
+    document.addEventListener('click',function(e){ if(r.classList.contains('x-on')&&!r.contains(e.target)){ r.classList.remove('x-on'); b.setAttribute('aria-expanded','false'); } },true); })();
+  /* 폰 사업장 판 — 손잡이로 올리고 내린다. 열린 판 바깥(어두운 막)을 누르면 닫는다 */
+  (function(){ if(q('#dashMDim')) return; const d=document.createElement('div'); d.id='dashMDim';
+    d.onclick=function(){ const ds=q('.dash'); if(ds&&!ds.classList.contains('m-collapsed')){ const t=q('#dashMToggle'); if(t) t.click(); } };
+    document.body.appendChild(d);
+    const fab=document.createElement('button'); fab.id='mAddFab'; fab.type='button'; fab.title='사업장 추가'; fab.textContent='＋';
+    fab.onclick=function(){ const a=q('#dashAddBtn'); if(a) a.click(); }; document.body.appendChild(fab); })();
   bindCalNav();
   q('#calDayPicker').onchange=e=>{S.calDay=e.target.value;renderCal();};
   q('#calWeekPicker').onchange=e=>{
@@ -12223,11 +12336,12 @@ function init(){
   initCalWheel();
   const dmt=q('#dashMToggle');
   if(dmt){
-    if(localStorage.getItem('p_dashMCollapsed')==='1'){q('.dash').classList.add('m-collapsed');const a=q('#dashMArrow');if(a)a.textContent='▸';}
+    if(localStorage.getItem('p_dashMCollapsed')==='1'||window.innerWidth<=768){q('.dash').classList.add('m-collapsed');const a=q('#dashMArrow');if(a)a.textContent=window.innerWidth<=768?'▴':'▸';}
     dmt.onclick=()=>{
       const d=q('.dash'),on=d.classList.toggle('m-collapsed');
       lsSet('p_dashMCollapsed',on?'1':'0');
-      const a=q('#dashMArrow');if(a)a.textContent=on?'▸':'▾';
+      const a=q('#dashMArrow');if(a)a.textContent=window.innerWidth<=768?(on?'▴':'▾'):(on?'▸':'▾');
+      document.body.classList.toggle('m-sheet-open',!on&&window.innerWidth<=768);
     };
   }
   setTimeout(autoSnapshotDaily,8000);
@@ -12328,6 +12442,7 @@ init();
 (function(){
   if(!/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent)) return;
   var b=document.createElement('button');
+  b.id='mHomeFab';
   b.textContent='\ud83c\udfe0'; b.title='\uc571 \uc120\ud0dd(\ud3ec\ud138)\uc73c\ub85c';
   b.style.cssText='position:fixed;left:10px;bottom:14px;z-index:99990;width:44px;height:44px;border-radius:50%;border:1px solid #cbd5e1;background:rgba(255,255,255,.95);font-size:20px;box-shadow:0 4px 12px rgba(0,0,0,.18);cursor:pointer;padding:0;line-height:1;';
   b.addEventListener('click',function(){ try{sessionStorage.setItem('pu_skip_home','1');}catch(e){} location.href='enter.html?v='+Math.floor(Date.now()/600000); });
