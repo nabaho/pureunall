@@ -11630,6 +11630,198 @@ function moveSelTo(gid){
   state.sel={}; renderSelbar(); render();
   toast(n+'개 명함을 폴더로 옮겼습니다');
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   👤 명함 담당자 채우기 (대표 지시 2026-10-05 「명함담당자 채우는것도 해라」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 실측 2026-10-05 — 명함 6,716장 가운데 담당자가 적힌 것이 «한 장도 없다».
+     옆줄 「담당자별」 거르개가 통째로 비어 있고, 메일 담당자 찾기의 명함 길도 죽어 있다.
+     근거가 있는 것은 761장(11%) 뿐이다 —
+       · 업체 번호(사업자번호·업체 열쇠)로 이알피 업체를 찾은 것   81장  확실
+       · 그 주소가 이미 메일함에서 담당자에게 닿는 것              48장  확실
+       · 그 명함을 받아 올린 직원(capturedBy)                     361장  확실
+       · 회사 «이름»으로만 맞은 것                                271장  짐작 ← 미리 꺼 둔다
+     나머지 5,955장은 자문사도 아니고 메일도 안 오갔다 — «건드리지 않는다».
+   ⚠ 기계가 혼자 적지 않는다 — 체크한 묶음만 채운다(온톨로지 규칙과 같은 결).
+   ⚠ 이미 적힌 담당자는 «덮지 않는다». 비어 있는 칸만 채운다.
+   ⚠ 퇴사자로 짚이면 이어받은 사람에게 — 이어받을 사람이 없으면 안 채운다.
+   ⚠ 쓰는 길은 «이미 있는 것»을 쓴다(bulkPatchFlush) — 새 저장 길을 만들지 않는다. */
+const CARDOWN_WHY = [
+  ['biz',  '업체 번호', true,  '명함의 사업자번호·업체 열쇠로 푸른이알피 업체를 찾았습니다 — 그 업체 주담당'],
+  ['mail', '메일 담당', true,  '그 주소가 이미 메일함에서 담당자에게 닿습니다'],
+  ['cap',  '올린 사람', true,  '그 명함을 직접 받아 올린 직원입니다'],
+  ['name', '회사 이름', false, '번호는 없고 회사 «이름»만 같습니다 — 이름이 겹치는 업체는 뺐습니다'],
+];
+/* 퇴사자면 이어받은 사람 — 메일함과 «같은 잣대»(mbWhoLive)를 쓴다 */
+function cardOwnLive(w){
+  if(!w) return '';
+  if(typeof mbRetired !== 'function' || !mbRetired(w)) return String(w);
+  return (typeof mbSuccOf === 'function' && mbSuccOf(w)) || '';
+}
+/* 명함 하나를 보고 «누구를, 무엇으로» 짚을지. 못 짚으면 null.
+   ⚠ 차례가 곧 규칙이다 — 업체 번호 > 메일 > 올린 사람 > 회사 이름.
+     계약에 적힌 담당이 「누가 받아 왔나」보다 세다. */
+function cardOwnGuess(it){
+  if(!it || String(it.owner||'').trim()) return null;      /* 이미 적힌 것은 안 건드린다 */
+  const em = String(it.email||'').trim().toLowerCase();
+  const EM = (typeof ErpMatch !== 'undefined') ? ErpMatch : null;
+  /* ① 업체 번호·열쇠 — 이름을 거치지 않는다 */
+  if(EM && EM.byId && it.erpCoId){
+    const rec = EM.byId[String(it.erpCoId)];
+    if(rec && !rec.left){ const w = cardOwnLive(rec.main); if(w) return { who:w, why:'biz' }; }
+  }
+  if(EM && EM.byBiz && EM._digits){
+    const b = EM._digits(it.bizno);
+    const rec = b.length >= 10 ? EM.byBiz[b] : null;
+    if(rec && !rec.left){ const w = cardOwnLive(rec.main); if(w) return { who:w, why:'biz' }; }
+  }
+  /* ② 그 주소가 이미 메일함에서 담당자에게 닿는가 — 메일 판정을 그대로 쓴다 */
+  if(em && typeof mbWhoOfRow === 'function'){
+    const w = mbWhoOfRow({ e: em });
+    if(w) return { who:w, why:'mail' };
+  }
+  /* ③ 그 명함을 받아 올린 직원 — 명부에 있는 이름일 때만 */
+  const cap = String(it.capturedBy||'').trim();
+  if(cap && typeof mbStaffOf === 'function' && mbStaffOf(cap)){
+    const w = cardOwnLive(cap);
+    if(w) return { who:w, why:'cap' };
+  }
+  /* ④ 회사 «이름»으로만 — 겹치는 이름은 아예 안 짚는다(남의 회사 담당이 붙는다) */
+  if(EM && EM.byName && EM._norm){
+    const n = EM._norm(it.company);
+    if(n && EM.byName[n] && Number((EM.nameN||{})[n]||0) <= 1){
+      const rec = EM.byName[n];
+      if(!rec.left){ const w = cardOwnLive(rec.main); if(w) return { who:w, why:'name' }; }
+    }
+  }
+  return null;
+}
+/* 명함 전부를 훑어 묶음을 만든다 — 그릴 때마다 다시 훑지 않게 담아 둔다 */
+let _cardOwnPlan = null;
+function cardOwnBust(){ _cardOwnPlan = null; }
+function cardOwnPlan(){
+  if(_cardOwnPlan) return _cardOwnPlan;
+  const by = {}; CARDOWN_WHY.forEach(([k])=>{ by[k] = { n:0, ids:[], people:{}, ex:[] }; });
+  let already = 0, none = 0, all = 0;
+  Object.keys(state.items||{}).forEach(id=>{
+    const it = state.items[id]; if(!it) return;
+    all++;
+    if(String(it.owner||'').trim()){ already++; return; }
+    const g = cardOwnGuess(it);
+    if(!g){ none++; return; }
+    const b = by[g.why];
+    b.n++; b.ids.push(id);
+    b.people[g.who] = (b.people[g.who]||0) + 1;
+    if(b.ex.length < 2) b.ex.push({ co:String(it.company||'(회사 없음)'), who:g.who });
+  });
+  _cardOwnPlan = { by, already, none, all };
+  return _cardOwnPlan;
+}
+function cardOwnPicked(){
+  const pick = state.coFillPick || {};
+  const plan = cardOwnPlan();
+  const ids = [], people = {};
+  CARDOWN_WHY.forEach(([k])=>{
+    if(!pick[k]) return;
+    const b = plan.by[k];
+    b.ids.forEach(id=>ids.push(id));
+    Object.keys(b.people).forEach(w=>{ people[w] = (people[w]||0) + b.people[w]; });
+  });
+  return { ids, people };
+}
+function cardOwnOpen(){
+  cardOwnBust();
+  const pick = {};
+  CARDOWN_WHY.forEach(([k,, sure])=>{ pick[k] = !!sure; });   /* 얇은 근거는 미리 꺼 둔다 */
+  state.coFillPick = pick;
+  state.coFillOpen = true;
+  cardOwnMount();
+}
+function cardOwnClose(){ state.coFillOpen = false; cardOwnMount(); }
+function cardOwnToggle(k){
+  state.coFillPick = state.coFillPick || {};
+  state.coFillPick[k] = !state.coFillPick[k];
+  cardOwnMount();
+}
+/* ⚠ 창을 «몸통에» 띄운다 — 명함 목록은 PC 표와 폰 목록이 서로 다른 칸을 쓴다.
+     한쪽 칸에 넣으면 다른 쪽에서는 창이 아예 안 뜬다. */
+function cardOwnMount(){
+  let box = document.getElementById('cardOwnBox');
+  if(!box){
+    if(!state.coFillOpen) return;
+    box = document.createElement('div');
+    box.id = 'cardOwnBox';
+    document.body.appendChild(box);
+  }
+  box.innerHTML = cardOwnHtml();
+}
+function cardOwnHtml(){
+  if(!state.coFillOpen) return '';
+  const plan = cardOwnPlan();
+  const pick = state.coFillPick || {};
+  const got = cardOwnPicked();
+  const rows = CARDOWN_WHY.map(([k, label, sure, desc])=>{
+    const b = plan.by[k];
+    const ex = b.ex.map(x=>esc(x.co.slice(0,16)) + ' → ' + esc(x.who)).join('<br>') || '—';
+    return '<tr class="' + (pick[k] ? '' : 'thin') + '">'
+      + '<td><input type="checkbox" ' + (pick[k]?'checked':'') + ' ' + (b.n?'':'disabled')
+      +   ' onclick="cardOwnToggle(\'' + k + '\')"></td>'
+      + '<td class="co"><b>' + b.n.toLocaleString() + '</b>장</td>'
+      + '<td><span class="t">' + (sure ? '확실' : '짐작') + '</span> ' + esc(label) + '</td>'
+      + '<td class="em">' + desc + (sure ? '' : ' — <b>미리 꺼 두었습니다</b>') + '</td>'
+      + '<td class="em">' + ex + '</td></tr>';
+  }).join('')
+    + '<tr class="thin"><td></td><td class="co"><b>' + plan.none.toLocaleString() + '</b>장</td>'
+    + '<td>근거 없음</td><td class="em">자문사도 아니고, 메일도 안 오갔고, 올린 사람도 안 적혀 있습니다. '
+    + '<b>건드리지 않습니다.</b></td><td class="em">—</td></tr>';
+  const chips = Object.keys(got.people).sort((a,b)=>got.people[b]-got.people[a])
+    .map(w=>'<span class="t">' + esc(w) + ' <b>' + got.people[w] + '</b>장</span>').join(' ')
+    || '<span class="em">고른 묶음이 없습니다</span>';
+  return '<div class="mck-dim" onclick="if(event.target===this)cardOwnClose()">'
+    + '<div class="mck">'
+    + '<header><span>👤</span><h2>명함 담당자 채우기</h2>'
+    + '<span class="x" onclick="cardOwnClose()" title="닫기">✕</span></header>'
+    + '<div class="body"><div class="why">'
+    + '명함 <b>' + plan.all.toLocaleString() + '장</b> 가운데 담당자가 적힌 것이 <b>'
+    + plan.already.toLocaleString() + '장</b>입니다. 옆줄의 「담당자별」 거르개와 메일 담당자 찾기가 이 칸을 씁니다.<br>'
+    + '<b>기계가 혼자 적지 않습니다</b> — 체크한 묶음만 채웁니다. '
+    + '<b>이미 적힌 담당자는 덮지 않습니다.</b> 퇴사한 사람으로 짚이면 이어받은 사람에게 갑니다.'
+    + '</div>'
+    + '<table><tr><th style="width:28px"></th><th style="width:9%">명함</th>'
+    + '<th style="width:17%">무엇으로 짚었나</th><th>어떤 것인가</th><th style="width:22%">보기</th></tr>'
+    + rows + '</table>'
+    + '<div class="why" style="margin-top:10px">채우면 — ' + chips + '</div>'
+    + '</div>'
+    + '<footer><span>명함 ' + plan.all.toLocaleString() + '장을 봤습니다 · 채울 수 있는 것 '
+    + (plan.all - plan.already - plan.none).toLocaleString() + '장</span>'
+    + '<span class="sp"></span>'
+    + '<button onclick="cardOwnClose()">닫기</button>'
+    + '<button class="pri" onclick="cardOwnApply()">고른 ' + got.ids.length.toLocaleString() + '장 채우기</button>'
+    + '</footer></div></div>';
+}
+function cardOwnApply(){
+  const got = cardOwnPicked();
+  if(!got.ids.length) return toast('고른 묶음이 없습니다');
+  const who = Object.keys(got.people).sort((a,b)=>got.people[b]-got.people[a]).slice(0,4)
+    .map(w=>w + ' ' + got.people[w] + '장').join(' · ');
+  if(!confirm('명함 ' + got.ids.length.toLocaleString() + '장에 담당자를 채웁니다.\n\n'
+    + who + (Object.keys(got.people).length > 4 ? ' …' : '') + '\n\n'
+    + '⚠ 이미 적힌 담당자는 덮지 않습니다.\n'
+    + '⚠ 되돌리시려면 명함을 골라 「담당자 지정」에서 비우시면 됩니다.\n\n진행할까요?')) return;
+  /* ⚠ 짚은 것을 «다시» 셈하지 않는다 — 두 번 셈하면 그 사이에 바뀐 것이 어긋난다.
+       묶음을 만들 때 정한 사람을 그대로 넣는다. */
+  const hit = [];
+  got.ids.forEach(id=>{
+    const it = state.items[id]; if(!it) return;
+    const g = cardOwnGuess(it); if(!g) return;
+    it.owner = g.who; hit.push(it);
+  });
+  state.coFillOpen = false;
+  cardOwnBust(); cardOwnMount(); render();
+  bulkPatchFlush(hit, ['owner'])
+    .then(()=>toast('👤 명함 ' + hit.length.toLocaleString() + '장에 담당자를 채웠습니다', 9000))
+    .catch(e=>toast('저장 실패: ' + ((e&&e.message)||''), 9000));
+}
+
 /* 선택 명함 일괄 담당자 지정 */
 function selPickOwner(){
   if(!Object.keys(state.sel).length) return toast('명함을 먼저 선택하세요');
@@ -16658,6 +16850,17 @@ function renderPCSide(){
     h += pcItem(`onclick="state.view='list';state.owner='${esc(o)}';state.group='all';state.region='';state.page=0;render()"`,
       '👤 '+esc(o), kindArr.filter(it=>String(it.owner||'').trim()===o).length, state.owner===o);
   });
+  /* 👤 담당자 채우기로 가는 문 (대표 지시 2026-10-05) —
+     ⚠ 「여기에 자동으로 분류됩니다」 바로 아래다. 안내를 읽은 그 자리에 손이 가야 한다.
+       따로 들어가야 하는 화면이면 아무도 안 간다(「📄 담당 모름 한 번에 나누기」와 같은 결).
+     ⚠ 채울 것이 하나도 없으면 안 그린다 — 눌러도 아무 일 없는 단추는 두지 않는다. */
+  /* ⚠ typeof 로 감싼다 — 이 함수만 잘라 돌리는 검사에서 cardOwnPlan 이 없어도 죽지 않게.
+       옆줄이 통째로 안 그려지는 것보다 문 하나가 없는 편이 낫다. */
+  const ownPlan = (typeof cardOwnPlan === 'function') ? cardOwnPlan() : null;
+  const ownFill = ownPlan ? (ownPlan.all - ownPlan.already - ownPlan.none) : 0;
+  if(ownFill > 0)
+    h += `<div class="pchintside" style="cursor:pointer;color:#2563eb;font-weight:700"
+      onclick="cardOwnOpen()" title="업체·메일·올린 사람으로 짚어 한꺼번에 채웁니다">👤 담당자 채우기 ${ownFill.toLocaleString()}장 ›</div>`;
 
   /* 맨 아래 고정 환경설정 — 갈림길마다 같은 것을 붙인다(pcSideBottomHtml) */
   h += pcSideBottomHtml();
