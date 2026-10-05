@@ -121,6 +121,44 @@ test('편집칸의 직원 줄은 «한 줄»이다 — 줄바꿈 상자를 쌓�
   }
 });
 
+/* saveRecord 를 가짜 서버 사본으로 실제로 돌린다 */
+async function 저장해보기(서버값, next) {
+  let 쓴것 = null;
+  const ctx = {
+    console: { warn() {} }, App: { members: { k: Object.assign({}, 서버값) }, pages: {} },
+    currentUserName: () => '관리자', histStamp: () => 't1',
+    db: { ref: (p) => ({
+      transaction: async (fn) => { 쓴것 = fn(JSON.parse(JSON.stringify(서버값))); return { committed: true }; },
+      set: async () => {}
+    }) }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource('saveRecord'), ctx);
+  await ctx.saveRecord('member', 'k', next);
+  return 쓴것;
+}
+
+test('★ 구성원을 편집해 저장해도 «자동 연결 칸»(직원 번호·내린 표시·사진·올리기 허락)이 안 지워진다', async () => {
+  const 서버 = { name: '홍길동', srl: '101', careers: [], updatedAt: 0,
+    sid: 'S1', takenDown: { at: 1 }, photo: { bytes: 9 }, publishOk: { at: 2 } };
+  const 쓴것 = await 저장해보기(서버, { name: '홍길동', srl: '101', careers: ['現 가'] });
+  assert.strictEqual(쓴것.sid, 'S1');
+  assert.ok(쓴것.takenDown && 쓴것.photo && 쓴것.publishOk);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(쓴것.careers)), ['現 가']);
+});
+
+test('저장할 것에 그 칸이 «있으면» 그 값이 이긴다(사람이 일부러 바꾼 것)', async () => {
+  const 쓴것 = await 저장해보기({ name: '홍길동', updatedAt: 0, sid: 'S1' }, { name: '홍길동', sid: 'S2' });
+  assert.strictEqual(쓴것.sid, 'S2');
+});
+
+test('명부에서 넣을 때 직원 번호를 함께 남긴다 — 그 번호가 «그 이름»일 때만', () => {
+  const 몸 = fnSource('addFromRoster');
+  assert.match(몸, /rec\.sid\s*=/);
+  assert.match(fnSource('명부재직자'), /sid:/);
+  assert.match(fnSource('openRosterAdd'), /esc\(s\.sid\)/);
+});
+
 test('공개 명부를 읽을 때 sid 를 함께 싣는다 — 잇기의 열쇠다', () => {
   const ctx = { console: { warn() {} } };
   vm.createContext(ctx);

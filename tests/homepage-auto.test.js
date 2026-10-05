@@ -261,6 +261,107 @@ test('기록에는 이름을 담지 않는다', async () => {
   assert.ok(!글.includes('가나상사'));
 });
 
+/* ══════ 2단계 — 새 거래처 로고 «올리기» 고르기 ══════ */
+const 올릴회사 = (더) => Object.assign({ posted: true, consent: { date: '2026-10-05', by: '관리자', at: 1 },
+  logo: { bytes: 9000, w: 300, h: 80, at: 1 } }, 더 || {});
+
+test('올림 표시·공개 동의·로고가 다 있고 아직 안 이은 거래 중 회사는 올릴 것에 든다', () => {
+  const r = HA.고르기(기본({ partners: { C1: 올릴회사() } }));
+  assert.strictEqual(r.올릴것.length, 1);
+  assert.strictEqual(r.올릴것[0].종류, '새거래처');
+  assert.strictEqual(r.올릴것[0].게시판, HA.게시판.자문사);
+  assert.strictEqual(r.올릴것[0].companyId, 'C1');
+});
+
+test('공개 동의가 없으면 올리지 않는다 — 고객사 이름·로고 공개는 동의가 먼저다', () => {
+  for (const 동의 of [undefined, null, {}, { by: 'x' }]) {
+    const r = HA.고르기(기본({ partners: { C1: 올릴회사({ consent: 동의 }) } }));
+    assert.strictEqual(r.올릴것.length, 0, JSON.stringify(동의));
+  }
+});
+
+test('로고가 없거나 «안 올림»·표시 안 함이면 올리지 않는다', () => {
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ logo: null }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ logo: { bytes: 0 } }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ posted: false }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ posted: undefined }) } })).올릴것.length, 0);
+});
+
+test('이미 로고와 이었거나(boardSrl) 내린 적이 있으면 다시 올리지 않는다', () => {
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ boardSrl: 185 }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ takenDown: { at: 1 } }) } })).올릴것.length, 0);
+});
+
+test('거래가 끝났거나 사무대행이거나 업체관리에 없으면 올리지 않는다', () => {
+  for (const 상태 of ['closed', 'suboffice']) {
+    const r = HA.고르기(기본({ companies: [업체('C1', 상태)], partners: { C1: 올릴회사() } }));
+    assert.strictEqual(r.올릴것.length, 0, 상태);
+  }
+  assert.strictEqual(HA.고르기(기본({ partners: { C9: 올릴회사() } })).올릴것.length, 0);
+});
+
+test('명부·업체관리를 못 읽으면 올리지도 않는다', () => {
+  const r = HA.고르기(기본({ companies: null, partners: { C1: 올릴회사() } }));
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual((r.올릴것 || []).length, 0);
+});
+
+function 올리기가짜(자료, 답) {
+  const g = 가짜(자료);
+  g.올린것 = [];
+  g.도구.올리기 = async (목록) => { g.올린것.push(...목록); return 목록.map(x => Object.assign({}, x, 답 ? 답(x) : { 됐나: true, srl: 777 })); };
+  return g;
+}
+const 올리기자료 = () => Object.assign(퇴사자료(), {
+  'data/companies': [업체('C1', 'closed'), 업체('C2', 'active')],
+  'homepage/partners': { C1: { boardSrl: 185 }, C2: 올릴회사() }
+});
+
+test('돌리기는 올릴 것을 올리고, 새 글 번호를 그 회사에 «이어 둔다»(다음에 계약이 끝나면 내려가게)', async () => {
+  const g = 올리기가짜(올리기자료());
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.올린것.length, 1);
+  assert.strictEqual(r.올림.length, 1);
+  const 이음 = g.쓴것.find(([p]) => p === 'homepage/partners/C2/boardSrl');
+  assert.ok(이음 && 이음[1] === 777, '새 글 번호를 안 이었습니다');
+  assert.ok(g.붙인것.some(([p]) => p === 'homepage/writeLog/777'));
+  const 기록 = g.붙인것.find(([p]) => p === 'homepage/auto/runs/2026-11');
+  assert.strictEqual(기록[1].올림.length, 1);
+});
+
+test('보기는 올리지 않는다 — 올릴 것만 알려 준다', async () => {
+  const g = 올리기가짜(올리기자료());
+  const r = await HA.돌기('보기', '', g.도구);
+  assert.strictEqual(g.올린것.length, 0);
+  assert.strictEqual(r.올릴것.length, 1);
+});
+
+test('못 올렸거나 글 번호를 못 받았으면 잇지 않고 «못 올림»으로 남긴다', async () => {
+  for (const 답 of [{ 됐나: false, 까닭: '홈페이지가 안 받음' }, { 됐나: true, srl: 0 }]) {
+    const g = 올리기가짜(올리기자료(), () => 답);
+    const r = await HA.돌기('돌리기', '', g.도구);
+    assert.ok(!g.쓴것.some(([p]) => p === 'homepage/partners/C2/boardSrl'), JSON.stringify(답));
+    assert.strictEqual(r.못올림.length, 1, JSON.stringify(답));
+  }
+});
+
+test('승인(멈춘 내리기 승인)은 올리지 않는다 — 올리기는 매달 돌기에서만', async () => {
+  const 자료 = 올리기자료();
+  const 여럿 = 퇴사여럿(HA.멈춤문턱 + 1);
+  자료['data/user_dir'] = 여럿.roster; 자료['homepage/members'] = 여럿.members;
+  const 본 = await HA.돌기('보기', '', 가짜(자료).도구);
+  const g = 올리기가짜(자료);
+  await HA.돌기('승인', 본.지문, g.도구);
+  assert.strictEqual(g.올린것.length, 0);
+});
+
+test('올리기 도구가 없으면(아직 못 짓는 단계) 올리지 않고 조용히 넘어가지도 않는다', async () => {
+  const g = 가짜(올리기자료());
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(r.올림.length, 0);
+  assert.ok(r.올리기안됨, '올릴 것이 있는데 못 올린 사실을 안 알립니다');
+});
+
 test('지문은 차례와 상관없이 같은 목록이면 같다', () => {
   const a = [{ 게시판: 'people_board', srl: 2 }, { 게시판: 'partner_board', srl: 1 }];
   assert.strictEqual(HA.지문(a), HA.지문(a.slice().reverse()));
