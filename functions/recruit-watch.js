@@ -27,7 +27,10 @@ const MAX_AGE_DAYS = 120;       // 이보다 오래된 글은 처음 봐도 안 
 
 /* org 는 js/gov-recruit.js 의 기관 번호와 같다 — 화면이 그 줄에 「🆕」를 붙인다 */
 const BOARDS = [
-  { id: 'erc',     org: 'erc',     name: '지방공기업평가원 공지',     url: 'https://www.erc.re.kr/usr/com/prm/BBSList.do?bbsId=BBSMSTR_000000000251&menuNo=3000&upperMenuId=3' },
+  /* js — 목록 링크가 프로그램(javascript)인 게시판: 그 안의 글 번호로 «본문 주소»를 만든다(GET 으로 열리는 것을 2026-10-05 확인).
+     본문이 있어야 접수 기간을 읽는다. ⚠ 열쇠(keyOf)는 주소와 무관하다 — 옛 글이 두 번 들어오지 않는다. */
+  { id: 'erc',     org: 'erc',     name: '지방공기업평가원 공지',     url: 'https://www.erc.re.kr/usr/com/prm/BBSList.do?bbsId=BBSMSTR_000000000251&menuNo=3000&upperMenuId=3',
+    js: { re: /fn_detail\(\s*'(\d+)'/, url: 'https://www.erc.re.kr/usr/com/prm/BBSDetail.do?bbsId=BBSMSTR_000000000251&nttId={id}&menuNo=3000&upperMenuId=3&bbsTyCode=BBST11&bbsAttrbCode=BBSA01&authFlag=Y&pageIndex=1' } },
   { id: 'seosan',  org: 'seosan',  name: '서산시 공지사항',           url: 'https://www.seosan.go.kr/www/selectBbsNttList.do?bbsNo=97&key=1256' },
   { id: 'kordi',   org: 'kordi',   name: '한국노인인력개발원 알림',   url: 'https://www.kordi.or.kr/content.do?cmsId=91' },
   { id: 'agri6',   org: 'agri6',   name: '농촌융복합(6차산업) 공지',  url: 'https://xn--980b99s59h34f6tl.com/home/board/B0030.cs?m=24' },
@@ -38,7 +41,8 @@ const BOARDS = [
   { id: 'kfcc',    org: 'kfcc',    name: '새마을금고 MG공지',         url: 'https://www.kfcc.co.kr/mgNotice/mgNoticeList.do' },
   { id: 'voucher', org: 'voucher', name: '데이터산업진흥원 알림',     url: 'https://kdata.or.kr/kr/board/notice_01/boardList.do' },
   { id: 'nrc',     org: 'nrc',     name: '경제·인문사회연구회 공지',  url: 'https://www.nrc.re.kr/board.es?mid=a12101000000&bid=0001' },
-  { id: 'semas',   org: 'semas',   name: '소상공인시장진흥공단 공지', url: 'https://www.semas.or.kr/web/board/webBoardList.kmdc?bCd=1&pNm=BOA0101' },
+  { id: 'semas',   org: 'semas',   name: '소상공인시장진흥공단 공지', url: 'https://www.semas.or.kr/web/board/webBoardList.kmdc?bCd=1&pNm=BOA0101',
+    js: { re: /fncGoDetail\(\s*'(\d+)'/, url: 'https://www.semas.or.kr/web/board/webBoardView.kmdc?bCd=1&b_idx={id}&pNm=BOA0101' } },
   { id: 'cepa',    org: 'cepa',    name: '충남경제진흥원 공지',       url: 'https://www.cepa.or.kr/notice/notice.do?pm=6&ms=32' },
   /* 목록 머리에 오래된 «고정 공지»가 먼저 온다 — 새 글은 그 아래에 있다(그래도 첫 쪽 안이다) */
   { id: 'sinbo',   org: 'sinbo',   name: '충남신용보증재단 공지',     url: 'https://www.cnsinbo.co.kr/boardCnts/list.do?boardID=134&m=030101&s=cnsinbo' },
@@ -109,7 +113,7 @@ function stripTag(t) {
    ⚠ 줄 = 표 한 줄(<tr>) 또는 목록 한 칸(<li>). 날짜가 없는 줄(머리줄·메뉴)은 버린다.
    ⚠ 제목 = 그 줄 안 링크 글자 중 «가장 긴 것» — 번호·첨부 아이콘 링크를 피한다.
    ⚠ href 가 javascript: 이면 비운다(서버가 열 주소가 아니다 — 화면은 게시판 주소로 보낸다). */
-function parseRows(html, base) {
+function parseRows(html, base, board) {
   const out = [], seen = {};
   const blocks = String(html || '').match(/<tr[\s>][\s\S]*?<\/tr>|<li[\s>][\s\S]*?<\/li>/gi) || [];
   blocks.forEach((b) => {
@@ -130,6 +134,7 @@ function parseRows(html, base) {
     let href = '';
     const h = /href\s*=\s*["']([^"']*)["']/i.exec(best.attrs);
     if (h && h[1] && !/^\s*(javascript:|#)/i.test(h[1])) { try { href = new URL(h[1].replace(/&amp;/g, '&'), base).href; } catch (e) { href = ''; } }
+    if (!href && board && board.js) { const j = board.js.re.exec(best.attrs); if (j) href = board.js.url.replace('{id}', j[1]); }
     const date = d[1] + '-' + pad(mo) + '-' + pad(da);
     const k = best.t + '|' + date; if (seen[k]) return; seen[k] = 1;
     out.push({ title: best.t, date, href });
@@ -176,10 +181,76 @@ function daysBetween(a, b) {
   return Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 864e5);
 }
 
+/* ── 접수 기간 읽기 (대표 지시 2026-10-05 「서류에 기간이 있다 — 날짜가 지났는지 반드시 표시」) ──
+   text: 공고 본문(또는 제목·메일 제목), post: 'YYYY-MM-DD'(올린 날 — 해가 빠진 날짜의 해를 정한다)
+   → { from, to, rolling } 또는 null(못 찾음).
+   ⚠ 「접수·신청·모집·제출·응모·공모·추천·원서」 + 「기간·기한·마감·일정·일시」 라벨 뒤만 본다 —
+     본문의 사업기간·위촉기간·임기·교육기간을 마감으로 읽으면 «지났다/안 지났다»가 거짓이 된다.
+   ⚠ 라벨이 없을 때 「~03.27 까지」 꼴은 «짧은 글»(제목·메일 제목, 200자 이하)에서만 — 긴 본문에서는 엉뚱한 날짜가 걸린다.
+   ⚠ 「채용 시 마감·수시·상시·ASAP·선착순」은 rolling(사람이 정해지면 끝) — 날짜를 지어내지 않는다.
+   ⚠ 이 함수는 서버(functions/recruit-watch.js)와 화면(js/gov-recruit.js)에 «글자까지 같이» 있다 — 검사가 맞댄다. */
+var PER_D = '(?:(20\\d{2})\\s*[.\\-\\/년]\\s*)?(\\d{1,2})\\s*[.\\-\\/월]\\s*(\\d{1,2})\\s*일?\\.?(?:\\s*\\(\\s*[월화수목금토일]\\s*\\))?(?:\\s*\\d{1,2}\\s*[:시]\\s*\\d{0,2}\\s*분?)?';
+var PER_LABEL = /(?:접수|신청|모집|제출|응모|공모|추천|원서)\s*(?:기간|기한|마감일?|일정|일시)/g;
+var PER_RANGE = new RegExp(PER_D + '\\s*(?:[~∼～〜]|\\s-\\s|부터)\\s*' + PER_D);
+var PER_ONE = new RegExp(PER_D);
+var PER_ROLL = /^[\s:：\-]*(?:채용\s*시|수시|상시|ASAP|선착순|소진\s*시|충원\s*시)/i;
+var PER_NOT = /(?:사업|위촉|활동|계약|운영|교육|임기|근무|과업|용역|행사)\s*(?:기간|일정)[^가-힣]{0,20}$/;
+var PER_SHORT = new RegExp('[~∼～〜]\\s*' + PER_D + '|' + PER_D + '\\s*까지');
+function perPad(n) { return (n < 10 ? '0' : '') + n; }
+function perDay(y, m, d) {
+  m = Number(m); d = Number(d);
+  if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31) || !y) return '';
+  return y + '-' + perPad(m) + '-' + perPad(d);
+}
+function perShift(ymd, post) {   /* 해가 없던 날짜 — 올린 날보다 한참 앞이면 다음 해 */
+  if (!ymd || !post) return ymd;
+  return (Date.parse(ymd) < Date.parse(post) - 31 * 864e5) ? (Number(ymd.slice(0, 4)) + 1) + ymd.slice(4) : ymd;
+}
+function periodOf(text, post) {
+  var t = String(text == null ? '' : text).replace(/\s+/g, ' ');
+  post = /^\d{4}-\d{2}-\d{2}$/.test(String(post || '')) ? String(post) : '';
+  var baseY = post ? Number(post.slice(0, 4)) : 0, m, win;
+  PER_LABEL.lastIndex = 0;
+  while ((m = PER_LABEL.exec(t))) {
+    win = t.slice(m.index + m[0].length, m.index + m[0].length + 90);
+    if (PER_ROLL.test(win)) return { from: '', to: '', rolling: true };
+    var r = win.match(PER_RANGE);
+    if (r && r.index < 25) {
+      var fy = r[1] ? Number(r[1]) : baseY, from = perDay(fy, r[2], r[3]);
+      var ty = r[4] ? Number(r[4]) : fy, to = perDay(ty, r[5], r[6]);
+      if (!r[1]) from = perShift(from, post);
+      if (from && to && to < from && !r[4]) to = (Number(to.slice(0, 4)) + 1) + to.slice(4);
+      if (to) return { from: from, to: to, rolling: false };
+    }
+    var one = win.match(PER_ONE);
+    if (one && one.index < 25) {
+      var d1 = perDay(one[1] ? Number(one[1]) : baseY, one[2], one[3]);
+      if (!one[1]) d1 = perShift(d1, post);
+      if (d1) return { from: '', to: d1, rolling: false };
+    }
+  }
+  if (t.length <= 200) {
+    var s = t.match(PER_SHORT);
+    if (s && !PER_NOT.test(t.slice(Math.max(0, s.index - 30), s.index))) {
+      var y = s[1] || s[4], mo = s[2] || s[5], da = s[3] || s[6];
+      var d2 = perDay(y ? Number(y) : baseY, mo, da);
+      if (!y) d2 = perShift(d2, post);
+      if (d2) return { from: '', to: d2, rolling: false };
+    }
+  }
+  return null;
+}
+
+/* 본문을 열어 볼 수 있는 글인가 — 목록 주소로 돌려 둔 글(javascript 링크였던 것)은 본문이 없다 */
+function hasDetail(h, b) {
+  const u = String(h && h.href || '');
+  return /^https:\/\//.test(u) && !!b && u !== b.url && u !== b.page;
+}
+
 /* 시간 셈 — 서버는 5분(300초)에 끊긴다. 끊기면 «그날 읽은 것을 하나도 못 남긴다»(쓰기가 맨 끝에 있다).
    ⚠ 그래서 ①몇 곳씩 함께 읽고 ②한 게시판이 오래 붙잡지 못하게 하고 ③전체 마감을 넘기면 남은 곳은
      «못 읽음»으로 적고 끝낸다 — 읽은 만큼은 반드시 남는다(검토 2026-10-04). */
-const LIMITS = { together: 4, boardMs: 45000, totalMs: 200000 };
+const LIMITS = { together: 4, boardMs: 45000, totalMs: 200000, detailMs: 20000, detailMax: 14 };
 function 늦으면(ms, why) {
   let t; const p = new Promise((_, no) => { t = setTimeout(() => no(new Error(why)), Math.max(0, ms)); });
   return { p, stop: () => clearTimeout(t) };
@@ -208,32 +279,71 @@ async function run(o) {
     }
   }
   async function 한곳(b) {
-    const out = { hits: [], error: null, count: undefined };
+    const out = { hits: [], error: null, count: undefined, fix: {} };
     {
       const html = await o.fetchText(b.url, b);
-      const rows = parseRows(html, b.url);
+      const rows = parseRows(html, b.url, b);
       out.count = rows.length;
       if (!rows.length) { out.error = '줄을 하나도 못 뽑았습니다(게시판 모양이 바뀌었을 수 있음)'; return out; }
       rows.forEach((r) => {
         if (!pass(b, r.title)) return;
         if (today && daysBetween(r.date, today) > MAX_AGE_DAYS) return;
         const key = keyOf(b.id, r);
-        if (have[key]) return;
-        out.hits.push({ key, board: b.id, org: b.org || orgHint(r.title), boardName: b.name, title: r.title, date: r.date,
-          href: r.href || b.page || b.url, at: nowIso });
+        if (have[key]) {
+          if (r.href && r.href !== have[key].href && !hasDetail(have[key], b) && hasDetail({ href: r.href }, b)) out.fix[key] = r.href;
+          return;
+        }
+        const h = { key, board: b.id, org: b.org || orgHint(r.title), boardName: b.name, title: r.title, date: r.date,
+          href: r.href || b.page || b.url, at: nowIso };
+        const tp = periodOf(r.title, r.date);   // 제목에 「~03.27까지」가 있으면 우선 그것(본문을 열면 덮는다)
+        if (tp) h.per = tp;
+        out.hits.push(h);
       });
     }
     return out;
   }
   await Promise.all(Array.from({ length: Math.min(together, boards.length) }, 일꾼));
   /* ⚠ 모으는 차례는 «게시판 차례» 그대로 — 함께 읽어도 결과가 날마다 같아야 한다 */
-  const hits = [], errors = [], counts = {};
+  const hits = [], errors = [], counts = {}, fixes = {};
   boards.forEach((b, i) => {
+    Object.assign(fixes, per[i].fix || {});
     if (per[i].count !== undefined) counts[b.id] = per[i].count;
     if (per[i].error) errors.push({ board: b.id, why: per[i].error });
     else per[i].hits.forEach((h) => hits.push(h));   // (오류 난 곳은 글이 비어 있지만 한 번 더 막아 둔다)
   });
-  return { hits, errors, counts, checked: boards.length, ms: now() - t0 };
+  /* ── 본문 열어 «접수 기간» 붙이기 (대표 지시 2026-10-05 「기간 표시해서 날짜가 지났는지 반드시」) ──
+     ⚠ o.details 일 때만(서버가 켠다) · 새 글 먼저, 남는 자리에 «아직 기간을 안 본» 옛 글을 하루 몇 건씩 메운다.
+     ⚠ 목록 시간 셈과 같은 전체 마감 안에서만 — 남은 시간이 없으면 그만둔다(다음 날 다시).
+     ⚠ 본문에서 못 찾으면 { none: true } 를 남겨 날마다 다시 열지 않는다(제목에서 찾은 것은 그대로 둔다). */
+  const pers = {};
+  if (o.details) {
+    const byId = {}; boards.forEach((b) => { byId[b.id] = b; });
+    const max = o.detailMax || LIMITS.detailMax, dms = o.detailMs || LIMITS.detailMs;
+    const todo = hits.filter((h) => hasDetail(h, byId[h.board])).map((h) => ({ h, fresh: true }));
+    Object.keys(have).forEach((k) => {
+      const x = Object.assign({}, have[k] || {}, fixes[k] ? { href: fixes[k] } : {});
+      if (x.per && (x.per.to || x.per.rolling || x.per.none)) return;
+      if (hasDetail(Object.assign({ key: k }, x), byId[x.board])) todo.push({ h: Object.assign({ key: k }, x), fresh: false });
+    });
+    const list = todo.slice(0, max);
+    let j = 0;
+    const 읽개 = async () => {
+      while (j < list.length) {
+        const it = list[j++], b = byId[it.h.board];
+        const left = totalMs - (now() - t0);
+        if (left <= 1000) return;
+        const 시계 = 늦으면(Math.min(dms, left), '본문을 늦게 줘 그만 읽었습니다');
+        let got = null;
+        try { got = periodOf(clean(await Promise.race([o.fetchText(it.h.href, b), 시계.p])), it.h.date); }
+        catch (e) { continue; }   // 못 열면 다음 날 다시
+        finally { 시계.stop(); }
+        const v = got || (it.h.per && it.h.per.to ? it.h.per : { none: true });
+        if (it.fresh) it.h.per = v; else pers[it.h.key] = v;
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(together, list.length) }, 읽개));
+  }
+  return { hits, errors, counts, pers, fixes, checked: boards.length, ms: now() - t0 };
 }
 
 /* 게시판에 맞는 «읽는 손»을 고른다 — login 이 붙은 게시판만 로그인한 손으로.
@@ -256,7 +366,7 @@ async function probeBoard(o) {
   let read = 0;
   for (let p = 1; p <= pages; p++) {
     const url = b.url + (b.url.indexOf('?') >= 0 ? '&' : '?') + 'page=' + p;
-    const got = parseRows(await o.fetchText(url, b), url);
+    const got = parseRows(await o.fetchText(url, b), url, b);
     if (!got.length) break;
     if (rows.length && got[0].title === rows[0].title && got[0].date === rows[0].date) break;   // 쪽이 안 넘어간다
     read = p; got.forEach((r) => rows.push(r));
@@ -278,6 +388,9 @@ function updatesOf(result, existing, nowIso) {
     all.sort((a, b) => a.d.localeCompare(b.d));
     all.slice(0, all.length - MAX_KEEP).forEach((x) => { upd['hits/' + x.k] = null; });
   }
+  /* 옛 글에 붙인 기간 — ⚠ 같은 쓰기에서 지우는 글(null)에는 안 붙인다(RTDB 는 부모·자식을 한 번에 못 쓴다) */
+  Object.keys(result.fixes || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/href'] = result.fixes[k]; });
+  Object.keys(result.pers || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/per'] = result.pers[k]; });
   upd.last = { at: nowIso, checked: result.checked, added: result.hits.length,
     errors: result.errors, counts: result.counts };
   return upd;
@@ -290,4 +403,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
+module.exports = { periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };

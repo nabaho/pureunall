@@ -430,3 +430,110 @@ test('★★ 서버 — 처음 훑기는 남은 시간이 있을 때만, 그것�
   /* 읽은 것은 훑기보다 «먼저» 쓴다 — 훑다 끊겨도 그날 결과는 남는다 */
   assert.ok(body.indexOf('root.update(RecruitWatch.updatesOf') < body.indexOf('probeBoard'), '쓰기가 훑기보다 뒤에 있다');
 });
+
+/* ── 접수 기간 (대표 지시 2026-10-05 「서류에 기간이 있다 — 날짜가 지났는지 반드시 표시」) ── */
+const PER_CASES = [
+  /* 2026-10-05 실제 본문 문구 그대로 */
+  ['「산업·일자리전환 지원센터」컨설턴트 추가 모집 공고 모집기간 : 2026-06-22 ~ 2026-06-28 / 작성일 : 2026-06-22', '2026-06-22', { from: '2026-06-22', to: '2026-06-28', rolling: false }],
+  ['□ 제출기간 및 방법 ○ 제출기간 : 2026. 7. 8.(수) ~ 2026. 7. 20.(월) 18:00까지, 12일간 ○ 제출방법', '2026-07-08', { from: '2026-07-08', to: '2026-07-20', rolling: false }],
+  ['제출서류 접수방법 이메일 접수 접수마감일 채용시 마감 기타', '2026-09-30', { from: '', to: '', rolling: true }],
+  ['[세종농촌융복합산업지원센터] 현장코칭 전문위원 선정 안내 및 관리카드 작성 요청(~03.27 까지)', '2026-03-20', { from: '', to: '2026-03-27', rolling: false }],
+  ['가. 신청기간: 2026. 9. 1.(월) ~ 9. 15.(월) 18:00까지 나. 위촉기간: 2027.1.1~2028.12.31', '2026-08-28', { from: '2026-09-01', to: '2026-09-15', rolling: false }],
+  ['□ 접수기간 : 2026년 12월 20일(금) ~ 2027년 1월 10일(금)', '2026-12-15', { from: '2026-12-20', to: '2027-01-10', rolling: false }],
+  ['○ 접수 일정 : 12. 22.(월) ~ 1. 9.(금)', '2026-12-15', { from: '2026-12-22', to: '2027-01-09', rolling: false }],
+  ['추천 기한: 10. 13.(월)까지 회신', '2026-10-01', { from: '', to: '2026-10-13', rolling: false }],
+  ['모집기간: 상시 모집', '2026-05-01', { from: '', to: '', rolling: true }],
+  ['10.15(수)까지 접수 — 공정채용 컨설턴트 모집', '2026-10-01', { from: '', to: '2026-10-15', rolling: false }]
+];
+const PER_NONE = [
+  ['사업기간 2026.1.1~2026.12.31 위촉기간 2년', '2026-01-02'],   /* ⚠ 사업·위촉 기간은 마감이 아니다 */
+  ['사업 기간: 2026.1.1~12.31', '2026-01-02'],
+  ['위촉기간: 2027.1.1~2028.12.31', '2026-10-01'],
+  ['2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고', '2026-09-20'],
+  /* ⚠ 라벨에서 한참 떨어진 날짜는 접수 기간이 아니다 */
+  ['모집기간 및 제출방법 등 자세한 사항은 붙임 공고문을 참고하시기 바랍니다. 사업기간: 2026.1.1~2026.12.31', '2026-01-02']
+];
+test('★★★ 접수 기간 읽기 — 실제 본문·제목 문구로', () => {
+  PER_CASES.forEach(([t, d, want]) => assert.deepEqual(W.periodOf(t, d), want, t));
+  PER_NONE.forEach(([t, d]) => assert.equal(W.periodOf(t, d), null, '마감이 아닌 날짜를 읽었다: ' + t));
+});
+test('★★ 서버와 화면의 기간 읽기는 «같은 답» — 둘이 갈라지면 서버가 붙인 것과 화면이 읽은 것이 다르다', () => {
+  const C = require('../js/gov-recruit.js');
+  PER_CASES.concat(PER_NONE.map((x) => x.concat([null]))).forEach(([t, d]) => assert.deepEqual(C.periodOf(t, d), W.periodOf(t, d), t));
+  /* 글자까지 — 들여쓰기만 다르다 */
+  const fs = require('fs'), path = require('path');
+  const cut = (src) => src.slice(src.indexOf('var PER_D'), src.indexOf('return null;\n', src.indexOf('function periodOf'))).replace(/^ +/gm, '');
+  assert.equal(cut(fs.readFileSync(path.join(__dirname, 'recruit-watch.js'), 'utf8').replace(/\r\n/g, '\n')),
+    cut(fs.readFileSync(path.join(__dirname, '..', 'js', 'gov-recruit.js'), 'utf8').replace(/\r\n/g, '\n')));
+});
+const LIST1 = '<table><tr><td><a href="/v?1">2027년 일터혁신 컨설턴트 모집 공고</a></td><td>2026-10-01</td></tr></table>';
+const BODY1 = '<div>공고 본문 … 접수기간 : 2026. 10. 2.(금) ~ 2026. 10. 16.(금) 18:00 까지 … 위촉기간 2027.1.1~2027.12.31</div>';
+const B1 = { id: 'tst', org: 'x', name: '시험 공지', url: 'https://t.kr/list' };
+test('★★★ 새 글은 본문을 열어 접수 기간을 붙인다 — details 를 켰을 때만', async () => {
+  const f = async (u) => (u === B1.url ? LIST1 : BODY1);
+  const r = await W.run({ boards: [B1], fetchText: f, today: '2026-10-05', details: true });
+  assert.deepEqual(r.hits[0].per, { from: '2026-10-02', to: '2026-10-16', rolling: false });
+  const r2 = await W.run({ boards: [B1], fetchText: f, today: '2026-10-05' });
+  assert.equal(r2.hits[0].per, undefined, 'details 없이는 본문을 열지 않는다');
+});
+test('★★ 본문에 없으면 { none } — 날마다 다시 열지 않는다. 제목에서 찾은 것은 지킨다', async () => {
+  const L = '<table><tr><td><a href="/v?1">강사 모집 (~10.20 까지)</a></td><td>2026-10-01</td></tr><tr><td><a href="/v?2">컨설턴트 모집 공고</a></td><td>2026-10-01</td></tr></table>';
+  const r = await W.run({ boards: [B1], fetchText: async (u) => (u === B1.url ? L : '<p>본문</p>'), today: '2026-10-05', details: true });
+  const by = Object.fromEntries(r.hits.map((h) => [h.title, h.per]));
+  assert.equal(by['강사 모집 (~10.20 까지)'].to, '2026-10-20');
+  assert.deepEqual(by['컨설턴트 모집 공고'], { none: true });
+});
+test('★★ 이미 있던 글도 하루 몇 건씩 기간을 채운다 — 이미 본 것(to·rolling·none)은 다시 안 연다', async () => {
+  const k = W.keyOf('tst', { title: '옛 글', date: '2026-09-01' });
+  const have = {
+    [k]: { board: 'tst', title: '옛 글', date: '2026-09-01', href: 'https://t.kr/v?9' },
+    x1: { board: 'tst', title: '본 글', date: '2026-09-01', href: 'https://t.kr/v?8', per: { none: true } },
+    x2: { board: 'tst', title: '목록뿐', date: '2026-09-01', href: B1.url }
+  };
+  const opened = [];
+  const r = await W.run({ boards: [B1], existing: have, today: '2026-10-05', details: true,
+    fetchText: async (u) => { opened.push(u); return u === B1.url ? '<table></table>' : BODY1; } });
+  assert.deepEqual(r.pers[k], { from: '2026-10-02', to: '2026-10-16', rolling: false });
+  assert.ok(!opened.includes('https://t.kr/v?8'), '이미 본 글을 또 열었다');
+  assert.ok(!opened.includes(B1.url + '#') && r.pers.x2 === undefined, '목록 주소는 본문이 아니다');
+  const u = W.updatesOf(r, have, 'T');
+  assert.deepEqual(u['hits/' + k + '/per'], r.pers[k]);
+});
+test('★★ 프로그램 링크(javascript)에서 본문 주소를 만든다 — 지방공기업평가원·소진공 실측 꼴', () => {
+  const erc = W.BOARDS.find((b) => b.id === 'erc'), semas = W.BOARDS.find((b) => b.id === 'semas');
+  const e = W.parseRows('<table><tr><td><a href="javascript: void(0);" onclick="fn_detail(\'11513\');"> 지방공기업평가원 위촉직이사 모집 재공고</a></td><td>2026-07-08</td></tr></table>', erc.url, erc);
+  assert.match(e[0].href, /BBSDetail\.do\?bbsId=BBSMSTR_000000000251&nttId=11513/);
+  const m = W.parseRows('<table><tr><td><a href="javascript:fncGoDetail(\'56585\');"> 소상공인시장진흥공단 비상임이사 모집공고 </a></td><td>2026-09-09</td></tr></table>', semas.url, semas);
+  assert.match(m[0].href, /webBoardView\.kmdc\?bCd=1&b_idx=56585/);
+  /* 판 정보가 없으면 예전처럼 비운다 */
+  assert.equal(W.parseRows('<table><tr><td><a href="javascript:fncGoDetail(\'1\');">소상공인시장진흥공단 비상임이사 모집공고</a></td><td>2026-09-09</td></tr></table>', semas.url)[0].href, '');
+});
+test('★★ 옛 글의 목록 주소를 본문 주소로 고쳐 쓴다 — 열쇠는 그대로(두 번 안 들어온다)', async () => {
+  const B = { id: 'jsb', org: 'x', name: 'js 판', url: 'https://j.kr/list', js: { re: /go\('(\d+)'/, url: 'https://j.kr/view?id={id}' } };
+  const L = '<table><tr><td><a href="javascript:go(\'7\');">외부 컨설턴트 모집 공고</a></td><td>2026-09-01</td></tr></table>';
+  const k = W.keyOf('jsb', { title: '외부 컨설턴트 모집 공고', date: '2026-09-01' });
+  const have = { [k]: { board: 'jsb', title: '외부 컨설턴트 모집 공고', date: '2026-09-01', href: B.url } };
+  const r = await W.run({ boards: [B], existing: have, today: '2026-10-05', details: true, fetchText: async (u) => (u === B.url ? L : BODY1) });
+  assert.equal(r.hits.length, 0, '옛 글이 새 글로 또 들어왔다');
+  assert.equal(r.fixes[k], 'https://j.kr/view?id=7');
+  assert.equal(r.pers[k].to, '2026-10-16');
+  const u = W.updatesOf(r, have, 'T');
+  assert.equal(u['hits/' + k + '/href'], 'https://j.kr/view?id=7');
+});
+test('★ 지우는 글에는 기간·주소를 안 붙인다 — RTDB 는 부모(null)·자식을 한 번에 못 쓴다', () => {
+  const have = {}; for (let i = 0; i < W.MAX_KEEP + 1; i++) have['h' + i] = { date: '2026-01-' + String(1 + (i % 28)).padStart(2, '0') };
+  const old = Object.keys(have).sort((a, b) => have[a].date.localeCompare(have[b].date))[0];
+  const u = W.updatesOf({ hits: [], errors: [], counts: {}, checked: 0, pers: { [old]: { none: true } }, fixes: { [old]: 'https://x' } }, have, 'T');
+  assert.equal(u['hits/' + old], null);
+  assert.equal(u['hits/' + old + '/per'], undefined); assert.equal(u['hits/' + old + '/href'], undefined);
+});
+test('★ 본문 읽기도 전체 마감 안에서만 — 시간이 없으면 안 연다', async () => {
+  let t = 0; const opened = [];
+  const r = await W.run({ boards: [B1], today: '2026-10-05', details: true, totalMs: 100, now: () => t,
+    fetchText: async (u) => { opened.push(u); t += 150; return u === B1.url ? LIST1 : BODY1; } });
+  assert.equal(r.hits.length, 1); assert.deepEqual(opened, [B1.url], '마감이 지났는데 본문을 열었다');
+});
+test('★ 서버는 본문 읽기를 켠다', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8');
+  assert.match(src, /RecruitWatch\.run\(\{ existing, today, nowIso, fetchText, details: true \}\)/);
+});
