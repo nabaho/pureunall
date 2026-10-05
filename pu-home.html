@@ -3460,6 +3460,30 @@ async function applyStatus(live, livePages, failed, 시작) {
     App.saveErr = '대조 결과를 저장하지 못했습니다' + (e && e.code ? '(' + e.code + ')' : '')
       + ' — 이 화면에만 새 딱지가 보이고, 다른 사람 화면에는 지난 딱지가 그대로 남습니다.';
   }
+  /* ★ 대조가 «퇴사했고 홈페이지에도 없음(done)»을 본 사람에게 «내린 표시»를 남긴다 (2026-10-05).
+       손으로 내린 분(박성수·임혜미 님)에게 표시가 없어 매달 1일 서버가 또 내리려 했다. */
+  if (typeof 내린표시남기기 === 'function') {
+    Object.keys((next && next.members) || {}).forEach(k => {
+      if ((next.members[k] || {}).status === 'done') 내린표시남기기(k, '대조 — 홈페이지에 없음');
+    });
+  }
+}
+
+/* 구성원 글에 «내린 표시»(takenDown)를 남긴다 — 매달 1일 자동이 같은 글을 또 내리지 않게.
+   ★ 이어 둔(sid) 글에만, 표시가 없을 때만. 한 칸만 쓴다(구성원 자료를 통째로 덮지 않는다).
+   ⚠ 실패해도 조용히 둔다 — 표시는 다음 대조에서 다시 남는다. */
+async function 내린표시남기기(key, 까닭) {
+  const rec = (App.members || {})[key];
+  if (!rec || !rec.sid || rec.takenDown) return false;
+  const 표시 = { at: todayString(), by: currentUserName(), 까닭: String(까닭 || '') };
+  try {
+    await db.ref('homepage/members/' + key + '/takenDown').set(표시);
+    rec.takenDown = 표시;
+    return true;
+  } catch (e) {
+    console.warn('[내린 표시]', e && e.code);
+    return false;
+  }
 }
 
 /* ══════ 붙여넣을 내용 ══════ */
@@ -3996,7 +4020,7 @@ async function 퇴사자한번에내리기() {
            퇴사자가 안 내려갔는데 「내렸습니다」라고 말했다. 못 찾은 것을 먼저 본다. */
       const 못함 = (답.못찾은것 || []).filter(t => /비공개/.test(String(t)));
       if (못함.length) 안됨.push(x.name + ' — ' + 못함.join(' / '));
-      else if (답.ok && 답.저장됨) 됨.push(x.name);
+      else if (답.ok && 답.저장됨) { 됨.push(x.name); if (typeof 내린표시남기기 === 'function') 내린표시남기기(x.key, '손으로 내림'); }
       else if (답.ok && !(답.바뀐것 || []).length) 됨.push(x.name + ' (이미 내려가 있음)');
       else 안됨.push(x.name + ' — ' + ((답.걸린것 || []).join(' / ') || 답.error || '까닭 모름'));
     } catch (e) {
@@ -4057,6 +4081,7 @@ async function 한사람내리기(key) {
        바뀐 것이 없다 — 그것을 «됐다»로 읽어 2026-09-13 에 퇴사자가 안 내려갔다. */
   const 못함 = ((답 && 답.못찾은것) || []).filter(t => /비공개/.test(String(t)));
   if (!못함.length && 답 && 답.ok && (답.저장됨 || !(답.바뀐것 || []).length)) {
+    if (답.저장됨 && typeof 내린표시남기기 === 'function') 내린표시남기기(key, '손으로 내림');
     await say('내렸습니다',
       esc(이름) + ' 님 글을 홈페이지 <b>휴지통</b>으로 옮겼습니다 — 되살릴 수 있습니다.'
       + ((답.바뀐것 || []).length ? '' : ' <span class="sub">(이미 내려가 있었습니다)</span>'));
@@ -5685,6 +5710,7 @@ function 자동기록창() {
       const 한것 = [];
       (r.내림 || []).forEach(x => 한것.push(['내림(휴지통)', 자동대상이름(x)]));
       (r.못내림 || []).forEach(x => 한것.push(['못 내림', 자동대상이름(x) + (x.까닭 ? ' — ' + x.까닭 : '')]));
+      (r.이미 || []).forEach(x => 한것.push(['이미 없음', 자동대상이름(x) + ' — 홈페이지에 이미 없어 표시만 남김']));
       (r.올림 || []).forEach(x => 한것.push(['올림', 자동대상이름(x) + ' · 글 번호 ' + x.srl]));
       (r.못올림 || []).forEach(x => 한것.push(['못 올림', 자동대상이름(x) + (x.까닭 ? ' — ' + x.까닭 : '')]));
       if (r.올리기안됨) 한것.push(['못 올림', r.올리기안됨]);

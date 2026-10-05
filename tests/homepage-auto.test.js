@@ -425,3 +425,13 @@ test('지문은 차례와 상관없이 같은 목록이면 같다', () => {
   assert.strictEqual(HA.지문(a), HA.지문(a.slice().reverse()));
   assert.notStrictEqual(HA.지문(a), HA.지문(a.slice(0, 1)));
 });
+
+test('★ 이미 홈페이지에 없는 글은 «내림»이 아니라 «이미 없음» — 표시만 남기고 경보·기록 글은 안 남긴다', async () => {
+  const g = 가짜(퇴사자료(), (x) => (x.key ? { 됐나: true, 이미: true, 까닭: '이미 홈페이지에 없음' } : { 됐나: true }));
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(r.이미.length, 1);
+  assert.strictEqual(r.못내림.length, 0, '이미 없는 글을 못 내림으로 알립니다');
+  assert.ok(g.쓴것.some(([p]) => p === 'homepage/members/m1/takenDown'), '표시를 안 남겼습니다 — 다음 달에 또 내리려 한다');
+  assert.ok(!g.붙인것.some(([p]) => p === 'homepage/writeLog/101'), '내리지도 않았는데 휴지통으로 옮겼다고 적었습니다');
+  assert.ok(!r.내림.some(x => x.srl === 101));
+});
