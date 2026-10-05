@@ -236,3 +236,14 @@ test('★ 종료 창에서 「미수행 종료」를 고를 수 있다', () => {
 test('★ 띠에 「⚠ 확인 필요」 칩 — 셈 함수가 고른 건 수를 그대로', () => {
   assert.match(bare(cutFn('function ClinicDayCards(')), /'⚠ 확인 필요 ' \+ r\.check\.length/);
 });
+
+test('★ 현장클리닉 한 사람 «한 해 최대 30일·기술보호 33»을 보이고, 넘으면 빨갛게 — 막지는 않는다 (대표 지시 2026-10-05)', () => {
+  const up = src.slice(src.indexOf('var UNIT_PROGS = {'), src.indexOf('};', src.indexOf('var UNIT_PROGS = {')));
+  assert.match(up, /clinic: \{[^}]*yearMax:30/, '★ 현장클리닉 한 해 최대 30일'); // 검사고정-허용: 대표가 정한 사업 규칙(연간 30일)
+  assert.match(up, /tech:\s+\{[^}]*yearMax:33/, '★ 기술보호 한 해 최대 33'); // 검사고정-허용: 대표가 정한 사업 규칙(기술보호컨설팅 연간 33일)
+  const cards = cutFn('function ClinicDayCards(');
+  assert.match(cards, /'\/' \+ cap/, '★ 칩에 「21/30일」 꼴로 보여야 합니다');
+  assert.match(cards, /\(s\.days \+ \(s\.planDays \|\| 0\)\) > cap/, '★ 수행+예정이 넘으면 알린다');
+  const cm = src.slice(src.indexOf('var hint = clinicContractHint('), src.indexOf('var hint = clinicContractHint(') + 2500);
+  assert.match(cm, /hint\.nextDays > cap/, '★ 계약 창: 이 계약까지 넘으면 알린다');
+});
