@@ -17984,6 +17984,19 @@ function printLedger(kind){
     +'<button onclick="print()" style="padding:8px 16px">인쇄 / PDF 저장</button>');
   w.document.close();
 }
+/* 통장 잔액 — 계좌(acct)마다 날짜 차례로 마지막 잔액을 골라 더한다. arr 는 날짜 차례.
+   잔액 칸이 하나도 없는 묶음(손으로 넣은 거래 등)은 통장이 아니므로 뺀다 — 그 금액은 계산 잔액에 남아 «차이»로 드러난다.
+   잔액이 있는 계좌가 하나도 없으면 sum:''(모름 — 대사 딱지를 안 띄운다). */
+function _bankLastBal(arr){
+  var last={};
+  (arr||[]).forEach(function(x){
+    if(x.balance===''||x.balance==null) return;
+    var b=num(x.balance); if(b==='') return;
+    last[String(x.acct||'')]=b;
+  });
+  var ks=Object.keys(last);
+  return {sum:ks.length?ks.reduce(function(s,k){ return s+last[k]; },0):'', n:ks.length};
+}
 function closingTab(f){
   var key=S.fundId+'/'+S.year;
   if(S.txnsFor!==key){ var _k=key; S.txnsFor=_k; S.txns=null;
@@ -17995,12 +18008,14 @@ function closingTab(f){
   var dep=arr.reduce(function(s,x){return s+(num(x.deposit)||0);},0), wd=arr.reduce(function(s,x){return s+(num(x.withdraw)||0);},0);
   var unclass=arr.filter(function(x){return !_txnDone(x);}).length, unappr=arr.filter(function(x){return !x.approved;}).length;
   var gateOk = arr.length && unclass===0 && unappr===0;
-  // ⑷ 통장 잔액 대사: 마지막 거래의 통장 잔액 vs (전기이월 현금 + 입금 - 출금)
+  // ⑷ 통장 잔액 대사: «계좌마다» 마지막 통장 잔액을 더한 것 vs (전기이월 현금 + 입금 - 출금)
+  //    ★ 2026-10-05 마지막 «한 줄»만 보던 것을 고침 — 계좌가 둘인 안전공사 2022(8,000,986 + 62,006,663 = 계산 잔액)가
+  //      맞는데도 「차이」로 떠 결산 관문을 막았다(대표 「1진행」). 계좌가 하나면 예전과 같다.
   var _yd=(funds[S.fundId]&&funds[S.fundId].years&&funds[S.fundId].years[S.year])||{};
-  var openCash=num((_yd.opening||{}).cash)||0, lastBal=arr.length?num(arr[arr.length-1].balance):'';
+  var _lb=_bankLastBal(arr), openCash=num((_yd.opening||{}).cash)||0, lastBal=_lb.sum;
   var calcBal=openCash+dep-wd;
   var reconChip=(arr.length&&lastBal!==''&&lastBal!=null)
-    ? (Math.abs(lastBal-calcBal)<1 ? '<span class="chip ok">통장잔액 대사 ✅</span>'
+    ? (Math.abs(lastBal-calcBal)<1 ? '<span class="chip ok"'+(_lb.n>1?' title="계좌 '+_lb.n+'개의 마지막 잔액 합"':'')+'>통장잔액 대사 ✅</span>'
        : '<span class="chip warn">통장잔액 대사 차이 '+won(lastBal-calcBal)+' (전기이월 현금 확인)</span>')
     : '';
   var rows=arr.map(function(x){
