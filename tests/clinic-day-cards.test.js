@@ -94,7 +94,8 @@ test('★ 이관된 계약은 예정에서 빠진다 — 컨설팅관리 쪽과 
   assert.equal(R.total.planCnt, 2);
 });
 test('화면: 컨설팅관리에만 카드가 붙고, 카드는 셈 함수 하나를 쓴다', () => {
-  assert.match(src, /props\.sourceKind === 'consulting' && h\(ClinicDayCards,/);
+  /* 띠는 접었다 펼 수 있다(2026-10-05) — 사이에 펼침 스위치가 끼어도 «컨설팅관리에만» 규칙은 같다 */
+  assert.match(src, /props\.sourceKind === 'consulting' && (?:\w+ && )?h\(ClinicDayCards,/);
   assert.match(cutFn('function ClinicDayCards('), /clinicDayCards\(props\.items, dbGet\('contracts', \[\]\), types, fy, consTypeDayFee, prog\.isType, prog\.max\)/);
   assert.match(cutFn('function ClinicDayCards('), /app\.fiscalYearStart/, '회계연도는 앱 설정에서');
 });

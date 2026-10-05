@@ -27457,13 +27457,8 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   var coHiddenCount = coColReg.filter(function(c){ return hiddenCols[c.k]; }).length;
   // 유형은 도구줄에 그대로 보이므로 '필터 (n)' 배지에서 뺀다 — 두 군데서 세면 헷갈린다
   var activeFilterCount = cOnCount();
-  // 컬럼 드롭다운 외부 클릭 자동 닫기
-  useEffect(function(){
-    if(!colMenuOpen) return;
-    function onDocClick(){ setColMenuOpen(false); }
-    document.addEventListener('click', onDocClick);
-    return function(){ document.removeEventListener('click', onDocClick); };
-  }, [colMenuOpen]);
+  // 컬럼 드롭다운 — 바깥 누르기·Esc 로 닫기 (공용 도우미)
+  usePopupDismiss(colMenuOpen, function(){ setColMenuOpen(false); });
   useEffect(function(){
     if(!filterMenuOpen) return;
     function onDocClick(){ setFilterMenuOpen(false); }
@@ -28007,7 +28002,8 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     return s + (erpFeeStopped(c, selYM) ? (c.monthlyAdvisoryFee||0) : 0);
   }, 0);
   // 페이지네이션 (표시 개수 선택)
-  var copsS = useState(50); var coPageSize = copsS[0]; var setCoPageSize = copsS[1];
+  /* 개수 보기는 이 기기에서 마지막에 고른 대로 (대표 지시 2026-10-05) */
+  var copsS = usePersistedState('pagesize_companies', 50); var coPageSize = copsS[0]; var setCoPageSize = copsS[1];
   var pg = usePagination(filtered, coPageSize);
   // (도구줄에 있던 유형 세그먼트·담당자·급여일 필터는 표 머리 깔때기로 옮겼다.
   //  거기 딸려 있던 typeCount·mgrCount·payrollDayOpts 도 함께 걷어냈다 —
@@ -31525,6 +31521,7 @@ function CaseManagement(props){
   var savedCaseCols = (function(){ try{ var sc=localStorage.getItem(caseCvKey); return sc?JSON.parse(sc):caseDefaultCols; }catch(e){ return caseDefaultCols; } })();
   var cvvS = useState(Object.assign({}, caseDefaultCols, savedCaseCols)); var colVis = cvvS[0]; var setColVis = cvvS[1];
   var cssS = useState(false); var colSettings = cssS[0]; var setColSettings = cssS[1];
+  usePopupDismiss(colSettings, function(){ setColSettings(false); });   // 「⚙️ 컬럼」 바깥 누르기·Esc 로 닫기
   function toggleCol(k){
     var next = Object.assign({}, colVis, {[k]: !colVis[k]});
     setColVis(next);
@@ -32057,7 +32054,8 @@ function CaseManagement(props){
   var progressCount = cases.filter(function(c){return c.status==='progress' || c.status==='mediation' || c.status==='judgment' || c.status==='pending';}).length;
   var closedCount = cases.filter(function(c){return c.status==='closed';}).length;
   // 페이지네이션
-  var cpsS = useState(50); var casePageSize = cpsS[0]; var setCasePageSize = cpsS[1];
+  /* 개수 보기는 이 기기에서 마지막에 고른 대로 (대표 지시 2026-10-05) */
+  var cpsS = usePersistedState('pagesize_cases', 50); var casePageSize = cpsS[0]; var setCasePageSize = cpsS[1];
   var pgCase = usePagination(filtered, casePageSize);
   var totalConfirmedIncome = cases.reduce(function(s,c){
     return s + (canSeeAmount(c) ? (c.incomes||[]).filter(function(i){return i.confirmed;}).reduce(function(s2,i){return s2+i.amount;}, 0) : 0);
@@ -32145,9 +32143,10 @@ function CaseManagement(props){
           h(MineFirstChip, { on:mineFirst, onToggle:function(){ setMineFirst(!mineFirst); } })
         )
       )
-    : h('div', { className:'dt-toolbar', style:{ marginBottom:'14px', flexWrap:'wrap', gap:'6px' } },
+    /* ★ 한 줄 (대표 지시 2026-10-05 「관리 대시보드는 항상 1줄로」) — 공용 툴바와 같은 규칙. flexWrap 으로 되돌리지 말 것. */
+    : h('div', { className:'dt-toolbar', style:{ marginBottom:'14px', flexWrap:'nowrap', whiteSpace:'nowrap', gap:'6px', minWidth:0 } },
         h('input', { type:'search', className:'dt-search', placeholder:'🔍 관리번호·의뢰인·사업자번호·비고 검색', value:query,
-          onChange:function(e){ setQuery(e.target.value); }, style:{ width:'260px' } }),
+          onChange:function(e){ setQuery(e.target.value); }, style:{ flex:'0 1 240px', minWidth:'110px', width:'auto' } }),
         h('select', { value:statusFilter, onChange:function(e){
           if(e.target.value === 'closed'){
             sessionStorage.setItem('goto_closed_kind', '사건');
@@ -32156,11 +32155,14 @@ function CaseManagement(props){
           }
           setStatusFilter(e.target.value);
         },
-          style:{ padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } },
+          style:{ padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit', flex:'0 0 auto' } },
+          /* 기본값 'open'(종결 제외)에 맞는 고르개가 없어 칸이 «빈칸»으로 보였다 (2026-10-05) */
+          h('option', { value:'open' }, '종결 제외 전체'),
           CASE_STATUS.filter(function(s){ return s.v !== 'closed'; }).map(function(s){ return h('option', { key:s.v, value:s.v }, s.label); }),
           h('option', { value:'closed' }, '📦 종결된 건 보기 →')),
         h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
-          style:{ padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } },
+          title:(types.find(function(t){ return t.code === typeFilter; }) || { name:'전체 유형' }).name,
+          style:{ padding:'6px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit', flex:'0 1 auto', minWidth:'90px', maxWidth:'170px' } },
           h('option', { value:'all' }, '전체 유형'),
           types.map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); })),
         // 심급·단계 필터 (stageCode 로 걸러낸다)
@@ -32187,9 +32189,9 @@ function CaseManagement(props){
           title:'시리즈별 번호 결번 검사 + 번호 재정렬',
           style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '🔍 결번 검사'),
         h('div', { style:{ position:'relative' } },
-          h('button', { onClick:function(){setColSettings(!colSettings);},
+          h('button', { onClick:function(e){ e.stopPropagation(); setColSettings(!colSettings); },
             style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', padding:'6px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '⚙️ 컬럼'),
-          colSettings && h('div', { style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
+          colSettings && h('div', { onClick:function(e){ e.stopPropagation(); }, style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
             h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#64748b', padding:'4px 6px', marginBottom:'4px', borderBottom:'1px solid #e2e8f0' } }, '컬럼 표시'),
             [
               {k:'type', l:'유형'},
@@ -35880,6 +35882,20 @@ function useCollapse(id, defaultOpen){
   var oS = useState(initOpen); var open = oS[0]; var setOpen = oS[1];
   function toggle(){ var nx = !open; setOpen(nx); try{ localStorage.setItem(key, nx?'1':'0'); }catch(e){ window._erpErrLog && window._erpErrLog(e); } }
   return { open: open, toggle: toggle, arrow: open ? '▼' : '▶' };
+}
+
+/* ── usePopupDismiss: 펼침창(컬럼 표시 등)을 «바깥 누르기·Esc» 로 닫는다 (대표 지시 2026-10-05
+   「팝업을 안 보이게 할 때는 항상 마우스로 빈 곳 클릭이나 Esc 로 사라지게」).
+   ⚠ 펼침창 안과 여는 단추는 onClick 에서 e.stopPropagation() 해야 한다 — 안 하면 누르자마자 닫힌다. */
+function usePopupDismiss(open, close){
+  useEffect(function(){
+    if(!open) return;
+    function onDoc(){ close(); }
+    function onKey(e){ if(e.key === 'Escape' || e.key === 'Esc'){ close(); } }
+    document.addEventListener('click', onDoc);
+    document.addEventListener('keydown', onKey);
+    return function(){ document.removeEventListener('click', onDoc); document.removeEventListener('keydown', onKey); };
+  }, [open]);
 }
 
 // ── usePersistedState: 로컬스토리지에 자동 저장/복원되는 useState ──
@@ -53953,7 +53969,8 @@ function IncomePendingTab(props){
   }, []);
   var vff = useState('all'); var vatFilter = vff[0]; var setVatFilter = vff[1];
   var pgf = useState('all'); var progFilter = pgf[0]; var setProgFilter = pgf[1]; // 진행상태 필터: all | closed(종료·마감) | active(진행중)
-  var ppsS = useState(99999); var pendPageSize = ppsS[0]; var setPendPageSize = ppsS[1]; // 기본: 전체 보기
+  /* 개수 보기는 이 기기에서 마지막에 고른 대로 (대표 지시 2026-10-05) */
+  var ppsS = usePersistedState('pagesize_income_pending', 99999); var pendPageSize = ppsS[0]; var setPendPageSize = ppsS[1]; // 기본: 전체 보기
   // 종료된 업체명 set (companyName 매칭용)
   var closedCompanyNames = {};
   var companyVatMap = {};
@@ -55556,7 +55573,8 @@ function IncomeListTab(){
 
   var totalAmount = filtered.reduce(function(s,i){return s+(i.amount||0);},0);
   // 페이지네이션
-  var ipsS = useState(100); var incPageSize = ipsS[0]; var setIncPageSize = ipsS[1];
+  /* 개수 보기는 이 기기에서 마지막에 고른 대로 (대표 지시 2026-10-05) */
+  var ipsS = usePersistedState('pagesize_income_list', 100); var incPageSize = ipsS[0]; var setIncPageSize = ipsS[1];
   var pgInc = usePagination(filtered, incPageSize);
   function exportListExcel(){
     function uname(sid){ var u = users.find(function(x){ return x.sid===sid; }); return u ? u.name : (sid||''); }
@@ -65883,6 +65901,9 @@ function ProjectManagementShared(props){
   var smg = usePersistedState('proj_'+props.sourceKind+'_submgr', 'all'); var subMgrFilter = smg[0]; var setSubMgrFilter = smg[1];
   // 내 담당 먼저 보기 — 기본 켬. 화면을 열자마자 내 업무가 위에 오게 한다.
   var mfS = usePersistedState('proj_'+props.sourceKind+'_minefirst', true); var mineFirst = mfS[0] !== false; var setMineFirst = mfS[1];
+  /* 🏥 현장클리닉·🛡 기술보호 띠 — 늘 펴 두지 않는다 (대표 지시 2026-10-05 「항상 나올 필요 없다 · 클릭하면 나오게」).
+     기본은 접힘. 툴바의 「📊 클리닉·기술보호」 단추로 편다 — 편 상태는 이 기기에서 기억한다. */
+  var usS = usePersistedState('proj_'+props.sourceKind+'_unitstrip', false); var unitStrip = usS[0] === true; var setUnitStrip = usS[1];
   var ymS = usePersistedState('proj_'+props.sourceKind+'_month', todayYM()); var selYM = ymS[0]; var setSelYM = ymS[1];
   var thisYM = selYM;
   var em = useState(null); var editModal = em[0]; var setEditModal = em[1];
@@ -65972,6 +65993,7 @@ function ProjectManagementShared(props){
   var savedCols = (function(){ try{ var s=localStorage.getItem(cvKey); return s?JSON.parse(s):defaultCols; }catch(e){ return defaultCols; } })();
   var cv = useState(Object.assign({}, defaultCols, savedCols)); var colVis = cv[0]; var setColVis = cv[1];
   var cs = useState(false); var colSettings = cs[0]; var setColSettings = cs[1];
+  usePopupDismiss(colSettings, function(){ setColSettings(false); });   // 「⚙️ 컬럼」 바깥 누르기·Esc 로 닫기
   function toggleCol(k){
     var next = Object.assign({}, colVis, {[k]: !colVis[k]});
     setColVis(next);
@@ -66216,7 +66238,8 @@ function ProjectManagementShared(props){
 
   /* 50행은 약 2천 개 화면 요소를 한꺼번에 만들어 실시간 갱신·GC와 겹치면 멈춤이
      커진다. 기본은 20행으로 낮추고 50/100/전체 선택은 그대로 제공한다. */
-  var ppsS = useState(20); var projPageSize = ppsS[0]; var setProjPageSize = ppsS[1];
+  /* 개수 보기는 이 기기에서 마지막에 고른 대로 (대표 지시 2026-10-05) */
+  var ppsS = usePersistedState('pagesize_proj_'+props.sourceKind, 20); var projPageSize = ppsS[0]; var setProjPageSize = ppsS[1];
   var pgConsult = usePagination(filtered, projPageSize);
   var totalCount = items.filter(function(c){return c.status!=='closed' && c.status!=='cancelled' && !c.closedDate;}).length;
   var pendingCount = items.filter(function(c){return c.status==='pending';}).length;
@@ -66283,7 +66306,7 @@ function ProjectManagementShared(props){
         monthOnly ? '✓ 이번 달만' : '📅 이번 달만')
     }),
     // 🏥 현장클리닉 주담당별 일수 (컨설팅관리에만)
-    props.sourceKind === 'consulting' && h(ClinicDayCards, {
+    props.sourceKind === 'consulting' && unitStrip && h(ClinicDayCards, {
       items: items, types: types, userName: userName,
       pickedSid: mgrFilter !== 'all' ? mgrFilter : '', pickedType: typeFilter !== 'all' ? typeFilter : '',
       /* 수행 일수에는 종료된 건도 든다 — 누르면 상태 거르개를 «전체»로, 풀면 기본(종료 제외)으로 */
@@ -66296,7 +66319,7 @@ function ProjectManagementShared(props){
     /* 🛡 기술보호 주담당별 회수 (대표 지시 2026-10-04 — 1회차 30만원이라 총 몇 회 했나 · 「셀은 작게」).
        현장클리닉과 «같은 컴포넌트·같은 한 줄 칩»이다 — 사업 설명서(UNIT_PROGS.tech)만 다르다.
        기술보호 유형이 없거나 이 회계연도에 한 건도 없으면 그리지 않는다. */
-    props.sourceKind === 'consulting' && h(ClinicDayCards, {
+    props.sourceKind === 'consulting' && unitStrip && h(ClinicDayCards, {
       key:'tech', prog: UNIT_PROGS.tech,
       items: items, types: types, userName: userName,
       pickedSid: mgrFilter !== 'all' ? mgrFilter : '', pickedType: typeFilter !== 'all' ? typeFilter : '',
@@ -66360,12 +66383,15 @@ function ProjectManagementShared(props){
             style:{ padding:'5px 10px', border:'1px solid #bfdbfe', borderRadius:'20px', fontSize:'11px', flexShrink:0, background:'#eff6ff', color:'#2563eb', fontWeight:700, cursor:'pointer' } }, '↺ 기본값')
         )
       )
-    : h('div', { style:{ display:'flex', gap:'8px', marginBottom:'14px', alignItems:'center', flexWrap:'wrap' } },
-      props.sourceKind === 'case' ? h('div', { style:{ fontSize:'11.5px', color:'#94a3b8', fontStyle:'italic' } },
+    /* ★ 한 줄 (대표 지시 2026-10-05 「관리 대시보드는 항상 1줄로」) — 넘치면 줄을 바꾸지 않고 검색칸·유형칸이 줄어든다.
+       ⚠ flexWrap:'wrap' 으로 되돌리지 말 것: 「N개씩 보기」 하나만 둘째 줄로 떨어져 표가 한 줄만큼 내려갔다.
+       ⚠ overflow 를 주지 말 것 — 「⚙️ 컬럼」 펼침창이 잘린다. */
+    : h('div', { style:{ display:'flex', gap:'6px', marginBottom:'14px', alignItems:'center', flexWrap:'nowrap', whiteSpace:'nowrap', minWidth:0 } },
+      props.sourceKind === 'case' ? h('div', { style:{ fontSize:'11.5px', color:'#94a3b8', fontStyle:'italic', flex:'0 1 auto', overflow:'hidden', textOverflow:'ellipsis' } },
         '※ 신규 등록은 계약관리에서 이관') : null,
       h('input', { type:'search', placeholder:'🔍 관리번호·업체명·사업자번호 검색', value:query,
         onChange:function(e){ setQuery(e.target.value); },
-        style:{ width:'260px', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } }),
+        style:{ flex:'0 1 240px', minWidth:'110px', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } }),
       h('select', { value:statusFilter, onChange:function(e){
         if(e.target.value === 'closed'){
           var kindMap = { consulting:'컨설팅', fund:'기금', other:'기타', case:'사건' };
@@ -66381,7 +66407,8 @@ function ProjectManagementShared(props){
         h('option', { value:'progress' }, '진행중'),
         h('option', { value:'closed' }, '📦 종료된 건 보기 →')),
       h('select', { value:typeFilter, onChange:function(e){ setTypeFilter(e.target.value); },
-        style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } },
+        title:(types.find(function(t){ return t.code === typeFilter; }) || { name:'전체 유형' }).name,
+        style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', flex:'0 1 auto', minWidth:'90px', maxWidth:'170px' } },
         h('option', { value:'all' }, '전체 유형'),
         types.map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); })),
       h('select', { value:mgrFilter, onChange:function(e){ setMgrFilter(e.target.value); },
@@ -66393,7 +66420,12 @@ function ProjectManagementShared(props){
         h('option', { value:'all' }, '👥 부담당'),
         users.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); })),
       h(MineFirstChip, { on:mineFirst, big:true, onToggle:function(){ setMineFirst(!mineFirst); } }),
-      h('div', { style:{ flex:1 } }),
+      props.sourceKind === 'consulting' && h('button', { onClick:function(){ setUnitStrip(!unitStrip); },
+        title: unitStrip ? '현장클리닉·기술보호 담당별 일수·회수 띠를 접습니다' : '현장클리닉 담당별 일수 · 기술보호 담당별 회수를 펼칩니다',
+        style:{ background: unitStrip ? '#1e40af' : '#fff', color: unitStrip ? '#fff' : '#1e40af', border:'1px solid ' + (unitStrip ? '#1e40af' : '#bfdbfe'),
+          padding:'7px 10px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer', flex:'0 0 auto' } },
+        (unitStrip ? '▾ ' : '▸ ') + '📊 클리닉·기술보호'),
+      h('div', { style:{ flex:1, minWidth:0 } }),
       props.sourceKind === 'consulting' && h('button', { onClick:resetProjView,
         title:RESET_VIEW_TIP,
         style:{ background:'#eff6ff', color:'#2563eb', border:'1px solid #bfdbfe', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '↺ 기본값으로'),
@@ -66401,9 +66433,9 @@ function ProjectManagementShared(props){
         title:'시리즈별 번호 결번 검사 + 번호 재정렬',
         style:{ background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '🔍 결번 검사'),
       h('div', { style:{ position:'relative' } },
-        h('button', { onClick:function(){setColSettings(!colSettings);},
+        h('button', { onClick:function(e){ e.stopPropagation(); setColSettings(!colSettings); },
           style:{ background:'#fff', color:'#475569', border:'1px solid #cbd5e1', padding:'7px 12px', borderRadius:'4px', fontSize:'12px', fontWeight:600, cursor:'pointer' } }, '⚙️ 컬럼'),
-        colSettings && h('div', { style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
+        colSettings && h('div', { onClick:function(e){ e.stopPropagation(); }, style:{ position:'absolute', top:'calc(100% + 4px)', right:0, background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', boxShadow:'0 8px 24px rgba(0,0,0,0.12)', padding:'8px', minWidth:'180px', zIndex:100 } },
           h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#64748b', padding:'4px 6px', marginBottom:'4px', borderBottom:'1px solid #e2e8f0' } }, '컬럼 표시'),
           [
             {k:'no', l:'#'},{k:'type', l:'유형'},{k:'company', l:'업체명'},{k:'bizNo', l:'사업자번호'},
@@ -67230,7 +67262,8 @@ function ClosedManagement(){
   var cpm = useState(null); var closedPrint = cpm[0]; var setClosedPrint = cpm[1];
   // 표시 개수/페이지 (7개 탭 공용)
   var clPgS = useState(1); var closedPage = clPgS[0]; var setClosedPage = clPgS[1];
-  var clPsS = useState(50); var closedPageSize = clPsS[0]; var setClosedPageSize = clPsS[1];
+  /* 개수 보기는 이 기기에서 마지막에 고른 대로 (대표 지시 2026-10-05) */
+  var clPsS = usePersistedState('pagesize_closed', 50); var closedPageSize = clPsS[0]; var setClosedPageSize = clPsS[1];
   var _clBar = null;
   function clPage(list){
     list = list || [];
