@@ -327,7 +327,11 @@
   }
   /* 계약 값이 «이기는» 칸 — 계약에서만 아는 값. 회사·담당자·근로자 칸은 채우기 창에서 고른 것이 먼저(비면 계약 값) */
   var CONTRACT_WINS = /^(계약|성공보수$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
-  function hasGroups(kind) { return kind === 'case' || kind === 'fund'; }
+  /* 「계약서 / 제안서·견적서」 두 묶음을 쓰는 종류 (대표 「추천대로」 2026-10-06 — 견적서·제안 공문을 기금 밖에서도).
+     사건계약은 사건유형 묶음, 상담사항은 묶음 없음. 이알피 계약서 출력은 어느 종류든 제안서·견적서를 자동 체크하지 않는다. */
+  var TWO_GROUP_KINDS = ['company', 'consulting', 'fund', 'other'];
+  function twoGroups(kind) { return TWO_GROUP_KINDS.indexOf(kind) >= 0; }
+  function hasGroups(kind) { return kind === 'case' || twoGroups(kind); }
   /* 측 — 사건계약에만. 적힌 값이 먼저, 없으면 본문 칸으로 짐작한다(근로자 칸이 있으면 근로자측:
      근로자측 양식도 상대 회사 {{회사명}} 을 적는 일이 흔하다). */
   function sideOf(f) {
@@ -341,10 +345,10 @@
   function groupOf(f) {
     var g = (f && String(f.groupName || '').trim()) || '';
     if (g) return g;
-    return f && f.kind === 'fund' ? FUND_GROUPS[0] : NO_GROUP;   // 기금: 묶음이 없으면 계약서(시드 fm-5)
+    return f && twoGroups(f.kind) ? FUND_GROUPS[0] : NO_GROUP;   // 묶음이 없으면 계약서(기금 시드 fm-5 · 업체 표준 계약서들)
   }
   function groupRank(g, kind) {
-    var list = kind === 'fund' ? FUND_GROUPS : CASE_TYPES, i = list.indexOf(g);
+    var list = twoGroups(kind) ? FUND_GROUPS : CASE_TYPES, i = list.indexOf(g);
     return i >= 0 ? i : (g === NO_GROUP ? 1000 : 500);
   }
   /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어 } */
@@ -372,7 +376,7 @@
     var list = (forms || []).filter(function (f) { return f.kind === kind; });
     var sides = { all: list.length, worker: 0, employer: 0, both: 0 };
     var by = {};
-    if (kind === 'fund') FUND_GROUPS.forEach(function (g) { by[g] = 0; });   // 0개 묶음도 칩으로 보인다
+    if (twoGroups(kind)) FUND_GROUPS.forEach(function (g) { by[g] = 0; });   // 0개 묶음도 칩으로 보인다
     list.forEach(function (f) {
       var s = sideOf(f);
       if (s) sides[s]++;
@@ -782,8 +786,8 @@
         return el('label', { style: 'display:inline-flex;align-items:center;gap:4px;border:1px solid #cbd5e1;border-radius:6px;padding:5px 10px;font-size:12.5px;cursor:pointer' }, [r, s.label]);
       }).concat(sideTouched ? [] : [el('span', { style: 'font-size:11.5px;color:#64748b', text: '지금은 본문 칸으로 짐작한 값입니다 — 누르면 정해집니다' })]));
     }
-    if (f.kind === 'fund') {
-      /* 기금관리 묶음 — 「제안서·견적서」는 이알피 계약서 출력이 자동 체크하지 않는다 */
+    if (twoGroups(f.kind)) {
+      /* 묶음 — 「제안서·견적서」는 이알피 계약서 출력이 자동 체크하지 않는다 */
       grpIn = el('select', { 'aria-label': '묶음' }, FUND_GROUPS.map(function (g) { return el('option', { value: g, text: g }); }));
       grpIn.value = groupOf(f);
     }
@@ -871,7 +875,7 @@
       el('div', { 'class': 'pcf-mb' }, [
         el('div', { style: 'display:grid;grid-template-columns:' + (grpIn ? '1fr 180px' : '1fr') + ';gap:10px' }, [
           el('div', null, [el('label', { 'class': 'l', text: '양식 이름 *' }), nameIn]),
-          grpIn ? el('div', null, [el('label', { 'class': 'l', text: f.kind === 'fund' ? '묶음' : '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
+          grpIn ? el('div', null, [el('label', { 'class': 'l', text: twoGroups(f.kind) ? '묶음' : '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
             f.kind === 'case' ? el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); })) : null]) : null
         ]),
         sideBox ? el('div', null, [el('label', { 'class': 'l', text: '측 (누가 의뢰하는 계약인가)' }), sideBox]) : null,
@@ -1715,9 +1719,12 @@
       }, function (e) { toast('⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
     }
     function openPropose() {
-      S.kind = 'fund'; S.side = 'all'; S.grp = PROPOSAL_GROUP; S.q = '';
-      var list = filterForms(S.forms, { kind: 'fund', grp: PROPOSAL_GROUP });
-      if (!list.length) { drawTree(); drawMain(); toast('기금관리 › 제안서·견적서 양식이 아직 없습니다 — 먼저 원본을 올려 주세요'); return; }
+      /* 제안서·견적서가 있는 첫 종류(업체계약 → 컨설팅 → 기타사업 → 기금관리)를 연다 — 예전에는 기금관리만 봤다 */
+      var kinds = ['company', 'consulting', 'other', 'fund'].filter(function (k) { return filterForms(S.forms, { kind: k, grp: PROPOSAL_GROUP }).length; });
+      S.kind = kinds[0] || 'company'; S.side = 'all'; S.grp = PROPOSAL_GROUP; S.q = '';
+      var list = filterForms(S.forms, { kind: S.kind, grp: PROPOSAL_GROUP });
+      if (!list.length) { drawTree(); drawMain(); toast('제안서·견적서 양식이 아직 없습니다 — 먼저 원본을 올려 주세요'); return; }
+      if (kinds.length > 1) toast('다른 종류에도 제안서·견적서가 있습니다: ' + kinds.slice(1).map(function (k) { return kindInfo(k).label; }).join('·'));
       select(list[0].id);
       if (list.length === 1) openFill([list[0]], host);
       else toast('보낼 제안서를 고르고 「📝 찾아서 채우기」를 누르세요 — 회사는 골라 둡니다');
@@ -2105,8 +2112,8 @@
             return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
           }))));
       }
-      if (kind === 'fund') {
-        var ff = facetCounts(S.forms, 'fund');
+      if (twoGroups(kind)) {
+        var ff = facetCounts(S.forms, kind);
         row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '묶음' },
           [chip('전체 ' + ff.sides.all, S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(ff.groups.map(function (g) {
             return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
@@ -2316,7 +2323,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TWO_GROUP_KINDS: TWO_GROUP_KINDS, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,

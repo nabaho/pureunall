@@ -37,7 +37,7 @@ test('ⓑ 양식 화면 — 처음 한 번 기금관리 › 제안서·견적서
   const m = cutFn(stripJs(CFJ), 'function mount(');
   const p = cutFn(m, 'function openPropose(');
   assert.match(p, /PROPOSAL_GROUP/);
-  assert.match(p, /kind: 'fund'/);
+  assert.match(p, /\['company', 'consulting', 'other', 'fund'\]/, '제안서 보내기는 기금관리까지 모든 묶음 종류를 본다');
   assert.match(p, /list\.length === 1/);
   assert.match(p, /openFill\(\[list\[0\]\], host\)/);
   assert.match(m, /if \(host\.propose && !S\.proposed\)/);
