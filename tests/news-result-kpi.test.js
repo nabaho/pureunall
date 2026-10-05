@@ -14,7 +14,13 @@ const 함 = (n) => { const i = 화면.indexOf('function ' + n + '('); return 화
 test('★ KPI 는 누르는 단추이고, 위에 붙는 머리 안에 있다', () => {
   const 몸 = 함('결과화면');
   assert.match(몸, /class="kpi' \+ \(켜짐 \? ' on' : ''\) \+ '" onclick="결과거르기바꿈\(/);
-  assert.ok(몸.indexOf('<div class="res-head">') < 몸.indexOf('띠 + \'</div>\''), 'KPI 가 붙는 머리 밖에 있다');
+  const 머 = 몸.indexOf('<div class="res-head');
+  assert.ok(머 > 0 && 머 < 몸.indexOf('+ 띠\n'), 'KPI 가 붙는 머리 밖에 있다');
+  /* ★ 한 줄 (대표 지시 2026-10-05 「1줄로」) — 고르개·다시 읽기·KPI 가 한 줄, 안내는 ⓘ 로 */
+  assert.match(몸, /res-head res-one/);
+  assert.ok(!/const 안내 = '<div class="note"/.test(몸), '안내가 아직 두 줄짜리 상자다');
+  assert.match(몸, /const 안내 = 도움\(/);
+  assert.match(화면, /\.res-one\{display:flex;align-items:center/);
   assert.match(화면, /\.res-head\{position:sticky;top:0/);
   /* 작게 — 숫자가 19px 큰 칸이 아니다 */
   assert.ok(!/font-size:19px/.test(몸), 'KPI 숫자가 아직 크다');
