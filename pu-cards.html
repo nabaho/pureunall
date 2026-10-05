@@ -20259,12 +20259,13 @@ function mbWorkLinkRows(){
     return (w.co + ' ' + w.title + ' ' + w.mgr).toLowerCase().indexOf(q) >= 0;
   });
 }
-const MB_WORK_CHIP = { consulting:'#047857', case:'#1d4ed8', fund:'#92400e', other:'#475569' };
-const MB_WORK_CHIPBG = { consulting:'#ecfdf5', case:'#eff6ff', fund:'#fef3c7', other:'#f1f5f9' };
+/* ⚠ 5계열 27색 밖으로 나가지 말 것 — 전체 실행에서만 걸린다(2026-10-05 일곱 색이 걸렸다) */
+const MB_WORK_CHIP = { consulting:'#166534', case:'#1e40af', fund:'#854d0e', other:'#475569' };
+const MB_WORK_CHIPBG = { consulting:'#f0fdf4', case:'#eff6ff', fund:'#fffbeb', other:'#f8fafc' };
 function mbWorkChip(kind){
   return '<span style="font-size:10.5px;border-radius:4px;padding:2px 6px;font-weight:700;'
     + 'white-space:nowrap;color:' + (MB_WORK_CHIP[kind]||'#475569') + ';background:'
-    + (MB_WORK_CHIPBG[kind]||'#f1f5f9') + '">' + esc(MB_WORK_KIND[kind]||kind) + '</span>';
+    + (MB_WORK_CHIPBG[kind]||'#f8fafc') + '">' + esc(MB_WORK_KIND[kind]||kind) + '</span>';
 }
 /* 목록 한 토막 — 창을 그릴 때와 글자를 칠 때가 «같은 글»을 쓴다 */
 function mbWorkLinkListHtml(){
@@ -20301,7 +20302,7 @@ function mbWorkLinkTabsHtml(){
       const on = cur === k;
       return '<span onclick="mbWorkLinkKind(\'' + k + '\')" style="cursor:pointer;padding:3px 10px;'
         + 'border-radius:12px;font-size:11.5px;border:1px solid ' + (on?'#2563eb':'#e2e8f0') + ';'
-        + 'background:' + (on?'#2563eb':'#fff') + ';color:' + (on?'#fff':'#0f172a') + ';'
+        + 'background:' + (on?'#2563eb':'#fff') + ';color:' + (on?'#fff':'#1e293b') + ';'
         + (on?'font-weight:700;':'') + '">' + label + ' ' + n(k) + '</span>';
     }).join('');
 }
