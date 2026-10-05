@@ -189,7 +189,8 @@ test('★ 바깥으로 나가는 길은 «이름 붙은 우리 주소»뿐이다
      2026-08-31: 홈페이지를 새로 만들기로 하면서 «올리기»와 «새 쪽 읽기»가 늘었다.
      늘어난 것도 모두 «이름 붙은 상수»여야 한다 — 주소를 그 자리에 박으면 걸린다. */
   /* 2026-09-13: 서버가 «지금 홈페이지»를 직접 고치는 길(HOME_WRITE_URL)이 늘었다. */
-  const 허용 = ['READ_HOMEPAGE_URL', 'PUBLISH_URL', 'SITE_BASE', 'HOME_WRITE_URL'];
+  /* 2026-10-05: 월간 자동 연결(HOME_AUTO_URL — 미리 보기·지금 돌리기·승인)이 늘었다. */
+  const 허용 = ['READ_HOMEPAGE_URL', 'PUBLISH_URL', 'SITE_BASE', 'HOME_WRITE_URL', 'HOME_AUTO_URL'];
   const targets = [...html.matchAll(/\bfetch\s*\(\s*([A-Za-z_$][\w$]*|['"`][^'"`]*['"`])/g)].map(m => m[1]);
   assert.ok(targets.length > 0, 'fetch 를 하나도 찾지 못했습니다 — 홈페이지로 가는 길이 사라졌습니다');
   targets.forEach(t => assert.ok(허용.indexOf(t) >= 0,

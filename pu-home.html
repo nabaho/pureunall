@@ -177,6 +177,16 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .mini.dash{background:#fff;color:var(--faint);border:1px dashed #cbd5e1}
 
 /* 할 일 — 안내 띠를 여기 모은다. 위에 쌓아 두면 몸통 높이를 최대 34% 까지 먹었다 */
+/* 월간 자동 연결 카드 (2026-10-05) — 한 줄 = 말 · 숫자. 팔레트 밖 색을 쓰지 않는다(변수만). */
+.autocard{flex:none;margin:6px 8px 0;border:1px solid var(--line);border-radius:9px;background:#fff;padding:6px 10px}
+.autocard .ath{font-size:12.5px;font-weight:800;display:flex;align-items:center;gap:6px;white-space:nowrap}
+.autocard .arow{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0;white-space:nowrap;overflow:hidden}
+.autocard .arow span{overflow:hidden;text-overflow:ellipsis}
+.autocard .ago{display:flex;gap:4px;margin-top:5px;flex-wrap:wrap}
+.atab{width:100%;border-collapse:collapse;font-size:12.5px}
+.atab th,.atab td{border-bottom:1px solid var(--line);padding:4px 6px;text-align:left;white-space:nowrap;
+  max-width:420px;overflow:hidden;text-overflow:ellipsis}
+.atab th{color:var(--sub);font-weight:700}
 .todo{flex:1;min-height:0;display:flex;flex-direction:column}
 .todo .th{flex:none;display:flex;align-items:center;gap:7px;padding:7px 13px;background:#fff;
   border-bottom:1px solid var(--line);font-size:12.5px;font-weight:800}
@@ -1405,8 +1415,14 @@ function loadAll() {
     /* 자문사현황 — 업체관리는 «읽기만» 한다. 표시(올림/안 올림)만 우리 자리에 쓴다. */
     read('data/companies', '푸른ERP 업체관리', null),
     read(PARTNER_PATH, '자문사 표시', null),
-    read(PARTNER_LOGO_PATH, '자문사 로고 차례', null)
-  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg]) => {
+    read(PARTNER_LOGO_PATH, '자문사 로고 차례', null),
+    /* 월간 자동 연결 기록 (2026-10-05) — 못 읽어도 화면은 뜬다. 못 읽은 것은 카드가 따로 말한다
+       («아직 돈 적 없음»과 «못 읽음»을 가른다). 그래서 failed(전체 띠)에 넣지 않는다. */
+    db.ref('homepage/auto/runs').once('value').then(s => ({ v: s.val() || {} }),
+      e => ({ err: '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')' }))
+  ]).then(([members, pages, lineFormat, check, roster, pageCfg, companies, partners, logoCfg, autoRuns]) => {
+    App.autoRuns = (autoRuns && autoRuns.v) || null;
+    App.autoErr = (autoRuns && autoRuns.err) || '';
     App.members = members || {};
     App.partnerLogos = logoCfg || { 숨김: {}, 차례: [] };
     App.pages = pages || {};
@@ -5218,10 +5234,188 @@ function screen() {
 
 /* 왼쪽 기둥 — «무엇을 볼까»(대시보드 카드)와 «무엇을 해야 하나»(할 일)를 한 기둥에 둔다.
    눈이 왼쪽에서 오른쪽으로만 움직인다: 갈래 고르기 → 줄 고르기 → 고치기. */
+/* ══════ 월간 자동 연결 카드 (대표 지시 2026-10-05 「1개월에 1번씩만 자동화」) ══════
+   매달 1일 08:00 서버(monthlyHomepageAuto)가 퇴사·계약 종료 글을 휴지통으로 내린다.
+   이 카드는 «마지막에 무엇을 했나 · 다음은 언제 · 지금 한 번 돌리기»만 보여 준다.
+   ★ 무엇을 내릴지는 서버의 homepage-auto.js 한 곳이 고른다. 화면은 서버에 «물어» 그 답을 보인다
+     (미리 보기 = mode 보기). 화면에서 따로 고르면 규칙이 두 벌이 된다.
+   ★ 기록(homepage/auto/runs)에는 이름이 없다 — sid·companyId 로 화면이 이름을 붙인다. */
+const HOME_AUTO_URL = 'https://us-central1-pureun-erp.cloudfunctions.net/homepageAuto';
+
+/* 다음 돌 때 — 매달 1일. 서버 일정(0 8 1 * *)과 같은 말을 한다. */
+function 다음자동날(오늘) {
+  const 칸 = String(오늘 || '').split('-').map(Number);
+  const y = 칸[0], m = 칸[1];
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  return ny + '-' + String(nm).padStart(2, '0') + '-01';
+}
+function 마지막자동() {
+  let 끝 = null;
+  Object.keys(App.autoRuns || {}).forEach(달 => Object.keys(App.autoRuns[달] || {}).forEach(k => {
+    const r = App.autoRuns[달][k];
+    if (r && (!끝 || Number(r.at) > Number(끝.at))) 끝 = r;
+  }));
+  return 끝;
+}
+/* 한 줄 = 말 · 숫자. 숫자가 없으면(0·빈 값) 그 줄을 안 그린다 — 빈 값은 자리만 차지한다. */
+function 자동카드Html() {
+  const r = 마지막자동();
+  const 줄 = (t, v) => v ? '<div class="arow"><span>' + t + '</span><b>' + v + '</b></div>' : '';
+  return '<div class="autocard"><div class="ath">자동 연결 <span class="sub">매달 1일 08:00</span></div>'
+    + (App.autoErr ? '<div class="arow"><span class="sub">' + esc(App.autoErr) + '</span></div>' : '')
+    + (r
+        ? 줄('마지막', esc(stampShort(r.at)))
+          + 줄('자동으로 내림', (r.내림 || []).length || '')
+          + 줄('못 내림', (r.못내림 || []).length || '')
+          + (r.멈춤 ? 줄('멈춤', '확인 필요') : '')
+        : '<div class="arow"><span class="sub">아직 돈 적 없음</span></div>')
+    + 줄('다음', 다음자동날(todayString()) + ' 08:00')
+    + '<div class="ago">'
+    + '<button class="btn sm" onclick="자동미리보기()">미리 보기</button>'
+    + '<button class="btn sm" onclick="자동지금돌리기()">지금 한 번 돌리기</button>'
+    + '<button class="btn sm" onclick="자동기록창()">기록</button>'
+    + '</div></div>';
+}
+/* 내린 것·내릴 것의 이름 — 우리 자료(직원 명부·업체관리)에서 붙인다. 모르면 글 번호라도. */
+function 자동대상이름(x) {
+  const r = x || {};
+  if (r.key) {
+    const m = (App.members || {})[r.key];
+    return ((m && m.name) || r.key) + ' · 구성원 소개';
+  }
+  if (r.sid) {
+    const s = (App.staff || []).filter(p => p && p.sid === r.sid)[0];
+    return (s ? s.name : '직원 ' + r.sid) + ' · 구성원 소개';
+  }
+  if (r.companyId) {
+    const c = (App.companies || []).filter(c => c && c.id === r.companyId)[0];
+    return (c ? c.name : '업체 ' + r.companyId) + ' · 자문사현황';
+  }
+  return '글 번호 ' + (r.srl || '?');
+}
+async function 자동부르기(mode, 지문) {
+  const token = await firebase.auth().currentUser.getIdToken();
+  const res = await fetch(HOME_AUTO_URL, {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ mode: mode, 지문: 지문 || '' })
+  });
+  const 답 = await res.json().catch(() => ({ ok: false, error: '답을 읽지 못했습니다 (' + res.status + ')' }));
+  if (!res.ok) throw new Error(답.error || ('서버 ' + res.status));
+  return 답;
+}
+async function 자동기록다시읽기() {
+  try {
+    const s = await db.ref('homepage/auto/runs').once('value');
+    App.autoRuns = s.val() || {};
+    App.autoErr = '';
+  } catch (e) {
+    App.autoErr = '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')';
+  }
+  App.render();
+}
+function 자동줄목록(목록, 까닭도) {
+  if (!(목록 || []).length) return '';
+  return '<ul style="margin:4px 0 0;padding-left:18px">' + 목록.map(x => '<li>' + esc(자동대상이름(x))
+    + (까닭도 && x.까닭 ? ' <span class="sub">— ' + esc(x.까닭) + '</span>' : '') + '</li>').join('') + '</ul>';
+}
+/* 미리 보기 — 서버에 «보기»로 묻는다. 아무것도 쓰지 않는다. */
+async function 자동미리보기() {
+  openModal(modalHead('자동 연결 — 미리 보기') + '<div class="sub">서버에 묻고 있습니다…</div>');
+  let r = null;
+  try { r = await 자동부르기('보기'); }
+  catch (e) { openModal(modalHead('자동 연결 — 미리 보기') + '<div class="bar bad">' + esc((e && e.message) || e) + '</div>' + modalFoot('')); return; }
+  let h = modalHead('자동 연결 — 지금 돌리면 이렇게 됩니다 (아직 아무것도 안 했습니다)');
+  if (r.꺼짐) h += '<div class="bar warn">자동 연결이 <b>꺼져</b> 있습니다.</div>';
+  if (r.실패) h += '<div class="bar bad">' + esc(r.실패) + ' — 아무것도 내리지 않습니다.</div>';
+  if (r.멈춤) h += '<div class="bar bad">' + esc(r.멈춤) + '</div>';
+  const 판 = {};
+  (r.게시판확인 || []).forEach(x => { 판[x.게시판 + ':' + x.srl] = x.판; });
+  const 내릴것 = (r.내릴것 || []).map(x => Object.assign({}, x,
+    판[x.게시판 + ':' + x.srl] && 판[x.게시판 + ':' + x.srl] !== 'ok' ? { 까닭: '게시판 확인 ' + 판[x.게시판 + ':' + x.srl] } : {}));
+  h += '<div class="fld"><label>내릴 것 ' + 내릴것.length + '건</label>'
+    + (내릴것.length ? 자동줄목록(내릴것, true) : '<div class="sub">없습니다.</div>') + '</div>';
+  if (r.게시판확인막힘) h += '<div class="bar warn">게시판 확인을 못 했습니다: ' + esc(r.게시판확인막힘) + '</div>';
+  if ((r.연결확인 || []).length) {
+    h += '<div class="fld"><label>이어지지 않아 자동으로 안 움직이는 것 ' + r.연결확인.length + '건</label>'
+      + 자동줄목록(r.연결확인, true) + '</div>';
+  }
+  h += modalFoot('미리 보기는 홈페이지를 바꾸지 않습니다.');
+  openModal(h);
+}
+async function 자동지금돌리기() {
+  if (!await askYes('자동 연결을 지금 한 번 돌립니다',
+    '매달 1일에 하는 일을 지금 합니다 — 퇴사 처리된 직원의 구성원 글, 계약이 끝난 업체의 로고 글 가운데 '
+    + '<b>이어 둔 것만</b> 홈페이지 <b>휴지통</b>으로 옮깁니다(지우지 않습니다, 되살릴 수 있습니다).<br>'
+    + '한 번에 너무 많으면 하나도 안 내리고 멈춥니다. 먼저 «미리 보기»로 보실 수 있습니다.', '돌리기')) return;
+  let r = null;
+  try { r = await 자동부르기('돌리기'); }
+  catch (e) { await say('돌리지 못했습니다', esc((e && e.message) || e)); return; }
+  await 자동결과알리기(r);
+}
+/* 멈춘 목록 «그대로»를 내린다 — 서버가 다시 세어 목록이 바뀌었으면 또 멈춘다(지문). */
+async function 자동승인() {
+  const r = 마지막자동();
+  if (!r || !r.멈춤 || !r.지문) { await say('멈춘 것이 없습니다', '마지막 자동 연결은 멈추지 않았습니다.'); return; }
+  if (!await askYes((r.후보 || []).length + '건을 모두 내립니다',
+    자동줄목록(r.후보 || [], false)
+    + '<div style="margin-top:8px"><b>지우지 않습니다 — 홈페이지 휴지통으로 옮깁니다.</b> 되살릴 수 있습니다.<br>'
+    + '그사이 목록이 바뀌었으면(예: 퇴사 처리를 되돌림) 서버가 다시 멈추고 아무것도 안 내립니다.</div>', '모두 내리기')) return;
+  let 답 = null;
+  try { 답 = await 자동부르기('승인', r.지문); }
+  catch (e) { await say('내리지 못했습니다', esc((e && e.message) || e)); return; }
+  await 자동결과알리기(답);
+}
+async function 자동결과알리기(r) {
+  const 내림 = (r && r.내림) || [], 못 = (r && r.못내림) || [];
+  await say((r && (r.ok === false || r.멈춤)) ? '자동 연결이 멈췄습니다' : '자동 연결을 돌렸습니다',
+    (r && r.실패 ? '<div class="bar bad">' + esc(r.실패) + '</div>' : '')
+    + (r && r.멈춤 ? '<div class="bar bad">' + esc(r.멈춤) + '</div>' : '')
+    + '<b>내림 ' + 내림.length + '건</b>' + 자동줄목록(내림, false)
+    + (못.length ? '<div style="margin-top:8px;color:var(--bad)"><b>못 내림 ' + 못.length + '건</b>' + 자동줄목록(못, true) + '</div>' : ''));
+  자동기록다시읽기();
+}
+/* 기록 — 때 · 한 일 · 누구/어디. 되살리기는 라이믹스 관리자 휴지통에서 한다(서버 되살리기는 아직 없다). */
+function 자동기록창() {
+  const 줄들 = [];
+  Object.keys(App.autoRuns || {}).forEach(달 => Object.keys(App.autoRuns[달] || {}).forEach(k => {
+    const r = App.autoRuns[달][k];
+    if (r) 줄들.push(r);
+  }));
+  줄들.sort((a, b) => Number(b.at) - Number(a.at));
+  let h = modalHead('자동 연결 기록');
+  if (!줄들.length) h += '<div class="sub">아직 돈 적이 없습니다.</div>';
+  else {
+    h += '<table class="atab"><tr><th>때</th><th>방식</th><th>한 일</th><th>누구·어디</th></tr>';
+    줄들.slice(0, 60).forEach(r => {
+      const 한것 = [];
+      (r.내림 || []).forEach(x => 한것.push(['내림(휴지통)', 자동대상이름(x)]));
+      (r.못내림 || []).forEach(x => 한것.push(['못 내림', 자동대상이름(x) + (x.까닭 ? ' — ' + x.까닭 : '')]));
+      if (r.멈춤) 한것.push(['멈춤', r.멈춤]);
+      if (r.실패) 한것.push(['못 돎', r.실패]);
+      if (!한것.length) 한것.push(['할 것 없음', '']);
+      한것.forEach((x, i) => {
+        h += '<tr><td>' + (i ? '' : esc(stampShort(r.at))) + '</td><td>' + (i ? '' : esc(r.방식 || ''))
+          + '</td><td>' + esc(x[0]) + '</td><td title="' + esc(x[1]) + '">' + esc(x[1]) + '</td></tr>';
+      });
+    });
+    h += '</table>';
+  }
+  h += '<div class="foot"><span class="sub">내린 글은 라이믹스 관리자 «휴지통»에서 되살릴 수 있습니다.</span>'
+    + '<span style="flex:1"></span>'
+    + '<a class="btn" style="text-decoration:none" target="_blank" rel="noopener" href="'
+    + esc(PuHomeExport.ORIGIN + '/index.php?module=admin&act=dispTrashAdminList') + '">휴지통 열기</a>'
+    + '<button class="btn" onclick="closeModal()">닫기</button></div>';
+  openModal(h, true);
+}
+window.자동미리보기 = 자동미리보기; window.자동지금돌리기 = 자동지금돌리기;
+window.자동승인 = 자동승인; window.자동기록창 = 자동기록창;
+
 function railHtml() {
   return '<div class="rail">'
     + '<div class="rh">무엇을 볼까</div>'
     + '<div class="dash">' + dashHtml() + '</div>'
+    + 자동카드Html()
     + todoHtml()
     + '</div>';
 }
@@ -5363,6 +5557,33 @@ function jobCard(j) {
 function jobsOf() {
   const jobs = [];
   const add = j => { if (j) jobs.push(j); };
+
+  /* ── 월간 자동 연결이 멈췄다·못 돌았다 (2026-10-05) — 가장 먼저 알린다 ──
+     ★ 도우미 함수를 부르지 않고 여기서 바로 센다 — 이 함수를 떼어 돌리는 검사 상자가 많아
+       새 함수를 부르면 그 상자들이 한꺼번에 죽는다(이 화면에서 여섯 번 겪었다). */
+  let 끝자동 = null;
+  Object.keys(App.autoRuns || {}).forEach(달 => Object.keys(App.autoRuns[달] || {}).forEach(k => {
+    const r = App.autoRuns[달][k];
+    if (r && (!끝자동 || Number(r.at) > Number(끝자동.at))) 끝자동 = r;
+  }));
+  if (끝자동 && 끝자동.멈춤) {
+    add({ cls: '', t: '자동 내리기를 멈췄습니다 — 확인해 주십시오', n: (끝자동.후보 || []).length,
+      who: esc(끝자동.멈춤),
+      go: '<button class="btn pri sm" onclick="자동승인()">모두 내려도 됩니다</button>'
+        + '<button class="btn sm" onclick="자동미리보기()">하나씩 보기</button>',
+      why: '한 번에 내릴 것이 너무 많아 <b>하나도 내리지 않았습니다</b>. 푸른ERP 자료가 한꺼번에 '
+         + '바뀐 것일 수 있습니다. «하나씩 보기»로 맞는지 보시고, 맞으면 «모두 내려도 됩니다»를 누르십시오. '
+         + '그대로 두면 다음 달 1일에 다시 셉니다.' });
+  } else if (끝자동 && 끝자동.ok === false && 끝자동.실패) {
+    add({ cls: 'warn', t: '자동 연결이 이번에 못 돌았습니다', who: esc(끝자동.실패),
+      go: '<button class="btn sm" onclick="자동지금돌리기()">지금 한 번 돌리기</button>',
+      why: '푸른ERP 자료를 못 읽으면 «아무것도 내리지 않고» 멈춥니다 — 홈페이지는 그대로입니다.' });
+  }
+  if (끝자동 && (끝자동.못내림 || []).length) {
+    add({ cls: 'warn', t: '자동으로 못 내린 것이 있습니다', n: 끝자동.못내림.length,
+      go: '<button class="btn sm" onclick="자동기록창()">기록 보기</button>',
+      why: '홈페이지가 받아 주지 않았거나, 그 글이 이어 둔 게시판 것이 아니었습니다. 기록에 까닭이 있습니다.' });
+  }
 
   /* ── 사고: 못 읽음·못 함·저장 실패 ── */
   if (App.checkMsg) {
