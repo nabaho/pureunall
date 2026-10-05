@@ -155,13 +155,28 @@ test('ⓔ 기금관리 칩 — 두 묶음이 늘 같은 순서로, 0개여도 �
   const P = loadCF();
   assert.deepStrictEqual(out(P.facetCounts(FUND, 'fund').groups), [{ name: '계약서', count: 1 }, { name: '제안서·견적서', count: 1 }]);
   assert.deepStrictEqual(out(P.facetCounts([FUND[0]], 'fund').groups), [{ name: '계약서', count: 1 }, { name: '제안서·견적서', count: 0 }]);
-  assert.deepStrictEqual(out(P.facetCounts(FUND, 'company').groups), [], '다른 종류에는 묶음 칩이 없다');
+  assert.deepStrictEqual(out(P.facetCounts(FUND, 'company').groups), [{ name: '계약서', count: 1 }, { name: '제안서·견적서', count: 0 }], '업체계약도 두 묶음');
+  assert.deepStrictEqual(out(P.facetCounts([{ id: 'k', kind: 'consult', name: '상담', body: '' }], 'consult').groups), [], '상담사항에는 묶음 칩이 없다');
+});
+/* 2026-10-06 견적서·제안 공문을 기금 밖에서도 (대표 「추천대로」) */
+test('ⓔ 업체계약·컨설팅·기타사업도 「계약서 / 제안서·견적서」 — 이알피 자동 체크는 제안서를 고르지 않는다', () => {
+  const P = loadCF();
+  assert.deepStrictEqual(out(P.TWO_GROUP_KINDS), ['company', 'consulting', 'fund', 'other']);
+  const F = [{ id: 'c1', kind: 'company', name: '자문계약서', body: '' },
+    { id: 'q1', kind: 'company', name: '자문 견적서', groupName: '제안서·견적서', body: '' },
+    { id: 'o1', kind: 'other', name: '비용 청구서', groupName: '제안서·견적서', body: '' }];
+  assert.deepStrictEqual(out(P.filterForms(F, { kind: 'company', grp: '계약서' }).map(f => f.id)), ['c1']);
+  assert.deepStrictEqual(out(P.filterForms(F, { kind: 'company', grp: '제안서·견적서' }).map(f => f.id)), ['q1']);
+  assert.deepStrictEqual(out(P.filterForms(F, { kind: 'company', grp: 'all' }).map(f => f.id)), ['c1', 'q1'], '계약서가 먼저');
+  assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company', 'other'] })), ['c1'], '계약 묶음 채우기는 견적서를 고르지 않는다');
+  const s = stripJs(CF);
+  assert.match(cutFn(s, 'function openPropose('), /\['company', 'consulting', 'other', 'fund'\]/, '제안서 보내기가 기금관리만 봅니다');
 });
 test('ⓔ 화면 — 기금관리에서도 묶음 칩 줄과 수정 창 묶음 칸이 뜬다', () => {
   const bar = cutFn(stripJs(CF), 'function filterBar(');
-  assert.match(bar, /kind === 'fund'/, '기금관리 칩 줄이 없습니다');
+  assert.match(bar, /twoGroups\(kind\)/, '묶음 칩 줄(기금·업체·컨설팅·기타)이 없습니다');
   const md = cutFn(stripJs(CF), 'function openModal(');
-  assert.match(md, /f\.kind === 'fund'/, '기금 양식 수정 창에 묶음 칸이 없습니다');
+  assert.match(md, /twoGroups\(f\.kind\)/, '양식 수정 창에 묶음 칸이 없습니다');
   assert.match(md, /FUND_GROUPS\.map/, '묶음 고르기 목록이 FUND_GROUPS 가 아닙니다');
 });
 
