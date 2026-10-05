@@ -157,3 +157,29 @@ test('★ 모집과 무관한 이름은 어느 기관에도 안 걸린다', () =
   ['2017종합소득세신고', '2018년귀속연말정산요청자료', '2023 공동주택 경비원 개편', '2024 충남 인권센타위원', '2022 동남경찰서 외사자문협의회']
     .forEach((n) => assert.deepEqual(R.matches(n), [], n));
 });
+
+test('★★ 제목 내용으로 갈래 — 2026-10-05 실제 걸린 제목', () => {
+  const k = (t) => R.kindOf(t);
+  assert.equal(k('[일반추천] (주)강원랜드 사내·외 투자심의위원회 심의 및 자문위원 후보자 일반추천의 건'), 'rec');
+  assert.equal(k('[일반추천] 경기도 부천시 민간위탁 운영평가위원회 심사위원 일반추천의 건'), 'rec');
+  assert.equal(k('인천시 민간위탁 적격자 심의위원 인력POOL 추천의 건(인천음악창작소)'), 'rec');
+  assert.equal(k('직장 내 괴롭힘 사건 외부 조사자 선임 공고'), 'cons');
+  assert.equal(k('AI 노동법 상담서비스 개선지원단 DB작성 담당자 모집의 건'), 'cons');
+  assert.equal(k('대한의료법인연합회 및 대한중소병원협회 업무협약에 따른 공인노무사 모집의 건'), 'cons');
+  assert.equal(k('2027년 농촌융복합산업 현장코칭 전문위원 모집'), 'cons', '「전문위원」은 위원이 아니라 컨설팅');
+  assert.equal(k('2026년 하반기 지방공기업평가원 정책연구 및 컨설팅 외부연구진 풀(Pool) 공개 모집'), 'cons');
+  /* ⚠ 행사는 «먼저» 거른다 — 「박람회 참여 공인노무사 모집」이 컨설팅으로 가지 않게 */
+  assert.equal(k('2026 부천시 다다진로박람회 체험부스 참여 공인노무사 모집 안내'), 'event');
+  assert.equal(k('한국공인노무사회 유튜브 토크쇼 출연 참여자 모집 안내'), 'event');
+  assert.equal(k('등록심사위원회 규정 개정안내'), 'event');
+  assert.equal(k('충남 국적 Dream 사업 강사·멘토 인력풀(POOL) 모집 재공고'), 'teach');
+  assert.equal(k('소상공인시장진흥공단 비상임이사 모집공고'), 'board');
+  assert.equal(k('지방공기업평가원 위촉직이사 모집 공고'), 'board');
+  assert.equal(k('무엇인지 모를 글'), 'etc');
+  assert.equal(R.kindInfo('zzz').k, 'etc');
+  assert.equal(new Set(R.KINDS.map((x) => x.k)).size, R.KINDS.length);
+});
+test('★ 출처 갈래 — 공인노무사회 게시판 셋은 kc, 나머지는 pub', () => {
+  ['kcplaa', 'kcplaa_m', 'kcplaa_job'].forEach((b) => assert.equal(R.hitGroup({ board: b }), 'kc'));
+  ['erc', 'semas', 'nosa', ''].forEach((b) => assert.equal(R.hitGroup({ board: b }), 'pub'));
+});

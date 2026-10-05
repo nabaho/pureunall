@@ -221,7 +221,33 @@
     return allOrgs(custom).filter(function (o) { return orgTest(o, nm); }).map(function (o) { return o.id; });
   }
 
+  /* ── 새 모집 글 나누기 (대표 지시 2026-10-05 「공인노무사 공지 · 그간 지원·메일 · 기타 공공기관으로 내용 보고 분류」) ──
+     ① 어디서 왔나(hitGroup) — 공인노무사회 게시판(공지·회원 공지·채용 정보)이면 'kc', 나머지는 'pub'.
+        ⚠ «출처»로 가른다 — 공인노무사회 공지에 실린 노사발전재단 모집 공문도 공인노무사회 탭에 둔다(대표가 거기서 봤다).
+     ② 무엇을 뽑나(kindOf) — 제목으로. 차례가 중요하다: 행사·안내를 먼저 거르고(「박람회 참여 노무사 모집」이 컨설팅으로 가지 않게),
+        다음 후보 추천 → 강사·멘토 → 컨설팅·자문·조사 → 위원·이사. 어디에도 안 맞으면 기타.
+        ⚠ 낱말은 2026-10-05 실제 걸린 제목으로 정했다 — 넓힐 때는 실측 제목을 검사에 더한다. */
+  var KINDS = [
+    { k: 'event', icon: '📌', name: '행사·안내', re: /박람회|체험\s*부스|토크쇼|출연|행사|축제|설명회|간담회|세미나|규정\s*개정|개정\s*안내|교육생|수강생/ },
+    { k: 'rec', icon: '🗳', name: '후보 추천', re: /추천/ },
+    { k: 'teach', icon: '🎓', name: '강사·멘토', re: /강사|멘토|교수/ },
+    { k: 'cons', icon: '💼', name: '컨설팅·자문·조사', re: /컨설턴트|컨설팅|전문가|전문위원|코칭|\bPM\b|수행\s*노무사|조사자|조사위원|연구진|인력\s*풀|\bpool\b|자문|고문|지원단|DB|담당자|노무사\s*모집|노무사\s*위촉|상담/i },
+    { k: 'board', icon: '🏛', name: '위원·이사', re: /위원|이사|감사|심사|평가/ }
+  ];
+  var KIND_ETC = { k: 'etc', icon: '📎', name: '기타' };
+  function kindOf(title) {
+    var t = s(title);
+    for (var i = 0; i < KINDS.length; i++) if (KINDS[i].re.test(t)) return KINDS[i].k;
+    return 'etc';
+  }
+  function kindInfo(k) {
+    for (var i = 0; i < KINDS.length; i++) if (KINDS[i].k === k) return KINDS[i];
+    return KIND_ETC;
+  }
+  function hitGroup(h) { return /^kcplaa/.test(s(h && h.board)) ? 'kc' : 'pub'; }
+
   return { ORGS: ORGS, group: group, matches: matches, prepDate: prepDate, gcalUrl: gcalUrl,
     prepEvent: prepEvent, dueEvent: dueEvent, typicalMonth: typicalMonth, monthsAhead: monthsAhead,
-    order: order, soon: soon, appliedThisYear: appliedThisYear, allOrgs: allOrgs };
+    order: order, soon: soon, appliedThisYear: appliedThisYear, allOrgs: allOrgs,
+    KINDS: KINDS.concat([KIND_ETC]), kindOf: kindOf, kindInfo: kindInfo, hitGroup: hitGroup };
 });
