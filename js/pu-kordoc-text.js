@@ -144,6 +144,20 @@
         out.text = back ? back.text : text;
         if (!back) out.residual = Math.max(out.residual, 1);   // 가린 파일을 다시 못 읽으면 믿지 않는다
       }
+      /* 마지막 그물 (2026-10-05) — «다시 읽은 글»을 같은 규칙으로 한 번 더 훑는다.
+         파일째 가리기가 표 칸 속 유선 번호를 놓친 일이 있었다(모은 자료 전수 재검사 1건 5곳). residual 은 kordoc 가
+         파일 안에서 스스로 센 것뿐이라 그것을 못 봤다. 걸리면 글을 가려 쓰고, 그 파일은 «믿지 않는다»(data 를 버린다) —
+         가린 파일(또는 원본)에 번호가 남아 있다는 뜻이기 때문이다. 부르는 쪽은 글만 담는다(leak 로 알린다). */
+      var again = K.redactText(String(out.text || ''), { rules: rules });
+      var tl = tally(again.hits);
+      if (tl.total) {
+        out.leak = tl.total;
+        out.text = again.text;
+        out.data = null;
+        out.fileOk = false;
+        Object.keys(tl.count).forEach(function (k) { out.count[k] = (out.count[k] || 0) + tl.count[k]; });
+        out.total += tl.total;
+      }
       return out;
     }
     var p = K.redactText(String(text || ''), { rules: rules });
