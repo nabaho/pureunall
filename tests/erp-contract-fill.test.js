@@ -22,9 +22,9 @@ function loadCF() {
 }
 const out = (v) => JSON.parse(JSON.stringify(v));
 
-test('ⓐ 이알피 — 계약서 출력 창에 「📦 문서관리에서 묶음 채우기」, id 만 들고 새 탭', () => {
+test('ⓐ 이알피 — 계약서 출력 창에 「📦 계약서등관리에서 묶음 채우기」(옛 이름 문서관리), id 만 들고 새 탭', () => {
   const s = stripJs(ERP);
-  assert.match(s, /📦 문서관리에서 묶음 채우기/);
+  assert.match(s, /📦 계약서등관리에서 묶음 채우기/);
   assert.match(s, /'docs-esign\.html#forms:contract=' \+ encodeURIComponent\(contract\.id\)/);
 });
 test('ⓑ 문서관리 — 계약을 읽어 PuContractVars 로, 열쇠를 양식 번호로 착각하지 않는다', () => {

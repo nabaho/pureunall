@@ -146,7 +146,7 @@
       writeContracts:[{path:'rules_mgmt/library/human/{id}',entityType:'RulesDocument'},
                       {path:'rules_mgmt/library/rounds/{id}',entityType:'RulesRound'},
                       {path:'rules_mgmt/library/ask/{id}',entityType:'Task'}] },
-    docs:{ name:'문서관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs'],
+    docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
       sharedRoots:['data/contract_forms','data/contract_forms_removed'],

@@ -1585,7 +1585,7 @@
           el('div', { style: 'display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap' }, [q,
             el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:4px;align-items:center' }, [signedCk, '서명된 계약만'])]),
           box,
-          el('div', { 'class': 'pcf-muted', style: 'margin-top:6px', text: '계약마다 이알피 「계약서 출력」과 같은 규칙으로 양식을 고르고, 계약 자료(번호·날짜·금액·기간·담당)로 채웁니다. 메일은 계약 하나씩 이알피에서 「📦 문서관리에서 묶음 채우기」로.' }),
+          el('div', { 'class': 'pcf-muted', style: 'margin-top:6px', text: '계약마다 이알피 「계약서 출력」과 같은 규칙으로 양식을 고르고, 계약 자료(번호·날짜·금액·기간·담당)로 채웁니다. 메일은 계약 하나씩 이알피에서 「📦 계약서등관리에서 묶음 채우기」로.' }),
           note]),
         el('div', { 'class': 'pcf-mf' }, [el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }), btnGo])
       ]);
