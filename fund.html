@@ -8709,20 +8709,40 @@ function estabGaps(f,sites){
   });
   if(!live.length) out.push({k:'_sites', label:'참여사업장', where:'참여사업장 › + 사업장 추가',
     docs:'설립합의서·정관·기금출연확인서·별지7호', n:1, of:1, site:false});
+  /* 비어 있지는 않지만 «계산한 추정값»이 서식에 들어가는 곳 — 사람 눈으로 봐야 한다(바닥 공사 2026-10-05).
+     foundContribOf 가 from:'rate' 를 돌려주는데 그것을 읽는 곳이 없어 추정 출연금이 확정값처럼 나갔다. */
+  var nEst=live.filter(function(s){ return _contribIsEst(s,f||{}); }).length;
+  if(nEst) out.push({k:'contrib_est', label:'출연금(추정값)', where:'참여사업장 › 편집 · 연도별 기록',
+    docs:'기금출연확인서·회의록·사업계획서', n:nEst, of:live.length, site:true, est:true});
   return out;
+}
+/* 이 사업장의 출연금이 «사람수 × 단가» 추정으로만 정해지는가 — 적은 값(그 해·기본)이 없을 때 */
+function _contribIsEst(s,f){
+  var sy=(_docRok()||{}).sy||{};
+  if(num((sy[(s||{})._id]||{}).contrib)>0) return false;
+  if(num((s||{}).contrib)>0) return false;
+  return siteContribOf(s,f)>0;
 }
 /* 빈 곳 목록을 화면에 세운다 — 누르면 어디로 가야 하는지까지 말한다 */
 function estabGapHTML(f,sites){
   var g=estabGaps(f,sites);
+  /* 추정값만 남았으면 «빈 것은 없다»가 먼저다 — 추정은 아래 한 줄로 따로 알린다 */
+  var gEst=g.filter(function(x){ return x.est; });
+  if(gEst.length===g.length) return '<div class="msg ok" style="font-size:12px;margin:0 0 8px">'
+    +'서식이 읽는 자료가 <b>모두 채워져 있습니다.</b> 아래에 남은 빈칸은 관청이 적는 칸이거나 손으로 쓸 자리입니다.'
+    +gEst.map(function(x){ return '<div style="margin-top:4px;color:var(--warn)">🧮 <b>'+esc(x.label)+'</b> '+x.n+'/'+x.of+'곳 — 계산한 값이라 확인이 필요합니다'+hlp('estab.est')+'</div>'; }).join('')
+    +'</div>';
   if(!g.length) return '<div class="msg ok" style="font-size:12px;margin:0 0 8px">'
     +'서식이 읽는 자료가 <b>모두 채워져 있습니다.</b> 아래에 남은 빈칸은 관청이 적는 칸이거나 손으로 쓸 자리입니다.</div>';
   return '<div class="msg warn" style="font-size:12px;margin:0 0 8px">'
-    +'<b>아직 안 적은 자료 '+g.length+'가지</b> 때문에 아래 서류에 빈칸이 남습니다 — 여기를 채우면 서식이 따라옵니다.'
+    +'<b>아직 안 적은 자료 '+g.filter(function(x){ return !x.est; }).length+'가지</b> 때문에 아래 서류에 빈칸이 남습니다 — 여기를 채우면 서식이 따라옵니다.'
+    +(g.some(function(x){ return x.est; })?' <b>추정값</b>은 비어 있지 않지만 계산한 값이라 확인이 필요합니다.'+hlp('estab.est'):'')
     +'<div style="margin-top:6px;overflow-x:auto"><table style="font-size:11.5px">'
     +'<thead><tr><th>비어 있는 것</th><th>적는 곳</th><th>이 서식들이 읽습니다</th></tr></thead><tbody>'
     +g.map(function(x){
       return '<tr><td style="white-space:nowrap;font-weight:600">'+esc(x.label)
-        +(x.site?(' <span class="chip warn" style="font-size:10px">'+x.n+'/'+x.of+'곳</span>'):'')+'</td>'
+        +(x.site?(' <span class="chip warn" style="font-size:10px">'+x.n+'/'+x.of+'곳</span>'):'')
+        +(x.est?' <span class="chip" style="font-size:10px" title="서류에서 읽은 값이 아니라 사람수 × 단가로 계산한 값">🧮 추정</span>':'')+'</td>'
         +'<td style="white-space:nowrap">'+esc(x.where)+'</td>'
         +'<td class="muted">'+esc(x.docs)+'</td></tr>';
     }).join('')+'</tbody></table></div></div>';
@@ -12021,10 +12041,11 @@ function applyDocFound(){
      바뀌는 자리만 남긴다 — 기금 정보 · 결산 확정 · 월마감 · 대부.
    ⚠ 실패해도 «하던 일을 막지 않는다». 기록은 곁다리다 — 이것 때문에 저장이 안 되면
      주객이 뒤바뀐다. */
+function _nowStamp(){ return new Date().toISOString().slice(0,19).replace('T',' '); }
 function _audit(fid,what,detail){
   try{
     if(!fid) return;
-    fbDb.ref(NS+'/audit/'+fid).push().set({at:new Date().toISOString().slice(0,19).replace('T',' '),
+    fbDb.ref(NS+'/audit/'+fid).push().set({at:_nowStamp(),
       by:(S.user||'?'), what:String(what||''), detail:String(detail||'').slice(0,300)});
   }catch(e){}
 }
@@ -16958,7 +16979,8 @@ function closingTab(f){
       +'<td style="text-align:right;color:#166534">'+(num(x.deposit)?num(x.deposit).toLocaleString():'')+'</td>'
       +'<td style="text-align:right;color:#dc2626">'+(num(x.withdraw)?num(x.withdraw).toLocaleString():'')+(x.nocash&&num(x.amount)?'<span class="chip" style="font-size:10px" title="현금이 오가지 않는 대체분개 — 통장 잔액 대사에서 제외">대체 '+num(x.amount).toLocaleString()+'</span>':'')+'</td>'
       +acctCells
-      +'<td style="text-align:center"><input type="checkbox"'+(x.approved?' checked':'')+' onchange="approveTxn(\''+x._id+'\',this.checked)"></td>'
+      +'<td style="text-align:center"><input type="checkbox"'+(x.approved?' checked':'')+(x.approved&&x.approved_by?' title="'+esc('승인 '+x.approved_by+' · '+(x.approved_at||''))+'"':'')+' onchange="approveTxn(\''+x._id+'\',this.checked)">'
+        +(!x.approved&&x.sug?' <span class="chip" style="font-size:9.5px" title="'+esc(_SUG_LABEL[x.sug]||'기계 제안')+' — 맞으면 승인하세요">🤖</span>':'')+'</td>'
       /* 증빙 — 붙어 있으면 📎(누르면 원본), 없으면 ⬇(사진첩에서 고르기) */
       +'<td style="text-align:center;white-space:nowrap">'
         +(x.scan?'<button onclick="openTxnScan(\''+x._id+'\')" title="연결된 증빙 보기 — '+esc((x.scan.year||'')+'년 · '+(x.scan.at||''))+'" style="padding:2px 6px;font-size:11px">📎</button>'
@@ -17261,7 +17283,7 @@ function learnAcct(memo,isDep,d,c,fid){
   var k=_learnKey(memo,isDep); if(!k||!d||!c||d===c) return;
   var prev=(_learned||{})[k];
   var rec={d:d,c:c,dir:isDep?'입금':'출금',word:k.slice(2),
-           hits:((prev&&num(prev.hits))||0)+1,at:ymd(),fund:fid||S.fundId||''};
+           hits:((prev&&num(prev.hits))||0)+1,at:ymd(),fund:fid||S.fundId||'',by:(S.user||'')};
   _learned=_learned||{}; _learned[k]=rec;                       // 화면은 바로 반영
   fbDb.ref(NS+'/learned/'+k).set(rec).catch(function(){});      // 실패해도 업무를 막지 않는다
 }
@@ -17303,13 +17325,13 @@ function _siteNames(fid){ return fbDb.ref(NS+'/sites/'+fid).once('value').then(f
 function proposeAcct(memo,isDep,sites,kind){
   var m=String(memo||''), dir=isDep?'입금':'출금';
   var lk=_learnKey(m,isDep), lr=lk&&(_learned||{})[lk];   // 배운 것이 일반 규칙보다 우선
-  if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true};
+  if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true,src:'learned'};
   /* 적요의 공백을 지우고 맞춘다. 통장 적요의 띄어쓰기는 제각각인데 키워드는 붙여 써 두어
      '근로자의 날 기념품'이 '근로자의날'을 그냥 비껴갔다(K공동 2024). */
   var mz=(m+' '+String(kind||'')).replace(/\s+/g,'');
   for(var i=0;i<ACCT_RULES.length;i++){ var r=ACCT_RULES[i];
     if(r.dir!==dir) continue;
-    for(var j=0;j<r.kw.length;j++){ if(mz.indexOf(r.kw[j])>=0) return {d:r.d,c:r.c}; }
+    for(var j=0;j<r.kw.length;j++){ if(mz.indexOf(r.kw[j])>=0) return {d:r.d,c:r.c,src:'rule'}; }
   }
   /* 참여사업장 이름으로 들어온 입금은 출연금이다. 공동기금 최대 유입인데 적요에는 '출연' 없이
      회사명만 찍히므로((주)가온로지콘·청원건설) 키워드로는 잡을 방법이 없다. */
@@ -17337,13 +17359,13 @@ function proposeAcct(memo,isDep,sites,kind){
     for(var k=0;k<sites.length;k++){ var nm=strip(sites[k]);
       if(nm.length<2) continue;
       /* ①토막이 이름과 정확히 같다 — 짧은 상호도 이 길로 잡힌다 */
-      if(all.indexOf(nm)>=0) return {d:'현금성자산',c:'기본재산'};
+      if(all.indexOf(nm)>=0) return {d:'현금성자산',c:'기본재산',src:'site'};
       /* ②은행이 칸 길이에 맞춰 이름을 잘라 적었다('(주)라온소프트' → '(주)라온소프')
          — 네 글자 이상만 본다. 두세 글자는 우연히 겹칠 수 있다. */
-      for(var q=0;q<toks.length;q++){ if(nm.indexOf(toks[q])===0) return {d:'현금성자산',c:'기본재산'}; }
+      for(var q=0;q<toks.length;q++){ if(nm.indexOf(toks[q])===0) return {d:'현금성자산',c:'기본재산',src:'site'}; }
       /* ③띄어쓰기 없이 붙여 적은 경우('이체청원건설'). 네 글자 이상이고,
          이름 뒤에 한글이 이어지지 않을 때만. */
-      if(nm.length>=4&&glued(nm)) return {d:'현금성자산',c:'기본재산'}; }
+      if(nm.length>=4&&glued(nm)) return {d:'현금성자산',c:'기본재산',src:'site'}; }
   }
   return {d:'',c:''};
 }
@@ -17494,18 +17516,23 @@ function findTransfers(arr){
   });
   return pairs;
 }
-/* 짝지어진 두 줄을 현금↔현금 대체로 만들고 승인까지 한 번에 쓴다 */
+/* 짝지어진 두 줄을 현금↔현금 대체로 만들고 승인까지 한 번에 쓴다.
+   ⚠ 사람이 짝 목록을 보고 [상계]를 누른 뒤에만 부른다 (바닥 공사 2026-10-05) — 예전에는 통장 가져오기가
+     «확실한» 짝을 묻지 않고 승인까지 해 버렸다. 승인은 누가·언제를 함께 남긴다. */
 function applyTransfers(pairs,fid,yr,quiet){
   pairs=pairs||[]; if(!pairs.length) return Promise.resolve(0);
-  var up={};
+  var up={}, who=(S.user||''), at=_nowStamp(), sum=0;
   pairs.forEach(function(pr){
+    sum+=num(pr.amount)||0;
     [pr.inId,pr.outId].forEach(function(id){
       var b='txns/'+fid+'/'+yr+'/'+id+'/';
       up[b+'debit']='현금성자산'; up[b+'credit']='현금성자산';
       up[b+'approved']=true; up[b+'xfer']=1;
+      up[b+'approved_by']=who; up[b+'approved_at']=at; up[b+'sug']=null;
     });
   });
   return fbDb.ref(NS).update(up).then(function(){
+    _audit(fid,'계좌 간 이체 상계',yr+'년 '+pairs.length+'쌍 · '+sum.toLocaleString()+'원');
     if(S.fundId===fid&&S.year===yr){ S.txnsFor=null; renderFund(); }
     if(!quiet) toast('계좌 간 이체 '+pairs.length+'쌍을 상계 처리했습니다');
     return pairs.length;
@@ -17516,27 +17543,44 @@ function autoMatchTransfers(){
   var t=S.txns||{}, arr=Object.keys(t).map(function(k){ var o=Object.assign({},t[k]); o._id=k; return o; });
   var pairs=findTransfers(arr);
   if(!pairs.length){ toast('짝지을 계좌 간 이체가 없습니다','warn'); return; }
-  var rows=pairs.map(function(pr){
-    return '<tr><td>'+esc(pr.date)+'</td><td style="text-align:right">'+pr.amount.toLocaleString()+'</td>'
+  _xferModal(pairs,fid,yr);
+}
+/* 짝 목록을 보여 주고 «고른 짝만» 상계한다 — 사람 눈을 거친다 (바닥 공사 2026-10-05).
+   · 계좌가 다른 «확실»은 처음부터 골라 두고, 계좌번호가 없는 «추정»은 비워 둔다 — 사람이 보고 고른다.
+   · 통장 가져오기 직후에도 같은 창이 뜬다(예전엔 확실한 짝을 묻지 않고 승인까지 했다). */
+function _xferModal(pairs,fid,yr,lead){
+  var rows=pairs.map(function(pr,i){
+    return '<tr><td style="text-align:center"><input type="checkbox" class="xfer-pick" data-i="'+i+'"'+(pr.kind==='sure'?' checked':'')+' onchange="_xferCount()"></td>'
+      +'<td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
+      +'<td>'+esc(pr.date)+'</td><td style="text-align:right">'+pr.amount.toLocaleString()+'</td>'
       +'<td class="muted" style="font-size:11.5px">'+esc(pr.outMemo.slice(0,26))+' → '+esc(pr.inMemo.slice(0,26))+'</td>'
       +'<td>'+(pr.kind==='sure'?'<span class="chip ok" style="font-size:10px">계좌 다름</span>'
         :'<span class="chip warn" style="font-size:10px">추정(계좌번호 없음)</span>')+'</td></tr>';
   }).join('');
   var nSure=pairs.filter(function(p){return p.kind==='sure';}).length;
-  window._xferPairs=pairs;
+  window._xferPairs={pairs:pairs,fid:fid,yr:yr};
   showModal('<div class="row" style="margin:0 0 6px"><h2 style="margin:0">계좌 간 이체 자동매칭</h2>'
-    +'<span class="chip" style="font-size:10px">'+pairs.length+'쌍</span></div>'
-    +'<p class="muted" style="font-size:12px;margin:0 0 10px">같은 날·같은 금액이 서로 반대 방향인 짝입니다. '
-    +'양쪽을 <b>현금성자산 ↔ 현금성자산</b>으로 상계 처리하고 승인합니다 — 재무제표에 영향이 없고 통장 잔액 대사도 그대로입니다.'
-    +(nSure<pairs.length?'<br>계좌번호가 없는 옛 자료는 <b>추정</b>입니다. 아닌 것이 있으면 취소하고 개별로 지정하세요.':'')+'</p>'
+    +'<span class="chip" style="font-size:10px">'+pairs.length+'쌍</span>'+hlp('xfer.pick')+'</div>'
+    +(lead?'<div class="msg ok" style="font-size:12px;margin:0 0 8px">'+lead+'</div>':'')
+    +'<p class="muted" style="font-size:12px;margin:0 0 10px">고른 짝만 상계·승인 · 추정은 비워 둠</p>'
     +'<div style="max-height:320px;overflow:auto;border:1px solid var(--line);border-radius:8px">'
-    +'<table><thead><tr><th>일자</th><th style="text-align:right">금액</th><th>출금 → 입금</th><th>판정</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-    +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">취소</button>'
-    +'<button class="primary" onclick="_applyXfer()">'+pairs.length+'쌍 상계 처리</button></div>');
+    +'<table><thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>일자</th><th style="text-align:right">금액</th><th>출금 → 입금</th><th>판정</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">나중에</button>'
+    +'<button class="primary" id="xferGo" onclick="_applyXfer()">'+nSure+'쌍 상계 처리</button></div>');
 }
+function _xferPicked(){
+  var d=window._xferPairs||{pairs:[]}, out=[];
+  Array.prototype.forEach.call(document.querySelectorAll('.xfer-pick'),function(c){
+    if(c.checked){ var pr=d.pairs[+c.getAttribute('data-i')]; if(pr) out.push(pr); }
+  });
+  return out;
+}
+function _xferCount(){ var b=$('xferGo'); if(b) b.textContent=_xferPicked().length+'쌍 상계 처리'; }
 function _applyXfer(){
-  var pairs=window._xferPairs||[]; window._xferPairs=null; closeM();
-  applyTransfers(pairs,S.fundId,S.year).catch(function(e){ toast('처리 실패: '+e.message,'err'); });
+  var d=window._xferPairs||{}, pairs=_xferPicked();
+  if(!pairs.length){ toast('상계할 짝을 고르세요','warn'); return; }
+  window._xferPairs=null; closeM();
+  applyTransfers(pairs,d.fid||S.fundId,d.yr||S.year).catch(function(e){ toast('처리 실패: '+e.message,'err'); });
 }
 function hkey(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return 't'+(h>>>0).toString(36);}
 /* ══ 거래 직접 추가 ══
@@ -17581,6 +17625,7 @@ function addTxnSave(){
   var base=date+'|'+dep+'|'+wd+'|'+memo, key=hkey(base);
   var rec={date:date,memo:memo,deposit:dep,withdraw:wd,balance:bal,acct:acct,
            debit:p.d,credit:p.c,approved:false,manual:1};
+  if(p.d&&p.c&&p.src) rec.sug=p.src;
   fbDb.ref(NS+'/txns/'+fid+'/'+yr+'/'+key).set(rec).then(function(){
     S.txnsFor=null; closeM(); renderFund();
     toast('거래를 추가했습니다'+(p.d&&p.c?' · 계정 제안 '+p.d+'/'+p.c:' — 계정을 지정하세요'));
@@ -17654,18 +17699,20 @@ function importBank(){
               if(dup){ kept++; return; }
               var p=proposeAcct(x.memo,x.deposit>0,_snames,x.kind);
               obj[key]={date:x.date,memo:x.memo,deposit:x.deposit,withdraw:x.withdraw,balance:x.balance,acct:(x.acct||''),kind:(x.kind||''),debit:p.d,credit:p.c,approved:false}; added++;
+              if(p.d&&p.c&&p.src) obj[key].sug=p.src;   // 이 분개는 기계가 골랐다 — 배운 것/규칙/사업장 이름
             });
             if(added===0){ toast('새로 추가할 거래가 없습니다 (기존 '+kept+'건 유지)','warn'); return; }
             return fbDb.ref(path).update(obj).then(function(){
-              /* 계좌번호가 서로 다른 확실한 이체만 자동 상계. 추정은 사람이 확인하게 남긴다. */
+              _audit(_fid,'통장 가져오기',_yr+'년 '+String(file.name||'').slice(0,60)+' · 신규 '+added+'건'+(kept?' · 기존 '+kept+'건 보존':''));
+              /* 계좌 간 이체 짝은 «묻고» 상계한다 — 확실한 짝은 골라 둔 채로 창을 띄운다.
+                 예전엔 확실한 짝을 사람 확인 없이 승인까지 했다(바닥 공사 2026-10-05). */
               var merged=Object.assign({},existing,obj);
               var list=Object.keys(merged).map(function(k){ var o=Object.assign({},merged[k]); o._id=k; return o; });
-              var sure=findTransfers(list).filter(function(pr){ return pr.kind==='sure'; });
-              return applyTransfers(sure,_fid,_yr,true).then(function(nx){
-                S.txnsFor=null; renderFund();
-                toast('가져오기 완료: 신규 '+added+'건'+(kept?' · 기존 '+kept+'건 보존':'')
-                  +(nx?' · 계좌 간 이체 '+nx+'쌍 자동 상계':''));
-              });
+              var pairs=findTransfers(list);
+              S.txnsFor=null; renderFund();
+              var msg='가져오기 완료: 신규 '+added+'건'+(kept?' · 기존 '+kept+'건 보존':'');
+              if(pairs.length) _xferModal(pairs,_fid,_yr,msg+' — 계좌 간 이체로 보이는 짝 '+pairs.length+'쌍을 확인하세요.');
+              else toast(msg);
             });
           }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
           });
@@ -17678,9 +17725,12 @@ function importBank(){
 }
 function setTxnAcct(id,side,val){ var _key=S.fundId+'/'+S.year;
   if(txnLocked(id)){ _lockStop(_monthOf((S.txns[id]||{}).date)); return; }
-  fbDb.ref(NS+'/txns/'+_key+'/'+id+'/'+side).set(val)
-    .then(function(){ if(S.txnsFor===_key&&S.txns&&S.txns[id])S.txns[id][side]=val; renderFund(); })
+  var _u={}; _u[side]=val; _u.sug=null;   // 사람이 고른 계정 — 기계 제안 표시를 걷는다
+  fbDb.ref(NS+'/txns/'+_key+'/'+id).update(_u)
+    .then(function(){ if(S.txnsFor===_key&&S.txns&&S.txns[id]){ S.txns[id][side]=val; delete S.txns[id].sug; } renderFund(); })
     .catch(function(e){ toast('저장 실패: '+e.message,'err'); renderFund(); }); }
+/* 분개를 «누가» 골랐나 — 통장 가져오기·직접 추가가 붙인다(sug). 사람이 계정을 바꾸면 걷힌다. */
+var _SUG_LABEL={learned:'전에 승인한 거래처에서 배운 분개', rule:'적요 낱말 규칙으로 고른 분개', site:'참여사업장 이름으로 고른 분개(출연금)'};
 function approveTxn(id,on){
   var x=S.txns&&S.txns[id];
   if(txnLocked(id)){ _lockStop(_monthOf((x||{}).date)); return; }
@@ -17690,9 +17740,11 @@ function approveTxn(id,on){
     if(x&&!_splitsOf(x).length&&x.debit===x.credit&&!x.xfer){ toast('차변과 대변이 같은 계정입니다','warn'); renderFund(); return; }
   }
   var _key=S.fundId+'/'+S.year, _fid=S.fundId;
-  fbDb.ref(NS+'/txns/'+_key+'/'+id+'/approved').set(on)
+  /* 승인은 누가·언제를 함께 남긴다 — 노동청에 나가는 장부의 확정이다(바닥 공사 2026-10-05) */
+  var _ap={approved:on, approved_by:on?(S.user||''):null, approved_at:on?_nowStamp():null};
+  fbDb.ref(NS+'/txns/'+_key+'/'+id).update(_ap)
     .then(function(){
-      if(S.txnsFor===_key&&S.txns&&S.txns[id])S.txns[id].approved=on;
+      if(S.txnsFor===_key&&S.txns&&S.txns[id]){ S.txns[id].approved=on; S.txns[id].approved_by=_ap.approved_by; S.txns[id].approved_at=_ap.approved_at; }
       // 사람이 확정한 것만 기억한다(이체 상계는 거래처 성격이 아니라 제외)
       // 쪼갠 거래는 계정이 하나가 아니어서 거래처 학습에 쓰지 않는다
       if(on&&x&&!x.xfer&&!_splitsOf(x).length) learnAcct(x.memo,(num(x.deposit)||0)>0,x.debit,x.credit,_fid);
@@ -18062,6 +18114,11 @@ var HELP={
    +'<p>내용은 <b>기금 정보 · 참여사업장 · 임원 명부</b>에서 옵니다.</p>'
    +'<p>★ <b>맨 위의 표가 「아직 안 적은 자료」</b>를 알려 줍니다 — 무엇이 비었는지, <b>어디에 적는지</b>, 그것을 <b>어느 서식이 읽는지</b>까지. 빈칸이 많으면 그 표부터 채우세요. 한 곳을 적으면 여러 서식이 함께 따라옵니다.</p>'
    +'<p>다섯 단계 <b>모두</b>에 있습니다 — ①인가 ②법인설립 ③고유번호증 ④운영 ⑤근복지원금. ④⑤에는 <b>장부를 읽어야</b> 채워지는 서식이 있어(재산목록표·출연확인서·체크리스트) 그리기 전에 회계 자료를 먼저 읽습니다.</p>'},
+ 'xfer.pick':{t:'계좌 간 이체 — 고른 짝만 상계',h:'<p>같은 날·같은 금액이 한 계좌에서 나가고 다른 계좌로 들어온 짝입니다. 고른 짝은 양쪽을 <b>현금성자산 ↔ 현금성자산</b>으로 상계하고 승인합니다 — 재무제표에 영향이 없고 통장 잔액 대사도 그대로입니다.</p>'
+   +'<p><b>계좌 다름</b>은 두 줄의 계좌번호가 달라 이체가 확실한 짝이라 처음부터 골라 둡니다. <b>추정</b>은 계좌번호가 없는 옛 자료라 비워 둡니다 — 맞는 것만 고르세요.</p>'
+   +'<p>예전에는 통장을 가져오면 «확실한» 짝을 묻지 않고 승인까지 했습니다. 이제는 이 창에서 사람이 보고 누른 것만 승인되고, 누가·언제 승인했는지 남습니다(2026-10-05).</p>'},
+ 'estab.est':{t:'추정 출연금',h:'<p>사업장의 출연금을 적지 않았으면 <b>상시근로자 수 × 1인당 출연단가</b>로 셈해 서식에 넣습니다. 이 값은 서류에서 읽은 것이 아니라 <b>계산한 추정값</b>입니다.</p>'
+   +'<p>제출 서류에 들어가기 전에 실제 약정 금액과 맞는지 확인하고, 다르면 참여사업장 › 편집(기본 출연금) 또는 연도별 기록에 실제 금액을 적으세요. 적으면 이 표시는 사라집니다.</p>'},
  'site.status':{t:'참여 상태 — 탈퇴·폐업',h:'<p><b>탈퇴</b>로 바꾸면 그 해부터 쓰는 서류(지원금 신청·예산·사업계획)에서 빠집니다. 참여사업장 목록에서도 숨겨지고, 아래 [탈퇴한 사업장 보기]로 다시 볼 수 있습니다.</p>'
    +'<p><b>설립 서류</b>(인가신청서·합의서·정관·설립 출연확인서·별지 위원 명단)에는 그대로 남습니다 — 설립 때 함께한 회사이기 때문입니다.</p>'
    +'<p><b>폐업</b>은 탈퇴한 사업장만 고를 수 있습니다. 회사가 문을 닫은 경우에 표시해 두세요.</p>'},

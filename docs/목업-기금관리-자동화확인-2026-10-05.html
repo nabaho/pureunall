@@ -1,0 +1,431 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>기금관리 자동화·확인 목업</title>
+<style>
+/* 목업 — 2026-10-05, 추천안(A+B)을 「완전 자동화 + 사람 눈 확인」으로 다시 본 것. 이름·숫자·번호는 전부 가짜. 색은 저장소 27색 안에서만. */
+:root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--acc-l:#bfdbfe;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;
+  --ok:#166534;--ok-bg:#f0fdf4;--okm:#16a34a;--okl:#bbf7d0;--warn:#854d0e;--warn-bg:#fffbeb;--wm:#d97706;--wl:#fde68a;
+  --dg:#dc2626;--dg-bg:#fef2f2;--dgi:#991b1b;--dgl:#fecaca;--gray:#64748b;--r:11px}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.55 'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:#e2e8f0;font-variant-numeric:tabular-nums}
+.top{position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;padding:9px 16px;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.top b{font-size:15px;margin-right:8px}
+.top button{background:#475569;color:#fff;border:0;border-radius:16px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.top button.on{background:var(--acc)}
+.wrap{padding:16px;max-width:1500px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+.vh{background:#fff;border-radius:var(--r);padding:12px 16px;margin-bottom:12px}
+.vh h2{margin:0 0 3px;font-size:17px}.vh p{margin:0;color:var(--sub);font-size:13px}
+.why{background:var(--acc-soft);border:1px solid var(--acc-l);border-radius:var(--r);padding:10px 14px;margin-top:10px;font-size:13px}
+.why b{color:var(--acc2)}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px 14px}
+.card h4{margin:0 0 6px;font-size:14px;display:flex;gap:6px;align-items:center}
+.row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sp{flex:1}
+h3{margin:0;font-size:17px}
+/* 공통 부품 */
+.app{background:var(--bg);border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;position:relative}
+.tb{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);background:#fff;font-size:12px;color:var(--sub);flex-wrap:wrap}
+.tb .cr{font-weight:800;color:var(--ink)}
+.kb{border:1px solid var(--line);border-radius:7px;padding:3px 9px;color:var(--faint);font-size:12px}
+.bd{padding:12px}
+.sb{display:inline-flex;gap:4px;align-items:center;border:1px solid var(--line);background:#fff;border-radius:14px;padding:2px 10px;font-size:12px;color:var(--sub)}
+.sb.g{background:var(--ok-bg);border-color:var(--okl);color:var(--ok)}.sb.y{background:var(--warn-bg);border-color:var(--wl);color:var(--warn)}.sb.r{background:var(--dg-bg);border-color:var(--dgl);color:var(--dgi)}
+.sb.on{outline:2px solid var(--acc);outline-offset:1px}
+.tw{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:var(--r);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{background:var(--bg);color:var(--sub);font-weight:700;font-size:11.5px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap;vertical-align:middle}
+td.w{white-space:normal}
+tr.sel td{background:var(--acc-soft)}
+.c{text-align:center}.nm{color:var(--faint);font-size:11.5px}.fs{font-size:11px;color:var(--faint)}
+.lamp{display:inline-block;width:11px;height:11px;border-radius:50%}
+.lamp.g{background:var(--okm)}.lamp.y{background:var(--wm)}.lamp.r{background:var(--dg)}.lamp.n{background:#cbd5e1}
+.old{color:var(--faint)}.old.e{font-style:italic}
+.new b{background:var(--warn-bg);border-bottom:2px solid var(--wm);font-weight:800}
+.arrow{color:var(--faint);margin:0 4px}
+.src{display:inline-flex;gap:4px;align-items:center;font-size:11.5px;color:var(--sub);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:0 6px}
+.why1{font-size:11.5px;color:var(--sub)}
+.st{font-size:11.5px;font-weight:700;border-radius:9px;padding:1px 8px;white-space:nowrap}
+.st.g{background:var(--ok-bg);color:var(--ok)}.st.y{background:var(--warn-bg);color:var(--warn)}.st.r{background:var(--dg-bg);color:var(--dgi)}.st.n{background:var(--bg);color:var(--gray)}
+.st.b{background:var(--acc-soft);color:var(--acc2)}
+.btn{display:inline-flex;gap:5px;align-items:center;border:1px solid #cbd5e1;background:#fff;border-radius:8px;padding:5px 11px;font-size:12.5px;white-space:nowrap}
+.btn.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+.btn.ok{background:var(--okm);border-color:var(--okm);color:#fff;font-weight:700}
+.btn.dg{color:var(--dg);border-color:var(--dgl)}
+.btn.s{padding:2px 8px;font-size:11.5px}
+.k{font:11px monospace;background:#fff;border:1px solid #cbd5e1;border-radius:4px;padding:0 4px;color:var(--sub)}
+.btn.p .k,.btn.ok .k{background:transparent;color:#fff;border-color:rgba(255,255,255,.5)}
+.bulk{display:flex;gap:7px;align-items:center;background:var(--ink);color:#fff;border-radius:9px;padding:7px 11px;margin-top:8px;font-size:12.5px;flex-wrap:wrap}
+.bulk span.b{background:#475569;border-radius:6px;padding:3px 9px}.bulk span.b.p{background:var(--okm)}.bulk .x{margin-left:auto}
+.si{display:flex;justify-content:space-between;align-items:center;padding:5px 8px;border-radius:7px;color:var(--sub);font-size:12.5px}
+.si.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}
+.si .cn{font-size:11px;color:var(--faint)}
+.sec{font-size:10.5px;color:var(--faint);margin:9px 8px 3px;letter-spacing:.03em}
+/* 확인함 */
+.q3{display:grid;grid-template-columns:170px 1fr 380px;min-height:540px}
+@media(max-width:1100px){.q3{grid-template-columns:1fr}}
+.ql{background:#fff;border-right:1px solid var(--line);padding:10px 8px}
+.qm{padding:10px;min-width:0}
+.qr{background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column}
+.today{display:flex;gap:10px;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:9px 12px;font-size:12.5px;color:var(--sub);margin-bottom:8px}
+.today b{color:var(--ink);font-size:14px}
+/* 원본 조각 */
+.scan{position:relative;background:#f1f5f9;border:1px solid #cbd5e1;border-radius:8px;height:170px;overflow:hidden;font-family:'Batang',serif;font-size:12px;color:#334155}
+.scan .pg{position:absolute;left:0;top:0;right:0;line-height:2.1;padding:14px 18px;transform:rotate(-.4deg)}
+.hlx{outline:2.5px solid var(--wm);background:rgba(251,191,36,.25);border-radius:3px;padding:0 3px}
+.scan .hl{position:absolute;border:2.5px solid var(--wm);background:rgba(251,191,36,.18);border-radius:3px}
+.scan .zoom{position:absolute;right:8px;bottom:8px;font:11px 'Pretendard',sans-serif;background:#fff;border:1px solid var(--line);border-radius:6px;padding:1px 6px;color:var(--sub)}
+.big{font-size:20px;font-weight:800;letter-spacing:.02em}
+.chk{list-style:none;margin:6px 0;padding:0;font-size:12.5px}
+.chk li{display:flex;gap:6px;align-items:flex-start;padding:2px 0}
+.chk .i{width:16px;flex:none;text-align:center;font-weight:800}
+.chk .g{color:var(--okm)}.chk .y{color:var(--wm)}.chk .r{color:var(--dg)}
+.acts{border-top:1px solid var(--line);padding:10px 12px;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.acts .btn{justify-content:center;padding:7px 8px}
+/* 표본 */
+.modal{background:#fff;border-radius:14px;max-width:760px;margin:20px auto;box-shadow:0 12px 40px rgba(20,30,50,.3);overflow:hidden}
+.modal .mh{padding:12px 16px;border-bottom:1px solid var(--line)}
+.modal .mb{padding:12px 16px}
+.modal .mf{padding:10px 16px;border-top:1px solid var(--line);display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap}
+.veil{background:rgba(20,30,50,.35);padding:10px;border-radius:12px}
+.prog{height:8px;background:var(--line);border-radius:4px;overflow:hidden;margin:6px 0}.prog i{display:block;height:100%;background:var(--okm)}
+/* 출처 표시 칸 */
+.fgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 16px}
+@media(max-width:800px){.fgrid{grid-template-columns:1fr}}
+.fv{display:grid;grid-template-columns:110px 1fr;gap:8px;align-items:center;font-size:13px}
+.fv label{color:var(--sub);font-size:12px}
+.val{border:1px solid var(--line);border-radius:7px;padding:5px 9px;background:#fff;display:flex;gap:6px;align-items:center}
+.val .m{margin-left:auto;font-size:11px;font-weight:800;border-radius:5px;padding:0 5px}
+.val.auto{border:1.5px dashed var(--acc);background:var(--acc-soft)}.val.auto .m{background:var(--acc);color:#fff}
+.val.ok .m{background:var(--ok-bg);color:var(--ok)}
+.val.hand .m{background:var(--bg);color:var(--sub);border:1px solid var(--line)}
+.val.empty{border:1px dashed var(--wm);background:var(--warn-bg);color:var(--wm)}
+.pop{position:absolute;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 30px rgba(20,30,50,.18);padding:10px 12px;width:330px;font-size:12.5px;z-index:4}
+.pop .ln{display:flex;gap:6px;padding:2px 0}.pop .ln span:first-child{color:var(--faint);width:52px;flex:none}
+.legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--sub);margin-top:8px}
+.legend .val{display:inline-flex;padding:1px 8px}
+/* 서식 */
+.paper{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.paper .pg{border:1px solid #cbd5e1;padding:16px 20px;line-height:2;font-family:'Batang',serif;position:relative;overflow:hidden;font-size:12.5px}
+.paper .wm{position:absolute;right:-30px;top:40%;transform:rotate(-24deg);font:900 34px 'Pretendard',sans-serif;color:rgba(220,38,38,.13);white-space:nowrap}
+.u{border-bottom:2px dotted var(--acc);background:var(--acc-soft);padding:0 3px}
+.split{display:grid;grid-template-columns:1.1fr 1fr;gap:12px}
+@media(max-width:1000px){.split{grid-template-columns:1fr}}
+/* 원칙 */
+.prin{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+@media(max-width:1000px){.prin{grid-template-columns:1fr}}
+.prin .card{border-top:4px solid var(--acc2)}
+.prin .n{font-size:11px;font-weight:900;color:var(--acc2)}
+.prin p{margin:3px 0 0;font-size:12.5px;color:var(--sub)}
+.prin .from{font-size:11px;color:var(--faint);margin-top:4px}
+.req td{white-space:normal;font-size:13px;padding:8px 10px}
+.tag{font-size:11px;font-weight:800;border-radius:5px;padding:1px 7px}
+.tag.ok{background:var(--ok-bg);color:var(--ok)}.tag.y{background:var(--warn-bg);color:var(--warn)}.tag.r{background:var(--dg-bg);color:var(--dgi)}
+.plan{list-style:none;padding:0;margin:0;counter-reset:p}
+.plan li{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:10px 14px;margin-bottom:8px;display:grid;grid-template-columns:34px 1fr auto;gap:10px;align-items:center}
+.plan li::before{counter-increment:p;content:counter(p);width:28px;height:28px;border-radius:50%;background:var(--acc2);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
+.plan small{color:var(--sub)}
+.note{font-size:12px;color:var(--faint);margin-top:12px}
+</style></head><body>
+
+<div class="top"><b>🏦 기금관리 — 자동화 + 사람 눈 확인 (추천안 A+B)</b>
+  <span id="tabs">
+    <button data-v="v0" class="on">0. 요청 다시 보기</button>
+    <button data-v="v1">1. 확인함</button>
+    <button data-v="v2">2. 하나씩 확인</button>
+    <button data-v="v3">3. 한꺼번에(표본 먼저)</button>
+    <button data-v="v4">4. 기금 화면 표시</button>
+    <button data-v="v5">5. 서식 내보내기 관문</button>
+    <button data-v="v6">6. 자동 규칙·신뢰</button>
+    <button data-v="v7">7. 작업 일지·되돌리기</button>
+  </span>
+</div>
+
+<div class="wrap">
+
+<!-- ═══════ 0 ═══════ -->
+<section class="view on" id="v-v0">
+  <div class="card" style="padding:16px 18px">
+    <h3 style="margin-bottom:6px">결론 — 「할 일함」을 「확인함」으로 바꿉니다</h3>
+    <div style="color:var(--sub);font-size:13.5px">앞의 4안은 <b>사람이 빈칸을 채우는</b> 화면이었습니다. 완전 자동화로 가면 채우는 것은 기계이고, 사람은 <b>기계가 한 것이 맞는지 보고 누르는 일</b>만 합니다.
+    그래서 B의 할 일함은 <b>「확인함」</b>이 되고, 모든 값에 <b>누가 채웠는지(기계/사람)·어디서 왔는지(원본)</b>가 붙어야 합니다. 틀(왼쪽 메뉴·탭)은 A 그대로입니다.</div>
+  </div>
+
+  <h4 style="margin:16px 0 6px">요청하신 것 다시 보기</h4>
+  <div class="tw"><table class="req">
+    <tr><th class="c">□</th><th>#</th><th>요청</th><th>앞에서 한 것</th><th>다시 보니</th><th>이번 목업</th></tr>
+    <tr><td class="c">□</td><td class="nm">1</td><td>자료는 정리됐다 — <b>화면을 편하게, 관리하기 쉽게</b></td><td>홈 신호등·서식 줄 정리·사업장 서랍 등</td><td><span class="tag ok">맞음</span> 다만 「편함」의 기준이 사람이 입력할 때였음</td><td>입력 대신 <b>확인</b>이 편하도록(1·2·3번)</td></tr>
+    <tr><td class="c">□</td><td class="nm">2</td><td><b>다른 모든 시스템</b> 검토</td><td>6개(이알피·업무관리·기업정보함·정부사업·급여관리·포털)</td><td><span class="tag y">덜 봄</span> 사진첩·급여자료·뉴스·근로자명부·계약서·전자서명·취업규칙을 안 봤음 — 마침 <b>기계가 읽고 사람이 확인하는</b> 모양이 거기 다 있었음</td><td>14개를 확인 방식 중심으로 다시 봄(아래 원칙마다 「가져온 곳」)</td></tr>
+    <tr><td class="c">□</td><td class="nm">3</td><td>목업 · <b>여러 개 비교</b></td><td>A·B·C·D 4안 + 나란히 보기</td><td><span class="tag ok">맞음</span></td><td>지시대로 추천안(A+B) 하나를 깊게</td></tr>
+    <tr><td class="c">□</td><td class="nm">4</td><td><b>완전 자동화</b>로 바꿀 때 <b>사람 눈으로 확인이 쉬워야</b></td><td>— (처음 나온 요청)</td><td><span class="tag r">빠져 있던 축</span> 지금 기금관리는 기계 값과 사람 값을 <b>구별하지 않고</b>, 되돌리기·승인자 기록이 없음</td><td>확인함 · 원본 조각 · 표본 검사 · 출처 표시 · 신뢰 장부 · 일지/되돌리기</td></tr>
+  </table></div>
+
+  <h4 style="margin:16px 0 6px">지금 코드에서 찾은 것 — 자동화 전에 먼저 막아야 할 구멍</h4>
+  <div class="tw"><table class="req">
+    <tr><th class="c">□</th><th>#</th><th>찾은 것</th><th>왜 문제인가</th></tr>
+    <tr><td class="c">□</td><td class="nm">1</td><td>저장된 값에 <b>누가 채웠는지 표시가 없음</b> (기계·사람·추정이 똑같이 저장)</td><td>사람이 확인했는지 화면·서식에서 알 수 없음</td></tr>
+    <tr><td class="c">□</td><td class="nm">2</td><td>통장 엑셀에서 「확실한 이체」는 <b>사람 확인 없이 승인됨</b></td><td>잘못 맞춘 짝이 장부에 확정으로 들어감</td></tr>
+    <tr><td class="c">□</td><td class="nm">3</td><td>분개 승인에 <b>누가·언제 기록이 없음</b>, 배운 분개 규칙은 <b>모든 기금 공통</b></td><td>한 번 잘못 배우면 기금 전체에 퍼짐</td></tr>
+    <tr><td class="c">□</td><td class="nm">4</td><td>비율로 <b>추정한 출연금</b>이 서식에 확정값처럼 들어감 (추정 표시를 읽는 곳 없음)</td><td>제출 서류에 추정값이 섞여도 모름</td></tr>
+    <tr><td class="c">□</td><td class="nm">5</td><td>서류 한 장 판독 확인 창이 <b>있던 값을 덮어씀</b>(이름만 「다릅니다」 경고), 일괄 가져오기 중 <b>9곳은 감사 기록 없음</b></td><td>무엇이 바뀌었는지 나중에 못 찾음, 되돌릴 수 없음</td></tr>
+  </table></div>
+
+  <h4 style="margin:16px 0 6px">사람 눈 확인 9원칙</h4>
+  <div class="prin">
+    <div class="card"><div class="n">원칙 1</div><b>기계 값은 늘 티가 난다</b><p>🤖 파란 점선 = 기계가 채움·아직 아무도 안 봄. 확인하면 ✓, 사람이 쓰면 ✎.</p><div class="from">가져온 곳: 급여관리 ● 표시 · 뉴스 「AI 초안 그대로」 딱지</div></div>
+    <div class="card"><div class="n">원칙 2</div><b>근거는 값 바로 옆</b><p>원본 전체가 아니라 그 값이 적힌 <b>자리만 잘라</b> 노란 테두리로. 누르면 전체.</p><div class="from">급여자료 원본 옆 고치기 + (새로) 칸별 자리 잘라 보기</div></div>
+    <div class="card"><div class="n">원칙 3</div><b>바뀐 곳만 굵게</b><p>「지금 값 → 새 값」, 같은 글자는 흐리게 다른 글자만 굵게.</p><div class="from">기업정보함 「값이 다른 칸」</div></div>
+    <div class="card"><div class="n">원칙 4</div><b>색은 셋, 사유는 한 줄</b><p>초록 = 검증 통과 · 노랑 = 사람이 봐야 · 빨강 = 충돌(확정 막힘). 왜 그 색인지 한국어 한 줄.</p><div class="from">급여관리 신호등 · 이알피 자동확정 관문 · 서류 판독 autoOk</div></div>
+    <div class="card"><div class="n">원칙 5</div><b>한꺼번에는 초록만, 표본 먼저</b><p>무작위 몇 건을 먼저 보고 다 맞아야 나머지 확정. 하나라도 틀리면 멈춤.</p><div class="from">급여관리 「초록 전부 확정」 + (새로) 표본 검사</div></div>
+    <div class="card"><div class="n">원칙 6</div><b>사람 값은 기계가 못 덮는다</b><p>다르면 덮지 않고 확인함에 「값이 다름」으로. 빈 칸만 바로 채움.</p><div class="from">기업정보함 손 도장 · 업무관리 원천 소유 칸</div></div>
+    <div class="card"><div class="n">원칙 7</div><b>「아니다」는 다시 안 묻는다</b><p>틀림으로 친 것은 같은 원본이 다시 와도 안 올라옴(내용이 바뀌면 다시).</p><div class="from">업무관리 자동 줄 ✕ · 이알피 알림 숨김 · 정부사업 되살림</div></div>
+    <div class="card"><div class="n">원칙 8</div><b>누가·언제·전 값, 묶음째 되돌리기</b><p>확인·자동 확정마다 기록. 한 번 들여온 묶음은 통째로 되돌림.</p><div class="from">이알피 합치기 되돌리기 · 감사 로그 칸별 전후</div></div>
+    <div class="card"><div class="n">원칙 9</div><b>믿음은 쌓아서 넓힌다</b><p>(원본 종류 × 칸)마다 맞힌 횟수를 세어, 연속으로 맞으면 자동 확정으로 올리고 한 번 틀리면 내림.</p><div class="from">이알피 입금 별칭(3회 학습) → (새로) 전체로 넓힘</div></div>
+  </div>
+  <div class="note">위쪽 1~7 단추로 화면을 보세요. 이름·숫자·번호는 전부 가짜입니다.</div>
+</section>
+
+<!-- ═══════ 1 확인함 ═══════ -->
+<section class="view" id="v-v1">
+<div class="vh"><h2>1. 확인함 — 기계가 한 일 중 사람 눈이 필요한 것만</h2><p>B의 「할 일함」 자리. 왼쪽은 색·원본 종류·기금, 가운데 목록, 오른쪽에서 바로 판단(2번 화면).</p></div>
+<div class="app">
+  <div class="tb"><span class="cr">확인함</span><span class="sp"></span><span class="kb">찾기 Ctrl K</span><span>기금 목록 ▸</span><span>김가람 ▾</span></div>
+  <div class="q3">
+    <div class="ql">
+      <div class="si on">전체 <span class="cn">32</span></div>
+      <div class="sec">색</div>
+      <div class="si"><span><span class="lamp r"></span> 값이 다름</span><span class="cn">3</span></div>
+      <div class="si"><span><span class="lamp y"></span> 봐야 함</span><span class="cn">9</span></div>
+      <div class="si"><span><span class="lamp g"></span> 검증 통과</span><span class="cn">20</span></div>
+      <div class="sec">어디서 왔나</div>
+      <div class="si">📧 메일 첨부 <span class="cn">7</span></div>
+      <div class="si">📷 스캔·사진첩 <span class="cn">6</span></div>
+      <div class="si">🏦 통장 <span class="cn">14</span></div>
+      <div class="si">🏢 기업정보함 <span class="cn">3</span></div>
+      <div class="si">🧮 계산·추정 <span class="cn">2</span></div>
+      <div class="sec">담당</div>
+      <div class="si">내 기금만 <span class="cn">19</span></div>
+      <div class="sec">치운 것</div>
+      <div class="si">틀림으로 친 것 <span class="cn">4</span></div>
+    </div>
+    <div class="qm">
+      <div class="today">오늘 기계가 한 일 <b>128칸</b> · 자동 확정 <b>96</b> (규칙대로) · 확인 기다림 <b>32</b> <span class="sp"></span><a style="color:var(--acc)">작업 일지 →</a></div>
+      <div class="row"><span class="sb r">값이 다름 <b>3</b></span><span class="sb y on">봐야 함 <b>9</b></span><span class="sb g">검증 통과 <b>20</b></span><span class="sp"></span><span class="fs">빨강 → 노랑 → 초록 차례로 · <span class="k">↑↓</span> 이동 <span class="k">Enter</span> 맞음</span></div>
+      <div class="tw"><table>
+        <tr><th class="c">□</th><th>#</th><th></th><th>기금 · 칸</th><th>지금 → 새 값</th><th>어디서</th><th>왜 이 색</th></tr>
+        <tr><td class="c">□</td><td class="nm">1</td><td><span class="lamp r"></span></td><td><b>한빛 1호</b> · 이사장</td><td><span class="old">김가람</span><span class="arrow">→</span><span class="new">김<b>나</b>람</span></td><td><span class="src">📧 10-04 메일 · 등기부 p.1</span></td><td class="w why1">사람이 쓴 값과 다름 — 덮지 않음</td></tr>
+        <tr class="sel"><td class="c">☑</td><td class="nm">2</td><td><span class="lamp y"></span></td><td><b>한빛 1호</b> · 설립합의일</td><td><span class="old e">비어 있음</span><span class="arrow">→</span><span class="new"><b>2021-03-15</b></span></td><td><span class="src">📷 설립합의서 스캔 p.3</span></td><td class="w why1">손글씨 날짜 · 읽기 확실도 낮음</td></tr>
+        <tr><td class="c">□</td><td class="nm">3</td><td><span class="lamp y"></span></td><td><b>누리 3호</b> · 다라물류 근로자대표</td><td><span class="old e">비어 있음</span><span class="arrow">→</span><span class="new"><b>최한결</b></span></td><td><span class="src">📧 재직증명서 · 09-28</span></td><td class="w why1">사람 이름은 늘 확인</td></tr>
+        <tr><td class="c">□</td><td class="nm">4</td><td><span class="lamp y"></span></td><td><b>새솔 2호</b> · 출연금(마바산업)</td><td><span class="old e">비어 있음</span><span class="arrow">→</span><span class="new"><b>3,000,000</b> 추정</span></td><td><span class="src">🧮 출연 비율로 계산</span></td><td class="w why1">추정값 — 서류 근거 없음</td></tr>
+        <tr><td class="c">□</td><td class="nm">5</td><td><span class="lamp g"></span></td><td><b>다온 4호</b> · 사아식품 사업자번호</td><td><span class="old e">비어 있음</span><span class="arrow">→</span><span class="new"><b>000-00-00000</b></span></td><td><span class="src">📷 사업자등록증</span></td><td class="w why1">검증숫자 맞음 · 기업정보함과 같음</td></tr>
+        <tr><td class="c">□</td><td class="nm">6</td><td><span class="lamp g"></span></td><td><b>새솔 2호</b> · 03-31 예금이자 분개</td><td><span class="old e">미분류</span><span class="arrow">→</span><span class="new"><b>보통예금 / 이자수익</b></span></td><td><span class="src">🏦 통장 엑셀</span></td><td class="w why1">같은 적요 9회 모두 같은 계정</td></tr>
+      </table></div>
+      <div class="bulk">1건 선택 <span class="b p">✓ 맞음</span><span class="b">담당 넘기기</span><span class="b">나중에</span><span class="b">틀림</span><span class="x">✕</span></div>
+      <div class="row" style="margin-top:8px"><span class="btn ok">초록 20건 한꺼번에 확인 → 표본 3건 먼저</span><span class="fs">빨강·노랑은 한꺼번에 안 됨</span></div>
+    </div>
+    <div class="qr">
+      <div style="padding:10px 12px;border-bottom:1px solid var(--line)"><b>한빛 1호 · 설립합의일</b><div class="fs">들어가는 서식: 별지7호 · 설립합의서 · 회의록</div></div>
+      <div style="padding:10px 12px;flex:1">
+        <div class="scan"><div class="pg">제3조(설립 합의) 위 기금의 설립에 관하여<br>참여 사업주와 근로자 대표는 <span class="hlx" style="font-family:cursive">2021. 3. 15.</span> 에 합의한다.<br>이사장 김가람 (인)</div><span class="zoom">🔍 원본 전체</span></div>
+        <div style="margin-top:10px" class="fs">읽은 값</div>
+        <div class="big">2021-03-15</div>
+        <ul class="chk"><li><span class="i y">!</span>손글씨 — 읽기 확실도 72%</li><li><span class="i g">✓</span>회의일(03-10)보다 뒤, 인가일(04-02)보다 앞</li></ul>
+      </div>
+      <div class="acts"><span class="btn ok">맞음 <span class="k">Enter</span></span><span class="btn">고쳐서 확정 <span class="k">E</span></span><span class="btn dg">틀림 <span class="k">X</span></span><span class="btn">나중에 <span class="k">→</span></span></div>
+    </div>
+  </div>
+</div>
+<div class="why"><b>달라지는 것:</b> 기계는 밤낮으로 채우고, <b>사람은 이 한 화면에서 위에서부터 눌러 내려가기만</b> 합니다. 색마다 왜 그런지 한 줄이 붙고, 빨강(값이 다름)은 기계가 덮지 않고 여기 올려 둡니다.
+「틀림으로 친 것」은 다시 안 올라오고 왼쪽 맨 아래에서 되살릴 수 있습니다. 기금을 통째로 보려면 오른쪽 위 「기금 목록」(= A 화면).</div>
+</section>
+
+<!-- ═══════ 2 하나씩 ═══════ -->
+<section class="view" id="v-v2">
+<div class="vh"><h2>2. 하나씩 확인 — 원본 조각 · 바뀐 곳 · 검증을 한 눈에</h2><p>확인함에서 줄을 누르거나 Enter. 키보드만으로 수십 건을 이어서 봅니다.</p></div>
+<div class="app"><div class="bd">
+  <div class="row"><span class="nm">확인함 › 값이 다름 1/3</span><span class="sp"></span><span class="fs"><span class="k">Enter</span> 맞음 · <span class="k">E</span> 고치기 · <span class="k">X</span> 틀림 · <span class="k">→</span> 나중에 · <span class="k">Ctrl Z</span> 방금 것 되돌리기</span></div>
+  <div class="split" style="margin-top:10px">
+    <div class="card">
+      <h4>📷 원본 — 그 값이 적힌 자리만 <span class="sp"></span><span class="btn s">원본 전체</span><span class="btn s">다른 쪽</span></h4>
+      <div class="scan" style="height:230px"><div class="pg" style="font-size:13px">등기사항전부증명서 (법인)<br>등기번호 000000 · 명칭 한빛1호공동근로복지기금<br>임원에 관한 사항<br>이사장 <span class="hlx">김나람</span> 000000-******* 2026년 09월 30일 중임<br>이사 이나래 …</div><span class="zoom">10-04 메일 첨부 · 등기부.pdf · p.1</span></div>
+      <div class="fs" style="margin-top:6px">노란 테두리 = 기계가 읽은 자리 · 주민번호 뒷자리는 읽지도 저장하지도 않음</div>
+    </div>
+    <div class="card">
+      <h4><span class="lamp r"></span> 한빛 1호 · 이사장 <span class="st r">값이 다름</span></h4>
+      <table style="font-size:13px;margin:6px 0">
+        <tr><td class="fs" style="width:70px">지금</td><td><span style="font-size:18px;font-weight:700">김가람</span> <span class="st n">✎ 이나래 입력 · 2025-02-11</span></td></tr>
+        <tr><td class="fs">읽은 값</td><td><span style="font-size:18px;font-weight:700">김<span style="background:var(--warn-bg);border-bottom:2px solid var(--wm)">나</span>람</span> <span class="st b">🤖 등기부 판독</span></td></tr>
+      </table>
+      <ul class="chk">
+        <li><span class="i r">✕</span>사람이 쓴 값과 한 글자 다름 — 그래서 기계가 덮지 않았습니다</li>
+        <li><span class="i g">✓</span>등기부 발급일 2026-10-02 (지금 값보다 새 서류)</li>
+        <li><span class="i y">!</span>「가/나」는 스캔에서 자주 헷갈리는 글자</li>
+        <li><span class="i g">✓</span>임원 명부에 「김나람」 생년월일이 같은 사람 있음</li>
+      </ul>
+      <div class="card" style="background:var(--bg);margin-top:8px"><b style="font-size:12.5px">이 값을 바꾸면 함께 바뀌는 곳</b><div class="fs" style="font-size:12px">서식 4종(정관 부칙·별지7호·회의록·운영상황보고서) · 임원 명부 1줄</div></div>
+    </div>
+  </div>
+  <div class="row" style="margin-top:10px;justify-content:flex-end">
+    <span class="btn">나중에 <span class="k">→</span></span><span class="btn dg">틀림 — 지금 값 유지, 다시 안 묻기 <span class="k">X</span></span><span class="btn">고쳐서 확정 <span class="k">E</span></span><span class="btn ok">새 값이 맞음 — 바꾸기 <span class="k">Enter</span></span>
+  </div>
+  <div class="row" style="margin-top:8px"><span class="fs">같은 서류(등기부 p.1)에서 온 나머지 <b>5칸</b>도 이어서 보기 ▸</span></div>
+</div></div>
+<div class="why"><b>달라지는 것:</b> 지금 확인 창은 원본 <b>전체</b>를 띄워 사람이 그 값을 찾아야 합니다. 바꾼 뒤엔 <b>그 값이 적힌 자리만 잘라</b> 노란 테두리로 보여 주고, 지금 값과 다른 <b>글자만</b> 칠합니다.
+검증(검증숫자·날짜 앞뒤·다른 출처와 같은지)이 줄마다 ✓/!/✕로 붙고, 바꾸면 함께 바뀌는 서식을 미리 알려 줍니다. 「틀림」은 지금 값을 지키고 다시 묻지 않습니다.</div>
+</section>
+
+<!-- ═══════ 3 표본 ═══════ -->
+<section class="view" id="v-v3">
+<div class="vh"><h2>3. 한꺼번에 확인 — 초록만, 표본을 먼저</h2><p>분개 596건 같은 많은 양을 빨리, 그러나 눈으로 보고 넘기게.</p></div>
+<div class="veil"><div class="modal">
+  <div class="mh"><b>초록 188건을 한꺼번에 확인하기 전에 — 무작위 5건만 먼저 보세요</b><div class="fs">5건이 다 맞으면 나머지 183건을 확인 처리합니다. 하나라도 틀리면 멈추고, 그 규칙은 노랑으로 내립니다.</div></div>
+  <div class="mb">
+    <div class="row"><span class="fs">표본 3 / 5</span><div class="prog" style="flex:1"><i style="width:60%"></i></div></div>
+    <div class="tw"><table>
+      <tr><th class="c">□</th><th>#</th><th>기금</th><th>일자</th><th>적요</th><th style="text-align:right">금액</th><th>기계가 고른 분개</th><th>근거</th><th></th></tr>
+      <tr><td class="c">☑</td><td class="nm">1</td><td>새솔 2호</td><td>03-31</td><td>예금이자</td><td style="text-align:right">41,230</td><td>보통예금 / 이자수익</td><td class="fs">같은 적요 9회</td><td><span class="st g">✓ 맞음</span></td></tr>
+      <tr><td class="c">☑</td><td class="nm">2</td><td>한빛 1호</td><td>05-10</td><td>출연금 가나기계</td><td style="text-align:right">5,000,000</td><td>보통예금 / 출연금</td><td class="fs">사업장 이름 일치 · 12회</td><td><span class="st g">✓ 맞음</span></td></tr>
+      <tr><td class="c">☑</td><td class="nm">3</td><td>누리 3호</td><td>06-30</td><td>예금이자</td><td style="text-align:right">18,004</td><td>보통예금 / 이자수익</td><td class="fs">같은 적요 6회</td><td><span class="st g">✓ 맞음</span></td></tr>
+      <tr class="sel"><td class="c">□</td><td class="nm">4</td><td>다온 4호</td><td>07-15</td><td>대부금 상환 사아식품</td><td style="text-align:right">500,000</td><td>보통예금 / 대부금</td><td class="fs">같은 적요 4회</td><td><span class="btn ok s">맞음</span> <span class="btn dg s">틀림</span></td></tr>
+      <tr><td class="c">□</td><td class="nm">5</td><td>한빛 1호</td><td>08-01</td><td>…</td><td></td><td></td><td></td><td class="fs">대기</td></tr>
+    </table></div>
+    <div class="card" style="margin-top:10px;background:var(--bg)"><b style="font-size:12.5px">한꺼번에서 빠지는 것</b><div class="fs" style="font-size:12px">· 빨강·노랑 전부 · 100만 원 넘는 출금 11건 · 처음 보는 적요 24건 · 마감된 달 — 이것들은 하나씩(2번 화면)</div></div>
+  </div>
+  <div class="mf"><span class="fs" style="margin-right:auto">표본은 기금·달·계정이 고루 섞이게 뽑습니다</span><span class="btn">그만두기</span><span class="btn ok" style="opacity:.45">나머지 183건 확인 (표본 끝나면)</span></div>
+</div></div>
+<div class="why"><b>달라지는 것:</b> 지금은 분개 승인이 한 줄씩이라 596건이 막막하거나, 거꾸로 이체 짝은 <b>통째로 자동 승인</b>됩니다. 바꾼 뒤엔 「초록만 + 표본 먼저 + 큰 금액·처음 보는 것은 제외」로, 사람 눈을 거치되 빨라집니다.
+(기업정보함에서 표본 13건 중 8건이 틀려 일괄 단추를 없앤 일이 있었는데, 그 판단을 기계가 매번 대신 해 주는 장치입니다.)</div>
+</section>
+
+<!-- ═══════ 4 기금 화면 ═══════ -->
+<section class="view" id="v-v4">
+<div class="vh"><h2>4. 기금 화면(A) — 칸마다 누가 채웠는지</h2><p>틀은 지금 그대로. 칸 모양만 셋으로 갈라지고, 누르면 출처·이력이 뜹니다.</p></div>
+<div class="app" style="min-height:470px">
+  <div style="background:#fff;border-bottom:1px solid var(--line);padding:9px 12px"><div class="row"><span class="nm">‹ 1/16 ›</span><h3>한빛 1호</h3><span class="st b">지역 · 충남</span><span class="sb y">🤖 확인 안 된 값 3</span><span class="sb r">값이 다름 1</span></div></div>
+  <div style="display:flex;gap:2px;border-bottom:1px solid var(--line);padding:0 10px;background:#fff;font-size:12.5px">
+    <span style="padding:8px 10px;color:var(--sub)">한눈에</span><span style="padding:8px 10px;color:var(--acc2);font-weight:800;border-bottom:2px solid var(--acc2)">기금 정보</span><span style="padding:8px 10px;color:var(--sub)">참여사업장</span><span style="padding:8px 10px;color:var(--sub)">회계·결산</span><span style="padding:8px 10px;color:var(--sub)">서식</span></div>
+  <div class="bd" style="position:relative">
+    <div class="card"><h4>인가·등기</h4>
+      <div class="fgrid">
+        <div class="fv"><label>인가번호</label><div class="val ok">0000-2021-1<span class="m">✓</span></div></div>
+        <div class="fv"><label>인가일</label><div class="val ok">2021-04-02<span class="m">✓</span></div></div>
+        <div class="fv"><label>설립합의일</label><div class="val auto">2021-03-15<span class="m">🤖</span></div></div>
+        <div class="fv"><label>법인등록번호</label><div class="val ok">000000-0000000<span class="m">✓</span></div></div>
+        <div class="fv"><label>이사장</label><div class="val hand" style="border-color:var(--dg)">김가람<span class="m" style="background:var(--dg-bg);color:var(--dgi);border:0">다름 1</span></div></div>
+        <div class="fv"><label>사무소 전화</label><div class="val empty">비어 있음 — 원본에도 없음</div></div>
+      </div>
+      <div class="legend"><span class="val auto">🤖 기계가 채움 · 아직 아무도 안 봄</span><span class="val ok">✓ 확인됨</span><span class="val hand">✎ 사람이 씀</span><span class="val empty">비어 있음</span></div>
+    </div>
+    <div class="pop" style="left:150px;top:200px">
+      <b>설립합의일 · 2021-03-15</b>
+      <div class="ln"><span>채움</span><span>🤖 기계 · 10-05 03:12 · 설립합의서 스캔 p.3</span></div>
+      <div class="ln"><span>확실도</span><span>72% (손글씨)</span></div>
+      <div class="ln"><span>확인</span><span>아직 — <a style="color:var(--acc)">지금 확인 ▸</a></span></div>
+      <div class="ln"><span>쓰는 곳</span><span>별지7호 · 설립합의서 · 회의록</span></div>
+      <div class="row" style="margin-top:6px"><span class="btn s">📷 원본 조각</span><span class="btn s">🕘 이력</span></div>
+    </div>
+  </div>
+</div>
+<div class="why"><b>달라지는 것:</b> 지금은 기계가 넣은 값과 사람이 쓴 값이 똑같이 보입니다. 바꾼 뒤엔 <b>🤖 파란 점선 = 기계·미확인</b>, <b>✓ = 누군가 확인</b>, <b>✎ = 사람이 씀</b>으로 갈리고, 칸을 누르면 언제·어디서·누가가 뜹니다.
+「사무소 전화」처럼 <b>원본에도 없는 빈칸</b>은 기계가 지어내지 않고 「원본에도 없음」이라고 적어 사람에게 넘깁니다.</div>
+</section>
+
+<!-- ═══════ 5 서식 관문 ═══════ -->
+<section class="view" id="v-v5">
+<div class="vh"><h2>5. 서식 내보내기 관문 — 확인 안 된 값은 제출본에 못 나간다</h2><p>A의 서식 줄 정리에 「확인」 축을 더한 것.</p></div>
+<div class="app"><div class="bd">
+  <div class="split">
+    <div>
+      <div class="tw"><table>
+        <tr><th class="c">□</th><th>#</th><th>서식</th><th>채움</th><th>확인</th><th></th></tr>
+        <tr class="sel"><td class="c">☑</td><td class="nm">1</td><td><b>설립인가신청서</b></td><td><span class="st g">다 채움</span></td><td><span class="st y">🤖 미확인 2</span></td><td><span class="btn p s">📄 한글로 열기</span></td></tr>
+        <tr><td class="c">☑</td><td class="nm">2</td><td><b>설립합의서</b></td><td><span class="st g">다 채움</span></td><td><span class="st y">🤖 미확인 1</span></td><td><span class="btn p s">📄 한글로 열기</span></td></tr>
+        <tr><td class="c">☑</td><td class="nm">3</td><td><b>정관</b></td><td><span class="st g">다 채움</span></td><td><span class="st g">✓ 전부</span></td><td><span class="btn p s">📄 한글로 열기</span></td></tr>
+        <tr><td class="c">□</td><td class="nm">4</td><td><b>회의록</b></td><td><span class="st y">빈칸 1</span></td><td><span class="st g">✓ 전부</span></td><td><span class="btn p s">📄 한글로 열기</span></td></tr>
+      </table></div>
+      <div class="veil" style="margin-top:10px"><div class="modal" style="margin:0">
+        <div class="mh"><b>날인용으로 묶기 전에 — 확인 안 된 값 3칸</b></div>
+        <div class="mb" style="font-size:13px">
+          <div>· 설립인가신청서 — 설립합의일 <b>2021-03-15</b> 🤖</div>
+          <div>· 설립인가신청서 — 출연금 합계 <b>48,000,000</b> 🧮 추정 포함</div>
+          <div>· 설립합의서 — 설립합의일 <b>2021-03-15</b> 🤖 <span class="fs">(같은 값 — 한 번 확인하면 둘 다)</span></div>
+        </div>
+        <div class="mf"><span class="btn">「초안」 글씨 넣어 묶기</span><span class="btn ok">3칸 확인하고 묶기 ▸</span></div>
+      </div></div>
+    </div>
+    <div class="paper"><div class="row" style="margin-bottom:6px"><b>미리보기 — 설립인가신청서</b><span class="sp"></span><span class="fs">파란 점선 = 기계·미확인 (인쇄엔 안 나옴)</span></div>
+      <div class="pg"><span class="wm">초안 · 미확인 3</span>
+        근로복지기금법인 설립인가 신청서<br>명칭 &nbsp; 한빛 1호 공동근로복지기금<br>설립합의일 &nbsp; <span class="u">2021-03-15</span><br>대표자 &nbsp; 김가람 &nbsp; 직책 &nbsp; 이사장<br>출연금 합계 &nbsp; <span class="u">48,000,000</span>원<br>참여사업장 &nbsp; 32개사(별지 명단)</div>
+    </div>
+  </div>
+</div></div>
+<div class="why"><b>달라지는 것:</b> 서식 줄에 「채움」과 「확인」 두 칸. 확인 안 된 값이 있으면 날인용 묶기 전에 그 칸만 모아 보여 주고, 그대로 묶으면 <b>「초안」 글씨</b>가 찍힙니다(급여관리 미확정 명세서와 같은 방식).
+미리보기에서 기계 값은 파란 점선으로 보이지만 인쇄·한글 파일에는 표시가 안 남습니다. 추정 출연금(🧮)도 여기서 걸러집니다.</div>
+</section>
+
+<!-- ═══════ 6 규칙·신뢰 ═══════ -->
+<section class="view" id="v-v6">
+<div class="vh"><h2>6. 자동 규칙·신뢰 장부 — 어디까지 기계에 맡길지 사람이 정한다</h2><p>완전 자동화로 「한 번에」가 아니라, 맞힌 기록이 쌓인 것부터 차례로 넘깁니다.</p></div>
+<div class="app"><div class="bd">
+  <div class="row"><h3 style="font-size:15px">자동 규칙 11</h3><span class="sb g">자동 확정 <b>4</b></span><span class="sb y">사람 확인 <b>6</b></span><span class="sb r">멈춤 <b>1</b></span><span class="sp"></span><span class="fs">바꾸기는 대표만 · 바꿀 때마다 기록</span></div>
+  <div class="tw"><table>
+    <tr><th class="c">□</th><th>#</th><th>어디서 → 어느 칸</th><th>최근 50건</th><th>지금</th><th>자동 확정 조건</th><th></th></tr>
+    <tr><td class="c">□</td><td class="nm">1</td><td>📷 사업자등록증 → 사업자번호</td><td>50/50 맞음</td><td><span class="st g">자동 확정</span></td><td class="w fs">검증숫자 맞음 + 기업정보함과 같음</td><td><span class="btn s">사람 확인으로</span></td></tr>
+    <tr><td class="c">□</td><td class="nm">2</td><td>🏦 통장 → 예금이자 분개</td><td>50/50 맞음</td><td><span class="st g">자동 확정</span></td><td class="w fs">같은 적요 5회 이상 같은 계정 · 금액 100만 원 미만</td><td><span class="btn s">사람 확인으로</span></td></tr>
+    <tr><td class="c">□</td><td class="nm">3</td><td>🏦 통장 → 출연금 입금 분개</td><td>38/38 맞음</td><td><span class="st y">사람 확인</span></td><td class="w fs">— <b style="color:var(--ok)">자동으로 올릴 수 있음</b> (30회 연속 맞음)</td><td><span class="btn ok s">자동 확정 켜기</span></td></tr>
+    <tr><td class="c">□</td><td class="nm">4</td><td>🏦 통장 → 계좌 사이 이체 짝</td><td>21/23 맞음</td><td><span class="st r">멈춤</span></td><td class="w fs">2건 틀려 자동으로 내려감 (09-12, 09-30)</td><td><span class="btn s">틀린 2건 보기</span></td></tr>
+    <tr><td class="c">□</td><td class="nm">5</td><td>📷 등기부 → 이사장 이름</td><td>12/13 맞음</td><td><span class="st y">사람 확인</span></td><td class="w fs">사람 이름 — <b>늘 사람 확인</b>(올릴 수 없음)</td><td class="fs">고정</td></tr>
+    <tr><td class="c">□</td><td class="nm">6</td><td>🧮 출연 비율 → 사업장 출연금</td><td>—</td><td><span class="st y">사람 확인</span></td><td class="w fs">추정값 — <b>늘 사람 확인</b></td><td class="fs">고정</td></tr>
+  </table></div>
+  <div class="card" style="margin-top:10px"><h4>규칙이 스스로 움직이는 방식</h4>
+    <div style="font-size:12.5px;color:var(--sub)">· <b>올림</b>: 같은 규칙이 연속 30회 사람에게 「맞음」을 받으면 「자동으로 올릴 수 있음」 표시 — 켜는 것은 사람<br>
+    · <b>내림</b>: 자동 확정한 값을 사람이 한 번이라도 고치면 그 규칙은 바로 「멈춤」, 그 규칙으로 확정된 최근 값은 확인함으로 되돌아옴<br>
+    · <b>고정</b>: 사람 이름 · 주민번호 앞자리 · 추정값 · 100만 원 넘는 돈은 늘 사람 확인<br>
+    · 배운 분개는 <b>기금마다 따로</b> 셈(한 기금에서 잘못 배운 것이 다른 기금으로 안 퍼짐)</div></div>
+</div></div>
+<div class="why"><b>달라지는 것:</b> 「완전 자동화」를 스위치 하나로 켜지 않고, <b>맞힌 기록이 있는 칸부터</b> 사람이 넘겨 줍니다. 틀리면 기계가 스스로 멈추고 사람에게 돌려줍니다.
+이알피 입금 별칭(3회 학습 후 자동)에만 있던 방식을 기금 전체로 넓힌 것입니다.</div>
+</section>
+
+<!-- ═══════ 7 일지 ═══════ -->
+<section class="view" id="v-v7">
+<div class="vh"><h2>7. 작업 일지 · 묶음째 되돌리기</h2><p>기계가 언제 무엇을 했는지 하루 단위로. 잘못 들여온 묶음은 통째로 되돌립니다.</p></div>
+<div class="app"><div class="bd">
+  <div class="row"><h3 style="font-size:15px">작업 일지</h3><span class="sb on">오늘</span><span class="sb">이번 주</span><span class="sb">기계만</span><span class="sb">사람만</span><span class="sp"></span><span class="kb">기금·칸 찾기</span></div>
+  <div class="tw"><table>
+    <tr><th class="c">□</th><th>#</th><th>시각</th><th>누가</th><th>무엇을</th><th>결과</th><th></th></tr>
+    <tr><td class="c">□</td><td class="nm">1</td><td>10-05 03:12</td><td>🤖 기계</td><td class="w">메일 첨부 7개 읽음 (등기부 2 · 재직증명서 4 · 사업자등록증 1)</td><td class="w fs">빈 칸 채움 11 · 확인함 6 · 값이 다름 1 · 덮어쓴 것 0</td><td><span class="btn s">펼치기</span> <span class="btn dg s">묶음 되돌리기</span></td></tr>
+    <tr><td class="c">□</td><td class="nm">2</td><td>10-05 03:20</td><td>🤖 기계</td><td class="w">새솔 2호 통장 엑셀 212줄</td><td class="w fs">분개 제안 212 · 자동 확정 96(규칙 #1·#2) · 확인함 116</td><td><span class="btn s">펼치기</span> <span class="btn dg s">묶음 되돌리기</span></td></tr>
+    <tr class="sel"><td class="c">□</td><td class="nm">3</td><td>10-05 09:41</td><td>✎ 김가람</td><td class="w">확인함 — 맞음 18 · 고쳐서 확정 2 · 틀림 1</td><td class="w fs">초록 묶음 표본 5/5 맞음 → 183건 확인</td><td><span class="btn s">펼치기</span></td></tr>
+    <tr><td class="c">□</td><td class="nm">4</td><td>10-04 17:05</td><td>✎ 이나래</td><td class="w">마바산업 탈퇴·폐업 표시</td><td class="w fs">상태 active → closed · 탈퇴일 비어 있음 → 2026-10-04</td><td><span class="btn s">되돌리기</span></td></tr>
+  </table></div>
+  <div class="card" style="margin-top:10px"><h4>▾ 1번 펼침 — 칸마다 전 값·새 값</h4>
+    <div class="tw" style="margin-top:0"><table>
+      <tr><th class="c">□</th><th>#</th><th>기금 · 칸</th><th>전</th><th>후</th><th>원본</th><th>지금 상태</th></tr>
+      <tr><td class="c">□</td><td class="nm">1</td><td>누리 3호 · 다라물류 근로자대표</td><td class="old e">비어 있음</td><td>최한결</td><td class="fs">재직증명서.pdf p.1</td><td><span class="st y">확인 기다림</span></td></tr>
+      <tr><td class="c">□</td><td class="nm">2</td><td>다온 4호 · 사아식품 사업자번호</td><td class="old e">비어 있음</td><td>000-00-00000</td><td class="fs">사업자등록증.jpg</td><td><span class="st g">자동 확정 (규칙 #1)</span></td></tr>
+      <tr><td class="c">□</td><td class="nm">3</td><td>한빛 1호 · 이사장</td><td>김가람</td><td class="old">(안 바꿈)</td><td class="fs">등기부.pdf p.1</td><td><span class="st r">값이 다름 — 확인함</span></td></tr>
+    </table></div></div>
+</div></div>
+<div class="why"><b>달라지는 것:</b> 지금은 감사 기록이 「N곳·M칸」 요약뿐이고 가져오기 9곳은 기록 자체가 없습니다. 바꾼 뒤엔 <b>모든 처리(기계·사람)가 칸마다 전 값·새 값·원본</b>과 함께 남고, 기계가 한 번에 들여온 것은 <b>묶음째 되돌리기</b>가 됩니다.
+이미 사람이 확인한 칸은 되돌릴 때 따로 묻습니다.</div>
+</section>
+
+<h3 style="margin:22px 0 8px;font-size:15px">진행 순서 — 추천</h3>
+<ol class="plan">
+  <li><div><b>바닥 공사 (화면 변화 거의 없음)</b><br><small>칸마다 출처·누가·언제 저장 · 빠진 감사 기록 메우기 · 승인자 기록 · 「확실한 이체 자동 승인」 멈춤 · 추정값 표시 살리기 — 이게 없으면 위 화면이 보여 줄 것이 없음</small></div><span class="tag ok">추천 1순위</span></li>
+  <li><div><b>확인함 + 하나씩 확인 (1·2번)</b><br><small>지금 흩어진 확인 창 10여 개를 한곳으로. 원본 조각은 판독 결과의 글자 자리를 받아 씀</small></div><span></span></li>
+  <li><div><b>기금 화면 표시 + 서식 관문 (4·5번)</b> + A의 서식 줄 정리</div><span></span></li>
+  <li><div><b>표본 검사 + 신뢰 장부 (3·6번)</b><br><small>분개 596건 승인이 여기서 가장 빨라짐 — 승인을 서두르시면 이걸 2번 앞으로</small></div><span></span></li>
+  <li><div><b>작업 일지 + 묶음 되돌리기 (7번)</b> · 나머지 A 정리(사업장 서랍·회계 묶기·Ctrl K)</div><span></span></li>
+  <li><div><b>기계가 스스로 읽기 시작</b> — 메일 첨부·사진첩을 밤에 읽어 확인함에 올리기<br><small>마지막에 켜는 까닭: 확인할 자리가 먼저 있어야 기계가 채운 것을 사람이 볼 수 있음</small></div><span></span></li>
+</ol>
+<div class="note">목업 — 2026-10-05 · 추천안(A+B)을 자동화·확인 축으로 다시 본 것 · 이름·숫자·번호는 전부 가짜 · 앞의 4안 비교 목업은 그대로 둡니다.</div>
+</div>
+<script>
+document.getElementById('tabs').addEventListener('click',function(e){var b=e.target.closest('button');if(!b)return;
+  document.querySelectorAll('#tabs button').forEach(function(x){x.classList.toggle('on',x===b)});
+  document.querySelectorAll('.view').forEach(function(s){s.classList.toggle('on',s.id==='v-'+b.dataset.v)});window.scrollTo(0,0);});
+</script>
+</body></html>
