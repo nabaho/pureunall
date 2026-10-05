@@ -28,17 +28,14 @@ async function adminUids(db) {
   return out;
 }
 
-/* payload: { title, body, tag, url } — 모두 글자. exceptUid: 이 사람에게는 안 보낸다(본인이 올린 건의 등) */
-async function pushAdmins(db, messaging, payload, opt) {
-  const o = opt || {};
+/* 고른 사람들에게 보내고 죽은 토큰을 치운다 — «보내는 일»은 여기 한 자리뿐이다.
+   ⚠ 누구에게 보낼지만 부르는 쪽이 정한다. 베껴 두면 뒷정리가 한쪽에만 남는다. */
+async function sendTo(db, messaging, uids, payload) {
   const out = { targets: 0, sent: 0, failed: 0, cleaned: 0 };
-  const uids = await adminUids(db);
-  if (!uids.length) return out;
+  if (!uids || !uids.length) return out;
 
-  const exceptUid = String(o.exceptUid || "");
   const targets = [];
   await Promise.all(uids.map(async (uid) => {
-    if (uid === exceptUid) return;
     const ts = await db.ref(`fcm_tokens/${uid}`).once("value");
     ts.forEach((t) => { targets.push({ uid, token: t.key }); });
   }));
@@ -69,4 +66,19 @@ async function pushAdmins(db, messaging, payload, opt) {
   return out;
 }
 
-module.exports = { pushAdmins, adminUids, DEAD_CODES };
+/* payload: { title, body, tag, url } — 모두 글자. exceptUid: 이 사람에게는 안 보낸다(본인이 올린 건의 등) */
+async function pushAdmins(db, messaging, payload, opt) {
+  const o = opt || {};
+  const exceptUid = String((o && o.exceptUid) || "");
+  const uids = (await adminUids(db)).filter((u) => u !== exceptUid);
+  return sendTo(db, messaging, uids, payload);
+}
+
+/* 「이 사람 하나」에게 (2026-10-05, 📬 내 담당 메일 알림).
+   ⚠ 등록한 기기가 없으면 아무 일도 안 한다 — targets 0 으로 돌려주어 부르는 쪽이
+     「폰이 없어서 못 갔다」와 「보냈다」를 가릴 수 있게 한다(지금 등록된 폰은 0대다). */
+async function pushOne(db, messaging, uid, payload) {
+  return sendTo(db, messaging, [String(uid || "")].filter(Boolean), payload);
+}
+
+module.exports = { pushAdmins, pushOne, sendTo, adminUids, DEAD_CODES };
