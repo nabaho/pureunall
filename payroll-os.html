@@ -2308,6 +2308,44 @@ function sumCounts(sites){
   sites.forEach(function(s){ var x=hubCounts(s); Object.keys(c).forEach(function(k){ c[k]+=x[k]; }); });
   return c;
 }
+/* ══════ 머리줄 금액 지표 — 대표 지시 2026-10-05 「직원 수·이번 달 총 지급액을 윗줄에」 ══════
+   · 셈은 명세서가 쓰는 slipRows **한 곳**으로 한다 — 윗줄 합계와 명세서 합계가 어긋날 수 없다
+     (임금총액 = 실수령 + 공제총액, 명세서와 같은 규칙).
+   · 직원 표는 «고른 회사 하나·그 달 기록만» 받는다 — 그 달을 열 때와 같은 일이다.
+     ⚠ 목록(가운데 칸)을 그릴 때는 여전히 안 받는다(110곳에서 받으면 화면이 안 열린다).
+   · 기준 달에 기록이 없으면 그 앞 가장 가까운 달로 물러서고 «그 달이라고 밝힌다».
+     (지금 자료는 2026년 5월까지라, 물러서지 않으면 거의 모든 회사가 빈칸이다)
+   · 같은 달 기록이 여럿이면(상용·일용 대장, 고친 판) 이름으로 한 사람 한 줄(dedupeEmps) — 앱 전체와 같은 규칙. */
+function monthRecsFor(sites, ym){
+  var t=ymParts(ym), cap=t?t.y*100+t.m:null, by={}, best=null;
+  sites.forEach(function(s){ (payRecs(s)||[]).forEach(function(r){ var x=ymOf(r); if(!x) return;
+    var k=x.y*100+x.m; if(cap!=null&&k>cap) return;
+    (by[k]=by[k]||[]).push({site:s,r:r}); if(best==null||k>best) best=k; }); });
+  if(best==null) return null;
+  var k=(cap!=null&&by[cap])?cap:best;
+  return {y:Math.floor(k/100), m:k%100, recs:by[k], fallback:k!==cap};
+}
+function coMoney(sites, ym){
+  var mr=monthRecsFor(sites, ym); if(!mr) return null;
+  var all=[], waiting=0, approx=0;
+  mr.recs.forEach(function(x){ var e=empsOf(x.r);
+    if(e) all=all.concat(e); else { waiting++; approx+=(x.r.직원수||0); ensureEmps(x.r); } });
+  var out={y:mr.y, m:mr.m, fallback:mr.fallback};
+  if(waiting){ out.loading=true; out.n=approx; return out; }
+  var emps=dedupeEmps(all), gross=0, ded=0, net=0, miss=0;
+  emps.forEach(function(e){ var r=slipRows(e);
+    if(r.gross==null){ miss++; return; }
+    gross+=r.gross; if(r.dedTotal!=null) ded+=r.dedTotal; if(r.net!=null) net+=r.net; });
+  out.n=emps.length; out.gross=gross; out.ded=ded; out.net=net; out.miss=miss;
+  /* ⚠ 대장 수식(일할 계산 등)이 원 미만을 남긴 값이 실제로 많다(실측 29곳·8천여 칸). 엑셀은 반올림해 «보여»
+     주지만 칸에는 소수가 들어 있다. 여기서는 원 단위로 반올림해 보이고, 그렇다고 밝힌다 —
+     어떻게 끊을지(절사·반올림)는 급여 판단이라 대표 결정 전에는 값 자체를 고치지 않는다. */
+  out.frac=[gross,ded,net].some(function(v){ return Math.abs(v-Math.round(v))>1e-6; });
+  return out;
+}
+/* 만 원 단위로 짧게 — 정확한 값은 알약에 손을 대면 보인다 */
+function manwon(n){ return (n==null)?'-':(Math.abs(n)>=10000?(Math.round(n/10000).toLocaleString()+'만원'):(won(n)+'원')); }
+
 /* ★ 본문은 탭부터 시작한다(대표 지시 2026-10-05 「캡쳐4는 위로」) — 회사 이름·지표는 머리줄로 갔다 */
 function shellMainHtml(m){
   if(!coData&&!coErr) return '<div class="empty">업체 명단을 불러오는 중…</div>';
@@ -2335,13 +2373,27 @@ function coBarHtml(m){
   var who=co?((co.managerMain?('담당 '+(dir[co.managerMain]||co.managerMain)):'담당 없음')
       +((co.managerSubs||[]).length?(' · 부 '+co.managerSubs.map(function(s){return dir[s]||s;}).join(', ')):'')):'';
   var now=co?m.state[co.id]:coState(null, sites, m.ym, m.links), c=sumCounts(sites);
-  function kpi(tab, label, tone){
-    return '<button class="kpi'+(tone?' '+tone:'')+'" onclick="pickTab(\''+tab+'\')">'+label+'</button>';
+  function kpi(tab, label, tone, tip){
+    return '<button class="kpi'+(tone?' '+tone:'')+'" onclick="pickTab(\''+tab+'\')"'+(tip?(' title="'+esc(tip)+'"'):'')+'>'+label+'</button>';
+  }
+  var my=coMoney(sites, m.ym), money='';
+  if(my){
+    var when=my.fallback?('<span class="cm">'+my.y+'년 '+my.m+'월 기준</span>'):'';
+    if(my.loading) money=when+kpi('payroll','직원 약 '+my.n+'명')+kpi('slip','지급 불러오는 중…');
+    else {
+      var tip='지급총액 '+won(Math.round(my.gross))+'원 · 공제 '+won(Math.round(my.ded))+'원 · 실수령 '+won(Math.round(my.net))+'원'
+        +(my.miss?(' · 금액을 못 읽은 '+my.miss+'명은 빠짐'):'')+' (명세서와 같은 셈)'
+        +(my.frac?' · ⚠ 대장에 원 미만 값이 있어 원 단위로 반올림해 보임':'');
+      money=when+kpi('payroll','직원 '+my.n+'명')
+        +kpi('slip','지급 '+manwon(my.gross)+(my.miss?' ?':''), my.miss?'warn':'', tip)
+        +kpi('slip','실수령 '+manwon(my.net), '', tip);
+    }
   }
   var h='<span class="cn" title="'+esc(name)+'">'+name+'</span>'
     +'<span class="cm">'+[who, card?('급여일 '+(card.급여일||'미지정')):'', '기준 '+ymText(m.ym)].filter(Boolean).join(' · ')+'</span>'
     +'<span class="kpis">'
     +kpi('sum', now.label, now.key==='done'?'ok':((now.key==='review'||now.key==='none')?'warn':''))
+    +money
     +kpi('payroll', '급여 '+(c.months?(c.months+'개월 · 확정 '+c.lock+(c.review?(' · 검토 '+c.review):'')):'자료 없음'), c.review?'warn':'')
     +kpi('attend', '근태 '+c.attend+'명')
     +kpi('leave', '연차 '+c.leave+'명')
