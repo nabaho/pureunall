@@ -674,6 +674,23 @@
   .pesync.off{background:var(--bg);color:var(--faint)}
   td.rowno{color:var(--faint);width:34px;text-align:right;font-variant-numeric:tabular-nums;font-size:11.5px;padding-right:8px}
   th.rowno{width:34px;text-align:right;padding-right:8px}
+  /* 🧹 치울 것 — 고르기 칸과 번호는 «모든 목록»의 맨 왼쪽 (대표 지시 2026-10-05).
+     좁게 둔다(고르기 28px · 번호 36px) — 「한 칸은 한 줄」과 함께 지킨다. */
+  th.wsck,td.wsck{width:28px;text-align:center;padding:6px 0}
+  th.wscn,td.wscn{width:36px;text-align:right;padding-right:8px;color:var(--faint);
+    font-size:11.5px;font-variant-numeric:tabular-nums}
+  .wscard{flex:1;min-width:168px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+    background:#fff;cursor:pointer}
+  .wscard.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc-soft)}
+  .wscard .big{font-size:22px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
+  .wscard .lb{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.5}
+  .wsbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);
+    border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin:0 0 10px}
+  .wsbar .n{margin-left:auto;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+  .wssec{font-size:13px;font-weight:800;margin:0 0 3px}
+  .wswhy{font-size:11.5px;color:var(--sub);margin:0 0 9px;line-height:1.6}
+  .wsfold{display:flex;align-items:center;gap:9px;background:var(--bg);border:1px dashed var(--line);
+    border-radius:9px;padding:9px 13px;cursor:pointer;font-size:12.5px;margin-top:10px}
   .grp-h td{background:var(--bg);font-weight:800;font-size:12.5px;padding:6px 10px}
   .grp-h .pct{float:right;font-weight:600;color:var(--sub);font-size:11px;font-variant-numeric:tabular-nums}
 
@@ -1470,6 +1487,7 @@ function shell(){
     +'<div class="sitem" id="nav-stats" onclick="go(\'stats\')">📊 업무량</div>'
     +'<div class="sitem" id="nav-mlk" onclick="go(\'mlk\')" title="기계가 어느 사업장인지 못 정한 메일 — 담당자가 짚어 주면 그 업무에 붙습니다">📬 이어 줄 메일 <span class="cnt" id="cnt-mlk"></span></div>'
     +'<div class="sitem" id="nav-ho" onclick="go(\'ho\')">🔄 인수인계 <span class="cnt" id="cnt-ho"></span></div>'
+    +'<div class="sitem" id="nav-clean" onclick="go(\'clean\')" title="오래 멈춘 업무를 «왜 멈췄는지»로 갈라 놓고 한꺼번에 정리합니다">🧹 치울 것 <span class="cnt" id="cnt-clean"></span></div>'
     +'<div class="sitem" id="nav-archive" onclick="go(\'archive\')" title="종료·취소·이관된 업무">✅ 종료 <span class="cnt" id="cnt-ar"></span></div>'
     +'<div class="sitem" id="nav-perf" onclick="go(\'perf\')" title="달마다 내 성과급을 직접 확인합니다 — 내 것만 보입니다">⭐ 내 성과급 <span class="cnt" id="cnt-perf"></span></div>'
     +'<div style="margin-top:auto">'
@@ -2855,8 +2873,8 @@ function go(v){ S.view=v; S.f=null; S.q=''; sideDrawer(false);
 function goBack(){ if(history.length>1) history.back(); else { S.view='my'; route(); } }
 window.addEventListener('popstate',function(ev){ try{ window.__puBackNav = true; }catch(e){}  /* 이 걸음은 우리가 썼다 — 공통 뒤로가기는 비켜선다 */ var st=ev.state; S.view=(st&&st.view)||'my'; route(); });
 function route(){
-  ['my','visits','team','stats','mlk','ho','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
-  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',ho:'인수인계',archive:'종료',perf:'내 성과급'};
+  ['my','visits','team','stats','mlk','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
+  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
   var c=$('crumb'); if(c)c.textContent=crumbs[S.view]||'업무관리';
   var qw=$('qwrap'); if(qw)qw.style.display=(S.view==='my'||S.view==='team')?'':'none';
   var cm=$('cnt-my'); if(cm)cm.textContent=viewOpen().length||'';
@@ -2866,6 +2884,9 @@ function route(){
   var cl=$('cnt-mlk'); if(cl){ var n4=mailSrc?mlkBadge():0;
     cl.textContent=n4||''; cl.style.color=n4?'#dc2626':''; cl.style.fontWeight=n4?'800':''; }
   visBadge();
+  /* 🧹 치울 것 — 끝낼 수 있는 것만 센다(자문·급여는 빼고 센다, 끝내는 일이 아니다) */
+  var cc=$('cnt-clean'); if(cc){ var n5=wsCleanCount(); cc.textContent=n5||''; }
+  wsLeave(S.view);              /* 고른 것은 화면을 떠나면 비운다 */
   /* 내가 확인할 달 + (대표라면) 답할 이의 건수를 함께 센다 — 둘 다 「내 성과급」에서 하는 일이다 */
   var cp=$('cnt-perf'); if(cp){
     var n3=(S.perfData||[]).filter(function(x){return !x.p.done;}).length + pcAdmPending().n;
@@ -2879,6 +2900,7 @@ function route(){
   else if(S.view==='kb'){ S.view='my'; renderMy(); }
   else if(S.view==='mlk') renderMlk();
   else if(S.view==='ho') renderHo();
+  else if(S.view==='clean') renderClean();
   else if(S.view==='archive') renderArchive();
   else if(S.view==='perf') renderPerf();
   else { S.view='my'; renderMy(); }
@@ -5970,6 +5992,12 @@ function renderMy(){
   xferRefresh();
   var xferHid=mine.filter(xferOf).length;
   if(!S.myXfer) mine=mine.filter(function(it){ return !xferOf(it); });
+  /* 자문·급여는 접어 둔다 (대표 지시 2026-10-05 「그대로 두되 접어 둔다」).
+     계약이 살아 있는 동안 계속 가는 일이라 «끝내는 업무»가 아니다 —
+     실측 217건이 목록 대부분을 차지해 끝낼 수 있는 일이 묻혔다.
+     ⚠ 지우지도 끝내지도 않는다. 아래 접힌 줄을 누르면 그대로 펴진다. */
+  var advHid=mine.filter(wsAdv).length;
+  if(!S.myAdv) mine=mine.filter(function(it){ return !wsAdv(it); });
   var base=mine;
   if(S.f==='due')base=fc.due; else if(S.f==='nolog')base=fc.nolog; else if(S.f==='next')base=fc.next;
   else if(S.f==='recv')base=recv;
@@ -6028,6 +6056,10 @@ function renderMy(){
     +'<span class="statbar" style="margin:0">'
     +'진행 <b>'+mine.length+'</b>'
     +'<span class="sep">·</span>완료 <b>'+fc.done.length+'</b>'
+    /* 🧹 오래 멈춘 것이 몇 건인지 여기서 바로 보이게 — 목록을 끝까지 내려야 알던 것이다 */
+    +(wsCleanCount()?'<span class="sep">|</span><span class="sb" onclick="go(\'clean\')" '
+      +'title="오래 멈춘 업무를 «왜 멈췄는지»로 갈라 놓고 한꺼번에 정리합니다">🧹 치울 것 '
+      +wsCleanCount()+'</span>':'')
     +'<span class="sep">|</span>'
     +'<span class="sb'+(S.myRole==='main'?' on':'')+'" onclick="myRole(\'main\')" '
     +'title="내가 주담당인 업무만">주 '+nMain+'</span>'
@@ -6157,6 +6189,9 @@ function renderMy(){
     +(on?'조건에 맞는 업무 '+list.length+' / 전체 '+total+'건'
         +' <span class="chipbtn" onclick="myReset()" title="걸러 보기를 모두 해제합니다">✕ 조건 해제</span>'
        :'진행 중 '+total+'건')+'</div>';
+  /* 자문·급여 접힌 줄 — 숫자를 보이게 둔다. 조용히 감추면 「자료가 없어졌다」가 된다
+     (이관 계약 칩과 같은 까닭). 눌러서 바로 편다. */
+  if(advHid) h+=advFoldHTML(advHid);
   app.innerHTML=h+splitClose();
   if(S.fPop) fPopPos();
   if(S.colPop) colPopPos();
@@ -6677,6 +6712,260 @@ function planRowHTML(it,s){
 /* ── 업무 종료 ── 푸른이알피에서 가져온 건이면 그쪽 사건도 함께 종료할지 묻는다 */
 var PE_KIND={contract:'계약',case:'사건',consulting:'컨설팅',fund:'기금',other:'기타사업'};
 function peLinked(it){ return !!(it&&it.src==='puerp'&&it.ref&&it.ref.type&&it.ref.id); }
+/* ══════════════════════════════════════════════════════════════════════
+   🧹 치울 것 — 「진행중」이 왜 안 닫히는지로 가른다 (대표 지시 2026-10-05)
+   ══════════════════════════════════════════════════════════════════════
+   「업무가 다 지나갔는데도 여전히 있는데 이부분 어떻게 처리해야되나」
+
+   ■ 실측 2026-10-04 (진행중 478건)
+       자문·급여   217건  업체관리가 「일하는 중」 — «끝나는 일이 아니다»
+       이알피 열림  97건  사건·컨설팅·계약이 이알피에서 접수중·진행중
+       엑셀        161건  이알피에 짝이 없다 — «아무도 안 닫아 준다». 61건은 반년 넘음
+       원본 없음     3건  이알피에서 치워졌다
+     최근 두 달 안에 사람이 기록을 쓴 것은 «14건»뿐이었다.
+
+   ⚠★ 「이알피는 끝났는데 업무관리만 열린」 것은 0건이었다 — 동기화는 제대로 돈다.
+     그러니 여기서 더 닫아 주는 길을 만들면 «이알피와 어긋난다». 덩어리마다
+     할 수 있는 일만 붙인다. 엑셀·원본없음은 여기서 끝내고, 이알피 것은 데려다만 준다. */
+var WS_CLEAN_MONTHS=6;          // 미리 골라 두는 잣대 — 이보다 오래 멈춘 것만 체크해 둔다
+/* 자문·급여 = 업체관리에서 온 업무. 계약이 살아 있는 동안 계속 가는 «관계»다.
+   ⚠ 「마지막 기록이 오래됐다」로 판단하면 안 된다 — 그 일은 원래 주간 기록을 안 남긴다
+     (countsLog 가 자문을 미기록 셈에서 빼는 것과 같은 까닭). */
+function wsAdv(it){ return !!(peLinked(it)&&it.ref.type==='companies'); }
+function wsCleanGroup(it){
+  if(!it||it.state==='done') return '';
+  if(wsAdv(it)) return 'adv';
+  if(!peLinked(it)) return 'excel';
+  if(it.pe_gone) return 'gone';
+  /* 마스터를 이미 읽어 두었으면 그것으로 다시 본다 — 동기화가 아직 안 돈 사이에도 맞게.
+     ⚠ 그 유형을 «실제로 읽어냈을 때만» 본다. 못 읽은 것을 「없다」로 읽으면 전건이 원본없음이 된다. */
+  var arr=peMaster&&peMaster[it.ref.type];
+  if(arr&&arr.length&&!peRec(it)) return 'gone';
+  return 'pe';
+}
+/* 마지막 «사람» 기록에서 몇 달이 지났나. 기록이 없으면 null.
+   ⚠ 자동 줄(🔗)은 last 를 안 바꾼다 — 그것이 설계다(alWrite 머리글). 그래서 여기서도
+     「사람이 손댄 지 얼마나 됐나」만 본다. */
+function wsStaleMon(it){
+  var d=it&&it.last&&it.last.d; if(!d) return null;
+  var t=new Date(String(d)+'T00:00:00'); if(isNaN(t)) return null;
+  return Math.floor((Date.now()-t.getTime())/(1000*60*60*24*30.4));
+}
+/* 누구 것을 치울 것인가 — 대표는 전 직원, 나머지는 자기 것.
+   ⚠ 실측에서 멈춘 464건이 열 사람에게 흩어져 있었다(박재원 105 · 박한별 73 …).
+     대표 화면이 제 것 46건만 보면 이 화면을 만든 뜻이 없다. */
+function wsAllOn(){ return isAdmin() && S.wsAll!==false; }
+function wsWho(){ return wsAllOn()?null:viewer(); }
+/* 치울 것 한 덩어리 — 오래 멈춘 것부터. 기록 없는 것을 맨 앞에 둔다. */
+function wsCleanList(g,who){
+  var v=(who===undefined)?wsWho():who;
+  return openItems().filter(function(it){
+    return wsCleanGroup(it)===g && (!v||isOf(it,v));
+  }).sort(function(a,b){
+    var ma=wsStaleMon(a), mb=wsStaleMon(b);
+    if(ma===null&&mb!==null) return -1;
+    if(mb===null&&ma!==null) return 1;
+    if(ma!==mb) return (mb||0)-(ma||0);
+    return String(a.company||'').localeCompare(String(b.company||''),'ko');
+  });
+}
+/* 미리 골라 두는 것 — 엑셀에서 온 것 가운데 오래 멈춘 것.
+   ⚠ 「기록 없음」은 미리 고르지 않는다. 엑셀로 들어와 아직 한 번도 안 적은 새 업무일 수 있다. */
+function wsCleanPre(it){
+  var m=wsStaleMon(it);
+  return m!==null && m>=WS_CLEAN_MONTHS;
+}
+function wsCleanCount(){
+  var v=wsWho(), n=0;
+  openItems().forEach(function(it){
+    if(v&&!isOf(it,v)) return;
+    var g=wsCleanGroup(it);
+    if(g==='excel'||g==='pe'||g==='gone') n++;
+  });
+  return n;
+}
+/* 「내 업무」 아래 접힌 줄 — 숫자를 보이게 둔다. 조용히 감추면 자료가 없어진 줄 안다. */
+function advFoldHTML(n){
+  return '<div class="wsfold" onclick="S.myAdv=!S.myAdv;renderMy()" '
+    +'title="'+(S.myAdv?'다시 접습니다':'자문·급여 업무를 목록에 펴 봅니다')+'">'
+    +'<span class="muted">'+(S.myAdv?'▾':'▸')+'</span>'
+    +'<b>자문 · 급여 '+n+'건</b>'
+    +'<span class="muted">— 계약이 살아 있는 동안 계속 가는 일입니다. 끝내는 업무가 아닙니다.</span>'
+    +'<span style="flex:1"></span>'
+    +'<span class="muted">'+(S.myAdv?'접기':'펴 보기')+'</span></div>';
+}
+
+/* ── 🧹 치울 것 — 세 덩어리, 덩어리마다 할 수 있는 일만 ──────────────── */
+var wsSel={}, wsPreOn=0;           /* 고른 줄. 화면을 떠나면 비운다(대표 지시 2026-10-05) */
+function wsSelKey(g,id){ return g+'~'+id; }
+function wsSelOf(g){ return Object.keys(wsSel).filter(function(k){ return k.indexOf(g+'~')===0; })
+  .map(function(k){ return k.slice(g.length+1); }); }
+function wsPick(g,id,on){ var k=wsSelKey(g,id); if(on) wsSel[k]=1; else delete wsSel[k]; wsCountPaint(g); }
+/* 보는 범위를 바꾸면 고른 것을 비운다 — 안 보이는 줄이 골라진 채로 남으면 모르고 종료한다 */
+function wsScope(){ S.wsAll=!wsAllOn(); wsSel={}; wsPreOn=0; renderClean(); }
+/* 치울 것 화면을 떠나면 고른 것을 비운다 (대표 지시 2026-10-05
+   「고른 것은 화면을 떠나면 비운다 — 돌아왔을 때 모르는 것이 골라져 있으면 안 된다」).
+   ⚠ 함수로 떼어 둔다 — route 안에 묻어 두면 «정말로 비우는지» 검사가 못 돌려 본다. */
+function wsLeave(v){ if(v!=='clean'){ wsSel={}; wsPreOn=0; } }
+function wsPickAll(g,on){
+  wsCleanList(g).forEach(function(it){ var k=wsSelKey(g,it._id); if(on) wsSel[k]=1; else delete wsSel[k]; });
+  renderClean();
+}
+/* 고른 수만 다시 찍는다 — □ 를 누를 때마다 표를 다시 그리면 긴 목록에서 튄다 */
+function wsCountPaint(g){
+  var el=$('wsn-'+g); if(!el) return;
+  var n=wsSelOf(g).length;
+  el.textContent=n?n+'건 골랐습니다':wsCleanList(g).length+'건';
+}
+function wsRowHTML(g,it,i){
+  var m=wsStaleMon(it), pre=wsSel[wsSelKey(g,it._id)];
+  var age=(m===null)?'<span class="muted">기록 없음</span>'
+    :esc(it.last.d)+' <span class="badge" style="background:'
+      +(m>=WS_CLEAN_MONTHS?'#fef2f2;color:#991b1b':'#fffbeb;color:#854d0e')+'">'+m+'개월</span>';
+  return '<tr>'
+    +'<td class="wsck"><input type="checkbox"'+(pre?' checked':'')
+      +' onchange="wsPick(\''+g+'\',\''+escJ(it._id)+'\',this.checked)"></td>'
+    +'<td class="wscn">'+i+'</td>'
+    +'<td>'+esc(it.company||it.client||'—')+'</td>'
+    +'<td>'+catBadge(it.cat)+'</td>'
+    +'<td>'+esc(itemName(it)||'')+'</td>'
+    +'<td>'+age+'</td>'
+    +'<td>'+esc(_mgrOf(it))+'</td>'
+    +(g==='pe'?'<td><button class="chipbtn" style="white-space:nowrap" onclick="openPuerp(\''+escJ(it.ref.type)+'\')">이알피에서 열기 ↗</button></td>':'')
+    +(g==='gone'?'<td>'+wsLogCntHTML(it)+'</td>':'')
+    +'</tr>';
+}
+/* 원본이 없는 줄은 «기록이 몇 줄인지» 함께 적는다 — 끝내도 기록은 남지만,
+   사람이 지우기로 마음먹을 때 무엇이 걸려 있는지 알아야 한다. */
+function wsLogCntHTML(it){
+  var n=(itemLogsCache[it._id]?Object.keys(itemLogsCache[it._id]).length:null);
+  return n===null?'<span class="muted">—</span>'
+    :(n?'<span class="badge" style="background:#fffbeb;color:#854d0e">기록 '+n+'줄</span>'
+       :'<span class="muted">0줄</span>');
+}
+function wsSecHTML(g,title,why,head,act){
+  var L=wsCleanList(g), n=wsSelOf(g).length, all=n&&n===L.length;
+  var h='<p class="wssec">'+title+' · '+L.length+'건</p><p class="wswhy">'+why+'</p>';
+  if(!L.length) return h+'<p class="muted" style="font-size:12.5px">없습니다.</p>';
+  h+='<div class="wsbar"><label><input type="checkbox"'+(all?' checked':'')
+    +' onchange="wsPickAll(\''+g+'\',this.checked)"> 모두</label>'+act
+    +'<span class="n" id="wsn-'+g+'">'+(n?n+'건 골랐습니다':L.length+'건')+'</span></div>';
+  h+='<div class="panel tbl" style="padding:0;max-height:none"><table><thead><tr class="fhead">'
+    +'<th class="wsck"></th><th class="wscn">#</th>'
+    +'<th style="min-width:110px">사업장</th><th style="width:64px">구분</th>'
+    +'<th style="min-width:150px">업무</th><th style="min-width:120px">마지막 기록</th>'
+    +'<th style="width:80px">담당</th>'+head+'</tr></thead><tbody>';
+  L.forEach(function(it,i){ h+=wsRowHTML(g,it,i+1); });
+  return h+'</tbody></table></div>';
+}
+/* 고른 것 한꺼번에 종료 — «한 번에» 보낸다 (반쯤 하다 멈추지 않게, 대표 지시 2026-10-05).
+   ⚠ 푸른이알피에 밀지 않는다. 여기서 닫는 것은 «업무관리 쪽 정리»이고,
+     이알피가 열어 둔 것(㉡)은 애초에 이 길로 오지 않는다. */
+function wsCloseSel(g){
+  var ids=wsSelOf(g);
+  if(!ids.length){ toast('먼저 □ 를 골라 주세요','warn'); return; }
+  confirmM('고른 업무 '+ids.length+'건을 종료합니다.\n\n'
+    +'→ 종료 화면으로 갑니다 (거기서 ↩ 재개로 되돌릴 수 있습니다)\n'
+    +'→ 주간 기록은 한 줄도 안 지웁니다\n'
+    +'→ 푸른이알피는 건드리지 않습니다',{ok:'종료 '+ids.length+'건'}).then(function(ok){
+    if(!ok) return;
+    var now=new Date().toISOString(), d=todayStr(), up={}, done=[];
+    ids.forEach(function(id){
+      var it=items[id];
+      if(!it||it.state==='done') return;        // 그사이 남이 닫은 것은 건너뛴다
+      var P=NS+'/items/'+id+'/';
+      up[P+'state']='done'; up[P+'done_date']=d; up[P+'status']=END_BY_KEY['done'][1];
+      up[P+'state_at']=now; up[P+'end_way']='done'; up[P+'end_to']=null; up[P+'end_result']=null;
+      if(peLinked(it)) up[P+'pe_nosync']=true;
+      done.push(id);
+    });
+    if(!done.length){ wsSel={}; toast('이미 다 종료되었습니다','warn'); route(); return; }
+    fbDb.ref().update(up).then(function(){
+      done.forEach(function(id){
+        var it=items[id]; if(!it) return;
+        it.state='done'; it.done_date=d; it.status=END_BY_KEY['done'][1]; it.state_at=now;
+        it.end_way='done'; it.end_to=null; it.end_result=null;
+        if(peLinked(it)) it.pe_nosync=true;
+      });
+      wsSel={};
+      toast('✅ '+done.length+'건 종료했습니다 — 종료 화면에서 ↩ 재개할 수 있습니다');
+      route();
+    }).catch(function(e){ toast('실패: '+e.message,'err'); });
+  });
+}
+/* 고른 것 목록 — 담당자에게 넘기라고 글자로 펴 준다.
+   ⚠ 클립보드 API 를 쓰지 않는다 — 막히면 «복사했다»고 거짓말하게 된다. 글을 보여 주고 사람이 복사한다. */
+function wsCopySel(){
+  var ids=wsSelOf('pe');
+  if(!ids.length){ toast('먼저 □ 를 골라 주세요','warn'); return; }
+  var txt=ids.map(function(id){
+    var it=items[id]; if(!it) return '';
+    return [it.company||'', it.cat||'', itemName(it)||'', _mgrOf(it)||''].join('\t');
+  }).filter(Boolean).join('\n');
+  showModal('<h2 style="margin:0 0 6px">고른 것 '+ids.length+'건</h2>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 9px">푸른이알피에서 닫아야 할 목록입니다 — '
+    +'글이 골라져 있으니 <b>Ctrl+C</b> 로 복사해 담당자에게 넘기세요.</p>'
+    +'<textarea id="wscopy" readonly style="width:100%;height:220px;font-size:12px;'
+    +'font-family:inherit;border:1px solid var(--line);border-radius:8px;padding:9px">'+esc(txt)+'</textarea>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+  setTimeout(function(){ var t=$('wscopy'); if(t){ t.focus(); t.select(); } },60);
+}
+function renderClean(){
+  var app=$('app'); if(!app) return;
+  /* 처음 들어왔을 때 한 번만 — 오래 멈춘 엑셀 건을 미리 골라 둔다.
+     ⚠ 다시 그릴 때마다 하면 사람이 뺀 체크가 도로 켜진다. */
+  if(!wsPreOn){ wsPreOn=1;
+    wsCleanList('excel').forEach(function(it){ if(wsCleanPre(it)) wsSel[wsSelKey('excel',it._id)]=1; }); }
+  var nE=wsCleanList('excel').length, nP=wsCleanList('pe').length, nG=wsCleanList('gone').length;
+  var _v=wsWho();
+  var nA=openItems().filter(function(it){ return wsAdv(it)&&(!_v||isOf(it,_v)); }).length;
+  var h='<div class="row" style="flex-wrap:wrap;margin-bottom:10px"><h1>🧹 치울 것</h1>'
+    +(isAdmin()?'<span class="chipbtn'+(wsAllOn()?' on':'')+'" onclick="wsScope()" '
+       +'title="전 직원의 멈춘 업무를 함께 봅니다">'+(wsAllOn()?'✓ 전 직원':'내 것만')+'</span>':'')
+    +'<span class="statbar" style="margin:0">오래 멈춘 업무를 <b>왜 멈췄는지</b>로 갈라 놓았습니다 '
+    +'— 덩어리마다 <b>할 수 있는 일만</b> 붙어 있습니다.</span></div>';
+  h+='<div class="row" style="gap:9px;flex-wrap:wrap;margin-bottom:12px">'
+    +'<div class="wscard on"><div class="big">'+nE+'</div><div class="lb">엑셀에서 옮겨 온 것<br>'
+      +'<span class="muted">여기서 끝낼 수 있습니다</span></div></div>'
+    +'<div class="wscard"><div class="big">'+nP+'</div><div class="lb">푸른이알피가 열어 둔 것<br>'
+      +'<span class="muted">이알피에서 닫아야 합니다</span></div></div>'
+    +'<div class="wscard"><div class="big">'+nG+'</div><div class="lb">원본이 없는 것<br>'
+      +'<span class="muted">끝내면 됩니다</span></div></div>'
+    +'<div class="wscard"><div class="big">'+nA+'</div><div class="lb">자문 · 급여<br>'
+      +'<span class="muted">끝나는 일이 아닙니다 — 여기에 없습니다</span></div></div>'
+    +'</div>';
+  if(!nE&&!nP&&!nG){
+    app.innerHTML=h+'<div class="panel" style="text-align:center;color:var(--sub);padding:40px">'
+      +'치울 것이 없습니다.</div>';
+    return;
+  }
+  h+='<div class="panel">'
+    +wsSecHTML('excel','① 엑셀에서 옮겨 온 것',
+       '푸른이알피에 짝이 없어 <b>아무도 닫아 주지 않습니다.</b> '
+       +WS_CLEAN_MONTHS+'개월 넘게 멈춘 것을 <b>미리 골라</b> 두었습니다 — 살려 둘 것은 체크를 빼세요.',
+       '',
+       '<button class="chipbtn" onclick="wsCloseSel(\'excel\')">고른 것 종료</button>'
+       +'<button class="chipbtn" onclick="matchModal()" title="푸른이알피의 같은 건과 짝을 지으면 그쪽에서 닫을 때 함께 닫힙니다">🔗 푸른이알피와 짝짓기</button>')
+    +'<p class="wswhy" style="margin-top:9px">종료하면 <b>종료 화면</b>으로 갑니다 — '
+    +'잘못 눌러도 거기서 <b>↩ 재개</b>로 돌아옵니다. <b>기록은 한 줄도 안 지웁니다.</b></p>'
+    +'</div>';
+  h+='<div class="panel">'
+    +wsSecHTML('pe','② 푸른이알피가 아직 열어 둔 것',
+       '사건·컨설팅·계약이 <b>푸른이알피에서 아직 진행중</b>입니다. 업무관리는 이알피를 비추기만 하므로 '
+       +'<b>여기서는 못 닫습니다</b> — 이알피에서 닫으면 여기도 저절로 닫힙니다.',
+       '<th style="width:152px"></th>',
+       '<button class="chipbtn" onclick="wsCopySel()">고른 것 목록 복사</button>')
+    +'<p class="wswhy" style="margin-top:9px">⚠ 종료 단추를 <b>일부러 안 붙였습니다.</b> '
+    +'여기서 닫으면 이알피와 어긋나고 다음 동기화에 도로 열립니다 — 두 곳이 서로를 되돌리며 싸웁니다.</p>'
+    +'</div>';
+  h+='<div class="panel">'
+    +wsSecHTML('gone','③ 원본이 없는 것',
+       '푸른이알피에서 치워진(휴지통) 건입니다. 끝내도 <b>주간 기록은 그대로 남습니다.</b>',
+       '<th style="width:96px">기록</th>',
+       '<button class="chipbtn" onclick="wsCloseSel(\'gone\')">고른 것 종료</button>')
+    +'</div>';
+  app.innerHTML=h;
+}
 /* 종료 = 암묵지를 건질 마지막 기회. 기억이 가장 선명한 시점이므로 회고 3문항을
    여기에 둔다(선택). 종료 후 AI가 기록·노트·회고를 읽어 지식 카드 후보를 뽑는다. */
 var RETRO_FIELDS=[
