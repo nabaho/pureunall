@@ -212,3 +212,16 @@ test('★ 가리는 규칙을 여기에 다시 만들지 않았다', () => {
   assert.ok(src.indexOf('maskName') < 0, '가리는 규칙을 베껴 오면 안 됩니다');
   assert.match(src, /KcareerAdvSummary/, '있는 것을 빌려 써야 합니다');
 });
+
+test('★★ 서류 보관함 → 서류 종류 (이름·해·제출처만, 신청 재료 건수에는 안 섞는다)', () => {
+  const G = require('../js/gov-career.js');
+  const ls = {
+    resume: JSON.stringify([{ kind: '이력서', year: '2026', org: '지방공기업평가원', genName: '2026_지방공기업평가원_이력서.hwpx' }]),
+    certdoc: JSON.stringify([{ certKind: 'own', title: '경력증명서', date: '2026-03-01', issuer: '푸른노무법인' }, { certKind: 'ext', fname: '실적증명서_충남경제진흥원.pdf', year: '2025' }])
+  };
+  const d = G.docbox(ls);
+  assert.deepEqual(d.map((x) => x.kind), ['resume', 'career', 'perf']);
+  assert.equal(d[0].name, '2026_지방공기업평가원_이력서.hwpx'); assert.equal(d[1].year, '2026');
+  assert.ok(G.STORES.includes('resume') && G.STORES.includes('certdoc'));
+  assert.equal(G.counts(G.build(ls, '2026-10-05')).total, 0, '보관함은 신청 재료 건수에 안 섞인다');
+});

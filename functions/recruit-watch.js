@@ -242,6 +242,55 @@ function periodOf(text, post) {
 }
 
 /* 본문을 열어 볼 수 있는 글인가 — 목록 주소로 돌려 둔 글(javascript 링크였던 것)은 본문이 없다 */
+/* ── 필요서류 읽기 (대표 지시 2026-10-05 「필요서류 ↔ 갖고 있는 서류」, 설계 3절) ──
+   본문의 「제출서류·구비서류·신청서류·접수서류·응모서류·필요서류」 단락에서 서류 종류를 뽑는다 → ['apply','resume',…] 또는 null(단락 없음).
+   ⚠ 종류 낱말은 화면 js/gov-submit.js 의 KINDS 와 «글자까지 같다» — 검사가 맞댄다(내기 전 점검과 같은 말을 써야 서로 견준다).
+   ⚠ 단락은 다음 단락(접수 방법·기간·선정 절차·문의·유의 사항 …)이나 □ 에서 끊는다 — 뒤의 개인정보 안내 글을 «동의서»로 읽지 않게. */
+const DOC_KINDS = [
+  { k: 'consent', re: /개인\s*정보[\s\S]{0,12}(?:동의|수집|이용)|동의서/ },
+  { k: 'apply',   re: /지원\s*서|신청\s*서|응모\s*서|참가\s*신청/ },
+  { k: 'career',  re: /경력\s*증명|재직\s*증명|경력\s*확인/ },
+  { k: 'resume',  re: /이력\s*서|프로필|profile|경력\s*기술/i },
+  { k: 'license', re: /자격\s*증|자격\s*수첩|노무사\s*등록|합격\s*증|등록\s*증/ },
+  { k: 'perf',    re: /실적\s*증명|수행\s*실적|참여\s*확인|실적\s*확인/ },
+  { k: 'degree',  re: /졸업\s*증명|학위\s*증명|학위\s*기/ },
+  { k: 'biz',     re: /사업자\s*등록/ },
+  { k: 'plan',    re: /계획\s*서|제안\s*서/ }
+];
+const DOC_LABEL = /(?:제출|구비|신청|접수|응모|필요|증빙)\s*서류/g;
+const DOC_END = /□|■|(?:접수|제출|신청)\s*(?:방법|기간|기한|처|장소)|선정\s*(?:방법|절차|기준)|심사\s*(?:방법|기준)|평가\s*(?:방법|기준)|문의\s*처?|유의\s*사항|기타\s*사항|붙임|첨부\s*파일/;
+function docsOf(text) {
+  const t = String(text == null ? '' : text).replace(/\s+/g, ' ');
+  const out = []; let m, found = false;
+  DOC_LABEL.lastIndex = 0;
+  while ((m = DOC_LABEL.exec(t))) {
+    found = true;
+    let win = t.slice(m.index + m[0].length, m.index + m[0].length + 500);
+    const e = DOC_END.exec(win.slice(5));   // 라벨 바로 뒤 몇 글자는 건너뛴다(「제출서류 및 제출방법」 같은 제목 줄)
+    if (e) win = win.slice(0, e.index + 5);
+    DOC_KINDS.forEach((d) => { if (d.re.test(win) && out.indexOf(d.k) < 0) out.push(d.k); });
+  }
+  if (!found) return null;
+  return DOC_KINDS.map((d) => d.k).filter((k) => out.indexOf(k) >= 0);   // 차례는 KINDS 차례로
+}
+
+/* 본문에 «제출서류» 단락이 없을 때 — 첨부 파일 «이름»에서 낼 서식을 읽는다(2026-10-05 실측: 충남경제진흥원은
+   본문엔 단락이 없고 첨부에 「신청서 및 개인정보 수집·이용 동의서.hwp」가 있다).
+   ⚠ 공고문 자체(공고·안내·모집공고·요강)는 낼 서식이 아니다 — 그 이름의 파일은 건너뛴다. 파일 이름(확장자 있는 것)만 본다. */
+const ATTACH = /첨부(?:\s*파일)?\s*[|:：]/;
+const FILE_RE = /[^|,]{2,120}?\.(?:hwpx?|docx?|pdf|xlsx?|zip)/gi;   // ⚠ 「·」로 끊지 않는다 — 제목 안에 「산업·일자리」가 있다
+function docsFromAttach(text) {
+  const t = String(text == null ? '' : text).replace(/\s+/g, ' ');
+  const m = ATTACH.exec(t); if (!m) return [];
+  const win = t.slice(m.index + m[0].length, m.index + m[0].length + 600);
+  const out = [];
+  (win.match(FILE_RE) || []).forEach((f) => {
+    if (/공고|안내|요강|공문|결과/.test(f) && !/신청서|지원서|동의서|이력서|계획서|증명/.test(f)) return;
+    DOC_KINDS.forEach((d) => { if (d.re.test(f) && out.indexOf(d.k) < 0) out.push(d.k); });
+  });
+  return DOC_KINDS.map((d) => d.k).filter((k) => out.indexOf(k) >= 0);
+}
+
 function hasDetail(h, b) {
   const u = String(h && h.href || '');
   return /^https:\/\//.test(u) && !!b && u !== b.url && u !== b.page;
@@ -315,14 +364,14 @@ async function run(o) {
      ⚠ o.details 일 때만(서버가 켠다) · 새 글 먼저, 남는 자리에 «아직 기간을 안 본» 옛 글을 하루 몇 건씩 메운다.
      ⚠ 목록 시간 셈과 같은 전체 마감 안에서만 — 남은 시간이 없으면 그만둔다(다음 날 다시).
      ⚠ 본문에서 못 찾으면 { none: true } 를 남겨 날마다 다시 열지 않는다(제목에서 찾은 것은 그대로 둔다). */
-  const pers = {};
+  const pers = {}, docs = {};
   if (o.details) {
     const byId = {}; boards.forEach((b) => { byId[b.id] = b; });
     const max = o.detailMax || LIMITS.detailMax, dms = o.detailMs || LIMITS.detailMs;
     const todo = hits.filter((h) => hasDetail(h, byId[h.board])).map((h) => ({ h, fresh: true }));
     Object.keys(have).forEach((k) => {
       const x = Object.assign({}, have[k] || {}, fixes[k] ? { href: fixes[k] } : {});
-      if (x.per && (x.per.to || x.per.rolling || x.per.none)) return;
+      if (x.per && (x.per.to || x.per.rolling || x.per.none) && (x.docs || x.docsNone)) return;   // 기간·서류 둘 다 본 글만 건너뛴다
       if (hasDetail(Object.assign({ key: k }, x), byId[x.board])) todo.push({ h: Object.assign({ key: k }, x), fresh: false });
     });
     const list = todo.slice(0, max);
@@ -333,17 +382,19 @@ async function run(o) {
         const left = totalMs - (now() - t0);
         if (left <= 1000) return;
         const 시계 = 늦으면(Math.min(dms, left), '본문을 늦게 줘 그만 읽었습니다');
-        let got = null;
-        try { got = periodOf(clean(await Promise.race([o.fetchText(it.h.href, b), 시계.p])), it.h.date); }
+        let got = null, ds = null;
+        try { const txt = clean(await Promise.race([o.fetchText(it.h.href, b), 시계.p])); got = periodOf(txt, it.h.date); ds = docsOf(txt); if (!ds || !ds.length) { const a = docsFromAttach(txt); if (a.length) ds = Object.assign(a, { fromAttach: true }); } }
         catch (e) { continue; }   // 못 열면 다음 날 다시
         finally { 시계.stop(); }
         const v = got || (it.h.per && it.h.per.to ? it.h.per : { none: true });
-        if (it.fresh) it.h.per = v; else pers[it.h.key] = v;
+        /* ⚠ 빈 배열은 RTDB 가 안 담는다 — 「못 찾음」은 docsNone 으로 남겨 날마다 다시 열지 않는다 */
+        const dv = ds && ds.length ? (ds.fromAttach ? { docs: ds.slice(), docsFrom: 'attach' } : { docs: ds }) : { docsNone: true };
+        if (it.fresh) { it.h.per = v; Object.assign(it.h, dv); } else { pers[it.h.key] = v; docs[it.h.key] = dv; }
       }
     };
     await Promise.all(Array.from({ length: Math.min(together, list.length) }, 읽개));
   }
-  return { hits, errors, counts, pers, fixes, checked: boards.length, ms: now() - t0 };
+  return { hits, errors, counts, pers, docs, fixes, checked: boards.length, ms: now() - t0 };
 }
 
 /* 게시판에 맞는 «읽는 손»을 고른다 — login 이 붙은 게시판만 로그인한 손으로.
@@ -390,6 +441,12 @@ function updatesOf(result, existing, nowIso) {
   }
   /* 옛 글에 붙인 기간 — ⚠ 같은 쓰기에서 지우는 글(null)에는 안 붙인다(RTDB 는 부모·자식을 한 번에 못 쓴다) */
   Object.keys(result.fixes || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/href'] = result.fixes[k]; });
+  Object.keys(result.docs || {}).forEach((k) => {
+    if (upd['hits/' + k] === null || !existing || !existing[k]) return;
+    const d = result.docs[k];
+    if (d.docs) { upd['hits/' + k + '/docs'] = d.docs; if (d.docsFrom) upd['hits/' + k + '/docsFrom'] = d.docsFrom; }
+    else upd['hits/' + k + '/docsNone'] = true;
+  });
   Object.keys(result.pers || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/per'] = result.pers[k]; });
   upd.last = { at: nowIso, checked: result.checked, added: result.hits.length,
     errors: result.errors, counts: result.counts };
@@ -403,4 +460,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
+module.exports = { docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
