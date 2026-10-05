@@ -97,6 +97,58 @@ def site_base(s):
     return re.sub(r'\s*[\(\[].*?[\)\]]\s*$', '', s).strip() or s
 
 
+# ══════ 한 폴더에 여러 회사가 섞인 곳 — 파일 이름으로 나눈다 (대표 승인 2026-10-05) ══════
+# 급여관리의 사업장은 «폴더 이름»이다. 그런데 담당자가 계열사·지점을 한 폴더에 모아 둔
+# 곳이 있어, 회사 여럿이 한 사업장으로 묶여 있었다. 급여관리를 업체관리 «업체번호»로
+# 잇기로 하면서(이름표, 1:1) 이 묶음은 이을 수가 없게 됐다 — 그래서 나눈다.
+#
+# ⚠ 나누는 표는 **저장소 밖** 자료 폴더의 folder_split.json 에 둔다 — 실제 업체 이름이
+#   들어 있어서다(업체·사람 이름을 저장소에서 걷어낸 보안 정리 2026-09). 표가 없으면
+#   나누지 않고 예전 그대로 만든다(알리기만 한다). 꼴:
+#     {"나누기": {"묶음 이름": [["나눌 이름", ["파일 이름 열쇠말", ...]], ...]}}
+#     예) {"나누기": {"새별반찬 3곳": [["새별반찬(모종점)", ["모종"]], ["새별사계절찬", ["사계절찬"]]]}}
+#   · 나눌 이름은 업체관리 이름에 맞춘다(앞 법인 표기만 뗀다) — 이름표가 「이름 같음」으로 붙는다.
+#   · ⚠ 지점 괄호를 떼지 않는다 — 「(모종점)」「(배방점)」이 한 곳이 된다. 그래서 나눈 이름은
+#     site_base 를 다시 거치지 않는다.
+#   · 열쇠말은 **파일 이름에서만** 찾는다(경로의 폴더 이름은 묶음 이름이라 다 걸린다).
+#     먼저 적은 것이 이긴다. 어느 열쇠말에도 안 걸리는 파일은 묶음 이름 그대로 남긴다.
+#   · ⚠ 한 파일 안에 회사별 시트가 섞인 묶음은 이 표로 못 나눈다(시트 단위 일이다).
+SPLIT_FILE = os.path.join(DATA_ROOT, "folder_split.json")
+
+
+def _load_split():
+    if not os.path.exists(SPLIT_FILE):
+        return {}
+    try:
+        raw = json.load(open(SPLIT_FILE, encoding="utf-8"))
+        return {k: [(n, list(keys)) for n, keys in v] for k, v in (raw.get("나누기") or {}).items()}
+    except Exception as e:                      # 표가 깨졌으면 나누지 않는다 — 조용히 넘기지는 않는다
+        print("[주의] folder_split.json 을 못 읽었습니다 — 묶음 폴더를 나누지 않습니다:", e)
+        return {}
+
+
+FOLDER_SPLIT = _load_split()
+
+
+def split_site(site, path):
+    """묶음 폴더의 파일을 회사별 사업장으로 가른다. 묶음이 아니면 그대로."""
+    rules = FOLDER_SPLIT.get(site)
+    if not rules:
+        return site
+    base = str(path).replace("\\", "/").split("/")[-1]      # 경로 구분자가 \ 로 온다(윈도)
+    for name, keys in rules:
+        if any(k in base for k in keys):
+            return name
+    return site
+
+
+def site_of(path):
+    """파일 하나의 사업장 이름 — 두 생성기(설정카드·급여)가 **이 한 함수**를 쓴다.
+    같은 규칙이 두 군데 있으면 카드와 급여의 사업장이 어느 날 다른 이름이 된다."""
+    sb = site_base(raw_site(path))
+    return split_site(sb, path) if sb else sb
+
+
 def load(name, default):
     p = os.path.join(OUT_DIR, name)
     if os.path.exists(p):
@@ -121,7 +173,7 @@ def main():
     for r in res:
         if not r.get("ok"):
             continue
-        sb = site_base(raw_site(r["path"]))
+        sb = site_of(r["path"])
         if not sb:
             continue
         a = agg[sb]

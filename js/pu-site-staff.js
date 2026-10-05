@@ -67,10 +67,25 @@
      ① «그대로 같은 것»이 먼저다 — 「두레」이 있는데 「두레가축약품」을 고르면 안 된다
        (PR #837 이 못 박은 쌍이다).
      ② 그다음에 품고 있는 것을 긴 이름부터 본다. */
+  /* 지점까지 담은 이름 — 법인 표기·빈칸·괄호 «글자»만 떼고 괄호 «안»은 남긴다.
+     ⚠ coreName 은 괄호 안을 통째로 버려서 「새별반찬(모종점)」과 「새별반찬(배방점)」이
+       같은 이름이 된다 — 묶음 폴더를 지점별로 나눈 뒤(2026-10-05) 엉뚱한 지점에 붙었다.
+       그래서 이것으로 «먼저» 견준다. */
+  function fullName(s) {
+    return String(s == null ? '' : s)
+      .replace(/㈜|\(주\)|\(유\)|주식회사|유한회사|농업회사법인/g, '')
+      .replace(/[()（）\s]/g, '');
+  }
+
   function matchCompany(site, list) {
     var want = coreName(site);
     if (!want) return null;
-    var sorted = (list || []).slice().sort(function (a, b) {
+    var full = fullName(site);
+    var arr = listOf(list), j;
+    for (j = 0; j < arr.length; j++) {                 /* ⓪ 지점까지 똑같은 것이 먼저다 */
+      if (arr[j] && full && fullName(arr[j].name) === full) return arr[j];
+    }
+    var sorted = arr.slice().sort(function (a, b) {
       return coreName(b && b.name).length - coreName(a && a.name).length;
     });
     var i, c;
@@ -195,7 +210,8 @@
     out.상태 = String(co.status || '');
     if (out.짐작) {
       var c = coreName(co.name);
-      out.정확 = !!c && (c === coreName(out.사업장) || c === coreName(stripTag(out.사업장)));
+      out.정확 = (!!fullName(co.name) && fullName(co.name) === fullName(out.사업장))
+        || (!!c && (c === coreName(out.사업장) || c === coreName(stripTag(out.사업장))));
     }
     out.sid = String(co.managerMain || '');
     out.담당 = out.sid ? (dir[out.sid] || out.sid) : '';
@@ -292,7 +308,7 @@
   }
 
   var API = {
-    coreName: coreName, stripTag: stripTag,
+    coreName: coreName, fullName: fullName, stripTag: stripTag,
     isPayrollCo: isPayrollCo, payrollCos: payrollCos,
     matchCompany: matchCompany,
     sidToEmail: sidToEmail, nameBySid: nameBySid, sidKey: sidKey,
