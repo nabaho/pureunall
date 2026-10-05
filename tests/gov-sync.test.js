@@ -93,6 +93,9 @@ test('★★ 화면은 이 모듈을 싣고, 칸 쓰기는 lsSet 한 길로만 �
   const src = fs.readFileSync(path.join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /<script src="js\/gov-sync\.js\?v=\d+"><\/script>/);
   /* localStorage 에 직접 쓰는 곳은 lsSet · 합친 값 두기(_rawWrite) · 시각·보낼 칸 표시뿐 */
-  const direct = (src.match(/localStorage\.setItem\(/g) || []).length;
-  assert.equal(direct, 4, 'localStorage 를 직접 쓰는 곳이 늘었다 — 시각이 안 찍혀 다른 기기와 합칠 때 진다');
+  /* 다섯째는 경력관리로 «넘기는» 자리(pu_kc_handoff — 다른 앱이 읽고 곧 지운다, 동기화 칸이 아니다 · 2026-10-05 ③) */
+  const all = src.match(/localStorage\.setItem\([^)]*/g) || [];
+  const handoff = all.filter((x) => /'pu_kc_handoff'/.test(x));
+  assert.equal(handoff.length, 1);
+  assert.equal(all.length - handoff.length, 4, 'localStorage 를 직접 쓰는 곳이 늘었다 — 시각이 안 찍혀 다른 기기와 합칠 때 진다');
 });

@@ -343,7 +343,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-recruit.js?v=5"></script>
 <script src="js/gov-submit.js?v=2"></script>
 <script src="js/gov-sync.js?v=3"></script>
-<script src="js/gov-match.js?v=1"></script>
+<script src="js/gov-match.js?v=2"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=2"></script>
 <script>
@@ -1632,6 +1632,23 @@ function recPdfLib(){
     document.head.appendChild(sc);
   });
 }
+/* 표를 «한 행 = 한 줄»(칸은 「 | 」)로 — 지원서 경력 줄을 맞추려고(2026-10-05 ③).
+   ⚠ 공용 읽개(PuKordocText)는 칸마다 한 줄로 풀어 내 「기간 | 기관 | 직책」이 흩어진다 — 공용 모듈은 고치지 않고,
+     그 엔진을 빌려(load) 여기서 행을 만든다. 못 하면 null(경력 줄 견주기만 빠진다). */
+async function recRowLines(buf){
+  try{
+    if(!window.PuKordocText || !PuKordocText.canRead(buf)) return null;
+    var K=await PuKordocText.load();
+    var p=await K.parse(new Uint8Array(buf instanceof ArrayBuffer ? buf.slice(0) : buf), { ocr:false });
+    if(!p || !p.success) return null;
+    var cell=function(c){ return c ? String(c.text||'').replace(/\s+/g,' ').trim() : ''; }, out=[];
+    (p.blocks||[]).forEach(function(b){
+      if(b && b.type==='table' && b.table) (b.table.cells||[]).forEach(function(row){ var t=(row||[]).map(cell).filter(Boolean).join(' | '); if(t) out.push(t); });
+      else if(b && b.text) out.push(String(b.text).replace(/\s+/g,' ').trim());
+    });
+    return out;
+  }catch(e){ return null; }
+}
 /* 파일 → 글자 (못 읽으면 {text:null, why}) */
 async function recFileText(name, buf){
   var ext=String(name||'').toLowerCase().split('.').pop();
@@ -1639,7 +1656,7 @@ async function recFileText(name, buf){
     if(/^(hwp|hwpx|docx|xlsx)$/.test(ext)){
       if(!window.PuKordocText) return { text:null, why:'한글 읽개를 싣지 못했습니다 — 눈으로 확인하세요' };
       var r=await PuKordocText.read(buf);
-      return r&&r.text ? { text:r.text } : { text:null, why:'글자를 읽지 못했습니다 — 눈으로 확인하세요' };
+      return r&&r.text ? { text:r.text, lines:await recRowLines(buf) } : { text:null, why:'글자를 읽지 못했습니다 — 눈으로 확인하세요' };
     }
     if(ext==='pdf'){
       var L=await recPdfLib(), doc=await L.getDocument({ data:new Uint8Array(buf) }).promise, out=[];
@@ -1648,9 +1665,9 @@ async function recFileText(name, buf){
         out.push(tc.items.map(function(x){ return x.str; }).join(' '));
       }
       var t=out.join('\n');
-      return t.replace(/\s/g,'').length>=20 ? { text:t } : { text:null, why:'스캔(그림) PDF 같아 글자가 없습니다 — 눈으로 확인하세요' };
+      return t.replace(/\s/g,'').length>=20 ? { text:t, lines:out } : { text:null, why:'스캔(그림) PDF 같아 글자가 없습니다 — 눈으로 확인하세요' };
     }
-    if(ext==='txt') return { text:new TextDecoder('utf-8').decode(buf) };
+    if(ext==='txt'){ var tx=new TextDecoder('utf-8').decode(buf); return { text:tx, lines:tx.split(/\r?\n/) }; }
   }catch(e){ return { text:null, why:'읽다가 멈췄습니다('+String(e&&e.message||e).slice(0,60)+') — 눈으로 확인하세요' }; }
   return { text:null, why:'그림·기타 파일 — 글자를 못 읽습니다. 눈으로 확인하세요' };
 }
@@ -1660,7 +1677,7 @@ async function recCheckRun(id, files){
   var rows=[];
   for(var i=0;i<list.length;i++){
     var f=list[i], buf=await f.arrayBuffer(), r=await recFileText(f.name, buf);
-    rows.push({ name:f.name, size:f.size, text:r.text, textErr:r.why||'' });
+    rows.push({ name:f.name, size:f.size, text:r.text, lines:r.lines||null, textErr:r.why||'' });
   }
   _recChk[id]={ files:rows };
   if(_recPopId===id) recCheckDraw(id);   /* 창을 닫았거나 다른 기관 창이면 담아만 두고 다시 열 때 그린다 */
@@ -1678,8 +1695,81 @@ function recCheckDraw(id){
       +'<td style="white-space:normal">'+(x.warn.map(function(w){ return '<div style="color:var(--red)">⚠ '+esc(w)+'</div>'; }).join('')
         +x.info.map(function(w){ return '<div class="sml">ℹ '+esc(w)+'</div>'; }).join('')||'<span style="color:var(--teal)">✓</span>')+'</td></tr>'; }).join('');
   $('recChkOut').innerHTML=head+'<div class="scroll"><table><thead><tr><th>파일</th><th>종류</th><th>점검</th></tr></thead><tbody>'+tb+'</tbody></table></div>'
+    +linesHtml(id)
     +'<div class="bar" style="margin-top:8px"><a class="btn sm primary" href="pu-cards.html?view=mail" target="_blank" rel="noopener">✉ 푸른 메일 열기</a>'
     +'<span class="sml">점검한 파일을 메일 쓰기 창에 붙여 보내세요. 보낸 뒤에는 📬 메일에서 찾은 것이 「지원함」으로 적습니다.</span></div>';
+}
+
+/* ═══ ④ 지원서 경력 줄 ↔ 경력관리 (대표 지시 2026-10-05, 설계 4절) ═══
+   ⚠ 지원서 글은 이 브라우저 안에서만 다룬다 — 어디에도 담지 않는다. 확인 표시는 줄 «지문»(GovMatch.lineKey)으로만 recruit_match 에.
+   ⚠ 경력관리에 없는 줄은 「➕ 경력관리로 넘기기」 — 등록 창을 «채워서» 열 뿐, 저장은 사람이 한다.
+     넘길 내용은 주소에 싣지 않고 이 기기 localStorage(pu_kc_handoff)로 건넨다(같은 사이트라 경력관리가 읽는다). */
+var _lnSel={}, _lnKind={};
+function linesOf(id){
+  var c=_recChk[id]; if(!c) return [];
+  var out=[];
+  c.files.forEach(function(f){ GovMatch.careerLines(f.lines || (f.text ? String(f.text).split(/\n+/) : [])).forEach(function(e){ e.file=f.name; out.push(e); }); });
+  var seen={}; return out.filter(function(e){ var k=GovMatch.lineKey(e); if(seen[k]) return false; seen[k]=1; e.key=k; return true; });
+}
+function lineGuess(e){ return /위원|위촉|자문|심사|평가|이사|회장|고문/.test(e.text) ? 'wiccok' : (/컨설팅|컨설턴트|수행|프로젝트|\bPM\b|코칭/.test(e.text) ? 'consult' : 'work'); }
+var LINE_KINDS={ wiccok:'위촉', consult:'컨설팅 실적', work:'근무' };
+function linesHtml(id){
+  var ls=linesOf(id); if(!ls.length) return '<div class="pop-sub" style="margin-top:12px">④ 지원서 경력 줄 ↔ 경력관리</div><div class="note">고른 파일에서 기간이 적힌 경력 줄을 찾지 못했습니다.</div>';
+  var recs=matchRecs();
+  if(!recs){ matchEnsure(); return '<div class="pop-sub" style="margin-top:12px">④ 지원서 경력 줄 ↔ 경력관리</div><div class="note">경력관리 자료를 받는 중입니다 — 잠시 뒤 다시 점검해 주세요.</div>'; }
+  var marks=recObj('recruit_match'), sel=_lnSel[id]=_lnSel[id]||{}, used={};
+  var mt=function(n){ return GovRecruit.matches(n, get('recruit_custom')); };
+  var lv={ same:'✅ 동일', similar:'🟡 유사', '':'❌ 경력관리에 없음' };
+  var rows=ls.map(function(e, i){
+    var j=GovMatch.judgeLine(e, recs, mt), mk=marks[GovSync.safeKey(e.key)]||'', top=j.best[0], level=mk==='n'?'':j.level;
+    j.best.forEach(function(b){ if(b.level==='same' || (b.level==='similar' && mk==='y')) used[b.rec.id]=1; });
+    var on=!!sel[e.key], k=_lnKind[e.key]||lineGuess(e);
+    var act = level
+      ? (mk==='y' ? '<span class="tag teal">✓ 맞음</span> <button class="btn sm" onclick="lineMark(\''+esc(id)+'\',\''+e.key+'\',\'\')">↩</button>'
+          : '<button class="btn sm" onclick="lineMark(\''+esc(id)+'\',\''+e.key+'\',\'y\')">✓ 맞음</button> <button class="btn sm" onclick="lineMark(\''+esc(id)+'\',\''+e.key+'\',\'n\')">✗ 아님</button>')
+      : ('<select onchange="lineKind(\''+esc(id)+'\',\''+e.key+'\',this.value)" style="padding:2px 5px;font-size:11.5px">'
+          + Object.keys(LINE_KINDS).map(function(x){ return '<option value="'+x+'"'+(x===k?' selected':'')+'>'+LINE_KINDS[x]+'</option>'; }).join('')+'</select> '
+          +'<button class="btn sm" onclick="lineSend(\''+esc(id)+'\',\''+e.key+'\')">➕ 경력관리로 넘기기</button>'
+          +(mk==='n'?' <button class="btn sm" title="아님 표시 지우기" onclick="lineMark(\''+esc(id)+'\',\''+e.key+'\',\'\')">↩</button>':''));
+    return '<tr'+(on?' class="sel-on"':'')+'><td class="chk"><input type="checkbox" class="row-chk"'+(on?' checked':'')+' onchange="lineSel(\''+esc(id)+'\',\''+e.key+'\',this.checked)"></td>'
+      +'<td class="rn">'+(i+1)+'</td>'
+      +'<td style="white-space:normal"><b>'+esc(e.from+(e.to?' ~ '+e.to:''))+'</b> '+esc(e.text)+'<div class="sml">'+esc(e.file)+'</div></td>'
+      +'<td><span class="mt-lv '+(level||'none')+'">'+lv[level]+'</span></td>'
+      +'<td class="sml" style="white-space:normal">'+(top && level ? esc(top.rec.srcName+' · '+top.rec.show)+'<br>'+esc(top.why.join(' · ')) : '—')+'</td>'
+      +'<td class="act">'+act+'</td></tr>';
+  }).join('');
+  var sn=Object.keys(sel).length;
+  /* 빠진 것 같은 실적 — ①에서 이 기관과 동일·유사로 나온 경력 가운데 지원서에 안 적힌 것 */
+  var o=recFind(id), miss=[];
+  if(o){ var f=matchFind({ key:'o|'+id, orgId:id, orgNames:[o.name], title:o.what||'' });
+    if(f) miss=f.same.concat(f.similar).filter(function(x){ return !used[x.rec.id] && x.rec.src!=='scan'; }).slice(0,8); }
+  return '<div class="pop-sub" style="margin-top:12px">④ 지원서 경력 줄 ↔ 경력관리 <span class="sml">— 기간이 적힌 줄 '+ls.length+'개 · 지원서 글은 이 브라우저 안에서만 봅니다</span></div>'
+    +(sn?'<div class="sel-bar">✔ <b>'+sn+'건</b> 선택 <button class="btn sm" onclick="lineBulk(\''+esc(id)+'\',\'y\')">✓ 고른 것 맞음</button> <button class="btn sm" onclick="lineBulk(\''+esc(id)+'\',\'\')">선택 해제</button></div>':'')
+    +'<div class="scroll"><table><thead><tr><th class="chk"></th><th class="rn">№</th><th>지원서 줄</th><th>판정</th><th>경력관리 쪽</th><th style="text-align:right">할 일</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +(miss.length?'<div class="pop-sub" style="margin-top:10px">💡 빠진 것 같은 실적 '+miss.length+' <span class="sml">— 이 기관과 같거나 비슷한데 지원서에 안 적힌 것</span></div>'
+      +'<div class="scroll"><table><tbody>'+miss.map(function(x, i){ return '<tr><td class="rn">'+(i+1)+'</td><td><span class="mt-lv '+x.level+'">'+(x.level==='same'?'동일':'유사')+'</span></td><td class="sml">'+esc(x.rec.srcName)+'</td>'
+        +'<td style="white-space:normal">'+esc(x.rec.show)+(x.rec.count>1?' <span class="sml">× '+x.rec.count+'건</span>':'')+'</td><td class="sml">'+esc((x.rec.years||[]).slice(-1).concat((x.rec.years||[]).length>1?[x.rec.years[0]]:[]).join('~'))+'</td></tr>'; }).join('')+'</tbody></table></div>':'');
+}
+function lineSel(id, k, on){ var s=_lnSel[id]=_lnSel[id]||{}; if(on) s[k]=1; else delete s[k]; recCheckDraw(id); }
+function lineKind(id, k, v){ _lnKind[k]=v; }
+function lineMark(id, k, v, quiet){
+  var m=recObj('recruit_match'), mk=GovSync.safeKey(k);
+  if(v) m[mk]=v; else delete m[mk];
+  recObjSet('recruit_match', m);
+  if(!quiet) recCheckDraw(id);
+}
+function lineBulk(id, v){ var ks=Object.keys(_lnSel[id]||{}); _lnSel[id]={};
+  if(v){ ks.forEach(function(k){ lineMark(id, k, v, true); }); toast('고른 '+ks.length+'줄을 「맞음」으로 적었습니다'); }
+  recCheckDraw(id); }
+/* 경력관리 등록 창을 «채워서» 연다 — 저장은 사람이 */
+function lineSend(id, k){
+  var e=linesOf(id).filter(function(x){ return x.key===k; })[0]; if(!e) return;
+  var page=_lnKind[k]||lineGuess(e), recs=matchRecs()||[];
+  var org=(GovMatch.orgsIn(e.text, recs)[0])||'';
+  var h={ page:page, org:org, title:e.text, from:e.from, to:e.to, at:Date.now() };
+  try{ localStorage.setItem('pu_kc_handoff', JSON.stringify(h)); }catch(x){ toast('넘기지 못했습니다 — 이 브라우저 저장소를 쓸 수 없습니다'); return; }
+  window.open('kcareer.html?go=add', '_blank');
+  toast('경력관리 「'+LINE_KINDS[page]+'」 등록 창을 채워 열었습니다 — 확인하고 저장을 눌러 주세요');
 }
 
 function recSetSt(id, v, quiet){

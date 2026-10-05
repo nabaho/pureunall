@@ -47,7 +47,7 @@ function runApp(seed, opt) {
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
-    + 'matchOpen,matchMark,matchSel,matchBulk,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
+    + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
     + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
@@ -1130,4 +1130,67 @@ test('★ 첨부 서식에서 읽은 목록은 그렇다고 밝힌다', async ()
   r.api.setFb(fbWith(w), 'U1'); await r.api.recWatchPull();
   r.api.docsOpen('e1');
   assert.match(r.el('popBody').innerHTML, /첨부 서식 이름에서 읽은 5가지/);
+});
+
+/* ═══ ④ 지원서 경력 줄 ↔ 경력관리 (2026-10-05 ③) ═══ */
+const txtFile = (name, text) => ({ name, size: text.length, arrayBuffer: async () => new TextEncoder().encode(text).buffer });
+async function checkWith(text) {
+  const { r } = await openMatch();
+  r.api.recPrep('cepa');
+  await r.api.recCheckRun('cepa', [txtFile('지원서.txt', text)]);
+  return r;
+}
+const APPTXT = ['재단법인 충남경제진흥원 컨설턴트 | 26.03~현재 | 구조혁신 일자리전환 컨설팅', '가나공원 시설관리 | 18.01~19.02 | 관리소장'].join('\n');
+test('★★★ 내기 전 점검 ④ — 지원서 경력 줄마다 ㅁ·№·판정·경력관리 쪽', async () => {
+  const r = await checkWith(APPTXT);
+  const out = r.el('recChkOut').innerHTML;
+  assert.match(out, /④ 지원서 경력 줄 ↔ 경력관리/);
+  const rowA = rowOf(out, '재단법인 충남경제진흥원 컨설턴트');
+  assert.match(rowA, /<td class="chk"><input type="checkbox" class="row-chk"[^>]*><\/td><td class="rn">1<\/td>/);
+  assert.match(rowA, /✅ 동일/); assert.match(rowA, /기간 겹침/);
+  const rowB = rowOf(out, '가나공원 시설관리');
+  assert.match(rowB, /❌ 경력관리에 없음/); assert.match(rowB, /➕ 경력관리로 넘기기/);
+  assert.match(rowB, /<option value="work" selected>근무<\/option>/, '갈래를 짐작해 고른다');
+});
+test('★★★ 경력관리로 넘기기 — 주소엔 싣지 않고 이 기기 저장소로, 등록 창을 연다', async () => {
+  const r = await checkWith(APPTXT);
+  const e = r.api.linesOf('cepa').find((x) => /가나공원/.test(x.text));
+  r.api.lineKind('cepa', e.key, 'consult');
+  r.api.lineSend('cepa', e.key);
+  const h = JSON.parse(r.store.pu_kc_handoff);
+  assert.equal(h.page, 'consult'); assert.equal(h.from, '2018.01'); assert.equal(h.to, '2019.02'); assert.match(h.title, /가나공원 시설관리 관리소장/);
+  assert.ok(r.opened.includes('kcareer.html?go=add'), '주소엔 내용이 없다');
+  assert.ok(!r.opened.some((u) => /가나공원/.test(String(u))));
+});
+test('★★ 확인 — 줄 지문으로만 기억하고, 아님은 «없음»으로 돌려 넘기기를 연다', async () => {
+  const r = await checkWith(APPTXT);
+  const e = r.api.linesOf('cepa').find((x) => /충남경제진흥원/.test(x.text));
+  r.api.lineMark('cepa', e.key, 'y');
+  assert.equal(r.api.recObj('recruit_match')[e.key], 'y');
+  assert.ok(!JSON.stringify(r.api.recObj('recruit_match')).includes('충남'), '지원서 글은 담지 않는다');
+  assert.match(rowOf(r.el('recChkOut').innerHTML, '충남경제진흥원 컨설턴트'), /✓ 맞음<\/span>/);
+  r.api.lineMark('cepa', e.key, 'n');
+  assert.match(rowOf(r.el('recChkOut').innerHTML, '충남경제진흥원 컨설턴트'), /❌ 경력관리에 없음[\s\S]*➕ 경력관리로 넘기기/);
+});
+test('★★ 빠진 것 같은 실적 — 이 기관과 같거나 비슷한데 지원서에 안 적힌 것', async () => {
+  const r = await checkWith('가나공원 시설관리 | 18.01~19.02 | 관리소장');
+  const out = r.el('recChkOut').innerHTML;
+  assert.match(out, /💡 빠진 것 같은 실적/);
+  assert.match(out, /구조혁신 · 일자리전환컨설팅 · 충남경제진흥원/);
+});
+test('★★ 한글 지원서는 표를 «한 행 = 한 줄»로 읽어 견준다 — 칸마다 흩어지면 기간만 남는다', async () => {
+  const cells = [[{ text: '재단법인 충남경제진흥원 컨설턴트' }, { text: '26.03~현재' }, { text: '구조혁신 일자리전환 컨설팅' }]];
+  const kordoc = {
+    canRead: () => true,
+    read: async () => ({ text: cells[0].map((c) => c.text).join('\n\n') + '\n\n이 지원서는 시험용입니다' }),
+    load: async () => ({ parse: async () => ({ success: true, blocks: [{ type: 'table', table: { cells } }] }) })
+  };
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00'), kordoc });
+  const f = fbKc(); r.api.setFb(f.db, 'U1');
+  await r.api.recWatchPull(); await tick(); await tick();
+  r.api.recPrep('cepa');
+  await r.api.recCheckRun('cepa', [{ name: '지원서.hwp', size: 10, arrayBuffer: async () => new Uint8Array([0xD0, 0xCF, 0x11, 0xE0, 1, 2, 3, 4]).buffer }]);
+  const row = rowOf(r.el('recChkOut').innerHTML, '재단법인 충남경제진흥원 컨설턴트');
+  assert.match(row, /2026\.03 ~ 현재<\/b> 재단법인 충남경제진흥원 컨설턴트 구조혁신 일자리전환 컨설팅/);
+  assert.match(row, /✅ 동일/);
 });
