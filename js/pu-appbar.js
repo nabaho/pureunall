@@ -51,7 +51,7 @@
     /* 취업규칙은 한 줄 — 조별 문안·모은 자료(rules-v2.html)는 앱 머리줄의 세 갈래 단추로 간다
        (두 앱 합치기 2026-10-04). 포털 타일과 짝이다. 첫 화면은 🏢 사업장(2026-10-04 대표 「추천」). */
     { key: 'rules',   name: '취업규칙',      icon: '📋', url: 'rules-v2.html',       desc: '작성·검토·개정·신고' },
-    { key: 'docs',    name: '문서관리',     icon: '📄', url: 'docs-esign.html',     desc: '사건 위임장 · 계약서 양식' },
+    { key: 'docs',    name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
     { key: 'payroll', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱' },
     { key: 'home',    name: '홈페이지', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },
     /* 뉴스레터 — 경력관리·홈페이지 관리와 «같이» 총괄관리자 전용이다.

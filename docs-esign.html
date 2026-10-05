@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>문서관리</title>
+<title>계약서등관리</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📤</text></svg>">
 <!-- 관리자(노무사) 페이지: 사건 관리·제출 취합·서류 생성. 로그인 필수. -->
 <style>
@@ -95,20 +95,20 @@
 /* 2026-10-04 대표 「직원도 문서관리 모두 본다」 — 준비중 문을 걷었다(포털 타일도 함께).
    🔒 서명본 열기·옮기기는 그대로 서버가 대표·관리자만 받는다. tests/app-soon-gate.test.js ⑦ */
 </script>
-<script src="js/pu-appbar.js?v=20"></script>
+<script src="js/pu-appbar.js?v=21"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script>
 </head>
 <body>
 <div class="top">
-  <h1>📄 문서관리</h1>
+  <h1>📄 계약서등관리</h1>
   <span id="whoami" style="font-size:12.5px;color:#94a3b8"></span>
   <span id="saveState" class="save-state saved" role="status" aria-live="polite">저장 완료</span>
   <a href="enter.html">← 포털</a>
 </div>
 <div class="shell">
 <!-- 왼쪽 목록 — 「사무관리서류」 아래에 서류 종류를 더해 간다(대표 지시 2026-09-26) -->
-<nav class="side" aria-label="문서관리 메뉴">
+<nav class="side" aria-label="계약서등관리 메뉴">
   <!-- 메뉴는 «묶음 › 메뉴» 두 단(이알피 메뉴와 같은 모양). 계약유형(3단)까지만 두고 양식 이름은 본문 목록 (C안 2026-09-27) -->
   <!-- 집단체불 위임장은 사건 일이라 「사건관리」 묶음 (대표 지시 2026-09-27, 옛 이름 「전자송부」) -->
   <div class="nav-grp">⚖ 사건관리</div>
@@ -174,7 +174,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=47"></script>
+<script src="js/pu-ontology.js?v=48"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -194,7 +194,7 @@
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=8"></script>
-<script src="js/pu-contract-forms.js?v=17"></script>
+<script src="js/pu-contract-forms.js?v=18"></script>
 <script src="js/pu-photo-store.js?v=31"></script>
 <script src="js/pu-office-store.js?v=5"></script>
 <script src="js/pu-doc-file.js?v=36"></script>

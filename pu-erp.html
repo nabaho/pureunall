@@ -90,7 +90,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=17"></script>
+<script src="js/pu-contract-forms.js?v=18"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -158,7 +158,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=20"></script>
+  <script src="js/pu-appbar.js?v=21"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -184,7 +184,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=11"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=47"></script>
+<script src="js/pu-ontology.js?v=48"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
@@ -39164,7 +39164,7 @@ function rhwpAutoUpdate(){
       rhwpSetVer(latest);
       try { showToast('🔄 문서 미리보기 엔진 자동 업데이트 (v'+latest+')'); } catch(e){}
     } else {
-      try { showToast('ℹ️ 문서 엔진 새 버전 v'+latest+' 있음 — 문서관리 › 사무관리서류 › 계약서 양식의 [rhwp ⟳]로 적용'); } catch(e){}
+      try { showToast('ℹ️ 문서 엔진 새 버전 v'+latest+' 있음 — 계약서등관리 › 사무관리서류 › 계약서 양식의 [rhwp ⟳]로 적용'); } catch(e){}
     }
   });
 }
@@ -39591,8 +39591,8 @@ function ContractFormPrintModal(props){
         /* 📦 문서관리에서 묶음 채우기 (설계 2026-10-03-계약서류-표준-기록 §4) — 한글·엑셀 원본에 계약 자료를 채워 받기·메일까지.
            ⚠ 계약 «id» 만 넘긴다(금액·이름은 주소에 안 싣는다). 문서관리가 계약을 읽어 같은 한 벌(PuContractVars)로 채운다. */
         contract.id && h('button', { type:'button', style:{ marginLeft:'auto', marginRight:'8px', background:'#166534', color:'#fff', border:0, borderRadius:'6px', padding:'5px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' },
-          title:'문서관리에서 이 계약 자료로 한글·엑셀 원본 서류 묶음을 채웁니다(받기·메일·보낸 기록까지)',
-          onClick:function(){ window.open('docs-esign.html#forms:contract=' + encodeURIComponent(contract.id), '_blank'); } }, '📦 문서관리에서 묶음 채우기'),
+          title:'계약서등관리에서 이 계약 자료로 한글·엑셀 원본 서류 묶음을 채웁니다(받기·메일·보낸 기록까지)',
+          onClick:function(){ window.open('docs-esign.html#forms:contract=' + encodeURIComponent(contract.id), '_blank'); } }, '📦 계약서등관리에서 묶음 채우기'),
         h('button', { className:'x', onClick:props.onClose }, '×')
       ),
       // 종류 탭 (계약 종류 N개)
@@ -39624,7 +39624,7 @@ function ContractFormPrintModal(props){
           ),
           formsInTab.length === 0
             ? h('div', { style:{ color:'#dc2626', fontSize:'12px', padding:'10px', background:'#fef2f2', borderRadius:'4px', border:'1px solid #fecaca' } },
-                '⚠ ' + kindInfo(kindTab).label + ' 양식 없음 - 문서관리 › 사무관리서류 › 계약서 양식에서 추가')
+                '⚠ ' + kindInfo(kindTab).label + ' 양식 없음 - 계약서등관리 › 사무관리서류 › 계약서 양식에서 추가')
             : h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'4px 10px', maxHeight:'160px', overflowY:'auto', border:'1px solid #e2e8f0', borderRadius:'4px', padding:'8px 10px', background:'#f8fafc' } },
                 formsInTab.map(function(f){
                   var checked = selectedIds.indexOf(f.id) >= 0;
