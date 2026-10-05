@@ -156,6 +156,19 @@ test('할 일 — 마지막 자동이 «멈춤»이면 승인으로 가는 할 �
   assert.ok(첫add > 0 && i < 몸.indexOf('add({', 첫add + 5), '멈춤 할 일이 맨 앞이 아닙니다');
 });
 
+test('카드 — 올린 수도 숫자 칸으로 보인다(2단계)', () => {
+  const ctx = 상자();
+  ctx.App.autoRuns = 기록({ 올림: [{ 종류: '새거래처', srl: 9 }] });
+  const h = ctx.자동카드Html();
+  assert.match(h, /<b>1<\/b>/);
+});
+
+test('할 일 — 못 올렸거나 올리는 길이 없으면 알린다(조용히 넘어가지 않는다)', () => {
+  const 몸 = fnSource('jobsOf').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.match(몸, /올리기안됨/);
+  assert.match(몸, /못올림/);
+});
+
 test('왼쪽 기둥에 자동 연결 카드가 실린다', () => {
   assert.match(fnSource('railHtml'), /자동카드Html\(\)/);
 });
