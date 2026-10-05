@@ -126,12 +126,20 @@ test('멀쩡한 자료는 한 글자도 바꾸지 않는다', () => {
   assert.strictEqual(JSON.stringify(out), JSON.stringify(rows));
 });
 
+/* 2026-10-05 부터 실제로 보내는 일은 _fbSendDelta·_fbSendWhole 이 한다(밀린 저장도 같은 길로 보내려고).
+   겉 함수와 «보내는 함수»를 함께 보고, 겉 함수가 그것을 실제로 부르는지도 본다. */
+const SEND_OF = { 'fbPushRecordDelta(': '_fbSendDelta(', 'fbPush(': '_fbSendWhole(' };
+function savePath(name) {
+  const cut = (n) => { const a = S.indexOf('function ' + n); if (a < 0) return ''; const b = S.indexOf('\nfunction ', a + 5); return S.slice(a, b < 0 ? S.length : b); };
+  const outer = cut(name), send = SEND_OF[name], inner = send ? cut(send) : '';
+  if (inner) assert.ok(outer.indexOf(send) >= 0, name + ' 가 ' + send + ' 를 안 부른다');
+  return outer + '\n' + inner;
+}
+
 test('두 저장 길 모두 빈 칸을 걸러 낸다', () => {
   ['fbPushRecordDelta(', 'fbPush('].forEach(function (name) {
-    const a = S.indexOf('function ' + name);
-    assert.ok(a > 0, name + ' 가 없다');
-    const b = S.indexOf('\nfunction ', a + 5);
-    const fn = S.slice(a, b < 0 ? S.length : b);
+    assert.ok(S.indexOf('function ' + name) > 0, name + ' 가 없다');
+    const fn = savePath(name);
     assert.strictEqual(/_noUndef\(/.test(fn), true, name + ' 가 빈 칸을 안 걸러 낸다');
     /* 어느 칸(node)에서 뺐는지 함께 넘겨야 기록이 쓸모 있다 —
        빈 문자열을 넘기면 「.defCoAtt」만 남아 어느 표인지 알 수 없다. */
