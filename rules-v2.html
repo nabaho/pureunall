@@ -63,7 +63,8 @@ button{font:inherit;cursor:pointer}
 .logo{flex:0 0 auto;width:30px;height:30px;border-radius:8px;background:#1e40af;color:#ffffff;display:grid;place-items:center;font-weight:800}
 /* 갈래 단추(.rmode)·머리줄 왼쪽 묶음의 모양은 css/rules-shell.css 한 벌에 있다(2026-10-05) — 여기 다시 두지 말 것 */
 .top .r{margin-left:auto;display:flex;align-items:center;gap:10px;color:#475569;font-size:12px}
-#lib{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
+/* 화면 좌우 끝까지 (대표 지시 2026-10-05 「화면을 좌우로 모두 끝까지 넓게 사용해라」) — 옆 여백은 ✏️ 검토·개정(rules.html .wrap 22px)과 같게 */
+#lib{max-width:none;margin:12px 22px 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
 #lib .msg{padding:60px 20px;text-align:center;color:#475569}
 .run{display:flex;align-items:center;gap:18px;padding:10px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff;flex-wrap:wrap}
 .run .k{color:#475569;font-size:12px;white-space:nowrap}.run .k b{color:#1e293b}.run .v{font-weight:800;font-size:15px;margin-left:4px}
@@ -141,7 +142,7 @@ button{font:inherit;cursor:pointer}
 .pick .pf{display:flex;justify-content:flex-end}
 .busy{position:absolute;right:16px;bottom:12px;background:#1e293b;color:#ffffff;border-radius:8px;padding:6px 12px;font-size:12px}
 /* ── 「📚 조별 문안」 (목업 2 승인본) — 칸은 한 줄, 넘치면 … 과 title ── */
-#topics{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;min-height:300px}
+#topics{max-width:none;margin:12px 22px 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;min-height:300px}
 #topics .msg{padding:60px 20px;text-align:center;color:#475569}
 #topics .tpx{display:grid;grid-template-columns:260px minmax(0,1fr)}
 #topics .left{border-right:1px solid #e2e8f0;background:#ffffff;position:sticky;top:52px;align-self:start;max-height:calc(100vh - 64px);overflow-y:auto;padding-bottom:12px}
@@ -180,7 +181,7 @@ button{font:inherit;cursor:pointer}
 @media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}}
 /* ── 「🏢 사업장」 (③-ⓐⓑ 목업 승인본) — 왼쪽 거래처 표, 오른쪽 그 사업장의 이력·개정 시작.
    표의 칸은 한 줄, 넘치면 … 과 title. 이름은 .side·.flow 와 겹치지 않게 따로 짓는다(📥 와 한 파일이다) ── */
-#sites{max-width:1440px;margin:12px auto 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
+#sites{max-width:none;margin:12px 22px 24px;background:#f8fafc;border:1px solid #cbd5e1;border-radius:16px;position:relative;min-height:300px}
 #sites .msg{padding:60px 20px;text-align:center;color:#475569}
 #sites .chip.warn:not(.on){background:#fffbeb;border-color:#fde68a;color:#854d0e}
 #sites .flt .q{width:240px}

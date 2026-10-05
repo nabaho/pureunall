@@ -6624,9 +6624,16 @@ async function rulesCollectOnce(reason, chain) {
 exports.collectRulesMail = functions
   .region(MAIL_REGION)
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
-  .pubsub.schedule("every day 05:00")
+  /* 30분마다 깨운다 (2026-10-05) — 작은 기록(run)만 읽고 RulesCollect.shouldRunScheduled 로 가른다.
+     밀린 메일이 있으면 돌고(이어 달리기가 이어받는다), 없으면 하루 한 번만. 잠금이 겹침을 막는다. */
+  .pubsub.schedule("every 30 minutes")
   .timeZone("Asia/Seoul")
-  .onRun(async () => { await rulesCollectOnce("매일"); return null; });
+  .onRun(async () => {
+    const run = (await getDatabase().ref(RulesCollect.LIB + "/run").once("value")).val();
+    if (!RulesCollect.shouldRunScheduled(run, Date.now())) return null;
+    await rulesCollectOnce("정해진 회차");
+    return null;
+  });
 exports.collectRulesMailAsk = functions
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
   .database.ref("/rules_mgmt/library/ask/{id}")

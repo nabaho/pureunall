@@ -48,7 +48,7 @@
 <script src="js/rules-v2/view-recommend.js?v=3"></script>
 <!-- ✨ AI 다듬기 — 호출기(서버 readDoc 를 부르는 얇은 층)·셈·상자. lib-polish 는 lib-topics·pu-rules-filecmp 를 쓴다(위에서 싣는다) -->
 <script src="js/pu-ai-call.js?v=4"></script>
-<script src="js/rules-v2/lib-polish.js?v=2"></script>
+<script src="js/rules-v2/lib-polish.js?v=3"></script>
 <script src="js/rules-v2/view-polish.js?v=2"></script>
 <script src="xlsx_gen.js?v=3"></script>
 <style>
@@ -7499,7 +7499,8 @@ async function polSend(mode){
   try{
     // 가림 — 기본 묶음(주민·계좌·카드·전화·전자우편·여권·면허)에 사업자번호까지. 서고와 달리 여기선 사업장 열쇠로 쓸 일이 없다
     const KT=PuKordocText, groups=KT.PII_GROUPS.filter(g=>g.on).map(g=>g.key).concat("brn");
-    const red=await KT.redactFile(new Uint8Array(0),P.toSend(cur,co).text,groups);
+    const sent=P.toSend(cur,co);   // form — 원문에 적혀 있던 회사 이름 꼴(「㈜가나상사」). 되돌릴 때 그것을 쓴다
+    const red=await KT.redactFile(new Uint8Array(0),sent.text,groups);
     const masked=String(red.text);   // 보낸 그대로 — parse 가 «보낸 가림 자리가 남았는가»를 이것으로 가른다
     const lines=finds.map(f=>({title:f.rule.name+(f.rule.law?" ("+f.rule.law+")":""),desc:f.rule.criterion||"",note:f.note||""}));
     const auth=(window.firebase&&firebase.auth)?firebase.auth():null;
@@ -7519,7 +7520,8 @@ async function polSend(mode){
     const r=P.parse(PuAiCall.textOf(reply),masked);
     if(!r.ok)throw new Error(r.why);
     // 시켜도 AI 가 조 머리(「제25조(연차휴가)」)를 붙여 올 때가 있다 — 떼고 견주고 넣는다(넣을 때 머리는 지금 것을 지킨다)
-    const text=polNoHead(P.restore(r.text,co));
+    /* {회사} 는 «원문의 꼴»로 — ERP 표기(co)로 채우면 원문의 ㈜·띄어쓰기가 바뀐다(2026-10-05). 원문에 이름이 없었으면 ERP 표기 */
+    const text=polNoHead(P.restore(r.text,sent.form||co));
     // 검토 기준으로 다시 판정 — 이 조(라벨·제목)·고친 글. «위반의심»만 다시 본다.
     // 둘 중 하나라도 못 했으면(던지면) 숫자 대신 «다시 판정 못 함» — 못 한 것을 0 이라고 하면 «다 고쳤다»로 읽힌다
     let warns=null;
