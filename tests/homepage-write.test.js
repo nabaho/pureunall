@@ -587,3 +587,35 @@ test('새 글 번호 읽기 — 옮겨 보낸 주소나 답 글자에서 글 번
   assert.equal(W.새글번호(200, '', '<html>오류</html>'), 0);
   assert.equal(W.새글번호(302, '/notice/5', ''), 0, '다른 게시판 번호를 받았다');
 });
+/* ══════ 2차 정찰(2026-10-05) — 2·4단계를 지을 «모양»만, 값은 절대 안 남긴다 ══════ */
+test('편집기단서 — 하는 동작(proc) 이름·편집기/올리기 숫자 속성·스크립트 이름만 돌려준다', () => {
+  const h = '<div class="xefu-container" data-editor-sequence="3" data-upload-target-srl="0" data-secret="비밀값"></div>'
+    + '<script src="/modules/editor/tpl/js/editor.js?v=1"></script><script>var x="act=procFileUpload";'
+    + 'var y = "procEditorCall"; var t = "토큰abc";</script>';
+  const r = W.편집기단서(h);
+  assert.ok(r.행위들.includes('procFileUpload'));
+  assert.ok(r.숫자속성['data-editor-sequence'].includes('3'));
+  assert.ok(r.숫자속성['data-upload-target-srl'].includes('0'));
+  assert.ok(r.스크립트.some(s => s.includes('editor.js')));
+  const 글 = JSON.stringify(r);
+  ['비밀값', '토큰abc'].forEach(v => assert.ok(!글.includes(v), '값이 새었다: ' + v));
+});
+
+test('본문모양 — 태그·속성 «이름»과 주소 «모양»만(글자·숫자는 가린다)', () => {
+  const 값 = '<p><img src="/files/attach/images/2025/11/27/abc123.png" alt="가나상사" data-file-srl="555" /></p><p>비밀문장</p>';
+  const r = W.본문모양(값);
+  assert.ok(r.태그.some(t => /^img\[/.test(t) && t.includes('data-file-srl')));
+  assert.ok(r.주소모양.some(s => /files\/attach\/images\/9+\/9+\/9+\/w+\.png/.test(s)), JSON.stringify(r.주소모양));
+  const 글 = JSON.stringify(r);
+  ['가나상사', '비밀문장', 'abc123', '555', '2025'].forEach(v => assert.ok(!글.includes(v), '값이 새었다: ' + v));
+});
+
+test('이름자리모양 — 이름은 안 남기고 «몇 번째 이름이 몇 번, 어떤 모양 안에» 있는지만', () => {
+  const 값 = '<div class="staff"><span class="nm">홍길동</span> <span class="tt">사무장</span></div><p>홍길동</p>';
+  const r = W.이름자리모양(값, ['홍길동', '없는사람']);
+  assert.equal(r[0].수, 2);
+  assert.equal(r[1].수, 0);
+  const 글 = JSON.stringify(r);
+  ['홍길동', '사무장', '없는사람'].forEach(v => assert.ok(!글.includes(v), '값이 새었다: ' + v));
+  assert.ok(r[0].모양[0].includes('<span class="nm">'), '이름을 둘러싼 태그 모양이 안 보입니다: ' + r[0].모양[0]);
+});

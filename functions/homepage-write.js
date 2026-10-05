@@ -497,6 +497,64 @@ function 새글번호(상태, 위치, 답) {
   return 찾기(위치) || 찾기(답);
 }
 
+/* ── 2차 정찰 (2026-10-05) — 2단계(로고 = 본문 첨부 그림)·4단계(구성원 쪽 위젯 본문)를 지을 «모양»만 ──
+   ⚠ 값은 안 남긴다. 하는 동작의 «이름», 편집기·올리기에 쓰는 «숫자», 태그·속성의 «이름»,
+     주소의 «모양»(숫자는 9, 파일 이름은 w)만. */
+function 편집기단서(html) {
+  const 본문 = String(html || "");
+  const 행위들 = [...new Set([...본문.matchAll(/\bproc[A-Z][A-Za-z0-9_]{2,50}/g)].map((m) => m[0]))].sort();
+  const 숫자속성 = {};
+  const 담기 = (이름, 값) => {
+    const k = String(이름).toLowerCase();
+    (숫자속성[k] = 숫자속성[k] || []);
+    if (숫자속성[k].indexOf(값) < 0 && 숫자속성[k].length < 5) 숫자속성[k].push(값);
+  };
+  for (const m of 본문.matchAll(/\b((?:data-)?[a-z_-]*(?:editor|upload|sequence|srl|target)[a-z_-]*)\s*=\s*["'](\d{1,12})["']/gi)) 담기(m[1], m[2]);
+  for (const m of 본문.matchAll(/["']?([a-z_]*(?:editor_sequence|upload_target_srl|sequence)[a-z_]*)["']?\s*[:=]\s*["']?(\d{1,12})\b/gi)) 담기(m[1], m[2]);
+  const 스크립트 = [...new Set([...본문.matchAll(/<script\b[^>]*\bsrc=["']([^"'?#]+)/gi)].map((m) => m[1]))]
+    .filter((s) => /editor|file|upload|xefu/i.test(s)).slice(0, 20);
+  return { 행위들: 행위들, 숫자속성: 숫자속성, 스크립트: 스크립트 };
+}
+function 주소모양(s) {
+  const 조각 = String(s || "").replace(/^https?:\/\/[^/]+/, "").split("/");
+  return 조각.map((p, i) => {
+    if (i === 조각.length - 1 && /\.[a-z0-9]{2,5}$/i.test(p)) return "w." + p.split(".").pop().toLowerCase();
+    return p.replace(/\d/g, "9").replace(/[가-힣]+/g, "가");
+  }).join("/");
+}
+function 본문모양(값) {
+  const 본문 = String(값 || "");
+  const 셈 = {};
+  for (const m of 본문.matchAll(/<([a-z][a-z0-9]*)\b([^>]*)>/gi)) {
+    const 속성들 = [...new Set([...m[2].matchAll(/([a-z_:-][a-z0-9_:-]*)\s*=/gi)].map((x) => x[1].toLowerCase()))].sort();
+    const k = m[1].toLowerCase() + "[" + 속성들.join(",") + "]";
+    셈[k] = (셈[k] || 0) + 1;
+  }
+  const 주소모양들 = [...new Set([...본문.matchAll(/\b(?:src|href)\s*=\s*["']([^"']+)["']/gi)].map((m) => 주소모양(m[1])))].slice(0, 20);
+  return { 태그: Object.keys(셈).sort().map((k) => k + "×" + 셈[k]), 주소모양: 주소모양들 };
+}
+/* 이름이 놓인 자리의 모양 — 이름은 «NAME» 으로, 한글은 「가」, 숫자는 9 로 가린다. 몇 번째 이름인지만 남긴다. */
+function 이름자리모양(값, 이름들) {
+  const 본문 = String(값 || "");
+  return (이름들 || []).map((이름, i) => {
+    const n = String(이름 || "").trim();
+    const 모양 = [];
+    let 수 = 0;
+    if (n) {
+      let at = 본문.indexOf(n);
+      while (at >= 0) {
+        수++;
+        if (모양.length < 3) {
+          const 조각 = 본문.slice(Math.max(0, at - 120), at) + "NAME" + 본문.slice(at + n.length, at + n.length + 80);
+          모양.push(조각.split(n).join("NAME").replace(/[가-힣]+/g, "가").replace(/\d/g, "9"));
+        }
+        at = 본문.indexOf(n, at + n.length);
+      }
+    }
+    return { 번째: i, 수: 수, 모양: 모양 };
+  });
+}
+
 /* 자동 올리기 정찰 자리 — «정해 둔 읽기 화면»만 연다(disp…). 하는 주소(proc…)는 없다.
    ⚠ 늘릴 때도 읽기 화면만. 글 번호는 숫자만 받는다. */
 function 자동정찰자리(로고글번호) {
@@ -748,6 +806,7 @@ module.exports = {
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
   내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리, 새구성원몸통, 새글번호,
+  편집기단서, 본문모양, 이름자리모양,
   파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
 };

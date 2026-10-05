@@ -4408,17 +4408,29 @@ async function 홈자동정찰(그릇) {
     if (m) 로고글번호 = Number(m[1]);
   } catch (e) { /* 공개 쪽을 못 읽으면 옛 로고 글 정찰만 빠진다 */ }
   const 자리 = HW.자동정찰자리(로고글번호);
-  const 결과 = { at: Date.now(), 대상: {} };
+  /* 2차 정찰(판 2) — 구성원 쪽 본문에서 «직원 이름이 놓인 모양»을 보려고 일반직원 이름을 쓴다.
+     ⚠ 이름은 기록에 안 남는다(HW.이름자리모양 이 몇 번째 이름인지만 남긴다). */
+  let 직원이름들 = [];
+  try {
+    const ms = (await getDatabase().ref("homepage/members").once("value")).val() || {};
+    직원이름들 = Object.keys(ms).map((k) => ms[k] || {})
+      .filter((m) => m.kind === "staff" || (m.kind !== "labor" && !/노무사/.test(String(m.position1 || "") + String(m.position2 || ""))))
+      .map((m) => String(m.name || "").trim()).filter(Boolean).slice(0, 20);
+  } catch (e) { /* 이름을 못 읽으면 이름 자리만 빠진다 */ }
+  const 결과 = { at: Date.now(), 판: HA.정찰판, 대상: {} };
   for (const 이름 of Object.keys(자리)) {
     try {
       const g = await 홈부르기(자리[이름], 그릇);
       const 화면 = await g.text();
       const 본 = HW.정찰(화면);
       const 채움 = HW.채운칸들(화면);
+      const 본문값 = String((HW.칸읽기(화면).칸 || {}).content || "");
       결과.대상[이름] = { 상태: g.status, 옮김: (g.headers.get("location") || "").replace(HW.ORIGIN, ""),
         크기: 본.크기, 글칸: 본.글칸, 넓은칸: 본.넓은칸, 파일칸: 본.파일칸, 딸깍칸: 본.딸깍칸,
         고르개: 본.고르개, 숨은칸: 본.숨은칸, 이름표: 본.이름표, 행위들: 본.행위들,
-        번호값: 본.번호값, 확인표있나: 본.확인표있나, 채운칸: 채움.채운칸, 본문에그림: 채움.본문에그림 };
+        번호값: 본.번호값, 확인표있나: 본.확인표있나, 채운칸: 채움.채운칸, 본문에그림: 채움.본문에그림,
+        편집기: HW.편집기단서(화면), 본문: HW.본문모양(본문값),
+        이름자리: 이름 === "구성원쪽고치기" ? HW.이름자리모양(본문값, 직원이름들) : undefined };
     } catch (e) {
       결과.대상[이름] = { 막힘: String((e && e.message) || e) };
     }

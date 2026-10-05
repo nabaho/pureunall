@@ -90,8 +90,10 @@ test('자동 정찰은 «읽기만» 한다 — 보내기(POST)가 없고, 적�
   const b = 함수몸('홈자동정찰');
   assert.ok(!/method\s*:\s*["']POST/i.test(b), '정찰에서 무언가를 보냅니다');
   assert.ok(!/휴지통몸통|저장할act|사진몸통/.test(b), '정찰에서 쓰는 길을 부릅니다');
-  const 자리들 = [...b.matchAll(/ref\(\s*["']([^"']+)["']\s*\)/g)].map(m => m[1]);
-  assert.deepStrictEqual(자리들, ['homepage/auto/recon']);
+  /* 읽는 자리(once)는 괜찮다 — «쓰는» 자리(set·update·push·remove)가 정찰 기록 하나여야 한다 */
+  const 쓰는자리 = [...b.matchAll(/ref\(\s*["']([^"']+)["']\s*\)\s*\.(set|update|push|remove|transaction)\(/g)].map(m => m[1]);
+  assert.deepStrictEqual(쓰는자리, ['homepage/auto/recon']);
+  assert.ok(!/\.(update|push|remove|transaction)\(/.test(b), '정찰에서 다른 쓰기를 합니다');
   assert.match(b, /HW\.자동정찰자리\(/, '정해 둔 자리 말고 다른 곳을 엽니다');
 });
 
