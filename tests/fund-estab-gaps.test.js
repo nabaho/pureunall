@@ -43,6 +43,7 @@ const API = (() => {
   new Function([
     'function num(v){if(v===""||v==null)return "";var n=Number(String(v).replace(/,/g,""));return isFinite(n)?n:"";}',
     'function esc(s){ return String(s==null?"":s); }',
+    'function hlp(){ return ""; }',
     grabFn('_officersOf'), grabFn('_siteWrep'),
     /* 2026-09-19: 출연금은 그 해 기록(연도별)까지 본다 — 그 길도 실어야 빈칸 표가 돈다.
        여기 없으면 「siteContribNow is not defined」로 이 검사가 통째로 죽는다.
@@ -50,7 +51,7 @@ const API = (() => {
     'function _docRok(){ return null; }',
     grabFn('estabSites'), grabFn('estabLiveSites'), grabFn('siteContribOf'), grabFn('siteContribNow'),
     grabDecl('ESTAB_NEED'), grabDecl('ESTAB_NEED_SITE'),
-    grabFn('estabGaps'), grabFn('estabGapHTML'),
+    grabFn('estabGaps'), grabFn('_contribIsEst'), grabFn('estabGapHTML'),
     'this.gaps=estabGaps; this.html=estabGapHTML;',
   ].join('\n')).call(box);
   return box;

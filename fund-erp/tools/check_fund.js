@@ -1042,7 +1042,7 @@ ok('이름 뒤에 한글이 이어지면 다른 낱말로 본다', src.includes(
   && src.includes('return !(nx&&/[가-힣]/.test(nx));')
   && src.includes('if(nm.length>=4&&glued(nm))'));
 // 짧은 상호도 «토막 하나»로 오면 잡아야 한다 — 아예 못 쓰게 되면 안 된다
-ok('토막이 이름과 같으면 길이와 무관하게 잡는다', src.includes("if(all.indexOf(nm)>=0) return {d:'현금성자산',c:'기본재산'};"));
+ok('토막이 이름과 같으면 길이와 무관하게 잡는다', src.includes("if(all.indexOf(nm)>=0) return {d:'현금성자산',c:'기본재산',src:'site'};"));
 ok('붙여 찾기를 그냥 쓰지 않는다', !src.includes("if(mzz.indexOf(nm)>=0) return {d:'현금성자산',c:'기본재산'};"));
 ok('엑셀 미국식 m/d/yy 인식', src.includes("m=t.match(/^(\\d{1,2})\\/(\\d{1,2})\\/(\\d{2})$/);"));
 ok('빈 일자는 위 일자를 이음', src.includes("if(/^\\d{4}-\\d{2}-\\d{2}$/.test(date)) lastDate=date; else if(!date) date=lastDate;"));
@@ -1187,7 +1187,9 @@ ok('applyTransfers 존재', src.includes('function applyTransfers'));
 ok('이체 자동매칭 버튼', src.includes('onclick="autoMatchTransfers()"'));
 // 계좌가 다르면 확실, 계좌번호가 없는 옛 자료는 추정으로 남겨 사람이 확인해야 한다
 ok('확실/추정 구분', src.includes("kind='sure'") && src.includes("kind='guess'"));
-ok('가져오기 직후 확실한 것만 자동 상계', /findTransfers\(list\)\.filter\(function\(pr\)\{ return pr\.kind==='sure'/.test(src));
+// 2026-10-05 바닥 공사: 가져오기 직후에도 «묻고» 상계 — 확실한 짝은 골라 둔 채 창을 띄운다(사람 확인 없이 승인 금지)
+ok('가져오기 직후 이체 짝은 창으로 묻는다', src.includes('if(pairs.length) _xferModal(pairs,_fid,_yr,') && !/applyTransfers\(sure,/.test(src));
+ok('확실한 짝만 처음부터 골라 둔다', src.includes(`(pr.kind==='sure'?' checked':'')`));
 // 상계는 현금↔현금 — 재무제표 영향 0이면서 통장 입·출금 합계는 그대로 남아야 한다
 ok('상계는 현금성자산 ↔ 현금성자산', /up\[b\+'debit'\]='현금성자산'; up\[b\+'credit'\]='현금성자산';/.test(src));
 ok('거래 목록에 이체 칩', src.includes('x.xfer?'));
@@ -1200,7 +1202,7 @@ ok('학습 저장·조회·삭제', src.includes('function learnAcct') && src.in
 ok('학습 관리 화면', src.includes('function learnedPanel') && src.includes('onclick="learnedPanel()"'));
 // 일반 적요('인터넷출금이체')를 배우면 모든 거래가 그 계정으로 오분류된다
 ok('일반 적요는 학습 제외 목록에', /var LEARN_SKIP=\[[^\]]*'인터넷출금이체'/.test(src));
-ok('학습이 일반 규칙보다 우선', src.includes("if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true};"));
+ok('학습이 일반 규칙보다 우선', src.includes("if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true,src:'learned'};"));
 // 입금·출금은 성격이 달라 방향별로 따로 기억해야 한다
 ok('방향별로 기억(i_/o_)', src.includes("return (isDep?'i_':'o_')+head;"));
 ok('승인할 때만 학습', src.includes('learnAcct(x.memo'));
@@ -1342,7 +1344,7 @@ ok('가져오기가 kind를 넘기고 보관', src.includes('proposeAcct(x.memo,
 // 공동기금 최대 유입인 출연금은 적요에 '출연' 없이 회사명만 찍힌다((주)가온로지콘·청원건설)
 ok('참여사업장명 입금을 출연금으로', src.includes('function _siteNames')
   && src.includes('if(isDep&&sites&&sites.length){')
-  && src.includes("return {d:'현금성자산',c:'기본재산'};"));
+  && src.includes("return {d:'현금성자산',c:'기본재산',src:'site'};"));
 
 // ── 푸른사진첩 연동 — 원본은 사진첩에 두고 기금은 참조만 갖는다 ──
 // 이 배선은 조용히 끊기기 쉽다: 부르는 이름이 사진첩 쪽에서 바뀌면 화면에는 아무 표시 없이 안 열린다.

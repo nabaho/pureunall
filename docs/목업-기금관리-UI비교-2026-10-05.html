@@ -1,0 +1,352 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>기금관리 화면 4안 비교</title>
+<style>
+/* 목업 4안 비교 — 2026-10-05. 이름·숫자·번호는 전부 가짜. 색은 저장소 27색 안에서만. */
+:root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;--line:#e2e8f0;--bg:#f8fafc;
+  --ok:#166534;--ok-bg:#f0fdf4;--okm:#16a34a;--warn:#854d0e;--warn-bg:#fffbeb;--wm:#d97706;--wl:#fde68a;
+  --dg:#dc2626;--dg-bg:#fef2f2;--dgi:#991b1b;--r:11px}
+*{box-sizing:border-box}
+body{margin:0;font:14px/1.5 'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);background:#e2e8f0;font-variant-numeric:tabular-nums}
+.top{position:sticky;top:0;z-index:30;background:var(--ink);color:#fff;padding:9px 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.top b{font-size:15px;margin-right:6px}
+.top button,.top select{background:#475569;color:#fff;border:0;border-radius:16px;padding:5px 12px;font:inherit;font-size:13px;cursor:pointer}
+.top button.on{background:var(--acc)}.top .sp{flex:1}
+.top select{border-radius:8px}
+.wrap{padding:16px;max-width:1600px;margin:0 auto}
+.view{display:none}.view.on{display:block}
+/* 안 머리 */
+.vh{background:#fff;border-radius:var(--r);padding:14px 16px;margin-bottom:12px;display:grid;grid-template-columns:auto 1fr;gap:4px 14px;align-items:center}
+.vh .L{grid-row:span 2;width:46px;height:46px;border-radius:12px;color:#fff;font-weight:900;font-size:22px;display:flex;align-items:center;justify-content:center}
+.vh h2{margin:0;font-size:17px}.vh p{margin:0;color:var(--sub);font-size:13px}
+.LA{background:#2563eb}.LB{background:#d97706}.LC{background:#16a34a}.LD{background:#1e40af}
+.cap{font-size:12px;font-weight:800;color:var(--sub);margin:14px 0 6px;letter-spacing:.03em}
+.pc{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
+@media(max-width:800px){.pc{grid-template-columns:1fr}}
+.pc div{background:#fff;border-radius:var(--r);padding:10px 14px;font-size:13px}
+.pc .p{border-left:4px solid var(--okm)}.pc .m{border-left:4px solid var(--dg)}
+.pc ul{margin:4px 0 0;padding-left:18px}.pc li{margin:2px 0}
+/* 나란히 */
+.cmpgrid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:900px){.cmpgrid{grid-template-columns:1fr}}
+.cmpgrid .z{zoom:.7}
+/* 앱 */
+.app{display:grid;grid-template-columns:180px 1fr;background:var(--bg);border:1px solid #cbd5e1;border-radius:12px;overflow:hidden;min-height:470px;position:relative}
+.app.nos{grid-template-columns:1fr}
+.side{background:#fff;border-right:1px solid var(--line);padding:10px 8px;font-size:12.5px}
+.side .lg{font-weight:800;margin:0 4px 8px}
+.si{display:flex;justify-content:space-between;padding:5px 8px;border-radius:7px;color:var(--sub)}
+.si.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}.si .cn{color:var(--faint);font-size:11.5px}
+.si .w{background:var(--warn-bg);color:var(--warn);border-radius:9px;padding:0 6px;font-size:11px;font-weight:800}
+.si .d{background:var(--dg-bg);color:var(--dg);border-radius:9px;padding:0 6px;font-size:11px;font-weight:800}
+.sec{font-size:10.5px;color:var(--faint);margin:9px 8px 3px}
+.main{min-width:0;position:relative}
+.tb{display:flex;align-items:center;gap:8px;padding:7px 12px;border-bottom:1px solid var(--line);background:#fff;font-size:12px;color:var(--sub)}
+.tb .cr{font-weight:800;color:var(--ink)}.tb .sp{flex:1}
+.kb{border:1px solid var(--line);border-radius:7px;padding:3px 9px;color:var(--faint);font-size:12px}
+.bd{padding:12px}
+h3{margin:0;font-size:17px}
+.row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.sb{display:inline-flex;gap:4px;border:1px solid var(--line);background:#fff;border-radius:14px;padding:2px 10px;font-size:12px;color:var(--sub)}
+.sb b{color:inherit}.sb.am{background:var(--warn-bg);border-color:var(--wl);color:var(--warn)}.sb.dg{background:var(--dg-bg);border-color:#fecaca;color:var(--dgi)}
+.sb.on{outline:2px solid var(--acc);outline-offset:1px}
+.tw{overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:var(--r);margin-top:8px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th{background:var(--bg);color:var(--sub);font-weight:700;font-size:11.5px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid #f1f5f9;white-space:nowrap}
+tr.sel td{background:var(--acc-soft)}
+.c{text-align:center}.nm{color:var(--faint);font-size:11.5px}.fs{font-size:11px;color:var(--faint)}
+.lt{display:inline-flex;gap:2px}.lt i{width:19px;height:16px;border-radius:4px;font-style:normal;font-size:9.5px;font-weight:800;color:#fff;text-align:center;line-height:16px}
+.g{background:var(--okm)}.y{background:var(--wm)}.r{background:var(--dg)}.n{background:#cbd5e1}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle}
+.dd{font-size:11.5px;font-weight:800;border-radius:5px;padding:1px 6px}
+.dd.r{background:var(--dg-bg);color:var(--dg)}.dd.y{background:var(--warn-bg);color:var(--wm)}.dd.g{background:var(--ok-bg);color:var(--ok)}
+.st{font-size:11.5px;font-weight:700;border-radius:9px;padding:1px 8px}
+.st.ok{background:var(--ok-bg);color:var(--ok)}.st.w{background:var(--warn-bg);color:var(--warn)}.st.no{background:var(--bg);color:#64748b}
+.btn{display:inline-flex;gap:4px;align-items:center;border:1px solid #cbd5e1;background:#fff;border-radius:7px;padding:4px 10px;font-size:12px;white-space:nowrap}
+.btn.p{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}.btn.s{padding:2px 8px;font-size:11.5px}
+.more{border:1px solid var(--line);background:#fff;border-radius:6px;padding:1px 7px;color:var(--sub);font-weight:800}
+.bulk{display:flex;gap:7px;align-items:center;background:var(--ink);color:#fff;border-radius:9px;padding:7px 11px;margin-top:8px;font-size:12px;flex-wrap:wrap}
+.bulk span.b{background:#475569;border-radius:6px;padding:3px 9px}.bulk span.b.p{background:var(--acc)}.bulk .x{margin-left:auto}
+.tabs{display:flex;gap:1px;border-bottom:1px solid var(--line);padding:0 10px;background:#fff;overflow-x:auto}
+.tabs span{padding:8px 10px;font-size:12.5px;color:var(--sub);white-space:nowrap;border-bottom:2px solid transparent}
+.tabs span.on{color:var(--acc2);font-weight:800;border-color:var(--acc2)}
+.tabs .k{font-size:10px;background:var(--warn-bg);color:var(--warn);border-radius:8px;padding:0 5px;margin-left:3px;font-weight:800}
+.fh{background:#fff;border-bottom:1px solid var(--line);padding:9px 12px}
+.badge{font-size:10px;font-weight:800;border-radius:4px;padding:2px 6px;background:var(--acc-soft);color:var(--acc2)}
+.wc{background:var(--warn-bg);border:1px solid var(--wl);color:var(--warn);border-radius:12px;padding:1px 9px;font-size:12px;font-weight:800}
+.meta{font-size:11.5px;color:var(--sub);margin-top:3px}
+.gap{background:var(--warn-bg);border:1px solid var(--wl);border-radius:var(--r);padding:7px 11px;font-size:12px;color:var(--warn)}
+.gap .gp{display:inline-block;background:#fff;border:1px solid var(--wl);border-radius:11px;padding:0 8px;margin:3px 3px 0 0;color:var(--ink)}
+.ph{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px}
+.ph span{border:1px solid var(--line);background:#fff;border-radius:8px;padding:4px 10px;font-size:12px;color:var(--sub)}
+.ph span.on{border-color:var(--acc2);background:var(--acc-soft);color:var(--acc2);font-weight:800}
+.ph small{display:block;font-size:10.5px}
+.paper{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:10px;font-size:12px}
+.paper .pg{border:1px solid #cbd5e1;padding:12px 16px;line-height:1.9;font-family:'Batang',serif}
+.bl{background:var(--warn-bg);border-bottom:2px solid var(--wm);padding:0 12px}
+.f{display:grid;grid-template-columns:86px 1fr;gap:6px;align-items:center;margin-bottom:6px;font-size:12.5px}
+.f label{color:var(--sub);font-size:11.5px}
+.in{border:1px solid var(--line);border-radius:7px;padding:4px 9px;background:#fff}
+.in.e{border:1px dashed var(--wm);background:var(--warn-bg);color:var(--wm)}
+.in.fo{border:2px solid var(--acc);background:#fff;color:var(--ink)}
+.card{background:#fff;border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.card h4{margin:0 0 6px;font-size:13px}
+.drw{background:#fff;border-left:1px solid var(--line);display:flex;flex-direction:column;min-width:0}
+.dh{padding:10px 12px;border-bottom:1px solid var(--line)}
+.db{padding:10px 12px;flex:1}
+.df{border-top:1px solid var(--line);padding:8px 12px;display:flex;gap:7px;justify-content:flex-end;align-items:center;font-size:11.5px;color:var(--faint)}
+.mini{font-size:11.5px;color:var(--sub)}
+/* B 받은편지함 */
+.inbox{display:grid;grid-template-columns:150px 1fr 330px;min-height:470px}
+.ig{background:#fff;border-right:1px solid var(--line);padding:10px 8px;font-size:12.5px}
+.il{padding:10px;min-width:0}
+.it{display:grid;grid-template-columns:16px 22px 1fr auto;gap:7px;align-items:center;background:#fff;border:1px solid var(--line);border-radius:9px;padding:7px 10px;margin-bottom:5px;font-size:12.5px}
+.it.sel{border-color:var(--acc);background:var(--acc-soft)}
+.it .w2{font-size:11px;color:var(--faint)}
+.grp{font-size:11px;font-weight:800;color:var(--sub);margin:8px 2px 4px}
+/* C 3단 */
+.c3{display:grid;grid-template-columns:190px 1fr 330px;min-height:470px}
+.fl{background:#fff;border-right:1px solid var(--line);font-size:12px;overflow:hidden}
+.fl .q{margin:8px;border:1px solid var(--line);border-radius:7px;padding:3px 8px;color:var(--faint)}
+.fi{display:flex;align-items:center;gap:6px;padding:6px 10px;border-left:3px solid transparent}
+.fi.on{background:var(--acc-soft);border-left-color:var(--acc2);font-weight:800;color:var(--acc2)}
+.fi .ct{margin-left:auto;font-size:10.5px;color:var(--faint)}
+/* D 단계 */
+.board{display:grid;grid-template-columns:repeat(5,1fr);gap:8px}
+.col{background:#eef2f7;border-radius:10px;padding:7px}
+.col .h{font-size:12px;font-weight:800;color:var(--sub);display:flex;justify-content:space-between;margin:2px 3px 6px}
+.kc{background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;margin-bottom:6px;font-size:12px}
+.kc b{display:block;font-size:12.5px}.kc .bar{height:5px;background:var(--line);border-radius:3px;margin-top:5px;overflow:hidden}.kc .bar i{display:block;height:100%;background:var(--okm)}
+.kc.w{border-left:3px solid var(--wm)}.kc.d{border-left:3px solid var(--dg)}
+.step{display:flex;gap:0;margin:2px 0 12px;overflow-x:auto}
+.step span{flex:1;min-width:92px;text-align:center;font-size:11.5px;color:var(--sub);position:relative;padding-top:24px}
+.step span::before{content:attr(data-n);position:absolute;top:0;left:50%;transform:translateX(-50%);width:22px;height:22px;border-radius:50%;background:#cbd5e1;color:#fff;font-weight:800;line-height:22px;font-size:11px}
+.step span::after{content:"";position:absolute;top:11px;left:calc(50% + 13px);right:calc(-50% + 13px);height:2px;background:#cbd5e1}
+.step span:last-child::after{display:none}
+.step span.dn::before{background:var(--okm);content:"✓"}.step span.dn::after{background:var(--okm)}
+.step span.cu{color:var(--acc2);font-weight:800}.step span.cu::before{background:var(--acc2)}
+.stg{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+@media(max-width:1000px){.stg{grid-template-columns:1fr}}
+.ck{list-style:none;margin:0;padding:0}.ck li{display:flex;gap:6px;align-items:center;padding:4px 0;border-bottom:1px solid #f1f5f9;font-size:12.5px}
+.ck li:last-child{border:0}.ck .s{margin-left:auto}
+/* 비교 표 */
+.score{background:#fff;border-radius:var(--r);overflow-x:auto}
+.score table{font-size:13px}.score td,.score th{padding:9px 10px;white-space:normal}
+.score th{font-size:12.5px}
+.star{color:var(--wm);letter-spacing:1px;white-space:nowrap}
+.rec{background:var(--ok-bg);border:1px solid #bbf7d0;border-radius:var(--r);padding:12px 16px;margin-top:12px;font-size:13.5px}
+.rec b{color:var(--ok)}
+.note{font-size:12px;color:var(--faint);margin-top:12px}
+</style></head><body>
+
+<div class="top"><b>🏦 기금관리 화면 — 4안 비교</b>
+  <span id="tabs">
+    <button data-v="sum" class="on">한눈에 비교</button>
+    <button data-v="A">A 정리형</button>
+    <button data-v="B">B 할 일 중심</button>
+    <button data-v="C">C 3단 분할</button>
+    <button data-v="D">D 단계 흐름</button>
+    <button data-v="cmp">나란히 보기</button>
+  </span>
+  <span class="sp"></span>
+  <span id="cmpSel" style="display:none">왼쪽 <select id="sl"><option>A</option><option selected>B</option><option>C</option><option>D</option></select>
+   오른쪽 <select id="sr"><option>A</option><option>B</option><option selected>C</option><option>D</option></select>
+   화면 <select id="ss"><option value="1">① 홈</option><option value="2">② 기금 작업</option></select></span>
+</div>
+
+<div class="wrap">
+
+<!-- ═════════ 한눈에 비교 ═════════ -->
+<section class="view on" id="v-sum">
+  <div class="score"><table>
+    <tr><th class="c">□</th><th>#</th><th>안</th><th>한 줄 생각</th><th>닮은 시스템</th><th>할 일이 보이나</th><th>빈칸 하나 채우기까지</th><th>폰</th><th>익숙함</th><th>만드는 양</th></tr>
+    <tr><td class="c">□</td><td class="nm">1</td><td><b style="color:#2563eb">A 정리형</b></td><td>지금 틀 그대로 두고 단추·색·빈칸 표시만 정리</td><td>업무관리 · 기업정보함</td><td class="star">★★★☆</td><td>3번 (홈→기금→할 일)</td><td class="star">★★★☆</td><td class="star">★★★★</td><td>적음</td></tr>
+    <tr><td class="c">□</td><td class="nm">2</td><td><b style="color:#d97706">B 할 일 중심</b></td><td>첫 화면이 「모든 기금의 할 일 목록」, 오른쪽에서 바로 입력</td><td>푸른이알피 내 업무 · 메일함</td><td class="star">★★★★</td><td><b>1번</b> (할 일 누르고 바로 입력)</td><td class="star">★★★☆</td><td class="star">★★★☆</td><td>중간</td></tr>
+    <tr><td class="c">□</td><td class="nm">3</td><td><b style="color:#16a34a">C 3단 분할</b></td><td>왼쪽 기금 목록이 늘 보이고, 가운데 작업, 오른쪽 미리보기·편집</td><td>기업정보함 PC · 메일 프로그램</td><td class="star">★★☆☆</td><td>2번 (기금→칸)</td><td class="star">★☆☆☆</td><td class="star">★★★☆</td><td>중간</td></tr>
+    <tr><td class="c">□</td><td class="nm">4</td><td><b style="color:#1e40af">D 단계 흐름</b></td><td>기금을 설립→등기→운영→결산→지원금 「단계」로 보고, 단계마다 자료·서식·할 일을 한곳에</td><td>설립 진행 탭 · 칸반 보드</td><td class="star">★★★☆</td><td>2번 (기금→지금 단계)</td><td class="star">★★☆☆</td><td class="star">★★☆☆</td><td>많음</td></tr>
+  </table></div>
+  <div class="rec"><b>추천: A를 바탕으로 B의 「할 일 → 바로 입력」 칸을 붙이기 (A+B).</b><br>
+  A는 지금 손에 익은 틀(왼쪽 메뉴·탭)을 그대로 두어 헤매지 않고, B의 장점인 「할 일을 누르면 그 자리에서 바로 채움」만 가져오면 빈칸 채우기가 1번으로 줄어듭니다.
+  C는 넓은 모니터에선 좋지만 폰에서 쓰기 어렵고, D는 결산·지원금처럼 해마다 도는 일과 설립처럼 한 번 하는 일이 섞여 단계로 나누기 애매합니다.</div>
+  <div class="note">위쪽 단추로 안마다 화면 ①홈 · ②기금 작업 두 장씩, 「나란히 보기」로 두 안을 옆에 놓고 견줄 수 있습니다. 이름·숫자·번호는 전부 가짜입니다.</div>
+</section>
+
+<!-- ═════════ A ═════════ -->
+<section class="view" id="v-A">
+<div class="vh"><div class="L LA">A</div><h2>정리형 — 지금 틀 그대로, 정리만</h2><p>왼쪽 메뉴·윗줄·탭은 그대로. 홈에 할 일 칩·신호등, 서식 줄은 「상태 + 단추 하나 + ⋯」, 빈칸은 늘 보이게.</p></div>
+<div class="cap">① 홈</div>
+<template id="A1">
+<div class="app">
+  <div class="side"><div class="lg">🏦 기금 통합운영</div><div class="si on">지역기금 <span class="cn">16</span></div><div class="si">공동기금 <span class="cn">9</span></div><div class="si">사내기금 <span class="cn">7</span></div><div class="sec">상태</div><div class="si">설립중 <span class="cn">2</span></div><div class="si">종료기금 <span class="cn">11</span></div><div class="sec">업무</div><div class="si">서식 자료실</div><div class="si">청구 관리 <span class="w">2</span></div></div>
+  <div class="main"><div class="tb"><span class="cr">지역기금</span><span class="sp"></span><span class="kb">찾기 Ctrl K</span></div>
+  <div class="bd"><div class="row"><h3>지역기금 16</h3><span class="sb dg">결산 지남 <b>1</b></span><span class="sb am on">서식 빈칸 <b>4</b></span><span class="sb am">근로자대표 없음 <b>11</b></span><span class="sb am">분개 승인 <b>596</b></span><span class="sb">다 갖춤 <b>9</b></span></div>
+  <div class="tw"><table><tr><th class="c">□</th><th>#</th><th>기금</th><th>담당</th><th>신호등</th><th>다음 할 일</th><th>기한</th></tr>
+  <tr class="sel"><td class="c">☑</td><td class="nm">1</td><td><b>한빛 1호</b><div class="fs">충남 · 32개사</div></td><td>김가람</td><td><span class="lt"><i class="g">정</i><i class="y">사</i><i class="y">서</i><i class="g">결</i><i class="g">기</i></span></td><td class="mini">별지7호 빈칸 3</td><td><span class="dd g">D-24</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">2</td><td><b>새솔 2호</b><div class="fs">충남 · 18개사</div></td><td>이나래</td><td><span class="lt"><i class="g">정</i><i class="g">사</i><i class="y">서</i><i class="r">결</i><i class="r">기</i></span></td><td class="mini">결산 보고 — 승인 212건</td><td><span class="dd r">D+5</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">3</td><td><b>누리 3호</b><div class="fs">경기 · 11개사</div></td><td>김가람</td><td><span class="lt"><i class="g">정</i><i class="y">사</i><i class="y">서</i><i class="g">결</i><i class="g">기</i></span></td><td class="mini">근로자대표 4곳</td><td><span class="dd y">D-6</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">4</td><td><b>다온 4호</b><div class="fs">경기 · 9개사</div></td><td>박다솜</td><td><span class="lt"><i class="g">정</i><i class="g">사</i><i class="y">서</i><i class="n">결</i><i class="g">기</i></span></td><td class="mini">인가신청서 원본 없음</td><td><span class="dd g">D-41</span></td></tr></table></div>
+  <div class="bulk">1곳 선택 <span class="b p">담당 지정</span><span class="b">서식 한꺼번에</span><span class="b">엑셀</span><span class="x">✕</span></div></div></div>
+</div></template>
+<div class="cap">② 기금 작업 (서식 탭)</div>
+<template id="A2">
+<div class="app nos"><div class="main">
+  <div class="fh"><div class="row"><span class="nm">‹ 1/16 ›</span><h3>한빛 1호</h3><span class="badge">지역 · 충남</span><span class="wc">⚠ 할 일 4</span></div><div class="meta">인가 0000-2021-1 · 법인 000000-0000000 · 고유 000-00-00000</div></div>
+  <div class="tabs"><span>한눈에</span><span>기금 정보</span><span>참여사업장<span class="k">2</span></span><span>회계·결산</span><span>근복지원금</span><span>목적사업·대부</span><span>일정·변경</span><span class="on">📑 서식<span class="k">3</span></span></div>
+  <div class="bd"><div class="ph"><span class="on">① 인가<small>빈칸 3</small></span><span>② 법인설립<small>다 채움</small></span><span>③ 고유번호증<small>다 채움</small></span><span>④ 운영<small>빈칸 1</small></span><span>⑤ 근복지원금<small>다 채움</small></span></div>
+  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:10px">
+  <div><div class="gap">⚠ 빈칸 3 — 누르면 그 칸으로 <span class="gp">설립합의일 →</span><span class="gp">대표자 직책 →</span><span class="gp">다라전자 근로자대표 →</span></div>
+  <div class="tw"><table><tr><th class="c">□</th><th>#</th><th>서식</th><th>상태</th><th></th><th></th></tr>
+  <tr class="sel"><td class="c">☑</td><td class="nm">1</td><td><b>설립인가신청서</b></td><td><span class="st w">빈칸 2</span></td><td><span class="btn p s">📄 한글로 열기</span></td><td><span class="more">⋯</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">2</td><td><b>설립합의서</b></td><td><span class="st w">빈칸 1</span></td><td><span class="btn p s">📄 한글로 열기</span></td><td><span class="more">⋯</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">3</td><td><b>정관</b></td><td><span class="st ok">✓ 다 채움</span></td><td><span class="btn p s">📄 한글로 열기</span></td><td><span class="more">⋯</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">4</td><td><b>회의록</b></td><td><span class="st ok">✓ 다 채움</span></td><td><span class="btn p s">📄 한글로 열기</span></td><td><span class="more">⋯</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">5</td><td><b>기금출연확인서</b></td><td><span class="st ok">✓ 다 채움</span></td><td><span class="btn p s">📄 한글로 열기</span></td><td><span class="more">⋯</span></td></tr></table></div>
+  <div class="bulk">1개 선택 <span class="b p">🖨 묶어 열기(날인용)</span><span class="b">⬇ ZIP</span><span class="x">✕</span></div></div>
+  <div class="paper"><b>미리보기</b><div class="pg">설립인가 신청서<br>명칭 한빛 1호 공동근로복지기금<br>설립합의일 <span class="bl">빈칸</span><br>대표자 김가람 직책 <span class="bl">빈칸</span></div></div>
+  </div></div></div></div></template>
+<div class="pc"><div class="p"><b>좋은 점</b><ul><li>지금과 같은 자리에 같은 메뉴 — 새로 배울 것 거의 없음</li><li>다른 시스템(업무관리·기업정보함)과 모양이 같아짐</li><li>나눠서 조금씩 바꿀 수 있어 탈이 적음</li></ul></div>
+<div class="m"><b>아쉬운 점</b><ul><li>빈칸을 채우려면 여전히 기금을 열고 탭을 옮겨 다녀야 함</li><li>여러 기금의 할 일을 한 줄로 몰아 처리하긴 어려움</li></ul></div></div>
+</section>
+
+<!-- ═════════ B ═════════ -->
+<section class="view" id="v-B">
+<div class="vh"><div class="L LB">B</div><h2>할 일 중심 — 받은편지함처럼</h2><p>첫 화면이 「전체 기금의 할 일」. 왼쪽은 할 일 종류, 가운데 목록, 오른쪽에서 그 자리에 바로 입력하고 「저장하고 다음 ▶」.</p></div>
+<div class="cap">① 홈 (할 일함)</div>
+<template id="B1">
+<div class="app nos"><div class="main"><div class="tb"><span class="cr">할 일함</span><span class="sp"></span><span class="kb">찾기 Ctrl K</span><span>기금 목록 ▸</span></div>
+<div class="inbox">
+  <div class="ig"><div class="si on">전체 <span class="cn">23</span></div><div class="sec">종류</div><div class="si">✏️ 빈칸 채우기 <span class="w">9</span></div><div class="si">🏢 사업장 <span class="w">11</span></div><div class="si">📒 결산·분개 <span class="d">2</span></div><div class="si">⏰ 기한 <span class="w">1</span></div><div class="sec">담당</div><div class="si">내 것만 <span class="cn">14</span></div><div class="sec">기금</div><div class="si">한빛 1호 <span class="cn">4</span></div><div class="si">새솔 2호 <span class="cn">3</span></div><div class="si">누리 3호 <span class="cn">5</span></div></div>
+  <div class="il"><div class="row"><h3>할 일 23</h3><span class="sb dg">지남 <b>1</b></span><span class="sb am">이번 주 <b>4</b></span><span class="sb">나중 <b>18</b></span></div>
+    <div class="grp">지남</div>
+    <div class="it"><span>□</span><span class="nm">1</span><span><b>새솔 2호</b> · 2025 결산 보고 — 분개 승인 212건<div class="w2">회계·결산</div></span><span class="dd r">D+5</span></div>
+    <div class="grp">이번 주</div>
+    <div class="it sel"><span>☑</span><span class="nm">2</span><span><b>한빛 1호</b> · 설립합의일 비어 있음<div class="w2">별지7호 · 설립합의서에 들어감</div></span><span class="dd y">D-3</span></div>
+    <div class="it"><span>□</span><span class="nm">3</span><span><b>한빛 1호</b> · 대표자 직책 비어 있음<div class="w2">별지7호</div></span><span class="dd y">D-3</span></div>
+    <div class="it"><span>□</span><span class="nm">4</span><span><b>누리 3호</b> · 다라물류 근로자대표 없음<div class="w2">사업장</div></span><span class="dd y">D-6</span></div>
+    <div class="grp">나중</div>
+    <div class="it"><span>□</span><span class="nm">5</span><span><b>다온 4호</b> · 인가신청서 원본 없음<div class="w2">서류 올리기</div></span><span class="dd g">D-41</span></div>
+    <div class="bulk">1건 선택 <span class="b p">담당 넘기기</span><span class="b">미루기</span><span class="b">해당 없음</span><span class="x">✕</span></div>
+  </div>
+  <div class="drw"><div class="dh"><b>한빛 1호 — 설립합의일</b><div class="mini">들어가는 서식: 별지7호 · 설립합의서</div></div>
+    <div class="db"><div class="f"><label>설립합의일</label><div class="in fo">2021-03-1▏</div></div>
+    <div class="mini" style="margin:6px 0 10px">참고: 회의일 2021-03-10 · 인가일 2021-04-02</div>
+    <div class="paper"><div class="pg" style="font-size:11.5px">… 설립합의일 <span class="bl">2021-03-1</span> …</div></div></div>
+    <div class="df"><span class="btn">건너뛰기</span><span class="btn p">저장하고 다음 ▶</span></div></div>
+</div></div></div></template>
+<div class="cap">② 기금 작업 (제출 꾸러미)</div>
+<template id="B2">
+<div class="app nos"><div class="main"><div class="tb"><span class="cr">할 일함 › 한빛 1호 › 인가 서류</span><span class="sp"></span></div>
+<div class="bd"><div class="row"><h3>한빛 1호 · ① 인가 서류 꾸러미</h3><span class="st ok">빈칸 0 — 준비 끝</span><span style="margin-left:auto" class="btn p">🖨 차례대로 묶어 열기(날인용)</span><span class="btn">⬇ ZIP</span></div>
+<div class="tw"><table><tr><th class="c">□</th><th>#</th><th>서식</th><th>상태</th><th>쪽</th><th></th></tr>
+<tr><td class="c">☑</td><td class="nm">1</td><td><b>설립인가신청서</b></td><td><span class="st ok">✓ 방금 채움</span></td><td>2</td><td><span class="more">⋯</span></td></tr>
+<tr><td class="c">☑</td><td class="nm">2</td><td><b>설립합의서</b></td><td><span class="st ok">✓</span></td><td>3</td><td><span class="more">⋯</span></td></tr>
+<tr><td class="c">☑</td><td class="nm">3</td><td><b>정관</b></td><td><span class="st ok">✓</span></td><td>9</td><td><span class="more">⋯</span></td></tr>
+<tr><td class="c">☑</td><td class="nm">4</td><td><b>회의록</b></td><td><span class="st ok">✓</span></td><td>2</td><td><span class="more">⋯</span></td></tr>
+<tr><td class="c">☑</td><td class="nm">5</td><td><b>기금출연확인서</b></td><td><span class="st ok">✓</span></td><td>32</td><td><span class="more">⋯</span></td></tr></table></div>
+<div class="card" style="margin-top:10px"><h4>🕘 이 꾸러미를 채운 기록</h4><div class="mini">10-05 설립합의일 · 대표자 직책 채움(할 일함) · 10-04 다라전자 근로자대표 채움</div></div>
+</div></div></div></template>
+<div class="pc"><div class="p"><b>좋은 점</b><ul><li>빈칸 채우기가 <b>1번</b> — 탭을 찾아다닐 필요 없음</li><li>여러 기금 일을 위에서부터 차례로 끝내면 됨(분개 596건·근로자대표 11곳처럼 많을 때 특히)</li><li>담당자별 「내 것만」이 바로 됨</li></ul></div>
+<div class="m"><b>아쉬운 점</b><ul><li>기금 하나를 통째로 훑어보려면 「기금 목록」으로 한 번 더 들어가야 함</li><li>할 일 규칙(무엇을 빈칸으로 볼지)을 잘 정해야 함 — 잘못 잡으면 목록이 시끄러움</li></ul></div></div>
+</section>
+
+<!-- ═════════ C ═════════ -->
+<section class="view" id="v-C">
+<div class="vh"><div class="L LC">C</div><h2>3단 분할 — 메일 프로그램처럼</h2><p>왼쪽 기금 목록이 늘 떠 있고(신호 점), 가운데에서 작업, 오른쪽에서 미리보기·편집. 기금을 바꿔도 탭 자리가 그대로.</p></div>
+<div class="cap">① 홈 = 기금 고르기 (참여사업장 탭)</div>
+<template id="C1">
+<div class="app nos"><div class="main"><div class="tb"><span class="cr">지역기금 › 한빛 1호 › 참여사업장</span><span class="sp"></span><span class="kb">찾기 Ctrl K</span></div>
+<div class="c3">
+  <div class="fl"><div class="q">기금 찾기</div>
+    <div class="fi on"><span class="dot" style="background:var(--wm)"></span>한빛 1호<span class="ct">32</span></div>
+    <div class="fi"><span class="dot" style="background:var(--dg)"></span>새솔 2호<span class="ct">18</span></div>
+    <div class="fi"><span class="dot" style="background:var(--wm)"></span>누리 3호<span class="ct">11</span></div>
+    <div class="fi"><span class="dot" style="background:var(--okm)"></span>다온 4호<span class="ct">9</span></div>
+    <div class="fi"><span class="dot" style="background:var(--okm)"></span>가온 5호<span class="ct">14</span></div>
+    <div class="fi"><span class="dot" style="background:var(--okm)"></span>마루 6호<span class="ct">21</span></div></div>
+  <div style="min-width:0"><div class="tabs"><span>한눈에</span><span>기금 정보</span><span class="on">참여사업장<span class="k">2</span></span><span>회계</span><span>서식<span class="k">3</span></span><span>⋯</span></div>
+    <div class="bd"><div class="row"><span class="sb am on">근로자대표 없음 <b>2</b></span><span class="sb">확인서 지남 <b>5</b></span></div>
+    <div class="tw"><table><tr><th class="c">□</th><th>#</th><th>상호</th><th>근로자대표</th><th>빈 칸</th></tr>
+    <tr><td class="c">□</td><td class="nm">1</td><td><b>★ 가나기계</b></td><td><span class="st w">없음</span></td><td>2</td></tr>
+    <tr class="sel"><td class="c">□</td><td class="nm">2</td><td><b>다라전자</b></td><td><span class="st w">없음</span></td><td>3</td></tr>
+    <tr><td class="c">□</td><td class="nm">3</td><td>사아식품</td><td><span class="st ok">재직</span></td><td>0</td></tr></table></div></div></div>
+  <div class="drw"><div class="dh"><b>다라전자</b> <span class="nm">2/32 ‹ ›</span></div>
+    <div class="tabs" style="padding:0 6px"><span>기업</span><span class="on">노사 대표</span><span>중소</span><span>상태</span></div>
+    <div class="db"><div class="f"><label>사용자대표</label><div class="in">이나래</div></div><div class="f"><label>근로자대표</label><div class="in e">비어 있음</div></div><div class="f"><label>재직증명서</label><div class="in e">📎 올리기</div></div></div>
+    <div class="df">자동 저장</div></div>
+</div></div></div></template>
+<div class="cap">② 기금 작업 (서식 탭)</div>
+<template id="C2">
+<div class="app nos"><div class="main"><div class="tb"><span class="cr">지역기금 › 한빛 1호 › 서식</span><span class="sp"></span></div>
+<div class="c3">
+  <div class="fl"><div class="q">기금 찾기</div><div class="fi on"><span class="dot" style="background:var(--wm)"></span>한빛 1호<span class="ct">빈칸 3</span></div><div class="fi"><span class="dot" style="background:var(--dg)"></span>새솔 2호<span class="ct">빈칸 1</span></div><div class="fi"><span class="dot" style="background:var(--wm)"></span>누리 3호<span class="ct">빈칸 2</span></div><div class="fi"><span class="dot" style="background:var(--okm)"></span>다온 4호<span class="ct">✓</span></div></div>
+  <div style="min-width:0"><div class="tabs"><span>한눈에</span><span>기금 정보</span><span>참여사업장</span><span>회계</span><span class="on">서식<span class="k">3</span></span></div>
+  <div class="bd"><div class="ph"><span class="on">① 인가<small>빈칸 3</small></span><span>② 등기<small>✓</small></span><span>③ 고유<small>✓</small></span><span>④ 운영</span></div>
+  <div class="tw"><table><tr><th class="c">□</th><th>#</th><th>서식</th><th>상태</th><th></th></tr>
+  <tr class="sel"><td class="c">☑</td><td class="nm">1</td><td><b>설립인가신청서</b></td><td><span class="st w">빈칸 2</span></td><td><span class="btn p s">열기</span> <span class="more">⋯</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">2</td><td><b>설립합의서</b></td><td><span class="st w">빈칸 1</span></td><td><span class="btn p s">열기</span> <span class="more">⋯</span></td></tr>
+  <tr><td class="c">□</td><td class="nm">3</td><td><b>정관</b></td><td><span class="st ok">✓</span></td><td><span class="btn p s">열기</span> <span class="more">⋯</span></td></tr></table></div></div></div>
+  <div class="drw"><div class="dh"><b>미리보기 · 설립인가신청서</b></div><div class="db"><div class="paper"><div class="pg" style="font-size:11.5px">설립합의일 <span class="bl">빈칸</span><br>대표자 김가람 직책 <span class="bl">빈칸</span></div></div><div class="mini" style="margin-top:6px">노란 칸 누르면 바로 입력</div></div></div>
+</div></div></div></template>
+<div class="pc"><div class="p"><b>좋은 점</b><ul><li>기금을 바꿔도 같은 탭에 머묾 — 16개 기금의 같은 서식을 차례로 보기 좋음</li><li>뒤로 가기·목록 다시 찾기가 없어짐</li></ul></div>
+<div class="m"><b>아쉬운 점</b><ul><li>세 칸이 나란히라 <b>노트북·폰에서 좁음</b>(폰은 한 칸씩 넘겨야 함)</li><li>지금 왼쪽 메뉴(지역/공동/사내…) 자리를 기금 목록이 차지 — 메뉴 위치가 바뀜</li></ul></div></div>
+</section>
+
+<!-- ═════════ D ═════════ -->
+<section class="view" id="v-D">
+<div class="vh"><div class="L LD">D</div><h2>단계 흐름 — 설립부터 결산까지 길 따라</h2><p>홈은 단계별 보드(어느 기금이 어느 단계에 있나), 기금은 단계 막대 + 「지금 단계에 필요한 자료·서식·할 일」을 한 화면에.</p></div>
+<div class="cap">① 홈 (단계 보드)</div>
+<template id="D1">
+<div class="app nos"><div class="main"><div class="tb"><span class="cr">기금 보드</span><span class="sp"></span><span class="kb">찾기 Ctrl K</span></div>
+<div class="bd"><div class="board">
+  <div class="col"><div class="h">설립 준비 <span>2</span></div><div class="kc w"><b>(가칭) 하늘 사내기금</b>임원·출연금 비어 있음<div class="bar"><i style="width:30%"></i></div></div></div>
+  <div class="col"><div class="h">인가·등기 <span>1</span></div><div class="kc"><b>바다 7호</b>등기 접수 대기<div class="bar"><i style="width:70%"></i></div></div></div>
+  <div class="col"><div class="h">운영 중 <span>12</span></div><div class="kc w"><b>한빛 1호</b>서식 빈칸 3<div class="bar"><i style="width:85%"></i></div></div><div class="kc w"><b>누리 3호</b>근로자대표 4곳<div class="bar"><i style="width:80%"></i></div></div><div class="kc"><b>다온 4호</b>할 일 없음<div class="bar"><i style="width:100%"></i></div></div></div>
+  <div class="col"><div class="h">결산 중 <span>3</span></div><div class="kc d"><b>새솔 2호</b>승인 212건 · D+5<div class="bar"><i style="width:40%"></i></div></div></div>
+  <div class="col"><div class="h">지원금 신청 <span>2</span></div><div class="kc"><b>가온 5호</b>제출서류 8/10<div class="bar"><i style="width:80%"></i></div></div></div>
+</div></div></div></div></template>
+<div class="cap">② 기금 작업 (지금 단계)</div>
+<template id="D2">
+<div class="app nos"><div class="main">
+<div class="fh"><div class="row"><h3>한빛 1호</h3><span class="badge">지역 · 충남</span><span class="wc">⚠ 할 일 4</span><span style="margin-left:auto" class="mini">모든 자료 보기 ▸</span></div></div>
+<div class="bd"><div class="step"><span class="dn" data-n="1">설립·인가</span><span class="dn" data-n="2">법인 등기</span><span class="dn" data-n="3">고유번호</span><span class="cu" data-n="4">연간 운영 2026</span><span data-n="5">결산 2026</span><span data-n="6">지원금</span></div>
+<div class="stg">
+  <div class="card"><h4>📋 이 단계 할 일 (n/12)</h4><ul class="ck"><li>☑ 사업계획서 의결<span class="s st ok">✓</span></li><li>□ 사업계획서 제출<span class="s dd g">D-24</span></li><li>□ 근로자대표 2곳 채우기<span class="s st w">빈칸</span></li><li>□ 상반기 운영보고<span class="s dd g">D-60</span></li></ul></div>
+  <div class="card"><h4>✏️ 필요한 자료</h4><div class="f"><label>사업연도</label><div class="in">2026</div></div><div class="f"><label>예산 총액</label><div class="in">120,000,000</div></div><div class="f"><label>다라전자 근로자대표</label><div class="in e">비어 있음</div></div></div>
+  <div class="card"><h4>📑 이 단계 서식</h4><ul class="ck"><li>사업계획서<span class="s"><span class="btn p s">열기</span></span></li><li>이사회 회의록<span class="s"><span class="btn p s">열기</span></span></li><li>운영상황보고서<span class="s st no">결산 때</span></li></ul></div>
+</div></div></div></div></template>
+<div class="pc"><div class="p"><b>좋은 점</b><ul><li>「지금 무엇을 해야 하는 시기인지」가 가장 분명함</li><li>자료·서식·할 일이 한 화면 — 새로 온 직원도 길을 잃지 않음</li></ul></div>
+<div class="m"><b>아쉬운 점</b><ul><li>지금 탭 구조를 크게 바꿔 <b>익숙해지는 데 시간</b>이 듦, 만드는 양도 가장 많음</li><li>결산·지원금·대부처럼 해마다 겹쳐 도는 일은 한 단계에 딱 맞지 않음</li></ul></div></div>
+</section>
+
+<!-- ═════════ 나란히 ═════════ -->
+<section class="view" id="v-cmp">
+  <div class="cmpgrid"><div><div class="cap" id="cl"></div><div class="z" id="zl"></div></div><div><div class="cap" id="cr"></div><div class="z" id="zr"></div></div></div>
+  <div class="note">위쪽에서 왼쪽·오른쪽 안과 화면(①홈 / ②기금 작업)을 고르세요.</div>
+</section>
+
+</div>
+<script>
+var NAMES={A:'A 정리형',B:'B 할 일 중심',C:'C 3단 분할',D:'D 단계 흐름'};
+// 템플릿을 각 안 화면 자리에 펼치기
+document.querySelectorAll('template').forEach(function(t){ t.after(t.content.cloneNode(true)); });
+function show(v){
+  document.querySelectorAll('#tabs button').forEach(function(b){ b.classList.toggle('on', b.dataset.v===v); });
+  document.querySelectorAll('.view').forEach(function(s){ s.classList.toggle('on', s.id==='v-'+v); });
+  document.getElementById('cmpSel').style.display = v==='cmp' ? '' : 'none';
+  if(v==='cmp') fill(); window.scrollTo(0,0);
+  try{ localStorage.setItem('fund_mock_v', v); }catch(e){}
+}
+function fill(){
+  var s=document.getElementById('ss').value;
+  [['sl','zl','cl'],['sr','zr','cr']].forEach(function(p){
+    var k=document.getElementById(p[0]).value, t=document.getElementById(k+s);
+    var z=document.getElementById(p[1]); z.innerHTML=''; z.appendChild(t.content.cloneNode(true));
+    document.getElementById(p[2]).textContent=NAMES[k]+' — '+(s==='1'?'① 홈':'② 기금 작업');
+  });
+}
+document.getElementById('tabs').addEventListener('click',function(e){ var b=e.target.closest('button'); if(b) show(b.dataset.v); });
+['sl','sr','ss'].forEach(function(id){ document.getElementById(id).addEventListener('change',fill); });
+try{ var v0=localStorage.getItem('fund_mock_v'); if(v0 && document.getElementById('v-'+v0)) show(v0); }catch(e){}
+</script>
+</body></html>
