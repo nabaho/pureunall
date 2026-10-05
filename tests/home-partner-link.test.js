@@ -179,6 +179,45 @@ test('편집칸의 로고 줄 — 남기기는 사유 칸과 함께, 남겼으�
   assert.match(남김, /로고남기기풀기\('C1'\)/);
 });
 
+/* 로고 잇기 창의 «업체 찾기» — 가짜 고르개(select)로 실제로 돌린다 */
+function 찾기상자(이름들) {
+  const 고르개 = { value: '', options: [{ value: '', text: '— 업체를 고르십시오 —', hidden: false }]
+    .concat(이름들.map((n, i) => ({ value: 'C' + i, text: n, hidden: false }))) };
+  const ctx = { document: { getElementById: (id) => (id === 'logoPick185' ? 고르개 : null) } };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource('업체이름다듬기') + '\n' + fnSource('로고고르개거르기'), ctx);
+  ctx.고르개 = 고르개;
+  return ctx;
+}
+const 보이는것 = (g) => g.options.slice(1).filter(o => !o.hidden).map(o => o.text);
+
+test('업체 찾기 — 친 글자가 든 업체만 보인다((주)·주식회사·띄어쓰기는 무시)', () => {
+  const ctx = 찾기상자(['(주)가나상사', '주식회사 다라 산업', '마바상회']);
+  ctx.로고고르개거르기(185, '다라산업');
+  assert.deepStrictEqual(보이는것(ctx.고르개), ['주식회사 다라 산업']);
+  ctx.로고고르개거르기(185, '㈜ 가나');
+  assert.deepStrictEqual(보이는것(ctx.고르개), ['(주)가나상사']);
+});
+
+test('업체 찾기 — 하나만 남으면 그것을 골라 두고, 여럿이면 고르지 않는다', () => {
+  const ctx = 찾기상자(['가나상사', '가나물산', '마바상회']);
+  ctx.로고고르개거르기(185, '마바');
+  assert.strictEqual(ctx.고르개.value, 'C2');
+  ctx.로고고르개거르기(185, '가나');
+  assert.strictEqual(ctx.고르개.value, '', '여럿인데 하나를 골라 두었습니다');
+});
+
+test('업체 찾기 — 지우면 다시 다 보인다', () => {
+  const ctx = 찾기상자(['가나상사', '마바상회']);
+  ctx.로고고르개거르기(185, '마바');
+  ctx.로고고르개거르기(185, '');
+  assert.strictEqual(보이는것(ctx.고르개).length, 2);
+});
+
+test('로고 잇기 창의 줄마다 찾기 칸이 있다', () => {
+  assert.match(fnSource('로고잇기창그리기'), /로고고르개거르기\(/);
+});
+
 test('★ 창 제목 함수(modalHead)가 «정의돼» 있다 — 없으면 구성원 넣기·자문사 로고 창이 안 열린다', () => {
   /* 2026-10-05 에 보니 한 번도 정의된 적이 없었다. 검사가 가짜를 넣어 돌려서 못 잡았다. */
   const ctx = { esc: (s) => String(s).replace(/</g, '&lt;') };
