@@ -345,7 +345,8 @@ test('★★ 증명서 다시읽기는 «글자면 글자로» 보낸다', () =>
 test('★★★ 한글을 읽는 문 넷이 모두 _hwpTextOf 를 쓴다 — 갈라지면 여기선 되고 저기선 안 된다', () => {
   const 문 = ['async function ocrDrop(', 'async function reOcrForm(',
               'async function extractTextForm(', 'async function _cdFileBytes(',
-              'async function packNoticeFile('];   /* 📦 제출 꾸러미 — 공고문 읽기(2026-10-05) */
+              'async function packNoticeFile(',    /* 📦 제출 꾸러미 — 공고문 읽기(2026-10-05) */
+              'async function _bizDocText('];      /* 🏢 사업관리 — 두 서류 비교(2026-10-05) */
   문.forEach(function (f) {
     assert.match(떼기(f), /_hwpTextOf\(/, f + ' 이 한글을 못 읽습니다');
   });

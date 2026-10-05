@@ -610,6 +610,17 @@ html.dark .empty{color:var(--text-mute)}
 /* 「구분」 칩 — 회의비용·기타비용을 한 화면으로 합치고 여기서 가른다(2026-08-29) */
 .fee-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
 .fd-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+/* 🏢 사업관리 — 표의 한 칸은 한 줄(넘치면 … + title) · 비교 색은 밝음·어둠 둘 다 */
+:root{--bzc-add:#bbf7d0;--bzc-del:#fecaca;--bzc-chg:#fde68a}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bzc-add:#166534;--bzc-del:#991b1b;--bzc-chg:#854d0e}}
+:root[data-theme="dark"]{--bzc-add:#166534;--bzc-del:#991b1b;--bzc-chg:#854d0e}
+.bz-cell{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bz-cmp{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;font-size:12px;border:1px solid var(--border);border-radius:8px;max-height:62vh;overflow:auto}
+.bz-cmp div{padding:2px 8px;border-bottom:1px solid var(--border);white-space:pre-wrap;word-break:break-all;color:var(--ink);min-height:1.4em}
+.bz-cmp .h{position:sticky;top:0;background:var(--card);font-weight:700;z-index:1}
+.bz-cmp .add{background:var(--bzc-add)}.bz-cmp .del{background:var(--bzc-del)}.bz-cmp .chg{background:var(--bzc-chg)}
+.bz-cmp .gap{color:var(--text-mute);font-style:italic}
+@media(max-width:720px){.bz-cmp{grid-template-columns:1fr}}
 .fd-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:2px 0 12px}
 .fd-tabs button{border:0;background:none;padding:8px 16px;font-size:13px;color:var(--text-mute);border-bottom:2px solid transparent;cursor:pointer;margin-bottom:-1px}
 .fd-tabs button.on{color:var(--ink);border-bottom-color:var(--ink);font-weight:800}
@@ -1319,6 +1330,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=2"></script>
+<!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
+<script src="js/kcareer-biz.js?v=1"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -1961,6 +1974,46 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn primary" id="fdAddExisting">+ 받은 서류 추가</button>
         </div>
         <div id="fdBody"></div>        </div>
+      </div></section>
+      <!-- ★ 🏢 사업관리 (대표 지시 2026-10-05 「이력서 관리 아래에 사업관리를 별도로 — 대시보드로」 → 목업 1+2 승인)
+           법인으로 내는 입찰·용역·수행기관·공모 사업. 계약한 것만이 아니라 «입찰에 넣었던 서식·서류 전부»를
+           사업별로 앱에 보관하고, 찾아와 다시 쓰거나 두 서류를 비교한다. 판정은 js/kcareer-biz.js 한 곳. -->
+      <section class="page-view" id="page-bizdash"><div class="page">
+        <div class="page-head"><div class="page-title">🏢 사업관리 — 한눈에</div><div class="page-desc">법인으로 낸 입찰·용역·수행기관·공모 사업 · 개인 지원(컨설턴트·위원·강사 모집)은 이력서관리·제출서류</div></div>
+        <div id="bizDash"></div>
+      </div></section>
+      <section class="page-view" id="page-bizlist"><div class="page">
+        <div class="page-head"><div class="page-title">📋 사업 목록</div><div class="page-desc">줄을 누르면 그 사업에 냈던 서류가 갈래별로 — 공고문·제안서·입찰서식·가격·증빙·결과</div></div>
+        <div class="toolbar">
+          <input class="tb-input" id="bizQ" placeholder="사업·기관·메모 검색" style="min-width:200px" oninput="renderBizList()">
+          <select class="tb-select" id="bizYear" onchange="renderBizList()"></select>
+          <select class="tb-select" id="bizKind" onchange="renderBizList()"></select>
+          <select class="tb-select" id="bizStage" onchange="renderBizList()"></select>
+          <div class="tb-spacer"></div>
+          <span class="cnt" id="bizCnt" style="font-size:11px;color:var(--text-mute)"></span>
+          <button class="btn fs-ui" type="button" onclick="bizPickCase()" title="서류 폴더 «7. 컨설턴트,위원신청등»의 건 폴더 가운데 사업을 골라 올립니다 — 서류도 앱에 보관">📂 7번 폴더에서 사업 고르기</button>
+          <button class="btn primary" type="button" onclick="bizOpen()">＋ 사업 추가</button>
+        </div>
+        <div class="sel-bar" id="bizSelBar" style="display:none;position:static;margin:0 0 8px">
+          <b id="bizSelCnt">0건 선택</b>
+          <button class="btn sm" type="button" onclick="bizSelAll(true)">전체 선택</button>
+          <button class="btn sm" type="button" onclick="bizSelAll(false)">선택 해제</button>
+          <span style="flex:1"></span>
+          <button class="btn sm" type="button" style="color:var(--red)" onclick="bizSelDel(this)">🗑 선택 삭제</button>
+        </div>
+        <div class="dt" id="bizBody"></div>
+      </div></section>
+      <section class="page-view" id="page-bizdocs"><div class="page">
+        <div class="page-head"><div class="page-title">🗂 서류 찾기</div><div class="page-desc">모든 사업의 서류를 한 표에서 — 둘을 골라 비교하거나, 지난 서식으로 다시 씁니다</div></div>
+        <div class="toolbar">
+          <input class="tb-input" id="bizDocQ" placeholder="서류·사업·기관 검색" style="min-width:200px" oninput="renderBizDocs()">
+          <select class="tb-select" id="bizDocKind" onchange="renderBizDocs()"></select>
+          <select class="tb-select" id="bizDocYear" onchange="renderBizDocs()"></select>
+          <div class="tb-spacer"></div>
+          <span class="cnt" id="bizDocCnt" style="font-size:11px;color:var(--text-mute)"></span>
+          <button class="btn primary" type="button" id="bizCmpBtn" onclick="bizCompareSel()" title="표에서 서류 둘을 골라 누르면 달라진 줄만 칠해 나란히 보여 줍니다">📑 고른 둘 비교</button>
+        </div>
+        <div class="dt" id="bizDocBody"></div>
       </div></section>
       <section class="page-view" id="page-meetfee" ondragover="pageDropOver(event,'meetfee')" ondragleave="pageDropLeave(event)" ondrop="pageDropFile(event,'meetfee')"><div class="page"><div class="page-drop-overlay" id="ovl-page-meetfee"><span>📎 영수증·증빙을 놓으면 OCR 자동 등록</span></div>
         <div class="page-head"><div class="page-title">🧾 비용관리</div><div class="page-desc">회의·출장·식대·교통·기타 — 모든 비용 신청·기록</div></div>
@@ -2770,6 +2823,28 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     </div>
   </div>
 </div>
+<!-- 🏢 사업 서랍 · 7번 폴더 고르기 · 서류 비교 (2026-10-05) -->
+<div class="modal-ov" id="modalBiz">
+  <div class="modal" style="width:860px;max-width:96vw">
+    <div class="modal-h" id="bizH">🏢 사업</div>
+    <div class="modal-b" id="bizBodyM"></div>
+    <div class="modal-foot"><button class="btn" style="color:var(--red);margin-right:auto" id="bizDelBtn" onclick="bizDelOne(this)">🗑 사업 삭제</button><button class="btn" onclick="bizClose()">닫기</button><button class="btn primary" onclick="bizSaveForm()">💾 저장</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="modalBizPick">
+  <div class="modal" style="width:820px;max-width:96vw">
+    <div class="modal-h" id="bizPickH">📂 7번 폴더에서 사업 고르기</div>
+    <div class="modal-b" id="bizPickBody"></div>
+    <div class="modal-foot"><button class="btn" onclick="document.getElementById('modalBizPick').classList.remove('open')">닫기</button><button class="btn primary" id="bizPickGo" onclick="bizPickGo()">고른 건 올리기</button></div>
+  </div>
+</div>
+<div class="modal-ov" id="modalBizCmp">
+  <div class="modal" style="width:1100px;max-width:97vw">
+    <div class="modal-h" id="bizCmpH">📑 서류 비교</div>
+    <div class="modal-b" id="bizCmpBody"></div>
+    <div class="modal-foot"><button class="btn" onclick="document.getElementById('modalBizCmp').classList.remove('open')">닫기</button></div>
+  </div>
+</div>
 <div class="modal-ov" id="modalSub">
   <div class="modal" style="width:720px">
     <div class="modal-h">📥 이 건에 낸 서류</div>
@@ -3439,7 +3514,7 @@ function loadSeed(){
   var owner=(typeof kcOwnerState!=='function') || kcOwnerState()==='owner';
   if(!LS.get(NS+'_seeded')){
     if(owner) Object.keys(map).forEach(k=>{ if(SEED[k]) set(map[k], SEED[k]); });
-    ['license','complete','award','edu','fund','etc','meetfee','etcfee','resume','profile','certdoc','feedoc','personal','account','id_docs','gallery','submission'].forEach(k=>{ if(!LS.get(NS+k)) set(k,[]); });
+    ['license','complete','award','edu','fund','etc','meetfee','etcfee','resume','profile','certdoc','feedoc','bizapp','personal','account','id_docs','gallery','submission'].forEach(k=>{ if(!LS.get(NS+k)) set(k,[]); });
     if(owner) LS.set(NS+'_seeded','1');
   }
 }
@@ -3551,6 +3626,13 @@ function _kcCloudRowOf(id){
       if(r.origFileId===id && r.origStPath) return { stPath:r.origStPath, name:r.origName||'원본',
         ext:(String(r.origName||'').split('.').pop()||'').toLowerCase(), savedAt:r.savedAt };
     }
+  }
+  /* 🏢 사업 서류 — 사업 한 건의 docs[] 한 줄이 자리(stPath)를 안다 */
+  var 사업=get('bizapp')||[];
+  for(var b=0;b<사업.length;b++){
+    var ds=(사업[b]&&Array.isArray(사업[b].docs))?사업[b].docs:[];
+    for(var k=0;k<ds.length;k++){ var d=ds[k];
+      if(d && d.id===id && d.stPath) return { stPath:d.stPath, name:d.name||'서류', ext:d.ext||'', savedAt:d.savedAt }; }
   }
   return null;
 }
@@ -5507,6 +5589,8 @@ let NAV=[
   /* 「이력서 생성·보관」이 첫 자리다 — 대표가 가장 자주 쓰는 화면이다(2026-08-29 지시).
      ⚠ 빠른 이력서를 «지우지는» 않는다. 순서만 바꾼다. */
   {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함']]},
+  /* ★ 사업관리 — 이력서관리 «아래» (대표 지시 2026-10-05). 개인 지원과 갈라 법인 사업(입찰·용역·공모)을 따로 */
+  {g:'사업관리', items:[['page-bizdash','📊 한눈에'],['page-bizlist','📋 사업 목록'],['page-bizdocs','🗂 서류 찾기']]},
   /* 회의비용·기타비용을 한 화면으로 합쳤다(2026-08-29) — 「구분」이 이미 가른다.
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
   /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
@@ -5680,6 +5764,9 @@ function navPick(g, 열기){
 function navCount(id){
   try{
     var page=String(id||'').replace(/^page-/,'');
+    /* 사업관리 — 숫자는 «사업 목록» 한 줄에만(한눈에·서류 찾기는 같은 사업을 다시 세는 것이라 안 단다) */
+    if(page==='bizlist') return (typeof bizAll==='function') ? bizAll().length : null;
+    if(page==='bizdash' || page==='bizdocs') return null;
     /* 외부기관 실적은 담긴 통이 없다 — 실적 넷에서 «수행기관이 적힌» 것을 모은 화면이다 */
     if(page==='puagency'){
       if(typeof PU_SYNC_STORES==='undefined' || typeof _isExternal!=='function') return null;
@@ -5880,6 +5967,9 @@ function nav_to(id,label,grp){
   /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
   if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
+  if(id==='page-bizdash') _safe(renderBizDash);
+  if(id==='page-bizlist') _safe(renderBizList);
+  if(id==='page-bizdocs') _safe(renderBizDocs);
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
   if(id==='page-certdoc' && typeof renderDocStore==='function') renderDocStore('certdoc');
   if(id==='page-settings'){ _safe(renderPersonal); _safe(renderAccounts); _safe(initIDSecurity); _safe(renderPubBox);
@@ -5982,6 +6072,8 @@ function renderHomeTiles(){ const box=document.getElementById('homeTiles'); if(!
       let cnt=null; const _g=(k)=>((typeof get==='function'?get(k):[])||[]).length;
       if(id==='page-docbox') cnt=_g('resume')+_g('profile')+_g('certdoc');
       else if(id==='page-feebox') cnt=_g('feedoc');
+      else if(id==='page-bizlist') cnt=_g('bizapp');
+      else if(id==='page-bizdash' || id==='page-bizdocs') cnt=null;
       else if(!(id in NAV_ALIAS) && id!=='page-resume-hub') cnt=_g(id.slice(5));
       html+='<div onclick="navTile(\''+id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:7px 10px;background:var(--card);display:flex;align-items:center;justify-content:space-between;gap:6px" onmouseover="this.style.borderColor=\'var(--teal)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
         +'<span style="font-size:12.5px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(label)+'</span>'
@@ -9759,6 +9851,7 @@ function allRecords(){ var out=[];
   ['resume','profile','certdoc'].forEach(function(k){ get(k).forEach(function(r){ out.push({r:r,page:'docbox'}); }); });
   /* 비용 서류는 회의·비용관리 쪽 문으로 연다 — 이력서관리 보관함에는 그 탭이 안 보인다 */
   get('feedoc').forEach(function(r){ out.push({r:r,page:'feebox'}); });
+  get('bizapp').forEach(function(r){ if(r && !r._deleted) out.push({r:r,page:'bizlist'}); });
   return out; }
 var _gsF=['org','title','titleVal','topic','project','content','kind','memo','note','school','name','agency','main','usage','issuer','coverage'];
 function openSearch(){ document.getElementById('gsInput').value=''; document.getElementById('gsResults').innerHTML='<div class="empty" style="padding:14px">검색어를 입력하세요</div>'; document.getElementById('modalSearch').classList.add('open'); setTimeout(function(){document.getElementById('gsInput').focus();},50); }
@@ -9859,6 +9952,8 @@ function kcTrashFileIds(rec){
   var out=[], r=rec||{};
   [r.id,r.fileId,r.genFileId,r.origFileId].forEach(function(v){
     if(v && out.indexOf(v)<0) out.push(v); });
+  /* 🏢 사업 한 건에 딸린 서류들 — 사업을 지우면 서류도 휴지통이 함께 든다 */
+  (Array.isArray(r.docs)?r.docs:[]).forEach(function(d){ if(d && d.id && out.indexOf(d.id)<0) out.push(d.id); });
   return out;
 }
 function kcTrashList(){ var a=get(TRASH_STORE); return Array.isArray(a)?a:[]; }
@@ -9967,7 +10062,11 @@ function kcTrashPurge(tid){
        ['stPath','genStPath','origStPath'].forEach(function(k){
          var 자리=e.rec&&e.rec[k]; if(!자리) return;
          st=st||kcFormStorage(); if(st) st.ref(자리).delete().catch(function(){});
-       }); }catch(err){}
+       });
+       /* 🏢 사업 서류들의 자리도 — 안 비우면 3,700개 서류가 창고에 남는다 */
+       ((e.rec&&Array.isArray(e.rec.docs))?e.rec.docs:[]).forEach(function(d){
+         if(!d||!d.stPath) return; st=st||kcFormStorage(); if(st) st.ref(d.stPath).delete().catch(function(){}); });
+     }catch(err){}
   set(TRASH_STORE, rest);
   return 1;
 }
@@ -10069,7 +10168,7 @@ function renderTrash(){
    ⚠ 내용(label)에는 「표창」이라는 낱말이 없다(수여 사유만 적힌다) — 종류를 따로 보여
      주지 않으면 130줄에서 표창 7건을 눈으로 골라낼 수가 없다. */
 var TRASH_KIND={wiccok:'위촉·표창', cert:'자격·수료', edu:'학력', work:'기업경력',
-  certdoc:'경력증명서', resume:'이력서', profile:'프로필', feedoc:'비용 서류', consult:'컨설팅', 'case':'사건',
+  certdoc:'경력증명서', resume:'이력서', profile:'프로필', feedoc:'비용 서류', bizapp:'사업', consult:'컨설팅', 'case':'사건',
   fund:'기금', etc:'기타실적', lecture:'강의', meetfee:'회의비', etcfee:'기타비용',
   submission:'제출서류', personal:'개인서류', account:'계좌', id_docs:'신분증',
   gallery:'사진', stamps:'도장', cvforms:'이력서 양식'};
@@ -14211,6 +14310,491 @@ async function _pkSaveToFolder(saveRoot, title, made, whole, zipName, zipBytes){
     return true;
   }catch(e){ console.warn('꾸러미 저장', e); toast('서류 폴더에 못 써서 zip 을 내려받습니다 — '+((e&&e.message)||'')); return false; }
 }
+/* ═══ 🏢 사업관리 (대표 지시 2026-10-05 — 목업 1+2 승인 · 서류는 «앱에 보관») ═══
+   법인으로 내는 입찰·용역·수행기관·공모 사업. 「계약한 것만이 아니라 입찰에 넣었던 서식·서류 등 모두를
+   별도 보관하고, 필요시에 찾아오거나 비교하려는 것이다」.
+   ⚠ 판정(구분·단계·갈래 짐작·셈·줄 비교)은 js/kcareer-biz.js «한 곳». 여기는 읽고·그리고·담기만 한다.
+   ⚠ 서류는 서류 보관함과 «같은 길»로 담는다 — 이 PC(IndexedDB) + 창고(kcareer_forms/{uid}, 본인만).
+     자리(stPath)는 사업 한 건의 docs[] 가 들고, 데려오는 곳은 _kcCloudRowOf 한 곳이다.
+   ⚠ 개인 지원(컨설턴트·위원·강사 모집)은 이력서관리·제출서류 몫 — 여기서 그 건을 옮기지 않는다(골라 «베껴» 올린다). */
+var BIZ_STORE='bizapp';
+function bizAll(){ return (get(BIZ_STORE)||[]).filter(function(r){ return r && !r._deleted; }); }
+function _bizGet(id){ return (get(BIZ_STORE)||[]).filter(function(r){ return r && r.id===id; })[0]||null; }
+function _bizClean(r){ var c=JSON.parse(JSON.stringify(r)); delete c._isNew; return c; }
+function _bizPut(rec){
+  var arr=get(BIZ_STORE)||[], c=_bizClean(rec), i=arr.findIndex(function(x){ return x && x.id===c.id; });
+  c.updatedAt=new Date().toISOString(); c.revision=(Number(c.revision)||0)+1;
+  if(i>=0) arr[i]=c; else arr.unshift(c);
+  set(BIZ_STORE, arr);
+  return c;
+}
+function _bizNew(o){
+  var now=new Date().toISOString();
+  return Object.assign({ id:kcNextNo('BZ',4,BIZ_STORE), entityType:'bizApplication', schemaVersion:1,
+    year:String(new Date().getFullYear()), title:'', org:'', kind:KcareerBiz.KINDS[0], stage:'준비',
+    due:'', sentAt:'', sentHow:'', amt:'', memo:'', caseDir:'', docs:[], createdAt:now, updatedAt:now, revision:0 }, o||{});
+}
+function _bizStageTag(st){
+  var c=KcareerBiz.isWin(st)?'teal':(KcareerBiz.isOpen(st)?'navy':'');
+  return '<span class="tag '+c+'">'+escapeHtml(st||'-')+'</span>';
+}
+function _bizMoney(v){ var n=Number(String(v==null?'':v).replace(/[^\d]/g,'')); return n?n.toLocaleString('ko-KR'):''; }
+function _bizDay(v){ return v?escapeHtml(formatDate(v)||String(v)):'-'; }
+function _bizKb(n){ n=Number(n)||0; return n>=1048576?(n/1048576).toFixed(1)+'MB':Math.max(1,Math.round(n/1024))+'KB'; }
+
+/* ── 📊 한눈에 ── */
+function renderBizDash(){
+  var box=document.getElementById('bizDash'); if(!box) return;
+  var all=bizAll(), s=KcareerBiz.summary(all);
+  if(!all.length){
+    box.innerHTML='<div class="fd-box" style="padding:22px;text-align:center;font-size:13px">아직 넣은 사업이 없습니다 — 7번 폴더의 사업 건을 골라 올리거나 새로 더하세요.'
+      +'<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
+      +'<button class="btn" type="button" onclick="navTile(\'page-bizlist\');bizPickCase()">📂 7번 폴더에서 사업 고르기</button>'
+      +'<button class="btn primary" type="button" onclick="bizOpen()">＋ 사업 추가</button></div></div>';
+    return;
+  }
+  var 진행=Object.keys(s.openBy).map(function(k){ return k+' '+s.openBy[k]; }).join(' · ')||'없음';
+  var kpi=function(l,v,sub,go,warn){ return '<button type="button" class="fd-kpi'+(warn?' warn':'')+'" onclick="'+go+'"><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="l">'+sub+'</div></button>'; };
+  var html='<div class="fd-kpis">'
+    +kpi('올해('+s.year+') 신청', s.thisYear+'건', '누르면 그 목록', "bizGo({year:'"+s.year+"'})")
+    +kpi('진행 중', s.open+'건', escapeHtml(진행), 'bizGo({open:1})')
+    +kpi('선정', s.win+'건', s.rate==null?'결과 난 건 없음':('선정률 '+s.rate+'% · 결과 '+s.decided+'건 중'), 'bizGo({win:1})')
+    +kpi('마감 7일 안', s.due.length+'건', s.due[0]?escapeHtml(s.due[0].title||''):'없음', 'bizGo({open:1})', s.due.length>0)
+    +'</div>';
+  var 진행줄=all.filter(function(r){ return KcareerBiz.isOpen(r.stage||'준비'); })
+    .sort(function(a,b){ return String(a.due||'9999').localeCompare(String(b.due||'9999')); }).slice(0,8);
+  html+='<div class="fd-two"><div class="fd-box"><h4>⏰ 다가오는 마감 · 진행 중</h4>'
+    +(진행줄.length?진행줄.map(function(r){ var d=KcareerBiz.dDay(r.due);
+        var 급=(d!=null&&d>=0&&d<=7);
+        return '<div class="fd-row" onclick="bizOpen(\''+_jsAttr(r.id)+'\')"><span style="width:118px'+(급?';color:var(--red);font-weight:700':'')+'">'+_bizDay(r.due)+(d!=null&&d>=0?' (D-'+d+')':'')+'</span>'
+          +'<span class="c" title="'+escapeHtml(r.title||'')+'">'+escapeHtml(r.title||'-')+'</span>'
+          +'<span style="color:var(--text-mute)">'+escapeHtml(r.org||'')+'</span>'+_bizStageTag(r.stage)+'</div>'; }).join('')
+      :'<div style="font-size:12px;color:var(--text-mute)">진행 중인 사업이 없습니다</div>')+'</div>';
+  var ys=Object.keys(s.byYear).sort().slice(-8), mx=1;
+  ys.forEach(function(y){ if(s.byYear[y].n>mx) mx=s.byYear[y].n; });
+  html+='<div class="fd-box"><h4>📈 연도별 — 신청 건수 · 선정</h4>'+ys.map(function(y){ var b=s.byYear[y];
+      return '<div class="fd-bar" onclick="bizGo({year:\''+y+'\'})"><span class="k">'+y+'</span><span class="t"><i style="width:'+Math.round(b.n*100/mx)+'%"></i></span><span class="a">'+b.n+'건 · 선정 '+b.win+'</span></div>'; }).join('')+'</div></div>';
+  html+='<div class="fd-box"><h4>구분별</h4>'+KcareerBiz.KINDS.map(function(k){
+      return '<button class="btn sm" type="button" style="margin:0 6px 4px 0" onclick="bizGo({kind:\''+_jsAttr(k)+'\'})">'+escapeHtml(k)+' '+(s.byKind[k]||0)+'</button>'; }).join('')+'</div>';
+  box.innerHTML=html;
+}
+/* 한눈에에서 누르면 목록이 «그 조건»으로 열린다 */
+function bizGo(o){
+  o=o||{};
+  navTile('page-bizlist');
+  _bizFillSel();
+  var v=function(id,x){ var el=document.getElementById(id); if(el) el.value=x||''; };
+  v('bizQ',''); v('bizYear',o.year); v('bizKind',o.kind); v('bizStage',o.open?'__open':(o.win?'__win':(o.stage||'')));
+  renderBizList();
+}
+
+/* ── 📋 사업 목록 ── */
+function _bizFillSel(){
+  var all=bizAll();
+  var put=function(id, head, opts){
+    var el=document.getElementById(id); if(!el) return; var cur=el.value;
+    el.innerHTML='<option value="">'+head+'</option>'+opts.map(function(o){ return '<option value="'+escapeHtml(o[0])+'">'+escapeHtml(o[1])+'</option>'; }).join('');
+    if(cur && opts.some(function(o){ return o[0]===cur; })) el.value=cur;
+  };
+  var ys=[]; all.forEach(function(r){ if(r.year && ys.indexOf(String(r.year))<0) ys.push(String(r.year)); }); ys.sort().reverse();
+  put('bizYear','전체 연도', ys.map(function(y){ return [y,y]; }));
+  put('bizKind','전체 구분', KcareerBiz.KINDS.map(function(k){ return [k,k]; }));
+  put('bizStage','전체 단계', [['__open','진행 중(공고~심사)'],['__win','선정·계약']].concat(KcareerBiz.STAGES.map(function(k){ return [k,k]; })));
+}
+function _bizRows(all){
+  var q=((document.getElementById('bizQ')||{}).value||'').trim().toLowerCase();
+  var yr=(document.getElementById('bizYear')||{}).value||'', kd=(document.getElementById('bizKind')||{}).value||'', st=(document.getElementById('bizStage')||{}).value||'';
+  return all.filter(function(r){
+    if(yr && String(r.year)!==yr) return false;
+    if(kd && (r.kind||'기타')!==kd) return false;
+    var s=r.stage||'준비';
+    if(st==='__open'){ if(!KcareerBiz.isOpen(s)) return false; }
+    else if(st==='__win'){ if(!KcareerBiz.isWin(s)) return false; }
+    else if(st && s!==st) return false;
+    if(q && ![r.title,r.org,r.memo,r.kind,r.caseDir].some(function(x){ return String(x||'').toLowerCase().indexOf(q)>=0; })) return false;
+    return true;
+  }).sort(function(a,b){ return String(b.year||'').localeCompare(String(a.year||'')) || String(b.due||b.sentAt||'').localeCompare(String(a.due||a.sentAt||'')) || String(b.updatedAt||'').localeCompare(String(a.updatedAt||'')); });
+}
+function renderBizList(){
+  var body=document.getElementById('bizBody'); if(!body) return;
+  _bizFillSel();
+  var all=bizAll(), rows=_bizRows(all);
+  var cnt=document.getElementById('bizCnt');
+  if(cnt){ var 좁=(rows.length!==all.length); cnt.textContent=좁?('전체 '+all.length+'건 · 지금 '+rows.length+'건'):(all.length+'건');
+    cnt.style.color=좁?'var(--red)':''; cnt.style.fontWeight=좁?'700':''; }
+  if(!rows.length){ body.innerHTML='<div class="empty"><div class="emp-ico">🏢</div>'+(all.length?'조건에 맞는 사업이 없습니다':'아직 넣은 사업이 없습니다 — 📂 7번 폴더에서 사업 고르기 · ＋ 사업 추가')+'</div>'; bizSelSync(); return; }
+  /* ⚠ 맨 왼쪽은 ☐ + 번호(대표 지시 2026-10-05). 번호는 보이는 차례일 뿐 — 저장하지 않는다 */
+  body.innerHTML='<table><thead><tr><th class="rownum-h" style="width:62px"><input type="checkbox" onclick="bizSelAll(this.checked)" title="보이는 줄 모두"> №</th>'
+    +'<th>연도</th><th>사업명</th><th>발주기관</th><th>구분</th><th>마감</th><th>제출</th><th>단계</th><th style="text-align:right">금액</th><th>서류</th></tr></thead><tbody>'
+    +rows.map(function(r,i){ var dc=(r.docs||[]).length;
+      return '<tr style="cursor:pointer" onclick="bizOpen(\''+_jsAttr(r.id)+'\')">'
+        +'<td class="rownum" onclick="event.stopPropagation()"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="row-chk" value="'+escapeHtml(r.id)+'" onchange="bizSelSync()"><span>'+(i+1)+'</span></label></td>'
+        +'<td>'+escapeHtml(r.year||'-')+'</td>'
+        +'<td class="bz-cell" title="'+escapeHtml(r.title||'')+'"><strong>'+escapeHtml(r.title||'-')+'</strong></td>'
+        +'<td class="bz-cell" style="max-width:160px" title="'+escapeHtml(r.org||'')+'">'+escapeHtml(r.org||'-')+'</td>'
+        +'<td style="white-space:nowrap">'+escapeHtml(r.kind||'-')+'</td>'
+        +'<td style="white-space:nowrap">'+_bizDay(r.due)+'</td>'
+        +'<td style="white-space:nowrap;font-size:11px">'+escapeHtml([r.sentAt?formatDate(r.sentAt):'', r.sentHow||''].filter(Boolean).join(' ')||'-')+'</td>'
+        +'<td>'+_bizStageTag(r.stage)+'</td>'
+        +'<td style="text-align:right;white-space:nowrap">'+(_bizMoney(r.amt)||'-')+'</td>'
+        +'<td style="white-space:nowrap">'+(dc?'📁 '+dc:'-')+'</td></tr>'; }).join('')
+    +'</tbody></table>';
+  bizSelSync();
+}
+function _bizChecked(){ return [].slice.call(document.querySelectorAll('#bizBody .row-chk:checked')).map(function(x){ return x.value; }); }
+function bizSelSync(){
+  var n=_bizChecked().length, bar=document.getElementById('bizSelBar'), c=document.getElementById('bizSelCnt');
+  if(bar) bar.style.display=n?'flex':'none'; if(c) c.textContent=n+'건 선택';
+}
+function bizSelAll(on){ document.querySelectorAll('#bizBody .row-chk').forEach(function(x){ x.checked=!!on; }); bizSelSync(); }
+function bizSelDel(btn){
+  var ids=_bizChecked(); if(!ids.length) return;
+  kcAskDelete(btn, { detail:'고른 사업 <b>'+ids.length+'건</b>과 그 서류를 휴지통으로 보냅니다.<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다.</b>' }, function(){
+    var arr=get(BIZ_STORE)||[], last=null;
+    arr.forEach(function(r){ if(r && ids.indexOf(r.id)>=0) last=kcTrashPut(BIZ_STORE,'page-bizlist',r,'사업'); });
+    set(BIZ_STORE, arr.filter(function(r){ return !(r && ids.indexOf(r.id)>=0); }));
+    renderBizList(); kcTrashDone(last, '🗑 사업 '+ids.length+'건을 휴지통으로 옮겼습니다');
+  });
+}
+
+/* ── 사업 서랍 — 사업 정보 + 그 사업에 냈던 서류 전부 ── */
+var _bizCur=null;
+function bizOpen(id){
+  var r=id?_bizGet(id):null;
+  _bizCur=r?JSON.parse(JSON.stringify(r)):_bizNew();
+  _bizCur._isNew=!r;
+  bizDraw();
+  document.getElementById('modalBiz').classList.add('open');
+}
+function bizClose(){ document.getElementById('modalBiz').classList.remove('open'); _bizCur=null; }
+var BIZ_FIELDS=[['year','연도'],['title','사업명'],['org','발주기관'],['kind','구분'],['stage','단계'],['due','마감'],['sentAt','제출일'],['sentHow','제출 방법'],['amt','금액(원)']];
+function _bizReadForm(){
+  var r=_bizCur; if(!r) return;
+  BIZ_FIELDS.concat([['memo','메모']]).forEach(function(f){ var el=document.getElementById('bzf-'+f[0]); if(el) r[f[0]]=String(el.value||'').trim(); });
+}
+function bizDraw(){
+  var r=_bizCur; if(!r) return;
+  document.getElementById('bizH').textContent='🏢 '+(r._isNew?'새 사업':(r.title||'사업'))+(r._isNew?'':' · '+r.id);
+  var del=document.getElementById('bizDelBtn'); if(del) del.style.display=r._isNew?'none':'';
+  var sel=function(k, opts){ return '<select class="tb-select" id="bzf-'+k+'" style="width:100%">'+opts.map(function(o){ return '<option'+(String(r[k]||'')===o?' selected':'')+'>'+escapeHtml(o)+'</option>'; }).join('')+'</select>'; };
+  var inp=function(k, type, ph){ return '<input class="tb-input" id="bzf-'+k+'" style="width:100%" type="'+(type||'text')+'" value="'+escapeHtml(type==='date'?String(r[k]||'').replace(/\./g,'-').slice(0,10):(r[k]||''))+'"'+(ph?' placeholder="'+escapeHtml(ph)+'"':'')+'>'; };
+  var cell=function(lab, h, wide){ return '<label style="display:flex;flex-direction:column;gap:3px;font-size:11.5px;color:var(--text-mute)'+(wide?';grid-column:1/-1':'')+'">'+lab+h+'</label>'; };
+  var html='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px 10px">'
+    +cell('연도',inp('year','text','2026'))+cell('사업명 *',inp('title','text','예) 2026 일자리 전환 컨설팅'),true)
+    +cell('발주기관',inp('org','text','예) 가나경제진흥원'))+cell('구분',sel('kind',KcareerBiz.KINDS))+cell('단계',sel('stage',KcareerBiz.STAGES))
+    +cell('마감',inp('due','date'))+cell('제출일',inp('sentAt','date'))+cell('제출 방법',inp('sentHow','text','메일·온라인·등기·방문'))
+    +cell('금액(원)',inp('amt','text','사업비·계약금액'))
+    +cell('메모','<textarea class="tb-input" id="bzf-memo" style="width:100%;min-height:46px">'+escapeHtml(r.memo||'')+'</textarea>',true)
+    +'</div>'
+    +(r.caseDir?'<div style="font-size:11px;color:var(--text-mute);margin-top:6px;word-break:break-all">📂 '+escapeHtml(r.caseDir)+'</div>':'');
+  var docs=(r.docs||[]).slice().sort(function(a,b){ return KcareerBiz.DOC_KINDS.indexOf(a.kind)-KcareerBiz.DOC_KINDS.indexOf(b.kind) || String(a.name).localeCompare(String(b.name),'ko'); });
+  html+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:14px 0 6px"><b style="font-size:13px">📎 이 사업에 낸 서류 '+docs.length+'개</b><span style="flex:1"></span>'
+    +'<button class="btn sm fs-ui" type="button" onclick="bizPickCase({into:1})" title="7번 폴더의 건 폴더 하나를 골라 그 파일을 모두 이 사업에 담습니다">📂 건 폴더에서 가져오기</button>'
+    +'<button class="btn sm primary" type="button" onclick="bizUpload()">＋ 파일 올리기</button></div>';
+  html+=docs.length?('<div class="dt"><table><thead><tr><th class="rownum-h" style="width:40px">№</th><th style="width:110px">갈래</th><th>서류</th><th style="width:60px">크기</th><th style="width:96px">보관</th><th style="width:250px"></th></tr></thead><tbody>'
+    +docs.map(function(d,i){ var 다시=/^(hwpx?|docx|pdf)$/.test(d.ext||''), 견줄=/^(hwpx?|pdf|txt|md|csv)$/.test(d.ext||'');
+      return '<tr><td class="rownum">'+(i+1)+'</td>'
+        +'<td><select class="tb-select" style="font-size:11px;padding:1px 4px;height:auto" onchange="bizDocKind(\''+_jsAttr(d.id)+'\',this.value)">'+KcareerBiz.DOC_KINDS.map(function(k){ return '<option'+(k===d.kind?' selected':'')+'>'+escapeHtml(k)+'</option>'; }).join('')+'</select></td>'
+        +'<td class="bz-cell" style="max-width:300px" title="'+escapeHtml(d.relPath||d.name)+'">'+escapeHtml(d.name)+'</td>'
+        +'<td style="white-space:nowrap;font-size:11px">'+_bizKb(d.size)+'</td>'
+        +'<td style="white-space:nowrap;font-size:11px;color:'+(d.stPath?'var(--teal)':'var(--text-mute)')+'" title="'+(d.stPath?'다른 PC 에서도 열립니다':'이 PC 에만 담겼습니다(창고에 못 올림)')+'">'+(d.stPath?'☁ 앱에 보관':'💻 이 PC')+'</td>'
+        +'<td style="white-space:nowrap"><button class="btn sm" type="button" onclick="bizDocView(\''+_jsAttr(d.id)+'\')">📄</button>'
+        +(견줄?' <button class="btn sm" type="button" onclick="bizCmpWith(\''+_jsAttr(d.id)+'\')" title="다른 사업의 서류와 견줍니다">📑 비교</button>':'')
+        +(다시?' <button class="btn sm" type="button" onclick="bizReuse(\''+_jsAttr(d.id)+'\')" title="이 파일을 서류 만들기에 열어 새로 씁니다 — 원본은 그대로">✍️ 다시 쓰기</button>':'')
+        +' <button class="btn sm" type="button" style="color:var(--red)" onclick="bizDocDrop(\''+_jsAttr(d.id)+'\',this)" title="이 서류를 사업에서 뺍니다">✕</button></td></tr>'; }).join('')
+    +'</tbody></table></div>')
+    :'<div style="font-size:12px;color:var(--text-mute);padding:8px 0">아직 서류가 없습니다 — 공고문·제안서·입찰서식·견적·증빙·결과를 올려 두면 다음 입찰 때 찾아 다시 쓰거나 견줄 수 있습니다.</div>';
+  document.getElementById('bizBodyM').innerHTML=html;
+}
+function bizSaveForm(){
+  if(!_bizCur) return;
+  _bizReadForm();
+  if(!String(_bizCur.title||'').trim()){ toast('사업명을 적어 주세요'); return; }
+  var 새=_bizCur._isNew;
+  _bizPut(_bizCur);
+  toast(새?'🏢 사업을 더했습니다':'💾 저장했습니다');
+  bizClose(); _safe(renderBizList); _safe(renderBizDash); _safe(renderBizDocs);
+}
+/* 서류를 담기 전에 사업부터 있어야 한다 — 새 사업이면 적은 것으로 먼저 담는다 */
+function _bizEnsureSaved(){
+  _bizReadForm();
+  if(!String(_bizCur.title||'').trim()){ toast('사업명을 먼저 적어 주세요 — 서류를 어느 사업에 담을지 알아야 합니다'); return false; }
+  if(_bizCur._isNew){ _bizPut(_bizCur); _bizCur._isNew=false; }
+  return true;
+}
+/* 파일들을 이 사업에 담는다 — list:[{name, bytes, relPath?, mtime?}]. 같은 파일(자리·이름·크기)은 두 번 안 담는다 */
+async function _bizAddFiles(list){
+  var r=_bizCur; if(!r) return { n:0, cloud:0, big:0 };
+  var have={}; (r.docs||[]).forEach(function(d){ have[(d.relPath||'')+'|'+d.name+'|'+d.size]=1; });
+  var n=0, cloud=0, big=0;
+  for(var i=0;i<list.length;i++){
+    var f=list[i], 키=(f.relPath||'')+'|'+f.name+'|'+f.bytes.length;
+    if(have[키]) continue;
+    var ext=(String(f.name).split('.').pop()||'').toLowerCase();
+    var id='bzd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
+    var b64=abToB64(f.bytes), now=new Date().toISOString();
+    saveFileUnified(id,{ id:id, name:f.name, ext:ext, size:f.bytes.length, base64:b64, savedAt:now });
+    /* 창고 한도(25MB) 안이면 올린다 — 못 올려도 이 PC 에는 담긴다 */
+    var 자리='';
+    if(f.bytes.length < 25*1024*1024){ 자리=await kcFormUpload(id, b64, ext); if(자리) cloud++; } else big++;
+    var d={ id:id, name:f.name, ext:ext, size:f.bytes.length, kind:KcareerBiz.guessDocKind(f.name), savedAt:now };
+    if(자리) d.stPath=자리; if(f.relPath) d.relPath=f.relPath; if(f.mtime) d.mtime=f.mtime;
+    r.docs=(r.docs||[]).concat([d]); have[키]=1; n++;
+    if(list.length>3 && (i+1)%3===0) toast('⏳ 서류 담는 중 '+(i+1)+' / '+list.length);
+  }
+  if(n){ _bizPut(r); r._isNew=false; }
+  return { n:n, cloud:cloud, big:big };
+}
+function _bizAddMsg(o){ return '📎 서류 '+o.n+'개를 담았습니다'+(o.cloud===o.n?' — 다른 PC 에서도 열립니다':(' — 창고에 '+o.cloud+'개 올림'+(o.big?' · 25MB 넘는 '+o.big+'개는 이 PC 에만':''))); }
+function bizUpload(){
+  if(!_bizCur || !_bizEnsureSaved()) return;
+  var inp=document.createElement('input'); inp.type='file'; inp.multiple=true;
+  inp.onchange=async function(){
+    var 고른=[].slice.call(inp.files||[]), list=[];
+    for(var i=0;i<고른.length;i++) list.push({ name:고른[i].name, bytes:new Uint8Array(await 고른[i].arrayBuffer()), mtime:new Date(고른[i].lastModified).toISOString() });
+    var o=await _bizAddFiles(list); bizDraw(); _safe(renderBizList); toast(_bizAddMsg(o), 5000);
+  };
+  inp.click();
+}
+function bizDocKind(id, k){
+  if(!_bizCur) return;
+  (_bizCur.docs||[]).forEach(function(d){ if(d.id===id) d.kind=k; });
+  if(!_bizCur._isNew) _bizPut(_bizCur);
+}
+/* 서류 빼기 — 파일은 휴지통에 30일 둔다(되살릴 수 있게). ⚠ 창고 사본은 지우지 않는다 — 되돌릴 길을 남긴다 */
+function bizDocDrop(id, btn){
+  var r=_bizCur, d=r&&(r.docs||[]).filter(function(x){ return x.id===id; })[0]; if(!d) return;
+  kcAskDelete(btn, { title:'✕ 이 서류를 사업에서 뺍니다', detail:escapeHtml(d.name)+'<br><b>'+TRASH_DAYS+'일 안에는 휴지통에서 되살릴 수 있습니다.</b>' }, function(){
+    var e=kcTrashPutFile(id, '사업 서류 · '+(r.title||''));
+    r.docs=(r.docs||[]).filter(function(x){ return x.id!==id; });
+    if(!r._isNew) _bizPut(r);
+    bizDraw(); _safe(renderBizList); kcTrashDone(e, '✕ 서류를 뺐습니다');
+  });
+}
+function bizDelOne(btn){
+  var r=_bizCur; if(!r || r._isNew){ bizClose(); return; }
+  kcAskDelete(btn, { detail:escapeHtml(r.title||r.id)+' · 서류 '+(r.docs||[]).length+'개<br><b>'+TRASH_DAYS+'일 안에는 되살릴 수 있습니다.</b>' }, function(){
+    var 원=_bizGet(r.id); if(!원){ bizClose(); return; }
+    var e=kcTrashPut(BIZ_STORE,'page-bizlist',원,'사업');
+    set(BIZ_STORE,(get(BIZ_STORE)||[]).filter(function(x){ return !(x && x.id===r.id); }));
+    bizClose(); _safe(renderBizList); _safe(renderBizDash); kcTrashDone(e);
+  });
+}
+/* 서류 한 개의 파일 — 이 PC 에 없으면 창고에서(getFileAsync 가 _kcCloudRowOf 로 찾는다) */
+async function _bizDocFile(id){
+  var f=await getFileAsync(id);
+  if(!f || !f.base64) throw new Error('원본을 찾을 수 없습니다 — 다른 PC 에서 담고 창고에 못 올린 서류일 수 있습니다');
+  return { bytes:new Uint8Array(b64ToAb(f.base64)), name:f.name||'서류', ext:String(f.ext||String(f.name||'').split('.').pop()||'').toLowerCase() };
+}
+async function bizDocView(id){
+  try{
+    var f=await _bizDocFile(id);
+    if(/^hwpx?$/.test(f.ext)){ openHwpViewer(f.bytes, f.name); return; }
+    if(f.ext==='pdf'){ openPdfBlob(f.bytes, f.name); return; }
+    var url=URL.createObjectURL(new Blob([f.bytes],{type:_kcFormMime(f.ext)})), a=document.createElement('a');
+    if(/^(png|jpe?g)$/.test(f.ext)){ window.open(url,'_blank'); }
+    else { a.href=url; a.download=f.name; a.click(); }
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
+  }catch(e){ toast(String(e&&e.message||e), 6000); }
+}
+/* ✍️ 이 서식으로 다시 쓰기 — 서류 만들기에 «사본»으로 연다. 원본(사업 서류)은 그대로 */
+async function bizReuse(id){
+  try{
+    var f=await _bizDocFile(id);
+    if(!/^(hwpx?|docx|pdf)$/.test(f.ext)){ toast('서식으로 다시 쓸 수 있는 것은 한글·PDF·DOCX 입니다'); return; }
+    var file=new File([f.bytes], f.name, { type:_kcFormMime(f.ext) });
+    ['modalBiz','modalBizCmp'].forEach(function(m){ var el=document.getElementById(m); if(el) el.classList.remove('open'); });
+    navTile('page-resume-hub');
+    var b=document.querySelector('#rh-tabrow .tab[data-tab="rh-edit"]'); if(b) rhTab('rh-edit', b);
+    await importTemplateFile(file, 'resume');
+    toast('✍️ 「'+f.name+'」를 서류 만들기에 열었습니다 — 사업에 담긴 원본은 그대로입니다', 6000);
+  }catch(e){ toast(String(e&&e.message||e), 6000); }
+}
+
+/* ── 📂 7번 폴더에서 사업 고르기 — «사업 같은 것»을 먼저 추려 보여 주고, 사람이 고른다 ── */
+var _bizPick=null;
+async function bizPickCase(opts){
+  opts=opts||{};
+  if(opts.into && (!_bizCur || !_bizEnsureSaved())) return;
+  if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
+  var root=await fsRoot();
+  if(!root){ toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var dirs=await fsCaseDirs(root);
+  if(!dirs){ toast('연결한 폴더 안에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없습니다'); return; }
+  var 쓴={}; bizAll().forEach(function(r){ if(r.caseDir) 쓴[r.caseDir]=r.title||r.id; });
+  var list=dirs.map(function(d){ var cd=KcareerCases.caseDirOf(d.yearDir, d.name);
+      return { d:d, caseDir:cd, biz:KcareerBiz.looksBiz(d.name), used:쓴[cd]||'', pre:KcareerBiz.fromCaseDir(d.yearDir, d.name) }; })
+    .sort(function(a,b){ return (b.biz-a.biz) || String(b.d.yearDir).localeCompare(String(a.d.yearDir)) || a.d.name.localeCompare(b.d.name,'ko'); });
+  _bizPick={ list:list, into:!!opts.into, all:false, q:'' };
+  bizPickDraw();
+  document.getElementById('modalBizPick').classList.add('open');
+}
+function bizPickDraw(){
+  var P=_bizPick; if(!P) return;
+  var q=P.q.toLowerCase();
+  var 보일=P.list.filter(function(x){ return (P.all || x.biz) && (!q || (x.d.yearDir+' '+x.d.name).toLowerCase().indexOf(q)>=0); });
+  document.getElementById('bizPickH').textContent=P.into?('📂 건 폴더에서 가져오기 → '+((_bizCur&&_bizCur.title)||'이 사업')):'📂 7번 폴더에서 사업 고르기';
+  var go=document.getElementById('bizPickGo'); if(go) go.textContent=P.into?'고른 폴더의 서류 담기':'고른 건을 사업으로 올리기';
+  var 사업수=P.list.filter(function(x){ return x.biz; }).length;
+  var html='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12px">'
+    +'<label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" '+(P.all?'checked':'')+' onchange="_bizPick.all=this.checked;bizPickDraw()"> 모든 건 폴더 보기 ('+P.list.length+')</label>'
+    +'<span style="color:var(--text-mute)">· 기본은 이름에 «사업·용역·입찰·수행기관·바우처…»가 든 '+사업수+'건만 — 모집·위원·강사 건은 개인 지원이라 뺐습니다</span>'
+    +'<span style="flex:1"></span><input class="tb-input" placeholder="찾기" value="'+escapeHtml(P.q)+'" oninput="_bizPick.q=this.value;bizPickDraw()" style="width:160px"></div>';
+  html+=보일.length?('<div class="dt" style="max-height:52vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.into?'':'<input type="checkbox" onclick="document.querySelectorAll(\'#bizPickBody .row-chk\').forEach(function(x){ if(!x.disabled) x.checked=this.checked; },this)"> ')+'№</th><th>연도</th><th>건 폴더</th><th>올릴 이름</th><th></th></tr></thead><tbody>'
+    +보일.map(function(x,i){ var k=P.list.indexOf(x);
+      return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="'+(P.into?'radio':'checkbox')+'" name="bizPickOne" class="row-chk" value="'+k+'"'+(x.used&&!P.into?' disabled':'')+'><span>'+(i+1)+'</span></label></td>'
+        +'<td>'+escapeHtml(x.pre.year||x.d.yearDir)+'</td>'
+        +'<td class="bz-cell" style="max-width:300px" title="'+escapeHtml(x.d.name)+'">'+escapeHtml(x.d.name)+(x.biz?' <span class="tag navy" style="font-size:10px">사업 같음</span>':'')+'</td>'
+        +'<td class="bz-cell" style="max-width:220px" title="'+escapeHtml(x.pre.title)+'">'+escapeHtml(x.pre.title)+(x.pre.org?' · '+escapeHtml(x.pre.org):'')+'</td>'
+        +'<td style="font-size:11px;white-space:nowrap;color:var(--teal)">'+(x.used?'✔ 올림 — '+escapeHtml(x.used):'')+'</td></tr>'; }).join('')
+    +'</tbody></table></div>')
+    :'<div class="empty" style="padding:16px">보일 건 폴더가 없습니다'+(P.all?'':' — 「모든 건 폴더 보기」를 켜 보세요')+'</div>';
+  html+='<div style="font-size:11.5px;color:var(--text-mute);margin-top:8px">· 고른 건 폴더의 파일을 <b>사업 서류로 앱에 담습니다</b>(다른 PC 에서도 열림). 폴더의 원본은 그대로입니다.<br>· 제출서류(개인 지원 기록)에서 옮기지 않습니다 — 거기 있던 줄은 그대로 남습니다.</div>';
+  document.getElementById('bizPickBody').innerHTML=html;
+}
+/* 건 폴더 하나의 파일을 «내용까지» 읽는다 — 고른 것만이다(7번 전체를 읽지 않는다) */
+async function _bizReadDir(handle, prefix){
+  var out=[];
+  async function walk(dir, pre){
+    for await (var ent of dir.entries()){
+      var p=pre+'/'+ent[0];
+      if(ent[1].kind==='directory'){ await walk(ent[1], p); continue; }
+      if(KcareerScan.isIgnoredFile(ent[0])) continue;
+      try{ var f=await ent[1].getFile(); out.push({ name:ent[0], relPath:p, bytes:new Uint8Array(await f.arrayBuffer()), mtime:new Date(f.lastModified).toISOString() }); }
+      catch(e){ console.warn('사업 서류 건너뜀', p, e); }
+    }
+  }
+  await walk(handle, prefix);
+  return out;
+}
+async function bizPickGo(){
+  var P=_bizPick; if(!P) return;
+  var 고른=[].slice.call(document.querySelectorAll('#bizPickBody .row-chk:checked')).map(function(x){ return P.list[Number(x.value)]; }).filter(Boolean);
+  if(!고른.length){ toast('건 폴더를 골라 주세요'); return; }
+  var btn=document.getElementById('bizPickGo'); if(btn){ btn.disabled=true; btn.textContent='⏳ 담는 중…'; }
+  var 건=0, 서류=0, 못=[];
+  try{
+    for(var i=0;i<고른.length;i++){
+      var x=고른[i];
+      toast('⏳ '+(i+1)+' / '+고른.length+' · '+x.d.name+' 읽는 중…');
+      var files=await _bizReadDir(x.d.handle, x.caseDir);
+      if(!P.into){
+        _bizCur=_bizNew({ year:x.pre.year||String(new Date().getFullYear()), title:x.pre.title, org:x.pre.org, caseDir:x.caseDir,
+          kind:KcareerBiz.KINDS[0], stage:KcareerBiz.stageForImport(x.pre.year) });
+        _bizCur._isNew=true; _bizPut(_bizCur); _bizCur._isNew=false;
+      } else if(_bizCur && !_bizCur.caseDir){ _bizCur.caseDir=x.caseDir; }
+      var o=await _bizAddFiles(files);
+      if(o.n===0 && _bizCur && P.into) _bizPut(_bizCur);
+      건++; 서류+=o.n; if(o.big) 못.push(x.d.name+' — 25MB 넘는 '+o.big+'개는 이 PC 에만');
+    }
+    document.getElementById('modalBizPick').classList.remove('open');
+    _safe(renderBizList); _safe(renderBizDash); _safe(renderBizDocs);
+    if(P.into) bizDraw(); else _bizCur=null;
+    toast((P.into?'📎 서류 '+서류+'개를 담았습니다':'🏢 사업 '+건+'건 · 서류 '+서류+'개를 올렸습니다 — 구분·단계는 줄을 눌러 고쳐 주세요')+(못.length?' · '+못.join(' / '):''), 8000);
+  }catch(e){ console.error(e); toast('올리기 실패: '+((e&&e.message)||e)); }
+  finally{ if(btn){ btn.disabled=false; bizPickDraw(); } }
+}
+
+/* ── 🗂 서류 찾기 — 모든 사업의 서류를 한 표에서 ── */
+var _bizDocPick=[];
+function _bizDocsFlat(){
+  var out=[]; bizAll().forEach(function(b){ (b.docs||[]).forEach(function(d){ out.push({ b:b, d:d }); }); });
+  return out;
+}
+function renderBizDocs(){
+  var body=document.getElementById('bizDocBody'); if(!body) return;
+  var all=_bizDocsFlat();
+  var ks=document.getElementById('bizDocKind'), ys=document.getElementById('bizDocYear');
+  if(ks){ var kc=ks.value; ks.innerHTML='<option value="">전체 갈래</option>'+KcareerBiz.DOC_KINDS.map(function(k){ return '<option'+(k===kc?' selected':'')+'>'+escapeHtml(k)+'</option>'; }).join(''); }
+  if(ys){ var yc=ys.value, yl=[]; all.forEach(function(x){ var y=String(x.b.year||''); if(y && yl.indexOf(y)<0) yl.push(y); }); yl.sort().reverse();
+    ys.innerHTML='<option value="">전체 연도</option>'+yl.map(function(y){ return '<option'+(y===yc?' selected':'')+'>'+y+'</option>'; }).join(''); }
+  var q=((document.getElementById('bizDocQ')||{}).value||'').trim().toLowerCase(), k=ks?ks.value:'', y=ys?ys.value:'';
+  var rows=all.filter(function(x){
+    if(k && x.d.kind!==k) return false; if(y && String(x.b.year)!==y) return false;
+    if(q && ![x.d.name, x.b.title, x.b.org].some(function(s){ return String(s||'').toLowerCase().indexOf(q)>=0; })) return false;
+    return true; }).sort(function(a,b){ return String(b.b.year||'').localeCompare(String(a.b.year||'')) || String(a.b.title||'').localeCompare(String(b.b.title||''),'ko'); });
+  _bizDocPick=_bizDocPick.filter(function(id){ return rows.some(function(x){ return x.d.id===id; }); });
+  var cnt=document.getElementById('bizDocCnt'); if(cnt) cnt.textContent=(rows.length!==all.length)?('전체 '+all.length+'개 · 지금 '+rows.length+'개'):(all.length+'개');
+  var cb=document.getElementById('bizCmpBtn'); if(cb) cb.textContent='📑 고른 둘 비교'+(_bizDocPick.length?' ('+_bizDocPick.length+'/2)':'');
+  if(!rows.length){ body.innerHTML='<div class="empty"><div class="emp-ico">🗂</div>'+(all.length?'조건에 맞는 서류가 없습니다':'아직 담긴 사업 서류가 없습니다 — 사업 목록에서 사업을 열고 서류를 올리세요')+'</div>'; return; }
+  body.innerHTML='<table><thead><tr><th class="rownum-h" style="width:62px">☐ №</th><th>연도</th><th>사업</th><th>갈래</th><th>서류</th><th>단계</th><th></th></tr></thead><tbody>'
+    +rows.map(function(x,i){ var d=x.d, b=x.b, 다시=/^(hwpx?|docx|pdf)$/.test(d.ext||'');
+      return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="row-chk"'+(_bizDocPick.indexOf(d.id)>=0?' checked':'')+' onchange="bizDocPickSet(\''+_jsAttr(d.id)+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
+        +'<td>'+escapeHtml(b.year||'-')+'</td>'
+        +'<td class="bz-cell" style="max-width:220px;cursor:pointer" title="'+escapeHtml((b.title||'')+(b.org?' · '+b.org:''))+'" onclick="bizOpen(\''+_jsAttr(b.id)+'\')"><strong>'+escapeHtml(b.title||'-')+'</strong></td>'
+        +'<td style="white-space:nowrap">'+escapeHtml(d.kind||'기타')+'</td>'
+        +'<td class="bz-cell" style="max-width:320px" title="'+escapeHtml(d.name)+'">'+escapeHtml(d.name)+'</td>'
+        +'<td>'+_bizStageTag(b.stage)+'</td>'
+        +'<td style="white-space:nowrap"><button class="btn sm" type="button" onclick="bizDocView(\''+_jsAttr(d.id)+'\')">📄</button>'
+        +(다시?' <button class="btn sm" type="button" onclick="bizReuse(\''+_jsAttr(d.id)+'\')" title="서류 만들기에 사본으로 엽니다">✍️ 다시 쓰기</button>':'')+'</td></tr>'; }).join('')
+    +'</tbody></table>';
+}
+/* 둘까지만 — 셋째를 고르면 가장 먼저 고른 것을 놓는다 */
+function bizDocPickSet(id, on){
+  _bizDocPick=_bizDocPick.filter(function(x){ return x!==id; });
+  if(on){ _bizDocPick.push(id); if(_bizDocPick.length>2) _bizDocPick.shift(); }
+  renderBizDocs();
+}
+function bizCompareSel(){
+  if(_bizDocPick.length!==2){ toast('서류 둘을 골라 주세요 — 지금 '+_bizDocPick.length+'개'); return; }
+  bizCompare(_bizDocPick[0], _bizDocPick[1]);
+}
+function _bizDocFind(id){ var hit=null; _bizDocsFlat().some(function(x){ if(x.d.id===id){ hit=x; return true; } return false; }); return hit; }
+/* 서랍에서 「📑 비교」 — 견줄 짝을 고른다(같은 갈래·다른 사업 먼저) */
+function bizCmpWith(id){
+  var me=_bizDocFind(id); if(!me){ toast('서류를 찾을 수 없습니다'); return; }
+  var 짝=_bizDocsFlat().filter(function(x){ return x.d.id!==id && /^(hwpx?|pdf|txt|md|csv)$/.test(x.d.ext||''); })
+    .sort(function(a,b){ return ((b.d.kind===me.d.kind)-(a.d.kind===me.d.kind)) || String(b.b.year||'').localeCompare(String(a.b.year||'')); });
+  document.getElementById('bizCmpH').textContent='📑 「'+me.d.name+'」와 견줄 서류 고르기';
+  document.getElementById('bizCmpBody').innerHTML=짝.length?('<div class="dt" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:40px">№</th><th>연도</th><th>사업</th><th>갈래</th><th>서류</th><th></th></tr></thead><tbody>'
+    +짝.map(function(x,i){ return '<tr><td class="rownum">'+(i+1)+'</td><td>'+escapeHtml(x.b.year||'-')+'</td><td class="bz-cell" style="max-width:220px" title="'+escapeHtml(x.b.title||'')+'">'+escapeHtml(x.b.title||'-')+'</td>'
+      +'<td style="white-space:nowrap">'+escapeHtml(x.d.kind||'')+(x.d.kind===me.d.kind?' ✔':'')+'</td><td class="bz-cell" style="max-width:300px" title="'+escapeHtml(x.d.name)+'">'+escapeHtml(x.d.name)+'</td>'
+      +'<td><button class="btn sm primary" type="button" onclick="bizCompare(\''+_jsAttr(x.d.id)+'\',\''+_jsAttr(id)+'\')">견주기</button></td></tr>'; }).join('')+'</tbody></table></div>')
+    :'<div class="empty" style="padding:16px">견줄 다른 서류가 없습니다 — 한글·PDF 서류가 둘 이상 있어야 합니다</div>';
+  document.getElementById('modalBizCmp').classList.add('open');
+}
+/* 서류 한 개의 «글자» — 한글은 _hwpTextOf, PDF 는 _pkPdfText(꾸러미와 같은 자). 표·그림 모양은 안 본다 */
+async function _bizDocText(id){
+  var f=await _bizDocFile(id);
+  if(/^hwpx?$/.test(f.ext)){ var t=await _hwpTextOf(f.bytes, f.name); if(t==null) throw new Error(f.name+' — 한글 글자를 못 뽑았습니다'); return t; }
+  if(f.ext==='pdf') return await _pkPdfText(f.bytes);
+  if(/^(txt|md|csv)$/.test(f.ext)) return new TextDecoder('utf-8').decode(f.bytes);
+  throw new Error(f.name+' — '+f.ext+' 형식은 글자를 견줄 수 없습니다(한글·PDF·글만)');
+}
+/* 📑 두 서류를 나란히 — 달라진 줄만 칠한다. 같은 줄이 길게 이어지면 접는다(앞뒤 두 줄만 보인다)
+   ⚠ 이 PC 안에서만 견준다 — 서류를 밖(AI 등)으로 보내지 않는다 */
+async function bizCompare(aId, bId){
+  var A=_bizDocFind(aId), B=_bizDocFind(bId);
+  var head=function(x){ return x?((x.b.year||'')+' '+(x.b.title||'')+' · '+x.d.name):'서류'; };
+  document.getElementById('bizCmpH').textContent='📑 서류 비교';
+  var body=document.getElementById('bizCmpBody');
+  body.innerHTML='<div style="padding:16px;font-size:12.5px;color:var(--text-mute)">⏳ 두 서류의 글자를 뽑는 중…</div>';
+  document.getElementById('modalBizCmp').classList.add('open');
+  try{
+    var ta=await _bizDocText(aId), tb=await _bizDocText(bId);
+    var r=KcareerBiz.lineDiff(ta, tb), html='', 같은=[];
+    var 쏟기=function(){ if(!같은.length) return;
+      var 보일=같은.length>5?같은.slice(0,2).concat([null]).concat(같은.slice(-2)):같은;
+      보일.forEach(function(s){ if(s===null){ html+='<div class="gap">… 같은 줄 '+(같은.length-4)+'개 …</div><div class="gap">… 같은 줄 '+(같은.length-4)+'개 …</div>'; return; }
+        html+='<div>'+escapeHtml(s.a)+'</div><div>'+escapeHtml(s.b)+'</div>'; });
+      같은=[]; };
+    r.rows.forEach(function(x){
+      if(x.t==='same'){ 같은.push(x); return; }
+      쏟기();
+      if(x.t==='chg') html+='<div class="chg">'+escapeHtml(x.a)+'</div><div class="chg">'+escapeHtml(x.b)+'</div>';
+      else if(x.t==='del') html+='<div class="del">'+escapeHtml(x.a)+'</div><div class="gap"></div>';
+      else html+='<div class="gap"></div><div class="add">'+escapeHtml(x.b)+'</div>';
+    });
+    쏟기();
+    body.innerHTML='<div style="font-size:12px;margin-bottom:8px;display:flex;gap:10px;flex-wrap:wrap">'
+      +'<span>같은 줄 '+r.same+'</span><span style="background:var(--bzc-chg);padding:0 6px;border-radius:4px">고친 줄 '+r.chg+'</span>'
+      +'<span style="background:var(--bzc-add);padding:0 6px;border-radius:4px">새 줄 '+r.add+'</span><span style="background:var(--bzc-del);padding:0 6px;border-radius:4px">빠진 줄 '+r.del+'</span>'
+      +(r.cut?'<span style="color:var(--amber)">⚠ 너무 길어 앞쪽 '+KcareerBiz.MAX_LINES+'줄씩만 견줬습니다</span>':'')
+      +'<span style="flex:1"></span><span style="color:var(--text-mute)">글자만 견줍니다 — 표·그림 모양은 안 봅니다</span></div>'
+      +'<div class="bz-cmp"><div class="h" title="'+escapeHtml(head(A))+'">◀ '+escapeHtml(head(A))+'</div><div class="h" title="'+escapeHtml(head(B))+'">▶ '+escapeHtml(head(B))+'</div>'+html+'</div>';
+  }catch(e){ body.innerHTML='<div style="padding:16px;color:var(--red);font-size:12.5px">'+escapeHtml(String(e&&e.message||e))+'</div>'; }
+}
+
 function openPdfBlob(bytes, name){
   var url=URL.createObjectURL(new Blob([bytes],{type:'application/pdf'}));
   var w=window.open(url,'_blank'); if(!w){ var a=document.createElement('a'); a.href=url; a.download=name||'첨부서류.pdf'; a.click(); }
