@@ -121,7 +121,18 @@
                detail: '명부에 같은 이름이 둘 이상 — 입·퇴사 판단을 보류함' };
     }
     const person = matches[0];
-    if (!hasLeft(person, today)) return null;   // 재직 중 — 붙일 딱지가 없다
+    if (!hasLeft(person, today)) {
+      /* ★ 휴직(leave)은 퇴사가 «아니다» (대표 확인 2026-10-04).
+           김석우 님이 ERP 에 휴직으로 남아 있었는데(퇴사 처리 전) 이 화면은 그것을
+           «재직»으로 읽어 「구성원 넣기」 목록에 그대로 올렸다.
+         ⚠ 그렇다고 퇴사로 보면 안 된다 — 휴직자는 돌아온다. 내리라고 재촉하면
+           멀쩡한 분 글을 내리게 된다. 그래서 «다른 종류»로 알리기만 한다. */
+      if (person.onLeave === true) {
+        return { kind: 'leave', label: '휴직',
+                 detail: '명부에 휴직으로 표시됨 — 퇴사가 아닙니다 (복직·퇴사는 푸른ERP 직원관리에서 확인)' };
+      }
+      return null;   // 재직 중 — 붙일 딱지가 없다
+    }
     return {
       kind: 'left',
       // 퇴사일이 없으면(공개 명부 폴백) 날짜를 지어내지 않고 「퇴사」로만 적는다

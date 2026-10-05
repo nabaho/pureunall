@@ -46,7 +46,7 @@
 <script src="js/pu-home-parse.js?v=4"></script>
 <script src="js/pu-home-career.js?v=2"></script>
 <script src="js/pu-home-export.js?v=3"></script>
-<script src="js/pu-home-diff.js?v=9"></script>
+<script src="js/pu-home-diff.js?v=10"></script>
 <script src="js/pu-home-fill.js?v=10"></script>
 <!-- 새 홈페이지를 «자료로» 그리는 부품. 명령줄(scripts/build-people.js)도 같은 것을 쓴다 -->
 <script src="js/pu-site-people.js?v=1"></script>
@@ -489,6 +489,8 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 /* 명부 딱지 (3차 설계 §3) — 대조 딱지와 «다른 것»이다. 화면을 열 때 바로 붙는다. */
 .pill.rm{background:var(--warn-bg);color:#991b1b;border:1px solid #fde68a}
 .pill.ask{background:var(--info-bg);color:var(--info);border:1px solid #bfdbfe}
+/* 휴직 — 퇴사(붉은 결)와 «다른 색»이다. 같은 색이면 퇴사로 읽고 내리려 든다 */
+.pill.lv{background:#fffbeb;color:#854d0e;border:1px solid #fbbf24;font-weight:700}
 .pill.tail{margin-left:auto}
 
 /* ★ 늘 뜨는 안내는 «한 줄 + 접기»다 (5차 지시). 쪽마다 네 줄짜리 띠를 매번 읽지 않는다.
@@ -1332,18 +1334,19 @@ function readRosterAt(path) {
     return Array.isArray(list) ? list : null;
   });
 }
-/* ★ «어느 명부를 읽었는지»까지 돌려준다.
-   data/user_accounts 에는 퇴사일(retireDate)이 있지만 공개 명부 data/user_dir 에는 없다.
-   폴백을 탄 것을 안 알리면 명부가 비지 않아 오류 표시도 안 뜨는데 퇴사일이 전부 빈 값이라
-   「내릴 것」 딱지가 경고 한 줄 없이 영영 안 붙는다. 실패해도 거부하지 않고 source 로 알린다. */
+/* ★ 직원 명부는 «공개 명부(data/user_dir)»만 읽는다 (대표 결정 2026-10-04 ㉮).
+   전에는 인사 명부(data/user_accounts)를 «먼저» 읽었다. 거기에는 주민번호·계좌·급여가
+   함께 들어 있어서, 이름·직급만 쓰는데도 통째로 관리자 PC 로 내려왔다 — 그런데 화면은
+   「읽지도 않습니다」라고 적고 있었다(사실이 아니었다).
+   공개 명부에는 이름·직급·재직 상태(active/leave/retired)·구분·순서·지점뿐이다.
+   퇴사일은 없다 — 「퇴사」 표시로만 판정하고, 날짜는 푸른ERP 직원관리에서 본다.
+   ⚠⚠ data/user_accounts 를 «다시» 읽게 하지 말 것. 날짜 하나 때문에 인사 명부에
+     손을 대는 것이다. 검사가 이 파일에서 그 글자를 찾으면 막는다. */
 function readRosterSource() {
-  return readRosterAt('data/user_accounts').then(
-    v => (v ? { list: v, source: 'accounts' } : null),
-    e => { console.warn('[직원 명부·민감]', e && e.code); return null; }
-  ).then(hit => hit || readRosterAt('data/user_dir').then(
+  return readRosterAt('data/user_dir').then(
     v => (v ? { list: v, source: 'dir' } : { list: null, source: 'none' }),
     e => { console.warn('[직원 명부·공개]', e && e.code); return { list: null, source: 'fail' }; }
-  ));
+  );
 }
 function readRoster() { return readRosterSource().then(r => r.list); }
 
@@ -1354,17 +1357,18 @@ function staffFromRoster(list, source) {
   const staff = (list || []).map(u => ({
     name: (u && u.name) || '',
     /* ★ 직급 — 명부에서 «이름과 함께» 당겨 넣을 때 쓴다 (대표 지시 2026-09-03).
-       ⚠ 공개 명부(data/user_dir)에는 없을 수 있다 — 그러면 빈 값이고,
-         고르는 창이 「직급 모름」으로 적어 사람이 채우게 한다. 지어내지 않는다. */
+       없으면 빈 값이고, 고르는 창이 「직급 모름」으로 적어 사람이 채우게 한다.
+       지어내지 않는다. */
     title: (u && u.title) || '',
-    leftAt: (u && u.retireDate) || '',
-    left: String((u && u.status) || '') === 'retired'
+    leftAt: '',          // 공개 명부에는 퇴사일이 없다 — 지어내지 않는다
+    left: String((u && u.status) || '') === 'retired',
+    /* ★ 휴직(leave) — 퇴사가 «아니다». 재직으로 뭉개면 퇴사한 분이 휴직으로 남아 있을 때
+         구성원 넣기 목록에 그대로 올라온다(2026-10-04 김석우 님). 따로 든다. */
+    onLeave: String((u && u.status) || '') === 'leave'
   }));
-  const warn = (source === 'dir')
-    ? '직원 명부(data/user_accounts)를 읽지 못해 공개 명부(data/user_dir)로 대신 봤습니다 — '
-      + '공개 명부에는 «퇴사일»이 없어, 「내릴 것」은 명부의 「퇴사」 표시로만 판정합니다(날짜는 못 보여 드립니다).'
-    : '';
-  return { staff: staff, warn: warn };
+  /* 공개 명부만 읽는 것이 «원래 뜻»이므로 경고 띠를 띄우지 않는다.
+     못 읽은 경우는 loadAll 이 따로 적는다(staffErr). */
+  return { staff: staff, warn: '' };
 }
 
 /* ══════ 자료 읽기 ══════
@@ -2670,10 +2674,11 @@ window.offSiteSet = offSiteSet;
 
    ★ 손으로 칠 일이 아니었다 — 직원 명부에 이름과 직급(title)이 이미 다 있다.
      재직 11명 가운데 노무사가 5명, 나머지 6명이 직원이다(2026-09-03 확인).
-   ★★ 명부에서 «이름과 직급 두 가지만» 가져온다.
-     명부에는 주민번호·계좌번호·급여·연락처·주소가 함께 들어 있다.
-     여기서는 그것을 읽지도 않는다 — 홈페이지는 손님이 보는 곳이라,
-     한 번 새면 되돌릴 수 없다.
+   ★★ 명부에서 «이름·직급·재직 상태»만 가져온다 — 그것도 «공개 명부(data/user_dir)»에서.
+     인사 명부(data/user_accounts)에는 주민번호·계좌번호·급여·연락처·주소가 함께 들어
+     있어서, 거기는 읽지 않는다(2026-10-04 까지는 이름·직급만 쓰면서도 통째로 읽고 있었고,
+     화면은 「읽지도 않습니다」라고 적고 있었다 — 사실이 아니어서 고쳤다).
+     홈페이지는 손님이 보는 곳이라, 한 번 새면 되돌릴 수 없다.
    ★ 퇴사자는 고르는 목록에 «안 뜬다» — 21명이 퇴사자라 섞이면 잘못 넣기 쉽다.
    ★ 넣는다고 홈페이지에 올라가지 않는다 — 목록에 들어올 뿐이다. */
 
@@ -2691,7 +2696,9 @@ function 명부재직자() {
   return App.staff.filter(function (s) { return s && s.name && !s.left; })
     .map(function (s) {
       return { name: s.name, title: String(s.title || '').trim(),
-               kind: 직급의갈래(s.title), 이미: !!있는이름[String(s.name).trim()] };
+               kind: 직급의갈래(s.title), 이미: !!있는이름[String(s.name).trim()],
+               /* 휴직 — 퇴사가 아니라서 목록에서 «빼지는» 않지만, 넣을 수도 없다 */
+               휴직: !!s.onLeave };
     });
 }
 
@@ -2704,11 +2711,14 @@ function openRosterAdd() {
   } else if (!목록.length) {
     h += '<div class="bar warn">명부에 재직 중인 분이 없습니다.</div>';
   } else {
-    h += '<div class="bar ok">명부에서 <b>이름과 직급만</b> 가져옵니다 — '
-      + '주민번호·계좌·연락처는 읽지도 않습니다.<br>'
+    /* ⚠ 읽는 곳을 «사실대로» 적는다. 「읽지도 않습니다」는 인사 명부를 통째로 읽던 때의
+         거짓 문구였다. 지금은 공개 명부만 읽으므로 «인사 명부는 읽지 않는다»가 참이다. */
+    h += '<div class="bar ok"><b>공개 직원 명부</b>에서 <b>이름·직급·재직 상태</b>만 가져옵니다. '
+      + '주민번호·계좌 등이 든 <b>인사 명부는 읽지 않습니다.</b><br>'
       + '<span class="sub">넣어도 홈페이지에 바로 올라가지 않습니다. 퇴사자는 안 보입니다.</span></div>';
     MEMBER_KINDS.forEach(function (mk) {
-      const 이갈래 = 목록.filter(function (s) { return s.kind === mk.key; });
+      /* 휴직자는 아래에 «따로» 모은다 — 넣을 수 없는 분이 넣을 수 있는 분 사이에 섞이면 안 된다 */
+      const 이갈래 = 목록.filter(function (s) { return s.kind === mk.key && !s.휴직; });
       if (!이갈래.length) return;
       h += '<div class="fld"><label>' + esc(mk.label) + ' ' + 이갈래.length + '명</label>'
         + '<div class="rows">';
@@ -2723,6 +2733,22 @@ function openRosterAdd() {
       });
       h += '</div></div>';
     });
+    /* ★ 휴직 중인 분 — «넣을 수 없다» (대표 확인 2026-10-04 · 김석우 님은 퇴사했는데
+         ERP 에는 휴직으로 남아 있었다). 단추를 «끄고» 까닭을 적는다 — 조용히 빼면
+         「명부에 있는데 왜 안 뜨지」 하게 된다. */
+    const 휴직들 = 목록.filter(function (s) { return s.휴직; });
+    if (휴직들.length) {
+      h += '<div class="fld"><label>휴직 중 ' + 휴직들.length + '명 — 넣을 수 없습니다</label>'
+        + '<div class="rows">';
+      휴직들.forEach(function (s) {
+        h += '<div class="l"><span class="t"><b>' + esc(s.name) + '</b></span>'
+          + '<span class="sub" style="flex:1">' + esc(s.title || '(직급 모름)') + '</span>'
+          + '<span class="pill lv">휴직 중</span>'
+          + '<button class="btn" disabled>넣기</button></div>';
+      });
+      h += '</div><div class="sub" style="margin-top:4px">'
+        + '푸른ERP <b>직원관리</b>에서 복직인지 퇴사인지 정리한 뒤 넣으십시오.</div></div>';
+    }
   }
   h += '<div class="guide"><b>명부에 없는 분</b> — 이름을 직접 적어 넣습니다.'
     + '<div style="margin-top:7px"><button class="btn" onclick="addMemberByHand()">이름 직접 적기</button></div></div>';
@@ -2738,6 +2764,17 @@ async function addFromRoster(name, title) {
   const 이름 = String(name || '').trim();
   const 직급 = String(title || '').trim();
   if (!이름) return;
+  /* ★ 휴직 중인 분은 «여기서도» 막는다 — 단추를 꺼 두었어도 이 함수는 직접 불릴 수 있다.
+       (퇴사했는데 ERP 에는 휴직으로 남은 분을 구성원에 넣는 사고를 막는 안전망이다.)
+     ⚠ 이름이 같은 분이 둘이면 «전부» 휴직일 때만 막는다 — 한 분이라도 재직이면 동명이인이다. */
+  const 명부줄 = (Array.isArray(App.staff) ? App.staff : [])
+    .filter(function (s) { return s && String(s.name || '').trim() === 이름; });
+  if (명부줄.length && 명부줄.every(function (s) { return s.onLeave; })) {
+    await say('휴직 중입니다',
+      esc(이름) + ' 님은 명부에 <b>휴직</b>으로 되어 있어 넣을 수 없습니다. '
+      + '푸른ERP 직원관리에서 복직인지 퇴사인지 정리한 뒤 넣으십시오.');
+    return;
+  }
   const 갈래 = 직급의갈래(직급);
   const rec = 갈래 === 'labor'
     ? { name: 이름, kind: 'labor', position1: (/노무사/.test(직급) ? '' : 직급),
@@ -5139,6 +5176,15 @@ function jobsOf() {
            + '<b>「홈페이지에 남기기」</b>로 사유를 남겨 두시면 다음부터 조용해집니다.' });
     }
   }
+  /* ★ 휴직 중인 분 — 퇴사가 «아니다». 그래서 「내릴 것」이 아니라 «확인 필요»로만 알린다.
+     ⚠ 자동으로 내리지 않는다. 휴직은 돌아오는 분이고, 퇴사했는데 ERP 에 휴직으로 남아
+       있는 경우(2026-10-04 김석우 님)는 ERP 직원관리에서 사람이 퇴사 처리를 해야 한다. */
+  if (ms.own.leave) {
+    add({ cls: 'info', t: '휴직 중인 분이 구성원에 있습니다', n: ms.own.leave,
+      go: '<button class="btn sm" onclick="App.filt(\'own:leave\',\'members\')">보기</button>',
+      why: '퇴사가 아닙니다. 복직인지 퇴사인지 <b>푸른ERP 직원관리</b>에서 확인하십시오 — '
+         + '퇴사로 처리하면 그때 「내릴 것」으로 바뀝니다. <b>자동으로 내리지 않습니다.</b>' });
+  }
   if (ms.own.none) {
     add({ cls: 'info', t: '명부에 없는 사람', n: ms.own.none,
       go: '<button class="btn sm" onclick="App.filt(\'own:none\',\'members\')">보기</button>',
@@ -5298,7 +5344,7 @@ function statOf(group) {
      「none 1」이 찍혀 있었고, 「명부에 없음」이 할 일 수에도 안 잡혔다(5차 지시로 고침).
      검사(pu-home-screen.test.js)가 rosterMark 가 돌려주는 모든 kind 에 이름이 있는지 본다.
    nobase — 쪽: 대조 기준 글자가 아직 없다.  ended — 자문사: 올림인데 거래가 끝났다. */
-const OWN_LABEL = { left: '퇴사 (명부)', none: '명부에 없음', dup: '동명이인', nobase: '기준 없음', ended: '자문 종료' };
+const OWN_LABEL = { left: '퇴사 (명부)', leave: '휴직 중 (명부)', none: '명부에 없음', dup: '동명이인', nobase: '기준 없음', ended: '자문 종료' };
 
 /* 딱지에 쓸 «짧은» 이름 — 뒤에 붙은 괄호말을 뗀다.
    ★ 왜 (대표 지적 2026-09-02): 딱지 여섯이 두 줄로 넘쳤고, 줄에서는 「퇴사」 딱지 옆에
@@ -5317,7 +5363,7 @@ function joinOnce(parts) {
     .filter(function (v, i, a) { return a.indexOf(v) === i; })
     .join(' · ');
 }
-const OWN_CLS = { left: 'rm', none: 'ask', dup: 'ask', nobase: 'ask', ended: 'rm' };
+const OWN_CLS = { left: 'rm', leave: 'lv', none: 'ask', dup: 'ask', nobase: 'ask', ended: 'rm' };
 /* 카드에 적는 «상태 한 마디» (5차 지시).
    ★ 딱지를 갈래마다 넷씩 붙였더니 「정보가 섞여 판단이 어렵다」는 지시를 받았다.
      카드는 「어디에 할 일이 있나」 하나만 답한다. 세부(퇴사 몇·명부에 없음 몇·남김 몇)는

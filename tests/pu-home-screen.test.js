@@ -341,12 +341,15 @@ test('★ 로그인 쪽 문제는 무엇을 하면 되는지까지 한국어로 
 
 /* ══════ Important 3 — 명부 폴백이 퇴사 딱지를 조용히 죽이지 않는다 ══════ */
 
-test('★ 공개 명부로 폴백하면 그 사실을 «화면에» 알린다', () => {
+test('★ 공개 명부만 읽는 것이 «정상»이다 — 쓸데없는 경고 띠를 띄우지 않는다', () => {
+  /* 2026-10-04 대표 결정 ㉮: 직원 명부는 공개 명부(data/user_dir)만 읽는다.
+     전에는 인사 명부를 못 읽어 공개 명부로 «대신» 봤을 때 노란 띠를 띄웠다 —
+     이제 그것이 «원래 뜻»이라 띠가 늘 떠 있으면 사람이 띠를 무시하게 된다.
+     (못 읽은 경우는 loadAll 이 staffErr 로 따로 알린다.) */
   const ctx = box();
   run(ctx, fnSource('staffFromRoster'));
   const r = plain(ctx.staffFromRoster([{ name: '권형하', status: 'active' }], 'dir'));
-  assert.ok(r.warn, '폴백을 탔는데 경고 한 줄이 없습니다');
-  assert.match(r.warn, /퇴사일/, '무엇을 못 보는지 안 적혀 있습니다');
+  assert.equal(r.warn, '', '공개 명부를 정상으로 읽었는데 경고 띠를 띄웁니다');
 });
 
 test('민감 명부를 제대로 읽었으면 쓸데없는 경고를 띄우지 않는다', () => {
@@ -368,11 +371,15 @@ test('★ 공개 명부의 「퇴사」 표시만으로도 「내릴 것」 딱�
   assert.equal(st[0].status, 'toRemove', '퇴사자가 홈페이지에 그대로 남습니다');
 });
 
-test('명부에 퇴사일이 있으면 날짜를 그대로 쓴다', () => {
+test('★★ 퇴사일은 «가져오지 않는다» — 인사 명부의 칸이다', () => {
+  /* 2026-10-04 ㉮: 날짜 하나 때문에 인사 명부(주민번호·계좌가 든 곳)를 읽지 않는다.
+     혹시 윗단에서 retireDate 가 딸려 와도 여기서 «받지 않는다» — 퇴사 판정은 「퇴사」
+     표시(status)로 한다. 날짜는 푸른ERP 직원관리에서 본다. */
   const ctx = box();
   run(ctx, fnSource('staffFromRoster'));
-  const r = plain(ctx.staffFromRoster([{ name: '나간사람', retireDate: '2026-07-31', status: 'retired' }], 'accounts'));
-  assert.equal(r.staff[0].leftAt, '2026-07-31');
+  const r = plain(ctx.staffFromRoster([{ name: '나간사람', retireDate: '2026-07-31', status: 'retired' }], 'dir'));
+  assert.equal(r.staff[0].leftAt, '', '★★ 퇴사일을 도로 들고 옵니다 — 인사 명부를 읽는 길이 다시 열립니다');
+  assert.equal(r.staff[0].left, true, '퇴사 표시로는 퇴사를 알아봐야 합니다');
 });
 
 /* ══════ Important 5 — 「읽기 거부」와 「그런 사람 없음」을 다르게 말한다 ══════ */
@@ -2057,6 +2064,52 @@ test('★ 명부에 없는 사람도 할 일에 잡힌다 — 목록에만 보�
   assert.ok(!열쇠노출.test(할일), '할 일 딱지에 열쇠 글자(none/dup)가 찍혔습니다');
   assert.ok(!열쇠노출.test(ctx.dashHtml()), '카드 딱지에 열쇠 글자(none/dup)가 찍혔습니다');
   assert.ok(!열쇠노출.test(ctx.chipsHtml()), '걸러 보기 딱지에 열쇠 글자가 찍혔습니다');
+});
+
+/* ══════ 휴직 (2026-10-04 · 김석우 님은 퇴사했는데 ERP 에는 휴직으로 남아 있었다) ══════
+   ★ 글자로 보지 않고 «돌려서» 본다 — 카드를 만드는 조건만 죽여도 소스에는 같은 글자가
+     남아 「글자가 있나」 검사는 통과한다(2026-10-04 되돌림 검사가 잡았다). */
+test('★★ 휴직 중인 분이 할 일에 «확인 필요»로 잡힌다 — 「내릴 것」이 아니다', () => {
+  const ctx = rosterBox([
+    { name: '권형하', leftAt: '' },
+    { name: '김휴직', leftAt: '', onLeave: true },
+    { name: '박성수', leftAt: '2026-06-30' }
+  ], null);
+  ctx.App.members = { '190': { name: '권형하' }, '999': { name: '김휴직' }, '193': { name: '박성수' } };
+  ctx.App.pages = {}; ctx.App.pageConfig = {}; ctx.App.checking = false;
+  ctx.App.dataErr = ''; ctx.App.staffErr = ''; ctx.App.saveErr = ''; ctx.App.checkMsg = '';
+  ctx.App.companiesErr = ''; ctx.App.companies = []; ctx.App.partners = {};
+  run(ctx, fnSource('rowsWith') + '\n' + fnSource('someNames') + '\n' + fnSource('seeBtns') + '\n'
+    + fnSource('leftoverGoBtns') + '\n' + fnSource('jobCard') + '\n' + fnSource('jobsOf') + '\n'
+    + fnSource('bannersHtml') + '\n' + fnSource('todoCount'));
+
+  const 줄들 = plain(ctx.memberRows());
+  const 휴직줄 = 줄들.find(r => r.name === '김휴직');
+  assert.equal(휴직줄.roster && 휴직줄.roster.kind, 'leave', '★★ 휴직 딱지가 목록에 안 붙었습니다');
+  assert.notEqual(휴직줄.roster.kind, 'left', '★★★ 휴직을 퇴사로 읽습니다');
+
+  const 할일 = ctx.bannersHtml();
+  assert.match(할일, /휴직 중인 분이 구성원에 있습니다/, '★★ 휴직자가 할 일에서 빠졌습니다');
+  assert.match(할일, /자동으로 내리지 않습니다/);
+  /* 퇴사 카드는 «퇴사한 사람만» 센다 — 휴직자가 섞이면 안 된다 */
+  const 퇴사카드 = /명부상 퇴사한 사람[\s\S]{0,40}?<[^>]*>\s*(\d+)/.exec(할일);
+  if (퇴사카드) assert.equal(Number(퇴사카드[1]), 1, '★★★ 퇴사 카드에 휴직자가 섞여 셉니다');
+  assert.ok(할일.indexOf('own:leave') >= 0, '「보기」 단추가 휴직으로 못 걸러 갑니다');
+});
+
+test('★ 휴직자만 있는 갈래는 «퇴사 카드»가 안 뜬다', () => {
+  const ctx = rosterBox([{ name: '김휴직', leftAt: '', onLeave: true }], null);
+  ctx.App.members = { '999': { name: '김휴직' } };
+  ctx.App.pages = {}; ctx.App.pageConfig = {}; ctx.App.checking = false;
+  ctx.App.dataErr = ''; ctx.App.staffErr = ''; ctx.App.saveErr = ''; ctx.App.checkMsg = '';
+  ctx.App.companiesErr = ''; ctx.App.companies = []; ctx.App.partners = {};
+  run(ctx, fnSource('rowsWith') + '\n' + fnSource('someNames') + '\n' + fnSource('seeBtns') + '\n'
+    + fnSource('leftoverGoBtns') + '\n' + fnSource('jobCard') + '\n' + fnSource('jobsOf') + '\n'
+    + fnSource('bannersHtml') + '\n' + fnSource('todoCount'));
+  const 할일 = ctx.bannersHtml();
+  assert.ok(할일.indexOf('명부상 퇴사한 사람') < 0,
+    '★★★ 휴직자를 퇴사 카드로 띄웁니다 — 내리라고 재촉하게 됩니다');
+  assert.match(할일, /휴직 중인 분이/);
 });
 
 /* ══════ 화면 정리 (5차 지시) ══════ */
