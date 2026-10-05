@@ -28,14 +28,25 @@ test('정부컨설팅: 가끔 쓰는 단추는 폰에서만 ⋯ 안으로 접는
      탓에 검사가 깨졌다(CLAUDE.md 「검사를 쓰는 규칙」).
      못 박을 것은 이름표가 아니라 **「가끔 쓰는 것은 묶여 있고, 접었다 펼 수 있다」**
      는 규칙이다 — 단추가 늘든 줄든 이 규칙은 그대로다. */
-  const box = gov.match(/<span class="hdr-extra">[\s\S]*?<\/span>/);
-  assert.ok(box, '⋯ 묶음을 찾지 못했습니다');
+  /* ⚠ 묶음 «끝»은 span 을 세어 찾는다 — 묶음 안에 소제목 span(「자주」·「가끔」)이 들어오자
+       첫 </span> 에서 멈춰 «묶인 것이 0개»로 읽었다(2026-10-05). */
+  const from = gov.indexOf('<span class="hdr-extra">');
+  assert.ok(from > 0, '⋯ 묶음을 찾지 못했습니다');
+  let depth = 0, to = -1;
+  const re = /<span\b|<\/span>/g; re.lastIndex = from;
+  for (let m; (m = re.exec(gov));) { depth += m[0] === '</span>' ? -1 : 1; if (depth === 0) { to = re.lastIndex; break; } }
+  assert.ok(to > from, '⋯ 묶음의 끝을 찾지 못했습니다');
+  const box = [gov.slice(from, to)];
   const ids = [...box[0].matchAll(/id="([^"]+)"/g)].map(function (m) { return m[1]; });
   assert.ok(ids.length >= 2, '묶을 것이 없으면 ⋯ 자체가 헛단추입니다 (지금 ' + ids.length + '개)');
-  /* 늘 보여야 하는 것(저장 상태·알림·로그아웃)은 묶으면 안 된다 — 접히면 못 쓴다 */
+  /* 늘 보여야 하는 것(저장 상태·알림)은 묶으면 안 된다 — 접히면 못 쓴다.
+     ⚠ 로그아웃은 폰에서 ⋯ 안으로 옮겼다(대표 지시 2026-10-05 폰 정리 목업 「이대로 고쳐라」).
+       그래도 원래 단추(hdrLogout)는 묶음 «밖»에 그대로 두고, ⋯ 안 줄은 그것과 같은 일(doLogout)을 부른다 —
+       PC 에서는 예전처럼 늘 보인다. */
   ['saveState', 'notifBtn', 'hdrLogout'].forEach(function (id) {
-    assert.ok(ids.indexOf(id) < 0, id + ' 은(는) 늘 보여야 하는데 ⋯ 안에 넣었습니다');
+    assert.ok(ids.indexOf(id) < 0, id + ' 은(는) 묶음 밖에 있어야 하는데 ⋯ 안에 넣었습니다');
   });
+  assert.match(box[0], /mMenu\('logout'\)/, '폰에서 로그아웃 줄이 ⋯ 안에 없으면 나갈 길이 없습니다');
   // PC 는 묶음이 없는 것처럼 — 단추가 예전 그대로 한 줄에 늘어선다
   assert.match(gov, /\.hdr-extra\{display:contents;\}/);
   /* ⋯ 단추는 PC 에서 안 보여야 한다. !important 가 필요하다 —
