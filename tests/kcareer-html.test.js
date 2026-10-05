@@ -930,11 +930,13 @@ test('한 번도 안 맞춘 기기가 클라우드를 조용히 덮지 않는다
   const src = funcSource('fbAutoPush');
   /* ⚠ 2026-09-12: 띠 «문구»가 갈렸다(처음인 기기에는 「받아 온 적이 없다」라고 말한다).
      가드 자체는 그대로여야 한다 — 여기서 못박는 것은 «올리지 않고 돌아선다»는 것이다. */
-  assert.match(src, /if\(_fbBase==null && cloudAt\)\{ fbShowNotice\([^)]*\); return; \}/,
+  /* ⚠ 2026-10-05: 돌아선 뒤 «잃을 것이 없으면 받아 온다»(fbFirstSync). 올리지 않는다는 것은 그대로다. */
+  assert.match(src, /if\(_fbBase==null && cloudAt\)\{ (?:fbShowNotice\([^)]*\)|fbFirstSync\(\)); return; \}/,
     '⚠ 이 가드를 지우면 폰의 시드 데이터가 PC 기록을 덮습니다');
-  /* ★ 그리고 «처음인 기기»라고 말해 주는지도 본다 — 무엇을 해야 할지 알려야 한다 */
-  assert.match(src, /fbShowNotice\('first'\)/,
+  /* ★ 그리고 «처음인 기기»라고 말해 주는지도 본다 — 무엇을 해야 할지 알려야 한다(못 받을 때) */
+  assert.match(src + funcSource('fbFirstSync'), /fbShowNotice\('first'\)/,
     '한 번도 안 받아 온 기기에는 「받아 오라」고 또박또박 말해야 합니다');
+  assert.ok(!/_fbDoPush/.test(funcSource('fbFirstSync')), '⚠ 처음 여는 기기는 «올리지» 않는다 — 받기만 한다');
 });
 
 test('저장·불러오기 확인창이 기록 건수를 비교해 보여준다', () => {
