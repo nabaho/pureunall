@@ -1331,7 +1331,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=1"></script>
+<script src="js/kcareer-biz.js?v=2"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -14596,12 +14596,21 @@ function bizDraw(){
     +cell('메모','<textarea class="tb-input" id="bzf-memo" style="width:100%;min-height:46px">'+escapeHtml(r.memo||'')+'</textarea>',true)
     +'</div>'
     +(r.caseDir?'<div style="font-size:11px;color:var(--text-mute);margin-top:6px;word-break:break-all">📂 '+escapeHtml(r.caseDir)+'</div>':'');
+  /* ★ 📈 선정·계약된 사업 → 실적관리 (대표 지시 2026-10-05) — 입력 창을 «채워서 열기»만 한다. 저장은 사람이.
+     ⚠ 실적 셋은 이알피 동기화도 받는 칸이다 — 여기서 몰래 쓰면 동기화와 겹친다. 사람이 보고 저장하게 둔다. */
+  if(!r._isNew && KcareerBiz.isWin(r.stage)){
+    html+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:8px 10px;border:1px dashed var(--border);border-radius:8px;font-size:12px">'
+      +'<b>📈 실적으로 넘기기</b><span style="color:var(--text-mute)">선정된 사업을 실적관리에 한 줄로 — 채운 입력 창이 열리고, 저장은 직접 누릅니다</span><span style="flex:1"></span>'
+      +[['consult','컨설팅실적'],['fund','기금실적'],['etc','기타실적']].map(function(p){ return '<button class="btn sm" type="button" onclick="bizToPerf(\''+p[0]+'\')">'+p[1]+'</button>'; }).join(' ')
+      +((r.perfTo||[]).length?'<div style="flex-basis:100%;color:var(--teal);font-size:11px">넘긴 기록: '+(r.perfTo||[]).map(function(x){ return escapeHtml(((FORM_DEFS[x.page]||{}).title||x.page)+' '+String(x.at||'').slice(5,10).replace('-','.')); }).join(' · ')+'</div>':'')
+      +'</div>';
+  }
   var docs=(r.docs||[]).slice().sort(function(a,b){ return KcareerBiz.DOC_KINDS.indexOf(a.kind)-KcareerBiz.DOC_KINDS.indexOf(b.kind) || String(a.name).localeCompare(String(b.name),'ko'); });
   html+='<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:14px 0 6px"><b style="font-size:13px">📎 이 사업에 낸 서류 '+docs.length+'개</b><span style="flex:1"></span>'
     +'<button class="btn sm fs-ui" type="button" onclick="bizPickCase({into:1})" title="7번 폴더의 건 폴더 하나를 골라 그 파일을 모두 이 사업에 담습니다">📂 건 폴더에서 가져오기</button>'
     +'<button class="btn sm primary" type="button" onclick="bizUpload()">＋ 파일 올리기</button></div>';
   html+=docs.length?('<div class="dt"><table><thead><tr><th class="rownum-h" style="width:40px">№</th><th style="width:110px">갈래</th><th>서류</th><th style="width:60px">크기</th><th style="width:96px">보관</th><th style="width:250px"></th></tr></thead><tbody>'
-    +docs.map(function(d,i){ var 다시=/^(hwpx?|docx|pdf)$/.test(d.ext||''), 견줄=/^(hwpx?|pdf|txt|md|csv)$/.test(d.ext||'');
+    +docs.map(function(d,i){ var 다시=/^(hwpx?|docx|pdf)$/.test(d.ext||''), 견줄=/^(hwpx?|pdf|xlsx|txt|md|csv)$/.test(d.ext||'');
       return '<tr><td class="rownum">'+(i+1)+'</td>'
         +'<td><select class="tb-select" style="font-size:11px;padding:1px 4px;height:auto" onchange="bizDocKind(\''+_jsAttr(d.id)+'\',this.value)">'+KcareerBiz.DOC_KINDS.map(function(k){ return '<option'+(k===d.kind?' selected':'')+'>'+escapeHtml(k)+'</option>'; }).join('')+'</select></td>'
         +'<td class="bz-cell" style="max-width:300px" title="'+escapeHtml(d.relPath||d.name)+'">'+escapeHtml(d.name)+'</td>'
@@ -14623,6 +14632,19 @@ function bizSaveForm(){
   _bizPut(_bizCur);
   toast(새?'🏢 사업을 더했습니다':'💾 저장했습니다');
   bizClose(); _safe(renderBizList); _safe(renderBizDash); _safe(renderBizDocs);
+}
+/* 📈 선정·계약된 사업 → 실적 입력 창을 채워서 연다. 칸 짝은 KcareerBiz.perfFields 한 곳 */
+function bizToPerf(page){
+  if(!_bizCur || !FORM_DEFS[page]) return;
+  _bizReadForm();
+  var r=_bizCur, val=KcareerBiz.perfFields(page, r);
+  if(!val){ toast('넘길 수 없는 실적 칸입니다'); return; }
+  r.perfTo=(r.perfTo||[]).concat([{ page:page, at:new Date().toISOString() }]);
+  if(!r._isNew) _bizPut(r);
+  bizClose();
+  openForm(page);
+  Object.keys(val).forEach(function(k){ var el=document.getElementById('ff-'+k); if(el && val[k]!=null && val[k]!=='') el.value=String(val[k]); });
+  toast('📈 '+FORM_DEFS[page].title+' 입력 창에 채워 열었습니다 — 고칠 것 고치고 「저장」을 누르세요', 6000);
 }
 /* 서류를 담기 전에 사업부터 있어야 한다 — 새 사업이면 적은 것으로 먼저 담는다 */
 function _bizEnsureSaved(){
@@ -14748,7 +14770,10 @@ function bizPickDraw(){
   var html='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;font-size:12px">'
     +'<label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" '+(P.all?'checked':'')+' onchange="_bizPick.all=this.checked;bizPickDraw()"> 모든 건 폴더 보기 ('+P.list.length+')</label>'
     +'<span style="color:var(--text-mute)">· 기본은 이름에 «사업·용역·입찰·수행기관·바우처…»가 든 '+사업수+'건만 — 모집·위원·강사 건은 개인 지원이라 뺐습니다</span>'
-    +'<span style="flex:1"></span><input class="tb-input" placeholder="찾기" value="'+escapeHtml(P.q)+'" oninput="_bizPick.q=this.value;bizPickDraw()" style="width:160px"></div>';
+    +'<span style="flex:1"></span>'
+    /* ★ «사업 같음» 한꺼번에 (대표 지시 2026-10-05) — 아직 안 올린 것만 고른다. 올리기는 아래 단추로(사람이 누른다) */
+    +(P.into?'':'<button class="btn sm" type="button" onclick="bizPickAllBiz()" title="«사업 같음»이 붙은 건 가운데 아직 안 올린 것을 모두 고릅니다">☑ 사업 같음 모두 고르기 ('+P.list.filter(function(x){ return x.biz && !x.used; }).length+')</button>')
+    +'<input class="tb-input" placeholder="찾기" value="'+escapeHtml(P.q)+'" oninput="_bizPick.q=this.value;bizPickDraw()" style="width:160px"></div>';
   html+=보일.length?('<div class="dt" style="max-height:52vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.into?'':'<input type="checkbox" onclick="document.querySelectorAll(\'#bizPickBody .row-chk\').forEach(function(x){ if(!x.disabled) x.checked=this.checked; },this)"> ')+'№</th><th>연도</th><th>건 폴더</th><th>올릴 이름</th><th></th></tr></thead><tbody>'
     +보일.map(function(x,i){ var k=P.list.indexOf(x);
       return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="'+(P.into?'radio':'checkbox')+'" name="bizPickOne" class="row-chk" value="'+k+'"'+(x.used&&!P.into?' disabled':'')+'><span>'+(i+1)+'</span></label></td>'
@@ -14760,6 +14785,13 @@ function bizPickDraw(){
     :'<div class="empty" style="padding:16px">보일 건 폴더가 없습니다'+(P.all?'':' — 「모든 건 폴더 보기」를 켜 보세요')+'</div>';
   html+='<div style="font-size:11.5px;color:var(--text-mute);margin-top:8px">· 고른 건 폴더의 파일을 <b>사업 서류로 앱에 담습니다</b>(다른 PC 에서도 열림). 폴더의 원본은 그대로입니다.<br>· 제출서류(개인 지원 기록)에서 옮기지 않습니다 — 거기 있던 줄은 그대로 남습니다.</div>';
   document.getElementById('bizPickBody').innerHTML=html;
+}
+function bizPickAllBiz(){
+  var P=_bizPick; if(!P) return;
+  if(P.all || P.q){ P.all=false; P.q=''; bizPickDraw(); }
+  document.querySelectorAll('#bizPickBody .row-chk').forEach(function(x){ var it=P.list[Number(x.value)]; x.checked=!!(it && it.biz && !it.used); });
+  var n=document.querySelectorAll('#bizPickBody .row-chk:checked').length;
+  toast('☑ 사업 같음 '+n+'건을 골랐습니다 — 아래 「고른 건을 사업으로 올리기」를 누르면 서류까지 담깁니다', 5000);
 }
 /* 건 폴더 하나의 파일을 «내용까지» 읽는다 — 고른 것만이다(7번 전체를 읽지 않는다) */
 async function _bizReadDir(handle, prefix){
@@ -14852,14 +14884,14 @@ function _bizDocFind(id){ var hit=null; _bizDocsFlat().some(function(x){ if(x.d.
 /* 서랍에서 「📑 비교」 — 견줄 짝을 고른다(같은 갈래·다른 사업 먼저) */
 function bizCmpWith(id){
   var me=_bizDocFind(id); if(!me){ toast('서류를 찾을 수 없습니다'); return; }
-  var 짝=_bizDocsFlat().filter(function(x){ return x.d.id!==id && /^(hwpx?|pdf|txt|md|csv)$/.test(x.d.ext||''); })
+  var 짝=_bizDocsFlat().filter(function(x){ return x.d.id!==id && /^(hwpx?|pdf|xlsx|txt|md|csv)$/.test(x.d.ext||''); })
     .sort(function(a,b){ return ((b.d.kind===me.d.kind)-(a.d.kind===me.d.kind)) || String(b.b.year||'').localeCompare(String(a.b.year||'')); });
   document.getElementById('bizCmpH').textContent='📑 「'+me.d.name+'」와 견줄 서류 고르기';
   document.getElementById('bizCmpBody').innerHTML=짝.length?('<div class="dt" style="max-height:60vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:40px">№</th><th>연도</th><th>사업</th><th>갈래</th><th>서류</th><th></th></tr></thead><tbody>'
     +짝.map(function(x,i){ return '<tr><td class="rownum">'+(i+1)+'</td><td>'+escapeHtml(x.b.year||'-')+'</td><td class="bz-cell" style="max-width:220px" title="'+escapeHtml(x.b.title||'')+'">'+escapeHtml(x.b.title||'-')+'</td>'
       +'<td style="white-space:nowrap">'+escapeHtml(x.d.kind||'')+(x.d.kind===me.d.kind?' ✔':'')+'</td><td class="bz-cell" style="max-width:300px" title="'+escapeHtml(x.d.name)+'">'+escapeHtml(x.d.name)+'</td>'
       +'<td><button class="btn sm primary" type="button" onclick="bizCompare(\''+_jsAttr(x.d.id)+'\',\''+_jsAttr(id)+'\')">견주기</button></td></tr>'; }).join('')+'</tbody></table></div>')
-    :'<div class="empty" style="padding:16px">견줄 다른 서류가 없습니다 — 한글·PDF 서류가 둘 이상 있어야 합니다</div>';
+    :'<div class="empty" style="padding:16px">견줄 다른 서류가 없습니다 — 한글·PDF·엑셀 서류가 둘 이상 있어야 합니다</div>';
   document.getElementById('modalBizCmp').classList.add('open');
 }
 /* 서류 한 개의 «글자» — 한글은 _hwpTextOf, PDF 는 _pkPdfText(꾸러미와 같은 자). 표·그림 모양은 안 본다 */
@@ -14868,7 +14900,16 @@ async function _bizDocText(id){
   if(/^hwpx?$/.test(f.ext)){ var t=await _hwpTextOf(f.bytes, f.name); if(t==null) throw new Error(f.name+' — 한글 글자를 못 뽑았습니다'); return t; }
   if(f.ext==='pdf') return await _pkPdfText(f.bytes);
   if(/^(txt|md|csv)$/.test(f.ext)) return new TextDecoder('utf-8').decode(f.bytes);
-  throw new Error(f.name+' — '+f.ext+' 형식은 글자를 견줄 수 없습니다(한글·PDF·글만)');
+  /* ★ 엑셀 견적·산출내역 (대표 지시 2026-10-05) — 행마다 한 줄로 펴서 견준다. 판정은 KcareerBiz.xlsxLines 한 곳 */
+  if(f.ext==='xlsx'){
+    await _loadJSZip();
+    var zip=await JSZip.loadAsync(f.bytes), 읽기=async function(n){ var e=zip.file(n); return e?await e.async('string'):''; };
+    var sheets={}, 이름들=Object.keys(zip.files).filter(function(n){ return /^xl\/worksheets\/sheet\d+\.xml$/i.test(n); });
+    for(var i=0;i<이름들.length;i++) sheets[이름들[i]]=await 읽기(이름들[i]);
+    return KcareerBiz.xlsxLines({ shared:await 읽기('xl/sharedStrings.xml'), workbook:await 읽기('xl/workbook.xml'),
+      rels:await 읽기('xl/_rels/workbook.xml.rels'), sheets:sheets }).join('\n');
+  }
+  throw new Error(f.name+' — '+f.ext+' 형식은 글자를 견줄 수 없습니다(한글·PDF·엑셀(.xlsx)·글만 — 옛 .xls 는 엑셀에서 .xlsx 로 저장해 올려 주세요)');
 }
 /* 📑 두 서류를 나란히 — 달라진 줄만 칠한다. 같은 줄이 길게 이어지면 접는다(앞뒤 두 줄만 보인다)
    ⚠ 이 PC 안에서만 견준다 — 서류를 밖(AI 등)으로 보내지 않는다 */
