@@ -145,6 +145,122 @@ test('명부·업체관리를 못 읽었거나 비었으면 실패이고 아무�
   }
 });
 
+/* ══════ 한 번 돌기 — 도구(읽기·쓰기·내리기)를 가짜로 넣어 실제로 돌린다 ══════ */
+function 가짜(자료, 내리기답) {
+  const 쓴것 = [], 붙인것 = [], 내린것 = [];
+  return {
+    쓴것, 붙인것, 내린것,
+    도구: {
+      읽기: async (p) => 자료[p],
+      쓰기: async (p, v) => { 쓴것.push([p, v]); },
+      덧붙이기: async (p, v) => { 붙인것.push([p, v]); },
+      내리기: async (목록) => {
+        내린것.push(...목록);
+        return 목록.map(x => Object.assign({}, x, 내리기답 ? 내리기답(x) : { 됐나: true }));
+      },
+      지금: () => 1000, 달: () => '2026-11', 누가: 'auto'
+    }
+  };
+}
+const 퇴사자료 = () => ({
+  'homepage/auto/config': null,
+  'data/user_dir': 명부([사람('S1', 'retired')]),
+  'data/companies': [업체('C1', 'closed')],
+  'homepage/members': { m1: { srl: 101, sid: 'S1' } },
+  'homepage/partners': { C1: { boardSrl: 185 } }
+});
+function 멈춤자료() {
+  const 자료 = 퇴사자료();
+  const 여럿 = 퇴사여럿(HA.멈춤문턱 + 1);
+  자료['data/user_dir'] = 여럿.roster; 자료['homepage/members'] = 여럿.members;
+  return 자료;
+}
+
+test('보기는 아무것도 쓰지도 내리지도 않는다', async () => {
+  const g = 가짜(퇴사자료());
+  const r = await HA.돌기('보기', '', g.도구);
+  assert.strictEqual(r.내릴것.length, 2);
+  assert.strictEqual(g.내린것.length + g.쓴것.length + g.붙인것.length, 0);
+});
+
+test('돌리기는 내리고, 내린 표시와 기록을 남긴다', async () => {
+  const g = 가짜(퇴사자료());
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.내린것.length, 2);
+  assert.strictEqual(r.내림.length, 2);
+  assert.ok(g.쓴것.some(([p]) => p === 'homepage/members/m1/takenDown'));
+  assert.ok(g.쓴것.some(([p]) => p === 'homepage/partners/C1/takenDown'));
+  assert.ok(g.붙인것.some(([p]) => p === 'homepage/auto/runs/2026-11'));
+  assert.ok(g.붙인것.some(([p]) => p === 'homepage/writeLog/101'));
+  assert.ok(g.붙인것.some(([p]) => p === 'homepage/writeLog/185'));
+});
+
+test('못 내린 것에는 내린 표시를 남기지 않고, 못 내림으로 알린다', async () => {
+  const g = 가짜(퇴사자료(), () => ({ 됐나: false, 까닭: '게시판 확인 실패' }));
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(r.못내림.length, 2);
+  assert.strictEqual(r.내림.length, 0);
+  assert.ok(!g.쓴것.some(([p]) => /takenDown/.test(p)));
+  assert.ok(!g.붙인것.some(([p]) => /writeLog/.test(p)));
+});
+
+test('꺼져 있으면(off) 읽지도 내리지도 기록하지도 않는다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/auto/config'] = { off: true };
+  const g = 가짜(자료);
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.내린것.length + g.붙인것.length + g.쓴것.length, 0);
+  assert.ok(r.꺼짐);
+});
+
+test('멈춤이면 돌리기는 0건을 내리고 멈춤을 기록한다', async () => {
+  const g = 가짜(멈춤자료());
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.내린것.length, 0);
+  assert.ok(r.멈춤);
+  const 기록 = g.붙인것.find(([p]) => p === 'homepage/auto/runs/2026-11');
+  assert.ok(기록 && 기록[1].멈춤);
+  assert.strictEqual(기록[1].후보.length, HA.멈춤문턱 + 2);
+});
+
+test('승인은 지문이 같을 때만 멈춘 목록을 모두 내린다', async () => {
+  const 본 = await HA.돌기('보기', '', 가짜(멈춤자료()).도구);
+  const 틀림 = 가짜(멈춤자료());
+  const r1 = await HA.돌기('승인', 'people_board:1', 틀림.도구);
+  assert.strictEqual(틀림.내린것.length, 0);
+  assert.strictEqual(r1.ok, false);
+  const 맞음 = 가짜(멈춤자료());
+  const r2 = await HA.돌기('승인', 본.지문, 맞음.도구);
+  assert.strictEqual(맞음.내린것.length, HA.멈춤문턱 + 2);
+  assert.strictEqual(r2.내림.length, HA.멈춤문턱 + 2);
+});
+
+test('승인은 빈 지문으로 «아무것도 없음»을 승인하지 못한다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/members'] = {}; 자료['homepage/partners'] = {};
+  const g = 가짜(자료);
+  const r = await HA.돌기('승인', '', g.도구);
+  assert.strictEqual(r.ok, false);
+});
+
+test('명부를 못 읽은 달은 내리지 않고 실패를 기록한다', async () => {
+  const 자료 = 퇴사자료(); 자료['data/user_dir'] = null;
+  const g = 가짜(자료);
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.내린것.length, 0);
+  assert.strictEqual(r.ok, false);
+  const 기록 = g.붙인것.find(([p]) => p === 'homepage/auto/runs/2026-11');
+  assert.ok(기록 && 기록[1].실패);
+});
+
+test('기록에는 이름을 담지 않는다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/members'].m1.name = '홍길동';
+  자료['data/companies'][0].name = '가나상사';
+  const g = 가짜(자료);
+  await HA.돌기('돌리기', '', g.도구);
+  const 글 = JSON.stringify(g.붙인것) + JSON.stringify(g.쓴것);
+  assert.ok(!글.includes('홍길동'));
+  assert.ok(!글.includes('가나상사'));
+});
+
 test('지문은 차례와 상관없이 같은 목록이면 같다', () => {
   const a = [{ 게시판: 'people_board', srl: 2 }, { 게시판: 'partner_board', srl: 1 }];
   assert.strictEqual(HA.지문(a), HA.지문(a.slice().reverse()));

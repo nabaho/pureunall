@@ -101,4 +101,69 @@ function 고르기(자료) {
            연결확인: 연결확인, 멈춤: 멈춤, 지문: 지문(내릴것) };
 }
 
-module.exports = { 멈춤문턱, 게시판, 고르기, 지문, 남기기있나 };
+/* 기록에 남기는 한 줄 — 이름은 «안» 담는다. sid·companyId·글 번호만.
+   이름은 화면이 우리 자료(구성원·업체관리)에서 붙인다. 기록이 사람 이름을 모으면
+   누가 언제 나갔는지가 홈페이지 자리 밖으로 따로 쌓인다. */
+function 기록줄(x) {
+  return { 종류: x.종류, 게시판: x.게시판, srl: x.srl, sid: x.sid || "", companyId: x.companyId || "" };
+}
+
+/* 한 번 돈다 — 서버 함수(매달·지금 돌리기·승인)가 «도구»만 넣어 부른다.
+   도구 = { 읽기(path), 쓰기(path,값), 덧붙이기(path,값), 내리기(목록)→[{…, 됐나, 까닭}],
+            지금()→ms, 달(ms)→"YYYY-MM", 누가 }
+   ★ 읽기·쓰기·내리기를 도구로 받아서, 검사가 서버 없이도 실제로 돌려 본다.
+   방식: 보기(아무것도 안 씀) · 돌리기(멈춤이면 0건) · 승인(멈춘 «그 목록»만 내림) */
+async function 돌기(방식, 받은지문, 도구) {
+  const 지금 = 도구.지금(), 달 = 도구.달(지금);
+  const 설정 = (await 도구.읽기("homepage/auto/config")) || {};
+  /* ⚠ 끄면 «아무것도» 하지 않는다 — 세지도, 기록하지도 않는다 */
+  if (설정.off === true) return { ok: true, 방식: 방식, 달: 달, 꺼짐: true, 내림: [], 못내림: [] };
+
+  const 고른것 = 고르기({
+    roster: await 도구.읽기("data/user_dir"),
+    companies: await 도구.읽기("data/companies"),
+    members: await 도구.읽기("homepage/members"),
+    partners: await 도구.읽기("homepage/partners")
+  });
+  const 결과 = Object.assign({ 방식: 방식, 달: 달, 내림: [], 못내림: [] }, 고른것);
+  if (방식 === "보기") return 결과;
+
+  let 보낼것 = 고른것.보낼것;
+  if (방식 === "승인") {
+    /* ★ 사람이 본 목록과 지금 목록이 «같을 때만» 내린다. 그사이 누가 퇴사 처리를
+         되돌렸다면 그분 글이 내려가면 안 된다. */
+    if (!고른것.ok || !고른것.내릴것.length || 고른것.지문 !== String(받은지문 || "")) {
+      결과.ok = false;
+      결과.실패 = 결과.실패 || "그사이 내릴 것이 바뀌었습니다 — 다시 보고 눌러 주십시오";
+      return 결과;
+    }
+    보낼것 = 고른것.내릴것;
+    결과.멈춤 = "";
+  }
+
+  if (고른것.ok && 보낼것.length) {
+    const 답 = await 도구.내리기(보낼것);
+    for (const x of 답) {
+      if (x.됐나) {
+        결과.내림.push(기록줄(x));
+        const 표시 = { at: 지금, by: 도구.누가, 달: 달 };
+        if (x.key) await 도구.쓰기("homepage/members/" + x.key + "/takenDown", 표시);
+        if (x.companyId) await 도구.쓰기("homepage/partners/" + x.companyId + "/takenDown", 표시);
+        /* 사람이 누른 내리기와 «같은 자리»에 남긴다 — 글 번호 하나로 무슨 일이 있었는지 다 보이게 */
+        await 도구.덧붙이기("homepage/writeLog/" + x.srl, { at: 지금, by: 도구.누가, 저장됨: true,
+          바뀐것: [{ 이름: "홈페이지에서", 옛: "보임", 새: "휴지통 (되살릴 수 있음)" }], 까닭: x.종류 });
+      } else {
+        결과.못내림.push(Object.assign(기록줄(x), { 까닭: x.까닭 || "까닭 모름" }));
+      }
+    }
+  }
+  await 도구.덧붙이기("homepage/auto/runs/" + 달, {
+    at: 지금, by: 도구.누가, 방식: 방식, ok: 고른것.ok, 실패: 고른것.실패 || "",
+    멈춤: 결과.멈춤 || "", 지문: 고른것.지문 || "",
+    후보: 고른것.내릴것.map(기록줄),
+    내림: 결과.내림, 못내림: 결과.못내림, 연결확인수: 고른것.연결확인.length
+  });
+  return 결과;
+}
+
+module.exports = { 멈춤문턱, 게시판, 고르기, 지문, 남기기있나, 돌기 };
