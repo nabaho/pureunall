@@ -56,6 +56,18 @@
     });
   }
 
+  /* 📚 지난 건 모두 넣기 (대표 지시 2026-10-05 「지난건 년도별로 넣어라») — 아직 안 넣은 건을 해마다 센다.
+     ⇒ [{ year:'2026', yearDir:'2026년', n }] 최근 해 먼저. 연도를 못 읽는 폴더는 «연도 모름» 한 줄로 모은다. */
+  function groupByYear(list) {
+    var by = {};
+    (list || []).forEach(function (c) {
+      var y = yearOf(c.yearDir), k = y ? String(y) : '';
+      (by[k] = by[k] || { year: k, yearDir: c.yearDir, n: 0 }).n++;
+    });
+    return Object.keys(by).map(function (k) { return by[k]; })
+      .sort(function (a, b) { return (Number(b.year) || 0) - (Number(a.year) || 0); });
+  }
+
   /* 건 폴더 하나의 파일 [{name, relPath, size, mtime}] → 제출서류 기록 한 줄.
      읽지 않는 파일(임시·잠금·md)은 뺀다 — 전체 스캔과 같은 거름망을 쓴다. */
   function buildCaseRecord(caseDir, files, opts) {
@@ -98,7 +110,7 @@
 
   var api = {
     CASE_ROOT: CASE_ROOT, YEAR_DIR: YEAR_DIR, RESULTS: RESULTS,
-    caseDirOf: caseDirOf, freshCases: freshCases, newestFirst: newestFirst, buildCaseRecord: buildCaseRecord,
+    caseDirOf: caseDirOf, freshCases: freshCases, newestFirst: newestFirst, groupByYear: groupByYear, buildCaseRecord: buildCaseRecord,
     filesChanged: filesChanged, refreshCaseRecord: refreshCaseRecord, normResult: normResult
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

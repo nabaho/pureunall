@@ -1329,7 +1329,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
-<script src="js/kcareer-cases.js?v=2"></script>
+<script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
 <script src="js/kcareer-biz.js?v=1"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
@@ -2371,6 +2371,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <input class="tb-input" data-f="q" placeholder="기관·건 이름 검색" style="min-width:220px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
           <button class="btn fs-ui" type="button" onclick="caseCheck({ask:true,changed:true})" title="7번 폴더에서 새로 생기거나 바뀐 지원 건만 찾습니다 — 위촉장·표창은 건드리지 않습니다">🔍 새 지원 건 찾기</button>
+          <button class="btn fs-ui" type="button" onclick="caseImportPast()" title="7번 폴더의 지난 지원 건을 연도별로 골라 한 번에 넣습니다 — 파일은 폴더에 그대로, 위촉장·표창으로 올리지 않습니다">📚 지난 건 모두 넣기</button>
           <button class="btn" type="button" onclick="packOpen()" title="공고문 제출서류 목록대로 번호를 매겨 묶습니다">📦 제출 꾸러미 만들기</button>
           <div class="tb-spacer"></div>
           <span class="cnt" style="font-size:11px;color:var(--text-mute)"></span>
@@ -2821,6 +2822,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <span id="hwpViewFootRead"><button class="btn" onclick="closeHwpView()">닫기</button><button class="btn primary" onclick="rhAutoFillDoc()" title="프로필·경력에서 성명·연락처·학력·경력을 끌어와 이 서식의 빈 칸에 넣습니다">✨ 내 정보로 채우기</button><button class="btn" onclick="hwpViewEdit()" title="한글 프로그램처럼 이 문서를 직접 고칩니다 — 글자를 치고 지우고 표를 손봅니다">✏️ 한글로 고치기</button><button class="btn" id="hwpViewToLib" style="display:none" onclick="hwpViewSaveToLib()" title="고친 서식을 양식 보관함에 «새 줄»로 담습니다 — 원본은 그대로 남습니다">📥 보관함에 담기</button><button class="btn" onclick="hwpViewPdfFile()" title="곧바로 .pdf 파일로 내려받습니다 — 다만 그림이라 글자 복사·검색은 안 됩니다">⬇ PDF 바로받기(그림)</button><button class="btn primary" onclick="hwpViewPdf()" title="인쇄창에서 「PDF로 저장」을 고르면 글자가 살아 있는 PDF가 됩니다 — 복사·검색이 됩니다">🖨 인쇄 · PDF(글자 살아 있음)</button><button class="btn" onclick="hwpViewDownload()">⬇ 파일로 저장</button></span>
       <span id="hwpViewFootEdit" style="display:none"><button class="btn" onclick="hwpViewEditCancel()" title="고친 것을 버리고 보기로 돌아갑니다">↩ 그만두기</button><button class="btn primary" onclick="hwpViewEditDone()" title="고친 내용을 이 창으로 가져옵니다 — 그 다음 인쇄하거나 파일로 저장하세요">✔ 다 고쳤습니다</button></span>
     </div>
+  </div>
+</div>
+<!-- 📚 지난 지원 건 모두 넣기 — 연도별로 골라 (2026-10-05) -->
+<div class="modal-ov" id="modalCasePast">
+  <div class="modal" style="width:560px;max-width:96vw">
+    <div class="modal-h">📚 지난 지원 건 모두 넣기</div>
+    <div class="modal-b" id="casePastBody"></div>
+    <div class="modal-foot"><button class="btn" onclick="document.getElementById('modalCasePast').classList.remove('open')">취소</button><button class="btn primary" id="casePastGo" onclick="casePastGo()">넣기</button></div>
   </div>
 </div>
 <!-- 🏢 사업 서랍 · 7번 폴더 고르기 · 서류 비교 (2026-10-05) -->
@@ -4740,6 +4749,75 @@ function caseRegister(){
   caseBannerDraw();
   try{ renderCareer('submission'); }catch(e){}
   toast('✅ 제출서류에 ' + (n ? '새 건 ' + n + '개 등록' : '') + (n && m ? ' · ' : '') + (m ? '바뀐 건 ' + m + '개 고침' : ''));
+}
+/* ═══ 📚 지난 건 모두 넣기 (대표 지시 2026-10-05 「지난건 년도별로 넣어라» — 목업 ①) ═══
+   7번 폴더의 건 가운데 아직 제출서류에 없는 것을 «해마다» 골라 한 번에 넣는다.
+   ⚠ 파일은 폴더에 그대로 — 이름·크기·수정일만 적는다(fsCaseFiles · 내용을 읽지 않는다, 3,700개를 올리지 않는다).
+   ⚠ 위촉장·표창·자격증으로 올리지 않는다(승격 없음) — 전체 스캔과 다른 점이다. 기록 모양은 KcareerCases 한 곳.
+   ⚠ 지난 건은 «새로» 딱지를 달지 않는다(pastImport) — 236줄에 «새로»가 붙으면 정말 새 건이 안 보인다. */
+var _casePast=null;
+async function caseImportPast(){
+  if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
+  var root=await fsRoot();
+  if(!root){ toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var dirs=await fsCaseDirs(root);
+  if(!dirs){ toast('연결한 폴더 안에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없습니다'); return; }
+  var fresh=KcareerCases.freshCases(dirs, get('submission'), [], { withDismissed:true });
+  var byKey={}; dirs.forEach(function(d){ byKey[KcareerCases.caseDirOf(d.yearDir, d.name)]=d; });
+  _casePast={ fresh:fresh, byKey:byKey, years:KcareerCases.groupByYear(fresh) };
+  casePastDraw();
+  document.getElementById('modalCasePast').classList.add('open');
+}
+function casePastDraw(){
+  var P=_casePast; if(!P) return;
+  var body=document.getElementById('casePastBody'), go=document.getElementById('casePastGo');
+  if(!P.fresh.length){ body.innerHTML='<div class="empty" style="padding:16px">✅ 7번 폴더의 건은 모두 제출서류에 들어 있습니다</div>'; if(go) go.style.display='none'; return; }
+  if(go) go.style.display='';
+  body.innerHTML='<div style="font-size:12.5px;margin-bottom:8px">7. 컨설턴트,위원신청등 — 아직 안 넣은 건 <b>'+P.fresh.length+'개</b></div>'
+    +'<div class="dt"><table><thead><tr><th class="rownum-h" style="width:62px"><input type="checkbox" checked onclick="document.querySelectorAll(\'#casePastBody .row-chk\').forEach(function(x){ x.checked=this.checked; },this);casePastSum()"> №</th><th>연도</th><th style="text-align:right">건</th></tr></thead><tbody>'
+    +P.years.map(function(y,i){ return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="row-chk" value="'+escapeHtml(y.year)+'" checked onchange="casePastSum()"><span>'+(i+1)+'</span></label></td>'
+      +'<td>'+escapeHtml(y.year||'연도 모름')+'</td><td style="text-align:right">'+y.n+'</td></tr>'; }).join('')
+    +'</tbody></table></div>'
+    +'<div style="font-size:11.5px;color:var(--text-mute);margin-top:8px;line-height:1.7">· 건마다 제출서류 한 줄(연도·기관·건 이름·파일 목록) — 제출서류의 「전체 연도」로 해마다 봅니다.<br>'
+    +'· <b>파일은 폴더에 그대로</b> — 어디 있는지만 적습니다(복사하지 않습니다).<br>'
+    +'· <b>위촉장·표창·자격증으로 올리지 않습니다.</b> 연도 칸을 빼면 그 해는 안 넣습니다. 다시 눌러도 이미 넣은 건은 건너뜁니다.</div>';
+  casePastSum();
+}
+function _casePastYears(){ return [].slice.call(document.querySelectorAll('#casePastBody .row-chk:checked')).map(function(x){ return x.value; }); }
+function casePastSum(){
+  var P=_casePast, go=document.getElementById('casePastGo'); if(!P||!go) return;
+  var ys=_casePastYears(), n=P.years.filter(function(y){ return ys.indexOf(y.year)>=0; }).reduce(function(s,y){ return s+y.n; },0);
+  go.textContent=n+'건 넣기'; go.disabled=!n;
+}
+async function casePastGo(){
+  var P=_casePast; if(!P) return;
+  var ys=_casePastYears();
+  var 고른=P.fresh.filter(function(c){ var m=String(c.yearDir||'').match(KcareerCases.YEAR_DIR); return ys.indexOf(m?m[1]:'')>=0; });
+  if(!고른.length){ toast('넣을 연도를 골라 주세요'); return; }
+  var go=document.getElementById('casePastGo'); if(go){ go.disabled=true; go.textContent='⏳ 읽는 중…'; }
+  try{
+    var subs=get('submission'), now=new Date().toISOString(), 파일=0, 해={};
+    var scanId='P'+now.slice(0,10).replace(/-/g,'')+'-'+String(Date.now()).slice(-4);
+    for(var i=0;i<고른.length;i++){
+      var c=고른[i], d=P.byKey[c.caseDir]; if(!d) continue;
+      if(i%10===0) toast('⏳ '+(i+1)+' / '+고른.length+' 건 폴더 살피는 중…');
+      var files=await fsCaseFiles(d.handle, c.caseDir);
+      var rec=KcareerCases.buildCaseRecord(c.caseDir, files, { scanId:scanId });
+      rec.id=kcNextNo('SB',4,'submission',subs); rec.savedAt=now; rec.pastImport=true;
+      subs.push(rec); 파일+=rec.fileCount; 해[rec.year||'?']=1;
+    }
+    /* ⚠ 한 번에 저장한다 — 236번 나눠 저장하면 그때마다 클라우드로 올라간다 */
+    set('submission', subs);
+    var done={}; 고른.forEach(function(c){ done[c.caseDir]=1; });
+    LS.set(NS+'case_dismissed', JSON.stringify(_caseDismissed().filter(function(x){ return !done[x]; })));
+    _caseFound={ fresh:(_caseFound.fresh||[]).filter(function(x){ return !done[x.caseDir]; }), changed:_caseFound.changed||[] };
+    caseBannerDraw();
+    document.getElementById('modalCasePast').classList.remove('open');
+    try{ renderCareer('submission'); }catch(e){}
+    var 연도=Object.keys(해).filter(function(y){ return y!=='?'; }).sort();
+    toast('✅ 제출서류에 '+고른.length+'건 — '+(연도.length?연도[0]+'~'+연도[연도.length-1]:'')+' · 파일 '+파일.toLocaleString()+'개(폴더에 그대로)', 8000);
+  }catch(e){ console.error(e); toast('넣기 실패: '+((e&&e.message)||e)); }
+  finally{ if(go){ go.disabled=false; casePastSum(); } }
 }
 function caseLater(){
   var d = _caseDismissed();
@@ -8679,7 +8757,7 @@ const CAREER_CFG={
   submission:{store:'submission',qFields:['org','title','caseDir'],
     /* 제출·결과 칸 (대표 승인 2026-10-05 목업 ①) — 지원 이력이 한 줄로 보이게 */
     cols:['ID','연도','기관·사업','건 이름','서류','제출','결과','승격','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openSubmissionFiles('${_jsAttr(r.id)}')"><td><span class="id-chip">${r.id}</span>${r.autoCase&&!r.sentAt&&!r.result?' <span class="tag navy" style="font-size:10px">새로</span>':''}</td>
+    row:(r,p)=>`<tr style="cursor:pointer" onclick="openSubmissionFiles('${_jsAttr(r.id)}')"><td><span class="id-chip">${r.id}</span>${r.autoCase&&!r.pastImport&&!r.sentAt&&!r.result?' <span class="tag navy" style="font-size:10px">새로</span>':''}</td>
       <td>${r.year||'-'}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${escapeHtml(r.org||'-')}</strong></td>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.title||'-')}</td>
