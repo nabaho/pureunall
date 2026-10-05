@@ -1318,7 +1318,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
-<script src="js/kcareer-cases.js?v=1"></script>
+<script src="js/kcareer-cases.js?v=2"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -4595,11 +4595,15 @@ async function caseCheck(opts){
   var dirs = await fsCaseDirs(root);
   if(!dirs){ if(opts.ask) toast('연결한 폴더 안에 「' + KcareerCases.CASE_ROOT + '」 폴더가 없습니다'); return; }
   var subs = get('submission');
-  var fresh = KcareerCases.freshCases(dirs, subs, _caseDismissed(), { withDismissed: !!opts.ask });
+  /* ★ 새 건은 올해(와 다음 해) 폴더만 — 1~2월에는 지난해까지(연말에 만든 건을 놓치지 않게).
+     옛 해의 건은 여기서 안 넣는다(제출서류가 비어 236건이 한꺼번에 «새 지원»이 됐다) — 전체 스캔이 맡는다. */
+  var 지금 = new Date(), 부터 = 지금.getFullYear() - (지금.getMonth() < 2 ? 1 : 0);
+  var fresh = KcareerCases.freshCases(dirs, subs, _caseDismissed(), { withDismissed: !!opts.ask, sinceYear: 부터 });
   var byKey = {}; dirs.forEach(function(d){ byKey[KcareerCases.caseDirOf(d.yearDir, d.name)] = d; });
   for(var i = 0; i < fresh.length; i++){
     fresh[i].files = await fsCaseFiles(byKey[fresh[i].caseDir].handle, fresh[i].caseDir);
   }
+  fresh = KcareerCases.newestFirst(fresh);   /* 방금 만든 건이 띠 맨 앞에 */
   var changed = [];
   if(opts.changed){
     if(opts.ask) toast('지원 건 폴더 살피는 중…');
