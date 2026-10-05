@@ -59,7 +59,9 @@
     if (String(co.status || '') !== 'active') return false;
     return String(co.typeCode || '') === '급여';
   }
-  function payrollCos(list) { return (list || []).filter(isPayrollCo); }
+  /* ⚠ 업체 명단은 배열로도, «업체번호 → 업체» 객체로도 온다 — 2026-10 현재 실데이터는
+     객체다(9월엔 배열이었다). 예전처럼 배열만 믿고 .filter 를 부르면 회사 화면이 통째로 죽는다. */
+  function payrollCos(list) { return listOf(list).filter(isPayrollCo); }
 
   /* 이름으로 업체 한 곳 고르기.
      ① «그대로 같은 것»이 먼저다 — 「두레」이 있는데 「두레가축약품」을 고르면 안 된다
@@ -102,36 +104,73 @@
     return map;
   }
 
+  /* 명단을 배열로 편다. 객체로 온 것은 «열쇠가 곧 업체번호»다 — 칸에 id 가 없으면
+     열쇠를 번호로 쓴다(급여데이터함 normalizeCompanies 와 같은 규칙: id → companyId → 열쇠).
+     번호가 어긋나면 데이터함이 실어 보낸 번호와 영영 안 만난다. */
   function listOf(v) {
     var arr = v;
     if (arr && typeof arr === 'object' && arr.v !== undefined) arr = arr.v;
     if (arr && !Array.isArray(arr) && typeof arr === 'object') {
-      arr = Object.keys(arr).map(function (k) { return arr[k]; });
+      var box = arr;
+      arr = Object.keys(box).map(function (k) {
+        var row = box[k];
+        if (!row || typeof row !== 'object') return null;
+        if (row.id || row.companyId) return row.id ? row : Object.assign({}, row, { id: row.companyId });
+        return Object.assign({}, row, { id: k });
+      });
     }
     return Array.isArray(arr) ? arr.filter(Boolean) : [];
+  }
+
+  /* ══════ 이름표 (대표 지시 2026-10-05 「이름표 맞추기는 내가」) ══════
+     payroll_os/site_co_link[급여관리 이름] =
+       { coId, coName, by, at }   이 업체가 맞다 — 번호가 열쇠다
+       { none: true, by, at }     업체가 아니다(폴더 꼬리표 같은 찌꺼기 이름)
+     ⚠ 예전 꼴 { coName } 도 그대로 읽는다(2026-09 에 이름만 적어 둔 것).
+     ⚠ 번호가 이긴다 — 업체관리에서 이름을 고쳐도 번호는 그대로다. */
+  function linkOf(site, links) {
+    var l = (links || {})[String(site || '')];
+    return (l && typeof l === 'object') ? l : null;
+  }
+  function findLinked(l, cos) {
+    var i;
+    if (l.coId) {
+      for (i = 0; i < cos.length; i++) if (cos[i] && String(cos[i].id) === String(l.coId)) return cos[i];
+    }
+    if (l.coName) {
+      for (i = 0; i < cos.length; i++) if (cos[i] && String(cos[i].name) === String(l.coName)) return cos[i];
+    }
+    return null;
   }
 
   /* 사업장 한 곳의 담당 — 화면이 그대로 그릴 수 있는 한 덩이로 돌려준다.
      opts = {companies, dir, links}
        companies : data/companies (배열·{v:…} 아무 꼴이나)
        dir       : data/user_dir
-       links     : payroll_os/site_co_link — 사람이 확정한 짝 {사업장:{coName,by,at}}
+       links     : payroll_os/site_co_link — 대표가 확정한 이름표
 
      돌려주는 것:
-       {업체, 담당, 부담당[], sid, 유형, 상태, 확정, 짐작, 경고}
+       {업체, coId, 담당, 부담당[], sid, subs[], 유형, 상태, 확정, 짐작, 정확, 업체아님, 경고}
+       정확 = 짐작이지만 이름 알맹이가 «똑같다»(꼬리표만 다름). 이름표 화면이
+              「한꺼번에 확정」에 넣는 것은 이것뿐이다.
      ⚠ 못 찾으면 «모른다»고 돌려준다. 지어내지 않는다 — 급여관리 사업장 이름은
-       업체관리에 없는 것이 실제로 있다(세창ENG). */
+       업체관리에 없는 것이 실제로 있다. */
   function staffFor(site, opts) {
     var o = opts || {};
     var cos = listOf(o.companies), dir = nameBySid(o.dir), links = o.links || {};
-    var out = { 사업장: String(site || ''), 업체: '', 담당: '', 부담당: [], sid: '', 유형: '', 상태: '', 확정: false, 짐작: false, 경고: '' };
+    var out = { 사업장: String(site || ''), 업체: '', coId: '', 담당: '', 부담당: [], sid: '', subs: [],
+                유형: '', 상태: '', 확정: false, 짐작: false, 정확: false, 업체아님: false, 경고: '' };
     if (!out.사업장) return out;
 
-    var co = null, fixed = links[out.사업장];
-    if (fixed && fixed.coName) {                       /* ① 사람이 확정한 짝이 이긴다 */
-      co = cos.filter(function (c) { return c && String(c.name) === String(fixed.coName); })[0] || null;
+    var co = null, fixed = linkOf(out.사업장, links);
+    if (fixed && fixed.none) {                          /* ⓪ 대표가 「업체 아님」으로 정리한 이름 */
+      out.업체아님 = true; out.확정 = true;
+      return out;
+    }
+    if (fixed) {                                        /* ① 대표가 확정한 이름표가 이긴다 */
+      co = findLinked(fixed, cos);
       if (co) out.확정 = true;
-      else out.경고 = '사람이 이어 둔 업체(' + fixed.coName + ')를 업체관리에서 못 찾았습니다';
+      else out.경고 = '확정해 둔 업체(' + (fixed.coName || fixed.coId) + ')를 업체관리에서 못 찾았습니다 — 이름표를 다시 맞춰 주세요';
     }
     if (!co) {                                          /* ② 지금 급여를 하는 곳에서 짐작 */
       co = matchCompany(out.사업장, payrollCos(cos)) || matchCompany(stripTag(out.사업장), payrollCos(cos));
@@ -146,43 +185,119 @@
         else if (String(any.status || '') === 'suboffice') out.경고 = '업체관리에 지점으로 담긴 곳입니다';
         else if (any.suspended) out.경고 = '업체관리에서 중단 표시된 업체입니다';
       } else {
-        out.경고 = '업체관리에서 같은 이름을 못 찾았습니다 — 손으로 이어 주세요';
+        if (!out.경고) out.경고 = '업체관리에서 같은 이름을 못 찾았습니다 — 이름표 맞추기에서 골라 주세요';
         return out;
       }
     }
     out.업체 = String(co.name || '');
+    out.coId = String(co.id || '');
     out.유형 = String(co.typeCode || '');
     out.상태 = String(co.status || '');
+    if (out.짐작) {
+      var c = coreName(co.name);
+      out.정확 = !!c && (c === coreName(out.사업장) || c === coreName(stripTag(out.사업장)));
+    }
     out.sid = String(co.managerMain || '');
     out.담당 = out.sid ? (dir[out.sid] || out.sid) : '';
-    out.부담당 = (co.managerSubs || []).map(function (s) { return dir[String(s)] || String(s); });
-    if (!out.sid && !out.경고) out.경고 = '업체관리에 주담당이 비어 있습니다';
+    out.subs = (co.managerSubs || []).map(String).filter(function (x) { return x && x !== out.sid; });
+    out.부담당 = out.subs.map(function (s) { return dir[s] || s; });
+    if (!out.sid && !out.subs.length && !out.경고) out.경고 = '업체관리에 주담당이 비어 있습니다';
     return out;
   }
 
-  /* 사업장 목록을 담당자별로 묶는다.
-     ⚠ 담당을 못 찾은 곳은 «버리지 않고» 맨 뒤 「담당 미확인」 묶음에 모은다 —
-       감추면 그 사업장이 통째로 사라진 줄 안다. */
+  /* 사번의 꼴 — 「글자 하나 + 숫자 두세 자리」(A-001·P-002). 데이터함 SID_RE 와 같다. */
+  var SID_RE = /^[A-Za-z]-?\d{2,3}$/;
+
+  /* 사번을 줄 세우는 열쇠 — 급여데이터함(pu-paydata-store.js sidKey)과 같은 규칙.
+     A-9 가 A-10 보다 앞이어야 하고, 사번이 아닌 값은 맨 뒤다. */
+  function sidKey(sid) {
+    var m = String(sid || '').match(/^([A-Za-z])-?(\d{1,4})$/);
+    if (!m) return 'zz' + String(sid || '');
+    return m[1].toUpperCase() + ('000' + m[2]).slice(-4);
+  }
+
+  /* 사업장 목록을 담당자별로 묶는다 — ★ 급여데이터함 담당자 명단과 «같은 규칙».
+     (대표 지시 2026-10-05 「형태나 유형을 일치시켜 연결성을 강하게」)
+       · 주담당과 부담당 **둘 다**의 묶음에 들어간다(데이터함 managerRoster 와 같다).
+         예전엔 주담당만 세어, 같은 사람이 두 앱에서 다른 숫자를 봤다.
+       · 사번 순으로 세운다(데이터함과 같은 차례).
+       · 담당을 못 찾은 곳은 「담당 미확인」, 대표가 업체 아님으로 정리한 이름은
+         「업체 아님」 — 둘 다 «버리지 않고» 맨 뒤에 모은다.
+     검사: tests/staff-roster-same.test.js 가 데이터함 managerRoster 와 실제로 견준다. */
   function groupByStaff(sites, opts) {
-    var by = {}, order = [], none = [];
+    var dir = nameBySid((opts || {}).dir);
+    var bySid = {}, order = [], none = [], notCo = [];
     (sites || []).forEach(function (s) {
       var st = staffFor(s, opts);
-      if (!st.담당) { none.push({ site: s, staff: st }); return; }
-      if (!(st.담당 in by)) { by[st.담당] = []; order.push(st.담당); }
-      by[st.담당].push({ site: s, staff: st });
+      if (st.업체아님) { notCo.push({ site: s, staff: st }); return; }
+      var sids = [], seen = {};
+      [st.sid].concat(st.subs || []).forEach(function (x) {
+        x = String(x || ''); if (!x || seen[x]) return; seen[x] = 1; sids.push(x);
+      });
+      if (!st.업체 || !sids.length) { none.push({ site: s, staff: st }); return; }
+      sids.forEach(function (sid) {
+        if (!bySid[sid]) { bySid[sid] = { sid: sid, 담당: dir[sid] || sid, rows: [] }; order.push(sid); }
+        bySid[sid].rows.push({ site: s, staff: st, 역할: sid === st.sid ? '주' : '부' });
+      });
     });
-    order.sort(function (a, b) { return by[b].length - by[a].length || a.localeCompare(b); });
-    var out = order.map(function (n) { return { 담당: n, rows: by[n] }; });
+    /* 차례 — 데이터함 managerRoster 와 똑같이: 사번 꼴(SID_RE)인 사람은 사번 순,
+       사번 꼴이 아닌 값(담당 칸에 이름·메모가 든 것)은 **맨 아래** 이름순.
+       사이에 섞이면 멀쩡한 담당자처럼 보여 고쳐야 할 것이 묻힌다. */
+    order.sort(function (a, b) {
+      var ba = !SID_RE.test(a), bb = !SID_RE.test(b);
+      if (ba !== bb) return ba ? 1 : -1;
+      if (ba) return String(bySid[a].담당).localeCompare(String(bySid[b].담당), 'ko');
+      var x = sidKey(a), y = sidKey(b); return x < y ? -1 : (x > y ? 1 : 0);
+    });
+    var out = order.map(function (sid) { return bySid[sid]; });
     if (none.length) out.push({ 담당: '담당 미확인', rows: none, 미확인: true });
+    if (notCo.length) out.push({ 담당: '업체 아님', rows: notCo, 업체아님: true });
     return out;
+  }
+
+  /* 데이터함이 넘긴 도착 알림 한 줄이 이 사업장 것인가.
+     ① 알림에 업체번호가 있고 이름표에도 번호가 있으면 **번호로만** 본다 —
+        번호가 다르면 이름이 비슷해도 남의 것이다(같은 이름의 지점이 실제로 있다).
+     ② 번호로 못 보면 이름으로 본다: 급여관리 이름, 그리고 이름표에 적힌 업체 이름.
+     ③ 「업체 아님」으로 정리한 이름에는 아무것도 붙이지 않는다. */
+  function arrivalMatches(rec, site, links) {
+    if (!rec || !rec.사업장 && !rec.companyId) return false;
+    var l = linkOf(site, links);
+    if (l && l.none) return false;
+    if (rec.companyId && l && l.coId) return String(rec.companyId) === String(l.coId);
+    var names = [String(site || '')];
+    if (l && l.coName) names.push(String(l.coName));
+    var want = String(rec.사업장 || ''), wk = coreName(want);
+    return names.some(function (n) { return n === want || (!!wk && coreName(n) === wk); });
+  }
+
+  /* 이름표 화면의 「다른 업체 고르기」 후보 — 지금 급여를 하는 곳이 먼저,
+     이름 알맹이가 똑같은 곳이 그다음, 짧은 이름이 그다음. */
+  function candidates(q, companies, limit) {
+    var cos = listOf(companies), want = coreName(q), n = limit || 30;
+    var hit = cos.filter(function (c) {
+      if (!c || !c.name) return false;
+      if (!want) return isPayrollCo(c);
+      var cn = coreName(c.name);
+      return !!cn && (cn.indexOf(want) >= 0 || want.indexOf(cn) >= 0);
+    });
+    hit.sort(function (a, b) {
+      var pa = isPayrollCo(a) ? 0 : 1, pb = isPayrollCo(b) ? 0 : 1;
+      if (pa !== pb) return pa - pb;
+      var ea = coreName(a.name) === want ? 0 : 1, eb = coreName(b.name) === want ? 0 : 1;
+      if (ea !== eb) return ea - eb;
+      return String(a.name).localeCompare(String(b.name), 'ko');
+    });
+    return hit.slice(0, n);
   }
 
   var API = {
     coreName: coreName, stripTag: stripTag,
     isPayrollCo: isPayrollCo, payrollCos: payrollCos,
     matchCompany: matchCompany,
-    sidToEmail: sidToEmail, nameBySid: nameBySid,
-    staffFor: staffFor, groupByStaff: groupByStaff
+    sidToEmail: sidToEmail, nameBySid: nameBySid, sidKey: sidKey,
+    linkOf: linkOf, staffFor: staffFor, groupByStaff: groupByStaff,
+    arrivalMatches: arrivalMatches, candidates: candidates
   };
 
   global.PuSiteStaff = API;

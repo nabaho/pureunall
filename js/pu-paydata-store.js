@@ -1770,6 +1770,12 @@
       ts: at,
       filename: o.companyName + ' ' + o.month + ' 값 ' + Number(o.rowCount || 0) + '줄',
       사업장: o.companyName,
+      /* ★ 업체번호를 함께 싣는다 (대표 지시 2026-10-05 「연결성을 강하게」).
+         급여관리는 사업장을 급여대장 «폴더 이름»으로 부르고, 여기는 업체관리
+         «정식 이름»으로 부른다 — 글자로 견주면 44곳 중 20곳이 안 붙었다
+         (「다온원」↔「농업회사법인 주식회사 다온원」 같은 꼴). 번호는 어긋나지 않는다.
+         급여관리는 대표가 확정한 이름표(payroll_os/site_co_link)로 이 번호를 찾는다. */
+      companyId: String(o.companyId || ''),
       월: o.month,
       종류: o.kindLabel || '급여데이터함 값',
       줄수: Number(o.rowCount || 0),

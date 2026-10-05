@@ -67,7 +67,10 @@ function load(opts) {
     /* ④ 목록이 직원 표를 건드리면 여기서 터진다 */
     몰래부르면터진다('siteEmployees'),
     몰래부르면터진다('ensureEmps'),
+    'var isAdminUser = ' + JSON.stringify(o.isAdmin !== false) + ';',
+    'function navTo(){}',
     cut('staffOf'), cut('hubCounts'), cut('hubRow'), cut('screenHub'), cut('hubPickHtml'),
+    cut('nameState'), cut('linkStats'), cut('namesBanner'),
     'globalThis.screenHub = screenHub; globalThis.hubPickHtml = hubPickHtml; globalThis.hubCounts = hubCounts;'
   ].join('\n')).runInContext(sandbox);
   return sandbox;
