@@ -6,6 +6,8 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { cutFn } = require('./cut-fn');
+
 const photos = fs.readFileSync(path.join(__dirname, '..', 'pu-photos.html'), 'utf8');
 const cards  = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
 
@@ -99,8 +101,13 @@ test('기업정보에서 새 창으로 열되 «한 창»만 쓴다', () => {
   /* ⚠ 2026-09-08 — 창 이름을 «앱이 짓지 않는다». 공용 층(PuAppBar.goApp)이 주소에서
        뽑는다(대표 지시 「모든 창은 2개가 열리지 않고 하나만」). 여기서는 «공용 층을
        쓰는가»만 보고, 이름이 실제로 같은지는 one-window-per-app 이 돌려서 본다. */
-  assert.match(cards, /PuAppBar\.goApp\('pu-photos\.html\?' \+ q\)/,
+  /* ⚠ 2026-10-05 — 여는 대목이 goPhotos 한 곳으로 모였다(메일 첨부를 건네는 길이
+       생기며 여는 곳이 둘이 될 뻔했다). 그래서 «그 한 곳이 공용 층을 쓰는가»와
+       «openCoDoc 이 그 한 곳을 거치는가»를 본다 — 글자 모양을 박지 않는다. */
+  assert.match(cutFn(cards, 'function goPhotos('), /PuAppBar\.goApp\(/,
     '★ 공용 층으로 열지 않으면 창 이름이 앱마다 갈려 탭이 쌓입니다');
+  assert.match(cutFn(cards, 'function openCoDoc('), /goPhotos\(/,
+    '★ 사진첩을 여는 «한 곳»을 거치지 않으면 창이 둘이 됩니다');
   assert.doesNotMatch(cards, /window\.open\('pu-photos\.html/,
     '★★ 사진첩을 «직접» 여는 곳이 되살아났습니다 — 그 길만 다시 탭을 쌓습니다');
   assert.match(cards, /onclick="openCoDoc\(/);
@@ -128,8 +135,10 @@ test('주소에 넣는 값은 인코딩한다', () => {
   /* ⚠ 2026-09-08 — 창 이름은 «앱이 짓지 않는다». 공용 층(PuAppBar.goApp)이 주소에서
        뽑는다(대표 지시 「모든 창은 2개가 열리지 않고 하나만」). 그래서 CO_DOC_WIN 대신
        PuAppBar 를 넣어 준다 — 여기서 재는 것은 «주소를 제대로 감쌌나»이고 그대로다. */
+  /* ⚠ 2026-10-05 — 실제로 여는 대목은 goPhotos 로 옮겼다. 둘을 함께 실어야
+       예전과 같은 것을 본다(하나만 실으면 길이 끊겨 헛돈다). */
   new Function('encodeURIComponent', 'toast', 'PuAppBar',
-    body + "\nopenCoDoc('2026&x', 'p 1=2&z', 'u#1');")(
+    cutFn(cards, 'function goPhotos(') + '\n' + body + "\nopenCoDoc('2026&x', 'p 1=2&z', 'u#1');")(
     encodeURIComponent, function () { },
     { goApp: function (u) { url = u; return { focus: function () { } }; } });
 

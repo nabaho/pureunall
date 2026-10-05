@@ -210,32 +210,58 @@ function renamedPath(path, name, delim) {
   return at > 0 ? p.slice(0, at + d.length) + String(name) : String(name);
 }
 
-/* ── 첨부가 몇 개인가 ──
-   본문을 내려받지 않고 **구조만** 보고 센다. 본문에 박힌 그림(서명 로고 등)은
-   첨부가 아니다 — 그것까지 세면 거의 모든 메일에 📎 가 붙어 표시가 뜻을 잃는다. */
-function attCount(node, depth) {
+/* ── 첨부 «목록» ──
+   본문을 내려받지 않고 **구조만** 보고 고른다. 본문에 박힌 그림(서명 로고 등)은
+   첨부가 아니다 — 그것까지 세면 거의 모든 메일에 📎 가 붙어 표시가 뜻을 잃는다.
+
+   ★ 2026-10-05: 세는 것과 «이름 모으는 것»을 한 함수로 합쳤다.
+     따로 두면 「무엇을 첨부로 보는가」가 두 벌이 되어 조용히 어긋난다
+     (📎 숫자는 2인데 이름은 3개 같은 일). attCount 는 이제 이것의 길이다. */
+function attList(node, depth) {
   const n = node;
-  if (!n || (depth || 0) > 8) return 0;
+  if (!n || (depth || 0) > 8) return [];
   const disp = String(n.disposition || '').toLowerCase();
   const type = String(n.type || '').toLowerCase();
-  const named = !!(n.dispositionParameters && n.dispositionParameters.filename) ||
-                !!(n.parameters && n.parameters.name);
+  const 이름 = (n.dispositionParameters && n.dispositionParameters.filename) ||
+               (n.parameters && n.parameters.name) || '';
+  const named = !!이름;
+  const 한개 = () => [{ n: String(이름 || '').replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80),
+                        m: type, s: Number(n.size || 0) }];
   /* ⚠ 첨부인지 «먼저» 본다 — 안으로 파고들기 전에.
      전달된 메일이 통째로 첨부된 것(message/rfc822)은 그 «안에» 또 조각이 들어 있다.
      먼저 파고들면 사람이 보는 첨부 한 개(전달된메일.eml) 대신 그 안의 것들이 세어져
      📎 개수가 엉뚱해진다. 사람 눈에 그것은 «파일 하나»다.
      (예전 차례로는 첨부인지 보기 전에 childNodes 부터 훑었다 — 2026-08-27 실측) */
-  if (disp === 'attachment') return 1;
+  if (disp === 'attachment') return 한개();
   /* 이름이 붙은 inline 은 사람이 「첨부」로 여긴다 — 단, cid 로 본문에 박힌 것은 뺀다 */
-  if (disp === 'inline' && named && !n.id) return 1;
+  if (disp === 'inline' && named && !n.id) return 한개();
   /* disposition 이 아예 없는 옛 메일 — 본문(text/*) 이 아니고 이름이 있으면 첨부다 */
-  if (!disp && named && type.indexOf('text/') !== 0) return 1;
-  let sum = 0;
+  if (!disp && named && type.indexOf('text/') !== 0) return 한개();
+  let out = [];
   const kids = n.childNodes || n.children;
   if (Array.isArray(kids)) {
-    for (let i = 0; i < kids.length; i++) sum += attCount(kids[i], (depth || 0) + 1);
+    for (let i = 0; i < kids.length; i++) out = out.concat(attList(kids[i], (depth || 0) + 1));
   }
-  return sum;
+  return out;
+}
+
+function attCount(node, depth) {
+  return attList(node, depth).length;
+}
+
+/* 거울에 담을 첨부 이름 — 몇 개만, 짧게.
+   ⚠ 이 자리는 «몇 만 줄»이 오가므로 길이가 그대로 요금이다. 이름만 담고
+     크기·종류·조각번호는 안 담는다 — 그것들은 메일을 열 때 실제 구조에서 본다.
+   ⚠ 이름이 없는 첨부(ATT00001 같은 것)는 빈 글자로 두지 않고 아예 뺀다 —
+     빈 글자를 만 줄 적으면 그것도 값이다. */
+function attNames(node, max) {
+  const n = Math.max(1, Number(max || 5));
+  const out = [];
+  attList(node, 0).forEach((a) => {
+    const name = String((a && a.n) || '').trim();
+    if (name && out.length < n) out.push(name.slice(0, 60));
+  });
+  return out;
 }
 
 /* ── 미리보기에 쓸 «본문 조각» 은 어디 있나 ──
@@ -409,7 +435,7 @@ function previewFrom(buf, tp) {
    표시(hi·lo)가 다 찼다고 되어 있어 다시 가져오지도 않는다 — 그러면 옛 줄은 영원히
    반쪽이다. 그래서 번호를 붙여 두고, 번호가 다르면 그 폴더만 처음부터 다시 훑는다.
    ⚠ 줄에 칸을 더할 때마다 이 번호를 올린다. 안 올리면 새 칸은 «새 메일에만» 붙는다. */
-const ROW_VER = 5;   /* 4→5: 글 조각에 실려 온 CSS 도 걷는다 */
+const ROW_VER = 6;   /* 5→6: 첨부 «이름»(an)을 담는다 — 옛 줄에는 없어 다시 훑는다 */
 
 function needsRefetch(sync) {
   return Number((sync || {}).ver || 0) !== ROW_VER;
@@ -468,6 +494,11 @@ function msgRow(msg, preview) {
     w: hasFlag(m.flags, '\\Answered') ? 1 : 0,
     a: attCount(m.bodyStructure, 0),
     z: Number(m.size || 0),
+    /* 첨부 «이름» — 2026-10-05, 대표 지시 「메일에 들어온 서류를 자동으로」의 0걸음.
+       여태 거울에는 「첨부 있음(a:1)」만 있어 **무엇이 왔는지 알 길이 없었다** —
+       사업자등록증인지 급여명세인지 모르니 고를 수가 없다(최근 90일 첨부 1,953통).
+       이름이 있으면 요금 0원으로 고를 수 있다. 없으면 칸을 아예 안 만든다. */
+    ...(attNames(m.bodyStructure, 5).length ? { an: attNames(m.bodyStructure, 5) } : {}),
     /* 미리보기 — 폰 목록의 셋째 줄. 없으면 아예 칸을 안 만든다(빈 글자를 만 줄 적으면 그것도 값이다) */
     p: String(preview || '').slice(0, PREVIEW_MAX),
   };
@@ -667,7 +698,7 @@ module.exports = {
   safeKey, hash8, slugOf,
   folderKind, folderOrder, isSyncable, isWanted, SKIP_KINDS, folderRecord,
   wantsMsgs, NO_MSG_KINDS,
-  attCount, oneAddr, addrList, hasFlag, msgRow,
+  attCount, attList, attNames, oneAddr, addrList, hasFlag, msgRow,
   folderNameBad, childPath, renamedPath,
   textPartOf, decodePart, toText, looksUtf8, previewFrom, unentity, isHeadLine, PREVIEW_MAX,
   ROW_VER, needsRefetch, folderDone,

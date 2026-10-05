@@ -49,6 +49,10 @@ function run(o) {
     }
   };
   vm.createContext(ctx);
+  /* ⚠ 2026-10-05 — 창을 «실제로 여는» 대목이 goPhotos 한 곳으로 모였다(메일 첨부를
+       건네는 길이 생기며 여는 곳이 둘이 될 뻔했다). openCoDoc 은 그것을 부른다.
+       둘을 함께 실어야 예전과 같은 것을 본다 — 하나만 실으면 길이 끊겨 헛돈다. */
+  vm.runInContext(cutFn(CARDS, 'function goPhotos('), ctx);
   vm.runInContext(cutFn(CARDS, 'function openCoDoc('), ctx);
   return { ctx: ctx, opened: opened, focused: function () { return focused; }, nav: bar.__nav };
 }
