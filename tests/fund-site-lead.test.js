@@ -111,6 +111,8 @@ function 줄그리기(site, 별쓰나) {
     'function num(v){ return Number(v)||0; }',
     'function _siteContacts(){ return {name:"",mobile:"",email:""}; }',
     'function _siteWrep(){ return {name:""}; }',
+    /* 상호 옆 🔗 업체관리 딱지(2026-10-05 사내기금 모회사) — 별과는 따로다. 여기서는 비워 둔다 */
+    'function siteCoChip(){ return ""; }',
     'var 별쓰나=LEAD;',
     'this.row=function(s,i){ ' + body + ' };'
   ].join('\n')).call(box, null, 별쓰나);

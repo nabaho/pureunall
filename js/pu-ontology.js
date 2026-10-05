@@ -64,7 +64,10 @@
       /* 업무 → 그 업무를 낳은 연락 (2026-10-03 급여데이터함 「입퇴사 할 일」).
          메일 속 「입사자 ○○」가 취득신고 할 일이 된다 — 그 할 일이 «어느 메일에서 왔나».
          ⚠ derivedFrom 은 목적어가 계약·사건·문서라 연락(Message)을 못 가리켰다. */
-      raisedBy:['Task','Message']
+      raisedBy:['Task','Message'],
+      /* 근로복지기금 → 출연하는 회사 (대표 지시 2026-10-05 「복지기금과 회사는 별개의 회사이다 … 반드시 관련회사로」).
+         ⚠ 둘은 따로 있는 업체다 — 합치지 않는다. 기금관리 참여사업장 줄(fund_erp/sites)의 puerp_co_id 가 회사 id 를 가리킨다. */
+      fundedBy:['Organization','Organization']
     }
   };
 
@@ -345,6 +348,7 @@
     fulfills:'계약 이행 — 어떤 일이 계약을 채웠는지 기준이 없다',
     supersedes:'개정 관계 — 취업규칙 대조표를 통합 화면에서 읽지 않는다',
     groundedIn:'검토 기준→법 조문 — 연결표는 js/pu-rules-lawlink.js 에 있다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다',
+    fundedBy:'기금→출연회사 — 기금관리 참여사업장 줄의 puerp_co_id(업체관리 id)로 잇는다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다',
     raisedBy:'할 일→그것을 낳은 메일 — 급여데이터함 paydata/hrtask 의 sourceId 가 paydata/maillog 열쇠를 가리킨다. 관계 색인(ontology/v1)이 아직 꺼져 있어 색인에는 안 넣는다'
   };
 

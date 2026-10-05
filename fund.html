@@ -8,7 +8,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=48"></script>
+<script src="js/pu-ontology.js?v=49"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -1262,6 +1262,7 @@ function fundRow(f,no,mode,showReg,showGov){
   var n=nDone(f); var chip=n===5?'<span class="chip ok">정보 완비</span>':n>=3?'<span class="chip warn">정보 '+n+'/5</span>':'<span class="chip dg">정보 '+n+'/5</span>';
   var subn=mgrSubNames(f);
   var setupB=(f.setup_stage==='설립준비')?' <span class="chip warn" style="font-size:10px">🏗 설립중</span>':'';
+  setupB+=fundSiteChip(f);   /* 🔗 모회사 없음 · 참여사업장 0곳 (대표 지시 2026-10-05 「항상체크해라」) */
   var _gc=grp(f)==='지역공동'?fundGovCell(f._id):{t:'<span class="muted">—</span>',title:''};
   return '<tr onclick="go(\'fund\',\''+f._id+'\')"><td class="no">'+no+'</td>'
     +'<td style="font-weight:700">'+esc(f.short_name||f.name)+setupB+'<div class="muted ph" style="font-weight:400;font-size:11.5px">'+esc(f.name||'')+'</div></td>'
@@ -1975,6 +1976,7 @@ function renderHome(){
   var head=offlineBanner()+'<div class="panel'+_qo+'" id="homehead" style="padding:10px 14px"><div class="row" style="gap:8px;flex-wrap:wrap">'
     +'<h1 style="font-size:17px;margin:0">'+_hdTitle(_GL[S.homeTab]||'기금 현황')+'</h1>'
     +'<span class="stat'+(regSel?' hd-pc':'')+'">'+_curList.length+'</span>'
+    +homeNoParentStat(live)
     +(curInc?'<span class="stat" style="background:var(--warn-bg);color:var(--warn);border-color:transparent"><span class="hd-pc">미완비 </span><span class="hd-m">⚠ </span>'+curInc+'</span>':'')
     +'<span class="hd-pc" style="display:contents">'+_bar+homeViewBar()+(regBar?_bar+regBar:'')+'</span>'
     +homeViewSel()+regSel+hlp('home.view')
@@ -2048,6 +2050,7 @@ function renderHome(){
   } else {
     var cur=(G[S.homeTab]||[]).slice();
     if(edit&&S.homeInc) cur=cur.filter(function(f){return nDone(f)<5;});
+    if(S.homeNoPar&&S.homeTab==='사내') cur=cur.filter(fundNoParent);
     /* 분류 나누기 — 고르는 곳(칩)은 머리줄에 있고, 여기서는 그 선택을 «따르기만» 한다.
        칩과 본문이 각자 나누면 「충남 12」인데 표에는 11줄 같은 어긋남이 생긴다. */
     if(_rs && _rk.length>1 && cur.length){
@@ -2857,7 +2860,7 @@ function _rvItems(D,yr){
 var RV_KINDS=[['all','전체'],['prov','칸 값'],['est','추정 출연금'],['xfer','이체 짝'],['txn','분개 승인']];
 function _rvSrcLabel(src){
   src=String(src||'');
-  var m={card:'기업정보함','guess:office':'소재지로 추정','import:fundinfo':'기금정보 가져오기','import:subsidy':'지원금 자료 가져오기',
+  var m={card:'기업정보함',erp:'업체관리','guess:office':'소재지로 추정','import:fundinfo':'기금정보 가져오기','import:subsidy':'지원금 자료 가져오기',
     'import:xlsx':'엑셀 등록','import:json':'JSON 가져오기','rule:urep_same':'사용자대표=대표자(한번에)','copy:prev':'작년 값 불러오기',
     'calc:budget':'예산 자동 계산','calc:rate':'사람수 × 단가','scan:wrep':'재직증명서 판독','scan:committee':'위원 명단 판독',
     'scan:bizreg':'사업자등록증 판독'};
@@ -9978,7 +9981,8 @@ function renderFund(){
     +(setupMode?'<div class="tab'+(S.tab==='setup'?' on':'')+'" onclick="goTab(\'setup\')">🏗 설립 진행</div>':'')
     +TABS.map(function(t){
     if(t[0]==='subsidy'&&f.fund_type==='사내') return '';   // 지원금은 공동 전용
-    if(t[2]) return '<div class="tab'+(S.tab===t[0]?' on':'')+'" onclick="goTab(\''+t[0]+'\')">'+t[1]+'</div>';
+    if(t[2]) return '<div class="tab'+(S.tab===t[0]?' on':'')+'" onclick="goTab(\''+t[0]+'\')">'+t[1]
+      +(t[0]==='sites'&&fundNoParent(Object.assign({_id:S.fundId},f))?' <span class="chip warn" style="font-size:9.5px" title="사내기금의 모회사(출연회사)가 아직 참여사업장에 없습니다">🔗 모회사 없음</span>':'')+'</div>';
     return '<div class="tab soon" title="다음 단계에서 추가">'+t[1]+' ·</div>';
   }).join('')+'<div class="tab'+(S.tab==='docs'?' on':'')+'" onclick="goTab(\'docs\')" title="이 기금 데이터로 채워진 서식 보기·수정·출력 (인가~인센티브 전 단계)">📑 서식</div></div>';
   if(S.tab==='subsidy'&&f.fund_type==='사내') S.tab='info';
@@ -12748,7 +12752,7 @@ function _provSub(fid){
   PV.ref.on('value',function(sn){ if(PV.fid!==fid) return; PV.v=sn.val()||{}; _provPaint();
     if(typeof _formGatePaint==='function') _formGatePaint(); },function(){ PV.v={}; });   // 서식 목록의 🤖 미확인 N 도 함께
 }
-var PV_SRC={hand:'사람',card:'기업정보함',auto:'기계','guess:office':'소재지로 추정','copy:prev':'작년 값','calc:budget':'계산','calc:rate':'사람수 × 단가'};
+var PV_SRC={hand:'사람',card:'기업정보함',erp:'업체관리',auto:'기계','guess:office':'소재지로 추정','copy:prev':'작년 값','calc:budget':'계산','calc:rate':'사람수 × 단가'};
 function _provSrcLabel(src){
   src=String(src||'');
   if(PV_SRC[src]) return PV_SRC[src];
@@ -13002,7 +13006,10 @@ function setSiteOnly(v){ _siteOnly=(_siteOnly===v)?'':v; renderFund(); }
 function sitesTab(){
   if(S.sitesFor!==S.fundId){
     var _fid=S.fundId; S.sitesFor=_fid; S.sites=null;
-    fbDb.ref(NS+'/sites/'+_fid).once('value').then(function(s){ if(S.sitesFor!==_fid)return; S.sites=s.val()||{}; if(S.tab==='sites'&&S.view==='fund'&&S.fundId===_fid) renderFund(); })
+    fbDb.ref(NS+'/sites/'+_fid).once('value').then(function(s){ if(S.sitesFor!==_fid)return; S.sites=s.val()||{};
+      /* 목록의 「🔗 모회사 없음」이 쓰는 전체 사본도 이 기금 몫을 새로 받은 것으로 — 저장·삭제·가져오기 뒤 늘 여기를 지난다 */
+      if(_allSites) _allSites[_fid]=JSON.parse(JSON.stringify(S.sites));
+      if(S.tab==='sites'&&S.view==='fund'&&S.fundId===_fid) renderFund(); })
       .catch(function(e){ if(S.sitesFor===_fid){S.sitesFor=null;} if(S.tab==='sites'&&S.view==='fund') renderFund(); });
     return '<div class="panel">'+loadingHTML()+'</div>';
   }
@@ -13070,7 +13077,7 @@ function sitesTab(){
       +'<td onclick="event.stopPropagation()" style="text-align:center"><input type="checkbox"'+(s.partner?' checked':'')
         +' onchange="setSitePartner(\''+s._id+'\',this.checked)" title="협력업체로 표시 — 별지15호 ⑩ 협력업체 근로자 수에 합산"></td>'
       +'<td class="no">'+(i+1)+'</td>'
-      +'<td style="font-weight:700">'+별칸+esc(s.name||'—')+'</td><td class="ph">'+esc(s.ceo||'—')+'</td>'
+      +'<td style="font-weight:700">'+별칸+esc(s.name||'—')+siteCoChip(s)+'</td><td class="ph">'+esc(s.ceo||'—')+'</td>'
       /* 업종은 «남긴다» — 넷만 남기면 411px 에 빈 자리가 생기는데(대표 지시 「빈공간이 많다」),
          한 기업을 한 줄로 알아보는 데 상호 다음으로 말이 많은 칸이 업종이다. */
       +'<td class="ph">'+esc(s.biz_no||'—')+'</td><td>'+esc(s.biz_type||'—')+'</td>'
@@ -13153,8 +13160,13 @@ function sitesTab(){
     +'<div class="row" style="gap:8px;justify-content:center;flex-wrap:wrap">'
     +'<button class="primary" onclick="editSite(\'\')">+ 한 곳씩 직접</button>'
     +'<button onclick="openCardPick(\'site\')" title="푸른 기업정보함에서 여러 곳을 한 번에 고릅니다">🏢 기업정보함에서</button>'
+    +'<button onclick="openErpCoPick(\'new\')" title="업체관리(푸른이알피)의 회사를 골라 업체 번호로 이어 넣습니다">🔗 업체관리에서</button>'
     +엑셀+'</div></div>';
-  return '<div class="panel" style="padding:10px 14px">'+머리+고르는줄
+  /* ★ 사내기금인데 한 곳도 없다 = 모회사가 빠졌다(대표 지시 2026-10-05 「항상체크해라」) — 맨 위에 후보 */
+  var _fcur=funds[S.fundId]||{};
+  var 모회사칸=(!있음&&!isYr&&!isPpl&&_fcur.fund_type==='사내')?fundParentBox(Object.assign({_id:S.fundId},_fcur)):'';
+  if(있음||모회사칸) erpCoLoad();   /* 명부의 🔗 딱지·후보에 쓴다 — 한 번만 읽는다 */
+  return '<div class="panel" style="padding:10px 14px">'+머리+모회사칸+고르는줄
     +(isYr ? sitesYearBody(arr) : isPpl ? sitesPeopleBody(arr)
       : (있음 ? '<div id="siteXlsxOut"></div>'+tbl : 빈안내)+탈퇴칸)
     +'</div>';
@@ -13170,6 +13182,7 @@ function siteToolsMenu(){
   return '<details class="tmenu"><summary title="가끔 쓰는 가져오기·맞추기 도구">⋯ 도구</summary>'
     +'<div class="tmlist">'
     +줄("openCardPick('site')",'🏢 기업정보함에서 고르기','푸른 기업정보함에서 여러 곳을 한 번에 골라 추가합니다')
+    +줄("openErpCoPick('new')",'🔗 업체관리에서 고르기','업체관리(푸른이알피)의 회사를 골라 업체 번호로 이어 추가합니다 — 사내기금의 모회사')
     +줄('bulkSiteCards()','🏢 빈 칸 일괄 채우기','참여사업장 전체를 기업정보함과 맞춰 빈 칸만 한꺼번에 채웁니다')
     /* ⓘ 는 «서랍 안에» 함께 둔다 — 딸린 설명이라 단추와 떨어지면 무엇의 설명인지 모른다 */
     +'<div style="display:flex;align-items:center">'
@@ -13491,6 +13504,8 @@ function editSite(sid,prefill){
        · 재직증명서·중소기업확인서 — 없애지 않고 [👤 사람] 보기로 «옮겼다». 그 둘은
          기업정보함에 없는 것이라(한 사람의 증명서, 해마다 새로 떼는 확인서) 길이 있어야 한다.
          거기서 읽으면 이 창이 값과 함께 다시 열린다 — 돌아오는 길은 그대로다. */
+    /* 🔗 업체관리 회사와 잇는 줄 — 사내기금의 모회사(대표 지시 2026-10-05). 그리는 것은 siteCoBarPaint */
+    +'<div id="siteCoBar"></div>'
     +'<div id="siteDocOut" style="margin:0 0 10px"></div>'
     +'<div class="secbox"><div class="bh">🏢 기업정보 <span class="d">— 상호·번호·규모 등</span></div>'
       +'<div class="gridw">'+flds+'<div class="fld full"><label>소재지</label>'+_addrStack('se-',s,'siteAddrSearch')+'<input type="hidden" id="se-address_alt" value="'+esc(s.address_alt||'')+'">'+'</div></div></div>'
@@ -13506,7 +13521,7 @@ function editSite(sid,prefill){
     +'<div class="row" style="justify-content:flex-end;margin-top:16px">'
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
-    ,{after:bindSiteDocIntake});
+    ,{after:function(){ bindSiteDocIntake(); siteCoBarPaint(); }});
   if(typeof _provApplyPend==='function') _provApplyPend();   // 판독·기업정보함으로 채워 연 칸에 «기계» 표시
 }
 /* 「대표자와 같은 사람」을 켜고 끌 때 성명 칸을 즉시 맞춘다 — 저장해 봐야 아는 것이 아니라
@@ -13577,16 +13592,242 @@ function saveSite(sid){
        set(전체 덮어쓰기)으로 바꾸면 저장할 때마다 재직증명서 연결이 사라진다. */
     if(obj.status) patch.status=obj.status;
     ['leave_date','biz_closed','biz_closed_date'].forEach(function(k){ if(Object.prototype.hasOwnProperty.call(obj,k)) patch[k]=obj[k]; });
-    fbDb.ref(NS+'/sites/'+_fid+'/'+sid).update(patch).then(function(){ _trk(sid,patch,base,'사업장 저장'); done(); }).catch(err);
+    fbDb.ref(NS+'/sites/'+_fid+'/'+sid).update(patch).then(function(){ _trk(sid,patch,base,'사업장 저장'); _allSitesPut(_fid,sid,patch); done(); }).catch(err);
   }else{
     var _nref=fbDb.ref(NS+'/sites/'+_fid).push();
-    _nref.set(obj).then(function(){ _trk(_nref.key,obj,{},'사업장 추가'); done(); }).catch(err);
+    _nref.set(obj).then(function(){ _trk(_nref.key,obj,{},'사업장 추가'); _allSitesPut(_fid,_nref.key,obj); done(); }).catch(err);
   }
 }
 /* 「푸른이알피 업체 연결」은 2025년에 «불필요»로 단추를 뗐고(4d7937b), 그 뒤로
    부르는 곳 없이 코드만 남아 있었다 — 함께 지운다.
-   되살릴 일이 생기면 그 커밋에서 꺼내면 된다(_normCo·loadCompanies·_coContacts·
-   companyToSite·pickCompany·renderCoList·chooseCompany 일곱 개가 한 덩이다). */
+   ⚠ 2026-10-05 에 «다른 목적»으로 다시 잇는다(아래 「사내기금의 모회사」). 옛 덩이를
+     되살린 것이 아니다 — 그때는 사업장 칸을 업체관리 값으로 «덮어썼고», 지금은 번호만 잇는다. */
+/* ══ 사내기금의 모회사 = 참여사업장 (대표 지시 2026-10-05) ══
+   「기금관리에 모회사정리도 같이 연결해서 저장해야된다. 사내기금에 참여사업장을 연결시켜 넣어야 한다.」
+   「복지기금과 회사는 별개의 회사이다 … 회사에서 출연을 하기 때문에 반드시 관련회사로 정리해야된다
+    모든 사내근로복지기금은 모두 연결되어 있는회사가 있다 이부분도 같이 항상체크해라」
+   · 기금과 회사는 «합치지 않는다» — 회사는 이 기금의 참여사업장 «한 줄»로 들어간다.
+   · 그 줄은 업체관리(푸른이알피 data/companies) 회사와 «업체 id»(puerp_co_id)로 잇는다.
+     이름·관리번호는 열쇠가 아니다(이름으로 회사를 맞추던 실수 — STATUS.md 「되풀이된 실수」).
+   · 업체관리는 «읽기만» 한다. 여기서 쓰는 것은 우리 사업장 줄(fund_erp/sites)뿐이다.
+   · 저절로 잇지 않는다 — 후보만 보여 주고, 사람이 누른 것만 저장한다.
+   ⚠ 업체관리 표에는 월 자문료가 들어 있다 — 쓰는 칸만 «덜어» 둔다(금액은 관리자만). */
+var _erpCos=null, _erpCosTried=false;
+var ERP_CO_KEEP=['id','name','bizNo','ceo','corpNo','bizType','bizCategory','address','zipcode','phone','openDate',
+  'typeCode','status','puNo','primaryContactName','primaryContactPhone'];
+function _erpCoLite(c){ var o={}; ERP_CO_KEEP.forEach(function(k){ if(c[k]!=null&&c[k]!=='') o[k]=c[k]; }); return o; }
+function erpCoLoad(){
+  if(_erpCos||_erpCosTried||!fbDb) return;
+  _erpCosTried=true;
+  fbDb.ref('data/companies/v').once('value').then(function(s){
+    _erpCos=_peNorm(s.val()).filter(function(c){ return c&&c.id&&!c._deleted; }).map(_erpCoLite);
+    if(S.view==='fund'&&S.tab==='sites') renderFund();
+    if($('erpPickList')) erpPickRender();
+    if($('siteCoBar')) siteCoBarPaint();
+  }).catch(function(e){ _erpCosTried=false; console.warn('업체관리 읽기 실패', e); });
+}
+function _coDg(s){ return String(s||'').replace(/\D/g,''); }
+function _coKey(s){ return String(s||'').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\(합\)|\s/g,'').toLowerCase(); }
+/* 기금 이름에서 «회사 이름 몫»만 — 「나래산업사내근로복지기금」 → 「나래산업」 */
+function fundStem(name){ return _coKey(String(name||'').replace(/(사내|공동)?근로복지기금[\s\S]*$/,'')); }
+/* 업체관리에 «기금 자체»로 들어간 줄 — 모회사 후보에서 뺀다(기금은 회사가 아니다) */
+function isFundCo(c){ return /근로복지기금/.test(String(c&&c.name||'')); }
+function erpCoById(id){ return id&&_erpCos ? (_erpCos.filter(function(c){ return c.id===id; })[0]||null) : null; }
+/* 모회사 후보 — ① 업체관리 «기금 줄»(f.puerp_co_id)의 사업자번호와 같은 회사
+   (그 줄에 회사 번호가 잘못 들어간 일이 있다 — 나래) ② 기금 이름 몫이 회사 이름에 들어 있는 곳.
+   ⚠ ②는 «후보»일 뿐이다 — 사람이 보고 눌러야 이어진다. */
+function fundParentCands(f,cos){
+  cos=cos||[]; var out=[], seen={};
+  var own=null; cos.forEach(function(c){ if(f&&c.id===f.puerp_co_id) own=c; });
+  var add=function(c,why){ if(seen[c.id]){ if(seen[c.id].why.indexOf(why)<0) seen[c.id].why.push(why); return; }
+    seen[c.id]={co:c, why:[why]}; out.push(seen[c.id]); };
+  var bz=_coDg(own&&own.bizNo);
+  if(bz.length===10) cos.forEach(function(c){ if(c!==own&&!isFundCo(c)&&_coDg(c.bizNo)===bz) add(c,'기금 줄의 사업자번호와 같음'); });
+  var st=fundStem(f&&f.name);
+  if(st.length>=2) cos.forEach(function(c){ if(c!==own&&!isFundCo(c)&&_coKey(c.name).indexOf(st)>=0) add(c,'이름에 「'+st+'」'); });
+  return out.slice(0,5);
+}
+/* 이미 있는 사업장의 짝 — «사업자번호가 같은» 회사만. 이름만 비슷한 것은 후보가 아니다. */
+function siteCoCands(s,cos){
+  var bz=_coDg(s&&s.biz_no); if(bz.length!==10) return [];
+  return (cos||[]).filter(function(c){ return !isFundCo(c)&&_coDg(c.bizNo)===bz; });
+}
+/* 업체관리 회사 → 「사업장 추가」 창에 채울 값. 빈 값은 안 싣는다(빈칸으로 덮지 않게). */
+function erpCoToSite(c){
+  var r={name:c.name, ceo:c.ceo, biz_no:c.bizNo, corp_no:c.corpNo, biz_type:c.bizType, biz_item:c.bizCategory,
+    address:c.address, zipcode:c.zipcode, company_tel:c.phone, open_date:c.openDate};
+  Object.keys(r).forEach(function(k){ if(!String(r[k]==null?'':r[k]).trim()) delete r[k]; });
+  if(c.primaryContactName||c.primaryContactPhone)
+    r.contacts=[{name:String(c.primaryContactName||''), position:'', phone:'', mobile:String(c.primaryContactPhone||''), email:'', isPrimary:true}];
+  r.puerp_co_id=c.id;
+  return r;
+}
+/* 참여 중인(탈퇴 아닌) 사업장 수 — 다 읽기 전이면 null(«0곳»과 «모름»을 가른다) */
+function fundLiveSiteN(fid){
+  if(!_allSites){ setTimeout(loadAllSites,0); return null; }
+  var m=_allSites[fid]||{};
+  return Object.keys(m).filter(function(k){ return m[k]&&m[k].status!=='closed'; }).length;
+}
+/* ★ 「항상 체크」 — 사내기금인데 참여사업장(=모회사)이 한 곳도 없다 */
+function fundNoParent(f){ return !!f && f.fund_type==='사내' && !isTrashed(f) && fundLiveSiteN(f._id||'')===0; }
+function _allSitesPut(fid,sid,rec){
+  if(!_allSites) return;
+  var m=(_allSites[fid]=_allSites[fid]||{});
+  m[sid]=Object.assign({}, m[sid]||{}, rec);
+  Object.keys(m[sid]).forEach(function(k){ if(m[sid][k]===null) delete m[sid][k]; });
+}
+/* 명부의 상호 «옆» 딱지 — 이어졌으면 🔗, 사업자번호가 같은 회사가 있으면 「🔗 잇기」.
+   ⚠ 칸(<td>)을 새로 세우지 않는다 — 명부는 이미 열한 열이고, 칸 수를 세는 검사가 있다. */
+function siteCoChip(s){
+  if(!s) return '';
+  if(s.puerp_co_id){
+    var c=erpCoById(s.puerp_co_id);
+    return ' <span class="chip ok" style="font-size:9.5px" title="업체관리 '+esc(c?('「'+c.name+'」'+(c.puNo?' '+c.puNo:'')):'회사')+'와 이어져 있습니다">🔗</span>';
+  }
+  if(!_erpCos||!siteCoCands(s,_erpCos).length) return '';
+  return ' <span class="chip warn" style="font-size:9.5px;cursor:pointer" onclick="event.stopPropagation();openErpCoPick(\'link\',\''+esc(s._id)+'\',\''+_coDg(s.biz_no)+'\')"'
+    +' title="업체관리에 사업자번호가 같은 회사가 있습니다 — 눌러서 잇기">🔗 잇기</span>';
+}
+/* 참여사업장 탭이 비어 있는 사내기금 — 맨 위에 모회사 후보 */
+function fundParentBox(f){
+  var head='<div style="margin:10px 0;border:1px solid var(--warn);background:var(--warn-bg);border-radius:10px;padding:12px 14px">'
+    +'<div style="font-weight:800;color:var(--warn);margin-bottom:4px">🔗 이 사내기금의 모회사(출연회사)가 아직 참여사업장에 없습니다</div>'
+    +'<div style="font-size:12px;margin-bottom:10px">모든 사내근로복지기금에는 출연하는 회사가 있습니다. 기금과 회사는 따로 두고, 회사를 이 기금의 참여사업장으로 넣어 잇습니다.</div>';
+  if(!_erpCos){ erpCoLoad(); return head+'<div class="muted" style="font-size:12px">업체관리에서 후보를 찾는 중…</div></div>'; }
+  var cs=fundParentCands(f,_erpCos);
+  var rows=cs.map(function(x){ var c=x.co;
+    return '<div style="display:flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 10px;margin-bottom:6px;white-space:nowrap;overflow:hidden">'
+      +'<b>'+esc(c.name||'')+'</b><span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis">업체관리'
+      +(c.puNo?' · '+esc(c.puNo):'')+(c.bizNo?' · '+esc(c.bizNo):'')+(c.ceo?' · 대표 '+esc(c.ceo):'')+'</span>'
+      +x.why.map(function(w){ return '<span class="chip warn" style="font-size:10px">'+esc(w)+'</span>'; }).join('')
+      +(c.status&&c.status!=='active'?'<span class="chip dg" style="font-size:10px">업체관리 '+esc(c.status==='closed'?'종료':c.status)+'</span>':'')
+      +'<span style="flex:1"></span><button class="primary" onclick="erpAddAsSite(\''+esc(c.id)+'\')">이 회사를 참여사업장으로</button></div>';
+  }).join('');
+  return head+(rows||'<div class="muted" style="font-size:12px;margin-bottom:8px">업체관리에서 짝지을 회사를 못 찾았습니다 — 아래에서 찾거나, 업체관리에 없는 회사면 이름만 적으세요.</div>')
+    +'<div class="row" style="gap:6px;flex-wrap:wrap"><button onclick="openErpCoPick(\'new\',\'\',\''+esc(fundStem(f.name).replace(/['\\]/g,''))+'\')">🔍 업체관리에서 다른 회사 찾기</button>'
+    +'<button onclick="editSite(\'\')" title="업체관리에 없는 회사 — 「사업장 추가」 창을 빈 채로 엽니다">이름만 적기 (업체관리에 없는 회사)</button></div></div>';
+}
+/* ── 업체관리 회사 고르기 창 ──
+   ⚠ showModal 을 «쓰지 않는다» — 사업장 편집 창 위에 겹쳐 떠야 하는데, closeM 은 첫 창을 지운다.
+     그래서 제 덮개(#erpPickBg)를 따로 둔다. 닫아도 아래 편집 창은 그대로다. */
+var _erpPick={mode:'new', sid:'', q:''};
+function openErpCoPick(mode,sid,q){
+  _erpPick={mode:mode||'new', sid:sid||'', q:q||''};
+  erpPickClose(); erpCoLoad();
+  var m=document.createElement('div'); m.id='erpPickBg';
+  m.style.cssText='position:fixed;inset:0;background:rgba(20,30,50,.35);z-index:200;display:flex;align-items:center;justify-content:center;padding:16px';
+  m.onclick=function(e){ if(e.target===m) erpPickClose(); };
+  m.innerHTML='<div style="background:#fff;border-radius:14px;padding:18px 20px;max-width:620px;width:100%;max-height:86vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25)">'
+    +'<div class="row" style="margin:0 0 6px"><h2 style="margin:0;font-size:16px">🔗 업체관리에서 회사 고르기</h2><span style="flex:1"></span><button onclick="erpPickClose()">닫기</button></div>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 8px">'+(_erpPick.mode==='link'
+      ?'이 사업장과 «같은 회사»를 고르면 업체 번호로 이어 둡니다 — 사업장 칸은 바꾸지 않습니다.'
+      :'고른 회사 값으로 「사업장 추가」 창을 채워 엽니다 — 확인하고 [저장]을 누르세요.')
+    +' 기금과 회사는 합치지 않습니다.</p>'
+    +'<input id="erpPickQ" value="'+esc(_erpPick.q)+'" oninput="_erpPick.q=this.value;erpPickRender()" placeholder="🔍 회사 이름·사업자번호" style="width:100%;font-size:16px;padding:6px 10px">'
+    +'<div id="erpPickList" style="margin-top:8px"></div></div>';
+  document.body.appendChild(m);
+  erpPickRender();
+  setTimeout(function(){ var q=$('erpPickQ'); if(q) q.focus(); },0);
+}
+function erpPickClose(){ var m=$('erpPickBg'); if(m) m.remove(); }
+/* 찾는 말에 맞는 회사 — 숫자만 치면 사업자번호로, 아니면 이름으로. 기금 줄은 뺀다. */
+function erpPickMatch(cos,q){
+  var d=_coDg(q), k=_coKey(q);
+  return (cos||[]).filter(function(c){
+    if(isFundCo(c)) return false;
+    if(!String(q||'').trim()) return true;
+    if(d.length>=3&&_coDg(c.bizNo).indexOf(d)>=0) return true;
+    return !!k&&_coKey(c.name).indexOf(k)>=0;
+  });
+}
+function erpPickRender(){
+  var box=$('erpPickList'); if(!box) return;
+  if(!_erpCos){ box.innerHTML='<div class="muted" style="padding:10px">업체관리를 읽는 중…</div>'; return; }
+  var hit=erpPickMatch(_erpCos,_erpPick.q);
+  box.innerHTML=(hit.length?'':'<div class="muted" style="padding:10px">맞는 회사가 없습니다.</div>')
+    +hit.slice(0,30).map(function(c){
+      return '<div onclick="erpPickChoose(\''+esc(c.id)+'\')" style="cursor:pointer;display:flex;gap:8px;align-items:center;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;overflow:hidden">'
+        +'<b>'+esc(c.name||'')+'</b><span class="muted" style="font-size:11.5px;overflow:hidden;text-overflow:ellipsis">'
+        +[c.puNo,c.bizNo,c.ceo?('대표 '+c.ceo):''].filter(Boolean).map(esc).join(' · ')+'</span>'
+        +(c.status&&c.status!=='active'?'<span class="chip dg" style="font-size:10px">'+esc(c.status==='closed'?'종료':c.status)+'</span>':'')+'</div>';
+    }).join('')
+    +(hit.length>30?'<div class="muted" style="padding:8px;font-size:11.5px">그 밖 '+(hit.length-30)+'곳 — 더 좁혀 찾으세요</div>':'');
+}
+function erpAddAsSite(id){ _erpPick={mode:'new', sid:'', q:''}; erpPickChoose(id); }
+function erpPickChoose(id){
+  var c=erpCoById(id); if(!c) return;
+  var P=_erpPick; erpPickClose();
+  if(P.mode==='new'){
+    var pre=Object.assign({status:'active', fund_id:S.fundId}, erpCoToSite(c));
+    if($('modalbg')) closeM();
+    if(typeof _provPend==='function') _provPend(Object.keys(pre).filter(function(k){ return ['status','fund_id','puerp_co_id'].indexOf(k)<0; }),'erp','');
+    editSite('',pre);
+    toast('업체관리 「'+(c.name||'')+'」 값으로 채웠습니다 — 확인하고 [저장]');
+    return;
+  }
+  siteLinkCo(P.sid,c);
+}
+/* 잇기·풀기 — 새 사업장(아직 저장 전)이면 창의 값에만, 있는 사업장이면 «그 칸 하나만» 바로 저장 */
+function siteLinkCo(sid,c){
+  if(!sid){
+    _sitePrefill=_sitePrefill||{status:'active'};
+    if(c) _sitePrefill.puerp_co_id=c.id; else delete _sitePrefill.puerp_co_id;
+    siteCoBarPaint(); return;
+  }
+  var fid=S.fundId, cur=((S.sites||{})[sid])||{}, before=cur.puerp_co_id||null, to=c?c.id:null;
+  fbDb.ref(NS+'/sites/'+fid+'/'+sid).update({puerp_co_id:to}).then(function(){
+    if(S.sites&&S.sites[sid]){ if(to) S.sites[sid].puerp_co_id=to; else delete S.sites[sid].puerp_co_id; }
+    _allSitesPut(fid,sid,{puerp_co_id:to});
+    if(typeof _track==='function') _track([{path:'sites/'+fid+'/'+sid+'/puerp_co_id', a:to, b:before, m:0, src:'hand', how:''}],
+      {what:to?'업체관리와 잇기':'업체관리 잇기 풀기', detail:String(cur.name||'')});
+    toast(to?('업체관리 「'+(c.name||'')+'」와 이었습니다'):'업체관리 잇기를 풀었습니다');
+    if($('siteCoBar')) siteCoBarPaint();
+    if(S.view==='fund'&&S.tab==='sites'&&!$('modalbg')) renderFund();
+  }).catch(function(e){ toast('저장 실패: '+(e&&e.message||e),'err'); });
+}
+function siteCoUnlink(){
+  var sid=_siteEditSid||'';
+  if(!sid){ siteLinkCo('',null); return; }
+  confirmM('이 사업장과 업체관리 회사의 잇기를 풀까요?\n\n사업장 칸은 그대로 두고 «잇는 번호»만 지웁니다.',{ok:'잇기 풀기'})
+    .then(function(ok){ if(ok) siteLinkCo(sid,null); });
+}
+/* 기금 목록 줄의 딱지 — 사내기금이 비었으면 「🔗 모회사 없음」, 공동기금이 비었으면 「참여사업장 0곳」.
+   ⚠ 다 읽기 전(null)에는 아무 말도 안 한다 — 「없음」이라 하면 «없는 것»으로 잘못 읽는다.
+   ⚠ 지난(종료) 기금에는 안 붙인다 — 집계에서 빠진 기금이다. */
+function fundSiteChip(f){
+  if(!f||isPast(f)||isTrashed(f)) return '';
+  var n=fundLiveSiteN(f._id||''); if(n!==0) return '';
+  return f.fund_type==='사내'
+    ? ' <span class="chip warn" style="font-size:10px" title="사내기금의 모회사(출연회사)가 아직 참여사업장에 없습니다 — 기금을 열어 참여사업장 탭에서 넣으세요">🔗 모회사 없음</span>'
+    : ' <span class="chip" style="font-size:10px" title="참여사업장이 한 곳도 없습니다">참여사업장 0곳</span>';
+}
+/* 목록 머리줄 — 모회사 없는 사내기금 수. 누르면 사내기금 묶음에서 그것만 (다시 누르면 풀림) */
+function homeNoParentStat(live){
+  var n=(live||[]).filter(fundNoParent).length;
+  if(!n){ if(S.homeNoPar&&_allSites) S.homeNoPar=false; return ''; }
+  var on=!!S.homeNoPar&&S.homeTab==='사내';
+  return '<button class="stat" onclick="S.homeNoPar=!(S.homeNoPar&&S.homeTab===\'사내\');S.homeTab=\'사내\';renderHome()"'
+    +' style="cursor:pointer;background:var(--warn-bg);color:var(--warn);border-color:'+(on?'var(--warn)':'transparent')+'"'
+    +' title="사내기금인데 참여사업장(모회사)이 한 곳도 없는 기금 — 눌러서 그것만 보기">🔗 모회사 없음 '+n+'</button>';
+}
+/* 편집 창 위의 한 줄 — 이어진 회사가 무엇인지, 아니면 잇는 길 */
+function siteCoBarPaint(){
+  var bar=$('siteCoBar'); if(!bar) return;
+  var sid=_siteEditSid||'';
+  var id=sid ? (((S.sites||{})[sid])||{}).puerp_co_id : (_sitePrefill||{}).puerp_co_id;
+  if(!_erpCos) erpCoLoad();
+  if(id){
+    var c=erpCoById(id);
+    bar.innerHTML='<div style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 12px;margin:0 0 10px;font-size:12.5px;white-space:nowrap;overflow:hidden">'
+      +'🔗 업체관리 <b>'+esc(c?c.name:(_erpCos?'(업체관리에서 지워진 회사)':'…'))+'</b>'+(c&&c.puNo?'<span class="muted">('+esc(c.puNo)+')</span>':'')+' 와 이어져 있습니다'
+      +'<span style="flex:1"></span><button onclick="siteCoUnlink()" style="font-size:11.5px">잇기 풀기</button></div>';
+  }else{
+    var f=funds[S.fundId]||{};
+    bar.innerHTML='<div style="display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12px;white-space:nowrap" class="muted">'
+      +'업체관리와 아직 안 이어져 있습니다'+(f.fund_type==='사내'?' — 사내기금의 모회사라면 이어 두세요':'')
+      +'<button onclick="openErpCoPick(\'link\',\''+esc(sid)+'\',\''+esc(_coDg(($('se-biz_no')||{}).value||'')||'')+'\')" style="font-size:11.5px">🔗 업체관리에서 잇기</button></div>';
+  }
+}
 /* ══ 사업장 연도별 기록 ══ site_years/{기금}/{연도}/{사업장} = {contrib 출연금, workers 근로자수, benef 수혜자수}
    사업장 명부(sites)는 현재 상태 1벌만 두고, 해마다 달라지는 값은 여기에 따로 쌓는다. */
 var SY_COLS=[['contrib','출연금(원)'],['workers','상시근로자(명)'],['benef','수혜자(명)'],
