@@ -169,6 +169,36 @@ test('할 일 — 못 올렸거나 올리는 길이 없으면 알린다(조용�
   assert.match(몸, /못올림/);
 });
 
+function 정찰상자(지난, 관리자) {
+  const ctx = 상자({ db: { ref: (p) => ({ once: async () => ({ val: () => (p === 'homepage/auto/recon/at' ? 지난 : null) }) }) } });
+  ctx.App.isAdmin = 관리자 !== false;
+  vm.runInContext(constLine('자동정찰간격') + '\n' + fnSource('자동정찰저절로'), ctx);
+  return ctx;
+}
+
+test('정찰 저절로 — 지난 정찰이 없으면 «보기»로 한 번 묻는다', async () => {
+  const ctx = 정찰상자(null);
+  assert.strictEqual(await ctx.자동정찰저절로(), true);
+  assert.strictEqual(ctx.부른것.length, 1);
+  assert.strictEqual(ctx.부른것[0][1].mode, '보기', '보기 말고 다른 것으로 부르면 홈페이지가 바뀐다');
+});
+
+test('정찰 저절로 — 이레 안에 한 번 했으면 다시 안 묻는다', async () => {
+  const ctx = 정찰상자(Date.now() - 60 * 1000);
+  assert.strictEqual(await ctx.자동정찰저절로(), false);
+  assert.strictEqual(ctx.부른것.length, 0);
+});
+
+test('정찰 저절로 — 관리자가 아니면 안 묻는다', async () => {
+  const ctx = 정찰상자(null, false);
+  assert.strictEqual(await ctx.자동정찰저절로(), false);
+  assert.strictEqual(ctx.부른것.length, 0);
+});
+
+test('정찰 저절로 — 관리자 화면을 열 때 부른다', () => {
+  assert.match(fnSource('openApp'), /자동정찰저절로\(\)/);
+});
+
 test('왼쪽 기둥에 자동 연결 카드가 실린다', () => {
   assert.match(fnSource('railHtml'), /자동카드Html\(\)/);
 });

@@ -1318,6 +1318,9 @@ function openApp() {
   App.render();
   loadAll();
   loadMyName();
+  /* ★ 자동 올리기(2·3·4단계) 정찰을 «화면을 열면 저절로» (2026-10-05) — 단추를 찾게 하지 않는다.
+       대표께 「미리 보기」를 눌러 달라 했더니 같은 이름의 다른 단추(홈페이지 모양 보기)와 헷갈렸다. */
+  if (typeof 자동정찰저절로 === 'function') 자동정찰저절로();
 }
 
 /* 이름은 명부에서 찾는다 — 이력에 「누가 고쳤는지」가 이메일로만 남으면 알아보기 어렵다. */
@@ -5475,6 +5478,24 @@ async function 자동기록다시읽기() {
     App.autoErr = '자동 연결 기록을 읽지 못했습니다(' + ((e && e.code) || e) + ')';
   }
   App.render();
+}
+/* 정찰을 저절로 — 관리자 화면을 열 때, 지난 정찰이 없거나 이레가 지났으면 서버에 «보기»로 한 번 묻는다.
+   ★ 화면에 아무것도 띄우지 않는다(보기는 홈페이지를 안 바꾼다). 실패해도 조용히 넘어간다 —
+     정찰이 없으면 서버가 «올리는 길이 아직 없습니다»로 따로 알린다.
+   ⚠ 이레에 한 번만 — 화면을 열 때마다 홈페이지 관리자로 들어가지 않게. */
+const 자동정찰간격 = 7 * 24 * 60 * 60 * 1000;
+async function 자동정찰저절로() {
+  if (!App.isAdmin) return false;
+  try {
+    const s = await db.ref('homepage/auto/recon/at').once('value');
+    const 지난 = Number(s.val() || 0);
+    if (지난 && Date.now() - 지난 < 자동정찰간격) return false;
+    await 자동부르기('보기');
+    return true;
+  } catch (e) {
+    console.warn('[자동 정찰]', (e && e.message) || e);
+    return false;
+  }
 }
 function 자동줄목록(목록, 까닭도) {
   if (!(목록 || []).length) return '';
