@@ -202,7 +202,8 @@
       var v = o[k];
       if (v == null || v === '') return;
       if (k === 'amount') { v = Math.round(+v); if (!isFinite(v) || v < 0) return; }
-      else v = String(v).slice(0, k === 'note' ? 200 : k === 'contact' ? 80 : k === 'kind' ? 20 : k === 'staff' ? 30 : 12);
+      /* ⚠ docId 는 푸시 열쇠(20자) — 12자로 자르면 카드와 끊긴다(2026-10-05 폴더 가져오기 230줄이 끊겼다). 규칙 상한 40 */
+      else v = String(v).slice(0, k === 'note' ? 200 : k === 'contact' ? 80 : k === 'docId' ? 40 : k === 'kind' ? 20 : k === 'staff' ? 30 : 12);
       r[k] = v;
     });
     if (!r.kind) r.kind = '기타';
@@ -231,10 +232,12 @@
       return p.then(function () {
         var g = by[key];
         return listCoRecs(key).then(function (have) {
-          var seen = {}; have.forEach(function (h) { seen[(h.date || '-') + '|' + (h.kind || '-')] = 1; });
+          /* 겹침 — 파일에 붙은 줄은 «같은 파일»일 때만(같은 날 같은 종류 계약서가 둘일 수 있다), 파일 없는 줄은 날짜·종류 */
+          var sigOf = function (x) { return x.docId ? 'doc|' + x.docId : (x.date || '-') + '|' + (x.kind || '-'); };
+          var seen = {}; have.forEach(function (h) { seen[sigOf(h)] = 1; });
           var up = {}, n = 0;
           g.rows.forEach(function (r) {
-            var rec = recRecord(r), sig = (rec.date || '-') + '|' + rec.kind;
+            var rec = recRecord(r), sig = sigOf(rec);
             if (seen[sig]) { skipped++; return; }
             seen[sig] = 1; n++;
             up[deps.db.ref(ROOT + '/co_recs/' + key).push().key] = rec;

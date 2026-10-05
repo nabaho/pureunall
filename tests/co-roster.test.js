@@ -167,3 +167,16 @@ test('ⓔ 폴더 가져오기 배선 — 기본 🔒 서명본, 같은 파일은
   assert.match(docs, /src: 'folder', docId: d\.docId/);
   assert.match(docs, /store\.hasHash/);
 });
+
+test('ⓒ 폴더 가져오기 줄 — docId(20자 푸시 열쇠)를 자르지 않고, 같은 날·같은 종류여도 다른 파일이면 둘 다 적는다', async () => {
+  const S = loadStore(), db = fakeDb();
+  S.init({ db, storage: null, uid: 'u1', name: '시험' });
+  const A = '-AbCdEfGhIjKlMnOpQr1', B = '-AbCdEfGhIjKlMnOpQr2';
+  const x1 = await S.importCoRecs([{ coName: '가나시험상사', date: '2016-12-22', kind: 'CMS', src: 'folder', docId: A }]);
+  const x2 = await S.importCoRecs([{ coName: '가나시험상사', date: '2016-12-22', kind: 'CMS', src: 'folder', docId: B }]);
+  const x3 = await S.importCoRecs([{ coName: '가나시험상사', date: '2016-12-22', kind: 'CMS', src: 'folder', docId: A }]);
+  assert.equal(x1.added + x2.added, 2, '다른 파일은 같은 날·같은 종류여도 따로 적는다');
+  assert.equal(x3.added, 0, '같은 파일은 다시 적지 않는다');
+  const recs = await S.listCoRecs(S.coKey('가나시험상사'));
+  assert.deepEqual(recs.map((r) => r.docId).sort(), [A, B], 'docId 가 잘리면 카드와 끊긴다');
+});
