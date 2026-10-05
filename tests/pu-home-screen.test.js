@@ -88,7 +88,10 @@ function box(extra) {
     noConst(constLine('직원쪽')), fnSource('직원줄'), fnSource('쪽으로가기'),
     /* 얼굴 사진 칸 — 편집칸(memberEdit)의 «붙은 칸»이 이것을 지난다 (2026-09-14).
        ⚠★ 상자에 새 함수를 안 실어 검사가 한꺼번에 죽은 것이 이번이 여섯 번째다. */
-    fnSource('사진칸Html')].join('\n'), ctx);
+    fnSource('사진칸Html'),
+    /* 푸른ERP 직원과 잇는 줄 — 편집칸의 «붙은 칸»이 이것을 지난다 (월간 자동 연결 2026-10-05).
+       ⚠★ 상자에 새 함수를 안 실어 검사가 한꺼번에 죽는 일이 일곱 번째가 되지 않게 여기에 싣는다. */
+    fnSource('잇기후보'), fnSource('직원연결칸Html')].join('\n'), ctx);
   return ctx;
 }
 function run(ctx, code) { vm.runInContext(code, ctx); return ctx; }

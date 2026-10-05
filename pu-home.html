@@ -1355,6 +1355,9 @@ function readRoster() { return readRosterSource().then(r => r.list); }
    user_dir 에도 그 status 만 실려 온다(pu-erp.html _syncUserDir). 짐작이 아니라 확인한 값이다. */
 function staffFromRoster(list, source) {
   const staff = (list || []).map(u => ({
+    /* ★ 직원 번호(sid) — 구성원 글을 이 사람과 «잇는» 열쇠다 (자동 연결 2026-10-05).
+         이름은 열쇠가 아니다(동명이인·오타). 공개 명부에 늘 실려 온다. */
+    sid: String((u && u.sid) || ''),
     name: (u && u.name) || '',
     /* ★ 직급 — 명부에서 «이름과 함께» 당겨 넣을 때 쓴다 (대표 지시 2026-09-03).
        없으면 빈 값이고, 고르는 창이 「직급 모름」으로 적어 사람이 채우게 한다.
@@ -3385,6 +3388,77 @@ async function 홈페이지바로고치기() {
 }
 window.홈페이지바로고치기 = 홈페이지바로고치기;
 
+/* ══════ 연결 확인 — 구성원 글 ↔ 푸른ERP 직원(sid) (월간 자동 연결 2026-10-05) ══════
+   대표 지시 「입퇴사 자동으로 니가 정리하고 … 1개월에 1번씩만」.
+   ★ 매달 1일 자동 내리기는 «이어 둔» 글만 움직인다. 이름은 열쇠가 아니다(온톨로지 규칙) —
+     동명이인·오타면 기계가 남의 글을 내린다.
+   ★ 이름이 한 사람과만 맞아도 «사람이 확인하고» 잇는다. 저절로 채우지 않는다.
+   ⚠ sid «한 자리»만 쓴다 — 구성원 자료를 통째로 set 하면 다른 칸(경력·사진 표시)을 덮는다. */
+function 잇기후보(rec) {
+  const n = String((rec && rec.name) || '').trim();
+  if (!n) return [];
+  return (App.staff || []).filter(s => s && s.sid && String(s.name || '').trim() === n);
+}
+function 이름하나만맞는것() {
+  return Object.keys(App.members || {}).map(k => {
+    const rec = App.members[k] || {};
+    if (rec.sid || !(Number(rec.srl) > 0)) return null;
+    const 후보 = 잇기후보(rec);
+    return 후보.length === 1 ? { key: k, sid: 후보[0].sid } : null;
+  }).filter(Boolean);
+}
+async function 직원잇기(key, sid) {
+  const s = String(sid || '').trim();
+  if (!key || !s) return false;
+  try {
+    await db.ref('homepage/members/' + key + '/sid').set(s);
+    (App.members[key] = App.members[key] || {}).sid = s;
+    App.render();
+    return true;
+  } catch (e) {
+    await say('잇지 못했습니다', esc((e && e.code) || String(e)));
+    return false;
+  }
+}
+async function 한번에잇기() {
+  const 줄 = 이름하나만맞는것();
+  if (!줄.length) {
+    await say('한 번에 이을 것이 없습니다',
+      '이름이 한 사람과만 맞는 글이 없습니다. 남은 것은 편집칸의 «푸른ERP 직원» 줄에서 한 사람씩 고르십시오.');
+    return;
+  }
+  if (!await askYes(줄.length + '명을 푸른ERP 직원과 잇습니다',
+    '<ul style="margin:6px 0 0;padding-left:18px">' + 줄.map(x => '<li>'
+      + esc((App.members[x.key] || {}).name || x.key) + ' — 직원 번호 ' + esc(x.sid) + '</li>').join('') + '</ul>'
+    + '<div style="margin-top:8px">이어 두면 그분이 푸른ERP 에서 퇴사 처리될 때 '
+    + '<b>다음 달 1일에 저절로 휴지통으로</b> 내려갑니다. 휴직은 내리지 않습니다.</div>', '잇기')) return;
+  for (const x of 줄) { if (!await 직원잇기(x.key, x.sid)) return; }
+  toast(줄.length + '명을 이었습니다.');
+}
+window.한번에잇기 = 한번에잇기;
+window.직원잇기 = 직원잇기;
+
+/* 편집칸의 «푸른ERP 직원» 한 줄 — 글 번호가 있을 때만(자동 내리기는 글 번호가 있어야 한다).
+   ★ 동명이인이면 고르개를 «비워 두고» 사람이 고르게 한다. 하나를 미리 골라 두면 그냥 누른다. */
+function 직원연결칸Html(d) {
+  if (!(Number(String((d && d.srl) || '').trim()) > 0) || !Array.isArray(App.staff)) return '';
+  const rec = (App.members || {})[d.key] || {};
+  const 줄 = (안) => '<div class="sub" style="display:flex;gap:6px;align-items:center;white-space:nowrap;'
+    + 'overflow:hidden;text-overflow:ellipsis;margin-top:6px"><b>푸른ERP 직원</b>' + 안 + '</div>';
+  if (rec.sid) {
+    const 이은 = (App.staff || []).filter(s => s && s.sid === rec.sid)[0];
+    return 줄('<span>' + esc(이은 ? 이은.name + (이은.title ? ' · ' + 이은.title : '') : '명부에 없음')
+      + ' · 번호 ' + esc(rec.sid) + '</span><span>— 퇴사 처리되면 다음 달 1일에 저절로 내려갑니다</span>');
+  }
+  const 후보 = 잇기후보(rec).length ? 잇기후보(rec) : (App.staff || []).filter(s => s && s.sid);
+  return 줄('<select id="sidPick" style="max-width:260px"><option value="">— 고르십시오 —</option>'
+    + 후보.map(s => '<option value="' + esc(s.sid) + '">' + esc(s.name)
+      + (s.title ? ' · ' + esc(s.title) : '') + ' · ' + esc(s.sid) + '</option>').join('')
+    + '</select><button class="btn" style="padding:3px 9px;font-size:11.5px" '
+    + 'onclick="직원잇기(\'' + esc(d.key) + '\', document.getElementById(\'sidPick\').value)">잇기</button>'
+    + '<span>이어 두어야 퇴사 때 저절로 내려갑니다</span>');
+}
+
 /* ══════ 퇴사자를 «한 번에» 내린다 (대표 지시 2026-09-13) ══════
    「퇴사자는 퇴사로 내리게 한 번에 하고 싶은데… 한 번에 수정할 수 있게 하고 싶다」
 
@@ -5185,6 +5259,18 @@ function jobsOf() {
       why: '퇴사가 아닙니다. 복직인지 퇴사인지 <b>푸른ERP 직원관리</b>에서 확인하십시오 — '
          + '퇴사로 처리하면 그때 「내릴 것」으로 바뀝니다. <b>자동으로 내리지 않습니다.</b>' });
   }
+  /* ★ 월간 자동 연결(2026-10-05) — 직원과 «안 이은» 구성원 글은 퇴사해도 저절로 안 내려간다.
+       명부를 못 읽었으면(App.staff 가 없으면) 권하지 않는다 — 고를 사람 목록이 없다. */
+  const 안이은 = Object.keys(App.members || {}).filter(k => {
+    const r = (App.members || {})[k] || {};
+    return !r.sid && Number(r.srl) > 0 && !r.takenDown;
+  });
+  if (Array.isArray(App.staff) && App.staff.length && 안이은.length) {
+    add({ cls: 'info', t: '자동 연결 — 푸른ERP 직원과 아직 안 이은 구성원 글', n: 안이은.length,
+      go: '<button class="btn sm" onclick="한번에잇기()">이름이 하나만 맞는 사람 한 번에 잇기</button>',
+      why: '이어 둔 글만 퇴사 처리 때 <b>다음 달 1일에 저절로</b> 휴지통으로 내려갑니다. '
+         + '동명이인은 편집칸의 «푸른ERP 직원» 줄에서 한 사람씩 고르십시오.' });
+  }
   if (ms.own.none) {
     add({ cls: 'info', t: '명부에 없는 사람', n: ms.own.none,
       go: '<button class="btn sm" onclick="App.filt(\'own:none\',\'members\')">보기</button>',
@@ -6264,6 +6350,8 @@ function memberEdit(d) {
          그래서 「저장」이 아니라 제 단추로 보낸다. 무엇이 바뀌는지 먼저 보여 준다.
        ⚠ 글 번호가 없으면 보낼 자리가 없다 — 아예 안 그린다. */
   붙은칸 += 사진칸Html(d);
+  /* ★ 푸른ERP 직원과 잇기 (월간 자동 연결 2026-10-05) — 이어 둔 글만 퇴사 때 저절로 내려간다 */
+  붙은칸 += 직원연결칸Html(d);
   /* ⚠ 붙은 칸은 여기서 끝나지 «않는다» — 대표 지시 2026-09-03 「이 부분 전체 틀고정해야
      한다」로 경력 목록 «위 전부»(구분·이름줄·메인 설명·담당 업무·경력사항 이름줄)를
      붙였다. 붙는 것은 모두 «붙은칸» 에 담긴다 — 담기지 않은 것은 구른다.
