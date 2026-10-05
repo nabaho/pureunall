@@ -133,7 +133,72 @@
     return { rows: rows, cut: cut, same: c.same, add: c.add, del: c.del, chg: c.chg };
   }
 
+  /* ── 엑셀(.xlsx) → 줄 (대표 지시 2026-10-05 「엑셀 견적서도 비교」) ──
+     .xlsx 는 XML 묶음이다 — 화면이 JSZip 으로 풀어 글자만 넘기고, 여기서 «행마다 한 줄»로 편다:
+       「[견적] 3행: 컨설팅비 · 1 · 3,000,000」  → 줄 비교(lineDiff)가 바뀐 행을 칠한다.
+     ⚠ 옛 .xls(이진)는 못 읽는다. 수식은 «계산된 값»(v)을 쓴다 — 식 글자는 견주지 않는다.
+     parts: { shared, workbook, rels, sheets:{ 'xl/worksheets/sheet1.xml': xml, … } } */
+  function xmlText(s) {
+    return String(s == null ? '' : s).replace(/<[^>]+>/g, '').replace(/&lt;/g, '<').replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"').replace(/&apos;|&#39;/g, "'").replace(/&#(\d+);/g, function (m, n) { return String.fromCharCode(+n); }).replace(/&amp;/g, '&');
+  }
+  function attr(tag, name) { var m = String(tag).match(new RegExp('\\s' + name + '="([^"]*)"')); return m ? m[1] : ''; }
+  function xlsxLines(parts) {
+    parts = parts || {};
+    var shared = [];
+    String(parts.shared || '').replace(/<si\b[^>]*>([\s\S]*?)<\/si>/g, function (m, inner) {
+      /* 읽는 법(rPh) 글자는 빼고 <t> 만 잇는다 */
+      var t = ''; inner.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '').replace(/<t\b[^>]*>([\s\S]*?)<\/t>/g, function (mm, x) { t += x; return mm; });
+      shared.push(xmlText(t)); return m;
+    });
+    var rid = {};
+    String(parts.rels || '').replace(/<Relationship\b[^>]*>/g, function (tag) { rid[attr(tag, 'Id')] = attr(tag, 'Target'); return tag; });
+    var order = [];
+    String(parts.workbook || '').replace(/<sheet\b[^>]*>/g, function (tag) {
+      var t = rid[attr(tag, 'r:id')] || '';
+      if (t) order.push({ name: xmlText(attr(tag, 'name')), path: 'xl/' + t.replace(/^\/?xl\//, '').replace(/^\//, '') });
+      return tag;
+    });
+    var sheets = parts.sheets || {};
+    if (!order.length) Object.keys(sheets).sort().forEach(function (p, i) { order.push({ name: '시트' + (i + 1), path: p }); });
+    var out = [];
+    order.forEach(function (s) {
+      var xml = sheets[s.path]; if (!xml) return;
+      String(xml).replace(/<row\b([^>]*)>([\s\S]*?)<\/row>/g, function (m, ra, inner) {
+        var vals = [];
+        inner.replace(/<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g, function (mm, ca, body) {
+          var t = attr(' ' + ca, 't'), v = '';
+          var vm = String(body || '').match(/<v\b[^>]*>([\s\S]*?)<\/v>/);
+          if (t === 's') v = shared[+(vm ? vm[1] : -1)] || '';
+          else if (t === 'inlineStr') v = xmlText((String(body || '').match(/<is\b[^>]*>([\s\S]*?)<\/is>/) || [])[1] || '');
+          else v = vm ? xmlText(vm[1]) : '';
+          v = String(v).replace(/\s+/g, ' ').trim();
+          if (v) vals.push(v);
+          return mm;
+        });
+        if (vals.length) out.push('[' + s.name + '] ' + (attr(' ' + ra, 'r') || '?') + '행: ' + vals.join(' · '));
+        return m;
+      });
+    });
+    return out;
+  }
+
+  /* ── 📈 선정·계약 사업 → 실적 입력 칸 짝 (대표 지시 2026-10-05) ──
+     실적 셋(컨설팅·기금·기타)의 입력 칸 이름에 맞춘다. 저장은 화면에서 사람이 한다.
+     ⚠ 금액은 숫자만 · 유형은 사업명에 «일터혁신·구조혁신»이 있을 때만 그 이름, 아니면 «기타» */
+  function perfFields(page, r) {
+    r = r || {};
+    var amt = String(r.amt == null ? '' : r.amt).replace(/[^\d]/g, '');
+    var note = '🏢 사업관리 ' + (r.id || '') + '에서' + (r.kind ? ' · ' + r.kind : '');
+    var 유형 = /일터\s*혁신/.test(r.title || '') ? '일터혁신' : (/구조\s*혁신/.test(r.title || '') ? '구조혁신' : '기타');
+    if (page === 'consult') return { type: 유형, org: r.org || '', project: r.title || '', agency: r.org || '', year: r.year || '', status: '진행', amt: amt, note: note };
+    if (page === 'fund') return { org: r.org || '', project: r.title || '', year: r.year || '', status: '진행', amt: amt, note: note };
+    if (page === 'etc') return { type: r.kind || '', org: r.org || '', project: r.title || '', year: r.year || '', amt: amt, note: note };
+    return null;
+  }
+
   var api = {
+    xlsxLines: xlsxLines, perfFields: perfFields,
     KINDS: KINDS, STAGES: STAGES, DOC_KINDS: DOC_KINDS,
     isOpen: function (st) { return !!OPEN[st]; }, isWin: function (st) { return !!WIN[st]; },
     guessDocKind: guessDocKind, looksBiz: looksBiz, fromCaseDir: fromCaseDir, stageForImport: stageForImport,
