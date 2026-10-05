@@ -307,13 +307,54 @@
     return hit.slice(0, n);
   }
 
+  /* ══════ 회사 단위 담당자 명단 — 급여관리 3칸 화면(2단계, 대표 승인 2026-10-05) ══════
+     가운데 칸은 «업체관리 급여 업체»(데이터함과 같은 명단)이고, 왼쪽 담당자 줄은
+     사람마다 맡은 회사 수다. 데이터함 managerRoster 와 **같은 답**을 내야 두 앱의
+     숫자가 같다 — tests/staff-roster-same.test.js 가 두 함수를 실제로 견준다.
+       · 주담당·부담당 둘 다 그 사람 몫(한 업체에 같은 사람이 두 번 적혀도 한 번)
+       · 사번 꼴인 사람은 사번 순, 사번 꼴이 아닌 값(이름·메모가 든 칸)은 맨 아래 이름순
+       · 아무도 없는 업체는 unassigned */
+  function rosterCos(companies, dirRows) {
+    var dir = nameBySid(dirRows), bySid = {}, order = [], unassigned = [];
+    listOf(companies).forEach(function (co) {
+      var sids = [], seen = {};
+      [co.managerMain].concat(co.managerSubs || []).forEach(function (x) {
+        x = String(x || ''); if (!x || seen[x]) return; seen[x] = 1; sids.push(x);
+      });
+      if (!sids.length) { unassigned.push(co); return; }
+      sids.forEach(function (sid) {
+        if (!bySid[sid]) {
+          bySid[sid] = { sid: sid, 담당: dir[sid] || sid, badSid: !SID_RE.test(sid), cos: [] };
+          order.push(sid);
+        }
+        bySid[sid].cos.push(co);
+      });
+    });
+    var people = order.map(function (s) { return bySid[s]; });
+    people.sort(function (a, b) {
+      if (a.badSid !== b.badSid) return a.badSid ? 1 : -1;
+      if (a.badSid) return String(a.담당).localeCompare(String(b.담당), 'ko');
+      var x = sidKey(a.sid), y = sidKey(b.sid); return x < y ? -1 : (x > y ? 1 : 0);
+    });
+    return { people: people, unassigned: unassigned };
+  }
+
+  /* 이 업체가 «내 담당»인가 — 주·부담당 사번을 이메일로 바꿔 견준다(데이터함 isMyCompany 와 같다). */
+  function isMine(co, email) {
+    if (!co || !email) return false;
+    var em = String(email).toLowerCase();
+    if (co.managerMain && sidToEmail(co.managerMain) === em) return true;
+    return (co.managerSubs || []).some(function (s) { return sidToEmail(s) === em; });
+  }
+
   var API = {
     coreName: coreName, fullName: fullName, stripTag: stripTag,
     isPayrollCo: isPayrollCo, payrollCos: payrollCos,
     matchCompany: matchCompany,
     sidToEmail: sidToEmail, nameBySid: nameBySid, sidKey: sidKey,
     linkOf: linkOf, staffFor: staffFor, groupByStaff: groupByStaff,
-    arrivalMatches: arrivalMatches, candidates: candidates
+    arrivalMatches: arrivalMatches, candidates: candidates,
+    rosterCos: rosterCos, isMine: isMine, list: listOf
   };
 
   global.PuSiteStaff = API;

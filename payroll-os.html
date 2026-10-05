@@ -22,7 +22,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-labor-core.js?v=4"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
-<script src="js/pu-site-staff.js?v=3"></script>
+<script src="js/pu-site-staff.js?v=4"></script>
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -134,7 +134,58 @@ h1{font-size:20px;margin-bottom:4px}.sub{color:var(--sub);font-size:13px;margin-
   .sub.noprint .btn{display:block;width:100%;margin:8px 0 0!important;min-height:44px}
   .report-hwp-action{width:100%;min-height:44px;margin:0 0 10px!important}
 }
-@media print{header,nav,.noprint{display:none !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
+/* ══════ 3칸 (2026-10-05) — 급여데이터함과 같은 치수(보기 170 · 목록 238)·같은 이름 ══════ */
+nav.viewbar{width:178px;padding:4px 0 14px;overflow:auto;max-height:calc(100vh - 46px);position:sticky;top:0}
+.ctitle{padding:11px 10px 4px;font-size:10.5px;color:var(--sub);font-weight:700}
+.vrow{display:flex;align-items:center;gap:5px;padding:7px 10px;font-size:12.5px;cursor:pointer}
+.vrow:hover{background:#f8fafc}
+.vrow.sel{background:#e2e8f0}.vrow.sel b{color:var(--navy)}
+.vrow b{flex:1;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.vrow .n{font-size:10.5px;color:var(--sub);background:var(--paper);border-radius:99px;padding:1px 6px;white-space:nowrap}
+.vrow.warn .n{background:#fffbeb;color:var(--warn)}
+.vrow.bad b{color:var(--bad)}.vrow.bad .n{background:#e2e8f0;color:var(--bad)}
+.vrow.prow{position:relative}
+.vrow.prow .fill{position:absolute;left:0;top:0;bottom:0;background:#eff6ff;pointer-events:none}
+.vrow.prow>b,.vrow.prow>.n,.vrow.prow>.pno{position:relative}
+.vrow.prow .pno{flex:0 0 15px;text-align:right;font-size:10px;color:var(--sub)}
+.vrow.prow.badsid b{color:var(--bad)}
+#colist{width:238px;flex:0 0 238px;background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;
+  max-height:calc(100vh - 46px);position:sticky;top:0}
+#colist[hidden]{display:none}
+#colist .chead{padding:9px 10px 7px;border-bottom:1px solid var(--line);flex:0 0 auto}
+#colist .ct{font-size:12px;font-weight:800;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+#colist .ct .n{font-size:10.5px;font-weight:700;color:var(--sub);background:var(--paper);border-radius:99px;padding:1px 6px}
+#colist .ym{display:flex;align-items:center;gap:4px;margin-bottom:6px;font-size:12px}
+#colist .ym button{border:1px solid var(--line);background:#fff;border-radius:6px;padding:1px 7px;cursor:pointer}
+#colist .ym b{flex:1;text-align:center}
+#colist input{width:100%;border:1px solid var(--line);border-radius:8px;padding:5px 8px;font-size:11.5px;font-family:inherit}
+#colRows{overflow:auto;flex:1}
+.corow{display:flex;align-items:center;gap:6px;padding:8px 10px;border-bottom:1px solid var(--line);cursor:pointer;font-size:12.5px}
+.corow:hover{background:#f8fafc}.corow.sel{background:#e2e8f0}
+.corow .nm{flex:1;min-width:0}
+.corow .nm b{display:block;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.corow .nm i{display:block;font-style:normal;font-size:10.5px;color:var(--sub)}
+.st{font-size:10.5px;border-radius:99px;padding:1px 7px;white-space:nowrap;flex:0 0 auto}
+.st.done{background:#f0fdf4;color:#166534}.st.review{background:#fffbeb;color:#854d0e}
+/* 색은 5계열 27색 팔레트 안에서만(tests/color-palette-apps.test.js) — 「자료 없음」 글자는 #94a3b8 이면 흰 바탕에서 2.6:1 로 묻혀 #64748b */
+.st.ready,.st.arrived{background:#eff6ff;color:#1e40af}.st.none{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0}.st.nodata{background:#fff;color:#64748b;border:1px dashed #cbd5e1}
+.cohead{background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+.cohead .ttl{font-size:19px;font-weight:800}
+.cohead .meta{font-size:12.5px;color:var(--sub);margin-top:4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:12px}
+.chips button{border:1px solid var(--line);background:#fff;border-radius:99px;padding:2px 10px;cursor:pointer;font-family:inherit;font-size:12px}
+.chips button.on{border-color:var(--navy);color:var(--navy);font-weight:700}
+.tabs{display:flex;gap:2px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:12px 0 14px}
+.tabs button{border:none;background:none;padding:8px 12px;font-size:13px;cursor:pointer;border-bottom:2px solid transparent;font-family:inherit;color:var(--ink)}
+.tabs button.on{border-bottom-color:var(--navy);color:var(--navy);font-weight:700}
+.tabbody h1{font-size:16px}
+@media (max-width:760px){
+  nav.viewbar{max-height:none;position:sticky}
+  nav.viewbar .ctitle,nav.viewbar .pnote{display:none}
+  nav.viewbar .vrow{flex:0 0 auto;border:1px solid var(--line);border-radius:99px;padding:6px 10px}
+  #colist{width:100%;flex:none;max-height:42vh;position:static;border-right:0;border-bottom:1px solid var(--line)}
+}
+@media print{header,nav,#colist,.noprint{display:none !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -192,7 +243,8 @@ try { PuGate.soonUnlessAdmin('급여관리'); } catch(_){}
   <span class="logo">급여관리</span><span class="env">푸른통합시스템 · payroll_os</span>
   <div class="who"><span id="whoami"></span><span id="saveState" class="save-state saved" role="status" aria-live="polite">저장 완료</span><button class="out" onclick="doLogout()">로그아웃</button></div>
 </header>
-<div class="layout"><nav id="nav"></nav><main id="main"></main></div>
+<!-- 3칸 (대표 승인 2026-10-05, 급여데이터함과 같은 뼈대) — ① 보기·담당자·도구 ② 사업장 목록 ③ 회사 한 장 -->
+<div class="layout"><nav id="nav" class="viewbar"></nav><aside id="colist" hidden></aside><main id="main"></main></div>
 <!-- 설정값 채우기 창. main 밖에 두어야 render() 가 다시 그려도 안 닫힌다. -->
 <div id="cardEditBox"></div>
 
@@ -398,14 +450,18 @@ function dbSet(k,v){
   });
 }
 
-var App={screen:'cards',site:null,month:null,emp:null,day:null};
+/* ★ 첫 화면은 3칸(shell)이다(2026-10-05). view=왼쪽 보기 · coId=고른 업체(업체번호) ·
+   loose=업체에 안 이어진 급여관리 자료 · tab=오른쪽 탭 · ym=기준 달(YYYY-MM) · q=찾기 */
+var App={screen:'shell',site:null,month:null,emp:null,day:null,view:null,coId:null,loose:null,tab:'sum',ym:null,q:''};
 /* ── 화면 이동 기록(직전 화면으로 되돌아가는 백 키) ──
    헤더 ← 버튼과 폰 물리 백키가 같은 History API를 공유. file://에선 pushState가
    막혀도(try/catch) 화면 전환은 정상, 폰 백키만 비활성(라이브 https에선 전부 동작). */
 var navDepth=0;
-function navSnap(){ return {screen:App.screen,site:App.site,month:App.month,emp:App.emp,day:App.day}; }
-function navSame(a,b){ return a.screen===b.screen&&a.site===b.site&&a.month===b.month&&a.emp===b.emp&&a.day===b.day; }
-function navApply(s){ App.screen=s.screen; App.site=s.site; App.month=s.month; App.emp=s.emp||null; App.day=s.day||null; }
+function navSnap(){ return {screen:App.screen,site:App.site,month:App.month,emp:App.emp,day:App.day,view:App.view,coId:App.coId,loose:App.loose,tab:App.tab,ym:App.ym}; }
+function navSame(a,b){ return a.screen===b.screen&&a.site===b.site&&a.month===b.month&&a.emp===b.emp&&a.day===b.day
+  &&a.view===b.view&&a.coId===b.coId&&a.loose===b.loose&&a.tab===b.tab&&a.ym===b.ym; }
+function navApply(s){ App.screen=s.screen||'shell'; App.site=s.site; App.month=s.month; App.emp=s.emp||null; App.day=s.day||null;
+  App.view=s.view||null; App.coId=s.coId||null; App.loose=s.loose||null; App.tab=s.tab||'sum'; if(s.ym) App.ym=s.ym; }
 function navSeed(){ navDepth=0; try{ history.replaceState({pnav:navSnap(),depth:0},''); }catch(e){} }
 function navTo(patch){
   var next=Object.assign(navSnap(),patch);
@@ -420,8 +476,11 @@ window.addEventListener('popstate',function(ev){
   if(st&&st.pnav){ try{ window.__puBackNav = true; }catch(e){}  /* 이 걸음은 우리가 썼다 — 공통 뒤로가기는 비켜선다 */ navApply(st.pnav); navDepth=st.depth||0; render(); }
   // 시작점보다 더 뒤로 = 브라우저 기본(앱 이탈/포털) 허용
 });
-App.go=function(s){ navTo({screen:s,site:null,month:null,emp:null,day:null}); };  // 기존 호출부 호환(탭 이동)
-var NAV=[{id:'cards',label:'⚙️ 설정 카드'},{id:'inbox',label:'📥 수신함'},{id:'hub',label:'🏢 회사'},{id:'payroll',label:'💰 급여 처리'},{id:'attend',label:'🕒 근태'},{id:'leave',label:'🌴 연차·휴가'},{id:'sever',label:'🎓 퇴직'},{id:'slip',label:'📄 명세서'},{id:'report',label:'📑 신고'}];
+App.go=function(s){ navTo({screen:s,site:null,month:null,emp:null,day:null,coId:null,loose:null}); };  // 도구(여러 회사를 한꺼번에 보는 화면)로
+/* 옛 왼쪽 기능 메뉴 9개는 둘로 갈랐다(대표 결정 2026-10-05 「도구로 줄여 남김」):
+   한 회사의 일 → 오른쪽 «회사 한 장»의 탭(TABS) · 여러 회사를 한꺼번에 보는 것 → 왼쪽 「도구」(TOOLS). */
+var TABS=[{id:'sum',label:'📋 한눈에'},{id:'payroll',label:'💰 급여'},{id:'attend',label:'🕒 근태'},{id:'leave',label:'🌴 연차·휴가'},{id:'sever',label:'🎓 퇴직'},{id:'slip',label:'📄 명세서'},{id:'report',label:'📑 신고'}];
+var TOOLS=[{id:'cards',label:'⚙️ 설정 카드'},{id:'inbox',label:'📥 수신함 전체'},{id:'report',label:'📑 신고 모아보기'},{id:'names',label:'🏷 이름표 맞추기'}];
 var SIG={green:'#166534',orange:'#d97706',red:'#dc2626',gray:'#94a3b8'};
 function won(n){ return (n==null)?'-':Number(n).toLocaleString(); }
 /* ── 표시용 중복 정리 ──
@@ -1855,7 +1914,7 @@ function ensureCo(){
     fbDb.ref('data/companies/v').once('value'),
     fbDb.ref('data/user_dir/v').once('value')
   ]).then(function(r){
-    coData={companies:r[0].val()||[], dir:r[1].val()||[]};
+    coData={companies:(window.PuSiteStaff&&PuSiteStaff.list)?PuSiteStaff.list(r[0].val()||[]):(r[0].val()||[]), dir:r[1].val()||[]};
     coBusy=false; if(ready) render();
   }).catch(function(e){
     coBusy=false; coErr=(e&&e.code)||String(e); if(ready) render();
@@ -1879,52 +1938,6 @@ function hubCounts(site){
   var L=lmap('leave');  Object.keys(L).forEach(function(k){ if(k.indexOf(pre)===0) lv++; });
   var V=lmap('sever');  Object.keys(V).forEach(function(k){ if(k.indexOf(pre)===0&&V[k]&&V[k].퇴사일) sv++; });
   return {months:recs.length, lock:lock, review:review, attend:at, leave:lv, sever:sv};
-}
-function hubRow(icon,label,state,tone,screen,site){
-  var c=tone==='warn'?'var(--warn)':(tone==='ok'?SIG.green:'var(--sub)');
-  return '<div onclick="navTo({screen:\''+screen+'\',site:\''+esc(site)+'\',month:null,emp:null,day:null})" '
-    +'style="display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);cursor:pointer">'
-    +'<span style="width:22px;text-align:center">'+icon+'</span>'
-    +'<b style="width:96px;flex-shrink:0">'+label+'</b>'
-    +'<span style="flex:1;font-size:12.5px;color:'+c+'">'+state+'</span>'
-    +'<span style="font-size:12px;color:var(--sub)">\u203a</span></div>';
-}
-function screenHub(){
-  ensureCo();
-  if(!App.site) return hubPickHtml();
-  var site=App.site, c=hubCounts(site), st=staffOf(site);
-  var card=cardsView().filter(function(v){ return v.사업장===site; })[0]||null;
-  var mo=(new Date().getMonth()+1)+'월';
-  var came=arrivalFor(site,mo);
-  var h='<h1>'+site+'</h1>';
-  h+='<div class="sub"><a href="#" onclick="goBack();return false">\u2190 회사 목록</a> \u00b7 이 회사의 모든 일</div>';
-
-  /* 머리 — 담당·업체·급여일. 못 이은 곳은 «왜 못 이었는지»를 여기서 말해 준다. */
-  var who = st ? (st.담당?('담당 '+st.담당+(st.부담당&&st.부담당.length?(' \u00b7 부담당 '+st.부담당.join(', ')):'')):'담당 미확인')
-               : (coErr?('업체 명단을 못 읽었습니다: '+coErr):'담당 불러오는 중\u2026');
-  h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin-bottom:14px">'
-    +'<div style="font-size:13px"><b>'+who+'</b>'
-    +(st&&st.업체?('<span style="color:var(--sub)"> \u00b7 업체관리 「'+st.업체+'」'+(st.확정?'':(st.짐작?' (짐작)':''))+'</span>'):'')
-    +'</div>'
-    +'<div style="font-size:12px;color:var(--sub);margin-top:4px">급여일 '+((card&&card.급여일)||'미지정')+' \u00b7 산정기간 '+((card&&card.산정기간)||'미지정')+'</div>'
-    +(st&&st.경고?('<div style="font-size:12px;color:var(--warn);margin-top:6px">\u26a0 '+st.경고+'</div>'):'')
-    +(st&&st.짐작&&st.업체&&isAdminUser?('<div style="margin-top:8px"><button class="btn" onclick="linkCo(\''+esc(site)+'\')">이 업체가 맞습니다 \u2014 확정</button> '
-      +'<a href="#" onclick="navTo({screen:\'names\',site:null,month:null,emp:null,day:null});return false" style="font-size:12px">다른 업체면 \ud83c\udff7 이름표에서 고르기</a></div>'):'')
-    +'</div>';
-
-  /* 일곱 칸 — 순서는 실제로 일하는 차례다(자료가 와야 급여, 급여가 끝나야 명세서·신고) */
-  h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
-  h+=hubRow('\ud83d\udce5','자료 도착', came?(mo+' 자료 도착'):(mo+' 아직 안 왔습니다 \u2014 독촉은 급여데이터함에서'),
-            came?'ok':'warn','inbox',site);
-  h+=hubRow('\ud83d\udcb0','급여 처리', c.months?(c.months+'개월 \u00b7 확정 '+c.lock+' \u00b7 검토할 것 '+c.review+'건'):'자료 없음',
-            (c.months&&c.review===0)?'ok':(c.review?'warn':''),'payroll',site);
-  h+=hubRow('\ud83d\udd52','근태', c.attend?(c.attend+'명분 입력됨'):'아직 입력 없음', c.attend?'ok':'','attend',site);
-  h+=hubRow('\ud83c\udf34','연차\u00b7휴가', c.leave?(c.leave+'명분 기록됨'):'아직 기록 없음', c.leave?'ok':'','leave',site);
-  h+=hubRow('\ud83c\udf93','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'','sever',site);
-  h+=hubRow('\ud83d\udcc4','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'','slip',site);
-  h+=hubRow('\ud83d\udcd1','신고', '일용 매월신고 \u00b7 취득상실 \u00b7 퇴직정산 \u00b7 연차', '', 'report', site);
-  h+='</div>';
-  return h;
 }
 /* 사람이 «이 업체가 맞다»고 못 박는다 — 짐작을 답으로 바꾸는 유일한 길 */
 function linkCo(site){
@@ -1971,15 +1984,6 @@ function linkStats(sites){
   if(!coData) return null;
   (sites||[]).forEach(function(s){ n[nameState(staffOf(s))]++; n.all++; });
   return n;
-}
-function namesBanner(sites){
-  var n=linkStats(sites); if(!n) return '';
-  var left=n.all-n.done;
-  return '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:'+(left?'#fffbeb':'#f0fdf4')
-    +';border:1px solid var(--line);border-radius:12px;padding:9px 14px;margin:6px 0 4px;font-size:12.5px">'
-    +'<b>\ud83c\udff7 이름표</b> 확정 '+n.done+' / '+n.all+'곳'
-    +(left?(' \u00b7 남은 '+left+'곳 <span style="color:var(--sub)">(이름 같음 '+n.same+' \u00b7 꼭 볼 것 '+n.check+' \u00b7 못 찾음 '+n.none+')</span>'):' \u2014 다 맞췄습니다')
-    +' <a href="#" onclick="navTo({screen:\'names\',site:null,month:null,emp:null,day:null});return false">이름표 맞추기 \u203a</a></div>';
 }
 function screenNames(){
   ensureCo();
@@ -2072,42 +2076,263 @@ function linkAllSame(){
 window.namesEdit=namesEdit; window.namesFind=namesFind; window.pickCo=pickCo;
 window.markNotCo=markNotCo; window.unlinkSite=unlinkSite; window.linkAllSame=linkAllSame;
 
-/* 회사 고르기 — 담당자별로 묶어서 보여 준다. 이것이 대표가 말한 「담당자별 정리」다. */
-function hubPickHtml(){
-  var sites=siteCardsList();
-  var h='<h1>회사</h1><div class="sub">담당자 \u2192 회사 \u2192 그 회사의 모든 일(자료\u00b7급여\u00b7근태\u00b7연차\u00b7퇴직\u00b7명세서\u00b7신고)</div>';
-  if(!sites.length) return h+'<div class="empty">급여 데이터가 없습니다. 급여 처리 화면에서 먼저 자료를 올리세요.</div>';
-  if(!coData){
-    h+='<div class="empty">'+(coErr?('업체 명단을 못 읽었습니다: '+coErr+' \u2014 담당자 묶기 없이 목록만 보여 줍니다.'):'담당자 명단을 불러오는 중\u2026')+'</div>';
-    h+='<div class="cards">'+sites.map(function(s){
-      return '<div class="c" style="cursor:pointer" onclick="navTo({site:\''+esc(s)+'\'})"><div class="t">'+s+'</div>'
-        +'<div class="m">'+((payRecs(s)||[]).length)+'개월</div></div>'; }).join('')+'</div>';
-    return h;
-  }
-  var groups=PuSiteStaff.groupByStaff(sites,{companies:coData.companies,dir:coData.dir,links:lmap('site_co_link')});
-  /* «업체관리에는 있는데 급여관리에 자료가 없는 곳»을 숨기지 않는다 —
-     담당자가 자기 업체 수와 견줘 볼 수 있어야 무엇이 빠졌는지 안다.
-     (2026-09-13 실측: 업체관리 급여 113곳 · 급여관리 자료 46곳) */
-  var coAll=PuSiteStaff.payrollCos(coData.companies||[]).length;
-  h+='<div style="font-size:12px;color:var(--sub);margin-bottom:4px">업체관리 급여 업체 '+coAll+'곳 중 급여관리에 자료가 있는 곳 '+sites.length+'곳</div>';
-  h+=namesBanner(sites);
-  groups.forEach(function(g){
-    h+='<div style="margin:18px 0 8px;font-size:13.5px"><b>'+g.담당+'</b> <span style="color:var(--sub)">'+g.rows.length+'곳</span>'
-      +(g.미확인?' <span style="font-size:12px;color:var(--warn)">\u2014 업체관리에서 유형\u00b7담당을 고치거나 이름표에서 골라 주세요</span>':'')
-      +(g.업체아님?' <span style="font-size:12px;color:var(--sub)">\u2014 이름표에서 「업체 아님」으로 정리한 이름(정리 대상)</span>':'')+'</div>';
-    h+='<div class="cards">';
-    g.rows.forEach(function(row){
-      var c=hubCounts(row.site);
-      h+='<div class="c" style="cursor:pointer" onclick="navTo({site:\''+esc(row.site)+'\'})">'
-        +'<div class="t">'+row.site+(row.역할==='부'?' <span style="font-size:11px;color:var(--sub);font-weight:400">부담당</span>':'')+'</div>'
-        +'<div class="m">'+c.months+'개월 \u00b7 확정 '+c.lock+(c.review?(' \u00b7 <span style="color:var(--warn)">검토 '+c.review+'건</span>'):'')+'</div>'
-        +(row.staff.경고?('<div class="m" style="color:var(--warn)">\u26a0 '+row.staff.경고+'</div>'):'')
-        +'</div>';
-    });
-    h+='</div>';
+
+/* ══════════════════════════════════════════════════════════════════════
+   3칸 화면 — 대표 승인 2026-10-05 「형태나 유형을 일치시켜 연결성이 강하게」
+   ──────────────────────────────────────────────────────────────────────
+   급여데이터함과 같은 뼈대: ① 보기(내 일·전체·담당자·도구) ② 사업장 목록 ③ 회사 한 장.
+   · 가운데 명단은 **업체관리 급여 업체 전부**(데이터함과 같은 명단·같은 업체번호).
+     급여관리에 자료가 없는 곳도 「자료 없음」으로 보인다 — 숨기면 빠진 줄 모른다.
+   · 회사 ↔ 급여관리 자료는 이름표(site_co_link)로 잇는다. 확정 전엔 짐작으로 잇고 그렇다고 밝힌다.
+   · 오른쪽 탭은 **원래 화면 그대로**다(App.site 가 정해져 있으면 고르기를 건너뛴다).
+     계산은 건드리지 않는다 — 둘러싼 틀만 바뀐다.
+   · 담당자 줄·「내 담당」은 데이터함과 같은 규칙(PuSiteStaff.rosterCos·isMine) — 검사가 견준다.
+   ⚠ 목록을 그리는 동안 직원 표를 받지 않는다(110곳에서 받으면 화면이 안 열린다).
+   ══════════════════════════════════════════════════════════════════════ */
+function ymNow(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
+function ymParts(s){ var m=String(s||'').match(/^(\d{4})-(\d{1,2})$/); return m?{y:+m[1],m:+m[2]}:null; }
+function ymText(s){ var t=ymParts(s); return t?(t.y+'년 '+t.m+'월'):''; }
+/* 데이터함 알림의 귀속월 — 「2026-08」이면 해까지, 「8월」이면 달만 */
+function inboxYm(a){
+  var m=String((a&&a.월)||'').match(/^(\d{4})\s*[.\-\/]\s*(\d{1,2})$/);
+  if(m) return {y:+m[1],m:+m[2]};
+  var mn=monthNum(a&&a.월); return mn?{y:null,m:mn}:null;
+}
+/* 이 회사에 그 달 자료가 왔나 — 번호가 실려 오면 번호로, 아니면 이름표로 */
+function coArrivals(co, sites, ym, links){
+  var t=ymParts(ym), map=inboxLog(), out=[];
+  Object.keys(map).forEach(function(id){ var a=map[id]; if(!a) return;
+    var mine=(co&&a.companyId&&String(a.companyId)===String(co.id))
+      ||sites.some(function(s){ return PuSiteStaff.arrivalMatches(a,s,links); });
+    if(!mine) return;
+    var r=inboxYm(a);
+    if(t&&r&&(r.m!==t.m||(r.y!=null&&r.y!==t.y))) return;
+    out.push(a);
   });
+  return out;
+}
+/* 한 회사의 그 달 상태 — 직원 표 없이 얇은 목록만 본다.
+   ⚠ 연·월을 못 읽은 기록(약 1/4)은 달 판정에서 빠진다 — 급여 탭에서는 그대로 보인다. */
+function coState(co, sites, ym, links){
+  var t=ymParts(ym), recs=[];
+  sites.forEach(function(s){ (payRecs(s)||[]).forEach(function(r){ var x=ymOf(r);
+    if(x&&t&&x.y===t.y&&x.m===t.m) recs.push({site:s,r:r}); }); });
+  var arrived=coArrivals(co,sites,ym,links).length>0;
+  if(recs.length){
+    var lock=recs.filter(function(x){return isLocked(x.site,x.r.월);}).length;
+    var rev=recs.filter(function(x){return !isLocked(x.site,x.r.월)&&effSig(x.r)!=='green';}).length;
+    if(lock===recs.length) return {key:'done',label:'확정 ✔',recs:recs.length};
+    if(rev) return {key:'review',label:'검토 '+rev,recs:recs.length};
+    return {key:'ready',label:'처리 전',recs:recs.length};
+  }
+  if(arrived) return {key:'arrived',label:'자료 도착',recs:0};
+  if(!sites.length) return {key:'nodata',label:'자료 없음',recs:0};
+  return {key:'none',label:'미도착',recs:0};
+}
+function sitesHaveSever(sites){
+  var V=lmap('sever');
+  return sites.some(function(s){ return Object.keys(V).some(function(k){ return k.indexOf(s+'|')===0&&V[k]&&V[k].퇴사일; }); });
+}
+/* 이름순 — 앞의 ㈜·(주)·주식회사는 빼고 견준다(안 빼면 법인들이 목록 맨 위에 몰린다) */
+function byKoName(a,b){ return PuSiteStaff.coreName(a.name).localeCompare(PuSiteStaff.coreName(b.name),'ko'); }
+/* 한 번 그릴 때 쓸 것을 한 번에 센다 — 칸 셋이 같은 셈을 본다 */
+function shellModel(){
+  var S=PuSiteStaff, links=lmap('site_co_link'), ym=App.ym||(App.ym=ymNow());
+  var em=((me&&me.email)||'').toLowerCase();
+  var cos=coData?S.payrollCos(coData.companies).slice().sort(byKoName):[];
+  var active={}; cos.forEach(function(c){ active[c.id]=c; });
+  var bySite={}, sitesByCo={}, loose=[];
+  paySites().forEach(function(site){
+    var st=coData?S.staffFor(site,{companies:coData.companies,dir:coData.dir,links:links}):null;
+    bySite[site]=st;
+    if(st&&st.coId&&active[st.coId]&&!st.업체아님) (sitesByCo[st.coId]=sitesByCo[st.coId]||[]).push(site);
+    else loose.push(site);
+  });
+  loose.sort(function(a,b){ return String(a).localeCompare(String(b),'ko'); });
+  var state={}; cos.forEach(function(c){ state[c.id]=coState(c, sitesByCo[c.id]||[], ym, links); });
+  var stOf=function(c){ return state[c.id].key; };
+  var late=function(c){ var k=stOf(c); return k==='none'||k==='nodata'; };
+  var mine=cos.filter(function(c){ return S.isMine(c,em); });
+  var roster=S.rosterCos(cos, coData?coData.dir:[]);
+  var views=[
+    {key:'mine',grp:'mine',label:'내 담당',list:mine},
+    {key:'late',grp:'mine',label:'자료 안 온 곳',list:mine.filter(late),warn:true},
+    {key:'review',grp:'mine',label:'검토할 것',list:mine.filter(function(c){return stOf(c)==='review';}),warn:true},
+    {key:'done',grp:'mine',label:'확정 끝',list:mine.filter(function(c){return stOf(c)==='done';})},
+    {key:'sever',grp:'mine',label:'퇴사자 있음',list:mine.filter(function(c){return sitesHaveSever(sitesByCo[c.id]||[]);})}
+  ];
+  if(isAdminUser){
+    views.push({key:'all',grp:'all',label:'전체 사업장',list:cos,who:true});
+    views.push({key:'alllate',grp:'all',label:'전체 자료 안 온 곳',list:cos.filter(late),warn:true,who:true});
+    views.push({key:'allreview',grp:'all',label:'전체 검토할 것',list:cos.filter(function(c){return stOf(c)==='review';}),warn:true,who:true});
+    views.push({key:'noman',grp:'all',label:'담당 없음',list:roster.unassigned,bad:true});
+    roster.people.forEach(function(p){
+      views.push({key:'p:'+p.sid,grp:'people',label:p.담당,list:p.cos,badSid:p.badSid,
+        done:p.cos.filter(function(c){return stOf(c)==='done';}).length});
+    });
+  }
+  views.push({key:'loose',grp:'tool',label:'지난·못 이은 자료',sites:loose});
+  var m={cos:cos,active:active,bySite:bySite,sitesByCo:sitesByCo,loose:loose,state:state,mine:mine,roster:roster,views:views,ym:ym,links:links};
+  m.view=curView(m);
+  return m;
+}
+/* 지금 보기 — 고른 것이 없으면 「내 담당」, 내 담당이 없는 관리자(대표)는 「전체」 */
+function curView(m){
+  var k=App.view;
+  if(!k) k=(m.mine.length||!isAdminUser)?'mine':'all';
+  return m.views.filter(function(v){return v.key===k;})[0]||m.views[0];
+}
+function viewbarHtml(m){
+  var shell=App.screen==='shell';
+  function row(v){
+    var n=v.sites?v.sites.length:v.list.length, on=shell&&m.view&&m.view.key===v.key;
+    return '<div class="vrow'+(on?' sel':'')+(v.warn?' warn':'')+(v.bad?' bad':'')+'" onclick="pickView(\''+esc(v.key)+'\')">'
+      +'<b>'+v.label+'</b><span class="n">'+n+'</span></div>';
+  }
+  if(!coData) return '<div class="ctitle">'+(coErr?('업체 명단을 못 읽었습니다: '+coErr):'업체 명단을 불러오는 중…')+'</div>'
+    +'<div class="ctitle">도구</div>'+TOOLS.map(toolRow).join('');
+  var h='<div class="ctitle">내 일</div>'+m.views.filter(function(v){return v.grp==='mine';}).map(row).join('');
+  var all=m.views.filter(function(v){return v.grp==='all';});
+  if(all.length) h+='<div class="ctitle">전체</div>'+all.map(row).join('');
+  var ppl=m.views.filter(function(v){return v.grp==='people';});
+  if(ppl.length){
+    /* 데이터함 담당자 줄과 같은 꼴 — 번호는 사번 순, 사번이 아닌 값은 번호 없이 빨갛게 */
+    var no=0;
+    h+='<div class="ctitle">담당자 · 확정/전체</div>'+ppl.map(function(v){
+      var on=shell&&m.view.key===v.key, pct=v.list.length?Math.round(v.done/v.list.length*100):0;
+      return '<div class="vrow prow'+(on?' sel':'')+(v.badSid?' badsid':'')+'" onclick="pickView(\''+esc(v.key)+'\')">'
+        +'<span class="fill" style="width:'+pct+'%"></span><span class="pno">'+(v.badSid?'–':(++no))+'</span>'
+        +'<b>'+v.label+'</b><span class="n">'+v.done+'/'+v.list.length+'</span></div>';
+    }).join('');
+  }
+  h+='<div class="ctitle">도구</div>'+m.views.filter(function(v){return v.grp==='tool';}).map(row).join('')+TOOLS.map(toolRow).join('');
   return h;
 }
+function toolRow(t){
+  var extra='';
+  if(t.id==='names'&&coData){ var n=linkStats(siteCardsList()); if(n&&n.all-n.done) extra='<span class="n" style="background:#fffbeb;color:var(--warn)">'+(n.all-n.done)+'</span>'; }
+  return '<div class="vrow'+(App.screen===t.id?' sel':'')+'" onclick="App.go(\''+t.id+'\')"><b>'+t.label+'</b>'+extra+'</div>';
+}
+function colistHtml(m){
+  var v=m.view;
+  var n=v?(v.sites?v.sites.length:v.list.length):0;
+  return '<div class="chead"><div class="ct">'+(v?v.label:'')+' <span class="n">'+n+'</span></div>'
+    +'<div class="ym"><button onclick="shiftYm(-1)" aria-label="지난 달">◀</button><b>'+ymText(m.ym)+'</b><button onclick="shiftYm(1)" aria-label="다음 달">▶</button></div>'
+    +'<input placeholder="사업장 이름으로 찾기" value="'+esc(App.q||'')+'" oninput="setQ(this.value)"></div>'
+    +'<div id="colRows">'+colRowsHtml(m)+'</div>';
+}
+function colRowsHtml(m){
+  var v=m.view; if(!v) return '';
+  var q=PuSiteStaff.coreName(App.q||'');
+  if(v.sites){
+    var ss=v.sites.filter(function(s){ return !q||PuSiteStaff.coreName(s).indexOf(q)>=0; });
+    if(!ss.length) return '<div class="ctitle">해당하는 자료가 없습니다.</div>';
+    return ss.map(function(s){ var st=m.bySite[s];
+      var why=!st?'':(st.업체아님?'업체 아님':(st.업체?(st.상태==='closed'?'지난 업체':(st.유형!=='급여'?'유형 '+st.유형:'지점·중단')):'못 이음'));
+      return '<div class="corow'+(App.loose===s?' sel':'')+'" onclick="openLoose(\''+esc(s)+'\')"><span class="nm"><b>'+s+'</b><i>'+why+' · '+(payRecs(s)||[]).length+'개월</i></span></div>';
+    }).join('');
+  }
+  var list=v.list.filter(function(c){ return !q||PuSiteStaff.coreName(c.name).indexOf(q)>=0; });
+  if(!list.length) return '<div class="ctitle">해당하는 사업장이 없습니다.</div>';
+  var dir=PuSiteStaff.nameBySid(coData&&coData.dir);
+  return list.map(function(c){ var st=m.state[c.id];
+    var who=v.who?('<i>'+(c.managerMain?(dir[c.managerMain]||c.managerMain):'담당 없음')+'</i>'):'';
+    return '<div class="corow'+(App.coId===c.id?' sel':'')+'" onclick="openCo(\''+esc(c.id)+'\')"><span class="nm"><b>'+c.name+'</b>'+who+'</span>'
+      +'<span class="st '+st.key+'">'+st.label+'</span></div>';
+  }).join('');
+}
+/* 고른 회사의 급여관리 자료 묶음 — 기록이 가장 많은 것이 먼저 */
+function coSites(m, coId){
+  return (m.sitesByCo[coId]||[]).slice().sort(function(a,b){ return (payRecs(b)||[]).length-(payRecs(a)||[]).length; });
+}
+function shellMainHtml(m){
+  if(!coData&&!coErr) return '<div class="empty">업체 명단을 불러오는 중…</div>';
+  var co=App.coId?m.active[App.coId]:null, sites;
+  if(App.loose){ sites=[App.loose]; }
+  else if(co){ sites=coSites(m, co.id); }
+  else {
+    var v=m.view, n=v?(v.sites?v.sites.length:v.list.length):0;
+    return '<div class="empty">왼쪽 목록에서 회사를 고르세요.<br><span style="font-size:12px">'+(v?v.label:'')+' '+n+'곳 · 기준 '+ymText(m.ym)+'</span></div>';
+  }
+  /* 자료 묶음이 바뀌었으면(다른 회사·옛 기록) 첫 묶음으로 맞춘다 */
+  if(sites.length&&sites.indexOf(App.site)<0){ App.site=sites[0]; App.month=null; App.emp=null; App.day=null; }
+  if(!sites.length) App.site=null;
+  var h='<div class="cohead">'+coHeadHtml(m, co, sites)+'</div>';
+  h+='<div class="tabs">'+TABS.map(function(t){
+    return '<button class="'+(App.tab===t.id?'on':'')+'" onclick="pickTab(\''+t.id+'\')">'+t.label+'</button>'; }).join('')+'</div>';
+  h+='<div class="tabbody">'+tabBodyHtml(m, co, sites)+'</div>';
+  return h;
+}
+function coHeadHtml(m, co, sites){
+  var dir=PuSiteStaff.nameBySid(coData&&coData.dir);
+  var st=App.site?m.bySite[App.site]:null;
+  var card=App.site?(cardsView().filter(function(v){ return v.사업장===App.site; })[0]||null):null;
+  var name=co?co.name:App.loose;
+  var who=co?((co.managerMain?('담당 '+(dir[co.managerMain]||co.managerMain)):'담당 없음')
+      +((co.managerSubs||[]).length?(' · 부담당 '+co.managerSubs.map(function(s){return dir[s]||s;}).join(', ')):'')):'';
+  var h='<div class="ttl">'+name+'</div><div class="meta">'+[who,
+    card?('급여일 '+(card.급여일||'미지정')+' · 산정기간 '+(card.산정기간||'미지정')):'',
+    '기준 '+ymText(m.ym)].filter(Boolean).join(' · ')+'</div>';
+  if(sites.length>1){
+    h+='<div class="chips">급여관리 자료 묶음 '+sites.map(function(s){
+      return '<button class="'+(App.site===s?'on':'')+'" onclick="pickChip(\''+esc(s)+'\')">'+s+' · '+(payRecs(s)||[]).length+'개월</button>'; }).join('')+'</div>';
+  }
+  if(st&&!st.확정&&st.업체){
+    h+='<div class="meta" style="color:var(--warn)">\u26a0 급여관리 「'+App.site+'」 \u2194 업체관리 「'+st.업체+'」 — 이름으로 짐작해 이었습니다'
+      +(isAdminUser?(' <button class="btn" style="padding:3px 10px;font-size:12px" onclick="linkCo(\''+esc(App.site)+'\')">맞습니다 — 확정</button>'
+        +' <a href="#" onclick="App.go(\'names\');return false">다른 업체면 🏷 이름표에서</a>'):'')+'</div>';
+  }
+  if(st&&st.경고&&App.loose) h+='<div class="meta" style="color:var(--warn)">\u26a0 '+st.경고+'</div>';
+  return h;
+}
+var TAB_FN={payroll:function(){return screenPayroll();},attend:function(){return screenAttend();},leave:function(){return screenLeave();},
+  sever:function(){return screenSever();},slip:function(){return screenSlip();},report:function(){return screenReport();}};
+function tabBodyHtml(m, co, sites){
+  if(App.tab==='sum'||!TAB_FN[App.tab]) return shellSummary(m, co, sites);
+  /* ⚠ 자료가 없는데 원래 화면을 부르면 「사업장 고르기」가 떠 버린다 — 여기서 막는다 */
+  if(!App.site) return '<div class="empty">급여관리에 이 회사 급여 자료가 아직 없습니다.<br>'
+    +'<span style="font-size:12px">급여 자료는 급여대장을 하네스로 올리면 생기고, 이번 달 도착 여부는 💼 급여데이터함의 「급여관리에 알리기」로 넘어옵니다.</span></div>';
+  return TAB_FN[App.tab]();
+}
+function shellSummary(m, co, sites){
+  var st=co?m.state[co.id]:coState(null, sites, m.ym, m.links);
+  var arr=coArrivals(co, sites, m.ym, m.links);
+  var c={months:0,lock:0,review:0,attend:0,leave:0,sever:0};
+  sites.forEach(function(s){ var x=hubCounts(s); Object.keys(c).forEach(function(k){ c[k]+=x[k]; }); });
+  function row(icon, label, text, tone, tab){
+    var col=tone==='warn'?'var(--warn)':(tone==='ok'?SIG.green:'var(--sub)');
+    return '<div onclick="pickTab(\''+tab+'\')" style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line);cursor:pointer">'
+      +'<span style="width:22px;text-align:center">'+icon+'</span><b style="width:96px;flex-shrink:0">'+label+'</b>'
+      +'<span style="flex:1;font-size:12.5px;color:'+col+'">'+text+'</span><span style="font-size:12px;color:var(--sub)">\u203a</span></div>';
+  }
+  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
+  h+='<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)"><span style="width:22px;text-align:center">📥</span>'
+    +'<b style="width:96px;flex-shrink:0">'+ymText(m.ym)+'</b><span class="st '+st.key+'">'+st.label+'</span>'
+    +'<span style="flex:1;font-size:12.5px;color:var(--sub)">'+(arr.length?('데이터함 알림 '+arr.length+'건 · '+arr.map(function(a){return (a.종류||'자료')+(a.줄수?(' '+a.줄수+'줄'):'');}).join(', '))
+      :(st.key==='nodata'?'급여관리에 자료 없음':'이 달 도착 알림 없음 — 독촉은 💼 급여데이터함에서'))+'</span></div>';
+  h+=row('💰','급여', c.months?(c.months+'개월 · 확정 '+c.lock+' · 검토할 것 '+c.review+'건'):'자료 없음', (c.months&&!c.review)?'ok':(c.review?'warn':''), 'payroll');
+  h+=row('🕒','근태', c.attend?(c.attend+'명분 입력됨'):'아직 입력 없음', c.attend?'ok':'', 'attend');
+  h+=row('🌴','연차·휴가', c.leave?(c.leave+'명분 기록됨'):'아직 기록 없음', c.leave?'ok':'', 'leave');
+  h+=row('🎓','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'', 'sever');
+  h+=row('📄','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'', 'slip');
+  h+=row('📑','신고', '일용 매월신고 · 취득상실 · 퇴직정산 · 연차', '', 'report');
+  return h+'</div>';
+}
+function pickView(k){ navTo({screen:'shell',view:k,coId:null,loose:null,site:null,month:null,emp:null,day:null}); }
+function openCo(id){ navTo({screen:'shell',coId:id,loose:null,site:null,month:null,emp:null,day:null}); }
+function openLoose(s){ navTo({screen:'shell',loose:s,coId:null,site:s,month:null,emp:null,day:null}); }
+function pickTab(t){ navTo({screen:'shell',tab:t,month:null,emp:null,day:null}); }
+function pickChip(s){ navTo({site:s,month:null,emp:null,day:null}); }
+function shiftYm(d){
+  var t=ymParts(App.ym||ymNow()); var y=t.y, mo=t.m+d;
+  if(mo<1){ mo=12; y--; } if(mo>12){ mo=1; y++; }
+  navTo({ym:y+'-'+('0'+mo).slice(-2)});
+}
+/* 찾기 — 목록 줄만 다시 그린다(칸을 통째로 다시 그리면 글자 넣던 자리가 사라진다) */
+function setQ(q){ App.q=q; var el=document.getElementById('colRows'); if(el&&window.PuSiteStaff) el.innerHTML=colRowsHtml(shellModel()); }
+window.pickView=pickView; window.openCo=openCo; window.openLoose=openLoose; window.pickTab=pickTab;
+window.pickChip=pickChip; window.shiftYm=shiftYm; window.setQ=setQ;
+
 function pickSiteHtml(title, sub) {
   var sites = siteCardsList();
   var h = '<h1>' + title + '</h1><div class="sub">' + sub + '</div>';
@@ -2735,10 +2960,17 @@ window.setAttend = setAttend; window.lput = lput; window.addSever = addSever;
 
 function render(){
   var bb=document.getElementById('backbtn'); if(bb) bb.style.display=(navDepth>0)?'':'none';
-  document.getElementById('nav').innerHTML=NAV.map(function(n){return '<button class="'+(App.screen===n.id?'on':'')+'" onclick="App.go(\''+n.id+'\')">'+n.label+'</button>';}).join('');
+  ensureCo();
+  var model=(typeof PuSiteStaff!=='undefined')?shellModel():null;
+  document.getElementById('nav').innerHTML=model?viewbarHtml(model):'';
+  var shell=App.screen==='shell', col=document.getElementById('colist');
+  col.hidden=!shell||!model; if(shell&&model) col.innerHTML=colistHtml(model);
   var m=document.getElementById('main');
-  if(App.screen==='cards') m.innerHTML=screenCards();
-  else if(App.screen==='hub') m.innerHTML=screenHub();
+  if(shell){
+    m.innerHTML=model?shellMainHtml(model):'<div class="empty">js/pu-site-staff.js 를 불러오지 못했습니다.</div>';
+    if(App.tab==='report'&&App.site) addPayrollReportHwpxAction(m);
+  }
+  else if(App.screen==='cards') m.innerHTML=screenCards();
   else if(App.screen==='names') m.innerHTML=screenNames();
   else if(App.screen==='payroll') m.innerHTML=screenPayroll();
   else if(App.screen==='attend') m.innerHTML=screenAttend();

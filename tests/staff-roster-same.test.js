@@ -83,3 +83,24 @@ test('사번을 이메일로 바꾸는 규칙도 같다', () => {
   const P = loadPaydataStore();
   ['A-001', 'A-10', 'P-001'].forEach(sid => assert.equal(Staff.sidToEmail(sid), P.sidToEmail(sid)));
 });
+
+/* ══════ 회사 단위 명단(rosterCos) — 급여관리 3칸 화면의 담당자 줄 (2026-10-05) ══════ */
+test('★★ 회사 단위 명단도 데이터함과 «차례·회사·빈 곳»까지 같다', () => {
+  const P = loadPaydataStore();
+  const pay = P.managerRoster(COS, DIR, {});
+  const mine = Staff.rosterCos(COS, DIR);
+  assert.deepEqual(Array.from(mine.people, p => p.sid), Array.from(pay.people, p => p.sid), '담당자 차례가 다릅니다');
+  pay.people.forEach(p => {
+    const g = mine.people.find(x => x.sid === p.sid);
+    assert.deepEqual(Array.from(g.cos, c => c.id).sort(), Array.from(p.companies, c => c.id).sort(), p.sid + ' 의 회사가 다릅니다');
+    assert.equal(g.badSid, p.badSid, p.sid + ' 의 「사번 아님」 판정이 다릅니다');
+  });
+  assert.deepEqual(Array.from(mine.unassigned, c => c.id).sort(), Array.from(pay.unassigned, c => c.id).sort());
+});
+
+test('「내 담당」 판정도 데이터함과 같다 — 부담당도 내 담당', () => {
+  const P = loadPaydataStore();
+  ['a003@pureun.kr', 'a005@pureun.kr', 'a9@pureun.kr', 'p001@pureun.kr'].forEach(em => {
+    COS.forEach(c => assert.equal(Staff.isMine(c, em), P.isMyCompany(c, em), c.id + ' / ' + em));
+  });
+});
