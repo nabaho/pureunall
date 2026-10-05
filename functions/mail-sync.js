@@ -22,6 +22,7 @@
 const MB = require('./mail-box');
 const AICLASSIFY = require('./mail-ai-classify');   /* 받은메일함 자동분류(Jev) — 기본은 꺼짐 */
 const NEWINQ = require('./mail-new-inquiry');       /* 신규 문의 → 관리자 폰 알림 + 메일함 띠 */
+const MYMAIL = require('./mail-owner');             /* 📬 내 담당 메일 → 그 담당자 폰 알림 */
 
 const ROOT = 'mailbox';
 
@@ -468,6 +469,20 @@ async function runSync(deps, opts) {
                 if (inq.ran) console.log('mail-new-inquiry', JSON.stringify(inq));
               } catch (e) {
                 console.warn('mail-new-inquiry 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+            }
+            /* ── 📬 내 담당 메일 → 그 담당자 폰 알림 (대표 승인 목업 2026-10-05) ──
+               ⚠ 위 신규 문의와 달리 받은메일함«만»이 아니다 — 어느 칸을 보는지는
+                 mail-owner.NOTIFY_KINDS 한 자리에 적혀 있다(까닭도 거기).
+               ⚠ 「새로 받아온 것」(fresh)만 본다. 옛것 채우기(back)에서 울리면
+                 몇 달 전 메일로 폰이 한꺼번에 울린다.
+               ⚠ 실패해도 던지지 않는다 — 알림이 죽어도 동기화는 계속된다. */
+            if (r.dir === 'fresh' && held.length && MYMAIL.NOTIFY_KINDS.indexOf(MB.folderKind(p.box)) >= 0) {
+              try {
+                const mine = await MYMAIL.notifyOwners(deps, { slug: p.slug, rows: held.map((g) => g.row) });
+                if (mine.ran) console.log('mail-owner', JSON.stringify(mine));
+              } catch (e) {
+                console.warn('mail-owner 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
             }
             /* ⚠★ 여기서 «이 칸의 기간»을 재던 자리다 — 걷어냈다 (대표 지적 2026-09-11).
