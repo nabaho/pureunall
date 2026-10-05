@@ -119,6 +119,22 @@ details.recban[open]>summary::before{content:'▾ '}
   .rec-hits tr{display:block;padding:6px 0;border-bottom:1px solid var(--border)}
   .rec-hits td{display:block;white-space:normal!important;border:0!important;padding:2px 6px!important}
 }
+/* 하위 탭 — 아래 갈래 단추(알약)와 헷갈리지 않게 «탭» 모양 */
+.rsubs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 12px;flex-wrap:wrap}
+.rsub{padding:9px 16px;border:0;background:none;font-family:inherit;font-size:13.5px;cursor:pointer;color:var(--text-mute);border-bottom:3px solid transparent;margin-bottom:-1px}
+.rsub.on{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
+.rsub .n{font-size:11px;background:#fee2e2;color:#991b1b;border-radius:9px;padding:1px 7px;margin-left:4px;font-weight:600}
+.rsub .n.amb{background:#fef3c7;color:#854d0e}
+/* 표 열 맞춤 (대표 지시 2026-10-05 「열을 좀 정리」) — 칸 너비를 못박아 줄마다 같은 자리에 선다 */
+.rec-fixed{table-layout:fixed;width:100%}
+.rec-fixed td{vertical-align:middle}
+.rec-fixed td.tt{white-space:normal;word-break:keep-all;line-height:1.55}
+.rec-fixed td.src{white-space:normal;line-height:1.4}
+.rec-fixed td.act{text-align:right;white-space:nowrap}
+.rec-fixed td.act .btn{margin-left:3px}
+.rec-fixed thead th{font-size:11.5px;color:var(--text-mute);font-weight:600;text-align:left}
+.rec-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;margin:2px 0 8px}
+.rec-head b{color:var(--navy)}
 .recban.calm{background:var(--bg);border-color:var(--border);color:var(--text-mute)}
 tr.rec-now td{background:#fffbeb}
 td.og{width:15%;max-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -225,21 +241,27 @@ table.cmp td{white-space:nowrap}
      ⚠ 지원 이력은 대표님 브라우저가 서류 폴더 7번에서 «읽기만» 한다(원본은 안 건드린다). -->
 <div class="wrap" id="pgRec" style="display:none">
   <div class="card">
-    <div class="bar">
-      <b style="color:var(--navy)">해마다 지원하던 곳</b>
-      <span class="sml" id="recAt"></span>
-      <div class="sp"></div>
-      <button class="btn primary" onclick="recScan()">📂 서류 폴더에서 읽기</button>
-      <button class="btn" onclick="recAddOrg()">＋ 기관 더하기</button>
+    <!-- 하위 탭 셋 (대표 지시 2026-10-05 「공인노무사 공지 · 그간 지원·메일 · 기타 공공기관으로 분류」) -->
+    <div class="rsubs" id="recSubs"></div>
+    <div id="recPaneKc"><div id="recWatchKc"></div></div>
+    <div id="recPaneHist" style="display:none">
+      <div class="bar">
+        <b style="color:var(--navy)">해마다 지원하던 곳</b>
+        <span class="sml" id="recAt"></span>
+        <div class="sp"></div>
+        <button class="btn primary" onclick="recScan()">📂 서류 폴더에서 읽기</button>
+        <button class="btn" onclick="recAddOrg()">＋ 기관 더하기</button>
+      </div>
+      <div id="recBan"></div>
+      <div id="recMail"></div>
+      <div class="scroll"><table>
+        <thead><tr><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
+        <tbody id="recTb"></tbody>
+      </table></div>
+      <div id="recRest" style="margin-top:10px"></div>
     </div>
-    <div id="recBan"></div>
-    <div id="recWatch"></div>
-    <div id="recMail"></div>
-    <div class="scroll"><table>
-      <thead><tr><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
-      <tbody id="recTb"></tbody>
-    </table></div>
-    <div id="recRest" style="margin-top:10px"></div>
+    <!-- ⚠ id 「recWatch」는 공공기관 쪽 목록이다(옛 이름을 그대로 둔다) -->
+    <div id="recPanePub" style="display:none"><div id="recWatch"></div></div>
   </div>
 </div>
 
@@ -295,7 +317,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-g2b.js?v=6"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
-<script src="js/gov-recruit.js?v=3"></script>
+<script src="js/gov-recruit.js?v=4"></script>
 <script src="js/gov-submit.js?v=2"></script>
 <script src="js/gov-sync.js?v=1"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
@@ -962,7 +984,10 @@ function recDraw(){
   var scan=get('recruit_scan'), today=recToday(), y=String(today.getFullYear());
   var at=Number(lsGet('recruit_at'));
   $('recAt').textContent = at ? '· 서류 폴더 읽은 때 '+new Date(at).toLocaleString('ko-KR') : '';
-  if($('recWatch')) $('recWatch').innerHTML=recWatchHtml();   /* ⚠ 폴더를 안 읽었어도 새 모집 글은 보인다 */
+  /* ⚠ 폴더를 안 읽었어도 새 모집 글은 보인다 */
+  if($('recWatchKc')) $('recWatchKc').innerHTML=recWatchHtml('kc');
+  if($('recWatch')) $('recWatch').innerHTML=recWatchHtml('pub');
+  recSubDraw();
   if($('recMail')) $('recMail').innerHTML=recMailHtml();
   if(!scan.length){
     $('recBan').innerHTML='<div class="recban calm">📂 아직 서류 폴더를 읽지 않았습니다. <b>📂 서류 폴더에서 읽기</b>를 눌러 '
@@ -993,7 +1018,7 @@ function recDraw(){
       : '<button class="btn sm" onclick="recSetUrl(\''+esc(o.id)+'\')">🔗 링크 넣기</button>';
     return '<tr class="'+(ah<=1&&o.month?'rec-now':'')+'"><td class="rn">'+(i+1)+'</td>'
       +'<td><b style="color:var(--navy)">'+esc(o.name)+'</b>'+(o.custom?' <span class="tag navy">직접 더함</span>':'')
-        +(recNewFor(o.id)?' <span class="tag red" title="기관 게시판에 새 모집 글 — 위 「새 모집 글」 칸">🆕 새 글</span>':'')
+        +(recNewFor(o.id)?' <span class="tag red" title="기관 게시판에 새 모집 글 — 「🏛 공인노무사회」·「🏢 공공기관」 탭">🆕 새 글</span>':'')
         +'<div class="sml">'+esc(o.what)+'</div></td>'
       +'<td style="white-space:nowrap">'+(o.month?o.month+'월'+(ah===0?' <span class="tag amber">이번 달</span>':ah===1?' <span class="tag amber">다음 달</span>':''):'<span class="sml">—</span>')+'</td>'
       +'<td>'+(yrs||'<span class="sml">아직 없음</span>')+'<span class="sml"> '+o.years.length+'해</span></td>'
@@ -1034,35 +1059,89 @@ function recNewFor(orgId){ var seen=recObj('recruit_seen');
 var _recFold={};
 function recFold(k, on){ _recFold[k]=!!on; }
 function recFoldOpen(k, need){ return (k in _recFold) ? _recFold[k] : !!need; }
-function recWatchHtml(){
-  if(_recWatchErr) return '<div class="recban calm">🛰 기관 게시판 감시 결과를 '+esc(_recWatchErr)+'</div>';
-  if(!_recWatch) return '';
-  var last=_recWatch.last||{}, seen=recObj('recruit_seen'), hits=recWatchHits();
-  var fresh=hits.filter(function(x){ return !seen[x.key]; });
-  var errs=(last.errors||[]).map(function(e){ return e.board; });
-  var head='<b>🛰 기관 게시판 새 모집 글</b>'+(fresh.length?' <span class="tag red">새 글 '+fresh.length+'</span>':' <span class="sml">('+hits.length+'건)</span>')
-    +' <span class="sml">— 서버가 매일 아침 7시 20분에 '+(last.checked?last.checked+'곳':'기관')+' 게시판을 읽습니다'
+
+/* ═══ 하위 탭 셋 (대표 지시 2026-10-05) ═══
+   🏛 공인노무사회(공지·회원 공지·채용 정보) · 📂 지원 이력·메일(해마다 지원한 곳·메일에서 찾은 것) · 🏢 공공기관(그 밖의 게시판).
+   ⚠ 고른 탭은 이 기기에만 기억한다(lsSet — 클라우드로 안 간다). 처음에는 «볼 것이 있는» 탭부터. */
+var REC_SUBS=[ {k:'kc', nm:'🏛 공인노무사회'}, {k:'hist', nm:'📂 지원 이력 · 메일'}, {k:'pub', nm:'🏢 공공기관'} ];
+var _recKind={ kc:'', pub:'' };
+function recFresh(grp){ var seen=recObj('recruit_seen');
+  return recWatchHits().filter(function(x){ return !seen[x.key] && (!grp || GovRecruit.hitGroup(x)===grp); }); }
+function recSubCur(){
+  var v=lsGet('rec_sub'); if(v==='kc'||v==='hist'||v==='pub') return v;
+  if(recFresh('kc').length) return 'kc';
+  if(recFresh('pub').length) return 'pub';
+  return 'hist';
+}
+function recSub(k){ lsSet('rec_sub', k); recSubDraw(); }
+function recSubDraw(){
+  if(!$('recSubs')) return;
+  var cur=recSubCur(), need=0;
+  try{ var mp=recMailPlan(); need=mp.ask.length+mp.pick.length; }catch(e){}
+  var badge={ kc:recFresh('kc').length, pub:recFresh('pub').length, hist:need };
+  $('recSubs').innerHTML=REC_SUBS.map(function(t){
+    var n=badge[t.k];
+    return '<button class="rsub'+(t.k===cur?' on':'')+'" onclick="recSub(\''+t.k+'\')">'+t.nm
+      +(n?' <span class="n'+(t.k==='hist'?' amb':'')+'">'+(t.k==='hist'?'고를 것 ':'새 ')+n+'</span>':'')+'</button>'; }).join('');
+  [['kc','recPaneKc'],['hist','recPaneHist'],['pub','recPanePub']].forEach(function(a){
+    if($(a[1])) $(a[1]).style.display=(a[0]===cur?'':'none'); });
+}
+function recKindSet(grp, k){ _recKind[grp]=k; recDraw(); }
+/* 출처 칸 — 공인노무사회는 게시판 이름만 짧게(+제목에서 알아낸 기관), 공공기관은 기관 이름 */
+function recSrcCell(x, grp){
+  var on=x.org?recOrgName(x.org):'';
+  if(grp==='kc'){
+    var b=String(x.boardName||x.board||'').replace(/^(한국)?공인노무사회\s*/,'').replace(/\(로그인\)/,'').trim()||'공지';
+    return esc(b)+(x.org&&x.org!=='kcplaa'?'<div class="sml">'+esc(on)+'</div>':'');
+  }
+  return esc(on||x.boardName||x.board||'')+(on&&x.boardName?'<div class="sml">'+esc(x.boardName)+'</div>':'');
+}
+function recWatchHtml(grp){
+  grp=grp||'pub';
+  var nm=grp==='kc'?'🏛 공인노무사회 공지·회원 공지·채용 정보':'🏢 공공기관 게시판 새 모집 글';
+  if(_recWatchErr) return '<div class="recban calm">'+nm+' — 감시 결과를 '+esc(_recWatchErr)+'</div>';
+  if(!_recWatch) return '<div class="recban calm">'+nm+' — 불러오는 중입니다…</div>';
+  var last=_recWatch.last||{}, seen=recObj('recruit_seen');
+  var all=recWatchHits().filter(function(x){ return GovRecruit.hitGroup(x)===grp; });
+  var errs=(last.errors||[]).map(function(e){ return e.board; }).filter(function(b){ return (/^kcplaa/.test(b)?'kc':'pub')===grp; });
+  var fresh=all.filter(function(x){ return !seen[x.key]; });
+  var info='<span class="sml">— 서버가 매일 아침 7시 20분에 '+(last.checked?last.checked+'곳':'기관')+' 게시판을 읽습니다'
     +(last.at?' · 마지막 '+esc(new Date(last.at).toLocaleString('ko-KR')):' · 아직 한 번도 안 돌았습니다')
-    +(errs.length?' · <span style="color:var(--red)">못 읽은 곳 '+errs.length+'('+esc(errs.join(', '))+')</span>':'')+'</span>';
-  if(!hits.length) return '<div class="recban calm">'+head+'<br>'+(last.at?'아직 걸린 모집 글이 없습니다.':'첫 실행(아침 7시 20분) 뒤에 채워집니다.')+'</div>';
-  var row=function(x){ var nw=!seen[x.key];
-    return '<tr'+(nw?' class="rec-now"':'')+'><td style="white-space:nowrap" class="sml">'+esc(x.date||'')+'</td>'
-      +'<td style="white-space:nowrap">'+esc(x.boardName||x.board||'')+'</td>'
-      +'<td style="white-space:normal">'+(nw?'<span class="tag red">새 글</span> ':'')+esc(x.title)+'</td>'
-      +'<td style="white-space:nowrap">'+(/^https:\/\//.test(x.href||'')?'<a class="btn sm" href="'+esc(x.href)+'" target="_blank" rel="noopener">🔗 열기</a> ':'')
-      +'<button class="btn sm" onclick="recWatchCal(\''+esc(x.key)+'\')">📅 마감일</button> '
-      +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
+    +(errs.length?' · <span style="color:var(--red)">못 읽은 곳 '+errs.length+'('+esc(errs.join(', '))+') — 다음 날 다시 읽습니다</span>':'')+'</span>';
+  var head='<div class="rec-head"><b>'+nm+'</b>'+(fresh.length?' <span class="tag red">새 글 '+fresh.length+'</span>':' <span class="sml">('+all.length+'건)</span>')+' '+info+'</div>';
+  if(!all.length) return head+'<div class="recban calm">'+(last.at?'아직 걸린 모집 글이 없습니다.':'첫 실행(아침 7시 20분) 뒤에 채워집니다.')+'</div>';
+  /* 갈래 단추 — 제목 내용으로 가른 것(GovRecruit.kindOf) */
+  var cnt={}; all.forEach(function(x){ var k=GovRecruit.kindOf(x.title); cnt[k]=(cnt[k]||0)+1; });
+  var cur=_recKind[grp]||''; if(cur && !cnt[cur]) cur=_recKind[grp]='';
+  var chips='<div class="mchips" style="margin-bottom:8px"><button class="mchip'+(cur?'':' on')+'" onclick="recKindSet(\''+grp+'\',\'\')">전체 <span class="n">'+all.length+'</span></button>'
+    + GovRecruit.KINDS.filter(function(k){ return cnt[k.k]; }).map(function(k){
+      return '<button class="mchip'+(cur===k.k?' on':'')+'" onclick="recKindSet(\''+grp+'\',\''+k.k+'\')">'+k.icon+' '+esc(k.name)+' <span class="n">'+cnt[k.k]+'</span></button>'; }).join('')+'</div>';
+  var list=cur?all.filter(function(x){ return GovRecruit.kindOf(x.title)===cur; }):all;
+  var fr=list.filter(function(x){ return !seen[x.key]; });
   /* ⚠ 새 글은 «모두» 보인다 — 30건으로 자르면 31번째 새 글이 영영 안 보인다. 본 글은 합쳐 30건까지 */
-  var shown=fresh.concat(hits.filter(function(x){ return seen[x.key]; }).slice(0, Math.max(0, 30-fresh.length)));
-  return '<details class="recban'+(fresh.length?'':' calm')+'"'+(recFoldOpen('watch', fresh.length)?' open':'')+' ontoggle="recFold(\'watch\',this.open)">'
-    +'<summary>'+head+'</summary>'
-    +(fresh.length>1?'<div class="bar" style="margin:6px 0 0"><button class="btn sm" onclick="recSeenAll()">✓ 새 글 '+fresh.length+'건 모두 봤음</button></div>':'')
-    +'<div class="scroll" style="margin:6px 0 2px"><table class="rec-hits"><tbody>'+shown.map(row).join('')+'</tbody></table></div>'
-    +(hits.length>shown.length?'<div class="sml">이미 본 옛 글 '+(hits.length-shown.length)+'건은 줄였습니다</div>':'')+'</details>';
+  var shown=fr.concat(list.filter(function(x){ return seen[x.key]; }).slice(0, Math.max(0, 30-fr.length)));
+  var row=function(x){ var nw=!seen[x.key], ki=GovRecruit.kindInfo(GovRecruit.kindOf(x.title));
+    return '<tr'+(nw?' class="rec-now"':'')+'><td class="sml">'+esc(x.date||'')+'</td>'
+      +'<td class="src">'+recSrcCell(x, grp)+'</td>'
+      +'<td><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td>'
+      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')+esc(x.title)+'</td>'
+      +'<td class="act">'+(/^https:\/\//.test(x.href||'')?'<a class="btn sm" href="'+esc(x.href)+'" target="_blank" rel="noopener">🔗 열기</a>':'')
+      +'<button class="btn sm" onclick="recWatchCal(\''+esc(x.key)+'\')">📅 마감일</button>'
+      +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
+  return head+chips
+    +(fr.length>1?'<div class="bar" style="margin:0 0 6px"><button class="btn sm" onclick="recSeenAll(\''+grp+'\')">✓ 새 글 '+fr.length+'건 모두 봤음</button></div>':'')
+    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:92px"><col style="width:150px"><col style="width:132px"><col><col style="width:250px"></colgroup>'
+    +'<thead><tr><th>날짜</th><th>'+(grp==='kc'?'게시판':'기관')+'</th><th>갈래</th><th>제목</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
+    +shown.map(row).join('')+'</tbody></table></div>'
+    +(list.length>shown.length?'<div class="sml">이미 본 옛 글 '+(list.length-shown.length)+'건은 줄였습니다</div>':'');
 }
 function recSeen(key){ var s=recObj('recruit_seen'); s[key]=Date.now(); recObjSet('recruit_seen', s); recDraw(); }
-function recSeenAll(){ var s=recObj('recruit_seen'), now=Date.now(), n=0;
-  recWatchHits().forEach(function(x){ if(!s[x.key]){ s[x.key]=now; n++; } });
+/* grp 를 주면 그 탭(과 지금 고른 갈래)의 새 글만 */
+function recSeenAll(grp){ var s=recObj('recruit_seen'), now=Date.now(), n=0, k=grp?(_recKind[grp]||''):'';
+  recWatchHits().forEach(function(x){
+    if(grp && GovRecruit.hitGroup(x)!==grp) return;
+    if(k && GovRecruit.kindOf(x.title)!==k) return;
+    if(!s[x.key]){ s[x.key]=now; n++; } });
   if(!n) return; recObjSet('recruit_seen', s); recDraw(); toast('새 모집 글 '+n+'건을 봤음으로 적었습니다'); }
 function recWatchCal(key){
   var x=recWatchHits().filter(function(h){ return h.key===key; })[0]; if(!x) return;
@@ -1170,34 +1249,42 @@ function recMailHtml(){
   if(!at) return '<div class="recban calm">'+head+'<br>'+(_recMailBusy?'메일함을 읽고 있습니다…':'아직 안 읽었습니다.')+'</div>';
   var p=recMailPlan(), lg=recObj('recruit_log'), seen=recObj('recruit_seen'), parts=[];
   var orgs=GovRecruit.allOrgs(get('recruit_custom'));
-  var opt=function(key){ return '<select onchange="recMailPick(\''+esc(key)+'\',this.value)" style="padding:2px 5px;font-size:11.5px"><option value="">기관 고르기…</option>'
+  var opt=function(key){ return '<select onchange="recMailPick(\''+esc(key)+'\',this.value)" style="padding:2px 5px;font-size:11.5px;max-width:150px"><option value="">기관 고르기…</option>'
     + orgs.map(function(o){ return '<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>'; }).join('')+'</select>'; };
+  /* ⚠ 네 묶음 모두 «같은 열» 표 — 날짜 · 기관·구분 · 메일 제목 · 판단 · 할 일 (대표 지시 2026-10-05 「열을 좀 정리」) */
+  var mtable=function(title, rows){
+    return '<div class="pop-sub" style="margin:10px 0 4px">'+title+'</div>'
+      +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:92px"><col style="width:150px"><col><col style="width:96px"><col style="width:250px"></colgroup><tbody>'
+      +rows.join('')+'</tbody></table></div>'; };
+  var mrow=function(d, who, subj, judge, act){ return '<tr><td class="sml">'+esc(d)+'</td><td class="src">'+who+'</td><td class="tt">「'+esc(subj)+'」</td>'
+    +'<td>'+(judge||'')+'</td><td class="act">'+act+'</td></tr>'; };
   /* 저절로 적은 것 */
   var done=[]; Object.keys(lg).forEach(function(o){ Object.keys(lg[o]||{}).forEach(function(y){ var c=lg[o][y]; if(c&&c.via==='mail'&&c.mail) done.push({o:o,y:y,c:c}); }); });
   done.sort(function(a,b){ return String(b.c.mail.date).localeCompare(String(a.c.mail.date)); });
-  if(done.length) parts.push('<div class="pop-sub" style="margin:8px 0 4px">✅ 「지원함」으로 저절로 적은 것 '+done.length+'</div>'
-    + done.slice(0,10).map(function(d){ return '<div class="note">'+esc(d.c.mail.date)+' · <b>'+esc(recOrgName(d.o))+'</b> '+esc(d.y)+'년 — 「'+esc(d.c.mail.subject)+'」'
-      +(d.c.mail.att?' <span class="sml">첨부 '+d.c.mail.att+'</span>':'')+' <button class="btn sm" onclick="recMailUndo(\''+esc(d.o)+'\',\''+esc(d.y)+'\')">↩ 되돌리기</button></div>'; }).join(''));
+  if(done.length) parts.push(mtable('✅ 「지원함」으로 저절로 적은 것 '+done.length, done.slice(0,10).map(function(d){
+    return mrow(d.c.mail.date, '<b>'+esc(recOrgName(d.o))+'</b><div class="sml">'+esc(d.y)+'년</div>', d.c.mail.subject,
+      d.c.mail.att?'<span class="sml">첨부 '+d.c.mail.att+'</span>':'',
+      '<button class="btn sm" onclick="recMailUndo(\''+esc(d.o)+'\',\''+esc(d.y)+'\')">↩ 되돌리기</button>'); })));
   /* 결과 — 묻는다 */
-  if(p.ask.length) parts.push('<div class="pop-sub" style="margin:8px 0 4px">🏅 결과 메일 '+p.ask.length+' <span class="sml">— 열어 보고 고르세요(저절로 적지 않습니다)</span></div>'
-    + p.ask.slice(0,12).map(function(a){ var k=a.item.key;
-      return '<div class="note">'+esc(a.item.date)+' · <b>'+esc(recOrgName(a.org))+'</b> — 「'+esc(a.item.subject)+'」'
-        +(a.guess?' <span class="tag teal">'+esc(a.guess)+' 같음</span>':' <span class="tag amber">열어 봐야 앎</span>')
-        +' <button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'선정\')">✓ 선정</button>'
-        +' <button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'탈락\')">✗ 탈락</button>'
-        +' <button class="btn sm" onclick="recMailSkip(\''+esc(k)+'\')">무시</button></div>'; }).join(''));
+  if(p.ask.length) parts.push(mtable('🏅 결과 메일 '+p.ask.length+' <span class="sml">— 열어 보고 고르세요(저절로 적지 않습니다)</span>', p.ask.slice(0,12).map(function(a){ var k=a.item.key;
+    return mrow(a.item.date, '<b>'+esc(recOrgName(a.org))+'</b>', a.item.subject,
+      a.guess?'<span class="tag teal">'+esc(a.guess)+' 같음</span>':'<span class="tag amber">열어 봐야 앎</span>',
+      '<button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'선정\')">✓ 선정</button>'
+      +'<button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'탈락\')">✗ 탈락</button>'
+      +'<button class="btn sm" onclick="recMailSkip(\''+esc(k)+'\')">무시</button>'); })));
   /* 기관 모름 */
-  if(p.pick.length) parts.push('<div class="pop-sub" style="margin:8px 0 4px">❓ 기관을 모르는 지원·결과 메일 '+p.pick.length+' <span class="sml">— 한 번 고르면 기억합니다</span></div>'
-    + p.pick.slice(0,12).map(function(it){
-      return '<div class="note">'+esc(it.date)+' · '+(it.kind==='submit'?'📨 지원':'🏅 결과')+' — 「'+esc(it.subject)+'」 '+opt(it.key)
-        +' <button class="btn sm" onclick="recMailSkip(\''+esc(it.key)+'\')">무시</button></div>'; }).join(''));
+  if(p.pick.length) parts.push(mtable('❓ 기관을 모르는 지원·결과 메일 '+p.pick.length+' <span class="sml">— 한 번 고르면 기억합니다</span>', p.pick.slice(0,12).map(function(it){
+    return mrow(it.date, it.kind==='submit'?'📨 지원':'🏅 결과', it.subject, '',
+      opt(it.key)+'<button class="btn sm" onclick="recMailSkip(\''+esc(it.key)+'\')">무시</button>'); })));
   /* 메일로 온 모집 공고 */
   var nts=p.notices.filter(function(n){ return !seen[GovSync.safeKey('m|'+n.key)]; });
-  if(nts.length) parts.push('<details class="sec" style="margin-top:8px"><summary><span class="nm">✉ 메일로 온 모집 공고 '+nts.length+'</span>'
+  if(nts.length) parts.push('<details class="sec" style="margin-top:10px"><summary><span class="nm">✉ 메일로 온 모집 공고 '+nts.length+'</span>'
     +'<span class="sml">게시판 감시가 못 읽는 기관도 메일로 알려 옵니다</span></summary><div class="body">'
-    + nts.slice(0,30).map(function(n){ return '<div class="note">'+esc(n.date)+' — 「'+esc(n.subject)+'」 '
-      +'<button class="btn sm" onclick="recMailNoticeCal(\''+esc(n.key)+'\')">📅 마감일</button> '
-      +'<button class="btn sm" onclick="recMailNoticeSeen(\''+esc(n.key)+'\')">✓ 봤음</button></div>'; }).join('')+'</div></details>');
+    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:92px"><col style="width:132px"><col><col style="width:200px"></colgroup><tbody>'
+    + nts.slice(0,30).map(function(n){ var ki=GovRecruit.kindInfo(GovRecruit.kindOf(n.subject));
+      return '<tr><td class="sml">'+esc(n.date)+'</td><td><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td><td class="tt">「'+esc(n.subject)+'」</td>'
+        +'<td class="act"><button class="btn sm" onclick="recMailNoticeCal(\''+esc(n.key)+'\')">📅 마감일</button>'
+        +'<button class="btn sm" onclick="recMailNoticeSeen(\''+esc(n.key)+'\')">✓ 봤음</button></td></tr>'; }).join('')+'</tbody></table></div></div></details>');
   if(!parts.length) parts.push('<div class="note">지원·결과·모집 메일을 찾지 못했습니다.</div>');
   var need=p.ask.length+p.pick.length;
   return '<details class="recban'+(need?'':' calm')+'"'+(recFoldOpen('mail', need)?' open':'')+' ontoggle="recFold(\'mail\',this.open)">'

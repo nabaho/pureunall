@@ -44,7 +44,7 @@ function runApp(seed, opt) {
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
-    + 'kwTog,star,recSeenAll,recFold,popClose,recWatchHits,matPull,get,'
+    + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
     + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
@@ -670,27 +670,25 @@ test('★★ 새 글은 30건이 넘어도 «모두» 보이고, 「모두 봤�
   r.api.setFb(fbWith({ last: { at: 'x', checked: 1 }, hits }), 'U1');
   await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
-  assert.equal((w.match(/<tr/g) || []).length, 40, '새 글 40건이 다 보여야 한다');
+  assert.equal((w.match(/<tr class="rec-now"/g) || []).length, 40, '새 글 40건이 다 보여야 한다');
   assert.match(w, /새 글 40건 모두 봤음/);
   r.api.recSeenAll();
   assert.equal(r.api.recNewFor('erc'), false);
   assert.ok(r.toasts.some((t) => /40건을 봤음/.test(t)));
   const w2 = r.el('recWatch').innerHTML;
-  assert.equal((w2.match(/<tr/g) || []).length, 30, '본 옛 글은 30건까지만');
+  assert.equal((w2.match(/<tbody>[\s\S]*<\/tbody>/)[0].match(/<tr/g) || []).length, 30, '본 옛 글은 30건까지만');
   assert.match(w2, /옛 글 10건은 줄였습니다/);
 });
-test('★★ 접는 칸 — 새 글이 있으면 열리고, 사람이 접으면 다시 그려도 접힌 채', async () => {
-  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
-  r.api.setFb(fbWith(WATCH), 'U1');
-  await r.api.recWatchPull();
-  assert.match(r.el('recWatch').innerHTML, /<details class="recban" open/);
-  r.api.recFold('watch', false); r.api.recDraw();
-  assert.match(r.el('recWatch').innerHTML, /<details class="recban"(?! open)/);
-  r.api.recSeenAll();
-  assert.match(r.el('recWatch').innerHTML, /<details class="recban calm"(?! open)/, '볼 것이 없으면 처음부터 접혀 있다');
+test('★★ 접는 칸(메일) — 사람이 접으면 다시 그려도 접힌 채, 손대기 전엔 볼 것이 있을 때만 열림', () => {
+  const r = runApp({});
+  assert.equal(r.api.recFoldOpen('mail', 3), true);
+  assert.equal(r.api.recFoldOpen('mail', 0), false);
+  r.api.recFold('mail', false);
+  assert.equal(r.api.recFoldOpen('mail', 3), false, '사람이 접은 것을 다시 열면 안 된다');
   /* 메일 칸 머리의 「다시 찾기」는 칸을 접지 않는다 */
   assert.match(require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8'), /event\.preventDefault\(\);event\.stopPropagation\(\);recMailScan\(true\)/);
 });
+
 test('★★ 올해 칸 — 서류 폴더에 올해 것이 있어도 «고를 수» 있다(선정·탈락을 적는 길)', () => {
   const scan = SCAN.concat([{ y: '2026', yd: '2026년', name: '2026 경영평가위원모집', dir: true, t: T(2026, 12) }]);
   const r = runApp({ recruit_scan: scan }, { Date: FixedDate('2026-12-05T09:00:00') });
@@ -760,4 +758,79 @@ test('★★ 신청 재료를 다시 받으면 고른 것·쪽을 비운다 — 
   const st = r.api.matState();
   assert.equal(Object.keys(st.sel).length, 0, '옛 줄 번호로 고른 것이 남았다');   /* vm 안 객체라 deepEqual 대신 열쇠 수 */
   assert.equal(st.page.cert, undefined, '옛 쪽 번호가 남았다');
+});
+
+/* ═══ 하위 탭 셋 + 갈래 (대표 지시 2026-10-05 「공인노무사 공지 · 그간 지원·메일 · 기타 공공기관으로 내용 보고 분류」) ═══ */
+const MIX = {
+  last: { at: '2026-10-04T22:20:04Z', checked: 19, errors: [{ board: 'erc', why: 'fetch failed' }] },
+  hits: {
+    a: { key: 'a', board: 'kcplaa_m', org: '', boardName: '공인노무사회 회원 공지(로그인)', title: '[일반추천] 관세청 안심노무사 후보자 일반추천의 건', date: '2026-09-16', href: 'https://www.kcplaa.or.kr/bbs/news/view/1' },
+    b: { key: 'b', board: 'kcplaa_m', org: '', boardName: '공인노무사회 회원 공지(로그인)', title: '2026 부천시 다다진로박람회 체험부스 참여 공인노무사 모집 안내', date: '2026-09-17' },
+    c: { key: 'c', board: 'kcplaa_job', org: 'kcplaa', boardName: '공인노무사회 채용 정보', title: '직장 내 괴롭힘 사건 외부 조사자 선임 공고', date: '2026-09-30' },
+    d: { key: 'd', board: 'kcplaa', org: 'nosa', boardName: '공인노무사회 공지', title: '2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고', date: '2026-09-20' },
+    e: { key: 'e', board: 'semas', org: 'semas', boardName: '소상공인시장진흥공단 공지', title: '소상공인시장진흥공단 비상임이사 모집공고', date: '2026-09-09' },
+    f: { key: 'f', board: 'cepa', org: 'cepa', boardName: '충남경제진흥원 공지', title: '충남 국적 Dream 사업 강사·멘토 인력풀(POOL) 모집 재공고', date: '2026-07-27' }
+  }
+};
+test('★★★ 출처로 두 탭에 가른다 — 공인노무사회 게시판(공지·회원 공지·채용 정보)은 공인노무사회, 나머지는 공공기관', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(MIX), 'U1');
+  await r.api.recWatchPull();
+  const kc = r.el('recWatchKc').innerHTML, pub = r.el('recWatch').innerHTML;
+  ['안심노무사', '다다진로박람회', '외부 조사자', '일터혁신 컨설팅'].forEach((t) => { assert.match(kc, new RegExp(t)); assert.doesNotMatch(pub, new RegExp(t)); });
+  ['비상임이사', 'Dream'].forEach((t) => { assert.match(pub, new RegExp(t)); assert.doesNotMatch(kc, new RegExp(t)); });
+  /* 공인노무사회 공지에 실린 노사발전재단 공문 — 공인노무사회 탭에 두되 기관을 밝힌다 */
+  assert.match(kc, /노사발전재단/);
+  /* 게시판 이름은 짧게 */
+  assert.match(kc, /<td class="src">회원 공지</);
+  /* 못 읽은 곳은 그 탭에만 */
+  assert.match(pub, /못 읽은 곳 1\(erc\)/); assert.doesNotMatch(kc, /못 읽은 곳/);
+});
+test('★★ 내용으로 갈래 — 단추를 누르면 그 갈래만, 개수가 맞는다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(MIX), 'U1');
+  await r.api.recWatchPull();
+  let kc = r.el('recWatchKc').innerHTML;
+  assert.match(kc, /🗳 후보 추천 <span class="n">1</); assert.match(kc, /📌 행사·안내 <span class="n">1</);
+  assert.match(kc, /💼 컨설팅·자문·조사 <span class="n">2</); assert.match(kc, /전체 <span class="n">4</);
+  r.api.recKindSet('kc', 'rec');
+  kc = r.el('recWatchKc').innerHTML;
+  assert.match(kc, /안심노무사/); assert.doesNotMatch(kc, /박람회 체험부스/); assert.doesNotMatch(kc, /외부 조사자/);
+  /* 「모두 봤음」은 지금 보는 탭·갈래만 */
+  r.api.recSeenAll('kc');
+  const seen = r.api.recObj('recruit_seen');
+  assert.ok(seen.a); assert.ok(!seen.b, '다른 갈래까지 봤음으로 적었다'); assert.ok(!seen.e, '다른 탭까지 봤음으로 적었다');
+  /* 「전체」 갈래에서 눌러도 다른 탭(공공기관) 글은 건드리지 않는다 */
+  r.api.recKindSet('kc', ''); r.api.recSeenAll('kc');
+  const seen2 = r.api.recObj('recruit_seen');
+  assert.ok(seen2.b && seen2.c && seen2.d); assert.ok(!seen2.e && !seen2.f, '공공기관 탭 글까지 봤음으로 적었다');
+});
+test('★★ 하위 탭 — 셋이 보이고, 고르면 그 판만 보이고 이 기기에 기억한다(클라우드로는 안 간다)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(MIX), 'U1');
+  await r.api.recWatchPull();
+  const subs = r.el('recSubs').innerHTML;
+  assert.match(subs, /🏛 공인노무사회 <span class="n">새 4</); assert.match(subs, /📂 지원 이력 · 메일/); assert.match(subs, /🏢 공공기관 <span class="n">새 2</);
+  assert.equal(r.api.recSubCur(), 'kc', '처음엔 볼 것이 있는 탭부터');
+  assert.equal(r.el('recPaneKc').style.display, ''); assert.equal(r.el('recPanePub').style.display, 'none'); assert.equal(r.el('recPaneHist').style.display, 'none');
+  r.api.recSub('hist');
+  assert.equal(r.el('recPaneHist').style.display, ''); assert.equal(r.el('recPaneKc').style.display, 'none');
+  assert.equal(r.store.gov3_rec_sub, 'hist');
+  assert.ok(!require('../js/gov-sync.js').field('rec_sub'), '고른 탭은 기기마다 — 클라우드 칸이 아니다');
+});
+test('★ 새 글이 없으면 지원 이력 탭부터', () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.recDraw();
+  assert.equal(r.api.recSubCur(), 'hist');
+});
+test('★★ 열 맞춤 — 새 모집 글·메일 표는 칸 너비를 못박는다(날짜·출처·갈래·제목·할 일)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(MIX), 'U1');
+  await r.api.recWatchPull();
+  const kc = r.el('recWatchKc').innerHTML;
+  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:92px"><col style="width:150px"><col style="width:132px"><col><col style="width:250px"><\/colgroup>/);
+  assert.match(kc, /<th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th>/);
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
+  assert.match(src, /\.rec-fixed\{table-layout:fixed;width:100%\}/);
+  assert.match(src, /var mtable=function/, '메일 묶음도 같은 열 표');
 });
