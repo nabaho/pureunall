@@ -4444,12 +4444,80 @@ async function 홈자동정찰(그릇) {
 /* 자동 올리기 — 3단계 새 노무사(구성원 게시판 새 글). 2단계 로고는 편집기 파일 올리기 정찰 뒤에 붙인다.
    ★ 받은 «새 글 쓰기» 화면 칸을 그대로 되돌려 보내고 아는 칸만 채운다(HW.새구성원몸통 이 막는다).
    ★ 보낸 뒤 받은 글 번호가 정말 구성원 게시판 글인지 한 번 더 연다(HW.게시판확인). */
+/* 2단계 — 새 거래처 로고 글. 라이믹스 업로드 부품이 하는 그대로(HW.로고올리기몸통 머리말 참고):
+   새 글 화면 → 편집기 번호 → procFileUpload → 받은 글 번호로 새 글 저장 → 그 글이 자문사현황 것인지 확인. */
+async function 홈로고올리기(그릇, x) {
+  try {
+    const db = getDatabase();
+    const 파일 = (await db.ref("homepage/logoFiles/" + x.companyId).once("value")).val() || {};
+    const 업체 = (await db.ref("data/companies").once("value")).val();
+    let 목록 = (업체 && 업체.v !== undefined) ? 업체.v : 업체;
+    if (목록 && !Array.isArray(목록)) 목록 = Object.keys(목록).map((k) => 목록[k]);
+    const 회사 = (목록 || []).filter((c) => c && String(c.id) === String(x.companyId))[0] || {};
+    let 바이트 = null;
+    try { 바이트 = Buffer.from(String(파일.b64 || ""), "base64"); } catch (e) { 바이트 = null; }
+    const 화면주소 = HW.자동정찰자리().자문사새글;
+    const g = await 홈부르기(화면주소, 그릇);
+    const 화면 = await g.text();
+    const 확인표 = HW.확인표뽑기(화면);
+    const 올몸 = HW.로고올리기몸통(HW.편집기번호(화면), "partner_board", { 종류: 파일.type, 바이트: 바이트 }, 확인표);
+    if (!올몸.ok) return Object.assign({}, x, { 됐나: false, 까닭: 올몸.why });
+    const u = await 홈부르기(HW.보낼주소(), 그릇, {
+      method: "POST",
+      body: 올몸.몸통,
+      headers: {
+        "User-Agent": HW.브라우저표시,
+        "Content-Type": "multipart/form-data; boundary=" + 올몸.경계,
+        "Content-Length": String(올몸.몸통.length),
+        /* ⚠ 「*\/*」를 쓰지 않는다 — 검사가 주석 시작(/*)으로 읽어 뒤를 지운다(2026-10-05) */
+        "Accept": "application/json, text/javascript",
+        "X-Requested-With": "XMLHttpRequest",
+        "Referer": 화면주소,
+        "Cookie": 그릇.글자(),
+        "X-CSRF-Token": 확인표
+      }
+    });
+    const 올림 = HW.올리기답풀기(await u.text());
+    if (!올림.ok) return Object.assign({}, x, { 됐나: false, 까닭: 올림.why });
+    const 글몸 = HW.로고새글몸통(화면, 회사.name, 올림);
+    if (!글몸.ok) return Object.assign({}, x, { 됐나: false, 까닭: 글몸.why });
+    const p = await 홈부르기(HW.보낼주소(), 그릇, {
+      method: "POST",
+      body: 글몸.몸통,
+      headers: {
+        "User-Agent": HW.브라우저표시,
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Referer": 화면주소,
+        "Cookie": 그릇.글자(),
+        "X-CSRF-Token": 글몸.확인표
+      }
+    });
+    const p답 = await p.text();
+    const 됐나 = p.status >= 200 && p.status < 400 && !/<error>\s*-?[1-9]/.test(p답);
+    /* 글 번호는 올리기 답이 이미 정해 주었다 — 옮겨 보낸 주소와 다르면 옮겨 보낸 것을 믿는다 */
+    let 새번호 = 됐나 ? (HW.새글번호(p.status, p.headers.get("location") || "", p답) || 올림.upload_target_srl) : 0;
+    if (새번호) {
+      const q = await 홈부르기(HW.게시판글주소(x.게시판, 새번호), 그릇);
+      await q.text();
+      if (HW.게시판확인(q.status, q.headers.get("location") || "") !== "ok") 새번호 = 0;
+    }
+    return Object.assign({}, x, { 됐나: 됐나, srl: 새번호,
+      까닭: 됐나 ? (새번호 ? "" : "글 번호를 확인하지 못함 — 홈페이지에서 확인 필요") : "홈페이지가 받아 주지 않음" });
+  } catch (e) {
+    return Object.assign({}, x, { 됐나: false, 까닭: String((e && e.message) || e) });
+  }
+}
+
 async function 홈자동올리기(그릇, 목록) {
   const db = getDatabase();
   const 답 = [];
   for (const x of 목록) {
+    if (x.종류 === "새거래처") {
+      답.push(await 홈로고올리기(그릇, x));
+      continue;
+    }
     if (x.종류 !== "새구성원") {
-      답.push(Object.assign({}, x, { 됐나: false, 까닭: "로고 올리는 길은 아직 짓는 중입니다(편집기 파일 올리기 정찰)" }));
+      답.push(Object.assign({}, x, { 됐나: false, 까닭: "모르는 종류라 올리지 않았습니다" }));
       continue;
     }
     try {

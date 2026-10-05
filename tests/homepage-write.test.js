@@ -619,3 +619,86 @@ test('이름자리모양 — 이름은 안 남기고 «몇 번째 이름이 몇 
   ['홍길동', '사무장', '없는사람'].forEach(v => assert.ok(!글.includes(v), '값이 새었다: ' + v));
   assert.ok(r[0].모양[0].includes('<span class="nm">'), '이름을 둘러싼 태그 모양이 안 보입니다: ' + r[0].모양[0]);
 });
+/* ══════ 2단계 — 새 거래처 로고 글 짓기 (2026-10-05) ══════
+   절차는 라이믹스 공개 파일(common/js/plugins/jquery.fileupload/js/main.js)이 하는 그대로다:
+   ① 새 글 화면의 편집기 번호(data-editor-sequence) ② procFileUpload 로 그림 올리기
+   ③ 받은 upload_target_srl 을 글 번호로 새 글 저장(본문 = 라이믹스가 짓는 img 꼴) */
+function 로고새글화면(더) {
+  const o = Object.assign({ mid: 'partner_board', srl: '', 확인표: 'tok9', 순번: '4' }, 더 || {});
+  return [
+    (o.확인표 ? '<meta name="csrf-token" content="' + o.확인표 + '" />' : ''),
+    '<form action="/index.php" method="post">',
+    '<input type="hidden" name="act" value="procBoardInsertDocument">',
+    '<input type="hidden" name="mid" value="' + o.mid + '">',
+    '<input type="hidden" name="content" value="">',
+    '<input type="hidden" name="document_srl" value="' + o.srl + '">',
+    '<input type="hidden" name="comment_status" value="ALLOW">',
+    '<select name="is_notice"><option value="N">일반</option></select>',
+    '<table><tbody><tr><th>제목</th><td><input type="text" name="title" value=""></td></tr></tbody></table>',
+    '<div class="xefu-container" data-editor-sequence="' + o.순번 + '" data-upload-target-srl=""></div>',
+    '<input type="file" name="Filedata">',
+    '</form>'
+  ].join('\n');
+}
+const 로고그림 = { 종류: 'image/png', 바이트: Buffer.from([0x89, 0x50, 0x4e, 0x47]) };
+
+test('편집기번호 — 새 글 화면의 data-editor-sequence 를 읽는다', () => {
+  assert.equal(W.편집기번호(로고새글화면({ 순번: '7' })), 7);
+  assert.equal(W.편집기번호('<div>없음</div>'), 0);
+});
+
+test('로고 올리기 몸통 — 라이믹스 업로드 부품이 싣는 칸 그대로(editor_sequence·upload_target_srl=0·mid·act)', () => {
+  const r = W.로고올리기몸통(4, 'partner_board', 로고그림, 'tok9');
+  assert.equal(r.ok, true, r.why);
+  const 글 = r.몸통.toString('utf8');
+  assert.match(글, /name="editor_sequence"\r\n\r\n4\r\n/);
+  assert.match(글, /name="upload_target_srl"\r\n\r\n0\r\n/);
+  assert.match(글, /name="mid"\r\n\r\npartner_board\r\n/);
+  assert.match(글, /name="act"\r\n\r\nprocFileUpload\r\n/);
+  assert.match(글, /name="Filedata"; filename="logo-\d+\.png"/);
+});
+
+test('로고 올리기 몸통 — 허용 게시판·그림·번호가 아니면 짓지 않는다', () => {
+  assert.equal(W.로고올리기몸통(4, 'notice', 로고그림, 'tok9').ok, false);
+  assert.equal(W.로고올리기몸통(0, 'partner_board', 로고그림, 'tok9').ok, false);
+  assert.equal(W.로고올리기몸통(4, 'partner_board', { 종류: 'text/html', 바이트: Buffer.from('x') }, 'tok9').ok, false);
+  assert.equal(W.로고올리기몸통(4, 'partner_board', 로고그림, '').ok, false);
+});
+
+test('올리기 답 풀기 — 파일 번호·글 번호·우리 첨부 주소일 때만 믿는다', () => {
+  const 좋은 = JSON.stringify({ error: 0, file_srl: 901, upload_target_srl: 900, download_url: '/files/attach/images/2026/10/05/abc.png' });
+  const r = W.올리기답풀기(좋은);
+  assert.equal(r.ok, true);
+  assert.equal(r.file_srl, 901); assert.equal(r.upload_target_srl, 900);
+  [
+    JSON.stringify({ error: -1, message: 'x' }),
+    JSON.stringify({ error: -1, message: 'x', file_srl: 901, upload_target_srl: 900, download_url: '/files/attach/images/a.png' }),
+    JSON.stringify({ error: 0, file_srl: 901, upload_target_srl: 900, download_url: 'https://evil.example/x.png' }),
+    JSON.stringify({ error: 0, file_srl: 901, upload_target_srl: 900, download_url: '/files/attach/images/a.png" onerror="x' }),
+    JSON.stringify({ error: 0, file_srl: 0, upload_target_srl: 900, download_url: '/files/attach/images/a.png' }),
+    '<html>오류</html>'
+  ].forEach(s => assert.equal(W.올리기답풀기(s).ok, false, s));
+});
+
+test('로고 새 글 — 받은 칸 그대로·글 번호는 올리기 답의 번호·본문은 라이믹스 img 꼴·제목은 회사 이름', () => {
+  const 올림 = { file_srl: 901, upload_target_srl: 900, download_url: '/files/attach/images/2026/10/05/abc.png' };
+  const r = W.로고새글몸통(로고새글화면(), '가나상사', 올림);
+  assert.equal(r.ok, true, r.why);
+  const p = new URLSearchParams(r.몸통);
+  assert.equal(p.get('document_srl'), '900');
+  assert.equal(p.get('title'), '가나상사');
+  assert.equal(p.get('act'), 'procBoardInsertDocument');
+  assert.equal(p.get('_rx_csrf_token'), 'tok9');
+  assert.equal(p.get('comment_status'), 'ALLOW', '받은 칸을 빠뜨렸습니다');
+  assert.match(p.get('content'), /<img src="\/files\/attach\/images\/2026\/10\/05\/abc\.png" alt="가나상사" editor_component="image_link" data-file-srl="901" \/>/);
+});
+
+test('로고 새 글 — 회사 이름의 꺾쇠·따옴표는 거른다, 안전하지 않으면 짓지 않는다', () => {
+  const 올림 = { file_srl: 901, upload_target_srl: 900, download_url: '/files/attach/images/a.png' };
+  const r = W.로고새글몸통(로고새글화면(), '가나"><script>', 올림);
+  assert.ok(!new URLSearchParams(r.몸통).get('content').includes('<script>'));
+  assert.equal(W.로고새글몸통(로고새글화면({ mid: 'people_board' }), '가나상사', 올림).ok, false, '다른 게시판');
+  assert.equal(W.로고새글몸통(로고새글화면({ srl: '185' }), '가나상사', 올림).ok, false, '고치는 화면');
+  assert.equal(W.로고새글몸통(로고새글화면({ 확인표: '' }), '가나상사', 올림).ok, false, '확인표 없음');
+  assert.equal(W.로고새글몸통(로고새글화면(), ' ', 올림).ok, false, '이름 없음');
+});
