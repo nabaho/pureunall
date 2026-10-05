@@ -104,12 +104,64 @@
     return String(no).split('-').map(function (x) { return ('000' + (parseInt(x, 10) || 0)).slice(-3); }).join('-');
   }
 
-  /* 점검 — 줄마다 무엇이 걸리는지. files: [{name, size, ext, pdf:{pages, encrypted, sigFields, formFields, noFontPages}}] */
+  /* ── 한 파일을 줄마다 쪽으로 나누기 (대표 승인 2026-10-05 「둘 다 목업대로」) ──
+     신청서·서약서·동의서가 «한 한글 파일»일 때가 많다 — 줄마다 그 파일의 몇 쪽만 넣는다.
+     「1-2」 「3」 「1,3,5-6」 「4~5」 · 비우거나 「전체」면 모두.
+     ⇒ { all:true } | { idx:[0,1] (0부터) } | { err:'…' }
+     ⚠ total(쪽 수)을 모르면 범위만 본다 — 없는 쪽은 쪽 수를 안 뒤(점검)에 걸린다. */
+  function parsePages(text, total) {
+    var s = String(text == null ? '' : text).replace(/\s+/g, '').replace(/쪽|p\.?/gi, '');
+    if (!s || /^(전체|all|모두)$/i.test(s)) return { all: true };
+    var idx = [], seen = {};
+    var parts = s.split(/[,，·]/);
+    for (var i = 0; i < parts.length; i++) {
+      if (!parts[i]) continue;
+      var m = parts[i].match(/^(\d+)(?:[-~–](\d+))?$/);
+      if (!m) return { err: '「' + parts[i] + '」 — 쪽은 1-2 · 3 · 5-6 처럼 적습니다' };
+      var a = parseInt(m[1], 10), b = m[2] ? parseInt(m[2], 10) : a;
+      if (a < 1 || b < a) return { err: '「' + parts[i] + '」 — 앞 쪽이 뒤 쪽보다 큽니다' };
+      if (total && b > total) return { err: total + '쪽까지만 있습니다(「' + parts[i] + '」)' };
+      for (var p = a; p <= b; p++) if (!seen[p]) { seen[p] = 1; idx.push(p - 1); }
+    }
+    if (!idx.length) return { all: true };
+    if (total && idx.length === total && idx.every(function (x, k) { return x === k; })) return { all: true };
+    return { idx: idx };
+  }
+  /* 같은 파일을 다음 줄에 또 넣을 때 «아직 안 쓴 첫 쪽»을 미리 적는다 — 앞 줄들이 쓴 가장 뒤 쪽 + 1 */
+  function nextPages(usedTexts) {
+    var last = 0;
+    (usedTexts || []).forEach(function (t) {
+      var r = parsePages(t);
+      if (r.idx) r.idx.forEach(function (x) { if (x + 1 > last) last = x + 1; });
+    });
+    return last ? String(last + 1) : '';
+  }
+
+  /* ── 메일 10MB 를 넘으면 줄인다 (대표 결정 2026-10-05 「넘으면 저절로」) ──
+     무거운 PDF 부터 하나씩 줄여 한도 밑으로 내려가면 멈춘다 — 가벼운 서류는 손대지 않는다.
+     ⇒ 줄일 차례(0부터 번호) · list: [{ext, size}] */
+  function shrinkOrder(list, limit) {
+    var total = 0;
+    (list || []).forEach(function (m) { total += m.size || 0; });
+    if (total <= (limit || MAIL_LIMIT)) return [];
+    return (list || []).map(function (m, i) { return { i: i, s: m.size || 0, pdf: String(m.ext || '').toLowerCase() === 'pdf' }; })
+      .filter(function (x) { return x.pdf && x.s > 0; })
+      .sort(function (a, b) { return b.s - a.s; })
+      .map(function (x) { return x.i; });
+  }
+
+  /* 점검 — 줄마다 무엇이 걸리는지. files: [{name, size, ext, pdf:{pages, encrypted, sigFields, formFields, noFontPages}, pages, total}]
+     pages: 사람이 적은 쪽(「1-2」) · total: 그 파일의 쪽 수(알 때만) */
   var MAIL_LIMIT = 10 * 1024 * 1024;
   function checkRow(row, files) {
     var out = [];
     if (!files || !files.length) { out.push({ level: 'miss', text: '파일 없음' }); return out; }
     files.forEach(function (f) {
+      if (f.pages) {
+        var sel = parsePages(f.pages, f.total || 0);
+        if (sel.err) out.push({ level: 'miss', text: '쪽 — ' + sel.err });
+        else if (sel.idx) out.push({ level: 'fix', text: '쪽 ' + String(f.pages).trim() + ' (' + sel.idx.length + '쪽)만 넣음' });
+      }
       var ext = String(f.ext || '').toLowerCase();
       if (/^hwpx?$/.test(ext)) out.push({ level: 'fix', text: '한글 → PDF로 바꿈' });
       else if (!/^(pdf|jpe?g|png)$/.test(ext)) out.push({ level: 'warn', text: ext + ' 형식 — 그대로 넣음' });
@@ -138,7 +190,8 @@
   var api = {
     extractRequired: extractRequired, isPerPerson: isPerPerson, shortTitle: shortTitle,
     buildPlan: buildPlan, fileName: fileName, noKey: noKey, checkRow: checkRow, sizeCheck: sizeCheck,
-    caseFolderName: caseFolderName, MAIL_LIMIT: MAIL_LIMIT
+    caseFolderName: caseFolderName, MAIL_LIMIT: MAIL_LIMIT,
+    parsePages: parsePages, nextPages: nextPages, shrinkOrder: shrinkOrder
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerPack = api;

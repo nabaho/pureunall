@@ -1319,7 +1319,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=1"></script>
-<script src="js/kcareer-pack.js?v=1"></script>
+<script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
@@ -13871,7 +13871,10 @@ function packDraw(){
   var cands=_pkCands();
   var html='<table class="at-tbl"><thead><tr><th><input type="checkbox" checked onchange="_pk.rows.forEach(function(r){r.on=this.checked;},this);packDraw()"></th><th>#</th><th>번호</th><th>서류</th><th>사람</th><th>넣은 파일</th><th>점검</th></tr></thead><tbody>';
   _pk.rows.forEach(function(r,i){
-    var 칩=r.files.map(function(f,k){ return '<span class="tag navy" style="margin:1px 3px 1px 0;font-size:11px">'+(f.auto?'추천 · ':'')+escapeHtml(f.name||'파일')+' <a href="#" onclick="event.preventDefault();_pk.rows['+i+'].files.splice('+k+',1);_pk.checked=false;packDraw()" title="빼기">✕</a></span>'; }).join('');
+    /* ★ 「쪽」 — 한 파일을 줄마다 나눠 넣는다(대표 승인 2026-10-05). 비우면 전체 */
+    var 칩=r.files.map(function(f,k){ return '<span class="tag navy" style="margin:1px 3px 1px 0;font-size:11px">'+(f.auto?'추천 · ':'')+escapeHtml(f.name||'파일')
+      +' <a href="#" onclick="event.preventDefault();packSetPages('+i+','+k+')" title="이 줄에 넣을 쪽 — 1-2 · 3 · 5-6 · 비우면 전체" style="text-decoration:underline dotted">쪽 '+escapeHtml(f.pages||'전체')+'</a>'
+      +' <a href="#" onclick="event.preventDefault();_pk.rows['+i+'].files.splice('+k+',1);_pk.checked=false;packDraw()" title="빼기">✕</a></span>'; }).join('');
     var opts=cands.map(function(o,ci){ return {ci:ci,s:_pkScore(r,o),o:o}; }).sort(function(a,b){ return b.s-a.s; }).slice(0,40)
       .map(function(x){ var y=String(x.o.r.year||x.o.r.issueDate||x.o.r.date||'').slice(0,4);
         return '<option value="'+x.ci+'">'+escapeHtml((y?y+' · ':'')+_attRecName(x.o.r,x.o.page)+' · '+_attFileName(x.o.r))+'</option>'; }).join('');
@@ -13892,17 +13895,47 @@ function _pkSum(){
   var on=_pk.rows.filter(function(r){ return r.on; }), 빈=on.filter(function(r){ return !r.files.length; }).length;
   el.textContent=on.length?('번호 '+on.length+' · 파일 없는 줄 '+빈+(_pk.total?' · '+KcareerPack.sizeCheck(_pk.total).text:'')):'';
 }
+/* 「같은 파일」인가 — 올린 파일은 이름·크기, 기록은 번호, 지금 쓰는 서류는 하나뿐 */
+function _pkFileKey(f){
+  if(!f) return '';
+  if(f.kind==='file') return 'f|'+(f.file?f.file.name+'|'+f.file.size:f.name);
+  if(f.kind==='rec') return 'r|'+((f.rec&&f.rec.id)||f.name);
+  return 'cur';
+}
+/* 줄에 파일을 넣는다 — 같은 파일이 앞 줄들에 «쪽을 정해» 들어 있으면 다음 쪽을 미리 적는다 */
+function _pkAddFile(i, f){
+  var 키=_pkFileKey(f), 쓴=[];
+  _pk.rows.forEach(function(r){ r.files.forEach(function(x){ if(_pkFileKey(x)===키 && x.pages) 쓴.push(x.pages); }); });
+  var 다음=KcareerPack.nextPages(쓴); if(다음) f.pages=다음;
+  _pk.rows[i].files.push(f); _pk.checked=false;
+}
+function packSetPages(i, k){
+  var f=_pk.rows[i]&&_pk.rows[i].files[k]; if(!f) return;
+  var v=prompt('이 줄에 넣을 쪽 — 예) 1-2 · 3 · 5-6\n비우면 파일 전체를 넣습니다.', f.pages||'');
+  if(v===null) return;
+  var t=String(v).trim(), sel=KcareerPack.parsePages(t);
+  if(sel.err){ toast('쪽 — '+sel.err, 5000); return; }
+  f.pages=sel.all?'':t; _pk.checked=false; packDraw();
+}
 function packPutFile(i){
   var inp=document.getElementById('pkFile'); if(!inp) return;
-  inp.value=''; inp.onchange=function(){ [].slice.call(inp.files||[]).forEach(function(f){ _pk.rows[i].files.push({ kind:'file', file:f, name:f.name }); }); _pk.checked=false; packDraw(); };
+  inp.value=''; inp.onchange=function(){ [].slice.call(inp.files||[]).forEach(function(f){ _pkAddFile(i, { kind:'file', file:f, name:f.name }); }); packDraw(); };
   inp.click();
 }
 function packPickRec(i, ci){
   if(ci==='') return;
-  if(ci==='cur'){ _pk.rows[i].files.push({ kind:'cur', name:(_rhDoc&&_rhDoc.name)||'지금 쓰는 서류.hwpx' }); _pk.checked=false; packDraw(); return; }
+  if(ci==='cur'){ _pkAddFile(i, { kind:'cur', name:(_rhDoc&&_rhDoc.name)||'지금 쓰는 서류.hwpx' }); packDraw(); return; }
   var o=_pkCands()[Number(ci)]; if(!o) return;
-  _pk.rows[i].files.push({ kind:'rec', rec:o.r, page:o.page, name:_attFileName(o.r) });
-  _pk.checked=false; packDraw();
+  _pkAddFile(i, { kind:'rec', rec:o.r, page:o.page, name:_attFileName(o.r) });
+  packDraw();
+}
+/* 한글 파일의 쪽 수 — 점검에서 「없는 쪽」을 가르려고 센다. 못 세면 0(범위만 본다) */
+async function _pkHwpPages(bytes, name){
+  if(!window.PureunHwp || typeof PureunHwp.openDoc!=='function') return 0;
+  var d=null;
+  try{ d=await PureunHwp.openDoc(bytes, name||'서류.hwpx'); return (typeof d.pageCount==='function')?(d.pageCount()||0):0; }
+  catch(e){ return 0; }
+  finally{ try{ if(d&&typeof d.free==='function') d.free(); }catch(e){} }
 }
 /* 파일 한 개의 바이트 */
 async function _pkBytes(f){
@@ -13960,10 +13993,14 @@ async function packCheck(){
       var r=_pk.rows[i]; if(!r.on){ r.checks=null; continue; }
       var infos=[];
       for(var k=0;k<r.files.length;k++){
-        var f=r.files[k], info={ name:f.name, ext:(String(f.name).split('.').pop()||'').toLowerCase() };
+        var f=r.files[k], info={ name:f.name, ext:(String(f.name).split('.').pop()||'').toLowerCase(), pages:f.pages||'' };
         try{
           var b=await _pkBytes(f); info.size=b.bytes.length; total+=b.bytes.length;
-          if(info.ext==='pdf'){ var p=await _pkPdfInfo(b.bytes); info.pdf={ pages:p.pages, encrypted:p.encrypted, sigFields:p.sigFields, formFields:p.formFields, noFontPages:p.fontless.length }; }
+          info.ext=(String(b.name||f.name).split('.').pop()||'').toLowerCase();
+          if(info.ext==='pdf'){ var p=await _pkPdfInfo(b.bytes); info.total=p.pages; info.pdf={ pages:p.pages, encrypted:p.encrypted, sigFields:p.sigFields, formFields:p.formFields, noFontPages:p.fontless.length }; }
+          /* 쪽을 정한 한글·그림은 쪽 수를 센다 — 「없는 쪽」을 여기서 걸러야 만들 때 안 터진다 */
+          else if(f.pages && /^hwpx?$/.test(info.ext)) info.total=await _pkHwpPages(b.bytes, b.name);
+          else if(f.pages && /^(jpe?g|png)$/.test(info.ext)) info.total=1;
         }catch(e){ info.pdf={ pages:0 }; info.err=(e&&e.message)||'못 읽음'; }
         infos.push(info);
       }
@@ -13992,18 +14029,34 @@ async function _pkRasterPages(bytes, idxs){
 /* 한 줄(번호)의 파일들 → PDF 한 파일. 손볼 것이 없는 PDF 한 개면 «원본 바이트 그대로»(글자·크기 보존) */
 async function _pkRowPdf(r){
   var P=PDFLib, A4=[595.28,841.89], parts=[];
-  for(var k=0;k<r.files.length;k++){ var b=await _pkBytes(r.files[k]); b.ext=(String(b.name).split('.').pop()||'').toLowerCase(); parts.push(b); }
-  if(parts.length===1 && parts[0].ext==='pdf'){
+  for(var k=0;k<r.files.length;k++){ var b=await _pkBytes(r.files[k]); b.ext=(String(b.name).split('.').pop()||'').toLowerCase();
+    /* ★ 쪽을 정했으면 그 쪽만 — 「1-2」 → [0,1]. 전체면 null */
+    var sel=KcareerPack.parsePages(r.files[k].pages||'');
+    if(sel.err) throw new Error(b.name+' — 쪽 '+sel.err);
+    b.pick=sel.idx||null; parts.push(b); }
+  /* 고른 쪽이 그 파일에 다 있나 — 없는 쪽을 조용히 건너뛰면 «빠진 서류»가 그대로 나간다 */
+  function 쪽들(n, pick, 이름){
+    if(!pick) return Array.from({length:n}, function(_,q){ return q; });
+    var 없는=pick.filter(function(q){ return q>=n; });
+    if(없는.length) throw new Error(이름+' — '+n+'쪽까지만 있습니다(고른 쪽 '+(없는[0]+1)+')');
+    return pick;
+  }
+  if(parts.length===1 && parts[0].ext==='pdf' && !parts[0].pick){
     var i0=await _pkPdfInfo(parts[0].bytes);
     if(!i0.sigFields && !i0.formFields && !i0.fontless.length) return { bytes:parts[0].bytes, ext:'pdf' };
   }
-  if(parts.length===1 && !/^(pdf|jpe?g|png|hwpx?)$/.test(parts[0].ext)) return { bytes:parts[0].bytes, ext:parts[0].ext };   /* 그대로 넣는다 */
+  if(parts.length===1 && !/^(pdf|jpe?g|png|hwpx?)$/.test(parts[0].ext)){
+    if(parts[0].pick) throw new Error(parts[0].name+' — 이 형식은 쪽을 나눌 수 없습니다(PDF·한글·그림만)');
+    return { bytes:parts[0].bytes, ext:parts[0].ext };   /* 그대로 넣는다 */
+  }
   var out=await P.PDFDocument.create();
   for(var j=0;j<parts.length;j++){
     var x=parts[j];
     if(x.ext==='pdf'){
-      var info=await _pkPdfInfo(x.bytes), src=info.doc, ras=info.fontless.length?await _pkRasterPages(x.bytes, info.fontless):{};
-      for(var q=0;q<src.getPageCount();q++){
+      var info=await _pkPdfInfo(x.bytes), src=info.doc, 넣을=쪽들(src.getPageCount(), x.pick, x.name);
+      var 그릴=info.fontless.filter(function(q){ return 넣을.indexOf(q)>=0; });
+      var ras=그릴.length?await _pkRasterPages(x.bytes, 그릴):{};
+      for(var qi=0;qi<넣을.length;qi++){ var q=넣을[qi];
         if(ras[q]){ var im=await out.embedJpg(ras[q].jpg), np=out.addPage([ras[q].w, ras[q].h]); np.drawImage(im,{x:0,y:0,width:ras[q].w,height:ras[q].h}); continue; }
         var cp=(await out.copyPages(src,[q]))[0];
         /* 서명칸·입력칸(위젯) 걷기 — 남으면 Acrobat 이 「유효성 검사가 필요한 서명」을 띄운다 */
@@ -14012,16 +14065,58 @@ async function _pkRowPdf(r){
         out.addPage(cp);
       }
     } else if(/^(jpe?g|png)$/.test(x.ext)){
+      쪽들(1, x.pick, x.name);   /* 그림은 한 쪽뿐 — 「2」를 적었으면 알린다 */
       var img=/png/.test(x.ext)?await out.embedPng(x.bytes):await out.embedJpg(x.bytes);
       var p1=out.addPage(A4), sc=Math.min((A4[0]-60)/img.width,(A4[1]-60)/img.height,1.5);
       p1.drawImage(img,{x:(A4[0]-img.width*sc)/2,y:(A4[1]-img.height*sc)/2,width:img.width*sc,height:img.height*sc});
     } else if(/^hwpx?$/.test(x.ext) && window.PureunHwp && PureunHwp.renderPreview){
       var tmp=document.createElement('div'); await PureunHwp.renderPreview(tmp, x.bytes, x.name);
       var cvs=[].slice.call(tmp.querySelectorAll('canvas')); if(!cvs.length) throw new Error(x.name+' — 한글 쪽을 못 그렸습니다');
-      for(var c2=0;c2<cvs.length;c2++){ var jm=await out.embedJpg(await _attJpgOf(cvs[c2])), p2=out.addPage(A4); p2.drawImage(jm,{x:0,y:0,width:A4[0],height:A4[1]}); }
+      var 한쪽=쪽들(cvs.length, x.pick, x.name);
+      for(var c2=0;c2<한쪽.length;c2++){ var jm=await out.embedJpg(await _attJpgOf(cvs[한쪽[c2]])), p2=out.addPage(A4); p2.drawImage(jm,{x:0,y:0,width:A4[0],height:A4[1]}); }
     } else throw new Error(x.name+' — 한 줄에 여럿일 때는 PDF·그림·한글만 합칠 수 있습니다');
   }
   return { bytes:await out.save(), ext:'pdf' };
+}
+/* ── 🗜 메일 한도 밑으로 줄이기 (대표 결정 2026-10-05 「넘으면 저절로」) ──
+   차례는 KcareerPack.shrinkOrder «한 곳»(무거운 PDF 먼저) — 한도 밑으로 내려가면 거기서 멈춘다.
+   ⚠ 줄인 것이 더 크면(이미 가벼운 그림) 원래 것을 둔다. 못 줄여도 꾸러미는 만든다. */
+async function _pkShrinkToLimit(made){
+  var 전=0; made.forEach(function(m){ 전+=m.bytes.length; });
+  var 지금=전, 줄인=0, L=KcareerPack.MAIL_LIMIT;
+  var 차례=KcareerPack.shrinkOrder(made.map(function(m){ return { ext:m.ext, size:m.bytes.length }; }), L);
+  for(var i=0;i<차례.length && 지금>L;i++){
+    var m=made[차례[i]], nb=null;
+    try{ nb=await _pkShrinkPdf(m.bytes); }catch(e){ console.warn('꾸러미 줄이기', m.name, e); }
+    if(nb && nb.length<m.bytes.length){ 지금-=m.bytes.length-nb.length; m.bytes=nb; 줄인++; }
+  }
+  return { before:전, after:지금, n:줄인 };
+}
+/* 그림이 든 쪽 — 쪽 자원의 그림(XObject /Image), 한 겹 안의 양식(Form) 속 그림까지 */
+function _pkImagePages(doc){
+  var P=PDFLib, N=function(n){ return P.PDFName.of(n); }, out=[];
+  function 그림있나(res, 깊이){
+    try{
+      var xo=res&&res.lookup(N('XObject')); if(!xo || !xo.keys) return false;
+      return xo.keys().some(function(k){ var x=xo.lookup(k); if(!x||!x.dict) return false;
+        var st=String(x.dict.lookup(N('Subtype'))||'');
+        if(st==='/Image') return true;
+        return st==='/Form' && 깊이<1 && 그림있나(x.dict.lookup(N('Resources')), 깊이+1); });
+    }catch(e){ return false; }
+  }
+  doc.getPages().forEach(function(pg, idx){ if(그림있나(pg.node.Resources(), 0)) out.push(idx); });
+  return out;
+}
+/* PDF 하나를 줄인다 — 그림이 든 쪽만 150dpi 그림으로 다시 그리고, 글자만 있는 쪽은 그대로 옮긴다 */
+async function _pkShrinkPdf(bytes){
+  var P=PDFLib, src=await P.PDFDocument.load(bytes,{ignoreEncryption:true,updateMetadata:false});
+  var 그림쪽=_pkImagePages(src); if(!그림쪽.length) return null;
+  var ras=await _pkRasterPages(bytes, 그림쪽), out=await P.PDFDocument.create();
+  for(var q=0;q<src.getPageCount();q++){
+    if(ras[q]){ var im=await out.embedJpg(ras[q].jpg), np=out.addPage([ras[q].w, ras[q].h]); np.drawImage(im,{x:0,y:0,width:ras[q].w,height:ras[q].h}); continue; }
+    out.addPage((await out.copyPages(src,[q]))[0]);
+  }
+  return await out.save();
 }
 async function packBuild(){
   var rows=_pk.rows.filter(function(r){ return r.on && r.files.length; })
@@ -14043,6 +14138,9 @@ async function packBuild(){
       catch(e){ console.warn('꾸러미', rows[i], e); 못.push(rows[i].no+' '+((e&&e.message)||'못 만들었습니다')); }
     }
     if(!made.length) throw new Error('만든 파일이 없습니다');
+    /* ★ 메일 10MB 를 넘으면 무거운 PDF 부터 «그림이 든 쪽만» 줄인다 (대표 결정 2026-10-05 「넘으면 저절로」).
+       ⚠ 전체합본·zip 보다 «먼저» — 줄인 것으로 묶어야 합본도 함께 가벼워진다. */
+    var 줄임=await _pkShrinkToLimit(made);
     var whole=null;
     if((document.getElementById('pkWhole')||{}).checked){
       var w=await PDFLib.PDFDocument.create();
@@ -14060,7 +14158,9 @@ async function packBuild(){
       a.href=url; a.download=zipName; a.click(); setTimeout(function(){ URL.revokeObjectURL(url); }, 120000);
     }
     _pk.done.save=true; _pkSteps();
-    toast((saved?'📦 서류 폴더에 저장하고 제출서류에 등록했습니다':'📦 zip 을 내려받았습니다')+' · '+made.length+'개 · '+size.text+(못.length?' · 못 만든 것: '+못.join(' / '):''), 9000);
+    var 줄임말=줄임.n?(' · 🗜 '+(줄임.before/1048576).toFixed(1)+'MB → '+(줄임.after/1048576).toFixed(1)+'MB (그림 줄인 파일 '+줄임.n+'개)'):'';
+    toast((saved?'📦 서류 폴더에 저장하고 제출서류에 등록했습니다':'📦 zip 을 내려받았습니다')+' · '+made.length+'개 · '+size.text+줄임말
+      +(size.level==='warn'?' · 그래도 넘어 나눠 보내셔야 합니다':'')+(못.length?' · 못 만든 것: '+못.join(' / '):''), 9000);
   }catch(e){ console.error(e); toast('꾸러미 만들기 실패: '+((e&&e.message)||e)); }
   finally{ if(btn){ btn.disabled=false; btn.textContent='📦 꾸러미 만들기'; } }
 }
