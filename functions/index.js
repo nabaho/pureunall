@@ -4337,6 +4337,139 @@ exports.homepageWrite = functions
     }
   });
 
+/* ── 홈페이지 월간 자동 연결 (대표 지시 2026-10-05 「1개월에 1번씩만 자동화 하면된다」) ──
+   매달 1일 08:00 — 퇴사한 직원의 구성원 글, 계약이 끝난 업체의 자문사현황 로고 글을 휴지통으로.
+   ★ 무엇을 내릴지는 homepage-auto.js «한 곳»이 고른다. 여기서는 읽고·들어가고·보내기만 한다.
+   ⚠ 지우지 않는다 — 휴지통(HW.내리는type)뿐. 게시판은 HW.내릴게시판 둘뿐.
+   ⚠ 배포는 이름을 찍어서: firebase deploy --only functions:homepageAuto,functions:monthlyHomepageAuto
+     homepageAuto 는 새 함수라 공개 호출 권한(allUsers)을 따로 넣어야 화면이 부를 수 있다
+     (안에서 총괄관리자인지 다시 본다). */
+const HA = require("./homepage-auto");
+
+async function 홈자동내리기(그릇, 목록) {
+  /* 확인표는 관리자 «문서 관리» 화면의 머리에서 받는다 — 로고 글은 구성원 글과 생김새가
+     달라 고치는 화면(막을까 자물쇠)을 거칠 수 없다. 휴지통으로 «옮기기»만 하므로 칸을
+     되돌려 보낼 일도 없다. */
+  const a = await 홈부르기(HW.문서관리주소(), 그릇);
+  const 확인표 = HW.확인표뽑기(await a.text());
+  if (!확인표) return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: "확인표를 못 받음(로그인 실패일 수 있음)" }));
+  const 답 = [];
+  for (const x of 목록) {
+    const 주소 = HW.게시판글주소(x.게시판, x.srl);
+    if (!주소) { 답.push(Object.assign({}, x, { 됐나: false, 까닭: "허용 밖 게시판" })); continue; }
+    /* ★ 그 글이 정말 «그 게시판» 것인지 먼저 연다 — 번호가 잘못 이어졌으면 남의 글이다 */
+    const g = await 홈부르기(주소, 그릇);
+    await g.text();
+    const 판 = HW.게시판확인(g.status, g.headers.get("location") || "");
+    if (판 !== "ok") { 답.push(Object.assign({}, x, { 됐나: false, 까닭: "게시판 확인 실패(" + 판 + ")" })); continue; }
+    const 지음 = HW.휴지통몸통([x.srl], 확인표);
+    if (!지음.ok) { 답.push(Object.assign({}, x, { 됐나: false, 까닭: 지음.why })); continue; }
+    const t = await 홈부르기(HW.문서관리보낼주소(), 그릇, {
+      method: "POST",
+      body: 지음.몸통,
+      headers: {
+        "User-Agent": HW.브라우저표시,
+        "Content-Type": "application/x-www-form-urlencoded; charset=UTF-8",
+        "Referer": HW.문서관리주소(),
+        "Cookie": 그릇.글자(),
+        "X-CSRF-Token": 확인표
+      }
+    });
+    const t답 = await t.text();
+    /* ⚠ 라이믹스는 200 으로 오류를 싣는다 — <error>0</error> 이 아니면 실패다 */
+    const 됐나 = t.status >= 200 && t.status < 400 && !/<error>\s*-?[1-9]/.test(t답);
+    답.push(Object.assign({}, x, { 됐나: 됐나, 까닭: 됐나 ? "" : "홈페이지가 받아 주지 않음" }));
+  }
+  return 답;
+}
+
+/* 미리 보기 — 고른 글마다 «그 게시판 글이 맞는지»만 열어 본다(쓰지 않는다).
+   첫 배포 뒤에는 이것이 정찰을 겸한다: ok 가 아니면 자동을 켜 두지 않는다. */
+async function 홈자동게시판보기(그릇, 목록) {
+  const 판들 = [];
+  for (const x of 목록) {
+    const 주소 = HW.게시판글주소(x.게시판, x.srl);
+    if (!주소) { 판들.push({ 게시판: x.게시판, srl: x.srl, 판: "허용 밖" }); continue; }
+    const g = await 홈부르기(주소, 그릇);
+    await g.text();
+    판들.push({ 게시판: x.게시판, srl: x.srl, 판: HW.게시판확인(g.status, g.headers.get("location") || "") });
+  }
+  return 판들;
+}
+
+async function 홈자동한번(방식, 받은지문, 누가) {
+  const 아이디 = process.env.HOME_ADMIN_ID, 암호 = process.env.HOME_ADMIN_PW;
+  let 그릇 = null;
+  /* 들어가는 것은 «내릴 것이 있을 때만» — 할 일 없는 달에 관리자 로그인을 남기지 않는다 */
+  const 들어가기 = async () => {
+    if (그릇) return 그릇;
+    if (!아이디 || !암호) throw new Error("홈페이지 관리자 아이디·비밀번호가 서버에 없습니다.");
+    그릇 = 홈쿠키그릇();
+    await 홈로그인(아이디, 암호, 그릇);
+    return 그릇;
+  };
+  const db = getDatabase();
+  const 결과 = await HA.돌기(방식, 받은지문, {
+    읽기: async (p) => (await db.ref(p).once("value")).val(),
+    쓰기: (p, v) => db.ref(p).set(v),
+    덧붙이기: (p, v) => db.ref(p).push(v),
+    내리기: async (목록) => {
+      try { return await 홈자동내리기(await 들어가기(), 목록); }
+      catch (e) {
+        const 까닭 = String((e && e.message) || e);
+        return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: 까닭 }));
+      }
+    },
+    지금: () => Date.now(),
+    달: 서울달,
+    누가: 누가
+  });
+  if (방식 === "보기" && 결과.ok && (결과.내릴것 || []).length) {
+    try { 결과.게시판확인 = await 홈자동게시판보기(await 들어가기(), 결과.내릴것); }
+    catch (e) { 결과.게시판확인막힘 = String((e && e.message) || e); }
+  }
+  return 결과;
+}
+
+exports.homepageAuto = functions
+  .runWith({ secrets: ["HOME_ADMIN_ID", "HOME_ADMIN_PW"], timeoutSeconds: 300, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setAutomationCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      /* ⚠ 총괄관리자만 — 대표 지시(2026-08-17): 홈페이지 수정은 오로지 관리자만 */
+      const match = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!match) { res.status(401).json({ ok: false, error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(match[1], true);
+      const 권 = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
+      if (권.isAdmin !== true) {
+        res.status(403).json({ ok: false, error: "총괄관리자만 홈페이지를 고칠 수 있습니다." });
+        return;
+      }
+      const 몸 = (req.body && typeof req.body === "object") ? req.body : {};
+      const 방식 = ["보기", "돌리기", "승인"].indexOf(String(몸.mode || "보기")) >= 0
+        ? String(몸.mode || "보기") : "보기";
+      res.json(await 홈자동한번(방식, String(몸.지문 || ""), decoded.uid));
+    } catch (err) {
+      console.error("homepageAuto", (err && err.message) || err);
+      res.status(500).json({ ok: false, error: (err && err.message) || "자동 연결을 돌리지 못했습니다." });
+    }
+  });
+
+exports.monthlyHomepageAuto = functions
+  .runWith({ secrets: ["HOME_ADMIN_ID", "HOME_ADMIN_PW"], timeoutSeconds: 300, memory: "256MB" })
+  /* 매달 1일 08:00(서울) — 대표 결정 2026-10-05 */
+  .pubsub.schedule("0 8 1 * *")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const r = await 홈자동한번("돌리기", "", "auto");
+    console.log("[홈페이지 자동] " + r.달 + " 내림 " + (r.내림 || []).length
+      + " · 못내림 " + (r.못내림 || []).length
+      + (r.꺼짐 ? " · 꺼져 있음" : "") + (r.멈춤 ? " · 멈춤" : "") + (r.실패 ? " · 실패 " + r.실패 : ""));
+    return null;
+  });
+
 const companyWebsiteMatch = require("./company-website-match");
 
 /* 업체 홈페이지 자동 찾기 (대표 지시 2026-09-02) — 업체관리에 홈페이지 URL이 없을 때
