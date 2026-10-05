@@ -8,7 +8,8 @@ const body = src.slice(start, end > start ? end : start + 80000);
 
 if (!body.includes('var _projUserBySid = {}')) throw new Error('담당자 색인이 없습니다.');
 if (!body.includes('var _projTypeByCode = {}')) throw new Error('유형 색인이 없습니다.');
-if (!body.includes('var ppsS = useState(20)')) throw new Error('기본 표시량 20행이 유지되지 않았습니다.');
+/* 개수 보기는 기기에 기억해도 된다(2026-10-05) — 처음 기본값 20행만 지킨다 */
+if (!/var ppsS = (?:useState\(|usePersistedState\([^,]+, *)20\)/.test(body)) throw new Error('기본 표시량 20행이 유지되지 않았습니다.');
 if (/users\.find\(function\(u\)\{ return u\.sid===it\.mgrMain/.test(body)) {
   throw new Error('행마다 담당자 전체를 다시 검색하는 느린 경로가 돌아왔습니다.');
 }
