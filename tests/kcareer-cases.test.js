@@ -56,7 +56,8 @@ test('④ 화면 배선 — 조용히 볼 때는 묻지 않고, 전체 스캔을
   assert.ok(!/requestPermission|fsRoot\(\)/.test(quiet), '★ 앱을 열 때 허락 창을 띄우면 안 된다(누르지 않았는데 뜬다)');
   const chk = 떼기('async function caseCheck(');
   assert.ok(/fsCaseDirs\(/.test(chk) && !/openScanPreview|fsScanAll|buildRecords/.test(chk), '★ 전체 스캔은 위촉장 수백 건을 함께 들고 온다');
-  assert.ok(/opts\.ask\s*\?\s*await fsRoot\(\)\s*:\s*await _caseRootQuiet\(\)/.test(chk), '단추일 때만 허락을 묻는다');
+  /* 단추일 때는 그 자리에서 폴더를 잇는 길(fsRootOrConnect, 2026-10-05) — 허락·고르기는 단추일 때만 */
+  assert.ok(/opts\.ask\s*\?\s*await (?:fsRoot|fsRootOrConnect)\([^)]*\)\s*:\s*await _caseRootQuiet\(\)/.test(chk), '단추일 때만 허락을 묻는다');
   const reg = 떼기('function caseRegister(');
   assert.ok(/KcareerCases\.buildCaseRecord/.test(reg) && /kcNextNo\('SB'/.test(reg), '기록 모양·번호는 한 곳에서');
   assert.ok(/<script src="js\/kcareer-cases\.js\?v=\d+"><\/script>/.test(SRC), '캐시 번호가 붙어 있다');
