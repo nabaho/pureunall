@@ -798,6 +798,7 @@ function gate(){ PuGate.show(); }
 
 function start(){
   $('root').innerHTML=shell();
+  setTimeout(tplSyncUp,5000);         // 이 기기에만 있는 원본 서식을 클라우드로 (2026-10-05)
   initTop();
   bindNavDrag(); loadNavOrder();      // 사이드바 메뉴 순서(사용자가 드래그로 정한 순서) 복원
   try{ history.replaceState({view:'home'}, ''); }catch(e){}
@@ -3406,6 +3407,137 @@ function idbGet(k){ return idbOpen().then(function(db){ return new Promise(funct
   g.onsuccess=function(){res(g.result||null);}; g.onerror=function(){rej(g.error);}; }); }); }
 function idbDel(k){ return idbOpen().then(function(db){ return new Promise(function(res){
   var tx=db.transaction(IDB_ST,'readwrite'); tx.objectStore(IDB_ST).delete(k); tx.oncomplete=function(){res();}; }); }); }
+/* ══ 원본 서식(엑셀·HWP)도 클라우드에 둔다 — 다른 브라우저에서 「원본 없음」이 안 뜨게 (대표 지시 2026-10-05) ══
+   「다른모든 프로그램에서도 데이터가 분리되지 않게 처리해라」
+   ★ 예전에는 [원본 등록]한 엑셀 원본(setup·subsidy·contribx)과 원본 HWP(hwp:*)가
+     «그 브라우저 IndexedDB(fundErpTpl)» 에만 있었다. 다른 PC·다른 브라우저에서 열면 「원본 없음」.
+   그래서 등록할 때 클라우드 fund_erp/tpl_orig/{열쇠} 에도 올리고, 있는지는 tpl_orig_index 만 본다
+   (한글 틀 hwp_tpl·hwp_tpl_index 와 같은 방식 — 30개를 다 받지 않게). 이 기기에 없으면 클라우드에서 받아 온다.
+   ⚠ hwp_tpl(표지 {{…}} 가 든 «한글 틀»)과 섞지 않는다 — 그것은 채우기용 틀이고, 이것은 사람이 올린 «원본 그대로»다.
+   ⚠ 규칙 고칠 것 없음 — fund_erp/* 는 로그인한 직원이 읽고 쓴다(hwp_tpl 과 같다).
+   ⚠ 이 기기 IndexedDB 는 «빠른 사본»으로 그대로 둔다. 어느 것이 최신인지는 색인의 at 으로 가린다:
+       fund_tpl_sync(localStorage)[열쇠] = 이 기기 사본이 클라우드 어느 판(at)인지 / 'dirty'(아직 못 올림) / 'del'(지우기 못 올림)
+   ⚠ 이 기기 것을 «지우지 않는다» — 클라우드 판으로 바꿀 때 한 번도 맞춘 적 없는 사본은 'prev:'+열쇠 에 남긴다. */
+var TPL_ORIG='tpl_orig', TPL_ORIG_IDX='tpl_orig_index', TPL_SYNC_LS='fund_tpl_sync';
+var _tplIdx=null, _tplIdxP=null, _tplSyncing=false;
+function _tplCk(k){ return String(k).replace(/:/g,'__'); }          // 'hwp:inka' → 'hwp__inka' (RTDB 열쇠)
+function _tplSyncMap(){ try{ var m=JSON.parse(localStorage.getItem(TPL_SYNC_LS)||'{}'); return (m&&typeof m==='object')?m:{}; }catch(e){ return {}; } }
+function _tplSyncSet(k,v){ var m=_tplSyncMap(); if(v==null) delete m[k]; else m[k]=v; try{ localStorage.setItem(TPL_SYNC_LS,JSON.stringify(m)); }catch(e){} }
+function _tplReady(){ try{ return !!(fbDb&&firebase.auth().currentUser); }catch(e){ return false; } }
+function _tplAllKeys(){ var ks=['setup','subsidy','contribx'];
+  try{ DOC_ALL.forEach(function(d){ ks.push('hwp:'+d[0]); }); }catch(e){}
+  Object.keys(_tplSyncMap()).forEach(function(k){ if(ks.indexOf(k)<0) ks.push(k); });
+  return ks; }
+/* 색인 — 한 번 받고 구독한다. 다른 PC 가 올리거나 지우면 화면 표시를 다시 본다. 못 읽으면 null(«모른다») */
+/* ⚠ 끊긴 채 켜면 on('value') 가 영영 안 온다 — 그대로 기다리면 서식 화면이 「불러오는 중」에서 멈춘다.
+     4초 안에 안 오면 «모른다»(null)로 답하고 이 기기 사본을 쓴다. 늦게 오면 그때 표시를 다시 본다. */
+var _tplIdxSlow=false;
+function _tplIdxLoad(){
+  if(_tplIdx) return Promise.resolve(_tplIdx);
+  if(!_tplReady()) return Promise.resolve(null);
+  if(_tplIdxSlow&&_tplIdxP) return Promise.resolve(null);
+  if(!_tplIdxP) _tplIdxP=new Promise(function(res){
+    var first=true;
+    fbDb.ref(NS+'/'+TPL_ORIG_IDX).on('value',function(sn){
+      _tplIdx=sn.val()||{};
+      if(first){ first=false; res(_tplIdx); if(!_tplIdxSlow) return; _tplIdxSlow=false; setTimeout(tplSyncUp,1000); }
+      S._tplChk=false; S._hwpChk=false; S._subTplChk=false;
+      try{ _formsRerender(); }catch(e){}
+    },function(err){ console.warn('[원본 서식 색인] 못 읽음',err); _tplIdxP=null; _tplIdxSlow=false; res(null); });
+  });
+  return Promise.race([_tplIdxP,new Promise(function(r){ setTimeout(function(){ if(!_tplIdx) _tplIdxSlow=true; r(_tplIdx||null); },4000); })]);
+}
+function _tplRef(k){ return fbDb.ref(NS+'/'+TPL_ORIG+'/'+_tplCk(k)); }
+function _tplIdxRefOf(k){ return fbDb.ref(NS+'/'+TPL_ORIG_IDX+'/'+_tplCk(k)); }
+/* 클라우드에 올린다 — 본문 먼저, 색인은 «그 뒤에». 색인이 있으면 본문도 있다. */
+function tplCloudPut(k,buf,name){
+  if(!_tplReady()) return Promise.reject(new Error('클라우드 연결 전'));
+  var u=new Uint8Array(buf), meta={at:Date.now(),size:u.length,name:String(name||''),saved:ymd()};
+  return _tplRef(k).set(Object.assign({b64:_bytesToB64(u)},meta))
+    .then(function(){ return _tplIdxRefOf(k).set(meta); })
+    .then(function(){ _tplSyncSet(k,meta.at); if(_tplIdx) _tplIdx[_tplCk(k)]=meta; return true; });
+}
+function _tplDownload(k){
+  return _tplRef(k).once('value').then(function(sn){ var v=sn.val();
+    if(!v||!v.b64) return null;
+    return _b64ToBytes(v.b64).buffer; });
+}
+/* 등록 — 이 기기에 넣고(바로 쓸 수 있게), 클라우드에도 올린다. 못 올리면 'dirty' 로 남겨 다음에 자동으로 */
+function tplPut(k,buf,name){
+  return idbPut(k,buf).then(function(){
+    _tplSyncSet(k,'dirty');
+    tplCloudPut(k,buf,name).catch(function(e){
+      console.warn('[원본 서식] 클라우드 올리기 실패',k,e);
+      toast('이 기기에는 저장했습니다 — 클라우드 올리기는 연결되면 자동으로 다시 합니다','warn');
+    });
+  });
+}
+/* 지우기 — 이 기기와 클라우드에서 함께. 못 지우면 'del' 로 남겨 다음에 자동으로 */
+function tplDel(k){
+  return idbDel(k).then(function(){
+    _tplSyncSet(k,'del');
+    if(!_tplReady()) return;
+    return _tplIdxRefOf(k).remove().then(function(){ return _tplRef(k).remove(); })
+      .then(function(){ _tplSyncSet(k,null); if(_tplIdx) delete _tplIdx[_tplCk(k)]; })
+      .catch(function(e){ console.warn('[원본 서식] 클라우드에서 지우기 실패',k,e); });
+  });
+}
+/* 읽기 — 이 기기 사본이 클라우드 최신 판이면 그대로, 아니면(없거나 다른 판) 클라우드에서 받아 온다.
+   클라우드를 못 읽으면 이 기기 것을 쓴다(없는 것보다 낫다). */
+function tplGet(k){
+  return Promise.all([_tplIdxLoad(),idbGet(k).catch(function(){ return null; })]).then(function(r){
+    var idx=r[0], local=r[1], st=_tplSyncMap()[k], meta=idx&&idx[_tplCk(k)];
+    if(st==='dirty') return local;               // 아직 못 올린 «내 것»이 최신이다
+    if(st==='del') return null;
+    if(!idx) return local;                       // 클라우드를 모른다 — 이 기기 것
+    if(!meta){
+      /* 이 기기에서 맞춘 적이 있는데 클라우드에 없다 = 다른 곳에서 지웠다. 지우지 않고 옆에 남긴다 */
+      if(local&&typeof st==='number'){ idbPut('prev:'+k,local).then(function(){ return idbDel(k); }).catch(function(){}); _tplSyncSet(k,null); return null; }
+      return local;                              // 아직 안 올린 옛 사본 — tplSyncUp 이 올린다
+    }
+    if(local&&st===meta.at) return local;
+    return _tplDownload(k).then(function(buf){
+      if(!buf) return local;
+      var keep=(local&&typeof st!=='number')?idbPut('prev:'+k,local):Promise.resolve();
+      return keep.then(function(){ return idbPut(k,buf); }).then(function(){ _tplSyncSet(k,meta.at); return buf; });
+    }).catch(function(e){ console.warn('[원본 서식] 클라우드에서 못 받음',k,e); return local; });
+  });
+}
+/* 있나 — 화면 표시용. 파일은 안 받는다(이 기기 사본 또는 클라우드 색인) */
+function tplHas(k){
+  return Promise.all([_tplIdxLoad(),idbGet(k).catch(function(){ return null; })]).then(function(r){
+    var st=_tplSyncMap()[k]; if(st==='del') return false;
+    return !!r[1]||!!(r[0]&&r[0][_tplCk(k)]);
+  });
+}
+/* ★ 이 기기에만 있는 원본을 클라우드로 — 켤 때·인터넷이 돌아올 때 «저절로» (옛 원본 옮기기 겸 다시 올리기)
+   ⚠ 색인을 못 읽으면 아무것도 안 한다 — 모르는 채로 올리면 남의 판을 덮는다.
+   ⚠ 클라우드에 이미 있으면 올리지 않는다(먼저 옮긴 기기 것이 기준). 이 기기 것은 열 때 'prev:' 로 남는다.
+   ⚠ 맞춘 적 있는 것이 클라우드에 없으면 «다른 곳에서 지운 것» — 되살리지 않는다. */
+function tplSyncUp(){
+  if(_tplSyncing||!_tplReady()) return Promise.resolve(0);
+  _tplSyncing=true;
+  return _tplIdxLoad().then(function(idx){
+    if(!idx) return 0;
+    var map=_tplSyncMap(), up=0;
+    return _tplAllKeys().reduce(function(p,k){
+      return p.then(function(){
+        var st=map[k], ck=_tplCk(k);
+        if(st==='del') return _tplIdxRefOf(k).remove().then(function(){ return _tplRef(k).remove(); })
+          .then(function(){ _tplSyncSet(k,null); delete idx[ck]; });
+        return idbGet(k).then(function(buf){
+          if(!buf) return;
+          if(st==='dirty'||(st==null&&!idx[ck])) return tplCloudPut(k,buf,(idx[ck]&&idx[ck].name)||'').then(function(){ up++; });
+        });
+      }).catch(function(e){ console.warn('[원본 서식] 올리기 실패',k,e); });
+    },Promise.resolve()).then(function(){ return up; });
+  }).then(function(n){
+    if(n){ toast('이 기기에만 있던 원본 서식 '+n+'개를 클라우드에 올렸습니다 — 다른 브라우저에서도 열립니다');
+      S._tplChk=false; S._hwpChk=false; try{ _formsRerender(); }catch(e){} }
+    return n;
+  }).finally(function(){ _tplSyncing=false; });
+}
+window.addEventListener('online',function(){ setTimeout(tplSyncUp,3000); });
 
 // 서식 화면 출력 대상 — 기금 상세 📑 서식 탭에 끼워 넣을 땐 S.formsHost 지정(임베드 모드)
 function _formsHostEl(){ var h=S.formsHost&&$(S.formsHost); return h||$('app'); }
@@ -3418,7 +3550,7 @@ function renderForms(){
   // 원본 등록 상태 비동기 확인 후 재렌더 (엑셀 원본·HWP 원본 어느 쪽이 바뀌어도 재조회)
   if(S._tplChk!==true||S._hwpChk===false){ S._tplChk='...'; S._hwpChk='...';
     var _hk=DOC_ALL.map(function(d){return d[0];});
-    Promise.all([idbGet('setup'),idbGet('subsidy'),idbGet('contribx')].concat(_hk.map(function(k){return idbGet('hwp:'+k);})))
+    Promise.all([tplHas('setup'),tplHas('subsidy'),tplHas('contribx')].concat(_hk.map(function(k){return tplHas('hwp:'+k);})))
       .then(function(a){ S._tplHas={setup:!!a[0],subsidy:!!a[1],contribx:!!a[2]}; S._hwpHas={}; _hk.forEach(function(k,i){S._hwpHas[k]=!!a[3+i];}); S._tplChk=true; S._hwpChk=true; _formsRerender(); })
       .catch(function(){ S._tplHas={setup:false,subsidy:false,contribx:false}; S._hwpHas={}; S._tplChk=true; S._hwpChk=true; _formsRerender(); });
     HOST.innerHTML='<div class="panel">'+loadingHTML()+'</div>'; return; }
@@ -3580,14 +3712,14 @@ function pickTpl(key){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file)return;
     var rd=new FileReader();
-    rd.onload=function(){ idbPut(key,rd.result).then(function(){ S._tplChk=false; S._subTplChk=false;
+    rd.onload=function(){ tplPut(key,rd.result,file.name).then(function(){ S._tplChk=false; S._subTplChk=false;
         if(_formsEmbedded()){renderFund();} else if(S.view==='forms'){renderForms();} else if(S.view==='fund'){renderFund();}
         toast('원본 등록 완료: '+file.name); })
       .catch(function(e){ toast('저장 실패: '+e.message,'err'); }); };
     rd.readAsArrayBuffer(file); };
   inp.click();
 }
-function clearTpl(key){ confirmM('등록된 원본 서식을 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) idbDel(key).then(function(){ S._tplChk=false; _formsRerender(); toast('삭제되었습니다'); }); }); }
+function clearTpl(key){ confirmM('등록된 원본 서식을 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) tplDel(key).then(function(){ S._tplChk=false; _formsRerender(); toast('삭제되었습니다'); }); }); }
 
 // ═══════════ 실제 HWP 서식 — 원본 .hwp 등록 + 브라우저 편집(rhwp)·저장 ═══════════
 // 저장은 IndexedDB('hwp:'+kind), 편집기는 저장소 안 rhwp studio(vendor/rhwp-studio). 데이터 자동채움 없음(수동 편집).
@@ -3602,13 +3734,13 @@ function pickHwp(kind){
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file)return;
     var rd=new FileReader();
     rd.onload=function(){ try{ PureunHwp.validate(rd.result,file.name); }catch(e){ toast(e.message,'err'); return; }
-      idbPut('hwp:'+kind,rd.result).then(function(){ S._hwpChk=false;
+      tplPut('hwp:'+kind,rd.result,file.name).then(function(){ S._hwpChk=false;
       _formsRerender(); toast('원본 HWP 등록: '+file.name); })
       .catch(function(e){ toast('저장 실패: '+e.message,'err'); }); };
     rd.readAsArrayBuffer(file); };
   inp.click();
 }
-function clearHwp(kind){ confirmM('등록된 원본 HWP를 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) idbDel('hwp:'+kind).then(function(){ S._hwpChk=false; _formsRerender(); toast('삭제되었습니다'); }); }); }
+function clearHwp(kind){ confirmM('등록된 원본 HWP를 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) tplDel('hwp:'+kind).then(function(){ S._hwpChk=false; _formsRerender(); toast('삭제되었습니다'); }); }); }
 // 여러 .hwp를 파일명으로 서식에 자동 매칭해 일괄 등록
 function pickHwpBulk(){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp,.hwpx'; inp.multiple=true;
@@ -3635,7 +3767,7 @@ function pickHwpBulk(){
     if(!matched.length){ toast('파일명에서 서식을 못 알아냈어요 — 서식별 [등록]으로 개별 등록하세요','warn'); return; }
     Promise.all(matched.map(function(p){ return new Promise(function(res){ var rd=new FileReader();
       rd.onload=function(){ try{ PureunHwp.validate(rd.result,p[1].name); }catch(e){res(false);return;}
-        idbPut('hwp:'+p[0],rd.result).then(function(){res(true);}).catch(function(){res(false);}); };
+        tplPut('hwp:'+p[0],rd.result,p[1].name).then(function(){res(true);}).catch(function(){res(false);}); };
       rd.onerror=function(){res(false);}; rd.readAsArrayBuffer(p[1]); }); }))
       .then(function(oks){ S._hwpChk=false; _formsRerender();
         var okN=oks.filter(Boolean).length, failN=oks.length-okN;      // 실제 저장 성공분만 집계
@@ -3681,7 +3813,7 @@ function _hwpBufText(buf){
   }).then(function(xs){ return xs.map(function(x){ return PuHwpxFill.textOf(x); }).join('\n'); });
 }
 function openHwpEditor(kind){
-  idbGet('hwp:'+kind).then(function(buf){
+  tplGet('hwp:'+kind).then(function(buf){
     if(!buf){ toast('먼저 이 서식의 원본 .hwp를 등록하세요','warn'); return; }
     _openHwpBuf(buf,docLabel(kind),null);
   });
@@ -4989,7 +5121,7 @@ function docsMatrixHTML(list){
   if(S._tplChk!==true){   // HWP 등록 상태도 필요 → 없으면 조회
     var _hk=DOC_ALL.map(function(d){return d[0];});
     if(S._tplChk!=='...'){ S._tplChk='...';
-      Promise.all(_hk.map(function(k){return idbGet('hwp:'+k);})).then(function(a){
+      Promise.all(_hk.map(function(k){return tplHas('hwp:'+k);})).then(function(a){
         S._hwpHas={}; _hk.forEach(function(k,i){S._hwpHas[k]=!!a[i];}); S._tplChk=true; S._hwpChk=true;
         S._tplHas=S._tplHas||{setup:false,subsidy:false,contribx:false};
         if(S.view==='home')renderHome(); }).catch(function(){ S._tplChk=true; if(S.view==='home')renderHome(); });
@@ -9036,7 +9168,7 @@ function _fillWbBuffer(key){
   var fid=S.formFund, f=funds[fid];
   if(curForm()._sample) return Promise.reject(new Error('샘플 모드 — 실데이터 채움은 기금 현황 → 기금 → 📑 서식에서'));
   if(!f) return Promise.reject(new Error('기금을 선택하세요'));
-  return idbGet(key).then(function(buf){
+  return tplGet(key).then(function(buf){
     if(!buf) throw new Error('먼저 원본 엑셀을 등록하세요');
     return _loadSites(fid).then(function(sites){
       var wb=new ExcelJS.Workbook();
@@ -13945,7 +14077,7 @@ function saveSubPlan(){
 function subsidyExcelPanel(f){
   // 서식 자료실의 지원신청서 원본(IndexedDB) 상태 확인 후 이 기금 데이터로 채워 다운로드
   if(S._subTplChk!==true){ S._subTplChk='...';
-    idbGet('subsidy').then(function(buf){ S._subTplHas=!!buf; S._subTplChk=true; if(S.tab==='subsidy'&&S.view==='fund')renderFund(); })
+    tplHas('subsidy').then(function(buf){ S._subTplHas=!!buf; S._subTplChk=true; if(S.tab==='subsidy'&&S.view==='fund')renderFund(); })
       .catch(function(){ S._subTplHas=false; S._subTplChk=true; if(S.tab==='subsidy'&&S.view==='fund')renderFund(); });
     return '<div class="panel">'+loadingHTML()+'</div>';
   }

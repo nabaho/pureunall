@@ -93,6 +93,10 @@ function world(denyReads) {
     /* 사업장 차례 구독은 이 검사의 관심사가 아니다(따로 tests/gov-dash-order.test.js
        가 지킨다) — 여기서는 «불러도 안전한가»만 흉내로 확인한다. */
     subscribeDashOrder() { log.subs.push({ path: '(사업장 차례)', cancel: true }); },
+    /* 밀린 저장·증빙 다시 올리기(2026-10-05)도 이 검사의 관심사가 아니다 —
+       tests/gov-sync-queue.test.js 가 지킨다. 여기서는 «불러도 안전한가»만. */
+    fbFlushDirty() { return Promise.resolve(0); }, evQueueRetry() { }, evAutoBacklog() { },
+    setTimeout() { },
     updateFbStatus(i) { log.status.push(i); },
     setSaveState(kind, text, title) { log.save.push({ kind, text, title }); },
     getSession: () => ({ id: 'a1', name: '권형하' }),

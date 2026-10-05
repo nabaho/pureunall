@@ -64,16 +64,25 @@ test('권한 안내는 「다시 시도」를 권하지 않는다', () => {
   assert.strictEqual(/관리자/.test(msg), true, '누구에게 말해야 하는지 안 알려 준다');
 });
 
+/* 저장 길 «통째» — 2026-10-05 부터 실제로 보내는 일은 _fbSendDelta·_fbSendWhole 이 한다
+   (연결 전에 쌓인 밀린 저장도 같은 길로 보내려고 떼어 냈다). 그래서 겉 함수와 «보내는 함수»를 함께 본다.
+   ⚠ 겉 함수가 그 보내는 함수를 실제로 부르는지도 본다 — 안 부르면 규칙이 헛돈다. */
+const SEND_OF = { 'fbPushRecordDelta(': '_fbSendDelta(', 'fbPush(': '_fbSendWhole(' };
+function savePath(name) {
+  const cut = (n) => { const a = S.indexOf('function ' + n); if (a < 0) return ''; const b = S.indexOf('\nfunction ', a + 5); return S.slice(a, b < 0 ? S.length : b); };
+  const outer = cut(name), send = SEND_OF[name], inner = send ? cut(send) : '';
+  if (inner) assert.ok(outer.indexOf(send) >= 0, name + ' 가 ' + send + ' 를 안 부른다');
+  return outer + '\n' + inner;
+}
+
 test('두 저장 길 «모두» 권한 문구를 쓴다', () => {
   /* 병합 저장(fbPushRecordDelta)과 통째 저장(fbPush) 둘 다 쓰인다.
      한쪽만 고치면 다른 쪽에서 여전히 「인터넷 확인」이라 한다. */
   /* ★ 이름 «앞부분» 으로 찾으면 fbPush 가 fbPushRecordDelta 에 걸려
      두 번 같은 함수를 보게 된다(2026-08-17 실제로 그렇게 놓쳤다). 여는 괄호까지 본다. */
   ['fbPushRecordDelta(', 'fbPush('].forEach(function (name) {
-    const a = S.indexOf('function ' + name);
-    assert.ok(a > 0, name + ' 가 없다');
-    const b = S.indexOf('\nfunction ', a + 5);
-    const fn = S.slice(a, b < 0 ? S.length : b);
+    assert.ok(S.indexOf('function ' + name) > 0, name + ' 가 없다');
+    const fn = savePath(name);
     assert.strictEqual(/_saveFailMsg\(\s*node\s*,\s*e\s*\)/.test(fn), true,
       name + ' 가 실패 이유를 안 알린다');
   });
@@ -103,8 +112,7 @@ test('권한이 «아닌» 실패는 이유를 그대로 보여 준다', () => {
 test('되돌려진 저장은 «되돌려졌다» 고 말한다', () => {
   /* 서버가 저장을 되돌리면 이유가 안 온다. 전에는 영문 한 줄만 던져
      화면이 「다시 시도해 주세요」로 뭉갰다. */
-  const a = S.indexOf('function fbPushRecordDelta(');
-  const fn = S.slice(a, S.indexOf('\nfunction ', a + 5));
+  const fn = savePath('fbPushRecordDelta(');
   assert.strictEqual(/되돌렸습니다|되돌려졌습니다/.test(fn), true, '되돌려진 것을 사람 말로 안 적는다');
   assert.strictEqual(/TX_NOT_COMMITTED/.test(fn), true, '되돌려진 것을 가릴 표가 없다');
 });
