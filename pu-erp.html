@@ -36872,6 +36872,101 @@ window.caseStageCurrent = caseStageCurrent;
 window.caseSyncStageCode= caseSyncStageCode;
 // ── 사건 심급·단계 카탈로그 끝 ──
 
+/* ══════ 업무유형 사전 안전장치 (대표 2026-10-05 「유형을 고치면 진행 중인 업무가 바뀌지 않나 —
+   아무 문제 없이 관리하려면」) ══════
+   ■ 기록은 유형을 «고유번호»(typeCode · typeCodes[kind])로 잇는다 — 이름·약어를 고쳐도 연결은 안 끊긴다.
+     위험한 것은 사전 쪽 다섯 자리였다:
+     ① 「복원」이 확인 없이 사전을 씨앗으로 «통째» 덮었다 — 운영 유형은 씨앗과 번호가 달라 누르는 순간
+        모든 업무가 「미설정」이 된다. → 이제 «빠진 기본 유형만 더한다». 지금 목록은 하나도 안 지운다.
+     ② 지우기 전 «쓰는 건수»가 계약관리(contracts.typeCodes)를 안 셌다 — 계약만 쓰는 유형이 지워졌다.
+     ③ 같은 약어·이름을 또 만들 수 있었다(일터 / 일터혁신 같은 겹침의 뿌리). → 막는다.
+     ④ 누가 언제 무엇을 바꿨는지 남지 않았다. → 항목마다 hist 에 전→후를 남긴다(최근 20개).
+     ⑤ 화면이 들고 있던 목록을 통째로 저장해 다른 사람이 그 사이 고친 것을 지웠다.
+        → 저장 직전 «지금 사전»을 다시 읽어 그 위에 내 한 가지만 얹는다(bizTypeApply).
+   ⚠ 이름 글자로 유형을 알아보는 곳이 아직 있다(현장클리닉 일수·기술보호 단가 등 — 2단계에서 번호로 바꾼다).
+     그 전까지는 그 이름을 바꿀 때 묻는다(bizTypeNameGuard). */
+var BIZ_TYPE_STORE = { company:'companies', case:'cases', consulting:'consultings', fund:'funds', other:'other_projects' };
+var BIZ_TYPE_HIST_MAX = 20;
+function bizTypeNorm(s){ return String(s == null ? '' : s).replace(/[\s·.,()\-_/]/g, '').toLowerCase(); }
+/* 이 유형을 쓰는 기록 수 — 모듈 표 + 계약관리 + 옛 원장. 삭제표시 줄은 안 센다. */
+function bizTypeUsage(kindKey, code, get){
+  get = get || dbGet;
+  var by = {}, n = 0;
+  function add(store){ by[store] = (by[store] || 0) + 1; n++; }
+  var store = BIZ_TYPE_STORE[kindKey];
+  if(store){
+    (get(store, []) || []).forEach(function(r){
+      if(!r || r._deleted) return;
+      if((r.typeCodes && r.typeCodes[kindKey] === code) || r.typeCode === code) add(store);
+    });
+  }
+  (get('contracts', []) || []).forEach(function(c){
+    if(!c || c._deleted) return;
+    var tc = c.typeCodes && c.typeCodes[kindKey];
+    var kinds = c.kinds || (c.kind ? [c.kind] : []);
+    if(tc === code || (!tc && c.typeCode === code && kinds.indexOf(kindKey) >= 0)) add('contracts');
+  });
+  (get('consultations', []) || []).forEach(function(r){
+    if(r && !r._deleted && r.typeCodes && r.typeCodes[kindKey] === code) add('consultations');
+  });
+  return { n:n, by:by };
+}
+/* 같은 약어 또는 같은 이름(띄어쓰기·점 무시)이 이미 있으면 그 항목 — 자기 자신은 뺀다. 숨긴 것도 본다. */
+function bizTypeDupOf(list, short, name, exceptCode){
+  var s = bizTypeNorm(short), nm = bizTypeNorm(name);
+  return (list || []).find(function(x){
+    if(!x || x.code === exceptCode) return false;
+    return (s && bizTypeNorm(x.short) === s) || (nm && bizTypeNorm(x.name) === nm);
+  }) || null;
+}
+/* 고친 기록 한 줄을 항목에 남긴다(새 항목을 돌려준다 — 원본은 안 바꾼다). */
+function bizTypeHist(item, act, before, who, at){
+  var pick = function(o){ o = o || {}; var r = { short:o.short || '', name:o.name || '' };
+    if(o.agency !== undefined) r.agency = o.agency; if(o.hidden) r.hidden = true; return r; };
+  var h = (item.hist || []).concat([{ at:at || new Date().toISOString(), by:who || '', act:act,
+    from: before ? pick(before) : null, to: pick(item) }]);
+  if(h.length > BIZ_TYPE_HIST_MAX) h = h.slice(h.length - BIZ_TYPE_HIST_MAX);
+  return Object.assign({}, item, { hist:h });
+}
+/* 「복원」 — 씨앗 가운데 «빠진 것만». 번호·약어·이름 어느 하나라도 지금 목록에 있으면 넣지 않는다.
+   ⚠ 지금 목록에서는 아무것도 빼지 않는다 — 운영 유형은 씨앗과 번호가 달라, 빼면 업무가 미설정이 된다. */
+function bizTypeMissingSeeds(list, seed){
+  var have = list || [];
+  return (seed || []).filter(function(sd){
+    if(!sd) return false;
+    if(have.some(function(x){ return x && x.code === sd.code; })) return false;
+    return !bizTypeDupOf(have, sd.short, sd.name, null);
+  });
+}
+/* 저장 직전 «지금 사전»을 다시 읽어 그 위에 바꿈 하나(fn)만 얹는다 — 화면이 들고 있던 목록으로 덮지 않는다. */
+function bizTypeRead(storageKey, seed){
+  var v = dbGet(storageKey, null);
+  if(v == null) return (seed || []).slice();
+  if(!Array.isArray(v)) v = Object.keys(v).map(function(k){ return v[k]; });
+  return v.filter(function(x){ return x != null; }).map(function(x){ return Object.assign({}, x); });
+}
+function bizTypeApply(storageKey, seed, fn){
+  var next = fn(bizTypeRead(storageKey, seed));
+  if(!Array.isArray(next)) return null;
+  next.sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0); });
+  dbSet(storageKey, next);
+  return next;
+}
+/* 이름 글자로 알아보는 유형 — 바꾸면 그 기능이 그 유형을 못 찾는다(2단계 전까지의 경고). */
+function bizTypeNameGuard(kindKey, oldName, newName){
+  if(kindKey !== 'consulting') return '';
+  var o = bizTypeNorm(oldName), n = bizTypeNorm(newName);
+  if(o.indexOf('현장클리닉') >= 0 && n.indexOf('현장클리닉') < 0) return '현장클리닉 일수·단가 계산';
+  if(o.indexOf('기술보호') >= 0 && n.indexOf('기술보호') < 0) return '기술보호 회차·단가 계산';
+  return '';
+}
+function bizTypeLastHist(x){
+  var h = x && x.hist && x.hist[x.hist.length - 1];
+  if(!h) return '';
+  return '마지막 변경: ' + String(h.at || '').slice(0, 10) + ' ' + (h.by || '') + ' · ' + h.act
+    + (h.from ? ' (' + (h.from.short || '') + ' ' + (h.from.name || '') + ' → ' + (h.to.short || '') + ' ' + (h.to.name || '') + ')' : '');
+}
+
 // 카테고리별 색상 (캡쳐 색상 톤)
 var BIZ_CATS = [
   { key:'company',    title:'업체유형',    storageKey:'biz_company_types', seed:COMPANY_TYPE_SEED, headBg:'#fffbeb', headFg:'#854d0e', icon:'🏢', addBtnBg:'#d97706', shortBg:'#fde68a', shortFg:'#854d0e' },
@@ -36895,66 +36990,85 @@ function BizTypeCard(props){
   var dgS = useState(null); var dragCode = dgS[0]; var setDragCode = dgS[1];
   var doS = useState(null); var dragOverCode = doS[0]; var setDragOverCode = doS[1];
 
-  function persist(arr){ arr.sort(function(a,b){ return (a.sortOrder||0)-(b.sortOrder||0); }); setList(arr); dbSet(cat.storageKey, arr); }
+  /* ⚠ 저장은 늘 «지금 사전» 위에 바꿈 하나만 얹는다(bizTypeApply) — 화면 목록으로 통째 덮지 않는다 */
+  function persistWith(fn){
+    var next = bizTypeApply(cat.storageKey, cat.seed, fn);
+    if(next) setList(next);
+    return next;
+  }
+  function who(){ return (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.sid)) || ''; }
   function add(){
     var name = input.trim();
     if(!name){ showToast('이름 입력'); return; }
     var sh = shortIn.trim() || name.slice(0,2);
-    var nextOrder = list.length === 0 ? 10 : (Math.max.apply(null, list.map(function(x){ return x.sortOrder || 0; })) + 10);
+    var dup = bizTypeDupOf(bizTypeRead(cat.storageKey, cat.seed), sh, name, null);
+    if(dup){
+      showToast('⚠ 이미 있는 유형입니다 — 「' + dup.short + ' ' + dup.name + '」' + (dup.hidden ? ' (숨김 — 👁 로 다시 표시하세요)' : '') + '. 같은 사업을 두 번 만들면 번호가 두 갈래가 됩니다', 7000);
+      return;
+    }
     var code = cat.key + '-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-    var item = { code:code, short:sh, name:name, sortOrder:nextOrder };
-    if(cat.key === 'consulting') item.agency = agencyIn.trim();
-    persist(list.concat([item]));
+    persistWith(function(cur){
+      var nextOrder = cur.length === 0 ? 10 : (Math.max.apply(null, cur.map(function(x){ return x.sortOrder || 0; })) + 10);
+      var item = { code:code, short:sh, name:name, sortOrder:nextOrder };
+      if(cat.key === 'consulting') item.agency = agencyIn.trim();
+      return cur.concat([bizTypeHist(item, '추가', null, who())]);
+    });
     setInput(''); setShortIn(''); setAgencyIn(''); showToast('추가됨');
   }
-  // 이 유형(code)을 사용 중인 데이터 건수 — cat.key별 저장소의 typeCodes[kind] 검사
-  function countUsage(code){
-    var kindKey = cat.key; // company/case/consulting/fund/other
-    var storeMap = { company:'companies', case:'cases', consulting:'consultings', fund:'funds', other:'other_projects' };
-    var store = storeMap[kindKey];
-    var n = 0;
-    function hit(rec){
-      if(!rec) return false;
-      if(rec.typeCodes && rec.typeCodes[kindKey] === code) return true;
-      // 옛 방식(이름 직접 저장) 호환
-      if(kindKey==='case' && rec.caseType && rec.typeCode===code) return true;
-      if(rec.typeCode === code) return true;
-      return false;
-    }
-    if(store){ (dbGet(store, [])||[]).forEach(function(r){ if(hit(r)) n++; }); }
-    // 컨설팅/사건은 이관 전 원장(consultations)에도 있을 수 있음
-    (dbGet('consultations', [])||[]).forEach(function(r){ if(r.typeCodes && r.typeCodes[kindKey]===code) n++; });
-    return n;
+  // 이 유형(code)을 사용 중인 데이터 건수 — 모듈 표 + 계약관리 + 옛 원장(bizTypeUsage)
+  function countUsage(code){ return bizTypeUsage(cat.key, code).n; }
+  function setHidden(code, hidden, act){
+    persistWith(function(cur){
+      return cur.map(function(x){
+        if(x.code !== code) return x;
+        return bizTypeHist(Object.assign({}, x, { hidden:hidden }), act, x, who());
+      });
+    });
   }
   function del(code){
     var used = countUsage(code);
     if(used > 0){
       var item = list.find(function(x){ return x.code === code; });
-      showConfirm('"'+(item?item.name:code)+'" 유형은 '+used+'건의 데이터가 사용 중입니다.\n\n삭제하면 그 '+used+'건이 "미설정"이 되어 유형 표시가 사라집니다.\n\n대신 목록에서 "숨김" 처리할까요?\n(숨기면 새 등록 시 안 보이지만, 기존 '+used+'건의 유형 표시는 그대로 유지됩니다)',
+      showConfirm('"'+(item?item.name:code)+'" 유형은 '+used+'건의 데이터가 사용 중입니다(계약관리 포함).\n\n삭제하면 그 '+used+'건이 "미설정"이 되어 유형 표시가 사라집니다.\n\n대신 목록에서 "숨김" 처리할까요?\n(숨기면 새 등록 시 안 보이지만, 기존 '+used+'건의 유형 표시는 그대로 유지됩니다)',
         { title:'유형 사용 중', confirmText:'숨김 처리', danger:false }).then(function(ok){
         if(!ok) return;
-        persist(list.map(function(x){ return x.code===code ? Object.assign({}, x, { hidden:true }) : x; }));
+        setHidden(code, true, '숨김');
         showToast('🙈 숨김 처리됨 — 기존 '+used+'건 표시 유지');
       });
       return;
     }
     // 사용 0건 → 안전하게 삭제
-    showConfirm('"'+(list.find(function(x){return x.code===code;})||{}).name+'" 유형을 삭제할까요?\n(사용 중인 데이터 없음)', { title:'유형 삭제', confirmText:'삭제', danger:true }).then(function(ok){
+    showConfirm('"'+(list.find(function(x){return x.code===code;})||{}).name+'" 유형을 삭제할까요?\n(사용 중인 데이터 없음 — 계약관리까지 세었습니다)', { title:'유형 삭제', confirmText:'삭제', danger:true }).then(function(ok){
       if(!ok) return;
-      persist(list.filter(function(x){ return x.code !== code; }));
+      /* 누르는 사이 누가 그 유형을 썼을 수 있다 — 지우기 직전에 한 번 더 센다 */
+      if(countUsage(code) > 0){ showToast('⚠ 그 사이 이 유형을 쓰는 기록이 생겼습니다 — 지우지 않았습니다. 숨김을 쓰세요', 7000); return; }
+      persistWith(function(cur){ return cur.filter(function(x){ return x.code !== code; }); });
       showToast('🗑 삭제됨');
     });
   }
   // 숨김 유형 다시 보이기
   function unhide(code){
-    persist(list.map(function(x){ return x.code===code ? Object.assign({}, x, { hidden:false }) : x; }));
+    setHidden(code, false, '다시 표시');
     showToast('👁 다시 표시됨');
   }
-  function editType(x){
+  async function editType(x){
     var sh = window.prompt('약어 (최대 4자)', x.short || ''); if(sh === null) return;
     var nm = window.prompt('유형 이름', x.name || ''); if(nm === null) return;
     sh = sh.trim().slice(0,4); nm = nm.trim();
     if(!sh || !nm){ showToast('약어와 이름을 모두 입력하세요'); return; }
+    var dupE = bizTypeDupOf(bizTypeRead(cat.storageKey, cat.seed), sh, nm, x.code);
+    if(dupE){
+      showToast('⚠ 「' + dupE.short + ' ' + dupE.name + '」 와 약어나 이름이 겹칩니다 — 고치지 않았습니다. 같은 사업이면 합치기로 정리합니다', 8000);
+      return;
+    }
+    /* 이름 글자로 알아보는 기능이 있는 유형 — 이름에서 그 말이 빠지면 묻는다 */
+    var guard = bizTypeNameGuard(cat.key, x.name, nm);
+    if(guard && !(await showConfirm('「' + x.name + '」 → 「' + nm + '」\n\n이 이름으로 ' + guard + '을(를) 알아보는 기능이 있습니다.\n이름에서 그 말이 빠지면 그 계산이 이 유형을 못 찾습니다.\n\n그래도 바꿀까요?', { title:'이름 변경 주의', confirmText:'그래도 바꾸기', danger:true }))) return;
+    /* 약어를 바꾸면 번호가 두 갈래가 된다 — 몇 건이 옛 약어로 남는지 보여 주고 묻는다 */
+    if(bizTypeNorm(sh) !== bizTypeNorm(x.short)){
+      var usedE = countUsage(x.code);
+      if(usedE > 0 && !(await showConfirm('약어 「' + (x.short || '') + '」 → 「' + sh + '」\n\n이미 붙은 관리번호(' + usedE + '건 사용 중)는 「' + (x.short || '') + '-」 그대로 남고,\n새로 만드는 것부터 「' + sh + '-」 가 붙습니다 — 같은 사업의 번호가 두 갈래가 됩니다.\n\n그래도 바꿀까요?', { title:'약어 변경 주의', confirmText:'그래도 바꾸기', danger:true }))) return;
+    }
     var ag = null, df = null, unitIn = '', vatIn = '';
     if(cat.key === 'consulting'){
       ag = window.prompt('기관 (없으면 비워두기)', x.agency || ''); if(ag === null) ag = x.agency || '';
@@ -36974,20 +37088,40 @@ function BizTypeCard(props){
         if(vt !== null && (vt.trim() === '별도' || vt.trim() === '없음')) vatIn = vt.trim() === '없음' ? 'none' : 'add';
       }
     }
-    persist(list.map(function(it){
-      if(it.code !== x.code) return it;
-      var nx = Object.assign({}, it, { short:sh, name:nm });
-      if(ag !== null) nx.agency = ag.trim();
-      /* ⚠ 비웠을 때 칸을 «지우지» 않고 0 을 적는다 — 지우면 「안 정했다」가 되어
-           씨앗의 기본값(현장클리닉 350,000)이 다시 올라온다. 0 은 「쓰지 않는다」다. */
-      if(df !== null) nx.dayFee = parseInt(String(df).replace(/[^\d]/g, ''), 10) || 0;
-      if(unitIn) nx.dayUnit = unitIn;
-      if(vatIn) nx.dayVat = vatIn;
-      return nx;
-    }));
+    persistWith(function(cur){
+      return cur.map(function(it){
+        if(it.code !== x.code) return it;
+        var nx = Object.assign({}, it, { short:sh, name:nm });
+        if(ag !== null) nx.agency = ag.trim();
+        /* ⚠ 비웠을 때 칸을 «지우지» 않고 0 을 적는다 — 지우면 「안 정했다」가 되어
+             씨앗의 기본값(현장클리닉 350,000)이 다시 올라온다. 0 은 「쓰지 않는다」다. */
+        if(df !== null) nx.dayFee = parseInt(String(df).replace(/[^\d]/g, ''), 10) || 0;
+        if(unitIn) nx.dayUnit = unitIn;
+        if(vatIn) nx.dayVat = vatIn;
+        return bizTypeHist(nx, '수정', it, who());
+      });
+    });
     showToast('✏ 수정됨 — 코드 유지, 기존 사건·컨설팅 연결 그대로');
   }
-  function reseed(){ persist(cat.seed.slice()); showToast('시드 복원됨'); }
+  /* 「복원」 — 빠진 기본 유형만 더한다. 지금 목록은 하나도 안 지운다(bizTypeMissingSeeds 머리글).
+     ⚠ 예전처럼 씨앗으로 통째 덮지 말 것 — 운영 유형은 씨앗과 번호가 달라 모든 업무가 미설정이 된다. */
+  function reseed(){
+    var miss = bizTypeMissingSeeds(bizTypeRead(cat.storageKey, cat.seed), cat.seed);
+    if(!miss.length){ showToast('빠진 기본 유형이 없습니다 — 바꾼 것 없음'); return; }
+    showConfirm('기본 유형 가운데 지금 목록에 없는 ' + miss.length + '개를 더합니다.\n\n'
+      + miss.map(function(m){ return '  + ' + m.short + ' ' + m.name; }).join('\n')
+      + '\n\n지금 목록은 하나도 지우거나 바꾸지 않습니다.', { title:'빠진 기본 유형 더하기', confirmText:'더하기', danger:false }).then(function(ok){
+      if(!ok) return;
+      persistWith(function(cur){
+        var add2 = bizTypeMissingSeeds(cur, cat.seed);   // 누르는 사이 바뀌었을 수 있다 — 다시 고른다
+        var top = cur.length ? Math.max.apply(null, cur.map(function(x){ return x.sortOrder || 0; })) : 0;
+        return cur.concat(add2.map(function(m, i){
+          return bizTypeHist(Object.assign({}, m, { sortOrder: top + (i+1)*10 }), '기본값 더하기', null, who());
+        }));
+      });
+      showToast('기본 유형 ' + miss.length + '개를 더했습니다');
+    });
+  }
 
   // 드래그 핸들러
   function onDragStart(code, e){
@@ -37005,15 +37139,18 @@ function BizTypeCard(props){
   function onDrop(targetCode, e){
     e.preventDefault();
     if(!dragCode || dragCode === targetCode){ setDragCode(null); setDragOverCode(null); return; }
-    var arr = list.slice().sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
-    var fromIdx = arr.findIndex(function(x){return x.code===dragCode;});
-    var toIdx = arr.findIndex(function(x){return x.code===targetCode;});
-    if(fromIdx<0 || toIdx<0){ setDragCode(null); setDragOverCode(null); return; }
-    var moved = arr.splice(fromIdx, 1)[0];
-    arr.splice(toIdx, 0, moved);
-    // sortOrder 재부여 (10, 20, 30...)
-    arr.forEach(function(x, idx){ x.sortOrder = (idx+1)*10; });
-    persist(arr);
+    var fromC = dragCode;
+    persistWith(function(cur){
+      var arr = cur.slice().sort(function(a,b){return (a.sortOrder||0)-(b.sortOrder||0);});
+      var fromIdx = arr.findIndex(function(x){return x.code===fromC;});
+      var toIdx = arr.findIndex(function(x){return x.code===targetCode;});
+      if(fromIdx<0 || toIdx<0) return null;            // 그 사이 지워졌다 — 저장 안 함
+      var moved = arr.splice(fromIdx, 1)[0];
+      arr.splice(toIdx, 0, moved);
+      // sortOrder 재부여 (10, 20, 30...)
+      arr.forEach(function(x, idx){ x.sortOrder = (idx+1)*10; });
+      return arr;
+    });
     setDragCode(null); setDragOverCode(null);
     showToast('순서 변경');
   }
@@ -37025,7 +37162,7 @@ function BizTypeCard(props){
       h('span', null, cat.title),
       h('span', { style:{ fontWeight:600, fontSize:'12px' } }, '(' + list.length + ')'),
       h('div', { style:{ flex:1 } }),
-      h('button', { onClick:function(e){ e.stopPropagation(); reseed(); }, className:'erp-tip', 'data-tip':'⚠️ 기본 유형으로 되돌림 — 추가·수정한 유형이 사라집니다',
+      h('button', { onClick:function(e){ e.stopPropagation(); reseed(); }, className:'erp-tip', 'data-tip':'기본 유형 가운데 빠진 것만 더합니다 — 지금 목록은 지우거나 바꾸지 않습니다',
         style:{ fontSize:'10.5px', padding:'2px 8px', background:'transparent', color:cat.headFg, border:'1px solid '+cat.headFg, borderRadius:'4px', opacity:.6, cursor:'pointer', marginLeft:'6px' } }, '복원')
     ),
     h('div', null,
@@ -37051,7 +37188,8 @@ function BizTypeCard(props){
                 cursor:'grab', userSelect:'none', transition:'all 0.1s' } },
               h('span', { style:{ color:'#cbd5e1', fontSize:'11px', cursor:'grab', flexShrink:0 }, title:'드래그로 순서 변경' }, '⋮⋮'),
               h('span', { style:{ background:cat.shortBg, color:cat.shortFg, fontSize:'10.5px', fontWeight:700, padding:'1px 4px', flexShrink:0, borderRadius:'4px', minWidth:'34px', maxWidth:'68px', textAlign:'center', whiteSpace:'nowrap' } }, x.short),
-              h('span', { style:{ flex:1, fontSize:'11px', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 } },
+              h('span', { title: [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n'),
+                style:{ flex:1, fontSize:'11px', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 } },
                 x.name,
                 x.hidden ? h('span', { style:{ marginLeft:'6px', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } }, '숨김') : null,
                 cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
