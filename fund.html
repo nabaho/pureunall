@@ -145,6 +145,11 @@
   td.no{color:var(--faint);width:34px;font-variant-numeric:tabular-nums}
   .chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px}
   .chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.dg{background:var(--danger-bg);color:var(--danger)}
+  /* 칸 출처 표시(목업 4) — 🤖 기계·미확인 · ✓ 확인됨 · ✎ 사람이 씀 */
+  .pvm{display:inline-block;margin-left:5px;font-size:10.5px;font-weight:700;line-height:1;padding:2px 5px;border-radius:6px;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--sub);vertical-align:1px}
+  .pvm.pv-a{border:1px dashed var(--acc);background:var(--acc-soft);color:var(--acc2)}
+  .pvm.pv-o{color:var(--ok)}
+  input.pv-a,select.pv-a{border:1.5px dashed var(--acc) !important;background:var(--acc-soft)}
   .tag{font-size:10px;padding:1px 7px;border-radius:8px;margin-left:6px}
   .tag.gong{background:var(--ok-bg);color:var(--ok)}.tag.sanae{background:var(--acc-soft);color:var(--acc2)}
   .tabbar{display:flex;gap:4px;flex-wrap:wrap;border-bottom:1px solid var(--line);margin:14px 0 16px}
@@ -10073,7 +10078,7 @@ function infoForm(f){
   };
   /* ★ 저장을 «맨 위»로 (대표 지시 2026-09-13 「저장버튼도 상단에 두고」) —
        칸이 스물다섯이라 저장하려면 화면 끝까지 내려가야 했다. */
-  var tools='<span style="flex:1"></span>'
+  var tools='<span id="provSum" style="margin-left:8px"></span><span style="flex:1"></span>'
     +'<button onclick="openAudit()" style="padding:2px 9px;font-size:11.5px" title="이 기금을 누가 언제 고쳤는지">🕘 변경 기록</button>'
     +hlp('info.card')
     +'<button onclick="openCardPick()" style="padding:2px 9px;font-size:11.5px;font-weight:600"'
@@ -10106,6 +10111,8 @@ function infoForm(f){
     return '<div class="secbox infobox">'+head+'<div id="sec-'+g.key+'"'+(열까?'':' style="display:none"')+'>'+몸+'</div></div>';
   }).join('');
   setTimeout(bindDocIntake,0);   // 렌더 후 드롭존 핸들러 연결
+  /* 칸 출처 딱지(🤖·✓·✎) — 그린 뒤에 단다. 구독은 기금마다 하나 */
+  setTimeout(function(){ if(typeof _provSub==='function'){ _provSub(S.fundId); _provPaint(); } },0);
   /* 한 줄로 줄인 서류 받는 곳 — 설명·상태·버튼을 칸 안으로 넣어 세로를 아꼈다.
      끌어다 놓기·클릭 선택은 그대로 되고, 자세한 설명은 ⓘ 와 마우스 올림말로 옮겼다. */
   return '<div class="panel" style="padding:10px 14px"><div class="row" style="flex-wrap:wrap;gap:8px">'
@@ -12549,6 +12556,87 @@ function _provApplyPend(){
     if(k==='contacts'){ ['name','mobile','email','position'].forEach(function(c){ var el=$('sc-'+c); if(el&&String(el.value||'').trim()) _provMark(el,P.src,P.how); }); return; }
     _provMark(_siteFieldEl(k),P.src,P.how);
   });
+}
+/* ══ 기금 정보 칸마다 «누가 채웠는지» 표시 (대표 지시 2026-10-05 「추천대로」 — 자동화 확인 목업 4) ══
+   prov/{기금}/f|{칸} 을 읽어 칸 이름 옆에 작은 딱지를 단다.
+     🤖 기계가 넣고 아직 아무도 원본과 대조하지 않음(m:1, ok 없음, how≠dialog) — 칸도 파란 점선
+     ✓  확인됨(ok 가 있음, 또는 원본 옆에서 보고 넣음 how:dialog — 확인함과 같은 잣대)
+     ✎  사람이 씀(m:0)
+     딱지 없음 — 출처 기록이 생기기 전(2026-10-05 이전)에 들어간 값. 모르는 것을 지어 붙이지 않는다.
+   ⚠ 화면을 다시 그리지 않고 «딱지만» 단다 — 적는 중인 칸이 날아가지 않게.
+   ⚠ 이 기금 칸 출처를 구독(on)한다 — 저장하면 _track 이 쓴 기록이 곧바로(로컬 이벤트) 딱지에 반영된다.
+     기금을 바꾸면 앞 구독을 끊는다. */
+var PV={fid:'', ref:null, v:{}};
+function _provState(p){
+  if(!p) return '';
+  if(p.ok||(p.m===1&&p.how==='dialog')) return 'o';
+  return p.m===1?'a':'h';
+}
+function _provSub(fid){
+  if(PV.fid===fid&&PV.ref) return;
+  try{ if(PV.ref) PV.ref.off(); }catch(e){}
+  PV.fid=fid; PV.v={}; PV.ref=null;
+  if(!fid||typeof fbDb==='undefined') return;
+  PV.ref=fbDb.ref(NS+'/prov/'+fid);
+  PV.ref.on('value',function(sn){ if(PV.fid!==fid) return; PV.v=sn.val()||{}; _provPaint(); },function(){ PV.v={}; });
+}
+var PV_SRC={hand:'사람',card:'기업정보함',auto:'기계','guess:office':'소재지로 추정','copy:prev':'작년 값','calc:budget':'계산','calc:rate':'사람수 × 단가'};
+function _provSrcLabel(src){
+  src=String(src||'');
+  if(PV_SRC[src]) return PV_SRC[src];
+  if(/^scan:/.test(src)) return '서류 판독('+src.slice(5)+')';
+  if(/^import:/.test(src)) return '가져오기('+src.slice(7)+')';
+  if(/^rule:/.test(src)) return '규칙('+src.slice(5)+')';
+  return src||'—';
+}
+function _provPaint(){
+  if(S.view!=='fund'||S.tab!=='info'||PV.fid!==S.fundId) return;
+  var n={a:0,o:0,h:0};
+  FIELDS.forEach(function(c){
+    var el=$('fd-'+c[0]); if(!el) return;
+    var fld=el.closest?el.closest('.fld'):null, lab=fld?fld.querySelector('label'):null;
+    var p=PV.v['f|'+c[0]], st=_provState(p);
+    var old=lab?lab.querySelector('.pvm'):null; if(old) old.remove();
+    el.classList.remove('pv-a');
+    if(!st||!lab) return;
+    n[st]++;
+    var m=document.createElement('span');
+    m.className='pvm pv-'+st;
+    m.textContent=st==='a'?'🤖':st==='o'?'✓':'✎';
+    m.title=(st==='a'?'기계가 채움 · 아직 아무도 원본과 대조하지 않음':st==='o'?'확인됨':'사람이 씀')+' — 눌러서 언제·어디서·누가';
+    m.setAttribute('onclick','provPop(\''+c[0]+'\')');
+    lab.appendChild(m);
+    if(st==='a') el.classList.add('pv-a');
+  });
+  var sum=$('provSum');
+  if(sum) sum.innerHTML=n.a?'<span class="chip warn" style="cursor:pointer" onclick="go(\'review\')" title="확인함에서 원본과 대조합니다">🤖 확인 안 된 값 '+n.a+'</span>':'';
+}
+/* 딱지를 누르면 — 언제·어디서·누가, 기계 값이면 [맞음] */
+function provPop(k){
+  var p=PV.v['f|'+k], c=FIELDS.filter(function(x){ return x[0]===k; })[0]; if(!p||!c) return;
+  var st=_provState(p), f=funds[S.fundId]||{};
+  var need=(typeof ESTAB_NEED!=='undefined'?ESTAB_NEED:[]).filter(function(x){ return x[0]===k; })[0];
+  var ln=function(a,b){ return '<div style="display:flex;gap:10px;padding:3px 0;border-bottom:1px solid var(--line)"><span class="muted" style="width:62px;flex:none">'+a+'</span><span>'+b+'</span></div>'; };
+  var how=p.how==='dialog'?'원본 옆에서 보고 넣음':p.how==='list'?'값 목록만 보고 넣음':'';
+  showModal('<h3 style="margin:0 0 8px">'+esc(INFO_SHORT[k]||c[1])+' · '+esc(String(f[k]==null?'':f[k])||'(비어 있음)')+'</h3>'
+    +ln('채움',(p.m===1?'🤖 기계':'✎ 사람')+' · '+esc(_provSrcLabel(p.src))+(how?' · '+how:''))
+    +ln('언제',esc(p.at||'—')+(p.by?' · '+esc(p.by):''))
+    +ln('확인',p.ok?'✓ '+esc(p.ok.by||'?')+' · '+esc(p.ok.at||''):(st==='o'?'✓ 원본 옆에서 보고 넣은 값':'아직'))
+    +(need?ln('쓰는 곳',esc(need[3])):'')
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px">'
+    +'<button onclick="closeM();openAudit()">🕘 변경 기록</button>'
+    +(st==='a'?'<button class="primary" onclick="provOkOne(\''+k+'\')" title="값은 그대로 두고 «확인함» 표시만 붙입니다">✓ 원본과 맞음</button>':'')
+    +'<button onclick="closeM()">닫기</button></div>',{width:420});
+}
+/* [맞음] — 값은 그대로, 확인 표시만(확인함 _rvOkMany 와 같은 자리에 쓴다) */
+function provOkOne(k){
+  var fid=S.fundId, at=_nowStamp(), by=(S.user||'');
+  var up={}; up['prov/'+fid+'/f|'+k+'/ok']={by:by,at:at};
+  fbDb.ref(NS).update(up).then(function(){
+    closeM(); _audit(fid,'칸 확인',(INFO_SHORT[k]||k)+' — 원본과 맞음');
+    if(typeof RV!=='undefined') RV.at=0;          // 확인함 숫자도 다시 센다
+    toast('확인했습니다');
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 function openAudit(){
   var fid=S.fundId, f=funds[fid]||{};
