@@ -20,8 +20,25 @@
   'use strict';
   if (!root || root.PuHwpKeep) return;
 
-  /* 조 머리 — 「제24조(휴게)」「제24조의2 (휴게시간 선택)」「제10조 삭제」 */
-  var HEAD = /^\s*제\s*(\d+)\s*조(?:\s*의\s*(\d+))?\s*(?:[(（]\s*([^)）]{0,40}?)\s*[)）]|(?=\s*삭\s*제))/;
+  /* 조 머리 — 「제24조(휴게)」「제24조의2 (휴게시간 선택)」「제10조 삭제」 · 괄호는 여럿(【】 〔〕 「」 …)
+     ⚠ 괄호 묶음은 규정관리(rules.html BR_OPEN·BR_CLOSE)와 «같은 한 벌» — 사업장 원본 7개 중 1개가 「제1조【목적】」 꼴이라
+       ( （ 만 보던 여기서 조를 하나도 못 찾았다(2026-10-05 실측). 짝은 같은 자리끼리(OPEN[i] ↔ CLOSE[i]). */
+  var OPEN = '(（[【〔〈《「『｛{', CLOSE = ')）]】〕〉》」』｝}';
+  function rx(s) { return s.replace(/[\]\\[^-]/g, '\\$&'); }
+  var HEAD = new RegExp('^\\s*제\\s*(\\d+)\\s*조(?:\\s*의\\s*(\\d+))?\\s*(?:[' + rx(OPEN) + ']\\s*([^' + rx(CLOSE) + '\\n]{0,40}?)\\s*[' + rx(CLOSE) + ']|(?=\\s*삭\\s*제))');
+  /* 머리의 괄호 — 「제5조【목적】」 → '【'. 없으면 '' */
+  function openOf(t) {
+    var m = new RegExp('^\\s*제\\s*\\d+\\s*조(?:\\s*의\\s*\\d+)?\\s*([' + rx(OPEN) + '])').exec(String(t || ''));
+    return m ? m[1] : '';
+  }
+  /* 새 글의 머리 괄호를 원본 문서의 괄호로 — 검토 화면은 늘 「(제목)」 으로 짓는다 (2026-10-05).
+     ⚠ 괄호만 바꾼다. 번호·제목·본문은 그대로 */
+  function restyle(line, open) {
+    var i = OPEN.indexOf(open);
+    if (i < 0 || open === '(') return line;
+    return String(line || '').replace(/^(\s*제\s*\d+\s*조(?:\s*의\s*\d+)?\s*)[(（]\s*([^)）\n]{0,40}?)\s*[)）]/,
+      function (_, pre, title) { return pre + open + title + CLOSE.charAt(i); });
+  }
   var HEAD_NUM = /^\s*제\s*\d+\s*조(?:\s*의\s*\d+)?/;
   var STOP = /^\s*(제\s*\d+\s*장|제\s*\d+\s*절|부\s*칙)/;
   var TOC_TAIL = /(\s|\.{2,}|·{2,}|…)\d{1,3}\s*$/;
@@ -92,7 +109,9 @@
   function scan(doc) {
     var seen = {}, cands = [];
     /* ⚠ 「조의」 를 빼면 가지번호 조(제24조의2(…))를 못 찾는다 — 「조(」 가 안 들어 있다 */
-    ['조(', '조 (', '조（', '조의', '조 삭제', '조삭제'].forEach(function (q) {
+    var qs = ['조의', '조 삭제', '조삭제'];
+    OPEN.split('').forEach(function (o) { qs.push('조' + o, '조 ' + o); });   // 괄호마다 — 【】 원본도 찾게
+    qs.forEach(function (q) {
       var hits = J(doc.searchAllText(q, false, true)) || [];
       if (!Array.isArray(hits)) return;
       hits.forEach(function (h) {
@@ -168,17 +187,26 @@
   function plan(run, changes) {
     var by = {};
     run.forEach(function (c) { by[c.key] = c; });
+    /* 원본 문서가 쓰는 괄호 — 본문 조 머리에서 가장 많이 쓴 것(새 조·고친 조가 그 괄호를 따른다) */
+    var tally = {}, docOpen = '';
+    run.forEach(function (c) { var o = openOf(c.head); if (o) tally[o] = (tally[o] || 0) + 1; });
+    Object.keys(tally).forEach(function (o) { if (!docOpen || tally[o] > tally[docOpen]) docOpen = o; });
+    function styled(lines, open) {
+      return (lines || []).length && open ? [restyle(lines[0], open)].concat(lines.slice(1)) : lines;
+    }
     return (changes || []).map(function (ch) {
       var row = Object.assign({}, ch, { state: 'ok', target: null, why: '' });
       if (ch.kind === '신설') {
         var an = ch.anchor ? by[keyOf(ch.anchor.num, ch.anchor.sub)] : run[run.length - 1];
         if (!an) { row.state = 'confirm'; row.why = '앞 조를 원본에서 찾지 못함 — 넣을 자리를 고르세요'; row.target = run[run.length - 1] || null; }
         else { row.state = 'place'; row.target = an; row.why = (ch.anchor ? an.key : '맨 끝') + ' 뒤'; }
+        row.lines = styled(ch.lines, (an && openOf(an.head)) || docOpen);
         return row;
       }
       var t = by[keyOf(ch.num, ch.sub)];
       if (!t) { row.state = 'missing'; row.why = '원본에서 이 조를 찾지 못함 — 고르거나 건너뛰세요'; return row; }
       row.target = t;
+      if (ch.kind === '개정') row.lines = styled(ch.lines, openOf(t.head));   // 그 조가 원래 쓰던 괄호 그대로
       if (norm(t.title) !== norm(ch.title) && !(t.deleted && !ch.title)) {
         row.state = 'confirm';
         row.why = '원본 제목 「' + (t.title || '없음') + '」 — 신구대조표 「' + (ch.title || '없음') + '」 와 다름';
