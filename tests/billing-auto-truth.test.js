@@ -69,6 +69,9 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
      2026-10-03 취업규칙 모으기(새벽 5:00, collectRulesMail)가 늘어 열셋이 됐다 —
        메일함의 취업규칙 첨부를 가려 rules_mgmt/library 에 담는다. 하루 한 번이라 아래 293 에 +1.
        (관리자 신호 collectRulesMailAsk 는 DB 신호라 스케줄이 아니다 — 안 센다.)
+     2026-10-05 취업규칙 모으기를 «30분마다 깨움»으로 바꿨다 — 대표 「2020년 부터 찾아라」. 밀린 메일이
+       있으면 스스로 이어 달리고, 없으면 작은 기록만 읽고 돌아간다. 깨움은 하루 48번이라 하루 셈에서
+       «하루 한 번» 묶음을 빼고 코드에서 읽은 주기로 센다.
      2026-10-04 뉴스레터 감시꾼 셋(newsletterWatchRetry 3시간마다 · newsletterWatchSunday 일 18:00 ·
        newsletterWatchDelivery 월 12:00)이 늘어 열여섯이 됐다 — 대표 지시 「자동화에 에러가 나면 검증도
        자동화 … 자동으로 고치는기능」. 3시간마다 도는 것은 날마다라 아래 하루 셈에 +8.
@@ -107,7 +110,7 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '취업규칙 법 개정 확인 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.dailyIlaborCollect') >= 0 && ENTER.indexOf('공인노무사회 자료 하루 한 번') >= 0,
     '공인노무사회 자료 매일 가져오기가 화면 설명에 없습니다');
-  assert.ok(FIDX.indexOf('exports.collectRulesMail ') >= 0 && ENTER.indexOf('취업규칙 모으기 하루 한 번') >= 0,
+  assert.ok(FIDX.indexOf('exports.collectRulesMail ') >= 0 && ENTER.indexOf('취업규칙 모으기 30분마다 확인') >= 0,
     '취업규칙 모으기 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.newsletterWatchRetry') >= 0 && ENTER.indexOf('뉴스레터 감시꾼 3시간마다') >= 0,
     '뉴스레터 감시꾼 일정이 화면 설명에 없습니다');
@@ -169,10 +172,12 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const send = scheduleOf(FIDX, 'sendScheduledMail');
   const pay = scheduleOf(FIDX, 'receivePaydataMail');
   const sync = scheduleOf(FSYNC, 'syncMailbox');
+  const rules = scheduleOf(FIDX, 'collectRulesMail ');
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
     + Math.round(60 / sync.every) * sync.hours
-    + 8    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기·컨설턴트 모집 감시·공인노무사회 자료·뉴스레터 반송 확인 — 각 하루 한 번
+    + 7    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·컨설턴트 모집 감시·공인노무사회 자료·뉴스레터 반송 확인 — 각 하루 한 번
+    + Math.round(60 / rules.every) * rules.hours   // 취업규칙 모으기 — 30분마다 깨움(2026-10-05)
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
   /* ⚠ 숫자를 박지 않는다 — 코드에서 셈한 값이 화면에 그대로 있는가만 본다 */

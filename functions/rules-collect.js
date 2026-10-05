@@ -82,7 +82,18 @@ async function heal(o, db, bucket, docs) {
   }
   return n;
 }
-const MAX_CHAIN = 150;            // 한 줄로 이어 달리는 회차 수 한도 — 고장 난 고리가 끝없이 돌지 않게
+const MAX_CHAIN = 150;
+/* 정해진 회차(30분마다 깨움)가 «돌지» 가른다 (2026-10-05 대표 「2020년 부터 찾아라」) — 작은 기록(run) 하나만 보고.
+   밀린 것이 있거나 모르면 돈다(이어 달리기가 이어받는다) · 없으면 하루 한 번(새 메일) · 사흘째 0(고장)이면 하루 한 번.
+   ⚠ 첫 회차를 사람·05:00 에 기대면, 신호를 못 넣는 날 수백 통이 하루를 기다린다(10-05 에 실제로 그랬다). */
+const DAY_MS = 23 * 3600e3;
+function shouldRunScheduled(run, now) {
+  if (!run) return true;
+  const stale = !(Number(run.at) > 0) || now - Number(run.at) >= DAY_MS;
+  if (Number(run.zeroStreak || 0) >= 3) return stale;
+  if (run.left === undefined || run.left === null) return true;
+  return Number(run.left) > 0 || stale;
+}            // 한 줄로 이어 달리는 회차 수 한도 — 고장 난 고리가 끝없이 돌지 않게
 function shouldChain(sum, chain) {
   if (!sum || sum.skipped) return false;
   if (!(Number(sum.left) > 0) || !(Number(sum.mails) > 0)) return false;   // 다 봤거나, 한 통도 못 봤다(나아가지 않는 고리)
@@ -219,4 +230,4 @@ async function runOnce(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, shouldChain, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, shouldRunScheduled, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };

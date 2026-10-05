@@ -64,3 +64,12 @@ test('두 파일이 같은 웹글꼴을 싣는다 — 안 실으면 같은 글�
   assert.ok(font('rules.html'), 'rules.html 웹글꼴이 없다');
   assert.equal(font('rules-v2.html'), font('rules.html'), '★ 두 파일의 웹글꼴이 다르다');
 });
+
+test('🏢·📚·📥 상자는 화면 좌우 끝까지 — 폭 상한을 두지 않는다 (대표 지시 2026-10-05)', () => {
+  const css = R('rules-v2.html').split('</style>')[0];
+  ['#lib', '#topics', '#sites'].forEach((sel) => {
+    const m = css.match(new RegExp(sel + '\{[^}]*\}'));
+    assert.ok(m, sel + ' 규칙이 없다');
+    assert.doesNotMatch(m[0], /max-width:\s*\d/, '★ ' + sel + ' 에 폭 상한이 남았다 — 넓은 화면 양옆이 빈다');
+  });
+});

@@ -349,7 +349,8 @@ test('⑥ 다시 판정 — 이 조(라벨·제목)·AI 가 고친 글·#size �
   }
   assert.equal(was.M.today, now.M.today);
   assert.equal(was.g.members[0].body, H.t.POL.st.cur, '«전» 은 보낸 지금 글(머리 뗀 것)로 재야 한다');
-  assert.equal(now.g.members[0].body, '① 가나상사는 15일을 준다.', '«후» 는 되돌려 채운 AI 글로 재야 한다');
+  /* 2026-10-05 — {회사} 는 «원문의 꼴»(AFTER 의 「㈜가나상사」)로 되돌린다. 전에는 ERP 표기로 채워 ㈜ 가 빠졌다(rules-polish 가 남긴 일) */
+  assert.equal(now.g.members[0].body, '① ㈜가나상사는 15일을 준다.', '«후» 는 되돌려 채운 AI 글로 재야 한다');
 });
 
 /* ── 최종 검토 지적 반영 (2026-10-04) ── */
@@ -498,7 +499,7 @@ test('④ AI 가 조 머리를 붙여 와도 — 견줄 때·넣을 때 머리�
   assert.match(H.t.POL.st.got.text, /^① /);
   H.click('use');
   assert.equal((H.after.value.match(/제\s*\d+\s*조/g) || []).length, 1, '머리가 겹쳤다: ' + H.after.value);
-  assert.ok(H.after.value.startsWith('제20조(연차유급휴가) ① 가나상사는'), H.after.value);
+  assert.ok(H.after.value.startsWith('제20조(연차유급휴가) ① ㈜가나상사는'), H.after.value);   // 원문의 꼴 그대로(2026-10-05)
 });
 
 test('③ 실패 글 — 이번 달 한도(서버 readDoc 의 429)는 우리 글로 · 사진첩 안내는 안 보인다', async () => {

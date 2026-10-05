@@ -47,9 +47,14 @@
       var gap = '[ \\t\\u00a0]*';
       var name = core.split('').map(reEsc).join(gap);
       var re = new RegExp('(?:' + CO_TAG + gap + ')?' + name + '(?:' + CO_TAG + ')?', 'gi');
-      t = t.replace(re, function () { n++; return PLACE; });
+      var seen = {};
+      t = t.replace(re, function (m) { n++; seen[m] = (seen[m] || 0) + 1; return PLACE; });
     }
-    return { text: t, coSwapped: n };
+    /* form — 바꾼 자리의 «원래 글자» 중 가장 많이 쓴 꼴 (2026-10-05).
+       되돌릴 때 이것을 쓴다 — ERP 표기(「가나상사」)로 채우면 원문의 「㈜가나상사」 에서 ㈜ 가 빠졌다. */
+    var form = '';
+    Object.keys(seen || {}).forEach(function (k) { if (!form || seen[k] > seen[form]) form = k; });
+    return { text: t, coSwapped: n, form: form };
   }
 
   /* ── 지시문 ── */

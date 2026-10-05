@@ -8,9 +8,10 @@ const IDX = strip(fs.readFileSync(path.join(__dirname, '../functions/index.js'),
 const fnOf = (name) => { const i = IDX.indexOf('exports.' + name); assert.ok(i >= 0, name + ' 없음');
   const j = IDX.indexOf('\nexports.', i + 10); return IDX.slice(i, j > i ? j : IDX.length); };
 
-test('매일 새벽 5시(서울), 메일 비밀번호, 9분·1GB', () => {
+/* 2026-10-05 — 하루 한 번(05:00) → 30분마다 깨워 작은 기록으로 가른다(tests/rules-collect-schedule.test.js) */
+test('30분마다 깨움(서울), 메일 비밀번호, 9분·1GB', () => {
   const f = fnOf('collectRulesMail');
-  assert.match(f, /\.pubsub\.schedule\(["']every day 05:00["']\)/);
+  assert.match(f, /\.pubsub\.schedule\(["']every 30 minutes["']\)/);
   assert.match(f, /\.timeZone\(["']Asia\/Seoul["']\)/);
   assert.match(f, /DAUM_MAIL_PASSWORD/);
   assert.match(f, /timeoutSeconds:\s*540/);
