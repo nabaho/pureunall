@@ -85,3 +85,19 @@ test('고르는 규칙은 homepage-auto.js 한 곳 — 서버가 따로 퇴사·
   assert.ok(!/["']retired["']|["']closed["']/.test(구간), '서버에 판정 규칙이 또 생겼습니다');
   assert.match(구간, /HA\.돌기\(/);
 });
+
+test('자동 정찰은 «읽기만» 한다 — 보내기(POST)가 없고, 적는 자리는 정찰 기록 하나다', () => {
+  const b = 함수몸('홈자동정찰');
+  assert.ok(!/method\s*:\s*["']POST/i.test(b), '정찰에서 무언가를 보냅니다');
+  assert.ok(!/휴지통몸통|저장할act|사진몸통/.test(b), '정찰에서 쓰는 길을 부릅니다');
+  const 자리들 = [...b.matchAll(/ref\(\s*["']([^"']+)["']\s*\)/g)].map(m => m[1]);
+  assert.deepStrictEqual(자리들, ['homepage/auto/recon']);
+  assert.match(b, /HW\.자동정찰자리\(/, '정해 둔 자리 말고 다른 곳을 엽니다');
+});
+
+test('정찰은 «미리 보기» 때만 돈다 — 매달 돌기·승인에는 안 끼어든다', () => {
+  const b = 함수몸('홈자동한번');
+  const i = b.indexOf('홈자동정찰(');
+  assert.ok(i > 0);
+  assert.match(b.slice(Math.max(0, i - 200), i), /방식 === "보기"/);
+});

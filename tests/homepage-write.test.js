@@ -478,3 +478,36 @@ test('게시판확인 — 관리자로 열어 200 이고 옮겨 보내지 않을
   assert.notEqual(W.게시판확인(200, '/partner_board/185'), 'ok');
   [403, 404, 500, 0].forEach((s) => assert.notEqual(W.게시판확인(s, ''), 'ok', s + ' 를 ok 로 봤다'));
 });
+/* ══════ 자동 올리기 정찰(2026-10-05) — «채워진 칸 이름»만, 값은 절대 안 돌려준다 ══════ */
+test('채운칸들 — 값이 든 칸의 «이름»만 돌려준다(값은 없다)', () => {
+  const h = '<input type="text" name="title" value="가나상사"><input type="text" name="extra_vars1" value="">'
+    + '<input type="hidden" name="content" value="&lt;p&gt;&lt;img src=&quot;/files/a.png&quot;&gt;&lt;/p&gt;">'
+    + '<textarea name="memo">비밀메모</textarea><textarea name="empty"></textarea>'
+    + '<input type="password" name="pw" value="secret">';
+  const r = W.채운칸들(h);
+  assert.ok(r.채운칸.includes('title'));
+  assert.ok(r.채운칸.includes('memo'));
+  assert.ok(!r.채운칸.includes('extra_vars1'));
+  assert.ok(!r.채운칸.includes('empty'));
+  const 글 = JSON.stringify(r);
+  ['가나상사', '비밀메모', 'secret', 'a.png'].forEach(값 =>
+    assert.ok(!글.includes(값), '★ 값이 새어 나왔다: ' + 값));
+});
+
+test('채운칸들 — 본문(숨은 content)에 그림이 들어 있는지는 «예/아니오»로만', () => {
+  const 있음 = W.채운칸들('<input type="hidden" name="content" value="&lt;img src=&quot;/x.png&quot;&gt;">');
+  const 없음 = W.채운칸들('<input type="hidden" name="content" value="&lt;p&gt;글&lt;/p&gt;">');
+  assert.equal(있음.본문에그림, true);
+  assert.equal(없음.본문에그림, false);
+});
+
+test('자동 정찰 자리는 «정해 둔 목록»뿐이고, 모두 읽기 화면(disp…)이다', () => {
+  const 자리 = W.자동정찰자리(185);
+  assert.ok(Object.keys(자리).length >= 3);
+  Object.keys(자리).forEach(k => {
+    const u = 자리[k];
+    assert.ok(u.startsWith('https://xn--o80bs5mdnbm0bf80anms.kr/'), k + ' 가 우리 홈페이지가 아닙니다: ' + u);
+    assert.ok(!/act=proc/i.test(u), k + ' 가 «하는» 주소(proc)입니다: ' + u);
+  });
+  assert.ok(!JSON.stringify(W.자동정찰자리('1;x')).includes('1;x'), '못된 글 번호를 주소에 넣었다');
+});

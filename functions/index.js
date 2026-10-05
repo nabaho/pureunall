@@ -4397,6 +4397,36 @@ async function 홈자동게시판보기(그릇, 목록) {
   return 판들;
 }
 
+/* 자동 올리기(2·3·4단계) 정찰 — 정해 둔 «읽기 화면»만 관리자로 열어 칸 이름·채워진 칸 이름만 적는다.
+   ⚠ 값은 한 글자도 안 남긴다(HW.정찰·HW.채운칸들 규칙). 읽기만 하고 아무것도 보내지 않는다.
+   결과는 homepage/auto/recon 에 — 관리자만 읽는 자리다. */
+async function 홈자동정찰(그릇) {
+  let 로고글번호 = 0;
+  try {
+    const p = await fetch(HW.ORIGIN + "/partner", { headers: { "User-Agent": HW.브라우저표시 } });
+    const m = /data-srl="(\d+)"/.exec(await p.text());
+    if (m) 로고글번호 = Number(m[1]);
+  } catch (e) { /* 공개 쪽을 못 읽으면 옛 로고 글 정찰만 빠진다 */ }
+  const 자리 = HW.자동정찰자리(로고글번호);
+  const 결과 = { at: Date.now(), 대상: {} };
+  for (const 이름 of Object.keys(자리)) {
+    try {
+      const g = await 홈부르기(자리[이름], 그릇);
+      const 화면 = await g.text();
+      const 본 = HW.정찰(화면);
+      const 채움 = HW.채운칸들(화면);
+      결과.대상[이름] = { 상태: g.status, 옮김: (g.headers.get("location") || "").replace(HW.ORIGIN, ""),
+        크기: 본.크기, 글칸: 본.글칸, 넓은칸: 본.넓은칸, 파일칸: 본.파일칸, 딸깍칸: 본.딸깍칸,
+        고르개: 본.고르개, 숨은칸: 본.숨은칸, 이름표: 본.이름표, 행위들: 본.행위들,
+        번호값: 본.번호값, 확인표있나: 본.확인표있나, 채운칸: 채움.채운칸, 본문에그림: 채움.본문에그림 };
+    } catch (e) {
+      결과.대상[이름] = { 막힘: String((e && e.message) || e) };
+    }
+  }
+  await getDatabase().ref("homepage/auto/recon").set(결과);
+  return 결과;
+}
+
 async function 홈자동한번(방식, 받은지문, 누가) {
   const 아이디 = process.env.HOME_ADMIN_ID, 암호 = process.env.HOME_ADMIN_PW;
   let 그릇 = null;
@@ -4427,6 +4457,12 @@ async function 홈자동한번(방식, 받은지문, 누가) {
   if (방식 === "보기" && 결과.ok && (결과.내릴것 || []).length) {
     try { 결과.게시판확인 = await 홈자동게시판보기(await 들어가기(), 결과.내릴것); }
     catch (e) { 결과.게시판확인막힘 = String((e && e.message) || e); }
+  }
+  /* 미리 보기 때마다 «새 글 쓰기» 화면들을 정찰해 둔다 — 2·3·4단계(자동 올리기)를 지을 근거다.
+     ⚠ 읽기만. 실패해도 미리 보기 답은 그대로 간다. */
+  if (방식 === "보기" && !결과.꺼짐) {
+    try { const r = await 홈자동정찰(await 들어가기()); 결과.정찰 = Object.keys(r.대상).length; }
+    catch (e) { 결과.정찰막힘 = String((e && e.message) || e); }
   }
   return 결과;
 }

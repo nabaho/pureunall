@@ -409,6 +409,53 @@ function 정찰(html) {
            확인표있나: !!확인표뽑기(본문), 크기: 본문.length };
 }
 
+/* «채워진 칸»의 이름만 — 값은 절대 담지 않는다 (월간 자동 연결 2·3단계 정찰, 2026-10-05).
+   기존 로고 글이 그림을 «본문(숨은 content)»에 두는지 «파일 칸»에 두는지 알아야 새 글을
+   같은 모양으로 지을 수 있다. 그래서 «어느 칸에 무언가 있나»와 «본문에 그림이 있나»만 본다.
+   ⚠ 비밀번호 칸은 아예 안 본다. 값·파일 이름·주소는 한 글자도 돌려주지 않는다. */
+function 채운칸들(html) {
+  const 본문 = String(html || "");
+  const 채운칸 = [];
+  let 본문에그림 = false;
+  const ire = /<input\b[^>]*>/gi;
+  let m;
+  while ((m = ire.exec(본문))) {
+    const 이름 = 속성(m[0], "name");
+    const 종류 = (속성(m[0], "type") || "text").toLowerCase();
+    if (!이름 || 종류 === "password" || 종류 === "file" || 종류 === "submit" || 종류 === "button") continue;
+    if (종류 === "checkbox" || 종류 === "radio") { if (/\bchecked\b/i.test(m[0])) 채운칸.push(이름); continue; }
+    const 값 = 글자되돌리기(속성(m[0], "value") || "");
+    if (!String(값).trim()) continue;
+    채운칸.push(이름);
+    if (이름 === "content" && /<img\b/i.test(값)) 본문에그림 = true;
+  }
+  const tre = /<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/gi;
+  while ((m = tre.exec(본문))) {
+    const 이름 = 속성("<t " + m[1] + ">", "name");
+    const 값 = 글자되돌리기(m[2] || "");
+    if (!이름 || !String(값).trim()) continue;
+    채운칸.push(이름);
+    if (이름 === "content" && /<img\b/i.test(값)) 본문에그림 = true;
+  }
+  return { 채운칸: [...new Set(채운칸)].sort(), 본문에그림: 본문에그림 };
+}
+
+/* 자동 올리기 정찰 자리 — «정해 둔 읽기 화면»만 연다(disp…). 하는 주소(proc…)는 없다.
+   ⚠ 늘릴 때도 읽기 화면만. 글 번호는 숫자만 받는다. */
+function 자동정찰자리(로고글번호) {
+  const n = Number(로고글번호);
+  const 자리 = {
+    자문사새글: ORIGIN + "/index.php?mid=partner_board&act=dispBoardWrite",
+    구성원새글: ORIGIN + "/index.php?mid=people_board&act=dispBoardWrite",
+    구성원쪽: ORIGIN + "/people",
+    구성원쪽고치기: ORIGIN + "/index.php?mid=people&act=dispPageAdminContentModify"
+  };
+  if (Number.isInteger(n) && n > 0) {
+    자리.자문사옛글 = ORIGIN + "/index.php?mid=partner_board&act=dispBoardWrite&document_srl=" + n;
+  }
+  return 자리;
+}
+
 /* 숨은 칸 가운데 «번호»만 — 이름이 srl 로 끝나고 값이 숫자인 것.
    글 번호·모듈 번호가 없으면 다음 요청(이동·상태 바꾸기)을 지을 수 없다.
    ⚠ 그 밖의 값은 절대 담지 않는다 — 정찰과 같은 규칙이다. */
@@ -643,7 +690,7 @@ module.exports = {
   경력칸, 이름표로찾을것, 손대지말것,
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
-  내릴게시판, 게시판글주소, 게시판확인,
+  내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리,
   파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
 };
