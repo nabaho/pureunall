@@ -25,18 +25,35 @@
   /* 폴더에서 찾은 건 [{yearDir, name}] 과 이미 있는 기록을 견준다.
      · fresh   = 기록에 없는 건 (나중에로 미룬 것은 opts.withDismissed 일 때만)
      · dismissed 는 caseDir 문자열 목록 */
+  /* ★ opts.sinceYear — 그 해 «이후» 연도 폴더만 새 건으로 본다 (2026-10-05).
+     ⚠ 제출서류가 비어 있으면 지난 10년의 건 폴더 236개가 전부 «새 지원»이 되어, 띠에는 「외 233건」으로
+       묻히고 「등록」 한 번에 236건이 들어간다(대표 폴더 실측). 새로 만든 건은 늘 올해(또는 다음 해) 폴더에 있다.
+       옛 건은 전체 스캔이 맡는다. 차례는 «최근 해 먼저» — 띠에 이름 셋만 보이므로 새 건이 앞에 와야 한다. */
+  function yearOf(yearDir) { var m = String(yearDir || '').match(YEAR_DIR); return m ? parseInt(m[1], 10) : 0; }
   function freshCases(found, existing, dismissed, opts) {
     opts = opts || {};
     var have = {};
     (existing || []).forEach(function (r) { if (r && r.caseDir) have[r.caseDir] = true; });
     var skip = {};
     if (!opts.withDismissed) (dismissed || []).forEach(function (d) { skip[d] = true; });
-    var seen = {};
+    var seen = {}, since = opts.sinceYear || 0;
     return (found || []).filter(function (c) {
       var k = caseDirOf(c.yearDir, c.name);
       if (have[k] || skip[k] || seen[k]) return false;
+      if (since && yearOf(c.yearDir) < since) return false;
       seen[k] = true; return true;
-    }).map(function (c) { return { yearDir: c.yearDir, name: c.name, caseDir: caseDirOf(c.yearDir, c.name) }; });
+    }).map(function (c) { return { yearDir: c.yearDir, name: c.name, caseDir: caseDirOf(c.yearDir, c.name) }; })
+      .sort(function (a, b) { return yearOf(b.yearDir) - yearOf(a.yearDir); });
+  }
+
+  /* 파일까지 읽은 새 건을 «최근에 손댄 것 먼저» — 같은 해 안에서도 방금 만든 건이 띠 맨 앞에 와야 한다
+     (실측: 올해 8건 가운데 이번 건이 폴더 차례로 8번째라 띠의 이름 셋에 안 보였다) */
+  function newestFirst(list) {
+    var top = function (c) { var t = ''; (c.files || []).forEach(function (f) { if (String(f.mtime || '') > t) t = String(f.mtime || ''); }); return t; };
+    return (list || []).slice().sort(function (a, b) {
+      var y = yearOf(b.yearDir) - yearOf(a.yearDir);
+      return y || top(b).localeCompare(top(a));
+    });
   }
 
   /* 건 폴더 하나의 파일 [{name, relPath, size, mtime}] → 제출서류 기록 한 줄.
@@ -81,7 +98,7 @@
 
   var api = {
     CASE_ROOT: CASE_ROOT, YEAR_DIR: YEAR_DIR, RESULTS: RESULTS,
-    caseDirOf: caseDirOf, freshCases: freshCases, buildCaseRecord: buildCaseRecord,
+    caseDirOf: caseDirOf, freshCases: freshCases, newestFirst: newestFirst, buildCaseRecord: buildCaseRecord,
     filesChanged: filesChanged, refreshCaseRecord: refreshCaseRecord, normResult: normResult
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
