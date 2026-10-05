@@ -1,5 +1,5 @@
 // 확대검증: 여러 사업장 × 단수처리 방식 매트릭스로 엔진 대조
-// 사용: node engine/validate_multi.js
+// 사용: node engine/validate_multi.js ["<사업장>" ...]   (빼면 자료 폴더 engine_defaults.json 의 기본값)
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -9,8 +9,29 @@ const DATA_ROOT = process.env.PAYROLL_DATA_ROOT ||
   'C:\\Users\\fair0\\OneDrive\\바탕 화면\\급여아웃소싱 서류들';
 const OUT_DIR = path.join(DATA_ROOT, '_harness_out');
 
+// 인자 없이 돌릴 때의 기본 사업장은 **저장소 밖** 자료 폴더의 engine_defaults.json 에 둔다
+// (실제 업체 이름이라서 — 보안 정리 2026-09 뒤 가짜 이름이 박혀 아무것도 못 찾았다, 2026-10-05).
+//   {"validate_multi": {"sites": ["사업장", ...]}}
+// 표가 없으면 가짜로 돌지 않고 사용법을 알리고 멈춘다.
+const DEFAULTS_FILE = path.join(DATA_ROOT, 'engine_defaults.json');
+function defaultSites() {
+  if (!fs.existsSync(DEFAULTS_FILE)) return [];
+  try {
+    const d = JSON.parse(fs.readFileSync(DEFAULTS_FILE, 'utf-8'));
+    return ((d.validate_multi || {}).sites || []).filter(Boolean);
+  } catch (e) {
+    console.log('[주의] engine_defaults.json 을 못 읽었습니다:', e.message);
+    return [];
+  }
+}
+
 const SITES = process.argv.slice(2);
-const targets = SITES.length ? SITES : ['가람떡집', '다온원 서산점', '새별반찬'];
+const targets = SITES.length ? SITES : defaultSites();
+if (!targets.length) {
+  console.log('사용: node engine/validate_multi.js "<사업장>" ["<사업장>" ...]');
+  console.log('     (인자 없이 돌리려면 기본값을 여기에: ' + DEFAULTS_FILE + ')');
+  process.exit(1);
+}
 const MODES = ['절사', '올림', '반올림'];
 
 const res = JSON.parse(fs.readFileSync(path.join(OUT_DIR, 'parser_output.json'), 'utf-8'));
