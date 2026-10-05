@@ -122,3 +122,8 @@ test('자동 올리기 — 아직 길이 없는 종류(로고)는 보내지 않�
 test('한 번 돌기가 올리기 도구를 넘긴다', () => {
   assert.match(함수몸('홈자동한번'), /올리기:\s*async/);
 });
+test('정찰 기록은 «undefined» 를 거른 뒤 적는다 — 데이터베이스가 통째로 거부한다', () => {
+  const b = 함수몸('홈자동정찰');
+  assert.ok(!/:\s*undefined\b/.test(b), '기록에 undefined 칸을 넣습니다');
+  assert.match(b, /ref\("homepage\/auto\/recon"\)\.set\(JSON\.parse\(JSON\.stringify\(/, '적기 전에 거르지 않습니다');
+});
