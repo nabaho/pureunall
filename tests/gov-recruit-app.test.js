@@ -35,7 +35,8 @@ function runApp(seed, opt) {
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
     prompt: () => answers.shift(), confirm: () => (opt.confirm !== false),
-    open: (u) => { opened.push(u); },
+    open: (u, n, f) => { opened.push(opt._open ? { u, n, f } : u); return opt._open ? opt._open(u, n, f) : undefined; },
+    screen: { availWidth: 1600, availHeight: 900 },
     TextDecoder, Uint8Array, PuKordocText: opt.kordoc
   };
   ctx.window = ctx;
@@ -45,9 +46,11 @@ function runApp(seed, opt) {
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
+    + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
+  ctx.__api.setOpen = (fn) => { opt._open = fn; };
   return { api: ctx.__api, el, store, opened, toasts };
 }
 /* 오늘을 2026-12-05 로 못박는다 */
@@ -339,7 +342,8 @@ test('★ javascript: 주소는 링크로 안 그린다', async () => {
   await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
   assert.doesNotMatch(w, /javascript:alert/);
-  assert.match(w, /href="https:\/\/www\.erc\.re\.kr\/v\?1"/);
+  assert.match(w, /<a class="tlink" href="https:\/\/www\.erc\.re\.kr\/v\?1"[^>]*onclick="return recOpenPost\('k1'\)">2027년 외부연구진 풀 공개 모집<\/a>/);
+  assert.doesNotMatch(w, /🔗 열기/, '「열기」 단추는 없다 — 제목을 누른다');
 });
 test('★ 폴더를 안 읽었어도 새 모집 글은 보인다', async () => {
   const r = runApp({});
@@ -828,9 +832,125 @@ test('★★ 열 맞춤 — 새 모집 글·메일 표는 칸 너비를 못박�
   r.api.setFb(fbWith(MIX), 'U1');
   await r.api.recWatchPull();
   const kc = r.el('recWatchKc').innerHTML;
-  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:92px"><col style="width:150px"><col style="width:132px"><col><col style="width:250px"><\/colgroup>/);
-  assert.match(kc, /<th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th>/);
+  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:150px"><col style="width:168px"><\/colgroup>/);
+  assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th>기간<\/th>/);
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /\.rec-fixed\{table-layout:fixed;width:100%\}/);
   assert.match(src, /var mtable=function/, '메일 묶음도 같은 열 표');
+});
+
+/* ═══ ㅁ · № · 기간 (대표 지시 2026-10-05) ═══ */
+const PERW = {
+  last: { at: '2026-10-05T22:20:00Z', checked: 19, errors: [] },
+  hits: {
+    p1: { key: 'p1', board: 'erc', org: 'erc', boardName: '지방공기업평가원 공지', title: '지방공기업평가원 위촉직이사 모집 재공고', date: '2026-07-08', per: { from: '2026-07-08', to: '2026-07-20', rolling: false } },
+    p2: { key: 'p2', board: 'cepa', org: 'cepa', boardName: '충남경제진흥원 공지', title: '강사·멘토 인력풀 모집', date: '2026-10-01', per: { from: '2026-10-01', to: '2026-10-09', rolling: false } },
+    p3: { key: 'p3', board: 'semas', org: 'semas', boardName: '소진공 공지', title: '비상임이사 모집공고', date: '2026-09-09' },
+    p4: { key: 'p4', board: 'cepa', org: 'cepa', boardName: '충남경제진흥원 공지', title: '컨설턴트 모집 (~11.20 까지)', date: '2026-10-01' }
+  }
+};
+const rowOf = (html, t) => html.split('</tr>').filter((x) => x.includes(t))[0] || '';
+test('★★★ 기간 칸 — 마감 지남·D-n·모름을 반드시 쓴다(본문 → 제목 차례)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.setFb(fbWith(PERW), 'U1'); await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.match(rowOf(w, '위촉직이사'), /class="due past">마감 지남\(7\.20\)<span class="src">본문/);
+  assert.match(rowOf(w, '위촉직이사'), /<tr class="[^"]*rec-past/, '지난 글은 흐리게');
+  assert.match(rowOf(w, '강사·멘토 인력풀 모집'), /class="due soon">~10\.9 · D-4/);
+  assert.match(rowOf(w, '비상임이사'), /class="due unknown">기간 모름/);
+  assert.match(rowOf(w, '(~11.20 까지)'), /class="due open">~11\.20 · D-46<span class="src">제목/);
+});
+test('★★ 📅 로 넣은 마감일이 맨 앞 — 기간 칸에 «직접 넣음», 클라우드 칸으로 간다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00'), prompts: ['2026-10-30'] });
+  r.api.setFb(fbWith(PERW), 'U1'); await r.api.recWatchPull();
+  r.api.recWatchCal('p3');
+  assert.equal(r.api.recObj('recruit_due').p3, '2026-10-30');
+  assert.match(rowOf(r.el('recWatch').innerHTML, '비상임이사'), /~10\.30 · D-25<span class="src">직접 넣음/);
+  assert.ok(require('../js/gov-sync.js').field('recruit_due'), '기기 사이로 가야 한다');
+  /* 비우면 지운다 */
+  const r2 = runApp({ recruit_scan: SCAN, recruit_due: { p3: '2026-10-30' } }, { Date: FixedDate('2026-10-05T09:00:00'), prompts: [''] });
+  r2.api.setFb(fbWith(PERW), 'U1'); await r2.api.recWatchPull();
+  r2.api.recWatchCal('p3');
+  assert.equal(r2.api.recObj('recruit_due').p3, undefined);
+});
+test('★★ 「⏳ 마감 지난 것 빼기」 — 지난 글만 목록에서 뺀다(지우지 않는다)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.setFb(fbWith(PERW), 'U1'); await r.api.recWatchPull();
+  assert.match(r.el('recWatch').innerHTML, /⏳ 마감 지난 것 빼기 <span class="n">1</);
+  r.api.recLiveTog('pub');
+  const w = r.el('recWatch').innerHTML;
+  assert.doesNotMatch(w, /위촉직이사/); assert.match(w, /비상임이사/, '기간 모름은 빼지 않는다');
+  assert.equal(r.api.recWatchHits().length, 4, '자료는 그대로');
+});
+test('★★★ ㅁ·№ — 맨 왼쪽에 고르는 칸과 번호, 고른 것만 한꺼번에 봤음', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.setFb(fbWith(PERW), 'U1'); await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  const rows = w.split('<tbody>')[1].split('</tr>').filter((x) => /<tr/.test(x));
+  rows.forEach((x, i) => assert.match(x, new RegExp('<tr[^>]*><td class="chk"><input type="checkbox" class="row-chk"[^>]*><\\/td><td class="rn">' + (i + 1) + '<\\/td>'), '줄 ' + (i + 1)));
+  r.api.recSelTog('pub', 'p2', true); r.api.recSelTog('pub', 'p3', true);
+  assert.match(r.el('recWatch').innerHTML, /✔ <b>2건<\/b> 선택/);
+  r.api.recSelSeen('pub', true);
+  const seen = r.api.recObj('recruit_seen');
+  assert.ok(seen.p2 && seen.p3); assert.ok(!seen.p1 && !seen.p4, '고르지 않은 것까지 봤음');
+  assert.equal(r.api.recSelN('pub'), 0, '처리한 뒤엔 고른 것을 비운다');
+  /* 머리 칸 — 보이는 것 모두 */
+  r.api.recSelAll('pub', true); assert.equal(r.api.recSelN('pub'), 4);
+  r.api.recSelSeen('pub', false);
+  assert.equal(Object.keys(r.api.recObj('recruit_seen')).length, 0, '「안 본 것으로」');
+});
+test('★★ 걸러서 안 보이게 된 줄은 고른 것에서 빠진다', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.setFb(fbWith(PERW), 'U1'); await r.api.recWatchPull();
+  r.api.recSelTog('pub', 'p1', true); r.api.recSelTog('pub', 'p3', true);
+  r.api.recLiveTog('pub');   /* p1(마감 지남)이 빠진다 */
+  assert.equal(r.api.recSelN('pub'), 1);
+});
+test('★★ 해마다 지원한 곳 표 — ㅁ 칸 · 고른 기관 올해 상태 한꺼번에 · 마감일 지남 표시', () => {
+  const r = runApp({ recruit_scan: SCAN, recruit_log: { alio: { 2026: { due: '2026-09-30' } } } }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.recDraw();
+  const tb = r.el('recTb').innerHTML;
+  assert.match(tb, /<td class="chk"><input type="checkbox" class="row-chk"[^>]*onchange="recSelTog\('org','alio'/);
+  assert.match(rowOf(tb, "recPrep('alio')"), /class="due past">마감 지남\(9\.30\)/);
+  r.api.recSelTog('org', 'alio', true); r.api.recSelTog('org', 'erc', true);
+  assert.match(r.el('recOrgBar').innerHTML, /2건<\/b> 선택/);
+  r.api.recSelSt('지원함');
+  const lg = r.api.recObj('recruit_log');
+  assert.equal(lg.alio['2026'].st, '지원함'); assert.equal(lg.erc['2026'].st, '지원함');
+  assert.equal(lg.alio['2026'].due, '2026-09-30', '마감일은 남는다');
+  assert.equal(r.toasts.filter((t) => /올해 상태/.test(t)).length, 1, '알림은 한 번');
+});
+test('★★ 메일 표도 ㅁ·№·기간 — 고른 결과 메일 한꺼번에 무시', () => {
+  const items = [
+    { key: 'f|1', subject: '[세종] 현장코칭 전문위원 선정 안내 및 관리카드 작성 요청(~03.27 까지)', date: '2026-03-20', kind: 'result', guess: '선정', org: 'agri6' },
+    { key: 'f|2', subject: '[지방공기업평가원] 심사 결과 안내', date: '2026-02-10', kind: 'result', guess: '', org: 'erc' }
+  ];
+  const r = runApp({ recruit_scan: SCAN, recruit_mailitems: items, recruit_mail_at: String(Date.now()), recruit_mailfolders: '9' }, { Date: FixedDate('2026-10-05T09:00:00') });
+  r.api.recDraw();
+  const m = r.el('recMail').innerHTML;
+  assert.match(m, /<th class="chk">[\s\S]*?<th class="rn">№<\/th><th>날짜<\/th><th>기관 · 구분<\/th><th>메일 제목<\/th><th>기간<\/th>/);
+  assert.match(rowOf(m, '관리카드'), /<td class="rn">1<\/td>[\s\S]*class="due past">마감 지남\(3\.27\)<span class="src">제목/);
+  r.api.recSelTog('ask', 'f|1', true); r.api.recSelTog('ask', 'f|2', true);
+  r.api.recSelSkip('ask');
+  const sk = r.api.recObj('recruit_mailskip');
+  assert.ok(sk['f|1'] && sk['f|2']);
+});
+
+test('★★ 제목을 누르면 공고가 «팝업 창»으로 — 한 창을 돌려 쓰고, 연 글은 봤음', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1'); await r.api.recWatchPull();
+  const ret = r.api.recOpenPost('k1');
+  assert.equal(ret, true, '팝업을 못 열었으면(가짜 창) 링크로 새 탭');
+  assert.ok(r.api.recObj('recruit_seen').k1, '연 글은 봤음으로');
+  assert.ok(r.toasts.some((t) => /팝업이 막혀/.test(t)));
+  assert.equal(r.api.recOpenPost('k2'), false, 'https 가 아닌 주소는 열지 않는다');
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
+  assert.match(src, /window\.open\(x\.href, 'recPost', 'popup=yes,/, '같은 이름의 팝업 창(recPost)을 돌려 쓴다');
+});
+test('★ 팝업이 열리면 링크로 새 탭을 또 열지 않는다(false)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1'); await r.api.recWatchPull();
+  r.api.setOpen((u, n, f) => ({ focus(){}, u, n, f }));
+  assert.equal(r.api.recOpenPost('k1'), false);
+  assert.equal(r.opened[0].n, 'recPost'); assert.match(r.opened[0].f, /popup=yes/);
 });

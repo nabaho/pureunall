@@ -93,8 +93,20 @@ test('★ 이관된 계약은 예정에서 빠진다 — 컨설팅관리 쪽과 
   assert.equal(R.by['P-1'].planCnt, 0);
   assert.equal(R.total.planCnt, 2);
 });
-test('화면: 컨설팅관리에만 카드가 붙고, 카드는 셈 함수 하나를 쓴다', () => {
-  assert.match(src, /props\.sourceKind === 'consulting' && h\(ClinicDayCards,/);
+test('★ 사람마다 «어느 건»인지 목록이 남는다 — 계약관리 담당자별 한 해 목록 (2026-10-05)', () => {
+  const rows = R.by['P-1'].rows;
+  assert.ok(Array.isArray(rows) && rows.length === R.by['P-1'].cnt + R.by['P-1'].planCnt + R.by['P-1'].skip,
+    '★ 수행·예정·미수행 종료 건이 모두 목록에 있어야 합니다');
+  rows.forEach((x) => {
+    assert.ok(['do', 'end', 'plan', 'skip'].includes(x.st), '구분: ' + x.st);
+    assert.ok(!('amount' in x) && !('fee' in x) && !('balanceFee' in x), '★ 목록에는 금액을 넣지 않는다(대표 2026-10-05)');
+  });
+});
+test('화면: 실적 띠는 계약관리에만(목록 열기) · 컨설팅관리에는 없다 · 카드는 셈 함수 하나를 쓴다', () => {
+  /* 대표 지시 2026-10-05 「계약관리로 보내라 — 매번 계약할 때 확인」 · 같은 숫자를 두 곳에 두지 않는다 */
+  const cm = cutFn('function ContractManagement(');
+  assert.match(cm, /h\(ClinicDayCards, \{[^}]*listMode:true/, '★ 계약관리에 띠(목록 열기)가 있어야 합니다');
+  assert.doesNotMatch(cutFn('function ProjectManagementShared('), /h\(ClinicDayCards,/, '★ 컨설팅관리에 띠가 남아 있으면 같은 숫자가 두 곳에 보입니다');
   assert.match(cutFn('function ClinicDayCards('), /clinicDayCards\(props\.items, dbGet\('contracts', \[\]\), types, fy, consTypeDayFee, prog\.isType, prog\.max\)/);
   assert.match(cutFn('function ClinicDayCards('), /app\.fiscalYearStart/, '회계연도는 앱 설정에서');
 });
@@ -214,7 +226,8 @@ test('★★ 확인 창은 직접 저장하지 않는다 — 컨설팅관리 저
   }
   assert.match(m, /props\.onPatch\(x\.rec\.id, patch\)/);
   assert.match(m, /props\.canEdit/, '고칠 수 있는 사람을 안 가린다');
-  assert.match(src, /onPatch: itemPatch/, '컨설팅관리가 저장 길을 안 넘긴다');
+  /* 띠가 계약관리로 옮겨 갔다(2026-10-05) — 저장 길은 컨설팅관리와 같은 «컨설팅 한 건 dbPatch» 다 */
+  assert.match(cutFn('function ContractManagement('), /dbPatch\('consultings', id, fields\)[\s\S]{0,400}?onPatch:patch/, '계약관리 띠가 컨설팅 저장 길을 안 넘긴다');
   assert.match(bare(cutFn('function ClinicDayCards(')), /canEdit: canCloseDirect/);
 });
 test('★ 종료 창에서 「미수행 종료」를 고를 수 있다', () => {

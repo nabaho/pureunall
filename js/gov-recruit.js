@@ -244,10 +244,84 @@
     for (var i = 0; i < KINDS.length; i++) if (KINDS[i].k === k) return KINDS[i];
     return KIND_ETC;
   }
+  /* ── 접수 기간 읽기 (대표 지시 2026-10-05 「서류에 기간이 있다 — 날짜가 지났는지 반드시 표시」) ──
+     text: 공고 본문(또는 제목·메일 제목), post: 'YYYY-MM-DD'(올린 날 — 해가 빠진 날짜의 해를 정한다)
+     → { from, to, rolling } 또는 null(못 찾음).
+     ⚠ 「접수·신청·모집·제출·응모·공모·추천·원서」 + 「기간·기한·마감·일정·일시」 라벨 뒤만 본다 —
+       본문의 사업기간·위촉기간·임기·교육기간을 마감으로 읽으면 «지났다/안 지났다»가 거짓이 된다.
+     ⚠ 라벨이 없을 때 「~03.27 까지」 꼴은 «짧은 글»(제목·메일 제목, 200자 이하)에서만 — 긴 본문에서는 엉뚱한 날짜가 걸린다.
+     ⚠ 「채용 시 마감·수시·상시·ASAP·선착순」은 rolling(사람이 정해지면 끝) — 날짜를 지어내지 않는다.
+     ⚠ 이 함수는 서버(functions/recruit-watch.js)와 화면(js/gov-recruit.js)에 «글자까지 같이» 있다 — 검사가 맞댄다. */
+  var PER_D = '(?:(20\\d{2})\\s*[.\\-\\/년]\\s*)?(\\d{1,2})\\s*[.\\-\\/월]\\s*(\\d{1,2})\\s*일?\\.?(?:\\s*\\(\\s*[월화수목금토일]\\s*\\))?(?:\\s*\\d{1,2}\\s*[:시]\\s*\\d{0,2}\\s*분?)?';
+  var PER_LABEL = /(?:접수|신청|모집|제출|응모|공모|추천|원서)\s*(?:기간|기한|마감일?|일정|일시)/g;
+  var PER_RANGE = new RegExp(PER_D + '\\s*(?:[~∼～〜]|\\s-\\s|부터)\\s*' + PER_D);
+  var PER_ONE = new RegExp(PER_D);
+  var PER_ROLL = /^[\s:：\-]*(?:채용\s*시|수시|상시|ASAP|선착순|소진\s*시|충원\s*시)/i;
+  var PER_NOT = /(?:사업|위촉|활동|계약|운영|교육|임기|근무|과업|용역|행사)\s*(?:기간|일정)[^가-힣]{0,20}$/;
+  var PER_SHORT = new RegExp('[~∼～〜]\\s*' + PER_D + '|' + PER_D + '\\s*까지');
+  function perPad(n) { return (n < 10 ? '0' : '') + n; }
+  function perDay(y, m, d) {
+    m = Number(m); d = Number(d);
+    if (!(m >= 1 && m <= 12 && d >= 1 && d <= 31) || !y) return '';
+    return y + '-' + perPad(m) + '-' + perPad(d);
+  }
+  function perShift(ymd, post) {   /* 해가 없던 날짜 — 올린 날보다 한참 앞이면 다음 해 */
+    if (!ymd || !post) return ymd;
+    return (Date.parse(ymd) < Date.parse(post) - 31 * 864e5) ? (Number(ymd.slice(0, 4)) + 1) + ymd.slice(4) : ymd;
+  }
+  function periodOf(text, post) {
+    var t = String(text == null ? '' : text).replace(/\s+/g, ' ');
+    post = /^\d{4}-\d{2}-\d{2}$/.test(String(post || '')) ? String(post) : '';
+    var baseY = post ? Number(post.slice(0, 4)) : 0, m, win;
+    PER_LABEL.lastIndex = 0;
+    while ((m = PER_LABEL.exec(t))) {
+      win = t.slice(m.index + m[0].length, m.index + m[0].length + 90);
+      if (PER_ROLL.test(win)) return { from: '', to: '', rolling: true };
+      var r = win.match(PER_RANGE);
+      if (r && r.index < 25) {
+        var fy = r[1] ? Number(r[1]) : baseY, from = perDay(fy, r[2], r[3]);
+        var ty = r[4] ? Number(r[4]) : fy, to = perDay(ty, r[5], r[6]);
+        if (!r[1]) from = perShift(from, post);
+        if (from && to && to < from && !r[4]) to = (Number(to.slice(0, 4)) + 1) + to.slice(4);
+        if (to) return { from: from, to: to, rolling: false };
+      }
+      var one = win.match(PER_ONE);
+      if (one && one.index < 25) {
+        var d1 = perDay(one[1] ? Number(one[1]) : baseY, one[2], one[3]);
+        if (!one[1]) d1 = perShift(d1, post);
+        if (d1) return { from: '', to: d1, rolling: false };
+      }
+    }
+    if (t.length <= 200) {
+      var s = t.match(PER_SHORT);
+      if (s && !PER_NOT.test(t.slice(Math.max(0, s.index - 30), s.index))) {
+        var y = s[1] || s[4], mo = s[2] || s[5], da = s[3] || s[6];
+        var d2 = perDay(y ? Number(y) : baseY, mo, da);
+        if (!y) d2 = perShift(d2, post);
+        if (d2) return { from: '', to: d2, rolling: false };
+      }
+    }
+    return null;
+  }
+
+  /* 기간 → 지금 어디쯤인가. today: 'YYYY-MM-DD' */
+  function dueState(per, today) {
+    if (!per || per.none) return { k: 'unknown', text: '기간 모름' };
+    if (per.rolling) return { k: 'rolling', text: '수시(사람이 정해지면 마감)' };
+    if (!per.to) return { k: 'unknown', text: '기간 모름' };
+    var d = Math.round((Date.parse(per.to) - Date.parse(today)) / 864e5);
+    var md = Number(per.to.slice(5, 7)) + '.' + Number(per.to.slice(8, 10));
+    if (d < 0) return { k: 'past', days: d, text: '마감 지남(' + md + ')' };
+    if (d === 0) return { k: 'soon', days: 0, text: '오늘 마감(' + md + ')' };
+    if (d <= 7) return { k: 'soon', days: d, text: '~' + md + ' · D-' + d };
+    if (per.from && Date.parse(per.from) > Date.parse(today)) return { k: 'open', days: d, text: (Number(per.from.slice(5, 7)) + '.' + Number(per.from.slice(8, 10))) + '~' + md + ' · 접수 전' };
+    return { k: 'open', days: d, text: '~' + md + ' · D-' + d };
+  }
   function hitGroup(h) { return /^kcplaa/.test(s(h && h.board)) ? 'kc' : 'pub'; }
 
   return { ORGS: ORGS, group: group, matches: matches, prepDate: prepDate, gcalUrl: gcalUrl,
     prepEvent: prepEvent, dueEvent: dueEvent, typicalMonth: typicalMonth, monthsAhead: monthsAhead,
     order: order, soon: soon, appliedThisYear: appliedThisYear, allOrgs: allOrgs,
-    KINDS: KINDS.concat([KIND_ETC]), kindOf: kindOf, kindInfo: kindInfo, hitGroup: hitGroup };
+    KINDS: KINDS.concat([KIND_ETC]), kindOf: kindOf, kindInfo: kindInfo, hitGroup: hitGroup,
+    periodOf: periodOf, dueState: dueState };
 });

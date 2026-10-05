@@ -214,9 +214,11 @@ test('⑤ 기술보호 건이 한 건도 없으면 띠를 그리지 않는다 ·
   assert.doesNotMatch(clinic, /3회/);
 });
 
-test('⑤ 컨설팅관리에 기술보호 줄이 «하나 더» 붙는다 · 확인 창은 사업 설명서를 받는다', () => {
-  assert.match(ERP, /props\.sourceKind === 'consulting' && h\(ClinicDayCards, \{\s*key:'tech', prog: UNIT_PROGS\.tech,/,
-    '★★ 컨설팅관리에 기술보호 줄이 안 붙었습니다');
+test('⑤ 계약관리 띠에 기술보호 줄이 «하나 더» 붙는다 · 확인 창은 사업 설명서를 받는다', () => {
+  /* 2026-10-05 #2000: 띠가 컨설팅관리에서 계약관리로 옮겨졌다(대표 「매번 계약할 때 확인이 필요하다」) — 접힘 단추(unitStrip) 안.
+     자리가 바뀌어도 «기술보호 줄이 현장클리닉 줄 옆에 하나 더» 붙는다는 것은 그대로다. */
+  assert.match(ERP, /unitStrip && \(function\(\)\{[\s\S]{0,1600}?h\(ClinicDayCards, \{ key:'clinic', prog: UNIT_PROGS\.clinic,[^\n]*\n\s*h\(ClinicDayCards, \{ key:'tech', prog: UNIT_PROGS\.tech,/,
+    '★★ 기술보호 줄이 안 붙었습니다');
   assert.match(fn('ClinicDayCards'), /ckOpen && h\(ClinicCheckModal, \{ prog: prog,/, '확인 창이 어느 사업인지 모릅니다');
   const modal = fn('ClinicCheckModal');
   assert.match(modal, /prog\.max > 0 && n > prog\.max/, '★★ 최대 3회를 손으로 쳐서 넘길 수 있습니다');

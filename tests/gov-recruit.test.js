@@ -183,3 +183,16 @@ test('★ 출처 갈래 — 공인노무사회 게시판 셋은 kc, 나머지는
   ['kcplaa', 'kcplaa_m', 'kcplaa_job'].forEach((b) => assert.equal(R.hitGroup({ board: b }), 'kc'));
   ['erc', 'semas', 'nosa', ''].forEach((b) => assert.equal(R.hitGroup({ board: b }), 'pub'));
 });
+
+test('★★ 기간 → 지금 어디쯤 — 지났나·며칠 남았나·수시·모름', () => {
+  const D = R.dueState;
+  assert.deepEqual([D({ to: '2026-10-01' }, '2026-10-05').k, D({ to: '2026-10-01' }, '2026-10-05').text], ['past', '마감 지남(10.1)']);
+  assert.equal(D({ to: '2026-10-05' }, '2026-10-05').text, '오늘 마감(10.5)');
+  assert.equal(D({ to: '2026-10-04' }, '2026-10-05').k, 'past', '어제 마감은 지난 것');
+  assert.equal(D({ to: '2026-10-10' }, '2026-10-05').k, 'soon');
+  assert.equal(D({ to: '2026-10-10' }, '2026-10-05').text, '~10.10 · D-5');
+  assert.equal(D({ to: '2026-11-30' }, '2026-10-05').k, 'open');
+  assert.match(D({ from: '2026-11-01', to: '2026-11-30' }, '2026-10-05').text, /접수 전/);
+  assert.equal(D({ rolling: true }, '2026-10-05').k, 'rolling');
+  assert.equal(D(null, '2026-10-05').k, 'unknown'); assert.equal(D({ none: true }, '2026-10-05').k, 'unknown');
+});

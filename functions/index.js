@@ -1104,7 +1104,7 @@ exports.recruitWatch = functions
         };
       },
     });
-    const result = await RecruitWatch.run({ existing, today, nowIso, fetchText });
+    const result = await RecruitWatch.run({ existing, today, nowIso, fetchText, details: true });   // 새 글 본문을 열어 접수 기간까지
     await root.update(RecruitWatch.updatesOf(result, existing, nowIso));
     /* 처음 한 번만 — 회원 공지에 모집 공문이 정말 오는지 다섯 쪽을 훑어 남긴다(대표 확인용, 관리자만 읽힌다).
        ⚠ 로그인이 안 됐으면 남기지 않는다 — 다음 날 다시 해 본다. */

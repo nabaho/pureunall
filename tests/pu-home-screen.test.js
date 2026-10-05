@@ -416,22 +416,30 @@ test('★ 이 브라우저에 내 경력이 없으면 클라우드 사본을 한
   assert.equal(ctx.Pull.err, '', '자료를 읽었는데 경고를 띄웠습니다');
 });
 
-test('이 브라우저에 내 경력이 있으면 클라우드를 괜히 부르지 않는다', async () => {
-  const ctx = box();
-  let asked = 0;
-  ctx.App = { draft: { kind: 'member', name: '권형하', careers: [] }, me: { uid: 'U1' } };
-  ctx.Pull = { open: false, kind: '', items: {}, sel: {}, err: '', name: '' };
-  ctx.openModal = () => {};
-  ctx.renderPull = () => {};
-  ctx.uidOfName = () => Promise.resolve({ uid: 'U1', why: 'ok' });
-  ctx.kcareerFromLocal = () => ({ wiccok: [{ org: '로컬' }], license: [], edu: [], complete: [], lecture: [] });
-  ctx.kcareerFromDb = () => { asked++; return Promise.resolve({}); };
-  run(ctx, constSource('CAREER_KINDS') + '\n' + fnSource('careerCount') + '\n'
-    + fnSource('uidFailText') + '\n' + fnSource('itemWhen') + '\n' + fnSource('날짜숫자') + '\n' + fnSource('기간숫자') + '\n' + fnSource('경력차례') + '\n' + fnSource('openPull'));
-  ctx.openPull();
-  await tick(); await tick();
-  assert.equal(asked, 0);
-  assert.equal(plain(ctx.Pull.items).wiccok.length, 1);
+test('★★ 내 경력은 클라우드 사본을 먼저 본다 — 로컬은 클라우드가 비었을 때만 (2026-10-05)', async () => {
+  /* 크롬·에지의 경력관리가 클라우드를 한 번도 안 받아 와 로컬은 처음 깔린 185건뿐이었다(클라우드 580건).
+     로컬을 먼저 믿으면 낡은 자료를 가져온다. */
+  const mk = (cloud) => {
+    const ctx = box();
+    ctx.asked = 0;
+    ctx.App = { draft: { kind: 'member', name: '권형하', careers: [] }, me: { uid: 'U1' } };
+    ctx.Pull = { open: false, kind: '', items: {}, sel: {}, err: '', name: '' };
+    ctx.openModal = () => {};
+    ctx.renderPull = () => {};
+    ctx.uidOfName = () => Promise.resolve({ uid: 'U1', why: 'ok' });
+    ctx.kcareerFromLocal = () => ({ wiccok: [{ org: '로컬' }], license: [], edu: [], complete: [], lecture: [] });
+    ctx.kcareerFromDb = () => { ctx.asked++; return Promise.resolve(cloud); };
+    run(ctx, constSource('CAREER_KINDS') + '\n' + fnSource('careerCount') + '\n'
+      + fnSource('uidFailText') + '\n' + fnSource('itemWhen') + '\n' + fnSource('날짜숫자') + '\n' + fnSource('기간숫자') + '\n' + fnSource('경력차례') + '\n' + fnSource('openPull'));
+    return ctx;
+  };
+  const a = mk({ wiccok: [{ org: '클라우드' }], license: [], edu: [], complete: [], lecture: [] });
+  a.openPull(); await tick(); await tick();
+  assert.equal(a.asked, 1, '로컬에 자료가 있어도 클라우드를 본다');
+  assert.equal(JSON.stringify(plain(a.Pull.items).wiccok).indexOf('클라우드') >= 0, true, '★ 클라우드 사본을 쓴다');
+  const b = mk({});
+  b.openPull(); await tick(); await tick();
+  assert.equal(plain(b.Pull.items).wiccok.length, 1, '클라우드가 비었으면 로컬');
 });
 
 test('★ 로컬도 클라우드도 «못 읽었으면» 「없다」고 하지 않는다', async () => {

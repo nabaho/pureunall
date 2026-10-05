@@ -105,7 +105,33 @@
       : '☁ 다른 기기에서 저장된 더 최신 기록이 있습니다.';
   }
 
-  var api = { decide: decide, newerText: newerText, dismissedStill: dismissedStill };
+  /* ── 처음 여는 기기: 받아 와도 «잃는 것이 없나» (대표 지시 2026-10-05 「데이터가 분리되지 않게」) ──
+     크롬·에지가 둘 다 클라우드를 한 번도 안 받아 와 185건(처음 깔린 자료)만 보고 있었다 — 클라우드는 580건.
+     띠는 떠 있었지만 작아서 아무도 누르지 않았다. 잃을 것이 없으면 «묻지 않고» 받아 온다.
+     localLs·cloudLs = { 열쇠(접두어 뺀 것): 저장된 글자 } · skip = 안 오가는 열쇠(FB_SKIP) · tombKey = 지운 기록표 열쇠
+     잃는 것 = 이 기기 «목록»에 있는 기록 가운데 클라우드에 같은 id 도 없고, 클라우드가 지웠다고 적지도 않은 것.
+     ⚠ 목록이 아닌 열쇠(설정 한 덩이)는 셈하지 않는다 — 처음 여는 기기의 설정은 기본값이다. */
+  function firstPullLoss(localLs, cloudLs, skip, tombKey) {
+    skip = skip || []; localLs = localLs || {}; cloudLs = cloudLs || {};
+    var parse = function (raw) { try { return JSON.parse(raw); } catch (e) { return null; } };
+    var tomb = parse(cloudLs[tombKey || '_tomb']) || {};
+    var lost = [];
+    Object.keys(localLs).forEach(function (k) {
+      if (skip.indexOf(k) >= 0 || k === (tombKey || '_tomb')) return;
+      var a = parse(localLs[k]);
+      if (!Array.isArray(a) || !a.length || !a[0] || a[0].id == null) return;
+      var c = parse(cloudLs[k]); var ids = {};
+      (Array.isArray(c) ? c : []).forEach(function (r) { if (r && r.id != null) ids[String(r.id)] = 1; });
+      a.forEach(function (r) {
+        if (!r || r.id == null) return;
+        var id = String(r.id);
+        if (!ids[id] && !tomb[id]) lost.push({ key: k, id: id });
+      });
+    });
+    return { lost: lost, safe: lost.length === 0 };
+  }
+
+  var api = { decide: decide, newerText: newerText, dismissedStill: dismissedStill, firstPullLoss: firstPullLoss };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerNotices = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
