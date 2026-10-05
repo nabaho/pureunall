@@ -12,12 +12,11 @@ const path = require('node:path');
 const erp = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 const body = erp.replace(/\/\*[\s\S]*?\*\//g, '');
 
-test('① 클리닉·기술보호 띠는 기본 접힘 — 단추로 편다', () => {
-  const m = body.match(/usePersistedState\('proj_'\+props\.sourceKind\+'_unitstrip', (\w+)\)/);
+test('① 클리닉·기술보호 실적 띠는 기본 접힘 — 단추로 편다 (계약관리, 2026-10-05 옮김)', () => {
+  const m = body.match(/usePersistedState\('contract_unitstrip', (\w+)\)/);
   assert.ok(m, '띠를 펴고 접는 상태가 없습니다');
   assert.equal(m[1], 'false', '★ 기본은 접힘이어야 합니다');
-  const cards = body.match(/props\.sourceKind === 'consulting' && (\w+) && h\(ClinicDayCards,/g) || [];
-  assert.ok(cards.length >= 2, '★ 두 띠(클리닉·기술보호) 모두 펼침 스위치 뒤에 있어야 합니다');
+  assert.match(body, /unitStrip && \(function\(\)\{[\s\S]{0,900}?h\(ClinicDayCards,[\s\S]{0,300}?h\(ClinicDayCards,/, '★ 두 띠(클리닉·기술보호) 모두 펼침 스위치 뒤에 있어야 합니다');
   assert.match(body, /setUnitStrip\(!unitStrip\)/, '여는 단추가 없습니다');
 });
 
