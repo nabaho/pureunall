@@ -2837,6 +2837,10 @@ function histTs(key) {
 }
 
 async function saveRecord(kind, key, next) {
+  /* 구성원 자료 가운데 «자동 연결»이 쓰는 칸 — 편집칸에 없어 저장이 지우면 안 된다 (2026-10-05).
+     sid 직원 번호 · takenDown 자동으로 내린 표시 · photo 새로 올릴 사진 표시 · publishOk 올리기 허락
+     ⚠ 함수 «안»에 둔다 — 이 함수를 떼어 돌리는 검사 상자들이 바깥 상수를 모른다. */
+  const 자동연결칸 = ['sid', 'takenDown', 'photo', 'publishOk'];
   const base = (kind === 'member') ? 'homepage/members/' : 'homepage/pages/';
   const histKey = (kind === 'member') ? key : 'page:' + key;
   const ref = db.ref(base + key);
@@ -2868,6 +2872,15 @@ async function saveRecord(kind, key, next) {
        ⚠ 트랜잭션 몸통은 여러 번 불릴 수 있다 — 마지막 것이 실제로 덮은 그 판이다. */
     이전 = cur;
     쓴것 = Object.assign({}, next, { updatedAt: Date.now(), updatedBy: currentUserName() });
+    /* ★ 자동 연결 칸(직원 번호·내린 표시·사진·올리기 허락)은 «서버에 있는 값»을 지킨다
+         (월간 자동 연결 2026-10-05). 편집칸에 없는 칸이라 저장할 때마다 사라졌고,
+         서버가 화면을 연 «뒤에» 적은 내린 표시는 화면 사본에도 없다 — 그래서 cur 에서 옮긴다.
+       ⚠ next 에 그 칸이 «있으면» 그 값이 이긴다(사람이 일부러 바꾼 것). */
+    if (kind === 'member' && cur) {
+      자동연결칸.forEach(k => {
+        if (!Object.prototype.hasOwnProperty.call(next, k) && cur[k] !== undefined) 쓴것[k] = cur[k];
+      });
+    }
     return 쓴것;
   });
   if (남이고침 || (r && r.committed === false)) {
@@ -3013,7 +3026,7 @@ function 명부재직자() {
   });
   return App.staff.filter(function (s) { return s && s.name && !s.left; })
     .map(function (s) {
-      return { name: s.name, title: String(s.title || '').trim(),
+      return { name: s.name, title: String(s.title || '').trim(), sid: String(s.sid || ''),
                kind: 직급의갈래(s.title), 이미: !!있는이름[String(s.name).trim()],
                /* 휴직 — 퇴사가 아니라서 목록에서 «빼지는» 않지만, 넣을 수도 없다 */
                휴직: !!s.onLeave };
@@ -3046,7 +3059,7 @@ function openRosterAdd() {
           + (s.이미
               ? '<span class="pill posted">이미 있음</span>'
               : '<button class="btn" onclick="addFromRoster(' + "'" + esc(s.name) + "'"
-                + ',' + "'" + esc(s.title) + "'" + ')">넣기</button>')
+                + ',' + "'" + esc(s.title) + "'" + ',' + "'" + esc(s.sid) + "'" + ')">넣기</button>')
           + '</div>';
       });
       h += '</div></div>';
@@ -3078,9 +3091,14 @@ window.openRosterAdd = openRosterAdd;
 /* 명부에서 고른 사람을 넣는다.
    ★ 직책을 «갈래에 맞게» 채운다 — 예전에는 누구를 넣어도 「공인노무사」가 박혔다.
      노무사면 직책2 에 공인노무사를, 직원이면 직책1 에 그 직급을 넣는다. */
-async function addFromRoster(name, title) {
+async function addFromRoster(name, title, sid) {
   const 이름 = String(name || '').trim();
   const 직급 = String(title || '').trim();
+  /* ★ 명부에서 «고른» 사람이라 직원 번호가 이미 정해져 있다 — 함께 남겨 «잇기»를 따로 안 하게 한다
+       (월간 자동 연결 2026-10-05). 명부에 그 번호가 «그 이름»으로 있을 때만 믿는다. */
+  const 번호 = String(sid || '').trim();
+  const 맞는번호 = 번호 && (Array.isArray(App.staff) ? App.staff : [])
+    .some(function (s) { return s && String(s.sid || '') === 번호 && String(s.name || '').trim() === 이름; });
   if (!이름) return;
   /* ★ 휴직 중인 분은 «여기서도» 막는다 — 단추를 꺼 두었어도 이 함수는 직접 불릴 수 있다.
        (퇴사했는데 ERP 에는 휴직으로 남은 분을 구성원에 넣는 사고를 막는 안전망이다.)
@@ -3099,6 +3117,7 @@ async function addFromRoster(name, title) {
         position2: '공인노무사', intro: '', srl: '', careers: [], duties: [] }
     : { name: 이름, kind: 'staff', position1: 직급, position2: '',
         intro: '', srl: '', careers: [], duties: [] };
+  if (맞는번호) rec.sid = 번호;
   const key = 'new-' + Date.now();
   try {
     App.members[key] = await saveRecord('member', key, rec);
