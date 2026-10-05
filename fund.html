@@ -4542,7 +4542,7 @@ function _hwpTplValues(f,sites){
     이사수: (wk&&wk===er)?String(wk):'',       // HTML 회의록과 같은 셈 — 양쪽 수가 같을 때만
     사용자측이사: dirs('사용자측'), 근로자측이사: dirs('근로자측'),
     출연금: won(amt), 출연월: '',
-    /* ⚠ 기금사용은 useRate(공동 90%·사내 중소 80%·그 밖 50%) — 대표 규칙(2026-09-12) */
+    /* ⚠ 기금사용은 useRate(공동 90%·사내 80%·「중소기업 아님」 사내만 50%) — 대표 규칙(2026-09-12, 2026-10-06 고침) */
     기금사용액: amt?won(amt*rate):'', 기금사용비율: amt?String(Math.round(rate*100)):'',
     수익: tot?_K(tot.rev):'', 비용: tot?_K(tot.exp):'', 수지차익: tot?_K(tot.net):'',
     자산: bsRow('자산총계'), 부채: bsRow('부채총계'), 자본: bsRow('자본총계'),
@@ -7000,6 +7000,9 @@ function _hasBudget(fid,yr){
 
    ① 쓸 수 있는 몫(useRate) — 근로복지기본법 시행령이 정한 한도. 대표 판단 2026-09-12:
         공동 90% · 사내 50% · «중소기업에 설치된» 사내 80%
+      ★ 대표 지시 2026-10-06: 「고유목적사업준비금2는 항상 출연금에서 최대 사용할 수 있는 금액 80% 또는 90%로 한다」
+        — 사내기금은 [기금 정보]에 「중소기업 아님」이라고 «적어 둔» 경우만 50%, 그 밖에는 80%.
+        (전에는 비어 있으면 50%였다 — 사내 기금 10곳이 모두 비어 있어 준비금2가 절반만 설정될 뻔했다)
       나머지가 기본재산으로 남는다.
    ② 쓸 돈을 지출로 펼치기 — 목적사업 90% · 일반관리비 5% · 예비비 5% (대표 판단).
       ⚠ 예비비는 «나머지»로 둔다 — 셋을 따로 반올림하면 합이 1~2원 어긋난다.
@@ -7010,7 +7013,7 @@ var BIZ_RATE_DEFAULT=2.0;                      // 예금 이자율(%) — 원본
 function useRate(f){
   f=f||{};
   if((f.fund_type||'공동')!=='사내') return 0.9;
-  return (f.sme==='중소기업') ? 0.8 : 0.5;
+  return (f.sme==='중소기업 아님') ? 0.5 : 0.8;
 }
 function bizRate(f){
   var r=num((f||{}).interest_rate);
@@ -8881,7 +8884,7 @@ function _docExtra(kind,f){
     fbDb.ref(NS+'/welfare/'+fid+'/'+yr).once('value').then(function(sn){ var v=sn.val()||{};
       return Object.keys(v).map(function(k){ return v[k]; }); }).catch(function(){ return []; })
   ]).then(function(r){
-    var arr=r[0], rp=r[1], sites=r[2], sy=r[3], welf=r[4];
+    var arr=closeArr(r[0],fid,yr), rp=r[1], sites=r[2], sy=r[3], welf=r[4];   // 서류도 결산 조정을 얹은 숫자로(화면과 같게)
     var open=num((_openingOf(fid,yr)||{}).basic)||0;
     S._docBf={fid:fid,yr:yr,open:open,days:bfDays(open,bfMovesOf(journalOf(arr),rp))};
     /* 별지15호 산출을 그대로 쓴다 — 기본재산 운용 내역(㉑~㉘)이 곧 재산목록표의 기본재산이고,
@@ -15476,7 +15479,8 @@ function loadPrevTxns(){
 }
 function prevArr(){
   var t=S.txnsPrev; if(!t) return null;                  // null=아직 로딩 중
-  return Object.keys(t).map(function(k){var o=Object.assign({},t[k]);o._id=k;return o;});
+  /* 전기도 확정 전이면 결산 조정을 얹어 본다 — 당기만 얹으면 전기 칸이 결손으로 보인다 */
+  return closeArr(Object.keys(t).map(function(k){var o=Object.assign({},t[k]);o._id=k;return o;}),S.fundId,_yr()-1);
 }
 function _n(v){ return (v||0).toLocaleString(); }
 function _nz(v){ return v?_n(v):''; }                    // 0은 빈칸(장부 관례)
@@ -17521,7 +17525,7 @@ function makeClosingWb(){
     _loadSites(fid).catch(function(){return [];}),
     fbDb.ref(NS+'/welfare/'+fid+'/'+yr).once('value').then(function(s){var v=s.val()||{};return Object.keys(v).map(function(k){return v[k];});}).catch(function(){return [];})
   ]).then(function(r){
-    var wb=buildClosingWb(fid,yr,arr,r[0],r[1],r[2],r[3]);
+    var wb=buildClosingWb(fid,yr,closeArr(arr,fid,yr),closeArr(r[0],fid,yr-1),r[1],r[2],r[3]);   // 워크북도 화면과 같은 결산 조정
     return wb.xlsx.writeBuffer();
   }).then(function(buf){
     var f=funds[fid]||{}, nm=(f.short_name||f.name||fid).replace(/\s+/g,'');
@@ -17728,9 +17732,48 @@ function _reserveEntries(yr,rc){
     if(p.amount>0) out.push({id:'rsv'+yr+(i?String.fromCharCode(97+i):''), e:_reserveEntry(yr,rc.kind,p.amount,p.acct)}); });
   return out;
 }
+/* ★ 결산 조정분개를 «확정 전에도» 재무제표에 얹는다 (대표 지시 2026-10-06
+   「기금에는 결손이 나서 손해가 있으면 안된다 … 왜 제대로 반영이 안되었나」)
+   준비금2 설정(당기 출연금 × 사용한도)과 환입은 [🔒 결산 확정] 때만 장부에 적혔다. 그래서 확정 전 화면은
+   목적사업비만큼 «결손»으로 보였다(사내 N 2025: 출연 5천만 → 기본재산 5천만·준비금2 0·결손금 7,809,520).
+   결산 정리분개가 빠진 표는 결산 재무제표가 아니다 — 근로복지공단 심화컨설팅 자료의
+   손익 짜임도 「6.사업외수익 나.고유목적사업준비금2전입수입」으로 비용을 메워 당기순이익 0 이다.
+   ─ 장부에 자동 분개가 «이미» 있으면(확정한 해) 그대로 둔다 — 두 번 얹지 않는다.
+   ─ 없으면 reserveAdjust 와 «같은 셈»으로 만든 분개를 _pending 을 달아 얹는다. 저장하지 않는다(확정 때 lockClosing 이 쓴다).
+   ─ 준비금 자동조정을 끈 기금(reserve_auto:false)은 손대지 않는다. */
+var RSV_AUTO_ID=/^rsv(?:1set|1in|set)?\d{4}[a-z]?$/;
+function _rsvIsAuto(x){ return RSV_AUTO_ID.test(String((x&&x._id)||'')); }
+function closeArr(arr,fid,yr){
+  arr=arr||[];
+  if(!arr.length||arr.some(_rsvIsAuto)) return arr;
+  var rc=null; try{ rc=reserveAdjust(arr,fid,yr); }catch(e){ return arr; }
+  if(!rc||rc.off) return arr;
+  var ents=_reserveEntries(yr,rc);
+  if(!ents.length) return arr;
+  var out=arr.concat(ents.map(function(x){ return Object.assign({_id:x.id,_pending:1},x.e); }));
+  out._rc=rc;                                   // 화면 안내(_rsvPendingNote)용 — 셈에는 쓰지 않는다
+  return out;
+}
+/* 미리 얹은 조정을 한 줄로 알린다 — 무엇을 얼마나 얹었는지, 재원이 모자라면 그것도 */
+function _rsvPendingNote(arrC){
+  var rc=arrC&&arrC._rc; if(!rc) return '';
+  var bits=[];
+  if(rc.setup>0) bits.push('준비금2 설정 '+won(rc.setup)+' (출연금 '+won(rc.contrib)+' × '+Math.round(rc.rate*100)+'%)');
+  if(rc.amount>0) bits.push('준비금 '+rc.kind+' '+won(rc.amount));
+  if(!bits.length&&!(rc.deficit>0)) return '';
+  return '<div class="row" style="gap:6px;flex-wrap:wrap;margin:0 0 8px">'
+    +(bits.length?'<span class="chip" title="결산 정리분개입니다. 장부에는 [🔒 결산 확정] 때 기록됩니다">결산 조정 미리 반영 · '+esc(bits.join(' · '))+'</span>':'')
+    +(rc.deficit>0?'<span class="chip dg">⚠ 재원 부족 '+won(rc.deficit)+' — 사용한도를 넘은 지출이라 결손으로 남습니다</span>':'')
+    +hlp('close.rsvpreview')+'</div>';
+}
 function lockClosing(){
   var fid=S.fundId, yr=S.year;
   var t=S.txns||{}, arr=Object.keys(t).map(function(k){var o=Object.assign({},t[k]);o._id=k;return o;});
+  /* 전에 확정했던 자동 분개는 걷어 내고 «처음부터» 다시 셈한다(2026-10-06).
+     남겨 둔 채 셈하면 설정은 또 얹히고 환입은 0 으로 나와, 확정을 풀었다 다시 하면 옛 환입이 그대로 남았다.
+     새로 쓰지 않는 옛 자동 분개는 아래 update 에서 지운다. */
+  var _oldAuto=arr.filter(_rsvIsAuto).map(function(x){ return x._id; });
+  arr=arr.filter(function(x){ return !_rsvIsAuto(x); });
   var fin=computeFin(arr,fid,yr);
   if(!journalOf(arr).length){ toast('승인된 분개가 없습니다','warn'); return; }
   var msg=yr+'년 결산을 확정합니다.\n확정 시점의 수치가 스냅샷으로 보존되어 결산 대장·연도별 비교에 쓰입니다.'
@@ -17767,6 +17810,7 @@ function lockClosing(){
     /* 환입 분개와 확정을 **한 번의 update로** 쓴다 — 하나만 저장되고 끊기면 장부가 어긋난다 */
     var arr2=arr, up={};
     var ents=_reserveEntries(yr,rc);
+    _oldAuto.forEach(function(id){ up['txns/'+fid+'/'+yr+'/'+id]=null; });   // 새 분개가 같은 자리면 아래가 덮는다
     if(ents.length){
       ents.forEach(function(x){ var id=x.id, e=x.e;
         up['txns/'+fid+'/'+yr+'/'+id]=e;
@@ -17811,7 +17855,7 @@ function loadYearSeries(){
       return fbDb.ref(NS+'/txns/'+fid+'/'+y).once('value')
         .then(function(ts){ var v=ts.val()||{};
           var a=Object.keys(v).map(function(k){var o=Object.assign({},v[k]);o._id=k;return o;});
-          return {y:y, fin:a.length?closeSnapshot(a,fid,y,(cl[y]||{}).report,[],[]):null};
+          return {y:y, fin:a.length?closeSnapshot(closeArr(a,fid,y),fid,y,(cl[y]||{}).report,[],[]):null};
         }).catch(function(){ return {y:y, fin:null}; });
     })).then(function(rs){
       var out={};
@@ -18058,7 +18102,9 @@ function closingTab(f){
     +(arr.length?(gateOk?'<span class="chip ok">✅ 결산 가능 (미분류·미승인 0)</span>':'<span class="chip warn">결산 관문: 미분류·미승인 0 필요</span>'):'')+reconChip+'</div>'
     +closeSubBar()+'</div>'
     +monthLockBar(arr)
-    +'<div id="closeBody">'+closeBodyHTML(arr,rows)+'</div>';
+    /* 장부 표(rows)는 통장 그대로, 그 밖의 장부·재무제표는 결산 조정을 얹은 것(closeArr)으로 */
+    +(function(){ var arrC=closeArr(arr,S.fundId,S.year);
+      return '<div id="closeBody">'+(S.closeSub==='accts'?'':_rsvPendingNote(arrC))+closeBodyHTML(arrC,rows)+'</div>'; })();
 }
 /* 하위 탭 본문 — 어느 장부를 보든 원천(승인 분개)은 같다 */
 function closeBodyHTML(arr,rows){
@@ -19234,8 +19280,12 @@ var HELP={
    +'<p><b>이미 있는 사업장도 꺼 둡니다.</b> 사업자등록번호가 같거나 상호가 완전히 같으면 「이미 있음」으로 봅니다 — 같은 회사가 두 번 들어가면 출연금이 두 번 세어지고 서식에도 두 번 섭니다.</p>'
    +'<p>만들 때 <b>사업자등록증 원본도 사업장마다 이어</b> 「받음」으로 표시합니다(지원금 제출서류 칸).</p>'
    +'<p><b>출연 약정액은 안 들어옵니다</b> — 사업자등록증에 없는 값입니다. 만든 뒤 명부에서 넣어 주세요. 그 값이 설립 첫해 사업계획서까지 굴러갑니다.</p>'},
+ 'close.rsvpreview':{t:'결산 조정을 미리 얹어 보여 줍니다',h:'<p>기금은 그해 출연금 중 <b>사용한도(공동 90% · 사내 80%)</b>를 <b>고유목적사업준비금2</b>로 설정하고, 목적사업비·관리비만큼 준비금을 <b>환입</b>해 <b>당기순이익을 0</b>으로 맞춥니다. 그래서 결손이 생기지 않습니다.</p>'
+   +'<p>이 분개는 장부에는 <b>[🔒 결산 확정] 때</b> 기록됩니다. 확정 전에도 재무제표·별지15호·결산서 워크북은 이 조정을 얹은 숫자로 보여 줍니다.</p>'
+   +'<p><b>재원 부족</b>이 뜨면 지출이 사용한도와 남은 준비금을 넘은 것입니다. 기본재산은 대부사업에만 쓸 수 있어 더 메울 수 없으므로, 출연금 분개가 빠지지 않았는지 먼저 확인하세요.</p>'
+   +'<p>협의회가 설정액을 따로 정했다면 [결산·재무제표]의 설정액 칸에 넣으세요. 사내기금이 대기업에 설치된 경우는 [기금 정보]의 중소기업 여부를 「중소기업 아님」(50%)으로 적으세요.</p>'},
  'bizplan.auto':{t:'출연예정금 하나로 사업계획서가 채워집니다',h:'<p><b>출연예정금만 정하면</b> 사업계획서의 손익예산·추정재무상태표가 모두 따라 나옵니다. 항목마다 따로 칠 일이 없습니다.</p>'
-   +'<p><b>그해 쓸 수 있는 몫</b>은 법이 정합니다 — 공동기금 <b>90%</b>, 사내기금 <b>50%</b>, 다만 <b>중소기업에 설치된 사내기금은 80%</b>입니다. 나머지가 기본재산으로 남습니다. 사내기금이면 [기금 정보]의 <b>중소기업 여부</b>를 정해 주세요.</p>'
+   +'<p><b>그해 쓸 수 있는 몫</b>은 법이 정합니다 — 공동기금 <b>90%</b>, 사내기금 <b>80%</b>(중소기업)입니다. [기금 정보]의 중소기업 여부에 <b>「중소기업 아님」</b>을 적은 사내기금만 <b>50%</b>입니다. 나머지가 기본재산으로 남습니다.</p>'
    +'<p><b>쓸 돈은</b> 목적사업비 90% · 일반관리비 5% · 예비비 5%로 펼칩니다. <b>이자수입</b>은 기본재산 × 예금 이자율(기본 2.0% — 원본 서식 비고란의 숫자)입니다.</p>'
    +'<p><b>손으로 적은 예산이 언제나 이깁니다.</b> 협의회가 정한 숫자가 예산 칸에 있으면 그것을 씁니다. 예산 칸이 비어 있을 때만 출연금에서 셈합니다.</p>'
    +'<p>[💰 출연금에서]를 누르면 셈한 숫자를 <b>예산 칸으로 내려</b> 줍니다 — 협의회에 올릴 숫자를 거기서 고치세요.</p>'
