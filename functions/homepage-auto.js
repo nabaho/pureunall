@@ -105,12 +105,31 @@ function 고르기(자료) {
   const 올릴것 = [];
   Object.keys(partners).forEach((id) => {
     const p = partners[id] || {};
-    if (p.posted !== true || 번호(p.boardSrl) || p.takenDown) return;
+    if (p.posted !== true || 번호(p.boardSrl) || p.takenDown || p.uploadedAt) return;
     if (!(p.consent && typeof p.consent === "object" && String(p.consent.date || "").trim())) return;
     if (!(p.logo && Number(p.logo.bytes) > 0)) return;
     const c = 회사[String(id)];
     if (!c || String(c.status || "") !== "active") return;
     올릴것.push({ 종류: "새거래처", 게시판: 게시판.자문사, companyId: String(id) });
+  });
+
+  /* ══ 3단계 — 새 노무사 «올리기» (2026-10-05) ══
+     다 있어야 올린다: 글 번호 없음 · 직원 번호(sid)로 이은 재직(active) 노무사 · 사진 · 경력 ·
+     대표의 «올리기 허락»(publishOk — 그때 화면이 지은 경력 글을 함께 담는다).
+     ★ 사람 소개는 공개되는 글이다 — 반쪽(사진·경력 없음)은 올리지 않고, 대표가 본 것만 올린다.
+     ⚠ 한 번 보낸 사람(uploadedAt)은 글 번호를 못 받았어도 다시 안 올린다 — 두 장이 걸린다. */
+  Object.keys(members).forEach((k) => {
+    const m = members[k] || {};
+    if (번호(m.srl) || m.takenDown || m.uploadedAt || m.offSite) return;
+    const 노무사 = m.kind === "labor"
+      || (m.kind !== "staff" && /노무사/.test(String(m.position1 || "") + " " + String(m.position2 || "")));
+    if (!노무사 || !m.sid) return;
+    const p = 사람[String(m.sid)];
+    if (!p || String(p.status || "") !== "active") return;
+    if (!(m.photo && Number(m.photo.bytes) > 0)) return;
+    if (!(Array.isArray(m.careers) && m.careers.some((c) => String(c || "").trim()))) return;
+    if (!(m.publishOk && typeof m.publishOk === "object" && String(m.publishOk.경력글 || "").trim())) return;
+    올릴것.push({ 종류: "새구성원", 게시판: 게시판.구성원, key: k, sid: String(m.sid) });
   });
 
   return { ok: true, 실패: "", 내릴것: 내릴것, 보낼것: 멈춤 ? [] : 내릴것.slice(),
@@ -186,6 +205,13 @@ async function 돌기(방식, 받은지문, 도구) {
       const 답 = await 도구.올리기(올릴것);
       for (const x of 답) {
         const 새번호 = 번호(x.srl);
+        /* ★ 보내기가 «됐으면» 글 번호를 못 받았어도 «올린 표시»를 남긴다 —
+             안 남기면 다음 달에 같은 글을 또 올린다(홈페이지에 두 장). */
+        if (x.됐나) {
+          const 표시 = { at: 지금, by: 도구.누가, 달: 달 };
+          if (x.companyId) await 도구.쓰기("homepage/partners/" + x.companyId + "/uploadedAt", 표시);
+          if (x.key) await 도구.쓰기("homepage/members/" + x.key + "/uploadedAt", 표시);
+        }
         if (x.됐나 && 새번호) {
           const 줄 = Object.assign(기록줄(x), { srl: 새번호 });
           결과.올림.push(줄);

@@ -511,3 +511,79 @@ test('자동 정찰 자리는 «정해 둔 목록»뿐이고, 모두 읽기 화�
   });
   assert.ok(!JSON.stringify(W.자동정찰자리('1;x')).includes('1;x'), '못된 글 번호를 주소에 넣었다');
 });
+/* ══════ 3단계 — 새 노무사 글 짓기 (2026-10-05) ══════
+   «새 글 쓰기» 화면은 2026-10-05 정찰로 본 모양을 그대로 본뜬다(칸 이름·숨은 칸·파일 칸). */
+function 새글화면(더) {
+  const o = Object.assign({ mid: 'people_board', srl: '', 확인표: 'tok123', 경력칸: true }, 더 || {});
+  return [
+    (o.확인표 ? '<meta name="csrf-token" content="' + o.확인표 + '" />' : ''),
+    '<form action="/index.php" method="post">',
+    '<input type="hidden" name="error_return_url" value="/index.php?mid=people_board&act=dispBoardWrite">',
+    '<input type="hidden" name="act" value="procBoardInsertDocument">',
+    '<input type="hidden" name="mid" value="' + o.mid + '">',
+    '<input type="hidden" name="content" value="">',
+    '<input type="hidden" name="document_srl" value="' + o.srl + '">',
+    '<input type="hidden" name="_saved_doc_title" value="">',
+    '<input type="hidden" name="comment_status" value="ALLOW">',
+    '<select name="is_notice"><option value="N">일반</option><option value="Y">공지</option></select>',
+    '<table><tbody>',
+    '<tr><th>제목</th><td><input type="text" name="title" value=""></td></tr>',
+    '<tr><th>직책1</th><td><input type="text" name="extra_vars1" value=""></td></tr>',
+    '<tr><th>직책2</th><td><input type="text" name="extra_vars2" value=""></td></tr>',
+    '<tr><th>메인설명</th><td><textarea name="extra_vars3"></textarea></td></tr>',
+    (o.경력칸 ? '<tr><th>경력사항</th><td><textarea name="extra_vars4"></textarea></td></tr>' : ''),
+    '<tr><th>메인 이미지</th><td><input type="file" name="extra_vars5"></td></tr>',
+    '</tbody></table>',
+    '<input type="text" name="title_color" value="">',
+    '<input type="checkbox" name="title_bold" value="Y">',
+    '<input type="file" name="Filedata">',
+    '</form>'
+  ].join('\n');
+}
+const 새사람 = { 이름: '홍길동', 직책1: '', 직책2: '공인노무사', 메인설명: '노동사건 대리', 경력글: '現 가나상사 자문\n前 다라산업 인사팀' };
+const 새사진 = { 종류: 'image/jpeg', 바이트: Buffer.from([0xff, 0xd8, 1, 2]) };
+
+test('새 노무사 글 — 아는 칸만 채우고 받은 칸은 그대로 보낸다(사진은 메인 이미지 파일 칸으로)', () => {
+  const r = W.새구성원몸통(새글화면(), 새사람, 새사진);
+  assert.equal(r.ok, true, r.why);
+  const 글 = r.몸통.toString('utf8');
+  assert.match(글, /name="title"\r\n\r\n홍길동\r\n/);
+  assert.match(글, /name="extra_vars2"\r\n\r\n공인노무사\r\n/);
+  assert.match(글, /name="extra_vars4"\r\n\r\n現 가나상사 자문\n前 다라산업 인사팀\r\n/);
+  assert.match(글, /name="act"\r\n\r\nprocBoardInsertDocument\r\n/);
+  assert.match(글, /name="_rx_csrf_token"\r\n\r\ntok123\r\n/);
+  assert.match(글, /name="comment_status"\r\n\r\nALLOW\r\n/, '받은 칸을 빠뜨렸습니다');
+  assert.match(글, /name="extra_vars5"; filename="photo-\d+\.jpg"/);
+});
+
+test('새 노무사 글 — 본문(content)이 비면 이름 한 줄을 넣는다(빈 본문은 홈페이지가 안 받는다)', () => {
+  const 글 = W.새구성원몸통(새글화면(), 새사람, 새사진).몸통.toString('utf8');
+  assert.match(글, /name="content"\r\n\r\n<p>홍길동<\/p>\r\n/);
+});
+
+test('새 노무사 글 — 이름에 꺾쇠가 있으면 본문에 그대로 안 넣는다', () => {
+  const 글 = W.새구성원몸통(새글화면(), Object.assign({}, 새사람, { 이름: '홍<b>길동' }), 새사진).몸통.toString('utf8');
+  assert.ok(!글.includes('<p>홍<b>'), '꺾쇠를 거르지 않았습니다');
+});
+
+test('새 노무사 글 — 안전하지 않으면 짓지 않는다', () => {
+  const 경우 = [
+    [새글화면({ mid: 'notice' }), '다른 게시판'],
+    [새글화면({ srl: '190' }), '새 글이 아니라 고치는 화면'],
+    [새글화면({ 확인표: '' }), '확인표 없음'],
+    [새글화면({ 경력칸: false }), '경력 칸 없음(화면이 바뀜)'],
+    ['<html>로그인</html>', '로그인 화면']
+  ];
+  경우.forEach(([h, 뜻]) => assert.equal(W.새구성원몸통(h, 새사람, 새사진).ok, false, 뜻));
+  assert.equal(W.새구성원몸통(새글화면(), Object.assign({}, 새사람, { 이름: ' ' }), 새사진).ok, false, '이름 없음');
+  assert.equal(W.새구성원몸통(새글화면(), Object.assign({}, 새사람, { 경력글: '' }), 새사진).ok, false, '경력 없음');
+  assert.equal(W.새구성원몸통(새글화면(), 새사람, { 종류: 'text/html', 바이트: Buffer.from('x') }).ok, false, '그림 아님');
+});
+
+test('새 글 번호 읽기 — 옮겨 보낸 주소나 답 글자에서 글 번호를 찾는다', () => {
+  assert.equal(W.새글번호(302, '/people_board/321', ''), 321);
+  assert.equal(W.새글번호(302, 'https://x.kr/index.php?mid=people_board&document_srl=322', ''), 322);
+  assert.equal(W.새글번호(200, '', '<script>location.href="/people_board/323"</script>'), 323);
+  assert.equal(W.새글번호(200, '', '<html>오류</html>'), 0);
+  assert.equal(W.새글번호(302, '/notice/5', ''), 0, '다른 게시판 번호를 받았다');
+});

@@ -362,6 +362,64 @@ test('올리기 도구가 없으면(아직 못 짓는 단계) 올리지 않고 �
   assert.ok(r.올리기안됨, '올릴 것이 있는데 못 올린 사실을 안 알립니다');
 });
 
+/* ══════ 3단계 — 새 노무사 «올리기» 고르기 ══════ */
+const 새노무사 = (더) => Object.assign({ name: '홍길동', kind: 'labor', position2: '공인노무사', srl: '',
+  sid: 'S1', careers: ['現 가나상사 자문'], photo: { bytes: 20000 }, publishOk: { at: 1, by: '관리자', 경력글: '現 가나상사 자문' } }, 더 || {});
+
+test('재직·노무사·사진·경력·올리기 허락이 다 있고 글 번호가 없으면 올릴 것에 든다', () => {
+  const r = HA.고르기(기본({ members: { n1: 새노무사() } }));
+  assert.strictEqual(r.올릴것.length, 1);
+  assert.strictEqual(r.올릴것[0].종류, '새구성원');
+  assert.strictEqual(r.올릴것[0].게시판, HA.게시판.구성원);
+  assert.strictEqual(r.올릴것[0].key, 'n1');
+});
+
+test('올리기 허락이 없으면 올리지 않는다 — 사람 소개는 대표가 보고 허락한 것만', () => {
+  for (const 허락 of [undefined, null, {}]) {
+    assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ publishOk: 허락 }) } })).올릴것.length, 0, JSON.stringify(허락));
+  }
+});
+
+test('사진·경력이 없으면 올리지 않는다(반쪽 소개가 공개되지 않게)', () => {
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ photo: null }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ careers: [] }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ publishOk: { at: 1, 경력글: ' ' } }) } })).올릴것.length, 0);
+});
+
+test('휴직·퇴사·명부에 없음·직원(노무사 아님)·새 홈페이지에서 뺌이면 올리지 않는다', () => {
+  for (const 상태 of ['leave', 'retired']) {
+    assert.strictEqual(HA.고르기(기본({ roster: 명부([사람('S1', 상태)]), members: { n1: 새노무사() } })).올릴것.length, 0, 상태);
+  }
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ sid: 'S9' }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ sid: '' }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ kind: 'staff' }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ offSite: true }) } })).올릴것.length, 0);
+});
+
+test('이미 글 번호가 있거나, 한 번 올려 둔(uploadedAt) 사람은 다시 올리지 않는다 — 두 장이 걸린다', () => {
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ srl: '190' }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ members: { n1: 새노무사({ uploadedAt: 5 }) } })).올릴것.length, 0);
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ uploadedAt: 5 }) } })).올릴것.length, 0);
+});
+
+test('올렸는데 글 번호를 못 받았어도 «올린 표시»(uploadedAt)는 남긴다 — 다음 달에 또 올리지 않게', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/members'] = { n1: 새노무사() }; 자료['data/user_dir'] = 명부([사람('S1', 'active')]);
+  const g = 올리기가짜(자료, () => ({ 됐나: true, srl: 0 }));
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.ok(g.쓴것.some(([p]) => p === 'homepage/members/n1/uploadedAt'), '올린 표시를 안 남겼습니다');
+  assert.ok(!g.쓴것.some(([p]) => p === 'homepage/members/n1/srl'));
+  assert.strictEqual(r.못올림.length, 1);
+});
+
+test('새 노무사를 올리면 받은 글 번호를 그 사람(srl)에 잇는다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/members'] = { n1: 새노무사() }; 자료['data/user_dir'] = 명부([사람('S1', 'active')]);
+  const g = 올리기가짜(자료);
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(r.올림.length, 1);
+  const 이음 = g.쓴것.find(([p]) => p === 'homepage/members/n1/srl');
+  assert.ok(이음 && 이음[1] === '777');
+});
+
 test('지문은 차례와 상관없이 같은 목록이면 같다', () => {
   const a = [{ 게시판: 'people_board', srl: 2 }, { 게시판: 'partner_board', srl: 1 }];
   assert.strictEqual(HA.지문(a), HA.지문(a.slice().reverse()));

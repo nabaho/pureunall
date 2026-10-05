@@ -440,6 +440,63 @@ function 채운칸들(html) {
   return { 채운칸: [...new Set(채운칸)].sort(), 본문에그림: 본문에그림 };
 }
 
+/* ── 3단계: 새 노무사 글 짓기 (월간 자동 연결 2026-10-05) ─────────────────
+   «새 글 쓰기» 화면(people_board · dispBoardWrite)을 통째로 받아, 받은 칸은 «그대로» 두고
+   이름을 아는 칸만 채운다(2026-10-05 정찰: 제목 title · 직책1 extra_vars1 · 직책2 extra_vars2 ·
+   메인설명 extra_vars3 · 경력사항 extra_vars4 · 메인 이미지 extra_vars5(파일)).
+   사진은 고치기의 «사진 넣기»와 같은 multipart 로 보낸다 — 이미 잘 도는 길이다.
+   ⚠ 하나라도 어긋나면 짓지 않는다: 다른 게시판 · 글 번호가 있음(고치는 화면) · 확인표 없음 ·
+     경력 칸 없음(화면이 바뀜/로그인 풀림) · 이름·경력 없음 · 그림 아님. */
+function 새구성원몸통(화면, 사람, 사진) {
+  const 원 = String(화면 || "");
+  const 폼 = 폼떼기(원, "procBoardInsertDocument") || 원;
+  const 읽은것 = 칸읽기(폼);
+  const 칸 = Object.assign({}, 읽은것.칸);
+  const 확인표 = 확인표뽑기(원);
+  const 이름 = String((사람 && 사람.이름) || "").trim();
+  const 경력글 = String((사람 && 사람.경력글) || "").trim();
+  if (칸.mid !== BOARD) return { ok: false, why: "구성원 게시판의 새 글 화면이 아닙니다" };
+  if (String(칸.document_srl || "").trim()) return { ok: false, why: "새 글 화면이 아니라 고치는 화면입니다" };
+  if (!Object.prototype.hasOwnProperty.call(칸, "title") || !Object.prototype.hasOwnProperty.call(칸, 경력칸)) {
+    return { ok: false, why: "제목·경력 칸이 없습니다 — 로그인이 풀렸거나 홈페이지 화면이 바뀌었습니다" };
+  }
+  if (!확인표) return { ok: false, why: "확인표가 없습니다 — 관리자로 들어가지 못한 것 같습니다" };
+  if (!이름) return { ok: false, why: "이름이 없습니다" };
+  if (!경력글) return { ok: false, why: "경력이 없습니다" };
+  const 파일칸 = 파일칸찾기(폼, "메인 이미지");
+  if (!파일칸) return { ok: false, why: "사진 칸(메인 이미지)을 찾지 못했습니다" };
+  const 받을까 = 사진받을까(사진 && 사진.종류, 사진 && 사진.바이트 ? 사진.바이트.length : 0);
+  if (!받을까.ok) return { ok: false, why: 받을까.why };
+
+  칸.title = 이름;
+  칸.extra_vars1 = String((사람 && 사람.직책1) || "");
+  칸.extra_vars2 = String((사람 && 사람.직책2) || "");
+  칸.extra_vars3 = String((사람 && 사람.메인설명) || "");
+  칸[경력칸] = 경력글;
+  /* 빈 본문은 홈페이지가 안 받는다 — 이름 한 줄(꺾쇠는 걸러서) */
+  if (!String(칸.content || "").trim()) {
+    칸.content = "<p>" + 이름.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") + "</p>";
+  }
+  칸.act = 저장할act();
+  칸._rx_csrf_token = 확인표;
+  const 지음 = 사진몸통(칸, 읽은것.여럿, 파일칸, { 종류: 사진.종류, 바이트: 사진.바이트 });
+  return { ok: true, 경계: 지음.경계, 몸통: 지음.몸통, 확인표: 확인표, 파일칸: 파일칸 };
+}
+
+/* 새로 쓴 글의 번호 — 라이믹스는 저장 뒤 그 글로 «옮겨 보낸다». 주소에서 먼저, 없으면 답 글자에서.
+   ⚠ 허용한 게시판(구성원·자문사현황)의 번호만 믿는다. */
+function 새글번호(상태, 위치, 답) {
+  const 찾기 = (s) => {
+    const t = String(s || "");
+    const a = /\/(people_board|partner_board)\/(\d+)/.exec(t);
+    if (a) return Number(a[2]);
+    const b = /mid=(people_board|partner_board)[^"'\s]*?document_srl=(\d+)/.exec(t);
+    if (b) return Number(b[2]);
+    return 0;
+  };
+  return 찾기(위치) || 찾기(답);
+}
+
 /* 자동 올리기 정찰 자리 — «정해 둔 읽기 화면»만 연다(disp…). 하는 주소(proc…)는 없다.
    ⚠ 늘릴 때도 읽기 화면만. 글 번호는 숫자만 받는다. */
 function 자동정찰자리(로고글번호) {
@@ -690,7 +747,7 @@ module.exports = {
   경력칸, 이름표로찾을것, 손대지말것,
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
-  내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리,
+  내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리, 새구성원몸통, 새글번호,
   파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
 };

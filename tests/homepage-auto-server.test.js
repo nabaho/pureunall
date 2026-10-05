@@ -101,3 +101,22 @@ test('정찰은 «미리 보기» 때만 돈다 — 매달 돌기·승인에는 
   assert.ok(i > 0);
   assert.match(b.slice(Math.max(0, i - 200), i), /방식 === "보기"/);
 });
+test('자동 올리기 — 몸통을 «안전 확인(새구성원몸통)»으로 지은 뒤에만 보내고, 보낸 뒤 게시판을 확인한다', () => {
+  const b = 함수몸('홈자동올리기');
+  const 짓기 = b.indexOf('HW.새구성원몸통('), 보냄 = b.indexOf('method: "POST"'), 확인 = b.indexOf('HW.게시판확인(');
+  assert.ok(짓기 > 0 && 보냄 > 짓기, '안전 확인 전에 보냅니다');
+  assert.match(b.slice(짓기, 보냄), /if \(!지음\.ok\)[^\n]*continue;/, '안전 확인에 걸려도 보냅니다');
+  assert.ok(확인 > 보냄, '보낸 뒤 게시판 확인이 없습니다');
+  assert.ok(!/휴지통몸통|["'](delete|move|copy)["']/.test(b), '올리기에서 지우는 길을 부릅니다');
+});
+
+test('자동 올리기 — 아직 길이 없는 종류(로고)는 보내지 않고 까닭을 남긴다', () => {
+  const b = 함수몸('홈자동올리기');
+  const i = b.indexOf('x.종류 !== "새구성원"');
+  assert.ok(i > 0);
+  assert.match(b.slice(i, i + 300), /됐나: false[\s\S]*continue;/);
+});
+
+test('한 번 돌기가 올리기 도구를 넘긴다', () => {
+  assert.match(함수몸('홈자동한번'), /올리기:\s*async/);
+});
