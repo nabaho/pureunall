@@ -252,6 +252,10 @@
   @keyframes spin{to{transform:rotate(360deg)}}
   /* ── 모바일(스마트폰) 대응 ── 넓은 화면에서는 ☰/오버레이를 숨긴다 */
   #menubtn,#sideveil{display:none}
+  .rvwrap{display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:12px;align-items:start}
+  #rvSide{border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;position:sticky;top:calc(var(--topbar-h,48px) + 10px)}
+  #rvSide:empty{display:none}
+  @media (max-width:980px){ .rvwrap{grid-template-columns:1fr} #rvSide{position:static} }
   @media (max-width:860px){
     body{font-size:13.5px}
     /* 사이드바 → 서랍(☰로 여닫음) */
@@ -801,6 +805,7 @@ function start(){
   setTimeout(tplSyncUp,5000);         // 이 기기에만 있는 원본 서식을 클라우드로 (2026-10-05)
   initTop();
   bindNavDrag(); loadNavOrder();      // 사이드바 메뉴 순서(사용자가 드래그로 정한 순서) 복원
+  setTimeout(function(){ _rvLoad().then(_rvNavCount).catch(function(){}); }, 5000);   // ✅ 확인함 숫자
   try{ history.replaceState({view:'home'}, ''); }catch(e){}
   fbDb.ref(NS+'/funds').on('value', function(snap){ funds=snap.val()||{};
     if(snap.exists()||_fbOnline) S._fundsSynced=true;   // 서버 값을 받은 뒤에만 '기금 없음'이라고 말한다
@@ -846,6 +851,7 @@ function shell(){
     /* 기금 현황은 «묶음»을 하위로 편다 — 유형(지역·공동·사내)과 상태(설립중·종료·삭제)를
        종전에는 본문 탭줄에 함께 늘어놓아, 축이 다른 둘이 한 층으로 보였다.
        하위는 끌어서 순서를 못 바꾼다(유형 차례가 바뀌면 오히려 헷갈린다). */
+    +'<div class="sitem" data-nav="1" id="nav-review" onclick="go(\'review\')" title="기계가 넣고 아직 사람이 원본과 대조하지 않은 것 · 드래그: 메뉴 순서 변경"><span class="gr">⋮⋮</span>✅ 확인함<span class="ncnt" id="nav-review-cnt"></span></div>'
     +'<div data-nav="1" id="nav-home-wrap">'
     +'<div class="sitem" id="nav-home" onclick="goHome()" title="드래그: 메뉴 순서 변경"><span class="gr">⋮⋮</span>'
     +'<span class="cx" id="nav-cx" onclick="event.stopPropagation();toggleNavSub()" title="묶음 접기·펴기">▾</span>'
@@ -1177,10 +1183,11 @@ function route(){
   // 없어진 메뉴(docsboard/closeboard)로 들어오면 기금 현황의 해당 보기로 돌린다(옛 링크·기록 호환)
   if(S.view==='docsboard'){ S.view='home'; S.homeView='docs'; }
   if(S.view==='closeboard'){ S.view='home'; S.homeView='close'; }
-  ['home','billing','forms'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
+  ['home','billing','forms','review'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
   if(S.view!=='fund'&&S.formsHost==='fundDocsHost') S.formsHost=null;   // 기금 밖으로 나가면 임베드 해제
   if(S.view==='fund'&&S.fundId&&funds[S.fundId]) renderFund();
   else if(S.view==='billing') renderBilling();
+  else if(S.view==='review') renderReview();
   else if(S.view==='forms') renderForms();
   else { S.view='home'; renderHome(); return; }   // 홈은 renderHome 안에서 사이드바까지 그린다
   renderNav();   // 다른 화면에서도 사이드바 개수는 최신으로(기금이 바뀌면 숫자도 바뀐다)
@@ -2791,6 +2798,250 @@ function patchSub(fid,field,val,type){
 }
 function openFundSubsidy(fid){ S.fundId=fid; S.tab='subsidy'; _pushHist(); renderFund(); }
 
+/* ══ ✅ 확인함 (대표 지시 2026-10-05 「추천대로」 — 자동화 확인 목업 1·2번) ══
+   기계가 넣고 «아직 사람이 원본과 대조하지 않은» 것만 한곳에 모은다. 사람은 위에서부터 보고 누르기만 한다.
+     ⓐ 칸 값 — 칸 출처(prov)가 m:1 이고 ok 가 없고 how 가 dialog 가 아닌 것
+                (서류 확인 창에서 원본 옆에 놓고 넣은 값은 이미 사람이 대조했다)
+     ⓑ 추정 출연금 — 그 해 출연금·기본 출연금이 없고 «사람수 × 단가»로만 정해지는 사업장
+     ⓒ 계좌 간 이체 짝 — 승인을 기다리는 짝(기금·연도마다 한 줄)
+     ⓓ 분개 승인 — 승인 안 된 거래(기금·연도마다 한 줄, 한 줄씩은 회계 탭)
+   ⚠ 「맞음」: ⓐ 는 prov/…/ok = {by,at} 만 쓴다(값은 그대로). ⓑ 는 그 금액을 기본 출연금으로 적고 출처(calc:rate)에 확인을 붙인다.
+   ⚠ 고치는 일은 여기서 하지 않는다 — 그 칸이 있는 화면으로 보낸다(한 칸은 한 곳에서만 고친다).
+   ⚠ 빨강(사람 값과 다름)은 아직 없다 — 기계가 사람 값을 덮지 않고 남기는 길을 만들 때 붙인다. */
+var RV={data:null, at:0, sel:0, kind:'all', mine:false, items:[], loading:null, picked:{}};
+function _rvLoad(force){
+  if(RV.loading) return RV.loading;
+  if(!force&&RV.data&&Date.now()-RV.at<60000) return Promise.resolve(RV.data);
+  var get=function(p){ return fbDb.ref(NS+'/'+p).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return null; }); };
+  RV.loading=Promise.all([get('prov'),get('sites'),get('txns'),get('site_years')]).then(function(r){
+    RV.loading=null; RV.at=Date.now();
+    RV.data={prov:r[0]||{}, sites:r[1]||{}, txns:r[2]||{}, sy:r[3]||{}, fail:r.some(function(x){ return x===null; })};
+    return RV.data;
+  },function(e){ RV.loading=null; throw e; });
+  return RV.loading;
+}
+/* 확인할 것을 모은다 — 자료만 본다(화면을 그리지 않는다) */
+function _rvItems(D,yr){
+  var out=[], Y=String(yr||S.year);
+  var live=function(fid){ var f=funds[fid]; return !!f&&!isTrashed(f); };
+  Object.keys(D.prov||{}).forEach(function(fid){ if(!live(fid)) return; var P=D.prov[fid]||{};
+    Object.keys(P).sort().forEach(function(k){ var p=P[k]||{};
+      if(p.m!==1||p.ok||p.how==='dialog') return;
+      out.push({t:'prov', fid:fid, key:k, p:p});
+    });
+  });
+  Object.keys(D.sites||{}).forEach(function(fid){ if(!live(fid)) return; var f=funds[fid], sy=((D.sy||{})[fid]||{})[Y]||{};
+    Object.keys(D.sites[fid]||{}).forEach(function(sid){
+      var s=Object.assign({_id:sid},D.sites[fid][sid]||{});
+      if(String(s.status||'active')==='closed') return;
+      if(num((sy[sid]||{}).contrib)>0||num(s.contrib)>0) return;
+      var v=siteContribOf(s,f); if(v>0) out.push({t:'est', fid:fid, sid:sid, s:s, v:v});
+    });
+  });
+  Object.keys(D.txns||{}).forEach(function(fid){ if(!live(fid)) return;
+    Object.keys(D.txns[fid]||{}).sort().forEach(function(y){
+      var T=D.txns[fid][y]||{}, arr=Object.keys(T).map(function(k){ var o=Object.assign({},T[k]); o._id=k; return o; });
+      var pairs=findTransfers(arr);
+      if(pairs.length) out.push({t:'xfer', fid:fid, yr:y, n:pairs.length});
+      var un=arr.filter(function(x){ return !x.approved&&x.sug!=='xfer'; });
+      if(un.length) out.push({t:'txn', fid:fid, yr:y, n:un.length, sug:un.filter(function(x){ return !!x.sug; }).length});
+    });
+  });
+  return out;
+}
+var RV_KINDS=[['all','전체'],['prov','칸 값'],['est','추정 출연금'],['xfer','이체 짝'],['txn','분개 승인']];
+function _rvSrcLabel(src){
+  src=String(src||'');
+  var m={card:'기업정보함','guess:office':'소재지로 추정','import:fundinfo':'기금정보 가져오기','import:subsidy':'지원금 자료 가져오기',
+    'import:xlsx':'엑셀 등록','import:json':'JSON 가져오기','rule:urep_same':'사용자대표=대표자(한번에)','copy:prev':'작년 값 불러오기',
+    'calc:budget':'예산 자동 계산','calc:rate':'사람수 × 단가','scan:wrep':'재직증명서 판독','scan:committee':'위원 명단 판독',
+    'scan:bizreg':'사업자등록증 판독'};
+  if(m[src]) return m[src];
+  if(src.indexOf('scan:')===0){ var k=src.slice(5); var l=(typeof docZoneLabel==='function')?docZoneLabel(k):''; return (l&&l!==k?l:k)+' 판독'; }
+  return src||'기계';
+}
+function _rvHowText(p){
+  if(String(p.src||'').indexOf('guess:')===0||String(p.src||'').indexOf('calc:')===0) return '계산·추정한 값 — 서류 근거가 없습니다';
+  return p.how==='list'?'값 목록만 보고 넣었습니다 — 원본과 대조하지 않았습니다':'사람이 따로 보지 않고 들어간 값입니다';
+}
+var _rvLblMap=null;
+function _rvLabel(field){
+  if(!_rvLblMap){ _rvLblMap={contacts:'담당자',officers:'임원 명부',prep_committee:'사업장 밖 위원',urep_same:'사용자대표 = 대표자',
+      contrib:'출연금',workers:'상시근로자',benef:'수혜자',sales:'매출액'};
+    [FIELDS,SITE_FIELDS,WREP_FIELDS,UREP_FIELDS,SME_FIELDS].forEach(function(L){ (L||[]).forEach(function(c){ if(!_rvLblMap[c[0]]) _rvLblMap[c[0]]=c[1]; }); }); }
+  return _rvLblMap[field]||field;
+}
+/* 칸 열쇠 → 어디의 무엇인지 · 지금 값 */
+function _rvWhere(it,D){
+  var f=funds[it.fid]||{}, fn=f.short_name||f.name||it.fid;
+  if(it.t!=='prov') return {fund:fn};
+  var p=it.key.split('|'), r={fund:fn, field:'', site:'', val:''};
+  var site=function(sid){ return ((D.sites||{})[it.fid]||{})[sid]||{}; };
+  if(p[0]==='f'){ r.field=(p[1]==='years')?(p[2]+'년 '+(p[3]==='budget'?'예산 · ':'')+_rvLabel(p[p.length-1])):_rvLabel(p[1]);
+    var v=f; p.slice(1).forEach(function(k){ v=(v||{})[k]; }); r.val=v; }
+  else if(p[0]==='s'){ var st=site(p[1]); r.site=st.name||p[1]; r.sid=p[1];
+    if(p.length>2){ r.field=_rvLabel(p[2]); r.val=st[p[2]]; } else { r.field='사업장 통째'; r.val=''; } }
+  else if(p[0]==='y'){ var st2=site(p[2]); r.site=st2.name||p[2]; r.sid=p[2]; r.field=p[1]+'년 '+_rvLabel(p[3]);
+    r.val=((((D.sy||{})[it.fid]||{})[p[1]]||{})[p[2]]||{})[p[3]]; }
+  else if(p[0]==='c'){ r.field='지원금 제출서류 체크'; r.val='✓'; }
+  return r;
+}
+function _rvValText(v){
+  if(v==null||v==='') return '(비어 있음)';
+  if(Array.isArray(v)) return v.length+'줄';
+  if(typeof v==='object') return Object.keys(v).length+'칸';
+  if(typeof v==='number') return v.toLocaleString();
+  return String(v);
+}
+function _rvNavCount(){
+  var el=$('nav-review-cnt'); if(!el||!RV.data) return;
+  var n=_rvItems(RV.data).length; el.textContent=n?String(n):'';
+}
+function _rvMine(it){ var f=funds[it.fid]||{}; var me=String(S.user||''); return !!me&&((f.mgr_main&&f.mgr_main.name===me)||(f.mgr_subs||[]).some(function(x){ return x&&x.name===me; })); }
+function rvSetKind(k){ RV.kind=k; RV.sel=0; RV.picked={}; renderReview(); }
+function rvToggleMine(){ RV.mine=!RV.mine; RV.sel=0; RV.picked={}; renderReview(); }
+function rvPick(i,on){ if(on) RV.picked[i]=1; else delete RV.picked[i]; _rvBulkBar(); }
+function rvSel(i){ RV.sel=i; renderReview(); }
+function rvReload(){ _rvLoad(true).then(function(){ if(S.view==='review') renderReview(); _rvNavCount(); }).catch(function(e){ toast('읽지 못했습니다: '+((e&&e.message)||e),'err'); }); }
+function renderReview(){
+  $('crumb').textContent='확인함';
+  var D=RV.data;
+  if(!D){ $('app').innerHTML='<div class="panel">'+loadingHTML('기계가 넣은 값을 모으는 중…')+'</div>';
+    _rvLoad().then(function(){ if(S.view==='review') renderReview(); _rvNavCount(); })
+      .catch(function(e){ if(S.view==='review') $('app').innerHTML='<div class="panel"><div class="msg err">확인함을 읽지 못했습니다: '+esc((e&&e.message)||e)+' <button onclick="rvReload()">다시 시도</button></div></div>'; });
+    return; }
+  var all=_rvItems(D), base=RV.mine?all.filter(_rvMine):all;
+  var cnt={}; base.forEach(function(it){ cnt[it.t]=(cnt[it.t]||0)+1; });
+  var items=RV.kind==='all'?base:base.filter(function(it){ return it.t===RV.kind; });
+  RV.items=items; if(RV.sel>=items.length) RV.sel=Math.max(0,items.length-1);
+  var chips=RV_KINDS.map(function(k){ var n=k[0]==='all'?base.length:(cnt[k[0]]||0);
+    if(k[0]!=='all'&&!n) return '';
+    return '<button class="seg'+(RV.kind===k[0]?' on':'')+'" onclick="rvSetKind(\''+k[0]+'\')" style="padding:4px 11px;border-radius:14px'+(RV.kind===k[0]?';background:var(--acc2);color:#fff;border-color:var(--acc2)':'')+'">'+k[1]+' <b>'+n+'</b></button>'; }).join(' ');
+  var lamp='<span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--warn)"></span>';
+  var rows=items.map(function(it,i){
+    var w=_rvWhere(it,D), what='', val='', src='', why='';
+    if(it.t==='prov'){ what=(w.site?esc(w.site)+' · ':'')+esc(w.field); val=esc(_rvValText(w.val)); src=esc(_rvSrcLabel(it.p.src)); why=esc(_rvHowText(it.p)); }
+    else if(it.t==='est'){ what=esc(it.s.name||'')+' · 출연금'; val=esc(it.v.toLocaleString())+' <span class="chip" style="font-size:10px">🧮 추정</span>'; src='사람수 × 단가'; why='서류 근거 없음 — 계산한 값'; }
+    else if(it.t==='xfer'){ what=esc(it.yr)+'년 계좌 간 이체'; val=it.n+'쌍'; src='통장 — 같은 날·같은 금액'; why='짝을 보고 승인해야 장부에 들어갑니다'; }
+    else { what=esc(it.yr)+'년 분개 승인'; val=it.n+'건'+(it.sug?' <span class="muted" style="font-size:11px">(기계 제안 '+it.sug+')</span>':''); src='통장 가져오기'; why='승인 전에는 결산에 못 씁니다'; }
+    return '<tr class="'+(i===RV.sel?'rvon':'')+'" onclick="rvSel('+i+')" style="cursor:pointer'+(i===RV.sel?';background:var(--acc-soft)':'')+'">'
+      +'<td style="text-align:center" onclick="event.stopPropagation()">'+((it.t==='prov'||it.t==='est')?'<input type="checkbox"'+(RV.picked[i]?' checked':'')+' onchange="rvPick('+i+',this.checked)">':'')+'</td>'
+      +'<td class="muted" style="font-size:11.5px">'+(i+1)+'</td><td>'+lamp+'</td>'
+      +'<td style="white-space:nowrap"><b>'+esc(w.fund)+'</b></td><td>'+what+'</td><td style="white-space:nowrap">'+val+'</td>'
+      +'<td class="muted" style="font-size:11.5px;white-space:nowrap">'+src+'</td><td class="muted" style="font-size:11.5px">'+why+'</td></tr>';
+  }).join('');
+  $('app').innerHTML='<div class="panel">'
+    +'<div class="row" style="flex-wrap:wrap;gap:8px;margin:0 0 10px"><h1 style="margin:0">✅ 확인함</h1>'+hlp('review.inbox')
+    +'<span class="muted" style="font-size:12px">기계가 넣고 아직 원본과 대조하지 않은 것</span><span style="flex:1"></span>'
+    +'<label style="font-size:12.5px;display:inline-flex;gap:4px;align-items:center"><input type="checkbox"'+(RV.mine?' checked':'')+' onchange="rvToggleMine()"> 내 기금만</label>'
+    +'<button onclick="rvReload()" title="서버에서 다시 모으기">↻ 다시 모으기</button></div>'
+    +(D.fail?'<div class="msg warn" style="font-size:12px;margin:0 0 8px">일부 자료를 읽지 못했습니다 — 목록이 덜 찼을 수 있습니다. [↻ 다시 모으기]</div>':'')
+    +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:0 0 10px">'+chips+'</div>'
+    +(items.length
+      ?'<div class="rvwrap"><div style="min-width:0"><div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table>'
+        +'<thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th style="width:22px"></th><th>기금</th><th>무엇</th><th>값</th><th>어디서</th><th>왜 확인</th></tr></thead>'
+        +'<tbody>'+rows+'</tbody></table></div><div id="rvBulk"></div>'
+        +'<div class="muted" style="font-size:11.5px;margin-top:6px">↑↓ 옮기기 · Enter 맞음 · 고칠 것은 [✎ 고치러 가기]</div></div>'
+        +'<div id="rvSide">'+_rvSide(items[RV.sel],D)+'</div></div>'
+      :'<div class="msg ok" style="font-size:13px">확인할 것이 없습니다'+(RV.kind!=='all'||RV.mine?' (이 거르기에서)':'')+'.</div>')
+    +'</div>';
+  _rvBulkBar(); _rvNavCount(); _rvBindKeys();
+}
+function _rvBulkBar(){
+  var b=$('rvBulk'); if(!b) return; var n=Object.keys(RV.picked).length;
+  b.innerHTML=n?'<div class="row" style="gap:8px;margin-top:8px;padding:8px 11px;border-radius:9px;background:var(--ink);color:#fff;font-size:12.5px">'+n+'건 선택'
+    +'<button class="primary" onclick="rvOkPicked()" style="padding:4px 11px">✓ 고른 것 맞음</button>'
+    +'<span style="flex:1"></span><button onclick="RV.picked={};renderReview()" style="padding:3px 9px">✕</button></div>':'';
+}
+function _rvSide(it,D){
+  if(!it) return '';
+  var w=_rvWhere(it,D), f=funds[it.fid]||{};
+  var head='<div class="muted" style="font-size:11.5px">'+esc(w.fund)+(w.site?' · '+esc(w.site):'')+'</div>';
+  var btn=function(label,on,primary){ return '<button'+(primary?' class="primary"':'')+' onclick="'+on+'" style="padding:7px 10px">'+label+'</button>'; };
+  if(it.t==='prov'){
+    var kind=String(it.p.src||'').indexOf('scan:')===0?String(it.p.src).slice(5):'';
+    var hasScan=kind&&(f.scans||{})[kind];
+    return head+'<h3 style="margin:2px 0 8px;font-size:15px">'+esc(w.field)+'</h3>'
+      +'<div class="muted" style="font-size:11.5px">지금 값</div><div style="font-size:19px;font-weight:800;margin:2px 0 8px;word-break:break-all">'+esc(_rvValText(w.val))+'</div>'
+      +'<table style="font-size:12.5px"><tr><td class="muted" style="width:62px">어디서</td><td>🤖 '+esc(_rvSrcLabel(it.p.src))+'</td></tr>'
+      +'<tr><td class="muted">언제</td><td>'+esc(it.p.at||'')+'</td></tr><tr><td class="muted">넣은 사람</td><td>'+esc(it.p.by||'(모름)')+'</td></tr></table>'
+      +'<div class="msg warn" style="font-size:12px;margin:8px 0">'+esc(_rvHowText(it.p))+'</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'
+      +btn('✓ 맞음 <span class="muted" style="font-size:10.5px;color:#fff">Enter</span>','rvOk('+RV.sel+')',true)
+      +btn('✎ 고치러 가기','rvGo('+RV.sel+')')
+      +(hasScan?btn('📷 원본 보기','rvScan(\''+it.fid+'\',\''+esc(kind)+'\')'):'')+'</div>';
+  }
+  if(it.t==='est'){
+    var rate=num(f.contrib_per_worker)||0, size=num(it.s.company_size)||0;
+    return head+'<h3 style="margin:2px 0 8px;font-size:15px">출연금 (추정)</h3>'
+      +'<div style="font-size:19px;font-weight:800;margin:2px 0 4px">'+esc(it.v.toLocaleString())+'원</div>'
+      +'<div class="muted" style="font-size:12px;margin-bottom:8px">상시근로자 '+size+'명 × 1인당 '+rate.toLocaleString()+'원</div>'
+      +'<div class="msg warn" style="font-size:12px;margin:0 0 8px">서류에서 읽은 값이 아니라 계산한 값입니다. 실제 약정 금액이 맞으면 [맞음] — 이 금액을 기본 출연금으로 적습니다.</div>'
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+btn('✓ 이 금액이 맞음','rvOk('+RV.sel+')',true)+btn('✎ 다른 금액 — 고치러 가기','rvGo('+RV.sel+')')+'</div>';
+  }
+  if(it.t==='xfer') return head+'<h3 style="margin:2px 0 8px;font-size:15px">'+esc(it.yr)+'년 계좌 간 이체 '+it.n+'쌍</h3>'
+      +'<div class="muted" style="font-size:12.5px;margin-bottom:8px">같은 날·같은 금액이 한 계좌에서 나가고 다른 계좌로 들어온 짝입니다. 짝을 보고 고른 것만 승인합니다.</div>'
+      +btn('🔁 짝 보러 가기','rvGo('+RV.sel+')',true);
+  return head+'<h3 style="margin:2px 0 8px;font-size:15px">'+esc(it.yr)+'년 분개 승인 '+it.n+'건</h3>'
+      +'<div class="muted" style="font-size:12.5px;margin-bottom:8px">'+(it.sug?'기계가 계정을 골라 둔 것 '+it.sug+'건(🤖) — 맞으면 승인, 다르면 계정을 바꿉니다. ':'')+'승인 전에는 결산에 쓰지 못합니다.</div>'
+      +btn('📒 회계·결산에서 보기','rvGo('+RV.sel+')',true);
+}
+/* 「맞음」 — 칸 값은 확인 표시만, 추정 출연금은 그 금액을 기본 출연금으로 적는다 */
+function rvOk(i){ var it=RV.items[i]; if(!it) return; _rvOkMany([it]); }
+function rvOkPicked(){
+  var its=Object.keys(RV.picked).map(function(k){ return RV.items[+k]; }).filter(function(it){ return it&&(it.t==='prov'||it.t==='est'); });
+  if(!its.length){ toast('고른 것이 없습니다','warn'); return; }
+  confirmM(its.length+'건을 «맞음»으로 처리할까요?\n\n칸 값은 확인 표시만 붙고(값은 그대로), 추정 출연금은 그 금액이 기본 출연금으로 적힙니다.',{ok:its.length+'건 맞음'}).then(function(ok){ if(ok) _rvOkMany(its); });
+}
+function _rvOkMany(its){
+  var D=RV.data||{}, up={}, cells=[], at=_nowStamp(), by=(S.user||''), nP=0, nE=0;
+  its.forEach(function(it){
+    if(it.t==='prov'){ up['prov/'+it.fid+'/'+it.key+'/ok']={by:by,at:at}; nP++; }
+    else if(it.t==='est'){ up['sites/'+it.fid+'/'+it.sid+'/contrib']=it.v; cells.push({path:'sites/'+it.fid+'/'+it.sid+'/contrib', a:it.v, m:1, src:'calc:rate', how:'list'}); nE++; }
+  });
+  if(!nP&&!nE) return;
+  fbDb.ref(NS).update(up).then(function(){
+    its.forEach(function(it){
+      if(it.t==='prov'&&D.prov&&D.prov[it.fid]&&D.prov[it.fid][it.key]) D.prov[it.fid][it.key].ok={by:by,at:at};
+      if(it.t==='est'&&D.sites&&D.sites[it.fid]&&D.sites[it.fid][it.sid]) D.sites[it.fid][it.sid].contrib=it.v;
+    });
+    if(cells.length&&typeof _track==='function') _track(cells,{what:'추정 출연금 확정(확인함)', ok:true});
+    if(nE) S.sitesFor=null;
+    RV.picked={}; renderReview();
+    toast((nP?'칸 '+nP+'건 확인':'')+(nP&&nE?' · ':'')+(nE?'출연금 '+nE+'곳 확정':''));
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+/* 고치러 가기 — 그 칸이 있는 화면으로. 사업장이면 편집 창까지 연다 */
+function _rvWait(cond,fn,ms){ var t0=Date.now(); (function tick(){ if(cond()) return fn(); if(Date.now()-t0>(ms||8000)) return; setTimeout(tick,200); })(); }
+function rvGo(i){
+  var it=RV.items[i]; if(!it) return;
+  var D=RV.data||{}, w=_rvWhere(it,D), fid=it.fid;
+  var open=function(tab){ S.fundId=fid; S.view='fund'; S.tab=tab; _pushHist(); route(); };
+  if(it.t==='xfer'||it.t==='txn'){
+    S.year=+it.yr; open('closing');
+    if(it.t==='xfer') _rvWait(function(){ return S.view==='fund'&&S.fundId===fid&&S.txnsFor===fid+'/'+it.yr&&S.txns; }, function(){ autoMatchTransfers(); });
+    return;
+  }
+  var sid=it.t==='est'?it.sid:w.sid;
+  if(sid){ open('sites'); _rvWait(function(){ return S.view==='fund'&&S.fundId===fid&&S.sitesFor===fid&&S.sites&&S.sites[sid]; }, function(){ editSite(sid); }); return; }
+  open('info');
+  var fld=it.key.split('|')[1];
+  _rvWait(function(){ return !!$('fd-'+fld); }, function(){ var el=$('fd-'+fld); try{ el.scrollIntoView({block:'center'}); el.focus(); }catch(e){}
+    el.style.outline='3px solid var(--warn)'; setTimeout(function(){ el.style.outline=''; },2400); });
+}
+function rvScan(fid,kind){ S.fundId=fid; openScan(kind); }
+var _rvKeysOn=false;
+function _rvBindKeys(){
+  if(_rvKeysOn) return; _rvKeysOn=true;
+  document.addEventListener('keydown',function(ev){
+    if(S.view!=='review'||ev.isComposing||ev.altKey||ev.ctrlKey||ev.metaKey) return;
+    var t=ev.target&&ev.target.tagName; if(t==='INPUT'||t==='TEXTAREA'||t==='SELECT') return;
+    if(document.getElementById('modalbg')||document.getElementById('confirmbg')) return;
+    if(ev.key==='ArrowDown'){ ev.preventDefault(); if(RV.sel<RV.items.length-1){ RV.sel++; renderReview(); } }
+    else if(ev.key==='ArrowUp'){ ev.preventDefault(); if(RV.sel>0){ RV.sel--; renderReview(); } }
+    else if(ev.key==='Enter'){ var it=RV.items[RV.sel]; if(it&&(it.t==='prov'||it.t==='est')){ ev.preventDefault(); rvOk(RV.sel); } }
+  });
+}
 // ── 청구 관리 (4단계) ──
 /* ══ 푸른이알피(pu-erp) 기금 청구 연동 ══
    원본은 푸른이알피 소유 — 여기서는 **읽기만** 한다(쓰면 사무관리 원장이 깨진다).
@@ -12238,7 +12489,9 @@ function _track(cells,meta){
       var m=(c.m!=null?c.m:meta.m)?1:0;
       var src=String(c.src||meta.src||(m?'auto':'hand')), how=String((c.how!=null?c.how:meta.how)||'');
       var empty=_provEmpty(c.a);
-      up['prov/'+k.fid+'/'+k.key]= empty ? null : {m:m, src:src, how:how, by:by, at:at, bid:bid};
+      var pv={m:m, src:src, how:how, by:by, at:at, bid:bid};
+      if(meta.ok) pv.ok={by:by, at:at};            // 확인함에서 «맞음»을 누르며 쓴 값 — 쓰는 순간 확인된 것
+      up['prov/'+k.fid+'/'+k.key]= empty ? null : pv;
       var cell={}; if(!_provEmpty(c.b)) cell.b=c.b; if(!empty) cell.a=c.a;
       if(!cell.hasOwnProperty('a')&&!cell.hasOwnProperty('b')) cell.x=1;
       up['batches/'+bid+'/cells/'+k.fid+'|'+k.key]=cell;
@@ -18016,7 +18269,8 @@ function setTxnAcct(id,side,val){ var _key=S.fundId+'/'+S.year;
     .then(function(){ if(S.txnsFor===_key&&S.txns&&S.txns[id]){ S.txns[id][side]=val; delete S.txns[id].sug; } renderFund(); })
     .catch(function(e){ toast('저장 실패: '+e.message,'err'); renderFund(); }); }
 /* 분개를 «누가» 골랐나 — 통장 가져오기·직접 추가가 붙인다(sug). 사람이 계정을 바꾸면 걷힌다. */
-var _SUG_LABEL={learned:'전에 승인한 거래처에서 배운 분개', rule:'적요 낱말 규칙으로 고른 분개', site:'참여사업장 이름으로 고른 분개(출연금)'};
+var _SUG_LABEL={learned:'전에 승인한 거래처에서 배운 분개', rule:'적요 낱말 규칙으로 고른 분개', site:'참여사업장 이름으로 고른 분개(출연금)',
+  xfer:'계좌 간 이체로 보이는 짝 — [🔁 이체 자동매칭]에서 짝을 보고 승인'};
 function approveTxn(id,on){
   var x=S.txns&&S.txns[id];
   if(txnLocked(id)){ _lockStop(_monthOf((x||{}).date)); return; }
@@ -18401,6 +18655,11 @@ var HELP={
    +'<p>내용은 <b>기금 정보 · 참여사업장 · 임원 명부</b>에서 옵니다.</p>'
    +'<p>★ <b>맨 위의 표가 「아직 안 적은 자료」</b>를 알려 줍니다 — 무엇이 비었는지, <b>어디에 적는지</b>, 그것을 <b>어느 서식이 읽는지</b>까지. 빈칸이 많으면 그 표부터 채우세요. 한 곳을 적으면 여러 서식이 함께 따라옵니다.</p>'
    +'<p>다섯 단계 <b>모두</b>에 있습니다 — ①인가 ②법인설립 ③고유번호증 ④운영 ⑤근복지원금. ④⑤에는 <b>장부를 읽어야</b> 채워지는 서식이 있어(재산목록표·출연확인서·체크리스트) 그리기 전에 회계 자료를 먼저 읽습니다.</p>'},
+ 'review.inbox':{t:'확인함 — 기계가 넣은 것을 사람 눈으로',h:'<p>서류 판독·기업정보함·가져오기·계산으로 <b>기계가 넣었는데 아직 아무도 원본과 대조하지 않은 것</b>을 한곳에 모았습니다. 위에서부터 보고 누르기만 하면 됩니다.</p>'
+   +'<p><b>칸 값</b> — 맞으면 [✓ 맞음](Enter). 값은 그대로 두고 «누가·언제 확인했다»만 붙습니다. 틀리면 [✎ 고치러 가기]로 그 칸에 가서 고치세요 — 사람이 고친 값은 사람 것으로 적힙니다.</p>'
+   +'<p><b>추정 출연금</b> — 사람수 × 1인당 단가로 계산한 값입니다. [맞음]을 누르면 그 금액을 기본 출연금으로 적습니다.</p>'
+   +'<p><b>이체 짝 · 분개 승인</b> — 기금·연도마다 한 줄입니다. 눌러서 회계 화면으로 가 짝을 보고 승인합니다.</p>'
+   +'<p>서류 확인 창에서 <b>원본 옆에 놓고</b> 넣은 값은 이미 사람이 대조한 것이라 여기 오지 않습니다. 2026-10-05 이전에 들어간 값은 누가 넣었는지 기록이 없어 여기 나오지 않습니다.</p>'},
  'xfer.pick':{t:'계좌 간 이체 — 고른 짝만 상계',h:'<p>같은 날·같은 금액이 한 계좌에서 나가고 다른 계좌로 들어온 짝입니다. 고른 짝은 양쪽을 <b>현금성자산 ↔ 현금성자산</b>으로 상계하고 승인합니다 — 재무제표에 영향이 없고 통장 잔액 대사도 그대로입니다.</p>'
    +'<p><b>계좌 다름</b>은 두 줄의 계좌번호가 달라 이체가 확실한 짝이라 처음부터 골라 둡니다. <b>추정</b>은 계좌번호가 없는 옛 자료라 비워 둡니다 — 맞는 것만 고르세요.</p>'
    +'<p>예전에는 통장을 가져오면 «확실한» 짝을 묻지 않고 승인까지 했습니다. 이제는 이 창에서 사람이 보고 누른 것만 승인되고, 누가·언제 승인했는지 남습니다(2026-10-05).</p>'},
