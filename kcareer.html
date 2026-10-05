@@ -1485,6 +1485,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <h2>홈</h2>
         <div class="desc">이번 달 작성·등록 내역 요약</div>
         <div class="kpi-grid" id="homeKpi"></div>
+        <!-- ⏰ 마감 다가오는 사업 (2026-10-05) — 7일 안에 마감인 사업이 있을 때만 그린다(없으면 빈 자리도 없다) -->
+        <div id="homeBizDue"></div>
         <div id="homeTiles"></div>
         <div class="card" style="margin-top:18px">
           <div style="font-weight:600;color:var(--navy);margin-bottom:10px">연도별 실적 요약</div>
@@ -1875,6 +1877,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <select class="tb-select" id="rsOrgFilter"><option value="">전체 기관</option></select>
           <div class="tb-spacer"></div>
           <span class="cnt" id="rsCnt" style="font-size:11px;color:var(--text-mute)"></span>
+          <button class="btn fs-ui" type="button" onclick="docImportResumeFolder()" title="서류 폴더 «5. 이력서 및 프로필»의 파일을 이력서·프로필 보관함에 한 번에 넣습니다 — 이름에 해가 있으면 그 해, 없으면 연도 모름">📚 5번 폴더 모두 넣기</button>
           <button class="btn primary" id="rsAddExisting">+ 기존 이력서 추가</button>
         </div>
         <div id="rsBody"></div>        </div>
@@ -3506,6 +3509,8 @@ function set(key,arr){
   /* ★ 옆줄 숫자도 여기서 함께 고친다 — 삭제·등록·합치기·스캔이 다 이 길로 지난다.
      ⚠ 화면마다 따로 부르게 하면 «빠뜨린 길»이 반드시 생긴다(실제로 전체 삭제가 그랬다). */
   try{ if(typeof navCountsSoon==='function') navCountsSoon(); }catch(e){}
+  /* 제출서류↔사업관리 잇기 표(_caseMap)는 저장할 때 버린다 — 안 버리면 1.5초 동안 옛 짝을 보여 준다 */
+  try{ if(typeof _caseMapMemo!=='undefined') delete _caseMapMemo[key]; }catch(e){}
   try{ LS.set(NS+key, JSON.stringify(arr)); if(typeof fbScheduleAuto==='function') fbScheduleAuto(key); }catch(e){ if(e.name==='QuotaExceededError'||String(e).includes('quota')||String(e).includes('storage')){ toast('⚠️ 저장공간 부족 — 환경설정 › 저장공간 관리에서 파일 삭제 필요'); console.error('Storage full:',key,e); checkStorageQuota(); } else { toast('저장 오류: '+e.message); console.error(e); } } }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 /* onclick="fn('VALUE')" 안에 안전하게 넣기용: HTML 속성 + 홑따옴표 JS 문자열 이스케이프 (XSS 방어) */
@@ -4607,13 +4612,29 @@ async function hwpViewPdf(){
 }
 
 /* ===== 제출서류 건 열기 — 그 사업에 낸 서류 목록 ===== */
+/* ★ 제출서류 ↔ 사업관리 잇기 (대표 지시 2026-10-05) — 열쇠는 «건 폴더 자리»(caseDir) 하나.
+   ⚠ 이름으로 맞추지 않는다(같은 기관에 해마다 건이 있다) · 서로 «베낀 사본»이라 한쪽을 고쳐도 다른 쪽은 안 바뀐다. */
+/* ⚠ 표 한 줄마다 부른다(제출서류 236줄) — 줄마다 보관함을 통째로 읽으면 느리다. 저장된 글자가 바뀔 때만 다시 짓는다 */
+/* ⚠ 지우는 곳은 set() 한 곳(저장할 때) + 1.5초 — 클라우드에서 통째로 받아 온 경우도 곧 다시 짓는다 */
+var _caseMapMemo={};
+function _caseMap(store){
+  var m=_caseMapMemo[store], now=Date.now();
+  if(m && now-m.at<1500) return m.map;
+  var map={}; (get(store)||[]).forEach(function(r){ if(r && r.caseDir && !r._deleted && !map[r.caseDir]) map[r.caseDir]=r; });
+  _caseMapMemo[store]={ at:now, map:map };
+  return map;
+}
+function _subOfCase(caseDir){ return caseDir ? (_caseMap('submission')[caseDir]||null) : null; }
+function _bizOfCase(caseDir){ return caseDir ? (_caseMap('bizapp')[caseDir]||null) : null; }
 function openSubmissionFiles(id){
   var s = get('submission').find(function(x){ return x.id === id; });
   if(!s){ toast('건을 찾을 수 없습니다'); return; }
   var promoted = s.promoted || [];
+  var 사업 = _bizOfCase(s.caseDir);
   var head = '<div style="font-size:12px;color:var(--text-mute);margin-bottom:10px">'
     + escapeHtml([s.year, s.org].filter(Boolean).join(' · ')) + ' · 서류 ' + (s.fileCount || 0) + '개'
     + (s.caseDir ? '<div style="margin-top:4px;word-break:break-all">' + escapeHtml(s.caseDir) + '</div>' : '')
+    + (사업 ? '<div style="margin-top:6px"><button class="btn sm" type="button" onclick="closeSub();bizOpen(\'' + _jsAttr(사업.id) + '\')" title="같은 건 폴더를 사업관리에도 올려 두었습니다">🏢 사업관리에 있음 — ' + escapeHtml(사업.title || 사업.id) + '</button></div>' : '')
     + '</div>'
     /* 제출·결과 — 표 칸과 같은 값을 여기서도 고친다(목업 ①) */
     + '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-size:12px;margin-bottom:10px">'
@@ -6138,6 +6159,23 @@ function renderHome(){
   _safe(function(){ var old=document.getElementById('homeAccCard'); if(old) old.remove(); });
   if(typeof renderCvRecent==='function') renderCvRecent();
   if(typeof renderHomeTiles==='function') renderHomeTiles();
+  _safe(renderHomeBizDue);
+}
+/* ⏰ 홈 — 7일 안에 마감인 사업 (대표 지시 2026-10-05). 셈은 KcareerBiz.summary 한 곳(사업관리 한눈에와 같은 수).
+   ⚠ 없으면 아무것도 안 그린다 — 「0건」 띠가 늘 떠 있으면 잔소리다. 금액은 안 보인다(홈은 처음 뜨는 화면이다). */
+function renderHomeBizDue(){
+  var box=document.getElementById('homeBizDue'); if(!box) return;
+  if(typeof KcareerBiz==='undefined' || typeof bizAll!=='function'){ box.innerHTML=''; return; }
+  var due=KcareerBiz.summary(bizAll()).due;
+  if(!due.length){ box.innerHTML=''; return; }
+  box.innerHTML='<div class="card" style="margin-top:12px;padding:10px 14px">'
+    +'<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><b style="font-size:13px;color:var(--ink)">⏰ 마감 다가오는 사업 '+due.length+'건</b><span style="flex:1"></span>'
+    +'<button class="btn sm" type="button" onclick="navTile(\'page-bizdash\')">🏢 사업관리</button></div>'
+    +due.slice(0,5).map(function(d){
+      return '<div class="fd-row" onclick="bizOpen(\''+_jsAttr(d.id)+'\')"><span style="width:118px;color:var(--red);font-weight:700">'+escapeHtml(formatDate(d.due)||String(d.due||''))+' (D-'+d.dDay+')</span>'
+        +'<span class="c" title="'+escapeHtml(d.title||'')+'">'+escapeHtml(d.title||'-')+'</span>'
+        +'<span style="color:var(--text-mute)">'+escapeHtml(d.org||'')+'</span><span class="tag navy">'+escapeHtml(d.stage||'')+'</span></div>'; }).join('')
+    +'</div>';
 }
 function navTile(id){ const inf=(typeof navInfo==='function')?navInfo(id):{label:id,grp:null}; nav_to(id, inf.label, inf.grp); }
 function renderHomeTiles(){ const box=document.getElementById('homeTiles'); if(!box||typeof NAV==='undefined') return;
@@ -6918,6 +6956,50 @@ async function confirmResumeSave(){ if(!_docCtx) return; const {domain,mode,file
   } else {
     toast(D.label+' 보관함에 저장됨'+(genSt?' — 다른 PC 에서도 열립니다':' (이 PC 에만 — 창고에 못 올렸습니다)'));
   }
+}
+/* ═══ 📚 5번 폴더 모두 넣기 (대표 지시 2026-10-05) ═══
+   서류 폴더 «5. 이력서 및 프로필»의 파일을 서류 보관함에 한 번에 담는다 — 이름에 «프로필»이 있으면 프로필, 아니면 이력서.
+   ⚠ 이 폴더는 날짜가 «복사한 날»뿐이다 — 연도는 이름에 적힌 해만 쓰고, 없으면 비워 둔다(지어내지 않는다).
+   ⚠ 파일은 «앱에 담는다»(서류 보관함과 같은 길 — 이 PC + 창고). 폴더의 원본은 그대로.
+   ⚠ 한 번 넣은 파일(srcRel 같은 것)은 다시 넣지 않는다. 폴더 이름은 KC_FOLDER 한 곳(fsFolderFor)에서. */
+function docFolderPlan(files, have){
+  var 있음={}; (have||[]).forEach(function(r){ if(r && r.srcRel) 있음[r.srcRel]=1; });
+  return (files||[]).filter(function(f){ return f && !있음[f.relPath] && /\.(hwpx?|docx?|pdf)$/i.test(f.name); }).map(function(f){
+    var 프로필=/프로필|profile/i.test(f.name), y=(String(f.name).match(/(?:^|\D)(20\d{2})(?!\d)/)||[])[1]||'';
+    return { f:f, domain:프로필?'profile':'resume', kind:프로필?'전문분야 프로필':'일반 이력서', year:y };
+  });
+}
+async function docImportResumeFolder(){
+  if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
+  var root=await fsRoot();
+  if(!root){ toast('먼저 위촉장 › ⋯ 더보기 › 📁 서류 폴더 연결을 눌러 폴더를 지정하세요'); return; }
+  var 폴더명=fsFolderFor('resume'), dir=null;
+  try{ dir=await root.getDirectoryHandle(폴더명); }catch(e){ toast('연결한 폴더 안에 「'+폴더명+'」 폴더가 없습니다'); return; }
+  var 목록=[];
+  for await (var ent of dir.entries()){
+    if(ent[1].kind!=='file' || KcareerScan.isIgnoredFile(ent[0])) continue;
+    try{ var fl=await ent[1].getFile(); 목록.push({ name:ent[0], relPath:폴더명+'/'+ent[0], size:fl.size, mtime:new Date(fl.lastModified).toISOString(), handle:ent[1] }); }catch(e){}
+  }
+  var plan=docFolderPlan(목록, (get('resume')||[]).concat(get('profile')||[]));
+  if(!plan.length){ toast('✅ 「'+폴더명+'」의 파일은 이미 모두 들어 있습니다'); return; }
+  var 이력=plan.filter(function(p){ return p.domain==='resume'; }).length, 프로=plan.length-이력, 해있음=plan.filter(function(p){ return p.year; }).length;
+  if(!confirm('「'+폴더명+'」에서 '+plan.length+'개를 넣습니다\n\n· 이력서 '+이력+'개 · 프로필 '+프로+'개\n· 이름에 해가 적힌 '+해있음+'개는 그 해, 나머지는 «연도 모름»\n· 파일은 앱에 담겨 다른 PC 에서도 열립니다(폴더 원본은 그대로)\n\n계속할까요?')) return;
+  var now=new Date().toISOString(), 담음={resume:[],profile:[]}, 창고=0;
+  for(var i=0;i<plan.length;i++){
+    var p=plan[i], bytes=new Uint8Array(await (await p.f.handle.getFile()).arrayBuffer()), ext=(p.f.name.split('.').pop()||'').toLowerCase();
+    if(i%5===0) toast('⏳ '+(i+1)+' / '+plan.length+' 담는 중…');
+    var id=p.domain+'_'+Date.now()+'_'+i, b64=abToB64(bytes);
+    saveFileUnified(id,{ id:id, name:p.f.name, ext:ext, size:bytes.length, base64:b64, savedAt:now });
+    var st=bytes.length<25*1024*1024 ? await kcFormUpload(id, b64, ext) : ''; if(st) 창고++;
+    var e={ id:id, kind:p.kind, year:p.year, org:'', memo:'📂 5번 폴더에서', genFileId:id, genName:p.f.name, origFileId:null, origName:null,
+      submits:[], savedAt:now, fileMtime:p.f.mtime, srcRel:p.f.relPath };
+    if(st) e.genStPath=st;
+    담음[p.domain].push(e);
+  }
+  /* ⚠ 한 번에 저장한다 — 마흔 번 나눠 저장하면 그때마다 클라우드로 올라간다 */
+  ['resume','profile'].forEach(function(d){ if(담음[d].length) set(d, 담음[d].concat(get(d)||[])); });
+  _safe(function(){ renderDocStore('resume'); renderDocStore('profile'); });
+  toast('✅ 이력서 '+담음.resume.length+'개 · 프로필 '+담음.profile.length+'개를 담았습니다'+(창고===plan.length?' — 다른 PC 에서도 열립니다':' — 창고에 '+창고+'개 올림'), 7000);
 }
 function delDoc(domain,id,btn){
   const D=DOMAINS[domain];
@@ -8764,7 +8846,7 @@ const CAREER_CFG={
       <td style="white-space:nowrap">${r.fileCount||0}개</td>
       <td style="white-space:nowrap;font-size:11px">${escapeHtml([r.sentAt?formatDate(r.sentAt):'',r.sentHow||''].filter(Boolean).join(' ')||'-')}</td>
       <td onclick="event.stopPropagation()">${subResultSel(r)}</td>
-      <td style="font-size:11px;color:var(--teal)">${(r.promoted||[]).length?('승격 '+(r.promoted||[]).length):'-'}</td>
+      <td style="font-size:11px;color:var(--teal);white-space:nowrap">${(r.promoted||[]).length?('승격 '+(r.promoted||[]).length):'-'}${_bizOfCase(r.caseDir)?' <span class="tag navy" style="font-size:10px" title="사업관리에도 있습니다 — 줄을 눌러 바로 가기">🏢 사업</span>':''}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'submission',r.title,p,r)}</td></tr>`},
   meetfee:{store:'meetfee',stores:['meetfee','etcfee'],qFields:['content','org','type'],
     cols:['ID','일자','구분','내용/사유','금액','지출처/수령인','관리'],
@@ -14546,7 +14628,7 @@ function renderBizList(){
         +'<td style="white-space:nowrap;font-size:11px">'+escapeHtml([r.sentAt?formatDate(r.sentAt):'', r.sentHow||''].filter(Boolean).join(' ')||'-')+'</td>'
         +'<td>'+_bizStageTag(r.stage)+'</td>'
         +'<td style="text-align:right;white-space:nowrap">'+(_bizMoney(r.amt)||'-')+'</td>'
-        +'<td style="white-space:nowrap">'+(dc?'📁 '+dc:'-')+'</td></tr>'; }).join('')
+        +'<td style="white-space:nowrap">'+(dc?'📁 '+dc:'-')+(_subOfCase(r.caseDir)?' <span class="tag navy" style="font-size:10px" title="제출서류에도 있습니다">📥</span>':'')+'</td></tr>'; }).join('')
     +'</tbody></table>';
   bizSelSync();
 }
@@ -14596,6 +14678,9 @@ function bizDraw(){
     +cell('메모','<textarea class="tb-input" id="bzf-memo" style="width:100%;min-height:46px">'+escapeHtml(r.memo||'')+'</textarea>',true)
     +'</div>'
     +(r.caseDir?'<div style="font-size:11px;color:var(--text-mute);margin-top:6px;word-break:break-all">📂 '+escapeHtml(r.caseDir)+'</div>':'');
+  /* 같은 건 폴더가 제출서류에도 있으면 바로 가기 — 열쇠는 caseDir 하나(_subOfCase) */
+  var 제출=_subOfCase(r.caseDir);
+  if(제출) html+='<div style="margin-top:6px"><button class="btn sm" type="button" onclick="bizClose();openSubmissionFiles(\''+_jsAttr(제출.id)+'\')" title="같은 건 폴더가 제출서류(개인 지원 기록)에도 있습니다">📥 제출서류에 있음 — '+escapeHtml(제출.id)+'</button></div>';
   /* ★ 📈 선정·계약된 사업 → 실적관리 (대표 지시 2026-10-05) — 입력 창을 «채워서 열기»만 한다. 저장은 사람이.
      ⚠ 실적 셋은 이알피 동기화도 받는 칸이다 — 여기서 몰래 쓰면 동기화와 겹친다. 사람이 보고 저장하게 둔다. */
   if(!r._isNew && KcareerBiz.isWin(r.stage)){
