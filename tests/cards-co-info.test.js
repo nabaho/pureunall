@@ -175,7 +175,7 @@ test('찾기 칸은 화면 맨 위 하나만 쓴다', () => {
      한쪽에 남은 글자가 다른 쪽 결과를 조용히 거른다(대표 지시 2026-08-13). */
   assert.doesNotMatch(source, /class="coq"/, '화면 안 찾기 칸이 아직 있다');
   assert.match(source, /function syncPcSearchFor/);
-  assert.match(source, /p\.placeholder = '상호·사업자번호·대표자로 찾기'/);
+  assert.match(source, /p\.placeholder = '상호·사업자번호·대표자·컨설팅 종류로 찾기'/);
 });
 
 test('기업정보에서 친 글자를 기업정보함 찾기칸에 옮기지 않는다', () => {
