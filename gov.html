@@ -132,6 +132,9 @@ details.recban[open]>summary::before{content:'▾ '}
 .rec-fixed td.src{white-space:normal;line-height:1.4}
 .rec-fixed td.act{text-align:right;white-space:nowrap}
 .rec-fixed td.act .btn{margin-left:3px}
+/* 제목을 누르면 공고가 팝업 창으로 (대표 지시 2026-10-05 「열기 버튼 만들지 말고 제목을 클릭하면 팝업」) */
+a.tlink{color:inherit;text-decoration:none;cursor:pointer}
+a.tlink:hover{color:var(--navy);text-decoration:underline}
 .due{font-size:11.5px;white-space:nowrap}
 .due.past{color:#991b1b;font-weight:700}
 .due.soon{color:#854d0e;font-weight:700}
@@ -1205,19 +1208,33 @@ function recWatchHtml(grp){
     return '<tr class="'+(nw?'rec-now':'')+(past?' rec-past':'')+'">'+recChk(grp, x.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(x.date||'')+'</td>'
       +'<td class="src">'+recSrcCell(x, grp)+'</td>'
       +'<td><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td>'
-      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')+esc(x.title)+'</td>'
+      +'<td class="tt">'+(nw?'<span class="tag red">새 글</span> ':'')
+        +(/^https:\/\//.test(x.href||'')?'<a class="tlink" href="'+esc(x.href)+'" title="누르면 공고가 팝업 창으로 열립니다" onclick="return recOpenPost(\''+esc(x.key)+'\')">'+esc(x.title)+'</a>':esc(x.title))+'</td>'
       +recDueCell(pp)
-      +'<td class="act">'+(/^https:\/\//.test(x.href||'')?'<a class="btn sm" href="'+esc(x.href)+'" target="_blank" rel="noopener">🔗 열기</a>':'')
+      +'<td class="act">'
       +'<button class="btn sm" onclick="recWatchCal(\''+esc(x.key)+'\')">📅 마감일</button>'
       +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
   recSelShown(grp, shown.map(function(x){ return x.key; }));
   return head+chips
     +(fr.length>1?'<div class="bar" style="margin:0 0 6px"><button class="btn sm" onclick="recSeenAll(\''+grp+'\')">✓ 새 글 '+fr.length+'건 모두 봤음</button></div>':'')
     +recSelBar(grp, '<button class="btn sm" onclick="recSelSeen(\''+grp+'\',true)">✓ 고른 것 봤음</button> <button class="btn sm" onclick="recSelSeen(\''+grp+'\',false)">↩ 안 본 것으로</button>')
-    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:150px"><col style="width:224px"></colgroup>'
+    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:150px"><col style="width:168px"></colgroup>'
     +'<thead><tr>'+recChkHead(grp)+'<th>날짜</th><th>'+(grp==='kc'?'게시판':'기관')+'</th><th>갈래</th><th>제목</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
     +shown.map(row).join('')+'</tbody></table></div>'
     +(list.length>shown.length?'<div class="sml">이미 본 옛 글 '+(list.length-shown.length)+'건은 줄였습니다</div>':'');
+}
+/* 공고를 팝업 창으로 — 한 창을 돌려 쓴다(누를 때마다 창이 쌓이지 않게). 연 글은 «봤음»으로 적는다.
+   ⚠ 팝업이 막히면 새 탭으로 연다(a 의 href 가 그대로 산다 — return true). */
+function recOpenPost(key){
+  var x=recWatchHits().filter(function(h){ return h.key===key; })[0];
+  if(!x || !/^https:\/\//.test(x.href||'')) return false;
+  var w=Math.min(1200, (screen.availWidth||1280)-80), h=Math.min(900, (screen.availHeight||900)-80);
+  var win=null;
+  try{ win=window.open(x.href, 'recPost', 'popup=yes,width='+w+',height='+h+',left='+Math.max(0,((screen.availWidth||1280)-w)/2)+',top=40,scrollbars=yes,resizable=yes'); }catch(e){ win=null; }
+  var s=recObj('recruit_seen'); if(!s[key]){ s[key]=Date.now(); recObjSet('recruit_seen', s); recDraw(); }
+  if(!win){ toast('팝업이 막혀 새 탭으로 엽니다 — 주소창 오른쪽에서 이 사이트의 팝업을 허용해 주세요'); return true; }
+  try{ win.focus(); }catch(e){}
+  return false;
 }
 function recSeen(key){ var s=recObj('recruit_seen'); s[key]=Date.now(); recObjSet('recruit_seen', s); recDraw(); }
 /* grp 를 주면 그 탭(과 지금 고른 갈래)의 새 글만 */

@@ -35,7 +35,8 @@ function runApp(seed, opt) {
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
     prompt: () => answers.shift(), confirm: () => (opt.confirm !== false),
-    open: (u) => { opened.push(u); },
+    open: (u, n, f) => { opened.push(opt._open ? { u, n, f } : u); return opt._open ? opt._open(u, n, f) : undefined; },
+    screen: { availWidth: 1600, availHeight: 900 },
     TextDecoder, Uint8Array, PuKordocText: opt.kordoc
   };
   ctx.window = ctx;
@@ -45,10 +46,11 @@ function runApp(seed, opt) {
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
-    + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,'
+    + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
+  ctx.__api.setOpen = (fn) => { opt._open = fn; };
   return { api: ctx.__api, el, store, opened, toasts };
 }
 /* 오늘을 2026-12-05 로 못박는다 */
@@ -340,7 +342,8 @@ test('★ javascript: 주소는 링크로 안 그린다', async () => {
   await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
   assert.doesNotMatch(w, /javascript:alert/);
-  assert.match(w, /href="https:\/\/www\.erc\.re\.kr\/v\?1"/);
+  assert.match(w, /<a class="tlink" href="https:\/\/www\.erc\.re\.kr\/v\?1"[^>]*onclick="return recOpenPost\('k1'\)">2027년 외부연구진 풀 공개 모집<\/a>/);
+  assert.doesNotMatch(w, /🔗 열기/, '「열기」 단추는 없다 — 제목을 누른다');
 });
 test('★ 폴더를 안 읽었어도 새 모집 글은 보인다', async () => {
   const r = runApp({});
@@ -829,7 +832,7 @@ test('★★ 열 맞춤 — 새 모집 글·메일 표는 칸 너비를 못박�
   r.api.setFb(fbWith(MIX), 'U1');
   await r.api.recWatchPull();
   const kc = r.el('recWatchKc').innerHTML;
-  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:150px"><col style="width:224px"><\/colgroup>/);
+  assert.match(kc, /<table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:150px"><col style="width:168px"><\/colgroup>/);
   assert.match(kc, /<th class="chk"><input type="checkbox"[^>]*><\/th><th class="rn">№<\/th><th>날짜<\/th><th>게시판<\/th><th>갈래<\/th><th>제목<\/th><th>기간<\/th>/);
   const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
   assert.match(src, /\.rec-fixed\{table-layout:fixed;width:100%\}/);
@@ -931,4 +934,23 @@ test('★★ 메일 표도 ㅁ·№·기간 — 고른 결과 메일 한꺼번�
   r.api.recSelSkip('ask');
   const sk = r.api.recObj('recruit_mailskip');
   assert.ok(sk['f|1'] && sk['f|2']);
+});
+
+test('★★ 제목을 누르면 공고가 «팝업 창»으로 — 한 창을 돌려 쓰고, 연 글은 봤음', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1'); await r.api.recWatchPull();
+  const ret = r.api.recOpenPost('k1');
+  assert.equal(ret, true, '팝업을 못 열었으면(가짜 창) 링크로 새 탭');
+  assert.ok(r.api.recObj('recruit_seen').k1, '연 글은 봤음으로');
+  assert.ok(r.toasts.some((t) => /팝업이 막혀/.test(t)));
+  assert.equal(r.api.recOpenPost('k2'), false, 'https 가 아닌 주소는 열지 않는다');
+  const src = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
+  assert.match(src, /window\.open\(x\.href, 'recPost', 'popup=yes,/, '같은 이름의 팝업 창(recPost)을 돌려 쓴다');
+});
+test('★ 팝업이 열리면 링크로 새 탭을 또 열지 않는다(false)', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1'); await r.api.recWatchPull();
+  r.api.setOpen((u, n, f) => ({ focus(){}, u, n, f }));
+  assert.equal(r.api.recOpenPost('k1'), false);
+  assert.equal(r.opened[0].n, 'recPost'); assert.match(r.opened[0].f, /popup=yes/);
 });
