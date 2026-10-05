@@ -448,3 +448,33 @@ test('고치는 주소는 글 번호 하나만 받는다', () => {
     assert.equal(W.고치는주소(못된것), null, '못된 글 번호(' + 못된것 + ')를 받아 줬다');
   });
 });
+
+/* ══════ 자동 내리기(2026-10-05) — 손댈 수 있는 게시판은 «둘뿐», 그 글이 «그 게시판 것»일 때만 ══════ */
+test('게시판글주소 — 허용 목록 밖 게시판·잘못된 번호는 null', () => {
+  assert.ok(W.게시판글주소('partner_board', 185));
+  assert.ok(W.게시판글주소('people_board', 7));
+  assert.ok(String(W.게시판글주소('partner_board', 185)).endsWith('/partner_board/185'));
+  ['notice', 'admin', '', null, 'people_board/../admin'].forEach((못된것) => {
+    assert.equal(W.게시판글주소(못된것, 185), null, '허용 밖 게시판(' + 못된것 + ')을 받아 줬다');
+  });
+  ['', null, 0, -1, 1.5, '1;x', '185 OR 1=1'].forEach((못된것) => {
+    assert.equal(W.게시판글주소('partner_board', 못된것), null, '못된 글 번호(' + 못된것 + ')를 받아 줬다');
+  });
+});
+
+test('자동 내리기 게시판 목록에는 구성원·자문사현황만 있다', () => {
+  assert.ok(W.내릴게시판.includes('people_board'));
+  assert.ok(W.내릴게시판.includes('partner_board'));
+  assert.ok(W.내릴게시판.every(b => /^(people|partner)_board$/.test(b)),
+    '공지사항·상담문의 같은 게시판이 끼면 그 글이 자동으로 휴지통에 갈 길이 생깁니다: ' + W.내릴게시판);
+});
+
+test('게시판확인 — 관리자로 열어 200 이고 옮겨 보내지 않을 때만 ok', () => {
+  assert.equal(W.게시판확인(200, ''), 'ok');
+  assert.equal(W.게시판확인(200, null), 'ok');
+  /* 라이믹스는 남의 게시판 주소로 열면 제 게시판으로 옮겨 보낸다(2026-10-05 실측) */
+  assert.equal(W.게시판확인(301, '/partner_board/185'), '다른게시판');
+  assert.equal(W.게시판확인(302, '/people_board/9'), '다른게시판');
+  assert.notEqual(W.게시판확인(200, '/partner_board/185'), 'ok');
+  [403, 404, 500, 0].forEach((s) => assert.notEqual(W.게시판확인(s, ''), 'ok', s + ' 를 ok 로 봤다'));
+});
