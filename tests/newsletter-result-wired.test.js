@@ -35,11 +35,14 @@ test('★ 세 가지를 «다» 읽는다 — 하나만 빠져도 반쪽이다',
   assert.ok(읽기.length > 100, '결과읽기 함수를 못 찾았다');
   assert.ok(/newsletter\/opens\//.test(읽기), '★ 열람을 안 읽는다');
   assert.ok(/pucards\/scheduled/.test(읽기), '★ 대기열(나갔나)을 안 읽는다');
-  assert.ok(/mailbox\/msgs\/inbox/.test(읽기), '★ 푸른메일함(반송)을 안 읽는다');
+  /* ⚠ 2026-10-05 — 예전엔 'mailbox/msgs/inbox' 를 못 박았는데 그 자리가 «비어 있었다»(진짜 열쇠는 INBOX-xxxx).
+       이 검사가 잘못된 자리를 지켜 반송을 한 건도 못 찾았다. 이제 «폴더 목록의 kind:inbox» 를 찾는지 본다. */
+  assert.ok(/mailbox\/folders/.test(읽기) && /kind === 'inbox'/.test(읽기), '★ 푸른메일함(반송)을 진짜 받은메일함에서 안 읽는다');
+  assert.ok(!/mailbox\/msgs\/inbox'/.test(읽기), '★ 빈 자리(mailbox/msgs/inbox)를 또 읽는다');
 });
 
 test('★ 메일함을 «통째로» 읽지 않는다 — 요금이 는다', () => {
-  assert.ok(/mailbox\/msgs\/inbox'\)\s*\.limitToLast\(/.test(읽기),
+  assert.ok(/mailbox\/msgs\/' \+ 받은\)\s*\.limitToLast\(/.test(읽기),
     '★ 받은편지함을 통째로 가져온다');
   assert.ok(!/\.on\(/.test(읽기),
     '★ 켜 두고 계속 받는다 — 이 칸은 들어올 때 한 번만 읽으면 된다');

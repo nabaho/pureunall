@@ -81,7 +81,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
   /* 2026-10-04 뉴스레터 일요일 보충(일 17:00, newsletterSundayRefill) — 주 1회라 하루 셈엔 안 든다 */
   /* 2026-10-04 «오늘만» 23시 보충(newsletterRefillOnce20261004) — 10/4 하루만 일하고 다음 날 지운다.
        지우면 이 수도 19 로 되돌린다. 한 번뿐이라 하루 셈·화면 설명엔 안 넣는다. */
-  assert.strictEqual(all.length, 20, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
+  /* 2026-10-05 뉴스레터 반송 확인(매일 9:00, newsletterBounceScan) — 하루 셈 +1 */
+  assert.strictEqual(all.length, 21, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
@@ -169,7 +170,7 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
     + Math.round(60 / sync.every) * sync.hours
-    + 7    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기·컨설턴트 모집 감시·공인노무사회 자료 — 각 하루 한 번
+    + 8    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·취업규칙 모으기·컨설턴트 모집 감시·공인노무사회 자료·뉴스레터 반송 확인 — 각 하루 한 번
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
   /* ⚠ 숫자를 박지 않는다 — 코드에서 셈한 값이 화면에 그대로 있는가만 본다 */
