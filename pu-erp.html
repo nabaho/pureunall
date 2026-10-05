@@ -22753,13 +22753,15 @@ function ContractModal(props){
         if(!hint) return null;
         var u0 = (lawyers || []).find(function(x){ return x.sid === f.managerMain; });
         var un = hint.prog.unit;
-        return h('div', { style:{ gridColumn:'1 / -1', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px',
-            padding:'5px 10px', fontSize:'12px', color:'#1e40af', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
+        var cap = hint.prog.yearMax || 0, over = cap && hint.nextDays > cap;
+        return h('div', { style:{ gridColumn:'1 / -1', background: over ? '#fef2f2' : '#eff6ff', border:'1px solid ' + (over ? '#fecaca' : '#bfdbfe'), borderRadius:'6px',
+            padding:'5px 10px', fontSize:'12px', color: over ? '#991b1b' : '#1e40af', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
             title:'주담당 기준 · 회계연도 · 컨설팅관리에 들어온 건 = 수행 / 계약관리 이관 전 = 예정 (이 계약은 빼고 셈)' },
           hint.prog.icon + ' ' + (u0 ? u0.name : f.managerMain) + ' · ' + hint.fyYear + ' 회계연도 — ',
           h('b', null, (hint.cnt + hint.planCnt) + '건 · ' + (hint.days + hint.planDays) + un),
           ' (수행 ' + hint.cnt + ' · 예정 ' + hint.planCnt + ') · 이 계약까지 ',
-          h('b', null, hint.nextCnt + '건 · ' + hint.nextDays + un));
+          h('b', null, hint.nextCnt + '건 · ' + hint.nextDays + (cap ? '/' + cap : '') + un),
+          over ? ' ⚠ 한 해 최대 ' + cap + un + '을(를) ' + (hint.nextDays - cap) + un + ' 넘습니다' : null);
       })(),
       /* 부담당 — 사람마다 칸 하나. 자리마다 select 를 두어 «그 자리»만 바꾼다.
          휴직·재배정이 필요한 사람은 라벨에 🚫 를 붙여 «말로» 알린다
@@ -66186,8 +66188,10 @@ function FinanceVAT(){
 /* 같은 «단가 × 단위 수» 셈을 쓰는 사업 둘 — 현장클리닉(일)과 기술보호(회). 띠·확인 창이 이 설명서로 글자·잣대를 정한다.
    ⚠ 기술보호는 최대 3회(max) — 그 위의 «짐작»은 버린다. 현장클리닉은 한도 없음(0). 정부사업일정 사업 찾기(govMatch)도 사업마다 다르다. */
 var UNIT_PROGS = {
-  clinic: { key:'clinic', name:'현장클리닉', icon:'🏥', unit:'일', what:'며칠', isType:clinicIsType, max:0, govMatch:null, color:'#166534' },
-  tech:   { key:'tech',   name:'기술보호',   icon:'🛡', unit:'회', what:'몇 회', isType:techIsType,   max:3, govMatch:function(nk){ return nk.indexOf('기술보호') >= 0; }, color:'#1e40af' }
+  /* yearMax — 담당자 한 사람의 «한 해» 수행 최대치 (대표 지시 2026-10-05 「연간 수행일수는 30일이 맥시멈 — 표시해라」).
+     ⚠ 막지는 않는다 — 보여 주고 넘으면 빨갛게 알릴 뿐. 현장클리닉 30일 · 기술보호 33(1회 = 1일로 본다, 대표 2026-10-05 「기술보호컨설팅은 33일」). 0 이면 안 보인다. */
+  clinic: { key:'clinic', name:'현장클리닉', icon:'🏥', unit:'일', what:'며칠', isType:clinicIsType, max:0, yearMax:30, govMatch:null, color:'#166534' },
+  tech:   { key:'tech',   name:'기술보호',   icon:'🛡', unit:'회', what:'몇 회', isType:techIsType,   max:3, yearMax:33, govMatch:function(nk){ return nk.indexOf('기술보호') >= 0; }, color:'#1e40af' }
 };
 function ClinicDayCards(props){
   var prog = props.prog || UNIT_PROGS.clinic;
@@ -66221,6 +66225,11 @@ function ClinicDayCards(props){
     var cnt = u === '일' ? '일수' : '회차';
     lines.push('수행 ' + s.cnt + '건(컨설팅관리) · ' + s.days + u);
     if(s.planCnt) lines.push('예정 ' + s.planCnt + '건(계약관리, 이관 전)' + (s.planDays ? ' · ' + s.planDays + u : ''));
+    if(!isTotal && prog.yearMax){
+      var tot = s.days + (s.planDays || 0);
+      lines.push('한 해 최대 ' + prog.yearMax + u + ' — 수행' + (s.planDays ? '+예정' : '') + ' ' + tot + u
+        + (tot > prog.yearMax ? ' ⚠ ' + (tot - prog.yearMax) + u + ' 넘음' : ' · 남은 ' + (prog.yearMax - tot) + u));
+    }
     if(s.est) lines.push('≈ ' + s.est + '건은 ' + cnt + '가 안 적혀 잔금으로 셈(' + feeNote + ')');
     if(s.done) lines.push('📦 끝난 ' + s.done + '건은 아래 표가 아니라 「📦 종료 보기」에 있습니다');
     if(s.skip) lines.push('「미수행 종료」 ' + s.skip + '건은 셈에서 뺐습니다');
@@ -66246,7 +66255,11 @@ function ClinicDayCards(props){
       h('b', { style:{ color: on ? '#fff' : '#1e40af', fontSize:'13px' } }, all + '건'),
       isTotal
         ? h('span', { style:{ color: on ? '#fff' : '#166534', fontWeight:700 } }, '· 수행 ' + s.cnt + ' · ' + s.days + u)
-        : h('span', { style:{ color: on ? '#fff' : '#166534', fontWeight:700 } }, s.days + u),
+        : (function(){
+            var cap = prog.yearMax || 0, over = cap && (s.days + (s.planDays || 0)) > cap;
+            return h('span', { style:{ color: on ? '#fff' : (over ? '#dc2626' : '#166534'), fontWeight:700 } },
+              (over ? '⚠ ' : '') + s.days + (cap ? '/' + cap : '') + u);
+          })(),
       s.planCnt ? h('span', { style:{ color: on ? '#fff' : '#d97706', fontSize:'11px', fontWeight:700 } }, (isTotal ? '+예정 ' : '예정 ') + s.planCnt) : null);
   }
   var navS = { border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'0 7px', cursor:'pointer', color:'#475569', flex:'0 0 auto', lineHeight:'20px' };
@@ -66258,7 +66271,8 @@ function ClinicDayCards(props){
   var listBox = openSlot && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'6px 10px', marginTop:'-4px', marginBottom:'8px' } },
     h('div', { style:{ display:'flex', alignItems:'baseline', gap:'8px', whiteSpace:'nowrap' } },
       h('b', { style:{ fontSize:'12.5px' } }, props.userName(openSid) + ' · ' + prog.icon + ' ' + prog.name + ' · ' + fyLabel),
-      h('span', { style:{ fontSize:'11.5px', color:'#64748b' } }, (openSlot.cnt + openSlot.planCnt) + '건 · 수행 ' + openSlot.cnt + '건 ' + openSlot.days + u
+      h('span', { style:{ fontSize:'11.5px', color: prog.yearMax && (openSlot.days + (openSlot.planDays || 0)) > prog.yearMax ? '#dc2626' : '#64748b' } },
+        (openSlot.cnt + openSlot.planCnt) + '건 · 수행 ' + openSlot.cnt + '건 ' + openSlot.days + (prog.yearMax ? '/' + prog.yearMax : '') + u
         + (openSlot.planCnt ? ' · 예정 ' + openSlot.planCnt + '건(계약관리, 이관 전)' : '')),
       h('span', { style:{ flex:1 } }),
       h('button', { onClick:function(){ setOpenSid(''); }, title:'목록 닫기', style:navS }, '✕')),
