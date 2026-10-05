@@ -645,13 +645,15 @@ function manyRecords(n) {
   return a;
 }
 
-test('★ 한꺼번에 절반 넘게 지워지면 사람에게 묻는다 — 안 물으면 조용히 사라진다', async () => {
+test('★ 한꺼번에 절반 넘게 지워지면 묻지 않고 전부 보존한다 — 재접속 신호로 자료를 지우지 않는다', async () => {
   const keys = ['contracts'];
+  let asked = 0;
   const env = makeEnv({
     fin: true, serverKeys: keys, serverU: { contracts: 900 }, ls: withCache(keys, 1),
     records: { contracts: manyRecords(20) },
     confirmDelete: false                       // 사람이 「아니오」
   });
+  env.sandbox.confirm = () => { asked++; return false; };
   await env.sync();
   await tick();
   for (let i = 0; i < 12; i++) {
@@ -660,7 +662,8 @@ test('★ 한꺼번에 절반 넘게 지워지면 사람에게 묻는다 — 안
   await new Promise(r => setTimeout(r, 160));
   const arr = JSON.parse(env.sandbox.localStorage.getItem('pureun_v6_contracts'));
   assert.equal(arr.length, 20,
-    '★ 「아니오」인데 묻기 전의 지움까지 반영했습니다(남은 ' + arr.length + '건)');
+    '★ 대량 동기화 신호가 로컬 자료를 지웠습니다(남은 ' + arr.length + '건)');
+  assert.equal(asked, 0, '대량 삭제 확인창을 띄웠습니다 — 자동 보존해야 합니다');
 });
 
 test('★★ 지웠다 같은 id가 다시 오면 「목록 모양 바꿈」이다 — 삭제 경고도 자료 변경도 없다', async () => {
