@@ -196,7 +196,7 @@ test('★★★ 걸린 줄에는 «왜 걸렸는지»와 «되돌리는 단추»
 function matched(rows, opts){
   const o = opts || {};
   const ctx = { String, Number, Object, Boolean, console,
-    state: { mbFilter:'', mbQ:'', mbSpamShow: !!o.show, mbPage:1, mbPageFor:'' },
+    state: { mbFilter:'', mbQ:'', mbSpamShow: !!o.show, mbPage:1, mbPageFor:'', mbOpenOnly:false },
     _mbFolders: { 'INBOX-x': { kind:'inbox' } },
     _mbCo:{}, _mbWhoMsg:{}, _mbNotSpam:{}, _mbSpamOff: o.off === true,
     _mbMemo: null,
@@ -206,7 +206,7 @@ function matched(rows, opts){
   vm.createContext(ctx);
   vm.runInContext(bare.match(/const MB_SENT_KINDS = [^\n]*/)[0], ctx);
   ['mbMemoOf','mbWhoKey','mbDomOf','mbFolderBy','mbSpamOn','mbBrokenText','mbBadLocal',
-   'mbSpamWhy','mbIsSpam','mbMatchedRows'].forEach(n=>
+   'mbSpamWhy','mbIsSpam','mbOpenOnly','mbMatchedRows'].forEach(n=>
     vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return ctx.mbMatchedRows();
 }
