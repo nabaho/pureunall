@@ -3863,7 +3863,9 @@ function renderForms(){
   function formRow(d,i){
     var kind=d[0], tk=!!(HWP_TPL_KINDS[kind]&&_hwpTplFits(kind,cur)), label=(i+1)+'. '+d[1], reg=(S._hwpHas||{})[kind], on=(S._sideKind===kind);
     return '<div onclick="selectForm(\''+kind+'\')" style="display:flex;align-items:center;gap:6px;padding:8px 8px;border-bottom:1px solid var(--line);flex-wrap:wrap;cursor:pointer;border-radius:7px'+(on?';background:var(--warn-bg);box-shadow:inset 3px 0 0 var(--warn)':'')+'" onmouseover="if(!'+on+')this.style.background=\'var(--hover,#f8fafc)\'" onmouseout="this.style.background=\''+(on?'var(--warn-bg)':'')+'\'">'
-      +'<span style="flex:1;min-width:170px;font-size:13px;font-weight:600">'+esc(label)+' <span style="font-size:10.5px;color:var(--sub);font-weight:400">'+(on?'▶ 오른쪽에 표시 중':'클릭=미리보기')+'</span></span>'
+      +'<span style="flex:1;min-width:170px;font-size:13px;font-weight:600">'+esc(label)
+      +(fundMode&&HWP_TPL_VALUES[kind]?' <span class="fgate" data-fk="'+kind+'"></span>':'')     // 서식 관문 — 🤖 미확인 N(_formGatePaint)
+      +' <span style="font-size:10.5px;color:var(--sub);font-weight:400">'+(on?'▶ 오른쪽에 표시 중':'클릭=미리보기')+'</span></span>'
       +'<span onclick="event.stopPropagation()">'
       /* ★ 한글 틀이 있는 서식은 «틀에 채워 여는 것»이 첫째 길이다(2026-09-23) — 원본 한글과 같은 엔진이 그린다 */
       +(tk
@@ -3939,6 +3941,7 @@ function renderForms(){
     +'<div style="flex:1;min-width:300px;position:sticky;top:8px;align-self:flex-start" class="panel" id="formSide"><p class="muted" style="font-size:12.5px;padding:26px 16px;text-align:center">👈 왼쪽에서 <b>서식 이름을 클릭</b>하세요 '+hlp('forms.fund')+'</p></div>'
     +'</div>';
   if(S._sideKind) sidePreview(S._sideKind);   // 선택된 서식은 재렌더 후에도 오른쪽에 유지
+  if(fundMode) setTimeout(function(){ if(typeof _formGatePaint==='function') _formGatePaint(); },0);   // 서식마다 🤖 미확인 N
 }
 // 서식 이름 클릭 → 선택 저장 + 목록 하이라이트 + 오른쪽 미리보기
 function selectForm(kind){ if(S._sideKind!==kind) S._sideHtml=null; S._sideKind=kind; renderForms(); }   // 임베드/자료실 모두 현재 HOST에 재렌더
@@ -9227,11 +9230,13 @@ function _bundleHwpPlan(ph,f){
   });
   return {use:use, skip:skip};
 }
-function estabBundleHwp(phase){
+/* draftN — 서식 관문에서 「초안」으로 받기를 골랐으면 미확인 칸 수. 파일마다 모든 쪽에 「초안 · 미확인 N」을 찍는다 */
+function _estabBundleHwpGo(phase,draftN){
   var f=curForm(); if(!f||f._sample){ toast('기금을 먼저 고르세요','warn'); return; }
   var ph=ESTAB_PHASES.filter(function(p){ return p[0]===phase; })[0]||ESTAB_PHASES[0];
   var plan=_bundleHwpPlan(ph,f), btn=$('bundleHwpBtn');
   if(!plan.use.length){ toast('이 단계에는 한글 틀이 있는 서식이 없습니다 — [🖨 전부 인쇄]를 쓰세요','warn'); return; }
+  var mk=function(b){ return draftN?_hwpDraftMark(b,'초안 · 미확인 '+draftN):Promise.resolve(b); };
   var say=function(t){ if(btn) btn.textContent=t; };
   if(btn) btn.disabled=true;
   var fail=[], got=0;
@@ -9242,11 +9247,13 @@ function estabBundleHwp(phase){
       /* 장부를 읽어야 채워지는 서식(재산목록·출연확인서…)은 한 서식 열 때처럼 그 서식 몫을 먼저 읽는다 */
       var pre=DOC_NEEDS_LEDGER[u.d[0]]?_docExtra(u.d[0],f).catch(function(){ return null; }):Promise.resolve();
       return pre.then(function(){ return hwpTplFill(u.d[0],f,sites); }).then(function(res){
+        return mk(res.bytes).then(function(b){ res.bytes=b; return res; });
+      }).then(function(res){
         z.file(('0'+(u.i+1)).slice(-2)+'. '+String(u.d[1]).replace(/[\\\/:*?"<>|]/g,'_')+'.hwpx',res.bytes); got++;
         /* 인가신청서에 「별지 명단과 같음」이 적혔으면 별지를 바로 뒤에 */
         if(u.d[0]==='inka'&&!('별지명단' in (res.opts||{}))&&(S._hwpTplHas||{}).inka_annex&&_cmAnnexNeeded(f,sites))   // 틀 안에 별지가 있으면 또 붙이지 않는다
-          return hwpTplFill('inka_annex',f,sites).then(function(ax){
-            z.file(('0'+(u.i+1)).slice(-2)+'-1. [별지] 설립준비위원회 위원 명단.hwpx',ax.bytes);
+          return hwpTplFill('inka_annex',f,sites).then(function(ax){ return mk(ax.bytes); }).then(function(ab){
+            z.file(('0'+(u.i+1)).slice(-2)+'-1. [별지] 설립준비위원회 위원 명단.hwpx',ab);
           }).catch(function(){ fail.push((u.i+1)+'-1. [별지] 위원 명단'); });
       }).catch(function(){ fail.push((u.i+1)+'. '+u.d[1]); });
     }); },Promise.resolve()).then(function(){
@@ -9255,13 +9262,173 @@ function estabBundleHwp(phase){
     });
   }).then(function(blob){
     var a=document.createElement('a'); a.href=URL.createObjectURL(blob);
-    a.download=(f.short_name||f.name||'기금')+'_'+String(ph[1]).replace(/[\\\/:*?"<>|]/g,'_')+'_한글원본.zip';
+    a.download=(draftN?'[초안] ':'')+(f.short_name||f.name||'기금')+'_'+String(ph[1]).replace(/[\\\/:*?"<>|]/g,'_')+'_한글원본.zip';
     document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500);
-    toast('한글 원본 '+got+'종을 한 묶음으로 받았습니다'
+    toast((draftN?'「초안」 표시로 ':'')+'한글 원본 '+got+'종을 한 묶음으로 받았습니다'
       +(plan.skip.length?' · 틀 없는 '+plan.skip.length+'종('+plan.skip.join(', ')+')은 [🖨 전부 인쇄]로':'')
       +(fail.length?' · 못 채운 '+fail.length+'종: '+fail.join(', '):''),(fail.length||plan.skip.length)?'warn':undefined);
   }).catch(function(e){ toast('받지 못했습니다: '+((e&&e.message)||e),'err'); })
     .then(function(){ if(btn){ btn.disabled=false; btn.textContent='⬇ 한글 원본 전부'; } });
+}
+/* ══ 서식 관문 (대표 지시 2026-10-05 「추천대로」 — 자동화 확인 목업 5) ══
+   기계가 넣고 아직 아무도 원본과 대조하지 않은 값(🤖)이 서식에 들어가면, 날인용으로 묶기 «전에» 그 칸만 모아 보여 준다.
+     [N칸 확인하고 받기] — 그 칸들에 확인 표시(확인함과 같은 prov/…/ok)를 붙이고 깨끗한 원본으로
+     [「초안」 표시 넣어 받기] — 파일마다 «모든 쪽» 가운데 글 뒤에 흐린 「초안 · 미확인 N」(머리말 안 글상자 — 글줄은 그대로)
+   ★ 서식이 «실제로 읽는 칸»만 센다 — 서식 값을 만드는 함수(HWP_TPL_VALUES)를 한 번 돌리며 읽은 칸을 적는다(_formDeps).
+     손으로 칸 목록을 따로 적어 두면 서식이 바뀔 때 어긋난다.
+   ⚠ 출처 기록이 없는 값(2026-10-05 이전)은 «모른다» — 미확인으로 세지 않는다(지어내지 않는다).
+   ⚠ 추정 출연금(🧮 사람수 × 단가)도 여기서 거른다 — 확인하면 그 금액이 기본 출연금으로 적힌다(확인함과 같다). */
+function _formDeps(kind,f,sites){
+  var fn=HWP_TPL_VALUES[kind]; if(typeof fn!=='function'||typeof Proxy==='undefined') return null;
+  var F={}, SS={};
+  var spy=function(o,bag){ return new Proxy(o||{},{get:function(t,k){ if(typeof k==='string') bag[k]=1; return t[k]; }}); };
+  var ps=(sites||[]).map(function(s){ var id=(s&&s._id)||''; var bag=SS[id]=SS[id]||{}; return spy(s,bag); });
+  try{ fn(spy(f||{},F),ps); }catch(e){}
+  return {f:F, s:SS};
+}
+/* 이 서식에서 «확인 안 된» 값 — [{key, lab, val, est?, sid?, v?}]. 서식 값 함수가 없으면 null(모른다) */
+function _formUnconf(kind,f,sites,P){
+  P=P||{};
+  if(!_estabKind(kind)) sites=(sites||[]).filter(function(s){ return s&&(s.status||'active')!=='closed'; });
+  var d=_formDeps(kind,f,sites); if(!d) return null;
+  var out=[];
+  Object.keys(d.f).forEach(function(k){
+    if(_provState(P['f|'+k])==='a') out.push({key:'f|'+k, lab:_rvLabel(k), val:(f||{})[k]});
+  });
+  (sites||[]).forEach(function(s){
+    var id=s&&s._id, bag=id&&d.s[id]; if(!bag) return;
+    var nm=s.name||'사업장', read=Object.keys(bag).filter(function(k){ return k!=='_id'&&k!=='status'; });
+    read.forEach(function(k){ if(_provState(P['s|'+id+'|'+k])==='a') out.push({key:'s|'+id+'|'+k, lab:nm+' · '+_rvLabel(k), val:s[k]}); });
+    if(read.length&&_provState(P['s|'+id])==='a') out.push({key:'s|'+id, lab:nm+' · 가져온 자료 통째', val:''});
+    if(bag.contrib&&!(num(s.contrib)>0)){ var v=siteContribOf(s,f); if(v>0) out.push({key:'est|'+id, est:1, sid:id, v:v, lab:nm+' · 출연금 🧮 사람수 × 단가 추정', val:v}); }
+  });
+  return out;
+}
+/* 여러 서식의 미확인 칸을 한데 — 같은 칸은 한 줄(한 번 확인하면 모든 서식에) */
+function _formUnconfMany(kinds,f,sites,P){
+  var by={}, order=[];
+  kinds.forEach(function(kd){
+    (_formUnconf(kd[0],f,sites,P)||[]).forEach(function(it){
+      if(!by[it.key]){ by[it.key]=Object.assign({forms:[]},it); order.push(it.key); }
+      by[it.key].forms.push(kd[1]);
+    });
+  });
+  return order.map(function(k){ return by[k]; });
+}
+/* 서식 목록 줄마다 「🤖 미확인 N」 — 기금 자료로 채우는 화면에서만 */
+var FG={fid:'', sites:null, at:0, busy:false};
+function _formGatePaint(){
+  if(S.formsCtx!=='fund') return;
+  var fid=S.formFund, f=funds[fid]; if(!f) return;
+  var els=[].slice.call(document.querySelectorAll('.fgate[data-fk]')); if(!els.length) return;
+  if(typeof _provSub==='function') _provSub(fid);
+  var paint=function(){
+    els.forEach(function(el){
+      var its=_formUnconf(el.getAttribute('data-fk'),f,FG.sites||[],PV.fid===fid?PV.v:{});
+      el.innerHTML=(its&&its.length)?'<span class="chip warn" style="font-size:10px" title="기계가 넣고 아직 원본과 대조하지 않은 값: '
+        +esc(its.map(function(x){ return x.lab; }).slice(0,8).join(' · '))+(its.length>8?' 외':'')+'">🤖 미확인 '+its.length+'</span>':'';
+    });
+  };
+  if(FG.fid===fid&&FG.sites&&Date.now()-FG.at<60000) return paint();
+  if(FG.busy) return; FG.busy=true;
+  _loadSites(fid,{withClosed:true}).then(function(ss){ FG.fid=fid; FG.sites=ss; FG.at=Date.now(); }).catch(function(){})
+    .then(function(){ FG.busy=false; if(S.formFund===fid) paint(); });
+}
+/* [⬇ 한글 원본 전부] — 묶기 전에 관문을 지난다 */
+function estabBundleHwp(phase){
+  var f=curForm(); if(!f||f._sample){ toast('기금을 먼저 고르세요','warn'); return; }
+  var ph=ESTAB_PHASES.filter(function(p){ return p[0]===phase; })[0]||ESTAB_PHASES[0];
+  var plan=_bundleHwpPlan(ph,f), fid=S.formFund;
+  if(!plan.use.length) return _estabBundleHwpGo(phase,0);
+  Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; })]).then(function(r){
+    var its=_formUnconfMany(plan.use.map(function(u){ return u.d; }),f,r[0],r[1]);
+    if(!its.length) return _estabBundleHwpGo(phase,0);
+    S._gate={phase:phase, fid:fid, items:its};
+    var rows=its.slice(0,40).map(function(it){
+      return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b>'+esc(_rvValText(it.val))+'</b> '+(it.est?'🧮':'🤖')
+        +' <span class="muted" style="font-size:11px">— '+esc(it.forms.join(' · '))+(it.forms.length>1?' (같은 값 — 한 번 확인하면 모두)':'')+'</span></div>';
+    }).join('')+(its.length>40?'<div class="muted" style="font-size:11.5px;padding-top:4px">외 '+(its.length-40)+'칸 — 확인함에서 모두 볼 수 있습니다</div>':'');
+    showModal('<h3 style="margin:0 0 4px">날인용으로 묶기 전에 — 확인 안 된 값 '+its.length+'칸</h3>'
+      +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 받고, 아직이면 「초안」 표시로 받으세요.</div>'
+      +'<div style="max-height:46vh;overflow:auto">'+rows+'</div>'
+      +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px;flex-wrap:wrap">'
+      +'<button onclick="closeM()">취소</button>'
+      +'<button onclick="closeM();_estabBundleHwpGo(S._gate.phase,S._gate.items.length)" title="모든 쪽 가운데에 흐린 「초안 · 미확인 '+its.length+'」 — 제출본이 아닙니다">「초안」 표시 넣어 받기</button>'
+      +'<button class="primary" onclick="formGateOk()" title="값은 그대로, 확인 표시만 붙이고 깨끗한 원본으로 받습니다">'+its.length+'칸 확인하고 받기 ▸</button></div>',{width:620});
+  }).catch(function(e){ toast('확인할 값을 읽지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* [N칸 확인하고 받기] — 확인함의 「맞음」과 같은 자리에 쓴다(칸 값=prov/…/ok · 추정 출연금=기본 출연금으로 확정) */
+function formGateOk(){
+  var G=S._gate; if(!G) return;
+  var up={}, cells=[], at=_nowStamp(), by=(S.user||''), nP=0, nE=0;
+  G.items.forEach(function(it){
+    if(it.est){ up['sites/'+G.fid+'/'+it.sid+'/contrib']=it.v; cells.push({path:'sites/'+G.fid+'/'+it.sid+'/contrib', a:it.v, m:1, src:'calc:rate', how:'list'}); nE++; }
+    else { up['prov/'+G.fid+'/'+it.key+'/ok']={by:by,at:at}; nP++; }
+  });
+  fbDb.ref(NS).update(up).then(function(){
+    if(cells.length&&typeof _track==='function') _track(cells,{what:'추정 출연금 확정(서식 관문)', ok:true});
+    _audit(G.fid,'서식 관문 확인',(nP?'칸 '+nP:'')+(nP&&nE?' · ':'')+(nE?'출연금 '+nE+'곳':''));
+    if(nE) S.sitesFor=null;
+    if(typeof RV!=='undefined') RV.at=0;
+    FG.at=0; closeM();
+    _estabBundleHwpGo(G.phase,0);
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+/* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색. 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
+   한글로 정관 9쪽·인가신청서 2쪽을 열어 모든 쪽에 찍히고 줄 위치가 원본과 같은 것을 확인했다(2026-10-05).
+   ⚠ 실패하면 표시 없는 원본 대신 «오류»로 둔다 — 초안이 제출본처럼 나가면 안 된다. */
+function _hwpDraftMarkXml(sec,hdr,text){
+  var cpM=/<hh:charProperties itemCnt="(\d+)">/.exec(hdr), ppM=/<hh:paraProperties itemCnt="(\d+)">/.exec(hdr);
+  var c0=/<hh:charPr id="0"[\s\S]*?<\/hh:charPr>/.exec(hdr), p0=/<hh:paraPr id="0"[\s\S]*?<\/hh:paraPr>/.exec(hdr);
+  var pg=/<hp:pagePr[^>]*\bwidth="(\d+)"[^>]*\bheight="(\d+)"/.exec(sec), runEnd=sec.indexOf('</hp:run>');
+  if(!cpM||!ppM||!c0||!p0||!pg||runEnd<0) return null;
+  var maxId=function(tag){ var n=-1; hdr.replace(new RegExp('<hh:'+tag+' id="(\\d+)"','g'),function(_,d){ n=Math.max(n,+d); return _; }); return n; };
+  var cid=maxId('charPr')+1, pid=maxId('paraPr')+1;
+  var cNew=c0[0].replace('id="0"','id="'+cid+'"').replace(/\bheight="\d+"/,'height="4400"').replace(/textColor="[^"]*"/,'textColor="#C8C8C8"').replace(/<hh:italic\/>/g,'');
+  if(!/<hh:bold\/>/.test(cNew)) cNew=cNew.replace('<hh:underline','<hh:bold/><hh:underline');
+  var pNew=p0[0].replace('id="0"','id="'+pid+'"').replace(/<hh:align horizontal="[A-Z_]+"/,'<hh:align horizontal="CENTER"')
+    .replace(/<hh:lineSpacing type="[A-Z_]+" value="\d+"/g,'<hh:lineSpacing type="PERCENT" value="100"');
+  hdr=hdr.replace('</hh:charProperties>',cNew+'</hh:charProperties>').replace(cpM[0],'<hh:charProperties itemCnt="'+(+cpM[1]+1)+'">')
+    .replace('</hh:paraProperties>',pNew+'</hh:paraProperties>').replace(ppM[0],'<hh:paraProperties itemCnt="'+(+ppM[1]+1)+'">');
+  var W=+pg[1], H=+pg[2], w=42000, h=9000, x=Math.round((W-w)/2), y=Math.round((H-h)/2);
+  var t=String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var rect='<hp:rect id="1999000001" zOrder="0" numberingType="PICTURE" textWrap="BEHIND_TEXT" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="1999000002" ratio="0">'
+    +'<hp:offset x="0" y="0"/><hp:orgSz width="'+w+'" height="'+h+'"/><hp:curSz width="'+w+'" height="'+h+'"/><hp:flip horizontal="0" vertical="0"/>'
+    +'<hp:rotationInfo angle="0" centerX="'+(w/2)+'" centerY="'+(h/2)+'" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
+    +'<hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>'
+    +'<hp:lineShape color="#C8C8C8" width="33" style="NONE" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" headfill="1" tailfill="1" headSz="SMALL_SMALL" tailSz="SMALL_SMALL" outlineStyle="NORMAL" alpha="0"/>'
+    +'<hp:shadow type="NONE" color="#B2B2B2" offsetX="0" offsetY="0" alpha="0"/>'
+    +'<hp:drawText lastWidth="'+w+'" name="" editable="0"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+    +'<hp:p id="0" paraPrIDRef="'+pid+'" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="'+cid+'"><hp:t>'+t+'</hp:t></hp:run></hp:p>'
+    +'</hp:subList><hp:textMargin left="283" right="283" top="283" bottom="283"/></hp:drawText>'
+    +'<hc:pt0 x="0" y="0"/><hc:pt1 x="'+w+'" y="0"/><hc:pt2 x="'+w+'" y="'+h+'"/><hc:pt3 x="0" y="'+h+'"/>'
+    +'<hp:sz width="'+w+'" widthRelTo="ABSOLUTE" height="'+h+'" heightRelTo="ABSOLUTE" protect="0"/>'
+    +'<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="0" allowOverlap="1" holdAnchorAndSO="0" vertRelTo="PAPER" horzRelTo="PAPER" vertAlign="TOP" horzAlign="LEFT" vertOffset="'+y+'" horzOffset="'+x+'"/>'
+    +'<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:shapeComment>초안 표시</hp:shapeComment></hp:rect>';
+  var hi=sec.indexOf('<hp:header ');
+  if(hi>=0){                                   // 머리말이 이미 있으면 그 첫 run 에 얹는다(한 쪽에 머리말은 하나)
+    var ri=sec.indexOf('<hp:run ',hi), he=sec.indexOf('</hp:header>',hi);
+    if(ri<0||ri>he) return null;
+    var close=sec.indexOf('>',ri);
+    sec=(sec.charAt(close-1)==='/') ? sec.slice(0,close-1)+'>'+rect+'</hp:run>'+sec.slice(close+1) : sec.slice(0,close+1)+rect+sec.slice(close+1);
+  } else {
+    sec=sec.slice(0,runEnd)+'<hp:ctrl><hp:header id="0" applyPageType="BOTH"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="TOP" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
+      +'<hp:p id="0" paraPrIDRef="'+pid+'" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="'+cid+'">'+rect+'</hp:run></hp:p></hp:subList></hp:header></hp:ctrl>'
+      +sec.slice(runEnd);
+  }
+  return {sec:sec, hdr:hdr};
+}
+function _hwpDraftMark(bytes,text){
+  return _loadJsZip().then(function(JSZip){ return JSZip.loadAsync(bytes); }).then(function(z){
+    var sf=z.file('Contents/section0.xml'), hf=z.file('Contents/header.xml');
+    if(!sf||!hf) throw new Error('「초안」 표시를 넣지 못했습니다(구조)');
+    return Promise.all([sf.async('string'),hf.async('string')]).then(function(a){
+      var r=_hwpDraftMarkXml(a[0],a[1],text);
+      if(!r) throw new Error('「초안」 표시를 넣지 못했습니다');
+      z.file('Contents/section0.xml',r.sec); z.file('Contents/header.xml',r.hdr);
+      return z.generateAsync({type:'uint8array',compression:'DEFLATE',mimeType:'application/hwp+zip'});
+    });
+  });
 }
 /* ── 생성 서식 → 한글(HWPX) 저장 ──
    화면에 그려진 초안을 공용 서식층(hwpx_doc.js)이 그대로 옮긴다.
@@ -12578,7 +12745,8 @@ function _provSub(fid){
   PV.fid=fid; PV.v={}; PV.ref=null;
   if(!fid||typeof fbDb==='undefined') return;
   PV.ref=fbDb.ref(NS+'/prov/'+fid);
-  PV.ref.on('value',function(sn){ if(PV.fid!==fid) return; PV.v=sn.val()||{}; _provPaint(); },function(){ PV.v={}; });
+  PV.ref.on('value',function(sn){ if(PV.fid!==fid) return; PV.v=sn.val()||{}; _provPaint();
+    if(typeof _formGatePaint==='function') _formGatePaint(); },function(){ PV.v={}; });   // 서식 목록의 🤖 미확인 N 도 함께
 }
 var PV_SRC={hand:'사람',card:'기업정보함',auto:'기계','guess:office':'소재지로 추정','copy:prev':'작년 값','calc:budget':'계산','calc:rate':'사람수 × 단가'};
 function _provSrcLabel(src){
