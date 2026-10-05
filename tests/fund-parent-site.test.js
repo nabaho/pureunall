@@ -50,8 +50,8 @@ const COS = [
   { id: 'co-f1', name: '가나산업사내근로복지기금', bizNo: '123-45-67890', typeCode: '자문', status: 'closed' },   // 기금 줄(회사 번호가 잘못 들어감)
   { id: 'co-a', name: '주식회사 가나산업', bizNo: '123-45-67890', ceo: '홍길동', address: '충남 ○○시', phone: '041-000-0000',
     bizType: '제조업', bizCategory: '부품', monthlyAdvisoryFee: 550000, managerMain: 'P-001', puNo: '자문-1' },
-  { id: 'co-b', name: '가나산업물류', bizNo: '222-81-00000' },
-  { id: 'co-c', name: '다라상사', bizNo: '333-81-00000' },
+  { id: 'co-b', name: '가나산업물류', bizNo: '123-81-00002' },
+  { id: 'co-c', name: '다라상사', bizNo: '123-81-00003' },
 ];
 
 test('기금 이름에서 회사 몫만 떼어 낸다', () => {

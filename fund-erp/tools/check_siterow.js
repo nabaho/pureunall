@@ -51,6 +51,8 @@ global.num = v => (v==null||v===''?'':Math.round(Number(String(v).replace(/[^0-9
 (0, eval)(gF('_siteContacts'));
 (0, eval)(gF('_siteWrep'));
 global.maxEmp = 20;
+/* 상호 옆 🔗 업체관리 딱지(2026-10-05 사내기금 모회사) — 칸을 세지 않는 덧글자라 여기서는 비운다 */
+global.siteCoChip = () => '';
 /* 2026-09-14: 대표사업장 별은 «지역기금에만» 선다. 줄을 그리는 쪽은 이 값만 본다 —
    여기서는 켠 채로 그려 별이 제자리에 서는지 보고, 아래에서 끈 채로 한 번 더 그린다. */
 global.별쓰나 = true;
