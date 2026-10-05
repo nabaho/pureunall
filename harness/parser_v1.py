@@ -30,7 +30,7 @@ FIELDS = {
     "고용보험": ["고용보험"],
     # 연말/중도정산 정산액(부호 그대로: 음수=환급, 양수=추가징수). 공제란에 표시.
     "연말정산": ["연말정산", "중도정산", "연말정산세액", "연말정산정산액"],
-    "공제총액": ["공제총액", "공제계", "공제합계", "공제금액", "공제 계"],
+    "공제총액": ["공제총액", "공제계", "공제합계", "공제금액", "공제 계", "공제액총계"],
     "실수령":   ["차인지급액", "차인지급", "실지급액", "실수령액", "실수령", "실지급", "차감지급", "실지급총액"],
     "지급총액": ["지급총액", "지급합계", "지급계", "급여계", "총지급액", "지급액계",
                 "지급 합계", "지급액 계", "지급액", "총지급"],
@@ -257,12 +257,129 @@ def score_sheet(ws):
             "extra_ded": extra_ded, "daily": daily, "daymap": daymap}
 
 
+# ══════════════════════════════════════════════════════════════
+#  줄 묶음 대장 — 머리글이 K줄이고 직원 한 명도 K줄인 표 (실측 2026-10-05)
+#    머리글 1줄: 국민연금 | 갑근세 | 지급액 총계     직원 1줄: 값 | 값 | 지급총액
+#    머리글 2줄: 건강보험 | 주민세 | 공제액 총계     직원 2줄: 값 | 값 | 공제총액
+#    머리글 3줄: 고용보험 |        | 차인 지급액     직원 3줄: 값 |    | 실수령
+#  score_sheet 는 머리글 K줄을 한 칸으로 합쳐 읽어(→ 실수령에 지급총액이 들어감)
+#  주민번호 줄을 자료 시작으로 잡았다(→ 첫 직원이 빠짐). 여기서는 «머리글 i번째 줄의
+#  칸 = 직원 i번째 줄의 값»으로 짝짓는다.
+#  ⚠ 오인 방지 — 둘 다 맞을 때만 이 길로 간다:
+#    ① 성명 칸의 이름이 정확히 K줄(K≥2)마다 나온다(보통 대장은 1줄마다)
+#    ② 한 칸에 줄마다 다른 항목이 쌓인 칸이 STACK_MIN개 이상(묶음 제목 한 칸은 해당 없음)
+# ══════════════════════════════════════════════════════════════
+STACK_MIN = 3
+
+
+def score_stacked(ws):
+    rows = list(ws.iter_rows(min_row=1, max_row=ws.max_row, max_col=min(ws.max_column, 60), values_only=True))
+    if not rows:
+        return None
+    width = max(len(r) for r in rows)
+    rows = [tuple(list(r) + [None] * (width - len(r))) for r in rows]
+    # 성명 머리글 칸(맨 위 25줄 안에서 처음 나오는 것)
+    hn = cn = None
+    for i, row in enumerate(rows[:25]):
+        for c, v in enumerate(row):
+            if v is not None and match_field(v) == "성명":
+                hn, cn = i, c
+                break
+        if hn is not None:
+            break
+    if hn is None:
+        return None
+    # 머리글 단어(「입사일」 등)는 한글 3자라 이름처럼 보인다 — 항목으로 읽히는 글자는 뺀다
+    names = [i for i in range(hn + 1, len(rows))
+             if rows[i][cn] is not None and is_name(str(rows[i][cn]).strip())
+             and not match_field(rows[i][cn])]
+    if len(names) < 2:
+        return None
+    from collections import Counter
+    k, n = Counter(b - a for a, b in zip(names, names[1:])).most_common(1)[0]
+    if k < 2 or n < 0.6 * (len(names) - 1):
+        return None
+    starts = [i for i in names if (i - hn) % k == 0]
+    if not starts:
+        return None
+    # 머리글 K줄 창: 성명 줄을 품는 창 중 항목이 가장 많이 잡히는 것(자료 같은 줄은 제외)
+    best = None
+    for h0 in range(max(0, hn - k + 1), hn + 1):
+        win = rows[h0:h0 + k]
+        if any(sum(1 for v in r if parse_num(v) is not None) >= 3 for r in win):
+            continue
+        hits = sum(1 for r in win for v in r if v is not None and match_field(v))
+        if best is None or hits > best[1]:
+            best = (h0, hits)
+    if best is None:
+        return None
+    h0 = best[0]
+    li_name = hn - h0
+    fmap, extra = {}, []          # (줄, 칸) → 항목
+    for li in range(k):
+        for c, v in enumerate(rows[h0 + li]):
+            if v is None or (li == li_name and c == cn):
+                continue
+            f = match_field(v)
+            if f and f != "성명" and f not in fmap.values():
+                fmap[(li, c)] = f
+            elif not f and any(p in str(v) for p in EXTRA_DED_PAT):
+                extra.append((li, c))
+    by_col = {}
+    for (li, c), f in fmap.items():
+        by_col.setdefault(c, set()).add(f)
+    if li_name > 0 or any(c == cn for (_, c) in fmap):
+        by_col.setdefault(cn, set()).add("성명")   # 성명 칸에도 다른 줄 항목(입사일 등)이 쌓인 경우
+    if sum(1 for fs in by_col.values() if len(fs) >= 2) < STACK_MIN:
+        return None
+    daily = any(kw in _nows(v) for r in rows[h0:h0 + k] for v in r if v is not None
+                for kw in ("임금총액", "노무비", "출역"))
+    return {"k": k, "h0": h0, "li_name": li_name, "cn": cn, "fmap": fmap, "extra": extra,
+            "starts": starts, "rows": rows, "daily": daily}
+
+
+def parse_stacked(ws, st):
+    rows, k, li_name, cn = st["rows"], st["k"], st["li_name"], st["cn"]
+    daily = st["daily"] or any(kw in ws.title for kw in ("일용", "노임", "노무"))
+    employees = []
+    for ni in st["starts"]:
+        b = ni - li_name
+        if b < st["h0"] + k or b + k > len(rows):
+            continue
+        nm = str(rows[ni][cn]).strip()
+        emp = {"성명": nm}
+        for (li, c), f in st["fmap"].items():
+            v = rows[b + li][c]
+            val = parse_date(v) if f in DATE_FIELDS else parse_num(v)
+            if val is not None:
+                emp[f] = val
+        ex = 0
+        for (li, c) in st["extra"]:
+            v = parse_num(rows[b + li][c])
+            if v is not None:
+                ex += v
+        if ex:
+            emp["기타공제"] = ex
+        if daily and emp.get("과세총액") is not None:
+            emp.setdefault("지급총액", emp["과세총액"])
+        if len(emp) >= 3:
+            employees.append(emp)
+    return employees
+
+
 def pick_and_parse(wb):
     """워크북에서 급여대장 시트들을 골라 파싱. 시트별 결과 리스트."""
     out = []
     for ws in wb.worksheets:
         nm = ws.title.lower()
         if any(b in nm for b in SHEET_BAD):
+            continue
+        st = score_stacked(ws)
+        if st:
+            employees = parse_stacked(ws, st)
+            if employees:
+                out.append({"sheet": ws.title, "fields": sorted(set(st["fmap"].values()) | {"성명"}),
+                            "n_emp": len(employees), "employees": employees, "줄묶음": st["k"]})
             continue
         sc = score_sheet(ws)
         if not sc:
