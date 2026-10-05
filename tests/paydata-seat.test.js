@@ -47,6 +47,10 @@ function loadApp(appState) {
     "const READ_TEXT_KINDS = ['sheet','doc','pdf','text'];",
     cut('sumBarHtml'), cut('sumTagHtml'), cut('canSumRow'), cut('sumRows'), cut('sumLeft'),
     cut('guessTag'), cut('pendTagOf'), cut('setPendTag'), cut('screenPending'),
+    /* 대기 칸이 사업장으로 묶여 그려진다(2026-10-05) — 묶기 부품도 함께 싣는다 */
+    cut('pendGroups'), cut('pendEditHtml'), cut('foldGroups'), cut('foldIsOpen'), cut('foldKeyOf'),
+    cut('cleanMailTitle'), cut('isBodyRow'), cut('fileIcon'), cut('monthShort'), cut('fmtWhen'),
+    'function ownerNameOf(u){ return u; }',
     cut('drawerCounts'), cut('drawerModel'), cut('searchRows'),
     cut('folderCounts'), cut('folderRows'), cut('folderBar'), cut('folderEditorHtml'),
     cut('folderOptionsHtml'), cut('monthShift'), cut('monthCount'), cut('monthAhead'), "const WEEKDAY = ['일','월','화','수','목','금','토'];", cut('todayLabel'), cut('monthStripHtml'), cut('sideCtx'), cut('guessTag'), cut('siteState'), cut('sideListModel'), cut('coArrivedAt'), cut('seatNow'), cut('drawerSeats'), cut('byName'), cut('canEditRow'), cut('screenDrawer'),
