@@ -71,7 +71,7 @@ test('취업규칙 바로가기 묶음은 PC 에서 «없는 셈»이라 PC 짜�
   const html = read('rules.html');
   assert.match(html, /header \.hdr-nav\{display:contents\}/,
     'display:contents 여야 PC 에서 감싼 것이 짜임에 끼어들지 않습니다.');
-  const hdr = html.slice(html.indexOf('<header>'), html.indexOf('</header>'));
+  const hdr = html.slice(html.indexOf('<header'), html.indexOf('</header>'));
   assert.match(hdr, /<span class="hdr-nav">/);
   assert.ok(hdr.indexOf('href="enter.html">← 포털로</a></span>') > 0,
     '바로가기 묶음이 「← 포털로」까지 감싸야 한 줄 띠가 됩니다.');

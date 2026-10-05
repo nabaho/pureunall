@@ -1,0 +1,30 @@
+/* 취업규칙 머리줄 «한 벌» — 왼쪽 묶음(로고·이름)과 갈래 단추(🏢 사업장 · ✏️ 검토·개정 · 📚 조별 문안 · 📥 모은 자료)
+   (대표 지시 2026-10-05 「이부분 위치가 안바뀌고 고정위치로 되었으면 좋겠다」)
+
+   rules.html(✏️)과 rules-v2.html(🏢·📚·📥)은 «한 앱»인데 머리줄을 제각각 짜서, 갈래를 누를 때마다
+   단추 묶음이 튀었다(1500px 실측: x 147↔152 · y 7↔11 · 폭 367↔386 · 머리줄 45↔51px, 이름 접는 폭 1200↔1100).
+   → 두 파일이 «이 파일 하나»를 싣는다. 단추 앞에 오는 것(로고·이름)도 두 파일이 같다.
+
+   ⚠ 페이지 <style> «뒤»에 싣는다 — rules-v2 의 .top 처럼 같은 세기의 페이지 규칙을 이기려면 뒤여야 한다.
+   ⚠ 여기 있는 모양을 페이지 안에 다시 두지 말 것 — 두 벌이면 또 갈린다(tests/rules-shell.test.js).
+   ⚠ 머리줄의 «오른쪽»(단계 막대·⚖·⋯·로그인 이름)은 파일마다 다르다 — 단추가 왼쪽에 붙어 있으므로 자리에 안 끼친다. */
+
+.rs-head{padding:6px 18px;gap:10px;min-height:45px;box-sizing:border-box}
+.rs-head .rs-logo{flex:0 0 auto;width:32px;height:32px;margin:0;border-radius:9px;background:#1e40af;color:#ffffff;
+  display:grid;place-items:center;font-weight:800;font-size:16px;font-family:"Noto Sans KR",system-ui,sans-serif;box-shadow:none}
+.rs-head .rs-name{flex:0 0 auto;font-weight:700;font-size:16px;line-height:20px;color:#1e293b;white-space:nowrap;
+  font-family:"Noto Sans KR",system-ui,sans-serif}
+
+.rmode{display:inline-flex;flex:0 0 auto;margin:0;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#ffffff;
+  font-family:"Noto Sans KR",system-ui,sans-serif}
+.rmode a{padding:5px 12px;font-size:12.5px;line-height:19px;color:#475569;white-space:nowrap;text-decoration:none}
+.rmode a+a{border-left:1px solid #cbd5e1}
+/* 켜진 단추는 «굵기» 대신 그림자로 굵게 보인다 — font-weight 를 바꾸면 그 글자 폭이 1~2px 늘어 옆 단추가 밀린다(갈래마다 켜진 단추가 다르다) */
+.rmode a.on{background:#1e40af;color:#ffffff;font-weight:400;text-shadow:.45px 0 0 currentColor}
+.rmode a:not(.on):hover{background:#eff6ff}
+
+/* 좁아지는 차례도 두 파일이 같다 — 이름 → 단추 글자 → 여백 */
+@media(max-width:1400px){.rs-head .rs-name{display:none}}
+@media(max-width:1200px){.rs-head{padding:6px 12px;gap:8px}.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
+@media(min-width:701px) and (max-width:780px){.rmode a{padding-left:6px;padding-right:6px}}
+@media(max-width:700px){.rs-head{padding:6px 9px;gap:6px}.rs-head .rs-logo{width:28px;height:28px;font-size:14px;border-radius:8px}}

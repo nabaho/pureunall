@@ -37,7 +37,29 @@ function docRecord(o) {
   }, o.body);
 }
 
+/* ══════ 이어 달리기 · 잠금 (2026-10-05 대표 지시 「지금까지 컨설팅했던것 모두 가지고 와라」) ══════
+   밀린 메일 744통 중 701통이 지난 메일(POP3) — 목록에 첨부 표시가 없어 한 통씩 통째로 받는다(한 회차 8~10통).
+   하루 한 번이면 두 달이 넘는다 → 회차가 «남은 메일 수»를 적고, 부르는 쪽(index.js)이 shouldChain 이면 다음 회차를 부른다.
+   ⚠ 두 회차가 동시에 돌면 같은 메일을 둘이 받는다 — 잠금. 함수 한도(9분)보다 조금 길게 잡고, 지나면 죽은 회차로 보고 이어받는다.
+   ⚠ 끝나면(터져도) 잠금을 푼다. */
+const LOCK_MS = 10 * 60 * 1000;
+const MAX_CHAIN = 150;            // 한 줄로 이어 달리는 회차 수 한도 — 고장 난 고리가 끝없이 돌지 않게
+function shouldChain(sum, chain) {
+  if (!sum || sum.skipped) return false;
+  if (!(Number(sum.left) > 0) || !(Number(sum.mails) > 0)) return false;   // 다 봤거나, 한 통도 못 봤다(나아가지 않는 고리)
+  if (Number(sum.retry) >= Number(sum.mails)) return false;                // 연결 실패투성이 — 지금 또 불러도 같다
+  return Number(chain || 0) < MAX_CHAIN;
+}
 async function run(o) {
+  const ref = o.db.ref(LIB + '/lock');
+  if (typeof ref.transaction !== 'function') return runOnce(o);
+  const now = o.now();
+  const r = await ref.transaction((cur) => (cur && Number(cur.until) > now ? undefined : { until: now + LOCK_MS, at: now }));
+  if (!r || !r.committed) return { skipped: 'busy', mails: 0, left: 0, retry: 0, stored: 0, held: 0, dup: 0 };
+  try { return await runOnce(o); }
+  finally { try { await ref.set(null); } catch (_) { /* 풀지 못하면 LOCK_MS 뒤 다음 회차가 이어받는다 */ } }
+}
+async function runOnce(o) {
   const t0 = o.now();
   const db = o.db, bucket = o.bucket;
   const [msgs, old, seen, docs, companies, prevRun] = await Promise.all([
@@ -47,7 +69,9 @@ async function run(o) {
   const have = Object.assign({}, docs || {});
   const coIndex = MR.buildCompanyIndex(companies || {});
   const domIndex = P.buildDomainIndex(companies || {});
-  const picked = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen || {}, o.limit);
+  /* 남은 것 «모두»를 한 번 세고(메모리 안 셈이라 싸다) 이번 몫만 자른다 — left 가 이어 달리기의 잣대다 */
+  const allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen || {}, 1e9);
+  const picked = allLeft.slice(0, Math.max(0, Number(o.limit) || 0));
   const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, errors: [], at: t0 };
 
   for (const m of picked) {
@@ -145,6 +169,7 @@ async function run(o) {
     sum.stored += c.stored; sum.held += c.held; sum.dup += c.dup;
   }
   sum.errors = sum.errors.slice(0, 10);
+  sum.left = Math.max(0, allLeft.length - (sum.mails - sum.retry));   // 다시 시도할 것은 남은 것으로 센다
   /* 설계 §4-5 — 「담음 0, 오류 있음」이 사흘 이어지면 관리자에게 알린다(부르는 쪽이 systemAlerts 에 쓴다) */
   const bad = sum.stored === 0 && (sum.retry > 0 || sum.errors.length > 0);
   sum.zeroStreak = bad ? Number((prevRun && prevRun.zeroStreak) || 0) + 1 : 0;
@@ -153,4 +178,4 @@ async function run(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, MAX_CHAIN, LOCK_MS, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };

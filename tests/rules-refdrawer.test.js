@@ -44,7 +44,7 @@ const REF = ['open-std', 'open-bank', 'open-arch', 'open-arts'];
 
 /* 머리줄에서 «서랍 밖»에 남은 부분만 잘라 본다 */
 function headOutsideDrawer() {
-  const h = src.slice(src.indexOf('<header>'), src.indexOf('</header>'));
+  const h = src.slice(src.indexOf('<header'), src.indexOf('</header>'));
   const s = h.indexOf('id="ref-drawer"');
   if (s < 0) return h;                       // 서랍이 아직 없으면 머리줄 전체
   const open = h.lastIndexOf('<div', s);
@@ -68,7 +68,7 @@ test('★ 넷이 서랍 «안»에 들어갔다 — 머리줄 겉에 남아 있�
 
 test('★ 서랍 여닫는 단추가 있다', () => {
   assert.match(src, /id="ref-toggle"/);
-  const h = src.slice(src.indexOf('<header>'), src.indexOf('</header>'));
+  const h = src.slice(src.indexOf('<header'), src.indexOf('</header>'));
   assert.match(h, /id="ref-toggle"/, '서랍 단추는 머리줄에 있어야 합니다');
 });
 
@@ -77,7 +77,7 @@ test('★ 보관함 개수는 서랍을 «안 열어도» 보인다 (설계서 �
   assert.match(r, /ref-cnt/,
     '접었다고 「몇 건 있는지」까지 감추면 접기 전보다 나빠집니다');
   assert.match(src, /id="ref-cnt"/);
-  const h = src.slice(src.indexOf('<header>'), src.indexOf('</header>'));
+  const h = src.slice(src.indexOf('<header'), src.indexOf('</header>'));
   assert.match(h, /id="ref-cnt"/, '개수는 머리줄에서 바로 보여야 합니다');
 });
 

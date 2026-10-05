@@ -6284,7 +6284,7 @@ exports.gcalTokenSweep = _gcalLink.gcalTokenSweep;
    ⚠ 메일은 읽기만 한다(MAIL_DEPS 를 메일 동기화와 «같은 것»으로 쓴다 — 계정·비밀번호가 한 곳). */
 const RulesCollect = require("./rules-collect");
 const RulesCollectMail = require("./rules-collect-mail");
-async function rulesCollectOnce(reason) {
+async function rulesCollectOnce(reason, chain) {
   const sum = await RulesCollect.run({
     db: getDatabase(), bucket: getStorage().bucket(PHOTO_BUCKET), now: () => Date.now(),
     limit: 60, budgetMs: 7 * 60 * 1000, contractVersion: OntologyServerWrite.CONTRACT_VERSION,
@@ -6298,6 +6298,16 @@ async function rulesCollectOnce(reason) {
       getDatabase().ref("systemAlerts/" + u).push({ createdAt: Date.now(), kind: "rulesCollect",
         message: "취업규칙 모으기가 사흘째 하나도 못 담았습니다" + ((sum.errors || []).length ? " (" + sum.errors.slice(0, 3).join(" / ") + ")" : "") })));
   }
+  /* 이어 달리기 (2026-10-05) — 밀린 메일이 남았으면 다음 회차를 스스로 부른다(ask 한 줄 → collectRulesMailAsk).
+     ⚠ 그만두는 셈은 RulesCollect.shouldChain 한 곳(다 봤다 · 나아가지 않았다 · 연결 실패투성이 · 한도 MAX_CHAIN).
+     ⚠ 동시에 둘이 돌지 않는 것은 run 의 잠금이 지킨다 — 사람이 「지금 더 모으기」를 눌러도 잠겨 있으면 그냥 돌아간다. */
+  const n = Number(chain || 0);
+  if (RulesCollect.shouldChain(sum, n)) {
+    const ref = getDatabase().ref(RulesCollect.LIB + "/ask").push();
+    const at = Date.now();
+    await ref.set({ id: ref.key, kind: "rulesCollect", by: "이어 달리기", chain: n + 1, left: Number(sum.left || 0),
+      entityType: "Task", schemaVersion: 1, contractVersion: OntologyServerWrite.CONTRACT_VERSION, revision: 1, createdAt: at, updatedAt: at });
+  }
   return sum;
 }
 exports.collectRulesMail = functions
@@ -6309,7 +6319,12 @@ exports.collectRulesMail = functions
 exports.collectRulesMailAsk = functions
   .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
   .database.ref("/rules_mgmt/library/ask/{id}")
-  .onCreate(async () => { await rulesCollectOnce("관리자"); return null; });
+  .onCreate(async (snap) => {
+    const v = (snap && snap.val && snap.val()) || {};
+    const chain = Number(v.chain || 0);
+    await rulesCollectOnce(chain ? "이어 달리기 " + chain : "관리자", chain);
+    return null;
+  });
 
 /* ══════════════════════════════════════════════════════════════════════════
    📬 열람 확인 — 보낸 메일의 «보이지 않는 1×1 그림»이 불리는 자리 (대표 결정 2026-09-06)

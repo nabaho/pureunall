@@ -19,8 +19,16 @@ function dirOf(src, slug, row) {
   if (src === 'imap' && SENT_BOX_RE.test(String(slug || ''))) return '보냄';
   return MR.normEmail((row && row.e) || '') === SELF ? '보냄' : '받음';
 }
+/* 넓은 낱말 — 「○○규정」·「변경신고」 (대표 지시 2026-10-05 「지금까지 컨설팅했던것 모두 가지고 와라」).
+   실측: 첨부가 있는데 위 낱말로는 놓친 메일 35통(규정 29 · 변경신고 4 · 단체협약 2 — 단체협약은 취업규칙이 아니라 뺐다).
+   ⚠ 첨부가 있을 때만 — 「법 규정 안내」 소식지까지 열면 시간만 든다. 취업규칙이 아닌 첨부는 갈래 「기타」라 글을 안 담는다. */
+const BROAD_RE = /규정|변경\s*신고/;
 function isRulesMail(row) {
-  return !!row && (RULES_RE.test(String(row.s || '')) || RULES_RE.test(String(row.p || '')));
+  if (!row) return false;
+  const s = String(row.s || ''), p = String(row.p || '');
+  if (RULES_RE.test(s) || RULES_RE.test(p)) return true;
+  /* 지난 메일(POP3 · row.o)은 머리글만 받아 둬서 첨부를 모른다(a 는 늘 0) — 넓은 낱말도 고른다 */
+  return (Number(row.a) > 0 || !!row.o) && (BROAD_RE.test(s) || BROAD_RE.test(p));
 }
 function pickMails(box, seen, limit) {
   const out = [];

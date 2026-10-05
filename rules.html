@@ -428,21 +428,10 @@ table.daejo thead th{position:sticky;top:-18px;z-index:3;
   padding:2px 8px 2px 6px;border-radius:8px;background:#f8fafc;border:1px solid var(--line)}
 .tgroup+.tgroup{margin-left:2px}
 .tglbl{font-size:10px;color:var(--mute);letter-spacing:-.2px;flex:0 0 auto;padding-right:1px}
-/* 갈래 단추 — rules-v2.html 의 .rmode 와 «같은 모양»으로 둔다(두 앱 합치기 2026-10-04, 🏢 사업장을 더해 넷).
-   ⚠ 1200px 아래에서는 이름을 접고 그림만 남긴다 — 이름까지 펴면 단추 셋이 290px 가까이 먹어
-     머리줄이 가로로 밀린다(셋일 때 1110px 에서 이름 편 채로 딱 맞았다, 실측). 이름은 title 에 있다.
-     넷이 되며 «사업장» 한 칸(약 80px, 어림)만큼 접는 폭을 올렸다 — rules-v2.html 은 머리줄이 짧아 1100px 그대로.
-     폰에서는 머리줄이 «두 줄만» 쓴다(위 .hdr-nav 주석) — ① 로고·갈래·바로가기 ② 단계 막대. */
-.rmode{display:inline-flex;flex:0 0 auto;border:1px solid #cbd5e1;border-radius:10px;overflow:hidden;background:#ffffff}
-.rmode a{padding:5px 12px;font-size:12.5px;color:#475569;white-space:nowrap;text-decoration:none}
-.rmode a+a{border-left:1px solid #cbd5e1}
-.rmode a.on{background:#1e40af;color:#ffffff;font-weight:700}
-.rmode a:not(.on):hover{background:#eff6ff}
-@media(max-width:1200px){.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
+/* 갈래 단추(.rmode)·머리줄 왼쪽 묶음의 모양은 css/rules-shell.css 한 벌에 있다(2026-10-05) — 여기 다시 두지 말 것 */
 /* 701~900px — 갈래 단추·단계 막대·⚖·⋯·← 가 한 줄에 다 들어오게 (2026-10-04 실측: 715px 에서 51px 넘쳐
    「← 포털로」가 머리줄 밖으로 밀렸다). 단계 사이 › 를 걷고 단추 옆 여백을 줄인다. 700px 아래는 두 줄 배치가 따로 있다. */
 @media(min-width:701px) and (max-width:900px){#stepbar .sep{display:none}#stepbar{gap:3px}#stepbar button{padding-left:7px;padding-right:7px}}
-@media(min-width:701px) and (max-width:780px){header .rmode a{padding-left:6px;padding-right:6px}}
 /* 단계 막대 — 흐름 넷. 못 가는 단계는 «막지 않고» 흐리게 두고 까닭을 말한다. */
 #stepbar{display:flex;align-items:center;gap:3px;flex:0 0 auto}
 #stepbar button{font:inherit;font-size:12px;padding:5px 11px;border-radius:8px;cursor:pointer;
@@ -867,6 +856,7 @@ table.daejo td.dj2{padding:0}
   [contenteditable]{outline:none!important;background:none!important}
 }
 </style>
+<link rel="stylesheet" href="css/rules-shell.css?v=1">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -895,10 +885,10 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
 </head>
 <body>
 <div id="dropOverlay"><div class="box"><div class="ic">📄</div><b>여기에 놓으면 업로드</b><span>취업규칙 HWP · HWPX · DOCX · ODT · RTF · PDF · TXT 파일을 끌어다 놓으세요</span></div></div>
-<header>
-  <div class="logo">푸</div>
-  <div class="wm">푸른노무법인<small>PUREUN · LLF</small></div>
-  <span class="crumb">› 취업규칙 · 검토·개정</span>
+<header class="rs-head">
+  <!-- 왼쪽 묶음 — rules-v2.html 과 «글자까지 같다»(css/rules-shell.css · tests/rules-shell.test.js).
+       다르면 갈래를 오갈 때 단추가 튄다(대표 지시 2026-10-05 「위치가 안바뀌고 고정위치로」). -->
+  <div class="logo rs-logo">규</div><b class="rs-name">취업규칙</b>
   <!-- 갈래 단추 넷 — 취업규칙은 «한 앱»이다(두 앱 합치기 2026-10-04, 대표 승인 목업).
        코드는 두 파일(rules.html · rules-v2.html)이지만 사람 눈에는 이 단추 하나로 오간다.
        ⚠ rules-v2.html 머리줄에 «같은 단추»가 있다 — 한쪽만 고치면 오가다 단추가 바뀐다
