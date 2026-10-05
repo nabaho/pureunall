@@ -201,7 +201,8 @@ test('★ 다섯과 사전 셋, 여덟 자리를 읽는다 — 그 밖은 안 �
      손으로 적어 두고 사람이 한 번 더 보게 한다. */
   const c = loadIndexer({});
   await new Promise(res => c.loadErpCaseCons(res));
-  same(c._seen.slice().sort(), ['data/biz_cons_types', 'data/biz_fund_types', 'data/biz_other_types',
+  /* ⚠ 2026-10-05: 사건 사전(data/biz_case_types)을 더했다 — 환경설정에서 고친 사건 이름이 따라오게(1KB 남짓) */
+  same(c._seen.slice().sort(), ['data/biz_case_types', 'data/biz_cons_types', 'data/biz_fund_types', 'data/biz_other_types',
     'data/cases/v', 'data/consultings/v', 'data/contracts/v',
     'data/funds/v', 'data/other_projects/v']);
 });

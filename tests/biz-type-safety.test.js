@@ -145,12 +145,14 @@ test('⑤ 화면의 저장 길은 모두 그 길(persistWith)이다 — 화면 �
   assert.match(body(card, 'function persistWith('), /bizTypeApply\(/);
 });
 
-test('⑥ 현장클리닉·기술보호 이름이 빠지면 경고 · 그대로면 조용', () => {
-  const c = ctx();
-  assert.ok(c.bizTypeNameGuard('consulting', '현장클리닉', '클리닉'));
-  assert.ok(c.bizTypeNameGuard('consulting', '통합기술보호지원단', '통합지원단'));
-  assert.equal(c.bizTypeNameGuard('consulting', '현장클리닉', '현장클리닉(중기청)'), '');
-  assert.equal(c.bizTypeNameGuard('case', '현장클리닉', 'x'), '');
-  const card = strip(body(src, 'function BizTypeCard('));
-  assert.match(body(card, 'async function editType('), /bizTypeNameGuard\(/);
+/* ⑥ 1단계의 «이름 변경 경고»는 2단계에서 «역할 칸»으로 바뀌었다 — tests/type-role-by-code.test.js 가 본다.
+     여기서는 컨설팅 사전 저장이 «고치기 전» 역할을 굳히는지만 본다. */
+test('⑥ 컨설팅 사전 저장은 고치기 전에 역할(role)을 굳힌다 — 이름을 바꿔도 셈이 그 유형을 찾는다', () => {
+  const store = { biz_cons_types: [{ code: 'consulting-mp0w1084', short: '현클', name: '현장클리닉', sortOrder: 10 }] };
+  const c = ctx(store);
+  c.bizTypeStampRoles = (l) => l.map((x) => (x.role ? x : Object.assign({}, x, { role: x.name === '현장클리닉' ? 'clinic' : undefined })));
+  c.bizTypeApply('biz_cons_types', [], (cur) => cur.map((x) => Object.assign({}, x, { name: '클리닉' })));
+  const saved = c.__written[c.__written.length - 1][1][0];
+  assert.equal(saved.name, '클리닉');
+  assert.equal(saved.role, 'clinic', '이름을 바꾼 저장에서 역할이 사라지면 현장클리닉 일수표가 그 유형을 못 찾는다');
 });

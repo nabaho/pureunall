@@ -25,10 +25,14 @@ function grab(name){
   }
   throw new Error('닫는 괄호 못 찾음: ' + name);
 }
-const need = ['erpNormName','erpIsClinicPayer','erpIsClinicItem'];
+/* erpIsClinicItem 은 2026-10-05 부터 유형 번호가 있으면 사전의 역할(consRoleOf)로 본다 — 그 함수들과
+   빈 사전(dbGet)을 함께 싣는다. 역할 표 한 줄은 원본에서 그대로 가져온다. */
+const need = ['erpNormName','erpIsClinicPayer','consNameKey','consTypeRole','consRoleOf','erpIsClinicItem'];
 const sandbox = {};
 new Function('exports', 'window',
   "var ERP_CLINIC_PAYERS = ['비즈사업','한국생산성본부','생산성본부'];\n"
+  + "var BIZ_CONS_SEED = []; function dbGet(k, d){ return d; }\n"
+  + ((src.match(/^var CONS_ROLE_SEED = .*$/m) || [''])[0]) + '\n'
   + need.map(grab).join('\n')
   + '\nObject.assign(exports,{erpIsClinicPayer, erpIsClinicItem});'
 )(sandbox, {});
