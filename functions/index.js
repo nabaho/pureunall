@@ -1374,7 +1374,8 @@ async function 뉴스레터경보(열쇠, 자리, 말) {
 async function 뉴스레터경고판갱신(db) {
   const v = (await db.ref("newsletter/watch").orderByKey().limitToLast(4).once("value")).val() || {};
   const 열쇠 = Object.keys(v).filter((k) => /^\d{4}-\d{2}-w\d{1,2}$/.test(k)).sort().pop();
-  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null);
+  const 반송들 = (await db.ref("newsletter/bounces").once("value")).val() || {};
+  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null, 반송들);
   await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
 /* 회차 한 벌 중 «감시꾼이 볼 칸»만 — 25,000자 전문과 받는 분 주소는 안 읽는다 */
@@ -1550,6 +1551,49 @@ exports.newsletterRefillOnce20261004 = functions
   .onRun(async () => {
     if (서울오늘() !== "2026-10-04") { console.log("[오늘만 보충] 날짜가 지나 아무것도 안 함"); return null; }
     await 일요일보충한번("오늘만 23시 보충");
+    return null;
+  });
+
+/* 매일 09:00 — 반송·수신거부 확인 (대표 지시 2026-10-05 「수신거부가 되거나 반송되는것은 자동으로 …」
+   → 목업 → 「원장의 주소 그대로 지우지 않는다. 추천대로」)
+   받은메일함(mailbox/msgs/{inbox})에서 마지막 발송 뒤의 반송·회신을 갈라 newsletter/bounces 에 적는다.
+   ★ 없는 주소 → newsletter/blocked 에 넣어 «뉴스레터 명단에서만» 뺀다. 업체관리 원장은 안 건드린다.
+   ★ 나머지는 «사람 몫» — 포털 뉴스레터 칸 «⚠» 와 받는 곳 › 반송·거부에서 검토의견을 본다.
+   ⚠ 판단은 news-watch.js(반송모으기) · Core(반송갈래) — 여기는 읽고 쓰기만.
+   ⚠ 보낸 지 14일이 지나면 안 본다(그 뒤 반송은 다음 회차가 잡는다). */
+exports.newsletterBounceScan = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .pubsub.schedule("every day 09:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase();
+    const now = Date.now();
+    const 회차들 = (await db.ref("newsletter/issues").orderByKey().limitToLast(6).once("value")).val() || {};
+    const 보낸 = Object.keys(회차들).filter((k) => 회차들[k] && 회차들[k].상태 === "발송" && 회차들[k].보낸때)
+      .sort((a, b) => Number(회차들[b].보낸때) - Number(회차들[a].보낸때))[0];
+    if (!보낸 || now - Number(회차들[보낸].보낸때) > 14 * 864e5) {
+      await 뉴스레터경고판갱신(db).catch(() => null);
+      return null;
+    }
+    const 폴더 = (await db.ref("mailbox/folders").once("value")).val() || {};
+    const 받은 = Object.keys(폴더).find((k) => 폴더[k] && 폴더[k].kind === "inbox") || "INBOX";
+    const [메일들, 설정, 사업장들, 더한분들, 기존] = await Promise.all([
+      db.ref("mailbox/msgs/" + 받은).orderByKey().limitToLast(800).once("value").then((x) => x.val() || {}),
+      db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
+      db.ref("data/companies/v").once("value").then((x) => x.val() || {}),
+      db.ref("newsletter/더한분들").once("value").then((x) => x.val() || {}),
+      db.ref("newsletter/bounces").once("value").then((x) => x.val() || {})]);
+    /* 명단은 «막은 주소까지» — 이미 막은 주소의 반송도 기록은 남긴다 */
+    const 명단 = (NF.명단짓기({ 설정, 사업장들, 더한분들, 막은주소: {} }).ok || []);
+    const r = NWatch.반송모으기({ 메일들, 명단, 보낸때: Number(회차들[보낸].보낸때), 회차: 보낸, 기존, now });
+    const upd = {};
+    Object.keys(r.쓸).forEach((k) => { upd["newsletter/bounces/" + k] = r.쓸[k]; });
+    Object.keys(r.막을).forEach((k) => { upd["newsletter/blocked/" + k] = r.막을[k]; });
+    upd["newsletter/bounceMeta"] = { 때: now, 회차: 보낸, 새로: Object.keys(r.쓸).length, 뺀것: Object.keys(r.막을).length, 메일함: 받은 };
+    await db.ref().update(upd);
+    await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
+    console.log("[반송 확인]", JSON.stringify({ 회차: 보낸, 새로: Object.keys(r.쓸).length, 뺀것: Object.keys(r.막을).length }));
     return null;
   });
 

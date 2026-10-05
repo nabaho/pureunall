@@ -48,7 +48,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
-<script src="js/pu-news-core.js?v=50"></script>
+<script src="js/pu-news-core.js?v=51"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
 <script src="js/pu-news-tpl.js?v=45"></script>
@@ -498,6 +498,31 @@ details.fold>summary .act{font-size:11px;font-weight:800;color:var(--brown);
   background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 9px;
   white-space:nowrap}
 details.fold[open]>summary .act:after{content:'접기'}
+/* 반송·거부 (2026-10-05) — 표는 한 줄씩, 팝업은 가운데 */
+table.bn-t td{white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
+table.bn-t tr.bn-done td{color:var(--faint)}
+.bn-k{font-size:11px;font-weight:800;border-radius:20px;padding:2px 9px;white-space:nowrap}
+.bn-k.k-dead{background:#f1f5f9;color:var(--sub)}
+.bn-k.k-srv{background:#fffbeb;color:#92400e;border:1px solid #fde68a}
+.bn-k.k-ref{background:#fef2f2;color:#991b1b;border:1px solid #fecaca}
+.bn-k.k-tmp{background:var(--paper);color:var(--navy);border:1px solid var(--line)}
+.bn-ok{color:var(--ok);font-weight:800;font-size:12px}
+.bn-st{color:var(--sub);font-size:12px}
+#bnPop{display:none;position:fixed;inset:0;z-index:60}
+#bnPop .bn-back{position:absolute;inset:0;background:rgba(15,23,42,.35)}
+#bnPop .bn-box{position:relative;max-width:640px;margin:8vh auto 0;background:#fff;border-radius:14px;
+  box-shadow:0 18px 40px rgba(15,23,42,.25);overflow:hidden;max-height:84vh;display:flex;flex-direction:column}
+#bnPop .bn-h{display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--line);white-space:nowrap}
+#bnPop .bn-h b{font-size:15px;overflow:hidden;text-overflow:ellipsis}
+#bnPop .bn-h .sp{flex:1}
+#bnPop .bn-b{padding:12px 16px;overflow-y:auto}
+#bnPop .bn-row{display:flex;gap:10px;padding:4px 0;white-space:nowrap;min-width:0}
+#bnPop .bn-row .kk{width:60px;color:var(--sub);font-weight:700;flex:0 0 auto}
+#bnPop .bn-row .vv{overflow:hidden;text-overflow:ellipsis;min-width:0}
+#bnPop .bn-op{background:var(--brown-soft);border-radius:10px;padding:10px 12px;margin-top:10px;line-height:1.75}
+#bnPop .bn-op b{color:var(--brown)}
+#bnPop .bn-a{display:flex;gap:8px;flex-wrap:wrap;padding:12px 16px;border-top:1px solid var(--line);background:var(--paper)}
+@media(max-width:640px){ #bnPop .bn-box{margin:0;max-height:100vh;height:100%;border-radius:0} }
 /* 자동 가져오기 현황 (2026-10-04) — 한 줄씩, 넘치면 … */
 .arow2{display:flex;align-items:center;gap:9px;padding:9px 14px;border-bottom:1px solid var(--line);white-space:nowrap;min-width:0}
 .arow2 .when{font-size:12px;color:var(--sub)}
@@ -1058,7 +1083,7 @@ var App = {
   me: null, isAdmin: false,
   /* ★ 포털의 «⚠» 칸을 누르면 ?tab=watch 로 온다 — 자동화 점검부터 연다 (2026-10-04) */
   tab: (function(){ try{ var t = new URLSearchParams(location.search).get('tab');
-    return ['now','past','note','who','noaddr','res','watch','cfg'].indexOf(t) >= 0 ? t : 'now'; }catch(_){ return 'now'; } })(),
+    return ['now','past','note','who','noaddr','bounce','res','watch','cfg'].indexOf(t) >= 0 ? t : 'now'; }catch(_){ return 'now'; } })(),
   설정: {}, 회차들: {}, 사업장들: {}, 막은주소: {}, 브리핑: {}, 지역후보: {},
   /* 「따로 더한 분」 — newsletter/더한분들 (대표 지시 2026-09-09).
      ⚠ 사업장 명단과 달리 «사본»이다. 계약이 끝나도 저절로 안 빠진다. */
@@ -1376,10 +1401,12 @@ async function 회차저장(자료){
    받는 곳 = 받는 명단 · 주소 없는 곳 / 설정 = 설정 · 자동화 점검
    ⚠ App.tab 값은 그대로다(who · noaddr · cfg · watch) — 다른 곳의 「App.tab='noaddr'」 길이 안 끊긴다.
      큰 탭의 불만 «묶음»으로 켠다. */
-const 탭묶음 = { noaddr:'who', watch:'cfg' };
+const 탭묶음 = { noaddr:'who', bounce:'who', watch:'cfg' };
 const 작은탭들 = {
   who: [ { t:'who', 이름:'받는 명단', 수: () => (명단셈().전체 || []).length },
-         { t:'noaddr', 이름:'주소 없는 곳', 수: () => (명단셈().주소없는곳 || []).length } ],
+         { t:'noaddr', 이름:'주소 없는 곳', 수: () => (명단셈().주소없는곳 || []).length },
+         /* ★ 반송·거부 (2026-10-05) — 빨간 숫자 = 사람이 볼 것 */
+         { t:'bounce', 이름:'반송·거부', 수: () => 반송볼것수(), 빨강: true } ],
   cfg: [ { t:'cfg', 이름:'설정' },
          { t:'watch', 이름:'자동화 점검', 수: () => 감시볼것수(), 빨강: true } ]
 };
@@ -1427,6 +1454,9 @@ function render(){
   /* 받는 곳 두 화면은 작은 탭 줄을 «제 손으로» 그린다 — 그 줄에 제 설명·단추를 싣는다 */
   if(App.tab==='who'){ 명함읽기(); m.innerHTML = 명단화면(); }
   if(App.tab==='noaddr'){ 명함읽기(); m.innerHTML = 주소없는곳화면(); }
+  if(App.tab==='bounce') m.innerHTML = 반송화면();
+  /* 받는 곳 작은 탭의 빨간 숫자 — 처음 한 번 읽어 둔다 */
+  if(App.반송 === undefined && (App.tab==='who' || App.tab==='noaddr')){ App.반송 = null; setTimeout(반송읽기, 0); }
   if(App.tab==='res')  m.innerHTML = 결과화면();
   if(App.tab==='watch') m.innerHTML = 작은탭() + 감시화면();
   /* 탭 숫자(사람이 볼 것)는 처음 한 번 읽어 둔다 — 탭을 안 눌러도 빨간 숫자가 보여야 한다 */
@@ -4166,7 +4196,11 @@ async function 결과읽기(열쇠){
     /* ㉢ 푸른메일함 — 보낸 뒤에 들어온 것만 본다.
        ⚠ 통째로 읽지 않는다. 뒤에서 400통만 가져와 보낸 때로 다시 거른다. */
     if(보낸때){
-      const v = (await db.ref('mailbox/msgs/inbox').limitToLast(400).once('value')).val() || {};
+      /* ⚠ 받은메일함 열쇠는 «inbox» 가 아니라 폴더마다 붙은 이름(INBOX-xxxx)이다 (2026-10-05 실측 —
+           예전 'mailbox/msgs/inbox' 는 빈 자리라 반송을 한 건도 못 찾았다). 폴더 목록에서 kind:inbox 를 찾는다. */
+      const 폴더 = (await db.ref('mailbox/folders').once('value')).val() || {};
+      const 받은 = Object.keys(폴더).find(k => 폴더[k] && 폴더[k].kind === 'inbox') || 'INBOX';
+      const v = (await db.ref('mailbox/msgs/' + 받은).limitToLast(400).once('value')).val() || {};
       나온것.메일 = Object.keys(v).map(function(k){ return v[k]||{}; });
     }
   }catch(e){ 나온것.탈 = (e&&e.message)||String(e); }
@@ -5880,6 +5914,172 @@ async function 노무사회가져오기(방식){
     if(바쁨) 바쁨.textContent = '';
   }
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   받는 곳 › 「반송·거부」 (대표 지시 2026-10-05 「수신거부가 되거나 반송되는것은 자동으로 뉴스레터에서
+   감지하고 … 거부 메일의 경우 어떻게 처리해야할지 검토의견 팝업으로 각사업장마다 달라」 → 「추천대로」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 찾고 가르는 것은 서버(매일 9시, newsletterBounceScan)가 한다 — newsletter/bounces.
+     여기는 그것을 «보여 주고», 사람이 고른 처리를 적을 뿐이다.
+   ★ 검토의견은 Core.반송검토의견 한 곳 — 사업장의 유형(자문·급여…)·받는 분·횟수에 따라 다르다.
+   ⚠ 업체관리 원장은 여기서도 안 고친다(대표 결정) — 「주소 바꾸기」는 기업정보함을 열어 줄 뿐이다.
+   ⚠ 수신거부 회신은 문안을 «보여 드리고» 누르셔야 나간다(대표 결정). */
+async function 반송읽기(){
+  if(App._반송읽는중) return;
+  App._반송읽는중 = true;
+  try{ App.반송 = (await db.ref('newsletter/bounces').once('value')).val() || {}; }
+  catch(e){ App.반송 = {}; App.반송탈 = (e && e.message) || String(e); }
+  App._반송읽는중 = false;
+  if(App.tab === 'bounce' || App.tab === 'who' || App.tab === 'noaddr') render();
+}
+function 반송볼것수(){
+  const v = App.반송 || {};
+  return Object.keys(v).filter(k => Core.반송사람몫인가(v[k])).length;
+}
+function 반송줄들(){
+  const v = App.반송 || {};
+  /* 사람 몫 먼저 → 저절로 뺀 것 → 처리한 것. 같은 무리 안에서는 최근 것 먼저 */
+  const 차례 = b => Core.반송사람몫인가(b) ? 0 : (b.상태 === '자동처리' ? 1 : 2);
+  return Object.keys(v).map(k => Object.assign({ 열: k }, v[k] || {}))
+    .sort((a,b) => (차례(a) - 차례(b)) || ((Number(b.때)||0) - (Number(a.때)||0)));
+}
+function 반송화면(){
+  if(App.반송 === undefined){ App.반송 = null; setTimeout(반송읽기, 0); }
+  const 줄 = App.반송 ? 반송줄들() : [];
+  const 꼴 = { 없는주소:'k-dead', 서버거부:'k-srv', 일시:'k-tmp', 모름:'k-srv', 수신거부:'k-ref' };
+  const 상태말 = b => Core.반송사람몫인가(b)
+      ? '<button class="mini on" onclick="반송팝업(\'' + esc(b.열) + '\')">검토의견 보기</button>'
+    : b.상태 === '자동처리' ? '<span class="bn-ok">✓ 명단에서 자동으로 뺌</span> <button class="mini" onclick="반송팝업(\'' + esc(b.열) + '\')">보기</button>'
+    : b.갈래 === '일시' && b.상태 === '열림' ? '<span class="bn-st">다음 회차에 다시 (' + (Number(b.횟수)||1) + '/3)</span>'
+    : '<span class="bn-st">' + esc(b.처리 || b.상태 || '') + '</span> <button class="mini" onclick="반송팝업(\'' + esc(b.열) + '\')">보기</button>';
+  const 몸 = !App.반송 ? '<tr><td colspan="6" class="empty">읽는 중…</td></tr>'
+    : !줄.length ? '<tr><td colspan="6" class="empty">반송·수신거부가 없습니다 — 매일 아침 9시에 받은메일함을 봅니다.</td></tr>'
+    : 줄.map(b => '<tr' + (Core.반송사람몫인가(b) || b.상태 === '자동처리' ? '' : ' class="bn-done"') + '>'
+        + '<td><span class="bn-k ' + (꼴[b.갈래] || 'k-srv') + '">' + esc(Core.반송갈래이름[b.갈래] || b.갈래) + '</span></td>'
+        + '<td>' + esc(b.회사 || '') + '</td><td>' + esc(b.누구 || '') + '</td>'
+        + '<td>' + esc(b.주소 || '') + '</td>'
+        + '<td class="bn-src" title="' + esc(b.원문 || '') + '">' + esc(b.원문 || '') + '</td>'
+        + '<td>' + 상태말(b) + '</td></tr>').join('');
+  return 작은탭('매일 아침 9시에 받은메일함을 봅니다 · 없는 주소는 뉴스레터 명단에서만 빼고 업체관리 원장은 그대로 둡니다',
+      '<button class="mini" onclick="App.반송=undefined;render()">⟳ 다시 읽기</button>')
+    + '<div class="box" style="margin-top:10px;overflow:hidden"><table class="list bn-t">'
+    + '<thead><tr><th>갈래</th><th>사업장</th><th>받는 분</th><th>주소</th><th>무슨 일 (원문 한 줄)</th><th>처리</th></tr></thead>'
+    + '<tbody>' + 몸 + '</tbody></table></div>'
+    + '<div class="hint" style="margin-top:6px">일시 오류(메일함 가득 등)는 다음 회차에 다시 보내고, 세 번 내리 실패하면 «검토의견 보기»로 올라옵니다 · 부재중 자동회신은 세지 않습니다</div>';
+}
+
+/* 검토의견 팝업 — 사업장마다 다른 의견과 단추 */
+function 반송팝업(열){
+  const b = Object.assign({ 열: 열 }, (App.반송 || {})[열] || {});
+  const o = Core.반송검토의견(b);
+  const 단추말 = { 요청문안:'허용 요청 문안 보기', 주소바꾸기:'업체관리에서 주소 바꾸기', 보류:'이번엔 그대로',
+    거부회신:'수신거부 처리 + 회신 보내기', 거부만:'수신거부만 처리', 되돌리기:'명단에 되돌리기' };
+  const 단추 = o.단추.map((d, i) => '<button class="mini' + (i === 0 ? ' on' : '') + '" onclick="반송처리(\'' + esc(열) + '\',\'' + d + '\')">'
+    + 단추말[d] + '</button>').join('');
+  const 줄 = (k, v) => '<div class="bn-row"><span class="kk">' + k + '</span><span class="vv" title="' + esc(v) + '">' + esc(v) + '</span></div>';
+  반송창(
+    '<div class="bn-h"><span class="bn-k ' + ({ 서버거부:'k-srv', 수신거부:'k-ref', 없는주소:'k-dead', 일시:'k-tmp' }[b.갈래] || 'k-srv') + '">'
+      + esc(o.제목) + '</span><b>' + esc(b.회사 || '(사업장 모름)') + '</b><span class="hint" style="margin:0">'
+      + esc([b.유형, b.누구].filter(Boolean).join(' · ')) + '</span><span class="sp"></span>'
+      + '<button class="mini" onclick="반송창닫기()">닫기</button></div>'
+    + '<div class="bn-b">' + 줄('주소', b.주소 || '') + 줄('원문', b.원문 || '')
+      + 줄('이력', (Number(b.횟수) || 1) + '회차째 · ' + (b.회차 || '') + (b.처리 ? ' · ' + b.처리 : ''))
+      + '<div class="bn-op"><b>검토의견</b> — ' + o.의견 + '</div>'
+      + (o.근거 ? '<div class="hint">근거: ' + esc(o.근거) + '</div>' : '')
+      + '<div id="bnMore"></div></div>'
+    + '<div class="bn-a">' + 단추 + '</div>');
+}
+function 반송창(html){
+  let el = $('bnPop');
+  if(!el){ el = document.createElement('div'); el.id = 'bnPop'; document.body.appendChild(el); }
+  el.innerHTML = '<div class="bn-back" onclick="반송창닫기()"></div><div class="bn-box">' + html + '</div>';
+  el.style.display = 'block';
+}
+function 반송창닫기(){ const el = $('bnPop'); if(el) el.style.display = 'none'; }
+
+/* 처리 — 무엇을 했는지 기록에 남긴다(상태·처리·처리한 이·때). 원장은 안 고친다. */
+async function 반송기록(열, 상태, 처리){
+  const 고침 = { 상태: 상태, 처리: 처리, 처리한이: (App.me && App.me.email) || '', 처리때: Date.now() };
+  await db.ref('newsletter/bounces/' + 열).update(고침);
+  App.반송[열] = Object.assign({}, App.반송[열] || {}, 고침);
+}
+async function 반송막기(열, 까닭){
+  const b = (App.반송 || {})[열] || {};
+  const e = String(b.주소 || '').toLowerCase();
+  await db.ref('newsletter/blocked/' + 열).set({ email: e, at: Date.now(), by: (App.me && App.me.email) || '', 까닭: 까닭 });
+  App.막은주소[e] = 1; App.막은주소[열] = 1;
+}
+async function 반송처리(열, 무엇){
+  const b = (App.반송 || {})[열] || {};
+  try{
+    if(무엇 === '요청문안'){
+      const 글 = (b.회사 || '') + ' ' + (b.누구 || '담당자') + '님께\n\n'
+        + (App.설정.회사이름 || '푸른노무법인') + '에서 보내 드리는 주간 뉴스레터가 귀사 메일 서버의 스팸방지 설정에 막혀 전달되지 않았습니다.\n'
+        + '번거로우시겠지만 보내는 주소 «' + 보내는주소() + '» 를 메일 서버의 허용(화이트리스트)에 등록해 주시면 다음 회차부터 받아 보실 수 있습니다.\n\n'
+        + (App.설정.회사이름 || '푸른노무법인') + (App.설정.전화 ? ' · ' + App.설정.전화 : '');
+      $('bnMore').innerHTML = '<div class="hint" style="margin-top:8px">담당 노무사가 사업장에 보낼 문안입니다 — 복사해 쓰십시오.</div>'
+        + '<textarea id="bnText" style="width:100%;min-height:150px;font-size:16px">' + esc(글) + '</textarea>'
+        + '<div style="margin-top:6px"><button class="mini on" onclick="반송복사()">문안 복사 + 처리했음</button></div>';
+      App._반송복사열 = 열;
+      return;
+    }
+    if(무엇 === '주소바꾸기'){
+      기업정보함에서찾기(b.회사 || '');
+      await 반송기록(열, '처리', '업체관리에서 주소 바꾸러 감');
+    }
+    if(무엇 === '보류') await 반송기록(열, '보류', '이번엔 그대로');
+    if(무엇 === '거부만'){
+      if(!confirm((b.주소 || '') + '\n\n이 주소로 뉴스레터를 보내지 않습니다(수신거부).\n업체관리 원장은 그대로 둡니다.\n\n처리할까요?')) return;
+      await 반송막기(열, '수신거부 회신');
+      await 반송기록(열, '처리', '수신거부 처리');
+    }
+    if(무엇 === '거부회신'){
+      const 안 = Core.수신거부회신문안(b, App.설정);
+      $('bnMore').innerHTML = '<div class="hint" style="margin-top:8px">보낼 회신입니다 — 고치신 뒤 «보내기»를 누르시면 '
+        + esc(b.주소 || '') + ' 로 나가고 수신거부로 처리됩니다.</div>'
+        + '<input id="bnSubj" style="width:100%;font-size:16px;margin-bottom:6px" value="' + esc(안.제목) + '">'
+        + '<textarea id="bnText" style="width:100%;min-height:200px;font-size:16px">' + esc(안.본문) + '</textarea>'
+        + '<div style="margin-top:6px"><button class="mini on" onclick="반송회신보내기(\'' + esc(열) + '\')">보내기 + 수신거부 처리</button></div>';
+      return;
+    }
+    if(무엇 === '되돌리기'){
+      if(!confirm((b.주소 || '') + '\n\n뉴스레터 명단에 다시 넣습니다.\n주소를 고치지 않았으면 다음 회차에 또 반송됩니다.\n\n되돌릴까요?')) return;
+      await db.ref('newsletter/blocked/' + 열).remove();
+      delete App.막은주소[String(b.주소 || '').toLowerCase()]; delete App.막은주소[열];
+      await 반송기록(열, '되돌림', '명단에 되돌림');
+    }
+    반송창닫기(); render();
+    toast('처리했습니다 — ' + (b.회사 || b.주소 || ''));
+  }catch(e){ toast('처리하지 못했습니다: ' + ((e && e.message) || ''), 9000); }
+}
+async function 반송복사(){
+  const 열 = App._반송복사열, t = $('bnText');
+  try{ await navigator.clipboard.writeText(t ? t.value : ''); }catch(_){ if(t){ t.select(); document.execCommand('copy'); } }
+  await 반송기록(열, '처리', '허용 요청 문안 복사');
+  반송창닫기(); render(); toast('문안을 복사했습니다');
+}
+/* 수신거부 회신 — 한 통만, 시험 문(바로 보내기)으로. 보내고 나서 수신거부 처리. */
+async function 반송회신보내기(열){
+  const b = (App.반송 || {})[열] || {};
+  const 제목 = ($('bnSubj') || {}).value || '', 본문 = ($('bnText') || {}).value || '';
+  if(!b.주소 || !본문.trim()) return toast('보낼 주소나 글이 없습니다');
+  if(!confirm(b.주소 + ' 로 회신을 보내고 수신거부로 처리합니다.')) return;
+  try{
+    const u = firebase.auth().currentUser;
+    if(!u) throw new Error('로그인이 풀렸습니다');
+    const token = await u.getIdToken();
+    const res = await fetch(시험즉시URL, { method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + token },
+      body: JSON.stringify({ to: b.주소, toName: b.회사 || '', from: 보내는주소(), subject: 제목, body: 본문,
+        html: '<div style="font-family:\'Malgun Gothic\',sans-serif;font-size:14px;line-height:1.8;white-space:pre-wrap">'
+          + esc(본문) + '</div>', files: [] }) });
+    let j = null; try{ j = await res.json(); }catch(_){}
+    if(!res.ok || !j || !j.ok) throw new Error((j && j.error) || ('서버 응답 ' + res.status));
+    await 반송막기(열, '수신거부 회신');
+    await 반송기록(열, '처리', '수신거부 처리 + 회신 보냄');
+    반송창닫기(); render(); toast('회신을 보내고 수신거부로 처리했습니다 — ' + b.주소, 9000);
+  }catch(e){ toast('보내지 못했습니다: ' + ((e && e.message) || '') + ' — 수신거부 처리도 하지 않았습니다', 12000); }
+}
+
 /* ══════════════════════════════════════════════════════════════════════════
    「자동화 점검」 탭 — 감시꾼이 남긴 것을 «읽기만» 한다 (대표 지시 2026-10-04)
    ══════════════════════════════════════════════════════════════════════════

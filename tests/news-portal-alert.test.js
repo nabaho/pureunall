@@ -87,6 +87,7 @@ test('④ 포털 — 문제가 있을 때만 «⚠ n», 누르면 자동화 점�
 
 test('⑤ 뉴스레터 화면 — ?tab=watch 로 오면 자동화 점검부터', () => {
   assert.match(뉴스, /new URLSearchParams\(location\.search\)\.get\('tab'\)/);
-  assert.match(뉴스, /\['now','past','note','who','noaddr','res','watch','cfg'\]\.indexOf\(t\) >= 0 \? t : 'now'/,
+  /* 2026-10-05 — 받는 곳 › 반송·거부(bounce)도 바로 열린다 */
+  assert.match(뉴스, /\['now','past','note','who','noaddr','bounce','res','watch','cfg'\]\.indexOf\(t\) >= 0 \? t : 'now'/,
     '아무 값이나 탭으로 받는다 — 모르는 값은 이번 회차로');
 });
