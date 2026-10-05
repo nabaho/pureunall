@@ -2984,7 +2984,7 @@ function _rvSide(it,D){
       +btn('🔁 짝 보러 가기','rvGo('+RV.sel+')',true);
   return head+'<h3 style="margin:2px 0 8px;font-size:15px">'+esc(it.yr)+'년 분개 승인 '+it.n+'건</h3>'
       +'<div class="muted" style="font-size:12.5px;margin-bottom:8px">'+(it.sug?'기계가 계정을 골라 둔 것 '+it.sug+'건(🤖) — 맞으면 승인, 다르면 계정을 바꿉니다. ':'')+'승인 전에는 결산에 쓰지 못합니다.</div>'
-      +btn('📒 회계·결산에서 보기','rvGo('+RV.sel+')',true);
+      +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">'+btn('🎯 골라 승인','rvGo('+RV.sel+',1)',true)+btn('📒 회계·결산에서 보기','rvGo('+RV.sel+')')+'</div>';
 }
 /* 「맞음」 — 칸 값은 확인 표시만, 추정 출연금은 그 금액을 기본 출연금으로 적는다 */
 function rvOk(i){ var it=RV.items[i]; if(!it) return; _rvOkMany([it]); }
@@ -3013,13 +3013,13 @@ function _rvOkMany(its){
 }
 /* 고치러 가기 — 그 칸이 있는 화면으로. 사업장이면 편집 창까지 연다 */
 function _rvWait(cond,fn,ms){ var t0=Date.now(); (function tick(){ if(cond()) return fn(); if(Date.now()-t0>(ms||8000)) return; setTimeout(tick,200); })(); }
-function rvGo(i){
+function rvGo(i,sample){
   var it=RV.items[i]; if(!it) return;
   var D=RV.data||{}, w=_rvWhere(it,D), fid=it.fid;
   var open=function(tab){ S.fundId=fid; S.view='fund'; S.tab=tab; _pushHist(); route(); };
   if(it.t==='xfer'||it.t==='txn'){
     S.year=+it.yr; open('closing');
-    if(it.t==='xfer') _rvWait(function(){ return S.view==='fund'&&S.fundId===fid&&S.txnsFor===fid+'/'+it.yr&&S.txns; }, function(){ autoMatchTransfers(); });
+    if(it.t==='xfer'||sample) _rvWait(function(){ return S.view==='fund'&&S.fundId===fid&&S.txnsFor===fid+'/'+it.yr&&S.txns; }, function(){ if(it.t==='xfer') autoMatchTransfers(); else sampleApprove(); });
     return;
   }
   var sid=it.t==='est'?it.sid:w.sid;
@@ -17529,7 +17529,7 @@ function closingTab(f){
       +'<button onclick="delTxn(\''+x._id+'\')" style="padding:2px 7px">×</button></td></tr>';
   }).join('');
   return '<div class="panel"><div class="row"><h2>회계·결산</h2>'+hlp('close.bank')+yearSel()
-    +'<span style="flex:1"></span><button onclick="addTxnForm()" title="통장을 엑셀로 못 받는 경우 한 줄씩 직접 넣기">＋ 거래 추가</button>'+'<button onclick="learnedPanel()" title="승인할 때 기억한 거래처·계정 보기·지우기">📚 분개 학습</button>'+'<button onclick="autoMatchTransfers()" title="같은 날·같은 금액이 서로 반대 방향인 계좌 간 이체를 찾아 상계 처리">🔁 이체 자동매칭</button>'+'<button class="primary" onclick="importBank()">📥 통장 엑셀 가져오기</button></div>'
+    +'<span style="flex:1"></span><button onclick="addTxnForm()" title="통장을 엑셀로 못 받는 경우 한 줄씩 직접 넣기">＋ 거래 추가</button>'+'<button onclick="learnedPanel()" title="승인할 때 기억한 거래처·계정 보기·지우기">📚 분개 학습</button>'+'<button onclick="autoMatchTransfers()" title="같은 날·같은 금액이 서로 반대 방향인 계좌 간 이체를 찾아 상계 처리">🔁 이체 자동매칭</button>'+'<button onclick="sampleApprove()" title="규칙과 같은 분개만 골라, 표본 몇 건을 먼저 보고 한꺼번에 승인">🎯 골라 승인</button>'+'<button class="primary" onclick="importBank()">📥 통장 엑셀 가져오기</button></div>'
     +'<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">'
     +'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">입금 '+dep.toLocaleString()+'원</span>'
     +'<span class="stat" style="background:var(--danger-bg);color:var(--danger)">출금 '+wd.toLocaleString()+'원</span>'
@@ -18292,6 +18292,100 @@ function approveTxn(id,on){
     })
     .catch(function(e){ toast('저장 실패: '+e.message,'err'); renderFund(); });
 }
+/* ══ 🎯 골라 승인 — 표본을 먼저 보고 한꺼번에 (대표 지시 2026-10-05 「니가 추천한거 진행해라」, 자동화 확인 목업 3번) ══
+   승인 대기가 수백 건이라 한 줄씩 누르면 끝이 안 나고, 통째로 누르면 사람 눈을 안 거친다. 그 사이:
+   ① «초록» 만 고른다 — 차·대가 정해져 있고(쪼갠 거래·이체 아님), 마감 안 된 달이고,
+      «지금 규칙이 고르는 계정과 같은» 것(배운 거래처·적요 규칙·사업장 이름). 100만 원 넘는 출금은 뺀다.
+      ※ 2026-10-05 전에 가져온 거래는 누가 골랐는지(sug) 기록이 없다 — 그래서 «지금 규칙과 같은가»로 본다.
+   ② 그중 몇 건을 고루(달·계정이 섞이게) 뽑아 사람이 먼저 본다 — 다 맞아야 나머지를 승인한다.
+      하나라도 틀리면 멈춘다 — 그 규칙으로 고른 것은 하나씩 보게 둔다.
+   ③ 승인은 누가·언제(approved_by·at)에 «표본으로 승인»(ok_via:'sample')까지 남기고, 변경 기록 한 줄. */
+var SAMPLE_WD_MAX=1000000;
+function _sampleGreen(arr,propose){
+  return (arr||[]).filter(function(x){
+    if(x.approved||x.xfer||x.sug==='xfer') return false;
+    if(_splitsOf(x).length||!x.debit||!x.credit||x.debit===x.credit) return false;
+    if(monthLocked(_monthOf(x.date))) return false;
+    if((num(x.withdraw)||0)>SAMPLE_WD_MAX) return false;
+    var p=propose(x); return !!(p&&p.d&&p.c&&p.d===x.debit&&p.c===x.credit);
+  });
+}
+/* 표본 — 날짜 차례로 늘어놓고 고르게 띄엄띄엄(첫 자리만 무작위). 같은 계정 짝이 몰리지 않게 짝마다 하나 먼저 */
+function _samplePick(list,k,rnd){
+  rnd=rnd||Math.random;
+  var a=list.slice().sort(function(x,y){ return String(x.date).localeCompare(String(y.date)); });
+  if(a.length<=k) return a;
+  var by={}, first=[];
+  a.forEach(function(x){ var key=x.debit+'/'+x.credit; if(!by[key]){ by[key]=1; first.push(x); } });
+  var out=first.length>k ? first.slice(0,k) : first.slice();
+  var rest=a.filter(function(x){ return out.indexOf(x)<0; }), need=k-out.length;
+  if(need>0){ var step=rest.length/need, off=Math.floor(rnd()*step); for(var i=0;i<need;i++){ var j=Math.min(rest.length-1,Math.floor(off+i*step)); if(out.indexOf(rest[j])<0) out.push(rest[j]); } }
+  return out.slice(0,k);
+}
+function _sampleSize(n){ return n<=5?n:Math.min(10,Math.max(5,Math.ceil(n*0.05))); }
+var _SA=null;
+function sampleApprove(){
+  var fid=S.fundId, yr=S.year;
+  if(!S.txns||S.txnsFor!==fid+'/'+yr){ toast('거래를 아직 읽는 중입니다 — 잠시 뒤 다시 누르세요','warn'); return; }
+  Promise.all([loadLearned(),_siteNames(fid)]).then(function(pre){
+    var names=pre[1];
+    var arr=Object.keys(S.txns).map(function(k){ var o=Object.assign({},S.txns[k]); o._id=k; return o; });
+    var un=arr.filter(function(x){ return !x.approved; });
+    var green=_sampleGreen(arr,function(x){ return proposeAcct(x.memo,(num(x.deposit)||0)>0,names,x.kind); });
+    if(!green.length){ toast('규칙과 같은 분개가 없습니다 — 승인 대기 '+un.length+'건은 하나씩 보세요','warn'); return; }
+    var sample=_samplePick(green,_sampleSize(green.length));
+    _SA={fid:fid, yr:yr, green:green, sample:sample, mark:{}, other:un.length-green.length};
+    _sampleShow();
+  }).catch(function(e){ toast('준비 실패: '+((e&&e.message)||e),'err'); });
+}
+function _sampleShow(){
+  var A=_SA; if(!A) return;
+  var done=A.sample.filter(function(x){ return A.mark[x._id]==='ok'; }).length;
+  var bad=A.sample.filter(function(x){ return A.mark[x._id]==='no'; });
+  var rows=A.sample.map(function(x,i){ var m=A.mark[x._id];
+    return '<tr'+(m==='ok'?' style="background:#f0fdf4"':m==='no'?' style="background:#fef2f2"':'')+'><td style="text-align:center">'+(m==='ok'?'☑':'□')+'</td><td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap">'+esc(x.date||'')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(x.memo||'')+'">'+esc(x.memo||'')+'</td>'
+      +'<td style="text-align:right">'+(num(x.deposit)?num(x.deposit).toLocaleString():'')+'</td><td style="text-align:right">'+(num(x.withdraw)?num(x.withdraw).toLocaleString():'')+'</td>'
+      +'<td style="white-space:nowrap">'+esc(x.debit)+' / '+esc(x.credit)+'</td>'
+      +'<td style="white-space:nowrap">'+(m?(m==='ok'?'<span class="chip ok" style="font-size:10px">맞음</span>':'<span class="chip dg" style="font-size:10px">틀림</span>')
+        :'<button class="primary" onclick="_sampleMark(\''+x._id+'\',\'ok\')" style="padding:2px 9px">맞음</button> <button onclick="_sampleMark(\''+x._id+'\',\'no\')" style="padding:2px 9px;color:var(--danger)">틀림</button>')+'</td></tr>';
+  }).join('');
+  var allOk=done===A.sample.length&&!bad.length;
+  var f=funds[A.fid]||{};
+  showModal('<div class="row" style="margin:0 0 6px;flex-wrap:wrap"><h2 style="margin:0">🎯 골라 승인</h2>'+hlp('sample.approve')
+      +'<span class="chip" style="font-size:10px">'+esc(f.short_name||f.name||'')+' · '+A.yr+'년</span></div>'
+    +'<div class="msg '+(bad.length?'err':'ok')+'" style="font-size:12.5px;margin:0 0 8px">'
+      +(bad.length?'표본에서 <b>틀린 것이 나와 한꺼번에 승인을 멈췄습니다.</b> 이 규칙으로 고른 것은 하나씩 보세요 — 틀린 줄은 계정을 고쳐 주세요.'
+        :'승인 대기 중 <b>'+A.green.length+'건</b>이 규칙이 고르는 계정과 같습니다. 그중 <b>'+A.sample.length+'건</b>을 먼저 보세요 — 다 맞으면 나머지를 한꺼번에 승인합니다.')+'</div>'
+    +'<div class="row" style="gap:8px;margin:0 0 6px"><span class="muted" style="font-size:12px">표본 '+done+' / '+A.sample.length+'</span>'
+      +'<div style="flex:1;height:7px;background:var(--line);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.round(done*100/A.sample.length)+'%;background:var(--ok)"></div></div></div>'
+    +'<div style="max-height:46vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>일자</th><th>적요</th><th style="text-align:right">입금</th><th style="text-align:right">출금</th><th>분개</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +'<div class="muted" style="font-size:11.5px;margin-top:6px">한꺼번에서 빠지는 것: 규칙과 다른 분개 · 100만 원 넘는 출금 · 쪼갠 거래 · 이체 · 마감한 달 — '+A.other+'건은 하나씩</div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:8px"><button onclick="_SA=null;closeM()">그만두기</button>'
+    +(bad.length?'':'<button class="primary" onclick="_sampleApply()"'+(allOk?'':' disabled')+'>'+A.green.length+'건 승인'+(allOk?'':' (표본 다 보면)')+'</button>')+'</div>',{width:900});
+}
+function _sampleMark(id,v){ if(!_SA) return; _SA.mark[id]=v; closeM(); _sampleShow(); }
+function _sampleApply(){
+  var A=_SA; if(!A) return;
+  if(A.sample.some(function(x){ return _SA.mark[x._id]!=='ok'; })){ toast('표본을 다 보세요','warn'); return; }
+  if(S.fundId!==A.fid||S.year!==A.yr){ toast('기금·연도가 바뀌었습니다 — 다시 여세요','warn'); _SA=null; closeM(); return; }
+  var up={}, who=(S.user||''), at=_nowStamp(), n=0, keys={};
+  A.green.forEach(function(x){
+    var cur=(S.txns||{})[x._id]; if(!cur||cur.approved||cur.debit!==x.debit||cur.credit!==x.credit) return;   // 그 사이 바뀐 줄은 건너뛴다
+    var b='txns/'+A.fid+'/'+A.yr+'/'+x._id+'/';
+    up[b+'approved']=true; up[b+'approved_by']=who; up[b+'approved_at']=at; up[b+'ok_via']='sample'; n++;
+    var lk=_learnKey(x.memo,(num(x.deposit)||0)>0); if(lk&&!keys[lk]) keys[lk]=x;
+  });
+  if(!n){ toast('승인할 줄이 없습니다(그 사이 바뀜)','warn'); return; }
+  fbDb.ref(NS).update(up).then(function(){
+    _audit(A.fid,'분개 골라 승인',A.yr+'년 '+n+'건 · 표본 '+A.sample.length+'건 모두 맞음 · 규칙과 같은 분개만');
+    /* 처음 보는 거래처만 배운다 — 이미 배운 것을 수백 번 더 세면 «쓰인 횟수»가 부풀어 뜻이 없어진다 */
+    Object.keys(keys).forEach(function(lk){ if(!(_learned||{})[lk]){ var x=keys[lk]; learnAcct(x.memo,(num(x.deposit)||0)>0,x.debit,x.credit,A.fid); } });
+    Object.keys(up).forEach(function(k){ var q=k.split('/'); var id=q[3], f=q[4]; if(S.txns&&S.txns[id]) S.txns[id][f]=up[k]; });
+    _SA=null; closeM(); renderFund(); toast(n+'건을 승인했습니다 (표본 '+A.sample.length+'건 확인)');
+    if(typeof RV!=='undefined') RV.at=0;
+  }).catch(function(e){ toast('승인 실패: '+((e&&e.message)||e),'err'); });
+}
 function delTxn(id){
   if(txnLocked(id)){ _lockStop(_monthOf(((S.txns||{})[id]||{}).date)); return; }
   confirmM('이 거래를 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) fbDb.ref(NS+'/txns/'+S.fundId+'/'+S.year+'/'+id).remove().then(function(){S.txnsFor=null;renderFund();toast('삭제되었습니다');}).catch(function(e){toast('삭제 실패: '+e.message,'err');}); }); }
@@ -18660,6 +18754,9 @@ var HELP={
    +'<p><b>추정 출연금</b> — 사람수 × 1인당 단가로 계산한 값입니다. [맞음]을 누르면 그 금액을 기본 출연금으로 적습니다.</p>'
    +'<p><b>이체 짝 · 분개 승인</b> — 기금·연도마다 한 줄입니다. 눌러서 회계 화면으로 가 짝을 보고 승인합니다.</p>'
    +'<p>서류 확인 창에서 <b>원본 옆에 놓고</b> 넣은 값은 이미 사람이 대조한 것이라 여기 오지 않습니다. 2026-10-05 이전에 들어간 값은 누가 넣었는지 기록이 없어 여기 나오지 않습니다.</p>'},
+ 'sample.approve':{t:'골라 승인 — 표본을 먼저 보고 한꺼번에',h:'<p>승인 대기 거래 가운데 <b>지금 규칙이 고르는 계정과 같은 것</b>(전에 승인한 거래처에서 배운 것 · 적요 낱말 규칙 · 참여사업장 이름 = 출연금)만 고릅니다.</p>'
+   +'<p>그중 몇 건을 달·계정이 섞이게 뽑아 먼저 보여 줍니다. <b>모두 맞으면</b> 나머지를 한꺼번에 승인하고, <b>하나라도 틀리면 멈춥니다</b> — 그 규칙으로 고른 것은 하나씩 보셔야 합니다.</p>'
+   +'<p>빠지는 것: 규칙과 다르게 정해진 분개, 100만 원 넘는 출금, 쪼갠 거래, 계좌 간 이체, 마감한 달. 승인한 줄에는 누가·언제와 «표본으로 승인»이 남습니다.</p>'},
  'xfer.pick':{t:'계좌 간 이체 — 고른 짝만 상계',h:'<p>같은 날·같은 금액이 한 계좌에서 나가고 다른 계좌로 들어온 짝입니다. 고른 짝은 양쪽을 <b>현금성자산 ↔ 현금성자산</b>으로 상계하고 승인합니다 — 재무제표에 영향이 없고 통장 잔액 대사도 그대로입니다.</p>'
    +'<p><b>계좌 다름</b>은 두 줄의 계좌번호가 달라 이체가 확실한 짝이라 처음부터 골라 둡니다. <b>추정</b>은 계좌번호가 없는 옛 자료라 비워 둡니다 — 맞는 것만 고르세요.</p>'
    +'<p>예전에는 통장을 가져오면 «확실한» 짝을 묻지 않고 승인까지 했습니다. 이제는 이 창에서 사람이 보고 누른 것만 승인되고, 누가·언제 승인했는지 남습니다(2026-10-05).</p>'},
