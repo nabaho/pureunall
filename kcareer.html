@@ -2314,7 +2314,6 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       </div></section>
       <section class="page-view" id="page-submission"><div class="page">
         <div class="page-head"><div class="page-title">📥 제출서류</div><div class="page-desc">신청서·제출서류를 건 단위로 보관 — 서류 폴더 «7. 컨설턴트,위원신청등 › 연도 › 건» 폴더를 만들면 그 건만 등록됩니다</div></div>
-        <div id="caseBanner"></div>
         <div class="toolbar">
           <input class="tb-input" data-f="q" placeholder="기관·건 이름 검색" style="min-width:220px">
           <select class="tb-select" data-f="year"><option value="">전체 연도</option></select>
@@ -4621,7 +4620,8 @@ function caseBannerDraw(){
       + '<button class="btn sm" onclick="caseLater()" title="이번에 찾은 건은 다시 띄우지 않습니다 — 제출서류 › 🔍 새 지원 건 찾기로 언제든 다시 찾을 수 있습니다">나중에</button>'
       + '</div>';
   }
-  ['caseBannerTop', 'caseBanner'].forEach(function(id){ var el = $(id); if(el) el.innerHTML = html; });
+  /* 띠는 맨 위 «한 곳» — 제출서류 화면에도 맨 위 띠가 보인다(두 곳에 그리면 한 화면에 두 번 뜬다) */
+  var el = $('caseBannerTop'); if(el) el.innerHTML = html;
 }
 function caseRegister(){
   var f = _caseFound.fresh, c = _caseFound.changed;
