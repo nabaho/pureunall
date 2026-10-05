@@ -379,6 +379,45 @@ h1{font-size:18px;margin-bottom:4px}
 .mrow .mmeta .who{color:var(--ink);font-weight:700}
 .mrow .mmeta .lateon{color:var(--warn)}
 .mrow .mtake{flex:0 0 auto;padding-top:2px;display:flex;flex-direction:column;gap:4px;align-items:flex-end}
+/* ── 묶어 보기 (대표 지시 2026-10-05 「불필요한 것 너무 많다 · 너무 길다」) ──
+   ⚠ 한 줄은 한 줄이다 — 넘치면 «…» 로 자르고 전문은 눌러서(자세히) 본다.
+   ⚠ 새 색을 만들지 않는다 — 있는 navy·sub·line·paper 만 쓴다(팔레트 검사). */
+.foldtabs{display:flex;gap:6px;margin:0 0 8px;overflow-x:auto;white-space:nowrap}
+.foldtabs .ftab{border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:99px;
+  padding:4px 12px;font-size:12.5px;font-family:inherit;cursor:pointer}
+.foldtabs .ftab.on{background:var(--navy);border-color:var(--navy);color:#fff;font-weight:600}
+.grp{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--line);
+  font-size:13.5px;white-space:nowrap}
+.grp.open{background:#f8fafc}
+.grp.pkon,.gl.pkon{background:#f8fafc}
+.grp .gnm{flex:1;min-width:0;display:flex;align-items:center;gap:6px;cursor:pointer;overflow:hidden}
+.grp .gnm b{overflow:hidden;text-overflow:ellipsis;flex:0 1 auto;min-width:0}
+.grp.unk .gnm b{color:var(--sub);font-weight:600}
+.grp .chev{color:var(--sub);width:12px;flex:0 0 12px;text-align:center}
+.grp .glast{color:var(--sub);font-size:12px;overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
+.grp .gcnt{color:var(--navy);font-weight:700;font-size:12.5px;flex:0 0 auto}
+.grp .gwhen{color:var(--sub);font-size:11.5px;flex:0 0 auto}
+.gl{display:flex;align-items:center;gap:7px;padding:7px 14px 7px 40px;border-bottom:1px solid var(--line);
+  font-size:12.5px;white-space:nowrap;background:#fff}
+.gl .gic{flex:0 0 auto}
+.gl .gt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.gl .tg,.gl .handtag{flex:0 0 auto}
+.gdet{padding:6px 14px 10px 64px;border-bottom:1px solid var(--line);background:#f8fafc}
+.gdet .mmeta{font-size:11.5px;color:var(--sub);line-height:1.6;word-break:break-all}
+.gdet .mmeta .who{color:var(--ink);font-weight:700}
+.gacts{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.foldinfo{display:flex;align-items:center;gap:6px;margin-top:10px;font-size:12px;color:var(--sub)}
+.ibtn{width:22px;height:22px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--sub);
+  font-size:12px;padding:0;cursor:pointer;font-family:inherit}
+.dtools{display:flex;gap:6px;flex-wrap:wrap;padding:0 0 8px}
+.hrbanner.oneline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* 폰 — 최근 제목은 빼고, 왼쪽 들여쓰기를 줄인다 */
+@media (max-width:640px){
+  .grp .glast{display:none}
+  .grp{padding:9px 10px;gap:6px}
+  .gl{padding:7px 10px 7px 30px}
+  .gdet{padding:6px 10px 10px 30px}
+}
 /* ── 막힌 자리를 이 줄에서 잇기 (대표 결정 2026-08-27) ──
    고치는 단추는 「내가 맡기」와 **색을 갈라 둔다** — 맡기는 내 일이고,
    이것은 업체관리를 고치는 일이다. */
@@ -765,6 +804,15 @@ function pickVisible(kind) {
     }).rows.map(r => r.id);
   }
   if (kind === 'pending') return Object.keys(App.pending || {});
+  /* ⚠ 메일 갈래가 **없었다** — 그래서 메일 화면의 「모두 고르기」를 눌러도 빈 목록을
+     받아 아무것도 안 골라졌다(2026-10-05 묶어 보기를 지으며 찾음).
+     지금 보이는 탭의 것만 — 「모르는 주소」 탭에서 모두 고르면 그 탭 것만. */
+  if (kind === 'mail') {
+    const tab = App.mailTab || 'all';
+    return [].concat.apply([], mailGroups(mailRows(App.mail, mailCtx()))
+      .filter(g => tab === 'all' || (tab === 'known' ? !g.unknown : g.unknown))
+      .map(g => g.ids));
+  }
   if (kind === 'drawer') {
     const rows = drawerModel(App.itemsKeep, App.itemsMonth, App.companyId, App.kind, Date.now()).rows;
     /* ⚠ 폴더로 거른 것까지 **똑같이** 걸러야 한다. 예전에는 찾기 줄만 걸러서,
@@ -794,10 +842,12 @@ function pickBar(kind, ids, acts) {
     + '<label><input type="checkbox" ' + (allOn ? 'checked' : '')
     + ' onchange="pickToggleAll(\'' + kind + '\')"> 모두 고르기'
     + (ids.length ? ' (' + ids.length + ')' : '') + '</label>'
+    /* ⚠ 안 골랐을 때 「☐ 를 눌러 여러 곳을 골라 둘 수 있습니다」를 늘 띄웠다 —
+       ☐ 는 늘 거기 있어 매번 읽을 말이 아니었고, 폰에서는 두 줄로 접혔다(2026-10-05). */
     + (on.length
       ? '<span class="pkn">' + on.length + '개 골랐습니다</span>' + (acts || '')
         + '<button class="btn pkx" onclick="pickCancel(\'' + kind + '\')">고르기 취소</button>'
-      : '<span class="sub" style="margin:0">☐ 를 눌러 여러 곳을 골라 둘 수 있습니다</span>')
+      : '')
     + '</div>';
 }
 
@@ -1736,47 +1786,117 @@ function screenPending() {
       + '<button class="btn" onclick="bulkPendingTrash()">🗑 휴지통으로</button></span>'
     : '';
 
-  h += '<div class="card">' + pickBar('pending', ids, pendActs) + ids.map((id, i) => {
-    const rec = App.pending[id];
-    const g = pendTagOf(id, rec);
-    const stale = S.isStalePending(rec, now);
-    const sel = pickOf('pending');
-    return '<div class="row' + (pickOn(sel, id) ? ' pkon' : '') + '" style="display:block">'
-      + '<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">'
-      + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (pickOn(sel, id) ? 'checked' : '')
-      + ' onchange="pickHit(\'pending\',\'' + esc(id) + '\')"></label>'
-      + '<span class="pkno">' + (i + 1) + '</span>'
-      + '<b style="flex:1">' + esc(rec.filename || '(이름 없음)') + '</b>'
-      /* 메일로 **저절로 내려온** 줄임을 알려 준다 — 어디서 왔는지 모르면
-         「내가 안 올린 것이 왜 있나」가 된다(대표 승낙 2026-08-21 갈라 보내기).
-         보낸이·제목은 note 에 있어 마우스를 올리면 보인다. */
-      + (rec.routed ? '<span class="mailtag" title="' + esc(rec.note || '') + '">메일</span>' : '')
-      /* 누가 왜 넘겼는지 (대표 지시 2026-08-29) — 「왜 나한테 왔지」를 알아야
-         받은 사람이 손을 댄다. 까닭이 없으면 또 떠넘기게 된다. */
-      + (rec.handedFrom
-        ? '<span class="handtag" title="' + esc(rec.handWhy || '') + '">'
-          + esc(ownerNameOf(rec.handedFrom)) + ' → 나'
-          + (rec.handWhy ? ' · 「' + esc(rec.handWhy) + '」' : '') + '</span>'
-        : '')
-      + (stale ? '<span class="expbadge">3일 넘음</span>' : '')
-      + '</div>'
-      /* 한 줄 요약 — 파일 이름이 「직현병국퇴.pdf」라 열지 않으면 알 수 없다
-         (대표 지시 2026-08-29). 값으로 쓰지 않고 **보고 고르는 데만** 쓴다. */
-      + '<div class="sumline">' + sumTagHtml(Object.assign({ id: id }, rec)) + '</div>'
-      + '<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;padding-left:34px">'
-      + '<select class="btn" id="co_' + id + '" onchange="setPendTag(\'' + jsq(id) + '\',\'companyId\',this.value)">'
-      + coOpts.replace('value="' + esc(g.companyId) + '"', 'value="' + esc(g.companyId) + '" selected') + '</select>'
-      + '<input class="btn" id="mo_' + id + '" style="width:104px" placeholder="2026-08" value="' + esc(g.month) + '"'
-      + ' oninput="setPendTag(\'' + jsq(id) + '\',\'month\',this.value)">'
-      + '<select class="btn" id="kd_' + id + '" onchange="setPendTag(\'' + jsq(id) + '\',\'kind\',this.value)">'
-      + kindOpts.replace('value="' + esc(g.kind) + '"', 'value="' + esc(g.kind) + '" selected') + '</select>'
-      + (canWrite() ? '<button class="btn pri" onclick="fileToDrawer(\'' + esc(id) + '\')">서랍으로</button>'
-        + '<button class="btn hand" onclick="openHand(\'' + jsq(id) + '\')"'
-        + ' title="이 자료가 내 것이 아니면 임자에게 넘깁니다">↪ 넘기기</button>' : '')
-      + '</div></div>';
+  /* ── 사업장(모르면 보낸 곳)으로 묶는다 (대표 지시 2026-10-05 — 메일 화면과 같은 방식) ──
+     ⚠ 묶음 안 한 줄에도 「서랍으로」가 바로 있다 — 이 화면의 일은 «넣는 것»이라
+       눌러 펼쳐야만 넣을 수 있으면 오히려 한 번 더 일이다. 이름을 누르면 고치는 칸이 열린다. */
+  const sel = pickOf('pending');
+  const groups = pendGroups(ids);
+  h += '<div class="card">' + pickBar('pending', ids, pendActs) + groups.map((g, gi) => {
+    const open = foldIsOpen('pend', g.key, groups.length);
+    const allOn = g.ids.every(id => pickOn(sel, id));
+    let s = '<div class="grp' + (open ? ' open' : '') + (g.unknown ? ' unk' : '') + (allOn ? ' pkon' : '') + '">'
+      + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (allOn ? 'checked' : '')
+      + ' onchange="pickMany(\'pending\',' + esc(JSON.stringify(g.ids)) + ')"></label>'
+      + '<span class="pkno">' + (gi + 1) + '</span>'
+      + '<span class="gnm" onclick="foldToggle(\'pend\',\'' + jsq(g.key) + '\',' + groups.length + ')">'
+      + '<span class="chev">' + (open ? '⌄' : '›') + '</span>'
+      + (g.unknown ? '<span class="q" title="사업장을 아직 모릅니다 — 이름을 눌러 고르십시오">❓</span>' : '')
+      + '<b>' + esc(g.name) + '</b>'
+      + '<span class="glast">' + esc((g.lines[0] || {}).title || '') + '</span></span>'
+      + '<span class="gcnt">' + g.ids.length + '건</span>'
+      + '<span class="gwhen">' + esc(fmtWhen(g.at, now)) + '</span>'
+      + (canWrite() && !g.unknown
+        ? '<button class="btn sm pri" title="이 사업장 것을 한꺼번에 서랍으로 — 덜 채워진 건은 남깁니다"'
+          + ' onclick="pendGroupToDrawer(' + esc(JSON.stringify(g.ids)) + ')">모두 서랍으로</button>' : '')
+      + '</div>';
+    if (!open) return s;
+    return s + g.lines.map((ln, li) => {
+      const id = ln.ids[0];
+      const rec = App.pending[id];
+      const tg = pendTagOf(id, rec);
+      const on = pickOn(sel, id);
+      const det = !!(App.lineOpen || {})[id];
+      /* 이름표는 «빈 것»만 알린다 — 다 찼으면 종류·달 한 칩, 비었으면 무엇이 비었는지 */
+      const miss = [!tg.companyId && '사업장', !(S.isKeepKind(tg.kind) || tg.month) && '달',
+        !(tg.kind && tg.kind !== 'etc') && '종류'].filter(Boolean);
+      const chip = miss.length
+        ? '<span class="tg guess" title="눌러서 채우십시오">' + miss.join('·') + ' ?</span>'
+        : '<span class="tg sure">' + esc(S.kindLabel(tg.kind)) + (tg.month ? ' ' + esc(monthShort(tg.month)) : '') + '</span>';
+      return '<div class="gl' + (on ? ' pkon' : '') + '">'
+        + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (on ? 'checked' : '')
+        + ' onchange="pickHit(\'pending\',\'' + esc(id) + '\')"></label>'
+        + '<span class="pkno">' + (li + 1) + '</span>'
+        + '<span class="gic">' + fileIcon(rec) + '</span>'
+        + '<span class="gt" title="눌러서 고치기" onclick="lineToggle(\'' + jsq(id) + '\')">' + esc(ln.title) + '</span>'
+        /* 누가 넘겼는지는 줄에 남긴다 — 「왜 나한테 왔지」(대표 지시 2026-08-29) */
+        + (rec.handedFrom ? '<span class="handtag" title="' + esc(rec.handWhy || '') + '">↪ '
+          + esc(ownerNameOf(rec.handedFrom)) + '</span>' : '')
+        + chip
+        + (canWrite() ? '<button class="btn sm pri" onclick="fileToDrawer(\'' + esc(id) + '\')">서랍으로</button>' : '')
+        + '</div>'
+        + (det ? pendEditHtml(id, rec, tg, now, coOpts, kindOpts) : '');
+    }).join('');
   }).join('') + '</div>';
   return h;
 }
+
+/* 확인 대기 줄들을 묶음으로 — 사람이 고친 것 > 줄에 적힌 것 > 짐작(pendTagOf) 차례로 사업장을 본다.
+   ⚠ 확인 대기에서는 같은 대화를 «한 줄로 합치지» 않는다(body:false) — 한 건씩 서랍에
+     넣는 화면이라, 합치면 「서랍으로」가 무엇을 넣는지 헷갈린다. */
+function pendGroups(ids) {
+  const all = App.allCompanies && App.allCompanies.length ? App.allCompanies : (App.companies || []);
+  return foldGroups((ids || []).map(id => {
+    const rec = App.pending[id] || {};
+    const tg = pendTagOf(id, rec);
+    const from = S.mailNote(rec.note).from || '';
+    const co = tg.companyId ? (all.filter(c => c.id === tg.companyId)[0] || null) : null;
+    const body = isBodyRow(rec);
+    const t = cleanMailTitle(rec.filename || '(이름 없음)', body);
+    return { id: id, key: foldKeyOf(tg.companyId, from), at: Number(rec.at || 0),
+      name: tg.companyId ? ((co && co.name) || tg.companyName || tg.companyId) : (from || '직접 올린 것'),
+      unknown: !tg.companyId, title: t.title, re: t.re, body: false, row: rec };
+  }));
+}
+
+/* 줄을 눌렀을 때 — 예전 한 건 카드에 있던 것을 그대로(요약·메일·넘김·3일 넘음·이름표 고치기·넘기기).
+   ⚠ 칸 번호(co_·mo_·kd_)는 그대로다 — pendTagLive 가 그 칸에서 사람이 고른 값을 읽는다. */
+function pendEditHtml(id, rec, g, now, coOpts, kindOpts) {
+  const stale = S.isStalePending(rec, now);
+  return '<div class="gdet">'
+    + '<div class="tagline">'
+    /* 메일로 저절로 내려온 줄 — 어디서 왔는지 모르면 「내가 안 올린 것이 왜 있나」가 된다 */
+    + (rec.routed ? '<span class="mailtag" title="' + esc(rec.note || '') + '">메일</span>' : '')
+    + (rec.handedFrom
+      ? '<span class="handtag" title="' + esc(rec.handWhy || '') + '">'
+        + esc(ownerNameOf(rec.handedFrom)) + ' → 나'
+        + (rec.handWhy ? ' · 「' + esc(rec.handWhy) + '」' : '') + '</span>'
+      : '')
+    + (stale ? '<span class="expbadge">3일 넘음</span>' : '')
+    + '<span class="mmeta">' + esc(rec.filename || '') + '</span>'
+    + '</div>'
+    /* 한 줄 요약 — 파일 이름이 「직현병국퇴.pdf」라 열지 않으면 알 수 없다(2026-08-29) */
+    + '<div class="sumline" style="padding-left:0">' + sumTagHtml(Object.assign({ id: id }, rec)) + '</div>'
+    + '<div class="gacts">'
+    + '<select class="btn" id="co_' + id + '" onchange="setPendTag(\'' + jsq(id) + '\',\'companyId\',this.value)">'
+    + coOpts.replace('value="' + esc(g.companyId) + '"', 'value="' + esc(g.companyId) + '" selected') + '</select>'
+    + '<input class="btn" id="mo_' + id + '" style="width:104px" placeholder="2026-08" value="' + esc(g.month) + '"'
+    + ' oninput="setPendTag(\'' + jsq(id) + '\',\'month\',this.value)">'
+    + '<select class="btn" id="kd_' + id + '" onchange="setPendTag(\'' + jsq(id) + '\',\'kind\',this.value)">'
+    + kindOpts.replace('value="' + esc(g.kind) + '"', 'value="' + esc(g.kind) + '" selected') + '</select>'
+    + (canWrite() ? '<button class="btn hand" onclick="openHand(\'' + jsq(id) + '\')"'
+      + ' title="이 자료가 내 것이 아니면 임자에게 넘깁니다">↪ 넘기기</button>' : '')
+    + '</div></div>';
+}
+
+/* 묶음 하나를 서랍으로 — 고르기를 그 묶음으로 바꿔 「고른 것 서랍으로」 길을 그대로 탄다.
+   (덜 채워진 건을 남기고 무엇이 왜 남았는지 알리는 일을 두 벌로 만들지 않는다) */
+function pendGroupToDrawer(ids) {
+  if (!canWrite()) return;
+  const set = {}; (ids || []).forEach(id => { set[id] = true; });
+  pickPut('pending', set);
+  return bulkToDrawer();
+}
+window.pendGroupToDrawer = pendGroupToDrawer;
 
 /* 그 줄에 채워져 있는 이름표를 읽는다. 화면에 그려져 있으면 화면 값이 먼저다 —
    사람이 방금 고른 것이 언제나 가장 새롭다. 안 그려져 있으면(한꺼번에 처리할 때
@@ -2223,6 +2343,122 @@ function mailRows(box, ctx) {
 }
 window.mailRows = mailRows;
 
+/* ══════ 묶어 보기 (대표 지시 2026-10-05 「불필요한 것 너무 많다 · 화면이 너무 길다」) ══════
+   실측: 공용 칸 184건이 보낸 곳 39곳에서 왔고, 「RE: RE: …」로 이어진 같은 대화가 115건이었다.
+   그런데 한 건에 다섯 줄씩 펼쳐 폰 한 화면에 두 건밖에 안 보였다.
+   → 같은 곳(사업장, 모르면 보낸 주소)끼리 **한 줄**로 묶고, 누르면 그 안을 **한 건에 한 줄**로.
+   ⚠ 묶기는 «보여 주는 것»만 바꾼다 — 고르기·맡기·서랍으로는 여전히 자료 한 건 단위다.
+   ⚠ 길 때만 접는다(묶음이 셋 넘을 때). 몇 건 안 되는데 접어 두면 한 번 더 눌러야 할 뿐이다. */
+
+/* 「RE: RE: RE …」 를 떼고 몇 번이었는지 센다. ⚠ 낱말 끝을 본다 — 「Report.xlsx」 의 Re 는 아니다. */
+function cleanMailTitle(s, body) {
+  let t = String(s == null ? '' : s);
+  let re = 0;
+  const head = t.match(/^\s*(?:(?:re|fw|fwd)(?:\[\d+\])?(?=[\s:：]|$)\s*[:：]?\s*)+/i);
+  if (head) {
+    re = (head[0].match(/(?:re|fw|fwd)(?:\[\d+\])?(?=[\s:：]|$)/ig) || []).length;
+    t = t.slice(head[0].length);
+  }
+  if (body) t = t.replace(/\.txt$/i, '');
+  t = t.replace(/\s+/g, ' ').trim();
+  return { title: t || String(s == null ? '' : s).trim(), re: re };
+}
+
+/* 메일 본문을 담은 줄인가(서버 isBodyRec 와 같은 잣대) — 본문은 이름이 곧 제목이다 */
+function isBodyRow(rec) {
+  return /^text\/plain/i.test(String((rec && rec.mime) || ''))
+    && /\.txt$/i.test(String((rec && rec.filename) || ''));
+}
+
+/* 파일 꼴을 한 글자로 — 줄이 한 줄이라 이름표 대신 그림 하나 */
+function fileIcon(rec) {
+  if (isBodyRow(rec)) return '✉';
+  const e = (String((rec && rec.filename) || '').match(/\.([a-z0-9]{1,5})$/i) || [])[1] || '';
+  if (/^(xlsx?|xlsm|csv)$/i.test(e)) return '📊';
+  if (/^(jpe?g|png|heic|webp|gif)$/i.test(e)) return '🖼';
+  if (/^zip$/i.test(e)) return '🗜';
+  return '📄';
+}
+
+/* 묶음 열쇠 — 사업장을 알면 사업장, 모르면 보낸 주소, 그것도 없으면 직접 올린 것 */
+function foldKeyOf(companyId, from) {
+  if (companyId) return 'co:' + companyId;
+  const a = String(from || '').trim().toLowerCase();
+  return a ? 'at:' + a : 'up:';
+}
+
+/* items: [{id, key, name, unknown, at, title, re, body, row}] → 묶음들.
+   ⚠ 묶음 안에서 **본문끼리** 같은 제목(RE 뗀 것)이면 한 줄로 합친다 — 같은 대화에
+     답장이 스무 번 오면 스무 줄이 아니라 「답장 20」 한 줄이다. 파일은 합치지 않는다
+     (서로 다른 파일이다). 합친 줄의 ☐·맡기는 그 안의 자료 모두에 걸린다.
+   묶음 차례는 «가장 최근에 온 것» 먼저 — 새로 온 것이 묻히면 안 된다. */
+function foldGroups(items) {
+  const by = {}, order = [];
+  (items || []).forEach(it => {
+    let g = by[it.key];
+    if (!g) {
+      g = by[it.key] = { key: it.key, name: it.name, unknown: !!it.unknown, at: 0, ids: [], lines: [], _thread: {} };
+      order.push(g);
+    }
+    g.at = Math.max(g.at, Number(it.at || 0));
+    g.ids.push(it.id);
+    const tk = it.body ? String(it.title).toLowerCase() : '';
+    if (tk && g._thread[tk]) {
+      const ln = g._thread[tk];
+      ln.ids.push(it.id); ln.re = Math.max(ln.re, it.re); ln.n++;
+      if (Number(it.at || 0) > ln.at) { ln.at = Number(it.at || 0); ln.row = it.row; }
+      return;
+    }
+    const ln = { ids: [it.id], title: it.title, re: Number(it.re || 0), n: 1, at: Number(it.at || 0),
+      body: !!it.body, row: it.row };
+    g.lines.push(ln);
+    if (tk) g._thread[tk] = ln;
+  });
+  order.forEach(g => {
+    delete g._thread;
+    g.lines.sort((a, b) => b.at - a.at);
+  });
+  return order.sort((a, b) => b.at - a.at);
+}
+
+/* 접혔나 — 사람이 눌러 둔 것이 먼저, 안 눌렀으면 «길 때만» 접는다 */
+function foldIsOpen(scope, key, total) {
+  const k = scope + ':' + key, v = (App.foldOpen || {})[k];
+  return v === undefined ? total <= 3 : !!v;
+}
+function foldToggle(scope, key, total) {
+  App.foldOpen = App.foldOpen || {};
+  App.foldOpen[scope + ':' + key] = !foldIsOpen(scope, key, total);
+  App.render();
+}
+window.foldToggle = foldToggle;
+
+/* 한 줄을 펼쳐 자세히(보낸이·제목·까닭) — 줄 번호가 아니라 첫 자료 번호로 기억한다 */
+function lineToggle(id) {
+  App.lineOpen = App.lineOpen || {};
+  App.lineOpen[id] = !App.lineOpen[id];
+  App.render();
+}
+window.lineToggle = lineToggle;
+
+/* 여러 건을 한 번에 고르거나 푼다 — 묶음 ☐ 와 합친 줄 ☐ 가 쓴다 */
+function pickMany(kind, ids) {
+  const sel = Object.assign({}, pickOf(kind));
+  const allOn = ids.length && ids.every(id => sel[id]);
+  ids.forEach(id => { if (allOn) delete sel[id]; else sel[id] = true; });
+  pickPut(kind, sel);
+  App.render();
+}
+window.pickMany = pickMany;
+
+/* 귀속월 짧게 — 「2026-09」 → 「9월」 (같은 해면), 다른 해면 「25.9월」 */
+function monthShort(m) {
+  const x = String(m || '').match(/^(\d{4})-?(\d{1,2})$/);
+  if (!x) return '';
+  const y = new Date().getFullYear();
+  return (Number(x[1]) === y ? '' : x[1].slice(2) + '.') + Number(x[2]) + '월';
+}
+
 function mailCtx() {
   return { companies: App.companies, allCompanies: App.allCompanies,
     dir: App.dir, owners: App.owners, now: Date.now() };
@@ -2432,16 +2668,21 @@ function sweepHtml() {
 
 function screenMail() {
   const rows = mailRows(App.mail, mailCtx());
-  const ids = rows.map(r => r.id);
   const now = Date.now();
-  const late = rows.filter(r => r.stale).length;
+  /* ⚠ 「오래된 것 N」을 뺐다(2026-10-05) — 184건 중 183건이 오래된 것이라 아무것도
+     안 알려 주면서 머리줄 자리만 먹었다. 머리에는 «몇 곳 · 몇 건»만. */
+  const nGroups = mailGroups(rows).length;
   let h = '<div class="stickhead">' + bannerHtml() + '<div class="dhead">'
     + '<button class="btn sm" onclick="App.go(\'sites\')" title="사업장 목록으로">←</button>'
     + '<b class="dtitle">메일로 온 것</b>'
-    + '<span class="dkpi"><b>' + rows.length + '</b>건'
-    + (late ? ' · 오래된 것 <b class="wa">' + late + '</b>' : '') + '</span>'
+    + '<span class="dkpi">' + (nGroups ? '<b>' + nGroups + '</b>곳 · ' : '') + '<b>' + rows.length + '</b>건</span>'
     + '<span class="dacts"><button class="btn sm pri"' + (App.mailPulling ? ' disabled' : '') + ' onclick="pullMailNow()">'
-        + (App.mailPulling ? '가져오는 중…' : '📥 지금 가져오기') + '</button>'
+        + (App.mailPulling ? '가져오는 중…' : '📥 가져오기') + '</button>'
+        /* 관리 단추는 «⋯» 안에 — 폰 머리줄이 단추 넷으로 두 줄이 되던 것(2026-10-05) */
+        + '<button class="btn sm" title="다시 읽기 · 관리" onclick="App.mailTools=!App.mailTools;App.render()">⋯</button></span>'
+    + '</div>'
+    + (App.mailTools
+      ? '<div class="dtools">'
         /* 다시 갈라 보내기 (대표 요청 2026-08-25) — 배달은 받을 때 한 번만 하므로,
            업체관리에 주소를 나중에 넣어도 이미 여기 떨어진 것은 그대로 남는다.
            ⚠ 총괄관리자에게만. 남의 자리로 옮기는 일이라 **서버가** 한다. */
@@ -2455,8 +2696,9 @@ function screenMail() {
             + ' title="이미 쌓인 확인 대기·공용 칸 자료 가운데 확실한 것을 서랍에 넣습니다 — 먼저 목록만 보여 드립니다"'
             + ' onclick="sweepPreview()">' + (App.sweepBusy ? '살펴보는 중…' : '🧹 쌓인 것 정리') + '</button>'
           : '')
-        + '<button class="btn sm" onclick="ensureMail(true)">↻ 다시 읽기</button></span>'
-    + '</div></div>';
+        + '<button class="btn sm" onclick="ensureMail(true)">↻ 다시 읽기</button></div>'
+      : '')
+    + '</div>';
 
   /* 공용 칸에 쌓이는 까닭을 «사람 이름»으로 (대표 승인 2026-10-03 목업 ③) — 관리자에게만.
      담당자가 이 함을 한 번도 안 열면 그 사람 자리가 없어 메일이 여기 남는다(30일 실측 46통).
@@ -2467,9 +2709,11 @@ function screenMail() {
     const names = Object.keys(away).sort((a, b) => away[b] - away[a]);
     if (names.length) {
       const n = names.reduce((s, k) => s + away[k], 0);
-      h += '<div class="hrbanner" title="그 담당자가 급여데이터함에 한 번 로그인한 뒤 「🔁 다시 갈라 보내기」를 누르면 그 사람 칸으로 갑니다">'
-        + '⚠ 공용 칸 ' + n + '건 — 담당자가 이 함을 아직 안 열어 자리가 없습니다: '
-        + names.map(k => esc(k) + ' ' + away[k]).join(' · ') + ' → 한 번 열면 「🔁 다시 갈라 보내기」로 내려갑니다</div>';
+      /* ⚠ 한 줄로 — 긴 안내는 마우스를 올리면(폰은 길게 누르면) 나온다(2026-10-05) */
+      h += '<div class="hrbanner oneline" title="담당자가 이 함을 아직 안 열어 자리가 없던 것입니다.'
+        + ' 그 담당자가 급여데이터함에 한 번 로그인한 뒤 「⋯ → 🔁 다시 갈라 보내기」를 누르면 그 사람 칸으로 갑니다">'
+        + '⚠ 아직 안 연 담당자 몫 ' + n + '건 — '
+        + names.map(k => esc(k) + ' ' + away[k]).join(' · ') + '</div>';
     }
   }
 
@@ -2485,54 +2729,127 @@ function screenMail() {
     : '';
   const sel = pickOf('mail');
 
-  h += '<div class="card">' + pickBar('mail', ids, acts) + rows.map((r, i) =>
-    '<div class="mrow' + (r.stale ? ' old' : '') + (pickOn(sel, r.id) ? ' pkon' : '') + '">'
-    + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (pickOn(sel, r.id) ? 'checked' : '')
-    + ' onchange="pickHit(\'mail\',\'' + jsq(r.id) + '\')"></label>'
-    + '<span class="mno">' + (i + 1) + '</span>'
-    + '<div class="mbody">'
-    + '<div class="mfn">' + esc(r.filename) + '</div>'
-    /* 보낸 사람을 파일 이름 **바로 다음 줄**에 둔다 — 이름이 IMG_2841.jpg 여도
-       누가 보냈는지는 늘 알기 때문이다. */
+  /* ── 보낸 곳으로 묶는다 (대표 지시 2026-10-05) ── */
+  const tab = App.mailTab || 'all';
+  const groupsAll = mailGroups(rows);
+  const nKnown = groupsAll.filter(g => !g.unknown).length;
+  const groups = groupsAll.filter(g => tab === 'all' || (tab === 'known' ? !g.unknown : g.unknown));
+  const shownIds = [].concat.apply([], groups.map(g => g.ids));
+  const byId = {}; rows.forEach(r => { byId[r.id] = r; });
+
+  h += '<div class="foldtabs">'
+    + [['all', '전체', groupsAll.length], ['known', '사업장 앎', nKnown], ['unk', '모르는 주소', groupsAll.length - nKnown]]
+      .filter(t => t[0] === 'all' || t[2])
+      .map(t => '<button class="ftab' + (tab === t[0] ? ' on' : '') + '" onclick="App.mailTab=\'' + t[0] + '\';App.render()">'
+        + t[1] + ' <b>' + t[2] + '</b></button>').join('')
+    + '</div>';
+
+  h += '<div class="card">' + pickBar('mail', shownIds, acts) + groups.map((g, gi) => {
+    const open = foldIsOpen('mail', g.key, groups.length);
+    const allOn = g.ids.every(id => pickOn(sel, id));
+    const first = byId[g.ids[0]] || {};
+    let s = '<div class="grp' + (open ? ' open' : '') + (g.unknown ? ' unk' : '') + (allOn ? ' pkon' : '') + '">'
+      + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (allOn ? 'checked' : '')
+      + ' onchange="pickMany(\'mail\',' + esc(JSON.stringify(g.ids)) + ')"></label>'
+      + '<span class="pkno">' + (gi + 1) + '</span>'
+      + '<span class="gnm" onclick="foldToggle(\'mail\',\'' + jsq(g.key) + '\',' + groups.length + ')">'
+      + '<span class="chev">' + (open ? '⌄' : '›') + '</span>'
+      + (g.unknown ? '<span class="q" title="업체관리에 없는 주소입니다">❓</span>' : '')
+      + '<b>' + esc(g.name) + '</b>'
+      /* PC 에서만 — 넓으니 가장 최근 것의 제목을 한 줄 더 붙인다 */
+      + '<span class="glast">' + esc((g.lines[0] || {}).title || '') + '</span></span>'
+      + '<span class="gcnt">' + g.ids.length + '건</span>'
+      + '<span class="gwhen">' + esc(fmtWhen(g.at, now)) + '</span>'
+      + (canWrite()
+        ? (g.unknown
+          ? '<button class="btn sm fix" title="이 보낸이를 업체관리의 그 사업장 담당자로 넣습니다 — 다음부터 저절로 갑니다"'
+            + ' onclick="openFixMail(\'' + jsq(first.id || '') + '\')">✉ 잇기</button>'
+          : '<button class="btn sm" onclick="claimMailIds(' + esc(JSON.stringify(g.ids)) + ')">'
+            + (open ? '모두 맡기' : '맡기') + '</button>')
+        : '')
+      + '</div>';
+    if (!open) return s;
+    return s + g.lines.map((ln, li) => {
+      const r = ln.row;
+      const on = ln.ids.every(id => pickOn(sel, id));
+      const det = !!(App.lineOpen || {})[ln.ids[0]];
+      /* 이름표는 «아는 것만» — 모르면 「종류 ?」 하나. 예전엔 「사업장을 모릅니다 ·
+         월을 모릅니다 · 기타」 세 칩이 184번 붙었다. */
+      const chip = r.kind && r.kind !== 'etc'
+        ? '<span class="tg sure">' + esc(S.kindLabel(r.kind)) + (r.month ? ' ' + esc(monthShort(r.month)) : '') + '</span>'
+        : '<span class="tg guess">종류 ?</span>';
+      return '<div class="gl' + (on ? ' pkon' : '') + '">'
+        + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (on ? 'checked' : '')
+        + ' onchange="pickMany(\'mail\',' + esc(JSON.stringify(ln.ids)) + ')"></label>'
+        + '<span class="pkno">' + (li + 1) + '</span>'
+        + '<span class="gic">' + fileIcon(r.rec) + '</span>'
+        + '<span class="gt" title="눌러서 자세히" onclick="lineToggle(\'' + jsq(ln.ids[0]) + '\')">' + esc(ln.title) + '</span>'
+        + (ln.n > 1 || ln.re ? '<span class="tg guess">답장 ' + Math.max(ln.n - 1, ln.re) + '</span>' : '')
+        + chip
+        + '</div>'
+        + (det ? mailDetailHtml(r, now, ln.ids) : '');
+    }).join('');
+  }).join('') + '</div>';
+
+  /* 갈라 보내기가 켜진 뒤로 이 화면은 「메일 전부」가 아니라 **못 갈랐던 것**이다.
+     그렇다고 말해 주지 않으면 「메일이 2건밖에 안 왔나」로 읽는다.
+     ⚠ 매번 읽을 글이 아니라 ⓘ 하나로 접는다 — 누르면 편다(대표 지시 2026-10-05). */
+  h += '<div class="foldinfo"><button class="ibtn" onclick="App.mailInfo=!App.mailInfo;App.render()">ⓘ</button>'
+    + ' 여기 남은 것은 임자를 못 찾은 것입니다</div>';
+  if (App.mailInfo) {
+    h += mailScanHtml();
+    h += '<div class="sub" style="margin-top:6px">임자를 찾은 메일은 <b>그 담당자 대기 칸</b>으로 바로 갔습니다 · '
+      + '아는 주소에서 온 것만 들어옵니다 ·'
+      + ' 고객사가 보냈는데 안 보이면 업체관리에 <b>그 담당자 메일 주소</b>가 있는지 봐 주세요 ·'
+      + ' 모르는 곳에서 온 것은 담지도 지우지도 않고 메일 폴더에 그대로 둡니다</div>';
+  }
+  return h;
+}
+
+/* 메일 줄들을 묶음으로 — 열쇠는 사업장(알면)·보낸 주소(모르면). 이름은 사업장 이름, 모르면 주소. */
+function mailGroups(rows) {
+  return foldGroups((rows || []).map(r => {
+    const body = isBodyRow(r.rec);
+    const t = cleanMailTitle(body ? (r.subject || r.filename) : r.filename, body);
+    return { id: r.id, key: foldKeyOf(r.companyId, r.from), at: r.at,
+      name: r.companyName || r.from || '(보낸이 모름)', unknown: !r.companyId,
+      title: t.title, re: t.re, body: body, row: r };
+  }));
+}
+
+/* 줄 하나를 눌렀을 때 — 예전 한 건 카드에 있던 것 «전부»를 여기서 보여 준다.
+   (보낸이·제목·크기·짐작·담당·까닭·맡기·고치기) 뺀 것이 아니라 한 번 누른 뒤로 옮긴 것이다. */
+function mailDetailHtml(r, now, ids) {
+  return '<div class="gdet">'
+    /* 보낸 사람을 먼저 — 이름이 IMG_2841.jpg 여도 누가 보냈는지는 늘 안다. */
     + '<div class="mmeta">'
     + (r.companyName ? '<span class="who">' + esc(r.companyName) + '</span> ' : '')
     + '&lt;' + esc(r.from || '(주소 없음)') + '&gt;'
     + (r.subject ? ' · 「' + esc(r.subject) + '」' : ' · (제목 없음)')
-    + ' · ' + (r.stale ? '<b class="lateon">' + esc(fmtWhen(r.at, now)) + '</b>' : esc(fmtWhen(r.at, now)))
-    + ' · ' + fmtBytes(r.bytes) + '</div>'
+    + ' · ' + esc(fmtWhen(r.at, now)) + ' · ' + fmtBytes(r.bytes)
+    + (ids && ids.length > 1 ? ' · 같은 대화 ' + ids.length + '통' : '') + '</div>'
     + '<div class="tagline">'
     + (r.companyName
       ? (r.sure
         ? '<span class="tg sure" title="보낸 주소가 업체관리에 적힌 그 업체입니다">✓ ' + esc(r.companyName) + '</span>'
         : '<span class="tg guess" title="파일 이름·제목에서 캔 것이라 틀릴 수 있습니다">'
           + esc(r.companyName) + ' (짐작)</span>')
-      : '<span class="tg guess">사업장을 모릅니다</span>')
-    + (r.month ? '<span class="tg guess">' + esc(r.month) + ' (짐작)</span>'
-      : '<span class="tg guess">월을 모릅니다</span>')
-    + (r.kind ? '<span class="tg guess">' + esc(S.kindLabel(r.kind)) + '</span>' : '')
-    /* 누가 맡을지 여기서 바로 알게 한다 — 업체관리의 주담당이다. 아직 이 함에
-       안 들어온 사람이면 그것도 적는다(기다려도 안 맡는다). */
+      : '')
+    + (r.month ? '<span class="tg guess">' + esc(r.month) + ' (짐작)</span>' : '')
+    /* 누가 맡을지 — 업체관리의 주담당. 아직 이 함에 안 들어온 사람이면 그것도 적는다. */
     + (r.ownerName ? '<span class="tg who">담당 ' + esc(r.ownerName)
       + (r.ownerAway ? ' — 아직 이 함에 안 들어옴' : '') + '</span>' : '')
-    /* 서버가 왜 이 줄을 담당자 칸으로 안 보냈는지 — 여기 남는 것은 **손이 필요한
-       것**뿐이라, 까닭이 곧 할 일이다(대표 승낙 2026-08-21 갈라 보내기). */
+    /* 서버가 왜 담당자 칸으로 안 보냈는지 — 까닭이 곧 할 일이다. */
     + (r.why ? '<span class="tg why" title="서버가 임자를 못 찾은 까닭입니다">' + esc(r.why) + '</span>' : '')
-    + '</div></div>'
+    + '</div>'
     + (canWrite()
-      ? '<span class="mtake"><button class="btn sm" onclick="claimMail(\'' + jsq(r.id) + '\')">내가 맡기</button>'
-        + fixBtnsHtml(r) + '</span>'
+      ? '<div class="gacts">'
+        + (ids && ids.length > 1
+          ? '<button class="btn sm" onclick="claimMailIds(' + esc(JSON.stringify(ids)) + ')">' + ids.length + '통 내가 맡기</button>'
+          : '<button class="btn sm" onclick="claimMail(\'' + jsq(r.id) + '\')">내가 맡기</button>')
+        + fixBtnsHtml(r) + '</div>'
       : '')
-    + '</div>').join('') + '</div>';
-
-  /* 갈라 보내기가 켜진 뒤로 이 화면은 「메일 전부」가 아니라 **못 갈랐던 것**이다.
-     그렇다고 말해 주지 않으면 「메일이 2건밖에 안 왔나」로 읽는다. */
-  h += mailScanHtml();
-  h += '<div class="sub" style="margin-top:10px">임자를 찾은 메일은 <b>그 담당자 대기 칸</b>으로 바로 갔습니다 —'
-    + ' 여기 남은 것은 임자를 못 찾은 것입니다 · '
-    + '아는 주소에서 온 것만 들어옵니다 ·'
-    + ' 고객사가 보냈는데 안 보이면 업체관리에 <b>그 담당자 메일 주소</b>가 있는지 봐 주세요 ·'
-    + ' 모르는 곳에서 온 것은 담지도 지우지도 않고 메일 폴더에 그대로 둡니다</div>';
-  return h;
+    + '</div>';
 }
 
 /* ══════ 자동 판독 · 한 줄 요약 (대표 지시 2026-08-29) ══════
@@ -3011,7 +3328,15 @@ window.claimMail = claimMail;
 function bulkClaimMail() {
   if (!canWrite()) return;
   const rows = mailRows(App.mail, mailCtx());
-  const ids = pickList(pickOf('mail'), rows.map(r => r.id));
+  return claimMailIds(pickList(pickOf('mail'), rows.map(r => r.id)));
+}
+window.bulkClaimMail = bulkClaimMail;
+
+/* 여러 건 맡기 — 고른 것·묶음 한 곳·같은 대화 한 줄이 함께 쓴다(2026-10-05 묶어 보기).
+   ⚠ 몇 건인지 묻고 나서 한다 — 묶음 하나가 스무 건일 수 있다. */
+function claimMailIds(list) {
+  if (!canWrite()) return;
+  const ids = (list || []).filter(Boolean);
   if (!ids.length) return;
   if (!confirm(ids.length + '건을 내 대기 칸으로 가져올까요?')) return;
   /* ⚠ 한 건씩 차례로 한다. 한 묶음으로 쓰면 그중 하나를 남이 먼저 맡았을 때
@@ -3029,7 +3354,7 @@ function bulkClaimMail() {
     return refreshMailAndPending();
   });
 }
-window.bulkClaimMail = bulkClaimMail;
+window.claimMailIds = claimMailIds;
 
 /* ══════ 사업장 서랍 (Task 9) — 사진첩과 같은 틀고정 탭·찾기 줄·확대 보기 ══════ */
 

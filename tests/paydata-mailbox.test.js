@@ -242,15 +242,20 @@ test('★ 내 자리에 넣다 실패하면 공용 칸에 도로 넣는다', asy
 });
 
 /* 한 묶음으로 쓰면 그중 하나를 남이 먼저 맡았을 때 나머지까지 통째로 안 들어온다. */
+/* 2026-10-05 묶어 보기 — 「고른 것 맡기」·묶음 「맡기」·같은 대화 한 줄이 모두
+   claimMailIds 한 곳을 탄다. 그래서 그 한 곳을 본다. */
 test('★ 여럿 맡을 때 하나를 놓쳐도 나머지는 가져온다', () => {
-  const src = cut('bulkClaimMail');
+  assert.match(cut('bulkClaimMail'), /claimMailIds\(/, '고른 것 맡기가 같은 길을 안 탑니다');
+  const src = cut('claimMailIds');
   assert.equal(/db\.ref\(\)\.update/.test(src), false, '한 묶음으로 쓰면 하나가 막으면 다 막힙니다');
   assert.match(src, /lost/, '놓친 것을 세지 않으면 몇 건 왔는지 거짓말이 됩니다');
+  assert.ok(src.indexOf('confirm(') >= 0 && src.indexOf('confirm(') < src.indexOf('claimSharedSafe('),
+    '★ 몇 건인지 묻지 않고 가져옵니다 — 묶음 하나가 스무 건일 수 있습니다');
 });
 
 /* ⚠ 받자마자 AI로 보내면 주민번호 가림을 통째로 건너뛴다(끌어다 놓기와 같은 원칙). */
 test('★ 메일로 온 것을 자동으로 판독하지 않는다', () => {
-  ['screenMail', 'claimMail', 'bulkClaimMail'].forEach(fn => {
+  ['screenMail', 'claimMail', 'bulkClaimMail', 'claimMailIds', 'mailDetailHtml'].forEach(fn => {
     assert.equal(/startMask\(|runRead\(|PuDocRead\./.test(cut(fn)), false,
       '★ ' + fn + ' 에서 자동 판독하면 주민번호가 그대로 나갑니다');
   });
