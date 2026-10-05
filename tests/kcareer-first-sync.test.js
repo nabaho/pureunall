@@ -50,3 +50,17 @@ test('④ 도장 목록은 이 기기에만 · 기기 이름표에 브라우저'
   assert.ok(/Edg/.test(lab) && /크롬/.test(lab), '「PC」만으로는 어느 브라우저가 올렸는지 모른다');
   assert.ok(/<script src="js\/kcareer-notices\.js\?v=\d+"><\/script>/.test(SRC));
 });
+
+test('⑤ 더 새 기록이 오면 — 안 올라간 고침이 없고 잃을 것이 없을 때만 받아 온다', () => {
+  assert.ok(/kind==='newer'\)\{ fbNewerSync\(\); return; \}/.test(떼기('function fbWatch(')), 'fbWatch');
+  assert.ok(/cloudAt>_fbBase\)\{ fbNewerSync\(\)/.test(떼기('function fbAutoPush(')), 'fbAutoPush — 올리기가 막힌 그 자리');
+  const f = 떼기('function fbNewerSync(');
+  assert.ok(/_fbpending/.test(f) && f.indexOf('pending') < f.indexOf('kcApplyRestore'), '★ 안 올라간 고침이 있으면 받지 않는다 — 덮으면 그 고침이 사라진다');
+  assert.ok(/\.modal-ov\.open/.test(f), '창이 열려 있으면 새로고침하지 않는다');
+  assert.ok(f.indexOf('r.safe') < f.indexOf('kcApplyRestore'), '잃을 것을 먼저 본다');
+  assert.ok(!/_fbDoPush/.test(f), '받기만 한다');
+  assert.ok(/localStorage\.setItem\(NS\+'_fbpending','1'\)/.test(떼기('function fbScheduleAuto(')), '고치면 표시');
+  assert.ok(/removeItem\(NS\+'_fbpending'\)/.test(떼기('function _fbDoPush(')), '올라가면 지움');
+  const skip = SRC.match(/var FB_SKIP=\[([\s\S]*?)\];/)[1];
+  assert.ok(/'_fbpending'/.test(skip), '그 표시는 기기마다 — 클라우드로 올리면 다른 기기가 못 받는다');
+});

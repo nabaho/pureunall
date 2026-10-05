@@ -18200,7 +18200,9 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              'firm_info',
              /* 도장 목록 — 도장 «그림»은 각자 브라우저 보관함에만 둔다(2026-08-30 보안). 목록만 오가면
                 다른 브라우저에 그림 없는 빈 도장이 생긴다(2026-10-05 에지에서 실제로 3개). 목록도 이 기기에만. */
-             'stamps'];
+             'stamps',
+             /* 이 기기에서 고친 것이 아직 안 올라갔다는 표시 — 기기마다의 사정이다 */
+             '_fbpending'];
 var _fbBase=null, _fbPushT=null, _fbWatching=false;
 /* ★ 「닫기」를 기억한다 — 예전에는 display:none 만 해서 PC 가 저장할 때마다(2.5초)
    곧바로 되살아났다. 대표가 겪은 「자꾸」가 이것이다(2026-09-12).
@@ -18625,6 +18627,7 @@ function _fbDoPush(hereTotal, quiet){
   var payload={ls:data, at:at, device:fbDeviceLabel(), keys:Object.keys(data).length,
                 counts:{total:hereTotal, at:at}};
   return fbDb.ref('kcareer/'+fbUid).update(payload).then(function(){
+    try{ localStorage.removeItem(NS+'_fbpending'); }catch(e){}   /* 다 올라갔다 */
     if(!quiet){ toast('클라우드에 저장됨 (기록 '+hereTotal+'건)'); fbShowInfo(payload); fbHideNotice(); }
     return payload;
   });
@@ -18742,6 +18745,7 @@ function fbWatch(){ if(!fbUid||!fbDb||_fbWatching) return; _fbWatching=true;
                                   dismissedAt:_fbDismissAt });
     /* ★ 처음 여는 기기 — 잃을 것이 없으면 묻지 않고 받아 온다(fbFirstSync). 잃을 것이 있으면 띠에 건수를 적는다 */
     if(d.newer.show && d.newer.kind==='first'){ fbFirstSync(); return; }
+    if(d.newer.show && d.newer.kind==='newer'){ fbNewerSync(); return; }
     if(d.newer.show) fbShowNotice(d.newer.kind); else fbHideNotice();
   }); }
 /* ═══ 처음 여는 기기는 «저절로» 받아 온다 (대표 지시 2026-10-05 「다른모든 프로그램에서도 데이터가 분리되지 않게」) ═══
@@ -18772,16 +18776,40 @@ function fbFirstSync(){
     setTimeout(function(){ location.reload(); }, 1500);
   }).catch(function(e){ console.warn('fbFirstSync', e); fbShowNotice('first'); });
 }
+/* ═══ 다른 기기가 더 새로 저장했을 때 — 이 기기에서 «안 올라간 고침»이 없으면 받아 온다 (2026-10-05) ═══
+   두 브라우저 다 자동으로 오가게 된 뒤에도, 크롬에서 고치면 에지는 「더 최신 기록이 있습니다」 띠만 띄우고
+   올리기도 멈춘 채 서로 달라진 채로 남았다(누를 때까지). 받아도 잃을 것이 없으면 받는다.
+   ⚠ 이 기기에 안 올라간 고침(_fbpending)이 있으면 받지 않는다 — 띠로 사람이 고른다(덮으면 그 고침이 사라진다).
+   ⚠ 창(모달)이 열려 있으면 받지 않는다 — 새로고침이 쓰던 것을 날린다. 띠만 띄운다. */
+var _fbNewerTried=false;
+function fbNewerSync(){
+  var pending=false; try{ pending=localStorage.getItem(NS+'_fbpending')==='1'; }catch(e){}
+  var busy=!!document.querySelector('.modal-ov.open') || (typeof _rhDoc!=='undefined' && _rhDoc && _rhDoc.bytes);
+  if(_fbNewerTried || pending || busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
+  _fbNewerTried=true;
+  fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
+    var v=snap.val();
+    if(!v||!v.ls){ fbShowNotice('newer'); return; }
+    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP, TOMB_KEY);
+    if(!r.safe){ fbShowNotice('newer'); return; }
+    kcApplyRestore(v.ls, 'pull');
+    if(v.at) fbSetBase(v.at);
+    try{ localStorage.removeItem(NS+'_fbpending'); }catch(e){}
+    fbHideNotice();
+    toast('☁ 다른 기기('+(v.device||'')+')에서 저장한 최신 기록을 받아 왔습니다 — 새로고침합니다', 5000);
+    setTimeout(function(){ location.reload(); }, 1500);
+  }).catch(function(e){ console.warn('fbNewerSync', e); fbShowNotice('newer'); });
+}
 /* ★ 직원 «보기 전용»에서는 클라우드로 «올리지 않는다» (대표 지시 2026-09-02).
    사본에서 읽은 대표 기록이 직원 자기 칸(kcareer/{직원uid})에 눌러앉으면,
    그 뒤에 대표가 사본을 내려도 직원 기기에는 남는다 — 내릴 수 있어야 공개다.
    ⚠ 두 곳 다 막는다(예약과 실제 올리기) — 한 곳만 막으면 다른 길로 새 나간다. */
 function kcNoPush(){ return typeof kcStaffView==='function' && kcStaffView(); }
-function fbScheduleAuto(key){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return; if(key&&FB_SKIP.indexOf(key)>=0) return; if(_fbPushT) clearTimeout(_fbPushT); _fbPushT=setTimeout(fbAutoPush, 2500); }
+function fbScheduleAuto(key){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return; if(key&&FB_SKIP.indexOf(key)>=0) return; try{ localStorage.setItem(NS+'_fbpending','1'); }catch(e){} if(_fbPushT) clearTimeout(_fbPushT); _fbPushT=setTimeout(fbAutoPush, 2500); }
 function fbAutoPush(){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return;
   fbDb.ref('kcareer/'+fbUid+'/at').once('value').then(function(s){ var cloudAt=s.val()||0;
     _fbCloudAt=Math.max(_fbCloudAt, cloudAt);
-    if(_fbBase!=null && cloudAt>_fbBase){ fbShowNotice('newer'); return; }
+    if(_fbBase!=null && cloudAt>_fbBase){ fbNewerSync(); return; }   /* 고친 것 없으면 받아 온다 — 아니면 띠 */
     /* ⚠ 이 기기에서 한 번도 저장·불러오기를 안 했는데(_fbBase==null) 클라우드에 이미 자료가 있으면
        자동으로 밀어넣지 않는다 — 폰에서 처음 열었을 때 시드 데이터가 PC 기록을 덮을 수 있었다.
        이 가드를 지우면 조용히 자료가 사라진다. 사람이 ☁ 저장/불러오기로 결정하게 둔다. */
