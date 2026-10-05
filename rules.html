@@ -1072,6 +1072,8 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
         <button class="btn ghost" id="mk-daejo" disabled>신구대조표 생성</button>
         <button class="btn orange" id="save" disabled>보관함에 저장</button>
         <button class="btn" id="save-done" disabled title="검토를 마쳤음을 표시합니다. 완료 후에는 다른 노무사도 보관함에서 열어 볼 수 있습니다">✅ 검토 완료</button>
+        <!-- 📮 신고 완료 (대표 결정 2026-10-05 「나중에 따로 표시」) — 검토 완료한 회차에만 켜진다 -->
+        <button class="btn ghost" id="save-filed" disabled title="노동청에 신고를 마친 뒤 신고일·관할 노동청을 적습니다. 적으면 「신고완료」가 됩니다">📮 신고 완료</button>
       </div>
     </div>
   </div>
@@ -1299,6 +1301,30 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
     <button class="stbtn" id="cbsub-clear" style="margin-right:auto">지우기</button>
     <button class="btn ghost" data-close>취소</button>
     <button class="btn orange" id="cbsub-save">저장</button>
+  </div>
+</div></div>
+
+<!-- 📮 신고 완료 적기 (대표 결정 2026-10-05) — 신고는 서류를 만든 뒤 며칠 지나 하는 일이 많아 «그날» 적는다.
+     ⚠ 서고(ov-cbsub)의 「제출 정보」와 자리가 다르다 — 그쪽은 올려 둔 «지난 회차 파일»의 기록이고,
+       이쪽은 규정관리에서 검토 완료한 회차의 기록이다(rules_mgmt/done). -->
+<div class="overlay" id="ov-filed"><div class="modal" style="max-width:420px">
+  <h2 id="filed-title">신고 완료 <span class="x" data-close>×</span></h2>
+  <div class="body">
+    <div class="sample-banner" style="margin-bottom:11px">노동청에 취업규칙 <b>신고를 마친 날</b>과 <b>관할 노동청</b>을 적습니다. 적으면 이 사업장이 <b>「신고완료」</b>가 되어 할 일에서 빠집니다.</div>
+    <div style="display:flex;flex-direction:column;gap:9px">
+      <label style="font-size:12px;color:var(--sub)">신고일
+        <input id="filed-at" type="date" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">관할 노동청
+        <input id="filed-office" placeholder="예: 천안고용노동지청" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">접수번호 <span class="muted" style="font-size:11px">(선택)</span>
+        <input id="filed-no" placeholder="모르면 비워 두십시오" style="width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+    </div>
+    <div id="filed-err" style="display:none;margin-top:10px;padding:9px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;font-size:12px;color:#991b1b;line-height:1.7"></div>
+  </div>
+  <div class="foot">
+    <button class="stbtn" id="filed-clear" style="margin-right:auto;display:none">신고 표시 지우기</button>
+    <button class="btn ghost" data-close>취소</button>
+    <button class="btn orange" id="filed-save">저장</button>
   </div>
 </div></div>
 
@@ -4833,7 +4859,7 @@ function setReadOnly(on,rec){
   const sv=$("save"); if(sv)sv.disabled=on?true:!ready;      // 해제하면 담당자 권한을 되돌려 준다
   const ae=$("ae-apply"); if(ae)ae.disabled=on;              // 대조표 보기는 되지만 조문 수정은 막는다
   const ap=$("ae-polish"); if(ap)ap.style.display=on?"none":"";   // ✨ AI 다듬기 — 넣을 수 없는 판에 회사 공동 하루 몫을 쓰지 않게
-  if(on){ const d=$("save-done"); if(d)d.disabled=true; } else updateDoneBtn();
+  if(on){ const d=$("save-done"); if(d)d.disabled=true; const f=$("save-filed"); if(f)f.disabled=true; } else updateDoneBtn();
 }
 /* ══════ 저장 위치 ══════
    rules_mgmt/wip/{uid}/{사업장키}    작업중 — 경로가 uid라 서버가 남의 접근을 막는다
@@ -4863,6 +4889,9 @@ function mergeStores(){
       status:r.status||"작업중"})); });
   return out.sort((a,b)=>(b.savedAt||"").localeCompare(a.savedAt||""));
 }
+/* 📮 신고 기록 칸 (2026-10-05) — putRecord 가 지키고, 아래 「신고 완료」가 적는다.
+   ⚠ putRecord «위»에 둔다 — 아래에 두면 먼저 불린 저장이 아직 없는 이름을 만나 멈춘다. */
+const FILED_F=["filedAt","filedOffice","filedNo","filedBy","filedMark"];
 /* 레코드 1건 단위 저장 — 보관함 전체를 덮어쓰지 않으므로 여러 노무사 동시 저장 안전 */
 function putRecord(rec){
   const arr=loadArch(), i=arr.findIndex(r=>r.id===rec.id), prev=i>=0?arr[i]:null;
@@ -4878,6 +4907,8 @@ function putRecord(rec){
   rec.status=rec.rev?"완료":"작업중";
   rec.year=String(rec.asof||"").slice(0,4);
   if(prev&&prev.doneAt){ rec.doneAt=prev.doneAt; rec.doneBy=prev.doneBy; }
+  /* 📮 신고 기록도 다시 저장할 때 지키지 않으면, 완료본을 한 번 더 저장하는 순간 「검토완료」로 되돌아간다 */
+  if(prev&&prev.filedAt)FILED_F.forEach(k=>{ if(prev[k]!=null)rec[k]=prev[k]; });
   if(i>=0)arr[i]=rec;else arr.unshift(rec);
   setLocal(arr); storePut(rec);
   const path=fbPath(rec);
@@ -5598,6 +5629,8 @@ $("save-done").addEventListener("click",()=>{
   if(!rec)return;
   const cur=loadArch().find(r=>r.id===rec.id);
   if(isDone(cur)){
+    /* 📮 신고한 회차는 풀지 않는다 — 풀어서 고치면 «노동청에 낸 것»과 «기록»이 달라진다 */
+    if(cur&&cur.filedAt){ alert(`'${rec.site}' 는 ${cur.filedAt} 에 신고한 회차라 완료를 해제할 수 없습니다.\n\n신고를 잘못 적었다면 「📮 신고」 단추에서 신고 표시를 먼저 지우십시오.`); return; }
     if(!confirm(`'${rec.site}' 검토 완료를 해제할까요?\n\n해제하면 다른 노무사 보관함에서 다시 보이지 않습니다.`))return;
     if(setRecordDone(rec.id,false))alert("작업중으로 되돌렸습니다.");
   }else{
@@ -5609,7 +5642,7 @@ $("save-done").addEventListener("click",()=>{
 /* 현재 사업장의 상태에 맞춰 버튼 글자를 바꾼다 */
 function updateDoneBtn(){
   const b=$("save-done"); if(!b)return;
-  if(READONLY||!LAST){ b.disabled=true; b.textContent="✅ 검토 완료"; return; }
+  if(READONLY||!LAST){ b.disabled=true; b.textContent="✅ 검토 완료"; updateFiledBtn(null); return; }
   const sk="site_"+fbKey(LAST.bizno||siteLabel());
   const arr=loadArch();
   const rec=(OPEN_REC&&arr.find(r=>r.id===OPEN_REC))||arr.find(r=>r.id===sk)||null;
@@ -5617,7 +5650,93 @@ function updateDoneBtn(){
   b.disabled=!(LAST&&LAST.arts&&LAST.arts.length)||!isOwner(rec);
   b.textContent=done?"↩ 완료 해제":"✅ 검토 완료";
   b.classList.toggle("orange",!done);
+  updateFiledBtn(rec);
 }
+/* ══════ 📮 신고 완료 (대표 결정 2026-10-05 「나중에 따로 표시」) ══════
+   ■ 무엇이 있었나 (2026-09-13 발견) — filedAt 을 «읽는 곳만» 있고 적는 곳이 없었다(dashStage).
+     그래서 모든 사업장이 영영 「검토완료」에 머물렀고, 할 일 셈이 부풀었다.
+   ■ 어디에 — 검토 완료한 회차(rules_mgmt/done/{사업장}/{회차})에 칸 몇 개를 더한다.
+     done 자리는 칸 이름을 막지 않는다(make-firebase-rules.js) — 규칙을 안 바꾼다.
+   ■ 지키는 것
+     ① 검토 완료한 회차에만 — 작업중에 신고했다고 적으면 «무엇을» 냈는지가 없다
+     ② 신고일·관할 노동청은 꼭, 접수번호는 선택 · 날짜는 오늘보다 뒤일 수 없다(«마친» 일이다)
+     ③ 신고한 회차는 완료 해제를 막는다 — 지우려면 신고 표시부터
+     ④ 다시 저장해도 안 사라진다(putRecord 가 지킨다) */
+/* 적을 값 → 기록에 얹을 칸 (화면·Firebase 없음 — 검사가 이것을 돌린다).
+   sub 가 null 이면 «지우기» — 칸마다 null 을 주어 update 가 그 자리를 지운다. */
+function filedPatch(rec,sub,who,now){
+  const 탈=[];
+  if(!rec||!rec.rev)탈.push("검토 완료한 회차에만 신고를 적을 수 있습니다");
+  const patch={};
+  if(sub===null){ FILED_F.forEach(k=>patch[k]=null); return {ok:!탈.length,why:탈,patch}; }
+  const v=sub||{}, at=String(v.at||"").trim(), office=String(v.office||"").trim(), no=String(v.no||"").trim();
+  const today=String(now||"").slice(0,10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(at))탈.push("신고일을 2026-10-05 꼴로 적으세요");
+  else if(today&&at>today)탈.push("신고일이 오늘보다 뒤입니다 — 신고를 마친 뒤 적어 주세요");
+  if(!office)탈.push("관할 노동청을 적으세요");
+  if(office.length>60)탈.push("노동청 이름이 너무 깁니다(60자)");
+  if(no.length>40)탈.push("접수번호가 너무 깁니다(40자)");
+  if(탈.length)return {ok:false,why:탈,patch:null};
+  patch.filedAt=at; patch.filedOffice=office; patch.filedNo=no||null;
+  patch.filedBy=String(who||"").slice(0,40)||null;
+  patch.filedMark=String(now||"").slice(0,16).replace("T"," ")||null;
+  return {ok:true,why:[],patch};
+}
+/* 지금 화면의 기록 — updateDoneBtn 과 같은 잣대 */
+function curArchRec(){
+  if(!LAST)return null;
+  const sk="site_"+fbKey(LAST.bizno||siteLabel());
+  const arr=loadArch();
+  return (OPEN_REC&&arr.find(r=>r.id===OPEN_REC))||arr.find(r=>r.id===sk)||null;
+}
+function updateFiledBtn(rec){
+  const b=$("save-filed"); if(!b)return;
+  const r=rec===undefined?curArchRec():rec;
+  const ok=!READONLY&&!!r&&isDone(r)&&isOwner(r);
+  b.disabled=!ok;
+  b.textContent=r&&r.filedAt?"📮 신고 "+r.filedAt:"📮 신고 완료";
+  b.title=!r||!isDone(r)?"검토 완료한 뒤에 켜집니다 — 노동청에 신고를 마치면 신고일·관할 노동청을 적습니다"
+    :r.filedAt?("신고 "+r.filedAt+(r.filedOffice?" · "+r.filedOffice:"")+(r.filedNo?" · 접수 "+r.filedNo:"")+" — 눌러서 고치거나 지웁니다")
+    :"노동청에 신고를 마친 뒤 신고일·관할 노동청을 적습니다. 적으면 「신고완료」가 됩니다";
+}
+let FILED_ID="";
+$("save-filed").addEventListener("click",()=>{
+  const r=curArchRec();
+  if(!r||!isDone(r)){ alert("검토 완료한 뒤에 신고를 적을 수 있습니다."); return; }
+  if(!isOwner(r)){ alert("담당자만 신고 기록을 적을 수 있습니다."); return; }
+  FILED_ID=r.id;
+  $("filed-title").innerHTML=escapeH(shortSite(r.site))+' 신고 완료 <span class="x" data-close>×</span>';
+  $("filed-at").value=r.filedAt||new Date(Date.now()+9*3600e3).toISOString().slice(0,10);   // 오늘(한국 시각)
+  $("filed-office").value=r.filedOffice||"";
+  $("filed-no").value=r.filedNo||"";
+  $("filed-clear").style.display=r.filedAt?"":"none";
+  $("filed-err").style.display="none";
+  $("ov-filed").classList.add("on");
+  $("ov-filed").querySelectorAll("[data-close]").forEach(x=>x.onclick=()=>closeOverlay($("ov-filed")));
+});
+async function saveFiled(sub){
+  const arr=loadArch(), i=arr.findIndex(x=>x.id===FILED_ID), r=i>=0?arr[i]:null;
+  const err=m=>{ $("filed-err").style.display="block"; $("filed-err").innerHTML="⚠ "+m; };
+  if(!r||!isOwner(r))return err("이 기록을 찾지 못했거나 담당자가 아닙니다.");
+  const p=filedPatch(r,sub,myName(),new Date(Date.now()+9*3600e3).toISOString());   // 날짜는 한국 시각으로
+  if(!p.ok)return err(p.why.map(escapeH).join("<br>⚠ "));
+  const path=fbPath(r);
+  if(!FBDB||!path)return err("로그인이 안 되어 저장하지 못했습니다.");
+  const btn=$("filed-save"); btn.disabled=true;
+  try{ await FBDB.ref(path).update(p.patch); }
+  catch(e){ btn.disabled=false; return err("저장하지 못했습니다 — "+escapeH(String(e&&e.message||e))); }
+  btn.disabled=false;
+  const next=Object.assign({},r);
+  Object.keys(p.patch).forEach(k=>{ if(p.patch[k]==null)delete next[k]; else next[k]=p.patch[k]; });
+  arr[i]=next; setLocal(arr); storePut(next);
+  closeOverlay($("ov-filed"));
+  updateDoneBtn();
+}
+$("filed-save").addEventListener("click",()=>saveFiled({at:$("filed-at").value,office:$("filed-office").value,no:$("filed-no").value}));
+$("filed-clear").addEventListener("click",()=>{
+  if(!confirm("신고 표시를 지울까요?\n\n지우면 이 사업장이 다시 「검토완료」로 돌아가 할 일에 들어옵니다."))return;
+  saveFiled(null);
+});
 /* ══════ 사업장 규정 대시보드 ══════
    보관함(rules_mgmt/archive) + 작성기 문서(chwieop/docs) + ERP 사업장(data/companies)을
    사업자번호 우선으로 묶어, 작성→검토→개정→제출 4단계 진행 상태를 한눈에 보여준다. */
