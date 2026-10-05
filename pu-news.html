@@ -48,7 +48,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
-<script src="js/pu-news-core.js?v=51"></script>
+<script src="js/pu-news-core.js?v=52"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
 <script src="js/pu-news-tpl.js?v=45"></script>
@@ -500,6 +500,18 @@ details.fold>summary .act{font-size:11px;font-weight:800;color:var(--brown);
   background:#fff;border:1px solid var(--line);border-radius:20px;padding:2px 9px;
   white-space:nowrap}
 details.fold[open]>summary .act:after{content:'접기'}
+/* 보낸 결과 KPI (2026-10-05) — 작게 · 위에 붙고 · 누르면 그 줄만 */
+.res-head{position:sticky;top:0;z-index:5;background:var(--paper);padding:8px 0 6px;margin:-8px 0 4px}
+.kpis{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.kpi{display:inline-flex;align-items:baseline;gap:6px;padding:4px 11px;border-radius:99px;border:1px solid var(--line);
+  background:#fff;cursor:pointer;white-space:nowrap;font:inherit}
+.kpi .k{font-size:11.5px;font-weight:700;color:var(--sub)}
+.kpi b{font-size:14px;font-weight:800}
+.kpi:hover{border-color:var(--brown)}
+.kpi.on{background:var(--brown);border-color:var(--brown)}
+.kpi.on .k{color:#fff}
+.kpi-now{font-size:12px;font-weight:700;color:var(--brown)}
+.kpi-now a{cursor:pointer;text-decoration:underline;color:var(--sub)}
 /* 반송·거부 (2026-10-05) — 표는 한 줄씩, 팝업은 가운데 */
 table.bn-t td{white-space:nowrap;max-width:260px;overflow:hidden;text-overflow:ellipsis}
 table.bn-t tr.bn-done td{color:var(--faint)}
@@ -4217,7 +4229,7 @@ async function 결과다시읽기(){
   await 결과읽기(열쇠); render();
 }
 
-function 결과회차고르기(k){ App.본결과 = k; render(); 결과채우기(); }
+function 결과회차고르기(k){ App.본결과 = k; App.결과거르기 = ''; render(); 결과채우기(); }
 
 /* 화면을 먼저 그리고, 자료가 없으면 뒤이어 읽는다 — 빈 화면을 오래 두지 않는다 */
 async function 결과채우기(){
@@ -4237,6 +4249,16 @@ function 결과줄들(열쇠){
   return { 줄들:줄들, 셈:Core.결과셈(줄들), 자료:자, 못붙임:찾음.못붙임||[] };
 }
 
+/* KPI 거르개 (2026-10-05) — 무엇을 «그 데이터만»으로 볼지 */
+const 결과거르기이름 = { 나감:'나감', 대기:'대기', 실패:'실패', 안걺:'안 걸림', 열람:'열람', 클릭:'링크 누름', 반송:'반송', 자동회신:'자동회신' };
+function 결과거르기맞나(x, 키){
+  if(!키) return true;
+  if(키 === '열람') return !!x.열람;
+  if(키 === '클릭') return !!x.클릭;
+  if(키 === '반송' || 키 === '자동회신') return !!(x.메일함 && x.메일함.갈래 === 키);
+  return Core.보낸상태(x) === 키;          /* 나감 · 대기 · 실패 · 안걺 */
+}
+function 결과거르기바꿈(키){ App.결과거르기 = (App.결과거르기 === 키) ? '' : String(키 || ''); render(); }
 function 결과화면(){
   const 보낸것 = Object.keys(App.회차들)
     .filter(k => (App.회차들[k]||{}).상태 === '발송').sort().reverse();
@@ -4272,23 +4294,30 @@ function 결과화면(){
   }
 
   const c = r.셈;
-  const 칸 = function(이름, 수, 빛){
-    return '<div style="flex:1;min-width:88px;background:#fff;border:1px solid var(--line);'
-      + 'border-radius:10px;padding:9px 12px">'
-      + '<div style="font-size:11px;color:var(--sub);font-weight:700">'+이름+'</div>'
-      + '<div style="font-size:19px;font-weight:800;color:'+빛+'">'+수.toLocaleString()+'</div></div>';
+  /* ★★ KPI 는 «작게 · 위에 고정 · 누르면 그 줄만» (대표 지시 2026-10-05
+       「kpi 크기 작게하고 틀고정해라 그리고 나감 대기 실패 등 kpi 클릭하면 그 데이터만 볼수 있게」)
+     ⚠ 큰 숫자 칸 아홉 개가 표를 한 화면 아래로 밀고 있었다 — 이제 한 줄짜리 알약이다.
+     ⚠ 누른 것을 다시 누르면 전체로 돌아온다(받는 명단의 유형 칩과 같은 손버릇). */
+  const 거름 = App.결과거르기 || '';
+  const 칸 = function(이름, 수, 빛, 키){
+    const 켜짐 = 거름 === 키;
+    return '<button class="kpi' + (켜짐 ? ' on' : '') + '" onclick="결과거르기바꿈(\'' + 키 + '\')"'
+      + ' title="' + 이름 + '만 봅니다' + (켜짐 ? ' — 다시 누르면 전체' : '') + '">'
+      + '<span class="k">' + 이름 + '</span><b style="color:' + (켜짐 ? '#fff' : 빛) + '">' + 수.toLocaleString() + '</b></button>';
   };
-  const 띠 = '<div style="display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 6px">'
-    + 칸('보낸 곳', c.전체, '#1e293b')
-    + 칸('나감', c.나감, '#166534')
-    + (c.대기 ? 칸('대기', c.대기, '#854d0e') : '')
-    + (c.실패 ? 칸('실패', c.실패, '#b91c1c') : '')
-    + (c.안걺 ? 칸('안 걸림', c.안걺, '#b91c1c') : '')
-    + 칸('열람', c.열람, '#2563eb')
-    + (c.클릭 ? 칸('링크 누름', c.클릭, '#2563eb') : '')
-    + 칸('반송', c.반송, '#b91c1c')
-    + 칸('자동회신', c.자동회신, '#854d0e')
+  const 띠 = '<div class="kpis">'
+    + 칸('보낸 곳', c.전체, '#1e293b', '')
+    + 칸('나감', c.나감, '#166534', '나감')
+    + (c.대기 ? 칸('대기', c.대기, '#854d0e', '대기') : '')
+    + (c.실패 ? 칸('실패', c.실패, '#b91c1c', '실패') : '')
+    + (c.안걺 ? 칸('안 걸림', c.안걺, '#b91c1c', '안걺') : '')
+    + 칸('열람', c.열람, '#2563eb', '열람')
+    + (c.클릭 ? 칸('링크 누름', c.클릭, '#2563eb', '클릭') : '')
+    + 칸('반송', c.반송, '#b91c1c', '반송')
+    + 칸('자동회신', c.자동회신, '#854d0e', '자동회신')
     + '</div>';
+  /* 고른 KPI 의 줄만 — 번호는 «보이는 차례»로 다시 붙는다 */
+  const 보일줄 = r.줄들.filter(function(x){ return 결과거르기맞나(x, 거름); });
 
   /* ⚠ 「열람 없음」을 「안 읽음」이라 적지 않는다 — 그림을 막아 둔 사람은
        읽고도 안 찍힌다. 아는 것만 말한다. */
@@ -4315,7 +4344,7 @@ function 결과화면(){
     return 딱('· 안 걸림', '#fef2f2', '#b91c1c');
   };
 
-  const 몸 = r.줄들.map(function(x,i){
+  const 몸 = 보일줄.length ? 보일줄.map(function(x,i){
     const 상 = Core.보낸상태(x);
     const 열람칸 = x.열람
       ? 딱('👁 ' + (x.열람수>1 ? x.열람수+'번' : '봄'), '#eff6ff', '#1e40af')
@@ -4339,7 +4368,7 @@ function 결과화면(){
       + '<td>'+열람칸+'</td>'
       + '<td>'+함칸+'</td>'
       + '</tr>';
-  }).join('');
+  }).join('') : '<tr><td colspan="7" class="empty">고른 것에 해당하는 곳이 없습니다</td></tr>';
 
   const 못붙인칸 = (r.못붙임 && r.못붙임.length)
     ? '<div class="note" style="margin-top:14px"><b>어느 곳인지 못 맞춘 '
@@ -4351,14 +4380,18 @@ function 결과화면(){
       + '</div>'
     : '';
 
+  /* ★ 고르개·KPI 는 «위에 붙는» 머리 — 표를 굴려도 남는다 */
+  const 거른말 = 거름 ? '<span class="kpi-now">' + esc(결과거르기이름[거름] || 거름) + ' ' + 보일줄.length + '곳만 보는 중 · '
+    + '<a onclick="결과거르기바꿈(\'\')">전체 보기</a></span>' : '';
   return '<div class="pad">'
-    + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + '<div class="res-head"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
     + 고르개
     + '<button class="btn" onclick="결과다시읽기()">⟳ 다시 읽기</button>'
     + '<span style="color:var(--faint);font-size:11.5px">'
     + (r.자료 && r.자료.읽은때 ? esc(때글(r.자료.읽은때)) + ' 기준' : '') + '</span>'
+    + 거른말
     + '</div>'
-    + 띠 + 안내
+    + 띠 + '</div>' + 안내
     + '<table class="list" style="width:100%"><thead><tr>'
     + '<th style="width:44px;text-align:right">#</th><th>업체</th><th>담당자</th>'
     + '<th>주소</th><th style="width:92px">나갔나</th>'

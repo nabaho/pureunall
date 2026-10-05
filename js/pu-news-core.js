@@ -1754,9 +1754,13 @@
        「수신 거부되었습니다」(서버가 막음)를 사람의 수신거부로 읽으면 안 된다(2026-10-05 실메일). */
   var 반송없는주소말 = ['address not found', 'user unknown', 'no such user', 'unknown user', 'does not exist',
     'mailbox unavailable', 'recipient address rejected', 'invalid recipient', 'unknown recipient', 'account disabled',
+    /* 550 5.2.1 휴면·사용 중지 계정 — 다시 보내도 안 간다(2026-10-05 실측 3곳) */
+    'inactive mailbox', 'mailbox disabled', 'account is disabled', '5.2.1',
     '5.1.1', '존재하지 않는', '없는 사용자', '없는 계정', '사용자가 없', '계정이 없', '주소가 없'];
   var 반송일시말 = ['mailbox full', 'mailbox is full', 'quota', 'over quota', 'insufficient storage', '4.2.2',
-    'temporarily', 'temporary', 'try again later', 'timed out', 'timeout', '용량', '가득', '일시적'];
+    'temporarily', 'temporary', 'try again later', 'timed out', 'timeout', '용량', '가득', '일시적',
+    /* 451 4.4.x — 상대 도메인을 못 찾음(2026-10-05 실측). 잠깐일 수도, 없어진 도메인일 수도 있어 «세 번 내리»면 사람 몫 */
+    '4.4.0', '4.4.1', 'dns query fail', 'domain dns'];
   var 반송서버거부말 = ['spam', '스팸', 'blocked', 'blacklist', 'block list', '차단', '발신 ip', 'sender ip',
     'policy', 'rejected', 'reputation', '5.7.1', '554', '수신 거부되', '수신거부되'];
   var 수신거부회신말 = ['수신거부', '수신 거부', '보내지 마', '보내지마', '발송 중지', '발송중지', '그만 보내',
