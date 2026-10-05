@@ -547,9 +547,10 @@ function toggleOnlyReview(){ App.onlyReview=!App.onlyReview; render(); }
 
 function screenPayroll(){
   var h='<h1>급여 처리</h1>';
-  if(!payHas()){ h+='<div class="sub">파일럿 급여 데이터를 서버에 올리세요</div>'+
-    '<button class="btn sec" onclick="importPayroll()">파일럿 급여(JSON) 가져와 서버 저장</button>'+
-    '<div class="empty" style="margin-top:14px">_harness_out\\pilot_payroll.json 을 올리면 다온원·나라앤드씨·새별 급여가 표시됩니다.</div>'; return h; }
+  if(!payHas()){ h+='<div class="sub">급여 데이터를 서버에 올리세요</div>'+
+    '<button class="btn sec" onclick="importPayroll()">급여(JSON) 가져와 서버 저장</button>'+
+    '<div class="empty" style="margin-top:14px">_harness_out\\payroll_all.json 을 올리면 전체 사업장 급여가 표시됩니다.<br>'+
+    '(만드는 법: <code>python engine/build_payroll_all.py</code>)</div>'; return h; }
   // 3단계 드릴다운
   if(!App.site){
     h+='<div class="sub">사업장 선택 · 계산 결과를 3색 신호로 확인 → 확정 '+
@@ -654,8 +655,33 @@ function importPayroll(){var i=document.createElement('input');i.type='file';i.a
   i.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
    r.onload=function(){
     var raw; try{ raw=JSON.parse(r.result); }catch(err){ alert('JSON 오류: '+err.message); return; }
-    if(raw.sites&&!raw.index){                       // 옛 모양 — 예전처럼 통째로
-      dbSet('payroll',raw); alert('옛 모양으로 저장했습니다: '+Object.keys(raw.sites).length+'곳'); return;
+    if(raw.sites&&!raw.index){                       // 옛 모양 — 되돌릴 때만 쓴다
+      /* ★ 옛 모양은 payroll 칸을 **통째로** 갈아 끼운다 — 목록(index)·직원 표(emp)가 지워진다
+         (2026-10-05 발견). 서버에 새 모양 목록이 이미 있는데 옛 파일(pilot_payroll.json,
+         파일럿 10곳)을 올리면 전체 54곳이 10곳으로 줄고 확정 표시도 안 옮겨진다.
+         payroll_all.json 이 파일럿 줄을 이미 다 품고 있으니, 평소에 올릴 것은 그것이다.
+         그래서 새 모양이 있으면 막고, 「되돌리기」를 손으로 쳐야만 지나가게 한다. */
+      var oldN=Object.keys(raw.sites).length;
+      if(payIdx){
+        var ans=prompt('⚠ 이 파일은 옛 모양(사업장 '+oldN+'곳)입니다.\n\n'
+          +'지금 서버에는 새 모양 목록(사업장 '+Object.keys(payIdx).length+'곳)이 있습니다.\n'
+          +'올리면 목록과 직원 표가 통째로 지워지고 이 파일의 '+oldN+'곳만 남습니다.\n\n'
+          +'평소에 올릴 파일은 _harness_out\\payroll_all.json 입니다.\n\n'
+          +'정말 옛 모양으로 되돌리려면 「되돌리기」 네 글자를 그대로 입력하세요.','');
+        if((ans||'').trim()!=='되돌리기'){
+          alert('올리지 않았습니다. 서버 자료는 그대로입니다.\n\n올릴 파일은 _harness_out\\payroll_all.json 입니다.'); return;
+        }
+      }
+      var orl=relockFor(raw.sites, dbGet('payroll_locked',{})||{});
+      dbSet('payroll',raw).then(function(ok){
+        if(!ok) return false;
+        payIdx=null; payOld=raw.sites; empBox={}; allEmpsState='';
+        return dbSet('payroll_locked', orl.locked);
+      }).then(function(ok){
+        if(ok) alert('옛 모양으로 저장했습니다: '+oldN+'곳 · 확정 '+orl.moved+'건 옮김'
+          +(orl.lost.length?'\n갈 곳을 못 찾아 그대로 둔 확정 '+orl.lost.length+'건: '+orl.lost.join(', '):''));
+      });
+      return;
     }
     if(!raw.index||!raw.emp){ alert('모양을 알 수 없습니다 — index 와 emp 가 있어야 합니다.'); return; }
     var sites=Object.keys(raw.index);
