@@ -1344,7 +1344,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
-<script src="js/kcareer-notices.js?v=1"></script>
+<script src="js/kcareer-notices.js?v=2"></script>
 <!-- 「합치기」 안전장치 — 다른 서류를 합쳐 잃지 않게 막는다(kcareer-mergeguard.js) -->
 <script src="js/kcareer-mergeguard.js?v=1"></script>
 <!-- 「잘못 붙은 원본 찾기」 — 기록 날짜와 붙은 파일 이름이 크게 어긋난 줄을 찾는다 -->
@@ -18197,7 +18197,10 @@ var fbDb=null, fbUid=null;
 var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              'id_docs','id_docs_enc','id_salt','api_key','gvision_key','gemini_key','staff_roster','pu_consult_cache','pu_case_cache','pu_fund_cache','pu_etc_cache','_idpin','_idmeta','_idsalt','kc_theme','_fbbase','_fbauto',
              /* 이알피 법인정보의 «사본»이다 — 되올리면 남의 자리를 덮는다 */
-             'firm_info'];
+             'firm_info',
+             /* 도장 목록 — 도장 «그림»은 각자 브라우저 보관함에만 둔다(2026-08-30 보안). 목록만 오가면
+                다른 브라우저에 그림 없는 빈 도장이 생긴다(2026-10-05 에지에서 실제로 3개). 목록도 이 기기에만. */
+             'stamps'];
 var _fbBase=null, _fbPushT=null, _fbWatching=false;
 /* ★ 「닫기」를 기억한다 — 예전에는 display:none 만 해서 PC 가 저장할 때마다(2.5초)
    곧바로 되살아났다. 대표가 겪은 「자꾸」가 이것이다(2026-09-12).
@@ -18278,7 +18281,10 @@ function fbLogoutConfirm(){
   if(!confirm('로그아웃하시겠습니까?\n\n※ 통합시스템 로그인을 공유하므로, 이 기기의 다른 푸른 앱(포털·pu-erp 등)에서도 함께 로그아웃될 수 있습니다.')) return;
   fbLogout(); }
 function fbGatherLS(){ var o={}; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(!k||k.indexOf(NS)!==0) continue; var bare=k.slice(NS.length); if(FB_SKIP.indexOf(bare)>=0) continue; o[bare]=localStorage.getItem(k); } return o; }
-function fbDeviceLabel(){ return (/Mobile|Android|iPhone/i.test(navigator.userAgent)?'폰':'PC'); }
+/* 기기 이름표에 «브라우저»도 붙인다 — 「PC」만으로는 크롬이 올렸는지 에지가 올렸는지 몰랐다(2026-10-05) */
+function fbDeviceLabel(){ var u=navigator.userAgent||'';
+  var b=/Edg\//.test(u)?'에지':/Whale\//.test(u)?'웨일':/Chrome\//.test(u)?'크롬':/Safari\//.test(u)?'사파리':/Firefox\//.test(u)?'파이어폭스':'';
+  return (/Mobile|Android|iPhone/i.test(u)?'폰':'PC')+(b?' · '+b:''); }
 /* API 키 개인 클라우드 보관 (kcareer/{uid}/_secrets — 본인 계정만 열람, 업데이트·기기변경에도 유지)
    ⚠ 2026-08-17 — Gemini 열쇠는 여기서 뺐다. 이제 **회사 서버**가 든다.
      빼기만 하면 예전에 올려 둔 값이 클라우드에 그대로 남으므로 **지운다**(아래 null).
@@ -18734,8 +18740,38 @@ function fbWatch(){ if(!fbUid||!fbDb||_fbWatching) return; _fbWatching=true;
     if(!window.KcareerNotices){ if(at>(base||0)) fbShowNotice(); return; }
     var d=KcareerNotices.decide({ base:base, cloudAt:at, here:0, cloud:null,
                                   dismissedAt:_fbDismissAt });
+    /* ★ 처음 여는 기기 — 잃을 것이 없으면 묻지 않고 받아 온다(fbFirstSync). 잃을 것이 있으면 띠에 건수를 적는다 */
+    if(d.newer.show && d.newer.kind==='first'){ fbFirstSync(); return; }
     if(d.newer.show) fbShowNotice(d.newer.kind); else fbHideNotice();
   }); }
+/* ═══ 처음 여는 기기는 «저절로» 받아 온다 (대표 지시 2026-10-05 「다른모든 프로그램에서도 데이터가 분리되지 않게」) ═══
+   크롬·에지 둘 다 클라우드(580건)를 한 번도 안 받아 와 처음 깔린 185건만 보고 있었다. 「받아 오면 최신이 됩니다」
+   띠는 떠 있었지만 작아서 넘기기 쉬웠고, 안 누르면 자동 올리기도 영영 시작되지 않는다(_fbBase 빗장).
+   → 이 기기 목록의 기록이 «모두» 클라우드에 있거나 클라우드가 지웠다고 적어 둔 것이면(잃을 것 0) 묻지 않고 받는다.
+   ⚠ 하나라도 이 기기에만 있으면 받지 않는다 — 띠에 「이 기기에만 N건」을 적어 사람이 고르게 둔다.
+   ⚠ 잣대는 KcareerNotices.firstPullLoss 한 곳. 받는 길은 fbPull 과 같은 kcApplyRestore('pull') 한 곳. */
+var _fbFirstTried=false;
+function fbFirstSync(){
+  if(_fbFirstTried || KC_SAFE || kcNoPush() || !fbUid || !fbDb) { fbShowNotice('first'); return; }
+  _fbFirstTried=true;
+  fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
+    var v=snap.val();
+    if(!v||!v.ls){ fbShowNotice('first'); return; }
+    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP, TOMB_KEY);
+    if(!r.safe){
+      fbShowNotice('first');
+      var m=document.getElementById('fbNoticeMsg');
+      if(m) m.textContent=KcareerNotices.newerText('first')+' 이 기기에만 있는 기록 '+r.lost.length+'건이 있어 저절로 받지 않았습니다 — ☁ 저장(이 기기 것 올리기) 또는 불러오기를 골라 주세요.';
+      return;
+    }
+    var cloud=_fbCounts(v.ls), here=_fbCounts(null);
+    kcApplyRestore(v.ls, 'pull');
+    if(v.at) fbSetBase(v.at);
+    fbHideNotice();
+    toast('☁ 이 기기는 처음이라 클라우드 기록 '+cloud.total+'건을 받아 왔습니다(이 기기 '+here.total+'건은 모두 클라우드에 있었습니다) — 새로고침합니다', 6000);
+    setTimeout(function(){ location.reload(); }, 1500);
+  }).catch(function(e){ console.warn('fbFirstSync', e); fbShowNotice('first'); });
+}
 /* ★ 직원 «보기 전용»에서는 클라우드로 «올리지 않는다» (대표 지시 2026-09-02).
    사본에서 읽은 대표 기록이 직원 자기 칸(kcareer/{직원uid})에 눌러앉으면,
    그 뒤에 대표가 사본을 내려도 직원 기기에는 남는다 — 내릴 수 있어야 공개다.
@@ -18751,7 +18787,7 @@ function fbAutoPush(){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fb
        이 가드를 지우면 조용히 자료가 사라진다. 사람이 ☁ 저장/불러오기로 결정하게 둔다. */
     /* ⚠ 여기 오는 기기는 «한 번도 받아 온 적이 없다» — 「다른 기기에서 저장된…」이라 하면
        무엇을 해야 할지 모른다. 받아 오라고 또박또박 말한다(2026-09-12). */
-    if(_fbBase==null && cloudAt){ fbShowNotice('first'); return; }
+    if(_fbBase==null && cloudAt){ fbFirstSync(); return; }   /* 잃을 것 없으면 저절로 받는다 */
     _fbDoPush(_fbCounts(null).total, true).then(function(){
       var b=document.getElementById('fbBtn'); if(b){ var t=b.textContent; b.textContent='☁ 저장됨'; setTimeout(function(){ if(b.textContent==='☁ 저장됨') b.textContent=t; },1500); }
     }).catch(function(){});
