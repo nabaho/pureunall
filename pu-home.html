@@ -2023,7 +2023,10 @@ function 로고잇기창그리기() {
       + (이은
           ? '<span style="overflow:hidden;text-overflow:ellipsis"><b>' + esc(c ? c.name : '(업체관리에 없음 ' + 이은 + ')') + '</b></span>'
             + '<span style="flex:1"></span><button class="btn sm" onclick="로고잇기풀기(\'' + esc(이은) + '\').then(로고잇기창그리기)">풀기</button>'
-          : '<select id="' + 고르개id + '" style="max-width:280px"><option value="">— 업체를 고르십시오 —</option>'
+          /* ★ 업체 찾기 (대표 지시 2026-10-05 「찾아서 검색할 수 있게 해달라」) —
+               업체가 377곳이라 고르개만으로는 못 찾는다. 치면 아래 고르개가 좁혀진다. */
+          : '<input placeholder="업체 찾기" style="width:130px" oninput="로고고르개거르기(' + x.srl + ', this.value)">'
+            + '<select id="' + 고르개id + '" style="max-width:240px"><option value="">— 업체를 고르십시오 —</option>'
             + 같은이름.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name) + ' (로고 이름과 같음)</option>').join('')
             + 나머지.map(c => '<option value="' + esc(c.id) + '">' + esc(c.name)
                 + (String(c.status || '') === 'closed' ? ' (거래 종료)' : '') + '</option>').join('')
@@ -2035,6 +2038,29 @@ function 로고잇기창그리기() {
   openModal(h, true);
 }
 window.로고잇기창 = 로고잇기창; window.로고잇기창그리기 = 로고잇기창그리기;
+
+/* 업체 이름을 찾기 좋게 — (주)·㈜·주식회사·띄어쓰기를 걷고 작은 글자로 */
+function 업체이름다듬기(s) {
+  return String(s || '').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s+/g, '').toLowerCase();
+}
+/* 로고 줄의 고르개를 친 글자로 좁힌다. 하나만 남으면 그것을 골라 둔다(사람이 친 글자로 찾은 것이다 —
+   그래도 «잇기»는 사람이 누른다). 여럿이면 고르지 않는다. */
+function 로고고르개거르기(srl, q) {
+  const 고르개 = document.getElementById('logoPick' + srl);
+  if (!고르개) return;
+  const 찾을 = 업체이름다듬기(q);
+  const 남은 = [];
+  for (let i = 1; i < 고르개.options.length; i++) {
+    const o = 고르개.options[i];
+    const 맞음 = !찾을 || 업체이름다듬기(o.text).indexOf(찾을) >= 0;
+    o.hidden = !맞음;
+    if (맞음) 남은.push(o);
+  }
+  if (찾을 && 남은.length === 1) 고르개.value = 남은[0].value;
+  else if (!남은.some(o => o.value === 고르개.value)) 고르개.value = '';
+  else if (찾을 && 남은.length > 1) 고르개.value = '';
+}
+window.로고고르개거르기 = 로고고르개거르기;
 
 /* ══════ 2단계 — 새 거래처 로고 «올리기» (월간 자동 연결 2026-10-05) ══════
    대표 지시 「새로운 거래처와 계약시 계약 사업장의 명단과 로고를 올리고」.
