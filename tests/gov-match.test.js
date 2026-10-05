@@ -109,3 +109,48 @@ test('★ 사업 종류 사전 — 대표 실적 이름이 제 종류로 간다'
   assert.ok(k('부당해고등노동위원회대리(노사)').includes('labcase'));
   assert.deepEqual(k('2027년 스마트공장 컨설팅'), [], '「컨설팅」 하나로는 종류가 아니다');
 });
+
+/* ── ③ 지원서 경력 줄 (2026-10-05) — 실측 꼴(이름은 가짜) ── */
+const APP_LINES = [
+  '자기소개 (주요 경력) | 17.10~현재 가나노무법인 천안 대표 15.05~17.09 다라노무사사무실 대표 16.01~17.12 공인노무사회 충청남도 분회 회장 25.01~28.01 대전지방해양수산청 공무직 인사위원회 위원',
+  '재택근무컨설팅 | 20.08~23.10 | 컨설턴트',
+  '컨설팅(프로젝트) 명 | 기간 | 담당직무',
+  '2019년 ~ 2021년 | 충청남도경제진흥원 | 외부 평가위원',
+  '2024.03. ~ 재직중 서산시 노사민정협의회 위원'
+];
+test('★★★ 경력 줄 뽑기 — 두 자리 해·한 칸에 여러 경력·표 행·해만 적은 기간', () => {
+  const e = M.careerLines(APP_LINES);
+  assert.deepEqual(e.map((x) => x.from + '~' + x.to), ['2017.10~현재', '2015.05~2017.09', '2016.01~2017.12', '2025.01~2028.01', '2020.08~2023.10', '2019~2021', '2024.03~현재']);
+  assert.deepEqual(e.map((x) => x.text), ['가나노무법인 천안 대표', '다라노무사사무실 대표', '공인노무사회 충청남도 분회 회장', '대전지방해양수산청 공무직 인사위원회 위원',
+    '재택근무컨설팅 컨설턴트', '충청남도경제진흥원 외부 평가위원', '서산시 노사민정협의회 위원']);
+  assert.equal(e[0].toY, '9999', '현재는 끝없음');
+  assert.deepEqual(M.careerLines(['2024. 13. ~ 2025. 01. 무엇']), [], '없는 달은 기간이 아니다');
+  assert.deepEqual(M.careerLines(['20.08~23.10']), [], '기간만 있고 글이 없으면 경력 줄이 아니다');
+});
+test('★★ 줄 안 기관 찾기 — 가장 긴 이름이 이긴다', () => {
+  const recs = [{ org: '충청남도' }, { org: '충청남도경제진흥원' }, { org: '서산시' }];
+  assert.deepEqual(M.orgsIn('충청남도경제진흥원 외부 평가위원', recs), ['충청남도경제진흥원']);
+  assert.deepEqual(M.orgsIn('서산시 노사민정협의회 위원', recs), ['서산시']);
+});
+test('★★★ 경력 줄 판정 — 동일은 기관 같음 + 기간 겹침 + (같은 종류 또는 이름 겹침)', () => {
+  const recs = M.toRecs({ wiccok: [
+    { org: '한국공인노무사회 대전충청지회', role: '충남분회 회장', year: '2016' },
+    { org: '충청남도', role: '노동권익보호관', year: '2017' },
+    { org: '대산지방해양수산청', role: '공무직 등 인사위원회 민간위원', year: '2025' },
+    { org: '충청남도경제진흥원', role: '외부 평가위원', year: '2020' }] }, []);
+  const mt = (n) => R.matches(n);
+  const by = Object.fromEntries(M.careerLines(APP_LINES).map((e) => [e.text, M.judgeLine(e, recs, mt)]));
+  assert.equal(by['공인노무사회 충청남도 분회 회장'].level, 'same');
+  assert.equal(by['공인노무사회 충청남도 분회 회장'].best[0].rec.org, '한국공인노무사회 대전충청지회');
+  assert.ok(by['공인노무사회 충청남도 분회 회장'].best.some((b) => b.rec.org === '충청남도' && b.level === 'similar'),
+    '충청남도 노동권익보호관은 기관·기간만 같아 «유사»에 머문다');
+  assert.equal(by['대전지방해양수산청 공무직 인사위원회 위원'].level, 'similar', '「대전」↔「대산」 — 같은 곳이라 단정하지 않고 유사로(오타일 수 있다)');
+  assert.equal(by['충청남도경제진흥원 외부 평가위원'].level, 'same');
+  assert.match(by['충청남도경제진흥원 외부 평가위원'].best[0].why.join(' '), /기간 겹침/);
+  assert.equal(by['가나노무법인 천안 대표'].level, '');
+});
+test('★ 줄 지문 — 같은 줄은 같은 열쇠, 글자를 담지 않는다', () => {
+  const [a] = M.careerLines(['20.08~23.10 재택근무컨설팅 컨설턴트']);
+  assert.equal(M.lineKey(a), M.lineKey({ from: a.from, text: a.text }));
+  assert.match(M.lineKey(a), /^a[0-9a-z]+$/);
+});

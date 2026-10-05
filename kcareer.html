@@ -6009,6 +6009,7 @@ function goForm(title){
      그래서 잠금이 풀릴 때까지 기다렸다가 연다(최대 8초, 그 뒤엔 조용히 그만둔다). */
 function kcOpenFromUrl(tries){
   try{
+    if(/[?&]go=add(?:&|$)/.test(location.search)) return kcAddFromHandoff(tries);
     if(!/[?&]go=form/.test(location.search)) return;
     var lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
     if(lk!=='owner'){
@@ -6021,6 +6022,27 @@ function kcOpenFromUrl(tries){
     /* ⚠ 주소에서 지운다 — 새로고침할 때마다 다시 튀어 들어오면 하던 일을 잃는다 */
     try{ history.replaceState(null,'',location.pathname); }catch(e){}
   }catch(e){}
+}
+/* ★ 정부사업신청 「➕ 경력관리로 넘기기」 받는 문 (대표 승인 2026-10-05 ③ — 「표시만 + 경력관리로 넘기기」)
+   ⚠ 등록 창을 «채워서 열기만» 한다 — 저장은 대표가 누른다. 넘길 내용은 주소가 아니라 같은 사이트 localStorage(pu_kc_handoff)로 받는다
+     (경력 글이 주소·방문 기록에 남지 않게). 읽으면 곧바로 지운다 · 10분 넘은 것은 안 쓴다.
+   ⚠ 받는 갈래는 셋뿐(위촉·컨설팅 실적·근무) — 그 밖의 값은 무시한다. */
+var KC_HANDOFF_FILL={
+  wiccok:  function(h){ return { 'ff-org':h.org, 'ff-titleVal':h.title, 'ff-periodStart':h.from, 'ff-periodEnd':h.to==='현재'?'':h.to }; },
+  consult: function(h){ return { 'ff-agency':h.org, 'ff-project':h.title, 'ff-year':(h.to&&h.to!=='현재'?h.to:h.from).slice(0,4), 'ff-status':h.to==='현재'?'진행':'완료', 'ff-note':'정부사업신청 지원서에서 넘김' }; },
+  work:    function(h){ return { 'ff-org':h.org, 'ff-title':h.title, 'ff-joinDate':h.from, 'ff-leaveDate':h.to==='현재'?'':h.to, 'ff-note':'정부사업신청 지원서에서 넘김' }; }
+};
+function kcAddFromHandoff(tries){
+  var lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
+  if(lk!=='owner'){ if((tries||0)<20) setTimeout(function(){ kcOpenFromUrl((tries||0)+1); },400); return; }
+  var h=null;
+  try{ h=JSON.parse(localStorage.getItem('pu_kc_handoff')||'null'); localStorage.removeItem('pu_kc_handoff'); }catch(e){ h=null; }
+  try{ history.replaceState(null,'',location.pathname); }catch(e){}
+  if(!h || !KC_HANDOFF_FILL[h.page] || !(Date.now()-Number(h.at||0) < 600000)){ toast('넘겨받은 내용이 없거나 오래됐습니다 — 정부사업신청에서 다시 눌러 주세요'); return; }
+  openForm(h.page, null);
+  var v=KC_HANDOFF_FILL[h.page](h);
+  Object.keys(v).forEach(function(id){ var el=document.getElementById(id); if(el && v[id]!=null && v[id]!=='' && !el.value) el.value=String(v[id]); });
+  toast('정부사업신청 지원서에서 넘긴 내용입니다 — 확인하고 저장을 눌러 주세요');
 }
 function renderHomeYr(){ const yrMap=_homeYr||{}; const selEl=document.getElementById('homeYrSel'); const f=selEl?selEl.value:'';
   let yrs=Object.keys(yrMap).sort().reverse(); if(f) yrs=yrs.filter(y=>y===f);

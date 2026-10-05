@@ -173,8 +173,97 @@
     return res;
   }
 
+  /* ══ ③ 지원서 경력 줄 (설계 4절, 2026-10-05) ══
+     실측(대표 실제 지원서): 기간이 「17.10~현재」「20.08~23.10」처럼 «두 자리 해» · 표 행은 「재택근무컨설팅 | 20.08~23.10 | 컨설턴트」 ·
+     자기소개 칸엔 「17.10~현재 ○○ 대표 15.05~17.09 △△ 대표 …」처럼 한 칸에 여러 경력이 이어 붙는다.
+     → 기간이 나올 때마다 끊어 경력 하나로 본다. 표 행(칸이 「 | 」로 이어진 줄)에 기간이 하나면 나머지 칸이 그 경력의 글이다. */
+  var PER_YM = /((?:19|20)?\d{2})\s*[.\-\/년]\s*(\d{1,2})\s*월?\s*\.?(?:\s*\d{1,2}\s*일?\s*\.?)?\s*[~∼～〜]\s*(현재|재직\s*중?|진행\s*중?|계속|((?:19|20)?\d{2})\s*[.\-\/년]\s*(\d{1,2})\s*월?\s*\.?(?:\s*\d{1,2}\s*일?\s*\.?)?)/g;
+  var PER_Y = /((?:19|20)\d{2})\s*년?\s*[~∼～〜]\s*(현재|재직\s*중?|진행\s*중?|((?:19|20)\d{2})\s*년?)/g;
+  function fullYear(y) { y = String(y); if (y.length === 4) return y; var n = Number(y); return String(n <= 40 ? 2000 + n : 1900 + n); }
+  function pad2(n) { n = String(Number(n)); return n.length < 2 ? '0' + n : n; }
+  function findPeriods(line) {
+    var out = [], m;
+    PER_YM.lastIndex = 0;
+    while ((m = PER_YM.exec(line))) {
+      var mo = Number(m[2]); if (mo < 1 || mo > 12) continue;
+      var now = /현재|재직|진행|계속/.test(m[3]);
+      out.push({ i: m.index, end: m.index + m[0].length, from: fullYear(m[1]) + '.' + pad2(m[2]),
+        to: now ? '현재' : (m[4] ? fullYear(m[4]) + '.' + pad2(m[5]) : '') });
+    }
+    PER_Y.lastIndex = 0;
+    while ((m = PER_Y.exec(line))) {
+      var hit = out.some(function (p) { return m.index < p.end && m.index + m[0].length > p.i; });
+      if (hit) continue;
+      out.push({ i: m.index, end: m.index + m[0].length, from: m[1], to: /현재|재직|진행/.test(m[2]) ? '현재' : (m[3] || '') });
+    }
+    return out.sort(function (a, b) { return a.i - b.i; });
+  }
+  function cleanLine(t) {
+    return s(t).replace(/\s*\|\s*/g, ' ').replace(/^[\s·•\-–:：,]+|[\s·•\-–:：,]+$/g, '')
+      .replace(/^(?:자기\s*소개|주요\s*경력|경력\s*사항|경력)\s*(?:\([^)]*\))?\s*/, '').replace(/\s+/g, ' ').slice(0, 90);
+  }
+  /* lines: 글줄 배열(표는 행마다 한 줄) → [{ from:'2020.08', to:'2023.10'|'현재'|'', fromY, toY, text, raw }] */
+  function careerLines(lines) {
+    var out = [];
+    (lines || []).forEach(function (raw) {
+      var line = s(raw); if (!line) return;
+      var ps = findPeriods(line); if (!ps.length) return;
+      var isRow = line.indexOf(' | ') >= 0;
+      ps.forEach(function (p, k) {
+        var text;
+        if (isRow && ps.length === 1) text = line.slice(0, p.i) + ' ' + line.slice(p.end);
+        else text = line.slice(p.end, k + 1 < ps.length ? ps[k + 1].i : line.length);
+        if (isRow && ps.length > 1) text = text.split(' | ')[0];
+        text = cleanLine(text);
+        if ((text.match(/[가-힣]/g) || []).length < 2) return;
+        var fy = p.from.slice(0, 4), ty = p.to === '현재' ? '9999' : (p.to ? p.to.slice(0, 4) : fy);
+        out.push({ from: p.from, to: p.to, fromY: fy, toY: ty, text: text, raw: line.slice(0, 160) });
+      });
+    });
+    return out;
+  }
+  /* 줄 안에서 경력관리 기관 이름 찾기 — ⚠ 가장 긴 이름이 이긴다(「충청남도경제진흥원」 줄에서 「충청남도」를 따로 세지 않는다) */
+  function orgsIn(text, recs) {
+    var tk = orgKey(text), found = [];
+    (recs || []).forEach(function (r) {
+      var k = orgKey(r.org); if (!r.org || k.length < 2) return;
+      if (tk.indexOf(k) >= 0 && found.indexOf(r.org) < 0) found.push(r.org);
+    });
+    return found.filter(function (a) { var ka = orgKey(a);
+      return !found.some(function (b) { var kb = orgKey(b); return kb.length > ka.length && kb.indexOf(ka) >= 0; }); });
+  }
+  /* 경력 줄 하나 ↔ 경력관리 → { level:'same'|'similar'|'', best:[{rec, level, why, score}] (3개까지) }
+     동일 = 기관 같음 + (기간이 겹침 또는 같은 종류 또는 이름 60%↑) */
+  function judgeLine(entry, recs, matches) {
+    var ids = matches ? matches(entry.text) : [];
+    var t = { orgId: ids[0] || '', orgNames: orgsIn(entry.text, recs), title: entry.text };
+    var list = [];
+    (recs || []).forEach(function (r) {
+      var c = compare(t, r, matches); if (!c.level) return;
+      var yHit = (r.years || [r.year]).some(function (y) { return y && y >= entry.fromY && y <= entry.toY; });
+      var why = c.why.slice(), level = c.level, score = c.score;
+      if (yHit) { why.splice(why.length - 1, 0, '기간 겹침'); score += 200; }
+      /* ⚠ 기관 같음 + 기간 겹침 «만»으로는 동일이 아니다 — 「공인노무사회 충청남도 분회 회장」이 「충청남도 노동권익보호관」과
+           동일로 잡혔다(실측). 같은 종류이거나 이름이 절반 넘게 겹쳐야 한다. */
+      var alike = why.some(function (w) { return /^같은 종류/.test(w) || /^이름 \d+% 겹침/.test(w); });
+      if (level === 'similar' && yHit && why[0] === '기관 같음' && alike) level = 'same';
+      if (level === 'same') score += 1000;
+      list.push({ rec: r, level: level, why: why, score: score });
+    });
+    list.sort(function (a, b) { return b.score - a.score; });
+    var level = list.length ? (list.some(function (x) { return x.level === 'same'; }) ? 'same' : 'similar') : '';
+    return { level: level, best: list.slice(0, 3) };
+  }
+  /* 줄 지문 — 확인 표시 열쇠(지원서 글은 담지 않고 지문만) */
+  function lineKey(entry) {
+    var t = s(entry.from) + '|' + s(entry.text), h = 5381;
+    for (var i = 0; i < t.length; i++) h = ((h * 33) ^ t.charCodeAt(i)) >>> 0;
+    return 'a' + h.toString(36);
+  }
+
   var api = { orgKey: orgKey, sameOrg: sameOrg, TOPICS: TOPICS, topicsOf: topicsOf, topicName: topicName,
-    words: words, overlap: overlap, toRecs: toRecs, compare: compare, findFor: findFor };
+    words: words, overlap: overlap, toRecs: toRecs, compare: compare, findFor: findFor,
+    findPeriods: findPeriods, careerLines: careerLines, orgsIn: orgsIn, judgeLine: judgeLine, lineKey: lineKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovMatch = api;
 })(typeof window !== 'undefined' ? window : this);

@@ -115,3 +115,47 @@ test('★★ 정부사업신청에 서식 채우기 «화면»을 짓지 않았�
       assert.ok(gov.indexOf(n) < 0, '「' + n + '」 이 정부사업신청으로 넘어왔습니다');
     });
 });
+
+/* ── ③ 「➕ 경력관리로 넘기기」 받는 문 (2026-10-05) ── */
+function runAdd(h, opt) {
+  opt = opt || {};
+  const els = {}, log = { form: [], toast: [], replaced: [] };
+  const store = h === undefined ? {} : { pu_kc_handoff: JSON.stringify(h) };
+  const ctx = {
+    console, String, Number, Object, Array, RegExp, JSON, Date, URLSearchParams,
+    location: { search: '?go=add', pathname: '/kcareer.html' },
+    history: { replaceState: (a, b, c) => log.replaced.push(c) },
+    localStorage: { getItem: (k) => (k in store ? store[k] : null), removeItem: (k) => { delete store[k]; } },
+    document: { getElementById: (id) => els[id] || null, querySelector: () => null },
+    openForm: (page, id) => { log.form.push([page, id]); ['ff-org', 'ff-titleVal', 'ff-periodStart', 'ff-periodEnd', 'ff-agency', 'ff-project', 'ff-year', 'ff-status', 'ff-note', 'ff-title', 'ff-joinDate', 'ff-leaveDate'].forEach((k) => { els[k] = { value: k === 'ff-status' ? '진행' : '' }; }); if (opt.pre) Object.assign(els['ff-org'], { value: opt.pre }); },
+    toast: (m) => log.toast.push(m), kcApplyLock: () => 'owner', setTimeout: () => {}, nav_to: () => {}, goForm: () => {}, _safe: (f) => f()
+  };
+  const pick = (re) => { const m = kc.match(re); assert.ok(m, String(re)); return m[0]; };
+  const code = [pick(/var KC_HANDOFF_FILL=\{[\s\S]*?\n\};/), pick(/function kcAddFromHandoff\(tries\)\{[\s\S]*?\n\}/), pick(/function kcOpenFromUrl\(tries\)\{[\s\S]*?\n\}/)].join('\n');
+  vm.runInNewContext(code + '\n;globalThis.__a={kcOpenFromUrl};', ctx);
+  ctx.__a.kcOpenFromUrl(0);
+  return { els, log, store };
+}
+test('★★★ go=add — 넘겨받은 위촉 경력으로 등록 창을 «채워서» 연다(저장은 안 한다)', () => {
+  const r = runAdd({ page: 'wiccok', org: '서산시', title: '서산시 노사민정협의회 위원', from: '2024.03', to: '현재', at: Date.now() });
+  assert.deepEqual(r.log.form, [['wiccok', null]]);
+  assert.equal(r.els['ff-org'].value, '서산시'); assert.equal(r.els['ff-titleVal'].value, '서산시 노사민정협의회 위원');
+  assert.equal(r.els['ff-periodStart'].value, '2024.03'); assert.equal(r.els['ff-periodEnd'].value, '', '현재는 끝날을 비운다');
+  assert.equal(r.store.pu_kc_handoff, undefined, '읽으면 곧바로 지운다');
+  assert.deepEqual(r.log.replaced, ['/kcareer.html']);
+  assert.match(r.log.toast[0], /확인하고 저장/);
+  assert.ok(!/fbPush|set\(/.test(kc.match(/function kcAddFromHandoff\(tries\)\{[\s\S]*?\n\}/)[0]), '저장하지 않는다');
+});
+test('★★ 컨설팅·근무도 칸이 맞게 · 이미 친 칸은 덮지 않는다', () => {
+  const c = runAdd({ page: 'consult', org: '충남경제진흥원', title: '일자리전환 컨설팅', from: '2020.08', to: '2023.10', at: Date.now() });
+  assert.equal(c.els['ff-agency'].value, '충남경제진흥원'); assert.equal(c.els['ff-year'].value, '2023'); assert.equal(c.els['ff-project'].value, '일자리전환 컨설팅');
+  assert.equal(c.els['ff-status'].value, '진행', '이미 값이 있는 칸(기본값)은 덮지 않는다');
+  const w = runAdd({ page: 'work', org: '가나재단', title: '관리소장', from: '2018.01', to: '2019.02', at: Date.now() }, { pre: '먼저친값' });
+  assert.equal(w.els['ff-org'].value, '먼저친값'); assert.equal(w.els['ff-joinDate'].value, '2018.01'); assert.equal(w.els['ff-leaveDate'].value, '2019.02');
+});
+test('★★ 넘긴 것이 없거나 10분 넘었거나 모르는 갈래면 열지 않고 말한다', () => {
+  [undefined, { page: 'wiccok', org: 'x', title: 'y', from: '2020', at: Date.now() - 11 * 60000 }, { page: 'secret', at: Date.now() }].forEach((h) => {
+    const r = runAdd(h);
+    assert.deepEqual(r.log.form, []); assert.match(r.log.toast[0], /넘겨받은 내용이 없거나 오래됐습니다/);
+  });
+});
