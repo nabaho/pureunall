@@ -24259,6 +24259,28 @@ function ContractManagement(props){
       return (y.signDate||'').localeCompare(x.signDate||''); }); });
     setContracts(fresh);
   }
+  /* ★ 서버 자료가 내려오면 «다시 읽는다» (대표 신고 2026-10-05 「상담접수·계약확정 사라진 것 살려라」).
+     목록은 처음 열 때 한 번 dbGet 으로 받아 useState 에 얼려 두었다. 그 순간 자료가 덜 와 있으면
+     화면은 그 사진에 멈춘다 — 실측: 서버 167건·이 PC 사본 169건인데 열려 있던 탭은 36건만 들고
+     상담접수 0·계약확정 2(실제 2·6)로 그렸다. 새로 연 탭은 다 나왔다 — 지워진 것은 없었다.
+     ⚠ 세금계산서(FinanceInvoice)가 2026-08-26 같은 까닭으로 이미 고친 길과 같다.
+     ⚠ 내 열쇠(contracts)이거나 묶음일 때만 — 다른 표가 바뀔 때마다 다시 그리지 않는다. */
+  useEffect(function(){
+    function again(e){
+      var k = e && e.detail;
+      if(e && e.type === 'pureun-saved') k = k && k.key;
+      if(e && e.type !== 'fb_initial_done' && k && k !== 'contracts' && k !== 'batch' && k !== 'manual') return;
+      refreshContracts();
+    }
+    window.addEventListener('pureun-saved', again);
+    window.addEventListener('fb_data_changed', again);
+    window.addEventListener('fb_initial_done', again);
+    return function(){
+      window.removeEventListener('pureun-saved', again);
+      window.removeEventListener('fb_data_changed', again);
+      window.removeEventListener('fb_initial_done', again);
+    };
+  }, []);
   function lockGuard(c){
     var ym = ((c && c.signDate) || '').slice(0,7);
     if(ym && isContractLocked(ym)){ showToast('🔒 ' + ym + ' 잠겨있어 수정 불가'); return false; }
