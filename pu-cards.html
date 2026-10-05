@@ -846,7 +846,14 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .cn-t th{text-align:left;font-weight:400;font-size:11.5px;color:#64748b;background:#f8fafc;padding:6px 6px;border-bottom:1px solid #e2e8f0;white-space:nowrap}
 .cn-t td{padding:0 6px;height:36px;border-top:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cn-t col.ck{width:30px} .cn-t col.no{width:36px} .cn-t col.nm{width:120px} .cn-t col.em{width:210px}
-.cn-t col.sg{width:150px} .cn-t col.act{width:300px} .cn-t col.dt{width:60px} .cn-t col.bk{width:120px}
+.cn-t col.sg{width:150px} .cn-t col.act{width:300px} .cn-t col.dt{width:84px} .cn-t col.bk{width:120px}
+/* 날짜 2026.10.02 — 숫자 폭을 맞춰 줄마다 같은 자리 (2026-10-06) */
+.cn-t .cn-d{font-variant-numeric:tabular-nums;color:#64748b}
+/* 단추 칸 — 자리가 모자라면 «잇기» 단추 글자만 … 로 접고 📇·🙈 는 늘 보인다 (2026-10-06)
+   예전: 칸 폭 300px 에 잇기 단추가 170px 까지 커지면 맨 오른쪽 🙈 가 칸 밖으로 밀려 안 보였다(실측 34px) */
+.cn-act{display:flex;justify-content:flex-end;align-items:center;gap:4px;min-width:0}
+.cn-act button{flex:none}
+.cn-act button.pri{flex:0 1 auto;min-width:0}
 .cn-t td.no{color:#94a3b8;font-size:12px} .cn-t td.nm{color:#1e293b;font-weight:600}
 .cn-t td.em{color:#64748b;font-size:12px} .cn-t td.sj{color:#475569} .cn-t td.dt{color:#94a3b8;font-size:12px}
 .cn-t td.sg{color:#854d0e;font-size:12px} .cn-t td.sg.none{color:#94a3b8}
@@ -856,7 +863,9 @@ body.mailview #pu-backup-admin-button{display:none!important}
 .cn-t tr.cn-find td{background:#f8fafc;height:40px}
 .cn-t tr.cn-find input{font-family:inherit;font-size:12.5px;border:1px solid #cbd5e1;border-radius:4px;padding:4px 8px;width:200px}
 .cn-none{color:#64748b;font-size:12.5px}
-@media (max-width:1100px){ .cn-t col.em{width:0} .cn-t td.em,.cn-t th:nth-child(4){font-size:0} }
+/* 이메일 칸은 1360px 아래에서 접는다 (2026-10-06) — 옆줄 240px·여백을 빼면 1101~1260px 창에서
+   «최근 메일»(날짜·제목) 칸이 0 에 가깝게 눌려 연도까지 넣은 날짜가 안 보였다. 이메일은 이름에 손을 올리면 뜬다. */
+@media (max-width:1360px){ .cn-t col.em{width:0} .cn-t td.em,.cn-t th:nth-child(4){font-size:0} }
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -25153,7 +25162,10 @@ function cntHtml(){
   const tab = state.cntTab || 'todo', sel = state.cntSel || (state.cntSel = {});
   const busy = cntLoading();
   const todo = busy ? [] : cntTodo(), done = cntDone(), skip = cntSkips();
-  const day = t => { const d = new Date(Number(t||0)); return isNaN(d) || !t ? '' : (d.getMonth()+1) + '-' + d.getDate(); };
+  /* 날짜는 «연도까지» (대표 지시 2026-10-06 「년도 날짜가 언제인지 표시되게 해라」 · 목업 승인 「추천대로」)
+     예전엔 「10-2」 월-일만이라 작년 메일과 올해 메일이 구별되지 않았다. 모든 줄에 같은 모양(fmtDate)으로. */
+  const dayTxt = t => { const v = Number(t||0); return !v || isNaN(new Date(v)) ? '' : fmtDate(v); };
+  const day = t => { const s = dayTxt(t); return s ? `<span class="cn-d">${s}</span>` : ''; };
   const card = (t, ic, label, n, sub) => `<button class="cn-card${tab===t?' on':''}" onclick="cntTabSet('${t}')" title="${sub}">
       ${ic} ${label} <b>${busy && t==='todo' ? '…' : n.toLocaleString()}</b></button>`;
   /* 제목·세 갈래·일괄 단추가 한 줄(.cn-head) — 위에 붙는다 */
@@ -25183,8 +25195,8 @@ function cntHtml(){
         + (r.kind === 'inq' ? `<button onclick="cntOpenMail('${k}')" title="메일 열기">✉</button>` : '')
         + `<button onclick="mnewCard('${k}')" title="명함으로 — 기업정보함 명함 입력 창을 채워서 엽니다">📇</button>
            <button onclick="cntSkip('${k}')" title="넘어가기 — 다시 안 묻습니다(전 직원 공용)">🙈</button>`;
-      let row = `<tr>${ck(r.key)}<td class="no">${++n}</td><td class="nm" title="${esc(r.name || r.em)}">${esc(r.name || r.em.split('@')[0])}</td>
-        <td class="em" title="${esc(r.em)}">${esc(r.em)}</td><td class="sj" title="${esc(r.subj||'')}">${day(r.last)} · ${esc(r.subj || '(제목 없음)')}</td>${sug}<td class="act">${act}</td></tr>`;
+      let row = `<tr>${ck(r.key)}<td class="no">${++n}</td><td class="nm" title="${esc(r.name ? r.name + ' · ' + r.em : r.em)}">${esc(r.name || r.em.split('@')[0])}</td>
+        <td class="em" title="${esc(r.em)}">${esc(r.em)}</td><td class="sj" title="${esc((dayTxt(r.last) ? dayTxt(r.last) + ' · ' : '') + (r.subj||''))}">${day(r.last)}${dayTxt(r.last) ? ' · ' : ''}${esc(r.subj || '(제목 없음)')}</td>${sug}<td class="act"><div class="cn-act">${act}</div></td></tr>`;
       if(Q[r.key] !== undefined) row += `<tr class="cn-find"><td colspan="7"><input value="${esc(Q[r.key])}" placeholder="업체 이름 두 글자 이상"
           oninput="mnewFind('${k}', this.value)"> <span id="mnf-${k}">${mnewHitsHtml(r.key, Q[r.key])}</span></td></tr>`;
       return row;
@@ -25204,7 +25216,7 @@ function cntHtml(){
       : `<a class="go co" onclick="cntGo('${esc(x.key)}')" title="그 회사를 엽니다">🏢 이알피 업체관리 › ${esc(x.coName)} › 담당자 ↗</a>${x.how === 'auto' ? ' <small class="cn-auto" title="회사 도메인이 업체 한 곳과 같아 저절로 채웠습니다">저절로</small>' : ''}`;
     h += `<table class="cn-t done"><colgroup><col class="ck"><col class="no"><col class="nm"><col class="em"><col><col class="dt"><col class="bk"></colgroup>`
       + th('<th>이름</th><th>이메일</th><th>들어간 곳</th><th>날짜</th><th></th>')
-      + done.map(x=>`<tr${x.undone ? ' class="off"' : ''}>${ck(x.key)}<td class="no">${++n}</td><td class="nm" title="${esc(x.name)}">${esc(x.name || x.em.split('@')[0])}</td>
+      + done.map(x=>`<tr${x.undone ? ' class="off"' : ''}>${ck(x.key)}<td class="no">${++n}</td><td class="nm" title="${esc(x.name ? x.name + ' · ' + x.em : x.em)}">${esc(x.name || x.em.split('@')[0])}</td>
           <td class="em" title="${esc(x.em)}">${esc(x.em)}</td><td class="wh">${where(x)}</td><td class="dt">${day(x.at)}</td>
           <td class="act">${x.go === 'co' && !x.undone ? `<button onclick="mnewUndo('${esc(x.key)}')">↩ 되돌리기</button>` : ''}</td></tr>`).join('')
       + (done.length ? '' : '<tr><td colspan="7" class="cn-none">아직 없습니다</td></tr>') + '</table>';

@@ -28,6 +28,10 @@ function load(o) {
     mbNewBust() {}, mnewBust() {}, renderPCSide() {}, uid: () => 'i' + put.length,
     Store: { mode: 'local', put: it => put.push(it) }, DB_ROOT: 'x' };
   vm.createContext(ctx);
+  /* 날짜는 앱의 fmtDate 그대로 (2026-10-06 연도 표시) — 흉내 내지 않고 원본을 싣는다 */
+  const fmt = SRC.match(/^const fmtDate = [^\n]*\n[^\n]*\n/m);
+  assert.ok(fmt, 'pu-cards.html 에서 fmtDate 를 찾지 못했습니다');
+  vm.runInContext(fmt[0].replace(/^const /, 'var '), ctx);
   vm.runInContext(['cntTodo', 'cntDone', 'cntSkips', 'cntLoading', 'cntHtml', 'cntRepaint', 'cntBulk']
     .map(n => cutFn(SRC, (n === 'cntBulk' ? 'async ' : '') + 'function ' + n + '(')).join('\n'), ctx);
   ctx.renderCntPage = () => {}; ctx.renderMailPage = () => {};
