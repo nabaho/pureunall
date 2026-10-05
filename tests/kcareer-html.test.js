@@ -67,8 +67,15 @@ test('★★ 원본을 덮지도 지우지도 옮기지도 않는다', () => {
   assert.ok(!/removeEntry/.test(source), '⚠ 원본을 지우면 안 됩니다');
   assert.ok(!/\bmove\(/.test(source), '⚠ 원본을 옮기면 안 됩니다');
   // 폴더를 새로 만들지 않는다 — 오타 폴더가 생기면 자료가 흩어진다
-  assert.ok(!/getDirectoryHandle\([^)]*create\s*:\s*true/.test(source),
+  // 예외 «하나»: 📦 제출 꾸러미(대표 승인 2026-10-05 목업 ②)가 7번 폴더 «안»에
+  //   연도·건·접수서류 폴더를 만든다. 건 이름이 곧 지원 건 하나라 새 폴더가 일이다.
+  //   ⚠ 그 함수 밖에서, 또는 7번 폴더(top) 말고 다른 손잡이에서 만들면 걸린다.
+  const pack = funcSource('_pkSaveToFolder');
+  const rest = source.replace(pack, '');
+  assert.ok(!/getDirectoryHandle\([^)]*create\s*:\s*true/.test(rest),
     '⚠ 없는 폴더를 새로 만들지 않습니다');
+  const made = [...pack.matchAll(/(\w+)\.getDirectoryHandle\([^)]*create\s*:\s*true/g)].map((m) => m[1]);
+  assert.ok(made.length >= 1 && made[0] === 'top', '꾸러미도 7번 폴더(top) 안에서부터만 만듭니다');
 });
 
 test('★★ 어느 폴더로 갈지는 한 표에서 정한다 — 화면마다 흩어지면 어긋난다', () => {
