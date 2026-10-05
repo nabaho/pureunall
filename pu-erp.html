@@ -36987,6 +36987,142 @@ function bizTypeApply(storageKey, seed, fn){
   dbSet(storageKey, next);
   return next;
 }
+/* ══════ 🔀 유형 합치기 (업무유형 정리 3단계, 대표 2026-10-05 「순서대로」 · 일터 → 일터혁신) ══════
+   콘솔 전용이던 erpMergeTypes 를 화면으로 옮기며 세 가지를 고쳤다.
+   ① 표를 통째로 저장(dbSet)하지 않고 «한 건씩» 고친다(dbPatch) — 낡은 사본 PC 가 남의 줄을 못 지운다.
+   ② 옛 유형을 지우지 않는다 — 숨기고 mergedInto 로 «어디로 합쳐졌는지» 남긴다.
+      혹시 못 옮긴 기록(다른 앱 사본 등)이 있어도 이름이 살아 있고, 다시 합치기를 누르면 남은 것만 옮긴다.
+   ③ 되돌릴 길 — 남긴 유형에 mergeLog(무엇을 어디서 어디로, 번호 전→후)를 적는다.
+   ■ 번호: 남길 유형의 약어로 바꾼다.
+     · 컨설팅은 저장할 때마다 reorderConsultingNos 가 「약어-연도」 안을 시작일 순으로 다시 매긴다 —
+       그래서 미리보기도 «같은 규칙»으로 매긴다(안 그러면 합친 뒤 첫 저장에서 번호가 또 바뀐다).
+       그 규칙 때문에 원래 남길 유형에 있던 건의 번호도 바뀔 수 있다 — 미리보기에 함께 보인다.
+     · 사건·기금·기타는 순번을 그대로 두고, 겹치면 그 해의 다음 빈 번호를 준다(콘솔 도구와 같다).
+   ⚠ 합칠지는 사람이 정한다 — 사업이 다르면 절대 합치지 않는다(현장클리닉 ≠ 기술보호). */
+var BIZ_TYPE_MERGE_MAP = {
+  company:   { store:'companies',      types:'biz_company_types', noKey:null     },
+  case:      { store:'cases',          types:'biz_case_types',    noKey:'caseNo' },
+  consulting:{ store:'consultings',    types:'biz_cons_types',    noKey:'no'     },
+  fund:      { store:'funds',          types:'biz_fund_types',    noKey:'no'     },
+  other:     { store:'other_projects', types:'biz_other_types',   noKey:'no'     }
+};
+var BIZ_NO_RE = /^(.+?)-(\d{4})-(\d+)$/;
+function bizTypeCodeOf(r, kind){ return (r && r.typeCodes && r.typeCodes[kind]) || (r && r.typeCode) || ''; }
+function bizTypeMergePlan(kind, fromCode, toCode, get){
+  get = get || dbGet;
+  var m = BIZ_TYPE_MERGE_MAP[kind];
+  if(!m) return { ok:false, why:'종류를 고르세요' };
+  if(!fromCode || !toCode) return { ok:false, why:'합칠 유형과 남길 유형을 고르세요' };
+  if(fromCode === toCode) return { ok:false, why:'같은 유형입니다' };
+  var types = get(m.types, []) || [];
+  if(!Array.isArray(types)) types = Object.keys(types).map(function(k){ return types[k]; });
+  types = types.filter(Boolean);
+  var to = types.find(function(t){ return t.code === toCode; });
+  if(!to) return { ok:false, why:'남길 유형이 목록에 없습니다' };
+  if(to.mergedInto) return { ok:false, why:'남길 유형이 이미 다른 유형에 합쳐져 있습니다' };
+  var from = types.find(function(t){ return t.code === fromCode; }) || { code:fromCode, short:'', name:'(목록에 없는 옛 유형)' };
+  var list = get(m.store, []) || [];
+  var key = m.noKey, target = String(to.short || '').trim();
+  var newNo = {};
+  function label(r){ return String(r.companyName || r.name || r.title || '').slice(0, 30); }
+  if(key && target){
+    if(kind === 'consulting'){
+      /* reorderConsultingNos 와 같은 규칙 — 합친 뒤의 모습(투영)으로 묶고 시작일 순으로 001 부터 */
+      var keyOf = function(r){
+        var mm = BIZ_NO_RE.exec(String(r[key] || '')); if(!mm) return '';
+        return (bizTypeCodeOf(r, kind) === fromCode ? target : mm[1]) + '-' + mm[2];
+      };
+      var affected = {};
+      list.forEach(function(r){ if(r && bizTypeCodeOf(r, kind) === fromCode){ var k0 = keyOf(r); if(k0) affected[k0] = 1; } });
+      var groups = {};
+      list.forEach(function(r){ if(!r) return; var k1 = keyOf(r); if(k1 && affected[k1]) (groups[k1] = groups[k1] || []).push(r); });
+      Object.keys(groups).forEach(function(gk){
+        groups[gk].slice().sort(function(a, b){
+          var da = a.startDate || a.contractDate || a.createdAt || '', db = b.startDate || b.contractDate || b.createdAt || '';
+          return da === db ? 0 : (da < db ? -1 : 1);
+        }).forEach(function(r, i){ newNo[r.id] = gk + '-' + ('00' + (i + 1)).slice(-3); });
+      });
+    } else {
+      var taken = {}, maxBy = {};
+      list.forEach(function(r){
+        if(!r) return;
+        var n0 = String(r[key] || ''); if(n0) taken[n0] = (taken[n0] || 0) + 1;
+        var mm = BIZ_NO_RE.exec(n0); if(!mm || mm[1] !== target) return;
+        var v = parseInt(mm[3], 10) || 0; if(v > (maxBy[mm[2]] || 0)) maxBy[mm[2]] = v;
+      });
+      list.forEach(function(r){
+        if(!r || bizTypeCodeOf(r, kind) !== fromCode) return;
+        var no = String(r[key] || ''), mm = BIZ_NO_RE.exec(no); if(!mm) return;
+        var want = target + '-' + mm[2] + '-' + mm[3];
+        var busy = (want === no) ? (taken[want] || 0) > 1 : (taken[want] || 0) > 0;
+        if(busy){ var nn = (maxBy[mm[2]] || 0) + 1; maxBy[mm[2]] = nn; want = target + '-' + mm[2] + '-' + ('00' + nn).slice(-3); }
+        if(want !== no){ taken[no] = Math.max(0, (taken[no] || 1) - 1); taken[want] = (taken[want] || 0) + 1; newNo[r.id] = want; }
+      });
+    }
+  }
+  var moves = [], renum = [];
+  list.forEach(function(r){
+    if(!r || !r.id) return;
+    var moving = bizTypeCodeOf(r, kind) === fromCode;
+    var n0 = key ? String(r[key] || '') : '', n1 = newNo[r.id] || n0;
+    if(moving) moves.push({ id:r.id, label:label(r), fromNo:n0, toNo:n1, deleted:!!r._deleted });
+    else if(n1 !== n0) renum.push({ id:r.id, label:label(r), fromNo:n0, toNo:n1 });
+  });
+  function refs(store){
+    return (get(store, []) || []).filter(function(c){
+      if(!c || !c.id) return false;
+      var tc = c.typeCodes && c.typeCodes[kind];
+      return tc === fromCode || (!tc && c.typeCode === fromCode);
+    }).map(function(c){ return { id:c.id, label:String(c.contractNo || c.companyName || c.id) }; });
+  }
+  return { ok:true, kind:kind, store:m.store, types:m.types, noKey:key, from:from, to:to,
+    moves:moves, renum:renum, contracts:refs('contracts'), consultations:refs('consultations') };
+}
+/* 계획대로 한 건씩 고친다 — 실패하면 그 자리에서 멈추고, 한 데까지만 기록에 남긴다(다시 누르면 남은 것만 옮긴다). */
+function bizTypeMergeRun(plan, who){
+  var done = { moves:[], renum:[], contracts:[], consultations:[] }, failed = null;
+  function fieldsFor(r, kind, toCode){
+    var f = {};
+    if(r.typeCodes && typeof r.typeCodes === 'object'){ var tc = Object.assign({}, r.typeCodes); tc[kind] = toCode; f.typeCodes = tc; }
+    if(r.typeCode === plan.from.code || !r.typeCodes) f.typeCode = toCode;
+    return f;
+  }
+  function rowOf(store, id){ return (dbGet(store, []) || []).find(function(x){ return x && x.id === id; }); }
+  var steps = [];
+  plan.moves.forEach(function(mv){ steps.push(['moves', plan.store, mv]); });
+  plan.renum.forEach(function(mv){ steps.push(['renum', plan.store, mv]); });
+  plan.contracts.forEach(function(c){ steps.push(['contracts', 'contracts', c]); });
+  plan.consultations.forEach(function(c){ steps.push(['consultations', 'consultations', c]); });
+  for(var i = 0; i < steps.length; i++){
+    var kindOf = steps[i][0], store = steps[i][1], it = steps[i][2];
+    var r = rowOf(store, it.id);
+    if(!r){ failed = { step:kindOf, id:it.id, why:'기록을 못 찾음' }; break; }
+    var f = kindOf === 'renum' ? {} : fieldsFor(r, plan.kind, plan.to.code);
+    if((kindOf === 'moves' || kindOf === 'renum') && plan.noKey && it.toNo && it.toNo !== it.fromNo) f[plan.noKey] = it.toNo;
+    if(!Object.keys(f).length){ done[kindOf].push(it); continue; }
+    if(!dbPatch(store, it.id, f)){ failed = { step:kindOf, id:it.id, why:'저장 실패' }; break; }
+    done[kindOf].push(it);
+  }
+  var at = new Date().toISOString();
+  bizTypeApply(plan.types, [], function(cur){
+    return cur.map(function(t){
+      if(t.code === plan.from.code && !failed){
+        return bizTypeHist(Object.assign({}, t, { hidden:true, mergedInto:plan.to.code }), '합침 → ' + (plan.to.short || '') + ' ' + (plan.to.name || ''), t, who, at);
+      }
+      if(t.code === plan.to.code){
+        var log = (t.mergeLog || []).concat([{ at:at, by:who || '', from:{ code:plan.from.code, short:plan.from.short || '', name:plan.from.name || '' },
+          moved:done.moves.map(function(x){ return { id:x.id, no0:x.fromNo, no1:x.toNo }; }),
+          renum:done.renum.map(function(x){ return { id:x.id, no0:x.fromNo, no1:x.toNo }; }),
+          contracts:done.contracts.map(function(x){ return x.id; }), consultations:done.consultations.map(function(x){ return x.id; }),
+          partial: failed ? true : undefined }]);
+        if(log.length > 10) log = log.slice(log.length - 10);
+        return bizTypeHist(Object.assign({}, t, { mergeLog:log }), '합침 받음 ← ' + (plan.from.short || '') + ' ' + (plan.from.name || ''), t, who, at);
+      }
+      return t;
+    });
+  });
+  return { done:done, failed:failed };
+}
 function bizTypeLastHist(x){
   var h = x && x.hist && x.hist[x.hist.length - 1];
   if(!h) return '';
@@ -37075,6 +37211,13 @@ function BizTypeCard(props){
   }
   // 숨김 유형 다시 보이기
   function unhide(code){
+    /* 합쳐진 유형은 다시 띄우지 않는다 — 띄우면 같은 사업이 다시 두 유형이 된다 */
+    var mx = list.find(function(x){ return x.code === code; });
+    if(mx && mx.mergedInto){
+      var into = list.find(function(x){ return x.code === mx.mergedInto; });
+      showToast('🔀 이 유형은 「' + (into ? into.short + ' ' + into.name : mx.mergedInto) + '」 에 합쳐졌습니다 — 다시 띄우지 않습니다', 7000);
+      return;
+    }
     setHidden(code, false, '다시 표시');
     showToast('👁 다시 표시됨');
   }
@@ -37224,7 +37367,8 @@ function BizTypeCard(props){
               h('span', { title: [x.name, bizTypeLastHist(x)].filter(Boolean).join('\n'),
                 style:{ flex:1, fontSize:'11px', color:'#1e293b', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', minWidth:0 } },
                 x.name,
-                x.hidden ? h('span', { style:{ marginLeft:'6px', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } }, '숨김') : null,
+                x.hidden ? h('span', { style:{ marginLeft:'6px', fontSize:'10px', color:'#64748b', background:'#e2e8f0', padding:'1px 6px', borderRadius:'8px', fontWeight:600 } },
+                  x.mergedInto ? '합쳐짐 → ' + ((list.find(function(y){ return y.code === x.mergedInto; }) || {}).short || '') : '숨김') : null,
                 cat.key === 'consulting' && x.agency ? h('span', { style:{ marginLeft:'6px', fontSize:'10.5px', color:'#64748b', background:'#f8fafc', padding:'2px 7px', borderRadius:'10px', fontWeight:500 } }, x.agency) : null,
                 /* 🏥 1일 단가 — 있는 유형만. 계약창에 일수 칸이 뜨는 유형이 어느 것인지
                    여기서 한눈에 보여야 한다(안 보이면 「왜 저기만 일수가 뜨지」가 된다). */
@@ -37610,8 +37754,123 @@ function CaseStageCard(){
   );
 }
 
+/* 이름이 비슷한 짝 — 후보로만 보여 준다(합칠지는 사람이 정한다). 글자 모음이 0.8 이상 겹치면.
+   ⚠ 0.7 은 「부당해고등노동위원회대리」·「부당노동행위노동위원회대리」를 짝으로 짚었다 — 전혀 다른 사건이다. */
+function bizTypeNearPairs(types){
+  var t = (types || []).filter(function(x){ return x && !x.mergedInto; }), out = [];
+  for(var i = 0; i < t.length; i++) for(var j = i + 1; j < t.length; j++){
+    var A = bizTypeNorm(t[i].name), B = bizTypeNorm(t[j].name);
+    if(A.length < 2 || B.length < 2) continue;
+    var sa = {}, sb = {}, both = 0, all = 0;
+    A.split('').forEach(function(c){ sa[c] = 1; }); B.split('').forEach(function(c){ sb[c] = 1; });
+    Object.keys(sa).forEach(function(c){ all++; if(sb[c]) both++; });
+    Object.keys(sb).forEach(function(c){ if(!sa[c]) all++; });
+    if(all && both / all >= 0.8) out.push([t[i], t[j]]);
+  }
+  return out;
+}
+function TypeMergeModal(props){
+  var kS = useState('consulting'); var kind = kS[0]; var setKind = kS[1];
+  var fS = useState(''); var fromC = fS[0]; var setFrom = fS[1];
+  var tS = useState(''); var toC = tS[0]; var setTo = tS[1];
+  var bS = useState(false); var busy = bS[0]; var setBusy = bS[1];
+  var cat = BIZ_CATS.find(function(c){ return c.key === kind; });
+  var types = bizTypeRead(cat.storageKey, cat.seed);
+  var live = types.filter(function(t){ return !t.mergedInto; });
+  var usage = {}; live.forEach(function(t){ usage[t.code] = bizTypeUsage(kind, t.code).n; });
+  var plan = (fromC && toC) ? bizTypeMergePlan(kind, fromC, toC) : null;
+  var pairs = bizTypeNearPairs(types);
+  function pick(a, b){   // 건수가 많은 쪽을 «남길 유형»으로 먼저 채운다 — 바꿀 수 있다
+    var keepB = (usage[b.code] || 0) >= (usage[a.code] || 0);
+    setFrom(keepB ? a.code : b.code); setTo(keepB ? b.code : a.code);
+  }
+  function opt(t){ return h('option', { key:t.code, value:t.code }, '[' + (t.short || '') + '] ' + (t.name || '') + ' · ' + (usage[t.code] || 0) + '건' + (t.hidden ? ' (숨김)' : '')); }
+  async function run(){
+    if(!plan || !plan.ok || busy) return;
+    var n = plan.moves.length + plan.renum.length + plan.contracts.length + plan.consultations.length;
+    var ok = await showConfirm('「' + plan.from.short + ' ' + plan.from.name + '」 을\n「' + plan.to.short + ' ' + plan.to.name + '」 으로 합칩니다.\n\n'
+      + '· 옮길 기록 ' + plan.moves.length + '건' + (plan.renum.length ? ' · 번호만 바뀌는 기록 ' + plan.renum.length + '건' : '')
+      + (plan.contracts.length ? ' · 계약 ' + plan.contracts.length + '건' : '') + '\n'
+      + '· 옛 유형은 지우지 않고 숨깁니다(「합쳐짐」 표시)\n· 무엇을 바꿨는지 남긴 유형에 기록합니다\n\n같은 사업이 맞습니까?',
+      { title:'유형 합치기 (' + n + '건)', confirmText:'합치기', danger:true });
+    if(!ok) return;
+    setBusy(true);
+    var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.sid)) || '';
+    var r = bizTypeMergeRun(plan, who);
+    setBusy(false);
+    if(r.failed){
+      showToast('⚠ 합치다가 멈췄습니다(' + r.failed.why + ') — 한 데까지는 기록했습니다. 다시 누르면 남은 것만 옮깁니다', 9000);
+    } else {
+      showToast('🔀 합쳤습니다 — 기록 ' + r.done.moves.length + '건' + (r.done.renum.length ? ' · 번호 ' + r.done.renum.length + '건' : '') + (r.done.contracts.length ? ' · 계약 ' + r.done.contracts.length + '건' : ''), 7000);
+      setFrom(''); setTo('');
+    }
+    if(props.onDone) props.onDone();
+  }
+  var rowSt = { display:'flex', alignItems:'center', gap:'8px', padding:'3px 6px', borderBottom:'1px solid #e2e8f0', fontSize:'11.5px', whiteSpace:'nowrap' };
+  function rows(list, moved){
+    return list.map(function(x, i){
+      return h('div', { key:x.id, style:rowSt },
+        h('span', { style:{ width:'28px', color:'#94a3b8', textAlign:'right', fontVariantNumeric:'tabular-nums', flexShrink:0 } }, String(i + 1)),
+        h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis' }, title:x.label }, x.label || '-', x.deleted ? ' (삭제표시)' : ''),
+        h('span', { style:{ fontFamily:'monospace', color:'#64748b' } }, x.fromNo || '(번호 없음)'),
+        x.toNo && x.toNo !== x.fromNo ? h('span', { style:{ color:'#94a3b8' } }, '→') : null,
+        x.toNo && x.toNo !== x.fromNo ? h('span', { style:{ fontFamily:'monospace', fontWeight:700, color: moved ? '#1e40af' : '#d97706' } }, x.toNo) : null);
+    });
+  }
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', onClick:function(e){ e.stopPropagation(); }, style:{ maxWidth:'720px' } },
+      h('div', { className:'modal-h' },
+        h('div', { className:'t' }, '🔀 유형 합치기 — 같은 사업이 두 유형으로 나뉜 것만'),
+        h('button', { className:'x', onClick:props.onClose }, '×')),
+      h('div', { className:'modal-b', style:{ maxHeight:'70vh', overflowY:'auto' } },
+        h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', marginBottom:'8px' } },
+          BIZ_CATS.map(function(c){
+            var on = c.key === kind;
+            return h('button', { key:c.key, onClick:function(){ setKind(c.key); setFrom(''); setTo(''); },
+              style:{ padding:'4px 10px', borderRadius:'6px', fontSize:'11.5px', fontWeight:700, cursor:'pointer',
+                background: on ? '#1e40af' : '#fff', color: on ? '#fff' : '#475569', border:'1px solid ' + (on ? '#1e40af' : '#cbd5e1') } }, c.icon + ' ' + c.title);
+          })),
+        pairs.length ? h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap', alignItems:'center', marginBottom:'8px', fontSize:'11px' } },
+          h('span', { style:{ color:'#64748b' } }, '💡 이름이 비슷한 짝 (같은 사업인지 확인하고 누르세요):'),
+          pairs.map(function(p){
+            return h('button', { key:p[0].code + p[1].code, onClick:function(){ pick(p[0], p[1]); },
+              style:{ padding:'2px 8px', borderRadius:'10px', fontSize:'11px', cursor:'pointer', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a' } },
+              (p[0].short || '') + ' ↔ ' + (p[1].short || ''));
+          })) : null,
+        h('div', { style:{ display:'flex', gap:'8px', alignItems:'center', flexWrap:'wrap', marginBottom:'8px' } },
+          h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:'#dc2626' } }, '합칠 유형(없어짐)'),
+          h('select', { value:fromC, onChange:function(e){ setFrom(e.target.value); },
+            style:{ padding:'4px 6px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit', minWidth:'200px' } },
+            [h('option', { key:'_', value:'' }, '고르세요')].concat(live.map(opt))),
+          h('span', { style:{ color:'#94a3b8' } }, '→'),
+          h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:'#166534' } }, '남길 유형'),
+          h('select', { value:toC, onChange:function(e){ setTo(e.target.value); },
+            style:{ padding:'4px 6px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit', minWidth:'200px' } },
+            [h('option', { key:'_', value:'' }, '고르세요')].concat(live.filter(function(t){ return t.code !== fromC; }).map(opt)))),
+        plan && !plan.ok ? h('div', { style:{ color:'#dc2626', fontSize:'11.5px', padding:'6px 0' } }, '⚠ ' + plan.why) : null,
+        plan && plan.ok ? h('div', null,
+          h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#1e293b', margin:'6px 0 4px' } },
+            '옮길 기록 ' + plan.moves.length + '건 — 유형과 관리번호가 바뀝니다'),
+          plan.moves.length ? rows(plan.moves, true) : h('div', { style:{ color:'#94a3b8', fontSize:'11px', padding:'4px 6px' } }, '없음'),
+          plan.renum.length ? h('div', null,
+            h('div', { style:{ fontSize:'11.5px', fontWeight:700, color:'#854d0e', margin:'10px 0 4px' } },
+              '번호만 바뀌는 기록 ' + plan.renum.length + '건 — 같은 「약어-연도」 안을 시작일 순으로 다시 매기는 규칙 때문입니다'),
+            rows(plan.renum, false)) : null,
+          (plan.contracts.length || plan.consultations.length) ? h('div', { style:{ fontSize:'11px', color:'#475569', marginTop:'10px' } },
+            '함께 바뀌는 유형 표시 — 계약 ' + plan.contracts.length + '건' + (plan.consultations.length ? ' · 이관 전 원장 ' + plan.consultations.length + '건' : '') + ' (계약번호는 안 바뀝니다)') : null,
+          h('div', { style:{ fontSize:'11px', color:'#64748b', marginTop:'10px', lineHeight:1.6 } },
+            '· 옛 유형은 지우지 않고 숨깁니다(「합쳐짐」) — 못 옮긴 기록이 있어도 이름이 남습니다.', h('br'),
+            '· 바꾼 내용(번호 전→후)은 남길 유형에 기록됩니다.')) : null),
+      h('div', { className:'modal-f' },
+        h('button', { className:'btn-secondary', onClick:props.onClose }, '닫기'),
+        h('button', { className:'btn-primary', disabled:!(plan && plan.ok) || busy, onClick:run },
+          busy ? '합치는 중…' : (plan && plan.ok ? '합치기 (' + (plan.moves.length + plan.renum.length + plan.contracts.length + plan.consultations.length) + '건)' : '합치기')))));
+}
+
 function BizMasters(){
   var dg = useState(null); var diag = dg[0]; var setDiag = dg[1];
+  var mgS = useState(false); var mergeOpen = mgS[0]; var setMergeOpen = mgS[1];
+  var rkS = useState(0); var cardKey = rkS[0]; var setCardKey = rkS[1];
   // 안내는 한 번 읽으면 그만이라 접어 둔다 — 유형 목록이 화면 위로 올라온다
   var hlp = useState(false); var helpOpen = hlp[0]; var setHelpOpen = hlp[1];
   // ── 유형 정합성 진단: 데이터에 박힌 유형코드 중 현재 목록에 없는 것(미설정) 찾기 ──
@@ -37709,8 +37968,16 @@ function BizMasters(){
         style:{ background:'#fffbeb', color:'#d97706', border:'1px solid #fde68a',
           padding:'4px 11px', borderRadius:'6px', fontSize:'11px', fontWeight:700,
           cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } },
-        '🔍 미설정 찾기')
+        '🔍 미설정 찾기'),
+      h('button', { onClick:function(){ setMergeOpen(true); },
+        title:'같은 사업이 두 유형으로 나뉜 것을 하나로 — 미리보기를 보고 합칩니다',
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
+          padding:'4px 11px', borderRadius:'6px', fontSize:'11px', fontWeight:700,
+          cursor:'pointer', whiteSpace:'nowrap', flexShrink:0 } },
+        '🔀 유형 합치기')
     ),
+    mergeOpen && h(TypeMergeModal, { onClose:function(){ setMergeOpen(false); },
+      onDone:function(){ setCardKey(function(n){ return n + 1; }); } }),
     h('div', { style:{ marginBottom:'8px' } },
       diag !== null ? (
         diag.length === 0
@@ -37741,7 +38008,7 @@ function BizMasters(){
     ),
     h('div', { style:{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(140px, 1fr))', gap:'6px', alignItems:'stretch' } },
       BIZ_CATS.map(function(cat){
-        return h(BizTypeCard, { key:cat.key, cat:cat });
+        return h(BizTypeCard, { key:cat.key + '-' + cardKey, cat:cat });   // 합친 뒤 다시 읽게 key 를 바꾼다
       })
     ),
     // 사건 유형의 형제 칸 — 사건은 유형 말고 심급(단계)도 관리한다
