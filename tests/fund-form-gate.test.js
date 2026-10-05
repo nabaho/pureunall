@@ -84,7 +84,7 @@ test('★★ ④ 「초안」 표시 — 머리말 안 글상자, 글 뒤·종�
   const r = b.mk(sec, hdr, '초안 · 미확인 3');
   assert.ok(r, '표시를 못 넣었습니다');
   assert.match(r.hdr, /<hh:charProperties itemCnt="3">/); assert.match(r.hdr, /<hh:paraProperties itemCnt="2">/);
-  assert.match(r.hdr, /<hh:charPr id="2" height="4400" textColor="#C8C8C8">/);
+  assert.match(r.hdr, /<hh:charPr id="2" height="4400" textColor="#CBD5E1">/);
   assert.match(r.hdr, /<hh:paraPr id="1"><hh:align horizontal="CENTER"/);
   assert.match(r.sec, /<hp:header id="0" applyPageType="BOTH">[\s\S]*<hp:rect [^>]*textWrap="BEHIND_TEXT"[\s\S]*<hp:t>초안 · 미확인 3<\/hp:t>[\s\S]*<\/hp:header>/, '★ 모든 쪽(머리말)·글 뒤가 아닙니다');
   assert.match(r.sec, /vertRelTo="PAPER" horzRelTo="PAPER"/);

@@ -9374,7 +9374,7 @@ function formGateOk(){
     _estabBundleHwpGo(G.phase,0);
   }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
-/* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색. 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
+/* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색(팔레트 #CBD5E1). 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
    한글로 정관 9쪽·인가신청서 2쪽을 열어 모든 쪽에 찍히고 줄 위치가 원본과 같은 것을 확인했다(2026-10-05).
    ⚠ 실패하면 표시 없는 원본 대신 «오류»로 둔다 — 초안이 제출본처럼 나가면 안 된다. */
 function _hwpDraftMarkXml(sec,hdr,text){
@@ -9384,7 +9384,7 @@ function _hwpDraftMarkXml(sec,hdr,text){
   if(!cpM||!ppM||!c0||!p0||!pg||runEnd<0) return null;
   var maxId=function(tag){ var n=-1; hdr.replace(new RegExp('<hh:'+tag+' id="(\\d+)"','g'),function(_,d){ n=Math.max(n,+d); return _; }); return n; };
   var cid=maxId('charPr')+1, pid=maxId('paraPr')+1;
-  var cNew=c0[0].replace('id="0"','id="'+cid+'"').replace(/\bheight="\d+"/,'height="4400"').replace(/textColor="[^"]*"/,'textColor="#C8C8C8"').replace(/<hh:italic\/>/g,'');
+  var cNew=c0[0].replace('id="0"','id="'+cid+'"').replace(/\bheight="\d+"/,'height="4400"').replace(/textColor="[^"]*"/,'textColor="#CBD5E1"').replace(/<hh:italic\/>/g,'');
   if(!/<hh:bold\/>/.test(cNew)) cNew=cNew.replace('<hh:underline','<hh:bold/><hh:underline');
   var pNew=p0[0].replace('id="0"','id="'+pid+'"').replace(/<hh:align horizontal="[A-Z_]+"/,'<hh:align horizontal="CENTER"')
     .replace(/<hh:lineSpacing type="[A-Z_]+" value="\d+"/g,'<hh:lineSpacing type="PERCENT" value="100"');
@@ -9396,8 +9396,8 @@ function _hwpDraftMarkXml(sec,hdr,text){
     +'<hp:offset x="0" y="0"/><hp:orgSz width="'+w+'" height="'+h+'"/><hp:curSz width="'+w+'" height="'+h+'"/><hp:flip horizontal="0" vertical="0"/>'
     +'<hp:rotationInfo angle="0" centerX="'+(w/2)+'" centerY="'+(h/2)+'" rotateimage="1"/><hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/>'
     +'<hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>'
-    +'<hp:lineShape color="#C8C8C8" width="33" style="NONE" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" headfill="1" tailfill="1" headSz="SMALL_SMALL" tailSz="SMALL_SMALL" outlineStyle="NORMAL" alpha="0"/>'
-    +'<hp:shadow type="NONE" color="#B2B2B2" offsetX="0" offsetY="0" alpha="0"/>'
+    +'<hp:lineShape color="#CBD5E1" width="33" style="NONE" endCap="FLAT" headStyle="NORMAL" tailStyle="NORMAL" headfill="1" tailfill="1" headSz="SMALL_SMALL" tailSz="SMALL_SMALL" outlineStyle="NORMAL" alpha="0"/>'
+    +'<hp:shadow type="NONE" color="#CBD5E1" offsetX="0" offsetY="0" alpha="0"/>'
     +'<hp:drawText lastWidth="'+w+'" name="" editable="0"><hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">'
     +'<hp:p id="0" paraPrIDRef="'+pid+'" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="'+cid+'"><hp:t>'+t+'</hp:t></hp:run></hp:p>'
     +'</hp:subList><hp:textMargin left="283" right="283" top="283" bottom="283"/></hp:drawText>'
