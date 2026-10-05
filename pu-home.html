@@ -5272,7 +5272,8 @@ function 자동카드Html() {
     + 줄('다음', 다음자동날(todayString()) + ' 08:00')
     + '<div class="ago">'
     + '<button class="btn sm" onclick="자동미리보기()">미리 보기</button>'
-    + '<button class="btn sm" onclick="자동지금돌리기()">지금 한 번 돌리기</button>'
+    /* ★ 「지금 한 번 돌리기」는 기둥 폭(276px)에서 단추가 두 줄로 넘쳤다 — 짧게 쓴다 */
+    + '<button class="btn sm" onclick="자동지금돌리기()">지금 돌리기</button>'
     + '<button class="btn sm" onclick="자동기록창()">기록</button>'
     + '</div></div>';
 }
@@ -5567,7 +5568,7 @@ function jobsOf() {
     if (r && (!끝자동 || Number(r.at) > Number(끝자동.at))) 끝자동 = r;
   }));
   if (끝자동 && 끝자동.멈춤) {
-    add({ cls: '', t: '자동 내리기를 멈췄습니다 — 확인해 주십시오', n: (끝자동.후보 || []).length,
+    add({ cls: '', t: '자동 내리기를 멈췄습니다', n: (끝자동.후보 || []).length,
       who: esc(끝자동.멈춤),
       go: '<button class="btn pri sm" onclick="자동승인()">모두 내려도 됩니다</button>'
         + '<button class="btn sm" onclick="자동미리보기()">하나씩 보기</button>',
