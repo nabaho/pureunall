@@ -1327,7 +1327,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=38"></script>
+<script src="js/kcareer-hwpxfill.js?v=39"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
@@ -2679,6 +2679,15 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <button class="btn" type="button" id="pkCheckBtn" onclick="packCheck()">🔎 점검</button>
       <button class="btn primary" type="button" id="pkMake" onclick="packBuild()">📦 꾸러미 만들기</button>
     </div>
+  </div>
+</div>
+<!-- ★ 🔎 채우기 전 확인 (대표 승인 2026-10-05 목업) — 자격·경력 표에 무엇이 몇 째 줄에 들어갈지 넣기 전에 고른다 -->
+<div class="modal-ov" id="modalFillPv">
+  <div class="modal" style="width:min(900px,96vw)">
+    <div class="modal-h">🔎 채우기 전 확인 <span style="font-size:12px;font-weight:400;color:var(--text-mute)">— 표마다 들어갈 기록 · ▲▼ 순서 · ☐ 빼기</span></div>
+    <div class="modal-b" id="fpBody"></div>
+    <div class="modal-foot"><button class="btn" type="button" onclick="document.getElementById('modalFillPv').classList.remove('open')">닫기</button>
+      <button class="btn primary" type="button" onclick="cvPreviewOk()">✨ 이대로 채우기</button></div>
   </div>
 </div>
 <div class="modal-ov" id="modalStampPick">
@@ -6396,6 +6405,7 @@ async function exportDocxFile(){
 var _rcPdfData=null, _rcFileName='', _rcVarMap={};
 
 async function mountEditor(buffer,name,cfg){
+  _cvPick=null;   /* 새 서식 — 지난 서식에서 고른 자격·경력 차례를 따라가게 하지 않는다 */
   cfg=cfg||DOMAINS.resume.create;
   /* 보관함·이어서 하기로 들어올 때도 이름을 속에 맞춘다 — 여기가 마지막 관문이다 */
   name=_hwpFixName(buffer,name);
@@ -15813,8 +15823,10 @@ async function rhNiceName(){
 function rhUploadName(){
   return (_rhOrig&&_rhOrig.name)||(_rhBase&&_rhBase.name)||(_rhDoc&&_rhDoc.name)||'';
 }
-async function rhFillByMap(){
+async function rhFillByMap(o){
   if(!_rhDoc||!_rhDoc.bytes||!_rhMap){ toast('먼저 서식을 올려주세요'); return; }
+  /* ★ 자격·경력 표가 있으면 «넣기 전에» 확인 창 — 고르고 「이대로 채우기」를 누르면 다시 여기로 온다 */
+  if(!(o&&o.previewed) && typeof cvPreviewOpen==='function' && cvPreviewOpen()) return;
   toast('⏳ 채우는 중…');
   /* ★★ 언제나 «원본»에서 새로 짓는다 (대표 제보 2026-09-06).
      지금 보고 있는 문서에서 시작하면 «이미 채워진 것 위에» 또 채워, 두 번 누를 때마다
@@ -17301,7 +17313,10 @@ function _cvFillData(){
     degree:(r.degree||'')+(r.graduated?(' / '+r.graduated):'') }; });
   /* ★ 기업경력 — 기관 이력서의 「경력사항」에 들어갈 «근무경력» 이다(대표 지시 2026-09-05).
      dept·title 을 함께 내보낸다 — 이력서 경력 표는 근무부서·직위 칸이 따로 있다. */
-  const work=get('work').map(function(r){ return { period:workPeriod(r), org:r.org||'',
+  /* ★ 채우기 전 확인 창(대표 승인 2026-10-05 목업)에서 고른 것 — 고른 차례 그대로, 뺀 것은 빼고 */
+  const _pk=(typeof _cvPick!=='undefined'&&_cvPick)||null;
+  const _골라=function(arr, ids){ if(!ids) return arr; var by={}; arr.forEach(function(r){ by[r.id]=r; }); return ids.map(function(id){ return by[id]; }).filter(Boolean); };
+  const work=_골라((typeof _cvWorkSorted==='function'?_cvWorkSorted():get('work')), _pk&&_pk.work).map(function(r){ return { period:workPeriod(r), org:r.org||'',
     dept:r.dept||'', title:r.title||'', role:r.role||'' }; });
   /* ★ 자격 및 면허 · 상벌 표 (대표 결정 2026-09-13 「채워라」)
      ⚠ 한 머리줄에 «두 목록»이 들어간다 — 왼쪽은 자격, 오른쪽은 상벌.
@@ -17320,8 +17335,8 @@ function _cvFillData(){
      국가자격·면허를 맨 앞에, 그 다음 최신순. 기관(인가·발급기관) 칸도 채운다.
      ⚠ 「과정·양성·교육」은 수료다 — 제목에 「수료」가 없어도 자격 표에 넣지 않는다. */
   const _국가=function(r){ return /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|산업기사|기능사|지도사/.test(r.title||'') || /고용노동부|한국산업인력공단/.test(r.org||''); };
-  const 자격목록=_자격.filter(function(r){ return !_isLangCert(r) && !/과정|양성|교육/.test(r.title||''); })
-    .sort(function(a,b){ return (_국가(b)?1:0)-(_국가(a)?1:0); })
+  const 자격목록=_골라(_자격.filter(function(r){ return !_isLangCert(r) && !/과정|양성|교육/.test(r.title||''); })
+    .sort(function(a,b){ return (_국가(b)?1:0)-(_국가(a)?1:0); }), _pk&&_pk.cert)
     .map(function(r){ return { certName:r.title||'', gotAt:formatDate(r.date)||'', org:r.org||'' }; });
   const 상벌목록=get('wiccok').filter(function(r){ return typeof isAwardType==='function' && isAwardType(r.type); })
     .slice().sort(function(a,b){ return String(b.issueDate||'').localeCompare(String(a.issueDate||'')); })
@@ -17392,8 +17407,83 @@ function _cvFillData(){
        기업경력이 맨 앞이다. 그 뒤에 위촉장, 그 뒤에 활동(컨설팅·사건·강의). */
     edu:edu, career:work.concat(wic, acts),
     /* 근무경력만 따로도 내보낸다 — 「경력사항」 칸이 뚜렷한 서식은 이것만 넣는 것이 맞다 */
-    work:work
+    work:work,
+    /* 확인 창에서 「위촉장·활동도 넣기」를 켰으면 직위 칸이 있는 경력 표에도 위촉·활동까지 */
+    careerAll:!!(_pk&&_pk.wic)
   };
+}
+/* 근무경력 — 최근 것 먼저(들어간 날 기준). 확인 창과 채우기가 «같은 차례»를 쓴다 */
+function _cvWorkSorted(){
+  return get('work').slice().sort(function(a,b){ return String(b.joinDate||'').localeCompare(String(a.joinDate||'')); });
+}
+/* 자격 후보 — _cvFillData 와 «같은 거름·같은 차례» (확인 창이 보여 주는 것 = 들어가는 것) */
+function _cvCertCands(){
+  var 국가=function(r){ return /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|산업기사|기능사|지도사/.test(r.title||'') || /고용노동부|한국산업인력공단/.test(r.org||''); };
+  return get('cert').filter(function(r){ return !/수료|이수/.test(r.title||'') && !_isLangCert(r) && !/과정|양성|교육/.test(r.title||''); })
+    .slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })
+    .sort(function(a,b){ return (국가(b)?1:0)-(국가(a)?1:0); });
+}
+
+/* ═══ 🔎 채우기 전 확인 (대표 승인 2026-10-05 목업 — 「1진행 목업대로」) ═══
+   「데이터가 제대로 안들어가거나 중복되거나 엉뚱하게 연결」 — 무엇이 몇 째 줄에 들어갈지 «넣기 전에» 보이고 고르게 한다.
+   ⚠ 서식에 자격·경력 표가 있을 때만 뜬다. 고른 것(_cvPick)은 채우기와 짓기(rhComposeBytes)가 같이 쓴다 — _cvFillData 한 곳.
+   ⚠ 새 서식을 올리면 고른 것을 지운다(mountEditor) — 남의 서식에 지난 고름이 따라가면 안 된다. */
+var _cvPick=null, _cvPv=null;
+function _cvPvLists(){
+  var cap={ cert:0, career:0, careerJob:false };
+  ((_rhMap&&_rhMap.lists)||[]).forEach(function(l){
+    if(l.kind==='certaward') cap.cert+=(l.blank||0);
+    if(l.kind==='career'){ cap.career+=(l.blank||0); if((l.cols||[]).some(function(k){ return k==='title'||k==='dept'; })) cap.careerJob=true; }
+  });
+  return cap;
+}
+function cvPreviewOpen(){
+  var cap=_cvPvLists();
+  if(!cap.cert && !cap.career) return false;
+  var 앞=_cvPick||{};
+  var 줄=function(arr, ids){ var by={}; arr.forEach(function(r){ by[r.id]=r; });
+    var 먼저=(ids||[]).map(function(id){ return by[id]; }).filter(Boolean);
+    var 나머지=arr.filter(function(r){ return !(ids||[]).some(function(id){ return id===r.id; }); });
+    return 먼저.map(function(r){ return {r:r,on:true}; }).concat(나머지.map(function(r){ return {r:r,on:!ids}; })); };
+  _cvPv={ cap:cap, cert:cap.cert?줄(_cvCertCands(), 앞.cert):[], work:cap.career?줄(_cvWorkSorted(), 앞.work):[], wic:!!앞.wic };
+  cvPreviewDraw();
+  document.getElementById('modalFillPv').classList.add('open');
+  return true;
+}
+function cvPreviewDraw(){
+  var b=document.getElementById('fpBody'); if(!b||!_cvPv) return;
+  var 표=function(key, name, list, cap, cols, row){
+    if(!cap) return '';
+    var n=0;
+    var h='<div style="margin-bottom:14px"><div style="display:flex;align-items:center;gap:8px;margin-bottom:6px"><b>'+name+'</b><span style="font-size:12px;color:var(--text-mute)">서식 줄 '+cap+' · 후보 '+list.length+'</span>'
+      +(key==='work' && _cvPv.cap.careerJob?'<label style="margin-left:auto;font-size:12px"><input type="checkbox" '+(_cvPv.wic?'checked':'')+' onchange="_cvPv.wic=this.checked"> 위촉장·활동도 넣기</label>':'')+'</div>'
+      +'<table class="at-tbl"><thead><tr><th>□</th><th>#</th>'+cols.map(function(c){ return '<th>'+c+'</th>'; }).join('')+'<th>들어감</th><th></th></tr></thead><tbody>';
+    list.forEach(function(x,i){
+      var 자리=x.on?(++n<=cap?'<span style="color:var(--teal)">'+n+'줄</span>':'<span style="color:var(--text-mute)">줄 없음</span>'):'<span style="color:var(--text-mute)">뺌</span>';
+      h+='<tr style="'+(x.on?'':'color:var(--text-mute)')+'"><td><input type="checkbox" '+(x.on?'checked':'')+' onchange="cvPreviewOn(\''+key+'\','+i+',this.checked)"></td><td>'+(i+1)+'</td>'
+        +row(x.r).map(function(v){ return '<td>'+escapeHtml(v||'')+'</td>'; }).join('')+'<td>'+자리+'</td>'
+        +'<td style="white-space:nowrap"><button class="btn sm" type="button" onclick="cvPreviewMove(\''+key+'\','+i+',-1)">▲</button><button class="btn sm" type="button" onclick="cvPreviewMove(\''+key+'\','+i+',1)">▼</button></td></tr>';
+    });
+    return h+'</tbody></table></div>';
+  };
+  b.innerHTML=표('cert','자격', _cvPv.cert, _cvPv.cap.cert, ['취득','자격증명','기관'], function(r){ return [formatDate(r.date)||r.date, r.title, r.org]; })
+    +표('work','경력', _cvPv.work, _cvPv.cap.career, ['근무기간','근무처','직위'], function(r){ return [workPeriod(r), r.org, r.title]; })
+    +(_cvPv.cap.career && !_cvPv.work.length?'<div style="font-size:12px;color:var(--amber)">⚠ 기업경력이 없습니다 — 경력관리 › 기업경력에 다닌 곳을 넣어 주세요(없으면 위촉·활동으로 채웁니다)</div>':'');
+}
+function cvPreviewOn(k, i, on){ if(_cvPv&&_cvPv[k]&&_cvPv[k][i]){ _cvPv[k][i].on=!!on; cvPreviewDraw(); } }
+function cvPreviewMove(k, i, d){
+  var a=_cvPv&&_cvPv[k]; if(!a) return; var j=i+d; if(j<0||j>=a.length) return;
+  var t=a[i]; a[i]=a[j]; a[j]=t; cvPreviewDraw();
+}
+function cvPreviewOk(){
+  if(!_cvPv) return;
+  _cvPick={ cert:_cvPv.cert.filter(function(x){ return x.on; }).map(function(x){ return x.r.id; }),
+            work:_cvPv.work.filter(function(x){ return x.on; }).map(function(x){ return x.r.id; }),
+            wic:!!_cvPv.wic };
+  if(!_cvPv.cap.cert) delete _cvPick.cert;
+  if(!_cvPv.cap.career) delete _cvPick.work;
+  document.getElementById('modalFillPv').classList.remove('open');
+  rhFillByMap({ previewed:true });
 }
 async function hwpxFill(id){ const form=(get('cvforms').find(function(x){return x.id===id;}))||null; if(!form) return;
   if((form.ext||'')!=='hwpx'){ toast('값 채우기는 HWPX 양식만 됩니다 — 한글에서 "다른 이름으로 저장 → hwpx"'); return; }
