@@ -14330,7 +14330,9 @@ function _bizPut(rec){
 }
 function _bizNew(o){
   var now=new Date().toISOString();
-  return Object.assign({ id:kcNextNo('BZ',4,BIZ_STORE), entityType:'bizApplication', schemaVersion:1,
+  /* ⚠ 개체 종류는 온톨로지 사전의 것을 쓴다 — 사업 = Project(사업·컨설팅), 그 서류 = Document(문서).
+       새 이름을 지어내면 통합 화면이 이 기록을 못 알아본다(CLAUDE.md 온톨로지 준수). */
+  return Object.assign({ id:kcNextNo('BZ',4,BIZ_STORE), entityType:'Project', projectKind:'bid', schemaVersion:1,
     year:String(new Date().getFullYear()), title:'', org:'', kind:KcareerBiz.KINDS[0], stage:'준비',
     due:'', sentAt:'', sentHow:'', amt:'', memo:'', caseDir:'', docs:[], createdAt:now, updatedAt:now, revision:0 }, o||{});
 }
@@ -14537,7 +14539,7 @@ async function _bizAddFiles(list){
     /* 창고 한도(25MB) 안이면 올린다 — 못 올려도 이 PC 에는 담긴다 */
     var 자리='';
     if(f.bytes.length < 25*1024*1024){ 자리=await kcFormUpload(id, b64, ext); if(자리) cloud++; } else big++;
-    var d={ id:id, name:f.name, ext:ext, size:f.bytes.length, kind:KcareerBiz.guessDocKind(f.name), savedAt:now };
+    var d={ id:id, entityType:'Document', name:f.name, ext:ext, size:f.bytes.length, kind:KcareerBiz.guessDocKind(f.name), savedAt:now };
     if(자리) d.stPath=자리; if(f.relPath) d.relPath=f.relPath; if(f.mtime) d.mtime=f.mtime;
     r.docs=(r.docs||[]).concat([d]); have[키]=1; n++;
     if(list.length>3 && (i+1)%3===0) toast('⏳ 서류 담는 중 '+(i+1)+' / '+list.length);

@@ -124,6 +124,11 @@ test('④ 서류는 «앱에 보관» — 이 PC + 창고, 같은 파일은 두 
   assert.ok(담김.docs[0].stPath.startsWith('kcareer_forms/'), '창고 자리가 적혀야 다른 PC 에서 열린다');
   assert.ok(!담김.docs[1].stPath);
   assert.equal(담김._isNew, undefined, '화면용 표시가 저장되면 안 된다');
+  assert.equal(담김.docs[0].entityType, 'Document', '서류는 온톨로지의 «문서»');
+  const O = require('../js/pu-ontology.js');
+  const 종류 = (O.TERMS || (O.PuOntology || {}).TERMS || {}).entityTypes || {};
+  assert.ok(종류.Project && 종류.Document, '사업·서류는 사전에 있는 종류를 쓴다');
+  assert.match(떼기('function _bizNew('), /entityType:'Project'/, '★ 새 개체 이름을 지어내지 않는다');
   /* ★ 다른 PC 에서 — 데려오는 곳은 _kcCloudRowOf 한 곳 */
   const 줄 = ctx._kcCloudRowOf(담김.docs[0].id);
   assert.ok(줄 && 줄.stPath === 담김.docs[0].stPath, '★ 사업 서류를 창고에서 못 찾으면 다른 PC 에서 「원본 없음」');
