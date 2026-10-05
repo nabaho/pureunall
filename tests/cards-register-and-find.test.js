@@ -143,22 +143,58 @@ test('★★ 걸리는 잣대는 각 화면과 «같은 함수» — 따로 두�
 test('★★ 근로자 사건을 못 읽어도 찾기가 «끝없이 맴돌지» 않는다', () => {
   /* 로그인 전처럼 읽개가 곧바로 빈손으로 돌아오는 때 — 예전에는 다시 그리기가 또 읽으러 가 화면이 멎었다 */
   const el = { value: '가나' };
+  /* 만든 상자를 세어 둔다 — 읽개가 곧바로 답하면 안에서 한 번 그려지므로 «두 겹»이 될 수 있다 */
+  const made = { gsBox: 0, gsBoxM: 0 }, dom = {};
+  const sb = { classList: { contains: () => true }, insertAdjacentElement(_w, b) { dom[b.id] = b; } };
   let asked = 0;
   const ctx = { console, state: {}, esc: (s) => String(s), fmtBizno: (s) => String(s || ''),
-    document: { activeElement: el, createElement: () => ({ set innerHTML(v) { this._h = v; } }) },
-    $: (id) => (id === 'pcSearch' ? el : id === 'pcSearchWrap' ? { appendChild() {} } : null),
-    _erpCaseCons: null,
+    document: { activeElement: el, body: { classList: { contains: () => ctx._pc } },
+      createElement: () => new Proxy({ remove() { delete dom[this.id]; } },
+        { set(t, k, v) { t[k] = v; if (k === 'id') made[v]++; return true; } }) },
+    $: (id) => (id === 'pcSearch' || id === 'search' ? el : id === 'pcSearchWrap' ? { appendChild(b) { dom[b.id] = b; } }
+      : id === 'searchbar' ? sb : (dom[id] || null)),
+    _erpCaseCons: null, _pc: true,
     loadErpCaseCons: (cb) => { asked++; if (asked > 50) throw new Error('맴돈다'); cb(null); },
     wkListBust() {}, gsCollect: () => ({ card: [], biz: [], co: [], wk: [] }) };
   vm.createContext(ctx);
-  vm.runInContext(grab(/const GS_SHOW = [^;]+;/).replace('const ', 'var ') + '\n'
+  const load = () => vm.runInContext(grab(/const GS_SHOW = [^;]+;/).replace('const ', 'var ') + '\n'
     + grab(/const GS_KINDS = \[[\s\S]*?\];/).replace('const ', 'var ') + '\n'
     + 'var _gsSel = -1, _gsRows = [], _gsErpAsked = false;\n'
-    + cutFn(SRC, 'function gsRowHtml(') + '\n' + cutFn(SRC, 'function gsPaint('), ctx);
+    + grab(/const gsIsPc = [^\n]+/).replace('const ', 'var ') + '\n'
+    + ['function gsRowHtml(', 'function gsBodyHtml(', 'function gsAskErp(', 'function gsPaint(', 'function gsPaintMobile(']
+      .map((d) => cutFn(SRC, d)).join('\n'), ctx);
+  load();
   ctx.gsPaint();
   assert.equal(asked, 1, '★★ 사건 읽기를 ' + asked + '번 불렀습니다 — 한 번만이어야 합니다');
   ctx.gsPaint();
   assert.equal(asked, 1, '다시 쳐도 또 읽으러 가지 않습니다');
+  assert.equal(made.gsBox, 1, '★ 펼침 상자를 ' + made.gsBox + '개 만들었습니다 — 두 겹이 됩니다');
+  /* 폰 띠도 같은 문을 지난다 */
+  asked = 0; ctx._pc = false; load();
+  ctx.gsPaintMobile(); ctx.gsPaintMobile();
+  assert.equal(asked, 1, '★★ 폰 찾기 띠가 사건 읽기를 ' + asked + '번 불렀습니다');
+  assert.equal(made.gsBoxM, 1, '★ 폰 띠를 ' + made.gsBoxM + '겹 만들었습니다(2026-10-05 실제로 두 겹이었다)');
+});
+
+test('★★ 폰 — ＋ 를 길게 누르면 「＋ 정보등록」(누르면 촬영은 그대로) · 🔍 찾기도 전체에서', () => {
+  const s = strip(SRC);
+  assert.match(s, /timer = setTimeout\(\(\) => \{ longFired = true; openRegister\(\); \}, 550\)/, '★★ ＋ 길게 누르기가 「정보등록」으로 안 갑니다');
+  assert.match(s, /if\(longFired\)\{[^}]*\}[\s\S]{0,80}openCamera\(\);/, '★ 그냥 누르면 바로 촬영 — 대표가 가장 자주 쓰는 길입니다');
+  assert.doesNotMatch(s, /function openAddSheet\(/, '쓰는 곳 없는 작은 창이 남아 있습니다');
+  assert.doesNotMatch(s, /id="addBg"/, '쓰는 곳 없는 작은 창 자리가 남아 있습니다');
+  assert.match(strip(cutFn(SRC, 'function onMobileSearchInput(')), /render\(\);\s*gsPaintMobile\(\);/, '★★ 폰 찾기 칸이 전체 찾기 띠를 안 그립니다');
+  assert.match(s, /search\.focus\(\);gsPaintMobile\(\)">🔍<\/button>/, '🔍 로 칸을 닫으면 띠도 닫혀야 합니다');
+  const m = strip(cutFn(SRC, 'function gsPaintMobile('));
+  assert.match(m, /if\(!q \|\| !sb\.classList\.contains\('open'\)\)\{[^}]*remove\(\); return; \}/, '칸이 닫혔거나 글자가 없으면 띠를 걷어야 합니다');
+  assert.match(m, /gsBodyHtml\(q, gsCollect\(q\)/, '★ 폰 띠는 PC 와 «같은 몸»(gsBodyHtml·gsCollect)을 써야 합니다');
+});
+
+test('★ 폰은 어두운 바탕 — 근로자 사건 고르기 글자를 짙은 색으로 박지 않는다', () => {
+  /* 2026-10-05 폰 목업에서 업체 이름이 «어두운 바탕 + 짙은 글자»로 안 보였다 */
+  const head = SRC.slice(0, SRC.indexOf('</head>'));
+  const rule = (head.match(/\.wrcases \.wrcase\{([^}]*)\}/) || [])[1] || '';
+  assert.match(rule, /color:var\(--ink\)/, '★ 사건 줄 글자가 화면 변수(--ink)를 안 따릅니다 — 폰에서 안 보입니다');
+  assert.doesNotMatch(head, /\n\.wrcases \.wrcase\.on,\.wrcases \.wrcase:hover\{background:#eff6ff/, '밝은 칠은 PC 에서만(body.pc) — 폰에서는 글자가 묻힙니다');
 });
 
 test('★ Esc 는 펼침부터 닫는다 — 한 번 더 누르면 글자를 지운다', () => {

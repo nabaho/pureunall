@@ -178,7 +178,8 @@ test('syncMobileTabs — 사업자 탭이면 tabBiz 만 켜진다', () => {
 function loadMobileSearchBlock(){
   const at = source.indexOf('function onMobileSearchInput');
   const end = source.indexOf('\n}', at) + 2;
-  const ctx = { state: { view:'list', coQ:'' }, render: () => { ctx.rendered = true; } };
+  const ctx = { state: { view:'list', coQ:'' }, render: () => { ctx.rendered = true; },
+    gsPaintMobile(){} };   /* 🔎 전체 찾기 띠 — 여기서는 거르기만 본다(2026-10-05) */
   vm.createContext(ctx);
   vm.runInContext(source.slice(at, end), ctx);
   return ctx;

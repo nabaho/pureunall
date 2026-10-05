@@ -371,6 +371,7 @@ function loadSearchChain(){
     },
     render: () => {},
     renderSelbar: () => {},
+    gsPaintMobile(){},   /* 🔎 전체 찾기 띠 — 여기서는 칸·거르개만 본다(2026-10-05) */
     loadCoInfo(){}, loadCoFolders(){}, loadCoTagHidden(){}
   };
   vm.createContext(ctx);
