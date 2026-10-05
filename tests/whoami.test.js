@@ -210,3 +210,19 @@ test('이력관리는 머리줄 «안»에 그린다 — 떠 있는 딱지가 �
   // 자리는 머리줄이 그려진 «뒤에» 생기므로 준비될 때까지 몇 번 두드려야 한다
   assert.match(kc, /setInterval\(function\(\)\{ if\(mount\(\)\|\|\+\+n>40\) clearInterval\(iv\); \}, 150\)/);
 });
+
+test('★★ 명부를 읽어 이름이 채워지면 onChange 가 «다시» 불린다 — 같은 사번이어도 (2026-10-05)', async () => {
+  /* 기금관리는 onChange 로 S.user 를 받는다. 먼저 빈 이름, 다음에 이름이 오는데 둘째를 안 알려
+     변경 기록의 «누가»가 늘 「?」로 남았다. */
+  const g = boot();
+  g.firebase.database = () => ({ ref: () => ({ once: () => Promise.resolve({ val: () => [{ sid: 'P001', name: '홍길동', title: '대표노무사' }] }) }) });
+  const got = [];
+  g.PuWhoami.onChange((m) => got.push(m && m.name));
+  g.PuWhoami._resolve({ email: 'p001@pureun.kr' });
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  assert.deepStrictEqual(got, ['', '홍길동'], '이름이 채워진 것을 알리지 않았다');
+  /* 정말 같은 값이면 또 알리지 않는다 — 다시 그리기만 */
+  g.PuWhoami._resolve({ email: 'p001@pureun.kr' });
+  for (let i = 0; i < 5; i++) await new Promise((r) => setImmediate(r));
+  assert.deepStrictEqual(got, ['', '홍길동', '', '홍길동']);
+});
