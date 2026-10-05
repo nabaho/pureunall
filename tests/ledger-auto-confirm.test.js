@@ -61,7 +61,9 @@ ok('개인수익·원천징수분은 법인 매출이 아니라고 표를 남긴
   ctx.window = ctx;
   vm.createContext(ctx);
   vm.runInContext('function erpWithholdTax(a, k, r){ return { total: Math.round(a * (k === "biz" ? 0.033 : (r||8.8)/100)) }; }', ctx);
-  vm.runInContext(cut('function erpInitDeductions(item, vatType){', '\nfunction CaseEditModal'), ctx);
+  /* 개인입금 사업(2026-10-05) — erpInitDeductions 가 바로 위 consTypeIsPersonal·erpPersonalDepositInfo 를 부른다. 함께 싣는다. */
+  ctx.dbGet = function(k, d){ return d; }; ctx.BIZ_CONS_SEED = [];
+  vm.runInContext(cut('function consTypeIsPersonal(', '\nfunction CaseEditModal'), ctx);
   const base = (amt, item, vatIncluded) =>
     ctx.calcDeductions(amt, ctx.erpInitDeductions(item, vatIncluded ? 'inclusive' : 'separate')).perfBaseAmount;
 

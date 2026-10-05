@@ -23,7 +23,10 @@ function t(name, got, want){
 const ctx = { console:console };
 ctx.window = ctx;
 vm.createContext(ctx);
-vm.runInContext(src.slice(src.indexOf('function erpInitDeductions(item, vatType){'),
+/* 개인입금 사업(2026-10-05) — 유형 스위치를 읽는 두 함수를 함께 싣는다. dbGet 은 유형 사전을 돌려준다(검사용 가짜). */
+let CONS_TYPES = [];
+ctx.dbGet = function(k, d){ return k === 'biz_cons_types' ? CONS_TYPES : d; }; ctx.BIZ_CONS_SEED = [];
+vm.runInContext(src.slice(src.indexOf('function consTypeIsPersonal('),
                           src.indexOf('function calcDeductions(amount, ded){')), ctx);
 
 console.log('\n[① 계약에 개인입금이면 개인수익으로 열린다]');
@@ -54,8 +57,9 @@ t('★ 부가세만 보고 열던 옛 코드가 사라졌다',
 console.log('\n[④ 계약 화면 — 계약 하나에 하나]');
 const PD = src.slice(src.indexOf('function personalDepositBlock(){'),
                      src.indexOf('function personalDepositBlock(){') + 2200);
-t('계약 단위 칸이다 (종류별이 아니다)', /f\.personalDeposit/.test(PD), true);
-t('켜고 끌 수 있다', /personalDeposit: e\.target\.checked/.test(PD), true);
+/* 2026-10-05 — 칸은 «유형을 따르고 이 건만 예외» 로 바뀌었다. 계약 단위·켜고 끄기 규칙은 그대로다. */
+t('계약 단위 칸이다 (종류별이 아니다)', /erpPersonalDepositInfo\(f\)/.test(PD), true);
+t('켜고 끌 수 있다', /setPd\(e\.target\.checked\)/.test(PD), true);
 t('무엇인지 이름으로 말한다', /'👤 개인입금 \(법인 아닌 개인 계좌\)'/.test(PD), true);
 /* data-tip(.erp-tip, css/pu-erp.css)은 실제로 잘 뜨지만 white-space:normal 이라 줄바꿈을 못 살린다.
    이 안내는 \n 으로 나뉜 여러 줄 문구라 title 이 맞는 선택이다. */
@@ -76,7 +80,7 @@ t('컨설팅·기금·기타로 이관', /personalDeposit: !!contract\.personalD
 t('★ 계약관리로 되돌아와도 꺼지지 않는다', /personalDeposit: !!item\.personalDeposit,     \/\/ 👤 개인입금 승계 \(역이관\)/.test(src), true);
 
 console.log('\n[⑥ 왜 켜져 있는지 밝힌다 — 까닭 없이 켜져 있으면 잘못 켠 줄 알고 끈다]');
-t('개인수익 옆에 까닭을 적는다', /!!\(it && it\.personalDeposit\) && h\('span'/.test(src), true);
+t('개인수익 옆에 까닭을 적는다', /erpIsPersonalDeposit\(it\) && h\('span'/.test(src), true);
 t('무슨 까닭인지', /'· 계약에 개인입금'/.test(src), true);
 
 console.log('\n[⑦ 긴 안내를 한 줄로 접었다 — 창이 길어지던 것]');
@@ -96,6 +100,40 @@ console.log('\n[⑧ 개인수익 성과급 조정도 세후 기준]');
 /* 2026-08-11 확정: 성과 기준은 세금 뗀 뒤 남은 금액. 저장 로직과 화면이 어긋나면 안 된다. */
 t('★ 세전 약정액으로 나누지 않는다', /var b = Math\.round\(_perfBase \* sp \/ 100\);/.test(src), true);
 t('옛 세전 셈이 사라졌다', /var b = Math\.round\(confirmModal\.p\.amount \* sp \/ 100\);/.test(src), false);
+
+console.log('\n[⑨ 개인입금 «사업» — 컨설팅 유형 스위치를 따른다 (대표 지시 2026-10-05)]');
+CONS_TYPES = [{ code:'c-tech', name:'통합기술보호지원단', personalDeposit:true }, { code:'c-clinic', name:'현장클리닉' }];
+t('★ 스위치 켠 유형의 컨설팅은 개인입금', ctx.erpIsPersonalDeposit({ typeCode:'c-tech' }), true);
+t('★ 계약도 컨설팅 유형으로 본다', ctx.erpIsPersonalDeposit({ kinds:['consulting'], typeCodes:{ consulting:'c-tech' } }), true);
+t('컨설팅이 아닌 계약은 유형 스위치와 무관', ctx.erpIsPersonalDeposit({ kinds:['company'], typeCodes:{ consulting:'c-tech' } }), false);
+t('★ 이 건만 법인 예외(off)는 유형을 이긴다', ctx.erpIsPersonalDeposit({ typeCode:'c-tech', personalDepositMode:'off' }), false);
+t('★ 이 건만 개인(on)도 유형을 이긴다', ctx.erpIsPersonalDeposit({ typeCode:'c-clinic', personalDepositMode:'on' }), true);
+t('옛 자료(personalDeposit:true)는 손으로 켠 것', ctx.erpPersonalDepositInfo({ typeCode:'c-clinic', personalDeposit:true }).why, 'manual');
+t('★ 스위치를 끄면 «따르던» 건은 저절로 법인으로', (CONS_TYPES[0].personalDeposit = false, ctx.erpIsPersonalDeposit({ typeCode:'c-tech' })), false);
+CONS_TYPES[0].personalDeposit = true;
+t('★ 입금확정 첫 설정도 유형을 따른다', ctx.erpInitDeductions({ typeCode:'c-tech' }, 'inclusive'), { personalRevenue:true, vatIncluded:false });
+t('예외 건은 부가세 그대로', ctx.erpInitDeductions({ typeCode:'c-tech', personalDepositMode:'off' }, 'inclusive'), { vatIncluded:true });
+
+console.log('\n[⑩ 이미 확정된 입금 일괄 변경 — 고르는 규칙]');
+{
+  const plan = src.slice(src.indexOf('function personalBulkPlan('), src.indexOf('function personalReclassPatch('));
+  vm.runInContext(plan, ctx);
+  const cons = [{ id:'s1', typeCode:'c-tech' }, { id:'s2', typeCode:'c-tech', personalDepositMode:'off' }, { id:'s3', typeCode:'c-clinic' }];
+  const inc = [
+    { id:'f1', sourceKind:'consulting', sourceId:'s1', date:'2026-09-01', isPersonalIncome:false },          // 바꿀 것
+    { id:'f2', sourceKind:'consulting', sourceId:'s1', date:'2026-09-02', isPersonalIncome:true },           // 이미 맞음
+    { id:'f3', sourceKind:'consulting', sourceId:'s2', date:'2026-09-03', isPersonalIncome:false },          // 예외라 그대로(안 나옴 — 이미 법인)
+    { id:'f4', sourceKind:'consulting', sourceId:'s3', date:'2026-09-04', isPersonalIncome:false },          // 다른 유형
+    { id:'f5', sourceKind:'consulting', sourceId:'s1', date:'2026-06-01', isPersonalIncome:false },          // 마감
+    { id:'f6', sourceKind:'consulting', sourceId:'s1', date:'2026-09-05', isPersonalIncome:false, deductions:{ bizIncomeTax:true } }, // 원천징수 건
+  ];
+  const rows = ctx.personalBulkPlan('c-tech', inc, cons, (fi) => String(fi.date).slice(0, 7) === '2026-06');
+  t('★ 분류가 다른 확정 입금만 고른다', rows.map((r) => r.fi.id).join(','), 'f1,f5');
+  t('★ 마감된 달은 «안 바꿈»으로', rows.find((r) => r.fi.id === 'f5').skip, 'locked');
+  t('바꿀 것은 개인수익으로', rows.find((r) => r.fi.id === 'f1').to, true);
+}
+t('★ 일괄 변경은 손댄 기록을 남긴다', /erpIncomeLog\(r\.fi\.id, '👤 개인입금 사업 일괄 변경/.test(src), true);
+t('★ 유형 카드에 스위치가 있다(컨설팅만)', /cat\.key === 'consulting' && h\('button', \{ onClick:function\(e\)\{ e\.stopPropagation\(\); togglePersonal\(x\); \}/.test(src), true);
 
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
 process.exit(fail ? 1 : 0);
