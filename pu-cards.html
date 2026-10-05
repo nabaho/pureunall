@@ -10410,7 +10410,7 @@ function syncMobileChrome(){
 function syncMobileSearchFor(view){
   const s = $('search'); if(!s) return;
   if(view === 'co'){
-    s.placeholder = '상호·사업자번호·대표자로 찾기';
+    s.placeholder = '상호·사업자번호·대표자·컨설팅 종류로 찾기';
     s.value = state.coQ || '';
   }else{
     /* 화면마다 제 안내 — 명함 칸에는 «전체에서»를 적는다(🔎 아래 띠가 명함·사업자·기업·근로자를 함께 찾는다) */
@@ -29700,7 +29700,7 @@ function syncPcSearchFor(view){
     p.placeholder = '이름·회사·사건으로 찾기';
     p.value = state.wkQ || '';
   }else if(view === 'co'){
-    p.placeholder = '상호·사업자번호·대표자로 찾기';
+    p.placeholder = '상호·사업자번호·대표자·컨설팅 종류로 찾기';
     p.value = state.coQ || '';
   }else{
     p.placeholder = '이름·회사·번호로 전체에서 찾기';
@@ -32033,10 +32033,22 @@ function coUidCount(){ return coFilteredList(null, false, true).filter(coIsUid).
      (대표 보고 2026-08-30). 2026-08-28 에 탭 줄에서 똑같은 것을 고쳤는데 할 일을
      옆줄로 내리면서 그 결함이 따라왔다.
    ⚠ 폴더·태그·검색은 «그대로 둔다» — 「지금 보는 것 안에서 몇 곳인가」는 뜻이 있다. */
-/* 회사 하나가 찾는 글자(소문자)에 걸리나 — 상호·사업자번호·대표자.
-   기업 상세 목록과 🔎 전체 찾기가 «이 하나»를 같이 본다 */
+/* 회사 하나가 찾는 글자(소문자)에 걸리나 — 상호·사업자번호·대표자 + 컨설팅 종류.
+   기업 상세 목록과 🔎 전체 찾기가 «이 하나»를 같이 본다
+   ── 컨설팅 종류로 찾기 (대표 지시 2026-10-05) ──
+   「현장클리닉」「기술보호」「상공회의소」「자문」처럼 «무슨 일을 한 곳인가»로 찾는다.
+   새 칸을 만들지 않는다 — 그 말은 이미 세 곳에 적혀 있다:
+     ① 서류 갈래 딱지(extra.tags — 「2021년 충남북부상공회의소 인사노무 컨설팅 신청서」 등)
+     ② 메모(extra.memo — 「[현장클리닉] … 클리닉위원 권형하 …」)
+     ③ 푸른이알피 업체유형(erp.type — 「자문」 등)
+   ⚠ 이 함수는 검사들이 «혼자» 떠서 돌린다 — 밖의 도우미(coVal·coTagsOf)를 부르지 말 것. */
 function coQueryHit(o, q){
-  return (o.name+' '+(o.bizno||'')+' '+(o.ceo||'')).toLowerCase().indexOf(q)>=0;
+  const ex = o.extra || {};
+  const hay = o.name+' '+(o.bizno||'')+' '+(o.ceo||'')
+    +' '+Object.keys(ex.tags || {}).join(' ')
+    +' '+(ex.memo || o.memo || '')
+    +' '+((o.erp && o.erp.type) || '');
+  return hay.toLowerCase().indexOf(q)>=0;
 }
 function coFilteredList(skipCol, skipCares, skipTodo){
   const q = String(state.coQ||'').trim().toLowerCase();
