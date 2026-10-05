@@ -34,7 +34,8 @@ function cut(name) {
   return m[0];
 }
 function cutVar(name) {
-  const m = HTML.match(new RegExp('var ' + name + '=[\\s\\S]*?;\\n'));
+  /* 줄끝은 LF 도 CRLF 도 된다 — 윈도에서 받으면 CRLF 라 「;\n」만 찾으면 못 찾는다 */
+  const m = HTML.match(new RegExp('var ' + name + '=[\\s\\S]*?;\\r?\\n'));
   assert.ok(m, name + ' 가 없습니다');
   return m[0];
 }
