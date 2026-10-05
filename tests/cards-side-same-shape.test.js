@@ -37,7 +37,8 @@ function coSide(){
 function listSide(){
   const i = src.indexOf('const folderRow = (g) =>');
   assert.ok(i > 0, '명함 폴더 줄을 못찾음');
-  return src.slice(src.lastIndexOf("h += `<div class=\"pcsec\"", i) - 400, src.indexOf('담당자별 (직원)', i));
+  /* 끝 표시: 폴더 목록 바로 뒤의 「담당자 채우기」 문(2026-10-05 「담당자별」 목록을 걷은 뒤 그 자리) */
+  return src.slice(src.lastIndexOf("h += `<div class=\"pcsec\"", i) - 400, src.indexOf('const ownPlan', i));
 }
 
 /* ══════ ① 「전체」가 폴더 머리 다음이다 ══════ */
@@ -104,9 +105,9 @@ test('폴더가 하나도 없을 때도 칸 안에서 안내가 나온다', () =
 
 /* ══════ ④ 남은 «참된» 차이는 그대로 둔다 ══════ */
 
-test('「담당자별」은 명함·사업자에만 있다 — 회사에는 담당자 갈래가 없다', () => {
-  /* 이건 모양 차이가 아니라 «있는 자료»의 차이다. 억지로 맞추면 빈 칸만 생긴다. */
-  assert.match(listSide() + src.slice(src.indexOf('담당자별 (직원)'), src.indexOf('담당자별 (직원)') + 40), /담당자별/);
+test('「담당자별 (직원)」 목록은 옆줄 어디에도 없다 (대표 지시 2026-10-05 「삭제 해라」)', () => {
+  /* 담당자로 거르는 길은 «담당 전체» 고르개 하나로 충분하다 — 옆줄에 같은 일을 하는 목록을 다시 두지 않는다. */
+  assert.ok(src.indexOf('<div class="pcsec">담당자별 (직원)</div>') < 0, '옆줄 「담당자별 (직원)」 목록이 되살아났다');
   assert.ok(!/담당자별/.test(coSide()), '기업 상세에 없는 갈래를 억지로 넣었다');
 });
 

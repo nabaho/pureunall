@@ -241,7 +241,8 @@ test('★★ 닫혀 있으면 아무것도 안 그린다', () => {
 test('★★★ 채울 것이 없으면 문을 안 그린다 — 눌러도 아무 일 없는 단추는 두지 않는다', () => {
   /* ⚠ cardOwnOpen 은 함수 «선언»에도 나온다 — 옆줄에 그리는 자리(pchintside)만 본다. */
   const src = strip(app);
-  const door = src.indexOf('cardOwnOpen()', src.indexOf('여기에 자동으로 분류됩니다'));
+  /* 2026-10-05 「담당자별」 목록을 걷은 뒤로는 문을 그리는 자리(const ownPlan)부터 찾는다 */
+  const door = src.indexOf('cardOwnOpen()', src.indexOf('const ownPlan'));
   assert.ok(door > 0, '옆줄에 문이 있어야 한다');
   const near = src.slice(Math.max(0, door - 400), door);
   assert.ok(/ownFill > 0\)/.test(near),
@@ -249,13 +250,13 @@ test('★★★ 채울 것이 없으면 문을 안 그린다 — 눌러도 아�
   assert.ok(/pchintside/.test(near), '옆줄 안내와 같은 모양이어야 한다');
 });
 
-test('★★★ 문이 옆줄 안내 «바로 아래»에 있다 — 읽은 자리에 손이 가야 한다', () => {
+test('★★★ 문이 옆줄 폴더 목록 «바로 아래»에 있다 — 따로 들어가는 화면이 아니다', () => {
+  /* 2026-10-05 「담당자별 (직원)」 목록과 그 안내를 걷었다(대표 지시). 문은 폴더 목록 끝 바로 뒤에 남는다. */
   const src = strip(app);
-  const hint = src.indexOf('여기에 자동으로 분류됩니다');
-  /* ⚠ 선언 자리가 아니라 «옆줄에 그리는» 자리를 찾는다 */
-  const door = src.indexOf('cardOwnOpen()', hint);
-  assert.ok(hint > 0 && door > hint, '안내 뒤에 문이 와야 한다');
-  assert.ok(door - hint < 1200, '따로 들어가야 하는 화면이면 아무도 안 간다');
+  const list = src.indexOf('groups.forEach(g=> h += folderRow(g));');
+  const door = src.indexOf('cardOwnOpen()', list);
+  assert.ok(list > 0 && door > list, '폴더 목록 뒤에 문이 와야 한다');
+  assert.ok(door - list < 1200, '따로 들어가야 하는 화면이면 아무도 안 간다');
 });
 
 test('★★★ 새 저장 길을 만들지 않는다 — 이알피에도 안 쓴다', () => {

@@ -140,13 +140,11 @@ test('★★★ 「담당 전체」 드롭다운은 없앴다 — 그래도 퇴�
     '★★★ 퇴사자를 가르는 셈이 사라졌다 — 「🚪 이어받기」 띠가 늘 0명이 된다');
 });
 
-test('★★★ 옆줄 「담당자별 (직원)」도 «같은 잣대»를 쓴다', () => {
+test('★★ 옆줄 「담당자별 (직원)」 목록은 걷었다 — 퇴사자가 새어 나올 자리 자체가 없다 (2026-10-05)', () => {
+  /* 대표 지시 「이 부분 필요없다. 삭제 해라」. 담당자로 거르는 길은 «담당 전체» 고르개 하나만 남는다
+     (그 고르개의 퇴사자 거르기는 위 검사가 지킨다). */
   const fn = fnBody('renderPCSide');
-  const at = fn.indexOf('const owners=');
-  assert.ok(at > 0, '★ 옆줄 담당자 목록 자리를 못 찾았다');
-  const seg = fn.slice(at, fn.indexOf('if (!owners.length)', at));
-  assert.match(seg, /nonRetiredPicks\(/, '★★★ 옆줄에는 퇴사자가 그대로 남는다');
-  assert.match(seg, /state\.owner\)/, '★★ 지금 고른 이름을 안 넘긴다');
+  assert.ok(fn.indexOf('const owners=') < 0, '★★ 옆줄 담당자 목록이 되살아났다 — 되살리면 퇴사자 거르기도 함께 넣을 것');
 });
 
 /* ── ⑤ 줄에 붙은 딱지는 «사실»이라 그대로 ── */
