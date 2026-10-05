@@ -503,6 +503,11 @@ details.fold[open]>summary .act:after{content:'접기'}
 /* 보낸 결과 KPI (2026-10-05) — 작게 · 위에 붙고 · 누르면 그 줄만 */
 .res-head{position:sticky;top:0;z-index:5;background:var(--paper);padding:8px 0 6px;margin:-8px 0 4px}
 .kpis{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+/* 한 줄 머리 (2026-10-05 「1줄로」) */
+.res-one{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.res-one .kpis{margin-top:0;display:inline-flex}
+.res-one .cut{width:1px;height:20px;background:var(--line);flex:0 0 auto}
+.kpi-warn{font-size:12px;font-weight:800;color:#92400e;white-space:nowrap;cursor:help}
 .kpi{display:inline-flex;align-items:baseline;gap:6px;padding:4px 11px;border-radius:99px;border:1px solid var(--line);
   background:#fff;cursor:pointer;white-space:nowrap;font:inherit}
 .kpi .k{font-size:11.5px;font-weight:700;color:var(--sub)}
@@ -4274,7 +4279,8 @@ function 결과화면(){
   const d = App.회차들[고른것] || {};
   const r = 결과줄들(고른것);
 
-  const 고르개 = '<select onchange="결과회차고르기(this.value)" style="padding:7px 10px;'
+  /* ⚠ 폭을 «글자만큼» — 온 줄을 먹으면 한 줄에 KPI 가 못 들어온다 (대표 지시 2026-10-05 「1줄로」) */
+  const 고르개 = '<select onchange="결과회차고르기(this.value)" style="width:auto;flex:0 0 auto;padding:5px 8px;'
     + 'border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:700">'
     + 보낸것.map(function(k,i){
         const x = App.회차들[k]||{};
@@ -4321,17 +4327,16 @@ function 결과화면(){
 
   /* ⚠ 「열람 없음」을 「안 읽음」이라 적지 않는다 — 그림을 막아 둔 사람은
        읽고도 안 찍힌다. 아는 것만 말한다. */
-  const 안내 = '<div class="note" style="margin:2px 0 10px">'
-    + '📌 <b>열람</b>은 편지 속 그림이 열린 것을 센 수입니다 — '
+  /* ★ 안내 두 줄은 ⓘ 안으로 (대표 지시 2026-10-05 「1줄로」) — 지우지 않고 «눌러 보는 글»로 옮긴다 */
+  const 안내 = 도움('📌 <b>열람</b>은 편지 속 그림이 열린 것을 센 수입니다 — '
     + '그림을 막아 둔 메일 프로그램이 많아 <b>읽고도 안 찍힐 수 있습니다</b>. '
     + '그래서 「안 읽음」이 아니라 「표시 없음」이라 적습니다.<br>'
     + '📌 <b>반송·자동회신</b>은 푸른메일함(받은편지함)에서 찾은 것입니다 — '
-    + '보낸 때(' + esc(때글(Number(d.보낸때||0))) + ') 뒤에 온 것만 봅니다.'
+    + '보낸 때(' + esc(때글(Number(d.보낸때||0))) + ') 뒤에 온 것만 봅니다.')
     + (r.못붙임 && r.못붙임.length
-        ? '<br>⚠ 반송·자동회신처럼 보이는데 <b>어느 곳인지 못 맞춘 것 '
-          + r.못붙임.length + '통</b>이 있습니다 (아래 맨 끝에 적었습니다).'
-        : '')
-    + '</div>';
+        ? '<span class="kpi-warn" title="반송·자동회신처럼 보이는데 어느 곳인지 못 맞춘 것 — 표 맨 끝에 적었습니다">⚠ 못 맞춘 '
+          + r.못붙임.length + '통</span>'
+        : '');
 
   const 딱 = function(글, 바탕, 글빛){
     return '<span class="pill" style="background:'+바탕+';color:'+글빛+'">'+글+'</span>';
@@ -4383,15 +4388,19 @@ function 결과화면(){
   /* ★ 고르개·KPI 는 «위에 붙는» 머리 — 표를 굴려도 남는다 */
   const 거른말 = 거름 ? '<span class="kpi-now">' + esc(결과거르기이름[거름] || 거름) + ' ' + 보일줄.length + '곳만 보는 중 · '
     + '<a onclick="결과거르기바꿈(\'\')">전체 보기</a></span>' : '';
+  /* ★★ 한 줄 — 고르개 · 다시 읽기 · 기준 · ⓘ · KPI · 거른 말 (대표 지시 2026-10-05 「1줄로」).
+       좁은 화면에서만 넘친 것이 아래로 내려간다 */
   return '<div class="pad">'
-    + '<div class="res-head"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
+    + '<div class="res-head res-one">'
     + 고르개
-    + '<button class="btn" onclick="결과다시읽기()">⟳ 다시 읽기</button>'
-    + '<span style="color:var(--faint);font-size:11.5px">'
+    + '<button class="mini" onclick="결과다시읽기()" title="다시 읽기">⟳</button>'
+    + '<span style="color:var(--faint);font-size:11.5px;white-space:nowrap">'
     + (r.자료 && r.자료.읽은때 ? esc(때글(r.자료.읽은때)) + ' 기준' : '') + '</span>'
+    + 안내
+    + '<span class="cut"></span>'
+    + 띠
     + 거른말
     + '</div>'
-    + 띠 + '</div>' + 안내
     + '<table class="list" style="width:100%"><thead><tr>'
     + '<th style="width:44px;text-align:right">#</th><th>업체</th><th>담당자</th>'
     + '<th>주소</th><th style="width:92px">나갔나</th>'
