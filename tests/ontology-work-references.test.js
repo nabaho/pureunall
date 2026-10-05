@@ -111,7 +111,9 @@ test('최종 건별 저장도 재검증하여 확인 도중 사라진 원본·�
 test('실제 계약 담당자 선택창은 동명이인도 SID로 구별하고 선택부터 건별 저장까지 성공한다',()=>{
   const {ctx,calls,data}=context();
   Object.assign(ctx,{f:{...form(),companyLinkStatus:'pending',company:{name:'신규'}},users:data.user_dir,lawyers:data.user_dir,
-    assignable:data.user_dir,SUBMGR_ADD_OPT:'추가',REASSIGN_SUFFIX:')',getUserAssignStatus:()=>({assignable:true,label:''})});
+    assignable:data.user_dir,SUBMGR_ADD_OPT:'추가',REASSIGN_SUFFIX:')',getUserAssignStatus:()=>({assignable:true,label:''}),
+    /* 2026-10-05 #2000: 담당자 장에 「그 사람 올해 실적」 한 줄이 붙었다 — 이 검사는 담당자 고르기만 보므로 없음으로 둔다 */
+    clinicContractHint:()=>null,BIZ_CONS_SEED:[]});
   ctx.setF=fn=>{ctx.f=fn(ctx.f);};
   /* ⚠ 담당자 장이 처음엔 4칸(fld4·sec4, 2026-09-18)이었다가 라벨-없는 6칸
      (fldn6·sec6·phOption, 2026-09-19)으로 바뀌었다. 흉내내지 않고
