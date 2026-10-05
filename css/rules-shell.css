@@ -28,3 +28,10 @@
 @media(max-width:1200px){.rs-head{padding:6px 12px;gap:8px}.rmode .rm-t{display:none}.rmode a{padding:5px 9px}}
 @media(min-width:701px) and (max-width:780px){.rmode a{padding-left:6px;padding-right:6px}}
 @media(max-width:700px){.rs-head{padding:6px 9px;gap:6px}.rs-head .rs-logo{width:28px;height:28px;font-size:14px;border-radius:8px}}
+/* 폰에서 «누를 수 있는 크기»로 (대표 「추천대로」 2026-10-05)
+   갈래 단추가 36×29 였다 — 손가락 끝이 닿는 넓이(44)보다 작아 옆 것이 같이 눌린다.
+   집 안의 기준은 푸른이알피의 min-height:38px 다(css/pu-erp.css 폰 보강 한 벌).
+   ⚠ 이 단추는 <a> 다 — 그냥 두면 inline 이라 min-height 가 안 듣는다. 그래서
+     inline-flex 로 세우고 가운데 맞춘다(배포본에서 재서 넣었다: 29 → 38,
+     띠 31 → 40, 줄 수 그대로 1줄, 가로 넘침 0). */
+@media(max-width:768px){.rmode a{min-height:38px;display:inline-flex;align-items:center}}

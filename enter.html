@@ -2248,6 +2248,23 @@ body.portal-mode #moreFab{display:flex;}
   if($('pkBtn')){ $('pkBtn').addEventListener('click', pkLogin); pkShowButton(); }
   $('loginId').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); $('loginPw').focus(); } });
 
+  /* ── 폰에서는 짧은 안내문으로 (대표 「추천대로」 2026-10-05) ──────────────
+     폰(375px)에서 안내문이 칸보다 40px 넘쳐 「아이디 (예: p001@pureur」로 잘렸다.
+     잘린 안내는 없느니만 못하다 — 주소를 끝까지 치라는 말인지 아닌지 알 수 없다.
+     ⚠ 칸은 사번(p001)도 메일주소도 받는다. 그래서 폰에서는 «짧은 쪽»만 보여 줘도
+       뜻이 온전하다. PC 는 자리가 넉넉하니 긴 것을 그대로 둔다.
+     ⚠ 창 크기가 바뀌면 다시 고른다 — 폰을 눕히면 넓어진다. */
+  var ID_HINT_LONG  = '아이디 (예: p001@pureun.kr)';
+  var ID_HINT_SHORT = '아이디 (예: p001)';
+  function fitIdHint(){
+    var el = $('loginId'); if(!el) return;
+    var 좁나 = false;
+    try { 좁나 = window.innerWidth <= 480; } catch(e){ 좁나 = false; }
+    el.placeholder = 좁나 ? ID_HINT_SHORT : ID_HINT_LONG;
+  }
+  fitIdHint();
+  window.addEventListener('resize', fitIdHint);
+
   // ── 로그인 화면 신선도 가드: 오래 방치된 탭은 크롬 절전으로 얼어 로그인이 안 먹으므로,
   //    탭에 돌아왔을 때 30분 이상 묵은 미로그인 화면이면 자동 새로고침 (비번 입력 중이면 방해 안 함) ──
   (function(){
