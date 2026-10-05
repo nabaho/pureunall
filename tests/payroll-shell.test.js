@@ -81,7 +81,7 @@ function load(o) {
     'var RECS = ' + JSON.stringify(o.recs || RECS) + ';',
     'var LOCK = ' + JSON.stringify(o.lock || {}) + ';',
     'var INBOX = ' + JSON.stringify(o.inbox || {}) + ';',
-    'var LINKS = ' + JSON.stringify(LINKS) + ';',
+    'var LINKS = ' + JSON.stringify(o.links || LINKS) + ';',
     'var CALLS = [];',
     'function paySites(){ return Object.keys(RECS); }',
     'function siteCardsList(){ return Object.keys(RECS); }',
@@ -99,7 +99,7 @@ function load(o) {
     cut('monthNum'), cut('guessMonth'), cut('ymOf'), cut('hubCounts'), cut('nameState'), cut('linkStats'), cut('staffOf'),
     cutVar('TABS'), cutVar('TOOLS'), cutVar('TAB_FN'),
     ['ymNow', 'ymParts', 'ymText', 'inboxYm', 'coArrivals', 'coState', 'sitesHaveSever', 'byKoName', 'shellModel', 'curView',
-      'viewbarHtml', 'toolRow', 'colistHtml', 'colRowsHtml', 'coSites', 'shellMainHtml', 'coHeadHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
+      'viewbarHtml', 'toolRow', 'colistHtml', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
     'globalThis.M = function(){ return shellModel(); };',
     'globalThis.peek = function(){ return { App: App, CALLS: CALLS }; };',
   ].join('\n')).runInContext(sandbox);
@@ -192,4 +192,50 @@ test('이름순은 법인 표기를 빼고 — ㈜가 붙은 곳이 맨 위로 �
   const names = [{ name: '㈜하늘상사' }, { name: '가람' }, { name: '주식회사 나무' }, { name: '(주)다리' }]
     .sort(s.byKoName).map(c => c.name);
   assert.deepEqual(Array.from(names), ['가람', '주식회사 나무', '(주)다리', '㈜하늘상사']);
+});
+
+/* ══════ 머리줄 회사 칸 — 대표 지시 2026-10-05 「회사 관련 KPI 는 맨 위 파란 줄에, 탭은 위로」 ══════ */
+
+test('★ 회사를 고르면 맨 위 줄에 이름·담당·기준 달·지표가 뜬다', () => {
+  const s = load({ App: { coId: 'c2' }, lock: { '두레가축약품|8월': 1 } });
+  const b = s.coBarHtml(s.M());
+  assert.match(b, /두레가축약품/);
+  assert.match(b, /담당 나사람/);
+  assert.match(b, /부 다사람/, '부담당이 안 보입니다');
+  assert.match(b, /2026년 8월/);
+  ['확정', '급여 1개월', '근태 0명', '연차 0명', '퇴사 0명', '명세서 1개월'].forEach(k =>
+    assert.ok(b.indexOf(k) >= 0, '「' + k + '」 지표가 맨 위 줄에 없습니다'));
+});
+
+test('★ 지표를 누르면 그 탭으로 간다', () => {
+  const s = load({ App: { coId: 'c1' } });
+  const b = s.coBarHtml(s.M());
+  ['payroll', 'attend', 'leave', 'sever', 'slip'].forEach(t =>
+    assert.ok(b.indexOf("pickTab('" + t + "')") >= 0, t + ' 지표가 그 탭으로 안 갑니다'));
+});
+
+test('★ 본문은 탭부터 시작한다 — 회사 이름 칸이 본문 위에 다시 생기지 않는다', () => {
+  const s = load({ App: { coId: 'c1' } });
+  const h = s.shellMainHtml(s.M());
+  assert.ok(h.indexOf('<div class="tabs"') === 0, '본문 첫머리가 탭이 아닙니다: ' + h.slice(0, 80));
+  assert.equal(h.indexOf('cohead'), -1, '예전 회사 칸이 남아 있습니다');
+});
+
+test('짐작으로 이은 회사는 맨 위 줄에 「짐작 연결」 + 관리자에게만 확정 단추', () => {
+  const noLink = { '두레가축약품': LINKS['두레가축약품'], '가온기술': LINKS['가온기술'] };   // 다온원은 이름표 없음 → 짐작
+  const a = load({ App: { coId: 'c1' }, links: noLink });
+  const b = a.coBarHtml(a.M());
+  assert.match(b, /짐작 연결/);
+  assert.ok(b.indexOf("linkCo('다온원_급여자료')") >= 0, '관리자에게 확정 단추가 없습니다');
+  const n = load({ App: { coId: 'c1' }, links: noLink, isAdmin: false, email: 'a004@pureun.kr' });
+  assert.equal(n.coBarHtml(n.M()).indexOf('linkCo('), -1, '관리자가 아닌데 확정 단추가 보입니다');
+  const ok = load({ App: { coId: 'c1' } });
+  assert.equal(ok.coBarHtml(ok.M()).indexOf('짐작 연결'), -1, '확정한 이름표인데 짐작이라 합니다');
+});
+
+test('고른 회사가 없거나 도구 화면이면 맨 위 줄은 비어 있다', () => {
+  const s = load();
+  assert.equal(s.coBarHtml(s.M()), '');
+  const t = load({ App: { screen: 'cards', coId: 'c1' } });
+  assert.equal(t.coBarHtml(t.M()), '');
 });
