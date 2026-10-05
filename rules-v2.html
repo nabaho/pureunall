@@ -45,10 +45,10 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=1"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
-<script src="js/rules-v2/lib-sites.js?v=1"></script>
+<script src="js/rules-v2/lib-sites.js?v=2"></script>
 <script src="js/rules-v2/store.js?v=2"></script>
 <script src="js/rules-v2/view-library.js?v=2"></script>
-<script src="js/rules-v2/view-sites.js?v=1"></script>
+<script src="js/rules-v2/view-sites.js?v=2"></script>
 <!-- 「📚 조별 문안」 — 검토 기준은 규정관리와 «같은 한 벌»(pu-rules-criteria.js), 주제 차례는 표준취업규칙(std_2026.js) -->
 <script src="js/pu-rules-criteria.js?v=2"></script>
 <script src="std_2026.js?v=2"></script>
@@ -185,6 +185,7 @@ button{font:inherit;cursor:pointer}
 #sites .chip.warn:not(.on){background:#fffbeb;border-color:#fde68a;color:#854d0e}
 #sites .flt .q{width:240px}
 #sites .flt .btn{margin-left:2px}
+#sites .flt select.who{height:28px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font:inherit;font-size:12px;color:#1e293b;background:#ffffff;margin-left:6px}
 #sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
 #sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
 .sites{width:100%;border-collapse:collapse;table-layout:fixed;min-width:800px}
@@ -307,7 +308,9 @@ function libMsg(t) { $lib.innerHTML = $sites.innerHTML = '<div class="msg">' + P
 var ST = { data: { docs: {}, human: {}, rounds: {}, run: null }, view: 'mail', filt: {}, picked: new Set(), sel: '',
   text: null, diff: {}, companies: [], isAdmin: false, picker: null, busy: '',
   /* 🏢 사업장 — 거르개(has·wait·all)·찾기·고른 사업장 id. 다시 읽어도(reload) 그대로 둔다 */
-  sites: { f: 'has', q: '', sel: '' } };
+  sites: { f: 'has', q: '', sel: '', who: '' },
+  /* 담당 거르기 — 명부(사번→이름)·로그인한 사람의 사번. 사번은 「P-001」 꼴로 맞춘다(업체관리 managerMain 과 같은 꼴) */
+  staff: {}, me: '' };
 var S = null, qTimer = 0;
 
 /* 지금 보이는 갈래를 그린다 — 🏢 면 사업장, 아니면 📥 모은 자료(📚 는 제 부품이 따로 그린다).
@@ -443,6 +446,7 @@ var H = {
     }, 200);
   },
   siteSel: function (d) { ST.sites.sel = d.co || ''; draw(); },
+  sm: function (v) { ST.sites.who = String(v || ''); draw(); },
   /* 후보를 한 번에 확정 — 그 사업장의 열린 후보 «전부»(메일 단위로 모인 것)를 이 업체 id 로 잇는다 */
   siteLink: function (d) {
     var row = siteRow(d.co);
@@ -527,7 +531,14 @@ try {
         };
         var store = PuRulesV2Store.make({ db: db, gateway: gw, companies: function () { return list; },
           actor: function () { return role.sid || u.uid; }, now: function () { return Date.now(); } });
-        boot(store, { isAdmin: role.isAdmin === true, companies: list });
+        /* 명부 — 담당 이름. 못 읽어도 화면은 돈다(이름 대신 사번이 보인다) */
+        var sidOf = function (x) { return String(x || '').trim().toUpperCase().replace(/^([A-Z])-?(\d+)$/, '$1-$2'); };
+        return db.ref('data/user_dir').once('value').then(function (d) { return d.val() || {}; }, function () { return {}; }).then(function (dir) {
+          var arr = Array.isArray(dir.v) ? dir.v : Object.keys(dir.v || {}).map(function (k) { return dir.v[k]; });
+          arr.forEach(function (p) { if (p && p.sid) ST.staff[sidOf(p.sid)] = String(p.name || p.sid); });
+          ST.me = sidOf(role.sid);
+          boot(store, { isAdmin: role.isAdmin === true, companies: list });
+        });
       });
     }).catch(function (e) { libMsg('시작하지 못했습니다: ' + ((e && e.message) || e)); });
   });

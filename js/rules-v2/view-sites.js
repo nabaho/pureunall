@@ -36,7 +36,23 @@
   }
 
   /* ── 위 거르개 줄 ── */
-  function filterHtml(st, c) {
+  /* 담당 이름 — 명부(st.staff: 사번→이름)에서. 명부에 없으면 사번 그대로(지우면 누가 맡았는지 잃는다) */
+  function staffName(st, sid) { return (st.staff && st.staff[sid]) || sid; }
+  /* 담당 고르개 (2026-10-05) — 모두 · 내 담당(사번을 알 때만) · 담당자별(곳 수) · 담당 없음 */
+  function ownerSelect(st, oc) {
+    var who = (st.sites || {}).who || '', me = st.me || '';
+    oc = oc || {};
+    function opt(v, label) { return '<option value="' + esc(v) + '"' + (who === v ? ' selected' : '') + '>' + esc(label) + '</option>'; }
+    var ids = Object.keys(oc).filter(function (k) { return k !== '-' && k !== me; })
+      .sort(function (a, b) { return staffName(st, a).localeCompare(staffName(st, b), 'ko'); });
+    return '<select class="who" data-role="sm" title="담당자로 거르기 — 주담당·부담당 모두">'
+      + opt('', '담당: 모두')
+      + (me ? opt(me, '내 담당 (' + (oc[me] || 0) + ')') : '')
+      + ids.map(function (k) { return opt(k, staffName(st, k) + ' (' + oc[k] + ')'); }).join('')
+      + (oc['-'] ? opt('-', '담당 없음 (' + oc['-'] + ')') : '')
+      + '</select>';
+  }
+  function filterHtml(st, c, oc) {
     var s = st.sites || {}, f = s.f || 'has';
     c = c || { has: 0, wait: 0, all: 0 };
     function chip(v, label, extra) {
@@ -45,11 +61,20 @@
     }
     return '<div class="flt">'
       + chip('has', '취업규칙 자료 있는 곳') + chip('wait', '확정 기다림', 'warn') + chip('all', '모든 거래처')
+      + ownerSelect(st, oc)
       + '<input class="q" data-role="sq" placeholder="🔍 회사 이름 · 사업자번호" value="' + esc(s.q || '') + '">'
       + '<button class="btn" data-act="reload">새로고침</button>'
       + '</div>';
   }
 
+  /* 담당 칸 — 주담당 이름(부담당이 있으면 「+n」), 전부는 title 에 */
+  function ownerCell(st, r) {
+    var subs = (r.subs || []).map(function (s) { return staffName(st, s); });
+    var main = r.mgr ? staffName(st, r.mgr) : '';
+    if (!main && !subs.length) return td('', '담당 없음', '<span class="k none">—</span>');
+    var t = (main ? main : '') + (subs.length ? (main ? ' · ' : '') + '부 ' + subs.join(', ') : '');
+    return td('', t, esc(main || subs[0]) + (main && subs.length ? ' <span class="k none">+' + subs.length + '</span>' : ''));
+  }
   /* ── 왼쪽 표 ── (rows 는 이미 거른 것) */
   function listHtml(st, rows) {
     var sel = (st.sites || {}).sel || '';
@@ -70,14 +95,15 @@
         + td('', r.name + (r.closed ? ' (폐업)' : ''), '<b>' + esc(r.name) + '</b>' + (r.closed ? ' <span class="k none">폐업</span>' : ''))
         + td('', size || '인원 모름', size ? esc(size) : '<span class="k none">—</span>')
         + td('', r.bizType || '업태 모름', r.bizType ? esc(r.bizType) : '<span class="k none">—</span>')
+        + ownerCell(st, r)
         + td('', docT.join(' · ') || '자료 없음', doc.join(' '))
         + td('', r.last ? '최근 메일 ' + ymd(r.last) : '자료 없음', esc(last))
         + fin
         + '</tr>';
     }).join('');
-    if (!body) body = '<tr><td colspan="7" class="empty" title="">맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요</td></tr>';
-    return '<table class="sites"><colgroup><col style="width:44px"><col><col style="width:120px"><col style="width:96px"><col style="width:250px"><col style="width:80px"><col style="width:80px"></colgroup>'
-      + '<thead><tr><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>'
+    if (!body) body = '<tr><td colspan="8" class="empty" title="">맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요</td></tr>';
+    return '<table class="sites"><colgroup><col style="width:44px"><col><col style="width:120px"><col style="width:96px"><col style="width:84px"><col style="width:250px"><col style="width:80px"><col style="width:80px"></colgroup>'
+      + '<thead><tr><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>'
       + '<tbody>' + body + '</tbody></table>';
   }
 
@@ -149,9 +175,9 @@
   function render(el, st, handlers) {
     var s = st.sites || {};
     var rows = Sx().model(st.data, st.companies);
-    var shown = Sx().filter(rows, s.f || 'has', s.q || '');
+    var shown = Sx().filter(rows, s.f || 'has', s.q || '', s.who || '');
     var row = s.sel ? rows.filter(function (r) { return r.id === s.sel; })[0] : null;
-    el.innerHTML = filterHtml(st, Sx().counts(rows))
+    el.innerHTML = filterHtml(st, Sx().counts(rows), Sx().ownerCounts(rows))
       + '<div class="swrap"><div class="stbl">' + listHtml(st, shown) + '</div>' + sideHtml(st, row) + '</div>'
       + (st.busy ? '<div class="busy">' + esc(st.busy) + '</div>' : '');
     var H = handlers || {};
@@ -164,7 +190,10 @@
       var t = ev.target;
       if (t.dataset && t.dataset.role === 'sq' && H.sq) H.sq(t.value);
     };
-    el.onchange = null;
+    el.onchange = function (ev) {
+      var t = ev.target;
+      if (t.dataset && t.dataset.role === 'sm' && H.sm) H.sm(t.value);
+    };
   }
 
   var api = { render: render, listHtml: listHtml, sideHtml: sideHtml, filterHtml: filterHtml };

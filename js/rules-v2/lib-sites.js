@@ -63,7 +63,9 @@
       rows.push({ id: co.id, name: str(co.name), bizNo: str(co.bizNo), size: size, band: band(size),
         bizType: str(co.bizType), closed: closed, linked: linked.length, cand: cand.length,
         candIds: cand.map(function (it) { return it.id; }), candMails: Object.keys(mails).length,
-        last: last, groups: groups, fin: finOf(linked.length, groups) });
+        last: last, groups: groups, fin: finOf(linked.length, groups),
+        // 담당 — 업체관리의 «사번»(주 managerMain · 부 managerSubs). 이름으로 맞추지 않는다
+        mgr: str(co.managerMain).trim(), subs: (Array.isArray(co.managerSubs) ? co.managerSubs : []).map(str).filter(Boolean) });
     });
     return rows.sort(function (a, b) {
       return (b.cand > 0 ? 1 : 0) - (a.cand > 0 ? 1 : 0) || b.last - a.last || a.name.localeCompare(b.name, 'ko');
@@ -93,9 +95,26 @@
     return { docId: lastRow.item.id, roundKey: g.roundKey, notFinal: true, no: lastRow.no };
   }
 
-  // 거르개 — 'has'(기본): 확정·후보가 있는 곳 · 'wait': 후보 있는 곳 · 'all'
-  function filter(rows, f, q) {
+  /* 담당 거르기 (2026-10-05) — who: '' 모두 · '-' 담당 없음 · 사번(주담당이거나 부담당) */
+  function ownerOf(r, who) {
+    if (!who) return true;
+    if (who === '-') return !r.mgr && !(r.subs || []).length;   // 아무도 안 맡은 곳 — 빠지면 아무도 안 본다
+    return r.mgr === who || (r.subs || []).indexOf(who) >= 0;   // 부담당도 내 담당이다
+  }
+  function ownerCounts(rows) {
+    var c = {};
+    (rows || []).forEach(function (r) {
+      var ws = {}; if (r.mgr) ws[r.mgr] = 1; (r.subs || []).forEach(function (s) { ws[s] = 1; });
+      var ks = Object.keys(ws);
+      if (!ks.length) c['-'] = (c['-'] || 0) + 1;
+      ks.forEach(function (k) { c[k] = (c[k] || 0) + 1; });
+    });
+    return c;
+  }
+  // 거르개 — 'has'(기본): 확정·후보가 있는 곳 · 'wait': 후보 있는 곳 · 'all' · who: 담당
+  function filter(rows, f, q, who) {
     var list = (rows || []).filter(function (r) {
+      if (!ownerOf(r, who)) return false;
       return f === 'all' ? true : f === 'wait' ? r.cand > 0 : (r.linked + r.cand) > 0;
     });
     var nq = normName(q), digits = str(q).replace(/\D/g, '');
@@ -111,7 +130,7 @@
     return c;
   }
 
-  var api = { band: band, model: model, filter: filter, counts: counts, startDoc: startDoc, normName: normName };
+  var api = { band: band, model: model, filter: filter, counts: counts, ownerCounts: ownerCounts, startDoc: startDoc, normName: normName };
   if (root) root.PuRulesV2Sites = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
