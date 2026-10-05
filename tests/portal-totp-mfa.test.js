@@ -29,3 +29,14 @@ test('이메일 미인증 계정은 인증 메일부터 보내고 등록을 멈�
   assert.match(mfa, /if\(!u\.emailVerified\)/);
   assert.match(mfa, /sendEmailVerification\(u\)/);
 });
+test('직원이 직접 로그인하면 미등록 인증 앱 등록을 자동으로 요청한다', () => {
+  assert.match(html, /function mfaOfferAfterLogin\(role, via\)/);
+  assert.match(html, /via !== 'login' \|\| role === 'admin'/);
+  assert.match(html, /mfaOfferAfterLogin\(role, info\.via\)/);
+  assert.match(html, /로그인 보호 등록 요청/);
+});
+test('카카오 로그인은 지원되지 않는 TOTP 등록을 억지로 시도하지 않는다', () => {
+  assert.match(html, /claims\.kakao===true/);
+  assert.match(html, /아이디·비밀번호로 로그인한 뒤 등록/);
+  assert.match(html, /if\(kakao\) kkOpenProfile\(\); else mfaBeginEnrollment\(\)/);
+});
