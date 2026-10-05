@@ -1887,6 +1887,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=21"></script>
+  <script src="js/pu-handoff.js?v=1"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -3094,6 +3095,7 @@ firebase.auth().onAuthStateChanged(u => {
       startUploadWatch();
       loadGrid();
       takeShared();          // 카톡·갤러리에서 공유해 들어온 사진이 있으면 확인 화면
+      takeHandoff();         // 메일함에서 「→ 사진첩」으로 건네진 첨부가 있으면 담는다
       loadCustomKinds();
       loadFolders();
       fillUpTip();           // 마우스를 올리면 펼쳐질 안내 (장수 상한이 저장 층에서 온다)
@@ -3178,6 +3180,47 @@ function clearShareFlag() {
     u.searchParams.delete('share');
     history.replaceState(null, '', u.pathname + u.search + u.hash);
   } catch (_) { /* 주소를 못 고쳐도 동작에는 지장 없다 */ }
+}
+
+/* ── 메일함에서 건네진 첨부 받기 (대표 지시 2026-10-05) ──────────────────
+   「메일함에 들어오는 사업자등록증·명함·계약서를 자동으로 사진첩으로 가져와
+     판독하고 기업정보함으로 보낼 수 없나」의 1걸음.
+
+   ★ 받는 길은 새로 만들지 않는다 — 공유(takeShared)와 똑같이 addFiles 한 통로로
+     들어간다. 그래야 축소·대기열·자동 판독·중복 살피기가 그대로 걸린다.
+   ⚠ 열쇠는 한 번만 쓴다(PuHandoff.take 가 꺼내며 지운다) — 뒤로가기로 돌아와도
+     같은 첨부가 두 번 담기지 않는다.
+   ⚠ 주소에서 take 를 지운다 — 남겨 두면 새로고침할 때마다 「못 받았다」가 뜬다. */
+function handoffKey() {
+  try { return new URLSearchParams(location.search).get('take') || ''; } catch (_) { return ''; }
+}
+function clearHandoffKey() {
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete('take');
+    history.replaceState(null, '', u.pathname + u.search + u.hash);
+  } catch (_) { /* 주소를 못 고쳐도 동작에는 지장 없다 */ }
+}
+function takeHandoff() {
+  const key = handoffKey();
+  if (!key) return;
+  if (!window.PuHandoff) { clearHandoffKey(); toast('건네받는 통로를 불러오지 못했습니다 — 새로고침해 주세요', 8000); return; }
+  PuHandoff.take(key).then(function (got) {
+    clearHandoffKey();
+    if (!got) { toast('건네진 첨부를 찾지 못했습니다 — 메일함에서 다시 눌러 주세요', 8000); return; }
+    /* ⚠ 담기 전에 «막힐 판»인지 본다 — 막힌 채 부르면 건네받은 것이 말없이 사라진다.
+         임시 보관함에서는 이미 꺼냈기 때문이다(공유 쪽에서 겪은 일과 같다). */
+    if (typeof viewingOnlyOther === 'function' && viewingOnlyOther()) {
+      alert('다른 직원의 사진첩을 보는 중에는 담을 수 없습니다.\n「내 사진」으로 돌아간 뒤 메일함에서 다시 눌러 주세요.');
+      return;
+    }
+    toast('📥 ' + (got.from ? got.from + ' 에서 받은 ' : '') + '「' + got.name + '」 을 담습니다');
+    /* isDoc = true — 메일로 오는 것은 사업자등록증·명함·계약서가 많아 글씨를 읽어야 한다 */
+    addFiles([got.file], true, { via: 'mail' });
+  }).catch(function (e) {
+    clearHandoffKey();
+    toast('건네받지 못했습니다 — ' + ((e && e.message) || e), 9000);
+  });
 }
 
 function takeShared() {
