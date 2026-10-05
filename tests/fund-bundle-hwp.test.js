@@ -43,7 +43,7 @@ test('틀 목록을 아직 못 읽었으면 아무것도 안 고른다(단추도
 });
 
 test('★ 배선 — 장부 서식은 먼저 읽고, 원본 틀로 채워, 번호 붙은 이름으로 ZIP 하나', () => {
-  const fn = gF('estabBundleHwp');
+  const fn = gF('_estabBundleHwpGo');   // 2026-10-05 서식 관문(estabBundleHwp)을 지난 뒤 실제로 묶는 곳
   assert.match(fn, /DOC_NEEDS_LEDGER\[u\.d\[0\]\]\?_docExtra\(u\.d\[0\],f\)/, '재산목록·출연확인서가 빈 채로 나간다');
   assert.match(fn, /hwpTplFill\(u\.d\[0\],f,sites\)/);
   assert.match(fn, /\('0'\+\(u\.i\+1\)\)\.slice\(-2\)\+'\. '/, '파일 이름이 묶음 차례를 안 따른다');

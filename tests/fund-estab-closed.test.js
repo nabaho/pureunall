@@ -47,6 +47,6 @@ test('★ 입구(docBody·hwpTplFill)에서 다시 거른다 — 같은 규칙, 
 test('서식을 여는 길이 «종류에 따라» 탈퇴한 곳을 받는다', () => {
   ['hwpOpenFilled', '_loadDocInto', 'hwpSidePreview'].forEach((n) =>
     assert.match(fnSrc(n), /_loadSites\([^)]*\{withClosed:_estabKind\(kind\)\}\)/, n));
-  ['hwpAnnexDownload', 'estabBundle', 'estabBundleHwp'].forEach((n) =>
+  ['hwpAnnexDownload', 'estabBundle', '_estabBundleHwpGo'].forEach((n) =>
     assert.match(fnSrc(n), /_loadSites\(S\.formFund,\{withClosed:true\}\)/, n));
 });

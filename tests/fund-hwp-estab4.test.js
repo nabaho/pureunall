@@ -192,7 +192,7 @@ test('★ 별지 배선 — 인가신청서 미리보기의 [⬇ 별지 명단] 
      같은 명단이 두 번 나간다. 옛 틀(별지가 없는 것)일 때만 따로 */
   assert.match(sp, /kind==='inka'&&!\('별지명단' in \(r\.opts\|\|\{\}\)\)&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,S\._hwpSideSites\|\|\[\]\)/);
   assert.match(sp, /hwpAnnexDownload\(\)/);
-  const bu = gF('estabBundleHwp');
+  const bu = gF('_estabBundleHwpGo');
   assert.match(bu, /u\.d\[0\]==='inka'&&!\('별지명단' in \(res\.opts\|\|\{\}\)\)&&\(S\._hwpTplHas\|\|\{\}\)\.inka_annex&&_cmAnnexNeeded\(f,sites\)/);
   assert.match(bu, /-1\. \[별지\] 설립준비위원회 위원 명단\.hwpx/);
   assert.match(gF('hwpAnnexDownload'), /hwpTplFill\('inka_annex',f,sites\)/);
