@@ -11477,14 +11477,10 @@ function _fbFlushRemoves(k){
   var actual = arr.filter(function(x){ return x && ids[String(x.id)]; }).length;
   if(!actual) return;                                // 같은 id가 다시 왔거나 원래 없던 건
   var left = before - actual;
-  if(q.base >= 10 && actual >= Math.ceil(q.base * 0.5)){
-    var okDel = false;
-    try {
-      okDel = confirm('「' + k + '」에서 ' + actual + '건이 한꺼번에 지워졌습니다(남은 ' + left + '건).\n\n' +
-        '다른 PC 에서 지운 것일 수도, 잘못된 것일 수도 있습니다.\n이 지움을 이 PC 에도 반영할까요?');
-    } catch(_c){ okDel = false; }
-    if(!okDel) return;                               // 취소면 처음 목록을 그대로 두는다
-  }
+  /* 절반 이상 급감은 브라우저·계정 전환 때 생기는 목록 재구성 신호로 본다.
+     화면에서 묻지도, 로컬 자료를 지우지도 않는다. 실제 일괄 삭제는 각 목록의
+     휴지통·일괄 작업처럼 사람이 직접 누른 저장 길만 사용한다. */
+  if(q.base >= 10 && actual >= Math.ceil(q.base * 0.5)) return;
   arr = arr.filter(function(x){ return !(x && ids[String(x.id)]); });
   _fbWriteArr(k, arr, _fbServerU[k]);
 }
