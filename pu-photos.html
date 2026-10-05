@@ -3205,22 +3205,31 @@ function takeHandoff() {
   const key = handoffKey();
   if (!key) return;
   if (!window.PuHandoff) { clearHandoffKey(); toast('건네받는 통로를 불러오지 못했습니다 — 새로고침해 주세요', 8000); return; }
-  PuHandoff.take(key).then(function (got) {
-    clearHandoffKey();
-    if (!got) { toast('건네진 첨부를 찾지 못했습니다 — 메일함에서 다시 눌러 주세요', 8000); return; }
-    /* ⚠ 담기 전에 «막힐 판»인지 본다 — 막힌 채 부르면 건네받은 것이 말없이 사라진다.
-         임시 보관함에서는 이미 꺼냈기 때문이다(공유 쪽에서 겪은 일과 같다). */
-    if (typeof viewingOnlyOther === 'function' && viewingOnlyOther()) {
-      alert('다른 직원의 사진첩을 보는 중에는 담을 수 없습니다.\n「내 사진」으로 돌아간 뒤 메일함에서 다시 눌러 주세요.');
-      return;
-    }
-    toast('📥 ' + (got.from ? got.from + ' 에서 받은 ' : '') + '「' + got.name + '」 을 담습니다');
-    /* isDoc = true — 메일로 오는 것은 사업자등록증·명함·계약서가 많아 글씨를 읽어야 한다 */
-    addFiles([got.file], true, { via: 'mail' });
-  }).catch(function (e) {
-    clearHandoffKey();
-    toast('건네받지 못했습니다 — ' + ((e && e.message) || e), 9000);
-  });
+  /* 열쇠가 여럿일 수 있다 — 메일함의 「한꺼번에 사진첩으로」(2026-10-05 2걸음).
+     ⚠ 한 번에 addFiles 로 넘긴다. 한 장씩 부르면 대기열·장수 상한이 따로 놀아
+       「스무 장까지」 같은 약속이 깨진다. */
+  const 열쇠들 = key.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+  Promise.all(열쇠들.map(function (k) { return PuHandoff.take(k).catch(function () { return null; }); }))
+    .then(function (받은것들) {
+      clearHandoffKey();
+      const 쓸것 = 받은것들.filter(Boolean);
+      const 놓친수 = 열쇠들.length - 쓸것.length;
+      if (!쓸것.length) { toast('건네진 첨부를 찾지 못했습니다 — 메일함에서 다시 눌러 주세요', 8000); return; }
+      /* ⚠ 담기 전에 «막힐 판»인지 본다 — 막힌 채 부르면 건네받은 것이 말없이 사라진다.
+           임시 보관함에서는 이미 꺼냈기 때문이다(공유 쪽에서 겪은 일과 같다). */
+      if (typeof viewingOnlyOther === 'function' && viewingOnlyOther()) {
+        alert('다른 직원의 사진첩을 보는 중에는 담을 수 없습니다.\n「내 사진」으로 돌아간 뒤 메일함에서 다시 눌러 주세요.');
+        return;
+      }
+      const 어디서 = 쓸것[0].from ? 쓸것[0].from + ' 에서 받은 ' : '';
+      toast('📥 ' + 어디서 + (쓸것.length > 1 ? 쓸것.length + '건' : '「' + 쓸것[0].name + '」') + ' 을 담습니다'
+        + (놓친수 ? ' (못 찾은 것 ' + 놓친수 + '건)' : ''));
+      /* isDoc = true — 메일로 오는 것은 사업자등록증·명함·계약서가 많아 글씨를 읽어야 한다 */
+      addFiles(쓸것.map(function (g) { return g.file; }), true, { via: 'mail' });
+    }).catch(function (e) {
+      clearHandoffKey();
+      toast('건네받지 못했습니다 — ' + ((e && e.message) || e), 9000);
+    });
 }
 
 function takeShared() {

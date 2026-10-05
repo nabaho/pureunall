@@ -1272,6 +1272,17 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-spam button:hover{background:#fef2f2}
 .dm-row.spam{background:#f8fafc}
 /* ── 📥 새 문의 띠 (대표 승인 목업 2026-10-04) — 한 줄, 넘치면 … ── */
+/* 📄 서류 후보 띠 — 「서류」 거르개를 켠 동안에만 뜬다 (대표 지시 2026-10-05 「2걸음」).
+   문의 띠(.dm-inq)와 같은 자리·같은 결로 둔다 — 띠마다 다른 모양이면 띠가 늘수록 시끄럽다. */
+.mbdoc{display:flex;align-items:center;gap:10px;padding:7px 12px;flex-wrap:wrap;
+  background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1e293b}
+.mbdoc b{color:#1e40af}
+.mbdoc .none{color:#64748b;font-size:12.5px}
+.mbdoc button{margin-left:auto;flex:none;border:1px solid #1e40af;background:#1e40af;color:#fff;
+  border-radius:9px;padding:6px 13px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer}
+/* ⚠ 마우스를 올렸을 때 «새 색을 만들지» 않는다 — 집안 팔레트는 정해져 있다
+     (tests/color-palette-apps.test.js). 색 대신 밝기만 바꾼다. */
+.mbdoc button:hover{filter:brightness(1.12)}
 .dm-inq{display:flex;align-items:center;gap:8px;padding:6px 12px;white-space:nowrap;
   background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1e293b}
 .dm-inq b{color:#1e40af}
@@ -3405,6 +3416,7 @@ body.pc #pcDetail{display:flex}
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=21"></script>
   <script src="js/pu-handoff.js?v=1"></script>
+  <script src="js/pu-doc-pick.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=2"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -20739,6 +20751,10 @@ function mbMatchedRows(){
   if(f==='unread') rows = rows.filter(v=>!Number(v.r||0));
   else if(f==='flag') rows = rows.filter(v=>Number(v.g||0));
   else if(f==='att')  rows = rows.filter(v=>Number(v.a||0));
+  /* 📄 서류 후보만 — 사업자등록증·등록확인서·명함·계약서로 «보이는» 첨부가 붙은 것
+     (대표 지시 2026-10-05 「2걸음」). 고르는 잣대는 js/pu-doc-pick.js 한 곳이다 —
+     여기서 따로 판단하면 띠에 적힌 수와 걸러진 수가 어긋난다. 판독은 아직 안 한다. */
+  else if(f==='doc')  rows = rows.filter(v=>mbIsDoc(v));
   const q = String(state.mbQ||'').trim().toLowerCase().replace(/\s/g,'');
   if(q) rows = rows.filter(v=>{
     /* ⚠ 미리보기(v.p)도 «함께» 본다 — 서버가 이미 본문 앞 140자를 적어 두었는데
@@ -20965,6 +20981,11 @@ function mailSideHtml(){
         <i>☆</i><span>중요</span></a>
       <a class="${fl==='att'?'on':''}" onclick="mbFilter('att')" title="첨부가 있는 메일만">
         <i>📎</i><span>첨부</span></a>
+      ${/* 📄 서류 — 사업자등록증·등록확인서·명함·계약서로 «보이는» 첨부가 붙은 것만.
+           판독은 안 한다(요금 0원) — 첨부 이름과 제목만 본다. 대표 지시 2026-10-05 */''}
+      <a class="${fl==='doc'?'on':''}" onclick="mbFilter('doc')"
+        title="사업자등록증·등록확인서·명함·계약서로 보이는 첨부가 붙은 메일만 — 판독하지 않고 이름·제목으로만 고릅니다">
+        <i>📄</i><span>서류</span></a>
     </div>
     <div class="dm-write">
       <button class="a" onclick="openMailPage()">메일쓰기</button>
@@ -22928,6 +22949,7 @@ function mbDrawerHtml(){
       <a class="${fl==='unread'?'on':''}" onclick="mbFilter('unread');mbDrawer(false)">✉ 안읽음 ${cntUnread?`<b>${cntUnread}</b>`:''}</a>
       <a class="${fl==='flag'?'on':''}" onclick="mbFilter('flag');mbDrawer(false)">☆ 중요</a>
       <a class="${fl==='att'?'on':''}" onclick="mbFilter('att');mbDrawer(false)">📎 첨부</a>
+      <a class="${fl==='doc'?'on':''}" onclick="mbFilter('doc');mbDrawer(false)">📄 서류</a>
     </div>`;
 
   h += row('*all','✉','전체메일');
@@ -23568,6 +23590,7 @@ function mbListHtml(){
     ${mbSpamLineHtml()}
     ${mbSentWhoLineHtml()}
     ${mbOpenOnlyLineHtml()}
+    ${mbDocStripHtml()}
     <div class="dm-list ${mbDense()}">${body}</div>
     ${/* ── 아래 영역 — 쪽번호와 보기설정 (대표 지시 2026-08-30, 다음메일 캡처3·4) ──
          예전에는 「이전 메일 더 보기」 단추 하나였다. 몇 쪽인지도, 지금 몇 쪽인지도
@@ -26052,6 +26075,77 @@ function mbYmd(ms){
   const d = new Date(Number(ms)||Date.now());
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   📄 서류 후보 — 저절로 모아서 한꺼번에 (대표 지시 2026-10-05 「2걸음」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 고르는 잣대는 js/pu-doc-pick.js 한 곳이다. 여기(띠·거르개·보내기)는 그 답만 쓴다.
+   ★ 실제 메일로 재고 만들었다 — 첨부 5,552통 가운데 서류 후보 299, 그중 사진첩으로
+     보낼 값어치가 있는 것(사업자등록증·등록확인서·명함) 68. 계약서 231통은 후보로
+     보여는 주되 «한꺼번에»에서는 뺀다 — 첨부 줄의 「→ 기업별 계약서」가 더 맞는 길이다.
+   ⚠ 판독은 사진첩이 한다. 여기서 하는 일은 고르기와 건네기뿐이다. */
+function mbIsDoc(v){
+  return !!(window.PuDocPick && PuDocPick.서류인가(v));
+}
+function mbDocSendable(){
+  if(!window.PuDocPick) return [];
+  return mbMatchedRows().filter(v=>PuDocPick.보낼만한가(v));
+}
+/* 띠 — 「📄 서류」를 켠 동안에만 뜬다. 다른 칸을 보는 사람 화면은 그대로다. */
+function mbDocStripHtml(){
+  if((state.mbFilter||'') !== 'doc' || !window.PuDocPick) return '';
+  const 보낼것 = mbDocSendable();
+  const 모두 = mbMatchedRows().length;
+  const 한번에 = PuDocPick.한번에;
+  const n = Math.min(보낼것.length, 한번에);
+  return `<div class="mbdoc">
+    <span>📄 서류로 보이는 첨부 <b>${모두}건</b>${
+      보낼것.length ? ` · 그중 판독해서 기업정보함에 쓸 것 <b>${보낼것.length}건</b>` : ''}</span>
+    ${보낼것.length ? `<button onclick="mbDocsToPhotos()"
+        title="사진첩으로 담습니다 — 거기서 판독한 뒤 「📇 기업정보함으로」는 사람이 누릅니다">
+        → 한꺼번에 사진첩으로 (${n}건)</button>`
+      : `<span class="none">계약서는 첨부 줄의 「→ 기업별 계약서」가 더 맞는 길입니다</span>`}
+  </div>`;
+}
+/* 한꺼번에 보내기 — 한 통씩 ① 첨부 목록을 받아 ② 서류 첨부를 찾아 ③ 받아서 ④ 통로에 담는다.
+   ⚠ 하나가 실패해도 나머지는 간다 — 「하나 때문에 전부 안 됐다」가 가장 나쁘다.
+   ⚠ 한 번에 보내는 수를 막는다(PuDocPick.한번에) — 사진첩 자동 판독이 한 번에 20장이라
+     그보다 많이 보내면 남은 것은 다음에 열 때 읽히는데, 사람은 「판독이 안 됐다」고 본다. */
+async function mbDocsToPhotos(){
+  if(!window.PuDocPick || !window.PuHandoff) return toast('도구를 불러오지 못했습니다 — 새로고침해 주세요', 8000);
+  const 고른것 = mbDocSendable().slice(0, PuDocPick.한번에);
+  if(!고른것.length) return toast('보낼 서류가 없습니다');
+  const 열쇠들 = [], 못한것 = [];
+  for(let i=0;i<고른것.length;i++){
+    const v = 고른것[i];
+    toast('📄 ' + (i+1) + '/' + 고른것.length + ' 받는 중…', 4000);
+    try {
+      const o = { slug: v._slug, uid: v.u };
+      const 본 = await mbFetchBody(v._slug, v.u, true);
+      const atts = (본 && 본.atts) || [];
+      /* 이름으로 찾는다 — 못 찾으면 서류로 «보이는» 첫 첨부. 둘 다 없으면 건너뛴다.
+         ⚠ 거울의 이름 차례와 서버의 첨부 차례가 같다고 «믿지 않는다» — 둘은 다른
+           걸음으로 훑는다. 그래서 번호가 아니라 이름으로 맞춘다. */
+      const 찍은이름 = PuDocPick.보기(v).이름;
+      let at = -1;
+      for(let k=0;k<atts.length;k++){
+        const nm = String((atts[k]&&atts[k].name)||'');
+        if(찍은이름 && nm === 찍은이름){ at = k; break; }
+        if(at < 0 && PuDocPick.이름갈래(nm)) at = k;
+      }
+      if(at < 0){ 못한것.push(String(v.s||'').slice(0,20) + ' (서류 첨부를 못 찾음)'); continue; }
+      const f = await mbAttFetch(o, at, atts[at]);
+      const k = await PuHandoff.put({ name:f.name, type:f.mime, bytes:f.bytes,
+        from:'메일 · ' + String(v.f || v.e || '').slice(0,40) });
+      열쇠들.push(k);
+    } catch(e){
+      못한것.push(String(v.s||'').slice(0,20) + ' (' + ((e&&e.message)||e) + ')');
+    }
+  }
+  if(못한것.length) toast('못 가져온 것 ' + 못한것.length + '건 — ' + 못한것.slice(0,2).join(' · '), 11000);
+  if(!열쇠들.length) return;
+  goPhotos('take=' + 열쇠들.map(encodeURIComponent).join(','));
+}
+
 /* ── 첨부를 «사진첩으로» (대표 지시 2026-10-05) ────────────────────────────
    「메일함에 들어오는 사업자등록증·명함·계약서를 자동으로 사진첩으로 가져와
      판독하고 기업정보함으로 보낼 수 없나」
