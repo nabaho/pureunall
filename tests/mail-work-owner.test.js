@@ -35,6 +35,7 @@ function box(o) {
     _mbWork: null,
     /* 사람이 손으로 이은 주소 → 건 (대표 승인 목업 2026-10-05) — config/mailWork */
     _mbWorkLink: o.workLink || {},
+    _mbNoWho: {}, _mbBoxWho: o.boxWho || {},   /* 👤 이 칸을 보는 사람 (2026-10-06) */
     MB_RAW_P: '~', MB_WHO_P: '@',
     mbNow: () => (o.now === undefined ? '#bin' : o.now),
     mbSentBox: () => !!o.sent,
@@ -49,7 +50,8 @@ function box(o) {
   vm.createContext(ctx);
   ['mbWhoLive', 'mbWhoWhy','mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkHandOf',
     'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbWorkMgrs', 'mbWorkTag', 'mbSubsOfRow', 'mbCoNameOf',
-    'mbWorkLinkedKeys', 'mbWorkTodo']
+    'mbWorkLinkedKeys', 'mbWorkTodo',
+    'mbNoWhoBox', 'mbBoxWhoList', 'mbBoxWhoOfRow']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   /* ⚠ 갈래 목록을 여기 «베껴 두지 않는다». 베껴 두면 앱이 갈래를 늘려도 검사만 옛 목록을
        보고 통과해, 「검사는 파란데 화면에는 안 나오는」 자리가 생긴다(2026-10-05 기금·기타). */

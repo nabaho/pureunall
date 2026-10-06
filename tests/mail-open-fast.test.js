@@ -347,6 +347,7 @@ function seedBox(over) {
     _mbBins: {}, _mbPut: {}, _mbPutBy: {}, _mbHide: {}, _mbOwner: {}, _mbSucc: {}, _mbCo: {}, _mbNotCo: {},
     _mbWhoMsg: {}, _mbNoWho: {}, _mbNotSpam: {}, _mbSpamOff: false,
     _mbWorkLink: {},   /* 📁 주소 → 사건·컨설팅 (2026-10-05) */
+    _mbBoxWho: {},     /* 👤 이 칸을 보는 사람 (2026-10-06) */
     _mbMsgs: {
       'INBOX-1': { 1: { u: 1, s: '가', p: '본문1' }, 2: { u: 2, s: '나', p: '본문2' }, 3: { u: 3, s: '다', p: '본문3' } },
       '*old': { a: { s: '옛것' } },
