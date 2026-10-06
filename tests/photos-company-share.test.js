@@ -153,7 +153,9 @@ function autoCtx(over) {
     _calls: calls
   };
   vm.createContext(ctx);
-  vm.runInContext(cutFn(photos, 'function autoShareByCo('), ctx);
+  /* 2026-10-06: 알림 글에 쓰는 이름은 «번호 없이» 내는 함수를 거친다 — 실제 코드를 그대로 싣는다 */
+  vm.runInContext(cutFn(photos, 'function ownerNameReal(') + '\n' + cutFn(photos, 'function ownerNameOf(') + '\n' +
+    cutFn(photos, 'function autoShareByCo('), ctx);
   ctx.coMgrsFor = function () { return Promise.resolve(o.mgrs === undefined ? { co: {}, sids: ['s1'], uids: ['U2'], noAcct: [] } : o.mgrs); };
   return ctx;
 }
