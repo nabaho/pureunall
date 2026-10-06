@@ -2847,7 +2847,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <div class="modal" style="width:820px;max-width:96vw">
     <div class="modal-h" id="bizPickH">📂 7번 폴더에서 사업 고르기</div>
     <div class="modal-b" id="bizPickBody"></div>
-    <div class="modal-foot"><button class="btn" onclick="document.getElementById('modalBizPick').classList.remove('open')">닫기</button><button class="btn primary" id="bizPickGo" onclick="bizPickGo()">고른 건 올리기</button></div>
+    <div class="modal-foot"><button class="btn" onclick="bizPickClose()" title="올리는 중이면 지금 건까지 담고 멈춥니다">닫기 · 멈추기</button><button class="btn primary" id="bizPickGo" onclick="bizPickGo()">고른 건 올리기</button></div>
   </div>
 </div>
 <div class="modal-ov" id="modalBizCmp">
@@ -14765,7 +14765,7 @@ function _bizEnsureSaved(){
   return true;
 }
 /* 파일들을 이 사업에 담는다 — list:[{name, bytes, relPath?, mtime?}]. 같은 파일(자리·이름·크기)은 두 번 안 담는다 */
-async function _bizAddFiles(list){
+async function _bizAddFiles(list, 앞말){
   var r=_bizCur; if(!r) return { n:0, cloud:0, big:0 };
   var have={}; (r.docs||[]).forEach(function(d){ have[(d.relPath||'')+'|'+d.name+'|'+d.size]=1; });
   var n=0, cloud=0, big=0;
@@ -14782,7 +14782,7 @@ async function _bizAddFiles(list){
     var d={ id:id, entityType:'Document', name:f.name, ext:ext, size:f.bytes.length, kind:KcareerBiz.guessDocKind(f.name), savedAt:now };
     if(자리) d.stPath=자리; if(f.relPath) d.relPath=f.relPath; if(f.mtime) d.mtime=f.mtime;
     r.docs=(r.docs||[]).concat([d]); have[키]=1; n++;
-    if(list.length>3 && (i+1)%3===0) toast('⏳ 서류 담는 중 '+(i+1)+' / '+list.length);
+    if(list.length>3 && (i+1)%3===0) toast('⏳ '+(앞말||'')+'서류 담는 중 '+(i+1)+' / '+list.length);
   }
   if(n){ _bizPut(r); r._isNew=false; }
   return { n:n, cloud:cloud, big:big };
@@ -14885,17 +14885,36 @@ function bizPickDraw(){
     /* ★ «사업 같음» 한꺼번에 (대표 지시 2026-10-05) — 아직 안 올린 것만 고른다. 올리기는 아래 단추로(사람이 누른다) */
     +(P.into?'':'<button class="btn sm" type="button" onclick="bizPickAllBiz()" title="«사업 같음»이 붙은 건 가운데 아직 안 올린 것을 모두 고릅니다">☑ 사업 같음 모두 고르기 ('+P.list.filter(function(x){ return x.biz && !x.used; }).length+')</button>')
     +'<input class="tb-input" placeholder="찾기" value="'+escapeHtml(P.q)+'" oninput="_bizPick.q=this.value;bizPickDraw()" style="width:160px"></div>';
-  html+=보일.length?('<div class="dt" style="max-height:52vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.into?'':'<input type="checkbox" onclick="document.querySelectorAll(\'#bizPickBody .row-chk\').forEach(function(x){ if(!x.disabled) x.checked=this.checked; },this)"> ')+'№</th><th>연도</th><th>건 폴더</th><th>올릴 이름</th><th></th></tr></thead><tbody>'
+  html+=보일.length?('<div class="dt" style="max-height:52vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px">'+(P.into?'':'<input type="checkbox" onclick="document.querySelectorAll(\'#bizPickBody .row-chk\').forEach(function(x){ if(!x.disabled) x.checked=this.checked; },this);bizPickSum()" title="보이는 줄 모두"> ')+'№</th><th>연도</th><th>건 폴더</th><th>올릴 이름</th><th></th></tr></thead><tbody>'
     +보일.map(function(x,i){ var k=P.list.indexOf(x);
-      return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="'+(P.into?'radio':'checkbox')+'" name="bizPickOne" class="row-chk" value="'+k+'"'+(x.used&&!P.into?' disabled':'')+'><span>'+(i+1)+'</span></label></td>'
+      return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="'+(P.into?'radio':'checkbox')+'" name="bizPickOne" class="row-chk" value="'+k+'"'+(x.used&&!P.into?' disabled':'')+' onchange="bizPickSum()"><span>'+(i+1)+'</span></label></td>'
         +'<td>'+escapeHtml(x.pre.year||x.d.yearDir)+'</td>'
-        +'<td class="bz-cell" style="max-width:300px" title="'+escapeHtml(x.d.name)+'">'+escapeHtml(x.d.name)+(x.biz?' <span class="tag navy" style="font-size:10px">사업 같음</span>':'')+'</td>'
+        /* ⚠ 「사업 같음」은 이름 «앞»에 — 뒤에 두면 긴 이름이 … 으로 잘릴 때 함께 사라진다(대표 화면 2026-10-06) */
+        +'<td class="bz-cell" style="max-width:320px" title="'+escapeHtml(x.d.name)+'">'+(x.biz?'<span class="tag navy" style="font-size:10px">사업 같음</span> ':'')+escapeHtml(x.d.name)+'</td>'
         +'<td class="bz-cell" style="max-width:220px" title="'+escapeHtml(x.pre.title)+'">'+escapeHtml(x.pre.title)+(x.pre.org?' · '+escapeHtml(x.pre.org):'')+'</td>'
         +'<td style="font-size:11px;white-space:nowrap;color:var(--teal)">'+(x.used?'✔ 올림 — '+escapeHtml(x.used):'')+'</td></tr>'; }).join('')
     +'</tbody></table></div>')
     :'<div class="empty" style="padding:16px">보일 건 폴더가 없습니다'+(P.all?'':' — 「모든 건 폴더 보기」를 켜 보세요')+'</div>';
   html+='<div style="font-size:11.5px;color:var(--text-mute);margin-top:8px">· 고른 건 폴더의 파일을 <b>사업 서류로 앱에 담습니다</b>(다른 PC 에서도 열림). 폴더의 원본은 그대로입니다.<br>· 제출서류(개인 지원 기록)에서 옮기지 않습니다 — 거기 있던 줄은 그대로 남습니다.</div>';
   document.getElementById('bizPickBody').innerHTML=html;
+  bizPickSum();
+}
+/* 고른 것 세기 — 단추에 «몇 건, 그중 사업 같음이 아닌 것 몇 건»을 늘 보인다(무엇을 올리는지 누르기 전에 안다) */
+function _bizPickChosen(){
+  var P=_bizPick; if(!P) return [];
+  return [].slice.call(document.querySelectorAll('#bizPickBody .row-chk:checked')).map(function(x){ return P.list[Number(x.value)]; }).filter(Boolean);
+}
+function bizPickSum(){
+  var P=_bizPick, go=document.getElementById('bizPickGo'); if(!P||!go||P.running) return;
+  var 고른=_bizPickChosen(), 밖=고른.filter(function(x){ return !x.biz; }).length;
+  go.disabled=!고른.length;
+  go.textContent=P.into?'고른 폴더의 서류 담기':(고른.length?('고른 '+고른.length+'건을 사업으로 올리기'+(밖?' (사업 같음 아닌 '+밖+'건 포함)':'')):'고른 건을 사업으로 올리기');
+}
+/* 닫기 — 올리는 중이면 «이번 건까지 담고 멈춘다»(이미 담은 것은 남는다) */
+function bizPickClose(){
+  var P=_bizPick;
+  if(P && P.running){ P.stop=true; toast('⏹ 지금 읽는 건까지 담고 멈춥니다 — 이미 올린 사업은 남습니다', 6000); return; }
+  document.getElementById('modalBizPick').classList.remove('open');
 }
 function bizPickAllBiz(){
   var P=_bizPick; if(!P) return;
@@ -14921,21 +14940,29 @@ async function _bizReadDir(handle, prefix){
 }
 async function bizPickGo(){
   var P=_bizPick; if(!P) return;
-  var 고른=[].slice.call(document.querySelectorAll('#bizPickBody .row-chk:checked')).map(function(x){ return P.list[Number(x.value)]; }).filter(Boolean);
+  var 고른=_bizPickChosen();
   if(!고른.length){ toast('건 폴더를 골라 주세요'); return; }
+  /* ★ 사업 같음이 아닌 것이 섞였으면 한 번 묻는다 (대표 화면 2026-10-06 — 「모든 건 폴더 보기」를 켠 채 머리 ☐ 를 누르면
+     개인 지원 236건이 통째로 골라진다. 파일 수천 개가 창고에 올라간 뒤에 알면 늦다) */
+  var 밖=고른.filter(function(x){ return !x.biz; });
+  if(!P.into && 밖.length && !confirm('고른 '+고른.length+'건 가운데 «사업 같음»이 아닌 '+밖.length+'건이 있습니다.\n'
+      +'(예: '+밖.slice(0,3).map(function(x){ return x.d.name; }).join(' / ')+')\n\n'
+      +'모집·위원·강사 같은 개인 지원 건일 수 있습니다 — 그 폴더의 파일도 모두 앱에 담깁니다.\n그래도 모두 사업으로 올릴까요?')) return;
   var btn=document.getElementById('bizPickGo'); if(btn){ btn.disabled=true; btn.textContent='⏳ 담는 중…'; }
+  P.running=true; P.stop=false;
   var 건=0, 서류=0, 못=[];
   try{
     for(var i=0;i<고른.length;i++){
+      if(P.stop){ 못.push('멈춤 — 남은 '+(고른.length-i)+'건은 안 올렸습니다'); break; }
       var x=고른[i];
-      toast('⏳ '+(i+1)+' / '+고른.length+' · '+x.d.name+' 읽는 중…');
+      toast('⏳ ['+(i+1)+' / '+고른.length+'건] '+x.d.name+' 읽는 중…');
       var files=await _bizReadDir(x.d.handle, x.caseDir);
       if(!P.into){
         _bizCur=_bizNew({ year:x.pre.year||String(new Date().getFullYear()), title:x.pre.title, org:x.pre.org, caseDir:x.caseDir,
           kind:KcareerBiz.KINDS[0], stage:KcareerBiz.stageForImport(x.pre.year) });
         _bizCur._isNew=true; _bizPut(_bizCur); _bizCur._isNew=false;
       } else if(_bizCur && !_bizCur.caseDir){ _bizCur.caseDir=x.caseDir; }
-      var o=await _bizAddFiles(files);
+      var o=await _bizAddFiles(files, '['+(i+1)+' / '+고른.length+'건] ');
       if(o.n===0 && _bizCur && P.into) _bizPut(_bizCur);
       건++; 서류+=o.n; if(o.big) 못.push(x.d.name+' — 25MB 넘는 '+o.big+'개는 이 PC 에만');
     }
@@ -14944,7 +14971,7 @@ async function bizPickGo(){
     if(P.into) bizDraw(); else _bizCur=null;
     toast((P.into?'📎 서류 '+서류+'개를 담았습니다':'🏢 사업 '+건+'건 · 서류 '+서류+'개를 올렸습니다 — 구분·단계는 줄을 눌러 고쳐 주세요')+(못.length?' · '+못.join(' / '):''), 8000);
   }catch(e){ console.error(e); toast('올리기 실패: '+((e&&e.message)||e)); }
-  finally{ if(btn){ btn.disabled=false; bizPickDraw(); } }
+  finally{ P.running=false; P.stop=false; if(btn){ btn.disabled=false; bizPickDraw(); } }
 }
 
 /* ── 🗂 서류 찾기 — 모든 사업의 서류를 한 표에서 ── */

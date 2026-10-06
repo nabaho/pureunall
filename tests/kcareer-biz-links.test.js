@@ -40,7 +40,9 @@ function 홈(bizs, 지금) {
   const 칸 = { innerHTML: 'X' };
   const 고정 = new Date(지금);
   class 시계 extends Date { constructor(...a) { if (a.length) super(...a); else super(고정.getTime()); } static now() { return 고정.getTime(); } }
-  const ctx = { Date: 시계, KcareerBiz: B, bizAll: () => bizs, escapeHtml: (s) => String(s), _jsAttr: (s) => String(s), formatDate: (s) => s,
+  /* ⚠ 판정 모듈은 상자 밖(이 검사 파일)에서 실렸다 — 상자의 고정 시계를 모른다. 시각을 «넘겨» 준다.
+       안 넘기면 진짜 오늘로 셈해서, 만든 날(10-05)에만 통과하고 다음 날 깨진다(2026-10-06 실제로 깨졌다). */
+  const ctx = { Date: 시계, KcareerBiz: Object.assign({}, B, { summary: (r) => B.summary(r, 고정) }), bizAll: () => bizs, escapeHtml: (s) => String(s), _jsAttr: (s) => String(s), formatDate: (s) => s,
     document: { getElementById: () => 칸 } };
   vm.createContext(ctx);
   vm.runInContext(떼기('function renderHomeBizDue('), ctx);
