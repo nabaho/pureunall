@@ -384,7 +384,7 @@ function memStore(seed) {
   const store = Object.assign({}, seed || {});
   return { store, api: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); }, removeItem: (k) => { delete store[k]; } } };
 }
-function afterLoginBox({ want, linked, yes }) {
+function afterLoginBox({ want, linked }) {
   const m = memStore(want != null ? { pu_kakao_want_link: String(want) } : {});
   const box = {
     Date, Number, String, Promise,
@@ -392,9 +392,9 @@ function afterLoginBox({ want, linked, yes }) {
     sessionStorage: m.api,
     auth: { currentUser: { uid: 'u1' } },
     db: { ref: () => ({ once: () => Promise.resolve({ val: () => (linked ? { kakaoId: '111' } : null) }) }) },
-    asked: 0, started: 0,
+    started: 0,
   };
-  box.confirm = () => { box.asked++; return yes !== false; };
+  box.kkToast = () => {};
   box.kkStartLink = () => { box.started++; };
   vm.createContext(box);
   vm.runInContext(enterFn('kkAfterLogin'), box);
@@ -402,22 +402,26 @@ function afterLoginBox({ want, linked, yes }) {
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
 
-test('★★ 화면 — 노란 단추가 «연결 안 됨» 이었으면 비밀번호 로그인 뒤 물어보고 연결을 시작한다', async () => {
+test('★★ 화면 — 노란 단추가 «연결 안 됨» 이었으면 비밀번호 확인 뒤 자동으로 연결을 시작한다', async () => {
   const a = afterLoginBox({ want: Date.now(), linked: false });
   a.box.kkAfterLogin(); await tick();
-  assert.equal(a.box.asked, 1, '묻지 않았다');
   assert.equal(a.box.started, 1, '연결을 시작하지 않았다');
   assert.equal(a.store.pu_kakao_want_link, undefined, '표시가 남아 다음 로그인에 또 묻는다');
   a.box.kkAfterLogin(); await tick();
-  assert.equal(a.box.asked, 1, '한 번 물은 뒤 또 물었다');
+  assert.equal(a.box.started, 1, '한 번 시작한 뒤 또 시작했다');
 });
 
-test('★ 화면 — 묻지 않을 때: 표시 없음 · 15분 넘음 · 이미 연결됨 · 「아니요」', async () => {
+test('★★ 화면 — 자동 연결 중에는 다시 묻는 확인창이 없다', () => {
+  const src = enterFn('kkAfterLogin');
+  assert.doesNotMatch(src, /confirm\s*\(/);
+  assert.match(src, /kkStartLink\(\)/);
+});
+
+test('★ 화면 — 자동으로 잇지 않을 때: 표시 없음 · 15분 넘음 · 이미 연결됨', async () => {
   const cases = [
     ['표시 없음', { want: null, linked: false }],
     ['15분 넘음', { want: Date.now() - 16 * 60 * 1000, linked: false }],
     ['이미 연결됨', { want: Date.now(), linked: true }],
-    ['아니요', { want: Date.now(), linked: false, yes: false }],
   ];
   for (const [why, o] of cases) {
     const a = afterLoginBox(o);
