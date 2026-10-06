@@ -79,6 +79,8 @@ function pick(over) {
    'function shareableSel(',
    'function openShareMany(', 'function openSharePeople(', 'function sharePeopleHtml(',
    'function sharePickFilter(', 'function sharePickChanges(', 'function sharePickTouched(',
+   /* 2026-10-06: 이름을 «번호 없이» 내는 함수 — 사람 고르기 창이 쓴다. 실제 코드를 그대로 싣는다 */
+   'function ownerNameReal(', 'function ownerNameOf(',
    'function renderShareCard('].forEach(function (n) {
     vm.runInContext(cutFn(APP, n), ctx);
   });

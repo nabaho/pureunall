@@ -13687,7 +13687,7 @@ function autoShareByCo(ids, coName) {
           .catch(function (e) { lastErr = e; console.warn('[업체 담당자 공유]', id, e); });
       });
     }, Promise.resolve()).then(function () {
-      const who = uids.map(function (u) { return ownerNames[u] || u; }).join('·');
+      const who = uids.map(function (u) { return ownerNameOf(u); }).join('·');
       if (done) toast('👥 ' + coName + ' 담당자(' + who + ')에게 ' + done + '장을 열었습니다');
       /* ⚠ 「내가 올린 사진에만」은 틀린 말이었다(2026-08-29) — 총괄관리자는 사진 자리에
          쓸 수 있고, 막는 것은 받는 사람 목록 자리 하나다. 알림은 짧아야 하므로 한 줄만
@@ -13710,7 +13710,7 @@ function autoShareByCo(ids, coName) {
 function govSharedToast(r) {
   if (!r || !r.photos) return;
   const who = Object.keys(r.byWho || {})
-    .map(function (u) { return ownerNames[u] || u; }).join('·');
+    .map(function (u) { return ownerNameOf(u); }).join('·');
   toast('📅 그 날 일정 담당' + (who ? '(' + who + ')' : '') + '에게 ' +
     r.photos + '장을 열었습니다' + (r.rest ? ' — ' + r.rest + '장은 다음에 엽니다' : ''));
 }
@@ -13836,7 +13836,7 @@ function bySid(a, b) {
   const na = Number(sa), nb = Number(sb);
   if (sa && sb && Number.isFinite(na) && Number.isFinite(nb) && na !== nb) return na - nb;
   if (sa !== sb) return sa < sb ? -1 : 1;
-  return String(ownerNames[a] || a) < String(ownerNames[b] || b) ? -1 : 1;
+  return String(ownerNameOf(a)) < String(ownerNameOf(b)) ? -1 : 1;
 }
 
 let _sharePick = null;      // { ids, pre[], has[], mayDrop, host }
@@ -14017,7 +14017,7 @@ function sharePeopleHtml(others, noAcct) {
     if (seen[u]) return '';
     seen[u] = 1;
     const o = opt || {};
-    const nm = ownerNames[u] || u;
+    const nm = ownerNameOf(u);
     const sid = sidOf(u);
     return '<label class="prow" data-nm="' + esc(nm + ' ' + sid) + '">' +
       '<input type="checkbox" class="shareOne" value="' + esc(u) + '"' +
@@ -14172,7 +14172,7 @@ function submitSharePeople() {
     if (add.length) noteShareOften(add);
     const said = add.length ? add : drop;
     if (p.host === 'sharePickBox') closeSharePick(); else closeKindPopup();
-    const who = said.map(function (u) { return ownerNames[u] || u; }).join('·');
+    const who = said.map(function (u) { return ownerNameOf(u); }).join('·');
     if (done) {
       toast(add.length
         ? '👥 ' + who + '님에게 ' + done + '장을 열었습니다'
@@ -17209,12 +17209,43 @@ let ownerDefaulted = false;   // 관리자를 「전체 근로자」로 한 번�
 function mergeStaffNames() {
   return PuPhotoStore.listStaff().then(function (staff) {
     Object.keys(staff || {}).forEach(function (uid) {
-      if (ownerNames[uid]) return;
+      /* ⚠ 「이미 이름이 있나」를 ownerNameReal 로 본다 — 번호(uid)가 이름 자리에 들어가
+           있어도 «있는 것»으로 세면 진짜 이름이 영영 못 들어온다(2026-10-06 실측:
+           사진첩에 이름을 안 적은 최기운 님이 「HVp8SMqMGVO8aUz…」로 떴다). */
+      if (ownerNameReal(uid)) return;
       const x = staff[uid] || {};
-      ownerNames[uid] = x.name || x.sid || uid;
+      ownerNames[uid] = x.name || x.sid || '';
     });
     return staff;
   }).catch(function (e) { console.warn('[직원 명단]', e && e.message); });
+}
+
+/* ── 이름표 읽기 — 번호(uid)를 «이름처럼» 내보내지 않는다 (대표 지시 2026-10-06 「에러났다」) ──
+   예전에는 owners 에 이름이 비어 있으면 그 자리에 uid 를 넣어 두었다(`name || uid`).
+   그러면 ① 사람 고르기 창에 「HVp8SMqMGVO8aUzH6SNYU6aTQVE3」가 그대로 뜨고
+   ② 뒤이어 직원 명단이 진짜 이름을 넣으려 해도 「이미 있다」며 막혔다.
+   ★ 여기서 보는 것은 «이름이 진짜인가»뿐이다 — 비었거나 번호와 같으면 이름이 아니다.
+   ⚠ 이름을 끝내 모르면 번호 대신 「(이름 모름)」을 낸다. 퇴직해 직원 명단에서 빠진
+     사람이 여기에 해당한다 — 번호를 내는 것보다 낫고, 누구인지는 몰라도 칸은 고를 수 있다. */
+function ownerNameReal(uid) {
+  const n = String((ownerNames && ownerNames[uid]) || '').trim();
+  return (n && n !== String(uid)) ? n : '';
+}
+function ownerNameOf(uid) {
+  return ownerNameReal(uid) || '(이름 모름)';
+}
+/* 직원 명단이 이름을 채운 «뒤에» 고르개의 사람 줄 글자를 바꿔 쓴다.
+   ⚠ 줄을 지우고 다시 만들지 않는다 — 글자만 바꾼다(고르던 값·펼친 목록이 그대로다).
+   ⚠ 사람 줄만 건드린다 — 「내 사진」·「전체 근로자」·「받은 사진」·「누구 사진」(from:)은 그대로. */
+function relabelOwnerOptions() {
+  const sel = $('ownerSel'); if (!sel) return;
+  for (let i = 0; i < sel.options.length; i++) {
+    const v = String(sel.options[i].value || '');
+    if (!v || v === ALL_OWNERS || v === SHARED_OWNER || v.indexOf('from:') === 0) continue;
+    if (!Object.prototype.hasOwnProperty.call(ownerNames, v)) continue;
+    const t = ownerNameOf(v);
+    if (sel.options[i].textContent !== t) sel.options[i].textContent = t;
+  }
 }
 
 /* ── 왜 열려 있는지 한 줄로 (대표 지시 2026-08-28) ──
@@ -17249,7 +17280,7 @@ function shareBox(it) {
   const list = Object.keys((it.meta && it.meta.shareWith) || {});
   const chips = list.map(function (uid) {
     const why = shareWhy(it, uid);
-    return '<span class="sc">' + esc(ownerNames[uid] || uid) +
+    return '<span class="sc">' + esc(ownerNameOf(uid)) +
       (why ? '<span class="auto" title="' + esc((it.meta.shareBy || {})[uid] || '') + '">'
              + esc(why) + '</span>' : '') +
       /* 빼는 것은 올린 분·총괄관리자만 — 넘겨받아 나눠 준 사람은 더하기만 된다.
@@ -19715,7 +19746,7 @@ function renderOwnerPick() {
     PuPhotoStore.listOwners().then(function (owners) {
       ownerNames = {};
       Object.keys(owners || {}).forEach(function (k) {
-        ownerNames[k] = (owners[k] && owners[k].name) || k;
+        ownerNames[k] = (owners[k] && owners[k].name) || '';   /* 번호를 이름 자리에 넣지 않는다 */
       });
     }).catch(function (e) { console.warn('[사람 명단]', e && e.message); })
       .then(mergeStaffNames);   /* 사진첩을 안 연 직원도 고를 수 있어야 한다 */
@@ -19731,8 +19762,9 @@ function renderOwnerPick() {
   PuPhotoStore.listOwners().then(function (owners) {
     /* 공유 칩에 uid 가 아니라 이름이 뜨게 이름표를 챙겨 둔다 */
     ownerNames = {};
-    Object.keys(owners).forEach(function (k) { ownerNames[k] = (owners[k] && owners[k].name) || k; });
-    mergeStaffNames();          /* 사진첩을 안 연 직원도 고를 수 있어야 한다 */
+    Object.keys(owners).forEach(function (k) { ownerNames[k] = (owners[k] && owners[k].name) || ''; });   /* 번호를 이름 자리에 넣지 않는다 */
+    /* 이름이 채워지면 고르개 줄 이름만 바꿔 쓴다 — 통째로 다시 만들면 고르던 값이 튄다 */
+    mergeStaffNames().then(relabelOwnerOptions);          /* 사진첩을 안 연 직원도 고를 수 있어야 한다 */
     const me = PuPhotoStore.myUid();
     const ids = Object.keys(owners).filter(function (k) { return k !== me; });
     $('ownerPick').style.display = 'block';   // 공유 줄이 있으므로 늘 보인다
@@ -19742,7 +19774,7 @@ function renderOwnerPick() {
       '<option value="' + ALL_OWNERS + '">전체 근로자 (' + (ids.length + 1) + '명)</option>' +
       '<option value="' + SHARED_OWNER + '">받은 사진 — 다른 해까지</option>' +
       ids.map(function (k) {
-        return '<option value="' + esc(k) + '">' + esc((owners[k] && owners[k].name) || k) + '</option>';
+        return '<option value="' + esc(k) + '">' + esc(ownerNameOf(k)) + '</option>';
       }).join('');
     renderOwnerSelLabel();   /* 다시 그렸으니 장수를 다시 적는다 */
     renderGotCard();
@@ -20904,11 +20936,20 @@ function renderRetBox() {
   /* 담당자를 정하는 것은 총괄 관리자만 */
   const sel = $('retSel');
   if (!PuPhotoStore.amAdmin()) { sel.style.display = 'none'; return; }
+  /* ⚠ 이 고르개는 «고른 줄의 글자»를 담당자 이름으로 그대로 저장한다(setRetOwner).
+       그래서 번호(uid)가 글자로 뜨면 **번호가 담당자 이름으로 저장된다.**
+       직원 명단이 이름을 채운 뒤에 그리고, 끝내 이름을 모르는 사람은 목록에서 뺀다 —
+       누구인지 모르는 사람을 점검 담당자로 정하는 일은 없어야 한다(2026-10-06). */
   PuPhotoStore.listOwners().then(function (owners) {
-    const ids = Object.keys(owners);
+    Object.keys(owners || {}).forEach(function (k) {
+      if (!ownerNameReal(k)) ownerNames[k] = (owners[k] && owners[k].name) || '';
+    });
+    return mergeStaffNames().then(function () { return owners || {}; });
+  }).then(function (owners) {
+    const ids = Object.keys(owners).filter(function (k) { return !!ownerNameReal(k); });
     sel.innerHTML = '<option value="">— 담당자 정하기 —</option>' +
       ids.map(function (k) {
-        return '<option value="' + esc(k) + '">' + esc((owners[k] && owners[k].name) || k) + '</option>';
+        return '<option value="' + esc(k) + '">' + esc(ownerNameReal(k)) + '</option>';
       }).join('');
     sel.value = r.uid || '';
     sel.style.display = 'block';
