@@ -136,6 +136,16 @@ test('★ 확정은 옛 자동 분개를 걷고 처음부터 다시 셈한다 �
   assert.match(f, /_oldAuto\.forEach\(function\(id\)\{ up\['txns\/'\+fid\+'\/'\+yr\+'\/'\+id\]=null; \}\)/);
 });
 
+test('★ 「중소기업 아님」 사내기금만 머리에 딱지가 붙는다 — 나머지는 아무것도 안 붙인다', () => {
+  const box = {};
+  new Function(grabFn('_smeNotTag') + '\nthis.t=_smeNotTag;').call(box);
+  assert.match(box.t({ fund_type: '사내', sme: '중소기업 아님' }), /중소기업 아님 · 사용한도 50%/);
+  assert.equal(box.t({ fund_type: '사내', sme: '중소기업' }), '');
+  assert.equal(box.t({ fund_type: '사내' }), '', '비어 있으면 중소기업으로 본다 — 딱지 없음');
+  assert.equal(box.t({ fund_type: '공동', sme: '중소기업 아님' }), '', '공동기금에는 뜻이 없다');
+  assert.match(grabFn('renderFund'), /tags\+=_smeNotTag\(f\);/);
+});
+
 test('ⓘ 설명이 등록돼 있다', () => {
   assert.ok(SRC.indexOf("'close.rsvpreview':{") >= 0);
   assert.ok(SRC.indexOf("hlp('close.rsvpreview')") >= 0);
