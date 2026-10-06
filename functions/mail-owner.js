@@ -76,10 +76,11 @@ async function loadTables(db) {
   const paths = ["data/user_dir", "data/companies", "uid_roles",
     MAIL_ROOT + "/config/mailWho", MAIL_ROOT + "/config/mailCo",
     MAIL_ROOT + "/config/mailWork", MAIL_ROOT + "/config/staffSucc",
-    PUSH_CFG]
-    .concat(WORK_STORES.map(([store]) => "data/" + store + "/v"));
+    PUSH_CFG, MAIL_ROOT + "/config/mailBoxWho", MAIL_ROOT + "/config/mailNoWho"];
+  const FIXED_PATHS = paths.length;
+  paths.push.apply(paths, WORK_STORES.map(([store]) => "data/" + store + "/v"));
   const snaps = await Promise.all(paths.map((p) => db.ref(p).once("value")));
-  const [dir, cos, roles, hand, co, workLink, succ, pushCfg] = snaps;
+  const [dir, cos, roles, hand, co, workLink, succ, pushCfg, boxWho, noWho] = snaps;
 
   /* 사람 — 사번↔이름, 퇴사, 이어받기, 사번→로그인(uid) */
   const nameBySid = {}, sidByName = {}, retired = {};
@@ -133,7 +134,9 @@ async function loadTables(db) {
   /* 진행 중인 사건·컨설팅 — 주소로 · 번호로 */
   const workByAddr = {}, workByKey = {};
   WORK_STORES.forEach(([store, kind, label], i) => {
-    arr(snaps[8 + i].val()).forEach((r) => {
+    /* ⚠ 앞의 고정 자리 수가 늘면 «여기»도 같이 늘려야 한다 — 어긋나면 사건 자료 자리에
+         엉뚱한 표가 들어와 조용히 0건이 된다. 그래서 세지 않고 목록에서 끌어 쓴다. */
+    arr(snaps[FIXED_PATHS + i].val()).forEach((r) => {
       if (!r || !workLive(r)) return;
       const id = String(r.id || "");
       const w = { kind: kind, label: label, id: id,
@@ -154,6 +157,7 @@ async function loadTables(db) {
 
   return { hand: hand.val() || {}, co: co.val() || {}, workLink: workLink.val() || {},
     succ: succ.val() || {}, pushCfg: pushCfg.val() || {},
+    boxWho: boxWho.val() || {}, noWho: noWho.val() || {},
     nameBySid, sidByName, retired, uidBySid, coById, coByName, coByBiz, erpAddr,
     workByAddr, workByKey };
 }
@@ -213,6 +217,30 @@ function whoOf(em0, T) {
   return none;
 }
 
+/* 👤 이 칸을 보는 사람들 (대표 승인 목업 2026-10-06) — 화면 mbBoxWhoList 와 같은 잣대.
+   ⚠ 「사람 안 붙임」 칸이면 아무도 아니다(경조사·광고).
+   ⚠ 맨 앞이 주담당, 나머지는 함께 보는 사람. 퇴사자는 이어받은 사람으로. */
+function boxWho(slug, T) {
+  const k = String(slug || "");
+  if (!k || (T.noWho || {})[k]) return [];
+  const v = (T.boxWho || {})[k];
+  const arr = (v && Array.isArray(v.who)) ? v.who : [];
+  const out = [];
+  arr.forEach((n) => { const w = live(n, T); if (w && out.indexOf(w) < 0) out.push(w); });
+  return out;
+}
+/* 이 메일을 «받아 볼» 사람 모두 — 주담당 하나 + 칸을 함께 보는 사람들.
+   ⚠ 칸 담당은 주소 판정보다 «약하다». 주소로 사람이 나오면 그가 주담당이고,
+     칸 사람들은 그 뒤에 함께 붙는다(화면의 부담당 길과 같은 모양). */
+function whoAll(em, slug, T) {
+  const w = whoOf(em, T);
+  const bw = boxWho(slug, T);
+  const main = w.who || bw[0] || "";
+  const out = main ? [main] : [];
+  bw.forEach((n) => { if (n !== main && out.indexOf(n) < 0) out.push(n); });
+  return { main: main, all: out, work: w.work, why: w.why || (main ? "box" : "") };
+}
+
 /* 이 사람이 알림을 받기로 했나 — 안 적혀 있으면 «켠 것»이다.
    ⚠ 빈 값을 「꺼짐」으로 읽으면 만들어 놓고 아무 일도 안 하는 기능이 된다. */
 function wantsPush(name, T) {
@@ -241,13 +269,19 @@ async function notifyOwners(deps, opts) {
 
   /* 사람마다 모은다 — 회차에 한 번만 울린다 */
   const mine = {};
+  const slug0 = String(o.slug || "");
   rows.forEach((r) => {
-    const w = whoOf(r.e, T);
-    if (!w.who) return;
-    (mine[w.who] = mine[w.who] || []).push({ r: r, w: w });
+    const w = whoAll(r.e, slug0, T);
+    if (!w.all.length) return;
+    /* ⚠ 함께 보는 사람에게도 «같은 한 통»을 센다. 한 사람 칸에 두 번 안 들어가게
+         whoAll 이 이미 겹치는 이름을 걸렀다. */
+    w.all.forEach((n) => { (mine[n] = mine[n] || []).push({ r: r, w: w }); });
   });
   const names = Object.keys(mine);
-  out.matched = names.reduce((s, n) => s + mine[n].length, 0);
+  /* ⚠ 사람마다 센 것을 그냥 더하면 «함께 보는» 한 통이 여러 번 세어진다 — 줄로 센다 */
+  const seen = {};
+  names.forEach((n) => mine[n].forEach((x) => { seen[String(x.r.u)] = 1; }));
+  out.matched = Object.keys(seen).length;
   if (!names.length) return out;
   out.people = names.length;
 
@@ -279,5 +313,5 @@ async function notifyOwners(deps, opts) {
   return out;
 }
 
-module.exports = { notifyOwners, loadTables, whoOf, wantsPush,
+module.exports = { notifyOwners, loadTables, whoOf, whoAll, boxWho, wantsPush,
   whoKey, normName, workLive, coLeft, WORK_STORES, NOTIFY_KINDS, PUSH_CFG };

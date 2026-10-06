@@ -2253,6 +2253,16 @@ table.sbox.tight td.none{padding:26px 8px}
    (tests/color-palette-apps.test.js 가 그 자리에서 잡았다). */
 #folderMenu .fmsec{padding:7px 14px 4px;font-size:11px;color:#64748b;background:#f8fafc;
   border-top:1px solid #f8fafc;border-bottom:1px solid #f8fafc}
+/* 👤 이 칸을 보는 사람 — 눌러서 넣고 빼는 칩 줄 (2026-10-06).
+   ⚠ 고른 사람이 «한눈에» 달라 보여야 한다. 주담당(main)과 함께 보는 사람(sub)도 갈라 보인다 —
+     누가 주담당인지 안 보이면 「왜 저 사람 칸으로 가나」를 알 길이 없다. */
+#folderMenu .fmwho{display:flex;flex-wrap:wrap;gap:5px;padding:7px 13px 9px;max-width:330px}
+#folderMenu .fmchip{border:1px solid #e2e8f0;border-radius:13px;padding:2px 9px;font-size:11.5px;
+  cursor:pointer;background:#fff;color:#1e293b;white-space:nowrap}
+#folderMenu .fmchip:hover{border-color:#bfdbfe;background:#eff6ff}
+#folderMenu .fmchip.main{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:700}
+#folderMenu .fmchip.sub{background:#eff6ff;border-color:#bfdbfe;color:#1e40af;font-weight:700}
+#folderMenu .fmnone{padding:2px 4px;font-size:11.5px;color:#64748b}
 #folderMenu .fmi.fmg,#folderMenu .fmi.fmg2{display:flex;gap:8px;align-items:flex-start;
   white-space:normal;max-width:300px;line-height:1.5;font-size:12.5px}
 #folderMenu .fmi.fmg b{font-size:13px}
@@ -17859,7 +17869,7 @@ function mbSeedSave(){
   const rec = { at: Date.now(), folders: _mbFolders, meta: _mbMeta || {}, msgs: msgs,
     cfg: { bins:_mbBins, put:_mbPut, putBy:_mbPutBy, hide:_mbHide, owner:_mbOwner, succ:_mbSucc,
            co:_mbCo, notCo:_mbNotCo, whoMsg:_mbWhoMsg, noWho:_mbNoWho, notSpam:_mbNotSpam,
-           workLink:_mbWorkLink,
+           workLink:_mbWorkLink, boxWho:_mbBoxWho,
            spamOff:_mbSpamOff } };
   mbSeedIdb('readwrite', (st, close)=>{ try{ if(st) st.put(rec, MB_SEED_KEY); }catch(_){ } setTimeout(close, 800); });
 }
@@ -17879,7 +17889,7 @@ function mbSeedApply(s){
     _mbWhoMsg = c.whoMsg||{}; _mbNoWho = c.noWho||{}; _mbNotSpam = c.notSpam||{};
     /* ⚠ 옛 씨앗에는 이 칸이 없다 — 그러면 빈 표로 두고 서버가 채운다(없는 채로 두면
          mbWorkHandOf 가 null 을 읽어 터진다). */
-    _mbWorkLink = c.workLink||{};
+    _mbWorkLink = c.workLink||{}; _mbBoxWho = c.boxWho||{};
     _mbSpamOff = (c.spamOff === true);
     _mbBinsFromSeed = true;
   }
@@ -18117,12 +18127,14 @@ function mbEnsureBins(cb){
        한 사람이 이어 두면 모두의 화면에서 그 담당자 칸으로 간다. */
     firebase.database().ref(DB_ROOT+'/config/mailWork').once('value'),
     /* 📬 사람마다 폰 알림 켜기·끄기 (2026-10-05) — 전 직원 공용 칸 */
-    firebase.database().ref(DB_ROOT+'/config/mailPush').once('value')
-  ]).then(([b,p,pb,h,w,sc,co,nc,wm,nw,ns,so,wk,pu])=>{
+    firebase.database().ref(DB_ROOT+'/config/mailPush').once('value'),
+    /* 👤 이 칸을 보는 사람 (2026-10-06) — 전 직원 공용 */
+    firebase.database().ref(DB_ROOT+'/config/mailBoxWho').once('value')
+  ]).then(([b,p,pb,h,w,sc,co,nc,wm,nw,ns,so,wk,pu,bw])=>{
     _mbBinsFromSeed = false;
     _mbBins = b.val()||{}; _mbPut = p.val()||{}; _mbPutBy = pb.val()||{}; _mbHide = h.val()||{}; _mbOwner = w.val()||{};
     _mbSucc = sc.val()||{}; _mbCo = co.val()||{}; _mbNotCo = nc.val()||{}; _mbWhoMsg = wm.val()||{}; _mbNoWho = nw.val()||{};
-    _mbWorkLink = wk.val()||{}; _mbPush = pu.val()||{};
+    _mbWorkLink = wk.val()||{}; _mbPush = pu.val()||{}; _mbBoxWho = bw.val()||{};
     /* ⚠ 안 적혀 있으면 «켠 것»이다 — 대표께서 「자동으로 거르게」라 하셨다.
          빈 값을 「꺼짐」으로 읽으면 만들어 놓고 아무 일도 안 하는 기능이 된다. */
     _mbNotSpam = ns.val()||{}; _mbSpamOff = (so.val() === true);
@@ -18133,7 +18145,7 @@ function mbEnsureBins(cb){
     if(!(denied && !mbAuthOk())){
       _mbBins = _mbBins||{}; _mbPut = _mbPut||{}; _mbPutBy = _mbPutBy||{}; _mbHide = _mbHide||{}; _mbOwner = _mbOwner||{};
       _mbSucc = _mbSucc||{}; _mbCo = _mbCo||{}; _mbNotCo = _mbNotCo||{}; _mbWhoMsg = _mbWhoMsg||{}; _mbNoWho = _mbNoWho||{};
-      _mbWorkLink = _mbWorkLink||{}; _mbPush = _mbPush||{};
+      _mbWorkLink = _mbWorkLink||{}; _mbPush = _mbPush||{}; _mbBoxWho = _mbBoxWho||{};
       /* ⚠ 못 읽었으면 스팸 거르기를 «끈 채로» 둔다 — 「스팸 아님」 목록을 못 읽은 채로
            거르면, 대표께서 이미 되돌려 둔 주소를 도로 잡는다. 모르면 안 거른다. */
       if(_mbNotSpam === null){ _mbNotSpam = {}; _mbSpamOff = true; }
@@ -18924,6 +18936,83 @@ const MB_WHO_OTH = '@#';   /* 그 밖 — 「자문사 아님」으로 치운 �
      「담당 모름」에도 안 넣는다. */
 const MB_WHO_OFF = '@0';   /* 사람 안 붙임 칸 */
 let _mbNoWho = null;       /* {폴더열쇠: 1} — 사람을 안 붙이는 칸 */
+
+/* ══════════════════════════════════════════════════════════════════════════
+   👤 이 칸을 보는 사람 (대표 승인 목업 2026-10-06)
+   ══════════════════════════════════════════════════════════════════════════
+   「같은 메일주소라도 사건이나 업무에 따라서 담당자가 바뀌는 경우가 많은데 …
+    특히 공공기관의 경우 업무 분류에 따라 자동으로 하나의 메일이 여러 사람과
+    공유하거나 담당자가 바뀐다」
+
+   ★ 실측 2026-10-06 — 공공기관 주소 184개 가운데 «제목이 두 사람 이상을 말하는»
+     주소는 0개다. 기관이 모두에게 보내는 안내라 제목에 회사 이름이 없다.
+     주소로도 제목으로도 가를 수 없다.
+   ★ 그런데 칸은 «이미» 업무별로 갈라져 있고, 담당 모름이 칸마다 거의 통째로 모여 있다 —
+       사무실업무관련 424/425 · 12_세금계산서 422/426 · 6_공공기관 415/437 ·
+       4_체불 406/406 · 8_기금 406/406 · 7_노무사회·노동부 402/402 · 9_자율점검 343/343
+     무엇에 대한 메일인지는 «칸이 이미 알고 있다».
+   ⚠★ 칸 담당은 «가장 약한» 규칙이다 — 차례의 맨 뒤다.
+     칸은 거친 그물이라 그 칸에 들어온 «모든» 메일에 걸린다. 그 업체·그 건의 담당이
+     있으면 그쪽이 이겨야 한다 — 안 그러면 산재 칸에 들어온 자문사 메일이 통째로
+     산재 담당에게 간다.
+   ⚠ 「사람 안 붙임」 칸이 이긴다(경조사·광고) — 거기는 지금처럼 아무에게도 안 붙는다.
+   ⚠ 맨 앞 사람이 주담당, 나머지는 «함께 보는 사람»이다. 함께 보는 쪽은 이미 있는
+     길(부담당 mbSubsOfRow)에 얹는다 — 세는 곳·거르는 곳이 저절로 맞는다.
+   ⚠ 퇴사자는 이어받은 사람으로 — 메일함 다른 자리와 같은 잣대(mbWhoLive). */
+let _mbBoxWho = null;      /* {폴더열쇠: {who:[이름…], at, by}} */
+/* 이 칸을 보는 사람들 — 살아 있는 사람만, 차례 그대로(맨 앞이 주담당) */
+function mbBoxWhoList(slug){
+  const v = (_mbBoxWho||{})[String(slug||'')];
+  const arr = (v && Array.isArray(v.who)) ? v.who : [];
+  const out = [];
+  arr.forEach(n=>{ const w = mbWhoLive(n); if(w && out.indexOf(w) < 0) out.push(w); });
+  return out;
+}
+/* 이 줄의 칸 담당 — 「사람 안 붙임」 칸이면 아무도 아니다 */
+function mbBoxWhoOfRow(v){
+  if(!v || !v._slug) return [];
+  if(mbNoWhoBox(v._slug)) return [];
+  return mbBoxWhoList(v._slug);
+}
+/* 이 칸을 보는 사람을 넣고 뺀다 — 전 직원 공용이라 config 밑에 둔다 */
+function mbBoxWhoToggle(slug, name){
+  const k = String(slug||''), nm = String(name||'').trim();
+  if(!k || !nm) return;
+  _mbBoxWho = _mbBoxWho || {};
+  const before = _mbBoxWho[k];
+  const cur = (before && Array.isArray(before.who)) ? before.who.slice() : [];
+  const i = cur.indexOf(nm);
+  if(i >= 0) cur.splice(i, 1); else cur.push(nm);
+  const val = cur.length ? { who:cur, at:Date.now(), by:mbWorkMe() } : null;
+  if(val) _mbBoxWho[k] = val; else delete _mbBoxWho[k];
+  mbWhoBust(); renderPCSide(); renderMailPage();
+  if(typeof Store==='undefined' || Store.mode!=='firebase') return;
+  const ref = firebase.database().ref(DB_ROOT+'/config/mailBoxWho/'+k);
+  const p = val ? ref.set(val) : ref.remove();
+  p.catch(e=>{
+    /* ⚠ 못 적었으면 화면도 되돌린다 — 이 기기에서만 바뀐 것처럼 보이면 안 된다 */
+    if(before === undefined) delete _mbBoxWho[k]; else _mbBoxWho[k] = before;
+    mbWhoBust(); renderPCSide(); renderMailPage();
+    toast('바꾸지 못했습니다 — ' + ((e&&e.message)||e), 9000);
+  });
+}
+/* 사람 고르개 — 눌러서 넣고 빼는 칩 줄.
+   ⚠ 차례를 보여 준다. 맨 앞이 주담당이라, 누가 주담당인지 보이지 않으면
+     「왜 저 사람 칸으로 가나」를 알 길이 없다. */
+function mbBoxWhoPickHtml(slug){
+  const on = mbBoxWhoList(slug);
+  const all = (typeof mbWhoList === 'function') ? mbWhoList().map(w=>w.name) : [];
+  const names = on.concat(all.filter(n=>on.indexOf(n) < 0));
+  if(!names.length) return '<span class="fmnone">직원 명부를 불러오는 중입니다…</span>';
+  return names.map((n, i)=>{
+    const picked = on.indexOf(n) >= 0;
+    const main = picked && on[0] === n;
+    return `<span class="fmchip${picked ? (main ? ' main' : ' sub') : ''}"
+      onclick="mbBoxWhoToggle('${esc(slug)}', '${esc(n)}')"
+      title="${picked ? (main ? '주담당입니다 — 눌러서 뺍니다' : '함께 봅니다 — 눌러서 뺍니다')
+                      : '눌러서 이 칸을 보게 합니다'}">${esc(n)}${main ? ' 주' : ''}</span>`;
+  }).join('');
+}
 /* 이 칸이 「사람 안 붙임」인가 */
 function mbNoWhoBox(slug){ return !!((_mbNoWho||{})[String(slug||'')]); }
 /* 이 줄이 「사람 안 붙임」인가 — 사람이 콕 집어 보낸 것은 빼고 본다 */
@@ -19740,7 +19829,14 @@ function mbWhoOfRow(v, idx0){
      ⚠ _key 가 없는 자리에서도 부른다(딱지·귀띔) — 없으면 그냥 건너뛴다. */
   const byMsg = mbWhoLive((v && v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '');
   if(byMsg) return byMsg;
-  return mbWhoWhy(em, idx0).who;
+  const w = mbWhoWhy(em, idx0).who;
+  if(w) return w;
+  /* ⑥ 이 칸을 보는 사람 — «맨 뒤»다 (대표 승인 목업 2026-10-06).
+     ⚠ 주소 판정(mbWhoWhy)이 아니라 «여기»에 둔다. 칸은 줄마다 다르고, 주소 판정은
+       주소 하나에 한 번만 셈해 담아 둔다 — 거기 넣으면 같은 주소의 메일이 어느 칸에
+       있든 «먼저 그려진 칸»의 사람으로 굳는다.
+     ⚠ 업체·건 담당이 있으면 그쪽이 이긴다(위에서 이미 돌아왔다). 칸은 거친 그물이다. */
+  return mbBoxWhoOfRow(v)[0] || '';
 }
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -20383,6 +20479,19 @@ function mbSubsOfRow(v, idx0){
         if(n !== main && n !== w && out.indexOf(n) < 0) out.push(n);
       });
     }
+  }
+  /* ★ 👤 이 칸을 «함께 보는» 사람들 (대표 승인 목업 2026-10-06)
+     맨 앞 사람은 주담당으로 이미 갔다 — 나머지를 부담당 길에 얹는다.
+     ⚠ 업체가 끝났는지와 상관없이 더한다. 칸은 «업무 갈래»지 업체가 아니다 —
+       기관 안내가 자문 종료 때문에 아무에게도 안 보이면 안 된다.
+     ⚠ 주담당과 같은 사람은 안 더한다 — 한 사람 칸에 같은 메일이 두 번 세어진다. */
+  const bw = mbBoxWhoOfRow(v);
+  if(bw.length > 1){
+    const w2 = mbWhoOfRow(v, idx0);
+    bw.forEach(n=>{
+      if(!n || n === main || n === w2 || out.indexOf(n) >= 0) return;
+      out.push(n);
+    });
   }
   return out;
 }
@@ -22034,6 +22143,15 @@ function mbFolderMenu(slug, ev){
          경조사·광고·청구서처럼 «특정인을 정할 필요가 없는» 칸을 여기서 켠다.
          ⚠ 켜면 그 칸의 메일은 담당자 칸에도 「담당 모름」에도 안 들어가고,
            옆줄의 「👤 사람 안 붙임」에 모인다. 메일이 옮겨지는 것은 아니다. */''}
+    ${/* ── 👤 이 칸을 보는 사람 (대표 승인 목업 2026-10-06) ──
+         공공기관 메일은 주소로도 제목으로도 못 가른다 — 무엇에 대한 메일인지는
+         «칸이 이미 알고 있다». 맨 앞 사람이 주담당, 나머지는 함께 보는 사람이다.
+         ⚠ 「담당자 안 붙임」 칸에서는 안 그린다 — 거기는 아무에게도 안 붙는 칸이다.
+           둘 다 보이면 「켜 뒀는데 왜 안 가나」가 된다. */''}
+    ${mbNoWhoBox(slug) ? '' : `
+      <div class="fmsec">👤 이 칸을 보는 사람
+        <span style="font-weight:400">— 맨 앞이 주담당, 나머지는 함께 봅니다</span></div>
+      <div class="fmwho">${mbBoxWhoPickHtml(slug)}</div>`}
     <div class="fmi" onclick="mbNoWhoSet('${slug}', ${mbNoWhoBox(slug) ? 'false' : 'true'})">
       ${mbNoWhoBox(slug) ? '👤 담당자 다시 붙이기' : '👤 담당자 안 붙임 (경조사·광고 등)'}</div>
     <div class="fmi danger" onclick="closeFolderMenu();mbAskDelete('${slug}')">🗑 폴더 지우기</div>`;
