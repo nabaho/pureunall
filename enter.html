@@ -1977,10 +1977,11 @@ body.portal-mode #moreFab{display:flex;}
       }).catch(function(err){ kkToast('❌ ' + ((err && err.message) || '연결에 실패했습니다')); });
     }
   }
-  /* 노란 단추를 눌렀는데 «아직 연결 안 됨» 이었던 사람 — 비밀번호로 들어오자마자 연결을 권한다.
+  /* 노란 단추를 눌렀는데 «아직 연결 안 됨» 이었던 사람 — 비밀번호로 들어오자마자 연결을 자동으로 잇는다.
      ⚠ 2026-09-27 실제로 대표님이 노란 단추만 거듭 눌렀다: 「내 정보 › 카카오 연결」 을 따로
-       찾아가야 하는 길은 아무도 못 찾는다. 이 탭(sessionStorage)·15분 안에서만, 물어본 뒤에만 잇는다
-       (공용 PC 에서 남의 카카오가 내 계정에 붙지 않게 — 연결은 카카오를 한 번 더 다녀와 서버가 확인한다). */
+       찾아가야 하는 길은 아무도 못 찾는다. 이 탭(sessionStorage)·15분 안에서만 잇고,
+       아이디·비밀번호 확인이 끝나면 카카오 확인 화면으로 곧바로 다시 보낸다.
+       공용 PC 에서 남의 카카오가 붙지 않게 서버는 카카오 계정을 한 번 더 직접 확인한다. */
   var KK_WANT = 'pu_kakao_want_link';
   function kkAfterLogin(){
     var want = null;
@@ -1991,7 +1992,7 @@ body.portal-mode #moreFab{display:flex;}
     db.ref('uid_kakao/' + u.uid).once('value').then(function(s){
       var v = s.val();
       if(v && (v.linked === true || v.kakaoId)) return;
-      if(!confirm('방금 누르신 카카오 계정을 이 계정에 연결할까요?\n\n연결하면 다음부터는 노란 「카카오로 로그인」 단추 하나로 들어옵니다.')) return;
+      kkToast('카카오 연결을 마무리합니다…', 8000);
       kkStartLink();
     }).catch(function(){});
   }
