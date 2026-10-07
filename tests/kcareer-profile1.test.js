@@ -47,7 +47,8 @@ test('★★ ② 금액·주민번호·생년월일·계좌는 들어갈 길이 
   const 글 = JSON.stringify(m) + P1.toHtml(m, '');
   ['800101-1234567', '1975.03.02', '48,000,000', '9,999,999'].forEach((v) => assert.equal(글.indexOf(v), -1, '★ 들어가면 안 되는 것이 들어갔다: ' + v));
   /* 화면 쪽도 fields 에서 고른 칸만 넘긴다 */
-  const src = bare.slice(bare.indexOf('function _p1Src('), bare.indexOf('function _p1Model('));
+  /* 재료 함수(_p1Src)만 — 바로 아래의 금액 읽기(고르는 데만 쓰는 것)는 따로 본다(⑨) */
+  const src = bare.slice(bare.indexOf('function _p1Src('), bare.indexOf('var _p1Measure=null;'));
   assert.match(src, /fields:\{ name:f\.name, license:f\.license, org:f\.org, title:f\.title, phone:f\.phone, email:f\.email \}/);
   assert.doesNotMatch(src, /secrets|rrn|birth|acct|amt/);
 });
@@ -163,4 +164,63 @@ test('화면 배선 — 옆줄 · 그리기 · 직원 보기에 안 나감 · �
   assert.match(go, /caseDir:it\.caseDir/, '어느 건에 냈는지 남겨 제출서류와 잇는다');
   assert.match(bare, /onclick="pastCvOpen\(\)"/);
   assert.match(bare, /KC_MODAL_NO_BACKDROP=\{[^}]*modalPastCv:1/);
+});
+
+test('★★ ⑨ 컨설팅 실적은 500만 원 이상만 — 모름·미만은 ⭐로 고른 것만 · 금액은 종이에 안 찍는다', () => {
+  const src = 재료();
+  src.consult = [
+    { id: 'S1', year: '2025', type: '일터혁신', org: '가나상사', project: '직무급' },
+    { id: 'S2', year: '2024', type: '노무진단', org: '다라산업', project: '임금체계' },
+    { id: 'S3', year: '2023', type: '일터혁신', org: '마바물산', project: '평가제도' },
+    { id: 'S4', year: '2022', type: '노무진단', org: '사아상회', project: '규정' } ];
+  const 금액 = { S1: 12000000, S2: 3000000, S3: null, S4: 5000000 };
+  const amtOf = (r) => 금액[r.id];
+  let m = P1.build(src, { use: 'general', on: { perf: true }, amtOf });
+  let perf = m.sections.find((x) => x.key === 'perf');
+  assert.deepEqual(perf.all.map((r) => r[2].split(' · ')[0]), ['가나상사', '사아상회'], '★ 500만 «이상»만(딱 500만 포함)');
+  assert.deepEqual({ ...m.perfAmt }, { big: 2, small: 1, unknown: 1 });
+  /* 모름(S3)·미만(S2)도 ⭐로 고르면 들어간다 */
+  m = P1.build(src, { use: 'general', on: { perf: true }, amtOf, pins: { perf: ['S3'] } });
+  perf = m.sections.find((x) => x.key === 'perf');
+  assert.equal(perf.all[0][2].split(' · ')[0], '마바물산', '고른 것은 맨 앞');
+  assert.equal(perf.all.length, 3);
+  assert.doesNotMatch(P1.toHtml(m, ''), /12,?000,?000|5,?000,?000|3,?000,?000|만 원|원\b/, '★ 금액은 종이에 찍지 않는다');
+  /* 금액을 아직 못 읽었으면(amtOf 없음) 문턱을 걸지 않는다 */
+  assert.equal(P1.build(src, { on: { perf: true } }).sections.find((x) => x.key === 'perf').all.length, 4);
+});
+
+test('★★ ⑩ ⭐ 중요로 고른 위촉은 오래된 것이어도 맨 앞에, 한 장에 맞출 때도 안 빠진다', () => {
+  const src = 재료();   /* 위촉 40건 — 2000년대 것부터 */
+  src.wiccok.forEach((r, i) => { r.id = 'K' + i; });
+  const 옛것 = src.wiccok.filter((r) => r.type === '위촉장').map((r) => r).sort((a, b) => P1.dkey(a.issueDate).localeCompare(P1.dkey(b.issueDate)))[0];
+  const m = P1.build(src, { use: 'general', pins: { wic: [옛것.id || 'X'] } });
+  const wic = m.sections.find((x) => x.key === 'wic');
+  assert.equal(wic.pin, 1, '고른 것 하나');
+  {
+    assert.equal(wic.rows[0][1], 옛것.org, '★ 고른 옛 경력이 맨 앞');
+    /* 한 장이 아주 작아도 고른 것은 바닥으로 남는다 */
+    const 작게 = P1.fit(P1.build(src, { use: 'general', pins: { wic: [옛것.id] } }), 5);
+    assert.ok(작게.sections.find((x) => x.key === 'wic').rows.some((r) => r[1] === 옛것.org), '★ 줄이느라 사람이 고른 것을 빼면 안 된다');
+    assert.match(P1.toHtml(m, ''), /\(주요 1 · 최근 \d+ · 전체 \d+\)/, '고른 것과 최근 것을 나눠 밝힌다');
+    /* 바닥(4줄)보다 많이 골라도 모두 남는다 */
+    const 여섯 = src.wiccok.filter((r) => r.type === '위촉장').sort((a, b) => P1.dkey(a.issueDate).localeCompare(P1.dkey(b.issueDate))).slice(0, 6).map((r) => r.id);
+    const 꽉 = P1.fit(P1.build(src, { use: 'general', pins: { wic: 여섯 } }), 5).sections.find((x) => x.key === 'wic');
+    assert.equal(꽉.rows.length, 6, '★ 고른 6건이 한 장 맞추기에 잘려 나갔다');
+  }
+});
+
+test('⑪ 화면 배선 — 금액은 이알피에서 «고르는 데만» · ⭐ 고른 것은 저장되어 바꾸기 전까지 그대로', () => {
+  const mod = bare.slice(bare.indexOf('function _p1Model('), bare.indexOf('function renderProfile1('));
+  assert.match(mod, /pins:o\.pins\|\|\{\}/);
+  assert.match(mod, /amtOf:_p1Amt\?_p1AmtOf:undefined/, '금액을 다 읽기 전엔 문턱을 걸지 않는다(잠깐 텅 비지 않게)');
+  const amt = bare.slice(bare.indexOf('function _p1AmtBuild('), bare.indexOf('function _p1AmtLoad('));
+  assert.match(amt, /_p1Num\(c\.contractFee\)/); assert.match(amt, /c\.amounts/);
+  const load = bare.slice(bare.indexOf('function _p1AmtLoad('), bare.indexOf('function _p1AmtOf('));
+  assert.match(load, /data\/consultings/); assert.match(load, /data\/contracts/);
+  assert.doesNotMatch(load, /\bset\(|LS\.set/, '★ 금액을 경력관리 기록에 남기지 않는다(고르는 데만)');
+  const save = bare.slice(bare.indexOf('function p1PickSave('), bare.indexOf('function _p1Name('));
+  assert.match(save, /o\.pins\[P\.k\]=P\.list\.filter\([\s\S]*?\.map\(function\(r\)\{ return String\(r\.id\); \}\)/, '번호(id)로 담는다 — 이름·차례로 담으면 엉뚱한 줄을 가리킨다');
+  assert.match(save, /_p1Keep\(\)/);
+  assert.doesNotMatch(bare.match(/var FB_SKIP=\[[\s\S]*?\];/)[0], /'p1_opts'/, '★ 고른 것은 클라우드로 함께 가야 다른 PC 에서도 그대로다');
+  assert.match(bare, /KC_MODAL_NO_BACKDROP=\{[^}]*modalP1Pick:1/, '여러 개 고르다 바깥 한 번 눌러 날아가면 안 된다');
 });

@@ -62,16 +62,47 @@
   function isCourse(r) { return /수료|이수|과정|양성|교육/.test(s(r && r.title)); }
   var 국가 = /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|지도사/;
 
+  /* ★ 컨설팅 실적 «금액 문턱» (대표 지시 2026-10-07 「500만원 이상것만 넣어라」).
+     금액은 «고르는 데만» 쓴다 — 종이에는 찍지 않는다(금액은 관리자만). amtOf(r) 가 null 이면 «금액 모름».
+     ⚠ 모름·미만은 저절로 넣지 않는다 — 넣고 싶으면 ⭐ 중요로 고정(pins). */
+  var MIN_AMT = 5000000;
+  /* 「⭐ 중요」로 고정한 것(pins) — 날짜와 상관없이 맨 앞, 한 장에 맞출 때도 안 줄인다(대표 지시 2026-10-07 「한번 클릭해서 저장하면
+     변경요청 전까지 그대로」). 위촉·위원과 컨설팅 실적에 쓴다. */
+  var PIN_KEYS = ['wic', 'perf'];
+  function perfClass(r, amtOf, min) {
+    if (typeof amtOf !== 'function') return 'all';
+    var v = amtOf(r);
+    if (v == null || !(v > 0)) return 'unknown';
+    return v >= (min || MIN_AMT) ? 'big' : 'small';
+  }
+
   /* src = { fields:{name,org,title,phone,email,license}, edu, cert, work, wiccok, consult, advisory, lecture }
-     opts = { use:'general'|…, on:{ edu:true,… }, roles:'2019~2021 ○○노무사회 회장\n…', now:Date } */
+     opts = { use:'general'|…, on:{ edu:true,… }, roles:'2019~2021 ○○노무사회 회장\n…', now:Date,
+              amtOf:function(실적)→원|null, minAmt:5000000, pins:{ wic:[id…], perf:[id…] } } */
   function build(src, opts) {
     src = src || {}; opts = opts || {};
     var use = USES[opts.use] ? opts.use : 'general', L = USES[use].lim;
     var on = opts.on || {}, f = src.fields || {};
     var 살 = function (k) { return isOn(k, on, use); };
     var 올해 = (opts.now instanceof Date ? opts.now : new Date()).getFullYear();
-    var 실적 = (src.consult || []).filter(function (r) { return r && !r.excluded; });
+    var pins = opts.pins || {}, 고정 = {};
+    PIN_KEYS.forEach(function (k) { 고정[k] = {}; (pins[k] || []).forEach(function (id) { 고정[k][String(id)] = 1; }); });
+    var 꽂힘 = function (k, r) { return !!(r && r.id != null && 고정[k][String(r.id)]); };
+    var 실적전부 = (src.consult || []).filter(function (r) { return r && !r.excluded; });
+    var 금액셈 = { big: 0, small: 0, unknown: 0 };
+    var 실적 = 실적전부.filter(function (r) {
+      var c = perfClass(r, opts.amtOf, opts.minAmt);
+      if (c !== 'all') 금액셈[c]++;
+      return 꽂힘('perf', r) || c === 'all' || c === 'big';
+    });
     var 위촉 = (src.wiccok || []).filter(function (r) { return r && !isAward(r); });
+    /* 고정한 것을 맨 앞으로(그 안에서도 최근 것부터) — 몇 개인지 세어 «줄이지 않는 바닥»으로 쓴다 */
+    var 고정수 = {};
+    function 고정먼저(k, arr) {
+      var 앞 = arr.filter(function (r) { return 꽂힘(k, r); }), 뒤 = arr.filter(function (r) { return !꽂힘(k, r); });
+      고정수[k] = 앞.length;
+      return 앞.concat(뒤);
+    }
     var 수상 = (src.wiccok || []).filter(isAward);
     var 자격 = (src.cert || []).filter(function (r) { return r && !isCourse(r); })
       .sort(function (a, b) { return (국가.test(s(b.title)) ? 1 : 0) - (국가.test(s(a.title)) ? 1 : 0) || dkey(b.date).localeCompare(dkey(a.date)); });
@@ -82,9 +113,9 @@
       work: (src.work || []).slice().map(function (r) { return [s(r.periodLabel || r.period || ''), s([r.org, r.dept, r.title].filter(Boolean).join(' '))]; }),
       lec: newest(src.lecture || [], function (r) { return r.date || r.year; })
         .map(function (r) { return [yearOf(r.date || r.year), s(r.topic || r.title), s(r.org)]; }),
-      wic: newest(위촉, function (r) { return r.issueDate || r.periodStart || r.year; })
+      wic: 고정먼저('wic', newest(위촉, function (r) { return r.issueDate || r.periodStart || r.year; }))
         .map(function (r) { return [yearOf(r.issueDate || r.periodStart || r.year), s(r.org), s(r.titleVal || '')]; }),
-      perf: newest(실적, function (r) { return r.date || r.year; })
+      perf: 고정먼저('perf', newest(실적, function (r) { return r.date || r.year; }))
         .map(function (r) { return [s(r.year) || yearOf(r.date), s(r.type), s([r.org, r.project].filter(Boolean).join(' · '))]; }),
       award: newest(수상, function (r) { return r.issueDate || r.year; })
         .map(function (r) { return [yearOf(r.issueDate || r.year), s(r.titleVal || r.type), s(r.org)]; }),
@@ -106,11 +137,15 @@
         { label: '강의', n: (src.lecture || []).length }, { label: '자격', n: 자격.length }
       ].concat((src.advisory || []).length ? [{ label: '자문', n: (src.advisory || []).filter(function (r) { return r && !r.excluded; }).length }] : []),
       perfByYear: 해줄,
+      /* 실적 금액 셈 — 화면 옆에 «500만↑ N건만 · 모름 M건은 ⭐로»를 밝힌다(종이에는 안 찍는다) */
+      perfAmt: typeof opts.amtOf === 'function' ? 금액셈 : null,
       sections: []
     };
     SECTIONS.forEach(function (S) {
       if (!살(S.key) || !all[S.key].length) return;
-      model.sections.push({ key: S.key, title: S.title, all: all[S.key], n: all[S.key].length, show: Math.min(limit[S.key], all[S.key].length) });
+      var pin = 고정수[S.key] || 0;
+      model.sections.push({ key: S.key, title: S.title, all: all[S.key], n: all[S.key].length, pin: pin,
+        show: Math.min(Math.max(limit[S.key], pin), all[S.key].length) });
     });
     return fit(model);
   }
@@ -129,7 +164,8 @@
       var 줄임 = false;
       for (var i = 0; i < SHRINK.length; i++) {
         var x = by[SHRINK[i][0]];
-        if (x && x.show > Math.min(SHRINK[i][1], x.n)) { x.show--; 줄임 = true; break; }
+        /* ⚠ 고정(⭐)한 만큼은 바닥 — 한 장에 맞추느라 사람이 고른 것을 빼면 안 된다 */
+        if (x && x.show > Math.max(Math.min(SHRINK[i][1], x.n), x.pin || 0)) { x.show--; 줄임 = true; break; }
       }
       if (!줄임) break;                                  /* 더 줄일 곳이 없다 — 넘친다고 알린다 */
     }
@@ -163,7 +199,8 @@
   function toHtml(model, photoUrl) {
     var h = model.head;
     var sec = function (x) {
-      return '<h4>' + esc(x.title) + (x.more ? ' <small>(최근 ' + x.show + ' · 전체 ' + x.n + ')</small>' : '') + '</h4><table class="t-' + x.key + '">'
+      var 머리말 = !x.more ? '' : (x.pin ? '(주요 ' + x.pin + (x.show > x.pin ? ' · 최근 ' + (x.show - x.pin) : '') + ' · 전체 ' + x.n + ')' : '(최근 ' + x.show + ' · 전체 ' + x.n + ')');
+      return '<h4>' + esc(x.title) + (머리말 ? ' <small>' + 머리말 + '</small>' : '') + '</h4><table class="t-' + x.key + '">'
         + x.rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td' + (i === 0 ? ' class="y"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('')
         + (x.more ? '<tr><td class="y"></td><td colspan="2" class="more">외 ' + x.more + '건</td></tr>' : '')
         + (x.key === 'perf' && model.perfByYear ? '<tr><td class="y"></td><td colspan="2" class="more">연도별: ' + esc(model.perfByYear) + '</td></tr>' : '')
@@ -193,7 +230,8 @@
     + '.p1 .t-work td.y,.p1 .t-role td.y{width:96px}'
     + '.p1 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
 
-  var api = { USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, build: build, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
+  var api = { USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass,
+    build: build, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerProfile1 = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
