@@ -28,6 +28,26 @@ function isRetry(e) {
   if (e.status === 404 || e.status === 413) return false;
   return true;   // 연결 끊김·시간 초과·모르는 실패 — 다음 회차에 다시
 }
+/* ── 멈춤 막기 (2026-10-07 대표 「다음」) ──
+   ■ 무엇이 있었나 — 10-05 17:32 부터 이틀 동안 «모든» 회차가 9분 제한(timeout)에 잘렸다. 첫 메일(지난 메일 POP3)을
+     받거나 가리다 멈췄는데, 7분 예산은 메일과 메일 «사이»에서만 재므로 멈춘 한 통 안에서는 못 멈춘다.
+     잘리면 run 기록도 seen 도 안 남아, 다음 회차가 «같은 메일»을 또 집고 또 잘렸다 — 632통이 그대로 섰다.
+   ■ 두 겹
+     ① 받기에 시간 한도(FETCH_MS) — 예산 7분 + 90초 < 9분이라 잘리기 전에 끝난다. 넘으면 그 메일만 «다시»로.
+     ② 손대기 «전에» 시도 표시(try/{메일})를 남기고 끝나면 지운다. 표시가 STUCK_MAX 번 쌓였다는 건 그 메일에서
+        회차가 통째로 죽었다는 뜻이다(받기든 가리기든) — 다음 회차가 그 메일을 seen 에 «멈춤 — 건너뜀»으로 적고 넘어간다.
+        원본은 메일함에 그대로 있다(사람이 직접 본다). */
+const TRY = LIB + '/try';
+const STUCK_MAX = 2;
+const FETCH_MS = 90 * 1000;
+function withTimeout(p, ms) {
+  let t;
+  const late = new Promise((_, rej) => {
+    t = setTimeout(() => rej(Object.assign(new Error('받기 시간 초과'), { code: 'FETCH_TIMEOUT', hang: true })), ms);
+    if (t && t.unref) t.unref();
+  });
+  return Promise.race([p, late]).finally(() => clearTimeout(t));
+}
 /* 오류는 «이름표»만 남긴다 — 파서·창고 메시지가 글 조각을 인용할 수 있어 e.message 는 담지 않는다 */
 function errTag(e) { return String((e && (e.code || e.name)) || '오류').slice(0, 40); }
 function docRecord(o) {
@@ -112,10 +132,22 @@ async function run(o) {
 async function runOnce(o) {
   const t0 = o.now();
   const db = o.db, bucket = o.bucket;
-  const [msgs, old, seen, docs, companies, prevRun] = await Promise.all([
+  const [msgs, old, seen0, docs, companies, prevRun, tries0] = await Promise.all([
     val(db, 'mailbox/msgs'), val(db, 'mailbox/old/msgs'), val(db, LIB + '/seen'),
-    val(db, LIB + '/docs'), val(db, 'data/companies'), val(db, LIB + '/run'),
+    val(db, LIB + '/docs'), val(db, 'data/companies'), val(db, LIB + '/run'), val(db, TRY),
   ]);
+  /* ② 두 번 회차를 죽인 메일은 건너뛴다 — seen 에 까닭을 적어 «다 본 것»으로 센다. 이미 seen 인 표시는 치운다 */
+  const tries = tries0 || {}, seen = Object.assign({}, seen0 || {}), skip = {};
+  Object.keys(tries).forEach((k) => {
+    const n = Number((tries[k] || {}).n || 0);
+    if (seen[k]) { skip[TRY + '/' + k] = null; return; }
+    if (n >= STUCK_MAX) {
+      const rec = { at: o.now(), docs: [], why: '멈춤 ' + n + '번 — 건너뜀(메일에서 직접 확인)' };
+      skip[LIB + '/seen/' + k] = rec; skip[TRY + '/' + k] = null; seen[k] = rec;
+    }
+  });
+  const stuck = Object.keys(skip).filter((k) => k.indexOf(LIB + '/seen/') === 0).length;
+  if (Object.keys(skip).length) await db.ref().update(skip);
   const healed = await heal(o, db, bucket, docs || {});
   const have = Object.assign({}, docs || {});
   const coIndex = MR.buildCompanyIndex(companies || {});
@@ -123,7 +155,7 @@ async function runOnce(o) {
   /* 남은 것 «모두»를 한 번 세고(메모리 안 셈이라 싸다) 이번 몫만 자른다 — left 가 이어 달리기의 잣대다 */
   const allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen || {}, 1e9);
   const picked = allLeft.slice(0, Math.max(0, Number(o.limit) || 0));
-  const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, errors: [], at: t0 };
+  const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, stuck, errors: [], at: t0 };
 
   for (const m of picked) {
     if (o.now() - t0 > o.budgetMs) break;
@@ -137,11 +169,19 @@ async function runOnce(o) {
     const c = { stored: 0, held: 0, dup: 0 };
     const has = (id) => have[id] || staged[id];
     let atts;
-    try { atts = await o.fetchAtts(m); }
+    /* ② 손대기 전에 시도 표시 — 이 메일에서 회차가 죽으면 표시가 남아 다음 회차가 센다 */
+    const tryKey = TRY + '/' + m.mailKey;
+    try { await db.ref(tryKey).set({ at: o.now(), n: Number((tries[m.mailKey] || {}).n || 0) + 1 }); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
+    try { atts = await withTimeout(o.fetchAtts(m), o.fetchMs || FETCH_MS); }
     catch (e) {
-      if (isRetry(e)) { sum.retry++; sum.errors.push(errTag(e)); continue; }
+      if (isRetry(e)) {
+        sum.retry++; sum.errors.push(errTag(e));
+        /* 시간 초과(멈춤)는 표시를 «남긴다» — 다음에도 멈추면 건너뛴다. 끊김 같은 보통 실패는 지운다(쌓이면 안 된다) */
+        if (!e.hang) { try { await db.ref(tryKey).set(null); } catch (_) { /* 다음 회차가 치운다 */ } }
+        continue;
+      }
       try {
-        await db.ref().update({ [LIB + '/seen/' + m.mailKey]: { at: o.now(), docs: [], why: e.status === 404 ? '없어짐' : '너무 큼' } });
+        await db.ref().update({ [LIB + '/seen/' + m.mailKey]: { at: o.now(), docs: [], why: e.status === 404 ? '없어짐' : '너무 큼' }, [tryKey]: null });
       } catch (e2) { sum.retry++; sum.errors.push(errTag(e2)); }
       continue;
     }
@@ -209,11 +249,13 @@ async function runOnce(o) {
         staged[id] = 1; c.stored++; ids.push(id);
       }
       up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: ids, why: ids.length ? '' : '첨부 없음' };
+      up[tryKey] = null;
       await db.ref().update(up);
     } catch (e) {
       /* 창고·가리기·DB 쓰기 도중 터짐 — staged 는 버리고, seen 에 안 적어 다음 회차에 다시.
          회차 전체를 죽이지 않는다(run 기록·zeroStreak 는 계속 쓴다) */
       sum.retry++; sum.errors.push(errTag(e));
+      try { await db.ref(tryKey).set(null); } catch (_) { /* 다음 회차가 치운다 */ }
       continue;
     }
     Object.assign(have, staged);
@@ -230,4 +272,4 @@ async function runOnce(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, shouldChain, shouldRunScheduled, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
