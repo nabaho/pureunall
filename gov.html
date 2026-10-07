@@ -120,6 +120,15 @@ details.recban[open]>summary::before{content:'▾ '}
   .rec-hits td{display:block;white-space:normal!important;border:0!important;padding:2px 6px!important}
 }
 /* 하위 탭 — 아래 갈래 단추(알약)와 헷갈리지 않게 «탭» 모양 */
+/* ★ 틀고정 (대표 지시 2026-10-07 「틀고정」) — 머리(#head) 바로 밑에 하위 탭 줄이, 그 밑에
+   「지원 이력·메일」의 단추 줄이 차례로 붙는다.
+   ⚠ 높이는 «재서» 알려 준다(recStickySync → --headH·--rsubH). 고정값을 박으면 좁은 화면에서
+     머리줄·탭이 두 줄로 접힐 때 겹치거나 틈이 난다. 바탕을 칠해 아래로 지나가는 줄이 비치지 않게. */
+#recSubs{position:sticky;top:var(--headH,94px);z-index:15;background:var(--card);margin-top:0;padding-top:4px}
+#recPaneHist>.bar{position:sticky;top:calc(var(--headH,94px) + var(--rsubH,44px));z-index:14;
+  background:var(--card);padding:6px 0;margin-top:-6px;border-bottom:1px solid var(--border)}
+/* ⚠ 폰(좁은 화면)에서는 단추 줄까지 붙이면 세 층이 화면의 3분의 1(375px 실측 278px)을 먹는다 → 하위 탭까지만 */
+@media (max-width:640px){ #recPaneHist>.bar{position:static;margin-top:0;border-bottom:0} }
 .rsubs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 12px;flex-wrap:wrap}
 .rsub{padding:9px 16px;border:0;background:none;font-family:inherit;font-size:13.5px;cursor:pointer;color:var(--text-mute);border-bottom:3px solid transparent;margin-bottom:-1px}
 .rsub.on{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
@@ -891,7 +900,7 @@ function setTab(t){
   $('pgRec').style.display  = (t==='rec'?'':'none');
   $('tbFeed').className='tb'+(t==='feed'?' on':'');
   $('tbRec').className ='tb'+(t==='rec'?' on':'');
-  if(t==='rec'){ recDraw(); recWatchPull(); recMailScan(false); }
+  if(t==='rec'){ recDraw(); recWatchPull(); recMailScan(false); recStickySync(); }
   lsSet('tab', t);                       /* ⚠ 클라우드로 내보내지 않는다(lsSet 은 안 밀어낸다) */
 }
 
@@ -1904,7 +1913,27 @@ async function careerPull(){
   _matDocs=GovCareer.docbox(ls);   /* 서류 보관함 이름·해 — 필요서류 견주기 */
 }
 
+/* 틀고정 높이 재기 — 머리(#head)와 하위 탭 줄(#recSubs)의 «지금» 높이를 CSS 변수로 알려 준다.
+   ⚠ 하위 탭은 «컨설턴트 모집» 화면에서만 보인다 — 숨어 있을 때(높이 0)는 옛 값을 지우지 않는다. */
+function recStickySync(){
+  var root=document.documentElement, h=$('head'), r=$('recSubs');
+  if(!root || !root.style || typeof root.style.setProperty!=='function') return;
+  if(h && h.offsetHeight) root.style.setProperty('--headH', h.offsetHeight+'px');
+  if(r && r.offsetHeight) root.style.setProperty('--rsubH', r.offsetHeight+'px');
+}
+function recStickyWatch(){
+  recStickySync();
+  try{
+    if(typeof ResizeObserver==='function'){
+      var ro=new ResizeObserver(function(){ recStickySync(); });
+      ['head','recSubs'].forEach(function(id){ if($(id)) ro.observe($(id)); });
+    }
+  }catch(e){}
+  try{ window.addEventListener('resize', recStickySync); }catch(e){}
+}
+
 function boot(){
+  recStickyWatch();
   drawKw(); draw(); readyNote(); applyLock('checking');
   if(location.protocol==='file:'){ applyLock('lock','file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ applyLock('lock','인터넷이 필요합니다'); return; }
