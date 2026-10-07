@@ -6054,15 +6054,17 @@ function puMailComposeTo(o){
     try{ history.replaceState(null, '', 'pu-cards.html?view=mail&to=' + encodeURIComponent(to)
       + '&name=' + encodeURIComponent(name) + '&card=' + encodeURIComponent(card)); }catch(_){}
     _compose = null;
-    mailComposeOpen({ card:card, to:to, name:name });
+    mailComposeOpen({ card:card, to:to, name:name, subject:String((o && o.subject) || ''), body:String((o && o.body) || ''), cc:String((o && o.cc) || '') });
     return true;
   }catch(_){ return false; }
 }
 try{ window.puMailComposeTo = puMailComposeTo; }catch(_){}
 /* to= 로 들어온 쓰기를 여는 «한 곳» — 새로 실린 창(restoreLastScreen)과 떠 있던 창(puMailComposeTo)이 함께 쓴다 */
 function mailComposeOpen(t){
-  if(t.card && state.items && state.items[t.card]){ openSendMaterials(t.card, { asked:true }); return; }
-  openMailPage({ cardId:t.card, to:t.to, name:t.name, company:'', ids:[] });
+  /* 문안(제목·본문)이 실려 왔으면 자료 고르기를 거치지 않고 곧바로 쓰기로 — 문안을 넘긴 쪽이 이미 고른 것이다 */
+  if(t.card && state.items && state.items[t.card] && !t.subject && !t.body){ openSendMaterials(t.card, { asked:true }); return; }
+  openMailPage({ cardId:t.card, to:t.to, name:t.name, company:'', ids:[],
+                 subject:t.subject||'', body:t.body||'', cc:t.cc||'' });
 }
 /* opt.asked — 「이미 물어본 길」. 딴 창(openMailWindow)으로 건너온 뒤에는 다시 묻지
    않는다. 사람이 「메일」을 눌러 창까지 열린 뒤에 「메일을 쓸까요?」를 또 묻는 것은
@@ -10713,7 +10715,10 @@ function mailToFromUrl(search){
   try{ p = new URLSearchParams(s || ''); }catch(_){ return null; }
   const to = String(p.get('to') || '').trim();
   if(!to) return null;
-  return { to: to, name: String(p.get('name') || ''), card: String(p.get('card') || '') };
+  /* subject·body·cc — 다른 앱(기금관리 「결산 후 진행」)이 문안까지 채워 넘긴다(2026-10-07).
+     없으면 빈 값 — 예전 길(명함 이메일 누르기)은 그대로다. */
+  return { to: to, name: String(p.get('name') || ''), card: String(p.get('card') || ''),
+           subject: String(p.get('subject') || ''), body: String(p.get('body') || ''), cc: String(p.get('cc') || '') };
 }
 /* 주소에 실려 온 「메일 주인 가리기」 갈래 (대표 지시 2026-09-08 「이어받기」)
    기업정보함의 「🚪 퇴사한 담당 N명 — 이어받기」 띠가 이 길로 온다.
@@ -10828,7 +10833,7 @@ function restoreLastScreen(){
            「메일을 쓸까요?」를 또 묻는 것은 뜻이 없다.
          ⚠ 명함이 아직 없으면(씨앗 없이 메일 문으로 바로 들어온 길) 예전 그대로
            openMailPage 로 간다 — 자료 고르기는 명함 없이는 못 연다. */
-      mailComposeOpen({ card:_to.card, to:_to.to, name:_to.name });
+      mailComposeOpen({ card:_to.card, to:_to.to, name:_to.name, subject:_to.subject, body:_to.body, cc:_to.cc });
       return;
     }
     /* ★ 「이 사업장과 오간 것」으로 건너온 길 (?view=mail&mail=co&co=…).
