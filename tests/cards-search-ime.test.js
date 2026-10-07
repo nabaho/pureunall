@@ -111,8 +111,20 @@ test('★ 조합이 끝나면 반드시 다시 그린다 — 안 그리면 친 �
 });
 
 test('조합 끝 손잡이도 같은 일을 한다', () => {
-  for (const h of (src.match(/oncompositionend="[^"]*"/g) || [])) {
-    assert.match(h, /renderMailPage\(\)|showPanel\(|Type\(/,
-      '조합이 끝났는데 찾기를 안 한다: ' + h);
+  /* ★ 규칙은 «조합이 끝나면, 조합 중이라 미뤘던 그 일을 한 번 한다»이다.
+       그래서 oncompositionend 는 «oninput 에서 조합 가드만 뺀 것»이어야 한다.
+     ⚠ 함수 이름(renderMailPage·showPanel·…)을 박아 두지 않는다 — 여기 이름을 적어
+       두면, 「목록만 바꾸는 길」을 새로 만들 때마다 멀쩡한 개선 때문에 이 검사가
+       깨진다(CLAUDE.md 「지금 값이 아니라 규칙을 못 박는다」).
+       2026-10-07 📎 첨부파일함의 찾기 칸(mbAttFind)이 실제로 그렇게 걸렸다. */
+  const norm = (s) => String(s).replace(/^[a-z]+=/, '')
+    .replace(/if\(!event\.isComposing\)/g, '').replace(/\s+/g, '');
+  const want = new Set(inputs().filter((h) => /isComposing/.test(h)).map(norm));
+  const ends = (src.match(/oncompositionend="[^"]*"/g) || []);
+  assert.ok(ends.length > 0, '조합 끝 손잡이가 하나도 없다');
+  for (const h of ends) {
+    assert.ok(want.has(norm(h)),
+      '조합이 끝났는데 «조합 중에 미룬 그 일»을 안 한다: ' + h
+      + '\n  조합 중을 피하는 칸들: ' + [...want].join(' / '));
   }
 });

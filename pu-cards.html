@@ -1270,6 +1270,35 @@ table.mstab2 tr:last-child td{border-bottom:none}
 /* 안 읽은 것은 굵게 — 다음메일과 같다 */
 .dm-row.unread .who,.dm-row.unread .sub{font-weight:700}
 .dm-none{text-align:center;color:#94a3b8;font-size:13px;padding:52px 10px;line-height:1.8}
+/* ══════ 📎 첨부파일함 (대표 지시 2026-10-07 — 다음메일에 있고 우리에게만 없던 칸) ══════
+   ⚠ 한 줄에 하나다. 자리가 넓다고 두 줄로 쌓지 않는다 — 7천 줄에서는 그것이 곧 두 배 길이다. */
+.dm-atop{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid #cbd5e1}
+.dm-atop b{font-size:14px;color:#1e293b}
+.dm-atop .cnt{color:#64748b;font-size:12.5px}
+.dm-atop .sp{flex:1}
+.dm-atop input{font:13px inherit;padding:5px 9px;border:1px solid #cbd5e1;border-radius:6px;width:200px}
+.dm-achip{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px;border-bottom:1px solid #cbd5e1}
+.dm-achip button{font:12.5px inherit;padding:3px 10px;border:1px solid #cbd5e1;border-radius:999px;
+  background:#fff;color:#1e293b;cursor:pointer;white-space:nowrap}
+.dm-achip button:hover{background:#f8fafc}
+.dm-achip button b{color:#64748b;font-weight:600;margin-left:3px}
+.dm-achip button.on{background:#1e293b;color:#fff;border-color:#1e293b}
+.dm-achip button.on b{color:#e2e8f0}
+.dm-achip .gap{width:12px}
+.dm-att{display:flex;align-items:center;gap:9px;padding:0 12px;height:36px;
+  border-bottom:1px solid #f8fafc;font-size:13px;white-space:nowrap;cursor:pointer}
+.dm-att:hover{background:#f8fafc}
+.dm-att .ex{flex:none;width:46px;text-align:center;font-size:10.5px;font-weight:700;
+  border:1px solid #cbd5e1;border-radius:5px;padding:2px 0;color:#64748b;background:#f8fafc}
+.dm-att .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;color:#1e293b}
+.dm-att .who{flex:none;width:130px;overflow:hidden;text-overflow:ellipsis;color:#1e293b}
+.dm-att .box{flex:none;width:124px;overflow:hidden;text-overflow:ellipsis;color:#64748b;font-size:12px}
+.dm-att .at{flex:none;width:96px;text-align:right;color:#94a3b8;font-size:12.5px}
+.dm-att .go{flex:none;font:12px inherit;padding:2px 9px;border:1px solid #cbd5e1;
+  border-radius:6px;background:#fff;color:#1e293b;cursor:pointer}
+.dm-afoot{padding:10px 12px;color:#64748b;font-size:12.5px;border-top:1px solid #cbd5e1;line-height:1.7}
+.dm-afoot button{font:12.5px inherit;padding:3px 12px;border:1px solid #cbd5e1;border-radius:6px;
+  background:#fff;color:#1e293b;cursor:pointer;margin-right:8px}
 /* ══════ 🚫 스팸으로 걸러진 줄 (대표 지시 2026-09-08) ══════════════════════════
    ⚠ «걸렀다고 알리는 줄»이 반드시 있어야 한다. 조용히 빼면 「우리 시스템이 메일을
      먹었다」가 되고, 그다음부터 이 메일함을 못 믿게 된다.
@@ -18851,7 +18880,7 @@ function mbMinePushSet(on){
   /* ⚠ 여기서 켠다고 폰이 바로 울리지 않는다 — 기기 등록은 그 폰에서 따로 해야 한다.
        그 말을 안 하면 「켰는데 왜 안 와요」가 된다(지금 등록된 폰은 0대다). */
   const done = ()=> toast(want
-    ? '🔔 켰습니다 — 폰에서 [🔔 폰 알림]으로 그 기기를 한 번 등록해 주셔야 옵니다'
+    ? '🔔 켰습니다 — 폰에서 포털 ▸ 💬 건의함 ▸ [🔔 폰 알림] 을 한 번 눌러 그 기기를 등록해 주셔야 옵니다'
     : '🔕 폰 알림을 껐습니다 — 이 띠는 그대로 보입니다', 9000);
   if(typeof Store==='undefined' || Store.mode!=='firebase') return done();
   firebase.database().ref(DB_ROOT+'/config/mailPush/'+sid).set(_mbPush[sid]).then(done).catch(e=>{
@@ -21454,6 +21483,9 @@ function mbNeedSlugs(id){
        「*old」 라는 폴더를 열어 달라고 하게 되고, 그 자리에서 오류가 난다.
        읽어 오는 일은 mbOldLoad 가 따로 한다. */
   if(s===MB_OLD_ID) return [];
+  /* 📎 첨부파일함은 «모든 칸»을 가로지른다 — 보낸 것에도 첨부가 많다(실측 1,040통).
+     전체메일(*all)처럼 받은 칸만 보면 우리가 보낸 계약서·명세서가 통째로 빠진다. */
+  if(s===MB_ATT_ID) return mbFolders().map(f=>f.slug);
   return [s];
 }
 
@@ -21559,6 +21591,7 @@ function mbFolderLabel(f){
 }
 function mbBoxName(id){
   if(id===MB_OLD_ID) return '📦 지난 메일';
+  if(id===MB_ATT_ID) return '📎 첨부파일함';
   if(id==='*all')  return '전체메일';
   if(id==='*tome') return '내게쓴메일함';
   if(id==='*sched')return '예약메일함';
@@ -21978,6 +22011,14 @@ function mailSideHtml(){
 칸을 옮기거나 지우는 것은 다음메일에서 하십니다.">
       <span class="ic">📦</span><span class="nm">지난 메일</span>
       <span class="n">${mbOldCount().toLocaleString()}</span></div>`;
+  /* ── 📎 첨부파일함 (대표 지시 2026-10-07) ──
+     다음메일과 견줘 «하나 없던 것»이다. 메일을 하나씩 열지 않고 파일 이름으로 찾는다.
+     ⚠ 수를 안 적는다 — 세려면 받아 둔 줄 전부를 훑어야 하고, 그 셈을 그릴 때마다 하면
+       화면이 그때마다 멈칫한다. 수는 들어가면 머리줄에 나온다(mbAttBoxHtml 머리글). */
+  h += `<div class="dm-f ${now===MB_ATT_ID?'on':''}" onclick="openMailBox('${MB_ATT_ID}')"
+      title="받아 둔 메일의 첨부를 «파일 이름»으로 찾습니다 — 메일을 하나씩 열지 않아도 됩니다.
+내려받기는 메일을 열면 그 화면에 있습니다.">
+      <span class="ic">📎</span><span class="nm">첨부파일함</span></div>`;
   {
     const folded = mbSysFolded();
     const head = `<div class="dm-fsec sys" onclick="mbToggleSys()"
@@ -24341,6 +24382,9 @@ function mbPagerHtml(){
      (2026-08-29 반응속도 일). mbListHtml 이 그대로 mbVisibleRows 를 쓴다.
    ⚠ 메일을 안 열었을 때는 나누지 않는다. 빈 칸을 절반 띄워 두면 목록만 좁아진다. */
 function mbBoxHtml(){
+  /* 📎 첨부파일함 — 메일을 열기 전까지는 이 자리다. 열면 아래 읽는 화면이 그대로 뜬다
+     (「‹ 돌아가기」가 다시 여기로 온다 — mbBoxName 이 이름을 안다). */
+  if(mbNow() === MB_ATT_ID && !state.mbOpen) return mbAttBoxHtml();
   if(!state.mbOpen) return mbListHtml();
   const m = mbViewMode();
   /* ⚠ 「목록만」은 목록(mbListHtml)을 «안» 그린다 — 그런데 읽는 화면에서 여는 창
@@ -24355,6 +24399,169 @@ function mbBoxHtml(){
 }
 /* 읽는 화면에서 여는 창 — 목록을 안 그리는 「목록만」에서도 떠야 한다(mbBoxHtml) */
 function mbReadPopsHtml(){ return mbPvHtml() + mbNewHtml(); }
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📎 첨부파일함 — 다음메일에 있고 «우리에게만 없던» 칸 (대표 지시 2026-10-07 전체 점검)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 실측 2026-10-07 — 첨부가 붙은 메일 5,709통(첨부 10,593개). 그 가운데 4,408통은
+     파일 «이름»이 이미 거울에 적혀 있다(row.an · 이름 7,354개).
+     많은 것부터 PDF 2,823 · 엑셀 1,464 · 한글 1,327 · 사진 570 · 압축 382.
+   ★ 그래서 요금이 0원이다 — 메일함(IMAP)을 새로 읽지 않는다. 이미 받아 둔 줄만 본다.
+   ⚠★ 내려받기를 여기 두지 않는다. 거울에는 이름만 있고 «조각 번호»가 없어서, 차례로
+     집으면 **다른 파일이 내려올 수 있다**. 길은 「메일 열기」 하나뿐이다 — 그 화면에
+     📥 내려받기 · 👁 미리보기 · → 사진첩 · → 급여데이터함이 이미 다 있다.
+     (여는 곳을 둘로 만들지 않는다 — 언젠가 한쪽만 고친다.)
+   ⚠ 이름이 없는 첨부(보낸 쪽이 안 붙였거나 본문 속 그림)는 여기 못 담는다.
+     그 수를 목록 아래에 «적어 둔다» — 안 적으면 「첨부가 있는데 왜 안 보이나」가 된다.
+   ⚠ 옆줄 칸에는 수를 안 적는다. 세려면 받아 둔 줄 전부를 훑어야 하는데, 그 셈을
+     그릴 때마다 하면 화면이 그때마다 멈칫한다(2026-10-02 「10초 중 676ms」가 그 자리였다).
+     수는 이 칸에 들어왔을 때 머리줄에 나온다. */
+const MB_ATT_ID = '*att';
+const MB_ATT_PAGE = 200;        /* 한 번에 보이는 줄 — 「더 보기」로 늘어난다 */
+const MB_ATT_KINDS = [
+  { k:'pdf', nm:'📄 PDF',  ex:['pdf'] },
+  { k:'xls', nm:'📊 엑셀', ex:['xlsx','xls','xlsm','xlsb','csv','cell'] },
+  { k:'hwp', nm:'📝 한글', ex:['hwp','hwpx','hml'] },
+  { k:'img', nm:'🖼 사진', ex:['jpg','jpeg','png','gif','bmp','heic','webp','tif','tiff'] },
+  { k:'zip', nm:'🗂 압축', ex:['zip','7z','rar','alz','egg','gz'] },
+  { k:'doc', nm:'📑 문서', ex:['doc','docx','ppt','pptx','pptm','txt','xml','htm','html','eml'] },
+];
+function mbAttExt(name){
+  const s = String(name||''); const i = s.lastIndexOf('.');
+  return i > 0 ? s.slice(i+1).toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,8) : '';
+}
+function mbAttKindOf(name){
+  const ex = mbAttExt(name);
+  for(let i=0;i<MB_ATT_KINDS.length;i++)
+    if(MB_ATT_KINDS[i].ex.indexOf(ex) >= 0) return MB_ATT_KINDS[i].k;
+  return 'etc';
+}
+/* 받아 둔 모든 칸의 줄에서 «첨부 이름»만 뽑는다 — 한 줄에 파일 하나.
+   ⚠ 그리는 «동안» 한 번만 만든다(mbMemoOf). 줄이 7천이라 그릴 때마다 만들면 그것이 곧 느림이다.
+   ⚠ 이름이 없는데 첨부는 있는 줄(noName)도 함께 센다 — 목록 아래에 적을 값이다. */
+function mbAttScan(){
+  const m = (typeof mbMemoOf === 'function') ? mbMemoOf() : null;
+  if(m && m.attScan) return m.attScan;
+  const out = []; let noName = 0, mails = 0;
+  Object.keys(_mbMsgs||{}).forEach(slug=>{
+    const box = _mbMsgs[slug] || {};
+    const bn = mbFolderLabel(mbFolderBy(slug) || {});
+    Object.keys(box).forEach(u=>{
+      const v = box[u]; if(!v) return;
+      const an = Array.isArray(v.an) ? v.an : [];
+      if(!an.length){ if(Number(v.a||0)) noName++; return; }
+      mails++;
+      an.forEach(name=>{
+        if(!name) return;
+        out.push({ name:String(name), kind:mbAttKindOf(name), slug:slug, u:String(u),
+          who:String(v.f||v.e||''), box:bn, d:Number(v.d||0), s:String(v.s||'') });
+      });
+    });
+  });
+  out.sort((a,b)=> b.d - a.d || (a.name < b.name ? -1 : 1));
+  const got = { files: out, noName: noName, mails: mails };
+  if(m) m.attScan = got;
+  return got;
+}
+function mbAttFiles(){ return mbAttScan().files; }
+function mbAttTally(files){
+  const t = { all: (files||[]).length, etc: 0 };
+  MB_ATT_KINDS.forEach(x=>{ t[x.k] = 0; });
+  (files||[]).forEach(f=>{ t[f.kind] = (t[f.kind]||0) + 1; });
+  return t;
+}
+/* 종류 칩 · 기간 · 찾는 말을 거친 줄 — 그리는 곳과 세는 곳이 «같은 함수»를 본다 */
+function mbAttRows(now0){
+  let rows = mbAttFiles();
+  const k = String(state.mbAttKind||'');
+  if(k) rows = rows.filter(f=>f.kind === k);
+  const days = Number(state.mbAttDays||0);
+  if(days > 0){
+    const cut = (now0 || Date.now()) - days * 86400000;
+    rows = rows.filter(f=>Number(f.d||0) >= cut);
+  }
+  const q = String(state.mbAttQ||'').trim().toLowerCase().replace(/\s/g,'');
+  if(q) rows = rows.filter(f=>
+    (String(f.name)+String(f.who)+String(f.s)).toLowerCase().replace(/\s/g,'').indexOf(q) >= 0);
+  return rows;
+}
+function mbAttShown(){ return Math.max(MB_ATT_PAGE, Number(state.mbAttShow)||0); }
+function mbAttListHtml(){
+  const rows = mbAttRows();
+  /* ⚠ 「없습니다」와 「읽고 있습니다」를 가른다 — 뭉뚱그리면 아직 받아 오는 중인데
+       없는 줄 알고 새로고침을 누른다(mbLoadingBox 가 그 일을 한다). */
+  if(!rows.length) return `<div class="dm-none">${
+    (state.mbAttQ||state.mbAttKind||state.mbAttDays) ? '찾은 첨부가 없습니다.'
+    : (typeof mbLoadingBox === 'function' && mbLoadingBox()) ? '읽고 있습니다…'
+    : '받아 둔 메일에 첨부가 없습니다.'}</div>`;
+  return rows.slice(0, mbAttShown()).map(f=>`<div class="dm-att"
+      onclick="mbOpenMsg('${esc(f.slug)}','${esc(f.u)}')"
+      title="${esc(f.name)} · ${esc(f.s||'(제목 없음)')} — ${esc(f.who)} · ${esc(f.box)}">
+      <span class="ex">${esc((mbAttExt(f.name)||'—').toUpperCase())}</span>
+      <span class="nm">${esc(f.name)}</span>
+      <span class="who">${esc(f.who)}</span>
+      <span class="box">${esc(f.box)}</span>
+      <span class="at">${mbTime(f.d)}</span>
+      <button class="go" title="이 첨부가 붙은 메일을 엽니다 — 내려받기·미리보기는 그 화면에 있습니다"
+        >메일 열기</button></div>`).join('');
+}
+function mbAttCntText(){
+  const n = mbAttRows().length, all = mbAttFiles().length;
+  return (n === all) ? (all.toLocaleString() + '개')
+                     : (n.toLocaleString() + '개 / 모두 ' + all.toLocaleString() + '개');
+}
+function mbAttBoxHtml(){
+  const scan = mbAttScan();
+  const t = mbAttTally(scan.files);
+  const rows = mbAttRows();
+  const k = String(state.mbAttKind||''), days = Number(state.mbAttDays||0);
+  const chip = (on, act, label, n, tip)=>`<button class="${on?'on':''}" onclick="${act}"
+    title="${esc(tip||label)}">${label}${n==null?'':`<b>${Number(n).toLocaleString()}</b>`}</button>`;
+  return `<div class="dm-atop">
+      <b>📎 첨부파일함</b>
+      <span class="cnt" id="mbAttCnt">${esc(mbAttCntText())} · 메일 ${scan.mails.toLocaleString()}통</span>
+      <span class="sp"></span>
+      <input id="mbAttQ" placeholder="파일 이름으로 찾기" value="${esc(state.mbAttQ||'')}"
+        oninput="if(!event.isComposing)mbAttFind(this.value)"
+        oncompositionend="mbAttFind(this.value)"></div>
+    <div class="dm-achip">
+      ${chip(!k, 'mbAttKind(\'\')', '전체', t.all, '모든 첨부')}
+      ${MB_ATT_KINDS.map(x=>chip(k===x.k, `mbAttKind('${x.k}')`, x.nm, t[x.k]||0,
+          x.nm + ' — ' + x.ex.map(e=>'.'+e).join(' '))).join('')}
+      ${chip(k==='etc', 'mbAttKind(\'etc\')', '그 밖', t.etc||0, '위 갈래에 안 드는 것')}
+      <span class="gap"></span>
+      ${chip(!days, 'mbAttDays(0)', '전체 기간', null, '받아 둔 것 모두')}
+      ${chip(days===365, 'mbAttDays(365)', '최근 1년', null, '한 해 안에 온 것만')}
+      ${chip(days===90, 'mbAttDays(90)', '최근 90일', null, '석 달 안에 온 것만')}
+    </div>
+    <div id="mbAttList">${mbAttListHtml()}</div>
+    <div class="dm-afoot">
+      ${rows.length > mbAttShown() ? `<button onclick="mbAttMore()"
+        >더 보기 (${(rows.length - mbAttShown()).toLocaleString()}개 남음)</button>` : ''}
+      ${/* ⚠ 못 담는 것을 «반드시» 적는다 — 안 적으면 「첨부가 있는데 왜 안 보이나」가 된다 */''}
+      ${scan.noName ? `첨부가 있지만 <b>이름이 없는 메일 ${scan.noName.toLocaleString()}통</b>은
+        여기 없습니다 — 보낸 쪽이 이름을 안 붙였거나 본문 속 그림입니다.
+        그 메일들은 왼쪽 위 <b>📎 첨부</b> 거르개로 찾습니다.` : ''}
+    </div>`;
+}
+/* 찾기는 «목록만» 다시 그린다 — 화면을 통째로 그리면 글자 칸에서 손이 떨어져
+   한 글자 치고 또 눌러야 한다. 칩은 손이 떠나 있으므로 통째로 그려도 된다. */
+function mbAttFind(v){
+  state.mbAttQ = String(v||''); state.mbAttShow = 0;
+  const el = $('mbAttList'); if(!el) return renderMailPage();
+  mbMemoClear();
+  el.innerHTML = mbAttListHtml();
+  const c = $('mbAttCnt'); if(c) c.textContent = mbAttCntText() + ' · 메일 ' + mbAttScan().mails.toLocaleString() + '통';
+}
+function mbAttKind(k){
+  state.mbAttKind = (String(state.mbAttKind||'') === String(k)) ? '' : String(k);
+  state.mbAttShow = 0; renderMailPage();
+}
+function mbAttDays(n){
+  state.mbAttDays = (Number(state.mbAttDays||0) === Number(n)) ? 0 : Number(n);
+  state.mbAttShow = 0; renderMailPage();
+}
+function mbAttMore(){ state.mbAttShow = mbAttShown() + MB_ATT_PAGE; renderMailPage(); }
 function mbListHtml(){
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
