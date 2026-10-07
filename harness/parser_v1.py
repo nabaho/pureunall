@@ -172,6 +172,27 @@ def pay_item_cols(flat, colmap, skip):
         pays[ci] = h
     return pays, hours
 JUMIN_RE = re.compile(r'\d{6}\s*[-]?\s*\d{6,7}')
+
+# ══ 주민번호 — 대표 결정 2026-10-07 「암호화해서 저장」 ══
+# ⚠ parser_output.json(여러 곳이 읽는 결과물)에는 «넣지 않는다». 줄마다 임시로 붙였다가 run_all 이
+#   떼어 별도 파일(rrn_raw.json)로만 내보낸다. 급여관리에는 브라우저에서 잠근 뒤에만 올라간다.
+# ⚠ 칸 «하나»가 통째로 주민번호 모양일 때만 잡는다 — 줄 전체를 이어 붙여 찾으면 계좌번호(12~13자리)가
+#   걸린다. 그리고 생년월일이 날짜로 말이 되고 7번째 자리가 1~8(내·외국인)일 때만.
+RRN_CELL = re.compile(r'^\s*(\d{6})\s*-?\s*(\d{7})\s*$')
+
+
+def rrn_of_row(row):
+    for c in row:
+        if c is None:
+            continue
+        m = RRN_CELL.match(str(c))
+        if not m:
+            continue
+        a, b = m.group(1), m.group(2)
+        mm, dd = int(a[2:4]), int(a[4:6])
+        if 1 <= mm <= 12 and 1 <= dd <= 31 and b[0] in "12345678":
+            return a + b
+    return None
 NAME_RE = re.compile(r'^[가-힣]{2,4}$')
 NUM_RE = re.compile(r'^-?[\d,]+(\.\d+)?$')
 
@@ -527,6 +548,9 @@ def pick_and_parse(wb):
                     if got:
                         emp[key] = got
             if len(emp) >= 3:  # 성명 + 숫자필드 2개+
+                rrn = rrn_of_row(row)
+                if rrn:
+                    emp["_rrn"] = rrn          # ⚠ run_all 이 떼어 간다 — parser_output 에 안 남는다
                 employees.append(emp)
         # ⚠ 지급 항목 열인데 그 시트의 값이 전부 1,000원 미만이면 돈이 아니다(나이·횟수·시간)
         #   — 열째로 뺀다. 「만나이 45원」 같은 줄이 명세서에 찍히면 안 된다(실측 2026-10-07).
@@ -780,6 +804,17 @@ def run_all():
             fs |= set(s["fields"])
         for f in fs:
             field_files[f] += 1
+
+    # 주민번호는 떼어서 따로 — parser_output 에는 평문 주민번호가 «남지 않게»(대표 결정 2026-10-07)
+    rrn_raw = []
+    for r in results:
+        for s in r.get("sheets") or []:
+            for e in s.get("employees") or []:
+                v = e.pop("_rrn", None)
+                if v:
+                    rrn_raw.append({"path": r["path"], "sheet": s.get("sheet"), "성명": e.get("성명"), "rrn": v})
+    with open(os.path.join(OUT_DIR, "rrn_raw.json"), "w", encoding="utf-8") as f:
+        json.dump(rrn_raw, f, ensure_ascii=False)
 
     # 결과 저장(개인정보 포함 → 자료 쪽)
     with open(os.path.join(OUT_DIR, "parser_output.json"), "w", encoding="utf-8") as f:
