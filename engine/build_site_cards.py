@@ -67,6 +67,24 @@ def site_from_filename(name):
     return None
 
 
+# 「3월」「2026년 4월」 같은 «달 폴더» — 담당자에 따라 회사별이 아니라 달별로 폴더를 나눈다
+# (2026-10-07 확인: 한 담당자는 3월·4월·5월 폴더 안에 「회사이름_2026년03월급여대장_…」).
+MONTH_DIR = re.compile(r'^\s*(\d{2,4}\s*년\s*)?\d{1,2}\s*월\s*$')
+
+
+def _keep_branch(s):
+    """「다온식당(본점)」 → 「다온식당 본점」.
+    ⚠ site_base 는 끝의 괄호를 떼어 버린다(「(10일)」 같은 꼬리표를 떼려고). 그런데 달 폴더 쪽은
+      괄호 안이 **지점**이라 떼면 「다온식당(본점)」과 「다온식당(2공장)」이 한 사업장이 된다.
+      그래서 괄호를 빈칸으로 바꿔 지점 이름을 남긴다. 「(주)」「(유)」는 법인 표기라 그대로 둔다."""
+    if not s:
+        return s
+    m = re.match(r'^(.*?)\s*\(([^()]+)\)\s*$', s)
+    if m and m.group(2).strip() not in ("주", "유") and m.group(1).strip():
+        s = m.group(1).strip() + " " + m.group(2).strip()
+    return re.sub(r'\s+', ' ', s).strip()
+
+
 def raw_site(rel):
     parts = rel.replace("/", "\\").split("\\")
     rest = parts[1:]
@@ -75,6 +93,10 @@ def raw_site(rel):
         i += 1
     if i >= len(rest):
         return None
+    # 담당자 폴더 바로 밑이 «달 폴더»면 회사는 파일 이름에 있다 — 달 폴더는 건너뛴다.
+    # ⚠ 회사 폴더 «안»의 달 폴더(회사/25년 7월/…)는 여기 오지 않는다 — 회사 폴더가 먼저 걸린다.
+    if i < len(rest) - 1 and MONTH_DIR.match(rest[i]):
+        return _keep_branch(site_from_filename(rest[-1]))
     # 마지막 토막이면 **폴더가 아니라 파일**이다 — 파일 이름에서 뽑는다
     if i == len(rest) - 1:
         return site_from_filename(rest[i])

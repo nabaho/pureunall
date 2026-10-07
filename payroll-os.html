@@ -362,7 +362,9 @@ function afterLogin(){
     fbDb.ref(ROOT+'/sever').once('value'),
     fbDb.ref(ROOT+'/labor_policy').once('value'),
     /* 사람이 확정한 «사업장 ↔ 업체» 짝 — 자동 짝맞추기(짐작)를 이긴다. */
-    fbDb.ref(ROOT+'/site_co_link').once('value')
+    fbDb.ref(ROOT+'/site_co_link').once('value'),
+    /* 회사별 「이 신고는 누가 하나」(2026-10-07) — 회사당 여섯 칸이라 얇다 */
+    fbDb.ref(ROOT+'/filing_owner').once('value')
   ]).then(function(r){
     cache.site_cards=r[0].val()||[];
     cache.payroll_locked=r[1].val()||{};
@@ -373,6 +375,7 @@ function afterLogin(){
     cache.sever=r[8].val()||{};
     cache.labor_policy=r[9].val()||{};
     cache.site_co_link=r[10].val()||{};
+    cache.filing_owner=r[11].val()||{};
     payIdx=r[2].val()||null;
     payOld=r[4].val()||null;
     ready=true; navSeed(); render();
@@ -2142,6 +2145,22 @@ window.markNotCo=markNotCo; window.unlinkSite=unlinkSite; window.linkAllSame=lin
    ⚠ 목록을 그리는 동안 직원 표를 받지 않는다(110곳에서 받으면 화면이 안 열린다).
    ══════════════════════════════════════════════════════════════════════ */
 function ymNow(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2); }
+/* ══════ 자료 기준월 (2026-10-07 대표 「순서대로」 1번) ══════
+   급여관리에 올라온 자료의 마지막 달. 화면 기준 달이 이것보다 뒤면 거의 모든 회사가 「미도착」으로
+   떠서, 정말 안 보낸 곳과 «아직 안 올린» 곳을 가를 수 없었다(실측: 자료는 2026-05 까지, 화면은 10월).
+   그래서 ① 처음 열 때 기준 달은 자료가 있는 마지막 달(이번 달보다 뒤면 이번 달) ② 목록 머리에
+   「자료는 언제까지」를 늘 적는다. ⚠ 직원 표는 안 본다 — 얇은 목록의 귀속월만 센다. */
+var horizonMemo={of:null, v:null};
+function dataHorizon(){
+  var src=payIdx||payOld;
+  if(horizonMemo.of===src) return horizonMemo.v;
+  var best=null;
+  paySites().forEach(function(s){ (payRecs(s)||[]).forEach(function(r){ var x=ymOf(r); if(!x) return;
+    var k=x.y*100+x.m; if(best==null||k>best) best=k; }); });
+  horizonMemo={of:src, v:best==null?null:(Math.floor(best/100)+'-'+('0'+(best%100)).slice(-2))};
+  return horizonMemo.v;
+}
+function defaultYm(){ var n=ymNow(), h=dataHorizon(); return (h&&h<n)?h:n; }
 function ymParts(s){ var m=String(s||'').match(/^(\d{4})-(\d{1,2})$/); return m?{y:+m[1],m:+m[2]}:null; }
 function ymText(s){ var t=ymParts(s); return t?(t.y+'년 '+t.m+'월'):''; }
 /* 데이터함 알림의 귀속월 — 「2026-08」이면 해까지, 「8월」이면 달만 */
@@ -2189,7 +2208,8 @@ function sitesHaveSever(sites){
 function byKoName(a,b){ return PuSiteStaff.coreName(a.name).localeCompare(PuSiteStaff.coreName(b.name),'ko'); }
 /* 한 번 그릴 때 쓸 것을 한 번에 센다 — 칸 셋이 같은 셈을 본다 */
 function shellModel(){
-  var S=PuSiteStaff, links=lmap('site_co_link'), ym=App.ym||(App.ym=ymNow());
+  /* ⚠ 기본 달은 «정해 두지 않고» 그때그때 센다 — 자료를 받기 전에 정해 버리면 이번 달로 굳는다 */
+  var S=PuSiteStaff, links=lmap('site_co_link'), ym=App.ym||defaultYm();
   var em=((me&&me.email)||'').toLowerCase();
   var cos=coData?S.payrollCos(coData.companies).slice().sort(byKoName):[];
   var active={}; cos.forEach(function(c){ active[c.id]=c; });
@@ -2218,6 +2238,7 @@ function shellModel(){
     views.push({key:'alllate',grp:'all',label:'전체 자료 안 온 곳',list:cos.filter(late),warn:true,who:true});
     views.push({key:'allreview',grp:'all',label:'전체 검토할 것',list:cos.filter(function(c){return stOf(c)==='review';}),warn:true,who:true});
     views.push({key:'noman',grp:'all',label:'담당 없음',list:roster.unassigned,bad:true});
+    views.push({key:'nofiling',grp:'all',label:'신고 담당 미정',list:cos.filter(function(c){return filingUnset(c.id)>0;}),warn:true,who:true});
     roster.people.forEach(function(p){
       views.push({key:'p:'+p.sid,grp:'people',label:p.담당,list:p.cos,badSid:p.badSid,
         done:p.cos.filter(function(c){return stOf(c)==='done';}).length});
@@ -2270,8 +2291,17 @@ function colistHtml(m){
   var n=v?(v.sites?v.sites.length:v.list.length):0;
   return '<div class="chead"><div class="ct">'+(v?v.label:'')+' <span class="n">'+n+'</span></div>'
     +'<div class="ym"><button onclick="shiftYm(-1)" aria-label="지난 달">◀</button><b>'+ymText(m.ym)+'</b><button onclick="shiftYm(1)" aria-label="다음 달">▶</button></div>'
+    +horizonNote(m.ym)
     +'<input placeholder="사업장 이름으로 찾기" value="'+esc(App.q||'')+'" oninput="setQ(this.value)"></div>'
     +'<div id="colRows">'+colRowsHtml(m)+'</div>';
+}
+/* 목록 머리의 「자료는 언제까지」 — 기준 달이 그보다 뒤면 노랗게, 무엇을 해야 하는지까지 적는다 */
+function horizonNote(ym){
+  var h=dataHorizon(); if(!h) return '';
+  var late=ym>h;
+  return '<div style="font-size:11px;margin:-2px 0 6px;'+(late?'color:#854d0e;background:#fffbeb;border-radius:6px;padding:3px 6px':'color:var(--sub)')+'">'
+    +(late?('\u26a0 급여관리 자료는 '+ymText(h)+'까지입니다 — 이 달은 아직 안 올라왔습니다(⚙️ 설정 카드에서 올리기)')
+          :('급여관리 자료: '+ymText(h)+'까지'))+'</div>';
 }
 function colRowsHtml(m){
   var v=m.view; if(!v) return '';
@@ -2350,6 +2380,61 @@ function coMoney(sites, ym){
   out.frac=[gross,ded,net].some(function(v){ return Math.abs(v-Math.round(v))>1e-6; });
   return out;
 }
+/* ══════ 지난달 대비 변동 검사 — 2026-10-07 대표 「순서대로」 5번 ══════
+   해외 급여대행 프로그램의 표준은 «다 보지 말고 달라진 것만 본다»이다. 그래서 고른 회사 하나의
+   그 달과 «바로 앞 자료 달»을 사람별로 견준다(셈은 명세서와 같은 slipRows).
+     · 새로 들어온 사람 / 빠진 사람
+     · 지급이 20% 이상 바뀐 사람 — 일할·수당 변동이면 정상, 아니면 입력 실수를 의심
+     · 지난달엔 있던 4대보험 공제(연금·건강·고용 중 하나라도)가 이번 달에 없는 사람 — 공제 누락 의심
+   ⚠ 판정이 아니라 «볼 곳을 짚어 주는 것»이다. 확정은 사람이 한다.
+   ⚠ 직원 표는 고른 회사·두 달치만 받는다(목록은 안 받는다). */
+var VAR_PCT=0.20;
+function empsMonth(mr){
+  var all=[], waiting=0;
+  mr.recs.forEach(function(x){ var e=empsOf(x.r); if(e) all=all.concat(e); else { waiting++; ensureEmps(x.r); } });
+  return waiting?null:dedupeEmps(all);
+}
+function insOf(e){ return ['국민연금','건강보험','고용보험'].some(function(k){ return Number(e[k]||0)>0; }); }
+function coVariance(sites, ym){
+  var cur=monthRecsFor(sites, ym); if(!cur) return null;
+  var before=(cur.m===1)?((cur.y-1)+'-12'):(cur.y+'-'+('0'+(cur.m-1)).slice(-2));
+  var prev=monthRecsFor(sites, before); if(!prev) return {cur:cur, prev:null};
+  var a=empsMonth(cur), b=empsMonth(prev);
+  var out={cur:cur, prev:prev};
+  if(!a||!b){ out.loading=true; return out; }
+  var pb={}; b.forEach(function(e){ pb[(e.성명||'').trim()]=e; });
+  var pa={}; a.forEach(function(e){ pa[(e.성명||'').trim()]=e; });
+  out.joined=[]; out.left=[]; out.jump=[]; out.insGone=[];
+  a.forEach(function(e){ var nm=(e.성명||'').trim(), o=pb[nm];
+    if(!o){ out.joined.push(nm); return; }
+    var g1=slipRows(e).gross, g0=slipRows(o).gross;
+    if(g1!=null&&g0!=null&&g0>0&&Math.abs(g1-g0)/g0>=VAR_PCT) out.jump.push({nm:nm, from:g0, to:g1, pct:Math.round((g1-g0)/g0*100)});
+    if(insOf(o)&&!insOf(e)) out.insGone.push(nm);
+  });
+  b.forEach(function(e){ var nm=(e.성명||'').trim(); if(!pa[nm]) out.left.push(nm); });
+  out.n=out.joined.length+out.left.length+out.jump.length+out.insGone.length;
+  return out;
+}
+function varianceHtml(sites, ym){
+  var v=coVariance(sites, ym); if(!v||!v.prev) return '';
+  var head='<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>지난달 대비</b> '
+    +'<span style="font-size:12px;color:var(--sub)">'+v.prev.y+'년 '+v.prev.m+'월 \u2192 '+v.cur.y+'년 '+v.cur.m+'월 · 달라진 것만</span></div>';
+  var box='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">';
+  if(v.loading) return box+head+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">두 달 직원 표를 불러오는 중…</div></div>';
+  if(!v.n) return box+head+'<div style="padding:10px 16px;font-size:12.5px;color:#166534">\u2714 크게 달라진 사람이 없습니다</div></div>';
+  function line(icon, label, items, tone){
+    if(!items.length) return '';
+    return '<div style="display:flex;gap:10px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
+      +'<span style="width:18px">'+icon+'</span><b style="width:150px;flex-shrink:0;'+(tone?'color:'+tone:'')+'">'+label+' '+items.length+'명</b>'
+      +'<span style="flex:1">'+items.join(', ')+'</span></div>';
+  }
+  return box+head
+    +line('\u26a0','4대보험 공제가 빠짐', v.insGone, 'var(--warn)')
+    +line('\u2195','지급 20% 이상 변동', v.jump.map(function(j){ return j.nm+' '+manwon(j.from)+'\u2192'+manwon(j.to)+' ('+(j.pct>0?'+':'')+j.pct+'%)'; }), 'var(--warn)')
+    +line('\u2795','새로 들어옴', v.joined)
+    +line('\u2796','빠짐(퇴사?)', v.left)
+    +'</div>';
+}
 /* 만 원 단위로 짧게 — 정확한 값은 알약에 손을 대면 보인다 */
 function manwon(n){ return (n==null)?'-':(Math.abs(n)>=10000?(Math.round(n/10000).toLocaleString()+'만원'):(won(n)+'원')); }
 
@@ -2401,6 +2486,7 @@ function coBarHtml(m){
     +'<span class="kpis">'
     +kpi('sum', now.label, now.key==='done'?'ok':((now.key==='review'||now.key==='none')?'warn':''))
     +money
+    +(function(){ var v=coVariance(sites, m.ym); return (v&&v.prev&&!v.loading&&v.n)?kpi('sum','변동 '+v.n+'건','warn'):''; })()
     +kpi('payroll', '급여 '+(c.months?(c.months+'개월 · 확정 '+c.lock+(c.review?(' · 검토 '+c.review):'')):'자료 없음'), c.review?'warn':'')
     +kpi('attend', '근태 '+c.attend+'명')
     +kpi('leave', '연차 '+c.leave+'명')
@@ -2444,6 +2530,52 @@ function shellSummary(m, co, sites){
   h+=row('🎓','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'', 'sever');
   h+=row('📄','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'', 'slip');
   h+=row('📑','신고', '일용 매월신고 · 취득상실 · 퇴직정산 · 연차', '', 'report');
+  return h+'</div>'+varianceHtml(sites, m.ym)+filingHtml(co);
+}
+/* ══════ 신고 담당 — 2026-10-07 대표 「순서대로」 4번 ══════
+   노무법인은 근로내용확인신고·4대보험을, 고객의 기장 세무사는 원천세·지급명세서를 맡는 경우가 많다.
+   서로 «상대가 냈겠지» 하다 빠지면 가산세(일용 지급명세서 0.25% 등)가 붙고, 둘 다 내면 중복이다.
+   그래서 회사마다 신고 여섯 가지를 «누가» 하는지 적어 둔다 — 우리 / 세무사 / 고객.
+   ⚠ 원천세·지급명세서 «제출 대리»는 세무대리 영역일 소지가 커서(세무사법, 담당 노무사 검토 필요)
+     우리가 맡는다고 고르면 경고를 띄운다. 막지는 않는다 — 판단은 사람이 한다.
+   담는 곳: payroll_os/filing_owner[업체번호] = {withhold:'us'|'tax'|'client', …, by, at} */
+var FILINGS=[
+  {k:'withhold', label:'원천세 신고', tax:true},
+  {k:'simple',   label:'간이지급명세서', tax:true},
+  {k:'dailypay', label:'일용 지급명세서', tax:true},
+  {k:'dailyins', label:'근로내용확인신고(일용)'},
+  {k:'ins',      label:'4대보험 취득·상실'},
+  {k:'yearend',  label:'연말정산', tax:true}
+];
+var FILING_WHO=[['us','우리'],['tax','세무사'],['client','고객']];
+function filingOf(coId){ var v=lmap('filing_owner')[String(coId||'')]; return (v&&typeof v==='object')?v:{}; }
+/* 아직 안 정한 신고 수 — 「신고 담당 미정」 보기가 센다 */
+function filingUnset(coId){ var f=filingOf(coId); return FILINGS.filter(function(x){ return !f[x.k]; }).length; }
+function setFiling(coId, k, who){
+  if(!coId) return;
+  var m=lmap('filing_owner'), cur=m[coId]||{};
+  if(cur[k]===who) delete cur[k]; else cur[k]=who;      /* 같은 것을 다시 누르면 비운다 */
+  cur.by=(me&&me.email)||''; cur.at=Date.now();
+  m[coId]=cur; dbSet('filing_owner', m);
+}
+window.setFiling=setFiling;
+function filingHtml(co){
+  if(!co) return '';
+  var f=filingOf(co.id), n=filingUnset(co.id);
+  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">'
+    +'<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>신고 담당</b> '
+    +'<span style="font-size:12px;color:var(--sub)">이 회사의 신고를 누가 하나 — 서로 미루다 빠지거나 두 번 내지 않게'+(n?(' · <span style="color:var(--warn)">미정 '+n+'</span>'):'')+'</span></div>';
+  FILINGS.forEach(function(x){
+    var who=f[x.k]||'';
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:8px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
+      +'<b style="width:170px;flex-shrink:0">'+x.label+'</b><span class="chips" style="margin:0">'
+      +FILING_WHO.map(function(w){
+        return '<button class="'+(who===w[0]?'on':'')+'" onclick="setFiling(\''+esc(co.id)+'\',\''+x.k+'\',\''+w[0]+'\')">'+w[1]+'</button>'; }).join('')
+      +'</span>'
+      +(!who?'<span style="color:var(--warn);font-size:11.5px">미정</span>':'')
+      +((x.tax&&who==='us')?'<span style="color:var(--warn);font-size:11.5px" title="원천세·지급명세서 제출 대리는 세무대리 영역일 수 있습니다 — 담당 노무사 검토">\u26a0 세무대리 경계 확인</span>':'')
+      +'</div>';
+  });
   return h+'</div>';
 }
 function pickView(k){ navTo({screen:'shell',view:k,coId:null,loose:null,site:null,month:null,emp:null,day:null}); }
@@ -2452,7 +2584,7 @@ function openLoose(s){ navTo({screen:'shell',loose:s,coId:null,site:s,month:null
 function pickTab(t){ navTo({screen:'shell',tab:t,month:null,emp:null,day:null}); }
 function pickChip(s){ navTo({site:s,month:null,emp:null,day:null}); }
 function shiftYm(d){
-  var t=ymParts(App.ym||ymNow()); var y=t.y, mo=t.m+d;
+  var t=ymParts(App.ym||defaultYm()); var y=t.y, mo=t.m+d;
   if(mo<1){ mo=12; y--; } if(mo>12){ mo=1; y++; }
   navTo({ym:y+'-'+('0'+mo).slice(-2)});
 }
