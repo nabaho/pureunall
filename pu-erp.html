@@ -85921,7 +85921,11 @@ function App(){
   var ssoWait = ssoS[0]; var setSsoWait = ssoS[1];
   useEffect(function(){
     if(typeof firebase === 'undefined' || !firebase.auth){ setSsoWait(false); return; }
-    var to = setTimeout(function(){ setSsoWait(false); }, 8000);  // 8초 내 확인 안 되면 로그인 화면
+    /* ★ 8초 → 40초 (대표 보고 2026-10-07 「튕겨서 로그인 화면이 나오고 또 로그인되고 반복」).
+       구글 인증 도구는 저장된 로그인을 쓰기 전에 서버에 확인하러 간다 — 폰이 막 깨어나면 8초를 넘긴다.
+       로그인이 «없는» 기기는 서버에 안 묻고 곧장 «없음»이 와서 아래 onAuthStateChanged 가 바로 풀어 준다.
+       그러니 오래 기다리는 것은 «있는 로그인을 확인 중»일 때뿐이다(enter.html 가림막과 같은 까닭). */
+    var to = setTimeout(function(){ setSsoWait(false); }, 40000);
     // 이메일 → 계정 매칭 후 로그인. 로컬 명부에 없으면 Firebase에서 직접 조회(명부 로딩 전이어도 확실히 매칭)
     function _tryLoginByEmail(email){
       var _em = String(email).toLowerCase();
@@ -85961,6 +85965,7 @@ function App(){
       } catch(_){ setSsoWait(false); }
     }
     var off = firebase.auth().onAuthStateChanged(function(user){
+      window.__puAuthKnown = true;   // 인증 확인이 «끝났다» — 아래 자물쇠 판정이 이것을 기다린다
       if(!user || !user.email){ setSsoWait(false); return; }
       // 이미 세션이 있으면(자동로그인 완료 또는 재진입) 화면을 확실히 로그인 상태로 전환
       if(isLoggedIn){ setSsoWait(false); return; }
@@ -85980,11 +85985,18 @@ function App(){
     if(isLoggedIn || forceLocalLogin || location.protocol === 'file:'){ setPortalWait(false); return; }
     if(ssoWait) return;   // 포털 경유(sso=1) 자동로그인 대기 중 — 끝나면 다시 판단
     // 로그인 화면 대신 흰 화면을 잠깐 띄우고, 세션 복구·자동로그인이 끝날 시간을 준 뒤 판단
-    var t = setTimeout(function(){
+    var _waitFrom = Date.now();
+    var t = setTimeout(function check(){
       if(isValidSession()){ setPortalWait(false); return; }          // 이 앱에 이미 세션 있음
       try {
         if(typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) return;   // 자동로그인 진행 중 → 더 기다림
       } catch(_){}
+      /* ★ 인증 확인이 «아직 안 끝났으면» 자물쇠를 띄우지 않는다 (2026-10-07).
+         확인 중에는 currentUser 가 비어 있다 — 그것을 «로그인 없음»으로 읽어 자물쇠를 띄웠다가,
+         서버 답이 오면 저절로 들어가 «튕겼다가 다시 로그인»으로 보였다. 끝날 때까지 0.5초마다 다시 본다.
+         ⚠ 인증 도구가 안 실렸으면 기다릴 것이 없다 · 40초가 넘으면 더 안 기다린다(들어올 길은 연다). */
+      var _sdk = (typeof firebase !== 'undefined' && firebase.auth);
+      if(_sdk && !window.__puAuthKnown && Date.now() - _waitFrom < 40000){ t = setTimeout(check, 500); return; }
       /* ⚠★ 포털로 «튕기지» 않는다 (대표 지시 2026-09-14 「모두 캡쳐1의 모습으로」).
          튕기면 로그인 창이 뜨는데, 대표는 자기가 무엇을 누르다 그리로 갔는지 알 수 없다.
          자물쇠 화면을 보이고 「🏠 통합시스템으로 이동」을 «누르게» 한다. */
