@@ -123,6 +123,8 @@ function 세상(opt) {
   vm.runInContext(RAW.match(/var STAMP_FIT_DEF = \{[^}]*\};/)[0], ctx);
   vm.runInContext(RAW.match(/var _rhStampPxMemo=\{[^}]*\};/)[0], ctx);
   ['async function rhComposeBytes(', 'async function rhFinishZip(', 'function rhPicksFor(',
+   /* 구역별로 가르는 셈·이름 꼬리 맞추기 (2026-10-07) */
+   'function rhSecTag(', 'function rhSecId(', 'function rhValsFor(', 'function _rhKindOf(', 'function _rhFixExt(',
    'function rhParaFill(', 'function rhOutTail(', 'async function rhOutRefresh(',
    'async function rhTidyZip(', 'function rhTidyReset(', 'async function rhStampDoc(',
    'async function _rhStampPx(', 'async function rhStampZip(', 'function stampFit(', 'function _rhPickSplit(', 'function stampOfWho(',

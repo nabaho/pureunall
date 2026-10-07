@@ -374,7 +374,7 @@
          실측 2026-09-06: 주소·전화가 세로 병합 라벨 자리(0번 칸)에 들어갔다.
          판독 층의 replaceCellAt 이 «자리»를 세어 바꾼다 — 그것만 쓴다. */
       var newRow = (X.replaceCellAt ? X.replaceCellAt(rows[row], col, next)
-                                    : rows[row].replace(cells[col], next));
+                                    : rows[row].replace(cells[col], function () { return next; }));
       return replaceRowOnce(t, rows, row, newRow);
     });
     return { xml: out, ok: done };
@@ -391,7 +391,8 @@
     var m = tc.match(/(<hp:t(?:\s[^>]*)?>)([\s\S]*?)(<\/hp:t>)/);
     if (!m) return null;
     /* 글이 길어지니 옛 줄 정보를 걷는다 — 안 그러면 한글에서 한 줄에 겹친다 */
-    return X.dropLines(tc.replace(m[0], m[1] + m[2] + ' ' + esc(value) + m[3]));
+    /* ⚠ 함수로 바꾼다 — 값 속 「$&」 같은 글자를 바꾸기 기호로 읽지 않게 */
+    return X.dropLines(tc.replace(m[0], function () { return m[1] + m[2] + ' ' + esc(value) + m[3]; }));
   }
 
   /* ── 한 글자씩 쪼개진 칸 ──
@@ -456,6 +457,18 @@
      ⚠★ 이 판정은 «여기 한 곳»이다. 종류를 더할 때 이 함수만 고치면 된다. */
   function 있던글자칸(kind) { return kind === '글자칸' || kind === '아무칸'; }
 
+  function unesc(s) {
+    return String(s == null ? '' : s).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&#39;|&apos;/g, "'").replace(/&amp;/g, '&');
+  }
+  /* 「자택:____ 직장:____」 칸에 값 «하나» — 첫 밑줄 자리에, 밑줄이 없으면 끝에 이어 쓴다.
+     ⚠ 라벨은 지우지 않는다. 글자는 한 번 풀어서 다룬다(setCellText 가 다시 감싼다 — 두 겹 방지). */
+  function intoLabelCell(tc, v) {
+    var t = unesc(X.cellText(tc));
+    var 새 = /_{2,}/.test(t) ? t.replace(/_{2,}/, function () { return ' ' + v + ' '; })
+                              : t.replace(/\s+$/, '') + ' ' + v;
+    return X.setCellText(tc, 새.replace(/\s+$/, ''));
+  }
   /* 직접 친 글자를 칸에 넣는다. 빈 글자면 «비워 둔다»(지우개로도 쓴다). */
   function putTyped(xml, s, typed) {
     if (typed.parts) {
@@ -477,7 +490,12 @@
     if (v === '' && !있던글자칸(s.kind)) return { ok: false, empty: true };
     var r2 = eachCellAt(xml, s.tbl, s.row, s.col, function (tc) {
       if (있던글자칸(s.kind)) return X.setCellText(tc, v);   /* 있던 글자를 바꾼다(비우기도 포함) */
-      return s.kind === '안내글뒤' ? appendAfter(tc, v) : X.fillCell(tc, v);
+      if (s.kind === '안내글뒤') return appendAfter(tc, v);
+      /* 칸 안 라벨인데 라벨별로 못 가른 칸 — 라벨 앞에 붙이지 않고 «값 자리»에 넣는다 */
+      if (s.kind === '칸안라벨') return intoLabelCell(tc, v);
+      /* ★ 빈칸 — 자리표(1900.00.00·[한글])가 박혀 있으면 «바꾼다». fillCell 은 앞에 끼워
+         「1980.01.011900.00.00」·「홍길동[한글]」이 됐다(2026-10-07 검토). 자동 채우기와 같은 일꾼(putValue). */
+      return putValue(tc, v);
     });
     return { ok: r2.ok, xml: r2.xml, shown: v };
   }

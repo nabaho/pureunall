@@ -1081,7 +1081,8 @@ test('.hwp 양식도 자동 채움된다 — 한글 엔진으로 hwpx로 바꿔�
   //    실측 확인: 열기 → exportHwpx() → 채움 → 다시 열기 (잉크 2010→2883)
   const src = funcSource('_rhToHwpx');
   assert.match(src, /ext==='hwpx'/, 'hwpx는 그대로 씁니다');
-  assert.match(src, /PureunHwp\.openDoc\(bytes, name\)/);
+  /* 이름은 «속에 맞춘» 것을 넘긴다(_rhFixExt) — 엔진은 이름과 속이 다르면 거절한다 */
+  assert.match(src, /PureunHwp\.openDoc\(bytes, [^)]*name/);
   assert.match(src, /doc\.exportHwpx\(\)/, '.hwp는 hwpx로 내보내 채웁니다');
   assert.match(src, /doc\.free\(\)/, 'WASM 기억은 스스로 안 비워집니다');
 });

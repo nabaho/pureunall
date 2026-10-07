@@ -70,6 +70,8 @@ function 세상(store) {
     /* 화면·알림은 화면 일이다 — 여기서는 부르기만 하고 넘긴다 */
     rhDraftCheck: () => {}, rhDraftDraw: () => {}, rhDraftPanelClose: () => {},
     rhDraftNow: async () => {},
+    /* 앞 문서 표시(도장·뺀 쪽·채움)를 놓는 일 — 몇 번 불렸나만 센다 */
+    rhTidyReset: () => { ctx._표시놓음 = (ctx._표시놓음 || 0) + 1; },
     /* mountEditor 가 도는 «동안» 바탕이 지켜지는지 보려고 그 순간을 적어 둔다 */
     mountEditor: async function () { ctx._올릴때KeepBase = ctx._rhKeepBase; },
     _rhVals: {}, _rhPicks: {}, _rhListPlan: null, _rhMap: null, _rhDoc: null,
@@ -237,6 +239,20 @@ test('★★ 원본이 없으면 «조용히 넘기지 않는다» — 말없이
   assert.equal(ctx._rhDoc && ctx._rhDoc.name, '옛것.hwpx', '원본이 없다고 열기를 막았습니다');
   /* ⚠ 목록도 건드리지 않는다 */
   assert.equal(ctx._store.rh_drafts.length, 1, '원본이 없다고 자리를 지웠습니다');
+});
+
+test('★★ 이어서 열면 «앞 문서»의 목록 계획·되돌리기·표시를 놓는다 (2026-10-07 검토)', async () => {
+  const id = 'rh_draft_w';
+  const ctx = 세상({ rh_drafts: [{ id: id, name: '가.hwpx', ext: 'hwpx', at: 1, done: false, hasBase: true }] });
+  ctx._담긴것[id] = { id: id, name: '가.hwpx', ext: 'hwpx', base64: b64(채운바이트) };
+  ctx._담긴것[id + '@base'] = { id: id + '@base', name: '가.hwpx', ext: 'hwpx', base64: b64(원본바이트) };
+  /* 앞 문서에서 남은 것들 */
+  vm.runInContext('_rhListPlan={"Contents/section0.xml":{L0:"career"}}; _rhUndo={name:"앞.hwpx"}; _cvPick={cert:[1]};', ctx);
+  await vm.runInContext('rhDraftResume("' + id + '")', ctx);
+  assert.equal(ctx._rhListPlan, null, '★ 앞 문서의 목록 계획이 남았습니다 — 누르지도 않은 학력·경력이 들어갑니다');
+  assert.equal(ctx._rhUndo, null, '↩ 되돌리기가 앞 문서를 되살립니다');
+  assert.equal(ctx._cvPick, null, '앞 문서에서 고른 경력 차례가 따라왔습니다');
+  assert.ok(ctx._표시놓음 >= 1, '★ 되살릴 표시가 없는데 앞 문서의 도장·뺀 쪽을 놓지 않았습니다');
 });
 
 test('★ 목록이 «원본 없음»을 밝힌다 — 모르면 눌러 보고 나서야 겹친 것을 안다', () => {
