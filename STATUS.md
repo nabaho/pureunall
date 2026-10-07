@@ -1228,8 +1228,9 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 11. **localStorage 에 큰 것 두기.** nabaho.github.io 의 앱 «전부»가 한 주소 몫(크롬 약 5백만 자)을 함께 쓴다.
    2026-10-07 한도까지 차서 경력관리가 목록을 못 적었다 — 범인은 이알피 계약서 양식 1.3MB·규정관리 작업본 1MB 같은 «남의 짐»이었다.
    수십 KB 를 넘는 것은 `js/pu-big-store.js`(IndexedDB, 옮길 때 읽기→쓰기→견주기→그때만 지우기)로.
-   ⚠ 다른 앱이 `'pureun_v6_'+열쇠` 로 빌려 읽는 칸(업체·계약·명부…)은 그 앱부터 고쳐야 옮길 수 있다.
-   기록: `status/2026-10-07-ls-big-to-idb.md`.
+   이알피 업무 표는 이제 «전부» 거기 있다 — 다른 앱이 빌려 읽을 때는 `PuBigStore.peek` 로(localStorage 로 읽으면 빈 것).
+   localStorage 에 남기는 것은 «그 자리에서» 읽는 직원 명부 둘(`ERP_LS_KEEP`)뿐. 모든 앱이 켤 때 크롬에 «지우지 말라»를 청한다(`pu-ls-guard`).
+   기록: `status/2026-10-07-ls-big-to-idb.md` · `status/2026-10-07-storage-all-big.md`.
 
 ---
 
