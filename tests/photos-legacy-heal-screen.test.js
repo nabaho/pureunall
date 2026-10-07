@@ -33,9 +33,7 @@ function grab(src, name) {
   }
   throw new Error(name + ' 끝을 못 찾았다');
 }
-function stripComments(s) {
-  return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/[^\n]*/g, '$1');
-}
+const { stripComments, stripJs } = require('./strip-comments.js');
 
 /* ══════════ ① 옛 자리 → 창고 ══════════ */
 
@@ -190,7 +188,7 @@ test('★ 증빙 칸 고르기(회의·현장만)에서도 «판독 전»은 들
 
 test('딱지 줄에는 갈래마다 칩 자리가 있다 — 이름만 있고 칩이 없으면 그 사진을 골라 볼 수 없다', () => {
   const g = govBox();
-  const s = stripComments(grab(GOV, 'pkPaintChrome'));
+  const s = stripJs(grab(GOV, 'pkPaintChrome'));
   const m = s.match(/const order\s*=\s*\[([^\]]*)\]/);
   assert.ok(m, '칩 차례 표를 못 찾았다');
   Object.keys(g.PK_KIND_NAME).forEach(k => {
