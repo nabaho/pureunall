@@ -3079,9 +3079,13 @@ window.addEventListener('error', function(ev){ try{ var b=document.getElementByI
 const _mem={}; let STORAGE_OK=true;
 try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); }catch(e){ STORAGE_OK=false; }
 const LS={
-  get(k){ try{ return localStorage.getItem(k); }catch(e){ return (k in _mem)?_mem[k]:null; } },
-  set(k,v){ try{ localStorage.setItem(k,v); }catch(e){ _mem[k]=String(v); } },
-  remove(k){ try{ localStorage.removeItem(k); }catch(e){ delete _mem[k]; } },
+  /* ★ 못 담아 기억(_mem)에만 둔 값이 «더 새것»이다 — 먼저 본다 (2026-10-07 검토).
+     전에는 저장공간이 차면 기억에만 두고, 읽기는 기기에 남은 «옛 값»을 먼저 읽어
+     방금 고친 것이 곧바로 옛것으로 돌아갔다. 경고도 안 떴다(오류를 여기서 삼켰다). */
+  get(k){ if(Object.prototype.hasOwnProperty.call(_mem,k)) return _mem[k]; try{ return localStorage.getItem(k); }catch(e){ return null; } },
+  /* 담았으면 true, 못 담아 기억에만 두었으면 false(까닭은 LS.lastErr) — 부르는 쪽이 알릴 수 있게 */
+  set(k,v){ try{ localStorage.setItem(k,v); delete _mem[k]; return true; }catch(e){ _mem[k]=String(v); LS.lastErr=e; return false; } },
+  remove(k){ delete _mem[k]; try{ localStorage.removeItem(k); }catch(e){} },
 };
 /* ===== 코어: 데이터 계층 ===== */
 const NS='cm3_';
@@ -3511,7 +3515,12 @@ function set(key,arr){
   try{ if(typeof navCountsSoon==='function') navCountsSoon(); }catch(e){}
   /* 제출서류↔사업관리 잇기 표(_caseMap)는 저장할 때 버린다 — 안 버리면 1.5초 동안 옛 짝을 보여 준다 */
   try{ if(typeof _caseMapMemo!=='undefined') delete _caseMapMemo[key]; }catch(e){}
-  try{ LS.set(NS+key, JSON.stringify(arr)); if(typeof fbScheduleAuto==='function') fbScheduleAuto(key); }catch(e){ if(e.name==='QuotaExceededError'||String(e).includes('quota')||String(e).includes('storage')){ toast('⚠️ 저장공간 부족 — 환경설정 › 저장공간 관리에서 파일 삭제 필요'); console.error('Storage full:',key,e); checkStorageQuota(); } else { toast('저장 오류: '+e.message); console.error(e); } } }
+  try{ var _담김=LS.set(NS+key, JSON.stringify(arr)); if(typeof fbScheduleAuto==='function') fbScheduleAuto(key);
+    /* ⚠ 못 담았으면 «말한다» — 클라우드로는 보내되(위), 이 기기엔 없어 새로고침하면 사라질 수 있다 */
+    if(_담김===false){ var _le=LS.lastErr||{}; if(_le.name==='QuotaExceededError'||/quota|storage/i.test(String(_le))){
+      if(!set._fullAt || Date.now()-set._fullAt>60000){ set._fullAt=Date.now(); toast('⚠️ 저장공간 부족 — 이 기기에 담지 못했습니다(새로고침하면 사라질 수 있음) · 환경설정 › 저장공간 관리에서 파일 삭제 필요', 8000); }
+      console.error('Storage full:',key,_le); try{ checkStorageQuota(); }catch(_){} } }
+  }catch(e){ if(e.name==='QuotaExceededError'||String(e).includes('quota')||String(e).includes('storage')){ toast('⚠️ 저장공간 부족 — 환경설정 › 저장공간 관리에서 파일 삭제 필요'); console.error('Storage full:',key,e); checkStorageQuota(); } else { toast('저장 오류: '+e.message); console.error(e); } } }
 function escapeHtml(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
 /* onclick="fn('VALUE')" 안에 안전하게 넣기용: HTML 속성 + 홑따옴표 JS 문자열 이스케이프 (XSS 방어) */
 function _jsAttr(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\\/g,'\\\\').replace(/"/g,'&quot;').replace(/'/g,"\\'"); }
@@ -6177,7 +6186,7 @@ function renderHome(){
     ['올해('+curY+') 실적',ty.c+'건',ty.a?fmtKRW(ty.a):''],
   ].map(([l,v,s])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val">${v}</div><div class="k-sub">${s}</div></div>`).join('');
   const yrs=Object.keys(yrMap).sort().reverse();
-  const sel='<select id="homeYrSel" class="tb-select" style="margin-left:8px" onchange="renderHomeYr()"><option value="">전체 연도</option>'+yrs.map(y=>`<option>${y}</option>`).join('')+'</select>';
+  const sel='<select id="homeYrSel" class="tb-select" style="margin-left:8px" onchange="renderHomeYr()"><option value="">전체 연도</option>'+yrs.map(y=>`<option>${escapeHtml(y)}</option>`).join('')+'</select>';
   var _hl = document.getElementById('homeList');
   /* ⚠ 「집계 대기」 자리표시일 때 붙였던 .empty 를 **떼어야 한다**. 안 떼면 채운 뒤에도
      .empty{padding:40px 0} 이 살아 있어 위아래로 80px 빈 띠가 남는다(대표 화면 2026-08-20). */
@@ -6222,7 +6231,9 @@ function renderHomeTiles(){ const box=document.getElementById('homeTiles'); if(!
       else if(id==='page-feebox') cnt=_g('feedoc');
       else if(id==='page-bizlist') cnt=_g('bizapp');
       else if(id==='page-bizdash' || id==='page-bizdocs') cnt=null;
-      else if(!(id in NAV_ALIAS) && id!=='page-resume-hub') cnt=_g(id.slice(5));
+      /* ⚠ 옆줄 숫자와 «같은 셈»(navCount) — 통 이름으로만 세면 표창(위촉장 통을 거름)·자격증·수료(cert 통을 가름)가
+           0 이나 다른 수로 나왔다(2026-10-07 검토). 셀 수 없는 화면만 옛 셈으로 */
+      else if(!(id in NAV_ALIAS) && id!=='page-resume-hub'){ const nc=(typeof navCount==='function')?navCount(id):null; cnt=(nc!=null)?nc:_g(id.slice(5)); }
       html+='<div onclick="navTile(\''+id+'\')" style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:7px 10px;background:var(--card);display:flex;align-items:center;justify-content:space-between;gap:6px" onmouseover="this.style.borderColor=\'var(--teal)\'" onmouseout="this.style.borderColor=\'var(--border)\'">'
         +'<span style="font-size:12.5px;font-weight:500;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(label)+'</span>'
         +(cnt!=null?'<span class="tile-n" style="font-size:12px;font-weight:700;color:var(--teal);background:var(--soft);border-radius:20px;padding:1px 8px;min-width:22px;text-align:center">'+cnt+'</span>':'<span class="tile-new" style="font-size:11px;color:var(--text-mute);white-space:nowrap">＋ 생성</span>')
@@ -8793,53 +8804,53 @@ const CAREER_CFG={
   wiccok:{store:'wiccok',filter:r=>!isAwardType(r.type),qFields:['org','titleVal','issuer'],
     cols:['ID','유형','위촉내용(직책)','발급기관','위촉인','발급일','위촉시작','위촉종료','관리'],
     row:(r,p)=>{const w=validateRecord('wiccok',r),sp=splitPeriod(r.period),_pg=(r.type==='표창'||r.type==='포상')?'award':'wiccok';return `<tr class="${w.length?'row-warn':''}" style="cursor:pointer">
-      <td><span class="id-chip">${r.id}</span>${w.length?`<span class="warn-ico" title="${w.join(' / ')}">⚠️</span>`:''}</td>
-      <td><span class="tag navy">${r.type||'위촉장'}</span></td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.titleVal||'-'}</td>
-      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${r.org||'-'}</strong></td>
-      <td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
+      <td><span class="id-chip">${escapeHtml(r.id)}</span>${w.length?`<span class="warn-ico" title="${escapeHtml(w.join(' / '))}">⚠️</span>`:''}</td>
+      <td><span class="tag navy">${escapeHtml(r.type||'위촉장')}</span></td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.titleVal||'-')}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${escapeHtml(r.org||'-')}</strong></td>
+      <td style="font-size:11px;color:var(--text-mute)">${escapeHtml(r.issuer||'-')}</td>
       <td style="white-space:nowrap">${formatDate(r.issueDate)||r.year||'-'}</td>
       <td style="font-size:11px;white-space:nowrap">${formatDate(r.periodStart||sp[0])||'-'}</td>
       <td style="font-size:11px;white-space:nowrap">${formatDate(r.periodEnd||sp[1])||'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'wiccok',r.org||r.titleVal,p,r)}</td></tr>`;}},
   award:{store:'wiccok',filter:r=>isAwardType(r.type),qFields:['org','titleVal','issuer'],
     cols:['ID','유형','수여기관','수여자','내용','수상일','문서번호','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><span class="tag amber">${r.type}</span></td>
-      <td><strong>${r.org||'-'}</strong></td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.titleVal||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${escapeHtml(r.id)}</span></td><td><span class="tag amber">${escapeHtml(r.type)}</span></td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="font-size:11px;color:var(--text-mute)">${escapeHtml(r.issuer||'-')}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.titleVal||'-')}</td>
       <td>${formatDate(r.issueDate)||r.year||'-'}</td>
-      <td style="font-size:11px;color:var(--text-mute)">${r.note||'-'}</td><td onclick="event.stopPropagation()">${rowActions(r.id,'wiccok',r.org||r.titleVal,p,r)}</td></tr>`},
+      <td style="font-size:11px;color:var(--text-mute)">${escapeHtml(r.note||'-')}</td><td onclick="event.stopPropagation()">${rowActions(r.id,'wiccok',r.org||r.titleVal,p,r)}</td></tr>`},
   license:{store:'cert',filter:r=>!/수료|이수/.test(r.title||''),qFields:['title','org','issuer','num'],
     cols:['ID','자격명','발급기관','발급자','취득일','자격번호·성적','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
-      <td>${r.org||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
-      <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${[r.num,r.grade].filter(Boolean).join(' · ')||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${escapeHtml(r.id)}</span></td><td><strong>${escapeHtml(r.title||'-')}</strong></td>
+      <td>${escapeHtml(r.org||'-')}</td><td style="font-size:11px;color:var(--text-mute)">${escapeHtml(r.issuer||'-')}</td>
+      <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${escapeHtml([r.num,r.grade].filter(Boolean).join(' · ')||'-')}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'cert',r.title,p,r)}</td></tr>`},
   complete:{store:'cert',filter:r=>/수료|이수/.test(r.title||''),qFields:['title','org','issuer'],
     cols:['ID','과정명','발급기관','발급자','수료일','이수시간','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.title||'-'}</strong></td>
-      <td>${r.org||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.issuer||'-'}</td>
-      <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.duration?r.duration+'h':'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${escapeHtml(r.id)}</span></td><td><strong>${escapeHtml(r.title||'-')}</strong></td>
+      <td>${escapeHtml(r.org||'-')}</td><td style="font-size:11px;color:var(--text-mute)">${escapeHtml(r.issuer||'-')}</td>
+      <td>${formatDate(r.date)||'-'}</td><td style="font-size:11px;color:var(--text-mute)">${r.duration?escapeHtml(r.duration)+'h':'-'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'cert',r.title,p,r)}</td></tr>`},
   edu:{store:'edu',qFields:['school','degree','major'],
     cols:['ID','학교명','학과·전공','학위','재학기간','졸업구분','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td><td><strong>${r.school||'-'}</strong></td>
-      <td style="font-size:11px">${r.major||'-'}</td><td>${r.degree||'-'}</td>
-      <td style="font-size:11px">${r.period||'-'}</td><td>${r.graduated||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${escapeHtml(r.id)}</span></td><td><strong>${escapeHtml(r.school||'-')}</strong></td>
+      <td style="font-size:11px">${escapeHtml(r.major||'-')}</td><td>${escapeHtml(r.degree||'-')}</td>
+      <td style="font-size:11px">${escapeHtml(r.period||'-')}</td><td>${escapeHtml(r.graduated||'-')}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'edu',r.school,p)}</td></tr>`},
   work:{store:'work',qFields:['org','dept','title','role'],
     cols:['ID','근무처','부서','직위','근무기간','재직','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td>
-      <td><strong>${r.org||'-'}</strong></td><td style="font-size:11px">${r.dept||'-'}</td>
-      <td>${r.title||'-'}</td><td style="white-space:nowrap">${workPeriod(r)||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${escapeHtml(r.id)}</span></td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="font-size:11px">${escapeHtml(r.dept||'-')}</td>
+      <td>${escapeHtml(r.title||'-')}</td><td style="white-space:nowrap">${workPeriod(r)||'-'}</td>
       <td>${workOnJob(r)?'<span class="tag teal">재직</span>':'<span class="tag amber">퇴직</span>'}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'work',r.org,p,r)}</td></tr>`},
   consult:{store:'consult',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','agency','main'],
     cols:['번호','유형','고객사','과제','수행기관','담당','연도','상태','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'consult')}<td><span class="tag navy">${r.type||'-'}</span></td>
-      <td><strong>${r.org||'-'}</strong></td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
-      <td style="font-size:11px">${r.agency||'-'}</td><td>${r.main||'-'}</td><td>${r.year||'-'}</td>
-      <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'consult')}<td><span class="tag navy">${escapeHtml(r.type||'-')}</span></td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.project||'-')}</td>
+      <td style="font-size:11px">${escapeHtml(r.agency||'-')}</td><td>${escapeHtml(r.main||'-')}</td><td>${escapeHtml(r.year||'-')}</td>
+      <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${escapeHtml(r.status||'-')}</span></td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'consult',r.org,p,r)}</td></tr>`},
   /* 자문·고문 — pu-erp 업체관리(companies)에서 온다(대표 지시 2026-09-03).
      ⚠ 월 자문료 칸을 만들지 말 것 — 모듈이 애초에 가져오지 않는다(회귀검사 있음).
@@ -8850,44 +8861,44 @@ const CAREER_CFG={
     /* ⚠ 목록은 이름을 그대로 보여 준다 — 가리는 것은 «내보낼 때»뿐이다(회귀검사 있음) */
     exportMask: rows => KcareerAdvSummary.maskRows(rows),
     cols:['번호','유형','고객사','업태·종목','규모','근로자','기간','담당','상태','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'advisory')}<td><span class="tag navy">${r.type||'-'}</span></td>
-      <td><strong>${r.org||'-'}</strong></td><td style="font-size:11px">${[r.bizType,r.bizCategory].filter(Boolean).join(' · ')||'-'}</td>
-      <td style="font-size:11px">${r.size||'-'}</td><td style="text-align:right">${r.insured?Number(r.insured).toLocaleString():'-'}</td>
-      <td style="font-size:11px;white-space:nowrap">${r.period||'-'}</td><td>${r.main||'-'}</td>
-      <td><span class="tag ${r.status==='진행'?'teal':'amber'}" title="${escapeHtml(r.closedReason||'')}">${r.status||'-'}</span></td>
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'advisory')}<td><span class="tag navy">${escapeHtml(r.type||'-')}</span></td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="font-size:11px">${escapeHtml([r.bizType,r.bizCategory].filter(Boolean).join(' · ')||'-')}</td>
+      <td style="font-size:11px">${escapeHtml(r.size||'-')}</td><td style="text-align:right">${r.insured?Number(r.insured).toLocaleString():'-'}</td>
+      <td style="font-size:11px;white-space:nowrap">${escapeHtml(r.period||'-')}</td><td>${escapeHtml(r.main||'-')}</td>
+      <td><span class="tag ${r.status==='진행'?'teal':'amber'}" title="${escapeHtml(r.closedReason||'')}">${escapeHtml(r.status||'-')}</span></td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'advisory',r.org,p,r)}</td></tr>`},
   lecture:{store:'lecture',qFields:['topic','org','speaker'],
     cols:['ID','주제','주관','일자','시간','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${r.id}</span></td>
-      <td><strong>${r.topic||'-'}</strong></td><td>${r.org||'-'}</td><td>${formatDate(r.date)||'-'}</td>
-      <td>${r.duration?r.duration+'h':'-'}</td><td>${r.year||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer"><td><span class="id-chip">${escapeHtml(r.id)}</span></td>
+      <td><strong>${escapeHtml(r.topic||'-')}</strong></td><td>${escapeHtml(r.org||'-')}</td><td>${formatDate(r.date)||'-'}</td>
+      <td>${r.duration?escapeHtml(r.duration)+'h':'-'}</td><td>${escapeHtml(r.year||'-')}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'lecture',r.topic,p)}</td></tr>`},
   case:{store:'case',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','type'],
     cols:['번호','유형','의뢰인/사업장','사건내용','담당','상태','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'case')}<td><span class="tag navy">${r.type||'-'}</span></td>
-      <td><strong>${r.org||'-'}</strong></td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'case')}<td><span class="tag navy">${escapeHtml(r.type||'-')}</span></td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.project||'-')}</td>
       <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td>
-      <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td><td>${r.year||'-'}</td>
+      <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${escapeHtml(r.status||'-')}</span></td><td>${escapeHtml(r.year||'-')}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'case',r.org,p,r)}</td></tr>`},
   fund:{store:'fund',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','main'],
     cols:['번호','기업/기금','내용','담당','상태','연도','관리'],
     row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'fund')}
-      <td><strong>${r.org||'-'}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.project||'-')}</td>
       <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td>
-      <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${r.status||'-'}</span></td><td>${r.year||'-'}</td>
+      <td><span class="tag ${r.status==='완료'?'teal':'amber'}">${escapeHtml(r.status||'-')}</span></td><td>${escapeHtml(r.year||'-')}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'fund',r.org,p,r)}</td></tr>`},
   etc:{store:'etc',filter:r=>!_isExternal(r)&&!r.excluded,qFields:['org','project','type','main'],
     cols:['번호','유형','기관/고객','내용','담당','연도','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'etc')}<td>${r.type||'-'}</td>
-      <td><strong>${r.org||'-'}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.project||'-'}</td>
-      <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td><td>${r.year||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer" data-rid="${escapeHtml(r.id)}">${puNoTd(r,'etc')}<td>${escapeHtml(r.type||'-')}</td>
+      <td><strong>${escapeHtml(r.org||'-')}</strong></td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.project||'-')}</td>
+      <td style="white-space:nowrap">${escapeHtml(r.main||'-')}</td><td>${escapeHtml(r.year||'-')}</td>
       <td onclick="event.stopPropagation()">${rowActions(r.id,'etc',r.org,p,r)}</td></tr>`},
   /* 제출서류 — 7번 폴더의 '건' 단위. 스캔으로만 등록되고 원본은 경로 참조다. */
   submission:{store:'submission',qFields:['org','title','caseDir'],
     /* 제출·결과 칸 (대표 승인 2026-10-05 목업 ①) — 지원 이력이 한 줄로 보이게 */
     cols:['ID','연도','기관·사업','건 이름','서류','제출','결과','승격','관리'],
-    row:(r,p)=>`<tr style="cursor:pointer" onclick="openSubmissionFiles('${_jsAttr(r.id)}')"><td><span class="id-chip">${r.id}</span>${r.autoCase&&!r.pastImport&&!r.sentAt&&!r.result?' <span class="tag navy" style="font-size:10px">새로</span>':''}</td>
-      <td>${r.year||'-'}</td>
+    row:(r,p)=>`<tr style="cursor:pointer" onclick="openSubmissionFiles('${_jsAttr(r.id)}')"><td><span class="id-chip">${escapeHtml(r.id)}</span>${r.autoCase&&!r.pastImport&&!r.sentAt&&!r.result?' <span class="tag navy" style="font-size:10px">새로</span>':''}</td>
+      <td>${escapeHtml(r.year||'-')}</td>
       <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"><strong>${escapeHtml(r.org||'-')}</strong></td>
       <td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(r.title||'-')}</td>
       <td style="white-space:nowrap">${r.fileCount||0}개</td>
@@ -9357,7 +9368,7 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   } else { if(dupBadgeEl) dupBadgeEl.remove(); }
   const yrSel=sec.querySelector('[data-f="year"]');
   if(yrSel){ const yrs=[...new Set(data.map(r=>r.year||(r.issueDate||r.date||'').slice(0,4)).filter(Boolean))].sort().reverse();
-    const cur=yrSel.value; yrSel.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option${y===cur?' selected':''}>${y}</option>`).join(''); }
+    const cur=yrSel.value; yrSel.innerHTML='<option value="">전체 연도</option>'+yrs.map(y=>`<option${y===cur?' selected':''}>${escapeHtml(y)}</option>`).join(''); }
   const q=(sec.querySelector('[data-f="q"]')?.value||'').toLowerCase();
   const yr=yrSel?yrSel.value:'', tp=sec.querySelector('[data-f="type"]')?.value||'';
   const mo=sec.querySelector('[data-f="month"]')?.value||'';   /* 월 고르개는 비용 목록에만 있다 — 없으면 늘 빈 값 */
@@ -9454,7 +9465,8 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   _stickyTop(sec);               /* 표 머리줄이 툴바 아래에 붙도록 높이를 알려준다 */
   careerSelSync(name);
   _safe(function(){ careerDragSel(name); });
-  box.querySelectorAll('th').forEach((th,idx)=>{ if(th.textContent==='관리'||th.textContent==='№') return; th.style.cursor='pointer'; th.title='클릭하면 정렬'; th.onclick=()=>sortTable(box,th,idx); });
+  /* ⚠ 「☐ №」 머리는 글자가 « №»(앞에 빈칸)라 「===『№』」로는 안 걸렀다 — ☐ 를 누르면 고르기와 함께 정렬까지 됐다(2026-10-07 검토) */
+  box.querySelectorAll('th').forEach((th,idx)=>{ var hn=(th.textContent||'').trim(); if(hn==='관리'||hn==='№'||th.classList.contains('rownum-h')) return; th.style.cursor='pointer'; th.title='클릭하면 정렬'; th.onclick=()=>sortTable(box,th,idx); });
   /* ⚠ 합친 표(비용관리)에서는 줄마다 «온 곳»이 다르다. 그걸 잃으면 기타비용 기록을
      고칠 때 회의비용 쪽에 새로 저장돼 원본이 남고 사본이 생긴다. */
   var _stOf={}; data.forEach(function(r){ _stOf[r.id]=r._st||cfg.store; });
@@ -9598,7 +9610,8 @@ function _showShortcutHelp(){ let d=document.getElementById('kbHelp'); if(d){ d.
    ⚠ «그 창의 닫기»를 부른다 — 클래스만 떼면 한글 편집기처럼 숨은 채 계속 도는 것이 남는다.
    ⚠ 한글 서식 창에서 고치는 중이면 닫지 않는다 — 고친 것이 사라진다(그만두기·다 고쳤습니다로).
    ⚠ 입력칸이 많은 창은 바깥 클릭으로는 안 닫는다 — 칸 밖을 한 번 잘못 누르면 친 것이 날아간다(Esc 는 된다). */
-var KC_MODAL_NO_BACKDROP={ modalBulk:1, modalPaste:1 };   /* 등록 창(modalForm)은 전부터 스스로 바깥 클릭에 닫힌다 */
+/* 사업 입력 창(modalBiz)도 칸이 열 개 넘는다 — 바깥을 한 번 잘못 누르면 친 사업 정보가 날아갔다(2026-10-07 검토) */
+var KC_MODAL_NO_BACKDROP={ modalBulk:1, modalPaste:1, modalBiz:1 };   /* 등록 창(modalForm)은 전부터 스스로 바깥 클릭에 닫힌다 */
 var _kcModalOpenAt={};
 function _kcModalCloser(ov){
   var id=ov.id;
@@ -10065,14 +10078,14 @@ function openSearch(){ document.getElementById('gsInput').value=''; document.get
 function closeSearch(){ document.getElementById('modalSearch').classList.remove('open'); }
 function runGlobalSearch(){ var q=(document.getElementById('gsInput').value||'').trim().toLowerCase(); var box=document.getElementById('gsResults');
   if(!q){ box.innerHTML='<div class="empty" style="padding:14px">검색어를 입력하세요</div>'; return; }
-  var hits=allRecords().filter(function(o){ return _gsF.some(function(f){ return (o.r[f]||'').toLowerCase().includes(q); }); });
+  var hits=allRecords().filter(function(o){ return _gsF.some(function(f){ return String(o.r[f]||'').toLowerCase().includes(q); }); });
   if(!hits.length){ box.innerHTML='<div class="empty" style="padding:14px">결과 없음</div>'; return; }
   var shown=hits.slice(0,60);
   box.innerHTML='<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">'+hits.length+'건'+(hits.length>60?' (상위 60건 표시)':'')+'</div>'
     +shown.map(function(o){ var info=navInfo('page-'+o.page)||{label:o.page}; var r=o.r;
       var main=r.org||r.title||r.topic||r.project||r.kind||r.school||r.content||'-';
       var sub=[r.titleVal||r.project||r.memo||r.note||'',r.year||(r.issueDate||r.date||'').slice(0,4)||''].filter(Boolean).join(' · ');
-      return '<div style="padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer" onclick="gsGo(\''+o.page+'\')"><span style="display:inline-block;min-width:78px;font-size:11px;color:#fff;background:var(--navy);border-radius:4px;padding:1px 6px;margin-right:6px">'+info.label+'</span><b style="font-size:13px">'+main+'</b>'+(sub?' <span style="font-size:11px;color:var(--text-mute)">'+sub+'</span>':'')+'</div>';
+      return '<div style="padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer" onclick="gsGo(\''+o.page+'\')"><span style="display:inline-block;min-width:78px;font-size:11px;color:#fff;background:var(--navy);border-radius:4px;padding:1px 6px;margin-right:6px">'+escapeHtml(info.label)+'</span><b style="font-size:13px">'+escapeHtml(main)+'</b>'+(sub?' <span style="font-size:11px;color:var(--text-mute)">'+escapeHtml(sub)+'</span>':'')+'</div>';
     }).join('');
 }
 function gsGo(page){ var info=navInfo('page-'+page)||{label:page,grp:''}; closeSearch(); nav_to('page-'+page, info.label, info.grp||''); }
@@ -10182,10 +10195,12 @@ function kcTrashPut(store, page, rec, what){
 }
 /* 첨부 원본만 지울 때도 담는다 — 레코드는 그대로 두고 «파일 한 개»만.
    잘못 눌러도 되살릴 수 있게. 파일 본문은 그대로 있고 번호만 적어 둔다. */
-function kcTrashPutFile(id, what){
+/* extra: 되살릴 때 «제자리»로 돌려놓을 정보 — 예) 사업 서류는 { bizDoc:{ bizId, doc } } */
+function kcTrashPutFile(id, what, extra){
   var e={ tid:'F'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),
     store:'', page:'', what:what||'첨부 원본', rec:null, fileOnly:id, delAt:Date.now(),
     label:(what||'첨부 원본')+' · '+id, files:[id] };
+  if(extra) Object.keys(extra).forEach(function(k){ e[k]=extra[k]; });
   var t=kcTrashList(); t.unshift(e); set(TRASH_STORE, t);
   return e;
 }
@@ -10216,6 +10231,17 @@ async function kcTrashRestore(tid, quiet){
   /* 첨부 원본만 담아 둔 것 — 파일은 그대로 있으니 목록에서 빼면 끝이다 */
   if(e.fileOnly){
     set(TRASH_STORE, rest);
+    /* ★ 사업에서 뺀 서류면 그 사업의 서류 목록에도 «다시 단다» — 파일만 돌아오면 아무 데서도 안 보인다(2026-10-07 검토) */
+    if(e.bizDoc && e.bizDoc.doc && typeof _bizGet==='function'){
+      var 사업=_bizGet(e.bizDoc.bizId);
+      if(사업 && !(사업.docs||[]).some(function(x){ return x && x.id===e.bizDoc.doc.id; })){
+        사업.docs=(사업.docs||[]).concat([e.bizDoc.doc]); _bizPut(사업);
+        if(typeof _bizCur!=='undefined' && _bizCur && _bizCur.id===사업.id){ _bizCur.docs=사업.docs.slice(); _safe(bizDraw); }
+        _safe(renderBizList);
+        if(!quiet) toast('사업 서류를 되살렸습니다 — 「'+String(사업.title||'').slice(0,24)+'」에 다시 붙였습니다');
+        return { fileOnly:e.fileOnly, bizId:사업.id };
+      }
+    }
     if(!quiet) toast('첨부 원본을 되살렸습니다');
     return { fileOnly:e.fileOnly };
   }
@@ -13487,7 +13513,9 @@ function feeSettleConsent(ev, who){
   if(ev) ev.stopPropagation();
   var gs=feeSettleGroups(feeAll(), _feeSettleWhen), x=gs.find(function(z){ return z.who===who; });
   if(!x || !x.rows.length) return;
-  var r=x.rows.slice().sort(function(a,b){ return String(b.date||'').localeCompare(String(a.date||'')); })[0];
+  /* ⚠ 일자는 「2026.9.5」·「2026-09-18」이 섞여 담긴다 — 글자 순으로 견주면 9월 5일이 18일보다 «나중»이 된다.
+     입금계좌(feeSettleAcct)와 같은 열쇠(_feeKey)로 고른다(2026-10-07 검토) */
+  var r=x.rows.slice().sort(function(a,b){ return _feeKey(b).localeCompare(_feeKey(a)); })[0];
   feeConsentDoc(r._st, r.id);
   setTimeout(renderFeeSettle, 300);
 }
@@ -14846,7 +14874,8 @@ function bizDocKind(id, k){
 function bizDocDrop(id, btn){
   var r=_bizCur, d=r&&(r.docs||[]).filter(function(x){ return x.id===id; })[0]; if(!d) return;
   kcAskDelete(btn, { title:'✕ 이 서류를 사업에서 뺍니다', detail:escapeHtml(d.name)+'<br><b>'+TRASH_DAYS+'일 안에는 휴지통에서 되살릴 수 있습니다.</b>' }, function(){
-    var e=kcTrashPutFile(id, '사업 서류 · '+(r.title||''));
+    /* 되살릴 때 이 사업에 다시 붙이도록 서류 줄을 함께 담는다(새로 만드는 중인 사업은 아직 통에 없어 붙일 곳이 없다) */
+    var e=kcTrashPutFile(id, '사업 서류 · '+(r.title||''), r._isNew?null:{ bizDoc:{ bizId:r.id, doc:JSON.parse(JSON.stringify(d)) } });
     r.docs=(r.docs||[]).filter(function(x){ return x.id!==id; });
     if(!r._isNew) _bizPut(r);
     bizDraw(); _safe(renderBizList); kcTrashDone(e, '✕ 서류를 뺐습니다');
