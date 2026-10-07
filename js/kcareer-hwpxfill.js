@@ -1201,7 +1201,8 @@
     });
     뼈 += String(xml).slice(끝);
     var out = 뼈.replace(/<hp:p\b[\s\S]*?<\/hp:p>/g, function (p) {
-      var txt = paraText(p);
+      /* ⚠ 풀어서 본다 — setParaText 가 다시 감싸므로, 감싼 채(&amp;) 쓰면 「&amp;amp;」가 된다(2026-10-07) */
+      var txt = paraPlain(p);
       if (!txt.trim()) return p;
       var 날 = fillDateLine(txt, today || new Date());
       if (날 && 날 !== txt) {
@@ -1218,6 +1219,149 @@
       return p;
     });
     return out.replace(/\u0000TBL(\d+)\u0000/g, function (m, n) { return 표[Number(n)]; });
+  }
+
+  /* ═══ 표 «밖» 줄 서식 — 「성    명 : ______」 (대표 제보 2026-10-07 「한글 입력이 여전히 잘 안 된다」) ═══
+     ■ 무엇이 문제였나 (실측 — 7번 폴더 실제 서식 20개를 돌림)
+       칸 지도는 «표»만 훑었다. 동의서·서약서·확인서는 표 없이 줄로 적는다:
+         「성    명 : ______」 「생년월일 :    .   .  」 「연 락 처 : ___-____-____」 「주    소 : ______」
+       이런 서식은 칠 자리가 «0개»라 입력판에 칸이 하나도 안 뜨고, 채우기도 성명(서명 줄)만 들어갔다.
+       글상자(도형 안의 글)에 적힌 서식도 같았다 — 「글상자는 여기서 못 칩니다」로 끝났다.
+     ■ 고친 법 — 줄 하나를 «라벨 : 값» 짝으로 가른다. 짝마다 자리가 된다(이름표 p{줄}k{짝}, 글상자는 b{상자}p{줄}k{짝}).
+     ⚠★ 값 자리에 «뜻 있는 글자»가 이미 있으면 자동으로는 안 덮는다(글자칸과 같은 약속) — 사람이 고쳐 칠 때만.
+     ⚠ 라벨은 사전(fieldKeyOf)이 알아보는 것만 자동으로 채운다. 모르는 라벨은 «비어 있을 때만» 칠 자리로 연다.
+     ⚠ 「(인)」「(서명)」 꼬리는 남긴다 — 도장이 그 자리를 찾는다. */
+  var PARA_LEAD = /^[\s　□■○●◦·•‧ㆍ\-–—*※①-⑳]*(?:\(?\d{1,2}[.)]\s*)?/;
+  var PARA_TAIL = /\(\s*(?:서명\s*(?:또는|및)?\s*)?인\s*\)\s*$|\(\s*서명\s*\)\s*$|\(\s*印\s*\)\s*$/;
+  /* 값 자리가 «비었나» — 빈칸·밑줄·날짜 틀(   .  .  )·번호 틀(   -    -)·○○○ */
+  function paraBlank(v) {
+    var s = String(v == null ? '' : v).trim();
+    if (!s) return true;
+    if (/^[_＿\s　.·\-–—~∼()（）/년월일○◯ㅇ×]*$/.test(s)) return true;
+    return isPlaceholder(s);
+  }
+  /* 줄 하나 → [{label, key, lStart, colon, vStart, vEnd, value, tail}] (글자 위치는 그 줄 글자 기준) */
+  function paraPairs(text) {
+    var t = String(text == null ? '' : text), colons = [];
+    for (var i = 0; i < t.length; i++) {
+      var ch = t.charAt(i);
+      if (ch !== ':' && ch !== '：') continue;
+      /* 시각(10:00)·주소(http://)는 짝이 아니다 */
+      if (/\d/.test(t.charAt(i - 1)) && /\d/.test(t.charAt(i + 1))) continue;
+      if (t.charAt(i + 1) === '/' ) continue;
+      colons.push(i);
+    }
+    var pairs = [];
+    colons.forEach(function (c, j) {
+      var segStart = j ? colons[j - 1] + 1 : 0;
+      var seg = t.slice(segStart, c);
+      /* 라벨 = 콜론 앞 조각의 «가장 긴 알아보는 꼬리» — 「홍길동   생년월일」에서 「생년월일」 */
+      var lab = '', at = -1, key = '';
+      for (var p = 0; p < seg.length; p++) {
+        var cand = seg.slice(p).replace(PARA_LEAD, '').trim();
+        if (!cand) break;
+        var k = fieldKeyOf(cand);
+        if (k) { lab = cand; at = segStart + seg.indexOf(cand, p); key = k; break; }
+      }
+      if (!lab) {
+        /* 모르는 라벨 — 앞 값 자리(빈칸·밑줄)를 걷고 남은 짧은 말 */
+        var rest = seg.replace(/^[_＿\s　.·\-–—~∼()（）/○◯]*/, '');
+        var m = rest.match(/([^\s　_＿][^_＿]{0,13})\s*$/);
+        cand = m ? m[1].replace(PARA_LEAD, '').trim() : '';
+        if (!cand || cand.length > 12 || !/[가-힣]/.test(cand) || /[.。!?]$/.test(cand)) { pairs.push(null); return; }
+        lab = cand; at = segStart + seg.lastIndexOf(cand);
+      }
+      pairs.push({ label: lab, key: key, lStart: at, colon: c });
+    });
+    var out = [];
+    pairs.forEach(function (pr, j) {
+      if (!pr) return;
+      /* 값 자리는 다음 짝의 라벨 앞까지 */
+      var next = null;
+      for (var q = j + 1; q < pairs.length; q++) if (pairs[q]) { next = pairs[q]; break; }
+      var vEnd = next ? next.lStart : t.length;
+      var raw = t.slice(pr.colon + 1, vEnd), tailM = raw.match(PARA_TAIL);
+      var tail = tailM ? tailM[0].trim() : '';
+      var core = tailM ? raw.slice(0, tailM.index) : raw;
+      out.push({ j: j, label: pr.label, key: pr.key, lStart: pr.lStart, colon: pr.colon, vStart: pr.colon + 1, vEnd: vEnd,
+                 value: core.trim(), tail: tail, blank: paraBlank(core) });
+    });
+    return out;
+  }
+  /* 줄 단위(표 밖 줄 · 글상자 안 줄)를 이름표와 함께 — 표·글상자는 가려 두고 센다 */
+  function maskBlocks(src, tag, mark, store) {
+    var out = '', end = 0;
+    tagBlocks(src, tag).forEach(function (b) {
+      out += src.slice(end, b.start) + mark + store.length + mark; store.push(b.text); end = b.end;
+    });
+    return out + src.slice(end);
+  }
+  var PARA_RE = /<hp:p\b[^>]*>[\s\S]*?<\/hp:p>/g;
+  /* paraText 는 XML 그대로(&amp;)를 준다 — 다시 써 넣을 때 setParaText 가 감싸므로 «한 번 풀어» 써야 두 겹(&amp;amp;)이 안 된다 */
+  function paraPlain(p) {
+    return paraText(p).replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+      .replace(/&apos;|&#39;/g, "'").replace(/&amp;/g, '&');
+  }
+  function paraUnits(xml) {
+    var tbls = [], boxes = [];
+    var skel = maskBlocks(String(xml || ''), 'hp:tbl', '\u0000T', tbls);
+    skel = maskBlocks(skel, 'hp:drawText', '\u0000B', boxes);
+    var units = [], n = 0;
+    skel.replace(PARA_RE, function (p) { units.push({ uid: 'p' + n, text: paraPlain(p) }); n++; return p; });
+    boxes.forEach(function (bx, bi) {
+      var inner = maskBlocks(bx, 'hp:tbl', '\u0001T', []), m2 = 0;
+      inner.replace(PARA_RE, function (p) { units.push({ uid: 'b' + bi + 'p' + m2, text: paraPlain(p) }); m2++; return p; });
+    });
+    return units;
+  }
+  /* 이름표가 가리키는 줄 하나를 fn(줄 XML)으로 바꾼다 — 가린 것을 그대로 되돌려 놓는다 */
+  function paraRewrite(xml, uid, fn) {
+    var src = String(xml || ''), tbls = [], boxes = [], ok = false;
+    var skel = maskBlocks(src, 'hp:tbl', '\u0000T', tbls);
+    skel = maskBlocks(skel, 'hp:drawText', '\u0000B', boxes);
+    var mm = /^b(\d+)p(\d+)$/.exec(uid), mp = /^p(\d+)$/.exec(uid);
+    function swapNth(s, nth) {
+      var k = -1;
+      return s.replace(PARA_RE, function (p) { k++; if (k !== nth) return p; var q = fn(p); if (q != null && q !== p) { ok = true; return q; } return p; });
+    }
+    if (mp) skel = swapNth(skel, +mp[1]);
+    else if (mm && boxes[+mm[1]] != null) {
+      var bt = [], inner = maskBlocks(boxes[+mm[1]], 'hp:tbl', '\u0001T', bt);
+      inner = swapNth(inner, +mm[2]);
+      boxes[+mm[1]] = inner.replace(/\u0001T(\d+)\u0001T/g, function (m, i) { return bt[+i]; });
+    }
+    if (!ok) return { xml: src, ok: false };
+    var out = skel.replace(/\u0000B(\d+)\u0000B/g, function (m, i) { return boxes[+i]; })
+                  .replace(/\u0000T(\d+)\u0000T/g, function (m, i) { return tbls[+i]; });
+    return { xml: out, ok: true };
+  }
+  /* 칠 자리 목록 — 칸 지도(scan)가 표 칸 뒤에 붙인다 */
+  function paraSlots(xml) {
+    var out = [];
+    paraUnits(xml).forEach(function (u) {
+      if (!u.text || u.text.indexOf(':') < 0 && u.text.indexOf('：') < 0) return;
+      paraPairs(u.text).forEach(function (pr) {
+        /* 모르는 라벨은 «비었을 때만» — 글이 든 줄의 아무 콜론에나 칸을 얹으면 안내문 위에 칸이 뜬다 */
+        if (!pr.key && !pr.blank) return;
+        out.push({ id: u.uid + 'k' + pr.j, unit: u.uid, pair: pr.j, label: pr.label, key: pr.key,
+                   value: pr.value, tail: pr.tail, blank: pr.blank, line: u.text });
+      });
+    });
+    return out;
+  }
+  /* 자리 하나에 값을 넣는다 — 라벨·꼬리(인)는 두고 값 자리만 바꾼다 */
+  function paraPut(xml, slotId, value) {
+    var m = /^((?:b\d+)?p\d+)k(\d+)$/.exec(String(slotId || ''));
+    if (!m) return { xml: xml, ok: false };
+    var j = +m[2];
+    return paraRewrite(xml, m[1], function (p) {
+      var t = paraPlain(p), pr = paraPairs(t).filter(function (x) { return x.j === j; })[0];
+      if (!pr) return null;
+      var v = String(value == null ? '' : value);
+      var 뒤 = t.slice(pr.vEnd);
+      var 새 = t.slice(0, pr.vStart) + ' ' + v + (pr.tail ? '  ' + pr.tail : '') + (뒤 ? '    ' : '') + 뒤;
+      return setParaText(p, 새.replace(/\s+$/, ''));
+    });
   }
 
   /* ═══ 개인정보 동의 □ 에 표시 (대표 지시 2026-10-03) ═══════════════════════
@@ -1419,6 +1563,10 @@
       return fillInCell(tc, fields || {}, rep, {});
     },
     fillParagraphs: fillParagraphs, paraText: paraText,
+    /* 표 밖 줄·글상자의 「라벨 : 값」 자리 — 칸 지도(scan)·되돌려 넣기(apply)가 같은 자를 쓴다 */
+    paraPairs: paraPairs, paraSlots: paraSlots, paraPut: paraPut, paraBlank: paraBlank,
+    /* 이 줄을 «서명 줄 채우기»(fillSignLine)가 맡나 — 맡으면 칸 지도는 이름을 안 넣는다(두 번 들어가지 않게, 도장은 그쪽이 찍는다) */
+    signLineFills: function (line) { return !!fillSignLine(String(line || ''), '가'); },
     /* 개인정보 동의란 □ → ■ — 채우기·짓는 길(rhParaFill)이 같이 쓴다 */
     tickConsent: tickConsent,
     /* 칸 지도(kcareer-formmap.js)가 «같은 자»를 쓰도록 내보낸다 —
