@@ -195,12 +195,12 @@
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=11"></script>
-<script src="js/pu-contract-forms.js?v=27"></script>
+<script src="js/pu-contract-forms.js?v=28"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
-<script src="js/pu-office-store.js?v=6"></script>
+<script src="js/pu-office-store.js?v=7"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=11"></script>
+<script src="js/pu-office-docs.js?v=12"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -343,6 +343,7 @@ function officeHost() {
     download: downloadOriginal, attKey: PuContractForms.attKey, secretMove: secretMoveCall, sentFor: formSentFor, coLink: formCoLink, coMerge: formCoMerge,
     fileBytes: formFileBytes, mail: { mode: formMailMode, send: formMailSend, record: formMailRecord },
     zip: formZip, hwpShow: formFileShow,   /* 원본 보관함 — 고른 것 묶어 받기·오른쪽 미리보기 (2026-10-07) */
+    contractList: formContractList,        /* 📎 서명본 올리기 — 이알피 계약 연결(읽기만) (2026-10-07) */
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
@@ -530,10 +531,16 @@ async function formMailSend(p, files) {
     files: up.map(function (f) { return { name: f.name, path: f.path }; }), cardId: '' });
 }
 /* 보낸 기록 — 기업정보함 「보낸 서류」. 받는 주소는 남기지 않는다. 열쇠마다 같은 at(업무관리가 겹침을 지운다) */
+/* o.how === '받기' — 채워서 내려받은 것(직접 전달·출력). 받는 분 칸에 「(받기)」로 남긴다(받는 주소는 원래 없다).
+   o.await — 계약서등관리에서 만든 «계약서»면 📬 서명본 대기에도 한 줄(pu_docs/await). 기업별 계약서 다시 보내기는 안 적는다 */
 function formMailRecord(row, V, o) {
   var keys = PuFormCardFill.sentKeys(row, V), at = Date.now();
-  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', kind: o.kind, names: o.names, who: o.who });
-  return Promise.all(keys.map(function (k) { return trackedWrite(db.ref('pucards/sentDocs/' + k).push(rec)); })).then(function () { return keys.length; });
+  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', kind: o.kind, names: o.names, who: o.how === '받기' ? '(받기)' : o.who });
+  var jobs = keys.map(function (k) { return trackedWrite(db.ref('pucards/sentDocs/' + k).push(rec)); });
+  var coName = String((V && V.회사명) || (row && row.c) || '').trim();
+  if (o.await && o.kind === '계약서' && coName)
+    jobs.push(trackedWrite(PuOfficeStore.markAwait({ coName: coName, bz: (row && row.bz) || (V && V.사업자번호) || '', at: at, how: o.how === '받기' ? '받기' : '메일', names: o.names })));
+  return Promise.all(jobs).then(function () { return keys.length; });
 }
 /* 그 회사에 보낸 서류 — 기업별 계약서 「✉ 보낸 서류」(설계 2026-10-03-계약서류-표준-기록 §3 (라)). 읽기만.
    쓸 때와 같은 열쇠(사업자번호 · 'n'+이름) 둘 다 읽어 합친다 — 이 앱·기업정보함에서 보낸 것 모두 */

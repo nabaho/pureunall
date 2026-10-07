@@ -1916,6 +1916,47 @@
           }
         }
       },
+      "await": {
+        "$k": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          ".validate": "newData.hasChildren(['name','at','how','by'])",
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 120"
+          },
+          "bz": {
+            ".validate": "newData.isString() && newData.val().length <= 12"
+          },
+          "at": {
+            ".validate": "newData.isNumber()"
+          },
+          "how": {
+            ".validate": "newData.val() === '메일' || newData.val() === '받기'"
+          },
+          "names": {
+            "$i": {
+              ".validate": "newData.isString() && newData.val().length <= 200"
+            }
+          },
+          "by": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "byName": {
+            ".validate": "newData.isString() && newData.val().length <= 60"
+          },
+          "remindAt": {
+            ".validate": "newData.isNumber()"
+          },
+          "got": {
+            ".validate": "newData.isNumber()"
+          },
+          "gotDoc": {
+            ".validate": "newData.isString() && newData.val().length <= 40"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
       "secret_log": {
         ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
       },

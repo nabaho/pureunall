@@ -170,6 +170,42 @@
     return out.sort(function (a, b) { return b.at - a.at; }).slice(0, 50);
   }
 
+  /* ══ 📬 서명본 대기 (대표 「추천대로」 2026-10-07, 목업 승인) — 순수 함수 ══
+     list: PuOfficeStore.listAwait 줄. 대기 = got 없음(오래된 것 위), 최근 회수 = got 이 30일 안(최근 위).
+     days = 보낸 날부터 지난 날수(달력 날짜로), late = 14일 넘음(빨강) */
+  var AWAIT_LATE = 14, AWAIT_DONE_DAYS = 30;
+  function dayNo(ts) { var d = new Date(ts); return Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 864e5); }
+  function awaitView(list, now) {
+    now = now || Date.now();
+    var wait = [], done = [];
+    (list || []).forEach(function (a) {
+      if (!a || !a.at) return;
+      var days = Math.max(0, dayNo(now) - dayNo(a.at));
+      var r = { key: a.key, name: a.name, bz: a.bz || '', at: a.at, how: a.how || '메일', names: a.names || [], byName: a.byName || '',
+        remindAt: a.remindAt || 0, got: a.got || 0, gotDoc: a.gotDoc || '', days: days, late: days > AWAIT_LATE };
+      if (!a.got) wait.push(r);
+      else if (dayNo(now) - dayNo(a.got) <= AWAIT_DONE_DAYS) done.push(r);
+    });
+    wait.sort(function (x, y) { return x.at - y.at; });
+    done.sort(function (x, y) { return y.got - x.got; });
+    return { wait: wait, done: done };
+  }
+  /* 보낸 서류 이름 → 계약 기록 종류(KINDS) 짐작. 묶음은 «가장 앞선» 계약서 이름으로 — 사람이 고친다 */
+  var AWAIT_KIND_RE = [[/급여/, '급여관리'], [/기금/, '기금'], [/컨설팅/, '컨설팅'], [/위임|사건/, '사건'], [/자문|노동조합|노조/, '자문'], [/사무\s*(대행|위탁)|EDI/i, 'EDI'], [/CMS|자동\s*출금|자동\s*이체/i, 'CMS']];
+  function awaitKindOf(names) {
+    var list = names || [];
+    for (var i = 0; i < AWAIT_KIND_RE.length; i++) {
+      for (var j = 0; j < list.length; j++) if (AWAIT_KIND_RE[i][0].test(String(list[j] || ''))) return AWAIT_KIND_RE[i][1];
+    }
+    return '자문';
+  }
+  function remindText(a) {
+    return { subject: '[푸른노무법인] 계약서 서명본 회신 부탁드립니다' + (a.name ? ' — ' + a.name : ''),
+      body: ['담당자님, 안녕하십니까.', '푸른노무법인입니다.', '', ymd(a.at) + '에 보내드린 계약서류의 서명(날인)본을 아직 받지 못하여 연락드립니다.']
+        .concat((a.names || []).slice(0, 8).map(function (t) { return '- ' + t; }))
+        .concat(['', '서명하신 서류를 스캔(또는 사진)하여 회신 메일로 보내 주시면 감사하겠습니다.', '', '푸른노무법인 드림']).join('\n') };
+  }
+
   var CSS = ''
     + '.pod,.pod *{box-sizing:border-box}.pod{font-size:13px;color:#1e293b}'
     + '.pod-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}'
@@ -239,6 +275,14 @@
     + '.pod-imp{max-height:52vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px}'
     + '.pod-imp .ok{color:#166534}.pod-imp .new{color:#854d0e}.pod-imp .dup{color:#94a3b8}'
     + '.pod-mb select{padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px;font-family:inherit}'
+    /* 📬 서명본 대기 (2026-10-07) */
+    + '.pod-tabs{display:flex;gap:4px;margin-bottom:10px;border-bottom:1px solid #e2e8f0}'
+    + '.pod-tabs button{border:none;background:none;padding:8px 14px;font:inherit;font-size:13px;font-weight:600;color:#64748b;cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px}'
+    + '.pod-tabs button.on{color:#1e40af;border-bottom-color:#1e40af}'
+    + '.pod-tabs i{font-style:normal;background:#fee2e2;color:#991b1b;border-radius:9px;padding:0 7px;margin-left:5px;font-size:11px}'
+    + '.pod-aw td.late{color:#dc2626;font-weight:700}.pod-aw td.nm{white-space:normal;min-width:160px;word-break:keep-all;overflow-wrap:anywhere}'
+    + '.pod-drop{border:2px dashed #93c5fd;border-radius:10px;background:#eff6ff;color:#1e40af;text-align:center;padding:22px 12px;cursor:pointer;font-size:13px}'
+    + '.pod-drop.on{background:#dbeafe;border-color:#2563eb}'
     + '.pod-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:1400}'
     + '@media(max-width:700px){.pod-co{display:block}.pod-cl{width:auto;margin-bottom:10px;max-height:30vh;overflow-y:auto}.pod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pod th:nth-child(5),.pod td:nth-child(5){display:none}}';
   function css() {
@@ -547,12 +591,14 @@
   function mountCompanies(root, host) {
     css();
     var store = host.store;
-    var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false };
+    var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false,
+      tab: 'co', aw: null, awErr: null, awPicked: {} };
 
     function load(keepSel) {
       S.err = null;
       return store.probe().then(function (p) {
         if (p === 'denied') { S.denied = true; S.loaded = true; draw(); return; }
+        loadAwait();
         return store.listCo().then(function (cos) {
           S.cos = cos.filter(function (c) { return c.n > 0 || c.r > 0; });
           if (!keepSel || !S.cos.some(function (c) { return c.key === S.sel; })) S.sel = S.cos.length ? S.cos[0].key : null;
@@ -574,6 +620,12 @@
         function (e) { S.recsDenied = !!(store.isDenied && store.isDenied(e)); return []; }) : Promise.resolve([]);
       return Promise.all([store.listCoDocs(key), recsP, sentP]).then(function (r) { if (key !== S.sel) return; S.docs = r[0]; S.recs = r[1]; S.sent = r[2]; draw(); },
         function (e) { if (key !== S.sel) return; S.docs = []; S.recs = []; S.sent = []; draw(); toast('❌ 이 회사 계약서를 불러오지 못했습니다 — ' + msg(e)); });
+    }
+    /* 📬 서명본 대기 — 작은 목록(pu_docs/await) 하나만 읽는다. 기업정보함 보낸 서류를 통째로 읽지 않는다 */
+    function loadAwait() {
+      if (!store.listAwait) return Promise.resolve();
+      return store.listAwait().then(function (l) { S.aw = l; S.awErr = null; draw(); },
+        function (e) { S.aw = []; S.awErr = store.isDenied && store.isDenied(e) ? '규칙이 아직 게시되지 않았습니다' : msg(e); draw(); });
     }
     function coName(key) { var c = S.cos.filter(function (x) { return x.key === key; })[0]; return c ? c.name : ''; }
     function coList() { return el('datalist', { id: 'pod-cos' }, S.cos.map(function (c) { return el('option', { value: c.name }); })); }
@@ -637,6 +689,114 @@
         } });
         return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: close }), go];
       });
+    }
+
+    /* ── 📎 서명본 올리기 (2026-10-07 목업 승인) — 끌어다 놓기 · 종류(보낸 서류로 짐작) · 계약일 · 이알피 계약 ──
+       🔒 저장: 서명본 창고(대표·관리자만 연다) + 회사 카드(co_docs) + 계약 기록(co_recs, 파일과 이어짐) + 대기에서 회수로 */
+    function openSigned(a) {
+      var file = null;
+      var fileIn = el('input', { type: 'file', accept: '.pdf,.jpg,.jpeg,.png,.heic,.hwp,.hwpx', style: 'display:none' });
+      var dropTxt = el('div', { text: '서명본 PDF·사진을 여기로 끌어 놓거나 눌러서 고르세요' });
+      var drop = el('div', { 'class': 'pod-drop', role: 'button', tabindex: '0', 'aria-label': '서명본 파일 고르기' }, [el('div', { style: 'font-size:24px', text: '📎' }), dropTxt]);
+      function setFile(f) {
+        if (!f) return;
+        var chk = store.okDocFile(f.name, f.size); if (!chk.ok) { toast('❌ ' + chk.why); return; }
+        file = f; dropTxt.textContent = '✅ ' + f.name + ' (' + fmtSize(f.size) + ')';
+      }
+      drop.addEventListener('click', function () { fileIn.click(); });
+      drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileIn.click(); } });
+      drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('on'); });
+      drop.addEventListener('dragleave', function () { drop.classList.remove('on'); });
+      drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('on'); setFile(e.dataTransfer && e.dataTransfer.files[0]); });
+      fileIn.addEventListener('change', function () { setFile(fileIn.files[0]); });
+      var kSel = el('select', null, KINDS.map(function (k) { return el('option', { value: k, text: k }); })); kSel.value = awaitKindOf(a.names);
+      var dIn = el('input', { type: 'date', value: ymd(Date.now()) });
+      var ctSel = el('select', { 'aria-label': '이알피 계약' }, [el('option', { value: '', text: host.contractList ? '불러오는 중…' : '(이알피 계약 목록 없음)' })]);
+      if (host.contractList) host.contractList().then(function (ls) {
+        var nk = nameKey(a.name), mine = (ls || []).filter(function (c) { return nameKey(c.companyName) === nk; });
+        ctSel.innerHTML = '';
+        ctSel.appendChild(el('option', { value: '', text: mine.length ? '(연결 안 함)' : '(이 회사 이름의 이알피 계약이 없습니다)' }));
+        mine.forEach(function (c) { ctSel.appendChild(el('option', { value: c.contractNo || c.id, text: (c.contractNo || c.id) + (c.signDate ? ' · ' + c.signDate : '') + (c.status ? ' · ' + c.status : '') })); });
+        if (mine.length === 1) ctSel.value = mine[0].contractNo || mine[0].id;
+      }, function () { ctSel.innerHTML = ''; ctSel.appendChild(el('option', { value: '', text: '(이알피 계약을 읽지 못했습니다)' })); });
+      modalShell('📎 서명본 올리기 — ' + a.name, [
+        el('div', { style: 'font-size:12px;color:#64748b;margin-bottom:8px', text: '보낸 서류: ' + ((a.names || []).join(', ') || '—') + ' · ' + ymd(a.at) + ' ' + a.how }),
+        drop, fileIn,
+        el('label', { text: '계약 종류 (보낸 서류로 짐작 — 고치세요)' }), kSel,
+        el('label', { text: '계약일' }), dIn,
+        el('label', { text: '이알피 계약 연결' }), ctSel,
+        el('div', { style: 'font-size:12px;color:#854d0e;margin-top:10px', text: '🔒 서명본으로 저장합니다 — 목록 줄(회사·종류·날짜)은 직원 모두 보고, 파일 열기는 대표·관리자만(연 기록이 남습니다).' })
+      ], function (close) {
+        var go = el('button', { type: 'button', 'class': 'pod-b p', text: '🔒 저장', onclick: function () {
+          if (!file) { toast('서명본 파일을 고르세요'); return; }
+          if (!dIn.value) { toast('계약일을 넣으세요'); dIn.focus(); return; }
+          go.disabled = true; go.textContent = '저장하는 중…';
+          var co = a.name, kind = kSel.value, ct = ctSel.value, f = file;
+          readBytes(f).then(function (bytes) {
+            return store.putOriginal({ name: f.name, size: f.size, type: f.type || '', bytes: bytes }, { kind: 'co', coKey: store.coKey(co), coName: co }, { secret: true });
+          }).then(function (r) {
+            return store.addCoDoc({ coName: co, fileId: r.fileId, title: kind + ' 계약서 (서명본)', date: dIn.value, src: 'upload', secret: true });
+          }).then(function (r) {
+            return store.importCoRecs([{ coName: co, bizNo: a.bz || '', date: dIn.value, kind: kind, docId: r.docId, note: ct ? '이알피 계약 ' + ct : '' }])
+              .then(function () { return store.gotAwait(a.key, r.docId); }).then(function () { return r; });
+          }).then(function (r) {
+            close(); toast('✅ ' + co + ' 서명본을 저장했습니다 — 최근 회수로 옮겼습니다'); S.sel = r.coKey; load(true);
+          }).catch(function (e) { go.disabled = false; go.textContent = '🔒 저장'; toast('❌ 저장하지 못했습니다 — ' + msg(e)); });
+        } });
+        return [el('button', { type: 'button', 'class': 'pod-b', text: '취소', onclick: close }), go];
+      });
+    }
+    /* ⏰ 다시 알림 — 메일은 보내지 않는다(받는 주소를 남기지 않으므로). 알림 글을 복사해 주고 «알린 날»만 적는다 */
+    function remind(list) {
+      list = [].concat(list);
+      var txt = list.map(function (a) { var t = remindText(a); return '제목: ' + t.subject + '\n\n' + t.body; }).join('\n\n────────\n\n');
+      var cp = w.navigator.clipboard ? w.navigator.clipboard.writeText(txt) : Promise.reject(new Error('복사 기능이 없습니다'));
+      return cp.then(function () { return Promise.all(list.map(function (a) { return store.remindAwait(a.key); })); })
+        .then(function () { toast('⏰ 알림 글 ' + list.length + '곳을 복사했습니다 — 메일·문자에 붙여 보내세요'); S.awPicked = {}; loadAwait(); },
+          function (e) { toast('❌ ' + msg(e)); });
+    }
+    function awaitPane() {
+      var box = el('div', { 'class': 'pod-aw' });
+      if (S.aw == null) { box.appendChild(el('div', { 'class': 'pod-empty', text: '불러오는 중…' })); return box; }
+      if (S.awErr) { box.appendChild(el('div', { 'class': 'pod-note pod-warn', text: '⚠ 서명본 대기 목록을 읽지 못했습니다 — ' + S.awErr })); return box; }
+      var v = awaitView(S.aw);
+      box.appendChild(el('div', { 'class': 'pod-note' }, ['계약서등관리에서 계약서를 ✉ 보내거나 📥 받으면 여기에 오릅니다. 서명본이 돌아오면 「📎 서명본 올리기」 — '
+        + AWAIT_LATE + '일이 넘으면 빨갛게 보입니다.']));
+      if (!v.wait.length) box.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '서명본을 기다리는 회사가 없습니다' }));
+      else {
+        var tb = el('tbody');
+        var picked = v.wait.filter(function (a) { return S.awPicked[a.key]; });
+        var all = el('input', { type: 'checkbox', 'aria-label': '모두 고르기', checked: picked.length === v.wait.length });
+        all.addEventListener('change', function () { v.wait.forEach(function (a) { S.awPicked[a.key] = all.checked; }); draw(); });
+        v.wait.forEach(function (a, i) {
+          var cb = el('input', { type: 'checkbox', 'aria-label': a.name + ' 고르기', checked: !!S.awPicked[a.key] });
+          cb.addEventListener('change', function () { S.awPicked[a.key] = cb.checked; draw(); });
+          tb.appendChild(el('tr', null, [el('td', null, [cb]), el('td', { style: 'color:#94a3b8', text: String(i + 1) }),
+            el('td', null, [el('b', { text: a.name }), a.bz ? el('div', { style: 'font-size:11px;color:#94a3b8', text: fmtBz(a.bz) }) : null]),
+            el('td', { 'class': 'nm', text: (a.names || []).join(', ') || '—' }),
+            el('td', null, [ymd(a.at) + ' ', el('span', { 'class': 'pod-tag ' + (a.how === '받기' ? 'ph' : 'up'), text: a.how })]),
+            el('td', { 'class': a.late ? 'late' : null, text: a.days + '일' + (a.remindAt ? ' · 알림 ' + ymd(a.remindAt).slice(5) : '') }),
+            el('td', { style: 'overflow:visible;white-space:nowrap' }, [
+              el('button', { type: 'button', 'class': 'pod-b p', text: '📎 서명본 올리기', onclick: function () { openSigned(a); } }), ' ',
+              el('button', { type: 'button', 'class': 'pod-b', text: '⏰ 다시 알림', title: '알림 글을 복사하고 알린 날을 적습니다(메일은 보내지 않습니다)', onclick: function () { remind(a); } })])]));
+        });
+        box.appendChild(el('div', { 'class': 'pod-bar', style: 'margin-bottom:6px' }, [el('b', { style: 'font-size:13px', text: '📬 서명본 대기 ' + v.wait.length + '곳' }),
+          picked.length ? el('button', { type: 'button', 'class': 'pod-b', text: '선택 ' + picked.length + '곳 알림 글 복사', onclick: function () { remind(picked); } }) : null]));
+        box.appendChild(el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { style: 'width:34px' }, [all]), el('th', { style: 'width:36px', text: '#' }),
+          el('th', { text: '회사' }), el('th', { text: '보낸 서류' }), el('th', { text: '보낸 날' }), el('th', { text: '지남' }), el('th', { text: '' })])]), tb])]));
+      }
+      if (v.done.length) {
+        var dtb = el('tbody');
+        v.done.forEach(function (a) {
+          dtb.appendChild(el('tr', { 'class': 'click', title: '이 회사 계약서 보기', onclick: function () { S.tab = 'co'; S.sel = a.key; S.cos.some(function (c) { return c.key === a.key; }) ? loadDocs() : load(true); } }, [
+            el('td', null, [el('b', { text: a.name })]), el('td', { 'class': 'nm', text: (a.names || []).join(', ') || '—' }),
+            el('td', { text: ymd(a.at) }), el('td', { text: ymd(a.got) }), el('td', { 'class': 'muted', text: '🔒 서명본' })]));
+        });
+        box.appendChild(el('b', { style: 'display:block;font-size:13px;margin:8px 0 6px', text: '✅ 최근 회수 (' + AWAIT_DONE_DAYS + '일)' }));
+        box.appendChild(el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '회사' }), el('th', { text: '보낸 서류' }),
+          el('th', { text: '보낸 날' }), el('th', { text: '받은 날' }), el('th', { text: '' })])]), dtb])]));
+      }
+      return box;
     }
 
     /* ── 사진첩에서 가져오기 ──
@@ -1250,6 +1410,13 @@
       if (S.denied) { wrap.appendChild(deniedBanner()); root.appendChild(wrap); return; }
       if (S.err) { wrap.appendChild(el('div', { 'class': 'pod-empty', style: 'color:#991b1b', text: '불러오지 못했습니다 — ' + S.err })); root.appendChild(wrap); return; }
       if (!S.loaded) { wrap.appendChild(el('div', { 'class': 'pod-empty', text: '불러오는 중…' })); root.appendChild(wrap); return; }
+      /* 탭 — 🏢 회사별 · 📬 서명본 대기(기다리는 곳 수) */
+      var nWait = S.aw ? awaitView(S.aw).wait.length : 0;
+      wrap.appendChild(el('div', { 'class': 'pod-tabs', role: 'tablist' }, [
+        el('button', { type: 'button', role: 'tab', 'aria-selected': S.tab === 'co' ? 'true' : 'false', 'class': S.tab === 'co' ? 'on' : null, text: '🏢 회사별', onclick: function () { S.tab = 'co'; draw(); } }),
+        el('button', { type: 'button', role: 'tab', 'aria-selected': S.tab === 'await' ? 'true' : 'false', 'class': S.tab === 'await' ? 'on' : null, onclick: function () { S.tab = 'await'; draw(); loadAwait(); } },
+          ['📬 서명본 대기', nWait ? el('i', { text: String(nWait) }) : null])]));
+      if (S.tab === 'await') { wrap.appendChild(awaitPane()); root.appendChild(wrap); return; }
       if (!S.cos.length) {
         wrap.appendChild(el('div', { 'class': 'pod-empty' }, ['엑셀 업체명단을 가져오거나, 사진첩의 계약서·파일을 올리면 회사별로 모입니다.']));
         root.appendChild(wrap); return;
@@ -1437,7 +1604,7 @@
     archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
     filterArchive: filterArchive, fileType: fileType, filterCos: filterCos, filterDocs: filterDocs,
     linkPlan: linkPlan, bzGroups: bzGroups, refNames: refNames, mergePlan: mergePlan, fmtBz: fmtBz,
-    mailTargets: mailTargets, sentKindOf: sentKindOf, resendMail: resendMail,
+    mailTargets: mailTargets, sentKindOf: sentKindOf, resendMail: resendMail, awaitView: awaitView, awaitKindOf: awaitKindOf, remindText: remindText,
     mountArchive: mountArchive, mountCompanies: mountCompanies,
     _el: el, _toast: toast, _fmtSize: fmtSize, _ymd: ymd, _css: css, _deniedBanner: deniedBanner
   };
