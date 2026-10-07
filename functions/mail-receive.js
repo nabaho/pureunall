@@ -807,6 +807,26 @@ function sureFor(o, route) {
   return { ok: true, why: '' };
 }
 
+/* ══════ 컨설팅 메일은 급여데이터함에 안 담는다 (대표 결정 2026-10-07) ══════
+   공용 칸 「업체관리에 없는 주소」 52건 가운데 35건이 급여가 아니라 컨설팅 자료였다
+   (산업일자리전환·통합진단·기술보호·현장클리닉의 재무제표·조직도·인터뷰지).
+   컨설팅 회사는 업체관리에 넣지 않기로 했으므로 이 메일들은 **언제나** 「없는 주소」로
+   쌓이고, 「✉ 잇기」를 누르면 컨설팅 회사가 급여 거래처로 잘못 이어진다.
+   ⚠ 잣대 둘이 **모두** 맞아야 거른다:
+     ① 보낸 주소가 업체관리에 없다 — 급여 거래처가 보낸 것은 무슨 말이 있어도 담는다
+     ② 제목이나 첨부 이름에 컨설팅 말이 있다
+   ⚠ 담당자 폴더(사람이 손으로 옮긴 것)에 있으면 거르지 않는다 — 손이 자동보다 세다.
+   ⚠ 메일은 지우지 않는다. 메일함에 그대로 있고, 받은 메일 목록에 까닭이 남는다. */
+const CONSULT_RE = /컨설팅|현장\s*클리닉|비즈니스\s*지원단|통합\s*진단|노무\s*진단|산업\s*일[자저]리\s*전환|일터\s*혁신|기술\s*보호|재무\s*제표|조직도|인[터텨]뷰|인식\s*수준\s*조사|직무\s*기술서|공정도|업무\s*분장/;
+
+function consultMail(o, index, owners) {
+  o = o || {};
+  if (seatFromBox(o.box, owners)) return false;
+  if (companiesFor(o.from, index).length) return false;
+  const text = [String(o.subject || '')].concat((o.filenames || []).map(String)).join(' ');
+  return CONSULT_RE.test(text);
+}
+
 /* 서랍 칸 열쇠 — 화면(pu-paydata-store slotOf)과 **같아야** 한다.
    근로계약서는 달과 무관한 keep 칸, 나머지는 '202609' 꼴. */
 function drawerSlotOf(kind, month) {
@@ -1080,5 +1100,7 @@ module.exports = {
   /* 확실한 것은 바로 서랍으로 (2026-10-03) */
   sureFor, drawerSlotOf, drawerWriteFor, monthGap, missingSeatSids, dirNameOf,
   settlePlan, settleChunks, isBodyRec,
-  SURE_KINDS, BLANK_FORM_RE, KST_MS, PAY_DATA_RE, PAY_ASK_RE
+  SURE_KINDS, BLANK_FORM_RE, KST_MS, PAY_DATA_RE, PAY_ASK_RE,
+  /* 컨설팅 메일 거르기 (2026-10-07) */
+  CONSULT_RE, consultMail
 };
