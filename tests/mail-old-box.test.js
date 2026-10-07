@@ -450,7 +450,8 @@ test('★★★ 담은 것이 있으면 「🔁 빠진 지난 메일 다시 훑�
 
 test('★★★ 다시 훑기는 fresh 를 «그 한 번만» 보낸다 — 이어서는 멈춘 자리부터', () => {
   const f = sliceFn(app, 'function mbBackfillRun(').replace(/\/\*[\s\S]*?\*\//g, ' ');
-  assert.match(f, /function mbBackfillRun\(days, fresh\)/, '다시 훑기를 가를 길이 없습니다');
+  /* auto — 「이어서 채우기」를 저절로 부를 때(2026-10-07 점검 ②). fresh 는 여전히 사람이 누른 그 한 번만 */
+  assert.match(f, /function mbBackfillRun\(days, fresh(, auto)?\)/, '다시 훑기를 가를 길이 없습니다');
   assert.match(f, /again \? \{ days:goal, again:true, fresh:true \} : \{ days:goal, again:true \}/,
     'fresh 를 늘 보내거나(이어 가기가 늘 맨 앞부터 다시 걷습니다) 아예 안 보냅니다');
   /* 실제로 불러 본다 — 보낸 몸통을 잡는다 */
@@ -461,7 +462,8 @@ test('★★★ 다시 훑기는 fresh 를 «그 한 번만» 보낸다 — 이�
     firebase:{ auth:()=>({ currentUser:{ getIdToken:()=>Promise.resolve('tok') } }) },
     fetch:(u, o)=>{ sent.push(JSON.parse(o.body)); return Promise.resolve({ json:()=>Promise.resolve({ ok:true }) }); } };
   vm.createContext(ctx);
-  vm.runInContext('let _mbFillBusy = false;\n' + sliceFn(app, 'function mbBackfillRun('), ctx);
+  vm.runInContext('let _mbFillBusy = false; var MB_FILL_AUTO_MAX = 20, _mbFillAutoN = 0, _mbFillLastGot = -1;\n'
+    + sliceFn(app, 'function mbFillAutoNext(') + '\n' + sliceFn(app, 'function mbBackfillRun('), ctx);
   ctx.mbBackfillRun(GOAL, true);
   return new Promise((r)=>setTimeout(r, 20)).then(()=>{
     /* 끝나면 화면이 old/state 를 다시 읽는다(mbOldStateLoad) — 그 값이 돌아온 셈으로 둔다 */

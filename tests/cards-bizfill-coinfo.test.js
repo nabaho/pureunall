@@ -117,7 +117,9 @@ test('⑤ 명함은 안 본다 — 등록증만', () => {
 });
 
 test('⑥★ 옮기는 일은 sendToCoInfo 가 한다 — 여기서 손으로 쓰지 않는다', () => {
-  const run = stripJs(cutFn(RAW, 'async function runBizFill('));
+  /* 한 장 보내기는 bizFillOne 이 한다 — 부어 넣기(여러 장)와 저장 직후(한 장)가 같이 쓴다(2026-10-07 점검 ②) */
+  const run = stripJs(cutFn(RAW, 'async function runBizFill(')) + stripJs(cutFn(RAW, 'async function bizFillOne('));
+  assert.match(run, /bizFillOne\(it\)/, '부어 넣기가 한 장 보내개(bizFillOne)를 쓴다');
   assert.match(run, /PuDocFile\.sendToCoInfo\(/, '공용 규칙을 거친다');
   assert.ok(!/Store\.db\.ref\([^)]*coInfo/.test(run),
     '기업상세에 직접 쓰지 않는다 — 「빈 칸만·안 덮는다·근거 남긴다」가 그쪽에 있다');
@@ -153,7 +155,7 @@ test('⑨ 판독 요금이 0원이라는 것을 화면이 말한다 (새로 읽�
 test('⑩ 세는 칸과 보내는 칸이 «같은 표»다 (어긋나면 화면이 거짓말한다)', () => {
   const list = /const BIZFILL_FIELDS = \[([^\]]*)\];/.exec(RAW)[1];
   const mine = list.match(/'([a-zA-Z]+)'/g).map(s => s.replace(/'/g, ''));
-  const run = cutFn(RAW, 'async function runBizFill(');
+  const run = cutFn(RAW, 'async function bizFillOne(');
   assert.match(run, /BIZFILL_FIELDS\.forEach/, '보낼 때도 같은 표를 쓴다');
   const docFile = fs.readFileSync(path.join(ROOT, 'js', 'pu-doc-file.js'), 'utf8');
   const keep = docFile.slice(docFile.indexOf('var KEEP = ['), docFile.indexOf('];', docFile.indexOf('var KEEP = [')));

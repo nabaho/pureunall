@@ -285,10 +285,12 @@ eq('대표담당 아니면 false', ctx.pcToContact(card, false).isPrimary, false
 (function () {
   const pc = rd(path.join(__dirname, '..', 'pu-cards.html'));
   const fn = cut(pc, 'pu-cards.html')('async function rebuildIdxAll(){', '\n}');
-  ok('★ 검색목록 다시 만들기가 있다', fn.length > 100);
+  /* 실제로 다시 쓰는 일은 rebuildIdxCore 가 한다 — 단추와 저절로(idxShapeCheck)가 같이 쓴다(2026-10-07 점검 ②) */
+  const core = cut(pc, 'pu-cards.html')('async function rebuildIdxCore(items){', '\n}');
+  ok('★ 검색목록 다시 만들기가 있다', fn.length > 100 && /rebuildIdxCore\(items\)/.test(fn));
   ok('한 번의 update 로 몰아 보낸다 (한 장씩 6천 번 쓰지 않는다)',
-     /\.ref\(DB_ROOT\+'\/idx'\)\.update\(upd\)/.test(fn));
-  ok('잠긴 폴더는 넣지 않고 지운다', /inLockedGroup\(it\) \? null : idxRecord\(it\)/.test(fn));
+     /\.ref\(DB_ROOT\+'\/idx'\)\.update\(upd\)/.test(core));
+  ok('잠긴 폴더는 넣지 않고 지운다', /inLockedGroup\(it\) \? null : idxRecord\(it\)/.test(core));
   ok('명함 자체는 안 건드린다고 알려 준다', fn.indexOf('명함 자체는 하나도 바뀌지 않습니다') > 0);
   ok('실행 전에 묻는다', /confirm\(/.test(fn));
   ok('실패를 성공이라 하지 않는다', /catch\(e\)\{[\s\S]{0,80}실패/.test(fn));
