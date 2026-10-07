@@ -160,3 +160,12 @@ test('★ 줄 높이 — 꺾일 줄 수만큼 칸 높이를 늘린다 · 줄 정
   assert.equal(box.f(span, hdr), span, '여러 줄 병합 칸은 건드리지 않는다');
   assert.match(gF('_hwpFillXml'), /if\(kind==='bizplan'\) r\.xml=_hwpRowFit\(r\.xml,hdr\);/, '사업계획서에만 건다');
 });
+
+test('★ 수지차액 한 줄 — 비용예산 표 아래(목업 A안): 사업수익 − 비용 = 차액 → 준비금2 환입으로 충당', () => {
+  const G = Object.assign({}, F, { _id: 'IT', years: { 2026: { budget_items: ITEMS } } });
+  V.setBudget('IT', { rev_contrib: 50000000, rev_interest: 133000, exp_purpose: 80000000, exp_admin: 1400000, exp_etc: 4000000 });
+  const v = V.v(G, SITES);
+  assert.equal(v.수지차액문, '※ 수지차액: 사업수익 133천원 − 비용 85,400천원 = △85,267천원 → 고유목적사업준비금2 환입(기본재산전입)으로 충당');
+  assert.equal(n(v.입_외), 85267, '차액 = 수입예산의 준비금2 전입수입');
+  assert.equal(V.v({}, []).수지차액문, '', '예산이 없으면 비운다');
+});
