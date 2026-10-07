@@ -308,14 +308,24 @@
     'case-safety': '산안', 'case-relation': '노사', 'case-support': '지원', 'case-edu': '교육', 'case-investigate': '조사',
     'case-admin': '행심', 'case-discipline': '징계', 'case-other': '기타' };
   var CONTRACT_SETS = { advisory: ['fm-pr-advisory', 'fm-pr-cms'], payroll: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] };
+  /* 업무 유형 → 세트 (2026-10-07 「세트 한 곳」) — 화면에서 고친 세트(data/contract_form_sets)를 이알피 계약서 출력·계약서 만들기·묶음 채우기가 같이 읽는다.
+     ⚠ 이알피 pu-erp.html ERP_TYPE_SET 과 글자가 같아야 한다(tests/erp-contract-fill.test.js). 세트를 못 읽으면 CONTRACT_SETS(옛 고정 목록) */
+  var TYPE_SET = { company: { '자문': 'fs-advisory', '급여': 'fs-payroll', '노조': 'fs-union' }, fund: { '*': 'fs-fund' } };
+  function setIdsFor(sets, kv, typeCode) {
+    var m = TYPE_SET[kv]; if (!m || !sets) return null;
+    var id = m[typeCode] || m['*']; if (!id) return null;
+    var st = (sets || []).filter(function (s) { return s && s.id === id; })[0];
+    return st && (st.formIds || []).length ? st.formIds.slice() : null;
+  }
   function contractPick(forms, info) {
     info = info || {};
     var out = [];
     (info.kinds || []).forEach(function (kv) {
       var list = (forms || []).filter(function (f) { return f && f.enabled !== false && f.kind === kv && groupOf(f) !== PROPOSAL_GROUP; });
       var ids = list.map(function (f) { return f.id; }), pick = ids;
-      var set = kv === 'company' ? (info.typeCode === '자문' ? CONTRACT_SETS.advisory : info.typeCode === '급여' ? CONTRACT_SETS.payroll : null) : null;
-      if (set) { var a = ids.filter(function (id) { return set.indexOf(id) >= 0; }); if (a.length) pick = a; }
+      var set = setIdsFor(info.sets, kv, info.typeCode)
+        || (kv === 'company' ? (info.typeCode === '자문' ? CONTRACT_SETS.advisory : info.typeCode === '급여' ? CONTRACT_SETS.payroll : null) : null);
+      if (set) { var a = set.filter(function (id) { return ids.indexOf(id) >= 0; }); if (a.length) pick = a; }   // 세트에 적힌 차례대로
       else if (kv === 'case' && info.caseName) {
         var cn = String(info.caseName);
         var m = list.filter(function (f) { var g = f.groupName || ''; return g && (g === cn || cn.indexOf(g) >= 0 || g.indexOf(cn) >= 0); }).map(function (f) { return f.id; });
@@ -335,13 +345,13 @@
     { v: 'case', label: '사건', icon: '⚖️', kind: 'case', sub: '위임계약·위임장' },
     { v: 'fund', label: '기금', icon: '🏦', kind: 'fund', sub: '기금 계약' }
   ];
-  function makePlan(forms, v) {
+  function makePlan(forms, v, sets) {
     var mk = MAKE_KINDS.filter(function (x) { return x.v === v; })[0];
     if (!mk) return { list: [], checked: [] };
     var all = (forms || []).filter(function (f) { return f && f.enabled !== false && f.kind === mk.kind; });
     var checked = mk.kind === 'case'
       ? all.filter(function (f) { return groupOf(f) === NO_GROUP; }).map(function (f) { return f.id; })
-      : contractPick(all, { kinds: [mk.kind], typeCode: mk.typeCode });
+      : contractPick(all, { kinds: [mk.kind], typeCode: mk.typeCode, sets: sets });
     var set = mk.typeCode === '자문' ? CONTRACT_SETS.advisory : mk.typeCode === '급여' ? CONTRACT_SETS.payroll : null;
     if (set) checked.sort(function (a, b) { return set.indexOf(a) - set.indexOf(b); });   // 세트에 적힌 차례대로(급여위임 → 연금 → 건강 → 고용 → CMS)
     var rest = all.filter(function (f) { return checked.indexOf(f.id) < 0; })
@@ -1701,14 +1711,14 @@
       function sel() { return plan.list.filter(function (f) { return picked[f.id]; }); }
       function sync() { var n = sel().length; btnGo.textContent = n ? '📝 ' + n + '개 채우기 → 확인표' : '양식을 고르세요'; btnGo.disabled = !n; }
       function setKind(v) {
-        cur = v; plan = makePlan(S.forms, v); picked = {};
+        cur = v; plan = makePlan(S.forms, v, S.sets); picked = {};
         plan.checked.forEach(function (id) { picked[id] = true; });
         drawKinds(); draw();
       }
       function drawKinds() {
         kinds.innerHTML = '';
         MAKE_KINDS.forEach(function (k) {
-          var n = makePlan(S.forms, k.v).list.length;
+          var n = makePlan(S.forms, k.v, S.sets).list.length;
           kinds.appendChild(el('button', { type: 'button', 'class': 'pcf-mk-kind' + (k.v === cur ? ' on' : ''), 'aria-pressed': k.v === cur ? 'true' : 'false',
             disabled: !n, onclick: function () { setKind(k.v); } }, [el('b', { text: k.icon + ' ' + k.label }), el('small', { text: n ? k.sub : '양식 없음' })]));
         });
@@ -1803,7 +1813,7 @@
             result[id] = { state: '채우는 중…' }; draw();
             note.textContent = '채우는 중… (' + (i + 1) + '/' + ids.length + ')';
             return host.contractLoad(id).then(function (info) {
-              var pick = contractPick(S.forms, info), fms = pick.map(function (fid) { return S.forms.filter(function (f) { return f.id === fid; })[0]; }).filter(Boolean);
+              var pick = contractPick(S.forms, Object.assign({ sets: S.sets }, info)), fms = pick.map(function (fid) { return S.forms.filter(function (f) { return f.id === fid; })[0]; }).filter(Boolean);
               if (!fms.length) throw new Error('이 계약 종류의 양식이 없습니다');
               var V = contractValues(info), folder = contractFolder(info, i), outs = [];
               return fms.reduce(function (q2, fm) {
@@ -1854,7 +1864,7 @@
       toast('이알피 계약 자료를 읽는 중…');
       host.contractLoad(host.contract).then(function (info) {
         host.contractCtx = { vals: info.vals, coKey: info.coKey, label: '계약 ' + (info.contractNo || info.id) };
-        var ids = contractPick(S.forms, info);
+        var ids = contractPick(S.forms, Object.assign({ sets: S.sets }, info));
         if (!ids.length) { drawMain(); toast('이 계약 종류의 양식이 아직 없습니다 — 계약 자료는 「찾아서 채우기」에 그대로 쓰입니다'); return; }
         var first = S.forms.filter(function (f) { return f.id === ids[0]; })[0];
         S.kind = first.kind; resetFilters();
@@ -2586,7 +2596,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TYPE_SET: TYPE_SET, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf, srcType: srcType, moreFilter: moreFilter,
     filterForms: filterForms,

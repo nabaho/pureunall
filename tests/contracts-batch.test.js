@@ -44,7 +44,7 @@ test('ⓒⓔ 창 — 하나씩 차례로, 실패는 계속, contractPick·fillFo
   const o = cutFn(m, 'function openContracts(');
   assert.match(o, /host\.contractList\(/);
   assert.match(o, /host\.contractLoad\(/);
-  assert.match(o, /contractPick\(S\.forms, info\)/);
+  assert.match(o, /contractPick\(S\.forms, Object\.assign\(\{ sets: S\.sets \}, info\)\)/);
   assert.match(o, /fillFormOnce\(/);
   assert.match(o, /host\.zip\(/);
   assert.match(o, /\.reduce\(function \(p, /, '계약을 한꺼번에 채웁니다 — 하나씩 차례로');

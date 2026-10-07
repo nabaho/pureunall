@@ -90,7 +90,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=25"></script>
+<script src="js/pu-contract-forms.js?v=26"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -2840,7 +2840,7 @@ var FB_ALL_SYNC_KEYS = [
   'month_close_log',
   'policy_leave','policy_loa','policy_perf','policy_special_leave','policy_vat',
   'pension_policy','security_perms',
-  'payroll_irregular','contract_forms','dc_contributions','biz_cases',
+  'payroll_irregular','contract_forms','contract_form_sets','dc_contributions','biz_cases',
   'payer_aliases','expense_cat_aliases',
   'gcal_mail_sid',   // 구글 계정(만든이 메일) ↔ 직원 — 한 번 이어 주면 색·거르기가 정확해진다
   'bank_processed','combo_whitelist','cms_ledger',
@@ -40368,10 +40368,25 @@ function ContractFormPrintModal(props){
     var f = allForms.filter(function(x){ return x.id === id; })[0];
     return !(f && String(f.groupName||'').trim() === PROPOSAL_GROUP_NAME);
   }
+  /* 업무 유형 → 계약서등관리 세트 (2026-10-07 「세트 한 곳」) — 계약서등관리에서 고친 세트를 그대로 읽는다.
+     ⚠ js/pu-contract-forms.js TYPE_SET 과 글자가 같아야 한다(tests/erp-contract-fill.test.js). 못 읽으면 아래 옛 고정 목록 */
+  var ERP_TYPE_SET = { company: { '자문':'fs-advisory', '급여':'fs-payroll', '노조':'fs-union' }, fund: { '*':'fs-fund' } };
+  function erpSetIds(kv, typeCode){
+    var m = ERP_TYPE_SET[kv]; if(!m) return null;
+    var id = m[typeCode] || m['*']; if(!id) return null;
+    var sets = [];
+    try { sets = (window.PuContractForms && PuContractForms.setsOf) ? PuContractForms.setsOf(dbGet('contract_form_sets', null)) : []; } catch(e){ sets = []; }
+    var st = sets.filter(function(s){ return s && s.id === id; })[0];
+    return st && (st.formIds||[]).length ? st.formIds.slice() : null;
+  }
   var initSelMap = {};
   kindsArr.forEach(function(kv){
     var allIds = formsForKind(kv).map(function(f){return f.id;});
-    if(kv === 'company' && _typeCode === '자문'){
+    var setIds = erpSetIds(kv, kv === 'company' ? _typeCode : '*');
+    if(setIds){
+      var inSet = setIds.filter(function(id){ return allIds.indexOf(id) >= 0; });
+      initSelMap[kv] = inSet.length > 0 ? inSet : allIds;
+    } else if(kv === 'company' && _typeCode === '자문'){
       var advisorySet = ['fm-pr-advisory','fm-pr-cms'];
       var sel = allIds.filter(function(id){return advisorySet.indexOf(id)>=0;});
       initSelMap[kv] = sel.length > 0 ? sel : allIds;
