@@ -7363,6 +7363,23 @@ function noteOneLine(short, why, whyLabel) {
      그래서 «여기서 미리 본 것»과 «실제로 올라가는 것»이 다를 수 없다.
    ★ 얼굴 사진은 홈페이지 것을 그대로 이어받는다(우리는 사진을 갖고 있지 않다).
      사진을 못 찾은 사람은 «올리지 않고» 이름을 알린다. */
+/* 새 홈페이지 «구성원 소개»에 갈 사람인가 (2026-10-07).
+   빠지는 사람: «새 홈페이지에 빼기» · 자동으로 내린 표시(takenDown) · 퇴사(남기기 사유가 없는).
+   ★ 퇴사는 직원 번호(sid)로 이었으면 그 번호로, 아직 안 이었으면 명부 딱지(이름)로 본다.
+   ★ 휴직은 퇴사가 아니다. 명부를 못 읽었으면 퇴사를 지어내지 않는다(간다). */
+function 새홈페이지에갈사람(rec) {
+  const r = rec || {};
+  if (offSiteOf(r) || r.takenDown) return false;
+  if (keptOf(r)) return true;
+  if (!Array.isArray(App.staff)) return true;
+  if (r.sid) {
+    const p = App.staff.filter(s => s && s.sid === r.sid)[0];
+    if (p) return !(p.left || String(p.status || '') === 'retired');
+  }
+  const 딱지 = rosterMarkOf(r.name);
+  return !(딱지 && 딱지.kind === 'left');
+}
+
 async function publishPeople() {
   if (App.publishing) return;
   if (!App.isAdmin) { await say('총괄관리자만 올릴 수 있습니다', ''); return; }
@@ -7373,9 +7390,13 @@ async function publishPeople() {
     if (!res.ok) throw new Error('지금 홈페이지 쪽을 읽지 못했습니다 (' + res.status + ')');
     const 지금쪽 = await res.text();
 
-    /* ★ 「안 올림」으로 표시한 사람은 빼고 넘긴다 — 사람이 이미 정한 것이다 */
+    /* ★ 「안 올림」·퇴사자는 빼고 넘긴다 (퇴사 빼기 2026-10-07 — 주소를 옮기기 전에 견줘 보니
+         퇴사한 두 분이 새 홈페이지에 그대로 있었다. 이 단추가 퇴사를 안 봤다). */
+    const 퇴사로뺀 = Object.keys(App.members)
+      .filter(k => !offSiteOf(App.members[k]) && !새홈페이지에갈사람(App.members[k]))
+      .map(k => App.members[k].name || k);
     const ours = Object.keys(App.members)
-      .filter(k => !offSiteOf(App.members[k]))
+      .filter(k => 새홈페이지에갈사람(App.members[k]))
       .map(k => Object.assign({}, App.members[k], { key: k }));
     const 고른것 = PuSitePeople.올릴사람(지금쪽, ours);
     if (!고른것.갈것.length) {
@@ -7396,6 +7417,7 @@ async function publishPeople() {
       '구성원 ' + 고른것.갈것.length + '명으로 «구성원 소개» 쪽을 다시 만듭니다.\n' +
       고른것.갈것.map(p => '· ' + p.이름 + (p.직책1 ? ' ' + p.직책1 : '') + ' · 경력 ' + p.경력.length + '줄').join('\n') +
       (고른것.못갈것.length ? '\n\n[못 올리는 사람]\n' + 고른것.못갈것.map(x => '· ' + x.이름 + ' — ' + x.why).join('\n') : '') +
+      (퇴사로뺀.length ? '\n\n[퇴사로 뺀 사람]\n' + 퇴사로뺀.map(n => '· ' + n).join('\n') : '') +
       '\n\n올리면 1~2분 뒤 홈페이지에 뜹니다.', '올리기');
     if (!ok) return;
 
