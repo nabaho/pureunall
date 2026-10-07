@@ -206,3 +206,30 @@ test('ⓕ 원본 모양 — 한글은 rhwp, 엑셀은 미리보기 PDF(보관함
   assert.match(hs, /hwp\|hwpx\|xlsx/, '채울 원본은 한글·엑셀만 — 미리보기 PDF 가 채울 원본으로 섞이면 안 된다');
   assert.ok(!/pdf/.test(hs), '미리보기 PDF 가 채울 원본으로 섞이면 안 된다');
 });
+
+/* 2026-10-07 기업정보함 「📄 계약서 만들기」 (목업 승인) */
+test('ⓖ 계약서 만들기 — 종류별 세트는 이알피 계약서 출력과 같은 규칙, 견적서는 체크하지 않는다', () => {
+  const P = loadCF();
+  const F = [
+    { id: 'fm-pr-advisory', kind: 'company', name: '자문계약서', body: '' }, { id: 'fm-pr-cms', kind: 'company', name: 'CMS', body: '' },
+    { id: 'fm-pr-payroll', kind: 'company', name: '급여위임', body: '' }, { id: 'fm-pr-pension', kind: 'company', name: '국민연금', body: '' },
+    { id: 'fm-pr-health', kind: 'company', name: '건강', body: '' }, { id: 'fm-pr-employment', kind: 'company', name: '고용', body: '' },
+    { id: 'q1', kind: 'company', name: '자문 견적서', groupName: '제안서·견적서', body: '' },
+    { id: 'c1', kind: 'case', name: '위임약정서', body: '' }, { id: 'c2', kind: 'case', name: '체당금 위임장', groupName: '체당금', body: '' },
+    { id: 'off', kind: 'consulting', name: '꺼진 양식', enabled: false, body: '' }];
+  assert.deepStrictEqual(out(P.makePlan(F, 'adv').checked), ['fm-pr-advisory', 'fm-pr-cms']);
+  assert.deepStrictEqual(out(P.makePlan(F, 'pay').checked), ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms']);
+  assert.ok(P.makePlan(F, 'adv').list.some(f => f.id === 'q1') && P.makePlan(F, 'adv').checked.indexOf('q1') < 0, '견적서는 목록에만, 체크는 안 한다');
+  assert.deepStrictEqual(out(P.makePlan(F, 'case').checked), ['c1'], '사건은 일반 양식만(체당금 묶음은 따로)');
+  assert.deepStrictEqual(out(P.makePlan(F, 'con').list), [], '꺼진 양식은 안 보인다');
+});
+test('ⓖ 계약서 만들기 배선 — 기업정보함은 회사 열쇠만 실어 열고, 문서관리는 그 회사를 골라 둔다', () => {
+  const cards = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
+  assert.match(cards, /function openContractFor\(k\)\{[\s\S]*?docs-esign\.html#forms:make=' \+ encodeURIComponent\(k\)/);
+  assert.match(cards, /onclick="openContractFor\(this\.dataset\.k\)">📄 계약서 만들기/);
+  const html = fs.readFileSync(path.join(__dirname, '..', 'docs-esign.html'), 'utf8');
+  assert.match(html, /make: makeFromHash\(\)/); assert.match(html, /#forms:make='\) === 0\) return null;/, '회사 열쇠를 양식 번호로 읽으면 안 된다');
+  const s = stripJs(CF);
+  assert.match(s, /var preKey = host\.propose \|\| host\.make \|\|/);
+  assert.match(s, /if \(host\.make && !S\.made\) \{ S\.made = true; openMake\(\); \}/);
+});
