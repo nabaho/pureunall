@@ -82491,13 +82491,24 @@ function StaffRoster(){
   var standbyCount   = users.filter(function(u){return u.status==='standby';}).length;
   var retiredCount   = users.filter(function(u){return u.status==='retired';}).length;
   var scheduledCount = users.filter(function(u){return u.status==='scheduled';}).length;
-  var lawyerCount   = users.filter(function(u){return effStatus(u)==='active' && (u.sid||'').startsWith('P-');}).length;
-  var staffCount    = users.filter(function(u){return effStatus(u)==='active' && (u.sid||'').startsWith('A-');}).length;
+  /* 노무사·직원 가르기 (대표 지시 2026-10-06 「노무사인 경우 P·T 같이 나오고 직원도 A·T」).
+     T- 는 예전 사번 체계의 퇴직자들이다(19명, 모두 퇴직) — 사번만 보면 노무사·직원 어느 쪽에도 안 들어가
+     「퇴직 + 노무사」가 P 두 명뿐으로 보였다. T- 는 직책(title) 칸으로 가른다: 「노무사」면 노무사, 아니면 직원.
+     ⚠ isLawyerByUser 를 쓰지 않는다 — 그것은 관리자(대표노무사 P-001)를 노무사에서 «빼는» 잣대(배분율·담당 고르기용)라,
+       명부에서 쓰면 대표노무사가 직원 쪽으로 간다. */
+  function roleOf(u){
+    var s = (u && u.sid) || '';
+    if(s.indexOf('P-') === 0) return 'lawyer';
+    if(s.indexOf('A-') === 0) return 'staff';
+    return /노무사/.test((u && u.title) || '') ? 'lawyer' : 'staff';
+  }
+  var lawyerCount   = users.filter(function(u){return effStatus(u)==='active' && roleOf(u)==='lawyer';}).length;
+  var staffCount    = users.filter(function(u){return effStatus(u)==='active' && roleOf(u)==='staff';}).length;
 
   var filtered = users.filter(function(u){
     if(statusTab !== 'all' && effStatus(u) !== statusTab) return false;
-    if(roleTab === 'lawyer' && !(u.sid||'').startsWith('P-')) return false;
-    if(roleTab === 'staff'  && !(u.sid||'').startsWith('A-')) return false;
+    if(roleTab === 'lawyer' && roleOf(u) !== 'lawyer') return false;
+    if(roleTab === 'staff'  && roleOf(u) !== 'staff') return false;
     if(query){
       var qq = query.toLowerCase();
       return (u.name||'').indexOf(query) >= 0
@@ -82984,7 +82995,7 @@ function StaffRoster(){
           h('button', { className:'btn-primary', onClick:openAdd }, '+ 근로자 등록')
         ),
         h('div', { style:{ display:'flex', gap:'4px', marginBottom:'12px' } },
-          [{v:'all',label:'전체'},{v:'lawyer',label:'⚖️ 노무사 (P-)'},{v:'staff',label:'🗂️ 직원 (A-)'}].map(function(t){
+          [{v:'all',label:'전체'},{v:'lawyer',label:'⚖️ 노무사 (P·T)'},{v:'staff',label:'🗂️ 직원 (A·T)'}].map(function(t){
             var on = roleTab === t.v;
             return h('button', { key:t.v, onClick:function(){ setRoleTab(t.v); },
               style:{ padding:'4px 14px', borderRadius:'5px', fontSize:'11.5px', cursor:'pointer', fontWeight:on?700:400,
@@ -83002,7 +83013,7 @@ function StaffRoster(){
               var stColor = es==='leave'?'#d97706':es==='retired'?'#dc2626':es==='scheduled'?'#16a34a':'#1e40af';
               var stBg = es==='leave'?'#fffbeb':es==='retired'?'#fef2f2':es==='scheduled'?'#f0fdf4':'#eff6ff';
               var stLabel = es==='leave'?'🏠 휴직':es==='retired'?'퇴직':es==='scheduled'?'📅 입사예정':'재직';
-              var isLawyer = u.sid && u.sid.startsWith('P-');
+              var isLawyer = roleOf(u) === 'lawyer';
               return h('div', { key:u.sid, onClick:function(){ setDetailModal(u); },
                 style:{ background:'#fff', border:'1px solid #e2e8f0',
                   borderLeft:'4px solid '+stColor,
