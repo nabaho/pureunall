@@ -163,6 +163,7 @@ test('★ 목록 표는 이름을 가리지 않는다', () => {
   const rowTpl = cfg.slice(cfg.indexOf('row:'));
   assert.ok(rowTpl.indexOf('row:') === 0, 'row 템플릿을 찾아야 합니다');
   assert.ok(rowTpl.indexOf('mask') < 0, '목록에서 가리면 안에서 일을 할 수 없습니다');
-  assert.match(rowTpl, /\$\{r\.org\|\|'-'\}/, '목록은 고객사 이름을 그대로 보여 준다');
+  /* 「그대로」 = 가리지 않는다는 뜻 — 화면용 감싸기(escapeHtml)는 글자를 바꾸지 않으므로 함께 받는다(2026-10-07) */
+  assert.match(rowTpl, /\$\{(escapeHtml\()?r\.org\|\|'-'\)?\}/, '목록은 고객사 이름을 그대로 보여 준다');
   assert.match(cfg, /exportMask/, '가림은 내보내는 자리에만 걸려 있어야 한다');
 });
