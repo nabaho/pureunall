@@ -15,7 +15,7 @@
 - 검사: `tests/mail-fill-core-in-sync.test.js`(사본·다듬개 같음, 관문과 같은 도장, 채우는 것·안 채우는 것 12가지, 부르는 자리).
   옛 메일 검사 12개 파일이 상자에 공용 셈을 불러오게 손봄.
 
-## 배포
+## 배포 — 끝 (2026-10-07)
 
-합친 뒤 `firebase deploy --only functions:syncMailbox,functions:pullMailbox` — 안 올리면 서버 채우기가 안 돈다(화면 쪽은 그대로 돈다).
+#2154 합친 뒤 `firebase deploy --only functions:syncMailbox,functions:pullMailbox` 로 올렸다. 첫 회차(19:20) 정상 종료.
 ⚠ `js/pu-mail-fill-core.js` 를 고치면 sync 를 돌리고 이 둘을 다시 올린다.
