@@ -1157,7 +1157,7 @@ ok('조각은 계정과 금액이 있어야 조각이다',
 // 검증한 열한 기금 모두 준비금1(법인세법 제29조)을 '현금 이자수익만큼 전입 후 환입'으로 적었다
 // 순이익·대차에는 영향이 없지만 손익계산서의 사업외수익·비용에 나타나야 제출본과 맞는다
 ok('준비금1 전입액을 이자수익만큼 자동 생성',
-  src.includes("if(!x.approved||x.credit!=='이자수익') return;")
+  src.includes("if(!x.approved||(x.credit!=='이자수익'&&x.credit!=='대부이자수익')) return;")
   && src.includes('interestCash:Math.round(itc)')
   && src.includes("out.push({id:'rsv1set'+yr, e:_reserveEntry(yr,'전입',it,R1)});")
   && src.includes("out.push({id:'rsv1in'+yr, e:_reserveEntry(yr,'환입',it,R1)});"));
