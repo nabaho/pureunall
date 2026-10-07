@@ -109,11 +109,11 @@ function load(o) {
     cut('monthNum'), cut('guessMonth'), cut('ymOf'), cut('hubCounts'), cut('nameState'), cut('linkStats'), cut('staffOf'),
     'var VAR_PCT = 0.20;',
     /* 주민번호 칸(2026-10-07) — 서버 없이: 받기는 건너뛰고 「불러오는 중」으로 그린다 */
-    'var fbDb = null, ready = false, rrnBox = {}, rrnBusy = {};',
+    'var fbDb = null, ready = false, rrnBox = {}, rrnBusy = {}, lockLogBox = {}, lockLogBusy = {};',
     cutVar('TABS'), cutVar('TOOLS'), cutVar('TAB_FN'), cutVar('FILINGS'), cutVar('FILING_WHO'),
     cut('filingOf'), cut('filingUnset'), cut('setFiling'), cut('filingHtml'),
     ['ymNow', 'ymParts', 'ymText', 'inboxYm', 'coArrivals', 'coState', 'sitesHaveSever', 'byKoName', 'shellModel', 'curView',
-      'viewbarHtml', 'toolRow', 'colistHtml', 'horizonNote', 'dataHorizon', 'defaultYm', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'monthRecsFor', 'coMoney', 'manwon', 'empsMonth', 'insOf', 'coVariance', 'varianceHtml', 'fbk', 'rrnValid', 'rrnMask', 'birthOfMask', 'ensureRrn', 'rrnRec', 'rrnPanelHtml', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
+      'viewbarHtml', 'toolRow', 'colistHtml', 'horizonNote', 'dataHorizon', 'defaultYm', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'monthRecsFor', 'coMoney', 'manwon', 'empsMonth', 'insOf', 'coVariance', 'varianceHtml', 'fbk', 'rrnValid', 'rrnMask', 'birthOfMask', 'ensureRrn', 'rrnRec', 'rrnPanelHtml', 'ensureLockLog', 'lockLogHtml', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
     'globalThis.M = function(){ return shellModel(); };',
     'globalThis.peek = function(){ return { App: App, CALLS: CALLS, EMP_CALLS: EMP_CALLS, FILING: FILING }; };',
   ].join('\n')).runInContext(sandbox);

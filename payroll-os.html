@@ -528,8 +528,27 @@ function dedupeEmps(list){
 function empCount(r){ var e=empsOf(r); return (e&&e.length)?dedupeEmps(e).length:(r.직원수||0); }
 function lockKey(site,month){ return site+'|'+month; }
 function isLocked(site,month){ var L=dbGet('payroll_locked',{})||{}; return !!L[lockKey(site,month)]; }
+/* ══════ 확정 기록 — 2026-10-07 (보고서 「계산자≠확정자·감사 로그」 중 기록 부분) ══════
+   확정 잠금은 «시각»만 남겨, 누가 확정했는지·누가 왜 되돌렸는지 알 길이 없었다. 분쟁 때 「누가 언제
+   이 급여를 확정했나」가 증빙이다. 그래서 확정·되돌리기·일괄 확정마다 회사별 기록을 하나씩 쌓는다.
+     payroll_os/lock_log/{사업장}/{push} = {months:[…], action:'확정'|'되돌리기'|'일괄 확정', by, at, why}
+   ⚠ 되돌릴 때는 사유가 있어야 되돌린다 — 확정된 급여를 고치는 것은 명세서가 이미 나갔을 수 있는 일이다.
+   ⚠ 잠금 저장(payroll_locked)의 꼴은 그대로 둔다 — 신호·명세서·relockFor 가 그 꼴에 기댄다. */
+function lockLog(site, months, action, why){
+  if(!fbDb||!site) return;
+  try{ fbDb.ref(ROOT+'/lock_log/'+String(site).replace(/[.#$\[\]\/]/g,'_')).push(
+    {months:months, action:action, by:(me&&me.email)||'', at:Date.now(), why:why||''}); }catch(e){ console.warn('[확정 기록]', e); }
+}
 function toggleLock(site,month){ var L=dbGet('payroll_locked',{})||{}; var k=lockKey(site,month);
-  if(L[k]){ if(!confirm('확정을 되돌릴까요?')) return; delete L[k]; } else { if(!confirm(site+' '+month+' 급여를 확정할까요? (되돌리기 가능)')) return; L[k]=Date.now(); }
+  if(L[k]){
+    var why=prompt('확정을 되돌립니다 — 사유를 적어 주세요(기록에 남습니다)\n예: 수당 누락으로 재계산','');
+    if(why==null) return;
+    if(!String(why).trim()){ alert('사유가 없어 되돌리지 않았습니다.'); return; }
+    delete L[k]; lockLog(site,[month],'되돌리기',String(why).trim());
+  } else {
+    if(!confirm(site+' '+month+' 급여를 확정할까요? (되돌리기 가능)')) return;
+    L[k]=Date.now(); lockLog(site,[month],'확정','');
+  }
   dbSet('payroll_locked', L); }
 
 /* ── 예외 중심 검토: 데이터 완전성 반영 신호 + 초록 일괄확정 + 필터 ──
@@ -564,7 +583,36 @@ function lockAllGreen(site){
   if(!confirm(site+' — 초록(이상없음) '+t.length+'건을 한 번에 확정할까요?\n(주황·빨강·데이터부족은 제외됩니다. 되돌리기 가능)')) return;
   var L=dbGet('payroll_locked',{})||{};
   t.forEach(function(r){ L[lockKey(site,r.월)]=Date.now(); });
+  lockLog(site, t.map(function(r){ return r.월; }), '일괄 확정', '초록(이상없음)만');
   dbSet('payroll_locked', L);
+}
+/* 회사 한 장(한눈에)에 보일 확정 기록 — 그 회사 것만 받는다 */
+var lockLogBox={}, lockLogBusy={};
+function ensureLockLog(site){
+  if(!site||lockLogBox[site]!==undefined||lockLogBusy[site]||!fbDb) return;
+  lockLogBusy[site]=1;
+  fbDb.ref(ROOT+'/lock_log/'+String(site).replace(/[.#$\[\]\/]/g,'_')).limitToLast(10).once('value').then(function(sn){
+    var v=sn.val()||{}; lockLogBox[site]=Object.keys(v).map(function(k){ return v[k]; }).sort(function(a,b){ return (b.at||0)-(a.at||0); });
+    delete lockLogBusy[site]; if(ready) render();
+  }).catch(function(e){ delete lockLogBusy[site]; lockLogBox[site]=[]; console.warn('[확정 기록]', e&&e.code); });
+}
+function lockLogHtml(site){
+  if(!site) return '';
+  ensureLockLog(site);
+  var list=lockLogBox[site];
+  var h='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">'
+    +'<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>확정 기록</b> <span style="font-size:12px;color:var(--sub)">누가·언제 확정하고 되돌렸나 (최근 10건)</span></div>';
+  if(list===undefined) return h+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">불러오는 중…</div></div>';
+  if(!list.length) return h+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">아직 기록이 없습니다 — 이 기능 이전의 확정은 시각만 남아 있습니다.</div></div>';
+  list.forEach(function(x){
+    var d=new Date(x.at||0), when=d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2)+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2);
+    h+='<div style="display:flex;gap:10px;padding:7px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
+      +'<span style="width:120px;color:var(--sub)">'+when+'</span>'
+      +'<b style="width:70px;'+(x.action==='되돌리기'?'color:var(--warn)':'')+'">'+(x.action||'')+'</b>'
+      +'<span style="flex:1">'+(x.months||[]).join(', ')+(x.why?(' · <span style="color:var(--sub)">'+x.why+'</span>'):'')+'</span>'
+      +'<span style="color:var(--sub)">'+String(x.by||'').split('@')[0]+'</span></div>';
+  });
+  return h+'</div>';
 }
 function toggleOnlyReview(){ App.onlyReview=!App.onlyReview; render(); }
 
@@ -2682,7 +2730,7 @@ function shellSummary(m, co, sites){
   h+=row('🎓','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'', 'sever');
   h+=row('📄','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'', 'slip');
   h+=row('📑','신고', '일용 매월신고 · 취득상실 · 퇴직정산 · 연차', '', 'report');
-  return h+'</div>'+varianceHtml(sites, m.ym)+filingHtml(co)+rrnPanelHtml(sites, m.ym);
+  return h+'</div>'+varianceHtml(sites, m.ym)+filingHtml(co)+rrnPanelHtml(sites, m.ym)+lockLogHtml(App.site);
 }
 /* ══════ 신고 담당 — 2026-10-07 대표 「순서대로」 4번 ══════
    노무법인은 근로내용확인신고·4대보험을, 고객의 기장 세무사는 원천세·지급명세서를 맡는 경우가 많다.
