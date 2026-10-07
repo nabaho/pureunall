@@ -28,7 +28,7 @@ const 재료 = () => ({
 });
 
 test('★★ ① 한 장에 맞춘다 — 넘치면 «최근 N»을 줄이고 줄인 만큼 밝힌다', () => {
-  const m = P1.build(재료(), { use: 'general' });
+  const m = P1.build(재료(), { use: 'general', on: { perf: true } });   /* 실적은 켰을 때만 — ⑤ */
   assert.ok(m.lines <= P1.BUDGET, '★ 한 장을 넘으면 «1장 정리»가 아니다: ' + m.lines);
   const by = {}; m.sections.forEach((x) => { by[x.key] = x; });
   assert.equal(by.perf.n, 120, '배제한 실적은 세지 않는다');
@@ -53,7 +53,7 @@ test('★★ ② 금액·주민번호·생년월일·계좌는 들어갈 길이 
 });
 
 test('③ 용도에 따라 몫이 달라진다 · 끈 칸은 안 나온다 · 글자는 감싼다', () => {
-  const 위 = P1.build(재료(), { use: 'committee' }), 컨 = P1.build(재료(), { use: 'consultant' });
+  const 위 = P1.build(재료(), { use: 'committee', on: { perf: true } }), 컨 = P1.build(재료(), { use: 'consultant' });
   const s = (m, k) => m.sections.find((x) => x.key === k).show;
   assert.ok(s(위, 'wic') > s(컨, 'wic'), '위원 신청용은 위촉을 더');
   assert.ok(s(컨, 'perf') > s(위, 'perf'), '컨설턴트 모집용은 실적을 더');
@@ -61,6 +61,78 @@ test('③ 용도에 따라 몫이 달라진다 · 끈 칸은 안 나온다 · �
   assert.ok(!끔.sections.some((x) => x.key === 'lec'));
   const x = 재료(); x.wiccok = [{ type: '위촉장', org: '<b>가나</b>', titleVal: '위원', issueDate: '2026.1.1' }];
   assert.doesNotMatch(P1.toHtml(P1.build(x, {}), ''), /<b>가나<\/b>/, '기록 글자가 태그로 돌면 안 된다');
+});
+
+test('★★ ⑤ 숫자 칸(KPI)·컨설팅 실적은 기본으로 안 넣는다 (대표 2026-10-07 「kpi 필요없다 · 컨설팅실적은 필요없고」)', () => {
+  const m = P1.build(재료(), { use: 'general' });
+  assert.ok(!m.sections.some((x) => x.key === 'perf'), '★ 켜지 않았는데 실적이 나온다');
+  assert.equal(m.perfByYear, '', '실적을 안 넣으면 «연도별» 줄도 없다');
+  const 글 = P1.toHtml(m, '');
+  assert.doesNotMatch(글, /class="kp"/, '★ 숫자 칸이 다시 그려진다');
+  assert.doesNotMatch(글, /컨설팅 실적/);
+  /* 사람이 켜면 나오고, 컨설턴트 모집용은 저절로 — 화면 고르기 칸도 같은 판정(isOn)을 본다 */
+  assert.ok(P1.build(재료(), { use: 'general', on: { perf: true } }).sections.some((x) => x.key === 'perf'));
+  assert.ok(P1.build(재료(), { use: 'consultant' }).sections.some((x) => x.key === 'perf'));
+  assert.equal(P1.isOn('perf', { perf: false }, 'consultant'), false, '컨설턴트용이라도 끄면 끈다');
+  assert.equal(P1.isOn('lec', {}, 'general'), true);
+  const side = bare.slice(bare.indexOf('function renderProfile1('), bare.indexOf('function _p1Scale('));
+  assert.match(side, /KcareerProfile1\.isOn\(S\.key, o\.on, o\.use\)/, '고르기 칸이 따로 판정하면 화면과 종이가 어긋난다');
+  const hw = bare.slice(bare.indexOf('function _p1Bytes('), bare.indexOf('function p1Hwpx('));
+  assert.doesNotMatch(hw, /kpis/, '한글 문서에도 숫자 요약을 넣지 않는다');
+});
+
+test('★★ ⑥ 주요 직책(전·현) — 사람이 적은 줄에 (전)/(현)을 붙여 위촉·위원 바로 위에', () => {
+  const r = (l) => P1.roleRow(l, 2026);
+  assert.deepEqual(r('2019~2021 가나지방공인노무사회 회장'), ['2019~2021', '(전) 가나지방공인노무사회 회장']);
+  assert.deepEqual(r('2024~ 다라위원회 위원'), ['2024~', '(현) 다라위원회 위원'], '「~」로 열려 있으면 현직');
+  assert.deepEqual(r('다라위원회 위원장 (2025~2027)'), ['2025~2027', '(현) 다라위원회 위원장'], '끝이 올해 이후면 현직 · 기간이 뒤에 와도');
+  assert.deepEqual(r('(전) 가나시 자문위원'), ['', '(전) 가나시 자문위원'], '사람이 적은 것은 겹쳐 붙이지 않는다');
+  assert.deepEqual(r('2018 가나협회 이사'), ['2018', '가나협회 이사'], '한 해만 적으면 전·현을 단정하지 않는다');
+  assert.equal(r('   '), null);
+  const m = P1.build(재료(), { use: 'general', roles: '2019~2021 가나지방공인노무사회 회장\n\n2024~ 다라위원회 위원', now: new Date(2026, 9, 7) });
+  const keys = m.sections.map((x) => x.key);
+  assert.equal(keys.indexOf('role') + 1, keys.indexOf('wic'), '위촉·위원 바로 위');
+  const 직 = m.sections.find((x) => x.key === 'role');
+  assert.equal(직.n, 2, '빈 줄은 버린다'); assert.equal(직.more, 0, '사람이 고른 직책은 줄이지 않는다');
+  const 글 = P1.toHtml(m, '');
+  assert.ok(글.indexOf('(전) 가나지방공인노무사회 회장') > 0 && 글.indexOf('(전) 가나지방공인노무사회 회장') < 글.indexOf('위촉·위원'));
+  assert.ok(!P1.build(재료(), { roles: '' }).sections.some((x) => x.key === 'role'), '안 적으면 칸도 없다');
+});
+
+test('★★ ⑦ 남는 자리를 «채운다» — 재어 보고 한 줄씩 늘리다 넘치면 그 줄만 되돌린다', () => {
+  const 쟤 = (cap) => (m) => P1.lines(m) <= cap;          /* 진짜 화면 대신 «줄 수 한도»로 재는 흉내 */
+  const 기본 = P1.build(재료(), { use: 'general' });
+  const 전 = 기본.lines;
+  const m = P1.fill(P1.build(재료(), { use: 'general' }), 쟤(전 + 10));
+  assert.ok(m.lines > 전 && m.lines <= 전 + 10, '★ 자리가 남는데 안 늘었다(또는 넘쳤다): ' + 전 + '→' + m.lines);
+  const by = {}; m.sections.forEach((x) => { by[x.key] = x; });
+  assert.equal(by.lec.more, 0, '★ 「외 N건」이 붙은 채 자리가 남던 그것 — 강의 9건이 다 들어가야 한다');
+  m.sections.forEach((x) => assert.equal(x.rows.length, x.show, '보이는 줄과 셈이 어긋나면 안 된다'));
+  assert.equal(m.overflow, false); assert.equal(m.filled, true);
+  /* 늘릴 자리가 없으면 그대로 · 처음부터 넘치면 늘리지 않고 넘친다고 말한다 */
+  const 꽉 = P1.fill(P1.build(재료(), { use: 'general' }), 쟤(전));
+  assert.equal(꽉.lines, 전);
+  const 넘 = P1.fill(P1.build(재료(), { use: 'general' }), () => false);
+  assert.equal(넘.overflow, true);
+  /* 재는 함수가 없으면(한글 문서 · Node) 셈 그대로 */
+  assert.equal(P1.fill(P1.build(재료(), {}), null).lines, 전);
+});
+
+test('⑧ 화면 배선 — 미리보기·PDF 는 «재어서 채운 것», 사진은 이력서 «사진 넣기»와 같은 길', () => {
+  const mod = bare.slice(bare.indexOf('function _p1Model('), bare.indexOf('function renderProfile1('));
+  assert.match(mod, /KcareerProfile1\.fill\(m, fits\)/);
+  assert.match(mod, /roles:o\.roles/);
+  const fits = bare.slice(bare.indexOf('function _p1Fits('), bare.indexOf('function _p1Model('));
+  assert.match(fits, /offsetHeight<=1017-\d+/, '쓸 자리(A4 1123 − 여백 53×2)보다 작게 재야 인쇄에서 두 장이 안 된다');
+  assert.match(fits, /width:688px/, '재는 너비 = A4 794 − 여백 53×2');
+  assert.match(bare, /function renderProfile1\(\)\{[\s\S]*?m=_p1Model\(\{ page:true \}\)/);
+  assert.match(bare, /function p1Pdf\(\)\{\s*var o=_p1Load\(\), m=_p1Model\(\{ page:true \}\)/, 'PDF 가 미리보기와 다른 줄 수면 안 된다');
+  /* 사진 — fileURLAsync 는 «data: 머리» 달린 사진을 못 풀어 조용히 비었다 */
+  const side = bare.slice(bare.indexOf('function renderProfile1('), bare.indexOf('function _p1Scale('));
+  assert.match(side, /_rhPhotoPng\(pid, 70\/90\)/);
+  assert.doesNotMatch(side, /fileURLAsync/);
+  assert.match(side, /_p1PhotoWhy/, '사진을 못 넣으면 까닭을 말한다');
+  assert.match(side, /onchange="p1Roles\(this\.value\)"/);
 });
 
 test('★★ ④ 지난 이력서 — 무엇을 잡고 무엇을 빼나 · 같은 내용은 한 번 · 이미 들인 것은 다시 안', () => {
