@@ -26003,7 +26003,19 @@ function cntUnskip(key, quiet){
   mbNewBust(); mnewBust();
   if(!quiet){ toast('↩ 다시 묻습니다 — ' + key.replace(/,/g, '.')); cntRepaint(); }
 }
+/* ✉ 신규 문의 메일 보기 — 기업정보함 문에서는 «메일함 앱 창»에서 연다
+   (대표 지시 2026-10-07 「메일함을 보일 필요없다 … 2중으로 할 필요없다」 → 「추천대로」).
+   그 사람 주소로 메일함을 찾아 연다(?view=mail&q= — 이알피 「✉ 메일 보기」와 같은 길).
+   ⚠ 메일 문(?view=mail) 안에서는 예전처럼 그 자리에서 연다 — 이미 메일함이다. */
 function cntOpenMail(key){
+  if(state.view === 'cnt' && !urlWantsMail()){
+    const r = mnewRow(key); if(!r || !r.em) return;
+    let w = null;
+    try{ w = window.open('pu-cards.html?view=mail&q=' + encodeURIComponent(r.em), MAIL_APP_WIN); }catch(_){}
+    if(!w) return toast('팝업이 막혀 열 수 없습니다 — 이 사이트의 팝업을 허용해 주세요', 8000);
+    try{ w.focus(); }catch(_){}
+    return;
+  }
   if(state.view === 'cnt'){ state.view = 'mail'; state.mailSent = 'mnew'; render(); }
   mnewOpenMail(key);
 }

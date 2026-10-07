@@ -12,4 +12,4 @@
   메뉴에서만 닿던 「🏢 사업장별」「📲 바탕화면 메일 아이콘」은 메일함 서랍으로 옮겼다.
 - 검사: 새 `cards-phone-five-tabs`(옛 코드에서 4개 다 운다), `cards-phone-mail`·`cards-menu-compact`·
   `mail-inbox-screen`·`cards-worker-count-unknown` 을 새 규칙에 맞춰 고침.
-- 남은 것: 연락처 정리의 ✉(신규 문의 메일 열기)는 아직 이 창 안 메일 화면으로 연다 — 대표가 쓰면서 보고 정할 것.
+- 연락처 정리의 ✉(신규 문의 메일 보기)도 기업정보함 문에서는 메일함 앱 창(?view=mail&q=주소)으로 연다(대표 「추천대로」).

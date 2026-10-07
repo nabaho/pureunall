@@ -79,3 +79,22 @@ test('★★ ④ 폰의 연락처 정리는 메일 화면으로 넘기지 않고
   /* 폰 render 가 그 화면으로 보낸다 */
   assert.match(fn('render'), /state\.view==='cnt'\) return renderCntPage\(\)/);
 });
+
+test('★★ ⑤ 연락처 정리의 ✉ 는 기업정보함 안에서 메일 화면을 열지 않는다 — 메일함 앱 창으로', () => {
+  const opened = [];
+  const ctx = {
+    state: { view: 'cnt' }, MAIL_APP_WIN: 'pureun-mail',
+    urlWantsMail: () => false,
+    mnewRow: () => ({ em: 'hong@example.com', slug: 'inbox', uid: '1' }),
+    window: { open: (u, n) => { opened.push([u, n]); return { focus() {} }; } },
+    toast() {}, render() { ctx._rendered = true; }, mnewOpenMail() { ctx._inPlace = true; },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(fn('cntOpenMail'), ctx);
+  ctx.cntOpenMail('k');
+  assert.equal(ctx.state.view, 'cnt', '★★ 기업정보함 화면이 메일 화면으로 바뀌었습니다');
+  assert.ok(!ctx._inPlace, '★★ 이 창 안에서 메일을 열었습니다');
+  assert.equal(opened.length, 1);
+  assert.match(opened[0][0], /view=mail&q=hong%40example\.com/);
+  assert.equal(opened[0][1], 'pureun-mail', '★ 메일함 창 이름이 다르면 창이 자꾸 새로 생깁니다');
+});
