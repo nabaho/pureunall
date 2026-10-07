@@ -45,7 +45,7 @@ test('ⓒ contractPick — 이알피 자동 체크와 같은 규칙', () => {
     { id: 'f1', kind: 'fund' }, { id: 'p1', kind: 'fund', groupName: '제안서·견적서' }, { id: 'off', kind: 'fund', enabled: false }
   ];
   assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company'], typeCode: '자문' })), ['fm-pr-advisory', 'fm-pr-cms']);
-  assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company'], typeCode: '급여' })), ['fm-pr-cms', 'fm-pr-payroll', 'fm-pr-pension']);
+  assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company'], typeCode: '급여' })), ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-cms'], '세트에 적힌 차례(2026-10-07 — 이알피도 같은 차례)');
   assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company'], typeCode: '' })), ['fm-pr-advisory', 'fm-pr-cms', 'fm-pr-payroll', 'fm-pr-pension', 'fm-2']);
   assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['case'], caseName: '체당금' })), ['c1']);
   assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['case'], caseName: '' })), ['c1', 'c2']);
@@ -75,7 +75,7 @@ test('ⓔ 화면 — 계약 자료 쓰는 중 칩(✕ 로 풀기), 처음 한 �
   assert.match(m, /if \(host\.contract && !S\.contractTried\)/);
   const o = cutFn(m, 'function openContract(');
   assert.match(o, /host\.contractLoad\(host\.contract\)/);
-  assert.match(o, /contractPick\(S\.forms, info\)/);
+  assert.match(o, /contractPick\(S\.forms, Object\.assign\(\{ sets: S\.sets \}, info\)\)/);
   assert.match(o, /S\.checked = ids\.slice\(\)/);
   const bar = cutFn(m, 'function listHead(');   // 2026-10-07 화면 개편 — 목록 칸 머리로
   assert.match(bar, /host\.contractCtx/);
@@ -91,4 +91,19 @@ test('ⓒ 사건유형 번호 → 이름이 이알피 BIZ_CASE_SEED 와 같은 �
   const f = cutFn(stripJs(DOCS), 'function formContractInfo(') + cutFn(stripJs(DOCS), 'async function formContractData(');
   assert.ok(!/biz_case_types/.test(f), '사건유형 표를 읽습니다 — 규칙에 이름 없는 자리');
   assert.match(f, /c\.caseType \|\| PuContractForms\.CASE_CODES\[caseCode\]/);
+});
+
+/* 2026-10-07 「세트 한 곳」 — 이알피 계약서 출력도 계약서등관리 세트를 읽는다 */
+test('ⓕ 세트 한 곳 — 업무 유형→세트 표가 두 쪽 같은 글자, 세트를 고치면 자동 체크도 바뀐다', () => {
+  const P = loadCF();
+  const s = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
+  const m = /var ERP_TYPE_SET = (\{[^\n]*\});/.exec(s);
+  assert.ok(m, '이알피에 업무 유형→세트 표가 없습니다');
+  assert.deepStrictEqual(JSON.parse(m[1].replace(/'/g, '"').replace(/(\w+):/g, '"$1":')), out(P.TYPE_SET));
+  assert.match(s, /'contract_forms','contract_form_sets'/, '이알피가 세트를 받아 오지 않습니다(동기화 목록)');
+  assert.match(s, /PuContractForms\.setsOf\(dbGet\('contract_form_sets', null\)\)/);
+  const F = [{ id: 'fm-pr-advisory', kind: 'company', name: 'a' }, { id: 'fm-pr-cms', kind: 'company', name: 'c' }, { id: 'x1', kind: 'company', name: 'x' }];
+  const sets = [{ id: 'fs-advisory', formIds: ['x1', 'fm-pr-advisory'] }];
+  assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company'], typeCode: '자문', sets })), ['x1', 'fm-pr-advisory'], '고친 세트를 따라야 한다');
+  assert.deepStrictEqual(out(P.contractPick(F, { kinds: ['company'], typeCode: '자문' })), ['fm-pr-advisory', 'fm-pr-cms'], '세트를 못 읽으면 옛 고정 목록');
 });
