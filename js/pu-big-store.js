@@ -101,6 +101,20 @@
       },
       put: function (k, v) { return tx('readwrite', function (s) { s.put(v, k); }); },
       del: function (k) { return tx('readwrite', function (s) { s.delete(k); }); },
+      /* 여러 칸을 «거래 하나»로 — 이알피 표 수십 개를 켤 때마다 칸마다 거래를 열면 켜는 시간이 는다 */
+      getMany: function (keys) {
+        return tx('readonly', function (s, set) {
+          var out = {};
+          set(out);
+          keys.forEach(function (k) {
+            var r = s.get(k);
+            r.onsuccess = function () { out[k] = (r.result === undefined ? null : r.result); };
+          });
+        });
+      },
+      putMany: function (map) {
+        return tx('readwrite', function (s) { Object.keys(map).forEach(function (k) { s.put(map[k], k); }); });
+      },
       close: function () { try { db.close(); } catch (_) {} }
     };
   }
@@ -132,7 +146,8 @@
   /* ── 켤 때: 칸마다 옛 자리를 먼저 옮기고(있으면 그것이 이긴다), 없으면 새 자리 값을 읽는다 ──
      돌려주는 것: { values:{key:값|null}, report:[{key,why,len}] }
      ⚠ 새 자리 읽기에 실패한 칸은 why:'idb-read' 로 적고 값은 null — 부르는 쪽이 «모른다»로 다룬다 */
-  function bootKeys(store, ls, keys) {
+  function bootKeys(store, ls, keys, cancelled) {
+    if (store && typeof store.getMany === 'function' && typeof store.putMany === 'function') return bootKeysBatch(store, ls, keys, cancelled);
     var values = {}, report = [];
     var chain = Promise.resolve();
     keys.forEach(function (key) {
@@ -155,6 +170,64 @@
       });
     });
     return chain.then(function () { return { values: values, report: report }; });
+  }
+
+  /* 묶어서 켜기 — 차례는 moveFromLs 와 «똑같다»: 읽기 → 쓰기(거래 하나) → 다시 읽어 견주기(거래 하나) → 그때만 지우기.
+     ⚠ cancelled() 가 참이면(시간 넘김으로 «못 씀»이 정해졌다) 옛 자리를 지우지 않는다 */
+  function bootKeysBatch(store, ls, keys, cancelled) {
+    var values = {}, report = [], lsVals = {}, toMove = {}, moveKeys = [], rest = [];
+    keys.forEach(function (k) {
+      var v = null, bad = false;
+      try { v = ls.getItem(k); } catch (_) { bad = true; }
+      if (bad) { values[k] = null; report.push({ key: k, why: 'ls-read', len: 0 }); return; }
+      lsVals[k] = v;
+      if (v != null) { toMove[k] = v; moveKeys.push(k); } else rest.push(k);
+    });
+    var moving = !moveKeys.length ? Promise.resolve() : Promise.resolve()
+      .then(function () { return store.putMany(toMove); })
+      .then(function () { return store.getMany(moveKeys); })
+      .then(function (back) {
+        moveKeys.forEach(function (k) {
+          var raw = toMove[k];
+          if (!back || back[k] !== raw) { values[k] = raw; report.push({ key: k, why: 'verify', len: raw.length }); return; }
+          var now;
+          try { now = ls.getItem(k); } catch (_) { now = raw; }
+          if (now !== raw) { values[k] = now; report.push({ key: k, why: 'changed', len: now ? now.length : 0 }); return; }
+          if (cancelled && cancelled()) { values[k] = raw; report.push({ key: k, why: 'cancelled', len: raw.length }); return; }
+          try { ls.removeItem(k); } catch (_) { values[k] = raw; report.push({ key: k, why: 'ls-remove', len: raw.length }); return; }
+          values[k] = raw; report.push({ key: k, why: 'ok', len: raw.length });
+        });
+      }, function () {
+        moveKeys.forEach(function (k) { values[k] = toMove[k]; report.push({ key: k, why: 'write', len: toMove[k].length }); });
+      });
+    return moving.then(function () {
+      if (!rest.length) return;
+      return store.getMany(rest).then(function (got) {
+        rest.forEach(function (k) {
+          var v = got ? got[k] : null;
+          values[k] = (typeof v === 'string') ? v : null;
+          report.push({ key: k, why: values[k] == null ? 'empty' : 'idb', len: values[k] ? values[k].length : 0 });
+        });
+      }, function () {
+        rest.forEach(function (k) { values[k] = null; report.push({ key: k, why: 'idb-read', len: 0 }); });
+      });
+    }).then(function () { return { values: values, report: report }; });
+  }
+
+  /* ── 한 칸만 «읽어 보기» — 이알피 밖의 앱(업무관리·기금·정부컨설팅)이 이알피 사본을 빌려 읽을 때 ──
+     옛 자리(localStorage)에 있으면 그것(옮기기 전이거나 옛 판 탭이 적은 것), 없으면 새 자리.
+     못 열면 null — 부르는 쪽은 서버를 읽는다. 옮기거나 지우지 않는다(읽기만). */
+  var _peekOpen = {};
+  function peek(key, opts) {
+    opts = opts || {};
+    var ls = opts.ls || (root && root.localStorage) || null;
+    try { var v = ls ? ls.getItem(key) : null; if (v != null) return Promise.resolve(v); } catch (_) {}
+    var name = opts.name || DB_NAME;
+    var p = opts.open ? Promise.resolve().then(opts.open) : (_peekOpen[name] || (_peekOpen[name] = open(opts)));
+    return p.then(function (st) {
+      if (!st) { if (!opts.open) delete _peekOpen[name]; return null; }
+      return st.get(key).then(function (v) { return typeof v === 'string' ? v : null; }, function () { return null; });
+    }, function () { return null; });
   }
 
   /* ── 동기식 거울 ──
@@ -218,11 +291,16 @@
       boot: function () {
         if (m.ready) return m.ready;
         var opener = opts.open || function () { return open(opts); };
-        m.ready = Promise.resolve()
+        /* ⚠ 켜기 «전체»에 시간 한도 — 열린 뒤 읽기가 멎어도 앱이 영영 안 뜨면 안 된다.
+             넘기면 «못 씀»으로 정하고, 늦게 끝난 읽기는 버린다(옛 자리도 더는 안 지운다). */
+        var gaveUp = false;
+        var limit = opts.bootTimeoutMs || 8000;
+        var work = Promise.resolve()
           .then(function () { return opener(); })
           .then(function (store) {
             if (!store) throw new Error('no idb');
-            return bootKeys(store, ls, m.keys()).then(function (res) {
+            return bootKeys(store, ls, m.keys(), function () { return gaveUp; }).then(function (res) {
+              if (gaveUp) throw new Error('late');
               m.store = store;
               m.keys().forEach(function (k) {
                 /* ⚠ 켜지는 사이 옛 자리에 새로 적힌 것이 있으면 그것이 이긴다 */
@@ -240,8 +318,17 @@
               m.report = { state: 'on', report: res.report, missing: m.keys().filter(function (k) { return !(k in mem); }) };
               return m.report;
             });
-          })
+          });
+        var timer = null;
+        var timeout = new Promise(function (_, reject) {
+          timer = setTimeout(function () { gaveUp = true; reject(new Error('boot timeout')); }, limit);
+        });
+        m.ready = Promise.race([work, timeout])
+          .then(function (rep) { clearTimeout(timer); return rep; })
           .catch(function () {
+            clearTimeout(timer);
+            if (m.state === 'on') return m.report;      // 이미 켜졌다(경합) — 그대로 둔다
+            gaveUp = true;
             m.state = 'off';
             m.report = {
               state: 'off', report: [],
@@ -255,5 +342,5 @@
     return m;
   }
 
-  return { open: open, moveFromLs: moveFromLs, bootKeys: bootKeys, mirror: mirror, DB_NAME: DB_NAME };
+  return { open: open, moveFromLs: moveFromLs, bootKeys: bootKeys, mirror: mirror, peek: peek, DB_NAME: DB_NAME };
 });

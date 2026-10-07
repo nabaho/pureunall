@@ -10,7 +10,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=50"></script>
 <script src="js/pu-addr.js?v=2"></script>
-<script src="js/pu-ls-guard.js?v=2"></script>
+<script src="js/pu-ls-guard.js?v=3"></script>
+<script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -3080,8 +3081,16 @@ function _rvBindKeys(){
    연결 보정값만 우리 네임스페이스 fund_erp/puerp_link 에 저장한다. */
 var _peCache=null;
 function _peNorm(v){ if(!v) return []; if(!Array.isArray(v)) v=Object.keys(v).map(function(k){return v[k];}); return v.filter(Boolean); }
-function _peLocal(key){ try{ return _peNorm(JSON.parse(localStorage.getItem('pureun_v6_'+key)||'null')); }catch(e){ return []; } }
-function _peRead(key){   // ① Firebase(최신) ② 같은 출처 localStorage(푸른이알피가 채워둔 값) 폴백
+/* 이알피 사본 폴백 — localStorage 에 없으면 큰 사본 창고(IndexedDB)를 본다.
+   ⚠ 2026-10-07 부터 이알피는 업무 표를 그 창고에 둔다(js/pu-big-store.js) — localStorage 5MB 가 차서. */
+function _peLocal(key){
+  var a=[]; try{ a=_peNorm(JSON.parse(localStorage.getItem('pureun_v6_'+key)||'null')); }catch(e){ a=[]; }
+  if(a.length||!window.PuBigStore||!PuBigStore.peek) return Promise.resolve(a);
+  return PuBigStore.peek('pureun_v6_'+key).then(function(raw){
+    try{ return _peNorm(JSON.parse(raw||'null')); }catch(e){ return []; }
+  }, function(){ return []; });
+}
+function _peRead(key){   // ① Firebase(최신) ② 같은 출처 이알피 사본(localStorage·큰 사본 창고) 폴백
   return fbDb.ref('data/'+key+'/v').once('value').then(function(s){
     var a=_peNorm(s.val()); return a.length?a:_peLocal(key);
   }).catch(function(){ return _peLocal(key); });

@@ -105,7 +105,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <!-- 큰 사본(계약서 양식·급여·장부)은 IndexedDB 로 — localStorage 5MB 를 통합 프로그램 전부가 나눠 쓴다 (2026-10-07) -->
-<script src="js/pu-big-store.js?v=2"></script>
+<script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
@@ -189,7 +189,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-ontology.js?v=50"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
-<script src="js/pu-ls-guard.js?v=2"></script>
+<script src="js/pu-ls-guard.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=2"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -2002,19 +2002,38 @@ var KEY = 'pureun_v6_';
      칸을 늘릴 때는 다른 앱이 'pureun_v6_'+열쇠 로 읽는지 먼저 찾을 것(tests/erp-big-store.test.js 가 막는다).
    ⚠ 켜지는 동안(wait)은 예전 그대로 localStorage — 앱 그리기와 첫 동기화가 켜짐을 기다린다(_erpBigBoot).
    ⚠ 어느 자리에도 값이 없는데 «받은 시각»(_meta_)만 남아 있으면 서버를 다시 안 받는다 — 켤 때 그 시각을 지운다.
-   ⚠ 이 PC 백업(NAS·내려받기)은 localStorage 만 훑었다 — 이제 erpLocalKeys()·erpLocalRaw() 로 새 자리도 담는다. */
-var ERP_BIG_KEYS = ['contract_forms','payroll_monthly','cms_ledger','trash_fin','ledger_batches','payroll_audit_log'];
-var _erpBig = (typeof PuBigStore !== 'undefined' && PuBigStore.mirror) ? PuBigStore.mirror({
-  keys: ERP_BIG_KEYS.map(function(k){ return KEY + k; }),
-  ls: localStorage,
-  onWriteFail: function(full){
-    /* 새 자리에도 옛 자리에도 못 적었다 — 받은 시각을 지워 다음에 켤 때 서버에서 다시 받게 한다 */
-    try { localStorage.removeItem(KEY + '_meta_' + full.slice(KEY.length)); } catch(_){}
-    try { erpQuotaNotice(); } catch(_){}
-  }
-}) : null;
+   ⚠ 이 PC 백업(NAS·내려받기)은 localStorage 만 훑었다 — 이제 erpLocalKeys()·erpLocalRaw() 로 새 자리도 담는다.
+   ★ 2단계 (대표 지시 2026-10-07 「용량을 더 늘리고 … 안지워도 되게 … 반드시 해결」)
+     여섯 칸만 옮긴 뒤 대표 크롬 실측 2,478,297자 — 남은 것도 업체 335K·계약 253K·컨설팅 122K … 다 «자라는 표»다.
+     그래서 이제 «동기화 표 전부»(FB_ALL_SYNC_KEYS)와 이 PC 기록 몇 개를 옮긴다. localStorage 에는 설정·표시·받은 시각만 남는다.
+     빌려 읽던 업무관리·기금·정부컨설팅은 PuBigStore.peek 로 새 자리도 읽게 고쳤다.
+     ⚠ 남기는 셋(ERP_LS_KEEP) — 직원 명부 둘은 포털·사진첩·규정관리·업무관리가 «그 자리에서»(동기식) 읽는다.
+       자문수입은 이미 sessionStorage 에 따로 둔다(_erpStoreGet 머리글). */
+var ERP_LS_KEEP = ['user_accounts','user_dir','finance_income'];
+var ERP_BIG_EXTRA = ['payroll_audit_log','co_tombstones','co_merge_log','co_link_log','co_vat_log','project_progress','bank_ledger_draft'];
+var ERP_BIG_KEYS = [];      // FB_ALL_SYNC_KEYS 가 생긴 «뒤에» 채운다(_erpBigMake) — 그 목록은 이 아래 800줄쯤에서 생긴다
+var _erpBig = null;         // 생기기 전에는 예전 그대로 localStorage(_erpStoreGet·_erpStoreSet 의 typeof 거름)
+function _erpBigMake(){
+  if(_erpBig || typeof PuBigStore === 'undefined' || !PuBigStore.mirror) return _erpBig;
+  var seen = {};
+  ERP_BIG_KEYS = ((typeof FB_ALL_SYNC_KEYS !== 'undefined' && FB_ALL_SYNC_KEYS) || []).concat(ERP_BIG_EXTRA).filter(function(k){
+    if(seen[k] || ERP_LS_KEEP.indexOf(k) >= 0) return false;
+    seen[k] = 1; return true;
+  });
+  _erpBig = PuBigStore.mirror({
+    keys: ERP_BIG_KEYS.map(function(k){ return KEY + k; }),
+    ls: localStorage,
+    onWriteFail: function(full){
+      /* 새 자리에도 옛 자리에도 못 적었다 — 받은 시각을 지워 다음에 켤 때 서버에서 다시 받게 한다 */
+      try { localStorage.removeItem(KEY + '_meta_' + full.slice(KEY.length)); } catch(_){}
+      try { erpQuotaNotice(); } catch(_){}
+    }
+  });
+  return _erpBig;
+}
 var _erpBigBooting = null;
 function _erpBigBoot(){
+  if(!_erpBig) _erpBigMake();
   if(!_erpBig) return Promise.resolve(null);
   /* ⚠ 한 번만 — 뒤처리(받은 시각 지우기)가 동기화 «뒤에» 또 돌면 막 받은 것을 다시 받게 된다 */
   if(_erpBigBooting) return _erpBigBooting;
@@ -2032,7 +2051,7 @@ function _erpBigBoot(){
     return rep;
   }));
 }
-try { _erpBigBoot(); } catch(_){}
+/* ⚠ 켜기는 FB_ALL_SYNC_KEYS 바로 뒤에서 한다(그 목록이 있어야 무엇을 옮길지 안다) */
 /* 이 PC 에 있는 이알피 열쇠 «전부» — localStorage + 큰 사본 창고. 백업이 이것으로 훑는다. */
 function erpLocalKeys(){
   var out = [], seen = {};
@@ -2120,6 +2139,9 @@ function _erpStoreSet(k,v){
     throw e;
   }
 }
+/* 맨 앞 «켤 때 점검»(따로 떨어진 script, 건수·중복·id 점검)이 같은 이름으로 읽는다 — 그쪽은 이 함수 밖이라
+   못 보고 localStorage 만 읽었다. 표가 큰 사본 창고로 간 뒤에는 그 점검이 조용히 «건너뛰기»만 한다(2026-10-07). */
+try { window._erpStoreGet = _erpStoreGet; } catch(_){}
 function _erpStoreRemove(k){
   if(typeof _erpMemStore !== 'undefined') delete _erpMemStore[k];
   if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.owns(KEY+k)){ try { _erpBig.remove(KEY+k); } catch(_){} }
@@ -2857,6 +2879,8 @@ var FB_ALL_SYNC_KEYS = [
   /* 사건 «업무 메모» — 2026-10-05 까지 그 PC 의 localStorage 에만 있었다(CaseMemoPanel 머리글) */
   'case_memos'
 ];
+/* 큰 사본 창고를 여기서 만들고 켠다 — 이 목록이 생긴 «바로 뒤»라야 무엇을 옮길지 안다(ERP_BIG_KEYS 머리글) */
+try { _erpBigMake(); _erpBigBoot(); } catch(_){}
 // App Check reCAPTCHA v3 사이트키 — Firebase 콘솔에서 발급 후 따옴표 안에 붙여넣기 (비어있으면 비활성, 동작에 영향 없음)
 var FB_APPCHECK_KEY = '6Ldu1hEtAAAAABB9lH9EMEyd7uBLEy9H5HxJoua_';
 /* ⚠ App Check 를 끈 채로 둔다 (2026-08-08).
@@ -4754,7 +4778,7 @@ async function erpPushLocalOnly(){
         var finArr = normalizeFbValue(fin.v);
         // 로컬도 서버 확정본으로 정렬 + meta 갱신 (즉시 재充돌 방지)
         try {
-          localStorage.setItem(KEY + store, JSON.stringify(finArr));
+          _erpStoreSet(store, JSON.stringify(finArr));   // 큰 사본 창고에 있는 표다 — localStorage 로 바로 쓰지 않는다(2026-10-07)
           localStorage.setItem(KEY + '_meta_' + store, String(typeof fin.u === 'number' ? fin.u : Date.now()));
           _dbCache[store] = finArr;
           if(typeof _scheduleFbChanged === 'function') _scheduleFbChanged(store);
@@ -40810,13 +40834,15 @@ var BIZ_DEFAULT_MENUS = DASH_MENUS.concat(BIZ_MENUS);
 
 
 // ============ 휴지통 30일 자동 영구삭제 ============
-(function autoPurgeTrash(){
+/* ⚠ 이 표들은 큰 사본 창고(IndexedDB)에 있다 — 창고가 켜진 «뒤에», _erpStoreGet·_erpStoreSet 으로 만진다(2026-10-07).
+     localStorage 를 바로 읽으면 옮긴 뒤에는 빈 것을 읽어 아무 일도 안 한다. */
+function autoPurgeTrash(){
   try {
     var THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
     var now = Date.now();
     var KEYS = ['cases','consultings','funds','other_projects','companies'];
     KEYS.forEach(function(k){
-      var arr; try{ arr = safeParse(localStorage.getItem('pureun_v6_'+k), []); }catch(e){ arr = []; }
+      var arr; try{ arr = safeParse(_erpStoreGet(k), []); }catch(e){ arr = []; }
       if(!Array.isArray(arr)) return;
       var purged = arr.filter(function(x){
         if(!x || !x._deleted) return true;
@@ -40824,11 +40850,12 @@ var BIZ_DEFAULT_MENUS = DASH_MENUS.concat(BIZ_MENUS);
         return (now - dt) < THIRTY_DAYS;  // 30일 이내만 보존
       });
       if(purged.length !== arr.length){
-        localStorage.setItem('pureun_v6_'+k, JSON.stringify(purged));
+        try { _erpStoreSet(k, JSON.stringify(purged)); delete _dbCache[k]; } catch(_q){}
       }
     });
   } catch(e){ window._erpErrLog && window._erpErrLog(e); }
-})();
+}
+try { _erpBigBoot().then(autoPurgeTrash, autoPurgeTrash); } catch(_){ autoPurgeTrash(); }
 
 // ============ 자문사 82개 강제 재구성 v2 (실무자·연락처·고용보험가입자수 포함) ============
 
@@ -42911,6 +42938,8 @@ function IntegritySection(){
 
 function HealthSection(){
   var stats = useState(null); var stat = stats[0]; var setStat = stats[1];
+  /* 큰 저장 공간·«지우지 않음» (대표 지시 2026-10-07 「지우지 말라 … 용량을 더 늘리고」) — js/pu-ls-guard.js 가 잰다 */
+  var bigS = useState(null); var big = bigS[0]; var setBig = bigS[1];
 
   function refresh(){
     var keys = [];
@@ -42931,6 +42960,12 @@ function HealthSection(){
       quota: 5 * 1024 * 1024,
       topKeys: keys.slice(0, 8)
     });
+    try {
+      if(window.PuLsGuard && PuLsGuard.storageInfo){
+        (PuLsGuard.persisting || Promise.resolve()).then(function(){ return PuLsGuard.storageInfo(); })
+          .then(function(r){ setBig(r); }, function(){ setBig(null); });
+      }
+    } catch(_){}
   }
   // 첫 마운트 시 자동 새로고침
   useEffect(function(){ refresh(); }, []);
@@ -42957,6 +42992,13 @@ function HealthSection(){
       h('div', { style:{ background:'#f0fdf4', padding:'12px 16px', borderRadius:'6px', border:'1px solid #bbf7d0' } },
         h('div', { style:{ fontSize:'11px', color:'#166534', fontWeight:600 } }, '사용 용량'),
         h('div', { style:{ fontSize:'13px', fontWeight:800, color:'#166534', marginTop:'2px' } }, fmtBytes(stat.totalSize)))
+    ),
+    /* 한 줄 — 큰 저장 공간(IndexedDB 등) 사용/한도 · 지우지 않음 · localStorage(모든 앱 합계) — 5242880 은 크롬 localStorage 한도(10MB = 글자 5,242,880, 2026-10-07 대표 크롬이 5,242,346자에서 막혔다) */
+    big && h('div', { title:'큰 저장 공간은 이알피 업무 표·규정관리 작업본·사진 미리보기 등이 쓴다. «지우지 않음»이 켜지면 디스크가 모자라도 크롬이 이 사이트 자료를 스스로 비우지 않는다.',
+        style:{ display:'flex', gap:'12px', alignItems:'center', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontSize:'12px', color:'#475569', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'8px 12px', marginBottom:'14px' } },
+      h('span', null, '큰 저장 공간 ', h('b', { style:{ color:'#1e293b', fontVariantNumeric:'tabular-nums' } }, (big.usage != null ? fmtBytes(big.usage) : '?') + ' / ' + (big.quota != null ? fmtBytes(big.quota) : '?'))),
+      h('span', { style:{ fontWeight:700, color: big.persisted ? '#166534' : '#854d0e' } }, big.persisted ? '🔒 지우지 않음 켜짐' : '⚠ 지우지 않음 꺼짐 — 즐겨찾기·앱 설치 뒤 다시 열면 켜짐'),
+      h('span', null, 'localStorage(모든 앱) ', h('b', { style:{ color:'#1e293b', fontVariantNumeric:'tabular-nums' } }, Math.round(big.lsChars / 5242880 * 100) + '%'), ' 씀')
     ),
     h('div', { style:{ marginBottom:'14px' } },
       h('div', { style:{ display:'flex', justifyContent:'space-between', fontSize:'11.5px', color:'#475569', marginBottom:'4px' } },

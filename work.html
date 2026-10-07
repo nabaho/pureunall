@@ -19,7 +19,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=50"></script>
-<script src="js/pu-ls-guard.js?v=2"></script>
+<script src="js/pu-ls-guard.js?v=3"></script>
+<script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
@@ -1810,11 +1811,13 @@ function ownerOptions(){
 }
 function loadCompanies(){
   if(_coCache) return _coCache;
-  var names=[];
-  try{ var raw=localStorage.getItem('pureun_v6_companies');
-    if(raw){ var v=JSON.parse(raw); var arr=Array.isArray(v)?v:Object.keys(v).map(function(k){return v[k];});
-      names=arr.map(function(c){return c&&c.name;}).filter(Boolean); } }catch(e){}
-  _coCache=names; return names;
+  /* 이알피 업체 사본 — localStorage 에 없으면 큰 사본 창고(_ls 머리글), 그것도 없으면 서버에서 읽어 둔 것(coSrc).
+     ⚠ 빈 목록은 «쥐지 않는다» — 쥐면 창고·서버가 뒤늦게 와도 영영 빈 목록이다(2026-10-07). */
+  var arr=_ls('companies')||coSrc||[];
+  var names=arr.map(function(c){return c&&c.name;}).filter(Boolean);
+  if(names.length) _coCache=names;
+  else _lsWarm(['companies']);   // 다음 번에는 창고 값이 있다
+  return names;
 }
 
 /* ── 공통 편의 ── */
@@ -9802,7 +9805,7 @@ function calLoadSrc(){
     return fbDb.ref('data/'+CAL_SRC[k]+'/v').once('value')
       /* 삭제표시(_deleted) 줄은 뺀다 — 푸른 캘린더에서 지운 근태·일정이 여기 남지 않게 (2026-09-27) */
       .then(function(s){ var a=_peArr(s.val()); return [k,Array.isArray(a)?a.filter(function(x){ return x && !x._deleted; }):a]; })
-      .catch(function(){ return [k,_ls(CAL_SRC[k])]; });
+      .catch(function(){ return _lsWarm([CAL_SRC[k]]).then(function(){ return [k,_ls(CAL_SRC[k])]; }); });
   })).then(function(rows){
     rows.forEach(function(r){ calSrc[r[0]]=r[1]||[]; });
     _calLoaded=true; _calLoading=null;
@@ -9823,7 +9826,7 @@ function coLoad(){
   if(_coT) return _coT;
   _coT=fbDb.ref('data/companies/v').once('value')
     .then(function(s){ coSrc=_peArr(s.val())||[]; _coT=null; return coSrc; })
-    .catch(function(){ coSrc=_ls('companies')||[]; _coT=null; return coSrc; });
+    .catch(function(){ return _lsWarm(['companies']).then(function(){ coSrc=_ls('companies')||[]; _coT=null; return coSrc; }); });
   return _coT;
 }
 // co_id(푸른이알피 companyId) 우선, 없으면 정규화한 업체명으로 찾는다
@@ -11658,8 +11661,18 @@ function renderArchive(){
 
 /* ── 푸른이알피 담당 업무 가져오기 (계약·사건·컨설팅·기금·기타) ── */
 // pu-erp는 localStorage(pureun_v6_*)에 마스터를 캐시함 — 같은 출처라 그대로 읽는다.
+/* ⚠ 2026-10-07 부터 이알피는 업무 표를 «큰 사본 창고»(IndexedDB, js/pu-big-store.js)에 둔다 —
+     localStorage 5MB 가 차서 경력관리가 목록을 못 적었다. 그래서 localStorage 에 없으면
+     _lsWarm 으로 미리 읽어 둔 창고 값(_lsBig)을 본다. 서버를 먼저 읽는 길은 그대로다. */
+var _lsBig={};
+function _lsWarm(keys){
+  if(!window.PuBigStore||!PuBigStore.peek) return Promise.resolve();
+  return Promise.all((keys||[]).map(function(k){
+    return PuBigStore.peek('pureun_v6_'+k).then(function(raw){ if(raw!=null) _lsBig[k]=raw; }, function(){});
+  })).then(function(){});
+}
 function _ls(key){
-  try{ var raw=localStorage.getItem('pureun_v6_'+key); if(!raw) return null;
+  try{ var raw=localStorage.getItem('pureun_v6_'+key); if(!raw) raw=_lsBig[key]||null; if(!raw) return null;
     var v=JSON.parse(raw); if(v&&!Array.isArray(v)&&typeof v==='object') v=Object.keys(v).map(function(k){return v[k];});
     return Array.isArray(v)?v:null; }catch(e){ return null; }
 }
@@ -11826,6 +11839,8 @@ var PE_CKIND={consult:'상담사항',company:'업체계약',case:'사건계약',
 var PE_XFER=[['companies','업체','companies'],['cases','사건','case'],
   ['consultings','컨설팅','consulting'],['funds','기금','fund'],
   ['other_projects','기타사업','other']];
+/* 이관 대조의 «사본 폴백»이 큰 사본 창고 값도 보게 미리 읽어 둔다(_ls 머리글, 2026-10-07) */
+try{ _lsWarm(PE_XFER.map(function(p){ return p[0]; })); }catch(e){}
 /* 한 번 그릴 때마다 한 번만 만든다 — 줄마다 저장소를 훑으면 느리다.
    rowHTML 은 renderMy 바깥 함수라, 안에 두면 못 본다(실제로 못 봤다). */
 var _xmap=null;
@@ -12051,7 +12066,7 @@ function peLoadAll(){
   var tload=Promise.all(Object.keys(PE_TKEY).map(function(kv){
     return fbDb.ref('data/'+PE_TKEY[kv]+'/v').once('value')
       .then(function(s){ return [kv,_peArr(s.val())]; })
-      .catch(function(){ return [kv,_ls(PE_TKEY[kv])]; });
+      .catch(function(){ return _lsWarm([PE_TKEY[kv]]).then(function(){ return [kv,_ls(PE_TKEY[kv])]; }); });
   })).then(function(rows){ rows.forEach(function(r){ if(r[1]) peTypes[r[0]]=r[1]; }); });
   return tload.then(function(){
     return Promise.all(PE_DEF.map(function(d){
@@ -12061,7 +12076,7 @@ function peLoadAll(){
         /* ★ 휴지통에 든 것(_deleted)은 뺀다 (2026-10-01) — 이알피에서 중복 사건을 휴지통으로 보냈는데
              업무관리에는 그대로 «진행중»으로 남았다. 이알피 휴지통은 딱지만 붙이고 지우지 않는다(TrashBin). */
         .then(function(s){ return [d[0],_peLive(_peArr(s.val()))]; })
-        .catch(function(){ return [d[0],_peLive(_ls(PE_KEYS[d[0]]))]; });   // 권한/네트워크 실패 → 캐시 폴백
+        .catch(function(){ return _lsWarm([PE_KEYS[d[0]]]).then(function(){ return [d[0],_peLive(_ls(PE_KEYS[d[0]]))]; }); });   // 권한/네트워크 실패 → 캐시 폴백
     }));
   }).then(function(rows){
     rows.forEach(function(r){ if(r[1]) peMaster[r[0]]=r[1]; });

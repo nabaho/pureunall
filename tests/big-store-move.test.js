@@ -287,3 +287,58 @@ test('⑥ IndexedDB 가 답하지 않으면 시간 안에 «못 씀»', async ()
   await mm.boot();
   assert.equal(mm.state, 'off');
 });
+
+/* ── 2단계 (2026-10-07 「용량을 더 늘리고 … 안지워도 되게」) — 이알피 표 수십 개를 «거래 하나»로 옮긴다 ── */
+test('묶어 옮기기: 차례는 같다 — 쓰기 거래 하나·다시 읽기 거래 하나 뒤에야 옛 자리를 지운다', async () => {
+  const log = [];
+  const m = { a: 'A', b: 'B' };
+  const ls = { getItem: (k) => (k in m ? m[k] : null), removeItem: (k) => { log.push('ls.remove ' + k); delete m[k]; }, setItem() {} };
+  const idb = new Map([['c', 'C-old']]);
+  const st = {
+    get: async (k) => idb.get(k) || null, put: async () => {}, del: async () => {},
+    putMany: async (map) => { log.push('putMany ' + Object.keys(map).join(',')); Object.keys(map).forEach((k) => idb.set(k, map[k])); },
+    getMany: async (keys) => { log.push('getMany ' + keys.join(',')); const o = {}; keys.forEach((k) => { o[k] = idb.has(k) ? idb.get(k) : null; }); return o; },
+  };
+  const res = await Big.bootKeys(st, ls, ['a', 'b', 'c']);
+  assert.deepEqual(log, ['putMany a,b', 'getMany a,b', 'ls.remove a', 'ls.remove b', 'getMany c'],
+    '★★ 새 자리를 확인하기 전에 옛 자리를 지우면, 쓰기가 실패한 순간 자료가 «아무 데도» 없습니다');
+  assert.deepEqual(res.values, { a: 'A', b: 'B', c: 'C-old' });
+});
+
+test('묶어 옮기기: 쓰기 거래가 실패하면 옛 자리를 하나도 안 지운다', async () => {
+  const m = { a: 'A', b: 'B' };
+  const ls = { getItem: (k) => (k in m ? m[k] : null), removeItem: (k) => { delete m[k]; }, setItem() {} };
+  const st = { get: async () => null, put: async () => {}, del: async () => {},
+    putMany: async () => { throw new Error('quota'); }, getMany: async () => ({}) };
+  const res = await Big.bootKeys(st, ls, ['a', 'b']);
+  assert.deepEqual(m, { a: 'A', b: 'B' });
+  assert.ok(res.report.every((r) => r.why === 'write'));
+});
+
+test('켜기가 시간을 넘기면 «못 씀» — 늦게 끝난 읽기는 옛 자리를 지우지 않는다', async () => {
+  const m = { a: 'A' };
+  const ls = { getItem: (k) => (k in m ? m[k] : null), removeItem: (k) => { delete m[k]; }, setItem(k, v) { m[k] = v; } };
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  const st = { get: async () => null, put: async () => {}, del: async () => {},
+    putMany: async () => {}, getMany: async (keys) => { await gate; const o = {}; keys.forEach((k) => { o[k] = 'A'; }); return o; } };
+  const mm = Big.mirror({ keys: ['a'], ls, open: async () => st, bootTimeoutMs: 30 });
+  const rep = await mm.boot();
+  assert.equal(rep.state, 'off', '앱이 이것을 기다리며 영영 안 뜨면 안 됩니다');
+  release();
+  await new Promise((r) => setTimeout(r, 20));
+  assert.equal(m.a, 'A', '★ 이미 «못 씀»으로 정했는데 옛 자리를 지우면, 이번 화면은 빈 것을 읽습니다');
+  assert.equal(mm.state, 'off');
+  assert.equal(mm.get('a'), 'A');
+});
+
+test('읽어 보기(peek): 옛 자리에 있으면 그것, 없으면 새 자리 — 옮기거나 지우지 않는다', async () => {
+  const m = { k1: 'from-ls' };
+  const ls = { getItem: (k) => (k in m ? m[k] : null), removeItem: (k) => { delete m[k]; } };
+  const st = { get: async (k) => (k === 'k2' ? 'from-idb' : null) };
+  assert.equal(await Big.peek('k1', { ls, open: async () => st }), 'from-ls');
+  assert.equal(await Big.peek('k2', { ls, open: async () => st }), 'from-idb');
+  assert.equal(await Big.peek('k3', { ls, open: async () => st }), null);
+  assert.equal(await Big.peek('k2', { ls, open: async () => null }), null, '못 열면 null — 부르는 쪽은 서버를 읽는다');
+  assert.equal(m.k1, 'from-ls');
+});

@@ -1202,7 +1202,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=50"></script>
-<script src="js/pu-ls-guard.js?v=2"></script>
+<script src="js/pu-ls-guard.js?v=3"></script>
+<script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -8772,8 +8773,18 @@ async function erpCloudStamp(key){
      **새 값을 옛 값으로 덮는다.** 그래서 시각을 견주고 새 쪽을 쓴다.
    ⚠ 클라우드 시각을 못 읽으면(규칙·끊김) 0 이고, 그때는 있는 사본을 쓴다 —
      못 읽었다고 빈손을 돌려주면 기능이 통째로 멈춘다. */
+/* 이알피 사본이 localStorage 에 없으면 큰 사본 창고(IndexedDB)를 본다 —
+   2026-10-07 부터 이알피는 업무 표를 그 창고에 둔다(js/pu-big-store.js, localStorage 5MB 가 차서) */
+async function erpPeekLocal(key){
+  try{
+    if(!window.PuBigStore||!PuBigStore.peek)return null;
+    const raw=await PuBigStore.peek(ERP_LS_PREFIX+key);
+    return raw?erpToArray(JSON.parse(raw)):null;
+  }catch(e){ return null; }
+}
 async function erpRead(key){
-  const local=erpReadLocal(key);
+  let local=erpReadLocal(key);
+  if(!local||!local.length)local=await erpPeekLocal(key);
   const localAt=erpLocalStamp(key);
   const cloudAt=await erpCloudStamp(key);
   const localFresh=!cloudAt||cloudAt<=localAt;
