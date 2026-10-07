@@ -28,10 +28,13 @@
     var method = (opts && opts.method) || 'POST';
     var qs = (opts && opts.query) ? ('?' + opts.query) : '';
     var st = 0;
+    var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    var timer = ctl ? setTimeout(function(){ ctl.abort(); }, 10000) : 0;
     return fetch(BASE + '/' + path + qs, {
-      method: method, headers: headers, body: method === 'GET' ? undefined : JSON.stringify(body || {})
+      method: method, headers: headers, body: method === 'GET' ? undefined : JSON.stringify(body || {}),
+      signal: ctl ? ctl.signal : undefined
     }).catch(function (e) {
-      throw new Error(whyNotJson(path, 0, (e && e.message) || ''));
+      throw new Error(e && e.name === 'AbortError' ? '카카오 서버 응답이 늦습니다 — 다시 시도해 주세요' : whyNotJson(path, 0, (e && e.message) || ''));
     }).then(function (r) {
       st = r.status;
       return r.text();
@@ -41,7 +44,7 @@
       if (!j) throw new Error(whyNotJson(path, st, t));
       if (!j.ok) { var e = new Error(j.error || '실패했습니다'); e.needLink = j.needLink === true; throw e; }
       return j;
-    });
+    }).finally(function(){ if(timer) clearTimeout(timer); });
   }
 
   /* 카카오로 보내기 전에 「무엇을 하려던 참이었나」를 남겨 둔다 — 카카오는 우리 화면을

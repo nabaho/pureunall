@@ -434,7 +434,7 @@ test('★ 화면 — needLink 로 실패했을 때만 표시를 남기고, 포�
   for (const need of [true, false]) {
     const m = memStore();
     const box = {
-      Promise, String, Date,
+      Promise, String, Date, setTimeout, clearTimeout,
       KK_WANT: 'pu_kakao_want_link', _freshLogin: false,
       sessionStorage: m.api,
       PuKakao: {
