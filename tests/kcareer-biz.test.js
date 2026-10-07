@@ -169,3 +169,28 @@ test('⑥ 목록은 맨 왼쪽 ☐ + 번호 · 한 칸 한 줄 · 7번 폴더 �
   assert.match(떼기('function bizPickDraw('), /P\.all \|\| x\.biz/, '기본은 사업 같은 것만, 켜면 모두');
   assert.match(떼기('async function bizCompare('), /KcareerBiz\.lineDiff\(/, '줄 비교는 판정 모듈 한 곳');
 });
+
+test('⑦ 서류 찾기의 연도는 «사업을 수행한 해» — 사업 연도가 아니다 (대표 지시 2026-10-07)', () => {
+  /* 2026년에 낸 사업에 2023·2024 일터혁신 실적 증빙이 함께 담긴다 — 사업 연도로 두면 다 2026 이었다 */
+  const 사업 = { year: '2026' }, 지금 = '2026-10-07';
+  const 해 = (name, more) => B.docYear(Object.assign({ name }, more || {}), 사업, 지금);
+  assert.equal(해('2023 일터혁신 홍길동.png').year, '2023', '파일 이름의 해');
+  assert.equal(해('2024년_일터혁신.pdf').year, '2024');
+  assert.equal(해('가나상사_결과보고서_250903.pdf').year, '2025', '이름 끝 날짜(yymmdd)');
+  assert.equal(해('20200527_파일다운로드.zip').year, '2020', '이름 앞 날짜(yyyymmdd)');
+  assert.equal(해('가나상사_결과보고서_최종.pdf', { kind: '증빙', mtime: '2025-09-29T08:00:00Z' }).year, '2025',
+    '결과 보고서는 끝낸 뒤 만든 것 — 파일 날짜');
+  assert.equal(해('Apply_Manual.pdf', { kind: '기타', mtime: '2025-11-13T00:00:00Z' }).year, '2026',
+    '신청 서류의 파일 날짜(전해 가을)를 수행 연도로 쓰면 안 된다');
+  assert.equal(해('통장사본.pdf', { kind: '증빙', mtime: '2017-10-10T00:00:00Z' }).year, '2026', '오래된 증빙 파일 날짜도 안 쓴다');
+  assert.equal(해('2031 계획.pdf').year, '2026', '내년 너머의 해는 믿지 않는다');
+  assert.equal(해('2023 일터혁신.png', { year: '2022' }).year, '2022', '사람이 적은 해가 먼저');
+  assert.equal(해('사업계획서.hwp').from, '사업');
+
+  /* 화면 — 열·거르기·차례가 모두 서류의 해(dy)를 본다 */
+  const 그림 = 떼기('function renderBizDocs(');
+  const 펼침 = 떼기('function _bizDocsFlat(');
+  assert.match(펼침, /KcareerBiz\.docYear\(d,\s*b\)/, '서류마다 수행 연도를 셈');
+  assert.doesNotMatch(그림.replace(/\/\*[\s\S]*?\*\//g, ''), /x\.b\.year|b\.b\.year|escapeHtml\(b\.year/, '사업 연도를 연도 칸·거르기·차례에 쓰면 안 된다');
+  assert.match(그림, /x\.dy\.year/);
+});

@@ -41,6 +41,27 @@
     return '기타';
   }
 
+  /* 서류 한 장의 «사업을 수행한 해» (대표 지시 2026-10-07 「년도는 사업수행한 년도로」).
+     2026년에 낸 사업에 「2023 일터혁신」 실적 증빙이 함께 담긴다 — 사업 연도(2026)를 그대로 쓰면 다 2026 이다.
+     차례: ① 사람이 적은 해(d.year) ② 파일 이름의 해(20231015 · 2023년 · _230903) ③ 결과·계약 서류는 파일 날짜
+           ④ 그 밖엔 사업 연도.  ⚠ 공고·서식·증빙은 «파일 날짜»를 안 쓴다 — 2026 신청 서류는 2025년 가을에
+           만들어지고, 통장 사본은 몇 년 전 파일이다. 결과 보고서만 «끝낸 뒤» 만들어진다.
+     돌려주는 것 { year, from:'직접'|'이름'|'파일날짜'|'사업' } — 화면은 from 을 풍선말로 보인다. */
+  var 끝낸뒤 = /(결과|완료|최종)\s*보고/;
+  function docYear(d, b, now) {
+    d = d || {}; b = b || {};
+    var 끝 = (now ? new Date(now) : new Date()).getFullYear() + 1;
+    function ok(y) { y = Number(y); return y >= 2000 && y <= 끝 ? String(y) : ''; }
+    var y = ok(d.year); if (y) return { year: y, from: '직접' };
+    /* 결과·완료 보고서는 갈래가 «증빙»으로 짐작돼도 끝낸 뒤 만든 것이다 */
+    var n = String(d.name || '').replace(/\.[^.]+$/, ''), m;
+    if ((m = n.match(/(?:^|\D)(20\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)/)) && (y = ok(m[1]))) return { year: y, from: '이름' };
+    if ((m = n.match(/(?:^|\D)(20\d{2})(?!\d)/)) && (y = ok(m[1]))) return { year: y, from: '이름' };
+    if ((m = n.match(/(?:^|\D)(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])(?!\d)/)) && (y = ok('20' + m[1]))) return { year: y, from: '이름' };
+    if (((d.kind || guessDocKind(d.name)) === '결과·계약' || 끝낸뒤.test(n)) && (y = ok(String(d.mtime || '').slice(0, 4)))) return { year: y, from: '파일날짜' };
+    return { year: String(b.year || ''), from: '사업' };
+  }
+
   /* 7번 폴더의 건 가운데 «사업» 같은 것 — 먼저 추려 보여 줄 뿐, 올리는 것은 사람이 고른다.
      ⚠ 「○○지원사업 컨설턴트 모집」은 개인 지원이다 — 모집·위원·강사가 붙으면 사업으로 보지 않는다. */
   var BIZ_WORD = /사업(?!자)|용역|입찰|제안|수행기관|공급기업|바우처|클리닉|실태\s*조사|분쟁사업장|컨소시엄|위탁|운영기관|일자리\s*전환|구조\s*개선/;
@@ -205,7 +226,7 @@
     xlsxLines: xlsxLines, perfFields: perfFields,
     KINDS: KINDS, STAGES: STAGES, DOC_KINDS: DOC_KINDS,
     isOpen: function (st) { return !!OPEN[st]; }, isWin: function (st) { return !!WIN[st]; },
-    guessDocKind: guessDocKind, looksBiz: looksBiz, fromCaseDir: fromCaseDir, stageForImport: stageForImport,
+    guessDocKind: guessDocKind, docYear: docYear, looksBiz: looksBiz, fromCaseDir: fromCaseDir, stageForImport: stageForImport,
     dDay: dDay, summary: summary, textLines: textLines, lineDiff: lineDiff, MAX_LINES: MAX_LINES
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

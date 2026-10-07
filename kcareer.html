@@ -1340,7 +1340,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=3"></script>
+<script src="js/kcareer-biz.js?v=4"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=4"></script>
@@ -15571,8 +15571,11 @@ async function bizPickGo(){
 
 /* ── 🗂 서류 찾기 — 모든 사업의 서류를 한 표에서 ── */
 var _bizDocPick=[];
+var _BIZ_DY_FROM={ '직접':'사람이 적은 해', '이름':'파일 이름에 적힌 해', '파일날짜':'결과 보고서 — 파일을 만든 해', '사업':'이름에 해가 없어 사업 연도를 씀' };
 function _bizDocsFlat(){
-  var out=[]; bizAll().forEach(function(b){ (b.docs||[]).forEach(function(d){ out.push({ b:b, d:d }); }); });
+  /* dy = 그 서류로 «사업을 수행한 해» (대표 지시 2026-10-07 「년도는 사업수행한 년도로」) — 사업 연도가 아니다.
+     2026년 사업에 「2023 일터혁신」 실적 증빙이 함께 담긴다. 셈은 KcareerBiz.docYear 한 곳 */
+  var out=[]; bizAll().forEach(function(b){ (b.docs||[]).forEach(function(d){ out.push({ b:b, d:d, dy:KcareerBiz.docYear(d,b) }); }); });
   return out;
 }
 function renderBizDocs(){
@@ -15580,21 +15583,21 @@ function renderBizDocs(){
   var all=_bizDocsFlat();
   var ks=document.getElementById('bizDocKind'), ys=document.getElementById('bizDocYear');
   if(ks){ var kc=ks.value; ks.innerHTML='<option value="">전체 갈래</option>'+KcareerBiz.DOC_KINDS.map(function(k){ return '<option'+(k===kc?' selected':'')+'>'+escapeHtml(k)+'</option>'; }).join(''); }
-  if(ys){ var yc=ys.value, yl=[]; all.forEach(function(x){ var y=String(x.b.year||''); if(y && yl.indexOf(y)<0) yl.push(y); }); yl.sort().reverse();
+  if(ys){ var yc=ys.value, yl=[]; all.forEach(function(x){ var y=x.dy.year; if(y && yl.indexOf(y)<0) yl.push(y); }); yl.sort().reverse();
     ys.innerHTML='<option value="">전체 연도</option>'+yl.map(function(y){ return '<option'+(y===yc?' selected':'')+'>'+y+'</option>'; }).join(''); }
   var q=((document.getElementById('bizDocQ')||{}).value||'').trim().toLowerCase(), k=ks?ks.value:'', y=ys?ys.value:'';
   var rows=all.filter(function(x){
-    if(k && x.d.kind!==k) return false; if(y && String(x.b.year)!==y) return false;
+    if(k && x.d.kind!==k) return false; if(y && x.dy.year!==y) return false;
     if(q && ![x.d.name, x.b.title, x.b.org].some(function(s){ return String(s||'').toLowerCase().indexOf(q)>=0; })) return false;
-    return true; }).sort(function(a,b){ return String(b.b.year||'').localeCompare(String(a.b.year||'')) || String(a.b.title||'').localeCompare(String(b.b.title||''),'ko'); });
+    return true; }).sort(function(a,b){ return b.dy.year.localeCompare(a.dy.year) || String(a.b.title||'').localeCompare(String(b.b.title||''),'ko'); });
   _bizDocPick=_bizDocPick.filter(function(id){ return rows.some(function(x){ return x.d.id===id; }); });
   var cnt=document.getElementById('bizDocCnt'); if(cnt) cnt.textContent=(rows.length!==all.length)?('전체 '+all.length+'개 · 지금 '+rows.length+'개'):(all.length+'개');
   var cb=document.getElementById('bizCmpBtn'); if(cb) cb.textContent='📑 고른 둘 비교'+(_bizDocPick.length?' ('+_bizDocPick.length+'/2)':'');
   if(!rows.length){ body.innerHTML='<div class="empty"><div class="emp-ico">🗂</div>'+(all.length?'조건에 맞는 서류가 없습니다':'아직 담긴 사업 서류가 없습니다 — 사업 목록에서 사업을 열고 서류를 올리세요')+'</div>'; return; }
-  body.innerHTML='<table><thead><tr><th class="rownum-h" style="width:62px">☐ №</th><th>연도</th><th>사업</th><th>갈래</th><th>서류</th><th>단계</th><th></th></tr></thead><tbody>'
+  body.innerHTML='<table><thead><tr><th class="rownum-h" style="width:62px">☐ №</th><th title="그 서류로 사업을 수행한 해 — 파일 이름의 해 · 결과 보고서는 파일 날짜 · 없으면 사업 연도">수행 연도</th><th>사업</th><th>갈래</th><th>서류</th><th>단계</th><th></th></tr></thead><tbody>'
     +rows.map(function(x,i){ var d=x.d, b=x.b, 다시=/^(hwpx?|docx|pdf)$/.test(d.ext||'');
       return '<tr><td class="rownum"><label style="display:inline-flex;gap:5px;align-items:center;cursor:pointer"><input type="checkbox" class="row-chk"'+(_bizDocPick.indexOf(d.id)>=0?' checked':'')+' onchange="bizDocPickSet(\''+_jsAttr(d.id)+'\',this.checked)"><span>'+(i+1)+'</span></label></td>'
-        +'<td>'+escapeHtml(b.year||'-')+'</td>'
+        +'<td style="white-space:nowrap" title="'+escapeHtml(_BIZ_DY_FROM[x.dy.from]||'')+'">'+escapeHtml(x.dy.year||'-')+'</td>'
         +'<td class="bz-cell" style="max-width:220px;cursor:pointer" title="'+escapeHtml((b.title||'')+(b.org?' · '+b.org:''))+'" onclick="bizOpen(\''+_jsAttr(b.id)+'\')"><strong>'+escapeHtml(b.title||'-')+'</strong></td>'
         +'<td style="white-space:nowrap">'+escapeHtml(d.kind||'기타')+'</td>'
         +'<td class="bz-cell" style="max-width:320px" title="'+escapeHtml(d.name)+'">'+escapeHtml(d.name)+'</td>'
