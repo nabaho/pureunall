@@ -84,13 +84,16 @@ function load(o) {
     'var LOCK = ' + JSON.stringify(o.lock || {}) + ';',
     'var INBOX = ' + JSON.stringify(o.inbox || {}) + ';',
     'var LINKS = ' + JSON.stringify(o.links || LINKS) + ';',
+    'var FILING = ' + JSON.stringify(o.filing || {}) + '; var WRITES = [];',
+    'function dbSet(k, v){ WRITES.push(k); if (k === "filing_owner") FILING = v; }',
     'var CALLS = [];',
+    'var payIdx = RECS, payOld = null, horizonMemo = {of:null, v:null};',
     'function paySites(){ return Object.keys(RECS); }',
     'function siteCardsList(){ return Object.keys(RECS); }',
     'function payRecs(s){ return RECS[s] || []; }',
     'function isLocked(s, m){ return !!LOCK[s + "|" + m]; }',
     'function effSig(r){ return r.신호 || "green"; }',
-    'function lmap(k){ return k === "site_co_link" ? LINKS : {}; }',
+    'function lmap(k){ return k === "site_co_link" ? LINKS : (k === "filing_owner" ? FILING : {}); }',
     'function inboxLog(){ return INBOX; }',
     'function cardsView(){ return []; }',
     'function esc(s){ return String(s == null ? "" : s).replace(/\'/g, "").replace(/"/g, ""); }',
@@ -104,11 +107,13 @@ function load(o) {
     'function won(n){ return (n==null)?"-":Number(n).toLocaleString(); }',
     cutVar('DED_KEYS_'), cut('dedupeEmps'), cut('empScore'), cut('slipRows'),
     cut('monthNum'), cut('guessMonth'), cut('ymOf'), cut('hubCounts'), cut('nameState'), cut('linkStats'), cut('staffOf'),
-    cutVar('TABS'), cutVar('TOOLS'), cutVar('TAB_FN'),
+    'var VAR_PCT = 0.20;',
+    cutVar('TABS'), cutVar('TOOLS'), cutVar('TAB_FN'), cutVar('FILINGS'), cutVar('FILING_WHO'),
+    cut('filingOf'), cut('filingUnset'), cut('setFiling'), cut('filingHtml'),
     ['ymNow', 'ymParts', 'ymText', 'inboxYm', 'coArrivals', 'coState', 'sitesHaveSever', 'byKoName', 'shellModel', 'curView',
-      'viewbarHtml', 'toolRow', 'colistHtml', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'monthRecsFor', 'coMoney', 'manwon', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
+      'viewbarHtml', 'toolRow', 'colistHtml', 'horizonNote', 'dataHorizon', 'defaultYm', 'colRowsHtml', 'coSites', 'shellCtx', 'sumCounts', 'monthRecsFor', 'coMoney', 'manwon', 'empsMonth', 'insOf', 'coVariance', 'varianceHtml', 'shellMainHtml', 'coBarHtml', 'tabBodyHtml', 'shellSummary'].map(cut).join('\n'),
     'globalThis.M = function(){ return shellModel(); };',
-    'globalThis.peek = function(){ return { App: App, CALLS: CALLS, EMP_CALLS: EMP_CALLS }; };',
+    'globalThis.peek = function(){ return { App: App, CALLS: CALLS, EMP_CALLS: EMP_CALLS, FILING: FILING }; };',
   ].join('\n')).runInContext(sandbox);
   return sandbox;
 }
@@ -189,10 +194,16 @@ test('찾기는 목록만 거른다', () => {
   assert.equal(h.indexOf('<b>다온원</b>'), -1);
 });
 
-test('★ 세 칸을 다 그리는 동안 직원 표를 받지 않는다', () => {
-  const s = load({ App: { coId: 'c1', tab: 'sum' } });
-  assert.doesNotThrow(() => { const m = s.M(); s.viewbarHtml(m); s.colistHtml(m); s.shellMainHtml(m); });
-  assert.equal(s.peek().EMP_CALLS.length, 0, '목록·본문을 그리다 직원 표를 받았습니다');
+test('★ 목록·보기 칸은 직원 표를 받지 않고, 본문은 «고른 회사» 것만 받는다', () => {
+  /* 9월을 보면 한눈에의 「지난달 대비」가 8·9월 표를 받는다 — 그래도 고른 회사(c1) 것만이어야 한다 */
+  const s = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-09' } });
+  const m = s.M();
+  assert.doesNotThrow(() => { s.viewbarHtml(m); s.colistHtml(m); });
+  assert.equal(s.peek().EMP_CALLS.length, 0, '목록·보기 칸을 그리다 직원 표를 받았습니다');
+  s.shellMainHtml(m); s.coBarHtml(m);
+  const got = Array.from(new Set(s.peek().EMP_CALLS)).sort();
+  assert.ok(got.length > 0, '고른 회사의 표를 받지 않았습니다(지표가 안 채워집니다)');
+  assert.deepEqual(got.filter(id => ['r1', 'r1b', 'r2'].indexOf(id) < 0), [], '고른 회사가 아닌 표까지 받았습니다: ' + got);
 });
 
 test('이름순은 법인 표기를 빼고 — ㈜가 붙은 곳이 맨 위로 몰리지 않는다', () => {
@@ -299,4 +310,88 @@ test('대장에 원 미만 값이 섞이면 원 단위로 반올림해 보이고
   assert.match(b, /원 미만 값이 있어/);
   const ok = load({ App: { coId: 'c1' }, emps: EMPS });
   assert.equal(ok.coBarHtml(ok.M()).indexOf('원 미만'), -1, '깨끗한 자료에 경고를 붙였습니다');
+});
+
+/* ══════ 자료 기준월 — 2026-10-07 「순서대로」 1번 ══════ */
+test('★ 기준 달을 안 정했으면 «자료가 있는 마지막 달»로 연다 — 이번 달로 열면 다 미도착이다', () => {
+  const s = load({ App: { ym: null } });
+  assert.equal(s.M().ym, '2026-09', '자료의 마지막 달(2026-09)이 아니라 이번 달로 열었습니다');
+});
+
+test('★ 목록 머리에 「자료는 언제까지」 — 기준 달이 그보다 뒤면 노랗게, 할 일까지', () => {
+  const s = load({ App: { ym: '2026-08' } });
+  assert.match(s.colistHtml(s.M()), /급여관리 자료: 2026년 9월까지/);
+  const late = load({ App: { ym: '2026-11' } });
+  const h = late.colistHtml(late.M());
+  assert.match(h, /2026년 9월까지입니다/);
+  assert.match(h, /설정 카드에서 올리기/);
+});
+
+/* ══════ 신고 담당 — 2026-10-07 「순서대로」 4번 ══════ */
+test('★ 회사 한 장(한눈에)에 신고 여섯 가지 × 우리/세무사/고객', () => {
+  const s = load({ App: { coId: 'c1', tab: 'sum' } });
+  const h = s.shellMainHtml(s.M());
+  ['원천세 신고', '간이지급명세서', '일용 지급명세서', '근로내용확인신고', '4대보험 취득·상실', '연말정산'].forEach(k =>
+    assert.ok(h.indexOf(k) >= 0, k + ' 줄이 없습니다'));
+  assert.match(h, /미정 6/);
+});
+
+test('★ 누르면 업체번호로 적히고, 같은 것을 다시 누르면 비운다', () => {
+  const s = load({ App: { coId: 'c1', tab: 'sum' } });
+  s.setFiling('c1', 'dailyins', 'us');
+  assert.equal(s.peek().FILING.c1.dailyins, 'us');
+  assert.equal(s.peek().FILING.c1.by, 'p001@pureun.kr');
+  s.setFiling('c1', 'dailyins', 'us');
+  assert.equal(s.peek().FILING.c1.dailyins, undefined);
+});
+
+test('★ 원천세를 「우리」로 고르면 세무대리 경계 경고 — 4대보험은 경고 없음', () => {
+  const s = load({ App: { coId: 'c1', tab: 'sum' }, filing: { c1: { withhold: 'us', ins: 'us' } } });
+  const h = s.shellMainHtml(s.M());
+  assert.equal((h.match(/세무대리 경계 확인/g) || []).length, 1, '원천세 한 줄에만 경고가 떠야 합니다');
+});
+
+test('「신고 담당 미정」 보기 — 여섯 칸을 다 정한 회사는 빠진다', () => {
+  const all = { withhold: 'tax', simple: 'tax', dailypay: 'tax', dailyins: 'us', ins: 'us', yearend: 'tax' };
+  const s = load({ filing: { c1: all } });
+  const v = s.M().views.find(x => x.key === 'nofiling');
+  assert.ok(v, '관리자에게 「신고 담당 미정」 보기가 없습니다');
+  assert.equal(Array.from(v.list, c => c.id).indexOf('c1'), -1);
+  assert.ok(Array.from(v.list, c => c.id).indexOf('c2') >= 0);
+});
+
+/* ══════ 지난달 대비 변동 — 2026-10-07 「순서대로」 5번 ══════ */
+const VEMPS = {
+  r1: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000, 국민연금: 90000 },
+       { 성명: '을', 실수령: 2700000, 공제총액: 300000, 국민연금: 120000 },
+       { 성명: '병', 실수령: 900000, 공제총액: 100000 }],
+  r1b: [],
+  /* 9월: 갑 그대로, 을은 연금이 빠짐, 병은 퇴사, 정은 입사, 무는… 없음. 을의 지급 300만 → 400만(+33%) */
+  r2: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000, 국민연금: 90000 },
+       { 성명: '을', 실수령: 3900000, 공제총액: 100000 },
+       { 성명: '정', 실수령: 1500000, 공제총액: 100000 }],
+};
+
+test('★★ 지난달 대비 — 입사·퇴사·20% 이상 변동·4대보험 공제 빠짐을 짚는다', () => {
+  const s = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-09' }, emps: VEMPS });
+  const h = s.shellMainHtml(s.M());
+  assert.match(h, /2026년 8월 → 2026년 9월/);
+  assert.match(h, /4대보험 공제가 빠짐 1명[\s\S]*?을/);
+  assert.match(h, /지급 20% 이상 변동 1명[\s\S]*?을 300만원→400만원 \(\+33%\)/);
+  assert.match(h, /새로 들어옴 1명[\s\S]*?정/);
+  assert.match(h, /빠짐\(퇴사\?\) 1명[\s\S]*?병/);
+  assert.match(s.coBarHtml(s.M()), /변동 4건/, '윗줄에 변동 알약이 없습니다');
+});
+
+test('달라진 것이 없으면 그렇다고 — 두 달 표를 받는 동안은 기다린다고', () => {
+  const same = { r1: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000 }], r1b: [], r2: [{ 성명: '갑', 실수령: 1800000, 공제총액: 200000 }] };
+  const s = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-09' }, emps: same });
+  assert.match(s.shellMainHtml(s.M()), /크게 달라진 사람이 없습니다/);
+  const w = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-09' } });
+  assert.match(w.shellMainHtml(w.M()), /두 달 직원 표를 불러오는 중/);
+});
+
+test('앞 달 자료가 없으면 변동 칸을 만들지 않는다(지어내지 않는다)', () => {
+  const s = load({ App: { coId: 'c1', tab: 'sum', ym: '2026-08' }, emps: VEMPS });
+  assert.equal(s.shellMainHtml(s.M()).indexOf('지난달 대비'), -1);
 });
