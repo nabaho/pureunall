@@ -1343,7 +1343,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=3"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=2"></script>
+<script src="js/kcareer-profile1.js?v=3"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -7172,11 +7172,11 @@ async function docImportResumeFolder(){
 /* ═══ 👤 프로필 1장 (대표 지시 2026-10-07 「경력실적 이력등을 1장으로」 → 목업 승인) ═══
    ⚠ 고르기·줄이기 셈은 KcareerProfile1 한 곳 — 화면은 재료를 모아 건네고 그림만 붙인다.
    ⚠ 재료에 금액·주민번호·계좌·생년월일을 «넣지 않는다»(fields 에서 이름·자격·소속·직위·연락처만 쓴다). */
-var _p1Opt=null, _p1PhotoUrl='';
+var _p1Opt=null, _p1PhotoUrl='', _p1PhotoWhy='', _p1PhotoTried=false;
 function _p1Load(){
   if(_p1Opt) return _p1Opt;
   try{ _p1Opt=JSON.parse(LS.get(NS+'p1_opts')||'null'); }catch(e){ _p1Opt=null; }
-  _p1Opt=Object.assign({ use:'general', on:{ award:false }, field:'', photo:true }, _p1Opt||{});
+  _p1Opt=Object.assign({ use:'general', on:{ award:false }, field:'', roles:'', photo:true }, _p1Opt||{});
   return _p1Opt;
 }
 function _p1Keep(){ try{ LS.set(NS+'p1_opts', JSON.stringify(_p1Opt)); }catch(e){} }
@@ -7187,39 +7187,77 @@ function _p1Src(){
     work:((typeof _cvWorkSorted==='function')?_cvWorkSorted():(get('work')||[])).map(function(r){ return Object.assign({}, r, { periodLabel:(typeof workPeriod==='function'?workPeriod(r):r.period) }); }),
     wiccok:get('wiccok')||[], consult:get('consult')||[], advisory:get('advisory')||[], lecture:get('lecture')||[] };
 }
-function _p1Model(){ var o=_p1Load(); return KcareerProfile1.build(_p1Src(), { use:o.use, on:o.on, field:o.field }); }
+/* ★ 한 장에 «드나»를 실제로 그려 잰다 — 셈(줄 수)으로는 글꼴·두 단 짝 때문에 4분의 1이 남았다(대표 2026-10-07 인쇄 화면).
+     A4(794×1123) 에서 여백 14mm(53px)를 뺀 1017px 이 쓸 자리, 인쇄 글꼴 차이를 두고 24px 남긴다.
+     사진을 넣기로 했으면 사진 자리(70×90)도 «같이» 잰다 — 늦게 붙는 사진이 한 장을 넘기면 안 된다. */
+var _p1Measure=null;
+function _p1Fits(photo){
+  if(typeof document==='undefined' || !document.body) return null;
+  if(!_p1Measure || !_p1Measure.isConnected){
+    _p1Measure=document.createElement('div');
+    _p1Measure.setAttribute('aria-hidden','true');
+    _p1Measure.style.cssText='position:fixed;left:-20000px;top:0;width:688px;visibility:hidden;pointer-events:none';
+    document.body.appendChild(_p1Measure);
+  }
+  var 사진=photo?'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACH5BAEAAAAALAAAAAABAAEAAAICRAEAOw==':'';
+  return function(m){
+    _p1Measure.innerHTML='<style>'+KcareerProfile1.CSS+'</style>'+KcareerProfile1.toHtml(m, 사진);
+    var p=_p1Measure.querySelector('.p1'); return !!p && p.offsetHeight<=1017-24;
+  };
+}
+/* page:true → 미리보기·PDF(남는 자리를 채운다) · 없으면 한글 문서(한 단이라 더 길다 — 셈 그대로) */
+function _p1Model(how){
+  var o=_p1Load(), m=KcareerProfile1.build(_p1Src(), { use:o.use, on:o.on, field:o.field, roles:o.roles });
+  if(how&&how.page){ var fits=_p1Fits(!!o.photo); if(fits) KcareerProfile1.fill(m, fits); }
+  return m;
+}
 function renderProfile1(){
   var side=document.getElementById('p1Side'), paper=document.getElementById('p1Paper');
   if(!side||!paper||!window.KcareerProfile1) return;
-  var o=_p1Load(), m=_p1Model();
-  var 전부=KcareerProfile1.build(_p1Src(), { use:o.use, on:{} });
+  var o=_p1Load(), m=_p1Model({ page:true });
+  var 전부=KcareerProfile1.build(_p1Src(), { use:o.use, on:{ perf:true }, roles:o.roles });
   var by={}; m.sections.forEach(function(x){ by[x.key]=x; });
   var cnt={}; 전부.sections.forEach(function(x){ cnt[x.key]=x.n; });
   var row='display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;white-space:nowrap;cursor:pointer';
   side.innerHTML='<div style="font-weight:700;margin:2px 0 6px">넣을 칸 고르기</div>'
     +KcareerProfile1.SECTIONS.map(function(S){
-      var 켬=(o.on||{})[S.key]!==false, n=cnt[S.key]||0, x=by[S.key];
+      var 켬=KcareerProfile1.isOn(S.key, o.on, o.use), n=cnt[S.key]||0, x=by[S.key];
       return '<label style="'+row+'"><input type="checkbox"'+(켬?' checked':'')+(n?'':' disabled')+' onchange="p1Toggle(\''+S.key+'\',this.checked)"> '+escapeHtml(S.title)
         +'<span style="margin-left:auto;color:var(--text-mute);font-size:12px">'+n+'건'+(x&&x.more?' · 최근 '+x.show:'')+'</span></label>'; }).join('')
+    +'<div style="font-weight:700;margin:12px 0 6px">주요 직책 (전·현) <span style="font-weight:400;color:var(--text-mute);font-size:12px">한 줄에 하나</span></div>'
+    +'<textarea class="tb-input" rows="4" style="width:100%;min-width:0;font-size:16px;resize:vertical" placeholder="2019~2021 ○○지방공인노무사회 회장&#10;2023~ ○○위원회 위원" onchange="p1Roles(this.value)">'+escapeHtml(o.roles||'')+'</textarea>'
+    +'<div style="color:var(--text-mute);font-size:12px;margin-top:2px">끝난 해가 지났으면 (전), 「~」로 열어 두면 (현)을 붙입니다 · 위촉·위원 바로 위에 나옵니다</div>'
     +'<div style="font-weight:700;margin:12px 0 6px">주 분야</div>'
     +'<input class="tb-input" style="width:100%;min-width:0" placeholder="예) 인사노무 컨설팅 · 일터혁신 · 노사관계" value="'+escapeHtml(o.field||'')+'" onchange="p1Field(this.value)">'
     +'<div style="font-weight:700;margin:12px 0 6px">용도</div>'
     +'<select class="tb-select" style="width:100%" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
     +'<label style="'+row+';margin-top:8px"><input type="checkbox"'+(o.photo?' checked':'')+' onchange="p1Photo(this.checked)"> 증명사진 넣기 <span style="margin-left:auto;color:var(--text-mute);font-size:12px">미리보기·PDF</span></label>'
+    +(o.photo&&!_p1PhotoUrl&&_p1PhotoWhy?'<div style="color:var(--red);font-size:12px;margin:-2px 0 4px;white-space:normal">⚠ '+escapeHtml(_p1PhotoWhy)+'</div>':'')
     +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'
     +'<button class="btn primary" type="button" onclick="p1Hwpx()">📄 한글(hwpx)로</button>'
     +'<button class="btn" type="button" onclick="p1Pdf()">🖨 PDF</button>'
     +'<button class="btn" type="button" onclick="p1Keep()">📁 서류 보관함에 담기</button></div>'
     +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:10px;font-size:12px">'
-    +(m.overflow?'⚠ 칸을 다 줄여도 한 장을 조금 넘습니다 — 칸 하나를 끄면 맞습니다':'✔ 한 장에 맞췄습니다')+'<br>✔ 금액·주민번호·계좌는 넣지 않습니다</div>';
+    +(m.overflow?'⚠ 칸을 다 줄여도 한 장을 조금 넘습니다 — 칸 하나를 끄면 맞습니다':'✔ 한 장에 맞췄습니다'+(m.filled?' — 남는 자리만큼 줄을 더 넣었습니다':''))+'<br>✔ 금액·주민번호·계좌는 넣지 않습니다</div>';
   /* ★ 종이는 «실제 A4 크기»(794×1123px, 여백 14mm)로 그리고 칸 너비에 맞춰 «줄여 보인다» —
        좁은 칸에 바로 그리면 글이 접혀 한 장을 넘는 것처럼 보인다(인쇄와 다르게 보이면 안 된다) */
   paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
     +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
   _p1Scale();
-  /* 사진은 «나중에» 붙인다 — 보관함에서 꺼내는 데 시간이 걸린다 */
-  if(o.photo && !_p1PhotoUrl){ var pid=(typeof rhPhotoSrc==='function')?rhPhotoSrc():null;
-    if(pid && typeof fileURLAsync==='function') fileURLAsync(pid).then(function(u){ if(u){ _p1PhotoUrl=u; renderProfile1(); } }).catch(function(){}); }
+  /* 사진은 «나중에» 붙인다 — 보관함에서 꺼내는 데 시간이 걸린다.
+     ⚠ 예전엔 fileURLAsync 로 꺼냈는데, 사진이 «data: 머리»를 단 채 담겨 있으면 풀다가 조용히 실패해 사진이 영영 안 나왔다
+       (대표 물음 2026-10-07 「증명사진 넣기에 왜 사진은 없나?」). 이력서 «사진 넣기»와 같은 길(_rhPhotoPng)로 꺼내
+       증명사진 비율(70×90)로 가운데를 자른다 — 인쇄 창에도 그대로 실리는 data: 주소다.
+     ⚠ 한 번만 시도한다 — 못 꺼내면 까닭을 옆에 적고, 다시 그리기를 되풀이하지 않는다. */
+  if(o.photo && !_p1PhotoUrl && !_p1PhotoTried){ _p1PhotoTried=true;
+    var pid=(typeof rhPhotoSrc==='function')?rhPhotoSrc():null;
+    if(!pid){ _p1PhotoWhy='사진 보관함에 사진이 없습니다 — 사진 보관함에 증명사진을 올려 주세요'; renderProfile1(); }
+    else if(typeof _rhPhotoPng==='function') _rhPhotoPng(pid, 70/90).then(function(v){
+        if(v&&v.png){ _p1PhotoUrl='data:image/png;base64,'+v.png; _p1PhotoWhy=''; }
+        else _p1PhotoWhy='사진 파일을 이 PC 에서 열지 못했습니다';
+        renderProfile1(); })
+      .catch(function(e){ _p1PhotoWhy='사진을 불러오지 못했습니다 — '+((e&&e.message)||e); renderProfile1(); });
+  }
 }
 function _p1Scale(){
   var paper=document.getElementById('p1Paper'), a4=paper&&paper.querySelector('.p1-a4'); if(!a4) return;
@@ -7230,7 +7268,8 @@ if(typeof window!=='undefined' && window.addEventListener) window.addEventListen
 function p1Toggle(k,v){ var o=_p1Load(); o.on=Object.assign({}, o.on||{}); o.on[k]=!!v; _p1Keep(); renderProfile1(); }
 function p1Use(v){ _p1Load().use=v; _p1Keep(); renderProfile1(); }
 function p1Field(v){ _p1Load().field=String(v||'').trim(); _p1Keep(); renderProfile1(); }
-function p1Photo(v){ _p1Load().photo=!!v; _p1Keep(); renderProfile1(); }
+function p1Photo(v){ _p1Load().photo=!!v; _p1Keep(); if(v&&!_p1PhotoUrl) _p1PhotoTried=false; renderProfile1(); }
+function p1Roles(v){ _p1Load().roles=String(v||'').replace(/\r/g,'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean).join('\n'); _p1Keep(); renderProfile1(); }
 function _p1Name(ext){ var m=_p1Model(), d=new Date();
   return '프로필_'+String(m.head.name||'').replace(/[\\/:*?"<>|]/g,'')+'_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.'+ext; }
 /* 한글 문서 — 표 칸으로 짓는다(사진은 넣지 않는다 — 한글에서 직접 붙이거나 PDF 를 쓴다) */
@@ -7241,8 +7280,8 @@ function _p1Bytes(){
     +HWPX.para([h.license,h.name].filter(Boolean).join(' ')+((h.org||h.title)?' · '+[h.org,h.title].filter(Boolean).join(' '):''), HWPX.CP.body, {paraPr:HWPX.PP.center})
     +HWPX.spacer();
   var 머리=[]; if(h.phone||h.email) 머리.push(['연락처', [h.phone,h.email].filter(Boolean).join(' · ')]); if(h.field) 머리.push(['주 분야', h.field]);
-  머리.push(['실적 요약', m.kpis.map(function(k){ return k.label+' '+k.n; }).join(' · ')]);
-  body+=HWPX.tablePara(머리, HWPX.cols([0.16,0.84]))+HWPX.spacer();
+  /* 숫자 요약(KPI)은 넣지 않는다 — 대표 2026-10-07 「kpi 필요없다」 */
+  if(머리.length) body+=HWPX.tablePara(머리, HWPX.cols([0.16,0.84]))+HWPX.spacer();
   m.sections.forEach(function(x){
     body+=HWPX.para('■ '+x.title+(x.more?'  (최근 '+x.show+' · 전체 '+x.n+')':''), HWPX.CP.body);
     var 폭=(x.rows[0]||[]).length;
@@ -7260,7 +7299,7 @@ function p1Hwpx(){
 }
 /* PDF — 미리보기와 «같은 글»을 인쇄 창으로(PDF 로 저장 고르기) */
 function p1Pdf(){
-  var o=_p1Load(), m=_p1Model();
+  var o=_p1Load(), m=_p1Model({ page:true });   /* 미리보기와 «같은 줄 수» */
   var fr=document.createElement('iframe'); fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
   document.body.appendChild(fr);
   var d=fr.contentWindow.document;
