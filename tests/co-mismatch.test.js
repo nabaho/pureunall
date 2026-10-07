@@ -213,3 +213,32 @@ test('★ 업체관리 툴바(폰·PC 둘 다)에 단추가 있고, 창이 업�
   assert.match(comp, /misOpen && h\(CoMismatchModal/);
   assert.match(comp, /onOpenCo\s*:\s*function\(co\)\{\s*setDetailModal\(co\)/, '「업체 열기」가 업체 상세로 안 간다');
 });
+
+/* ★★ 2026-10-07 대표 결정 「빈칸만 채우기」(기업정보함 점검 4절) — 되돌릴 기록이 «업체 기록 안»에 남는다.
+     예전에는 화면 상태에만 있어 창을 닫으면 되돌릴 길이 사라졌다. */
+test('★★ 채운 것은 업체 기록(coFill)에 남고, 창을 닫았다 열어도 «마지막 채우기»를 다시 찾는다', () => {
+  const co = { id: 'e', name: '가나상사', bizNo: B1 };
+  const r = run([co], [{ c: '가나상사', bz: B1, ceo: '홍길동', ad: '서울특별시 마포구 월드컵로 1' }]);
+  const fresh = [{ id: 'e', name: '가나상사', bizNo: B1, ceo: '', address: '' }];
+  const p = M.fillRecs(r.rows, fresh, { at: 1000, by: '대표' });
+  assert.deepEqual(p.recs[0].coFill, { at: 1000, by: '대표', put: { ceo: '홍길동', address: '서울특별시 마포구 월드컵로 1' } });
+  const saved = p.recs.concat([{ id: 'x', coFill: { at: 500, put: { ceo: '옛것' } } }]);
+  const last = M.pendingFill(saved);
+  assert.equal(last.at, 1000, '가장 최근 채우기를 찾아야 한다');
+  assert.equal(last.cells, 2);
+  assert.deepEqual(last.undo, [{ id: 'e', put: { ceo: '홍길동', address: '서울특별시 마포구 월드컵로 1' } }]);
+  /* 되돌리면 «되돌렸음»을 찍고 지우지 않는다 — 다음엔 그 앞 채우기가 «마지막»이 된다 */
+  const u = M.undoRecs(last.undo, saved, { at: 2000, by: '대표' });
+  assert.equal(u.recs[0].ceo, '');
+  assert.equal(u.recs[0].coFill.undoneAt, 2000);
+  assert.equal(u.recs[0].coFill.at, 1000, '기록을 지웠다 — 언제 무엇을 넣었는지 남아야 한다');
+  assert.equal(M.pendingFill(u.recs.concat([saved[1]])).at, 500);
+  assert.equal(M.pendingFill([{ id: 'z' }]), null);
+});
+
+test('★ 이알피 창은 마지막 채우기를 «업체 기록에서» 센다 — 화면 상태(useState)에 두면 닫는 순간 사라진다', () => {
+  const src = fnSrc('CoMismatchModal');
+  assert.match(src, /pendingFill\(dbGet\('companies'/);
+  assert.ok(!/setLastFill/.test(src), '되돌릴 기록을 화면 상태에 둔다');
+  assert.match(fnSrc('undoFill'), /confirm\(/, '며칠 뒤에도 누르는 단추라 한 번 물어야 한다');
+});

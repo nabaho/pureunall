@@ -195,7 +195,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 기업정보함 → 업체관리 담당자 메일 (대표 요청 2026-08-27).
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
-<script src="js/pu-co-mismatch.js?v=2"></script>
+<script src="js/pu-co-mismatch.js?v=3"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
@@ -9545,25 +9545,28 @@ function CoMismatchModal(props){
   var tabS = useState('all'); var tab = tabS[0]; var setTab = tabS[1];
   var openS = useState(''); var openId = openS[0]; var setOpenId = openS[1];
   var tkS = useState(0); var bump = function(){ tkS[1](function(n){ return n + 1; }); };
-  var lfS = useState(null); var lastFill = lfS[0]; var setLastFill = lfS[1];
   var r = coMismatchBuild();
+  /* 아직 안 되돌린 마지막 채우기 — 업체 기록의 coFill 에서 센다(창을 닫아도·다른 PC 에서도 남는다, 2026-10-07) */
+  var lastFill = window.PuCoMismatch && window.PuCoMismatch.pendingFill ? window.PuCoMismatch.pendingFill(dbGet('companies', []) || []) : null;
+  var meName = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && CURRENT_USER.name) || '';
   /* 빈칸 채우기 — 계산은 PuCoMismatch.fillRecs(저장 직전 목록으로 다시 본다), 저장은 props.onFill 하나 */
   function doFill(rows){
     var M = window.PuCoMismatch;
-    var plan = M.fillRecs(rows, dbGet('companies', []) || []);
+    var plan = M.fillRecs(rows, dbGet('companies', []) || [], { at:Date.now(), by:meName });
     if(!plan.recs.length){ showToast('채울 빈칸이 없습니다 — 그사이 다른 사람이 적었을 수 있습니다'); bump(); return; }
     if(rows.length > 1 && !confirm('업체 ' + plan.recs.length + '곳의 빈칸 ' + plan.cells + '칸을 기업정보함 사업자등록증 값으로 채웁니다.\n\n'
-      + '이미 적힌 칸은 건드리지 않습니다. 이 창에서 바로 되돌릴 수 있습니다.')) return;
+      + '이미 적힌 칸은 건드리지 않습니다. 넣은 것은 업체 기록에 남아, 나중에 이 창에서 되돌릴 수 있습니다.')) return;
     if(!props.onFill || !props.onFill(plan.recs)) return;
-    setLastFill(plan);
     showToast('📥 빈칸 ' + plan.cells + '칸을 채웠습니다 (' + plan.recs.length + '곳)');
     bump();
   }
   function undoFill(){
     if(!lastFill) return;
-    var u = window.PuCoMismatch.undoRecs(lastFill.undo, dbGet('companies', []) || []);
+    /* 며칠 뒤에도 누를 수 있으므로 한 번 묻는다 — 그 뒤 사람이 고친 칸은 undoRecs 가 안 건드린다 */
+    if(!confirm(new Date(lastFill.at).toLocaleString('ko-KR') + ' 에 채운 업체 ' + lastFill.n + '곳 ' + lastFill.cells + '칸을 다시 비웁니다.\n\n'
+      + '그 뒤 누가 고친 칸은 그대로 둡니다.')) return;
+    var u = window.PuCoMismatch.undoRecs(lastFill.undo, dbGet('companies', []) || [], { at:Date.now(), by:meName });
     if(u.recs.length && (!props.onFill || !props.onFill(u.recs))) return;
-    setLastFill(null);
     showToast('↩ ' + u.cells + '칸을 되돌렸습니다' + (u.cells < lastFill.cells ? ' — 그사이 고친 칸은 그대로 두었습니다' : ''));
     bump();
   }
@@ -9727,7 +9730,7 @@ function CoMismatchModal(props){
             border:'1px solid #bfdbfe', background:'#eff6ff', color:'#2563eb' } }, '🔗 이름으로만 이어진 기록 ' + props.linkCount + ' →'),
         lastFill && h('button', { type:'button', onClick:undoFill,
           style:{ marginLeft:'auto', padding:'4px 11px', borderRadius:'14px', fontSize:'12px', cursor:'pointer', whiteSpace:'nowrap',
-            border:'1px solid #cbd5e1', background:'#fff', color:'#475569', fontWeight:700 } }, '↩ 방금 채운 ' + lastFill.cells + '칸 되돌리기')),
+            border:'1px solid #cbd5e1', background:'#fff', color:'#475569', fontWeight:700 } }, '↩ 지난번 채운 ' + lastFill.cells + '칸 되돌리기 (' + new Date(lastFill.at).toLocaleDateString('ko-KR') + ')')),
       h('div', { className:'modal-b', style:{ maxHeight:'68vh', overflowY:'auto', padding:0 } }, body),
       c && h('div', { style:{ padding:'6px 14px', fontSize:'11px', color:'#64748b', borderTop:'1px solid #e2e8f0' } },
         '등록증과 짝지어진 업체 ' + c.paired + '곳 · 등록증이 기업정보함에 없는 업체 ' + c.noCert + '곳')));
