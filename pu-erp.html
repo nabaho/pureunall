@@ -31323,6 +31323,24 @@ function CompanyDetailModal(props){
                       }))
                     : h('div', { style:{ color:'#94a3b8', fontSize:'11.5px', textAlign:'center', padding:'10px' } },
                         '다른 프로그램에 이 업체 기록이 없습니다'))),
+          /* ✉ 메일함으로 가는 길 (대표 지시 2026-10-07 전체 점검) —
+             ★ 메일함 → 이알피 길(📁 「컨설팅·담당」)은 있었는데 «반대 길이 아예 없었다».
+               업체를 보다가 그 업체 메일을 보려면 메일함을 열고 이름을 다시 쳐야 했다.
+             ⚠ 위 줄들과 달리 «기록을 읽어 세지 않는다» — 메일은 수천 통이라 업체 상세를
+               열 때마다 훑으면 그만큼 느려진다. 길만 내주고 세는 일은 메일함이 한다.
+             ⚠ 그래서 「(N)」을 안 적는다. 세지 않은 수를 적으면 그 숫자를 못 믿게 된다. */
+          !oa.loading && co && co.name && h('div', {
+            style:{ display:'grid', gridTemplateColumns:'auto 1fr auto', gap:'8px', alignItems:'center',
+              padding:'5px 8px', background:'#eff6ff', borderRadius:'5px', marginTop:'3px' } },
+            h('span', { style:{ fontSize:'10px', background:'#bfdbfe', color:'#1e40af',
+              padding:'2px 8px', borderRadius:'8px', fontWeight:700, whiteSpace:'nowrap' } }, '메일함'),
+            h('span', { style:{ fontSize:'11px', color:'#1e293b', overflow:'hidden',
+              textOverflow:'ellipsis', whiteSpace:'nowrap' } }, '이 업체 이름으로 메일을 찾아 봅니다'),
+            h('button', { onClick:function(){
+                oaOpen('pu-cards.html?sso=1&view=mail&q=' + encodeURIComponent(co.name || '')); },
+              title:'메일함에서 「' + (co.name || '') + '」 로 찾습니다 — 보낸이·제목·본문 첫 줄을 함께 봅니다',
+              style:{ background:'none', border:'none', color:'#2563eb', fontSize:'10.5px',
+                fontWeight:700, cursor:'pointer', whiteSpace:'nowrap', padding:'2px 4px' } }, '열기 ↗')),
           !oa.loading && !oa.err && h('div', { style:{ fontSize:'10px', color:'#cbd5e1', marginTop:'4px' } },
             '보기만 합니다 · 사업자번호 › 업체 ID › 이름 순으로 찾습니다')
         ),
