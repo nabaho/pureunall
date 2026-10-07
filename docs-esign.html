@@ -194,7 +194,7 @@
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=11"></script>
-<script src="js/pu-contract-forms.js?v=22"></script>
+<script src="js/pu-contract-forms.js?v=23"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=6"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
@@ -283,6 +283,12 @@ function proposeFromHash() {
   if (h.indexOf(p) !== 0) return '';
   try { return decodeURIComponent(h.slice(p.length)); } catch (e) { return ''; }
 }
+/* 기업정보함 「📄 계약서 만들기」 (2026-10-07) — #forms:make={회사 열쇠}. 회사 열쇠만 싣는다(이름·금액 없음) */
+function makeFromHash() {
+  var h = location.hash, p = '#forms:make=';
+  if (h.indexOf(p) !== 0) return '';
+  try { return decodeURIComponent(h.slice(p.length)); } catch (e) { return ''; }
+}
 /* 이알피 「📦 문서관리에서 묶음 채우기」 (설계 2026-10-03 §4) — #forms:contract={계약 id}. 금액·이름은 주소에 싣지 않는다 */
 function contractFromHash() {
   var h = location.hash, p = '#forms:contract=';
@@ -294,6 +300,7 @@ function formFromHash() {
   if (h.indexOf('#forms:') !== 0) return null;
   if (h.indexOf('#forms:propose=') === 0) return null;   // 기업정보함 「📨 제안서 보내기」 — 양식 번호가 아니다
   if (h.indexOf('#forms:contract=') === 0) return null;  // 이알피 「📦 문서관리에서 묶음 채우기」 — 계약 번호다
+  if (h.indexOf('#forms:make=') === 0) return null;      // 기업정보함 「📄 계약서 만들기」 — 회사 열쇠다
   try { return decodeURIComponent(h.slice(7)) || null; } catch (e) { return null; }
 }
 /* 🔒 서명본 받기 — 서버 함수 puDocSecret 이 총괄관리자인지 보고 파일을 내준다(설계 2026-10-03 §3.1).
@@ -658,7 +665,7 @@ function showPane(name) {
   if (!curUser) return;
   if (name === 'forms' && !formsMounted) {
     formsMounted = true;
-    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
+    formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), make: makeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });

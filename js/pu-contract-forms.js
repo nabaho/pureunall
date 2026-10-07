@@ -325,6 +325,30 @@
     });
     return out;
   }
+  /* ── 📄 계약서 만들기 (대표 「추천대로」 2026-10-07, 목업 승인) — 기업정보함 회사 상세에서 출발 ──
+     계약 종류를 고르면 그 종류의 세트를 미리 체크한다. 체크 규칙은 이알피 「계약서 출력」(contractPick)과 같다 —
+     어디서 시작하든 같은 서류 묶음이 나와야 한다. 사건은 사건유형을 모르므로 묶음 없는(일반) 사건 양식만. */
+  var MAKE_KINDS = [
+    { v: 'adv', label: '자문', icon: '🏢', kind: 'company', typeCode: '자문', sub: '자문계약서 + CMS' },
+    { v: 'pay', label: '급여', icon: '💰', kind: 'company', typeCode: '급여', sub: '급여 6종' },
+    { v: 'con', label: '컨설팅', icon: '📊', kind: 'consulting', sub: '컨설팅 계약' },
+    { v: 'case', label: '사건', icon: '⚖️', kind: 'case', sub: '위임계약·위임장' },
+    { v: 'fund', label: '기금', icon: '🏦', kind: 'fund', sub: '기금 계약' }
+  ];
+  function makePlan(forms, v) {
+    var mk = MAKE_KINDS.filter(function (x) { return x.v === v; })[0];
+    if (!mk) return { list: [], checked: [] };
+    var all = (forms || []).filter(function (f) { return f && f.enabled !== false && f.kind === mk.kind; });
+    var checked = mk.kind === 'case'
+      ? all.filter(function (f) { return groupOf(f) === NO_GROUP; }).map(function (f) { return f.id; })
+      : contractPick(all, { kinds: [mk.kind], typeCode: mk.typeCode });
+    var set = mk.typeCode === '자문' ? CONTRACT_SETS.advisory : mk.typeCode === '급여' ? CONTRACT_SETS.payroll : null;
+    if (set) checked.sort(function (a, b) { return set.indexOf(a) - set.indexOf(b); });   // 세트에 적힌 차례대로(급여위임 → 연금 → 건강 → 고용 → CMS)
+    var rest = all.filter(function (f) { return checked.indexOf(f.id) < 0; })
+      .sort(function (a, b) { return (groupOf(a) === PROPOSAL_GROUP) - (groupOf(b) === PROPOSAL_GROUP) || String(a.name || '').localeCompare(String(b.name || '')); });
+    var first = checked.map(function (id) { return all.filter(function (f) { return f.id === id; })[0]; }).filter(Boolean);
+    return { list: first.concat(rest), checked: checked.slice() };
+  }
   /* 계약 값이 «이기는» 칸 — 계약에서만 아는 값. 회사·담당자·근로자 칸은 채우기 창에서 고른 것이 먼저(비면 계약 값) */
   var CONTRACT_WINS = /^(계약|성공보수$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
   /* 「계약서 / 제안서·견적서」 두 묶음을 쓰는 종류 (대표 「추천대로」 2026-10-06 — 견적서·제안 공문을 기금 밖에서도).
@@ -691,6 +715,12 @@
     + '.pcf-nts{display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 9px;border-radius:6px;margin-bottom:6px;background:#eff6ff;color:#1e40af}'
     + '.pcf-nts.bad{background:#fef2f2;color:#991b1b;font-weight:700}.pcf-nts.dim{background:#f8fafc;color:#64748b}'
     + '.pcf-nts button{margin-left:auto;white-space:nowrap;flex:none;font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid #93c5fd;background:#fff;color:#1d4ed8;border-radius:6px;cursor:pointer}'
+    + '.pcf-mk-kinds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:6px}'
+    + '.pcf-mk-kind{border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px;text-align:left;cursor:pointer;font:inherit;font-size:13px}'
+    + '.pcf-mk-kind small{display:block;font-size:11px;color:#64748b}.pcf-mk-kind.on{border:2px solid #1d4ed8;background:#eff6ff;color:#1e40af}'
+    + '.pcf-mk-kind:disabled{opacity:.45;cursor:default}'
+    + '.pcf-mk-row{grid-template-columns:20px 26px minmax(0,1fr) 60px!important}'
+    + '@media(max-width:700px){.pcf-mk-kinds{grid-template-columns:repeat(3,minmax(0,1fr))}}'
     + '.pcf-vsum{font-size:12px;padding:6px 9px;border-radius:6px;margin-bottom:6px;background:#fef3c7;color:#92400e}.pcf-vsum.ok{background:#dcfce7;color:#166534}'
     + '.pcf-fprev{margin-top:10px;border:1px solid #e2e8f0;border-radius:8px;max-height:60vh;overflow:auto;background:#e2e8f0;padding:12px}'
     + '@media(max-width:700px){.pcf-fcols{grid-template-columns:1fr}}'
@@ -1470,7 +1500,7 @@
     drawContacts(); drawVals();
     /* 기업정보함 「📨 제안서 보내기」로 왔으면 그 회사를 골라 둔다 (설계 2026-09-29 §8).
        ⚠ «회사» 줄만 — 사람(명함·담당자) 줄도 같은 회사 이름을 가져 먼저 걸리면 회사 칸이 비뚤어진다. */
-    var preKey = host.propose || (host.contractCtx && host.contractCtx.coKey) || '';
+    var preKey = host.propose || host.make || (host.contractCtx && host.contractCtx.coKey) || '';
     if (preKey) withRows(function (rows) {
       if (st.co) return;
       var r = rows.filter(function (x) { return (x.k === 'biz' || x.k === 'erp' || x.k === 'card-co') && CF.sentKeys(x, {}).indexOf(preKey) >= 0; })[0];
@@ -1607,6 +1637,66 @@
     /* 📦 계약 여러 건 (서식 묶음 설계 2026-09-28 상황 1-C) — 이알피 계약을 골라, 계약마다 이알피와 같은 규칙으로 양식을 골라
        같은 한 벌 값으로 채워 .zip 하나(계약마다 폴더)로 받는다. 하나씩 차례로 — 한 건이 실패해도 나머지는 계속.
        ⚠ db 를 만지지 않는다(읽기는 host). 메일·보낸 기록은 없다(내려받기만) — 보낼 때는 계약 하나씩 「📦 문서관리에서 묶음 채우기」로. */
+    /* 📄 계약서 만들기 창 — 종류 고르기 → 세트 체크 → 채우기 창(회사는 host.make 로 골라 둔다) */
+    function openMake() {
+      ensureCss();
+      var cur = MAKE_KINDS[0].v, plan = null, picked = {};
+      var bg = el('div', { 'class': 'pcf-mbg' });
+      function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      document.addEventListener('keydown', onKey);
+      var kinds = el('div', { 'class': 'pcf-mk-kinds' }), box = el('div', { 'class': 'pcf-ct-list' });
+      var btnGo = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff;font-weight:700', onclick: go });
+      function sel() { return plan.list.filter(function (f) { return picked[f.id]; }); }
+      function sync() { var n = sel().length; btnGo.textContent = n ? '📝 ' + n + '개 채우기 → 확인표' : '양식을 고르세요'; btnGo.disabled = !n; }
+      function setKind(v) {
+        cur = v; plan = makePlan(S.forms, v); picked = {};
+        plan.checked.forEach(function (id) { picked[id] = true; });
+        drawKinds(); draw();
+      }
+      function drawKinds() {
+        kinds.innerHTML = '';
+        MAKE_KINDS.forEach(function (k) {
+          var n = makePlan(S.forms, k.v).list.length;
+          kinds.appendChild(el('button', { type: 'button', 'class': 'pcf-mk-kind' + (k.v === cur ? ' on' : ''), 'aria-pressed': k.v === cur ? 'true' : 'false',
+            disabled: !n, onclick: function () { setKind(k.v); } }, [el('b', { text: k.icon + ' ' + k.label }), el('small', { text: n ? k.sub : '양식 없음' })]));
+        });
+      }
+      function draw() {
+        box.innerHTML = '';
+        var rows = plan.list, allOn = rows.length > 0 && rows.every(function (f) { return picked[f.id]; });
+        box.appendChild(el('label', { 'class': 'pcf-ct-row pcf-mk-row pcf-ct-head' }, [el('input', { type: 'checkbox', checked: allOn, 'aria-label': '모두',
+          onchange: function (e) { rows.forEach(function (f) { picked[f.id] = e.target.checked; }); draw(); } }), el('b', { text: '#' }), el('b', { text: '양식' }), el('b', { text: '원본' })]));
+        if (!rows.length) box.appendChild(el('div', { 'class': 'pcf-muted', style: 'padding:10px', text: '이 종류의 양식이 없습니다' }));
+        rows.forEach(function (f, i) {
+          var src = hwpSources(f)[0];
+          box.appendChild(el('label', { 'class': 'pcf-ct-row pcf-mk-row' }, [
+            el('input', { type: 'checkbox', checked: !!picked[f.id], onchange: function (e) { picked[f.id] = e.target.checked; sync(); } }),
+            el('span', { text: String(i + 1) }),
+            el('span', { text: f.name + (groupOf(f) === PROPOSAL_GROUP ? ' · 견적·제안' : '') }),
+            el('span', { 'class': 'pcf-muted', text: src ? (/\.xlsx$/i.test(src.name) ? '엑셀' : '한글') : '본문' })]));
+        });
+        sync();
+      }
+      function go() {
+        var list = sel(); if (!list.length) return;
+        var mk = MAKE_KINDS.filter(function (x) { return x.v === cur; })[0];
+        close();
+        S.kind = mk.kind; resetFilters(); S.checked = list.map(function (f) { return f.id; }); select(list[0].id);
+        openFill(list, host, mk.icon + ' ' + mk.label + ' 계약서');
+      }
+      var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '계약서 만들기', style: 'width:760px' }, [
+        el('div', { 'class': 'pcf-mh' }, [el('span', { text: '📄 계약서 만들기 — 기업정보함에서 고른 회사' }),
+          el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
+        el('div', { 'class': 'pcf-mb' }, [
+          el('div', { 'class': 'pcf-fh', text: '계약 종류' }), kinds,
+          el('div', { 'class': 'pcf-fh', text: '채울 양식 — 세트대로 미리 체크했습니다(빼거나 더할 수 있습니다)' }), box,
+          el('div', { 'class': 'pcf-muted', style: 'margin-top:6px', text: '계약금액·기간은 다음 창(확인표)에서 적습니다. 회사·담당자는 이알피·기업정보함에서 채웁니다.' })]),
+        el('div', { 'class': 'pcf-mf' }, [el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }), btnGo])
+      ]);
+      bg.appendChild(m); document.body.appendChild(bg);
+      setKind(cur);
+    }
     function openContracts() {
       if (!host.contractList || !host.contractLoad) return;
       ensureCss();
@@ -1752,6 +1842,7 @@
         else { var f0 = shown()[0]; S.sel = f0 ? f0.id : null; }
         drawTree(); drawMain();
         if (host.propose && !S.proposed) { S.proposed = true; openPropose(); }
+        if (host.make && !S.made) { S.made = true; openMake(); }
         if (host.contract && !S.contractTried) { S.contractTried = true; openContract(); }
         /* 세트는 따로 받는다 — 못 받아도 양식 화면은 그대로 쓴다(기본 세트만 보인다) */
         db.ref(PATH_SETS).once('value').then(function (s) { S.sets = setsOf(s.val()); drawMain(); }, function () {});
@@ -2388,7 +2479,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TWO_GROUP_KINDS: TWO_GROUP_KINDS, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf,
     filterForms: filterForms,

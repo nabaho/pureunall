@@ -36764,6 +36764,12 @@ function openProposeFor(k){
   if(!k) return;
   window.open('docs-esign.html#forms:propose=' + encodeURIComponent(k), '_blank', 'noopener');
 }
+/* 📄 계약서 만들기 (2026-10-07) — 계약서등관리에서 이 회사를 골라 둔 채 계약 종류별 세트를 고르게 한다.
+   회사 열쇠만 싣는다(이름·금액은 주소에 안 싣는다 — 제안서 보내기와 같다) */
+function openContractFor(k){
+  if(!k) return;
+  window.open('docs-esign.html#forms:make=' + encodeURIComponent(k), '_blank', 'noopener');
+}
 function coSentHtml(o){
   const cards = (o && o.cards) || [];
   const rows = coSentList(cards, state.sendLog, _coSent[(o && o.key) || '']);
@@ -36775,7 +36781,7 @@ function coSentHtml(o){
   const note = '자료함·문서관리에서 보낸 것만 잡힙니다';
   const noteFull = '취업규칙 회차는 위 「이 회사에서 한 일」에 있습니다. 단체 메일과 전 사업장 배포도 여기 함께 나옵니다.'
     + (cut ? ` 2026-09-03 앞의 기록은 이 회사 사람 ${cards.length}명 가운데 최근 ${CO_SENT_MAX_CARDS}명분만 읽었습니다.` : '');
-  return `<div class="pcsec" style="margin:16px 4px 8px;display:flex;align-items:center;gap:8px">📤 보낸 서류 ${rows.length}건<span style="flex:1"></span>${o && o.key ? `<button type="button" class="btn ghost" style="font-size:12px;padding:3px 9px" title="문서관리에서 이 회사로 채운 제안서·견적서를 메일로 보냅니다" data-k="${esc(o.key)}" onclick="openProposeFor(this.dataset.k)">📨 제안서 보내기</button>` : ''}</div>
+  return `<div class="pcsec" style="margin:16px 4px 8px;display:flex;align-items:center;gap:8px">📤 보낸 서류 ${rows.length}건<span style="flex:1"></span>${o && o.key ? `<button type="button" class="btn ghost" style="font-size:12px;padding:3px 9px" title="문서관리에서 이 회사로 채운 제안서·견적서를 메일로 보냅니다" data-k="${esc(o.key)}" onclick="openProposeFor(this.dataset.k)">📨 제안서 보내기</button><button type="button" class="btn ghost" style="font-size:12px;padding:3px 9px" title="계약서등관리에서 이 회사로 계약서 세트(자문·급여·컨설팅·사건·기금)를 채웁니다" data-k="${esc(o.key)}" onclick="openContractFor(this.dataset.k)">📄 계약서 만들기</button>` : ''}</div>
     ${hintLine(note, noteFull)}
     ${rows.length ? rows.map(r=>`<div class="cof">
       <span>${r.kind && r.kind!=='자료' ? `<b>${esc(r.kind)}</b> · ` : ''}${r.set?`<b>📦 ${esc(r.set)}</b> — `:''}${esc(r.what)}</span>
