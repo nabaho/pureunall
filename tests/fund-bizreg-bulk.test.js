@@ -86,7 +86,7 @@ test('짧은 번호는 번호로 보지 않는다 — 잘못 읽은 번호가 �
 /* ══════════ ② 여러 장 고르기 ══════════ */
 
 test('★ 사진첩 창이 «여러 장 고르기»를 켤 수 있다', () => {
-  assert.match(grabFn('openAlbumPick'), /function openAlbumPick\(zid,kind,sid,shelf,txn,wrepSid,multi\)/);
+  assert.match(grabFn('openAlbumPick'), /function openAlbumPick\(zid,kind,sid,shelf,txn,wrepSid,multi[,)]/);
   assert.match(grabFn('openAlbumPick'), /multi:!!multi, sel:\{\}/);
   assert.match(grabFn('bizregBulkPick'), /openAlbumPick\('','bizreg','','','','',true\)/);
 });

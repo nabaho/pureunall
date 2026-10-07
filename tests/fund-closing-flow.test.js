@@ -38,11 +38,11 @@ const B = (() => {
     'function hlp(){return "";} function loadingHTML(){return "…";} function f15Load(){return true;} function _lockInfo(){return "2026-02-18";}',
     'var TODAY="2026-03-19"; function ymd(){return TODAY;}',
     grabFn('dueDays'),
-    grabDecl('FLOW_STEPS'), grabDecl('FLOW_LBL'), grabDecl('FLOW_SEAL'),
+    grabDecl('FLOW_STEPS'), grabDecl('FLOW_LBL'), grabDecl('FLOW_SEAL'), grabDecl('FLOW_SEAL_KEYS'), grabFn('flowSealStat'), grabFn('flowMailUrl'),
     grabFn('flowState'), grabFn('flowTone'), grabFn('flowDue'), grabFn('flowMailText'), grabFn('flowReadme'),
     grabFn('flowView'), grabFn('flowHomeHTML'),
     'this.S=S; this.funds=funds; this.state=flowState; this.tone=flowTone; this.due=flowDue; this.mail=flowMailText;',
-    'this.readme=flowReadme; this.view=flowView; this.home=flowHomeHTML; this.STEPS=FLOW_STEPS;',
+    'this.seal=flowSealStat; this.mailUrl=flowMailUrl; this.readme=flowReadme; this.view=flowView; this.home=flowHomeHTML; this.STEPS=FLOW_STEPS;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -120,7 +120,8 @@ test('★ 메일은 직접 보내지 않는다 — 푸른메일함 쓰기 화면
     const f = grabFn(n);
     assert.ok(!/sendMail|putMailFile|fetch\(/.test(f), n + ' 가 메일을 직접 보낸다');
   });
-  assert.match(grabFn('flowMailOpen'), /pu-cards\.html\?view=mail/);
+  assert.match(grabFn('flowMailOpen'), /flowMailUrl\(/);
+  assert.match(grabFn('flowMailUrl'), /pu-cards\.html\?view=mail/);
 });
 
 test('묶음은 화면 상태가 아니라 그 기금·그 해 자료로 만든다(한글 서식 채우는 동안만 S.year·S.formFund 를 맞추고 되돌림)', () => {
@@ -129,4 +130,34 @@ test('묶음은 화면 상태가 아니라 그 기금·그 해 자료로 만든�
   assert.match(z, /S\.year=yr; S\.formFund=fid;/);
   assert.match(z, /back\(\)/);
   assert.match(grabFn('_flowLoad'), /txns\/'\+fid\+'\/'\+yr/);
+});
+
+test('★★ 날인본 — 받아야 할 것(출연 있던 해만 기본재산 변경 보고서)·받은 것', () => {
+  const none = B.seal({});
+  assert.deepEqual(none.need, ['f15', 'books', 'audit', 'minutes'], '출연을 모르면 변경 보고서는 받아야 할 것에서 뺀다');
+  assert.equal(none.done, false);
+  const withC = B.seal({ fin: { contrib_employer: 1000000 }, flow: { seal: { docs: { f15: { id: 'p1' }, books: { id: 'p2' } } } } });
+  assert.deepEqual(withC.need, ['f15', 'books', 'audit', 'minutes', 'asset']);
+  assert.deepEqual(withC.have, ['f15', 'books']);
+  const all = B.seal({ flow: { seal: { docs: { f15: { id: 1 }, books: { id: 2 }, audit: { id: 3 }, minutes: { id: 4 } } } } });
+  assert.equal(all.done, true);
+});
+
+test('★★ 푸른메일함으로 받는 사람·제목·본문을 실어 넘긴다(첫째 to, 나머지 cc)', () => {
+  const u = B.mailUrl(['a@x.kr', 'b@y.kr', 'c@z.kr'], '가나다공동', '제목 가', '본문\n둘째 줄');
+  const q = new URLSearchParams(u.split('?')[1]);
+  assert.equal(q.get('view'), 'mail'); assert.equal(q.get('to'), 'a@x.kr');
+  assert.equal(q.get('cc'), 'b@y.kr, c@z.kr'); assert.equal(q.get('subject'), '제목 가');
+  assert.equal(q.get('body'), '본문\n둘째 줄');
+  assert.equal(B.mailUrl([], 'x', 's', 'b'), 'pu-cards.html?view=mail', '받는 사람이 없으면 메일함만');
+  /* 메일함 쪽이 실제로 읽는다 */
+  const PC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
+  assert.match(PC, /subject: String\(p\.get\('subject'\) \|\| ''\), body: String\(p\.get\('body'\) \|\| ''\), cc: String\(p\.get\('cc'\) \|\| ''\)/);
+  assert.match(PC, /subject:t\.subject\|\|'', body:t\.body\|\|'', cc:t\.cc\|\|''/);
+});
+
+test('날인본은 사진첩 원본을 잇는다(새 창고 자리를 만들지 않는다)', () => {
+  assert.match(SRC, /function openAlbumPick\(zid,kind,sid,shelf,txn,wrepSid,multi,seal\)/);
+  assert.match(SRC, /if\(_pick\.seal\)\{\s*closeM\(\);\s*flowSealSave\(/);
+  assert.ok(!/fbStore\.ref/.test(grabFn('flowSealSave')), '창고에 직접 올리지 않는다');
 });

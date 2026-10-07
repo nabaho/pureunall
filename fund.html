@@ -10687,13 +10687,14 @@ function docFindPick(kind,id,year){
 /* wrepSid 가 오면 «근로자대표 재직증명서» 갈래다.
    ⚠ 그때는 sid 를 비운다 — 안 비우면 아래에서 «연도별 제출서류» 자리에 먼저 걸린다.
      재직증명서는 해마다 내는 서류가 아니라 «그 사람»에 붙는 서류다. */
-function openAlbumPick(zid,kind,sid,shelf,txn,wrepSid,multi){
+function openAlbumPick(zid,kind,sid,shelf,txn,wrepSid,multi,seal){
   if(!photoStoreReady()){ toast('사진첩과 연결되지 않았습니다 — 새로고침 후 다시','err'); return; }
   _pick={kind:kind,zid:zid,items:[],year:new Date().getFullYear(),fid:S.fundId,
          sid:wrepSid?'':(sid||''), wrep:wrepSid||'', yr:S.year,
-         shelf:shelf||'',txn:txn||'', multi:!!multi, sel:{}};
+         shelf:shelf||'',txn:txn||'', multi:!!multi, sel:{}, seal:seal||''};
   var _tx=txn&&(S.txns||{})[txn];
-  var _what=txn?('거래 증빙 · '+((_tx&&_tx.date)||'')+' '+(((_tx&&_tx.memo)||'').slice(0,18)))
+  var _what=seal?('결산 날인본 · '+((FLOW_SEAL[FLOW_SEAL_KEYS.indexOf(seal)]||[seal])[0]))
+          :txn?('거래 증빙 · '+((_tx&&_tx.date)||'')+' '+(((_tx&&_tx.memo)||'').slice(0,18)))
           :shelf?('서류함 · '+shelf)
           :wrepSid?(_siteName(wrepSid)+' 근로자대표 재직증명서')
           :((sid?(_siteName(sid)+' '):'')+docZoneLabel(kind));
@@ -10780,6 +10781,12 @@ function pickAlbumPhoto(id){
   var owner=it.meta.__ownerUid||undefined, year=String(_pick.year), kind=_pick.kind, zid=_pick.zid, fid=_pick.fid;
   /* 참여사업장 서류(중소기업확인서·등기부·사업자등록증)는 판독하지 않는다 —
      기금 정보 칸을 채우는 서류가 아니라 «받았다»를 증명하는 서류다. 원본만 잇고 체크를 켠다. */
+  /* 결산 날인본 — 판독하지 않고 잇기만(결산 후 진행 › 날인본) */
+  if(_pick.seal){
+    closeM();
+    flowSealSave(fid,_pick.yr,_pick.seal,{owner:owner||'',year:year,id:id},it.meta);
+    return;
+  }
   if(_pick.shelf){
     closeM();                                        // 원본을 받아 올 일이 없어 곧바로 닫는다
     saveShelfScanRef(fid,_pick.yr,_pick.shelf,{owner:owner||'',year:year,id:id},it.meta);
@@ -17603,6 +17610,16 @@ var FLOW_SEAL=[
   ['협의회 회의록(결산·사업계획 승인)','출석위원 전원 서명 또는 날인 — 근로복지기본법 제57조'],
   ['기본재산 총액 변경 보고서(별지 제10호) — 그해 출연이 있었을 때','기금법인 대표자']
 ];
+var FLOW_SEAL_KEYS=['f15','books','audit','minutes','asset'];   // FLOW_SEAL 과 차례가 같다
+/* 날인본 — 받아야 할 것·받은 것. 기본재산 변경 보고서는 그해 출연이 확인될 때만(확정 스냅샷의 출연금) 받아야 할 것에 넣는다.
+   순수 함수(검사 대상). c = closing/{기금}/{연도} 마디 */
+function flowSealStat(c){
+  c=c||{}; var fin=c.fin||{}, docs=(((c.flow||{}).seal||{}).docs)||{};
+  var contrib=(Number(fin.contrib_employer)||0)+(Number(fin.contrib_other)||0);
+  var need=FLOW_SEAL_KEYS.filter(function(k){ return k!=='asset'||contrib>0; });
+  var have=need.filter(function(k){ return !!(docs[k]&&docs[k].id); });
+  return {need:need, have:have, done:have.length===need.length, docs:docs};
+}
 function flowState(c,step){
   c=c||{};
   if(step==='lock') return c.locked?'locked':'';
@@ -17786,16 +17803,72 @@ function flowMailCopy(){
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){ toast('복사했습니다 — 메일함 쓰기 화면에 붙여 넣으세요'); },
     function(){ if(b){ b.select(); } toast('복사하지 못했습니다 — 본문을 직접 복사하세요','warn'); });
 }
-function flowMailOpen(){
-  var m=S._flowMail||{}, f=funds[S.fundId]||{};
-  var u='pu-cards.html?view=mail'+((m.to||[])[0]?'&to='+encodeURIComponent(m.to[0])+'&name='+encodeURIComponent(f.short_name||f.name||''):'');
-  if(!window.open(u,'puMailWrite')) toast('팝업이 막혔습니다 — 브라우저에서 팝업을 허용하세요','warn');
-  else if((m.to||[]).length>1) toast('받는 사람이 '+m.to.length+'명입니다 — 나머지는 [📋 복사]한 목록에서 붙여 넣으세요','warn');
+/* 푸른메일함 쓰기 화면 주소 — 받는 사람(첫째 to, 나머지 cc)·제목·본문을 실어 넘긴다(2026-10-07 메일함이 받게 함).
+   순수 함수(검사 대상) */
+function flowMailUrl(to,name,subject,body){
+  to=(to||[]).filter(Boolean);
+  if(!to.length) return 'pu-cards.html?view=mail';
+  return 'pu-cards.html?view=mail&to='+encodeURIComponent(to[0])+'&name='+encodeURIComponent(name||'')
+    +(to.length>1?'&cc='+encodeURIComponent(to.slice(1).join(', ')):'')
+    +'&subject='+encodeURIComponent(subject||'')+'&body='+encodeURIComponent(body||'');
 }
+function flowMailOpen(){
+  var m=S._flowMail||{}, f=funds[S.fundId]||{}, s=$('flowSubj'), b=$('flowBody');
+  if(!(m.to||[]).length){ toast('받는 사람(사업장 담당자 이메일)이 없습니다 — 메일함에서 직접 적으세요','warn'); }
+  var u=flowMailUrl(m.to,f.short_name||f.name||'',s?s.value:m.subject,b?b.value:m.body);
+  if(!window.open(u,'puMailWrite')) toast('팝업이 막혔습니다 — 브라우저에서 팝업을 허용하세요','warn');
+  else toast('푸른메일함에 받는 사람·제목·본문을 채웠습니다 — '+(m.kind==='review'?'제출 묶음 파일을 붙여 ':'')+'보내세요');
+}
+/* 날인본 — 서류마다 사진첩 원본을 잇는다(원본은 사진첩이 보관, 기금은 참조만 — 서류함과 같은 방식) */
 function flowSealInfo(){
-  showModal('<h2 style="margin-bottom:8px">날인할 서류</h2><table><thead><tr><th class="no">#</th><th>서류</th><th>날인</th></tr></thead><tbody>'
-    +FLOW_SEAL.map(function(s,i){ return '<tr><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+'</td><td>'+esc(s[1])+'</td></tr>'; }).join('')
-    +'</tbody></table><div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+  var c=S.f15Close||{}, st=flowSealStat(c), yr=S.year;
+  showModal('<div class="row" style="margin-bottom:8px"><h2 style="margin:0">'+yr+'년 날인본</h2>'+hlp('close.seal')
+    +'<span class="chip '+(st.done?'ok':st.have.length?'warn':'')+'" style="font-size:11px">'+st.have.length+'/'+st.need.length+' 받음</span></div>'
+    +'<table><thead><tr><th class="no">#</th><th>서류</th><th>날인</th><th>받음</th><th></th></tr></thead><tbody>'
+    +FLOW_SEAL.map(function(s,i){ var k=FLOW_SEAL_KEYS[i], d=st.docs[k], need=st.need.indexOf(k)>=0;
+      return '<tr'+(need?'':' class="muted"')+'><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+(need?'':' <span class="muted" style="font-size:10.5px">(해당 없음)</span>')+'</td><td style="font-size:11.5px">'+esc(s[1])+'</td>'
+        +'<td class="mo" style="white-space:nowrap">'+(d&&d.id?'<span class="chip ok" style="font-size:10px">✓ '+esc(String(d.at||'').slice(5))+'</span>':'—')+'</td>'
+        +'<td style="white-space:nowrap">'+(d&&d.id
+          ?'<button onclick="flowSealView(\''+k+'\')" style="padding:2px 8px;font-size:11px">보기</button> <button onclick="flowSealUnlink(\''+k+'\')" style="padding:2px 8px;font-size:11px;color:var(--danger)">빼기</button>'
+          :'<button onclick="openAlbumPick(\'\',\'\',null,\'\',\'\',null,false,\''+k+'\')" style="padding:2px 8px;font-size:11px">🖼 사진첩에서</button>')+'</td></tr>'; }).join('')
+    +'</tbody></table>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+}
+function flowSealSave(fid,yr,key,ref,meta){
+  var rec={owner:ref.owner||'',year:String(ref.year||''),id:String(ref.id||''),at:ymd(),by:(S.user||''),
+           name:String((meta&&(meta.title||meta.name))||'')};
+  var c0=Object.assign({},S.f15Close||{}); c0.flow=Object.assign({},c0.flow||{});
+  c0.flow.seal=Object.assign({},c0.flow.seal||{}); c0.flow.seal.docs=Object.assign({},c0.flow.seal.docs||{}); c0.flow.seal.docs[key]=rec;
+  var st=flowSealStat(c0), state=st.done?'done':'part', base='closing/'+fid+'/'+yr+'/flow/seal/', up={};
+  up[base+'docs/'+key]=rec; up[base+'state']=state; up[base+'at']=ymd(); up[base+'by']=(S.user||'');
+  fbDb.ref(NS).update(up).then(function(){
+    var lab=FLOW_SEAL[FLOW_SEAL_KEYS.indexOf(key)]||[key];
+    markFundUsed(ref,'기금 결산 날인본 — '+((funds[fid]||{}).name||fid)+' '+yr+' '+lab[0]);
+    if(S.fundId===fid&&S.year===yr){ c0.flow.seal.state=state; c0.flow.seal.at=ymd(); S.f15Close=Object.assign(S.f15Close||{},{flow:c0.flow}); }
+    _cbDirty(); renderFund(); flowSealInfo();
+    toast('날인본을 이었습니다 — '+st.have.length+'/'+st.need.length+(st.done?' · 모두 받았습니다':''));
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+function flowSealView(key){
+  var d=flowSealStat(S.f15Close).docs[key]; if(!d||!d.id) return;
+  if(!photoStoreReady()){ toast('사진첩과 연결되지 않았습니다','err'); return; }
+  var lab=FLOW_SEAL[FLOW_SEAL_KEYS.indexOf(key)]||[key];
+  showModal('<div class="row" style="margin:0 0 8px"><h2 style="margin:0">'+esc(lab[0])+' 날인본</h2>'
+    +'<span class="muted" style="font-size:11.5px">'+esc(d.year)+'년 · 이은 날 '+esc(d.at||'')+'</span><span style="flex:1"></span>'
+    +'<button onclick="flowSealInfo()">← 목록</button></div><div id="scanBody" style="text-align:center">'+loadingHTML('사진첩에서 불러오는 중…')+'</div>');
+  _loadScanInto({owner:d.owner,year:d.year,id:d.id});
+}
+function flowSealUnlink(key){
+  var fid=S.fundId, yr=S.year;
+  confirmM('이 날인본 연결을 뺄까요?\n사진첩 원본은 그대로 남습니다.',{ok:'빼기',danger:true}).then(function(ok){ if(!ok) return;
+    var c0=Object.assign({},S.f15Close||{}); c0.flow=Object.assign({},c0.flow||{});
+    c0.flow.seal=Object.assign({},c0.flow.seal||{}); c0.flow.seal.docs=Object.assign({},c0.flow.seal.docs||{}); delete c0.flow.seal.docs[key];
+    var st=flowSealStat(c0), state=st.have.length?(st.done?'done':'part'):null, base='closing/'+fid+'/'+yr+'/flow/seal/', up={};
+    up[base+'docs/'+key]=null; up[base+'state']=state;
+    fbDb.ref(NS).update(up).then(function(){
+      c0.flow.seal.state=state||''; S.f15Close=Object.assign(S.f15Close||{},{flow:c0.flow}); _cbDirty(); renderFund(); flowSealInfo();
+    }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+  });
 }
 function flowView(){
   if(!f15Load()) return '<div class="panel">'+loadingHTML()+'</div>';
@@ -17812,7 +17885,8 @@ function flowView(){
     review:'<button onclick="flowMail(\'review\')" style="padding:2px 9px;font-size:11.5px">✉ 메일 쓰기</button> '
       +'<button onclick="flowPackage()" style="padding:2px 9px;font-size:11.5px">📦 제출 묶음</button>',
     reply:'<span class="muted" style="font-size:11.5px">수정 요청이면 메모에 적고, 고친 뒤 다시 보내기</span>',
-    seal:'<button onclick="flowSealInfo()" style="padding:2px 9px;font-size:11.5px">ⓘ 날인할 서류</button>',
+    seal:(function(){ var st=flowSealStat(c);
+      return '<button onclick="flowSealInfo()" style="padding:2px 9px;font-size:11.5px">📎 날인본 '+st.have.length+'/'+st.need.length+'</button>'; })(),
     submit:'<select onchange="flowWho(this.value)" style="padding:2px 5px;font-size:11.5px;border:1px solid var(--line);border-radius:6px">'
       +[['','제출: 우리'],['사업장','제출: 사업장']].map(function(o){ return '<option value="'+o[0]+'"'+(who===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select> '
       +'<span class="muted" style="font-size:11.5px">'+esc(String(f.labor_office||'관할 노동청 [확인 필요]'))+'</span>',
@@ -19713,6 +19787,8 @@ var HELP={
    +'<p><b>이미 있는 사업장도 꺼 둡니다.</b> 사업자등록번호가 같거나 상호가 완전히 같으면 「이미 있음」으로 봅니다 — 같은 회사가 두 번 들어가면 출연금이 두 번 세어지고 서식에도 두 번 섭니다.</p>'
    +'<p>만들 때 <b>사업자등록증 원본도 사업장마다 이어</b> 「받음」으로 표시합니다(지원금 제출서류 칸).</p>'
    +'<p><b>출연 약정액은 안 들어옵니다</b> — 사업자등록증에 없는 값입니다. 만든 뒤 명부에서 넣어 주세요. 그 값이 설립 첫해 사업계획서까지 굴러갑니다.</p>'},
+ 'close.seal':{t:'날인본 — 서류마다 받았는지',h:'<p>사업장이 날인해 돌려준 스캔 PDF·사진을 <b>먼저 사진첩에 올린 뒤</b> 서류마다 <b>🖼 사진첩에서</b>로 고릅니다. 기금은 사진첩 원본을 가리키기만 하고, 원본은 사진첩에 그대로 남습니다.</p>'
+   +'<p>필요한 서류: 운영상황보고서(별지15호)·결산서·감사보고서·결산 승인 회의록, 그해 출연이 있으면 기본재산 변경 보고서까지. 회의록은 <b>출석위원 전원 서명·날인</b>(근로복지기본법 제57조)이 필요합니다. 모두 받으면 「날인」 단계가 자동으로 끝남이 됩니다.</p>'},
  'close.flow':{t:'결산 후 진행 — 검토·날인·노동부 제출까지',h:'<p>결산이 끝나면 <b>사업장 검토 → 날인 → 관할 고용노동관서 제출</b>까지가 한 묶음입니다. 운영상황보고는 회계연도가 끝난 뒤 <b>3개월 이내</b>(12월 결산이면 3/31)에 운영상황·결산서·<b>다음 연도 사업계획서</b>(추정재무상태표·손익계산서)를 붙여 냅니다(근로복지기본법 시행령 제63조①).</p>'
    +'<p><b>✉ 메일 쓰기</b>는 문안과 받는 사람(참여사업장 담당자 이메일)을 보여 주고 <b>푸른메일함</b>을 엽니다. 보내기와 첨부는 메일함에서 직접 합니다.</p>'
    +'<p><b>📦 제출 묶음</b>은 결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글 틀이 있을 때)와 제출 안내문을 한 zip 으로 받습니다.</p>'
