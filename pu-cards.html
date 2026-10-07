@@ -10860,6 +10860,20 @@ function cntFromUrl(search){
 function urlWantsMail(){
   try{ return /(^|[?&])view=mail(&|$)/.test(location.search); }catch(_){ return false; }
 }
+/* ── 다른 앱이 «이 말로 찾아 달라»고 보낸 것 (대표 지시 2026-10-07 전체 점검) ──
+   푸른이알피 업체 상세의 [✉ 메일 보기] 가 pu-cards.html?view=mail&q=… 로 온다.
+   ★ 메일함 → 이알피 길(📁 open=case:id)은 있었는데 «반대 길이 아예 없었다» —
+     업체를 보다가 그 업체 메일을 보려면 메일함을 열고 이름을 다시 쳐야 했다.
+   ⚠ 찾는 말은 «글자»다. 메일함 찾기가 보낸이·주소·제목·미리보기를 함께 보므로,
+     업체 이름 하나로 그 업체가 보낸 것과 제목에 이름이 적힌 것이 같이 걸린다.
+   ⚠ 번호(id)로 받지 않는다 — 메일에는 업체 번호가 적혀 있지 않다. 번호로 이으려면
+     주소를 거쳐야 하는데 그것은 이미 📁·🔗 가 하는 일이다. */
+function mailQFromUrl(search){
+  try{
+    const m = /(^|[?&])q=([^&]*)/.exec(String(search === undefined ? location.search : search));
+    return m ? decodeURIComponent(m[2].replace(/\+/g, ' ')).trim() : '';
+  }catch(_){ return ''; }
+}
 /* ── 메일 문으로 들어왔을 때 «첫 그림» (대표 지시 2026-09-05) ──
    「메일함 열릴 때 아주 짧게 이 화면(메일쓰기)이 나왔다가 받은메일함으로 나온다」
 
@@ -19285,7 +19299,7 @@ function mbCkTypesOf(name){
 function mbCheckAll(){
   const idx  = mbWhoIndex();
   const rows = mbCkRows();
-  const mixM = {}, noneM = {}, endM = {}, dupM = {};
+  const mixM = {}, noneM = {}, endM = {}, dupM = {}, boxM = {};
   rows.forEach(v=>{
     const em = String((v&&v.e)||'').trim().toLowerCase();
     if(!em) return;
@@ -19314,13 +19328,51 @@ function mbCheckAll(){
     if(du && du.length > 1){
       mbCkBump(dupM, 'dup|' + em, v, { co:co, em:em, cos:du.slice(0) });
     }
+    /* ⑤ 이 «칸»에 보는 사람이 없습니다 (대표 지시 2026-10-07 전체 점검)
+       ★ 실측 2026-10-07 — 받은 메일 6,863통 가운데 담당 모름이 5,905통(86%)이고,
+         그 거의 전부가 «칸마다 통째로» 모여 있다(세금계산서 422 · 공공기관 420 …).
+         공공기관 메일은 주소로도 제목으로도 못 가르므로(주소 184개 중 갈리는 것 0개),
+         칸에 보는 사람을 정하는 것이 이 수를 줄이는 «유일한» 길이다.
+       ⚠ ②(담당 모름)와 «같은 메일»을 센다 — 보는 눈이 다를 뿐이다. ②는 「이 주소를
+         어느 업체에」, 여기는 「이 칸을 누가」다. 겹친다고 한쪽을 빼면 둘 다 작아 보여
+         아무도 손대지 않는다.
+       ⚠ 사람 안 붙임 칸(경조사·광고)은 안 센다 — 거기는 «일부러» 아무도 안 붙는다. */
+    if(!ended && !mbWhoOfRow(v, idx) && v._slug && !mbNoWhoBox(v._slug)
+       && !mbBoxWhoList(v._slug).length){
+      boxM[v._slug] = (boxM[v._slug] || 0) + 1;
+    }
   });
   const done = (m)=> Object.keys(m).map(k=>m[k])
     .filter(x=>!mbCkSkipped(x.key))
     .sort((a,b)=> b.n - a.n || String(a.co||a.em).localeCompare(String(b.co||b.em),'ko'));
   _mbCk = { at:Date.now(), seen:rows.length,
-    mix:done(mixM), none:done(noneM), ended:done(endM), dup:done(dupM) };
+    mix:done(mixM), none:done(noneM), ended:done(endM), dup:done(dupM), box:mbBoxTodo(boxM) };
   return _mbCk;
+}
+/* 👤 보는 사람이 없는 칸 — 많은 쪽부터. 이미 정해 둔 칸도 함께 내놓는다(고칠 자리가 달리 없다).
+   ⚠ 받는 칸만 본다 — 보낸메일함·초안·휴지통에 「누가 봅니까」를 묻는 것은 뜻이 없다.
+     보는 갈래는 MB_MINE_KINDS 한 곳에서 읽는다(서버 NOTIFY_KINDS 와 짝이다). */
+function mbBoxTodo(cnt){
+  const out = [];
+  const 볼것 = {};
+  /* ⚠ 셈에서 온 칸도 «안 붙임»을 다시 거른다 — 세는 쪽(mbCheckAll)이 이미 걸렀지만,
+       거르개가 한 곳에만 있으면 셈을 다른 데서 넘길 때 조용히 새어 들어온다. */
+  Object.keys(cnt || {}).forEach(slug=>{ if(!mbNoWhoBox(slug)) 볼것[slug] = 1; });
+  Object.keys(_mbFolders || {}).forEach(slug=>{
+    const f = _mbFolders[slug]; if(!f) return;
+    if(MB_MINE_KINDS.indexOf(String(f.kind || 'custom')) < 0) return;
+    if(mbNoWhoBox(slug)) return;
+    볼것[slug] = 1;
+  });
+  Object.keys(볼것).forEach(slug=>{
+    const f = mbFolderBy(slug);
+    const who = mbBoxWhoList(slug);
+    const n = Number((cnt && cnt[slug]) || 0);
+    if(!n && !who.length) return;          /* 할 일도 없고 정해 둔 것도 없으면 안 그린다 */
+    out.push({ key:'box|' + slug, slug:slug, n:n, who:who,
+      name:String((f && (f.name || f.path)) || slug) });
+  });
+  return out.sort((a,b)=> b.n - a.n || a.name.localeCompare(b.name,'ko'));
 }
 /* 한 줄을 무더기에 얹는다 — 통수를 세고, 가장 최근 한 통을 남긴다 */
 function mbCkBump(map, k, v, more){
@@ -19414,6 +19466,9 @@ function mbCheckHtml(){
     ['none', '담당을 모릅니다', r.none],
     ['ended','끝난 업체',       r.ended],
     ['dup',  '주소가 겹칩니다', r.dup],
+    /* ⚠ 「보는 사람이 없는 칸」도 «이상한 것»이 아니라 «할 일»이다 — 칩 수에는 안 넣는다.
+         넣으면 점검 칩이 늘 수천으로 떠 정작 이상한 것이 묻힌다('new'·'rule' 과 같은 결). */
+    ['box',  '👤 보는 사람이 없는 칸', r.box || []],
     /* ⚠ 「정해 둔 것」은 «이상한 것»이 아니다 — 그래서 칩 수(mbCkCount)에는 안 넣는다.
          여기 두는 까닭은 되돌릴 자리가 달리 없어서다. 정한 곳과 무르는 곳이 멀면
          아무도 정하지 않는다. */
@@ -19433,6 +19488,7 @@ function mbCheckHtml(){
         + '회사를 이어 주면 그 회사 담당자가 저절로 따라옵니다.',
     ended:'자문이 <b>끝난 업체</b>인데 아직 메일이 옵니다. 담당자 칸에서는 빠져 있습니다.',
     dup:  '한 주소가 <b>두 업체</b>에 이어져 있습니다 — 담당자가 어느 쪽으로 잡힐지 흔들립니다.',
+    box:  '이 칸에 온 메일은 <b>담당자가 안 잡힙니다</b> — 보낸 주소로도 제목으로도 가를 수 없는 공공기관·기관 안내가 대부분입니다(실측: 공공기관 주소 184개 가운데 제목이 두 사람 이상을 말하는 것 0개).<br>무엇에 대한 메일인지는 <b>칸이 이미 알고 있습니다</b>. 아래에서 <b>이 칸을 보는 사람</b>을 고르면 그 수가 <u>그대로 줄어듭니다</u>.<br>⚠ <b>맨 앞이 주담당</b>, 나머지는 함께 봅니다. ⚠ 칸 담당은 <b>가장 약한 규칙</b>이라 그 업체·그 건의 담당이 있으면 <b>그쪽이 이깁니다</b>.',
     rule: '<b>「늘 이 칸으로」</b> 정해 둔 것입니다. 지난 메일도 앞으로 올 메일도 함께 갑니다. '
         + '잘못 정했으면 여기서 무르십시오 — 무르면 다시 다음메일이 넣은 자리를 따릅니다.',
     new:  '최근 1년에 <b>처음 온 주소</b>입니다. 기업정보함에 담아 두면 다음부터 '
@@ -19443,9 +19499,26 @@ function mbCheckHtml(){
         + '업체를 만드는 일은 사업자번호·계약이 함께 걸려 있어 메일함에서 만들지 않습니다.',
   };
   const H = [];
+  /* ── 👤 보는 사람이 없는 칸 (대표 지시 2026-10-07 전체 점검) ──
+     ⚠ 고르는 칩을 «그 줄 안»에 둔다. 폴더 메뉴로 보내면 창을 닫고 옆줄에서 폴더를 찾아
+       오른쪽 단추를 눌러야 한다 — 그렇게 멀면 아무도 안 한다(「📄 한 번에 나누기」와 같은 결).
+     ⚠ 폴더 메뉴의 고르개(mbBoxWhoPickHtml)를 «그대로» 쓴다. 두 벌이면 한쪽만 고쳐진다. */
+  if(tab === 'box'){
+    list.forEach(x=>{
+      H.push('<tr><td><div class="co">' + esc(x.name) + '</div>'
+        + '<div class="em">' + (x.n ? x.n.toLocaleString() + '통이 담당 모름' : '담당 모름 없음')
+        + '</div></td>'
+        + '<td colspan="3"><div class="fmwho" style="padding:2px 0;max-width:none">'
+        +   mbBoxWhoPickHtml(x.slug) + '</div></td>'
+        + '<td class="act">' + (x.who.length
+            ? '<span class="t" title="맨 앞이 주담당입니다">' + esc(x.who[0]) + ' 주'
+              + (x.who.length > 1 ? ' 외 ' + (x.who.length - 1) : '') + '</span>'
+            : '<span class="em">아무도 없음</span>') + '</td></tr>');
+    });
+  }
   /* ── 👤 처음 보는 주소 — 담는 자리 (대표 지시 2026-09-16) ──
      ⚠ 다른 갈래와 «세우는 칸이 다르다» — 메일이 아니라 «주소 한 줄»이다. */
-  if(tab === 'new'){
+  else if(tab === 'new'){
     const qs = state.mbNewQ || {};
     list.forEach(x=>{
       const why = x.why === '도메인'
@@ -19517,7 +19590,11 @@ function mbCheckHtml(){
   });
   const skipN = Object.keys(mbCkSkipMap()).length;
   const table = H.length
-    ? (tab === 'new'
+    ? (tab === 'box'
+      ? '<table><tr><th style="width:24%">칸</th>'
+        + '<th colspan="3">이 칸을 보는 사람 — 눌러서 넣고 뺍니다</th>'
+        + '<th style="width:15%">지금</th></tr>' + H.join('') + '</table>'
+      : tab === 'new'
       ? '<table><tr><th style="width:30%">보낸 사람</th><th style="width:9%">근거</th>'
         + '<th colspan="2">어느 업체로</th><th style="width:20%"></th></tr>'
         + H.join('') + '</table>'
@@ -19528,7 +19605,10 @@ function mbCheckHtml(){
       + '<th style="width:11%">' + (tab==='mix' ? '푸른이알피' : '') + '</th>'
       + '<th style="width:20%">' + (tab==='mix' ? '지금 담긴 칸' : '') + '</th>'
       + '<th>메일</th><th style="width:17%"></th></tr>' + H.join('') + '</table>')
-    : (tab === 'rule'
+    : (tab === 'box'
+      ? '<div class="mck-empty"><b>칸마다 보는 사람이 정해져 있습니다</b>'
+        + '담당을 못 찾는 메일이 쌓인 칸이 없습니다.</div>'
+      : tab === 'rule'
       ? '<div class="mck-empty"><b>아직 정해 둔 칸이 없습니다</b>'
         + '「분류 ˅」 에서 <b>📌 늘 이 칸으로</b> 를 누르면 여기 쌓입니다.</div>'
       : tab === 'new'
@@ -23444,8 +23524,16 @@ function mbLoadingBox(){
   return mbNeedSlugs(mbNow()).some(x=>x && !_mbMsgs[x]);
 }
 
+/* 주소로 온 찾는 말 — 한 번만 쓰고 비운다(null 은 «아직 안 읽음») */
+let _mbUrlQ = null;
 function openMailBox(id){
   state.view='mail'; state.mailSent='box'; state.mbBox=id; state.mbOpen=null;
+  /* ✉ 다른 앱이 「이 말로 찾아 달라」고 보냈으면 찾기 칸에 담는다 (2026-10-07).
+     ⚠ «한 번»만 쓴다 — 주소에서 지우지 않으면, 칸을 바꿀 때마다 찾는 말이 되살아나
+       사람이 지워도 도로 들어온다. 열쇠를 비워 다음부터는 안 보게 한다.
+     ⚠ 주소 자체는 안 고친다(history) — 뒤로 가기를 건드리지 않는다. */
+  if(_mbUrlQ === null) _mbUrlQ = (typeof mailQFromUrl === 'function') ? mailQFromUrl() : '';
+  if(_mbUrlQ){ state.mbQ = _mbUrlQ; _mbUrlQ = ''; }
   pickClear('mbox');
   render();
   try{ $('pcMain').scrollTop=0; }catch(_){}
