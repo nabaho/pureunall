@@ -22,6 +22,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { sliceFn } = require('./fnslice.js');
+const { coFake } = require('./erp-co-fake.js');
 
 const root = path.join(__dirname, '..');
 const app = fs.readFileSync(path.join(root, 'pu-cards.html'), 'utf8');
@@ -47,27 +48,26 @@ const REAL_NORM = (() => {
 /* 진짜 erpFillContact 를 태운다 — 가짜 실시간DB 로 «무엇이 적히는지»를 본다 */
 function boot(o) {
   const opt = o || {};
-  const wrote = [];
   const cos = opt.companies || [{ id: 'co1', name: '맘스터치', contacts: [] }];
+  /* 업체관리 가짜 서버 — 업체 «한 건» 읽기 + 공용 관문 거래(2026-10-07, tests/erp-co-fake.js) */
+  const fake = coFake(cos, opt.fake);
   const ctx = {
     Object, String, Number, Array, JSON, Date, Math, Promise, console,
     toast(){}, mbWhoBust(){}, mbCardsRevBump(){}, renderPCSide(){}, renderMailPage(){},
     /* ⚠ _norm·_nameHit 은 «앱에서 떼어 온 진짜»다 — 흉내 내면 규칙이 두 벌이 된다 */
     ErpMatch: { load(){}, companies: cos, _norm: REAL_NORM, _nameHit: REAL_HIT },
+    window: { PuCompanyWrite: fake.PuCompanyWrite },
     firebase: {
       auth: () => ({ currentUser: opt.noUser ? null : { email: 'me@pureun.kr' } }),
-      database: () => ({
-        ref: (p) => ({
-          once: async () => { ctx.reads++;
-            return { val: () => ({ v: cos.reduce((m,c)=>{ m[c.id]=c; return m; }, {}) }) }; },
-          update: async (up) => { wrote.push(up); Object.assign(cos.filter(c=>c.id==='co1')[0]||{}, {}); },
-        }),
-      }),
+      database: fake.database,
     },
-    wrote, reads: 0,
+    wrote: fake.writes, fake,
+    get reads(){ return fake.reads.whole + fake.reads.one; },
   };
   vm.createContext(ctx);
+  vm.runInContext(sliceFn(app, 'async function erpCoPatchMany('), ctx);
   vm.runInContext(sliceFn(app, 'async function erpFillContact('), ctx);
+  vm.runInContext(sliceFn(app, 'function erpFillContactPlan('), ctx);
   return ctx;
 }
 const written = (c) => (c.wrote[0] ? c.wrote[0]['data/companies/v/co1'] : null);

@@ -143,9 +143,10 @@ test('★ 저절로 하는 일은 조용하다 — 채울 것이 없다고 말�
   assert.match(b, /const quiet = !!\(opt && opt\.quiet\)/,
     '★ 조용할지는 «부르는 쪽»이 정한다 — 안에서 못 박으면 단추도 조용해지거나 그 반대가 된다');
   const says = b.match(/toast\(/g) || [];
-  const guarded = b.match(/if\(!quiet\)\s*toast\(/g) || [];
-  assert.ok(says.length - guarded.length <= 1,
-    '★ 말을 거는 자리 ' + says.length + '곳 중 ' + guarded.length + '곳만 막혀 있다 —'
+  /* «저장 못 함»은 조용히 넘기지 않는다(2026-10-07 점검 ①) — 실패 알림은 «실패가 있을 때만» 막혀 있으면 된다 */
+  const guarded = (b.match(/if\(!quiet\)\s*toast\(/g) || []).length + (b.match(/if\(fails\.length\)\s*toast\(/g) || []).length;
+  assert.ok(says.length - guarded <= 1,
+    '★ 말을 거는 자리 ' + says.length + '곳 중 ' + guarded + '곳만 막혀 있다 —'
     + ' 저절로 도는 것이 「채울 곳이 없습니다」를 띄우면 화면마다 알림이 뜬다');
 });
 

@@ -46,6 +46,25 @@
     return gateway(options).save(recordRef(db,record.id),record,{entityType:ENTITY_TYPE,
       expectedRevision:expectedOf(previous),allowPendingCompany:true});
   }
+  /* 바뀐 칸만 — «서버의 지금 판»을 받아 change 로 다시 셈한다 (2026-10-07 기업정보함 점검).
+     ⚠ 이알피는 revision 을 안 올린다. 그래서 «밖에서 미리 합친 레코드 + 판 번호 비교»로는
+       그사이 이알피에서 고친 칸을 못 지킨다(판이 같아 보인다). 거래 안에서 서버 판 위에 다시
+       셈하면 남이 고친 칸은 그대로 남는다(js/pu-cal-write.js 의 overlay 와 같은 결).
+     ⚠ 찬 자리에서는 서버 판이 null 로 먼저 온다 — 그때는 화면이 든 판(base)으로 셈해 돌려준다.
+       접으면(undefined) 서버에 묻지도 않고 끝난다(memory: transaction cold abort).
+     change(cur) 는 저장할 레코드를 돌려준다. 돌려준 것이 없으면 cur 그대로(바꿀 것 없음). */
+  function patch(db,id,base,change,options){
+    options=options||{}; id=clean(id);
+    if(!id) return Promise.reject(new Error('업체 영구 ID가 없습니다.'));
+    if(typeof change!=='function') return Promise.reject(new Error('고칠 셈이 없습니다.'));
+    return gateway(options).save(recordRef(db,id),function(server){
+      var cur=(server&&typeof server==='object')?server:((base&&typeof base==='object')?base:null);
+      if(!cur) return undefined;
+      var out=change(Object.assign({},cur))||cur;
+      out=Object.assign({},out); out.id=id;
+      return out;
+    },{entityType:ENTITY_TYPE,allowPendingCompany:true});
+  }
   function remove(db,previous,options){
     options=options||{};
     if(!previous || !clean(previous.id)) return Promise.reject(new Error('삭제할 업체 원본을 찾지 못했습니다.'));
@@ -76,5 +95,5 @@
   }
 
   return {VERSION:1,ENTITY_TYPE:ENTITY_TYPE,ROOT_PATH:ROOT_PATH,expectedRevision:expectedOf,
-    recordRef:recordRef,prepare:prepare,save:save,remove:remove,audit:audit};
+    recordRef:recordRef,prepare:prepare,save:save,patch:patch,remove:remove,audit:audit};
 });

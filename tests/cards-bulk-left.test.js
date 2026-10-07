@@ -164,19 +164,20 @@ test('빈 목록이면 아무것도 없다', () => {
   assert.equal(p.skip.length, 0);
 });
 
-/* ── ⑤ 쓰기는 «한 번 읽고 한 번 쓴다» ── */
-test('bulkMarkLeft 가 사람마다 읽지 않는다', () => {
-  const src = fn('bulkMarkLeft');
-  const reads = (src.match(/once\(/g) || []).length;
-  assert.equal(reads, 1, '읽기가 ' + reads + '번이다 — 회사 통째 읽기는 한 번이어야 한다');
-  const writes = (src.match(/\.update\(/g) || []).length;
-  assert.equal(writes, 1, '쓰기가 ' + writes + '번이다 — 2026-08-16 에 5,000건 오류를 낸 방식이다');
+/* ── ⑤ 쓰기는 «사람마다»가 아니라 «회사마다 한 번» ──
+   2026-10-07 점검 ①: 예전 «목록 통째 읽기 한 번 + 통째 쓰기 한 번»은 그사이 이알피 손질을 지웠다.
+   이제 공용 문(erpCoPatchMany) 하나로 — 회사마다 «한 건 읽기 + 한 건 거래», 사람은 그 안에서 모은다. */
+test('bulkMarkLeft 가 사람마다 읽고 쓰지 않는다 — 회사마다 공용 문 한 번', () => {
+  const src = fn('bulkMarkLeft').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.equal((src.match(/erpCoPatchMany\(/g) || []).length, 1, '공용 문(erpCoPatchMany)을 한 번만 불러야 합니다');
+  assert.ok(!/\.once\(|\.update\(|\.transaction\(/.test(src), '★ 공용 문을 거치지 않고 직접 읽거나 씁니다');
+  assert.ok(/plan\.groups\.map\(/.test(src), '★ 회사(groups)마다 한 건이어야 합니다 — 사람마다 쓰면 2026-08-16 5,000건 오류 방식');
   assert.ok(!/forEach[\s\S]{0,200}Store\.put/.test(src), '한 장씩 Store.put 을 부른다');
 });
 
-test('bulkMarkLeft 가 푸른이알피 갱신시각을 함께 적는다', () => {
-  const src = fn('bulkMarkLeft');
-  assert.ok(/data\/companies\/u/.test(src),
+test('bulkMarkLeft 가 푸른이알피 갱신시각을 함께 적는다 — 공용 문이 쓴 뒤 u 를 올린다', () => {
+  const g = fn('erpCoPatchMany').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(/if\(out\.done\)\{[\s\S]*?ref\('data\/companies\/u'\)\.set\(/.test(g),
     '갱신시각(u)을 안 적으면 푸른이알피 화면이 안 바뀐다');
 });
 
