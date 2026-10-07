@@ -81,7 +81,7 @@ global.funds = {};
   /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — fillBizplanDoc 이 부른다.
      여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
   gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
-  gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
+  gF('useRate'), gF('bizIncomeOnly'), gF('bizUseRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
   gF('isSetupFund'), gF('_bizFinZero'), gF('fillBizplanHead'),
   gF('fillDerived'), gF('fillFoundContribDoc'), gF('hwpFormHTML')].join('\n'));
 

@@ -44,7 +44,7 @@ global.funds = {};
   /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — bizplanRows·bizplanBS 가 부른다.
      여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
   gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
-  gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
+  gF('useRate'), gF('bizIncomeOnly'), gF('bizUseRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
   gF('isSetupFund'), gF('_bizFinZero'), gF('fillBizplanHead'),
   gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'), gF('fillCommittee'),
   /* hwpFormHTML 이 끝에서 fillDerived 를, 설립 출연확인서에서 fillFoundContribDoc 를 부른다(2026-09-07).

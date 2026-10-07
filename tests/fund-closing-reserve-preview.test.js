@@ -46,7 +46,7 @@ const B = (() => {
     grabFn('num'),
     grabFn('acctType'), grabFn('isDrAcct'), grabFn('_openingOf'), grabFn('_splitsOf'), grabFn('expandSplits'),
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
-    grabFn('useRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
+    grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
     grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('closeArr'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
