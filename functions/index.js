@@ -6597,6 +6597,11 @@ exports.sweepDeletedMail = MGONE.sweepDeletedMail;
 const MGRW = require("./mgr-watch")({ functions, getDatabase, MAIL_REGION });
 exports.mgrWatch = MGRW.mgrWatch;
 
+/* 🏛 국세청 폐업·대표자 확인 — 매달 1일 06시 (대표 결정 2026-10-07 기업정보함 점검 4절 「월 1회 자동」).
+   실제 코드는 nts-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
+const NTSM = require("./nts-monthly")({ functions, getDatabase, MAIL_REGION });
+exports.ntsMonthly = NTSM.ntsMonthly;
+
 /* 🗄 구글 공용 달력 «보관함» — 매일 새벽 3시 data/gcal_archive 로 베낀다 (대표 지시 2026-09-27
    「푸른캘린더에서 별도로 보관」). 실제 코드는 gcal-archive.js. 누가 지운 일정도 보관함엔 남는다. */
 const GARCH = require("./gcal-archive")({ functions, getDatabase, MAIL_REGION,
