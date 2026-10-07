@@ -24,6 +24,7 @@ const V = (() => {
     gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'), gF('isSetupFund'), gF('_bizFinZero'), gF('_bizFinOf'),
     gF('bizplanRows'), gF('bizplanBS'),
     gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
+    gV('BUD_GWAN'), gV('BUD_GWAN_KEY'), gF('_fnum'), gF('budItemAmt'), gF('budItemBasis'), gF('budItemsList'),
     gF('_hwpBizplanValues'),
     'this.v=_hwpBizplanValues; this.setBudget=function(fid,b){ _BUDGET[fid]=b; }; this.S=S;',
   ].join('\n')).call(box);
@@ -101,4 +102,40 @@ test('★ 이미 굴러가는 기금은 올해 결산(스냅샷)이 없으면 �
   const v = V.v(Object.assign({}, F, { setup_stage: '운영', inka_date: '2024-01-01' }), SITES);
   assert.equal(v.대_자산계, '');
   assert.notEqual(v['손1_계'], '', '손익예산은 예산만으로 나온다');
+});
+
+/* ★ 세부 항목 줄 (2026-10-07 — 실무매뉴얼 부록3식, 목업 ②). 틀: 비용예산 {{#행:목적|관리|예비}}·목적사업계획서 {{#행:목적사업}} */
+const ITEMS = {
+  a: { gwan: 'int', name: '예금이자', base: '10,000', rate: '2.0', months: '8', ord: 1 },
+  b: { gwan: 'purpose', name: '명절 상품권', goal: '명절 격려', n: '40', n_unit: '인', price: '300', times: '2', t_unit: '회', ord: 2 },
+  c: { gwan: 'purpose', name: '건강검진비', n: '40', n_unit: '인', price: '150', ord: 3 },
+  d: { gwan: 'purpose', name: '경조사비', n: '10', n_unit: '건', price: '200', ord: 4 },
+  e: { gwan: 'purpose', name: '선택적복지', n: '40', n_unit: '인', price: '1,200', ord: 5 },
+  f: { gwan: 'admin', name: '등기소송비', memo: '임원변경등기', n: '2', n_unit: '회', price: '200', ord: 6 },
+  g: { gwan: 'admin', name: '회의진행비', memo: '협의회·이사회', n: '4', n_unit: '회', price: '250', ord: 7 },
+  h: { gwan: 'spare', name: '예비비', price: '4,000', ord: 8 },
+};
+test('★★ 세부 항목 — 비용예산 줄(목·금액·산출근거)·목적사업계획서 줄(대상인원·총금액)·계가 항목 합과 맞물린다', () => {
+  const G = Object.assign({}, F, { _id: 'IT', years: { 2026: { budget_items: ITEMS } } });
+  V.setBudget('IT', { rev_contrib: 50000000, rev_interest: 133000, exp_purpose: 80000000, exp_admin: 1400000, exp_etc: 4000000 });
+  const v = V.v(G, SITES);
+  assert.deepEqual(v.목적.map((x) => [x.목, x.금액, x.근거]), [
+    ['명절 상품권', '24,000', '-40인×2회×300=24,000'], ['건강검진비', '6,000', '-40인×150=6,000'],
+    ['경조사비', '2,000', '-10건×200=2,000'], ['선택적복지', '48,000', '-40인×1,200=48,000']]);
+  assert.deepEqual(v.관리.map((x) => x.근거), ['-임원변경등기 2회×200=400', '-협의회·이사회 4회×250=1,000']);
+  assert.deepEqual(v.예비.map((x) => x.근거), ['-예비비 4,000']);
+  assert.equal(v.출_사업, '80,000'); assert.equal(v.목적계, '80,000'); assert.equal(v.운_목적, '80,000'); assert.equal(v['손2_계'], '80,000');
+  assert.equal(n(v.출_관리), v.관리.reduce((s, x) => s + n(x.금액), 0), '관리비 줄의 합 = 관리비용');
+  assert.equal(v.목적사업.length, 4);
+  assert.equal(v.목적사업[0].단계, '1단계(설립시)'); assert.equal(v.목적사업[1].단계, ' ', '단계는 첫 줄만');
+  assert.equal(v.목적사업[0].대상, '40명'); assert.equal(v.목적사업[2].대상, ' ', '«건»은 사람 수가 아니다');
+  assert.equal(v.목적사업[0].목적, '명절 격려');
+  assert.equal(v.입_이자근거, '-10,000×2.0%×(8/12)=133');
+});
+test('★ 세부 항목이 없으면 관마다 «총액 한 줄» — 빈 표가 나가지 않는다', () => {
+  V.setBudget('X', null);
+  const v = V.v(F, SITES);
+  assert.equal(v.목적.length, 1); assert.equal(v.목적[0].목, '목적사업비'); assert.equal(v.목적[0].금액, v.출_사업);
+  assert.equal(v.예비[0].금액, v.출_예비);
+  assert.equal(v.목적사업[0].사업명, '목적사업'); assert.equal(v.목적사업[0].금액, v.목적계);
 });

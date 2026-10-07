@@ -4586,7 +4586,7 @@ function _hwpTplValues(f,sites){
    ⚠ 추정재무상태표는 «계»만 — 목적사업/기금관리 가름은 기금마다 달라 비운다(HTML 과 같은 결정).
    이름 약속(틀과 짝): 손N_목·_기·_계 = 손익예산 N번 줄의 목적사업회계·기금관리회계·계 / 대_… = 재무상태표 계 /
    요_… = 예산총칙 요약 / 입_… 수입예산 / 출_… 비용예산 / 운_… 기금운영 계획서 */
-var BIZ_TPL_ROWS={'1.사업수익':'손1','가.이자수입':'손1가','2.고유목적사업비용':'손2','3.사업총이익':'손3','4.일반관리비':'손4',
+var BIZ_TPL_ROWS={'1.사업수익':'손1','가.이자수입':'손1가','나.대부이자수입':'손1나','2.고유목적사업비용':'손2','3.사업총이익':'손3','4.일반관리비':'손4',
   '5.사업이익':'손5','6.사업외수익':'손6','가.고유목적사업준비금1전입수입':'손6가','나.고유목적사업준비금2전입수입':'손6나',
   '7.사업외비용':'손7','8.법인세차감전순이익':'손8','9.법인세비용':'손9','10.당기순이익':'손10'};
 var BIZ_TPL_BS={'Ⅰ.유동자산':'대_유동','1.당좌자산':'대_당좌','Ⅱ.비유동자산':'대_비유동','1.투자자산':'대_투자','자산총계':'대_자산계',
@@ -4609,7 +4609,13 @@ function _hwpBizplanValues(f,sites){
   Object.keys(BIZ_TPL_BS).forEach(function(k){ V[BIZ_TPL_BS[k]]=''; });
   ['대_현금','대_단기','대_준비금1','대_준비금2','대_이익잉여','대_차기이월','요_비용','요_순이익','요_수익',
    '입_사업','입_이자','입_외','입_계','출_사업','출_관리','출_예비','출_계',
-   '운_수입','운_전입','운_조달계','운_목적','운_관리','운_예비','운_지출계','운_과부족'].forEach(function(k){ V[k]=''; });
+   '운_수입','운_전입','운_조달계','운_목적','운_관리','운_예비','운_지출계','운_과부족',
+   '입_대부','입_이자근거','입_대부근거','목적계',
+   /* 줄 반복 안쪽 이름(항목마다 채운다) — 틀 올릴 때 «모르는 이름»으로 잡히지 않게 미리 깐다 */
+   '목','금액','근거','단계','사업명','대상','방법'].forEach(function(k){ V[k]=''; });
+  /* ★ 세부 항목 줄 (2026-10-07 — 실무매뉴얼 부록3식, 목업 ②) — 비용예산 {{#행:목적|관리|예비}}·목적사업계획서 {{#행:목적사업}}.
+     항목이 없는 관은 «총액 한 줄»로 — 빈 표가 나가지 않게. 예산이 아예 없으면 빈 목록(엔진이 빈 한 벌을 남긴다) */
+  V.목적=[]; V.관리=[]; V.예비=[]; V.목적사업=[];
   var R=null; try{ R=bizplanRows(f,yr,sites); }catch(e){}
   if(R){
     var r={}; R.forEach(function(x){ r[x[0]]=x;
@@ -4628,6 +4634,21 @@ function _hwpBizplanValues(f,sites){
     V.운_수입=W(rev1); V.운_전입=W(in2); V.운_조달계=W(rev1+in2);
     V.운_목적=W(pur); V.운_관리=W(adm); V.운_예비=W(spare); V.운_지출계=W(pur+adm+spare);
     V.운_과부족=W(rev1+in2-(pur+adm+spare));
+    var L=budItemsList((((f.years||{})[yr])||{}).budget_items), K=function(n){ return Number(n||0).toLocaleString(); };
+    var byG=function(gs){ return L.filter(function(x){ return gs.indexOf(x.gwan)>=0; }); };
+    var line=function(x){ return {목:String(x.name||'').trim()||' ', 금액:K(budItemAmt(x)), 근거:budItemBasis(x)}; };
+    var one=function(nm,v){ return [{목:nm, 금액:W(v), 근거:' '}]; };
+    V.목적=byG(['purpose']).length?byG(['purpose']).map(line):one('목적사업비',pur);
+    V.관리=byG(['admin']).length?byG(['admin']).map(line):one('일반관리비',adm);
+    V.예비=byG(['spare']).length?byG(['spare']).map(line):one('예비비',spare);
+    var PM='기금 재원으로 지원';   // 원본 문장(「출연기금 및 증식사업에서 발생한 수익을 재원으로 직원들에게 혜택제공」)은 좁은 칸에서 다섯 줄로 꺾여 줄이 높아지고 첫 줄이 테두리에 걸렸다 — 두 줄 안으로
+    V.목적사업=(byG(['purpose']).length?byG(['purpose']):[{name:'목적사업',_amt:Math.round(pur/1000)}]).map(function(x,i){
+      var u=String(x.n_unit||''), ppl=/^(인|명)$/.test(u)&&_fnum(x.n)?K(_fnum(x.n))+'명':' ';
+      return {단계:i?' ':(isSetupFund(f)?'1단계(설립시)':'1단계'), 사업명:String(x.name||'').trim()||' ', 목적:String(x.goal||'').trim()||' ', 대상:ppl,
+              금액:x._amt!=null?K(x._amt):K(budItemAmt(x)), 방법:i?'〃':PM}; });
+    V.목적계=W(pur);
+    var bas=function(gs){ return byG(gs).map(budItemBasis).join(' ')||' '; };
+    V.입_대부=W(g('나.대부이자수입',2)); V.입_이자근거=bas(['int']); V.입_대부근거=bas(['loanint']);
   }
   var fin=null; try{ fin=_bizFinOf()||(isSetupFund(f)?_bizFinZero():null); }catch(e){}
   var P=null; try{ if(fin) P=bizplanBS(f,yr,fin,sites); }catch(e){}
@@ -7007,7 +7028,7 @@ function fillRoster(root,f){
 /* 예산이 «하나라도» 적혔나 — 손익예산과 추정재무상태표가 같은 잣대를 써야 한다.
    따로 적어 두었더니 서로 어긋났다: 손익 쪽은 예비비를, 재무상태표 쪽은 그 밖의 수입과
    예비비를 빠뜨려, 예비비만 있는 계획은 손익만 비고 재무상태표는 차는 일이 생겼다. */
-var BUDGET_KEYS=['rev_contrib','rev_interest','rev_etc','exp_purpose','exp_admin','exp_etc'];
+var BUDGET_KEYS=['rev_contrib','rev_interest','rev_loanint','rev_etc','exp_purpose','exp_admin','exp_etc'];
 function _hasBudget(fid,yr){
   var b=budgetOf(fid,yr)||{};
   for(var i=0;i<BUDGET_KEYS.length;i++) if(num(b[BUDGET_KEYS[i]])) return true;
@@ -7088,28 +7109,31 @@ function bizplanRows(f,yr,sites){
   var b=planBudget(f,sites,yr);
   if(!b) return null;                                // 예산도 출연금도 없으면 채우지 않는다
   var g=function(k){ return num(b[k])||0; };
-  var interest=g('rev_interest'), etcRev=g('rev_etc');
+  var interest=g('rev_interest'), loanint=g('rev_loanint'), etcRev=g('rev_etc'), fundRev=interest+loanint;
   var pur=g('exp_purpose'), adm=g('exp_admin'), spare=g('exp_etc');   // 그 밖의 비용 = 예비비
   /* ── 목적사업 회계 ── 수익은 기타뿐이고, 모자란 만큼 준비금에서 꺼내 쓴다
      ── 기금관리 회계 ── 이자를 벌어 그만큼 준비금에 넣는다
      둘 다 «따로» 0 으로 맞물린다(원본 제출본이 그렇게 짜여 있다). */
   var pGross=etcRev-pur, pOp=pGross-adm;
   var pNonopExp=spare, pNonopRev=spare-pOp;         // 5+6-7=0 이 되게
-  var fNonopExp=interest;                            // 준비금1 전입 = 이자
+  var fNonopExp=fundRev;                             // 준비금1 전입 = 이자(예금·대부 — 법인세법 제29조①1호 가·다목)
+  /* 환입은 준비금1(그 해 이자)에서 먼저, 모자란 만큼 준비금2 — 이자가 필요보다 크면 준비금1 에 남긴다(음수 환입을 적지 않는다) */
+  var in1=Math.max(0,Math.min(fundRev,pNonopRev)), in2=pNonopRev-in1;
   var R=[], add=function(lbl,p,fu){ R.push([lbl,p,fu]); };
-  add('1.사업수익',        etcRev,   interest);
+  add('1.사업수익',        etcRev,   fundRev);
   add('가.이자수입',       0,        interest);
+  add('나.대부이자수입',   0,        loanint);
   add('2.고유목적사업비용', pur,      0);
-  add('3.사업총이익',      pGross,   interest);
+  add('3.사업총이익',      pGross,   fundRev);
   add('4.일반관리비',      adm,      0);
-  add('5.사업이익',        pOp,      interest);
+  add('5.사업이익',        pOp,      fundRev);
   add('6.사업외수익',      pNonopRev, 0);
-  add('가.고유목적사업준비금1전입수입', interest, 0);
-  add('나.고유목적사업준비금2전입수입', pNonopRev-interest, 0);
+  add('가.고유목적사업준비금1전입수입', in1, 0);
+  add('나.고유목적사업준비금2전입수입', in2, 0);
   add('7.사업외비용',      pNonopExp, fNonopExp);
-  add('8.법인세차감전순이익', pOp+pNonopRev-pNonopExp, interest-fNonopExp);
+  add('8.법인세차감전순이익', pOp+pNonopRev-pNonopExp, fundRev-fNonopExp);
   add('9.법인세비용',      0,        0);
-  add('10.당기순이익',     pOp+pNonopRev-pNonopExp, interest-fNonopExp);
+  add('10.당기순이익',     pOp+pNonopRev-pNonopExp, fundRev-fNonopExp);
   return R;
 }
 /* ══ 추정재무상태표 — 올해 기말에 내년 계획을 얹는다 ══
@@ -7126,16 +7150,17 @@ function bizplanBS(f,yr,fin,sites){
   var b=planBudget(f,sites,yr);
   if(!b) return null;
   var g=function(k){ return num(b[k])||0; };
-  var contrib=g('rev_contrib'), interest=g('rev_interest');
+  var contrib=g('rev_contrib'), fundRev=g('rev_interest')+g('rev_loanint'), etcRev=g('rev_etc');
   var pur=g('exp_purpose'), adm=g('exp_admin'), spare=g('exp_etc');
   var setup=Math.round(contrib*useRate(f));               // 출연금의 정해진 몫을 준비금2로
-  var back2=pur+adm+spare-interest;                       // 준비금2 환입(손익예산과 같은 셈)
-  var cash=fin.cash+contrib+interest-pur-adm-spare;
+  var need=pur+adm+spare-etcRev;                          // 준비금에서 메울 몫(손익예산 6.사업외수익)
+  var in1=Math.max(0,Math.min(fundRev,need)), back2=need-in1;   // 손익예산과 같은 셈
+  var cash=fin.cash+contrib+fundRev+etcRev-pur-adm-spare;
   var res2=fin.res2+setup-back2;
   var basic=fin.basic+contrib-setup;
   return {
     cash:cash, savings:fin.savings, secu:fin.secu, loan:fin.loan, otherAsset:fin.otherAsset,
-    res1:fin.res1, res2:res2, basic:basic, retained:fin.retained,
+    res1:fin.res1+fundRev-in1, res2:res2, basic:basic, retained:fin.retained,
     curLiab:fin.liab-fin.res1-fin.res2,
     assets:cash+fin.savings+fin.secu+fin.loan+fin.otherAsset
   };
@@ -15557,6 +15582,7 @@ var CLOSE_SUBS=[['txn','거래·분개입력'],['journal','분개장'],['ledger'
 var BUDGET_ROWS=[
   ['rev','수입',[['rev_contrib','출연금','contrib'],
                  ['rev_interest','기금 운용수익','bizRev'],
+                 ['rev_loanint','대부이자 수입','loanInt'],
                  ['rev_etc','그 밖의 수입','nonopRev']]],
   ['exp','지출',[['exp_purpose','목적사업비','purpose'],
                  ['exp_admin','일반관리비','admin'],
@@ -15569,12 +15595,61 @@ function budgetActual(arr,fin,rep){
     .reduce(function(t,b){ return t+b.amount; },0);
   /* 수익은 bizRev(사업수익) + nonopRev(사업외수익) 로 «갈라서» 본다 — 합쳐 놓은 칸을 쓰면
      준비금환입이 섞여 두 번 세어진다. 그래서 예전의 fin.interest 는 아예 없앴다. */
-  return { contrib:bf, bizRev:num(fin.bizRev)||0, nonopRev:num(fin.nonopRev)||0,
+  /* 대부이자는 따로 센다 — 기금 운용수익(bizRev)에서 빼야 두 번 세지 않는다 */
+  var _li=fin.tb&&fin.tb['대부이자수익'], loanInt=_li?Math.round((_li.credit||0)-(_li.debit||0)):0;
+  return { contrib:bf, bizRev:(num(fin.bizRev)||0)-loanInt, loanInt:loanInt, nonopRev:num(fin.nonopRev)||0,
            purpose:num(fin.purpose)||0, admin:num(fin.admin)||0, otherExp:num(fin.otherExp)||0 };
+}
+/* ══ 예산 세부 항목 — funds/{기금}/years/{연도}/budget_items/{id} (2026-10-05 목업 승인 「목업대로」, 2026-10-07 구현) ══
+   실무매뉴얼 부록3 사업계획서는 «인원 × 단가 × 횟수»로 항목을 쌓고 줄마다 산출근거를 적는다.
+   지금까지는 총액 다섯 칸만 있어 한글 서식의 「목」·산출근거가 밑줄 빈칸으로 나갔다.
+   ─ 단위는 «천원»이다(서식 단위). 줄마다 천원으로 반올림해 두면 줄의 합과 총액이 어긋나지 않는다.
+   ─ 항목이 «하나라도» 있는 관은 그 관의 예산 칸을 항목 합이 정한다(budgetOf 한 곳에서 얹는다 —
+     손익예산·추정재무상태표·회의록·예산 화면이 모두 같은 숫자를 본다).
+   ─ 관: int 예금이자(원금 × 이율 × 달/12) · loanint 대부이자 · purpose 목적사업 · admin 관리비 · spare 예비비 */
+var BUD_GWAN=[['int','수입','예금이자'],['loanint','수입','대부이자'],['purpose','목적사업',''],['admin','관리비',''],['spare','예비비','예비비']];
+var BUD_GWAN_KEY={int:'rev_interest',loanint:'rev_loanint',purpose:'exp_purpose',admin:'exp_admin',spare:'exp_etc'};
+function _fnum(v){ var s=String(v==null?'':v).replace(/,/g,'').trim(); if(!s) return 0; var n=parseFloat(s); return isNaN(n)?0:n; }
+/* 항목 금액(천원, 정수) — 순수 */
+function budItemAmt(it){
+  it=it||{}; var g=it.gwan;
+  if(g==='int'||g==='loanint'){ var mo=_fnum(it.months)||12; return Math.round(_fnum(it.base)*_fnum(it.rate)/100*mo/12); }
+  if(g==='spare') return Math.round(_fnum(it.price));
+  if(!_fnum(it.price)) return 0;
+  return Math.round((_fnum(it.n)||1)*_fnum(it.price)*(_fnum(it.times)||1));
+}
+/* 산출근거 — 매뉴얼 꼴 「-40인×2회×300=24,000」 · 「-10,000×2.0%×(8/12)=133」 · 「-임원변경등기 2회×200=400」 */
+function budItemBasis(it){
+  it=it||{}; var g=it.gwan, a=budItemAmt(it), K=function(v){ return Number(v).toLocaleString(); };
+  var pre='-'+(String(it.memo||'').trim()?String(it.memo).trim()+' ':'');
+  if(g==='int'||g==='loanint'){ var mo=_fnum(it.months)||12;
+    return pre+K(_fnum(it.base))+'×'+(Math.round(_fnum(it.rate)*10)/10).toFixed(1)+'%'+(mo!==12?'×('+mo+'/12)':'')+'='+K(a); }
+  if(g==='spare') return pre+(String(it.memo||'').trim()?'':'예비비 ')+K(a);
+  var parts=[];
+  if(_fnum(it.n)) parts.push(K(_fnum(it.n))+String(it.n_unit||''));
+  if(_fnum(it.times)) parts.push(K(_fnum(it.times))+String(it.t_unit||'회'));
+  parts.push(K(_fnum(it.price)));
+  return pre+parts.join('×')+'='+K(a);
+}
+/* 항목 목록(차례대로) — 관 차례, 그 안에서는 ord */
+function budItemsList(m){
+  var gi=function(g){ for(var i=0;i<BUD_GWAN.length;i++) if(BUD_GWAN[i][0]===g) return i; return 99; };
+  return Object.keys(m||{}).map(function(k){ var o=Object.assign({},m[k]); o._id=k; return o; })
+    .filter(function(o){ return o&&o.gwan; })
+    .sort(function(a,b){ return gi(a.gwan)-gi(b.gwan)||(_fnum(a.ord)-_fnum(b.ord))||String(a._id).localeCompare(String(b._id)); });
+}
+/* 관별 합 → 예산 칸(원). 항목이 있는 관만 담는다 — 순수 */
+function budItemSums(m){
+  var out={}, any=false;
+  budItemsList(m).forEach(function(it){ var k=BUD_GWAN_KEY[it.gwan]; if(!k) return; any=true;
+    out[k]=(out[k]||0)+budItemAmt(it)*1000; });
+  return {any:any, vals:out};
 }
 function budgetOf(fid,yr){
   var yd=(funds[fid]&&funds[fid].years&&funds[fid].years[yr])||{};
-  return yd.budget||{};
+  /* 세부 항목이 있는 관은 항목 합이 그 칸을 정한다 — 여기 «한 곳»에서 얹는다 */
+  var s=budItemSums(yd.budget_items);
+  return s.any?Object.assign({},yd.budget||{},s.vals):(yd.budget||{});
 }
 /* 한 줄 계산 — 예산·실적·집행률·남은 것 (순수, 검사 대상) */
 function budgetLine(plan,act){
@@ -15631,7 +15706,7 @@ function budgetView(arr){
   var fin=computeFin(arr,fid,yr), plan=budgetOf(fid,yr);
   var act=budgetActual(arr,fin,(S.f15Rep||{}));
   var W=function(v){ return Number(Math.round(v||0)).toLocaleString(); };
-  var tot={};
+  var tot={}, byItem=budItemSums((((funds[fid]||{}).years||{})[yr]||{}).budget_items).vals;
   var body=BUDGET_ROWS.map(function(g){
     var sp=0,sa=0;
     var rows=g[2].map(function(r){
@@ -15639,6 +15714,7 @@ function budgetView(arr){
       sp+=L.plan; sa+=L.act;
       return '<tr><td>'+esc(r[1])+'</td>'
         +'<td style="text-align:right"><input value="'+esc(L.plan||'')+'" placeholder="0" '
+          +(r[0] in byItem?'disabled title="아래 세부 항목의 합입니다 — 항목에서 고치세요" ':'')
           +'onchange="budgetSet(\''+r[0]+'\',this.value)" '
           +'style="width:130px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:12px;text-align:right"></td>'
         +'<td style="text-align:right">'+W(L.act)+'</td>'
@@ -15667,7 +15743,98 @@ function budgetView(arr){
     +body
     +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td>수입 − 지출</td>'
     +'<td style="text-align:right">'+W(pDiff)+'</td><td style="text-align:right'+(aDiff<0?';color:var(--danger)':'')+'">'+W(aDiff)+'</td>'
-    +'<td colspan="2"></td></tr></tbody></table></div></div>';
+    +'<td colspan="2"></td></tr></tbody></table></div></div>'
+    +budItemsHTML(fid,yr,plan);
+}
+/* 세부 항목 화면 — 예산·집행 아래. 입력은 천원, 금액·산출근거는 저절로(목업 ①) */
+function budItemsHTML(fid,yr,plan){
+  var f=funds[fid]||{}, yd=(f.years||{})[yr]||{}, L=budItemsList(yd.budget_items);
+  var inp=function(id,k,v,w,ph,txt){ return '<input value="'+esc(v==null?'':v)+'" placeholder="'+(ph||'')+'" onchange="budItemSet(\''+id+'\',\''+k+'\',this.value)" '
+    +'style="width:'+w+'px;padding:2px 5px;border:1px solid var(--line);border-radius:5px;font-size:11.5px'+(txt?'':';text-align:right')+'">'; };
+  var X='<span class="muted" style="margin:0 3px">×</span>';
+  var gl=function(g){ for(var i=0;i<BUD_GWAN.length;i++) if(BUD_GWAN[i][0]===g) return BUD_GWAN[i]; return [g,g,'']; };
+  var rows=L.map(function(it,i){ var id=it._id, g=it.gwan, fx;
+    if(g==='int'||g==='loanint') fx=inp(id,'base',it.base,80,'원금')+X+inp(id,'rate',it.rate,44,'%')+'<span class="muted">%</span>'+X+inp(id,'months',it.months,34,'12')+'<span class="muted">/12</span>';
+    else if(g==='spare') fx=inp(id,'price',it.price,90,'금액');
+    else fx=inp(id,'n',it.n,46,'수')+inp(id,'n_unit',it.n_unit,30,'인',1)+X+inp(id,'price',it.price,70,'단가')+X+inp(id,'times',it.times,40,'횟수')+inp(id,'t_unit',it.t_unit,30,'회',1);
+    return '<tr><td><input type="checkbox" class="bipick" value="'+id+'"></td><td class="no">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap">'+esc(gl(g)[1])+'</td>'
+      +'<td>'+inp(id,'name',it.name,110,gl(g)[2]||'목',1)+(g==='purpose'?' '+inp(id,'goal',it.goal,120,'목적(사업계획서)',1):'')+'</td>'
+      +'<td style="white-space:nowrap">'+fx+'</td>'
+      +'<td style="text-align:right;font-weight:700">'+budItemAmt(it).toLocaleString()+'</td>'
+      +'<td class="mo">'+inp(id,'memo',it.memo,110,'내용(선택)',1)+' <span class="muted" style="font-size:11px">'+esc(budItemBasis(it))+'</span></td></tr>'; }).join('');
+  /* 맞물림 — 손익예산 2.고유목적사업비용 · 비용예산 사업비 · 목적사업계획서 계 · 기금운영 목적사업이 모두 목적사업 항목 합과 같은가 */
+  var pur=L.filter(function(x){ return x.gwan==='purpose'; }).reduce(function(s,x){ return s+budItemAmt(x); },0)*1000;
+  var R=null; try{ R=bizplanRows(Object.assign({_id:fid},f),yr,S.f15Sites||[]); }catch(e){}
+  var r2=(R||[]).filter(function(x){ return x[0]==='2.고유목적사업비용'; })[0];
+  var hasPur=L.some(function(x){ return x.gwan==='purpose'; });
+  var mesh=!hasPur?'':(r2&&(num(r2[1])||0)===pur&&(num(plan.exp_purpose)||0)===pur)
+    ?'<span class="chip ok" title="손익예산·비용예산·목적사업계획서·기금운영계획서가 같은 목적사업비를 씁니다">맞물림 4곳 일치</span>'
+    :'<span class="chip dg" title="목적사업 항목 합과 손익예산의 목적사업비가 다릅니다">맞물림 어긋남</span>';
+  var g=function(k){ return num(plan[k])||0; };
+  var diff=g('rev_interest')+g('rev_loanint')+g('rev_etc')-g('exp_purpose')-g('exp_admin')-g('exp_etc');
+  return '<div class="panel" style="margin-top:12px"><div class="row" style="flex-wrap:wrap;gap:6px"><h2 style="font-size:15px">'+yr+'년 예산 세부 항목</h2>'+hlp('budget.items')
+    +'<span class="muted" style="font-size:11.5px">단위 천원</span>'+mesh
+    +(L.length?'<span class="chip'+(diff<0?' warn':'')+'">수지차액 '+(diff<0?'−':'')+Math.abs(Math.round(diff/1000)).toLocaleString()+(diff<0?' → 준비금2 환입':'')+'</span>':'')
+    +'<span style="flex:1"></span><button onclick="budItemsSeed()">출연금에서 기본 항목 세우기</button>'
+    +'<select id="biAdd" style="padding:3px 6px;font-size:12px">'+BUD_GWAN.map(function(x){ return '<option value="'+x[0]+'">'+x[1]+(x[2]&&x[1]==='수입'?' · '+x[2]:'')+'</option>'; }).join('')+'</select>'
+    +'<button onclick="budItemAdd(($(\'biAdd\')||{}).value)">＋ 항목</button>'
+    +(L.length?'<button onclick="budItemDel()" style="color:var(--danger)">선택 삭제</button>':'')+'</div>'
+    +(L.length?'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="width:24px"><input type="checkbox" onclick="[].forEach.call(document.querySelectorAll(\'.bipick\'),function(x){x.checked=this.checked;},this)"></th>'
+      +'<th class="no">#</th><th>관</th><th>목</th><th>산식</th><th style="text-align:right">금액</th><th class="mo">산출근거(자동)</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      :'<div class="muted" style="padding:12px 4px">세부 항목이 없습니다 — 예산은 위 다섯 칸 그대로 씁니다.</div>')
+    +'</div>';
+}
+function _budItemsRef(){ return fbDb.ref(NS+'/funds/'+S.fundId+'/years/'+S.year+'/budget_items'); }
+function budItemSet(id,k,v){
+  var val=String(v==null?'':v).trim();
+  _budItemsRef().child(id+'/'+k).set(val||null).then(function(){ toast('저장됨'); })
+    .catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+function budItemAdd(g){
+  if(!BUD_GWAN_KEY[g]) return;
+  var f=funds[S.fundId]||{}, o={gwan:g, ord:Date.now()};
+  if(g==='int'){ o.name='예금이자'; o.rate=String(bizRate(f)); o.months='12'; }
+  if(g==='loanint'){ o.name='대부이자'; o.months='12'; }
+  if(g==='spare') o.name='예비비';
+  if(g==='purpose'){ o.n_unit='인'; o.t_unit='회'; }
+  if(g==='admin') o.t_unit='회';
+  _budItemsRef().push(o).then(function(){ toast('항목을 더했습니다 — 칸을 채우세요'); })
+    .catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+function budItemDel(){
+  var ids=[].slice.call(document.querySelectorAll('.bipick:checked')).map(function(x){ return x.value; });
+  if(!ids.length){ toast('지울 항목을 고르세요','warn'); return; }
+  confirmM('세부 항목 '+ids.length+'개를 지울까요?',{ok:'삭제',danger:true}).then(function(ok){
+    if(!ok) return; var up={}; ids.forEach(function(id){ up[id]=null; });
+    _budItemsRef().update(up).then(function(){ toast('지웠습니다'); }).catch(function(e){ toast('삭제 실패: '+e.message,'err'); });
+  });
+}
+/* 출연금에서 기본 항목 — 예금이자(기본재산 × 이율)·목적사업(그 해 목적사업 탭의 사업별 예산, 없으면 한 줄)·관리비·예비비.
+   숫자는 autoBudget 과 같은 셈이다. 세운 뒤 사람이 인원·단가·횟수로 고친다 */
+function budItemsSeed(){
+  var fid=S.fundId, yr=S.year, f=funds[fid]||{};
+  Promise.all([_loadSites(fid),fbDb.ref(NS+'/welfare/'+fid+'/'+yr).once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return {}; })])
+  .then(function(r){
+    var b=autoBudget(Object.assign({_id:fid},f),r[0]);
+    if(!b){ toast('출연금이 비어 있습니다 — 참여사업장 약정액이나 [기금 정보]의 설립 출연금 총액을 먼저 넣으세요','warn'); return; }
+    var T=function(v){ return String(Math.round((v||0)/1000)); }, items=[], t=Date.now();
+    items.push({gwan:'int',name:'예금이자',base:T(b._basic),rate:String(bizRate(f)),months:'12'});
+    var progs=Object.keys(r[1]).map(function(k){ return r[1][k]; })
+      .filter(function(w){ return w&&w.category!=='대부사업'&&num(w.budget); });
+    if(progs.length) progs.forEach(function(w){ items.push({gwan:'purpose',name:String(w.name||w.category||'목적사업'),price:T(w.budget),n_unit:'인',t_unit:'회'}); });
+    else items.push({gwan:'purpose',name:'목적사업비',price:T(b.exp_purpose),n_unit:'인',t_unit:'회'});
+    items.push({gwan:'admin',name:'일반관리비',price:T(b.exp_admin),t_unit:'회'});
+    items.push({gwan:'spare',name:'예비비',price:T(b.exp_etc)});
+    var had=budItemsList(((f.years||{})[yr]||{}).budget_items).length;
+    confirmM(yr+'년 세부 항목 '+items.length+'줄을 세울까요?\n\n· 예금이자: 기본재산 '+won(b._basic)+' × '+bizRate(f)+'%\n· 목적사업 '+(progs.length?progs.length+'개 사업(목적사업 탭 예산)':'한 줄 '+won(b.exp_purpose))
+      +'\n· 관리비 '+won(b.exp_admin)+' · 예비비 '+won(b.exp_etc)+(had?'\n\n이미 있는 항목 '+had+'개는 지우고 새로 세웁니다.':''),{ok:'세우기'}).then(function(ok){
+      if(!ok) return; var m={};
+      items.forEach(function(o,i){ o.ord=t+i; m['s'+t.toString(36)+i]=o; });
+      _budItemsRef().set(m).then(function(){ toast('세부 항목을 세웠습니다 — 인원·단가·횟수로 고치세요'); })
+        .catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+    });
+  }).catch(function(e){ toast('읽지 못했습니다: '+((e&&e.message)||e),'err'); });
 }
 function closeSub(k){ S.closeSub=k; renderFund(); }
 function closeSubBar(){
@@ -20038,6 +20205,9 @@ var HELP={
    +'<p><b>이미 있는 사업장도 꺼 둡니다.</b> 사업자등록번호가 같거나 상호가 완전히 같으면 「이미 있음」으로 봅니다 — 같은 회사가 두 번 들어가면 출연금이 두 번 세어지고 서식에도 두 번 섭니다.</p>'
    +'<p>만들 때 <b>사업자등록증 원본도 사업장마다 이어</b> 「받음」으로 표시합니다(지원금 제출서류 칸).</p>'
    +'<p><b>출연 약정액은 안 들어옵니다</b> — 사업자등록증에 없는 값입니다. 만든 뒤 명부에서 넣어 주세요. 그 값이 설립 첫해 사업계획서까지 굴러갑니다.</p>'},
+ 'budget.items':{t:'예산 세부 항목 — 인원 × 단가 × 횟수',h:'<p>실무매뉴얼의 사업계획서처럼 항목마다 <b>산식</b>을 넣으면 금액과 <b>산출근거</b>(「-40인×2회×300=24,000」)가 저절로 나옵니다. 단위는 서식과 같은 <b>천원</b>입니다.</p>'
+   +'<p>항목이 있는 관(예금이자·대부이자·목적사업·관리비·예비비)은 위 예산 칸이 <b>항목 합</b>으로 바뀌고, 손익예산·추정재무상태표·비용예산·목적사업계획서·기금운영계획서가 모두 같은 숫자를 씁니다(맞물림 4곳). 줄마다 천원으로 반올림하므로 줄의 합과 총액이 어긋나지 않습니다.</p>'
+   +'<p>예금이자는 원금 × 이율 × 달/12, 예비비는 금액만. 「출연금에서 기본 항목 세우기」는 출연금·목적사업 탭 예산으로 첫 줄들을 세웁니다 — 그다음 인원·단가·횟수로 고치세요. 수지차액이 음수면 그만큼 준비금2에서 환입합니다.</p>'},
  'close.tax':{t:'법인세·지방소득세 신고 준비표',h:'<p>신고는 <b>홈택스(법인세)·위택스(법인지방소득세)</b>에서 기금 법인의 인증서로 로그인해 냅니다. 앱은 인증서를 다루지 않으므로 대신 내지 않고, <b>서식 판정 → 칸별 값 → 복사·엑셀</b>까지 준비합니다.</p>'
    +'<p><b>서식 판정</b> — 예금이자만 있으면 별지 제56호(이자소득만 있는 비영리법인). 원천징수된 이자는 신고하지 않아도 되지만(법인세법 제62조), 신고하면 고유목적사업준비금을 손금에 넣어 과세표준 0, <b>떼인 법인세·지방소득세를 돌려받습니다</b>. 근로자 대부이자·잡수익이 있으면 일반 신고(별지 제1호)로 셈합니다 — 대부이자는 원천징수가 없어 반드시 신고합니다.</p>'
    +'<p><b>셈</b> — 수입금액(이자는 원천징수 전 총액, 미수이자 제외) − 준비금 손금산입(한도: 이자·대부이자 100%, 그 밖 50% — 법 제29조①) = 과세표준. 세율은 사업연도로 고릅니다(2026년부터 10·20·22·25%, 지방은 그 1/10). 원천납부세액은 결산 화면 «이자 원천징수» 칸 값입니다.</p>'

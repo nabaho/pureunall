@@ -351,7 +351,7 @@ function boot() {
     gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'),
     gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'),
     gF('_isRateRow'), gF('stripBaked'), gF('korWon'), gF('_docRok'),
-    gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'), gF('budgetOf'), gF('_hasBudget'),
+    gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'), gV('BUD_GWAN'), gV('BUD_GWAN_KEY'), gF('_fnum'), gF('budItemAmt'), gF('budItemsList'), gF('budItemSums'), gF('budgetOf'), gF('_hasBudget'),
     gF('_reserveRate'), gF('_bizFinOf'),
     gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
     gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),

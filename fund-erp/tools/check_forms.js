@@ -40,7 +40,7 @@ global.funds = {};
   gF('_officersOf'), gF('_boss'), gF('_isBlankCell'), gF('_isLabelCell'), gF('_bakeText'),
   gF('_isRateRow'), gF('stripBaked'), gF('korWon'), gF('_docRok'),
   /* 2026-09-20: 확인서 한 장의 모양(제목·가운데 배치·회사이름·날인 자리)을 하나로 모았다 */
-  gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'), gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'),
+  gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'), gV('BUD_GWAN'), gV('BUD_GWAN_KEY'), gF('_fnum'), gF('budItemAmt'), gF('budItemsList'), gF('budItemSums'), gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'),
   /* 출연금 하나로 세우는 첫해 예산(2026-09-12) — bizplanRows·bizplanBS 가 부른다.
      여기 없으면 「planBudget is not defined」로 이 검사가 통째로 죽는다. */
   gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
