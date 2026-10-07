@@ -645,6 +645,10 @@
             + '.pcf-ok{background:#dcfce7;color:#166534;border-radius:9px;padding:0 7px;font-size:10.5px;font-weight:700}'
     + '.pcf-sheetwrap{background:#e2e8f0;padding:16px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 8px 8px}'
     + '.pcf-sheet{background:#fff;max-width:820px;margin:0 auto;padding:40px 52px;box-shadow:0 1px 3px rgba(15,23,42,.15);min-height:600px;position:relative}'
+    /* 원본 모양 (2026-10-07) — 종이 대신 원본 쪽 그림을 그대로 */
+    + '.pcf-sheet.orig{background:transparent;box-shadow:none;padding:0;max-width:880px}'
+    + '.pcf-pvbar{display:flex;gap:6px;justify-content:flex-end;max-width:880px;margin:0 auto 8px}'
+    + '.pcf-orig{min-height:200px;text-align:center}.pcf-orig .pcf-muted{padding:40px}'
     + '.pcf-offband{background:#fef3c7;color:#92400e;font-size:12px;font-weight:700;padding:6px 10px;border-radius:4px;margin-bottom:16px}'
     + '.pcf-body{white-space:pre-wrap;font-family:"Malgun Gothic","맑은 고딕",monospace;font-size:13px;line-height:1.85;color:#1e293b;margin:0}'
     + '.pcf-v{background:#dbeafe;color:#1e40af;border-radius:3px;padding:0 2px}'
@@ -2075,9 +2079,70 @@
       return [el('button', { type: 'button', 'class': 'pcf-b', title: 'rhwp(한글 미리보기 엔진) 최신 판 확인', text: 'rhwp v' + rhwpVer() + ' ⟳', onclick: rhwpUpdatePrompt }),
         kind === 'case' ? el('button', { type: 'button', 'class': 'pcf-b y', title: '체당금 기본 양식 4개를 다시 넣습니다', text: '📥 체당금 시드', onclick: reseedChedang }) : null];
     }
+    /* ── 원본 모양 (대표 /goal 2026-10-07 「글자크기·모양·줄간 서식 등 모든 형태가 제대로」) ──
+       가운데 종이는 본문 글자판(pre)만 보여 줬다 — 원본이 있어도 상자 글자(┌─┐)로 그린 «흉내»였고,
+       진짜 모양은 🔍 창에서만 보였다. 이제 원본이 있으면 종이에 원본을 그대로 그린다:
+         한글(hwp·hwpx) → rhwp (한글 2022 와 쪽수까지 같음 — 양식 19개로 견줌)
+         엑셀 → 엑셀이 직접 만든 「미리보기 PDF」(첨부 role:'preview', pdf.js) — 엑셀은 rhwp 가 못 그린다
+       「글자 본문」 칩으로 표지({{…}}) 확인용 글자판을 볼 수 있다. */
+    function previewPdfOf(fm) {
+      /* 미리보기 PDF 는 크다(엑셀이 글꼴을 품는다 — 70~800KB) — 양식 목록에 박지 않고 원본 보관함(fileId)에 두고 열 때 받는다 */
+      return ((fm && fm.attachments) || []).filter(function (a) { return a && a.role === 'preview' && /\.pdf$/i.test(a.name || '') && (a.data || a.dataUrl || a.fileId); })[0] || null;
+    }
+    function hwpOrigOf(fm) { return hwpSources(fm || {}).filter(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); })[0] || null; }
+    function srcBytes(src) {
+      if (src.data) return Promise.resolve(bytesOfDataUrl(src.data));
+      return host.hwpBytes ? host.hwpBytes(src) : Promise.reject(new Error('원본을 불러올 길이 없습니다'));
+    }
+    function renderPdfPages(box, u8) {
+      return new Promise(function (res, rej) {
+        _ensurePdfjs2(function (err) {
+          if (err) { rej(new Error(err)); return; }
+          w.pdfjsLib.getDocument({ data: u8 }).promise.then(function (pdf) {
+            var chain = Promise.resolve();
+            for (var i = 1; i <= pdf.numPages; i++) (function (n) {
+              chain = chain.then(function () {
+                return pdf.getPage(n).then(function (pg) {
+                  var vp0 = pg.getViewport({ scale: 1 }), cw = Math.max(280, Math.min((box.clientWidth || 820) - 8, 820));
+                  var dpr = Math.min(2, w.devicePixelRatio || 1), vp = pg.getViewport({ scale: cw / vp0.width * dpr });
+                  var c = document.createElement('canvas'); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+                  c.style.cssText = 'display:block;background:#fff;margin:0 auto 14px;box-shadow:0 2px 8px rgba(0,0,0,.2);max-width:100%;width:' + Math.round(cw) + 'px';
+                  box.appendChild(c);
+                  return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise;
+                });
+              });
+            })(i);
+            return chain.then(function () { res({ pageCount: pdf.numPages }); });
+          }, rej);
+        });
+      });
+    }
+    function drawOrig(box, fm) {
+      var pdf = previewPdfOf(fm), src = pdf ? null : hwpOrigOf(fm), want = fm.id;
+      box.innerHTML = ''; box.appendChild(el('div', { 'class': 'pcf-muted', text: '원본 모양을 그리는 중…' }));
+      var go = pdf ? srcBytes({ name: pdf.name, data: pdf.data || pdf.dataUrl, fileId: pdf.fileId })
+          .then(function (u8) { if (S.sel !== want) return; box.innerHTML = ''; return renderPdfPages(box, u8); })
+        : srcBytes(src).then(function (u8) { if (S.sel !== want) return; box.innerHTML = ''; return w.PureunHwp.renderPreview(box, u8, src.name); });
+      go.catch(function (e) {
+        if (S.sel !== want) return;
+        box.innerHTML = '';
+        box.appendChild(el('div', { 'class': 'pcf-muted', text: '원본 모양을 그리지 못했습니다(' + ((e && e.message) || e) + ') — 「글자 본문」을 누르면 글자판으로 봅니다' }));
+      });
+    }
     function paper(fm) {
-      var sheet = el('div', { 'class': 'pcf-sheet' });
+      var hasOrig = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp));
+      var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
+      var sheet = el('div', { 'class': 'pcf-sheet' + (view === 'orig' ? ' orig' : '') });
       if (fm.enabled === false) sheet.appendChild(el('div', { 'class': 'pcf-offband', text: '사용 안 함 — 계약서 출력 때 고를 수 없습니다' }));
+      if (hasOrig) sheet.appendChild(el('div', { 'class': 'pcf-pvbar' }, [
+        chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
+        chip('🔤 글자 본문(표시 확인)', view === 'text', function () { S.paperView = 'text'; drawBody(); })]));
+      if (view === 'orig') {
+        var ob = el('div', { 'class': 'pcf-orig' });
+        sheet.appendChild(ob);
+        setTimeout(function () { if (ob.isConnected) drawOrig(ob, fm); }, 0);   // 붙은 뒤에 그려야 너비를 안다
+        return el('div', { 'class': 'pcf-sheetwrap' }, [sheet]);
+      }
       var pre = el('pre', { 'class': 'pcf-body' });
       var parts = splitVars(fm.body);
       if (!parts.length) pre.appendChild(el('span', { 'class': 'pcf-muted', text: '본문 없음 — [수정]에서 넣으세요' }));
