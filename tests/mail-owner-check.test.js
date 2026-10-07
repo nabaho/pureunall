@@ -50,8 +50,10 @@ function box(o) {
   ctx.firebase = { database: () => ({ ref: (p) => ({
     update: async (u) => { ctx.writes.push(p ? { p, u } : u); },
     set: async (v) => { ctx.writes.push({ p, v }); },
-    once: async () => ({ val: () => null }) }) }) };
+    once: async () => ({ val: () => (p === 'pucards/config/mgrChange' && o.serverChange !== undefined ? o.serverChange : null) }) }) }) };
   vm.createContext(ctx);
+  /* 셈은 js/pu-mgr-watch-core.js «한 벌» — 화면과 서버(mgrWatch)가 같이 쓴다(2026-10-07 점검 ③) */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mgr-watch-core.js'), 'utf8'), ctx);
   vm.runInContext("var _mgrSeen = null, _mgrChange = null, _mgrKeep = null, _mgrBusy = false, _mgrLoading = false; var _mgrReqs = " + JSON.stringify(o.reqs || []) + ";", ctx);
   const m = app.match(/^const MGR_KEY_OK = [^\n]*;/m); assert.ok(m);
   vm.runInContext(m[0].replace(/^const /, 'var '), ctx);
@@ -79,28 +81,38 @@ test('★★★ 바뀐 것을 «전 → 새»로 낸다 · 기준에 없던 새 
   assert.deepEqual(d.changes.map((x) => x.co + ':' + x.from + '>' + x.to).sort(), ['co1:P-002>P-001', 'co4:P-001>']);
 });
 
-test('★★★ 관리자 PC 만 적는다 — 기준과 바뀐 것을 한 번에', async () => {
-  const n = box({ admin: false, seen: { co1: 'P-002' } });
-  await n.mgrWatchRun();
-  assert.equal(n.writes.length, 0, '★★★ 관리자가 아닌데 적습니다 — 여러 PC 가 기준을 서로 덮습니다');
-  const c = box({ seen: { co1: 'P-002', co2: 'P-002', co3: 'P-009', co4: '', co5: '' } });
-  await c.mgrWatchRun();
-  assert.equal(c.writes.length, 1, '★★ 여러 번 나눠 적습니다');
-  const u = c.writes[0];
-  assert.deepEqual(plain(u['pucards/config/mgrChange/co1']), { co: 'co1', coName: '가나상사', from: 'P-002', to: 'P-001', at: u['pucards/config/mgrChange/co1'].at });
-  assert.equal(u['pucards/config/mgrSeen/co1'], 'P-001', '★★ 기준을 새로 안 적어 다음에 또 잡습니다');
-  assert.match(String(c._toast), /담당이 바뀐 업체 1곳/);
+/* 2026-10-07 점검 ③: 견주어 «적는» 일은 서버(functions/mgr-watch.js)가 셈 한 벌(PuMgrWatch.plan)로 한다.
+   화면은 서버가 적은 바뀐 것을 «다시 읽어» 새로 생겼으면 알리기만 한다. */
+test('★★★ 기준과 바뀐 것을 «한 번에» 셈한다 — 서버가 쓰는 셈 한 벌(PuMgrWatch.plan)', () => {
+  const c = box();
+  const P = c.get('PuMgrWatch');
+  const p = P.plan({ co1: 'P-002', co2: 'P-002', co3: 'P-009', co4: '', co5: '' }, {}, COS(), D);
+  assert.equal(p.n, 1);
+  assert.deepEqual(plain(p.up['mgrChange/co1']), { co: 'co1', coName: '가나상사', from: 'P-002', to: 'P-001', at: D });
+  assert.equal(p.up['mgrSeen/co1'], 'P-001', '★★ 기준을 새로 안 적어 다음에 또 잡습니다');
+  assert.equal(p.up['mgrSeen/co6'], undefined, '★ 끝난 업체까지 지켜봅니다');
 });
 
-test('★★ 확인 전에 또 바뀌면 «처음 담당»을 지킨다 · 원래대로 돌아오면 줄을 지운다', async () => {
-  const cos = COS(); cos[0].managerMain = 'P-009';
-  const c = box({ cos, seen: { co1: 'P-002' }, change: { co1: { co: 'co1', coName: '가나상사', from: 'P-001', to: 'P-002', at: 1 } } });
+test('★★★ 화면은 «적지 않는다» — 서버가 적은 것을 다시 읽어 새로 생긴 것만 알린다', async () => {
+  const c = box({ seen: { co1: 'P-002' }, change: {},
+    serverChange: { co1: { co: 'co1', coName: '가나상사', from: 'P-002', to: 'P-001', at: 1 } } });
   await c.mgrWatchRun();
-  assert.equal(c.writes[0]['pucards/config/mgrChange/co1'].from, 'P-001', '★★ 처음 담당을 잃어 무엇이 바뀌었는지 모릅니다');
-  const cos2 = COS();
-  const b = box({ cos: cos2, seen: { co1: 'P-002' }, change: { co1: { co: 'co1', from: 'P-001', to: 'P-002', at: 1 } } });
-  await b.mgrWatchRun();
-  assert.equal(b.writes[0]['pucards/config/mgrChange/co1'], null, '★★ 원래대로 돌아왔는데 «바뀌었다»가 남습니다');
+  assert.equal(c.writes.length, 0, '★★★ 화면이 다시 적습니다 — 낡은 기준으로 서버가 적은 것을 되돌립니다');
+  assert.match(String(c._toast), /담당이 바뀐 업체 1곳/, '★★ 새로 생긴 바뀐 것을 안 알립니다');
+  const n = box({ admin: false, seen: {}, change: {}, serverChange: { co1: { co: 'co1', from: 'a', to: 'b', at: 1 } } });
+  await n.mgrWatchRun();
+  assert.equal(n._toast, undefined, '관리자가 아니면 알리지 않는다(보는 것은 화면에서 누구나)');
+  const fn = strip(sliceFn(app, 'async function mgrWatchRun('));
+  assert.doesNotMatch(fn, /\.update\(|\.set\(|\.transaction\(|config\/mgrSeen/, '★★★ 화면이 기준이나 바뀐 것을 적습니다');
+});
+
+test('★★ 확인 전에 또 바뀌면 «처음 담당»을 지킨다 · 원래대로 돌아오면 줄을 지운다', () => {
+  const P = box().get('PuMgrWatch');
+  const cos = COS(); cos[0].managerMain = 'P-009';
+  const p = P.plan({ co1: 'P-002' }, { co1: { co: 'co1', coName: '가나상사', from: 'P-001', to: 'P-002', at: 1 } }, cos, D);
+  assert.equal(p.up['mgrChange/co1'].from, 'P-001', '★★ 처음 담당을 잃어 무엇이 바뀌었는지 모릅니다');
+  const q = P.plan({ co1: 'P-002' }, { co1: { co: 'co1', from: 'P-001', to: 'P-002', at: 1 } }, COS(), D);
+  assert.equal(q.up['mgrChange/co1'], null, '★★ 원래대로 돌아왔는데 «바뀌었다»가 남습니다');
 });
 
 test('★★★ 넷을 가려 보여 준다 — 확인한 것·메일 없는 빈 담당·그대로 둔 것은 빠진다', () => {
