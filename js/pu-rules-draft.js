@@ -7,7 +7,11 @@
    ■ 우리 것과 다른 점 — 그들은 «만들고 끝»이다. 여기서는 만든 한 권을 곧바로 92항목 검토에 넣는다
      (rules.html takeDraft) — 만들자마자 법 개정·시행예정까지 짚는다.
 
-   ■ 두 권 — kind 'general'(일반근로자용, std.text) · 'short'(단시간 근로자용, std.short · 2026-10-07 「추천대로」).
+   ■ 세 권 — kind 'general'(일반근로자용, std.text) · 'short'(단시간 근로자용, std.short · 2026-10-07 「추천대로」)
+     · 'harass'(별도 직장 내 괴롭힘 예방·대응규정 표준안, std.harass · 2026-10-07 「다음」 — 검토가 아니라 한글 파일로 내준다).
+   ⚠ 표준 원문은 조 머리를 「제68조 (교육시간)」처럼 띄어 쓴 곳이 있다(단시간 제68·69조, 괴롭힘 규정 제1~4·7조).
+     그대로 두면 그 조를 «조»로 못 알아봐 앞 조에 붙고 번호를 다시 못 매긴다(2026-10-07 단시간에서 실제로 났다) —
+     읽자마자 「제N조(」로 붙여 쓴다(normHead).
      두 권은 조 번호가 다르다(일반 제23조 근로시간 = 단시간 제23조, 일반 제61조 퇴직급여 = 단시간 제59조 …).
      그래서 조를 «번호»가 아니라 «제목»으로 찾는다 — 같은 규칙을 두 권에 그대로 쓴다.
 
@@ -32,6 +36,7 @@
     start: '09:00', end: '18:00', breakStart: '12:00', breakEnd: '13:00',
     shortDays: '월, 수, 금',         // 단시간 — 근무 요일
     shortStart: '09:00', shortEnd: '13:00', shortBreakStart: '', shortBreakEnd: '',
+    harassDays: '', harassExtend: '', // 괴롭힘 조사 완료 기한·연장(일) — 비면 «직접 채울 곳»
     shift: '', shiftScope: '',       // 교대 — 비면 교대 조를 뺀다 (예: 3조2교대)
     flex: { elastic: false, select: false, deemed: false, discretion: false },
     founding: '',                    // 창립기념일 「3월 2일」 — 비면 그 낱말을 뺀다
@@ -72,10 +77,23 @@
     return { s: s, e: e, bs: bs, be: be, br: br, hasB: !!hasB, work: e - s - br };
   }
 
+  /* 「제68조 (교육시간)」 → 「제68조(교육시간)」 — 띄어 쓴 조 머리도 조로 알아보게 */
+  function normHead(l) { return String(l).replace(/^제(\d+)조(의\d+)?\s+\(/, function (m, n, sub) { return '제' + n + '조' + (sub || '') + '('; }); }
+  function dateKo(ef) { var d = String(ef || '').split('-'); return d.length === 3 ? (+d[0]) + '년 ' + (+d[1]) + '월 ' + (+d[2]) + '일' : '20 년 월 일'; }
+
   /* 답을 먼저 거른다 — 위법이 되는 답은 «안 받는다»(④) */
   function validate(answers) {
     var a = merge(answers), why = [];
-    if (['general', 'short'].indexOf(a.kind) < 0) why.push('어느 규칙을 지을지 고르세요');
+    if (['general', 'short', 'harass'].indexOf(a.kind) < 0) why.push('어느 규칙을 지을지 고르세요');
+    if (a.kind === 'harass') {
+      if (!String(a.company || '').trim()) why.push('회사 이름을 적으세요');
+      [['harassDays', '조사 완료 기한'], ['harassExtend', '조사 연장']].forEach(function (k) {
+        var x = String(a[k[0]] || '').trim();
+        if (x && !(/^\d{1,3}$/.test(x) && +x > 0)) why.push(k[1] + '은 일수(숫자)로 적으세요');
+      });
+      if (a.effective && !/^\d{4}-\d{2}-\d{2}$/.test(a.effective)) why.push('시행일은 2026-11-01 꼴로 적으세요');
+      return { ok: why.length === 0, why: why };
+    }
     if (!String(a.company || '').trim()) why.push('회사 이름을 적으세요');
     if (!(Number(a.size) >= 1)) why.push('상시 근로자 수를 적으세요');
     if (!(Number(a.retireAge) >= 60)) why.push('정년은 60세 이상이어야 합니다 (고령자고용법 제19조)');
@@ -176,14 +194,42 @@
 
   var LEFT_RE = /○○|ㅇ(?=[년개일조요시교])|(^|[^0-9])00(?=[:월일%시간])|20 년 월 일/;   // 「100일」의 00 은 빈칸이 아니다
 
+  /* 못 채운 빈칸(⑤) — 조 이름으로 모아 돌려준다 */
+  function leftovers(all) {
+    var left = [], curNo = '', inTail = false;
+    all.forEach(function (l) {
+      var m = /^제(\d+)조(?:의\d+)?\(([^)]*)\)/.exec(l);
+      if (/^부\s*칙/.test(l)) { inTail = true; curNo = '부칙'; }
+      if (m) curNo = (inTail ? '부칙 ' : '') + '제' + m[1] + '조(' + m[2] + ')';
+      if (LEFT_RE.test(l) && left.indexOf(curNo) < 0) left.push(curNo);
+    });
+    return left;
+  }
+
+  /* 괴롭힘 예방·대응규정 — 표준안 원문 그대로(안내 줄·<참고>만 뺌), 조사 기한만 채우고 부칙 한 줄을 단다 */
+  function buildHarass(std, a) {
+    var L = String((std && std.harass) || '').replace(/\r\n?/g, '\n').split('\n').map(normHead);
+    var s = L.findIndex(function (l) { return /^제1조\(/.test(l); });
+    if (s < 0) return { ok: false, why: ['표준 문안(괴롭힘 예방·대응규정)을 못 찾았습니다'] };
+    var dd = String(a.harassDays || '').trim(), de = String(a.harassExtend || '').trim();
+    var body = L.slice(s).filter(function (l) { return l.trim() && !/^\s*[<＜]참고[>＞]/.test(l); }).map(function (l) {
+      return l.replace('개시된 날부터 00일 이내에', dd ? '개시된 날부터 ' + dd + '일 이내에' : '개시된 날부터 00일 이내에')
+        .replace('00일의 범위에서', de ? de + '일의 범위에서' : '00일의 범위에서');
+    });
+    var all = body.concat(['부 칙', '제1조(시행일) 이 규정은 ' + dateKo(a.effective) + '부터 시행한다.']);
+    var n = body.filter(function (l) { return /^제\d+조\(/.test(l); }).length;
+    return { ok: true, kind: 'harass', text: all.join('\n'), articles: n, dropped: [], leftovers: leftovers(all), warnings: [] };
+  }
+
   function build(std, answers) {
     var v = validate(answers);
     if (!v.ok) return { ok: false, why: v.why };
     var a = merge(answers);
+    if (a.kind === 'harass') return buildHarass(std, a);
     var src = a.kind === 'short' ? (std && std.short) : ((std && std.text) || std);
     var text = String(src || '').replace(/\r\n?/g, '\n');
     if (!text.trim()) return { ok: false, why: ['표준 문안(' + (a.kind === 'short' ? '단시간 근로자용' : '일반근로자용') + ')을 못 찾았습니다'] };
-    var L = text.split('\n');
+    var L = text.split('\n').map(normHead);
     var b = L.findIndex(function (l) { return /^부\s*칙/.test(l); });
     if (b < 0) return { ok: false, why: ['표준 문안에 부칙이 없습니다'] };
     var body = pickRetirement(L.slice(0, b), a), tail = L.slice(b);
@@ -291,18 +337,10 @@
     var all = out.concat(tailOut);
     if (a.term && a.term !== '사원') all = all.map(function (l) { return l.replace(/사원/g, a.term); });
 
-    /* ── 못 채운 빈칸(⑤) ── */
-    var left = [], curNo = '', inTail = false;
-    all.forEach(function (l) {
-      var m = /^제(\d+)조(?:의\d+)?\(([^)]*)\)/.exec(l);
-      if (/^부\s*칙/.test(l)) { inTail = true; curNo = '부칙'; }
-      if (m) curNo = (inTail ? '부칙 ' : '') + '제' + m[1] + '조(' + m[2] + ')';
-      if (LEFT_RE.test(l) && left.indexOf(curNo) < 0) left.push(curNo);
-    });
-    return { ok: true, kind: a.kind, text: all.join('\n'), articles: n, dropped: dropped, leftovers: left, warnings: warn };
+    return { ok: true, kind: a.kind, text: all.join('\n'), articles: n, dropped: dropped, leftovers: leftovers(all), warnings: warn };
   }
 
-  var api = { DEFAULTS: DEFAULTS, DAYS: DAYS, validate: validate, build: build, remapRefs: remapRefs, dayList: dayList };
+  var api = { DEFAULTS: DEFAULTS, DAYS: DAYS, validate: validate, build: build, remapRefs: remapRefs, dayList: dayList, normHead: normHead };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   global.PuRulesDraft = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this);

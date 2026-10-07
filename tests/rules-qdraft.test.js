@@ -156,3 +156,39 @@ test('⑨ 화면 — 단시간은 «따로» 들인다(사업자번호 없이 ·
   assert.match(go, /const qdShortSite=ans=>ans\.company\+" 단시간근로자";/);
   assert.match(RAW, /await takeDraft\(q\.r,q\.ans,"",qdShortSite\(q\.ans\)\)/, '★ 단시간을 같은 사업자번호로 넣어 일반 규칙을 덮어쓴다');
 });
+
+/* ── 띄어 쓴 조 머리 · 괴롭힘 예방·대응규정 (대표 「다음」 2026-10-07) ──
+   표준 원문은 「제68조 (교육시간)」처럼 띄어 쓴 곳이 있다. 조로 못 알아보면 앞 조에 붙어 번호를 다시 못 매긴다 —
+   2026-10-07 단시간 한 권에서 제62조 다음에 「제68조 (교육시간)」이 그대로 나갔다. */
+test('⑩ 띄어 쓴 조 머리도 조로 — 단시간 제68·69조가 제대로 다시 매겨진다', () => {
+  assert.equal(D.normHead('제68조 (교육시간) 이 규칙에서'), '제68조(교육시간) 이 규칙에서');
+  assert.equal(D.normHead('제3조의2  (가) 나'), '제3조의2(가) 나');
+  const t = D.build(STD, 단).text;
+  assert.ok(!/^제\d+조\s+\(/m.test(t), '★ 띄어 쓴 조 머리가 남았다');
+  const 재심 = 조(t, '재심절차').no, 교육 = 조(t, '교육시간').no, 직무 = 조(t, '직무교육').no;
+  assert.deepEqual([교육, 직무], [재심 + 1, 재심 + 2], '★ 교육시간·직무교육이 옛 번호(제68·69조)로 남았다');
+});
+
+test('⑪ 괴롭힘 예방·대응규정 — 표준안 제1~20조 그대로, 조사 기한만 채운다', () => {
+  const r = D.build(STD, { kind: 'harass', company: '주식회사 가나상사', harassDays: '30', harassExtend: '14', effective: '2026-11-01' });
+  assert.equal(r.ok, true, (r.why || []).join(' / '));
+  assert.equal(r.articles, 20, '★ 조가 빠졌다(띄어 쓴 제1~4·7조)');
+  ['목적', '적용범위', '회사의 책무', '직장 내 괴롭힘 행위의 금지', '직장 내 괴롭힘 예방교육', '재발방지조치 등'].forEach((x) =>
+    assert.ok(조(r.text, x), x + ' 가 없다'));
+  assert.match(조(r.text, '정식 조사').text, /개시된 날부터 30일 이내에 완료.*14일의 범위에서/s);
+  assert.ok(!/<참고>|^▪|별첨/m.test(r.text), '안내 줄이 규정에 남았다');
+  assert.match(r.text, /부 칙\n제1조\(시행일\) 이 규정은 2026년 11월 1일부터 시행한다\.$/);
+  assert.deepEqual(r.leftovers, []);
+  const b = D.build(STD, { kind: 'harass', company: '가' });
+  assert.deepEqual(b.leftovers, ['제12조(정식 조사)', '부칙 제1조(시행일)'], '비운 조사 기한·시행일을 안 알린다');
+  assert.equal(D.validate({ kind: 'harass', company: '가', harassDays: '삼십' }).ok, false);
+});
+
+test('⑫ 화면 — 괴롭힘 규정은 검토가 아니라 한글 파일로', () => {
+  assert.match(RAW, /id="qd-harass"/);
+  assert.match(RAW, /kind:"harass"/);
+  const at = RAW.indexOf('function qdHarassHwpx(');
+  const fn = RAW.slice(at, RAW.indexOf('\n}\n', at) + 2);
+  assert.match(fn, /HWPX\.download\(body,q\.ans\.company\+"_직장 내 괴롭힘 예방·대응규정\(제정안\)\.hwpx"\)/);
+  assert.ok(!/takeDraft\(/.test(fn), '괴롭힘 규정을 92항목 검토(취업규칙 잣대)에 넣는다');
+});
