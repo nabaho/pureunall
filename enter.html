@@ -924,7 +924,30 @@ body.portal-mode #moreFab{display:flex;}
     window.__kkReturning = true;
     if(m) m.textContent='💬 카카오로 로그인하는 중…';
   }
-  setTimeout(function(){ var s2=document.getElementById('pu-boot-splash'); if(s2) s2.remove(); }, kk ? 20000 : 8000); // 인증 SDK가 멎어도 로그인 길은 다시 연다
+  /* ★★ 8초가 지나도 «로그인 화면을 드러내지 않는다» (대표 보고 2026-10-07 「앱에 들어갔다 나오면 튕겨서
+       로그인 화면이 나오고 또 로그인되고 반복한다 — 정확한 이유」).
+     ■ 이유: 구글 인증 도구(10.13)는 저장된 로그인을 쓰기 «전에» 서버에 확인하러 간다
+       (열쇠가 1시간 넘었으면 갱신 + 계정 조회 — 두 번 왕복). 폰이 앱을 오가며 막 깨어난 참이면
+       이것이 8초를 넘긴다. 예전엔 8초에 가림막을 걷어 그 밑의 로그인 화면이 드러났고,
+       응답이 오면 저절로 포털로 들어갔다 = «튕겼다가 또 로그인됨».
+       실측 10/7: 대표 폰 실제 로그인은 그날 12:15 한 번뿐 — 튕긴 것들은 로그아웃이 아니었다.
+     ■ 로그인이 «없는» 기기는 이 길에 안 온다 — 저장된 로그인이 없으면 서버에 안 묻고 바로 «없음»이
+       나와 onAuthStateChanged 가 곧장 로그인 화면을 연다. 8초를 넘기는 것은 «있는 로그인을 확인 중»뿐이다.
+     ■ 그래서 가림막은 두고 «느리다»고 말한다. 기다리기 싫으면 누를 단추를 준다(들어올 길은 늘 열려 있다).
+       구글 요청은 늦어도 30초 안에 끝나고(끊겨도 로그인은 남는다) — 마지막 안전망은 40초다.
+     ⚠ 인증 도구가 아예 안 실렸으면(firebase 없음) 기다릴 것이 없다 — 곧바로 연다. */
+  setTimeout(function(){
+    var s2=document.getElementById('pu-boot-splash'); if(!s2) return;
+    if(kk || typeof firebase === 'undefined' || !firebase.auth){ s2.remove(); return; }
+    var m2=document.getElementById('pu-boot-msg');
+    if(m2) m2.textContent='연결이 느려 로그인 확인이 늦어지고 있습니다…';
+    var b=document.createElement('button');
+    b.type='button'; b.id='pu-boot-skip'; b.textContent='기다리지 않고 로그인 화면 보기';
+    b.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
+    b.onclick=function(){ var s3=document.getElementById('pu-boot-splash'); if(s3) s3.remove(); };
+    s2.appendChild(b);
+    setTimeout(function(){ var s4=document.getElementById('pu-boot-splash'); if(s4) s4.remove(); }, 32000);   // 8초 + 32초 = 40초
+  }, kk ? 20000 : 8000);
 })();
 </script>
 <div class="mesh"></div>
