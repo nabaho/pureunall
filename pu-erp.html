@@ -184,7 +184,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=11"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=49"></script>
+<script src="js/pu-ontology.js?v=50"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
@@ -24649,6 +24649,36 @@ function ContractManagement(props){
     form.note = '📸 사진첩에서 자동 등록 (' + (docName || '신청서') + ')'
       + (req.by ? ' · 보낸 사람 ' + req.by : '')
       + (ty ? '\n유형 「' + (ty.name || '') + '」 으로 등록했습니다' : '');
+    /* 🏥 중진공 현장클리닉 화면에서 보낸 요청 (2026-10-07, clinic-intake.html) — 출처만 다르게 적는다 */
+    if(req.source === 'smes'){
+      var sm = req.smes || {};
+      form.note = '🏥 중진공 현장클리닉에서 등록' + (sm.stage ? ' (단계 「' + sm.stage + '」)' : '')
+        + (req.by ? ' · 보낸 사람 ' + req.by : '')
+        + (sm.region ? '\n컨설팅지역 ' + sm.region : '')
+        + (sm.workers ? ' · 상시근로자 ' + sm.workers + '명' : '')
+        + (sm.sales ? ' · 매출 ' + sm.sales : '')
+        + (ty ? '\n유형 「' + (ty.name || '') + '」 으로 등록했습니다' : '');
+    }
+    return form;
+  }
+
+  /* 🏥 사람이 «직접 적은» 값만 얹는다 (2026-10-07, 중진공 현장클리닉 보내기).
+     ⚠ ctReqForm 은 서류에 없는 숫자를 지어내지 않는다(tests/photo-contract-auto) — 그 규칙은 그대로다.
+       여기 들어오는 것은 보내는 사람이 창에서 «손으로 적은» 선정일·예정 일수뿐이고,
+       비어 있으면 아무것도 안 채운다(기본값을 넣지 않는다).
+     ★ 금액은 계약 창과 «같은 셈»(consTypeDayOpt · consDayAmount)으로 낸다 — 1일 단가 × 일수 (+ 부가세).
+       예정 일수는 이관 전 현장클리닉의 «예정»으로 셈에 들어간다(clinicDayCards ③). */
+  function ctReqHumanFill(form, req){
+    if(!req || req.source !== 'smes') return form;
+    var d = String(req.startDate || '');
+    if(/^\d{4}-\d{2}-\d{2}$/.test(d)){ form.signDate = d; form.startDate = d; }
+    var nd = parseInt(req.consultDays, 10) || 0;
+    if(nd > 0 && nd <= 60 && form.typeCodes.consulting){
+      var dopt = consTypeDayOpt(form.typeCodes.consulting);
+      var calc = dopt.fee > 0 ? consDayAmount(dopt.fee, nd, dopt.noVat) : null;
+      form.consultDays = nd;
+      if(calc){ form.successFee = calc.total; form.balanceFeeVatIncluded = !calc.noVat; form.dayCalc = calc; }
+    }
     return form;
   }
 
@@ -24693,7 +24723,7 @@ function ContractManagement(props){
        (retryBlockedRequest, 걸린 요청 화면)도 «이 함수 하나»를 쓴다.
        두 곳에 같은 판단을 따로 두면 한쪽만 고쳐지는 날이 온다. */
   async function processOneContractRequest(key, req){
-    var form = ctReqForm(req);
+    var form = ctReqHumanFill(ctReqForm(req), req);
     /* ★★ 업체관리에 없는 회사면 «연결 보류»로 둔다 — 사람에게 묻는 길이
        「예」일 때 하는 것과 «같은 함수»다(erpDeferCoLinkIfNew).
        ⚠ 이 걸음이 빠져 있어 자동 등록이 통째로 막혀 있었다(2026-09-19 실제로 겪음).
@@ -24743,7 +24773,7 @@ function ContractManagement(props){
       console.warn('[계약 등록 요청]', e && e.message);
     }
     _erpCtReqBusy = false;
-    if(made.length) showToast('📸 사진첩에서 온 계약 ' + made.length + '건을 등록했습니다 — '
+    if(made.length) showToast('📥 사진첩·중진공에서 온 계약 ' + made.length + '건을 등록했습니다 — '
       + made.map(function(x){ return x.companyName; }).join(', ')
       + ' · 기간·금액을 넣어 주세요', 9000);
     /* ⚠ 걸린 것을 조용히 두지 않는다 — 자동이라 아무도 기다리고 있지 않다 */
