@@ -135,8 +135,8 @@ function runApp(seed) {
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');   // 부팅은 빼고 함수만 싣는다
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
-    + 'setTab,matDraw,matPull,matRowsFor,matText,matCsv,matLiveTog,srcBackfill,rejudge,pullAll,PAGE_MAX,matGo,matPageTo,matTog,matSelPage,matSelAll,matSelClear,matList,'
-    + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,matPer,matRowClick,'
+    + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
+    + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -195,20 +195,13 @@ test('★ 인증키가 없으면 받는 방법을 화면에 적는다', () => {
   assert.match(h, /nabaho\.github\.io\/pureunall\/gov\.html/, '기업마당이 묻는 시스템 URL');
 });
 
-/* ═══════ 신청 재료 탭 (2026-09-10, 대표 승인 「안 A · 접이식」 + 수행실적) ═══════ */
+/* ═══════ 경력관리 자료 — 견주기 전용 (대표 지시 2026-10-07 「신청재료 필요없다 모두 정리해달라」) ═══════
+   「👤 신청 재료」 탭(목록·복사·CSV)은 걷어냈다. 경력관리 자료는 «지난 이력과 견주기»에만 읽는다. */
 
 const MAT_LS = {
   edu: JSON.stringify([{ school: '영남대학교', major: '법학과', degree: '학사',
                          period: '1999.03 ~ 2003.02', graduated: '졸업' }]),
-  cert: JSON.stringify([{ title: '공인노무사', org: '고용노동부', date: '20100813', num: '제3016호' },
-                        { title: 'NCS 기업활용 수료증', org: '한국산업인력공단', date: '2024-05-30' }]),
-  wiccok: JSON.stringify([
-    { type: '위촉장', org: '충청남도경제진흥원', titleVal: '노무자문위원',
-      periodStart: '2025-03-01', periodEnd: '2099-02-28' },
-    { type: '위촉장', org: '한국산업인력공단', titleVal: 'NCS 컨설턴트',
-      periodStart: '2012-04-01', periodEnd: '2014-03-31' },
-    { type: '표창', org: '고용노동부', titleVal: '노사문화 우수', issueDate: '2023-12-05' }
-  ]),
+  cert: JSON.stringify([{ title: '공인노무사', org: '고용노동부', date: '20100813', num: '제9999호' }]),
   advisory: JSON.stringify([{ org: '○○정밀주식회사', type: '고문', bizType: '제조업',
                               size: '중소', insured: 412, period: '2019.03~', status: '진행' }]),
   consult: JSON.stringify([{ year: '2024', project: '일터혁신 상생컨설팅',
@@ -225,42 +218,40 @@ function fakeDb(map, mode) {
     } }; } };
 }
 
-async function runMat(mode) {
+async function runCareer(mode) {
   const r = runApp({ feed: [] });
   const map = {};
   Object.keys(MAT_LS).forEach((k) => { map['kcareer/U9/ls/' + k] = MAT_LS[k]; });
   const db = fakeDb(map, mode);
   r.api.setFb(db, 'U9');
-  await r.api.matPull();
+  await r.api.careerPull();
   return { ...r, db };
 }
 
-test('두 문(공고·신청 재료)이 화면에 있다', () => {
+test('★★ 「신청 재료」 탭이 없다 — 탭·화면·복사·CSV 모두', () => {
+  ['tbMat', 'pgMat', 'matBox', 'matNote', "setTab('mat')", 'matPull', 'matDraw', 'matCopy', 'matCsv',
+   'matRowsFor', 'MAT_KINDS', '👤 신청 재료<'].forEach((w) => {
+    assert.ok(src.indexOf(w) < 0, '남았다: ' + w);
+  });
   assert.match(src, /id="tbFeed"[^>]*onclick="setTab\('feed'\)"/);
-  assert.match(src, /id="tbMat"[^>]*onclick="setTab\('mat'\)"/);
-  assert.match(src, /<div class="wrap" id="pgFeed">/);
-  assert.match(src, /id="pgMat"/);
+  assert.match(src, /id="tbRec"[^>]*onclick="setTab\('rec'\)"/);
 });
 
-test('★ 재료 부품 둘을 싣는다 — 가리기는 경력관리 것을 빌려 쓴다', () => {
-  assert.match(src, /<script src="js\/gov-career\.js\?v=\d+"><\/script>/);
-  assert.match(src, /<script src="js\/kcareer-adv-summary\.js\?v=\d+"><\/script>/,
-    '가리기 모듈을 안 실으면 자문 문장이 통째로 빕니다');
+test('★ 내보내기용 가리기 모듈을 싣지 않는다 — 고객사 이름을 내보내는 길 자체가 없다', () => {
+  assert.ok(src.indexOf('kcareer-adv-summary.js') < 0);
+  assert.match(src, /<script src="js\/gov-career\.js\?v=\d+"><\/script>/, '견주기는 경력관리 자료를 읽어야 합니다');
 });
 
-test('★ 문을 바꾸면 화면이 실제로 바뀐다', () => {
+test('★ 예전에 「신청 재료」를 보던 기기도 공고 탭으로 연다', () => {
   const r = runApp({ feed: [] });
   r.api.setTab('mat');
-  assert.equal(r.el('pgFeed').style.display, 'none');
-  assert.equal(r.el('pgMat').style.display, '');
-  assert.match(r.el('tbMat').className, /\bon\b/);
-  r.api.setTab('feed');
   assert.equal(r.el('pgFeed').style.display, '');
-  assert.equal(r.el('pgMat').style.display, 'none');
+  assert.equal(r.el('pgRec').style.display, 'none');
+  assert.match(r.el('tbFeed').className, /\bon\b/);
 });
 
 test('★★ 창고를 «콕 집어» 읽는다 — 노드를 통째로 읽지 않는다', async () => {
-  const r = await runMat();
+  const r = await runCareer();
   assert.ok(r.db.seen.length >= 8);
   r.db.seen.forEach((p) => {
     assert.match(p, /^kcareer\/U9\/ls\//, '통째로 읽으면 첨부 조각·열쇠까지 딸려 옵니다: ' + p);
@@ -268,80 +259,46 @@ test('★★ 창고를 «콕 집어» 읽는다 — 노드를 통째로 읽지 �
   assert.ok(r.db.seen.every((p) => p.indexOf('_secrets') < 0));
 });
 
-test('★ 갈래 여섯이 «단추»로 있고 누르면 그 갈래만 보인다', async () => {
-  // 대표 지시 2026-10-03 「너무 많은 내용으로 정리되어 있다 구분 좀 하고」
-  const r = await runMat();
-  const h = r.el('matBox').innerHTML;
-  ['학력', '자격 · 수료', '위촉 · 위원 경력', '표창 · 포상', '자문 · 고문', '수행 실적']
-    .forEach((n) => assert.ok(h.indexOf(n) >= 0, n + ' 갈래 단추가 없습니다'));
-  r.api.matGo('edu');  assert.match(r.el('matBox').innerHTML, /영남대학교/);
-  assert.ok(r.el('matBox').innerHTML.indexOf('공인노무사') < 0, '다른 갈래 내용이 같이 보이면 «구분»이 아닙니다');
-  r.api.matGo('cert'); assert.match(r.el('matBox').innerHTML, /공인노무사/);
-  r.api.matGo('perf'); assert.match(r.el('matBox').innerHTML, /일터혁신 상생컨설팅/);
+test('★★ 받은 자료가 견주기 재료가 된다', async () => {
+  const r = await runCareer();
+  const m = r.api.getMat();
+  assert.ok(m, '받은 것이 없습니다');
+  assert.ok(require('../js/gov-career.js').counts(m).total > 0);
 });
 
-test('★ 위촉·위원은 「지금 맡고 있는 것만」이 기본이다', async () => {
-  const r = await runMat();
-  r.api.matGo('wiccok');
-  assert.match(r.el('matBox').innerHTML, /충청남도경제진흥원/);
-  assert.ok(r.el('matBox').innerHTML.indexOf('NCS 컨설턴트') < 0,
-    '끝난 위촉이 기본 목록에 보입니다 — 197건이 다 나오면 못 읽습니다');
-  r.api.matLiveTog();
-  assert.match(r.el('matBox').innerHTML, /NCS 컨설턴트/, '끄면 다 보여야 합니다');
-});
-
-test('★★ 자문 목록에는 이름이 그대로 있다 — 대표님이 알아보셔야 한다', async () => {
-  const r = await runMat();
-  r.api.matGo('advisory');
-  assert.match(r.el('matBox').innerHTML, /○○정밀주식회사/);
-});
-
-test('★★ 내보낼 때는 고객사 이름이 한 글자도 안 나간다', async () => {
-  const r = await runMat();
-  const rows = r.api.matRowsFor('advisory');
-  assert.ok(rows.length > 0);
-  rows.forEach((x) => assert.ok(String(x.org).indexOf('정밀') < 0,
-    '이름이 그대로 나갔습니다: ' + x.org));
-  const t = r.api.matText('advisory');
-  assert.ok(t.length > 0, '가린 문장이 만들어져야 합니다');
-  assert.ok(t.indexOf('정밀') < 0 && t.indexOf('주식회사') < 0, '문장에 이름이 샜습니다: ' + t);
-});
-
-test('★★ 재료를 «클라우드로 내보내지 않는다»', () => {
-  // 담으면 대표님 이력이 두 자리에 있게 되고, 한쪽이 낡아 «두 앱이 다른 건수»를 보여 준다.
+test('★★ 경력관리 자료를 «클라우드로 내보내지 않는다»', () => {
   const m = src.match(/function cloudPush\(\)\{[\s\S]*?\n\}/);
   assert.ok(m, 'cloudPush 를 못 찾았습니다');
   ['_mat', 'mat:', 'advisory', 'wiccok'].forEach((w) => {
-    assert.ok(m[0].indexOf(w) < 0, 'cloudPush 가 재료를 밀어 올립니다: ' + w);
+    assert.ok(m[0].indexOf(w) < 0, 'cloudPush 가 경력관리 자료를 밀어 올립니다: ' + w);
   });
 });
 
-test('★★ 재료를 이 기기에도 담지 않는다', async () => {
-  const r = await runMat();
+test('★★ 경력관리 자료를 이 기기에도 담지 않는다', async () => {
+  const r = await runCareer();
   Object.keys(r.store).forEach((k) => {
     const v = String(r.store[k] || '');
-    assert.ok(v.indexOf('영남대학교') < 0 && v.indexOf('정밀') < 0,
-      '재료가 저장되어 남았습니다: ' + k);
+    assert.ok(v.indexOf('영남대학교') < 0 && v.indexOf('정밀') < 0, '저장되어 남았습니다: ' + k);
   });
 });
 
+const tick = () => new Promise((res) => setTimeout(res, 0));
 test('★★ 하나도 못 읽으면 «없다»가 아니라 «못 읽었다»고 말한다', async () => {
-  // 「이력이 0건」으로 보이면 대표님이 자료가 날아간 줄 아신다.
-  const r = await runMat('fail');
-  assert.match(r.el('matNote').innerHTML, /읽지 못했습니다/);
-  assert.equal(r.el('matBox').innerHTML, '');
+  const r = runApp({ feed: [] });
+  r.api.setFb(fakeDb({}, 'fail'), 'U9');
+  r.api.matchEnsure(); await tick(); await tick();
+  assert.equal(r.api.getMat(), null);
+  assert.match(r.api.matchNoteHtml(), /못 읽어/);
 });
 
 test('★★ 클라우드가 비었으면 «☁ 저장을 한 번 누르시라»고 알려 준다', async () => {
   // 경력관리에서 한 번도 저장을 안 하면 클라우드는 비어 있다 — 흔한 막다른 길이다.
-  const r = await runMat('empty');
-  const h = r.el('matNote').innerHTML;
-  assert.match(h, /클라우드에는 아직 없습니다/, '무엇이 문제인지 말해야 합니다');
+  const r = runApp({ feed: [] });
+  r.api.setFb(fakeDb({}, 'empty'), 'U9');
+  r.api.matchEnsure(); await tick(); await tick();
+  const h = r.api.matchNoteHtml();
+  assert.match(h, /클라우드에 아직 없습니다/, '무엇이 문제인지 말해야 합니다');
   assert.match(h, /클라우드에 저장/, '무엇을 하면 되는지도 말해야 합니다');
-});
-
-test('★ 재료 탭을 처음 열면 저절로 받아온다 — 빈 화면을 내놓지 않는다', () => {
-  assert.match(src, /if\(t==='mat' *&& *!_mat\) *matPull\(\);/);
 });
 
 test('★ 출처가 빠진 옛 줄을 부팅 때 되살린다 — 두 번 돌려도 같다', () => {
@@ -431,87 +388,7 @@ test('★ 로그인 뒤 불러온 다음에 규칙을 댄다', () => {
   assert.ok(src.indexOf('await cloudPull(); srcBackfill(); rejudge();') >= 0);
 });
 
-/* ═══════ 신청 재료 — 50건씩 · ㅁ · № (대표 지시 2026-10-03) ═══════ */
-
-async function bigMat(n) {
-  const r = runApp({ feed: [] });
-  const rows = Array.from({ length: n }, (_, i) => ({ year: '2024' /* 실적은 해 내림차순으로 줄 선다 — 해를 같게 두어 순서를 못박는다 */, project: '과제' + (i + 1),
-    org: '고객' + (i + 1), status: '완료' }));
-  const map = { 'kcareer/U9/ls/consult': JSON.stringify(rows) };
-  r.api.setFb(fakeDb(map), 'U9');
-  await r.api.matPull();
-  r.api.matGo('perf');
-  return r;
-}
 const rowCount = (h) => (h.match(/class="row-chk"/g) || []).length;
-
-test('★★ 한 쪽에 50건만 — 나머지는 쪽을 넘겨 본다', async () => {
-  const r = await bigMat(120);
-  const h = r.el('matBox').innerHTML;
-  assert.equal(rowCount(h), 50, '한 쪽 50건');
-  assert.match(h, /1–50 \/ 120건/);
-  assert.match(h, /matPageTo\(2\)/, '3쪽까지 있어야 합니다');
-  r.api.matPageTo(2);
-  assert.equal(rowCount(r.el('matBox').innerHTML), 20, '마지막 쪽은 남은 20건');
-  assert.match(r.el('matBox').innerHTML, /101–120 \/ 120건/);
-});
-
-test('★★ 번호는 갈래 전체로 이어 센다 — 둘째 쪽은 51번부터', async () => {
-  const r = await bigMat(120);
-  r.api.matPageTo(1);
-  const h = r.el('matBox').innerHTML;
-  assert.match(h, /<td class="rn">51<\/td>/);
-  assert.match(h, /<td class="rn">100<\/td>/);
-  assert.ok(h.indexOf('<td class="rn">1</td>') < 0);
-});
-
-test('★★ ㅁ 로 고르면 복사·CSV 는 «고른 것만» — 단추 글자도 그렇게 바뀐다', async () => {
-  const r = await bigMat(120);
-  assert.match(r.el('matBox').innerHTML, /전체 120건/);
-  r.api.matTog(0, true); r.api.matTog(2, true);
-  const h = r.el('matBox').innerHTML;
-  assert.match(h, /고른 2건/, '무엇이 나가는지 단추가 말해야 합니다');
-  assert.match(h, /class="sel-bar"/);
-  const out = r.api.matRowsFor('perf');
-  assert.equal(out.length, 2);
-  assert.deepEqual(out.map((x) => x.project), ['과제1', '과제3']);
-  assert.match(r.api.matText('perf'), /과제1/);
-  assert.ok(r.api.matText('perf').indexOf('과제2') < 0);
-});
-
-test('★ 머리 ㅁ 는 «이 쪽»만 고르고 끈다', async () => {
-  const r = await bigMat(120);
-  r.api.matPageTo(1); r.api.matSelPage(true);
-  assert.equal(r.api.matRowsFor('perf').length, 50);
-  assert.equal(r.api.matRowsFor('perf')[0].project, '과제51');
-  r.api.matSelPage(false);
-  assert.equal(r.api.matRowsFor('perf').length, 120, '다 끄면 다시 전부');
-});
-
-test('★ 갈래마다 고른 것을 따로 기억한다 — 다른 갈래로 새지 않는다', async () => {
-  const r = await bigMat(120);
-  r.api.matTog(0, true);
-  r.api.matGo('edu');
-  assert.ok(r.el('matBox').innerHTML.indexOf('class="sel-bar"') < 0);
-  r.api.matGo('perf');
-  assert.match(r.el('matBox').innerHTML, /고른 1건/);
-});
-
-test('★★ 자문은 고른 것만 내보내도 «가려서» 나간다', async () => {
-  const r = await runMat();
-  r.api.matGo('advisory'); r.api.matTog(0, true);
-  const out = r.api.matRowsFor('advisory');
-  assert.equal(out.length, 1);
-  assert.ok(String(out[0].org).indexOf('정밀') < 0, '고른 것이라도 이름이 나가면 안 됩니다');
-  assert.ok(r.api.matText('advisory').indexOf('정밀') < 0);
-});
-
-test('★ 「지금 맡고 있는 것만」을 바꾸면 고른 것을 놓는다 — 번호가 다른 줄을 가리킨다', async () => {
-  const r = await runMat();
-  r.api.matGo('wiccok'); r.api.matTog(0, true);
-  r.api.matLiveTog();
-  assert.ok(r.el('matBox').innerHTML.indexOf('class="sel-bar"') < 0);
-});
 
 /* ═══════ 공고 모아보기 — ㅁ · № (대표 지시 2026-10-03) ═══════ */
 
@@ -642,22 +519,11 @@ test('★ ㅁ·단추를 누른 것은 팝업을 띄우지 않는다', () => {
 test('★★ 넓게 · 한 줄 — 폭 제한을 풀고 긴 칸은 줄여 title 로 전체를 본다', () => {
   assert.match(src, /\.wrap\{max-width:none/, '좌우를 다 쓴다');
   assert.ok(src.indexOf('.wrap{max-width:1180px') < 0);
-  assert.match(src, /#pgFeed td,#pgMat td\{white-space:nowrap/, '한 줄');
+  assert.match(src, /#pgFeed td\{white-space:nowrap/, '한 줄');
   const r = runApp({ feed: many(1) });
   r.api.draw();
   assert.match(r.el('tb').innerHTML, /<td class="nm" title="노무 공고 1">/, '줄인 이름은 title 로');
   assert.ok(r.el('tb').innerHTML.indexOf('<div class="sub">') < 0, '두 번째 줄(번호)을 두지 않는다');
-});
-
-test('★ 신청 재료도 몇 건씩 볼지 고르고, 줄을 누르면 팝업', async () => {
-  const r = await bigMat(120);
-  assert.equal(rowCount(r.el('matBox').innerHTML), 50);
-  r.api.matPer(100); assert.equal(rowCount(r.el('matBox').innerHTML), 100);
-  r.api.matPer(0);   assert.equal(rowCount(r.el('matBox').innerHTML), 120);
-  r.api.matRowClick({ target: { closest: () => null } }, 2);
-  assert.equal(r.el('pop').className, 'pop on');
-  assert.match(r.el('popBody').innerHTML, /과제3/);
-  assert.match(r.el('popTtl').textContent, /3번/);
 });
 
 /* ═══ 「새로 받기」 사이에 누른 ★·숨김 — 다 받은 «뒤» 목록에 더한다 (검토 2026-10-04) ═══ */

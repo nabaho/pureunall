@@ -45,10 +45,9 @@ function runApp(seed, opt) {
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
     + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
-    + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,matPull,get,recSub,recSubCur,recKindSet,'
+    + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
-    + 'matState:function(){ return { sel:_matSel, page:_matPage }; },matSet:function(sel,page){ _matSel=sel; _matPage=page; },'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setOpen = (fn) => { opt._open = fn; };
@@ -753,16 +752,6 @@ test('★ 서류 준비 창의 폴더 단추는 「📂 폴더 열기」', () =>
   r.api.recPrep('erc');
   assert.match(r.el('popBody').innerHTML, /📂 폴더 열기/);
   assert.doesNotMatch(r.el('popBody').innerHTML, /안 보기/);
-});
-test('★★ 신청 재료를 다시 받으면 고른 것·쪽을 비운다 — 줄 번호가 바뀌어 엉뚱한 줄이 골라진다', async () => {
-  const r = runApp({});
-  r.api.matSet({ cert: { 3: 1 } }, { cert: 2 });
-  const db = { ref: () => ({ once: () => Promise.resolve({ val: () => null }) }) };
-  r.api.setFb(db, 'U1');
-  await r.api.matPull();
-  const st = r.api.matState();
-  assert.equal(Object.keys(st.sel).length, 0, '옛 줄 번호로 고른 것이 남았다');   /* vm 안 객체라 deepEqual 대신 열쇠 수 */
-  assert.equal(st.page.cert, undefined, '옛 쪽 번호가 남았다');
 });
 
 /* ═══ 하위 탭 셋 + 갈래 (대표 지시 2026-10-05 「공인노무사 공지 · 그간 지원·메일 · 기타 공공기관으로 내용 보고 분류」) ═══ */
