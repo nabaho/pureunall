@@ -86,6 +86,8 @@ function box(o) {
     confirm: () => true,
   };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(consts, ctx);
   ['mbAutoOther', 'mbNewAskable', 'mnewSentTo', 'mnewSkipFolder', 'mnewDomCo', 'mnewDomTable', 'mnewRows', 'mnewBust',
     'mnewInqTag', 'mnewAutoFill', 'erpUnfillContact', 'mnewUndoOne', 'mnewUndo', 'mnewLink', 'mnewRow']
@@ -228,6 +230,8 @@ test('★★ 메일 창·기업정보함 «둘 다»에서 들어간다 · 주�
   assert.match(strip(sliceFn(app, 'function openMnewWindow(')), /view=mail&mail=mnew/);
   const ctx = { String, RegExp };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(sliceFn(app, 'function mailMnewFromUrl('), ctx);
   assert.equal(ctx.mailMnewFromUrl('?view=mail&mail=mnew'), true);
   assert.equal(ctx.mailMnewFromUrl('?view=mail&mail=mnewx'), false);

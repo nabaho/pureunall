@@ -60,6 +60,8 @@ function run(msgs, opt){
     renderMailPage(){}
   };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   ['mbGotFolder','mbAutoOther','mbNewAskable','mbNewCoOf','mbNewList','mbNewBust','mbNewFind','mbNewHits']
     .forEach(n => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   ['MB_PUB_TAIL','MB_BOT_RE','MB_NEW_DAYS'].forEach(n =>
@@ -227,7 +229,9 @@ test('★★★ 담는 길은 «새로 안 짓는다» — erpFillContact 하나
   assert.match(save, /erpFillContact\(/, '담는 길이 erpFillContact 가 아닙니다');
   assert.ok(!/data\/companies/.test(save), '이 화면이 업체 기록을 제 손으로 씁니다');
   /* 셈은 erpFillContactPlan 에 있다 — 서버의 지금 판으로 다시 불리는 자리(2026-10-07 점검 ①) */
-  const fill = sliceFn(app, 'async function erpFillContact(') + sliceFn(app, 'function erpFillContactPlan(');
+  const fill = sliceFn(app, 'async function erpFillContact(') + sliceFn(app, 'function erpFillContactPlan(')
+    /* 셈 본체는 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)도 같은 것을 쓴다(2026-10-07 점검 ③-A) */
+    + fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8');
   assert.match(fill, /if\(has\) return \{ none:true, info:\{ added:false/,
     '이미 적힌 주소를 덮습니다 — 남이 고쳐 둔 것이 조용히 사라집니다');
   assert.match(fill, /blank\(cur\.primaryContactEmail\)/,

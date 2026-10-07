@@ -132,6 +132,8 @@ function load(over){
   /* firebase.database().ref() 를 인자 없이 부르는 자리가 있다 */
   ctx.firebase.database = () => ({ ref: (p) => (p === undefined ? rootRef : dbRefCo(p)) });
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
   const MSGS = { B1: { '1': Object.assign({ u:1, f:'정하늘', e:'ha.jung@ctstech.co.kr',

@@ -65,6 +65,8 @@ function boot(o) {
     get reads(){ return fake.reads.whole + fake.reads.one; },
   };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(sliceFn(app, 'async function erpCoPatchMany('), ctx);
   vm.runInContext(sliceFn(app, 'async function erpFillContact('), ctx);
   vm.runInContext(sliceFn(app, 'function erpFillContactPlan('), ctx);
@@ -236,6 +238,8 @@ test('★★ 업체를 «열쇠(id)»로 담는다 — 이름만 담으면 온�
 test('★★ 옛 칸(이름 글자)도 «그대로 산다» — 값이 두 꼴이라 읽는 자리가 다 지나야 한다', () => {
   const ctx = { String, Object };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(sliceFn(app, 'function mbCoValName('), ctx);
   assert.equal(ctx.mbCoValName('맘스터치'), '맘스터치', '옛 꼴을 못 읽습니다');
   assert.equal(ctx.mbCoValName({ n:'맘스터치', id:'co1' }), '맘스터치', '새 꼴을 못 읽습니다');
@@ -260,6 +264,8 @@ test('★★ 새로 지은 이름이 «이미 있는 것과 안 겹친다» — 
 test('★★ 기본이 «켜짐»이다 — 끄는 것이 예외여야 실제로 채워진다', () => {
   const ctx = { localStorage: { getItem: () => null } };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(app.match(/const MB_ERPFILL_LS\s*=[^;]*;/)[0], ctx);
   vm.runInContext(sliceFn(app, 'function mbErpFillOn('), ctx);
   assert.equal(ctx.mbErpFillOn(), true, '기본이 꺼져 있습니다 — 아무도 안 켜면 예전 그대로입니다');
