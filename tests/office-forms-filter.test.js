@@ -119,13 +119,19 @@ test('★ 칩에 가려진 양식을 고르면 칩을 푼다', () => {
 
 /* ── 한 화면에 (대표 지적 2026-09-27 「문서관리 내용이 너무 많이 내려왔다. 한번에 화면 볼수 있게」) ──
    위에 줄이 다섯(제목·첨부·측 칩·사건유형 칩·찾기) 쌓여 종이가 화면 가운데서 시작했다. */
-test('★★ 위 줄은 둘 — 제목 줄 하나, 칩·찾기·도구 줄 하나', () => {
+/* 2026-10-07 화면 개편(목업 승인) — 보기 칸이 오른쪽 전체, 칩·찾기는 목록 칸 머리, 드문 도구는 ⋯ 하나 */
+test('★★ 세 칸 — 목록 칸(머리·목록) · 보기 칸(머리·원본), 드문 도구는 ⋯ 메뉴', () => {
   const m = cutFn(stripJs(CF), 'function mount(');
   const tb = cutFn(m, 'function toolbar(');
   assert.ok(!/pcf-top2/.test(tb), '★ 첨부 줄이 따로 한 줄을 더 씁니다');
-  const fb = cutFn(m, 'function filterBar(');
-  assert.equal((fb.match(/'class': 'pcf-crow'/g) || []).length, 1, '★ 칩·찾기가 여러 줄로 갈렸습니다');
-  assert.match(fb, /uploadBtn\(/, '파일 업로드·양식 추가가 칩 줄로 안 왔습니다');
+  assert.match(tb, /moreMenu\(/, '수정·복제·삭제가 ⋯ 메뉴로 안 갔습니다');
+  assert.match(tb, /toolItems\(kind\)/);
+  const lh = cutFn(m, 'function listHead(');
+  assert.equal((lh.match(/'class': 'pcf-crow'/g) || []).length, 1, '★ 칩이 여러 줄로 갈렸습니다');
+  assert.match(lh, /drawList\(\)/, '찾기 칸이 목록만 다시 그려야 커서가 안 사라진다');
+  assert.match(cutFn(m, 'function toolItems('), /quickUpload\(kind/, '파일 올리기가 없습니다');
+  const db = cutFn(m, 'function drawBody(');
+  assert.match(db, /'class': 'pcf-lp'/); assert.match(db, /'class': 'pcf-vp'/, '보기 칸이 없습니다');
 });
 
 test('★★ 목록·종이는 화면 높이에 맞추고 안에서 스크롤 — 페이지가 아래로 늘어나지 않는다', () => {
@@ -173,7 +179,7 @@ test('ⓔ 업체계약·컨설팅·기타사업도 「계약서 / 제안서·견
   assert.match(cutFn(s, 'function openPropose('), /\['company', 'consulting', 'other', 'fund'\]/, '제안서 보내기가 기금관리만 봅니다');
 });
 test('ⓔ 화면 — 기금관리에서도 묶음 칩 줄과 수정 창 묶음 칸이 뜬다', () => {
-  const bar = cutFn(stripJs(CF), 'function filterBar(');
+  const bar = cutFn(stripJs(CF), 'function listHead(');
   assert.match(bar, /twoGroups\(kind\)/, '묶음 칩 줄(기금·업체·컨설팅·기타)이 없습니다');
   const md = cutFn(stripJs(CF), 'function openModal(');
   assert.match(md, /twoGroups\(f\.kind\)/, '양식 수정 창에 묶음 칸이 없습니다');
@@ -194,7 +200,7 @@ test('ⓕ 원본 모양 — 한글은 rhwp, 엑셀은 미리보기 PDF(보관함
   const s = stripJs(CF);
   const p = cutFn(s, 'function paper(');
   assert.match(p, /previewPdfOf\(fm\) \|\| \(hwpOrigOf\(fm\) && w\.PureunHwp\)/, '원본이 있는지 보지 않습니다');
-  assert.match(p, /S\.paperView = 'text'/, '글자 본문으로 바꿔 보는 칩이 없습니다');
+  assert.match(cutFn(s, 'function toolbar('), /S\.paperView = 'text'/, '글자 본문으로 바꿔 보는 칩이 없습니다(보기 칸 머리)');
   assert.match(p, /drawOrig\(ob, fm\)/);
   const d = cutFn(s, 'function drawOrig(');
   assert.match(d, /renderPdfPages\(box, u8\)/, '엑셀 미리보기 PDF 를 그리지 않습니다');
