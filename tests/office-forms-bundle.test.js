@@ -40,12 +40,12 @@ test('ⓑ 기본 세트 — 체당금 접수 세트가 들어오고, 지우면 �
   assert.equal(ch.side, 'worker'); assert.equal(ch.groupName, '체당금');
   assert.ok(!out(P.setsOf({ v: [], rm: ['fs-chedang'] })).some((x) => x.id === 'fs-chedang'), '★ 지운 기본 세트가 되살아났습니다');
   /* 2026-10-07 업무별 기본 세트 — 자문·급여는 이알피 계약서 출력(CONTRACT_SETS)과 같은 양식 */
-  assert.deepEqual(a.map((s) => s.id), ['fs-advisory', 'fs-payroll', 'fs-fund', 'fs-union', 'fs-chedang']);
+  assert.deepEqual(a.map((s) => s.id), ['fs-advisory', 'fs-payroll', 'fs-fund', 'fs-union', 'fs-office', 'fs-chedang']);
   assert.deepEqual(a.filter((s) => s.id === 'fs-advisory')[0].formIds, out(P.CONTRACT_SETS.advisory));
   assert.deepEqual(a.filter((s) => s.id === 'fs-payroll')[0].formIds, out(P.CONTRACT_SETS.payroll));
   const mine = { id: 'fs-1', name: '부해 세트', formIds: ['x'] };
-  assert.deepEqual(out(P.setsOf({ v: [mine], rm: [] })).map((s) => s.id), ['fs-1', 'fs-advisory', 'fs-payroll', 'fs-fund', 'fs-union', 'fs-chedang']);
-  assert.deepEqual(out(P.setsOf({ v: { 0: mine }, rm: [] })).map((s) => s.id), ['fs-1', 'fs-advisory', 'fs-payroll', 'fs-fund', 'fs-union', 'fs-chedang'], '열쇠 지도 꼴도 읽는다');
+  assert.deepEqual(out(P.setsOf({ v: [mine], rm: [] })).map((s) => s.id), ['fs-1', 'fs-advisory', 'fs-payroll', 'fs-fund', 'fs-union', 'fs-office', 'fs-chedang']);
+  assert.deepEqual(out(P.setsOf({ v: { 0: mine }, rm: [] })).map((s) => s.id), ['fs-1', 'fs-advisory', 'fs-payroll', 'fs-fund', 'fs-union', 'fs-office', 'fs-chedang'], '열쇠 지도 꼴도 읽는다');
 });
 
 test('ⓐ ★★ changeSets — 서버 최신본 위에 한 건만, u 를 올린다', async () => {

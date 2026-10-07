@@ -310,7 +310,7 @@
   var CONTRACT_SETS = { advisory: ['fm-pr-advisory', 'fm-pr-cms'], payroll: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] };
   /* 업무 유형 → 세트 (2026-10-07 「세트 한 곳」) — 화면에서 고친 세트(data/contract_form_sets)를 이알피 계약서 출력·계약서 만들기·묶음 채우기가 같이 읽는다.
      ⚠ 이알피 pu-erp.html ERP_TYPE_SET 과 글자가 같아야 한다(tests/erp-contract-fill.test.js). 세트를 못 읽으면 CONTRACT_SETS(옛 고정 목록) */
-  var TYPE_SET = { company: { '자문': 'fs-advisory', '급여': 'fs-payroll', '노조': 'fs-union' }, fund: { '*': 'fs-fund' } };
+  var TYPE_SET = { company: { '자문': 'fs-advisory', '급여': 'fs-payroll', '노조': 'fs-union', '사무대행': 'fs-office' }, fund: { '*': 'fs-fund' } };
   function setIdsFor(sets, kv, typeCode) {
     var m = TYPE_SET[kv]; if (!m || !sets) return null;
     var id = m[typeCode] || m['*']; if (!id) return null;
@@ -341,6 +341,9 @@
   var MAKE_KINDS = [
     { v: 'adv', label: '자문', icon: '🏢', kind: 'company', typeCode: '자문', sub: '자문계약서 + CMS' },
     { v: 'pay', label: '급여', icon: '💰', kind: 'company', typeCode: '급여', sub: '급여 6종' },
+    /* 이알피 업무 유형(자문·급여·노조·기금·사무대행)과 칸을 맞춘다 — 2026-10-07 */
+    { v: 'union', label: '노조', icon: '🤝', kind: 'company', typeCode: '노조', sub: '노조 자문계약서' },
+    { v: 'office', label: '사무대행', icon: '🗂', kind: 'company', typeCode: '사무대행', sub: '사무위탁·EDI·CMS' },
     { v: 'con', label: '컨설팅', icon: '📊', kind: 'consulting', sub: '컨설팅 계약' },
     { v: 'case', label: '사건', icon: '⚖️', kind: 'case', sub: '위임계약·위임장' },
     { v: 'fund', label: '기금', icon: '🏦', kind: 'fund', sub: '기금 계약' }
@@ -434,6 +437,7 @@
     { id: 'fs-payroll', name: '급여 세트', kind: 'company', formIds: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] },
     { id: 'fs-fund', name: '기금 세트', kind: 'fund', formIds: ['fm-5', 'fm-pq-07'] },
     { id: 'fs-union', name: '노조 세트', kind: 'company', formIds: ['fm-pr-union'] },
+    { id: 'fs-office', name: '사무대행 세트', kind: 'company', formIds: ['fm-pr-employment', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-cms'] },
     { id: 'fs-chedang', name: '체당금 접수 세트', kind: 'case', side: 'worker', groupName: '체당금',
       formIds: ['fm-case-cd-01', 'fm-case-cd-02', 'fm-case-cd-03', 'fm-case-cd-04'] }
   ];
@@ -755,7 +759,7 @@
     + '.pcf-menu[hidden]{display:none}.pcf-menu button{background:none;border:none;text-align:left;padding:7px 10px;border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;color:#1e293b}'
     + '.pcf-menu button:hover{background:#eff6ff}.pcf-menu hr{border:none;border-top:1px solid #e2e8f0;margin:4px 0}'
     + '@media(max-width:700px){.pcf-lp{width:auto;border-right:1px solid #e2e8f0;border-radius:8px}.pcf-lbody{max-height:40vh}.pcf-vp .pcf-top{border-radius:8px 8px 0 0;margin-top:8px}}'
-    + '.pcf-mk-kinds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:6px}'
+    + '.pcf-mk-kinds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:6px}'
     + '.pcf-mk-kind{border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px;text-align:left;cursor:pointer;font:inherit;font-size:13px}'
     + '.pcf-mk-kind small{display:block;font-size:11px;color:#64748b}.pcf-mk-kind.on{border:2px solid #1d4ed8;background:#eff6ff;color:#1e40af}'
     + '.pcf-mk-kind:disabled{opacity:.45;cursor:default}'
