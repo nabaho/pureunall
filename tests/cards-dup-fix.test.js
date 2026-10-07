@@ -350,11 +350,14 @@ test('「중복 아님」은 되돌릴 수 있다', () => {
   assert.match(app, /function dupUnignore\(/, '되돌릴 길이 없습니다');
 });
 
-test('「중복 아님」은 이 PC에만 남는다 — 서버를 건드리지 않는다', () => {
-  const get = fnBody('dupIgnoreSet'), put = fnBody('dupIgnoreSave');
-  assert.match(get, /localStorage/);
-  assert.match(put, /localStorage/);
-  assert.ok(!/Store\.|firebase/.test(get + put), '서버에 씁니다');
+/* ⚠ 2026-10-07 대표 결정(기업정보함 점검 4절 「완전히 같은 중복 명함 저절로 합치기」)으로 규칙이 바뀌었다 —
+   예전에는 «이 PC 에만»(2026-08-10). 이제 서버에도 적는다: 저절로 합치기가 다른 PC 에서 돌 때
+   사람이 「다른 사람이다」라고 가른 짝을 알아야 한다. 자세한 것은 tests/cards-dup-auto.test.js. */
+test('「중복 아님」은 서버와 옛 PC 표시를 «함께» 본다 — 옛 표시를 버리지 않는다', () => {
+  const get = fnBody('dupIgnoreSet'), add = fnBody('dupIgnoreAdd');
+  assert.match(get, /dupIgnoreLocal\(\)/, '옛 PC 표시를 안 봅니다');
+  assert.match(get, /_dupIgnSrv/, '서버 목록을 안 봅니다');
+  assert.match(add, /config\/dupIgnore/, '서버에 안 적습니다 — 다른 PC 의 저절로 합치기가 모릅니다');
 });
 
 test('묶음이 셋 이상이면 짝을 모두 적어 둔다', () => {
