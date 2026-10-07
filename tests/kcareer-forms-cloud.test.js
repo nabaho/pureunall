@@ -142,7 +142,9 @@ test('⑥★ 창고 규칙이 그 자리를 덮는다 — 안 덮이면 올리�
 });
 
 test('⑦ 완전삭제하면 창고에서도 비운다 — 아무도 못 꺼내는 파일이 쌓이지 않게', () => {
-  const 비우기 = cutFn(CODE, 'function kcTrashPurge(');
+  /* 비우기는 _kcTrashFree «한 곳»이 한다 — 완전삭제·30일 비우기 모두 그것을 부른다(2026-10-07) */
+  assert.match(cutFn(CODE, 'function kcTrashPurge('), /_kcTrashFree\(e\)/);
+  const 비우기 = cutFn(CODE, 'function _kcTrashFree(');
   assert.match(비우기, /stPath/, '★ 창고에 올린 양식이 영영 남습니다 — 요금만 나갑니다');
   assert.match(비우기, /\.delete\(\)/, '창고에서 안 지웁니다');
   /* ⚠ 휴지통에 «있는 동안»은 지우면 안 된다 — 되살릴 수 있어야 한다 */
@@ -210,7 +212,9 @@ test('⑪★★ 공용 첨부 길(신분증·통장사본)은 창고에 «절대
 });
 
 test('⑫ 완성 서류를 완전삭제하면 창고의 두 칸도 비운다', () => {
-  const 비우기 = cutFn(CODE, 'function kcTrashPurge(');
+  /* 비우기는 _kcTrashFree «한 곳»이 한다 — 완전삭제·30일 비우기 모두 그것을 부른다(2026-10-07) */
+  assert.match(cutFn(CODE, 'function kcTrashPurge('), /_kcTrashFree\(e\)/);
+  const 비우기 = cutFn(CODE, 'function _kcTrashFree(');
   ['genStPath', 'origStPath'].forEach((k) => assert.ok(비우기.indexOf(k) >= 0,
     '★ ' + k + ' 를 안 비웁니다 — 아무도 못 꺼내는 파일이 창고에 쌓입니다'));
 });

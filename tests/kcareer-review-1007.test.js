@@ -109,8 +109,14 @@ test('★★ ③ 사업에서 뺀 서류를 되살리면 그 사업 서류 목�
 });
 
 test('④ 「☐ №」 머리는 정렬하지 않는다 · 사업 입력 창은 바깥 클릭에 안 닫힌다', () => {
-  assert.match(bare, /var hn=\(th\.textContent\|\|''\)\.trim\(\); if\(hn==='관리'\|\|hn==='№'\|\|th\.classList\.contains\('rownum-h'\)\) return;/,
-    '★ « №» 앞 빈칸 때문에 ☐ 를 누르면 정렬까지 된다');
+  /* 머리칸 정렬은 sortCol(전체 자료) 하나 — 보이는 줄만 정렬하며 머리 글자를 통째로 다시 쓰던 sortTable 로 덮어쓰지 않는다(2026-10-07) */
+  const rc = cutBlock(bare, 'function renderCareer(');
+  assert.doesNotMatch(rc, /th\.onclick=\(\)=>sortTable/, '★ sortTable 로 덮으면 ☐(전체 선택)가 지워지고 50줄만 정렬된다');
+  assert.match(rc, /title="이 쪽 전체 선택"> №<\/th>/, '№ 머리에는 정렬을 달지 않는다');
+  assert.match(rc, /onclick="sortCol\(/);
+  /* 기본 정렬은 날짜 모양(점·줄표)을 맞춘 열쇠로 */
+  const ctx = {}; vm.createContext(ctx); vm.runInContext(cutBlock(bare, 'function _rowDateKey('), ctx);
+  assert.ok(vm.runInContext('_rowDateKey({date:"2026-09-18"}) > _rowDateKey({date:"2026.9.5"})', ctx), '★ 9월 18일이 9월 5일보다 나중이어야 한다');
   assert.match(bare, /KC_MODAL_NO_BACKDROP=\{[^}]*modalBiz:1/, '★ 칸이 많은 사업 입력 창이 바깥 한 번 클릭에 닫히면 친 것이 날아간다');
 });
 

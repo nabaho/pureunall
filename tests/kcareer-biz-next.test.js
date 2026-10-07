@@ -47,6 +47,8 @@ test('② 실적 칸 짝 — 사업명·발주기관·연도·금액(숫자만)�
   assert.equal(B.perfFields('etc', r).type, '수행기관');
   assert.equal(B.perfFields('fund', r).org, '가나재단');
   assert.equal(B.perfFields('case', r), null, '정한 셋 밖으로는 안 넘긴다');
+  /* ★ 발주처와 직접 맺은 사업(입찰·용역)은 수행기관을 비운다 — 적으면 «외부기관 실적»으로만 간다(2026-10-07) */
+  assert.equal(B.perfFields('consult', Object.assign({}, r, { kind: '입찰·용역' })).agency, '', '직접 맺은 사업이 외부기관 실적으로 새면 컨설팅실적에서 안 보인다');
 });
 
 test('★★ ② 실적 입력 창을 채워서 «열기만» — 실적을 몰래 저장하지 않는다', () => {
