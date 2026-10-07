@@ -49,6 +49,8 @@ const B = (() => {
     grabFn('useRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
     grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('closeArr'),
+    grabFn('carryOpening'), grabFn('f15PrevCheck'),
+    'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
     'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto;',
   ].join('\n')).call(box);
@@ -163,6 +165,42 @@ test('★ 지도점검 두 가지 — 임금성 지급 의심·기본재산 잠�
   assert.equal(r.erosion, 12345, '결손이면 그만큼 잠식');
   assert.equal(box.f([], { retained: 0 }).erosion, 0);
   assert.match(SRC, /_rsvPendingNote\(arrC\)\+_closeRiskNote\(arrC\)/, '회계·결산 화면에 붙어 있다');
+});
+
+test('★★ 전년 기말에서 전기이월 가져오기 — 준비금2 잔액이 넘어와 다음 해 지출을 덮는다(결손 없음)', () => {
+  /* 2025: 출연 5천만·지출 780만·이자 9,520 → 결산 조정(준비금2 설정 4천만·환입) */
+  fresh({ fund_type: '사내', years: {} });
+  const prevC = B.closeArr(TX, 'F1', 2025);
+  const prevFin = B.computeFin(prevC, 'F1', 2025);
+  const r = B.carry(prevC, {}, prevFin);
+  assert.equal(r.op.basic, Math.round(prevFin.basic), '기본재산');
+  assert.equal(r.op.reserve2, Math.round(prevFin.res2), '준비금2 잔액이 넘어온다');
+  assert.equal(r.op.cash, Math.round(prevFin.cash), '현금');
+  assert.equal(r.op.retained, Math.round(prevFin.retained), '이월잉여금');
+  assert.deepEqual(r.missing, []);
+  /* 2026: 출연 없이 300만 지출 — 넘어온 준비금2로 덮여 결손이 없어야 한다 */
+  B.funds.F1.years[2026] = { opening: r.op };
+  const tx26 = [{ _id: 'b1', date: '2026-05-01', memo: '경조', withdraw: 3000000, debit: '경조사비', credit: '현금성자산', approved: true }];
+  const f26 = B.computeFin(B.closeArr(tx26, 'F1', 2026), 'F1', 2026);
+  assert.ok(f26.balanced, '이월한 기초로 대차가 맞는다');
+  assert.equal(Math.round(f26.net), 0, '전년 준비금2로 덮여 당기순이익 0');
+  assert.equal(Math.round(f26.retained), 0, '결손 없음');
+});
+
+test('이월할 칸이 없는 계정에 잔액이 남으면 알린다(조용히 버리지 않는다)', () => {
+  fresh({ fund_type: '사내', years: {} });
+  const arr = TX.concat([{ _id: 'm1', date: '2025-12-30', memo: '미지급', amount: 50000, nocash: 1, debit: '지급수수료', credit: '미지급금', approved: true }]);
+  const pc = B.closeArr(arr, 'F1', 2025);
+  assert.deepEqual(B.carry(pc, {}, B.computeFin(pc, 'F1', 2025)).missing, ['미지급금']);
+});
+
+test('★ ⑫(올해 기초 기본재산)와 작년에 보고한 ⑳을 천원 단위로 견준다', () => {
+  assert.deepEqual(B.prevCheck(10000000, null), { known: false }, '전년 확정이 없으면 모름');
+  assert.equal(B.prevCheck(10000400, { bf_end: 10000100 }).off, false, '천원 단위가 같으면 같다');
+  const c = B.prevCheck(10000000, { bf_end: 12000000 });
+  assert.ok(c.known && c.off && c.cur === 10000 && c.prev === 12000);
+  assert.match(SRC, /f15PrevCheck\(R\.bfOpen,S\.f15PrevFin\)/, '운영상황보고서 화면에 붙어 있다');
+  assert.match(SRC, /closing\/'\+fid\+'\/'\+\(yr-1\)\+'\/fin'/, '전년 확정 스냅샷을 읽는다');
 });
 
 test('원천징수 칸이 비면 아무것도 얹지 않는다', () => {

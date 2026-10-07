@@ -16775,16 +16775,27 @@ function f15Load(){
     _loadSites(fid).catch(function(){return [];}),
     fbDb.ref(NS+'/welfare/'+fid+'/'+yr).once('value').then(function(s){var v=s.val()||{};return Object.keys(v).map(function(k){return v[k];});}).catch(function(){return [];}),
     /* 사업장별 «그 해» 출연금 — 장부와 대조하려고 함께 읽는다(contribCheck) */
-    fbDb.ref(NS+'/site_years/'+fid+'/'+yr).once('value').then(function(s){return s.val()||{};}).catch(function(){return {};})
+    fbDb.ref(NS+'/site_years/'+fid+'/'+yr).once('value').then(function(s){return s.val()||{};}).catch(function(){return {};}),
+    /* 전년도 확정 스냅샷 — ⑫(직전 기본재산)가 «작년에 보고한 ⑳»과 같은지 본다(f15PrevCheck) */
+    fbDb.ref(NS+'/closing/'+fid+'/'+(yr-1)+'/fin').once('value').then(function(s){return s.val()||null;}).catch(function(){return null;})
   ]).then(function(r){
     if(S.f15For!==key) return;
     S.f15Close=r[0]||{}; S.f15Rep=S.f15Close.report||{}; S.f15Sites=r[1]||[]; S.f15Welf=r[2]||[];
-    S.f15Sy=r[3]||{};
+    S.f15Sy=r[3]||{}; S.f15PrevFin=r[4]||null;
     if(S.tab==='closing'&&S.view==='fund') renderFund();
   });
   return false;
 }
 function _isLocked(){ return !!(S.f15Close&&S.f15Close.locked); }
+/* ★ ⑫ 직전 기본재산 = 작년에 보고한 ⑳ 인가 (2026-10-07, 결산 법령 체계 정리 추천 2)
+   고용노동부 시스템은 ⑫를 «작년 보고서의 ⑳»에서 가져와 고칠 수 없다. 올해 전기이월(기본재산)이 그와 다르면
+   지청 확인 전화가 오고, 숫자가 틀린 채 내면 거짓 보고(법 제99조③2, 별표 150만원)가 된다.
+   비교는 서식 단위(천원)로 한다. 전년 확정 스냅샷이 없으면 «모름» — 견주지 않는다. */
+function f15PrevCheck(bfOpen,prevFin){
+  if(!prevFin||prevFin.bf_end==null) return {known:false};
+  var a=Math.round((num(bfOpen)||0)/1000), b=Math.round((num(prevFin.bf_end)||0)/1000);
+  return {known:true, off:a!==b, cur:a, prev:b};
+}
 /* 확정한 해를 다시 계산했더니 별지15호 숫자가 달라졌는가.
    산식을 고치면(69.잔액·㉚ 처럼) 이미 낸 해의 인쇄물이 조용히 바뀐다 — 그것을 붙잡는다.
    ⚠ 예전에 확정한 해에는 스냅샷에 이 칸들이 없다. 그때는 «모른다»가 맞으므로 비교하지 않는다. */
@@ -16847,6 +16858,12 @@ function f15View(arr){
     +'<div class="row" style="gap:18px;align-items:flex-start;margin-top:12px;flex-wrap:wrap">'
     +'<div style="min-width:300px;flex:1"><div style="font-weight:700;margin-bottom:6px">기본재산 현황 ⑫~⑳ (천원)</div><table>'
       +'<tr><td>⑫ 직전 회계연도 말</td><td style="text-align:right">'+_n(_k1000(R.bfOpen))+'</td></tr>'
+      +(function(){ var pc=f15PrevCheck(R.bfOpen,S.f15PrevFin); if(!pc.known||!pc.off) return '';
+        return '<tr><td colspan="2" style="padding:0"><div class="msg err" style="margin:6px 0;font-size:11.5px;line-height:1.55">'
+          +'<b>⚠ ⑫가 작년에 보고한 ⑳과 다릅니다.</b> 올해 ⑫ '+_n(pc.cur)+'천원 · '+(S.year-1)+'년 확정 ⑳ '+_n(pc.prev)+'천원<br>'
+          +'노동부 시스템은 ⑫를 작년 보고서에서 가져옵니다 — 전기이월(기본재산)을 확인하세요.'
+          +'<br><button onclick="closeSub(\'fin\')" style="margin-top:4px;padding:2px 9px;font-size:11px">결산·재무제표 › 전기이월로</button>'
+          +'</div></td></tr>'; })()
       +'<tr><td>⑬ 사업주 출연</td><td style="text-align:right">'+_n(_k1000(R.bf.employer))+'</td></tr>'
       +'<tr><td>⑮ 사업주 외의 자 출연</td><td style="text-align:right">'+_n(_k1000(R.bf.other))+'</td></tr>'
       +'<tr><td>⑭ 수익금ㆍ이월금 전입</td><td style="text-align:right">'+_n(_k1000(R.bf.income))+'</td></tr>'
@@ -18299,7 +18316,56 @@ function computeFin(arr,fid,yr){
     totalAssets:totalAssets,net:net,retained:retained,equity:equity,totalLiabEq:totalLiabEq,
     balanced:totalAssets===totalLiabEq,opening:opening};
 }
+/* ★ 전년 결산에서 전기이월 가져오기 (2026-10-07, 결산 법령 체계 정리 추천 1)
+   남은 결손 대부분이 «전기이월 칸이 비어서»였다 — 전년 준비금2 잔액이 안 넘어와 올해 지출을 덮을 재원이 0 으로 보였다
+   (손실은 이월, 잉여금은 보전 후 전입 — 근로복지기본법 제64조③. 이월이 끊기면 그 셈이 성립하지 않는다).
+   전년 «기초 + 승인 분개(결산 조정 포함, closeArr)»로 OPEN_ACCT 칸마다 기말 잔액을 셈한다.
+   이월잉여금은 전년 재무제표의 잉여금에서 «따로 칸이 있는 자본»(손실대비특별적립금 등)을 뺀 나머지다.
+   칸이 없는 계정(미지급금·예수금 등)에 잔액이 남으면 missing 으로 알린다 — 조용히 버리면 대차가 어긋난다.
+   순수 함수 — 검사가 그대로 돌린다. 화면은 칸을 «채우기만» 하고 저장은 사람이 누른다. */
+function carryOpening(prevArrC,prevOp,prevFin){
+  prevOp=prevOp||{};
+  var appr=expandSplits(prevArrC||[]).filter(function(x){ return x.approved&&x.debit&&x.credit; });
+  var mv={};
+  appr.forEach(function(x){ var a=num(x.amount)||num(x.deposit)||num(x.withdraw)||0;
+    (mv[x.debit]=mv[x.debit]||{d:0,c:0}).d+=a; (mv[x.credit]=mv[x.credit]||{d:0,c:0}).c+=a; });
+  var op={}, used={}, otherEq=0;
+  Object.keys(OPEN_ACCT).forEach(function(k){
+    var acct=OPEN_ACCT[k]; used[acct]=1;
+    if(k==='retained') return;
+    var t=ACCT_CHART[acct]||'자산', m=mv[acct]||{d:0,c:0};
+    op[k]=Math.round((num(prevOp[k])||0)+((t==='자산'||t==='비용')?(m.d-m.c):(m.c-m.d)));
+    if(t==='자본'&&k!=='basic') otherEq+=op[k];
+  });
+  op.retained=Math.round((num(prevFin&&prevFin.retained)||0)-otherEq);
+  var missing=[];
+  Object.keys(mv).forEach(function(a){
+    var t=ACCT_CHART[a]; if(used[a]||!(t==='자산'||t==='부채'||t==='자본')) return;
+    var b=Math.round(mv[a].d-mv[a].c); if(b) missing.push(a);
+  });
+  return {op:op, missing:missing};
+}
+function carryOpeningFill(){
+  var fid=S.fundId, yr=S.year, py=yr-1;
+  loadPrevTxns();
+  var pa=prevArr();
+  if(pa===null){ toast(py+'년 장부를 읽는 중입니다 — 잠시 뒤 다시 누르세요','warn'); return; }
+  var pOp=_openingOf(fid,py);
+  if(!pa.length&&!Object.keys(pOp).some(function(k){ return num(pOp[k]); })){
+    toast(py+'년 장부와 전기이월이 모두 비어 있어 가져올 것이 없습니다 — 그 해 결산서의 기말 잔액을 직접 넣으세요','warn'); return; }
+  var r=carryOpening(pa,pOp,computeFin(pa,fid,py));
+  var cur=_openingOf(fid,yr), has=Object.keys(cur).some(function(k){ return num(cur[k]); });
+  var go=function(){
+    Object.keys(r.op).forEach(function(k){ var el=$('op-'+k); if(el) el.value=r.op[k]?String(r.op[k]):''; });
+    toast(py+'년 기말 잔액을 채웠습니다 — 확인하고 [💾 전기이월·설정액 저장]을 누르세요'
+      +(r.missing.length?' · 이월할 칸이 없는 계정: '+r.missing.join(', '):''), r.missing.length?'warn':undefined);
+  };
+  if(has) confirmM(yr+'년 전기이월 칸에 이미 값이 있습니다.\n'+py+'년 기말 잔액으로 바꿔 채울까요? (저장은 따로 누릅니다)',{ok:'바꿔 채우기'})
+    .then(function(ok){ if(ok) go(); });
+  else go();
+}
 function finPanel(arr){
+  loadPrevTxns();                       // 「전년 기말에서 가져오기」가 바로 쓰도록 미리 읽어 둔다
   var f=computeFin(arr);
   var op=f.opening||{};
   function oi(k,lbl){return '<div class="fld"><label>'+lbl+'</label><input id="op-'+k+'" value="'+esc(op[k]||'')+'" placeholder="0"></div>';}
@@ -18339,7 +18405,9 @@ function finPanel(arr){
       +'<span>이 기금의 <b>과거 제출본이 서식과 반대로</b> 되어 있습니다(준비금1이 이월)'
       +' <span class="muted">— 공식 서식은 1=법인세법 §29(이자)·2=근로복지기본법 §62②(이월)입니다.'
       +' 전기 대비를 맞추려 옛 제출본을 그대로 재현할 때만 켜세요</span></span></label>'
-      +'<button style="margin-top:8px" onclick="saveOpening()">💾 전기이월·설정액 저장</button></div>';
+      +'<div class="row" style="gap:6px;margin-top:8px;flex-wrap:wrap">'
+      +'<button onclick="carryOpeningFill()" title="'+(S.year-1)+'년 기초 + 승인 분개(결산 조정 포함)로 계정마다 기말 잔액을 셈해 위 칸에 채웁니다 — 저장은 따로 누릅니다">⬅ '+(S.year-1)+'년 기말에서 가져오기</button>'
+      +'<button onclick="saveOpening()">💾 전기이월·설정액 저장</button></div></div>';
   if(!f.appr) return '<div class="panel"><div class="muted">승인된 거래가 없어 재무제표를 만들 수 없습니다. 위에서 계정 지정 후 승인하세요.</div>'+openingHtml+'</div>';
   // ⑻ 전기이월(기초잔액)을 시산표 맨 위에 표시 — 재무상태표와 대차가 맞는 이유를 드러냄
   var openMap=[['현금성자산',op.cash],['정기예금',op.savings],['근로자대부금',op.loan],['매도가능증권',op.secu],
