@@ -319,6 +319,47 @@
         .sort(function (a, b) { return String(b.date || '').localeCompare(String(a.date || '')) || (b.at || 0) - (a.at || 0); });
     });
   }
+  /* ══ 📬 서명본 대기 (대표 「추천대로」 2026-10-07) — 계약서를 보냈거나(메일) 채워 받은(받기) 회사 ══
+     pu_docs/await/{coKey} = { name, bz?, at, how:'메일'|'받기', names[], by, byName, remindAt?, got?, gotDoc? }
+     회사마다 한 줄(가장 최근 보냄). 다시 보내면 got 이 지워져 다시 대기로. 서명본을 올리면 got·gotDoc 이 찍혀 「최근 회수」로.
+     ⚠ 받는 주소는 남기지 않는다(보낸 서류와 같은 원칙). 기업정보함(pucards)은 건드리지 않는다. */
+  function awaitRecord(o) {
+    o = o || {};
+    var r = { name: clampStr(String(o.coName || '').trim(), 120), at: Number(o.at) || Date.now(), how: o.how === '받기' ? '받기' : '메일',
+      names: (o.names || []).map(function (v) { return String(v || '').slice(0, 200); }).filter(Boolean).slice(0, 20),
+      by: deps.uid, byName: clampStr(deps.name, 60) };
+    var bz = String(o.bz || '').replace(/\D/g, '');
+    if (bz.length >= 10) r.bz = bz.slice(0, 12);
+    if (!r.names.length) delete r.names;
+    return r;
+  }
+  function markAwait(o) {
+    needDb();
+    var key = coKey(o && o.coName);
+    if (!key) return Promise.reject(new Error('회사 이름이 없습니다'));
+    return deps.db.ref(ROOT + '/await/' + key).set(clean(awaitRecord(o))).then(function () { return key; });
+  }
+  function listAwait() {
+    needDb();
+    return deps.db.ref(ROOT + '/await').once('value').then(function (s) {
+      var v = s.val() || {};
+      return Object.keys(v).map(function (k) {
+        var d = v[k] || {}, names = d.names;
+        if (names && !Array.isArray(names)) names = Object.keys(names).map(function (i) { return names[i]; });
+        return { key: k, name: d.name || k, bz: d.bz || '', at: d.at || 0, how: d.how || '메일', names: names || [], byName: d.byName || '',
+          remindAt: d.remindAt || 0, got: d.got || 0, gotDoc: d.gotDoc || '' };
+      });
+    });
+  }
+  function remindAwait(key) { needDb(); return deps.db.ref(ROOT + '/await/' + key).update({ remindAt: Date.now() }); }
+  function gotAwait(key, docId) {
+    needDb();
+    return deps.db.ref(ROOT + '/await/' + key).once('value').then(function (s) {
+      if (!s.exists()) return;   // 대기 목록에 없던 회사 — 적을 것 없음
+      return deps.db.ref(ROOT + '/await/' + key).update(clean({ got: Date.now(), gotDoc: docId ? String(docId).slice(0, 40) : undefined }));
+    });
+  }
+
   /* 규칙이 게시됐는지 — 읽기가 막히면 'denied'. 그 밖의 오류는 그대로 던진다 */
   function probe() {
     needDb();
@@ -334,6 +375,7 @@
     fileUrl: fileUrl, download: download, isSecret: isSecret, secretBlob: secretBlob, saveBlob: saveBlob, hasHash: hasHash,
     addCoDoc: addCoDoc, updateCoDoc: updateCoDoc, unlinkCoDoc: unlinkCoDoc,
     listCo: listCo, listCoDocs: listCoDocs, probe: probe,
+    awaitRecord: awaitRecord, markAwait: markAwait, listAwait: listAwait, remindAwait: remindAwait, gotAwait: gotAwait,
     keepCo: keepCo, recRecord: recRecord, listCoRecs: listCoRecs, importCoRecs: importCoRecs, updateCoRec: updateCoRec, removeCoRec: removeCoRec
   };
 })(typeof window !== 'undefined' ? window : this);

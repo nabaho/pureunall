@@ -1484,6 +1484,7 @@
         fillOne(it).then(function (r) {
           busy = false; refresh(); warnOf([r]);
           save(r.bytes, outName(it), isXl(it) ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/x-hwp');
+          recordGet([it], [outName(it)]);
         }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
         return;
       }
@@ -1507,7 +1508,17 @@
       }).then(function (zipBytes) {
         busy = false; refresh(); warnOf(rs);
         save(zipBytes, zipName(title || '서식묶음', V), 'application/zip');
+        recordGet(items, names);
       }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
+    /* 📥 받기도 «보낸 서류»에 (대표 「추천대로」 2026-10-07) — 회사를 골랐을 때만. 받는 주소 없이 받는 분 칸 「(받기)」.
+       계약서면 📬 서명본 대기에도 오른다. 기록이 실패해도 받은 파일은 그대로다(알림만) */
+    function recordGet(its, names) {
+      if (!st.co || !host.mail || !host.mail.record) return;
+      var kind = its.some(function (x) { return CF.SENT_KIND_OF(x.fm.groupName || '') === '계약서'; }) ? '계약서' : '제안서';
+      Promise.resolve().then(function () { return host.mail.record(st.co, values(), { kind: kind, names: names, how: '받기', await: true }); })
+        .then(function () { toast('받았습니다 — 보낸 서류에 「받기」로 기록했습니다' + (kind === '계약서' ? ' · 📬 서명본 대기에 올렸습니다' : '')); },
+          function (e) { toast('받았습니다 — ⚠ 기록은 남기지 못했습니다: ' + ((e && e.message) || e)); });
     }
     function copyText() {
       var t = CF.fillText(items[0].fm.body, values());
@@ -1610,7 +1621,7 @@
     function after(fs, how) {
       var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
       /* ⚠ 메일은 이미 나갔다 — 기록·보관이 실패해도(동기 throw 포함) «보내기 실패»로 보이면 안 된다(다시 눌러 두 번 간다) */
-      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: V.담당자 || '' }); }];
+      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: V.담당자 || '', await: true }); }];
       if (keepCk.checked) jobs.push(function () { return host.mail.keep(V, { name: o.name, size: o.bytes.length, type: '', bytes: o.bytes }, '[보냄] ' + (o.fm.name || '서류')); });
       return Promise.all(jobs.map(function (fn) { return Promise.resolve().then(fn).then(function () { return ''; }, function (e) { return (e && e.message) || String(e); }); }))
         .then(function (errs) {

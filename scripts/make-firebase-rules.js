@@ -1395,6 +1395,23 @@ rules.pu_docs = {
     byName:  { '.validate': 'newData.isString() && newData.val().length <= 60' },
     $other:  { '.validate': false }
   } } },
+  /* 📬 서명본 대기 (2026-10-07) — 계약서를 보냈거나 채워 받은 회사 한 줄. 서명본을 올리면 got 이 찍힌다.
+     재직 직원이 읽고 쓴다(co_docs 와 같은 결). 받는 주소 칸은 없다. */
+  await: { $k: {
+    '.write': LOGIN,
+    '.validate': "newData.hasChildren(['name','at','how','by'])",
+    name:     { '.validate': 'newData.isString() && newData.val().length <= 120' },
+    bz:       { '.validate': 'newData.isString() && newData.val().length <= 12' },
+    at:       { '.validate': 'newData.isNumber()' },
+    how:      { '.validate': "newData.val() === '메일' || newData.val() === '받기'" },
+    names:    { $i: { '.validate': 'newData.isString() && newData.val().length <= 200' } },
+    by:       { '.validate': 'newData.val() === auth.uid' },
+    byName:   { '.validate': 'newData.isString() && newData.val().length <= 60' },
+    remindAt: { '.validate': 'newData.isNumber()' },
+    got:      { '.validate': 'newData.isNumber()' },
+    gotDoc:   { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    $other:   { '.validate': false }
+  } },
   /* 🔒 서명본을 누가 언제 열었나 — 서버(관리자 SDK)만 쓴다. 총괄관리자만 읽는다 */
   secret_log: { '.read': ADMIN },
   co_docs: { $k: { $d: {
