@@ -67,7 +67,8 @@ test('★★ 백업을 만드는 «모든» 자리가 그 하나를 쓴다', () 
   const lines = APP.split('\n');
   const 담는곳 = [];
   lines.forEach(function (ln, i) {
-    if (!/localStorage\.key\(/.test(ln)) return;
+    /* 훑는 길이 둘이다 — localStorage 를 바로 훑거나, 큰 사본 창고까지 함께 훑는 erpLocalKeys() (2026-10-07) */
+    if (!/localStorage\.key\(|=\s*_lk\[i\]/.test(ln)) return;
     const 몸통 = lines.slice(i, i + 8).join('\n');
     if (!/\bdata\[k\]\s*=/.test(몸통)) return;        // 담지 않으면 백업이 아니다
     담는곳.push({ line: i + 1, ok: /SECRET_KEYS\.test/.test(몸통) });
