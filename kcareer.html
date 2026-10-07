@@ -1358,7 +1358,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
-<script src="js/kcareer-notices.js?v=2"></script>
+<script src="js/kcareer-notices.js?v=3"></script>
 <!-- 「합치기」 안전장치 — 다른 서류를 합쳐 잃지 않게 막는다(kcareer-mergeguard.js) -->
 <script src="js/kcareer-mergeguard.js?v=1"></script>
 <!-- 「잘못 붙은 원본 찾기」 — 기록 날짜와 붙은 파일 이름이 크게 어긋난 줄을 찾는다 -->
@@ -3449,10 +3449,22 @@ _safe(function(){
      (되돌리기·재등록이 저절로 반영된다 — 따로 부를 것이 없다).
    ⚠ FB_SKIP 에 넣지 말 것 — 자리표는 클라우드로 «올라가야» 다른 기기도 존중한다. */
 var TOMB_KEY='_tomb', TOMB_MAX=3000, TOMB_DAYS=400;
-function tombLoad(){ try{ var o=JSON.parse(LS.get(NS+TOMB_KEY)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }catch(e){ return {}; } }
+/* ★ «되살린 시각»표 (2026-10-07 검토 — 휴지통에서 되살린 기록이 다른 기기를 거쳐 다시 지워지던 것).
+   지운 표는 «합집합»으로만 합쳐져, A 기기가 되살려 자리표를 뗀 사실이 B 기기로 안 갔다 —
+   B 는 남은 자리표로 그 기록을 버리고, 그 상태를 올려 A 까지 잃었다.
+   그래서 되살린 «시각»도 적어 함께 오가게 하고, 번호마다 «더 늦은 쪽»이 이긴다:
+     지운 시각 > 되살린 시각 → 지운 것 · 아니면 산 것.
+   ⚠ FB_SKIP 에 넣지 말 것 — 자리표처럼 클라우드로 «올라가야» 다른 기기가 안다. */
+var TOMB_REV_KEY='_tombrev';
+function _tombObj(k){ try{ var o=JSON.parse(LS.get(NS+k)||'{}'); return (o&&typeof o==='object'&&!Array.isArray(o))?o:{}; }catch(e){ return {}; } }
+function tombLoad(){ return _tombObj(TOMB_KEY); }
+function tombRevLoad(){ return _tombObj(TOMB_REV_KEY); }
 function tombSave(o){ try{ LS.set(NS+TOMB_KEY, JSON.stringify(o)); }catch(e){} }
-function tombHas(id){ return !!tombLoad()[id]; }
-function tombCount(){ return Object.keys(tombLoad()).length; }
+function tombRevSave(o){ try{ LS.set(NS+TOMB_REV_KEY, JSON.stringify(o)); }catch(e){} }
+/* 지운 것인가 — 자리표가 있고, 그 뒤에 되살린 적이 없을 때만 */
+function tombDead(tb, rv, id){ var t=Number(tb&&tb[id])||0; return t>0 && t>(Number(rv&&rv[id])||0); }
+function tombHas(id){ return tombDead(tombLoad(), tombRevLoad(), id); }
+function tombCount(){ var tb=tombLoad(), rv=tombRevLoad(); return Object.keys(tb).filter(function(id){ return tombDead(tb, rv, id); }).length; }
 /* 너무 오래된 것·너무 많은 것은 버린다 — 자리표가 자료보다 커지면 안 된다 */
 function tombPrune(o){
   var ks=Object.keys(o); if(ks.length<=TOMB_MAX) {
@@ -3472,7 +3484,7 @@ function _tombDiff(key, oldArr, newArr){
   var o=idOf(oldArr), n=idOf(newArr);
   var oks=Object.keys(o), nks=Object.keys(n);
   if(!oks.length && !nks.length) return;
-  var t=tombLoad(), now=Date.now(), changed=false;
+  var t=tombLoad(), rv=tombRevLoad(), now=Date.now(), changed=false, rvChanged=false;
   /* ⚠ «다른 통에 같은 id 로 살아 있으면 지운 것이 아니다 — 옮긴 것이다.»
      예: _tplMerge 는 옛 보관함을 set(k,[]) 로 비우고 그 기록을 새 보관함으로 옮긴다.
      그것을 «지웠다»고 적으면, 다음 되살리기가 «살아 있는» 기록을 버린다. */
@@ -3497,16 +3509,21 @@ function _tombDiff(key, oldArr, newArr){
     return alive;
   };
   oks.forEach(function(id){
-    if (n[id] || t[id]) return;
+    /* ⚠ 자리표가 있어도 «되살린 뒤»의 것이면 새로 적는다 — 옛 시각이 남으면 다시 지운 것이 안 먹는다 */
+    if (n[id] || tombDead(t, rv, id)) return;
     if (aliveIds()[id]) return;              /* 옮긴 것 → 지운 것이 아니다 */
-    t[id] = now; changed = true;             /* 사라짐 → 적는다 */
+    /* ⚠ 시각이 같으면 «나중 일»이 이기게 한 칸 더 — 되살린 바로 그 순간에 다시 지워도 지운 것이 된다 */
+    t[id] = Math.max(now, (Number(rv[id])||0)+1); changed = true;   /* 사라짐 → 적는다 */
   });
-  nks.forEach(function(id){ if(t[id]){ delete t[id]; changed=true; } });             /* 다시 나타남 → 뗀다 */
+  /* 다시 나타남 → 자리표를 떼고 «되살린 시각»을 적는다 — 다른 기기가 이것을 보고 자기 자리표를 뗀다 */
+  nks.forEach(function(id){ if(t[id]){ rv[id]=Math.max(now, (Number(t[id])||0)+1); delete t[id]; changed=true; rvChanged=true; } });
   if(changed) tombSave(tombPrune(t));
+  if(rvChanged) tombRevSave(tombPrune(rv));
 }
 
 function set(key,arr){
   if(key===TOMB_KEY){ tombSave(arr); return; }                  /* 자리표 자체는 견주지 않는다 */
+  if(key===TOMB_REV_KEY){ tombRevSave(arr); return; }
   if(key==='id_docs' && hasIDPin()){ if(_idUnlocked && _idKey){ _idDocs=Array.isArray(arr)?arr.slice():[]; _persistIdDocs(); } return; }
   /* ★ 삭제를 «여기 한 곳»에서 잡는다 — 삭제 경로가 늘어도 빠지지 않는다 */
   try{ if(Array.isArray(arr)) _tombDiff(key, get(key), arr); }catch(e){}
@@ -19820,7 +19837,9 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
                 다른 브라우저에 그림 없는 빈 도장이 생긴다(2026-10-05 에지에서 실제로 3개). 목록도 이 기기에만. */
              'stamps',
              /* 이 기기에서 고친 것이 아직 안 올라갔다는 표시 — 기기마다의 사정이다 */
-             '_fbpending'];
+             '_fbpending',
+             /* 지금 올리는 중인 시각(탭끼리 보는 표) — 기기마다의 사정이다 */
+             '_fbpushing'];
 var _fbBase=null, _fbPushT=null, _fbWatching=false;
 /* ★ 「닫기」를 기억한다 — 예전에는 display:none 만 해서 PC 가 저장할 때마다(2.5초)
    곧바로 되살아났다. 대표가 겪은 「자꾸」가 이것이다(2026-09-12).
@@ -19966,7 +19985,7 @@ function fbCheckLoss(){
        ★★ 2026-09-12 — 여기에 «하나 더» 있다: 폰처럼 «아직 한 번도 받아 오지 않은 기기»는
        적은 것이 정상이다. 잣대는 KcareerNotices 한 곳에 모았다. */
     var del=tombCount();
-    var base=(_fbBase!=null)?_fbBase:fbGetBase();
+    var base=_fbBaseNow();
     var d=window.KcareerNotices ? KcareerNotices.decide({
             base:base, cloudAt:cloudAt||_fbCloudAt||0,
             here:here.total, cloud:cloud.total, deleted:del, dismissedAt:_fbDismissAt })
@@ -20221,6 +20240,13 @@ async function kcRecoverRun(key, n){
     if(!body||!body.paths) throw new Error('백업 본문이 없습니다');
     var updates={}, list=Array.isArray(body.paths)?body.paths:Object.keys(body.paths).map(function(k){return body.paths[k];});
     list.forEach(function(e){ if(!e||!e.path||e.skipped) return; updates[e.path]=(e.exists===false||e.value===undefined)?null:e.value; });
+    /* ⚠ 백업 속 prevAt(«이 판 위에 썼다»는 표)은 빼고 쓴다 — 서버 규칙이 «지금 시각과 같을 때만» 받으므로
+         그때의 prevAt 을 그대로 쓰면 되돌리기가 거절된다. 되돌리기는 사람이 고른 «통째 덮기»다. */
+    Object.keys(updates).forEach(function(p){
+      var 내자리='kcareer/'+fbUid;
+      if(p===내자리+'/prevAt'){ delete updates[p]; return; }
+      if(p===내자리 && updates[p] && typeof updates[p]==='object'){ var c=Object.assign({}, updates[p]); delete c.prevAt; updates[p]=c; }
+    });
     if(!Object.keys(updates).length) throw new Error('이 백업에는 되살릴 내용이 없습니다');
     await fbDb.ref().update(updates);
     if(box) box.innerHTML='<div class="rc-mute">③ 이 기기로 내려받는 중…</div>';
@@ -20231,7 +20257,8 @@ async function kcRecoverRun(key, n){
        그 id 의 자리표는 떼어 앞뒤를 맞춘다. 셈법은 kcApplyRestore 한 곳에 있다. */
     var _rb=kcApplyRestore(v.ls, 'rollback');
     if(_rb.freed) console.log('되돌리기: 자리표 '+_rb.freed+'건을 뗐습니다(그 시점에 살아 있던 것)');
-    if(v.at) fbSetBase(v.at);
+    if(kcRestoreFailed(_rb)) throw new Error('저장공간이 모자라 '+_rb.failed.length+'개 보관함을 이 기기에 못 썼습니다 — 클라우드는 되돌렸습니다');
+    if(v.at) fbSetBase(v.at); _fbPendingClear(null);
     alert('되살렸습니다 — 화면을 새로고침합니다.');
     location.reload();
   }catch(e){
@@ -20239,20 +20266,59 @@ async function kcRecoverRun(key, n){
       +'<div style="font-size:12px;margin-top:8px">다시 시도하거나, 위촉장 › ⋯ 더보기 › 🔍 서류 폴더 스캔으로 원본에서 다시 읽어 오세요.</div></div>';
   }
 }
-/* 실제로 클라우드에 올리는 부분 — 건수(counts)도 함께 적어 다음 로그인이 가벼워진다 */
-function _fbDoPush(hereTotal, quiet){
-  var at=Date.now(); fbSetBase(at); var data=fbGatherLS();
-  var payload={ls:data, at:at, device:fbDeviceLabel(), keys:Object.keys(data).length,
-                counts:{total:hereTotal, at:at}};
-  return fbDb.ref('kcareer/'+fbUid).update(payload).then(function(){
-    try{ localStorage.removeItem(NS+'_fbpending'); }catch(e){}   /* 다 올라갔다 */
-    if(!quiet){ toast('클라우드에 저장됨 (기록 '+hereTotal+'건)'); fbShowInfo(payload); fbHideNotice(); }
-    return payload;
+/* ── «안 올라간 고침» 표시 — 일련번호로 (2026-10-07 검토) ──
+   전에는 '1' 한 글자였고, 올리기가 끝나면 «무조건» 지웠다. 올리는 2~3초 사이에 고친 것도
+   표시가 함께 사라져, 곧이어 다른 기기 저장을 받아 오면 그 고침을 덮었다.
+   이제 고칠 때마다 새 번호를 적고, 올리기는 «모을 때 본 번호»와 같을 때만 지운다. */
+function _fbPendingNow(){ try{ var v=localStorage.getItem(NS+'_fbpending'); return (v&&v!=='0')?v:''; }catch(e){ return ''; } }
+function _fbPendingMark(){ try{ localStorage.setItem(NS+'_fbpending', Date.now().toString(36)+Math.random().toString(36).slice(2,6)); }catch(e){} }
+/* seq 가 null 이면 무조건 지운다(받아 와서 클라우드와 같아졌을 때) */
+function _fbPendingClear(seq){ try{ if(seq==null || localStorage.getItem(NS+'_fbpending')===seq) localStorage.removeItem(NS+'_fbpending'); }catch(e){} }
+/* 올리는 중인 시각 — «탭끼리» 함께 본다(같은 PC 다른 탭이 이 올리기를 «남의 새 저장»으로 보지 않게) */
+function _fbPushingAt(){ try{ return Number(localStorage.getItem(NS+'_fbpushing'))||0; }catch(e){ return 0; } }
+/* 실제로 클라우드에 올리는 부분 — 건수(counts)도 함께 적어 다음 로그인이 가벼워진다
+   ★★ «내가 마지막에 본 판 위에만» 쓴다 (2026-10-07 검토 — 마지막에 쓴 쪽이 이기던 것).
+     prevAt 에 내 기준 시각을 함께 보내고, 서버 규칙이 «지금 클라우드 시각 = prevAt» 일 때만 받는다
+     (scripts/make-firebase-rules.js · kcareer/$uid/prevAt). 확인과 쓰기가 «한 번에» 서버에서 일어난다 —
+     두 기기가 같은 순간에 올리거나, 꺼져 있다 다시 붙으며 묵은 쓰기가 나가도 남의 고침을 덮지 않는다.
+   ★ 시각은 «내 기준보다 늘 크게» — 시계가 늦은 기기가 올린 것이 «옛것»으로 보이지 않게.
+   ⚠ 기준 시각은 «올라간 뒤에» 적는다. 실패하면 표시를 남기고 «말한다»(조용히 버리지 않는다).
+   o.force: ☁ 저장 단추 — 사람이 정한 것이므로 «지금 클라우드 시각»을 막 읽어 그 위에 쓴다 */
+function _fbDoPush(hereTotal, quiet, o){
+  o=o||{};
+  var ref=fbDb.ref('kcareer/'+fbUid);
+  var 바탕=o.force ? ref.child('at').once('value').then(function(s){ return s.val(); }) : Promise.resolve(fbGetBase());
+  return 바탕.then(function(prev){
+    var seq=_fbPendingNow();                       /* ⚠ 모으기 «전»에 본다 — 그 뒤 고친 것은 표시가 남아야 한다 */
+    var at=Math.max(Date.now(), (Number(prev)||0)+1);
+    var data=fbGatherLS();
+    var payload={ls:data, at:at, prevAt:(prev==null?null:prev), device:fbDeviceLabel(), keys:Object.keys(data).length,
+                  counts:{total:hereTotal, at:at}};
+    try{ localStorage.setItem(NS+'_fbpushing', String(at)); }catch(e){}
+    return ref.update(payload).then(function(){
+      fbSetBase(at);
+      _fbPendingClear(seq);                        /* 올리는 사이에 또 고쳤으면 표시는 남는다 */
+      try{ localStorage.removeItem(NS+'_fbpushing'); }catch(e){}
+      if(_fbPendingNow()) _fbSchedulePush();       /* 남은 고침은 곧 이어서 */
+      if(!quiet){ toast('클라우드에 저장됨 (기록 '+hereTotal+'건)'); fbShowInfo(payload); fbHideNotice(); }
+      return payload;
+    }, function(ex){
+      try{ localStorage.removeItem(NS+'_fbpushing'); }catch(e){}
+      var 앞섬=/permission|PERMISSION_DENIED/i.test(String((ex&&ex.code)||'')+' '+String((ex&&ex.message)||ex));
+      if(앞섬){
+        /* 다른 기기가 먼저 올렸다 — 이 기기 고침은 그대로 두고(표시도 그대로) 사람이 고르게 한다 */
+        fbShowNotice('newer');
+        if(!_fbDoPush._said || Date.now()-_fbDoPush._said>60000){ _fbDoPush._said=Date.now();
+          toast('☁ 다른 기기가 먼저 저장해 이 기기 고침을 올리지 않았습니다 — 위 띠에서 «저장(이 기기 것)» 또는 «불러오기»를 골라 주세요', 9000); }
+      }else if(!_fbDoPush._said || Date.now()-_fbDoPush._said>60000){ _fbDoPush._said=Date.now();
+        toast('☁ 클라우드 저장 실패 — '+((ex&&ex.message)||ex)+' · 고친 것은 이 기기에 있고 다음에 다시 올립니다', 7000); }
+      throw ex;
+    });
   });
 }
 function fbPush(){ if(!fbUid){ toast('먼저 로그인하세요'); return; } if(!fbDb) return;
   var here=_fbCounts(null);
-  var save=function(){ _fbDoPush(here.total,false).catch(function(ex){ toast('저장 실패: '+((ex&&ex.message)||ex)); }); };
+  var save=function(){ _fbDoPush(here.total,false,{force:true}).catch(function(){ /* 까닭은 _fbDoPush 가 이미 말했다 */ }); };
   /* ⚠ 클라우드가 이 기기보다 많으면 먼저 물어본다 — 폰(시드만 있는 기기)에서 눌러
      PC의 기록을 덮어버리는 일을 막는다.
      ⚠ 단, 건수를 못 읽었다고 저장까지 막으면 안 된다 — 자료를 되살린 직후 올려 둬야 하는
@@ -20275,17 +20341,23 @@ function fbPush(){ if(!fbUid){ toast('먼저 로그인하세요'); return; } if(
    mode 'rollback' — 「그 시점으로 되돌린다」가 뜻이다 → 그때 있던 것은 되살리고,
                      그 id 의 자리표는 «뗀다»(살아 있는데 지웠다고 남겨 두면 앞뒤가 어긋난다).
    ⚠ 어느 쪽이든 자리표는 «덮지 않고 합친다» — 덮으면 기억이 날아가 고리가 돌아온다. */
+/* ⚠★ 돌려주는 failed(못 쓴 열쇠)를 «반드시» 볼 것 — 하나라도 있으면 이 기기는 반쯤만 받은 것이다.
+     그때 기준 시각(fbSetBase)을 적으면 «맞춰졌다»고 여겨, 다음 저장 때 줄어든 자료가 클라우드로 올라간다(2026-10-07 검토). */
 function kcApplyRestore(ls, mode){
-  if(!ls) return { dropped:0, freed:0 };
-  var tb=tombLoad(), dropped=0, freed=0;
-  try{
-    var ct=JSON.parse(ls[TOMB_KEY]||'{}');
-    if(ct && typeof ct==='object' && !Array.isArray(ct))
-      Object.keys(ct).forEach(function(id){ if(!tb[id]) tb[id]=ct[id]; });
-  }catch(e){}
+  if(!ls) return { dropped:0, freed:0, failed:[] };
+  var tb=tombLoad(), rv=tombRevLoad(), dropped=0, freed=0, failed=[], now=Date.now();
+  /* 지운 시각·되살린 시각 모두 번호마다 «더 늦은 것»으로 합친다 — 덮지 않는다 */
+  var 합치기=function(dst, raw){
+    try{
+      var o=JSON.parse(raw||'{}');
+      if(o && typeof o==='object' && !Array.isArray(o))
+        Object.keys(o).forEach(function(id){ var v=Number(o[id])||0; if(v>(Number(dst[id])||0)) dst[id]=v; });
+    }catch(e){}
+  };
+  합치기(tb, ls[TOMB_KEY]); 합치기(rv, ls[TOMB_REV_KEY]);
   Object.keys(ls).forEach(function(bare){
     if(FB_SKIP.indexOf(bare)>=0) return;
-    if(bare===TOMB_KEY) return;                       /* 위에서 합쳤다 */
+    if(bare===TOMB_KEY || bare===TOMB_REV_KEY) return;   /* 위에서 합쳤다 */
     var raw=ls[bare];
     try{
       var a=JSON.parse(raw);
@@ -20293,19 +20365,27 @@ function kcApplyRestore(ls, mode){
         if(mode==='rollback'){
           a.forEach(function(r){
             var k=r&&r.id!=null?String(r.id):null;
-            if(k && tb[k]){ delete tb[k]; freed++; }
+            /* 그 시점에 살아 있던 것 — 자리표를 떼고 «되살린 시각»을 적어 다른 기기도 알게 한다 */
+            if(k && tombDead(tb, rv, k)){ delete tb[k]; rv[k]=now; freed++; }
           });
         }else{
-          var keep=a.filter(function(r){ return !(r&&r.id!=null&&tb[String(r.id)]); });
+          var keep=a.filter(function(r){ return !(r&&r.id!=null&&tombDead(tb, rv, String(r.id))); });
           dropped+=(a.length-keep.length);
           raw=JSON.stringify(keep);
         }
       }
     }catch(e){}
-    try{ localStorage.setItem(NS+bare, raw); }catch(e){ console.error('restore set',bare,e); }
+    try{ localStorage.setItem(NS+bare, raw); }catch(e){ console.error('restore set',bare,e); failed.push(bare); }
   });
-  tombSave(tombPrune(tb));
-  return { dropped:dropped, freed:freed };
+  tombSave(tombPrune(tb)); tombRevSave(tombPrune(rv));
+  return { dropped:dropped, freed:freed, failed:failed };
+}
+/* 받다가 못 쓴 보관함이 있으면 «맞춰졌다»고 적지 않고 알린다 — 부르는 곳(받는 길 넷)이 같이 쓴다 */
+function kcRestoreFailed(r){
+  if(!r || !r.failed || !r.failed.length) return false;
+  toast('⚠️ 저장공간이 모자라 '+r.failed.length+'개 보관함을 받지 못했습니다 — 이 기기는 «덜 받은» 상태라 자동 저장을 멈춥니다. 환경설정 › 저장공간 관리에서 파일을 지운 뒤 ☁ 불러오기를 다시 눌러 주세요', 12000);
+  try{ localStorage.setItem(NS+'_fbpending','partial'); }catch(e){}
+  return true;
 }
 
 function fbPull(){ if(!fbUid){ toast('먼저 로그인하세요'); return; } if(!fbDb) return;
@@ -20322,12 +20402,15 @@ function fbPull(){ if(!fbUid){ toast('먼저 로그인하세요'); return; } if(
       +'이 기기(현재 '+here.total+'건)에 덮어씁니다.'+warn+'\n\n계속할까요?')) return;
     /* ★ 지운 것은 데려오지 않는다 — 셈법은 kcApplyRestore 한 곳에 있다 */
     var _r=kcApplyRestore(v.ls, 'pull');
+    if(kcRestoreFailed(_r)) return;      /* 반쯤 받은 채 「맞춰졌다」고 적지 않는다 */
     if(_r.dropped) toast('지웠던 '+_r.dropped+'건은 «다시 데려오지 않았습니다» — 중복이 되살아나지 않습니다', 6000);
-    if(v.at) fbSetBase(v.at); fbHideNotice();
+    if(v.at) fbSetBase(v.at); _fbPendingClear(null); fbHideNotice();
     toast('불러오기 완료 — 새로고침합니다'); setTimeout(function(){ location.reload(); }, 900); }).catch(function(ex){ toast('불러오기 실패: '+((ex&&ex.message)||ex)); }); }
 function fbShowInfo(p){ var el=document.getElementById('fbInfo'); if(el&&p&&p.at) el.textContent='마지막 저장: '+new Date(p.at).toLocaleString('ko-KR')+' · '+(p.keys||0)+'개 · '+(p.device||''); }
 function fbLoadInfo(){ if(!fbUid||!fbDb) return; fbDb.ref('kcareer/'+fbUid).child('at').once('value').then(function(s){ var el=document.getElementById('fbInfo'); if(!el) return; var at=s.val(); el.textContent=at?('클라우드 최신 저장: '+new Date(at).toLocaleString('ko-KR')):'클라우드에 저장된 데이터 없음'; }).catch(function(){}); }
 function fbGetBase(){ try{ var v=localStorage.getItem(NS+'_fbbase'); return v?Number(v):null; }catch(e){ return null; } }
+/* 지금의 기준 — 기기에 적힌 것이 먼저(탭끼리 함께 본다), 못 읽으면 이 탭이 든 것 */
+function _fbBaseNow(){ var b=fbGetBase(); return (b!=null)?b:_fbBase; }
 function fbSetBase(at){ _fbBase=at; try{ localStorage.setItem(NS+'_fbbase', String(at)); }catch(e){} }
 /* ═══ 안전 모드 — kcareer.html?safe=1 (대표 제보 2026-09-05 「갑자기 모두 멈춘것 같다」) ═══
    ■ 왜 있어야 하나
@@ -20339,7 +20422,12 @@ function fbSetBase(at){ _fbBase=at; try{ localStorage.setItem(NS+'_fbbase', Stri
    ⚠ 이 기기 자료를 건드리지 않는다. 「안전 모드로 열었다가 자료가 사라졌다」가 되면 안 된다.
    ⚠ 화면 위에 «지금 안전 모드»라고 늘 띄운다 — 모르고 쓰다가 「저장이 안 된다」가 되면 안 된다. */
 function fbAutoOn(){ if(KC_SAFE) return false; try{ return localStorage.getItem(NS+'_fbauto')!=='0'; }catch(e){ return true; } }
-function fbSetAuto(on){ try{ localStorage.setItem(NS+'_fbauto', on?'1':'0'); }catch(e){} var c=document.getElementById('fbAutoChk'); if(c) c.checked=on; if(on&&fbUid){ fbWatch(); toast('자동 동기화 켜짐'); } else if(!on){ toast('자동 동기화 꺼짐'); } }
+/* ⚠ 끄면 «받기»도 멈춘다 — 감시를 떼고 띠도 내린다(2026-10-07 검토: 꺼도 다른 기기 저장을 받아 와 새로고침했다).
+   켜면 꺼 둔 동안 고친 것부터 올린다(표시가 남아 있으면 — 클라우드가 더 새것이면 띠로 고르게 된다). */
+function fbSetAuto(on){ try{ localStorage.setItem(NS+'_fbauto', on?'1':'0'); }catch(e){} var c=document.getElementById('fbAutoChk'); if(c) c.checked=on;
+  if(on&&fbUid){ fbWatch(); if(_fbPendingNow()) _fbSchedulePush(); toast('자동 동기화 켜짐'); }
+  else if(!on){ fbUnwatch(); if(_fbPushT){ clearTimeout(_fbPushT); _fbPushT=null; } fbHideNotice(); toast('자동 동기화 꺼짐'); } }
+function fbUnwatch(){ try{ if(fbDb&&fbUid&&_fbWatchFn) fbDb.ref('kcareer/'+fbUid+'/at').off('value', _fbWatchFn); }catch(e){} _fbWatchFn=null; _fbWatching=false; }
 /* kind: 'first' = 이 기기가 아직 한 번도 안 받아 왔다 · 'newer' = 받아 왔는데 뒤처졌다
    ⚠ 「다른 기기에서 저장된…」은 처음 여는 폰에게는 뜻이 안 통한다 — 무엇을 할지 모른다. */
 function fbShowNotice(kind){ if(!fbAutoOn()) return;
@@ -20351,10 +20439,14 @@ function fbShowNotice(kind){ if(!fbAutoOn()) return;
    기억해 버리면 진짜 새 저장이 와도 안 알리게 된다. */
 function fbHideNotice(byUser){ var n=document.getElementById('fbNotice'); if(n) n.style.display='none';
   if(byUser) _fbDismissAt=_fbCloudAt; }
+var _fbWatchFn=null;
 function fbWatch(){ if(!fbUid||!fbDb||_fbWatching) return; _fbWatching=true;
-  fbDb.ref('kcareer/'+fbUid+'/at').on('value', function(s){ var at=s.val(); if(!at) return;
+  _fbWatchFn=function(s){ var at=s.val(); if(!at) return;
     _fbCloudAt=at;
-    var base=(_fbBase!=null)?_fbBase:fbGetBase();
+    if(!fbAutoOn()) return;                         /* 꺼 두었으면 보기만 — 받지 않는다 */
+    /* 이 PC(어느 탭이든)가 지금 올리는 그것이면 «남의 새 저장»이 아니다 */
+    if(at===_fbPushingAt()) return;
+    var base=_fbBaseNow();
     /* ★ 잣대는 KcareerNotices 한 곳에 있다 — 손실 띠와 이 띠가 갈라지면 안 된다.
        ⚠ 예전에는 base 가 없으면 «무조건» 띄웠다. 폰은 base 가 없으므로
          PC 가 저장할 때마다 영영 다시 떴다(2026-09-12 대표 제보). */
@@ -20365,7 +20457,8 @@ function fbWatch(){ if(!fbUid||!fbDb||_fbWatching) return; _fbWatching=true;
     if(d.newer.show && d.newer.kind==='first'){ fbFirstSync(); return; }
     if(d.newer.show && d.newer.kind==='newer'){ fbNewerSync(); return; }
     if(d.newer.show) fbShowNotice(d.newer.kind); else fbHideNotice();
-  }); }
+  };
+  fbDb.ref('kcareer/'+fbUid+'/at').on('value', _fbWatchFn); }
 /* ═══ 처음 여는 기기는 «저절로» 받아 온다 (대표 지시 2026-10-05 「다른모든 프로그램에서도 데이터가 분리되지 않게」) ═══
    크롬·에지 둘 다 클라우드(580건)를 한 번도 안 받아 와 처음 깔린 185건만 보고 있었다. 「받아 오면 최신이 됩니다」
    띠는 떠 있었지만 작아서 넘기기 쉬웠고, 안 누르면 자동 올리기도 영영 시작되지 않는다(_fbBase 빗장).
@@ -20374,6 +20467,7 @@ function fbWatch(){ if(!fbUid||!fbDb||_fbWatching) return; _fbWatching=true;
    ⚠ 잣대는 KcareerNotices.firstPullLoss 한 곳. 받는 길은 fbPull 과 같은 kcApplyRestore('pull') 한 곳. */
 var _fbFirstTried=false;
 function fbFirstSync(){
+  if(!fbAutoOn()) return;                           /* 꺼 두었으면 저절로 받지 않는다 */
   if(_fbFirstTried || KC_SAFE || kcNoPush() || !fbUid || !fbDb) { fbShowNotice('first'); return; }
   _fbFirstTried=true;
   fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
@@ -20387,7 +20481,7 @@ function fbFirstSync(){
       return;
     }
     var cloud=_fbCounts(v.ls), here=_fbCounts(null);
-    kcApplyRestore(v.ls, 'pull');
+    if(kcRestoreFailed(kcApplyRestore(v.ls, 'pull'))) return;
     if(v.at) fbSetBase(v.at);
     fbHideNotice();
     toast('☁ 이 기기는 처음이라 클라우드 기록 '+cloud.total+'건을 받아 왔습니다(이 기기 '+here.total+'건은 모두 클라우드에 있었습니다) — 새로고침합니다', 6000);
@@ -20401,18 +20495,23 @@ function fbFirstSync(){
    ⚠ 창(모달)이 열려 있으면 받지 않는다 — 새로고침이 쓰던 것을 날린다. 띠만 띄운다. */
 var _fbNewerTried=false;
 function fbNewerSync(){
-  var pending=false; try{ pending=localStorage.getItem(NS+'_fbpending')==='1'; }catch(e){}
+  if(!fbAutoOn()) return;                           /* 꺼 두었으면 저절로 받지 않는다(☁ 불러오기는 그대로 된다) */
+  var pending=!!_fbPendingNow();
   var busy=!!document.querySelector('.modal-ov.open') || (typeof _rhDoc!=='undefined' && _rhDoc && _rhDoc.bytes);
   if(_fbNewerTried || pending || busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
   _fbNewerTried=true;
   fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
     var v=snap.val();
     if(!v||!v.ls){ fbShowNotice('newer'); return; }
+    /* 같은 PC 다른 탭이 방금 올린 것이면 받을 것이 없다 — 새로고침하지 않는다 */
+    if(v.at && v.at===fbGetBase()){ _fbNewerTried=false; fbHideNotice(); return; }
     var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP, TOMB_KEY);
     if(!r.safe){ fbShowNotice('newer'); return; }
-    kcApplyRestore(v.ls, 'pull');
+    /* 받는 사이에 이 기기에서 고친 것이 생겼으면 덮지 않는다 */
+    if(_fbPendingNow()){ fbShowNotice('newer'); return; }
+    if(kcRestoreFailed(kcApplyRestore(v.ls, 'pull'))) return;
     if(v.at) fbSetBase(v.at);
-    try{ localStorage.removeItem(NS+'_fbpending'); }catch(e){}
+    _fbPendingClear(null);
     fbHideNotice();
     toast('☁ 다른 기기('+(v.device||'')+')에서 저장한 최신 기록을 받아 왔습니다 — 새로고침합니다', 5000);
     setTimeout(function(){ location.reload(); }, 1500);
@@ -20423,17 +20522,27 @@ function fbNewerSync(){
    그 뒤에 대표가 사본을 내려도 직원 기기에는 남는다 — 내릴 수 있어야 공개다.
    ⚠ 두 곳 다 막는다(예약과 실제 올리기) — 한 곳만 막으면 다른 길로 새 나간다. */
 function kcNoPush(){ return typeof kcStaffView==='function' && kcStaffView(); }
-function fbScheduleAuto(key){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return; if(key&&FB_SKIP.indexOf(key)>=0) return; try{ localStorage.setItem(NS+'_fbpending','1'); }catch(e){} if(_fbPushT) clearTimeout(_fbPushT); _fbPushT=setTimeout(fbAutoPush, 2500); }
+/* ★ 고친 것은 «자동 동기화를 꺼 두었어도·로그인 전이어도» 표시한다 (2026-10-07 검토).
+   전에는 꺼 둔 동안 표시를 안 남겨, 다시 켜는 순간 다른 기기 저장을 받아 오며 그 고침을 덮었다. */
+/* ⚠ 로그인 «전»의 저장은 표시하지 않는다 — 켤 때마다 도는 다듬기(loadSeed·_tplMerge…)가 매번 표시를 남겨
+     다른 기기 저장을 영영 저절로 못 받게 된다. 로그인한 뒤의 고침만 센다(예전과 같다). */
+function fbScheduleAuto(key){ if(key&&FB_SKIP.indexOf(key)>=0) return; if(kcNoPush()) return; if(!fbUid||!fbDb) return;
+  _fbPendingMark();
+  if(KC_SAFE) return; if(!fbAutoOn()) return; _fbSchedulePush(); }
+function _fbSchedulePush(){ if(_fbPushT) clearTimeout(_fbPushT); _fbPushT=setTimeout(fbAutoPush, 2500); }
 function fbAutoPush(){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fbDb||!fbAutoOn()) return;
   fbDb.ref('kcareer/'+fbUid+'/at').once('value').then(function(s){ var cloudAt=s.val()||0;
     _fbCloudAt=Math.max(_fbCloudAt, cloudAt);
-    if(_fbBase!=null && cloudAt>_fbBase){ fbNewerSync(); return; }   /* 고친 것 없으면 받아 온다 — 아니면 띠 */
+    /* ⚠ 기준은 «기기에 적힌 것»(fbGetBase) — 같은 PC 다른 탭이 방금 올린 것도 안다(탭마다 따로 들던 _fbBase 로 견주면
+         한 탭이 저장할 때마다 다른 탭이 「더 새것」으로 보고 받아 와 새로고침했다) */
+    var base=fbGetBase();
+    if(base!=null && cloudAt>base){ fbNewerSync(); return; }   /* 고친 것 없으면 받아 온다 — 아니면 띠 */
     /* ⚠ 이 기기에서 한 번도 저장·불러오기를 안 했는데(_fbBase==null) 클라우드에 이미 자료가 있으면
        자동으로 밀어넣지 않는다 — 폰에서 처음 열었을 때 시드 데이터가 PC 기록을 덮을 수 있었다.
        이 가드를 지우면 조용히 자료가 사라진다. 사람이 ☁ 저장/불러오기로 결정하게 둔다. */
     /* ⚠ 여기 오는 기기는 «한 번도 받아 온 적이 없다» — 「다른 기기에서 저장된…」이라 하면
        무엇을 해야 할지 모른다. 받아 오라고 또박또박 말한다(2026-09-12). */
-    if(_fbBase==null && cloudAt){ fbFirstSync(); return; }   /* 잃을 것 없으면 저절로 받는다 */
+    if(base==null && cloudAt){ fbFirstSync(); return; }   /* 잃을 것 없으면 저절로 받는다 */
     _fbDoPush(_fbCounts(null).total, true).then(function(){
       var b=document.getElementById('fbBtn'); if(b){ var t=b.textContent; b.textContent='☁ 저장됨'; setTimeout(function(){ if(b.textContent==='☁ 저장됨') b.textContent=t; },1500); }
     }).catch(function(){});

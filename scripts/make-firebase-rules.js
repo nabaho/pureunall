@@ -987,7 +987,14 @@ rules.newsletter = { '.read': `auth != null && ${ADMIN}`, '.write': `auth != nul
      받아 온 자료를 사람이 실수로 지울 수 있고, 그러면 원본이 없다.
    ⚠ 총괄관리자만 — 남의 회원 계정으로 받아 온 자료다. */
 rules.ilabor = { '.read': `auth != null && ${ADMIN}`, '.write': false };
-rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid' } };
+/* ★ 경력관리 올리기는 «내가 마지막에 본 판 위에만» (2026-10-07 — 마지막에 쓴 쪽이 이기던 것).
+     화면이 prevAt(내 기준 시각)을 함께 보내면, 지금 클라우드 시각(at)과 같을 때만 받는다.
+     확인과 쓰기가 서버에서 «한 번에» 일어나 — 두 기기가 같은 순간에 올리거나 꺼졌다 붙으며 묵은 쓰기가 나가도
+     남의 고침을 덮지 않는다(거절되면 화면이 띠로 «저장/불러오기»를 고르게 한다).
+   ⚠ prevAt 을 «안 보내는» 쓰기(옛 판 화면·통째 되돌리기)는 이 검사를 안 거친다 — 일부러다. 받는 칸 이름도 늘리지 말 것.
+   ⚠ 첫 저장(at 이 아직 없음)은 그대로 받는다. */
+rules.kcareer  = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'auth != null && auth.uid === $uid',
+  prevAt: { '.validate': "!data.parent().child('at').exists() || newData.val() === data.parent().child('at').val()" } } };
 
 /* ══ 정부사업신청(gov.html) — 대표 «개인» 자리 (2026-10-03) ═══════════════
    공고 목록·찾는 말·인증키 둘(공공데이터포털·기업마당)을 담는다.

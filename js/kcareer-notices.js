@@ -115,17 +115,28 @@
     skip = skip || []; localLs = localLs || {}; cloudLs = cloudLs || {};
     var parse = function (raw) { try { return JSON.parse(raw); } catch (e) { return null; } };
     var tomb = parse(cloudLs[tombKey || '_tomb']) || {};
+    /* 되살린 시각표 — 클라우드가 «지웠다가 되살린» 것은 지운 것이 아니다 */
+    var rev = parse(cloudLs[(tombKey || '_tomb') + 'rev']) || {};
+    var dead = function (id) { var t = Number(tomb[id]) || 0; return t > 0 && t > (Number(rev[id]) || 0); };
+    /* ★ 같은 번호라도 «이 기기에서 더 나중에 고친 것»이면 잃는 것이다 (2026-10-07 검토).
+       번호만 보면 — 이 기기에서 고친 기록(저장 시각이 클라우드보다 늦음)도 「클라우드에 있다」로 보아
+       묻지 않고 덮었다. 이 기기 쪽에 저장 시각(updatedAt·savedAt)이 «있을 때»만 견준다 —
+       처음 깔린 자료(시각 없음)를 잃는 것으로 세면 처음 여는 기기가 영영 저절로 못 받는다.
+       클라우드 쪽에 시각이 없으면(손대지 않은 원래 기록) 이 기기에서 고친 것이다. */
+    var stamp = function (r) { return String((r && (r.updatedAt || r.savedAt)) || ''); };
     var lost = [];
     Object.keys(localLs).forEach(function (k) {
-      if (skip.indexOf(k) >= 0 || k === (tombKey || '_tomb')) return;
+      if (skip.indexOf(k) >= 0 || k === (tombKey || '_tomb') || k === (tombKey || '_tomb') + 'rev') return;
       var a = parse(localLs[k]);
       if (!Array.isArray(a) || !a.length || !a[0] || a[0].id == null) return;
-      var c = parse(cloudLs[k]); var ids = {};
-      (Array.isArray(c) ? c : []).forEach(function (r) { if (r && r.id != null) ids[String(r.id)] = 1; });
+      var c = parse(cloudLs[k]); var byId = {};
+      (Array.isArray(c) ? c : []).forEach(function (r) { if (r && r.id != null) byId[String(r.id)] = r; });
       a.forEach(function (r) {
         if (!r || r.id == null) return;
         var id = String(r.id);
-        if (!ids[id] && !tomb[id]) lost.push({ key: k, id: id });
+        if (!byId[id]) { if (!dead(id)) lost.push({ key: k, id: id }); return; }
+        var mine = stamp(r), theirs = stamp(byId[id]);
+        if (mine && (!theirs || mine > theirs)) lost.push({ key: k, id: id, changed: true });
       });
     });
     return { lost: lost, safe: lost.length === 0 };

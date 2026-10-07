@@ -931,7 +931,7 @@ test('한 번도 안 맞춘 기기가 클라우드를 조용히 덮지 않는다
   /* ⚠ 2026-09-12: 띠 «문구»가 갈렸다(처음인 기기에는 「받아 온 적이 없다」라고 말한다).
      가드 자체는 그대로여야 한다 — 여기서 못박는 것은 «올리지 않고 돌아선다»는 것이다. */
   /* ⚠ 2026-10-05: 돌아선 뒤 «잃을 것이 없으면 받아 온다»(fbFirstSync). 올리지 않는다는 것은 그대로다. */
-  assert.match(src, /if\(_fbBase==null && cloudAt\)\{ (?:fbShowNotice\([^)]*\)|fbFirstSync\(\)); return; \}/,
+  assert.match(src, /if\((?:_fbBase|base)==null && cloudAt\)\{ (?:fbShowNotice\([^)]*\)|fbFirstSync\(\)); return; \}/,
     '⚠ 이 가드를 지우면 폰의 시드 데이터가 PC 기록을 덮습니다');
   /* ★ 그리고 «처음인 기기»라고 말해 주는지도 본다 — 무엇을 해야 할지 알려야 한다(못 받을 때) */
   assert.match(src + funcSource('fbFirstSync'), /fbShowNotice\('first'\)/,
