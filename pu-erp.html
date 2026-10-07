@@ -1990,7 +1990,29 @@ var KEY = 'pureun_v6_';
 // 자문수입은 2천 건을 넘어 localStorage 5MB 한도를 밀어낸다. 이 표의 영구 원본은
 // Firebase이고, 현재 탭에서는 동기식으로 읽을 수 있는 sessionStorage에 둔다.
 // 나머지 표와 메타데이터는 기존 localStorage를 그대로 쓴다.
+/* ══ 이 PC 저장 공간이 가득 찼을 때 (대표 지시 2026-10-07 「이관했는데 계속 남아 있다 … 근본고침 해라」) ══
+   nabaho.github.io 의 저장 공간(localStorage 약 10MB)은 통합 프로그램 «전부»가 나눠 쓴다. 그것이 차면
+   예전에는 dbSet 이 «여기서 멈추고 서버에도 안 보냈다» — 화면은 바뀐 듯 보여도 아무 데도 안 남았다.
+   실제로: 10/7 13:19 이관에서 업체 둘은 만들어졌는데 계약의 «이관완료»는 서버에 못 올라가
+   계약관리에 그대로 남았고, 실패 알림이 저장 때마다 떠 화면 아래가 깜빡였다.
+   ★ 이제: 못 쓴 값은 _erpMemStore 에 쥐고(_erpStoreSet), 읽을 때 먼저 본다(_erpStoreGet) —
+     그래서 dbSet 은 서버로 «그대로» 보낸다. 서버가 원본이고, 이 PC 사본은 다음에 켤 때 서버에서 다시 받는다.
+   ★ 공간이 차면 «이 PC 자동 스냅샷»(__erp_snap__)부터 비운다 — 서버에 원본·서버 백업이 있는 사본이다.
+   ⚠ 정부컨설팅이 같은 날 같은 방식으로 고쳤다(lsSet·_lsMem, tests/gov-ls-quota). */
+var _erpMemStore = {};
+function _erpMemFlush(){
+  Object.keys(_erpMemStore).forEach(function(k){ try { _erpStoreSet(k, _erpMemStore[k]); } catch(_){} });
+}
+var _erpQuotaToldAt = 0;
+function erpQuotaNotice(){
+  /* 알림은 «10분에 한 번» — 저장할 때마다 띄우면 화면 아래가 깜빡이고 아무도 안 읽는다 */
+  var now = Date.now();
+  if(now - _erpQuotaToldAt < 10 * 60 * 1000) return;
+  _erpQuotaToldAt = now;
+  try { showToast('⚠ 이 PC 저장 공간이 가득 찼습니다 — 고친 내용은 서버에 저장됩니다(이 PC 사본만 못 씀). 정리: 환경설정 → 시스템 → 데이터·백업', 9000); } catch(_){}
+}
 function _erpStoreGet(k){
+  if(typeof _erpMemStore !== 'undefined' && Object.prototype.hasOwnProperty.call(_erpMemStore, k)) return _erpMemStore[k];
   try{
     if(k==='finance_income'){
       var sv=sessionStorage.getItem(KEY+k);
@@ -2004,20 +2026,35 @@ function _erpStoreGet(k){
 }
 function _erpStoreSet(k,v){
   /* 못 쓰면 «못 썼다»를 남기고 그대로 던진다(부르는 곳의 처리는 예전 그대로) — _dbStoreFailed 머리글 */
-  try {
+  var put = function(){
     if(k==='finance_income'){
       sessionStorage.setItem(KEY+k,v);
       try{ localStorage.removeItem(KEY+k); }catch(_){}
     } else {
       localStorage.setItem(KEY+k,v);
     }
+  };
+  try {
+    try { put(); }
+    catch(e1){
+      /* ★ 공간이 가득이면 «이 PC 자동 스냅샷»부터 비우고 한 번 더 (2026-10-07, _erpMemStore 머리글) */
+      var q1 = e1 && (e1.name === 'QuotaExceededError' || e1.code === 22 || e1.code === 1014 || /quota|exceeded/i.test(e1.message || ''));
+      var freed = false;
+      if(q1){ try { if(localStorage.getItem('__erp_snap__') !== null){ localStorage.removeItem('__erp_snap__'); freed = true; } } catch(_){} }
+      if(!freed) throw e1;
+      put();
+    }
     if(typeof _dbStoreFailed !== 'undefined') delete _dbStoreFailed[k];
+    if(typeof _erpMemStore !== 'undefined') delete _erpMemStore[k];
   } catch(e){
     if(typeof _dbStoreFailed !== 'undefined') _dbStoreFailed[k] = true;
+    /* 못 쓴 값은 메모리에 쥔다 — 읽는 쪽(_erpStoreGet)이 먼저 본다 */
+    if(typeof _erpMemStore !== 'undefined') _erpMemStore[k] = v;
     throw e;
   }
 }
 function _erpStoreRemove(k){
+  if(typeof _erpMemStore !== 'undefined') delete _erpMemStore[k];
   try{ sessionStorage.removeItem(KEY+k); }catch(_){}
   try{ localStorage.removeItem(KEY+k); }catch(_){}
 }
@@ -3336,9 +3373,12 @@ function scheduleAutoSnap(){
       var snaps = [];
       try { snaps = safeParse(localStorage.getItem('__erp_snap__'), []); } catch(e){}
       snaps.unshift(snap);
-      if(snaps.length > 3) snaps = snaps.slice(0,3);
+      /* ★ 한 벌만 (2026-10-07) — 큰 표 여섯을 세 벌씩 쥐어 통합 프로그램 전부가 나눠 쓰는 공간을 먹었다.
+           서버에 원본과 서버 백업(일간·수시)이 있다. 공간이 모자란 PC 에서는 아예 안 쥔다. */
+      if(snaps.length > 1) snaps = snaps.slice(0,1);
+      if(Object.keys(_erpMemStore).length){ try { localStorage.removeItem('__erp_snap__'); } catch(_){} return; }
       localStorage.setItem('__erp_snap__', JSON.stringify(snaps));
-    } catch(e) {}
+    } catch(e) { try { localStorage.removeItem('__erp_snap__'); } catch(_){} }
   }, _SNAP_INTERVAL);
 }
 
@@ -5015,34 +5055,27 @@ function dbSet(k, v){
   try { _erpStoreSet(k, newJson); }
   catch(e){
     window._erpErrLog && window._erpErrLog(e);
-    var _quota = e && (e.name === 'QuotaExceededError' || e.code === 22 || /quota|exceeded/i.test(e.message||''));
-    // [자동복구] 저장공간 초과 = 대부분 레코드에 인라인으로 박힌 base64 이미지 때문.
-    //   사용자가 매번 수동 정리하지 않도록 자동으로 이미지를 IndexedDB로 옮긴 뒤 저장을 1회 재시도한다.
-    if(_quota && !window._erpQuotaFixing){
-      window._erpQuotaFixing = true;
-      try { showToast('⚠ 저장공간 부족 — 이미지를 자동 정리하고 다시 저장합니다…'); } catch(_){}
-      (function(_pk, _pv){
-        setTimeout(function(){
-          var done = function(){
-            window._erpQuotaFixing = false;
-            var ok2 = false;
-            try { ok2 = dbSet(_pk, _pv); } catch(_){}
-            try { showToast(ok2 ? '✅ 자동 정리 후 저장 완료 — 화면을 새로고침하면 반영됩니다'
-                                : '❌ 자동 정리 후에도 저장 실패 — 환경설정 → 시스템 → 데이터·백업 → 유실 검사·복원에서 저장공간을 확인하세요'); } catch(_){}
-            if(ok2){ try { window.dispatchEvent(new CustomEvent('pureun-saved', { detail:{ key:_pk, at:Date.now() } })); } catch(_){} }
-          };
-          try {
-            if(typeof erpMigrateImagesToIdb === 'function'){
-              /* 비상 — 저장이 실패한 자리다. 창고를 기다리지 않고 참조로 바꾸고, 올리기는 뒤에서 다시 한다 */
-              erpMigrateImagesToIdb({ requireCloud:false }).then(done).catch(done);
-            } else done();
-          } catch(_){ done(); }
-        }, 0);
-      })(k, v);
+    var _quota = e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014 || /quota|exceeded/i.test(e.message||''));
+    if(!_quota){
+      try { showToast('⚠ 저장 실패 — 변경사항이 저장되지 않았습니다'); } catch(_){}
       return false;
     }
-    try { showToast(_quota ? '⚠ 저장 공간 부족 — 변경사항이 저장되지 않았습니다! 이미지 등 정리 필요' : '⚠ 저장 실패 — 변경사항이 저장되지 않았습니다'); } catch(_){}
-    return false;
+    /* ★★ 공간 부족은 «멈추지 않는다» (2026-10-07 근본 고침, _erpMemStore 머리글).
+       못 쓴 값은 _erpStoreSet 이 메모리에 쥐었다 — 아래로 내려가 화면·서버에 그대로 반영한다.
+       ⚠ 예전에는 여기서 return false 로 멈춰 서버에도 안 갔다(이관 반쪽 사고). 그 길로 되돌리지 말 것
+         — tests/erp-quota-server-first.test.js 가 지킨다. */
+    erpQuotaNotice();
+    // [자동복구] 저장공간 초과 = 대개 레코드에 인라인으로 박힌 base64 이미지 — 뒤에서 한 번 정리하고 메모리 것을 다시 써 본다.
+    if(!window._erpQuotaFixing && typeof erpMigrateImagesToIdb === 'function'){
+      window._erpQuotaFixing = true;
+      setTimeout(function(){
+        var done = function(){ window._erpQuotaFixing = false; try { _erpMemFlush(); } catch(_){} };
+        try {
+          /* 비상 — 저장이 실패한 자리다. 창고를 기다리지 않고 참조로 바꾸고, 올리기는 뒤에서 다시 한다 */
+          erpMigrateImagesToIdb({ requireCloud:false }).then(done).catch(done);
+        } catch(_){ done(); }
+      }, 0);
+    }
   }
   _dbCache[k] = v; // 메모리 캐시 갱신
   // [자동 슬림화] 방금 저장한 값에 인라인 base64 이미지가 있으면 잠시 후 IndexedDB로 자동 이전.
@@ -5068,7 +5101,9 @@ function dbSet(k, v){
     try {
       var ts = Date.now();
       var _preMeta = parseInt(localStorage.getItem(KEY+'_meta_'+k) || '0', 10); // 되돌림방지: 덮이기 전 마지막 동기화 시각
-      localStorage.setItem(KEY+'_meta_'+k, String(ts));
+      /* ⚠ 공간이 차서 못 적어도 보내기는 막지 않는다(2026-10-07) — 못 적으면 이 PC 는 «옛 시각»으로 남아
+           다음에 켤 때 서버 것을 받는다(서버가 원본이라 그쪽이 맞다) */
+      try { localStorage.setItem(KEY+'_meta_'+k, String(ts)); } catch(_){}
       // 쓰기 실패 시 meta를 원복 — 실패했는데 meta만 올라가면 이 기기가 '더 최신'으로 오인되어
       // 나중에 옛 데이터를 서버로 미는 과거회귀 사고의 씨앗이 됨
       /* ★ 보내는 동안도 «못 보낸 것»으로 디스크에 적는다 (2026-10-05, _fbPendSave 머리글).
