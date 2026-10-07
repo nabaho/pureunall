@@ -20,7 +20,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
-<script src="js/pu-labor-core.js?v=4"></script>
+<script src="js/pu-labor-core.js?v=5"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-site-staff.js?v=4"></script>
 <script src="js/pu-hwp-engine.js?v=20"></script>
@@ -1945,10 +1945,12 @@ var LC = (typeof PuLaborCore !== 'undefined') ? PuLaborCore : null;
 /* 연도별 기준값 — engine/rates.json 과 같은 값(마스터는 rates.json) */
 var LABOR_RATES = {
   minWageHourly: { '2023': 9620, '2024': 9860, '2025': 10030, '2026': 10320 },
-  pensionEE: { 'default': 0.045 },
-  healthEE: { 'default': 0.03545 },
-  longtermRate: { '2025': 0.1295, '2026': 0.1281, 'default': 0.1281 },
-  empInsEE: { 'default': 0.009 }
+  /* 2026-10-07: 2026년 요율로 바로잡음 — 연금 4.75%·건보 3.595%·장기 13.14% (근거는 pu-labor-core.js INS_RATES)
+     'default' 를 두지 않는다 — 표에 없는 해는 코어가 연도표에서 가장 가까운 앞 해 값을 고른다 */
+  pensionEE: { '2023': 0.045, '2024': 0.045, '2025': 0.045, '2026': 0.0475 },
+  healthEE: { '2023': 0.03545, '2024': 0.03545, '2025': 0.03545, '2026': 0.03595 },
+  longtermRate: { '2023': 0.1281, '2024': 0.1295, '2025': 0.1295, '2026': 0.1314 },
+  empInsEE: { '2023': 0.009, '2024': 0.009, '2025': 0.009, '2026': 0.009 }
 };
 function laborYear() { return String(new Date().getFullYear()); }
 function minWageOf(y) { return LABOR_RATES.minWageHourly[String(y)] || LABOR_RATES.minWageHourly['2026']; }
