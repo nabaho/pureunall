@@ -141,7 +141,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-kakao.js?v=5"></script>
+<script src="js/pu-kakao.js?v=6"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -1931,6 +1931,13 @@ body.portal-mode #moreFab{display:flex;}
     if(p.error){ kkEndReturn(); kkUnfoldPw(); showErr(p.error); return; }
     if(p.mode === 'login'){
       _freshLogin = true;
+      /* 휴대전화의 저장소·네트워크가 응답하지 않아도 흰 화면에 영원히 가두지 않는다. */
+      var kkDone = false;
+      var kkWatch = setTimeout(function(){
+        if(kkDone) return;
+        kkEndReturn(); kkUnfoldPw();
+        showErr('카카오 로그인 응답이 늦습니다. 아래 카카오 버튼을 다시 한 번 눌러 주세요.');
+      }, 15000);
       /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
       try { db.ref('.info/connected').once('value'); } catch(_c){}
       PuKakao.loginFinish(p.code).then(function(token){
@@ -1938,16 +1945,23 @@ body.portal-mode #moreFab{display:flex;}
            ⚠ 못 읽으면 «유지 안 함(SESSION)» 쪽 — 공용 PC 에 로그인이 남는 쪽보다 안전하다. */
         var keep = false;
         try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
-        return auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION)
-          .catch(function(){})
+        var persist = auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
+        /* 일부 안드로이드 브라우저는 저장소 설정 약속을 끝내지 않는다. 2초 뒤에는 로그인부터 진행한다. */
+        var quickPersist = new Promise(function(resolve){
+          var done=false, t=setTimeout(function(){ if(!done){ done=true; resolve(); } }, 2000);
+          Promise.resolve(persist).then(function(){ if(!done){ done=true; clearTimeout(t); resolve(); } }, function(){ if(!done){ done=true; clearTimeout(t); resolve(); } });
+        });
+        return quickPersist
           .then(function(){ return auth.signInWithCustomToken(token); });
       }).then(function(cred){
+        kkDone = true; clearTimeout(kkWatch);
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
         try {
           cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
         } catch(e){}
       }).catch(function(err){
+        kkDone = true; clearTimeout(kkWatch);
         if(err && err.needLink){ try { sessionStorage.setItem(KK_WANT, String(Date.now())); } catch(e){} }
         // 카카오로 못 들어왔으면 비밀번호 칸을 펼친다 — 접힌 채면 «들어올 길이 없는» 화면이 된다
         kkEndReturn();
@@ -2459,7 +2473,12 @@ body.portal-mode #moreFab{display:flex;}
     }
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
     function _readRoster(path){
-      return db.ref(path).once('value').then(function(snap){
+      var read = db.ref(path).once('value');
+      var timed = new Promise(function(resolve, reject){
+        var done=false, t=setTimeout(function(){ if(!done){ done=true; reject(new Error('명부 읽기 시간 초과')); } }, 3500);
+        Promise.resolve(read).then(function(v){ if(!done){ done=true; clearTimeout(t); resolve(v); } }, function(e){ if(!done){ done=true; clearTimeout(t); reject(e); } });
+      });
+      return timed.then(function(snap){
         var raw = snap.val();
         var list = (raw && raw.v !== undefined) ? raw.v : raw;
         if(list && !Array.isArray(list) && typeof list === 'object'){

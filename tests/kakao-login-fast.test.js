@@ -167,3 +167,15 @@ test('★★ ⑤ 서버 답을 기다리는 «동안» 화면의 DB 연결을 �
     '★ 로그인 화면이 카카오 쓰는 기기에서 서버를 미리 안 깨운다');
   assert.match(enter, /js\/pu-kakao\.js\?v=\d+/);
 });
+
+test('★★ 휴대전화에서 카카오 응답·저장소·명부를 끝없이 기다리지 않는다', () => {
+  const kakaoJs = fs.readFileSync(path.join(ROOT, 'js', 'pu-kakao.js'), 'utf8');
+  const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  assert.match(kakaoJs, /AbortController/);
+  assert.match(kakaoJs, /10000/);
+  assert.match(enter, /카카오 로그인 응답이 늦습니다/);
+  assert.match(enter, /}, 15000\)/);
+  assert.match(enter, /}, 2000\)/);
+  assert.match(enter, /명부 읽기 시간 초과/);
+  assert.match(enter, /}, 3500\)/);
+});
