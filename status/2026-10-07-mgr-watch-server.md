@@ -8,10 +8,10 @@
 - 화면(`mgrWatchRun`)은 이제 «읽기만» — 서버가 적은 바뀐 것을 다시 읽어 새로 생겼으면 알린다.
 - 검사: `tests/mgr-watch-core-in-sync.test.js`(사본 같음·서버 실제로 돌림·배포 목록), `mail-owner-check` 손봄.
 
-## ⚠ 남은 일 — 배포
+## 배포 — 끝 (2026-10-07)
 
-**이 PR 이 합쳐지면 화면은 더 안 적는다.** 서버 함수를 올려야 감지가 다시 돈다:
-`firebase deploy --only functions:mgrWatch` (memory: functions-deploy-by-name · discovery timeout).
+#2137 합친 뒤 `firebase deploy --only functions:mgrWatch` 로 올렸다(asia-northeast3, 새로 만듦).
+⚠ `js/pu-mgr-watch-core.js` 를 고치면 sync 를 돌리고 이 함수를 «다시» 올려야 서버에 반영된다.
 
 ## 미룬 것 — 메일로 업체 담당자 채우기(③-A)
 
