@@ -199,6 +199,11 @@ test('★★★ 메일을 연 채로 👁·❓ 창이 «보기마다 꼭 한 번
       mbReadHtml: () => '[READ]',
       mbPvHtml: () => '[PV]',
       mbNewHtml: () => '[NEW]',
+      /* 📎 첨부파일함이 생기며 mbBoxHtml 이 «지금 어느 칸인가»를 묻게 됐다(2026-10-07).
+         여기는 첨부파일함이 아닌 보통 칸이다 — 그 갈래는 tests/mail-att-box 가 본다. */
+      mbNow: () => 'IN',
+      MB_ATT_ID: '*att',
+      mbAttBoxHtml: () => '[ATT]',
     };
     /* 목록은 «진짜 목록이 붙이는 것»만 붙인다 — 목록 쪽을 고쳐도 이 검사가 따라간다 */
     ctx.mbListHtml = () => '[LIST]' + (inList.pv ? ctx.mbPvHtml() : '') + (inList.nw ? ctx.mbNewHtml() : '');
