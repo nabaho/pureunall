@@ -20,7 +20,7 @@ const 건 = (name, biz) => ({ d: { name, yearDir: '2025년', handle: {} }, caseD
 function 상자(list, 고른번호, 답) {
   const 기록 = { 물음: 0, 읽음: [], 알림: [] };
   const 단추 = { disabled: false, textContent: '' };
-  const ctx = { console, String, Date, window: {}, toast: (m) => 기록.알림.push(m),
+  const ctx = { console, String, Date, window: {}, kcBusy() {}, toast: (m) => 기록.알림.push(m),
     confirm: () => { 기록.물음++; return 답; },
     document: { getElementById: (id) => (id === 'bizPickGo' ? 단추 : { classList: { remove() {} } }),
       querySelectorAll: () => 고른번호.map((k) => ({ value: String(k) })) },
