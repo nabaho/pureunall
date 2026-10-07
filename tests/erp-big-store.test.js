@@ -1,6 +1,7 @@
 'use strict';
-/* 이알피의 큰 사본 여섯 칸은 IndexedDB 에 둔다 (2026-10-07 — localStorage 한도 5MB 가 차서
-   경력관리가 목록을 못 적었다. 이알피 혼자 계약서 양식 1.3MB·급여 0.36MB … 약 2.4MB 를 먹고 있었다)
+/* 이알피의 업무 표는 IndexedDB(큰 사본 창고)에 둔다 (2026-10-07 — localStorage 한도 5MB 가 차서
+   경력관리가 목록을 못 적었다. 1단계는 큰 여섯 칸, 2단계(대표 지시 「용량을 더 늘리고 … 안지워도 되게」)는
+   동기화 표 «전부» — 남기는 것은 다른 앱이 그 자리에서 읽는 칸(ERP_LS_KEEP)뿐)
 
    지키는 것
    ① 켜진 뒤 큰 칸은 localStorage 가 꽉 차도 적힌다 — 다른 칸은 예전 그대로(던지고 메모리에 쥔다)
@@ -8,7 +9,8 @@
       (시각만 남으면 서버를 다시 안 받아 빈 표가 최신인 줄 안다)
    ③ 백업(NAS·내려받기)이 새 자리 것도 담는다 — localStorage 만 훑으면 급여·장부가 백업에서 빠진다
    ④ 앱 그리기·첫 동기화는 창고 켜짐을 기다린다
-   ⑤ 다른 앱이 localStorage 로 «빌려 읽는» 칸은 큰 칸에 넣지 않는다 */
+   ⑤ 다른 앱이 «빌려 읽으면» 큰 창고도 본다(PuBigStore.peek) — 그 자리에서(동기식) 읽는 칸은 남긴다
+   ⑥ 이알피 안에서 업무 표를 localStorage 로 «바로» 만지는 자리가 없다 */
 const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
@@ -28,7 +30,17 @@ function body(head) {
   throw new Error(head);
 }
 function stmt(re) { const m = SRC.match(re); assert.ok(m, re + ' 을 못 찾았습니다'); return m[0]; }
-const BIG = JSON.parse(stmt(/var ERP_BIG_KEYS = (\[[^\]]*\]);/).replace(/^var ERP_BIG_KEYS = /, '').replace(/;$/, '').replace(/'/g, '"'));
+/* 동기화 표 목록 — 줄마다 주석이 있어 글자로 떠서 상자에서 돌려 얻는다 */
+const SYNC_SRC = stmt(/var FB_ALL_SYNC_KEYS = \[[\s\S]*?\n\];/);
+const KEEP_SRC = stmt(/var ERP_LS_KEEP = \[[^\]]*\];/);
+const EXTRA_SRC = stmt(/var ERP_BIG_EXTRA = \[[^\]]*\];/);
+const BIG = (function () {
+  const c = {}; vm.createContext(c);
+  vm.runInContext([SYNC_SRC, KEEP_SRC, EXTRA_SRC, stmt(/var ERP_BIG_KEYS = \[\];/), 'var _erpBig = null; var KEY = "pureun_v6_";',
+    'var PuBigStore = { mirror: function(){ return {}; } }; var localStorage = {};', body('function _erpBigMake('), '_erpBigMake();'].join('\n'), c);
+  return vm.runInContext('ERP_BIG_KEYS.slice()', c);
+})();
+const KEEP = (function () { const c = {}; vm.createContext(c); vm.runInContext(KEEP_SRC, c); return vm.runInContext('ERP_LS_KEEP.slice()', c); })();
 
 function lsFake(cap) {
   const m = {};
@@ -60,8 +72,7 @@ function box(cap, st) {
   vm.createContext(ctx);
   vm.runInContext(['var _dbStoreFailed = {}; var _dbCache = {};',
     stmt(/var KEY = 'pureun_v6_';/),
-    stmt(/var ERP_BIG_KEYS = \[[^\]]*\];/),
-    stmt(/var _erpBig = \(typeof PuBigStore[\s\S]*?\}\) : null;/),
+    SYNC_SRC, KEEP_SRC, EXTRA_SRC, stmt(/var ERP_BIG_KEYS = \[\];/), 'var _erpBig = null;', body('function _erpBigMake('),
     stmt(/var _erpBigBooting = null;/),
     body('function _erpBigBoot('), body('function erpLocalKeys('), body('function erpLocalRaw('),
     stmt(/var _erpMemStore = \{\};/), body('function _erpMemFlush('), stmt(/var _erpQuotaToldAt = 0;/),
@@ -78,9 +89,11 @@ test('① 켜진 뒤 큰 칸은 localStorage 가 꽉 차도 적힌다 · 다른 
   ctx._erpStoreSet('contract_forms', big);                     // 한도 200자를 크게 넘는다
   assert.equal(ctx._erpStoreGet('contract_forms'), big);
   assert.equal(ls._m.pureun_v6_contract_forms, undefined, '큰 칸이 localStorage 에 들어가면 이번 고침이 헛것입니다');
-  assert.throws(() => ctx._erpStoreSet('contracts', 'Y'.repeat(500)), /full/,
-    '다른 칸의 공간 부족 처리(메모리에 쥐고 서버로)는 예전 그대로여야 합니다');
-  assert.equal(ctx._erpStoreGet('contracts'), 'Y'.repeat(500));
+  ctx._erpStoreSet('companies', 'C'.repeat(5000));               // 2단계: 업체·계약도 큰 창고다
+  assert.equal(ls._m.pureun_v6_companies, undefined);
+  assert.throws(() => ctx._erpStoreSet('user_accounts', 'Y'.repeat(500)), /full/,
+    '남기는 칸(직원 명부)의 공간 부족 처리(메모리에 쥐고 서버로)는 예전 그대로여야 합니다');
+  assert.equal(ctx._erpStoreGet('user_accounts'), 'Y'.repeat(500));
   ctx._erpStoreRemove('contract_forms');
   assert.equal(ctx._erpStoreGet('contract_forms'), null);
 });
@@ -93,8 +106,8 @@ test('② 켤 때 옛 자리 것을 옮기고, 아무 데도 없는 칸은 받�
   ls._m.pureun_v6__meta_payroll_monthly = '111';
   ls._m.pureun_v6__meta_cms_ledger = '222';
   ls._m.pureun_v6__meta_trash_fin = '333';          // 값은 어디에도 없고 시각만 남았다
-  ls._m.pureun_v6__meta_contracts = '444';          // 큰 칸이 아니다 — 건드리지 않는다
-  vm.runInContext('_dbCache.payroll_monthly = []; _dbCache.contracts = [9];', ctx);
+  ls._m.pureun_v6__meta_user_accounts = '444';      // 남기는 칸 — 건드리지 않는다
+  vm.runInContext('_dbCache.payroll_monthly = []; _dbCache.user_accounts = [9];', ctx);
   await ctx._erpBigBoot();
   assert.equal(ctx._erpStoreGet('payroll_monthly'), '[1]');
   assert.equal(ls._m.pureun_v6_payroll_monthly, undefined, '옮긴 뒤 옛 자리를 비워야 자리가 생깁니다');
@@ -104,9 +117,9 @@ test('② 켤 때 옛 자리 것을 옮기고, 아무 데도 없는 칸은 받�
     '★★ 값 없이 시각만 남으면 서버를 다시 안 받아 «빈 표가 최신»이 됩니다');
   assert.equal(ls._m.pureun_v6__meta_payroll_monthly, '111');
   assert.equal(ls._m.pureun_v6__meta_cms_ledger, '222');
-  assert.equal(ls._m.pureun_v6__meta_contracts, '444');
+  assert.equal(ls._m.pureun_v6__meta_user_accounts, '444');
   assert.equal(vm.runInContext("'payroll_monthly' in _dbCache", ctx), false, '켜지기 전에 읽어 둔 «빈 것»을 버려야 합니다');
-  assert.equal(vm.runInContext("'contracts' in _dbCache", ctx), true);
+  assert.equal(vm.runInContext("'user_accounts' in _dbCache", ctx), true);
 });
 
 test('② IndexedDB 를 못 쓰면 예전 그대로 · 비어 있는 큰 칸은 받은 시각을 지운다', async () => {
@@ -114,8 +127,9 @@ test('② IndexedDB 를 못 쓰면 예전 그대로 · 비어 있는 큰 칸은 
   const ctx = { localStorage: ls, sessionStorage: lsFake(0), Object, Date, Math, JSON, Promise, console: { info() {}, warn() {} }, showToast() {},
     PuBigStore: { mirror: (o) => Big.mirror(Object.assign({}, o, { open: async () => null })) } };
   vm.createContext(ctx);
-  vm.runInContext(['var _dbStoreFailed = {}; var _dbCache = {};', stmt(/var KEY = 'pureun_v6_';/), stmt(/var ERP_BIG_KEYS = \[[^\]]*\];/),
-    stmt(/var _erpBig = \(typeof PuBigStore[\s\S]*?\}\) : null;/), stmt(/var _erpBigBooting = null;/), body('function _erpBigBoot('),
+  vm.runInContext(['var _dbStoreFailed = {}; var _dbCache = {};', stmt(/var KEY = 'pureun_v6_';/),
+    SYNC_SRC, KEEP_SRC, EXTRA_SRC, stmt(/var ERP_BIG_KEYS = \[\];/), 'var _erpBig = null;', body('function _erpBigMake('),
+    stmt(/var _erpBigBooting = null;/), body('function _erpBigBoot('),
     stmt(/var _erpMemStore = \{\};/), body('function _erpStoreGet('), body('function _erpStoreSet(')].join('\n'), ctx);
   ls._m.pureun_v6_ledger_batches = '[1]';
   ls._m.pureun_v6__meta_ledger_batches = '5';
@@ -129,11 +143,14 @@ test('② IndexedDB 를 못 쓰면 예전 그대로 · 비어 있는 큰 칸은 
 
 test('③ 백업이 새 자리 것도 담는다', async () => {
   const { ctx, ls } = box(0);
-  ls._m.pureun_v6_companies = '[1]';
+  ls._m.pureun_v6_user_accounts = '[1]';
+  ls._m.pureun_v6_companies = '[2]';
   await ctx._erpBigBoot();
   ctx._erpStoreSet('payroll_monthly', '[7]');
   const keys = vm.runInContext('erpLocalKeys()', ctx);
-  assert.ok(keys.includes('pureun_v6_companies'));
+  assert.ok(keys.includes('pureun_v6_user_accounts'));
+  assert.ok(keys.includes('pureun_v6_companies'), '옮겨진 업체도 백업에 담겨야 합니다');
+  assert.equal(ls._m.pureun_v6_companies, undefined);
   assert.ok(keys.includes('pureun_v6_payroll_monthly'), '★★ 급여가 NAS 백업에서 빠집니다');
   assert.equal(ctx.erpLocalRaw('pureun_v6_payroll_monthly'), '[7]');
   assert.ok(!keys.includes('pureun_v6_trash_fin'), '없는 칸까지 «빈 값»으로 담지는 않습니다');
@@ -166,20 +183,61 @@ test('④ 앱 그리기와 첫 동기화는 창고 켜짐을 기다린다', () =
   assert.match(SRC, /<script src="js\/pu-big-store\.js\?v=\d+"><\/script>/, '캐시 번호(?v=)를 붙여야 고친 판이 바로 갑니다');
 });
 
-test('⑤ 다른 앱이 localStorage 로 빌려 읽는 칸은 큰 칸이 아니다', () => {
-  assert.ok(BIG.length >= 1);
+test('★ 2단계: 동기화 표는 «전부» 큰 창고로 — 남기는 것은 ERP_LS_KEEP 뿐', () => {
+  const c = {}; vm.createContext(c); vm.runInContext(SYNC_SRC, c);
+  const sync = vm.runInContext('FB_ALL_SYNC_KEYS.slice()', c);
+  const left = sync.filter((k) => !BIG.includes(k) && !KEEP.includes(k));
+  assert.deepEqual(left, [], '이 표들이 localStorage 에 남아 다시 5MB 를 채웁니다');
+  ['contract_forms', 'companies', 'contracts', 'consultings', 'payroll_audit_log'].forEach((k) =>
+    assert.ok(BIG.includes(k), k + ' 가 큰 창고에 없습니다'));
+  ['user_accounts', 'user_dir'].forEach((k) => assert.ok(KEEP.includes(k) && !BIG.includes(k),
+    k + ' 는 포털·사진첩·규정관리·업무관리가 «그 자리에서» 읽는다 — 옮기면 그 앱들이 빈 명부를 읽습니다'));
+  assert.ok(KEEP.length <= 4, '남기는 칸이 ' + KEEP.length + '개 — 늘면 localStorage 가 다시 찹니다. 정말 그 자리에서 읽는 칸인지 보세요');
+});
+
+test('⑤ 다른 앱이 이알피 표를 빌려 읽으면 큰 창고도 본다', () => {
   const files = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html') && f !== 'pu-erp.html')
     .map((f) => path.join(ROOT, f))
     .concat(fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js')).map((f) => path.join(ROOT, 'js', f)));
   const bad = [];
+  let 빌려읽는앱 = 0;
   files.forEach(function (f) {
     const t = fs.readFileSync(f, 'utf8');
+    const name = path.basename(f);
+    /* ① 큰 창고 표를 글자 그대로 localStorage 에서 읽으면 옮긴 뒤 빈 것을 읽는다 */
     BIG.forEach(function (k) {
-      if (t.indexOf('pureun_v6_' + k) >= 0) bad.push(path.basename(f) + ' → pureun_v6_' + k);
-      /* 'pureun_v6_'+열쇠 로 읽는 앱이 그 열쇠 이름을 들고 있으면 빌려 읽는 것이다 */
-      const 빌려읽기 = /localStorage\.getItem\(\s*(?:'pureun_v6_'|"pureun_v6_"|ERP_LS_PREFIX)\s*\+/.test(t);
-      if (빌려읽기 && new RegExp("['\"]" + k + "['\"]").test(t)) bad.push(path.basename(f) + ' → ' + k);
+      if (new RegExp("localStorage\\.getItem\\(\\s*['\"]pureun_v6_" + k + "['\"]").test(t)) bad.push(name + ' → pureun_v6_' + k + ' 를 localStorage 로 바로 읽음');
     });
+    /* ② 'pureun_v6_'+열쇠 로 빌려 읽는 앱은 PuBigStore.peek 도 쓰고 pu-big-store.js 를 싣는다 */
+    const 빌려읽기 = /localStorage\.getItem\(\s*(?:'pureun_v6_'|"pureun_v6_"|ERP_LS_PREFIX)\s*\+/.test(t);
+    if (!빌려읽기 || name === 'pu-obsidian.js') return;   // 옵시디언은 이알피 안에서만 실린다 — dbGet 을 먼저 쓴다
+    빌려읽는앱++;
+    if (!/PuBigStore\.peek\(/.test(t)) bad.push(name + ' → 빌려 읽는데 큰 창고(PuBigStore.peek)를 안 봄');
+    if (f.endsWith('.html') && !/<script src="js\/pu-big-store\.js\?v=\d+"><\/script>/.test(t)) bad.push(name + ' → pu-big-store.js 를 안 실음');
   });
-  assert.deepEqual(bad, [], '이 앱들이 localStorage 에서 읽는데 그 칸이 IndexedDB 로 갔습니다 — ERP_BIG_KEYS 에서 빼거나 그 앱을 고치세요');
+  assert.ok(빌려읽는앱 >= 3, '빌려 읽는 앱을 ' + 빌려읽는앱 + '곳만 찾았습니다(업무관리·기금·정부컨설팅) — 찾는 규칙이 어긋났습니다');
+  assert.deepEqual(bad, [], '옮긴 뒤 이 앱들은 빈 사본을 읽습니다');
+  const ob = fs.readFileSync(path.join(ROOT, 'js', 'pu-obsidian.js'), 'utf8');
+  assert.match(ob, /typeof w\.dbGet === 'function'/, '옵시디언이 이알피 dbGet 을 먼저 써야 큰 창고 값을 읽습니다');
+});
+
+test('⑥ 이알피 안에서 업무 표를 localStorage 로 «바로» 만지지 않는다', () => {
+  /* 예전 길(else·삼항 «없으면» 갈래)은 _erpStoreGet 이 없는 검사 상자용이다 — 그 밖은 막는다 */
+  /* 저장층 자체(_erpStoreGet·_erpStoreSet)와 설정 한 줄 읽기(_readSyncKey — 표가 아니다)는 제외한다 */
+  const 허용 = ['function _erpStoreGet(', 'function _erpStoreSet(', 'function _readSyncKey('].map(function (h) {
+    const b = body(h), at = SRC.indexOf(b);
+    return [SRC.slice(0, at).split('\n').length, SRC.slice(0, at + b.length).split('\n').length];
+  });
+  const lines = SRC.split('\n');
+  const bad = [];
+  lines.forEach(function (ln, i) {
+    if (허용.some(function (r) { return i + 1 >= r[0] && i + 1 <= r[1]; })) return;
+    if (!/localStorage\.(?:getItem|setItem)\(\s*(?:KEY\s*\+\s*(?:k|store)\b|'pureun_v6_'\s*\+\s*k\b)/.test(ln)) return;
+    if (/\belse\s+localStorage|:\s*localStorage\.getItem/.test(ln)) return;
+    bad.push((i + 1) + ': ' + ln.trim().slice(0, 100));
+  });
+  assert.deepEqual(bad, [], '큰 창고 표를 localStorage 로 바로 읽거나 쓰면 옮긴 뒤 빈 것을 보거나, 옛 자리에 «이기는» 값이 생깁니다');
+  assert.match(body('function autoPurgeTrash('), /_erpStoreGet\(k\)/, '휴지통 30일 정리가 큰 창고를 봐야 합니다');
+  assert.match(SRC, /_erpBigBoot\(\)\.then\(autoPurgeTrash, autoPurgeTrash\)/, '휴지통 정리는 창고가 켜진 뒤에');
+  assert.match(SRC, /window\._erpStoreGet = _erpStoreGet/, '맨 앞 «켤 때 점검»이 같은 이름으로 읽습니다 — 안 내주면 그 점검이 조용히 건너뜁니다');
 });

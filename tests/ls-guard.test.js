@@ -134,3 +134,33 @@ test('⑥ 통합 프로그램 앱이 이 감시를 싣는다 (경력관리 제�
   const missing = apps.filter((f) => !/<script src="js\/pu-ls-guard\.js\?v=\d+"><\/script>/.test(fs.readFileSync(path.join(root, f), 'utf8')));
   assert.deepEqual(missing, [], '이 앱들은 저장 실패를 삼키면 아무도 모릅니다 — js/pu-ls-guard.js 를 실으세요');
 });
+
+/* ── «지우지 말라» (대표 지시 2026-10-07 「지우지 말라 … 안지워도 되게」) ── */
+test('★ 켤 때 크롬에 «이 사이트 자료는 지우지 말라»를 청한다 — 이미 허락됐으면 다시 안 청한다', async () => {
+  const w = fakeWin(1000);
+  let asked = 0;
+  w.navigator = { storage: { persisted: async () => false, persist: async () => { asked++; return true; },
+    estimate: async () => ({ usage: 5e8, quota: 1e10 }) } };
+  const g = G.install(w, { wait: 0 });
+  assert.equal(await g.persisting, true);
+  assert.equal(asked, 1, '청하지 않으면 디스크가 모자랄 때 크롬이 이 사이트 자료를 스스로 비울 수 있습니다');
+  const info = await g.storageInfo();
+  assert.equal(info.quota, 1e10); assert.equal(info.usage, 5e8);
+  assert.equal(typeof info.lsChars, 'number');
+
+  const w2 = fakeWin(1000);
+  let asked2 = 0;
+  w2.navigator = { storage: { persisted: async () => true, persist: async () => { asked2++; return true; } } };
+  const g2 = G.install(w2, { wait: 0 });
+  assert.equal(await g2.persisting, true);
+  assert.equal(asked2, 0);
+});
+
+test('«지우지 말라»를 모르는 브라우저에서도 멈추지 않는다', async () => {
+  const w = fakeWin(1000);
+  w.navigator = {};
+  const g = G.install(w, { wait: 0 });
+  assert.equal(await g.persisting, null);
+  const info = await g.storageInfo();
+  assert.equal(info.quota, null);
+});

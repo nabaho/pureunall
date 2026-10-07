@@ -133,9 +133,40 @@
       return origRemove.apply(this, arguments);
     };
 
+    /* ── «이 사이트 자료는 지우지 말라» (대표 지시 2026-10-07 「지우지 말라 … 안지워도 되게」) ──
+       크롬은 디스크가 모자라면 오래 안 쓴 사이트의 IndexedDB 를 스스로 비울 수 있다(«지워도 되는» 칸).
+       navigator.storage.persist() 로 «지우지 않는» 칸으로 바꿔 달라고 한다. 한 주소에 한 번 허락되면
+       통합 프로그램 전부(같은 nabaho.github.io)가 함께 지켜진다.
+       ⚠ 크롬은 묻는 창 없이 스스로 정한다(즐겨찾기·앱 설치·자주 씀이면 허락). 거절되면 다음에 열 때 또 청한다.
+       2026-10-07 대표 크롬 실측: 이미 허락돼 있었다(persisted:true), 한도 약 10.8GB. */
+    var persistState = null;
+    function persist() {
+      try {
+        var st = w.navigator && w.navigator.storage;
+        if (!st || typeof st.persisted !== 'function' || typeof st.persist !== 'function') return Promise.resolve(null);
+        return st.persisted().then(function (p) { return p ? true : st.persist(); })
+          .then(function (ok) { persistState = !!ok; return persistState; }, function () { return null; });
+      } catch (_) { return Promise.resolve(null); }
+    }
+    /* 지금 얼마나 쓰고 얼마까지 되나 — 화면(이알피 저장 공간 칸)과 콘솔이 쓴다. 값(자료)은 안 본다 */
+    function storageInfo() {
+      var lsChars = usage().reduce(function (a, r) { return a + r.chars; }, 0);
+      var st = w.navigator && w.navigator.storage;
+      var est = (st && typeof st.estimate === 'function') ? st.estimate().catch(function () { return null; }) : Promise.resolve(null);
+      var per = (st && typeof st.persisted === 'function') ? st.persisted().catch(function () { return null; }) : Promise.resolve(null);
+      return Promise.all([est, per]).then(function (r) {
+        return { lsChars: lsChars, usage: r[0] ? r[0].usage : null, quota: r[0] ? r[0].quota : null, persisted: r[1] };
+      });
+    }
+    var persisting = persist();
+
     var api = {
       usage: usage,
       label: label,
+      persist: persist,
+      persisting: persisting,
+      persisted: function () { return persistState; },
+      storageInfo: storageInfo,
       shownCount: function () { return shown; },
       _check: check
     };
