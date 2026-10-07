@@ -758,6 +758,28 @@ body.has-gtabs #kcUndo{bottom:calc(var(--gtabH,56px) + 16px)}
 .kpi .k-label{font-size:12px;color:var(--text-mute)}
 .kpi .k-val{font-size:18px;font-weight:700;color:var(--navy);margin-top:2px}
 .kpi .k-sub{font-size:11px;color:var(--teal);margin-top:1px}
+/* 홈 KPI 는 «한 줄» 칸 (대표 지시 2026-10-07 「너무 크다」) — 이름·숫자·연도별 › 를 한 줄에 */
+.kpi.kpi-btn{display:flex;align-items:baseline;gap:6px;padding:7px 12px;cursor:pointer;font:inherit;text-align:left;width:100%;min-width:0;white-space:nowrap}
+.kpi.kpi-btn .k-label{overflow:hidden;text-overflow:ellipsis}
+.kpi.kpi-btn .k-val{font-size:16px;margin:0}
+.kpi.kpi-btn .k-sub{margin:0;color:var(--text-mute)}
+.kpi.kpi-btn .k-go{margin-left:auto;font-size:11px;color:var(--teal)}
+.hy-tabs{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.hy-tip{margin-left:auto;font-size:12px;color:var(--text-mute)}
+.hy-wrap{overflow-x:auto}
+.hy-tbl{width:100%;border-collapse:collapse;font-size:13px}
+.hy-tbl th,.hy-tbl td{border-bottom:1px solid var(--border);padding:5px 8px;text-align:right;white-space:nowrap}
+.hy-tbl th{font-size:12px;color:var(--text-mute);font-weight:600}
+.hy-tbl th:first-child,.hy-tbl td:first-child{text-align:left}
+.hy-tbl th.hy-h{cursor:pointer}
+.hy-tbl th.hy-h:hover{color:var(--teal);text-decoration:underline}
+.hy-tbl td.hy-n{cursor:pointer;color:var(--teal);font-weight:600}
+.hy-tbl td.hy-n:hover{background:var(--soft);text-decoration:underline}
+.hy-tbl td.hy-z{color:var(--text-mute);opacity:.5}
+.hy-tbl td.hy-y{font-weight:700;color:var(--navy)}
+.hy-tbl td.hy-unk{color:var(--amber)}
+.hy-tbl td.hy-sum{font-weight:700;color:var(--navy)}
+.hy-tbl tr.hy-cur td{background:var(--soft)}
 #page-home h2{font-size:21px}
 #page-home .desc{font-size:14px}
 #homeList{font-size:15px}
@@ -2862,6 +2884,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="modal-h" id="p1PickTitle">⭐ 중요 고르기</div>
     <div class="modal-b" id="p1PickBody"></div>
     <div class="modal-foot"><span id="p1PickSum" style="margin-right:auto;font-size:12px;color:var(--text-mute)"></span><button class="btn" onclick="p1PickClose()">취소</button><button class="btn primary" onclick="p1PickSave()">저장</button></div>
+  </div>
+</div>
+<!-- 🗓 연도별 보기 (2026-10-07) — 홈 KPI 를 누르면 뜬다. 읽기만 하는 창이라 바깥을 눌러도 닫힌다 -->
+<div class="modal-ov" id="modalHomeYr">
+  <div class="modal" style="width:920px;max-width:96vw">
+    <div class="modal-h">🗓 연도별 보기</div>
+    <div class="modal-b" id="homeYrBody"></div>
+    <div class="modal-foot"><span id="homeYrSum" style="margin-right:auto;font-size:12px;color:var(--text-mute)"></span><button class="btn" onclick="homeYrClose()">닫기</button></div>
   </div>
 </div>
 <!-- 📚 지난 제출 이력서 모으기 (2026-10-07 목업 승인) — 고르기 셈은 js/kcareer-pastcv.js -->
@@ -6269,22 +6299,27 @@ function thisMonth(){ const d=new Date(); return d.getFullYear()+'.'+String(d.ge
 function fmtKRW(n){ return (n||0).toLocaleString('ko-KR')+'원'; }
 function renderHome(){
   const ym=thisMonth();
-  const career=['wiccok','license','complete','award','edu'], perf=['case','consult','fund','lecture','etc'];
+  /* ⚠ 셈은 목록 화면과 같은 통·거르기(_homeYrRows) — get('license') 처럼 통 이름으로 세면
+       자격·수료(cert 통)·표창(위촉장 통)이 0 이 되고, 위촉장은 표창까지 두 번 셌다(2026-10-07) */
+  const career=HOME_YR_COLS.career.map(c=>c[0]), perf=HOME_YR_COLS.perf.map(c=>c[0]);
   let cCnt=0,pCnt=0;
   const inMonth=r=>{ const d=(r.savedAt||r.issueDate||r.date||'').replace(/-/g,'.'); return d.startsWith(ym); };
-  career.forEach(k=>get(k).forEach(r=>{ if(inMonth(r)) cCnt++; }));
-  perf.forEach(k=>get(k).forEach(r=>{ if(inMonth(r)){ pCnt++; } }));
-  const total=career.concat(perf).reduce((s,k)=>s+get(k).length,0);
+  career.forEach(k=>_homeYrRows(k).forEach(r=>{ if(inMonth(r)) cCnt++; }));
+  perf.forEach(k=>_homeYrRows(k).forEach(r=>{ if(inMonth(r)){ pCnt++; } }));
+  const total=career.concat(perf).reduce((s,k)=>s+_homeYrRows(k).length,0);
+  const 올해실적=perf.reduce((s,k)=>s+_homeYrRows(k).filter(r=>_homeYrKey(r)===String(new Date().getFullYear())).length,0);
   const yrMap={}; perf.forEach(k=>get(k).forEach(r=>{ const y=r.year||(r.date||'').slice(0,4)||'미상'; if(!yrMap[y])yrMap[y]={c:0,a:0}; yrMap[y].c++; yrMap[y].a+=Number(r.amt)||0; }));
   _homeYr=yrMap;
   const curY=String(new Date().getFullYear()); const ty=yrMap[curY]||{c:0,a:0};
   const kpi=document.getElementById('homeKpi');
+  /* 한 줄 칸 — 누르면 🗓 연도별 창 (대표 지시 2026-10-07 「kpi 너무 크다 · 클릭하면 팝업창으로 년도별」)
+     ⚠ 금액은 안 싣는다 — 홈은 로그인하면 맨 먼저 뜨는 화면이다 */
   kpi.innerHTML=[
-    ['전체 보유 데이터',total+'건','경력+실적'],
-    ['이번 달 경력 등록',cCnt+'건',''],
-    ['이번 달 실적 등록',pCnt+'건',''],
-    ['올해('+curY+') 실적',ty.c+'건',ty.a?fmtKRW(ty.a):''],
-  ].map(([l,v,s])=>`<div class="kpi"><div class="k-label">${l}</div><div class="k-val">${v}</div><div class="k-sub">${s}</div></div>`).join('');
+    ['전체 보유',total,'all'],
+    ['이번 달 경력',cCnt,'career'],
+    ['이번 달 실적',pCnt,'perf'],
+    ['올해('+curY+') 실적',올해실적,'perf'],
+  ].map(([l,v,g])=>`<button type="button" class="kpi kpi-btn" onclick="homeYrOpen('${g}')" title="눌러서 연도별로 보기"><span class="k-label">${l}</span><b class="k-val">${v}</b><span class="k-sub">건</span><span class="k-go">›</span></button>`).join('');
   const yrs=Object.keys(yrMap).sort().reverse();
   const sel='<select id="homeYrSel" class="tb-select" style="margin-left:8px" onchange="renderHomeYr()"><option value="">전체 연도</option>'+yrs.map(y=>`<option>${escapeHtml(y)}</option>`).join('')+'</select>';
   var _hl = document.getElementById('homeList');
@@ -6404,12 +6439,67 @@ function renderHomeYr(){ const yrMap=_homeYr||{}; const selEl=document.getElemen
   const box=document.getElementById('homeYrTable'); if(!box) return;
   if(!yrs.length){ box.innerHTML='<div class="empty">실적 데이터 없음</div>'; return; }
   box.innerHTML='<div class="home-yr-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(116px,1fr));gap:6px;margin-top:6px">'
-    +yrs.map(function(y){ return '<div style="border:1px solid var(--border);border-radius:8px;padding:6px 9px;background:var(--card)">'
+    +yrs.map(function(y){ return '<div onclick="homeYrOpen(\'perf\')" title="눌러서 항목별로 보기" style="cursor:pointer;border:1px solid var(--border);border-radius:8px;padding:6px 9px;background:var(--card)">'
       +'<div style="display:flex;justify-content:space-between;align-items:baseline;gap:6px"><b style="font-size:13px;color:var(--navy)">'+y+'</b><span style="font-size:12px;color:var(--text)">'+yrMap[y].c+'건</span></div>'
       +'<div style="font-size:11.5px;color:var(--teal);margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+fmtKRW(yrMap[y].a)+'</div></div>'; }).join('')
     +'</div>';
 }
 var _homeYr=null;
+
+/* ═══ 🗓 연도별 보기 창 (대표 지시 2026-10-07 「kpi 클릭하면 팝업창으로 년도별 볼수 있게 · 각각마다 년도별로」) ═══
+   행 = 연도, 열 = 항목(위촉·표창·자격·수료·학력 / 사건·컨설팅·기금·강의·기타).
+   ⚠ 셈은 목록 화면과 «같은 규칙» — CAREER_CFG 의 통·거르기, 연도는 목록의 연도 고르개와 같은 열쇠(_homeYrKey).
+     그래야 칸의 숫자를 눌러 연 목록의 줄 수가 창의 숫자와 같다.
+   ⚠ 금액은 싣지 않는다. 연도가 없는 기록은 «연도 모름» 줄 — 버리지 않는다(채울 자리를 보여 준다). */
+var HOME_YR_COLS={
+  career:[['wiccok','위촉'],['award','표창'],['license','자격'],['complete','수료'],['edu','학력']],
+  perf:[['case','사건'],['consult','컨설팅'],['fund','기금'],['lecture','강의'],['etc','기타']]
+};
+var HOME_YR_TABS=[['all','전체'],['career','경력'],['perf','실적']];
+var _homeYrTab='all';
+function _homeYrKey(r){ var y=String((r&&(r.year||String(r.issueDate||r.date||'').slice(0,4)))||'').trim(); return /^(19|20)\d{2}$/.test(y)?y:''; }
+function _homeYrRows(page){
+  var cfg=(typeof CAREER_CFG!=='undefined')&&CAREER_CFG[page]; if(!cfg) return [];
+  var a=[]; (cfg.stores||[cfg.store]).forEach(function(st){ a=a.concat(get(st)||[]); });
+  return cfg.filter?a.filter(cfg.filter):a;
+}
+function homeYrCols(tab){ return tab==='career'?HOME_YR_COLS.career:tab==='perf'?HOME_YR_COLS.perf:HOME_YR_COLS.career.concat(HOME_YR_COLS.perf); }
+/* { cols, years:[연도 내림차순, 모름은 맨 끝 ''], cell:{연도:{page:n}}, tot:{page:n}, n } */
+function homeYrCount(tab){
+  var cols=homeYrCols(tab), cell={}, tot={}, n=0;
+  cols.forEach(function(c){ tot[c[0]]=0;
+    _homeYrRows(c[0]).forEach(function(r){ var y=_homeYrKey(r); (cell[y]=cell[y]||{}); cell[y][c[0]]=(cell[y][c[0]]||0)+1; tot[c[0]]++; n++; }); });
+  var years=Object.keys(cell).filter(Boolean).sort().reverse(); if(cell['']) years.push('');
+  return { cols:cols, years:years, cell:cell, tot:tot, n:n };
+}
+function homeYrOpen(tab){ _homeYrTab=tab||'all'; homeYrDraw(); document.getElementById('modalHomeYr').classList.add('open'); }
+function homeYrClose(){ document.getElementById('modalHomeYr').classList.remove('open'); }
+function homeYrDraw(){
+  var body=document.getElementById('homeYrBody'); if(!body) return;
+  var C=homeYrCount(_homeYrTab), curY=String(new Date().getFullYear());
+  var 칸=function(p,y,v){ return v?'<td class="hy-n" onclick="homeYrGo(\''+p+'\',\''+y+'\')" title="'+escapeHtml((y||'연도 모름')+' · 목록 열기')+'">'+v+'</td>':'<td class="hy-z">·</td>'; };
+  var html='<div class="hy-tabs">'+HOME_YR_TABS.map(function(t){ return '<button type="button" class="btn sm'+(t[0]===_homeYrTab?' primary':'')+'" onclick="_homeYrTab=\''+t[0]+'\';homeYrDraw()">'+t[1]+'</button>'; }).join('')
+    +'<span class="hy-tip">숫자를 누르면 그 목록이 «그 해»만 걸러져 열립니다 · 머리를 누르면 목록 전체</span></div>';
+  if(!C.n){ body.innerHTML=html+'<div class="empty">아직 기록이 없습니다</div>'; return; }
+  html+='<div class="hy-wrap"><table class="hy-tbl"><thead><tr><th>연도</th>'
+    +C.cols.map(function(c){ return '<th class="hy-h" onclick="homeYrGo(\''+c[0]+'\',\'\')" title="'+escapeHtml(c[1])+' 목록 열기">'+escapeHtml(c[1])+'</th>'; }).join('')+'<th>합계</th></tr></thead><tbody>'
+    +C.years.map(function(y){ var row=C.cell[y]||{}, 합=0;
+      var tds=C.cols.map(function(c){ var v=row[c[0]]||0; 합+=v; return 칸(c[0],y,v); }).join('');
+      return '<tr'+(y===curY?' class="hy-cur"':'')+'><td class="hy-y'+(y?'':' hy-unk')+'">'+(y||'연도 모름')+'</td>'+tds+'<td class="hy-sum">'+합+'</td></tr>'; }).join('')
+    +'</tbody><tfoot><tr><td class="hy-y">합계</td>'+C.cols.map(function(c){ return '<td class="hy-sum">'+C.tot[c[0]]+'</td>'; }).join('')+'<td class="hy-sum">'+C.n+'</td></tr></tfoot></table></div>';
+  body.innerHTML=html;
+  var sum=document.getElementById('homeYrSum'); if(sum) sum.textContent='모두 '+C.n+'건 · '+C.years.filter(Boolean).length+'개 연도'+(C.cell['']?' · 연도 모름 있음':'');
+}
+/* 칸을 누르면 그 목록으로 — 연도 고르개를 «그 해»로 맞춘다. 연도 모름·머리는 거르지 않고 연다 */
+function homeYrGo(page, y){
+  homeYrClose();
+  navTile('page-'+page);
+  setTimeout(function(){
+    var sec=document.getElementById('page-'+page), sel=sec&&sec.querySelector('[data-f="year"]'); if(!sel) return;
+    if(y && ![].some.call(sel.options,function(o){ return o.value===y; })){ var o=document.createElement('option'); o.textContent=y; sel.appendChild(o); }
+    sel.value=y||''; _safe(function(){ renderCareer(page); });
+  },0);
+}
 
 /* ===== 파일명 경고 ===== */
 function checkFilename(){
