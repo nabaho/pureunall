@@ -12,5 +12,5 @@
 - 실자료로 «안 보내고» 돌려 봄(10/7): 번호 있는 회사 456 · 이번에 물을 곳 141(2통) · 대조할 곳 144(4통) · 대조 못 하는 곳 15.
 - 화면의 「🏛 국세청 훑기」·「🧾 전체 대조」 단추는 그대로(급할 때 손으로).
 
-## 배포
-합친 뒤 `firebase deploy --only functions:ntsMonthly`.
+## 배포 — 끝 (2026-10-07)
+#2159 합친 뒤 `firebase deploy --only functions:ntsMonthly` 로 올렸다(새로 만듦). 첫 회차는 2026-11-01 06:00 — 그 뒤 `pucards/config/ntsMonthly` 를 한 번 볼 것.
