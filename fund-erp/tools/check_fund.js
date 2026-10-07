@@ -750,7 +750,7 @@ ok('적어 둔 예산이 짐작을 이긴다',
   /function planBudget\(f,sites,yr\)\{[\s\S]{0,240}if\(_hasBudget\(fid,yr\)\) return budgetOf\(fid,yr\)/.test(src));
 /* 목적사업 회계와 기금관리 회계가 «따로» 0 으로 맞물린다(제출본이 그렇게 짜여 있다) */
 ok('두 회계가 따로 맞물린다', src.includes('var pNonopExp=spare, pNonopRev=spare-pOp;')
-  && src.includes('var fNonopExp=interest;'));
+  && src.includes('var fNonopExp=fundRev;'));
 /* ⚠ 이 서식은 «천원» 단위다 — 원으로 적으면 천 배로 부풀어 보인다 */
 ok('천원 단위로 적는다', src.includes('var n=Math.round((v||0)/1000);'));
 // 음수는 △ 로 적는 것이 이 서식의 관례다
@@ -796,7 +796,7 @@ ok('예산 있나를 한 곳에서 본다', src.includes('function _hasBudget(fi
 ok('추정재무상태표를 셈한다', src.includes('function bizplanBS(f,yr,fin,sites){')
   && src.includes('var BIZ_BS_ROWS=['));
 // 예비비도 «쓸 돈»으로 보아 현금에서 뺀다 — 안 빼면 그만큼 대차가 어긋난다
-ok('예비비를 현금에서 뺀다', src.includes('var cash=fin.cash+contrib+interest-pur-adm-spare;'));
+ok('예비비를 현금에서 뺀다', src.includes('var cash=fin.cash+contrib+fundRev+etcRev-pur-adm-spare;'));
 // 올해 기말이 없으면 바탕이 없다 — 0 을 바탕으로 삼으면 «올해 재산이 0» 이라 적는 셈이다
 ok('확정 결산이 없으면 안 채운다', src.includes('var fin=_bizFinOf();') && src.includes('if(!fin) return;'));
 /* 회계 가름은 기금마다 다르다(제출본도 한쪽을 비웠다) — 「계」만 적는다 */

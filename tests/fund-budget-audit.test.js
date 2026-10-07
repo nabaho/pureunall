@@ -241,7 +241,9 @@ test('수입 항목끼리 겹치지 않는다 — 같은 돈을 두 번 세지 �
   const a = grabFn('budgetActual').replace(/\/\*[\s\S]*?\*\//g, '');
   assert.ok(!/fin\.interest/.test(a),
     'fin.interest 는 수익 «전체»라 bizRev 와 겹친다 — 두 번 세어진다');
-  assert.match(a, /bizRev:num\(fin\.bizRev\)/, '사업수익을 안 쓴다');
+  assert.match(a, /bizRev:\(?num\(fin\.bizRev\)/, '사업수익을 안 쓴다');
+  /* 2026-10-07: 대부이자는 따로 센다 — 운용수익에서 «빼야» 두 번 세지 않는다 */
+  assert.match(a, /bizRev:\(num\(fin\.bizRev\)\|\|0\)-loanInt, loanInt:loanInt/, '대부이자를 운용수익에서 빼지 않는다');
   assert.match(a, /nonopRev:num\(fin\.nonopRev\)/, '사업외수익을 안 쓴다');
 
   /* ── 2026-09-02: 전제가 «바뀌었다» ──

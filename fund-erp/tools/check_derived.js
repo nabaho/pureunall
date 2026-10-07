@@ -47,7 +47,7 @@ global.funds = {};
  gF('_cmOver'), gF('_cmAnnexNeeded'), gF('_cmToAnnex'), gF('isRegionFund'), gF('_cmSeeAnnex'), gF('_shortBirth'), gF('_cmPairRows'), gF('committeeAnnexHTML'),
  /* 2026-09-20: 확인서 한 장의 모양(제목·가운데 배치·회사이름·날인 자리)을 하나로 모았다 */
  gV('_SIDO_ABBR'), gF('_addrParts'), gF('_siteGovs'), gF('_dotDate'), gF('contribCertHTML'), gF('fillContribDoc'), gF('fillChecklistDoc'),
-  gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
+  gV('BUD_GWAN'), gV('BUD_GWAN_KEY'), gF('_fnum'), gF('budItemAmt'), gF('budItemsList'), gF('budItemSums'), gF('budgetOf'), gF('_hasBudget'), gF('_reserveRate'), gF('_bizFinOf'), gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'),
   gF('fillCommittee'), gF('fillRoster'), gF('fillSubsidyDoc'), gF('_dashPhone'), gF('_prepDirectors'), gF('_bizTotals'),
   /* 설립 출연금 «한 줄기» + 참여사업장 자리표 채우기(2026-09-10).
      hwpFormHTML 이 정관·설립합의서에서 fillPartyList 를, fillDerived 가 foundContrib 를 부른다 —
