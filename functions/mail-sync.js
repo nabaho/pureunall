@@ -22,6 +22,7 @@
 const MB = require('./mail-box');
 const AICLASSIFY = require('./mail-ai-classify');   /* 받은메일함 자동분류(Jev) — 기본은 꺼짐 */
 const NEWINQ = require('./mail-new-inquiry');       /* 신규 문의 → 관리자 폰 알림 + 메일함 띠 */
+const MAILFILL = require('./mail-fill');            /* 📥 회사 도메인이 같은 업체 담당자로 채우기(점검 ③-A) */
 const MYMAIL = require('./mail-owner');             /* 📬 내 담당 메일 → 그 담당자 폰 알림 */
 
 const ROOT = 'mailbox';
@@ -469,6 +470,15 @@ async function runSync(deps, opts) {
                 if (inq.ran) console.log('mail-new-inquiry', JSON.stringify(inq));
               } catch (e) {
                 console.warn('mail-new-inquiry 실패(동기화는 계속합니다):', String((e && e.message) || e));
+              }
+              /* ── 📥 회사 도메인이 같은 업체 «한 곳» 담당자로 채운다 (2026-10-07 기업정보함 점검 ③-A) ──
+                 예전에는 대표님 PC 에서 메일 화면이 열려 있을 때만 채웠다. 잣대·까닭은 mail-fill.js.
+                 ⚠ 실패해도 던지지 않는다 — 채우기가 죽어도 동기화는 계속된다. */
+              try {
+                const mf = await MAILFILL.fillFromNewMail(deps, { rows: held.map((g) => g.row) });
+                if (mf.ran) console.log('mail-fill', JSON.stringify(mf));
+              } catch (e) {
+                console.warn('mail-fill 실패(동기화는 계속합니다):', String((e && e.message) || e));
               }
             }
             /* ── 📬 내 담당 메일 → 그 담당자 폰 알림 (대표 승인 목업 2026-10-05) ──

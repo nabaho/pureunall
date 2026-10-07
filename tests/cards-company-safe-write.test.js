@@ -30,6 +30,8 @@ function box(list, fakeOpt) {
     ErpMatch: { load() {}, _norm: (s) => String(s || '').replace(/\s/g, ''), _nameHit: (a, b) => !!a && a === b },
     mbWhoBust() {}, mbCardsRevBump() {}, fake };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   ['async function erpCoPatchMany(', 'async function erpFillContact(', 'function erpFillContactPlan(',
     'async function erpUnfillContact('].forEach((h) => vm.runInContext(sliceFn(app, h), ctx));
   return ctx;

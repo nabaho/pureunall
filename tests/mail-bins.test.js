@@ -109,6 +109,8 @@ function load(over){
     }
   };
   vm.createContext(ctx);
+  /* 메일로 업체 담당자 채우기 셈은 js/pu-mail-fill-core.js «한 벌» — 서버(mailSync)와 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mail-fill-core.js'), 'utf8') + ';var PuMailFill = this.PuMailFill || (typeof window !== "undefined" && window.PuMailFill);', ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
   vm.runInContext(
     '_mbFolders = ' + JSON.stringify(o.folders || FOLDERS) + ';' +
