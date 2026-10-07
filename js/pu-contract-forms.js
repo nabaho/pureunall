@@ -418,7 +418,12 @@
      data/contract_form_sets = { v:[세트…], rm:[지운 기본 세트 id…], u } — 계약서 양식과 같은 통표·거래 방식.
      ⚠ 저장은 changeSets 한 길 — 들고 있던 사본을 통째로 밀면 그사이 남이 만든 세트를 지운다. */
   var PATH_SETS = 'data/contract_form_sets';
+  /* 업무별 세트 (대표 「추천대로」 2026-10-07) — 자문·급여는 CONTRACT_SETS(이알피 계약서 출력)와 «같은 양식» */
   var SET_SEED = [
+    { id: 'fs-advisory', name: '자문 세트', kind: 'company', formIds: ['fm-pr-advisory', 'fm-pr-cms'] },
+    { id: 'fs-payroll', name: '급여 세트', kind: 'company', formIds: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] },
+    { id: 'fs-fund', name: '기금 세트', kind: 'fund', formIds: ['fm-5', 'fm-pq-07'] },
+    { id: 'fs-union', name: '노조 세트', kind: 'company', formIds: ['fm-pr-union'] },
     { id: 'fs-chedang', name: '체당금 접수 세트', kind: 'case', side: 'worker', groupName: '체당금',
       formIds: ['fm-case-cd-01', 'fm-case-cd-02', 'fm-case-cd-03', 'fm-case-cd-04'] }
   ];
@@ -715,6 +720,21 @@
     + '.pcf-nts{display:flex;gap:8px;align-items:center;font-size:12px;padding:6px 9px;border-radius:6px;margin-bottom:6px;background:#eff6ff;color:#1e40af}'
     + '.pcf-nts.bad{background:#fef2f2;color:#991b1b;font-weight:700}.pcf-nts.dim{background:#f8fafc;color:#64748b}'
     + '.pcf-nts button{margin-left:auto;white-space:nowrap;flex:none;font:inherit;font-size:11.5px;padding:3px 8px;border:1px solid #93c5fd;background:#fff;color:#1d4ed8;border-radius:6px;cursor:pointer}'
+    /* 화면 개편 (2026-10-07) */
+    + '.pcf-th{font-size:11px;color:#64748b;font-weight:700;margin:10px 0 2px 24px}.pcf-tk.add{color:#1d4ed8}'
+    + '.pcf-lp{width:270px;flex:none;display:flex;flex-direction:column;border:1px solid #e2e8f0;border-right:none;border-radius:8px 0 0 8px;background:#fff;min-height:0}'
+    + '.pcf-cols.card .pcf-lp{width:auto;flex:1;border-right:1px solid #e2e8f0;border-radius:8px}'
+    + '.pcf-lh{padding:6px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;flex-direction:column;gap:5px}'
+    + '.pcf-lhr{display:flex;gap:4px;align-items:center}.pcf-lhr .pcf-q{flex:1;min-width:0;max-width:none}'
+    + '.pcf-lbody{flex:1;min-height:0;overflow-y:auto}.pcf-lbody .pcf-list{width:auto;border:none;height:auto;overflow:visible}'
+    + '.pcf-vp{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}'
+    + '.pcf-vp .pcf-top{border-radius:0 8px 0 0}.pcf-vp .pcf-sheetwrap{flex:1;min-height:0;overflow-y:auto;border-radius:0 0 8px 0}'
+    + '.pcf-top .pcf-strip{flex:0 1 auto}.pcf-top b{max-width:46%}'
+    + '.pcf-morew{position:relative;margin-left:auto}.pcf-more{font-size:15px;line-height:1;padding:3px 10px}'
+    + '.pcf-menu{position:absolute;right:0;top:110%;z-index:30;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.15);padding:4px;min-width:220px;display:flex;flex-direction:column}'
+    + '.pcf-menu[hidden]{display:none}.pcf-menu button{background:none;border:none;text-align:left;padding:7px 10px;border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;color:#1e293b}'
+    + '.pcf-menu button:hover{background:#eff6ff}.pcf-menu hr{border:none;border-top:1px solid #e2e8f0;margin:4px 0}'
+    + '@media(max-width:700px){.pcf-lp{width:auto;border-right:1px solid #e2e8f0;border-radius:8px}.pcf-lbody{max-height:40vh}.pcf-vp .pcf-top{border-radius:8px 8px 0 0;margin-top:8px}}'
     + '.pcf-mk-kinds{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:6px}'
     + '.pcf-mk-kind{border:1px solid #cbd5e1;background:#f8fafc;border-radius:8px;padding:8px;text-align:left;cursor:pointer;font:inherit;font-size:13px}'
     + '.pcf-mk-kind small{display:block;font-size:11px;color:#64748b}.pcf-mk-kind.on{border:2px solid #1d4ed8;background:#eff6ff;color:#1e40af}'
@@ -2116,6 +2136,16 @@
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
       });
+      /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
+      t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
+      S.sets.forEach(function (st) {
+        var on = S.setId === st.id;
+        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), title: st.name + ' — 누르면 목록에 체크됩니다',
+          onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]));
+      });
+      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk add', text: '+ 세트 만들기', onclick: function () {
+        if (S.checked.length) saveAsSet(); else toast('목록에서 양식을 체크한 뒤 다시 누르세요 — 체크한 양식으로 세트를 만듭니다');
+      } }));
     }
 
     /* ── 오른쪽 ── */
@@ -2124,7 +2154,7 @@
         var n = S.forms.filter(function (x) { return x.kind === k.v; }).length;
         return el('option', { value: k.v, text: k.icon + ' ' + k.label + ' (' + n + ')', selected: k.v === S.kind });
       }));
-      return el('div', { 'class': 'pcf-msel' }, [kSel]);
+      return el('div', { 'class': 'pcf-msel' }, [kSel, setPicker()]);
     }
     function uploadBtn(kind) {
       var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.xlsx,.xls,.docx,.doc,.pdf', style: 'display:none',
@@ -2136,39 +2166,59 @@
         ['📎 파일 업로드', upIn]);
       return b;
     }
-    /* 제목 줄 «하나» — 제목 · 원본 첨부 · 채워서 받기/수정/복제/삭제 (한 화면에 보이게, 2026-09-27) */
+    /* 보기 칸 머리 (2026-10-07 화면 개편, 목업 승인) — 제목 · 원본 파일 · 원본 모양/글자 본문 · 📝 찾아서 채우기 · ⋯
+       드물게 쓰는 것(수정·복제·삭제·바꿀 자리·올리기·계약 여러 건·rhwp)은 ⋯ 하나에 접는다 */
+    function moreMenu(items) {
+      var box = el('div', { 'class': 'pcf-menu', hidden: true, role: 'menu' });
+      items.filter(Boolean).forEach(function (it) { box.appendChild(it.nodeType ? it : el('button', { type: 'button', role: 'menuitem', title: it.title || '', text: it.t,
+        onclick: function () { box.hidden = true; it.fn(); } })); });
+      var btn = el('button', { type: 'button', 'class': 'pcf-b pcf-more', 'aria-label': '더 보기', 'aria-haspopup': 'menu', text: '⋯', onclick: function (e) {
+        e.stopPropagation(); box.hidden = !box.hidden;
+        if (!box.hidden) setTimeout(function () { document.addEventListener('click', function off(ev) { if (!box.contains(ev.target)) { box.hidden = true; document.removeEventListener('click', off); } }); }, 0);
+      } });
+      return el('span', { 'class': 'pcf-morew' }, [btn, box]);
+    }
     function toolbar(fm) {
       var kind = curKind(), k = kindInfo(kind);
+      if (!fm) return el('div', { 'class': 'pcf-top' }, [el('b', { text: k.icon + ' ' + k.label + ' 양식' }), el('span', { 'class': 'pcf-strip', text: '목록에서 양식을 고르세요' })]);
       var strip = el('div', { 'class': 'pcf-strip' });
-      if (fm) {
-        var arcd = {};
-        (fm.originals || []).forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
-        (fm.attachments || []).forEach(function (a) {
-          strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl || '#', download: a.name || '첨부', text: '📥 ' + (a.name || '첨부') }));
-          if (/\.(hwp|hwpx)$/i.test(a.name || '')) strip.appendChild(el('button', { type: 'button', 'class': 'pcf-b g', title: '한글 원본 미리보기', text: '🔍', onclick: function () { openHwpPreview(a, null); } }));
-          if (arcd[attKey(a)]) strip.appendChild(el('span', { 'class': 'pcf-ok', text: '✓ 보관함' }));
-        });
-        (fm.originals || []).filter(function (o) { return !o.attId; }).forEach(function (o) {
-          strip.appendChild(el('button', { type: 'button', 'class': 'pcf-att', style: 'border:none;cursor:pointer', title: '원본 보관함에서 내려받기',
-            text: '🗄 ' + o.name, onclick: function () { if (host.downloadOriginal) host.downloadOriginal(o.fileId, o.name); else toast('보관함이 연결되지 않았습니다'); } }));
-        });
-        if (!strip.childNodes.length) strip.appendChild(el('span', { text: '원본 파일 없음' }));
-      }
-      return el('div', { 'class': 'pcf-top' }, fm ? [
-        el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' + k.label + ' · ' }), fm.name]),
+      var arcd = {};
+      (fm.originals || []).forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
+      (fm.attachments || []).forEach(function (a) {
+        if (a.role === 'preview') return;   // 미리보기 PDF 는 보기 칸이 쓴다 — 받을 원본 줄에는 안 띄운다
+        strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl || '#', download: a.name || '첨부', title: (a.name || '첨부') + ' 받기',
+          text: '📥 ' + (/\.xlsx$/i.test(a.name || '') ? '엑셀' : /\.(hwp|hwpx)$/i.test(a.name || '') ? '한글' : '파일') + (arcd[attKey(a)] ? ' ✓' : '') }));
+      });
+      if (!strip.childNodes.length) strip.appendChild(el('span', { text: '원본 파일 없음' }));
+      var hasOrig = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp));
+      var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
+      var hwpAtt = (fm.attachments || []).filter(function (a) { return /\.(hwp|hwpx)$/i.test(a.name || '') && (a.data || a.dataUrl); })[0];
+      return el('div', { 'class': 'pcf-top' }, [
+        el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' }), fm.name]),
         strip,
+        hasOrig ? el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
+          chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
+          chip('🔤 글자 본문', view === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
         host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
-        (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
-          ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1d4ed8', title: '원본 글자를 찾아 표시나 고친 글자로 바꿉니다. 이전 원본은 보관함에 남습니다.', text: '✏ 바꿀 자리 만들기', onclick: function () { openMark(fm); } }) : null,
-        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '수정', onclick: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } }),
-        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', text: '복제', onclick: function () { copy(fm); } }),
-        el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#dc2626', text: '삭제', onclick: function () { del(fm); } })
-      ].concat(rareTools(kind)) : [el('b', { text: k.icon + ' ' + k.label + ' 양식' }), el('span', { 'class': 'pcf-strip', text: '목록에서 양식을 고르세요' })].concat(rareTools(kind)));
+        moreMenu([
+          { t: '✏ 수정', fn: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } },
+          { t: '⧉ 복제', fn: function () { copy(fm); } },
+          (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
+            ? { t: '✏ 바꿀 자리 만들기', title: '원본 글자를 찾아 표시나 고친 글자로 바꿉니다. 이전 원본은 보관함에 남습니다.', fn: function () { openMark(fm); } } : null,
+          hwpAtt ? { t: '🔍 한글 원본 크게 보기', fn: function () { openHwpPreview(hwpAtt, null); } } : null,
+          { t: '🗑 삭제', fn: function () { del(fm); } }
+        ].concat(toolItems(kind)))
+      ]);
     }
-    /* 드물게 쓰는 도구 — 제목 줄 끝(칩 줄을 한 줄로 두려고) */
-    function rareTools(kind) {
-      return [el('button', { type: 'button', 'class': 'pcf-b', title: 'rhwp(한글 미리보기 엔진) 최신 판 확인', text: 'rhwp v' + rhwpVer() + ' ⟳', onclick: rhwpUpdatePrompt }),
-        kind === 'case' ? el('button', { type: 'button', 'class': 'pcf-b y', title: '체당금 기본 양식 4개를 다시 넣습니다', text: '📥 체당금 시드', onclick: reseedChedang }) : null];
+    /* 드물게 쓰는 도구 — ⋯ 메뉴 아래쪽 */
+    function toolItems(kind) {
+      var upIn = el('input', { type: 'file', multiple: true, accept: '.hwpx,.hwp,.xlsx,.xls,.docx,.doc,.pdf', style: 'display:none',
+        onchange: function (e) { quickUpload(kind, e.target.files); e.target.value = ''; } });
+      return [el('hr'),
+        { t: '📎 파일 올려 양식 만들기', title: 'HWPX · HWP · XLSX · DOCX · DOC · PDF — 올리면 원본 보관함에 사본이 남습니다', fn: function () { upIn.click(); } }, upIn,
+        host.contractList ? { t: '📦 계약 여러 건 채우기', title: '이알피 계약 여러 건을 골라 계약마다 서류 묶음을 .zip 하나로', fn: openContracts } : null,
+        { t: 'rhwp v' + rhwpVer() + ' 새 판 확인', fn: rhwpUpdatePrompt },
+        kind === 'case' ? { t: '📥 체당금 기본 양식 다시 넣기', fn: reseedChedang } : null];
     }
     /* ── 원본 모양 (대표 /goal 2026-10-07 「글자크기·모양·줄간 서식 등 모든 형태가 제대로」) ──
        가운데 종이는 본문 글자판(pre)만 보여 줬다 — 원본이 있어도 상자 글자(┌─┐)로 그린 «흉내»였고,
@@ -2225,9 +2275,6 @@
       var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
       var sheet = el('div', { 'class': 'pcf-sheet' + (view === 'orig' ? ' orig' : '') });
       if (fm.enabled === false) sheet.appendChild(el('div', { 'class': 'pcf-offband', text: '사용 안 함 — 계약서 출력 때 고를 수 없습니다' }));
-      if (hasOrig) sheet.appendChild(el('div', { 'class': 'pcf-pvbar' }, [
-        chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
-        chip('🔤 글자 본문(표시 확인)', view === 'text', function () { S.paperView = 'text'; drawBody(); })]));
       if (view === 'orig') {
         var ob = el('div', { 'class': 'pcf-orig' });
         sheet.appendChild(ob);
@@ -2252,17 +2299,19 @@
     }
     /* 칩 줄 «하나» — 사건계약: 측 칩 | 사건유형 칩(고른 측 안에서 센 수). 모든 종류: 이름 찾기 · 목록/카드 · 올리기·추가 도구.
        넓은 화면에서는 한 줄, 좁으면 줄바꿈한다(한 화면에 보이게, 2026-09-27) */
-    function filterBar() {
-      var kind = S.kind, row = [setPicker()];
-      if (host.contractCtx) row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '계약 자료' }, [
-        chip('📄 ' + host.contractCtx.label + ' 자료로 채움 ✕', true, function () { host.contractCtx = null; drawMain(); toast('계약 자료를 풀었습니다 — 이제 기업정보함 값만으로 채웁니다'); })]));
+    /* 목록 칸 머리 (2026-10-07 화면 개편) — 찾기 · 묶음/측/사건유형 칩 · 목록/카드. 세트는 왼쪽 나무로 갔다(휴대폰은 위 고르기 칸) */
+    function listHead() {
+      var kind = S.kind, row = [];
+      if (host.contractCtx) row.push(chip('📄 ' + host.contractCtx.label + ' 자료로 채움 ✕', true, function () { host.contractCtx = null; drawMain(); toast('계약 자료를 풀었습니다 — 이제 기업정보함 값만으로 채웁니다'); }));
+      var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
+      /* 글자를 칠 때마다 목록만 다시 그린다 — 머리까지 그리면 찾기 칸 커서가 사라진다 */
+      q.addEventListener('input', function () { S.q = q.value; drawList(); });
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
         row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '측' },
           [chip('전체 ' + fc.sides.all, S.side === 'all', function () { setFilter({ side: 'all', grp: 'all' }); })].concat(SIDES.map(function (sd) {
             return chip(sd.label + ' ' + fc.sides[sd.v], S.side === sd.v, function () { setFilter({ side: sd.v, grp: 'all' }); });
           }))));
-        row.push(el('span', { 'class': 'pcf-fsep' }));
         row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '사건유형' },
           [chip('모든 유형', S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(fc.groups.map(function (g) {
             return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
@@ -2272,21 +2321,14 @@
         var ff = facetCounts(S.forms, kind);
         row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '묶음' },
           [chip('전체 ' + ff.sides.all, S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(ff.groups.map(function (g) {
-            return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
+            return chip(g.name.replace('제안서·견적서', '견적') + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
           }))));
       }
-      var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 이름 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
-      /* 글자를 칠 때마다 본문만 다시 그린다 — 칩 줄까지 그리면 찾기 칸 커서가 사라진다 */
-      q.addEventListener('input', function () { S.q = q.value; drawBody(); });
-      row.push(q);
-      row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
-        chip('목록', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
-        chip('카드', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })]));
-      row.push(el('span', { 'class': 'pcf-tools' }, [
-        host.contractList ? el('button', { type: 'button', 'class': 'pcf-b', title: '이알피 계약 여러 건을 골라 계약마다 서류 묶음을 채워 .zip 하나로 받습니다', text: '📦 계약 여러 건', onclick: openContracts }) : null,
-        uploadBtn(kind),
-        el('button', { type: 'button', 'class': 'pcf-b b', text: '+ 양식 추가', onclick: function () { modal({ kind: kind, onSave: save }); } })]));
-      return el('div', { 'class': 'pcf-fbar' }, [el('div', { 'class': 'pcf-crow' }, row)]);
+      return el('div', { 'class': 'pcf-lh' }, [
+        el('div', { 'class': 'pcf-lhr' }, [q, el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
+          chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
+          chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
+        row.length ? el('div', { 'class': 'pcf-crow' }, row) : null]);
     }
     /* ── 묶음 채우기 (설계 2026-09-28 §2-2) — 체크(2-A) · 세트(2-B) · 아래 막대 ── */
     function checkedForms() {
@@ -2381,6 +2423,8 @@
       b.appendChild(el('b', { text: (st ? '📚 ' + st.name + ' · ' : '☑ ') + fms.length + '개 골랐습니다' }));
       b.appendChild(el('span', { 'class': 'pcf-bnames', title: fms.map(function (f) { return f.name; }).join(', '), text: fms.map(function (f) { return f.name; }).join(' · ') }));
       if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: saveAsSet }));
+      else { b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 세트 이름', onclick: function () { editSet(st.id, true); } }));
+        b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '🗑 세트 지우기', onclick: function () { editSet(st.id, false); } })); }
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
       if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
         onclick: function () { openFill(checkedForms(), host, st ? st.name : (host.contractCtx ? host.contractCtx.label : '고른 양식')); } }));
@@ -2421,14 +2465,24 @@
       });
       return grid;
     }
+    /* 세 칸 (2026-10-07 화면 개편, 목업 승인) — [목록 칸: 머리·목록] [보기 칸: 머리·원본]. 보기 칸이 오른쪽 전체를 쓴다 */
     function drawBody() {
       var box = S.bodyEl; if (!box) return;
       box.innerHTML = '';
-      var list = shown(), fm = cur();
-      if (S.view === 'card') box.appendChild(cardGrid(list));
-      else box.appendChild(el('div', { 'class': 'pcf-cols' }, [listCol(list),
-        fm ? paper(fm) : el('div', { 'class': 'pcf-sheetwrap' }, [el('div', { 'class': 'pcf-none', text: '목록에서 양식을 고르세요' })])]));
+      var fm = cur();
+      S.listEl = el('div', { 'class': 'pcf-lbody' });
+      var lp = el('div', { 'class': 'pcf-lp' }, [listHead(), S.listEl]);
+      if (S.view === 'card') box.appendChild(el('div', { 'class': 'pcf-cols card' }, [lp]));
+      else box.appendChild(el('div', { 'class': 'pcf-cols' }, [lp, el('div', { 'class': 'pcf-vp' }, [toolbar(fm),
+        fm ? paper(fm) : el('div', { 'class': 'pcf-sheetwrap' }, [el('div', { 'class': 'pcf-none', text: '목록에서 양식을 고르세요' })])])]));
+      drawList();
       fitHeight();
+    }
+    function drawList() {
+      var b = S.listEl; if (!b) return;
+      b.innerHTML = '';
+      var list = shown();
+      b.appendChild(S.view === 'card' ? cardGrid(list) : listCol(list));
     }
     /* 목록·종이(또는 카드)를 화면 아래 끝까지만 — 그 안에서 스크롤한다. 페이지 전체가 아래로 늘어나면
        종이 끝을 보려고 제목·칩이 화면 밖으로 밀려난다. 휴대폰(세로로 쌓는 화면)은 묶지 않는다. */
@@ -2453,9 +2507,8 @@
       }
       if (!S.loaded) { wrap.appendChild(el('div', { 'class': 'pcf-none', text: '불러오는 중…' })); root.appendChild(wrap); return; }
       wrap.appendChild(mobileSelects());
-      wrap.appendChild(toolbar(cur()));
-      wrap.appendChild(filterBar());
       wrap.appendChild(bundleBar());
+      drawTree();   // 세트가 나중에 오거나 바뀌면 왼쪽 나무도 다시
       S.bodyEl = el('div');
       wrap.appendChild(S.bodyEl);
       root.appendChild(wrap);

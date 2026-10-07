@@ -50,7 +50,7 @@ test('ⓒⓔ 창 — 하나씩 차례로, 실패는 계속, contractPick·fillFo
   assert.match(o, /\.reduce\(function \(p, /, '계약을 한꺼번에 채웁니다 — 하나씩 차례로');
   assert.match(o, /if \(busy\) return;/);
   assert.ok(!/db\.ref|changeForms/.test(o), '창이 db 를 직접 만집니다');
-  assert.match(cutFn(m, 'function filterBar('), /📦 계약 여러 건/);
+  assert.match(cutFn(m, 'function toolItems('), /📦 계약 여러 건/);   // 2026-10-07 화면 개편 — ⋯ 메뉴로
 });
 test('ⓔ 문서관리 host — 계약 목록·계약 읽기는 한 번 읽은 자료를 같이 쓴다(읽기만)', () => {
   const s = stripJs(DOCS);

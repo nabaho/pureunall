@@ -77,7 +77,7 @@ test('ⓔ 화면 — 계약 자료 쓰는 중 칩(✕ 로 풀기), 처음 한 �
   assert.match(o, /host\.contractLoad\(host\.contract\)/);
   assert.match(o, /contractPick\(S\.forms, info\)/);
   assert.match(o, /S\.checked = ids\.slice\(\)/);
-  const bar = cutFn(m, 'function filterBar(');
+  const bar = cutFn(m, 'function listHead(');   // 2026-10-07 화면 개편 — 목록 칸 머리로
   assert.match(bar, /host\.contractCtx/);
   assert.match(bar, /host\.contractCtx = null/);
 });
