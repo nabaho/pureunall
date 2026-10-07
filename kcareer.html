@@ -485,6 +485,15 @@ html.dark input,html.dark select,html.dark textarea{background:#1e293b;color:var
 html.dark .dt thead th,html.dark .th-sort:hover{background:#1e293b}
 html.dark .pglimit-btn,html.dark .nofile-btn,html.dark .cv-chip,html.dark .cv-pop{background:#1e293b;color:var(--text)}
 html.dark .empty{color:var(--text-mute)}
+/* ★ 어두운 화면에서 «남색 글자»가 남색 바탕(카드 #1e293b)에 묻히던 것 (2026-10-07 검토 — 창 제목·홈 숫자·보관함 묶음 머리 등).
+   ⚠ --navy 값 자체를 바꾸지 말 것 — 흰 글자 단추의 «바탕»이 같은 값을 쓴다. 글자만 --ink(어두운 화면에선 밝은 색)로 덮는다.
+   ⚠ 밝은 바탕을 따로 가진 것(.tag.navy·#kcUndo button·.kf-mode.on·.rh-dtab.on·.cv-pgcnt)은 남색 글자가 그대로 읽히므로 넣지 않는다. */
+html.dark .tabrow .tab:hover,html.dark .tabrow .tab.active,html.dark .modal-h,html.dark #cvNeedInfo b,html.dark #page-advisory .adv-stat b,
+html.dark .hj-syl-k,html.dark .pi-grp-h b,html.dark .rc-h,html.dark .rh-more[open] summary,html.dark .td-h,html.dark .ds-grp,html.dark .ds-pv-t,
+html.dark #kcDelPop .kdp-t,html.dark .page h2,html.dark .kpi .k-val,html.dark .cv-chip-h,html.dark .rh-fold>summary,html.dark .rh-slot .nm,
+html.dark .cv-hwp-head,html.dark .cv-hwp-pgno{color:var(--ink)}
+/* 화면에 직접 박힌 남색 글자(홈 바로가기 묶음 제목·연도칸·관리번호 등) — 밝은 바탕을 함께 박은 것은 뺀다 */
+html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*="background: #"]){color:var(--ink)!important}
 .dt tbody tr.row-warn{background:#f8fafc}
 .dt tbody tr.row-warn:hover{background:#fffbeb}
 .dt tbody tr.row-flash{animation:rowflash 1.4s ease}
@@ -1331,7 +1340,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=2"></script>
+<script src="js/kcareer-biz.js?v=3"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -3530,6 +3539,8 @@ function set(key,arr){
   /* ★ 옆줄 숫자도 여기서 함께 고친다 — 삭제·등록·합치기·스캔이 다 이 길로 지난다.
      ⚠ 화면마다 따로 부르게 하면 «빠뜨린 길»이 반드시 생긴다(실제로 전체 삭제가 그랬다). */
   try{ if(typeof navCountsSoon==='function') navCountsSoon(); }catch(e){}
+  /* 비용 «한눈에»를 보고 있으면 숫자 카드·정산도 다시 — 고치고 지워도 옛 숫자가 남았다(2026-10-07 검토) */
+  try{ if((key==='meetfee'||key==='etcfee') && typeof feeDashSoon==='function') feeDashSoon(); }catch(e){}
   /* 제출서류↔사업관리 잇기 표(_caseMap)는 저장할 때 버린다 — 안 버리면 1.5초 동안 옛 짝을 보여 준다 */
   try{ if(typeof _caseMapMemo!=='undefined') delete _caseMapMemo[key]; }catch(e){}
   try{ var _담김=LS.set(NS+key, JSON.stringify(arr)); if(typeof fbScheduleAuto==='function') fbScheduleAuto(key);
@@ -3572,14 +3583,29 @@ function _openIDB(){ return new Promise(function(res,rej){
   req.onerror=function(){ rej(req.error); };
 }); }
 
-function saveFileUnified(id,file){ /* async-safe: fire-and-forget */
+/* ★ 끝까지 기다리는 저장 — 이 PC 보관함(IndexedDB)에 «다 들어가면» true, 못 들어가면 false (2026-10-07 검토).
+   ⚠ «저장한 뒤 원본을 지우는» 길(중복 합치기 등)은 반드시 이것을 await 한다 —
+     saveFileUnified 는 기다리지 않고 번호를 돌려주므로, 실패해도 원본을 지웠다.
+   o.noCache: 대량 가져오기 — 다 들어간 뒤 기억 사본(_cache)을 놓는다(수백 개를 담아 탭이 멎던 것) */
+function saveFileWait(id,file,o){
+  o=o||{};
   const rec={id:id,name:file.name,ext:file.ext,size:file.size,base64:file.base64||'',savedAt:file.savedAt||new Date().toISOString()};
   _cache[id]=rec; _fileIdSet.add(id);
-  _openIDB().then(function(db){
+  return _openIDB().then(function(db){ return new Promise(function(res){
     const tx=db.transaction('files','readwrite'); tx.objectStore('files').put(rec);
     tx.oncomplete=function(){ /* 구 localStorage 청크 정리 */
-      const m=localStorage.getItem(NS+'pf_meta_'+id); if(m){ try{ const meta=JSON.parse(m); for(let i=0;i<(meta.chunks||0);i++) localStorage.removeItem(NS+'pf_chunk_'+id+'_'+i); localStorage.removeItem(NS+'pf_meta_'+id); }catch(e){} } };
-  }).catch(function(e){ console.error('IDB saveFile:',e); });
+      const m=localStorage.getItem(NS+'pf_meta_'+id); if(m){ try{ const meta=JSON.parse(m); for(let i=0;i<(meta.chunks||0);i++) localStorage.removeItem(NS+'pf_chunk_'+id+'_'+i); localStorage.removeItem(NS+'pf_meta_'+id); }catch(e){} }
+      if(o.noCache && _cache[id]===rec) delete _cache[id];
+      res(true); };
+    tx.onerror=tx.onabort=function(){ console.error('IDB saveFile:', tx.error); res(false); };
+  }); }).catch(function(e){ console.error('IDB saveFile:',e); return false; }).then(function(ok){
+    /* 못 담았으면 «한 번은» 말한다 — 기억 사본으로는 보이지만 새로고침하면 사라진다 */
+    if(!ok && (!saveFileWait._said || Date.now()-saveFileWait._said>60000)){ saveFileWait._said=Date.now();
+      try{ toast('⚠️ 파일을 이 PC 보관함에 담지 못했습니다(저장공간 부족일 수 있음) — 새로고침하면 사라질 수 있습니다', 8000); }catch(e){} }
+    return ok; });
+}
+function saveFileUnified(id,file,o){ /* 기다리지 않는다 — 번호를 바로 돌려준다. 끝까지 기다릴 곳은 saveFileWait */
+  saveFileWait(id,file,o);
   return id;
 }
 
@@ -4869,17 +4895,21 @@ async function casePastGo(){
   if(!고른.length){ toast('넣을 연도를 골라 주세요'); return; }
   var go=document.getElementById('casePastGo'); if(go){ go.disabled=true; go.textContent='⏳ 읽는 중…'; }
   try{
-    var subs=get('submission'), now=new Date().toISOString(), 파일=0, 해={};
+    var 새것=[], now=new Date().toISOString(), 파일=0, 해={};
     var scanId='P'+now.slice(0,10).replace(/-/g,'')+'-'+String(Date.now()).slice(-4);
     for(var i=0;i<고른.length;i++){
       var c=고른[i], d=P.byKey[c.caseDir]; if(!d) continue;
       if(i%10===0) toast('⏳ '+(i+1)+' / '+고른.length+' 건 폴더 살피는 중…');
       var files=await fsCaseFiles(d.handle, c.caseDir);
       var rec=KcareerCases.buildCaseRecord(c.caseDir, files, { scanId:scanId });
-      rec.id=kcNextNo('SB',4,'submission',subs); rec.savedAt=now; rec.pastImport=true;
-      subs.push(rec); 파일+=rec.fileCount; 해[rec.year||'?']=1;
+      rec.savedAt=now; rec.pastImport=true;
+      새것.push(rec); 파일+=rec.fileCount; 해[rec.year||'?']=1;
     }
-    /* ⚠ 한 번에 저장한다 — 236번 나눠 저장하면 그때마다 클라우드로 올라간다 */
+    /* ⚠ 한 번에 저장한다 — 236번 나눠 저장하면 그때마다 클라우드로 올라간다
+       ⚠★ 저장 «직전»에 다시 읽어 새 줄만 더한다 — 처음 읽은 목록을 몇 분 들고 있다가 통째로 덮으면
+         그 사이 다른 창·탭에서 고친 제출서류가 사라졌다(2026-10-07 검토). 번호도 지금 목록을 보고 매긴다. */
+    var subs=get('submission');
+    새것.forEach(function(rec){ rec.id=kcNextNo('SB',4,'submission',subs); subs.push(rec); });
     set('submission', subs);
     var done={}; 고른.forEach(function(c){ done[c.caseDir]=1; });
     LS.set(NS+'case_dismissed', JSON.stringify(_caseDismissed().filter(function(x){ return !done[x]; })));
@@ -6056,9 +6086,11 @@ function syncGroupUI(id){ const inf=(typeof navInfo==='function')?navInfo(id):{g
      들어가면, 옆줄은 엉뚱한 그룹을 펼친 채라 「지금 어디인지」가 안 보였다.
      ⚠ buildNav 가 이 함수를 부르므로 다시 그릴 때는 «바뀐 것이 없어야» 한다 —
        안 그러면 서로 부르며 끝없이 돈다. 그래서 다를 때만 담고 다시 그린다. */
-  if(grp && typeof navPicked==='function' && navPicked()!==grp){
+  /* ⚠★ 다시 그리기는 «한 번만» — 담기가 실패하면(저장공간 참) navPicked 가 끝내 grp 와 안 맞아
+       buildNav ↔ syncGroupUI 가 서로를 끝없이 불러 화면 이동이 멎었다(2026-10-07 검토). */
+  if(grp && typeof navPicked==='function' && navPicked()!==grp && !syncGroupUI._busy){
     try{ LS.set(NS+'nav_group', grp); }catch(e){}
-    if(typeof buildNav==='function'){ buildNav(); return syncGroupUI(id); }
+    if(typeof buildNav==='function'){ syncGroupUI._busy=true; try{ buildNav(); return syncGroupUI(id); } finally{ syncGroupUI._busy=false; } }
   }
   /* 켜진 상위는 «펼친 것»(navPicked)으로 칠한다 — «지금 화면의 그룹»으로 칠하면
      홈·환경설정처럼 그룹이 없는 화면에서 넷 다 꺼져, 무엇을 펼쳐 두었는지 안 보인다
@@ -7059,22 +7091,39 @@ async function docImportResumeFolder(){
   if(!plan.length){ toast('✅ 「'+폴더명+'」의 파일은 이미 모두 들어 있습니다'); return; }
   var 이력=plan.filter(function(p){ return p.domain==='resume'; }).length, 프로=plan.length-이력, 해있음=plan.filter(function(p){ return p.year; }).length;
   if(!confirm('「'+폴더명+'」에서 '+plan.length+'개를 넣습니다\n\n· 이력서 '+이력+'개 · 프로필 '+프로+'개\n· 이름에 해가 적힌 '+해있음+'개는 그 해, 나머지는 «연도 모름»\n· 파일은 앱에 담겨 다른 PC 에서도 열립니다(폴더 원본은 그대로)\n\n계속할까요?')) return;
-  var now=new Date().toISOString(), 담음={resume:[],profile:[]}, 창고=0;
-  for(var i=0;i<plan.length;i++){
-    var p=plan[i], bytes=new Uint8Array(await (await p.f.handle.getFile()).arrayBuffer()), ext=(p.f.name.split('.').pop()||'').toLowerCase();
-    if(i%5===0) toast('⏳ '+(i+1)+' / '+plan.length+' 담는 중…');
-    var id=p.domain+'_'+Date.now()+'_'+i, b64=abToB64(bytes);
-    saveFileUnified(id,{ id:id, name:p.f.name, ext:ext, size:bytes.length, base64:b64, savedAt:now });
-    var st=bytes.length<25*1024*1024 ? await kcFormUpload(id, b64, ext) : ''; if(st) 창고++;
-    var e={ id:id, kind:p.kind, year:p.year, org:'', memo:'📂 5번 폴더에서', genFileId:id, genName:p.f.name, origFileId:null, origName:null,
-      submits:[], savedAt:now, fileMtime:p.f.mtime, srcRel:p.f.relPath };
-    if(st) e.genStPath=st;
-    담음[p.domain].push(e);
+  var now=new Date().toISOString(), 담음={resume:[],profile:[]}, 셈={resume:0,profile:0}, 창고=0, 못=[];
+  /* ⚠★ 파일마다 따로 잡고, 열 개마다 «중간 저장»한다 (2026-10-07 검토).
+       전엔 한 파일(OneDrive 에 아직 안 받은 것 등)에서 오류가 나면 거기서 멈춰 — 이미 담은 파일은 «주인 없는 파일»로
+       남고 목록은 하나도 안 생겼으며 「⏳ 담는 중」에서 말없이 섰다.
+     ⚠ 담는 동안은 다른 기기 저장을 «받아 오지» 않는다(받으면 새로고침으로 중간에 끊긴다) — _kcBusyImport */
+  var 중간저장=function(){ ['resume','profile'].forEach(function(d){ if(담음[d].length){ set(d, 담음[d].concat(get(d)||[])); 셈[d]+=담음[d].length; 담음[d]=[]; } }); };
+  window._kcBusyImport=true;
+  try{
+    for(var i=0;i<plan.length;i++){
+      var p=plan[i];
+      try{
+        var bytes=new Uint8Array(await (await p.f.handle.getFile()).arrayBuffer()), ext=(p.f.name.split('.').pop()||'').toLowerCase();
+        if(i%5===0) toast('⏳ '+(i+1)+' / '+plan.length+' 담는 중…');
+        var id=p.domain+'_'+Date.now()+'_'+i, b64=abToB64(bytes);
+        /* 이 PC 보관함에 «다 들어간 뒤»에만 목록에 올린다 · 기억 사본은 놓는다(수십 개를 들고 있으면 탭이 멎는다) */
+        if(!(await saveFileWait(id,{ id:id, name:p.f.name, ext:ext, size:bytes.length, base64:b64, savedAt:now }, { noCache:true }))) throw new Error('이 PC 보관함에 못 담았습니다');
+        var st=bytes.length<25*1024*1024 ? await kcFormUpload(id, b64, ext) : ''; if(st) 창고++;
+        bytes=null; b64=null;
+        var e={ id:id, kind:p.kind, year:p.year, org:'', memo:'📂 5번 폴더에서', genFileId:id, genName:p.f.name, origFileId:null, origName:null,
+          submits:[], savedAt:now, fileMtime:p.f.mtime, srcRel:p.f.relPath };
+        if(st) e.genStPath=st;
+        담음[p.domain].push(e);
+      }catch(err){ console.warn('5번 폴더 넣기', p.f.name, err); 못.push(p.f.name+' — '+((err&&err.message)||'못 읽음')); }
+      if((i+1)%10===0) 중간저장();
+    }
+  } finally {
+    중간저장();
+    window._kcBusyImport=false;
   }
-  /* ⚠ 한 번에 저장한다 — 마흔 번 나눠 저장하면 그때마다 클라우드로 올라간다 */
-  ['resume','profile'].forEach(function(d){ if(담음[d].length) set(d, 담음[d].concat(get(d)||[])); });
   _safe(function(){ renderDocStore('resume'); renderDocStore('profile'); });
-  toast('✅ 이력서 '+담음.resume.length+'개 · 프로필 '+담음.profile.length+'개를 담았습니다'+(창고===plan.length?' — 다른 PC 에서도 열립니다':' — 창고에 '+창고+'개 올림'), 7000);
+  var 넣음=셈.resume+셈.profile;
+  toast('✅ 이력서 '+셈.resume+'개 · 프로필 '+셈.profile+'개를 담았습니다'+(창고===넣음?' — 다른 PC 에서도 열립니다':' — 창고에 '+창고+'개 올림')
+    +(못.length?' · ⚠ 못 넣은 것 '+못.length+'개: '+못.slice(0,3).join(' / ')+(못.length>3?' …':''):''), 못.length?12000:7000);
 }
 function delDoc(domain,id,btn){
   const D=DOMAINS[domain];
@@ -7792,7 +7841,12 @@ function initDocCreate(domain){ const cfg=DOMAINS[domain].create; const drop=doc
     document.addEventListener('drop', function(e){
       if(!onPage()||!isFile(e)) return;
       e.preventDefault(); depth=0; if(ovl) ovl.classList.remove('on');
-      var f=e.dataTransfer.files[0]; if(f) importTemplateFile(f, (document.getElementById('rhModeSel')||{}).value||'resume');
+      /* ⚠ 「👤 프로필로 저장」을 골라 둔 채 끌어다 놓으면 프로필 쪽 설정(숨은 #rhwpProfileEditor·pcSaveLib)으로 가
+           서류 만들기 화면엔 앞 문서가 남았다(2026-10-07 검토). 열기는 «지금 보이는 편집기»를 쓰는 갈래로만 —
+           어디에 담을지는 rhSaveDomain 이 따로 정한다. */
+      var m=(document.getElementById('rhModeSel')||{}).value||'resume';
+      var c=DOMAINS[m]&&DOMAINS[m].create, 보임=c && (!c.editor || c.editor==='#rhwpEditor');
+      var f=e.dataTransfer.files[0]; if(f) importTemplateFile(f, 보임?m:'resume');
     });
   }
   const fillBtn=document.getElementById(cfg.fillBtn); if(fillBtn) fillBtn.onclick=()=>toggleFillPanel(domain);
@@ -8508,7 +8562,10 @@ async function _formFileAsync(){
   return await recFileAsync(rec, _formCtx.editId);
 }
 /* 옛 이름 — 이제 openForm 이 스스로 판단하므로 그냥 넘긴다 */
-function openEditDrawer(page,id){ openForm(page,id); }
+/* ⚠ 직원 «보기 전용»에서는 있는 기록을 열어 고치지 못한다 — 줄을 누르면 수정 창이 열려 「수정 완료」까지 떴다(2026-10-07 검토).
+     직원의 «PDF 올리기(등록 신청)»는 받은 함 길이라 여기와 상관없다. */
+function _kcReadOnly(){ if(typeof kcStaffView==='function' && kcStaffView()){ toast('🔎 보기 전용입니다 — 고치거나 붙일 수는 없습니다'); return true; } return false; }
+function openEditDrawer(page,id){ if(_kcReadOnly()) return; openForm(page,id); }
 /* 편집창에서 첨부 원본을 다시 OCR로 읽어 폼 채우기 (파일명으로만 등록된 기존 기록 보정) */
 async function reOcrForm(){
   if(!_formCtx || !_formCtx.editId){ toast('저장된 항목에서 열어야 다시 읽기가 됩니다'); return; }
@@ -8751,6 +8808,7 @@ function wiccokTermClear(){
   document.querySelectorAll('.wc-term').forEach(function(b){ b.classList.remove('primary'); });
 }
 function saveForm(){ if(!_formCtx) return; const {page,editId}=_formCtx; const def=FORM_DEFS[page]; const data={};
+  if(editId && _kcReadOnly()) return;
   def.fields.forEach(f=>{ if(f.type==='period_row'){ data.periodStart=v('ff-periodStart'); data.periodEnd=v('ff-periodEnd'); }
     else if(f.type==='account_ref'){ const id=v('ff-'+f.key); data[f.key]=id; const a=get('account').find(x=>x.id===id); data.acctLabel=a?((a.bank||'')+' '+(a.number||'')).trim():''; }
     else data[f.key]=v('ff-'+f.key); });
@@ -9397,7 +9455,9 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
     keyed.sort(function(a,b){ const xa=a.k,xb=b.k; const sa=xa.replace(/[,\s원]/g,''), sb=xb.replace(/[,\s원]/g,'');
       let rr; if(sa&&sb&&/^-?[\d.]+$/.test(sa)&&/^-?[\d.]+$/.test(sb)) rr=parseFloat(sa)-parseFloat(sb); else rr=xa.localeCompare(xb,'ko'); return rr*ss.dir; });
     rows=keyed.map(function(o){return o.r;}); }
-  else { rows.sort((a,b)=>(b.issueDate||b.date||b.year||'').localeCompare(a.issueDate||a.date||a.year||'')); }
+  /* 기본은 최근 것부터 — ⚠ 일자는 「2026.9.5」·「2026-09-18」이 섞여 담긴다. 글자 순으로 견주면 9월 5일이
+     18일보다 «나중»이 된다 → 해·달·날을 맞춘 열쇠(_rowDateKey)로 견준다(2026-10-07 검토) */
+  else { rows.sort((a,b)=>_rowDateKey(b).localeCompare(_rowDateKey(a))); }
   const missingCount=rows.filter(function(r){ return !hasOriginal(r); }).length;
   if(_noFileOnly[name]) rows=rows.filter(function(r){ return !hasOriginal(r); });
   /* 연결 걸러보기 칩 (목업 안 E, 2026-09-29) — 실적 다섯 칸에만. 셈은 «거르기 전» 줄로 */
@@ -9482,8 +9542,10 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
   _stickyTop(sec);               /* 표 머리줄이 툴바 아래에 붙도록 높이를 알려준다 */
   careerSelSync(name);
   _safe(function(){ careerDragSel(name); });
-  /* ⚠ 「☐ №」 머리는 글자가 « №»(앞에 빈칸)라 「===『№』」로는 안 걸렀다 — ☐ 를 누르면 고르기와 함께 정렬까지 됐다(2026-10-07 검토) */
-  box.querySelectorAll('th').forEach((th,idx)=>{ var hn=(th.textContent||'').trim(); if(hn==='관리'||hn==='№'||th.classList.contains('rownum-h')) return; th.style.cursor='pointer'; th.title='클릭하면 정렬'; th.onclick=()=>sortTable(box,th,idx); });
+  /* ⚠★ 머리칸 정렬은 위 조립문의 sortCol(«전체 자료»를 정렬해 다시 그림) «하나»다 (2026-10-07 검토).
+       예전엔 여기서 th.onclick=sortTable 로 «덮어써» — 보이는 50줄만 정렬되고 「더 보기」에 풀렸으며,
+       머리칸 글자를 통째로 다시 써서 ☐(전체 선택)까지 지웠다. 덮어쓰지 말 것. */
+  box.querySelectorAll('th.th-sort').forEach(function(th){ th.style.cursor='pointer'; th.title='클릭하면 정렬'; });
   /* ⚠ 합친 표(비용관리)에서는 줄마다 «온 곳»이 다르다. 그걸 잃으면 기타비용 기록을
      고칠 때 회의비용 쪽에 새로 저장돼 원본이 남고 사본이 생긴다. */
   var _stOf={}; data.forEach(function(r){ _stOf[r.id]=r._st||cfg.store; });
@@ -9502,6 +9564,14 @@ function renderCareer(name){ const cfg=CAREER_CFG[name]; if(!cfg) return;
 var _flashId=null, _pageLimit={}, _pageStep={};
 var _noFileOnly={}, _sortState={};
 function toggleNoFile(name){ _noFileOnly[name]=!_noFileOnly[name]; renderCareer(name); }
+/* 줄을 «날짜 차례»로 세울 열쇠 — 「YYYYMMDD」. 달·날을 모르면 00. 아무것도 없으면 '' (맨 뒤) */
+function _rowDateKey(r){
+  var s=String((r&&(r.issueDate||r.date||r.year))||'');
+  var m=/(\d{4})(?:\D{0,3}(\d{1,2}))?(?:\D{0,3}(\d{1,2}))?/.exec(s);
+  if(!m) return '';
+  var p=function(x){ return x?('0'+Number(x)).slice(-2):'00'; };
+  return m[1]+p(m[2])+p(m[3]);
+}
 function sortCol(name,i){ const s=_sortState[name]; if(s&&s.col===i){ s.dir*=-1; } else { _sortState[name]={col:i,dir:1}; } renderCareer(name); }
 function _cellText(trHtml,i){ const t=document.createElement('table'); t.innerHTML='<tbody>'+trHtml+'</tbody>'; const tr=t.querySelector('tr'); if(!tr) return ''; const td=tr.children[i]; return td?(td.textContent||'').trim():''; }
 function toggleTheme(){ const on=!document.documentElement.classList.contains('dark'); document.documentElement.classList.toggle('dark',on); try{ localStorage.setItem('kc_theme',on?'dark':'light'); }catch(e){} const b=document.getElementById('themeBtn'); if(b) b.textContent=on?'☀️':'🌙'; }
@@ -9912,7 +9982,8 @@ async function mergeInto(primaryId){ const page=_dupPage, store=getDupStore(page
   if(!primFile && !primIsFs){
     for(var i=0;i<others.length;i++){
       var f=await getFileAsync(others[i].id);
-      if(f&&f.base64){ await saveFileUnified(primaryId,Object.assign({},f,{id:primaryId})); moved=true; break; }
+      /* ⚠ saveFileWait — 이 PC 보관함에 «다 들어간 뒤»에야 옮긴 것이다(saveFileUnified 는 기다리지 않는다) */
+      if(f&&f.base64){ moved=await saveFileWait(primaryId,Object.assign({},f,{id:primaryId})); break; }
     }
   }
   /* 옮길 원본이 있었는데 못 옮겼다면 «지우지 않고» 멈춘다 — 지우면 되돌릴 수 없다 */
@@ -10099,13 +10170,16 @@ function runGlobalSearch(){ var q=(document.getElementById('gsInput').value||'')
   if(!hits.length){ box.innerHTML='<div class="empty" style="padding:14px">결과 없음</div>'; return; }
   var shown=hits.slice(0,60);
   box.innerHTML='<div style="font-size:11px;color:var(--text-mute);margin-bottom:8px">'+hits.length+'건'+(hits.length>60?' (상위 60건 표시)':'')+'</div>'
-    +shown.map(function(o){ var info=navInfo('page-'+o.page)||{label:o.page}; var r=o.r;
+    +shown.map(function(o){ var info=_gsInfo(o.page); var r=o.r;
       var main=r.org||r.title||r.topic||r.project||r.kind||r.school||r.content||'-';
       var sub=[r.titleVal||r.project||r.memo||r.note||'',r.year||(r.issueDate||r.date||'').slice(0,4)||''].filter(Boolean).join(' · ');
       return '<div style="padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer" onclick="gsGo(\''+o.page+'\')"><span style="display:inline-block;min-width:78px;font-size:11px;color:#fff;background:var(--navy);border-radius:4px;padding:1px 6px;margin-right:6px">'+escapeHtml(info.label)+'</span><b style="font-size:13px">'+escapeHtml(main)+'</b>'+(sub?' <span style="font-size:11px;color:var(--text-mute)">'+escapeHtml(sub)+'</span>':'')+'</div>';
     }).join('');
 }
-function gsGo(page){ var info=navInfo('page-'+page)||{label:page,grp:''}; closeSearch(); nav_to('page-'+page, info.label, info.grp||''); }
+/* 비용 두 통(회의·기타)은 «한눈에 › 목록» 한 화면이다 — 옛 단독 화면(page-etcfee)으로 보내지 않는다(2026-10-07 검토) */
+function _gsPage(page){ return (page==='meetfee'||page==='etcfee') ? 'meetfee' : page; }
+function _gsInfo(page){ var p=(page==='meetfee'||page==='etcfee')?'feedash':page; var i=navInfo('page-'+p); return (i&&i.grp)?i:{label:i&&i.label||page,grp:''}; }
+function gsGo(page){ var info=_gsInfo(page); closeSearch(); nav_to('page-'+_gsPage(page), info.label, info.grp||''); }
 /* 서류 폴더 제자리에 저장 — 안 되면 «평소대로» 내려받기 폴더로 떨어뜨린다.
    ⚠ 조용히 실패하지 않는다. 어디에 저장됐는지 늘 알려 준다. */
 /* 목록 줄에서 기록을 찾아 넘긴다 — 이름을 지으려면 기록이 있어야 한다 */
@@ -10150,7 +10224,7 @@ function attachRec(id,store,page){ const inp=document.createElement('input'); in
   inp.onchange=async()=>{ const file=inp.files[0]; if(!file) return; await saveAttach(id,file); renderCareer(page); openForm(page,id,true); }; inp.click(); }
 async function saveAttach(id,file){ const buf=await file.arrayBuffer();
   saveFileUnified(id,{id,name:file.name,ext:(file.name.split('.').pop()||'').toLowerCase(),size:file.size,base64:abToB64(buf),savedAt:new Date().toISOString()}); }
-async function dropAttach(id,store,page,file){ await saveAttach(id,file); toast('첨부됨 — 원본 확인 후 저장하세요'); renderCareer(page); openForm(page,id,true); }
+async function dropAttach(id,store,page,file){ if(_kcReadOnly()) return; await saveAttach(id,file); toast('첨부됨 — 원본 확인 후 저장하세요'); renderCareer(page); openForm(page,id,true); }
 function memoRec(store,id,page){ const arr=get(store); const r=arr.find(x=>x.id===id); if(!r) return;
   const m=prompt('메모(비고)', r.note||''); if(m===null) return; r.note=m; set(store,arr); renderCareer(page); }
 /* ═══════════════════════════════════════════════════════════════════
@@ -10292,6 +10366,8 @@ function kcTrashRedraw(e){
     else if(e.store==='account') renderAccounts();
     else if(e.store==='gallery') renderGallery();
     else if(e.store==='stamps') renderStamps();
+    /* 🏢 사업 — 되살려도 목록이 그대로였다(2026-10-07 검토) */
+    else if(typeof BIZ_STORE!=='undefined' && (e.store===BIZ_STORE || e.bizDoc)){ _safe(renderBizList); _safe(renderBizDash); }
     else if(typeof DOMAINS!=='undefined'){
       Object.keys(DOMAINS).forEach(function(d){ if(DOMAINS[d].store===e.store) renderDocStore(d); });
     }
@@ -10303,22 +10379,23 @@ function kcTrashPurge(tid){
   var t=kcTrashList(), e=null;
   var rest=t.filter(function(x){ if(x.tid===tid){ e=x; return false; } return true; });
   if(!e) return 0;
-  (e.files||[]).forEach(function(fid){ try{ deleteFile(fid); }catch(err){} });
-  /* ⚠ 창고에 올린 양식도 함께 비운다 — 안 비우면 아무도 못 꺼내는 파일이 창고에
-     영영 쌓이고 요금만 나간다. «완전삭제»일 때만이다(휴지통에 있는 동안은 그대로 둔다 —
-     되살릴 수 있어야 하니까). 실패해도 지우기는 그대로 성공시킨다. */
-  /* 양식(stPath)과 완성 서류(genStPath·origStPath) 모두 — 자리가 적힌 것만 지운다 */
-  try{ var st=null;
-       ['stPath','genStPath','origStPath'].forEach(function(k){
-         var 자리=e.rec&&e.rec[k]; if(!자리) return;
-         st=st||kcFormStorage(); if(st) st.ref(자리).delete().catch(function(){});
-       });
-       /* 🏢 사업 서류들의 자리도 — 안 비우면 3,700개 서류가 창고에 남는다 */
-       ((e.rec&&Array.isArray(e.rec.docs))?e.rec.docs:[]).forEach(function(d){
-         if(!d||!d.stPath) return; st=st||kcFormStorage(); if(st) st.ref(d.stPath).delete().catch(function(){}); });
-     }catch(err){}
+  _kcTrashFree(e);
   set(TRASH_STORE, rest);
   return 1;
+}
+/* 휴지통 한 줄을 «정말로» 비운다 — 이 PC 파일과 창고 파일 모두. 완전삭제·30일 비우기가 «이 한 곳»을 쓴다.
+   ⚠ 예전엔 30일 비우기가 이 PC 파일만 지워, 창고에 아무도 못 꺼내는 파일이 쌓이고 요금만 나갔다(2026-10-07 검토).
+   ⚠ 휴지통에 있는 동안은 그대로 둔다 — 되살릴 수 있어야 하니까. 실패해도 지우기는 그대로 성공시킨다. */
+function _kcTrashFree(e){
+  (e.files||[]).forEach(function(fid){ try{ deleteFile(fid); }catch(err){} });
+  /* 양식(stPath)과 완성 서류(genStPath·origStPath) 모두 — 자리가 적힌 것만 지운다 */
+  try{ var st=null, 지우기=function(자리){ if(!자리) return; st=st||kcFormStorage(); if(st) st.ref(자리).delete().catch(function(){}); };
+       ['stPath','genStPath','origStPath'].forEach(function(k){ 지우기(e.rec&&e.rec[k]); });
+       /* 🏢 사업 서류들의 자리도 — 안 비우면 3,700개 서류가 창고에 남는다 */
+       ((e.rec&&Array.isArray(e.rec.docs))?e.rec.docs:[]).forEach(function(d){ 지우기(d&&d.stPath); });
+       /* 사업에서 «빼기»만 한 서류 한 장 */
+       if(e.bizDoc && e.bizDoc.doc) 지우기(e.bizDoc.doc.stPath);
+     }catch(err){}
 }
 
 /* 30일 지난 것만 비운다. 지운 때가 없는 것은 «건드리지 않는다» —
@@ -10336,7 +10413,7 @@ function kcTrashSweep(){
   var t=kcTrashList(); if(!t.length) return 0;
   var due=t.filter(kcTrashDue);
   if(!due.length) return 0;
-  due.forEach(function(e){ (e.files||[]).forEach(function(fid){ try{ deleteFile(fid); }catch(err){} }); });
+  due.forEach(_kcTrashFree);       /* 창고 파일까지 — 완전삭제와 같은 일 */
   set(TRASH_STORE, t.filter(function(e){ return !kcTrashDue(e); }));
   return due.length;
 }
@@ -11649,7 +11726,7 @@ async function saveOCRRecord(page,parsed,file,ext,b64){
   if(_same){
     var _added=false;
     if(!hasOriginal(_same)){
-      try{ await saveFileUnified(_same.id,{id:_same.id,name:file.name,ext,size:file.size,base64:b64,savedAt:new Date().toISOString()}); _added=true; }catch(e){}
+      try{ _added=await saveFileWait(_same.id,{id:_same.id,name:file.name,ext,size:file.size,base64:b64,savedAt:new Date().toISOString()}); }catch(e){}
       if(_added && !_same.fname){ _same.fname=file.name; set(store,db); }
     }
     return { dup:true, id:_same.id, attached:_added };
@@ -13445,6 +13522,14 @@ function feeDashTab(t){
   if(_feeTab==='list') renderCareer('meetfee');
   if(_feeTab==='settle') renderFeeSettle();
 }
+/* 비용 기록이 바뀌면 — 「한눈에」가 떠 있을 때만, 여러 번 바뀌어도 끝에 한 번 */
+var _feeDashT=null;
+function feeDashSoon(){
+  if(typeof document==='undefined') return;
+  if(_feeDashT) clearTimeout(_feeDashT);
+  _feeDashT=setTimeout(function(){ _feeDashT=null;
+    if((typeof curNavId==='function'?curNavId():'')==='page-feedash') _safe(renderFeeDash); }, 250);
+}
 function renderFeeDash(){
   var body=document.getElementById('feeDashBody'); if(!body) return;
   var all=feeAll(), yr=_feeDashYear(all);
@@ -14080,11 +14165,9 @@ async function rhAttachBuild(){
   try{
     await _loadPdfLib();
     var P=PDFLib, out=await P.PDFDocument.create(), A4=[595.28,841.89];
-    /* 목록표 — 맨 앞 */
-    var 목록=고른.map(function(x){ var row=_att.rows[x.row];
-      return { no:x.no, name:x.file?x.file.name.replace(/\.[^.]+$/,''):_attRecName(x.r,x.page), org:(x.r&&x.r.org)||row.org||'', period:row.period||'' }; });
-    var 목록쪽=_attListPages(목록);
-    for(var a=0;a<목록쪽.length;a++){ var im=await out.embedPng(await _attPngOf(목록쪽[a])); var pg=out.addPage(A4); pg.drawImage(im,{x:0,y:0,width:A4[0],height:A4[1]}); }
+    /* ⚠ 목록표는 증빙을 다 붙인 «뒤»에 맨 앞에 끼운다 — 먼저 그리면 못 붙인 증빙까지 목록에 실려,
+         목록에는 있는데 뒤에 서류가 없는 첨부가 나갔다(2026-10-07 검토) */
+    var 붙음=[];
     for(var i=0;i<고른.length;i++){
       var x=고른[i], 이름, 확장, 바이트, f=null;
       try{
@@ -14113,8 +14196,15 @@ async function rhAttachBuild(){
           var pw=쪽들[q].getWidth(), ph=쪽들[q].getHeight(), sw=Math.min(130, st.width*0.3), sh=sw*st.height/st.width;
           쪽들[q].drawImage(st,{x:pw-sw-22,y:ph-sh-18,width:sw,height:sh});
         }
+        붙음.push(x);
       }catch(e){ console.warn('첨부', x, e); 못.push(x.label+' — '+((e&&e.message)||'못 붙였습니다')); }
     }
+    /* 목록표 — 실제로 붙은 것만, 맨 앞에 */
+    var 목록=붙음.map(function(x){ var row=_att.rows[x.row];
+      return { no:x.no, name:x.file?x.file.name.replace(/\.[^.]+$/,''):_attRecName(x.r,x.page), org:(x.r&&x.r.org)||row.org||'', period:row.period||'' }; });
+    var 목록쪽=목록.length?_attListPages(목록):[];
+    for(var a=0;a<목록쪽.length;a++){ var im=await out.embedPng(await _attPngOf(목록쪽[a])); var pg=out.insertPage(a, A4); pg.drawImage(im,{x:0,y:0,width:A4[0],height:A4[1]}); }
+    if(!붙음.length) throw new Error('붙인 증빙이 하나도 없습니다 — '+못.join(' / '));
     var pdf=await out.save();
     /* 서류 보관함에 — 그 신청서 곁(같은 기관·같은 이름 바탕)으로 */
     var domain=(typeof rhSaveDomain==='function')?rhSaveDomain():'resume', D=DOMAINS[domain];
@@ -14508,7 +14598,9 @@ async function _pkKeepApplication(title){
   var kinds=kindsOf(domain), kind=kinds.indexOf('위원·위촉 제출용')>=0?'위원·위촉 제출용':kinds[0];
   var entry=hit>=0?arr[hit]:{ id:id, kind:kind, year:year, org:title, memo:'📦 제출 꾸러미에서', genFileId:id, origFileId:null, origName:null, submits:[], packKey:key };
   entry.genName=name; entry.savedAt=now; if(st) entry.genStPath=st;
-  if(hit>=0) arr[hit]=entry; else arr.unshift(entry);
+  /* ⚠ 올리기를 기다린 «뒤»에 다시 읽어 그 줄만 바꾼다 — 처음 읽은 목록으로 덮으면 그 사이 고친 서류 보관함 줄이 사라진다(2026-10-07 검토) */
+  arr=get(D.store); hit=arr.findIndex(function(r){ return r && r.packKey===key; });
+  if(hit>=0) arr[hit]=Object.assign({}, arr[hit], { genName:entry.genName, savedAt:now }, st?{ genStPath:st }:{}); else arr.unshift(entry);
   set(D.store, arr);
   _safe(function(){ renderDocStore(domain); });
   return { label:D.label, org:entry.org, replaced:hit>=0, cloud:!!st };
@@ -14852,24 +14944,33 @@ function _bizEnsureSaved(){
 async function _bizAddFiles(list, 앞말){
   var r=_bizCur; if(!r) return { n:0, cloud:0, big:0 };
   var have={}; (r.docs||[]).forEach(function(d){ have[(d.relPath||'')+'|'+d.name+'|'+d.size]=1; });
-  var n=0, cloud=0, big=0;
+  var n=0, cloud=0, big=0, 못=0, 안저장=0;
   for(var i=0;i<list.length;i++){
-    var f=list[i], 키=(f.relPath||'')+'|'+f.name+'|'+f.bytes.length;
+    var f=list[i], 크기=f.bytes?f.bytes.length:(Number(f.size)||0), 키=(f.relPath||'')+'|'+f.name+'|'+크기;
     if(have[키]) continue;
-    var ext=(String(f.name).split('.').pop()||'').toLowerCase();
-    var id='bzd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
-    var b64=abToB64(f.bytes), now=new Date().toISOString();
-    saveFileUnified(id,{ id:id, name:f.name, ext:ext, size:f.bytes.length, base64:b64, savedAt:now });
-    /* 창고 한도(25MB) 안이면 올린다 — 못 올려도 이 PC 에는 담긴다 */
-    var 자리='';
-    if(f.bytes.length < 25*1024*1024){ 자리=await kcFormUpload(id, b64, ext); if(자리) cloud++; } else big++;
-    var d={ id:id, entityType:'Document', name:f.name, ext:ext, size:f.bytes.length, kind:KcareerBiz.guessDocKind(f.name), savedAt:now };
-    if(자리) d.stPath=자리; if(f.relPath) d.relPath=f.relPath; if(f.mtime) d.mtime=f.mtime;
-    r.docs=(r.docs||[]).concat([d]); have[키]=1; n++;
+    /* ⚠ 한 장이 안 읽혀도(OneDrive 미내려받음 등) 나머지는 계속 담는다 */
+    try{
+      var bytes=f.bytes || new Uint8Array(await (await f.handle.getFile()).arrayBuffer());
+      크기=bytes.length;
+      var ext=(String(f.name).split('.').pop()||'').toLowerCase();
+      var id='bzd_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,7);
+      var b64=abToB64(bytes), now=new Date().toISOString();
+      /* 이 PC 보관함에 «다 들어간 뒤»에만 목록에 올린다 · 폴더에서 읽은 것은 기억 사본을 놓는다 */
+      if(!(await saveFileWait(id,{ id:id, name:f.name, ext:ext, size:크기, base64:b64, savedAt:now }, { noCache:!f.bytes }))) throw new Error('이 PC 보관함에 못 담음');
+      /* 창고 한도(25MB) 안이면 올린다 — 못 올려도 이 PC 에는 담긴다 */
+      var 자리='';
+      if(크기 < 25*1024*1024){ 자리=await kcFormUpload(id, b64, ext); if(자리) cloud++; } else big++;
+      bytes=null; b64=null; if(!f.bytes) f.handle=null;
+      var d={ id:id, entityType:'Document', name:f.name, ext:ext, size:크기, kind:KcareerBiz.guessDocKind(f.name), savedAt:now };
+      if(자리) d.stPath=자리; if(f.relPath) d.relPath=f.relPath; if(f.mtime) d.mtime=f.mtime;
+      r.docs=(r.docs||[]).concat([d]); have[키]=1; n++; 안저장++;
+    }catch(err){ console.warn('사업 서류 넣기', f.name, err); 못++; }
+    /* 열 장마다 사업을 저장 — 중간에 멎어도 창고에 올라간 파일이 «주인 없는 파일»로 남지 않게 */
+    if(안저장>=10){ _bizPut(r); r._isNew=false; 안저장=0; }
     if(list.length>3 && (i+1)%3===0) toast('⏳ '+(앞말||'')+'서류 담는 중 '+(i+1)+' / '+list.length);
   }
-  if(n){ _bizPut(r); r._isNew=false; }
-  return { n:n, cloud:cloud, big:big };
+  if(안저장){ _bizPut(r); r._isNew=false; }
+  return { n:n, cloud:cloud, big:big, fail:못 };
 }
 function _bizAddMsg(o){ return '📎 서류 '+o.n+'개를 담았습니다'+(o.cloud===o.n?' — 다른 PC 에서도 열립니다':(' — 창고에 '+o.cloud+'개 올림'+(o.big?' · 25MB 넘는 '+o.big+'개는 이 PC 에만':''))); }
 function bizUpload(){
@@ -15016,7 +15117,9 @@ async function _bizReadDir(handle, prefix){
       var p=pre+'/'+ent[0];
       if(ent[1].kind==='directory'){ await walk(ent[1], p); continue; }
       if(KcareerScan.isIgnoredFile(ent[0])) continue;
-      try{ var f=await ent[1].getFile(); out.push({ name:ent[0], relPath:p, bytes:new Uint8Array(await f.arrayBuffer()), mtime:new Date(f.lastModified).toISOString() }); }
+      /* ⚠ 내용은 «여기서 읽지 않는다» — 손잡이만 들고, 담을 때 한 장씩 읽고 바로 놓는다(_bizAddFiles).
+           폴더째 미리 읽으면 수백 MB 가 한꺼번에 메모리에 올라 탭이 멎었다(2026-10-07 검토) */
+      try{ var f=await ent[1].getFile(); out.push({ name:ent[0], relPath:p, handle:ent[1], size:f.size, mtime:new Date(f.lastModified).toISOString() }); }
       catch(e){ console.warn('사업 서류 건너뜀', p, e); }
     }
   }
@@ -15036,6 +15139,7 @@ async function bizPickGo(){
   var btn=document.getElementById('bizPickGo'); if(btn){ btn.disabled=true; btn.textContent='⏳ 담는 중…'; }
   P.running=true; P.stop=false;
   var 건=0, 서류=0, 못=[];
+  window._kcBusyImport=true;     /* 담는 동안 다른 기기 저장을 받아 와 새로고침하지 않는다 */
   try{
     for(var i=0;i<고른.length;i++){
       if(P.stop){ 못.push('멈춤 — 남은 '+(고른.length-i)+'건은 안 올렸습니다'); break; }
@@ -15050,13 +15154,14 @@ async function bizPickGo(){
       var o=await _bizAddFiles(files, '['+(i+1)+' / '+고른.length+'건] ');
       if(o.n===0 && _bizCur && P.into) _bizPut(_bizCur);
       건++; 서류+=o.n; if(o.big) 못.push(x.d.name+' — 25MB 넘는 '+o.big+'개는 이 PC 에만');
+      if(o.fail) 못.push(x.d.name+' — 못 읽은 '+o.fail+'개');
     }
     document.getElementById('modalBizPick').classList.remove('open');
     _safe(renderBizList); _safe(renderBizDash); _safe(renderBizDocs);
     if(P.into) bizDraw(); else _bizCur=null;
     toast((P.into?'📎 서류 '+서류+'개를 담았습니다':'🏢 사업 '+건+'건 · 서류 '+서류+'개를 올렸습니다 — 구분·단계는 줄을 눌러 고쳐 주세요')+(못.length?' · '+못.join(' / '):''), 8000);
   }catch(e){ console.error(e); toast('올리기 실패: '+((e&&e.message)||e)); }
-  finally{ P.running=false; P.stop=false; if(btn){ btn.disabled=false; bizPickDraw(); } }
+  finally{ window._kcBusyImport=false; P.running=false; P.stop=false; if(btn){ btn.disabled=false; bizPickDraw(); } }
 }
 
 /* ── 🗂 서류 찾기 — 모든 사업의 서류를 한 표에서 ── */
@@ -19093,7 +19198,12 @@ function kcApplyLock(){
   var st=kcOwnerState();
   var box=document.getElementById('kcLock');
   /* 대표로 «막 확인된» 순간 — 부팅 때 미뤄 둔 시드를 이제 깐다(_seeded 로 멱등) */
-  if(st==='owner' && !LS.get(NS+'_seeded')){ _safe(loadSeed); _safe(function(){ if(typeof renderCareer==='function') renderCareer(); }); }
+  /* ⚠ renderCareer 는 «화면 이름»이 있어야 그린다 — 이름 없이 부르면 아무것도 안 했다(2026-10-07 검토). 지금 화면을 다시 그린다 */
+  if(st==='owner' && !LS.get(NS+'_seeded')){ _safe(loadSeed); _safe(function(){
+    var p=(typeof curNavId==='function'?curNavId():'').replace(/^page-/,'');
+    if(typeof renderCareer==='function' && typeof CAREER_CFG!=='undefined' && CAREER_CFG[p]) renderCareer(p);
+    if(typeof navCountsSoon==='function') navCountsSoon(); }); }
+  if(st==='owner'){ _safe(kcPubCopyRecover); }
   if(st==='owner' || st==='checking'){ if(box) box.remove(); document.body.classList.remove('kc-staff'); return st; }
   /* ★ 재직 직원이면 잠금창 대신 «경력관리만 보는 화면»으로 — 자료는 사본에서 읽는다 */
   if(kcStaffView()){ if(box) box.remove(); _safe(kcStaffEnter); return 'staff'; }
@@ -19130,6 +19240,8 @@ async function kcStaffEnter(){
   /* 옆줄에서 경력관리만 남긴다 — 나머지 상위는 애초에 안 그린다 */
   try{ NAV=NAV.filter(function(g){ return g.g==='경력관리' || !g.g; }); }catch(e){}
   try{ NAV=NAV.map(function(g){ return g.g ? g : { g:null, items:[] }; }); }catch(e){}
+  /* 경력관리 안에서도 «직원에게 열린 화면»만 — 기업경력이 보였다가 누르면 막혔다(2026-10-07 검토) */
+  try{ NAV=NAV.map(function(g){ return g.g ? Object.assign({}, g, { items:(g.items||[]).filter(function(it){ return KC_PUB_PAGES.indexOf(it[0])>=0; }) }) : g; }); }catch(e){}
   _safe(buildNav);
   await kcPubPull();
   _safe(buildNav);        /* ⚠ 사본을 읽은 «뒤»에 다시 그린다 — 먼저 그리면 건수가 0 으로 남는다 */
@@ -19306,6 +19418,9 @@ async function kcPubPull(){
       try{ LS.set(NS+k, JSON.stringify(v.ls[k]||[])); }catch(e){}
     });
     LS.set(NS+'pub_at', String(v.at||''));
+    /* ⚠ «이 기기 세 통은 지금 직원용 사본이다» 표시 — 같은 브라우저로 대표가 들어오면 이 사본을
+         대표 클라우드로 올리지 않고 먼저 받아 오게 한다(kcPubCopyRecover, 2026-10-07 검토) */
+    try{ localStorage.setItem(NS+'_pubcopy', '1'); }catch(e){}
     /* 언제 올린 사본인지 적는다 — 안 적으면 「최신인가」를 알 길이 없다 */
     try{
       var d=v.at?new Date(Number(v.at)).toLocaleString('ko-KR').slice(0,17):'';
@@ -19315,6 +19430,20 @@ async function kcPubPull(){
     _safe(function(){ if(typeof renderCareer==='function') KC_PUB_PAGES.forEach(function(p){ renderCareer(p.replace(/^page-/,'')); }); });
     return true;
   }catch(e){ console.warn('[직원보기] 사본 읽기', e); return false; }
+}
+/* ★ 같은 브라우저에서 직원이 보던 «사본»이 대표 자료를 덮지 않게 (2026-10-07 검토).
+   직원 보기는 위촉장·자격·학력 세 통을 사본으로 «갈아 끼운다». 그 브라우저로 대표가 들어오면
+   다음 저장 때 그 사본(대표 원본보다 적고 낡은 것)이 대표 클라우드로 올라갈 수 있었다.
+   → 대표로 확인되는 순간, 이 기기를 «한 번도 맞춘 적 없는 기기»로 돌려 먼저 받아 오게 한다
+     (기준 시각을 지우면 자동 올리기가 멈추고 fbFirstSync 가 받는다 — 사본은 모두 클라우드에 있어 잃을 것이 없다). */
+function kcPubCopyRecover(){
+  var on=false; try{ on=localStorage.getItem(NS+'_pubcopy')==='1'; }catch(e){}
+  if(!on) return false;
+  try{ localStorage.removeItem(NS+'_fbbase'); localStorage.removeItem(NS+'_fbpending'); localStorage.removeItem(NS+'_pubcopy'); }catch(e){}
+  try{ _fbBase=null; _fbFirstTried=false; }catch(e){}
+  toast('이 브라우저에는 직원 보기 사본이 있었습니다 — 대표 기록을 클라우드에서 다시 받아 옵니다', 6000);
+  try{ if(typeof fbFirstSync==='function' && fbUid && fbDb) fbFirstSync(); }catch(e){}
+  return true;
 }
 /* 대표가 «직원 공개용 사본»을 올린다 — 경력관리 세 통만 */
 async function kcPubPush(){
@@ -19839,7 +19968,12 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              /* 이 기기에서 고친 것이 아직 안 올라갔다는 표시 — 기기마다의 사정이다 */
              '_fbpending',
              /* 지금 올리는 중인 시각(탭끼리 보는 표) — 기기마다의 사정이다 */
-             '_fbpushing'];
+             '_fbpushing',
+             /* «이 기기 세 통은 직원용 사본» 표시 — 기기마다 */
+             '_pubcopy',
+             /* 옛 첨부 조각을 IndexedDB 로 옮겼다는 표시 — 기기마다의 사정이다. 클라우드로 오가면
+                새 기기가 「이미 옮겼다」고 보고 영영 안 옮긴다(2026-10-07 검토) */
+             '_idb_migrated'];
 var _fbBase=null, _fbPushT=null, _fbWatching=false;
 /* ★ 「닫기」를 기억한다 — 예전에는 display:none 만 해서 PC 가 저장할 때마다(2.5초)
    곧바로 되살아났다. 대표가 겪은 「자꾸」가 이것이다(2026-09-12).
@@ -19919,7 +20053,9 @@ function fbLogoutConfirm(){
   if(typeof firebase==='undefined'||!firebase.auth||!firebase.auth().currentUser){ toast('이미 로그아웃 상태입니다'); return; }
   if(!confirm('로그아웃하시겠습니까?\n\n※ 통합시스템 로그인을 공유하므로, 이 기기의 다른 푸른 앱(포털·pu-erp 등)에서도 함께 로그아웃될 수 있습니다.')) return;
   fbLogout(); }
-function fbGatherLS(){ var o={}; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(!k||k.indexOf(NS)!==0) continue; var bare=k.slice(NS.length); if(FB_SKIP.indexOf(bare)>=0) continue; o[bare]=localStorage.getItem(k); } return o; }
+/* ⚠ 옛 첨부 조각(pf_chunk_*·pf_meta_*)은 오가지 않는다 — 파일은 IndexedDB·창고가 맡는다.
+     조각이 클라우드를 타면 새 기기 저장공간만 채우고(옮기기는 이미 끝났다고 표시돼 영영 안 돈다) 올릴 때마다 무겁다(2026-10-07 검토) */
+function fbGatherLS(){ var o={}; for(var i=0;i<localStorage.length;i++){ var k=localStorage.key(i); if(!k||k.indexOf(NS)!==0) continue; var bare=k.slice(NS.length); if(FB_SKIP.indexOf(bare)>=0 || bare.indexOf('pf_')===0) continue; o[bare]=localStorage.getItem(k); } return o; }
 /* 기기 이름표에 «브라우저»도 붙인다 — 「PC」만으로는 크롬이 올렸는지 에지가 올렸는지 몰랐다(2026-10-05) */
 function fbDeviceLabel(){ var u=navigator.userAgent||'';
   var b=/Edg\//.test(u)?'에지':/Whale\//.test(u)?'웨일':/Chrome\//.test(u)?'크롬':/Safari\//.test(u)?'사파리':/Firefox\//.test(u)?'파이어폭스':'';
@@ -20356,7 +20492,7 @@ function kcApplyRestore(ls, mode){
   };
   합치기(tb, ls[TOMB_KEY]); 합치기(rv, ls[TOMB_REV_KEY]);
   Object.keys(ls).forEach(function(bare){
-    if(FB_SKIP.indexOf(bare)>=0) return;
+    if(FB_SKIP.indexOf(bare)>=0 || bare.indexOf('pf_')===0) return;   /* 옛 첨부 조각은 받지 않는다 */
     if(bare===TOMB_KEY || bare===TOMB_REV_KEY) return;   /* 위에서 합쳤다 */
     var raw=ls[bare];
     try{
@@ -20497,7 +20633,8 @@ var _fbNewerTried=false;
 function fbNewerSync(){
   if(!fbAutoOn()) return;                           /* 꺼 두었으면 저절로 받지 않는다(☁ 불러오기는 그대로 된다) */
   var pending=!!_fbPendingNow();
-  var busy=!!document.querySelector('.modal-ov.open') || (typeof _rhDoc!=='undefined' && _rhDoc && _rhDoc.bytes);
+  /* 창이 열려 있거나 · 한글 서식을 쓰는 중이거나 · 폴더에서 여러 개를 담는 중이면 새로고침하지 않는다 */
+  var busy=!!document.querySelector('.modal-ov.open') || (typeof _rhDoc!=='undefined' && _rhDoc && _rhDoc.bytes) || !!window._kcBusyImport;
   if(_fbNewerTried || pending || busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
   _fbNewerTried=true;
   fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){

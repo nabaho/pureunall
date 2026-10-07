@@ -95,13 +95,13 @@ function 상자(통) {
   const 올림 = [], 지움 = [];
   const ctx = { console, JSON, Date, Math, String, Number, Array, Object, Uint8Array,
     통, get: (k) => 통[k] || [], set: (k, v) => { 통[k] = v; },
-    abToB64: (u) => 'B64:' + u.length, saveFileUnified: () => {},
+    abToB64: (u) => 'B64:' + u.length, saveFileUnified: () => {}, saveFileWait: async () => true,
     kcFormUpload: async (id) => { 올림.push(id); return 'kcareer_forms/u1/' + id; },
     kcFormStorage: () => ({ ref: (p) => ({ delete: () => { 지움.push(p); return Promise.resolve(); } }) }),
     deleteFile: () => {}, toast() {}, KcareerBiz: B, kcNextNo: () => 'BZ0001' };
   vm.createContext(ctx);
   ['var BIZ_STORE=\'bizapp\';', 떼기('function _bizClean('), 떼기('function _bizPut('), 떼기('async function _bizAddFiles('),
-    'var TRASH_STORE=\'kc_trash\';', 떼기('function kcTrashFileIds('), 떼기('function kcTrashList('), 떼기('function kcTrashPurge('),
+    'var TRASH_STORE=\'kc_trash\';', 떼기('function kcTrashFileIds('), 떼기('function kcTrashList('), 떼기('function kcTrashPurge('), 떼기('function _kcTrashFree('),
     'var KC_DOC_STORES=[];', 떼기('function _kcCloudRowOf(')].forEach((s) => vm.runInContext(s, ctx));
   return { ctx, 올림, 지움 };
 }

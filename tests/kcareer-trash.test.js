@@ -167,7 +167,9 @@ test('30일 비우기는 «지운 때가 있는 것»만 지운다', () => {
 
   const sw = cutFn(bare, 'function kcTrashSweep(');
   assert.ok(sw, 'kcTrashSweep 가 없다');
-  assert.ok(/deleteFile\s*\(/.test(sw), '비울 때는 첨부 원본까지 지워야 한다');
+  /* 비우기는 완전삭제와 «같은 한 곳»(_kcTrashFree)으로 지운다 — 창고 파일까지(2026-10-07) */
+  const free = cutFn(bare, 'function _kcTrashFree(');
+  assert.ok(/_kcTrashFree/.test(sw) && /deleteFile\s*\(/.test(free), '비울 때는 첨부 원본까지 지워야 한다');
   assert.ok(!/86400000/.test(sw),
     '비우기 안에 기한 셈을 또 적어 두었다 — kcTrashDue 하나만 쓸 것');
   const 판단횟수 = (sw.match(/kcTrashDue/g) || []).length;
@@ -178,7 +180,7 @@ test('30일 비우기는 «지운 때가 있는 것»만 지운다', () => {
 test('완전삭제만이 첨부 원본을 지운다', () => {
   const p = cutFn(bare, 'function kcTrashPurge(');
   assert.ok(p, 'kcTrashPurge 가 없다');
-  assert.ok(/deleteFile\s*\(/.test(p), '완전삭제가 원본을 안 지우면 자리가 안 빈다');
+  assert.ok(/_kcTrashFree\(e\)/.test(p) && /deleteFile\s*\(/.test(cutFn(bare, 'function _kcTrashFree(')), '완전삭제가 원본을 안 지우면 자리가 안 빈다');
   const put = cutFn(bare, 'function kcTrashPut(');
   assert.ok(!/deleteFile\s*\(/.test(put), '담을 때 원본을 지우면 휴지통이 껍데기가 된다');
 });

@@ -191,7 +191,11 @@
     var amt = String(r.amt == null ? '' : r.amt).replace(/[^\d]/g, '');
     var note = '🏢 사업관리 ' + (r.id || '') + '에서' + (r.kind ? ' · ' + r.kind : '');
     var 유형 = /일터\s*혁신/.test(r.title || '') ? '일터혁신' : (/구조\s*혁신/.test(r.title || '') ? '구조혁신' : '기타');
-    if (page === 'consult') return { type: 유형, org: r.org || '', project: r.title || '', agency: r.org || '', year: r.year || '', status: '진행', amt: amt, note: note };
+    /* ★ 수행기관 칸은 «수행기관으로 들어간 사업»일 때만 (2026-10-07 검토).
+         수행기관이 적힌 실적은 «외부기관 실적»으로 간다(_isExternal). 입찰·용역처럼 발주처와 «직접» 맺은 사업에
+         발주기관을 수행기관으로 적으면, 컨설팅실적이 아니라 외부기관 실적에만 보였다. */
+    var 수행 = (r.kind === '수행기관') ? (r.org || '') : '';
+    if (page === 'consult') return { type: 유형, org: r.org || '', project: r.title || '', agency: 수행, year: r.year || '', status: '진행', amt: amt, note: note };
     if (page === 'fund') return { org: r.org || '', project: r.title || '', year: r.year || '', status: '진행', amt: amt, note: note };
     if (page === 'etc') return { type: r.kind || '', org: r.org || '', project: r.title || '', year: r.year || '', amt: amt, note: note };
     return null;
