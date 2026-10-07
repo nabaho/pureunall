@@ -1342,6 +1342,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
 <script src="js/kcareer-biz.js?v=3"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
+<script src="js/kcareer-profile1.js?v=2"></script>
+<script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=6"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
@@ -1887,6 +1889,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <div class="tb-spacer"></div>
           <span class="cnt" id="rsCnt" style="font-size:11px;color:var(--text-mute)"></span>
           <button class="btn fs-ui" type="button" onclick="docImportResumeFolder()" title="서류 폴더 «5. 이력서 및 프로필»의 파일을 이력서·프로필 보관함에 한 번에 넣습니다 — 이름에 해가 있으면 그 해, 없으면 연도 모름">📚 5번 폴더 모두 넣기</button>
+          <button class="btn fs-ui" type="button" onclick="pastCvOpen()" title="서류 폴더 «7. 컨설턴트,위원신청등»의 건 폴더 속 이력서·경력기술서·프로필을 찾아 그 건의 해로 넣습니다 — 같은 내용은 한 번만">📚 지난 제출 이력서 모으기</button>
           <button class="btn primary" id="rsAddExisting">+ 기존 이력서 추가</button>
         </div>
         <div id="rsBody"></div>        </div>
@@ -1990,6 +1993,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <!-- ★ 🏢 사업관리 (대표 지시 2026-10-05 「이력서 관리 아래에 사업관리를 별도로 — 대시보드로」 → 목업 1+2 승인)
            법인으로 내는 입찰·용역·수행기관·공모 사업. 계약한 것만이 아니라 «입찰에 넣었던 서식·서류 전부»를
            사업별로 앱에 보관하고, 찾아와 다시 쓰거나 두 서류를 비교한다. 판정은 js/kcareer-biz.js 한 곳. -->
+      <!-- 👤 프로필 1장 (대표 지시 2026-10-07 → 목업 승인) — 경력·실적·이력을 A4 한 장으로. 셈은 js/kcareer-profile1.js -->
+      <section class="page-view" id="page-profile1"><div class="page">
+        <div class="page-head"><div class="page-title">👤 프로필 1장</div><div class="page-desc">경력관리에 든 학력·자격·경력·위촉·실적·강의를 A4 한 장으로 — 넘치면 «최근 N»을 저절로 줄입니다 · 금액·주민번호·계좌는 넣지 않습니다</div></div>
+        <div class="p1-wrap" style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start">
+          <div id="p1Side"></div>
+          <div id="p1Paper" style="background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;max-width:640px;overflow:hidden"></div>
+        </div>
+      </div></section>
       <section class="page-view" id="page-bizdash"><div class="page">
         <div class="page-head"><div class="page-title">🏢 사업관리 — 한눈에</div><div class="page-desc">법인으로 낸 입찰·용역·수행기관·공모 사업 · 개인 지원(컨설턴트·위원·강사 모집)은 이력서관리·제출서류</div></div>
         <div id="bizDash"></div>
@@ -2842,6 +2853,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
     <div class="modal-h">📚 지난 지원 건 모두 넣기</div>
     <div class="modal-b" id="casePastBody"></div>
     <div class="modal-foot"><button class="btn" onclick="document.getElementById('modalCasePast').classList.remove('open')">취소</button><button class="btn primary" id="casePastGo" onclick="casePastGo()">넣기</button></div>
+  </div>
+</div>
+<!-- 📚 지난 제출 이력서 모으기 (2026-10-07 목업 승인) — 고르기 셈은 js/kcareer-pastcv.js -->
+<div class="modal-ov" id="modalPastCv">
+  <div class="modal" style="width:820px;max-width:96vw">
+    <div class="modal-h">📚 지난 제출 이력서 모으기</div>
+    <div class="modal-b" id="pastCvBody"></div>
+    <div class="modal-foot"><button class="btn" onclick="pastCvClose()">닫기</button><button class="btn primary" id="pastCvGo" onclick="pastCvGo()">고른 것 넣기</button></div>
   </div>
 </div>
 <!-- 🏢 사업 서랍 · 7번 폴더 고르기 · 서류 비교 (2026-10-05) -->
@@ -5775,7 +5794,7 @@ async function exportEditedHwpx(){
 let NAV=[
   /* 「이력서 생성·보관」이 첫 자리다 — 대표가 가장 자주 쓰는 화면이다(2026-08-29 지시).
      ⚠ 빠른 이력서를 «지우지는» 않는다. 순서만 바꾼다. */
-  {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함']]},
+  {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함'],['page-profile1','👤 프로필 1장']]},
   /* ★ 사업관리 — 이력서관리 «아래» (대표 지시 2026-10-05). 개인 지원과 갈라 법인 사업(입찰·용역·공모)을 따로 */
   {g:'사업관리', items:[['page-bizdash','📊 한눈에'],['page-bizlist','📋 사업 목록'],['page-bizdocs','🗂 서류 찾기']]},
   /* 회의비용·기타비용을 한 화면으로 합쳤다(2026-08-29) — 「구분」이 이미 가른다.
@@ -6157,6 +6176,7 @@ function nav_to(id,label,grp){
   if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
   if(id==='page-bizdash') _safe(renderBizDash);
+  if(id==='page-profile1') _safe(renderProfile1);
   if(id==='page-bizlist') _safe(renderBizList);
   if(id==='page-bizdocs') _safe(renderBizDocs);
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
@@ -7124,6 +7144,217 @@ async function docImportResumeFolder(){
   var 넣음=셈.resume+셈.profile;
   toast('✅ 이력서 '+셈.resume+'개 · 프로필 '+셈.profile+'개를 담았습니다'+(창고===넣음?' — 다른 PC 에서도 열립니다':' — 창고에 '+창고+'개 올림')
     +(못.length?' · ⚠ 못 넣은 것 '+못.length+'개: '+못.slice(0,3).join(' / ')+(못.length>3?' …':''):''), 못.length?12000:7000);
+}
+/* ═══ 👤 프로필 1장 (대표 지시 2026-10-07 「경력실적 이력등을 1장으로」 → 목업 승인) ═══
+   ⚠ 고르기·줄이기 셈은 KcareerProfile1 한 곳 — 화면은 재료를 모아 건네고 그림만 붙인다.
+   ⚠ 재료에 금액·주민번호·계좌·생년월일을 «넣지 않는다»(fields 에서 이름·자격·소속·직위·연락처만 쓴다). */
+var _p1Opt=null, _p1PhotoUrl='';
+function _p1Load(){
+  if(_p1Opt) return _p1Opt;
+  try{ _p1Opt=JSON.parse(LS.get(NS+'p1_opts')||'null'); }catch(e){ _p1Opt=null; }
+  _p1Opt=Object.assign({ use:'general', on:{ award:false }, field:'', photo:true }, _p1Opt||{});
+  return _p1Opt;
+}
+function _p1Keep(){ try{ LS.set(NS+'p1_opts', JSON.stringify(_p1Opt)); }catch(e){} }
+function _p1Src(){
+  var d=_cvFillData(), f=d.fields||{};
+  return { fields:{ name:f.name, license:f.license, org:f.org, title:f.title, phone:f.phone, email:f.email },
+    edu:get('edu')||[], cert:get('cert')||[],
+    work:((typeof _cvWorkSorted==='function')?_cvWorkSorted():(get('work')||[])).map(function(r){ return Object.assign({}, r, { periodLabel:(typeof workPeriod==='function'?workPeriod(r):r.period) }); }),
+    wiccok:get('wiccok')||[], consult:get('consult')||[], advisory:get('advisory')||[], lecture:get('lecture')||[] };
+}
+function _p1Model(){ var o=_p1Load(); return KcareerProfile1.build(_p1Src(), { use:o.use, on:o.on, field:o.field }); }
+function renderProfile1(){
+  var side=document.getElementById('p1Side'), paper=document.getElementById('p1Paper');
+  if(!side||!paper||!window.KcareerProfile1) return;
+  var o=_p1Load(), m=_p1Model();
+  var 전부=KcareerProfile1.build(_p1Src(), { use:o.use, on:{} });
+  var by={}; m.sections.forEach(function(x){ by[x.key]=x; });
+  var cnt={}; 전부.sections.forEach(function(x){ cnt[x.key]=x.n; });
+  var row='display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;white-space:nowrap;cursor:pointer';
+  side.innerHTML='<div style="font-weight:700;margin:2px 0 6px">넣을 칸 고르기</div>'
+    +KcareerProfile1.SECTIONS.map(function(S){
+      var 켬=(o.on||{})[S.key]!==false, n=cnt[S.key]||0, x=by[S.key];
+      return '<label style="'+row+'"><input type="checkbox"'+(켬?' checked':'')+(n?'':' disabled')+' onchange="p1Toggle(\''+S.key+'\',this.checked)"> '+escapeHtml(S.title)
+        +'<span style="margin-left:auto;color:var(--text-mute);font-size:12px">'+n+'건'+(x&&x.more?' · 최근 '+x.show:'')+'</span></label>'; }).join('')
+    +'<div style="font-weight:700;margin:12px 0 6px">주 분야</div>'
+    +'<input class="tb-input" style="width:100%;min-width:0" placeholder="예) 인사노무 컨설팅 · 일터혁신 · 노사관계" value="'+escapeHtml(o.field||'')+'" onchange="p1Field(this.value)">'
+    +'<div style="font-weight:700;margin:12px 0 6px">용도</div>'
+    +'<select class="tb-select" style="width:100%" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
+    +'<label style="'+row+';margin-top:8px"><input type="checkbox"'+(o.photo?' checked':'')+' onchange="p1Photo(this.checked)"> 증명사진 넣기 <span style="margin-left:auto;color:var(--text-mute);font-size:12px">미리보기·PDF</span></label>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px">'
+    +'<button class="btn primary" type="button" onclick="p1Hwpx()">📄 한글(hwpx)로</button>'
+    +'<button class="btn" type="button" onclick="p1Pdf()">🖨 PDF</button>'
+    +'<button class="btn" type="button" onclick="p1Keep()">📁 서류 보관함에 담기</button></div>'
+    +'<div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:8px 10px;margin-top:10px;font-size:12px">'
+    +(m.overflow?'⚠ 칸을 다 줄여도 한 장을 조금 넘습니다 — 칸 하나를 끄면 맞습니다':'✔ 한 장에 맞췄습니다')+'<br>✔ 금액·주민번호·계좌는 넣지 않습니다</div>';
+  /* ★ 종이는 «실제 A4 크기»(794×1123px, 여백 14mm)로 그리고 칸 너비에 맞춰 «줄여 보인다» —
+       좁은 칸에 바로 그리면 글이 접혀 한 장을 넘는 것처럼 보인다(인쇄와 다르게 보이면 안 된다) */
+  paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
+    +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
+  _p1Scale();
+  /* 사진은 «나중에» 붙인다 — 보관함에서 꺼내는 데 시간이 걸린다 */
+  if(o.photo && !_p1PhotoUrl){ var pid=(typeof rhPhotoSrc==='function')?rhPhotoSrc():null;
+    if(pid && typeof fileURLAsync==='function') fileURLAsync(pid).then(function(u){ if(u){ _p1PhotoUrl=u; renderProfile1(); } }).catch(function(){}); }
+}
+function _p1Scale(){
+  var paper=document.getElementById('p1Paper'), a4=paper&&paper.querySelector('.p1-a4'); if(!a4) return;
+  var s=Math.min(1, (paper.clientWidth||794)/794); a4.style.transform='scale('+s+')';
+  paper.style.height=Math.round(1123*s)+'px';
+}
+if(typeof window!=='undefined' && window.addEventListener) window.addEventListener('resize', function(){ _safe(_p1Scale); });
+function p1Toggle(k,v){ var o=_p1Load(); o.on=Object.assign({}, o.on||{}); o.on[k]=!!v; _p1Keep(); renderProfile1(); }
+function p1Use(v){ _p1Load().use=v; _p1Keep(); renderProfile1(); }
+function p1Field(v){ _p1Load().field=String(v||'').trim(); _p1Keep(); renderProfile1(); }
+function p1Photo(v){ _p1Load().photo=!!v; _p1Keep(); renderProfile1(); }
+function _p1Name(ext){ var m=_p1Model(), d=new Date();
+  return '프로필_'+String(m.head.name||'').replace(/[\\/:*?"<>|]/g,'')+'_'+d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+'.'+ext; }
+/* 한글 문서 — 표 칸으로 짓는다(사진은 넣지 않는다 — 한글에서 직접 붙이거나 PDF 를 쓴다) */
+function _p1Bytes(){
+  if(typeof HWPX==='undefined') throw new Error('한글 문서 도구를 불러오지 못했습니다');
+  var m=_p1Model(), h=m.head;
+  var body=HWPX.docTitle('프로필')
+    +HWPX.para([h.license,h.name].filter(Boolean).join(' ')+((h.org||h.title)?' · '+[h.org,h.title].filter(Boolean).join(' '):''), HWPX.CP.body, {paraPr:HWPX.PP.center})
+    +HWPX.spacer();
+  var 머리=[]; if(h.phone||h.email) 머리.push(['연락처', [h.phone,h.email].filter(Boolean).join(' · ')]); if(h.field) 머리.push(['주 분야', h.field]);
+  머리.push(['실적 요약', m.kpis.map(function(k){ return k.label+' '+k.n; }).join(' · ')]);
+  body+=HWPX.tablePara(머리, HWPX.cols([0.16,0.84]))+HWPX.spacer();
+  m.sections.forEach(function(x){
+    body+=HWPX.para('■ '+x.title+(x.more?'  (최근 '+x.show+' · 전체 '+x.n+')':''), HWPX.CP.body);
+    var 폭=(x.rows[0]||[]).length;
+    var rows=x.rows.map(function(r){ var a=r.slice(); while(a.length<폭) a.push(''); return a; });
+    if(x.more) rows.push(폭===2?['','외 '+x.more+'건']:['','외 '+x.more+'건','']);
+    if(x.key==='perf' && m.perfByYear) rows.push(폭===2?['','연도별: '+m.perfByYear]:['','연도별: '+m.perfByYear,'']);
+    body+=HWPX.tablePara(rows, HWPX.cols(폭===2?[0.16,0.84]:[0.12,0.34,0.54]));
+  });
+  var bytes=HWPX.build(body); PureunHwp.validate(bytes,'프로필.hwpx');
+  return bytes;
+}
+function p1Hwpx(){
+  try{ openHwpViewer(_p1Bytes(), _p1Name('hwpx')); toast('프로필 한 장을 만들었습니다 — ⬇ 저장하거나 🖨 로 뽑으세요'); }
+  catch(e){ toast('프로필 만들기 실패: '+((e&&e.message)||e)); }
+}
+/* PDF — 미리보기와 «같은 글»을 인쇄 창으로(PDF 로 저장 고르기) */
+function p1Pdf(){
+  var o=_p1Load(), m=_p1Model();
+  var fr=document.createElement('iframe'); fr.style.cssText='position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+  document.body.appendChild(fr);
+  var d=fr.contentWindow.document;
+  d.open(); d.write('<!doctype html><html><head><meta charset="utf-8"><title>'+escapeHtml(_p1Name('pdf').replace(/\.pdf$/,''))+'</title><style>@page{size:A4;margin:14mm}body{margin:0}'+KcareerProfile1.CSS+'</style></head><body>'
+    +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</body></html>'); d.close();
+  setTimeout(function(){ try{ fr.contentWindow.focus(); fr.contentWindow.print(); }catch(e){ toast('인쇄 창을 열지 못했습니다'); }
+    setTimeout(function(){ fr.remove(); }, 60000); }, 400);
+}
+/* 서류 보관함(프로필)에 — 같은 용도는 «한 줄»을 고쳐 쓴다(날마다 줄이 늘지 않게) */
+async function p1Keep(){
+  var bytes; try{ bytes=_p1Bytes(); }catch(e){ toast('프로필 만들기 실패: '+((e&&e.message)||e)); return; }
+  var o=_p1Load(), key='p1|'+o.use, now=new Date().toISOString(), name=_p1Name('hwpx'), D=DOMAINS.profile;
+  var arr=get(D.store), hit=arr.findIndex(function(r){ return r && r.p1Key===key; });
+  var id=hit>=0?arr[hit].genFileId:('profile_'+Date.now()), b64=abToB64(bytes);
+  if(!(await saveFileWait(id,{ id:id, name:name, ext:'hwpx', size:bytes.length, base64:b64, savedAt:now }))){ toast('이 PC 보관함에 담지 못했습니다'); return; }
+  var st=''; try{ st=await kcFormUpload(id, b64, 'hwpx'); }catch(e){}
+  var kinds=kindsOf('profile'), kind=kinds.indexOf('전문분야 프로필')>=0?'전문분야 프로필':kinds[0];
+  arr=get(D.store); hit=arr.findIndex(function(r){ return r && r.p1Key===key; });   /* 기다린 뒤 다시 읽는다 */
+  var entry=Object.assign(hit>=0?arr[hit]:{ id:id, kind:kind, org:'', submits:[], origFileId:null, origName:null, p1Key:key },
+    { year:String(new Date().getFullYear()), memo:'👤 프로필 1장 · '+KcareerProfile1.USES[o.use].label, genFileId:id, genName:name, savedAt:now }, st?{ genStPath:st }:{});
+  if(hit>=0) arr[hit]=entry; else arr.unshift(entry);
+  set(D.store, arr);
+  _safe(function(){ renderDocStore('profile'); });
+  toast('📁 서류 보관함 › 프로필에 담았습니다'+(hit>=0?' (같은 용도 것을 새로 고쳐 씀)':'')+(st?' — 다른 PC 에서도 열립니다':''), 5000);
+}
+
+/* ═══ 📚 지난 제출 이력서 모으기 (대표 지시 2026-10-07 「그간 제출하였던 이력서를 정리해서 보관함에」 → 목업 승인) ═══
+   7번 폴더 건 폴더 속 이력서·경력기술서·프로필을 그 건의 해로 넣는다. 고르기 셈은 KcareerPastCv 한 곳.
+   ⚠ 폴더 원본은 그대로 · 파일 이름만 먼저 읽고(내용은 넣을 때 한 장씩) · 같은 내용은 한 번만 골라 둔다. */
+var _pastCv=null;
+async function pastCvOpen(){
+  if(!fsSupported()){ toast('이 브라우저는 폴더 읽기를 지원하지 않습니다 — Chrome 또는 Edge에서 열어주세요'); return; }
+  var root=await fsRootOrConnect(KcareerCases.CASE_ROOT);
+  if(!root) return;
+  var dirs=await fsCaseDirs(root);
+  if(!dirs){ toast('연결한 폴더 안에 「'+KcareerCases.CASE_ROOT+'」 폴더가 없습니다'); return; }
+  toast('⏳ 건 폴더 '+dirs.length+'개에서 이력서를 찾는 중…');
+  var cases=[];
+  for(var i=0;i<dirs.length;i++){
+    var d=dirs[i], caseDir=KcareerCases.caseDirOf(d.yearDir, d.name);
+    if(i%20===0) toast('⏳ '+(i+1)+' / '+dirs.length+' 건 폴더 살피는 중…');
+    var files=[]; try{ files=await _bizReadDir(d.handle, caseDir); }catch(e){ console.warn('지난 이력서 — 건 폴더 못 읽음', caseDir, e); }
+    var y=(String(d.yearDir||'').match(/20\d{2}/)||String(d.name||'').match(/^(20\d{2})/)||[''])[0];
+    cases.push({ year:y, caseDir:caseDir, name:d.name, files:files });
+  }
+  var items=KcareerPastCv.plan(cases, (get('resume')||[]).concat(get('profile')||[]));
+  _pastCv={ items:items, running:false, stop:false, year:'' };
+  if(!items.length){ toast('✅ 7번 폴더의 이력서는 이미 모두 들어 있습니다 (또는 찾은 것이 없습니다)'); return; }
+  pastCvDraw();
+  document.getElementById('modalPastCv').classList.add('open');
+}
+function pastCvDraw(){
+  var P=_pastCv, box=document.getElementById('pastCvBody'); if(!P||!box) return;
+  var sm=KcareerPastCv.summary(P.items), 해=Object.keys(sm.byYear).sort().reverse();
+  var 보일=P.items.filter(function(it){ return !P.year || it.year===P.year; });
+  box.innerHTML='<div style="font-size:12.5px;margin-bottom:8px">이름에 «이력서·이력사항·경력기술서·프로필»이 든 파일 <b>'+(sm.fresh+sm.dup)+'개</b>'
+    +' — 새로 <b>'+sm.fresh+'</b> · 같은 내용 <b>'+sm.dup+'</b>(골라 두지 않음) · 경력«증명서»·동의서는 뺐습니다</div>'
+    +'<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><select class="tb-select" onchange="_pastCv.year=this.value;pastCvDraw()"><option value="">전체 연도</option>'
+    +해.map(function(y){ return '<option value="'+escapeHtml(y)+'"'+(P.year===y?' selected':'')+'>'+escapeHtml(y==='?'?'연도 모름':y)+' ('+sm.byYear[y]+')</option>'; }).join('')+'</select>'
+    +'<span class="cnt" id="pastCvSum" style="font-size:12px;color:var(--text-mute)"></span></div>'
+    +'<div class="dt" style="max-height:52vh;overflow:auto"><table><thead><tr><th class="rownum-h" style="width:62px"><input type="checkbox" onclick="document.querySelectorAll(\'#pastCvBody .row-chk\').forEach(function(x){ x.checked=this.checked; },this);pastCvSum()" title="보이는 줄 모두"> №</th>'
+    +'<th style="width:60px">해</th><th>건 폴더</th><th>파일</th><th style="width:130px">넣을 곳</th></tr></thead><tbody>'
+    +보일.map(function(it){
+      return '<tr'+(it.dupOf?' style="color:var(--text-mute)"':'')+'><td class="rownum"><label class="rn-chk"><input type="checkbox" class="row-chk" value="'+(it.no-1)+'"'+(it.pick?' checked':'')+' onclick="pastCvSum()"><span>'+it.no+'</span></label></td>'
+        +'<td>'+escapeHtml(it.year||'-')+'</td>'
+        +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(it.caseName)+'">'+escapeHtml(it.caseName)+'</td>'
+        +'<td style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(it.f.name)+'">'+escapeHtml(it.f.name)+'</td>'
+        +'<td style="white-space:nowrap">'+(it.dupOf?'같은 내용 — '+it.dupOf+'번':(it.domain==='profile'?'프로필':'이력서')+' · '+escapeHtml(it.year||'연도 모름'))+'</td></tr>'; }).join('')
+    +'</tbody></table></div>';
+  pastCvSum();
+}
+function pastCvSum(){ var n=document.querySelectorAll('#pastCvBody .row-chk:checked').length, el=document.getElementById('pastCvSum'); if(el) el.textContent='고른 것 '+n+'개'; var b=document.getElementById('pastCvGo'); if(b && !(_pastCv&&_pastCv.running)) b.textContent='고른 것 넣기 ('+n+')'; }
+function pastCvClose(){
+  var P=_pastCv;
+  if(P && P.running){ P.stop=true; toast('⏹ 지금 넣는 것까지 담고 멈춥니다 — 이미 넣은 것은 남습니다', 6000); return; }
+  document.getElementById('modalPastCv').classList.remove('open');
+}
+async function pastCvGo(){
+  var P=_pastCv; if(!P||P.running) return;
+  var 고른=[].slice.call(document.querySelectorAll('#pastCvBody .row-chk:checked')).map(function(x){ return P.items[Number(x.value)]; }).filter(Boolean);
+  if(!고른.length){ toast('넣을 것을 골라 주세요'); return; }
+  var btn=document.getElementById('pastCvGo'); if(btn){ btn.disabled=true; btn.textContent='⏳ 넣는 중…'; }
+  P.running=true; P.stop=false; window._kcBusyImport=true;
+  var now=new Date().toISOString(), 담음={resume:[],profile:[]}, 셈={resume:0,profile:0}, 창고=0, 못=[];
+  var 이종류=kindsOf('resume'), 프종류=kindsOf('profile');
+  var 종류={ resume:(이종류.indexOf('위원·위촉 제출용')>=0?'위원·위촉 제출용':이종류[0]), profile:(프종류.indexOf('전문분야 프로필')>=0?'전문분야 프로필':프종류[0]) };
+  /* 저장 직전에 «지금 목록»을 다시 읽어 새 줄만 더한다 — 열 개마다 중간 저장 */
+  var 중간저장=function(){ ['resume','profile'].forEach(function(d){ if(담음[d].length){ set(d, 담음[d].concat(get(d)||[])); 셈[d]+=담음[d].length; 담음[d]=[]; } }); };
+  try{
+    for(var i=0;i<고른.length;i++){
+      if(P.stop){ 못.push('멈춤 — 남은 '+(고른.length-i)+'개는 안 넣었습니다'); break; }
+      var it=고른[i];
+      try{
+        if(i%5===0) toast('⏳ '+(i+1)+' / '+고른.length+' 넣는 중…');
+        var bytes=new Uint8Array(await (await it.f.handle.getFile()).arrayBuffer()), ext=(it.f.name.split('.').pop()||'').toLowerCase();
+        var id=it.domain+'_'+Date.now()+'_'+i, b64=abToB64(bytes);
+        if(!(await saveFileWait(id,{ id:id, name:it.f.name, ext:ext, size:bytes.length, base64:b64, savedAt:now }, { noCache:true }))) throw new Error('이 PC 보관함에 못 담았습니다');
+        var st=bytes.length<25*1024*1024 ? await kcFormUpload(id, b64, ext) : ''; if(st) 창고++;
+        bytes=null; b64=null;
+        var 건=(window.KcareerBiz&&KcareerBiz.fromCaseDir)?KcareerBiz.fromCaseDir(it.year, it.caseName):{};
+        var e={ id:id, kind:종류[it.domain], year:it.year, org:건.org||'', memo:'📂 7번 «'+String(it.caseName).slice(0,40)+'»에 낸 것',
+          genFileId:id, genName:it.f.name, origFileId:null, origName:null, submits:[], savedAt:now,
+          fileMtime:it.f.mtime, srcRel:it.f.relPath, caseDir:it.caseDir, pastSubmit:true };
+        if(st) e.genStPath=st;
+        담음[it.domain].push(e);
+      }catch(err){ console.warn('지난 이력서 넣기', it.f.name, err); 못.push(it.f.name+' — '+((err&&err.message)||'못 읽음')); }
+      if((i+1)%10===0) 중간저장();
+    }
+  } finally {
+    중간저장();
+    window._kcBusyImport=false; P.running=false; P.stop=false;
+    if(btn){ btn.disabled=false; }
+  }
+  document.getElementById('modalPastCv').classList.remove('open');
+  _safe(function(){ renderDocStore('resume'); renderDocStore('profile'); });
+  var 넣음=셈.resume+셈.profile;
+  toast('✅ 지난 제출 이력서 '+셈.resume+'개 · 프로필 '+셈.profile+'개를 해마다 담았습니다'+(창고===넣음?' — 다른 PC 에서도 열립니다':' — 창고에 '+창고+'개 올림')
+    +(못.length?' · ⚠ '+못.length+'개: '+못.slice(0,3).join(' / ')+(못.length>3?' …':''):''), 못.length?12000:7000);
 }
 function delDoc(domain,id,btn){
   const D=DOMAINS[domain];
@@ -9698,7 +9929,7 @@ function _showShortcutHelp(){ let d=document.getElementById('kbHelp'); if(d){ d.
    ⚠ 한글 서식 창에서 고치는 중이면 닫지 않는다 — 고친 것이 사라진다(그만두기·다 고쳤습니다로).
    ⚠ 입력칸이 많은 창은 바깥 클릭으로는 안 닫는다 — 칸 밖을 한 번 잘못 누르면 친 것이 날아간다(Esc 는 된다). */
 /* 사업 입력 창(modalBiz)도 칸이 열 개 넘는다 — 바깥을 한 번 잘못 누르면 친 사업 정보가 날아갔다(2026-10-07 검토) */
-var KC_MODAL_NO_BACKDROP={ modalBulk:1, modalPaste:1, modalBiz:1 };   /* 등록 창(modalForm)은 전부터 스스로 바깥 클릭에 닫힌다 */
+var KC_MODAL_NO_BACKDROP={ modalBulk:1, modalPaste:1, modalBiz:1, modalPastCv:1 };   /* 등록 창(modalForm)은 전부터 스스로 바깥 클릭에 닫힌다 */
 var _kcModalOpenAt={};
 function _kcModalCloser(ov){
   var id=ov.id;
