@@ -188,3 +188,21 @@ test('ⓔ 이알피 계약서 출력 — 제안서·견적서 묶음은 자동 �
   assert.ok(blk.includes("'" + P.PROPOSAL_GROUP + "'"), '이알피가 제안서 묶음 이름을 모릅니다 — 글자가 같아야 합니다');
   assert.match(blk, /initSelMap\[kv\] = initSelMap\[kv\]\.filter\(notProposal\)/, '자동 체크에서 제안서를 빼는 거르기가 없습니다');
 });
+
+/* 2026-10-07 /goal — 가운데 종이에 원본 모양(글자크기·모양·줄간 그대로) */
+test('ⓕ 원본 모양 — 한글은 rhwp, 엑셀은 미리보기 PDF(보관함 fileId), 없으면 글자판 · 「글자 본문」으로 바꿔 보기', () => {
+  const s = stripJs(CF);
+  const p = cutFn(s, 'function paper(');
+  assert.match(p, /previewPdfOf\(fm\) \|\| \(hwpOrigOf\(fm\) && w\.PureunHwp\)/, '원본이 있는지 보지 않습니다');
+  assert.match(p, /S\.paperView = 'text'/, '글자 본문으로 바꿔 보는 칩이 없습니다');
+  assert.match(p, /drawOrig\(ob, fm\)/);
+  const d = cutFn(s, 'function drawOrig(');
+  assert.match(d, /renderPdfPages\(box, u8\)/, '엑셀 미리보기 PDF 를 그리지 않습니다');
+  assert.match(d, /w\.PureunHwp\.renderPreview\(box, u8, src\.name\)/, '한글 원본을 rhwp 로 그리지 않습니다');
+  assert.match(d, /S\.sel !== want/, '다른 양식으로 넘어간 뒤 늦게 온 그림을 덮어쓰면 안 된다');
+  const pv = cutFn(s, 'function previewPdfOf(');
+  assert.match(pv, /a\.role === 'preview'/); assert.match(pv, /a\.fileId/, '미리보기 PDF 는 보관함(fileId)에서도 받아야 한다(양식 목록에 박으면 무겁다)');
+  const hs = cutFn(s, 'function hwpSources(');
+  assert.match(hs, /hwp\|hwpx\|xlsx/, '채울 원본은 한글·엑셀만 — 미리보기 PDF 가 채울 원본으로 섞이면 안 된다');
+  assert.ok(!/pdf/.test(hs), '미리보기 PDF 가 채울 원본으로 섞이면 안 된다');
+});
