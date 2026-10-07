@@ -15511,7 +15511,7 @@ function _nz(v){ return v?_n(v):''; }                    // 0은 빈칸(장부 �
 var CLOSE_SUBS=[['txn','거래·분개입력'],['journal','분개장'],['ledger','계정별원장'],
                 ['monthly','월계표'],['tb','합계잔액시산표'],['fin','재무제표·전기대비'],
                 ['cf','현금흐름표'],['ie','수입지출명세서'],['notes','주석'],['accts','계정과목표'],
-                ['budget','예산·집행'],['years','연도별 비교'],['f15','운영상황보고서']];
+                ['budget','예산·집행'],['years','연도별 비교'],['f15','운영상황보고서'],['flow','결산 후 진행']];
 
 /* ══════════ 예산·집행 — funds/{기금}/years/{연도}/budget ══════════
    연간 일정에 「차기연도 사업계획·예산 수립, 협의회 상정」이 있는데 그 «결과를 넣을 곳»이
@@ -17198,7 +17198,9 @@ function _f15Ready(){
 }
 function _f15R(){
   var t=S.txns||{}, arr=Object.keys(t).map(function(k){ var o=Object.assign({},t[k]); o._id=k; return o; });
-  return buildF15(arr,S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
+  /* 인쇄·미리보기도 화면과 «같은» 결산 조정(closeArr)을 얹는다 — 안 얹으면 확정 전 인쇄본만
+     준비금2 설정·환입이 빠져 화면(별지15호 탭)과 다른 숫자가 나갔다(2026-10-07 발견) */
+  return buildF15(closeArr(arr,S.fundId,S.year),S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
 }
 /* 팝업 미리보기 — 제출 전에 A4 두 장을 그대로 눈으로 확인한다(새 창 팝업 차단과 무관). */
 function previewF15(){
@@ -17572,6 +17574,286 @@ function makeClosingWb(){
     toast('결산서 워크북을 내려받았습니다');
   }).catch(function(e){ toast('생성 실패: '+((e&&e.message)||e),'err'); });
 }
+/* ══════════ 결산 후 진행 ══════════
+   대표 지시 2026-10-07 「결산 이후 사업장에 메일 보내서 문제가 없는지 검토 후 날인 받고 관할 고용노동부에
+   사업계획서 등을 모두 준비해서 보내야 된다 — 자동화」 → 목업 승인(「추천대로」).
+   실제 순서(2026년 메일함): 자료 요청 → 자료 회신 → 결산 → 결산서·사업계획서 송부 → 수정 → 날인본 회신 → 노동부 제출 → 세무.
+   근거: 운영상황보고 = 운영상황·결산서·다음 연도 사업계획서, 3개월 이내(근로복지기본법 시행령 제63조①) ·
+         회의록 출석위원 전원 서명·날인(법 제57조) · 협의회 7일 전 통보(령 제42조③).
+   저장: closing/{기금}/{연도}/flow/{단계} = {state, at, by, memo} — 결산 확정 자료와 같은 마디라
+         홈 「결산」 보기가 closing 을 한 번 읽을 때 같이 온다.
+   ⚠ 메일은 직접 보내지 않는다 — 문안을 보여 주고 푸른메일함 쓰기 화면으로 넘기기만(메일은 푸른메일함에서).
+   ⚠ 노동부 전자신고는 공동인증서 로그인이 필요한 정부 시스템 — 앱은 준비·기록까지만. */
+var FLOW_STEPS=[
+  ['req','자료 요청 메일',['','sent']],
+  ['recv','자료 수령',['','part','done']],
+  ['lock','결산 확정',null],                       // 🔒 결산 확정(closing.locked) 그대로 — 따로 적지 않는다
+  ['review','검토 요청 메일',['','sent']],
+  ['reply','검토 회신',['','fix','ok']],
+  ['seal','날인본 받기',['','part','done']],
+  ['submit','노동부 제출',['','done']],
+  ['tax','법인세·지방소득세',['','part','done']]
+];
+var FLOW_LBL={'':'대기',sent:'보냄',part:'일부',done:'완료',fix:'수정 요청',ok:'승인',locked:'확정'};
+/* 날인할 서류와 날인하는 사람 */
+var FLOW_SEAL=[
+  ['운영상황보고서(별지 제15호)','기금법인 대표자 서명 또는 인'],
+  ['결산서·다음 연도 사업계획서','기금법인 대표자(이사)'],
+  ['감사보고서','감사(근로자·사용자 측 각 1명)'],
+  ['협의회 회의록(결산·사업계획 승인)','출석위원 전원 서명 또는 날인 — 근로복지기본법 제57조'],
+  ['기본재산 총액 변경 보고서(별지 제10호) — 그해 출연이 있었을 때','기금법인 대표자']
+];
+function flowState(c,step){
+  c=c||{};
+  if(step==='lock') return c.locked?'locked':'';
+  return (((c.flow||{})[step])||{}).state||'';
+}
+function flowTone(st){ return (st==='done'||st==='ok'||st==='sent'||st==='locked')?'ok':(st==='part'||st==='fix')?'warn':''; }
+function flowDue(yr){ return (yr+1)+'-03-31'; }   // 운영상황보고 — 12월 결산(연간 일정 RPT-03 과 같은 기한)
+/* 메일 문안 — 순수 함수(검사 대상). who: 노동부 제출을 누가 하나('사업장' | 그 밖 = 우리) */
+function flowMailText(kind,f,yr,who){
+  f=f||{}; var nm=String(f.name||f.short_name||'기금'), lab=String(f.labor_office||'관할 고용노동관서').trim();
+  var n1=yr+1;
+  if(kind==='req') return {
+    subject:'[푸른노무법인] '+nm+' '+yr+'년 운영상황보고를 위한 자료 요청의 건',
+    body:['안녕하세요. 푸른노무법인입니다.','',
+      '근로복지기금법인은 회계연도가 끝난 뒤 3개월 이내('+n1+'년 3월 31일까지)에 결산서와 다음 연도 사업계획서를 붙여 관할 고용노동관서에 운영상황을 보고해야 합니다(근로복지기본법 시행령 제63조).',
+      yr+'년 결산을 위해 아래 자료를 '+n1+'년 1월 말까지 보내 주시기 바랍니다.','',
+      '1. 기금 통장(전 계좌) '+yr+'. 1. 1. ~ 12. 31. 거래내역 — 엑셀 파일',
+      '2. 이자소득 원천징수영수증 — 1월 1일부터 12월 31일까지 전체 기간',
+      '3. '+yr+'. 12. 31. 기준 예금 잔액증명서(계좌별)',
+      '4. 목적사업 지출 증빙(영수증·지급 명단 등)',
+      '5. 출연 내역(출연 회사·금액·입금일)',
+      '6. 근로자 대부가 있으면 개인별 대부 잔액 명세',
+      '7. 세무사·회계사가 결산하셨다면 그 결산서와 법인세 신고서','',
+      '궁금하신 점은 회신 주시거나 연락 주십시오. 감사합니다.'].join('\n')};
+  return {
+    subject:'[푸른노무법인] '+nm+' '+yr+'년 결산서 및 '+n1+'년 사업계획서 검토·날인 요청의 건',
+    body:['안녕하세요. 푸른노무법인입니다.','',
+      yr+'년 결산서와 '+n1+'년 사업계획서, 운영상황보고서를 첨부와 같이 보내드립니다.','',
+      '1. 첨부 서류',
+      '  - 결산서 및 사업계획서(엑셀)',
+      '  - 운영상황보고서(별지 제15호)',
+      '  - 감사보고서, 협의회 회의록(결산·사업계획 승인), (출연이 있던 해) 기본재산 총액 변경 보고서',
+      '2. 검토 부탁드립니다 — 고칠 곳이 있으면 회신으로 알려 주십시오.',
+      '3. 이상이 없으면 아래와 같이 날인하여 스캔본(PDF)을 보내 주십시오.']
+      .concat(FLOW_SEAL.map(function(s){ return '  - '+s[0]+': '+s[1]; }))
+      .concat(['   ※ 협의회는 회의 7일 전까지 위원께 일시·장소·안건을 알려야 합니다(근로복지기본법 시행령 제42조③).',
+      '4. 운영상황보고 기한: '+n1+'년 3월 31일 — '+(who==='사업장'
+        ?'날인본을 '+lab+'에 제출해 주시고, 제출하셨다고 알려 주십시오.'
+        :'날인본을 받는 대로 저희가 '+lab+'에 제출하겠습니다.'),'',
+      '감사합니다.']).join('\n')};
+}
+/* 제출 묶음 안의 안내문 — 순수 함수 */
+function flowReadme(f,yr,notes,who){
+  f=f||{}; var lab=String(f.labor_office||'[확인 필요] 관할 고용노동관서').trim();
+  return [(f.name||'')+' '+yr+'년 결산 제출 묶음','',
+    '■ 제출처: '+lab+' (운영상황보고 — 근로복지기본법 시행령 제63조①)',
+    '■ 기한: '+(yr+1)+'. 3. 31.(휴일이면 다음 날)',
+    '■ 제출: '+(who==='사업장'?'사업장이 직접':'푸른노무법인'),
+    '■ 제출 서류: 운영상황보고서(별지 제15호) + 해당 연도 결산서 + 다음 연도 사업계획서(추정재무상태표·추정손익계산서 포함)','',
+    '■ 날인']
+    .concat(FLOW_SEAL.map(function(s){ return '  - '+s[0]+': '+s[1]; }))
+    .concat(notes&&notes.length?['','■ 참고']:[]).concat((notes||[]).map(function(n){ return '  - '+n; }))
+    .join('\r\n');
+}
+/* 한 기금·한 해의 자료를 한 번에 읽는다 — 화면 상태(S.txns 등)에 기대지 않게(홈에서 여러 기금을 묶을 때도 쓴다) */
+function _flowLoad(fid,yr){
+  var rd=function(p,d){ return fbDb.ref(NS+'/'+p).once('value').then(function(s){ return s.val()||d; }).catch(function(){ return d; }); };
+  var arrOf=function(v){ return Object.keys(v||{}).map(function(k){ var o=Object.assign({},v[k]); o._id=k; return o; }); };
+  return Promise.all([rd('txns/'+fid+'/'+yr,{}),rd('txns/'+fid+'/'+(yr-1),{}),rd('closing/'+fid+'/'+yr,{}),
+    _loadSites(fid).catch(function(){ return []; }),rd('welfare/'+fid+'/'+yr,{})]).then(function(r){
+    return {arr:arrOf(r[0]), prev:arrOf(r[1]), close:r[2]||{}, rep:(r[2]||{}).report||{}, sites:r[3]||[],
+            welf:Object.keys(r[4]||{}).map(function(k){ return r[4][k]; })};
+  });
+}
+/* 묶음 하나를 zip 안 폴더(dir)에 채운다. 결산서 워크북·별지15호·한글 서식(감사보고서·결산 승인 회의록·기본재산 변경 보고서).
+   ⚠ 한글 서식 값 함수는 S.year·S.formFund 를 본다 — 채우는 동안만 이 기금·이 해로 맞추고 되돌린다. */
+function _flowZipInto(z,dir,fid,yr,d,has){
+  var f=Object.assign({_id:fid},funds[fid]||{}), notes=[];
+  var arrC=closeArr(d.arr,fid,yr), prevC=closeArr(d.prev,fid,yr-1);
+  var who=(((d.close||{}).flow||{}).submit||{}).who||'';
+  var wb=buildClosingWb(fid,yr,arrC,prevC,d.rep,d.sites,d.welf);
+  return wb.xlsx.writeBuffer().then(function(buf){
+    z.file(dir+'01. '+yr+' 결산서+'+(yr+1)+' 사업계획서.xlsx',buf);
+    var R=buildF15(arrC,fid,yr,d.rep,d.sites,d.welf), P=f15Pages(R);
+    z.file(dir+'02. 운영상황보고서(별지 제15호) '+yr+'.html','<!doctype html><meta charset=utf-8><title>운영상황보고서 '+yr+'</title><style>'
+      +f15CSS('',true)+'</style>'+P.p1+P.p2+'<button onclick="print()" style="position:fixed;right:16px;top:16px;padding:9px 16px">인쇄 / PDF 저장</button>');
+    var kinds=[['ops_audit','03. 감사보고서'],['ops_minutes_close','04. 협의회 회의록(결산 승인)'],['ops_asset_change','05. 기본재산 총액 변경 보고서']];
+    var keep={y:S.year,ff:S.formFund}; S.year=yr; S.formFund=fid;
+    var back=function(){ S.year=keep.y; S.formFund=keep.ff; };
+    return kinds.reduce(function(p,k){ return p.then(function(){
+      var nm=k[1].slice(4);
+      if(!has[_hwpTplKey(k[0],f)]){ notes.push(nm+' — 한글 틀이 없어 넣지 못했습니다(서식 탭에서 인쇄)'); return; }
+      if(k[0]==='ops_asset_change'&&!(R.bf.employer+R.bf.other)){ notes.push(nm+' — 그해 출연이 없어 뺐습니다'); return; }
+      var pre=DOC_NEEDS_LEDGER[k[0]]?_docExtra(k[0],f).catch(function(){ return null; }):Promise.resolve();
+      return pre.then(function(){ return hwpTplFill(k[0],f,d.sites); })
+        .then(function(res){ z.file(dir+k[1]+'.hwpx',res.bytes); })
+        .catch(function(){ notes.push(nm+' — 채우지 못했습니다'); });
+    }); },Promise.resolve()).then(function(){ back(); }, function(e){ back(); throw e; })
+    .then(function(){ z.file(dir+'00. 제출 안내.txt',flowReadme(f,yr,notes,who)); return notes; });
+  });
+}
+function _flowTplIdx(){ return _hwpTplIdxRef().once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return {}; }); }
+function _dlBlob(blob,name){ var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name;
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },1500); }
+/* 📦 이 기금 제출 묶음 */
+function flowPackage(){
+  var fid=S.fundId, yr=S.year, f=funds[fid]||{};
+  if(typeof ExcelJS==='undefined'){ toast('ExcelJS 로드 실패 — 새로고침 후 다시','err'); return; }
+  toast('제출 묶음을 만드는 중…');
+  Promise.all([_flowLoad(fid,yr),_loadJsZip(),_flowTplIdx()]).then(function(r){
+    if(!journalOf(r[0].arr).length) throw new Error(yr+'년 승인된 분개가 없습니다');
+    var z=new r[1]();
+    return _flowZipInto(z,'',fid,yr,r[0],r[2]).then(function(notes){
+      return z.generateAsync({type:'blob'}).then(function(b){ return {b:b,notes:notes}; }); });
+  }).then(function(o){
+    _dlBlob(o.b,'[제출묶음] '+String(f.short_name||f.name||fid).replace(/\s+/g,'')+'_'+yr+'결산.zip');
+    toast('제출 묶음을 받았습니다'+(o.notes.length?' · '+o.notes.join(' · '):''),o.notes.length?'warn':undefined);
+  }).catch(function(e){ toast('묶음을 만들지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 홈 「결산」에서 고른 기금들 — 한 zip 안에 기금마다 폴더 하나 */
+function flowPackageMany(yr){
+  var ids=[].slice.call(document.querySelectorAll('.flowpick:checked')).map(function(x){ return x.value; });
+  if(!ids.length){ toast('기금을 고르세요','warn'); return; }
+  if(typeof ExcelJS==='undefined'){ toast('ExcelJS 로드 실패 — 새로고침 후 다시','err'); return; }
+  toast(ids.length+'곳 제출 묶음을 만드는 중… (기금마다 몇 초)');
+  var fail=[], got=0;
+  Promise.all([_loadJsZip(),_flowTplIdx()]).then(function(r){
+    var z=new r[0](), has=r[1];
+    return ids.reduce(function(p,fid){ return p.then(function(){
+      var nm=String((funds[fid]||{}).short_name||(funds[fid]||{}).name||fid).replace(/[\\\/:*?"<>|\s]+/g,'');
+      return _flowLoad(fid,yr).then(function(d){
+        if(!journalOf(d.arr).length){ fail.push(nm+'(분개 없음)'); return; }
+        return _flowZipInto(z,nm+'/',fid,yr,d,has).then(function(){ got++; });
+      }).catch(function(){ fail.push(nm); });
+    }); },Promise.resolve()).then(function(){
+      if(!got) throw new Error('한 곳도 만들지 못했습니다'+(fail.length?' — '+fail.join(', '):''));
+      return z.generateAsync({type:'blob'});
+    });
+  }).then(function(b){
+    _dlBlob(b,'[제출묶음] '+yr+'결산_'+got+'곳.zip');
+    toast(got+'곳 제출 묶음을 받았습니다'+(fail.length?' · 못 만든 곳: '+fail.join(', '):''),fail.length?'warn':undefined);
+  }).catch(function(e){ toast('묶음을 만들지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 상태 바꾸기 — 노동부 제출·세무 완료는 연간 일정(RPT-03, TAX-02·03)에도 같이 체크한다 */
+function flowSet(step,state){
+  var fid=S.fundId, yr=S.year, at=state?ymd():null, up={}, base='closing/'+fid+'/'+yr+'/flow/'+step+'/';
+  up[base+'state']=state||null; up[base+'at']=at; up[base+'by']=state?(S.user||''):null;
+  var ann=[];
+  if(step==='submit'&&state==='done') ann=['RPT-03'];
+  if(step==='tax'&&state==='done') ann=['TAX-02','TAX-03'];
+  ann.forEach(function(c){ up['annual/'+fid+'/'+yr+'/'+c]={done:true,done_date:ymd()}; });
+  fbDb.ref(NS).update(up).then(function(){
+    var c=S.f15Close=S.f15Close||{}; c.flow=c.flow||{}; var r=c.flow[step]=c.flow[step]||{};
+    r.state=state||''; r.at=at||''; _cbDirty(); if(ann.length){ S.annualFor=null; _dueDirty(); }
+    renderFund(); toast('저장됨'+(ann.length?' · 연간 일정도 체크했습니다':''));
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+function flowMemo(step,v){
+  var fid=S.fundId, yr=S.year, val=String(v||'').trim();
+  fbDb.ref(NS+'/closing/'+fid+'/'+yr+'/flow/'+step+'/memo').set(val||null).then(function(){
+    var c=S.f15Close=S.f15Close||{}; c.flow=c.flow||{}; (c.flow[step]=c.flow[step]||{}).memo=val; _cbDirty();
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+function flowWho(v){
+  var fid=S.fundId, yr=S.year;
+  fbDb.ref(NS+'/closing/'+fid+'/'+yr+'/flow/submit/who').set(v||null).then(function(){
+    var c=S.f15Close=S.f15Close||{}; c.flow=c.flow||{}; (c.flow.submit=c.flow.submit||{}).who=v||''; renderFund();
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
+}
+/* ✉ 메일 — 문안을 보여 주고(복사), 푸른메일함 쓰기 화면을 «받는 사람»과 함께 연다. 보내기는 메일함에서 사람이 */
+function flowMail(kind){
+  var fid=S.fundId, yr=S.year, f=funds[fid]||{}, who=((((S.f15Close||{}).flow||{}).submit)||{}).who||'';
+  _loadSites(fid).then(function(sites){
+    var em=[]; (sites||[]).forEach(function(s){ var c=_siteContacts(s); var e=String(c.email||'').trim(); if(e&&em.indexOf(e)<0) em.push(e); });
+    var T=flowMailText(kind,f,yr,who);
+    S._flowMail={to:em, subject:T.subject, body:T.body, kind:kind};
+    showModal('<h2 style="margin-bottom:6px">'+(kind==='req'?'자료 요청 메일':'검토·날인 요청 메일')+'</h2>'
+      +'<div class="muted" style="font-size:12px;margin-bottom:6px">받는 사람: '+(em.length?esc(em.join(', ')):'<b style="color:var(--danger)">사업장 담당자 이메일이 없습니다 — 참여사업장에 적어 주세요</b>')+'</div>'
+      +'<input id="flowSubj" value="'+esc(T.subject)+'" style="width:100%;margin-bottom:6px">'
+      +'<textarea id="flowBody" rows="16" style="width:100%;font-size:12.5px">'+esc(T.body)+'</textarea>'
+      +(kind==='review'?'<div class="muted" style="font-size:11.5px;margin-top:4px">첨부는 [📦 제출 묶음 받기]로 받은 파일을 메일함에서 붙이세요.</div>':'')
+      +'<div class="row" style="justify-content:flex-end;gap:6px;margin-top:10px">'
+      +'<button onclick="flowMailCopy()">📋 제목·본문 복사</button>'
+      +'<button onclick="flowMailOpen()">✉ 푸른메일함 열기</button>'
+      +'<button class="primary" onclick="closeM();flowSet(\''+(kind==='req'?'req':'review')+'\',\'sent\')">보냄으로 표시</button></div>');
+  }).catch(function(e){ toast('참여사업장을 읽지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+function flowMailCopy(){
+  var s=$('flowSubj'), b=$('flowBody'), m=S._flowMail||{};
+  var txt=(m.to&&m.to.length?'받는 사람: '+m.to.join(', ')+'\n':'')+'제목: '+(s?s.value:'')+'\n\n'+(b?b.value:'');
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(function(){ toast('복사했습니다 — 메일함 쓰기 화면에 붙여 넣으세요'); },
+    function(){ if(b){ b.select(); } toast('복사하지 못했습니다 — 본문을 직접 복사하세요','warn'); });
+}
+function flowMailOpen(){
+  var m=S._flowMail||{}, f=funds[S.fundId]||{};
+  var u='pu-cards.html?view=mail'+((m.to||[])[0]?'&to='+encodeURIComponent(m.to[0])+'&name='+encodeURIComponent(f.short_name||f.name||''):'');
+  if(!window.open(u,'puMailWrite')) toast('팝업이 막혔습니다 — 브라우저에서 팝업을 허용하세요','warn');
+  else if((m.to||[]).length>1) toast('받는 사람이 '+m.to.length+'명입니다 — 나머지는 [📋 복사]한 목록에서 붙여 넣으세요','warn');
+}
+function flowSealInfo(){
+  showModal('<h2 style="margin-bottom:8px">날인할 서류</h2><table><thead><tr><th class="no">#</th><th>서류</th><th>날인</th></tr></thead><tbody>'
+    +FLOW_SEAL.map(function(s,i){ return '<tr><td class="no">'+(i+1)+'</td><td>'+esc(s[0])+'</td><td>'+esc(s[1])+'</td></tr>'; }).join('')
+    +'</tbody></table><div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+}
+function flowView(){
+  if(!f15Load()) return '<div class="panel">'+loadingHTML()+'</div>';
+  var fid=S.fundId, yr=S.year, f=funds[fid]||{}, c=S.f15Close||{}, fl=c.flow||{};
+  var due=flowDue(yr), dd=dueDays(ymd(),due), who=((fl.submit||{}).who)||'';
+  var allDone=flowState(c,'submit')==='done';
+  var dchip=allDone?'<span class="chip ok">노동부 제출 완료</span>'
+    :(dd==null?'':'<span class="chip '+(dd<0?'dg':dd<=30?'warn':'')+'">운영상황보고 기한 '+due.slice(5).replace('-','/')+' · '+(dd<0?(-dd)+'일 지남':'D-'+dd)+'</span>');
+  var act={
+    req:'<button onclick="flowMail(\'req\')" style="padding:2px 9px;font-size:11.5px">✉ 메일 쓰기</button>',
+    recv:'<span class="muted" style="font-size:11.5px">통장 거래내역·원천징수영수증·잔액증명·증빙</span>',
+    lock:c.locked?'<span class="muted" style="font-size:11.5px">🔒 '+esc(_lockInfo())+'</span>'
+      :'<button onclick="closeSub(\'f15\')" style="padding:2px 9px;font-size:11.5px">운영상황보고서 탭에서 확정</button>',
+    review:'<button onclick="flowMail(\'review\')" style="padding:2px 9px;font-size:11.5px">✉ 메일 쓰기</button> '
+      +'<button onclick="flowPackage()" style="padding:2px 9px;font-size:11.5px">📦 제출 묶음</button>',
+    reply:'<span class="muted" style="font-size:11.5px">수정 요청이면 메모에 적고, 고친 뒤 다시 보내기</span>',
+    seal:'<button onclick="flowSealInfo()" style="padding:2px 9px;font-size:11.5px">ⓘ 날인할 서류</button>',
+    submit:'<select onchange="flowWho(this.value)" style="padding:2px 5px;font-size:11.5px;border:1px solid var(--line);border-radius:6px">'
+      +[['','제출: 우리'],['사업장','제출: 사업장']].map(function(o){ return '<option value="'+o[0]+'"'+(who===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select> '
+      +'<span class="muted" style="font-size:11.5px">'+esc(String(f.labor_office||'관할 노동청 [확인 필요]'))+'</span>',
+    tax:'<span class="muted" style="font-size:11.5px">법인세 3/31 · 지방소득세 4/30 — 접수일은 메모에</span>'
+  };
+  var rows=FLOW_STEPS.map(function(s,i){
+    var st=flowState(c,s[0]), rec=fl[s[0]]||{}, tone=flowTone(st);
+    var stCell=s[2]
+      ? '<select onchange="flowSet(\''+s[0]+'\',this.value)" class="chip '+tone+'" style="font-size:11px;padding:2px 4px;border:1px solid var(--line)">'
+        +s[2].map(function(o){ return '<option value="'+o+'"'+(st===o?' selected':'')+'>'+FLOW_LBL[o]+'</option>'; }).join('')+'</select>'
+      : '<span class="chip '+tone+'" style="font-size:11px">'+FLOW_LBL[st]+'</span>';
+    var at=s[0]==='lock'?String(c.locked_at||''):String(rec.at||'');
+    return '<tr><td><input type="checkbox"></td><td class="no">'+(i+1)+'</td><td style="white-space:nowrap;font-weight:600">'+esc(s[1])+'</td>'
+      +'<td>'+stCell+'</td><td class="mo" style="white-space:nowrap">'+esc(at.slice(5))+'</td>'
+      +'<td>'+act[s[0]]+'</td>'
+      +'<td>'+(s[2]?'<input value="'+esc(rec.memo||'')+'" placeholder="메모" onchange="flowMemo(\''+s[0]+'\',this.value)" style="width:100%;min-width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">':'')+'</td></tr>';
+  }).join('');
+  return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="font-size:15px">'+yr+'년 결산 후 진행</h2>'+hlp('close.flow')+dchip
+    +'<span style="flex:1"></span><button onclick="flowPackage()" title="결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글)를 한 zip 으로">📦 제출 묶음 받기(ZIP)</button></div>'
+    +'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th style="width:24px"><input type="checkbox"></th><th class="no">#</th><th>단계</th><th>상태</th><th>날짜</th><th>할 일</th><th>메모</th></tr></thead><tbody>'
+    +rows+'</tbody></table></div></div>';
+}
+/* 홈 「결산」 아래 — 기금마다 여덟 단계를 한 줄로(closing 을 이미 읽은 S.cb 를 그대로 쓴다) */
+function flowHomeHTML(list,cb,yr){
+  var due=flowDue(yr), dd=dueDays(ymd(),due);
+  var rows=list.map(function(fid,i){
+    var f=funds[fid]||{}, c=(cb[fid]||{})[yr]||{}, sub=flowState(c,'submit')==='done';
+    var chips=FLOW_STEPS.map(function(s,k){ var st=flowState(c,s[0]);
+      return '<span class="chip '+flowTone(st)+'" style="font-size:10px;min-width:18px;text-align:center" title="'+esc(s[1]+' · '+FLOW_LBL[st])+'">'+(k+1)+'</span>'; }).join(' ');
+    return '<tr><td><input type="checkbox" class="flowpick" value="'+fid+'"></td><td class="no">'+(i+1)+'</td>'
+      +'<td style="font-weight:700;cursor:pointer;white-space:nowrap" onclick="goClosingFlow(\''+fid+'\','+yr+')">'+esc(f.short_name||f.name)+'</td>'
+      +'<td style="white-space:nowrap">'+chips+'</td>'
+      +'<td class="mo" style="white-space:nowrap">'+(sub?'<span class="chip ok" style="font-size:10px">제출</span>':(dd==null?'':(dd<0?(-dd)+'일 지남':'D-'+dd)))+'</td></tr>';
+  }).join('');
+  return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="font-size:15px">'+yr+'년 결산 후 진행</h2>'+hlp('close.flow')
+    +'<span class="muted" style="font-size:11.5px">1 자료 요청 · 2 자료 수령 · 3 결산 확정 · 4 검토 요청 · 5 회신 · 6 날인본 · 7 노동부 제출 · 8 세무</span>'
+    +'<span style="flex:1"></span><button onclick="flowPackageMany('+yr+')">📦 고른 기금 제출 묶음</button></div>'
+    +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="width:24px"><input type="checkbox" onclick="[].forEach.call(document.querySelectorAll(\'.flowpick\'),function(x){x.checked=this.checked;},this)"></th>'
+    +'<th class="no">#</th><th>기금</th><th>진행 (1 → 8)</th><th>기한</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+function goClosingFlow(fid,yr){ S.year=yr; S.closeSub='flow'; S.txnsFor=null; S.f15For=null; _go('fund',fid); S.tab='closing'; renderFund(); }
 /* ══════════ 결산 확정(잠금) · 연도별 대장 · 연도별 비교 ══════════
    확정하면 그 시점 수치를 closing/{기금}/{연도}에 스냅샷으로 남긴다.
    이후 대장·연도별 비교는 스냅샷을 읽으므로 여러 연도를 빠르게 나란히 볼 수 있고,
@@ -18091,7 +18373,9 @@ function closeMatrixHTML(list0){
     +(list.length
       ? '<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th>번호</th><th>기금</th>'
         +Y.map(function(y){return '<th style="text-align:center">'+y+'</th>';}).join('')+'</tr></thead><tbody>'+rows+'</tbody></table></div>'
-      : '<div class="muted" style="padding:12px">이 분류에 기금이 없습니다.</div>')+'</div>';
+      : '<div class="muted" style="padding:12px">이 분류에 기금이 없습니다.</div>')+'</div>'
+    /* 직전 회계연도의 «결산 후 진행» — 1~4월이 그 해 결산·제출 철이다 */
+    +(list.length?flowHomeHTML(list,cb,yNow-1):'');
 }
 function goClosing(fid,yr){ S.year=yr; S.closeSub='fin'; S.txnsFor=null; S.f15For=null; _go('fund',fid); S.tab='closing'; renderFund(); }
 // 장부 인쇄 — 지금 보고 있는 표를 A4 가로로 그대로
@@ -18205,6 +18489,7 @@ function closeBodyHTML(arr,rows){
     case 'budget':  return budgetView(arr);
     case 'years':   return yearsView();
     case 'f15':     return f15View(arr);
+    case 'flow':    return flowView();
     default:
       return '<div class="panel">'+(arr.length
           ? '<div style="overflow-x:auto"><table><thead><tr><th>일자</th><th>적요</th><th style="text-align:right">입금</th><th style="text-align:right">출금</th><th>차변</th><th>대변</th><th>승인</th><th style="white-space:nowrap">증빙'+hlp('txn.scan')+'</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
@@ -19428,6 +19713,11 @@ var HELP={
    +'<p><b>이미 있는 사업장도 꺼 둡니다.</b> 사업자등록번호가 같거나 상호가 완전히 같으면 「이미 있음」으로 봅니다 — 같은 회사가 두 번 들어가면 출연금이 두 번 세어지고 서식에도 두 번 섭니다.</p>'
    +'<p>만들 때 <b>사업자등록증 원본도 사업장마다 이어</b> 「받음」으로 표시합니다(지원금 제출서류 칸).</p>'
    +'<p><b>출연 약정액은 안 들어옵니다</b> — 사업자등록증에 없는 값입니다. 만든 뒤 명부에서 넣어 주세요. 그 값이 설립 첫해 사업계획서까지 굴러갑니다.</p>'},
+ 'close.flow':{t:'결산 후 진행 — 검토·날인·노동부 제출까지',h:'<p>결산이 끝나면 <b>사업장 검토 → 날인 → 관할 고용노동관서 제출</b>까지가 한 묶음입니다. 운영상황보고는 회계연도가 끝난 뒤 <b>3개월 이내</b>(12월 결산이면 3/31)에 운영상황·결산서·<b>다음 연도 사업계획서</b>(추정재무상태표·손익계산서)를 붙여 냅니다(근로복지기본법 시행령 제63조①).</p>'
+   +'<p><b>✉ 메일 쓰기</b>는 문안과 받는 사람(참여사업장 담당자 이메일)을 보여 주고 <b>푸른메일함</b>을 엽니다. 보내기와 첨부는 메일함에서 직접 합니다.</p>'
+   +'<p><b>📦 제출 묶음</b>은 결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글 틀이 있을 때)와 제출 안내문을 한 zip 으로 받습니다.</p>'
+   +'<p>협의회 회의록은 <b>출석위원 전원이 서명 또는 날인</b>해야 합니다(법 제57조). 협의회는 <b>7일 전까지</b> 알려야 합니다(시행령 제42조③).</p>'
+   +'<p>노동부 전자신고는 공동인증서 로그인이 필요해 앱이 대신 낼 수 없습니다 — 제출 뒤 <b>노동부 제출 → 완료</b>로 바꾸면 연간 일정(별지15호 제출)도 함께 체크됩니다.</p>'},
  'close.wht':{t:'이자는 원천징수 «전» 총액으로 잡습니다',h:'<p>은행은 이자에서 <b>법인세(14%)·지방소득세</b>를 먼저 떼고 남은 것만 통장에 넣습니다. 통장 입금액만 이자로 잡으면 이자수익과 <b>고유목적사업준비금1</b>이 그만큼 모자라고, 떼인 세금이 장부에 없어 법인세 신고(별지 제10호 원천납부세액명세서)와 맞지 않습니다.</p>'
    +'<p>은행에서 받은 <b>이자소득 원천징수영수증</b>(1.1~12.31 전체)의 법인세·지방소득세 합계를 넣으세요. 결산 때 <b>(차) 선납세금 / (대) 이자수익</b>으로 얹어 이자를 총액으로 만듭니다.</p>'
    +'<p>선납세금은 <b>법인세(3/31)·법인지방소득세(4/30)를 기한 안에 신고해야</b> 돌려받습니다. 환급금이 들어오면 선납세금을 줄이는 쪽으로 분개합니다(잡이익 아님).</p>'
