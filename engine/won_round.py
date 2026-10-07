@@ -52,6 +52,9 @@ def round_emp(e):
     for k in WON_FIELDS:
         if k in out:
             out[k] = round_won(out[k])
+    # 지급 항목(수당 열, 2026-10-07)도 같은 규칙 — 명세서에 그대로 찍히는 금액이다
+    if isinstance(out.get("지급항목"), dict):
+        out["지급항목"] = {k: round_won(v) for k, v in out["지급항목"].items()}
     fixed = []
 
     items = [e[k] for k in DED_ITEMS if _num(e.get(k))]

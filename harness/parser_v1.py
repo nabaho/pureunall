@@ -101,6 +101,76 @@ def _nows(s):
 # ⚠ 「연말정산」은 이미 FIELDS 로 잡혀 colmap 에 들어가므로 여기서 중복 합산되지 않는다
 #   (extra_ded 는 colmap 에 없는 열만 본다).
 EXTRA_DED_PAT = ["상조", "조합비", "사우회", "경조", "학자금", "가불", "기숙사비", "친목", "정산"]
+
+# ══ 지급 항목(수당) 열 — 2026-10-07 임금명세서 「구성항목별 금액」 ══
+# 근로기준법 시행령 제27조의2(임금명세서 기재사항)는 기본급·각종 수당·상여 등 «구성항목별 금액»과,
+# 시간에 따라 달라지는 항목의 계산방법·연장·야간·휴일 «시간 수»(상시 4명 이하 제외)를 적게 한다
+# (조문 원문 대조는 아직 — 2차 자료로 확인). 그런데 파서는 FIELDS 에 없는 열을 다 버려서, 실측
+# 직원 줄의 85.6%가 명세서에 「그 외 지급」 한 줄로 뭉쳐 나갔다(지급액의 35%).
+# 규칙: 「기본급」 열과 「지급총액」 열 «사이»의 숫자 열을 지급 항목으로 본다(지급총액 열이 없으면
+#   첫 공제 열 앞까지). 합계·과세·공제·일수 같은 열은 뺀다 — 단, 이름에 「수당」이 있으면 지급이다.
+#   연장·야간·휴일 «시간» 열은 따로 모은다(시간 수 기재용).
+# ⚠ 이 열을 잘못 읽어도 명세서가 틀리지 않게, 쓰는 쪽(앱 slipRows)이 «기본급+항목 합 ≤ 임금총액»일
+#   때만 쓰고 모자란 몫은 「그 외 지급(차액)」으로 남긴다.
+PAY_SKIP = ("합계", "총계", "소계", "계", "총액", "과세", "공제", "세", "보험", "연금", "요양",
+            "차인", "실지급", "실수령", "지급액", "일수", "시간", "시급", "일당", "단가", "번호",
+            "주민", "입사", "퇴사", "성명", "이름", "직위", "직급", "부서", "비고", "계좌", "은행",
+            "근무", "출근", "결근", "공수", "일자", "순번", "예금", "통장", "연번",
+            # 실측(2026-10-07)에서 섞여 들어온 «돈이 아닌» 열 — 나이·사내 규정 메모·비율
+            "나이", "연령", "생년", "내규", "비율", "율", "%",
+            # 참고값·합계·날짜 — 이달 지급 항목이 아니다(연봉 최대 1억, 신고월 202603 같은 값이 실제로 섞였다)
+            "연봉", "통상", "총급여", "급여액", "신고월")
+
+
+def clean_label(h):
+    """머리글 다듬기 — 여러 줄 머리글을 합칠 때 표 위쪽의 제목·날짜가 붙어 온다(실측 2026-10-07):
+    「2026.02.10 수당」「12:30~13:30 직책수당」「#REF! 면허 수당」「고정급 0」「○○(지점) 25년 1월 급여대장 식대」.
+    ⚠ 마지막 것은 명세서에 «회사 이름»이 찍힌다. 「…대장」 제목은 그 뒤만, 날짜·시각·숫자·#REF! 토막과
+      끝의 「0」은 뗀다. 다 떼고 남는 게 없으면 원래 것을 둔다."""
+    toks = h.split()
+    cut = -1
+    for i, t in enumerate(toks):
+        if "급여대장" in t or "임금대장" in t:
+            cut = i
+    if cut >= 0:
+        toks = toks[cut + 1:]
+    toks = [t for t in toks if not (t.startswith("#") or re.fullmatch(r"[\d.:~\-/()]+|\d+년|\d+월", t))]
+    while toks and toks[-1] == "0":
+        toks.pop()
+    return " ".join(toks) or h
+HOUR_PAT = ("연장", "야간", "휴일", "특근", "잔업")
+
+
+def pay_item_cols(flat, colmap, skip):
+    """(지급 항목 열 {열: 이름}, 시간 열 {열: 이름}). 위치로 고르고 이름으로 거른다."""
+    pos = {f: ci for ci, f in colmap.items()}
+    lo = pos.get("기본급", pos.get("성명"))
+    his = [pos["지급총액"]] if "지급총액" in pos else [
+        pos[f] for f in ("국민연금", "건강보험", "장기요양", "고용보험", "소득세", "지방세", "공제총액") if f in pos]
+    if lo is None or not his:
+        return {}, {}
+    hi = min(his)
+    pays, hours = {}, {}
+    for ci in range(lo + 1, hi):
+        if ci in colmap or ci in skip or ci >= len(flat):
+            continue
+        h = clean_label(re.sub(r"\s+", " ", str(flat[ci] or "")).strip())
+        if not h:
+            continue
+        hn = _nows(h)
+        # 「…시간」「…일수」로 끝나면 돈이 아니다 — 「연차미사용수당 시간」(값 10)이 지급으로 들어왔다.
+        #   「시간외수당」처럼 «수당»으로 끝나면 돈이다.
+        if (hn.endswith("시간") or hn.endswith("일수")) and not any(k in hn for k in HOUR_PAT):
+            continue
+        if any(k in hn for k in HOUR_PAT) and "시간" in hn and "수당" not in hn:
+            hours[ci] = h
+            continue
+        if "수당" not in hn and any(k in hn for k in PAY_SKIP):
+            continue
+        if re.fullmatch(r"[\d\s.\-/~]+", h):        # 「3 18」 같은 숫자만 있는 머리글(날짜 칸)
+            continue
+        pays[ci] = h
+    return pays, hours
 JUMIN_RE = re.compile(r'\d{6}\s*[-]?\s*\d{6,7}')
 NAME_RE = re.compile(r'^[가-힣]{2,4}$')
 NUM_RE = re.compile(r'^-?[\d,]+(\.\d+)?$')
@@ -252,7 +322,9 @@ def score_sheet(ws):
                 daymap[ci] = d
     if len(daymap) < 10:      # 달력이라 보기 어려우면(우연한 숫자열) 버림
         daymap = {}
-    return {"data_start": data_start, "header_rows": (hstart, data_start),
+    pay_cols, hour_cols = pay_item_cols(flat, colmap, set(extra_ded) | set(daymap))
+    return {"pay_cols": pay_cols, "hour_cols": hour_cols,
+            "data_start": data_start, "header_rows": (hstart, data_start),
             "colmap": colmap, "fields": fields, "col_count": col_count,
             "extra_ded": extra_ded, "daily": daily, "daymap": daymap}
 
@@ -443,8 +515,32 @@ def pick_and_parse(wb):
             # → 지급총액 칸이 따로 없으므로 동일값 채움(일용은 총액=과세=지급)
             if daily and emp.get("과세총액") is not None:
                 emp.setdefault("지급총액", emp["과세총액"])
+            # 지급 항목·시간 — 직원으로 볼지 정한 «뒤에» 붙인다(이 칸만으로 직원이 되면 안 된다)
+            if len(emp) >= 3:
+                for key, cols in (("지급항목", sc.get("pay_cols") or {}), ("근로시간", sc.get("hour_cols") or {})):
+                    got = {}
+                    for c, lab in cols.items():
+                        if c < len(row):
+                            v = parse_num(row[c])
+                            if v:
+                                got[lab] = got.get(lab, 0) + v
+                    if got:
+                        emp[key] = got
             if len(emp) >= 3:  # 성명 + 숫자필드 2개+
                 employees.append(emp)
+        # ⚠ 지급 항목 열인데 그 시트의 값이 전부 1,000원 미만이면 돈이 아니다(나이·횟수·시간)
+        #   — 열째로 뺀다. 「만나이 45원」 같은 줄이 명세서에 찍히면 안 된다(실측 2026-10-07).
+        big = {}
+        for e in employees:
+            for k, v in (e.get("지급항목") or {}).items():
+                big[k] = max(big.get(k, 0), abs(v))
+        drop = {k for k, m in big.items() if m < 1000}
+        if drop:
+            for e in employees:
+                if e.get("지급항목"):
+                    e["지급항목"] = {k: v for k, v in e["지급항목"].items() if k not in drop}
+                    if not e["지급항목"]:
+                        del e["지급항목"]
         if employees:
             out.append({"sheet": ws.title, "fields": sorted(sc["fields"]),
                         "n_emp": len(employees), "employees": employees})
