@@ -5107,6 +5107,52 @@ function _hwpTblFlow(xml,hdr){
   return apply(s,body).split(HWP_FLOW_MARK).join('');
 }
 /* 틀 XML 한 장(section) 채우기 — 말 바꾸기 → 표지 채우기. 엔진과 저장소를 떼어 두어 검사로 돌려 볼 수 있게 */
+/* ★ 채운 줄의 높이 맞추기 (2026-10-07 사업계획서 세부 항목 줄) — 채운 칸은 줄 정보가 없다(엔진이 폭을 넘는 글의 줄 정보를 걷는다).
+   그러면 한글은 줄 높이를 글만큼 다 늘리지 않아, 세 줄 넘게 꺾이는 사업명의 첫 줄이 위 테두리에 걸렸다
+   (한글 COM 으로 그려 봄 — rhwp 로 열어 .hwp 로 저장한 뒤 한글로 열어도 같았다. 칸 여백을 늘려도 그대로였다).
+   그래서 칸 폭·글자 크기·줄 간격으로 «몇 줄로 꺾일지» 어림해 칸 높이를 미리 늘린다 — 줄여지지는 않는다.
+   ⚠ 줄 정보가 있는 문단(틀에 원래 있던 글)은 그 줄 수를 믿는다. 여러 줄을 품은 칸(rowSpan>1)과 표 속 표는 건드리지 않는다. */
+function _hwpRowFit(xml,hdr){
+  var H={}, SP={};
+  String(hdr||'').replace(/<hh:charPr id="(\d+)" height="(\d+)"/g,function(m,id,h){ H[id]=+h; return m; });
+  String(hdr||'').split('<hh:paraPr ').slice(1).forEach(function(b){
+    var id=/^id="(\d+)"/.exec(b), sp=/<hh:lineSpacing type="PERCENT" value="(\d+)"/.exec(b);
+    if(id) SP[id[1]]=sp?+sp[1]:160; });
+  var wOf=function(t,h){ var w=0; for(var i=0;i<t.length;i++){ var c=t.charCodeAt(i);
+    w+=(c>=0x1100&&(c<=0x11ff||(c>=0x2e80&&c<=0xa4cf)||(c>=0xac00&&c<=0xd7a3)||(c>=0xf900&&c<=0xfaff)||(c>=0xfe30&&c<=0xfe4f)||(c>=0xff00&&c<=0xff60)||(c>=0x3000&&c<=0x33ff)))?h:(c===32?h*0.25:h*0.55); }
+    return w; };
+  /* 어절 단위로 꺾는다(한글이 그렇게 꺾었다) — 한 어절이 줄보다 길면 글자 단위 */
+  var linesOf=function(t,h,W){ if(!t) return 1; var n=1, cur=0;
+    t.split(' ').forEach(function(wd,i){ var ww=wOf(wd,h), sp=i&&cur?wOf(' ',h):0;
+      if(cur+sp+ww<=W*1.02){ cur+=sp+ww; return; }   // 한글은 끝 글자를 조금 당겨 넣는다(그려 보고 맞춘 값)
+      if(cur>0){ n++; cur=0; }
+      while(ww>W){ n++; ww-=W; }
+      cur=ww; });
+    return n; };
+  return String(xml).replace(/<hp:tr>[\s\S]*?<\/hp:tr>/g,function(row){
+    if(row.indexOf('<hp:tbl')>=0) return row;
+    var cells=row.match(/<hp:tc [\s\S]*?<\/hp:tc>/g)||[], need=0, cur=0;
+    cells.forEach(function(c){
+      var rs=/rowSpan="(\d+)"/.exec(c); if(rs&&+rs[1]>1) return;
+      var sz=/<hp:cellSz width="(\d+)" height="(\d+)"/.exec(c), mg=/<hp:cellMargin left="(\d+)" right="(\d+)" top="(\d+)" bottom="(\d+)"/.exec(c);
+      if(!sz||!mg) return;
+      cur=Math.max(cur,+sz[2]);
+      var W=+sz[1]-(+mg[1])-(+mg[2]), tot=0;
+      (c.match(/<hp:p [\s\S]*?<\/hp:p>/g)||[]).forEach(function(p){
+        var cp=/charPrIDRef="(\d+)"/.exec(p), pp=/paraPrIDRef="(\d+)"/.exec(p);
+        var h=(cp&&H[cp[1]])||1000, lh=h*((pp&&SP[pp[1]])||160)/100;
+        var segs=(p.match(/<hp:lineseg\b/g)||[]).length;
+        var t=(p.match(/<hp:t>([^<]*)<\/hp:t>/g)||[]).map(function(x){ return x.slice(6,-7); }).join('')
+          .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&amp;/g,'&');
+        tot+=(segs||linesOf(t,h,W))*lh;
+      });
+      need=Math.max(need,Math.ceil(tot+(+mg[3])+(+mg[4])));
+    });
+    if(!(need>cur)) return row;
+    return row.replace(/<hp:tc [\s\S]*?<\/hp:tc>/g,function(c){
+      return /rowSpan="([2-9]|\d{2,})"/.test(c)?c:c.replace(/(<hp:cellSz width="\d+" height=")\d+"/,'$1'+need+'"'); });
+  });
+}
 function _hwpFillXml(xml,V,from,to,kind,hdr){
   /* ⚠ 인가신청서·정관은 말을 안 바꾼다(HTML 의 FTYPE_SKIP 과 같다) — 인가신청서의 「[V] 공동 / [ ] 사내」 체크 줄을
        바꾸면 두 줄이 다 «공동»이 된다. 정관은 공동·사내가 아예 다른 문서다. */
@@ -5125,6 +5171,7 @@ function _hwpFillXml(xml,V,from,to,kind,hdr){
   var r=X.fill(e.xml,V,{blank:HWP_TPL_BLANK});
   r.filled+=e.filled; e.unknown.forEach(function(k){ if(r.unknown.indexOf(k)<0) r.unknown.push(k); });
   r.opts=opts;
+  if(kind==='bizplan') r.xml=_hwpRowFit(r.xml,hdr);   // 세부 항목 줄(사업명이 길면 여러 줄) — 칸 높이를 글만큼
   return r;
 }
 /* «있거나 없거나» 묶음 — {{#이름}} 이 든 맨 바깥 문단부터 {{/이름}} 이 든 맨 바깥 문단까지.

@@ -139,3 +139,24 @@ test('★ 세부 항목이 없으면 관마다 «총액 한 줄» — 빈 표가
   assert.equal(v.예비[0].금액, v.출_예비);
   assert.equal(v.목적사업[0].사업명, '목적사업'); assert.equal(v.목적사업[0].금액, v.목적계);
 });
+
+/* ★ 채운 줄 높이 맞추기 — 줄 정보가 없는 칸은 한글이 높이를 다 안 늘려 첫 줄이 테두리에 걸렸다(한글로 그려 봄) */
+test('★ 줄 높이 — 꺾일 줄 수만큼 칸 높이를 늘린다 · 줄 정보가 있는 문단·여러 줄 병합 칸은 그대로', () => {
+  const box = {}; new Function(gF('_hwpRowFit') + '\nthis.f=_hwpRowFit;').call(box);
+  const hdr = '<hh:charPr id="70" height="1100" x="1"/><hh:paraPr id="5" x="1"><hh:lineSpacing type="PERCENT" value="160" unit="HWPUNIT"/></hh:paraPr>';
+  const cell = (txt, h, extra) => '<hp:tc name="" borderFillIDRef="2"><hp:subList><hp:p id="0" paraPrIDRef="5"><hp:run charPrIDRef="70"><hp:t>' + txt + '</hp:t></hp:run>' + (extra || '') + '</hp:p></hp:subList>'
+    + '<hp:cellAddr colAddr="0" rowAddr="1"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="7782" height="' + h + '"/><hp:cellMargin left="510" right="510" top="141" bottom="141"/></hp:tc>';
+  const H = (x) => [...x.matchAll(/height="(\d+)"/g)].map((m) => +m[1]);
+  const long = '<hp:tr>' + cell('해당사업으로부터 직접도급 받는 업체의 소속근로자 복리후생 증진', 2795) + cell('2,000', 2795) + '</hp:tr>';
+  const out = box.f(long, hdr);
+  assert.ok(H(out)[0] > 2795 * 2, '여러 줄이면 늘어난다: ' + H(out));
+  assert.equal(H(out)[0], H(out)[1], '한 줄의 칸은 모두 같은 높이');
+  assert.equal(box.f(out, hdr), out, '두 번 돌려도 같다');
+  const short = '<hp:tr>' + cell('경조사비', 2795) + '</hp:tr>';
+  assert.equal(box.f(short, hdr), short, '한 줄이면 그대로');
+  const kept = '<hp:tr>' + cell('해당사업으로부터 직접도급 받는 업체의 소속근로자 복리후생 증진', 2795, '<hp:linesegarray><hp:lineseg textpos="0"/></hp:linesegarray>') + '</hp:tr>';
+  assert.equal(box.f(kept, hdr), kept, '틀의 줄 정보는 믿는다');
+  const span = long.replace(/rowSpan="1"/g, 'rowSpan="3"');
+  assert.equal(box.f(span, hdr), span, '여러 줄 병합 칸은 건드리지 않는다');
+  assert.match(gF('_hwpFillXml'), /if\(kind==='bizplan'\) r\.xml=_hwpRowFit\(r\.xml,hdr\);/, '사업계획서에만 건다');
+});
