@@ -269,6 +269,7 @@ function bkBox(cloud) {
     },
     Date, Object, Array, String, JSON, Promise
   };
+  box.lsGet = k => box.localStorage.getItem(k);   // 앱은 lsGet 으로 읽는다(PC 에 못 쓴 값 먼저)
   vm.createContext(box);
   vm.runInContext(fnSrc('logKey') + '\n' + fnSrc('buildBackupData') + '\n' + fnSrc('restorePhotoLog'), box);
   return { box, pushed, reads, writes };

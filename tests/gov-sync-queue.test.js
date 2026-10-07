@@ -78,6 +78,8 @@ function loadPush() {
   };
   vm.createContext(ctx);
   const code = [
+    'const _lsMem=Object.create(null);let _lsFullTold=false;',
+    cutFn(src, 'function lsGet('),
     cutFn(src, 'function lsSet('),
     cutFn(src, 'function _isDeniedErr('),
     cutFn(src, 'function _noUndef('),
