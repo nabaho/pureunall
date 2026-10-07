@@ -160,6 +160,8 @@ function 복귀세상(성공) {
   w.ctx.auth.setPersistence = (m) => { w.ctx.유지.push(m); return Promise.resolve(); };
   w.ctx.auth.signInWithCustomToken = () => { w.ctx.유지.push('signIn'); return Promise.resolve({ user: { email: '', getIdToken: () => Promise.resolve('t') } }); };
   w.ctx.reportLogin = () => {};
+  w.ctx.enterPortal = () => { w.ctx.유지.push('enterPortal'); };
+  w.ctx._handled = false;
   w.ctx._freshLogin = false;
   w.ctx.window.__kkReturning = true;   // 카카오에서 막 돌아온 참(첫 줄이 세운 표시)
   싣기(w, ['kkMarkUsed', 'kkUnfoldPw', '_rmBootSplash', 'kkEndReturn', 'kkHandleReturn']);

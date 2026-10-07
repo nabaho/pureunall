@@ -187,3 +187,11 @@ test('★★ 카카오 인증표·로그인 저장·직원명부를 차례로 �
   assert.match(enter, /Promise\.all\(\[PuKakao\.loginFinish\(p\.code\),\s*quickPersist\]\)/);
   assert.match(enter, /path === 'data\/user_dir' && window\.__puRosterPrefetch/);
 });
+
+test('★★ 카카오 인증 성공 결과로 포털을 바로 열고 인증상태 재알림을 기다리지 않는다', () => {
+  const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  const start = enter.indexOf("Promise.all([PuKakao.loginFinish(p.code), quickPersist])");
+  const end = enter.indexOf("}).catch(function(err){", start);
+  assert.ok(start > 0 && end > start);
+  assert.match(enter.slice(start, end), /if\(!_handled\)\{ _handled = true; enterPortal\(cred\.user\); \}/);
+});
