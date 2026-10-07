@@ -6575,6 +6575,12 @@ exports.readOldMail = MSYNC.readOldMail;
 const MGONE = require("./mail-gone")({ functions, getDatabase, MAIL_REGION });
 exports.sweepDeletedMail = MGONE.sweepDeletedMail;
 
+/* 🔎 담당 점검 — 이알피 담당이 바뀐 업체를 서버가 10분마다 잡는다(2026-10-07 기업정보함 점검 ③).
+   예전에는 대표님 PC 에서 메일 화면이 열려 있을 때만 셌다. 실제 코드는 mgr-watch.js,
+   셈은 js/pu-mgr-watch-core.js 의 사본(functions/mgr-watch-core/). ⚠ 이 줄이 없으면 배포가 안 된다. */
+const MGRW = require("./mgr-watch")({ functions, getDatabase, MAIL_REGION });
+exports.mgrWatch = MGRW.mgrWatch;
+
 /* 🗄 구글 공용 달력 «보관함» — 매일 새벽 3시 data/gcal_archive 로 베낀다 (대표 지시 2026-09-27
    「푸른캘린더에서 별도로 보관」). 실제 코드는 gcal-archive.js. 누가 지운 일정도 보관함엔 남는다. */
 const GARCH = require("./gcal-archive")({ functions, getDatabase, MAIL_REGION,

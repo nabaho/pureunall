@@ -45,6 +45,7 @@
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
 <script src="js/pu-company-write.js?v=2"></script>
+<script src="js/pu-mgr-watch-core.js?v=1"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
@@ -25752,69 +25753,37 @@ function mgrLoad(cb){
     .catch(()=>{})
     .then(()=>{ _mgrLoading = false; if(_mgrSeen !== null && cb) cb(); });
 }
+/* 지금 일하는 업체 — 셈은 js/pu-mgr-watch-core.js «한 벌»(서버 mgrWatch 와 같다, 2026-10-07 점검 ③) */
 function mgrLiveCos(){
-  const cos = (typeof ErpMatch!=='undefined' && ErpMatch.companies) || [];
-  return cos.filter(c=>c && c.id && MGR_KEY_OK.test(String(c.id))
-    && !/closed|terminated|inactive/.test(String(c.status||'')));
+  return PuMgrWatch.liveCos((typeof ErpMatch!=='undefined' && ErpMatch.companies) || []);
 }
 function mgrName(sid){
   const s = String(sid||''); if(!s) return '';
   return String(((typeof ErpMatch!=='undefined' && ErpMatch.nameBySid) || {})[s] || s);
 }
-/* 지난번 본 담당 ↔ 지금 — 새 기준과 바뀐 것 (순수 로직, 검사 대상)
+/* 지난번 본 담당 ↔ 지금 — 셈은 js/pu-mgr-watch-core.js «한 벌» (서버 mgrWatch 와 같다)
    ⚠ 기준이 비어 있으면(처음) 바뀐 것을 안 낸다. 기준에 없던 새 업체도 «바뀐 것»이 아니다. */
-function mgrDiff(seen, cos, now){
-  const s0 = seen || {};
-  const first = !Object.keys(s0).length;
-  const next = {}, changes = [];
-  (cos || []).forEach(c=>{
-    const id = String(c.id), m = String(c.managerMain || '');
-    next[id] = m;
-    if(first || !Object.prototype.hasOwnProperty.call(s0, id)) return;
-    if(String(s0[id] || '') !== m){
-      /* 이알피가 남긴 이력의 마지막 줄이 «이 바꿈»이면 누가 했는지 함께 적는다(2026-10-03 승인제) */
-      const last = (Array.isArray(c.mgrHistory) ? c.mgrHistory : []).slice(-1)[0];
-      const by = (last && String(last.to || '') === m)
-        ? (last.okByName ? String(last.reqByName || '') + ' 요청 · ' + String(last.okByName) + ' 승인' : String(last.byName || ''))
-        : '';
-      const ch = { co:id, coName:String(c.name||''), from:String(s0[id]||''), to:m, at:now };
-      if(by) ch.by = by;
-      changes.push(ch);
-    }
-  });
-  return { first:first, next:next, changes:changes };
-}
-/* 관리자 PC — 기준과 견주어 바뀐 것을 남긴다 */
+function mgrDiff(seen, cos, now){ return PuMgrWatch.diff(seen, cos, now); }
+/* 관리자 PC — 서버가 적은 «바뀐 것»을 다시 읽어 새로 생겼으면 알린다 (2026-10-07 점검 ③).
+   ★ 견주어 «적는» 일은 이제 서버(functions/mgr-watch.js)가 10분마다 한다. 예전에는 여기서 적어
+     대표님 PC 에서 메일 화면이 열려 있을 때만 돌았고, 로그인 때 읽은 «옛» 업체 목록을 견주고 있었다.
+   ⚠ 여기서 다시 적으면 화면이 든 낡은 기준이 서버가 적은 것을 되돌린다 — «읽기만» 한다.
+   ⚠ 바뀐 것(mgrChange)만 다시 읽는다 — 작다. 기준(mgrSeen, 업체 수만큼)은 처음 한 번(mgrLoad)으로 충분하다. */
 async function mgrWatchRun(){
   if(_mgrBusy || !state.isAdmin) return;
-  if(typeof ErpMatch==='undefined' || !ErpMatch.ready) return;
   if(_mgrSeen === null || _mgrChange === null) return mgrLoad(mgrWatchRun);
   _mgrBusy = true;
-  let n = 0;
+  let grew = 0;
+  const open = o => Object.keys(o || {}).filter(k => o[k] && !o[k].ack).length;
   try{
-    const d = mgrDiff(_mgrSeen, mgrLiveCos(), Date.now());
-    const up = {};
-    Object.keys(d.next).forEach(id=>{ if(_mgrSeen[id] !== d.next[id]) up[DB_ROOT + '/config/mgrSeen/' + id] = d.next[id]; });
-    d.changes.forEach(ch=>{
-      const prev = _mgrChange[ch.co];
-      /* 확인 안 한 것이 또 바뀌면 «처음 담당»을 그대로 둔다 — 전→새 가 한눈에 보이게 */
-      const from = (prev && !prev.ack) ? String(prev.from || '') : ch.from;
-      if(from === ch.to){                        /* 원래대로 돌아왔다 — 줄을 지운다 */
-        if(prev){ up[DB_ROOT + '/config/mgrChange/' + ch.co] = null; delete _mgrChange[ch.co]; }
-        return;
-      }
-      const rec = { co:ch.co, coName:ch.coName, from:from, to:ch.to, at:ch.at };
-      if(ch.by) rec.by = ch.by;
-      _mgrChange[ch.co] = rec; up[DB_ROOT + '/config/mgrChange/' + ch.co] = rec; n++;
-    });
-    if(Object.keys(up).length){
-      await firebase.database().ref().update(up);
-      Object.keys(d.next).forEach(id=>{ _mgrSeen[id] = d.next[id]; });
-    }
+    const before = open(_mgrChange);
+    const snap = await firebase.database().ref(DB_ROOT + '/config/mgrChange').once('value');
+    _mgrChange = snap.val() || {};
+    grew = open(_mgrChange) - before;
   }catch(e){ console.warn('[담당 점검]', (e&&e.message)||e); }
   finally{ _mgrBusy = false; }
-  if(n){
-    toast('🔎 이알피에서 담당이 바뀐 업체 ' + n + '곳 — 「담당 점검」에서 확인해 주세요', 10000);
+  if(grew > 0){
+    toast('🔎 이알피에서 담당이 바뀐 업체 ' + grew + '곳 — 「담당 점검」에서 확인해 주세요', 10000);
     if(state.view==='mail') mbDrawSoon();
   }
 }
@@ -25915,7 +25884,7 @@ function mgrHtml(){
   let h = `<div class="mn-head"><b>🔎 담당 점검</b>
     <span>이알피 담당이 바뀌었거나 비었거나 퇴사자인 곳 · 손으로 정한 담당이 이알피와 다른 곳 — 고치는 것은 이알피에서 합니다</span></div>`;
   if(_mgrSeen !== null && !Object.keys(_mgrSeen).length)
-    h += `<div class="mn-none">처음 켜는 날입니다 — 지금 담당을 적어 두고, 다음에 바뀌면 여기 잡힙니다${state.isAdmin ? '' : '(대표님 PC 에서 적습니다)'}</div>`;
+    h += `<div class="mn-none">처음 켜는 날입니다 — 서버가 지금 담당을 적어 두고(업무 시간 10분마다), 다음에 바뀌면 여기 잡힙니다</div>`;
   h += `<div class="mn-sec">🔄 이알피에서 담당이 바뀐 업체 <small>지난번과 다릅니다 — 맞게 바뀐 것이면 「확인」, 아니면 이알피에서 고치십시오</small></div>`;
   h += r.changes.length ? r.changes.map((x, i)=>{
     const n = (typeof ErpMatch!=='undefined' && ErpMatch.ready) ? (mgrMailCount()[ErpMatch._norm(x.coName)] || 0) : 0;
