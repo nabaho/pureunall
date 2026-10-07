@@ -116,6 +116,8 @@ function load(over){
     fetch: () => Promise.resolve({ json: () => Promise.resolve({ ok:true }) })
   };
   vm.createContext(ctx);
+  /* 담당 점검 셈은 js/pu-mgr-watch-core.js «한 벌» — 화면과 서버(mgrWatch)가 같이 쓴다 */
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-mgr-watch-core.js'), 'utf8') + ';var PuMgrWatch = this.PuMgrWatch || (typeof window !== "undefined" && window.PuMgrWatch);', ctx);  /* 상자에 가짜 window 가 있으면 그쪽에 붙는다 */
   vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);
   vm.runInContext(
