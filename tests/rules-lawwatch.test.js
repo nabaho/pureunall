@@ -156,7 +156,9 @@ test('「개정안 만들기」 는 그 조의 시행일을 기준일로 새 회
 
 test('로그인하면 불러오고, 완료 회차가 바뀌면 다시 판정한다', () => {
   /* 로그인 갈래(if(u){ … }) 한 덩어리를 통째로 본다 — 고정 길이로 자르면 줄이 하나 늘 때마다 깨진다 */
-  const at = html.indexOf('if(u){subscribeArch();');
+  /* 큰 작업본 창고가 켜진 뒤에 부른다(rulesBigReady().then) — 그 감싸개는 건너뛰고 찾는다 */
+  const at = html.search(/if\(u\)\{[\s\S]{0,120}?subscribeArch\(\);/);
+  assert.ok(at > 0, '로그인 갈래를 못 찾았습니다');
   const login = html.slice(at, html.indexOf('}else if(FBDB){', at));
   assert.match(login, /lwLoad\(\)/);
   const sub = html.slice(html.indexOf('function subscribeArch()'), html.indexOf('function subscribeArch()') + 1200);

@@ -57,7 +57,10 @@ function boot(user) {
     },
     /* 대시보드는 펼쳐져 있는 상태로 둔다 */
     $: (id) => (id === 'dash' ? { style: { display: 'block' } } : badge),
-    renderDash: () => { painted.push(1); }
+    renderDash: () => { painted.push(1); },
+    /* 보관함은 큰 사본 창고(RULES_BIG)의 bigGet·bigSet 으로 만진다 — 여기서는 localStorage 그대로 비춘다 */
+    bigGet: (k) => (k in store ? store[k] : null),
+    bigSet: (k, v) => { store[k] = String(v); }
   };
   vm.createContext(ctx);
 
@@ -119,7 +122,7 @@ test('★ 접기가 없어졌으므로 «늘» 그린다 (2026-09-13)', () => {
 });
 
 test('★ 보관함 쓰기는 setLocal 한 곳뿐이어야 한다 (두 숫자가 다시 어긋나지 않게)', () => {
-  const writes = html.match(/localStorage\.setItem\(ARCH_KEY/g) || [];
+  const writes = html.match(/(?:localStorage\.setItem|bigSet)\(ARCH_KEY/g) || [];
   assert.equal(writes.length, 1,
     'ARCH_KEY 를 여러 곳에서 쓰면 갱신을 빠뜨리는 자리가 다시 생깁니다.');
 });
