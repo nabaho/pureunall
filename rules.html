@@ -36,6 +36,7 @@
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="std_2026.js?v=2"></script>
+<script src="js/pu-rules-draft.js?v=1"></script>
 <!-- 「💡 우리 문안」(✏️ 조문 편집 아래) — 📚 조별 문안과 «같은 부품». 캐시 번호는 rules-v2.html 과 같게.
      lib-sites 는 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-order.js?v=1"></script>
@@ -1471,6 +1472,55 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
   <div class="foot"><button class="btn ghost" data-close>닫기</button></div>
 </div></div>
 
+<!-- 📝 질문으로 바로 작성 (대표 지시 2026-10-07 「완벽히 자동화가 되고 있는 프로그램이 있으면 벤치마킹」) —
+     표준취업규칙(2026)을 답으로 채우고, 안 쓰는 선택 조를 빼 번호를 다시 매긴 뒤, 곧바로 92항목 검토에 넣는다.
+     문안을 짓는 일은 js/pu-rules-draft.js(검사가 도는 자리)가 한다. 여기는 묻고 넘겨주기만. -->
+<div class="overlay" id="ov-qdraft"><div class="modal" style="max-width:720px">
+  <h2>📝 질문으로 바로 작성 <span style="font-size:12px;color:var(--mute);font-weight:400">고용노동부 표준취업규칙(2026) 바탕</span><span class="x" data-close>×</span></h2>
+  <div class="body" style="max-height:70vh">
+    <div class="sample-banner" style="margin-bottom:11px">답한 만큼 표준 문안의 빈칸을 채우고, <b>안 쓰는 제도의 조는 빼고 번호를 다시 매깁니다</b>. 만들자마자 <b>92항목 자동 검토</b>로 넘어갑니다. 못 채운 빈칸은 끝에 «직접 채울 곳»으로 알려 드립니다.</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:9px 12px">
+      <label style="font-size:12px;color:var(--sub)">회사 이름 <b style="color:#991b1b">*</b><input id="qd-company" placeholder="예: 주식회사 가나상사" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">사업자번호<input id="qd-bizno" placeholder="000-00-00000" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">상시 근로자 수(명) <b style="color:#991b1b">*</b><input id="qd-size" type="number" min="1" step="1" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">근로자를 부르는 말<select id="qd-term" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"><option>사원</option><option>직원</option><option>근로자</option></select></label>
+      <label style="font-size:12px;color:var(--sub)">시업<input id="qd-start" type="time" value="09:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">종업<input id="qd-end" type="time" value="18:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">휴게 시작<input id="qd-bstart" type="time" value="12:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">휴게 끝<input id="qd-bend" type="time" value="13:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">1주의 첫날 <span class="muted" style="font-size:11px">(근무 월~금 · 토 무급휴무 · 일 주휴)</span><select id="qd-week" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"><option>월</option><option>화</option><option>수</option><option>목</option><option>금</option><option>토</option><option>일</option></select></label>
+      <label style="font-size:12px;color:var(--sub)">임금 지급일(매월)<input id="qd-pay" type="number" min="1" max="31" value="25" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">수습기간(개월) <span class="muted" style="font-size:11px">0이면 조를 뺍니다</span><input id="qd-prob" type="number" min="0" max="12" value="3" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">정년(만 나이)<input id="qd-retire" type="number" min="60" value="60" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">휴직 기간(년)<input id="qd-leave" type="number" min="1" max="5" value="1" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">퇴직급여<select id="qd-ret" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"><option value="pension">퇴직연금(DB·DC)</option><option value="severance">퇴직금</option></select></label>
+      <label style="font-size:12px;color:var(--sub)" style="grid-column:1/-1">고정 수당 <span class="muted" style="font-size:11px">통상임금에 들어가는 것만, 쉼표로 — 비우면 「기본급」만</span><input id="qd-allow" placeholder="예: 직책수당, 자격수당" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">창립기념일 <span class="muted" style="font-size:11px">비우면 안 넣음</span><input id="qd-found" placeholder="예: 3월 2일" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">하기휴가 기간 <span class="muted" style="font-size:11px">비우면 조를 뺍니다</span><input id="qd-summer" placeholder="예: 7월 1일~8월 31일" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">교대제 <span class="muted" style="font-size:11px">비우면 조를 뺍니다</span><input id="qd-shift" placeholder="예: 3조2교대" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <label style="font-size:12px;color:var(--sub)">교대 대상<input id="qd-shiftscope" placeholder="예: 생산직 사원 (비우면 각 사원)" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+      <div style="grid-column:1/-1;font-size:12px;color:var(--sub)">쓰는 제도 <span class="muted" style="font-size:11px">— 안 고르면 그 조를 뺍니다. 고르면 조는 남기고 세부(기간·시간)는 «직접 채울 곳»으로 알려 드립니다</span>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:5px">
+          <label><input type="checkbox" id="qd-elastic"> 탄력적 근로시간제</label>
+          <label><input type="checkbox" id="qd-select"> 선택적 근로시간제</label>
+          <label><input type="checkbox" id="qd-deemed"> 간주근로시간제</label>
+          <label><input type="checkbox" id="qd-discretion"> 재량근로</label>
+          <label><input type="checkbox" id="qd-bonus"> 상여금</label>
+        </div></div>
+      <label style="font-size:12px;color:var(--sub)">시행일 <span class="muted" style="font-size:11px">비우면 부칙에 «직접 채울 곳»</span><input id="qd-eff" type="date" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+    </div>
+    <label style="display:flex;gap:7px;align-items:flex-start;margin-top:11px;font-size:12.5px;color:var(--ink);line-height:1.6"><input type="checkbox" id="qd-adopt" checked style="margin-top:3px">
+      <span><b>표준 뒤에 바뀐 법도 바로 반영</b> — 검토가 짚은 것 중 <b>준비된 개정 문안이 있는 것</b>만 「반영」으로 넣습니다(시행일이 아직이면 부칙 단서가 붙습니다). 카드마다 되돌릴 수 있습니다.</span></label>
+    <div id="qd-err" style="display:none;margin-top:10px;padding:9px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;font-size:12px;color:#991b1b;line-height:1.7"></div>
+    <p class="muted" style="font-size:11px;margin:11px 0 0;line-height:1.6">※ 탄력·선택적 근로시간제는 근로자대표와의 <b>서면합의</b>가 있어야 시행할 수 있습니다(근로기준법 제51조의2·제52조). 최종 판단은 공인노무사.</p>
+  </div>
+  <div class="foot">
+    <button class="stbtn" id="qd-old" style="margin-right:auto" title="조를 하나씩 고르는 예전 작성기">예전 작성기로</button>
+    <button class="btn ghost" data-close>취소</button>
+    <button class="btn orange" id="qd-go">📝 만들고 바로 검토</button>
+  </div>
+</div></div>
+
 <div class="overlay" id="ov-std"><div class="modal" style="max-width:860px">
   <h2>📘 표준취업규칙 (고용노동부) <span class="tag" id="std-sub" style="font-size:12px;color:var(--mute);font-weight:400"></span><span class="x" data-close>×</span></h2>
   <div class="body">
@@ -1848,7 +1898,7 @@ function docsetSign(n){   // 서명란 — 근로자 과반수 확인용
 function opinionDoc(site,asof,summary){
   return "근로자 의견청취서"
     +"\n\n1. 사업장명: "+site
-    +"\n2. 의견 청취 대상: 취업규칙 "+(REV_MODE==="partial"?"일부":"전부")+" 개정(안)"
+    +"\n2. 의견 청취 대상: 취업규칙 "+revKindWord()+"(안)"
     +"\n3. 개정 내용: "+summary
     +"\n4. 의견 청취 일자: "+fmtKDate(asof)
     +"\n\n위 취업규칙 개정(안)에 대하여 근로기준법 제94조 제1항에 따라 근로자 과반수의 의견을 청취하였음을 확인합니다."
@@ -1864,7 +1914,7 @@ function consentDoc(site,asof,summary,hits){
   const list=(hits&&hits.length)?hits.map(h=>"   · "+h.no+(h.title?"("+h.title+")":"")+" — "+h.kind).join("\n"):"   · (해당 조문을 기재하십시오)";
   return "취업규칙 불이익 변경 동의서"
     +"\n\n1. 사업장명: "+site
-    +"\n2. 변경 대상: 취업규칙 "+(REV_MODE==="partial"?"일부":"전부")+" 개정(안)"
+    +"\n2. 변경 대상: 취업규칙 "+revKindWord()+"(안)"
     +"\n3. 불이익 변경에 해당하는 사항\n"+list
     +"\n4. 변경 내용 요약: "+summary
     +"\n5. 시행 예정일: "+fmtKDate(asof)
@@ -1916,7 +1966,7 @@ function opinionFormHwpx(site,asof,summary,pageBreak){
     let x=HWPX.docTitle("의  견  서",{pageBreak:!!pageBreak});
     x+=HWPX.spacer();
     x+=HWPX.bodyPara(`${fmtKDate(asof)}자로 회사가 제시한 변경된 취업규칙에 대하여 그 내용을 확인한 후 이의가 없으므로 아래와 같이 의견서를 제출합니다.`);
-    x+=HWPX.bodyPara(`※ 대상: 취업규칙 ${REV_MODE==="partial"?"일부":"전부"} 개정(안) — ${summary}`);
+    x+=HWPX.bodyPara(`※ 대상: 취업규칙 ${revKindWord()}(안) — ${summary}`);
     x+=HWPX.spacer();
     /* 의견 칸이 있어야 '의견을 들었음'이 증명된다 — 종전에는 서명만 받아
        근로기준법 §94① 의 입증자료로 쓰기에 약했다. */
@@ -2144,7 +2194,7 @@ function applyDoc(site,asof){
       +"   사업자등록번호: "+((SITE_INFO&&SITE_INFO.bizNo)||"____________")
     +"\n상시 근로자 수: "+(LAST&&LAST.size?LAST.size:"____")+"   (남 ____명 / 여 ____명)"
     +"\n\n■ 신고 내용"
-    +"\n신고 사유: 취업규칙 "+(REV_MODE==="partial"?"일부 개정":"전부 개정")
+    +"\n신고 사유: 취업규칙 "+revKindWord()
     +"\n시행 예정일: "+fmtKDate(asof)
     +"\n\n■ 첨부서류 (근로기준법 시행규칙 제15조)"
     +"\n  1. 취업규칙 전문 1부"+(DOCSET.full?" [√]":" [ ]")
@@ -2199,6 +2249,11 @@ function lawDelayFindings(asof){
   try{ return LAST&&LAST.arts?PuRulesCriteria.evaluate(LAST.arts,LAST.size,new Set(LAST.conds||[]),asof):[]; }
   catch(e){ console.warn("부칙 단서 판정 실패:",e); return []; }
 }
+/* 📝 제정(새로 짓는 한 권) — 질문으로 바로 작성한 것은 파일 이름에 「(제정안)」을 단다(2026-10-07).
+   이름은 작업 보관·보관함에 함께 남아 다시 열어도 갈래가 안 바뀐다. 제정이면 서류의 말이 「제정」이 되고,
+   부칙은 이력 승계 없이 「이 규칙은 …부터 시행한다」 한 줄(+ 아직 시행 전 법의 단서)이다. */
+function isEnact(){ return !!(LAST&&/\(제정안\)/.test(SITE_FILE[LAST.key]||"")); }
+function revKindWord(){ return isEnact()?"제정":(REV_MODE==="partial"?"일부 개정":"전부 개정"); }
 function composeAddendum(){
   const prev=(LAST&&LAST.addendum)||"";
   const lines=prev?prev.split("\n").map(s=>s.trim()).filter(Boolean):[];
@@ -2207,6 +2262,7 @@ function composeAddendum(){
   const date=fmtKDate(asof);
   const views=numberedView(CUR_ITEMS,REV_MODE).filter(v=>inDaejoDoc(v.it));
   const dl=lawDelayText(lawDelayGroups(views,lawDelayFindings(asof),asof,TPLS));
+  if(isEnact())return {lines:[],entry:"이 규칙은 "+date+"부터 시행한다."+(dl?" "+dl.replace(/의 개정규정은/g,"의 규정은"):"")};   // 제정에는 «개정»규정이 없다
   const sent=(REV_MODE==="full"?"본 규칙을 전부 개정하여 ":"본 규칙의 일부를 개정하여 ")+date+"부터 시행한다."+(dl?" "+dl:"");
   const entry=(n||!lines.length?String(n+1)+". ":"")+sent;   // 기존 번호 매김 이어가기(없던 문서는 1.부터)
   return {lines,entry};
@@ -9405,11 +9461,75 @@ $("line-join").addEventListener("click",ljOpen);
 $("lj-go").addEventListener("click",ljGo);
 $("dash-all").addEventListener("click",()=>{ DASHM_FILT=""; $("dashm-q").value=""; renderDashModal(); $("ov-dash").classList.add("on"); });
 $("dashm-q").addEventListener("input",renderDashModal);
+/* ＋ 신규 — 질문으로 바로 작성(2026-10-07). 예전 작성기는 창 안의 단추로 남긴다 */
 $("dash-new").addEventListener("click",()=>{
-  const site=prompt("신규 사업장명을 입력하세요 (표준 취업규칙으로 작성합니다)","");
-  if(site===null)return;
-  goWrite(site.trim(),"","");
+  $("qd-err").style.display="none";
+  $("ov-qdraft").classList.add("on");
+  $("ov-qdraft").querySelectorAll("[data-close]").forEach(x=>x.onclick=()=>closeOverlay($("ov-qdraft")));
+  setTimeout(()=>{ const c=$("qd-company"); if(c)c.focus(); },50);
 });
+$("qd-old").addEventListener("click",()=>{
+  const site=$("qd-company").value.trim()||prompt("신규 사업장명을 입력하세요 (표준 취업규칙으로 작성합니다)","");
+  if(site===null)return;
+  closeOverlay($("ov-qdraft")); goWrite(String(site).trim(),$("qd-bizno").value.trim(),"");
+});
+function qdAnswers(){
+  const v=id=>$(id).value, n=id=>Number($(id).value), c=id=>$(id).checked;
+  return { company:v("qd-company").trim(), size:n("qd-size"), term:v("qd-term"),
+    start:v("qd-start"), end:v("qd-end"), breakStart:v("qd-bstart"), breakEnd:v("qd-bend"),
+    weekStart:v("qd-week"), payDay:n("qd-pay"), probation:n("qd-prob"), retireAge:n("qd-retire"),
+    leaveYears:n("qd-leave"), retirement:v("qd-ret"), allowances:v("qd-allow"),
+    founding:v("qd-found").trim(), summer:v("qd-summer").trim(), shift:v("qd-shift").trim(), shiftScope:v("qd-shiftscope").trim(),
+    flex:{elastic:c("qd-elastic"),select:c("qd-select"),deemed:c("qd-deemed"),discretion:c("qd-discretion")},
+    bonus:c("qd-bonus"), effective:v("qd-eff"), adopt:c("qd-adopt") };
+}
+/* 상시 근로자 수 → 검토의 「근로자」 칸(규칙집이 사업장 규모로 갈린다) */
+const qdSizeKey=n=>n<5?"5인미만":(n<10?"5인이상":(n<30?"10인이상":"30인이상"));
+$("qd-go").addEventListener("click",async()=>{
+  const ans=qdAnswers(), err=$("qd-err");
+  if(!window.STD_2026||!window.PuRulesDraft){ err.style.display="block"; err.textContent="⚠ 표준규칙 파일을 불러오지 못했습니다 — 새로고침 뒤 다시 하세요."; return; }
+  const r=PuRulesDraft.build(STD_2026,ans);
+  if(!r.ok){ err.style.display="block"; err.innerHTML="⚠ "+r.why.map(escapeH).join("<br>⚠ "); return; }
+  closeOverlay($("ov-qdraft"));
+  await takeDraft(r,ans,$("qd-bizno").value.trim());
+});
+/* 지은 한 권을 «올린 파일»처럼 들인다 — 작성기 인계(takeHandoff)와 같은 길: 넣기 → 92항목 검토 → 보관 */
+async function takeDraft(r,ans,bizno){
+  const key="Q"+Date.now(), site=ans.company;
+  SAMPLES[key]=r.text; SITE_MAP[key]="🏢 "+site; SITE_BIZNO[key]=bizno||"";
+  SITE_FILE[key]=site+"_취업규칙(제정안).txt"; SITE_NAME[key]=site;   // 「(제정안)」 — isEnact 의 잣대
+  const o=document.createElement("option"); o.value=key; o.textContent=SITE_MAP[key];
+  siteSel.appendChild(o); siteSel.value=key;
+  if($("size"))$("size").value=qdSizeKey(ans.size);
+  if($("asof"))$("asof").value=ans.effective||todayKST();   // 시행일에 맞는 법으로 본다
+  REV_MODE="full"; if(typeof syncRevBtns==="function")syncRevBtns();   // 새 한 권 — 가지번호 없이 제1조부터
+  saveWorkFromUpload(key,null,false);
+  await renderPreview();
+  run();
+  const adopted=ans.adopt?qdAutoAdopt():[];
+  autoSaveArchive("질문 작성",true);
+  const pv=$("preview"), note=document.createElement("div");
+  note.className="sample-banner"; note.style.cssText="background:#f8fafc;border-color:#4ade80;color:#166534;line-height:1.7";
+  note.innerHTML="📝 표준취업규칙(2026)으로 지었습니다 — <b>"+r.articles+"개 조</b>"
+    +(r.dropped.length?" · 뺀 조: "+r.dropped.map(d=>escapeH(d.title)).join(", "):"")
+    +(r.leftovers.length?"<br>⚠ <b>직접 채울 곳 "+r.leftovers.length+"</b>: "+r.leftovers.map(escapeH).join(", "):"<br>✓ 빈칸 없음")
+    +(r.warnings.length?"<br>⚠ "+r.warnings.map(escapeH).join(" / "):"")
+    +(adopted.length?"<br>⚖ 표준 뒤에 바뀐 법 <b>"+adopted.length+"건</b>을 바로 반영했습니다: "+adopted.map(escapeH).join(", "):"");
+  pv.insertBefore(note,pv.firstChild);
+}
+/* 검토가 짚은 것 중 «준비된 개정 문안»(TPL_BY_RULE)이 있는 것만 반영한다 — 문안 없는 지적·수동확인은 사람이 본다.
+   ⚠ 이미 결정한 것은 안 건드린다. 결정은 카드에 «✓ 반영»으로 남아 되돌릴 수 있다. */
+function qdAutoAdopt(){
+  const done=[];
+  (ALL_FINDINGS||[]).forEach(f=>{
+    if(!(f.status==="누락"||f.status==="시행예정"||f.status==="위반의심"))return;
+    if(!TPL_BY_RULE[f.rule.id])return;
+    const it=itemForFinding(f); if(!it||it.decision)return;
+    applyDecision(f,"반영"); done.push(f.rule.id+" "+f.rule.name);
+  });
+  if(done.length)renderFindings();
+  return done;
+}
 /* 사업장 줄의 업로드는 걷었다 — ① 넣기가 늘 닿으므로 두 자리일 까닭이 없다(설계서 §4). */
 $("run").addEventListener("click",run);
 /* 비교에 쓰는 화면들 — 새 창으로 띄워 모니터 여러 대에 나란히 */
@@ -9421,6 +9541,11 @@ addPopBtn("ov-stdcmp",()=>"표준규칙 대조 — "+siteLabel(),".body",{w:1250
 goFlowStep(1);   /* 처음에는 ① 넣기 — 설정 줄을 펼친다 */
 /* 한글 모양을 별창으로 — 편집 창은 본 화면에 두고 다른 모니터에서 나란히 본다 */
 addPopBtn("ov-docpv",()=>siteLabel()+" — "+(DOC_LABEL[PV_KEY]||"서식")+" (한글 모양)",".body",{w:1250,h:900});
+/* 기준일은 «오늘»(한국 시각)에서 시작한다 (2026-10-07) — 예전엔 마크업에 2026-07-21 이 박혀 있어, 손으로 안 바꾸면
+   그 뒤 시행된 법(단기 육아휴직 2026-08-20 · 배우자 유산·사산휴가 2026-09-18)이 «시행예정»으로 읽혔다.
+   저장해 둔 검토를 되살리면 그 검토의 기준일로 덮인다(restoreWork) — 그건 그대로 맞다. */
+const todayKST=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
+if($("asof"))$("asof").value=todayKST();
 renderPreview();updateArchCnt();
 migrateWip();    // 옛 임시저장(WIP)이 남아 있으면 통합 저장으로 이관
 renderDash();   /* 단추에 「이어서 할 곳 N」을 적는다 — 접기는 없앴다(2026-09-13) */
