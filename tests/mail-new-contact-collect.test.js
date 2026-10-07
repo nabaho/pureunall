@@ -226,8 +226,9 @@ test('★★★ 담는 길은 «새로 안 짓는다» — erpFillContact 하나
   const save = sliceFn(app, 'async function mbNewSave(');
   assert.match(save, /erpFillContact\(/, '담는 길이 erpFillContact 가 아닙니다');
   assert.ok(!/data\/companies/.test(save), '이 화면이 업체 기록을 제 손으로 씁니다');
-  const fill = sliceFn(app, 'async function erpFillContact(');
-  assert.match(fill, /if\(has\) return \{ ok:true, added:false/,
+  /* 셈은 erpFillContactPlan 에 있다 — 서버의 지금 판으로 다시 불리는 자리(2026-10-07 점검 ①) */
+  const fill = sliceFn(app, 'async function erpFillContact(') + sliceFn(app, 'function erpFillContactPlan(');
+  assert.match(fill, /if\(has\) return \{ none:true, info:\{ added:false/,
     '이미 적힌 주소를 덮습니다 — 남이 고쳐 둔 것이 조용히 사라집니다');
   assert.match(fill, /blank\(cur\.primaryContactEmail\)/,
     '대표 담당자 칸을 «빈 칸만» 채우지 않습니다');

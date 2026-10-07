@@ -139,7 +139,10 @@ ok('세무사무실만 적힌 업체가 안 걸러진다', /&& !rec\.taxEmail\) 
    '담당자·유형이 비어 있어도 세무 메일은 온다');
 ok('저장은 빈 칸만 채운다', /if\(blank\(cur\.taxEmail\)\)/.test(src) && /안 덮는다/.test(src),
    '사람이 고쳐 둔 것을 메일 한 통이 지우면 안 된다');
-ok('갱신시각을 찍어 ERP 가 다시 읽게 한다', /up\['data\/companies\/u'\] = now;/.test(src),
+/* 2026-10-07 점검 ①: 저장은 공용 문(erpCoPatchMany)으로 — 그 문이 쓴 뒤 시각(u)을 찍는다 */
+ok('갱신시각을 찍어 ERP 가 다시 읽게 한다',
+   /async function taxSaveDo\(\)[\s\S]*?erpCoPatchMany\(/.test(src)
+   && /async function erpCoPatchMany\([\s\S]*?if\(out\.done\)\{[\s\S]*?ref\('data\/companies\/u'\)\.set\(/.test(src),
    '안 찍으면 저장해도 푸른이알피에 안 나타난다');
 ok('띠가 메일 화면에 붙어 있다', /\$\{taxStripHtml\(v\)\}/.test(src));
 const modals = (src.match(/\+ taxSaveHtml\(\);/g) || []).length;

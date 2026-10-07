@@ -29,6 +29,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const { coFake } = require('./erp-co-fake.js');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
 
@@ -68,7 +69,9 @@ function indexInto(M, companies){
    ⚠ ErpMatch 는 «진짜»를 싣는다 — 사람 가리는 규칙(keyOfCard·samePerson)이 읽을 때와
      같은지가 이 검사의 핵심이라, 대역을 쓰면 아무것도 안 보게 된다. */
 function load(companies){
-  const writes = [];
+  /* 업체관리 가짜 서버 — 업체 «한 건» 읽기 + 공용 관문 거래(2026-10-07, tests/erp-co-fake.js) */
+  const fake = coFake(companies);
+  const writes = fake.writes;
   const i = src.indexOf('const ErpMatch = {');
   const open = src.indexOf('{', i);
   let d = 0, end = -1;
@@ -80,19 +83,14 @@ function load(companies){
   const ctx = { console, Object, Array, String, Number, Math, JSON, Promise, Date, Set,
     setTimeout: () => {}, render: () => {}, coListBust: () => {},
     toast: m => { ctx._toast = m; },
-    firebase: { database: () => ({
-      ref: p => ({
-        /* 업체관리는 «객체꼴»(id 로 매긴 것)이 지금 쓰는 꼴이다. 배열꼴은 아래에서
-           따로 본다 — 두 꼴이 다 실제로 있어 한쪽만 맞으면 반은 안 된다. */
-        once: () => Promise.resolve({ val: () => ({ v: asObj(companies) }) }),
-        update: u => { writes.push(u); return Promise.resolve(); }
-      })
-    }) },
-    _writes: writes };
+    window: { PuCompanyWrite: fake.PuCompanyWrite },
+    firebase: { auth: () => ({ currentUser: { email: 'me@pureun.kr' } }), database: fake.database },
+    _writes: writes, _fake: fake };
   vm.createContext(ctx);
   vm.runInContext(src.slice(i, end).replace(/^const /, 'var ') + ';', ctx);
   ctx.ErpMatch.load = () => { ctx._reloaded = true; };
   indexInto(ctx.ErpMatch, companies);
+  vm.runInContext(fnBody('erpCoPatchMany'), ctx);
   vm.runInContext(fnBody('cardMarkLeft'), ctx);
   return ctx;
 }
@@ -220,7 +218,7 @@ test('★ 갱신시각을 남긴다 — 안 쓰면 푸른이알피 화면이 안
   const C = load([ co([{ id:'p1', email:'park@gana.co.kr' }]) ]);
   return C.cardMarkLeft(card({ email:'park@gana.co.kr' }), true, '권형하').then(() => {
     const u = C._writes[0];
-    assert.ok(u['data/companies/u'], '★ 갱신시각이 없으면 저쪽이 다시 안 읽는다');
+    assert.ok(C._fake.uSets.length, '★ 갱신시각이 없으면 저쪽이 다시 안 읽는다');
     assert.ok(u['data/companies/v/c1'].updatedAt, '고친 때가 없다');
     assert.equal(u['data/companies/v/c1'].updatedBy, '권형하', '누가 고쳤는지 없다');
   });
@@ -257,34 +255,18 @@ test('다른 업체는 손대지 않는다', () => {
   });
 });
 
-/* ══════ ⑦-2 «배열꼴» 업체관리도 다룬다 ══════ */
+/* ══════ ⑦-2 업체관리 목록을 «통째로» 쓰지 않는다 (2026-10-07 점검 ①) ══════
+   예전에는 «배열꼴»이면 목록 전체를 다시 썼다 — 한 사람 표시하려고 업체 378곳을 덮어썼다.
+   서버는 이미 업체 id 꼴이다(2026-10-07 재 봄: 378곳 모두 id 열쇠). 이제 «그 업체 한 건»만 쓴다. */
 
-test('★ 업체관리가 배열꼴이어도 쓴다 — 두 꼴이 실제로 다 있다', () => {
-  const writes = [];
-  const i = src.indexOf('const ErpMatch = {');
-  const open = src.indexOf('{', i);
-  let d = 0, end = -1;
-  for (let k = open; k < src.length; k++) {
-    if (src[k] === '{') d++;
-    else if (src[k] === '}') { d--; if (!d) { end = k + 1; break; } }
-  }
-  const arr = [ co([{ id:'p1', email:'park@gana.co.kr' }]) ];
-  const ctx = { console, Object, Array, String, Number, Math, JSON, Promise, Date, Set,
-    setTimeout: () => {}, render: () => {}, coListBust: () => {},
-    firebase: { database: () => ({ ref: () => ({
-      once: () => Promise.resolve({ val: () => ({ v: arr }) }),
-      update: u => { writes.push(u); return Promise.resolve(); } }) }) } };
-  vm.createContext(ctx);
-  vm.runInContext(src.slice(i, end).replace(/^const /, 'var ') + ';', ctx);
-  ctx.ErpMatch.load = () => {};
-  indexInto(ctx.ErpMatch, arr);
-  vm.runInContext(fnBody('cardMarkLeft'), ctx);
-  return ctx.cardMarkLeft(card({ email:'park@gana.co.kr' }), true).then(r => {
+test('★★ 업체 «한 건»만 쓴다 — 목록 전체(data/companies/v)를 덮지 않는다', () => {
+  const C = load([ co([{ id:'p1', email:'park@gana.co.kr' }]),
+    { id:'c2', name:'다라산업', bizNo:'123-86-20022', status:'active', contacts:[] } ]);
+  return C.cardMarkLeft(card({ email:'park@gana.co.kr' }), true).then(r => {
     assert.equal(r.ok, true);
-    const list = writes[0]['data/companies/v'];
-    assert.ok(Array.isArray(list), '★ 배열꼴인데 객체꼴로 쓰면 업체 목록이 통째로 뒤집힌다');
-    assert.equal(list[0].contacts[0].left, true);
-    assert.ok(writes[0]['data/companies/u'], '갱신시각이 없다');
+    C._writes.forEach(w => Object.keys(w).forEach(k => assert.notEqual(k, 'data/companies/v',
+      '★★ 업체 목록을 통째로 썼습니다 — 그사이 이알피에서 고친 다른 업체가 사라집니다')));
+    assert.equal(C._fake.reads.whole, 0, '★ 업체 목록을 통째로 읽었습니다 — 한 건만 읽으면 됩니다');
   });
 });
 

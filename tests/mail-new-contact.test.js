@@ -19,6 +19,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const vm = require('node:vm');
 const path = require('node:path');
+const { coFake } = require('./erp-co-fake.js');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
 const fnrecv = fs.readFileSync(path.join(__dirname, '..', 'functions', 'mail-receive.js'), 'utf8');
@@ -78,6 +79,22 @@ function load(over){
     update: (u) => { held.wrote = u; return Promise.resolve(); },
     orderByKey(){ return this; }, limitToLast(){ return this; } });
   const rootRef = { update: (u) => { held.wrote = u; return Promise.resolve(); } };
+  /* 업체관리는 이제 «한 건 읽기 + 공용 관문 거래»로 쓴다(2026-10-07, tests/erp-co-fake.js).
+     쓴 것은 예전처럼 held.wrote 에 { 'data/companies/v/{id}': 레코드 } 로 보이게 한다. */
+  const fake = coFake(COS.map(c => JSON.parse(JSON.stringify(c))));
+  const fakeDb = fake.database();
+  const dbRef0 = dbRef;
+  const dbRefCo = (p) => {
+    if (/^data\/companies\/v\//.test(String(p))) {
+      const r = fakeDb.ref(p);
+      return Object.assign({}, r, { transaction: async (fn) => {
+        const out = await r.transaction(fn);
+        if (out && out.committed) held.wrote = fake.writes[fake.writes.length - 1];
+        return out; } });
+    }
+    if (String(p) === 'data/companies/u') return fakeDb.ref(p);
+    return dbRef0(p);
+  };
   const ctx = {
     console, Object, Array, String, Number, Math, JSON, RegExp, Set, Date, Promise,
     setTimeout: (f) => { if(typeof f==='function') f(); return 0; }, clearTimeout(){}, atob:()=>'',
@@ -106,13 +123,14 @@ function load(over){
     document: { getElementById: el, addEventListener(){}, removeEventListener(){},
       body:{ classList:{ contains: () => true } } },
     $: el,
+    window: { PuCompanyWrite: fake.PuCompanyWrite },
     firebase: { auth: () => ({ currentUser:{ uid:'U1', email:'p001@pureun.kr' } }),
       database: () => Object.assign(function(){ return rootRef; },
-        { ref: (p) => (p === undefined ? rootRef : dbRef(p)) }) },
+        { ref: (p) => (p === undefined ? rootRef : dbRefCo(p)) }) },
     fetch: () => Promise.resolve({ json: () => Promise.resolve({ ok:true }) })
   };
   /* firebase.database().ref() 를 인자 없이 부르는 자리가 있다 */
-  ctx.firebase.database = () => ({ ref: (p) => (p === undefined ? rootRef : dbRef(p)) });
+  ctx.firebase.database = () => ({ ref: (p) => (p === undefined ? rootRef : dbRefCo(p)) });
   vm.createContext(ctx);
   vm.runInContext(cut('const ErpMatch = {', '\nfunction autoFolderFlush('), ctx);
   vm.runInContext(cut('function pcItem(attrs', '\nfunction switchTab('), ctx);

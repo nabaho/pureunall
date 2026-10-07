@@ -25,6 +25,7 @@ const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('node:vm');
+const { coFake } = require('./erp-co-fake.js');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8');
 
@@ -111,18 +112,21 @@ test('폴더로 옮길 명함·사업자 수를 미리 센다 — 모르고 누�
 
 /* ── ③ 원본은 하나 · 쓰기는 한 번 ─────────────────────────────────── */
 test('★ 상태를 적는 곳이 «푸른이알피 업체관리» 하나다', () => {
-  const src = fn('coTerminate');
-  assert.ok(/data\/companies\/v\//.test(src), '업체관리에 안 쓴다');
+  const src = fn('coTerminate').replace(/\/\*[\s\S]*?\*\//g, '');
+  /* 2026-10-07 점검 ①: 업체관리에는 공용 문(erpCoPatchMany → 업체 한 건 거래)으로 쓴다 */
+  assert.ok(/erpCoPatchMany\(/.test(src) && /status:\s*st/.test(src), '업체관리에 안 쓴다');
   assert.ok(!/coInfo\/[^']*\/status|\/status'\]\s*=\s*.*pucards/.test(src),
     '★ 기업정보함에도 상태를 적는다 — 두 곳에 적으면 어느 쪽이 참인지 모른다');
 });
 
-test('★ 회사가 몇이든 읽기 한 번·쓰기 한 번', () => {
-  const src = fn('coTerminate');
-  assert.equal((src.match(/once\(/g) || []).length, 1,
-    '★ 회사마다 업체관리를 읽는다 — 2026-08-16 에 5,000건 오류를 낸 방식이다');
+test('★ 업체관리는 공용 문으로만 — 목록을 통째로 읽고 쓰지 않는다', () => {
+  /* 2026-10-07 점검 ①: 예전 «통째 읽기 한 번 + 통째 쓰기 한 번»은 그사이 이알피 손질을 지웠다.
+     이제 회사마다 «한 건 읽기 + 한 건 거래»(고른 몇 곳이다). 장마다 따로 쓰지는 않는다. */
+  const src = fn('coTerminate').replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.equal((src.match(/erpCoPatchMany\(/g) || []).length, 1, '공용 문을 한 번만 불러야 합니다');
+  assert.ok(!/\.once\(|\.transaction\(|data\/companies/.test(src), '★ 공용 문을 거치지 않고 업체관리를 직접 읽거나 씁니다');
   const ups = (src.match(/\.update\(/g) || []).length;
-  assert.ok(ups >= 1 && ups <= 2, '쓰기가 ' + ups + '번이다 (업체관리 1 + 회사폴더 1 까지)');
+  assert.ok(ups <= 1, '쓰기가 ' + ups + '번이다 (회사폴더 1 까지)');
   assert.ok(/autoFolderFlush\(/.test(src), '명함·사업자를 한 장씩 옮긴다');
 });
 
@@ -130,17 +134,21 @@ test('★ 회사가 몇이든 읽기 한 번·쓰기 한 번', () => {
    ⚠ 「소스에 data/companies/u 가 있나」만 보면, 보내기 직전에 그 칸을 지우는 고장이
      그대로 샌다 — 2026-08-29 고장 시험에서 실제로 샜다. */
 function runTerminate(on, cos) {
-  const writes = [], puWrites = [], flushed = [];
-  const list = [{ id: 'c1', name: 'A', status: 'active', bizNo: '111' }];
+  const puWrites = [], flushed = [];
+  /* 서버의 상태는 검사가 준 업체의 상태로 — 이제 «같은 상태면 안 쓴다»(헛쓰기를 안 한다) */
+  const st0 = (cos[0] && cos[0].erp && cos[0].erp.status) || 'active';
+  const list = [{ id: 'c1', name: 'A', status: st0, bizNo: '111' }];
+  /* 업체관리 가짜 서버 — 업체 «한 건» 읽기 + 공용 관문 거래(2026-10-07, tests/erp-co-fake.js) */
+  const fake = coFake(list);
+  const writes = fake.writes;
   const b = {
     coList: () => cos, ErpMatch: { load: () => {} },
     _coFolders: {}, _canon: s => String(s || ''),
     erpClosedFolderOf: () => null, autoFolderFlush: x => flushed.push(x),
-    DB_ROOT: 'pucards',
+    DB_ROOT: 'pucards', toast: () => {},
     Store: { db: { ref: () => ({ update: u => { puWrites.push(u); return Promise.resolve(); } }) } },
-    firebase: { database: () => ({ ref: () => ({
-      once: () => Promise.resolve({ val: () => ({ v: { c1: list[0] } }) }),
-      update: u => { writes.push(u); return Promise.resolve(); } }) }) }
+    window: { PuCompanyWrite: fake.PuCompanyWrite },
+    firebase: { auth: () => ({ currentUser: { email: 'me@pureun.kr' } }), database: fake.database }
   };
   vm.createContext(b);
   const at = SRC.indexOf('const CO_CLOSED_ST');
@@ -148,17 +156,18 @@ function runTerminate(on, cos) {
   vm.runInContext(fn('closedFolderName'), b);
   vm.runInContext(fn('coClosedFolder'), b);
   vm.runInContext(fn('coTerminatePlan'), b);
+  vm.runInContext(fn('erpCoPatchMany'), b);
   vm.runInContext(fn('coTerminate'), b);
   b.__p = vm.runInContext("coTerminatePlan(['111'], " + (on ? 'true' : 'false') + ')', b);
   return vm.runInContext("coTerminate(__p, " + (on ? 'true' : 'false') + ", '권형하')", b)
-    .then(r => ({ r, writes, puWrites, flushed }));
+    .then(r => ({ r, writes, puWrites, flushed, fake }));
 }
 
 test('★ 보낸 통에 «갱신시각»이 들어 있다 — 없으면 푸른이알피 화면이 안 바뀐다', () => {
   return runTerminate(true, [ co('111', 'A', erp('c1', 'active')) ]).then(o => {
     assert.equal(o.writes.length, 1, '쓰기가 한 번이 아니다');
-    assert.ok(o.writes[0]['data/companies/u'],
-      '★ 갱신시각이 «보낸 통에» 없다 — 저쪽이 다시 안 읽어 화면이 그대로다');
+    assert.ok(o.fake.uSets.length,
+      '★ 갱신시각을 안 올렸다 — 저쪽이 다시 안 읽어 화면이 그대로다');
     assert.equal(o.writes[0]['data/companies/v/c1'].status, 'terminated');
     assert.equal(o.writes[0]['data/companies/v/c1'].updatedBy, '권형하');
   });

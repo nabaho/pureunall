@@ -18,6 +18,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const { sliceFn } = require('./fnslice.js');
+const { coFake } = require('./erp-co-fake.js');
 
 const app = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').replace(/\r\n/g, '\n');
 const strip = (s) => String(s).replace(/\/\*[\s\S]*?\*\//g, ' ');
@@ -186,15 +187,21 @@ test('★★★ 되돌리기는 «저절로 넣은 줄»만 뺀다 — 사람이
   const company = { id: 'co1', name: '가나상사', primaryContactEmail: 'hong@ganasa.co.kr', primaryContactName: '홍길동',
     contacts: [{ email: 'hong@ganasa.co.kr', addedFrom: 'mail-auto', isPrimary: true },
       { email: 'hong@ganasa.co.kr', addedFrom: 'mail-read' }, { email: 'boss@ganasa.co.kr' }] };
-  let up = null; const sets = [];
-  c.firebase = { database: () => ({
-    ref: (p) => ({ once: async () => ({ val: () => (p === 'data/companies' ? { v: [company] } : null) }),
-      set: async (v) => { sets.push(p + '=' + v); }, update: async (u) => { up = u; } }) }) };
+  const sets = [];
+  /* 업체관리는 «한 건 읽기 + 공용 관문 거래»로 쓴다(2026-10-07, tests/erp-co-fake.js) */
+  const fake = coFake([company]);
+  const fdb = fake.database();
+  c.window = { PuCompanyWrite: fake.PuCompanyWrite };
+  c.firebase = { auth: () => ({ currentUser: { email: 'me@pureun.kr' } }), database: () => ({
+    ref: (p) => (/^data\/companies/.test(String(p)) ? fdb.ref(p)
+      : { once: async () => ({ val: () => null }), set: async (v) => { sets.push(p + '=' + v); }, update: async () => {} }) }) };
   c.mbWhoBust = () => {}; c.mbCardsRevBump = () => {};
   vm.runInContext('ErpMatch.load = function(){};', c);
+  vm.runInContext(sliceFn(app, 'async function erpCoPatchMany('), c);
   await c.mnewUndo('k1');
+  const up = fake.writes[0];
   assert.ok(up, '★★★ 되돌리기가 아무것도 안 씁니다');
-  const merged = up['data/companies/v/0'];
+  const merged = up['data/companies/v/co1'];
   assert.equal(merged.contacts.length, 2);
   assert.ok(merged.contacts.some((x) => x.addedFrom === 'mail-read'), '★★★ 사람이 넣은 줄까지 뺍니다');
   assert.equal(merged.primaryContactEmail, '', '★★ 대표 담당자 칸에 뺀 주소가 남습니다');
