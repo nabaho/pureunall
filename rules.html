@@ -13,8 +13,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=50"></script>
+<script src="js/pu-ls-guard.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
+<!-- 큰 작업본(올린 원본 포함)·보관함 사본은 IndexedDB 로 — localStorage 5MB 를 통합 프로그램 전부가 나눠 쓴다 (2026-10-07) -->
+<script src="js/pu-big-store.js?v=2"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
@@ -1696,6 +1699,23 @@ const SITE_MAP = {A:"〔샘플〕(주)한빛산업 — 2026 전부개정본",B:"
 const isSample=k=>k==="A"||k==="B"||k==="C";   // 내장 데모 샘플 여부
 const SITE_BIZNO = {A:"123-81-20333",B:"123-86-20342",C:"123-85-20359"};
 const ARCH_KEY = "pureun_rules_archive_v1";
+/* ══ 큰 작업본은 IndexedDB 로 (2026-10-07 — localStorage 한도 5MB 가 차서 경력관리가 목록을 못 적었다) ══
+   대표 크롬 실측: 규정관리 몫이 작업본(WORK_KEY) 0.53MB + 보관함 사본(ARCH_KEY) 0.52MB.
+   작업본에는 올린 원본 파일(b64)까지 들어 있어 크고, 보관함은 서버(rules_mgmt)를 비춘 사본이다.
+   통합 프로그램 전부가 나눠 쓰는 5MB 의 5분의 1을 혼자 먹어, 그 «남의 짐»에 경력관리가 밀려났다.
+   그래서 js/pu-big-store.js 로 IndexedDB 에 둔다 — 읽기 → 새 자리 쓰기 → 다시 읽어 견주기 → 그때만 옛 자리 지우기.
+   ⚠ 이 두 칸은 bigGet·bigSet·bigDel 로만 만진다(tests/rules-big-store.test.js). localStorage 로 바로 읽으면
+     옮긴 뒤에는 «빈 것»을 읽는다 — 작업본이 사라진 줄 알게 된다.
+   ⚠ 켜지는 중(wait)·IndexedDB 를 못 쓰는 브라우저(off)는 예전 그대로 localStorage 다.
+     그래서 작업본 되살리기·보관함 구독·클라우드 확인은 켜짐(rulesBigReady)을 기다린다.
+   ⚠ 열쇠 이름을 글자로 적는다 — WORK_KEY 는 한참 아래에서 const 로 생겨 여기서 쓰면 TDZ 다. */
+var RULES_BIG = (typeof PuBigStore !== "undefined" && PuBigStore.mirror)
+  ? PuBigStore.mirror({ keys: ["pureun_rules_work_v1", "pureun_rules_archive_v1"], ls: localStorage }) : null;
+function rulesBigReady(){ return RULES_BIG ? RULES_BIG.boot() : Promise.resolve(null); }
+function bigGet(k){ return (RULES_BIG && RULES_BIG.owns(k)) ? RULES_BIG.get(k) : localStorage.getItem(k); }
+function bigSet(k, v){ if(RULES_BIG && RULES_BIG.owns(k)) RULES_BIG.set(k, v); else localStorage.setItem(k, v); }
+function bigDel(k){ if(RULES_BIG && RULES_BIG.owns(k)) RULES_BIG.remove(k); else localStorage.removeItem(k); }
+try { rulesBigReady(); } catch(e){}
 
 const TPL_BY_RULE = {};
 TPLS.forEach(t=>t.ruleIds.forEach(rid=>{ if(!TPL_BY_RULE[rid]) TPL_BY_RULE[rid]=t; }));
@@ -2409,7 +2429,7 @@ const SITE_FILE={},SITE_NAME={};   // key별 원본 파일명 / 인식된 사업
    임시저장(자동 저장) 슬롯은 문서 1건뿐이라, 새 파일을 올리면 그 슬롯이 새 문서로 바뀐다.
    넘어가기 전에 진행 중 작업을 보관함에 확정 저장해 두면 나중에 대시보드·보관함에서 그대로 이어갈 수 있다. */
 function confirmSwitchDoc(what){
-  let w=null; try{const raw=localStorage.getItem(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
+  let w=null; try{const raw=bigGet(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
   if(!w||!w.orig)return true;                       // 진행 중 작업 없음
   const cnt=(w.state&&Array.isArray(w.state.items))?w.state.items.filter(it=>itemKind(it)!=="유지").length:0;
   const who=(w.orig.site||w.orig.name||"작업 문서");
@@ -2446,7 +2466,7 @@ async function cancelUpload(){
   if(!confirm(`'${u.name}' 업로드를 취소합니다.\n\n지워지는 것:\n · ${what.join("\n · ")}\n\n`
     +(u.id?"보관함 기록과 원본은 공용 저장소에서도 지워져 다른 노무사 화면에서도 사라집니다.\n되돌릴 수 없습니다. ":"")+"계속할까요?"))return;
   if(u.id)removeRecord(u.id);                        // 보관함 기록 + 원본(공용 포함)
-  try{ localStorage.removeItem(WORK_KEY); }catch(e){}
+  try{ bigDel(WORK_KEY); }catch(e){}
   if(FBDB&&FBUSER)FBDB.ref("rules_mgmt/worksession/"+FBUSER.uid).remove().catch(()=>{});
   clearTimeout(_cloudWorkTimer);
   // 메모리·드롭다운 정리
@@ -4645,10 +4665,10 @@ function ljGo(){
 function ljSave(){
   if(siteSel.value===LJ_KEY){
     try{
-      const raw=localStorage.getItem(WORK_KEY);
+      const raw=bigGet(WORK_KEY);
       if(raw){ const w=JSON.parse(raw);
         if(w&&w.orig){ w.orig.text=SAMPLES[LJ_KEY]||""; w.savedAt=new Date().toISOString();
-          localStorage.setItem(WORK_KEY,JSON.stringify(w)); } }
+          bigSet(WORK_KEY,JSON.stringify(w)); } }
     }catch(e){ console.warn("줄 정리 보관 실패:",e); }
     if(typeof pushWorkToCloud==="function")try{ pushWorkToCloud(true); }catch(e){}
   }
@@ -5034,22 +5054,25 @@ function migrateWip(){
   let w=null; try{ w=JSON.parse(localStorage.getItem(WIP_KEY)||"null"); }catch(e){}
   if(!w||!w.items||!w.items.length){ clearWip(); return; }
   try{
-    let cur=null; try{ cur=JSON.parse(localStorage.getItem(WORK_KEY)||"null"); }catch(e){}
+    let cur=null; try{ cur=JSON.parse(bigGet(WORK_KEY)||"null"); }catch(e){}
     const curAt=cur&&cur.savedAt?Date.parse(cur.savedAt):0;
     if(curAt>=(w.at||0)){ clearWip(); return; }   // 통합 저장본이 더 최신 → 옛 임시본 폐기
     const name=String(w.site||"작업 문서").replace(/^[🏢📄]\s*/u,"");
     const rec={orig:{name,site:(w.txt?detectSiteName(w.txt):"")||name,ext:"",text:w.txt||"",b64:null,isPdf:false,truncated:!w.txt},
       state:{items:w.items,mode:w.mode||"partial",size:w.size,asof:w.asof},
       savedAt:new Date(w.at||Date.now()).toISOString()};
-    localStorage.setItem(WORK_KEY,JSON.stringify(rec));
+    bigSet(WORK_KEY,JSON.stringify(rec));
   }catch(e){ console.warn("임시저장 이관 실패:",e); }
   clearWip();
 }
-function loadArch(){try{return JSON.parse(localStorage.getItem(ARCH_KEY))||[]}catch(e){return[]}}
+function loadArch(){try{return JSON.parse(bigGet(ARCH_KEY))||[]}catch(e){return[]}}
 /* 보관함이 바뀌면 머리줄 수와 대시보드를 한자리에서 같이 고친다.
    로그인 전에는 내 기록도 남의 것으로 걸러져(uid 가 아직 빈 값) 대시보드가 '0곳'으로 그려지는데,
    로그인이 끝난 뒤 다시 그리지 않으면 「보관함 (5)」와 「0곳」이 나란히 남는다. */
-function setLocal(a){localStorage.setItem(ARCH_KEY,JSON.stringify(a));updateArchCnt();refreshDash();}
+function setLocal(a){
+  /* 이 PC 사본을 못 적어도 화면 갱신은 이어 간다 — 원본은 서버(rules_mgmt)다. 알림은 공용 감시(js/pu-ls-guard.js)가 한다 */
+  try{ bigSet(ARCH_KEY,JSON.stringify(a)); }catch(e){ console.warn("보관함 사본 저장 실패(용량):",e&&e.name); }
+  updateArchCnt();refreshDash();}
 function refreshDash(){renderDash();}
 /* ══════ 담당자(소유) 규칙 ══════
    검토한 사람만 그 사업장 규정을 고칠 수 있고, [검토 완료] 이후에만 남에게 보인다.
@@ -5317,7 +5340,7 @@ function backfillLocal(pre){
 }
 /* 실시간 동기화 — 내 작업중 + 전원 완료본. 남의 작업중은 서버가 아예 안 내려준다. */
 function subscribeArch(){if(!FBDB||!FBUSER)return;
-  let pre=[]; try{ pre=JSON.parse(localStorage.getItem(ARCH_KEY))||[]; }catch(e){}   // 덮어쓰기 전 사본
+  let pre=[]; try{ pre=JSON.parse(bigGet(ARCH_KEY))||[]; }catch(e){}   // 덮어쓰기 전 사본
   const got={wip:false,done:false};
   const apply=()=>{
     if(got.wip&&got.done)backfillLocal(pre);      // 서버 상태를 다 받은 뒤 한 번만
@@ -5387,13 +5410,14 @@ try{if(window.firebase){firebase.initializeApp(FB_CONFIG);FBDB=firebase.database
        구독만 끊고 화면은 그대로 두니, 로그아웃한 줄 모르고 빈 표를 들여다보게 된다.
        이제 모든 앱과 같은 자물쇠 화면을 보인다. */
     try{ if(u) PuGate.hide(); else PuGate.show(); }catch(_g){}
-    if(u){subscribeArch();subscribeMfix();resolveUserName();loadErpCompanies();pullDecisions();
+    if(u){rulesBigReady().then(()=>{ if(FBUSER!==u)return;   // 작업본 창고가 켜진 뒤에(RULES_BIG 머리글)
+      subscribeArch();subscribeMfix();resolveUserName();loadErpCompanies();pullDecisions();
       loadDrafts();               // 로그인 전 호출은 FBUSER 가 없어 클라우드 문서를 못 읽었다 — 여기서 한 번 더
       checkCloudWorkSession();   // 재로그인 시 계정에 남은 작업 세션 이어받기
       pushWorkToCloud(true);     // 로그인 전 로컬에만 있던 작업을 계정에 올려 다른 기기에서도 이어갈 수 있게
       try{trimOrigLocal();}catch(_){}   // 브라우저에 쌓인 원본 덩어리 걷어내기(서버본이 있는 것만)
       lwLoad();                   // 법 개정 감시 — 사건 몇 건뿐이라 가볍다
-    }else if(FBDB){ ["wip","done"].forEach(k=>FBDB.ref("rules_mgmt/"+k).off()); STORE={wip:{},done:{},legacy:{}};
+    });}else if(FBDB){ ["wip","done"].forEach(k=>FBDB.ref("rules_mgmt/"+k).off()); STORE={wip:{},done:{},legacy:{}};
       LW.data=null; LW.rows={}; lwBadge(); }});
 }}catch(e){console.warn("Firebase 초기화 건너뜀:",e);}
 
@@ -5620,7 +5644,7 @@ function statusLineOf(s){
 }
 function renderStatusBar(){
   const box=$("statusbar"); if(!box)return;
-  let w=null; try{const raw=localStorage.getItem(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
+  let w=null; try{const raw=bigGet(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
   const st=statusLineOf({
     site:(LAST&&String(LAST.site||"").replace(/^[📄🏢]\s*/u,""))||"",
     size:$("size")?$("size").value:"", asof:$("asof")?$("asof").value:"",
@@ -5652,7 +5676,7 @@ function renderStatusBar(){
 function updateWorkBadge(){
   renderStatusBar();
   const box=$("work-badge"); if(!box)return;
-  let w=null; try{const raw=localStorage.getItem(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
+  let w=null; try{const raw=bigGet(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
   if(!w||!w.orig){ box.style.display="none"; return; }
   const t=w.savedAt?new Date(w.savedAt):null;
   const hhmm=t?(" · "+String(t.getHours()).padStart(2,"0")+":"+String(t.getMinutes()).padStart(2,"0")+" 기준"):"";
@@ -5667,7 +5691,7 @@ function updateWorkBadge(){
 /* 다른 취업규칙 시작 — 지금 작업을 보관함에 확정 저장하고 임시저장 슬롯을 비운 뒤 새 파일 선택 */
 $("work-new").addEventListener("click",()=>{
   if(!confirmSwitchDoc("다른 취업규칙 시작"))return;
-  localStorage.removeItem(WORK_KEY);
+  bigDel(WORK_KEY);
   if(FBDB&&FBUSER)FBDB.ref("rules_mgmt/worksession/"+FBUSER.uid).remove().catch(()=>{});
   clearTimeout(_cloudWorkTimer);
   CUR_ITEMS=[]; CUR_KEY=""; LAST=null; ALL_FINDINGS=[]; DT_LIST=[]; FS_STATUS="";
@@ -5677,7 +5701,7 @@ $("work-new").addEventListener("click",()=>{
 });
 $("work-clear").addEventListener("click",()=>{
   if(!confirm("임시저장된 작업 내용을 지우시겠습니까?\n(보관함에 정식 저장한 내용은 영향 없습니다)"))return;
-  localStorage.removeItem(WORK_KEY);
+  bigDel(WORK_KEY);
   if(FBDB&&FBUSER)FBDB.ref("rules_mgmt/worksession/"+FBUSER.uid).remove().catch(()=>{});
   clearTimeout(_cloudWorkTimer);
   updateWorkBadge();
@@ -5689,14 +5713,14 @@ function saveWorkFromUpload(key,buf,isPdf){
   try{
     let b64=null;
     if(buf&&buf.byteLength<=MAX_ORIG_BYTES)b64=bufToB64(buf);
-    localStorage.setItem(WORK_KEY,JSON.stringify(mk(b64)));
-  }catch(e){ try{localStorage.setItem(WORK_KEY,JSON.stringify(mk(null)));}catch(_){console.warn("작업 보관 실패(용량):",e);} }
+    bigSet(WORK_KEY,JSON.stringify(mk(b64)));
+  }catch(e){ try{bigSet(WORK_KEY,JSON.stringify(mk(null)));}catch(_){console.warn("작업 보관 실패(용량):",e);} }
   updateWorkBadge();
   pushWorkToCloud(true);   // 새 파일 업로드는 드문 이벤트 → 즉시 클라우드 반영
 }
 function saveWorkState(){
   try{
-    const raw=localStorage.getItem(WORK_KEY); if(!raw)return;
+    const raw=bigGet(WORK_KEY); if(!raw)return;
     const w=JSON.parse(raw); if(!w||!w.orig)return;
     if(!LAST||!LAST.key||SAMPLES[LAST.key]===undefined)return;
     // 보관 중인 작업 문서일 때만 상태 갱신 — 표시명(📄 파일명 / 🏢 사업장명)이 아니라 원본 파일명으로 비교
@@ -5704,7 +5728,7 @@ function saveWorkState(){
     if(w.orig.name&&curFile&&w.orig.name!==curFile)return;
     w.state={items:CUR_ITEMS,mode:REV_MODE,land:PAGE_LAND,pauto:PAGE_AUTO,note:INC_NOTE,rzNone:RZ_NONE,size:LAST.size,asof:LAST.asof};
     w.savedAt=new Date().toISOString();
-    localStorage.setItem(WORK_KEY,JSON.stringify(w));
+    bigSet(WORK_KEY,JSON.stringify(w));
   }catch(e){}
   updateWorkBadge();
   pushWorkToCloud(false);   // 편집은 잦음 → 디바운스(6초)로 클라우드 반영
@@ -5736,7 +5760,7 @@ async function applyWorkObject(w,opts){
     CUR_ITEMS=normalizeItems(w.state.items);CUR_KEY=key;REV_MODE=w.state.mode||"partial";
     $("mk-daejo").disabled=false;$("save").disabled=!!READONLY;updateDoneBtn();
   }
-  try{localStorage.setItem(WORK_KEY,JSON.stringify(w));}catch(e){}   // 클라우드에서 왔으면 로컬에도 반영
+  try{bigSet(WORK_KEY,JSON.stringify(w));}catch(e){}   // 클라우드에서 왔으면 로컬에도 반영
   const pv=$("preview");
   const note=document.createElement("div");note.className="sample-banner";
   note.style.cssText="background:#f8fafc;border-color:#4ade80;color:#166534";
@@ -5749,7 +5773,7 @@ async function applyWorkObject(w,opts){
 }
 async function restoreWork(){
   try{
-    const raw=localStorage.getItem(WORK_KEY); if(!raw)return;
+    const raw=bigGet(WORK_KEY); if(!raw)return;
     const w=JSON.parse(raw);
     await applyWorkObject(w,{source:"local"});
   }catch(e){console.warn("작업 복원 실패:",e);}
@@ -5761,7 +5785,7 @@ function pushWorkToCloud(immediate){
   if(!FBDB||!FBUSER)return;
   clearTimeout(_cloudWorkTimer);
   const doPush=()=>{
-    let w=null; try{const raw=localStorage.getItem(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
+    let w=null; try{const raw=bigGet(WORK_KEY); if(raw)w=JSON.parse(raw);}catch(e){}
     if(!w||!w.orig)return;
     FBDB.ref("rules_mgmt/worksession/"+FBUSER.uid).set(w).catch(e=>console.warn("클라우드 작업 보관 실패:",e));
   };
@@ -5786,7 +5810,7 @@ async function checkCloudWorkSession(){
     const snap=await FBDB.ref("rules_mgmt/worksession/"+FBUSER.uid).once("value");
     if(!snap.exists())return;
     const cw=snap.val(); if(!cw||!cw.orig)return;
-    let local=null; try{const raw=localStorage.getItem(WORK_KEY); if(raw)local=JSON.parse(raw);}catch(e){}
+    let local=null; try{const raw=bigGet(WORK_KEY); if(raw)local=JSON.parse(raw);}catch(e){}
     const cloudNewer=!local||!local.savedAt||(cw.savedAt&&cw.savedAt>local.savedAt);
     const nothingLoadedYet=!LAST||!LAST.key||SAMPLES[LAST.key]===undefined;
     if(!cloudNewer)return;   // 로컬이 더 최신 → 다음 편집 시 자동으로 클라우드에 다시 올라감
@@ -9608,7 +9632,7 @@ addPopBtn("ov-docpv",()=>siteLabel()+" — "+(DOC_LABEL[PV_KEY]||"서식")+" (�
 const todayKST=()=>new Date(Date.now()+9*3600e3).toISOString().slice(0,10);
 if($("asof"))$("asof").value=todayKST();
 renderPreview();updateArchCnt();
-migrateWip();    // 옛 임시저장(WIP)이 남아 있으면 통합 저장으로 이관
+/* 옛 임시저장(WIP) 이관(migrateWip)은 아래 takeHandoff 앞에서 — 작업본 창고(RULES_BIG)가 켜진 뒤라야 한다 */
 renderDash();   /* 단추에 「이어서 할 곳 N」을 적는다 — 접기는 없앴다(2026-09-13) */
 /* 취업규칙 작성기(chwieop.html)에서 [검토로 넘기기]로 온 경우 — 그 문서를 바로 검토 */
 async function takeHandoff(){
@@ -9634,7 +9658,14 @@ async function takeHandoff(){
     pv.insertBefore(note,pv.firstChild);
   }catch(e){ console.warn("작성기 인계 실패:",e); restoreWork(); }
 }
-takeHandoff();
+/* 작업본·보관함을 새 자리(IndexedDB)에서 다 읽은 «뒤에» 되살린다 — 먼저 하면 «작업본 없음»으로 읽어
+   빈 화면으로 시작하고, 그 위에 새로 적으면 옮겨 둔 작업본을 덮는다 (RULES_BIG 머리글) */
+rulesBigReady().then(()=>{
+  migrateWip();    // 옛 임시저장(WIP)이 남아 있으면 통합 저장으로 이관
+  updateArchCnt(); renderDash();
+  takeHandoff();
+  updateWorkBadge();
+});
 updateWorkBadge();   // 복원 대상이 없어도 배지는 즉시 반영(비동기 restoreWork 완료 전 안전)
 /* ⚠ 「최종 판단은 공인노무사」를 여기 붙인다. 발밑 안내로는 아무도 안 읽었고,
      정작 단서가 필요한 곳은 결과를 «읽는» 이 자리다 — 「위반의심 0」이

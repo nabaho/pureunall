@@ -126,6 +126,8 @@ function reassemble(batches){
      (2026-09-10 「나스 연결 검토」에서 비밀 거름망을 한 곳으로 모으며 그 위에 세웠다).
      여기서 값을 «베껴 적지 않는다» — 베끼면 화면과 검사가 갈라져 검사가 거짓말을 한다. */
   vm.runInContext(slice('var SECRET_KEYS =', '// 백업 목록용 경량 요약'), c);
+  /* 훑기는 erpLocalKeys·erpLocalRaw 로 한다 — localStorage 와 큰 사본 창고(IndexedDB)를 함께 본다(2026-10-07) */
+  vm.runInContext(slice('function erpLocalKeys(', '/* ══ 이 PC 저장 공간이 가득 찼을 때'), c);
   const snap = c.buildBackupSnapshot();
   t('진짜 데이터는 백업에 들어간다', !!snap.data.contracts, true);
   t('cms_ledger 도 들어간다 (서버 동기화 대상)', !!snap.data.cms_ledger, true);

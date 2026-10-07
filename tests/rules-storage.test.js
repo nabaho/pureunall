@@ -96,5 +96,10 @@ test('truncated 를 함부로 쓰지 않는다 (사용자에게 보이는 말이
 });
 
 test('로그인하면 한 번 걷어내도록 걸려 있다', () => {
-  assert.match(app, /onAuthStateChanged[\s\S]{0,600}trimOrigLocal\(\)/);
+  /* 로그인 갈래(onAuthStateChanged … }else if(FBDB)) «안에» 있으면 된다 — 글자 600자 안이라고 박으면
+     로그인 갈래에 한 줄만 늘어도 깨진다(2026-10-07 큰 작업본 창고 감싸개로 597→696자) */
+  const at = app.indexOf('onAuthStateChanged(');
+  assert.ok(at > 0, '로그인 갈래를 못 찾았습니다');
+  const login = app.slice(at, app.indexOf('}else if(FBDB){', at));
+  assert.match(login, /trimOrigLocal\(\)/);
 });

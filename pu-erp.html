@@ -104,6 +104,8 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
+<!-- 큰 사본(계약서 양식·급여·장부)은 IndexedDB 로 — localStorage 5MB 를 통합 프로그램 전부가 나눠 쓴다 (2026-10-07) -->
+<script src="js/pu-big-store.js?v=2"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
@@ -187,6 +189,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-ontology.js?v=50"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
+<script src="js/pu-ls-guard.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=2"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -1990,6 +1993,64 @@ var KEY = 'pureun_v6_';
 // 자문수입은 2천 건을 넘어 localStorage 5MB 한도를 밀어낸다. 이 표의 영구 원본은
 // Firebase이고, 현재 탭에서는 동기식으로 읽을 수 있는 sessionStorage에 둔다.
 // 나머지 표와 메타데이터는 기존 localStorage를 그대로 쓴다.
+/* ══ 큰 사본은 IndexedDB 로 (2026-10-07 — 경력관리가 «한 주소 몫 5MB»가 차서 목록을 못 적었다) ══
+   대표 크롬 실측: 5,242,346자(한도). 이알피 혼자 계약서 양식 1.3MB·급여 0.36MB·CMS 장부 0.2MB …
+   이 여섯 칸은 서버(data/…)가 원본이고 이 PC 것은 «다시 받을 수 있는 사본»이다. 합쳐 약 2.4MB.
+   그래서 js/pu-big-store.js 로 IndexedDB(한 주소 몫 수백 MB)에 둔다. 읽기·쓰기 모양(_erpStoreGet·_erpStoreSet)은 그대로다.
+   ⚠ 다른 앱이 localStorage 로 «빌려 읽는» 칸은 넣지 않는다 — companies·contracts·consultings·cases·funds·
+     other_projects·user_accounts·user_dir·finance_income 은 업무관리·정부컨설팅·기금·옵시디언이 읽는다.
+     칸을 늘릴 때는 다른 앱이 'pureun_v6_'+열쇠 로 읽는지 먼저 찾을 것(tests/erp-big-store.test.js 가 막는다).
+   ⚠ 켜지는 동안(wait)은 예전 그대로 localStorage — 앱 그리기와 첫 동기화가 켜짐을 기다린다(_erpBigBoot).
+   ⚠ 어느 자리에도 값이 없는데 «받은 시각»(_meta_)만 남아 있으면 서버를 다시 안 받는다 — 켤 때 그 시각을 지운다.
+   ⚠ 이 PC 백업(NAS·내려받기)은 localStorage 만 훑었다 — 이제 erpLocalKeys()·erpLocalRaw() 로 새 자리도 담는다. */
+var ERP_BIG_KEYS = ['contract_forms','payroll_monthly','cms_ledger','trash_fin','ledger_batches','payroll_audit_log'];
+var _erpBig = (typeof PuBigStore !== 'undefined' && PuBigStore.mirror) ? PuBigStore.mirror({
+  keys: ERP_BIG_KEYS.map(function(k){ return KEY + k; }),
+  ls: localStorage,
+  onWriteFail: function(full){
+    /* 새 자리에도 옛 자리에도 못 적었다 — 받은 시각을 지워 다음에 켤 때 서버에서 다시 받게 한다 */
+    try { localStorage.removeItem(KEY + '_meta_' + full.slice(KEY.length)); } catch(_){}
+    try { erpQuotaNotice(); } catch(_){}
+  }
+}) : null;
+var _erpBigBooting = null;
+function _erpBigBoot(){
+  if(!_erpBig) return Promise.resolve(null);
+  /* ⚠ 한 번만 — 뒤처리(받은 시각 지우기)가 동기화 «뒤에» 또 돌면 막 받은 것을 다시 받게 된다 */
+  if(_erpBigBooting) return _erpBigBooting;
+  return (_erpBigBooting = _erpBig.boot().then(function(rep){
+    try {
+      (rep.missing || []).forEach(function(full){
+        try { localStorage.removeItem(KEY + '_meta_' + full.slice(KEY.length)); } catch(_){}
+      });
+      /* 켜지기 전에 읽어 둔 «빈 것»을 버린다 — 다음 dbGet 이 새 자리에서 다시 읽는다 */
+      ERP_BIG_KEYS.forEach(function(k){ try { delete _dbCache[k]; } catch(_){} });
+      var moved = (rep.report || []).filter(function(r){ return r.why === 'ok'; });
+      if(moved.length) console.info('[큰 사본] IndexedDB 로 옮김: ' + moved.map(function(r){ return r.key.slice(KEY.length) + ' ' + Math.round(r.len / 1024) + 'KB'; }).join(', '));
+      if(rep.state === 'off') console.warn('[큰 사본] IndexedDB 를 못 써서 예전처럼 localStorage 를 씁니다');
+    } catch(_){}
+    return rep;
+  }));
+}
+try { _erpBigBoot(); } catch(_){}
+/* 이 PC 에 있는 이알피 열쇠 «전부» — localStorage + 큰 사본 창고. 백업이 이것으로 훑는다. */
+function erpLocalKeys(){
+  var out = [], seen = {};
+  try {
+    for(var i = 0; i < localStorage.length; i++){
+      var f = localStorage.key(i);
+      if(f && !seen[f]){ seen[f] = 1; out.push(f); }
+    }
+  } catch(_){}
+  if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.state === 'on'){
+    _erpBig.keys().forEach(function(f){ if(!seen[f] && _erpBig.get(f) != null){ seen[f] = 1; out.push(f); } });
+  }
+  return out;
+}
+function erpLocalRaw(full){
+  if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.owns(full)) return _erpBig.get(full);
+  return localStorage.getItem(full);
+}
 /* ══ 이 PC 저장 공간이 가득 찼을 때 (대표 지시 2026-10-07 「이관했는데 계속 남아 있다 … 근본고침 해라」) ══
    nabaho.github.io 의 저장 공간(localStorage 약 10MB)은 통합 프로그램 «전부»가 나눠 쓴다. 그것이 차면
    예전에는 dbSet 이 «여기서 멈추고 서버에도 안 보냈다» — 화면은 바뀐 듯 보여도 아무 데도 안 남았다.
@@ -2009,11 +2070,15 @@ function erpQuotaNotice(){
   var now = Date.now();
   if(now - _erpQuotaToldAt < 10 * 60 * 1000) return;
   _erpQuotaToldAt = now;
+  /* 공용 감시(js/pu-ls-guard.js)와 한 번만 — 이쪽이 알렸으면 그쪽은 조용히 있는다 */
+  try { if(typeof window !== 'undefined') window.__puQuotaToldAt = now; } catch(_){}
   try { showToast('⚠ 이 PC 저장 공간이 가득 찼습니다 — 고친 내용은 서버에 저장됩니다(이 PC 사본만 못 씀). 정리: 환경설정 → 시스템 → 데이터·백업', 9000); } catch(_){}
 }
 function _erpStoreGet(k){
   if(typeof _erpMemStore !== 'undefined' && Object.prototype.hasOwnProperty.call(_erpMemStore, k)) return _erpMemStore[k];
   try{
+    /* 큰 사본(ERP_BIG_KEYS)은 새 자리에서 — 켜지는 중·못 쓰는 브라우저면 거울이 알아서 localStorage 를 본다 */
+    if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.owns(KEY+k)) return _erpBig.get(KEY+k);
     if(k==='finance_income'){
       var sv=sessionStorage.getItem(KEY+k);
       if(sv!==null) return sv;
@@ -2027,6 +2092,8 @@ function _erpStoreGet(k){
 function _erpStoreSet(k,v){
   /* 못 쓰면 «못 썼다»를 남기고 그대로 던진다(부르는 곳의 처리는 예전 그대로) — _dbStoreFailed 머리글 */
   var put = function(){
+    /* 큰 사본: 켜졌으면 메모리+IndexedDB(던지지 않는다), 아니면 localStorage(공간이 없으면 예전처럼 던진다) */
+    if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.owns(KEY+k)){ _erpBig.set(KEY+k, v); return; }
     if(k==='finance_income'){
       sessionStorage.setItem(KEY+k,v);
       try{ localStorage.removeItem(KEY+k); }catch(_){}
@@ -2055,6 +2122,7 @@ function _erpStoreSet(k,v){
 }
 function _erpStoreRemove(k){
   if(typeof _erpMemStore !== 'undefined') delete _erpMemStore[k];
+  if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.owns(KEY+k)){ try { _erpBig.remove(KEY+k); } catch(_){} }
   try{ sessionStorage.removeItem(KEY+k); }catch(_){}
   try{ localStorage.removeItem(KEY+k); }catch(_){}
 }
@@ -3377,16 +3445,27 @@ function scheduleAutoSnap(){
            서버에 원본과 서버 백업(일간·수시)이 있다. 공간이 모자란 PC 에서는 아예 안 쥔다. */
       if(snaps.length > 1) snaps = snaps.slice(0,1);
       if(Object.keys(_erpMemStore).length){ try { localStorage.removeItem('__erp_snap__'); } catch(_){} return; }
+      /* 큰 사본 창고가 켜졌으면 스냅샷도 그쪽에 — 급여·계약을 통째로 담아 localStorage 를 먹던 것이다 */
+      if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.state === 'on' && _erpBig.store){
+        _erpBig.store.put('__erp_snap__', JSON.stringify(snaps))
+          .then(function(){ try { localStorage.removeItem('__erp_snap__'); } catch(_){} }, function(){});
+        return;
+      }
       localStorage.setItem('__erp_snap__', JSON.stringify(snaps));
     } catch(e) { try { localStorage.removeItem('__erp_snap__'); } catch(_){} }
   }, _SNAP_INTERVAL);
 }
 
 // ── 긴급 복구 함수 (콘솔에서: erpRestore()) ──
-window.erpRestore = function(snapIndex){
+window.erpRestore = function(snapIndex, _fromBig){
   snapIndex = snapIndex || 0;
   try {
-    var snaps = safeParse(localStorage.getItem('__erp_snap__'), []);
+    var snaps = (_fromBig !== undefined) ? safeParse(_fromBig, []) : safeParse(localStorage.getItem('__erp_snap__'), []);
+    /* 큰 사본 창고에 둔 스냅샷(scheduleAutoSnap) — localStorage 에 없으면 그쪽을 한 번 더 본다 */
+    if(!snaps.length && _fromBig === undefined && typeof _erpBig !== 'undefined' && _erpBig && _erpBig.store){
+      _erpBig.store.get('__erp_snap__').then(function(raw){ window.erpRestore(snapIndex, raw || ''); }, function(){ console.log('❌ 스냅샷 없음'); });
+      return;
+    }
     if(!snaps.length){ console.log('❌ 스냅샷 없음'); return; }
     var snap = snaps[snapIndex];
     console.log('스냅샷 시각:', new Date(snap.ts).toLocaleString());
@@ -3619,13 +3698,13 @@ function buildBackupSnapshot(){
          2026-09-10 지시(「나스 연결 검토」)로 세운 울타리이고, 여기서 풀지 않는다. */
     };
   var data = {};
-  for(var i=0;i<localStorage.length;i++){
-    var full = localStorage.key(i);
+  var _lk = erpLocalKeys(); for(var i=0;i<_lk.length;i++){
+    var full = _lk[i];
     if(!full || full.indexOf(KEY)!==0) continue;
     var k = full.slice(KEY.length);
     if(k.indexOf('_meta_')===0 || k.indexOf('pinned_menus_')===0 || k.indexOf('login_')===0 || k.indexOf('session')===0) continue;
     if(SNAP_EXCLUDE[k] || SECRET_KEYS.test(k)) continue; // 비밀은 백업에서 제외 — 거름망은 SECRET_KEYS 한 곳이다
-    var raw = localStorage.getItem(full);
+    var raw = erpLocalRaw(full);
     if(raw==null) continue;
     try { data[k] = JSON.parse(raw); } catch(e){ data[k] = raw; }
   }
@@ -8950,12 +9029,12 @@ function coDupGroups(){
 function coRefStores(){
   var out = [];
   try{
-    for(var i = 0; i < localStorage.length; i++){
-      var lk = localStorage.key(i);
+    var _lk = erpLocalKeys(); for(var i = 0; i < _lk.length; i++){
+      var lk = _lk[i];
       if(!lk || lk.indexOf(KEY) !== 0) continue;
       var name = lk.slice(KEY.length);
       if(name.charAt(0) === '_' || name.indexOf('session') === 0) continue;
-      var v = safeParse(localStorage.getItem(lk), null);
+      var v = safeParse(erpLocalRaw(lk), null);
       if(!Array.isArray(v)) continue;
       if(v.some(function(x){ return x && typeof x === 'object' && x.companyId; })) out.push(name);
     }
@@ -10732,6 +10811,7 @@ window.popConfirm = function(msg, onYes, opts){
       + 'body.pe-ask-open #pu-reload-banner,'
       + 'body.pe-ask-open #pu-boot-storm,'          /* 부팅 폭풍 띠 (2026-09-17) — 묻는 동안은 가린다 */
       + 'body.pe-ask-open #puWhoamiBadge,'
+      + 'body.pe-ask-open #pu-ls-guard,'           /* 저장 공간 가득 알림 (2026-10-07, js/pu-ls-guard.js) */
       + 'body.pe-ask-open #pu-backup-admin-button{display:none!important}';
     document.head.appendChild(st);
   }
@@ -11228,6 +11308,10 @@ function _erpBootStormGate(){
 }
 function fbInitialSync(_isRetry){
   if(!fbDb) return Promise.resolve(0);
+  /* 큰 사본 창고가 켜지기 전에 받으면 «받은 시각»과 «이 PC 값»이 어긋난다 — 켜짐부터 (_erpBigBoot 머리글) */
+  if(typeof _erpBig !== 'undefined' && _erpBig && _erpBig.state === 'wait'){
+    return _erpBigBoot().then(function(){ return fbInitialSync(_isRetry); });
+  }
   var _gate = _erpBootStormGate();
   if(_gate) return _gate.then(function(){ return fbInitialSync(_isRetry); });
   return _bootKeyPlan().then(function(plan){
@@ -41971,10 +42055,10 @@ function BackupSection(){
   function doBackup(kind){
     var data = {};
     var size = 0;
-    for(var i=0; i<localStorage.length; i++){
-      var k = localStorage.key(i);
+    var _lk = erpLocalKeys(); for(var i=0; i<_lk.length; i++){
+      var k = _lk[i];
       if(k && k.indexOf(KEY) === 0 && !SECRET_KEYS.test(k)){   // 거름망은 SECRET_KEYS 한 곳이다
-        var v = localStorage.getItem(k);
+        var v = erpLocalRaw(k);
         data[k] = v;
         size += (k.length + v.length);
       }
@@ -42088,7 +42172,18 @@ function BackupSection(){
           writes.forEach(function(w){ try{ localStorage.removeItem(w.lsKey); localStorage.removeItem(w.lsKey.replace(KEY, KEY+'_meta_')); }catch(_e){} });
         }
       } catch(_e){}
-      writes.forEach(function(w){ localStorage.setItem(w.lsKey, w.raw); });
+      /* 큰 사본(ERP_BIG_KEYS)은 새 자리로 — localStorage 에 1.3MB 를 다시 밀어 넣으면 이 복원부터 공간 부족으로 멈춘다.
+         전체 복원이면 백업에 없는 큰 사본도 지운다(예전에 localStorage 를 통째 비우던 것과 같은 뜻). */
+      var _bigOn = (typeof _erpBig !== 'undefined' && _erpBig && _erpBig.state === 'on');
+      if(_bigOn && writes.length >= 30){
+        var _inW = {}; writes.forEach(function(w){ _inW[w.lsKey] = 1; });
+        _erpBig.keys().forEach(function(f){ if(!_inW[f]) _erpBig.remove(f); });
+      }
+      writes.forEach(function(w){
+        if(_bigOn && _erpBig.owns(w.lsKey)) _erpBig.set(w.lsKey, w.raw);
+        else localStorage.setItem(w.lsKey, w.raw);
+      });
+      if(_bigOn){ try { await _erpBig.flush(); } catch(_f){} }   // 새로고침 전에 새 자리 쓰기가 끝나게
       var fbOk = true;
       if(fbDb && Object.keys(fbUpdates).length){
         try { await fbDb.ref().update(fbUpdates); }
@@ -43133,9 +43228,9 @@ function DataManagementSection(){
 
   function downloadBackup(){
     var data = {};
-    for(var i=0; i<localStorage.length; i++){
-      var k = localStorage.key(i);
-      if(k && k.indexOf(KEY) === 0 && !SECRET_KEYS.test(k)){ data[k] = localStorage.getItem(k); }
+    var _lk = erpLocalKeys(); for(var i=0; i<_lk.length; i++){
+      var k = _lk[i];
+      if(k && k.indexOf(KEY) === 0 && !SECRET_KEYS.test(k)){ data[k] = erpLocalRaw(k); }
     }
     var json = JSON.stringify({ ts:new Date().toISOString(), kind:'pre-migration', data:data });
     var blob = new Blob([json], { type:'application/json' });
@@ -44727,11 +44822,11 @@ function NasBackupSettings(){
   function collectLocal(){
     var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
     var 뺀것 = 0;
-    for(var i=0; i<localStorage.length; i++){
-      var k=localStorage.key(i);
+    var _lk = erpLocalKeys(); for(var i=0; i<_lk.length; i++){
+      var k=_lk[i];
       if(!k || k.indexOf('pureun_v6_')!==0) continue;
       if(SECRET_KEYS.test(k)){ 뺀것++; continue; }
-      try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
+      try{ data[k]=JSON.parse(erpLocalRaw(k)); }catch(e){ data[k]=erpLocalRaw(k); }
     }
     return { json: JSON.stringify(data, null, 2), 뺀것: 뺀것 };
   }
@@ -45049,10 +45144,10 @@ function NasBackupSettings(){
           h('div', { style:{display:'flex', gap:'8px'} },
             h('button', { onClick:function(){
               var data = { _ts:(new Date()).toISOString(), _ver:'v6' };
-              for(var i=0;i<localStorage.length;i++){
-                var k=localStorage.key(i);
+              var _lk = erpLocalKeys(); for(var i=0;i<_lk.length;i++){
+                var k=_lk[i];
                 if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;   /* 비밀은 안 담는다 */
-                try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
+                try{ data[k]=JSON.parse(erpLocalRaw(k)); }catch(e){ data[k]=erpLocalRaw(k); }
               }
               var blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
               var url=URL.createObjectURL(blob);
@@ -84751,10 +84846,10 @@ function ERPMain(props){
            API 열쇠가 든 파일이 조용히 쌓이고 있었다(2026-09-10 대표 지시 「나스 연결 검토」).
            조용히 새는 것이 이 집에서 가장 아픈 흠이다. */
       var data = { _ts:new Date().toISOString(), _ver:'v6', _auto:true };
-      for(var i=0;i<localStorage.length;i++){
-        var k=localStorage.key(i);
+      var _lk = erpLocalKeys(); for(var i=0;i<_lk.length;i++){
+        var k=_lk[i];
         if(!k || k.indexOf('pureun_v6_')!==0 || SECRET_KEYS.test(k)) continue;
-        try{ data[k]=JSON.parse(localStorage.getItem(k)); }catch(e){ data[k]=localStorage.getItem(k); }
+        try{ data[k]=JSON.parse(erpLocalRaw(k)); }catch(e){ data[k]=erpLocalRaw(k); }
       }
       var json = JSON.stringify(data, null, 2);
       var today = todayYMD();
@@ -85834,7 +85929,19 @@ function App(){
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+/* 큰 사본 창고(IndexedDB)를 다 읽은 뒤에 그린다 — 먼저 그리면 급여·장부가 «빈 표»로 한 번 보이고,
+   그 빈 것을 보고 무언가 적으면 사본이 상한다. 창고는 3초 안에 답하거나 «못 씀»으로 정한다(js/pu-big-store.js). */
+(function(){
+  var 그렸다 = false;
+  function 그리기(){
+    if(그렸다) return; 그렸다 = true;
+    ReactDOM.createRoot(document.getElementById('root')).render(h(App));
+  }
+  var p = null;
+  try { p = (typeof _erpBigBoot === 'function') ? _erpBigBoot() : null; } catch(_){ p = null; }
+  if(p && typeof p.then === 'function') p.then(그리기, 그리기);
+  else 그리기();
+})();
 
 // ─── 전역: 모든 date input 년도 4자리 제한 (max=9999-12-31) ───
 (function(){
