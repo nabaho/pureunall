@@ -36,7 +36,7 @@
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="std_2026.js?v=2"></script>
-<script src="js/pu-rules-draft.js?v=2"></script>
+<script src="js/pu-rules-draft.js?v=3"></script>
 <!-- 「💡 우리 문안」(✏️ 조문 편집 아래) — 📚 조별 문안과 «같은 부품». 캐시 번호는 rules-v2.html 과 같게.
      lib-sites 는 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-order.js?v=1"></script>
@@ -1516,6 +1516,13 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
           <label style="font-size:12px;color:var(--sub)">종업<input id="qd-send" type="time" value="13:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
           <label style="font-size:12px;color:var(--sub)">휴게 시작<input id="qd-sbstart" type="time" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
           <label style="font-size:12px;color:var(--sub)">휴게 끝<input id="qd-sbend" type="time" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+        </div></div>
+      <div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:9px;font-size:12px;color:var(--sub)">
+        <label style="color:var(--ink)"><input type="checkbox" id="qd-harass"> <b>직장 내 괴롭힘 예방·대응규정도 함께 만들기</b></label>
+        <span class="muted" style="font-size:11px">— 표준 별첨 「별도 규정」(제1~20조) 바탕 · 취업규칙이 아니라 따로 두는 규정이라 <b>한글 파일로 내려받습니다</b></span>
+        <div id="qd-harass-box" style="display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:7px">
+          <label style="font-size:12px;color:var(--sub)">조사 완료 기한(일) <span class="muted" style="font-size:11px">비우면 직접 채울 곳</span><input id="qd-hdays" type="number" min="1" placeholder="예: 30" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+          <label style="font-size:12px;color:var(--sub)">연장할 수 있는 기간(일)<input id="qd-hext" type="number" min="1" placeholder="예: 14" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
         </div></div>
       <label style="font-size:12px;color:var(--sub)">시행일 <span class="muted" style="font-size:11px">비우면 부칙에 «직접 채울 곳»</span><input id="qd-eff" type="date" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
     </div>
@@ -9493,7 +9500,8 @@ function qdAnswers(){
     flex:{elastic:c("qd-elastic"),select:c("qd-select"),deemed:c("qd-deemed"),discretion:c("qd-discretion")},
     bonus:c("qd-bonus"), effective:v("qd-eff"), adopt:c("qd-adopt"),
     shortOn:c("qd-short"), shortDays:v("qd-sdays"), shortStart:v("qd-sstart"), shortEnd:v("qd-send"),
-    shortBreakStart:v("qd-sbstart"), shortBreakEnd:v("qd-sbend") };
+    shortBreakStart:v("qd-sbstart"), shortBreakEnd:v("qd-sbend"),
+    harassOn:c("qd-harass"), harassDays:v("qd-hdays"), harassExtend:v("qd-hext") };
 }
 /* 상시 근로자 수 → 검토의 「근로자」 칸(규칙집이 사업장 규모로 갈린다) */
 const qdSizeKey=n=>n<5?"5인미만":(n<10?"5인이상":(n<30?"10인이상":"30인이상"));
@@ -9509,13 +9517,34 @@ $("qd-go").addEventListener("click",async()=>{
     if(!rs.ok){ err.style.display="block"; err.innerHTML="⚠ 단시간: "+rs.why.map(escapeH).join("<br>⚠ 단시간: "); return; }
     QD_SHORT={r:rs,ans:sa};
   }
+  QD_HARASS=null;
+  if(ans.harassOn){
+    const ha=Object.assign({},ans,{kind:"harass"}), rh=PuRulesDraft.build(STD_2026,ha);
+    if(!rh.ok){ err.style.display="block"; err.innerHTML="⚠ 괴롭힘 규정: "+rh.why.map(escapeH).join("<br>⚠ 괴롭힘 규정: "); return; }
+    QD_HARASS={r:rh,ans:ha};
+  }
   closeOverlay($("ov-qdraft"));
   await takeDraft(r,ans,$("qd-bizno").value.trim());
 });
 $("qd-short").addEventListener("change",()=>{ $("qd-short-box").style.display=$("qd-short").checked?"grid":"none"; });
 /* 단시간 근로자용은 «따로» 들인다 — 사업자번호를 안 붙이고 이름에 「단시간근로자」를 단다.
    ⚠ 같은 사업자번호로 넣으면 보관함 자리(site_사업자번호)가 같아 일반 규칙을 덮어쓴다. */
-let QD_SHORT=null;
+let QD_SHORT=null, QD_HARASS=null;
+$("qd-harass").addEventListener("change",()=>{ $("qd-harass-box").style.display=$("qd-harass").checked?"grid":"none"; });
+/* 괴롭힘 예방·대응규정 → 한글(HWPX). 조 머리는 굵게, 항·호는 내어쓰기 — 취업규칙 전문과 같은 모양 */
+function qdHarassHwpx(q){
+  if(!q||!window.HWPX){ alert("한글 파일 만들개를 불러오지 못했습니다 — 새로고침 뒤 다시 하세요."); return; }
+  let body=HWPX.docTitle("직장 내 괴롭힘 예방·대응규정")+HWPX.docSub(q.ans.company)+HWPX.spacer();
+  let cur=null; const flush=()=>{ if(cur){ body+=HWPX.articleRun({title:cur.t,rest:cur.r},cur.p); cur=null; } };
+  q.r.text.split("\n").forEach(l=>{
+    const m=/^(제\d+조\([^)]*\))\s*(.*)$/.exec(l);
+    if(m){ flush(); cur={t:m[1],r:m[2]?" "+m[2]:"",p:[]}; return; }
+    if(/^부\s*칙/.test(l)){ flush(); body+=HWPX.chapter("부 칙"); return; }
+    if(cur)cur.p.push(l); else body+=HWPX.bodyPara(l);
+  });
+  flush();
+  HWPX.download(body,q.ans.company+"_직장 내 괴롭힘 예방·대응규정(제정안).hwpx");
+}
 const qdShortSite=ans=>ans.company+" 단시간근로자";
 /* 지은 한 권을 «올린 파일»처럼 들인다 — 작성기 인계(takeHandoff)와 같은 길: 넣기 → 92항목 검토 → 보관 */
 async function takeDraft(r,ans,bizno,siteName){
@@ -9539,10 +9568,15 @@ async function takeDraft(r,ans,bizno,siteName){
     +(r.leftovers.length?"<br>⚠ <b>직접 채울 곳 "+r.leftovers.length+"</b>: "+r.leftovers.map(escapeH).join(", "):"<br>✓ 빈칸 없음")
     +(r.warnings.length?"<br>⚠ "+r.warnings.map(escapeH).join(" / "):"")
     +(adopted.length?"<br>⚖ 표준 뒤에 바뀐 법 <b>"+adopted.length+"건</b>을 바로 반영했습니다: "+adopted.map(escapeH).join(", "):"")
-    +(r.kind!=="short"&&QD_SHORT?'<br>📄 단시간 근로자용도 지어 두었습니다 — <button class="stbtn on-adopt" id="qd-open-short">단시간 근로자용 열기·검토</button>':"");
+    +(r.kind!=="short"&&QD_SHORT?'<br>📄 단시간 근로자용도 지어 두었습니다 — <button class="stbtn on-adopt" id="qd-open-short">단시간 근로자용 열기·검토</button>':"")
+    +(r.kind!=="short"&&QD_HARASS?'<br>📄 괴롭힘 예방·대응규정 '+QD_HARASS.r.articles+'개 조'
+      +(QD_HARASS.r.leftovers.length?' (직접 채울 곳: '+QD_HARASS.r.leftovers.map(escapeH).join(", ")+')':'')
+      +' — <button class="stbtn on-adopt" id="qd-dl-harass">한글로 받기</button>':"");
   pv.insertBefore(note,pv.firstChild);
   const os=$("qd-open-short");
   if(os)os.onclick=async()=>{ const q=QD_SHORT; if(!q)return; QD_SHORT=null; await takeDraft(q.r,q.ans,"",qdShortSite(q.ans)); };
+  const dh=$("qd-dl-harass");
+  if(dh){ const q=QD_HARASS; dh.onclick=()=>qdHarassHwpx(q); }
 }
 /* 검토가 짚은 것 중 «준비된 개정 문안»(TPL_BY_RULE)이 있는 것만 반영한다 — 문안 없는 지적·수동확인은 사람이 본다.
    ⚠ 이미 결정한 것은 안 건드린다. 결정은 카드에 «✓ 반영»으로 남아 되돌릴 수 있다. */
