@@ -505,11 +505,22 @@
     /* PDF 안에 있던 글자는 «정보와 갈라» 담는다 — 까닭은 textPath 에 적었다.
        ⚠ 빈 글자는 아예 안 적는다. 실시간DB 는 빈 값을 안 적으므로 헛 경로만 남는다. */
     if (p.text) u[textPath(year, p.id)] = String(p.text);
-    u[ownerPath(deps.uid)] = {
-      name: deps.name || (p.meta && p.meta.byName) || '',
-      lastAt: Date.now()
-    };
+    ownerStamp(u, deps.uid, deps.name || (p.meta && p.meta.byName));
     return deps.db.ref().update(u).then(function () { return { year: year, id: p.id }; });
+  }
+
+  /* ── 사람 색인(owners/{uid}) 찍기 — «언제»는 늘, «이름»은 알 때만 (2026-10-07 전수 점검) ──
+     예전에는 `{ name: 이름 || '', lastAt }` 를 «통째로» 썼다. 그래서 이름을 모르는 기기에서
+     한 장만 올려도 **이미 있던 이름이 빈 글자로 덮였다**(실측: 최기운 님 이름표가 "").
+     그러면 사람 고르기 창에 이름 대신 번호가 떴다(#2106 에서 화면 쪽은 막았다 — 여기는 뿌리다).
+     ⚠ 칸 단위로 쓴다 — 규칙(owners/$uid 는 본인만 쓰기)이 하위 칸을 막지 않는다.
+     ⚠ 같은 update 안에 owners/{uid} 와 그 하위 칸을 «함께» 넣지 말 것 — 조상·자손 경로가
+       한 묶음에 들면 파이어베이스가 통째로 거절한다. */
+  function ownerStamp(u, uid, name) {
+    var n = String(name == null ? '' : name).trim();
+    u[ownerPath(uid) + '/lastAt'] = Date.now();
+    if (n) u[ownerPath(uid) + '/name'] = n;
+    return u;
   }
 
   function saveToRtdb(p, year) {
@@ -523,10 +534,7 @@
     /* 업로드 성공과 사용자 색인을 한 번에 저장한다. 로그인 때 touchOwner가
        일시적으로 실패해도 이 색인이 남아야 다른 휴대폰·PC의 「전체 근로자」
        화면에서 방금 올린 사진을 빠뜨리지 않고 찾을 수 있다. */
-    u[ownerPath(deps.uid)] = {
-      name: deps.name || (p.meta && p.meta.byName) || '',
-      lastAt: Date.now()
-    };
+    ownerStamp(u, deps.uid, deps.name || (p.meta && p.meta.byName));
     return deps.db.ref().update(u).then(function () { return { year: year, id: p.id }; });
   }
 
@@ -1022,6 +1030,20 @@
         if (!r.owner || !r.year) return null;
         return readOnce(metaPath(r.year, id, r.owner)).then(function (meta) {
           if (!meta) return null;   // 원본이 지워졌다 — 목록에서 그냥 뺀다
+          /* ⚠ 공유가 «풀렸는데» 색인 줄만 남은 것도 뺀다 (2026-10-07 전수 점검 — 실측 1줄).
+               색인(sharedTo)은 «여기 있다»는 쪽지일 뿐이고, 진짜 권한은 사진 정보의
+               shareWith 다. 둘이 어긋나면 shareWith 를 믿는다.
+             ⚠ 주인 본인 사진은 「받은 사진」이 아니다 — 자기에게 남은 쪽지도 뺀다.
+             ★ 받은 사람은 «자기» 색인 줄을 지울 수 있다(규칙) — 조용히 치운다.
+               치우다 실패해도 목록에서는 이미 빠졌으므로 그냥 넘어간다. */
+          var 열림 = meta.shareWith && meta.shareWith[deps.uid];
+          if (!열림 || r.owner === deps.uid) {
+            try {
+              var d = {}; d[sharedToPath(deps.uid, id)] = null;
+              deps.db.ref().update(d).catch(function () { });
+            } catch (_) { }
+            return null;
+          }
           /* __year 도 함께 새긴다 — 화면이 본문·미리보기를 찾을 때 쓰는 값이다.
              __sharedYear 는 예전부터 있었지만 아무도 안 읽어, 받은 사진이
              늘 «올해» 자리에서 찾히다 통째로 까맣게 나왔다 (2026-08-13 김보람 제보). */
@@ -1964,7 +1986,7 @@
   function touchOwnerFor(name, uid, activeDb) {
     if (!activeDb || !uid) return Promise.resolve();
     var u = {};
-    u[ownerPath(uid)] = { name: name || '', lastAt: Date.now() };
+    ownerStamp(u, uid, name);     /* 이름을 모르면 이름 칸은 안 건드린다 — 있던 이름을 지우지 않는다 */
     return activeDb.ref().update(u);
   }
 
@@ -2353,6 +2375,27 @@
             u[thumbPath(year, id, uid)] = null;
             return deps.db.ref().update(u);
           })
+          /* 보기 주소도 «지금» 채운다 (2026-10-07) — 예전에는 loc 만 바꾸고 주소는 서버
+             「주소 채우기」에 미뤘다. 그 사이 주인이 아닌 사람(관리자·공유받은 사람)은 창고에
+             직접 못 청해(규칙: 자기 사진만) 회색 칸을 봤다.
+             ⚠ 서류(kind:'doc')는 원본 주소를 «안 적는다» — saveMetaOnly 와 같은 규칙(isDocKind).
+             ⚠ 주소받기가 실패해도 옮긴 것은 그대로 성공이다 — 주소는 서버가 나중에 채운다.
+             ⚠ 살아 있는 사진에만 쓴다(updateAlive) — 그 사이 지워졌으면 유령으로 되살리지 않는다. */
+          .then(function () {
+            return Promise.all([
+              deps.storage.ref(filePath(year, id, 'full', uid)).getDownloadURL().catch(function () { return null; }),
+              thumb ? deps.storage.ref(filePath(year, id, 'thumb', uid)).getDownloadURL().catch(function () { return null; })
+                    : Promise.resolve(null)
+            ]).then(function (urls) {
+              if (!urls[0] && !urls[1]) return null;
+              return updateAlive(year, id, uid, function (path, m) {
+                var w = {};
+                if (urls[0] && !isDocKind(m && m.kind)) w[path + '/fullUrl'] = urls[0];
+                if (urls[1]) w[path + '/thumbUrl'] = urls[1];
+                return w;
+              }).catch(function () { return null; });
+            });
+          })
           .then(function () { out.moved++; if (onStep) onStep(out); });
       })
       .catch(function (e) {
@@ -2360,6 +2403,35 @@
         out.failed++;
         if (onStep) onStep(out);
       });
+  }
+
+  /* ── 내 «옛 자리» 사진을 조용히 창고로 — 주인 기기에서, 몇 장씩 (2026-10-07 전수 점검) ──
+     ★ 왜 생기나: 올리기(savePhoto)는 창고가 막히면 실시간DB 로 «물러난다» — 사진을 잃지
+       않으려는 옳은 안전장치다. 그런데 물러난 사진을 «다시 창고로 보내는 길이 없었다.»
+       관리자 도구(migrateToStorage)는 남의 사진을 못 옮긴다 — 창고 규칙이 «자기 자리만»이라
+       관리자도 남의 창고 자리에 못 쓴다. 그래서 실측 73장이 실시간DB 에 남아 있었다
+       (2026-08-10~09-14, 「이사는 끝났다」는 주석과 달리). 실시간DB 는 창고보다 훨씬 비싸다.
+     ★ 그래서 «주인»이 사진첩을 열 때 자기 것만 몇 장씩 옮긴다 — 주인은 자기 창고에 쓸 수 있다.
+     ⚠ 옮기는 순서는 migrateOneToStorage 그대로다: 올리고 → 되읽어 확인 → 그제야 지운다.
+       중간에 끊겨도 사진을 잃지 않고, 다음에 열 때 남은 것만 이어 한다.
+     ⚠ 한 번에 조금만(기본 5장) — 원본을 실시간DB 에서 한 번 내려받아야 해서다. 한꺼번에
+       하면 사진첩 여는 것이 느려진다. 73장이면 주인이 몇 번 열 동안 저절로 끝난다.
+     ⚠ 창고 방식이 아닐 때·로그인이 없을 때·남의 사진에는 아무것도 안 한다. */
+  var HEAL_MAX = 5;
+  function healToStorage(rows, limit) {
+    var out = { moved: 0, skipped: 0, failed: 0, tried: 0 };
+    if (!deps.db || !deps.storage || !deps.uid || mode !== 'storage') return Promise.resolve(out);
+    var n = Math.max(1, Math.min(Number(limit) || HEAL_MAX, 20));
+    var list = (rows || []).filter(function (r) {
+      return r && r.id && r.year && (!r.owner || r.owner === deps.uid) &&
+             !(r.meta && r.meta.loc === 'storage');
+    }).slice(0, n);
+    out.tried = list.length;
+    return list.reduce(function (chain, r) {
+      return chain.then(function () {
+        return migrateOneToStorage(deps.uid, String(r.year), r.id, r.meta || {}, out);
+      });
+    }, Promise.resolve()).then(function () { return out; });
   }
 
   /* ── 창고 점검 ──
@@ -2597,6 +2669,8 @@
     listYearAll: listYearAll,
     listYearsAll: listYearsAll,
     migrateToStorage: migrateToStorage,
+    healToStorage: healToStorage,   /* 2026-10-07 — 주인 기기에서 옛 자리 사진을 몇 장씩 창고로 */
+    ownerStamp: ownerStamp,         /* 2026-10-07 — 사람 색인: 이름은 알 때만 쓴다(검사가 돌린다) */
     listYear: listYear,
     loadThumb: loadThumb,
     loadThumbsYear: loadThumbsYear,
