@@ -179,3 +179,44 @@ test('★ 한 사람의 연도 목록을 통째로 못 읽어도 다른 사람�
   const r = await migrateBatch(db, fakeBucket(), 30);
   assert.equal(r.moved, 1, '★ U1 목록을 못 읽었다고 U2 까지 안 옮겼습니다');
 });
+
+/* ══════ 서류·민감 서류에는 원본 주소를 «안 적는다» (2026-10-07 전수 점검) ══════
+   화면은 2026-09-27 부터 서류에 원본 토큰 주소를 안 적는다(민감 서류는 판독 때 지운다).
+   이 도구가 «원본 주소가 없으면 덜 끝난 것»으로 보고 채우면, 관리자가 단추 한 번 누르는 것으로
+   그 규칙이 통째로 무효가 된다 — 만료도 로그인도 없는 신분증 주소가 정보에 남는다. */
+function urlWorld(items, blobs) {
+  const db = fakeDb({ U1: { items: { 2026: items }, blobs: { 2026: blobs || {} }, thumbs: { 2026: {} } } });
+  db.urls = [];
+  db.writeUrls = (uid, year, id, u) => { db.urls.push([id, u]); return Promise.resolve(); };
+  const bucket = fakeBucket();
+  bucket.downloadUrl = (p) => Promise.resolve('https://firebasestorage.example/' + p + '?token=T');
+  return { db, bucket };
+}
+const fullOf = (db, id) => db.urls.filter(x => x[0] === id).map(x => x[1].fullUrl).filter(Boolean);
+
+test('★★ 이미 옮긴 서류·민감 서류에 원본 주소를 채우지 않는다 — 미리보기 주소만', async () => {
+  const { db, bucket } = urlWorld({
+    d: { loc: 'storage', kind: 'doc' },
+    s: { loc: 'storage', kind: 'photo', read: { kind: 'idcard' } },
+    p: { loc: 'storage', kind: 'photo' }
+  });
+  await migrateBatch(db, bucket, 30);
+  assert.deepEqual(fullOf(db, 'd'), [], '★ 서류에 원본 토큰 주소를 적었습니다');
+  assert.deepEqual(fullOf(db, 's'), [], '★ 신분증에 원본 토큰 주소를 적었습니다');
+  assert.ok(db.urls.some(x => x[0] === 'd' && x[1].thumbUrl), '서류도 미리보기 주소는 적습니다(격자)');
+  assert.equal(fullOf(db, 'p').length, 1, '사진(회의사진)은 예전 그대로 원본 주소를 적습니다 — 「회색 46장」');
+});
+
+test('★ 서류가 미리보기 주소만 있으면 «끝난 것»이다 — 누를 때마다 다시 손대지 않는다', async () => {
+  const { db, bucket } = urlWorld({ d: { loc: 'storage', kind: 'doc', thumbUrl: 'https://x/t' } });
+  const r = await migrateBatch(db, bucket, 30);
+  assert.equal(db.urls.length, 0);
+  assert.equal(r.skipped, 1);
+});
+
+test('★ 지금 옮기는 서류에도 원본 주소를 안 적는다', async () => {
+  const { db, bucket } = urlWorld({ d: { takenAt: 1, kind: 'doc' } }, { d: 'data:full' });
+  const r = await migrateBatch(db, bucket, 30);
+  assert.equal(r.moved, 1);
+  assert.deepEqual(fullOf(db, 'd'), [], '★ 옮기면서 서류에 원본 토큰 주소를 적었습니다');
+});

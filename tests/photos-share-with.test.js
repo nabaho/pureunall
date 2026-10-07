@@ -79,7 +79,7 @@ test('★ 한 장을 못 읽어도 나머지는 보인다', async () => {
     sharedToPath: () => 'idx',
     readOnce: (p) => {
       if (p === 'idx') return Promise.resolve(idx);
-      if (p === 'u2/2026/a') return Promise.resolve({ takenAt: 1 });
+      if (p === 'u2/2026/a') return Promise.resolve({ takenAt: 1, shareWith: { me: true } });
       return Promise.reject(new Error('권한 없음'));   // b 는 공유가 풀렸다
     },
     deps: { uid: 'me', db: {} }

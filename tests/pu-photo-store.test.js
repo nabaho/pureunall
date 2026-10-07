@@ -528,7 +528,7 @@ test('savePhoto — 사진 세 경로와 사용자 색인이 update 한 번으�
   assert.equal(db.calls.update[0].path, '');
   const u = db.calls.update[0].u;
   assert.deepEqual(Object.keys(u).sort(), [
-    'puphotos/owners/U1', 'puphotos/u/U1/blobs/2026/p1',
+    'puphotos/owners/U1/lastAt', 'puphotos/u/U1/blobs/2026/p1',
     'puphotos/u/U1/items/2026/p1', 'puphotos/u/U1/thumbs/2026/p1'
   ]);
   assert.equal(u['puphotos/u/U1/blobs/2026/p1'], 'data:full');
@@ -541,7 +541,7 @@ test('savePhoto — 촬영 시각을 모르는 사진은 unknown 연도로', asy
   S.init({ uid: 'U1', db });
   const r = await S.savePhoto({ id: 'p2', takenAt: null, meta: {}, full: 'f', thumb: 't' });
   assert.equal(r.year, 'unknown');
-  const photoKeys = Object.keys(db.calls.update[0].u).filter(k => k !== 'puphotos/owners/U1');
+  const photoKeys = Object.keys(db.calls.update[0].u).filter(k => k.indexOf('puphotos/owners/U1/') !== 0);
   assert.ok(photoKeys.every(k => k.includes('/unknown/')));
 });
 
@@ -582,7 +582,7 @@ test('★ savePhoto — 창고 방식은 본문·미리보기를 창고에 올�
   assert.ok(st.calls.some(c => c[0] === 'putString' && c[1] === 'pu_photos/u/U1/thumbs/2026/p1.jpg' && c[2] === 'data:thumb'));
   // 실시간DB에는 본문·미리보기가 없다 — 정보만
   const u = db.calls.update[0].u;
-  assert.deepEqual(Object.keys(u).sort(), ['puphotos/owners/U1', 'puphotos/u/U1/items/2026/p1']);
+  assert.deepEqual(Object.keys(u).sort(), ['puphotos/owners/U1/lastAt', 'puphotos/u/U1/items/2026/p1']);
   assert.equal(u['puphotos/u/U1/items/2026/p1'].loc, 'storage',
     '★ loc 표시가 없으면 지우기·복원·용량 계산이 본문을 실시간DB에서 찾습니다');
 });
@@ -822,7 +822,7 @@ test('savePhoto 는 내 자리에만 쓴다 — 남의 자리에 쓰는 길이 �
   S.init({ uid: 'U1', db });
   await S.savePhoto({ id: 'p1', takenAt: new Date(2026, 6, 15).getTime(), meta: {}, full: 'f', thumb: 't' });
   for (const k of Object.keys(db.calls.update[0].u)) {
-    assert.ok(k.indexOf('puphotos/u/U1/') === 0 || k === 'puphotos/owners/U1',
+    assert.ok(k.indexOf('puphotos/u/U1/') === 0 || k.indexOf('puphotos/owners/U1/') === 0,
       '내 자리와 내 사용자 색인 밖에 썼습니다: ' + k);
   }
 });
@@ -835,9 +835,26 @@ test('savePhoto — 업로드할 때 사용자 색인도 함께 남겨 다른 �
     id: 'phone1', takenAt: new Date(2026, 7, 11).getTime(),
     meta: { byName: '김보람' }, full: 'f', thumb: 't'
   });
-  const owner = db.calls.update[0].u['puphotos/owners/U1'];
-  assert.equal(owner.name, '김보람');
-  assert.ok(owner.lastAt > 0);
+  const u = db.calls.update[0].u;
+  assert.equal(u['puphotos/owners/U1/name'], '김보람');
+  assert.ok(u['puphotos/owners/U1/lastAt'] > 0);
+});
+
+/* ★ 이름을 모르는 기기가 올려도 «있던 이름»을 지우지 않는다 (2026-10-07 전수 점검).
+     예전엔 owners/{uid} 를 `{name:'', lastAt}` 로 통째 덮어 최기운 님 이름표가 빈 글자가 됐다. */
+test('★ 이름을 모르면 이름 칸은 건드리지 않는다 — 올리기·로그인 표시 모두', async () => {
+  const S = loadStore();
+  const db = fakeDb();
+  S.init({ uid: 'U1', db });
+  await S.savePhoto({ id: 'p9', takenAt: new Date(2026, 7, 11).getTime(), meta: {}, full: 'f', thumb: 't' });
+  await S.touchOwner('   ');
+  db.calls.update.forEach(c => {
+    const ks = Object.keys(c.u);
+    assert.ok(!ks.includes('puphotos/owners/U1'), '사람 색인을 통째로 덮었습니다 — 있던 이름이 지워집니다');
+    assert.ok(!ks.includes('puphotos/owners/U1/name'), '모르는 이름(빈 글자)을 적었습니다 — 있던 이름이 지워집니다');
+    assert.ok(c.u['puphotos/owners/U1/lastAt'] > 0, '«언제» 표시는 늘 남아야 다른 기기가 새 사진을 압니다');
+  });
+  assert.equal(db.calls.update.length, 2);
 });
 
 test('listYear·loadThumb·loadFull 은 남의 자리도 읽을 수 있다 (관리자용)', async () => {
@@ -859,8 +876,8 @@ test('사진첩을 쓰는 사람 명단 — 내 칸만 쓰고, 관리자만 훑�
   S.init({ uid: 'U1', db, isAdmin: true });
   await S.touchOwner('홍길동');
   assert.equal(db.calls.update.length, 1);
-  assert.deepEqual(Object.keys(db.calls.update[0].u), ['puphotos/owners/U1']);
-  assert.equal(db.calls.update[0].u['puphotos/owners/U1'].name, '홍길동');
+  assert.ok(Object.keys(db.calls.update[0].u).every(k => k.indexOf('puphotos/owners/U1/') === 0), '내 칸 밖에 썼습니다');
+  assert.equal(db.calls.update[0].u['puphotos/owners/U1/name'], '홍길동');
   const owners = await S.listOwners();
   assert.deepEqual(Object.keys(owners).sort(), ['U1', 'U2']);
 });
@@ -1195,10 +1212,14 @@ test('★ 이사 — 순서는 반드시 올리기 → 확인 → 지우기다(�
   const upAt = timeline.findIndex(s => s.startsWith('storage:putString:'));
   /* ⚠ 옮기기 전 loadFull/loadThumb 도 "창고 먼저" 읽기라 getDownloadURL 을
      부른다(이번엔 아직 안 올라가 있어 실패하고 실시간DB로 물러난다) — 그 앞선
-     시도까지 걸리므로 첫 번째가 아니라 "올리기 뒤 맨 나중" getDownloadURL(확인)
-     을 찾아야 한다. */
+     시도까지 걸리므로 첫 번째가 아니라 "마지막 올리기 바로 뒤" getDownloadURL(확인)
+     을 찾아야 한다.
+     ⚠ 옮긴 뒤 보기 주소를 채우느라 getDownloadURL 을 또 부른다(2026-10-07) — 그래서
+       «맨 나중» 것이 아니라 «마지막 올리기 다음 첫 번째» 것이 확인이다. */
+  let lastPut = -1;
+  timeline.forEach((s, i) => { if (s.startsWith('storage:putString:')) lastPut = i; });
   let getAt = -1;
-  for (let i = timeline.length - 1; i >= 0; i--) {
+  for (let i = lastPut + 1; i < timeline.length; i++) {
     if (timeline[i].startsWith('storage:getDownloadURL:')) { getAt = i; break; }
   }
   const rtdbNullAt = timeline.indexOf('db-clear-blob');
@@ -2025,4 +2046,133 @@ test('saveRead — 주인을 안 넘기면 예전처럼 내 자리 (기존 흐�
   S.init({ uid: 'U1', db });
   await S.saveRead('2026', 'p1', { kind: 'card' });
   assert.deepEqual(Object.keys(db.calls.update[0].u), ['puphotos/u/U1/items/2026/p1/read']);
+});
+
+/* ══════════ 옛 자리(실시간DB) → 창고 되돌리기 (2026-10-07 전수 점검) ══════════
+   창고가 막혀 실시간DB 로 물러난 사진이 «다시 창고로 갈 길»이 없어 73장이 남아 있었다. */
+
+function legacyTree(items) {
+  const blobs = {}, thumbs = {};
+  Object.keys(items).forEach(id => {
+    if (items[id].loc !== 'storage') { blobs[id] = 'data:full-' + id; thumbs[id] = 'data:thumb-' + id; }
+  });
+  return { puphotos: { owners: { U1: { name: '홍길동' } },
+    u: { U1: { items: { [NOW_YEAR]: items }, blobs: { [NOW_YEAR]: blobs }, thumbs: { [NOW_YEAR]: thumbs } } } } };
+}
+
+test('★ 옮긴 사진은 보기 주소도 함께 채운다 — 서류·민감 서류는 원본 주소를 안 적는다', async () => {
+  const S = loadStore(webShims());
+  const st = fakeStorage({});
+  const db = mutableDb(legacyTree({
+    ph: { takenAt: 1, kind: 'photo' },
+    dc: { takenAt: 1, kind: 'doc' },
+    se: { takenAt: 1, read: { kind: 'contract' } }
+  }));
+  S.init({ uid: 'U1', db, storage: st, isAdmin: true });
+  const r = await S.migrateToStorage();
+  assert.equal(r.moved, 3);
+  const it = db.tree.puphotos.u.U1.items[NOW_YEAR];
+  assert.equal(typeof it.ph.fullUrl, 'string', '사진 주소를 안 채우면 공유받은 사람·관리자 화면이 회색입니다');
+  assert.equal(typeof it.ph.thumbUrl, 'string');
+  assert.equal(it.dc.fullUrl, undefined, '★ 서류에 만료 없는 원본 주소를 적었습니다');
+  assert.equal(typeof it.dc.thumbUrl, 'string', '미리보기 주소는 서류도 적습니다(240px)');
+  assert.equal(it.se.fullUrl, undefined, '★ 민감 서류(계약서)에 원본 주소를 적었습니다');
+});
+
+test('★ 주소받기가 실패해도 옮기기는 성공이다 — 사진은 이미 창고에 안전하다', async () => {
+  const S = loadStore(webShims());
+  const base = fakeStorage({});
+  const db = mutableDb(legacyTree({ ph: { takenAt: 1 } }));
+  const st = { calls: base.calls, ref(p) {
+    const r = base.ref(p);
+    /* 옛 본문을 지우기 «전»(읽기·되읽어 확인)은 살리고, 지운 «뒤» 주소받기만 실패시킨다 */
+    return Object.assign({}, r, { getDownloadURL() {
+      return db.tree.puphotos.u.U1.blobs[NOW_YEAR].ph ? r.getDownloadURL() : Promise.reject(new Error('x'));
+    } });
+  } };
+  S.init({ uid: 'U1', db, storage: st, isAdmin: true });
+  const r = await S.migrateToStorage();
+  assert.equal(r.moved, 1);
+  assert.equal(r.failed, 0);
+  assert.equal(db.tree.puphotos.u.U1.items[NOW_YEAR].ph.loc, 'storage');
+});
+
+test('★ 주인 기기에서 몇 장씩 — 내 것·옛 자리 것만, 정한 장수까지만', async () => {
+  const S = loadStore(webShims());
+  const st = fakeStorage({});
+  const db = mutableDb(legacyTree({ a: { takenAt: 1 }, b: { takenAt: 1 }, c: { takenAt: 1 }, s: { takenAt: 1, loc: 'storage' } }));
+  S.init({ uid: 'U1', db, storage: st });
+  const it = db.tree.puphotos.u.U1.items[NOW_YEAR];
+  const rows = [
+    { id: 's', year: NOW_YEAR, meta: it.s, owner: 'U1' },
+    { id: 'x', year: NOW_YEAR, meta: { takenAt: 1 }, owner: 'U2' },
+    { id: 'a', year: NOW_YEAR, meta: it.a, owner: 'U1' },
+    { id: 'b', year: NOW_YEAR, meta: it.b, owner: 'U1' },
+    { id: 'c', year: NOW_YEAR, meta: it.c, owner: 'U1' }
+  ];
+  const r = await S.healToStorage(rows, 2);
+  assert.equal(r.tried, 2, '정한 장수보다 많이 옮기면 사진첩 여는 것이 느려집니다');
+  assert.equal(r.moved, 2);
+  assert.deepEqual(Array.from(r.ids), ['a', 'b'], '화면이 고칠 «옮겨진 장» 목록이 틀렸습니다');
+  assert.ok(!st.calls.some(c => c[0] === 'putString' && /\/x\.jpg$/.test(c[1])), '★ 남의 사진을 옮기려 했습니다(규칙상 못 쓴다)');
+  assert.equal(it.x, undefined, '★ 남의 사진 번호로 내 자리에 유령 정보를 만들었습니다');
+  assert.ok(!st.calls.some(c => c[0] === 'putString' && c[1].indexOf('/s.jpg') >= 0), '이미 창고에 있는 사진을 또 올렸습니다');
+  assert.equal(it.a.loc, 'storage');
+  assert.equal(db.tree.puphotos.u.U1.blobs[NOW_YEAR].a, undefined, '옮긴 뒤 옛 본문을 안 지웠습니다');
+  assert.equal(db.tree.puphotos.u.U1.blobs[NOW_YEAR].c, 'data:full-c', '정한 장수 밖의 사진까지 건드렸습니다');
+});
+
+test('★ 못 옮긴 장은 «옮겨진 장» 목록에 안 든다 — 화면이 그 장을 창고로 착각하지 않게', async () => {
+  const S = loadStore(webShims());
+  const base = fakeStorage({});
+  const st = { calls: base.calls, ref(p) {
+    const r = base.ref(p);
+    if (!/\/n\.jpg$/.test(p)) return r;
+    return Object.assign({}, r, { putString() { return Promise.reject(new Error('막힘')); } });
+  } };
+  const db = mutableDb(legacyTree({ a: { takenAt: 1 }, n: { takenAt: 1 } }));
+  S.init({ uid: 'U1', db, storage: st });
+  const it = db.tree.puphotos.u.U1.items[NOW_YEAR];
+  const r = await S.healToStorage([
+    { id: 'n', year: NOW_YEAR, meta: it.n, owner: 'U1' },
+    { id: 'a', year: NOW_YEAR, meta: it.a, owner: 'U1' }
+  ]);
+  assert.equal(r.failed, 1);
+  assert.deepEqual(Array.from(r.ids), ['a']);
+  assert.equal(db.tree.puphotos.u.U1.blobs[NOW_YEAR].n, 'data:full-n', '★ 못 올린 사진의 본문을 지웠습니다 — 사진을 잃습니다');
+});
+
+test('옛 자리 되돌리기 — 창고 방식이 아니거나 창고가 없으면 아무것도 안 한다', async () => {
+  for (const o of [{ mode: 'rtdb' }, { noStorage: true }]) {
+    const S = loadStore(webShims());
+    const st = fakeStorage({});
+    const db = mutableDb(legacyTree({ a: { takenAt: 1 } }));
+    S.init(Object.assign({ uid: 'U1', db }, o.noStorage ? {} : { storage: st }, o.mode ? { mode: o.mode } : {}));
+    const r = await S.healToStorage([{ id: 'a', year: NOW_YEAR, meta: { takenAt: 1 }, owner: 'U1' }]);
+    assert.equal(r.tried, 0, JSON.stringify(o));
+    assert.equal(st.calls.length, 0);
+    assert.equal(db.calls.update.length, 0);
+  }
+});
+
+/* ══════════ 낡은 공유 색인 (2026-10-07 전수 점검 — 실측 1줄) ══════════ */
+
+test('★ 공유가 풀렸는데 색인 줄만 남았으면 «받은 사진»에서 빼고, 내 색인 줄을 치운다', async () => {
+  const S = loadStore();
+  const db = mutableDb({ puphotos: {
+    sharedTo: { ME: { ok: { owner: 'U2', year: '2026' }, gone: { owner: 'U2', year: '2026' }, self: { owner: 'ME', year: '2026' } } },
+    u: {
+      U2: { items: { 2026: { ok: { takenAt: 1, shareWith: { ME: true } }, gone: { takenAt: 1, shareWith: { U3: true } } } } },
+      ME: { items: { 2026: { self: { takenAt: 1, shareWith: { ME: true } } } } }
+    }
+  } });
+  S.init({ uid: 'ME', db });
+  const out = await S.listSharedToMe();
+  assert.deepEqual(Object.keys(out), ['ok']);
+  await new Promise(r => setTimeout(r, 0));
+  const idx = db.tree.puphotos.sharedTo.ME;
+  assert.ok(idx.ok, '살아 있는 공유 줄을 지웠습니다');
+  assert.equal(idx.gone, undefined, '풀린 공유의 색인 줄을 안 치웠습니다');
+  assert.equal(idx.self, undefined, '내 사진을 가리키는 색인 줄을 안 치웠습니다');
+  assert.ok(db.tree.puphotos.u.U2.items[2026].gone, '★ 남의 사진 정보를 건드렸습니다');
 });

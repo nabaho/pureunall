@@ -13,6 +13,16 @@
 
 var BUCKET_ROOT = 'pu_photos'; // js/pu-photo-store.js 의 BUCKET_ROOT 와 반드시 같아야 한다
 
+/* 원본 주소를 «안 적는» 사진인가 — 서류(kind:'doc')·민감 서류 (2026-10-07 전수 점검)
+   ★ 화면(js/pu-photo-store.js)은 2026-09-27 부터 서류에 원본 토큰 주소를 안 적고,
+     민감 서류는 판독 때 지운다. 그런데 이 도구는 «원본 주소가 없으면 덜 끝난 것»으로 보고
+     채워 넣었다 — 관리자가 단추 한 번 누르는 것으로 그 규칙이 통째로 무효가 될 수 있었다.
+   ⚠ 판정은 서버 문지기(photo-view.js)와 «같은 함수»를 쓴다. 두 벌이 되면 한쪽만 고쳐진다. */
+var PV = require('./photo-view');
+function noFullUrl(meta) {
+  return PV.isSensitiveItem(meta) || PV.isDocItem(meta);
+}
+
 function photoPath(uid, year, id, kind) {
   return BUCKET_ROOT + '/u/' + uid + '/' + kind + '/' + year + '/' + id + '.jpg';
 }
@@ -27,17 +37,24 @@ function photoPath(uid, year, id, kind) {
    **정보(실시간DB)** 에 적어 두면, 정보를 읽을 수 있는 사람(주인·관리자·공유)이
    곧 사진도 볼 수 있다 — 실시간DB 시절과 똑같은 접근 범위다.
    이 통과는 **이미 옮겨진(loc=storage) 사진에 주소가 빠져 있으면** 만들어 적는다. */
-function tokenizeOne(db, bucket, uid, year, id, out) {
+function tokenizeOne(db, bucket, uid, year, id, out, meta) {
   /* 주소를 못 만드는 창고(옛 감싸개 등)면 조용히 건너뛴다 — 이사 자체를
      실패로 만들면 안 된다. 사진은 이미 안전하고, 주소는 다음에 채우면 된다. */
   if (!bucket || typeof bucket.downloadUrl !== 'function' || typeof db.writeUrls !== 'function') {
     out.skipped++;
     return Promise.resolve();
   }
+  /* 서류·민감 서류는 미리보기 주소만 만든다 — 원본은 서버 문(photoView)으로만 본다 */
+  var thumbOnly = noFullUrl(meta);
   return Promise.all([
-    bucket.downloadUrl(photoPath(uid, year, id, 'blobs')),
+    thumbOnly ? Promise.resolve(null) : bucket.downloadUrl(photoPath(uid, year, id, 'blobs')),
     bucket.downloadUrl(photoPath(uid, year, id, 'thumbs'))
   ]).then(function (urls) {
+    if (thumbOnly) {
+      if (!urls[1]) { out.skipped++; return; }
+      return db.writeUrls(uid, year, id, { fullUrl: null, thumbUrl: urls[1] })
+        .then(function () { out.linked++; });
+    }
     if (!urls[0] && !urls[1]) { out.skipped++; return; }   // 창고에 파일 자체가 없다
     /* ⚠ 한쪽만 만들어진 것을 «세어서 알려 준다» (2026-08-21 조사). 한 번 돌린 뒤
        32장이 미리보기 주소만 있고 원본 주소가 없었는데, 예전 셈법으로는 그것도
@@ -57,7 +74,7 @@ function tokenizeOne(db, bucket, uid, year, id, out) {
   });
 }
 
-function migrateOne(db, bucket, uid, year, id, out) {
+function migrateOne(db, bucket, uid, year, id, out, meta) {
   return db.readItem(uid, year, id).then(function (item) {
     if (!item || !item.full) { out.skipped++; return; }
     var fullPath = photoPath(uid, year, id, 'blobs');
@@ -74,7 +91,7 @@ function migrateOne(db, bucket, uid, year, id, out) {
       /* 방금 옮긴 사진도 주소를 바로 적는다 — 다음 통과를 기다릴 이유가 없다.
          ⚠ 주소 채우기 실패가 이사 성공을 뒤집으면 안 된다(사진은 이미 안전하다). */
       .then(function () {
-        return tokenizeOne(db, bucket, uid, year, id, { linked: 0, skipped: 0, failed: 0, partial: 0 });
+        return tokenizeOne(db, bucket, uid, year, id, { linked: 0, skipped: 0, failed: 0, partial: 0 }, meta);
       });
   }).catch(function (e) {
     console.warn('[사진 이사:서버]', uid, year, id, e && e.message);
@@ -91,10 +108,11 @@ function migrateYear(db, bucket, uid, year, quotaLeft, out) {
         var meta = items[id];
         if (meta && meta.loc === 'storage') {
           /* 이미 옮겨졌다 — 주소만 확인한다. 둘 다 있으면 손대지 않는다(멱등). */
-          if (meta.fullUrl && meta.thumbUrl) { out.skipped++; return; }
-          return tokenizeOne(db, bucket, uid, year, id, out);
+          /* ⚠ 서류·민감 서류는 원본 주소가 «없는 것이 끝난 모양»이다 — 미리보기만 보면 된다 */
+          if (meta.thumbUrl && (meta.fullUrl || noFullUrl(meta))) { out.skipped++; return; }
+          return tokenizeOne(db, bucket, uid, year, id, out, meta);
         }
-        return migrateOne(db, bucket, uid, year, id, out);
+        return migrateOne(db, bucket, uid, year, id, out, meta);
       });
     }, Promise.resolve());
   });
