@@ -151,7 +151,12 @@
        한 번 띄운 화면의 옛 값을 믿고 덮으면, 그사이 사람이 적은 값이 사라진다.
      ⚠ 되돌리기도 «내가 넣은 값 그대로»인 칸만 비운다 — 그 뒤 사람이 고친 칸은 안 건드린다. */
   var FILL = [['ceo', 'ceo', 'ceo'], ['addr', 'address', 'ad'], ['tel', 'phone', 'ct']];   // [판정칸, 업체칸, 등록증칸]
-  function fillRecs(rows, fresh) {
+  /* ★ 무엇을 넣었는지 «업체 기록 안»(coFill)에 남긴다 (2026-10-07 대표 결정 「빈칸만 채우기」 — 기업정보함 점검 4절).
+       예전에는 화면 상태에만 있어 창을 닫으면 되돌릴 길이 사라졌다. 명함 「🏢 푸른이알피로」의 cardSync 와 같은 결:
+       따로 기록 자리를 만들지 않고 그 업체와 함께 다닌다 — 다른 PC·다음 날에도 되돌린다.
+     opts: { at, by } — 안 주면 예전처럼 기록 없이(검사·옛 부르는 곳). */
+  function fillRecs(rows, fresh, opts) {
+    var o = opts || {};
     var byId = {};
     (fresh || []).forEach(function (co) { if (co && co.id) byId[co.id] = co; });
     var recs = [], undo = [], cells = 0;
@@ -168,12 +173,16 @@
       var n = Object.keys(patch).length;
       if (!n) return;
       cells += n;
+      if (o.at) patch.coFill = { at: o.at, by: str(o.by), put: put };
       recs.push(Object.assign({}, cur, patch));
       undo.push({ id: cur.id, put: put });
     });
     return { recs: recs, undo: undo, cells: cells };
   }
-  function undoRecs(undo, fresh) {
+  /* 되돌리기 — «넣은 값 그대로»인 칸만 비운다. opts.at 을 주면 그 업체의 coFill 에 «되돌렸음»을 찍는다
+     (지우지 않는다 — 언제 무엇을 넣고 되돌렸는지 남는다). */
+  function undoRecs(undo, fresh, opts) {
+    var o = opts || {};
     var byId = {};
     (fresh || []).forEach(function (co) { if (co && co.id) byId[co.id] = co; });
     var recs = [], cells = 0;
@@ -183,14 +192,34 @@
       var back = {};
       Object.keys(u.put || {}).forEach(function (k) { if (str(cur[k]) === u.put[k]) back[k] = ''; });
       var n = Object.keys(back).length;
-      if (!n) return;
+      var mark = o.at && cur.coFill && !cur.coFill.undoneAt;
+      if (!n && !mark) return;
       cells += n;
+      if (mark) back.coFill = Object.assign({}, cur.coFill, { undoneAt: o.at, undoneBy: str(o.by) });
       recs.push(Object.assign({}, cur, back));
     });
     return { recs: recs, cells: cells };
   }
+  /* 아직 안 되돌린 «마지막 채우기» — 업체 기록의 coFill 에서 다시 모은다. 없으면 null.
+     ⚠ 화면 상태가 아니라 업체 기록에서 센다 — 창을 닫았다 열어도, 다른 PC 에서도 같은 답이다. */
+  function pendingFill(fresh) {
+    var last = 0;
+    (fresh || []).forEach(function (co) {
+      var f = co && !co._deleted && co.coFill;
+      if (f && !f.undoneAt && Number(f.at) > last) last = Number(f.at);
+    });
+    if (!last) return null;
+    var undo = [], cells = 0;
+    (fresh || []).forEach(function (co) {
+      var f = co && !co._deleted && co.coFill;
+      if (!f || f.undoneAt || Number(f.at) !== last) return;
+      undo.push({ id: co.id, put: f.put || {} });
+      cells += Object.keys(f.put || {}).length;
+    });
+    return { at: last, undo: undo, cells: cells, n: undo.length };
+  }
 
-  var API = { build: build, people: people, samePeople: samePeople, fillRecs: fillRecs, undoRecs: undoRecs };
+  var API = { build: build, people: people, samePeople: samePeople, fillRecs: fillRecs, undoRecs: undoRecs, pendingFill: pendingFill };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.PuCoMismatch = API;
 })(typeof window !== 'undefined' ? window : this);
