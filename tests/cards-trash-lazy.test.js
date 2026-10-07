@@ -76,10 +76,13 @@ test('④ 화면은 모를 때 «…» 로 적는다', () => {
 });
 
 test('③★ 30일 정리는 «하루 한 번»만 — 그때만 휴지통을 읽는다', () => {
-  const boot = SRC.slice(SRC.indexOf('if(!Store._trashPurgeDone){'),
-                         SRC.indexOf('if(!Store._trashPurgeDone){') + 700);
-  assert.match(boot, /pucards_trash_purge_at/, '★ 언제 정리했는지 안 적으면 켤 때마다 읽습니다');
-  assert.match(boot, /Date\.now\(\) - _plast > 20\*3600\*1000/, '★ 하루 한 번이 아닙니다');
+  /* 2026-10-07 점검 ②: «PC 마다 하루 한 번»에서 «서버 시각을 차지한 PC 하나만 하루 한 번»으로 */
+  const at = SRC.indexOf('if(!Store._trashPurgeDone){');
+  const boot = SRC.slice(at, SRC.indexOf('watchCardMap(', at));
+  assert.match(boot, /trashPurgeClaim\(this\.db\)\.then\(function\(mine\)\{\s*if\(mine\)/, '★ 언제 정리했는지 안 보면 켤 때마다 읽습니다');
+  const claim = SRC.slice(SRC.indexOf('function trashPurgeClaim('), SRC.indexOf('function purgeTrash('));
+  assert.match(claim, /config\/trashPurgeAt'\)\.transaction\(/, '★ 서버 시각을 거래로 차지해야 «한 PC 만» 됩니다');
+  assert.match(SRC, /const TRASH_PURGE_EVERY = 20\*3600\*1000;/, '★ 하루 한 번이 아닙니다');
   assert.match(boot, /loadTrash\(function\(\)\{/, '★ 정리하려면 휴지통을 읽어야 합니다');
   assert.match(boot, /purgeTrash\(\);/, '★ 30일 지난 것이 영영 안 지워집니다');
 });
