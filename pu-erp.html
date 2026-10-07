@@ -37384,6 +37384,108 @@ function bizTypeMergeRun(plan, who){
   });
   return { done:done, failed:failed };
 }
+/* ══════ 🧹 사전에 없는 유형(고아) 정리 — 업무유형 정리 4단계 (대표 2026-10-07 「4단계」) ══════
+   지워진 유형 번호를 아직 쓰는 기록이 13건 있었다(모두 종료·이관된 옛 건). 대표 결정:
+   ① 이관되어 생긴 기록이 «지금 쓰는 유형»이 있으면 그 유형으로 잇는다 — 가장 확실한 근거다.
+   ② 같은 일로 보이는 것은 지금 유형으로 잇는다 — 약어가 같은 것 + 대표가 확인한 짝(BIZ_TYPE_ORPHAN_ALIAS).
+   ③ 이을 유형이 없으면 «숨긴 옛 유형»으로 이름표만 되살린다 — 기록은 하나도 안 바꾼다.
+   ⚠ 잇기는 유형 표시만 바꾼다 — 관리번호는 그대로 둔다(종료된 건의 번호를 바꿀 까닭이 없다).
+   ⚠ 짝 표에 없는 것을 이름이 비슷하다고 잇지 않는다 — 사업이 다르면 절대 합치지 않는다. */
+var BIZ_TYPE_ORPHAN_ALIAS = {
+  /* 대표 확인 2026-10-07 — 옛 약어·이름 → 지금 유형의 약어 */
+  case: { '임금등체':'임금체불', '체당':'대지급금', '체당금':'대지급금' }
+};
+function bizTypeSeedOf(kind){
+  /* ⚠ typeof 로 본다 — 검사가 이 함수만 떼어 상자에서 돌릴 때 씨앗표가 없다 */
+  if(kind === 'company') return typeof COMPANY_TYPE_SEED !== 'undefined' ? COMPANY_TYPE_SEED : [];
+  if(kind === 'case') return typeof BIZ_CASE_SEED !== 'undefined' ? BIZ_CASE_SEED : [];
+  if(kind === 'consulting') return typeof BIZ_CONS_SEED !== 'undefined' ? BIZ_CONS_SEED : [];
+  if(kind === 'fund') return typeof BIZ_FUND_SEED !== 'undefined' ? BIZ_FUND_SEED : [];
+  if(kind === 'other') return typeof BIZ_OTHER_SEED !== 'undefined' ? BIZ_OTHER_SEED : [];
+  return [];
+}
+function bizTypeOrphanPlan(get){
+  get = get || dbGet;
+  var out = [];
+  Object.keys(BIZ_TYPE_MERGE_MAP).forEach(function(kind){
+    var m = BIZ_TYPE_MERGE_MAP[kind];
+    var types = get(m.types, []) || [];
+    if(!Array.isArray(types)) types = Object.keys(types).map(function(k){ return types[k]; });
+    types = types.filter(Boolean);
+    var known = {}; types.forEach(function(t){ known[t.code] = t; });
+    var live = types.filter(function(t){ return !t.mergedInto; });
+    var recs = get(m.store, []) || [];
+    var refs = {};      // 고아 번호 → [{store,id,label,prefix,evidence}]
+    function add(code, ref){ (refs[code] = refs[code] || []).push(ref); }
+    recs.forEach(function(r){
+      if(!r || !r.id) return;
+      var c = bizTypeCodeOf(r, kind); if(!c || known[c]) return;
+      var mm = m.noKey ? BIZ_NO_RE.exec(String(r[m.noKey] || '')) : null;
+      add(c, { store:m.store, id:r.id, label:String((m.noKey && r[m.noKey]) || r.companyName || r.id), prefix: mm ? mm[1] : '' });
+    });
+    (get('contracts', []) || []).forEach(function(ct){
+      if(!ct || !ct.id) return;
+      var tc = ct.typeCodes && ct.typeCodes[kind];
+      var kinds = ct.kinds || (ct.kind ? [ct.kind] : []);
+      var c = tc || (kinds.indexOf(kind) >= 0 ? ct.typeCode : '');
+      if(!c || known[c]) return;
+      /* 근거 ① — 이 계약이 이관되어 생긴 기록이 지금 쓰는 유형 */
+      var mod = recs.find(function(x){ return x && (x.sourceContractId === ct.id || (ct.contractNo && x.sourceContractNo === ct.contractNo)); });
+      var mc = mod ? bizTypeCodeOf(mod, kind) : '';
+      add(c, { store:'contracts', id:ct.id, label:String(ct.contractNo || ct.id), prefix:'', evidence: (mc && known[mc] && !known[mc].mergedInto) ? mc : '' });
+    });
+    var seed = bizTypeSeedOf(kind) || [];
+    var alias = BIZ_TYPE_ORPHAN_ALIAS[kind] || {};
+    Object.keys(refs).forEach(function(code){
+      var list = refs[code];
+      /* 옛 이름의 단서 — 기록 번호 머리(가장 많은 것) · 씨앗표 */
+      var cnt = {}; list.forEach(function(x){ if(x.prefix) cnt[x.prefix] = (cnt[x.prefix] || 0) + 1; });
+      var prefix = Object.keys(cnt).sort(function(a, b){ return cnt[b] - cnt[a]; })[0] || '';
+      var sd = seed.find(function(s){ return s && s.code === code; }) || null;
+      var oldShort = prefix || (sd && sd.short) || '';
+      var oldName = (sd && sd.name) || (prefix ? prefix + ' (옛 유형)' : '(이름 모르는 옛 유형)');
+      /* ② 지금 유형 — 대표가 확인한 짝, 또는 같은 약어 */
+      var aliased = alias[oldShort] || (sd && (alias[sd.short] || alias[sd.name])) || '';
+      var want = aliased || oldShort;
+      var same = want ? live.find(function(t){ return bizTypeNorm(t.short) === bizTypeNorm(want); }) : null;
+      list.forEach(function(x){
+        if(x.evidence) out.push({ kind:kind, code:code, ref:x, action:'link', to:x.evidence, why:'이관된 기록이 쓰는 유형' });
+        else if(same) out.push({ kind:kind, code:code, ref:x, action:'link', to:same.code,
+          why: aliased ? '대표 확인 짝(' + oldShort + ' → ' + same.short + ')' : '같은 약어(' + same.short + ')' });
+        else out.push({ kind:kind, code:code, ref:x, action:'restore',
+          entry:{ code:code, short:(oldShort || '옛유형').slice(0, 4), name:oldName }, why:'이을 유형이 없음' });
+      });
+    });
+  });
+  return out;
+}
+/* 계획대로 — 잇기는 한 건씩 dbPatch(유형 표시만), 되살리기는 사전에 숨긴 항목을 더한다(기록은 안 바꾼다) */
+function bizTypeOrphanRun(plan, who){
+  var done = 0, failed = null, restore = {};
+  for(var i = 0; i < plan.length; i++){
+    var p = plan[i];
+    if(p.action === 'restore'){ (restore[p.kind] = restore[p.kind] || {})[p.code] = p.entry; done++; continue; }
+    var r = (dbGet(p.ref.store, []) || []).find(function(x){ return x && x.id === p.ref.id; });
+    if(!r){ failed = { ref:p.ref, why:'기록을 못 찾음' }; break; }
+    var f = {};
+    if(r.typeCodes && typeof r.typeCodes === 'object'){ var tc = Object.assign({}, r.typeCodes); tc[p.kind] = p.to; f.typeCodes = tc; }
+    if(r.typeCode === p.code || !r.typeCodes) f.typeCode = p.to;
+    if(!dbPatch(p.ref.store, r.id, f)){ failed = { ref:p.ref, why:'저장 실패' }; break; }
+    done++;
+  }
+  Object.keys(restore).forEach(function(kind){
+    var m = BIZ_TYPE_MERGE_MAP[kind];
+    bizTypeApply(m.types, [], function(cur){
+      var have = {}; cur.forEach(function(t){ have[t.code] = 1; });
+      var top = cur.length ? Math.max.apply(null, cur.map(function(x){ return x.sortOrder || 0; })) : 0;
+      var add = Object.keys(restore[kind]).filter(function(c){ return !have[c]; }).map(function(c, j){
+        return bizTypeHist(Object.assign({}, restore[kind][c], { hidden:true, oldType:true, sortOrder: top + (j + 1) * 10 }), '옛 유형 이름표 되살림', null, who);
+      });
+      return cur.concat(add);
+    });
+  });
+  return { done:done, failed:failed };
+}
 function bizTypeLastHist(x){
   var h = x && x.hist && x.hist[x.hist.length - 1];
   if(!h) return '';
@@ -38268,6 +38370,9 @@ function BizMasters(){
   var dg = useState(null); var diag = dg[0]; var setDiag = dg[1];
   var mgS = useState(false); var mergeOpen = mgS[0]; var setMergeOpen = mgS[1];
   var rkS = useState(0); var cardKey = rkS[0]; var setCardKey = rkS[1];
+  var opS = useState(null); var orphanPlan = opS[0]; var setOrphanPlan = opS[1];
+  /* ☐ 고르기 — 기본은 전부 골라 둔다. 푼 줄은 이번에 안 한다(목록 맨 왼쪽 ☐+번호 규칙) */
+  var ooS = useState({}); var orphanOff = ooS[0]; var setOrphanOff = ooS[1];
   // 안내는 한 번 읽으면 그만이라 접어 둔다 — 유형 목록이 화면 위로 올라온다
   var hlp = useState(false); var helpOpen = hlp[0]; var setHelpOpen = hlp[1];
   // ── 유형 정합성 진단: 데이터에 박힌 유형코드 중 현재 목록에 없는 것(미설정) 찾기 ──
@@ -38299,25 +38404,42 @@ function BizMasters(){
       if(list.length) result.push({ kv:K.kv, label:K.label, store:K.store, orphans:list, validTypes:getKindTypes(K.kv, true) });
     });
     setDiag(result);
+    try { setOrphanPlan(bizTypeOrphanPlan()); } catch(e){ setOrphanPlan([]); if(window._erpErrLog) window._erpErrLog(e); }
+    setOrphanOff({});
   }
   // 미설정 일괄 복구: 특정 store에서 oldCode를 쓰는 데이터의 typeCodes[kv]를 newCode로 교체
   function fixOrphan(store, kv, oldCode, newCode){
     if(!newCode) return;
     var recs = dbGet(store, []) || [];
     var n = 0;
-    var next = recs.map(function(r){
+    /* ⚠ 한 건씩 고친다(dbPatch) — 예전엔 표를 통째로 저장(dbSet)해 낡은 사본 PC 가 남의 줄을 지울 수 있었다 (2026-10-07) */
+    var fail = 0;
+    recs.forEach(function(r){
+      if(!r || !r.id) return;
       var code = (r.typeCodes && r.typeCodes[kv]) || r.typeCode || '';
-      if(code !== oldCode) return r;
-      n++;
-      var nr = Object.assign({}, r);
-      nr.typeCodes = Object.assign({}, nr.typeCodes || {});
-      nr.typeCodes[kv] = newCode;
-      if(nr.typeCode === oldCode) nr.typeCode = newCode;
-      return nr;
+      if(code !== oldCode) return;
+      var f = {};
+      if(r.typeCodes && typeof r.typeCodes === 'object'){ var tc = Object.assign({}, r.typeCodes); tc[kv] = newCode; f.typeCodes = tc; }
+      if(r.typeCode === oldCode || !r.typeCodes) f.typeCode = newCode;
+      if(dbPatch(store, r.id, f)) n++; else fail++;
     });
-    try { console.log('[유형복구 백업] '+store, JSON.stringify(recs)); } catch(_){}
-    dbSet(store, next);
-    showToast('✅ '+n+'건 복구됨 ('+oldCode+' → '+newCode+')');
+    showToast('✅ '+n+'건 복구됨 ('+oldCode+' → '+newCode+')' + (fail ? ' · ⚠ '+fail+'건 실패' : ''));
+    runTypeDiag();
+  }
+  /* 🧹 추천대로 정리 (4단계, 대표 2026-10-07) — 계약까지 훑어 «잇기 / 옛 유형 이름표» 계획을 세운다 */
+  async function runOrphanTidy(){
+    var plan = (orphanPlan || []).filter(function(p, i){ return !orphanOff[i]; });
+    if(!plan.length){ showToast('고른 줄이 없습니다'); return; }
+    var nLink = plan.filter(function(p){ return p.action === 'link'; }).length;
+    var nRest = plan.length - nLink;
+    var ok = await showConfirm('사전에 없는 유형을 쓰는 기록 ' + plan.length + '건을 정리합니다.\n\n'
+      + '· 지금 유형으로 잇기 ' + nLink + '건 — 유형 표시만 바꿉니다(관리번호는 그대로)\n'
+      + '· 숨긴 옛 유형으로 이름표만 되살리기 ' + nRest + '건 — 기록은 안 바꿉니다', { title:'🧹 추천대로 정리', confirmText:'정리하기', danger:false });
+    if(!ok) return;
+    var who = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER && (CURRENT_USER.name || CURRENT_USER.sid)) || '';
+    var r = bizTypeOrphanRun(plan, who);
+    showToast(r.failed ? '⚠ ' + r.done + '건까지 하고 멈췄습니다(' + r.failed.why + ') — 다시 누르면 남은 것만' : '🧹 ' + r.done + '건 정리했습니다', 7000);
+    setCardKey(function(n){ return n + 1; });
     runTypeDiag();
   }
   return h('div', { className:'env-section', style:{ maxWidth:'100%' } },
@@ -38375,6 +38497,34 @@ function BizMasters(){
     ),
     mergeOpen && h(TypeMergeModal, { onClose:function(){ setMergeOpen(false); },
       onDone:function(){ setCardKey(function(n){ return n + 1; }); } }),
+    /* 🧹 추천대로 정리 — 계약까지 훑은 계획. 줄마다 무엇을 할지 보여 주고, 단추 한 번에 한다(목록 맨 왼쪽은 번호) */
+    orphanPlan && orphanPlan.length ? h('div', { style:{ marginTop:'8px', padding:'8px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px' } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' } },
+        h('input', { type:'checkbox', 'aria-label':'보이는 줄 전부 고르기',
+          checked: orphanPlan.every(function(p, i){ return !orphanOff[i]; }),
+          onChange:function(e){ var off = {}; if(!e.target.checked) orphanPlan.forEach(function(p, i){ off[i] = true; }); setOrphanOff(off); },
+          style:{ width:'16px', height:'16px', margin:'0 3px', flexShrink:0, cursor:'pointer' } }),
+        h('span', { style:{ fontWeight:700, fontSize:'12px', color:'#1e40af' } }, '🧹 추천대로 정리 — '
+          + orphanPlan.filter(function(p, i){ return !orphanOff[i]; }).length + ' / ' + orphanPlan.length + '건 선택 (계약 포함)'),
+        h('div', { style:{ flex:1 } }),
+        h('button', { onClick:runOrphanTidy,
+          style:{ background:'#1e40af', color:'#fff', border:'none', padding:'4px 12px', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, cursor:'pointer', whiteSpace:'nowrap' } }, '정리하기')),
+      orphanPlan.map(function(p, i){
+        var cat = BIZ_CATS.find(function(c){ return c.key === p.kind; }) || { title:p.kind };
+        var toT = p.action === 'link' ? (bizTypeRead(cat.storageKey, cat.seed).find(function(t){ return t.code === p.to; }) || {}) : null;
+        return h('div', { key:p.ref.store + p.ref.id + i, style:{ display:'flex', alignItems:'center', gap:'8px', padding:'3px 6px', background:'#fff', borderRadius:'4px', marginBottom:'3px', fontSize:'11px', whiteSpace:'nowrap' } },
+          h('input', { type:'checkbox', checked:!orphanOff[i], 'aria-label':(i + 1) + '번 고르기',
+            onChange:function(e){ var off = Object.assign({}, orphanOff); if(e.target.checked) delete off[i]; else off[i] = true; setOrphanOff(off); },
+            style:{ width:'16px', height:'16px', margin:'0 3px', flexShrink:0, cursor:'pointer' } }),
+          h('span', { style:{ width:'22px', color:'#94a3b8', textAlign:'right', fontVariantNumeric:'tabular-nums', flexShrink:0 } }, String(i + 1)),
+          h('span', { style:{ color:'#64748b', flexShrink:0 } }, cat.title),
+          h('span', { style:{ fontFamily:'monospace', fontWeight:700, color:'#1e293b' } }, p.ref.label),
+          h('span', { style:{ color:'#94a3b8' } }, '→'),
+          p.action === 'link'
+            ? h('span', { style:{ color:'#166534', fontWeight:700 } }, '잇기: [' + (toT.short || '') + '] ' + (toT.name || p.to))
+            : h('span', { style:{ color:'#854d0e', fontWeight:700 } }, '옛 유형 이름표: [' + p.entry.short + '] ' + p.entry.name),
+          h('span', { style:{ color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 } }, '· ' + p.why));
+      })) : null,
     h('div', { style:{ marginBottom:'8px' } },
       diag !== null ? (
         diag.length === 0
