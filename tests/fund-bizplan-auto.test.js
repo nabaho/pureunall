@@ -50,7 +50,7 @@ const API = (() => {
     'var S={fundId:"X",year:2026}; var funds={};',
     grabDecl('BIZ_SPLIT'), 'var BIZ_RATE_DEFAULT=2.0;',
     grabFn('estabSites'), grabFn('estabLiveSites'), grabFn('siteContribOf'), grabFn('foundContribOf'), grabFn('foundContrib'), grabFn('foundContribLive'),
-    grabFn('useRate'), grabFn('bizRate'), grabFn('autoBudget'), grabFn('isSetupFund'),
+    grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('bizRate'), grabFn('autoBudget'), grabFn('isSetupFund'),
     'this.useRate=useRate; this.bizRate=bizRate; this.auto=autoBudget; this.setup=isSetupFund;',
   ].join('\n')).call(box);
   return box;
@@ -209,4 +209,23 @@ test('ⓘ 가 법정 한도 셋을 다 말한다 — 사내 대표가 자기 숫
   ['90%', '50%', '80%', '중소기업'].forEach((w) => {
     assert.ok(help.indexOf(w) >= 0, 'ⓘ 에 ' + w + ' 가 없다');
   });
+});
+
+/* ══════════ ③ 「수익금만 쓰기」 (2026-10-05 목업 승인 · 2026-10-07 구현) ══════════
+   실무매뉴얼 예시처럼 출연금을 모두 기본재산으로 두고 이자만 쓴다 — 사업계획서 셈에만. */
+test('★★ 수익금만 쓰기 — 출연금 1억은 모두 기본재산, 쓸 돈은 그해 이자 200만(목적 90·관리 5·예비 5)', () => {
+  const b = API.auto({ fund_type: '공동', budget_mode: 'income' }, SITES);
+  assert.equal(b._basic, 100000000);
+  assert.equal(b.rev_interest, 2000000);
+  assert.equal(b._use, 2000000, '쓸 돈 = 이자');
+  assert.deepEqual([b.exp_purpose, b.exp_admin, b.exp_etc], [1800000, 100000, 100000]);
+  assert.equal(b.exp_purpose + b.exp_admin + b.exp_etc, b.rev_interest, '쓰는 돈이 수익금을 넘지 않는다 — 준비금2 환입이 필요 없다');
+  assert.equal(b._income, true);
+});
+test('★ 수익금만 쓰기는 사업계획서 셈에만 — useRate(결산 준비금·회의록)는 그대로', () => {
+  assert.equal(API.useRate({ fund_type: '공동', budget_mode: 'income' }), 0.9, 'useRate 를 바꾸면 결산 준비금2 설정이 0 이 되어 결손');
+  assert.match(grabFn('bizplanBS'), /var setup=Math\.round\(contrib\*bizUseRate\(f\)\)/, '추정재무상태표는 계획 셈을 따른다');
+  assert.doesNotMatch(grabFn('_reserveRate'), /bizUseRate/, '결산 준비금은 계획 셈을 따르지 않는다');
+  assert.match(SRC, /onchange="budgetModeSet\(this\.value\)"/, '예산 화면에서 고른다');
+  assert.match(SRC, /'budget\.mode':\{/, '설명은 ⓘ');
 });

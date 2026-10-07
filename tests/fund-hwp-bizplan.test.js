@@ -21,7 +21,7 @@ const V = (() => {
     'var _BUDGET={}; function _hasBudget(fid,yr){ return !!_BUDGET[fid]; } function budgetOf(fid){ return _BUDGET[fid]; }',
     gV('_K'), gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'), gV('BIZ_BS_ROWS'), gV('BIZ_TPL_ROWS'), gV('BIZ_TPL_BS'),
     gV('_KOR_D'), gV('_KOR_P'), gV('_KOR_U'), gF('korWon'),
-    gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'), gF('isSetupFund'), gF('_bizFinZero'), gF('_bizFinOf'),
+    gF('useRate'), gF('bizIncomeOnly'), gF('bizUseRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'), gF('isSetupFund'), gF('_bizFinZero'), gF('_bizFinOf'),
     gF('bizplanRows'), gF('bizplanBS'),
     gF('estabSites'), gF('estabLiveSites'), gF('siteContribOf'), gF('foundContribOf'), gF('foundContrib'), gF('foundContribLive'),
     gV('BUD_GWAN'), gV('BUD_GWAN_KEY'), gF('_fnum'), gF('budItemAmt'), gF('budItemBasis'), gF('budItemsList'),

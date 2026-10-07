@@ -28,7 +28,7 @@ const B = (() => {
     'var S={fundId:"F1",year:2027}, funds={};',
     grabDecl('BUD_GWAN'), grabDecl('BUD_GWAN_KEY'), grabDecl('BUDGET_KEYS'), grabDecl('BIZ_SPLIT'), 'var BIZ_RATE_DEFAULT=2.0;',
     grabFn('num'), grabFn('_fnum'), grabFn('budItemAmt'), grabFn('budItemBasis'), grabFn('budItemsList'), grabFn('budItemSums'),
-    grabFn('budgetOf'), grabFn('_hasBudget'), grabFn('useRate'), grabFn('bizRate'),
+    grabFn('budgetOf'), grabFn('_hasBudget'), grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('bizRate'),
     'function foundContribLive(){ return 0; }', grabFn('autoBudget'), grabFn('planBudget'), grabFn('bizplanRows'), grabFn('bizplanBS'),
     'this.S=S; this.funds=funds; this.amt=budItemAmt; this.basis=budItemBasis; this.list=budItemsList; this.sums=budItemSums;',
     'this.budgetOf=budgetOf; this.rows=bizplanRows; this.bs=bizplanBS;',

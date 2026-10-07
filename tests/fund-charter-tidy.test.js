@@ -354,7 +354,7 @@ function boot() {
     gF('_dotDate'), gF('fillContribDoc'), gF('fillChecklistDoc'), gV('BUD_GWAN'), gV('BUD_GWAN_KEY'), gF('_fnum'), gF('budItemAmt'), gF('budItemsList'), gF('budItemSums'), gF('budgetOf'), gF('_hasBudget'),
     gF('_reserveRate'), gF('_bizFinOf'),
     gV('BIZ_SPLIT'), gS('BIZ_RATE_DEFAULT'),
-    gF('useRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
+    gF('useRate'), gF('bizIncomeOnly'), gF('bizUseRate'), gF('bizRate'), gF('autoBudget'), gF('planBudget'),
     gF('isSetupFund'), gF('_bizFinZero'), gF('fillBizplanHead'),
     gF('bizplanRows'), gF('bizplanBS'), gF('fillBizplanDoc'), gF('fillCommittee'),
     gV('_K'), gF('_siteWrep'), gF('_isCommittee'),

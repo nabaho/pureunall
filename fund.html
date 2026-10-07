@@ -7114,14 +7114,22 @@ function bizRate(f){
   var r=num((f||{}).interest_rate);
   return (r===''||r<0||r>20) ? BIZ_RATE_DEFAULT : r;
 }
+/* ★ 「수익금만 쓰기」 (2026-10-05 목업 승인 · 2026-10-07 구현) — 실무매뉴얼 부록3 예시처럼 출연금을 «모두» 기본재산으로 두고
+   그 수익금(이자 등)만 목적사업에 쓰는 기금. 기금마다 고른다(funds/{기금}/budget_mode='income').
+   ⚠ 사업계획서 셈(autoBudget·bizplanBS)에만 쓴다. useRate 는 결산 준비금(_reserveRate)·회의록이 그대로 쓴다 —
+     여기서 useRate 를 바꾸면 결산의 준비금2 설정이 0 이 되어 결손이 난다(대표 지시 2026-10-06 「결손이 나면 안 된다」). */
+function bizIncomeOnly(f){ return !!(f&&f.budget_mode==='income'); }
+function bizUseRate(f){ return bizIncomeOnly(f)?0:useRate(f); }
 function autoBudget(f,sites){
   var c=Math.round(foundContribLive(f,sites)||0);
   if(c<=0) return null;                         // 출연금이 없으면 «지어내지 않는다»
-  var use=Math.round(c*useRate(f)), basic=c-use;
-  var pur=Math.round(use*BIZ_SPLIT.purpose), adm=Math.round(use*BIZ_SPLIT.admin);
-  return { rev_contrib:c, rev_interest:Math.round(basic*bizRate(f)/100),
-           exp_purpose:pur, exp_admin:adm, exp_etc:use-pur-adm,
-           _auto:true, _basic:basic, _use:use };
+  var use=Math.round(c*bizUseRate(f)), basic=c-use, interest=Math.round(basic*bizRate(f)/100);
+  /* 쓸 돈 — 사용한도 방식은 출연금의 정해진 몫, 수익금만 쓰기는 그 해 이자 */
+  var spend=bizIncomeOnly(f)?interest:use;
+  var pur=Math.round(spend*BIZ_SPLIT.purpose), adm=Math.round(spend*BIZ_SPLIT.admin);
+  return { rev_contrib:c, rev_interest:interest,
+           exp_purpose:pur, exp_admin:adm, exp_etc:spend-pur-adm,
+           _auto:true, _basic:basic, _use:spend, _income:bizIncomeOnly(f) };
 }
 /* 손으로 적은 예산이 «언제나» 이긴다 — 협의회가 정한 숫자를 짐작이 덮으면 안 된다 */
 function planBudget(f,sites,yr){
@@ -7206,7 +7214,7 @@ function bizplanBS(f,yr,fin,sites){
   var g=function(k){ return num(b[k])||0; };
   var contrib=g('rev_contrib'), fundRev=g('rev_interest')+g('rev_loanint'), etcRev=g('rev_etc');
   var pur=g('exp_purpose'), adm=g('exp_admin'), spare=g('exp_etc');
-  var setup=Math.round(contrib*useRate(f));               // 출연금의 정해진 몫을 준비금2로
+  var setup=Math.round(contrib*bizUseRate(f));            // 출연금의 정해진 몫을 준비금2로(수익금만 쓰기면 0 — 모두 기본재산)
   var need=pur+adm+spare-etcRev;                          // 준비금에서 메울 몫(손익예산 6.사업외수익)
   var in1=Math.max(0,Math.min(fundRev,need)), back2=need-in1;   // 손익예산과 같은 셈
   var cash=fin.cash+contrib+fundRev+etcRev-pur-adm-spare;
@@ -7856,7 +7864,7 @@ function fillDerived(root,f,sites,kind){
     ['ops_asset_change', _rx('기 본 재 산 목 록\\( '+W+' 현재\\)'), function(){ return '기 본 재 산 목 록('+todayDot+' 현재)'; }],
     ['ops_asset_change', _rx('주소: '+W), function(){ return f.address?'주소: '+f.address:''; }],
     /* 사업계획서 산출근거 — 이자는 «기본재산 × 요율»이라 적는 자리다 */
-    ['bizplan', _rx('예금이자 '+W+' \\*'), function(){ var b=Math.round(amt*(1-useRate(f)));
+    ['bizplan', _rx('예금이자 '+W+' \\*'), function(){ var b=Math.round(amt*(1-bizUseRate(f)));
       return b?('예금이자 '+b.toLocaleString()+' *'):''; }],
     /* ── 어느 서식에나 같은 꼴로 나오는 자리 ('*') ──
        날짜와 대표자 서명은 서식마다 열몇 곳에 흩어져 있다. 서식마다 규칙을 따로 쓰면
@@ -15726,7 +15734,8 @@ function budgetFromContrib(){
     if(!b){ toast('출연금이 비어 있습니다 — 참여사업장 약정액이나 [기금 정보]의 설립 출연금 총액을 먼저 넣으세요','warn'); return; }
     var pct=Math.round(useRate(f)*100);
     confirmM(yr+'년 예산을 출연금 '+won(b.rev_contrib)+'에서 세울까요?\n\n'
-      +'· 그해 쓸 몫 '+pct+'% = '+won(b._use)+'  (기본재산 '+won(b._basic)+')\n'
+      +(b._income?'· 수익금만 쓰기 — 출연금은 모두 기본재산('+won(b._basic)+'), 그해 이자 '+won(b._use)+'만 씁니다\n'
+        :'· 그해 쓸 몫 '+pct+'% = '+won(b._use)+'  (기본재산 '+won(b._basic)+')\n')
       +'· 목적사업비 '+won(b.exp_purpose)+'\n· 일반관리비 '+won(b.exp_admin)+'\n· 예비비 '+won(b.exp_etc)+'\n'
       +'· 이자수입 '+won(b.rev_interest)+' (기본재산 × '+bizRate(f)+'%)\n\n'
       +'이미 적어 둔 예산은 덮어씁니다.',{ok:'예산 칸에 넣기'}).then(function(ok){
@@ -15785,7 +15794,11 @@ function budgetView(arr){
   }).join('');
   var pDiff=(tot.rev.plan||0)-(tot.exp.plan||0), aDiff=(tot.rev.act||0)-(tot.exp.act||0);
   var noPlan=!BUDGET_ROWS.some(function(g){ return g[2].some(function(r){ return num(plan[r[0]]); }); });
+  var _f=funds[fid]||{}, _pct=Math.round(useRate(_f)*100);
   return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2 style="font-size:15px">'+yr+'년 예산·집행</h2>'+hlp('close.budget')
+    +'<select onchange="budgetModeSet(this.value)" title="사업계획서에서 출연금을 어떻게 쓰나 — 결산 준비금에는 영향 없음" style="padding:3px 6px;font-size:12px">'
+      +[['','출연금 '+_pct+'% 사용'],['income','수익금만 쓰기']].map(function(o){ return '<option value="'+o[0]+'"'+((bizIncomeOnly(_f)?'income':'')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')
+    +'</select>'+hlp('budget.mode')
     +'<span style="flex:1"></span>'
     +'<button onclick="budgetFromContrib()" class="primary" title="출연예정금 하나에서 다섯 칸을 세웁니다 — 그해 쓸 몫·목적사업비·관리비·예비비·이자수입">💰 출연금에서</button>'
     +'<button onclick="budgetFromWelfare()" title="목적사업 탭의 사업별 예산 합계를 목적사업비 예산으로 옮깁니다">📥 목적사업에서</button>'+hlp('bizplan.auto')+'</div>'
@@ -15889,6 +15902,14 @@ function budItemsSeed(){
         .catch(function(e){ toast('저장 실패: '+e.message,'err'); });
     });
   }).catch(function(e){ toast('읽지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 「수익금만 쓰기」 고르기 — 기금 한 곳의 사업계획서 셈 방식. 예산 칸·세부 항목은 그대로 둔다(다시 세우려면 [💰 출연금에서]) */
+function budgetModeSet(v){
+  var fid=S.fundId, val=v==='income'?'income':null;
+  fbDb.ref(NS+'/funds/'+fid+'/budget_mode').set(val).then(function(){
+    if(typeof _audit==='function') _audit(fid,'사업계획 셈 방식',val?'수익금만 쓰기':'출연금 사용한도');
+    toast(val?'수익금만 쓰기로 바꿨습니다 — 출연금은 모두 기본재산, 이자만 씁니다. 예산을 다시 세우려면 [💰 출연금에서]':'출연금 사용한도 방식으로 바꿨습니다');
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function closeSub(k){ S.closeSub=k; renderFund(); }
 function closeSubBar(){
@@ -20259,6 +20280,9 @@ var HELP={
    +'<p><b>이미 있는 사업장도 꺼 둡니다.</b> 사업자등록번호가 같거나 상호가 완전히 같으면 「이미 있음」으로 봅니다 — 같은 회사가 두 번 들어가면 출연금이 두 번 세어지고 서식에도 두 번 섭니다.</p>'
    +'<p>만들 때 <b>사업자등록증 원본도 사업장마다 이어</b> 「받음」으로 표시합니다(지원금 제출서류 칸).</p>'
    +'<p><b>출연 약정액은 안 들어옵니다</b> — 사업자등록증에 없는 값입니다. 만든 뒤 명부에서 넣어 주세요. 그 값이 설립 첫해 사업계획서까지 굴러갑니다.</p>'},
+ 'budget.mode':{t:'출연금 사용 방식 — 사업계획서 셈',h:'<p><b>출연금 N% 사용</b>(기본) — 그해 출연금의 사용한도(공동 90%, 사내 80%, 중소기업 아닌 사내 50%)를 준비금2로 옮겨 목적사업에 씁니다. 나머지는 기본재산.</p>'
+   +'<p><b>수익금만 쓰기</b> — 실무매뉴얼 예시처럼 출연금을 <b>모두 기본재산</b>으로 두고, 그 이자 등 수익금만 목적사업에 씁니다. 사업계획서의 손익예산·추정재무상태표·비용예산이 이 방식으로 셈해집니다.</p>'
+   +'<p>⚠ 이 선택은 <b>사업계획서에만</b> 적용됩니다. 결산의 준비금2 설정(출연금 × 사용한도)과 회의록 문구는 그대로입니다. 바꾼 뒤 [💰 출연금에서]·「출연금에서 기본 항목 세우기」를 다시 누르면 예산이 새 방식으로 세워집니다.</p>'},
  'budget.items':{t:'예산 세부 항목 — 인원 × 단가 × 횟수',h:'<p>실무매뉴얼의 사업계획서처럼 항목마다 <b>산식</b>을 넣으면 금액과 <b>산출근거</b>(「-40인×2회×300=24,000」)가 저절로 나옵니다. 단위는 서식과 같은 <b>천원</b>입니다.</p>'
    +'<p>항목이 있는 관(예금이자·대부이자·목적사업·관리비·예비비)은 위 예산 칸이 <b>항목 합</b>으로 바뀌고, 손익예산·추정재무상태표·비용예산·목적사업계획서·기금운영계획서가 모두 같은 숫자를 씁니다(맞물림 4곳). 줄마다 천원으로 반올림하므로 줄의 합과 총액이 어긋나지 않습니다.</p>'
    +'<p>예금이자는 원금 × 이율 × 달/12, 예비비는 금액만. 「출연금에서 기본 항목 세우기」는 출연금·목적사업 탭 예산으로 첫 줄들을 세웁니다 — 그다음 인원·단가·횟수로 고치세요. 수지차액이 음수면 그만큼 준비금2에서 환입합니다.</p>'},
