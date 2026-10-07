@@ -2201,6 +2201,7 @@ async function runPaydataMailOnce() {
     /* 갈린 것·공용에 남은 것을 따로 센다 — 「왜 아무도 안 받나」를 로그만 보고 알아야 한다. */
     let routed = 0, shared = 0;
     let filed = 0;     // 그중 확인 대기를 건너뛰고 바로 서랍으로 간 것 (2026-10-03)
+    let consult = 0;   // 컨설팅 메일이라 안 담은 것 (2026-10-07)
     const whys = {};
     /* ⚠ 돌려줄 셈은 **try 밖에** 둔다. 예전에는 try 안에서 만든 boxes·inbox 를
        try 를 나온 뒤 return 에서 썼다 — 담기가 다 끝난 회차마다 반드시
@@ -2383,6 +2384,19 @@ async function runPaydataMailOnce() {
         }
 
         const atts = Array.isArray(parsed.attachments) ? parsed.attachments : [];
+        /* 컨설팅 메일은 담지 않는다(대표 결정 2026-10-07) — 업체관리에 없는 주소 +
+           제목·첨부 이름의 컨설팅 말, 둘 다일 때만. 판정은 MR.consultMail 한 곳.
+           ⚠ 목록에는 남긴다 — 「왜 안 들어왔나」를 화면에서 볼 수 있어야 한다. */
+        if (MR.consultMail({ from: sender, subject: subject, box: item.box,
+          filenames: atts.map(function (a) { return (a && a.filename) || ""; }) },
+        payMailKnownCache.index, payMailKnownCache.owners)) {
+          consult++;
+          if (mkey) {
+            logRows.push(logRowOf(mkey, parsed, item, fromText || sender, subject,
+              { why: '컨설팅 메일이라 급여데이터함에 담지 않았습니다' }));
+          }
+          continue;   // 처리한 것으로 적어 둔다(위에서 newlyDone 에 넣었다)
+        }
         let tookHere = 0;              // 이 메일에서 담은 첨부 수
         /* 푸른 메일 「받은 메일」 목록에 적을 것 — 이 메일이 누구 칸으로 갔고
            안 갔으면 왜 안 갔는지. 목록의 핵심 칸이다. */
@@ -2451,13 +2465,15 @@ async function runPaydataMailOnce() {
       scanned.looked = inbox.length;
       scanned.took = took; scanned.skipped = skipped; scanned.unknown = unknown;
       scanned.routed = routed; scanned.shared = shared; scanned.filed = filed;
+      scanned.consult = consult;
       console.log("receivePaydataMail",
-        { boxes: boxes, looked: inbox.length, took, skipped, unknown, routed, shared, filed, whys });
+        { boxes: boxes, looked: inbox.length, took, skipped, unknown, routed, shared, filed, consult, whys });
       /* 앱이 「마지막에 언제·어느 폴더를 봤나」를 보여 줄 수 있게 적어 둔다 —
          이것이 없으면 자료가 안 들어올 때 사람이 확인할 데가 로그뿐이다. */
       await db.ref(PAYDATA_ROOT + "/mailconf/lastScan").set({
         at: Date.now(), boxes: boxes, looked: inbox.length,
-        took: took, routed: routed, shared: shared, unknown: unknown, filed: filed
+        took: took, routed: routed, shared: shared, unknown: unknown, filed: filed,
+        consult: consult
       }).catch(function () { /* 적지 못해도 받는 일은 이미 끝났다 */ });
     } catch (e) {
       console.error("receivePaydataMail 실패:", String((e && e.message) || e));
