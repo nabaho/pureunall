@@ -200,7 +200,7 @@
 <script src="js/pu-office-store.js?v=6"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=9"></script>
+<script src="js/pu-office-docs.js?v=10"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -342,6 +342,7 @@ function officeHost() {
     cards: formCards(),  /* 엑셀 명단 가져오기 — 이알피 업체·기업정보함과 맞춰 보기(읽기만) */
     download: downloadOriginal, attKey: PuContractForms.attKey, secretMove: secretMoveCall, sentFor: formSentFor, coLink: formCoLink, coMerge: formCoMerge,
     fileBytes: formFileBytes, mail: { mode: formMailMode, send: formMailSend, record: formMailRecord },
+    zip: formZip, hwpShow: formFileShow,   /* 원본 보관함 — 고른 것 묶어 받기·오른쪽 미리보기 (2026-10-07) */
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
@@ -645,6 +646,18 @@ function formHwpShow(host, bytes, name) {
   var wb = XLSX.read(bytes, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
   var note = document.createElement('div'); note.style.cssText = 'font-size:12px;color:#64748b;margin-bottom:8px';
   note.textContent = '「' + wb.SheetNames[0] + '」에 채운 값입니다. 서식 시트(' + wb.SheetNames.slice(1).join(', ') + ')는 엑셀로 열면 이 값으로 채워집니다.';
+  var box = document.createElement('div'); box.style.cssText = 'background:#fff;overflow:auto;font-size:12px';
+  box.innerHTML = XLSX.utils.sheet_to_html(ws, { editable: false });
+  host.appendChild(note); host.appendChild(box);
+  return Promise.resolve();
+}
+/* 원본 보관함 오른쪽 미리보기 — 한글은 문서 엔진, 엑셀은 첫 시트(시트 이름을 알려 준다). 채우기 화면 안내 글은 쓰지 않는다 */
+function formFileShow(host, bytes, name) {
+  if (!formIsXlsx(name)) return PureunHwp.renderPreview(host, bytes, name);
+  if (!window.XLSX) { host.textContent = '엑셀 미리보기 도구를 불러오지 못했습니다 — 내려받아 엑셀로 여세요'; return Promise.resolve(); }
+  var wb = XLSX.read(bytes, { type: 'array' }), ws = wb.Sheets[wb.SheetNames[0]];
+  var note = document.createElement('div'); note.style.cssText = 'font-size:12px;color:#64748b;margin-bottom:8px';
+  note.textContent = wb.SheetNames.length > 1 ? '시트 ' + wb.SheetNames.length + '개 — 첫 시트 「' + wb.SheetNames[0] + '」를 보여 드립니다 (나머지: ' + wb.SheetNames.slice(1).join(', ') + ')' : '시트 「' + wb.SheetNames[0] + '」';
   var box = document.createElement('div'); box.style.cssText = 'background:#fff;overflow:auto;font-size:12px';
   box.innerHTML = XLSX.utils.sheet_to_html(ws, { editable: false });
   host.appendChild(note); host.appendChild(box);
