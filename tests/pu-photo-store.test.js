@@ -2113,11 +2113,33 @@ test('★ 주인 기기에서 몇 장씩 — 내 것·옛 자리 것만, 정한 
   const r = await S.healToStorage(rows, 2);
   assert.equal(r.tried, 2, '정한 장수보다 많이 옮기면 사진첩 여는 것이 느려집니다');
   assert.equal(r.moved, 2);
-  assert.ok(!st.calls.some(c => c[0] === 'putString' && c[1].indexOf('/U2/') >= 0), '★ 남의 사진을 옮기려 했습니다(규칙상 못 쓴다)');
+  assert.deepEqual(Array.from(r.ids), ['a', 'b'], '화면이 고칠 «옮겨진 장» 목록이 틀렸습니다');
+  assert.ok(!st.calls.some(c => c[0] === 'putString' && /\/x\.jpg$/.test(c[1])), '★ 남의 사진을 옮기려 했습니다(규칙상 못 쓴다)');
+  assert.equal(it.x, undefined, '★ 남의 사진 번호로 내 자리에 유령 정보를 만들었습니다');
   assert.ok(!st.calls.some(c => c[0] === 'putString' && c[1].indexOf('/s.jpg') >= 0), '이미 창고에 있는 사진을 또 올렸습니다');
   assert.equal(it.a.loc, 'storage');
   assert.equal(db.tree.puphotos.u.U1.blobs[NOW_YEAR].a, undefined, '옮긴 뒤 옛 본문을 안 지웠습니다');
   assert.equal(db.tree.puphotos.u.U1.blobs[NOW_YEAR].c, 'data:full-c', '정한 장수 밖의 사진까지 건드렸습니다');
+});
+
+test('★ 못 옮긴 장은 «옮겨진 장» 목록에 안 든다 — 화면이 그 장을 창고로 착각하지 않게', async () => {
+  const S = loadStore(webShims());
+  const base = fakeStorage({});
+  const st = { calls: base.calls, ref(p) {
+    const r = base.ref(p);
+    if (!/\/n\.jpg$/.test(p)) return r;
+    return Object.assign({}, r, { putString() { return Promise.reject(new Error('막힘')); } });
+  } };
+  const db = mutableDb(legacyTree({ a: { takenAt: 1 }, n: { takenAt: 1 } }));
+  S.init({ uid: 'U1', db, storage: st });
+  const it = db.tree.puphotos.u.U1.items[NOW_YEAR];
+  const r = await S.healToStorage([
+    { id: 'n', year: NOW_YEAR, meta: it.n, owner: 'U1' },
+    { id: 'a', year: NOW_YEAR, meta: it.a, owner: 'U1' }
+  ]);
+  assert.equal(r.failed, 1);
+  assert.deepEqual(Array.from(r.ids), ['a']);
+  assert.equal(db.tree.puphotos.u.U1.blobs[NOW_YEAR].n, 'data:full-n', '★ 못 올린 사진의 본문을 지웠습니다 — 사진을 잃습니다');
 });
 
 test('옛 자리 되돌리기 — 창고 방식이 아니거나 창고가 없으면 아무것도 안 한다', async () => {

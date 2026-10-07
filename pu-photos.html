@@ -23,7 +23,7 @@
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=33"></script>
+<script src="js/pu-photo-store.js?v=34"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
@@ -2453,8 +2453,8 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
               (옛 자리(2026-08-03 전) 사람별 분리 도구는 이사가 끝나 2026-08-15 지웠다) -->
          <div class="card" id="mig" style="display:none">
            <div class="row" style="border:none"><span>옛 사진 창고로 옮기기</span></div>
-           <p class="mignote">2026-08-13 이전에 올라온 사진을 파일 창고로 옮깁니다.
-             <b>이사는 이미 끝났습니다</b> — 옛 사진이 다시 나타났을 때만 쓰십시오.
+           <p class="mignote">실시간DB에 남은 사진(옛 사진·창고가 막혀 물러난 사진)을 파일 창고로 옮깁니다.
+             <b>보통은 누를 일이 없습니다</b> — 사진 주인이 사진첩을 열면 몇 장씩 저절로 옮겨집니다.
              한 번 옮기면 실시간DB에서는 지워집니다(창고에는 그대로 남습니다).</p>
            <button class="wide" onclick="runServerMigrate()">옛 사진 창고로 옮기기</button>
            <pre id="serverMigOut"></pre>
@@ -13739,23 +13739,30 @@ function govShareSweep() {
      그런데 물러난 사진을 다시 보내는 길이 없어 73장이 비싼 자리에 남아 있었다 —
      「⚙ 문제 해결 도구」의 옮기기는 관리자용인데, 창고 규칙상 관리자도 남의 창고 자리에는
      못 쓴다. 주인만 자기 것을 옮길 수 있다.
-   ⚠ «내 사진»만 — 남의 사진·받은 사진은 건드리지 않는다(photoOwner 로 가른다).
+   ⚠ «내 사진»만 — 남의 사진·받은 사진은 건드리지 않는다(isMinePhoto 로 가른다).
    ⚠ 조용히 한다 — 사람이 할 일이 없는 일이라 알림을 띄우지 않는다(콘솔에만 남긴다).
-   ⚠ 화면 정보는 안 고친다 — 한 판에 한 번만 돌고(_healSwept), 다음 판에는 서버에서 새로
-     읽어 «옮겨진 것»은 저절로 빠진다. 옮긴 장만 골라 고치려다 엉뚱한 장을 표시하는 것보다 낫다. */
+   ⚠ 화면 정보는 «실제로 옮겨진 장»(r.ids)만 고친다 — 한 판에 한 번만 돌고(_healSwept),
+     실패·건너뛴 장은 그대로 둔다. 다음 판에는 서버에서 새로 읽는다. */
 let _healSwept = false;
 function legacyHealSweep() {
   if (_healSwept || !PuPhotoStore.healToStorage) return;
   if (PuPhotoStore.getMode && PuPhotoStore.getMode() !== 'storage') return;
-  _healSwept = true;
   const me = PuPhotoStore.myUid();
   const rows = gridItems
     .filter(function (it) {
-      return it && it.meta && it.meta.loc !== 'storage' && photoOwner(it.id) === me;
+      /* ⚠ photoOwner 는 «내 자리»면 undefined 를 준다(저장 층이 나로 본다) — 그것과 견주면
+           내 사진이 하나도 안 걸린다. 판정은 isMinePhoto 한 곳이다. */
+      return it && it.meta && it.meta.loc !== 'storage' && isMinePhoto(it.id);
     })
     .map(function (it) { return { id: it.id, year: photoYearOf(it.id), meta: it.meta, owner: me }; });
+  /* 표시는 «옮길 것을 찾았을 때» 세운다 — 남의 사진을 보던 판에 세우면 내 판에서 못 돈다 */
   if (!rows.length) return;
+  _healSwept = true;
   PuPhotoStore.healToStorage(rows).then(function (r) {
+    const moved = new Set((r && r.ids) || []);
+    gridItems.forEach(function (it) {
+      if (it && moved.has(it.id)) it.meta = Object.assign({}, it.meta, { loc: 'storage' });
+    });
     console.info('[옛 자리 → 창고]', r);
   }).catch(function (e) { console.warn('[옛 자리 → 창고]', e && e.message); });
 }

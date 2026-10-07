@@ -2419,7 +2419,8 @@
      ⚠ 창고 방식이 아닐 때·로그인이 없을 때·남의 사진에는 아무것도 안 한다. */
   var HEAL_MAX = 5;
   function healToStorage(rows, limit) {
-    var out = { moved: 0, skipped: 0, failed: 0, tried: 0 };
+    /* ids = «실제로 옮겨진» 사진만 — 화면이 자기 목록의 loc 를 그 장들만 고친다 */
+    var out = { moved: 0, skipped: 0, failed: 0, tried: 0, ids: [] };
     if (!deps.db || !deps.storage || !deps.uid || mode !== 'storage') return Promise.resolve(out);
     var n = Math.max(1, Math.min(Number(limit) || HEAL_MAX, 20));
     var list = (rows || []).filter(function (r) {
@@ -2429,7 +2430,9 @@
     out.tried = list.length;
     return list.reduce(function (chain, r) {
       return chain.then(function () {
-        return migrateOneToStorage(deps.uid, String(r.year), r.id, r.meta || {}, out);
+        var before = out.moved;
+        return migrateOneToStorage(deps.uid, String(r.year), r.id, r.meta || {}, out)
+          .then(function () { if (out.moved > before) out.ids.push(r.id); });
       });
     }, Promise.resolve()).then(function () { return out; });
   }
