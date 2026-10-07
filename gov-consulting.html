@@ -2225,18 +2225,37 @@ function lsKeyValid(k){ return LS_VALID_KEYS.includes(k)||LS_VALID_PREFIXES.some
     });
   }catch(e){}
 })();
-function lsSet(key,value){
+/* ⚠ 이 저장 공간(약 5MB)은 «늘릴 수 없고», 같은 주소(nabaho.github.io)의 앱 «전부»가 나눠 쓴다.
+   2026-10-07 실측: 10MB(글자 5백만) 꽉 참 — 이 앱 몫은 0.2MB, 나머지는 이알피 계약서 양식 첨부·취업규칙 원본.
+   그래서 이 앱이 «오래된 데이터를 정리하라» 고 해도 사람이 할 수 있는 일이 없었다.
+   ① 자동백업(p_autobackups)은 이 PC 사본일 뿐이다(서버 백업이 따로 있다) — 자리가 없으면 «조용히» 줄인다(opt.quiet).
+   ② 진짜 자료를 못 쓰면 먼저 그 자동백업을 비워 자리를 만들고 다시 쓴다.
+   ③ 그래도 안 되면 알리되 «한 번만» — 매 저장마다 띄우면 아무도 안 읽는다. */
+let _lsFullTold=false;
+function lsSet(key,value,opt){
   try{localStorage.setItem(key,value);return true;}
   catch(e){
     // 용량 초과 시 잔재 제거 후 1회 재시도
     try{
       Object.keys(localStorage).forEach(k=>{if(k.startsWith('p_') && !lsKeyValid(k))localStorage.removeItem(k);});
       localStorage.setItem(key,value);return true;
-    }catch(e2){
-      console.warn('저장 용량 초과:',key);
-      if(typeof toast==='function')toast('저장 공간이 부족합니다. 오래된 데이터를 정리해주세요.','err');
-      return false;
+    }catch(e2){}
+    if(opt&&opt.quiet)return false;   // 자동백업 등 «없어도 되는» 것 — 부른 쪽이 줄여서 다시 시도한다
+    // 진짜 자료: 이 PC 자동백업을 비워 자리를 만든 뒤 다시
+    if(key!=='p_autobackups'){
+      try{
+        localStorage.removeItem('p_autobackups');
+        localStorage.setItem(key,value);
+        console.warn('저장 공간이 꽉 차 이 PC 자동백업을 비우고 저장:',key);
+        return true;
+      }catch(e3){}
     }
+    console.warn('저장 용량 초과:',key);
+    if(!_lsFullTold && typeof toast==='function'){
+      _lsFullTold=true;
+      toast('이 PC 브라우저 저장 공간이 가득 찼습니다 (대부분 다른 앱 자료) — 관리자에게 알려 주세요','err');
+    }
+    return false;
   }
 }
 
@@ -5511,7 +5530,7 @@ function takeSnapshot(label){
   list.unshift({t:new Date().toISOString(),label:label||'자동저장',data});
   let keep=autoKeepMax();
   while(keep>=1){
-    if(lsSet(AUTOBK_KEY,JSON.stringify(list.slice(0,keep))))return true;
+    if(lsSet(AUTOBK_KEY,JSON.stringify(list.slice(0,keep)),{quiet:true}))return true;
     keep=Math.floor(keep/2); // 용량 초과 시 보관 수를 줄여 재시도
   }
   return false;
