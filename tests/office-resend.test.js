@@ -70,5 +70,5 @@ test('ⓓ 화면 — 누르기 전엔 안 나감, 🔒 한 번 더, 18MB, 받는
   assert.match(f, /MAX = 18 \* 1024 \* 1024/);
   const rec = f.slice(f.indexOf('host.mail.record('), f.indexOf('host.mail.record(') + 260);
   assert.doesNotMatch(rec, /\bto\b/, '보낸 기록에 받는 주소를 넣지 않는다');
-  assert.match(docs, /host\.mail && S\.docs\.length \? el\('button'[^\n]*onclick: openResend/);
+  assert.match(docs, /host\.mail && S\.docs\.length \? el\('button'[^\n]*onclick: function \(\) \{ openResend\(S\.dpicked\); \}/, '표에서 고른 파일을 미리 체크해 연다');
 });
