@@ -1005,7 +1005,9 @@ db = firebase.database();
 try { store = firebase.storage(); } catch (e) { store = null; }
 
 firebase.auth().onAuthStateChanged(function (user) {
-  if (user) { App.me = user; afterLogin(); return; }
+  /* ★ 익명 손님(정부사업일정·전자서명이 스스로 거는 익명 로그인)은 «사람이 아니다» — 없음과 같게 보고 로그인 화면으로 보낸다.
+       예전엔 익명도 «로그인함»으로 쳐서 대표가 「총괄관리자만」 화면에 갇혔다(2026-10-07). */
+  if (user && !user.isAnonymous) { App.me = user; afterLogin(); return; }
   /* 로그인은 통합 포털 한 곳에서만 한다 — 앱마다 두면 계정 문제를 앱 수만큼 겪는다.
      ⚠★ 포털로 «튕기지» 않는다 (대표 지시 2026-09-14) — 자물쇠 화면을 보이고 누르게 한다 */
   PuGate.show();
