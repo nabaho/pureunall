@@ -183,6 +183,21 @@
     + '.pod th,.pod td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.pod th{background:#f8fafc;color:#475569;font-size:11.5px}'
     + '.pod td.gone{color:#b45309}'
+    /* 원본 보관함 — 틀 고정(머리는 그대로, 표만 스크롤·표 머리줄 고정)·☐·#·오른쪽 미리보기 (대표 2026-10-07) */
+    + '.pod-arc{display:flex;gap:12px;align-items:flex-start}'
+    + '.pod-arc-l{flex:1;min-width:0}'
+    + '.pod-arc-scroll{max-height:calc(100vh - 300px);min-height:240px;overflow:auto;border:1px solid #e5e7eb;border-radius:8px}'
+    + '.pod-arc-scroll thead th{position:sticky;top:0;z-index:1;box-shadow:0 1px 0 #e5e7eb}'
+    + '.pod-arc-scroll tbody tr{cursor:pointer}.pod-arc-scroll tbody tr:hover td{background:#f8fafc}'
+    + '.pod-arc-scroll tbody tr.on td{background:#dbeafe}'
+    + '.pod-arc-r{width:46%;flex:none;position:sticky;top:12px;border:1px solid #e5e7eb;border-radius:8px;background:#fff;display:flex;flex-direction:column;max-height:calc(100vh - 180px)}'
+    + '.pod-arc-rh{display:flex;gap:6px;align-items:center;padding:8px 10px;border-bottom:1px solid #e5e7eb}'
+    + '.pod-arc-rh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}'
+    + '.pod-arc-rb{flex:1;overflow:auto;padding:10px;background:#f8fafc;min-height:300px}'
+    + '.pod-arc-rb img{max-width:100%}.pod-arc-rb iframe{width:100%;height:calc(100vh - 260px);border:none;background:#fff}'
+    + '.pod-fil{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:12px;color:#475569}'
+    + '.pod-fil select{padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;background:#fff}'
+    + '@media(max-width:900px){.pod-arc{display:block}.pod-arc-r{width:auto;position:static;margin-top:12px;max-height:none}.pod-arc-scroll{max-height:60vh}}'
     + '.pod-empty{color:#94a3b8;text-align:center;padding:40px;border:1px dashed #e2e8f0;border-radius:8px}'
     + '.pod-co{display:flex;gap:12px;align-items:flex-start}'
     + '.pod-cl{width:220px;flex:none;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;background:#fff}'
@@ -240,7 +255,32 @@
         if (gone) link += ' — 양식 삭제됨 · 사본만 남음';
       } else if (fr.kind === 'co') link = '기업 · ' + (fr.coName || '');
       else if (fr.kind === 'photo') link = '기업 · ' + (fr.coName || '') + ' (사진첩)';
-      return { id: r.id, name: r.name, size: r.size, at: r.at, byName: r.byName || '', link: link, gone: gone, rec: r };
+      else if (fr.kind === 'folder') link = '기업 · ' + (fr.coName || '') + ' (PC 폴더)';
+      return { id: r.id, name: r.name, size: r.size, at: r.at, byName: r.byName || '', link: link, gone: gone, rec: r,
+        kind: fr.kind || '', type: fileType(r.name), secret: !!r.secret };
+    });
+  }
+  /* 파일 형식 — 걸러 보기·미리보기 갈래 */
+  function fileType(name) {
+    var n = String(name || '').toLowerCase();
+    if (/\.pdf$/.test(n)) return 'pdf';
+    if (/\.(hwp|hwpx)$/.test(n)) return 'hwp';
+    if (/\.(xlsx|xls|xlsm|csv)$/.test(n)) return 'xlsx';
+    if (/\.(jpe?g|png|gif|webp|heic|bmp)$/.test(n)) return 'img';
+    if (/\.(docx?|pptx?)$/.test(n)) return 'doc';
+    return 'etc';
+  }
+  var ARC_KINDS = [['form', '계약서 양식'], ['co', '기업별 계약서'], ['photo', '사진첩'], ['folder', 'PC 폴더']];
+  var ARC_TYPES = [['pdf', 'PDF'], ['hwp', '한글'], ['xlsx', '엑셀'], ['img', '그림'], ['doc', '워드·PPT'], ['etc', '그 밖']];
+  /* 원본 보관함 걸러 보기 — f: { q, kind, type, by } (빈 값 = 전체) */
+  function filterArchive(rows, f) {
+    f = f || {};
+    var q = String(f.q || '').trim().toLowerCase();
+    return (rows || []).filter(function (r) {
+      if (f.kind && r.kind !== f.kind) return false;
+      if (f.type && r.type !== f.type) return false;
+      if (f.by && r.byName !== f.by) return false;
+      return !q || (r.name + ' ' + r.link).toLowerCase().indexOf(q) >= 0;
     });
   }
   /* 양식 첨부 중 아직 보관함에 없는 것 (자료가 있는 것만) */
@@ -286,7 +326,7 @@
   function mountArchive(root, host) {
     css();
     var store = host.store;
-    var S = { rows: [], pend: [], q: '', loaded: false, err: null, denied: false, busy: false };
+    var S = { rows: [], pend: [], q: '', kind: '', type: '', by: '', picked: {}, sel: null, loaded: false, err: null, denied: false, busy: false };
 
     function load() {
       S.err = null;
@@ -295,6 +335,9 @@
         return Promise.all([store.listOriginals(), host.loadForms()]).then(function (r) {
           S.rows = archiveRows(r[0], r[1]);
           S.pend = pendingBackfill(r[1], host.attKey);
+          var ids = {}; S.rows.forEach(function (x) { ids[x.id] = 1; });
+          Object.keys(S.picked).forEach(function (k) { if (!ids[k]) delete S.picked[k]; });
+          if (S.sel && !ids[S.sel.id]) S.sel = null;
           S.loaded = true; draw();
         });
       }).catch(function (e) { S.err = msg(e); S.loaded = true; draw(); });
@@ -322,6 +365,68 @@
         });
       }, Promise.resolve()).then(finish, finish);
     }
+    /* 고른 것 묶어 받기 — 브라우저 안에서 .zip 하나로(🔒 서명본은 서버가 대표·관리자에게만 내준다) */
+    function zipPicked() {
+      var list = S.rows.filter(function (r) { return S.picked[r.id]; });
+      if (!list.length || S.busy || !host.fileBytes || !host.zip) return;
+      S.busy = true; draw();
+      var files = [], fail = 0, used = {};
+      list.reduce(function (p, r, i) {
+        return p.then(function () {
+          toast('파일 가져오는 중… (' + (i + 1) + '/' + list.length + ')');
+          return host.fileBytes(r.id).then(function (f) {
+            var nm = f.name || r.name, k = nm, n = 2;
+            while (used[k]) k = nm.replace(/(\.[^.]+)?$/, '(' + (n++) + ')$1');
+            used[k] = 1; files.push({ name: k, bytes: f.bytes });
+          }, function () { fail++; });
+        });
+      }, Promise.resolve()).then(function () {
+        if (!files.length) throw new Error('받은 파일이 없습니다');
+        return host.zip(files);
+      }).then(function (u8) {
+        saveBytes(u8, '원본보관함_' + ymd(Date.now()) + '_' + files.length + '개.zip', 'application/zip');
+        toast('📦 ' + files.length + '개를 묶었습니다' + (fail ? ' · ' + fail + '개는 못 받음(🔒 서명본은 대표·관리자만)' : ''));
+      }).catch(function (e) { toast('❌ 묶지 못했습니다 — ' + msg(e)); })
+        .then(function () { S.busy = false; draw(); });
+    }
+    function saveBytes(u8, name, type) {
+      var a = el('a', { href: w.URL.createObjectURL(new Blob([u8], { type: type || 'application/octet-stream' })), download: name });
+      w.document.body.appendChild(a); a.click();
+      setTimeout(function () { w.URL.revokeObjectURL(a.href); if (a.parentNode) a.parentNode.removeChild(a); }, 1500);
+    }
+    /* 오른쪽 미리보기 — PDF·그림은 그대로, 한글·엑셀은 문서 엔진(host.hwpShow) */
+    var prevUrl = null;
+    function drawPreview(box) {
+      if (prevUrl) { try { w.URL.revokeObjectURL(prevUrl); } catch (_) {} prevUrl = null; }
+      var r = S.sel; box.innerHTML = '';
+      if (!r) return;
+      var body = el('div', { 'class': 'pod-arc-rb' }, [el('div', { 'class': 'pod-empty', style: 'border:none', text: '여는 중…' })]);
+      box.appendChild(el('div', { 'class': 'pod-arc-rh' }, [el('b', { title: r.name, text: (r.secret ? '🔒 ' : '') + r.name }),
+        el('button', { type: 'button', 'class': 'pod-b', text: '📥 내려받기', onclick: function () { host.download(r.id, r.name); } }),
+        el('button', { type: 'button', 'class': 'pod-b', 'aria-label': '미리보기 닫기', text: '×', onclick: function () { S.sel = null; draw(); } })]));
+      if (r.link) box.appendChild(el('div', { style: 'padding:4px 10px 6px;font-size:11.5px;color:#64748b;border-bottom:1px solid #f1f5f9', text: '연결 · ' + r.link }));
+      box.appendChild(body);
+      if (r.type === 'doc' || r.type === 'etc') { body.innerHTML = ''; body.appendChild(el('div', { 'class': 'pod-empty', style: 'border:none', text: '이 형식은 미리보기가 없습니다 — 📥 내려받아 여세요' })); return; }
+      if (!host.fileBytes) { body.textContent = '미리보기 길이 연결되지 않았습니다'; return; }
+      var want = r;
+      host.fileBytes(r.id).then(function (f) {
+        if (S.sel !== want) return;
+        body.innerHTML = '';
+        if (r.type === 'pdf' || r.type === 'img') {
+          prevUrl = w.URL.createObjectURL(new Blob([f.bytes], { type: r.type === 'pdf' ? 'application/pdf' : (r.rec && r.rec.type) || 'image/jpeg' }));
+          body.appendChild(r.type === 'pdf' ? el('iframe', { src: prevUrl, title: r.name }) : el('img', { src: prevUrl, alt: r.name }));
+          return;
+        }
+        if (!host.hwpShow) { body.textContent = '한글·엑셀 미리보기 도구가 없습니다 — 내려받아 여세요'; return; }
+        var host2 = el('div', { style: 'background:#fff' });
+        body.appendChild(host2);
+        return host.hwpShow(host2, f.bytes, f.name || r.name);
+      }).catch(function (e) {
+        if (S.sel !== want) return;
+        body.innerHTML = '';
+        body.appendChild(el('div', { 'class': 'pod-empty', style: 'border:none;color:#991b1b', text: '열지 못했습니다 — ' + msg(e) }));
+      });
+    }
     function draw() {
       root.innerHTML = '';
       var wrap = el('div', { 'class': 'pod' });
@@ -338,28 +443,77 @@
           el('span', { style: 'flex:1', text: '계약서 양식에 붙어 있는 기존 첨부 ' + S.pend.length + '개가 아직 보관함에 없습니다.' }),
           el('button', { type: 'button', 'class': 'pod-b p', text: S.busy ? '담는 중…' : '보관함에 담기', onclick: backfill })]));
       }
-      var tableBox = el('div');
-      wrap.appendChild(tableBox);
+      /* 걸러 보기 — 연결 · 형식 · 올린 사람 */
+      function sel(label, val, opts, set) {
+        var se = el('select', { 'aria-label': label }, [el('option', { value: '', text: label + ' 전체' })].concat(opts.map(function (o) {
+          return el('option', { value: o[0], text: o[1] });
+        })));
+        se.value = val;
+        se.addEventListener('change', function () { set(se.value); drawTable(); });
+        return se;
+      }
+      var people = {};
+      S.rows.forEach(function (r) { if (r.byName) people[r.byName] = 1; });
+      var countEl = el('span', { style: 'margin-left:auto' });
+      var actBox = el('span', { style: 'display:inline-flex;gap:6px' });
+      wrap.appendChild(el('div', { 'class': 'pod-fil' }, [
+        sel('연결', S.kind, ARC_KINDS, function (v) { S.kind = v; }),
+        sel('형식', S.type, ARC_TYPES, function (v) { S.type = v; }),
+        sel('올린 사람', S.by, Object.keys(people).sort().map(function (n) { return [n, n]; }), function (v) { S.by = v; }),
+        actBox, countEl]));
+      var tableBox = el('div', { 'class': 'pod-arc-l' });
+      var prevBox = el('div', { 'class': 'pod-arc-r' });
+      if (!S.sel) prevBox.hidden = true;
+      wrap.appendChild(el('div', { 'class': 'pod-arc' }, [tableBox, prevBox]));
       root.appendChild(wrap);
+      function drawActs() {
+        actBox.innerHTML = '';
+        var n = Object.keys(S.picked).filter(function (k) { return S.picked[k]; }).length;
+        if (!n) return;
+        actBox.appendChild(el('button', { type: 'button', 'class': 'pod-b p', text: S.busy ? '묶는 중…' : '📦 선택 ' + n + '개 묶어 받기', onclick: zipPicked }));
+        actBox.appendChild(el('button', { type: 'button', 'class': 'pod-b', text: '선택 풀기', onclick: function () { S.picked = {}; drawTable(); } }));
+      }
       function drawTable() {
         tableBox.innerHTML = '';
-        var q = S.q.trim().toLowerCase();
-        var rows = S.rows.filter(function (r) { return !q || (r.name + ' ' + r.link).toLowerCase().indexOf(q) >= 0; });
+        var rows = filterArchive(S.rows, { q: S.q, kind: S.kind, type: S.type, by: S.by });
+        countEl.textContent = rows.length === S.rows.length ? S.rows.length + '개' : rows.length + '개 / 전체 ' + S.rows.length;
+        drawActs();
         if (!rows.length) { tableBox.appendChild(el('div', { 'class': 'pod-empty', text: S.rows.length ? '찾는 파일이 없습니다' : '아직 보관된 원본이 없습니다 — 계약서 양식이나 기업별 계약서에 파일을 올리면 여기 쌓입니다' })); return; }
-        tableBox.appendChild(el('table', null, [
-          el('thead', null, [el('tr', null, [el('th', { style: 'width:34%', text: '파일' }), el('th', { text: '연결' }),
-            el('th', { style: 'width:70px', text: '크기' }), el('th', { style: 'width:92px', text: '올린 날' }), el('th', { style: 'width:80px', text: '올린 사람' }), el('th', { style: 'width:64px', text: '' })])]),
-          el('tbody', null, rows.map(function (r) {
-            return el('tr', null, [
-              el('td', { title: r.name, text: '📄 ' + r.name }),
+        var all = el('input', { type: 'checkbox', 'aria-label': '보이는 것 모두 고르기', checked: rows.every(function (r) { return S.picked[r.id]; }) });
+        all.addEventListener('change', function () { rows.forEach(function (r) { S.picked[r.id] = all.checked; }); drawTable(); });
+        /* 미리보기가 열려 있으면 표가 좁아진다 — 칸을 줄이고 «연결»은 파일 이름 밑 작은 줄로 */
+        var compact = !!S.sel;
+        tableBox.appendChild(el('div', { 'class': 'pod-arc-scroll' }, [el('table', null, [
+          el('thead', null, [el('tr', null, compact
+            ? [el('th', { style: 'width:34px' }, [all]), el('th', { style: 'width:38px', text: '#' }), el('th', { text: '파일 · 연결' }),
+              el('th', { style: 'width:88px', text: '올린 날' }), el('th', { style: 'width:52px', text: '' })]
+            : [el('th', { style: 'width:34px' }, [all]), el('th', { style: 'width:42px', text: '#' }),
+              el('th', { style: 'width:34%', text: '파일' }), el('th', { text: '연결' }),
+              el('th', { style: 'width:70px', text: '크기' }), el('th', { style: 'width:92px', text: '올린 날' }), el('th', { style: 'width:80px', text: '올린 사람' }), el('th', { style: 'width:52px', text: '' })])]),
+          el('tbody', null, rows.map(function (r, i) {
+            var cb = el('input', { type: 'checkbox', 'aria-label': r.name + ' 고르기', checked: !!S.picked[r.id] });
+            cb.addEventListener('click', function (e) { e.stopPropagation(); });
+            cb.addEventListener('change', function () { S.picked[r.id] = cb.checked; all.checked = rows.every(function (x) { return S.picked[x.id]; }); drawActs(); });
+            var dl = el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': r.name + ' 내려받기', text: '📥' });
+            dl.addEventListener('click', function (e) { e.stopPropagation(); host.download(r.id, r.name); });
+            var pick = function () { S.sel = r; draw(); };
+            if (compact) return el('tr', { 'class': S.sel.id === r.id ? 'on' : null, title: '눌러서 오른쪽에 미리보기', onclick: pick }, [
+              el('td', { style: 'overflow:visible' }, [cb]), el('td', { style: 'color:#94a3b8', text: String(i + 1) }),
+              el('td', { title: r.name + (r.link ? '\n' + r.link : '') }, [el('div', { style: 'overflow:hidden;text-overflow:ellipsis', text: (r.secret ? '🔒 ' : '📄 ') + r.name }),
+                r.link ? el('div', { 'class': r.gone ? 'gone' : null, style: 'overflow:hidden;text-overflow:ellipsis;font-size:11px;color:' + (r.gone ? '#b45309' : '#94a3b8'), text: r.link }) : null]),
+              el('td', { text: ymd(r.at) }), el('td', { style: 'overflow:visible' }, [dl])]);
+            return el('tr', { title: '눌러서 오른쪽에 미리보기', onclick: pick }, [
+              el('td', { style: 'overflow:visible' }, [cb]), el('td', { style: 'color:#94a3b8', text: String(i + 1) }),
+              el('td', { title: r.name, text: (r.secret ? '🔒 ' : '📄 ') + r.name }),
               el('td', { 'class': r.gone ? 'gone' : null, title: r.link, text: r.link }),
               el('td', { text: fmtSize(r.size) }), el('td', { text: ymd(r.at) }), el('td', { text: r.byName }),
-              el('td', { style: 'overflow:visible' }, [el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': r.name + ' 내려받기', text: '📥', onclick: function () { host.download(r.id, r.name); } })])
+              el('td', { style: 'overflow:visible' }, [dl])
             ]);
           }))
-        ]));
+        ])]));
       }
       drawTable();
+      if (S.sel) drawPreview(prevBox);
     }
     draw(); load();
     return { reload: load };
@@ -1168,6 +1322,7 @@
 
   w.PuOfficeDocs = {
     archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
+    filterArchive: filterArchive, fileType: fileType,
     linkPlan: linkPlan, bzGroups: bzGroups, refNames: refNames, mergePlan: mergePlan, fmtBz: fmtBz,
     mailTargets: mailTargets, sentKindOf: sentKindOf, resendMail: resendMail,
     mountArchive: mountArchive, mountCompanies: mountCompanies,
