@@ -174,11 +174,11 @@ test('완료한 것은 「지남」에서 빠지고 「완료」로 센다', () 
   new Function('O', grabDecl('ANNUAL_TMPL') + 'ANNUAL_TMPL.forEach(function(t){ if(t[3]) O[t[0]]={done:true}; });')({}, all);
   // 위 한 줄로는 못 채운다 — 직접 만든다
   const done = {};
-  ['RPT-01', 'CLS-01', 'CLS-02', 'AUD-01', 'RPT-02', 'RPT-03', 'TAX-01'].forEach(c => { done[c] = { done: true }; });
+  ['RPT-01', 'CLS-01', 'CLS-02', 'AUD-01', 'RPT-02', 'RPT-03', 'TAX-01', 'TAX-02', 'TAX-03'].forEach(c => { done[c] = { done: true }; });
   const full = renderDue([FUNDS[0]], { F1: { 2025: done } }, '2026-08-24', 2025);
   assert.ok(/지남 \d+/.test(none), '아무것도 안 했는데 지남이 0으로 나온다');
   assert.ok(!/지남 \d+/.test(full), '전부 체크했는데 아직 늦은 것이 있다고 한다');
-  assert.ok(/완료 7/.test(full), '완료 건수를 안 세었다');
+  assert.ok(/완료 9/.test(full), '완료 건수를 안 세었다');
 });
 
 test('연간 일정을 «한 번만» 읽는다 — 기금별 반복 조회 금지', () => {

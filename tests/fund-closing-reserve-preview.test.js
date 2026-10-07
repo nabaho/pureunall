@@ -48,7 +48,7 @@ const B = (() => {
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
     grabFn('useRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
-    grabFn('_rsvIsAuto'), grabFn('closeArr'),
+    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('closeArr'),
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
     'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto;',
   ].join('\n')).call(box);
@@ -134,6 +134,40 @@ test('★ 확정은 옛 자동 분개를 걷고 처음부터 다시 셈한다 �
   const f = grabFn('lockClosing');
   assert.match(f, /arr=arr\.filter\(function\(x\)\{ return !_rsvIsAuto\(x\); \}\)/);
   assert.match(f, /_oldAuto\.forEach\(function\(id\)\{ up\['txns\/'\+fid\+'\/'\+yr\+'\/'\+id\]=null; \}\)/);
+});
+
+test('★★ 이자 원천징수(원천징수영수증)를 넣으면 이자수익이 총액이 되고 선납세금이 생긴다 — 그래도 당기순이익 0', () => {
+  fresh({ fund_type: '사내', years: { 2025: { wht: { corp: 1400, local: 140 } } } });
+  const arrC = B.closeArr(TX, 'F1', 2025);
+  const f = B.computeFin(arrC, 'F1', 2025);
+  assert.equal(arrC._wht, 1540);
+  const w = arrC.find((x) => x._id === 'rsvwht2025');
+  assert.ok(w && w.debit === '선납세금' && w.credit === '이자수익' && w.nocash && w.wht, '(차)선납세금/(대)이자수익 대체분개');
+  assert.equal(Math.round(f.net), 0, '당기순이익 0');
+  assert.ok(f.balanced, '대차 일치');
+  assert.equal(arrC._rc.interestCash, 9520 + 1540, '준비금1 설정 기준은 이자 «총액»');
+  assert.ok(B.isAuto(w), '확정 때 다시 셈할 자동 분개 자리');
+});
+
+test('★ 지도점검 두 가지 — 임금성 지급 의심·기본재산 잠식을 센다', () => {
+  const box = {};
+  new Function([grabFn('num'), grabDecl('WAGE_LIKE_RE'), grabFn('closeRisks'), 'this.f=closeRisks;'].join('\n')).call(box);
+  const arr = [
+    { approved: true, withdraw: 500000, debit: '격려금', memo: '연말' },
+    { approved: true, withdraw: 300000, debit: '기타복지비', memo: '특별상여 지급' },
+    { approved: true, withdraw: 70000, debit: '경조사비', memo: '결혼 축의' },
+    { approved: false, withdraw: 900000, debit: '격려금', memo: '미승인' },
+  ];
+  const r = box.f(arr, { retained: -12345 });
+  assert.equal(r.wageN, 2); assert.equal(r.wageSum, 800000);
+  assert.equal(r.erosion, 12345, '결손이면 그만큼 잠식');
+  assert.equal(box.f([], { retained: 0 }).erosion, 0);
+  assert.match(SRC, /_rsvPendingNote\(arrC\)\+_closeRiskNote\(arrC\)/, '회계·결산 화면에 붙어 있다');
+});
+
+test('원천징수 칸이 비면 아무것도 얹지 않는다', () => {
+  fresh({ fund_type: '사내', years: {} });
+  assert.ok(!B.closeArr(TX, 'F1', 2025).some((x) => x._id === 'rsvwht2025'));
 });
 
 test('★ 「중소기업 아님」 사내기금만 머리에 딱지가 붙는다 — 나머지는 아무것도 안 붙인다', () => {
