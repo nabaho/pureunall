@@ -51,16 +51,30 @@
         done = true; clearTimeout(timer);
         resolve(db ? wrap(db) : null);
       }
-      var req;
-      try { req = idb.open(name, 1); } catch (_) { finish(null); return; }
-      req.onupgradeneeded = function () {
-        try {
+      /* ⚠ 같은 이름의 창고가 «칸(kv) 없이» 먼저 생겨 있을 수 있다(다른 판·손으로 연 것).
+           그러면 판을 하나 올려 칸을 만든다 — 안 그러면 쓰기가 영영 실패해 옮기지를 못한다(잃지는 않는다). */
+      function go(ver, retried) {
+        var req;
+        try { req = (ver ? idb.open(name, ver) : idb.open(name)); } catch (_) { finish(null); return; }
+        req.onupgradeneeded = function () {
+          try {
+            var db = req.result;
+            if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+          } catch (_) {}
+        };
+        req.onsuccess = function () {
           var db = req.result;
-          if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
-        } catch (_) {}
-      };
-      req.onsuccess = function () { finish(req.result); };
-      req.onerror = function () { finish(null); };
+          var ok = false;
+          try { ok = db.objectStoreNames.contains(STORE); } catch (_) {}
+          if (ok) { finish(db); return; }
+          var next = (Number(db.version) || 1) + 1;
+          try { db.close(); } catch (_) {}
+          if (retried) { finish(null); return; }
+          go(next, true);
+        };
+        req.onerror = function () { finish(null); };
+      }
+      go(0, false);
     });
   }
 

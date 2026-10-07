@@ -52,14 +52,16 @@ function idbFake(o) {
   const dbs = {};
   return {
     dbs,
-    open(name) {
+    open(name, ver) {
       const req = {};
       if (o.hang) return req;                       // 답하지 않는 브라우저
       setTimeout(() => {
-        let fresh = false;
-        if (!dbs[name]) { dbs[name] = { stores: {} }; fresh = true; }
+        let upgrade = false;
+        if (!dbs[name]) { dbs[name] = { stores: {}, version: ver || 1 }; upgrade = true; }
         const d = dbs[name];
+        if (ver && ver > d.version) { d.version = ver; upgrade = true; }
         const db = {
+          version: d.version,
           objectStoreNames: { contains: (n) => n in d.stores },
           createObjectStore: (n) => { d.stores[n] = new Map(); },
           close() {},
@@ -78,7 +80,7 @@ function idbFake(o) {
           },
         };
         req.result = db;
-        if (fresh && req.onupgradeneeded) req.onupgradeneeded();
+        if (upgrade && req.onupgradeneeded) req.onupgradeneeded();
         req.onsuccess && req.onsuccess();
       }, 0);
       return req;
@@ -261,6 +263,21 @@ test('진짜 모양: 거래가 중단되면(쓰기 실패) 옛 자리를 지우�
   const r = await Big.moveFromLs(st, ls, 'k');
   assert.equal(r.moved, false);
   assert.equal(ls._m.k, 'keep-me');
+});
+
+test('창고가 «칸 없이» 먼저 생겨 있으면 판을 올려 칸을 만든다 (2026-10-07 브라우저 실측)', async () => {
+  /* 실제로 겪었다: 손으로 같은 이름을 열어 빈 창고(v1, 칸 없음)가 생겼고, 이알피가 쓰기를 못 해 옮기지를 못했다.
+     잃지는 않았지만(옛 자리 그대로) 영영 옮기지 못한다 — 스스로 고쳐야 한다. */
+  const idb = idbFake();
+  idb.dbs.broken = { stores: {}, version: 1 };      // 칸 없는 v1
+  const ls = lsFake();
+  ls._m.k = 'payload';
+  const mm = Big.mirror({ keys: ['k'], ls, idb, name: 'broken' });
+  await mm.boot();
+  assert.equal(mm.state, 'on');
+  assert.equal(ls._m.k, undefined, '칸을 만들고 옮겨야 합니다');
+  assert.equal(idb.dbs.broken.version, 2);
+  assert.equal(idb.dbs.broken.stores.kv.get('k'), 'payload');
 });
 
 test('⑥ IndexedDB 가 답하지 않으면 시간 안에 «못 씀»', async () => {
