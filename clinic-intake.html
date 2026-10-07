@@ -68,7 +68,7 @@ ol.how{padding-left:18px;line-height:1.9;font-size:12.5px;}
 </style>
 </head>
 <body>
-<div class="hd"><div class="org">PUREUN · LLF</div><h1>📤 현장클리닉 → 푸른이알피</h1></div>
+<div class="hd" style="display:flex;align-items:center;gap:10px"><div style="flex:1"><div class="org">PUREUN · LLF</div><h1>📤 현장클리닉 → 푸른이알피</h1></div><span id="whoami" style="font-size:12px;opacity:.9"></span></div>
 <div class="wrap" id="app"><div class="card muted">불러오는 중…</div></div>
 
 <script>
@@ -228,6 +228,8 @@ function clinicRequest(o) {
       draw();
     });
   });
+  /* 「지금 로그인한 사람」은 머리줄 자리에 — 안 알려 주면 표가 떠서 겹친다(tests/whoami-no-overlap) */
+  if (window.PuWhoami && PuWhoami.mount) PuWhoami.mount('#whoami');
   if (window.PuWhoami && PuWhoami.onChange) PuWhoami.onChange(function (me) { S.me = me; draw(); });
 
   /* 업체관리에 같은 사업자번호가 있나 · 같은 회사로 이미 보낸 요청이 있나 — 번호로만 본다 */
