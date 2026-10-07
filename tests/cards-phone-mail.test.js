@@ -26,28 +26,35 @@ test('폰 메일은 PC 것을 그대로 쓴다 — 폰용을 따로 만들지 �
   assert.match(fn, /wireMailWrite\(\)/, '쓰기 화면의 배선을 안 걸면 보내기가 안 먹습니다.');
 });
 
-test('폰에서 메일로 들어가고 나올 길이 있다', () => {
-  /* 들어갈 길이 없으면 만든 화면이 없는 화면이다. */
-  assert.match(cards, /openMailPage\(\)">✏️ 메일 쓰기/, '☰ 메뉴에 메일 쓰기가 없습니다.');
-  assert.match(cards, /openSentBox\(\)">📤 보낸 메일/);
-  assert.match(cards, /openSchedBox\(\)">⏰ 예약한 메일/);
+/* ── 2026-10-07 대표 지시 「메일함을 보일 필요없다. 메일 수신 등에 대한부분은 메일함에서
+   찾으면 된다 2중으로 할 필요없다」 — 기업정보함 ☰ 메뉴에서 메일 묶음을 뺐다.
+   메일 화면들은 그대로 살아 있고, 들어가는 길은 «메일함 앱(?view=mail) 서랍» 하나다.
+   ⚠ 그래서 지킬 것이 둘이다: ① 기업정보함 메뉴에 메일이 다시 끼지 않는다
+     ② 메뉴에서만 닿던 칸이 서랍에서 사라지지 않는다(안 그러면 그 화면에 갈 길이 없어진다). */
+const drawer = (() => {
+  const at = cards.indexOf('function mbDrawerHtml(');
+  return cards.slice(at, cards.indexOf('\nfunction ', at + 10));
+})();
+
+test('★ 메일 화면들로 가는 길은 메일함 서랍에 다 있다 — 뺀 메뉴 칸이 갈 곳을 잃지 않는다', () => {
+  assert.ok(drawer.length > 100, 'mbDrawerHtml 을 못 찾았습니다');
+  ['openSentBox()', 'openSchedBox()', 'openInbox()', 'openMatPage()', 'openCoThread()', 'addMailIcon()']
+    .forEach(fn => assert.ok(drawer.includes(fn), '★ 메일함 서랍에 ' + fn + ' 가 없습니다 — 그 화면에 갈 길이 없어집니다'));
+  /* 쓰기는 메일함 화면의 ✏️ 떠 있는 단추가 연다 */
+  assert.match(cards, /dmm-fab[^\n]*openMailPage\(\)|openMailPage\(\)[^\n]*dmm-fab/, '★ 메일함에서 새 편지를 쓸 길이 없습니다');
   /* 나올 길 — 메일 화면 위 「‹ 목록」 */
   assert.match(cards, /class="mmback" onclick="closeMailPage\(\)"/,
     '★ 돌아갈 길이 없으면 메일 화면에 갇힙니다.');
 });
 
-test('★ 메일은 ☰ 메뉴 «맨 위»에 있고, 그 시트는 「환경설정」이 아니다', () => {
-  /* 처음에는 「⚙️ 환경설정」 시트 넷째 묶음에 넣었다. 대표가 「메일 송부함은 없다」
-     하셨다(2026-08-20) — 환경설정 안에서 메일을 찾을 사람은 없다.
-     있는데 못 찾으면 없는 것과 같다. */
-  assert.match(cards, /<div class="mhead"><b>☰ 메뉴<\/b>/,
-    '★ 「환경설정」이라고 적혀 있으면 메일을 거기서 찾지 않습니다.');
+test('★★ 기업정보함 ☰ 메뉴에는 메일 묶음이 없다 — 메일은 메일함에서만(두 벌 금지)', () => {
+  assert.match(cards, /<div class="mhead"><b>☰ 메뉴<\/b>/);
   const at = cards.indexOf('function openMenu()');
-  const menu = cards.slice(at, cards.indexOf('/* ════════════ 🗑 휴지통', at));
-  const mail = menu.indexOf("hd('✉️ 메일')");
-  const clean = menu.indexOf("hd('🧹 정리')");
-  assert.ok(mail > 0 && clean > 0 && mail < clean,
-    '★ 메일이 정리·데이터 묶음 아래 있으면 한참 내려야 보입니다.');
+  const menu = cards.slice(at, cards.indexOf('/* ════════════ 🗑 휴지통', at)).replace(/<!--[\s\S]*?-->/g, '');
+  assert.ok(menu.includes("hd('🧹 정리')"), '메뉴를 못 읽었습니다');
+  assert.ok(!menu.includes("hd('✉️ 메일')"), '★★ 메일 묶음이 기업정보함 메뉴에 다시 생겼습니다');
+  ['openMailPage()', 'openInbox()', 'openSentBox()', 'openSchedBox()', 'openCoThread()']
+    .forEach(fn => assert.ok(!menu.includes(fn), '★★ 기업정보함 메뉴에 ' + fn + ' 가 다시 생겼습니다'));
 });
 
 test('메일 화면에서는 명함 목록의 줄들을 접는다', () => {

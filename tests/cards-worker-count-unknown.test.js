@@ -114,7 +114,8 @@ test('★★★ 모를 때와 없을 때를 «다르게» 말한다', () => {
 test('★★★ 옆줄 딱지가 그 잣대를 «실제로» 쓴다', () => {
   /* 옆줄의 근로자 단추 한 줄을 원본에서 떠서 그려 본다 — 글자만 찾으면
      `wkCountLabel()` 을 적어 놓고 쓰지 않아도 통과한다. */
-  const line = grab(/\n[^\n]*openWkPage\(\)[^\n]*👷[^\n]*\n/, '옆줄 근로자 단추');
+  /* 폰 갈래 줄(#tabs)에도 👷 단추가 생겨(2026-10-07) 옆줄 것을 <em>근로자</em> 로 고른다 */
+  const line = grab(/\n[^\n]*openWkPage\(\)[^\n]*<em>근로자<\/em>[^\n]*\n/, '옆줄 근로자 단추');
   const ctx = { onWk:false, _불렸나:false,
     wkCountLabel(){ ctx._불렸나 = true; return '…'; } };
   vm.createContext(ctx);

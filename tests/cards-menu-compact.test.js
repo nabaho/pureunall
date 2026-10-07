@@ -22,8 +22,9 @@ const cards = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8
 const menu = sliceFn(cards, 'function openMenu(){');
 
 test('★ 칸을 하나도 안 없앴다 — 좁히는 것과 감추는 것은 다르다', () => {
-  /* 메일 넷은 특히 그렇다. 어제 「환경설정」 안에 있다는 이유만으로 «없는 것»이 됐다. */
-  ['openMailPage()', 'openSentBox()', 'openSchedBox()', 'openMatPage()',
+  /* ⚠ 메일 넷(openMailPage·openSentBox·openSchedBox·openMatPage)은 2026-10-07 대표 지시로 «일부러» 뺐다
+     (「메일함을 보일 필요없다 … 2중으로 할 필요없다」) — 메일함 앱 서랍에 그대로 있다(cards-phone-mail 검사). */
+  [
     'openCleanupCenter()', 'importInput.click()', /* 2026-08-29 — 내보내기가 «셋 중 고르는 창»(openExportPick)으로 바뀌었다.
        칸은 그대로 있고 여는 문만 새것이다. 지킬 것은 «칸이 있다»이지 함수 이름이 아니다. */
         'openExportPick()', 'printList()',
