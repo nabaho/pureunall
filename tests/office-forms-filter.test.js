@@ -239,3 +239,15 @@ test('ⓖ 계약서 만들기 배선 — 기업정보함은 회사 열쇠만 실
   assert.match(s, /var preKey = host\.propose \|\| host\.make \|\|/);
   assert.match(s, /if \(host\.make && !S\.made\) \{ S\.made = true; openMake\(\); \}/);
 });
+
+/* 2026-10-07 계약서 만들기 칸을 이알피 업무 유형과 맞춤 */
+test('ⓗ 계약서 만들기 — 노조·사무대행 칸, 세트를 따라 체크', () => {
+  const P = loadCF();
+  assert.deepStrictEqual(out(P.MAKE_KINDS.map(k => k.v)), ['adv', 'pay', 'union', 'office', 'con', 'case', 'fund']);
+  const F = [{ id: 'fm-pr-union', kind: 'company', name: '노조' }, { id: 'fm-pr-employment', kind: 'company', name: '고용' },
+    { id: 'fm-pr-pension', kind: 'company', name: '연금' }, { id: 'fm-pr-health', kind: 'company', name: '건강' }, { id: 'fm-pr-cms', kind: 'company', name: 'CMS' },
+    { id: 'fm-pr-advisory', kind: 'company', name: '자문' }];
+  const sets = out(P.setsOf(null));
+  assert.deepStrictEqual(out(P.makePlan(F, 'union', sets).checked), ['fm-pr-union']);
+  assert.deepStrictEqual(out(P.makePlan(F, 'office', sets).checked), ['fm-pr-employment', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-cms']);
+});
