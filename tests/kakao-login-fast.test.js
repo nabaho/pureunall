@@ -162,7 +162,8 @@ test('★★ ⑤ 서버 답을 기다리는 «동안» 화면의 DB 연결을 �
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
   const at = enter.indexOf('PuKakao.loginFinish(p.code)');
   assert.ok(at > 0);
-  assert.match(enter.slice(at - 300, at), /db\.ref\('\.info\/connected'\)\.once\('value'\)/, '★★ DB 연결을 표를 받은 뒤에야 연다');
+  const connectAt = enter.lastIndexOf("db.ref('.info/connected').once('value')", at);
+  assert.ok(connectAt > 0 && connectAt < at, '★★ DB 연결을 표를 받은 뒤에야 연다');
   assert.match(enter, /localStorage\.getItem\('pu_kakao_used'\) === '1' && window\.PuKakao && PuKakao\.warm\) PuKakao\.warm\(\)/,
     '★ 로그인 화면이 카카오 쓰는 기기에서 서버를 미리 안 깨운다');
   assert.match(enter, /js\/pu-kakao\.js\?v=\d+/);
@@ -178,4 +179,11 @@ test('★★ 휴대전화에서 카카오 응답·저장소·명부를 끝없이
   assert.match(enter, /}, 2000\)/);
   assert.match(enter, /명부 읽기 시간 초과/);
   assert.match(enter, /}, 3500\)/);
+});
+
+test('★★ 카카오 인증표·로그인 저장·직원명부를 차례로 기다리지 않고 동시에 준비한다', () => {
+  const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  assert.match(enter, /__puRosterPrefetch\s*=\s*Promise\.resolve\(db\.ref\('data\/user_dir'\)\.once\('value'\)\)/);
+  assert.match(enter, /Promise\.all\(\[PuKakao\.loginFinish\(p\.code\),\s*quickPersist\]\)/);
+  assert.match(enter, /path === 'data\/user_dir' && window\.__puRosterPrefetch/);
 });

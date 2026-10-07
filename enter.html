@@ -1940,19 +1940,22 @@ body.portal-mode #moreFab{display:flex;}
       }, 15000);
       /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
       try { db.ref('.info/connected').once('value'); } catch(_c){}
-      PuKakao.loginFinish(p.code).then(function(token){
-        /* 떠나기 전에 고른 「로그인 유지」 대로 — 끈 채 들어오면 창을 닫는 순간 풀린다.
-           ⚠ 못 읽으면 «유지 안 함(SESSION)» 쪽 — 공용 PC 에 로그인이 남는 쪽보다 안전하다. */
-        var keep = false;
-        try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
-        var persist = auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-        /* 일부 안드로이드 브라우저는 저장소 설정 약속을 끝내지 않는다. 2초 뒤에는 로그인부터 진행한다. */
-        var quickPersist = new Promise(function(resolve){
-          var done=false, t=setTimeout(function(){ if(!done){ done=true; resolve(); } }, 2000);
-          Promise.resolve(persist).then(function(){ if(!done){ done=true; clearTimeout(t); resolve(); } }, function(){ if(!done){ done=true; clearTimeout(t); resolve(); } });
-        });
-        return quickPersist
-          .then(function(){ return auth.signInWithCustomToken(token); });
+      /* 인증표를 받는 동안 직원명부도 먼저 받는다. 인증 뒤 다시 통신하던 한 왕복을 없앤다. */
+      try {
+        window.__puRosterPrefetch = Promise.resolve(db.ref('data/user_dir').once('value'))
+          .catch(function(){ return null; });
+      } catch(_r){ window.__puRosterPrefetch = null; }
+      /* 떠나기 전에 고른 「로그인 유지」 대로 맞추되, 서버의 인증표와 «동시에» 준비한다.
+         예전에는 인증표를 받은 뒤 최대 2초를 더 기다려 휴대전화에서 유난히 느렸다. */
+      var keep = false;
+      try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
+      var persist = auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
+      var quickPersist = new Promise(function(resolve){
+        var done=false, t=setTimeout(function(){ if(!done){ done=true; resolve(); } }, 2000);
+        Promise.resolve(persist).then(function(){ if(!done){ done=true; clearTimeout(t); resolve(); } }, function(){ if(!done){ done=true; clearTimeout(t); resolve(); } });
+      });
+      Promise.all([PuKakao.loginFinish(p.code), quickPersist]).then(function(ready){
+        return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkDone = true; clearTimeout(kkWatch);
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
@@ -2473,12 +2476,19 @@ body.portal-mode #moreFab{display:flex;}
     }
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
     function _readRoster(path){
-      var read = db.ref(path).once('value');
+      var read = null;
+      if(path === 'data/user_dir' && window.__puRosterPrefetch){
+        read = window.__puRosterPrefetch;
+        window.__puRosterPrefetch = null;
+      } else {
+        read = db.ref(path).once('value');
+      }
       var timed = new Promise(function(resolve, reject){
         var done=false, t=setTimeout(function(){ if(!done){ done=true; reject(new Error('명부 읽기 시간 초과')); } }, 3500);
         Promise.resolve(read).then(function(v){ if(!done){ done=true; clearTimeout(t); resolve(v); } }, function(e){ if(!done){ done=true; clearTimeout(t); reject(e); } });
       });
       return timed.then(function(snap){
+        if(!snap) return null;
         var raw = snap.val();
         var list = (raw && raw.v !== undefined) ? raw.v : raw;
         if(list && !Array.isArray(list) && typeof list === 'object'){
