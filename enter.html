@@ -1960,6 +1960,9 @@ body.portal-mode #moreFab{display:flex;}
         kkDone = true; clearTimeout(kkWatch);
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
+        /* signIn 성공 결과를 이미 받았다. 인증 상태 알림이 한 번 더 올 때까지 기다리지 않고
+           곧바로 포털을 연다(알림이 먼저 왔으면 _handled가 중복 진입을 막는다). */
+        if(!_handled){ _handled = true; enterPortal(cred.user); }
         try {
           cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
         } catch(e){}
