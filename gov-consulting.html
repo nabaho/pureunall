@@ -2230,26 +2230,32 @@ function lsKeyValid(k){ return LS_VALID_KEYS.includes(k)||LS_VALID_PREFIXES.some
    그래서 이 앱이 «오래된 데이터를 정리하라» 고 해도 사람이 할 수 있는 일이 없었다.
    ① 자동백업(p_autobackups)은 이 PC 사본일 뿐이다(서버 백업이 따로 있다) — 자리가 없으면 «조용히» 줄인다(opt.quiet).
    ② 진짜 자료를 못 쓰면 먼저 그 자동백업을 비워 자리를 만들고 다시 쓴다.
-   ③ 그래도 안 되면 알리되 «한 번만» — 매 저장마다 띄우면 아무도 안 읽는다. */
+   ③ 그래도 안 되면 알리되 «한 번만» — 매 저장마다 띄우면 아무도 안 읽는다.
+   ④★ 못 쓴 값은 _lsMem 에 쥐고, 읽기(lsGet)는 그것을 먼저 본다 (2026-10-07 태양농산).
+      전에는 PC 저장만 실패하고 서버에는 들어갔는데, 화면은 «옛 PC 사본»을 읽었다 —
+      그래서 새 일정이 회차 번호를 못 받고(0회차) 중복 검사도 통과해, 누를 때마다 한 건씩 더 생겼다. */
 let _lsFullTold=false;
+const _lsMem=Object.create(null);
+function lsGet(key){ return (key in _lsMem) ? _lsMem[key] : localStorage.getItem(key); }
 function lsSet(key,value,opt){
-  try{localStorage.setItem(key,value);return true;}
+  try{localStorage.setItem(key,value);delete _lsMem[key];return true;}
   catch(e){
     // 용량 초과 시 잔재 제거 후 1회 재시도
     try{
       Object.keys(localStorage).forEach(k=>{if(k.startsWith('p_') && !lsKeyValid(k))localStorage.removeItem(k);});
-      localStorage.setItem(key,value);return true;
+      localStorage.setItem(key,value);delete _lsMem[key];return true;
     }catch(e2){}
     if(opt&&opt.quiet)return false;   // 자동백업 등 «없어도 되는» 것 — 부른 쪽이 줄여서 다시 시도한다
     // 진짜 자료: 이 PC 자동백업을 비워 자리를 만든 뒤 다시
     if(key!=='p_autobackups'){
       try{
         localStorage.removeItem('p_autobackups');
-        localStorage.setItem(key,value);
+        localStorage.setItem(key,value);delete _lsMem[key];
         console.warn('저장 공간이 꽉 차 이 PC 자동백업을 비우고 저장:',key);
         return true;
       }catch(e3){}
     }
+    _lsMem[key]=String(value);   // ★ PC 에 못 썼어도 화면은 «방금 것»을 읽는다
     console.warn('저장 용량 초과:',key);
     if(!_lsFullTold && typeof toast==='function'){
       _lsFullTold=true;
@@ -2902,7 +2908,7 @@ const DEFAULT_STAFF=[
   {id:'a6',name:'임혜미',color:'#2a9d8f',pin:'123456',isAdmin:false},
   {id:'a7',name:'김동현',color:'#e94560',pin:'123456',isAdmin:false},
 ];
-function getStaff(){const s=localStorage.getItem('p_staff');if(!s){lsSet('p_staff',JSON.stringify(DEFAULT_STAFF));return DEFAULT_STAFF;}return JSON.parse(s).map(x=>({pin:'123456',isAdmin:false,...x}));}
+function getStaff(){const s=lsGet('p_staff');if(!s){lsSet('p_staff',JSON.stringify(DEFAULT_STAFF));return DEFAULT_STAFF;}return JSON.parse(s).map(x=>({pin:'123456',isAdmin:false,...x}));}
 function setStaff(v){lsSet('p_staff',JSON.stringify(v));fbPush('p_staff',v);}
 const DEFAULT_TYPES=[
   {id:'t1',name:'일터혁신',fullName:'일터혁신 컨설팅',agency:'FM협회',color:'#d97706',rounds:8,mandatoryField:3,exclusiveDay:true,active:true},
@@ -2971,24 +2977,24 @@ function getHoliday(ds){
 /* dayRule — 이 사업이 쉬는 날에도 나가는가.
    ''(빈 값) = 전체 설정을 따른다(처음 값) · 'exceptSun' = 일요일만 빼고 아무 날이나.
    ⚠ 새 갈래를 늘릴 때는 isBlocked 도 함께 봐야 한다 — 여기만 늘리면 조용히 무시된다. */
-function getTypes(){const s=localStorage.getItem('p_types');if(!s){lsSet('p_types',JSON.stringify(DEFAULT_TYPES));return DEFAULT_TYPES;}return JSON.parse(s).map(t=>({mandatoryField:0,fullName:'',agency:'',exclusiveDay:false,onePhoto:false,dayRule:'',agencyExclusiveDay:false,...t}));}
+function getTypes(){const s=lsGet('p_types');if(!s){lsSet('p_types',JSON.stringify(DEFAULT_TYPES));return DEFAULT_TYPES;}return JSON.parse(s).map(t=>({mandatoryField:0,fullName:'',agency:'',exclusiveDay:false,onePhoto:false,dayRule:'',agencyExclusiveDay:false,...t}));}
 function setTypes(v){lsSet('p_types',JSON.stringify(v));fbPush('p_types',v);publishTypeColors();}
-function getCos(){return JSON.parse(localStorage.getItem('p_cos')||'[]');}
+function getCos(){return JSON.parse(lsGet('p_cos')||'[]');}
 // ===== 데이터 안전장치: 대량 삭제(비정상 축소) 감지 =====
 // 기존이 5건 이상인데 새 값이 기존의 20% 미만이면 '실수/오작동에 의한 대량 삭제'로 판단
 function _cnt(x){return Array.isArray(x)?x.length:(x&&typeof x==='object'?Object.keys(x).length:0);}
 function _isBulkShrink(oldV,newV){const o=_cnt(oldV),n=_cnt(newV);return o>=5&&n<o*0.2;}
 function setCos(v){
   let old=[];
-  try{old=JSON.parse(localStorage.getItem('p_cos')||'[]');
+  try{old=JSON.parse(lsGet('p_cos')||'[]');
     if(_isBulkShrink(old,v)&&!confirm(`⚠️ 사업장이 ${_cnt(old)}개 → ${_cnt(v)}개로 크게 줄어듭니다.\n실수로 데이터가 지워지는 것일 수 있습니다.\n\n정말 저장하시겠습니까?`)){return;}
   }catch(e){}
   lsSet('p_cos',JSON.stringify(v));fbPushRecordDelta('p_cos',old,v);
 }
-function getScheds(){return JSON.parse(localStorage.getItem('p_scheds')||'[]');}
+function getScheds(){return JSON.parse(lsGet('p_scheds')||'[]');}
 function setScheds(v){
   let old=[];
-  try{old=JSON.parse(localStorage.getItem('p_scheds')||'[]');
+  try{old=JSON.parse(lsGet('p_scheds')||'[]');
     if(_isBulkShrink(old,v)&&!confirm(`⚠️ 일정이 ${_cnt(old)}개 → ${_cnt(v)}개로 크게 줄어듭니다.\n실수로 데이터가 지워지는 것일 수 있습니다.\n\n정말 저장하시겠습니까?`)){return;}
   }catch(e){}
   lsSet('p_scheds',JSON.stringify(v));fbPushRecordDelta('p_scheds',old,v);
@@ -5305,7 +5311,7 @@ function runPhotoQueue(){
 const BK_KEYS=['p_staff','p_types','p_cos','p_scheds','p_fieldState','p_env','p_conflictMatrix','p_erpTypeMap','p_erpTypeRun','p_erpConsHold'];
 function buildBackupData(withLog){
   const d={version:1,exported:new Date().toISOString()};
-  BK_KEYS.forEach(k=>d[k]=localStorage.getItem(k));
+  BK_KEYS.forEach(k=>d[k]=lsGet(k));
   /* 사진 이력 — 「누가 언제 넣었나」(대표 결정 2026-08-30).
      ⚠ 새로 읽지 않는다. 구독으로 이미 손에 든 것을 담으므로 요금이 0 이다.
      ⚠ «이 기기 스냅샷»에는 안 담는다(withLog 없이 부른다) — 여덟 벌이 쌓이면
@@ -5537,7 +5543,7 @@ function takeSnapshot(label){
 }
 function autoSnapshotDaily(){
   let cos=[],sch=[];
-  try{cos=JSON.parse(localStorage.getItem('p_cos')||'[]');sch=JSON.parse(localStorage.getItem('p_scheds')||'[]');}catch(e){}
+  try{cos=JSON.parse(lsGet('p_cos')||'[]');sch=JSON.parse(lsGet('p_scheds')||'[]');}catch(e){}
   if(!cos.length && !sch.length) return; // 데이터 없음/미동기화 시 건너뜀
   const today=todayStr();
   const hasToday=getAutoBackups().some(s=>(s.t||'').slice(0,10)===today && (s.label||'').indexOf('복원 직전')<0);
@@ -10071,7 +10077,7 @@ const DEFAULT_ENV={
   autoStampOnField:true,
   stampDefault:true,
 };
-function getEnv(){return {...DEFAULT_ENV,...JSON.parse(localStorage.getItem('p_env')||'{}')};}
+function getEnv(){return {...DEFAULT_ENV,...JSON.parse(lsGet('p_env')||'{}')};}
 function setEnv(v){lsSet('p_env',JSON.stringify(v));fbPush('p_env',v);}
 function saveEnvField(key,val){const e=getEnv();e[key]=val;setEnv(e);}
 
