@@ -441,7 +441,10 @@ test('★ 화면 — needLink 로 실패했을 때만 표시를 남기고, 포�
         pending: () => ({ code: 'C1', mode: 'login' }),
         loginFinish: () => { const e = new Error('x'); e.needLink = need; return Promise.reject(e); },
       },
-      auth: {}, reportLogin() {}, shown: '',
+      firebase: { auth: { Auth: { Persistence: { LOCAL: 'local', SESSION: 'session' } } } },
+      localStorage: { getItem: () => null },
+      db: { ref: () => ({ once: () => Promise.resolve(null) }) },
+      auth: { setPersistence: () => Promise.resolve() }, reportLogin() {}, shown: '',
       // 실패하면 접힌 비밀번호 칸을 편다(카카오 먼저, 2026-09-27) — 그 자체는 kakao-first-login.test.js 가 본다
       kkUnfoldPw() {}, kkMarkUsed() {}, kkEndReturn() {},
     };
