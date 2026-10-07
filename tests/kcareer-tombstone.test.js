@@ -39,8 +39,10 @@ test('★★ 삭제는 «set() 한 곳»에서 잡는다 — 경로마다 적으
 
 test('★★ 사라진 id 는 적고, 다시 나타난 id 는 뗀다 — 재등록·되돌리기가 저절로 반영된다', () => {
   const fn = cutFn(bare, 'function _tombDiff(');
-  assert.match(fn, /t\[id\] = now; changed = true;/, '사라짐 → 적는다');
-  assert.match(fn, /nks\.forEach\(function\(id\)\{ if\(t\[id\]\)\{ delete t\[id\]/,
+  /* 지금 시각으로 — 되살린 시각과 같으면 한 칸 더(나중 일이 이기게, 2026-10-07) */
+  assert.match(fn, /t\[id\] = (now|Math\.max\(now, [^;]*\)); changed = true;/, '사라짐 → 적는다');
+  /* 떼기 전에 «되살린 시각»을 적을 수 있다(2026-10-07) — 떼는 것 자체가 규칙이다 */
+  assert.match(fn, /nks\.forEach\(function\(id\)\{ if\(t\[id\]\)\{ [^}]*delete t\[id\]/,
     '다시 나타남 → 뗀다. 안 떼면 재등록한 것이 되살리기에서 버려집니다');
 });
 
@@ -58,7 +60,8 @@ test('★★ 다른 통에 살아 있으면 지운 것이 아니다 — 옮긴 �
 
 test('★★ 되살리기는 자리표에 있는 id 를 «버린다»', () => {
   const fn = cutFn(bare, 'function kcApplyRestore(');
-  assert.match(fn, /tb\[String\(r\.id\)\]/, '자리표에 있는 기록은 데려오지 않아야 합니다');
+  /* 지운 것인지는 tombDead(지운 시각 > 되살린 시각) 한 곳이 가른다 (2026-10-07 «되살린 시각»표) */
+  assert.match(fn, /tombDead\(tb, rv, String\(r\.id\)\)/, '자리표에 있는 기록은 데려오지 않아야 합니다');
   assert.match(fn, /dropped\+=\(a\.length-keep\.length\)/, '몇 건을 버렸는지 세어야 합니다');
   assert.match(cutFn(bare, 'function fbPull()'), /_r\.dropped/,
     '몇 건을 버렸는지 사람에게 말해야 합니다');
@@ -66,9 +69,11 @@ test('★★ 되살리기는 자리표에 있는 id 를 «버린다»', () => {
 
 test('★★ 되살리기는 자리표를 «덮지 않고 합친다» — 덮으면 다음 번에 또 부활한다', () => {
   const fn = cutFn(bare, 'function kcApplyRestore(');
-  assert.match(fn, /if\(bare===TOMB_KEY\) return;/,
+  assert.match(fn, /if\(bare===TOMB_KEY \|\| bare===TOMB_REV_KEY\) return;/,
     '★ 자리표를 클라우드 것으로 덮으면 기억이 날아가 고리가 그대로 돌아옵니다');
-  assert.match(fn, /Object\.keys\(ct\)\.forEach\(function\(id\)\{ if\(!tb\[id\]\) tb\[id\]=ct\[id\]; \}\)/,
+  /* 번호마다 «더 늦은 시각»을 남긴다 — 이 기기 것을 지우지 않는다 */
+  assert.match(fn, /합치기\(tb, ls\[TOMB_KEY\]\)/);
+  assert.match(fn, /if\(v>\(Number\(dst\[id\]\)\|\|0\)\) dst\[id\]=v;/,
     '이 기기 것과 클라우드 것을 합쳐야 합니다');
   assert.match(fn, /tombSave\(tombPrune\(tb\)\)/);
 });
@@ -88,7 +93,8 @@ test('★★ 「그 시점으로 되돌리기」는 그때 살아 있던 것의 
   /* 되살려 놓고 「지웠다」고 기억하면 다음 불러오기가 또 버린다 — 앞뒤가 어긋난다. */
   const fn = cutFn(bare, 'function kcApplyRestore(');
   assert.match(fn, /if\(mode==='rollback'\)/);
-  assert.match(fn, /delete tb\[k\]; freed\+\+;/);
+  /* 떼면서 «되살린 시각»도 적는다 — 다른 기기가 자기 자리표를 떼도록 */
+  assert.match(fn, /delete tb\[k\]; rv\[k\]=now; freed\+\+;/);
 });
 
 test('★★ 「없어진 것만 되살리기」는 «내가 지운 것»을 켜 두지 않는다', () => {
@@ -148,7 +154,9 @@ test('★★ 「진짜로 지워진 경우」는 그대로 복구된다 — 이 
      ⚠ 자리표를 localStorage 밖(예: 쿠키·IndexedDB)에 두면 이 성질이 깨진다. */
   assert.match(cutFn(bare, 'function tombSave('), /LS\.set\(NS\+TOMB_KEY/,
     '★ 자리표는 반드시 기록과 «같은 곳»(localStorage)에 있어야 합니다 — 함께 지워져야 복구가 됩니다');
-  assert.match(cutFn(bare, 'function tombLoad('), /LS\.get\(NS\+TOMB_KEY\)/);
+  assert.match(cutFn(bare, 'function tombLoad('), /_tombObj\(TOMB_KEY\)/);
+  assert.match(cutFn(bare, 'function _tombObj('), /LS\.get\(NS\+k\)/);
+  assert.match(cutFn(bare, 'function tombRevSave('), /LS\.set\(NS\+TOMB_REV_KEY/, '되살린 시각표도 같은 곳에');
 });
 
 test('★★ 손실 띠에도 «이 기기 것이 맞다»(올리기) 길이 있어야 한다', () => {

@@ -67,7 +67,7 @@ test('★★ ② 저장공간이 차도 «방금 고친 것»을 읽고, 못 담
     console: { error() {}, warn() {}, log() {} }, JSON, Object, Array, String, Date, Error,
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: () => { throw 꽉참; }, removeItem: (k) => { delete store[k]; } },
     toast: (m) => 알림.push(String(m)), checkStorageQuota: () => {},
-    TOMB_KEY: '__tomb', hasIDPin: () => false, _tombDiff: () => {}, navCountsSoon: () => {},
+    TOMB_KEY: '__tomb', TOMB_REV_KEY: '__tombrev', hasIDPin: () => false, _tombDiff: () => {}, navCountsSoon: () => {},
     fbScheduleAuto: () => { ctx._보냄 = (ctx._보냄 || 0) + 1; },
   };
   vm.createContext(ctx);
