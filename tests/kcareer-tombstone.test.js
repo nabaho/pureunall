@@ -84,7 +84,9 @@ test('★★ 되살리는 문 «셋 모두» 한 곳(kcApplyRestore)을 지난�
   assert.match(cutFn(bare, 'function fbPull()'), /kcApplyRestore\(v\.ls, 'pull'\)/);
   assert.match(cutFn(bare, 'async function kcRecoverRun('), /kcApplyRestore\(v\.ls, 'rollback'\)/);
   /* 자리표를 아는 곳 밖에서 ls 를 통째로 쓰는 코드가 남아 있으면 안 된다 */
-  const strays = bare.split('localStorage.setItem(NS+bare').length - 1;
+  /* 경력관리 기록은 자기 저장소로 — 쓰는 길은 LS.set (2026-10-07) */
+  assert.equal(bare.split('localStorage.setItem(NS+bare').length - 1, 0, 'localStorage 로 곧장 쓰면 자기 저장소를 건너뛴다');
+  const strays = bare.split('LS.set(NS+bare').length - 1;
   assert.equal(strays, 1,
     '★ ls 를 이 기기에 쓰는 곳은 kcApplyRestore 하나여야 합니다 (지금 ' + strays + '곳)');
 });

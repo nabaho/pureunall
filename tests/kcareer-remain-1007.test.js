@@ -45,7 +45,8 @@ test('★★ 5번 폴더 넣기 — 파일마다 따로 잡고, 열 개마다 �
   const f = cut('async function docImportResumeFolder(');
   assert.match(f, /catch\(err\)\{ console\.warn\('5번 폴더 넣기'/, '★ 한 파일 오류로 통째로 멈추면 담은 파일이 «주인 없는 파일»이 된다');
   assert.match(f, /if\(\(i\+1\)%10===0\) 중간저장\(\);/);
-  assert.match(f, /finally \{\s*중간저장\(\);\s*window\._kcBusyImport=false;/);
+  assert.match(f, /kcBusy\(true\);/);
+  assert.match(f, /finally \{\s*중간저장\(\);\s*kcBusy\(false\);/);
   assert.match(f, /saveFileWait\([^;]*\{ noCache:true \}/, '대량은 기억 사본을 놓는다');
   assert.match(cut('function fbNewerSync('), /window\._kcBusyImport/, '담는 동안 새로고침하지 않는다');
 });
@@ -84,6 +85,7 @@ test('★★ 직원 보기 — 고칠 수 없다 · 같은 브라우저로 대�
   const store = { cm3__pubcopy: '1', cm3__fbbase: '123', cm3__fbpending: 'x' }, 받기 = [];
   const ctx = { NS: 'cm3_', fbUid: 'u1', fbDb: {}, _fbBase: 123, _fbFirstTried: true, toast() {}, fbFirstSync: () => 받기.push(1),
     localStorage: { getItem: (k) => (k in store ? store[k] : null), removeItem: (k) => { delete store[k]; } } };
+  ctx.LS = { get: (k) => (k in store ? store[k] : null), remove: (k) => { delete store[k]; }, set: (k, v) => { store[k] = String(v); return true; } };
   vm.createContext(ctx);
   vm.runInContext(cut('function kcPubCopyRecover('), ctx);
   assert.equal(vm.runInContext('kcPubCopyRecover()', ctx), true);

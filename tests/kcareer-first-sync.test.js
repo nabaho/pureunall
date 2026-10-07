@@ -61,7 +61,7 @@ test('⑤ 더 새 기록이 오면 — 안 올라간 고침이 없고 잃을 것
   assert.ok(!/_fbDoPush/.test(f), '받기만 한다');
   /* 표시는 일련번호로(2026-10-07) — 고칠 때마다 새 번호, 올리기는 «모을 때 본 번호»일 때만 지운다 */
   assert.ok(/_fbPendingMark\(\)/.test(떼기('function fbScheduleAuto(')), '고치면 표시');
-  assert.ok(/localStorage\.setItem\(NS\+'_fbpending'/.test(떼기('function _fbPendingMark(')), '표시는 이 기기에');
+  assert.ok(/(localStorage\.setItem|LS\.set)\(NS\+'_fbpending'/.test(떼기('function _fbPendingMark(')), '표시는 이 기기에');
   assert.ok(/_fbPendingClear\(seq\)/.test(떼기('function _fbDoPush(')), '올라가면 지움(그 사이 고친 것은 남긴다)');
   const skip = SRC.match(/var FB_SKIP=\[([\s\S]*?)\];/)[1];
   assert.ok(/'_fbpending'/.test(skip), '그 표시는 기기마다 — 클라우드로 올리면 다른 기기가 못 받는다');

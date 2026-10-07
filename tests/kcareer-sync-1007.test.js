@@ -37,7 +37,7 @@ function 기기(이름) {
   ctx.Date = class extends Date { static now() { return ctx.시계; } };
   ctx.toast = (m) => ctx.알림.push(String(m));
   vm.createContext(ctx);
-  vm.runInContext('var _mem={}; var STORAGE_OK=true; var NS="cm3_";', ctx);
+  vm.runInContext('var _mem={}; var STORAGE_OK=true; var NS="cm3_"; var KV=null;', ctx);
   vm.runInContext(cut('const LS={').replace(/^const /, 'var '), ctx);
   vm.runInContext(bare.match(/var TOMB_KEY='_tomb'[^\n]*/)[0] + bare.match(/var TOMB_REV_KEY='_tombrev';/)[0], ctx);
   vm.runInContext(bare.match(/var FB_SKIP=\[[\s\S]*?\];/)[0], ctx);

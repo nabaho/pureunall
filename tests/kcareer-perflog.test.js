@@ -98,6 +98,6 @@ test('★★ 누르지 않고도 연다 — ?diag=1', () => {
 
 test('★ 기록을 비울 때 둘 다 비운다', () => {
   const fn = cutFn(bare, 'function kcPerfClear(');
-  assert.match(fn, /removeItem\(NS\+KC_PERF_KEY\)/);
-  assert.match(fn, /removeItem\(NS\+KC_ERR_KEY\)/);
+  assert.match(fn, /(removeItem|LS\.remove)\(NS\+KC_PERF_KEY\)/);
+  assert.match(fn, /(removeItem|LS\.remove)\(NS\+KC_ERR_KEY\)/);
 });

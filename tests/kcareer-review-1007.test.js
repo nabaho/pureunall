@@ -72,6 +72,7 @@ test('★★ ② 저장공간이 차도 «방금 고친 것»을 읽고, 못 담
   };
   vm.createContext(ctx);
   vm.runInContext(bare.match(/const _mem=\{\};[^\n]*/)[0].replace(/^const /, 'var ').replace(/let STORAGE_OK/, 'var STORAGE_OK'), ctx);
+  vm.runInContext('var KV=null;', ctx);   /* 자기 저장소 없이 — localStorage 길을 본다 */
   vm.runInContext(cutBlock(bare, 'const LS={').replace(/^const /, 'var '), ctx);
   vm.runInContext('var NS="cm3_"; function get(k){ try{ return JSON.parse(LS.get(NS+k)||"[]"); }catch(e){ return []; } }', ctx);
   vm.runInContext(cutBlock(bare, 'function set(key,arr){'), ctx);

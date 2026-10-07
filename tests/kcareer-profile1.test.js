@@ -87,7 +87,7 @@ test('화면 배선 — 옆줄 · 그리기 · 직원 보기에 안 나감 · �
   const go = bare.slice(bare.indexOf('async function pastCvGo('), bare.indexOf('function delDoc('));
   assert.match(go, /catch\(err\)\{ console\.warn\('지난 이력서 넣기'/);
   assert.match(go, /saveFileWait\([^;]*\{ noCache:true \}/);
-  assert.match(go, /window\._kcBusyImport=true/);
+  assert.match(go, /kcBusy\(true\)/, '넣는 동안 «저장 중» — 받아 오기·배포 새로고침을 미룬다');
   assert.match(go, /caseDir:it\.caseDir/, '어느 건에 냈는지 남겨 제출서류와 잇는다');
   assert.match(bare, /onclick="pastCvOpen\(\)"/);
   assert.match(bare, /KC_MODAL_NO_BACKDROP=\{[^}]*modalPastCv:1/);
