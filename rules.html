@@ -5410,8 +5410,7 @@ try{if(window.firebase){firebase.initializeApp(FB_CONFIG);FBDB=firebase.database
        구독만 끊고 화면은 그대로 두니, 로그아웃한 줄 모르고 빈 표를 들여다보게 된다.
        이제 모든 앱과 같은 자물쇠 화면을 보인다. */
     try{ if(u) PuGate.hide(); else PuGate.show(); }catch(_g){}
-    /* 큰 작업본 창고(RULES_BIG)가 켜진 뒤에 — 보관함 «덮어쓰기 전 사본»·클라우드 작업본 견주기가 이 PC 값을 읽는다 */
-    if(u){rulesBigReady().then(()=>{ if(FBUSER!==u)return;
+    if(u){rulesBigReady().then(()=>{ if(FBUSER!==u)return;   // 작업본 창고가 켜진 뒤에(RULES_BIG 머리글)
       subscribeArch();subscribeMfix();resolveUserName();loadErpCompanies();pullDecisions();
       loadDrafts();               // 로그인 전 호출은 FBUSER 가 없어 클라우드 문서를 못 읽었다 — 여기서 한 번 더
       checkCloudWorkSession();   // 재로그인 시 계정에 남은 작업 세션 이어받기

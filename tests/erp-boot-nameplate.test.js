@@ -122,7 +122,8 @@ test('NAS 자동 백업을 화면 뜨는 길에서 비켜 놓았다', () => {
   // 무거운 일이 _run 안에 들어가 있어야 뜻이 있다
   const run = blk.slice(blk.indexOf('var _run = function(){'));
   assert.match(run, /JSON\.stringify\(data, null, 2\)/);
-  assert.match(run, /for\(var i=0;i<localStorage\.length;i\+\+\)/);
+  /* 훑기(무거운 일)도 _run 안에 — 큰 사본 창고까지 훑는 erpLocalKeys() 꼴이어도 된다(2026-10-07) */
+  assert.match(run, /for\(var i=0;i<(?:localStorage|_lk)\.length;i\+\+\)/);
 });
 
 test('설정이 없으면 여전히 아무것도 안 한다', () => {
