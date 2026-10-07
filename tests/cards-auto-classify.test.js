@@ -295,8 +295,9 @@ test('같은 탭을 두 번 심지 않는다', () => {
   assert.match(body, /if\(dup\) return;/);
   /* ⚠ 「읽기」와 「쓰기」를 둘 다 본다. 이름만 세면 위쪽 guard 하나로도 통과해,
        표시를 «안 남기는» 되돌림이 그냥 지나갔다(되돌림이 잡아 준 자리). */
-  assert.match(body, /if\(localStorage\.getItem\('pucards_proftabs_v1'\)\) return;/,
+  /* 표시는 이제 서버에 둔다(seedDone·seedMark — 2026-10-07 점검 ①) */
+  assert.match(body, /if\(seedDone\('pucards_proftabs_v1'\)\) return;/,
     '이미 심었으면 다시 안 심어야 한다');
-  assert.match(body, /localStorage\.setItem\('pucards_proftabs_v1','1'\);/,
+  assert.match(body, /seedMark\('pucards_proftabs_v1'\);/,
     '표시를 남기지 않으면 지운 탭이 다시 살아난다');
 });

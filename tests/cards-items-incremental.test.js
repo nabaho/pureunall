@@ -70,10 +70,13 @@ test('① 통째로 받을 때는 예전처럼 유령을 걷는다 — 지운 �
 
 /* ══ ② 지운 자국 ═══════════════════════════════════════════════════════ */
 test('②★ 지울 때 «자국»을 남긴다 — 네 갈래 모두', () => {
-  const del = SRC.slice(SRC.indexOf('async del(id){'), SRC.indexOf('async del(id){') + 1400);
-  assert.match(del, /cardTomb\(id\)/, '★ 한 장 지우기에 자국이 없습니다');
+  const at = SRC.indexOf('async del(id){');
+  const del = SRC.slice(at, SRC.indexOf('/* 영구 삭제', at));
+  /* 2026-10-07 점검 ①: 한 장 지우기는 목록 지우기와 자국을 «한 통»으로 — up 에 자국 자리를 함께 싣는다 */
+  assert.match(del, /up\[`\$\{DB_ROOT\}\$\{TOMB\}\/\$\{id\}`\] = Date\.now\(\)/, '★ 한 장 지우기에 자국이 없습니다');
   assert.match(SRC, /cardTomb\(Object\.keys\(chunk\)\)/, '★ 묶음 지우기에 자국이 없습니다');
-  assert.match(SRC, /cardTomb\(Object\.keys\(itemUpd\)\)/, '★ 깨진 글자 정리에 자국이 없습니다');
+  /* 깨진 글자 정리는 자국을 «기다려» 쓴다 — 실패를 삼키지 않게(2026-10-07 점검 ①) */
+  assert.match(SRC, /ref\(DB_ROOT\+TOMB\)\.update\(tomb\)/, '★ 깨진 글자 정리에 자국이 없습니다');
   const priv = SRC.slice(SRC.indexOf('function cardPrivPaths(id, on){'), SRC.indexOf('function cardPrivPaths(id, on){') + 900);
   assert.match(priv, /if\(on\) out\[`\$\{DB_ROOT\}\$\{TOMB\}\/\$\{id\}`\] = Date\.now\(\);/,
     '★★ 개인으로 옮긴 명함이 남의 화면에 그대로 남습니다 — 숨긴 것이 안 숨겨집니다');

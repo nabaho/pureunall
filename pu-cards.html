@@ -3910,12 +3910,38 @@ async function ensureByKeyMap(){
   }catch(_){}
 }
 
+/* ══════ «한 번만 심기» 표시 — 서버에 둔다 (2026-10-07 기업정보함 점검 ①) ══════
+   공용 탭·폴더·분류 규칙을 «처음 한 번» 심는 함수가 다섯이다(seedErpTabs·seedClosedTab·seedBizFolders·
+   seedClassifyRules·seedProfTabs). 「심었음」 표시가 브라우저(localStorage)에만 있어, 새 PC·새 브라우저로
+   들어온 직원이 대표님이 «지운» 공용 탭·폴더를 다시 만들었다(지우는 것이 자유라던 약속과 어긋난다).
+   ★ 이제 서버(pucards/config/seeded/{열쇠})에 적는다. 옛 브라우저 표시가 있으면 서버에도 옮겨 적는다.
+   ⚠ 서버 표시를 아직 못 읽었으면 «심지 않는다» — 모르면 안 만든다(다음 접속에 다시 본다). */
+let _seeded = null, _seededAsk = false;
+function seedFlagsLoad(){
+  if(_seededAsk || Store.mode!=='firebase' || !Store.db) return;
+  _seededAsk = true;
+  Store.db.ref(DB_ROOT+'/config/seeded').once('value')
+    .then(s=>{ _seeded = s.val() || {}; })
+    .catch(()=>{ _seededAsk = false; });
+}
+function seedDone(key){
+  let local = false;
+  try{ local = !!localStorage.getItem(key); }catch(_){}
+  if(local){ if(_seeded && !_seeded[key]) seedMark(key); return true; }   /* 옛 표시 → 서버에도 */
+  if(_seeded === null){ seedFlagsLoad(); return true; }                     /* 모르면 안 심는다 */
+  return !!_seeded[key];
+}
+function seedMark(key){
+  try{ localStorage.setItem(key,'1'); }catch(_){}
+  if(_seeded) _seeded[key] = Date.now();
+  try{ Store.db.ref(DB_ROOT+'/config/seeded/'+key).set(Date.now()).catch(()=>{}); }catch(_){}
+}
 /* 자문·급여·노조·기금·사무대행 탭을 '전체 명함/전체 사업자등록증'에 1회 생성.
    (예전 자동 표시되던 줄을 대신 — 이제는 일반 탭이라 삭제·이름변경이 자유롭다) */
 function seedErpTabs(){
   try{
     if(Store.mode!=='firebase') return;
-    if(localStorage.getItem('pucards_erptabs_v1')) return;
+    if(seedDone('pucards_erptabs_v1')) return;   /* 표시는 서버에(점검 ①) */
     ['card','biz'].forEach(kind=>{
       ERP_TYPES.forEach((t,i)=>{
         const dup=Object.values(state.views||{}).find(v=>v&&(v.kind||'card')===kind
@@ -3928,7 +3954,7 @@ function seedErpTabs(){
         Store.putView(v); state.views[v.id]=v;
       });
     });
-    localStorage.setItem('pucards_erptabs_v1','1');
+    seedMark('pucards_erptabs_v1');
     try{ render(); }catch(_){}
   }catch(e){ console.warn('[seedErpTabs]', e&&e.message); }
 }
@@ -3940,7 +3966,7 @@ function seedErpTabs(){
 function seedClosedTab(){
   try{
     if(Store.mode!=='firebase') return;
-    if(localStorage.getItem('pucards_closedtab_v1')) return;
+    if(seedDone('pucards_closedtab_v1')) return;   /* 표시는 서버에(점검 ①) */
     ['card','biz'].forEach(kind=>{
       const dup = Object.values(state.views||{}).find(v=>v&&(v.kind||'card')===kind
         &&(v.scope||'all')==='all'&&((v.f||{}).erpFilter)==='closed');
@@ -3951,7 +3977,7 @@ function seedClosedTab(){
       const v = { id:uid(), name:'🚪 해지', kind, scope:'all', order:1100, f };
       Store.putView(v); state.views[v.id]=v;
     });
-    localStorage.setItem('pucards_closedtab_v1','1');
+    seedMark('pucards_closedtab_v1');
     try{ render(); }catch(_){}
   }catch(e){ console.warn('[seedClosedTab]', e&&e.message); }
 }
@@ -3962,7 +3988,7 @@ function seedClosedTab(){
 function seedBizFolders(){
   try{
     if(Store.mode!=='firebase') return;
-    if(localStorage.getItem('pucards_bizfolders_v1')) return;
+    if(seedDone('pucards_bizfolders_v1')) return;   /* 표시는 서버에(점검 ①) */
     if(!state.groups) return;
     const hasBiz = nm => Object.values(state.groups).some(g=>g && ((g.kind||'card')==='biz') && _canon(g.name)===nm);
     [['거래처·기관',9001],['우리법인',9002]].forEach(([nm,ord])=>{
@@ -3970,7 +3996,7 @@ function seedBizFolders(){
       const g={id:uid(), name:nm, kind:'biz', order:ord};
       Store.putGroup(g); state.groups[g.id]=g;
     });
-    localStorage.setItem('pucards_bizfolders_v1','1');
+    seedMark('pucards_bizfolders_v1');
     try{ render(); }catch(_){}
   }catch(e){ console.warn('[seedBizFolders]', e&&e.message); }
 }
@@ -4264,6 +4290,8 @@ const Store = {
       modeBadge.textContent='실시간 공유'; modeBadge.classList.add('live');
       modeBadge.title='전 직원 실시간 공유 중';
       const subscribe = (seed, ckpt) => {
+        /* «한 번만 심기» 서버 표시를 먼저 읽어 둔다 — 탭·폴더 씨앗(몇 초 뒤)이 이것을 보고 정한다(점검 ①) */
+        seedFlagsLoad();
         /* ★★ «바뀐 것만» 받는다 (대표 지시 2026-09-18 「기업정보함도 줄여라」)
            ── 무엇이 있었나
              씨앗이 있어도 켤 때마다 명함 6,600장 3.07MB 를 통째로 다시 받았다.
@@ -4288,6 +4316,8 @@ const Store = {
             bootMark('items', _partial ? '바뀐 것만' : '통째로');
             Store._itemsReady=true; _cardSeedUsed=false; restoreLastScreen();
             if(!Store._idxDone){ setTimeout(backfillIdx, 3000); }
+            /* 자동 폴더 정리는 명함이 다 들어온 «뒤»에만 돈다 — 이알피가 먼저 읽혔으면 거기서는 건너뛰었다 */
+            setTimeout(function(){ try{ if(ErpMatch.ready) ErpMatch.autoFolder(); }catch(_){} }, 1500);
             /* 번호 열쇠 자리 첫 채우기 — 한 번만. 명함이 다 들어온 뒤라야 빠짐없이 찬다. */
             if(!Store._byKeyDone){ Store._byKeyDone=true; setTimeout(ensureByKeyMap, 4000); }
           }
@@ -4525,11 +4555,15 @@ const Store = {
          그리로 보내면 숨겨 둔 것이 지우는 순간 드러난다. */
       const R = priv ? privRoot() : DB_ROOT;
       await this.db.ref(`${R}/trash/${id}`).set(rec);
-      /* ⚠ 사진·썸네일은 **안 지운다**. 지우면 휴지통에서 복원해도 빈 사진이 온다. */
-      this.db.ref(`${R}/items/${id}`).remove();
-      if (!priv){ removeIdx(id, it);  /* 개인 명함은 애초에 검색목록에 없다 */
-        /* 지운 자국 — 「바뀐 것만」 받는 기기는 이 자국이 없으면 지운 명함을 계속 들고 있다 */
-        cardTomb(id); }
+      /* ⚠ 사진·썸네일은 **안 지운다**. 지우면 휴지통에서 복원해도 빈 사진이 온다.
+         ★ 명함 지우기와 «지운 자국»을 한 통으로 보낸다(2026-10-07 점검 ①). 예전에는 따로 보내고
+           둘 다 실패를 삼켰다 — 지우기만 되고 자국이 빠지면 「바뀐 것만」 받는 기기에 지운 명함이
+           유령으로 남았다. 이제 실패하면 부르는 쪽까지 알려진다(await). */
+      const up = {}; up[`${R}/items/${id}`] = null;
+      /* 지운 자국 — 「바뀐 것만」 받는 기기는 이 자국이 없으면 지운 명함을 계속 들고 있다 */
+      if (!priv) up[`${DB_ROOT}${TOMB}/${id}`] = Date.now();
+      await this.db.ref().update(up);
+      if (!priv) removeIdx(id, it);  /* 개인 명함은 애초에 검색목록에 없다 */
       /* 휴지통을 «다시 읽어야 할 것»으로 표시한다 (2026-09-18) — 이제 열 때 읽으므로,
          방금 지운 것이 목록에 안 보이면 사람이 「안 지워졌나」 한다. */
       _trashLoaded = false;
@@ -5041,6 +5075,10 @@ const ErpMatch = {
   autoFolder(){
     try{
       if(!ErpMatch.ready) return;
+      /* ⚠ 명함이 «다 들어오기 전»에는 안 돈다(2026-10-07 점검 ①) — 이 셈은 «명함이 하나도 안 남은
+           폴더»를 지운다. 반쯤 들어온 때 돌면 실제로는 명함이 든 폴더를 비었다고 지울 수 있다.
+           명함이 다 들어오면 그때 한 번 부른다(Store.init 의 _itemsReady 자리). */
+      if(Store.mode === 'firebase' && !Store._itemsReady) return;
       const items = Object.values(state.items||{});
       if(!items.length) return;
       /* 폴더는 명함용(card)·사업자용(biz)이 따로 — 이름이 같아도 서로 섞이지 않게 종류까지 맞춰 찾는다 */
@@ -10453,22 +10491,32 @@ function chosung(s){ let r='';
     r += (c>=0xAC00 && c<=0xD7A3) ? CHO[Math.floor((c-0xAC00)/588)] : ch; }
   return r; }
 /* 빈 명함(이름·회사·전화·이메일 모두 없음) 목록 — 정리 센터 건수 표시에도 사용 */
+/* ⚠ 남의 잠긴 폴더 명함은 빼고 센다(2026-10-07 점검 ①) — 이름 고치기·섞임 정리(inHiddenLocked)와 같은 잣대 */
 function emptyTargets(){
-  return Object.values(state.items).filter(it=>it&&it.kind===state.tab)
+  return Object.values(state.items).filter(it=>it&&it.kind===state.tab&&!inHiddenLocked(it))
     .filter(it=> !String(it.name||'').trim() && !String(it.company||'').trim()
               && !String(it.mobile||'').trim() && !String(it.tel||'').trim()
               && !String(it.companyTel||'').trim() && !String(it.email||'').trim());
 }
 /* 빈 명함 정리 — 이름·회사·전화·이메일이 모두 없는 항목 삭제 */
 async function cleanEmpty(){
-  const targets = Object.values(state.items).filter(it=>it.kind===state.tab)
-    .filter(it=> !String(it.name||'').trim() && !String(it.company||'').trim()
-              && !String(it.mobile||'').trim() && !String(it.tel||'').trim()
-              && !String(it.companyTel||'').trim() && !String(it.email||'').trim());
+  /* 고를 것은 emptyTargets 한 곳에서 — 따로 세면 한쪽만 잠긴 폴더를 뺀다 */
+  const targets = emptyTargets();
   if (!targets.length) return toast('빈 명함이 없습니다');
   if (!confirm(`이름·회사·전화·이메일이 모두 없는 빈 명함 ${targets.length}건을 삭제할까요?`)) return;
-  targets.forEach(it=>Store.del(it.id));
-  toast(`빈 명함 ${targets.length}건을 삭제했습니다`);
+  const r = await delMany(targets.map(it=>it.id));
+  toast(r.fail ? `빈 명함 ${r.ok}건을 지웠고 ${r.fail}건은 못 지웠습니다 — ${r.why}` : `빈 명함 ${r.ok}건을 삭제했습니다`, r.fail ? 9000 : undefined);
+}
+/* 여러 장 지우기 — 스무 장씩 묶어 보내고 «된 것·안 된 것»을 센다(2026-10-07 점검 ①).
+   예전에는 forEach 로 던져 놓고 결과를 안 봐, 실패해도 「N건 지웠습니다」가 떴다. */
+async function delMany(ids){
+  let ok = 0, fail = 0, why = '';
+  const list = (ids||[]).filter(Boolean);
+  for(let i=0;i<list.length;i+=20){
+    const rs = await Promise.allSettled(list.slice(i,i+20).map(id => Store.del(id)));
+    rs.forEach(x => { if(x.status==='fulfilled') ok++; else { fail++; if(!why) why = (x.reason && x.reason.message) || String(x.reason); } });
+  }
+  return { ok, fail, why };
 }
 
 /* 회사주소 앞 시·도 추출 (지역 필터용) */
@@ -11888,7 +11936,7 @@ function mailSel(){
    찾은 결과를 통째로 고를 수 있게 된 뒤로는 엔터 한 번에 수백 건이 사라질 수 있다.
    100건이 넘으면 확인 창을 넘기지 못하게 '삭제'를 손으로 치게 한다. */
 const DEL_TYPE_MIN = 100;
-function delSel(){
+async function delSel(){
   const ids=Object.keys(state.sel); if(!ids.length) return toast('항목을 먼저 선택하세요');
   const n = ids.length;
   if(n > DEL_TYPE_MIN){
@@ -11901,8 +11949,10 @@ function delSel(){
   } else {
     if(!confirm(n+'개 항목을 삭제할까요? (전 직원 기업정보함에서 삭제됩니다)')) return;
   }
-  ids.forEach(id=>Store.del(id)); state.sel={}; renderSelbar(); render();
-  toast(`${n.toLocaleString()}건을 휴지통으로 옮겼습니다 — 되살리려면 환경설정 → 🗑 휴지통`,7000);
+  toast(`휴지통으로 옮기는 중… ${n.toLocaleString()}건`, 30000);
+  const r = await delMany(ids); state.sel={}; renderSelbar(); render();
+  if(r.fail) toast(`${r.ok.toLocaleString()}건을 휴지통으로 옮겼고 ${r.fail.toLocaleString()}건은 못 옮겼습니다 — ${r.why}`, 9000);
+  else toast(`${n.toLocaleString()}건을 휴지통으로 옮겼습니다 — 되살리려면 환경설정 → 🗑 휴지통`,7000);
 }
 
 /* ── 그룹으로 드래그 이동(PC) ── */
@@ -13259,7 +13309,9 @@ function askCardOwner(id){
 }
 function delItem(id){
   if(!confirm('정말 삭제할까요? (전 직원 기업정보함에서 삭제됩니다)')) return;
-  Store.del(id); closeDetail(); toast('삭제되었습니다');
+  closeDetail();
+  /* 지우기가 실패하면 «삭제되었습니다»라고 하지 않는다(2026-10-07 점검 ①) */
+  Store.del(id).then(()=>toast('삭제되었습니다'), e=>toast('삭제하지 못했습니다 — ' + ((e && e.message) || e), 8000));
 }
 async function zoom(id){
   let src;
@@ -15136,7 +15188,8 @@ function dupIgnoreAdd(ids){
 
 /* 지금 종류의 명함 전부 — 개인 폴더(잠금) 명함은 넣지 않는다.
    ⚠ 공용 목록에 개인 명함이 옆에 나오면 숨긴 사실 자체가 드러난다. */
-function dupPool(){ return Object.values(state.items).filter(it=>it.kind===state.tab); }
+/* ⚠ 남의 잠긴 폴더 명함은 합치기·치우기 대상에서 뺀다(2026-10-07 점검 ①) */
+function dupPool(){ return Object.values(state.items).filter(it=>it&&it.kind===state.tab&&!inHiddenLocked(it)); }
 
 let _dupFixIds = [];      /* 지금 팝업이 다루는 명함들 */
 let _dupFixKeep = '';     /* 남길 것 */
@@ -15571,18 +15624,22 @@ async function openMojibakeCleanup(){
   toast('정리 중…',9000);
   if(Store.mode==='firebase'){
     const now=Date.now();
+    let failN = 0, failWhy = '';   /* 못 보낸 것을 센다 — 예전에는 삼키고 「✅ 다 보냈다」고 했다(점검 ①) */
     for(let s=0;s<bad.length;s+=200){
       const chunk=bad.slice(s,s+200), trashUpd={}, itemUpd={};
       chunk.forEach(it=>{ trashUpd[it.id]={...it,_deletedAt:now,_photo:'',_photo2:''}; itemUpd[it.id]=null; removeIdx(it.id, it); });
       try{ await Store.db.ref(DB_ROOT+'/trash').update(trashUpd);
            await Store.db.ref(DB_ROOT+'/items').update(itemUpd);
-           cardTomb(Object.keys(itemUpd));    /* 지운 자국 */
+           /* 지운 자국 — 실패를 삼키지 않게 기다린다(cardTomb 은 조용히 넘긴다) */
+           const tomb = {}; Object.keys(itemUpd).forEach(id=>{ tomb[id] = now; });
+           await Store.db.ref(DB_ROOT+TOMB).update(tomb);
            chunk.forEach(it=>{ Store.delPhoto(it.id); Store.delPhoto(it.id+'_b');
                                Store.delThumb(it.id); Store.delThumb(it.id+'_b'); });
-      }catch(e){ console.warn('[mojibake]', e&&e.message); }
+      }catch(e){ console.warn('[mojibake]', e&&e.message); failN += chunk.length; if(!failWhy) failWhy = (e&&e.message)||String(e); }
       toast(`정리 중… ${Math.min(s+200,bad.length).toLocaleString()}/${bad.length.toLocaleString()}`,5000);
     }
-  } else { bad.forEach(it=>Store.del(it.id)); }
+    if(failN){ toast(`깨진 명함 ${(bad.length-failN).toLocaleString()}장은 휴지통으로 보냈고 ${failN.toLocaleString()}장은 못 보냈습니다 — ${failWhy}`, 9000); render(); return; }
+  } else { await delMany(bad.map(it=>it.id)); }
   toast(`✅ 깨진 명함 ${bad.length.toLocaleString()}장을 휴지통으로 보냈습니다 (30일 복구 가능)`,7000);
   render();
 }
@@ -15791,7 +15848,7 @@ function openMixedFix(){
    중복·유사·빈 명함·깨진 글자·휴지통이 흩어져 있어 "지금 정리할 게 있나?"를 네 번 눌러야 알던 것을
    한 번에 보여준다. 각 줄의 버튼은 기존 정리 화면을 그대로 연다. */
 function mojibakeTargets(){
-  return Object.values(state.items).filter(it=>it&&it.kind==='card'&&itemMojibake(it));
+  return Object.values(state.items).filter(it=>it&&it.kind==='card'&&!inHiddenLocked(it)&&itemMojibake(it));
 }
 /* ════════════ 📋 사업자등록증 → 기업상세 부어 넣기 (대표 지시 2026-09-18) ════════════
    「이알피 데이터와 기업정보함을 검토하고 어떻게 하는 게 좋은지」 → 「추천대로」
@@ -27966,6 +28023,9 @@ async function unsetFolderLock(id){
       const it = state.priv.items[cid];
       if(!it){ delete upd[`${DB_ROOT}/items/${cid}`]; delete upd[`${DB_ROOT}/photos/${cid}`]; continue; }
       const body = {...it}; delete body.thumb; delete body.thumb2;
+      /* ★ 고친 시각을 새로 찍는다 — 잠글 때 남긴 «지운 자국»(movePaths)을 본 다른 PC 는 이 명함을 걷어 냈다.
+           시각이 옛것이면 「바뀐 것만」 받는 그 PC 에 다시 안 실려 온다(사흘마다 통째 받기 전까지) */
+      body.updatedAt = Date.now();
       upd[`${DB_ROOT}/items/${cid}`] = body;
       const ph = await Store.getPhoto(cid).catch(()=>'');
       if(ph) upd[`${DB_ROOT}/photos/${cid}`] = ph; else delete upd[`${DB_ROOT}/photos/${cid}`];
@@ -29034,10 +29094,10 @@ function classifyTabsOf(r){
 function seedClassifyRules(){
   try{
     if(Store.mode!=='firebase') return;
-    if(localStorage.getItem('pucards_rules_v1')) return;
+    if(seedDone('pucards_rules_v1')) return;   /* 표시는 서버에(점검 ①) */
     if(Object.keys(state.rules||{}).length) return;
     CLASSIFY_DEFAULTS.forEach(r=>{ Store.putRule({...r, words:r.words.slice()}); });
-    localStorage.setItem('pucards_rules_v1','1');
+    seedMark('pucards_rules_v1');
   }catch(e){ console.warn('[seedClassifyRules]', e&&e.message); }
 }
 /* 지금 쓸 규칙 — 저장된 게 있으면 그것, 없으면 기본값. 항상 order 오름차순 */
@@ -29255,7 +29315,7 @@ async function autoClassifyOnArrive(){
 function seedProfTabs(){
   try{
     if(Store.mode!=='firebase') return;
-    if(localStorage.getItem('pucards_proftabs_v1')) return;
+    if(seedDone('pucards_proftabs_v1')) return;   /* 표시는 서버에(점검 ①) */
     if(!state.groups || !Object.keys(state.groups).length) return;
     let put = 0;
     classifyRuleList().forEach(function(r){
@@ -29281,7 +29341,7 @@ function seedProfTabs(){
         });
       });
     });
-    localStorage.setItem('pucards_proftabs_v1','1');
+    seedMark('pucards_proftabs_v1');
     if(put){ try{ render(); }catch(_){} toast(`직업별 탭 ${put}개를 만들었습니다 — 폴더를 누르면 윗줄에 나옵니다`, 7000); }
   }catch(e){ console.warn('[seedProfTabs]', e && e.message); }
 }
@@ -38562,6 +38622,10 @@ function movePaths(ids, gid, dir){
     /* 공유 검색목록에는 잠글 때 '지우기'만 넣고, 풀 때 되살릴 값을 넣는다.
        개인 명함이 여기 남으면 푸른이알피 같은 다른 앱이 읽는다. */
     out[`${DB_ROOT}/idx/${id}`] = lock ? null : 1;
+    /* ★ 잠그면 공유에서는 «지워진 것»과 같다 — 지운 자국을 남긴다(2026-10-07 점검 ①, 한 장짜리 cardPrivPaths 와 같다).
+         안 남기면 「바뀐 것만」 받는 다른 직원 PC 에 잠근 명함이 최대 사흘 그대로 보인다.
+         ⚠ 풀 때는 자국이 필요 없다 — 풀면서 고친 시각을 새로 찍어 다시 실려 간다. */
+    if(lock) out[`${DB_ROOT}${TOMB}/${id}`] = Date.now();
   });
   out[`${P}/groups/${gid}`]        = lock ? 1 : null;
   out[`${DB_ROOT}/groups/${gid}`]  = lock ? null : 1;

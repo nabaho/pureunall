@@ -28,7 +28,7 @@ function load(){
     crypto: require('node:crypto').webcrypto,
     btoa: s => Buffer.from(s, 'binary').toString('base64'),
     atob: s => Buffer.from(s, 'base64').toString('binary'),
-    DB_ROOT: 'pucards',
+    DB_ROOT: 'pucards', TOMB: '/tomb',
     PRIV_ROOT: 'pucards_private',
     privRoot: () => 'pucards_private/UID1'
   };
@@ -94,8 +94,20 @@ test('잠글 때 — 개인 자리에 쓰고 공용 자리를 모두 지운다',
     'pucards/photos/a1': 1,
     'pucards/photos/a2': 1,
     'pucards/idx/a1': 1,
-    'pucards/idx/a2': 1
+    'pucards/idx/a2': 1,
+    /* 지운 자국 — 「바뀐 것만」 받는 다른 PC 가 걷어 내게(2026-10-07 점검 ①) */
+    'pucards/tomb/a1': 1,
+    'pucards/tomb/a2': 1
   }));
+});
+
+test('★★ 잠글 때 — 다른 PC 에 «지운 자국»을 남긴다, 풀 때는 안 남긴다', () => {
+  /* 안 남기면 바뀐 것만 받는 다른 직원 PC 에 잠근 명함이 최대 사흘 보인다(개인정보) */
+  const c = load();
+  const p = c.movePaths(['a1'], 'g1', 'lock');
+  assert.ok(Number(p['pucards/tomb/a1']) > 0, '★★ 잠갔는데 지운 자국이 없습니다');
+  const q = c.movePaths(['a1'], 'g1', 'unlock');
+  assert.equal(q['pucards/tomb/a1'], undefined, '풀 때 자국을 남기면 다시 걷어 냅니다');
 });
 
 test('잠글 때 — 공용 자리 값은 반드시 null (지우기)', () => {

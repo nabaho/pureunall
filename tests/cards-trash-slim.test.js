@@ -46,6 +46,7 @@ function store(over) {
     __ref: ref, __calls: calls, Date, Object, JSON, Promise,
     DB_ROOT: 'pucards',
     privRoot: function () { return 'pucards_private'; },
+    TOMB: '/tomb',
     state: { items: { c1: { id: 'c1', name: '홍길동', thumb: '' } }, priv: null, trash: {} },
     removeIdx: function () {},
     /* 지운 자국 — 「바뀐 것만」 받는 기기가 이 자국으로 지운 명함을 걷는다 (2026-09-18) */
@@ -78,7 +79,12 @@ test('★ 지울 때 사진을 안 지운다 — 지우면 복원해도 빈 사�
   await s.del('c1');
   assert.deepEqual(s._calls.delPhoto, [], '★ 사진을 지웠습니다 — 휴지통에서 못 되살립니다');
   assert.deepEqual(s._calls.delThumb, []);
-  assert.deepEqual(s._calls.remove, ['pucards/items/c1'], '목록에서는 빠져야 합니다');
+  /* 목록에서 빠지는 것은 이제 «지운 자국»과 한 통(update 의 null)으로 간다(2026-10-07 점검 ①) */
+  const gone = s._calls.remove.concat([].concat(...s._calls.update.map(u =>
+    Object.keys(u.val || {}).filter(k => u.val[k] === null))));
+  assert.deepEqual(gone, ['pucards/items/c1'], '목록에서는 빠져야 합니다');
+  assert.ok(s._calls.update.some(u => Number((u.val || {})['pucards/tomb/c1']) > 0),
+    '★ 지운 자국이 목록 지우기와 한 통에 없습니다 — 따로 보내면 하나만 되고 하나가 빠진다');
 });
 
 test('★ 영구삭제 때 사진까지 지운다 — 안 지우면 창고에 영영 남는다', () => {

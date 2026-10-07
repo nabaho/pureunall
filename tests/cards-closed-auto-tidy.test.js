@@ -340,8 +340,9 @@ test('★ 「🚪 해지」 탭을 심는 자리가 있다 — 만들어 놓고 
   assert.match(SRC, /erpFilter:'closed'/, '심는 탭이 이 거르개를 걸어야 한다');
   assert.match(SRC, /seedClosedTab, \d+\)/, '★ 심는 함수를 아무도 안 부른다 — 탭이 안 생긴다');
   /* 유형 탭 씨앗과 «다른 열쇠»여야 한다 — 같으면 지운 탭들이 통째로 되살아난다 */
-  const a = SRC.match(/localStorage\.getItem\('pucards_erptabs_v1'\)/);
-  const b = SRC.match(/localStorage\.getItem\('pucards_closedtab_v1'\)/);
+  /* 표시는 이제 서버에 둔다(seedDone — 2026-10-07 점검 ①). 열쇠가 따로인 것은 그대로다 */
+  const a = SRC.match(/seedDone\('pucards_erptabs_v1'\)/);
+  const b = SRC.match(/seedDone\('pucards_closedtab_v1'\)/);
   assert.ok(a && b, '씨앗 열쇠가 따로 있어야 한다');
 });
 
