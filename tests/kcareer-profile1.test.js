@@ -16,7 +16,7 @@ const bare = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
 const 많이 = (n, f) => Array.from({ length: n }, (_, i) => f(i));
 const 재료 = () => ({
   fields: { name: '홍길동', license: '공인노무사', org: '가나노무법인', title: '대표', phone: '010-0000-0000', email: 'hong@example.com',
-            birth: '1975.03.02', rrn: '750302-1234567', amt: '9,999,999' },
+            birth: '1975.03.02', rrn: '800101-1234567', amt: '9,999,999' },
   edu: [{ period: '1998~2002', school: '가나대학교', major: '법학과', degree: '학사' }],
   cert: [{ title: '공인노무사', date: '2006.11.20', org: '고용노동부' }, { title: '노무관리 과정 수료', date: '2020.1.1' }],
   work: 많이(6, (i) => ({ periodLabel: (2000 + i) + '~', org: '가나' + i, title: '노무사' })),
@@ -45,7 +45,7 @@ test('★★ ① 한 장에 맞춘다 — 넘치면 «최근 N»을 줄이고 �
 test('★★ ② 금액·주민번호·생년월일·계좌는 들어갈 길이 없다', () => {
   const m = P1.build(재료(), { use: 'general' });
   const 글 = JSON.stringify(m) + P1.toHtml(m, '');
-  ['750302-1234567', '1975.03.02', '48,000,000', '9,999,999'].forEach((v) => assert.equal(글.indexOf(v), -1, '★ 들어가면 안 되는 것이 들어갔다: ' + v));
+  ['800101-1234567', '1975.03.02', '48,000,000', '9,999,999'].forEach((v) => assert.equal(글.indexOf(v), -1, '★ 들어가면 안 되는 것이 들어갔다: ' + v));
   /* 화면 쪽도 fields 에서 고른 칸만 넘긴다 */
   const src = bare.slice(bare.indexOf('function _p1Src('), bare.indexOf('function _p1Model('));
   assert.match(src, /fields:\{ name:f\.name, license:f\.license, org:f\.org, title:f\.title, phone:f\.phone, email:f\.email \}/);
