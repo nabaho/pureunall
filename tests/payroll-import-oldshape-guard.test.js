@@ -20,7 +20,8 @@ const vm = require('node:vm');
 const { cutFn } = require('./cut-fn');
 
 const html = fs.readFileSync(path.join(__dirname, '..', 'payroll-os.html'), 'utf8');
-const FNS = ['function relockFor(', 'function dbGet(', 'function dbSet(',
+/* 2026-10-07: 올리기가 주민번호 섞임을 먼저 검사한다(rrnLeakCount) — 그 검사도 함께 잘라 온다 */
+const FNS = ['function rrnValid(', 'function rrnLeakCount(', 'function relockFor(', 'function dbGet(', 'function dbSet(',
   'function payHas(', 'function importPayroll(', 'function screenPayroll('];
 const SRC = FNS.map(h => cutFn(html, h)).join('\n');
 

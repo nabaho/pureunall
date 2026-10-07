@@ -678,6 +678,9 @@ function importPayroll(){var i=document.createElement('input');i.type='file';i.a
   i.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
    r.onload=function(){
     var raw; try{ raw=JSON.parse(r.result); }catch(err){ alert('JSON 오류: '+err.message); return; }
+    /* ★ 주민번호가 섞인 급여 파일은 올리지 않는다(2026-10-07) — 주민번호는 「주민번호 올리기」로만, 잠가서. */
+    var leak=rrnLeakCount(r.result);
+    if(leak){ alert('⚠ 이 파일에 주민번호 모양 값이 '+leak+'개 들어 있어 올리지 않았습니다.\n\n급여 자료(payroll_all.json)에는 주민번호가 없어야 합니다. 주민번호는 ⚙️ 설정 카드 → 「주민번호 올리기」로만 올립니다(잠가서 저장).'); return; }
     if(raw.sites&&!raw.index){                       // 옛 모양 — 되돌릴 때만 쓴다
       /* ★ 옛 모양은 payroll 칸을 **통째로** 갈아 끼운다 — 목록(index)·직원 표(emp)가 지워진다
          (2026-10-05 발견). 서버에 새 모양 목록이 이미 있는데 옛 파일(pilot_payroll.json,
@@ -845,7 +848,7 @@ function slipHTML(site,month,e,payday,notice,draft){
   function rows(rs){ return rs.map(function(p){return '<tr><td>'+p[0]+'</td><td class="n">'+won(p[1])+'</td></tr>';}).join(''); }
   return '<div class="slip'+(draft?' draft':'')+'">'+
     '<div class="shead"><div class="co">'+site+'</div><div class="ttl">임 금 명 세 서</div></div>'+
-    '<table class="meta"><tr><td><b>성명</b> '+(e.성명||'')+'</td><td><b>귀속</b> '+month+'</td><td><b>지급일</b> '+(payday||'-')+'</td></tr></table>'+
+    '<table class="meta"><tr><td><b>성명</b> '+(e.성명||'')+'</td>'+(birthOf(App.site, e.성명)?('<td><b>생년월일</b> '+birthOf(App.site, e.성명)+'</td>'):'')+'<td><b>귀속</b> '+month+'</td><td><b>지급일</b> '+(payday||'-')+'</td></tr></table>'+
     '<div class="cols"><div><div class="sec">지급 내역</div><table class="tb">'+rows(r.pay)+
     '<tr class="tot"><td>임금총액</td><td class="n">'+won(r.gross)+'</td></tr></table></div>'+
     '<div><div class="sec">공제 내역</div><table class="tb">'+rows(r.ded)+
@@ -882,7 +885,7 @@ function exportPayrollSlipsHwpx(){
       var r=slipRows(e);
       body+=HWPXDOC.title('임 금 명 세 서', App.site+(draft?' · 미확정 검토용':''), {pageBreak:i>0})
         +HWPX.spacer()
-        +HWPXDOC.infoTable([['성명', e.성명||'', '귀속', App.month], ['지급일', payday||'-']], doc)
+        +HWPXDOC.infoTable([['성명', e.성명||'', '귀속', App.month], ['지급일', payday||'-', '생년월일', birthOf(App.site, e.성명)||'-']], doc)
         +HWPX.spacer()
         +HWPXDOC.moneyTable(['지급 내역','금액(원)'], r.pay, ['지급총액', r.gross], doc)
         +HWPX.spacer()
@@ -1577,6 +1580,8 @@ function screenCards(){
      없어져, 올리는 단추를 아무 데서도 찾을 수 없었다. 올리는 일 둘(급여·설정 카드)을 한 곳에 모은다. */
   h+='<div style="margin:6px 0 12px;font-size:13px"><b>① 급여 자료</b> <button class="btn" onclick="importPayroll()">급여(JSON) 올리기</button>'
     +' <span style="color:var(--sub);font-size:12px">_harness_out 폴더의 payroll_all.json</span></div>';
+  h+='<div style="margin:0 0 12px;font-size:13px"><b>③ 주민번호</b> <button class="btn sec" onclick="uploadRrn()">주민번호 올리기(잠가서 저장)</button>'
+    +' <span style="color:var(--sub);font-size:12px">_harness_out 폴더의 rrn_local.json — 브라우저에서 잠근 뒤에만 서버로 갑니다</span></div>';
   h+='<div style="margin:0 0 12px;font-size:13px"><b>② 설정 카드</b> <button class="btn sec" onclick="importCards()">설정 카드(JSON) 가져와 서버 저장</button>'
     +' <span style="color:var(--sub);font-size:12px">_harness_out 폴더의 site_cards.json</span></div>';
   /* 🏷 이름표 맞추기 — 급여관리 사업장 이름을 업체관리 업체번호에 잇는 곳(2026-10-05) */
@@ -2452,6 +2457,136 @@ function varianceHtml(sites, ym){
     +line('\u2796','빠짐(퇴사?)', v.left)
     +'</div>';
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   주민번호 — 대표 결정 2026-10-07 「암호화해서 저장」
+   ──────────────────────────────────────────────────────────────────────
+   · 하네스가 원본 급여대장에서 읽은 주민번호(rrn_local.json, 평문, 자료 폴더 안)를 «브라우저에서
+     잠근 뒤에만» 서버에 보낸다. 잠금은 백업이 쓰는 모듈(js/pu-rrn-seal.js, AES-GCM) 그대로.
+   · 서버: payroll_os/rrn/{사업장}/{성명} = {v:'enc:v1:…', mask:'800101-1******', by, at}
+           payroll_os/rrn_key/v1 = 열쇠(처음 한 번 만든다)
+   · 화면에는 mask 만 보인다(명세서 생년월일 칸도 이것으로). 「보기」를 누를 때만 풀고,
+     누가·언제·누구 것을 봤는지 payroll_os/rrn_log 에 남긴다.
+   ⚠ 못 막는 것(솔직히): 급여관리 권한(재무·관리자)이 있는 사람은 열쇠도 읽을 수 있어 「보기」가 된다.
+     그래서 열람 기록을 남긴다. 막는 것은 «서버 자료·백업·내보낸 파일이 밖으로 나갔을 때» 읽히는 것.
+   ⚠ 급여 자료 파일(payroll_all.json)에는 주민번호가 들어가면 안 된다 — 올릴 때 막는다(rrnLeakCount).
+   ══════════════════════════════════════════════════════════════════════ */
+var rrnBox={}, rrnBusy={}, rrnKeyP=null;
+function fbk(s){ return String(s==null?'':s).replace(/[.#$\[\]\/]/g,'_'); }
+/* 주민번호 모양 검사 — 13자리, 생년월일이 날짜로 말이 되고 7번째 자리가 1~8 */
+function rrnValid(v){
+  var d=String(v==null?'':v).replace(/\D/g,'');
+  if(d.length!==13) return null;
+  var mm=+d.slice(2,4), dd=+d.slice(4,6);
+  if(mm<1||mm>12||dd<1||dd>31||'12345678'.indexOf(d[6])<0) return null;
+  return d;
+}
+function rrnMask(d){ return d.slice(0,6)+'-'+d[6]+'******'; }
+/* 가린 값에서 생년월일 — 7번째 자리로 세기를 가린다(1·2·5·6=1900년대, 3·4·7·8=2000년대) */
+function birthOfMask(mask){
+  var m=String(mask||'').match(/^(\d{2})(\d{2})(\d{2})-(\d)/); if(!m) return '';
+  var c='3478'.indexOf(m[4])>=0?'20':'19';
+  return c+m[1]+'.'+m[2]+'.'+m[3];
+}
+/* 급여 자료 파일 글자 안의 주민번호 모양 개수 — 0이 아니면 올리지 않는다 */
+function rrnLeakCount(text){
+  var n=0, re=/(^|[^\d])(\d{6})-?(\d{7})(?!\d)/g, m;
+  while((m=re.exec(String(text||'')))){ if(rrnValid(m[2]+m[3])) n++; }
+  return n;
+}
+function rrnKey(){ if(!rrnKeyP) rrnKeyP=PuRrnSeal.keyFor(fbDb.ref(ROOT+'/rrn_key/v1')); return rrnKeyP; }
+/* 사업장 하나의 주민번호(잠긴 것)만 받는다 — 전체를 받지 않는다 */
+function ensureRrn(site){
+  if(!site||rrnBox[site]!==undefined||rrnBusy[site]||!fbDb) return;
+  rrnBusy[site]=1;
+  fbDb.ref(ROOT+'/rrn/'+fbk(site)).once('value').then(function(sn){
+    rrnBox[site]=sn.val()||{}; delete rrnBusy[site]; if(ready) render();
+  }).catch(function(e){ delete rrnBusy[site]; rrnBox[site]={}; console.warn('[주민번호]', e&&e.code); });
+}
+function rrnRec(site, name){ var b=rrnBox[site]; return b?b[fbk(String(name||'').trim())]||null:null; }
+/* 명세서 생년월일 — 그 사업장 것만 처음 한 번 받는다(받는 동안은 빈칸, 받으면 다시 그린다) */
+function birthOf(site, name){ ensureRrn(site); var r=rrnRec(site, name); return r?birthOfMask(r.mask):''; }
+/* 한 사람 잠그기 — {v, mask, by, at} */
+function sealRrn(d, key){
+  return PuRrnSeal.sealOne(d, key).then(function(v){
+    if(!PuRrnSeal.isSealed(v)) throw new Error('잠기지 않았습니다');
+    return {v:v, mask:rrnMask(d), by:(me&&me.email)||'', at:Date.now()};
+  });
+}
+function rrnLog(site, name, why){
+  try{ fbDb.ref(ROOT+'/rrn_log').push({site:site, name:name, why:why, by:(me&&me.email)||'', at:Date.now()}); }catch(e){}
+}
+/* 올릴 묶음 만들기 — rrn_local.json → {경로: 잠긴 값}. 평문은 이 함수 밖으로 안 나간다. */
+function rrnUploadMap(json, key){
+  var jobs=[], bad=0, skipped=json&&json._동명이인?Object.keys(json._동명이인).reduce(function(a,k){ return a+json._동명이인[k].length; },0):0;
+  Object.keys(json||{}).forEach(function(site){
+    if(site==='_동명이인') return;
+    var ppl=json[site]||{};
+    Object.keys(ppl).forEach(function(nm){
+      var d=rrnValid(ppl[nm]); if(!d){ bad++; return; }
+      jobs.push(sealRrn(d, key).then(function(rec){ return [ROOT+'/rrn/'+fbk(site)+'/'+fbk(nm), rec]; }));
+    });
+  });
+  return Promise.all(jobs).then(function(pairs){
+    var up={}; pairs.forEach(function(x){ up[x[0]]=x[1]; });
+    return {up:up, n:pairs.length, bad:bad, dup:skipped};
+  });
+}
+function uploadRrn(){
+  var i=document.createElement('input'); i.type='file'; i.accept='.json';
+  i.onchange=function(e){ var f=e.target.files[0]; if(!f) return; var r=new FileReader();
+    r.onload=function(){
+      var json; try{ json=JSON.parse(r.result); }catch(err){ alert('JSON 오류: '+err.message); return; }
+      rrnKey().then(function(key){ return rrnUploadMap(json, key); }).then(function(res){
+        if(!res.n){ alert('올릴 주민번호가 없습니다.'); return; }
+        if(!confirm('주민번호 '+res.n+'명분을 «잠가서» 저장합니다.\n(모양이 틀린 것 '+res.bad+'건 · 동명이인이라 뺀 것 '+res.dup+'명은 화면에서 직접 넣습니다)\n\n계속할까요?')) return;
+        return fbDb.ref().update(res.up).then(function(){
+          rrnBox={}; rrnLog('*', '*', '올리기 '+res.n+'명'); render();
+          alert('잠가서 저장했습니다: '+res.n+'명\n원본 파일(rrn_local.json)은 자료 폴더 밖으로 옮기지 마세요.');
+        });
+      }).catch(function(err){ alert('주민번호 올리기 실패: '+((err&&err.code)||err.message||err)); });
+    }; r.readAsText(f); };
+  i.click();
+}
+function revealRrn(site, name){
+  var rec=rrnRec(site, name); if(!rec){ alert('등록된 주민번호가 없습니다.'); return; }
+  rrnKey().then(function(key){ return PuRrnSeal.unsealOne(rec.v, key); }).then(function(plain){
+    rrnLog(site, name, '보기');
+    prompt(name+' 주민번호 (열람 기록이 남습니다)', plain.slice(0,6)+'-'+plain.slice(6));
+  }).catch(function(err){ alert('풀지 못했습니다: '+((err&&err.code)||err.message||err)); });
+}
+function enterRrn(site, name){
+  var v=prompt(name+' 주민번호 13자리(입력하는 즉시 잠가서 저장합니다)',''); if(v==null) return;
+  var d=rrnValid(v); if(!d){ alert('주민번호 모양이 아닙니다(13자리, 생년월일·성별 자리 확인).'); return; }
+  rrnKey().then(function(key){ return sealRrn(d, key); }).then(function(rec){
+    return fbDb.ref(ROOT+'/rrn/'+fbk(site)+'/'+fbk(name)).set(rec).then(function(){
+      (rrnBox[site]=rrnBox[site]||{})[fbk(name)]=rec; rrnLog(site, name, '입력'); render();
+    });
+  }).catch(function(err){ alert('저장 실패: '+((err&&err.code)||err.message||err)); });
+}
+window.uploadRrn=uploadRrn; window.revealRrn=revealRrn; window.enterRrn=enterRrn;
+/* 회사 한 장(한눈에)의 주민번호 칸 — 그 달 직원 명단 기준, 가린 값 · 「보기」 · 없으면 「입력」 */
+function rrnPanelHtml(sites, ym){
+  var site=App.site; if(!site) return '';
+  ensureRrn(site);
+  var mr=monthRecsFor(sites, ym); if(!mr) return '';
+  var emps=empsMonth(mr);
+  var box='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:14px">';
+  var head='<div style="padding:10px 16px;border-bottom:1px solid var(--line);font-size:13px"><b>주민번호</b> <span style="font-size:12px;color:var(--sub)">잠가서 저장 · 가린 값만 보임 · 「보기」는 기록이 남습니다 ('+mr.y+'년 '+mr.m+'월 명단)</span></div>';
+  if(!emps||rrnBox[site]===undefined) return box+head+'<div style="padding:10px 16px;font-size:12.5px;color:var(--sub)">불러오는 중…</div></div>';
+  var have=emps.filter(function(e){ return rrnRec(site, e.성명); }).length;
+  var h=box+head+'<div style="padding:8px 16px;font-size:12.5px;border-bottom:1px solid var(--line)">등록 '+have+' / '+emps.length+'명'
+    +(emps.length-have?(' · <span style="color:var(--warn)">없음 '+(emps.length-have)+'명</span>'):'')+'</div>';
+  emps.forEach(function(e){
+    var nm=String(e.성명||'').trim(), rec=rrnRec(site, nm), q=esc(site), qn=esc(nm);
+    h+='<div style="display:flex;align-items:center;gap:10px;padding:6px 16px;border-bottom:1px solid var(--line);font-size:12.5px">'
+      +'<b style="width:110px">'+nm+'</b>'
+      +(rec?('<span style="font-family:monospace">'+rec.mask+'</span><span style="flex:1"></span><button class="btn sec" style="padding:2px 9px;font-size:12px" onclick="revealRrn(\''+q+'\',\''+qn+'\')">보기</button>')
+           :('<span style="color:var(--warn)">없음</span><span style="flex:1"></span><button class="btn" style="padding:2px 9px;font-size:12px" onclick="enterRrn(\''+q+'\',\''+qn+'\')">입력</button>'))
+      +'</div>';
+  });
+  return h+'</div>';
+}
 /* 만 원 단위로 짧게 — 정확한 값은 알약에 손을 대면 보인다 */
 function manwon(n){ return (n==null)?'-':(Math.abs(n)>=10000?(Math.round(n/10000).toLocaleString()+'만원'):(won(n)+'원')); }
 
@@ -2547,7 +2682,7 @@ function shellSummary(m, co, sites){
   h+=row('🎓','퇴직', c.sever?(c.sever+'명 퇴사일 등록'):'퇴사자 없음', c.sever?'warn':'', 'sever');
   h+=row('📄','명세서', c.lock?(c.lock+'개월분 발급 가능'):'확정된 달이 없습니다', c.lock?'ok':'', 'slip');
   h+=row('📑','신고', '일용 매월신고 · 취득상실 · 퇴직정산 · 연차', '', 'report');
-  return h+'</div>'+varianceHtml(sites, m.ym)+filingHtml(co);
+  return h+'</div>'+varianceHtml(sites, m.ym)+filingHtml(co)+rrnPanelHtml(sites, m.ym);
 }
 /* ══════ 신고 담당 — 2026-10-07 대표 「순서대로」 4번 ══════
    노무법인은 근로내용확인신고·4대보험을, 고객의 기장 세무사는 원천세·지급명세서를 맡는 경우가 많다.
