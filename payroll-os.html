@@ -770,11 +770,26 @@ function slipRows(e){
     payRows.push(['노무비(일당제)',(gross!=null)?gross:e.일당*e.근무일수]);
     calc='일당 '+won(e.일당)+'원 × '+e.근무일수+'일';
   }else{
-    if(e.기본급!=null) payRows.push(['기본급',e.기본급]);
-    if(gross!=null&&e.기본급!=null&&gross>e.기본급) payRows.push(['그 외 지급(수당·비과세 등)',gross-e.기본급]);
-    else if(gross!=null&&e.기본급==null) payRows.push(['지급액',gross]);
+    /* ★ 구성항목별 금액(근로기준법 시행령 제27조의2 — 원문 대조 전, 2차 자료로 확인) — 2026-10-07.
+       파서가 대장의 수당 열을 「지급항목」으로 읽어 오면 한 줄씩 적는다. 예전엔 기본급 밖을 전부
+       「그 외 지급」 한 줄로 뭉쳐(실측 직원 줄의 85.6%) 법정 기재사항을 못 채웠다.
+       ⚠ 안전장치: 기본급+항목 합이 임금총액을 «넘으면» 잘못 읽은 것이라 쓰지 않고 예전처럼 뭉친다.
+         모자라면 남는 몫을 「그 외 지급(차액)」으로 — 그래서 임금총액−공제=실수령은 늘 그대로다. */
+    var items=(e.지급항목&&typeof e.지급항목==='object')?Object.keys(e.지급항목).map(function(k){ return [k, Number(e.지급항목[k])||0]; }).filter(function(x){ return x[1]; }):[];
+    var base=(e.기본급!=null)?e.기본급:0, isum=items.reduce(function(a,x){ return a+x[1]; },0);
+    if(items.length&&gross!=null&&base+isum<=gross+1){
+      if(e.기본급!=null) payRows.push(['기본급',e.기본급]);
+      items.forEach(function(x){ payRows.push(x); });
+      if(gross-(base+isum)>=1) payRows.push(['그 외 지급(차액)',gross-(base+isum)]);
+    } else {
+      if(e.기본급!=null) payRows.push(['기본급',e.기본급]);
+      if(gross!=null&&e.기본급!=null&&gross>e.기본급) payRows.push(['그 외 지급(수당·비과세 등)',gross-e.기본급]);
+      else if(gross!=null&&e.기본급==null) payRows.push(['지급액',gross]);
+    }
   }
-  return {pay:payRows,ded:dedRows,gross:gross,dedTotal:dedTotal,net:net,calc:calc};
+  /* 연장·야간·휴일 시간 수 — 대장에 시간 열이 있으면 적는다(상시 4명 이하는 생략 가능) */
+  var hours=(e.근로시간&&typeof e.근로시간==='object')?Object.keys(e.근로시간).map(function(k){ return k+' '+e.근로시간[k]+'시간'; }).join(' · '):'';
+  return {pay:payRows,ded:dedRows,gross:gross,dedTotal:dedTotal,net:net,calc:calc,hours:hours};
 }
 /* 설정카드의 급여일이 «진짜 급여일인가».
    ⚠ 생성기(engine/build_site_cards.py)는 못 찾은 곳에 「미확인(사람 지정 필요)」이라는
@@ -837,6 +852,7 @@ function slipHTML(site,month,e,payday,notice,draft){
     '<tr class="tot"><td>공제총액</td><td class="n">'+won(r.dedTotal)+'</td></tr></table></div></div>'+
     '<div class="net">실수령액 <b>'+won(r.net)+'</b> 원</div>'+
     (r.calc?'<div class="calc">계산방법: '+r.calc+' = '+won(r.gross)+'원</div>':'')+
+    (r.hours?'<div class="calc">근로시간: '+r.hours+'</div>':'')+
     (notice?'<div class="snote">'+notice+'</div>':'')+
     '<div class="foot">본 명세서는 근로기준법 제48조제2항에 따라 교부됩니다.</div></div>';
 }
@@ -874,6 +890,7 @@ function exportPayrollSlipsHwpx(){
         +HWPX.spacer()
         +HWPXDOC.moneyTable(null, [['실수령액', r.net]], null, doc, {strong:true});
       if(r.calc) body+=HWPXDOC.note('※ 계산방법: '+r.calc+' = '+won(r.gross)+'원');
+      if(r.hours) body+=HWPXDOC.note('※ 근로시간: '+r.hours);
       if(notice) body+=HWPXDOC.note('※ '+String(notice).replace(/\s*\n\s*/g,' '));
       body+=HWPXDOC.note('본 명세서는 근로기준법 제48조제2항에 따라 교부됩니다.');
     });
