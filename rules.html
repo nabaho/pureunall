@@ -36,7 +36,7 @@
 <script src="js/pu-hwp-engine.js?v=20"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="std_2026.js?v=2"></script>
-<script src="js/pu-rules-draft.js?v=1"></script>
+<script src="js/pu-rules-draft.js?v=2"></script>
 <!-- 「💡 우리 문안」(✏️ 조문 편집 아래) — 📚 조별 문안과 «같은 부품». 캐시 번호는 rules-v2.html 과 같게.
      lib-sites 는 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-order.js?v=1"></script>
@@ -1506,6 +1506,16 @@ try { PuGate.soonUnlessAdmin('취업규칙'); } catch(_){}
           <label><input type="checkbox" id="qd-deemed"> 간주근로시간제</label>
           <label><input type="checkbox" id="qd-discretion"> 재량근로</label>
           <label><input type="checkbox" id="qd-bonus"> 상여금</label>
+        </div></div>
+      <div style="grid-column:1/-1;border-top:1px dashed var(--line);padding-top:9px;font-size:12px;color:var(--sub)">
+        <label style="color:var(--ink)"><input type="checkbox" id="qd-short"> <b>단시간 근로자용 규칙도 함께 만들기</b></label>
+        <span class="muted" style="font-size:11px">— 일반 규칙은 단시간사원을 빼므로(제3조) 단시간 근로자가 있으면 따로 한 권이 필요합니다. 표준 「단시간 근로자용」 바탕 · 따로 보관됩니다</span>
+        <div id="qd-short-box" style="display:none;grid-template-columns:2fr 1fr 1fr 1fr 1fr;gap:8px;margin-top:7px">
+          <label style="font-size:12px;color:var(--sub)">근무 요일<input id="qd-sdays" value="월, 수, 금" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+          <label style="font-size:12px;color:var(--sub)">시업<input id="qd-sstart" type="time" value="09:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+          <label style="font-size:12px;color:var(--sub)">종업<input id="qd-send" type="time" value="13:00" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+          <label style="font-size:12px;color:var(--sub)">휴게 시작<input id="qd-sbstart" type="time" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
+          <label style="font-size:12px;color:var(--sub)">휴게 끝<input id="qd-sbend" type="time" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
         </div></div>
       <label style="font-size:12px;color:var(--sub)">시행일 <span class="muted" style="font-size:11px">비우면 부칙에 «직접 채울 곳»</span><input id="qd-eff" type="date" style="width:100%;padding:7px 9px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-family:inherit;margin-top:3px"></label>
     </div>
@@ -9481,7 +9491,9 @@ function qdAnswers(){
     leaveYears:n("qd-leave"), retirement:v("qd-ret"), allowances:v("qd-allow"),
     founding:v("qd-found").trim(), summer:v("qd-summer").trim(), shift:v("qd-shift").trim(), shiftScope:v("qd-shiftscope").trim(),
     flex:{elastic:c("qd-elastic"),select:c("qd-select"),deemed:c("qd-deemed"),discretion:c("qd-discretion")},
-    bonus:c("qd-bonus"), effective:v("qd-eff"), adopt:c("qd-adopt") };
+    bonus:c("qd-bonus"), effective:v("qd-eff"), adopt:c("qd-adopt"),
+    shortOn:c("qd-short"), shortDays:v("qd-sdays"), shortStart:v("qd-sstart"), shortEnd:v("qd-send"),
+    shortBreakStart:v("qd-sbstart"), shortBreakEnd:v("qd-sbend") };
 }
 /* 상시 근로자 수 → 검토의 「근로자」 칸(규칙집이 사업장 규모로 갈린다) */
 const qdSizeKey=n=>n<5?"5인미만":(n<10?"5인이상":(n<30?"10인이상":"30인이상"));
@@ -9490,12 +9502,24 @@ $("qd-go").addEventListener("click",async()=>{
   if(!window.STD_2026||!window.PuRulesDraft){ err.style.display="block"; err.textContent="⚠ 표준규칙 파일을 불러오지 못했습니다 — 새로고침 뒤 다시 하세요."; return; }
   const r=PuRulesDraft.build(STD_2026,ans);
   if(!r.ok){ err.style.display="block"; err.innerHTML="⚠ "+r.why.map(escapeH).join("<br>⚠ "); return; }
+  /* 단시간 근로자용 — 같은 답에 단시간 칸만 더해 한 권 더. 틀리면 둘 다 안 짓는다(반쪽만 지으면 헷갈린다) */
+  QD_SHORT=null;
+  if(ans.shortOn){
+    const sa=Object.assign({},ans,{kind:"short"}), rs=PuRulesDraft.build(STD_2026,sa);
+    if(!rs.ok){ err.style.display="block"; err.innerHTML="⚠ 단시간: "+rs.why.map(escapeH).join("<br>⚠ 단시간: "); return; }
+    QD_SHORT={r:rs,ans:sa};
+  }
   closeOverlay($("ov-qdraft"));
   await takeDraft(r,ans,$("qd-bizno").value.trim());
 });
+$("qd-short").addEventListener("change",()=>{ $("qd-short-box").style.display=$("qd-short").checked?"grid":"none"; });
+/* 단시간 근로자용은 «따로» 들인다 — 사업자번호를 안 붙이고 이름에 「단시간근로자」를 단다.
+   ⚠ 같은 사업자번호로 넣으면 보관함 자리(site_사업자번호)가 같아 일반 규칙을 덮어쓴다. */
+let QD_SHORT=null;
+const qdShortSite=ans=>ans.company+" 단시간근로자";
 /* 지은 한 권을 «올린 파일»처럼 들인다 — 작성기 인계(takeHandoff)와 같은 길: 넣기 → 92항목 검토 → 보관 */
-async function takeDraft(r,ans,bizno){
-  const key="Q"+Date.now(), site=ans.company;
+async function takeDraft(r,ans,bizno,siteName){
+  const key="Q"+Date.now(), site=siteName||ans.company;
   SAMPLES[key]=r.text; SITE_MAP[key]="🏢 "+site; SITE_BIZNO[key]=bizno||"";
   SITE_FILE[key]=site+"_취업규칙(제정안).txt"; SITE_NAME[key]=site;   // 「(제정안)」 — isEnact 의 잣대
   const o=document.createElement("option"); o.value=key; o.textContent=SITE_MAP[key];
@@ -9514,8 +9538,11 @@ async function takeDraft(r,ans,bizno){
     +(r.dropped.length?" · 뺀 조: "+r.dropped.map(d=>escapeH(d.title)).join(", "):"")
     +(r.leftovers.length?"<br>⚠ <b>직접 채울 곳 "+r.leftovers.length+"</b>: "+r.leftovers.map(escapeH).join(", "):"<br>✓ 빈칸 없음")
     +(r.warnings.length?"<br>⚠ "+r.warnings.map(escapeH).join(" / "):"")
-    +(adopted.length?"<br>⚖ 표준 뒤에 바뀐 법 <b>"+adopted.length+"건</b>을 바로 반영했습니다: "+adopted.map(escapeH).join(", "):"");
+    +(adopted.length?"<br>⚖ 표준 뒤에 바뀐 법 <b>"+adopted.length+"건</b>을 바로 반영했습니다: "+adopted.map(escapeH).join(", "):"")
+    +(r.kind!=="short"&&QD_SHORT?'<br>📄 단시간 근로자용도 지어 두었습니다 — <button class="stbtn on-adopt" id="qd-open-short">단시간 근로자용 열기·검토</button>':"");
   pv.insertBefore(note,pv.firstChild);
+  const os=$("qd-open-short");
+  if(os)os.onclick=async()=>{ const q=QD_SHORT; if(!q)return; QD_SHORT=null; await takeDraft(q.r,q.ans,"",qdShortSite(q.ans)); };
 }
 /* 검토가 짚은 것 중 «준비된 개정 문안»(TPL_BY_RULE)이 있는 것만 반영한다 — 문안 없는 지적·수동확인은 사람이 본다.
    ⚠ 이미 결정한 것은 안 건드린다. 결정은 카드에 «✓ 반영»으로 남아 되돌릴 수 있다. */

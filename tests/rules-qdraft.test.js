@@ -118,3 +118,41 @@ test('⑥ 화면 — ＋ 신규가 질문 창 · 제정으로 넣기·검토·�
   assert.match(RAW, /if\(isEnact\(\)\)return \{lines:\[\],entry:"이 규칙은 "/, '제정 부칙이 아니다');
   assert.match(RAW, /if\(\$\("asof"\)\)\$\("asof"\)\.value=todayKST\(\);/, '기준일이 아직 2026-07-21 에서 시작한다');
 });
+
+/* ── 단시간 근로자용 (대표 「추천대로」 2026-10-07) — 표준 「단시간 근로자용」은 조 번호가 다르다(제목으로 찾는다) ── */
+const 단 = Object.assign({}, 기본, { kind: 'short', shortDays: '월, 수, 금', shortStart: '09:00', shortEnd: '14:00', shortBreakStart: '12:00', shortBreakEnd: '12:30' });
+
+test('⑦ 단시간 — 요일·하루·한 주를 채우고, 일반과 같은 규칙으로 빼고 매긴다', () => {
+  const r = D.build(STD, 단);
+  assert.equal(r.ok, true, (r.why || []).join(' / '));
+  const t = r.text;
+  assert.match(조(t, '적용범위').text, /주식회사 가나상사\(이하 “회사”라 한다\)에 근무하는 단시간사원에게/, '단시간 원문이 아니다');
+  assert.match(조(t, '근로시간').text, /근무일은 월, 수, 금요일로 하고, .*09:00~14:00까지\(4시간 30분\)로 하며, 1주 근로시간은 13시간 30분으로/s);
+  assert.match(조(t, '근로시간').text, new RegExp('제' + 조(t, '휴게').no + '조의 휴게시간'), '★ 옮긴 휴게 조를 옛 번호로 가리킨다');
+  assert.match(조(t, '휴게').text, /12:00부터 12:30까지/);
+  assert.equal(r.leftovers.length, 0, r.leftovers.join(', '));
+  assert.ok(!/^[<＜]/m.test(t), '퇴직급여 안내 줄이 남았다');
+  const nos = [...t.split('부 칙')[0].matchAll(/^제(\d+)조\(/gm)].map((m) => +m[1]);
+  assert.deepEqual(nos, nos.map((_, i) => i + 1));
+  assert.ok(r.warnings.some((w) => /15시간 미만\(초단시간\)/.test(w)), '★ 주 13.5시간인데 초단시간을 안 알린다');
+});
+
+test('⑧ 단시간 — 위법이 되는 답은 안 받는다', () => {
+  const v = (o) => D.validate(Object.assign({}, 단, o));
+  assert.equal(v({ shortBreakStart: '', shortBreakEnd: '' }).ok, false, '★ 4시간 넘게 일하는데 휴게 없이 받았다(제54조)');
+  assert.equal(v({ shortDays: '월 화 수 목 금', shortStart: '09:00', shortEnd: '18:00', shortBreakStart: '12:00', shortBreakEnd: '13:00' }).ok, false,
+    '★ 주 40시간을 단시간으로 받았다(제2조제1항제9호)');
+  assert.equal(v({ shortDays: '', }).ok, false);
+  assert.equal(v({ shortEnd: '12:00', shortBreakStart: '', shortBreakEnd: '' }).ok, true, '3시간 근무는 휴게 없이 된다');
+  const r = D.build(STD, Object.assign({}, 단, { shortEnd: '12:00', shortBreakStart: '', shortBreakEnd: '' }));
+  assert.ok(r.leftovers.some((x) => /휴게/.test(x)), '휴게를 안 두는데 휴게 조의 빈칸을 안 알린다');
+});
+
+test('⑨ 화면 — 단시간은 «따로» 들인다(사업자번호 없이 · 이름에 단시간근로자)', () => {
+  assert.match(RAW, /id="qd-short"/);
+  const go = RAW.slice(RAW.indexOf('$("qd-go").addEventListener("click"'), RAW.indexOf('async function takeDraft('));
+  assert.match(go, /kind:"short"/);
+  assert.match(go, /if\(!rs\.ok\)\{[^}]*return; \}/, '단시간이 틀려도 일반만 짓는다(반쪽)');
+  assert.match(go, /const qdShortSite=ans=>ans\.company\+" 단시간근로자";/);
+  assert.match(RAW, /await takeDraft\(q\.r,q\.ans,"",qdShortSite\(q\.ans\)\)/, '★ 단시간을 같은 사업자번호로 넣어 일반 규칙을 덮어쓴다');
+});
