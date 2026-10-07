@@ -81,38 +81,35 @@ const fs = require('node:fs');
 const path = require('node:path');
 const source = fs.readFileSync(path.join(__dirname, '..', 'kcareer.html'), 'utf8');
 const bare = source.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/<!--[\s\S]*?-->/g, ' ');
+/* 함수 «끝까지» 자른다 — 앞 몇 글자로 자르면 함수에 줄을 보탤 때마다 검사가 헛깨진다(2026-10-07) */
+const buildFn = (() => { const at = bare.indexOf('async function rhBuildInput'); const m = /\n(?:async\s+)?function\s/.exec(bare.slice(at + 10)); return bare.slice(at, m ? at + 10 + m.index : undefined); })();
 
 test('겹치기 모듈을 읽어 들인다 — 캐시 번호를 붙여서', () => {
   assert.match(source, /js\/kcareer-overlay\.js\?v=\d+/);
 });
 
 test('★ 입력판은 «원본 그림»을 그린다 — HTML 표로 흉내 내지 않는다', () => {
-  const at = bare.indexOf('async function rhBuildInput');
-  const fn = bare.slice(at, at + 4200);
+  const fn = buildFn;
   assert.match(fn, /renderPageToCanvas|_rhLayout/, '엔진이 그린 쪽을 써야 합니다');
   assert.doesNotMatch(fn, /KcareerFormHtml\.toHtml/, '표를 흉내 내면 서식마다 깨집니다');
 });
 
 test('★ 두 번 재서 «누가 어느 칸인지»를 정한다 — 순서로 짐작하지 않는다', () => {
-  const at = bare.indexOf('async function rhBuildInput');
-  const fn = bare.slice(at, at + 4200);
+  const fn = buildFn;
   assert.match(fn, /KcareerOverlay\.markPlan/, '칸마다 표식을 심어야 합니다');
   assert.match(fn, /KcareerOverlay\.boxesFrom/, '표식 자리로 상자를 얻어야 합니다');
 });
 
 test('못 쓸 상자는 얹지 않는다 — 잘못 얹느니 안 얹는다', () => {
-  const at = bare.indexOf('async function rhBuildInput');
-  assert.match(bare.slice(at, at + 4200), /KcareerOverlay\.usable\(/);
+  assert.match(buildFn, /KcareerOverlay\.usable\(/);
 });
 
 test('도장 자리에는 입력칸을 얹지 않는다 — 거기엔 글자가 아니라 도장이 간다', () => {
-  const at = bare.indexOf('async function rhBuildInput');
-  assert.match(bare.slice(at, at + 4200), /guess\s*===\s*"__stamp"/);
+  assert.match(buildFn, /guess\s*===\s*"__stamp"/);
 });
 
 test('칠 자리를 못 찾으면 «칸 지도로 채우라»고 알린다 — 막다른 길을 두지 않는다', () => {
-  const at = bare.indexOf('async function rhBuildInput');
-  assert.match(bare.slice(at, at + 4200), /칸 지도로 채워 주세요/);
+  assert.match(buildFn, /칸 지도로 채워 주세요/);
 });
 
 test('표식판은 «그리지 않는다» — 재기만 하면 되므로 두 번 그리면 느리다', () => {

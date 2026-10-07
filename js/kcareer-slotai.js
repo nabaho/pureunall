@@ -154,13 +154,14 @@
       if (s.byList) return;
       if (s.hint === 'rrn') return;                  /* 주민번호 자리는 묻지 않는다 */
       if (items.length >= 한도) { cut++; return; }
-      var line = rows[s.tbl + ':' + s.row] || [];
+      /* 표 밖 줄 자리(2026-10-07)는 «그 줄 글자»가 곧 줄이다 — 표 칸 번호가 없다 */
+      var line = s.para ? [String(s.line || '')] : (rows[s.tbl + ':' + s.row] || []);
       items.push({
         /* ⚠ 구역 이름을 앞에 붙인다 — 자리 이름표는 구역마다 되풀이되므로
            그냥 쓰면 2쪽의 답이 1쪽의 같은 이름 칸에 얹힌다. */
         id: 자리이름(s),
         slot: s.id, sec: s.sec || '',
-        at: (s.tbl + 1) + '표 ' + (s.row + 1) + '행 ' + (s.col + 1) + '열',
+        at: s.para ? '본문 줄' : ((s.tbl + 1) + '표 ' + (s.row + 1) + '행 ' + (s.col + 1) + '열'),
         col: s.col,
         left: scrub(s.left, own),
         up: scrub(s.up, own),

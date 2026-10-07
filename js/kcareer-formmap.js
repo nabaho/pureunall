@@ -273,7 +273,18 @@
     });
     /* 못 읽는 것은 «반드시» 세어서 알린다 — 조용히 빠지면 「채웠다는데 비어 있다」가 된다.
        글상자(도형 안의 글)는 엔진이 아직 못 읽고, 중첩 표는 경계를 잘못 짚어 건드리지 않는다. */
-    warn.textBoxes = (xmlAll.match(/<hp:drawText\b/g) || []).length;
+    /* ★ 표 «밖» 줄과 글상자 안 줄의 「라벨 : 값」 자리 (대표 제보 2026-10-07 「한글 입력이 잘 안 된다」).
+       동의서·서약서·확인서는 표 없이 줄로 적는다 — 이것을 안 보면 칠 자리가 0개가 된다.
+       ⚠ 이름표 규칙(p{줄}k{짝} · b{상자}p{줄}k{짝})은 판독 층(paraSlots) 한 곳이 정한다. */
+    var 상자칸 = {};
+    if (X.paraSlots) X.paraSlots(xmlAll).forEach(function (ps) {
+      var bm = /^b(\d+)p/.exec(ps.unit); if (bm) 상자칸[bm[1]] = true;
+      slots.push({ id: ps.id, tbl: -1, row: -1, col: -1, colAddr: -1, para: true,
+                   kind: ps.blank ? '문단빈칸' : '문단글자', text: ps.value, left: ps.label, up: '',
+                   tail: ps.tail, line: ps.line, guess: '', inList: '', inKind: '' });
+    });
+    /* 글상자는 «칠 자리를 하나도 못 찾은 것»만 센다 — 줄 서식으로 읽은 상자까지 「못 칩니다」라고 하면 거짓이다 */
+    warn.textBoxes = Math.max(0, (xmlAll.match(/<hp:drawText\b/g) || []).length - Object.keys(상자칸).length);
     warn.nested = countNested(xmlAll);
     return { slots: slots, lists: lists, warn: warn };
   }
@@ -309,7 +320,17 @@
          여기서 열쇠를 주면 기관이 적어 둔 안내문까지 덮어쓴다. */
       /* ⚠ '아무칸'도 같다 — 사람이 켠 것뿐이지 「채워도 된다」는 뜻이 아니다.
          여기서 열쇠를 주면 기관이 적어 둔 문구 위에 값이 박힌다. */
-      if (s.kind === '글자칸' || s.kind === '아무칸') { s.guess = ''; return; }
+      if (s.kind === '글자칸' || s.kind === '아무칸' || s.kind === '문단글자') { s.guess = ''; return; }
+      /* 표 밖 줄 「라벨 : (빈자리)」 — 라벨이 곧 열쇠다 */
+      if (s.kind === '문단빈칸') {
+        var pk = X.fieldKeyOf(s.left);
+        if (pk === 'rrn') { s.guess = ''; s.hint = 'rrn'; return; }
+        /* ⚠ 서명 줄(「성 명 : ____ (인)」)의 이름은 문단 채우기(fillSignLine)가 넣고 «도장까지» 찍는다.
+             여기서 먼저 넣으면 그 줄이 «찬 줄»이 되어 도장을 안 찍는다. 칠 자리로만 남긴다. */
+        if (pk === 'name' && X.signLineFills && X.signLineFills(s.line)) { s.guess = ''; s.sign = true; return; }
+        s.guess = pk || '';
+        return;
+      }
       /* ★ 자리표가 스스로 이름을 말하면 그것이 가장 확실하다 — [한자]·[영문]·(자택)( ) -
          왼쪽 칸만 보면 「[한자]의 왼쪽은 [한글]」이라 아무것도 못 알아본다
          (실측 2026-09-06: 성명 행에서 한자·영문이 통째로 빠졌다). */
@@ -490,6 +511,15 @@
       if (typed !== null) {
         var s0 = map.slots.filter(function (x) { return x.id === id; })[0];
         if (!s0) { failed.push({ id: id, why: '그런 자리가 없습니다' }); return; }
+        /* 표 밖 줄 자리 — 라벨·꼬리(인)는 두고 값 자리만 바꾼다(판독 층 paraPut 한 곳) */
+        if (s0.para) {
+          var tv = typed.one != null ? typed.one : '';
+          if (tv === '' && s0.kind !== '문단글자') return;          /* 비워 두기 — 실패가 아니다 */
+          var rp = X.paraPut(xml, id, tv);
+          if (rp.ok) { xml = rp.xml; filled.push({ id: id, key: '(직접)', value: tv }); }
+          else failed.push({ id: id, why: '이 줄에는 넣을 수 없습니다' });
+          return;
+        }
         var r0 = putTyped(xml, s0, typed);
         if (r0.ok) { xml = r0.xml; filled.push({ id: id, key: '(직접)', value: r0.shown }); }
         else if (r0.empty) { /* 비워 두기로 한 자리 — 실패가 아니다 */ }
@@ -519,6 +549,13 @@
          ⚠ secrets 를 fields 에 합치지 말 것. 합치는 순간 자동으로 나간다. */
       if ((val == null || val === '') && plan.secrets) val = plan.secrets[key];
       if (val == null || val === '') { failed.push({ id: id, why: '넣을 값이 없습니다' }); return; }
+      if (s.para) {
+        var rq = X.paraPut(xml, id, val);
+        /* 「(인)」 꼬리가 붙은 줄에 이름을 넣었으면 «서명 줄»이다 — 화면이 도장을 찍을지 이것을 본다 */
+        if (rq.ok) { xml = rq.xml; filled.push({ id: id, key: key, value: val, sign: !!(key === 'name' && s.tail) }); }
+        else failed.push({ id: id, why: '이 줄에는 넣을 수 없습니다' });
+        return;
+      }
       /* 라벨 뒤로 빈 칸이 여럿 이어지면 한 글자씩 나눠 넣는다(생년월일 7|5|0|1|0|7) */
       var run = (s.kind === '빈칸') ? digitRun(map, s.tbl, s.row, s.col) : null;
       var ds = run ? digitsFor(val, run.length) : '';

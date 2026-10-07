@@ -1340,21 +1340,21 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=39"></script>
+<script src="js/kcareer-hwpxfill.js?v=40"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
 <!-- 📎 첨부서류 만들기의 셈(표 읽기·짝 후보·번호) — 화면·파일은 kcareer.html 이 만진다 -->
 <script src="js/kcareer-attach.js?v=3"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
-<script src="js/kcareer-formmap.js?v=20"></script>
+<script src="js/kcareer-formmap.js?v=21"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=8"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
 <!-- 낱개 칸의 «자리»를 AI에게 묻는다 — 값은 우리가 갖고 있다(kcareer-slotai.js) -->
-<script src="js/kcareer-slotai.js?v=6"></script>
+<script src="js/kcareer-slotai.js?v=7"></script>
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
@@ -15412,7 +15412,7 @@ function rhRenderMap(){
     var ok=willFill(s);
     return '<div class="rh-slot '+(ok?'ok':'miss')+'">'
       +'<div class="r1"><span class="nm">'+escapeHtml(s.left||s.text||'빈 칸')+'</span>'
-      +'<span class="loc">'+(s.tbl+1)+'표 '+(s.row+1)+'행 '+(s.col+1)+'열</span></div>'
+      +'<span class="loc">'+(s.para?(/^b/.test(s.id)?'글상자 줄':'본문 줄'):((s.tbl+1)+'표 '+(s.row+1)+'행 '+(s.col+1)+'열'))+'</span></div>'
       /* ★ AI 가 짚은 칸은 «그렇다고 밝힌다» — 사람이 확인하고 넘어가야 한다.
          조용히 넣으면 그것이 바로 「자기 마음데로 입력된다」다(대표 제보 2026-09-09). */
       +(s.ai&&_rhPicks[s.id]==null?'<div style="font-size:10.5px;color:var(--blue);margin-bottom:4px">'
@@ -16077,7 +16077,18 @@ async function rhBuildInput(){
     m.slots.forEach(function(sl){ sl.sec=n; }); m.lists.forEach(function(l){ l.sec=n; });
     warn.textBoxes+=m.warn.textBoxes; warn.nested+=m.warn.nested;
     _rhSlots=_rhSlots.concat(m.slots);
-    var plan=KcareerOverlay.markPlan(m.slots);
+    /* ★ 칸 하나에 「라벨 : ___」가 여럿인 칸(성 명 : / 주 소 : / 소 속 :)은 «라벨마다» 입력칸을 낸다 (2026-10-07).
+       전에는 칸 전체에 상자 하나라 친 글자가 첫 자리에 몰렸다. 되돌려 넣기는 이미 「칸:라벨」을 알아듣는다(typedFor).
+       ⚠ 라벨을 하나도 못 가르면 예전처럼 칸 하나에 상자 하나. */
+    var 표식칸=[];
+    m.slots.forEach(function(sl){
+      var parts=(sl.kind==='칸안라벨' && window.KcareerFormHtml && KcareerFormHtml.incellParts) ? (KcareerFormHtml.incellParts(sl.text)||[]) : [];
+      var keys=parts.filter(function(p){ return p.t==='in'; }).map(function(p){ return p.key; });
+      if(!keys.length){ 표식칸.push(sl); return; }
+      sl.subKeys=keys;
+      keys.forEach(function(k){ 표식칸.push({ id:sl.id+':'+k, guess:sl.guess }); });
+    });
+    var plan=KcareerOverlay.markPlan(표식칸);
     plans[n]=plan;
     var r=KcareerFormMap.apply(xml,{values:plan.values,data:{fields:{}}});
     probeZip.file(n, r.xml);
@@ -16111,6 +16122,22 @@ async function rhBuildInput(){
     paper.style.height=Math.round(pg.info.height)+"px";
     paper.appendChild(pg.canvas);
     _rhSlots.forEach(function(sl){
+      /* 라벨마다 낸 칸 — data-key 를 달면 묶기(rhBindInputs)·미리 채우기(rhPrefillInput)가 「칸:라벨」로 담는다 */
+      if(sl.subKeys){
+        sl.subKeys.forEach(function(k){
+          var b2=boxes[sl.id+':'+k]; if(!b2||b2.page!==pi) return;
+          if(!KcareerOverlay.usable(b2, pg.info.width, pg.info.height)) return;
+          var e2=document.createElement("input");
+          e2.className="kf-in"; e2.dataset.slot=sl.id; e2.dataset.key=k;
+          e2.style.left=Math.round(b2.x)+"px"; e2.style.top=Math.round(b2.y)+"px";
+          e2.style.width=Math.round(b2.w)+"px"; e2.style.height=Math.round(b2.h*1.25)+"px";
+          e2.style.fontSize=Math.round(b2.h*0.86)+"px";
+          var v2=_rhVals[sl.id+':'+k]; if(v2){ e2.value=v2; e2.classList.add("kf-done"); }
+          e2.title=((RH_KEYS.filter(function(p){ return p[0]===k; })[0])||[k,k])[1];
+          paper.appendChild(e2); made++;
+        });
+        return;
+      }
       var b=boxes[sl.id]; if(!b||b.page!==pi) return;
       if(sl.guess==="__stamp") return;
       if(!KcareerOverlay.usable(b, pg.info.width, pg.info.height)) return;
@@ -16876,6 +16903,8 @@ async function rhFillByMap(o){
       });
     }
     if(r.changed) zip.file(n,r.xml);
+    /* 표 밖 «서명 줄»(「성 명 : ____ (인)」)에 칸 지도가 이름을 넣었어도 도장 자리다 (2026-10-07) */
+    if((r.filled||[]).some(function(f){ return f && f.sign; })) _rhSignedLine=true;
     filled=filled.concat(r.filled); failed=failed.concat(r.failed);
   }
   if(!filled.length){ toast('채운 칸이 없습니다 — 오른쪽에서 넣을 값을 골라 주세요'); return; }
