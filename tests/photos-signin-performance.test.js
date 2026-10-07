@@ -83,7 +83,8 @@ test('로그인은 권한과 이름을 동시에 읽고 owners 갱신 완료를 
   const result = await within(signingIn);
   assert.deepEqual({ isAdmin: result.isAdmin, name: result.name }, { isAdmin: true, name: '홍길동' });
   assert.equal(updates.length, 1, 'owners 보조 색인 갱신은 시작되어야 합니다');
-  assert.equal(updates[0]['puphotos/owners/U1'].name, '홍길동');
+  /* 사람 색인은 칸 단위로 쓴다(2026-10-07) — 통째로 쓰면 이름 모르는 기기가 이름을 지운다 */
+  assert.equal(updates[0]['puphotos/owners/U1/name'], '홍길동');
 
   // ownerWrite는 일부러 끝내지 않았다. 위 signIn이 이미 끝났다면 사진 열기를
   // 보조 색인 쓰기가 막지 않는다는 계약이 지켜진 것이다.
@@ -127,8 +128,9 @@ test('늦게 끝난 이전 로그인은 새 계정의 이름과 권한을 덮지
   assert.equal(store.myUid(), 'B');
   assert.equal(store.myName(), '새 사용자');
   assert.equal(store.amAdmin(), false);
-  assert.equal(updates.some(u => u['puphotos/owners/A']), false);
-  assert.equal(updates.some(u => u['puphotos/owners/B']), true);
+  const touches = (u, uid) => Object.keys(u).some(k => k === 'puphotos/owners/' + uid || k.indexOf('puphotos/owners/' + uid + '/') === 0);
+  assert.equal(updates.some(u => touches(u, 'A')), false);
+  assert.equal(updates.some(u => touches(u, 'B')), true);
 });
 
 test('로그아웃은 진행 중인 로그인 응답을 무효화한다', async () => {

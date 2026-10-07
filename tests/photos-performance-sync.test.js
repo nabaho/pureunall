@@ -54,7 +54,8 @@ test('사진 저장과 사용자 색인을 한 번에 저장해 다른 기기 �
      saveMetaOnly(창고)·saveToRtdb(옛 방식) 두 갈래로 나뉘었다 — 어느 길로
      가도 색인 쓰기가 함께 있는지는 그 갈래들까지 봐야 한다. */
   const fn = store.match(/function savePhoto\([\s\S]*?function saveToRtdb\([\s\S]*?\n  \}/)[0];
-  assert.match(fn, /u\[ownerPath\(deps\.uid\)\]/);
+  /* 색인 쓰기는 ownerStamp 한 곳을 거친다(2026-10-07 — 이름을 빈 글자로 덮지 않게) */
+  assert.match(fn, /ownerStamp\(u, deps\.uid,/);
   assert.match(fn, /deps\.db\.ref\(\)\.update\(u\)/);
 });
 

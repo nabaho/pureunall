@@ -81,7 +81,7 @@ function uploadWrites(kind) {
     ownerPath: uid => 'puphotos/owners/' + uid
   };
   vm.createContext(b);
-  vm.runInContext(grab(STORE_SRC, 'isDocKind') + '\n' + grab(STORE_SRC, 'saveMetaOnly'), b);
+  vm.runInContext(grab(STORE_SRC, 'isDocKind') + '\n' + grab(STORE_SRC, 'saveMetaOnly') + '\n' + grab(STORE_SRC, 'ownerStamp'), b);
   return b.saveMetaOnly({ id: 'p1', meta: { kind: kind, byName: '홍길동' } }, '2026',
     'https://firebasestorage.googleapis.com/full?token=T', 'https://firebasestorage.googleapis.com/thumb?token=T')
     .then(() => writes[0][META]);

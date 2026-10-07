@@ -2378,7 +2378,7 @@
           /* 보기 주소도 «지금» 채운다 (2026-10-07) — 예전에는 loc 만 바꾸고 주소는 서버
              「주소 채우기」에 미뤘다. 그 사이 주인이 아닌 사람(관리자·공유받은 사람)은 창고에
              직접 못 청해(규칙: 자기 사진만) 회색 칸을 봤다.
-             ⚠ 서류(kind:'doc')는 원본 주소를 «안 적는다» — saveMetaOnly 와 같은 규칙(isDocKind).
+             ⚠ 서류(kind:'doc')·민감 서류는 원본 주소를 «안 적는다» — 본문 다시 올리기와 같은 규칙.
              ⚠ 주소받기가 실패해도 옮긴 것은 그대로 성공이다 — 주소는 서버가 나중에 채운다.
              ⚠ 살아 있는 사진에만 쓴다(updateAlive) — 그 사이 지워졌으면 유령으로 되살리지 않는다. */
           .then(function () {
@@ -2390,7 +2390,7 @@
               if (!urls[0] && !urls[1]) return null;
               return updateAlive(year, id, uid, function (path, m) {
                 var w = {};
-                if (urls[0] && !isDocKind(m && m.kind)) w[path + '/fullUrl'] = urls[0];
+                if (urls[0] && !isDocKind(m && m.kind) && !isSensitiveRead(m && m.read)) w[path + '/fullUrl'] = urls[0];
                 if (urls[1]) w[path + '/thumbUrl'] = urls[1];
                 return w;
               }).catch(function () { return null; });
