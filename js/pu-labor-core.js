@@ -68,6 +68,8 @@
   }
   function roundBy(v, mode) {
     if (!isFinite(v)) return 0;
+    /* 2026-10-07: 소수 오차 걷어내기 — 3,000,000×0.009 가 26999.999… 로 나와 절사하면 1원이 빠졌다 */
+    v = Math.round(v * 1e6) / 1e6;
     if (mode === 'ceil') return Math.ceil(v);
     if (mode === 'round') return Math.round(v);
     return Math.floor(v);           // 기본 절사
@@ -716,6 +718,35 @@
      E. 4대보험 · 월 급여 통합
      ══════════════════════════════════════════════════════════════════ */
 
+  /* 4대보험 근로자 부담 요율 — 연도표 (2026-10-07 바로잡음)
+     예전엔 연도와 상관없이 4.5%·3.545%·12.81% 하나만 박혀 있어, 2026년 급여에도 2025년 요율이 쓰였다.
+       국민연금 근로자  2025까지 4.5%  → 2026 4.75% (국민연금법 개정: 총 9%→9.5%, 2033년 13%까지 해마다 0.5%p)
+                        ⚠ 공단 원문 대조 전 — 2027년 이후 값은 일부러 넣지 않는다(그해 공단 고시를 보고 넣는다)
+       건강보험 근로자  2023~2025 3.545%(총 7.09%) → 2026 3.595%(총 7.19%)  [건보공단 2026 요율 안내]
+       장기요양(건보×)  2023 12.81% · 2024~2025 12.95% → 2026 13.14%            [건보공단 2026 요율 안내]
+       고용보험 근로자  2022.7~ 0.9%
+     표에 없는 해는 가장 가까운 앞 해 값을 쓴다(미래 해에 옛 값이 조용히 쓰이지 않도록 근거 문자열에 연도를 남긴다). */
+  var INS_RATES = {
+    pensionEE:    { '2019': 0.045, '2025': 0.045, '2026': 0.0475 },
+    healthEE:     { '2023': 0.03545, '2024': 0.03545, '2025': 0.03545, '2026': 0.03595 },
+    longtermRate: { '2023': 0.1281, '2024': 0.1295, '2025': 0.1295, '2026': 0.1314 },
+    empInsEE:     { '2019': 0.008, '2022': 0.009, '2026': 0.009 }
+  };
+  function rateOfYear(table, year) {
+    var y = parseInt(year, 10), best = null, bestY = -1;
+    Object.keys(table).forEach(function (k) {
+      var ky = parseInt(k, 10);
+      if (ky <= y && ky > bestY) { bestY = ky; best = table[k]; }
+    });
+    if (best == null) {   // 표보다 앞선 해 → 가장 이른 값
+      Object.keys(table).forEach(function (k) {
+        var ky = parseInt(k, 10);
+        if (best == null || ky < bestY) { bestY = ky; best = table[k]; }
+      });
+    }
+    return best;
+  }
+
   /* 4대보험 근로자 부담.
      주의: 국민연금·건강보험은 **공단 고지액**이 진실이다(실측 확인 —
            급여가 출렁여도 연금은 3개월 고정, 건보는 정산달만 변동).
@@ -732,10 +763,10 @@
       return dft;
     };
     var year = String(o.연도 || new Date().getUTCFullYear());
-    var 연금율 = pick(R.pensionEE, year, 0.045);
-    var 건보율 = pick(R.healthEE, year, 0.03545);
-    var 장기율 = pick(R.longtermRate, year, 0.1281);
-    var 고용율 = pick(R.empInsEE, year, 0.009);
+    var 연금율 = pick(R.pensionEE, year, rateOfYear(INS_RATES.pensionEE, year));
+    var 건보율 = pick(R.healthEE, year, rateOfYear(INS_RATES.healthEE, year));
+    var 장기율 = pick(R.longtermRate, year, rateOfYear(INS_RATES.longtermRate, year));
+    var 고용율 = pick(R.empInsEE, year, rateOfYear(INS_RATES.empInsEE, year));
 
     var 연금 = (o.고지_국민연금 != null) ? num(o.고지_국민연금) : roundBy(과세 * 연금율, P.rounding);
     var 건보 = (o.고지_건강보험 != null) ? num(o.고지_건강보험) : roundBy(과세 * 건보율, P.rounding);
@@ -745,7 +776,7 @@
       국민연금: 연금, 건강보험: 건보, 장기요양: 장기, 고용보험: 고용,
       합계: 연금 + 건보 + 장기 + 고용,
       모드: (o.고지_국민연금 != null || o.고지_건강보험 != null) ? '고지액' : '요율계산',
-      근거: '연금 ' + (연금율 * 100).toFixed(2) + '% · 건보 ' + (건보율 * 100).toFixed(3)
+      근거: year + '년 요율 — 연금 ' + (연금율 * 100).toFixed(2) + '% · 건보 ' + (건보율 * 100).toFixed(3)
         + '% · 장기 건보×' + (장기율 * 100).toFixed(2) + '% · 고용 ' + (고용율 * 100).toFixed(1) + '%'
     };
   }
