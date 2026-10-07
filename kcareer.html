@@ -1340,14 +1340,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
      ⚠ 이 두 줄은 «짝»이다. 하나만 실으면 판독이 그 자리에서 멈춘다. -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-doc-read.js?v=50"></script>
-<script src="js/kcareer-hwpxfill.js?v=40"></script>
+<script src="js/kcareer-hwpxfill.js?v=41"></script>
 <!-- ⚠ 정리하는 자는 «채우는 자 뒤»에 실어야 한다 — 표·칸을 다루는 자를 거기서 빌려 온다 -->
 <script src="js/kcareer-hwpxtidy.js?v=2"></script>
 <script src="js/kcareer-hwpxfit.js?v=1"></script>
 <!-- 📎 첨부서류 만들기의 셈(표 읽기·짝 후보·번호) — 화면·파일은 kcareer.html 이 만진다 -->
 <script src="js/kcareer-attach.js?v=3"></script>
 <script src="js/kcareer-svgtext.js?v=1"></script>
-<script src="js/kcareer-formmap.js?v=21"></script>
+<script src="js/kcareer-formmap.js?v=22"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
 <script src="js/kcareer-hwpstamp.js?v=8"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
@@ -5705,7 +5705,13 @@ async function exportEditedHwpx(){
     try{ var e=await _rhHwpEd.exportHwpx(); if(e && e.byteLength) return new Uint8Array(e); }
     catch(err){ console.warn('편집기에서 받기', err); }
   }
-  try{ var b=await rhComposeBytes(); if(b && b.length) return b; }catch(e){}
+  try{ var b=await rhComposeBytes(); if(b && b.length) return b; }catch(e){ console.warn('완성본 짓기', e); }
+  /* ⚠ 못 지었는데 «친 값·채움»이 있으면 한 번은 알린다 — 조용히 원본만 담으면
+     친 값이 빠진 서류가 경고 없이 저장된다(2026-10-07 검토). 30초 저장마다 떠들지는 않는다. */
+  if(_rhDoc && ((_rhVals && Object.keys(_rhVals).length) || _rhFilled) && exportEditedHwpx._warned!==_rhDoc.name){
+    exportEditedHwpx._warned=_rhDoc.name;
+    _safe(function(){ toast('⚠ 친 값을 서식에 넣지 못해 «지금 문서 그대로» 담았습니다 — 「📄 한글로 보기」로 확인해 주세요', 7000); });
+  }
   return (_rhDoc && _rhDoc.bytes) ? _rhDoc.bytes : null;
 }
 
@@ -6665,11 +6671,18 @@ async function exportDocxFile(){
 var _rcPdfData=null, _rcFileName='', _rcVarMap={};
 
 async function mountEditor(buffer,name,cfg){
-  _cvPick=null;   /* 새 서식 — 지난 서식에서 고른 자격·경력 차례를 따라가게 하지 않는다 */
+  /* 새 서식 — 지난 서식에서 고른 자격·경력 차례를 따라가게 하지 않는다.
+     ⚠ 채운 결과를 다시 올리는 길(_rhKeepBase)에서는 놓지 않는다 — 놓으면 확인 창에서
+       뺀 경력·바꾼 차례가 채우자마자 풀려, 30초 저장·완성본에서 되돌아왔다(2026-10-07 검토). */
+  if(!_rhKeepBase) _cvPick=null;
   cfg=cfg||DOMAINS.resume.create;
   /* 보관함·이어서 하기로 들어올 때도 이름을 속에 맞춘다 — 여기가 마지막 관문이다 */
   name=_hwpFixName(buffer,name);
-  try{ _lastOriginal={name, b64:abToB64(buffer)}; }catch(e){}
+  /* «원본 양식»은 원본이어야 한다 — 채운 결과를 다시 올릴 때 덮으면 보관함의 「원본」에 개인정보가 채워져 담긴다 */
+  try{
+    if(!_rhKeepBase) _lastOriginal={name, b64:abToB64(buffer)};
+    else if(_rhBase && _rhBase.bytes) _lastOriginal={name:_rhBase.name, b64:abToB64(_rhBase.bytes)};
+  }catch(e){}
   const ext=(name.split('.').pop()||'').toLowerCase();
   const editCard=document.getElementById('rcEditCard'); if(editCard) editCard.style.display='';
   _rcFileName=name;
@@ -6699,7 +6712,7 @@ async function mountEditor(buffer,name,cfg){
            바꾸면 「이미 채워진 것」이 바탕이 되어 되돌려 넣을 때 값이 두 번 들어간다. */
         /* ⚠ 원본이 바뀌면 «담아 둔 표시»도 놓는다 — 안 놓으면 새 원본을 담지 않는다 */
         if(!_rhKeepBase){ _rhBase={ name:name, ext:ext, bytes:_u8 }; _rhListPlan=null; _rhVals={};
-                          _rhBaseSaved='';
+                          _rhBaseSaved=''; _rhUndo=null; _rhFillShown=null;
                           /* 새 서식이면 쪽 번호도 뺀 자리도 남의 것이다 — 놓는다 */
                           if(typeof rhTidyReset==='function') rhTidyReset();
                           /* 새 서식이면 편집기도 닫는다 — 남의 서식이 떠 있으면 안 된다 */
@@ -6885,8 +6898,12 @@ async function importTemplateFile(file,d){ const cfg=DOMAINS[d].create;
   /* 올린 양식을 기억해 둔다 — ✨ 내 정보로 채우기와 임시저장이 이걸 쓴다.
      ★ 새로 올린 양식은 «새 자리»에 담는다 — 이것이 「덮어쓰기」를 막는 한 줄이다.
        (「↩ 이어서」로 들어올 때는 그 자리 번호를 그대로 쓰므로 여기를 지나지 않는다.) */
-  _rhDraftId=null; _rhVals={}; _rhPicks={};
-  try{ _rhDoc={ name:fname, ext:ext, bytes:new Uint8Array(buf) }; rhDraftSave(); }catch(e){ console.warn('rhDoc',e); }
+  _rhDraftId=null; _rhVals={}; _rhPicks={}; _rhUndo=null;
+  /* ⚠★ _rhDoc 를 «여기서 채우지 않는다» (2026-10-07 검토). 미리 채워 두면 mountEditor 가
+     「같은 문서」로 보고 새 서식 준비(원본 잡기·앞 서식 표시 놓기)를 통째로 건너뛴다 —
+     그래서 새로 올린 양식마다 「⚠ 원본 없음」이었고, 앞 서식의 도장·뺀 쪽·되돌리기가 따라왔다.
+     비워 두고 mountEditor 에 맡긴 뒤, 담기는 그다음에 한다. */
+  _rhDoc=null;
   const tempId='_tpl_preview_'+d;
   /* 사이드 패널에 원본 즉시 표시 */
   const b64=abToB64(buf);
@@ -6905,7 +6922,11 @@ async function importTemplateFile(file,d){ const cfg=DOMAINS[d].create;
          다른 PC 에서 안 열린다. */
     const 줄=await cvFormPut(id,{id:id,name:fname,ext:ext,size:file.size,base64:b64,savedAt:new Date().toISOString()});
     renderFormLib(); toast(줄.stPath?'양식 보관함에 추가됨 — 다른 PC 에서도 열립니다':'양식 보관함에 추가됨 (이 PC 에만)'); }
-  await mountEditor(buf,fname,cfg);
+  try{ await mountEditor(buf,fname,cfg); }
+  finally{
+    /* 담기는 mountEditor «뒤에» — 그래야 잡힌 원본까지 함께 담긴다. 못 열었어도 올린 것은 담는다. */
+    try{ if(!_rhDoc) _rhDoc={ name:fname, ext:ext, bytes:new Uint8Array(buf) }; rhDraftSave(); }catch(e){ console.warn('rhDoc',e); }
+  }
   /* ⚠ 여기서 큰 창(팝업)을 «띄우지 않는다» — 대표 지시 2026-08-30.
      전에는 서식을 올리기만 해도 팝업이 튀어나왔다. 그런데 편집기에 원본이 이미
      그대로 나오므로, 팝업은 같은 것을 한 번 더 보여 주면서 화면을 덮고
@@ -13508,12 +13529,29 @@ function renderFeeSettle(){
      (잉크 2010→2883 = 값이 실제로 그려짐). */
 var _rhDoc=null;   /* {name, ext, bytes} — 지금 편집 중인 양식 원본 */
 
+/* 바이트의 «속»이 무엇인가 — 'hwpx'(ZIP) · 'hwp'(복합 문서) · '' */
+function _rhKindOf(bytes){
+  var b=bytes||[];
+  if(b[0]===0x50 && b[1]===0x4B && b[2]===0x03 && b[3]===0x04) return 'hwpx';
+  if(b[0]===0xD0 && b[1]===0xCF && b[2]===0x11 && b[3]===0xE0) return 'hwp';
+  return '';
+}
+/* 이름의 꼬리를 «속»에 맞춘다 (2026-10-07).
+   ⚠★ .hwp 를 올리면 자동 저장(30초)·임시저장이 속을 hwpx 로 바꿔 담는데 이름은 「X.hwp」로 남았다.
+     엔진은 이름과 속이 다르면 거절한다 — 그 뒤로 채우기·한글로 보기·한글 편집이 모두 멎었다. */
+function _rhFixExt(name, bytes){
+  var n=String(name||'작성중'), k=_rhKindOf(bytes);
+  if(!k) return n;
+  return /\.(hwpx?|HWPX?)$/.test(n) ? n.replace(/\.hwpx?$/i, '.'+k) : n+'.'+k;
+}
 async function _rhToHwpx(bytes, name){
-  var ext=String(name||'').split('.').pop().toLowerCase();
+  /* ★ 갈래는 «속»으로 정한다 — 이름만 보면 속이 바뀐 자리에서 멎는다 */
+  var k=_rhKindOf(bytes);
+  var ext=k||String(name||'').split('.').pop().toLowerCase();
   if(ext==='hwpx') return bytes;
   if(ext!=='hwp') return null;
   /* .hwp → 한글 엔진으로 열어 hwpx로 내보낸다 */
-  var doc=await PureunHwp.openDoc(bytes, name);
+  var doc=await PureunHwp.openDoc(bytes, _rhFixExt(name, bytes));
   try{
     var out=doc.exportHwpx();
     return (out && out.length) ? new Uint8Array(out) : null;
@@ -13814,7 +13852,8 @@ async function rhDraftNow(quiet){
   if(!_rhDoc || !_rhDoc.bytes){ if(!quiet) toast('담아 둘 것이 없습니다'); return; }
   try{
     var bytes=await exportEditedHwpx();
-    if(bytes && bytes.length) _rhDoc={ name:_rhDoc.name, ext:'hwpx', bytes:new Uint8Array(bytes) };
+    /* ⚠ 이름 꼬리를 속에 맞춘다(_rhFixExt) — 「X.hwp」에 hwpx 를 담으면 다음부터 엔진이 거절한다 */
+    if(bytes && bytes.length){ var u=new Uint8Array(bytes); _rhDoc={ name:_rhFixExt(_rhDoc.name,u), ext:_rhKindOf(u)||'hwpx', bytes:u }; }
   }catch(e){ /* 편집기가 아직이면 원본 그대로 담는다 */ }
   rhDraftSave(); rhDraftCheck();
   if(!quiet){
@@ -15253,8 +15292,12 @@ async function rhBuildMap(){
   var box=document.getElementById('rhMapList'); if(!box) return;
   if(!window.KcareerFormMap){ box.textContent='칸 지도 모듈을 못 불러왔습니다'; return; }
   try{ await _ensureJSZip(); }catch(e){ box.textContent='모듈을 못 불러왔습니다(인터넷 필요)'; return; }
+  /* ★★ «바탕(원본)»을 훑는다 — 입력판(rhBuildInput)·짓는 길(rhComposeBytes)과 같은 것 (2026-10-07 검토).
+     채운 문서를 훑으면 채워진 칸이 「글자칸」이 되어 짐작이 비고, 원본에서 다시 짓는
+     30초 저장·한글로 보기·완성본에서 성명·생년월일이 통째로 빠졌다. */
+  var _b=_rhBase||_rhDoc;
   var src=null;
-  try{ src=await _rhToHwpx(_rhDoc.bytes,_rhDoc.name); }catch(e){ src=null; }
+  try{ src=await _rhToHwpx(_b.bytes,_b.name); }catch(e){ src=null; }
   if(!src){ box.textContent='이 형식은 칸 지도를 만들 수 없습니다 — 한글에서 HWPX로 저장해 올려주세요'; return; }
   var zip=await JSZip.loadAsync(src);
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
@@ -15264,14 +15307,17 @@ async function rhBuildMap(){
   for(const n of names){
     var xml=await zip.file(n).async('string');
     var m=KcareerFormMap.guess(KcareerFormMap.scan(xml,{all:_rhAnyCell}), data);
-    m.slots.forEach(function(s){ s.sec=n; }); m.lists.forEach(function(l){ l.sec=n; });
+    m.slots.forEach(function(s){ s.sec=n; rhSecId(s); }); m.lists.forEach(function(l){ l.sec=n; });
     slots=slots.concat(m.slots); lists=lists.concat(m.lists);
     warn.textBoxes+=m.warn.textBoxes; warn.nested+=m.warn.nested;
     fps.push(KcareerFormMap.fingerprint(xml));
     secs.push({xml:xml, slots:m.slots});
   }
   _rhMap={slots:slots,lists:lists,warn:warn,fp:fps.join('/')};
-  _rhPicks=rhMemoryLoad(_rhMap.fp)||{};
+  /* ⚠ 채운 결과·이어서 하기로 다시 그릴 때(_rhKeepBase)는 «지금 고른 짝»이 기억보다 앞선다 —
+     기억으로 덮으면 ↩ 이어서 연 자리에서 손으로 고른 짝이 사라졌다(2026-10-07 검토) */
+  var 기억=rhMemoryLoad(_rhMap.fp)||{};
+  _rhPicks=_rhKeepBase ? Object.assign(기억, _rhPicks||{}) : 기억;
   rhRenderMap();                       /* 먼저 사전만으로 그린다 — 기다리게 하지 않는다 */
   /* ★ 사전이 못 짚은 칸을 AI에게 «한 번» 묻는다(대표 지시 2026-09-09 「근본적 해결」).
      ⚠ 못 물어도 그냥 간다 — 사전 결과가 이미 화면에 있다. AI 는 «더 채우는» 것뿐이다. */
@@ -15412,7 +15458,7 @@ function rhRenderMap(){
     var ok=willFill(s);
     return '<div class="rh-slot '+(ok?'ok':'miss')+'">'
       +'<div class="r1"><span class="nm">'+escapeHtml(s.left||s.text||'빈 칸')+'</span>'
-      +'<span class="loc">'+(s.para?(/^b/.test(s.id)?'글상자 줄':'본문 줄'):((s.tbl+1)+'표 '+(s.row+1)+'행 '+(s.col+1)+'열'))+'</span></div>'
+      +'<span class="loc">'+(s.para?(/^b/.test(s.rawId||s.id)?'글상자 줄':'본문 줄'):((s.tbl+1)+'표 '+(s.row+1)+'행 '+(s.col+1)+'열'))+'</span></div>'
       /* ★ AI 가 짚은 칸은 «그렇다고 밝힌다» — 사람이 확인하고 넘어가야 한다.
          조용히 넣으면 그것이 바로 「자기 마음데로 입력된다」다(대표 제보 2026-09-09). */
       +(s.ai&&_rhPicks[s.id]==null?'<div style="font-size:10.5px;color:var(--blue);margin-bottom:4px">'
@@ -16048,6 +16094,13 @@ async function rhHwpEdKeys(){
    그 위에 입력칸만 얹으면 깨질 구석이 없다.
    ⚠ 두 번 그린다: ①표식판(누가 어느 칸인지) ②원본판(칸의 진짜 크기·보이는 그림).
      짐작으로 순서를 맞추지 않는다 — 한 칸만 어긋나도 값이 엉뚱한 자리에 박힌다. */
+/* XML 그대로의 칸 글자를 사람 글자로 — 입력칸에 보여 줄 때만 (저장은 판독 층이 다시 감싼다) */
+function _rhUnesc(s){
+  return String(s==null?'':s).replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"')
+    .replace(/&#39;|&apos;/g,"'").replace(/&amp;/g,'&');
+}
+/* «있던 글자를 덮어 고치는» 칸인가 — 글자칸, 그리고 아무 칸 중 글자가 든 것 */
+function _rhOverKind(sl){ return !!sl && (sl.kind==='글자칸' || (sl.kind==='아무칸' && !!String(sl.text||'').trim())); }
 async function rhBuildInput(){
   var wrap=document.getElementById("kfSheetWrap"), sheet=document.getElementById("kfSheet");
   var modes=document.getElementById("kfModes"), hint=document.getElementById("kfHintBar");
@@ -16069,30 +16122,36 @@ async function rhBuildInput(){
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
   var warn={textBoxes:0,nested:0};
   _rhSlots=[];
+  _rhLastInput=null;   /* 앞 판의 칸은 이제 없다 — 붙들고 있으면 「내 정보」가 사라진 칸에 들어간다 */
   /* ① 칸 지도 + 표식 심기 */
-  var probeZip=await JSZip.loadAsync(src), plans={};
+  var probeZip=await JSZip.loadAsync(src), 원문={}, 표식칸=[];
   for(const n of names){
     var xml=await zip.file(n).async("string");
+    원문[n]=xml;
     var m=KcareerFormMap.guess(KcareerFormMap.scan(xml,{all:_rhAnyCell}), _cvFillData());
-    m.slots.forEach(function(sl){ sl.sec=n; }); m.lists.forEach(function(l){ l.sec=n; });
+    /* ⚠ 이름표에 구역을 붙인다(rhSecId) — 칸 지도(rhBuildMap)와 같은 이름이어야 미리 채우기가 맞는다 */
+    m.slots.forEach(function(sl){ sl.sec=n; rhSecId(sl); }); m.lists.forEach(function(l){ l.sec=n; });
     warn.textBoxes+=m.warn.textBoxes; warn.nested+=m.warn.nested;
     _rhSlots=_rhSlots.concat(m.slots);
     /* ★ 칸 하나에 「라벨 : ___」가 여럿인 칸(성 명 : / 주 소 : / 소 속 :)은 «라벨마다» 입력칸을 낸다 (2026-10-07).
        전에는 칸 전체에 상자 하나라 친 글자가 첫 자리에 몰렸다. 되돌려 넣기는 이미 「칸:라벨」을 알아듣는다(typedFor).
        ⚠ 라벨을 하나도 못 가르면 예전처럼 칸 하나에 상자 하나. */
-    var 표식칸=[];
     m.slots.forEach(function(sl){
-      var parts=(sl.kind==='칸안라벨' && window.KcareerFormHtml && KcareerFormHtml.incellParts) ? (KcareerFormHtml.incellParts(sl.text)||[]) : [];
+      var parts=(sl.kind==='칸안라벨' && window.KcareerFormHtml && KcareerFormHtml.incellParts) ? (KcareerFormHtml.incellParts(_rhUnesc(sl.text))||[]) : [];
       var keys=parts.filter(function(p){ return p.t==='in'; }).map(function(p){ return p.key; });
       if(!keys.length){ 표식칸.push(sl); return; }
       sl.subKeys=keys;
       keys.forEach(function(k){ 표식칸.push({ id:sl.id+':'+k, guess:sl.guess }); });
     });
-    var plan=KcareerOverlay.markPlan(표식칸);
-    plans[n]=plan;
-    var r=KcareerFormMap.apply(xml,{values:plan.values,data:{fields:{}}});
+  }
+  /* ⚠★ 표식은 «모든 구역을 한 번에» 심는다 — 구역마다 따로 심으면 표식 글자가 겹쳐
+     2구역 칸의 입력칸이 1구역 자리에 얹혔다(2026-10-07 검토). 넣을 때만 구역별로 나눈다(rhValsFor). */
+  var plan=KcareerOverlay.markPlan(표식칸);
+  for(const n of names){
+    var r=KcareerFormMap.apply(원문[n],{values:rhValsFor(n, plan.values),data:{fields:{}}});
     probeZip.file(n, r.xml);
   }
+  var plans={ all:plan };
   var probeBytes=new Uint8Array(await probeZip.generateAsync({type:"arraybuffer"}));
 
   /* \u2461 \ub450 \ud310\uc744 \uadf8\ub824 \uc88c\ud45c\ub97c \uc5bb\ub294\ub2e4 */
@@ -16107,7 +16166,7 @@ async function rhBuildInput(){
         ? (clean.pages[p].info.columns[0].x+clean.pages[p].info.columns[0].width)
         : clean.pages[p].info.width;
       /* ★ 이미 글자가 든 «값 칸»은 그 글자를 «덮는» 상자여야 한다 — 뒤에 붙으면 못 고친다 */
-      var overIds={}; _rhSlots.forEach(function(sl){ if(sl.kind==='글자칸') overIds[sl.id]=1; });
+      var overIds={}; _rhSlots.forEach(function(sl){ if(_rhOverKind(sl)) overIds[sl.id]=1; });
       var b=KcareerOverlay.boxesFrom(probe.pages[p].runs, clean.pages[p].runs, allMarks, colR, overIds);
       Object.keys(b).forEach(function(id){ if(!boxes[id]){ b[id].page=p; boxes[id]=b[id]; } });
     }
@@ -16149,9 +16208,12 @@ async function rhBuildInput(){
       /* ★ 글자칸은 «있던 글자»를 그대로 담아 둔다 — 눌러 고치면 그 자리가 바뀐다.
          ⚠ _rhVals 에는 담지 않는다. 사람이 «고쳐 쳤을 때만» 담겨야
            손대지 않은 칸을 되돌려 넣기가 공연히 다시 쓰지 않는다. */
-      if(sl.kind==='글자칸'){ el.classList.add('kf-over'); if(sl.text) el.value=sl.text; }
-      var v=_rhVals[sl.id]; if(v){ el.value=v; el.classList.add("kf-done"); }
-      el.title=(sl.kind==='글자칸') ? '눌러서 고칠 수 있습니다' : (sl.left||sl.text||"채울 칸");
+      /* ⚠ 「✍ 아무 칸이나」의 글자 든 칸도 같다 — 저장은 칸을 통째로 바꾸므로(setCellText),
+         빈 상자를 뒤에 띄우면 이어 쓰는 줄 알았다가 기관 문구가 통째로 지워졌다(2026-10-07 검토).
+         ⚠ 칸 글자는 XML 그대로라 «한 번 풀어» 보여 준다 — 안 풀면 R&amp;D 가 고칠 때마다 한 겹씩 늘었다. */
+      if(_rhOverKind(sl)){ el.classList.add('kf-over'); el.value=_rhUnesc(sl.text); }
+      var v=_rhVals[sl.id]; if(v!=null && (v || _rhOverKind(sl))){ el.value=v; if(v) el.classList.add("kf-done"); }
+      el.title=_rhOverKind(sl) ? '눌러서 고칠 수 있습니다' : _rhUnesc(sl.left||sl.text||"채울 칸");
       paper.appendChild(el); made++;
     });
     sheet.appendChild(paper);
@@ -16173,6 +16235,8 @@ async function rhBuildInput(){
      ⚠ 조용히 두지 말 것 — 어느 쪽이 진짜 서류인지 알 수 없다. */
   _safe(function(){ rhInputBaseNote(); });
   rhBindInputs();
+  /* 채운 뒤라면 들어간 값을 칸에 보여 준다 — 다시 그릴 때마다(아무 칸 켜기 등) 빈 칸으로 돌아가지 않게 */
+  _safe(rhPrefillInput);
   rhSetMode("in");
   /* ⚠ 종이를 새로 그린 뒤에는 반드시 다시 맞춘다 — 안 하면 본디 크기로 돌아가 또 잘린다 */
   _safe(rhApplyFit);
@@ -16224,9 +16288,12 @@ function rhBindInputs(){
   });
 }
 var _rhLastInput=null;
+var _rhFillShown=null;   /* ✨ 채우기가 «실제로» 넣은 값 { 자리이름표: {key,value} } — 입력판에 보여 주기만 한다 */
 
 /* 「내 정보」를 클릭하면 «지금 커서가 있는» 입력칸에 넣는다 */
 function rhPutValue(v){
+  /* ⚠ 다시 그려 사라진 칸이면 넣지 않는다 — 안 보이는 칸에 넣고 「넣었습니다」라 하면 앞 서식 자리 번호로 엉뚱한 칸에 들어간다 */
+  if(_rhLastInput && !_rhLastInput.isConnected) _rhLastInput=null;
   if(_rhMode==='in' && _rhLastInput){
     _rhLastInput.value=v;
     _rhLastInput.dispatchEvent(new Event('input'));
@@ -16237,23 +16304,27 @@ function rhPutValue(v){
 }
 
 /* 「내 정보로 채우기」를 입력판에도 반영한다 — 짐작한 값을 칸에 미리 넣어 준다 */
+/* ⚠★ «보여 주기만» 한다 — 친 값(_rhVals)으로 담지 않는다 (2026-10-07 검토).
+   담으면 자동으로 들어간 값이 «직접 친 값»이 되어 특수 넣기(생년월일 한 자리씩·자리표 바꾸기)를
+   건너뛰고 칸 하나에 통째로 들어갔다(「1980.01.011900.00.00」). 짓는 길은 채움 표시(_rhFilled)로
+   같은 값을 이미 넣는다. 사람이 그 칸을 고쳐 칠 때만 rhBindInputs 가 담는다(지우는 것도). */
 function rhPrefillInput(){
-  if(!_rhMap) return;
+  if(!_rhMap || !_rhFilled) return;
   var f=(_cvFillData().fields)||{};
+  var 보임=function(el, v){ if(!el || el.value || v==null || v==='') return; el.value=String(v); el.classList.add('kf-done','kf-auto'); };
   _rhMap.slots.forEach(function(s){
     var p=(_rhPicks[s.id]!=null)?_rhPicks[s.id]:s.guess;
     if(!p||p==='__stamp') return;
+    var sel='#kfSheet input[data-slot="'+(window.CSS&&CSS.escape?CSS.escape(s.id):s.id)+'"]';
     if(p==='__incell'){
       /* 칸 안 라벨은 라벨마다 — 값이 있는 것만 */
-      Object.keys(f).forEach(function(k){
-        var el=document.querySelector('#kfSheet input[data-slot="'+s.id+'"][data-key="'+k+'"]');
-        if(el && f[k] && !el.value){ el.value=f[k]; el.dispatchEvent(new Event('input')); }
-      });
+      Object.keys(f).forEach(function(k){ 보임(document.querySelector(sel+'[data-key="'+k+'"]'), f[k]); });
       return;
     }
-    if(f[p]==null||f[p]==='') return;
-    var el=document.querySelector('#kfSheet input[data-slot="'+s.id+'"]:not([data-key])');
-    if(el && !el.value){ el.value=f[p]; el.dispatchEvent(new Event('input')); }
+    /* 채우기가 «실제로» 넣은 값이 있으면 그것을 — 못 넣은 칸에 값을 보여 주면 들어간 줄 안다 */
+    var 넣음=_rhFillShown ? _rhFillShown[s.id] : null;
+    if(_rhFillShown && !넣음) return;
+    보임(document.querySelector(sel+':not([data-key])'), 넣음 ? 넣음.value : f[p]);
   });
 }
 
@@ -16263,7 +16334,7 @@ async function rhPreviewHwp(){
   var bytes=await rhComposeBytes();
   if(!bytes){ toast('한글로 그릴 수 없습니다'); return; }
   ed.innerHTML='<div class="rc-mute" style="padding:20px">한글 엔진으로 그리는 중…</div>';
-  try{ await previewKcareerHwp('#rhwpEditor', bytes.buffer.slice(0), _rhDoc.name); }
+  try{ await previewKcareerHwp('#rhwpEditor', bytes.buffer.slice(0), _rhFixExt(_rhDoc.name, bytes)); }
   catch(e){ ed.innerHTML='<div class="rc-mute" style="padding:20px">그리지 못했습니다 — '+escapeHtml(e.message||'')+'</div>'; }
 }
 
@@ -16279,8 +16350,7 @@ async function rhComposeBytes(){
   var zip=await JSZip.loadAsync(src), data=_cvFillData();
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
   for(const n of names){
-    var vals={};
-    Object.keys(_rhVals).forEach(function(k){ vals[k]=_rhVals[k]; });
+    var vals=rhValsFor(n);    /* ⚠ 그 구역에 친 것만(rhValsFor) — 채우기와 같은 셈 */
     var xml=await zip.file(n).async('string');
     /* ⚠ 목록 표(학력·경력)는 입력칸으로 못 담는다 — 채울 때 세워 둔 계획을 여기서 같이 적용한다.
        안 하면 완성본을 내는 순간 학력·경력 줄이 통째로 사라진다. */
@@ -16407,15 +16477,31 @@ async function rhAttachMarkZip(zip){
   return n;
 }
 /* 이 구역에서 «채울 곳»으로 고른 것 — 채우기와 짓는 길이 같이 쓴다(따로 적으면 어긋난다) */
+/* ── 구역(section)이 여럿인 서식 — 자리 이름표에 구역을 붙인다 (2026-10-07 검토) ──
+   칸 지도는 구역마다 t0r0c1 부터 다시 센다. 그대로 두면 1구역에 친 값이 2구역의 같은 자리에도
+   들어가고, 입력판 표식이 겹쳐 입력칸이 엉뚱한 데 얹혔다.
+   ⚠ 첫 구역(section0)은 이름표를 «그대로» 둔다 — 담아 둔 자리·서식 기억이 그 이름으로 되어 있다.
+   ⚠ 판독 층(apply)에는 «구역 안 이름표(rawId)»로 건넨다 — rhPicksFor · rhValsFor 두 곳이 바꾼다. */
+function rhSecTag(sec){ var m=/section(\d+)\.xml$/i.exec(String(sec||'')); var k=m?+m[1]:0; return k>0?('s'+k+'/'):''; }
+function rhSecId(s){ if(!s) return s; if(s.rawId==null) s.rawId=s.id; s.id=rhSecTag(s.sec)+s.rawId; return s; }
 function rhPicksFor(n){
   var picks={};
   if(!_rhMap||!_rhMap.slots) return picks;
   _rhMap.slots.forEach(function(s){
     if(s.sec!==n) return;
     var p=(_rhPicks[s.id]!=null)?_rhPicks[s.id]:s.guess;
-    if(p) picks[s.id]=p;
+    if(p) picks[(s.rawId!=null)?s.rawId:s.id]=p;
   });
   return picks;
+}
+/* 그 구역에 친 값만 — 구역 꼬리표를 떼어 판독 층 이름표로 */
+function rhValsFor(n, vals){
+  var tag=rhSecTag(n), out={}, src=vals||_rhVals||{};
+  Object.keys(src).forEach(function(k){
+    if(tag){ if(k.indexOf(tag)===0) out[k.slice(tag.length)]=src[k]; }
+    else if(!/^s\d+\//.test(k)) out[k]=src[k];
+  });
+  return out;
 }
 /* 표 «밖» 문단(「2026년 월 일」·「지원자 ○ ○ ○」) — 채우기와 짓는 길이 같이 쓴다 */
 function rhParaFill(xml, data){
@@ -16563,7 +16649,7 @@ async function rhTidyPreview(){
   toast('⏳ 다시 그리는 중…');
   var bytes=await rhComposeBytes();
   if(!bytes){ toast('다시 그릴 수 없습니다'); return; }
-  _rhDoc={ name:_rhDoc.name, ext:'hwpx', bytes:bytes };
+  _rhDoc={ name:_rhFixExt(_rhDoc.name, bytes), ext:'hwpx', bytes:bytes };
   closeTidy();
   if(typeof rhSetMode==='function') rhSetMode('hwp'); else _safe(rhPreviewHwp);
   toast('✅ 정리한 대로 그렸습니다 — 완성본·PDF 도 이대로 나갑니다');
@@ -16870,7 +16956,7 @@ async function rhFillByMap(o){
      ⚠ 못 물어도 그냥 간다(사전으로). AI가 없어도 앱은 돌아야 한다. */
   var colMap=await rhColMap(src);
   var zip=await JSZip.loadAsync(src), data=_cvFillData();
-  var filled=[], failed=[];
+  var filled=[], failed=[], 보일것={};
   /* 이 서식에 «서명 줄»이 있고 우리가 이름을 채웠나 — 도장을 찍을지 정하는 잣대다 */
   _rhSignedLine=false;
   var names=Object.keys(zip.files).filter(function(n){ return /Contents\/section\d+\.xml$/i.test(n); }).sort();
@@ -16885,8 +16971,7 @@ async function rhFillByMap(o){
     /* ★ 직접 친 값도 «함께» 얹는다 (대표 물음 2026-09-06 「한번에 처리하고」).
        채우기가 원본에서 새로 짓게 됐으므로, 여기서 안 얹으면 사람이 친 것이 사라진다.
        ⚠ 직접 친 값이 고른 값보다 «앞선다» — 사람이 고쳐 쓴 것이 최종이다(apply 가 그렇게 한다). */
-    var 친것={};
-    Object.keys(_rhVals||{}).forEach(function(k){ 친것[k]=_rhVals[k]; });
+    var 친것=rhValsFor(n);    /* ⚠ 그 구역에 친 것만 — 다른 구역 값이 같은 이름표 자리에 새지 않게 */
     var r=KcareerFormMap.apply(xml,{picks:picks,lists:wantLists,data:data,colMap:colMap,
       values:친것,
       /* 가려 둔 값 — 사람이 그 자리에 직접 고른 경우에만 쓰인다(자동으로는 안 나간다) */
@@ -16905,12 +16990,15 @@ async function rhFillByMap(o){
     if(r.changed) zip.file(n,r.xml);
     /* 표 밖 «서명 줄»(「성 명 : ____ (인)」)에 칸 지도가 이름을 넣었어도 도장 자리다 (2026-10-07) */
     if((r.filled||[]).some(function(f){ return f && f.sign; })) _rhSignedLine=true;
+    /* 입력판에 «보여 줄» 값 — 실제로 들어간 것만, 구역 꼬리표를 붙여서 */
+    var 꼬리=rhSecTag(n);
+    (r.filled||[]).forEach(function(f){ if(f && f.id && f.key!=='(직접)' && f.id!=='L') 보일것[꼬리+f.id]={ key:f.key, value:f.value }; });
     filled=filled.concat(r.filled); failed=failed.concat(r.failed);
   }
   if(!filled.length){ toast('채운 칸이 없습니다 — 오른쪽에서 넣을 값을 골라 주세요'); return; }
   /* ★ 채웠다는 «표시»를 남긴다 — 그래야 한글로 보기·완성본·자동 저장이 «같은 셈»으로 짓는다
      (rhComposeBytes). 안 남기면 채우기가 넣은 날짜 줄·가려 둔 값이 다음 짓기에서 빠진다. */
-  _rhFilled=true; _rhColMap=colMap||null;
+  _rhFilled=true; _rhColMap=colMap||null; _rhFillShown=보일것;
   /* ★ 사진 칸이 있으면 사진도 넣는다 — 「내 정보로 채우기」에는 증명사진도 든다(대표 물음 2026-09-07).
      ⚠ 사진 칸이 없는 서식이 대부분이다 — 그때는 표시를 «조용히» 거둔다(실패라고 말하지 않는다).
      ⚠ 칸은 있는데 사진이 없으면 그 까닭은 말한다(아래 사진말). */
@@ -17690,7 +17778,8 @@ async function rhAutoTick(){
     try{
       var bytes=await exportEditedHwpx();
       if(bytes && bytes.length){
-        _rhDoc={ name:(_rhDoc&&_rhDoc.name)||'작성중.hwpx', ext:'hwpx', bytes:new Uint8Array(bytes) };
+        var u8=new Uint8Array(bytes);
+        _rhDoc={ name:_rhFixExt((_rhDoc&&_rhDoc.name)||'작성중.hwpx', u8), ext:_rhKindOf(u8)||'hwpx', bytes:u8 };
       }
     }catch(e){ /* 편집기가 아직 준비 안 됐으면 원본 그대로 저장한다 */ }
     rhDraftSave();   /* ⚠ «지금 자리»(_rhDraftId)에 담는다 — 옛 코드는 한 자리를 덮어썼다 */
@@ -17914,7 +18003,10 @@ async function rhDraftResume(id){
   _rhDoc={ name:f.name, ext:f.ext, bytes:new Uint8Array(b64ToAb(f.base64)) };
   var side=await rhSideLoad(id);
   _rhVals=(side&&side.vals)||{}; _rhPicks=(side&&side.picks)||{};
-  try{ if(side&&side.listPlan) _rhListPlan=side.listPlan; }catch(e){}
+  /* ⚠ 없으면 «비운다» — 앞 문서의 목록 계획이 남으면 누르지도 않은 학력·경력이 들어갔다(2026-10-07 검토) */
+  _rhListPlan=(side&&side.listPlan)||null;
+  /* 앞 문서 것은 놓는다 — 되돌리기·보여 줄 값·고른 경력 차례 */
+  _rhUndo=null; _rhFillShown=null; _cvPick=null;
   /* ★★ 원본을 되살린다 — 없으면 «채워진 문서»가 바탕이 되어, 채우기를 누른 만큼
      값이 겹쳐 적힌다(대표 제보 2026-09-06 「푸른노무법인 푸른노무법인 푸른노무법인」). */
   _rhBase=await rhBaseLoad(id);
@@ -17935,6 +18027,9 @@ async function rhDraftResume(id){
     _rhAttachMarks=Array.isArray(표.attachMarks)?표.attachMarks:null;
     var td=표.tidy||{};
     _rhTidy={ drop:td.drop||{}, ph:!!td.ph, italic:!!td.italic, rows:!!td.rows };
+  }else{
+    /* 되살릴 표시가 없으면 «앞 문서 표시»를 놓는다 — 안 놓으면 도장·뺀 쪽·채움이 이 자리로 따라왔다 */
+    rhTidyReset();
   }
   rhDraftPanelClose();
   /* ⚠ mountEditor 는 «새 서식이 올라온 것»으로 보고 바탕을 다시 잡는다(_rhVals 도 비운다).

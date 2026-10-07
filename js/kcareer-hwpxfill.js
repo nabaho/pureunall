@@ -348,8 +348,10 @@
        깨진다(코덱스 권고). 그 칸의 값은 «안쪽 표»를 따로 다뤄 넣는다. */
     if (hasInnerTable(tc)) return null;
     var v = esc(value);
-    if (/<hp:t(?:\s[^>]*)?><\/hp:t>/.test(tc)) return dropLines(tc.replace(/(<hp:t(?:\s[^>]*)?>)(<\/hp:t>)/, '$1' + v + '$2'));
-    if (/<hp:t(?:\s[^>]*)?\/>/.test(tc)) return dropLines(tc.replace(/<hp:t((?:\s[^>]*)?)\/>/, '<hp:t$1>' + v + '</hp:t>'));
+    /* ⚠★ 바꿀 글자는 «함수로» 준다 — 글자로 주면 값 속 「$1」「$&」「$'」를 바꾸기 기호로 읽어
+       태그 조각이 끼어 문서가 안 열린다(「US$1 …」 실측 2026-10-07). */
+    if (/<hp:t(?:\s[^>]*)?><\/hp:t>/.test(tc)) return dropLines(tc.replace(/(<hp:t(?:\s[^>]*)?>)(<\/hp:t>)/, function (m, a, b) { return a + v + b; }));
+    if (/<hp:t(?:\s[^>]*)?\/>/.test(tc)) return dropLines(tc.replace(/<hp:t((?:\s[^>]*)?)\/>/, function (m, a) { return '<hp:t' + a + '>' + v + '</hp:t>'; }));
     /* ★★ 한글이 저장한 빈 칸은 run 이 «스스로 닫혀» 있다 — <hp:run charPrIDRef="0"/>.
        예전에는 이것을 여는 태그로 보고 그 «뒤»에 <hp:t> 를 붙여, 글자가 run 밖으로 나갔다.
        우리 엔진은 그래도 글자를 보여 줬지만 «한글은 그 글자를 버렸다» — 채운 파일을
@@ -357,10 +359,10 @@
     var mSelf = tc.match(/<hp:run\b([^>]*?)\s*\/>/);
     var mRun = tc.match(/<hp:run\b[^>]*>/);
     if (mSelf && mRun && mSelf.index === mRun.index)
-      return dropLines(tc.replace(mSelf[0], '<hp:run' + mSelf[1] + '><hp:t>' + v + '</hp:t></hp:run>'));
-    if (mRun) return dropLines(tc.replace(mRun[0], mRun[0] + '<hp:t>' + v + '</hp:t>'));
+      return dropLines(tc.replace(mSelf[0], function () { return '<hp:run' + mSelf[1] + '><hp:t>' + v + '</hp:t></hp:run>'; }));
+    if (mRun) return dropLines(tc.replace(mRun[0], function () { return mRun[0] + '<hp:t>' + v + '</hp:t>'; }));
     var mP = tc.match(/<hp:p\b[^>]*>/);
-    if (mP) return dropLines(tc.replace(mP[0], mP[0] + '<hp:run charPrIDRef="' + inheritedCharPr(tc) + '"><hp:t>' + v + '</hp:t></hp:run>'));
+    if (mP) return dropLines(tc.replace(mP[0], function () { return mP[0] + '<hp:run charPrIDRef="' + inheritedCharPr(tc) + '"><hp:t>' + v + '</hp:t></hp:run>'; }));
     return null;
   }
 

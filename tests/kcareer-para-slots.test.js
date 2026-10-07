@@ -94,12 +94,12 @@ test('⑤ 라벨 여럿인 칸 — 입력판이 «라벨마다» 칸을 내고, 
   const t = 줄들(r.xml)[0];
   assert.match(t, /기관명 :\s*가나상사/); assert.match(t, /부서명 :\s*$/, '다른 라벨 자리는 비워 둔다');
   const build = SRC.slice(SRC.indexOf('async function rhBuildInput('), SRC.indexOf('async function _rhLayout('));
-  assert.match(build, /KcareerFormHtml\.incellParts\(sl\.text\)/, '라벨을 가르는 자는 입력판과 같은 것');
+  assert.match(build, /KcareerFormHtml\.incellParts\([^;]*sl\.text/, '라벨을 가르는 자는 입력판과 같은 것');
   assert.match(build, /id:sl\.id\+':'\+k/, '표식도 라벨마다');
   assert.match(build, /e2\.dataset\.key=k/, '★ data-key 가 없으면 친 글자가 칸 첫 자리에 몰린다');
 });
 
 test('화면 배선 — 칸 지도 자리 이름 · 서명 줄 도장 표시', () => {
-  assert.match(SRC, /s\.para\?\(\/\^b\/\.test\(s\.id\)\?'글상자 줄':'본문 줄'\)/, '칸 지도가 표 밖 줄을 «0표 0행»으로 적지 않는다');
+  assert.match(SRC, /s\.para\?\(\/\^b\/\.test\([^)]*s\.id\)\?'글상자 줄':'본문 줄'\)/, '칸 지도가 표 밖 줄을 «0표 0행»으로 적지 않는다');
   assert.match(SRC, /some\(function\(f\)\{ return f && f\.sign; \}\)\) _rhSignedLine=true/);
 });

@@ -89,6 +89,8 @@ function 세상(opt) {
   vm.runInContext('var _rhAutoT=null, _rhAutoBusy=false, _rhAutoBound=false; var _rhSaveFail=0;', ctx);
 
   ['function rhSaveTag(', 'function rhEditing(',
+   /* 담을 때 이름 꼬리를 속에 맞춘다(2026-10-07 — .hwp 이름에 hwpx 를 담아 엔진이 거절하던 것) */
+   'function _rhKindOf(', 'function _rhFixExt(',
    'async function rhAutoTick(', 'function rhAutoSaveStart(']
     .forEach((d) => vm.runInContext(cutFn(CODE, d), ctx));
   return ctx;

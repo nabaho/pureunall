@@ -107,8 +107,11 @@ test('★★ 채운 결과에 «또» 채워도 값이 겹치지 않는다 (마�
 test('직접 친 값도 «함께» 다시 얹힌다 — 한 번에 완성된다', () => {
   /* 원본에서 새로 짓기 때문에, 직접 친 값을 따로 다시 넣을 필요가 없어야 한다 */
   const fn = cutFn(bare, 'async function rhFillByMap(');
-  assert.match(fn, /_rhVals/,
+  /* 친 값은 _rhVals 에서 곧바로, 또는 구역별로 가르는 rhValsFor 로 모은다(2026-10-07 — 여러 구역 서식) */
+  assert.match(fn, /_rhVals|rhValsFor\(/,
     '직접 친 값을 안 실으면, 원본에서 새로 지을 때 사람이 친 것이 사라진다');
+  if (!/_rhVals/.test(fn)) assert.match(bare, /function rhValsFor\([^)]*\)\{[\s\S]{0,120}_rhVals/,
+    'rhValsFor 가 친 값(_rhVals)을 안 읽는다');
   /* ⚠ 모으는 것만으로는 부족하다 — «넘기는지»까지 본다.
      실측 2026-09-06: values 를 안 넘기게 되돌려도 검사가 통과했다.
      모아 두고 안 넘기면 사람이 친 것이 조용히 사라진다 — 화면엔 아무 표시가 없다. */
