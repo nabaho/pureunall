@@ -279,6 +279,10 @@
       note:'취업규칙 관리 안에 끼워 넣어 쓴다' },
     camera:{ name:'푸른카메라', file:'pu-camera.html', program:'photos',
       note:'사진을 찍어 사진첩에 넣는 입구' },
+    /* 중진공 현장클리닉 화면에서 보낸 값을 «계약 등록 요청» 한 줄로 남기는 창 (2026-10-07).
+       계약은 계약관리가 사진첩 요청과 같은 문(processOneContractRequest)으로 만든다 — 여기서는 요청만 쓴다. */
+    clinic_intake:{ name:'현장클리닉 보내기', file:'clinic-intake.html', program:'erp',
+      note:'중진공 현장클리닉 → data/contract_requests 요청 한 줄 (계약은 계약관리가 만든다)' },
     esign_submit:{ name:'전자위임장 제출', file:'sign.html', program:'docs',
       note:'근로자가 폰으로 제출하는 쪽 — 문서관리가 받는다' }
   };

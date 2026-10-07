@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e40af">
+<title>현장클리닉 보내기 — 푸른노무법인</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📤</text></svg>">
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=50"></script>
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-version.js?v=8"></script>
+<script src="js/pu-active.js?v=1"></script>
+<script src="js/pu-authsync.js?v=3"></script>
+<script src="js/pu-whoami.js?v=3"></script>
+<!--
+  ══ 중진공 현장클리닉 → 푸른이알피 «계약 등록 요청» (대표 지시 2026-10-07 「목업」→「진행해라」) ══
+  「현장클리닉 사업장의 컨설팅 자문위원을 푸른노무법인 노무사로 선정하는 경우
+    자동으로 푸른이알피에 계약내용과 담당자 금액 등을 자동으로 넣게 할 수 있나?」
+
+  어떻게 도나
+   ① 노무사가 평소처럼 중진공(smes.go.kr)에 «스스로» 로그인해 현장클리닉 상세 화면을 연다.
+   ② 즐겨찾기의 「📤 푸른이알피로 보내기」(이 창이 만들어 주는 북마클릿)를 누르면,
+      그 화면에 «보이는 표»를 읽어 이 창을 열고 값을 건네준다(postMessage).
+   ③ 이 창에서 담당 노무사·예정 일수를 확인하고 [요청함으로 보내기] → data/contract_requests 에 한 줄.
+   ④ 계약관리가 열릴 때 «사진첩에서 온 요청과 같은 문»(processOneContractRequest)으로 검사해 계약을 만든다 —
+      사업자번호 겹침·같은 계약 중복·업체 연결·월 잠금 검사가 전부 그 집 안에 있다.
+
+  ⚠ 하지 않는 것: 중진공에 대신 로그인 · 인증서·비밀번호 저장 · 중진공 화면에 쓰기 ·
+    계약(data/contracts)에 직접 쓰기 · 이름으로 회사 잇기 · 대표자 휴대폰을 묻지 않고 저장하기.
+  ⚠ 받는 값은 «smes.go.kr 에서 온 것»만 믿는다(SMES_ORIGIN). 다른 곳에서 온 메시지는 버린다.
+  ⚠ 이 화면은 이알피의 «딸린 화면»이다(pu-ontology.js SATELLITES.clinic_intake) — 제 저장뿌리가 없다.
+-->
+<style>
+:root{--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;--bg:#f8fafc;--card:#fff;--blue:#1e40af;--blue2:#2563eb;--bluebg:#eff6ff;
+  --green:#166534;--greenbg:#f0fdf4;--amber:#854d0e;--amberbg:#fffbeb;--red:#991b1b;--redbg:#fef2f2;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--ink);font-family:system-ui,-apple-system,"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;font-size:13px;min-height:100vh;}
+.hd{background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;padding:14px 18px;}
+.hd .org{font-size:10.5px;opacity:.8;letter-spacing:.1em;font-weight:600;}
+.hd h1{font-size:16px;font-weight:800;margin-top:2px;}
+.wrap{max-width:560px;margin:0 auto;padding:12px;}
+.card{background:var(--card);border-radius:12px;padding:12px 14px;margin-bottom:10px;box-shadow:0 1px 2px rgba(16,30,70,.05),0 6px 18px -10px rgba(16,30,70,.15);}
+.sect{font-weight:800;font-size:12.5px;margin:2px 0 8px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.kv{display:grid;grid-template-columns:104px 1fr;gap:6px 8px;align-items:center;}
+.kv label{color:var(--sub);font-size:12px;}
+.kv input,.kv select{width:100%;border:1px solid var(--line);border-radius:7px;padding:6px 8px;font-size:13px;font-family:inherit;color:var(--ink);background:#fff;}
+.kv input[readonly]{background:var(--bg);}
+.tag{display:inline-block;border-radius:4px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;}
+.t-g{background:var(--greenbg);color:var(--green);border:1px solid #bbf7d0;}
+.t-a{background:var(--amberbg);color:var(--amber);border:1px solid #fde68a;}
+.t-r{background:var(--redbg);color:var(--red);border:1px solid #fecaca;}
+.t-b{background:var(--bluebg);color:var(--blue);border:1px solid #bfdbfe;}
+.muted{color:var(--sub);font-size:12px;line-height:1.6;}
+.btns{display:flex;gap:8px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap;}
+.btn{border:1px solid var(--line);background:#fff;border-radius:8px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;color:var(--ink);}
+.btn.pri{background:var(--blue2);border-color:var(--blue2);color:#fff;}
+.btn:disabled{opacity:.5;cursor:default;}
+.bm{display:inline-block;background:#16a34a;color:#fff;border-radius:999px;padding:8px 16px;font-weight:800;text-decoration:none;font-size:13px;cursor:grab;}
+.msg{border-radius:8px;padding:9px 12px;font-size:12.5px;margin-bottom:10px;line-height:1.6;}
+.msg.ok{background:var(--greenbg);color:var(--green);border:1px solid #bbf7d0;}
+.msg.err{background:var(--redbg);color:var(--red);border:1px solid #fecaca;}
+.msg.warn{background:var(--amberbg);color:var(--amber);border:1px solid #fde68a;}
+ol.how{padding-left:18px;line-height:1.9;font-size:12.5px;}
+@media (max-width:760px){ input,select,textarea{font-size:16px !important;} .kv{grid-template-columns:92px 1fr;} }
+</style>
+</head>
+<body>
+<div class="hd" style="display:flex;align-items:center;gap:10px"><div style="flex:1"><div class="org">PUREUN · LLF</div><h1>📤 현장클리닉 → 푸른이알피</h1></div><span id="whoami" style="font-size:12px;opacity:.9"></span></div>
+<div class="wrap" id="app"><div class="card muted">불러오는 중…</div></div>
+
+<script>
+/* ── 어디서 온 값만 믿나 — 중진공(smes.go.kr) 화면에서 보낸 것만 ── */
+var SMES_ORIGIN = /^https:\/\/(www\.)?smes\.go\.kr$/;
+var REQ_ROOT = 'data/contract_requests';
+
+/* ── 북마클릿 몸통 — 중진공 화면에서 돈다. «바깥 것을 아무것도 안 부른다»(스스로 다 들고 간다).
+   ⚠ 중진공 화면은 우리 것이 아니라 바깥 스크립트를 실을 수 없을 수 있다 — 그래서 통째로 넣는다.
+   ⚠ 화면에 «보이는 표»만 읽는다: 칸 이름(th·td·dt) 바로 옆 칸의 글자.
+   ⚠ 줄 주석(//)을 쓰지 않는다 — 즐겨찾기 주소로 바뀔 때 줄이 붙으면 뒤가 통째로 주석이 된다. */
+function smesClip(intakeUrl) {
+  var LABELS = { '지원기업명': 'name', '대표자성명': 'ceo', '사업자등록번호': 'bizNo', '본사주소': 'addr',
+    '컨설팅주소': 'addr2', '본사전화': 'phone', 'e-mail주소': 'email', '이메일주소': 'email', '업태(업종)': 'bizType',
+    '주생산품': 'item', '매출액': 'sales', '상시근로자수': 'workers', '설립년월일': 'openDate',
+    '컨설팅지역': 'region', '대표자휴대폰번호': 'mobile' };
+  var STAGES = ['현장클리닉추천', '현장클리닉승인', '자문위원선정', '수행계획서승인', '현장지도결과서승인', '자문료지급대기', '자문료지급'];
+  var norm = function (s) { return String(s || '').replace(/\s+/g, '').replace(/[:：]/g, ''); };
+  var txt = function (el) { return String((el && (el.innerText || el.textContent)) || '').replace(/[ \t]+/g, ' ').trim(); };
+  var out = {};
+  var cells = document.querySelectorAll('th,td,dt');
+  for (var i = 0; i < cells.length; i++) {
+    var key = LABELS[norm(txt(cells[i]))];
+    if (!key || out[key]) continue;
+    var v = cells[i].nextElementSibling;
+    if (v) out[key] = txt(v);
+  }
+  var best = null, bestLum = 2;
+  var all = document.querySelectorAll('a,li,span,button,div,td');
+  for (var j = 0; j < all.length; j++) {
+    var t = norm(txt(all[j]));
+    if (STAGES.indexOf(t) < 0) continue;
+    var bg = '';
+    try { bg = window.getComputedStyle(all[j]).backgroundColor || ''; } catch (e) { bg = ''; }
+    var m = bg.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/);
+    if (!m || (m[4] !== undefined && Number(m[4]) === 0)) continue;
+    var lum = (0.299 * m[1] + 0.587 * m[2] + 0.114 * m[3]) / 255;
+    if (lum < bestLum) { bestLum = lum; best = t; }
+  }
+  if (best && bestLum < 0.6) out.stage = best;
+  if (!out.name || !out.bizNo) {
+    alert('이 화면에서 회사 정보(지원기업명·사업자등록번호)를 못 찾았습니다.\n현장클리닉 「상담신청 및 현황」의 상세 화면에서 눌러 주세요.');
+    return;
+  }
+  var to = '';
+  try { to = new URL(intakeUrl).origin; } catch (e) { return; }
+  var w = window.open(intakeUrl, 'pu_clinic_intake');
+  if (!w) { alert('새 창이 막혔습니다 — 이 사이트의 팝업을 허용한 뒤 다시 눌러 주세요.'); return; }
+  var got = false, n = 0;
+  var onAck = function (ev) { if (ev.origin === to && ev.data && ev.data.type === 'pu-clinic-got') { got = true; window.removeEventListener('message', onAck); } };
+  window.addEventListener('message', onAck);
+  var timer = setInterval(function () {
+    n++;
+    if (got || n > 40) { clearInterval(timer); return; }
+    try { w.postMessage({ type: 'pu-smes-clinic', v: 1, data: out }, to); } catch (e) { }
+  }, 400);
+}
+
+/* 북마클릿 주소 — 위 함수를 통째로 담는다 */
+function bookmarkletHref(intakeUrl) {
+  return 'javascript:' + encodeURIComponent('(' + smesClip.toString() + ')(' + JSON.stringify(intakeUrl) + ')');
+}
+
+/* ── 읽은 값 다듬기 — 사업자번호는 10자리로, 주소 앞 우편번호는 떼어 낸다 ── */
+function clinicNorm(raw) {
+  raw = raw || {};
+  var s = function (v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); };
+  var dg = s(raw.bizNo).replace(/\D/g, '');
+  var bizNo = dg.length === 10 ? dg.slice(0, 3) + '-' + dg.slice(3, 5) + '-' + dg.slice(5) : s(raw.bizNo);
+  var addr = s(raw.addr || raw.addr2), zip = '';
+  var zm = addr.match(/^(\d{5})\s*(.*)$/);
+  if (zm) { zip = zm[1]; addr = zm[2]; }
+  var workers = parseInt(s(raw.workers).replace(/[^\d]/g, ''), 10) || 0;
+  return {
+    name: s(raw.name), bizNo: bizNo, bizOk: dg.length === 10, ceo: s(raw.ceo), address: addr, zipcode: zip,
+    phone: s(raw.phone).replace(/^-+$/, ''), email: s(raw.email).replace(/^-+$/, ''),
+    bizType: s(raw.bizType), item: s(raw.item), sales: s(raw.sales), workers: workers,
+    openDate: s(raw.openDate), region: s(raw.region), stage: s(raw.stage), mobile: s(raw.mobile)
+  };
+}
+
+/* ── 현장클리닉 유형 — 역할(role:'clinic')이 붙은 «한 개»만. 둘이면 안 고른다(사람이 고른다) ── */
+function clinicTypeOf(types) {
+  var list = (types || []).filter(function (t) { return t && t.code && t.name; });
+  var byRole = list.filter(function (t) { return t.role === 'clinic'; });
+  if (byRole.length === 1) return byRole[0];
+  if (byRole.length > 1) return null;   /* 역할이 겹치면 이름으로도 고르지 않는다 — 사람이 정할 일 */
+  var key = function (n) { return String(n || '').replace(/[\s()（）·,\-]/g, '').replace(/컨설팅$/, ''); };
+  var byName = list.filter(function (t) { return key(t.name) === '현장클리닉'; });
+  return byName.length === 1 ? byName[0] : null;
+}
+
+/* ── 요청 한 줄 — 계약관리가 사진첩 요청과 «같은 문»으로 받는 꼴 ──
+   ⚠ 주담당·유형·회사 이름·사업자번호(10자리)가 없으면 «안 만든다»(계약관리에서 걸려 쌓이기만 한다).
+   ⚠ 대표자 휴대폰은 사람이 체크했을 때만 담당자 칸에 넣는다.
+   ⚠ 일수·선정일은 사람이 적은 그대로 — 비어 있으면 안 채운다(기본값 금지). */
+function clinicRequest(o) {
+  o = o || {};
+  var c = o.company || {};
+  var why = !o.managerMain ? '담당 노무사를 고르지 않았습니다'
+    : !o.consultingType ? '현장클리닉 유형을 못 찾았습니다'
+    : !c.name ? '회사 이름이 없습니다'
+    : String(c.bizNo || '').replace(/\D/g, '').length !== 10 ? '사업자번호가 10자리가 아닙니다' : '';
+  if (why) return { why: why };
+  var now = typeof o.now === 'number' ? o.now : Date.now();
+  var id = 'ctreq-' + now.toString(36) + Math.random().toString(36).slice(2, 7);
+  var company = { name: c.name, bizNo: c.bizNo, ceo: c.ceo || '', address: c.address || '', phone: c.phone || '',
+    email: c.email || '', bizType: c.bizType || '', bizCategory: c.item || '' };
+  if (o.sendMobile && c.mobile) {
+    company.contacts = [{ id: 'mc-' + now.toString(36), name: c.ceo || '', role: '대표', phone: c.mobile, fax: '', email: '', isPrimary: true }];
+  }
+  var rec = { id: id, state: 'pending', at: now, by: String(o.by || ''), managerMain: String(o.managerMain),
+    consultingType: String(o.consultingType), company: company, source: 'smes',
+    smes: { stage: c.stage || '', region: c.region || '', workers: c.workers || 0, sales: c.sales || '', openDate: c.openDate || '', zipcode: c.zipcode || '' } };
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(o.startDate || ''))) rec.startDate = o.startDate;
+  var nd = parseInt(o.consultDays, 10) || 0;
+  if (nd > 0) rec.consultDays = nd;
+  return { rec: rec };
+}
+</script>
+
+<script>
+(function () {
+  'use strict';
+  var FB_CONFIG = {apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',storageBucket:'pureun-erp.firebasestorage.app',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+  if (!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  var db = firebase.database();
+  var $ = function (id) { return document.getElementById(id); };
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); };
+  var vals = function (raw) { var v = raw && raw.v !== undefined ? raw.v : raw; return Array.isArray(v) ? v.filter(Boolean) : Object.keys(v || {}).map(function (k) { return v[k]; }).filter(Boolean); };
+  var S = { user: null, me: null, staff: [], type: null, data: null, co: null, dupReq: null, sent: false };
+  var INTAKE_URL = location.origin + location.pathname;
+
+  /* 중진공에서 온 값 받기 — 다른 곳에서 온 것은 버린다 */
+  window.addEventListener('message', function (ev) {
+    if (!SMES_ORIGIN.test(ev.origin)) return;
+    var d = ev.data;
+    if (!d || d.type !== 'pu-smes-clinic' || !d.data) return;
+    try { ev.source.postMessage({ type: 'pu-clinic-got' }, ev.origin); } catch (e) { }
+    if (S.data) return;
+    S.data = clinicNorm(d.data);
+    lookups().then(draw);
+    draw();
+  });
+
+  firebase.auth().onAuthStateChanged(function (u) {
+    S.user = (u && !u.isAnonymous) ? u : null;
+    if (!S.user) { draw(); return; }
+    Promise.all([
+      db.ref('data/user_dir').once('value').then(function (s) { return vals(s.val()); }).catch(function () { return []; }),
+      db.ref('data/biz_cons_types').once('value').then(function (s) { return vals(s.val()); }).catch(function () { return []; })
+    ]).then(function (r) {
+      S.staff = r[0].filter(function (x) { return x && x.sid && x.name && (x.status === 'active' || !x.status); })
+        .sort(function (a, b) { return String(a.name).localeCompare(String(b.name), 'ko'); });
+      S.type = clinicTypeOf(r[1]);
+      lookups().then(draw);
+      draw();
+    });
+  });
+  /* 「지금 로그인한 사람」은 머리줄 자리에 — 안 알려 주면 표가 떠서 겹친다(tests/whoami-no-overlap) */
+  if (window.PuWhoami && PuWhoami.mount) PuWhoami.mount('#whoami');
+  if (window.PuWhoami && PuWhoami.onChange) PuWhoami.onChange(function (me) { S.me = me; draw(); });
+
+  /* 업체관리에 같은 사업자번호가 있나 · 같은 회사로 이미 보낸 요청이 있나 — 번호로만 본다 */
+  function lookups() {
+    if (!S.user || !S.data || !S.data.bizOk) return Promise.resolve();
+    var bz = S.data.bizNo.replace(/\D/g, '');
+    return Promise.all([
+      db.ref('data/companies/v').once('value').then(function (s) {
+        var hit = vals(s.val()).filter(function (c) { return c && !c._deleted && String(c.bizNo || '').replace(/\D/g, '') === bz; });
+        S.co = hit.length ? hit : [];
+      }).catch(function () { S.co = null; }),
+      db.ref(REQ_ROOT).once('value').then(function (s) {
+        var all = s.val() || {};
+        S.dupReq = Object.keys(all).map(function (k) { return all[k]; }).filter(function (r) {
+          return r && (r.state === 'pending' || r.state === 'blocked') && String((r.company || {}).bizNo || '').replace(/\D/g, '') === bz;
+        });
+      }).catch(function () { S.dupReq = null; })
+    ]);
+  }
+
+  function installCard() {
+    return '<div class="card"><div class="sect">처음 한 번 — 즐겨찾기에 단추 넣기</div>'
+      + '<ol class="how"><li>크롬 즐겨찾기 줄이 안 보이면 <b>Ctrl + Shift + B</b></li>'
+      + '<li>아래 초록 단추를 <b>즐겨찾기 줄로 끌어다 놓기</b></li>'
+      + '<li>중진공에 평소처럼 로그인 → 현장클리닉 「상담신청 및 현황」 상세 화면을 연다</li>'
+      + '<li>즐겨찾기의 <b>「📤 푸른이알피로 보내기」</b>를 누른다 → 이 창이 열리며 값이 채워진다</li></ol>'
+      + '<div style="margin:12px 0 4px"><a class="bm" id="bmLink" href="#" onclick="return false">📤 푸른이알피로 보내기</a></div>'
+      + '<div class="muted">중진공에 대신 로그인하지 않습니다 · 중진공 화면에는 아무것도 쓰지 않습니다 · 보낸 것은 계약관리가 검사한 뒤 계약이 됩니다</div></div>';
+  }
+
+  function draw() {
+    var app = $('app');
+    if (!S.user) {
+      app.innerHTML = '<div class="msg warn">푸른 통합시스템에 로그인되어 있지 않습니다. <a href="enter.html">포털에서 로그인</a>한 뒤, 중진공 화면에서 다시 눌러 주세요.</div>' + installCard();
+      bindBm(); return;
+    }
+    if (S.sent) {
+      app.innerHTML = '<div class="msg ok">✔ 요청함으로 보냈습니다. 계약관리를 열면 검사를 거쳐 계약으로 등록됩니다 — 기간·금액을 확인해 주세요.</div>'
+        + '<div class="btns"><button class="btn" onclick="window.close()">창 닫기</button></div>';
+      return;
+    }
+    if (!S.data) { app.innerHTML = installCard(); bindBm(); return; }
+    var d = S.data;
+    var coTag = S.co === null ? '<span class="tag t-a">업체관리를 못 읽음</span>'
+      : !S.co ? '<span class="tag t-a">업체관리 확인 중…</span>'
+      : S.co.length === 1 ? '<span class="tag t-g">업체관리에 있음 · ' + esc(S.co[0].name) + '</span>'
+      : S.co.length > 1 ? '<span class="tag t-a">업체관리에 같은 번호 ' + S.co.length + '곳</span>'
+      : '<span class="tag t-a">업체관리에 없음 · 새 업체 후보</span>';
+    var dup = (S.dupReq && S.dupReq.length) ? '<div class="msg warn">⚠ 같은 사업자번호로 보낸 요청이 이미 ' + S.dupReq.length + '건 있습니다 — 또 보내면 계약관리에서 중복으로 걸립니다.</div>' : '';
+    var meSid = (S.me && S.me.sid) || '';
+    var opts = S.staff.map(function (u) { return '<option value="' + esc(u.sid) + '"' + (u.sid === meSid ? ' selected' : '') + '>' + esc(u.name) + (u.sid === meSid ? ' (나)' : '') + '</option>'; }).join('');
+    var today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    var inp = function (id, label, v, ro) { return '<label for="' + id + '">' + label + '</label><input id="' + id + '" value="' + esc(v) + '"' + (ro ? ' readonly' : '') + '>'; };
+    app.innerHTML = dup
+      + (d.bizOk ? '' : '<div class="msg err">사업자번호가 10자리로 읽히지 않았습니다 — 확인해 고쳐 주세요.</div>')
+      + '<div class="card"><div class="sect">🏢 회사 ' + coTag + '</div><div class="kv">'
+      + inp('f-name', '회사명', d.name) + inp('f-bizNo', '사업자번호', d.bizNo) + inp('f-ceo', '대표자', d.ceo)
+      + inp('f-address', '소재지', d.address) + inp('f-phone', '전화', d.phone) + inp('f-email', '이메일', d.email)
+      + inp('f-bizType', '업태', d.bizType) + inp('f-item', '주생산품', d.item)
+      + '<label>상시·매출</label><input readonly value="' + esc((d.workers ? d.workers + '명' : '-') + ' · ' + (d.sales || '-')) + '">'
+      + '<label for="f-mob">대표자 휴대폰</label><div class="muted"><input type="checkbox" id="f-mob" style="width:auto;vertical-align:middle"> '
+      + (d.mobile ? esc(d.mobile) + ' — 체크하면 담당자 칸에 함께 보냅니다' : '화면에 없음') + '</div>'
+      + '</div></div>'
+      + '<div class="card"><div class="sect">📋 사업 <span class="tag t-b">' + esc(S.type ? S.type.name : '현장클리닉 유형 없음') + '</span>'
+      + (d.stage ? '<span class="tag t-b">단계 ' + esc(d.stage) + '</span>' : '') + (d.region ? '<span class="tag t-b">' + esc(d.region) + '</span>' : '') + '</div><div class="kv">'
+      + '<label for="f-mgr">담당 노무사</label><select id="f-mgr"><option value="">— 고르세요 —</option>' + opts + '</select>'
+      + '<label for="f-date">선정일</label><input id="f-date" type="date" value="' + today + '">'
+      + '<label for="f-days">예정 일수</label><input id="f-days" type="number" min="0" max="60" placeholder="비우면 금액은 계약관리에서">'
+      + '</div><div class="muted" style="margin-top:6px">금액은 계약관리의 「1일 단가 × 일수」로 셈합니다(부가세 별도). 일수를 비우면 금액도 비워 둡니다.</div></div>'
+      + '<div id="sendMsg"></div>'
+      + '<div class="btns"><button class="btn" onclick="window.close()">취소</button><button class="btn pri" id="sendBtn">요청함으로 보내기</button></div>';
+    $('sendBtn').onclick = send;
+  }
+
+  function bindBm() {
+    var a = $('bmLink');
+    if (a) { a.setAttribute('href', bookmarkletHref(INTAKE_URL)); a.onclick = function () { alert('누르지 말고, 즐겨찾기 줄로 «끌어다 놓아» 주세요.'); return false; }; }
+  }
+
+  function send() {
+    var val = function (id) { var el = $(id); return el ? String(el.value || '').trim() : ''; };
+    var mgr = val('f-mgr');
+    var me = S.staff.filter(function (u) { return u.sid === ((S.me && S.me.sid) || ''); })[0];
+    var r = clinicRequest({
+      managerMain: mgr, consultingType: S.type && S.type.code, by: (me && me.name) || (S.me && S.me.name) || (S.user && S.user.email) || '',
+      startDate: val('f-date'), consultDays: val('f-days'), sendMobile: !!($('f-mob') && $('f-mob').checked),
+      company: { name: val('f-name'), bizNo: val('f-bizNo'), ceo: val('f-ceo'), address: val('f-address'), phone: val('f-phone'),
+        email: val('f-email'), bizType: val('f-bizType'), item: val('f-item'), mobile: S.data.mobile,
+        stage: S.data.stage, region: S.data.region, workers: S.data.workers, sales: S.data.sales, openDate: S.data.openDate, zipcode: S.data.zipcode }
+    });
+    var box = $('sendMsg');
+    if (r.why) { box.innerHTML = '<div class="msg err">' + esc(r.why) + '</div>'; return; }
+    if (S.dupReq && S.dupReq.length && !confirm('같은 사업자번호로 보낸 요청이 이미 있습니다. 그래도 보낼까요?')) return;
+    $('sendBtn').disabled = true;
+    db.ref(REQ_ROOT + '/' + r.rec.id).set(r.rec).then(function () { S.sent = true; draw(); })
+      .catch(function (e) { $('sendBtn').disabled = false; box.innerHTML = '<div class="msg err">보내지 못했습니다 — ' + esc((e && e.message) || e) + '</div>'; });
+  }
+
+  /* 중진공 쪽 단추가 기다리고 있으면 «준비됐다»고 알린다(값은 싣지 않는다) */
+  try { if (window.opener) window.opener.postMessage({ type: 'pu-clinic-ready' }, '*'); } catch (e) { }
+  draw();
+})();
+</script>
+</body>
+</html>

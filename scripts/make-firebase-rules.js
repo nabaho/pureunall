@@ -219,6 +219,11 @@ rules.data = {
   contract_forms_removed: { '.read': LOGIN, '.write': LOGIN },
   /* 서식 묶음 세트(2026-09-28 설계 서식-묶음-채우기 §2-1) — 양식 id 목록뿐, 개인정보 없음. 양식과 같은 권한 */
   contract_form_sets:     { '.read': LOGIN, '.write': LOGIN },
+  /* 컨설팅 유형표(현장클리닉·기술보호 …, 1일 단가) — 이름을 붙임(2026-10-07).
+     여태 이름 없이 $other 로 떨어져 있었다 — 이알피 설정은 dbGet 으로, 사진첩은 글자를 이어 붙여 불러
+     검사 눈에 안 띄었다. 「현장클리닉 보내기」(clinic-intake.html)가 글자 그대로 읽으며 드러났다.
+     ★ 권한은 «그대로»(재직 직원 전원 읽고 쓰기) — 이알피 설정 화면에서 유형을 고친다. */
+  biz_cons_types: { '.read': LOGIN, '.write': LOGIN },
   consultings:   { '.read': LOGIN, '.write': LOGIN },   /* 컨설팅 사업(금액 포함) */
   /* 사건 기록. 여태 이름이 없어 $other 로 떨어져 있었다 — 권한은 «그대로»
      재직 직원 전원이고, 이름을 붙여 어디에 무엇이 있는지 드러낸 것뿐이다.
