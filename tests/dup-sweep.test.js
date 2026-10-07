@@ -41,6 +41,9 @@ function makeCtx(store){
   vm.runInContext(slice('function contractSubtypeCode(c, kindV){', 'function contractSubtypeLabel('), c);
   vm.runInContext(slice('var PC_CORP_TOKENS', 'function pcToContact('), c);
   vm.runInContext(slice('function isItemClosed(item){', '// ============ 종료 권한'), c);
+  // 휴지통 줄을 빼고 읽는 도우미 — 진짜 것을 싣는다(흉내를 만들면 진짜가 바뀌어도 모른다)
+  vm.runInContext(slice('function erpLiveRows(', 'function dbGetLive('), c);
+  vm.runInContext(slice('function dbGetLive(', '\n'), c);
   vm.runInContext(slice('// ============ 지난 자료 중복 훑기 ============', '// 여러 건 중 가장 센 판정'), c);
   return c;
 }
@@ -93,6 +96,17 @@ const K = (g) => g.verdict + ':' + g.kindLabel + ':' + g.coName + ':' + g.rows.l
   t('업무종류·업무명이 다 없으면 빈 코드',
     c.dupSweepFacets('work', {})[0].code, '');
   t('모르는 갈래는 빈 배열', c.dupSweepFacets('없는것', { a:1 }), []);
+}
+
+/* ═══ 휴지통 줄은 중복으로 잡지 않는다 (2026-10-07) ═══ */
+{
+  const r = scan({ contracts:[
+    { id:'c1', companyName:'자차에프앤비', signDate:'2026-03-11', contractNo:'계약-041',
+      kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' }, status:'signed' },
+    { id:'c2', companyName:'(주)자차에프앤비', signDate:'2026-07-28', contractNo:'계약-172',
+      kinds:['consulting'], typeCodes:{ consulting:'cons-ilteo' }, status:'signed', _deleted:true }
+  ]});
+  t('★ 한쪽이 휴지통에 있으면 중복이 아니다', r.groups.length, 0);
 }
 
 /* ═══ 3. ★ 진짜 중복 / 재계약 / 판단 못 함 ═══ */

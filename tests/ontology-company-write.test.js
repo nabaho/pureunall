@@ -113,7 +113,10 @@ test('연결 보류 저장 및 저장 도중 삭제된 업체에는 업체정보
 test('과거 계약·사건의 자체 ID를 업체 ID로 가져오지 않는다',()=>{
   const code=panel.slice(panel.indexOf('  function _pastCoRecord(r){'),panel.indexOf('  var ERP_CO_FILL_KEYS'));
   const ctx={dbGet:key=>key==='contracts'?[{id:'ct-not-company',companyName:'과거기업',company:{name:'과거기업'}}]:[]};
-  vm.createContext(ctx);new vm.Script(code).runInContext(ctx);
+  vm.createContext(ctx);
+  // 휴지통 줄을 빼고 읽는 도우미(dbGetLive) — 진짜 것을 싣는다
+  new vm.Script(erp.slice(erp.indexOf('function erpLiveRows('),erp.indexOf('\n',erp.indexOf('function dbGetLive(')))).runInContext(ctx);
+  new vm.Script(code).runInContext(ctx);
   assert.equal(ctx._coFieldsOf({label:'과거기업'}).companyId,'');
 });
 

@@ -1788,7 +1788,7 @@ function openAddressSearch(onComplete, prefill){
       ['consultings','컨설팅'],['funds','기금'],['other_projects','기타사업']
     ];
     keys.forEach(function(p){
-      (dbGet(p[0],[])||[]).forEach(function(it){
+      dbGetLive(p[0]).forEach(function(it){
         var b = (it.bizNo || (it.company&&it.company.bizNo) || '').replace(/[^0-9]/g,'');
         if(b===norm && it.id!==excludeId){
           found.push({module:p[1], id:it.id, name: it.companyName||it.name||(it.company&&it.company.name)||''});
@@ -10324,6 +10324,23 @@ var TrashBin = {
   }
 };
 
+/* ★ 휴지통 딱지(_deleted) 붙은 줄을 뺀 «살아 있는 줄»만 돌려준다 (2026-10-07).
+   TrashBin.remove 는 줄을 지우지 않고 딱지만 붙인다 — 그래서 dbGet 은 휴지통 줄까지 준다.
+   그 줄이 미수금 알림·미입금 목록·검색·업체 찾기·건수에 그대로 섞여 «지운 건»이 살아 있는 것처럼 보였다
+   (2026-10-05 기타사업 이음센터-2026-001 두 줄 — #2026 은 그 표 하나만 고쳤다).
+   ■ 쓰는 곳: 세기·합계·알림·미수/미입금 목록·검색·고르기 목록 → dbGetLive
+   ■ 쓰지 않는 곳(그대로 dbGet): 휴지통·복원 화면, id 가 있는지만 보는 연결 확인,
+     표를 통째로 다시 저장하는 길(dbSet) — 여기서 빼면 휴지통 줄이 «영구 삭제» 된다.
+   ⚠ _FB_HIDE_DELETED 에 이 표들을 넣지 말 것 — 휴지통 화면(TrashBin.list)이 텅 빈다.
+   ⚠ 딱지 줄이 없으면 «같은 배열»을 그대로 준다 — 옛 코드의 === 비교를 깨지 않게. */
+function erpLiveRows(arr){
+  if(!Array.isArray(arr)) return arr;
+  for(var i = 0; i < arr.length; i++){
+    if(arr[i] && arr[i]._deleted === true) return arr.filter(function(x){ return !(x && x._deleted === true); });
+  }
+  return arr;
+}
+function dbGetLive(k){ return erpLiveRows(dbGet(k, []) || []); }
 // ============ Audit Log: 핵심 데이터 변경 추적 (#E + B안) ============
 // 사용 예: AuditLog.write('case', caseId, 'retainerFee', 1000000, 1500000, '오류 정정')
 //          AuditLog.readAll() → 서버에서 바로 읽기(재무 권한자만) — 이 기기엔 사본을 두지 않는다
@@ -13232,7 +13249,7 @@ function Sidebar(props){
   // 본인 KPI 데이터 집계
   var sid = CURRENT_USER.sid;
   var todayStr = todayYMD();
-  var allCases = dbGet('cases', []) || [];
+  var allCases = dbGetLive('cases');
   var allSchedules = dbGet('my_schedules', []) || [];
   var allCompanies = dbGet('companies', []) || [];
   // 본인 담당 사건 (active) - 주담당+부담당 (종료 판정 isItemClosed로 통일)
@@ -13290,7 +13307,7 @@ function Sidebar(props){
       });
       // 2) 컨설팅·기금·기타 - 종결된 것만
       ['consultings','funds','other_projects'].forEach(function(key){
-        var arr = dbGet(key, []);
+        var arr = dbGetLive(key);
         if(!Array.isArray(arr)) return;
         arr.forEach(function(p){
           if(!p.closedDate || p.permanentArchived) return;
@@ -14660,13 +14677,13 @@ function GlobalSearch(props){
       });
     }
 
-    (dbGet('cases', [])||[]).forEach(function(c){
+    dbGetLive('cases').forEach(function(c){
       if(c.permanentArchived) return;
       if(match(c, ['title','caseNo','companyName','payee','description','note','plaintiff','defendant'])){
         results.push({type:'사건',icon:'⚖️',color:'#dc2626',title:c.title||c.caseNo||'-',sub:_nz(c.caseType, c.companyName||c.payee, c.caseNo)||'-',mgr:mgrs(c),goto:'biz/case',closed:!!(c.closedDate||c.status==='closed')});
       }
     });
-    (dbGet('consultings', [])||[]).forEach(function(c){
+    dbGetLive('consultings').forEach(function(c){
       if(c.permanentArchived) return;
       if(match(c, ['title','companyName','consultingType','description','note','programName'])){
         results.push({type:'컨설팅',icon:'💼',color:'#2563eb',title:c.title||c.programName||c.consultingType||'-',sub:_nz(c.consultingType||c.programName, c.companyName)||'-',mgr:mgrs(c),goto:'biz/consulting',closed:!!c.closedDate});
@@ -14677,19 +14694,19 @@ function GlobalSearch(props){
         results.push({type:'업체',icon:'🏢',color:'#16a34a',title:c.name||'-',sub:(c.typeCode||'')+(c.ceo?' · '+c.ceo:''),mgr:mgrs(c),goto:'biz/company',closed:false});
       }
     });
-    (dbGet('funds', [])||[]).forEach(function(c){
+    dbGetLive('funds').forEach(function(c){
       if(c.permanentArchived) return;
       if(match(c, ['name','title','companyName','description','fundType','note'])){
         results.push({type:'기금',icon:'💰',color:'#d97706',title:c.name||c.title||'-',sub:c.companyName||c.fundType||'-',mgr:mgrs(c),goto:'biz/fund',closed:!!c.closedDate});
       }
     });
-    (dbGet('other_projects', [])||[]).forEach(function(c){
+    dbGetLive('other_projects').forEach(function(c){
       if(c.permanentArchived) return;
       if(match(c, ['title','companyName','description','note','category'])){
         results.push({type:'기타사업',icon:'📌',color:'#2563eb',title:c.title||'-',sub:c.companyName||c.category||'-',mgr:mgrs(c),goto:'biz/other',closed:!!c.closedDate});
       }
     });
-    (dbGet('contracts', [])||[]).forEach(function(c){
+    dbGetLive('contracts').forEach(function(c){
       if(c.status==='closed'||c.status==='cancelled'||c.status==='transferred') return;
       if(match(c, ['companyName','ceoName','bizNum','contractType','contactName'])){
         results.push({type:'계약',icon:'📋',color:'#1e40af',title:c.companyName||'-',sub:_nz(_ctKinds(c), c.consultingType||c.caseType||c.fundType||c.programName, c.contractNo)||c.ceoName||'-',mgr:mgrs(c),goto:'biz/contract',closed:false});
@@ -14932,10 +14949,10 @@ function NotificationCenter(){
 
   // 2) 미수금 (D+30 이상) - 비관리자는 본인 담당만 노출
   var sidNc = CURRENT_USER.sid;
-  var cases = dbGet('cases', []);
-  var consultings = dbGet('consultings', []);
-  var funds = dbGet('funds', []);
-  var others = dbGet('other_projects', []);
+  var cases = dbGetLive('cases');
+  var consultings = dbGetLive('consultings');
+  var funds = dbGetLive('funds');
+  var others = dbGetLive('other_projects');
   function addRecv(p, kind, amount, expectedDate, type){
     if(!amount || amount<=0) return;
     // 비관리자는 본인 주담당/부담당만 노출
@@ -15367,7 +15384,7 @@ function dupSweepScan(opts){
   var scanned = 0;
   DUP_SWEEP_KINDS.forEach(function(K){
     if(only && only.indexOf(K.key) < 0) return;
-    var arr = dbGet(K.store, []) || [];
+    var arr = dbGetLive(K.store);
     if(!Array.isArray(arr)) return;
     arr.forEach(function(rec){
       if(!rec || !rec.id) return;
@@ -15886,7 +15903,7 @@ function searchPastCompanies(query){
     return qNorm.length >= 2 && nameNorm.indexOf(qNorm) >= 0;
   }
   // contracts
-  dbGet('contracts', []).forEach(function(c){
+  dbGetLive('contracts').forEach(function(c){
     var co = c.company || {};
     if(match(co.name || c.companyName, co.bizNo || c.bizNo)){
       results.push({
@@ -15915,7 +15932,7 @@ function searchPastCompanies(query){
     { key:'funds',          label:'기금',      color:'#854d0e', bg:'#fffbeb' },
     { key:'other_projects', label:'기타사업',  color:'#166534', bg:'#f0fdf4' }
   ].forEach(function(mod){
-    dbGet(mod.key, []).forEach(function(it){
+    dbGetLive(mod.key).forEach(function(it){
       if(match(it.companyName, it.bizNo)){
         results.push({
           source: mod.label, sourceColor: mod.color, sourceBg: mod.bg,
@@ -20064,7 +20081,7 @@ function ContractModal(props){
       if(!preHit && label.toLowerCase().indexOf(q)<0 && (bizNo||'').indexOf(q)<0) return;
       results.push({ label:label, bizNo:bizNo, date:date, source:source, sourceBg:sourceBg, sourceColor:sourceColor });
     }
-    dbGet('contracts',[]).forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.contractDate||c.createdAt,'계약','#eff6ff','#2563eb'); });
+    dbGetLive('contracts').forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.contractDate||c.createdAt,'계약','#eff6ff','#2563eb'); });
     /* 예전 이름으로 쳐도 그 업체가 나온다 (대표 지시 ③) — 보이는 이름은 «현재» 이름이다.
        ⚠ 예전 이름을 줄에 그대로 띄우지 않는다. 두 이름이 목록에 같이 있으면 같은 회사가 두 줄이 된다. */
     dbGet('companies',[]).forEach(function(c){
@@ -20074,10 +20091,10 @@ function ContractModal(props){
       if(!hit) return;
       add(c.name, c.bizNo, c.contractDate, '업체', '#bbf7d0', '#166534', true);
     });
-    dbGet('cases',[]).forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.receiveDate,'사건','#eff6ff','#1e40af'); });
-    dbGet('consultings',[]).forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.startDate,'컨설팅','#bfdbfe','#2563eb'); });
-    dbGet('funds',[]).forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.estDate,'기금','#fffbeb','#854d0e'); });
-    dbGet('other_projects',[]).forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.startDate,'기타','#f0fdf4','#166534'); });
+    dbGetLive('cases').forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.receiveDate,'사건','#eff6ff','#1e40af'); });
+    dbGetLive('consultings').forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.startDate,'컨설팅','#bfdbfe','#2563eb'); });
+    dbGetLive('funds').forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.estDate,'기금','#fffbeb','#854d0e'); });
+    dbGetLive('other_projects').forEach(function(c){ if(c.companyName) add(c.companyName,c.bizNo,c.startDate,'기타','#f0fdf4','#166534'); });
     // 기업정보함 — 회사 줄(통째로) 먼저, 그다음 사람 줄(그 사람을 담당자로)
     pcCompanyRows(q).forEach(function(row){ results.push(row); });
     pcPersonRows(q).forEach(function(row){ results.push(row); });
@@ -20172,12 +20189,12 @@ function ContractModal(props){
   /* 지난 기록(업체·계약·사건·컨설팅·기금·기타)에서 그 줄의 «원본»을 찾는다. */
   function _pastCoRecord(r){
     var allSrc = [
-      { list: dbGet('contracts',[]), nameKey:'companyName', isContract:true },
+      { list: dbGetLive('contracts'), nameKey:'companyName', isContract:true },
       { list: dbGet('companies',[]), nameKey:'name', isCompany:true },
-      { list: dbGet('cases',[]), nameKey:'companyName' },
-      { list: dbGet('consultings',[]), nameKey:'companyName' },
-      { list: dbGet('funds',[]), nameKey:'companyName' },
-      { list: dbGet('other_projects',[]), nameKey:'companyName' }
+      { list: dbGetLive('cases'), nameKey:'companyName' },
+      { list: dbGetLive('consultings'), nameKey:'companyName' },
+      { list: dbGetLive('funds'), nameKey:'companyName' },
+      { list: dbGetLive('other_projects'), nameKey:'companyName' }
     ];
     var out = null;
     allSrc.forEach(function(src){
@@ -31252,10 +31269,10 @@ function CompanyDetailModal(props){
   }
   // 다른 프로그램(업무관리·컨설팅일정·기금관리·기업정보함) — 서버에서 읽어온다
   var oa = useOtherApps(co);
-  var cases = dbGet('cases', []).filter(matchCompany);
-  var consultings = dbGet('consultings', []).filter(matchCompany);
-  var funds = dbGet('funds', []).filter(matchCompany);
-  var contracts = dbGet('contracts', []).filter(matchCompany);
+  var cases = dbGetLive('cases').filter(matchCompany);
+  var consultings = dbGetLive('consultings').filter(matchCompany);
+  var funds = dbGetLive('funds').filter(matchCompany);
+  var contracts = dbGetLive('contracts').filter(matchCompany);
 
   function row(label, val){
     return h('div', { style:{ display:'flex', borderBottom:'1px solid #f8fafc', padding:'7px 0', fontSize:'12px' } },
@@ -42966,7 +42983,7 @@ function SystemMapSection(){
   // 저장소 현황 카운트
   function countOf(key){
     var v = dbGet(key, null);
-    if(Array.isArray(v)) return v.length;
+    if(Array.isArray(v)) return erpLiveRows(v).length;   // 휴지통 줄은 세지 않는다
     if(v && typeof v === 'object') return Object.keys(v).length;
     return 0;
   }
@@ -43102,7 +43119,7 @@ function DuplicateCleanerSection(){
     ];
     var result = [];
     KEYS.forEach(function(k){
-      var arr = dbGet(k.key, []) || [];
+      var arr = dbGetLive(k.key);
       var seen = {}, dups = [];
       arr.forEach(function(item){
         // 사업자번호 또는 관리번호 기준
@@ -43144,6 +43161,7 @@ function DuplicateCleanerSection(){
       var arr = dbGet(r.storeKey, []) || [];
       var bestIdx = {};   // 그룹키 -> 보존할 인덱스 (id가 같아도 인덱스로 처리해 1개는 반드시 보존)
       arr.forEach(function(item, idx){
+        if(item && item._deleted === true){ bestIdx['__d' + idx] = idx; return; }   // 휴지통 줄은 남기고, 살아 있는 줄을 밀어내지도 않는다
         var key = (r.field === 'bizNo') ? (item.bizNo||'').replace(/[^0-9]/g,'') : (item[r.field] || '');
         if(!key) key = item.name || item.companyName || item.id || '';
         if(!key){ bestIdx['__k' + idx] = idx; return; }   // 키 없으면 각자 보존
@@ -43237,7 +43255,7 @@ function erpVatCarryScan(){
   contracts.forEach(function(c){ if(!c) return; if(c.contractNo) byNo[c.contractNo] = c; if(c.id) byId[c.id] = c; });
   var rows = [];
   VAT_FIX_STORES.forEach(function(S){
-    (dbGet(S.k, []) || []).forEach(function(it){
+    dbGetLive(S.k).forEach(function(it){
       if(!it || !it.id) return;
       var c = (it.sourceContractNo && byNo[it.sourceContractNo]) || (it.sourceContractId && byId[it.sourceContractId]);
       if(!c) return;
@@ -63071,12 +63089,12 @@ function MyDeskV2(props){
   var navigate = props.onNavigate || function(){};
 
   // ── 데이터 로드 ──
-  var allCases = dbGet('cases', []);
+  var allCases = dbGetLive('cases');
   var allCompanies = dbGet('companies', []);
-  var allConsultings = dbGet('consultings', []);
-  var allFunds = dbGet('funds', []);
-  var allOthers = dbGet('other_projects', []);
-  var allContracts = dbGet('contracts', []);
+  var allConsultings = dbGetLive('consultings');
+  var allFunds = dbGetLive('funds');
+  var allOthers = dbGetLive('other_projects');
+  var allContracts = dbGetLive('contracts');
   var allBizCases = dbGet('biz_cases', []);
   var allIncomes = dbGet('finance_income', []);
   var attendance = dbGet('attendance_records', []);
@@ -66042,7 +66060,7 @@ function FinanceTxn(){
     {key:'consultings',label:'컨설팅'},{key:'funds',label:'기금'},{key:'other_projects',label:'기타'}
   ];
   STORES.forEach(function(store){
-    (dbGet(store.key,[])||[]).filter(function(it){ return !it.permanentArchived && !it.closedDate; }).forEach(function(it){
+    dbGetLive(store.key).filter(function(it){ return !it.permanentArchived && !it.closedDate; }).forEach(function(it){
       var nm = it.companyName||it.name||'-';
       if(it.retainerFee&&!it.retainerPaid&&!it.retainerPaidDate)
         pending.push({id:it.id+'-r',store:store.key,label:store.label+'(착수)',companyName:nm,amount:it.retainerFee,item:it,kind:'retainer'});
@@ -66554,10 +66572,10 @@ function FinancePnL(){
 function FinanceReceivable(props){
   var _fill8 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 480px)
   var onNav = props.onNavigate || function(){};
-  var cases = dbGet('cases', []);
-  var consultings = dbGet('consultings', []);
-  var funds = dbGet('funds', []);
-  var others = dbGet('other_projects', []);
+  var cases = dbGetLive('cases');
+  var consultings = dbGetLive('consultings');
+  var funds = dbGetLive('funds');
+  var others = dbGetLive('other_projects');
   var invoices = dbGet('finance_invoice', []);
   var incomes = dbGet('finance_income', []);
 
@@ -68325,7 +68343,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
               showToast('수정됨');
             }
             // persist 후 자동 reload 트리거를 위해 컴포넌트 상위 데이터 갱신 필요
-            setItems(dbGet('consultings', []));
+            setItems(dbGetLive('consultings'));   // 휴지통 줄은 목록에 안 올린다(#2026 과 같은 까닭)
           } else {
             showToast('수정됨');
           }
@@ -70631,7 +70649,7 @@ function StaffRosterDetail(props){
           // 인계 내역: mgrHistory에 본인 이름이 before로 남아있는 사무관리 항목
           var handovers = [];
           [['cases','사건'],['consultings','컨설팅'],['funds','기금'],['other_projects','기타사업'],['companies','업체']].forEach(function(p){
-            (dbGet(p[0], [])||[]).forEach(function(it){
+            dbGetLive(p[0]).forEach(function(it){
               var hist = it.mgrHistory || [];
               var moved = hist.some(function(h0){ return h0.before === u.name && (h0.field||'').indexOf('담당')>=0; });
               if(moved){
@@ -70825,7 +70843,7 @@ function rtHeld(sid, includeClosed){
   if(!sid) return [];
   var out = [];
   RT_STORES.forEach(function(st){
-    var arr = dbGet(st.key, []) || [];
+    var arr = dbGetLive(st.key);
     (Array.isArray(arr) ? arr : []).forEach(function(x){
       if(!x || !x.id) return;
       var closed = rtIsClosed(x);
