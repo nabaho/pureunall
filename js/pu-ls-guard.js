@@ -96,7 +96,8 @@
       var top = usage().slice(0, 3).map(function (r) { return label(r.key) + ' ' + kb(r.chars); });
       var app = '';
       try { app = String((w.document && w.document.title) || '').split(/[|·—-]/)[0].trim(); } catch (_) {}
-      toast('⚠ 이 브라우저 저장 공간(통합 프로그램이 함께 쓰는 약 5MB)이 가득 차 '
+      /* ⚠ 크기(5MB 등)는 안 적는다 — 브라우저마다 다르다(크롬 약 5백만 자, 이 앱 창 브라우저는 5천만 자) */
+      toast('⚠ 이 브라우저 저장 공간(푸른 통합 프로그램이 함께 씀)이 가득 차 '
         + (app ? '«' + app + '»의 ' : '') + '내용 일부를 이 PC에 저장하지 못했습니다. 관리자에게 알려 주세요.'
         + (top.length ? ' 큰 것: ' + top.join(' · ') : ''));
       try {
