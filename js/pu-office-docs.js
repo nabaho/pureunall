@@ -195,6 +195,13 @@
     + '.pod-arc-rh b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}'
     + '.pod-arc-rb{flex:1;overflow:auto;padding:10px;background:#f8fafc;min-height:300px}'
     + '.pod-arc-rb img{max-width:100%}.pod-arc-rb iframe{width:100%;height:calc(100vh - 260px);border:none;background:#fff}'
+    /* 기업별 계약서 — 위 단추 줄·회사 이름은 그대로, 회사 목록·내용은 그 안에서 스크롤(표 머리줄 고정) (2026-10-07) */
+    + '.pod-co-l{max-height:calc(100vh - 240px);display:flex;flex-direction:column}.pod-co-l .pod-co-ls{flex:1;overflow-y:auto}'
+    + '.pod-co-r{flex:1;min-width:0;max-height:calc(100vh - 240px);overflow:auto;padding-right:2px}'
+    + '.pod-co-r .pod-rt thead th{position:sticky;top:0;z-index:1;box-shadow:0 1px 0 #e5e7eb}'
+    + '.pod-co-r tr.pick{cursor:pointer}.pod-co-r tr.pick:hover td{background:#f8fafc}.pod-co-r tr.pick.on td{background:#dbeafe}'
+    + '.pod-co .pod-arc-r{width:40%}'
+    + '@media(max-width:900px){.pod-co-l,.pod-co-r{max-height:none}.pod-co .pod-arc-r{width:auto}}'
     + '.pod-fil{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;font-size:12px;color:#475569}'
     + '.pod-fil select{padding:5px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;background:#fff}'
     + '@media(max-width:900px){.pod-arc{display:block}.pod-arc-r{width:auto;position:static;margin-top:12px;max-height:none}.pod-arc-scroll{max-height:60vh}}'
@@ -282,6 +289,21 @@
       if (f.by && r.byName !== f.by) return false;
       return !q || (r.name + ' ' + r.link).toLowerCase().indexOf(q) >= 0;
     });
+  }
+  /* 기업별 계약서 — 회사 목록 거르기(f: ''|'recs'|'files'|'nobz') · 파일 거르기(src: ''|'upload'|'photo'|'folder') */
+  var CO_FILTERS = [['recs', '계약 기록 있음'], ['files', '파일 있음'], ['nobz', '사업자번호 없음']];
+  var DOC_SRCS = [['upload', '업로드'], ['photo', '사진첩'], ['folder', 'PC 폴더']];
+  function filterCos(cos, q, f) {
+    q = String(q || '').trim().toLowerCase();
+    return (cos || []).filter(function (c) {
+      if (f === 'recs' && !(c.r > 0)) return false;
+      if (f === 'files' && !(c.n > 0)) return false;
+      if (f === 'nobz' && String(c.bz || '').replace(/\D/g, '').length === 10) return false;
+      return !q || String(c.name || '').toLowerCase().indexOf(q) >= 0;
+    });
+  }
+  function filterDocs(docs, src) {
+    return (docs || []).filter(function (d) { return !src || (d.src || 'upload') === src; });
   }
   /* 양식 첨부 중 아직 보관함에 없는 것 (자료가 있는 것만) */
   function pendingBackfill(forms, attKey) {
@@ -543,6 +565,7 @@
       var key = S.sel;
       if (!key) { S.docs = []; S.recs = []; S.sent = []; draw(); return Promise.resolve(); }
       S.picked = {};
+      if (S.dkey !== key) { S.dpicked = {}; S.dsel = null; S.dkey = key; }
       /* 보낸 서류는 곁들이 — 못 읽어도 파일·계약 기록은 그대로 보인다 */
       var co = S.cos.filter(function (c) { return c.key === key; })[0] || {};
       var sentP = host.sentFor ? host.sentFor(co.name || '', co.bz || '').then(sentRows, function () { return []; }) : Promise.resolve([]);
@@ -803,14 +826,15 @@
     /* ── ✉ 파일 골라 보내기 — 이 회사 계약서 파일을 메일로. 보내는 길·보낸 기록은 계약서 양식 보내기와 같은 것(host.mail) ──
        ⚠ 「✉ 보내기」를 누르기 전엔 아무것도 나가지 않는다. 받는 주소는 기록하지 않는다.
        ⚠ 🔒 서명본은 서버가 대표·관리자에게만 내준다 — 그 밖의 사람은 붙이지 못한다. 붙이면 한 번 더 묻는다. */
-    function openResend() {
+    function openResend(pre) {
       if (!host.mail || !host.fileBytes) { toast('메일 보내는 길이 연결되지 않았습니다'); return; }
       var key = S.sel, co = S.cos.filter(function (c) { return c.key === key; })[0] || {};
       var docs = S.docs.slice(), on = {}, busy = false, mode = 'auto', targets = { co: null, to: [] };
+      Object.keys(pre || {}).forEach(function (k) { if (pre[k]) on[k] = true; });   /* 표에서 고른 것을 미리 체크 */
       var MAX = 18 * 1024 * 1024;
       var listBox = el('div', { style: 'max-height:200px;overflow-y:auto;border:1px solid #e2e8f0;border-radius:6px;padding:4px 8px' });
       docs.forEach(function (d) {
-        var cb = el('input', { type: 'checkbox', 'aria-label': d.title || '파일', onchange: function () { on[d.id] = cb.checked; fill(); } });
+        var cb = el('input', { type: 'checkbox', 'aria-label': d.title || '파일', checked: !!on[d.id], onchange: function () { on[d.id] = cb.checked; fill(); } });
         listBox.appendChild(el('label', { style: 'display:flex;gap:6px;align-items:center;font-size:12.5px;padding:3px 0' }, [cb,
           el('span', { style: 'flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: d.title || '(제목 없음)' }),
           el('span', { 'class': 'muted', style: 'color:#94a3b8;font-size:11.5px', text: d.date || '' }),
@@ -1231,31 +1255,56 @@
         root.appendChild(wrap); return;
       }
       var search = el('input', { type: 'search', placeholder: '회사 검색', 'aria-label': '회사 검색', value: S.q, style: 'width:100%;border:none;border-bottom:1px solid #e2e8f0;padding:8px 10px;font-size:12.5px' });
-      var listBox = el('div');
+      var coFil = el('select', { 'aria-label': '회사 거르기', style: 'width:100%;border:none;border-bottom:1px solid #e2e8f0;padding:6px 8px;font-size:12px;font-family:inherit;background:#f8fafc;color:#475569' },
+        [el('option', { value: '', text: '회사 전체 ' + S.cos.length })].concat(CO_FILTERS.map(function (o) { return el('option', { value: o[0], text: o[1] }); })));
+      coFil.value = S.cof || '';
+      coFil.addEventListener('change', function () { S.cof = coFil.value; drawList(); });
+      var listBox = el('div', { 'class': 'pod-co-ls' });
       function drawList() {
         listBox.innerHTML = '';
-        var q = S.q.trim().toLowerCase();
-        S.cos.filter(function (c) { return !q || c.name.toLowerCase().indexOf(q) >= 0; }).forEach(function (c, i) {
+        var shownCos = filterCos(S.cos, S.q, S.cof);
+        if (!shownCos.length) listBox.appendChild(el('div', { style: 'padding:12px;color:#94a3b8;font-size:12px', text: '맞는 회사가 없습니다' }));
+        shownCos.forEach(function (c, i) {
           listBox.appendChild(el('button', { type: 'button', 'class': c.key === S.sel ? 'on' : null, 'aria-current': c.key === S.sel ? 'true' : null,
             onclick: function () { S.sel = c.key; loadDocs(); } }, [el('span', { text: (i + 1) + '. ' + c.name }), el('i', { title: '계약 기록 ' + (c.r || 0) + ' · 파일 ' + (c.n || 0), text: String((c.n || 0) + (c.r || 0)) })]));
         });
       }
       search.addEventListener('input', function () { S.q = search.value; drawList(); });
       drawList();
-      var grid = el('div', { 'class': 'pod-grid' });
-      S.docs.forEach(function (d) {
-        var th = el('div', { 'class': 'pod-th', text: d.src === 'photo' ? '🖼' : '📄' });
-        if (d.secret) th.textContent = '🔒';
-        grid.appendChild(el('button', { type: 'button', 'class': 'pod-card', onclick: function () { openDoc(d); } }, [th,
-          el('div', { 'class': 'pod-cm' }, [el('b', { title: d.title, text: d.title || '계약서' }),
-            el('span', null, [d.date || '날짜 없음', el('span', { 'class': 'pod-tag ' + (d.src === 'photo' ? 'ph' : 'up'), text: d.src === 'photo' ? '사진첩' : d.src === 'folder' ? 'PC 폴더' : '업로드' }),
-              d.secret ? el('span', { 'class': 'pod-tag', title: '서명본 — 대표·관리자만 엽니다', text: '🔒 서명본' }) : null])])]));
-        if (d.secret) return;
-        urlFor(d.fileId).then(function (u) {
-          if (!u.rec || !isImg(u.rec.name)) return;
-          th.textContent = ''; th.appendChild(el('img', { src: u.url, alt: '', loading: 'lazy' }));
-        }).catch(function () {});
+      /* 계약서 파일 — 원본 보관함과 같은 표(대표 2026-10-07 「기업별계약서도 같은방식」): ☐·#·제목·계약일·출처, 줄을 누르면 오른쪽 미리보기 */
+      var docRows = filterDocs(S.docs, S.dsrc);
+      var dPicked = Object.keys(S.dpicked || {}).filter(function (k) { return S.dpicked[k]; });
+      var dAll = el('input', { type: 'checkbox', 'aria-label': '보이는 파일 모두 고르기', checked: docRows.length > 0 && docRows.every(function (d) { return S.dpicked[d.id]; }) });
+      dAll.addEventListener('change', function () { docRows.forEach(function (d) { S.dpicked[d.id] = dAll.checked; }); draw(); });
+      var dtb = el('tbody');
+      docRows.forEach(function (d, i) {
+        var cb = el('input', { type: 'checkbox', 'aria-label': (d.title || '계약서') + ' 고르기', checked: !!S.dpicked[d.id] });
+        cb.addEventListener('click', function (e) { e.stopPropagation(); });
+        cb.addEventListener('change', function () { S.dpicked[d.id] = cb.checked; draw(); });
+        var ed = el('button', { type: 'button', 'class': 'pod-b', title: '제목·계약일 고치기 · 이 회사에서 빼기', 'aria-label': (d.title || '계약서') + ' 고치기', text: '✏' });
+        ed.addEventListener('click', function (e) { e.stopPropagation(); openDoc(d); });
+        var dl = el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': (d.title || '계약서') + ' 내려받기', text: '📥' });
+        dl.addEventListener('click', function (e) { e.stopPropagation(); host.download(d.fileId, d.title); });
+        dtb.appendChild(el('tr', { 'class': 'pick' + (S.dsel && S.dsel.id === d.id ? ' on' : ''), title: '눌러서 오른쪽에 미리보기', onclick: function () { S.dsel = d; draw(); } }, [
+          el('td', { style: 'overflow:visible' }, [cb]), el('td', { style: 'color:#94a3b8', text: String(i + 1) }),
+          el('td', { title: d.title, text: (d.secret ? '🔒 ' : d.src === 'photo' ? '🖼 ' : '📄 ') + (d.title || '계약서') }),
+          el('td', { text: d.date || '날짜 없음' }),
+          el('td', null, [el('span', { 'class': 'pod-tag ' + (d.src === 'photo' ? 'ph' : 'up'), style: 'margin-left:0', text: d.src === 'photo' ? '사진첩' : d.src === 'folder' ? 'PC 폴더' : '업로드' })]),
+          el('td', { style: 'overflow:visible;white-space:nowrap' }, [ed, dl])]));
       });
+      var srcSel = el('select', { 'aria-label': '출처', style: 'padding:4px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:12px;font-family:inherit;background:#fff' },
+        [el('option', { value: '', text: '출처 전체' })].concat(DOC_SRCS.map(function (o) { return el('option', { value: o[0], text: o[1] }); })));
+      srcSel.value = S.dsrc || '';
+      srcSel.addEventListener('change', function () { S.dsrc = srcSel.value; draw(); });
+      var grid = el('div', null, [
+        el('div', { 'class': 'pod-fil' }, [srcSel,
+          dPicked.length && host.zip ? el('button', { type: 'button', 'class': 'pod-b p', text: S.zbusy ? '묶는 중…' : '📦 선택 ' + dPicked.length + '개 묶어 받기', onclick: zipDocs }) : null,
+          dPicked.length && host.mail ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 선택 ' + dPicked.length + '개 보내기', onclick: function () { openResend(S.dpicked); } }) : null,
+          dPicked.length ? el('button', { type: 'button', 'class': 'pod-b', text: '선택 풀기', onclick: function () { S.dpicked = {}; draw(); } }) : null,
+          el('span', { style: 'margin-left:auto', text: docRows.length === S.docs.length ? S.docs.length + '개' : docRows.length + '개 / 전체 ' + S.docs.length })]),
+        docRows.length ? el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { style: 'width:34px' }, [dAll]), el('th', { style: 'width:40px', text: '#' }),
+          el('th', { text: '제목' }), el('th', { style: 'width:96px', text: '계약일' }), el('th', { style: 'width:76px', text: '출처' }), el('th', { style: 'width:90px', text: '' })])]), dtb])
+          : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '맞는 파일이 없습니다' })]);
       var selCo = S.cos.filter(function (c) { return c.key === S.sel; })[0] || {};
       wrap.appendChild(el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px' }, [el('b', null, [coName(S.sel)]),
         selCo.bz ? el('span', { 'class': 'pod-tag', title: '사업자번호', text: fmtBz(selCo.bz) }) : null,
@@ -1302,11 +1351,75 @@
           el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '보낸 때' }), el('th', { text: '종류' }),
             el('th', { text: '서류' }), el('th', { text: '받는 분' }), el('th', { text: '보낸 이' })])]), stb])])]);
       }
-      var right = el('div', null, [recBox, sentBox, el('div', { 'class': 'pod-bar', style: 'margin:4px 0 6px' }, [el('b', { style: 'font-size:13px', text: '계약서 파일' }),
-        host.mail && S.docs.length ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 파일 골라 보내기', onclick: openResend }) : null]),
+      var right = el('div', { 'class': 'pod-co-r' }, [recBox, sentBox, el('div', { 'class': 'pod-bar', style: 'margin:4px 0 6px' }, [el('b', { style: 'font-size:13px', text: '계약서 파일' }),
+        host.mail && S.docs.length ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 파일 골라 보내기', onclick: function () { openResend(S.dpicked); } }) : null]),
         S.docs.length ? grid : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '올린 계약서 파일이 없습니다' })]);
-      wrap.appendChild(el('div', { 'class': 'pod-co' }, [el('div', { 'class': 'pod-cl' }, [search, listBox]), right]));
+      var prev = el('div', { 'class': 'pod-arc-r' });
+      if (!S.dsel) prev.hidden = true;
+      wrap.appendChild(el('div', { 'class': 'pod-co' }, [el('div', { 'class': 'pod-cl pod-co-l' }, [search, coFil, listBox]), right, prev]));
       root.appendChild(wrap);
+      if (S.dsel) drawDocPreview(prev);
+    }
+    /* 오른쪽 미리보기 — 원본 보관함과 같다(PDF·그림 그대로, 한글·엑셀은 문서 엔진, 🔒 은 서버가 대표·관리자에게만) */
+    var dPrevUrl = null;
+    function drawDocPreview(box) {
+      if (dPrevUrl) { try { w.URL.revokeObjectURL(dPrevUrl); } catch (_) {} dPrevUrl = null; }
+      var d = S.dsel; box.innerHTML = '';
+      if (!d) return;
+      var body = el('div', { 'class': 'pod-arc-rb' }, [el('div', { 'class': 'pod-empty', style: 'border:none', text: '여는 중…' })]);
+      box.appendChild(el('div', { 'class': 'pod-arc-rh' }, [el('b', { title: d.title, text: (d.secret ? '🔒 ' : '') + (d.title || '계약서') }),
+        el('button', { type: 'button', 'class': 'pod-b', title: '제목·계약일 고치기 · 이 회사에서 빼기', text: '✏', onclick: function () { openDoc(d); } }),
+        el('button', { type: 'button', 'class': 'pod-b', text: '📥', title: '내려받기', onclick: function () { host.download(d.fileId, d.title); } }),
+        el('button', { type: 'button', 'class': 'pod-b', 'aria-label': '미리보기 닫기', text: '×', onclick: function () { S.dsel = null; draw(); } })]));
+      box.appendChild(el('div', { style: 'padding:4px 10px 6px;font-size:11.5px;color:#64748b;border-bottom:1px solid #f1f5f9', text: (d.date || '날짜 없음') + ' · ' + (d.src === 'photo' ? '사진첩' : d.src === 'folder' ? 'PC 폴더' : '업로드') }));
+      box.appendChild(body);
+      if (!host.fileBytes) { body.textContent = '미리보기 길이 연결되지 않았습니다'; return; }
+      var want = d;
+      host.fileBytes(d.fileId).then(function (f) {
+        if (S.dsel !== want) return;
+        body.innerHTML = '';
+        var t = fileType(f.name || d.title);
+        if (t === 'pdf' || t === 'img') {
+          dPrevUrl = w.URL.createObjectURL(new Blob([f.bytes], { type: t === 'pdf' ? 'application/pdf' : 'image/jpeg' }));
+          body.appendChild(t === 'pdf' ? el('iframe', { src: dPrevUrl, title: d.title || 'PDF' }) : el('img', { src: dPrevUrl, alt: d.title || '' }));
+          return;
+        }
+        if ((t === 'hwp' || t === 'xlsx') && host.hwpShow) {
+          var h2 = el('div', { style: 'background:#fff' }); body.appendChild(h2);
+          return host.hwpShow(h2, f.bytes, f.name || d.title);
+        }
+        body.appendChild(el('div', { 'class': 'pod-empty', style: 'border:none', text: '이 형식은 미리보기가 없습니다 — 📥 내려받아 여세요' }));
+      }).catch(function (e) {
+        if (S.dsel !== want) return;
+        body.innerHTML = '';
+        body.appendChild(el('div', { 'class': 'pod-empty', style: 'border:none;color:#991b1b', text: '열지 못했습니다 — ' + msg(e) }));
+      });
+    }
+    /* 고른 파일 묶어 받기 — 브라우저 안에서 .zip 하나로 */
+    function zipDocs() {
+      var list = S.docs.filter(function (d) { return S.dpicked[d.id]; });
+      if (!list.length || S.zbusy || !host.fileBytes || !host.zip) return;
+      S.zbusy = true; draw();
+      var files = [], fail = 0, used = {};
+      list.reduce(function (p, d, i) {
+        return p.then(function () {
+          toast('파일 가져오는 중… (' + (i + 1) + '/' + list.length + ')');
+          return host.fileBytes(d.fileId).then(function (f) {
+            var nm = f.name || d.title || '계약서', k = nm, n = 2;
+            while (used[k]) k = nm.replace(/(\.[^.]+)?$/, '(' + (n++) + ')$1');
+            used[k] = 1; files.push({ name: k, bytes: f.bytes });
+          }, function () { fail++; });
+        });
+      }, Promise.resolve()).then(function () {
+        if (!files.length) throw new Error('받은 파일이 없습니다');
+        return host.zip(files);
+      }).then(function (u8) {
+        var a = el('a', { href: w.URL.createObjectURL(new Blob([u8], { type: 'application/zip' })), download: (coName(S.sel) || '기업') + '_계약서_' + files.length + '개.zip' });
+        w.document.body.appendChild(a); a.click();
+        setTimeout(function () { w.URL.revokeObjectURL(a.href); if (a.parentNode) a.parentNode.removeChild(a); }, 1500);
+        toast('📦 ' + files.length + '개를 묶었습니다' + (fail ? ' · ' + fail + '개는 못 받음(🔒 서명본은 대표·관리자만)' : ''));
+      }).catch(function (e) { toast('❌ 묶지 못했습니다 — ' + msg(e)); })
+        .then(function () { S.zbusy = false; draw(); });
     }
     draw(); load();
     return { reload: load };
@@ -1322,7 +1435,7 @@
 
   w.PuOfficeDocs = {
     archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
-    filterArchive: filterArchive, fileType: fileType,
+    filterArchive: filterArchive, fileType: fileType, filterCos: filterCos, filterDocs: filterDocs,
     linkPlan: linkPlan, bzGroups: bzGroups, refNames: refNames, mergePlan: mergePlan, fmtBz: fmtBz,
     mailTargets: mailTargets, sentKindOf: sentKindOf, resendMail: resendMail,
     mountArchive: mountArchive, mountCompanies: mountCompanies,

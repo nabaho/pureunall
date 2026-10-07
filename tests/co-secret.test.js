@@ -84,7 +84,11 @@ test('ⓓ 화면 — 문서관리가 서버 길을 넘기고, 카드·큰 보기
   const html = read('docs-esign.html');
   assert.match(html, /secretFetch: fetchSecretDoc/); assert.match(html, /cloudfunctions\.net\/puDocSecret/);
   const docs = read('js/pu-office-docs.js');
-  assert.match(docs, /if \(d\.secret\) return;/, '서명본 카드에서 주소를 만들려 하면 안 된다');
+  /* 2026-10-07 카드 → 표: 표 줄은 주소를 아예 만들지 않고, 오른쪽 미리보기는 host.fileBytes(🔒 은 서버 puDocSecret)로만 받는다 */
+  const co = docs.slice(docs.indexOf('function mountCompanies('), docs.indexOf('function readBytes('));
+  const rowsPart = co.slice(co.indexOf('var docRows = filterDocs('), co.indexOf('var selCo = '));
+  assert.doesNotMatch(rowsPart, /urlFor\(|fileUrl\(/, '서명본 줄에서 주소를 만들려 하면 안 된다');
+  assert.match(co, /function drawDocPreview\(box\)[\s\S]*?host\.fileBytes\(d\.fileId\)/, '미리보기는 서버 길(fileBytes)로만');
   assert.match(docs, /store\.secretBlob\(d\.fileId\)/);
 });
 test('ⓓ 사진첩에서 가져오기도 기본 🔒 서명본 — 사진첩의 보호가 풀리지 않게 (2026-10-03)', () => {
