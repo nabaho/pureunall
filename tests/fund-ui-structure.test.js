@@ -214,8 +214,9 @@ test('기금 정보 폼은 화면 폭을 다 쓴다 — 760px 2열에 갇히지 
      ★ 2026-09-27 「관할」 묶음 머리를 tax_office→labor_office 로 옮겼다 — 소재지·전화번호가 「기본」으로
        가면서 관할 세 칸(노동청·등기소·세무서, 서식이 묻는 차례)만 남았고, 그 첫 칸이 labor_office 다. */
   /* ★ 2026-09-28 정리안 A — 「담당」은 칸 하나뿐이라 «기본» 상자에 넣었다(머리 「담당」 + 칸 「주담당·부담당」이 겹쳤다) */
-  assert.deepEqual(Object.keys(box.S), ['name','chairman','labor_office','lease_lessor','contribution_total'],
-    '묶음 머리가 정해진 다섯(기본·인가등기·관할·사무소 임대차·설립)이 아니다');
+  /* ★ 2026-10-08 「관리 계약」(관리 형태·연 보수·자문 해지·비고) — 대표 지시 「관리사업장 정리해서 넣어라」·목업 승인 */
+  assert.deepEqual(Object.keys(box.S), ['name','chairman','labor_office','svc_kind','lease_lessor','contribution_total'],
+    '묶음 머리가 정해진 여섯(기본·인가등기·관할·관리 계약·사무소 임대차·설립)이 아니다');
   const fields = SRC.slice(SRC.indexOf('var FIELDS='), SRC.indexOf('];', SRC.indexOf('var FIELDS=')));
   Object.keys(box.S).forEach(k => assert.ok(fields.includes("'" + k + "'"), 'FIELDS 에 없는 칸에 묶음 머리를 걸었다: ' + k));
   /* 여러 칸 폭이 필요한 칸(단추가 붙는 관할 3칸·담당 한 줄)은 넓게, 단 «자리가 있을 때만».
@@ -225,4 +226,23 @@ test('기금 정보 폼은 화면 폭을 다 쓴다 — 760px 2열에 갇히지 
   assert.match(wide[0], /\.fld\.w2\{grid-column:span 2\}/, 'w2 규칙이 없다');
   assert.match(wide[0], /\.fld\.w3\{grid-column:span 3\}/, 'w3 규칙이 없다');
   assert.match(SRC, /\.gridw \.fld\.w2,\.gridw \.fld\.w3\{grid-column:auto\}/, '폰에서 여러 칸 폭을 풀지 않으면 넘친다');
+});
+
+/* ★ 관리 사업장 보기 (2026-10-08 대표 지시·목업 승인) — 관리 형태·대표사업장 담당자·연 보수·청구(이알피 읽기)·결산 후 진행 점 */
+test('★ 관리 사업장 보기 — 기금 정보 「관리 계약」이 원본, 고객 담당은 대표사업장 담당자, 청구는 읽기만', () => {
+  const grab = (n) => { const a = SRC.indexOf('function ' + n + '('); let d = 0, on = false;
+    for (let j = a; j < SRC.length; j++) { if (SRC[j] === '{') { d++; on = true; } else if (SRC[j] === '}') { d--; if (on && !d) return SRC.slice(a, j + 1); } } };
+  assert.match(SRC, /\['mgmt','관리'\]\]/, '홈 보기에 「관리」가 없다');
+  assert.match(SRC, /if\(S\.homeView==='mgmt'\)  return mgmtMatrixHTML\(list\);/);
+  assert.match(SRC, /\['svc_kind','관리 형태','select'\]/);
+  assert.match(SRC, /svc_kind:\['','자문','결산만','연합회 위탁'\]/);
+  const box = {};
+  new Function(grab('num') + '\n' + grab('mgmtBillOf') + '\nthis.f=mgmtBillOf;').call(box);
+  const rows = { wait: [{ fund_id: 'A', amount: 500000, date: '2026-04-13' }, { fund_id: 'A', amount: 250000 }], done: [{ fund_id: 'B', amount: 1000000, paid_date: '2026-03-27' }] };
+  assert.deepEqual(box.f(rows, 'A'), { k: 'wait', amount: 750000, date: '2026-04-13' }, '미입금이 있으면 그 합');
+  assert.deepEqual(box.f(rows, 'B'), { k: 'done', amount: 1000000, date: '2026-03-27' });
+  assert.deepEqual(box.f(rows, 'C'), { k: 'none' });
+  assert.match(grab('mgmtMatrixHTML'), /class="mgpick"/, '□ 체크칸');
+  assert.match(grab('mgmtMatrixHTML'), /<th class="no">#<\/th>/, '# 번호');
+  assert.match(SRC, /'home\.mgmt':\{/);
 });

@@ -93,7 +93,8 @@ test('★ ② 아래에 저장 안내 줄을 또 깔지 않는다 — 단추 올
 
 test('★★ 묶음마다 상자 — 머리(.bh)가 상자 «안»에 있어 칸 이름과 겹치지 않는다 (정리안 A)', () => {
   const h = 폼그리기(채운기금).html;
-  assert.equal((h.match(/class="secbox infobox"/g) || []).length, 5, '★ 묶음 상자가 다섯(기본·인가등기·관할·임대차·설립)이 아니다');
+  /* 2026-10-08 「관리 계약」 묶음을 더했다(대표 지시 「관리사업장 정리해서 넣어라」) */
+  assert.equal((h.match(/class="secbox infobox"/g) || []).length, 6, '★ 묶음 상자가 여섯(기본·인가등기·관할·관리 계약·임대차·설립)이 아니다');
   assert.ok(!/<div class="sec[ "]/.test(h), '★ 상자 밖 맨 글자 묶음 머리(.sec)가 아직 있다 — 칸 이름 위에 겹쳐 보인다');
   assert.match(h, /<label>지방고용노동청<\/label>/, '★ 「관할」 상자 안에서 「관할」을 또 적는다');
   assert.equal((h.match(/🔍 소재지로/g) || []).length, 1, '★ [🔍 소재지로] 단추가 아직 여럿이다');
