@@ -162,19 +162,25 @@ async function runOnce(o) {
   /* 남은 것 «모두»를 한 번 세고(메모리 안 셈이라 싸다) 이번 몫만 자른다 — left 가 이어 달리기의 잣대다 */
   let allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen || {}, 1e9);
   /* ③ 줄이 다 비었으면 — 90초에 걸려 건너뛴 메일을 «한 번» 다시 세운다(seen 을 지우고 slow 시도 표시) */
+  /* ③ 다시 세우기 — 90초에 걸려 건너뛴 메일(slow 아님)을 seen 에서 빼고 slow 시도 표시를 단다.
+     ⚠ 회차 «시작»에만 보면 안 된다(2026-10-09 실측) — 새벽 회차에 새 메일 5통이 와 있어 줄이 안 비었고,
+       다 본 뒤엔 다시 볼 자리가 없어 하루가 밀렸다. 새 메일이 날마다 오면 영영 밀린다.
+       → 시작에 줄이 비었으면 지금, 아니면 회차를 다 돈 뒤 줄이 비었을 때 세우고 «남은 것»에 넣어 이어 달리기가 받게 한다. */
+  async function requeueStuck() {
+    const back = Object.keys(seen).filter((k) => /^멈춤 \d+번/.test(String((seen[k] || {}).why || '')) && !(seen[k] || {}).slow);
+    if (!back.length) return 0;
+    const rq = {};
+    back.forEach((k) => {
+      rq[LIB + '/seen/' + k] = null; rq[TRY + '/' + k] = { at: o.now(), n: 0, slow: true };
+      delete seen[k]; tries[k] = { n: 0, slow: true };
+    });
+    await db.ref().update(rq);
+    return back.length;
+  }
   let requeued = 0;
   if (!allLeft.length) {
-    const back = Object.keys(seen).filter((k) => /^멈춤 \d+번/.test(String((seen[k] || {}).why || '')) && !(seen[k] || {}).slow);
-    if (back.length) {
-      const rq = {};
-      back.forEach((k) => {
-        rq[LIB + '/seen/' + k] = null; rq[TRY + '/' + k] = { at: o.now(), n: 0, slow: true };
-        delete seen[k]; tries[k] = { n: 0, slow: true };
-      });
-      await db.ref().update(rq);
-      requeued = back.length;
-      allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen, 1e9);
-    }
+    requeued = await requeueStuck();
+    if (requeued) allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen, 1e9);
   }
   const picked = allLeft.slice(0, Math.max(0, Number(o.limit) || 0));
   const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, stuck, requeued, errors: [], at: t0 };
@@ -288,6 +294,10 @@ async function runOnce(o) {
   }
   sum.errors = sum.errors.slice(0, 10);
   sum.left = Math.max(0, allLeft.length - (sum.mails - sum.retry));
+  if (!sum.left && !requeued) {   // 다 본 뒤 줄이 비었다 — 이제 세운다(다음 회차가 길게 기다리며 본다)
+    const n2 = await requeueStuck();
+    sum.requeued += n2; sum.left += n2;
+  }
   sum.healed = healed;   // 다시 시도할 것은 남은 것으로 센다
   /* 설계 §4-5 — 「담음 0, 오류 있음」이 사흘 이어지면 관리자에게 알린다(부르는 쪽이 systemAlerts 에 쓴다) */
   const bad = sum.stored === 0 && (sum.retry > 0 || sum.errors.length > 0);

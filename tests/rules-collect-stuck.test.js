@@ -60,21 +60,24 @@ test('① 받기가 멈추면 그 메일만 끊고 회차는 끝까지 — run �
   assert.equal(lib(db).try[B], undefined, '② 끝난 메일의 표시가 남았다');
 });
 
-test('④ 두 번 멈춘 메일은 셋째 회차에 건너뛴다 — 줄이 남아 있으면 그대로 둔다', async () => {
+test('④ 두 번 멈춘 메일은 셋째 회차에 건너뛴다 — 그 회차에는 안 집고, 줄이 비면 «다음 회차»용으로 세운다', async () => {
   const db = fakeDb(MAIL);
   const f = (m) => (m.mailKey === A ? never() : Promise.resolve([]));
   await C.run(opts(db, f));
   await C.run(opts(db, f));
   assert.equal(lib(db).try[A].n, 2);
-  /* B 를 다시 줄에 세워(아직 안 본 메일이 있는 상태) — 그러면 A 는 «건너뜀»에서 멈춘다 */
+  /* B 를 다시 줄에 세워(새 메일이 온 상태) — A 는 이 회차엔 안 집힌다 */
   delete lib(db).seen[B];
   let asked = 0;
   const sum = await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return f(m); }));
   assert.equal(asked, 0, '★ 두 번 멈춘 메일을 또 집었다');
   assert.equal(sum.stuck, 1);
-  assert.equal(sum.requeued, 0, '줄이 안 비었는데 큰 메일을 다시 세웠다');
-  assert.match(lib(db).seen[A].why, /^멈춤 2번 — 건너뜀/);
-  assert.equal(Object.keys(lib(db).try || {}).length, 0, '건너뛴 메일의 표시가 남았다');
+  assert.ok(lib(db).seen[B], 'B(새 메일)를 먼저 본다');
+  /* ★ 2026-10-09 실측 — 새 메일이 있어 시작에 줄이 안 비면, 다 본 뒤에 세워야 한다(안 그러면 하루씩 밀린다) */
+  assert.equal(sum.requeued, 1, '★ 다 본 뒤 줄이 비었는데 큰 메일을 안 세웠다 — 다음 날로 밀린다');
+  assert.equal(sum.left, 1, '세운 것을 «남은 것»에 안 넣었다 — 이어 달리기가 안 받는다');
+  assert.ok(!lib(db).seen[A]);
+  assert.equal(lib(db).try[A].slow, true);
 });
 
 /* ── 큰 메일 다시 보기 (2026-10-08 대표 「네」) — 첫 바퀴에 36통이 90초에 걸려 건너뛰어졌다(대개 고객사 취업규칙) ── */
@@ -124,9 +127,10 @@ test('⑤ 큰 메일은 회차 끝에서 시작하지 않는다 — 9분 제한�
 test('④ 가리다 회차가 통째로 죽은 메일도 — 표시만 남아 있으면 건너뛴다', async () => {
   const db = fakeDb(Object.assign({}, MAIL, { rules_mgmt: { library: { try: { [A]: { at: 1, n: 2 } } } } }));
   let asked = 0;
-  await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return Promise.resolve([]); }));
-  assert.equal(asked, 0);
-  assert.match(lib(db).seen[A].why, /멈춤/);
+  const sum = await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return Promise.resolve([]); }));
+  assert.equal(asked, 0, '★ 회차를 죽인 메일을 같은 회차에 또 집었다');
+  assert.equal(sum.stuck, 1);
+  assert.equal(lib(db).try[A].slow, true, '다 본 뒤 큰 메일로 다시 세운다(다음 회차)');
 });
 
 test('③ 보통 실패(끊김)는 표시를 지운다 — 쌓여서 건너뛰면 안 된다', async () => {
