@@ -1172,7 +1172,7 @@ ok('결산 확정이 조정을 자동 기록', src.includes('var rc=reserveAdjus
 // 분개와 확정이 따로 저장되면 하나만 성공했을 때 장부가 어긋난다 → 한 번의 update로
 ok('조정 분개와 확정을 한 번에 저장', /up\['txns\/'\+fid\+'\/'\+yr\+'\/'\+id\]=e;/.test(src)
   && /up\['closing\/'\+fid\+'\/'\+yr\+'\/locked'\]=true;/.test(src)
-  && src.includes('var ents=(_w?[_w]:[]).concat(_reserveEntries(yr,rc));'));   // 2026-10-07 원천징수 계상(_w)이 앞에 붙는다
+  && src.includes('var ents=(_w?[_w]:[]).concat(_ac?[_ac]:[]).concat(_reserveEntries(yr,rc));'));   // 2026-10-07 원천징수 계상(_w), 2026-10-08 전기 미수수익 회수(_ac)가 앞에 붙는다
 ok('거래 목록에 대체분개 표시', src.includes('x.nocash&&num(x.amount)'));
 
 // ── ⑨-2 통장 여러 시트 ──

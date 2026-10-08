@@ -41,18 +41,18 @@ const B = (() => {
   const box = {};
   new Function([
     grabDecl('ACCT_CHART'), grabDecl('PURPOSE_ACCTS'), grabDecl('OPEN_ACCT'), grabDecl('ADMIN_ACCTS'),
-    grabDecl('RESERVE_ACCTS'), grabDecl('RSV_AUTO_ID'),
+    grabDecl('RESERVE_ACCTS'), grabDecl('RSV_AUTO_ID'), grabDecl('RSV1_FIFO_FROM'),
     'var funds={}, S={fundId:"F1", year:2025};',
     grabFn('num'),
     grabFn('acctType'), grabFn('isDrAcct'), grabFn('_openingOf'), grabFn('_splitsOf'), grabFn('expandSplits'),
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
     grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
-    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'),
+    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
     'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
-    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf; this.annex=annexRows;',
+    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf; this.annex=annexRows; this.ledger=rsv1Ledger; this.useOf=rsv1UseOf;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -278,4 +278,42 @@ test('★★ 준비금명세서·기본재산명세서 — 기초+설정−사�
   assert.equal(x.rsv.r2.end, Math.round(fin.res2)); assert.equal(x.rsv.r1.end, Math.round(fin.res1));
   assert.deepEqual(x.chk, { r1: true, r2: true, basic: true });
   assert.equal(x.basic.end, 10000000);
+});
+
+/* ★★ 준비금1 선입선출 (책 대조 D1·D4 — 김승훈 2014 p.41·111·209, 법인세법 제29조③⑤4호), 2026 사업연도부터 */
+test('★★ 2026~ 이자가 지출보다 많으면 남은 이자는 준비금1에 남는다 — 준비금2로 넘기지 않는다', () => {
+  fresh({ fund_type: '공동', years: {} });
+  const T = [{ _id: 'i', date: '2026-06-30', memo: '이자', deposit: 1000000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'e', date: '2026-07-01', memo: '경조사비', withdraw: 300000, debit: '경조사비', credit: '현금성자산', approved: true }];
+  const arrC = B.closeArr(T, 'F1', 2026), fin = B.computeFin(arrC, 'F1', 2026);
+  assert.equal(Math.round(fin.net), 0, '순이익 0');
+  assert.equal(Math.round(fin.res1), 700000, '쓰고 남은 이자 70만이 준비금1 에');
+  assert.equal(Math.round(fin.res2), 0, '준비금2 로 넘기지 않는다');
+  assert.equal(arrC.filter((x) => x._id === 'rsv1in2026').length, 0, '같은 금액을 바로 되돌리지 않는다');
+  assert.deepEqual(B.useOf(arrC, '고유목적사업준비금1'), { set: 1000000, use: 300000 });
+  const T5 = T.map((x) => Object.assign({}, x, { date: x.date.replace('2026', '2025') }));
+  const f5 = B.computeFin(B.closeArr(T5, 'F1', 2025), 'F1', 2025);
+  assert.equal(Math.round(f5.res1), 0, '2025 이전은 옛 방식(제출본과 맞춘다)'); assert.equal(Math.round(f5.res2), 700000);
+});
+test('★★ 2026~ 지출이 이자보다 많을 때 — 준비금1(이월 포함) 먼저, 모자란 만큼 준비금2', () => {
+  fresh({ fund_type: '공동', years: { 2026: { opening: { cash: 5000000, reserve: 200000, reserve2: 4800000 } } } });
+  const T = [{ _id: 'i', date: '2026-06-30', memo: '이자', deposit: 100000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'e', date: '2026-07-01', memo: '경조사비', withdraw: 1000000, debit: '경조사비', credit: '현금성자산', approved: true }];
+  const fin = B.computeFin(B.closeArr(T, 'F1', 2026), 'F1', 2026);
+  assert.equal(Math.round(fin.net), 0);
+  assert.equal(Math.round(fin.res1), 0, '이월 20만 + 올해 10만 모두 사용');
+  assert.equal(Math.round(fin.res2), 4800000 - 700000, '나머지 70만은 준비금2');
+});
+test('★★ 준비금1 연도별 원장 — 먼저 설정한 것부터 쓰고, 5년이 되는 해까지 못 쓰면 기한 지남', () => {
+  const L1 = B.ledger(null, 2026, 1000000, 300000, 0);
+  assert.deepEqual(L1.save, [{ y: '2026', set: 1000000, used: 300000 }]);
+  assert.equal(L1.rows[0].due, '2031');
+  const L2 = B.ledger(L1.save, 2027, 500000, 900000, 0);
+  assert.deepEqual(L2.rows.map((r) => [r.y, r.usedNow, r.left]), [['2026', 700000, 0], ['2027', 200000, 300000]], '2026 분부터');
+  assert.deepEqual(L2.save, [{ y: '2027', set: 500000, used: 200000 }], '다 쓴 해는 넘기지 않는다');
+  const L3 = B.ledger([{ y: '2026', set: 1000000, used: 0 }], 2031, 0, 400000, 0);
+  assert.equal(L3.rows[0].left, 600000); assert.equal(L3.rows[0].over, true, '2031 = 2026 + 5 — 익금산입 대상');
+  assert.equal(B.ledger([{ y: '2026', set: 1000000, used: 0 }], 2030, 0, 0, 0).rows[0].soon, true, '한 해 전에 알린다');
+  const L5 = B.ledger(null, 2026, 100000, 250000, 200000);
+  assert.deepEqual(L5.rows.map((r) => [r.y, r.usedNow, r.left]), [['이월', 200000, 0], ['2026', 50000, 50000]], '원장이 없으면 기초 잔액을 이월로');
 });

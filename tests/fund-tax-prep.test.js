@@ -24,7 +24,7 @@ const B = (() => {
   new Function([
     "var RESERVE_ACCTS=['고유목적사업준비금1','고유목적사업준비금2'];",
     grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'),
-    grabFn('accruedOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('taxPrep'), grabFn('taxText'),
+    grabFn('accruedOf'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('taxPrep'), grabFn('taxText'),
     'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText;',
   ].join('\n')).call(box);
   return box;
@@ -99,7 +99,15 @@ test('★ 준비금이 남으면 5년 기한을 알린다 · 수입이 없으면
   const arr = INT.filter((x) => x._id !== 'rsv1in2025');
   const P = B.prep(arr, { tb: tbOf({ 이자수익: [0, 1000000] }), resvExp: 1000000 }, WHT, 2025, F, '고유목적사업준비금1');
   assert.equal(P.remain, 1000000);
-  assert.ok(P.notes.some((x) => x.includes('2030년까지')));
+  assert.ok(P.notes.some((x) => x.includes('5년이 되는 해까지')));
+  /* 제27호(을) 원장 — 2025 설정분, 기한 2030(설정 연도 + 5) */
+  assert.deepEqual(P.ledger.rows.map((r) => [r.y, r.set, r.left, r.due]), [['2025', 1000000, 1000000, '2030']]);
+  /* 전년 원장이 있으면 그 해 것부터 쓴다 */
+  const Q = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000] }), resvExp: 1000000 }, WHT, 2025, F, '고유목적사업준비금1', [{ y: '2021', set: 300000, used: 0 }], 0);
+  assert.deepEqual(Q.ledger.rows.map((r) => [r.y, r.usedNow, r.left]), [['2021', 300000, 0], ['2025', 700000, 300000]]);
+  assert.ok(Q.notes.some((x) => x.includes('2021년 설정분')) === false, '다 쓴 해는 경고하지 않는다');
+  const O = B.prep(arr, { tb: tbOf({ 이자수익: [0, 1000000] }), resvExp: 1000000 }, WHT, 2026, F, '고유목적사업준비금1', [{ y: '2021', set: 300000, used: 0 }], 0);
+  assert.ok(O.notes.some((x) => x.includes('2021년 설정분') && x.includes('기한')), '5년 지난 잔액은 익금산입 경고');
   const N = B.prep([], { tb: {}, resvExp: 0 }, {}, 2025, F, '고유목적사업준비금1');
   assert.equal(N.kind, 'none'); assert.equal(N.rows.length, 11);
   assert.match(B.text(B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000] }), resvExp: 1000000 }, WHT, 2025, F), F), /\[법인지방소득세\]/);

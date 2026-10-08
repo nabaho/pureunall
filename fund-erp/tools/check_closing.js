@@ -44,6 +44,7 @@ global.S = { fundId: 'X', year: 2024 };
 global.funds = { X: { fund_type: '공동', years: {} } };
 /* 간접 eval — 이 파일은 strict 모드라 그냥 eval 하면 함수가 지역 스코프에 갇힌다 */
 (0, eval)(['ACCT_CHART', 'PURPOSE_ACCTS', 'ADMIN_ACCTS', 'OPEN_ACCT', 'RESERVE_ACCTS', 'F15_ROWS'].map(grabVar).join('\n') + '\n'
+  + (src.match(/var RSV1_FIFO_FROM=\d+;/) || [''])[0] + '\n'   // 숫자 하나뿐인 상수 — grabVar(괄호를 센다)로는 못 가져온다
   + ['_openingOf', '_splitsOf', '_splitSum', '_txnDone', 'expandSplits', 'journalOf', 'acctMoves',
      // 준비금 1·2 배치는 기금마다 다르다 — 그것을 읽는 도우미도 함께 들여온다
      // _reserveRate 는 useRate 로 한 줄기를 이룬다(2026-09-12) — 빠지면 이 검사가 통째로 죽는다
