@@ -31,6 +31,8 @@
 <!-- ✨ AI 지우개 계산 층 (대표 지시 2026-08-29) — 자르기·마젠타 표시·제자리 붙이기.
      ⚠ 사진첩만 쓴다(급여데이터함은 가리기까지만). -->
 <script src="js/pu-photo-edit.js?v=5"></script>
+<!-- 📑 여러 장으로 나누기 — 한 사진 속 서류를 찾는 계산 (대표 지시 2026-10-08) -->
+<script src="js/pu-photo-split.js?v=1"></script>
 <!-- 🖍 사진 편집 — 칠한 자취를 «군데»로 나누는 셈 (대표 지시 2026-08-29 「자유롭게 편집」).
      ⚠ 몇 군데인지가 곧 «요금 몇 번»이라, 이 셈은 노드에서 그대로 돌려 볼 수 있어야 한다. -->
 <script src="js/pu-photo-paint.js?v=1"></script>
@@ -1052,6 +1054,26 @@ body.phsheet #pu-version-fab{display:none!important}
 .edwrap .canvas-container canvas{width:100% !important;height:100% !important}
 .edtools button.col{padding:6px}
 .edtools button.col.on{box-shadow:0 0 0 2px var(--blue) inset}
+/* 📑 여러 장으로 나누기 (대표 지시 2026-10-08) — 네모 판은 사진과 «똑같은 자리»를 덮는다 */
+.edsplit{position:absolute;inset:0;touch-action:none;cursor:crosshair}
+.spbox{position:absolute;border:2.5px solid #fbbf24;box-shadow:0 0 0 1px #1e293b;border-radius:2px;cursor:move}
+.spbox.new{border-style:dashed;pointer-events:none}
+.spbox .no{position:absolute;left:4px;top:4px;min-width:22px;height:22px;border-radius:999px;background:#d97706;
+  color:#fff;font:800 12px/22px inherit;text-align:center;pointer-events:none}
+.spbox .x{position:absolute;right:4px;top:4px;width:22px;height:22px;border-radius:50%;background:#1e293b;
+  color:#fff;font-size:12px;line-height:22px;text-align:center;cursor:pointer}
+.spbox .hd{position:absolute;width:14px;height:14px;background:#fff;border:2px solid #d97706;border-radius:3px}
+.spbox .hd.nw{left:-8px;top:-8px;cursor:nwse-resize}.spbox .hd.se{right:-8px;bottom:-8px;cursor:nwse-resize}
+.spbox .hd.ne{right:-8px;top:-8px;cursor:nesw-resize}.spbox .hd.sw{left:-8px;bottom:-8px;cursor:nesw-resize}
+.edtools.spgrid{flex-wrap:wrap}
+.edsplitgo{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.spchk{display:flex;gap:6px;align-items:flex-start;font-size:12px;margin-top:9px;color:var(--ink)}
+.sppieces{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;align-content:center;
+  max-width:100%;max-height:100%;overflow:auto;padding:6px}
+.sppiece{background:#fff;border-radius:8px;padding:6px;display:flex;flex-direction:column;gap:5px;cursor:pointer}
+.sppiece img{max-width:220px;max-height:40vh;object-fit:contain;display:block}
+.sppiece.off{opacity:.4}
+.sppiece .cap{font:700 12px inherit;color:var(--ink);display:flex;align-items:center;gap:5px}
 /* 요금 없이 되는 길 — 눈에 띄되 잔소리로 안 보이게 */
 .note.edfree{background:#f0fdf4;border:1px solid #bbf7d0;color:#166534;border-radius:8px;
   padding:7px 9px;font-size:11.5px;line-height:1.7}
@@ -18342,6 +18364,9 @@ function setEdMode(m) {
   photoEd.erasing = false;
   photoEd.bri = 100;
   photoEd.con = 100;
+  /* 📑 여러 장으로 나누기 — 네모는 사진을 다 불러온 뒤 저절로 찾는다(edSplitStart) */
+  photoEd.split = m === 'split' ? { boxes: null, how: '' } : null;
+  photoEd.pieces = null;
   renderReadPanel(maskItem());
   renderViewerEdit();
 }
@@ -18415,6 +18440,321 @@ function edCropApply() {
   renderReadPanel(maskItem());
   renderViewerEdit();
   toast('✂️ 잘랐습니다 — 보시고 골라 주세요 (요금 없음)');
+}
+
+/* ══════ 📑 여러 장으로 나누기 — 요금 0원 (대표 지시 2026-10-08 「여러장이 될 수 있다」) ══════
+   한 사진에 신청서·등록증·명함이 함께 찍혀 들어온다. 판독은 한 장만 읽고 나머지 글자를
+   엉뚱한 칸에 섞는다(실측: 신청서의 「연락처 담당자」가 등록증 소재지 칸에 붙었다).
+   서류마다 네모를 하나씩 쳐 «새 사진 여러 장»으로 담는다.
+   ⚠ 찾는 계산은 js/pu-photo-split.js 한 곳 — 여기는 그리기·끌기·담기만 한다.
+   ⚠ 원본은 그대로 둔다. 휴지통은 사람이 체크했을 때만(사진을 저절로 지우지 않는다).
+   ⚠ 나눈 사진은 원본의 판독을 «물려받지 않는다» — 신청서가 등록증으로 붙던 것이 이 일의 까닭이다. */
+function edSplitStart(im) {
+  edFitWrap(im);
+  if (!photoEd || photoEd.mode !== 'split' || !photoEd.split) return;
+  if (photoEd.split.boxes == null) edSplitDetect(im);
+  else edSplitPaint();
+}
+
+/* 저절로 찾기 — 사진을 줄여(긴 변 256) 밝기만 본다. 이 기기 안에서 끝난다.
+   ⚠ 못 찾아도 막지 않는다 — 사람이 그리거나 칸 나누기를 쓰면 된다. */
+function edSplitDetect(im) {
+  const sp = photoEd && photoEd.split;
+  if (!sp) return;
+  const img = im || $('edImg');
+  let r = { how: 'none', boxes: [] };
+  try {
+    const W = img.naturalWidth, H = img.naturalHeight;
+    const k = Math.min(1, PuPhotoSplit.DETECT_SIDE / Math.max(W, H));
+    const c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(W * k));
+    c.height = Math.max(1, Math.round(H * k));
+    const ctx = c.getContext('2d');
+    ctx.drawImage(img, 0, 0, c.width, c.height);
+    r = PuPhotoSplit.findBoxes(ctx.getImageData(0, 0, c.width, c.height));
+  } catch (e) {
+    console.warn('[나누기 — 찾기]', e);
+  }
+  sp.boxes = r.boxes.slice();
+  sp.how = r.how;
+  edSplitPaint();
+  renderReadPanel(maskItem());
+}
+
+function edSplitPos(b) {
+  return 'left:' + (b.x * 100) + '%;top:' + (b.y * 100) + '%;width:' + (b.w * 100) + '%;height:' + (b.h * 100) + '%';
+}
+
+function edSplitPaint() {
+  const lay = $('edSplit');
+  const sp = photoEd && photoEd.split;
+  if (!lay || !sp) return;
+  lay.innerHTML = (sp.boxes || []).map(function (b, i) {
+    return '<div class="spbox" data-i="' + i + '" style="' + edSplitPos(b) + '">' +
+      '<span class="no">' + (i + 1) + '</span>' +
+      '<span class="x" data-x="' + i + '" title="이 네모 빼기">✕</span>' +
+      ['nw', 'ne', 'sw', 'se'].map(function (h) { return '<span class="hd ' + h + '" data-h="' + h + '"></span>'; }).join('') +
+      '</div>';
+  }).join('') +
+    (sp.drag && sp.drag.kind === 'new' ? '<div class="spbox new" style="' + edSplitPos(sp.drag.box) + '"></div>' : '');
+}
+
+/* 누른 자리(0~1) — 네모 판이 사진과 똑같은 자리라 그 비율이 곧 사진 위 비율이다 */
+function edSplitAt(ev) {
+  const r = $('edSplit').getBoundingClientRect();
+  return {
+    x: Math.max(0, Math.min(1, (ev.clientX - r.left) / Math.max(1, r.width))),
+    y: Math.max(0, Math.min(1, (ev.clientY - r.top) / Math.max(1, r.height)))
+  };
+}
+function edSplitNorm(x0, y0, x1, y1) {
+  const a = Math.max(0, Math.min(x0, x1)), b = Math.max(0, Math.min(y0, y1));
+  return { x: a, y: b, w: Math.min(1, Math.max(x0, x1)) - a, h: Math.min(1, Math.max(y0, y1)) - b };
+}
+
+/* 누르기 — ✕ 는 빼기, 모서리는 크기, 네모 안은 옮기기, 빈 곳은 새 네모 */
+function edSplitDown(ev) {
+  const sp = photoEd && photoEd.split;
+  if (!sp || !sp.boxes) return;
+  const t = ev.target;
+  const p = edSplitAt(ev);
+  if (t.dataset && t.dataset.x != null) {
+    sp.boxes.splice(Number(t.dataset.x), 1);
+    edSplitPaint();
+    renderReadPanel(maskItem());
+    return;
+  }
+  const el = t.closest ? t.closest('.spbox') : null;
+  const i = el && el.dataset.i != null ? Number(el.dataset.i) : -1;
+  if (i >= 0 && t.dataset && t.dataset.h) sp.drag = { kind: 'size', i: i, h: t.dataset.h, from: p, box: Object.assign({}, sp.boxes[i]) };
+  else if (i >= 0) sp.drag = { kind: 'move', i: i, from: p, box: Object.assign({}, sp.boxes[i]) };
+  else {
+    if (sp.boxes.length >= PuPhotoSplit.MAX_BOXES) { toast('한 번에 ' + PuPhotoSplit.MAX_BOXES + '장까지 나눌 수 있습니다'); return; }
+    sp.drag = { kind: 'new', from: p, box: { x: p.x, y: p.y, w: 0, h: 0 } };
+  }
+  try { $('edSplit').setPointerCapture(ev.pointerId); } catch (_) { /* 손가락이 이미 떨어졌다 */ }
+  ev.preventDefault();
+}
+
+function edSplitMove(ev) {
+  const sp = photoEd && photoEd.split;
+  const d = sp && sp.drag;
+  if (!d) return;
+  const p = edSplitAt(ev), dx = p.x - d.from.x, dy = p.y - d.from.y, b0 = d.box;
+  let b;
+  if (d.kind === 'move') {
+    b = { x: Math.max(0, Math.min(1 - b0.w, b0.x + dx)), y: Math.max(0, Math.min(1 - b0.h, b0.y + dy)), w: b0.w, h: b0.h };
+  } else if (d.kind === 'size') {
+    let x0 = b0.x, y0 = b0.y, x1 = b0.x + b0.w, y1 = b0.y + b0.h;
+    if (d.h.indexOf('w') >= 0) x0 += dx; else x1 += dx;
+    if (d.h.indexOf('n') >= 0) y0 += dy; else y1 += dy;
+    b = edSplitNorm(x0, y0, x1, y1);
+  } else {
+    b = edSplitNorm(d.from.x, d.from.y, p.x, p.y);
+  }
+  if (d.kind === 'new') d.box = b; else sp.boxes[d.i] = b;
+  edSplitPaint();
+}
+
+/* 떼기 — 너무 작게 그린 것은 버린다(그냥 누른 것이다), 줄인 것이 너무 작으면 되돌린다 */
+function edSplitUp() {
+  const sp = photoEd && photoEd.split;
+  const d = sp && sp.drag;
+  if (!d) return;
+  sp.drag = null;
+  if (d.kind === 'new') {
+    const nb = PuPhotoSplit.clampBox(d.box);
+    if (nb) sp.boxes.push(nb);
+  } else {
+    sp.boxes[d.i] = PuPhotoSplit.clampBox(sp.boxes[d.i]) || d.box;
+  }
+  sp.boxes = PuPhotoSplit.sortBoxes(sp.boxes);
+  edSplitPaint();
+  renderReadPanel(maskItem());
+}
+
+function edSplitGrid(cols, rows) {
+  const sp = photoEd && photoEd.split;
+  if (!sp) return;
+  sp.boxes = PuPhotoSplit.gridBoxes(cols, rows);
+  sp.how = 'grid';
+  edSplitPaint();
+  renderReadPanel(maskItem());
+}
+function edSplitAgain() { edSplitDetect(); }
+function edSplitClear() {
+  const sp = photoEd && photoEd.split;
+  if (!sp) return;
+  sp.boxes = [];
+  sp.how = 'none';
+  edSplitPaint();
+  renderReadPanel(maskItem());
+}
+
+/* 나누기 — 네모마다 «원본 크기»에서 잘라 조각을 만든다. 아직 저장하지 않는다. */
+async function edSplitApply() {
+  const sp = photoEd && photoEd.split;
+  if (!sp || !sp.boxes || !sp.boxes.length) { toast('나눌 네모를 먼저 그려 주세요'); return; }
+  const id = photoEd.id;
+  try {
+    const im = await loadImg(photoEd.url);
+    if (!photoEd || photoEd.id !== id) return;
+    const W = im.naturalWidth, H = im.naturalHeight;
+    photoEd.pieces = sp.boxes.map(function (b) {
+      const r = PuPhotoSplit.pixelRect(b, W, H);
+      const c = document.createElement('canvas');
+      c.width = r.sw; c.height = r.sh;
+      c.getContext('2d').drawImage(im, r.sx, r.sy, r.sw, r.sh, 0, 0, r.sw, r.sh);
+      return { full: c.toDataURL('image/jpeg', 0.92), on: true, w: r.sw, h: r.sh };
+    });
+    photoEd.splitTrash = false;
+    renderReadPanel(maskItem());
+    renderViewerEdit();
+    toast('📑 ' + photoEd.pieces.length + '장으로 나눴습니다 — 보시고 골라 주세요 (요금 없음)');
+  } catch (e) {
+    console.warn('[나누기]', e);
+    toast('나누지 못했습니다 — ' + ((e && e.message) || e));
+  }
+}
+
+function edPiecesHtml() {
+  return '<div class="sppieces">' + photoEd.pieces.map(function (p, i) {
+    return '<label class="sppiece' + (p.on ? '' : ' off') + '">' +
+      '<img src="' + esc(p.full) + '" alt="" draggable="false">' +
+      '<span class="cap"><input type="checkbox"' + (p.on ? ' checked' : '') +
+      ' onchange="edSplitToggle(' + i + ')"> ' + (i + 1) + '번째</span></label>';
+  }).join('') + '</div>';
+}
+function edSplitToggle(i) {
+  const p = photoEd && photoEd.pieces && photoEd.pieces[i];
+  if (!p) return;
+  p.on = !p.on;
+  renderViewerEdit();
+  renderReadPanel(maskItem());
+}
+function edSplitBack() {
+  if (!photoEd) return;
+  photoEd.pieces = null;
+  renderReadPanel(maskItem());
+  renderViewerEdit();
+}
+
+/* ── 나눈 조각이 «물려받으면 거짓이 되는» 것까지 뗀다 ──
+   edCopyMeta(편집본 공통)에 더해, 조각은 «다른 서류»일 수 있으므로 원본이 읽어 둔 것을 모두 뗀다:
+     · read·company·customKind·cardBack — 원본(여러 장이 섞인 그림)을 읽은 결과다.
+       남기면 신청서 조각이 「사업자등록증」으로 붙는다 — 이 기능을 만든 바로 그 병이다.
+     · hasText·sharp·size·capWay·capW·capH — 원본 그림을 잰 값이다. 조각은 다르다.
+   ⚠ 찍은 날·올린 사람·폴더·설명은 물려받는다 — 같은 때 같은 자리에서 찍은 것이다.
+   ⚠ 어디서 나왔는지(splitFrom)를 남긴다 — 나중에 「이 조각은 어느 사진에서?」에 답한다. */
+function splitPieceMeta(srcMeta, srcId, n, all, p) {
+  const m = edCopyMeta(srcMeta);
+  ['read', 'company', 'customKind', 'cardBack', 'hasText', 'sharp', 'size',
+    'capWay', 'capW', 'capH', 'edited', 'editedFrom'].forEach(function (k) { delete m[k]; });
+  m.kind = 'doc';
+  m.w = p.w;
+  m.h = p.h;
+  m.splitFrom = { id: String(srcId || ''), n: n, of: all, at: Date.now() };
+  return m;
+}
+
+/* 저장 — 체크한 조각만 새 사진으로. 한 장씩 차례로 담아 어디까지 됐는지 안다. */
+async function edSplitKeep() {
+  const e = photoEd;
+  if (!e || !e.pieces || e.splitBusy) return;
+  const list = e.pieces.filter(function (p) { return p.on; });
+  if (!list.length) return;
+  const srcId = e.id;
+  const src = gridItems.find(function (x) { return x.id === srcId; });
+  const srcYear = photoYearOf(srcId);
+  const trash = !!e.splitTrash;
+  e.splitBusy = { done: 0, all: list.length };
+  renderReadPanel(maskItem());
+  const saved = [];
+  try {
+    for (let i = 0; i < list.length; i++) {
+      const p = list[i];
+      const thumb = await shrinkDataUrl(p.full, 240, 0.8);
+      const id = PuPhotoStore.newId();
+      const meta = splitPieceMeta(src && src.meta, srcId, i + 1, list.length, p);
+      await PuPhotoStore.savePhoto({ id: id, meta: meta, full: p.full, thumb: thumb });
+      gridItems.unshift({ id: id, meta: meta, full: p.full, thumb: thumb });
+      saved.push(p);
+      e.splitBusy.done = i + 1;
+      renderReadPanel(maskItem());
+    }
+  } catch (err) {
+    /* ⚠ 담은 조각은 체크를 풀어 둔다 — 다시 누르면 «남은 것만» 담긴다(같은 조각이 두 장 생기지 않게) */
+    console.warn('[나누기 저장]', err);
+    saved.forEach(function (p) { p.on = false; });
+    e.splitBusy = null;
+    renderGrid();
+    renderViewerEdit();
+    renderReadPanel(maskItem());
+    alert('저장하지 못했습니다 — ' + ((err && err.message) || err) + '\n' +
+      saved.length + '장은 이미 담겼습니다. 원본은 그대로 있습니다. 다시 누르면 남은 것만 담습니다.');
+    return;
+  }
+  photoEd = null;
+  let trashed = false;
+  /* 원본 휴지통은 «다 담은 뒤에», 사람이 체크했을 때만, 내 사진일 때만 */
+  if (trash && isMinePhoto(srcId)) {
+    try {
+      await PuPhotoStore.deletePhoto(srcYear, srcId, '여러 장으로 나눔 — 나눈 ' + saved.length + '장이 새 사진으로 있음', photoOwner(srcId));
+      gridItems = gridItems.filter(function (x) { return x.id !== srcId; });
+      refreshTrashCount();
+      trashed = true;
+    } catch (err) {
+      console.warn('[나누기 — 원본 휴지통]', err);
+      alert('나눈 사진은 담았지만 원본을 휴지통으로 보내지 못했습니다 — ' + ((err && err.message) || err));
+    }
+  }
+  if (trashed && viewerId === srcId) closeViewer();
+  else { renderReadPanel(maskItem()); renderViewerEdit(); }
+  renderGridBar();
+  renderGrid();
+  toast('📑 ' + saved.length + '장을 새 사진으로 담았습니다 — ' + (trashed ? '원본은 휴지통으로 보냈습니다' : '원본은 그대로 있습니다'));
+  autoReadSoon();      /* 새 조각은 «판독 전» — 평소처럼 자동 판독 차례에 든다 */
+}
+
+/* 옆 칸 — 네모 맞추기 / 나눈 결과 / 담는 중 */
+function edSplitPanelHtml(tabs) {
+  const e = photoEd, sp = e.split || {};
+  if (e.splitBusy) {
+    return '<div class="box"><b>📑 담는 중…</b><p class="note" style="margin:8px 0 0">' +
+      e.splitBusy.done + ' / ' + e.splitBusy.all + '장 — 창을 닫지 마십시오.</p></div>';
+  }
+  if (e.pieces) {
+    const all = e.pieces.length;
+    const on = e.pieces.filter(function (p) { return p.on; }).length;
+    return '<div class="box"><b>📑 나눈 결과 — 아직 저장하지 않았습니다</b>' +
+      '<p class="note" style="margin:8px 0 0">체크한 것만 <b>새 사진</b>으로 담습니다. <b>원본은 그대로</b> 있습니다.<br>' +
+      '담을 것 <b>' + on + '장</b> / ' + all + '장</p>' +
+      '<button class="again pri edkeep" onclick="edSplitKeep()"' + (on ? '' : ' disabled') + '>✅ ' + on + '장 새 사진으로 저장</button>' +
+      '<button class="again" onclick="edSplitBack()">↩ 네모 다시 맞추기</button>' +
+      '<label class="spchk"><input type="checkbox"' + (e.splitTrash ? ' checked' : '') +
+      ' onchange="if(photoEd)photoEd.splitTrash=this.checked"> <span>저장한 뒤 <b>원본은 휴지통으로</b> (' +
+      PuPhotoStore.TRASH_DAYS + '일 안에 되살릴 수 있음)</span></label>' +
+      '<p class="note edmode">나눈 사진은 원본의 판독을 <b>물려받지 않고 한 장씩 새로 읽습니다</b> — ' +
+      '명함은 명함으로, 등록증은 등록증으로 따로 읽혀 각각 기업정보함으로 갑니다.</p>' +
+      '<p class="note" style="margin:6px 0 0;font-size:11px">이 나누기는 <b>요금이 들지 않았습니다</b>.</p></div>';
+  }
+  const n = (sp.boxes || []).length;
+  const said = sp.boxes == null ? '서류를 찾는 중입니다…'
+    : sp.how === 'grid' ? '칸으로 나눴습니다 — 맞는지 보세요'
+      : n ? '서류 <b>' + n + '장</b>을 찾았습니다 — 맞는지 보세요'
+        : '저절로 못 찾았습니다 — 네모를 그리거나 아래 칸 나누기를 쓰세요';
+  return '<div class="box"><b>📑 여러 장으로 나누기</b>' + tabs +
+    '<p class="note" style="margin:8px 0 0">' + said + '</p>' +
+    '<p class="note" style="margin:6px 0 0">· 빈 곳을 <b>끌면 네모가 하나 더</b> 생깁니다<br>' +
+    '· 네모를 끌면 옮기고, 모서리를 끌면 크기가 바뀝니다<br>· 잘못 잡은 네모는 <b>✕</b> 로 뺍니다</p>' +
+    '<div class="edtools"><button onclick="edSplitAgain()">↺ 다시 찾기</button>' +
+    '<button onclick="edSplitClear()">네모 모두 지우기</button></div>' +
+    '<div class="edtools spgrid"><span class="lb">칸</span>' +
+    '<button onclick="edSplitGrid(2,1)">◧ 세로 2</button><button onclick="edSplitGrid(3,1)">세로 3</button>' +
+    '<button onclick="edSplitGrid(1,2)">⬒ 가로 2</button><button onclick="edSplitGrid(2,2)">⊞ 2×2</button></div>' +
+    '<div class="maskfoot"><button class="again" onclick="photoEdCancel()">그만두기</button></div>' +
+    '<button class="again pri" onclick="edSplitApply()"' + (n ? '' : ' disabled') + '>📑 ' +
+    (n ? n + '장으로 ' : '') + '나누기 (요금 없음)</button></div>';
 }
 
 /* ══════ ☀️ 밝기·대비 — 요금 0원 ══════
@@ -19079,6 +19419,14 @@ function edPeek(on) {
 function edCopyMeta(srcMeta) {
   const m = Object.assign({}, srcMeta || {});
   delete m.used; delete m.doc; delete m.shareWith; delete m.shareBy;
+  /* ⚠ 그림이 «어디 있나»도 뗀다 (2026-10-08) — fullUrl·thumbUrl·loc 는 «원본 파일»을 가리킨다.
+       물려받으면 새 사진을 연 남(관리자·공유받은 사람)에게 «고치기 전 원본»이 보이고,
+       서류는 주소를 안 새로 적으므로(isDocKind) 옛 주소가 그대로 남는다. 창고가 막혀
+       실시간DB 로 물러나면 loc:'storage' 만 남아 본문을 엉뚱한 자리에서 찾는다.
+       저장 층(savePhoto)이 새 파일의 자리·주소를 스스로 적는다.
+     ⚠ 화면이 붙인 표(__year·__ownerUid …)도 뗀다 — 저장할 값이 아니다. */
+  delete m.fullUrl; delete m.thumbUrl; delete m.loc;
+  Object.keys(m).forEach(function (k) { if (k.indexOf('__') === 0) delete m[k]; });
   if (m.read) {
     const r = Object.assign({}, m.read);
     ['filed', 'filedError', 'filedInfo', 'filedInfoError', 'filedCo', 'filedCoError']
@@ -19231,6 +19579,12 @@ function renderViewerEdit() {
   if (pic0) pic0.classList.toggle('editing', on);
   if (!on) { edCropStop(); edMarkStop(); box.style.display = 'none'; box.innerHTML = ''; return; }
   box.style.display = 'flex';
+  /* 📑 나눈 결과를 보고 계신 중 — 큰 사진 자리에 조각들을 늘어놓는다 */
+  if (photoEd.mode === 'split' && photoEd.pieces) {
+    edCropStop(); edMarkStop();
+    box.innerHTML = edPiecesHtml();
+    return;
+  }
   /* 결과를 보고 계실 때는 도구를 안 얹는다 — 무엇이 고쳐졌는지 보시는 자리다 */
   const mode = photoEd.done ? 'done' : photoEd.mode;
   /* ⚠ 자르기는 자르개가 사진 둘레를 제 짜임으로 바꾼다 — 그래서 «비를 안 박고»
@@ -19238,6 +19592,7 @@ function renderViewerEdit() {
   const crop = mode === 'crop';
   /* 도구를 칸에 적어 둔다 — 커서가 도구마다 달라진다(꾸밈이 이것을 본다) */
   const modeCls = crop ? ' crop'
+    : mode === 'split' ? ' mode-split'
     : mode === 'mark' ? ' mode-mark'
       : mode === 'ai' ? (photoEd.erasing ? ' mode-erase' : ' mode-ai') : '';
   box.innerHTML =
@@ -19245,6 +19600,7 @@ function renderViewerEdit() {
     '<img id="edImg" src="' + esc(photoEd.done ? photoEd.done.full : photoEd.url) +
     '" alt="" draggable="false"' +
     (crop ? ' onload="edCropStart(this)"'
+      : mode === 'split' ? ' onload="edSplitStart(this)"'
       : mode === 'mark' ? ' onload="edMarkStart(this)"' : ' onload="edFitWrap(this)"') +
     (mode === 'tone' ? ' style="filter:' + esc(edFilterCss()) + '"' : '') +
     /* ✏️ 글자·도형일 때는 사진을 판이 «배경으로» 들고 그린다 — 두 장이 겹쳐 보이면 안 된다 */
@@ -19256,6 +19612,12 @@ function renderViewerEdit() {
         ' onpointerleave="edHoverOut()" onpointerup="edUp()" onpointercancel="edUp()"></canvas>'
       : '') +
     (mode === 'mark' ? '<canvas id="edFab"></canvas>' : '') +
+    /* 📑 네모 판 — 사진과 «똑같은 자리»를 덮는다(edFitWrap 이 칸에 사진의 비를 박는다) */
+    (mode === 'split'
+      ? '<div id="edSplit" class="edsplit" onpointerdown="edSplitDown(event)"' +
+        ' onpointermove="edSplitMove(event)" onpointerup="edSplitUp(event)"' +
+        ' onpointercancel="edSplitUp(event)"></div>'
+      : '') +
     '</div>';
   if (mode !== 'crop') edCropStop();
   if (mode !== 'mark') edMarkStop();
@@ -19315,7 +19677,9 @@ function edPanelHtml() {
   }
   /* ── 도구 고르개 — 요금이 드는 것은 하나뿐이라는 것이 늘 보여야 한다 ── */
   const tabs = '<div class="edmodes">' + ED_MODES.map(function (m) {
-    return '<button class="' + (e.mode === m.k ? 'on' : '') + '"' +
+    /* 나누기는 자르기의 한 갈래다 — 자르기 칸에 불이 들어온다 */
+    const on = e.mode === m.k || (m.k === 'crop' && e.mode === 'split');
+    return '<button class="' + (on ? 'on' : '') + '"' +
       ' onclick="setEdMode(\'' + m.k + '\')">' + m.t +
       '<span class="pay' + (m.pay ? ' y' : '') + '">' + (m.pay ? '요금' : '0원') + '</span></button>';
   }).join('') + '</div>';
@@ -19328,8 +19692,15 @@ function edPanelHtml() {
       '<b>원본은 그대로 두고</b> 자른 것을 새 사진으로 담습니다.</p>' +
       '<div class="maskfoot"><button class="again" onclick="photoEdCancel()">그만두기</button></div>' +
       '<button class="again pri" onclick="edCropApply()">✂️ 이대로 자르기 (요금 없음)</button>' +
+      /* 서류 여러 장이 한 사진에 — 자르기를 여러 번 하지 않고 한 번에 (대표 지시 2026-10-08) */
+      '<div class="edsplitgo"><b>📑 서류가 여러 장 찍혔나요?</b>' +
+      '<p class="note" style="margin:4px 0 0">서류마다 네모를 쳐 <b>한 번에 따로</b> 담습니다.</p>' +
+      '<button class="again" onclick="setEdMode(\'split\')">📑 여러 장으로 나누기</button></div>' +
       '</div>';
   }
+
+  /* ── 📑 여러 장으로 나누기 — 요금 0원 ── */
+  if (e.mode === 'split') return edSplitPanelHtml(tabs);
 
   /* ── ✏️ 글자·도형 — 요금 0원 (대표 지시 2026-08-29 「3단계」) ── */
   if (e.mode === 'mark') {
