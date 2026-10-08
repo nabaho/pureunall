@@ -588,11 +588,11 @@
   /* ══ 기업별 계약서 ══
      사진첩은 «사람별 잠금»이라 남의 사진을 모아 볼 수 없다 — 그래서 «가져오기 = 공유 보관함으로 사본 복사»다.
      사진첩 원본은 읽기만 한다. 「이 회사에서 빼기」는 연결만 끊고 파일은 보관함에 남는다. */
-  function mountCompanies(root, host) {
+  function mountCompanies(root, host, opts) {
     css();
     var store = host.store;
     var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false,
-      tab: 'co', aw: null, awErr: null, awPicked: {} };
+      tab: opts && opts.tab === 'await' ? 'await' : 'co', aw: null, awErr: null, awPicked: {} };
 
     function load(keepSel) {
       S.err = null;

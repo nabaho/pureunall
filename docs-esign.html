@@ -200,7 +200,7 @@
 <script src="js/pu-office-store.js?v=7"></script>
 <script src="js/pu-doc-file.js?v=36"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=12"></script>
+<script src="js/pu-office-docs.js?v=13"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -273,7 +273,7 @@ var docBucket = null, photosReady = null;
 function paneFromHash() {
   var h = location.hash;
   if (h === '#forms' || h.indexOf('#forms:') === 0) return 'forms';
-  if (h === '#co') return 'co';
+  if (h === '#co' || h === '#co:await') return 'co';   /* #co:await — 업무관리 「📬 서명본 대기」 알림에서 (2026-10-08) */
   if (h === '#arc') return 'arc';
   if (h === '#lib' && libIndex && libIndex.length) return 'lib';
   return 'esign';
@@ -691,7 +691,7 @@ function showPane(name) {
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
-  if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost()); }
+  if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }
   if (name === 'lib' && !mounted.lib && libIndex) {
     mounted.lib = true;

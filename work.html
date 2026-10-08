@@ -3590,6 +3590,37 @@ function mailNew(it){ return mailFor(it).filter(function(m){ return !mailChk(m);
      섞어 쓰면 화면에는 같은 회사인데 기록은 딴 회사에서 찾게 되어, 있는 것이
      조용히 안 나온다. 고칠 일이 있으면 기업정보함 쪽과 «함께» 고쳐야 한다. */
 var SENT_ROOT='pucards/sentDocs', SENT_MAX=40;
+/* ── 📬 서명본 대기 알림 (대표 「추천대로」 2026-10-08) ──
+   문서관리 › 기업별 계약서 「📬 서명본 대기」(pu_docs/await, 회사마다 한 줄)에서
+   보낸 지 14일이 넘었는데 서명본이 안 돌아온 곳만 센다. 작은 목록 하나를 «한 번» 읽는다(읽기만).
+   ⚠ 기준 14일은 js/pu-office-docs.js AWAIT_LATE 와 같아야 한다(tests/work-await-alert.test.js). */
+var AWAIT_LATE_DAYS=14, awaitLate=null, _awaitT=0;
+function awaitLateOf(v,now){
+  var out=[], n=now||Date.now();
+  Object.keys(v||{}).forEach(function(k){
+    var a=v[k]; if(!a||!a.at||a.got) return;
+    var d0=new Date(a.at), d1=new Date(n);
+    var days=Math.floor((Date.UTC(d1.getFullYear(),d1.getMonth(),d1.getDate())-Date.UTC(d0.getFullYear(),d0.getMonth(),d0.getDate()))/864e5);
+    if(days>AWAIT_LATE_DAYS) out.push({name:String(a.name||k),days:days});
+  });
+  return out.sort(function(x,y){ return y.days-x.days; });
+}
+function awaitLoad(){
+  if(awaitLate||_awaitT||typeof fbDb==='undefined'||!fbDb) return;
+  _awaitT=1;
+  fbDb.ref('pu_docs/await').once('value').then(function(s){
+    awaitLate=awaitLateOf(s.val()||{});
+    if(awaitLate.length&&S.view==='team') route();
+  },function(){ awaitLate=[]; });
+}
+function awaitBanner(){
+  awaitLoad();
+  if(!awaitLate||!awaitLate.length) return '';
+  var names=awaitLate.slice(0,3).map(function(a){ return esc(a.name)+' '+a.days+'일'; }).join(', ');
+  return '<div class="histbanner">📬 계약서 서명본을 <b>'+AWAIT_LATE_DAYS+'일 넘게</b> 기다리는 곳 <b>'+awaitLate.length+'곳</b> — '
+    +names+(awaitLate.length>3?' 외':'')
+    +'<a class="back" style="text-decoration:none" href="docs-esign.html#co:await" target="_blank" rel="noopener">문서관리에서 보기 →</a></div>';
+}
 function _coDigits(s){ return String(s||'').replace(/\D/g,''); }
 function _coNorm(s){ return String(s||'').replace(/\s|\(주\)|주식회사|㈜/g,'').replace(/[.#$/[\]]/g,'').toLowerCase(); }
 /* 열쇠가 둘일 수 있다 — 사업자등록증이 «나중에» 들어온 회사는 옛 기록이
@@ -11153,6 +11184,7 @@ function renderTeam(){
       +'이 주 기록 <b>'+totLogs+'</b>줄 · 완료 <b>'+doneWk.length+'</b>건</span>'
     +'</div>';
   if(!isCurWeek()) h+='<div class="histbanner">🕘 <b>'+esc(weekLabel(S.week))+'</b> 열람 중<span class="back" onclick="setWeek(null)">이번 주로 →</span></div>';
+  h+=awaitBanner();
   if(S.calDay) h+='<div class="histbanner">📅 캘린더에서 고른 <b>'+esc(md(S.calDay))+'</b> 것만 보고 있습니다.'
     +'<span class="back" onclick="calDayOnly(\'\')">모두 보기 →</span></div>';
   /* 현황판에서 사람 칸을 눌러 들어온 자리 — 왜 이 사람 것만 보이는지 한 줄로 짚고
