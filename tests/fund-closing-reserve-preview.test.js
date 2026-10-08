@@ -153,7 +153,7 @@ test('★★ 이자 원천징수(원천징수영수증)를 넣으면 이자수�
 
 test('★ 지도점검 두 가지 — 임금성 지급 의심·기본재산 잠식을 센다', () => {
   const box = {};
-  new Function([grabFn('num'), grabDecl('WAGE_LIKE_RE'), grabFn('closeRisks'), 'this.f=closeRisks;'].join('\n')).call(box);
+  new Function([grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'), grabDecl('WAGE_LIKE_RE'), grabDecl('CF_FINANCE'), grabFn('closeRisks'), 'this.f=closeRisks;'].join('\n')).call(box);
   const arr = [
     { approved: true, withdraw: 500000, debit: '격려금', memo: '연말' },
     { approved: true, withdraw: 300000, debit: '기타복지비', memo: '특별상여 지급' },
@@ -164,6 +164,7 @@ test('★ 지도점검 두 가지 — 임금성 지급 의심·기본재산 잠�
   assert.equal(r.wageN, 2); assert.equal(r.wageSum, 800000);
   assert.equal(r.erosion, 12345, '결손이면 그만큼 잠식');
   assert.equal(box.f([], { retained: 0 }).erosion, 0);
+  assert.equal(r.borrowN, 0, '차입 없음');
   assert.match(SRC, /_rsvPendingNote\(arrC\)\+_closeRiskNote\(arrC\)/, '회계·결산 화면에 붙어 있다');
 });
 
@@ -316,4 +317,17 @@ test('★★ 준비금1 연도별 원장 — 먼저 설정한 것부터 쓰고, 
   assert.equal(B.ledger([{ y: '2026', set: 1000000, used: 0 }], 2030, 0, 0, 0).rows[0].soon, true, '한 해 전에 알린다');
   const L5 = B.ledger(null, 2026, 100000, 250000, 200000);
   assert.deepEqual(L5.rows.map((r) => [r.y, r.usedNow, r.left]), [['이월', 200000, 0], ['2026', 50000, 50000]], '원장이 없으면 기초 잔액을 이월로');
+});
+
+test('★ 차입 — 기금법인은 자금차입을 할 수 없다(근로복지기본법 제64조②, 책 대조 D13). 같은 해에 갚아도 센다', () => {
+  const box = {};
+  new Function([grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'), grabDecl('WAGE_LIKE_RE'), grabDecl('CF_FINANCE'), grabFn('closeRisks'), 'this.f=closeRisks;'].join('\n')).call(box);
+  const r = box.f([
+    { approved: true, deposit: 5000000, debit: '현금성자산', credit: '단기차입금', memo: '운영자금' },
+    { approved: true, withdraw: 5000000, debit: '단기차입금', credit: '현금성자산', memo: '상환' },
+    { approved: false, deposit: 900000, debit: '현금성자산', credit: '장기차입금' },
+  ], { retained: 0 });
+  assert.equal(r.borrowN, 1); assert.equal(r.borrowSum, 5000000);
+  assert.match(SRC, /⚠ 차입 '\+r\.borrowN/, '회계·결산 화면 칩');
+  assert.match(SRC, /제64조②/);
 });
