@@ -27412,6 +27412,10 @@ function mbAttToCo(i){
     ${guess ? '' : '<div style="color:#d97706;font-size:12px;margin-top:6px">⚠ 파일 이름으로는 우리 계약서류인지 모르겠습니다(고객사 직원 서류일 수 있음) — 맞는지 확인해 주세요</div>'}
     <label style="display:flex;gap:6px;align-items:center;margin-top:10px"><input id="mbcoSecret" type="checkbox" checked> 🔒 서명본으로 (대표·관리자만 열 수 있음)</label>
     <label style="display:flex;gap:6px;align-items:center;margin-top:4px"><input id="mbcoRec" type="checkbox" checked> 「계약 기록」에도 한 줄</label>
+    <div id="mbcoAw" hidden style="margin-top:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:7px 9px;font-size:12px;color:#1e40af">
+      <div id="mbcoAwTxt"></div>
+      <label style="display:flex;gap:6px;align-items:center;margin-top:4px"><input id="mbcoGot" type="checkbox" checked> 이 파일이 그 서명본입니다 — 「📬 서명본 대기」에서 회수로 옮김</label>
+    </div>
     <div id="mbcoNote" style="font-size:12px;color:#64748b;min-height:16px;margin-top:8px"></div>
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px">
       <button type="button" id="mbcoNo" class="btn ghost">취소</button>
@@ -27423,10 +27427,22 @@ function mbAttToCo(i){
   const close = () => { if(!busy) bg.remove(); };
   $q('mbcoNo').onclick = close;
   bg.addEventListener('click', e => { if(e.target === bg) close(); });
+  /* 📬 서명본 대기 (2026-10-08) — 고른 회사가 대기 중이면 알려 주고, 담을 때 회수로 옮긴다.
+     대기 목록(pu_docs/await)은 회사마다 한 줄인 작은 목록 — 창을 열 때 한 번 읽는다(읽기만) */
+  let awList = [];
+  const awShow = () => {
+    const a = mbAwaitFor(awList, $q('mbcoName').value);
+    $q('mbcoAw').hidden = !a;
+    if(a) $q('mbcoAwTxt').textContent = '📬 이 회사는 서명본을 기다리는 중입니다 — ' + mbYmd(a.at) + ' ' + (a.how||'메일')
+      + (a.names && a.names.length ? ' · ' + a.names.slice(0, 2).join(', ') + (a.names.length > 2 ? ' 외' : '') : '');
+  };
+  $q('mbcoName').addEventListener('input', awShow);
+  try { const st0 = mbOfficeStore(); if(st0.listAwait) st0.listAwait().then(l => { awList = l||[]; awShow(); }, () => {}); } catch(e){}
   $q('mbcoGo').onclick = () => {
     if(busy) return;
+    const aw = mbAwaitFor(awList, $q('mbcoName').value);
     const p = { co: $q('mbcoName').value.trim(), kind: $q('mbcoKind').value, date: $q('mbcoDate').value,
-      secret: $q('mbcoSecret').checked, rec: $q('mbcoRec').checked };
+      secret: $q('mbcoSecret').checked, rec: $q('mbcoRec').checked, got: aw && $q('mbcoGot').checked ? aw.key : '' };
     if(!p.co){ $q('mbcoNote').textContent = '⚠ 회사를 적어 주세요'; return; }
     busy = true; $q('mbcoGo').disabled = true; $q('mbcoNote').textContent = '첨부를 가져와 담는 중…';
     mbAttToCoSave(o, i, a, p).then(msg => { busy = false; bg.remove(); toast(msg, 9000); },
@@ -27434,7 +27450,15 @@ function mbAttToCo(i){
   };
   $q('mbcoName').focus();
 }
-/* 담기 — ① 첨부 가져오기 ② 원본 보관함(기본 🔒) ③ 그 회사 기업별 계약서 카드(같은 파일이 있으면 건너뜀) ④ 계약 기록 한 줄 */
+/* 대기 목록에서 그 회사 줄(회수 전) — 열쇠는 문서관리와 같은 coKey */
+function mbAwaitFor(list, co){
+  if(!window.PuOfficeStore) return null;
+  const k = PuOfficeStore.coKey(co);
+  if(!k) return null;
+  return (list||[]).filter(x => x && x.key === k && !x.got)[0] || null;
+}
+/* 담기 — ① 첨부 가져오기 ② 원본 보관함(기본 🔒) ③ 그 회사 기업별 계약서 카드(같은 파일이 있으면 건너뜀) ④ 계약 기록 한 줄
+   ⑤ p.got(대기 열쇠)이 있으면 📬 서명본 대기에서 회수로 — 실패해도 담은 것은 그대로(알림만) */
 function mbAttToCoSave(o, i, a, p){
   let store;
   try { store = mbOfficeStore(); } catch(e){ return Promise.reject(e); }
@@ -27448,9 +27472,13 @@ function mbAttToCoSave(o, i, a, p){
           .then(d => ({ docId: d.docId, dup: false, name: f.name }));
       }))
   ).then(x => {
-    if(x.dup) return '이미 「' + p.co + '」 기업별 계약서에 있는 파일입니다 — 다시 담지 않았습니다';
-    const done = '🏢 「' + p.co + '」 기업별 계약서에 담았습니다' + (p.secret ? ' (🔒 서명본)' : '');
-    if(!p.rec) return done;
+    if(!p.got || !x.docId) return x;
+    return store.gotAwait(p.got, x.docId).then(() => Object.assign({ got: true }, x), () => Object.assign({ gotErr: true }, x));
+  }).then(x => {
+    if(x.dup && !x.got) return '이미 「' + p.co + '」 기업별 계약서에 있는 파일입니다 — 다시 담지 않았습니다';
+    const done = (x.dup ? '이미 담긴 파일입니다' : '🏢 「' + p.co + '」 기업별 계약서에 담았습니다' + (p.secret ? ' (🔒 서명본)' : ''))
+      + (x.got ? ' · 📬 서명본 대기에서 회수로 옮겼습니다' : x.gotErr ? ' · ⚠ 서명본 대기는 못 옮김' : '');
+    if(x.dup || !p.rec) return done;
     return store.importCoRecs([{ coName: p.co, date: p.date, kind: p.kind, src: 'manual', docId: x.docId, note: '메일 첨부에서' }])
       .then(r => done + (r && r.added ? ' · 계약 기록 한 줄' : ' · 같은 날짜·종류 계약 기록이 이미 있어 기록은 건너뜀'),
             e => done + ' · ⚠ 계약 기록은 못 남김: ' + ((e&&e.message)||e));
