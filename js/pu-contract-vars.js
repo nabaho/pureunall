@@ -24,6 +24,11 @@
     if (parts.length === 2 && parts[0].length === 6) return parts[0] + '-' + (parts[1][0] || '') + '******';
     return clean.slice(0, 6) + '-' + (clean[6] || '') + '******';
   }
+  /* 법인등록번호 13자리면 000000-0000000 로, 아니면 적힌 그대로 */
+  function corpRegFmt(v) {
+    var d = String(v || '').replace(/\D/g, '');
+    return d.length === 13 ? d.slice(0, 6) + '-' + d.slice(6) : String(v || '').trim();
+  }
   function contractVars(contract, ctx) {
     ctx = ctx || {};
     var c = contract || {};
@@ -34,7 +39,7 @@
       var matches = (ctx.companies || []).filter(function (x) { return (x.bizNo || '').replace(/\D/g, '').slice(0, 10) === bizKey; });
       var coRec = matches.filter(function (x) { return x.status !== 'suboffice'; })[0] || matches[0];
       if (coRec) {
-        ['taxInvoicePaymentDay', 'cmsPayDay', 'pensionNo', 'healthNo', 'employmentNo', 'injuryNo', 'corpRegNo', 'ceoBirth', 'ceoGender'].forEach(function (k) {
+        ['taxInvoicePaymentDay', 'cmsPayDay', 'pensionNo', 'healthNo', 'employmentNo', 'injuryNo', 'corpRegNo', 'corpNo', 'ceoBirth', 'ceoGender'].forEach(function (k) {
           if (!co[k] && coRec[k]) co[k] = coRec[k];
         });
       }
@@ -102,7 +107,9 @@
       건강보험번호: co.healthNo || '',
       고용보험번호: co.employmentNo || '',
       산재관리번호: co.injuryNo || '',
-      법인등록번호: co.corpRegNo || '',
+      /* ⚠ 업체관리(data/companies)는 법인등록번호를 corpNo 에, 계약 스냅샷(company)은 corpRegNo 에 둔다(2026-10-08 확인 —
+         업체 69곳이 corpNo 만 있어 서식 칸이 늘 비었다). 둘 다 본다 — 계약에 적은 값 우선 */
+      법인등록번호: corpRegFmt(co.corpRegNo || co.corpNo || ''),
       대표생년월일: co.ceoBirth || '',
       대표자전체: co.ceo2 ? ((co.ceo || '') + ', ' + co.ceo2) : (co.ceo || ''),
       대표주민번호: (function () { var d = (co.ceoBirth || '').replace(/\D/g, ''); var ymd = d.length >= 8 ? d.slice(2, 8) : (d.length === 6 ? d : ''); return (ymd && co.ceoGender) ? (ymd + '-' + co.ceoGender + '******') : ''; })(),

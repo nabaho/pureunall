@@ -67,3 +67,15 @@ test('ⓑ 이알피 fillContractVars 는 PuContractVars 를 부르고, 같은 �
   assert.ok(!/maskRRN|numToKorMoney\(totalAmount\)/.test(f), '이알피에 옛 계산이 남아 있습니다 — 두 벌이 됩니다');
   assert.match(ERP, /<script src="js\/pu-contract-vars\.js\?v=\d+"><\/script>/);
 });
+
+/* 2026-10-08 — 업체관리는 법인등록번호를 corpNo 에 둔다(업체 69곳). 계약 스냅샷 corpRegNo 가 비면 corpNo 를 읽는다 */
+test('ⓓ 법인등록번호 — 업체관리 corpNo 도 읽고 000000-0000000 으로', () => {
+  const cos = [{ id: 'cx', name: '마바(주)', bizNo: '123-00-00009', corpNo: '1101110000009' }];
+  const find = (it) => cos.filter((x) => x.id === it.companyId)[0] || null;
+  const base = { id: 'c9', companyId: 'cx', companyName: '마바(주)', company: { bizNo: '123-00-00009', name: '마바(주)' }, kinds: ['company'] };
+  assert.strictEqual(V.contractVars(base, { companies: cos }).법인등록번호, '110111-0000009', '사업자번호로 찾은 업체의 corpNo');
+  assert.strictEqual(V.contractVars(base, { findCompany: find }).법인등록번호, '110111-0000009', '업체 찾기로 합친 corpNo');
+  const snap = Object.assign({}, base, { company: Object.assign({}, base.company, { corpRegNo: '110111-1111111' }) });
+  assert.strictEqual(V.contractVars(snap, { companies: cos, findCompany: find }).법인등록번호, '110111-1111111', '계약에 적은 값이 먼저');
+  assert.strictEqual(V.contractVars({ company: { corpRegNo: '미등록' } }, {}).법인등록번호, '미등록', '13자리가 아니면 그대로');
+});
