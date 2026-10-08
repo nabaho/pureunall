@@ -48,11 +48,11 @@ const B = (() => {
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
     grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
-    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('closeArr'),
+    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
     'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
-    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto;',
+    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -221,4 +221,36 @@ test('★ 「중소기업 아님」 사내기금만 머리에 딱지가 붙는�
 test('ⓘ 설명이 등록돼 있다', () => {
   assert.ok(SRC.indexOf("'close.rsvpreview':{") >= 0);
   assert.ok(SRC.indexOf("hlp('close.rsvpreview')") >= 0);
+});
+
+/* ★★ 미수수익 (책 대조 D2 — 김승훈 2014 p.170~192, 2026-10-08) — 첫해 이익으로 남기고, 다음 해 역분개해 상계한다 */
+test('★★ 미수수익 첫해 — 미수이자는 준비금으로 메우지 않는다 → 그만큼 당기순이익으로 남는다', () => {
+  fresh({ fund_type: '사내', years: {} });
+  const T1 = TX.concat([{ _id: 'acc1', date: '2025-12-31', memo: '정기예금 미수이자', amount: 50000, nocash: 1, debit: '미수수익', credit: '이자수익', approved: true }]);
+  const ac = B.accruedOf(T1);
+  assert.deepEqual(ac, { acc: 50000, revInc: 0, revCash: 0, credit: 0 });
+  const fin = B.computeFin(B.closeArr(T1, 'F1', 2025), 'F1', 2025);
+  assert.equal(Math.round(fin.net), 50000, '미수이자만큼 이익(책: 그 해 이익 → 이월)');
+  const rc = B.reserveAdjust(T1, 'F1', 2025);
+  assert.equal(rc.interestCash, 9520, '준비금1 기준은 받은 이자뿐 — 미수이자 제외');
+});
+test('★★ 미수수익 다음 해 — 전기 미수를 결산 때 지워(역분개) 그만큼 손실, 전기이월이익잉여금과 상계해 0', () => {
+  fresh({ fund_type: '사내', years: { 2026: { opening: { cash: 5000000, accrued: 50000, reserve2: 4950000, basic: 50000, retained: 50000 } } } });
+  const T2 = [
+    { _id: 'b1', date: '2026-01-05', memo: '정기예금 이자(전기 미수 포함)', deposit: 80000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'b2', date: '2026-05-02', memo: '체육대회', withdraw: 1000000, debit: '체육문화비', credit: '현금성자산', approved: true },
+  ];
+  const arrC = B.closeArr(T2, 'F1', 2026);
+  const acc = arrC.filter((x) => x._id === 'rsvacc2026')[0];
+  assert.ok(acc, '전기 미수수익 회수 분개가 얹힌다');
+  assert.equal(acc.amount, 50000); assert.equal(acc.debit, '이자수익'); assert.equal(acc.credit, '미수수익');
+  assert.ok(B.isAuto(acc), '자동 분개로 알아본다(두 번 얹지 않게)');
+  const fin = B.computeFin(arrC, 'F1', 2026);
+  assert.equal(Math.round(fin.net), -50000, '전기 미수만큼 손실');
+  assert.equal(Math.round(fin.retained), 0, '전기이월이익잉여금 50,000 과 상계 → 0(책 p.180~183)');
+  assert.ok(fin.balanced, '대차가 맞는다');
+  assert.equal(B.reserveAdjust(arrC.filter((x) => !String(x._id).startsWith('rsv1') && !/^rsv2026/.test(x._id)), 'F1', 2026).interestCash, 80000, '준비금1 기준은 받은 이자 전부(전기 미수분 포함)');
+  /* 사람이 이미 미수수익을 지웠으면 다시 지우지 않는다 */
+  const T3 = T2.concat([{ _id: 'b3', date: '2026-01-05', memo: '전기 미수 정리', amount: 50000, nocash: 1, debit: '이자수익', credit: '미수수익', approved: true }]);
+  assert.equal(B.closeArr(T3, 'F1', 2026).filter((x) => x._id === 'rsvacc2026').length, 0, '이미 지운 것은 또 지우지 않는다');
 });

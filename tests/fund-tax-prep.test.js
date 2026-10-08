@@ -24,7 +24,7 @@ const B = (() => {
   new Function([
     "var RESERVE_ACCTS=['고유목적사업준비금1','고유목적사업준비금2'];",
     grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'),
-    grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('taxPrep'), grabFn('taxText'),
+    grabFn('accruedOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('taxPrep'), grabFn('taxText'),
     'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText;',
   ].join('\n')).call(box);
   return box;
@@ -133,4 +133,20 @@ test('★ 결산 후 진행에 붙는다 — 8단계 단추·홈 일괄·제출 
   assert.match(SRC, /https:\/\/www\.hometax\.go\.kr/); assert.match(SRC, /https:\/\/www\.wetax\.go\.kr/);
   const body = grabFn('taxPrepShow') + grabFn('taxPrepOpen');
   assert.doesNotMatch(body, /password|인증서 비밀번호|fetch\(/, '인증정보를 다루거나 어디로 보내지 않는다');
+});
+
+test('★★ 미수수익이 있으면 제56호 간편신고가 아니라 제1호 + 세무조정(책 대조 D2 — p.170·312·340)', () => {
+  const acc = INT.concat([{ _id: 'acc', approved: true, amount: 50000, nocash: 1, debit: '미수수익', credit: '이자수익' }]);
+  const P = B.prep(acc, { tb: tbOf({ 이자수익: [0, 1050000] }), resvExp: 1000000 }, WHT, 2025, F, '고유목적사업준비금1');
+  assert.equal(P.kind, '1');
+  assert.equal(P.income, 1000000, '세법상 이자 = 받은 이자(미수 제외)');
+  assert.equal(P.base, 0);
+  assert.ok(P.notes.some((x) => x.includes('익금불산입(△유보)')));
+  assert.match(P.decision, /제56호 간편신고는 쓸 수 없습니다/);
+  /* 다음 해 — 전기 미수를 받은 해: 받은 이자 전부가 세법상 이자, 익금산입(유보 추인) */
+  const nxt = [{ _id: 'n1', approved: true, deposit: 846000, debit: '현금성자산', credit: '이자수익' },
+    { _id: 'rsvacc2026', approved: true, amount: 50000, nocash: 1, debit: '이자수익', credit: '미수수익' }];
+  const Q = B.prep(nxt, { tb: tbOf({ 이자수익: [50000, 846000] }), resvExp: 846000 }, {}, 2026, F, '고유목적사업준비금1');
+  assert.equal(Q.kind, '1'); assert.equal(Q.intCash, 846000); assert.equal(Q.accRev, 50000);
+  assert.ok(Q.notes.some((x) => x.includes('익금산입(유보 추인)')));
 });
