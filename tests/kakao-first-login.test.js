@@ -414,15 +414,17 @@ test('⑪ ★★ 처음 쓰는 PC 는 꺼짐 · 처음 쓰는 폰은 켬 · 고�
   assert.equal(w.ctx.keepDefault('0', 폰), false, '★ 끈 것을 기억하지 않습니다');
 });
 
-test('⑪ ★★ 카카오 로그인도 이 칸을 따른다 — 끄면 창을 닫을 때 풀린다(SESSION)', async () => {
+test('⑪ ★★ 카카오 단추는 유지 선택만 기록하고 바로 이동한다 — 실제 저장 방식은 복귀 뒤 정한다', async () => {
   const 끔 = 단추세상({ 저장: { pu_kakao_used: '1' } });
   끔.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
   assert.equal(끔.w.ctx.localStorage._m.pu_portal_auto, '0', '떠나기 전에 고른 것을 안 남깁니다 — 돌아와서 모릅니다');
-  assert.equal(끔.w.ctx.유지[0], 'session');
+  assert.equal(끔.부탁.length, 1, '카카오 화면으로 곧바로 떠나지 않았다');
+  assert.equal(끔.w.ctx.유지.length, 0, '카카오로 떠나기 전에 느린 저장소를 기다렸다');
   const 켬 = 단추세상({ 저장: { pu_kakao_used: '1' }, 유지켬: true });
   켬.w.ctx.kkLogin(); await 틈(); await 틈(); await 틈();
   assert.equal(켬.w.ctx.localStorage._m.pu_portal_auto, '1');
-  assert.equal(켬.w.ctx.유지[0], 'local');
+  assert.equal(켬.부탁.length, 1);
+  assert.equal(켬.w.ctx.유지.length, 0);
 });
 
 test('⑪ ★★ 카카오에서 돌아와 표를 받기 «직전» 에 고른 유지 방식을 정한다', async () => {

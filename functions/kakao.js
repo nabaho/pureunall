@@ -73,7 +73,9 @@ function setCors(req, res) {
     res.set("Access-Control-Allow-Origin", origin);
     res.set("Vary", "Origin");
   }
-  res.set("Access-Control-Allow-Methods", "POST,OPTIONS");
+  /* 예전 화면은 본문 없는 GET 에도 JSON 헤더를 붙여 OPTIONS 를 보낸다.
+     새 화면은 바로 GET 하지만 캐시된 옛 화면도 로그인 길이 막히지 않게 허용한다. */
+  res.set("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
   res.set("Access-Control-Allow-Headers", "Content-Type,Authorization");
   res.set("Cache-Control", "no-store");
 }
