@@ -24,8 +24,8 @@ const B = (() => {
   new Function([
     "var RESERVE_ACCTS=['고유목적사업준비금1','고유목적사업준비금2'];",
     grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'),
-    grabFn('accruedOf'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('taxPrep'), grabFn('taxText'),
-    'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText;',
+    grabFn('accruedOf'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('whtBookCash'), grabFn('taxPrep'), grabFn('taxText'),
+    'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText; this.wsum=whtItemsSum; this.wof=whtItemsOf; this.wbook=whtBookCash;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -179,4 +179,39 @@ test('★★ 일반 신고 — 재무제표·세무조정계산서 첨부, 수�
   assert.equal(small.extAdj, false); assert.ok(!small.notes.some((x) => x.includes('외부세무조정')));
   const only = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000], 선납세금: [154000, 0] }), resvExp: 1000000 }, WHT, 2025, F, '고유목적사업준비금1');
   assert.ok(!only.notes.some((x) => x.includes('제60조⑤')));
+});
+
+/* ★★ 원천징수 건별 — 별지 제10호 원천납부세액명세서(책 대조 D5) */
+const ITEMS = [
+  { date: '2025-06-30', payer: '가나다은행', bizno: '000-00-00000', int: 600000, corp: 84000, local: 8400 },
+  { date: '2025-12-31', payer: '라마바은행', bizno: '111-11-11111', int: 400000, corp: 56000, local: 5600 },
+];
+test('★★ 원천징수 건별 — 합계·세율 검산(14%·1.4%, 10원 미만 끝수 허용)·Firebase 객체 꼴도 읽는다', () => {
+  const s = B.wsum(ITEMS);
+  assert.deepEqual([s.n, s.int, s.corp, s.local, s.bad], [2, 1000000, 140000, 14000, []]);
+  assert.deepEqual(B.wsum([{ int: 123456, corp: 17280, local: 1720 }]).bad, [], '17,283 → 10원 미만 절사 17,280');
+  assert.deepEqual(B.wsum([ITEMS[0], { int: 400000, corp: 50000, local: 5000 }]).bad, [2], '2번 줄 세율 틀림');
+  assert.equal(B.wsum([{}, { date: '2025-01-01' }]).n, 0, '빈 줄은 세지 않는다');
+  assert.equal(B.wof({ items: { 1: ITEMS[1], 0: ITEMS[0] } })[0].payer, '가나다은행', '배열이 객체로 돌아와도 차례대로');
+  assert.deepEqual(B.wof({}), []);
+  assert.equal(B.wbook([
+    { approved: true, deposit: 846000, debit: '현금성자산', credit: '이자수익' },
+    { approved: true, amount: 154000, nocash: 1, wht: 1, debit: '선납세금', credit: '이자수익' },
+    { approved: false, deposit: 5000, credit: '이자수익' }]), 846000, '통장으로 받은 이자만');
+});
+test('★★ 신고 준비표 — 건별이 있으면 별지 제10호 표, 장부 이자와 어긋나면 알린다', () => {
+  const P = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000], 선납세금: [154000, 0] }), resvExp: 1000000 }, Object.assign({ items: ITEMS }, WHT), 2025, F, '고유목적사업준비금1');
+  assert.equal(P.f10.length, 2); assert.equal(P.f10[1].payer, '라마바은행');
+  assert.ok(!P.notes.some((x) => x.includes('원천징수영수증 이자 총액')), '장부 이자 총액 1,000,000 과 같다');
+  assert.ok(!P.notes.some((x) => x.includes('합계로만')));
+  assert.match(B.text(P, F), /별지 제10호 원천납부세액명세서/);
+  const P2 = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000] }), resvExp: 1000000 }, Object.assign({ items: [ITEMS[0]] }, { corp: 84000, local: 8400 }), 2025, F, '고유목적사업준비금1');
+  assert.ok(P2.notes.some((x) => x.includes('원천징수영수증 이자 총액 600,000')), '영수증 한 장이 빠졌다');
+  const P3 = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000] }), resvExp: 1000000 }, WHT, 2025, F, '고유목적사업준비금1');
+  assert.deepEqual(P3.f10, []); assert.ok(P3.notes.some((x) => x.includes('합계로만')), '합계만 넣은 해는 건별 입력을 권한다');
+});
+test('★ 결산 화면 — 「건별 입력」 단추, 건별이 있으면 합계 칸은 읽기만(전기이월 저장이 건별을 지우지 않게)', () => {
+  assert.match(SRC, /onclick="whtItemsOpen\(\)"/);
+  assert.match(SRC, /w\.items\.length\s*\n?\s*\?'<input value="'\+esc\(w\.corp\.toLocaleString\(\)\)\+'" readonly/);
+  assert.match(SRC, /\/funds\/'\+fid\+'\/years\/'\+yr\+'\/wht'\)\.update\(o\)/, '건별 저장은 update — 합계 칸만 있던 자료를 통째로 덮지 않는다');
 });
