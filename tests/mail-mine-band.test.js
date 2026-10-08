@@ -27,8 +27,12 @@ const AGO = (d) => NOW - d * 86400000;
 function box(o) {
   o = o || {};
   const sent = [];
+  /* ⚠ 상자 안 시계를 NOW 에 묶는다 (2026-10-08) — 띠 글(mbMineLineHtml)은 시각을 안 받고
+       Date.now() 를 스스로 읽는다. 진짜 시계를 주면 NOW(10-05)에서 3일이 지난 10-08 부터
+       «새로 온 메일»이 모두 «오래된 것»이 되어 검사 셋이 깨졌다(모든 PR 의 CI 가 막혔다). */
+  const FixedDate = class extends Date { static now() { return NOW; } };
   const ctx = {
-    Object, String, Number, Array, JSON, Date, Math, RegExp,
+    Object, String, Number, Array, JSON, Date: FixedDate, Math, RegExp,
     esc: (s) => String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;')
       .replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'),
     DB_ROOT: 'pucards',
