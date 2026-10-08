@@ -189,7 +189,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-ontology.js?v=50"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
-<script src="js/pu-ls-guard.js?v=3"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=2"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
@@ -42963,7 +42963,15 @@ function HealthSection(){
     try {
       if(window.PuLsGuard && PuLsGuard.storageInfo){
         (PuLsGuard.persisting || Promise.resolve()).then(function(){ return PuLsGuard.storageInfo(); })
-          .then(function(r){ setBig(r); }, function(){ setBig(null); });
+          .then(function(r){
+            /* 이 PC 에서 본 «작은 칸의 큰 덩어리» (2026-10-08 미리 알림) — 열쇠 이름·크기·화면만 */
+            try {
+              var wb = (PuLsGuard.watch && PuLsGuard.watch().big) || {};
+              r.bigWrites = Object.keys(wb).map(function(k){ return { key:k, chars:wb[k].chars, page:wb[k].page }; })
+                .sort(function(a, b){ return b.chars - a.chars; }).slice(0, 3);
+            } catch(_w){ r.bigWrites = []; }
+            setBig(r);
+          }, function(){ setBig(null); });
       }
     } catch(_){}
   }
@@ -42999,6 +43007,11 @@ function HealthSection(){
       h('span', null, '큰 저장 공간 ', h('b', { style:{ color:'#1e293b', fontVariantNumeric:'tabular-nums' } }, (big.usage != null ? fmtBytes(big.usage) : '?') + ' / ' + (big.quota != null ? fmtBytes(big.quota) : '?'))),
       h('span', { style:{ fontWeight:700, color: big.persisted ? '#166534' : '#854d0e' } }, big.persisted ? '🔒 지우지 않음 켜짐' : '⚠ 지우지 않음 꺼짐 — 즐겨찾기·앱 설치 뒤 다시 열면 켜짐'),
       h('span', null, 'localStorage(모든 앱) ', h('b', { style:{ color:'#1e293b', fontVariantNumeric:'tabular-nums' } }, Math.round(big.lsChars / 5242880 * 100) + '%'), ' 씀')
+    ),
+    /* 미리 알림(js/pu-ls-guard.js) — 작은 칸에 100KB 넘는 덩어리를 쓴 기능. 있을 때만 한 줄. 그 기능만 큰 칸으로 옮기면 된다 */
+    big && big.bigWrites && big.bigWrites.length > 0 && h('div', { title:'작은 칸(localStorage)은 모든 앱이 함께 쓰는 약 5백만 자다. 여기 나온 기능은 큰 칸(js/pu-big-store.js)으로 옮겨야 다시 차지 않는다.',
+        style:{ whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', fontSize:'12px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'8px 12px', marginBottom:'14px' } },
+      '⚠ 작은 칸에 큰 덩어리 — ' + big.bigWrites.map(function(x){ return x.key + ' ' + fmtBytes(x.chars) + (x.page ? ' (' + x.page + ')' : ''); }).join(' · ') + ' — 큰 칸으로 옮길 것'
     ),
     h('div', { style:{ marginBottom:'14px' } },
       h('div', { style:{ display:'flex', justifyContent:'space-between', fontSize:'11.5px', color:'#475569', marginBottom:'4px' } },
