@@ -4787,12 +4787,18 @@ function docsetSummary(){
   return `${REV_MODE==="partial"?"일부개정":"전부개정"} · 개정 ${개정} · 신설 ${신설} · 삭제 ${삭제}`;
 }
 function renderDocset(){
-  const hits=disadvantageScan();
+  /* 📝 제정(최초 신고) — 2026-10-08 대표 「네」. 근로기준법 시행규칙 제15조: 변경 전후 비교 서류는 «변경신고»에만,
+     동의는 근로자에게 «불리하게 변경»할 때만. 제정에는 둘 다 없다 — 사람이 손대기 전까지는 끈다. */
+  const enact=isEnact();
+  if(enact&&!DOCSET._touched){ DOCSET.daejo=false; DOCSET.consent=false; }
+  const hits=enact?[]:disadvantageScan();
   const site=siteLabel();
   $("docset-sub").textContent=`${site} · ${docsetSummary()}`;
   // 불이익 변경 자동 판단 보조
   const warn=$("docset-warn");
-  if(hits.length){
+  if(enact){
+    warn.innerHTML=`<div class="sample-banner" style="background:#f8fafc;border-color:#4ade80;color:#166534">📝 <b>제정(최초 신고)</b>입니다 — 신고서 · 취업규칙 전문 · <b>의견청취서</b>를 냅니다. 신구대조표(변경신고에만)와 동의서(불리하게 변경할 때만)는 필요 없습니다(근로기준법 시행규칙 제15조). (판단은 노무사 확인 필요)</div>`;
+  }else if(hits.length){
     warn.innerHTML=`<div class="sample-banner" style="background:#fef2f2;border-color:#fecaca;color:#991b1b">
       ⚠ <b>불이익 변경 가능성 ${hits.length}건</b> — 동의서가 필요할 수 있습니다(근로기준법 §94① 단서, 동의 없는 불이익 변경은 무효).
       <div style="margin-top:6px;font-weight:400;font-size:11px;line-height:1.6;max-height:120px;overflow:auto">
@@ -4804,7 +4810,7 @@ function renderDocset(){
   }
   const ITEMS=[
     ["apply","취업규칙 (변경)신고서 [별지 제15호]","사업장 개요·신고 사유·첨부서류 목록 — 제출 표지"],
-    ["daejo","신구대조표 (변경 전후 비교)","시행규칙 §15 ① — 변경신고 시 필수"],
+    ["daejo","신구대조표 (변경 전후 비교)",enact?"시행규칙 §15 ① — 변경신고 때만. <b>제정(최초 신고)에는 필요 없음</b>":"시행규칙 §15 ① — 변경신고 시 필수"],
     ["full","취업규칙 전문 (개정 반영)","시행규칙 §15 ① — 전문 1부"],
     ["opinion","근로자 의견청취서","시행규칙 §15 ② — <b>항상 필수</b>. 과반수 의견 청취 입증"],
     ["consent","근로자 동의서 (불이익 변경)","시행규칙 §15 ③ — 불이익 변경 시에만"]
@@ -4851,8 +4857,8 @@ $("fin-dl").addEventListener("click",()=>{
     if(!confirm(q))return;
     miss.forEach(n=>{c[n]=1;}); finSave(c); finMark();   // 진행을 택한 것도 확인 기록으로 남긴다
   }
-  DOCSET.apply=true; DOCSET.daejo=true; DOCSET.full=true; DOCSET.opinion=true;
-  if(disadvantageScan().length)DOCSET.consent=true;   // 불이익 변경이면 동의서 포함
+  DOCSET.apply=true; DOCSET.daejo=!isEnact(); DOCSET.full=true; DOCSET.opinion=true;   // 제정이면 대조표 없음(시행규칙 §15)
+  if(!isEnact()&&disadvantageScan().length)DOCSET.consent=true;   // 불이익 변경이면 동의서 포함 — 제정에는 «변경»이 없다
   $("ov-final").classList.remove("on");
   renderDocset(); $("ov-docset").classList.add("on"); renderStepNav(); // 받기 전에 서류 구성을 확인
 });
