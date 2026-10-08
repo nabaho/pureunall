@@ -113,10 +113,73 @@
       if (keys.length) tell(keys);
     }
 
+    /* ── 차기 «전에» 알린다 (대표 지시 2026-10-08 「용량이 계속 차면 … 지우는 것 반복하지 않고 싶다」) ──
+       ① 작은 칸(localStorage)이 60%, 큰 칸(IndexedDB 등)이 80% 를 넘으면
+       ② 어느 앱이 작은 칸에 100KB 넘는 덩어리를 쓰면 — 다시 찬다면 원인은 이것 하나다(STATUS «되풀이된 실수» 11)
+       → 관리자 «장애 알림»(js/pu-health.js 의 PUHealth.report → 서버 systemAlerts)에 올린다. 새 알림 길을 만들지 않는다.
+       ⚠ 잔소리가 되지 않게 같은 알림은 «이 PC 에서 하루 한 번»(pu_storage_watch_v1 에 적어 둔다).
+       ⚠ 알림에는 열쇠 이름·크기·화면 이름만 — 값(자료)은 안 싣는다.
+       ⚠ 문턱 숫자는 «규칙»이다: 60% 면 아직 두 배 가까운 여유가 있어 «그 기능만 옮기기»를 할 시간이 있다. */
+    var LS_LIMIT = 5242880;          // 크롬 localStorage 한도(글자) — 2026-10-07 대표 크롬이 5,242,346자에서 막혔다
+    var WARN_LS = opts.warnLs != null ? opts.warnLs : 0.6;
+    var WARN_BIG = opts.warnBig != null ? opts.warnBig : 0.8;
+    var BIG_WRITE = opts.bigWrite != null ? opts.bigWrite : 100 * 1024;
+    var WATCH_KEY = 'pu_storage_watch_v1';
+    var bigNoted = {};
+    function watchRead() { try { return JSON.parse(origGet.call(LS, WATCH_KEY) || '{}') || {}; } catch (_) { return {}; } }
+    function watchWrite(o) { try { origSet.call(LS, WATCH_KEY, JSON.stringify(o)); } catch (_) {} }
+    function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+    function pageName() { try { return String(w.location && w.location.pathname || '').split('/').pop() || 'enter.html'; } catch (_) { return ''; } }
+    /* 오늘 이 PC 에서 처음이면 true — 그리고 «했다»를 적는다 */
+    function firstToday(tag) {
+      var o = watchRead(); o.told = o.told || {};
+      if (o.told[tag] === today()) return false;
+      o.told[tag] = today();
+      watchWrite(o);
+      return true;
+    }
+    function report(kind, message, detail) {
+      try { if (w.console && w.console.warn) w.console.warn('[저장 공간] ' + message + ' — ' + detail); } catch (_) {}
+      try { if (w.PUHealth && typeof w.PUHealth.report === 'function') w.PUHealth.report(kind, { message: message }, { detail: detail }); } catch (_) {}
+    }
+    function noteBigWrite(k, chars) {
+      if (k === WATCH_KEY || bigNoted[k]) return;
+      bigNoted[k] = 1;                                   // 한 화면에서는 한 번만 센다(저장마다 일하지 않게)
+      var o = watchRead(); o.big = o.big || {};
+      o.big[k] = { chars: chars, page: pageName(), at: Date.now() };
+      watchWrite(o);
+      if (firstToday('big:' + k)) {
+        (w.setTimeout || setTimeout)(function () {
+          report('storage-bigwrite', '저장 공간 미리 알림 — 작은 칸(localStorage)에 큰 덩어리: ' + label(k),
+            kb(chars) + ' · ' + pageName() + ' · 이 기능은 큰 칸(js/pu-big-store.js)으로 옮길 것');
+        }, 0);
+      }
+    }
+    function checkPressure() {
+      return storageInfo().then(function (info) {
+        var out = { lsPct: info.lsChars / LS_LIMIT, bigPct: (info.quota ? info.usage / info.quota : null), told: [] };
+        if (out.lsPct >= WARN_LS && firstToday('ls')) {
+          out.told.push('ls');
+          report('storage-pressure', '저장 공간 미리 알림 — 작은 칸(localStorage) ' + Math.round(WARN_LS * 100) + '% 넘음',
+            Math.round(out.lsPct * 100) + '% · 큰 것: ' + usage().slice(0, 3).map(function (r) { return label(r.key) + ' ' + kb(r.chars); }).join(' · '));
+        }
+        if (out.bigPct != null && out.bigPct >= WARN_BIG && firstToday('idb')) {
+          out.told.push('idb');
+          report('storage-pressure', '저장 공간 미리 알림 — 큰 칸(IndexedDB 등) ' + Math.round(WARN_BIG * 100) + '% 넘음',
+            Math.round(out.bigPct * 100) + '% · ' + kb(info.usage) + ' / ' + kb(info.quota) + ' · 이 PC 디스크 여유가 줄었는지 볼 것');
+        }
+        return out;
+      }, function () { return null; });
+    }
+
     S.prototype.setItem = function (k, v) {
       try {
         var r = origSet.apply(this, arguments);
-        if (this === LS) delete failed[String(k)];       // 다시 적혔다 — 수습됐다
+        if (this === LS) {
+          delete failed[String(k)];                      // 다시 적혔다 — 수습됐다
+          var n = (typeof v === 'string') ? v.length : String(v).length;
+          if (n > BIG_WRITE) noteBigWrite(String(k), n);
+        }
         return r;
       } catch (e) {
         /* 공간 재기용 시험 쓰기(probe)는 «넘치는지 보려고» 일부러 크게 쓴다 — 알릴 일이 아니다 */
@@ -159,6 +222,10 @@
       });
     }
     var persisting = persist();
+    /* 켠 뒤 잠시 있다가 한 번 잰다 — 화면 뜨는 길을 비켜서(로그인·첫 동기화 뒤). 하루 한 번만 알린다(firstToday) */
+    if (opts.pressureDelay !== false) {
+      (w.setTimeout || setTimeout)(function () { checkPressure(); }, opts.pressureDelay || 20000);
+    }
 
     var api = {
       usage: usage,
@@ -167,6 +234,9 @@
       persisting: persisting,
       persisted: function () { return persistState; },
       storageInfo: storageInfo,
+      checkPressure: checkPressure,
+      /* 이 PC 에서 본 큰 덩어리 기록 — 이알피 시스템 헬스가 보여 준다(열쇠 이름·크기·화면만) */
+      watch: function () { return watchRead(); },
       shownCount: function () { return shown; },
       _check: check
     };

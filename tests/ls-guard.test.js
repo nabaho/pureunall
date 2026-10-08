@@ -164,3 +164,82 @@ test('«지우지 말라»를 모르는 브라우저에서도 멈추지 않는�
   const info = await g.storageInfo();
   assert.equal(info.quota, null);
 });
+
+/* ── 차기 «전에» 알린다 (대표 지시 2026-10-08 「용량이 계속 차면 … 지우는 것 반복하지 않고 싶다」) ──
+   ① 작은 칸 60%·큰 칸 80% 를 넘으면 관리자 «장애 알림»(PUHealth.report)에
+   ② 작은 칸에 100KB 넘는 덩어리를 쓰면 — 어느 칸·어느 화면인지
+   ③ 같은 알림은 이 PC 에서 하루 한 번 — 잔소리가 되면 아무도 안 읽는다
+   ④ 알림에 값(자료)은 안 싣는다 */
+function warnWin(cap) {
+  const w = fakeWin(cap || 1e9);
+  w.location = { pathname: '/pureunall/pu-erp.html' };
+  w.reports = [];
+  w.PUHealth = { report: (kind, err, extra) => w.reports.push({ kind, message: err.message, detail: extra.detail }) };
+  return w;
+}
+
+test('① 작은 칸이 60% 를 넘으면 관리자 알림에 올린다 — 하루 한 번', async () => {
+  const w = warnWin();
+  w.navigator = { storage: { persisted: async () => true, persist: async () => true, estimate: async () => ({ usage: 1e6, quota: 1e10 }) } };
+  const g = G.install(w, { wait: 0, pressureDelay: false });
+  w.localStorage.setItem('cm3_list', 'a'.repeat(90000));
+  w.localStorage.setItem('p_autobackups', '비밀자료'.repeat(800000));          // 3.2M 자 → 60% 넘음
+  w.run();
+  const before = w.reports.filter((r) => r.kind === 'storage-pressure').length;
+  const out = await g.checkPressure();
+  assert.ok(out.lsPct >= 0.6);
+  const pr = w.reports.filter((r) => r.kind === 'storage-pressure');
+  assert.equal(pr.length - before, 1, '★★ 차기 전에 알리지 않으면 다시 «꽉 참 → 지우기»가 된다');
+  assert.match(pr[pr.length - 1].detail, /정부컨설팅 autobackups/, '무엇이 자리를 먹는지 보여야 그 기능만 옮긴다');
+  assert.ok(!JSON.stringify(w.reports).includes('비밀자료'), '★ 값(자료)을 알림에 실으면 안 된다');
+  await g.checkPressure();
+  assert.equal(w.reports.filter((r) => r.kind === 'storage-pressure').length - before, 1, '같은 날 두 번 알리면 잔소리가 된다');
+});
+
+test('① 60% 아래면 조용하다', async () => {
+  const w = warnWin();
+  w.navigator = { storage: { persisted: async () => true, persist: async () => true, estimate: async () => ({ usage: 1e6, quota: 1e10 }) } };
+  const g = G.install(w, { wait: 0, pressureDelay: false });
+  w.localStorage.setItem('pureun_v6_dark_mode', '0');
+  const out = await g.checkPressure();
+  assert.equal(out.told.length, 0);
+  assert.equal(w.reports.filter((r) => r.kind === 'storage-pressure').length, 0);
+});
+
+test('① 큰 칸이 80% 를 넘으면 알린다 — 디스크 여유가 줄었다는 뜻', async () => {
+  const w = warnWin();
+  w.navigator = { storage: { persisted: async () => true, persist: async () => true, estimate: async () => ({ usage: 85e8, quota: 100e8 }) } };
+  const g = G.install(w, { wait: 0, pressureDelay: false });
+  const out = await g.checkPressure();
+  assert.deepEqual(out.told, ['idb']);
+  assert.match(w.reports[w.reports.length - 1].message, /큰 칸/);
+});
+
+test('② 작은 칸에 100KB 넘는 덩어리를 쓰면 어느 칸·어느 화면인지 알린다 — 하루 한 번', () => {
+  const w = warnWin();
+  const g = G.install(w, { wait: 0, pressureDelay: false });
+  w.localStorage.setItem('pureun_v6_small', 'x'.repeat(1000));
+  assert.equal(w.reports.length, 0, '작은 것은 조용히');
+  w.localStorage.setItem('pureun_v6_new_feature_cache', '고객자료'.repeat(30000));
+  w.localStorage.setItem('pureun_v6_new_feature_cache', '고객자료'.repeat(30001));   // 저장마다 알리지 않는다
+  w.run();
+  const bw = w.reports.filter((r) => r.kind === 'storage-bigwrite');
+  assert.equal(bw.length, 1);
+  assert.match(bw[0].message, /이알피 new_feature_cache/);
+  assert.match(bw[0].detail, /pu-erp\.html/, '어느 화면이 썼는지 알아야 그 기능을 고친다');
+  assert.ok(!JSON.stringify(w.reports).includes('고객자료'), '★ 값(자료)을 알림에 실으면 안 된다');
+  assert.ok(g.watch().big.pureun_v6_new_feature_cache, '이알피 시스템 헬스가 보여 줄 기록이 남아야 한다');
+  /* 같은 PC 에서 다시 켜도 오늘은 또 안 알린다 */
+  const w2 = warnWin(); w2.localStorage = w.localStorage; w2.Storage = w.Storage;   // 같은 PC(같은 저장소)의 새 화면
+  G.install(w2, { wait: 0, pressureDelay: false });
+  w2.localStorage.setItem('pureun_v6_new_feature_cache', '고객자료'.repeat(30002));
+  w2.run();
+  assert.equal(w2.reports.filter((r) => r.kind === 'storage-bigwrite').length, 0, '같은 날 두 번 알리면 잔소리가 된다');
+});
+
+test('켜고 잠시 뒤 저절로 잰다 (화면 뜨는 길을 비켜서)', () => {
+  const src = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-ls-guard.js'), 'utf8');
+  assert.match(src, /setTimeout \|\| setTimeout\)\(function \(\) \{ checkPressure\(\); \}, opts\.pressureDelay \|\| \d+\)/);
+  const erp = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8');
+  assert.match(erp, /PuLsGuard\.watch\(\)\.big/, '이알피 시스템 헬스가 큰 덩어리 기록을 보여 줘야 한다');
+});
