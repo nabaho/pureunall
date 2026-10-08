@@ -24,7 +24,7 @@ const B = (() => {
   new Function([
     "var RESERVE_ACCTS=['고유목적사업준비금1','고유목적사업준비금2'];",
     grabFn('num'), grabFn('_splitsOf'), grabFn('expandSplits'),
-    grabFn('accruedOf'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('whtBookCash'), grabFn('taxPrep'), grabFn('taxText'),
+    grabFn('accruedOf'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'), grabFn('taxCalc'), grabFn('taxRateTxt'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('whtBookCash'), grabFn('splitPL'), grabFn('taxPrep'), grabFn('taxText'),
     'this.calc=taxCalc; this.prep=taxPrep; this.text=taxText; this.wsum=whtItemsSum; this.wof=whtItemsOf; this.wbook=whtBookCash;',
   ].join('\n')).call(box);
   return box;

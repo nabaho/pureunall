@@ -48,11 +48,11 @@ const B = (() => {
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
     grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
-    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'),
+    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'), grabFn('splitPL'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
     'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
-    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf; this.annex=annexRows; this.ledger=rsv1Ledger; this.useOf=rsv1UseOf;',
+    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf; this.annex=annexRows; this.split=splitPL; this.ledger=rsv1Ledger; this.useOf=rsv1UseOf;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -330,4 +330,28 @@ test('★ 차입 — 기금법인은 자금차입을 할 수 없다(근로복지
   assert.equal(r.borrowN, 1); assert.equal(r.borrowSum, 5000000);
   assert.match(SRC, /⚠ 차입 '\+r\.borrowN/, '회계·결산 화면 칩');
   assert.match(SRC, /제64조②/);
+});
+
+/* ★★ 구분경리 운영성과표(책 대조 D10 — p.358~392, 법인세법 제113조·시행규칙 제76조①) */
+test('★★ 구분경리 — 수익·준비금 전입액은 기금관리회계, 목적사업비·관리비·환입은 목적사업회계, 두 칸 합 = 당기순이익', () => {
+  fresh({ fund_type: '공동', years: { 2026: { opening: { cash: 9000000, reserve2: 9000000 } } } });
+  const T = [{ _id: 'i', date: '2026-06-30', memo: '이자', deposit: 1000000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'e', date: '2026-07-01', memo: '경조사비', withdraw: 9000000, debit: '경조사비', credit: '현금성자산', approved: true },
+    { _id: 'a', date: '2026-07-02', memo: '수수료', withdraw: 100000, debit: '지급수수료', credit: '현금성자산', approved: true }];
+  const fin = B.computeFin(B.closeArr(T, 'F1', 2026), 'F1', 2026);
+  const sp = B.split(fin);
+  const row = (t) => sp.rows.find((r) => r.t.startsWith(t));
+  assert.deepEqual([row('Ⅰ.').p, row('Ⅰ.').f], [0, 1000000], '수익은 기금관리회계');
+  assert.equal(row('이자수익').f, 1000000);
+  assert.deepEqual([row('Ⅱ.').p, row('Ⅱ.').f], [9000000, 0]);
+  assert.deepEqual([row('Ⅲ.').p, row('Ⅲ.').f], [100000, 0], '일반관리비는 전부 목적사업회계(책 방식)');
+  assert.equal(row('Ⅳ.').p, 9100000, '환입(전입수입)으로 지출을 메운다');
+  assert.equal(row('준비금1 환입').p, 1000000, '준비금1 먼저'); assert.equal(row('준비금2 환입').p, 8100000);
+  assert.equal(row('Ⅴ.').f, 1000000, '준비금 전입액은 기금관리회계 사업외비용');
+  assert.deepEqual([sp.netP, sp.netF, sp.net], [0, 0, 0]);
+  assert.equal(sp.net, Math.round(fin.net), '나누기만 한다');
+  sp.rows.forEach((r) => assert.equal(r.sum, r.p + r.f));
+  assert.match(SRC, /var sp=splitPL\(f\)/, '결산·재무제표 화면 운영성과표');
+  assert.match(SRC, /addWorksheet\('구분경리'\)/, '세무사용 엑셀 시트');
+  assert.match(SRC, /'close\.split':\{/, 'ⓘ 근거');
 });

@@ -53,7 +53,9 @@ global.funds = { X: { fund_type: '공동', years: {} } };
      /* ⚠ buildF15 가 부르는 것은 모두 들여와야 한다 — 하나만 빠져도 이 검사가 «통째로» 죽고,
         167건이 도는 줄 알지만 실제로는 아무것도 안 돈다(bfMovesOf 가 빠져 그랬다).
         아래 «부르는데 없는 이름» 검사가 그것을 미리 잡는다. */
-     '_k1000', '_openAssets', 'guessBfKind', 'bfMovesOf', 'bfDays', 'buildF15'].map(grabFn).join('\n'));
+     '_k1000', '_openAssets', 'guessBfKind', 'bfMovesOf', 'bfDays', 'buildF15',
+     // 구분경리 운영성과표(책 대조 D10) — 두 회계 합이 당기순이익과 같아야 한다
+     'splitPL'].map(grabFn).join('\n'));
 
 /* ══ 파수꾼 ══ 들여온 함수들이 «부르는데 없는 이름»을 미리 찾는다.
    하나만 빠져도 이 검사는 첫 호출에서 죽고, 167건이 도는 줄 알지만 실제로는 0건이 돈다.
@@ -252,6 +254,8 @@ CASES.forEach(c => {
   if (c.deficitWant != null) ok('    결손금 이월', r.rc.deficit, c.deficitWant);
   if (c.kindWant) { n++; if (r.rc.kind !== c.kindWant) { fail++; console.log('FAIL     조정 방향 ' + r.rc.kind + '  기대 ' + c.kindWant); } }
   ok('    당기순이익', f.net, c.net || 0);
+  { const sp = splitPL(f); ok('    구분경리 두 회계 합', sp.net, f.net);
+    if (sp.netP || sp.netF) console.log('         · 구분경리 목적 ' + sp.netP.toLocaleString() + ' / 기금관리 ' + sp.netF.toLocaleString()); }
   /* 어떤 기금이든 반드시 지켜야 하는 것 */
   n++; if (!f.balanced) { fail++; console.log('FAIL     대차 불일치  차이' + W(f.totalAssets - f.totalLiabEq)); }
   n++; if (Math.round(r.reserve1) < 0 || Math.round(r.reserve2) < 0) {
