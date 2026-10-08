@@ -40,6 +40,11 @@ function isRetry(e) {
 const TRY = LIB + '/try';
 const STUCK_MAX = 2;
 const FETCH_MS = 90 * 1000;
+/* ③ 큰 메일 다시 보기 (2026-10-08 대표 「네」) — 첫 바퀴에서 36통이 90초 한도에 걸려 건너뛰어졌다(지난 메일 POP3,
+   대개 첨부가 큰 고객사 취업규칙 메일). 줄이 다 비면 그것들을 다시 세우고 «4분»까지 기다린다.
+   회차 앞쪽(예산 7분 − 4분 = 3분 안)에서만 시작한다 — 끝에서 시작하면 9분 제한에 잘린다.
+   다시 봐도 안 오면 slow 표시를 단 채 「큰 메일 — 메일에서 직접」으로 남기고 다시 안 세운다. */
+const SLOW_MS = 240 * 1000;
 function withTimeout(p, ms) {
   let t;
   const late = new Promise((_, rej) => {
@@ -142,7 +147,9 @@ async function runOnce(o) {
     const n = Number((tries[k] || {}).n || 0);
     if (seen[k]) { skip[TRY + '/' + k] = null; return; }
     if (n >= STUCK_MAX) {
-      const rec = { at: o.now(), docs: [], why: '멈춤 ' + n + '번 — 건너뜀(메일에서 직접 확인)' };
+      const rec = (tries[k] || {}).slow
+        ? { at: o.now(), docs: [], why: '멈춤 — 큰 메일, 4분 기다려도 안 옴(메일에서 직접 확인)', slow: true }
+        : { at: o.now(), docs: [], why: '멈춤 ' + n + '번 — 건너뜀(메일에서 직접 확인)' };
       skip[LIB + '/seen/' + k] = rec; skip[TRY + '/' + k] = null; seen[k] = rec;
     }
   });
@@ -153,12 +160,30 @@ async function runOnce(o) {
   const coIndex = MR.buildCompanyIndex(companies || {});
   const domIndex = P.buildDomainIndex(companies || {});
   /* 남은 것 «모두»를 한 번 세고(메모리 안 셈이라 싸다) 이번 몫만 자른다 — left 가 이어 달리기의 잣대다 */
-  const allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen || {}, 1e9);
+  let allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen || {}, 1e9);
+  /* ③ 줄이 다 비었으면 — 90초에 걸려 건너뛴 메일을 «한 번» 다시 세운다(seen 을 지우고 slow 시도 표시) */
+  let requeued = 0;
+  if (!allLeft.length) {
+    const back = Object.keys(seen).filter((k) => /^멈춤 \d+번/.test(String((seen[k] || {}).why || '')) && !(seen[k] || {}).slow);
+    if (back.length) {
+      const rq = {};
+      back.forEach((k) => {
+        rq[LIB + '/seen/' + k] = null; rq[TRY + '/' + k] = { at: o.now(), n: 0, slow: true };
+        delete seen[k]; tries[k] = { n: 0, slow: true };
+      });
+      await db.ref().update(rq);
+      requeued = back.length;
+      allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen, 1e9);
+    }
+  }
   const picked = allLeft.slice(0, Math.max(0, Number(o.limit) || 0));
-  const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, stuck, errors: [], at: t0 };
+  const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, stuck, requeued, errors: [], at: t0 };
 
   for (const m of picked) {
     if (o.now() - t0 > o.budgetMs) break;
+    const slow = !!(tries[m.mailKey] || {}).slow;
+    const waitMs = slow ? (o.slowMs || SLOW_MS) : (o.fetchMs || FETCH_MS);
+    if (slow && o.now() - t0 > Math.max(0, o.budgetMs - waitMs)) continue;   // 회차 끝에서는 큰 메일을 시작하지 않는다 — 다음 회차로
     sum.mails++;
     const up = {};
     const ids = [];
@@ -171,8 +196,8 @@ async function runOnce(o) {
     let atts;
     /* ② 손대기 전에 시도 표시 — 이 메일에서 회차가 죽으면 표시가 남아 다음 회차가 센다 */
     const tryKey = TRY + '/' + m.mailKey;
-    try { await db.ref(tryKey).set({ at: o.now(), n: Number((tries[m.mailKey] || {}).n || 0) + 1 }); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
-    try { atts = await withTimeout(o.fetchAtts(m), o.fetchMs || FETCH_MS); }
+    try { await db.ref(tryKey).set(Object.assign({ at: o.now(), n: Number((tries[m.mailKey] || {}).n || 0) + 1 }, slow ? { slow: true } : {})); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
+    try { atts = await withTimeout(o.fetchAtts(m), waitMs); }
     catch (e) {
       if (isRetry(e)) {
         sum.retry++; sum.errors.push(errTag(e));
@@ -272,4 +297,4 @@ async function runOnce(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };

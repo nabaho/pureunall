@@ -45,7 +45,7 @@ const MAIL = {
 const A = 'i_INBOX-4a1e411c_10', B = 'i_INBOX-4a1e411c_11';
 const never = () => new Promise(() => {});
 const opts = (db, fetchAtts, extra) => Object.assign({ db, bucket: bucket(), now: () => 1e12, limit: 60, budgetMs: 1e9,
-  contractVersion: 1, fetchMs: 30, fetchAtts }, extra || {});
+  contractVersion: 1, fetchMs: 30, slowMs: 60, fetchAtts }, extra || {});
 const lib = (db) => db.store.rules_mgmt.library;
 
 test('① 받기가 멈추면 그 메일만 끊고 회차는 끝까지 — run 기록을 쓴다', async () => {
@@ -60,19 +60,65 @@ test('① 받기가 멈추면 그 메일만 끊고 회차는 끝까지 — run �
   assert.equal(lib(db).try[B], undefined, '② 끝난 메일의 표시가 남았다');
 });
 
-test('④ 두 번 멈춘 메일은 셋째 회차에 건너뛴다', async () => {
+test('④ 두 번 멈춘 메일은 셋째 회차에 건너뛴다 — 줄이 남아 있으면 그대로 둔다', async () => {
   const db = fakeDb(MAIL);
   const f = (m) => (m.mailKey === A ? never() : Promise.resolve([]));
   await C.run(opts(db, f));
   await C.run(opts(db, f));
   assert.equal(lib(db).try[A].n, 2);
+  /* B 를 다시 줄에 세워(아직 안 본 메일이 있는 상태) — 그러면 A 는 «건너뜀»에서 멈춘다 */
+  delete lib(db).seen[B];
   let asked = 0;
   const sum = await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return f(m); }));
   assert.equal(asked, 0, '★ 두 번 멈춘 메일을 또 집었다');
   assert.equal(sum.stuck, 1);
+  assert.equal(sum.requeued, 0, '줄이 안 비었는데 큰 메일을 다시 세웠다');
   assert.match(lib(db).seen[A].why, /^멈춤 2번 — 건너뜀/);
   assert.equal(Object.keys(lib(db).try || {}).length, 0, '건너뛴 메일의 표시가 남았다');
+});
+
+/* ── 큰 메일 다시 보기 (2026-10-08 대표 「네」) — 첫 바퀴에 36통이 90초에 걸려 건너뛰어졌다(대개 고객사 취업규칙) ── */
+const 건너뜀 = (extra) => Object.assign({}, MAIL, { rules_mgmt: { library: { seen: Object.assign({
+  [A]: { at: 1, docs: [], why: '멈춤 2번 — 건너뜀(메일에서 직접 확인)' } }, extra || {}) } } });
+
+test('⑤ 줄이 다 비면 건너뛴 메일을 한 번 다시 세우고, 이번엔 길게(slowMs) 기다린다', async () => {
+  const db = fakeDb(건너뜀({ [B]: { at: 1, docs: [], why: '첨부 없음' } }));
+  let waited = 0;
+  const sum = await C.run(opts(db, (m) => {
+    if (m.mailKey !== A) return Promise.resolve([]);
+    return new Promise((res) => setTimeout(() => { waited = 1; res([{ name: '가나_취업규칙.hwpx', data: RULE }]); }, 45));
+  }));
+  assert.equal(sum.requeued, 1);
+  assert.equal(waited, 1, '★ 큰 메일을 다시 세웠는데 여전히 짧게(fetchMs 30) 끊었다');
+  assert.equal(lib(db).seen[A].why, '', '다시 봐서 담았는데 seen 이 «멈춤»으로 남았다');
+  assert.ok(lib(db).seen[A].docs.length >= 1);
+  assert.equal(Object.keys(lib(db).try || {}).length, 0);
+});
+
+test('⑤ 다시 봐도 안 오면 «큰 메일 — 직접»으로 남기고 다시 안 세운다', async () => {
+  const db = fakeDb(건너뜀({ [B]: { at: 1, docs: [], why: '첨부 없음' } }));
+  const f = (m) => (m.mailKey === A ? never() : Promise.resolve([]));
+  await C.run(opts(db, f));                           // 다시 세움 → 길게 기다려도 멈춤(표시 1, slow)
+  assert.equal(lib(db).try[A].slow, true);
+  await C.run(opts(db, f));                           // 표시 2
+  const sum = await C.run(opts(db, f));               // 건너뜀(slow)
+  assert.match(lib(db).seen[A].why, /^멈춤 — 큰 메일, 4분 기다려도 안 옴/);
+  assert.equal(lib(db).seen[A].slow, true);
+  let asked = 0;
+  const again = await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return f(m); }));
+  assert.equal(again.requeued, 0, '★ 다시 봐도 안 온 메일을 또 세웠다 — 끝없이 돈다');
+  assert.equal(asked, 0);
   assert.equal(sum.left, 0);
+});
+
+test('⑤ 큰 메일은 회차 끝에서 시작하지 않는다 — 9분 제한에 잘린다', async () => {
+  const db = fakeDb(건너뜀({ [B]: { at: 1, docs: [], why: '첨부 없음' } }));
+  let t = 0, asked = 0;
+  /* 예산 100 · 큰 메일 한도 80 → 경과 20 넘으면 시작 안 함. now() 를 부를 때마다 50씩 흐르게 */
+  await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return Promise.resolve([]); },
+    { now: () => (t += 50), budgetMs: 100, slowMs: 80 }));
+  assert.equal(asked, 0, '★ 예산 끝에서 큰 메일을 시작했다');
+  assert.ok(!lib(db).seen[A], '시작 안 한 큰 메일은 줄에 남아야 한다(다음 회차)');
 });
 
 test('④ 가리다 회차가 통째로 죽은 메일도 — 표시만 남아 있으면 건너뛴다', async () => {
@@ -101,4 +147,5 @@ test('② 없어짐·너무 큼도 표시를 지운다', async () => {
 test('받기 한도 + 예산 < 9분 — 잘리기 전에 끝난다', () => {
   assert.ok(C.FETCH_MS + 7 * 60 * 1000 < 540 * 1000, '받기 한도가 너무 길다 — 예산 끝에 시작한 받기가 9분 제한에 잘린다');
   assert.equal(C.STUCK_MAX, 2);
+  assert.ok(C.SLOW_MS <= 7 * 60 * 1000, '큰 메일 한도가 예산보다 길다 — 앞쪽에서 시작해도 못 끝난다');
 });
