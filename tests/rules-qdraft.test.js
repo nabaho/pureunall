@@ -192,3 +192,16 @@ test('⑫ 화면 — 괴롭힘 규정은 검토가 아니라 한글 파일로', 
   assert.match(fn, /HWPX\.download\(body,q\.ans\.company\+"_직장 내 괴롭힘 예방·대응규정\(제정안\)\.hwpx"\)/);
   assert.ok(!/takeDraft\(/.test(fn), '괴롭힘 규정을 92항목 검토(취업규칙 잣대)에 넣는다');
 });
+
+/* ── 제정 서류 세트 (대표 「네」 2026-10-08) — 근로기준법 시행규칙 제15조:
+   변경 전후 비교 서류는 «변경신고»에만, 동의는 «불리하게 변경»할 때만. 제정(최초 신고)에는 둘 다 없다. ── */
+test('⑬ 제정 서류 세트 — 신구대조표·동의서를 끄고, 불이익 변경 점검을 안 한다', () => {
+  const at = RAW.indexOf('function renderDocset(');
+  const fn = RAW.slice(at, RAW.indexOf('\n}\n', at) + 2);
+  assert.match(fn, /if\(enact&&!DOCSET\._touched\)\{ DOCSET\.daejo=false; DOCSET\.consent=false; \}/, '★ 제정인데 신구대조표가 켜진다');
+  assert.match(fn, /const hits=enact\?\[\]:disadvantageScan\(\);/, '★ 제정에 불이익 변경 점검이 돌아 동의서가 켜진다');
+  assert.match(fn, /제정\(최초 신고\)/);
+  const go = RAW.slice(RAW.indexOf('$("fin-dl").addEventListener'), RAW.indexOf('$("fin-dl").addEventListener') + 900);
+  assert.match(go, /DOCSET\.daejo=!isEnact\(\)/, '★ 「확인하고 서류 만들기」가 제정에도 대조표를 켠다');
+  assert.match(go, /if\(!isEnact\(\)&&disadvantageScan\(\)\.length\)DOCSET\.consent=true;/);
+});
