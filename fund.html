@@ -17565,6 +17565,47 @@ function _xlRow(ws,row,vals,opt){
 }
 function _xlWidths(ws,ws_widths){ ws_widths.forEach(function(w,i){ ws.getColumn(i+1).width=w; }); }
 /* 결산 워크북 생성 — arr=당기 거래, prev=전기 거래(비교·추정용) */
+/* ★ 부속명세서 세 장 (책 대조 D3 — 김승훈 2014 p.124~127, 2026-10-08 목업 승인 「추천대로」)
+   이자수입명세서 · 고유목적사업준비금명세서 · 기본재산명세서. 값은 모두 이미 있는 셈에서 온다 —
+   이자는 분개, 준비금은 재무제표(computeFin)와 같은 기초·전입·환입, 기본재산은 별지15호(buildF15)와 «같은» 숫자.
+   ⚠ 원천징수는 두 갈래다: ① 영수증 합계를 넣은 기금 — 통장 이자는 «세후»라 총액 = 입금 + 원천징수
+                          ② 통장에 원천징수가 따로 출금 줄로 찍히는 기금 — 통장 이자가 이미 «총액», 원천징수 = 그 출금 줄(선납세금 차변)
+   순수 함수(검사 대상): arr = closeArr 를 거친 그 해 거래, fin = computeFin(arr), R = buildF15(…), op = 전기이월 */
+function annexRows(arr,fin,R,op){
+  op=op||{}; fin=fin||{tb:{}}; R=R||{bf:{},run:{}};
+  var rows=[], loan=[], whtRcpt=0, whtLine=0;
+  expandSplits(arr||[]).forEach(function(x){
+    if(!x||!x.approved) return;
+    var cash=x._split?!x._nocashSrc:!x.nocash, amt=num(x._split?x.amount:(x.deposit||x.withdraw||x.amount))||0;
+    if(x.credit==='이자수익'&&x.wht){ whtRcpt+=num(x.amount)||0; return; }
+    if(!cash) return;
+    if(x.debit==='선납세금'&&num(x.withdraw)>0){ whtLine+=amt; return; }
+    if(x.credit==='이자수익') rows.push({date:String(x.date||''), memo:String(x.memo||''), amt:amt});
+    else if(x.credit==='대부이자수익') loan.push({date:String(x.date||''), memo:String(x.memo||''), amt:amt});
+  });
+  rows.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  loan.sort(function(a,b){ return a.date.localeCompare(b.date); });
+  var dep=rows.reduce(function(s,r){ return s+r.amt; },0), lsum=loan.reduce(function(s,r){ return s+r.amt; },0);
+  var wht=whtRcpt||whtLine, gross=whtRcpt?dep+whtRcpt:dep, recv=gross-wht;
+  var tb=fin.tb||{};
+  var rv=function(a,k){ var v=tb[a]||{debit:0,credit:0}; var o={open:Math.round(num(op[k])||0), set:Math.round(v.credit||0), use:Math.round(v.debit||0)};
+    o.end=o.open+o.set-o.use; return o; };
+  var r1=rv(RESERVE_ACCTS[0],'reserve'), r2=rv(RESERVE_ACCTS[1],'reserve2');
+  var bf=R.bf||{}, run=R.run||{};
+  var inv=Math.round((run.secu||0)+(run.trust||0)+(run.own||0)+(run.reit||0)+(run.etc||0));
+  return {
+    interest:rows, deposits:Math.round(dep), wht:Math.round(wht), whtFrom:whtRcpt?'receipt':(whtLine?'line':''),
+    gross:Math.round(gross), received:Math.round(recv),
+    loan:loan, loanSum:Math.round(lsum), accrued:accruedOf(arr).acc,
+    rsv:{r1:r1, r2:r2},
+    basic:{open:Math.round(R.bfOpen||0), employer:Math.round(bf.employer||0), other:Math.round(bf.other||0), income:Math.round(bf.income||0),
+           merge:Math.round(bf.merge||0), use:Math.round(bf.use||0), split:Math.round(bf.split||0), end:Math.round(R.bfEnd||0),
+           run:{deposit:Math.round(run.deposit||0), invest:inv, loan:Math.round(run.loan||0), total:Math.round(run.total||0)}},
+    /* 맞물림 — 준비금 기말이 재무상태표와, 기본재산 기말이 재무제표와 같은가(다르면 표 아래 알린다) */
+    chk:{r1:r1.end===Math.round(num(fin.res1)||0), r2:r2.end===Math.round(num(fin.res2)||0),
+         basic:Math.round(R.bfEnd||0)===Math.round(num(fin.basic)||0)}
+  };
+}
 function buildClosingWb(fid,yr,arr,prevA,rep,sites,welf){
   var wb=new ExcelJS.Workbook();
   wb.creator='푸른노무법인 기금 통합운영'; wb.created=new Date();
@@ -17742,6 +17783,42 @@ function buildClosingWb(fid,yr,arr,prevA,rep,sites,welf){
   });
   var _ce=acctCodeChk();
   if(_ce.length){ rw++; _xlRow(s,rw++,['※ 어긋난 곳: '+_ce.join(' · ')],{bold:true}); }
+
+  /* 1-8 ~ 1-10 부속명세서 (책 대조 D3) — annexRows 한 곳에서 */
+  var AX=annexRows(arr,fin,R,_openingOf(fid,yr));
+  s=wb.addWorksheet('1-8 이자수입명세서'); _xlWidths(s,[3,6,13,34,16]);
+  _xlTitle(s,'이자수입명세서 ('+yr+'년) — 단위: 원',5);
+  _xlHead(s,4,['#','받은 날','적요','통장 입금액']); rw=5;
+  AX.interest.forEach(function(r,i){ _xlRow(s,rw++,[i+1,r.date,r.memo,r.amt]); });
+  _xlRow(s,rw++,['','','통장 입금액 계',AX.deposits],{bold:true});
+  _xlRow(s,rw++,['','',AX.whtFrom==='line'?'원천징수(통장 출금 줄)':'원천징수(원천징수영수증 합계)',AX.wht]);
+  _xlRow(s,rw++,['','','이자수익 총액(원천징수 전)',AX.gross],{bold:true});
+  _xlRow(s,rw++,['','','실수령액',AX.received]);
+  if(AX.loan.length){ rw++; _xlRow(s,rw++,['','','대부이자수익(원천징수 없음)'],{bold:true});
+    AX.loan.forEach(function(r,i){ _xlRow(s,rw++,[i+1,r.date,r.memo,r.amt]); });
+    _xlRow(s,rw++,['','','대부이자 계',AX.loanSum],{bold:true}); }
+  if(AX.accrued){ rw++; _xlRow(s,rw++,['','','미수이자(받기 전 — 준비금 대상 아님)',AX.accrued]); }
+
+  s=wb.addWorksheet('1-9 준비금명세서'); _xlWidths(s,[3,26,18,18,18]);
+  _xlTitle(s,'고유목적사업준비금명세서 ('+yr+'년) — 단위: 원',5);
+  _xlHead(s,4,['구분','고유목적사업준비금1','고유목적사업준비금2','계']); rw=5;
+  [['기초(전기이월)','open'],['설정(전입)','set'],['사용(환입)','use'],['기말','end']].forEach(function(k){
+    var a=AX.rsv.r1[k[1]], b=AX.rsv.r2[k[1]], sg=k[1]==='use'?-1:1;
+    _xlRow(s,rw++,[k[0],sg*a,sg*b,sg*(a+b)],{bold:k[1]==='end'}); });
+  rw++; _xlRow(s,rw++,['준비금1 — 법인세법 제29조(이자 등)']); _xlRow(s,rw++,['준비금2 — 근로복지기본법 제62조제2항(출연금 사용한도)']);
+  if(!AX.chk.r1||!AX.chk.r2) _xlRow(s,rw++,['※ 기말이 재무상태표와 다릅니다 — 전기이월 준비금 칸을 확인하세요'],{bold:true});
+
+  s=wb.addWorksheet('1-10 기본재산명세서'); _xlWidths(s,[3,34,18]);
+  _xlTitle(s,'기본재산명세서 ('+yr+'년) — 단위: 원',3);
+  _xlHead(s,4,['구분','금액']); rw=5;
+  var BX=AX.basic;
+  [['기초 기본재산(직전 회계연도 말)',BX.open],['사업주 출연',BX.employer],['사업주 외의 자 출연',BX.other],
+   ['수익금·이월금 전입',BX.income],['합병',BX.merge],['기본재산 사용(준비금2로)',-BX.use],['분할 등',-BX.split]]
+    .forEach(function(r){ if(r[1]||/기초|사업주 출연|사용/.test(r[0])) _xlRow(s,rw++,r); });
+  _xlRow(s,rw++,['기말 기본재산',BX.end],{bold:true});
+  rw++; _xlRow(s,rw++,['운용 — 금융기관 예입',BX.run.deposit]); _xlRow(s,rw++,['운용 — 증권·신탁 등',BX.run.invest]);
+  _xlRow(s,rw++,['운용 — 근로자 대부',BX.run.loan]); _xlRow(s,rw++,['운용 계',BX.run.total],{bold:true});
+  if(!AX.chk.basic) _xlRow(s,rw++,['※ 기말이 재무제표 기본재산과 다릅니다 — 출연·사용 분류(별지15호)를 확인하세요'],{bold:true});
 
   // ⑨ 익년도 사업계획서 · ⑩ 예산편성안 — 당기 실적을 기준선으로 깔고 예산칸은 비워 둔다
   s=wb.addWorksheet('2.익년도사업계획서'); _xlWidths(s,[3,34,18,18,30]);

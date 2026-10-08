@@ -48,11 +48,11 @@ const B = (() => {
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
     grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
-    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'),
+    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
     'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
-    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf;',
+    'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf; this.annex=annexRows;',
   ].join('\n')).call(box);
   return box;
 })();
@@ -253,4 +253,29 @@ test('★★ 미수수익 다음 해 — 전기 미수를 결산 때 지워(역�
   /* 사람이 이미 미수수익을 지웠으면 다시 지우지 않는다 */
   const T3 = T2.concat([{ _id: 'b3', date: '2026-01-05', memo: '전기 미수 정리', amount: 50000, nocash: 1, debit: '이자수익', credit: '미수수익', approved: true }]);
   assert.equal(B.closeArr(T3, 'F1', 2026).filter((x) => x._id === 'rsvacc2026').length, 0, '이미 지운 것은 또 지우지 않는다');
+});
+
+/* ★ 부속명세서 세 장 (책 대조 D3 — 김승훈 2014 p.124~127, 2026-10-08) */
+test('★★ 이자수입명세서 — 원천징수 두 갈래(영수증 합계 / 통장 출금 줄) 모두 총액·실수령액이 맞다', () => {
+  fresh({ fund_type: '사내', years: {} });
+  const A = [{ _id: 'i1', date: '2025-06-30', memo: '정기예금 이자', deposit: 423000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'i2', date: '2025-12-31', memo: '정기예금 이자', deposit: 423000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'rsvwht2025', date: '2025-12-31', amount: 154000, nocash: 1, wht: 1, debit: '선납세금', credit: '이자수익', approved: true }];
+  const a = B.annex(A, B.computeFin(A, 'F1', 2025), {}, {});
+  assert.equal(a.interest.length, 2); assert.equal(a.deposits, 846000); assert.equal(a.wht, 154000);
+  assert.equal(a.gross, 1000000); assert.equal(a.received, 846000); assert.equal(a.whtFrom, 'receipt');
+  const L = [{ _id: 'j1', date: '2025-12-31', memo: '이자', deposit: 1000000, debit: '현금성자산', credit: '이자수익', approved: true },
+    { _id: 'j2', date: '2025-12-31', memo: '법인세 원천징수', withdraw: 154000, debit: '선납세금', credit: '현금성자산', approved: true }];
+  const b = B.annex(L, B.computeFin(L, 'F1', 2025), {}, {});
+  assert.equal(b.gross, 1000000, '통장 이자가 이미 총액'); assert.equal(b.wht, 154000); assert.equal(b.received, 846000); assert.equal(b.whtFrom, 'line');
+});
+test('★★ 준비금명세서·기본재산명세서 — 기초+설정−사용 = 기말이 재무제표와 맞물린다', () => {
+  fresh({ fund_type: '사내', years: {} });
+  const arrC = B.closeArr(TX, 'F1', 2025), fin = B.computeFin(arrC, 'F1', 2025);
+  const R = { bfOpen: 0, bfEnd: Math.round(fin.basic), bf: { employer: 50000000, use: 40000000 }, run: { deposit: Math.round(fin.basic), loan: 0, total: Math.round(fin.basic) } };
+  const x = B.annex(arrC, fin, R, {});
+  assert.equal(x.rsv.r2.set, 40000000, '준비금2 설정 = 출연 × 80%');
+  assert.equal(x.rsv.r2.end, Math.round(fin.res2)); assert.equal(x.rsv.r1.end, Math.round(fin.res1));
+  assert.deepEqual(x.chk, { r1: true, r2: true, basic: true });
+  assert.equal(x.basic.end, 10000000);
 });
