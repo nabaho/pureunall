@@ -40236,6 +40236,58 @@ function fillContractVars(template, contract){
   return result;
 }
 
+/* ── 🔒 문서관리 서명본 (대표 「추천대로」 2026-10-08) ──
+   문서관리 › 기업별 계약서에 올린 계약서 파일(pu_docs/co_docs)과 계약 기록(co_recs)을 «읽기만» 한다.
+   ⚠ 이알피 계약(data/contracts)에는 쓰지 않는다 — 이알피가 통째로 저장하는 표라 다른 화면이 고치면 덮어쓰인다.
+   ⚠ 회사 열쇠는 js/pu-office-store.js coKey 와 «같은 글자»여야 한다(tests/erp-signed-badge.test.js).
+   「이 계약」 = 서명본 올리기에서 이 계약번호를 골라 이어 둔 파일(계약 기록 note 「이알피 계약 {번호}」 + docId). */
+function erpDocCoKey(name){
+  return String(name || '')
+    .replace(/\(주\)|㈜|주식회사|\(유\)|유한회사/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
+    .replace(/[.#$\[\]\/]/g, '_');
+}
+function erpSignedFor(docs, recs, contractNo, contractId){
+  var want = [contractNo, contractId].map(function(x){ return String(x || '').trim(); }).filter(Boolean), mine = {};
+  Object.keys(recs || {}).forEach(function(k){
+    var r = recs[k]; if(!r || !r.docId) return;
+    if(want.some(function(no){ return String(r.note || '') === '이알피 계약 ' + no; })) mine[r.docId] = 1;
+  });
+  return Object.keys(docs || {}).map(function(id){
+    var d = docs[id] || {};
+    return { id:id, title:String(d.title || '계약서'), date:String(d.date || ''), secret:!!d.secret, mine:!!mine[id] };
+  }).sort(function(a, b){ return (b.mine - a.mine) || b.date.localeCompare(a.date); });
+}
+function ErpSignedDocs(props){
+  var key = erpDocCoKey(props.companyName);
+  var st = useState(null); var list = st[0]; var setList = st[1];
+  useEffect(function(){
+    if(!key || typeof firebase === 'undefined'){ setList([]); return; }
+    var alive = true, db = firebase.database();
+    Promise.all([db.ref('pu_docs/co_docs/' + key).once('value'), db.ref('pu_docs/co_recs/' + key).once('value')])
+      .then(function(r){ if(alive) setList(erpSignedFor(r[0].val() || {}, r[1].val() || {}, props.contractNo, props.contractId)); },
+        function(){ if(alive) setList('err'); });
+    return function(){ alive = false; };
+  }, [key, props.contractNo, props.contractId]);
+  var box = { border:'1px solid #e2e8f0', borderRadius:'6px', padding:'10px 12px', marginBottom:'14px' };
+  var head = h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px' } },
+    h('b', { style:{ fontSize:'12.5px', color:'#1e293b', flex:1 } }, '🔒 문서관리에 올린 서명본'),
+    h('a', { href:'docs-esign.html#co', target:'_blank', rel:'noopener', style:{ fontSize:'11px', color:'#1e40af', fontWeight:700, textDecoration:'none' } }, '문서관리에서 보기 →'));
+  if(list === null) return h('div', { style:box }, head, h('div', { style:{ fontSize:'11.5px', color:'#94a3b8' } }, '불러오는 중…'));
+  if(list === 'err') return h('div', { style:box }, head, h('div', { style:{ fontSize:'11.5px', color:'#94a3b8' } }, '문서관리 기록을 읽지 못했습니다'));
+  if(!list.length) return h('div', { style:box }, head, h('div', { style:{ fontSize:'11.5px', color:'#94a3b8' } }, '아직 올린 계약서가 없습니다 — 서명본이 오면 문서관리 › 기업별 계약서 「📬 서명본 대기」에서 올리세요'));
+  return h('div', { style:box }, head,
+    list.slice(0, 8).map(function(d){
+      return h('div', { key:d.id, style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12px', padding:'3px 0' } },
+        h('span', null, d.secret ? '🔒' : '📄'),
+        h('span', { style:{ flex:1, minWidth:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, d.title),
+        d.mine && h('span', { style:{ background:'#dcfce7', color:'#166534', borderRadius:'9px', padding:'0 7px', fontSize:'10.5px', fontWeight:700 } }, '이 계약'),
+        h('span', { style:{ color:'#94a3b8', fontSize:'11px' } }, d.date || '날짜 없음'));
+    }),
+    list.length > 8 && h('div', { style:{ fontSize:'11px', color:'#94a3b8' } }, '외 ' + (list.length - 8) + '건'));
+}
+
 // ============ 계약서 보관함 (NAS 링크 관리) ============
 // 서명 완료된 계약서 스캔본을 NAS에 보관하고, ERP에는 링크만 등록/열람
 function ContractDocVault(props){
@@ -40277,6 +40329,7 @@ function ContractDocVault(props){
         h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 12px', fontSize:'11.5px', color:'#1e40af', lineHeight:'1.6', marginBottom:'14px' } },
           '서명한 계약서(스캔본)는 NAS에 보관하고, 여기엔 그 파일의 NAS 링크만 등록합니다. ',
           'NAS File Station에서 파일 우클릭 → 공유 링크 생성 → 그 주소를 아래에 붙여넣으세요.'),
+        h(ErpSignedDocs, { companyName:contract.companyName || (contract.company && contract.company.name) || '', contractNo:contract.contractNo || '', contractId:contract.id || '' }),
         docs.length === 0
           ? h('div', { style:{ color:'#94a3b8', textAlign:'center', padding:'24px', border:'1px dashed #cbd5e1', borderRadius:'6px', fontSize:'12px', marginBottom:'14px' } }, '등록된 계약서 링크가 없습니다')
           : h('div', { style:{ marginBottom:'14px', display:'flex', flexDirection:'column', gap:'6px' } },
