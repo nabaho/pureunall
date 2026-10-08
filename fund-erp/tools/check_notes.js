@@ -22,6 +22,7 @@ global.S = { fundId: 'X', year: 2026 };
 global.funds = { X: { fund_type: '공동', years: { 2026: { opening: {}, reserve_auto: false } } } };
 (0, eval)(['ACCT_CHART','PURPOSE_ACCTS','ADMIN_ACCTS','OPEN_ACCT','RESERVE_ACCTS','CF_INVEST',
   'CF_FINANCE','IE_TREE'].map(gV).join('\n') + '\n'
+  + (src.match(/var RSV1_FIFO_FROM=\d+;/) || [''])[0] + '\n'
   + ['_openingOf','_splitsOf','_splitSum','_txnDone','expandSplits','journalOf','acctMoves','computeFin',
      // _reserveRate 는 useRate 와 한 줄기다(2026-09-12) — 빠지면 이 검사가 통째로 죽는다
      '_contribOf','useRate','_reserveRate','_rsvSwapOf','_rsvRoles','_reserveAcct','accruedOf','_accEntry','reserveAdjust','_reserveEntry',
@@ -212,12 +213,17 @@ console.log('\n■ 전입·환입 차례');
 [false, true].forEach(sw => {
   /* 순이익이 나는 해 — 이자 20만만 들어오고 쓴 것이 없다.
      출연금이 없으므로 설정 한도도 0 이라 전입만 생긴다. */
-  funds.X = { fund_type:'공동', reserve_swap:sw, years:{2026:{opening:{},reserve_auto:true}} };
+  /* ★ 2026-10-08 — 2026 사업연도부터 준비금1은 «쓴 만큼만» 환입한다(책 대조 D1). 이자가 남으면 준비금1에 남지
+     준비금2로 전입하지 않는다. 그래서 «순이익이 나면 이월 쪽 전입» 차례는 옛 방식(2025)으로 본다. */
+  funds.X = { fund_type:'공동', reserve_swap:sw, years:{2025:{opening:{},reserve_auto:true},2026:{opening:{},reserve_auto:true}} };
   const arr = [
-    { _id:'i', date:'2026-03-01', approved:true, deposit:200000, withdraw:0,
+    { _id:'i', date:'2025-03-01', approved:true, deposit:200000, withdraw:0,
       memo:'이자', debit:'현금성자산', credit:'이자수익' },
   ];
-  const rc = reserveAdjust(arr, 'X', 2026);
+  const rc = reserveAdjust(arr, 'X', 2025);
+  const rcF = reserveAdjust([Object.assign({}, arr[0], { date:'2026-03-01' })], 'X', 2026);
+  ok((sw ? '맞바꿈 켜짐' : '기본    ') + ' — 2026~ 쓰지 않은 이자는 준비금1에 남는다(전입·환입 없음)',
+     rcF.fifo === true && rcF.kind === '' && rcF.interestCash === 200000, rcF.kind + '/' + rcF.interestCash);
   const tag = sw ? '맞바꿈 켜짐' : '기본    ';
   ok(tag + ' — 순이익이 나면 전입이다', rc.kind === '전입', rc.kind);
   ok(tag + ' — 전입도 이월 쪽(' + rc.acctCarry + ')으로',
