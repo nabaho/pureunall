@@ -158,3 +158,25 @@ test('★★ 미수수익이 있으면 제56호 간편신고가 아니라 제1�
   assert.equal(Q.kind, '1'); assert.equal(Q.intCash, 846000); assert.equal(Q.accRev, 50000);
   assert.ok(Q.notes.some((x) => x.includes('익금산입(유보 추인)')));
 });
+
+test('★★ 일반 신고 — 재무제표·세무조정계산서 첨부, 수입 3억원 이상이면 외부세무조정 대상 경고(책 대조 D6 — 법 제60조⑤⑨, 시행령 제97조의2①)', () => {
+  const big = [{ _id: 'b1', approved: true, deposit: 350000000, debit: '현금성자산', credit: '대부이자수익' }];
+  const P = B.prep(big, { tb: tbOf({ 대부이자수익: [0, 350000000] }), resvExp: 350000000 }, {}, 2026, F, '고유목적사업준비금1');
+  assert.equal(P.kind, '1');
+  assert.ok(P.notes.some((x) => x.includes('제60조⑤')), '첨부 안 하면 무신고');
+  assert.equal(P.extAdj, true);
+  const n = P.notes.find((x) => x.includes('외부세무조정'));
+  assert.ok(n && n.includes('준비금 손금산입(2호)') && n.includes('[확인 필요]'));
+  /* 준비금을 안 쌓고 설립도 오래됐으면 3억원이 넘어도 2·3·4호 어디에도 안 걸린다 */
+  const P2 = B.prep(big, { tb: tbOf({ 대부이자수익: [0, 350000000] }), resvExp: 0 }, {}, 2026, Object.assign({ inka_date: '2015-03-01' }, F), '고유목적사업준비금1');
+  assert.equal(P2.extAdj, false);
+  /* 설립 2년 안이면 4호 */
+  const P3 = B.prep(big, { tb: tbOf({ 대부이자수익: [0, 350000000] }), resvExp: 0 }, {}, 2026, Object.assign({ inka_date: '2025-06-01' }, F), '고유목적사업준비금1');
+  assert.equal(P3.extAdj, true); assert.ok(P3.notes.some((x) => x.includes('설립 2년 안(4호)')));
+  /* 3억원 미만은 조용하다 · 제56호(이자만)에는 붙이지 않는다 */
+  const small = B.prep(INT.concat([{ _id: 't2', approved: true, deposit: 300000, debit: '현금성자산', credit: '대부이자수익' }]),
+    { tb: tbOf({ 이자수익: [0, 1000000], 대부이자수익: [0, 300000] }), resvExp: 1300000 }, WHT, 2026, F, '고유목적사업준비금1');
+  assert.equal(small.extAdj, false); assert.ok(!small.notes.some((x) => x.includes('외부세무조정')));
+  const only = B.prep(INT, { tb: tbOf({ 이자수익: [0, 1000000], 선납세금: [154000, 0] }), resvExp: 1000000 }, WHT, 2025, F, '고유목적사업준비금1');
+  assert.ok(!only.notes.some((x) => x.includes('제60조⑤')));
+});

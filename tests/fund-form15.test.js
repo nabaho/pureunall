@@ -250,3 +250,27 @@ test('보고서 화면 배선 — 저장 경로와 인쇄 서식', () => {
   assert.ok(SRC.includes('제93조제1항제3호'), '법 근거 문구가 빠졌다');
   assert.ok(!SRC.includes('function openForm15('), '옛 9행 요약표가 남아 있다');
 });
+
+test('★★ 운영상황보고서 검산(책 대조 D8) — ⑳ = 재무상태표 기본재산 · 운용 상품 ≤ ⑳ · 천원 끝수 합계', () => {
+  const box = {};
+  new Function([grabFn('num'), grabFn('_k1000'), grabFn('f15Checks'), 'this.ck=f15Checks;'].join('\n')).call(box);
+  const R = (o) => Object.assign({
+    fin: { basic: 100000000 }, bfOpen: 60000000, bfInc: 40000000, bfDec: 0, bfEnd: 100000000,
+    bf: { employer: 40000000, other: 0, income: 0, merge: 0, use: 0, split: 0 },
+    run: { deposit: 100000000, trust: 0, secu: 0, own: 0, reit: 0, etc: 0, loan: 0, total: 100000000 },
+    src: { income: 1000000, contrib: 20000000, capExcess: 0, basicRange: 0, support: 0, carry: 61000000, total: 82000000 },
+    items: [{ amt: 3000000 }], subAmt: 3000000, loanAmt: 0, admin: 100000, rest: 78900000, total: 82000000,
+  }, o);
+  assert.deepEqual(box.ck(R({})), [], '맞는 해는 조용하다');
+  /* 증가 분개를 ⑰ 사용으로 골랐다 → ⑳ 이 장부보다 8천만 적다 */
+  const a = box.ck(R({ bfInc: 0, bfDec: 40000000, bfEnd: 20000000, bf: { employer: 0, other: 0, income: 0, merge: 0, use: 40000000, split: 0 },
+    run: { deposit: 20000000, trust: 0, secu: 0, own: 0, reit: 0, etc: 0, loan: 0, total: 20000000 } }));
+  assert.equal(a.length, 1); assert.equal(a[0].lv, 'err'); assert.match(a[0].t, /재무상태표/); assert.match(a[0].d, /20,000천원.*100,000천원/);
+  /* 증권이 기본재산보다 많다 → ㉑ 이 0 으로 잘린다 */
+  const b = box.ck(R({ fin: { basic: 100000000 }, run: { deposit: 0, trust: 0, secu: 130000000, own: 0, reit: 0, etc: 0, loan: 0, total: 130000000 } }));
+  assert.ok(b.some((c) => /운용 상품/.test(c.t)));
+  /* 천원 끝수 — 400원 + 400원 = 800원: 칸마다 0천원인데 합은 1천원 */
+  const c = box.ck(R({ src: { income: 400, contrib: 400, capExcess: 0, basicRange: 0, support: 0, carry: 82000000, total: 82000800 } }));
+  assert.equal(c.length, 1); assert.equal(c[0].lv, 'warn'); assert.match(c[0].d, /㉟ 재원 합계/);
+  assert.match(SRC, /var ck=f15Checks\(R\)/, '운영상황보고서 화면에 붙어 있다');
+});
