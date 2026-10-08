@@ -18382,6 +18382,7 @@ function taxPrep(arrC,fin,wht,yr,f,acctInt,prevRsv1,openRsv1){
     rsvUsed:Math.min(deduct,Math.round(rsvUsed)), remain:0,
     due:{corp:(yr+1)+'-03-31', local:(yr+1)+'-04-30'}, forms:[], lforms:[], notes:[], rows:[], lrows:[]};
   P.remain=Math.max(0,deduct-P.rsvUsed);
+  P.split=splitPL(fin);   // 구분경리 운영성과표(책 대조 D10) — 세무사용 엑셀 «구분경리» 시트
   /* 별지 제10호 원천납부세액명세서 — 건별이 있으면 그대로 옮긴다(책 대조 D5) */
   P.f10=(wht.items||[]).map(function(x){ return {date:x.date||'',payer:x.payer||'',bizno:x.bizno||'',int:Math.round(num(x.int)||0),corp:Math.round(num(x.corp)||0),local:Math.round(num(x.local)||0)}; });
   var _ws=whtItemsSum(P.f10);
@@ -18555,6 +18556,13 @@ function buildTaxWb(list){
     P.forms.concat(P.lforms).forEach(function(x,i){ ws.addRow([i+1,x]); });
     if(P.notes.length){ ws.addRow([]); ws.addRow(['','[참고·확인 필요]']).font=bold; P.notes.forEach(function(x,i){ ws.addRow([i+1,x]); }); }
     ws.getColumn(3).numFmt='#,##0';
+    if(P.split){ var w2=wb.addWorksheet('구분경리');
+      w2.columns=[{width:30},{width:16},{width:16},{width:16}];
+      w2.addRow([(f.name||'')+' '+P.yr+'년 운영성과표 — 회계 구분 (법인세법 제113조, 시행규칙 제76조)']).font=bold;
+      w2.addRow(['재무상태표의 자산·부채·자본은 전부 기금관리회계(수익사업) 소속 — 시행규칙 제76조①']);
+      w2.addRow([]); w2.addRow(['계정과목','목적사업회계','기금관리회계','계']).font=bold;
+      P.split.rows.forEach(function(r){ var x=w2.addRow([(r.lv?'':'   ')+r.t,r.p,r.f,r.sum]); if(r.lv) x.font=bold; });
+      [2,3,4].forEach(function(c){ w2.getColumn(c).numFmt='#,##0'; }); }
     return wb;
   }
   ws.columns=[{header:'#',width:4}].concat(TAX_XL_COLS.map(function(c){ return {header:c[0],width:c[1]==='note'?60:c[1]==='name'?24:14}; }));
@@ -19569,6 +19577,37 @@ function computeFin(arr,fid,yr){
     totalAssets:totalAssets,net:net,retained:retained,equity:equity,totalLiabEq:totalLiabEq,
     balanced:totalAssets===totalLiabEq,opening:opening};
 }
+/* ★ 구분경리 운영성과표 — 목적사업회계 / 기금관리회계 / 계 (책 대조 D10 — 김승훈 2014 p.358~392, 2026-10-08 대표 승인 목업)
+   법인세법 제113조① 수익사업은 따로 경리한다. 시행규칙 제76조① 공통 자산·부채는 수익사업 소속(2026-07-01 시행본 원문 확인)
+   → 재무상태표는 전부 기금관리회계라 칸을 나누지 않는다. 손익만 나눈다:
+     기금관리회계(수익사업) = 이자·대부이자·잡수익 + 준비금 «전입액»(사업외비용) + 법인세등 + 그 밖의 사업외비용
+     목적사업회계           = 고유목적사업비 + 일반관리비 + 준비금 «환입»(책은 «전입수입», 사업외수익)
+   일반관리비는 책 사례 모두와 같이 전부 목적사업회계에 둔다(시행규칙 제76조⑥ 배분을 쓴 사례는 책에 없다).
+   두 회계를 잇는 것은 준비금뿐 — 미수이자가 없으면 두 칸 모두 순이익 0 이 맞다.
+   나누기만 한다: 두 칸 합은 computeFin 의 net 과 같아야 한다(검사가 지킨다). 순수 함수. */
+function splitPL(fin){
+  fin=fin||{}; var tb=fin.tb||{}, V=function(k){ return Math.round(num(fin[k])||0); };
+  var cr=function(a){ var v=tb[a]; return v?Math.round((v.credit||0)-(v.debit||0)):0; };
+  var revSub=['이자수익','대부이자수익','잡수익'].map(function(a){ return [a,cr(a)]; }).filter(function(x){ return x[1]; });
+  var bizRev=V('bizRev'), purpose=V('purpose'), admin=V('admin'), resvExp=V('resvExp'), tax=V('tax');
+  var nonopRev=V('nonopRev'), rev1=V('rev1'), rev2=V('rev2'), otherOp=V('otherExp')-resvExp;
+  var R=function(t,p,f,lv){ return {t:t,p:p,f:f,sum:p+f,lv:lv||0}; }, rows=[];
+  rows.push(R('Ⅰ. 사업수익',0,bizRev,1));
+  revSub.forEach(function(x){ rows.push(R(x[0],0,x[1])); });
+  rows.push(R('Ⅱ. 고유목적사업비',purpose,0,1));
+  rows.push(R('Ⅲ. 일반관리비',admin,0,1));
+  rows.push(R('Ⅳ. 사업외수익',nonopRev,0,1));
+  if(rev1) rows.push(R('준비금1 환입(전입수입)',rev1,0));
+  if(rev2) rows.push(R('준비금2 환입(전입수입)',rev2,0));
+  if(nonopRev-rev1-rev2) rows.push(R('그 밖의 환입',nonopRev-rev1-rev2,0));
+  rows.push(R('Ⅴ. 사업외비용',0,resvExp+otherOp,1));
+  if(resvExp) rows.push(R('고유목적사업준비금 전입액',0,resvExp));
+  if(otherOp) rows.push(R('그 밖의 사업외비용',0,otherOp));
+  if(tax) rows.push(R('Ⅵ. 법인세등',0,tax,1));
+  var netP=nonopRev-purpose-admin, netF=bizRev-resvExp-otherOp-tax;
+  rows.push(R('당기순이익',netP,netF,2));
+  return {rows:rows, netP:netP, netF:netF, net:netP+netF};
+}
 /* ★ 전년 결산에서 전기이월 가져오기 (2026-10-07, 결산 법령 체계 정리 추천 1)
    남은 결손 대부분이 «전기이월 칸이 비어서»였다 — 전년 준비금2 잔액이 안 넘어와 올해 지출을 덮을 재원이 0 으로 보였다
    (손실은 이월, 잉여금은 보전 후 전입 — 근로복지기본법 제64조③. 이월이 끊기면 그 셈이 성립하지 않는다).
@@ -19707,12 +19746,16 @@ function finPanel(arr){
       +'<tr><td>기본재산</td><td style="text-align:right">'+won(f.basic)+'</td></tr>'
       +'<tr><td>'+_retLabel(f.retained)+'</td><td style="text-align:right">'+won(_retVal(f.retained))+'</td></tr>'
       +'<tr style="font-weight:700"><td>부채·자본 총계</td><td style="text-align:right">'+won(f.totalLiabEq)+'</td></tr></table></div>'
-    +'<div style="min-width:280px;flex:1"><div style="font-weight:700;margin-bottom:6px">운영성과표</div><table>'
-      +'<tr><td>사업수익(이자·잡수익)</td><td style="text-align:right">'+won(f.bizRev)+'</td></tr>'
-      +'<tr><td>목적사업비</td><td style="text-align:right">'+won(f.purpose)+'</td></tr>'
-      +'<tr><td>운영비(관리비)</td><td style="text-align:right">'+won(f.admin)+'</td></tr>'
-      +(f.otherExp?'<tr><td>기타비용(정기예금전입 등)</td><td style="text-align:right">'+won(f.otherExp)+'</td></tr>':'')
-      +'<tr style="font-weight:700"><td>당기순이익</td><td style="text-align:right">'+won(f.net)+'</td></tr></table></div></div>'
+    +(function(){ var sp=splitPL(f), N=function(v){ return Number(v||0).toLocaleString(); };
+      /* 합이 0 인데 칸끼리 차이가 나면 틀린 것이 아니다 — 준비금 전입·환입 금액이 그 해 수익·지출과 달라서다(옛 제출본 C공동 2022 등). 알리기만 한다 */
+      var chip=(!sp.netP&&!sp.netF)?'<span class="chip ok">두 회계 모두 순이익 0</span>'
+        :'<span class="chip'+(sp.net?' warn':'')+'" title="두 회계를 잇는 것은 준비금뿐입니다 — 준비금 전입액이 그 해 수익과, 환입이 그 해 지출과 같으면 두 칸 모두 0 입니다">'
+          +(sp.netP?'목적사업회계 '+N(sp.netP):'')+(sp.netP&&sp.netF?' · ':'')+(sp.netF?'기금관리회계 '+N(sp.netF):'')+'</span>';
+      return '<div style="min-width:340px;flex:1.3"><div class="row" style="gap:6px;margin-bottom:6px;flex-wrap:wrap"><b>운영성과표 — 회계 구분</b>'+chip+hlp('close.split')+'</div>'
+        +'<div style="overflow-x:auto"><table><thead><tr><th>계정과목</th><th style="text-align:right">목적사업회계</th><th style="text-align:right">기금관리회계</th><th style="text-align:right">계</th></tr></thead><tbody>'
+        +sp.rows.map(function(r){ var td=function(v){ return '<td style="text-align:right'+(v?'':';color:#94a3b8')+'">'+N(v)+'</td>'; };
+          return '<tr'+(r.lv?' style="font-weight:700'+(r.lv===2?';background:var(--bg)':'')+'"':'')+'><td'+(r.lv?'':' style="padding-left:18px" class="muted"')+'>'+esc(r.t)+'</td>'+td(r.p)+td(r.f)+td(r.sum)+'</tr>'; }).join('')
+        +'</tbody></table></div></div></div>'; })()
     +'<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">합계잔액시산표</summary>'
       +'<table style="margin-top:8px"><thead><tr><th>계정</th><th>유형</th><th style="text-align:right">차변잔액</th><th style="text-align:right">대변잔액</th></tr></thead><tbody>'+tbRows+'</tbody></table></details>'
     +openingHtml+'</div>';
@@ -20710,6 +20753,10 @@ var HELP={
    +'<p><b>📦 제출 묶음</b>은 결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글 틀이 있을 때)와 제출 안내문을 한 zip 으로 받습니다.</p>'
    +'<p>협의회 회의록은 <b>출석위원 전원이 서명 또는 날인</b>해야 합니다(법 제57조). 협의회는 <b>7일 전까지</b> 알려야 합니다(시행령 제42조③).</p>'
    +'<p>노동부 전자신고는 공동인증서 로그인이 필요해 앱이 대신 낼 수 없습니다 — 제출 뒤 <b>노동부 제출 → 완료</b>로 바꾸면 연간 일정(별지15호 제출)도 함께 체크됩니다.</p>'},
+ 'close.split':{t:'운영성과표를 두 회계로 나눕니다',h:'<p>기금은 이자 같은 <b>수익사업</b>(기금관리회계)과 복지 지출인 <b>목적사업</b>(목적사업회계)을 나눠 적습니다 — 법인세법 제113조①, 사내근로복지기금 업무처리지침 제19조.</p>'
+   +'<p><b>기금관리회계</b>: 이자·대부이자·잡수익, 고유목적사업준비금 <b>전입액</b>, 법인세등<br><b>목적사업회계</b>: 고유목적사업비, 일반관리비, 준비금 <b>환입</b>(전입수입)</p>'
+   +'<p>두 회계를 잇는 것은 준비금뿐이라, 미수이자가 없으면 두 칸 모두 순이익이 0 입니다. 일반관리비는 공통비용이지만 전부 목적사업회계에 둡니다(실무 사례 방식).</p>'
+   +'<p>재무상태표는 나누지 않습니다 — 공통 자산·부채는 수익사업에 속합니다(법인세법 시행규칙 제76조①). 그래서 목적사업 칸은 늘 0 입니다.</p>'},
  'close.wht':{t:'이자는 원천징수 «전» 총액으로 잡습니다',h:'<p>은행은 이자에서 <b>법인세(14%)·지방소득세</b>를 먼저 떼고 남은 것만 통장에 넣습니다. 통장 입금액만 이자로 잡으면 이자수익과 <b>고유목적사업준비금1</b>이 그만큼 모자라고, 떼인 세금이 장부에 없어 법인세 신고(별지 제10호 원천납부세액명세서)와 맞지 않습니다.</p>'
    +'<p><b>건별 입력</b>에 영수증 한 장을 한 줄로 넣으면 합계 칸이 저절로 채워지고, 법인세 신고 준비표에 <b>별지 제10호 원천납부세액명세서</b>가 붙습니다. 줄마다 법인세 14%·지방소득세 1.4% 인지, 영수증 이자 총액이 «통장 이자 + 떼인 세금»과 맞는지 함께 봅니다.</p>'
    +'<p>은행에서 받은 <b>이자소득 원천징수영수증</b>(1.1~12.31 전체)의 법인세·지방소득세 합계를 넣으세요. 결산 때 <b>(차) 선납세금 / (대) 이자수익</b>으로 얹어 이자를 총액으로 만듭니다.</p>'
