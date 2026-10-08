@@ -18485,10 +18485,29 @@ function edSplitPos(b) {
   return 'left:' + (b.x * 100) + '%;top:' + (b.y * 100) + '%;width:' + (b.w * 100) + '%;height:' + (b.h * 100) + '%';
 }
 
+/* 네모 판을 «사진이 실제로 그려진 자리»에 맞춘다.
+   ⚠ 칸(edWrap)에 사진의 비를 박아도, 화면이 사진보다 좁으면(폰 세로) 칸은 높이를 다 쓰고
+     사진은 그 안에 가운데로 작게 그려진다(object-fit:contain). 판을 칸에 맞추면 네모가
+     사진 밖 빈 곳을 가리키고, 자른 조각이 엉뚱한 자리가 된다(2026-10-08 확인 상자에서 봤다). */
+function edSplitFit() {
+  const lay = $('edSplit'), im = $('edImg');
+  if (!lay || !im || !im.naturalWidth || !im.naturalHeight) return;
+  const W = im.clientWidth, H = im.clientHeight, ar = im.naturalWidth / im.naturalHeight;
+  let w = W, h = W / ar;
+  if (h > H) { h = H; w = H * ar; }
+  lay.style.inset = 'auto';
+  lay.style.left = ((W - w) / 2) + 'px';
+  lay.style.top = ((H - h) / 2) + 'px';
+  lay.style.width = w + 'px';
+  lay.style.height = h + 'px';
+}
+window.addEventListener('resize', function () { if (photoEd && photoEd.mode === 'split') edSplitFit(); });
+
 function edSplitPaint() {
   const lay = $('edSplit');
   const sp = photoEd && photoEd.split;
   if (!lay || !sp) return;
+  edSplitFit();
   lay.innerHTML = (sp.boxes || []).map(function (b, i) {
     return '<div class="spbox" data-i="' + i + '" style="' + edSplitPos(b) + '">' +
       '<span class="no">' + (i + 1) + '</span>' +
