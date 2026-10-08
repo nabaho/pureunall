@@ -18382,6 +18382,9 @@ function taxPrep(arrC,fin,wht,yr,f,acctInt,prevRsv1,openRsv1){
     rsvUsed:Math.min(deduct,Math.round(rsvUsed)), remain:0,
     due:{corp:(yr+1)+'-03-31', local:(yr+1)+'-04-30'}, forms:[], lforms:[], notes:[], rows:[], lrows:[]};
   P.remain=Math.max(0,deduct-P.rsvUsed);
+  /* 별지 제10호 원천납부세액명세서 — 건별이 있으면 그대로 옮긴다(책 대조 D5) */
+  P.f10=(wht.items||[]).map(function(x){ return {date:x.date||'',payer:x.payer||'',bizno:x.bizno||'',int:Math.round(num(x.int)||0),corp:Math.round(num(x.corp)||0),local:Math.round(num(x.local)||0)}; });
+  var _ws=whtItemsSum(P.f10);
   /* 제27호(을) — 설정연도별 잔액(선입선출). 전년 원장이 없으면 기초 잔액을 「이월(연도 미상)」 한 줄로 */
   var _u=rsv1UseOf(arrC,acctInt||RESERVE_ACCTS[0]);
   P.ledger=rsv1Ledger(prevRsv1,yr,_u.set,_u.use,openRsv1);
@@ -18429,6 +18432,9 @@ function taxPrep(arrC,fin,wht,yr,f,acctInt,prevRsv1,openRsv1){
     P.ledger.rows.filter(function(r){ return r.over; }).forEach(function(r){ P.notes.push('⚠ '+r.y+'년 설정분 '+W(r.left).toLocaleString()+'원이 5년 기한('+r.due+')을 넘겼습니다 — 익금산입·이자상당액 대상(법 제29조⑤4호·⑦).'); });
     P.ledger.rows.filter(function(r){ return r.soon; }).forEach(function(r){ P.notes.push(r.y+'년 설정분 '+W(r.left).toLocaleString()+'원 — 내년('+r.due+')까지 써야 합니다.'); });
     if(whtSrc==='book') P.notes.push('[추정] 원천징수영수증 세액을 넣지 않아 장부 선납세금을 법인세 10 : 지방소득세 1로 나눴습니다 — 결산 화면 «이자 원천징수» 칸에 영수증 금액을 넣으세요.');
+    if(_ws.bad.length) P.notes.push('[확인 필요] 원천징수 건별 '+_ws.bad.join('·')+'번 줄 — 법인세 14%·지방소득세 1.4% 와 다릅니다. 영수증을 다시 보세요.');
+    if(_ws.n&&Math.abs(_ws.int-intCash)>10) P.notes.push('[확인 필요] 원천징수영수증 이자 총액 '+W(_ws.int).toLocaleString()+'원이 장부 이자(총액) '+W(intCash).toLocaleString()+'원과 다릅니다 — 빠진 영수증이나 통장 이자 분개를 확인하세요.');
+    if(whtSrc==='input'&&!_ws.n&&(corp+local)) P.notes.push('원천징수를 합계로만 넣었습니다 — 별지 제10호는 영수증 건별로 적습니다. 결산 화면 «건별 입력»에 넣으면 이 표가 채워집니다.');
     if(whtSrc==='none'&&intCash) P.notes.push('[확인 필요] 원천징수세액이 0입니다 — 원천징수영수증(1.1~12.31 전체)을 받아 결산 화면 «이자 원천징수» 칸에 넣으세요.');
     P.notes.push('지방소득세 세율은 지방자치단체가 조례로 표준세율의 50% 안에서 가감할 수 있습니다(지방세법 제103조의20②) — 고지된 세율 확인.');
   }
@@ -18500,6 +18506,10 @@ function taxPrepShow(){
           return '<tr><td><input type="checkbox"></td><td class="no">'+(i+1)+'</td><td>'+esc(r.y)+'</td><td style="text-align:right">'+K(r.set)+'</td><td style="text-align:right">'+K(r.usedBefore)+'</td><td style="text-align:right">'+K(r.usedNow)+'</td>'
             +'<td style="text-align:right;font-weight:700">'+K(r.left)+'</td><td>'+(r.over?'<span class="chip dg" style="font-size:10px">지남 '+esc(r.due)+'</span>':r.soon?'<span class="chip warn" style="font-size:10px">'+esc(r.due)+'</span>':esc(r.due||'—'))+'</td></tr>'; }).join('')
         +'</tbody></table></div>':'')
+      +(P.f10&&P.f10.length?'<h3 style="font-size:13px;margin:12px 0 4px">원천납부세액명세서 — 별지 제10호</h3><div style="overflow-x:auto"><table><thead><tr><th style="width:24px"><input type="checkbox"></th><th class="no">#</th><th>원천징수일</th><th>징수의무자</th><th>사업자번호</th><th style="text-align:right">이자 총액</th><th style="text-align:right">법인세</th><th style="text-align:right">지방소득세</th></tr></thead><tbody>'
+        +P.f10.map(function(r,i){ var K=function(v){ return Number(v||0).toLocaleString(); };
+          return '<tr><td><input type="checkbox"></td><td class="no">'+(i+1)+'</td><td>'+esc(r.date)+'</td><td>'+esc(r.payer)+'</td><td>'+esc(r.bizno)+'</td><td style="text-align:right">'+K(r.int)+'</td><td style="text-align:right">'+K(r.corp)+'</td><td style="text-align:right">'+K(r.local)+'</td></tr>'; }).join('')
+        +'</tbody></table></div>':'')
       +'<div class="row" style="flex-wrap:wrap;gap:4px;margin-top:10px">'+P.forms.concat(P.lforms).map(function(x){ return '<span class="chip" style="font-size:10.5px">'+esc(x)+'</span>'; }).join('')+'</div>')
     +(P.notes.length?'<div class="msg warn" style="font-size:12px;line-height:1.6;margin-top:10px">'+P.notes.map(function(n){ return '• '+esc(n); }).join('<br>')+'</div>':'')
     +'<div class="row" style="flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-top:12px">'
@@ -18517,6 +18527,7 @@ function taxText(P,f){
   return [(f&&f.name||'')+' '+P.yr+'년 법인세·지방소득세 신고 준비 — '+P.decision,'','[법인세]']
     .concat(P.rows.map(function(r){ return r[0]+': '+(typeof r[1]==='number'?r[1].toLocaleString():r[1]); }))
     .concat(['','[법인지방소득세]']).concat(P.lrows.map(function(r){ return r[0]+': '+(typeof r[1]==='number'?r[1].toLocaleString():r[1]); }))
+    .concat(P.f10&&P.f10.length?['','[별지 제10호 원천납부세액명세서]'].concat(P.f10.map(function(r,i){ return (i+1)+'. '+r.date+' '+r.payer+' '+r.bizno+' · 이자 '+r.int.toLocaleString()+' · 법인세 '+r.corp.toLocaleString()+' · 지방 '+r.local.toLocaleString(); })):[])
     .concat(['','[서식]']).concat(P.forms.concat(P.lforms)).concat(P.notes.length?['','[참고]']:[]).concat(P.notes).join('\n');
 }
 function taxCopyAll(){ _copyText(taxText(_taxP,funds[_taxP.fid]),'신고 준비표 전체를 복사했습니다'); }
@@ -18538,6 +18549,8 @@ function buildTaxWb(list){
     P.lrows.forEach(function(r,i){ ws.addRow([i+1,r[0],r[1],r[2]||'']); });
     if(P.ledger&&P.ledger.rows.length){ ws.addRow([]); ws.addRow(['#','[준비금1 설정연도별 — 제27호(을)] 연도','손금산입액','직전까지 사용 / 당기 사용 / 잔액 / 기한']).font=bold;
       P.ledger.rows.forEach(function(r,i){ ws.addRow([i+1,r.y,r.set,r.usedBefore.toLocaleString()+' / '+r.usedNow.toLocaleString()+' / '+r.left.toLocaleString()+' / '+(r.due||'—')+(r.over?' (기한 지남)':'')]); }); }
+    if(P.f10&&P.f10.length){ ws.addRow([]); ws.addRow(['#','[원천납부세액명세서 — 별지 제10호] 원천징수일 · 징수의무자','이자 총액','사업자번호 / 법인세 / 지방소득세']).font=bold;
+      P.f10.forEach(function(r,i){ ws.addRow([i+1,r.date+' · '+r.payer,r.int,r.bizno+' / '+r.corp.toLocaleString()+' / '+r.local.toLocaleString()]); }); }
     ws.addRow([]); ws.addRow(['','[서식]']).font=bold;
     P.forms.concat(P.lforms).forEach(function(x,i){ ws.addRow([i+1,x]); });
     if(P.notes.length){ ws.addRow([]); ws.addRow(['','[참고·확인 필요]']).font=bold; P.notes.forEach(function(x,i){ ws.addRow([i+1,x]); }); }
@@ -18920,7 +18933,102 @@ function _rsvIsAuto(x){ return RSV_AUTO_ID.test(String((x&&x._id)||'')); }
    ⚠ 통장에 원천징수가 «따로 출금 줄»로 찍히는 기금은 이미 총액이 들어와 있다 — 그때는 칸을 비운다(두 번 잡힌다). */
 function _rsvWhtOf(fid,yr){
   var w=((((funds[fid]||{}).years||{})[yr]||{}).wht)||{};
-  return { corp:Math.max(0,Math.round(num(w.corp)||0)), local:Math.max(0,Math.round(num(w.local)||0)) };
+  /* 건별(별지 제10호)이 있으면 합계는 건별에서 낸다 — 합계 칸과 건별이 따로 놀지 않게 */
+  var it=whtItemsOf(w), s=whtItemsSum(it);
+  if(s.n) return { corp:s.corp, local:s.local, items:it, int:s.int };
+  return { corp:Math.max(0,Math.round(num(w.corp)||0)), local:Math.max(0,Math.round(num(w.local)||0)), items:[] };
+}
+/* ★ 원천징수 건별 — 별지 제10호 원천납부세액명세서(책 대조 D5, 2026-10-08)
+   은행 원천징수영수증 한 장 = 한 줄 {date 원천징수일, payer 징수의무자, bizno 사업자번호, int 이자 총액, corp 법인세, local 지방소득세}.
+   저장: funds/{fid}/years/{yr}/wht/items (배열) — corp·local 에는 그 합계를 함께 적는다(옛 화면·검사가 읽는 자리).
+   세율 검산 — 법인 이자 원천징수 14%(법인세법 제73조①1호), 지방소득세 특별징수는 그 10%(지방세법 제103조의29).
+   원 단위 끝수(10원 미만 절사) 때문에 10원까지는 맞는 것으로 본다. 판단은 사람이 한다 — 알리기만. 순수 함수. */
+function whtItemsOf(w){
+  var v=(w&&w.items)||[];
+  return (Array.isArray(v)?v:Object.keys(v).sort(function(a,b){ return a-b; }).map(function(k){ return v[k]; })).filter(Boolean);
+}
+function whtItemsSum(items){
+  var s={n:0,int:0,corp:0,local:0,bad:[]};
+  (items||[]).forEach(function(it,i){ if(!it) return;
+    var a=Math.round(num(it.int)||0), c=Math.round(num(it.corp)||0), l=Math.round(num(it.local)||0);
+    if(!(a||c||l)) return;
+    s.n++; s.int+=a; s.corp+=c; s.local+=l;
+    var ec=Math.floor(a*0.14/10)*10, el=Math.floor(c*0.1/10)*10;
+    if(a&&(Math.abs(c-ec)>10||Math.abs(l-el)>10)) s.bad.push(i+1);
+  });
+  return s;
+}
+/* 장부에서 «통장으로 받은» 이자 — 영수증 이자 총액 = 이 값 + 떼인 세금 이어야 한다 */
+function whtBookCash(arr){
+  var s=0;
+  expandSplits(arr||[]).forEach(function(x){
+    if(!x||!x.approved||x.credit!=='이자수익') return;
+    if(x._split){ if(!x._nocashSrc) s+=num(x.amount)||0; return; }
+    if(x.nocash) return;
+    s+=num(x.deposit)||num(x.amount)||0; });
+  return Math.round(s);
+}
+/* 화면 — 결산 › 전기이월 의 「건별 입력」 단추에서 연다 */
+function whtItemsOpen(){
+  var w=_rsvWhtOf(S.fundId,S.year);
+  S.whtEd=(w.items.length?w.items:[{}]).map(function(x){ return Object.assign({},x); });
+  _whtItemsShow();
+}
+function _whtItemsShow(){
+  var L=S.whtEd||[], st='width:100%;padding:3px 5px;border:1px solid var(--line);border-radius:6px;font-size:12px';
+  var cell=function(i,k,ph,w,isN){ var v=L[i][k]; v=(v==null?'':v);
+    return '<td style="min-width:'+w+'px"><input value="'+esc(isN&&v!==''?Number(v).toLocaleString():v)+'" placeholder="'+ph+'" oninput="whtItemsSet('+i+',\''+k+'\',this.value)" style="'+st+(isN?';text-align:right':'')+'"></td>'; };
+  showModal('<div class="row" style="gap:6px;margin-bottom:8px"><h2 style="margin:0">'+S.year+'년 이자 원천징수 — 건별</h2>'+hlp('close.wht')+'</div>'
+    +'<div style="overflow-x:auto"><table><thead><tr><th style="width:24px"><input type="checkbox" onclick="document.querySelectorAll(\'.whtck\').forEach(function(c){c.checked=this.checked;},this)"></th><th class="no">#</th>'
+    +'<th>원천징수일</th><th>징수의무자(은행)</th><th>사업자번호</th><th style="text-align:right">이자 총액</th><th style="text-align:right">법인세</th><th style="text-align:right">지방소득세</th></tr></thead><tbody>'
+    +L.map(function(x,i){ return '<tr><td><input type="checkbox" class="whtck" data-i="'+i+'"></td><td class="no">'+(i+1)+'</td>'
+      +cell(i,'date','2026-12-31',96)+cell(i,'payer','은행 이름',110)+cell(i,'bizno','000-00-00000',104)
+      +cell(i,'int','이자',96,1)+cell(i,'corp','법인세',86,1)+cell(i,'local','지방',76,1)+'</tr>'; }).join('')
+    +'<tr style="font-weight:700"><td></td><td></td><td colspan="3">합계</td><td id="wht-s-int" style="text-align:right"></td><td id="wht-s-corp" style="text-align:right"></td><td id="wht-s-local" style="text-align:right"></td></tr>'
+    +'</tbody></table></div><div id="wht-chk" class="row" style="gap:6px;flex-wrap:wrap;margin-top:8px"></div>'
+    +'<div class="row" style="gap:6px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">'
+    +'<button onclick="whtItemsAdd()">+ 줄 추가</button><button onclick="whtItemsDel()">선택 삭제</button>'
+    +'<button class="primary" onclick="whtItemsSave()">저장</button><button onclick="closeM()">닫기</button></div>',{width:820});
+  _whtItemsSum();
+}
+function whtItemsSet(i,k,v){
+  if(!S.whtEd||!S.whtEd[i]) return;
+  S.whtEd[i][k]=(k==='int'||k==='corp'||k==='local')?(String(v).replace(/[^0-9]/g,'')===''?'':num(v)):String(v).trim();
+  _whtItemsSum();
+}
+function _whtItemsSum(){
+  var s=whtItemsSum(S.whtEd), K=function(v){ return Number(v||0).toLocaleString(); };
+  var set=function(id,v){ var e=$(id); if(e) e.textContent=v; };
+  set('wht-s-int',K(s.int)); set('wht-s-corp',K(s.corp)); set('wht-s-local',K(s.local));
+  var box=$('wht-chk'); if(!box) return;
+  var t=S.txns||{}, arr=Object.keys(t).map(function(k){ return t[k]; });
+  var book=whtBookCash(arr), gap=s.int-(book+s.corp+s.local), out=[];
+  if(s.n) out.push(s.bad.length
+    ?'<span class="chip warn">⚠ 세율 검산 — '+s.bad.join('·')+'번 줄이 14% · 1.4% 와 다릅니다(영수증 다시 확인)</span>'
+    :'<span class="chip ok">세율 검산 — '+s.n+'건 모두 14% · 1.4%</span>');
+  if(s.n&&S.txns) out.push('<span class="chip'+(Math.abs(gap)>10?' warn':' ok')+'" title="영수증 이자 총액 = 통장으로 받은 이자 + 떼인 법인세·지방소득세 이어야 합니다">장부 통장 이자 '+K(book)+' + 원천징수 '+K(s.corp+s.local)+' = '+K(book+s.corp+s.local)
+    +' · 영수증 '+K(s.int)+(Math.abs(gap)>10?' → '+K(Math.abs(gap))+' 차이':' ✓')+'</span>');
+  box.innerHTML=out.join('');
+}
+function whtItemsAdd(){ S.whtEd=(S.whtEd||[]).concat([{}]); _whtItemsShow(); }
+function whtItemsDel(){
+  var del={}; document.querySelectorAll('.whtck:checked').forEach(function(c){ del[c.getAttribute('data-i')]=1; });
+  if(!Object.keys(del).length){ toast('지울 줄을 고르세요','warn'); return; }
+  S.whtEd=(S.whtEd||[]).filter(function(x,i){ return !del[i]; }); if(!S.whtEd.length) S.whtEd=[{}];
+  _whtItemsShow();
+}
+function whtItemsSave(){
+  var fid=S.fundId, yr=S.year;
+  var items=(S.whtEd||[]).filter(function(x){ return x&&(num(x.int)||num(x.corp)||num(x.local)); }).map(function(x){
+    return {date:x.date||'',payer:x.payer||'',bizno:x.bizno||'',int:Math.round(num(x.int)||0),corp:Math.round(num(x.corp)||0),local:Math.round(num(x.local)||0)}; });
+  var s=whtItemsSum(items);
+  /* 건별을 모두 지우면 건별만 걷는다 — 손으로 넣어 둔 합계 칸은 그대로 둔다 */
+  var o=items.length?{items:items,corp:s.corp,local:s.local}:{items:null};
+  fbDb.ref(NS+'/funds/'+fid+'/years/'+yr+'/wht').update(o).then(function(){
+    var Y=((funds[fid]=funds[fid]||{}).years=funds[fid].years||{}); Y[yr]=Y[yr]||{};
+    Y[yr].wht=Object.assign({},Y[yr].wht||{},o); if(!items.length) delete Y[yr].wht.items;
+    closeM(); _cbDirty(); renderFund(); toast(items.length?'원천징수 '+items.length+'건 저장 — 합계 칸에 반영됨':'건별을 지웠습니다 — 합계 칸은 그대로');
+  }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function _whtEntry(fid,yr){
   var w=_rsvWhtOf(fid,yr), amt=w.corp+w.local;
@@ -19538,8 +19646,12 @@ function finPanel(arr){
       +(function(){ var w=_rsvWhtOf(S.fundId,S.year), st='width:130px;padding:5px 8px;border:1px solid var(--line);border-radius:8px;font-size:12.5px';
         return '<div class="row" style="gap:8px;margin:8px 0 0;flex-wrap:wrap">'
         +'<label style="font-size:12px;font-weight:700;white-space:nowrap">이자 원천징수</label>'
-        +'<input id="op-whtcorp" value="'+esc(w.corp||'')+'" placeholder="법인세" title="원천징수영수증 — 법인세 합계" style="'+st+'">'
-        +'<input id="op-whtlocal" value="'+esc(w.local||'')+'" placeholder="지방소득세" title="원천징수영수증 — 지방소득세 합계" style="'+st+'">'
+        +(w.items.length
+          ?'<input value="'+esc(w.corp.toLocaleString())+'" readonly title="건별 합계 — 고치려면 「건별 입력」" style="'+st+';background:var(--bg)">'
+            +'<input value="'+esc(w.local.toLocaleString())+'" readonly title="건별 합계 — 고치려면 「건별 입력」" style="'+st+';background:var(--bg)">'
+          :'<input id="op-whtcorp" value="'+esc(w.corp||'')+'" placeholder="법인세" title="원천징수영수증 — 법인세 합계" style="'+st+'">'
+            +'<input id="op-whtlocal" value="'+esc(w.local||'')+'" placeholder="지방소득세" title="원천징수영수증 — 지방소득세 합계" style="'+st+'">')
+        +'<button onclick="whtItemsOpen()" style="padding:4px 10px;font-size:12px" title="원천징수영수증 한 장을 한 줄로 — 별지 제10호 원천납부세액명세서">건별 입력'+(w.items.length?' · '+w.items.length+'건':'')+'</button>'
         +hlp('close.wht')+'</div>'; })()
       /* 비영리조직회계기준으로 결산하는 기금은 당기운영이익이 0이 아니다 — 자동조정을 끈다 */
       +'<label class="row" style="gap:6px;margin-top:10px;font-size:12.5px;cursor:pointer">'
@@ -19627,7 +19739,7 @@ function saveOpening(){
   /* 이자 원천징수(원천징수영수증 합계) — 둘 다 비면 지운다 */
   var _wc=$('op-whtcorp'), _wl=$('op-whtlocal');
   var _wv={corp:_wc?(num(_wc.value)||0):0, local:_wl?(num(_wl.value)||0):0};
-  var _wObj=(_wv.corp||_wv.local)?_wv:null;
+  var _wObj=(_wv.corp||_wv.local)?_wv:null;   // 건별이 있으면 두 칸이 없다(_wc·_wl 이 null) — 아래 두 줄이 건너뛴다
   if(_wc||_wl) up['funds/'+_fid+'/years/'+_yr+'/wht']=_wObj;
   var ra=$('op-rsvauto'); var raOn=ra?!!ra.checked:true;
   up['funds/'+_fid+'/years/'+_yr+'/reserve_auto']=(raOn?null:false);
@@ -20599,6 +20711,7 @@ var HELP={
    +'<p>협의회 회의록은 <b>출석위원 전원이 서명 또는 날인</b>해야 합니다(법 제57조). 협의회는 <b>7일 전까지</b> 알려야 합니다(시행령 제42조③).</p>'
    +'<p>노동부 전자신고는 공동인증서 로그인이 필요해 앱이 대신 낼 수 없습니다 — 제출 뒤 <b>노동부 제출 → 완료</b>로 바꾸면 연간 일정(별지15호 제출)도 함께 체크됩니다.</p>'},
  'close.wht':{t:'이자는 원천징수 «전» 총액으로 잡습니다',h:'<p>은행은 이자에서 <b>법인세(14%)·지방소득세</b>를 먼저 떼고 남은 것만 통장에 넣습니다. 통장 입금액만 이자로 잡으면 이자수익과 <b>고유목적사업준비금1</b>이 그만큼 모자라고, 떼인 세금이 장부에 없어 법인세 신고(별지 제10호 원천납부세액명세서)와 맞지 않습니다.</p>'
+   +'<p><b>건별 입력</b>에 영수증 한 장을 한 줄로 넣으면 합계 칸이 저절로 채워지고, 법인세 신고 준비표에 <b>별지 제10호 원천납부세액명세서</b>가 붙습니다. 줄마다 법인세 14%·지방소득세 1.4% 인지, 영수증 이자 총액이 «통장 이자 + 떼인 세금»과 맞는지 함께 봅니다.</p>'
    +'<p>은행에서 받은 <b>이자소득 원천징수영수증</b>(1.1~12.31 전체)의 법인세·지방소득세 합계를 넣으세요. 결산 때 <b>(차) 선납세금 / (대) 이자수익</b>으로 얹어 이자를 총액으로 만듭니다.</p>'
    +'<p>선납세금은 <b>법인세(3/31)·법인지방소득세(4/30)를 기한 안에 신고해야</b> 돌려받습니다. 환급금이 들어오면 선납세금을 줄이는 쪽으로 분개합니다(잡이익 아님).</p>'
    +'<p>통장에 원천징수가 <b>따로 출금 줄로</b> 찍히는 기금은 이미 총액이 들어와 있으니 칸을 비우고, 그 출금 줄을 선납세금으로 분개하세요.</p>'},

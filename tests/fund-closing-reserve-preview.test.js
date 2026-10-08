@@ -48,7 +48,7 @@ const B = (() => {
     grabFn('journalOf'), grabFn('acctMoves'), grabFn('openingMoves'), grabFn('tbRowsOf'), grabFn('computeFin'),
     grabFn('useRate'), grabFn('bizIncomeOnly'), grabFn('bizUseRate'), grabFn('_reserveRate'), grabFn('_contribOf'), grabFn('_rsvSwapOf'), grabFn('_rsvRoles'),
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
-    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'),
+    grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
     'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
