@@ -1575,7 +1575,11 @@
   function erpStaff() {
     if (!deps.db) return Promise.resolve([]);
     return deps.db.ref(STAFF_DIR).once('value').then(function (sn) {
-      var v = sn.val();
+      /* ⚠⚠ 명부도 { u: 마지막수정, v: 목록 } 봉투다 (2026-09-22 이알피가 트랜잭션으로 바꿈).
+         v 를 안 풀면 칸 두 개짜리 객체가 나와 아무도 안 걸러지고, 주담당 고르개가
+         «직원 명부를 아직 못 받았습니다»로 영영 비어 계약을 못 만든다(2026-10-08 실측, 9/22~). */
+      var raw = sn.val();
+      var v = (raw && typeof raw === 'object' && !Array.isArray(raw) && raw.v !== undefined) ? raw.v : raw;
       var arr = Array.isArray(v) ? v
         : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []);
       return arr.filter(function (u) {
