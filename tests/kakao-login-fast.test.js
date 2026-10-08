@@ -158,6 +158,44 @@ test('★★ ④ 노란 단추가 서버를 미리 깨우고, 1분에 한 번만
   assert.equal(calls.filter(c => /warm=1/.test(c.url)).length, 1, '★ 1분 안에 또 두드린다');
 });
 
+test('★★ 로그인 주소 GET 은 본문·JSON 헤더 없이 보내 브라우저의 CORS 사전 요청을 만들지 않는다', async () => {
+  const { K, calls } = loadClient();
+  await K.goLogin({});
+  const auth = calls.find(c => /kakaoAuthUrl/.test(c.url));
+  assert.ok(auth, '카카오 로그인 주소 요청이 없다');
+  assert.equal(auth.o.method, 'GET');
+  assert.equal(auth.o.body, undefined);
+  assert.ok(!auth.o.headers || !Object.keys(auth.o.headers).some(k => k.toLowerCase() === 'content-type'),
+    '본문 없는 GET 에 JSON Content-Type 을 붙이면 휴대전화가 OPTIONS 를 한 번 더 보낸다');
+});
+
+test('★★ 캐시된 옛 화면의 GET 사전 요청도 서버가 허용한다', async () => {
+  const K = fresh();
+  const headers = {};
+  const result = await new Promise(resolve => {
+    const res = { set(k, v) { headers[k.toLowerCase()] = v; return this; },
+      status(code) { this.code = code; return this; }, send() { resolve(this.code); } };
+    K.kakaoAuthUrl({ method: 'OPTIONS', headers: { origin: 'https://nabaho.github.io' }, query: {} }, res);
+  });
+  assert.equal(result, 204);
+  assert.ok(headers['access-control-allow-methods'].split(',').includes('GET'),
+    '이전 화면이 GET 전에 보낸 OPTIONS 는 GET 을 허용해야 한다');
+});
+
+test('★★ 카카오 단추는 인증 저장소를 먼저 기다리지 않고 곧바로 카카오 주소를 요청한다', () => {
+  const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  const start = enter.indexOf('function kkLogin(){');
+  const end = enter.indexOf('function kkEndReturn()', start);
+  assert.ok(start >= 0 && end > start, '카카오 단추 처리 구간을 찾지 못했다');
+  const body = enter.slice(start, end);
+  assert.match(body, /PuKakao\.goLogin\(\{ ask: !used \}\)/);
+  assert.doesNotMatch(body, /auth\.setPersistence|_persistenceReady\.then/,
+    '카카오 화면으로 가기 전 저장소 준비를 기다리고 있다');
+  assert.match(enter.slice(end, enter.indexOf('var KK_WANT', end)),
+    /auth\.setPersistence\(keep \? firebase\.auth\.Auth\.Persistence\.LOCAL : firebase\.auth\.Auth\.Persistence\.SESSION\)/,
+    '복귀 뒤 로그인 유지 선택은 계속 적용해야 한다');
+});
+
 test('★★ ⑤ 서버 답을 기다리는 «동안» 화면의 DB 연결을 먼저 연다 · 로그인 화면은 카카오 쓰는 기기만 깨운다', () => {
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
   const at = enter.indexOf('PuKakao.loginFinish(p.code)');

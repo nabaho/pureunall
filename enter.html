@@ -142,7 +142,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
 <script src="js/pu-passkey.js?v=3"></script>
-<script src="js/pu-kakao.js?v=6"></script>
+<script src="js/pu-kakao.js?v=7"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -1928,16 +1928,12 @@ body.portal-mode #moreFab{display:flex;}
          유지 방식은 사라진다. 실제로 정하는 곳은 돌아온 뒤 표를 받기 직전(kkHandleReturn)이다. */
     var keep = !!($('autoLogin') && $('autoLogin').checked);
     try { localStorage.setItem('pu_portal_auto', keep ? '1' : '0'); } catch(e){}
-    _persistenceReady.then(function(){
-      return auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-    }).then(function(){
-      /* ★ 처음 쓰는 기기(카카오로 들어온 적 없음)면 카카오가 «다시 묻게» 한다 (2026-09-28 대표 「추천대로」).
-           공용 PC 에 남의 카카오 로그인이 남아 있으면 그대로 그 사람으로 들어가 버린다.
-           ⚠ 저장소를 못 읽으면 «묻는 쪽» 으로 — 안전한 쪽이 기본이다. */
-      var used = false;
-      try { used = localStorage.getItem(KK_USED_KEY) === '1'; } catch(e){}
-      return PuKakao.goLogin({ ask: !used });   // 여기서 화면이 카카오로 떠난다 — 아래 catch 는 «떠나기 전» 실패만 잡는다
-    }).catch(function(err){
+    /* 카카오로 떠나기 전에는 Firebase 인증 저장소를 바꿀 필요가 없다.
+       특히 휴대전화 IndexedDB 가 느리면 노란 단추가 여기서 멈춘 듯 보였다.
+       유지 방식은 복귀 뒤 인증표로 실제 로그인하기 직전에 적용한다. */
+    var used = false;
+    try { used = localStorage.getItem(KK_USED_KEY) === '1'; } catch(e){}
+    PuKakao.goLogin({ ask: !used }).catch(function(err){
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
       if(btn) btn.disabled = false;
     });

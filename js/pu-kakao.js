@@ -23,9 +23,11 @@
   }
 
   function call(path, opts, body, idToken) {
-    var headers = { 'Content-Type': 'application/json' };
-    if (idToken) headers.Authorization = 'Bearer ' + idToken;
     var method = (opts && opts.method) || 'POST';
+    /* 본문 없는 GET 에 JSON 헤더를 붙이면 브라우저가 OPTIONS 사전 요청을 보낸다.
+       카카오 주소를 받는 첫 단계는 GET 한 번이면 된다. POST 의 JSON·인증 헤더는 유지한다. */
+    var headers = method === 'GET' ? {} : { 'Content-Type': 'application/json' };
+    if (idToken) headers.Authorization = 'Bearer ' + idToken;
     var qs = (opts && opts.query) ? ('?' + opts.query) : '';
     var st = 0;
     var ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
