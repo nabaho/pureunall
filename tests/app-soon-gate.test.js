@@ -32,10 +32,11 @@ const 잠글앱 = {
   'rules.html': '취업규칙', 'payroll-os.html': '급여관리',
   /* 문서관리는 2026-10-04 대표 「직원도 문서관리 모두 본다」로 열었다 — ⑦ 이 지킨다 */
   'pu-paydata.html': '급여데이터함',
-  'pu-cards.html': '푸른 메일', 'rules-v2.html': '취업규칙'
+  /* 푸른 메일(pu-cards.html)은 2026-10-09 대표 「준비중 풀어도 된다」로 열었다 — ⑧ 이 지킨다 */
+  'rules-v2.html': '취업규칙'
 };
 
-test('①★★ 다섯 앱이 모두 문을 단다 — 하나라도 빠지면 그 앱은 주소로 열린다', () => {
+test('①★★ 잠근 앱은 모두 문을 단다 — 하나라도 빠지면 그 앱은 주소로 열린다', () => {
   Object.keys(잠글앱).forEach(f => {
     const s = R(f);
     assert.match(s, /PuGate\.soonUnlessAdmin\(/,
@@ -59,26 +60,18 @@ test('②★★ 로그인 화면을 재탕하지 않는다 — 이미 로그인�
   assert.doesNotMatch(soon, /🔒/, '★ 자물쇠는 「못 들어온다」는 뜻이다 — 여기는 「아직 없다」다');
 });
 
-test('③★★ 명함함(기업정보함)은 안 잠긴다 — 같은 파일이지만 다른 프로그램이다', () => {
-  const s = R('pu-cards.html');
-  const i = s.indexOf('PuGate.soonUnlessAdmin(');
-  assert.ok(i > -1);
-  /* 그 부름이 «view=mail 일 때만» 도는지 본다 — 같은 줄에서 확인한다 */
-  const 줄 = s.slice(s.lastIndexOf('\n', i) + 1, s.indexOf('\n', i));
-  assert.match(줄, /view=mail/,
-    '★★ 조건 없이 막는다 — 기업정보함이 함께 잠긴다. 대표가 잠그라 하신 것은 메일뿐이다');
-
-  /* 진짜로 갈리는지 돌려 본다 */
-  const 판 = (search) => {
-    let 막았나 = null;
-    const ctx = { location: { search }, PuGate: { soonUnlessAdmin: (n) => { 막았나 = n; } }, console };
-    vm.createContext(ctx);
-    vm.runInContext(줄, ctx);
-    return 막았나;
-  };
-  assert.equal(판('?view=mail&sso=1'), '푸른 메일', '★★ 메일 문인데 안 막았다');
-  assert.equal(판('?sso=1'), null, '★★ 명함함인데 막았다 — 쓰던 기능이 잠긴다');
-  assert.equal(판(''), null, '★ 맨 주소(명함함)인데 막았다');
+test('③★★ 잠근 앱은 «그 앱만» 막는다 — 한 파일에 두 프로그램이 들었을 때', () => {
+  /* ⚠ 한 파일이 두 프로그램인 곳(pu-cards.html = 기업정보함 + 푸른 메일)에서
+       조건 없이 막으면 «시키지 않은 쪽»이 함께 잠긴다. 지금 그런 앱은 없지만,
+       다시 생기면 이 규칙이 그 자리에서 걸려야 한다. */
+  Object.keys(잠글앱).forEach(f => {
+    const s = R(f);
+    const i = s.indexOf('PuGate.soonUnlessAdmin(');
+    const 줄 = s.slice(s.lastIndexOf('\n', i) + 1, s.indexOf('\n', i));
+    /* 조건을 달았으면 그 조건이 «주소를 본다»는 것까지 확인한다 */
+    if (/if\s*\(/.test(줄)) assert.match(줄, /location\.(search|pathname|href)/,
+      '★★ ' + f + ' 의 문에 조건은 있는데 무엇을 보는지 알 수 없다');
+  });
 });
 
 test('④★★ 역할을 «모르는 동안»에는 안 씌운다 — 대표가 자기 프로그램에서 잠기면 안 된다', () => {
@@ -138,4 +131,19 @@ test('⑦★ 문서관리는 직원에게 열려 있다 — 대표 「직원도 
   const 줄 = portal.split('\n').find(l => l.indexOf("key:'docs'") >= 0);
   assert.ok(줄, '★ 포털에 문서관리 타일이 없다');
   assert.doesNotMatch(줄, /soon:\s*true/, '★ 포털 문서관리 타일이 다시 준비중이다');
+});
+
+test('⑧★★ 푸른 메일은 직원에게 열려 있다 — 대표 「준비중 풀어도 된다」(2026-10-09)', () => {
+  /* ★ 문은 «두 곳»이 짝이다 — 포털 딱지와 앱 안쪽. 하나만 되살아나도 반쪽이 된다:
+       딱지만 남으면 주소를 직접 친 사람에게 열리고, 안쪽만 남으면 포털에서는
+       멀쩡해 보이는데 눌러서 들어가면 막힌다. 그래서 둘을 함께 본다. */
+  const portal = R('enter.html');
+  const 줄 = portal.split('\n').find(l => l.indexOf("key:'mail'") >= 0);
+  assert.ok(줄, '★ 포털에 푸른 메일 타일이 없다');
+  assert.doesNotMatch(줄, /soon:\s*true/,
+    '★★ 포털 푸른 메일 타일이 다시 준비중이다 — 직원이 못 누른다');
+
+  const s = stripJs(R('pu-cards.html'));
+  assert.doesNotMatch(s, /PuGate\.soonUnlessAdmin\(/,
+    '★★ 메일함 안쪽에 준비중 문이 다시 생겼다 — 포털에서는 열리는데 들어가면 막힌다');
 });
