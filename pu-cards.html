@@ -34876,9 +34876,9 @@ function openCoDoc(year, id, owner){
      「같은 서류 정리」의 무더기 처리뿐). 붙이는 길만 만들면 잘못 붙인 것이 영영 남는다.
      떼기는 «휴지통»으로 보낸다 — 되돌리기·영구삭제 화면이 이미 있다(trashDocs).
      새 자리를 만들지 않는다.
-   ⚠ **내가 찍은 것만** 고를 수 있다(1걸음). 규칙상 관리자는 남의 사진첩도 읽지만,
-     사람을 고르는 화면은 다음 걸음이다 — 없는 기능을 있는 것처럼 보이게 하지 않는다.
-     그 사실을 고르개에 적어 둔다.
+   ⚠ 직원은 **내가 찍은 것만** 고른다 — 규칙상 남의 사진첩은 관리자만 읽는다.
+     대표는 사람을 골라(또는 「모두」) 직원이 찍은 것도 고른다(2걸음, 2026-10-09 — 아래 coAttachPeople).
+     고르개에 누구 것을 보는지 적어 둔다.
    ⚠ 통째로 안 읽는다 — 사진 번호가 push 키(시간순)라 limitToLast 로 최근 것만 받는다.
      1월에 지난해 것이 보여야 하므로 «올해와 지난해» 둘만 본다. */
 const CO_ATTACH_SCAN = 60;          /* 해마다 최근 몇 장까지 훑나 */
@@ -34985,7 +34985,54 @@ function coAttachHave(o){
   Object.keys((o && o.extra && o.extra.docs) || {}).forEach(k=>{ have[k] = 1; });
   return have;
 }
-async function openCoAttach(){
+/* ── 2걸음: 대표는 «직원이 찍은» 사진첩에서도 고른다 (대표 지시 2026-10-09 「진행」, 목업 승인) ──
+   ★ 사람 고르기 줄은 «관리자에게만» 그린다. 규칙상 남의 사진첩(puphotos/u/$uid)은
+     관리자만 읽는다 — 직원 화면에 줄을 세우면 누를 때마다 «권한 없음»만 뜬다.
+   ★ 이 회사 이름이 적힌 서류를 «먼저» 세운다 — 다만 «저절로 붙이지는 않는다».
+     이름이 같아도 다른 회사일 수 있다(이름으로 회사 맞추기는 이 저장소가 여러 번 밟은 자리).
+   ⚠ 사람 이름은 명부(사번 → 이름)로만 낸다. 이름을 모르는 계정은 «안 세운다» —
+     사람 자리에 번호가 뜨던 사고가 있었다(사진첩 2026-09).
+   ⚠ 남의 사진에 주인(owner)이 비어 있으면 읽은 자리의 uid 를 넣는다 —
+     안 넣으면 「원본 보기」가 «내» 사진첩에서 그 번호를 찾다가 못 찾는다. */
+const CO_ATTACH_ALL = 'all';
+/* 고를 수 있는 사람 — 재직 중이고 이름을 아는 사람만, 사번 순 (순수 로직) */
+function coAttachPeople(roles, nameBySid, myUid){
+  const out = [];
+  Object.keys(roles || {}).forEach(uid=>{
+    const r = (roles || {})[uid] || {};
+    if(!uid || uid === myUid) return;
+    if(String(r.status || '') !== 'active') return;
+    const sid = String(r.sid || '');
+    const name = String((nameBySid || {})[sid] || '').trim();
+    if(!name) return;
+    out.push({ uid: uid, sid: sid, name: name });
+  });
+  return out.sort((a,b)=>a.sid.localeCompare(b.sid));
+}
+/* 서류에 적힌 회사가 «이 회사»인가 — 이름 다듬개는 ErpMatch._norm 하나만 쓴다 */
+function coAttachHit(rowCompany, coName){
+  const n = (typeof ErpMatch !== 'undefined' && ErpMatch._norm)
+    ? ErpMatch._norm : (s=>String(s || '').replace(/\s+/g, '').toLowerCase());
+  const a = n(rowCompany || ''), b = n(coName || '');
+  return !!a && !!b && a === b;
+}
+/* 이 회사 것으로 보이는 줄 먼저, 그다음 최근 것부터 (순수 로직) */
+function coAttachSort(rows, coName){
+  (rows || []).forEach(r=>{ r.hit = coAttachHit(r.company, coName); });
+  return (rows || []).slice().sort((a,b)=>
+    ((b.hit ? 1 : 0) - (a.hit ? 1 : 0)) || (b.at - a.at) || String(b.id).localeCompare(String(a.id)));
+}
+let _coAttachPeople = null;
+async function coAttachPeopleLoad(myUid){
+  if(_coAttachPeople) return _coAttachPeople;
+  try{
+    const snap = await firebase.database().ref('uid_roles').once('value');
+    _coAttachPeople = coAttachPeople(snap.val() || {},
+      (typeof ErpMatch !== 'undefined' && ErpMatch.nameBySid) || {}, myUid);
+  }catch(_){ _coAttachPeople = []; }
+  return _coAttachPeople;
+}
+async function openCoAttach(who){
   const key = String(state.coPick || '');
   if(!key) return toast('먼저 회사를 골라 주세요', 6000);
   if(typeof Store === 'undefined' || Store.mode !== 'firebase')
@@ -34995,33 +35042,70 @@ async function openCoAttach(){
   if(!uid) return toast('로그인이 필요합니다', 6000);
   const o = (coList() || []).filter(x=>x.key === key)[0];
   if(!o) return toast('그 회사를 찾지 못했습니다', 6000);
+  const admin = !!state.isAdmin;
+  const people = admin ? await coAttachPeopleLoad(uid) : [];
+  /* 직원이면 «나» 하나뿐이다 — 주소를 꾸며 남의 uid 를 넘겨도 여기서 막는다 */
+  let pick = admin ? String(who || '') : '';
+  if(pick && pick !== CO_ATTACH_ALL && !people.some(p=>p.uid === pick)) pick = '';
+  const nameOf = {}; nameOf[uid] = '나';
+  people.forEach(p=>{ nameOf[p.uid] = p.name; });
+  const uids = pick === CO_ATTACH_ALL ? [uid].concat(people.map(p=>p.uid)) : [pick || uid];
   const now = new Date().getFullYear();
   const years = [String(now), String(now - 1)];
-  showPanel(`<div class="mhead"><b>📎 사진첩에서 붙이기</b>${_closeBtn()}</div>
-    <p class="cpnone" style="padding:18px 2px">사진첩을 읽고 있습니다…</p>`);
-  const byYear = {};
-  try{
-    for(const y of years){
-      const snap = await firebase.database()
-        .ref(`puphotos/u/${uid}/items/${y}`).limitToLast(CO_ATTACH_SCAN).once('value');
-      byYear[y] = snap.val() || {};
+  const head = `<div class="mhead"><b>📎 사진첩에서 붙이기</b>${_closeBtn()}</div>`;
+  const chip = (v, label) => `<button${(pick || '') === v ? ' style="background:#2563eb;color:#ffffff"' : ''}
+      onclick="openCoAttach('${esc(v)}')">${esc(label)}</button>`;
+  const whoBar = admin && people.length ? `<div class="coerppin" style="margin:4px 0 8px">
+      <span class="dim">누가 찍은 사진첩 (대표만 보입니다)</span>
+      ${chip('', '나')}${people.map(p=>chip(p.uid, p.name)).join('')}${chip(CO_ATTACH_ALL, '👥 모두')}</div>` : '';
+  showPanel(`${head}${whoBar}<p class="cpnone" style="padding:18px 2px">사진첩을 읽고 있습니다…</p>`);
+  const have = coAttachHave(o);
+  let rows = [], failed = 0;
+  for(const u of uids){
+    const byYear = {};
+    try{
+      for(const y of years){
+        const snap = await firebase.database()
+          .ref(`puphotos/u/${u}/items/${y}`).limitToLast(CO_ATTACH_SCAN).once('value');
+        byYear[y] = snap.val() || {};
+      }
+    }catch(e){
+      /* 모두 볼 때 한 사람이 막혀도 나머지는 보인다 — 몇 명이 막혔는지는 아래에 적는다 */
+      if(uids.length === 1) return toast('사진첩을 읽지 못했습니다: ' + ((e && e.message) || ''), 9000);
+      failed++; continue;
     }
-  }catch(e){ return toast('사진첩을 읽지 못했습니다: ' + ((e && e.message) || ''), 9000); }
-  const rows = coAttachList(byYear, coAttachHave(o));
+    coAttachList(byYear, have).forEach(r=>{
+      if(!r.owner) r.owner = u;
+      r.by = nameOf[u] || '';
+      rows.push(r);
+    });
+  }
+  rows = coAttachSort(rows, o.name);
   _coAttach = {};
   rows.forEach(r=>{ _coAttach[r.dk] = r; });
-  showPanel(`<div class="mhead"><b>📎 사진첩에서 붙이기</b>${_closeBtn()}</div>
+  const many = uids.length > 1;
+  const whoTxt = pick === CO_ATTACH_ALL ? '직원 모두가 찍은 사진'
+    : pick ? `${esc(nameOf[pick] || '')} 님이 찍은 사진` : '';
+  const line = r => `
+      <button class="setbtn" onclick="coAttachDo('${esc(r.dk)}')"${r.hit ? ' style="background:#f0fdf4"' : ''}
+        title="${esc((r.company ? r.company + ' · ' : '') + '사진첩 ' + r.year + (r.by ? ' · ' + r.by : ''))}">📄 ${esc(r.name || '이름 없는 서류')}
+        <span class="sdesc">${many && r.by ? esc(r.by) + ' · ' : ''}${esc(r.company || '')}${r.company ? ' · ' : ''}${r.at ? esc(fmtDate(r.at)) : esc(r.year)}</span>
+      </button>`;
+  const hits = rows.filter(r=>r.hit), rest = rows.filter(r=>!r.hit);
+  showPanel(`${head}${whoBar}
     <p class="setnote">고른 서류가 <b>${esc(o.name || key)}</b> 의 「📥 읽어 온 서류」에 붙습니다.
       <b>회사 칸의 값은 채우지 않습니다</b> — 값을 채우는 것은 사진첩의 「기업 상세로 보내기」입니다.<br>
-      내가 찍은 사진 가운데 <b>올해·지난해 최근 ${CO_ATTACH_SCAN}장</b>씩만 나옵니다.</p>
-    ${rows.length ? `<div class="setpanel">${rows.map(r=>`
-      <button class="setbtn" onclick="coAttachDo('${esc(r.dk)}')"
-        title="${esc((r.company ? r.company + ' · ' : '') + '사진첩 ' + r.year)}">📄 ${esc(r.name || '이름 없는 서류')}
-        <span class="sdesc">${esc(r.company || '')}${r.company ? ' · ' : ''}${r.at ? esc(fmtDate(r.at)) : esc(r.year)}</span>
-      </button>`).join('')}</div>`
-      : `<p class="cpnone" style="padding:14px 2px">붙일 서류가 없습니다 — 내가 찍은 최근 사진 가운데
+      ${whoTxt ? `<b>${whoTxt}</b> 가운데 <b>올해·지난해 최근 ${CO_ATTACH_SCAN}장</b>씩만 나옵니다.`
+        : `내가 찍은 사진 가운데 <b>올해·지난해 최근 ${CO_ATTACH_SCAN}장</b>씩만 나옵니다.`}
+      ${failed ? `<br>⚠ ${failed}명의 사진첩은 읽지 못했습니다.` : ''}</p>
+    ${rows.length ? `${hits.length ? `<div class="sdesc" style="padding:6px 2px;color:#16a34a;font-weight:700">★ 이 회사 이름이 적힌 서류</div>
+      <div class="setpanel">${hits.map(line).join('')}</div>` : ''}
+      ${rest.length ? `${hits.length ? '<div class="sdesc" style="padding:10px 2px 6px;font-weight:700">그 밖의 서류</div>' : ''}
+      <div class="setpanel">${rest.map(line).join('')}</div>` : ''}`
+      : `<p class="cpnone" style="padding:14px 2px">붙일 서류가 없습니다 — ${whoTxt ? whoTxt : '내가 찍은 최근 사진'} 가운데
          판독된 서류가 없거나, 이미 다 붙어 있습니다.</p>`}`);
 }
+
 let _coAttach = {};
 async function coAttachDo(dk){
   const key = String(state.coPick || '');
