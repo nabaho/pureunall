@@ -19869,6 +19869,22 @@ function mbBoxWhoPickHtml(slug){
 }
 /* 이 칸이 「사람 안 붙임」인가 */
 function mbNoWhoBox(slug){ return !!((_mbNoWho||{})[String(slug||'')]); }
+/* ══ 왜 안 붙이나 — 까닭이 둘이다 (대표 지시 2026-10-09) ═══════════════════════
+   「칸 안에는 여러 사람의 담당이 섞여 있어서 특정을 할 수 없다」
+   ① 그냥 '' — 담당이라는 말이 안 맞는 칸(경조사·광고·쇼핑 …)
+   ② 'mixed'  — 담당은 «있는데» 여러 사람 것이 섞여 칸 하나로는 못 정하는 칸
+                (사무실업무관련·공공기관·노무사회·자율점검·국민건강고용산재)
+   ⚠★ 하는 일은 둘이 똑같다 — 칸이 담당을 «안 내놓는다». 다른 것은 «말»뿐이다.
+     그런데 그 말이 중요하다: ②를 ①로 적어 두면 다음 사람이 「담당이 없는 칸이구나」로
+     읽고, 거꾸로 아무 표시가 없으면 「아직 안 정했구나」 하고 한 사람을 얹는다.
+     그 순간 남의 메일이 그 사람에게 통째로 간다 — 대표께서 막으신 것이 바로 그것이다. */
+function mbNoWhoWhy(slug){
+  const v = (_mbNoWho||{})[String(slug||'')];
+  return (v && typeof v === 'object' && v.why === 'mixed') ? 'mixed' : '';
+}
+function mbNoWhoLabel(slug){
+  return mbNoWhoWhy(slug) === 'mixed' ? '여럿이 섞임' : '사람 안 붙임';
+}
 /* 이 줄이 「사람 안 붙임」인가 — 사람이 콕 집어 보낸 것은 빼고 본다 */
 function mbNoWhoOfRow(v){
   if(!v || !v._slug) return false;
@@ -19876,19 +19892,23 @@ function mbNoWhoOfRow(v){
   const byMsg = (v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '';
   return !byMsg;
 }
-/* 칸을 켜고 끈다 — 전 직원 공용이라 config 밑에 둔다 */
-function mbNoWhoSet(slug, on){
+/* 칸을 켜고 끈다 — 전 직원 공용이라 config 밑에 둔다.
+   why: 'mixed' 면 «여럿이 섞여 못 정하는 칸», 없으면 «담당이라는 말이 안 맞는 칸». */
+function mbNoWhoSet(slug, on, why){
   const k = String(slug||''); if(!k) return;
   _mbNoWho = _mbNoWho || {};
-  if(on) _mbNoWho[k] = 1; else delete _mbNoWho[k];
+  const 섞임 = String(why||'') === 'mixed';
+  const val = 섞임 ? { why:'mixed', at:Date.now(), by:(typeof mbWorkMe==='function'?mbWorkMe():'') } : 1;
+  if(on) _mbNoWho[k] = val; else delete _mbNoWho[k];
   closeFolderMenu();
   mbWhoBust(); renderPCSide(); renderMailPage();
   if(typeof Store!=='undefined' && Store.mode==='firebase'){
-    firebase.database().ref(DB_ROOT+'/config/mailNoWho/'+k).set(on ? 1 : null)
+    firebase.database().ref(DB_ROOT+'/config/mailNoWho/'+k).set(on ? val : null)
       .catch(e=>toast('저장하지 못했습니다 — '+((e&&e.message)||e), 7000));
   }
-  toast(on ? '👤 이 칸은 담당자를 안 붙입니다 — 「사람 안 붙임」에 모입니다'
-           : '이 칸도 다시 담당자를 붙입니다', 6000);
+  toast(!on ? '이 칸도 다시 담당자를 붙입니다'
+       : 섞임 ? '🔀 이 칸은 여러 사람 것이 섞여 «칸으로는» 안 정합니다 — 한 통씩 박는 것은 그대로 됩니다'
+              : '👤 이 칸은 담당자를 안 붙입니다 — 「사람 안 붙임」에 모입니다', 7000);
 }
 
 /* ⚠ 찾아 둔 표(idx0)를 받아 쓸 수 있게 열어 둔다 — 만 통을 훑는 자리(mbWhoTally)에서
@@ -20197,7 +20217,14 @@ function mbCheckHtml(){
         + '<td class="act">' + (x.who.length
             ? '<span class="t" title="맨 앞이 주담당입니다">' + esc(x.who[0]) + ' 주'
               + (x.who.length > 1 ? ' 외 ' + (x.who.length - 1) : '') + '</span>'
-            : '<span class="em">아무도 없음</span>') + '</td></tr>');
+            /* ⚠ 「아무도 없음」만 적어 두면 할 일이 영영 안 지워진다. 대표 지시 2026-10-09
+                 「칸 안에는 여러 사람의 담당이 섞여 있어서 특정을 할 수 없다」 — 그런 칸은
+                 못 정하는 것이 «답»이므로, 그 자리에서 그렇게 적을 수 있어야 한다. */
+            : '<span class="em">아무도 없음</span>'
+              + ' <button class="mck-chip" onclick="mbNoWhoSet(\'' + esc(x.slug) + '\', true, \'mixed\')"'
+              + ' title="담당은 있지만 여러 사람 것이 섞여 칸 하나로는 못 정하는 칸입니다 —'
+              + ' 할 일에서 빠집니다. 한 통씩 박는 것은 그대로 됩니다">🔀 여럿이 섞임</button>')
+        + '</td></tr>');
     });
   }
   /* ── 👤 처음 보는 주소 — 담는 자리 (대표 지시 2026-09-16) ──
@@ -23084,8 +23111,16 @@ function mbFolderMenu(slug, ev){
       <div class="fmsec">👤 이 칸을 보는 사람
         <span style="font-weight:400">— 맨 앞이 주담당, 나머지는 함께 봅니다</span></div>
       <div class="fmwho">${mbBoxWhoPickHtml(slug)}</div>`}
-    <div class="fmi" onclick="mbNoWhoSet('${slug}', ${mbNoWhoBox(slug) ? 'false' : 'true'})">
-      ${mbNoWhoBox(slug) ? '👤 담당자 다시 붙이기' : '👤 담당자 안 붙임 (경조사·광고 등)'}</div>
+    ${/* ── 안 붙이는 까닭이 둘이다 (대표 지시 2026-10-09) ──
+         「칸 안에는 여러 사람의 담당이 섞여 있어서 특정을 할 수 없다」
+         하는 일은 같지만 «말»이 다르다 — 까닭을 안 적으면 다음 사람이 한 사람을 얹고,
+         그 순간 남의 메일이 그 사람에게 통째로 간다. */''}
+    ${mbNoWhoBox(slug) ? `
+      <div class="fmi" onclick="mbNoWhoSet('${slug}', false)">👤 담당자 다시 붙이기
+        <span style="color:#94a3b8">— 지금 「${esc(mbNoWhoLabel(slug))}」</span></div>` : `
+      <div class="fmi" onclick="mbNoWhoSet('${slug}', true)">👤 담당자 안 붙임 (경조사·광고 등)</div>
+      <div class="fmi" onclick="mbNoWhoSet('${slug}', true, 'mixed')">🔀 여럿이 섞여 못 정함
+        <span style="color:#94a3b8">— 담당은 있지만 칸 하나로는 못 정하는 칸</span></div>`}
     <div class="fmi danger" onclick="closeFolderMenu();mbAskDelete('${slug}')">🗑 폴더 지우기</div>`;
   mbPlaceMenu(m, ev);
 }
