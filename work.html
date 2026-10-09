@@ -1507,6 +1507,7 @@ function shell(){
     +'<div class="sitem nw" onclick="searchModal()" title="노트·회고·기록·지식 본문까지 찾기 (Ctrl+K)">🔎 전체 검색 <span style="opacity:.5;font-size:10px">⌃K</span></div>'
     +'<div class="sitem nw" onclick="puerpModal()" title="자동 연동 상태 확인 · 기준일 이전 백로그 1회 정리">🔗 푸른이알피 연동</div>'
     +'<div class="sitem nw" onclick="importModal()" title="엑셀 이관 JSON 파일 불러오기">📥 엑셀 가져오기</div>'
+    +'<div class="sitem nw" id="nav-install" onclick="wkInstall()" style="'+(window._wkInstall?'':'display:none')+'" title="폰 바탕화면에 「업무관리」 아이콘을 만듭니다 — 누르면 포털을 거치지 않고 여기로 바로 옵니다">📲 바탕화면에 아이콘 만들기</div>'
     +'<div class="sitem nw" onclick="obsModal()" title="사람·사업장·업무·지식을 markdown 으로 적어 이 PC 옵시디언 금고에 넣습니다 — 한 방향">🪨 옵시디언으로</div>'
     +'<div style="font-size:11px;color:var(--faint);padding:8px">주간 업무기록 · Firebase<br>기록은 자동 저장됩니다</div></div>'
     +'</div>'
@@ -13741,6 +13742,32 @@ function runImport(){
   };
   rd.readAsText(f,'utf-8');
 }
+
+/* ── 📲 바탕화면에 아이콘 만들기 (대표 「추천대로」 2026-10-09) ──────────────────────────
+   대표: 「폰에서 로그인 후 화면으로 넘어가려면 많이 힘들다」 — 주소 → 로그인 → 포털 → 업무관리 네 걸음.
+   폰은 로그인 유지가 처음부터 켜져 있다(enter.html keepDefault). 남은 것은 «포털을 거치는 걸음»이다.
+   ★ 업무관리는 이미 따로 깔 수 있는 앱이다(work-manifest.json · start_url work.html · 통합 워커).
+     없던 것은 «길» 이었다 — 폰 브라우저 메뉴 깊숙이 「홈 화면에 추가」가 있다는 걸 아무도 모른다.
+   ⚠ 크롬이 «깔 수 있다»고 알려 줄 때(beforeinstallprompt)만 메뉴에 보인다.
+     이미 깔았거나(standalone)·PC·아이폰이면 그 신호가 안 와서 메뉴도 안 보인다 — 못 쓸 단추를 보이지 않는다. */
+/* ⚠ window 에 단다 — 메뉴를 그리는 shell() 은 앞쪽 다른 script 에 있어 var 로는 안 닿는다 */
+window._wkInstall=null;
+window.addEventListener('beforeinstallprompt',function(e){
+  e.preventDefault(); _wkInstall=e;
+  var n=document.getElementById('nav-install'); if(n) n.style.display='';
+});
+function wkInstall(){
+  if(!_wkInstall){ toast('폰 인터넷 메뉴(⋮) → 「홈 화면에 추가」를 눌러 주세요'); return; }
+  var ev=_wkInstall; _wkInstall=null;
+  ev.prompt();
+  ev.userChoice.then(function(c){
+    var n=document.getElementById('nav-install');
+    if(c&&c.outcome==='accepted'){ if(n) n.style.display='none'; toast('바탕화면에 「업무관리」 아이콘을 만들었습니다'); }
+  }).catch(function(){});
+}
+window.addEventListener('appinstalled',function(){
+  _wkInstall=null; var n=document.getElementById('nav-install'); if(n) n.style.display='none';
+});
 
 /* ── 폰 홈화면 앱 등록 (https 에서만 — file:// 나 http 에서는 조용히 넘긴다) ── */
 if('serviceWorker' in navigator && location.protocol==='https:')
