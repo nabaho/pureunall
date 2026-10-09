@@ -100,14 +100,70 @@ test('②★★ 대표가 아니면 흐리고·「준비중」이라 적히고·
   });
 });
 
-test('③★★ 대표에게는 그대로다 — 잠근 김에 대표까지 잠그면 일을 못 하신다', () => {
-  const { 타일 } = 그려보기('admin');
+/* ③ 2026-10-09 바뀜 — 대표 「관리자 이외는 준비중인표시로 나오는게 어떤건지 직원만 안다
+   관리자도 준비중인게 확인되게 해달라」. 예전엔 «대표 화면엔 준비중이 안 붙는다»를 못 박았다.
+   이제는 «딱지는 붙되 그대로 열린다» 가 규칙이다. */
+test('③★★ 대표에게는 «딱지만» — 흐리거나 막지 않는다 (대표 지시 2026-10-09)', () => {
+  const { 타일, 외침 } = 그려보기('admin');
   준비중앱.forEach(k => {
     const t = 타일[k];
     assert.ok(t, '★★ ' + k + ' 타일이 대표 화면에서 사라졌다');
-    assert.doesNotMatch(t.innerHTML, /준비중/, '★★ 대표 화면에 「준비중」이 붙었다');
+    assert.match(t.innerHTML, /class="tile-soon-pill">준비중</,
+      '★★ 대표 화면에 준비중 딱지가 없다 — 어느 것이 준비중인지 직원만 안다');
     assert.notEqual(t.href, '#', '★★ 대표님이 ' + k + ' 을 못 여신다');
+    assert.ok(!(parseFloat(t.style.opacity) < 1), '★ 대표 화면에서 흐려졌다 — 딱지만 붙이기로 했다');
+    assert.equal(t.dataset.soonApp, '1', '★★ 줄 오른쪽 끝으로 보낼 표가 없다');
   });
+  assert.equal(외침.length, 0);
+  assert.equal(타일['cards'].dataset.soonApp, undefined, '★ 준비중 아닌 앱에 표가 붙었다');
+  assert.doesNotMatch(타일['cards'].innerHTML, /tile-soon-pill/);
+});
+
+/* ⑧ 준비중은 «늘 줄의 오른쪽 끝» — 모든 사람 화면 (대표 지시 2026-10-09)
+   「준비중인것은 항상 오른쪽 화면으로 다 보내라 모든 직원들에게 도 오른쪽으로 정렬되어 있게」 */
+function 줄정리(줄들) {
+  const mk = (key, soon) => {
+    const cls = new Set();
+    const t = { dataset: soon ? { key, soonApp: '1' } : { key },
+      classList: { add: (c) => cls.add(c), remove: (c) => cls.delete(c), has: (c) => cls.has(c) } };
+    return t;
+  };
+  const conts = 줄들.map(줄 => {
+    const c = { children: [] };
+    c.appendChild = (t) => { const i = c.children.indexOf(t); if (i > -1) c.children.splice(i, 1); c.children.push(t); };
+    줄.forEach(([k, s]) => c.children.push(mk(k, s)));
+    return c;
+  });
+  const i = SRC.indexOf('function soonToEnd(');
+  assert.ok(i > -1, '★★ 준비중을 오른쪽으로 보내는 함수가 없다');
+  let j = SRC.indexOf('{', i), d = 0;
+  do { if (SRC[j] === '{') d++; else if (SRC[j] === '}') d--; j++; } while (d > 0);
+  const ctx = { Array, tileConts: () => conts };
+  vm.createContext(ctx);
+  vm.runInContext(SRC.slice(i, j), ctx);
+  ctx.soonToEnd();
+  return conts;
+}
+
+test('⑧★★ 준비중은 줄 안에서 «맨 오른쪽» — 사람이 앞으로 끌어 둔 순서보다 앞선다', () => {
+  const [줄] = 줄정리([[['erp'], ['payroll', 1], ['gov'], ['rules', 1], ['docs']]]);
+  assert.deepEqual(줄.children.map(t => t.dataset.key), ['erp', 'gov', 'docs', 'payroll', 'rules'],
+    '★★ 준비중이 오른쪽 끝으로 안 갔다');
+  assert.ok(줄.children[3].classList.has('tile-soon-first'), '★★ 첫 준비중에 오른쪽으로 미는 표가 없다');
+  assert.ok(!줄.children[4].classList.has('tile-soon-first'));
+  assert.ok(!줄.children[0].classList.has('tile-soon-first'));
+});
+
+test('⑧ 준비중만 있는 줄은 밀지 않는다 · 순서를 적용한 «뒤»와 끌어 놓은 뒤에 부른다', () => {
+  const [줄] = 줄정리([[['mail', 1], ['paydata', 1]]]);
+  assert.ok(!줄.children[0].classList.has('tile-soon-first'), '★ 준비중뿐인 줄을 오른쪽으로 밀면 줄이 비어 보인다');
+  const bare = stripJs(SRC);
+  const apply = bare.slice(bare.indexOf('function applyTileOrder('), bare.indexOf('function persistOrderFromDom('));
+  assert.ok((apply.match(/soonToEnd\(\)/g) || []).length >= 2,
+    '★★ 저장된 순서가 없을 때·있을 때 둘 다 불러야 한다 — 한쪽만이면 그 사람 화면에서 준비중이 섞인다');
+  const persist = bare.slice(bare.indexOf('function persistOrderFromDom('), bare.indexOf('function updateLockUi('));
+  assert.match(persist, /soonToEnd\(\)/, '★★ 끌어 놓은 자리에 준비중이 남는다');
+  assert.match(SRC, /\.tile\.tile-soon-first\{margin-left:auto\}/, '★★ PC 에서 오른쪽 끝으로 미는 자리가 없다');
 });
 
 test('④★★ 눌렀을 때 «까닭을 말한다» — 아무 일도 안 나면 고장인 줄 안다', () => {
