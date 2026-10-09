@@ -30,6 +30,14 @@
     });
   }
   function enc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  /* 여러 줄 값 — breaks 를 켜면 값의 줄바꿈(\n)을 한 칸 안의 한글 줄바꿈(<hp:lineBreak/>)으로 쓴다
+     (정부컨설팅 보고서 2026-10-07: 「수행 내역」 한 칸에 여러 줄). 글자 모양은 그 run 그대로다.
+     ⚠ 기본은 꺼짐 — 지금까지 채운 서식(기금·경력관리)은 예전과 똑같이 나와야 한다. */
+  function encB(s, breaks) {
+    var t = enc(String(s).replace(/\r\n?/g, '\n'));
+    return breaks ? t.replace(/\n/g, '<hp:lineBreak/>') : t;
+  }
+  function hasBreak(s, breaks) { return !!breaks && s != null && /[\r\n]/.test(String(s)); }
 
   /* 문단을 문서 차례대로 모은다 — 각 문단의 «글자 조각»(XML 속 자리)과 이어 붙인 글 */
   function scan(xml) {
@@ -102,10 +110,11 @@
     return { n: segs.length, width: segs.length ? attr(segs[0], 'horzsize') : 0, h: segs.length ? (attr(segs[0], 'textheight') || attr(segs[0], 'vertsize')) : 0 };
   }
   /* mode: 'auto' — 한 줄이고 새 글이 폭에 들어가면 둔다 / 'keep1' — 한 줄이면 둔다(틀 만들 때: 값은 채울 때 정해진다) */
-  function lineEdit(p, xml, newText, mode) {
+  function lineEdit(p, xml, newText, mode, breaks) {
     if (p.lsS < 0 || p.lsE <= p.lsS) return [];
     var li = xml != null ? lineInfo(xml, p) : null;
-    if (li && li.n === 1 && newText != null) {
+    /* 줄바꿈을 넣었으면 한 줄짜리여도 반드시 걷는다 — 옛 한 줄 자리를 믿으면 둘째 줄이 첫 줄에 겹친다 */
+    if (li && li.n === 1 && newText != null && !hasBreak(newText, breaks)) {
       if (mode === 'keep1') return [];
       if (li.width > 0 && li.h > 0 && estWidth(newText, li.h) <= li.width * 0.97) return [];
     }
@@ -128,7 +137,7 @@
     return out;
   }
   /* 같은 조각을 여러 번 고치는 경우를 하나로 합친다 — 한 문단에서 여러 자리를 바꿀 때 */
-  function paraReplace(p, pairs) {
+  function paraReplace(p, pairs, breaks) {
     /* pairs: [{a,b,to}] (문단 글 기준, 겹치지 않게) → 새 글 → 조각별로 다시 나눠 쓴다 */
     if (!pairs.length) return [];
     pairs.sort(function (x, y) { return x.a - y.a; });
@@ -152,27 +161,27 @@
     segs.forEach(function (s, i) {
       var arr = nt[i], outS = '';
       for (var k = 0; k <= arr.length; k++) { if (ins[i][k]) outS += ins[i][k]; if (k < arr.length) outS += arr[k]; }
-      if (outS !== s.text) edits.push({ s: s.s, e: s.e, raw: enc(outS) });
+      if (outS !== s.text) edits.push({ s: s.s, e: s.e, raw: encB(outS, breaks) });
     });
     return edits;
   }
   /* 글자가 하나도 없는 문단(빈 칸)에 글을 «새로» 넣는다 — 첫 run 안에 <hp:t> 를 만든다.
      ⚠ 한글이 저장한 빈 칸은 run 이 스스로 닫혀 있다(<hp:run …/>). 그 «뒤»에 글자를 붙이면
        한글이 버린다(#1584 에서 한글로 직접 열어 보고 알았다) — 반드시 run «안»에 넣는다. */
-  function emptyInsert(xml, p, text) {
+  function emptyInsert(xml, p, text, breaks) {
     var body = xml.slice(p.start, p.end);
     var m = /<hp:run\b((?:[^>"']|"[^"]*"|'[^']*')*?)(\/?)>/.exec(body);
     if (!m) return null;
     var at = p.start + m.index;
-    if (m[2] === '/') return { s: at, e: at + m[0].length, raw: '<hp:run' + m[1] + '><hp:t>' + enc(text) + '</hp:t></hp:run>' };
-    return { s: at + m[0].length, e: at + m[0].length, raw: '<hp:t>' + enc(text) + '</hp:t>' };
+    if (m[2] === '/') return { s: at, e: at + m[0].length, raw: '<hp:run' + m[1] + '><hp:t>' + encB(text, breaks) + '</hp:t></hp:run>' };
+    return { s: at + m[0].length, e: at + m[0].length, raw: '<hp:t>' + encB(text, breaks) + '</hp:t>' };
   }
 
   /* 글 바꾸기 규칙: [{at:'T5.C7.'|'P3'|null, find:'…', to:'…', all:true|false, nth:1}]
      at 은 «주소 앞부분» — 'T5.' 면 여섯째 표 전체, null 이면 문서 전체. 문단을 넘는 글은 못 찾는다.
      돌려주는 것: {xml, hits:[규칙마다 바꾼 수]} */
   function replaceText(xml, rules, opts) {
-    var mode = (opts && opts.lines) || 'auto';
+    var mode = (opts && opts.lines) || 'auto', breaks = !!(opts && opts.breaks);
     var ps = scan(xml), hits = rules.map(function () { return 0; }), edits = [];
     /* set(문단 통째)을 먼저 — 같은 문단에 «찾아 바꾸기»(예: 연도 전부)가 겹치면 set 이 이긴다 */
     var order = rules.map(function (r, i) { return i; })
@@ -195,7 +204,7 @@
           if (p.text.length) { pairs.push({ a: 0, b: p.text.length, to: r.set }); hits[ri]++; }
           else if (r.set !== '') {
             var leaf = xml.slice(p.start + 1, p.end).indexOf('<hp:p') < 0;
-            var ins = leaf ? emptyInsert(xml, p, r.set) : null;
+            var ins = leaf ? emptyInsert(xml, p, r.set, breaks) : null;
             if (ins) { edits.push(ins); touched = r.set; hits[ri]++; }
           }
           return;
@@ -210,7 +219,7 @@
           var endRun = xml.lastIndexOf('</hp:run>', p.lsS >= 0 ? p.lsS : p.end);
           if (ro < p.start || !cp || endRun < p.start) return;
           var at = endRun + '</hp:run>'.length;
-          edits.push({ s: at, e: at, raw: '<hp:run charPrIDRef="' + cp[1] + '"><hp:t>' + enc(r.tail) + '</hp:t></hp:run>' });
+          edits.push({ s: at, e: at, raw: '<hp:run charPrIDRef="' + cp[1] + '"><hp:t>' + encB(r.tail, breaks) + '</hp:t></hp:run>' });
           touched = touched || (p.text + r.tail); hits[ri]++;
           return;
         }
@@ -224,8 +233,8 @@
         }
       });
       if (touched === '\u0000drop') return;
-      if (pairs.length) edits = edits.concat(paraReplace(p, pairs), lineEdit(p, xml, newTextOf(p, pairs), mode));
-      else if (touched) edits = edits.concat(lineEdit(p, xml, touched, mode));
+      if (pairs.length) edits = edits.concat(paraReplace(p, pairs, breaks), lineEdit(p, xml, newTextOf(p, pairs), mode, breaks));
+      else if (touched) edits = edits.concat(lineEdit(p, xml, touched, mode, breaks));
     });
     return { xml: applyEdits(xml, edits), hits: hits };
   }
@@ -262,7 +271,7 @@
         if (val != null && String(val) !== '') filled++;
         pairs.push({ a: m.index, b: m.index + m[0].length, to: show(val) });
       }
-      if (pairs.length) edits = edits.concat(paraReplace(p, pairs), lineEdit(p, xml, newTextOf(p, pairs), opts.lines || 'auto'));
+      if (pairs.length) edits = edits.concat(paraReplace(p, pairs, opts.breaks), lineEdit(p, xml, newTextOf(p, pairs), opts.lines || 'auto', opts.breaks));
     });
     var over = {};
     Object.keys(maxN).forEach(function (k) { var L = (V[k] || []).filter(function (x) { return x != null && String(x) !== ''; }).length; if (L > maxN[k]) over[k] = L - maxN[k]; });

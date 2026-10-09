@@ -219,3 +219,15 @@ test('★ 쪽 반복 — 둘째 장부터는 맨 바깥 문단의 줄 정보를 
   const ps = X.scan(r.xml).filter((p) => /^P\d+$/.test(p.addr));
   assert.deepEqual(ps.map((p) => p.lsS >= 0), [true, false, true], '첫 장·뒤 문단은 그대로, 베낀 장만 걷는다');
 });
+
+test('★ 여러 줄 값은 한 칸 안에서 한글 줄바꿈으로 — breaks 를 켰을 때만, 그 문단의 옛 줄 정보는 걷는다 (정부컨설팅 보고서 2026-10-07)', () => {
+  const LSV = '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" horzsize="40000"/></hp:linesegarray>';
+  const xml = SEC(P(RUN('{{가}}'), LSV));
+  const on = X.fill(xml, { 가: '첫줄\n둘째줄' }, { breaks: true }).xml;
+  assert.match(on, /<hp:t>첫줄<hp:lineBreak\/>둘째줄<\/hp:t>/);
+  assert.equal(X.scan(on)[0].lsS, -1, '한 줄 정보를 그대로 두면 한글이 두 줄을 한 줄 자리에 겹쳐 그린다');
+  const off = X.fill(xml, { 가: '첫줄\n둘째줄' }).xml;
+  assert.doesNotMatch(off, /lineBreak/, '기본은 예전 그대로');
+  const set = X.replaceText(SEC(P('<hp:run charPrIDRef="0"/>')), [{ at: 'P0', set: 'ㄱ\nㄴ' }], { breaks: true }).xml;
+  assert.match(set, /<hp:t>ㄱ<hp:lineBreak\/>ㄴ<\/hp:t>/, '빈 칸에 새로 넣을 때도');
+});
