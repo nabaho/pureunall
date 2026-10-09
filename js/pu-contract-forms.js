@@ -519,8 +519,12 @@
      ⚠ 엑셀 양식은 서식 시트가 수식이라 여기서 바르게 그리지 못한다 — 건너뛰고 이름을 알린다(엑셀로 열어 인쇄).
      ⚠ 채운 값은 어디에도 저장하지 않는다 — 인쇄 틀은 인쇄 창이 닫히면 지운다. */
   function isXlsxName(n) { return /\.xlsx?$/i.test(n || ''); }
-  function fillForPrint(fm, V, host) {
-    var CF = w.PuFormCardFill, src = hwpSources(fm)[0];
+  /* 인쇄할 원본 — 한글 원본이 있으면 그것(첫 원본이 엑셀이어도), 없으면 첫 원본 */
+  function printSrc(fm) { var l = hwpSources(fm || {}); return l.filter(function (s) { return !isXlsxName(s.name); })[0] || l[0] || null; }
+  /* src — 채우기 창에서 고른 원본(「채울 원본」·못 찾아 넘어간 대체 원본). 없으면 printSrc */
+  function fillForPrint(fm, V, host, src) {
+    var CF = w.PuFormCardFill;
+    src = src || printSrc(fm);
     if (!src) return Promise.reject(new Error((fm.name || '양식') + ': 한글 원본이 없습니다'));
     if (isXlsxName(src.name)) return Promise.resolve({ xlsx: true, name: fm.name || src.name });
     var bytesP = src.data ? Promise.resolve(bytesOfDataUrl(src.data)) : (host.hwpBytes ? host.hwpBytes(src) : Promise.reject(new Error('원본을 불러올 길이 없습니다')));
@@ -574,12 +578,12 @@
     });
   }
   /* 여러 양식을 차례로 채워 그려 한 번에 인쇄. onStep(i, n) 으로 진행을 알린다. 반환 { pages, skipped:[이름], failed:[이름] } */
-  function printForms(fms, V, host, title, onStep) {
+  function printForms(fms, V, host, title, onStep, srcs) {
     var pages = [], skipped = [], failed = [];
     return fms.reduce(function (p, fm, i) {
       return p.then(function () {
         if (onStep) onStep(i + 1, fms.length);
-        return fillForPrint(fm, V, host).then(function (doc) {
+        return fillForPrint(fm, V, host, srcs && srcs[i]).then(function (doc) {
           if (doc.xlsx) { skipped.push(doc.name); return; }
           return pagesOf(doc, host).then(function (pgs) { pages = pages.concat(pgs); });
         }).catch(function () { failed.push(fm.name || '양식'); });
@@ -1759,7 +1763,8 @@
       var V = values(), fms = items.map(function (x) { return x.fm; });
       var run = (one && st.edited && !isXl(items[0]))
         ? pagesOf({ bytes: st.edited.bytes, name: outName(items[0]) }, host).then(function (pgs) { return printPages(pgs, nameOf(items[0])).then(function () { return { pages: pgs.length, skipped: [], failed: [] }; }); })
-        : printForms(fms, V, host, one ? nameOf(items[0]) : (title || '서식묶음'), function (i, n) { note.textContent = '인쇄할 쪽을 그리는 중… (' + i + '/' + n + ')'; });
+        : printForms(fms, V, host, one ? nameOf(items[0]) : (title || '서식묶음'), function (i, n) { note.textContent = '인쇄할 쪽을 그리는 중… (' + i + '/' + n + ')'; },
+          items.map(function (x) { return x.src; }));   // 미리보기·받기와 같은 원본으로
       run.then(function (r) { busy = false; refresh(); note.textContent = printNote(r); },
         function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
@@ -1901,8 +1906,10 @@
     }
     function after(fs, how) {
       var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
+      /* 공단(근로복지·건강·연금)에 낸 서류는 받는 분을 기관으로 적고, 회사 서명본을 기다리지 않는다(검토 2026-10-09) */
+      var ag = CF.agencyOrgOf ? CF.agencyOrgOf(toAddr()) : '';
       /* ⚠ 메일은 이미 나갔다 — 기록·보관이 실패해도(동기 throw 포함) «보내기 실패»로 보이면 안 된다(다시 눌러 두 번 간다) */
-      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: V.담당자 || '', await: true }); }];
+      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: ag || V.담당자 || '', await: !ag }); }];
       if (keepCk.checked) [{ name: o.name, bytes: o.bytes }].concat(o.extra || []).forEach(function (f, i) {
         jobs.push(function () { return host.mail.keep(V, { name: f.name, size: f.bytes.length, type: '', bytes: f.bytes }, '[보냄] ' + (i ? f.name.replace(/\.[^.]+$/, '') : (o.fm.name || '서류'))); });
       });
@@ -1950,8 +1957,11 @@
       files().then(function (fs) {
         var total = fs.reduce(function (n, f) { return n + f.bytes.length; }, 0);
         if (total > MAX) {
-          if (fs.length > 1 && w.confirm('첨부가 18MB를 넘습니다. PDF 를 빼고 보낼까요?')) fs = fs.slice(0, 1);
-          else throw new Error('첨부가 18MB를 넘어 보낼 수 없습니다');
+          /* PDF 를 붙였을 때만 «PDF 를 빼고» — 뺀 뒤에도 넘으면 묻지 않는다. ⚠ 예전엔 첫 서류만 남겨 묶음 나머지가 빠진 채 «보냄»으로 적혔다 */
+          var noPdf = pdfCk.checked && fs.length > 1 && fs[fs.length - 1].name === pdfName() ? fs.slice(0, -1) : null;
+          var left = noPdf && noPdf.reduce(function (n, f) { return n + f.bytes.length; }, 0);
+          if (noPdf && left <= MAX && w.confirm('첨부가 18MB를 넘습니다. PDF 를 빼고 보낼까요?')) fs = noPdf;
+          else throw new Error('첨부가 18MB를 넘어 보낼 수 없습니다' + (fs.length - (noPdf ? 1 : 0) > 1 ? ' — 서류를 나눠 보내 주세요' : ''));
         }
         if (mode !== 'auto') return viaMailto(fs);
         note.textContent = '보내는 중…';

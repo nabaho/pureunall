@@ -376,6 +376,11 @@
      ⚠ 자동 발신 주소(noreply·webmaster·master 등)는 사람이 아니라 뺀다. 팩스번호는 미리보기에 없어 모으지 않는다. */
   var AGENCY_ORGS = { 'kcomwel.or.kr': '근로복지공단', 'nhis.or.kr': '국민건강보험공단', 'nps.or.kr': '국민연금공단' };
   var AGENCY_SKIP = /^(no-?reply|webmaster|master|admin|mailadmin|pension_master|welco|postmaster|help|info)@/i;
+  /* 받는 주소가 공단이면 기관 이름, 아니면 '' — 공단에 낸 서류는 회사 «서명본 대기»에 올리지 않는다 */
+  function agencyOrgOf(email) {
+    var m = /@([a-z0-9.-]+)$/.exec(String(email || '').trim().toLowerCase());
+    return (m && AGENCY_ORGS[m[1]]) || '';
+  }
   function agencyBook(rows) {
     var by = {};
     (rows || []).forEach(function (r) {
@@ -384,7 +389,9 @@
       var org = m && AGENCY_ORGS[m[1]];
       if (!org || AGENCY_SKIP.test(e)) return;
       var txt = String(r.p || '') + ' ' + String(r.s || '') + ' ' + String(r.f || '');
-      var br = (/([가-힣]{2,6}(?:지사|지역본부|지부|센터))/.exec(txt.replace(/근로복지공단|국민건강보험공단|국민연금공단/g, ' ')) || [])[1] || '';
+      /* 「고객센터·콜센터」는 지사가 아니다(검토 2026-10-09) — 건너뛰고 다음 것을 본다 */
+      var br = ((txt.replace(/근로복지공단|국민건강보험공단|국민연금공단/g, ' ').match(/[가-힣]{2,6}(?:지사|지역본부|지부|센터)/g) || [])
+        .filter(function (x) { return !/(고객|콜)센터$/.test(x); })[0]) || '';
       var d = Number(r.d) || 0;
       var x = by[e] || (by[e] = { org: org, branch: '', email: e, name: '', last: 0, n: 0, brs: {} });
       x.n++;
@@ -588,7 +595,7 @@
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
     CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,
-    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook
+    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook, agencyOrgOf: agencyOrgOf
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
