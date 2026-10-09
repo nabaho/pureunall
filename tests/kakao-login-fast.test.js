@@ -218,12 +218,26 @@ test('★★ 휴대전화에서 카카오 서버 응답·명부를 끝없이 기
   assert.match(enter, /}, 3500\)/);
 });
 
-test('★★ 카카오 인증표·로그인 저장·직원명부를 차례로 기다리지 않고 동시에 준비한다', () => {
+test('★★ 직원명부는 인증 뒤에만 읽는다 — 로그인 전 읽기는 권한 거부로 재시도를 만든다', () => {
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
-  assert.match(enter, /__puRosterPrefetch\s*=\s*Promise\.resolve\(db\.ref\('data\/user_dir'\)\.once\('value'\)\)/);
+  const start = enter.indexOf('function kkHandleReturn(){');
+  const signIn = enter.indexOf('auth.signInWithCustomToken(ready[0])', start);
+  const signed = enter.indexOf('}).then(function(cred){', signIn);
+  const roster = enter.indexOf("db.ref('data/user_dir').once('value')", start);
+  assert.ok(start >= 0 && signIn > start && signed > signIn && roster > signed,
+    '직원명부를 Firebase 로그인 전에 읽으면 권한 거부 뒤 다른 명부를 다시 기다린다');
   assert.match(enter, /Promise\.all\(\[server,\s*persist\]\)/);
   assert.match(enter, /PuKakao\.loginFinish\(p\.code\)/);
   assert.match(enter, /path === 'data\/user_dir' && window\.__puRosterPrefetch/);
+});
+
+test('★★ 로그인 전 글꼴 다운로드는 Firebase 인증 스크립트를 막지 않는다', () => {
+  const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  const fonts = (enter.match(/<link[^>]+fonts\.googleapis\.com[^>]*>/g) || [])
+    .filter(tag => /css2\?family=/.test(tag));
+  assert.ok(fonts.length > 0, '글꼴 링크가 사라졌는지 확인해야 한다');
+  assert.ok(fonts.every(tag => /media="print"/.test(tag) && /onload="this\.media='all'"/.test(tag)),
+    '외부 글꼴 CSS를 동기 stylesheet로 두면 느린 휴대전화에서 인증 스크립트까지 기다린다');
 });
 
 test('★★ 카카오 인증 성공 결과로 포털을 바로 열고 인증상태 재알림을 기다리지 않는다', () => {
