@@ -89,7 +89,7 @@
   /* 합치기 한 번에 — pu_docs 아래 «여러 자리 한 번 쓰기»(update) 모양. 반쯤 합쳐진 채로 남지 않게 한 번에 쓴다.
      ⚠ 규칙상 줄의 by 는 «지금 쓰는 사람»이어야 한다 — 옮긴 줄은 합친 사람 이름으로 바뀐다(at·나머지 값은 그대로).
      ⚠ 파일(originals)은 건드리지 않는다. 계약 기록의 docId(파일 줄 번호)는 줄 번호를 그대로 쓰므로 이어진다. */
-  var DOC_FIELDS = ['fileId', 'title', 'date', 'src', 'secret', 'at'];
+  var DOC_FIELDS = ['fileId', 'title', 'date', 'src', 'secret', 'kind', 'at'];
   var REC_FIELDS = ['date', 'kind', 'amount', 'payDay', 'tax', 'edi', 'staff', 'contact', 'bizNo', 'note', 'docId', 'src', 'at'];
   function pick(o, keys) { var r = {}; keys.forEach(function (k) { if (o && o[k] != null && o[k] !== '') r[k] = o[k]; }); return r; }
   function mergePlan(fromKey, toKey, d, me, now) {
@@ -400,7 +400,8 @@
   /* 갈래·대조 칩으로 회사 거르기 — grp: 갈래 v, chk: 'ok'|'missing'|'norec'|'none' */
   function filterCosBy(cos, idx, grp, chk) {
     return (cos || []).filter(function (c) {
-      var x = (idx || {})[c.key]; if (!x) return !grp && !chk;
+      if (!idx) return true;
+      var x = idx[c.key]; if (!x) return !grp && !chk;
       if (grp && !x.groups[grp]) return false;
       if (chk && !x.n[chk]) return false;
       return true;
@@ -531,7 +532,7 @@
       setTimeout(function () { w.URL.revokeObjectURL(a.href); if (a.parentNode) a.parentNode.removeChild(a); }, 1500);
     }
     /* 오른쪽 미리보기 — PDF·그림은 그대로, 한글·엑셀은 문서 엔진(host.hwpShow) */
-    var prevUrl = null;
+    var prevUrl = null, prevBytes = null;  /* 미리보기 파일은 고른 줄이 바뀔 때만 다시 받는다(☐ 누를 때마다 🔒 를 서버에서 다시 열던 것) */
     function drawPreview(box) {
       if (prevUrl) { try { w.URL.revokeObjectURL(prevUrl); } catch (_) {} prevUrl = null; }
       var r = S.sel; box.innerHTML = '';
@@ -545,7 +546,9 @@
       if (r.type === 'doc' || r.type === 'etc') { body.innerHTML = ''; body.appendChild(el('div', { 'class': 'pod-empty', style: 'border:none', text: '이 형식은 미리보기가 없습니다 — 📥 내려받아 여세요' })); return; }
       if (!host.fileBytes) { body.textContent = '미리보기 길이 연결되지 않았습니다'; return; }
       var want = r;
-      host.fileBytes(r.id).then(function (f) {
+      var got = prevBytes && prevBytes.id === r.id ? Promise.resolve(prevBytes.f)
+        : host.fileBytes(r.id).then(function (f) { prevBytes = { id: r.id, f: f }; return f; });
+      got.then(function (f) {
         if (S.sel !== want) return;
         body.innerHTML = '';
         if (r.type === 'pdf' || r.type === 'img') {
@@ -707,8 +710,9 @@
       return todo.reduce(function (p, r) {
         return p.then(function () {
           S.sgNote = '🔒 제출된 서명본을 저장하는 중… (' + (done + 1) + '/' + todo.length + ') ' + ((r.who && r.who.name) || ''); draw();
-          return host.sign.finalize(r).then(function (x) { done++; if (!x.hashOk) bad.push((r.who && r.who.name) + '(문서 지문 다름)'); },
-            function (e) { bad.push(((r.who && r.who.name) || '') + ' — ' + msg(e)); });
+          return host.sign.finalize(r).then(function (x) { done++; if (!x.hashOk) bad.push((r.who && r.who.name) + '(문서 지문 다름)');
+              if (x.warn && x.warn.length) bad.push(((r.who && r.who.name) || '') + ' — ' + x.warn.join(', ')); },
+            function (e) { if (e && e.code === 'busy') return; bad.push(((r.who && r.who.name) || '') + ' — ' + msg(e)); });
         });
       }, Promise.resolve()).then(function () {
         S.sgBusy = false; S.sgNote = '✅ ' + done + '건을 🔒 서명본으로 저장했습니다' + (bad.length ? ' · ⚠ ' + bad.join(', ') : '');
@@ -868,7 +872,8 @@
           readBytes(f).then(function (bytes) {
             return store.putOriginal({ name: f.name, size: f.size, type: f.type || '', bytes: bytes }, { kind: 'co', coKey: store.coKey(co), coName: co }, { secret: true });
           }).then(function (r) {
-            return store.addCoDoc({ coName: co, fileId: r.fileId, title: kind + ' 계약서 (서명본)', date: dIn.value, src: 'upload', secret: true });
+            if (r.secret === false) toast('⚠ 같은 파일이 일반 원본으로 이미 있어 🔒 가 아닙니다 — 「🔒 서명본으로 옮기기」로 옮기세요');
+            return store.addCoDoc({ coName: co, fileId: r.fileId, title: kind + ' 계약서 (서명본)', date: dIn.value, src: 'upload', secret: r.secret !== false });
           }).then(function (r) {
             return store.importCoRecs([{ coName: co, bizNo: a.bz || '', date: dIn.value, kind: kind, docId: r.docId, note: ct ? '이알피 계약 ' + ct : '' }])
               .then(function () { return store.gotAwait(a.key, r.docId); }).then(function () { return r; });
@@ -1724,7 +1729,7 @@
       if (S.dsel) drawDocPreview(prev);
     }
     /* 오른쪽 미리보기 — 원본 보관함과 같다(PDF·그림 그대로, 한글·엑셀은 문서 엔진, 🔒 은 서버가 대표·관리자에게만) */
-    var dPrevUrl = null;
+    var dPrevUrl = null, dPrevBytes = null;  /* 미리보기 파일은 고른 줄이 바뀔 때만 다시 받는다 */
     function drawDocPreview(box) {
       if (dPrevUrl) { try { w.URL.revokeObjectURL(dPrevUrl); } catch (_) {} dPrevUrl = null; }
       var d = S.dsel; box.innerHTML = '';
@@ -1738,8 +1743,10 @@
       box.appendChild(body);
       if (!host.fileBytes) { body.textContent = '미리보기 길이 연결되지 않았습니다'; return; }
       var want = d;
-      host.fileBytes(d.fileId).then(function (f) {
-        if (S.dsel !== want) return;
+      var got = dPrevBytes && dPrevBytes.id === d.fileId ? Promise.resolve(dPrevBytes.f)
+        : host.fileBytes(d.fileId).then(function (f) { dPrevBytes = { id: d.fileId, f: f }; return f; });
+      got.then(function (f) {
+        if (!S.dsel || S.dsel.fileId !== want.fileId) return;
         body.innerHTML = '';
         var t = fileType(f.name || d.title);
         if (t === 'pdf' || t === 'img') {

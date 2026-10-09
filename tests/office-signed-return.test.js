@@ -119,7 +119,7 @@ test('ⓖ 화면 — 탭·서명본 올리기·다시 알림', () => {
   assert.match(m, /if \(S\.tab === 'await'\) \{ wrap\.appendChild\(awaitPane\(\)\)/);
   const os = cut(m, '    function openSigned(');
   assert.match(os, /store\.putOriginal\([^;]*\{ secret: true \}\)/, '🔒 서명본 창고로');
-  assert.match(os, /store\.addCoDoc\(\{[^}]*secret: true \}\)/);
+  assert.match(os, /store\.addCoDoc\(\{[^}]*secret: r\.secret !== false \}\)/, '같은 파일이 일반 원본으로 있으면 🔒 표시를 붙이지 않는다');
   assert.match(os, /store\.importCoRecs\(\[\{[^}]*docId: r\.docId/, '계약 기록이 파일과 이어진다');
   assert.match(os, /store\.gotAwait\(a\.key, r\.docId\)/);
   assert.match(os, /addEventListener\('drop'/, '끌어다 놓기');

@@ -107,6 +107,10 @@
     return sha256Hex(file.bytes).then(function (h) {
       return deps.db.ref(ROOT + '/hash/' + h).once('value').then(function (s) {
         var have = s.val();
+        /* 🔒 로 올리려는데 같은 파일이 이미 있으면 그 자리가 🔒 인지 알려 준다 — 부르는 쪽이 🔒 표시를 함부로 붙이지 않게(검토 2026-10-09) */
+        if (have && secret) return deps.db.ref(ROOT + '/originals/' + have + '/secret').once('value').then(function (x) {
+          return { fileId: have, sha256: h, reused: true, secret: x.val() === true };
+        }, function () { return { fileId: have, sha256: h, reused: true, secret: false }; });
         if (have) return { fileId: have, sha256: h, reused: true };
         var fileId = deps.db.ref(ROOT + '/originals').push().key;
         var p = ROOT + (secret ? '/secret/' : '/originals/') + fileId + '/' + safeFileName(file.name);
@@ -118,7 +122,7 @@
           })
           .then(function () {
             return deps.db.ref(ROOT + '/hash/' + h).set(fileId).then(function () {
-              return { fileId: fileId, sha256: h, reused: false };
+              return { fileId: fileId, sha256: h, reused: false, secret: secret };
             }, function (setErr) {
               /* ⚠ 겹쳐 쓰기 — 다른 탭·사람이 같은 순간 같은 해시로 먼저 hash/{h} 를
                  심었으면(규칙이 «새로 쓰기만» 이라 우리 것은 거절된다) 진 게 아니다.
