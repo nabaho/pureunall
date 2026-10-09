@@ -629,6 +629,9 @@
     + '.pcf-b{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;padding:4px 10px;border-radius:4px;font-size:11.5px;font-weight:600;cursor:pointer;white-space:nowrap;display:inline-flex;align-items:center;gap:4px;font-family:inherit}'
     + '.pcf-b.g{background:#f0fdf4;color:#166534;border-color:#bbf7d0}.pcf-b.b{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}.pcf-b.y{background:#fffbeb;color:#854d0e;border-color:#fde68a}'
     + '.pcf-act{border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}'
+    /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
+    + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
+    + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-att{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1e40af;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:600;text-decoration:none;margin:0 4px 4px 0}'
     + '.pcf-none{color:#94a3b8;font-size:11.5px;text-align:center;padding:48px;border:1px dashed #e2e8f0;margin:16px;border-radius:4px}'
     + '.pcf-mbg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px}'
@@ -2255,7 +2258,7 @@
         hasOrig ? el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
           chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
           chip('🔤 글자 본문', view === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
-        host.cards ? el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#166534', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
+        host.cards ? el('button', { type: 'button', 'class': 'pcf-fillbig', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다. 채운 뒤 내려받거나 보냅니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
         moreMenu([
           { t: '✏ 수정', fn: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } },
           { t: '⧉ 복제', fn: function () { copy(fm); } },
