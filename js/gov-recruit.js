@@ -259,6 +259,7 @@
   var PER_ROLL = /^[\s:：\-]*(?:채용\s*시|수시|상시|ASAP|선착순|소진\s*시|충원\s*시)/i;
   var PER_NOT = /(?:사업|위촉|활동|계약|운영|교육|임기|근무|과업|용역|행사)\s*(?:기간|일정)[^가-힣]{0,20}$/;
   var PER_SHORT = new RegExp('[~∼～〜]\\s*' + PER_D + '|' + PER_D + '\\s*까지');
+  var PER_UNTIL = new RegExp(PER_D + '\\s*까지[\\s\\S]{0,40}?(?:제출|신청|접수|회신|추천|송부|발송|응모|보내)');
   function perPad(n) { return (n < 10 ? '0' : '') + n; }
   function perDay(y, m, d) {
     m = Number(m); d = Number(d);
@@ -300,6 +301,13 @@
         if (!y) d2 = perShift(d2, post);
         if (d2) return { from: '', to: d2, rolling: false };
       }
+    }
+    /* 라벨 없이 「2026. 10. 15.(수)까지 이메일로 제출」 — 공문 문장 꼴. ⚠ 「까지」 뒤 40자 안에 «내는» 말이 있어야 한다 */
+    var u = t.match(PER_UNTIL);
+    if (u && !PER_NOT.test(t.slice(Math.max(0, u.index - 30), u.index))) {
+      var d3 = perDay(u[1] ? Number(u[1]) : baseY, u[2], u[3]);
+      if (!u[1]) d3 = perShift(d3, post);
+      if (d3) return { from: '', to: d3, rolling: false };
     }
     return null;
   }
