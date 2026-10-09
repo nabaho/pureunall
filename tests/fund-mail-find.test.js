@@ -11,16 +11,27 @@ const varSrc = (n) => { const i = SRC.indexOf('var ' + n + '='); assert.ok(i >= 
 
 const box = {};
 new Function([
-  varSrc('MF_KINDS'), fnSrc('_cardFundKey'), fnSrc('_mfKind'), fnSrc('_mfKeys'), fnSrc('_mfScore'), fnSrc('_mfNeed'),
-  'this.kind=_mfKind; this.keys=_mfKeys; this.score=_mfScore; this.need=_mfNeed;',
+  varSrc('MF_KINDS'), fnSrc('_cardFundKey'), fnSrc('_mfKind'), fnSrc('_mfKeys'), fnSrc('_mfScore'), fnSrc('_mfNeed'), fnSrc('_mfSiteGuess'),
+  'this.kind=_mfKind; this.keys=_mfKeys; this.score=_mfScore; this.need=_mfNeed; this.site=_mfSiteGuess;',
 ].join('\n')).call(box);
 
-test('★ 서류 종류 — 첨부·제목 글자로', () => {
+test('★ 서류 종류 — 첨부·제목 글자로 (기금 서류 + 🏢 사업장 서류)', () => {
   assert.equal(box.kind('가람_등기사항전부증명서.pdf'), 'corpreg');
   assert.equal(box.kind('법인등기부등본(말소포함).pdf'), 'corpreg');
   assert.equal(box.kind('고유번호증 사본.jpg'), 'taxid');
   assert.equal(box.kind('설립인가증.pdf'), 'inka');
+  assert.equal(box.kind('재직증명서-10호.pdf'), 'wrep', '재직증명서는 근로자대표가 기본');
+  assert.equal(box.kind('중소기업확인서.pdf'), 'smecert');
+  assert.equal(box.kind('사업자등록증(가나산업).png'), 'bizreg');
   assert.equal(box.kind('재무현황.xlsx'), '');
+});
+
+test('★ 🏢 어느 사업장 서류인가 — 보낸 메일 주소·이름, 둘 이상이면 고르지 않는다', () => {
+  const sites = [{ _id: 'S1', name: '(주)가나산업', email: 'boss@gana.kr' }, { _id: 'S2', name: '다라물류', contacts: [{ email: 'hr@dara.kr' }] }, { _id: 'S3', name: '가나' }];
+  assert.equal(box.site('재직증명서.pdf', 'HR@dara.kr', sites), 'S2', '보낸 사람 메일로 못 찾는다');
+  assert.equal(box.site('다라물류_재직증명서.pdf', '', sites), 'S2');
+  assert.equal(box.site('가나산업 사업자등록증.pdf', '', sites), '', '두 곳에 걸리는데 골랐다(가나산업·가나)');
+  assert.equal(box.site('재직증명서.pdf', 'x@y.kr', sites), '');
 });
 
 test('★ 이 기금 메일인가 — 보낸 사람 메일·기금 이름 · 첨부 없으면 0', () => {
@@ -58,8 +69,18 @@ test('★ 배선 — 읽기만 · peek · 판독은 기존 길(readDocInto) · �
   assert.match(rd, /JSZip\.loadAsync\(buf,\{decodeFileName:_mfZipName\}\)/, 'zip 을 안 푼다(또는 한글 이름이 깨진다)');
   assert.match(fnSrc('mailFind'), /!MF_READ\.test\(nm\)&&!\/\\\.zip\$\/i\.test\(nm\)/, 'zip 첨부를 목록에서 뺀다');
   assert.match(fnSrc('mailFindInner'), /if\(!kind\|\|!DOC_PARSE\[kind\]\)/);
-  assert.ok(rd.includes("kind:_mfKind(n.split('/').pop())||(all.length===1?(kind||r.kind):'')"), '묶음 안 파일이 모두 묶음 이름의 종류가 된다(출연확인서가 «인가증»으로)');
+  assert.ok(rd.includes("kind:_mfKind(b)||(all.length===1?(kind||r.kind):'')"),'묶음 안 파일이 모두 묶음 이름의 종류가 된다(출연확인서가 «인가증»으로)');
   assert.match(fnSrc('renderMailFind'), /<th style="width:34px">□<\/th><th style="width:40px">#<\/th>/);
   assert.match(SRC, /onclick="mailFind\(\)"/);
   assert.match(SRC, /'doc\.mail':\{t:'메일에서 서류 찾기'/);
+});
+
+test('★ 🏢 사업장 서류 배선 — 사업장 탭에서 목록이 읽힌 뒤 그 사업장 범위로 판독, 사업장을 안 고르면 막는다', () => {
+  const rf = fnSrc('_mfReadFile');
+  assert.match(rf, /scope=\{wrep:_siteRepScope, urep:_siteUrepScope, smecert:_siteSmeScope, bizreg:_siteDocScope\}\[kind\]/);
+  assert.match(rf, /_rvWait\(function\(\)\{ return S\.view==='fund'&&S\.fundId===fid&&S\.sitesFor===fid&&S\.sites&&S\.sites\[sid\]; \}/, 'editSite 가 볼 목록을 기다리지 않는다');
+  assert.match(rf, /_siteEditSid=sid; _siteDocKeep=null; scope\(\); readDocInto\(MF_SITE_ZID\[kind\], kind, file\)/);
+  assert.match(fnSrc('mailFindRead'), /if\(!r\.zip&&MF_SITE_ZID\[kind\]&&!sid\)/);
+  assert.match(fnSrc('mailFindInner'), /if\(MF_SITE_ZID\[kind\]&&!sid\)/);
+  assert.match(fnSrc('renderMailFind'), /id="mf-s-'\+i\+'"/, '사업장 고르기가 없다');
 });
