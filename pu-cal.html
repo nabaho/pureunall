@@ -32,6 +32,7 @@
 <script src="js/gov-recruit.js?v=6"></script>
 <script src="js/pu-cal-recruit.js?v=1"></script>
 <script src="js/pu-cal-write.js?v=8"></script>
+<script src="js/pu-cal-map.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -351,6 +352,31 @@
   .dhint{font-size:11.5px;color:var(--gsub);background:var(--bg);border-radius:6px;
     padding:7px 10px;margin:0 16px 8px;line-height:1.5}
   .modal.det .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0}
+  /* ── 주소 지도 · 하루 동선 (2026-10-09) ── 상세 창 «위»에 겹쳐 뜬다 */
+  .veil.top{z-index:44}
+  .modal.mapw{z-index:45;width:min(560px,94vw);padding:0;overflow:hidden}
+  .mapw .mwhd{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--gline)}
+  .mapw .gx{border:none;background:transparent;color:var(--gtext);font-size:18px;width:36px;height:36px;border-radius:50%;cursor:pointer;flex-shrink:0}
+  .mapw .mwhd b{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mapw .maddr{font-size:12.5px;color:var(--gsub);padding:8px 14px 0;word-break:break-word}
+  .mapw iframe{display:block;width:100%;height:min(52vh,380px);border:0;margin-top:8px;background:var(--bg)}
+  .mapw .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0;flex-wrap:wrap}
+  .maplink{color:var(--acc2);text-decoration:underline;cursor:pointer}
+  .mapw a.btn{text-decoration:none;display:inline-flex;align-items:center}
+  .rlist{max-height:min(56vh,460px);overflow:auto;padding:4px 0}
+  .rrow{display:flex;align-items:center;gap:6px;padding:7px 12px;border-bottom:1px solid var(--gline);font-size:12.5px}
+  .rrow .rck{width:28px;flex-shrink:0;display:flex;justify-content:center}
+  .rrow .rck input{width:18px;height:18px}
+  .rrow .rno{width:24px;flex-shrink:0;text-align:right;color:var(--gsub);font-variant-numeric:tabular-nums}
+  .rrow .rtm{width:84px;flex-shrink:0;font-variant-numeric:tabular-nums;font-weight:600}
+  .rrow .rbody{flex:1;min-width:0}
+  .rrow .rttl{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow .rpl{color:var(--gsub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rrow.off{opacity:.45}
+  .rrow .btn{padding:4px 8px;font-size:11.5px;flex-shrink:0}
+  .rnone{padding:18px 14px;color:var(--gsub);font-size:12.5px}
+  /* 폰 — 시각 칸을 글 길이만큼만, 단추를 좁게(제목·주소에 자리를 준다) */
+  @media (max-width:520px){ .rrow{gap:4px;padding:7px 8px} .rrow .rtm{width:auto;white-space:nowrap} .rrow .btn{padding:4px 6px} }
   .mypal{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:8px 0 9px}
   .mysw{width:100%;aspect-ratio:1;border-radius:6px;border:2px solid transparent;cursor:pointer;
     padding:0;position:relative;font-family:inherit}
@@ -717,6 +743,8 @@ var ME = null;           // 나 (직원 한 줄)
    자동(prefers-color-scheme)으로 넘어가지 않는다. */
 var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toast:'', open:null, theme:'light',
           scope:'month', showLeft:false, openRows:{},
+          /* map — 주소 지도 창 { place, title } · route — 하루 동선 창 { date, off:{열쇠:true} } (2026-10-09) */
+          map:null, route:null,
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'',
           /* pick — 폰에서 «고른 날»(그날 목록이 보여 주는 날). 주·일 보기의 date 와 따로 둔다:
@@ -3021,6 +3049,107 @@ function openDetail(어떤것){
 }
 function closeDetail(){ S.detail = null; render(); }
 
+/* ── 주소 지도 · 하루 동선 ───────────────────────────────────────────────
+   대표 지시 2026-10-09 「팝업창이 나올경우 주소에 대해 지도를 팝업으로」
+                       「시간단위로 사업장방문시 주소로 동선 만들고 … 제네시스 차량에」(순정내비).
+   ★ 지도·동선 셈은 js/pu-cal-map.js(PuCalMap) 한 곳 — 여기서는 그리기와 단추만.
+   ★ 상세 창 «위»에 겹쳐 뜬다. 닫으면 보던 상세 창으로 돌아간다.
+   ⚠ 순정 내비로 «바로» 보내는 공개된 길은 없다(2026-10-09 조사 — 마이 제네시스 앱의
+     「내 차로 전송」, 목적지 한 곳씩만 확인됨). 된 척하지 않는다 — 주소 복사로 넘긴다. */
+function 동선들(ymd){
+  if(typeof PuCalMap === "undefined" || !ymd) return [];
+  return PuCalMap.stopsOn(ymd, {
+    gcal: GCAL.evs || [],
+    sch: arr(D.my_schedules).filter(function(s){ return s && !s.externalId; }),
+    priv: arr(D.cal_private)
+  });
+}
+function openMap(place, title){
+  var p = typeof PuCalMap !== "undefined" ? PuCalMap.cleanPlace(place) : "";
+  if(!p){ toast("지도에 띄울 주소가 없습니다"); return; }
+  S.map = { place:p, title:title || "" }; render();
+}
+function openRoute(ymd){ S.route = { date:ymd, off:{} }; render(); }
+/* 동선 창에서 «고른» 곳만 — 체크를 끈 곳은 빠진다 */
+function 고른동선(){
+  var r = S.route; if(!r) return [];
+  return 동선들(r.date).filter(function(x){ return !r.off[x.key]; });
+}
+function 글복사(글, 됨){
+  function 실패(){ toast("복사가 안 됩니다 — 글을 길게 눌러 직접 복사해 주세요"); }
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(글).then(function(){ toast(됨 || "📋 복사했습니다"); }, 실패);
+      return;
+    }
+  }catch(e){}
+  실패();
+}
+function mapHtml(){
+  var m = S.map; if(!m) return "";
+  var L = PuCalMap.links(m.place);
+  return '<div class="veil top" data-close="1" style="z-index:46"></div>'
+    + '<div class="modal mapw" style="z-index:47">'
+    + '<div class="mwhd"><b>🗺 ' + esc(m.title || "지도") + '</b><button class="gx" data-close="1" title="닫기">✕</button></div>'
+    + '<div class="maddr">📍 ' + esc(m.place) + '</div>'
+    + '<iframe src="' + esc(PuCalMap.embedUrl(m.place)) + '" referrerpolicy="no-referrer-when-downgrade" title="지도"></iframe>'
+    + '<div class="mbtns">'
+    +   '<button class="btn ghost" data-mapcopy="1" title="마이 제네시스 앱 «내 차로 전송»에 붙여 넣기">📋 주소 복사</button>'
+    +   '<a class="btn ghost" href="' + esc(L.kakao) + '" target="_blank" rel="noopener">카카오맵</a>'
+    +   '<a class="btn ghost" href="' + esc(L.naver) + '" target="_blank" rel="noopener">네이버지도</a>'
+    +   '<a class="btn ghost" href="' + esc(L.googleGo) + '" target="_blank" rel="noopener">구글 길찾기</a>'
+    +   '<span class="sp"></span><button class="btn" data-close="1">닫기</button>'
+    + '</div></div>';
+}
+/* 지도 창은 판(#app) «밖»의 제 칸에 그린다 — 판은 알림 하나에도 통째로 다시 그려지는데,
+   지도(iframe)는 다시 그리면 처음부터 다시 받아 깜빡인다. 주소가 바뀔 때만 새로 그린다. */
+function 지도그리기(){
+  var box = document.getElementById("pumapbox");
+  if(!box){ box = document.createElement("div"); box.id = "pumapbox"; document.body.appendChild(box); }
+  var 열쇠 = S.map ? S.map.place + "|" + S.map.title : "";
+  if(box.getAttribute("data-key") === 열쇠) return;
+  box.setAttribute("data-key", 열쇠);
+  box.innerHTML = (S.map && typeof PuCalMap !== "undefined") ? mapHtml() : "";
+}
+function routeHtml(){
+  var r = S.route; if(!r) return "";
+  var 모두 = 동선들(r.date), 고름 = 고른동선();
+  var 다 = 모두.length && 모두.every(function(x){ return !r.off[x.key]; });
+  var 묶음 = PuCalMap.routeUrls(고름).length;   /* 0 이면 단추가 안 그려진다 */
+  /* ☐ 고르기 + 번호(보는 순서) — 자료 목록 규칙(CLAUDE.md 2026-10-05) */
+  var 줄들 = 모두.map(function(x, i){
+    var 끔 = !!r.off[x.key];
+    return '<div class="rrow' + (끔 ? ' off' : '') + '">'
+      + '<span class="rck"><input type="checkbox" data-rpick="' + esc(x.key) + '"' + (끔 ? '' : ' checked') + ' title="동선에 넣기"></span>'
+      + '<span class="rno">' + (i + 1) + '</span>'
+      + '<span class="rtm">' + esc(x.time ? x.time + (x.endTime ? "~" + x.endTime : "") : "시각 없음") + '</span>'
+      + '<span class="rbody"><div class="rttl" title="' + esc(x.title) + '">' + esc(x.title) + '</div>'
+      +   '<div class="rpl" title="' + esc(x.place) + '">📍 ' + esc(x.place) + '</div></span>'
+      + '<button class="btn ghost" data-rmap="' + esc(x.key) + '" title="지도 보기">🗺</button>'
+      + '<button class="btn ghost" data-rcopy="' + esc(x.key) + '" title="이 주소 복사 — 마이 제네시스 «내 차로 전송»에">📋</button>'
+      + '</div>';
+  }).join("");
+  return '<div class="veil top" data-close="1"></div>'
+    + '<div class="modal mapw">'
+    + '<div class="mwhd"><span class="rck"><input type="checkbox" data-rall="1"' + (다 ? ' checked' : '') + ' title="모두 고르기"></span>'
+    +   '<b>🚗 ' + esc(긴날짜(r.date)) + ' 방문 동선</b><button class="gx" data-close="1" title="닫기">✕</button></div>'
+    + (모두.length ? '<div class="rlist">' + 줄들 + '</div>'
+        : '<div class="rnone">이날 주소가 적힌 일정이 없습니다.</div>')
+    + '<div class="dhint" style="margin:8px 12px">제네시스 순정 내비는 이 화면에서 바로 받지 못합니다. '
+    +   '📋로 주소를 복사해 <b>마이 제네시스 앱 → 목적지 검색 → 「내 차로 전송」</b>에 붙여 넣어 주세요(한 곳씩). '
+    +   '동선 전체는 「구글 지도로 동선」에서 순서·거리를 확인하실 수 있습니다.</div>'
+    + '<div class="mbtns">'
+    +   '<span style="font-size:12px;color:var(--gsub)">' + 고름.length + '곳 선택</span>'
+    +   '<span class="sp"></span>'
+    +   '<button class="btn ghost" data-rtext="1"' + (고름.length ? '' : ' disabled') + '>📋 동선 글 복사</button>'
+    /* 경유지가 넘쳐 나뉘면 묶음마다 단추 — 한 번 눌러 창 여럿을 열면 팝업 막기에 걸린다 */
+    +   PuCalMap.routeUrls(고름).map(function(u, i){
+          return '<a class="btn" href="' + esc(u) + '" target="_blank" rel="noopener">구글 지도로 동선'
+            + (묶음 > 1 ? ' ' + (i + 1) + '/' + 묶음 : '') + '</a>';
+        }).join("")
+    + '</div></div>';
+}
+
 /* 구글 일정 한 건 → 상세 창에 낼 것 */
 function 구글상세(id){
   var e = null;
@@ -3183,6 +3312,9 @@ function detailHtml(){
             var 글 = esc(r.t).replace(/\n/g, "<br>");
             /* 회의·첨부 링크 — https 만, 새 창으로(보던 달을 잃지 않게) */
             if(/^https:\/\//i.test(r.href || "")) 글 = '<a href="' + esc(r.href) + '" target="_blank" rel="noopener">' + 글 + '</a>';
+            /* 📍 장소 — 누르면 지도 창(2026-10-09). 온라인 회의 링크 같은 «장소 아닌 것»은 그대로 */
+            else if(r.i === "📍" && typeof PuCalMap !== "undefined" && PuCalMap.cleanPlace(r.t))
+              글 = '<a class="maplink" href="#" data-map="det" title="지도 보기">' + 글 + ' 🗺</a>';
             return '<div class="drow"><span class="di">' + esc(r.i) + '</span>'
               + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
@@ -3193,7 +3325,11 @@ function detailHtml(){
     + (d.kind === "gcal" && d.moreErr ? '<div class="dhint">⚠ 구글에서 나머지를 못 받았습니다 — ' + esc(d.moreErr) + '</div>' : "")
     + (d.kind === "gcal" && !d.more && !d.loading && !d.moreErr && typeof GLINK !== "undefined" && GLINK.st === "need"
         ? '<div class="dhint">🔐 구글을 연결하면 참석자·첨부·알림도 여기 나옵니다 — <a href="#" data-glogin="1">연결하기</a></div>' : "")
-    + '<div class="mbtns"><span class="sp"></span>'
+    + '<div class="mbtns">'
+    /* 🚗 이날 동선 — 주소 있는 일정이 그날 하나라도 있으면 */
+    + (typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length
+        ? '<button class="btn ghost" data-route="' + esc(d.date) + '" title="이날 방문지를 시각 순서로">🚗 이날 동선</button>' : "")
+    + '<span class="sp"></span>'
     + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
     /* 모집 공지 — http(s) 만(PuCalRecruit.safeUrl 이 거른 값) */
     + (/^https?:\/\//i.test(d.link || "") ? '<a class="btn ghost" href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a>' : "")
@@ -3265,7 +3401,9 @@ function modalHtml(){
     + "<div class=\"gcols\"><div class=\"gmain\">"
     +   줄("🕒", "<input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\">" + 시각, "날짜·시각")
     +   (일정 && 새것 ? 줄("🏢", 명함칸Html(m), "기업정보함에서 불러오기") : "")
-    +   (일정 ? 줄("📍", "<input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"위치 추가\">", "장소") : "")
+    +   (일정 ? 줄("📍", "<input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"위치 추가\">"
+          /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
+          + (typeof PuCalMap !== "undefined" ? "<button class=\"btn ghost\" data-map=\"form\" title=\"지도 보기\" style=\"flex-shrink:0;padding:4px 8px\">🗺</button>" : ""), "장소") : "")
     +   (일정 ? 줄("👤", "<input data-m=\"contact\" value=\""+esc(m.contact||"")+"\" placeholder=\"담당자 추가 (이름 · 전화)\">", "담당자") : "")
     +   줄("≡", "<textarea data-m=\"note\" rows=\""+(넓게?6:2)+"\" placeholder=\"설명 추가\">"+esc(m.note||"")+"</textarea>", "설명")
     + "</div><div class=\"gside\">"
@@ -3806,10 +3944,12 @@ function render(){
   html += colorsHtml();
   html += myColorHtml();
   html += detailHtml();
+  if(typeof PuCalMap !== "undefined") html += routeHtml();   /* 상세 창 «위»에. 지도 창은 판 «밖»(지도그리기) */
   html += noteHtml();
   html += 구글연결창Html();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
   $('app').innerHTML = html;
+  지도그리기();
   끌기손잡이();   /* 판이 새로 그려져도 손잡이는 한 번만 달린다 */
   /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
   $('app').className = 달력 ? 'fit' : '';
@@ -3918,8 +4058,51 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext]') : null;
   if(!t) return;
+  /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
+  if(t.hasAttribute('data-close') && (S.map || S.route)){
+    if(S.map) S.map = null; else S.route = null;
+    render(); return;
+  }
+  if(t.hasAttribute('data-map')){
+    e.preventDefault();
+    if(t.getAttribute('data-map') === 'form'){
+      modalRead();                                  /* 적던 글이 다시 그릴 때 날아가지 않게 */
+      var _pl = document.querySelector("[data-m='place']");
+      var _ti = document.querySelector("[data-m='title']");
+      openMap(_pl ? _pl.value : "", _ti ? _ti.value : "");
+    } else {
+      var _row = ((S.detail && S.detail.rows) || []).filter(function(r){ return r.i === "📍"; })[0];
+      openMap(_row ? _row.t : "", S.detail && S.detail.title);
+    }
+    return;
+  }
+  if(t.hasAttribute('data-mapcopy')){ if(S.map) 글복사(S.map.place, "📋 주소를 복사했습니다 — 마이 제네시스 «내 차로 전송»에 붙여 넣으세요"); return; }
+  if(t.hasAttribute('data-route')){ openRoute(t.getAttribute('data-route')); return; }
+  if(t.hasAttribute('data-rpick') && S.route){
+    var _k = t.getAttribute('data-rpick');
+    if(S.route.off[_k]) delete S.route.off[_k]; else S.route.off[_k] = true;
+    render(); return;
+  }
+  if(t.hasAttribute('data-rall') && S.route){
+    var _모두 = 동선들(S.route.date), _다 = _모두.every(function(x){ return !S.route.off[x.key]; });
+    S.route.off = {};
+    if(_다) _모두.forEach(function(x){ S.route.off[x.key] = true; });
+    render(); return;
+  }
+  if((t.hasAttribute('data-rmap') || t.hasAttribute('data-rcopy')) && S.route){
+    var _key = t.getAttribute('data-rmap') || t.getAttribute('data-rcopy');
+    var _x = 동선들(S.route.date).filter(function(x){ return x.key === _key; })[0];
+    if(!_x) return;
+    if(t.hasAttribute('data-rmap')) openMap(_x.place, (_x.time ? _x.time + " " : "") + _x.title);
+    else 글복사(_x.place, "📋 주소를 복사했습니다 — 마이 제네시스 «내 차로 전송»에 붙여 넣으세요");
+    return;
+  }
+  if(t.hasAttribute('data-rtext') && S.route){
+    글복사(PuCalMap.routeText(S.route.date, 고른동선()), "📋 동선을 복사했습니다");
+    return;
+  }
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
   if(t.hasAttribute('data-mv')){
     var mv = +t.getAttribute('data-mv');
@@ -4147,6 +4330,8 @@ document.addEventListener('change', function(e){
 /* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */
 document.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
+  if(S.map){ e.preventDefault(); S.map = null; render(); return; }
+  if(S.route){ e.preventDefault(); S.route = null; render(); return; }
   if(S.detail){ e.preventDefault(); closeDetail(); return; }
   if(S.mycolor){ e.preventDefault(); if(S.mycolor.겹침){ S.mycolor.겹침 = null; render(); } else closeMyColor(); return; }
   if(S.note){ e.preventDefault(); closeNote(); return; }
