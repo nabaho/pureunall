@@ -5194,6 +5194,28 @@ function _hwpFillXml(xml,V,from,to,kind,hdr){
   if(kind==='bizplan') r.xml=_hwpRowFit(r.xml,hdr);   // 세부 항목 줄(사업명이 길면 여러 줄) — 칸 높이를 글만큼
   return r;
 }
+/* ★ 쪽번호 — 한글로 나가는 서식은 모든 쪽 아래 가운데에 번호 (대표 지시 2026-10-09 「모든 페이지에 넘버링 항상」)
+   한글이 직접 저장한 모양 그대로 넣는다(한글 2024 자동화로 «쪽 번호 매기기»를 넣고 저장해 확인):
+     구역 정의(secPr)가 든 run 바로 뒤에 <hp:run><hp:ctrl><hp:pageNum …/></hp:ctrl><hp:t/></hp:run> 하나.
+   모양은 «- 1 -»(아래 가운데). 옆 글자를 비우면 .hwpx 는 «1», 편집기에서 .hwp 로 저장하면 «- 1 -» 로 갈렸다(한글 PDF 로 확인)
+   — 그래서 처음부터 «-» 로 둔다. 화면에서 만든 서식(공용 hwpx_gen.js)은 «1» 그대로다(다른 앱도 쓴다).
+   틀에 이미 쪽번호가 있으면(쪽 번호 매기기 또는 꼬리말의 쪽 번호 필드) 새로 넣지 않는다 — 두 번 찍히지 않게.
+   다만 «모든 쪽에 항상»이라 틀이 꺼 둔 것은 푼다(실제 틀 33개를 rhwp 로 그려 확인, 2026-10-09):
+     · 쪽 번호 위치 «없음»(pos=NONE — 사업계획서·출연확인서) → 아래 가운데
+     · 쪽 번호 감추기(pageHiding hidePageNum=1 — 정관·회의록 표지 등) → 보이기
+     · 새 번호로 시작(newNum — 정관 0→1, 회의록 1·3) → 걷는다. 한 문서 안에서 1, 2, 3… 차례대로.
+   구역마다 따로 넣는다(구역이 바뀌어도 번호는 이어진다). 순수 함수. */
+function _hwpPageNum(xml){
+  xml=String(xml||'')
+    .replace(/(<hp:pageHiding\b[^>]*\bhidePageNum=")1"/g,'$10"')
+    .replace(/<hp:ctrl><hp:newNum\b[^>]*\bnumType="PAGE"[^>]*\/><\/hp:ctrl>/g,'')
+    .replace(/(<hp:pageNum\b[^>]*\bpos=")NONE"/g,'$1BOTTOM_CENTER"');
+  if(/<hp:pageNum\b/.test(xml)||/<hp:autoNum\b[^>]*numType="PAGE"/.test(xml)) return xml;
+  var s=xml.indexOf('</hp:secPr>'); if(s<0) return xml;
+  var e=xml.indexOf('</hp:run>',s); if(e<0) return xml;
+  e+='</hp:run>'.length;
+  return xml.slice(0,e)+'<hp:run charPrIDRef="0"><hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl><hp:t/></hp:run>'+xml.slice(e);
+}
 /* «있거나 없거나» 묶음 — {{#이름}} 이 든 맨 바깥 문단부터 {{/이름}} 이 든 맨 바깥 문단까지.
    keep 이면 표지만 지우고, 아니면 그 문단들째로 걷는다(표가 든 문단도 통째로 — 빈 쪽이 남지 않는다).
    틀에 그 묶음이 없으면 found:false — 옛 틀은 그대로 둔다. */
@@ -5321,7 +5343,7 @@ function hwpTplFill(kind,f,sites){
     if(!t||!t.b64) throw new Error('이 서식의 한글 틀이 아직 없습니다 — [⬆ 한글 틀 올리기]로 먼저 올려 주세요');
     var V=_hwpValuesFor(key,f,sites), from=t.type||HWP_TPL_KINDS[key]||'공동', to=(f&&f.fund_type==='사내')?'사내':'공동';
     return _hwpTplBytes(t).then(function(hx){
-      return _hwpxEach(hx,function(x,h){ return _hwpFillXml(x,V,from,to,kind,h); });
+      return _hwpxEach(hx,function(x,h){ var o=_hwpFillXml(x,V,from,to,kind,h); o.xml=_hwpPageNum(o.xml); return o; });   // 모든 쪽 번호
     }).then(function(res){
       var r={bytes:res.bytes, filled:0, unknown:[], over:{}, note:V._note||'', opts:{}}, u={};
       res.outs.forEach(function(o){ r.filled+=o.filled||0; (o.unknown||[]).forEach(function(k){ u[k]=1; });
@@ -9568,7 +9590,7 @@ function _docToHwpxRun(kind){
     toast('한글 변환 모듈을 불러오지 못했습니다 — 새로고침 후 다시 시도','err'); return; }
   var f=funds[S.formFund]||{};
   try{
-    var doc=HWPXDOC.begin('gov');                 // 별지 서식 원본 여백(별지 제15호서식 실측)
+    var doc=HWPXDOC.begin('gov',{pageNum:true});  // 별지 서식 원본 여백(별지 제15호서식 실측) · 모든 쪽 아래 번호(2026-10-09)
     var body=HWPXDOC.fromHtml(ed, doc);
     if(!body){ toast('내보낼 내용이 없습니다','warn'); return; }
     var name=((f.short_name||f.name||'기금')+'_'+docLabel(kind)+'_'+ymd()+'.hwpx').replace(/[\\/:*?"<>|]/g,'_');
