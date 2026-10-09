@@ -48,8 +48,11 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-sites.js?v=2"></script>
 <script src="js/rules-v2/store.js?v=3"></script>
-<script src="js/rules-v2/view-library.js?v=2"></script>
+<script src="js/rules-v2/view-library.js?v=3"></script>
 <script src="js/rules-v2/view-sites.js?v=2"></script>
+<!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
+<script src="js/rules-v2/lib-tidy.js?v=1"></script>
+<script src="js/rules-v2/view-tidy.js?v=1"></script>
 <!-- 「📚 조별 문안」 — 검토 기준은 규정관리와 «같은 한 벌»(pu-rules-criteria.js), 주제 차례는 표준취업규칙(std_2026.js) -->
 <script src="js/pu-rules-criteria.js?v=3"></script>
 <script src="std_2026.js?v=2"></script>
@@ -265,6 +268,26 @@ button{font:inherit;cursor:pointer}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* 🧹 정리하기 (설계 §10-3) — 표는 .lib 를 그대로, 칩·띠·단계 탭만 */
+.tidy{padding:0 0 8px}
+.tsteps{display:flex;align-items:center;gap:6px;padding:10px 20px;border-bottom:1px solid #e2e8f0;background:#ffffff}
+.tsteps button{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;border-radius:9px;padding:5px 12px;font-size:12.5px;white-space:nowrap}
+.tsteps button.on{background:#1e40af;border-color:#1e40af;color:#ffffff}
+.tsteps .q{margin-left:auto}
+.tband{display:flex;align-items:center;gap:10px;margin:10px 20px;padding:8px 12px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:10px;white-space:nowrap;overflow:hidden}
+.tband.b{border-color:#bfdbfe;background:#eff6ff;color:#1e40af}
+.tband .sp{margin-left:auto}
+.tlast{margin:10px 20px 0;padding:6px 12px;border:1px solid #bbf7d0;background:#f0fdf4;color:#166534;border-radius:10px;font-size:12px}
+.tchip{display:inline-block;padding:0 7px;border-radius:999px;font-size:11px;margin-left:5px;border:1px solid #cbd5e1;background:#f8fafc;color:#475569}
+.tchip.addr{color:#166534;border-color:#bbf7d0;background:#f0fdf4}
+.tchip.learn{color:#1e40af;border-color:#bfdbfe;background:#eff6ff}
+.tchip.name{color:#854d0e;border-color:#fde68a;background:#fffbeb}
+.tidy .mix{color:#991b1b}
+.tidy td .btn+.btn,.tidy td select+.btn{margin-left:4px}
+.tidy td select{height:24px;font-size:11.5px;border:1px solid #cbd5e1;border-radius:7px;max-width:120px}
+.tflow i{font-style:normal;display:inline-block;padding:0 6px;border-radius:6px;background:#f8fafc;border:1px solid #e2e8f0;margin-right:4px;font-size:11.5px}
+.tflow i.f{background:#fffbeb;border-color:#fde68a;color:#854d0e;font-weight:700}
+.tflow i.rep{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
 </style>
 <link rel="stylesheet" href="css/rules-shell.css?v=2">
 </head>
@@ -355,6 +378,47 @@ function diffOf(id, prev) {
   });
 }
 function pickedList() { return Array.from(ST.picked); }
+
+/* ── 🧹 정리하기 (설계 §10) — 셈은 PuRulesV2Tidy, 그리기는 PuRulesV2TidyView ── */
+function T() { return PuRulesV2TidyView.ensure(ST); }
+function tGroups() { return PuRulesV2Tidy.groups(ST.data, ST.companies); }
+function tRounds() { return PuRulesV2Tidy.rounds(ST.data); }
+function tGroup(key) { return tGroups().filter(function (g) { return g.key === key; })[0]; }
+function tRound(rid) { return tRounds().filter(function (r) { return r.roundId === rid; })[0]; }
+/* 보이는 것만 — 찾기 칸에 걸러진 것 (일괄은 «보이는» 것에만) */
+function tVisible(list, parts) {
+  var q = String(T().q || '').trim().toLowerCase();
+  return list.filter(function (x) { return !q || parts(x).join(' ').toLowerCase().indexOf(q) >= 0; });
+}
+function tVisGroups() {
+  return tVisible(tGroups(), function (g) { return [g.addr, g.subject].concat(g.cands.map(function (c) { return PuRulesV2TidyView.coName(ST, c.companyId); })); });
+}
+function tVisRounds() { return tVisible(tRounds(), function (r) { return [PuRulesV2TidyView.coName(ST, r.companyId), r.roundKey]; }); }
+/* 여러 묶음을 차례로 잇는다 — 진행은 «서류» 수로 */
+function tLinkMany(list, label) {
+  var total = 0, done = 0, ids = [];
+  list.forEach(function (x) { total += x.ids.length; ids = ids.concat(x.ids); });
+  var p = list.reduce(function (p, x) {
+    return p.then(function () {
+      return S.linkCompany(x.ids, x.co, function () { done++; ST.busy = '사업장을 잇는 중… ' + done + '/' + total; draw(); });
+    });
+  }, Promise.resolve());
+  return busy('사업장을 잇는 중… 0/' + total, p).then(function () {
+    T().last = { kind: 'link', label: label, ids: ids, rounds: [] }; T().picked.clear(); return reload();
+  }, function () { return reload(); });
+}
+function tFinalMany(list, label) {
+  var done = 0;
+  var p = list.reduce(function (p, r) {
+    return p.then(function () {
+      return S.setFinal(r.companyId, r.roundKey, r.docId).then(function () { done++; ST.busy = '★ 정하는 중… ' + done + '/' + list.length; draw(); });
+    });
+  }, Promise.resolve());
+  return busy('★ 정하는 중… 0/' + list.length, p).then(function () {
+    T().last = { kind: 'final', label: label, ids: [], rounds: list.map(function (r) { return { co: r.companyId, rk: r.roundKey, what: 'final' }; }) };
+    T().picked.clear(); return reload();
+  }, function () { return reload(); });
+}
 function itemOf(id) {
   return PuRulesV2Order.merge(ST.data.docs, ST.data.human).filter(function (it) { return it.id === id; })[0];
 }
@@ -374,7 +438,7 @@ var H = {
       alert('부탁을 남겼습니다. 1~2분 뒤 「새로고침」을 누르세요.');
     });
   },
-  view: function (d) { ST.view = d.v === 'company' ? 'company' : 'mail'; ST.picked.clear(); draw(); },
+  view: function (d) { ST.view = d.v === 'company' || d.v === 'tidy' ? d.v : 'mail'; ST.picked.clear(); if (ST.tidy) { ST.tidy.picked.clear(); ST.tidy.last = null; } draw(); },
   kind: function (d) { ST.filt.kind = d.v || ''; draw(); },
   only: function (d) { ST.filt.only = ST.filt.only === d.v ? '' : d.v; draw(); },
   q: function (v) {
@@ -437,6 +501,94 @@ var H = {
   unsetFinal: function (d) {
     if (!confirm('이 회차의 최종본을 풉니다. (지우지 않고 «미정»으로 돌립니다)')) return;
     busy('최종본을 푸는 중…', S.setFinal(d.co, d.round, null)).then(reload);
+  },
+  /* ── 🧹 정리하기 ── */
+  tidyStep: function (d) { T().step = d.s === 'final' ? 'final' : 'link'; T().picked.clear(); draw(); },
+  tq: function (v) {
+    clearTimeout(qTimer);
+    qTimer = setTimeout(function () {
+      T().q = v; draw();
+      var q = $lib.querySelector('[data-role="tq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    }, 200);
+  },
+  tpick: function (k, on) { if (on) T().picked.add(k); else T().picked.delete(k); draw(); },
+  tpickAll: function (on) {
+    $lib.querySelectorAll('input[data-tpick]').forEach(function (c) { if (on) T().picked.add(c.dataset.tpick); else T().picked.delete(c.dataset.tpick); });
+    draw();
+  },
+  tidyOpen: function (d) { var o = T().open; if (o[d.key]) delete o[d.key]; else o[d.key] = 1; draw(); },
+  /* 줄 하나 확정 — 사람이 누른 회사 id 로. 되돌리기가 있어 묻지 않는다 */
+  tidyLink: function (d) {
+    var g = tGroup(d.key); if (!g) return;
+    tLinkMany([{ ids: g.ids, co: d.co }], PuRulesV2TidyView.coName(ST, d.co));
+  },
+  /* 다른 회사 — 있는 사업장 고르기 창(pickCo·noCo)에 이 묶음 서류를 넘긴다 */
+  tidyOther: function (d) {
+    var g = tGroup(d.key); if (!g) return;
+    ST.picker = { ids: g.ids.slice(), label: (g.addr || '메일 한 통') + ' · 서류 ' + g.ids.length + '건', q: '' }; draw();
+  },
+  tidyNone: function (d) {
+    var g = tGroup(d.key); if (!g) return;
+    busy('사업장 없음으로 두는 중…', S.notRequired(g.ids)).then(function () {
+      T().last = { kind: 'none', label: g.addr || '메일 한 통', ids: g.ids.slice(), rounds: [] }; return reload();
+    }, function () { return reload(); });
+  },
+  /* 띠 — 보이는 «주소 일치» 묶음(bulkOk) 모두. 건수를 묻는다 */
+  tidyBand: function () {
+    var list = tVisGroups().filter(function (g) { return g.bulkOk && g.pre; });
+    if (!list.length) return;
+    var n = 0; list.forEach(function (g) { n += g.ids.length; });
+    if (!confirm('보낸 주소가 업체관리 담당자 메일과 같은 ' + list.length + '묶음 · 서류 ' + n + '건을\n그 회사로 확정합니다.')) return;
+    tLinkMany(list.map(function (g) { return { ids: g.ids, co: g.pre }; }), '주소 일치 ' + list.length + '묶음');
+  },
+  /* ☐ 일괄 — 골라 둔 후보(pre)가 있는 묶음만, 나머지는 건너뛴다 */
+  tidyBulkLink: function () {
+    var picked = tVisGroups().filter(function (g) { return T().picked.has(g.key); });
+    var ok = picked.filter(function (g) { return g.pre; }), skip = picked.length - ok.length;
+    if (!ok.length) { alert('골라 둔 후보가 있는 묶음이 없습니다 — 줄마다 회사를 골라 주세요.'); return; }
+    var n = 0; ok.forEach(function (g) { n += g.ids.length; });
+    if (!confirm(ok.length + '묶음 · 서류 ' + n + '건을 골라 둔 회사로 확정합니다.' + (skip ? '\n(후보가 없는 ' + skip + '묶음은 건너뜁니다)' : ''))) return;
+    tLinkMany(ok.map(function (g) { return { ids: g.ids, co: g.pre }; }), '고른 ' + ok.length + '묶음');
+  },
+  tidyBulkNone: function () {
+    var picked = tVisGroups().filter(function (g) { return T().picked.has(g.key); });
+    var ids = []; picked.forEach(function (g) { ids = ids.concat(g.ids); });
+    if (!ids.length || !confirm(picked.length + '묶음 · 서류 ' + ids.length + '건을 «사업장 없음»으로 둡니다.')) return;
+    busy('사업장 없음으로 두는 중…', S.notRequired(ids)).then(function () {
+      T().last = { kind: 'none', label: '고른 ' + picked.length + '묶음', ids: ids, rounds: [] }; T().picked.clear(); return reload();
+    }, function () { return reload(); });
+  },
+  tidyUnpick: function () { T().picked.clear(); draw(); },
+  /* 되돌리기 — 방금 한 일만. 서류는 다시 미확정(pending), 회차는 최종본·「없음」을 푼다 */
+  tidyUndo: function () {
+    var l = T().last; if (!l) return;
+    var p = l.ids.length ? S.unlink(l.ids) : Promise.resolve();
+    (l.rounds || []).forEach(function (r) {
+      p = p.then(function () { return r.what === 'noFinal' ? S.setNoFinal(r.co, r.rk, false) : S.setFinal(r.co, r.rk, null); });
+    });
+    busy('되돌리는 중…', p).then(function () { T().last = null; return reload(); }, function () { return reload(); });
+  },
+  tidyVer: function (rid, id) { T().ver[rid] = id; draw(); },
+  tidyFinal: function (d) {
+    var r = tRound(d.rid); if (!r) return;
+    tFinalMany([{ companyId: r.companyId, roundKey: r.roundKey, docId: T().ver[r.roundId] || r.pre }], PuRulesV2TidyView.coName(ST, r.companyId));
+  },
+  tidyNoFinal: function (d) {
+    var r = tRound(d.rid); if (!r) return;
+    busy('「최종본 없음」으로 두는 중…', S.setNoFinal(r.companyId, r.roundKey, true)).then(function () {
+      T().last = { kind: 'final', label: PuRulesV2TidyView.coName(ST, r.companyId) + ' 최종본 없음', ids: [], rounds: [{ co: r.companyId, rk: r.roundKey, what: 'noFinal' }] };
+      return reload();
+    }, function () { return reload(); });
+  },
+  tidyBandFinal: function () {
+    var list = tVisRounds().filter(function (r) { return r.bulkOk; });
+    if (!list.length || !confirm('신고서 메일 바로 앞 판이 있는 ' + list.length + '회차를 그 판으로 ★ 정합니다.')) return;
+    tFinalMany(list.map(function (r) { return { companyId: r.companyId, roundKey: r.roundKey, docId: r.pre }; }), '신고서 앞 판 ' + list.length + '회차');
+  },
+  tidyBulkFinal: function () {
+    var list = tVisRounds().filter(function (r) { return T().picked.has(r.roundId); });
+    if (!list.length || !confirm('고른 ' + list.length + '회차를 골라 둔 판으로 ★ 정합니다.')) return;
+    tFinalMany(list.map(function (r) { return { companyId: r.companyId, roundKey: r.roundKey, docId: T().ver[r.roundId] || r.pre }; }), '고른 ' + list.length + '회차');
   },
   /* ── 🏢 사업장 ── */
   siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' ? d.f : 'has'; draw(); },

@@ -93,7 +93,7 @@
       return row;
     }).join('');
     if (!body) body = '<tr><td colspan="7" class="empty" title="">이을 서류가 없습니다 ✓</td></tr>';
-    return '<table class="lib"><colgroup><col style="width:36px"><col style="width:48px"><col style="width:210px"><col style="width:110px"><col><col style="width:300px"><col style="width:300px"></colgroup>'
+    return '<table class="lib"><colgroup><col style="width:36px"><col style="width:48px"><col style="width:210px"><col style="width:110px"><col><col style="width:300px"><col style="width:420px"></colgroup>'
       + '<thead><tr><th class="c"><input type="checkbox" data-act="tpickAll" title="보이는 것 모두 고르기"></th><th class="c">번호</th><th>보낸 주소(묶음)</th><th>메일 · 서류</th><th>제목 예</th><th>후보 · 근거</th><th>확정</th></tr></thead>'
       + '<tbody>' + body + '</tbody></table>';
   }

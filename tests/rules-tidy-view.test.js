@@ -85,3 +85,67 @@ test('단계 탭 둘 — 남은 수를 단다', () => {
   assert.match(h, /data-act="tidyStep"[^>]*data-s="link"/);
   assert.match(h, /data-act="tidyStep"[^>]*data-s="final"/);
 });
+
+test('② 신고서가 없는 회차에는 「신고서 앞 판」 띠가 없다', () => {
+  const L = { companyId: 'c1', companyLinkStatus: 'linked' };
+  const data = pack([doc('a', { dir: '받음', d: 0 }), doc('b', { dir: '보냄', d: 2 })], { a: L, b: L });
+  const h = V.html(st(data, { step: 'final' }));
+  assert.doesNotMatch(h, /data-act="tidyBandFinal"/);
+});
+
+test('제목·주소의 따옴표가 속성을 깨지 않는다', () => {
+  const h = V.html(st(pack([doc('a', { from: 'kim@naver.com', subj: 'a" onmouseover="x' })])));
+  assert.doesNotMatch(h, /" onmouseover="x/);
+});
+
+/* ── 꽂기 ── */
+const fs = require('node:fs');
+const path = require('node:path');
+const { stripComments, stripJs } = require('./strip-comments');
+const HTML = stripComments(fs.readFileSync(path.join(__dirname, '../rules-v2.html'), 'utf8'));
+const LIBV = global.PuRulesV2Lib;
+
+test('📥 보기 단추 셋 — 「🧹 정리하기」 에 남은 수, tidy 면 정리하기를 그린다', () => {
+  global.PuRulesV2TidyView = V;
+  const s = st(pack([doc('a', { from: 'kim@naver.com' })]));
+  s.view = 'mail'; s.filt = {};
+  assert.match(LIBV.filterHtml(s), /data-act="view" data-v="tidy"/);
+  s.view = 'tidy';
+  assert.match(LIBV.tableHtml(s), /class="tidy"/);
+});
+
+test('rules-v2.html — 새 스크립트는 캐시 번호를 달고 view-library 뒤에', () => {
+  ['js/rules-v2/lib-tidy.js', 'js/rules-v2/view-tidy.js'].forEach((f) => {
+    const re = new RegExp('<script src="' + f.replace(/[.\/]/g, '\\$&') + '\\?v=\\d+"></script>');
+    assert.match(HTML, re, f);
+    assert.ok(HTML.search(re) > HTML.indexOf('js/rules-v2/view-library.js'), f + ' 는 view-library 뒤에');
+  });
+});
+
+const Hsrc = HTML.slice(HTML.indexOf('var H = {'), HTML.indexOf('\n};', HTML.indexOf('var H = {')));
+const fn = (k) => { const i = Hsrc.indexOf(k + ': function'); assert.ok(i >= 0, k + ' 손잡이'); return Hsrc.slice(i, Hsrc.indexOf('\n  }', i)); };
+
+test('손잡이 — 정리하기 단추마다 있다', () => {
+  ['tidyStep', 'tq', 'tpick', 'tpickAll', 'tidyOpen', 'tidyLink', 'tidyOther', 'tidyNone', 'tidyBand', 'tidyBulkLink',
+    'tidyBulkNone', 'tidyUnpick', 'tidyUndo', 'tidyFinal', 'tidyVer', 'tidyNoFinal', 'tidyBandFinal', 'tidyBulkFinal'].forEach(fn);
+  assert.match(fn('view'), /'tidy'/);
+});
+
+test('한꺼번에는 건수를 묻고, 일괄 가능만 보낸다', () => {
+  assert.match(fn('tidyBand'), /confirm\(/); assert.match(fn('tidyBand'), /bulkOk/);
+  assert.match(fn('tidyBulkLink'), /confirm\(/); assert.match(fn('tidyBulkLink'), /\.pre\b/);
+  assert.match(fn('tidyBulkNone'), /confirm\(/);
+  assert.match(fn('tidyBandFinal'), /confirm\(/); assert.match(fn('tidyBandFinal'), /bulkOk/);
+  assert.match(fn('tidyBulkFinal'), /confirm\(/);
+});
+
+test('되돌리기는 pending 으로(unlink) · 최종본 풀기 · noFinal 풀기', () => {
+  const u = fn('tidyUndo');
+  assert.match(u, /S\.unlink\(/); assert.match(u, /S\.setFinal\([^)]*null\)/); assert.match(u, /S\.setNoFinal\([^)]*false\)/);
+  assert.match(fn('tidyNoFinal'), /S\.setNoFinal\([^)]*true\)/);
+});
+
+test('render 가 정리하기 입력을 손잡이로 넘긴다', () => {
+  const src = stripJs(fs.readFileSync(path.join(__dirname, '../js/rules-v2/view-library.js'), 'utf8'));
+  assert.match(src, /dataset\.tpick/); assert.match(src, /'tidyVer'/); assert.match(src, /'tq'/); assert.match(src, /'tpickAll'/);
+});
