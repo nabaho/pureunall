@@ -1236,6 +1236,16 @@ exports.weeklyNewsletterSend = functions
         return null;
       }
 
+      /* ★ 봉인 뒤에 막은 주소(수신거부·반송)는 빼고 건다 (2026-10-09) — 금요일 확정본에는 그 뒤의 거부가 없다.
+           봉인 도장은 위에서 이미 견줬다(받는 줄은 도장에 안 들어간다). 손 발송은 명단을 새로 지어 이미 지킨다. */
+      const 막은 = (await db.ref("newsletter/blocked").once("value")).val() || {};
+      const 거름 = NCore.막은주소거르기(ready.to, 막은);
+      if (거름.뺀.length) {
+        console.log("[뉴스레터 자동발송] 봉인 뒤 막은 주소 " + 거름.뺀.length + "곳을 뺐습니다");
+        const 받는이 = {};
+        Object.keys(ready.받는이 || {}).forEach((k) => { if (!막은[k]) 받는이[k] = ready.받는이[k]; });
+        ready = Object.assign({}, ready, { to: 거름.남김, 받는이 });
+      }
       const v = MB.validateBulk(ready);
       if (!v.ok) throw new Error(v.error);
       const now = Date.now();
