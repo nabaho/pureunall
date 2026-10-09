@@ -15498,13 +15498,30 @@ async function _bizMbCall(fn, body){
   if(!j.ok) throw new Error(j.error||'메일을 열지 못했습니다');
   return j;
 }
-async function _bizAttText(x, att, idx){
+async function _bizAttText(x, att, idx, 이름){
   var old=(x.box==='*old');
   var j=await _bizMbCall(old?'readOldMail':'readMailAttachment', old?{ key:x.k, index:idx }:{ slug:x.box, uid:x.k, index:idx, part:String(att.part||'') });
   var bin=atob(j.b64||''), bytes=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
   var nm=String(att.name||'');
-  if(/\.pdf$/i.test(nm)) return await _pkPdfText(bytes);
-  return (await _hwpTextOf(bytes, nm))||'';
+  if(!/\.pdf$/i.test(nm)) return { text:(await _hwpTextOf(bytes, nm))||'', ai:false };
+  var t=''; try{ t=await _pkPdfText(bytes); }catch(e){ t=''; }
+  /* ★ 스캔한 PDF — 글자 층이 없다(실측 2026-10-09: 날인본 결과보고서가 글자 2개).
+       그때만 AI 에게 «담당자 이름»만 묻는다. 고를 이름을 함께 주고, 답도 ownerGuess 로 다시 걸러
+       명부에 없는 이름은 버린다(AI 가 지어내도 들어오지 않는다). */
+  if(String(t).replace(/\s/g,'').length>=50 || !aiReady() || bytes.length>12*1024*1024) return { text:t, ai:false };
+  try{
+    var 질문='이 문서는 컨설팅 결과보고서입니다. 이 컨설팅을 «수행한» 담당자(컨설턴트·노무사·전문위원·작성자)의 이름을 찾아 '
+      +'「담당: 이름」 꼴로 한 줄씩만 답하세요. 다음 사람 가운데에서만 고르세요: '+(이름||[]).join(', ')
+      +'. 대표자 서명·직인만 있는 사람은 빼고, 문서에 없으면 「없음」이라고만 답하세요.';
+    var reply=await PuAiCall.ask([{text:질문},{inline_data:{mime_type:'application/pdf',data:String(j.b64||'')}}],
+      { auth: firebase.auth(), fetch: kcFetch, generationConfig:{temperature:0,maxOutputTokens:120} });
+    return { text:PuAiCall.textOf(reply)||'', ai:true };
+  }catch(e){ console.warn('보고서 AI 판독', e); return { text:t, ai:false }; }
+}
+/* 메일 본문이 html 로만 올 때 — 글자만 (태그·스크립트는 버린다. 화면에 넣지 않으므로 정화는 필요 없다) */
+function _bizHtmlText(h){
+  try{ var d=new DOMParser().parseFromString(String(h||''),'text/html'); d.querySelectorAll('script,style').forEach(function(n){ n.remove(); });
+    return (d.body&&d.body.textContent)||''; }catch(e){ return String(h||'').replace(/<[^>]+>/g,' '); }
 }
 async function bizMailOwner(i, quiet){
   var c=_bizMailCache(), x=c&&c.list[i]; if(!x) return null;
@@ -15512,14 +15529,16 @@ async function bizMailOwner(i, quiet){
   var 이름=_bizOwnerNames(), 결과={ at:Date.now(), names:[], src:'' };
   try{
     var j=await _bizMbCall(x.box==='*old'?'readOldMail':'readMailMessage', x.box==='*old'?{ key:x.k }:{ slug:x.box, uid:x.k, peek:1 });
-    var 후보=KcareerBiz.ownerGuess([x.s, j.text||'', (j.atts||[]).map(function(a){ return a&&a.name; }).join(' ')].join('\n'), 이름);
+    /* ⚠ 본문이 html 로만 오는 메일이 많다(실측: text 0자 · html 2만 자) — 글자로 바꿔 본다 */
+    var 본문=String(j.text||'').trim() || _bizHtmlText(j.html);
+    var 후보=KcareerBiz.ownerGuess([x.s, 본문, (j.atts||[]).map(function(a){ return a&&a.name; }).join(' ')].join('\n'), 이름);
     if(후보.some(function(h){ return h.near; })){ 결과.names=후보.slice(0,3); 결과.src='본문'; }
     else{
       var ra=KcareerBiz.reportAtt(j.atts);
       if(ra){
-        var 글=''; try{ 글=await _bizAttText(x, ra.a, ra.i); }catch(e){ console.warn('보고서 첨부', e); }
-        var 후2=KcareerBiz.ownerGuess(글, 이름);
-        if(후2.length){ 결과.names=후2.slice(0,3); 결과.src='📎 '+String(ra.a.name||'').slice(0,40); }
+        var 읽음={ text:'', ai:false }; try{ 읽음=await _bizAttText(x, ra.a, ra.i, Array.from(new Set(이름))); }catch(e){ console.warn('보고서 첨부', e); }
+        var 후2=KcareerBiz.ownerGuess(읽음.text, 이름);
+        if(후2.length){ 결과.names=후2.slice(0,3); 결과.src='📎 '+String(ra.a.name||'').slice(0,40)+(읽음.ai?' (AI 판독)':''); }
       }
       if(!결과.names.length && 후보.length){ 결과.names=후보.slice(0,3); 결과.src='본문(담당 표시 없음)'; }
     }

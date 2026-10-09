@@ -125,3 +125,13 @@ test('⑤ 화면 — 미리 받기(읽음 표시 안 건드림) · 같은 창구
   assert.ok(/실적엔/.test(chip), '실적 담당과 다르면 «다르다»고만');
   assert.ok(/넣기\('main'/.test(strip(떼기('function bizMailToPerf('))), '실적으로 열 때 담당 칸에 후보');
 });
+
+test('⑥ 실측 고침 — html 만 오는 본문 · 스캔 PDF 는 AI 에게 «이름만», 답도 명부로 다시 거른다', () => {
+  const own = strip(떼기('async function bizMailOwner('));
+  assert.ok(/j\.text\|\|''\)\.trim\(\)\s*\|\|\s*_bizHtmlText\(j\.html\)/.test(own), 'text 가 비면 html 을 글자로(실측: text 0자)');
+  const at = strip(떼기('async function _bizAttText('));
+  assert.ok(/_pkPdfText\(/.test(at) && /length>=50/.test(at), '글자 층이 있으면 AI 를 안 부른다');
+  assert.ok(/PuAiCall\.ask\(/.test(at) && /가운데에서만/.test(at), '스캔본만 AI — 고를 이름을 준다');
+  assert.ok(/KcareerBiz\.ownerGuess\(읽음\.text, 이름\)/.test(own), 'AI 답도 명부로 다시 거른다 — 지어낸 이름은 못 들어온다');
+  assert.ok(/AI 판독/.test(own), 'AI 가 읽었으면 그렇다고 적는다');
+});
