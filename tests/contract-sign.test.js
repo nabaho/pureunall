@@ -44,7 +44,7 @@ test('ⓓ 규칙', () => {
   const src = read('scripts/make-firebase-rules.js');
   const blk = src.slice(src.indexOf('rules.pu_sign = {'), src.indexOf('\n};\n', src.indexOf('rules.pu_sign = {')));
   assert.match(blk, /req: \{\n    '\.read': LOGIN,/);
-  assert.match(blk, /open: \{ \$t: \{\n    '\.read': true,/, '열쇠 한 칸만 읽는다');
+  assert.match(blk, /open: \{ \$t: \{\n    '\.read': 'auth != null',/, '열쇠 한 칸만, 로그인(익명)한 사람만 읽는다');
   assert.doesNotMatch(blk, /open: \{\n?\s*'\.read'/, 'open 목록 읽기는 막혀 있어야 한다');
   assert.match(blk, /\$t\.matches\(\/\^\[0-9a-f\]\{32\}\$\/\)/);
   const sub = blk.slice(blk.indexOf('sub: {'));
@@ -54,6 +54,7 @@ test('ⓓ 규칙', () => {
   assert.match(sub, /root\.child\('pu_sign\/req\/' \+ data\.parent\(\)\.child\('req'\)\.val\(\) \+ '\/p4'\)/, '끝 4자리는 직원 칸에서');
   assert.match(sub, /newData\.child\('docHash'\)\.val\(\) === data\.parent\(\)\.child\('docHash'\)\.val\(\)/);
   assert.match(sub, /\$other: \{ '\.validate': false \}/);
+  assert.match(sub, /\(data\.parent\(\)\.child\('mode'\)\.val\(\) === 'agree' \|\| newData\.child\('sig'\)\.isString\(\)\)/, '손서명 방식은 서명 그림이 있어야');
   assert.match(blk, /p4: \{ '\.validate': "newData\.isString\(\) && newData\.val\(\)\.matches\(\/\^\[0-9\]\{4\}\$\/\)" \}/);
 });
 
