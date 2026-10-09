@@ -100,7 +100,7 @@ test('ⓓ 메뉴에는 계약유형만 — 양식 이름을 메뉴에 그리지 
 test('ⓑ 수정 창 — 사건계약이면 측을 고르고, 그룹명 보기는 이알피 사건유형', () => {
   const o = cutFn(stripJs(CF), 'function openModal(');
   assert.match(o, /SIDES/, '★ 측을 고를 수 없습니다');
-  assert.match(o, /CASE_TYPES/, '★ 그룹명 보기가 이알피 사건유형이 아닙니다');
+  assert.match(o, /caseTypeList\(\)/, '★ 그룹명 보기가 이알피 사건유형이 아닙니다(이알피 환경설정 · 못 읽으면 CASE_TYPES)');
   assert.ok(!/'해고', '산재', '체불'/.test(o), '옛 보기(해고·산재…)가 남아 있습니다');
 });
 

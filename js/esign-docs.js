@@ -47,7 +47,7 @@
     },
     delegation: {
       title: '위임장',
-      body: '위        임        장\n\n사 무 소 명 : 푸른 노무법인\n소   재   지 : 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층\n연   락   처 : TEL 041-556-0035   FAX 041-556-3656\n이메일주소 : 370-6@daum.net\n\n성         명 : 대표 / 공인노무사   권 형 하\n                           공인노무사   박 한 별\n                           공인노무사   김 혜 민\n                           공인노무사   박 재 원\n\n상기인을 공인노무사법 제2조 제1항의 규정에 의하여 대리인으로 선임하고 아래 사항의 처리에 관한 일체의 권한을 위임합니다.\n\n---------------- 아         래 ----------------\n\n미지급임금 등 체불 처리에 대한 일체의 사항 위임\n\n{{작성일}}\n\n위임인 :  {{이름}}                  ( 서 명 )\n연락처 :  {{근로자연락처}}'
+      body: '위        임        장\n\n사 무 소 명 : 푸른 노무법인\n소   재   지 : 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층\n연   락   처 : TEL 041-556-0035   FAX 041-556-3656\n이메일주소 : 370-6@daum.net\n\n성         명 : {{공인노무사명단}}\n\n상기인을 공인노무사법 제2조 제1항의 규정에 의하여 대리인으로 선임하고 아래 사항의 처리에 관한 일체의 권한을 위임합니다.\n\n---------------- 아         래 ----------------\n\n미지급임금 등 체불 처리에 대한 일체의 사항 위임\n\n{{작성일}}\n\n위임인 :  {{이름}}                  ( 서 명 )\n연락처 :  {{근로자연락처}}'
     },
     privacyConsent: {
       title: '개인정보 수집·이용·제공 동의서',
@@ -93,7 +93,9 @@
     return {
       '이름': esc(person.name), '주민등록번호': esc(person.idNo), '주소': esc(person.addr),
       '근로자연락처': esc(person.phone || ''),
-      '회사명': esc((caseMeta && caseMeta.company) || ''), '작성일': esc((person.consentAt || '').slice(0, 10))
+      '회사명': esc((caseMeta && caseMeta.company) || ''), '작성일': esc((person.consentAt || '').slice(0, 10)),
+      /* 재직 공인노무사 전원 — 화면이 명부를 읽어 PuFormCardFill 에 넣어 둔다(못 읽으면 그쪽 기본값) */
+      '공인노무사명단': esc((caseMeta && caseMeta._lawyers) || (root.PuFormCardFill && root.PuFormCardFill.lawyersNow ? root.PuFormCardFill.lawyersNow() : ''))
     };
   }
   function sigBlock(person) {
