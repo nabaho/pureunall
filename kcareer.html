@@ -13012,7 +13012,7 @@ function renderGallery(){ const grid=document.getElementById('galleryGrid'); if(
 }
 /* 파일이 이 기기에도 창고에도 없을 때 — 하얀 칸 대신 «까닭과 할 일»을 적는다 (2026-10-09) */
 function _kcNoFileHere(img){ var box=img.parentNode; if(!box) return;
-  box.innerHTML='<div style="padding:6px;font-size:10.5px;line-height:1.45;color:#b45309;text-align:center">이 브라우저에 원본이 없습니다<br>처음 올린 PC·브라우저에서 경력관리를 한 번 열면 옮겨 옵니다</div>'; }
+  box.innerHTML='<div style="padding:6px;font-size:10.5px;line-height:1.45;color:var(--amber);text-align:center">이 브라우저에 원본이 없습니다<br>처음 올린 PC·브라우저에서 경력관리를 한 번 열면 옮겨 옵니다</div>'; }
 async function addGalleryPhotos(files){
   const list=Array.from(files||[]).filter(function(f){ return /^image\//.test(f.type); });
   if(!list.length){ toast('이미지 파일만 업로드할 수 있습니다'); return; }
