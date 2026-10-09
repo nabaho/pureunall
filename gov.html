@@ -246,6 +246,8 @@ table.cmp td{white-space:nowrap}
       <select id="fSt" onchange="draw()"><option value="">전체 상태</option>
         <option>새 공고</option><option>관심</option><option>지원함</option><option>지나감</option>
         <option value="__hidden">🙈 숨긴 것</option><option value="__all">모두 (숨긴 것 포함)</option></select>
+      <select id="fMthd" onchange="feedMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
+        <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
       <div class="sp"></div>
       <span id="cnt" class="sub"></span>
       <span id="perBox"></span>
@@ -537,8 +539,15 @@ function perSel(key, onch){
 function feedPer(v){ lsSet('per', String(v)); _feedPage=0; draw(); }
 function feedPageTo(p){ _feedPage=p; draw(); }
 
+/* ═══ 수의계약 (대표 지시 2026-10-09 「수의계약의 경우 대부분 직접계약을 하는 사업장이 있다 — 표시하고, 빼고 볼 수 있게」) ═══
+   계약방법(나라장터 cntrctCnclsMthdNm)에 「수의」가 들면 수의계약(「수의계약」·「수의(소액)」…). 알리오·기업마당은 계약방법이 없어 아니다.
+   ⚠ 거르개는 «보이는 것»만 바꾼다 — 공고를 숨기거나 지우지 않는다. 고른 것은 이 기기만 기억한다(feed_mthd). */
+function isSole(r){ return /수의/.test(String(r&&r.mthd||'')); }
+function soleTag(r){ return isSole(r)?'<span class="tag amber" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다'+(r.mthd?' ('+esc(r.mthd)+')':'')+'">수의계약</span> ':''; }
+function feedMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); _feedPage=0; draw(); }
 function feedVisible(){
   var q=($('q').value||'').toLowerCase(), fs=$('fSrc').value, ft=$('fSt').value;
+  var fm=($('fMthd')&&$('fMthd').value)||'', soleOut=0;
   var every=get('feed').filter(function(r){ return !!r; });
   var base=every.filter(function(r){
     if(ft==='__hidden') return !!r.hidden;
@@ -548,8 +557,10 @@ function feedVisible(){
     if(fs && r.src!==fs) return false;
     if(ft && ft.charAt(0)!=='_' && r.type!==ft) return false;
     if(q && [r.nm,r.org,r.ntce,r.kw].join(' ').toLowerCase().indexOf(q)<0) return false;
+    if(fm==='nosole' && isSole(r)){ soleOut++; return false; }
+    if(fm==='sole' && !isSole(r)) return false;
     return true; });
-  return {every:every, all:every.filter(function(r){ return !r.hidden; }), rows:rows};
+  return {every:every, all:every.filter(function(r){ return !r.hidden; }), rows:rows, soleOut:soleOut, fm:fm};
 }
 function _pager(p, pages, from, shown, n, fn){
   if(pages<=1) return '';
@@ -595,7 +606,7 @@ function draw(){
   Object.keys(_feedSel).forEach(function(id){ if(!vis[id]) delete _feedSel[id]; });
   var sn=Object.keys(_feedSel).length, hiddenN=v.every.length-all.length;
   $('cnt').textContent='전체 '+all.length+'건'+(rows.length!==all.length?' · 지금 '+rows.length+'건':'')
-    +(hiddenN?' · 숨김 '+hiddenN+'건':'');
+    +(hiddenN?' · 숨김 '+hiddenN+'건':'')+(v.soleOut?' · 수의계약 '+v.soleOut+'건 뺌':'')+(v.fm==='sole'?' · 수의계약만':'');
   var pb=$('perBox'); if(pb) pb.innerHTML=perSel('per','feedPer');
   var per=perOf('per'), n=rows.length;
   var pages=per?Math.max(1,Math.ceil(n/per)):1, p=Math.min(_feedPage,pages-1); _feedPage=p;
@@ -616,7 +627,7 @@ function draw(){
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+'"><b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
       +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
       +matchCell(function(){ return matchTargetFeed(r); })
       +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
@@ -692,7 +703,7 @@ function feedPop(id){
     +_kv('걸린 낱말',esc(r.kw||''))
     +_kv('공고일',esc((r.openDt||'').slice(0,16)))+_kv('마감',esc((r.closeDt||'').slice(0,16))+' '+dchip(r))
     +_kv('추정가격',r.prc?_won(r.prc)+' <span class="sml">('+Number(r.prc).toLocaleString()+'원)</span>':'')
-    +_kv('계약방법',esc(r.mthd||''))+_kv('받은 날',esc((r.savedAt||'').slice(0,16).replace('T',' ')))
+    +_kv('계약방법',soleTag(r)+esc(r.mthd||''))+_kv('받은 날',esc((r.savedAt||'').slice(0,16).replace('T',' ')))
     +'</table>'
     +'<div class="bar" style="margin:12px 0">'
     +'<button class="btn sm" onclick="star(\''+esc(r.id)+'\');feedPop(\''+esc(r.id)+'\')">'+(r.type==='관심'?'★ 관심 끄기':'☆ 관심')+'</button>'
@@ -1943,6 +1954,7 @@ function recStickyWatch(){
 
 function boot(){
   recStickyWatch();
+  var fmd=$('fMthd'); if(fmd){ var fmv=lsGet('feed_mthd'); fmd.value=(fmv==='sole'||fmv==='nosole')?fmv:''; }
   drawKw(); draw(); readyNote(); applyLock('checking');
   if(location.protocol==='file:'){ applyLock('lock','file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ applyLock('lock','인터넷이 필요합니다'); return; }
