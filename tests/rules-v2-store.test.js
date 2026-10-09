@@ -122,3 +122,13 @@ test('최종본 없음 — noFinal 만 바꾸고 finalDocId 는 그대로', asyn
   r = db.store.rules_mgmt.library.rounds.co_gana_r202601;
   assert.equal(r.noFinal, false); assert.equal(r.finalDocId, 'rd_1');
 });
+
+test('「최종본 없음」 뒤에 최종본을 정하면 noFinal 이 꺼진다 — 나중에 최종본을 풀어도 회차가 다시 사라지지 않는다', async () => {
+  const db = fakeDb(); const S = make(db);
+  await S.setNoFinal('co_gana', 'r202601', true);
+  await S.setFinal('co_gana', 'r202601', 'rd_1');
+  assert.equal(db.store.rules_mgmt.library.rounds.co_gana_r202601.noFinal, false);
+  await S.setFinal('co_gana', 'r202601', null);
+  const r = db.store.rules_mgmt.library.rounds.co_gana_r202601;
+  assert.equal(r.finalDocId, null); assert.notEqual(r.noFinal, true, '풀면 다시 정리 목록으로 돌아온다');
+});

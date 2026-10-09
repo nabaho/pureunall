@@ -39,7 +39,8 @@
   function lastHtml(st) {
     var l = ensure(st).last;
     if (!l) return '';
-    var what = l.kind === 'final' ? '★ 정함 ' + l.rounds.length + '회차' : l.kind === 'none' ? '사업장 없음으로 둠 ' + l.ids.length + '건' : '방금 확정 ' + l.ids.length + '건';
+    var allNo = l.kind === 'final' && l.rounds.length && l.rounds.every(function (r) { return r.what === 'noFinal'; });
+    var what = l.kind === 'final' ? (allNo ? '최종본 없음으로 둠 ' : '★ 정함 ') + l.rounds.length + '회차' : l.kind === 'none' ? '사업장 없음으로 둠 ' + l.ids.length + '건' : '방금 확정 ' + l.ids.length + '건';
     return '<div class="tlast">✓ ' + esc(l.label) + ' — ' + esc(what) + ' <button class="btn sm" data-act="tidyUndo">되돌리기</button></div>';
   }
 
@@ -48,7 +49,8 @@
     var out = '';
     if (g.pre) {
       out +='<button class="btn sm p" data-act="tidyLink" data-key="' + esc(g.key) + '" data-co="' + esc(g.pre) + '">' + esc(coName(st, g.pre)) + ' 확정</button>';
-    } else {
+    } else if (!g.mixed) {
+      // 섞인 묶음은 «맞음» 한 번으로 통째 잇지 않는다 — 펼쳐서 메일마다 확정한다
       g.cands.slice(0, 3).forEach(function (c) {
         out += '<button class="btn sm" data-act="tidyLink" data-key="' + esc(g.key) + '" data-co="' + esc(c.companyId) + '">' + esc(coName(st, c.companyId)) + ' 맞음</button>';
       });
@@ -104,7 +106,7 @@
     });
     var bulk = list.filter(function (g) { return g.bulkOk; }), bulkDocs = 0;
     bulk.forEach(function (g) { bulkDocs += g.ids.length; });
-    var band = bulk.length ? '<div class="tband">✅ <b>보낸 주소가 업체관리 담당자 메일과 같은 서류 ' + bulkDocs + '건</b>(' + bulk.length + '묶음) — 후보가 하나뿐입니다'
+    var band = bulk.length ? '<div class="tband"><span class="tx" title="보낸 주소가 업체관리 담당자 메일과 같은 서류 ' + bulkDocs + '건">✅ <b>보낸 주소가 업체관리 담당자 메일과 같은 서류 ' + bulkDocs + '건</b>(' + bulk.length + '묶음) — 후보가 하나뿐입니다</span>'
       + '<span class="sp"></span><button class="btn sm g" data-act="tidyBand">보이는 «주소 일치» 모두 확정</button></div>' : '';
     var picked = list.filter(function (g) { return t.picked.has(g.key); });
     var bar = picked.length ? '<div class="bulk">☑ <b>' + picked.length + '묶음</b> 골랐습니다 —'
@@ -153,11 +155,22 @@
       + '<thead><tr><th class="c"><input type="checkbox" data-act="tpickAll" title="보이는 것 모두 고르기"></th><th class="c">번호</th><th>사업장</th><th>회차</th><th>흐름 (판 → 신고)</th><th>골라 둔 판 · 근거</th><th>정하기</th></tr></thead>'
       + '<tbody>' + body + '</tbody></table>';
   }
+  // 띠(★ 한꺼번에)에 드는 회차 — 일괄 가능(bulkOk)이면서 사람이 줄에서 다른 판을 고르지 않은 것.
+  // skipped = 직접 다른 판을 골라 띠에서 뺀 회차 수(띠 글과 확인 창이 같은 수를 말하도록 여기서 한 번만 센다)
+  function bandRounds(st, list) {
+    var ver = ensure(st).ver, ok = [], skipped = 0;
+    list.forEach(function (r) {
+      if (!r.bulkOk) return;
+      if (ver[r.roundId] && ver[r.roundId] !== r.pre) skipped++; else ok.push(r);
+    });
+    return { ok: ok, skipped: skipped };
+  }
   function finalPane(st, all) {
     var t = ensure(st);
     var list = all.filter(function (r) { return hit(t.q, [coName(st, r.companyId), r.roundKey]); });
-    var bulk = list.filter(function (r) { return r.bulkOk; });
-    var band = bulk.length ? '<div class="tband b">★ <b>신고서 메일 바로 앞 판이 있는 회차 ' + bulk.length + '개</b> — 그 판을 골라 두었습니다'
+    var bd = bandRounds(st, list), bulk = bd.ok;
+    var band = bulk.length ? '<div class="tband b"><span class="tx" title="신고서 메일 바로 앞 판이 있는 회차 ' + bulk.length + '개">★ <b>신고서 메일 바로 앞 판이 있는 회차 ' + bulk.length + '개</b> — 그 판을 골라 두었습니다'
+      + (bd.skipped ? ' (직접 고른 ' + bd.skipped + '회차는 뺌)' : '') + '</span>'
       + '<span class="sp"></span><button class="btn sm p" data-act="tidyBandFinal">보이는 ' + bulk.length + '회차 ★ 확정</button></div>' : '';
     var picked = list.filter(function (r) { return t.picked.has(r.roundId); });
     var bar = picked.length ? '<div class="bulk">☑ <b>' + picked.length + '회차</b> 골랐습니다 —'
@@ -174,7 +187,7 @@
       + (t.step === 'final' ? finalPane(st, rs) : linkPane(st, gs)) + '</div>';
   }
 
-  var api = { html: html, ensure: ensure, coName: coName };
+  var api = { html: html, ensure: ensure, coName: coName, bandRounds: bandRounds };
   if (root) root.PuRulesV2TidyView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

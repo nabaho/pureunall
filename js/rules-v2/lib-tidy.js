@@ -128,8 +128,9 @@
       }
       if (!pre) pre = g.rows[g.rows.length - 1];
       var why = (g.cand[pre.item.id] || []).slice();
+      // 일괄(★)은 «신고서 바로 앞 판» — 단, 고객이 보낸 현행(0)은 줄에는 골라 두되 띠는 ★ 하지 않는다
       return { roundId: g.roundId, companyId: g.companyId, roundKey: g.roundKey, group: g,
-        pre: pre.item.id, preNo: pre.no, why: why, bulkOk: why.indexOf(O.R_REPORT) >= 0, last: g.last };
+        pre: pre.item.id, preNo: pre.no, why: why, bulkOk: why.indexOf(O.R_REPORT) >= 0 && pre.no !== 0, last: g.last };
     }).sort(function (a, b) { return (b.bulkOk ? 1 : 0) - (a.bulkOk ? 1 : 0) || b.last - a.last; });
   }
   function counts(data, companies) {

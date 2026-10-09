@@ -158,3 +158,11 @@ test('도메인만 — 층 3, 골라 두지 않고, 이름 단서보다 앞에 �
   const i1 = x.cands.findIndex((c) => c.companyId === 'c1');
   assert.ok(i1 > 0 && x.cands[i1].whys.includes(T.W_NAME));
 });
+
+test('회차 — 신고서 바로 앞 판이 고객이 보낸 현행(0)이면 줄엔 골라 두되 일괄(★)엔 넣지 않는다', () => {
+  const data = pack([RD('a', { d: 0, dir: '받음' }), RD('r', { d: 6, mk: 'mr', doc: { kind: '신고서' } })], { a: LINK('c1'), r: LINK('c1') });
+  const r = T.rounds(data)[0];
+  assert.equal(r.pre, 'a'); assert.equal(r.preNo, 0);
+  assert.ok(r.why.includes(global.PuRulesV2Order.R_REPORT), '근거는 그대로 보인다');
+  assert.equal(r.bulkOk, false, '고객의 옛 규칙을 띠로 ★ 하지 않는다');
+});
