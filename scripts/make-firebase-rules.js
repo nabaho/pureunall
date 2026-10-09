@@ -625,8 +625,13 @@ function scal() {
  'scal_conflictMatrix','scal_roundlog','scal_erpConsHold','scal_erpTypeMap','scal_erpTypeRun',
  /* 사진 변경 이력 — 회차 이력과 같은 «한 줄씩 쌓는» 자리 (2026-08-29 대표 결정 「가」).
     직원은 남길 수 있고, 지우기는 관리자만. */
- 'scal_photoLog']
+ 'scal_photoLog',
+ /* 정부컨설팅 보고서 (2026-10-09, 2단계) — 직원이 만들고 고치고, 지우기는 관리자만. */
+ 'scal_reports']
   .forEach(function(k){ rules[k] = scal(); });
+/* 보고서 양식 서고 — 읽기는 로그인, 양식 등록·고침은 관리자만. */
+rules.scal_rptForms      = { '.read': LOGIN, '.write': ADMIN };
+rules.scal_rptFormsIndex = { '.read': LOGIN, '.write': ADMIN };
 
 /* ══ 백업 ══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).
