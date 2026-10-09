@@ -1666,6 +1666,27 @@
       }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     /* ✉ 메일로 보내기 (설계 §7) — 채운(손본) 파일을 들고 확인 창으로. 보내는 일은 그 창의 「✉ 보내기」에서만 */
+    /* ✉ 묶음 메일 (2026-10-09 「계약이 확정되면 계약서와 나머지 서류를 보낼 수 있게」) — 묶음 받기와 같은 차례로 채워 첨부 여럿으로 */
+    function doMailAll() {
+      if (busy) return;
+      if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다'; return; }
+      if (!conflictsOkToGo()) return;
+      var bad = items.filter(function (x) { return x.state === 'fail'; });
+      if (bad.length && !w.confirm('원본을 찾지 못한 양식 ' + bad.length + '개는 채운 본문(.txt)으로 붙입니다. 계속할까요?')) return;
+      var V = values(), rs = [], k = 0;
+      var names = bundleFileNames(items.map(function (x) { return { name: x.fm.name, ext: x.state === 'fail' ? '.txt' : extOf(x) }; }), V);
+      busy = true; refresh();
+      function next() {
+        if (k >= items.length) return Promise.resolve();
+        note.textContent = '채우는 중… (' + (k + 1) + '/' + items.length + ')';
+        return fillOne(items[k], items[k].state === 'fail').then(function (r) { rs.push(r); k++; return next(); });
+      }
+      next().then(function () {
+        busy = false; refresh(); note.textContent = ''; warnOf(rs);
+        openSend({ fm: items[0].fm, title: title || '서류 묶음', V: V, row: st.co || {}, bytes: rs[0].bytes, name: names[0], isHwp: false,
+          extra: rs.slice(1).map(function (r, i) { return { name: names[i + 1], bytes: r.bytes }; }) }, host);
+      }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
     function doMail() {
       var it = items[0];
       if (busy) return;
@@ -1783,6 +1804,7 @@
         host.hwpShow ? el('button', { type: 'button', 'class': 'pcf-b', title: '지금 값으로 채워(비운 칸은 ＿＿＿ 밑줄) 인쇄합니다. 회사를 고르지 않으면 빈 양식으로 나옵니다.', text: one ? '🖨 인쇄' : '🖨 ' + items.length + '개 한 번에 인쇄', onclick: doPrint }) : null,
         (one && items[0].src && !isXl(items[0]) && host.hwpEdit) ? el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 한글처럼 손보기', onclick: doEdit }) : null,
         (one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ 메일로 보내기 →', onclick: doMail }) : null,
+        (!one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ ' + items.length + '개 메일로 보내기 →', title: '모두 채워 메일 한 통에 붙입니다', onclick: doMailAll }) : null,
         btnDown = (one && !items[0].src) ? null : el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', onclick: doDownload })
       ])
     ]);
@@ -1813,7 +1835,7 @@
      o = { fm, V, row, bytes, name, isHwp }. 보낸 뒤: 보낸 서류 기록(받는 주소 없음) + (선택) 기업별 서류에 사본.
      ⚠ db 를 직접 만지지 않는다 — host.mail 이 한다(tests/form-cardfill.test.js 의 «채우기 창은 쓰지 않는다» 규칙). */
   function openSend(o, host) {
-    var CF = w.PuFormCardFill, V = o.V || {}, d = CF.mailDefaults(V, o.fm.name || '서류');
+    var CF = w.PuFormCardFill, V = o.V || {}, d = CF.mailDefaults(V, o.title || o.fm.name || '서류');
     var MAX = 18 * 1024 * 1024, busy = false, mode = 'auto';
     ensureCss();
     var bg = el('div', { 'class': 'pcf-mbg', style: 'z-index:10001' });
@@ -1828,7 +1850,7 @@
     var autoBody = d.body, autoSub = d.subject;
     function bodyFor() {
       var opt = toSel.options[toSel.selectedIndex], ag = !!(opt && opt.parentNode && opt.parentNode.tagName === 'OPTGROUP');
-      var nd = CF.mailDefaults(V, o.fm.name || '서류', { agency: ag });
+      var nd = CF.mailDefaults(V, o.title || o.fm.name || '서류', { agency: ag });
       if (bodyIn.value === autoBody) { bodyIn.value = nd.body; autoBody = nd.body; }
       if (subIn.value === autoSub) { subIn.value = nd.subject; autoSub = nd.subject; }
     }
@@ -1866,7 +1888,7 @@
     function toAddr() { return String(toSel.value || toIn.value || '').trim(); }
     function pdfName() { return o.name.replace(/\.[^.]+$/, '') + '.pdf'; }
     function files() {
-      var out = [{ name: o.name, bytes: o.bytes }];
+      var out = [{ name: o.name, bytes: o.bytes }].concat(o.extra || []);   // 묶음이면 나머지 서류도
       if (!pdfCk.checked) return Promise.resolve(out);
       note.textContent = 'PDF 만드는 중…';
       /* PDF 는 «다시 나누기 전» 사본으로 그린다(있으면) — 한글 프로그램에서 보이는 모양과 같다 */
@@ -1876,7 +1898,9 @@
       var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
       /* ⚠ 메일은 이미 나갔다 — 기록·보관이 실패해도(동기 throw 포함) «보내기 실패»로 보이면 안 된다(다시 눌러 두 번 간다) */
       var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: V.담당자 || '', await: true }); }];
-      if (keepCk.checked) jobs.push(function () { return host.mail.keep(V, { name: o.name, size: o.bytes.length, type: '', bytes: o.bytes }, '[보냄] ' + (o.fm.name || '서류')); });
+      if (keepCk.checked) [{ name: o.name, bytes: o.bytes }].concat(o.extra || []).forEach(function (f, i) {
+        jobs.push(function () { return host.mail.keep(V, { name: f.name, size: f.bytes.length, type: '', bytes: f.bytes }, '[보냄] ' + (i ? f.name.replace(/\.[^.]+$/, '') : (o.fm.name || '서류'))); });
+      });
       return Promise.all(jobs.map(function (fn) { return Promise.resolve().then(fn).then(function () { return ''; }, function (e) { return (e && e.message) || String(e); }); }))
         .then(function (errs) {
           errs = errs.filter(Boolean);
@@ -1948,7 +1972,9 @@
         el('label', { 'class': 'pcf-frow' }, [el('span', { text: '제목' }), subIn]),
         bodyIn,
         el('div', { 'class': 'pcf-fh', text: '첨부' }),
-        el('div', { 'class': 'pcf-muted', text: '📄 ' + o.name + ' · ' + Math.max(1, Math.round(o.bytes.length / 1024)) + ' KB' }),
+        el('div', null, [{ name: o.name, bytes: o.bytes }].concat(o.extra || []).map(function (f) {
+          return el('div', { 'class': 'pcf-muted', text: '📄 ' + f.name + ' · ' + Math.max(1, Math.round(f.bytes.length / 1024)) + ' KB' });
+        })),
         el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [pdfCk, '📕 같은 내용 PDF도 붙이기 (한글 없는 곳용 · 그림 PDF)']),
         el('div', { 'class': 'pcf-fh', text: '보낸 뒤' }),
         el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [keepCk, V.회사명 ? '보낸 사본을 기업별 서류 › ' + V.회사명 + ' 에 보관' : '보낸 사본 보관 — 회사를 고르지 않아 보관하지 않습니다']),
