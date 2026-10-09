@@ -29,7 +29,8 @@ const GATE = R('js/pu-gate.js');
 const 잠글앱 = {
   /* 취업규칙은 «한 앱 두 파일»(두 앱 합치기 2026-10-04) — 타일은 하나라도 문은 두 파일에 다 단다.
      한 파일만 달면 그 파일 주소를 직접 친 사람에게 열린다. */
-  'rules.html': '취업규칙', 'payroll-os.html': '급여관리',
+  'rules.html': '취업규칙',
+  /* 급여관리(payroll-os.html)는 2026-10-09 대표 「준비중 풀기」로 열었다 — ⑨ 가 지킨다 */
   /* 문서관리는 2026-10-04 대표 「직원도 문서관리 모두 본다」로 열었다 — ⑦ 이 지킨다 */
   'pu-paydata.html': '급여데이터함',
   /* 푸른 메일(pu-cards.html)은 2026-10-09 대표 「준비중 풀어도 된다」로 열었다 — ⑧ 이 지킨다 */
@@ -146,4 +147,27 @@ test('⑧★★ 푸른 메일은 직원에게 열려 있다 — 대표 「준비
   const s = stripJs(R('pu-cards.html'));
   assert.doesNotMatch(s, /PuGate\.soonUnlessAdmin\(/,
     '★★ 메일함 안쪽에 준비중 문이 다시 생겼다 — 포털에서는 열리는데 들어가면 막힌다');
+});
+
+test('⑨★★ 급여관리는 담당자에게 열려 있다 — 대표 「준비중 풀기」(2026-10-09)', () => {
+  /* ★ 왜 열었나 — 공용 기록(payroll-STATUS.md §6)이 「담당자 한 명이 이 앱으로 실제
+       업무를 한 바퀴 돌려 본다」를 다음 할 일로 적어 둔 채, 정작 담당자가 열 수조차
+       없었다. 「아직 아무도 실데이터로 한 달을 통과시켜 본 적이 없다」도 같은 뿌리다.
+     ⚠★ 문을 연 것이 «자료를 연 것»은 아니다 — payroll_os 읽기는 규칙이 재무(fin)·
+       관리자로 따로 지킨다. 그래서 못 읽을 때 «사람 말»로 알려 주는지도 함께 본다. */
+  const portal = R('enter.html');
+  const 줄 = portal.split('\n').find(l => l.indexOf("key:'payroll'") >= 0);
+  assert.ok(줄, '★ 포털에 급여관리 타일이 없다');
+  assert.doesNotMatch(줄, /soon:\s*true/,
+    '★★ 포털 급여관리 타일이 다시 준비중이다 — 담당자가 못 누른다');
+
+  const s = stripJs(R('payroll-os.html'));
+  assert.doesNotMatch(s, /PuGate\.soonUnlessAdmin\(/,
+    '★★ 급여관리 안쪽에 준비중 문이 다시 생겼다 — 포털에서는 열리는데 들어가면 막힌다');
+
+  /* 권한이 없을 때 «무엇을 하면 되는지»를 말해야 한다 — 만든 사람에게 하는 말 말고 */
+  assert.match(s, /권한이 없습니다/,
+    '★★ 권한이 없을 때 사람 말로 알려 주지 않는다');
+  assert.doesNotMatch(s, /규칙에 payroll_os 블록/,
+    '★★ 「규칙에 블록이 있는지 확인하세요」는 만든 사람에게 하는 말이다 — 담당자는 고장인 줄 안다');
 });
