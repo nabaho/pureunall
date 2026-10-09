@@ -141,3 +141,19 @@ test('⑦ 약어 고치기 — 「과거까지 모두 / 앞으로만」을 고�
   assert.match(ed, /var rp2 = bizTypeRenamePlan\(/, '★ 묻는 사이 생긴 건을 못 본다');
   assert.match(ed, /bizTypeRenameRun\(rp2/);
 });
+
+/* ⑧ 2026-10-09 실측 — 바꾼 기록(renameLog)을 따로 한 번 더 저장했더니 서버에 안 남았다.
+   두 저장이 잇달아 나가며 뒤의 것이 묻혔다. 약어를 바꾸는 «같은 저장»에 얹어야 한다. */
+test('⑧★★ 바꾼 기록은 약어와 «같은 저장»에 — 따로 저장하면 묻힌다', () => {
+  const run = stripJs(cutFn(ERP, 'function bizTypeRenameRun('));
+  assert.doesNotMatch(run, /bizTypeApply\(|dbSet\(/, '★★ 기록을 따로 저장한다 — 약어 저장과 잇달아 나가 서버에서 묻힌다');
+  assert.match(run, /log:log/);
+  const ed = stripJs(cutFn(ERP, 'async function editType('));
+  const runAt = ed.indexOf('bizTypeRenameRun(rp2'), saveAt = ed.indexOf('persistWith(function(cur){');
+  assert.ok(runAt > 0 && saveAt > runAt, '★★ 번호를 바꾸기 «전에» 약어를 저장하면 기록을 같은 저장에 못 얹는다');
+  assert.match(ed.slice(saveAt), /bizTypeRenameLogAdd\(nx, rr\.log\)/, '★★ 약어 저장에 기록을 안 얹는다');
+  const c = box({}); vm.runInContext(cutFn(ERP, 'function bizTypeRenameLogAdd('), c);
+  const t = c.bizTypeRenameLogAdd({ code: 'T', renameLog: Array.from({ length: 10 }, (_, i) => ({ i })) }, { i: 99 });
+  assert.equal(t.renameLog.length, 10, '★ 기록이 끝없이 쌓인다');
+  assert.equal(t.renameLog[9].i, 99);
+});
