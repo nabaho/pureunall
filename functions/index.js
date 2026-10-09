@@ -6602,6 +6602,11 @@ exports.mgrWatch = MGRW.mgrWatch;
 const NTSM = require("./nts-monthly")({ functions, getDatabase, MAIL_REGION });
 exports.ntsMonthly = NTSM.ntsMonthly;
 
+/* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
+   실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */
+const GONE = require("./gone-watch")({ functions, getDatabase, MAIL_REGION });
+exports.goneWatch = GONE.goneWatch;
+
 /* 🗄 구글 공용 달력 «보관함» — 매일 새벽 3시 data/gcal_archive 로 베낀다 (대표 지시 2026-09-27
    「푸른캘린더에서 별도로 보관」). 실제 코드는 gcal-archive.js. 누가 지운 일정도 보관함엔 남는다. */
 const GARCH = require("./gcal-archive")({ functions, getDatabase, MAIL_REGION,
