@@ -11696,13 +11696,18 @@ function monthLocked(mm){ return !!(((S.f15Close||{}).months||{})[mm]); }
 /* 보고 있는 해가 «결산 확정»됐는가 — 확정한 해는 달 잠금과 상관없이 장부를 못 고친다(점검 2026-10-09: 확정만 하고 달을 안 잠그면 다 고쳐졌다).
    ⚠ 지금 기금·연도의 마감 자료(S.f15Close)일 때만 본다 — 다른 해 것이 남아 있으면 엉뚱하게 막는다. */
 function _yearLocked(){ return !!(S.f15For===S.fundId+'/'+S.year&&S.f15Close&&S.f15Close.locked); }
+/* 같은 것을 서버에서 바로 — 마감 자료를 안 읽은 화면(사업장 연도 기록)에서 저장 직전에 본다. 못 읽으면 막지 않는다(저장을 멈추는 곁다리가 되면 안 된다) */
+function _yearLockedP(fid,yr){
+  if(S.f15For===fid+'/'+yr&&S.f15Close) return Promise.resolve(!!S.f15Close.locked);
+  return fbDb.ref(NS+'/closing/'+fid+'/'+yr+'/locked').once('value').then(function(sn){ return !!sn.val(); },function(){ return false; });
+}
 /* 그 거래의 달이 잠겼는가 — 막는 자리마다 이 하나만 부른다(결산 확정한 해도 잠김) */
 function txnLocked(id){
   var x=(S.txns||{})[id]; if(!x) return false;
   return (typeof _yearLocked==='function'&&_yearLocked())||monthLocked(_monthOf(x.date));
 }
 function _lockStop(mm){
-  if(_yearLocked()) toast(S.year+'년은 결산 확정되어 장부를 고칠 수 없습니다 — 확정을 풀고 고치세요','warn');
+  if(_yearLocked()) toast(S.year+'년은 결산 확정되어 고칠 수 없습니다 — 확정을 풀고 고치세요','warn');
   else toast((+mm)+'월은 마감되어 고칠 수 없습니다 — 월마감을 풀고 고치세요','warn');
   renderFund();
 }
@@ -14730,16 +14735,21 @@ function repSameAll(){
 function sySet(sid,k,v){
   var fid=S.fundId, yr=S.year, val=num(v)||0;
   var _b=((S.sy||{})[sid]||{})[k];
-  fbDb.ref(NS+'/site_years/'+fid+'/'+yr+'/'+sid+'/'+k).set(val||null).then(function(){
+  /* 결산 확정한 해의 사업장 연도 기록(출연금·근로자수 등)은 못 고친다 — 확정 때 남긴 숫자와 어긋난다 */
+  _yearLockedP(fid,yr).then(function(lk){
+    if(lk){ toast(yr+'년은 결산 확정되어 고칠 수 없습니다 — 확정을 풀고 고치세요','warn'); renderFund(); return; }
+    return fbDb.ref(NS+'/site_years/'+fid+'/'+yr+'/'+sid+'/'+k).set(val||null).then(function(){
     if(typeof _track==='function') _track([{path:'site_years/'+fid+'/'+yr+'/'+sid+'/'+k, a:val||null, b:_b, m:0}],{what:'연도별 기록',audit:false});
     S.sy=S.sy||{}; S.sy[sid]=S.sy[sid]||{}; S.sy[sid][k]=val;
     S.f15For=null; toast('저장됨');
+  });
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function syCopyPrev(){
   var fid=S.fundId, yr=S.year;
   confirmM((yr-1)+'년 사업장 연도별 값을 '+yr+'년으로 불러올까요?\n이미 입력된 '+yr+'년 값은 그대로 둡니다.',{ok:'불러오기'}).then(function(ok){
     if(!ok)return;
+    return _yearLockedP(fid,yr).then(function(lk){ if(lk){ toast(yr+'년은 결산 확정되어 고칠 수 없습니다 — 확정을 풀고 고치세요','warn'); return; }
     fbDb.ref(NS+'/site_years/'+fid+'/'+(yr-1)).once('value').then(function(s){
       var prev=s.val()||{}, cur=S.sy||{}, up={}, n=0;
       Object.keys(prev).forEach(function(sid){
@@ -14753,6 +14763,7 @@ function syCopyPrev(){
         if(typeof _trackUp==='function') _trackUp('site_years/'+fid+'/'+yr,up,{what:(yr-1)+'년 값 불러오기', src:'copy:prev', m:1, how:''});
         S.syFor=null; S.f15For=null; renderFund(); toast(n+'개 값을 불러왔습니다');
       });
+    });
     });
   });
 }
@@ -17870,6 +17881,7 @@ function f15Drift(R){
 }
 function _lockInfo(){ var c=S.f15Close||{}; return (c.locked_at||'')+(c.locked_by?' · '+c.locked_by:''); }
 function f15Save(){
+  if(_yearLocked()){ _lockStop(''); return; }   // 결산 확정한 해의 보고서 입력값은 못 고친다(대표 「계속」 2026-10-09)
   var fid=S.fundId, yr=S.year, o=Object.assign({},S.f15Rep||{});
   ['biz_type','capital','partner_workers','use_ratio','run_trust','run_secu','run_own','run_reit',
    'run_etc','src_cap_excess','src_basic_range',
@@ -17883,6 +17895,7 @@ function f15Save(){
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function f15SetBf(id,kind){
+  if(_yearLocked()){ _lockStop(''); return; }
   var fid=S.fundId, yr=S.year;
   fbDb.ref(NS+'/closing/'+fid+'/'+yr+'/report/bf/'+id).set(kind).then(function(){
     S.f15Rep=S.f15Rep||{}; S.f15Rep.bf=S.f15Rep.bf||{}; S.f15Rep.bf[id]=kind;
