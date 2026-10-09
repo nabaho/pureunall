@@ -108,3 +108,17 @@ test('입금 기록 — 자동 표시·지문·출처를 단다, 연락처는 �
   assert.equal(rec.autoConfirmed, true); assert.equal(rec.autoBy, 'cms-auto'); assert.equal(rec.sourceKind, 'company');
   assert.equal(rec.managerSid, 'A-001'); assert.match(rec.id, /^fi-/); assert.equal(rec.entityType, 'FinancialTransaction');
 });
+
+test('더빌 합계 줄은 그날 명세 합계와 맞을 때만, 이름·금액·날짜가 맞는 입금은 딱 하나일 때만', () => {
+  const norm = s => String(s || '').replace(/\(주\)|㈜|주식회사|\s/g, '').toLowerCase();
+  const cms = [{ status: 'ok', setdate: '2026-10-12', amount: 220000, fee: 0 }, { status: 'ok', setdate: '2026-10-12', amount: 110000, fee: 0 },
+               { status: 'fail', setdate: '2026-10-12', amount: 999000, fee: 0 }];
+  const inc = [{ id: 'i1', companyName: '(주)가나상사', amount: 330000, date: '2026-10-03' }];
+  const bank = [{ date: '2026-10-12 10:00', amount: 330000, memo: '더빌이체3572' },
+                { date: '2026-10-13 10:00', amount: 500000, memo: '더빌이체3572' },
+                { date: '2026-10-05 09:00', amount: 330000, memo: '가나상사' },
+                { date: '2026-10-05 09:00', amount: 330000, memo: '라마상회' }];
+  const out = A.bankLinesToMark(bank, { cmsRows: cms, incomes: inc, normName: norm });
+  assert.deepEqual(out.map(x => x.why + ':' + x.row.memo), ['cms_sum:더빌이체3572', 'recorded:가나상사']);
+  assert.equal(out[1].incomeId, 'i1');
+});

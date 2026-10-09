@@ -147,8 +147,45 @@
     };
   }
 
+  function dayMs(s) { return Date.parse(str(s).slice(0, 10) + 'T00:00:00Z'); }
+  function shift(ymd, n) { var t = dayMs(ymd); return isNaN(t) ? '' : new Date(t + n * 864e5).toISOString().slice(0, 10); }
+  /* ★ 입금을 만들지 않는다 — «처리됨» 표시만 고른다(2026-01·02 겹침 43건의 뿌리를 막는다) */
+  function bankLinesToMark(bankRows, opts) {
+    opts = opts || {};
+    var norm = opts.normName || function (s) { return nospace(s).toLowerCase(); };
+    var tol = opts.feeTol == null ? 1100 : opts.feeTol;
+    var used = {}, out = [];
+    (bankRows || []).forEach(function (b) {
+      var amt = parseInt(b.amount, 10) || 0, d = str(b.date).slice(0, 10);
+      if (!amt || !d) return;
+      if (/더빌/.test(String(b.memo || ''))) {
+        var days = [d, shift(d, -1), shift(d, 1)];
+        for (var i = 0; i < days.length; i++) {
+          var sum = 0, fee = 0, n = 0;
+          (opts.cmsRows || []).forEach(function (r) {
+            if (r && r.status === 'ok' && str(r.setdate).slice(0, 10) === days[i]) { sum += r.amount || 0; fee += r.fee || 0; n++; }
+          });
+          if (n && Math.abs(sum - amt) <= fee + tol) { out.push({ row: b, why: 'cms_sum', day: days[i] }); return; }
+        }
+        return;
+      }
+      var m = norm(b.memo), t = dayMs(d);
+      if (isNaN(t)) return;
+      var hits = (opts.incomes || []).filter(function (x) {
+        if (!x || x._deleted || used[x.id] || (parseInt(x.amount, 10) || 0) !== amt) return false;
+        var xt = dayMs(x.date);
+        if (isNaN(xt) || Math.abs(xt - t) > 4 * 864e5) return false;
+        var c = norm(x.companyName);
+        return c && m && (c.indexOf(m) >= 0 || m.indexOf(c) >= 0);
+      });
+      if (hits.length === 1) { used[hits[0].id] = true; out.push({ row: b, why: 'recorded', incomeId: hits[0].id }); }
+    });
+    return out;
+  }
+
   var API = { statusOf: statusOf, rowKey: rowKey, parsePayTable: parsePayTable,
-    nextAdvisoryYm: nextAdvisoryYm, judgeRows: judgeRows, buildIncome: buildIncome };
+    nextAdvisoryYm: nextAdvisoryYm, judgeRows: judgeRows, buildIncome: buildIncome,
+    bankLinesToMark: bankLinesToMark };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.PuCmsAuto = API;
 })(typeof window !== 'undefined' ? window : this);
