@@ -11368,7 +11368,7 @@ function mailFindRead(i){
     if(!r.zip) return _mfReadFile(new File([buf],j.name||r.a.name||'첨부',{type:j.mime||'application/octet-stream'}),kind);
     return _loadJsZip().then(function(JSZip){ return JSZip.loadAsync(buf,{decodeFileName:_mfZipName}); }).then(function(z){
       var files=Object.keys(z.files).filter(function(n){ return !z.files[n].dir&&!/__MACOSX\//.test(n)&&MF_READ.test(n); })
-        .map(function(n){ return {name:n, kind:_mfKind(n.split('/').pop())||kind||r.kind}; });
+        .map(function(n,_,all){ return {name:n, kind:_mfKind(n.split('/').pop())||(all.length===1?(kind||r.kind):'')}; });   // 묶음 이름의 종류는 파일이 하나뿐일 때만 — 출연확인서까지 «인가증»이 되면 안 된다
       MF.inner={r:r, z:z, files:files}; renderMailFind();
       var b=$('mfBody'); if(b) b.scrollTop=0;
       if(!files.length) toast('묶음 안에 PDF·그림이 없습니다','warn');

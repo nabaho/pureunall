@@ -58,6 +58,7 @@ test('★ 배선 — 읽기만 · peek · 판독은 기존 길(readDocInto) · �
   assert.match(rd, /JSZip\.loadAsync\(buf,\{decodeFileName:_mfZipName\}\)/, 'zip 을 안 푼다(또는 한글 이름이 깨진다)');
   assert.match(fnSrc('mailFind'), /!MF_READ\.test\(nm\)&&!\/\\\.zip\$\/i\.test\(nm\)/, 'zip 첨부를 목록에서 뺀다');
   assert.match(fnSrc('mailFindInner'), /if\(!kind\|\|!DOC_PARSE\[kind\]\)/);
+  assert.ok(rd.includes("kind:_mfKind(n.split('/').pop())||(all.length===1?(kind||r.kind):'')"), '묶음 안 파일이 모두 묶음 이름의 종류가 된다(출연확인서가 «인가증»으로)');
   assert.match(fnSrc('renderMailFind'), /<th style="width:34px">□<\/th><th style="width:40px">#<\/th>/);
   assert.match(SRC, /onclick="mailFind\(\)"/);
   assert.match(SRC, /'doc\.mail':\{t:'메일에서 서류 찾기'/);
