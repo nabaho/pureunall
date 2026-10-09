@@ -84,3 +84,13 @@ test('⑧ 결산 확정한 해 — 운영상황보고서 입력값·사업장 �
   assert.ok(p.includes("'/locked').once('value')"), '서버에서 안 읽는다');
   assert.ok(p.includes('function(){ return false; }'), '못 읽으면 저장까지 멈춘다');
 });
+
+test('⑨ 잠긴 줄은 처음부터 흐리게 — 승인·계정·✂·× 는 disabled, 증빙은 열어 둠, 확정한 해는 머리에 🔒', () => {
+  const c = fnSrc('closingTab');
+  assert.ok(c.includes("lk=_yl||monthLocked(_monthOf(x.date)), dis=lk?' disabled':''"));
+  assert.ok(c.includes("dis+' onchange=\"approveTxn("), '잠긴 줄의 승인 체크가 살아 있다');
+  assert.ok(c.includes("acctSel(x._id,'debit',x.debit).replace('<select','<select disabled')"), '잠긴 줄의 계정 선택이 살아 있다');
+  assert.ok(c.includes("<button'+dis+' onclick=\"splitForm(") && c.includes("<button'+dis+' onclick=\"delTxn("), '잠긴 줄의 ✂·× 가 살아 있다');
+  assert.ok(!c.includes("<button'+dis+' onclick=\"openAlbumPick("), '증빙 붙이기까지 막았다');
+  assert.ok(c.includes('🔒 결산 확정</span>'));
+});
