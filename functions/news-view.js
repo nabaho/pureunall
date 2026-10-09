@@ -427,9 +427,11 @@ function 쪽(제목, 전문) {
        ⚠ 밑줄은 border 가 아니라 inset 그림자로 긋는다 — border 를 얹으면 그 칸만
          1px 커져 차림표가 통째로 들썩인다. */
     + '#wrap [data-stick] td.nav{cursor:pointer;transition:color .12s,background .12s}'
-    + '#wrap [data-stick] td.nav:hover{color:#241a13 !important;background:#faf8f5}'
-    + '#wrap [data-stick] td.nav.on{color:#241a13 !important;'
-    + 'box-shadow:inset 0 -2px 0 #6f5a48}'
+    /* ⚠ 차림표가 갈색 띠·흰 글자가 됐다(2026-10-10 B안) — 누름·고름도 «어둡게» 간다.
+         밝은 바탕을 깔면 흰 글자가 사라진다. */
+    + '#wrap [data-stick] td.nav:hover{color:#ffffff !important;background:#5c4a3b}'
+    + '#wrap [data-stick] td.nav.on{color:#ffffff !important;background:#241a13;'
+    + 'box-shadow:inset 0 -3px 0 #e8cfa9}'
     + '#wrap [data-stick] td.nav:focus-visible{outline:2px solid #c9b79b;outline-offset:-3px}'
     /* ★ 그 자리에서 편 «전문» (2026-09-18). 창으로 안 넘어가고 여기에 쌓인다.
        ⚠ 글자 크기를 편지보다 살짝 낮춘다 — 길어서, 편지와 같은 크기면 벽처럼 보인다.

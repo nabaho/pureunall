@@ -46,7 +46,11 @@
     남색: '#1b3a6b', 글: '#33302c', 흐린글: '#9a938a',
     줄: '#e0dcd6', 가는줄: '#eceae6', 바탕: '#e9e7e3', 상자: '#f7f5f2',
     /* 자료 꼭지 바탕 — 원본의 「고용·노동정책」 칸이 옅은 살구빛이다 */
-    살구: '#fbf4ea', 표지테: '#d9d2c8', 표지바탕: '#ffffff'
+    살구: '#fbf4ea', 표지테: '#d9d2c8', 표지바탕: '#ffffff',
+    /* 제호 이름 아래 짧은 줄 — 갈과 살구 사이 (2026-10-10 B안) */
+    장식: '#b08a5f',
+    /* 갈색 차림표 띠 위 «특별» 꼭지 — 남색은 갈색 위에서 안 읽힌다 */
+    띠강조: '#f2d4a4'
   };
   var 폰트 = "'Malgun Gothic',sans-serif";
   /* 요약판 제목에 쓰는 명조 — 「신문 안」(대표 결정 2026-09-17).
@@ -260,13 +264,24 @@
       + _줄띠(1, 색.갈)
       + '<div style="height:3px;line-height:3px;font-size:1px;">&nbsp;</div>'
       + _줄띠(3, 색.짙은갈)
-      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">'
+      /* ★ 제호 바탕은 옅은 살구빛 (대표 결정 2026-10-10 B안 「너무 아무런 색이 없어서
+           약간 허전해 보인다」). 새 색을 만들지 않고 정책 꼭지의 살구빛을 쓴다.
+         ⚠ bgcolor 와 background-color 를 «둘 다» 건다 — 아웃룩은 앞의 것만 본다. */
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
+      + ' bgcolor="' + 색.살구 + '" style="background-color:' + 색.살구 + ';">'
       + '<tr><td align="center" style="padding:13px 0 0 0;">'
       + '<div style="font-size:10px;letter-spacing:4px;line-height:1.4;color:' + 색.딱지 + ';'
       + 'font-family:' + 세리프 + ';">PUREUN LABOR LAW FIRM</div></td></tr>'
       + '<tr><td align="center" style="padding:6px 0 0 0;">' + 이름칸 + '</td></tr>'
-      + '<tr><td align="center" style="padding:8px 0 11px 0;">'
-      + '<div style="font-size:11.5px;letter-spacing:2px;line-height:1.4;color:' + 색.흐린글 + ';'
+      /* 이름 아래 짧은 장식 줄 — 가운데 세우려고 표를 하나 더 쓴다(div 의 margin:auto 를
+         모르는 메일 프로그램이 있다). */
+      + '<tr><td align="center" style="padding:8px 0 0 0;">'
+      + '<table role="presentation" align="center" cellpadding="0" cellspacing="0" border="0"><tr>'
+      + '<td width="40" height="2" bgcolor="' + 색.장식 + '" style="width:40px;height:2px;'
+      + 'line-height:2px;font-size:1px;background-color:' + 색.장식 + ';">&nbsp;</td>'
+      + '</tr></table></td></tr>'
+      + '<tr><td align="center" style="padding:7px 0 11px 0;">'
+      + '<div style="font-size:11.5px;letter-spacing:2px;line-height:1.4;color:' + 색.딱지 + ';'
       + 'white-space:nowrap;font-family:' + 세리프 + ';">' + esc(회.이름 || '') + '</div>'
       + '</td></tr></table>'
       + _줄띠(1, 색.줄)
@@ -393,7 +408,7 @@
       /* ⚠ 폰에서는 쌓는다 — 다섯 칸에 nowrap 이라 좁은 화면에서는 옆으로 삐져나간다 */
       return '<td align="center" class="' + 쌓을칸 + ' ' + 차림칸 + '" width="' + 폭칸
         + '%" style="padding:11px 2px;font-size:12px;'
-        + 'white-space:nowrap;font-weight:bold;color:' + (g.강조 ? 색.남색 : 색.딱지) + ';'
+        + 'white-space:nowrap;font-weight:bold;color:' + (g.강조 ? 색.띠강조 : '#ffffff') + ';'
         + 'letter-spacing:1px;'
         + 'font-family:' + 폰트 + ';">' + esc(g.차림표이름 || g.이름) + '</td>';
     }).join('');
@@ -401,9 +416,11 @@
          (대표 지시 2026-09-13 「이부분 틀고정 해라」).
        ⚠ 메일에서는 그냥 뜻 없는 표시라 아무 일도 안 한다 — 해롭지 않다.
          붙잡는 규칙은 functions/news-view.js 에 있다(거기서만 통한다). */
+    /* ★ 갈색 띠에 흰 글자 (대표 결정 2026-10-10 B안) — 살구빛 제호 바로 밑에서
+         제호를 «닫는» 띠가 된다. 흰 바탕 갈색 글자일 때는 제호와 한 덩이로 풀어져 보였다. */
     return '<tr data-stick="1"><td style="padding:0 ' + 옆여백 + 'px 4px ' + 옆여백 + 'px;background-color:#ffffff;">'
       + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"'
-      + ' style="border-bottom:1px solid ' + 색.줄 + ';">'
+      + ' bgcolor="' + 색.갈 + '" style="background-color:' + 색.갈 + ';">'
       + '<tr>' + 칸 + '</tr></table></td></tr>';
   }
 
