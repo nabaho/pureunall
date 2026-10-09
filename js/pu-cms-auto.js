@@ -154,18 +154,20 @@
     opts = opts || {};
     var norm = opts.normName || function (s) { return nospace(s).toLowerCase(); };
     var tol = opts.feeTol == null ? 1100 : opts.feeTol;
-    var used = {}, out = [];
+    var used = {}, usedDay = {}, out = [];
     (bankRows || []).forEach(function (b) {
       var amt = parseInt(b.amount, 10) || 0, d = str(b.date).slice(0, 10);
       if (!amt || !d) return;
       if (/더빌/.test(String(b.memo || ''))) {
+        /* R9: 정산일 하루는 더빌 줄 하나만 먹는다 — 이미 쓴 날은 건너뛴다 */
         var days = [d, shift(d, -1), shift(d, 1)];
         for (var i = 0; i < days.length; i++) {
+          if (usedDay[days[i]]) continue;
           var sum = 0, fee = 0, n = 0;
           (opts.cmsRows || []).forEach(function (r) {
             if (r && r.status === 'ok' && str(r.setdate).slice(0, 10) === days[i]) { sum += r.amount || 0; fee += r.fee || 0; n++; }
           });
-          if (n && Math.abs(sum - amt) <= fee + tol) { out.push({ row: b, why: 'cms_sum', day: days[i] }); return; }
+          if (n && Math.abs(sum - amt) <= fee + tol) { usedDay[days[i]] = true; out.push({ row: b, why: 'cms_sum', day: days[i] }); return; }
         }
         return;
       }

@@ -122,3 +122,29 @@ test('더빌 합계 줄은 그날 명세 합계와 맞을 때만, 이름·금액
   assert.deepEqual(out.map(x => x.why + ':' + x.row.memo), ['cms_sum:더빌이체3572', 'recorded:가나상사']);
   assert.equal(out[1].incomeId, 'i1');
 });
+
+test('딱 하나 규칙 — 이름이 맞는 입금이 둘이면 아무것도 고르지 않는다', () => {
+  const norm = s => String(s || '').replace(/\(주\)|㈜|주식회사|\s/g, '').toLowerCase();
+  const inc = [{ id: 'i1', companyName: '(주)가나상사', amount: 330000, date: '2026-10-03' },
+               { id: 'i2', companyName: '가나상사 본점', amount: 330000, date: '2026-10-04' }];
+  const bank = [{ date: '2026-10-05 09:00', amount: 330000, memo: '가나상사' }];
+  assert.deepEqual(A.bankLinesToMark(bank, { cmsRows: [], incomes: inc, normName: norm }), []);
+});
+
+test('한 입금은 한 줄에만 — 같은 입금에 같은 줄이 둘이면 한 번만 고른다', () => {
+  const norm = s => String(s || '').replace(/\(주\)|㈜|주식회사|\s/g, '').toLowerCase();
+  const inc = [{ id: 'i1', companyName: '(주)가나상사', amount: 330000, date: '2026-10-03' }];
+  const bank = [{ date: '2026-10-05 09:00', amount: 330000, memo: '가나상사' },
+                { date: '2026-10-05 09:00', amount: 330000, memo: '가나상사' }];
+  const out = A.bankLinesToMark(bank, { cmsRows: [], incomes: inc, normName: norm });
+  assert.equal(out.length, 1); assert.equal(out[0].why, 'recorded'); assert.equal(out[0].incomeId, 'i1');
+});
+
+test('R9 — 정산일 하루는 더빌 줄 하나만 먹는다', () => {
+  const cms = [{ status: 'ok', setdate: '2026-10-12', amount: 220000, fee: 0 }, { status: 'ok', setdate: '2026-10-12', amount: 110000, fee: 0 }];
+  const bank = [{ date: '2026-10-12 10:00', amount: 330000, memo: '더빌이체3572' },
+                { date: '2026-10-13 10:00', amount: 330000, memo: '더빌이체3572' }];
+  const out = A.bankLinesToMark(bank, { cmsRows: cms, incomes: [] });
+  assert.equal(out.length, 1); assert.equal(out[0].why, 'cms_sum'); assert.equal(out[0].row.date, '2026-10-12 10:00');
+  assert.equal(out[0].day, '2026-10-12');
+});
