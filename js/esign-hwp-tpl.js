@@ -89,14 +89,30 @@
       동의일시: String(person.consentAt || '').replace('T', ' ').slice(0, 16),
       체불임금1개월차: won(m1), 체불임금2개월차: won(m2), 체불임금3개월차: won(m3),
       체불퇴직금: won(sev), 체불총액: won(m1 + m2 + m3 + sev),
-      착수금: '', 성공보수율: ''   // 사건마다 다르고 자료에 없다 — 비워 두고 편집기에서 적는다
+      착수금: '', 성공보수율: '',   // 사건마다 다르고 자료에 없다 — 비워 두고 편집기에서 적는다
+      /* 대표 근로자(진정인 대표·선정당사자) — 대표 지시 2026-10-09 「근로자 대표 등 선정 서식」.
+         caseMeta.repName 은 사건에서 고른 이름, caseMeta._rep 은 그 사람의 제출(연락처·주소) — 화면이 열 때 붙인다 */
+      대표근로자: String(caseMeta.repName || ''),
+      대표근로자연락처: String((caseMeta._rep && caseMeta._rep.phone) || ''),
+      대표근로자주소: String((caseMeta._rep && caseMeta._rep.addr) || ''),
+      진정인수: caseMeta._count ? String(caseMeta._count) : '',
+      관할관서: String(caseMeta.office || ''),
+      생년월일: birthOf(person.idNo)
     };
+  }
+  /* 주민번호 앞 7자리 → 생년월일(YYYY.MM.DD). 성별 자리 1·2·5·6 은 1900년대, 3·4·7·8 은 2000년대. 모르면 빈칸 */
+  function birthOf(idNo) {
+    var d = String(idNo || '').replace(/\D/g, '');
+    if (d.length < 7) return '';
+    var g = +d[6], cen = (g === 1 || g === 2 || g === 5 || g === 6) ? '19' : (g === 3 || g === 4 || g === 7 || g === 8) ? '20' : '';
+    if (!cen) return '';
+    return cen + d.slice(0, 2) + '.' + d.slice(2, 4) + '.' + d.slice(4, 6);
   }
 
   var api = {
     MK_OPEN: MK_OPEN, MK_CLOSE: MK_CLOSE, BLANK: BLANK,
     mk: mk, markerAt: markerAt, markersOf: markersOf, fillDoc: fillDoc,
-    stripLinesegs: stripLinesegs, valuesOf: valuesOf
+    stripLinesegs: stripLinesegs, valuesOf: valuesOf, birthOf: birthOf
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.EsignHwpTpl = api;
