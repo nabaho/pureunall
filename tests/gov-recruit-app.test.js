@@ -27,7 +27,7 @@ function runApp(seed, opt) {
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }), addEventListener(){} },
     location: { protocol: 'https:' }, navigator: {},
-    GovG2b: require('../js/gov-g2b.js'), GovCareer: require('../js/gov-career.js'),
+    GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
     GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovSync: require('../js/gov-sync.js'),

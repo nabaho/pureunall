@@ -40,7 +40,12 @@
     { ls: 'recruit_mailskip',   path: 'recruit/mailskip',   kind: 'map' },
     { ls: 'recruit_need',       path: 'recruit/need',       kind: 'map' },
     { ls: 'recruit_due',        path: 'recruit/due',        kind: 'map' },   /* 글마다 사람이 넣은 마감일 (2026-10-05) */
-    { ls: 'recruit_match',      path: 'recruit/match',      kind: 'map' }    /* 지난 이력 견주기 — 맞음·아님 (2026-10-05) */
+    { ls: 'recruit_match',      path: 'recruit/match',      kind: 'map' },   /* 지난 이력 견주기 — 맞음·아님 (2026-10-05) */
+    /* 📅 발주 예정 — 나라장터 발주계획·사전규격 (2026-10-09). 받은 범위(since)도 함께 — 폰이 올해 1월부터 또 받지 않게 */
+    { ls: 'plan',               path: 'plan',               kind: 'rows', idf: 'no' },
+    { ls: 'plan_since',         path: 'plan_since',         kind: 'scalar' },
+    { ls: 'spec_since',         path: 'spec_since',         kind: 'scalar' },
+    { ls: 'plan_at',            path: 'plan_at',            kind: 'scalar' }
   ];
   var SV = 2;   /* 이 판의 쓰기 표 — 보안규칙이 이 값 이상만 받는다 */
   var byLs = {};
