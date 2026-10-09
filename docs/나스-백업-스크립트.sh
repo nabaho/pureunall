@@ -72,6 +72,35 @@ if [ "$CNT" -gt "$KEEP" ]; then
   done
 fi
 
+# ⑥ 앱별로 «제 폴더»에 한 벌씩 더 받는다 — 푸른이알피(erp)·직원 인사(hr)·재무(fin) (2026-10-09)
+#    대표 지시: 「파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」
+#    ⚠ 위 «통째 백업»은 그대로 둔다 — 앱별 받기는 «덤»이다. 하나가 실패해도 나머지는 그대로다.
+#    ⚠ 어느 표가 어느 앱 것인지는 서버 백업에 적힌 목차를 따른다(서버가 거른다).
+#      목차가 없는 옛 백업이면 서버가 거절한다(409) — 그날은 앱별 파일만 안 생긴다.
+fetch_app() {
+  APP="$1"
+  ADIR="$DIR/$APP"
+  mkdir -p "$ADIR" || { note "✗ [$APP] 폴더를 못 만듭니다: $ADIR"; return 1; }
+  ATMP="$ADIR/.downloading.json"
+  ADATED="$ADIR/pureun_${APP}_auto_$TODAY.json"
+  wget -q -O "$ATMP" --header="X-Nas-Key: $NAS_KEY" "$URL?app=$APP"
+  if [ $? -ne 0 ]; then note "✗ [$APP] 못 받았습니다 — 지난 것은 그대로 둡니다"; rm -f "$ATMP"; return 1; fi
+  if ! grep -q '"ok":true' "$ATMP" || ! grep -q '"data"' "$ATMP"; then
+    note "✗ [$APP] 받은 것이 백업이 아닙니다 — 앞부분: $(head -c 160 "$ATMP")"; rm -f "$ATMP"; return 1
+  fi
+  mv -f "$ATMP" "$ADATED" || { note "✗ [$APP] 날짜 파일로 못 옮겼습니다"; rm -f "$ATMP"; return 1; }
+  cp -f "$ADATED" "$ADIR/pureun_${APP}_latest.json" 2>/dev/null
+  note "✓ [$APP] 받았습니다 → $APP/$(basename "$ADATED")"
+  ACNT=$(ls -1 "$ADIR" 2>/dev/null | grep -c "^pureun_${APP}_auto_[0-9][0-9-]*\.json$")
+  if [ "$ACNT" -gt "$KEEP" ]; then
+    ls -1 "$ADIR" | grep "^pureun_${APP}_auto_[0-9][0-9-]*\.json$" | sort | head -n $((ACNT - KEEP)) | while read -r OLD; do
+      rm -f "$ADIR/$OLD" && note "  [$APP] 정리: $OLD"
+    done
+  fi
+  return 0
+}
+for A in erp hr fin; do fetch_app "$A"; done
+
 # ⑤ 로그가 끝없이 불지 않게 — 뒤 500 줄만 남긴다
 tail -n 500 "$LOG" > "$LOG.tmp" 2>/dev/null && mv -f "$LOG.tmp" "$LOG"
 

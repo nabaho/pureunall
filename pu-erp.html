@@ -24,6 +24,23 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 아이폰 홈화면 아이콘 — 탭 아이콘과 다른 것이다. 여기는 PNG 여야 한다(SVG 를 안 읽는다) -->
 <link rel="apple-touch-icon" href="icon-erp-192.png">
 <script>
+/* 한 엔진 · 세 앱 — 직원 인사(?app=hr)·재무(?app=fin) 창은 제 이름·그림·설치 정보를 단다 (2026-10-09, PU_APPS 머리글).
+   ⚠ 반드시 <head> 에서 — 「홈 화면에 추가」를 누르는 순간 브라우저는 «그때 걸린» manifest 를 읽는다
+     (푸른 메일 pu-cards.html?view=mail 과 같은 까닭). 그림글자는 포털 타일과 같아야 한다(tests/app-icons). */
+(function(){ try{
+  var a = (location.search.match(/(?:^|[?&])app=(hr|fin)(?:&|$)/) || [])[1];
+  if(!a) return;
+  var info = a === 'hr' ? { title:'직원 인사', emo:'👥', mf:'pu-hr-manifest.json', png:'icon-hr-192.png' }
+                        : { title:'재무',      emo:'📒', mf:'pu-fin-manifest.json', png:'icon-fin-192.png' };
+  document.title = info.title;
+  var m = document.querySelector('link[rel=manifest]'); if(m) m.href = info.mf;
+  var t = document.querySelector('meta[name=apple-mobile-web-app-title]'); if(t) t.content = info.title;
+  var ap = document.querySelector('link[rel=apple-touch-icon]'); if(ap) ap.href = info.png;
+  var i = document.querySelector('link[rel=icon]');
+  if(i) i.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>" + info.emo + "</text></svg>";
+}catch(e){} })();
+</script>
+<script>
 /* 휴대폰 홈 화면에 예전에 만든 「푸른 ERP」 바로가기가 pu-erp.html 주소를 기억해도
    먼저 통합 포털에서 프로그램을 고르게 한다. 포털 타일에서 정상 진입한 sso=1은 통과한다. */
 (function(){
@@ -160,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=21"></script>
+  <script src="js/pu-appbar.js?v=22"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -186,11 +203,11 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=11"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=53"></script>
+<script src="js/pu-ontology.js?v=54"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
-<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=2"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
      그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
@@ -1089,6 +1106,62 @@ var MENUS = [
     { id:'env/settings', icon:'🔧', text:'환경설정' }
   ]}
 ];
+
+/* ══ 한 엔진 · 세 앱 — 푸른이알피 / 직원 인사 / 재무 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 만들어라 …
+       분리시킬때 오류나 문제가 발생하면 안된다」) ══
+   ■ 무엇이 갈라지나 — 앱마다 «따로»: 포털 타일·창(pureun-erp/hr/fin)·탭 이름·왼쪽 메뉴·환경설정 탭·
+     시작 화면·마지막 본 화면·못 보낸 저장 기록·접속표시 자리. 포털 내외관리 줄에 「직원 인사」「재무」.
+   ■ 무엇이 «하나»로 남나 — 화면 코드·저장 엔진(dbSet·충돌 감지·잠금·휴지통)·서버 자료(data/*).
+     ⚠★ 코드를 복사해 떼지 않은 까닭(세 갈래 실측 2026-10-09):
+       · 입금(finance_income)을 재무 밖 15곳 넘게(사건·업체·캘린더·성과·급여·설정)가 함께 고친다.
+       · 직원 명부(user_accounts)는 열쇠(id) 없이 «통째로» 저장된다 — 고치는 곳이 9곳이다.
+       · 월말 마감 잠금 6단계를 인사·재무·계약 화면이 함께 걸고 푼다.
+       코드가 두 벌이 되면 같은 자료를 «다른 코드»가 고치게 되고, 한쪽만 고친 날 자료가 조용히 사라진다.
+       그래서 앱은 «주소 꼬리표»(?app=hr · ?app=fin)로 가른다 — 메일(pu-cards.html?view=mail)과 같은 집안 방식.
+   ■ 다른 앱 화면으로 가는 길(검색·알림·마감 단계·단축키·대시보드 카드)은 전부 selectMenu 한 곳을 지난다 —
+     거기서 그 화면의 앱 창으로 넘긴다(puAppGo). 그래서 «앱 밖 화면이 이 창에 뜨는» 일이 없다.
+   ⚠ 메뉴 id(hr/…·fin/…)는 바꾸지 않는다 — 권한(security_perms)·서버 권한표(uid_roles)가 이 이름에서 나온다. */
+var PU_APPS = {
+  erp: { name:'푸른이알피', short:'', groups:['dash','biz','env'], env:['company','biz','policy','dup','archive','nas','system'], start:'dash/my' },
+  hr:  { name:'직원 인사', short:'직원 인사', groups:['hr','env'], env:['hr'], start:'hr/staff', icon:'👥' },
+  fin: { name:'재무', short:'재무', groups:['fin','env'], env:['fin'], start:'fin/ledger', icon:'📒' }
+};
+var PU_APP = (function(){
+  try { var a = new URLSearchParams(window.location.search).get('app'); if(a === 'hr' || a === 'fin') return a; } catch(e){}
+  return 'erp';
+})();
+/* 이 메뉴는 어느 앱의 것인가 — 환경설정·시작화면은 «지금 앱»의 것이다(앱마다 제 설정 탭을 보인다) */
+function puAppOfMenu(id){
+  var g = String(id || '').split('/')[0];
+  if(g === 'hr' || g === 'fin') return g;
+  if(g === 'biz' || g === 'dash') return 'erp';
+  return PU_APP;
+}
+function puAppHasGroup(gid){ return PU_APPS[PU_APP].groups.indexOf(gid) >= 0; }
+function puAppEnvTabOk(tabId){ return PU_APPS[PU_APP].env.indexOf(tabId) >= 0; }
+/* 앱 주소 — 포털 타일과 «같은 모양»이어야 포털이 이미 열린 창을 다시 쓴다(sso·v 는 견줄 때 빠진다) */
+function puAppUrl(app, menuId){
+  return 'pu-erp.html?sso=1' + (app === 'erp' ? '' : '&app=' + app) + (menuId ? '#menu=' + encodeURIComponent(menuId) : '');
+}
+/* 다른 앱의 화면으로 — 그 앱 창이 열려 있으면 그 창에서 바로 고르고, 없으면 연다.
+   ⚠ 창 이름은 포털 타일과 같다(pureun-<앱>) — 그래야 같은 앱이 두 창으로 안 열린다(대표 지시 2026-09-08). */
+function puAppGo(menuId){
+  var app = puAppOfMenu(menuId);
+  var url = puAppUrl(app, menuId);
+  if(window.IS_MOBILE){ window.location.href = url; return; }      // 폰은 창이 하나다 — 이 창에서 간다
+  var w = null;
+  try { w = window.open('', 'pureun-' + app); } catch(e){ w = null; }
+  if(!w){ window.location.href = url; return; }                     // 팝업이 막혔다 — 이 창에서 간다
+  try {
+    /* 이미 그 앱이 떠 있는 창이면 다시 읽지 않고 그 화면만 고른다(쓰던 것을 잃지 않게) */
+    var sameApp = w.location && /pu-erp\.html$/.test(w.location.pathname || '') && typeof w.navigateTo === 'function'
+      && ((new URLSearchParams(w.location.search).get('app') || 'erp') === app);
+    if(sameApp){ w.navigateTo(menuId); try { w.focus(); } catch(_){} return; }
+  } catch(e){ /* 다른 주소의 창 — 아래에서 옮긴다 */ }
+  try { w.location.replace(url); } catch(e){ try { w.location.href = url; } catch(_){} }
+  try { w.focus(); } catch(_){}
+}
+/* 앱마다 탭 이름·탭 그림·설치 정보는 <head> 의 첫 스크립트가 단다(그때 걸려야 「홈 화면에 추가」가 읽는다) */
 
 // ============ 세션 / 동적 로그인 ============
 var SESSION_KEY = 'pureun_v6_session_sid';
@@ -2537,7 +2610,15 @@ function initPresence(sid, name){
            지우면, 연결이 한 번 끊겼다 붙을 때마다 그 사람이 «새로 접속한 것»으로 보여
            「🟢 ○○○ 님이 접속했습니다」 알림이 되풀이해 뜬다 — 그것이 깜빡임이다.
            대신 «언제 알렸는지»를 남겨, 한참 뒤 진짜로 다시 들어왔을 때만 한 번 더 알린다. */
-        remove:function(s){ delete _presenceMap[s.key]; _schedulePresencePublish(); }
+        remove:function(s){
+          delete _presenceMap[s.key]; _schedulePresencePublish();
+          /* ★ 내 자리가 지워졌는데 이 창은 살아 있다 = 같은 PC·같은 사람의 «다른 창»(이알피·직원 인사·재무)이
+               닫히며 onDisconnect 가 지운 것이다(자리 열쇠가 기기+사번이라 창끼리 같다). 곧바로 되살린다 —
+               안 그러면 다음 심장박동(2분)까지 «접속 없음»으로 보이고, 그 뒤엔 사번 없는 껍데기만 남는다. */
+          if(s.key === _presenceKey && _presenceRef && _presencePayload){
+            setTimeout(function(){ if(_presenceRef && _presencePayload){ try { _writePresence(true); } catch(_w){} } }, 400);
+          }
+        }
       };
       _presenceRootRef.on('child_added', _presenceHandlers.add);
       _presenceRootRef.on('child_changed', _presenceHandlers.change);
@@ -3734,7 +3815,26 @@ function buildBackupSnapshot(){
     if(raw==null) continue;
     try { data[k] = JSON.parse(raw); } catch(e){ data[k] = raw; }
   }
-  return { savedAt: new Date().toISOString(), version:'v6', data: data };
+  /* apps — 앱별 목차(한 엔진 · 세 앱). 나스가 이것으로 직원 인사·재무를 따로 받아 간다 */
+  return { savedAt: new Date().toISOString(), version:'v6', data: data,
+    apps: (typeof erpBackupAppIndex === 'function') ? erpBackupAppIndex(data) : null };
+}
+/* ══ 앱별 목차 — 이 백업의 어느 표가 어느 앱 것인가 (대표 지시 2026-10-09 「파이어베이스와 나스 등 …
+     각자 데이터를 잘 관리할 수 있도록」) ══
+   목록은 온톨로지 등록부(PuOntology.PROGRAMS.hr·fin 의 primaryRoots 'data/…') «한 곳»에서 온다 —
+   여기에 표 이름을 따로 적지 않는다(두 곳에 적으면 언젠가 어긋난다).
+   나스는 이 목차로 앱별 폴더에 따로 받아 간다(functions/nas-backup-export.js ?app=hr|fin|erp).
+   ⚠ 표 «이름»만 적는다 — 자료를 두 벌로 담지 않는다(백업 본문은 하나다). */
+function erpBackupAppIndex(data){
+  var out = { erp:[], hr:[], fin:[] }, own = {};
+  try {
+    ['hr','fin'].forEach(function(app){
+      var p = window.PuOntology && window.PuOntology.PROGRAMS && window.PuOntology.PROGRAMS[app];
+      ((p && p.primaryRoots) || []).forEach(function(r){ var m = /^data\/([^\/]+)$/.exec(r); if(m) own[m[1]] = app; });
+    });
+  } catch(e){}
+  Object.keys(data || {}).forEach(function(k){ out[own[k] || 'erp'].push(k); });
+  return out;
 }
 // 백업 목록용 경량 요약(주요 키 건수) — 인덱스에 저장해 목록 로드시 전체 데이터를 안 받게 함
 function _snapSummary(data){
@@ -3863,7 +3963,9 @@ function serverBackupWrite(id, snap){
 }
 function _serverBackupWriteRaw(id, snap, locked){
   var batches = erpBackupBatches(locked.data);
-  var p = fbDb.ref('serverBackups/' + id).set({ savedAt: snap.savedAt, version: snap.version });
+  var _head = { savedAt: snap.savedAt, version: snap.version };
+  if(snap.apps) _head.apps = snap.apps;          // 앱별 목차(표 이름만) — 나스가 앱별로 따로 받아 간다
+  var p = fbDb.ref('serverBackups/' + id).set(_head);
   batches.forEach(function(b){
     p = p.then(function(){ return fbDb.ref('serverBackups/' + id).update(b); });
   });
@@ -5718,7 +5820,10 @@ var FB_PEND_LS = 'pu_erp_fb_pending_v1';
 function _fbPendLsKey(){
   /* 사번(세션) 먼저 — 로그인하자마자 정해지고 PC·탭이 바뀌어도 같은 사람이면 같다. 없으면 파이어베이스 uid */
   var who = (typeof getSessionSid === 'function' && getSessionSid()) || (typeof fbAuthUid !== 'undefined' && fbAuthUid) || '_';
-  return FB_PEND_LS + '_' + String(who).replace(/[^A-Za-z0-9_-]/g, '');
+  /* 한 엔진 · 세 앱 — 앱마다 따로 적는다(PU_APPS 머리글). 같이 쓰면 «못 보낸 것이 없는» 앱이 저장할 때
+     열쇠를 지워(_fbPendSave 의 removeItem) 다른 앱 창의 못 보낸 기록이 사라진다. 이알피는 예전 열쇠 그대로. */
+  var app = (typeof PU_APP !== 'undefined' && PU_APP !== 'erp') ? '_' + PU_APP : '';
+  return FB_PEND_LS + app + '_' + String(who).replace(/[^A-Za-z0-9_-]/g, '');
 }
 function _fbPendPick(src){
   var out = {}, n = 0;
@@ -11232,7 +11337,10 @@ function _fbApplyRecordInner(k, v, opts){
     _dbCache[k] = arrValue; // 캐시 갱신
     if(notify){ try { _scheduleFbChanged(k); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }
   }
-  if(v.u > localTime){
+  /* opts.force — 같은 PC 의 «다른 창»(이알피·직원 인사·재무·다른 탭)이 이 표를 먼저 받아 이 기기 표시(_meta_)를
+     올려 두었다. 그 표시만 보면 «이미 받았다»로 건너뛰어 이 창 화면이 낡은 채 남는다(그 위에서 저장하면 남의 변경을 덮는다).
+     그래서 같은 판(v.u === 표시)이면 이 창에도 얹는다. 표시보다 «옛» 판은 여전히 안 얹는다(내가 못 보낸 새것이 있다). */
+  if(v.u > localTime || (opts.force && v.u >= localTime)){
     try {
       if(opts.storm){ try { opts.storm(k); } catch(_s){} }
       // #4 Tier 3: 객체 형식이면 배열화 (LS는 배열 유지)
@@ -11244,7 +11352,8 @@ function _fbApplyRecordInner(k, v, opts){
       }
       try { // [버그수정] 정규식 근사 제거 — 최상위 항목 수만 비교 (_fbLocalCountForShrink 참고)
         var _oldN = _fbLocalCountForShrink(k);
-        if(_oldN !== null && Array.isArray(arrValue) && _oldN >= 10 && arrValue.length < _oldN * 0.5 && !_shrinkExempt(k)){
+        /* 다른 창이 이미 받아 얹은 판(force)은 급감 확인을 다시 묻지 않는다 — 그 창에서 이미 지나온 판이다 */
+        if(!opts.force && _oldN !== null && Array.isArray(arrValue) && _oldN >= 10 && arrValue.length < _oldN * 0.5 && !_shrinkExempt(k)){
           // 급감 차단: 자동 저장하지 않고 사용자 선택(현재 유지 / 서버값 교체). 승인 시엔 항상 리렌더.
           //   적용 콜백은 버전 가드 — 대기 중 더 새 값이 이미 반영됐으면(meta 진행) 옛 급감을 쓰지 않는다(되돌림 방지).
           _handleShrinkSync(k, _oldN, arrValue.length, function(){
@@ -11304,6 +11413,35 @@ function _fbApplyRecordInner(k, v, opts){
   }
   return false;
 }
+/* ══ 같은 PC 의 다른 창이 새 판을 받았다 — 이 창도 맞춘다 (한 엔진 · 세 앱, 2026-10-09) ══
+   ■ 왜 — 받은 판 표시(_meta_)는 이 PC 의 «모든 창»이 함께 쓰는 localStorage 에 있다. 이알피 창이 먼저 받아
+     표시를 올리면, 직원 인사·재무 창은 같은 판을 받고도 «이미 받았다»로 건너뛰고(위 v.u > localTime),
+     u 감시도 «바뀐 것 없음»으로 본다. 그 창 화면은 낡은 채 남고, 그 위에서 통째 저장하면 남의 변경을 덮는다.
+     큰 표의 거울(IndexedDB 사본)도 창마다 메모리에 따로 들고 있어 저절로 새것이 되지 않는다.
+   ■ 그래서 — 다른 창이 표시를 바꾸면(storage 신호는 «다른 창»에만 온다) 이 창이 그 표를 서버에서 한 번 받아
+     force 로 얹는다. 이미 그 표를 실시간 구독 중이면 파이어베이스가 제 사본에서 바로 준다(통신 없음).
+   ⚠ 이알피 탭 두 개를 열었을 때도 같은 일이 있었다 — 그것도 함께 고쳐진다.
+   ⚠ 0.5초 안에 같은 표가 여러 번 바뀌면 한 번만 받는다. */
+var _fbSiblingTimers = {};
+function _fbSiblingRefresh(k){
+  if(typeof fbDb === 'undefined' || !fbDb || !fbShouldSync(k)) return;
+  try {
+    fbDb.ref('data/' + k).once('value').then(function(s){
+      var v = s && s.val();
+      if(!v || v.v === undefined || typeof v.u !== 'number') return;
+      _fbApplyRecord(k, v, { notify:true, force:true });
+    }).catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
+  } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+}
+function _fbOnSiblingStorage(e){
+  var pre = KEY + '_meta_';
+  if(!e || !e.key || e.key.indexOf(pre) !== 0 || !e.newValue) return;
+  var k = e.key.slice(pre.length);
+  if(!k || !fbShouldSync(k)) return;
+  clearTimeout(_fbSiblingTimers[k]);
+  _fbSiblingTimers[k] = setTimeout(function(){ delete _fbSiblingTimers[k]; _fbSiblingRefresh(k); }, 500);
+}
+try { window.addEventListener('storage', _fbOnSiblingStorage); } catch(_){}
 /* ── 초기 동기화 갈림길 (설계서 2026-08-16) ──
    ① 기본: 열쇠별 받기 — 「내가 볼 수 있는 것만」 + 리스너의 첫 값이 곧 초기값.
       ⚠ 예전에는 once('value') 로 통째(2.83MB)를 받은 «뒤에» data.on() 을 붙여
@@ -13407,12 +13545,18 @@ function Sidebar(props){
   var pinnedItems = pinned.map(function(mid){
     var f = findMenu(mid);
     return f ? { id:mid, item:f.item, grp:f.grp } : null;
-  }).filter(Boolean);
+  }).filter(Boolean)
+    /* 즐겨찾기는 사람마다 «하나»(서버 ui_pins) — 보이는 것만 이 앱 것으로 거른다(저장은 그대로) */
+    .filter(function(p){ return typeof puAppHasGroup !== 'function' || puAppHasGroup(p.grp.gid); });
 
   return h('aside', { className: 'sb' + (collapsed ? ' collapsed':''),
       onTouchStart:onAsideTouchStart, onTouchEnd:onAsideTouchEnd },
     h('div', { className:'sb-logo' },
-      h('div', { className:'t1' }, '🏛️ 푸른노무법인')
+      h('div', { className:'t1' }, '🏛️ 푸른노무법인',
+        /* 어느 앱 창인지 — 직원 인사·재무 창에만 이름표(목업 2026-10-09) */
+        (typeof PU_APP !== 'undefined' && PU_APP !== 'erp') && h('span', { 'data-pu-app': PU_APP,
+          style:{ marginLeft:'6px', background:'#2563eb', color:'#fff', borderRadius:'6px', fontSize:'11px', fontWeight:800,
+            padding:'1px 7px', verticalAlign:'middle', whiteSpace:'nowrap' } }, PU_APPS[PU_APP].short))
     ),
     // 권형하 카드 — 이름·직책 한 줄 + 모두펼치기 버튼을 같은 줄에 압축
     h('div', { className:'sb-user', style:{ position:'relative' } },
@@ -13516,6 +13660,8 @@ function Sidebar(props){
       MENUS.map(function(grp){
         // 환경설정은 하단 고정으로 별도 렌더 → 여기서 제외
         if(grp.gid === 'env') return null;
+        // 한 엔진 · 세 앱 — 이 앱의 묶음만 (PU_APPS 머리글). 다른 앱 화면은 그 앱 창에서 연다
+        if(typeof puAppHasGroup === 'function' && !puAppHasGroup(grp.gid)) return null;
         // 모바일 자동 숨김 (그룹 단위 hideOnMobile) — 관리자는 제외
         var _isAdmin = CURRENT_USER && CURRENT_USER.isAdmin;
         if(window.IS_MOBILE && !_isAdmin && grp.hideOnMobile) return null;
@@ -46592,28 +46738,34 @@ function SaveIndicator(){
 }
 
 function EnvSettings(){
+  /* 한 엔진 · 세 앱 — 환경설정도 «그 앱에 필요한 탭만» (대표 지시 2026-10-09 「환경설정등도 반드시 필요한부분만 분리」).
+     직원 인사 창은 인사관리기준, 재무 창은 재무관리기준, 푸른이알피는 나머지(회사정보·사무·권한·데이터·보관소·시스템). */
+  var _envTabs = ENV_TABS.filter(function(t){ return typeof puAppEnvTabOk !== 'function' || puAppEnvTabOk(t.id); });
+  var _envFirst = (_envTabs[0] || ENV_TABS[0]).id;
+  var _envLastKey = 'pureun_v6_env_last_tab' + ((typeof PU_APP !== 'undefined' && PU_APP !== 'erp') ? '_' + PU_APP : '');
+  var _envOrderKey = 'pureun_v6_env_tabs_order' + ((typeof PU_APP !== 'undefined' && PU_APP !== 'erp') ? '_' + PU_APP : '');
   // 마지막 활성 탭 복원 (localStorage)
   var savedTab = (function(){
     try {
-      var v = localStorage.getItem('pureun_v6_env_last_tab') || 'company';
-      // 저장된 탭이 ENV_TABS에 존재하는지 검증
-      return ENV_TABS.find(function(t){return t.id===v;}) ? v : 'company';
-    } catch(e){ return 'company'; }
+      var v = localStorage.getItem(_envLastKey) || _envFirst;
+      // 저장된 탭이 이 앱의 탭에 있는지 검증
+      return _envTabs.find(function(t){return t.id===v;}) ? v : _envFirst;
+    } catch(e){ return _envFirst; }
   })();
   var t = useState(savedTab); var tab = t[0]; var _setTab = t[1];
   function setTab(newTab){
     _setTab(newTab);
-    try { localStorage.setItem('pureun_v6_env_last_tab', newTab); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+    try { localStorage.setItem(_envLastKey, newTab); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
   }
 
   // 탭 순서 (localStorage 저장)
   var oS = useState((function(){
     var saved = null;
-    try { saved = safeParse(localStorage.getItem('pureun_v6_env_tabs_order'), null); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
-    if(!saved || !saved.length) return ENV_TABS.slice();
-    var ordered = saved.map(function(id){ return ENV_TABS.find(function(t){return t.id===id;}); }).filter(Boolean);
+    try { saved = safeParse(localStorage.getItem(_envOrderKey), null); } catch(e){ window._erpErrLog && window._erpErrLog(e); }
+    if(!saved || !saved.length) return _envTabs.slice();
+    var ordered = saved.map(function(id){ return _envTabs.find(function(t){return t.id===id;}); }).filter(Boolean);
     // 새로 추가된 탭은 뒤에 보충
-    ENV_TABS.forEach(function(t){ if(!ordered.find(function(x){return x.id===t.id;})) ordered.push(t); });
+    _envTabs.forEach(function(t){ if(!ordered.find(function(x){return x.id===t.id;})) ordered.push(t); });
     return ordered;
   })());
   var orderedTabs = oS[0]; var setOrderedTabs = oS[1];
@@ -46641,7 +46793,7 @@ function EnvSettings(){
     var dstIdx = newOrder.findIndex(function(t){return t.id === tid;});
     if(dstIdx < 0) dstIdx = newOrder.length;
     newOrder.splice(dstIdx, 0, src);
-    try { localStorage.setItem('pureun_v6_env_tabs_order', JSON.stringify(newOrder.map(function(t){return t.id;}))); } catch(err){ window._erpErrLog && window._erpErrLog(err); }
+    try { localStorage.setItem(_envOrderKey, JSON.stringify(newOrder.map(function(t){return t.id;}))); } catch(err){ window._erpErrLog && window._erpErrLog(err); }
     setOrderedTabs(newOrder);
     setTd({srcId:null, overId:null});
     showToast('탭 순서 저장됨');
@@ -46697,7 +46849,7 @@ function EnvSettings(){
       ? h(SystemMasters, null)
       : h('div', { className:'page-empty' },
           h('div', { className:'ic' }, '🚧'),
-          h('div', { className:'t' }, (ENV_TABS.find(function(x){return x.id===tab;})||{}).name || ''),
+          h('div', { className:'t' }, (_envTabs.find(function(x){return x.id===tab;})||{}).name || ''),
           h('div', { className:'d' }, '다음 단계에서 진행')
         )
   );
@@ -85693,15 +85845,28 @@ function ERPMain(props){
     } catch(e){ window._erpErrLog && window._erpErrLog(e); }
     return '';
   })();
+  /* 한 엔진 · 세 앱 — 시작·마지막 화면은 «이 앱의 화면»만 (PU_APPS 머리글).
+     ⚠ 마지막 본 화면은 앱마다 따로 적는다 — 하나를 같이 쓰면 재무 창이 이알피 창의 마지막 화면을 물려받는다. */
+  var _inApp = function(mid){ return typeof puAppOfMenu !== 'function' || puAppOfMenu(mid) === PU_APP; };
+  var _lastMenuKey = 'pureun_v6_session_last_menu_' + ((typeof PU_APP !== 'undefined' && PU_APP !== 'erp') ? PU_APP + '_' : '') + (CURRENT_USER.sid||'');
   // ★ 시작화면 결정: ①URL hash ②마지막 본 화면(기기별) ③개인 설정 ④역할 기본
   var startMenu = (function(){
     // 마지막 본 화면 복원 (이 기기·이 사용자 기준, 권한·모바일 차단 메뉴는 제외)
     try {
-      var lastMenu = localStorage.getItem('pureun_v6_session_last_menu_' + (CURRENT_USER.sid||''));
-      if(_menuAllowed(lastMenu)) return lastMenu;
+      var lastMenu = localStorage.getItem(_lastMenuKey);
+      if(_menuAllowed(lastMenu) && _inApp(lastMenu)) return lastMenu;
     } catch(e){}
     var personal = dbGet('start_menu_' + (CURRENT_USER.sid||''), null);
-    if(_menuAllowed(personal)) return personal;   // 권한 잃었거나 모바일 차단이면 무시하고 역할 기본으로
+    if(_menuAllowed(personal) && _inApp(personal)) return personal;   // 권한 잃었거나 모바일 차단이면 무시하고 역할 기본으로
+    /* 직원 인사·재무 창 — 그 앱의 첫 화면부터, 권한이 있는 것 가운데 첫째(없으면 환경설정도 막혔을 수 있어 아래 기본) */
+    if(typeof PU_APP !== 'undefined' && PU_APP !== 'erp'){
+      if(_menuAllowed(PU_APPS[PU_APP].start)) return PU_APPS[PU_APP].start;
+      var _first = '';
+      MENUS.forEach(function(g){ if(_first || g.gid === 'env' || !puAppHasGroup(g.gid)) return;
+        g.items.forEach(function(it){ if(!_first && _menuAllowed(it.id)) _first = it.id; }); });
+      if(_first) return _first;
+      return 'env/settings';
+    }
     /* ★ 2026-09-20 — 전에는 법인 대시보드였다. 그 화면을 걷어냈으므로 «나의 업무»로.
        ⚠ 푸른 캘린더로 보내지 않는다 — 다른 앱이라, 이알피를 열자마자 튕겨 나가면
          이알피에 볼일이 있어 온 사람이 매번 되돌아와야 한다. */
@@ -85709,7 +85874,11 @@ function ERPMain(props){
     return 'dash/my';
   })();
   // #menu= 해시는 권한·모바일 검사를 통과할 때만 사용, 아니면 시작화면으로 fallback
-  var defaultMenu = _menuAllowed(hashMenu) ? hashMenu : startMenu;
+  //   다른 앱의 화면을 가리키면(옛 링크·다른 앱에서 온 길) 이 창은 제 시작화면을 띄우고 그 앱 창으로 넘긴다(아래 효과)
+  var defaultMenu = (_menuAllowed(hashMenu) && _inApp(hashMenu)) ? hashMenu : startMenu;
+  useEffect(function(){
+    if(hashMenu && !_inApp(hashMenu) && _menuAllowed(hashMenu) && typeof puAppGo === 'function') puAppGo(hashMenu);
+  }, []);
   var s = useState(defaultMenu); var current = s[0]; var setCurrent = s[1];
   var tourS = useState(false); var showTour = tourS[0]; var setShowTour = tourS[1];
   var _fpRaw = localStorage.getItem('pureun_v6_force_pw') || '';
@@ -85802,6 +85971,9 @@ function ERPMain(props){
       });
       if(blocked){ showToast('📱 모바일에서는 재무·금액 메뉴에 접근할 수 없습니다'); return; }
     }
+    /* 한 엔진 · 세 앱 — 다른 앱의 화면이면 그 앱 창으로 넘긴다(PU_APPS 머리글).
+       검색·알림·마감 단계·단축키·대시보드 카드·다른 화면의 「→ 보기」가 모두 이 길을 지난다. */
+    if(!_inApp(id) && typeof puAppGo === 'function'){ puAppGo(id); return; }
     // history 갱신: 현재 메뉴를 스택에 추가 (중복 제거, 최대 10개)
     if(current && current !== id){
       setMenuHistory(function(prev){
@@ -85810,7 +85982,7 @@ function ERPMain(props){
       });
     }
     setCurrent(id);
-    try { localStorage.setItem('pureun_v6_session_last_menu_' + (CURRENT_USER.sid||''), id); } catch(e){}
+    try { localStorage.setItem(_lastMenuKey, id); } catch(e){}
     // 그룹 자동 펼침 제거 (즐겨찾기/검색 클릭 시 사이드바 펼침 방지)
     // 사용자가 직접 펼친 상태가 그대로 유지됨
     // 모바일: 메뉴 선택 후 사이드바 자동 닫힘

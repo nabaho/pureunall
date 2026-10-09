@@ -20,7 +20,12 @@
      화면 태그에 observe를 써도 강제 모드다. 기존 앱도 정리가 끝나는 순서대로 뺀다. */
   var LEGACY_OBSERVE_PROGRAMS = {
     erp:1,consult:1,work:1,career:1,govbid:1,mail:1,cards:1,photos:1,fund:1,
-    rules:1,docs:1,payroll:1,paydata:1,home:1,news:1
+    rules:1,docs:1,payroll:1,paydata:1,home:1,news:1,
+    /* 직원 인사·재무(2026-10-09) — 새 코드가 아니라 «이알피 한 벌»의 다른 문(pu-erp.html?app=hr·fin)이다.
+       같은 저장 엔진(dbSet·동기화·백업)을 쓰므로 이알피와 «같은 모드»여야 한다 — 이 둘만 강제로 막으면
+       같은 코드가 창에 따라 저장되거나 막혀 자료가 갈라진다. 이알피가 이 유예에서 빠지는 날 함께 뺀다
+       (tests/erp-three-apps.test.js 가 셋이 같은 모드인지 본다). */
+    hr:1,fin:1
   };
   var RELATION_FIELDS = ['companyId','sid','sourceId'];
   var issues = [];

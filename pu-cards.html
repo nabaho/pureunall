@@ -41,9 +41,9 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=53"></script>
+<script src="js/pu-ontology.js?v=54"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
-<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
 <script src="js/pu-company-write.js?v=2"></script>
 <script src="js/pu-mgr-watch-core.js?v=1"></script>
@@ -3551,7 +3551,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=21"></script>
+  <script src="js/pu-appbar.js?v=22"></script>
   <script src="js/pu-handoff.js?v=1"></script>
   <script src="js/pu-doc-pick.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -36801,7 +36801,7 @@ function coNtsCloseHtml(o, data){
     <p class="setnote" style="margin:0 0 8px">${esc(coVal(o, 'ntsEndDt') || '폐업일 모름')} 폐업 · ${
       f.erp ? (f.left ? '이미 계약해지(🚪)' : '업체관리: 계약 중') : '업체관리에 없음'}</p>
     <table class="ntsclose">
-      ${row('💰', '받을 돈', '<span class="why">이알피가 셉니다</span>', coNtsGoBtn('pu-erp.html#menu=fin/recv', '미수금관리'))}
+      ${row('💰', '받을 돈', '<span class="why">이알피가 셉니다</span>', coNtsGoBtn('pu-erp.html?app=fin#menu=fin/recv', '미수금관리'))}
       ${row('📂', '하던 일', 읽는중 || (f.open ? `<b>${f.open}건</b> <span class="why">${esc(f.openNames.join(' · '))}</span>` : '없음'),
             f.open ? coNtsGoBtn('pu-erp.html#menu=biz/case', '이알피') : '')}
       ${row('🏦', '근로복지기금', 읽는중 || (f.fund ? '<b>있음 — 기금 정리(해산) 검토</b>' : '없음'),

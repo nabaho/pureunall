@@ -213,3 +213,43 @@ test('⑩ 백업이 하나도 없으면 그렇다고 말한다 — 빈 것을 «
   assert.equal(res._code, 404,
     '★★ 빈 것을 200 으로 주면 나스가 그것으로 지난 백업을 덮는다 — 가장 나쁜 고장이다');
 });
+
+/* ⑨ 앱별로 따로 받기 — ?app=hr|fin|erp (대표 지시 2026-10-09 「파이어베이스와 나스 등 … 각자 데이터를 잘 관리」)
+   어느 표가 어느 앱 것인지는 «백업에 함께 적힌 목차»(apps)를 따른다 — 여기에 표 이름을 따로 적지 않는다. */
+const 목차백업 = {
+  savedAt: '2026-10-09T00:00:00.000Z', version: 'v6',
+  apps: { erp: ['contracts', 'companies'], hr: ['payroll_monthly', 'user_accounts'], fin: ['finance_income'] },
+  data: { contracts: [{ id: 'c1' }], companies: [{ id: 'co1' }], payroll_monthly: [{ id: 'p1' }],
+    user_accounts: [{ sid: 'P-001' }], finance_income: [{ id: 'f1' }], new_table: [{ id: 'n1' }], api_keys: { x: 1 } },
+};
+const 목차값 = { serverBackupsIndex: { '2026-10-09': {} }, 'serverBackups/2026-10-09': 목차백업 };
+test('⑨★ 앱별 받기 — 그 앱의 표만 준다 · 이알피는 «남의 것이 아닌 것 전부»', async () => {
+  const hr = JSON.parse((await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 목차값, query: { app: 'hr' } })).res._body);
+  assert.deepEqual(Object.keys(hr.data).sort(), ['payroll_monthly', 'user_accounts']);
+  assert.equal(hr.app, 'hr');
+  const fin = JSON.parse((await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 목차값, query: { app: 'fin' } })).res._body);
+  assert.deepEqual(Object.keys(fin.data), ['finance_income']);
+  const erp = JSON.parse((await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 목차값, query: { app: 'erp' } })).res._body);
+  assert.deepEqual(Object.keys(erp.data).sort(), ['companies', 'contracts', 'new_table'],
+    '★ 목차 뒤에 새로 생긴 표(new_table)가 어느 폴더에도 안 가면 안 된다 — 이알피 폴더가 받는다');
+  assert.ok(!('api_keys' in erp.data), '★★ 앱별로 받아도 비밀은 빠진다');
+  const all = JSON.parse((await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 목차값 })).res._body);
+  assert.equal(Object.keys(all.data).length, 6, '통째 받기(app 없이)는 예전 그대로 전부');
+});
+test('⑨★ 목차가 없는 옛 백업은 앱별로 «안» 준다(409) · 통째는 준다 · 모르는 앱은 400', async () => {
+  const 옛값 = { serverBackupsIndex: { '2026-09-18': {} }, 'serverBackups/2026-09-18': 백업하나 };
+  const a = await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 옛값, query: { app: 'hr' } });
+  assert.equal(a.res._code, 409, '★ 어림으로 갈라 주면 빠진 표를 모른 채 보관하게 된다');
+  const b = await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 옛값 });
+  assert.equal(b.res._code, 200);
+  const c = await 부르기({ 참열쇠: 'k', 열쇠: 'k', 값: 목차값, query: { app: '../x' } });
+  assert.equal(c.res._code, 400);
+});
+test('⑨ 나스 스크립트 — 통째 백업은 그대로 두고, 세 앱을 제 폴더로 한 벌씩 더 받는다', () => {
+  const sh = fs.readFileSync(path.join(ROOT, 'docs', '나스-백업-스크립트.sh'), 'utf8');
+  assert.match(sh, /wget -q -O "\$TMP" --header="X-Nas-Key: \$NAS_KEY" "\$URL"/, '★ 통째 받기가 사라지면 안 된다');
+  assert.match(sh, /"\$URL\?app=\$APP"/);
+  assert.match(sh, /for A in erp hr fin; do fetch_app "\$A"; done/);
+  assert.match(sh, /ADIR="\$DIR\/\$APP"/, '앱마다 제 폴더');
+  assert.match(sh, /grep -q '"ok":true' "\$ATMP"/, '★ 받은 것이 백업인지 본 «뒤에만» 바꾼다');
+});
