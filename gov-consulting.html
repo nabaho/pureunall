@@ -1050,6 +1050,48 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   .mc{min-height:54px;}
 }
 
+/* ══ 폰 «회차 진행 보기» (2026-10-08) — 한 업체 한 줄. 넘치면 … (한 칸은 한 줄) ══ */
+.mp-bar{display:flex;gap:6px;align-items:center;padding:8px 10px;background:var(--surface);border-bottom:1px solid var(--border);}
+.mp-tab{font:inherit;font-size:13px;font-weight:800;padding:6px 12px;border-radius:14px;border:1px solid var(--border);color:var(--accent);background:var(--surface);}
+.mp-tab.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+.mp-sel{margin-left:auto;font:inherit;font-size:16px;padding:4px 6px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text);}
+.mp-sum{display:flex;gap:6px;padding:8px 10px 4px;}
+.mp-sum div{flex:1;background:var(--surface);border:1px solid var(--border);border-radius:10px;text-align:center;padding:5px 0;font-size:11px;color:var(--dash-t2);font-weight:700;white-space:nowrap;}
+.mp-sum b{display:block;font-size:17px;color:var(--text);}
+.mp-sum b.warn{color:var(--danger);}
+.mp-lg{display:flex;gap:12px;padding:2px 12px 6px;font-size:11px;color:var(--dash-t2);font-weight:700;}
+.mp-k{display:inline-block;width:14px;height:8px;border-radius:3px;margin-right:3px;vertical-align:middle;background:var(--border);}
+.mp-k.d{background:var(--accent);}
+.mp-k.p,.mp-row .bar .p{background:repeating-linear-gradient(45deg,var(--info) 0 4px,var(--sf2) 4px 8px);}
+.mp-list{flex:1;overflow-y:auto;padding:0 10px 16px;}
+.mp-grp{font-size:12px;font-weight:900;color:var(--accent);margin:10px 2px 5px;display:flex;justify-content:space-between;}
+.mp-grp span{color:var(--dash-t2);font-weight:700;}
+.mp-row{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin-bottom:6px;display:flex;align-items:center;gap:8px;white-space:nowrap;cursor:pointer;}
+.mp-row .nm{font-size:13px;font-weight:900;width:92px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;}
+.mp-row .bar{flex:1;height:10px;border-radius:6px;background:var(--border);display:flex;overflow:hidden;min-width:50px;}
+.mp-row .bar i{display:block;height:100%;}
+.mp-row .bar .d{background:var(--accent);}
+.mp-row .n{font-size:13px;font-weight:900;flex-shrink:0;text-align:right;}
+.mp-row .nx{font-size:11px;color:var(--dash-t2);font-weight:700;flex-shrink:0;width:66px;text-align:right;overflow:hidden;text-overflow:ellipsis;}
+.mp-row.done .n{color:var(--ok);}
+.mp-row.done .bar .d{background:var(--ok);}
+.mp-row.warn{border-color:var(--danger);}
+.mp-row.warn .nx{color:var(--danger);}
+.mp-row.open{flex-wrap:wrap;border-color:var(--accent);}
+.mp-det{width:100%;white-space:normal;border-top:1px dashed var(--border);margin-top:6px;padding-top:6px;font-size:12px;line-height:1.75;cursor:default;}
+.mp-det b{color:var(--accent);}
+.mp-det .rds{display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;}
+.mp-det .rds span{font-size:11px;font-weight:800;border-radius:5px;padding:1px 5px;background:var(--sf2);color:var(--accent);}
+.mp-det .rds span.of{background:var(--bg);color:var(--text);border:1px solid var(--border);}
+.mp-det .rds span.fu{background:var(--surface);border:1px dashed var(--info);}
+.mp-empty{text-align:center;color:var(--dash-t2);font-size:13px;padding:40px 10px;}
+@media (max-width:768px){
+  /* 탭이 넷이 되어 한 줄에 똑같이 나눈다 — 셋일 때 규칙(33%)이면 넷째가 둘째 줄로 떨어졌다 */
+  .hdr .hdr-tab{flex:1 1 0!important;min-width:0;padding:6px 2px;}
+  /* 보기 전용 화면엔 «추가» 단추를 띄우지 않는다 */
+  body.m-prog-on #mAddFab{display:none!important;}
+}
+
 /* ══ 폰 정리 (대표 지시 2026-10-05 「폰화면에 정부컨설팅일정 너무 정리가 안된다 깔끔하게 불필요한 부분은
      정리하고 볼수 있게」 → 목업 승인 「이대로 고쳐라」) ══
    ① 머리 세 줄 → 한 줄(제목·저장 점·🔔·⋯·나) + 탭 한 줄
@@ -1244,7 +1286,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   <div class="logo" id="brandLogo" data-tip="클릭하면 캘린더로 이동" style="cursor:pointer;">푸른<span>노무법인</span> <span class="logo-app" style="font-size:11px;font-weight:700;opacity:.75;">정부컨설팅 일정관리</span></div>
   <div id="hdrUser" style="display:flex;align-items:center;gap:6px;flex-shrink:0;"></div>
   <div class="sep"></div>
-  <button class="hdr-tab hdr-home active" id="tabMain" data-tip="캘린더 — 월·주·일 일정 보기">🏠 캘린더</button>
+  <button class="hdr-tab hdr-sub m-only" id="tabProg" data-tip="회차 진행 보기 (폰)">📈 진행</button>
+  <button class="hdr-tab hdr-home active" id="tabMain"data-tip="캘린더 — 월·주·일 일정 보기">🏠 캘린더</button>
   <button class="hdr-tab hdr-sub" id="tabTimeline" data-tip="타임라인 — 사업장별 진행 현황을 가로 막대로">📊 타임라인</button>
   <button class="hdr-tab hdr-sub" id="tabEnded" data-tip="종료된 사업장 모아보기">🔒 종료사업장</button>
   <div class="sep"></div>
@@ -1504,6 +1547,19 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
     <input type="file" id="importJsonFi" accept=".json" style="display:none;">
   </div>
 
+</div>
+
+<!-- 폰 «회차 진행 보기» (대표 결정 2026-10-08 「폰에서는 직접 작업하지 않고 진행상황 확인만 한다」
+     → 목업 승인 「내담당 목록 그대로」). ⚠ 보기 전용 — 지우기·옮기기·사진 단추를 넣지 않는다. -->
+<div id="viewProg" style="display:none;flex:1;overflow:hidden;flex-direction:column;background:var(--bg);">
+  <div class="mp-bar">
+    <button type="button" class="mp-tab on" data-mine="1">내 담당</button>
+    <button type="button" class="mp-tab" data-mine="0">전체</button>
+    <select id="mpStatus" class="mp-sel"><option value="active">진행중</option><option value="ended">완료</option><option value="all">전체</option></select>
+  </div>
+  <div class="mp-sum" id="mpSum"></div>
+  <div class="mp-lg"><span><i class="mp-k d"></i>한 것</span><span><i class="mp-k p"></i>잡아 둔 것</span><span><i class="mp-k"></i>남은 것</span></div>
+  <div class="mp-list" id="mpList"></div>
 </div>
 
 <!-- TIMELINE VIEW -->
@@ -6890,8 +6946,104 @@ function renderDashTypeRows(co,types,showEnded,onlyTid){
 }
 
 // ===== DASHBOARD =====
+/* ===== 폰 «회차 진행 보기» (대표 결정 2026-10-08) =====
+   ★ 「13/15」의 13 은 «오늘까지 한» 회차다 — 왼쪽 목록의 「다음 14회차」는 앞으로 잡아 둔 것까지 세서
+     «몇 번 했나»와 구분이 안 됐다. 그래서 한 것(오늘 이하)·잡아 둔 것(내일 이후)을 나눈다.
+   ⚠ 보기 전용 — 이 길에서는 아무것도 저장하지 않는다. */
+function progCalc(list,today,total,ended){
+  const rows=[...list].sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:0);
+  const done=rows.filter(s=>s.date<=today), plan=rows.filter(s=>s.date>today);
+  const field=done.filter(s=>s.isField).length;
+  return {rows,done:done.length,plan:plan.length,field,office:done.length-field,total:total||0,
+    last:done.length?done[done.length-1]:null, next:plan[0]||null,
+    full:!!ended||(total>0&&done.length>=total),
+    /* 남은 회차가 있는데 잡아 둔 일정이 «하나도» 없을 때만 — 다 잡아 뒀으면 할 일이 없다 */
+    noNext:!ended&&total>0&&done.length+plan.length<total&&!plan.length};
+}
+let _mpMine=true, _mpOpen='';
+function mpDate(ds){
+  if(!ds)return '';
+  const d=new Date(ds+'T00:00:00');
+  return `${d.getMonth()+1}/${d.getDate()}(${'일월화수목금토'[d.getDay()]})`;
+}
+function renderProg(){
+  const box=q('#mpList'); if(!box)return;
+  const types=getTypes(), staff=getStaff(), scheds=getScheds(), today=todayStr();
+  const status=q('#mpStatus')?.value||'active';
+  const warnDays=getEnv().warnDeadlineDays||14;
+  const nm=id=>staff.find(a=>a.id===id)?.name||'';
+  const cos=getCos().filter(c=>c.active!==false&&!c.deleted&&myVisible(c)&&(!_mpMine||coIsMine(c)));
+  qa('#viewProg .mp-tab').forEach(b=>b.classList.toggle('on',(b.dataset.mine==='1')===_mpMine));
+  let nActive=0, nRisk=0;
+  const groups=types.filter(t=>t.active!==false).map(t=>{
+    const items=[];
+    cos.forEach(co=>{
+      if(!(co.types||[]).includes(t.id))return;
+      const ended=!!co.endedTypes?.[t.id];
+      if(status==='active'&&ended)return;
+      if(status==='ended'&&!ended)return;
+      /* 일터혁신은 본컨설팅만 센다 — 사전진단은 펼친 칸에 따로 */
+      const pre=isPrePhaseType(t.id);
+      const all=scheds.filter(s=>s.coId===co.id&&s.typeId===t.id);
+      const P=progCalc(pre?all.filter(s=>schedPhase(s)==='main'):all,today,getCoMaxRounds(co.id,t.id),ended);
+      P.preN=pre?all.filter(s=>schedPhase(s)==='pre'&&s.date<=today).length:0;
+      if(!ended){
+        nActive++;
+        const dl=co.deadlines?.[t.id];
+        if(dl){const diff=Math.round((new Date(dl)-new Date(today))/864e5);if(diff>=0&&diff<=warnDays)nRisk++;}
+      }
+      items.push({co,t,P,ended,mand:getCoMandatory(co.id,t.id),dl:co.deadlines?.[t.id]||''});
+    });
+    items.sort((a,b)=>(a.co.name||'').localeCompare(b.co.name||'','ko'));
+    return {t,items};
+  }).filter(g=>g.items.length);
+  /* 이번 주(월~일) 방문 — 보이는 사업장 것만 */
+  const d0=new Date(today+'T00:00:00'); const dow=(d0.getDay()+6)%7;
+  const mon=new Date(d0); mon.setDate(d0.getDate()-dow); const sun=new Date(mon); sun.setDate(mon.getDate()+6);
+  const ymd=d=>`${d.getFullYear()}-${p2(d.getMonth()+1)}-${p2(d.getDate())}`;
+  const wk0=ymd(mon), wk1=ymd(sun), coIds=new Set(cos.map(c=>c.id));
+  const nWeek=scheds.filter(s=>s.isField&&coIds.has(s.coId)&&s.date>=wk0&&s.date<=wk1).length;
+  q('#mpSum').innerHTML=`<div><b>${nActive}</b>진행중</div><div><b>${nWeek}</b>이번 주 방문</div><div><b class="${nRisk?'warn':''}">${nRisk}</b>마감 ${warnDays}일 내</div>`;
+  if(!groups.length){box.innerHTML=`<div class="mp-empty">${_mpMine?'내 담당':'보이는'} ${status==='ended'?'완료된':'진행중인'} 컨설팅이 없습니다</div>`;return;}
+  const pct=(n,t)=>t>0?Math.min(100,Math.round(n/t*100)):0;
+  box.innerHTML=groups.map(g=>`<div class="mp-grp">${escAttr(g.t.fullName||g.t.name)} <span>${g.items.length}곳</span></div>`+g.items.map(it=>{
+    const {co,P}=it, key=co.id+'|'+it.t.id, open=_mpOpen===key;
+    const tot=P.total, cnt=tot>0?`${P.done}/${tot}`:`${P.done}회`;
+    const nx=it.ended?`${mpDate(co.endedTypes[it.t.id]).replace(/\(.\)/,'')} 끝`:P.next?`다음 ${mpDate(P.next.date).replace(/\(.\)/,'')}`:P.noNext?'잡힌 일 없음':'';
+    const dw=tot>0?pct(P.done,tot):(P.done?100:0), pw=tot>0?Math.min(100-dw,pct(P.plan,tot)):0;
+    let det='';
+    if(open){
+      const left=tot>0?Math.max(0,tot-P.done-P.plan):null;
+      const fNeed=it.mand>0?Math.max(0,it.mand-P.field):0;
+      const att=[nm(co.defAtt),...getCoAtts(co).map(nm)].filter(Boolean);
+      det=`<div class="mp-det">
+        한 것 <b>${P.done}회</b> (방문 ${P.field} · 사무실 ${P.office})${P.preN?` · 사전진단 ${P.preN}회 별도`:''} · 잡아 둔 것 <b>${P.plan}회</b>${left!==null?` · 남은 것 <b>${left}회</b>`:''}<br>
+        ${it.mand>0?`필수 방문 <b>${P.field}/${it.mand}</b>${fNeed?` — 방문 ${fNeed}회 더 필요`:' ✓'}<br>`:''}
+        ${P.last?`마지막 ${mpDate(P.last.date)} ${P.last.round||'?'}회차 ${P.last.isField?'방문':'사무실'}`:'아직 한 회차 없음'}${P.next?` · 다음 ${mpDate(P.next.date)} ${P.next.round||'?'}회차 ${P.next.isField?'방문':'사무실'}`:''}<br>
+        ${att.length?`담당 ${escAttr(att[0])}${att.length>1?` · 부담당 ${escAttr(att.slice(1).join(', '))}`:''}`:''}${it.dl?` · 마감 ${mpDate(it.dl)}`:''}
+        ${P.rows.length?`<div class="rds">${P.rows.map(s=>`<span class="${s.date>today?'fu':s.isField?'':'of'}" title="${s.date} ${s.isField?'방문':'사무실'}">${s.round||'?'}</span>`).join('')}</div>`:''}
+      </div>`;
+    }
+    return `<div class="mp-row ${P.full?'done':''} ${P.noNext?'warn':''} ${open?'open':''}" data-k="${key}">
+      <span class="nm" title="${escAttr(co.name||'')}">${escAttr(co.name||'')}</span>
+      <span class="bar"><i class="d" style="width:${dw}%"></i><i class="p" style="width:${pw}%"></i></span>
+      <span class="n">${P.full?'✓':''}${cnt}</span><span class="nx">${nx}</span>${det}</div>`;
+  }).join('')).join('');
+}
+function bindProg(){
+  qa('#viewProg .mp-tab').forEach(b=>b.onclick=()=>{_mpMine=b.dataset.mine==='1';renderProg();});
+  const st=q('#mpStatus'); if(st)st.onchange=renderProg;
+  const box=q('#mpList');
+  if(box)box.onclick=e=>{
+    if(e.target.closest('.mp-det'))return;
+    const r=e.target.closest('.mp-row'); if(!r)return;
+    _mpOpen=_mpOpen===r.dataset.k?'':r.dataset.k; renderProg();
+  };
+}
+
 function renderDash(){
   refreshStaffDropdowns();
+  if(q('#viewProg')?.style.display==='flex')renderProg();   // 자료가 바뀌면 진행 보기도 함께
   const search=S.dashSearch;
   const attF=S.dashAtt||'';
   const status=S.dashStatus||'active';
@@ -12057,8 +12209,11 @@ function showTab(tab){
   q('#viewTimeline').style.display=tab==='timeline'?'flex':'none';
   q('#viewSettings').style.display=tab==='settings'?'flex':'none';
   q('#viewEnded').style.display=tab==='ended'?'flex':'none';
+  q('#viewProg').style.display=tab==='prog'?'flex':'none';
   q('#calControls').style.display=tab==='main'?'flex':'none';
-  ['main','timeline','ended'].forEach(t=>{const el=q(`#tab${t.charAt(0).toUpperCase()+t.slice(1)}`);if(el)el.classList.toggle('active',t===tab);});
+  document.body.classList.toggle('m-prog-on',tab==='prog');
+  if(tab==='prog')renderProg();
+  ['main','timeline','ended','prog'].forEach(t=>{const el=q(`#tab${t.charAt(0).toUpperCase()+t.slice(1)}`);if(el)el.classList.toggle('active',t===tab);});
   q('#dashSettingsBtn')?.classList.toggle('active',tab==='settings');
   if(tab==='timeline')renderTimeline();
   if(tab==='settings'){
@@ -12077,6 +12232,8 @@ function bind(){
   q('#tabTimeline').onclick=()=>showTab('timeline');
   q('#dashSettingsBtn').onclick=()=>showTab('settings');
   q('#tabEnded').onclick=()=>showTab('ended');
+  q('#tabProg').onclick=()=>showTab('prog');
+  bindProg();
   q('#setSpreadColorBtn').onclick=openTypeColorSpread;
   q('#setAddBtn').onclick=addType;
   q('#staffAddBtn').onclick=addStaff;
@@ -12403,6 +12560,8 @@ function init(){
   loadPhotosFromDB();
   fbInit();   // 직원 색 구독은 fbInit 안 «붙은 뒤» 자리에서 함께 한다(시계에 안 맡긴다)
   applyMobileLayout();
+  /* 폰은 «보기»가 주 용도 — 열면 진행 목록부터 (대표 결정 2026-10-08). 달력은 탭으로 */
+  if(window.innerWidth<=768)showTab('prog');
   initDashResizer();
   initModalDrag();
   initCalWheel();
