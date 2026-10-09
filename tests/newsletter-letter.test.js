@@ -436,6 +436,19 @@ test('★ 추적 밑주소를 주면 편지에 «보이지 않는 그림»이 �
     '1×1 그림이 아닙니다');
 });
 
+/* ★★★ 열람 그림이 «발송기를 지나서도» 남는다 (2026-10-05 실측 — 10월 1주차 147곳 나갔는데 열람 0)
+   ⚠ 위 검사는 «편지에 그림이 들어가는가»만 봤다. 발송기(mail-send sanitizeHtml)가 허락 목록에 없는
+     우리 도메인(news.fairrunlabor.com)의 그림을 말없이 지웠고, 열람이 한 건도 서버에 안 왔다.
+     편지 → 발송기까지 «이어서» 봐야 이 고장이 잡힌다. */
+test('★★★ 우리 도메인의 열람 그림은 발송기를 지나서도 남는다 · 다른 그림은 그대로 지운다', () => {
+  const 편 = T.편지짓기(회차자료(),
+    Object.assign({}, 설정, { 추적밑주소: 'https://news.fairrunlabor.com' }));
+  const 나감 = MS.sanitizeHtml(String(편.서식).split('{추적열쇠}').join('k1'));
+  assert.match(나감, /<img[^>]+news\.fairrunlabor\.com\/newsOpen\?i=/, '발송기가 열람 그림을 지운다 — 열람이 영영 0 이다');
+  const 딴것 = MS.sanitizeHtml('<img src="https://news.fairrunlabor.com/evil.png"><img src="https://example.com/a.png">');
+  assert.ok(!/evil\.png|example\.com/.test(딴것), '열람 그림 말고 다른 그림까지 열어 줬다');
+});
+
 test('★ 추적 밑주소가 없으면 «아무것도 넣지 않는다» — 예전처럼 나간다', () => {
   const 편 = T.편지짓기(회차자료(), 설정);
   assert.ok(!/newsOpen/.test(편.서식), '밑주소가 없는데 그림을 넣었습니다');

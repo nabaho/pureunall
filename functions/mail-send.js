@@ -107,9 +107,16 @@ const SIGN_IMG_OK = 'cid:pusign';
      tests/mail-bulk.test.js 가 그것을 본다 — 그리고 남의 도메인이 여전히 막히는지도. */
 const IMG_HOST_OK = ['https://nabaho.github.io/pureunall/',
                      'https://asia-northeast3-pureun-erp.cloudfunctions.net/'];
+/* ★★ 뉴스레터 «열람 그림» — 우리 도메인의 newsOpen 한 길만 (2026-10-05 실측: 10월 1주차 147곳 나갔는데 열람 0).
+     편지 짓개가 추적밑주소(https://news.fairrunlabor.com)로 그림을 그리는데, 이 주소가 아래 목록에 없어
+     발송기가 그림을 «말없이» 지웠다 — 열람이 한 건도 서버에 안 왔다(링크는 그림이 아니라 멀쩡히 찍혔다).
+   ⚠ 그림 주소 목록(IMG_HOST_OK)은 넓히지 않는다 — 화면·CSP·편지짓개와 «같은 목록»이어야 한다(tests/newsletter-show).
+     여기는 «그 도메인의 newsOpen?» 한 길만 따로 허락한다. 다른 그림은 그 도메인이라도 여전히 지운다. */
+const OPEN_PIXEL_OK = ['https://news.fairrunlabor.com/newsopen?'];
 function imgSrcOk(v) {
   const s = String(v == null ? '' : v).trim();
   if (s.toLowerCase() === SIGN_IMG_OK) return SIGN_IMG_OK;
+  for (const p of OPEN_PIXEL_OK) { if (s.slice(0, p.length).toLowerCase() === p) return s; }
   for (const p of IMG_HOST_OK) { if (s.slice(0, p.length).toLowerCase() === p) return s; }
   return '';
 }
