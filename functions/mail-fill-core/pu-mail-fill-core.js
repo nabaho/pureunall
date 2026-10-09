@@ -31,7 +31,14 @@
     var by = {};
     (cos || []).forEach(function(co){
       if(!co || !co.id || co._deleted || /closed|terminated|inactive/.test(String(co.status||''))) return;
-      [co.email, co.primaryContactEmail].concat((co.contacts||[]).map(function(c){ return c && c.email; })).forEach(function(e){
+      /* ⚠★ 메일에서 이은 담당자(addedFrom 'mail…')는 도메인의 «근거»로 안 쓴다 (2026-10-09).
+           한 번 잘못 이으면 그 도메인 사람이 «모두» 저절로 그 업체로 따라 붙는다 — 실제로
+           사업 운영기관(컨설팅 회사) 한 사람을 자문사에 이었더니 동료 셋이 같은 업체로 짚혔다.
+           짐작이 짐작을 낳지 않게, 업체관리에 «사람이 적은» 주소만 근거로 삼는다. */
+      var fromMail = {};
+      (co.contacts||[]).forEach(function(c){ if(c && /^mail/.test(String(c.addedFrom||''))) fromMail[String(c.email||'').trim().toLowerCase()] = 1; });
+      [co.email, co.primaryContactEmail].concat((co.contacts||[]).map(function(c){ return c && !/^mail/.test(String(c.addedFrom||'')) && c.email; }))
+        .filter(function(e){ return !fromMail[String(e||'').trim().toLowerCase()]; }).forEach(function(e){
         var d = domOf(String(e||'').trim().toLowerCase()); if(!d) return;
         var t = by[d] || (by[d] = { ids:[], co:null });
         if(t.ids.indexOf(String(co.id)) < 0){ t.ids.push(String(co.id)); t.co = co; }

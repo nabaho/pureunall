@@ -47,7 +47,7 @@
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
 <script src="js/pu-company-write.js?v=2"></script>
 <script src="js/pu-mgr-watch-core.js?v=1"></script>
-<script src="js/pu-mail-fill-core.js?v=1"></script>
+<script src="js/pu-mail-fill-core.js?v=2"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
@@ -25563,12 +25563,15 @@ async function erpCoPatchMany(jobs){
 /* 저절로 채운 것을 «되돌린다» — 그 주소로 우리가 넣은 담당자 줄만 뺀다.
    ⚠ 사람이 따로 넣은 줄(addedFrom 이 다른 것)은 건드리지 않는다.
    ⚠ 기록은 지우지 않고 undone 으로 남긴다 — 지우면 다음 차례에 또 채운다. */
-async function erpUnfillContact(coId, email){
+async function erpUnfillContact(coId, email, how){
   const em = String(email||'').trim().toLowerCase();
+  /* ⚠ 「업체에 잇기」로 넣은 줄은 addedFrom 이 'mail-new' 다(how:'link'). 예전엔 'mail-auto' 만 봐서
+       되돌려도 아무것도 안 빠지고 「되돌렸습니다」 표만 남았다(2026-10-09). 기록이 가리키는 그 줄만 뺀다. */
+  const mine = how === 'link' ? 'mail-new' : 'mail-auto';
   const r = await erpCoPatchMany([{ id: coId, plan: function(cur){
     const before = (cur.contacts||[]).length;
     const contacts = (cur.contacts||[]).filter(c=>!(c && String(c.email||'').trim().toLowerCase()===em
-      && String(c.addedFrom||'')==='mail-auto'));
+      && String(c.addedFrom||'')===mine));
     if(contacts.length === before) return { none:true, info:{ removed:false } };
     const fields = { contacts:contacts };
     if(String(cur.primaryContactEmail||'').trim().toLowerCase() === em){
@@ -25588,7 +25591,7 @@ async function erpUnfillContact(coId, email){
 async function mnewUndoOne(key){
   const rec = (_mnewAutoLog||{})[key];
   if(!rec || rec.undone) return false;
-  const r = await erpUnfillContact(rec.co, rec.em);
+  const r = await erpUnfillContact(rec.co, rec.em, rec.how);
   if(!r.ok) throw new Error(r.why || '되돌리지 못했습니다');
   rec.undone = Date.now();
   await firebase.database().ref(DB_ROOT + '/config/mailAutoFill/' + key + '/undone').set(rec.undone);
@@ -26325,8 +26328,12 @@ function mbNewCoOf(em, hay){
   if(d && MB_PUB_DOM.indexOf(d) < 0){
     for(let i=0;i<cos.length;i++){
       const co = cos[i]; if(!co) continue;
+      /* ⚠ 메일에서 이은 담당자는 근거로 안 쓴다 — PuMailFill.domTable 과 같은 잣대(2026-10-09) */
+      const fromMail = {};
+      (co.contacts||[]).forEach(c=>{ if(c && /^mail/.test(String(c.addedFrom||''))) fromMail[String(c.email||'').trim().toLowerCase()] = 1; });
       const list = [co.email, co.primaryContactEmail]
-        .concat((co.contacts||[]).map(c=>c && c.email));
+        .concat((co.contacts||[]).map(c=>c && !/^mail/.test(String(c.addedFrom||'')) && c.email))
+        .filter(x=>!fromMail[String(x||'').trim().toLowerCase()]);
       for(let k=0;k<list.length;k++){
         const e2 = String(list[k]||'').trim().toLowerCase();
         if(e2 && e2 !== e && mbDomOf(e2) === d) return { co:co, why:'도메인', dom:d };
@@ -26422,8 +26429,12 @@ function mbNewCoHint(v){
   if(d && MB_PUB_DOM.indexOf(d) < 0){
     for(let i=0;i<cos.length;i++){
       const co = cos[i]; if(!co) continue;
+      /* ⚠ 메일에서 이은 담당자는 근거로 안 쓴다 — PuMailFill.domTable 과 같은 잣대(2026-10-09) */
+      const fromMail = {};
+      (co.contacts||[]).forEach(c=>{ if(c && /^mail/.test(String(c.addedFrom||''))) fromMail[String(c.email||'').trim().toLowerCase()] = 1; });
       const list = [co.email, co.primaryContactEmail]
-        .concat((co.contacts||[]).map(c=>c && c.email));
+        .concat((co.contacts||[]).map(c=>c && !/^mail/.test(String(c.addedFrom||'')) && c.email))
+        .filter(x=>!fromMail[String(x||'').trim().toLowerCase()]);
       for(let k=0;k<list.length;k++){
         const e2 = String(list[k]||'').trim().toLowerCase();
         if(e2 && e2 !== em && mbDomOf(e2) === d)
