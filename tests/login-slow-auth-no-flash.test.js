@@ -10,7 +10,7 @@
    못 박는 것(규칙):
    ① 포털: 8초가 지나도 인증 도구가 있으면 가림막을 두고 «느리다» + 「로그인 화면 보기」 단추
    ② 포털: 단추를 누르면 바로 열린다 · 마지막 안전망은 구글 요청 시간(30초)보다 길다
-   ③ 포털: 인증 도구가 아예 없거나 카카오에서 돌아온 참이면 예전처럼 곧장 연다
+   ③ 포털: 인증 도구가 없으면 열되, 카카오 복귀는 자동으로 열지 않는다
    ④ 포털: «로그인 없음»이 확정되면 곧장 로그인 화면(기다리지 않는다)
    ⑤ 이알피: 포털 경유 대기는 구글 요청 시간보다 길다 · 확인이 끝나기 전엔 자물쇠를 안 띄운다 */
 const test = require('node:test');
@@ -85,13 +85,14 @@ test('③ 인증 도구가 안 실렸으면 기다릴 것이 없다 — 8초에 
   b.tick(8000);
   assert.equal(b.splash.removed, true);
 });
-test('③ 카카오에서 돌아온 참은 예전대로(20초, 단추 없음)', () => {
+test('③ 카카오에서 돌아온 참은 인증이 진행되는 동안 로그인 폼을 자동 노출하지 않는다', () => {
   const b = boot({ kk: true });
   b.tick(19000);
   assert.equal(b.splash.removed, false);
-  b.tick(20000);
-  assert.equal(b.splash.removed, true);
-  assert.equal(b.kids.length, 0);
+  b.tick(60000);
+  assert.equal(b.splash.removed, false, '늦게 성공할 인증을 중간에 실패 화면으로 바꾸면 안 된다');
+  assert.equal(b.kids.length, 1, '오래 기다리는 사람에게는 수동 재시작 길이 있어야 한다');
+  assert.match(b.kids[0].textContent, /다시 시작/);
 });
 test('④ «로그인 없음»이 확정되면 기다리지 않고 곧장 로그인 화면', () => {
   /* onAuthStateChanged 의 «로그인 없음» 갈래 — 미로그인 확정 줄부터 가림막 걷기까지 사이에 기다림이 없어야 한다 */

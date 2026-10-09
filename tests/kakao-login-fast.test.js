@@ -192,8 +192,8 @@ test('★★ 카카오 단추는 인증 저장소를 먼저 기다리지 않고 
   assert.doesNotMatch(body, /auth\.setPersistence|_persistenceReady\.then/,
     '카카오 화면으로 가기 전 저장소 준비를 기다리고 있다');
   assert.match(enter.slice(end, enter.indexOf('var KK_WANT', end)),
-    /auth\.setPersistence\(keep \? firebase\.auth\.Auth\.Persistence\.LOCAL : firebase\.auth\.Auth\.Persistence\.SESSION\)/,
-    '복귀 뒤 로그인 유지 선택은 계속 적용해야 한다');
+    /auth\.setPersistence\(firebase\.auth\.Auth\.Persistence\.SESSION\)/,
+    '복귀 뒤 로그인 유지 끄기는 SESSION 으로 적용해야 한다');
 });
 
 test('★★ ⑤ 서버 답을 기다리는 «동안» 화면의 DB 연결을 먼저 연다 · 로그인 화면은 카카오 쓰는 기기만 깨운다', () => {
@@ -207,14 +207,13 @@ test('★★ ⑤ 서버 답을 기다리는 «동안» 화면의 DB 연결을 �
   assert.match(enter, /js\/pu-kakao\.js\?v=\d+/);
 });
 
-test('★★ 휴대전화에서 카카오 응답·저장소·명부를 끝없이 기다리지 않는다', () => {
+test('★★ 휴대전화에서 카카오 서버 응답·명부를 끝없이 기다리지 않는다', () => {
   const kakaoJs = fs.readFileSync(path.join(ROOT, 'js', 'pu-kakao.js'), 'utf8');
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
   assert.match(kakaoJs, /AbortController/);
   assert.match(kakaoJs, /10000/);
-  assert.match(enter, /카카오 로그인 응답이 늦습니다/);
-  assert.match(enter, /}, 15000\)/);
-  assert.match(enter, /}, 2000\)/);
+  assert.doesNotMatch(enter, /카카오 로그인 응답이 늦습니다\. 아래 카카오 버튼을 다시 한 번 눌러 주세요/,
+    '진행 중인 인증을 실패로 표시해 재시도를 유도한다');
   assert.match(enter, /명부 읽기 시간 초과/);
   assert.match(enter, /}, 3500\)/);
 });
@@ -222,13 +221,14 @@ test('★★ 휴대전화에서 카카오 응답·저장소·명부를 끝없이
 test('★★ 카카오 인증표·로그인 저장·직원명부를 차례로 기다리지 않고 동시에 준비한다', () => {
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
   assert.match(enter, /__puRosterPrefetch\s*=\s*Promise\.resolve\(db\.ref\('data\/user_dir'\)\.once\('value'\)\)/);
-  assert.match(enter, /Promise\.all\(\[PuKakao\.loginFinish\(p\.code\),\s*quickPersist\]\)/);
+  assert.match(enter, /Promise\.all\(\[server,\s*persist\]\)/);
+  assert.match(enter, /PuKakao\.loginFinish\(p\.code\)/);
   assert.match(enter, /path === 'data\/user_dir' && window\.__puRosterPrefetch/);
 });
 
 test('★★ 카카오 인증 성공 결과로 포털을 바로 열고 인증상태 재알림을 기다리지 않는다', () => {
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
-  const start = enter.indexOf("Promise.all([PuKakao.loginFinish(p.code), quickPersist])");
+  const start = enter.indexOf('Promise.all([server, persist])');
   const end = enter.indexOf("}).catch(function(err){", start);
   assert.ok(start > 0 && end > start);
   assert.match(enter.slice(start, end), /if\(!_handled\)\{ _handled = true; enterPortal\(cred\.user\); \}/);
