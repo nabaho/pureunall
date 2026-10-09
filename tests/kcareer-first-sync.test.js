@@ -5,7 +5,7 @@
      ① 잃을 것 0 = 이 기기 목록의 기록이 모두 클라우드에 있거나 클라우드가 지웠다고 적은 것
      ② 하나라도 이 기기에만 있으면 저절로 받지 않는다(사람이 고른다)
      ③ 처음 여는 기기의 두 문(fbWatch·fbAutoPush)이 모두 fbFirstSync 로 간다 · 받는 길은 kcApplyRestore 한 곳
-     ④ 도장 목록은 이 기기에만(그림이 안 오가므로) · 기기 이름표에 브라우저 */
+     ④ 도장 목록은 «합쳐» 오간다(그림은 본인 창고로 — 2026-10-09) · 기기 이름표에 브라우저 */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -37,15 +37,18 @@ test('③ 두 문이 모두 fbFirstSync — 받는 길은 kcApplyRestore 한 곳
   assert.ok(/kind==='first'\)\{ fbFirstSync\(\); return; \}/.test(떼기('function fbWatch(')), 'fbWatch');
   assert.ok(/(_fbBase|base)==null && cloudAt\)\{ fbFirstSync\(\)/.test(떼기('function fbAutoPush(')), 'fbAutoPush');
   const f = 떼기('function fbFirstSync(');
-  assert.ok(/KcareerNotices\.firstPullLoss\(fbGatherLS\(\), v\.ls, FB_SKIP, TOMB_KEY\)/.test(f), '잣대 한 곳');
+  assert.ok(/KcareerNotices\.firstPullLoss\(fbGatherLS\(\), v\.ls, FB_SKIP\.concat\(FB_UNION\), TOMB_KEY\)/.test(f), '잣대 한 곳');
   assert.ok(/kcApplyRestore\(v\.ls, 'pull'\)/.test(f) && /fbSetBase\(v\.at\)/.test(f), '받는 길 한 곳 · 받은 뒤 자동 올리기가 시작되게 기준을 둔다');
   assert.ok(f.indexOf('r.safe') < f.indexOf('kcApplyRestore'), '★ 잃을 것을 먼저 본다 — 순서가 바뀌면 이 기기에만 있는 기록이 사라진다');
   assert.ok(/KC_SAFE/.test(f) && /kcNoPush\(\)/.test(f), '안전 모드·직원 보기 전용에서는 하지 않는다');
 });
 
-test('④ 도장 목록은 이 기기에만 · 기기 이름표에 브라우저', () => {
+test('④ 도장 목록은 합쳐 오간다 · 기기 이름표에 브라우저', () => {
   const skip = SRC.match(/var FB_SKIP=\[([\s\S]*?)\];/)[1];
-  assert.ok(/'stamps'/.test(skip), '★ 목록만 오가면 그림 없는 빈 도장이 생긴다(2026-10-05 에지 3개)');
+  /* 2026-10-09 대표 제보 「왜 도장이 사라졌나」 — 이 기기에만 두니 브라우저를 바꾸면 없었다.
+     이제 그림은 본인 창고로, 목록은 «덮지 않고 합친다» (자세한 검사: kcareer-own-files.test.js) */
+  assert.ok(!/'stamps'/.test(skip), '도장 목록은 오간다');
+  assert.ok(/var FB_UNION=\[[^\]]*'stamps'/.test(SRC), '★ 덮지 않고 합친다 — 1개인 기기가 4개인 기기를 지우면 안 된다');
   const lab = 떼기('function fbDeviceLabel(');
   assert.ok(/Edg/.test(lab) && /크롬/.test(lab), '「PC」만으로는 어느 브라우저가 올렸는지 모른다');
   assert.ok(/<script src="js\/kcareer-notices\.js\?v=\d+"><\/script>/.test(SRC));

@@ -2641,6 +2641,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
             </div>
             <div class="dt" id="firmDocList"></div>
           </div>
+          <!-- ★ 🏢 법인 도장 (대표 지시 2026-10-09 「법인정보에는 법인도장도 있으면 좋겠다」)
+               도장 그림은 도장 보관함 한 곳에 둔다 — 여기서는 «어느 것이 법인 도장인지»만 정한다(firm 표시).
+               두 곳에 따로 담으면 한쪽만 고쳐져 어긋난다. -->
+          <div class="card" id="firmSealCard">
+            <div class="rc-h">🏢 법인 도장<span style="font-size:11px;font-weight:400;color:var(--text-mute)">— 도장 보관함에서 고르거나 새로 올립니다</span></div>
+            <div id="firmSealBox" style="margin-top:8px"></div>
+            <input type="file" id="firmSealInput" accept="image/*" style="display:none" onchange="firmSealUpload(this.files);this.value=''">
+          </div>
           </div><!-- .pi-side -->
         </div>
         <div class="tabpanel" id="tab-staff">
@@ -3756,13 +3764,25 @@ function _kcFormMime(ext){
      · 기관 양식     : cvforms 한 줄의 stPath
      · 내가 만든 서류 : 서류 보관함(resume·profile·certdoc) 한 건의
                        genStPath(완성본 genFileId) · origStPath(쓴 양식 원본 origFileId)
-   ⚠ 받은 서류(스캔·첨부)와 신분증·통장사본은 «여기 없다» — 일부러다.
+   ⚠ 받은 서류(스캔·첨부)와 신분증·통장사본(신분증·계좌 탭)은 «여기 없다» — 일부러다.
+     (내 사진·도장·법인 서류는 2026-10-09 부터 아래 KC_OWN_FILE_STORES 로 간다)
      그것들은 공용 첨부 길(saveAttach)로 들어오며, 신분증은 어떤 경우에도 창고에 올리지 않는다.
    ⚠ 새 보관함이 창고를 쓰게 되면 «여기에» 더한다. 따로 데려오는 길을 만들지 말 것. */
 var KC_DOC_STORES=['resume','profile','certdoc','feedoc'];
+/* ★ 내 사진·도장·법인 서류 (대표 제보 2026-10-09 「왜 사진과 도장이 사라졌나」)
+   목록은 클라우드로 오가는데 «파일은 처음 올린 브라우저에만» 있었다 — 다른 PC·브라우저에서는
+   사진 칸이 하얗고, 법인 서류는 「원본 없음」이었다. 한 줄의 stPath 가 자리를 안다.
+   ⚠ 올리는 곳은 kcOwnFilesUp 한 곳 · 자리는 kcareer_forms/{uid}/ (본인만 읽는다). */
+var KC_OWN_FILE_STORES=['gallery','stamps','firm_docs'];
 function _kcCloudRowOf(id){
   var 줄=(get('cvforms')||[]).filter(function(x){ return x && x.id===id && x.stPath; })[0];
   if(줄) return { stPath:줄.stPath, name:줄.name||'양식', ext:줄.ext||'hwpx', savedAt:줄.savedAt };
+  for(var o=0;o<KC_OWN_FILE_STORES.length;o++){
+    var 내=(get(KC_OWN_FILE_STORES[o])||[]).filter(function(x){ return x && x.id===id && x.stPath; })[0];
+    /* ⚠ 법인 서류의 name 은 «법인명»이다 — 파일 이름은 fname */
+    if(내) return { stPath:내.stPath, name:내.fname||내.name||'파일',
+      ext:String(내.ext||String(내.fname||내.name||'').split('.').pop()||'').toLowerCase(), savedAt:내.savedAt };
+  }
   for(var i=0;i<KC_DOC_STORES.length;i++){
     var arr=get(KC_DOC_STORES[i])||[];
     for(var j=0;j<arr.length;j++){
@@ -3797,6 +3817,40 @@ async function kcFormFromCloud(id){
   }catch(e){ console.warn('양식 창고에서 데려오기', e); return null; }
 }
 
+/* ★ 내 사진·도장·법인 서류를 창고에 올린다 — 자리가 아직 없고 «이 기기에 파일이 있는» 줄만.
+   보관함 화면을 그릴 때마다 조용히 부른다(_kcOwnUpSoon) — 그래서 처음 올렸던 브라우저에서
+   경력관리를 한 번 열면 옛 사진·도장도 옮겨진다. 새로 올린 것도 같은 길로 간다.
+   ⚠ 신분증(id_docs)은 넣지 않는다 — 어떤 경우에도 창고에 올리지 않는다(위 머리말).
+   ⚠ 직원 보기 전용·로그인 전에는 하지 않는다. 실패한 번호는 이 화면에서 다시 시도하지 않는다. */
+var _kcOwnUpBusy=false, _kcOwnUpTried={}, _kcOwnUpT=null;
+async function kcOwnFilesUp(){
+  if(_kcOwnUpBusy) return 0;
+  if(typeof kcIsStaff==='function' && kcIsStaff()) return 0;
+  if(!kcFormStorage() || !kcFormPath('x')) return 0;
+  _kcOwnUpBusy=true; var n=0;
+  try{
+    for(var s=0;s<KC_OWN_FILE_STORES.length;s++){
+      var store=KC_OWN_FILE_STORES[s];
+      var 할=(get(store)||[]).filter(function(r){ return r && r.id && !r.stPath && !_kcOwnUpTried[r.id] && fileExists(r.id); });
+      for(var i=0;i<할.length;i++){
+        var r=할[i]; _kcOwnUpTried[r.id]=1;
+        var f=null; try{ f=await getFileAsync(r.id); }catch(e){ f=null; }
+        if(!f || !f.base64) continue;
+        var b64=String(f.base64).replace(/^data:[^,]*,/,'');
+        if(b64.length*0.75 >= 25*1024*1024) continue;
+        var ext=String(f.ext||r.ext||String(r.fname||r.name||'').split('.').pop()||'').toLowerCase();
+        var 자리=await kcFormUpload(r.id, b64, ext);
+        if(!자리) continue;
+        /* ⚠ 올리는 사이 목록이 바뀌었을 수 있다 — 새로 읽어 그 줄에만 적는다 */
+        var arr=get(store)||[], 적음=false;
+        arr.forEach(function(x){ if(x && x.id===r.id && !x.stPath){ x.stPath=자리; 적음=true; } });
+        if(적음){ set(store, arr); n++; }
+      }
+    }
+  }finally{ _kcOwnUpBusy=false; }
+  return n;
+}
+function _kcOwnUpSoon(){ if(_kcOwnUpT) clearTimeout(_kcOwnUpT); _kcOwnUpT=setTimeout(function(){ _kcOwnUpT=null; kcOwnFilesUp().catch(function(e){ console.warn('내 파일 창고 올리기', e); }); }, 1500); }
 async function getFileAsync(id){
   if(_cache[id]) return _cache[id];
   var 여기 = await new Promise(async function(res){
@@ -10146,8 +10200,10 @@ function fileURL(id){ if(_furl[id]) return _furl[id]; const f=getFile(id); if(!f
   const t=f.ext==='pdf'?'application/pdf':(f.ext==='png'?'image/png':(f.ext==='jpg'||f.ext==='jpeg'?'image/jpeg':(f.ext==='gif'?'image/gif':(f.ext==='webp'?'image/webp':'application/octet-stream'))));
   _furl[id]=URL.createObjectURL(new Blob([b64ToAb(f.base64)],{type:t})); return _furl[id]; }
 async function fileURLAsync(id){ if(_furl[id]) return _furl[id]; const f=await getFileAsync(id); if(!f||!f.base64) return null;
-  const t=f.ext==='pdf'?'application/pdf':(f.ext==='png'?'image/png':(f.ext==='jpg'||f.ext==='jpeg'?'image/jpeg':'application/octet-stream'));
-  _furl[id]=URL.createObjectURL(new Blob([b64ToAb(f.base64)],{type:t})); return _furl[id]; }
+  const t=f.ext==='pdf'?'application/pdf':(f.ext==='png'?'image/png':(f.ext==='jpg'||f.ext==='jpeg'?'image/jpeg':(f.ext==='gif'?'image/gif':(f.ext==='webp'?'image/webp':'application/octet-stream'))));
+  /* ⚠ «data: 머리» 달린 옛 값도 푼다 — 그대로 atob 하면 조용히 깨져 사진 칸이 하얗다 */
+  try{ _furl[id]=URL.createObjectURL(new Blob([b64ToAb(String(f.base64).replace(/^data:[^,]*,/,''))],{type:t})); }catch(e){ return null; }
+  return _furl[id]; }
 function fileExt(id){ const f=getFile(id); return f?(f.ext||''):''; }
 function isPrev(ext){ return /^(png|jpg|jpeg|gif|webp|pdf)$/.test(ext); }
 function hoverThumb(id,ev){ const ext=fileExt(id); if(!isPrev(ext)) return; const box=document.getElementById('hoverPrev'); const u=fileURL(id); if(!u) return;
@@ -12951,8 +13007,12 @@ function renderGallery(){ const grid=document.getElementById('galleryGrid'); if(
     +'<div style="display:flex;align-items:center;gap:4px;padding:5px 6px">'
     +'<span style="flex:1;min-width:0;font-size:10px;color:var(--text-mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+escapeHtml(p.name||'')+'">'+escapeHtml(p.name||'사진')+'</span>'
     +'<button class="btn sm" style="color:var(--red);font-size:11px;padding:2px 6px" onclick="delGalleryPhoto(\''+p.id+'\',this)">🗑</button></div></div>'; }).join('');
-  arr.forEach(function(p){ fileURLAsync(p.id).then(function(u){ if(!u) return; const img=grid.querySelector('img[data-pid="'+p.id+'"]'); if(img) img.src=u; }); });
+  arr.forEach(function(p){ fileURLAsync(p.id).then(function(u){ const img=grid.querySelector('img[data-pid="'+p.id+'"]'); if(!img) return; if(u){ img.src=u; return; } _kcNoFileHere(img); }); });
+  _kcOwnUpSoon();
 }
+/* 파일이 이 기기에도 창고에도 없을 때 — 하얀 칸 대신 «까닭과 할 일»을 적는다 (2026-10-09) */
+function _kcNoFileHere(img){ var box=img.parentNode; if(!box) return;
+  box.innerHTML='<div style="padding:6px;font-size:10.5px;line-height:1.45;color:var(--amber);text-align:center">이 브라우저에 원본이 없습니다<br>처음 올린 PC·브라우저에서 경력관리를 한 번 열면 옮겨 옵니다</div>'; }
 async function addGalleryPhotos(files){
   const list=Array.from(files||[]).filter(function(f){ return /^image\//.test(f.type); });
   if(!list.length){ toast('이미지 파일만 업로드할 수 있습니다'); return; }
@@ -13030,7 +13090,7 @@ function renderStamps(){ const grid=document.getElementById('stampGrid'); if(!gr
     +'<img data-sid="'+s.id+'" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>'
     +'<div style="display:flex;align-items:center;gap:4px;padding:5px 6px">'
     +'<button class="btn sm" title="기본 도장으로 지정" style="font-size:12px;padding:2px 6px;'+(s.def?'color:var(--teal)':'color:var(--text-mute)')+'" onclick="setDefaultStamp(\''+s.id+'\')">'+(s.def?'★':'☆')+'</button>'
-    +'<span style="flex:1;min-width:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="이름 변경" onclick="renameStamp(\''+s.id+'\')">'+escapeHtml(s.label||s.name||'도장')+'</span>'
+    +'<span style="flex:1;min-width:0;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:text" title="이름 변경" onclick="renameStamp(\''+s.id+'\')">'+(s.firm?'🏢 ':'')+escapeHtml(s.label||s.name||'도장')+'</span>'
     +'<button class="btn sm" style="color:var(--red);font-size:11px;padding:2px 6px" onclick="delStamp(\''+s.id+'\',this)">🗑</button></div>'
     /* ★ 크기·자리 — 여기서 고친 값이 «다음에 찍을 때» 그대로 쓰인다(대표 제보 2026-09-27) */
     +'<div style="border-top:1px dashed var(--border);padding:5px 6px;font-size:10.5px;color:var(--text-mute)">'
@@ -13049,7 +13109,8 @@ function renderStamps(){ const grid=document.getElementById('stampGrid'); if(!gr
         +'<button class="btn sm" style="padding:0 5px;margin-left:auto" title="처음대로" onclick="stampFitReset(\''+s.id+'\')">↩</button>'
       +'</div></div>'
     +'</div>'; }).join('');
-  arr.forEach(function(s){ fileURLAsync(s.id).then(function(u){ if(!u) return; const img=grid.querySelector('img[data-sid="'+s.id+'"]'); if(img) img.src=u; }); }); }
+  arr.forEach(function(s){ fileURLAsync(s.id).then(function(u){ const img=grid.querySelector('img[data-sid="'+s.id+'"]'); if(!img) return; if(u){ img.src=u; return; } _kcNoFileHere(img); }); });
+  _kcOwnUpSoon(); }
 function _whiteToTransparent(dataURL,cb){ const img=new Image(); img.onload=function(){ try{ const c=document.createElement('canvas'); c.width=img.width; c.height=img.height; const x=c.getContext('2d'); x.drawImage(img,0,0); const d=x.getImageData(0,0,c.width,c.height); const p=d.data; for(let i=0;i<p.length;i+=4){ if(p[i]>232&&p[i+1]>232&&p[i+2]>232) p[i+3]=0; } x.putImageData(d,0,0); cb(c.toDataURL('image/png')); }catch(e){ cb(dataURL); } }; img.onerror=function(){ cb(dataURL); }; img.src=dataURL; }
 async function addStamps(files){ const list=Array.from(files||[]).filter(function(f){ return /^image\//.test(f.type); });
   if(!list.length){ toast('이미지 파일만 등록할 수 있습니다'); return; }
@@ -18852,6 +18913,49 @@ function renderFirmTab(){
       : '⚠ 아직 이알피에서 받은 적이 없습니다 — 로그인되어 있으면 「🔄 이알피에서 다시 받기」를 눌러 보세요.')
       +'<br>이알피 값을 고치려면 <b>푸른이알피 › 회사정보</b>에서 고치세요 — 그러면 모든 서류가 함께 바뀝니다.';
   }
+  _safe(renderFirmSeal);
+}
+/* ── 🏢 법인 도장 (대표 지시 2026-10-09) ──
+   도장 보관함의 한 줄에 firm:true 를 단다 — 하나만. 그림은 보관함 한 곳에 있다.
+   ⚠ 아직 안 정했으면 이름에 「법인」이 든 도장을 «권하기만» 한다 — 저절로 정하지 않는다
+     (노무사 직인이 법인 도장 자리에 찍히면 서류가 틀린다). */
+function firmSealStamp(){ return (get('stamps')||[]).filter(function(s){ return s && s.firm; })[0] || null; }
+function _firmSealGuess(){ return (get('stamps')||[]).filter(function(s){ return s && /법인/.test(String(s.label||s.name||'')); })[0] || null; }
+function renderFirmSeal(){
+  var box=document.getElementById('firmSealBox'); if(!box) return;
+  var arr=get('stamps')||[], 정함=firmSealStamp(), 권함=정함?null:_firmSealGuess(), 보일=정함||권함;
+  var 그림=보일
+    ? '<div style="width:96px;height:96px;flex:none;border:1px solid '+(정함?'var(--teal)':'var(--border)')+';border-radius:8px;'+_STAMP_CHK+';display:flex;align-items:center;justify-content:center;padding:6px">'
+      +'<img data-fsid="'+보일.id+'" alt="" style="max-width:100%;max-height:100%;object-fit:contain"></div>'
+    : '<div style="width:96px;height:96px;flex:none;border:1px dashed var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--text-mute)">없음</div>';
+  var 말=정함 ? '<b>'+escapeHtml(정함.label||정함.name||'도장')+'</b> — 법인 도장으로 정해져 있습니다'
+    : 권함 ? '아직 정하지 않았습니다 — 이름으로 보아 <b>'+escapeHtml(권함.label||권함.name||'')+'</b> 같습니다. 맞으면 「이것으로」를 누르세요'
+    : (arr.length ? '아직 정하지 않았습니다 — 아래에서 고르거나 새로 올리세요' : '도장 보관함이 비어 있습니다 — 법인 도장 그림을 올리세요');
+  var 고르기=arr.length
+    ? '<select id="firmSealPick" style="font-size:16px;max-width:220px">'+arr.map(function(s){
+        return '<option value="'+_jsAttr(s.id)+'"'+(보일&&보일.id===s.id?' selected':'')+'>'+escapeHtml(s.label||s.name||'도장')+'</option>'; }).join('')+'</select>'
+      +'<button class="btn sm primary" type="button" onclick="setFirmSeal(document.getElementById(\'firmSealPick\').value)">이것으로</button>'
+    : '';
+  box.innerHTML='<div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">'+그림
+    +'<div style="flex:1;min-width:200px;font-size:12px;line-height:1.6">'+말
+    +'<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px">'+고르기
+    +'<button class="btn sm" type="button" onclick="document.getElementById(\'firmSealInput\').click()">＋ 새 도장 올리기</button>'
+    +(정함?'<button class="btn sm" type="button" onclick="setFirmSeal(\'\')">해제</button>':'')
+    +'</div></div></div>';
+  if(보일) fileURLAsync(보일.id).then(function(u){ var img=box.querySelector('img[data-fsid]'); if(!img) return; if(u){ img.src=u; return; } _kcNoFileHere(img); });
+}
+function setFirmSeal(id){
+  var arr=get('stamps')||[];
+  if(id && !arr.some(function(s){ return s && s.id===id; })){ toast('그 도장을 찾을 수 없습니다'); return; }
+  set('stamps', arr.map(function(s){ return Object.assign({}, s, { firm: !!id && s.id===id }); }));
+  _safe(renderFirmSeal); _safe(renderStamps);
+  toast(id ? '🏢 법인 도장으로 정했습니다' : '법인 도장 지정을 풀었습니다');
+}
+async function firmSealUpload(files){
+  var 전={}; (get('stamps')||[]).forEach(function(s){ if(s&&s.id) 전[s.id]=1; });
+  await addStamps(files);
+  var 새=(get('stamps')||[]).filter(function(s){ return s && s.id && !전[s.id]; })[0];
+  if(새) setFirmSeal(새.id); else _safe(renderFirmSeal);
 }
 /* 💾 저장 — 이알피에 값이 «없는» 칸만 담는다(읽기 전용 칸은 안 건드린다) */
 function firmTabSave(quiet){
@@ -18989,7 +19093,8 @@ function renderFirmDocs(){
   var arr=get('firm_docs'); var cnt=document.getElementById('firmDocCnt'); if(cnt) cnt.textContent=arr.length+'건';
   if(!arr.length){ box.innerHTML='<div class="empty"><div class="emp-ico">🏢</div>보관한 법인 서류 없음<br><span style="font-size:12px">위 칸에 사업자등록증·등기부·통장사본을 끌어놓으세요</span></div>'; return; }
   box.innerHTML='<table><thead><tr><th class="rownum-h">№</th><th>종류</th><th>법인명</th><th>번호</th><th>원본</th><th>관리</th></tr></thead><tbody>'
-    +arr.map(function(a,i){ var id=a.id, has=fileExists(id);
+    /* ★ 창고에 자리(stPath)가 있으면 «있다» — 누르는 순간 창고에서 데려온다(getFileAsync) */
+    +arr.map(function(a,i){ var id=a.id, has=fileExists(id)||!!a.stPath;
       return '<tr><td class="rownum">'+(i+1)+'</td><td><b>'+escapeHtml(a.kind||'-')+'</b></td><td>'+escapeHtml(a.name||'-')+'</td>'
         +'<td>'+escapeHtml(a.number||'-')+'</td><td style="font-size:11px;color:var(--text-mute)">'+escapeHtml(a.fname||'')+'</td>'
         +'<td><span style="display:inline-flex;gap:3px">'
@@ -18997,6 +19102,7 @@ function renderFirmDocs(){
         +'<button class="btn sm" onclick="delFirmDoc(\''+id+'\',this)" style="color:#fff;background:var(--red);border-color:var(--red)">🗑 삭제</button>'
         +'</span></td></tr>'; }).join('')+'</tbody></table>';
   _safe(function(){ stampCellLabels(box); });
+  _kcOwnUpSoon();
 }
 function delFirmDoc(id, btn){
   var r=get('firm_docs').find(function(x){ return x.id===id; });
@@ -20468,9 +20574,7 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              'id_docs','id_docs_enc','id_salt','api_key','gvision_key','gemini_key','staff_roster','pu_consult_cache','pu_case_cache','pu_fund_cache','pu_etc_cache','_idpin','_idmeta','_idsalt','kc_theme','_fbbase','_fbauto',
              /* 이알피 법인정보의 «사본»이다 — 되올리면 남의 자리를 덮는다 */
              'firm_info',
-             /* 도장 목록 — 도장 «그림»은 각자 브라우저 보관함에만 둔다(2026-08-30 보안). 목록만 오가면
-                다른 브라우저에 그림 없는 빈 도장이 생긴다(2026-10-05 에지에서 실제로 3개). 목록도 이 기기에만. */
-             'stamps',
+             /* ⚠ 도장 목록(stamps)은 2026-10-09 부터 «오간다» — 아래 FB_UNION 머리말 */
              /* 이 기기에서 고친 것이 아직 안 올라갔다는 표시 — 기기마다의 사정이다 */
              '_fbpending',
              /* 지금 올리는 중인 시각(탭끼리 보는 표) — 기기마다의 사정이다 */
@@ -20480,6 +20584,14 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              /* 옛 첨부 조각을 IndexedDB 로 옮겼다는 표시 — 기기마다의 사정이다. 클라우드로 오가면
                 새 기기가 「이미 옮겼다」고 보고 영영 안 옮긴다(2026-10-07 검토) */
              '_idb_migrated'];
+/* ★ «합쳐 받는» 목록 — 덮지 않고 번호(id)로 합친다 (대표 제보 2026-10-09 「왜 사진과 도장이 사라졌나」).
+   도장은 2026-08-30 부터 «이 브라우저에만» 두었다 — 그래서 PC·브라우저를 바꾸면 도장이 없었다
+   (대표 크롬 하나에 4개, 다른 브라우저에 1개). 이제 도장 그림은 «본인만 읽는» 창고 자리
+   (kcareer_forms/{uid}/ — 창고 규칙이 본인 외에는 읽기·쓰기를 막는다)에 올리고 목록도 오간다.
+   ⚠ 공개 파일(저장소)에 박지 않는다는 2026-08-30 결정은 그대로다 — 그것이 위험했던 까닭이다.
+   ⚠ 덮어 받으면 도장 1개인 기기가 4개인 기기를 지운다 — 그래서 이 목록만은 «합친다».
+     지운 것은 자리표(_tomb)로 가린다 — 합쳐도 지운 도장이 되살아나지 않는다. */
+var FB_UNION=['stamps'];
 var _fbBase=null, _fbPushT=null, _fbWatching=false;
 /* ★ 「닫기」를 기억한다 — 예전에는 display:none 만 해서 PC 가 저장할 때마다(2.5초)
    곧바로 되살아났다. 대표가 겪은 「자꾸」가 이것이다(2026-09-12).
@@ -20998,6 +21110,14 @@ function fbPush(){ if(!fbUid){ toast('먼저 로그인하세요'); return; } if(
    ⚠ 어느 쪽이든 자리표는 «덮지 않고 합친다» — 덮으면 기억이 날아가 고리가 돌아온다. */
 /* ⚠★ 돌려주는 failed(못 쓴 열쇠)를 «반드시» 볼 것 — 하나라도 있으면 이 기기는 반쯤만 받은 것이다.
      그때 기준 시각(fbSetBase)을 적으면 «맞춰졌다»고 여겨, 다음 저장 때 줄어든 자료가 클라우드로 올라간다(2026-10-07 검토). */
+/* 받은 줄(먼저) + 이 기기에만 있는 줄(지운 것은 빼고) — 같은 번호는 받은 것이 이긴다 */
+function _kcUnionRows(받은, 여기raw, tb, rv){
+  var 여기=[]; try{ 여기=JSON.parse(여기raw||'[]'); }catch(e){ 여기=[]; }
+  if(!Array.isArray(여기)) 여기=[];
+  var 있음={}; (받은||[]).forEach(function(r){ if(r&&r.id!=null) 있음[String(r.id)]=1; });
+  var 더=여기.filter(function(r){ return r && r.id!=null && !있음[String(r.id)] && !tombDead(tb, rv, String(r.id)); });
+  return (받은||[]).concat(더);
+}
 function kcApplyRestore(ls, mode){
   if(!ls) return { dropped:0, freed:0, failed:[] };
   var tb=tombLoad(), rv=tombRevLoad(), dropped=0, freed=0, failed=[], now=Date.now();
@@ -21016,7 +21136,12 @@ function kcApplyRestore(ls, mode){
     var raw=ls[bare];
     try{
       var a=JSON.parse(raw);
-      if(Array.isArray(a) && a.length && a[0] && a[0].id!=null){
+      /* ★ 합쳐 받는 목록(FB_UNION) — 받은 것이 «빈 목록»이어도 이 기기 것을 지우지 않는다 */
+      if(FB_UNION.indexOf(bare)>=0 && mode!=='rollback'){
+        var 받은=(Array.isArray(a)?a:[]).filter(function(r){ return !(r&&r.id!=null&&tombDead(tb, rv, String(r.id))); });
+        raw=JSON.stringify(_kcUnionRows(받은, LS.get(NS+bare), tb, rv));
+      }
+      else if(Array.isArray(a) && a.length && a[0] && a[0].id!=null){
         if(mode==='rollback'){
           a.forEach(function(r){
             var k=r&&r.id!=null?String(r.id):null;
@@ -21128,7 +21253,7 @@ function fbFirstSync(){
   fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
     var v=snap.val();
     if(!v||!v.ls){ fbShowNotice('first'); return; }
-    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP, TOMB_KEY);
+    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP.concat(FB_UNION), TOMB_KEY);
     if(!r.safe){
       fbShowNotice('first');
       var m=document.getElementById('fbNoticeMsg');
@@ -21161,7 +21286,7 @@ function fbNewerSync(){
     if(!v||!v.ls){ fbShowNotice('newer'); return; }
     /* 같은 PC 다른 탭이 방금 올린 것이면 받을 것이 없다 — 새로고침하지 않는다 */
     if(v.at && v.at===fbGetBase()){ _fbNewerTried=false; fbHideNotice(); return; }
-    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP, TOMB_KEY);
+    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP.concat(FB_UNION), TOMB_KEY);
     if(!r.safe){ fbShowNotice('newer'); return; }
     /* 받는 사이에 이 기기에서 고친 것이 생겼으면 덮지 않는다 */
     if(_fbPendingNow()){ fbShowNotice('newer'); return; }

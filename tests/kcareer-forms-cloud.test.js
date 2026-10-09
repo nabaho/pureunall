@@ -178,7 +178,7 @@ test('⑩★ 데려오는 곳은 «한 곳»이 양식·서류를 다 안다 —
     }[k] || [])
   };
   vm.createContext(ctx);
-  vm.runInContext('var KC_DOC_STORES=["resume","profile","certdoc"];', ctx);
+  vm.runInContext('var KC_DOC_STORES=["resume","profile","certdoc"]; var KC_OWN_FILE_STORES=[];', ctx);
   vm.runInContext(cutFn(CODE, 'function _kcCloudRowOf('), ctx);
   const 봐 = (id) => vm.runInContext('JSON.stringify(_kcCloudRowOf(' + JSON.stringify(id) + '))', ctx);
 

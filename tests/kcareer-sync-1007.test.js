@@ -40,7 +40,7 @@ function 기기(이름) {
   vm.runInContext('var _mem={}; var STORAGE_OK=true; var NS="cm3_"; var KV=null;', ctx);
   vm.runInContext(cut('const LS={').replace(/^const /, 'var '), ctx);
   vm.runInContext(bare.match(/var TOMB_KEY='_tomb'[^\n]*/)[0] + bare.match(/var TOMB_REV_KEY='_tombrev';/)[0], ctx);
-  vm.runInContext(bare.match(/var FB_SKIP=\[[\s\S]*?\];/)[0], ctx);
+  vm.runInContext(bare.match(/var FB_SKIP=\[[\s\S]*?\];/)[0] + bare.match(/var FB_UNION=\[[^\]]*\];/)[0], ctx);
   ['function _tombObj(', 'function tombLoad(', 'function tombRevLoad(', 'function tombSave(', 'function tombRevSave(',
    'function tombDead(', 'function tombHas(', 'function tombPrune(', 'function _tombDiff(', 'function kcApplyRestore(',
    'function kcRestoreFailed(', 'function _fbPendingNow(', 'function _fbPendingMark(', 'function _fbPendingClear(']
