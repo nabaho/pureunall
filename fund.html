@@ -10009,7 +10009,7 @@ function formGateOk(){
     if(typeof _trEv==='function') _trEv(ev);   // 🛡 서식 관문에서 «맞음»도 규칙마다 센다
     FG.at=0; closeM();
     S._oneGate=null;
-    if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else if(G.after==='hwpone') _hwpOneDl(0); else _estabBundleHwpGo(G.phase,0);
+    if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else if(G.after==='hwpone') _hwpOneDl(0); else if(G.after==='hwpx') _docToHwpxRun(G.kind,0); else _estabBundleHwpGo(G.phase,0);
   }).catch(function(e){ try{ if(pw) pw.close(); }catch(x){} toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 /* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색(팔레트 #CBD5E1). 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
@@ -10073,8 +10073,14 @@ function _hwpDraftMark(bytes,text){
    이전엔 이 자리에서 표를 «열폭이 모두 같은 격자»로 뭉개고 병합(colspan·rowspan)을
    버렸다 — 별지 서식이 서식으로 보이지 않았던 까닭이다. 지금은 화면에 그려진 표를
    실측해 원본 .hwp 에서 온 열폭 비율·병합을 그대로 쓴다. */
-function docToHwpx(kind){ _docToHwpxRun(kind); }
-function _docToHwpxRun(kind){
+/* [📄 한글(HWPX)] — 화면에서 편집한 HTML 을 한글로. 한 장 인쇄와 같은 관문(대표 「계속 진행」 2026-10-09 — 관문 없던 마지막 출구) */
+function docToHwpx(kind){
+  var G=(typeof _oneGateOf==='function')?_oneGateOf(kind):null; if(!G) return _docToHwpxRun(kind,0);
+  S._gate={fid:G.fid, items:G.items, P:G.P, after:'hwpx', kind:kind};
+  _gateModal(G.items,'받기','_docToHwpxRun(\''+kind+'\','+G.items.length+')');
+}
+/* n — 「초안 · 미확인 n」을 머리말 글상자로(한글 묶음과 같은 _hwpDraftMark). 못 넣으면 받지 않는다 */
+function _docToHwpxRun(kind,n){
   var ed=$('doced'); if(!ed){ toast('문서를 먼저 여세요','warn'); return; }
   if(typeof HWPX==='undefined'||typeof HWPXDOC==='undefined'){
     toast('한글 변환 모듈을 불러오지 못했습니다 — 새로고침 후 다시 시도','err'); return; }
@@ -10083,7 +10089,13 @@ function _docToHwpxRun(kind){
     var doc=HWPXDOC.begin('gov',{pageNum:true});  // 별지 서식 원본 여백(별지 제15호서식 실측) · 모든 쪽 아래 번호(2026-10-09)
     var body=HWPXDOC.fromHtml(ed, doc);
     if(!body){ toast('내보낼 내용이 없습니다','warn'); return; }
-    var name=((f.short_name||f.name||'기금')+'_'+docLabel(kind)+'_'+ymd()+'.hwpx').replace(/[\\/:*?"<>|]/g,'_');
+    var name=((n?'[초안] ':'')+(f.short_name||f.name||'기금')+'_'+docLabel(kind)+'_'+ymd()+'.hwpx').replace(/[\\/:*?"<>|]/g,'_');
+    if(n){
+      _hwpDraftMark(HWPX.build([{body:body, landscape:false, margin:doc.margin}]),'초안 · 미확인 '+n)
+        .then(function(b){ PureunHwp.download(b,name,'hwpx'); toast('「초안」 표시로 한글 파일을 저장했습니다'); })
+        .catch(function(e){ toast('「초안」 표시를 넣지 못해 받지 않았습니다: '+((e&&e.message)||e),'err'); });
+      return;
+    }
     HWPX.download([{body:body, landscape:false, margin:doc.margin}], name);
     toast('한글 파일로 저장했습니다');
   }catch(e){ toast('한글 변환 실패: '+((e&&e.message)||e),'err'); }
