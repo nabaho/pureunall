@@ -19,10 +19,14 @@ const G = require('../js/pu-gov-report.js');
 
 const LS = '<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="1000" textheight="1000" horzsize="40000"/></hp:linesegarray>';
 const EMPTY = '<hp:run charPrIDRef="0"/>';
-const P = (inner) => '<hp:p id="0" paraPrIDRef="0">' + inner + LS + '</hp:p>';
-const RUN = (t) => '<hp:run charPrIDRef="0"><hp:t>' + t + '</hp:t></hp:run>';
-/* 칸 — 글 하나면 한 문단, 배열이면 여러 문단(지난 업체 글이 여러 문단으로 든 칸) */
-const cell = (t) => '<hp:tc><hp:subList>' + (Array.isArray(t) ? t : [t]).map((x) => P(x == null ? EMPTY : RUN(x))).join('') + '</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/></hp:tc>';
+const P = (inner, pp) => '<hp:p id="0" paraPrIDRef="' + (pp || 0) + '">' + inner + LS + '</hp:p>';
+const RUN = (t, cp) => '<hp:run charPrIDRef="' + (cp || 0) + '"><hp:t>' + t + '</hp:t></hp:run>';
+/* 칸 — 글 하나면 한 문단, 배열이면 여러 문단(지난 업체 글이 여러 문단으로 든 칸).
+   문단 모양·글자 모양을 흉내 낼 때는 {t, pp, cp} (pp = paraPrIDRef, cp = charPrIDRef) */
+const cell = (t) => '<hp:tc><hp:subList>' + (Array.isArray(t) ? t : [t]).map((x) => {
+  const o = (x && typeof x === 'object') ? x : { t: x };
+  return P(o.t == null ? '<hp:run charPrIDRef="' + (o.cp || 0) + '"/>' : RUN(o.t, o.cp), o.pp);
+}).join('') + '</hp:subList><hp:cellAddr colAddr="0" rowAddr="0"/></hp:tc>';
 const tbl = (...ts) => P('<hp:run><hp:tbl><hp:tr>' + ts.map(cell).join('') + '</hp:tr></hp:tbl></hp:run>');
 const SEC = (...ps) => '<hs:sec>' + ps.join('') + '</hs:sec>';
 
@@ -164,9 +168,11 @@ const PICRUN = (t) => '<hp:run charPrIDRef="0">' + PIC + '<hp:t>' + t + '</hp:t>
 /* 서산 업체 방문 확인서 — 첫 장 P0~P8(T0~T2) · 둘째 장 P9~P16(T3·T4) */
 function seosanVisitXml() {
   const 머리 = (pb) => tblQ(pb, '업 체 명', '다라상사 ', '방 문 일', '2024.05.10', '방문회차', '1회차');
+  /* 문의(C4)·자문(C8) 칸은 원본처럼 «자동 번호» 문단 모양(29·30), 진단(C6)은 번호 없는 모양(23) */
+  const pp = (n, ts) => ts.map((t) => ({ t, pp: n }));
   const 내용 = (old) => tblQ(0, '내 용', '상 담 분 야', '인사 노무관련', ['업  체', '문 의 내 용 /', '애 로 사 항'],
-    old ? ['지난 문의 하나', '지난 문의 둘 010-0000-0000'] : null, ['전 문 가', '진 단 의 견'],
-    old ? ['지난 진단 하나', '지난 진단 둘'] : null, '상담 / 자문내용', old ? ['지난 자문 하나', '지난 자문 둘', '지난 자문 셋'] : null);
+    old ? pp(29, ['지난 문의 하나', '지난 문의 둘 010-0000-0000']) : null, ['전 문 가', '진 단 의 견'],
+    old ? pp(23, ['지난 진단 하나', '지난 진단 둘']) : null, '상담 / 자문내용', old ? pp(30, ['지난 자문 하나', '지난 자문 둘', '지난 자문 셋']) : null);
   const 끝 = () => [Q(RUN('  위와 같이 방문하였음을 확인합니다.')), Q(EMPTY),
     Q(RUN('                                 업체담당자:                   (서명)')), Q(EMPTY),
     Q(PICRUN('                                 경영상담역:    김 지 난      (서명)')), Q(RUN('서산상공회의소 귀중'))];
@@ -179,10 +185,11 @@ function seosanReportXml() {
     tblQ(0, '상담일시', '2024.05.10', '상담업체', '㈜다라상사', '사업자등록번호', '999-99-99999 ', '업종', '제조/지난업종',
       '소재지', '충남 서산시 지난로 1', '근로자수', '35', '근무형태', '교대근무'),
     tblQ(0, '부서', '지난부서', '직위', '지난직위', '성명', '김지난', '연락처', '010-0000-0000', '팩스', '010-0000-0001', '이메일', 'old@example.com'),
-    tblQ(0, '요청사항 및 진단내용', ['지난 요청 하나', '지난 요청 둘', '지난 요청 셋']),
+    tblQ(0, '요청사항 및 진단내용', [26, 26, 26].map((pp, i) => ({ t: '지난 요청 ' + '하둘셋'[i], pp }))),
     Q(RUN(' ')), Q(RUN('2024년   05월   10일')), Q(EMPTY), Q(PICRUN('')), Q(RUN('                                 경영상담역: 김 지 난  (서명)')),
     Q(EMPTY), Q(EMPTY), Q(RUN('서산상공회의소 귀중')),
-    tblQ(1, '상담 및 자문결과', ['지난 결과 하나', '지난 결과 둘', null, null, null]));
+    /* 결과 칸 — 글 든 문단은 «자동 번호» 모양(27), 뒤 빈 문단(P2~)은 번호 없는 모양(23) */
+    tblQ(1, '상담 및 자문결과', [{ t: '지난 결과 하나', pp: 27 }, { t: '지난 결과 둘', pp: 27 }].concat([2, 3, 4, 5, 6, 7, 8].map(() => ({ t: null, pp: 23 })))));
 }
 /* 기술보호 별지11 — T0~T8 · P0~P18 (P15 1일차 일지 · P16 교육 일지 · P17 참석자 명단 · P18 ○일차 일지) */
 const TECH_FIELD = ' 지원분야 (□ 사전예방, □ 스타트업) / 전문가(□ 변호사 □ 변리사 ■ 노무사)';
@@ -190,11 +197,13 @@ function techXml() {
   const 날짜 = '   년      월      일', 안내 = '위에서 파악한 문제점에 대한 구체적 자문 내용 명시';
   return SEC(
     Q(EMPTY), tblQ(0, '별지 11', null, ' 자문서식 (법률)'), Q(EMPTY), tblQ(0, '‘통합 기술보호지원반’법률 자문 완료보고서'),
+    /* 안내 글자 모양: 파란 기울임 47·43 · 파랑 55 — 첫 지원일자 칸만 43, 나머지 6칸은 45 · 값 글자 모양 기준은 T8.C4(4) */
     tblQ(0, '1. 지원정보', '상담구분', TECH_FIELD, '기 업 명', '다라상사', '지원일자',
-      '(1차)', '(2차)', '(3차)', '(4차)', '(5차)', '(6차)', '(7차)', '1/1(월) ', null, null, null, null, null, null),
-    tblQ(0, '2. 자문내용', [null, null, '신청기업 자문 희망 내용에 따른 구체적 자문 내용 기술', null, null]),
+      '(1차)', '(2차)', '(3차)', '(4차)', '(5차)', '(6차)', '(7차)', { t: '1/1(월) ', cp: 43 },
+      { cp: 45 }, { cp: 45 }, { cp: 45 }, { cp: 45 }, { cp: 45 }, { cp: 45 }),
+    tblQ(0, '2. 자문내용', [{ cp: 47 }, { cp: 47 }, { t: '신청기업 자문 희망 내용에 따른 구체적 자문 내용 기술', cp: 47 }, { cp: 47 }, { cp: 47 }]),
     Q(EMPTY),
-    tblQ(0, '3. 총 평', [null, null, null, '기업 소개 작성 불필요', '자문내용만 작성(지원 성과 등 구체적 기술)', null]),
+    tblQ(0, '3. 총 평', [{ cp: 43 }, { cp: 43 }, { cp: 43 }, { t: '기업 소개 작성 불필요', cp: 43 }, { t: '자문내용만 작성(지원 성과 등 구체적 기술)', cp: 43 }, { cp: 43 }]),
     Q(RUN('상기 내용과 같이 통합 기술보호지원반 사업 완료보고서를 제출합니다.')), Q(EMPTY),
     Q(RUN('                              신청기업  대 표 자 :              (서명/인)')),
     Q(PICRUN('                                   “    담 당 자 :              (서명/인)')),
@@ -203,8 +212,8 @@ function techXml() {
     tblQ(1, '법률 자문 일지 (1일차)', '자문일', 날짜, null, null, '문제점·개선사항', null, '자문 내용', 안내),
     tblQ(1, '법률 교육 수행 일지 (○일차)', '강 의 일 자', null, '강 의 장 소', null),
     tblQ(1, '법률 교육 참석자 명단', '연번', '직  책', '이  름', '서  명'),
-    tblQ(1, '            법률 자문 일지 (○일차) * 지원일수 만큼 작성', '자문일', 날짜, null, null, '문제점·개선사항',
-      '3일간 기업 방문 시 파악한 문제점·개선필요사항 등 명시', '자문 내용', 안내, '지원 성과', null, '향후 계획', null));
+    tblQ(1, '            법률 자문 일지 (○일차) * 지원일수 만큼 작성', '자문일', 날짜, null, { cp: 4, pp: 4 }, '문제점·개선사항',
+      { t: '3일간 기업 방문 시 파악한 문제점·개선필요사항 등 명시', cp: 47 }, '자문 내용', { t: 안내, cp: 47 }, '지원 성과', { cp: 55 }, '향후 계획', { cp: 55 }));
 }
 
 /* 서산·기술보호용 자료 — 회차는 일부러 날짜 순이 아니게 넣는다(쓸 때 날짜 순으로 정렬돼야 한다) */
@@ -372,4 +381,63 @@ test('지도 — 서산·기술보호 주소가 합성 양식에 실제로 있�
   });
   assert.deepEqual(G.FORMS['cci-seosan'].rounds, { min: 1, max: 10 });
   assert.deepEqual(G.FORMS.techguard.rounds, { min: 1, max: 7 });
+});
+
+/* ── 모양 빌리기(like) — 2026-10-09 한글로 열어 보니 ──
+ *   서산 칸 첫 문단이 «자동 번호» 모양이라 값 앞에 「1.」 이 붙고 베낀 장마다 「2.」「3.」 으로 이어졌다.
+ *   기술보호 안내 칸의 파란 기울임이 값에 묻었고, 첫 지원일자 칸만 글자 모양이 달랐다.
+ *   → 값 칸의 문단 모양·글자 모양을 «같은 문서의 기준 칸» 것으로 바꾼다(속성만 — 주소는 그대로). */
+const ppAt = (xml, a) => /paraPrIDRef="(\d+)"/.exec(rawAt(xml, a))[1];
+const cpsAt = (xml, a) => (rawAt(xml, a).match(/charPrIDRef="(\d+)"/g) || []).map((m) => m.slice(13, -1));
+
+test('모양 빌리기 — 서산 칸은 번호 없는 문단 모양(23)으로, 베낀 장에도 번호 모양이 안 남는다', () => {
+  const r = G.fillForm(seosanVisitXml(), 'cci-seosan', 'visit', report2(3));
+  for (let k = 0; k < 3; k++) {
+    const t = 'T' + (3 * k + 2);
+    assert.equal(ppAt(r.xml, t + '.C4.P0'), '23', t + '.C4');
+    assert.equal(ppAt(r.xml, t + '.C8.P0'), '23', t + '.C8');
+    assert.equal(ppAt(r.xml, t + '.C6.P0'), '23', t + '.C6');
+  }
+  assert.doesNotMatch(r.xml, /paraPrIDRef="(29|30)"/, '자동 번호 모양이 남으면 「1.」「2.」 가 붙는다');
+  const rr = G.fillForm(seosanReportXml(), 'cci-seosan', 'report', report2(3));
+  assert.equal(ppAt(rr.xml, 'T3.C1.P0'), '23');
+  assert.equal(ppAt(rr.xml, 'T4.C1.P0'), '23');
+  assert.doesNotMatch(rr.xml, /paraPrIDRef="(26|27)"/);
+  assert.deepEqual(rr.missing, []);
+});
+
+test('모양 빌리기 — 기술보호 값 칸은 안내 글자 모양(파란 기울임)을 버리고 기준 칸(4) 모양, 첫 지원일자 칸은 둘째 칸과 같게', () => {
+  const r = G.fillForm(techXml(), 'techguard', 'main', report2(7));
+  for (let t = 5; t <= 11; t++) ['C6', 'C8', 'C10', 'C12'].forEach((c) => {
+    const a = 'T' + t + '.' + c + '.P0';
+    assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['4'], a);
+    assert.equal(ppAt(r.xml, a), '4', a);
+  });
+  assert.deepEqual([...new Set(cpsAt(r.xml, 'T3.C1.P0'))], ['4']);
+  assert.deepEqual([...new Set(cpsAt(r.xml, 'T4.C1.P0'))], ['4']);
+  assert.doesNotMatch(r.xml, /charPrIDRef="(47|55|43)"/, '안내 글자 모양이 값에 남으면 안 된다');
+  assert.deepEqual(cpsAt(r.xml, 'T2.C13.P0'), ['45']);
+  assert.deepEqual(r.missing, []);
+});
+
+test('모양 빌리기 — like 없는 칸은 그대로(북부 결과 불변) · 기준 칸이 없으면 지어내지 않고 missing 으로 알린다', () => {
+  const plain = G.fillForm(northXml(), 'cci-north', 'main', report());
+  assert.deepEqual(plain.missing, []);
+  /* 결과보고서의 결과 칸이 해마다 짧아져 기준 문단(T4.C1.P7)이 없는 경우 */
+  const short = seosanReportXml().replace(/(<hp:p [^>]*paraPrIDRef="23">(?:(?!<\/hp:p>)[\s\S])*<\/hp:p>)+(?=<\/hp:subList>)/, '');
+  const r = G.fillForm(short, 'cci-seosan', 'report', report2(3));
+  assert.ok(r.missing.includes('like T4.C1.P7'), JSON.stringify(r.missing));
+  assert.equal(ppAt(r.xml, 'T4.C1.P0'), '27', '기준이 없으면 모양은 원본 그대로(추측하지 않는다)');
+  assert.equal(textAt(r.xml, 'T4.C1.P0').indexOf('자문 결과 첫줄'), 0, '값은 그대로 채운다');
+});
+
+test('missing — 해마다 바뀐 양식에서 지도 칸이 없으면 조용히 버리지 않고 알린다', () => {
+  /* 기술보호 서식에서 일지 장(P18·T8)이 빠진 해 */
+  const noJournal = techXml().replace(/<hp:p [^>]*pageBreak="1"><hp:run><hp:tbl><hp:tr><hp:tc><hp:subList><hp:p id="0" paraPrIDRef="0"><hp:run charPrIDRef="0"><hp:t> {12}법률 자문 일지[\s\S]*<\/hs:sec>$/, '</hs:sec>');
+  assert.ok(!noJournal.includes('지원일수 만큼'), '검사 준비: 일지 장이 빠져야 한다');
+  const r = G.fillForm(noJournal, 'techguard', 'main', report2(2));
+  ['T8.C0.P0', 'T8.C2.P0', 'T8.C6.', 'T8.C12.'].forEach((a) => assert.ok(r.missing.includes(a), a + ' — ' + JSON.stringify(r.missing)));
+  assert.ok(r.missing.includes('like T8.C4.P0'));
+  assert.ok(!r.missing.includes('T2.C4.P0'), '있는 칸은 missing 이 아니다');
+  assert.deepEqual(G.fillForm(seosanVisitXml(), 'cci-seosan', 'visit', report2(3)).missing, []);
 });

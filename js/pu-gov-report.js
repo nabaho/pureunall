@@ -67,6 +67,7 @@
        gap   — 원문의 «이름표: (빈칸) (서명/날인)» 빈칸 자리에만 값을 넣는다(서명 줄 — 빈칸 길이는 해마다 다르다).
                빈칸 자리에 지난 사람 이름이 들어 있으면 그것도 지운다(서산 2024 원본)
        check — {이름표: 값이름} 원문의 «□ 이름표» 체크만 값대로 ■/□ (값이 null 이면 그 칸은 원문 그대로)
+       like  — 문단 모양·글자 모양을 이 주소(같은 문서) 것으로 — 번호 문단·안내 글자 모양을 값에 안 묻힌다(cell 이면 표지 받는 문단)
        post  — 표지 뒤에 붙일 글(반복 묶음 끝 표시 {{/쪽:회차}})
      {cell:'T2.C4.', tok}  그 칸의 첫 문단에 표지, 나머지 문단은 지운다 — 지난 업체 글이 여러 문단으로 든 칸.
                            칸 문단 수는 해마다 달라서 그때 문서를 scan 해서 정한다
@@ -122,9 +123,9 @@
             { at: 'T1.C3.P0', tok: '방문일' },
             { at: 'T1.C5.P0', tok: '회차명' },
             { cell: 'T2.C2.', tok: '상담분야' },
-            { cell: 'T2.C4.', tok: '문의' },
+            { cell: 'T2.C4.', tok: '문의', like: 'T2.C6.P0' },
             { cell: 'T2.C6.', tok: '진단' },
-            { cell: 'T2.C8.', tok: '자문' },
+            { cell: 'T2.C8.', tok: '자문', like: 'T2.C6.P0' },
             { at: 'P5', tok: '업체담당자줄', gap: true },
             { at: 'P7', tok: '상담역줄', gap: true },
             { at: 'P8', raw: '{{원문}}{{/쪽:회차}}' },
@@ -148,10 +149,10 @@
             { at: 'T2.C7.P0', tok: '연락처' },
             { at: 'T2.C9.P0', tok: '팩스' },
             { at: 'T2.C11.P0', tok: '이메일' },
-            { cell: 'T3.C1.', tok: '요청진단' },
+            { cell: 'T3.C1.', tok: '요청진단', like: 'T4.C1.P7' },
             { at: 'P5', tok: '작성일' },
             { at: 'P8', tok: '상담역줄', gap: true },
-            { cell: 'T4.C1.', tok: '자문결과' },
+            { cell: 'T4.C1.', tok: '자문결과', like: 'T4.C1.P7' },
           ],
         },
       },
@@ -168,21 +169,21 @@
           set: [
             { at: 'T2.C2.P0', tok: '지원분야', check: { '사전예방': '분야_사전예방', '스타트업': '분야_스타트업' } },
             { at: 'T2.C4.P0', tok: '업체명' },
-            { at: 'T2.C13.P0', tok: '지원일1' }, { at: 'T2.C14.P0', tok: '지원일2' }, { at: 'T2.C15.P0', tok: '지원일3' },
+            { at: 'T2.C13.P0', tok: '지원일1', like: 'T2.C14.P0' }, { at: 'T2.C14.P0', tok: '지원일2' }, { at: 'T2.C15.P0', tok: '지원일3' },
             { at: 'T2.C16.P0', tok: '지원일4' }, { at: 'T2.C17.P0', tok: '지원일5' }, { at: 'T2.C18.P0', tok: '지원일6' },
             { at: 'T2.C19.P0', tok: '지원일7' },
-            { cell: 'T3.C1.', tok: '자문내용' },
-            { cell: 'T4.C1.', tok: '총평' },
+            { cell: 'T3.C1.', tok: '자문내용', like: 'T8.C4.P0' },
+            { cell: 'T4.C1.', tok: '총평', like: 'T8.C4.P0' },
             { at: 'P10', tok: '대표자서명줄', gap: true },
             { at: 'P11', tok: '담당자서명줄', gap: true },
             { at: 'P12', tok: '상담역줄', gap: true },
             { drop: 'P15' }, { drop: 'P16' }, { drop: 'P17' },
             { at: 'T8.C0.P0', raw: '{{#쪽:회차}}법률 자문 일지 ({{번호}}일차)' },
             { at: 'T8.C2.P0', tok: '자문일' },
-            { cell: 'T8.C6.', tok: '문제점' },
-            { cell: 'T8.C8.', tok: '자문' },
-            { cell: 'T8.C10.', tok: '성과' },
-            { cell: 'T8.C12.', tok: '향후', post: '{{/쪽:회차}}' },
+            { cell: 'T8.C6.', tok: '문제점', like: 'T8.C4.P0' },
+            { cell: 'T8.C8.', tok: '자문', like: 'T8.C4.P0' },
+            { cell: 'T8.C10.', tok: '성과', like: 'T8.C4.P0' },
+            { cell: 'T8.C12.', tok: '향후', like: 'T8.C4.P0', post: '{{/쪽:회차}}' },
           ],
         },
       },
@@ -267,29 +268,62 @@
   function tokenize(xml, formKey, fileKey) {
     return tokenizeWith(xml, formKey, fileKey).xml;
   }
+  /* 모양 빌리기(like) — 값 칸의 문단 모양·글자 모양을 같은 문서의 «기준 칸» 것으로 바꾼다.
+     서산 칸 첫 문단은 «자동 번호» 모양이라 값 앞에 「1.」 이 붙고 베낀 장마다 「2.」「3.」 으로 이어졌고,
+     기술보호 안내 칸의 파란 기울임이 값에 묻었다(2026-10-09 한글로 열어 봄). 속성만 바꾸므로 주소는 그대로다.
+     기준 칸이 문서에 없으면 짐작하지 않는다 — 모양은 원본 그대로 두고 missing 으로 알린다. */
+  function styleOf(xml, p) {
+    var body = xml.slice(p.start, p.end);
+    var pp = /^<hp:p\b[^>]*?\bparaPrIDRef="(\d+)"/.exec(body), cp = /<hp:run\b[^>]*?\bcharPrIDRef="(\d+)"/.exec(body);
+    return pp && cp ? { pp: pp[1], cp: cp[1] } : null;
+  }
+  function restyle(xml, targets) {             // targets: [{p, st}] — 뒤에서부터 바꿔야 앞 자리가 안 밀린다
+    targets.sort(function (a, b) { return b.p.start - a.p.start; });
+    targets.forEach(function (g) {
+      var body = xml.slice(g.p.start, g.p.end)
+        .replace(/^(<hp:p\b[^>]*?\bparaPrIDRef=")\d+"/, '$1' + g.st.pp + '"')
+        .replace(/(\bcharPrIDRef=")\d+"/g, '$1' + g.st.cp + '"');
+      xml = xml.slice(0, g.p.start) + body + xml.slice(g.p.end);
+    });
+    return xml;
+  }
   function tokenizeWith(xml, formKey, fileKey) {
-    var f = FORMS[formKey].files[fileKey], rules = [], orig = {};
+    var f = FORMS[formKey].files[fileKey], rules = [], owner = [], orig = {}, styles = [], missing = [];
     xml = stripPictures(xml);
-    var ps = F.scan(xml), byAddr = {};
-    ps.forEach(function (p) { byAddr[p.addr] = p.text; });
-    (f.set || []).forEach(function (r) {
-      if (r.drop) { rules.push({ at: r.drop, drop: true }); return; }
+    var ps = F.scan(xml), byAddr = {}, pBy = {};
+    ps.forEach(function (p) { byAddr[p.addr] = p.text; pBy[p.addr] = p; });
+    var label = function (r) { return r.drop || r.cell || r.at; };
+    (f.set || []).forEach(function (r, ri) {
+      if (r.drop) { rules.push({ at: r.drop, drop: true }); owner.push(ri); return; }
       var at = r.at;
       if (r.cell) {
         var inCell = ps.filter(function (p) { return p.addr.indexOf(r.cell) === 0 && /^P\d+$/.test(p.addr.slice(r.cell.length)); });
         at = inCell.length ? inCell[0].addr : r.cell + 'P0';
-        inCell.slice(1).forEach(function (p) { rules.push({ at: p.addr, drop: true }); });
+        inCell.slice(1).forEach(function (p) { rules.push({ at: p.addr, drop: true }); owner.push(-1); });
+      }
+      if (r.like) {
+        var ref = pBy[r.like] && styleOf(xml, pBy[r.like]);
+        if (!ref) { if (missing.indexOf('like ' + r.like) < 0) missing.push('like ' + r.like); }
+        else if (pBy[at]) styles.push({ p: pBy[at], st: ref });
       }
       var o = byAddr[at] != null ? byAddr[at] : '';
       if (r.tok) orig[r.tok] = o;
       var body = r.raw != null ? r.raw.split('{{원문}}').join(o) : '{{' + r.tok + '}}' + (r.post || '');
-      rules.push({ at: at, set: body });
+      rules.push({ at: at, set: body }); owner.push(ri);
     });
-    (f.find || []).forEach(function (r) { rules.push({ at: r.at, find: r.find, to: '{{' + r.tok + '}}' }); });
-    return { xml: F.replaceText(xml, rules, { lines: 'keep1' }).xml, orig: orig };
+    (f.find || []).forEach(function (r) { rules.push({ at: r.at, find: r.find, to: '{{' + r.tok + '}}' }); owner.push(-1); });
+    if (styles.length) xml = restyle(xml, styles);
+    var res = F.replaceText(xml, rules, { lines: 'keep1' });
+    /* 지도 칸이 문서에 없으면(해마다 바뀐 양식) 값이 조용히 빠진다 — 알린다 */
+    var hit = {};
+    res.hits.forEach(function (n, j) { if (owner[j] >= 0) hit[owner[j]] = (hit[owner[j]] || 0) + n; });
+    (f.set || []).forEach(function (r, ri) { if (!hit[ri]) missing.push(label(r)); });
+    (f.find || []).forEach(function (r, k) { if (!res.hits[rules.length - (f.find.length - k)]) missing.push(r.at + ' find ' + r.find); });
+    return { xml: res.xml, orig: orig, missing: missing };
   }
 
-  /* 채우기 — 돌려주는 것: {xml, unknown:[모르는 표지], left:[안 채워진 표지], short:{need,have}|null, over:{max,have}|null} */
+  /* 채우기 — 돌려주는 것: {xml, unknown:[모르는 표지], left:[안 채워진 표지], short:{need,have}|null, over:{max,have}|null,
+     missing:[문서에 없던 지도 칸 · 'like 주소' = 없던 기준 칸]} */
   function fillForm(xml, formKey, fileKey, report) {
     var form = FORMS[formKey];
     if (!form || !form.files[fileKey]) throw new Error('모르는 양식: ' + formKey + '/' + fileKey);
@@ -309,6 +343,7 @@
       left: left,
       short: (lim.min && have < lim.min) ? { need: lim.min, have: have } : null,
       over: (lim.max && have > lim.max) ? { max: lim.max, have: have } : null,
+      missing: t.missing,
     };
   }
 
