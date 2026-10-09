@@ -112,8 +112,34 @@
     });
   }
 
+  // ② 골라 둘 판 — 근거 차례(신고서 바로 앞 판 → 「최종·신고용」 → 동의서와 같은 메일), 없으면 마지막 판
+  function rounds(data) {
+    data = data || {};
+    var ORDER = [O.R_REPORT, O.R_NAME, O.R_AGREE];
+    var items = O.merge(data.docs, data.human);
+    return O.companyGroups(items, data.rounds).filter(function (g) {
+      return g.rows.length && !g.finalDocId && !g.noFinal;
+    }).map(function (g) {
+      var pre = null;
+      for (var i = 0; i < ORDER.length && !pre; i++) {
+        for (var j = g.rows.length - 1; j >= 0; j--) {
+          if ((g.cand[g.rows[j].item.id] || []).indexOf(ORDER[i]) >= 0) { pre = g.rows[j]; break; }
+        }
+      }
+      if (!pre) pre = g.rows[g.rows.length - 1];
+      var why = (g.cand[pre.item.id] || []).slice();
+      return { roundId: g.roundId, companyId: g.companyId, roundKey: g.roundKey, group: g,
+        pre: pre.item.id, preNo: pre.no, why: why, bulkOk: why.indexOf(O.R_REPORT) >= 0, last: g.last };
+    }).sort(function (a, b) { return (b.bulkOk ? 1 : 0) - (a.bulkOk ? 1 : 0) || b.last - a.last; });
+  }
+  function counts(data, companies) {
+    var gs = groups(data, companies), docs = 0;
+    gs.forEach(function (g) { docs += g.ids.length; });
+    return { groups: gs.length, docs: docs, rounds: rounds(data).length };
+  }
+
   var api = { SELF: SELF, W_ADDR: W_ADDR, W_LEARN: W_LEARN, W_DOM: W_DOM, W_NAME: W_NAME,
-    addrOf: addrOf, isOurs: isOurs, isOpen: isOpen, groups: groups };
+    addrOf: addrOf, isOurs: isOurs, isOpen: isOpen, groups: groups, rounds: rounds, counts: counts };
   if (root) root.PuRulesV2Tidy = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));

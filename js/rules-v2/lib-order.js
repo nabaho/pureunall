@@ -99,6 +99,8 @@
         var fin = rec.finalDocId && r.items.some(function (it) { return it.id === rec.finalDocId; }) ? rec.finalDocId : null;
         out.push({ companyId: co, roundKey: r.roundKey, roundId: rid, items: r.items, rows: versionsOf(r),
           cand: finalCandOf(r), finalDocId: fin, finalBy: fin ? rec.finalBy : '', finalAt: fin ? rec.finalAt : 0,
+          // 「최종본 없음」(중간에 멈춘 회차) — 최종본이 정해져 있으면 무시한다 (설계 §10-2)
+          noFinal: !fin && rec.noFinal === true,
           hasReport: r.items.some(function (it) { return it.kind === '신고서'; }),
           last: r.items[r.items.length - 1].date });
       });

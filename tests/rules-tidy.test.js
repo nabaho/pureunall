@@ -97,3 +97,64 @@ test('차례 — 층 → 서류 많은 묶음 → 최근', () => {
   const keys = T.groups(data, CO).map((x) => x.key);
   assert.deepEqual(keys, ['a:a@ganasangsa.co.kr', 'a:big@naver.com', 'a:small@naver.com', 'a:none@naver.com']);
 });
+
+/* ── ② 회차 ── */
+const RD = (id, o) => doc(id, Object.assign({ dir: '보냄' }, o));
+const L1 = { a: LINK('c1'), b: LINK('c1'), c: LINK('c1'), r: LINK('c1') };
+
+test('회차 — 신고서 바로 앞 판을 골라 두고 일괄 가능', () => {
+  const data = pack([RD('a', { d: 0, dir: '받음' }), RD('b', { d: 2 }), RD('c', { d: 4, name: 'c(최종).hwp' }),
+    RD('r', { d: 6, mk: 'mr', doc: { kind: '신고서' } })], L1);
+  const r = T.rounds(data)[0];
+  assert.equal(r.pre, 'c'); assert.ok(r.why.includes(global.PuRulesV2Order.R_REPORT)); assert.equal(r.bulkOk, true);
+});
+
+test('회차 — 근거가 없으면 마지막 판, 일괄은 아니다', () => {
+  const data = pack([RD('a', { d: 0, dir: '받음' }), RD('b', { d: 2 })], { a: LINK('c1'), b: LINK('c1') });
+  const r = T.rounds(data)[0];
+  assert.equal(r.pre, 'b'); assert.deepEqual(r.why, []); assert.equal(r.bulkOk, false);
+});
+
+test('회차 — 최종본이 있거나 「최종본 없음」으로 닫은 회차는 빠진다', () => {
+  const docs = [RD('a', { d: 0 }), RD('b', { d: 2 })];
+  const H = { a: LINK('c1'), b: LINK('c1') };
+  const items = global.PuRulesV2Order.merge(pack(docs).docs, H);
+  const rk = global.PuRulesV2Order.companyGroups(items, {})[0].roundKey;
+  const rid = 'c1_' + rk;
+  assert.equal(T.rounds(pack(docs, H, { [rid]: { finalDocId: 'b' } })).length, 0);
+  assert.equal(T.rounds(pack(docs, H, { [rid]: { noFinal: true } })).length, 0);
+  assert.equal(T.rounds(pack(docs, H, { [rid]: { noFinal: false } })).length, 1);
+});
+
+test('lib-order — 최종본이 있으면 noFinal 은 무시한다', () => {
+  const docs = [RD('a', { d: 0 })];
+  const items = global.PuRulesV2Order.merge(pack(docs).docs, { a: LINK('c1') });
+  const rk = global.PuRulesV2Order.companyGroups(items, {})[0].roundKey;
+  const g1 = global.PuRulesV2Order.companyGroups(items, { ['c1_' + rk]: { noFinal: true } })[0];
+  assert.equal(g1.noFinal, true);
+  const g2 = global.PuRulesV2Order.companyGroups(items, { ['c1_' + rk]: { noFinal: true, finalDocId: 'a' } })[0];
+  assert.equal(g2.noFinal, false);
+});
+
+test('셈 — 남은 묶음·서류·회차', () => {
+  const data = pack([doc('x', { from: 'kim@naver.com' }), RD('a', { d: 0 })], { a: LINK('c1') });
+  const n = T.counts(data, CO);
+  assert.equal(n.groups, 1); assert.equal(n.docs, 1); assert.equal(n.rounds, 1);
+});
+
+/* ── 일괄·도메인 규칙 (R2) — 이미 있는 규칙을 못 박는 검사 ── */
+test('일괄 — 주소 후보가 없는 서류가 하나라도 있으면 일괄 불가', () => {
+  const cand = [{ companyId: 'c1', why: '주소' }];
+  const data = pack([doc('a', { from: 'hong@ganasangsa.co.kr', cand }), doc('b', { from: 'hong@ganasangsa.co.kr', mk: 'm2' })]);
+  const x = T.groups(data, CO)[0];
+  assert.equal(x.pre, 'c1'); assert.equal(x.tier, 1); assert.equal(x.bulkOk, false);
+});
+
+test('도메인만 — 층 3, 골라 두지 않고, 이름 단서보다 앞에 놓인다', () => {
+  const data = pack([doc('x', { from: 'x@dara.kr', subj: '가나상사 자료', cand: [{ companyId: 'c2', why: '도메인' }] })]);
+  const x = T.groups(data, CO)[0];
+  assert.equal(x.tier, 3); assert.equal(x.pre, '');
+  assert.equal(x.cands[0].companyId, 'c2'); assert.ok(x.cands[0].whys.includes(T.W_DOM));
+  const i1 = x.cands.findIndex((c) => c.companyId === 'c1');
+  assert.ok(i1 > 0 && x.cands[i1].whys.includes(T.W_NAME));
+});
