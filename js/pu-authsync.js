@@ -54,6 +54,15 @@
   var kicked = false;
   var handlers = [];
   var started = false;
+  var seenUid = '';        // 이 탭이 마지막으로 본 «사람» — 로그아웃으로 밀려날 때 돌아올 표에 적는다
+
+  /* ── 다시 로그인하면 «하던 앱으로» 돌아오는 표 (대표 결정 2026-10-09 「4」) ──
+     로그아웃하면 열린 앱 탭이 모두 포털 로그인 화면으로 밀려나, 앱 다섯 개면 로그인 탭 다섯 개가 남았다.
+     다시 로그인해도 그 탭들은 포털로 쌓였고, 숨어 있다 앞으로 나올 때 로그인 화면이 번쩍였다.
+     그래서 밀려날 때 «이 탭이 보던 주소·창 이름·사람»을 적어 두고, 포털(enter.html)이 같은 사람의
+     로그인을 보면 그 주소로 되돌린다. ⚠ sessionStorage — 이 탭에만 남는다(다른 탭·기기와 안 섞인다).
+     ⚠ 열쇠 이름·모양은 enter.html 의 RETURN_KEY 와 «짝»이다 — 한쪽만 바꾸면 조용히 안 돌아온다. */
+  var RETURN_KEY = 'pu_return_app';
 
   function lsGet(k) { try { return localStorage.getItem(k) || ''; } catch (e) { return ''; } }
   function lsSet(k, v) { try { if (v) localStorage.setItem(k, v); else localStorage.removeItem(k); } catch (e) { } }
@@ -93,9 +102,10 @@
   }
   /* 이 탭의 파이어베이스도 끊고 나간다 — 메모리에 남은 사용자가 토큰을 계속 새로 받지 않게 */
   function forceOut() {
+    var who = curUid() || seenUid;      // 끊기 «전»에 누구였는지 잡아 둔다
     try { if (global.PuLogoutWhy) global.PuLogoutWhy.why('다른 창 로그아웃을 따라 나감'); } catch (e) { }
     try { var a = global.firebase && global.firebase.auth && global.firebase.auth(); if (a && a.signOut) a.signOut(); } catch (e) { }
-    return kick('signedout');
+    return kick('signedout', who);
   }
   function onWake() {
     if (kicked) return;
@@ -103,10 +113,22 @@
   }
 
   /* 끊는다. 두 번 부르지 않는다 — 여러 신호가 겹쳐 와도 화면이 한 번만 넘어가게. */
-  function kick(why) {
+  function kick(why, uid) {
     if (kicked) return false;
     kicked = true;
     wipeLocalSession();
+    /* 로그아웃(«같은 사람»이 다시 들어올 수 있는 경우)만 적는다 — 다른 사람으로 바뀐 것은 안 적는다 */
+    if (why === 'signedout') {
+      try {
+        var from = String((global.location && global.location.href) || '');
+        var who = String(uid || seenUid || '');
+        if (from && who) {
+          global.sessionStorage.setItem(RETURN_KEY, JSON.stringify({
+            from: from, name: String(global.name || ''), uid: who, at: Date.now()
+          }));
+        }
+      } catch (e) { }
+    }
     handlers.forEach(function (fn) { try { fn(why); } catch (e) { } });
     /* 「남의 이름이 떠 있는 화면」을 한 순간도 보이지 않게 덮는다 */
     try {
@@ -135,6 +157,7 @@
     if (now) {
       // 다른 사람으로 바뀌었다 — 이 화면은 앞사람 것이다
       if (was && was !== now) { kick('switched'); return; }
+      seenUid = now;
       lastAuthAt = Date.now();
       lsSet(KEY, now);
       return;
@@ -145,7 +168,7 @@
     setTimeout(function () {
       if (curUid()) return;              // 그새 돌아왔다 — 부팅 중이었다
       lsSet(KEY, '');
-      if (was) kick('signedout');        // 로그인해 있던 화면이었다면 끊는다
+      if (was) kick('signedout', seenUid || was);   // 로그인해 있던 화면이었다면 끊는다
     }, GRACE_MS);
   }
 
