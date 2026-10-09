@@ -57,20 +57,41 @@ test('일곱 갈래 — 하나라도 어긋나면 확인 상자', () => {
   assert.deepEqual(V([R('g', '1001', 220000)], ctx({ skip: { g: true } })), ['skip'], '되돌린 줄은 다시 안 넣는다');
 });
 
-test('이미 넣은 줄(cmsKey)은 done, 받을 달에 입금이 있으면 dup_month', () => {
+test('이미 넣은 줄(cmsKey)은 done, 출금월에 받은 자문료가 있으면 dup_month', () => {
   const inc = [{ id: 'i1', companyId: 'co-1', kind: '자문료', amount: 220000, date: '2026-09-10', advisoryYm: '2026-09' }];
+  // (a) 이미 넣은 줄
   assert.deepEqual(V([R('h', '1001', 220000)], ctx({ incomes: inc.concat([{ id: 'i2', cmsKey: 'h', companyId: 'co-1', amount: 220000 }]) })), ['done']);
+  // (b) 은행으로 10월분을 이미 받았다 — 10/10 출금은 중복
+  const bank10 = [{ id: 'i6', companyId: 'co-1', kind: '자문료', amount: 220000, date: '2026-10-02', advisoryYm: '2026-10' }];
+  assert.deepEqual(V([R('b2', '1001', 220000, 'ok', '2026-10-10')], ctx({ incomes: bank10 })), ['dup_month']);
+  // (c) 직전이 10/2 입금(10월)이고 10/31 출금 — 같은 달이라 중복
   const inc2 = inc.concat([{ id: 'i3', companyId: 'co-1', kind: '자문료', amount: 220000, date: '2026-10-02', advisoryYm: '2026-10' }]);
-  assert.deepEqual(V([R('j', '1001', 220000, 'ok', '2026-10-31')], ctx({ incomes: inc2 })).slice(0, 1), ['auto'],
-    '직전이 10월분이면 받을 달은 11월 — 겹치지 않는다');
+  assert.deepEqual(V([R('j', '1001', 220000, 'ok', '2026-10-31')], ctx({ incomes: inc2 })), ['dup_month']);
+  // (d) 말일 선납: 9/30 입금(받을 달 10월)을 10/31 출금 — 출금월이 달라 중복 아님, 받을 달은 11월
+  const early = [{ id: 'i7', companyId: 'co-1', kind: '자문료', amount: 220000, date: '2026-09-30', advisoryYm: '2026-10' }];
+  const d = A.judgeRows([R('d2', '1001', 220000, 'ok', '2026-10-31')], ctx({ incomes: early }))[0];
+  assert.equal(d.verdict, 'auto'); assert.equal(d.ym, '2026-11');
+  // 받을 달 계산 자체 (inc3)
   const inc3 = [{ id: 'i4', companyId: 'co-1', kind: '자문료', amount: 220000, date: '2026-10-02', advisoryYm: '2026-10' },
                 { id: 'i5', companyId: 'co-1', kind: '자문료', amount: 220000, date: '2026-11-01', advisoryYm: '2026-11' }];
   assert.equal(A.nextAdvisoryYm('co-1', inc3, '2026-10-31'), '2026-12');
 });
 
-test('같은 실행 안에서 한 업체 두 줄이면 받을 달이 겹치지 않는다', () => {
+test('같은 실행 안에서 한 업체 두 줄이면 두 번째는 같은 달이라 dup_month', () => {
   const out = A.judgeRows([R('k1', '1001', 220000, 'ok', '2026-10-10'), R('k2', '1001', 220000, 'ok', '2026-10-11')], ctx());
-  assert.equal(out[0].ym === out[1].ym && out[1].verdict === 'auto', false);
+  assert.equal(out[0].verdict, 'auto'); assert.equal(out[0].ym, '2026-10');
+  assert.equal(out[1].verdict, 'dup_month');
+});
+
+test('회원코드가 두 업체에 이어지면 자동 금지 — 이름이 같아도 고르지 않는다', () => {
+  const dupCo = CO.concat([{ id: 'co-3', name: '가나상사2', status: 'active', monthlyAdvisoryFee: 220000, vatType: 'inclusive', cmsMemberCodes: ['1001'], managerMain: 'A-003' }]);
+  const out = A.judgeRows([R('amb', '1001', 220000)], ctx({ companies: dupCo }));
+  assert.equal(out[0].verdict, 'new_member'); assert.equal(out[0].why, '회원코드가 두 업체에 이어져 있음');
+});
+
+test('삭제된 업체(_deleted)의 회원코드는 잇지 않는다 — new_member', () => {
+  const delCo = CO.map(c => c.id === 'co-1' ? Object.assign({}, c, { _deleted: true }) : c);
+  assert.deepEqual(V([R('del', '1001', 220000)], ctx({ companies: delCo })), ['new_member']);
 });
 
 test('받을 달 — 직전 자문료의 다음 달, 없으면 출금일의 달', () => {

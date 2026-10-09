@@ -85,19 +85,25 @@
     if (amt === fee) return true;
     return co.vatType === 'separate' && amt === Math.round(fee * 1.1);
   }
-  function hasMonth(companyId, incomes, ym) {
+  /* 출금월(wdate 의 달)에 이미 받은 자문료가 있나 — 이번 실행에서 자동으로 정한 것도 포함 */
+  function hasPaidInWdateMonth(companyId, incomes, wdate) {
+    var wm = str(wdate).slice(0, 7);
     return (incomes || []).some(function (x) {
-      return x && !x._deleted && x.companyId === companyId && x.kind === '자문료' && ymOf(x) === ym;
+      return x && !x._deleted && x.companyId === companyId && x.kind === '자문료' && str(x.date).slice(0, 7) === wm;
     });
   }
 
   /* 줄마다 판정 — 순서가 곧 우선순위다(실패 → 되돌림 → 이미 넣음 → 잇기 → 금액 → 마감 → 겹침 → 자동) */
   function judgeRows(rows, ctx) {
     ctx = ctx || {};
-    var byCode = {};
+    var byCode = {}, ambiguous = {};
     (ctx.companies || []).forEach(function (c) {
-      if (!c || !c.id || c.status !== 'active') return;
-      (c.cmsMemberCodes || []).forEach(function (code) { if (code && !byCode[code]) byCode[code] = c; });
+      if (!c || !c.id || c.status !== 'active' || c._deleted === true) return;
+      (c.cmsMemberCodes || []).forEach(function (code) {
+        if (!code) return;
+        if (byCode[code] && byCode[code].id !== c.id) { ambiguous[code] = true; return; }
+        if (!byCode[code]) byCode[code] = c;
+      });
     });
     var done = {};
     (ctx.incomes || []).forEach(function (x) { if (x && !x._deleted && x.cmsKey) done[x.cmsKey] = true; });
@@ -108,15 +114,17 @@
       var it = { row: r, verdict: '', company: null, ym: '', why: '' };
       if (r.status === 'fail') { it.verdict = 'fail'; it.why = r.reason || '출금 실패'; return it; }
       if (r.status !== 'ok') { it.verdict = 'skip'; it.why = '출금 중'; return it; }
+      if (!str(r.wdate)) { it.verdict = 'skip'; it.why = '출금일 없음'; return it; }
       if (skip[r._k]) { it.verdict = 'skip'; it.why = '되돌린 줄'; return it; }
       if (done[r._k]) { it.verdict = 'done'; return it; }
+      if (ambiguous[r.code]) { it.verdict = 'new_member'; it.why = '회원코드가 두 업체에 이어져 있음'; return it; }
       var co = byCode[r.code] || null;
       it.company = co;
       if (!co) { it.verdict = 'new_member'; it.why = '회원코드가 어느 업체에도 이어져 있지 않음'; return it; }
       it.ym = nextAdvisoryYm(co.id, seen, r.wdate);
       if (!feeFits(co, r.amount)) { it.verdict = 'amount'; it.why = '월 자문료 ' + (co.monthlyAdvisoryFee || 0) + '원과 다름'; return it; }
       if (locked(it.ym)) { it.verdict = 'locked'; it.why = it.ym + ' 마감됨'; return it; }
-      if (hasMonth(co.id, seen, it.ym)) { it.verdict = 'dup_month'; it.why = it.ym + ' 입금이 이미 있음'; return it; }
+      if (hasPaidInWdateMonth(co.id, seen, r.wdate)) { it.verdict = 'dup_month'; it.why = str(r.wdate).slice(0, 7) + ' 에 이미 받은 자문료가 있음'; return it; }
       it.verdict = 'auto';
       seen.push({ companyId: co.id, kind: '자문료', advisoryYm: it.ym, date: r.wdate });
       return it;
