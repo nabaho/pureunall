@@ -3150,7 +3150,7 @@ function _trTxnEv(x,fid,names,force){
   if(!x||x.xfer||x.sug==='xfer'||_splitsOf(x).length) return null;
   var dep=(num(x.deposit)||0)>0, d, c, o;
   if(x.sug&&x.sug!=='xfer'&&force==null){ d=x.debit; c=x.credit; o=1; }      // 가져올 때 기계가 고른 그대로 승인
-  else { var p=proposeAcct(x.memo,dep,names||[],x.kind); if(!p||!p.d||!p.c) return null;
+  else { var p=proposeAcct(x.memo,dep,names||[],x.kind,fid); if(!p||!p.d||!p.c) return null;
     d=p.d; c=p.c; o=force!=null?(force?1:0):(p.d===x.debit&&p.c===x.credit?1:0); }
   var amt=(num(x.deposit)||0)+(num(x.withdraw)||0);
   return {rk:_trTxnRk(fid,dep,dep?c:d), o:o, f:fid, r:String(x.date||'')+' '+String(x.memo||'').slice(0,20)+' '+amt.toLocaleString()};
@@ -20542,6 +20542,10 @@ function saveOpening(){
    · '인터넷출금이체'처럼 모든 거래에 붙는 말은 학습하지 않는다(전부 오분류된다).
    · 입금·출금은 성격이 달라 방향별로 따로 기억한다(같은 거래처의 출연 입금 vs 환불 출금).
    · **전 기금 공통**으로 쌓는다 — 한 노무법인이 42개 기금을 보므로 거래처 성격은 기금이 달라도 같다.
+     ★ 다만 «어느 기금에서 확인했는지»를 함께 적는다(funds — 대표 「계속」 2026-10-09, 자동화 확인 목업 6 «기금마다 따로 셈»).
+       이 기금에서 확인한 것은 «배운 것»(learned), 다른 기금에서만 확인한 것은 «다른 기금에서 배움»(learned_other)으로 제안하고
+       🎯 골라 승인의 초록에서 뺀다 — 한 기금에서 잘못 배운 것이 다른 기금 장부로 한꺼번에 번지지 않게.
+       같은 계정으로 다시 승인하면 그 기금이 funds 에 더해지고, 다른 계정으로 승인하면 funds 는 그 기금 하나로 새로 시작한다.
    · 학습 시점은 **승인**이다. 사람이 확정한 것만 기억한다.
    · 잘못 배운 것은 [📚 분개 학습]에서 지운다. */
 var LEARN_SKIP=['인터넷출금이체','인터넷입금이체','현금출금','현금입금','전자금융','FBS출금','타행이체',
@@ -20566,11 +20570,19 @@ function loadLearned(force){
 function learnAcct(memo,isDep,d,c,fid){
   var k=_learnKey(memo,isDep); if(!k||!d||!c||d===c) return;
   var prev=(_learned||{})[k];
+  var f0=fid||S.fundId||'';
   var rec={d:d,c:c,dir:isDep?'입금':'출금',word:k.slice(2),
-           hits:((prev&&num(prev.hits))||0)+1,at:ymd(),fund:fid||S.fundId||'',by:(S.user||'')};
+           hits:((prev&&num(prev.hits))||0)+1,at:ymd(),fund:f0,by:(S.user||'')};
+  rec.funds=_learnFunds(prev,d,c); if(f0) rec.funds[f0]=1;   // 이 계정 짝을 확인한 기금들
   _learned=_learned||{}; _learned[k]=rec;                       // 화면은 바로 반영
   fbDb.ref(NS+'/learned/'+k).set(rec).catch(function(){});      // 실패해도 업무를 막지 않는다
 }
+/* 같은 계정 짝이면 앞서 확인한 기금들을 이어받고, 짝이 바뀌면 새로 시작한다 */
+function _learnFunds(prev,d,c){
+  if(!prev||prev.d!==d||prev.c!==c) return {};
+  var o=Object.assign({},prev.funds||{}); if(prev.fund) o[prev.fund]=1; return o;
+}
+function _learnOwn(lr,fid){ return !fid||lr.fund===fid||!!(lr.funds&&lr.funds[fid]); }
 function forgetAcct(k){
   confirmM('이 학습을 지울까요?\n다음 가져오기부터 자동 제안하지 않습니다.',{ok:'지우기',danger:true}).then(function(ok){
     if(!ok) return;
@@ -20583,19 +20595,20 @@ function forgetAcct(k){
 function learnedPanel(){
   loadLearned(true).then(function(L){
     var ks=Object.keys(L||{}).sort(function(a,b){ return (num(L[b].hits)||0)-(num(L[a].hits)||0); });
-    var rows=ks.map(function(k){ var r=L[k];
-      return '<tr><td>'+esc(r.word||k.slice(2))+'</td>'
+    var rows=ks.map(function(k,i){ var r=L[k], fs=Object.keys(_learnFunds(r,r.d,r.c)), own=_learnOwn(r,S.fundId);
+      return '<tr><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(i+1)+'</td><td>'+esc(r.word||k.slice(2))+'</td>'
         +'<td><span class="chip" style="font-size:10px">'+esc(r.dir||'')+'</span></td>'
         +'<td class="muted" style="font-size:11.5px">'+esc(r.d||'')+' / '+esc(r.c||'')+'</td>'
         +'<td style="text-align:right">'+(num(r.hits)||0)+'</td>'
+        +'<td style="font-size:11.5px;white-space:nowrap">'+(S.fundId?(own?'<span class="chip ok" style="font-size:10px">이 기금</span> ':'<span class="chip warn" style="font-size:10px">다른 기금</span> '):'')+'<span class="muted">'+fs.length+'곳</span></td>'
         +'<td><button onclick="forgetAcct(\''+k+'\')" style="padding:2px 7px">×</button></td></tr>';
     }).join('');
     showModal('<div class="row" style="margin:0 0 6px"><h2 style="margin:0">분개 학습</h2>'
       +'<span class="chip" style="font-size:10px">'+ks.length+'건</span></div>'
       +'<p class="muted" style="font-size:12px;margin:0 0 10px">거래를 <b>승인</b>할 때 거래처와 계정을 기억합니다. '
-      +'다음 통장 가져오기부터 자동으로 제안합니다. 전 기금에 함께 적용됩니다.</p>'
+      +'다음 통장 가져오기부터 자동으로 제안합니다. <b>다른 기금에서만 확인한 것</b>은 «다른 기금에서 배움»으로 제안하고 🎯 골라 승인에서는 빼서 하나씩 봅니다.</p>'
       +(ks.length?'<div style="max-height:340px;overflow:auto;border:1px solid var(--line);border-radius:8px">'
-        +'<table><thead><tr><th>거래처</th><th>방향</th><th>차변 / 대변</th><th style="text-align:right">쓰인 횟수</th><th></th></tr></thead>'
+        +'<table><thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>거래처</th><th>방향</th><th>차변 / 대변</th><th style="text-align:right">쓰인 횟수</th><th>배운 기금</th><th></th></tr></thead>'
         +'<tbody>'+rows+'</tbody></table></div>'
         :'<div class="muted" style="padding:12px">아직 학습한 것이 없습니다. 거래를 승인하면 쌓입니다.</div>')
       +'<div class="row" style="justify-content:flex-end;margin-top:14px"><button onclick="closeM()">닫기</button></div>');
@@ -20606,10 +20619,10 @@ function learnedPanel(){
 function _siteNames(fid){ return fbDb.ref(NS+'/sites/'+fid).once('value').then(function(s){
   var v=s.val()||{}; return Object.keys(v).map(function(k){ return String((v[k]||{}).name||''); }).filter(Boolean);
 }).catch(function(){ return []; }); }
-function proposeAcct(memo,isDep,sites,kind){
+function proposeAcct(memo,isDep,sites,kind,fid){
   var m=String(memo||''), dir=isDep?'입금':'출금';
   var lk=_learnKey(m,isDep), lr=lk&&(_learned||{})[lk];   // 배운 것이 일반 규칙보다 우선
-  if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true,src:'learned'};
+  if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true,src:_learnOwn(lr,fid)?'learned':'learned_other'};   // fid 를 안 주면 예전처럼 «배운 것»
   /* 적요의 공백을 지우고 맞춘다. 통장 적요의 띄어쓰기는 제각각인데 키워드는 붙여 써 두어
      '근로자의 날 기념품'이 '근로자의날'을 그냥 비껴갔다(K공동 2024). */
   var mz=(m+' '+String(kind||'')).replace(/\s+/g,'');
@@ -20908,7 +20921,7 @@ function addTxnSave(){
   if(String(date).slice(0,4)!==String(yr)){ toast(yr+'년 거래만 이 연도에 넣을 수 있습니다','warn'); return; }
   if(!dep&&!wd){ toast('입금 또는 출금 금액을 입력하세요','warn'); return; }
   if(dep&&wd){ toast('입금과 출금을 함께 넣을 수 없습니다 — 두 줄로 나눠 주세요','warn'); return; }
-  var p=proposeAcct(memo,dep>0,Object.keys(S.sites||{}).map(function(k){ return String((S.sites[k]||{}).name||''); }));
+  var p=proposeAcct(memo,dep>0,Object.keys(S.sites||{}).map(function(k){ return String((S.sites[k]||{}).name||''); }),'',fid);
   /* 키는 가져오기와 같은 방식(hkey) — 같은 거래를 두 번 넣으면 같은 키가 되어 덮어쓴다 */
   var base=date+'|'+dep+'|'+wd+'|'+memo, key=hkey(base);
   var rec={date:date,memo:memo,deposit:dep,withdraw:wd,balance:bal,acct:acct,
@@ -20985,7 +20998,7 @@ function importBank(){
               }
               seen[base]=n;
               if(dup){ kept++; return; }
-              var p=proposeAcct(x.memo,x.deposit>0,_snames,x.kind);
+              var p=proposeAcct(x.memo,x.deposit>0,_snames,x.kind,_fid);
               obj[key]={date:x.date,memo:x.memo,deposit:x.deposit,withdraw:x.withdraw,balance:x.balance,acct:(x.acct||''),kind:(x.kind||''),debit:p.d,credit:p.c,approved:false}; added++;
               if(p.d&&p.c&&p.src) obj[key].sug=p.src;   // 이 분개는 기계가 골랐다 — 배운 것/규칙/사업장 이름
               /* 🛡 그 기금에서 이 계정 규칙이 «자동 확정»으로 켜져 있으면 100만 원 이하는 바로 승인한다(누가=자동 확정, 어느 규칙인지 남김) */
@@ -21027,7 +21040,7 @@ function setTxnAcct(id,side,val){ var _key=S.fundId+'/'+S.year;
     .then(function(){ if(S.txnsFor===_key&&S.txns&&S.txns[id]){ S.txns[id][side]=val; delete S.txns[id].sug; } renderFund(); })
     .catch(function(e){ toast('저장 실패: '+e.message,'err'); renderFund(); }); }
 /* 분개를 «누가» 골랐나 — 통장 가져오기·직접 추가가 붙인다(sug). 사람이 계정을 바꾸면 걷힌다. */
-var _SUG_LABEL={learned:'전에 승인한 거래처에서 배운 분개', rule:'적요 낱말 규칙으로 고른 분개', site:'참여사업장 이름으로 고른 분개(출연금)',
+var _SUG_LABEL={learned:'전에 승인한 거래처에서 배운 분개', learned_other:'다른 기금에서 배운 분개 — 이 기금에서는 아직 확인 안 됨', rule:'적요 낱말 규칙으로 고른 분개', site:'참여사업장 이름으로 고른 분개(출연금)',
   xfer:'계좌 간 이체로 보이는 짝 — [🔁 이체 자동매칭]에서 짝을 보고 승인'};
 function approveTxn(id,on){
   var x=S.txns&&S.txns[id];
@@ -21075,7 +21088,7 @@ function _sampleGreen(arr,propose){
     if(_splitsOf(x).length||!x.debit||!x.credit||x.debit===x.credit) return false;
     if(monthLocked(_monthOf(x.date))) return false;
     if((num(x.withdraw)||0)>SAMPLE_WD_MAX) return false;
-    var p=propose(x); return !!(p&&p.d&&p.c&&p.d===x.debit&&p.c===x.credit);
+    var p=propose(x); return !!(p&&p.d&&p.c&&p.d===x.debit&&p.c===x.credit&&p.src!=='learned_other');   // 다른 기금에서만 배운 것은 하나씩
   });
 }
 /* 표본 — 날짜 차례로 늘어놓고 고르게 띄엄띄엄(첫 자리만 무작위). 같은 계정 짝이 몰리지 않게 짝마다 하나 먼저 */
@@ -21099,7 +21112,7 @@ function sampleApprove(){
     var names=pre[1];
     var arr=Object.keys(S.txns).map(function(k){ var o=Object.assign({},S.txns[k]); o._id=k; return o; });
     var un=arr.filter(function(x){ return !x.approved; });
-    var green=_sampleGreen(arr,function(x){ return proposeAcct(x.memo,(num(x.deposit)||0)>0,names,x.kind); });
+    var green=_sampleGreen(arr,function(x){ return proposeAcct(x.memo,(num(x.deposit)||0)>0,names,x.kind,fid); });
     if(!green.length){ toast('규칙과 같은 분개가 없습니다 — 승인 대기 '+un.length+'건은 하나씩 보세요','warn'); return; }
     var sample=_samplePick(green,_sampleSize(green.length));
     _SA={fid:fid, yr:yr, green:green, sample:sample, mark:{}, other:un.length-green.length, names:names};

@@ -90,7 +90,7 @@ test('사람이 계정을 고르면 «기계 제안» 표시(sug)를 걷는다',
 
 test('분개 제안은 어디서 왔는지 말한다 — 배운 것 / 규칙 / 사업장 이름', () => {
   const pa = fnSrc('proposeAcct');
-  assert.match(pa, /learned:true,src:'learned'/);
+  assert.match(pa, /learned:true,src:_learnOwn\(lr,fid\)\?'learned':'learned_other'/);   // 2026-10-09 다른 기금에서만 배운 것은 따로
   assert.match(pa, /return \{d:r\.d,c:r\.c,src:'rule'\}/);
   assert.equal((pa.match(/src:'site'/g) || []).length, 3, '사업장 이름으로 고른 세 길 모두 출처를 단다');
   assert.match(fnSrc('learnAcct'), /by:\(S\.user\|\|''\)/, '배운 규칙에 누가 가르쳤는지 없다');
