@@ -718,3 +718,8 @@ test('★★★ 활용신청 승인 전 — 「승인을 기다리는 중」이�
   assert.match(r.el('planNote').innerHTML, /href="https:\/\/www\.data\.go\.kr\/data\/15129462\/openapi\.do"[\s\S]*15129437/);
   assert.match(r.el('note').innerHTML, /활용신청 승인/);
 });
+test('★ 저장된 줄의 규격서 주소가 https 가 아니면 링크로 안 그린다(다른 기기·옛 자료)', () => {
+  const l = PLANS(); l[3].files = ['javascript:alert(1)'];
+  const r = runApp({ plan: l }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.doesNotMatch(r.el('ptb').innerHTML, /javascript:/); assert.doesNotMatch(r.el('ptb').innerHTML, /📎/);
+});

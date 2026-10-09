@@ -70,6 +70,10 @@ test('★★★ 활용신청 승인 전 — 「서비스 접근거부」를 «�
   assert.match(P.errSay('발주계획', o), /^발주계획: 아직 못 받습니다 — 공공데이터포털 «활용신청 승인»을 기다리는 중/);
   assert.equal(P.errSay('사전규격', P.parse({ response: { header: { resultCode: '07', resultMsg: '입력범위값 초과 에러' } } }, 'spec')), '사전규격: 입력범위값 초과 에러');
   assert.equal(P.parse(null).ok, false);
+  /* 글자 없이 코드만 와도 — 20 접근거부 · 30 등록되지 않은 열쇠 */
+  assert.match(P.errSay('발주계획', { err: 'X', code: '20' }), /활용신청 승인/);
+  assert.match(P.errSay('발주계획', { err: 'X', code: '30' }), /활용신청 승인/);
+  assert.equal(P.errSay('발주계획', { err: 'X', code: '22' }), '발주계획: X');
 });
 const judge = (r) => G.judge(r, G.KEYWORDS_DEFAULT);
 test('★★★ 합치기 — 공고 모아보기와 «같은» 찾는 말로 거른다 · 이미 있는 줄은 공고 사실만 바꾸고 ★·숨김은 지킨다', () => {
@@ -95,6 +99,7 @@ test('★★★ 지금 어디쯤 — 공고 나옴 · 공고 임박(의견 마�
   assert.equal(P.state({ kind: 'plan', ym: '2026-11' }, t).label, '⏳ 다음 달 발주 예정');
   assert.equal(P.state({ kind: 'plan', ym: '2027-02' }, t).label, '4개월 뒤 발주 예정');
   assert.equal(P.state({ kind: 'plan', ym: '2026-07' }, t).k, 'late');
+  assert.equal(P.state({ kind: 'plan', ym: '2026-09' }, t).k, 'late', '딱 한 달 지난 것도 지남');
   assert.equal(P.state({ kind: 'plan', ym: '' }, t).k, 'unknown');
   assert.equal(P.state({ kind: 'plan', ym: '2027-01' }, '2026-12-20').label, '⏳ 다음 달 발주 예정', '해가 바뀌는 달');
 });
