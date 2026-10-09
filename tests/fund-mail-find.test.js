@@ -24,7 +24,7 @@ test('★ 서류 종류 — 첨부·제목 글자로 (기금 서류 + 🏢 사�
   assert.equal(box.kind('설립인가신청서-10호.pdf'), '', '신청서를 인가증으로 잡았다');
   assert.equal(box.kind('재직증명서-10호.pdf'), 'wrep', '재직증명서는 근로자대표가 기본');
   assert.equal(box.kind('중소기업확인서.pdf'), 'smecert');
-  assert.equal(box.kind('사업자등록증(가나산업).png'), 'bizreg');
+  assert.equal(box.kind('사업자등록증(가나산업).png'), '', '사업장 사업자등록증은 기업정보함 길(대표 지시 2026-09-13)');
   assert.equal(box.kind('재무현황.xlsx'), '');
 });
 
@@ -79,7 +79,7 @@ test('★ 배선 — 읽기만 · peek · 판독은 기존 길(readDocInto) · �
 
 test('★ 🏢 사업장 서류 배선 — 사업장 탭에서 목록이 읽힌 뒤 그 사업장 범위로 판독, 사업장을 안 고르면 막는다', () => {
   const rf = fnSrc('_mfReadFile');
-  assert.match(rf, /scope=\{wrep:_siteRepScope, urep:_siteUrepScope, smecert:_siteSmeScope, bizreg:_siteDocScope\}\[kind\]/);
+  assert.match(rf, /scope=\{wrep:_siteRepScope, urep:_siteUrepScope, smecert:_siteSmeScope\}\[kind\]/);
   assert.match(rf, /_rvWait\(function\(\)\{ return S\.view==='fund'&&S\.fundId===fid&&S\.sitesFor===fid&&S\.sites&&S\.sites\[sid\]; \}/, 'editSite 가 볼 목록을 기다리지 않는다');
   assert.match(rf, /_siteEditSid=sid; _siteDocKeep=null; scope\(\); readDocInto\(MF_SITE_ZID\[kind\], kind, file\)/);
   assert.match(fnSrc('mailFindRead'), /if\(!r\.zip&&MF_SITE_ZID\[kind\]&&!sid\)/);

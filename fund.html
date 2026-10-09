@@ -11268,10 +11268,11 @@ var _dfFound={}, _dfScanned=0;
 var MF_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/';
 var MF_TOP=12;
 var MF_KINDS=[['corpreg',/등기사항|등기부|법인등기/],['taxid',/고유번호/],['inka',/인가증|설립인가(?![ ·_-]*신청)/],
-  ['wrep',/재직증명/],['urep',null],['smecert',/중소기업확인/],['bizreg',/사업자등록증/]];
+  ['wrep',/재직증명/],['urep',null],['smecert',/중소기업확인/]];
 /* 사업장 서류(대표 「사업장서류까지」 2026-10-09) — 그 사업장 편집 창으로 간다. 사진첩에서 고를 때와 같은 범위·같은 확인 창.
-   재직증명서는 근로자대표가 기본(사용자대표 것이면 사람이 바꾼다 — 이름만으로는 못 가른다). */
-var MF_SITE_ZID={wrep:'dz-siterep', urep:'dz-siterep', smecert:'dz-sitesme', bizreg:'dz-sitebiz'};
+   재직증명서는 근로자대표가 기본(사용자대표 것이면 사람이 바꾼다 — 이름만으로는 못 가른다).
+   ⚠ 사업자등록증은 넣지 않는다 — 사업장 사업자등록증 한 장 판독은 걷어냈다(대표 지시 2026-09-13 「기업정보함에서 바로 가지고 오면 된다」). */
+var MF_SITE_ZID={wrep:'dz-siterep', urep:'dz-siterep', smecert:'dz-sitesme'};
 function _mfLabel(k){ return (MF_SITE_ZID[k]?'🏢 ':'')+(((typeof DOC_PARSE!=='undefined'&&DOC_PARSE[k])||{}).label||docZoneLabel(k)); }
 /* 어느 사업장 서류인가 — 보낸 메일 주소가 그 사업장 메일이거나, 파일·제목에 그 사업장 이름이 있으면. 둘 이상이면 고르지 않는다 */
 function _mfSiteGuess(txt,email,sites){
@@ -11433,7 +11434,7 @@ function _mfReadFile(file,kind,sid){
   /* 🏢 사업장 서류 — 사업장 탭으로 옮겨 목록이 읽히면(editSite 가 S.sites 를 본다) 그 사업장 범위로 판독 → 확인 창 → 그 사업장 편집 창 */
   if(MF_SITE_ZID[kind]){
     if(!sid){ toast('어느 사업장 서류인지 고르세요','warn'); return; }
-    var fid=MF.fid, scope={wrep:_siteRepScope, urep:_siteUrepScope, smecert:_siteSmeScope, bizreg:_siteDocScope}[kind];
+    var fid=MF.fid, scope={wrep:_siteRepScope, urep:_siteUrepScope, smecert:_siteSmeScope}[kind];
     closeM(); MF.inner=null;
     if(S.tab!=='sites'){ S.tab='sites'; renderFund(); }
     _rvWait(function(){ return S.view==='fund'&&S.fundId===fid&&S.sitesFor===fid&&S.sites&&S.sites[sid]; }, function(){
@@ -21408,7 +21409,7 @@ var HELP={
  'doc.mail':{t:'메일에서 서류 찾기',h:'<p>푸른메일함(받은메일함과 «근로복지기금» 메일함)에서 <b>이 기금 메일</b> 가운데 첨부가 있는 것을 찾아, 등기부·고유번호증·인가증으로 보이는 첨부를 보여 줍니다.</p>'
    +'<p>이 기금 메일인지는 <b>보낸 사람 메일</b>이 참여사업장·담당자 메일과 같은지, <b>제목·미리보기·보낸 이름</b>에 기금 이름이 있는지로 봅니다. 점수 높은 12통만 첨부 목록을 묻습니다(읽음 표시는 안 바뀝니다).</p>'
    +'<p>[읽기]를 누르면 첨부를 받아 <b>서류 자동 입력과 같은 길</b>로 읽습니다 — 원본 옆 확인 창에서 값을 보고 [반영], 그다음 [💾 저장]. 원본은 사진첩에 남고 이 기금에 이어집니다. 메일을 보내거나 지우지 않습니다.</p>'
-   +'<p><b>🏢 사업장 서류</b>(재직증명서·중소기업확인서·사업자등록증)는 옆 칸에서 <b>어느 사업장</b>인지 고릅니다 — 보낸 메일 주소나 파일 이름으로 한 곳만 맞으면 미리 골라 둡니다. 읽으면 그 사업장 편집 창이 판독값을 얹은 채 열리고, [저장]은 사람이 누릅니다. 재직증명서는 근로자대표가 기본이고 사용자대표 것이면 종류를 바꾸세요.</p>'
+   +'<p><b>🏢 사업장 서류</b>(재직증명서·중소기업확인서)는 옆 칸에서 <b>어느 사업장</b>인지 고릅니다 — 보낸 메일 주소나 파일 이름으로 한 곳만 맞으면 미리 골라 둡니다. 읽으면 그 사업장 편집 창이 판독값을 얹은 채 열리고, [저장]은 사람이 누릅니다. 재직증명서는 근로자대표가 기본이고 사용자대표 것이면 종류를 바꾸세요. 사업장 사업자등록증은 [🏢 기업정보함에서]로 가져옵니다.</p>'
    +'<p>PDF·그림만 읽습니다(zip 은 풀어서). 한글·엑셀 첨부는 푸른메일함에서 여세요.</p>'},
  'doc.auto':{t:'사진첩에서 서류 찾기',h:'<p>푸른사진첩을 훑어 이 기금의 <b>설립인가증 · 법인 등기부등본 · 고유번호증</b>을 <b>스스로 찾아</b> 줍니다. 해마다 사진을 눈으로 뒤질 필요가 없습니다.</p>'
    +'<p><b>어떻게 찾나</b> — 사진첩이 이미 읽어 둔 <b>서류 제목</b>으로 고릅니다. 제목에 「인가증」·「등기사항」·「고유번호」가 든 사진이 후보입니다. 기금 이름까지 맞으면 <b>이름 맞음</b> 딱지를 달고 맨 위에 둡니다.</p>'
