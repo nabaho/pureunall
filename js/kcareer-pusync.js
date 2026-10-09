@@ -168,7 +168,7 @@
     var proj = pick(c, m.proj);
     var cn = fromCaseNo(c.caseNo || proj);
     var t = lookupType(coll, c, typeMap);
-    return {
+    var out = {
       store: m.store,
       rec: {
         type: pick(c, m.type) || (t ? (t.name || '') : '') || (cn ? cn.type : ''),
@@ -184,6 +184,10 @@
         puRef: refOf(coll, key, c)
       }
     };
+    /* 💰 금액(공급가액) — 있을 때만 칸을 만든다. 출처를 함께 적어 다음 동기화가 따라 고칠 수 있게 */
+    var 돈 = amountOf(coll, c);
+    if (돈) { out.rec.amt = String(돈); out.rec.amtFrom = 'erp'; }
+    return out;
   }
   /* 온톨로지 연결 칸 — 실적은 이알피 원본에서 «나온» 것(derivedFrom).
      sourceId 가 비면 영구 연결이 아니다(puRefWeak). */
@@ -395,7 +399,39 @@
     return out;
   }
 
-  var api = { isClosed: isClosed, isCoClosed: isCoClosed, mapRecord: mapRecord, buildSyncPlan: buildSyncPlan,
+  /* ===== 💰 금액 (대표 지시 2026-10-09 「이알피금액도 받아오게」) =====
+     예전에는 «금액은 안 담는다»였다(계약서와 엮인 값이라 이알피가 원본). 이제 받아 온다 — 다만
+     ⚠ 이알피가 «원본»인 것은 그대로다: 받은 금액에는 amtFrom:'erp' 를 달고, 사람이 손으로 적은 금액은 덮지 않는다.
+     ■ 이알피가 보이는 «받을 돈»과 같은 셈이다(pu-erp erpUnpaidParts):
+        계약금(contractFee) + 잔금(balanceFee) + 옛 한 칸 컨설팅비(consultingFee).
+        ⚠ fee 칸은 더하지 않는다 — 계약서에서 넘어올 때 계약금과 «같은 값»을 한 번 더 적어 둔 것이다.
+     ■ 부가세가 들고 안 들고가 건마다 다르다(contractFeeVatIncluded·balanceFeeVatIncluded) —
+        섞인 채로 더하면 셈이 틀린다. 그래서 «공급가액»(부가세 뺀 값)으로 맞춘다: 포함이면 ÷1.1 반올림.
+     ⚠ 사건(cases)은 안 받는다 — 성공보수가 %(승소금액 기준)라 확정 금액이 아니다. */
+  function _n(v) { var x = Number(String(v == null ? '' : v).replace(/[^\d.-]/g, '')); return isFinite(x) && x > 0 ? x : 0; }
+  function amountOf(coll, c) {
+    if (!c || coll === 'cases' || coll === 'companies') return 0;
+    var 공급 = function (v, vat) { var x = _n(v); return vat === true ? Math.round(x / 1.1) : x; };
+    return 공급(c.contractFee, c.contractFeeVatIncluded) + 공급(c.balanceFee, c.balanceFeeVatIncluded) + _n(c.consultingFee);
+  }
+  /* 이미 가져온 실적의 금액을 이알피에 맞춘다 — 영구 열쇠로 이어진 건만(줄 번호 열쇠는 다른 건일 수 있다).
+     ⚠ 비어 있거나 «이알피에서 받은 금액»인 것만 고친다. 사람이 적은 금액은 그대로 둔다. */
+  function buildAmtUpdates(collData, existingRecords) {
+    var byRef = _indexByRef(collData), out = [];
+    (existingRecords || []).forEach(function (r) {
+      if (!r || !isIdRef(r.puRef) || r.puRefCheck) return;
+      var hit = byRef[r.puRef]; if (!hit) return;
+      var amt = amountOf(hit.coll, hit.c); if (!amt) return;
+      var 지금 = _n(r.amt);
+      if (지금 && r.amtFrom !== 'erp') return;                 /* 사람이 적은 금액 */
+      if (지금 === amt && r.amtFrom === 'erp') return;          /* 이미 같다 */
+      out.push({ puRef: r.puRef, amt: String(amt) });
+    });
+    return out;
+  }
+
+  var api = { amountOf: amountOf, buildAmtUpdates: buildAmtUpdates,
+              isClosed: isClosed, isCoClosed: isCoClosed, mapRecord: mapRecord, buildSyncPlan: buildSyncPlan,
               buildStatusUpdates: buildStatusUpdates, unwrap: unwrap, fromCaseNo: fromCaseNo,
               refOf: refOf, isIdRef: isIdRef, sourceNoOf: sourceNoOf,
               buildRefMigration: buildRefMigration, buildNoUpdates: buildNoUpdates,
