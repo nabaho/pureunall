@@ -42,11 +42,11 @@
 
 **Interfaces:** Produces `fill(xml, V, {breaks:true})`, `replaceText(xml, rules, {breaks:true})` — 값의 `\n` 을 `<hp:lineBreak/>` 로 쓴다(글자 모양은 그 run 그대로). 기본(꺼짐)은 지금과 같다.
 
-- [ ] Step 1: 실패하는 검사 — `fill('<hp:p><hp:run><hp:t>{{가}}</hp:t></hp:run></hp:p>', {가:'첫줄\n둘째줄'}, {breaks:true}).xml` 에 `첫줄<hp:lineBreak/>둘째줄` 이 들고, breaks 없이는 `\n` 이 그대로(지금 모습) 남는다.
-- [ ] Step 2: 돌려 실패 확인 — `node --test tests/pu-hwpx-fill.test.js`
-- [ ] Step 3: 구현 — `paraReplace(p, pairs, breaks)` 가 조각 글을 `enc` 한 뒤 `breaks` 면 `\n` 을 `<hp:lineBreak/>` 로 바꾼다. `fill`·`replaceText` 가 `opts.breaks` 를 넘긴다.
-- [ ] Step 4: 통과 확인 + 기존 hwpx 검사(`fund-hwp-*`) 통과
-- [ ] Step 5: 커밋
+- [x] Step 1: 실패하는 검사 — `fill('<hp:p><hp:run><hp:t>{{가}}</hp:t></hp:run></hp:p>', {가:'첫줄\n둘째줄'}, {breaks:true}).xml` 에 `첫줄<hp:lineBreak/>둘째줄` 이 들고, breaks 없이는 `\n` 이 그대로(지금 모습) 남는다.
+- [x] Step 2: 돌려 실패 확인 — `node --test tests/pu-hwpx-fill.test.js`
+- [x] Step 3: 구현 — `paraReplace(p, pairs, breaks)` 가 조각 글을 `enc` 한 뒤 `breaks` 면 `\n` 을 `<hp:lineBreak/>` 로 바꾼다. `fill`·`replaceText` 가 `opts.breaks` 를 넘긴다.
+- [x] Step 4: 통과 확인 + 기존 hwpx 검사(`fund-hwp-*`) 통과
+- [x] Step 5: 커밋
 
 ### Task 2: 충남북부상의 지도 + 채우기 핵심
 
@@ -82,12 +82,12 @@
 | P10 | 작성일 | koDate(writtenAt) |
 | P13 find `경영상담역:` | 상담역 | `경영상담역: ` + consultant |
 
-- [ ] Step 1: 실패하는 검사 — 합성 XML 도우미 `tblXml(rows)` 로 T0~T6·P0~P21 주소를 흉내 낸 문서를 만들어
+- [x] Step 1: 실패하는 검사 — 합성 XML 도우미 `tblXml(rows)` 로 T0~T6·P0~P21 주소를 흉내 낸 문서를 만들어
   ① 모든 칸이 채워지고 결과에 `{{` 가 남지 않음 ② 근로자수는 workers(피보험자수 칸 무시) ③ 회차 2개면 3회 칸은 BLANK + `short:{need:3,have:2}` ④ 방문 여부 미상이면 체크칸 원문 ⑤ 여러 줄 글은 lineBreak.
-- [ ] Step 2: 실패 확인
-- [ ] Step 3: 구현(아래 핵심 코드)
-- [ ] Step 4: 통과 확인
-- [ ] Step 5: 커밋
+- [x] Step 2: 실패 확인
+- [x] Step 3: 구현(아래 핵심 코드)
+- [x] Step 4: 통과 확인
+- [x] Step 5: 커밋
 
 핵심 코드 꼴:
 ```js
@@ -112,8 +112,8 @@ function fillForm(xml, formKey, fileKey, report){
 
 **Files:** scratchpad `gov-verify.js` · 작업 폴더 `pu-gov-forms-work`
 
-- [ ] Step 1: `cci-north.hwpx`(변환본)의 section0.xml 을 `fillForm` 으로 채워(홍길동·가나상사 합성 자료, 회차 3) 새 HWPX 로 다시 묶는다(원본 ZIP 의 다른 항목은 그대로, mimetype 첫 항목·무압축 유지).
-- [ ] Step 2: 한글 자동조종으로 열어 쪽 수(원본 2쪽 → 2~3쪽)·PDF 저장 — 열기 실패·쪽 수 폭증이면 실패.
+- [x] Step 1: `cci-north.hwpx`(변환본)의 section0.xml 을 `fillForm` 으로 채워(홍길동·가나상사 합성 자료, 회차 3) 새 HWPX 로 다시 묶는다(원본 ZIP 의 다른 항목은 그대로, mimetype 첫 항목·무압축 유지).
+- [x] Step 2: 한글 자동조종으로 열어 쪽 수(원본 2쪽 → 2~3쪽)·PDF 저장 — 열기 실패·쪽 수 폭증이면 실패.
 - [ ] Step 3: PDF 를 대표께 보내 «칸이 맞는가» 확인(설계서 §5-3 사람 확인).
 
 ### Task 4: 서산상의 — 방문확인서(회차마다 한 쪽) + 상담·자문 결과 보고서
