@@ -335,10 +335,12 @@
   /* ══ 📬 서명본 대기 (대표 「추천대로」 2026-10-07) — 계약서를 보냈거나(메일) 채워 받은(받기) 회사 ══
      pu_docs/await/{coKey} = { name, bz?, at, how:'메일'|'받기', names[], by, byName, remindAt?, got?, gotDoc? }
      회사마다 한 줄(가장 최근 보냄). 다시 보내면 got 이 지워져 다시 대기로. 서명본을 올리면 got·gotDoc 이 찍혀 「최근 회수」로.
+     ⚠ 다시 📥 받기(출력용이 많다)는 이미 있는 줄을 건드리지 않는다 — 회수 끝난 회사가 대기로, 기다린 날수가 0으로 돌아가던 것(대표 「추천대로」 2026-10-09).
+       메일·서명 요청으로 다시 보내면 예전처럼 새로 대기.
      ⚠ 받는 주소는 남기지 않는다(보낸 서류와 같은 원칙). 기업정보함(pucards)은 건드리지 않는다. */
   function awaitRecord(o) {
     o = o || {};
-    var r = { name: clampStr(String(o.coName || '').trim(), 120), at: Number(o.at) || Date.now(), how: o.how === '받기' ? '받기' : '메일',
+    var r = { name: clampStr(String(o.coName || '').trim(), 120), at: Number(o.at) || Date.now(), how: o.how === '받기' || o.how === '서명' ? o.how : '메일',
       names: (o.names || []).map(function (v) { return String(v || '').slice(0, 200); }).filter(Boolean).slice(0, 20),
       by: deps.uid, byName: clampStr(deps.name, 60) };
     var bz = String(o.bz || '').replace(/\D/g, '');
@@ -350,7 +352,11 @@
     needDb();
     var key = coKey(o && o.coName);
     if (!key) return Promise.reject(new Error('회사 이름이 없습니다'));
-    return deps.db.ref(ROOT + '/await/' + key).set(clean(awaitRecord(o))).then(function () { return key; });
+    var rec = clean(awaitRecord(o));
+    return deps.db.ref(ROOT + '/await/' + key).transaction(function (cur) {
+      if (cur && rec.how === '받기') return undefined;   // 받기는 있던 줄 그대로(위 ⚠)
+      return rec;
+    }).then(function () { return key; });
   }
   function listAwait() {
     needDb();

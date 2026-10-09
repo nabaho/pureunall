@@ -55,3 +55,20 @@ test('ⓓ 저장 · 규칙', () => {
   const rules = read('scripts/make-firebase-rules.js');
   assert.match(rules, /kind: +\{ '\.validate': 'newData\.isString\(\) && newData\.val\(\)\.length <= 20' \},\n    at: +\{ '\.validate': 'newData\.isNumber\(\)' \},\n    by: +\{ '\.validate': 'newData\.val\(\) === auth\.uid' \},\n    byName/);
 });
+
+/* ⓔ △ 기록 없는 파일 「+ 기록 만들기」 — 같은 종류의 «파일 없음» 기록이 있으면 거기에 잇기를 먼저 묻는다(검토 2026-10-09) */
+test('ⓔ 파일 없는 기록에 잇기', () => {
+  const recs = [{ id: 'r1', kind: '자문', date: '2024-03-01' }, { id: 'r2', kind: '자문', date: '2025-03-01' }, { id: 'r3', kind: 'CMS', date: '2025-03-01' }];
+  const docs = [{ id: 'd1', title: '자문계약서', kind: '자문', date: '2025-02-20' }, { id: 'd2', title: '자문계약서', kind: '자문', date: '2024-03-01' },
+    { id: 'd3', title: '컨설팅 계약서', kind: '컨설팅' }];
+  const s = D.coSort(recs, docs), doc = (id) => s.items.find((x) => x.doc && x.doc.id === id);
+  assert.equal(D.linkableRec(s.items, doc('d2')).rec.id, 'r1', '같은 날짜 먼저');
+  assert.equal(D.linkableRec(s.items, doc('d1')).rec.id, 'r2', '아니면 가장 가까운 날짜');
+  assert.equal(D.linkableRec(s.items, doc('d3')), null, '같은 종류가 없으면 새 기록');
+  assert.equal(D.linkableRec(D.coSort([recs[0], recs[1]], []).items, { doc: { id: 'x' }, kind: '자문', date: '' }), null, '날짜 모르고 여럿이면 고르지 않는다');
+  const src = read('js/pu-office-docs.js');
+  assert.match(src, /else recForDoc\(x\.items, it\)/);
+  const f = src.slice(src.indexOf('function recForDoc('), src.indexOf('function kindBox('));
+  assert.match(f, /w\.confirm\([\s\S]*store\.updateCoRec\(key, to\.rec\.id, \{ docId: it\.doc\.id \}\)/);
+  assert.match(f, /openRec\(null, \{ kind: it\.kind \|\| '기타'/, '취소하면 새 기록');
+});

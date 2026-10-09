@@ -81,7 +81,7 @@
 <script src="js/pu-ontology.js?v=52"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
-<script src="js/pu-sign.js?v=2"></script>
+<script src="js/pu-sign.js?v=3"></script>
 <script>
 'use strict';
 /* Firebase — 위임장 제출 화면(sign.html)과 같은 프로젝트, 익명 인증 */
@@ -116,7 +116,8 @@ else firebase.auth().signInAnonymously().then(function () {
   return db.ref('pu_sign/open/' + t).once('value');
 }).then(function (s) {
   O = s.val();
-  if (!O) { fatal('찾을 수 없는 링크입니다. 담당자에게 문의해 주세요.'); return; }
+  /* 🔒 저장·취소·기한 지남 뒤에는 직원 화면이 이 칸을 지운다(문서·서명이 링크로 남지 않게) */
+  if (!O) { fatal('이미 처리되었거나 찾을 수 없는 링크입니다. 제출하신 계약서 사본은 담당자에게 요청해 주세요.'); return; }
   $('docTitle').textContent = O.title || '계약서 서명';
   $('docSub').textContent = '푸른노무법인' + (O.co ? ' · ' + O.co : '') + ' · ' + PuSign.ymd(O.exp) + '까지';
   if (O.sub) { $('doneMsg').textContent = PuSign.ymdhm(O.sub.at) + '에 제출하셨습니다.'; drawPages($('pagesDone')); show(4); return; }

@@ -187,7 +187,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-contract-vars.js?v=2"></script>
-<script src="js/pu-sign.js?v=2"></script>
+<script src="js/pu-sign.js?v=3"></script>
 <script src="js/esign-crypto.js?v=1"></script>
 <script src="js/esign-docs.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
@@ -197,10 +197,10 @@
 <script src="js/pu-form-cardfill.js?v=14"></script>
 <script src="js/pu-contract-forms.js?v=36"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
-<script src="js/pu-office-store.js?v=9"></script>
+<script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=16"></script>
+<script src="js/pu-office-docs.js?v=17"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -569,14 +569,27 @@ function formSignList() {
     return Promise.all(rows.map(function (r) {
       r.o = {};
       if (r.status === 'saved' || r.status === 'void') return r;
-      /* 상태만 콕 집어 읽는다 — 문서 그림(pages)은 받지 않는다 */
-      return Promise.all(['seen', 'sub/at', 'void'].map(function (c) { return db.ref('pu_sign/open/' + r.t + '/' + c).once('value').then(function (x) { return x.val(); }, function () { return null; }); }))
-        .then(function (x) { r.o = { seen: x[0], subAt: x[1], void: x[2] }; return r; });
-    })).then(function (rs) { return rs.sort(function (a, b) { return (b.at || 0) - (a.at || 0); }); });
+      /* 상태만 콕 집어 읽는다 — 문서 그림(pages)은 받지 않는다. 못 읽으면 err(그 줄은 지우지 않는다) */
+      var err = false;
+      return Promise.all(['seen', 'sub/at', 'void'].map(function (c) { return db.ref('pu_sign/open/' + r.t + '/' + c).once('value').then(function (x) { return x.val(); }, function () { err = true; return null; }); }))
+        .then(function (x) { r.o = { seen: x[0], subAt: x[1], void: x[2], err: err }; return r; });
+    })).then(function (rs) {
+      /* 끝난 링크 칸 정리 — 저장 때 못 지웠거나, 기한이 지난 것. 기다리지 않는다(다음에 다시) */
+      rs.forEach(function (r) { if (PuSign.needClean(r, r.o)) formSignClean(r).catch(function () {}); });
+      return rs.sort(function (a, b) { return (b.at || 0) - (a.at || 0); });
+    });
   });
 }
 function formSignVoid(r) {
-  return trackedWrite(db.ref('pu_sign/open/' + r.t + '/void').set(true)).then(function () { return trackedWrite(db.ref('pu_sign/req/' + r.id).update({ status: 'void' })); });
+  return trackedWrite(db.ref('pu_sign/open/' + r.t + '/void').set(true)).then(function () { return trackedWrite(db.ref('pu_sign/req/' + r.id).update({ status: 'void' })); })
+    .then(function () { return formSignClean(r).catch(function () {}); });
+}
+/* 서명 링크 칸(open/{t})을 통째로 지운다 — 문서 그림·서명·적은 값이 링크로 더는 안 읽힌다(규칙: 직원 LOGIN 쓰기).
+   직원 칸(req)에 gone 을 찍어 다시 지우지 않는다. 🔒 서명본·확인서는 그대로(보관함). */
+function formSignClean(r) {
+  if (!r || !r.t || !r.id) return Promise.resolve();
+  return trackedWrite(db.ref('pu_sign/open/' + r.t).remove())
+    .then(function () { return trackedWrite(db.ref('pu_sign/req/' + r.id).update({ gone: Date.now() })); });
 }
 /* 서명 확인서 한 쪽 — 캔버스에 그린다(한글 글꼴 걱정 없이) */
 function formSignCert(r, sub, docHash, hashOk) {
@@ -659,6 +672,7 @@ async function formSignFinalize(r) {
     }
     if (put.secret === false) warn.push('같은 파일이 일반 원본으로 이미 있어 🔒 가 아닙니다 — 「🔒 서명본으로 옮기기」로 옮기세요');
     await trackedWrite(reqRef.update({ status: 'saved', savedAt: Date.now(), hashOk: hashOk, lock: null, warn: warn.length ? warn.join(' · ').slice(0, 300) : null }));
+    await formSignClean(r).catch(function (e) { warn.push('링크 칸 정리 실패 — 목록을 열 때 다시 지웁니다(' + ((e && e.message) || e) + ')'); });
     return { docId: cd.docId, coKey: cd.coKey, hashOk: hashOk, warn: warn };
   } catch (e) {
     await reqRef.child('lock').remove().catch(function () {});
@@ -937,6 +951,28 @@ function loadCases() {
 }
 $('btnRefreshCases').onclick = loadCases;
 
+/* 👤 대표 근로자·관할 노동관서 자리 — esign/cases/{사건}/secret/rep = { name?, office? } (검토 2026-10-09 대표 「추천대로»)
+   ⚠ meta 는 링크를 연 근로자(익명 로그인)도 읽는다 — 대표 근로자 이름을 거기 두면 모든 근로자가 본다.
+     secret 은 직원(MAIL)만 읽고 쓴다(규칙 그대로). 파기할 때 함께 지운다. */
+function repRecord(name, office) {
+  var r = {}, n = String(name || '').trim().slice(0, 60), o = String(office || '').trim().slice(0, 60);
+  if (n) r.name = n; if (o) r.office = o;
+  return n || o ? r : null;
+}
+function caseRep(caseId) {
+  var c = casesCache[caseId] || {}, r = (c.secret && c.secret.rep) || {}, m = c.meta || {};
+  return { repName: r.name || m.repName || '', office: r.office || m.office || '' };
+}
+/* 예전(meta 에 적던 때) 사건 — 열 때 secret/rep 로 옮기고 meta 칸을 지운다. 실패해도 열기는 계속 */
+function moveRepOut(caseId) {
+  var c = casesCache[caseId] || {}, m = c.meta || {};
+  if (!m.repName && !m.office) return Promise.resolve();
+  var x = caseRep(caseId), rep = repRecord(x.repName, x.office);
+  return trackedWrite(db.ref('esign/cases/' + caseId + '/secret/rep').set(rep))
+    .then(function () { return trackedWrite(db.ref('esign/cases/' + caseId + '/meta').update({ repName: null, office: null })); })
+    .then(function () { c.secret = c.secret || {}; c.secret.rep = rep; delete m.repName; delete m.office; })
+    .catch(function () {});
+}
 // ── 새 사건 생성 ──
 $('btnNewCase').onclick = function () {
   var bg = document.createElement('div');
@@ -971,19 +1007,20 @@ $('btnNewCase').onclick = function () {
       var linkToken = EsignCrypto.randomToken();
       var meta = {
         title: title, company: company, respondent: $('ncResp').value.trim(),
-        repName: $('ncRep').value.trim(), office: $('ncOffice').value.trim(),
         ownerSid: curUser.email.split('@')[0],
         pubKey: keys.pubKeyJwk, linkToken: linkToken,
         createdAt: firebase.database.ServerValue.TIMESTAMP, status: 'active'
       };
       await trackedWrite(ref.child('meta').set(meta));
       await trackedWrite(ref.child('secret/encPrivKey').set(prot));
+      var rep = repRecord($('ncRep').value, $('ncOffice').value);
+      if (rep) await trackedWrite(ref.child('secret/rep').set(rep));
       bg.remove();
       /* ⚠ 목록을 once 로만 받으므로(비용 절감) 여기서 캐시에 직접 넣어야
          한다 — 안 넣으면 [🔄 새로고침]을 누르기 전까지 방금 만든 사건이
          목록에 안 보인다. createdAt 은 서버 시각을 몰라 지금 시각으로
          어림한다(정렬에만 쓰인다 — 서버 값은 다음 새로고침 때 정확해진다). */
-      casesCache[ref.key] = { meta: Object.assign({}, meta, { createdAt: Date.now() }) };
+      casesCache[ref.key] = { meta: Object.assign({}, meta, { createdAt: Date.now() }), secret: rep ? { rep: rep } : {} };
       renderCaseList();
       showToast('✅ 사건이 생성되었습니다 — [🔗 링크]로 근로자에게 공유하세요');
     } catch (e) {
@@ -1040,6 +1077,7 @@ async function openCase(caseId) {
   }
   curCaseId = caseId;
   selSubs = null;
+  await moveRepOut(caseId);
   await refreshSubs();
   await loadArrearsCache();
   $('viewList').style.display = 'none';
@@ -1082,7 +1120,7 @@ function renderDetail() {
     + '<b style="flex:1;font-size:15px">' + EsignDocs.esc(m.title || '') + ' <span style="color:#64748b;font-weight:400">— 제출 '
     + decrypted.length + '명</span></b>'
     + '<button class="btn btn-sub" onclick="shareCase(curCaseId)">🔗 링크</button>'
-    + '<button class="btn btn-sub" onclick="openRepPick()" title="진정인 대표·선정당사자 — 한글 서식의 {{대표근로자}} 칸에 들어갑니다">👤 대표 ' + EsignDocs.esc(m.repName || '정하기') + '</button>'
+    + '<button class="btn btn-sub" onclick="openRepPick()" title="진정인 대표·선정당사자 — 한글 서식의 {{대표근로자}} 칸에 들어갑니다">👤 대표 ' + EsignDocs.esc(caseRep(curCaseId).repName || '정하기') + '</button>'
     + '<span id="detailActions"></span>' // Task 11·12가 버튼 추가
     + '</div>'
     + (function () {
@@ -1331,7 +1369,7 @@ async function _esignRelayout(doc) {
 }
 /* 👤 대표 근로자 고르기 (2026-10-09) — 제출한 사람 가운데서. 관할 노동관서도 함께(진정서 「귀하」) */
 function openRepPick() {
-  var m = (casesCache[curCaseId] || {}).meta || {};
+  var m = caseRep(curCaseId);
   var names = decrypted.filter(function (d) { return d && d.name && d._reviewState !== 'error'; }).map(function (d) { return d.name; });
   var bg = document.createElement('div'); bg.className = 'modal-bg';
   bg.innerHTML = '<div class="modal"><h3 style="margin-bottom:6px">👤 대표 근로자 정하기</h3>'
@@ -1344,17 +1382,18 @@ function openRepPick() {
   $('rpOffice').value = m.office || '';
   $('rpNo').onclick = function () { bg.remove(); };
   $('rpOk').onclick = async function () {
-    var up = { repName: $('rpSel').value, office: $('rpOffice').value.trim() };
+    var rep = repRecord($('rpSel').value, $('rpOffice').value), c = casesCache[curCaseId] || {};
     try {
-      await trackedWrite(db.ref('esign/cases/' + curCaseId + '/meta').update(up));
-      Object.assign(m, up); bg.remove(); renderDetail(); showToast('저장했습니다');
+      await trackedWrite(db.ref('esign/cases/' + curCaseId + '/secret/rep').set(rep));
+      c.secret = c.secret || {}; c.secret.rep = rep || undefined; bg.remove(); renderDetail(); showToast('저장했습니다');
     } catch (e) { showToast('저장하지 못했습니다 — ' + ((e && e.message) || e)); }
   };
 }
 /* 서식에 넣을 사건 값 — 대표 근로자의 제출(연락처·주소)과 진정인 수를 붙인다(저장하지 않는다) */
 function _esignMetaForFill(meta) {
-  var rep = meta && meta.repName ? decrypted.filter(function (d) { return d && d.name === meta.repName; })[0] : null;
-  return Object.assign({}, meta || {}, { _rep: rep || null, _count: decrypted.filter(function (d) { return d && d._reviewState !== 'error'; }).length });
+  meta = Object.assign({}, meta || {}, caseRep(curCaseId));
+  var rep = meta.repName ? decrypted.filter(function (d) { return d && d.name === meta.repName; })[0] : null;
+  return Object.assign(meta, { _rep: rep || null, _count: decrypted.filter(function (d) { return d && d._reviewState !== 'error'; }).length });
 }
 async function _esignFillOne(record, meta, person) {
   meta = _esignMetaForFill(meta);
@@ -1630,13 +1669,15 @@ function purgeCase() {
     trackedWrite(Promise.all([
       db.ref('esign/cases/' + curCaseId + '/submissions').remove(),
       db.ref('esign/cases/' + curCaseId + '/arrears').remove(),
-      db.ref('esign/cases/' + curCaseId + '/meta/status').set('purged')
+      db.ref('esign/cases/' + curCaseId + '/secret/rep').remove(),   // 대표 근로자 이름도 개인정보
+      db.ref('esign/cases/' + curCaseId + '/meta').update({ status: 'purged', repName: null, office: null })
     ])).then(function () {
       /* 목록을 once 로만 받으므로 캐시도 직접 고친다 — 안 고치면 제출 개수가
          지운 뒤에도 목록에 그대로 남는다. */
       var c = casesCache[curCaseId];
       if (c) {
-        if (c.meta) c.meta.status = 'purged';
+        if (c.meta) { c.meta.status = 'purged'; delete c.meta.repName; delete c.meta.office; }
+        if (c.secret) delete c.secret.rep;
         delete c.submissions; delete c.arrears;
       }
       renderCaseList();

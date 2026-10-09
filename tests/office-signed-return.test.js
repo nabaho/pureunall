@@ -26,7 +26,13 @@ function fakeDb() {
       return {
         once() { const v = store[p] === undefined ? null : JSON.parse(JSON.stringify(store[p])); return Promise.resolve({ val: () => v, exists: () => v != null }); },
         set(v) { store[p] = JSON.parse(JSON.stringify(v)); return Promise.resolve(); },
-        update(v) { store[p] = Object.assign({}, store[p] || {}, JSON.parse(JSON.stringify(v))); return Promise.resolve(); }
+        update(v) { store[p] = Object.assign({}, store[p] || {}, JSON.parse(JSON.stringify(v))); return Promise.resolve(); },
+        transaction(fn) {
+          const cur = store[p] === undefined ? null : JSON.parse(JSON.stringify(store[p]));
+          const nv = fn(cur);
+          if (nv === undefined) return Promise.resolve({ committed: false });
+          store[p] = JSON.parse(JSON.stringify(nv)); return Promise.resolve({ committed: true });
+        }
       };
     }
   };
@@ -72,8 +78,18 @@ test('ⓒ 저장 층 — 회사마다 한 줄, 받는 주소 없음, 다시 보�
   assert.equal(S.awaitRecord({ coName: 'x', how: '아무거나' }).how, '메일');
   await S.gotAwait(key, 'docABC');
   assert.ok(db.store['pu_docs/await/' + key].got > 0); assert.equal(db.store['pu_docs/await/' + key].gotDoc, 'docABC');
+  await S.markAwait({ coName: '가나상사', how: '받기', names: ['출력용.hwp'] });
+  assert.ok(db.store['pu_docs/await/' + key].got > 0, '다시 📥 받기는 회수 끝난 회사를 대기로 되돌리지 않는다');
+  assert.deepStrictEqual(db.store['pu_docs/await/' + key].names, ['자문계약서.hwp'], '받기는 있던 줄을 건드리지 않는다');
   await S.markAwait({ coName: '가나상사', how: '메일' });
   assert.ok(!('got' in db.store['pu_docs/await/' + key]), '다시 보내면 다시 대기');
+  const at0 = db.store['pu_docs/await/' + key].at;
+  await S.markAwait({ coName: '가나상사', how: '받기', at: at0 + 5 * DAY });
+  assert.equal(db.store['pu_docs/await/' + key].at, at0, '기다리던 회사도 받기로 날수가 0이 되지 않는다');
+  assert.equal(db.store['pu_docs/await/' + key].how, '메일');
+  await S.markAwait({ coName: '다라테크', how: '받기' });
+  assert.equal(db.store['pu_docs/await/' + S.coKey('다라테크')].how, '받기', '처음이면 받기도 대기에 오른다');
+  assert.equal(S.awaitRecord({ coName: 'x', how: '서명' }).how, '서명', '서명 요청은 「서명」으로 남는다(규칙도 받는다)');
   await S.gotAwait('없는회사', 'd1');
   assert.ok(!('pu_docs/await/없는회사' in db.store), '대기에 없던 회사에는 쓰지 않는다');
   await assert.rejects(S.markAwait({ coName: '  ' }));

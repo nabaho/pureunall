@@ -389,6 +389,22 @@
     items.sort(function (a, b) { return String(b.date).localeCompare(String(a.date)); });
     return { items: items, n: n, groups: groups };
   }
+  /* 「+ 기록 만들기」 전에 — 같은 종류의 «✗ 파일 없음» 기록이 있으면 그 기록(같은 날짜 먼저, 아니면 가장 가까운 날짜).
+     ⚠ 예전엔 늘 새 기록을 만들어, 파일 없는 기록 옆에 같은 계약이 한 줄 더 생겼다(검토 2026-10-09) */
+  function linkableRec(items, it) {
+    if (!it || !it.doc) return null;
+    var dayOf = function (d) { var t = Date.parse(d); return isFinite(t) ? t : null; };
+    var c = (items || []).filter(function (x) { return x && x.state === 'missing' && x.rec && x.rec.id && x.kind === (it.kind || '기타'); });
+    if (!c.length) return null;
+    var same = c.filter(function (x) { return x.date && x.date === it.date; })[0];
+    if (same) return same;
+    var t0 = dayOf(it.date);
+    if (t0 == null) return c.length === 1 ? c[0] : null;
+    return c.slice().sort(function (a, b) {
+      var da = dayOf(a.date), db = dayOf(b.date);
+      return (da == null ? Infinity : Math.abs(da - t0)) - (db == null ? Infinity : Math.abs(db - t0));
+    })[0];
+  }
   /* 모든 회사 — { 열쇠: coSort 결과 } (pu_docs/co_recs·co_docs 원본 모양) */
   function coIndex(allRecs, allDocs) {
     var out = {}, keys = {};
@@ -1561,6 +1577,16 @@
       });
       return el('div', { 'class': 'pod-kchips', role: 'group', 'aria-label': '갈래·대조로 거르기' }, row);
     }
+    /* △ 기록 없는 파일 — 같은 종류의 «파일 없음» 기록이 있으면 거기에 잇기를 먼저 묻는다(취소하면 새 기록) */
+    function recForDoc(items, it) {
+      var to = linkableRec(items, it), key = S.sel;
+      if (to && w.confirm('「' + to.kind + ' · ' + (to.date || '날짜 없음') + '」 계약 기록(✗ 파일 없음)에 이 파일을 이을까요?\n\n'
+          + '파일: ' + (it.title || '계약서') + (it.date ? ' (' + it.date + ')' : '') + '\n[취소] 를 누르면 새 기록을 만듭니다')) {
+        store.updateCoRec(key, to.rec.id, { docId: it.doc.id }).then(function () { toast('기록에 파일을 이었습니다'); load(true); }, function (e) { toast('❌ ' + msg(e)); });
+        return;
+      }
+      openRec(null, { kind: it.kind || '기타', date: it.date || ymd(Date.now()), docId: it.doc.id });
+    }
     /* 고른 회사 — 갈래마다 한 묶음: 기록·파일을 한 줄씩, 상태와 할 일 */
     function kindBox() {
       var x = S.idx && S.idx[S.sel];
@@ -1580,7 +1606,7 @@
             var act = it.state === 'norec' || it.state === 'none'
               ? [el('button', { type: 'button', 'class': 'pod-b', text: it.state === 'none' ? '✏ 종류 정하기' : '+ 기록 만들기',
                   title: it.state === 'none' ? '이 파일의 계약 종류를 정합니다' : '이 파일에 이어진 계약 기록을 만듭니다(종류·날짜는 짐작값 — 고치세요)',
-                  onclick: function () { if (it.state === 'none') openDoc(it.doc); else openRec(null, { kind: it.kind || '기타', date: it.date || ymd(Date.now()), docId: it.doc.id }); } })]
+                  onclick: function () { if (it.state === 'none') openDoc(it.doc); else recForDoc(x.items, it); } })]
               : [];
             return el('div', { 'class': 'pod-krow' }, [
               el('span', { 'class': 'pod-kd', text: it.kind || '—' }),
@@ -1807,7 +1833,7 @@
     archiveRows: archiveRows, pendingBackfill: pendingBackfill, photoCandidates: photoCandidates, sentRows: sentRows,
     filterArchive: filterArchive, fileType: fileType, filterCos: filterCos, filterDocs: filterDocs,
     linkPlan: linkPlan, bzGroups: bzGroups, refNames: refNames, mergePlan: mergePlan, fmtBz: fmtBz,
-    KIND_GROUPS: KIND_GROUPS, groupOfKind: groupOfKind, coSort: coSort, coIndex: coIndex, filterCosBy: filterCosBy,
+    KIND_GROUPS: KIND_GROUPS, groupOfKind: groupOfKind, coSort: coSort, coIndex: coIndex, filterCosBy: filterCosBy, linkableRec: linkableRec,
     mailTargets: mailTargets, sentKindOf: sentKindOf, resendMail: resendMail, awaitView: awaitView, awaitKindOf: awaitKindOf, remindText: remindText,
     mountArchive: mountArchive, mountCompanies: mountCompanies,
     _el: el, _toast: toast, _fmtSize: fmtSize, _ymd: ymd, _css: css, _deniedBanner: deniedBanner
