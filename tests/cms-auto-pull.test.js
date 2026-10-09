@@ -30,3 +30,12 @@ test('서버엔 표 통째가 아니라 줄 하나씩 더한다', () => {
   assert.match(code, /cms_pull\/rows\//);
   assert.doesNotMatch(code, /database:set/);
 });
+test('status 는 칸별 경로로 쓴다 — lastOkAt 은 성공 때만, 통째 객체로 덮지 않는다', () => {
+  assert.match(code, /'cms_pull\/status\/lastOkAt'/);
+  assert.doesNotMatch(code, /['"]cms_pull\/status['"]\s*:/);
+  assert.match(code, /if \(ok\) upd\['cms_pull\/status\/lastOkAt'\]/);
+});
+test('표·조회 단추를 못 찾으면 오류로 돌린다', () => {
+  assert.match(code, /조회 단추 없음/);
+  assert.match(code, /표를 못 찾음/);
+});
