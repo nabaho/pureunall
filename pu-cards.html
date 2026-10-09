@@ -1212,6 +1212,34 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .nck-m .l2{margin-top:6px;text-align:left}
 .mck .nck-m .l2 button{height:34px}
 .mck div.nck-find{margin-top:6px;padding:8px}
+/* 🏚 없어진 듯한 곳 (2026-10-09) — 한 칸은 한 줄, 넘치면 … */
+.mck.gn-box{width:min(1240px,100%)}
+.mck.gn-box>header .em{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mck.gn-box>header h2{flex:none}
+.mck .gn-cards{display:flex;gap:8px;padding:12px 18px;overflow-x:auto}
+.mck .gn-cd{flex:1;min-width:120px;overflow:hidden;border:1px solid #e2e8f0;border-radius:8px;padding:7px 11px;cursor:pointer;white-space:nowrap}
+.mck .gn-cd b{display:block;font-size:19px}
+.mck .gn-cd span{display:block;font-size:12px;color:#64748b;overflow:hidden;text-overflow:ellipsis}
+.mck .gn-cd.on{border-color:#bfdbfe;background:#eff6ff}
+.mck .gn-cd.red b{color:#dc2626}
+.mck .gn-cd.amb b{color:#d97706}
+.mck table.gn{table-layout:fixed}
+.mck table.gn td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mck .gn-tag{display:inline-block;border-radius:10px;padding:0 8px;font-size:11.5px;font-weight:600}
+.mck .gn-tag.nts{background:#fef2f2;color:#991b1b}
+.mck .gn-tag.dom{background:#fffbeb;color:#854d0e}
+.mck .gn-tag.bnc{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.mck .gn-lnk{color:#2563eb;cursor:pointer}
+.mck .act button.mv,.mck .gn-bulk button.mv{border-color:#fecaca;background:#fef2f2;color:#991b1b;font-weight:600}
+.mck .act button.ok,.mck .gn-bulk button.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
+.mck .gn-bulk{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12.5px;color:#64748b;flex-wrap:wrap}
+.mck .gn-bulk button,.mck .gn-more{height:28px;padding:0 10px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;font-size:12.5px;cursor:pointer}
+.mck .gn-open td,.mck div.gn-open{background:#f8fafc;white-space:normal;font-size:12.5px;color:#475569}
+.mck div.gn-open{margin-top:6px;padding:8px}
+.mck .gn-m{padding:10px 0;border-bottom:1px solid #e2e8f0}
+.mck .gn-m .l1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mck .gn-m .l2{margin-top:6px;text-align:left}
+.mck .gn-m .l2 button{height:34px}
 /* ── 첨부 미리보기 창 (대표 승인 목업 2026-09-05) ──
    ⚠ 창을 크게 잡는다. 서식이 든 문서는 좁으면 줄이 접혀 무엇인지 더 알기 어렵다. */
 .mck.pvbox{width:min(1060px,100%);max-height:92vh}
@@ -12267,6 +12295,267 @@ function nameChkHtml(){
     + body + '</div></div></div>';
 }
 
+/* ══════ 🏚 없어진 듯한 곳 (대표 승인 목업 2026-10-09 「추천대로」) ══════
+   「메일에 회사들이 폐업되거나 없어진것들 찾을 수 있을까 · 별도로 정리할 수 있을까」 — 근거 셋을 «한 목록»으로:
+     🏛 국세청 폐업·휴업 — pucards/coInfo/{번호}/ntsState (매달 1일 서버 ntsMonthly · 손 단추)
+     🌐 메일 도메인 없어짐 — pucards/gone/dom   (매일 서버 goneWatch, 도메인 이름 자체가 없을 때만)
+     ↩ 반송 메일          — pucards/gone/bounce (메일 동기화가 반송 알림에서 받는 사람 주소를 뽑는다)
+   회사 하나가 한 줄 — 회사 이름(_norm)으로 근거를 모은다. 회사 이름이 없는 명함은 도메인·주소로 한 줄.
+   ★ 저절로 지우거나 옮기지 않는다 — 사람이 누른 것만:
+     📁 명함 옮기기 — 「업체종료」 폴더로(지우지 않음). 어디에 있었는지 남겨 ↩ 되돌린다.
+     ✓ 정리함 · 살아 있음 — pucards/gone/done/{줄} 에 «그때의 근거»(sig)와 함께 적는다.
+       근거가 바뀌면(새 반송·다음 달 국세청 답) 다시 올라온다 — 사람의 확인이 새 사실을 덮지 않게(국세청 ntsOkOf 와 같은 결).
+   ⚠ 업체관리(이알피) 기록은 고치지 않는다 — 계약 종료는 업체관리에서 사람이 한다.
+   ⚠ 국세청에서 이미 「🧹 폐업 정리」·「영업 중 확인」한 곳(coNtsHandled)은 다시 안 올린다.
+   ⚠ 남의 잠긴 폴더 명함은 안 본다(세지도 옮기지도 않는다). */
+let _gone = null, _goneAsk = false;
+const GONE_PAGE = 50;
+const GONE_FOLDER_RE = /업체\s*종료/;
+const GONE_RANK = { nts:0, dom:1, bnc:2 };
+function goneLoad(cb){
+  if(_gone !== null){ cb && cb(); return; }
+  if(_goneAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
+  _goneAsk = true;
+  Store.db.ref(DB_ROOT + '/gone').once('value').then(function(snap){
+    const v = snap.val() || {};
+    _gone = { dom:v.dom || {}, bounce:v.bounce || {}, done:v.done || {} };
+    cb && cb();
+  }).catch(function(){ _goneAsk = false; });
+}
+function goneKey(k){ return String(k || '').replace(/[.#$\[\]\/]/g, ','); }
+function goneDay(at){
+  if(typeof at === 'number' && at > 0){ const d = new Date(at); return (d.getMonth()+1) + '/' + d.getDate(); }
+  const m = String(at || '').match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+  return m ? Number(m[2]) + '/' + Number(m[3]) : '';
+}
+function goneMs(at){
+  if(typeof at === 'number') return at;
+  const m = String(at || '').match(/(\d{4})\D(\d{1,2})\D(\d{1,2})/);
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : 0;
+}
+function goneRows(){
+  if(!_gone) return [];
+  const EM = (typeof ErpMatch !== 'undefined') ? ErpMatch : null;
+  const nrm = x => (EM && EM._norm) ? EM._norm(x) : String(x || '').toLowerCase().replace(/\s/g, '');
+  const rows = {};
+  const rowOf = (k, nm) => rows[k] || (rows[k] = { key:k, name:String(nm || ''), cards:{}, ev:[], o:null });
+  const addCard = (r, it) => { if(it && it.id && it.kind === 'card' && !inHiddenLocked(it)) r.cards[it.id] = it; };
+  const addEv = (r, ev) => { if(!r.ev.some(x => x.t === ev.t && x.txt === ev.txt)) r.ev.push(ev); };
+  /* 🏛 국세청 */
+  (typeof coList === 'function' ? (coList() || []) : []).forEach(function(o){
+    const c = coNtsCls(coVal(o, 'ntsState'));
+    if((c !== 'gone' && c !== 'soon') || coNtsHandled(o)) return;
+    const nm = o.name || coVal(o, 'company') || o.key;
+    const r = rowOf('n:' + (nrm(nm) || o.key), nm);
+    r.o = o;
+    addEv(r, { t:'nts', txt:(c === 'gone' ? '폐업' : '휴업') + (coVal(o, 'ntsEndDt') ? ' ' + coVal(o, 'ntsEndDt') : ''), at:coVal(o, 'ntsAt') });
+    (o.cards || []).forEach(it => addCard(r, it));
+  });
+  /* 🌐 도메인 · ↩ 반송 — 명함으로 회사를 찾는다 */
+  const byDom = {}, byEm = {};
+  Object.keys(state.items || {}).forEach(function(id){
+    const it = state.items[id];
+    if(!it || it.kind !== 'card' || inHiddenLocked(it)) return;
+    [it.email].concat(Array.isArray(it.emailMore) ? it.emailMore : []).forEach(function(e){
+      e = String(e || '').trim().toLowerCase(); if(e.indexOf('@') < 1) return;
+      (byEm[e] = byEm[e] || []).push(it);
+      const d = e.slice(e.lastIndexOf('@') + 1);
+      (byDom[d] = byDom[d] || []).push(it);
+    });
+  });
+  const place = function(cards, fallback, ev){
+    const by = {};
+    (cards.length ? cards : [null]).forEach(function(it){
+      const nm = it ? String(it.company || '').trim() : '';
+      const k = (nm && nrm(nm)) ? 'n:' + nrm(nm) : 'x:' + fallback;
+      (by[k] = by[k] || { nm:nm || fallback, list:[] }).list.push(it);
+    });
+    Object.keys(by).forEach(function(k){ const r = rowOf(k, by[k].nm); by[k].list.forEach(it => addCard(r, it)); addEv(r, ev); });
+  };
+  Object.keys(_gone.dom).forEach(function(k){
+    const x = _gone.dom[k]; if(!x || x.st !== 'none' || !x.d) return;
+    place(byDom[x.d] || [], x.d, { t:'dom', txt:x.d + ' 없음', at:x.at });
+  });
+  Object.keys(_gone.bounce).forEach(function(k){
+    const x = _gone.bounce[k]; if(!x || !x.em) return;
+    place(byEm[x.em] || [], x.em, { t:'bnc', txt:'반송 ' + goneDay(x.at), at:x.at, em:x.em });
+  });
+  return Object.keys(rows).map(function(k){
+    const r = rows[k];
+    r.cards = Object.keys(r.cards).map(id => r.cards[id]);
+    r.ev.sort((a,b)=> GONE_RANK[a.t] - GONE_RANK[b.t]);
+    r.sig = r.ev.map(x => x.t + ':' + x.txt).sort().join('|');
+    r.at = r.ev.reduce((m, x) => Math.max(m, goneMs(x.at)), 0);
+    r.rank = GONE_RANK[r.ev[0].t];
+    let who = r.o && r.o.erp && r.o.erp.main;
+    if(!who && EM && EM.match) for(const it of r.cards){ const m = EM.match(it); if(m && m.main){ who = m.main; break; } }
+    r.who = who || '';
+    const d = _gone.done[goneKey(k)];
+    r.state = (d && d.sig === r.sig) ? d.v : 'todo';
+    return r;
+  }).sort((a,b)=> a.rank - b.rank || String(a.name).localeCompare(String(b.name), 'ko'));
+}
+/* ⚡ 옆줄이 그릴 때마다 부른다 — 명함 전부를 훑으므로 잠깐(3초) 담아 둔다. 적거나 되돌리면 바로 버린다(goneBust). */
+let _goneMemo = null, _goneMemoAt = 0;
+function goneBust(){ _goneMemo = null; }
+function goneTodo(){
+  if(_goneMemo && Date.now() - _goneMemoAt < 3000) return _goneMemo;
+  _goneMemo = goneRows().filter(r => r.state === 'todo'); _goneMemoAt = Date.now();
+  return _goneMemo;
+}
+function goneCount(){ if(_gone === null){ goneLoad(function(){ try{ renderSoon(); }catch(_){ } }); return 0; } return goneTodo().length; }
+function goneFolder(){
+  const gs = Object.values(state.groups || {}).filter(g => g && (g.kind || 'card') === 'card' && GONE_FOLDER_RE.test(String(g.name || '')));
+  gs.sort((a,b)=> (/퇴사/.test(b.name) ? 1 : 0) - (/퇴사/.test(a.name) ? 1 : 0));
+  return gs[0] || null;
+}
+function goneOpen(){
+  state.goneOn = true; state.goneTab = 'todo'; state.goneSel = {}; state.goneRow = ''; state.gonePage = 1;
+  goneLoad(goneMount);
+  goneMount();
+}
+function goneClose(){ state.goneOn = false; goneMount(); }
+function goneMount(){
+  goneBust();
+  let box = document.getElementById('goneBox');
+  if(!box){ if(!state.goneOn) return; box = document.createElement('div'); box.id = 'goneBox'; document.body.appendChild(box); }
+  box.innerHTML = state.goneOn ? goneHtml() : '';
+}
+function goneTabSet(t){ state.goneTab = t; state.goneSel = {}; state.goneRow = ''; state.gonePage = 1; goneMount(); }
+function goneSel(k){ state.goneSel = state.goneSel || {}; if(state.goneSel[k]) delete state.goneSel[k]; else state.goneSel[k] = 1; goneMount(); }
+function goneSelAll(on, keys){ state.goneSel = {}; if(on) (keys || []).forEach(k => { state.goneSel[k] = 1; }); goneMount(); }
+function goneRowToggle(k){ state.goneRow = state.goneRow === k ? '' : k; goneMount(); }
+function goneMore(){ state.gonePage = (state.gonePage || 1) + 1; goneMount(); }
+/* 적기 — 줄마다 «그때의 근거»와 함께 */
+async function goneMark(keys, v, extra){
+  if(!_gone) return toast('기록을 아직 못 읽었습니다 — 잠시 뒤 다시 눌러 주세요');
+  const rows = {}; goneRows().forEach(r => { rows[r.key] = r; });
+  const up = {};
+  (keys || []).forEach(function(k){
+    const r = rows[k]; if(!r) return;
+    up[goneKey(k)] = Object.assign({ v:v, sig:r.sig, name:r.name, n:r.cards.length, at:Date.now(), by:String(myEmail || '') }, (extra && extra[k]) || {});
+  });
+  const n = Object.keys(up).length;
+  if(!n) return toast('고른 줄이 없습니다');
+  try{
+    await Store.db.ref(DB_ROOT + '/gone/done').update(up);
+    Object.assign(_gone.done, up);
+    state.goneSel = {}; goneMount(); renderSoon();
+    if(v === 'alive') toast('「살아 있음」으로 적었습니다 — 근거가 새로 생기면 다시 올라옵니다', 6000);
+    else if(!extra) toast('✓ ' + n + '곳을 정리함으로 적었습니다', 5000);
+  }catch(e){ toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+async function goneMove(keys){
+  const f = goneFolder();
+  if(!f) return toast('「업체종료」 폴더를 찾지 못했습니다 — 명함 폴더에 만들어 주세요', 8000);
+  const rows = {}; goneRows().forEach(r => { rows[r.key] = r; });
+  const extra = {}, hit = []; let n = 0;
+  (keys || []).forEach(function(k){
+    const r = rows[k]; if(!r) return;
+    const moved = {};
+    r.cards.forEach(function(it){ if(String(it.group || '') === f.id) return; moved[it.id] = String(it.group || ''); it.group = f.id; hit.push(it); });
+    extra[k] = { moved:moved, to:f.id };
+    n += Object.keys(moved).length;
+  });
+  if(!Object.keys(extra).length) return toast('고른 줄이 없습니다');
+  if(!confirm('명함 ' + n + '장을 「' + f.name + '」 폴더로 옮깁니다.\n\n지우지 않습니다 — 「정리한 것」에서 ↩ 되돌리면 있던 폴더로 돌아갑니다.')) return;
+  try{
+    if(hit.length) await bulkPatchFlush(hit, ['group']);
+    await goneMark(Object.keys(extra), 'done', extra);
+    render();
+    toast('📁 명함 ' + n + '장을 「' + f.name + '」로 옮겼습니다', 7000);
+  }catch(e){ toast('옮기지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+/* 되돌리기 — 옮긴 명함은 «아직 그 폴더에 있을 때만» 있던 자리로 */
+async function goneUndo(k){
+  const gk = goneKey(k), rec = (_gone && _gone.done[gk]) || null; if(!rec) return;
+  try{
+    const back = [];
+    Object.keys(rec.moved || {}).forEach(function(id){
+      const it = state.items[id];
+      if(it && String(it.group || '') === String(rec.to)){ it.group = rec.moved[id]; back.push(it); }
+    });
+    if(back.length) await bulkPatchFlush(back, ['group']);
+    await Store.db.ref(DB_ROOT + '/gone/done/' + gk).remove();
+    delete _gone.done[gk];
+    goneMount(); render();
+    toast('↩ 되돌렸습니다' + (back.length ? ' — 명함 ' + back.length + '장을 있던 폴더로' : ''), 5000);
+  }catch(e){ toast('되돌리지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+function goneFix(id){ goneClose(); try{ openDetail(id); }catch(_){ } }
+function goneHtml(){
+  const pc = document.body.classList.contains('pc');
+  const all = goneRows(), todo = all.filter(r => r.state === 'todo');
+  const tab = state.goneTab || 'todo', sel = state.goneSel || {};
+  const cnt = t => todo.filter(r => r.ev.some(x => x.t === t)).length;
+  const domCards = todo.filter(r => r.ev.some(x => x.t === 'dom')).reduce((n, r) => n + r.cards.length, 0);
+  const doneRows = all.filter(r => r.state !== 'todo');
+  const list = tab === 'done' ? doneRows : tab === 'todo' ? todo : todo.filter(r => r.ev.some(x => x.t === tab));
+  const show = list.slice(0, (state.gonePage || 1) * GONE_PAGE);
+  const card = (t, n, l, cls) => '<div class="gn-cd' + (tab === t ? ' on' : '') + (cls ? ' ' + cls : '') + '" onclick="goneTabSet(\'' + t + '\')"><b>' + n + '</b><span>' + l + '</span></div>';
+  const tag = x => '<span class="gn-tag ' + x.t + '">' + ({ nts:'🏛 ', dom:'🌐 ', bnc:'↩ ' })[x.t] + esc(x.txt) + '</span>';
+  const onlyDom = r => r.ev.length === 1 && r.ev[0].t === 'dom' && r.cards.length;
+  const btns = function(r){
+    if(r.state !== 'todo') return '<button onclick="goneUndo(\'' + esc(r.key) + '\')">↩ 되돌리기</button>';
+    return (r.cards.length ? '<button class="mv" onclick="goneMove([\'' + esc(r.key) + '\'])">📁 명함 옮기기</button>' : '')
+      + (onlyDom(r) ? '<button onclick="goneFix(\'' + r.cards[0].id + '\')">✎ 메일 고치기</button>' : '')
+      + '<button class="ok" onclick="goneMark([\'' + esc(r.key) + '\'],\'done\')">✓ 정리함</button>'
+      + '<button onclick="goneMark([\'' + esc(r.key) + '\'],\'alive\')">살아 있음</button>';
+  };
+  const detail = function(r){
+    const cs = r.cards.slice(0, 8).map(it => esc(it.name || '(이름 없음)') + (it.title ? ' ' + esc(it.title) : '') + (it.email ? ' (' + esc(it.email) + ')' : '')).join(' · ');
+    const o = r.o;
+    return '명함 ' + r.cards.length + '장' + (cs ? ' — ' + cs + (r.cards.length > 8 ? ' …' : '') : '')
+      + (o && o.bizno ? ' &nbsp;|&nbsp; 사업자번호 ' + esc(o.bizno) : '')
+      + (o && o.erp ? ' · 업체관리 「' + esc(o.erp.status || '등록') + '」' : '')
+      + (r.state !== 'todo' ? ' &nbsp;|&nbsp; ' + (r.state === 'alive' ? '살아 있음' : '정리함') + ' ' + esc(goneDay((_gone.done[goneKey(r.key)] || {}).at)) : '');
+  };
+  let body;
+  if(_gone === null) body = '<p class="em">근거를 읽는 중입니다…</p>';
+  else if(!list.length) body = '<p class="em">' + (tab === 'done' ? '정리한 줄이 없습니다' : '✓ 정리할 곳이 없습니다') + '</p>';
+  else{
+    const keys = show.map(r => r.key), nSel = Object.keys(sel).length;
+    body = (tab === 'done' ? '' : '<div class="gn-bulk"><label><input type="checkbox" ' + (nSel && nSel === keys.length ? 'checked' : '')
+      + ' onclick="goneSelAll(this.checked,' + esc(JSON.stringify(keys)) + ')"> 전체</label> · <b>' + nSel + '곳</b> 고름 '
+      + '<button class="mv" onclick="goneMove(Object.keys(state.goneSel||{}))">📁 고른 ' + nSel + '곳 명함 옮기기</button>'
+      + '<button class="ok" onclick="goneMark(Object.keys(state.goneSel||{}),\'done\')">✓ 정리함</button>'
+      + '<button onclick="goneMark(Object.keys(state.goneSel||{}),\'alive\')">살아 있음</button>'
+      + (pc ? '<span class="em" style="margin-left:auto">차례: 근거가 센 것부터 (국세청 → 도메인 → 반송)</span>' : '') + '</div>');
+    if(pc){
+      body += '<table class="gn"><colgroup><col style="width:30px"><col style="width:42px"><col style="width:16%"><col style="width:58px">'
+        + '<col><col style="width:76px"><col style="width:72px"><col style="width:392px"></colgroup>'
+        + '<tr><th></th><th>#</th><th>회사</th><th>명함</th><th>근거</th><th>확인한 날</th><th>담당</th><th>처리</th></tr>'
+        + show.map(function(r, i){
+          return '<tr><td>' + (tab === 'done' ? '' : '<input type="checkbox" ' + (sel[r.key] ? 'checked' : '') + ' onclick="goneSel(\'' + esc(r.key) + '\')">') + '</td>'
+            + '<td class="em" style="text-align:right">' + (i + 1) + '</td>'
+            + '<td title="' + esc(r.name) + '"><b>' + esc(r.name) + '</b></td>'
+            + '<td><span class="gn-lnk" onclick="goneRowToggle(\'' + esc(r.key) + '\')">' + r.cards.length + '장 ›</span></td>'
+            + '<td title="' + esc(r.ev.map(x => x.txt).join(' · ')) + '">' + r.ev.map(tag).join(' ') + '</td>'
+            + '<td class="em">' + esc(goneDay(r.at)) + '</td>'
+            + '<td>' + (r.who ? '<span class="t">' + esc(r.who) + '</span>' : '<span class="em">—</span>') + '</td>'
+            + '<td class="act">' + btns(r) + '</td></tr>'
+            + (state.goneRow === r.key ? '<tr class="gn-open"><td></td><td></td><td colspan="6">' + detail(r) + '</td></tr>' : '');
+        }).join('') + '</table>';
+    }else{
+      body += show.map(function(r, i){
+        return '<div class="gn-m"><div class="l1">' + (tab === 'done' ? '' : '<input type="checkbox" ' + (sel[r.key] ? 'checked' : '') + ' onclick="goneSel(\'' + esc(r.key) + '\')"> ')
+          + '<span class="em">' + (i + 1) + '</span> <b onclick="goneRowToggle(\'' + esc(r.key) + '\')">' + esc(r.name) + '</b> ' + r.cards.length + '장 '
+          + r.ev.map(tag).join(' ') + '</div><div class="l2 act">' + btns(r) + '</div>'
+          + (state.goneRow === r.key ? '<div class="gn-open">' + detail(r) + '</div>' : '') + '</div>';
+      }).join('');
+    }
+    if(list.length > show.length) body += '<div style="text-align:center;margin-top:10px"><button class="gn-more" onclick="goneMore()">더 보기 (' + (list.length - show.length) + '곳 남음)</button></div>';
+  }
+  return '<div class="mck-dim" onclick="if(event.target===this)goneClose()"><div class="mck gn-box">'
+    + '<header><span>🏚</span><h2>없어진 듯한 곳</h2>'
+    + (pc ? '<span class="em">폐업·이전 등으로 더는 연락이 안 될 것 같은 회사를 모았습니다. 저절로 지우거나 옮기지 않습니다.</span>' : '')
+    + '<span class="x" onclick="goneClose()" title="닫기">✕</span></header>'
+    + '<div class="gn-cards">' + card('todo', todo.length, '정리할 것 (회사)') + card('nts', cnt('nts'), '🏛 국세청 폐업·휴업', 'red')
+    + card('dom', cnt('dom'), '🌐 메일 도메인 없어짐 · 명함 ' + domCards + '장', 'amb') + card('bnc', cnt('bnc'), '↩ 반송 메일')
+    + card('done', doneRows.length, '정리한 것 · 살아 있음') + '</div>'
+    + '<div class="body">' + body + '</div></div></div>';
+}
+
 /* 선택 명함 일괄 담당자 지정 */
 function selPickOwner(){
   if(!Object.keys(state.sel).length) return toast('명함을 먼저 선택하세요');
@@ -14624,6 +14913,8 @@ function openMenu(){
     ${hd('🧹 정리')}
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');openCleanupCenter()">🧹 정리 센터
       <span class="msub">중복·유사·빈·깨짐·휴지통</span></button>
+    <button class="sheetbtn" onclick="menuBg.classList.remove('open');goneOpen()">🏚 없어진 듯한 곳
+      <span class="msub">국세청 폐업·도메인 없어짐·반송 메일</span></button>
 
     ${hd('📥 데이터')}
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');importInput.click()">📥 파일 가져오기
@@ -17210,6 +17501,8 @@ function renderPCSide(){
     ${/* 📥 메일에서 온 연락처 (대표 승인 목업 2026-10-03) — 메일 «앱 창»의 그 화면으로 연다.
          수는 메일 창이 마지막에 센 값이다(이 창에는 메일이 없다). */''}
     <button class="${state.view==='cnt'?'on':''}" onclick="openCntPage()" title="메일에서 처음 온 상대를 업체 담당자 · 명함으로 정리합니다 — 이 창에서 열립니다">📥<em>연락처 정리</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
+    ${/* 🏚 없어진 듯한 곳 (대표 승인 목업 2026-10-09) — 창으로 연다. 수는 «정리할 것» 회사 수 */''}
+    <button onclick="goneOpen()" title="국세청 폐업 · 메일 도메인 없어짐 · 반송 메일로 «없어진 듯한 회사»를 모아 봅니다">🏚<em>없어진 듯한 곳</em><span>${(n => n ? n.toLocaleString() : '')(typeof goneCount === 'function' ? goneCount() : 0)}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
      이미 갈라져 나갔으므로 여기서는 갈래 줄이 늘 그려진다 — 따로 닫을 일이 없다. */
