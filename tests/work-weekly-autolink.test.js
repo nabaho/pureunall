@@ -77,7 +77,7 @@ const FNS = [
   'sentNeed', 'sentLoad', 'sentKey', 'sentBrief', 'sentLogLine', '_mlkWho',
   'alWeeks', 'alIn', 'alItems', 'alMailSure', 'alNarrow', 'alCoNarrow', 'alCatNarrow', 'alMailRows', 'alGroups', 'alAddCand',
   'alCoRows', 'alSentRows', 'alCoHits', 'alCalLine', 'alCalRows', 'alLogOf', 'alCachePut', 'alWrite',
-  'alChunks', 'alEvents', 'alFull', 'alWeekOnce', 'alRun', 'alTook', 'alTookHTML', 'alAmbList',
+  'alChunks', 'alEvents', 'alFull', 'alWeekOnce', 'alToday', 'alCurOnce', 'alRun', 'alTook', 'alTookHTML', 'alAmbList',
   /* 2026-10-03 — 일정에 «만든이»를 함께 담는다(「고를 것」의 단서로만 쓴다).
      후보를 좁히는 데는 안 쓴다 — 그것은 tests/work-autolog-hint.test.js 가 돌려서 지킨다. */
   'alMailKey', 'alSidByMail', 'alHints', 'alNames',
@@ -114,6 +114,8 @@ function box(o) {
     + FNS.map(grab).join('\n'), b);
   /* 「지금」을 고정한다 — alWeeks() 가 인자 없이 불린다 */
   vm.runInContext('var _alW=alWeeks; alWeeks=function(n){ return _alW(n||new Date(' + NOW.getTime() + ')); };', b);
+  /* 이번 주(2026-W41)도 같은 「지금」으로 — 위 검사들의 메일·일정은 지난주(W40)라 이번 주에는 안 걸린다 */
+  vm.runInContext('alToday=function(){ return new Date(' + (o.now || NOW).getTime() + '); };', b);
   return b;
 }
 const it = (id, company, extra) => Object.assign({ company, title: '자문', status: '진행중', mgr_main: { sid: 'S1', name: '박한별' } }, extra || {});
@@ -324,7 +326,9 @@ test('통째로 돈 주는 다시 열 때 사업장 자료·일정을 다시 읽
     items: { I1: it('I1', '가나정밀') }
   });
   await b.alRun();
-  assert.ok(!b.fbDb.reads.some((p) => /gcal_archive|coMail|sentDocs/.test(p)), '다시 읽었습니다: ' + b.fbDb.reads.join(', '));
+  /* 2026-10-03 — 이번 주를 매일 채우면서 «이번 주» 일정은 한 번 읽는다(그 주만, date 색인). 다 돈 주는 다시 안 읽는다. */
+  assert.ok(!b.fbDb.reads.some((p) => /coMail|sentDocs/.test(p)), '다시 읽었습니다: ' + b.fbDb.reads.join(', '));
+  assert.equal(b.fbDb.reads.filter((p) => /gcal_archive/.test(p)).length, 1, '일정을 이번 주 몫보다 더 읽었습니다: ' + b.fbDb.reads.join(', '));
 });
 
 test('고르기 — 고른 업무에 줄을 넣고, 「업무 아님」은 다시 묻지 않는다', async () => {
@@ -385,4 +389,51 @@ test('메일함(mailbox)을 직접 읽지 않는다 · 일정 보관함은 «그
   assert.ok(!/['"]mailbox/.test(all), 'mailbox 를 읽습니다');
   const ev = grab('alEvents');
   assert.ok(/orderByChild\('date'\)/.test(ev) && /startAt\(/.test(ev) && /endAt\(/.test(ev), '보관함을 통째로 받습니다');
+});
+
+/* ── 이번 주도 «매일» (대표 지시 2026-10-04 → 추천대로) ── */
+
+test('★ 이번 주 — 오늘까지 온 메일은 바로 넣고, 「통째로 돌았다」 표는 안 남긴다', async () => {
+  const b = box({
+    now: new Date(2026, 9, 7, 15, 0, 0),                 // 10.7(수) 오후 — 이번 주는 W41(10.5~10.11)
+    items: { I1: it('I1', '가나정밀', { contacts: [{ email: 'boss@gana.co.kr' }] }) },
+    mail: [{ _k: 'C1', at: at(2026, 10, 6), from: 'boss@gana.co.kr', subject: '10월 근태자료' }],
+    seed: { work_erp: { autoweek: { [W40]: { n: 0 }, '2026-W39': { n: 0 } } } }
+  });
+  assert.equal(await b.alRun(), 1);
+  const L = logsOf(b, 'I1');
+  assert.equal(L.length, 1); assert.equal(L[0].w, '2026-W41'); assert.equal(L[0].d, '2026-10-06');
+  assert.ok(!(b.fbDb.root.work_erp.autoweek || {})['2026-W41'], '이번 주에 「통째로 돌았다」 표를 남겼습니다 — 월요일에 사업장별 자료를 안 읽게 됩니다');
+  assert.ok(!b.fbDb.reads.some((p) => /coMail|sentDocs/.test(p)), '이번 주에 사업장별 자료를 읽었습니다(무겁다)');
+});
+
+test('★ 이번 주 — 앞으로 잡힌 일정(오늘 것 포함)은 넣지 않는다 · 지난 일정은 넣는다', async () => {
+  const b = box({
+    now: new Date(2026, 9, 7, 15, 0, 0),
+    items: { I1: it('I1', '가나정밀') },
+    seed: { work_erp: { autoweek: { [W40]: { n: 0 }, '2026-W39': { n: 0 } } },
+      data: { gcal_archive: {
+        P: { id: 'P', date: '2026-10-06', summary: '가나정밀 미팅' },      // 어제 — 넣는다
+        T: { id: 'T', date: '2026-10-07', summary: '가나정밀 점검' },      // 오늘 — 아직이다
+        F: { id: 'F', date: '2026-10-09', summary: '가나정밀 방문' } } } }   // 앞으로 — 안 넣는다
+  });
+  assert.equal(await b.alRun(), 1);
+  assert.deepEqual(logsOf(b, 'I1').map((l) => l.sourceId), ['P']);
+});
+
+test('이번 주에 넣은 줄은 다음 월요일 «통째로» 돌 때 또 들어가지 않는다', async () => {
+  const o = {
+    now: new Date(2026, 9, 7, 15, 0, 0),
+    items: { I1: it('I1', '가나정밀', { contacts: [{ email: 'boss@gana.co.kr' }] }) },
+    mail: [{ _k: 'C1', at: at(2026, 10, 6), from: 'boss@gana.co.kr', subject: '10월 근태자료' }],
+    seed: { work_erp: { autoweek: { [W40]: { n: 0 }, '2026-W39': { n: 0 } } } }
+  };
+  const b = box(o);
+  await b.alRun();
+  /* 다음 월요일 아침 — 이 주(W41)가 «지난주»가 되어 통째로 돈다 */
+  const mon = box(Object.assign({}, o, { seed: b.fbDb.root, now: new Date(2026, 9, 12, 9, 0, 0) }));
+  vm.runInContext('alWeeks=function(n){ return _alW(n||new Date(2026,9,12,9,0,0)); };', mon);
+  await mon.alRun();
+  assert.equal(logsOf(mon, 'I1').length, 1, '같은 메일이 두 번 들어갔습니다');
+  assert.ok(mon.fbDb.root.work_erp.autoweek['2026-W41'], '월요일에 W41 을 통째로 돌지 않았습니다');
 });

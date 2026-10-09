@@ -76,7 +76,11 @@
 
   /* 주 내비 + 포커스 */
   .wkpill{font-size:12.5px;font-weight:700;color:var(--acc2);background:var(--acc-soft);border:1px solid #bfdbfe;border-radius:14px;padding:3px 13px;cursor:pointer;font-variant-numeric:tabular-nums;user-select:none}
-  .wknav{color:var(--faint);cursor:pointer;padding:2px 7px;border-radius:6px;font-size:14px;user-select:none}
+  .wknav{color:var(--sub);cursor:pointer;padding:2px 9px;border-radius:7px;font-size:12px;font-weight:700;
+    user-select:none;border:1px solid var(--line);background:#fff;white-space:nowrap}
+  .wknav.wkcur{color:var(--acc2);border-color:#bfdbfe}
+  /* 주 이동 덩어리 — 도구줄이 접혀도 ‹ 와 › 가 떨어지지 않는다 */
+  .wkgrp{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;flex:0 0 auto}
   .wknav:hover{background:var(--bg)}
   /* 캘린더 (월·주·일 + 레이어 체크) — 격자선은 옅게, 강조는 오늘·이벤트에만 */
   .calwrap{background:#fff;border:1px solid #e2e8f0;border-radius:14px;margin:0 0 12px;overflow:hidden;
@@ -1397,6 +1401,20 @@ function weekLabel(mon){var fri=addDays(mon,4);
   return (mon.getMonth()+1)+'월 '+wno+'주 · '+(mon.getMonth()+1)+'.'+mon.getDate()+' ~ '+(fri.getMonth()+1)+'.'+fri.getDate();}
 function curMonday(){return mondayOf(new Date());}
 function isCurWeek(){return ymd(S.week)===ymd(curMonday());}
+/* 주 이동 — 「‹ 지난주 · 📅 이 주 · 다음 주 ›」를 «한 덩어리»로 (대표 지시 2026-10-04
+   「지난주와 다음주 등을 계속 확인할 수 있게 — 지금 화면에서는 과거 확인이 어렵다」).
+   ⚠ 예전에는 ‹ 와 › 가 따로 놓인 흐린 글자였다. 도구줄이 두 줄로 접히면 ‹ 만 윗줄 끝(화면 밖)에
+     남아, 지난주로 가는 길이 «안 보였다». 덩어리를 줄바꿈 없이 묶고(.wkgrp) 글자 단추로 바꾼다.
+   ⚠ 다른 주를 보고 있으면 「이번 주로」를 붙인다 — 몇 주를 거슬러 갔다가 돌아오는 길.
+   ⚠ 키보드 [ ] 는 그대로다. */
+function wkNavHTML(){
+  return '<span class="wkgrp">'
+    +'<span class="wknav" onclick="shiftWeek(-1)" title="지난주 — 키보드 [">‹ 지난주</span>'
+    +'<span class="wkpill" id="wkpill" onclick="openCal()">📅 '+esc(weekLabel(S.week))+' ▾</span>'
+    +'<span class="wknav" onclick="shiftWeek(1)" title="다음 주 — 키보드 ]">다음 주 ›</span>'
+    +(isCurWeek()?'':'<span class="wknav wkcur" onclick="setWeek(null)">이번 주로</span>')
+    +'</span>';
+}
 function inWeek(dateStr,mon){var d=new Date(dateStr+'T00:00:00');return d>=mon&&d<addDays(mon,7);}
 /* 기한까지 며칠 — today 를 넘기면 그 날을 기준으로 센다.
    ⚠ 안 넘기면 «지금 이 컴퓨터의 오늘»이다(예전 그대로. 부르는 곳 아홉은 그대로 둔다).
@@ -5709,6 +5727,30 @@ function alWeekOnce(mon){
     });
   });
 }
+/* ── 이번 주도 «매일» (대표 지시 2026-10-04 「이미 푸른메일에 들어왔던 내용들 간략하게
+   기록에 정리 되지 않았나?」 → 추천대로) ──
+   주간 자동 기록은 «지난주»를 월요일에 채웠다. 그래서 이번 주 칸은 다음 월요일까지 비어,
+   메일이 왔는데도 화면에는 아무것도 없었다.
+   ★ 열 때마다 이번 주의 «오늘까지» 온 받은 메일과 «이미 지난» 일정을 넣는다.
+   ⚠ 앞으로 잡힌 일정은 넣지 않는다 — 안 한 일을 한 것처럼 남기지 않는다(오늘 것도 아직이다).
+   ⚠ 사업장별 요약·보낸 서류는 사업장마다 한 칸씩 읽어야 해 무겁다 — 이번 주에는 안 읽고
+     월요일 «통째로» 돌 때(alWeekOnce) 그대로 읽는다. 그래서 「통째로 돌았다」 표(autoweek)도 안 남긴다.
+   ⚠ 같은 줄은 안 겹친다 — 원천 열쇠로 한 번만 적는다(alWrite). 월요일에 다시 봐도 건너뛴다. */
+function alToday(){ return new Date(); }
+function alCurOnce(now){
+  var mon=mondayOf(now), wk=weekKeyOf(mon), today=ymd(now);
+  return Promise.all([
+    fbDb.ref(NS+'/autolog/'+wk).once('value').then(function(s){ return s.val()||{}; }),
+    alEvents(mon),
+    calLoadSrc().catch(function(){ return null; })
+  ]).then(function(r){
+    var al=r[0];
+    alBox[wk]=al;
+    var rows=alMailRows(mon).filter(function(x){ return x.d<=today; })
+      .concat(alCalRows(mon,r[1],calSrc.sch||[]).filter(function(x){ return x.d<today; }));
+    return alWrite(wk,rows,al);
+  });
+}
 /* 한 바퀴 — 조용히 돈다(토스트를 띄우지 않는다). 업무·메일이 아직 안 왔으면 조금 뒤 다시 */
 function alRun(){
   if(_alBusy||typeof fbDb==='undefined'||!fbDb) return Promise.resolve(0);
@@ -5717,6 +5759,8 @@ function alRun(){
   return alWeeks().reduce(function(p,mon){
     return p.then(function(){ return alWeekOnce(mon).then(function(n){ total+=n; }); });
   },Promise.resolve()).then(function(){
+    return alCurOnce(alToday()).then(function(n){ total+=n; });
+  }).then(function(){
     _alBusy=false;
     if(total) route();
     return total;
@@ -6555,9 +6599,7 @@ function renderMy(){
     +colBtn('my')+viewChips()
     +'<span class="sepv"></span>'
     +calBtn()
-    +'<span class="wknav" onclick="shiftWeek(-1)">‹</span>'
-    +'<span class="wkpill" id="wkpill" onclick="openCal()">📅 '+esc(weekLabel(S.week))+' ▾</span>'
-    +'<span class="wknav" onclick="shiftWeek(1)">›</span>'
+    +wkNavHTML()
     +'</div>'
     +splitOpen();                       // 캘린더가 켜져 있으면 여기서부터 좌우로 갈린다
   /* 상태 알림은 줄로 남긴다 — 「왜 목록이 이렇게 보이는가」라 안 보이면 헷갈린다.
@@ -11535,9 +11577,7 @@ function renderTeam(){
     +(_tv==='table'?colBtn('team'):'')         // 열 접기는 표에만 있는 이야기다
     +viewChips()+teamViewSeg()
     +calBtn()
-    +'<span class="wknav" onclick="shiftWeek(-1)">‹</span>'
-    +'<span class="wkpill" id="wkpill" onclick="openCal()">📅 '+esc(weekLabel(S.week))+' ▾</span>'
-    +'<span class="wknav" onclick="shiftWeek(1)">›</span></div>'
+    +wkNavHTML()+'</div>'
     +splitOpen();                       // 캘린더가 켜져 있으면 여기서부터 좌우로 갈린다
   /* 현황판 — 사람 칸만 두고 끝낸다.
      깔때기·정렬·접기는 표의 도구다. 여기까지 끌고 오면 손잡이가 스무 개가 되어
@@ -12354,6 +12394,25 @@ var PE_MIRROR=['no','cat','ptype','company','client','officer','title','due','st
 var PE_TKEY={company:'biz_company_types',case:'biz_case_types',consulting:'biz_cons_types',
   fund:'biz_fund_types',other:'biz_other_types'};
 var peTypes={};
+/* 푸른이알피 유형의 «약칭» (대표 지시 2026-10-04 「업무 부분에 모든 단어를 넣는 것보다
+   푸른이알피의 간략한 이름은 어떤가」 → 추천대로).
+   유형표(biz_*_types)마다 short 칸이 이미 있다 — 일터상생혁신컨설팅 → 일터,
+   통합기술보호지원단 → 기술보호, 공동근로복지기금 → 공동기금 …
+   ⚠ «보이는 글자»만 줄인다. 거르기·검색·저장은 원래 이름 그대로다(ptOf·matchQ) —
+     거르기 기준까지 바꾸면 저장해 둔 거르기가 조용히 어긋난다.
+   ⚠ 유형표에 없는 이름은 그대로 둔다(지어내지 않는다). 유형표가 아직 안 왔어도 원래 이름. */
+function peShort(name){
+  name=String(name==null?'':name).trim(); if(!name) return '';
+  var ks=Object.keys(peTypes||{});
+  for(var i=0;i<ks.length;i++){
+    var arr=peTypes[ks[i]]||[];
+    for(var j=0;j<arr.length;j++){
+      var x=arr[j];
+      if(x&&String(x.name||'').trim()===name){ var sh=String(x.short||'').trim(); return sh||name; }
+    }
+  }
+  return name;
+}
 function peTypeName(kv,code){
   code=String(code==null?'':code).trim(); if(!code) return '';
   var arr=peTypes[kv]||[];
@@ -12411,12 +12470,15 @@ function nameCell(it,xfer){
   // 이관한 계약이면 어디로 넘어갔는지 붙인다 — 감춤을 풀고 볼 때 까닭이 보인다
   var xf=(xfer&&xfer.length)?'<span class="xfer" title="이 계약에서 넘어간 곳입니다">→ '+esc(xfer.join('·'))+'</span>':'';
   var head=(p&&t&&t!==p)?(p+' · '+t):(p||t||'');
+  /* 보이는 것은 약칭, 마우스를 올리면 원래 이름 (peShort) */
+  var full=head;
+  head=(p&&t&&t!==p)?(peShort(p)+' · '+peShort(t)):(peShort(p)||peShort(t)||'');
   function pen(lbl,tip){ return '<span class="prm" onclick="event.stopPropagation();briefEdit(\''
     +escJ(it._id)+'\')" title="'+tip+'">'+lbl+'</span>'; }
   if(!head&&!b) return '<span class="muted" title="유형·업무명·업무 요약이 모두 비어 있습니다">—</span>'
     +pen('✏️ 이름 적기','이 업무의 이름을 적습니다 — 푸른이알피에도 반영됩니다');
   if(!head) return '<span title="업무 요약 — 푸른이알피와 서로 반영됩니다">'+esc(b)+'</span>';
-  return '<span title="업무명 — 푸른이알피 유형'+(t?'·업무명':'')+'">'+esc(head)+'</span>'+xf
+  return '<span title="업무명 — 푸른이알피 유형'+(t?'·업무명':'')+(full!==head?'&#10;'+esc(full):'')+'">'+esc(head)+'</span>'+xf
     +(b?'<div class="brf" title="업무 요약 — 푸른이알피와 서로 반영됩니다">'+esc(b)+'</div>'
        :pen('✏️','무슨 일인지 한 줄 적어 두면 목록에서 바로 보입니다 — 푸른이알피 업무 요약에도 반영됩니다'));
 }
