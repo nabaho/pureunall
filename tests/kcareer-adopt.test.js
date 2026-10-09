@@ -10,7 +10,8 @@
 //   ① 밀어 넣지 않는다 — 본인이 담는다 (경력은 본인이 책임지는 자료다)
 //   ② 끝난 것만 담는다 (진행 중인 일을 경력에 적으면 거짓이다)
 //   ③ 두 번 담기지 않는다
-//   ④ 금액은 안 담는다 (계약서와 엮인 값이라 틀린 채로 증명서에 박힌다)
+//   ④ 사건 금액은 안 담는다 (성공보수가 % 라 확정 금액이 아니다) — 컨설팅·기금·기타는
+//      2026-10-09 대표 지시 「이알피금액도 받아오게」로 이알피 금액(공급가액)을 담는다(kcareer-pusync-amt.test.js)
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
@@ -120,7 +121,7 @@ test('어디서 온 것인지 비고에 남긴다 — 나중에 「이건 뭐지
   assert.match(r.note, /사건-2026-011/);
 });
 
-test('⚠ 금액은 안 담는다 — 계약서와 엮인 값이라 틀린 채로 증명서에 박힌다', () => {
+test('⚠ 사건 금액은 안 담는다 — 성공보수가 % 라 확정 금액이 아니다', () => {
   const r = makeBox({}).toRec('cases',
     Object.assign({}, 사건[0], { contractFee:5000000, amount:3000000, successFee:10 }));
   assert.ok(!('amt' in r), '금액이 담겼다');
@@ -177,10 +178,12 @@ test('되돌리기 번거로운 일이라 물어본 뒤에 담는다', () => {
   assert.ok(b._log.asked, '묻지도 않았다');
 });
 
-test('물을 때 금액을 안 담는다는 것까지 적는다', () => {
+test('물을 때 금액을 어떻게 담는지까지 적는다', () => {
   const b = 상자();
   b.adopt('cases', '권형하');
-  assert.match(b._log.asked, /금액은 담지 않습니다/);
+  assert.match(b._log.asked, /금액은 담지 않습니다/, '사건은 금액을 안 담는다고 말한다');
+  /* 컨설팅·기금·기타는 이알피 금액을 담는다(2026-10-09) — 묻는 말에도 그렇게 적는다 */
+  assert.match(grab('puAdopt'), /금액은 이알피 금액\(부가세 뺀 공급가액\)으로 담습니다/, '컨설팅은 어떻게 담는지 말한다');
   assert.match(b._log.asked, /이미 담은 건은 건너뜁니다/);
 });
 
