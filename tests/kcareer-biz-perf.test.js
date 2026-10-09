@@ -89,3 +89,39 @@ test('④ 메일은 누를 때만 읽고 · 찾은 것은 기기에만 · 실적
   assert.ok(!/set\('consult'|saveForm|submitForm/.test(to), '저장은 사람이 누른다');
   assert.match(SRC, /<script src="js\/kcareer-biz\.js\?v=\d+"><\/script>/);
 });
+
+test('⑤ 담당자 — 명부 이름만 · 담당 가까이 +3 · 「대표」 서명은 깎는다', () => {
+  const 명부 = ['홍길동', '김철수', '이영희', '대표자'];
+  const 글 = '수고 많으십니다.\n본 컨설팅의 담당 컨설턴트 김철수 노무사가 작성한 결과보고서를 보내 드립니다.\n'
+    + '---\n푸른노무법인 대표노무사 홍길동\n대표 홍길동 드림';
+  const r = B.ownerGuess(글, 명부);
+  assert.equal(r[0].name, '김철수', '담당 가까이 적힌 사람이 1등 — 서명의 대표가 아니라');
+  assert.equal(r[0].near, true);
+  assert.ok(/담당 컨설턴트 김철수/.test(r[0].ctx), '어디서 읽었는지 보여 준다');
+  assert.ok(!r.some((h) => h.name === '이영희'), '안 나온 이름은 없다 — 지어내지 않는다');
+  assert.deepEqual(B.ownerGuess('결과보고서 송부', 명부), [], '이름이 없으면 빈 목록');
+  assert.deepEqual(B.ownerGuess('박아무개 담당', 명부), [], '명부에 없는 이름은 찾지 않는다');
+});
+
+test('⑤ 담당을 읽을 첨부 — 결과·완료·최종 보고 + pdf·hwp·hwpx 만', () => {
+  const atts = [{ name: '업체방문확인서.pdf', size: 1000 }, { name: '취업규칙.hwp', size: 1000 },
+    { name: '컨설팅 결과보고서_최종.hwp', size: 1000, part: '3' }, { name: '최종보고서.pptx', size: 1000 }];
+  assert.deepEqual(B.reportAtt(atts), { a: atts[2], i: 2 }, '차례(i)와 조각(part)을 함께 — 조각으로 집는다');
+  assert.equal(B.reportAtt([{ name: '최종보고서.pptx', size: 1 }]), null, '글자를 못 꺼내는 꼴은 안 받는다');
+  assert.equal(B.reportAtt([{ name: '결과보고서.pdf', size: 20 * 1024 * 1024 }]), null, '너무 큰 것은 안 받는다');
+});
+
+test('⑤ 화면 — 미리 받기(읽음 표시 안 건드림) · 같은 창구 · 실적은 안 고친다', () => {
+  const own = strip(떼기('async function bizMailOwner('));
+  assert.ok(/readMailMessage'[^)]*peek:1/.test(own.replace(/\s+/g, ' ')), '미리 받기 — 읽음 표시를 안 건드린다');
+  assert.ok(/readOldMail/.test(own), '지난 메일은 POP3 창구');
+  assert.ok(!/set\('consult'/.test(own), '실적의 담당을 고치지 않는다 — 후보만');
+  const at = strip(떼기('async function _bizAttText('));
+  assert.ok(/part:String\(att\.part/.test(at), '첨부는 조각 이름(part)으로 집는다');
+  assert.ok(/readMailAttachment/.test(at), '메일함과 같은 창구');
+  const batch = strip(떼기('async function bizMailOwnerBatch('));
+  assert.ok(/for\(/.test(batch) && /await bizMailOwner\(/.test(batch) && /_bizOwnStop/.test(batch), '한 통씩 · 멈출 수 있다');
+  const chip = strip(떼기('function _bizOwnerChip('));
+  assert.ok(/실적엔/.test(chip), '실적 담당과 다르면 «다르다»고만');
+  assert.ok(/넣기\('main'/.test(strip(떼기('function bizMailToPerf('))), '실적으로 열 때 담당 칸에 후보');
+});
