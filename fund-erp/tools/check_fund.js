@@ -1203,7 +1203,7 @@ ok('학습 저장·조회·삭제', src.includes('function learnAcct') && src.in
 ok('학습 관리 화면', src.includes('function learnedPanel') && src.includes('onclick="learnedPanel()"'));
 // 일반 적요('인터넷출금이체')를 배우면 모든 거래가 그 계정으로 오분류된다
 ok('일반 적요는 학습 제외 목록에', /var LEARN_SKIP=\[[^\]]*'인터넷출금이체'/.test(src));
-ok('학습이 일반 규칙보다 우선', src.includes("if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true,src:'learned'};"));
+ok('학습이 일반 규칙보다 우선', src.includes("if(lr&&lr.d&&lr.c) return {d:lr.d,c:lr.c,learned:true,src:_learnOwn(lr,fid)?'learned':'learned_other'};"));
 // 입금·출금은 성격이 달라 방향별로 따로 기억해야 한다
 ok('방향별로 기억(i_/o_)', src.includes("return (isDep?'i_':'o_')+head;"));
 ok('승인할 때만 학습', src.includes('learnAcct(x.memo'));
@@ -1343,7 +1343,7 @@ ok('성격 열을 여러 개 읽음(구분·거래기록사항·이체메모·�
 // 농협은 순번 칸의 머리글이 '구분'이라 1·2·3…이 거래성격으로 읽혔다
 ok('숫자만인 값은 성격으로 보지 않음', src.includes('!/^[\\d,.\\s]+$/.test(t)'));
 ok('거래마다 kind를 담음', src.includes('kind:kind});'));
-ok('가져오기가 kind를 넘기고 보관', src.includes('proposeAcct(x.memo,x.deposit>0,_snames,x.kind)')
+ok('가져오기가 kind를 넘기고 보관', src.includes('proposeAcct(x.memo,x.deposit>0,_snames,x.kind,_fid)')
   && src.includes("kind:(x.kind||'')"));
 // 공동기금 최대 유입인 출연금은 적요에 '출연' 없이 회사명만 찍힌다((주)가온로지콘·청원건설)
 ok('참여사업장명 입금을 출연금으로', src.includes('function _siteNames')
