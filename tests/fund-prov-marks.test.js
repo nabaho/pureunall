@@ -29,8 +29,10 @@ test('★★ 잣대 — 확인함과 같다(기계·미확인 / 확인 / 사람 
   assert.equal(box.st({ m: 1, ok: { by: 'x', at: 'y' } }), 'o');
   assert.equal(box.st({ m: 0, src: 'hand' }), 'h');
   assert.equal(box.st(undefined), '', '기록이 없으면 지어 붙이지 않는다');
-  /* 확인함의 «미확인» 조건과 글자 그대로 맞대 본다 */
-  assert.match(strip(grabFn('_rvItems')), /if\(p\.m!==1\|\|p\.ok\|\|p\.how==='dialog'\) return;/, '확인함 잣대가 바뀌었습니다 — _provState 도 함께 바꾸세요');
+  /* 확인함의 «미확인» 조건과 글자 그대로 맞대 본다 — «확인됨» 식은 둘이 같은 글자(🛡 자동 확정은 켜진 규칙일 때만, 2026-10-09) */
+  const OK = "(p.ok&&(!p.ok.rule||(typeof _trOn==='function'&&_trOn(p.ok.rule))))";
+  assert.ok(strip(grabFn('_rvItems')).includes("if(p.m!==1||" + OK + "||p.how==='dialog') return;"), '확인함 잣대가 바뀌었습니다 — _provState 도 함께 바꾸세요');
+  assert.ok(strip(grabFn('_provState')).includes('if(' + OK + "||(p.m===1&&p.how==='dialog')) return 'o';"), '딱지 잣대가 확인함과 다릅니다');
 });
 
 test('★★ 딱지를 단다 — 기계 칸은 파란 점선, 위 머리에 미확인 수', { skip: !JSDOM && 'jsdom 없음' }, () => {
