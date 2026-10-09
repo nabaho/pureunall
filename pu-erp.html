@@ -67552,7 +67552,7 @@ function MonthClose(props){
 function FinanceAuto(props){
   var isAdm = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && isAdminByUser(CURRENT_USER);
   var lastS = useState(window.__erpCmsAutoLast || null); var last = lastS[0], setLast = lastS[1];
-  var tabS = usePersistedState('finauto_tab', 'check'); var tab = tabS[0], setTab = tabS[1];
+  var tabS = useState('check'); var tab = tabS[0], setTab = tabS[1];
   var onS = useState(function(){ return (dbGet('app_settings', {}) || {}).cmsAutoConfirm === true; });
   var pickS = useState({}); var pick = pickS[0], setPick = pickS[1];
   useEffect(function(){
