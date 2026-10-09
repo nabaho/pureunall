@@ -158,6 +158,8 @@ function 복귀세상(성공) {
   w.ctx.firebase = { auth: { Auth: { Persistence: { LOCAL: 'local', SESSION: 'session' } } } };
   w.ctx.유지 = [];   // setPersistence 가 무엇으로 불렸나 · signIn 보다 먼저인가
   w.ctx.auth.setPersistence = (m) => { w.ctx.유지.push(m); return Promise.resolve(); };
+  w.ctx._persistenceReady = Promise.resolve();
+  w.ctx._persistenceBootError = null;
   w.ctx.auth.signInWithCustomToken = () => { w.ctx.유지.push('signIn'); return Promise.resolve({ user: { email: '', getIdToken: () => Promise.resolve('t') } }); };
   w.ctx.reportLogin = () => {};
   w.ctx.enterPortal = () => { w.ctx.유지.push('enterPortal'); };
@@ -179,6 +181,7 @@ function 첫줄() {
 function 첫줄세상(search) {
   const w = 세상({});
   w.ctx.location = { search };
+  w.ctx.setTimeout = () => 0; // 첫 화면만 검사 — 실제 시계는 login-slow-auth-no-flash 에서 돌린다
   vm.runInContext(첫줄(), w.ctx);
   return w;
 }
@@ -431,11 +434,68 @@ test('⑪ ★★ 카카오에서 돌아와 표를 받기 «직전» 에 고른 �
   for (const [저장값, 기대] of [['0', 'session'], ['1', 'local'], [undefined, 'session']]) {
     const w = 복귀세상(true);
     if (저장값 === undefined) delete w.ctx.localStorage._m.pu_portal_auto; else w.ctx.localStorage._m.pu_portal_auto = 저장값;
+    if (저장값 === '1') w.ctx._persistenceReady = w.ctx.auth.setPersistence('local'); // 실제 화면의 첫 부팅이 이미 시작한 작업
     w.ctx.kkHandleReturn();
     for (let i = 0; i < 5; i++) await 틈();
     assert.deepEqual([...w.ctx.유지].slice(0, 2), [기대, 'signIn'],
       '★★ 「로그인 유지」 가 ' + (저장값 || '없음') + ' 인데 ' + JSON.stringify(w.ctx.유지) + ' — 새 페이지는 기본이 «유지» 라, 표 받기 전에 안 정하면 끈 것이 안 먹습니다');
   }
+});
+
+test('⑪ ★★★ 저장 방식 변경이 실제로 끝나기 전에는 인증표가 와도 Firebase 로그인을 시작하지 않는다', async () => {
+  const w = 복귀세상(true);
+  w.ctx.localStorage._m.pu_portal_auto = '0';
+  let 저장완료;
+  w.ctx.auth.setPersistence = (m) => {
+    w.ctx.유지.push(m);
+    return new Promise(resolve => { 저장완료 = resolve; });
+  };
+  const 시계 = [];
+  w.ctx.setTimeout = (fn, ms) => { 시계.push({ fn, ms }); return 시계.length; };
+  w.ctx.clearTimeout = () => {};
+  w.ctx.kkHandleReturn();
+  for (let i = 0; i < 4; i++) await 틈();
+  시계.filter(t => t.ms <= 2000).forEach(t => t.fn()); // 예전 «2초면 준비됐다» 우회 경로를 재현
+  for (let i = 0; i < 4; i++) await 틈();
+  assert.ok(!w.ctx.유지.includes('signIn'), '저장소 작업이 아직 끝나지 않았는데 로그인을 시작했다');
+  저장완료();
+  for (let i = 0; i < 4; i++) await 틈();
+  assert.deepEqual([...w.ctx.유지].slice(0, 2), ['session', 'signIn']);
+});
+
+test('⑨ ★★★ 인증이 15초 넘게 걸려도 실패 화면으로 되돌리지 않고, 늦은 성공을 그대로 받는다', async () => {
+  const w = 복귀세상(true);
+  let 서버완료;
+  w.ctx.PuKakao.loginFinish = () => new Promise(resolve => { 서버완료 = resolve; });
+  const 시계 = [];
+  w.ctx.setTimeout = (fn, ms) => { 시계.push({ fn, ms }); return 시계.length; };
+  w.ctx.clearTimeout = () => {};
+  w.ctx.kkHandleReturn();
+  for (let i = 0; i < 4; i++) await 틈();
+  시계.filter(t => t.ms <= 15000).forEach(t => t.fn());
+  assert.notEqual(w.els['pu-boot-splash'].걷힘, true, '진행 중인데 로그인 화면을 노출했다');
+  assert.equal(w.기록.오류.length, 0, '진행 중인데 실패라고 안내했다');
+  서버완료('CT');
+  for (let i = 0; i < 4; i++) await 틈();
+  assert.ok(w.ctx.유지.includes('enterPortal'), '늦게 도착한 성공을 버렸다');
+});
+
+test('⑪ ★★★ 저장소가 실제로 실패하면 로그인하지 않고 이유와 다른 로그인 길을 보인다', async () => {
+  const w = 복귀세상(true);
+  w.ctx.auth.setPersistence = () => Promise.reject(new Error('IndexedDB unavailable'));
+  w.ctx.kkHandleReturn();
+  for (let i = 0; i < 4; i++) await 틈();
+  assert.ok(!w.ctx.유지.includes('signIn'), '저장 실패를 무시하고 로그인하면 유지 설정이 거짓말이 된다');
+  assert.equal(w.els['pu-boot-splash'].걷힘, true, '실제 실패인데 가림막에 갇혔다');
+  assert.match(w.기록.오류.join(' '), /저장소/);
+  assert.notEqual(w.els.pwFold.style.display, 'none', '실패 뒤 다른 로그인 수단이 가려졌다');
+});
+
+test('⑨ 카카오 복귀 중 기존 세션의 인증 알림으로 포털을 먼저 열지 않는다', () => {
+  const a = 화면.indexOf('auth.onAuthStateChanged(function(user)');
+  const b = 화면.indexOf('} else if(_handled)', a);
+  assert.ok(a >= 0 && b > a);
+  assert.match(화면.slice(a, b), /if\(!_handled && !window\.__kkReturning\)\{ _handled = true; enterPortal\(user\); \}/);
 });
 
 test('⑪ ★ 칸은 노란 단추 바로 밑, 접히는 칸 «밖» 에 하나만 있다', () => {

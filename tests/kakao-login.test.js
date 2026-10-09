@@ -436,6 +436,7 @@ test('★ 화면 — needLink 로 실패했을 때만 표시를 남기고, 포�
     const box = {
       Promise, String, Date, setTimeout, clearTimeout,
       KK_WANT: 'pu_kakao_want_link', _freshLogin: false,
+      _persistenceReady: Promise.resolve(), _persistenceBootError: null,
       sessionStorage: m.api,
       PuKakao: {
         pending: () => ({ code: 'C1', mode: 'login' }),

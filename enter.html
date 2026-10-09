@@ -921,10 +921,9 @@ body.portal-mode #moreFab{display:flex;}
   var m=document.getElementById('pu-boot-msg');
   if(s) s.style.display='flex';
   if(m) m.style.display='block';
-  /* ★ 카카오에서 막 돌아온 참(주소에 code·state)이면 로그인 화면을 보이지 않는다 (대표 보고 2026-09-28
-     「로그인 했는데도 계속 이렇게 나오다가 화면으로 넘어간다」). 서버가 카카오에 확인하는 몇 초 동안
-     로그인 화면이 떠 있으면 «실패했나» 로 보인다. 끝나면 포털이 스플래시를 걷고, 실패하면
-     kkHandleReturn 이 걷는다. 서버가 잠에서 깨는 데 오래 걸릴 수 있어 안전망은 20초다. */
+  /* 카카오 복귀 중에는 인증 성공 또는 실제 실패가 확정될 때까지 로그인 폼을 가린다.
+     느린 휴대전화에서 시간이 지났다는 이유만으로 폼을 보이면 실패처럼 보였다가
+     진행 중인 인증이 끝나 갑자기 포털로 넘어간다. 오래 걸리면 수동 재시작만 제공한다. */
   var kk = /[?&]code=/.test(location.search) && /[?&]state=/.test(location.search);
   if(kk){
     window.__kkReturning = true;
@@ -944,7 +943,22 @@ body.portal-mode #moreFab{display:flex;}
      ⚠ 인증 도구가 아예 안 실렸으면(firebase 없음) 기다릴 것이 없다 — 곧바로 연다. */
   setTimeout(function(){
     var s2=document.getElementById('pu-boot-splash'); if(!s2) return;
-    if(kk || typeof firebase === 'undefined' || !firebase.auth){ s2.remove(); return; }
+    if(kk){
+      if(!window.__kkReturning) return;
+      var km=document.getElementById('pu-boot-msg');
+      if(km) km.textContent='카카오 로그인 확인이 늦어지고 있습니다. 아직 실패한 것은 아닙니다.';
+      setTimeout(function(){
+        if(!window.__kkReturning) return;
+        var ks=document.getElementById('pu-boot-splash'); if(!ks) return;
+        var kb=document.createElement('button');
+        kb.type='button'; kb.id='pu-kakao-restart'; kb.textContent='로그인 다시 시작';
+        kb.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
+        kb.onclick=function(){ location.replace(location.pathname + '?v=' + Date.now()); };
+        ks.appendChild(kb);
+      }, 25000);
+      return;
+    }
+    if(typeof firebase === 'undefined' || !firebase.auth){ s2.remove(); return; }
     var m2=document.getElementById('pu-boot-msg');
     if(m2) m2.textContent='연결이 느려 로그인 확인이 늦어지고 있습니다…';
     var b=document.createElement('button');
@@ -1853,7 +1867,8 @@ body.portal-mode #moreFab{display:flex;}
         window._puAuthAt = Date.now();
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
-        if(!_handled){ _handled = true; enterPortal(user); }
+        // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
+        if(!_handled && !window.__kkReturning){ _handled = true; enterPortal(user); }
       } else if(_handled){
         // 로그아웃됨(유휴 60분·다른 탭 로그아웃 포함) → 화면 바꿔치기 대신 '완전 새로고침'.
         // 오래 방치된 탭은 브라우저 절전으로 얼어 있어, 그 안에서 화면만 바꿔치기하면
@@ -1957,13 +1972,6 @@ body.portal-mode #moreFab{display:flex;}
     if(p.error){ kkEndReturn(); kkUnfoldPw(); showErr(p.error); return; }
     if(p.mode === 'login'){
       _freshLogin = true;
-      /* 휴대전화의 저장소·네트워크가 응답하지 않아도 흰 화면에 영원히 가두지 않는다. */
-      var kkDone = false;
-      var kkWatch = setTimeout(function(){
-        if(kkDone) return;
-        kkEndReturn(); kkUnfoldPw();
-        showErr('카카오 로그인 응답이 늦습니다. 아래 카카오 버튼을 다시 한 번 눌러 주세요.');
-      }, 15000);
       /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
       try { db.ref('.info/connected').once('value'); } catch(_c){}
       /* 인증표를 받는 동안 직원명부도 먼저 받는다. 인증 뒤 다시 통신하던 한 왕복을 없앤다. */
@@ -1971,19 +1979,25 @@ body.portal-mode #moreFab{display:flex;}
         window.__puRosterPrefetch = Promise.resolve(db.ref('data/user_dir').once('value'))
           .catch(function(){ return null; });
       } catch(_r){ window.__puRosterPrefetch = null; }
-      /* 떠나기 전에 고른 「로그인 유지」 대로 맞추되, 서버의 인증표와 «동시에» 준비한다.
-         예전에는 인증표를 받은 뒤 최대 2초를 더 기다려 휴대전화에서 유난히 느렸다. */
+      /* 카카오 인증표와 저장 방식은 동시에 준비하되 둘 다 «실제로 끝난 뒤» 로그인한다.
+         Firebase는 저장 방식 변경을 2초만 기다리는 척해도 signIn에서 다시 기다린다.
+         로그인 유지 켠 경우에는 부팅 때 이미 시작한 LOCAL 작업을 재사용한다. */
       var keep = false;
       try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
-      var persist = auth.setPersistence(keep ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.SESSION);
-      var quickPersist = new Promise(function(resolve){
-        var done=false, t=setTimeout(function(){ if(!done){ done=true; resolve(); } }, 2000);
-        Promise.resolve(persist).then(function(){ if(!done){ done=true; clearTimeout(t); resolve(); } }, function(){ if(!done){ done=true; clearTimeout(t); resolve(); } });
+      var kkStarted = Date.now(), kkServerMs = 0, kkStoreMs = 0;
+      var persist = _persistenceReady.then(function(){
+        if(_persistenceBootError) throw _persistenceBootError;
+        if(!keep) return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+      }).then(function(){ kkStoreMs = Date.now() - kkStarted; }).catch(function(err){
+        if(err && typeof err === 'object') err.puPersistence = true;
+        throw err;
       });
-      Promise.all([PuKakao.loginFinish(p.code), quickPersist]).then(function(ready){
+      var server = PuKakao.loginFinish(p.code).then(function(token){ kkServerMs = Date.now() - kkStarted; return token; });
+      Promise.all([server, persist]).then(function(ready){
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
-        kkDone = true; clearTimeout(kkWatch);
+        // 개인 식별값 없이 이 탭에만 단계별 소요를 남겨 다음 지연 제보를 구별한다.
+        try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({serverMs:kkServerMs, storeMs:kkStoreMs, totalMs:Date.now()-kkStarted})); } catch(_t){}
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
         /* signIn 성공 결과를 이미 받았다. 인증 상태 알림이 한 번 더 올 때까지 기다리지 않고
@@ -1993,12 +2007,13 @@ body.portal-mode #moreFab{display:flex;}
           cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
         } catch(e){}
       }).catch(function(err){
-        kkDone = true; clearTimeout(kkWatch);
         if(err && err.needLink){ try { sessionStorage.setItem(KK_WANT, String(Date.now())); } catch(e){} }
         // 카카오로 못 들어왔으면 비밀번호 칸을 펼친다 — 접힌 채면 «들어올 길이 없는» 화면이 된다
         kkEndReturn();
         kkUnfoldPw();
-        showErr((err && err.message) || '카카오 로그인에 실패했습니다');
+        showErr(err && err.puPersistence
+          ? '이 기기의 로그인 저장소를 열 수 없습니다. 브라우저 저장공간을 확인하거나 로그인 유지를 끄고 다시 시도해 주세요.'
+          : ((err && err.message) || '카카오 로그인에 실패했습니다'));
       });
       return;
     }
