@@ -1353,12 +1353,21 @@ function recWatchHtml(grp){
   if(!_recWatch) return '<div class="recban calm">'+nm+' — 불러오는 중입니다…</div>';
   var last=_recWatch.last||{}, seen=recObj('recruit_seen');
   var all=recWatchHits().filter(function(x){ return GovRecruit.hitGroup(x)===grp; });
-  var errs=(last.errors||[]).map(function(e){ return e.board; }).filter(function(b){ return (/^kcplaa/.test(b)?'kc':'pub')===grp; });
+  var errs=(last.errors||[]).filter(function(e){ return e && (/^kcplaa/.test(e.board)?'kc':'pub')===grp; });
+  /* ⚠ 여러 날 못 읽는 곳은 「다음 날 다시 읽습니다」로 넘기지 않는다 — 새 모집 글을 놓친다(지방공기업평가원 2026-10-05~) */
+  var fails=_recWatch.fails||{}, stuck=errs.filter(function(e){ var f=fails[e.board]; return f && (f.n||0)>=2; });
+  var errName=function(e){ var f=fails[e.board]||{}; return e.name||f.name||recOrgName(e.board)||e.board; };
+  var stuckHtml=stuck.map(function(e){
+    var f=fails[e.board], u=String(e.url||f.url||'');
+    return '<div class="recban">⚠ 서버가 <b>'+esc(errName(e))+'</b> 게시판을 '+esc(String(f.since||'').slice(5).replace('-','.'))+'부터 <b>'+(f.n||2)+'일째</b> 못 읽고 있습니다 — 새 모집 글을 놓칠 수 있으니 직접 확인해 주세요. '
+      +(/^https:\/\//.test(u)?'<a href="'+esc(u)+'" target="_blank" rel="noopener">🔗 게시판 직접 열기</a>':'')
+      +' <span class="sml" title="'+esc(e.why||f.why||'')+'">(까닭: '+esc(String(e.why||f.why||'').slice(0,60))+')</span></div>';
+  }).join('');
   var fresh=all.filter(function(x){ return !seen[x.key]; });
   var info='<span class="sml">— 서버가 매일 아침 7시 20분에 '+(last.checked?last.checked+'곳':'기관')+' 게시판을 읽습니다'
     +(last.at?' · 마지막 '+esc(new Date(last.at).toLocaleString('ko-KR')):' · 아직 한 번도 안 돌았습니다')
-    +(errs.length?' · <span style="color:var(--red)">못 읽은 곳 '+errs.length+'('+esc(errs.join(', '))+') — 다음 날 다시 읽습니다</span>':'')+'</span>';
-  var head='<div class="rec-head"><b>'+nm+'</b>'+(fresh.length?' <span class="tag red">새 글 '+fresh.length+'</span>':' <span class="sml">('+all.length+'건)</span>')+' '+info+'</div>';
+    +(errs.length?' · <span style="color:var(--red)">못 읽은 곳 '+errs.length+'('+esc(errs.map(errName).join(', '))+')'+(stuck.length<errs.length?' — 다음 날 다시 읽습니다':'')+'</span>':'')+'</span>';
+  var head=stuckHtml+'<div class="rec-head"><b>'+nm+'</b>'+(fresh.length?' <span class="tag red">새 글 '+fresh.length+'</span>':' <span class="sml">('+all.length+'건)</span>')+' '+info+'</div>';
   if(!all.length) return head+'<div class="recban calm">'+(last.at?'아직 걸린 모집 글이 없습니다.':'첫 실행(아침 7시 20분) 뒤에 채워집니다.')+'</div>';
   /* 갈래 단추 — 제목 내용으로 가른 것(GovRecruit.kindOf) */
   var cnt={}; all.forEach(function(x){ var k=GovRecruit.kindOf(x.title); cnt[k]=(cnt[k]||0)+1; });

@@ -717,3 +717,36 @@ test('★★ 공인노무사회 두 공지판에만 ai 표시 — 공문이 그�
   assert.equal(W.BOARDS.filter((b) => b.ai).length, 2, '다른 판에 AI 를 켰다');
   assert.ok(W.LIMITS.aiMax > 0 && W.LIMITS.aiMax <= 10);
 });
+
+/* ── 며칠째 못 읽는 게시판 (2026-10-09, 지방공기업평가원 10-05~ 서버에서만 실패) ── */
+test('★★ 못 읽은 게시판은 이름·주소와 함께 남긴다(화면이 직접 열 길을 준다)', async () => {
+  const B = { id: 'erc', org: 'erc', name: '지방공기업평가원 공지', url: 'https://e.kr/list', page: 'https://e.kr/page' };
+  const r = await W.run({ boards: [B], today: '2026-10-10', fetchText: async () => { throw new Error('fetch failed'); } });
+  assert.deepEqual(r.errors, [{ board: 'erc', why: 'fetch failed', name: '지방공기업평가원 공지', url: 'https://e.kr/page' }]);
+});
+test('★★★ fails — 처음 못 읽은 날·이어진 날 수, 다시 읽히면 지운다, 안 읽은 판은 그대로', () => {
+  const res = (errs, counts) => ({ hits: [], errors: errs, counts, checked: 3 });
+  const E = (b) => ({ board: b, why: 'fetch failed', name: b + ' 공지', url: 'https://' + b + '.kr/' });
+  let u = W.updatesOf(res([E('erc')], { semas: 10 }), {}, 'T', { fails: {}, today: '2026-10-10' });
+  assert.deepEqual(u['fails/erc'], { since: '2026-10-10', n: 1, last: '2026-10-10', why: 'fetch failed', name: 'erc 공지', url: 'https://erc.kr/' });
+  const prev = { erc: { since: '2026-10-05', n: 5, last: '2026-10-09', name: 'erc 공지', url: 'https://erc.kr/' }, semas: { since: '2026-10-08', n: 2, last: '2026-10-09' }, lh: { since: '2026-10-01', n: 3, last: '2026-10-09' } };
+  u = W.updatesOf(res([E('erc')], { semas: 10 }), {}, 'T', { fails: prev, today: '2026-10-10' });
+  assert.equal(u['fails/erc'].since, '2026-10-05'); assert.equal(u['fails/erc'].n, 6, '이어진 날 수');
+  assert.equal(u['fails/semas'], null, '다시 읽혔으면 지운다');
+  assert.equal(u['fails/lh'], undefined, '이번에 안 읽은 판은 건드리지 않는다');
+  const same = W.updatesOf(res([E('erc')], {}), {}, 'T', { fails: { erc: { since: '2026-10-05', n: 6, last: '2026-10-10' } }, today: '2026-10-10' });
+  assert.equal(same['fails/erc'].n, 6, '같은 날 두 번 돌아도 하루로 센다');
+  const rows0 = W.updatesOf(res([{ board: 'tp', why: '줄을 하나도 못 뽑았습니다' }], { tp: 0 }), {}, 'T', { fails: {}, today: '2026-10-10' });
+  assert.equal(rows0['fails/tp'].n, 1, '줄을 못 뽑은 것도 실패');
+  assert.equal(W.updatesOf(res([E('erc')], {}), {}, 'T')['fails/erc'], undefined, 'today 없이는 안 쓴다(옛 부르는 쪽)');
+});
+test('★★ 서버 — fetch 가 못 열면 node https(IPv4)로 한 번 더 · fails 를 읽어 넘긴다', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
+  const i = src.indexOf('function 모집다른길'); const j = src.indexOf('exports.recruitWatch'); const body = src.slice(i, src.indexOf('\nexports.', j + 30));
+  assert.ok(i > 0, '다른 길이 없다');
+  assert.match(body, /require\("https"\)\.get\(u, \{ family: 4, timeout: 30000/);
+  assert.match(body, /넘김 < 3/);
+  assert.match(body, /catch \(e\) \{[\s\S]*?return await 모집다른길\(u, raw, 0\)/, 'fetch 실패 뒤에 다른 길을 안 부른다');
+  assert.match(body, /root\.child\("fails"\)\.once\("value"\)/);
+  assert.match(body, /RecruitWatch\.updatesOf\(result, existing, nowIso, \{ fails, today \}\)/);
+});
