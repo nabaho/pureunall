@@ -164,8 +164,8 @@ test('DOC_PARSE 에 재직증명서가 등록돼 있다 — 없으면 판독 자
 
 test('파일로 올리는 길과 사진첩 길이 «둘 다» 재직증명서 갈래를 켠다', () => {
   assert.match(grabFn('bindSiteDocIntake'), /dz-siterep'\]=function\(files\)\{ _siteRepScope\(\); readDocInto\('dz-siterep','wrep'/);
-  assert.match(grabFn('siteRepAlbum'), /_siteRepScope\(\)/);
-  assert.match(grabFn('pickWrepDoc'), /_siteRepScope\(\)/, '옛 단추가 갈래를 안 켜면 판독이 기금 칸으로 간다');
+  /* 옛 단추 짝(siteRepAlbum·pickWrepDoc)은 2026-10-09 정리로 지웠다 — 부르는 곳이 없었다. 사진첩 길은 pplRepDoc 이 켠다 */
+  assert.match(grabFn('pplRepDoc'), /_siteRepScope\(\)/);
 });
 
 test('★ 사진첩 갈래가 원본을 잇고 «판독도» 한다 — 종전에는 잇기만 했다', () => {
