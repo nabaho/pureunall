@@ -35,6 +35,13 @@ test('★ 이 기금 메일인가 — 보낸 사람 메일·기금 이름 · 첨
   assert.equal(box.score({ a: 1, e: 'x@y.kr', s: '나래 기금 등기부' }, K), 0, '다른 기금 메일을 골랐다');
 });
 
+test('★ zip 안 한글 이름 — UTF-8 아니면 EUC-KR', () => {
+  const b2 = {};
+  new Function(fnSrc('_mfZipName') + '\nthis.n=_mfZipName;').call(b2);
+  assert.equal(b2.n(new TextEncoder().encode('등기부.pdf')), '등기부.pdf');
+  assert.equal(b2.n(Uint8Array.from([0xB5, 0xEE, 0xB1, 0xE2, 0xBA, 0xCE, 0x2E, 0x70, 0x64, 0x66])), '등기부.pdf', 'EUC-KR 이름이 깨진다');
+});
+
 test('★ 빈 칸 알림 — 찾는 다섯 칸 중 빈 것만', () => {
   assert.deepEqual(box.need({ corp_reg_no: '', tax_id_no: '000-82-00000', inka_no: 'x', inka_date: '', reg_date: '2020-01-01' }), ['법인등록번호', '인가일']);
 });
@@ -44,9 +51,13 @@ test('★ 배선 — 읽기만 · peek · 판독은 기존 길(readDocInto) · �
   assert.match(mf, /_mfCall\('readMailMessage',\{slug:x\.m\.slug, uid:String\(x\.m\.uid\), peek:1\}\)/, '읽음 표시를 건드린다');
   assert.match(mf, /\.slice\(0,MF_TOP\)/, '첨부 목록을 모든 메일에 묻는다');
   assert.doesNotMatch(SRC.slice(SRC.indexOf('/* ══ 📨 메일에서 찾기'), SRC.indexOf('function mailFindRead(')), /sendMail|flagMail|deleteMail|\.set\(|\.update\(|\.remove\(/, '메일·자료를 바꾸는 길이 있다');
+  assert.match(fnSrc('_mfReadFile'), /readDocInto\(\{inka:'dz-inka',corpreg:'dz-corpreg',taxid:'dz-taxid'\}\[kind\], kind, file\)/, '기존 판독·확인 길을 안 탄다');
   const rd = fnSrc('mailFindRead');
-  assert.match(rd, /readDocInto\(\{inka:'dz-inka',corpreg:'dz-corpreg',taxid:'dz-taxid'\}\[kind\], kind, file\)/, '기존 판독·확인 길을 안 탄다');
-  assert.match(rd, /if\(!kind\|\|!DOC_PARSE\[kind\]\)/);
+  assert.match(rd, /if\(!r\.zip&&\(!kind\|\|!DOC_PARSE\[kind\]\)\)/);
+  /* ★ 실제 기금 메일함에서 서류는 zip 으로 왔다 — 풀어서 안의 PDF·그림을 고른다 */
+  assert.match(rd, /JSZip\.loadAsync\(buf,\{decodeFileName:_mfZipName\}\)/, 'zip 을 안 푼다(또는 한글 이름이 깨진다)');
+  assert.match(fnSrc('mailFind'), /!MF_READ\.test\(nm\)&&!\/\\\.zip\$\/i\.test\(nm\)/, 'zip 첨부를 목록에서 뺀다');
+  assert.match(fnSrc('mailFindInner'), /if\(!kind\|\|!DOC_PARSE\[kind\]\)/);
   assert.match(fnSrc('renderMailFind'), /<th style="width:34px">□<\/th><th style="width:40px">#<\/th>/);
   assert.match(SRC, /onclick="mailFind\(\)"/);
   assert.match(SRC, /'doc\.mail':\{t:'메일에서 서류 찾기'/);

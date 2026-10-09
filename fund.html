@@ -11250,11 +11250,19 @@ var _dfFound={}, _dfScanned=0;
    · 읽는 메일함: 받은메일함 + 이름에 «근로복지기금»이 든 메일함(목록만 — 몇백 KB). 본문·첨부는 고를 때만 서버에서.
    · 이 기금 메일인가: 보낸 사람 메일이 참여사업장·담당자 메일과 같거나, 제목·미리보기·보낸 이름에 기금 이름이 있다.
    · 첨부 목록은 점수 높은 메일 몇 통만 서버에 묻는다(peek — 읽음 표시를 안 건드린다).
+   · ★ 서류는 흔히 ZIP 으로 온다(실제 기금 메일함 확인 2026-10-09 — 등기부·인가증이 모두 zip 안에). 받아서 풀고 안의 PDF·그림을 고른다.
+     zip 안 한글 이름은 EUC-KR 로 적힌 것이 많아 UTF-8 이 아니면 EUC-KR 로 푼다.
    ⚠ 메일을 보내거나 지우지 않는다. 읽기만. 칸에 넣는 것은 늘 사람이 확인 창에서. */
 var MF_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/';
 var MF_TOP=12;
 var MF_KINDS=[['corpreg',/등기사항|등기부|법인등기/],['taxid',/고유번호/],['inka',/인가증|설립인가/]];
-var MF={fid:'', rows:null};
+var MF={fid:'', rows:null, inner:null};
+var MF_READ=/\.(pdf|png|jpe?g|gif|bmp|tiff?|webp)$/i;
+/* zip 안 이름 — UTF-8 이 아니면 EUC-KR(윈도 압축) */
+function _mfZipName(bytes){
+  try{ return new TextDecoder('utf-8',{fatal:true}).decode(bytes); }catch(e){}
+  try{ return new TextDecoder('euc-kr').decode(bytes); }catch(e){ return String.fromCharCode.apply(null,bytes); }
+}
 /* 첨부·제목 글자로 서류 종류를 가린다 — 모르면 '' */
 function _mfKind(t){ t=String(t||''); for(var i=0;i<MF_KINDS.length;i++){ if(MF_KINDS[i][1].test(t)) return MF_KINDS[i][0]; } return ''; }
 /* 이 기금을 알아볼 열쇠 — 이름(정식·약칭, «근로복지기금» 뗀 것)과 메일 주소들 */
@@ -11313,8 +11321,8 @@ function mailFind(){
         got.forEach(function(g){
           if(!g.atts){ rows.push({m:g.m, a:null, i:-1, kind:''}); return; }
           g.atts.forEach(function(a,i){
-            var nm=String(a.name||''); if(!/\.(pdf|png|jpe?g|gif|bmp|tiff?|webp)$/i.test(nm)) return;   // 판독할 수 있는 것만(한글·엑셀은 [메일 열기]로)
-            rows.push({m:g.m, a:a, i:i, kind:_mfKind(nm)||_mfKind(g.m.s)});
+            var nm=String(a.name||''); if(!MF_READ.test(nm)&&!/\.zip$/i.test(nm)) return;   // 판독할 수 있는 것과 묶음만(한글·엑셀은 메일함에서)
+            rows.push({m:g.m, a:a, i:i, kind:_mfKind(nm)||_mfKind(g.m.s), zip:/\.zip$/i.test(nm)});
           });
         });
         rows.sort(function(a,b){ return (b.kind?1:0)-(a.kind?1:0)||(+b.m.d||0)-(+a.m.d||0); });
@@ -11337,12 +11345,13 @@ function renderMailFind(){
     return '<tr><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
       +'<td style="white-space:nowrap">'+esc(ds)+'</td><td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.m.f||'')+'">'+esc(r.m.f||'')+'</td>'
       +'<td style="max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(r.m.s||'')+'">'+esc(r.m.s||'')+'</td>'
-      +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.a?esc(r.a.name||''):'<span class="muted">첨부 목록을 못 받음</span>')+'</td>'
+      +'<td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+(r.zip?'📦 ':'')+(r.a?esc(r.a.name||''):'<span class="muted">첨부 목록을 못 받음</span>')+'</td>'
       +'<td>'+(r.a?'<select id="mf-k-'+i+'" style="padding:2px 4px">'+opt(r.kind)+'</select>':'')+'</td>'
       +'<td style="white-space:nowrap">'+(r.a?'<button class="primary" onclick="mailFindRead('+i+')" style="padding:2px 10px">읽기</button>':'')+'</td></tr>';
   }).join('');
   b.innerHTML='<div class="row" style="margin:0 0 8px;gap:6px;flex-wrap:wrap"><span class="muted" style="font-size:12px">메일 '+MF.scanned+'통 훑음 · 이 기금 메일 첨부 '+MF.rows.length+'개</span>'
     +(need.length?'<span class="chip warn" style="font-size:10.5px">빈 칸: '+esc(need.join(' · '))+'</span>':'<span class="chip ok" style="font-size:10.5px">찾는 칸이 다 차 있습니다</span>')+'</div>'
+    +(MF.inner?_mfInnerHTML():'')
     +(MF.rows.length?'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>받은 날</th><th>보낸 사람</th><th>메일 제목</th><th>첨부</th><th>서류</th><th></th></tr></thead><tbody>'+body+'</tbody></table></div>'
       +'<div class="muted" style="font-size:11.5px;margin-top:6px">[읽기] → 첨부를 받아 판독 → 원본 옆 확인 창 → [반영] 후 [💾 저장]. 원본은 사진첩에 남고 이 기금에 이어집니다.</div>'
       :'<div class="msg" style="font-size:13px">이 기금 메일에서 판독할 첨부(PDF·그림)를 찾지 못했습니다. 기금 이름이 제목에 없거나 담당자 메일이 등록되지 않았을 수 있습니다.</div>');
@@ -11351,16 +11360,48 @@ function mailFindRead(i){
   var r=(MF.rows||[])[i]; if(!r||!r.a) return;
   if(S.fundId!==MF.fid){ toast('기금이 바뀌었습니다 — 다시 찾으세요','warn'); closeM(); return; }
   var sel=$('mf-k-'+i), kind=sel?sel.value:r.kind;
-  if(!kind||!DOC_PARSE[kind]){ toast('서류 종류를 고르세요','warn'); return; }
-  toast('첨부를 받는 중…');
+  if(!r.zip&&(!kind||!DOC_PARSE[kind])){ toast('서류 종류를 고르세요','warn'); return; }
+  toast(r.zip?'묶음(zip)을 받아 푸는 중…':'첨부를 받는 중…');
   _mfCall('readMailAttachment',{slug:r.m.slug, uid:String(r.m.uid), index:r.i, part:String(r.a.part||'')}).then(function(j){
     if(S.fundId!==MF.fid) return;
     var bin=atob(j.b64||''), buf=new Uint8Array(bin.length); for(var k=0;k<bin.length;k++) buf[k]=bin.charCodeAt(k);
-    var file=new File([buf],j.name||r.a.name||'첨부',{type:j.mime||'application/octet-stream'});
-    closeM(); _docScopeFund();
-    if(S.tab!=='info'){ S.tab='info'; renderFund(); }
-    readDocInto({inka:'dz-inka',corpreg:'dz-corpreg',taxid:'dz-taxid'}[kind], kind, file);
+    if(!r.zip) return _mfReadFile(new File([buf],j.name||r.a.name||'첨부',{type:j.mime||'application/octet-stream'}),kind);
+    return _loadJsZip().then(function(JSZip){ return JSZip.loadAsync(buf,{decodeFileName:_mfZipName}); }).then(function(z){
+      var files=Object.keys(z.files).filter(function(n){ return !z.files[n].dir&&!/__MACOSX\//.test(n)&&MF_READ.test(n); })
+        .map(function(n){ return {name:n, kind:_mfKind(n.split('/').pop())||kind||r.kind}; });
+      MF.inner={r:r, z:z, files:files}; renderMailFind();
+      var b=$('mfBody'); if(b) b.scrollTop=0;
+      if(!files.length) toast('묶음 안에 PDF·그림이 없습니다','warn');
+    });
   }).catch(function(e){ toast('첨부를 받지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 묶음 안 파일 고르기 — 목록 위에 붙는다 */
+function _mfInnerHTML(){
+  var I=MF.inner, opt=function(k){ return '<option value="">— 서류 종류 —</option>'+MF_KINDS.map(function(x){ return '<option value="'+x[0]+'"'+(x[0]===k?' selected':'')+'>'+esc(docZoneLabel(x[0]))+'</option>'; }).join(''); };
+  return '<div style="border:1.5px solid var(--acc);border-radius:9px;padding:8px 10px;margin:0 0 10px;background:var(--acc-soft)">'
+    +'<div class="row" style="margin:0 0 6px"><b style="font-size:13px">📦 '+esc(I.r.a.name||'묶음')+' — 안의 파일 '+I.files.length+'개</b><span style="flex:1"></span><button onclick="MF.inner=null;renderMailFind()" style="padding:2px 8px">✕ 닫기</button></div>'
+    +(I.files.length?'<div style="overflow-x:auto;background:#fff;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>파일</th><th>서류</th><th></th></tr></thead><tbody>'
+      +I.files.map(function(x,j){ return '<tr><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(j+1)+'</td>'
+        +'<td>'+esc(x.name)+'</td><td><select id="mf-ik-'+j+'" style="padding:2px 4px">'+opt(x.kind)+'</select></td>'
+        +'<td><button class="primary" onclick="mailFindInner('+j+')" style="padding:2px 10px">읽기</button></td></tr>'; }).join('')+'</tbody></table></div>'
+      :'<div class="muted" style="font-size:12px">PDF·그림이 없습니다 — 메일함에서 묶음을 받아 보세요.</div>')
+    +'</div>';
+}
+function mailFindInner(j){
+  var I=MF.inner, x=I&&I.files[j]; if(!x) return;
+  var sel=$('mf-ik-'+j), kind=sel?sel.value:x.kind;
+  if(!kind||!DOC_PARSE[kind]){ toast('서류 종류를 고르세요','warn'); return; }
+  I.z.file(x.name).async('uint8array').then(function(buf){
+    var nm=x.name.split('/').pop(), mime=/\.pdf$/i.test(nm)?'application/pdf':('image/'+(nm.split('.').pop()||'png').toLowerCase().replace('jpg','jpeg'));
+    _mfReadFile(new File([buf],nm,{type:mime}),kind);
+  }).catch(function(e){ toast('묶음에서 꺼내지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+/* 받은 파일 → 기존 판독 길(원본 옆 확인 창 → 반영 → 저장, 원본은 사진첩에 남고 이어짐) */
+function _mfReadFile(file,kind){
+  if(S.fundId!==MF.fid) return;
+  closeM(); _docScopeFund(); MF.inner=null;
+  if(S.tab!=='info'){ S.tab='info'; renderFund(); }
+  readDocInto({inka:'dz-inka',corpreg:'dz-corpreg',taxid:'dz-taxid'}[kind], kind, file);
 }
 /* 찾기 창 → 사진첩 훑어 고르기. 창을 갈아 끼운다 — 두 창이 겹쳐 뜨지 않는다.
    고른 뒤는 기존 길 그대로다: 원본을 가져와 판독 → 확인 창 → 칸에 넣고 원본을 잇는다.
