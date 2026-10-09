@@ -57,7 +57,7 @@ eval("var END_WAYS=[['done','종료','x','closed'],['cancel','취소','x','cance
 
   + ['catNorm', 'isKind', 'catColor', 'catList', 'catBadge',
      'peTypeName', '_peRawType', 'peType', 'peStatus', 'peEndWay', '_peClosed', '_peDue',
-     'briefTrim', 'itemName', 'ptOf', 'needBrief', 'nameCell',
+     'briefTrim', 'itemName', 'ptOf', 'needBrief', 'peShort', 'nameCell',   /* peShort — 2026-10-04 업무 칸 약칭(유형표에 약칭이 없으면 그대로) */
      'safeKey', '_peArr', '_peCandOf', 'puerpCandidates',
      'kindFixList', 'kindFixRun'].map(grab).join('\n'));
 
