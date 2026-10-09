@@ -514,6 +514,83 @@
       return host.hwpMarkers(u8, src.name).then(function (ks) { return host.hwpFill(u8, src.name, CF.hwpValues(ks || [], V)); });
     }).then(function (r) { return { bytes: r.bytes, ext: xl ? '.xlsx' : '.hwp', unknown: r.unknown || [] }; });
   }
+  /* ══ 🖨 인쇄 (대표 2026-10-09 「계약당사자를 비워 놓고 출력만 해야 하는 경우도 많다 … 일괄 출력 기능」) ══
+     한글 양식을 값 V 로(비우면 ＿＿＿ 밑줄) 채워 «쪽 그림»으로 그리고, 숨은 틀 하나에 모아 인쇄 창을 한 번 연다.
+     ⚠ 엑셀 양식은 서식 시트가 수식이라 여기서 바르게 그리지 못한다 — 건너뛰고 이름을 알린다(엑셀로 열어 인쇄).
+     ⚠ 채운 값은 어디에도 저장하지 않는다 — 인쇄 틀은 인쇄 창이 닫히면 지운다. */
+  function isXlsxName(n) { return /\.xlsx?$/i.test(n || ''); }
+  function fillForPrint(fm, V, host) {
+    var CF = w.PuFormCardFill, src = hwpSources(fm)[0];
+    if (!src) return Promise.reject(new Error((fm.name || '양식') + ': 한글 원본이 없습니다'));
+    if (isXlsxName(src.name)) return Promise.resolve({ xlsx: true, name: fm.name || src.name });
+    var bytesP = src.data ? Promise.resolve(bytesOfDataUrl(src.data)) : (host.hwpBytes ? host.hwpBytes(src) : Promise.reject(new Error('원본을 불러올 길이 없습니다')));
+    return bytesP.then(function (u8) {
+      return host.hwpMarkers(u8, src.name).then(function (ks) { return host.hwpFill(u8, src.name, CF.hwpValues(ks || [], V || {})); });
+    }).then(function (r) {
+      /* 미리보기·PDF 와 같이 «다시 나누기 전» 사본(preview, .hwpx)으로 그린다 — 그림 엔진이 바르게 그린다 */
+      /* ⚠ 채운 본(r.bytes)은 원본이 .hwpx 여도 한글(.hwp)로 나온다(받기와 같다) — 이름을 원본 확장자로 붙이면 엔진이 거절한다 */
+      return { bytes: r.preview || r.bytes, name: String(src.name).replace(/\.[^.]+$/, '') + (r.preview ? '.hwpx' : '.hwp') };
+    });
+  }
+  /* 문서 하나 → 쪽 그림들 [{url, land}] — 화면 밖 틀에 그려 캔버스를 그림으로 */
+  function pagesOf(doc, host) {
+    var box = w.document.createElement('div');
+    box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px';
+    w.document.body.appendChild(box);
+    /* 인쇄는 화면보다 촘촘히(약 200dpi) — 화면 배율(1)로 그리면 종이에서 글자가 흐리다 */
+    var draw = w.PureunHwp && w.PureunHwp.renderPreview ? w.PureunHwp.renderPreview(box, doc.bytes, doc.name, { dpr: 2.5 }) : host.hwpShow(box, doc.bytes, doc.name);
+    return Promise.resolve(draw).then(function () {
+      var cv = box.querySelectorAll('canvas');
+      if (!cv.length) throw new Error('쪽을 그리지 못했습니다');
+      return Array.prototype.map.call(cv, function (c) { return { url: c.toDataURL('image/jpeg', 0.92), land: c.width > c.height }; });
+    }).then(function (pgs) { box.remove(); return pgs; }, function (e) { box.remove(); throw e; });
+  }
+  /* 쪽 그림들을 숨은 틀에 모아 인쇄 창 — 가로 쪽은 가로 용지로 */
+  function printPages(pages, title) {
+    var fr = w.document.createElement('iframe');
+    fr.setAttribute('aria-hidden', 'true');
+    fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0';
+    w.document.body.appendChild(fr);
+    var d = fr.contentWindow.document;
+    d.open();
+    d.write('<!doctype html><html><head><meta charset="utf-8"><title>' + String(title || '인쇄').replace(/[<&]/g, '') + '</title><style>'
+      + '@page{size:A4 portrait;margin:0}@page land{size:A4 landscape;margin:0}html,body{margin:0;padding:0}'
+      + '.pg{width:210mm;height:296mm;display:flex;align-items:center;justify-content:center;break-after:page;overflow:hidden}'
+      + '.pg.land{page:land;width:297mm;height:209mm}.pg img{max-width:100%;max-height:100%}</style></head><body></body></html>');
+    d.close();
+    pages.forEach(function (pg) {
+      var div = d.createElement('div'); div.className = 'pg' + (pg.land ? ' land' : '');
+      var img = d.createElement('img'); img.src = pg.url; img.alt = '';
+      div.appendChild(img); d.body.appendChild(div);
+    });
+    var imgs = Array.prototype.slice.call(d.images);
+    return Promise.all(imgs.map(function (im) { return im.complete ? 0 : new Promise(function (r) { im.onload = im.onerror = r; }); })).then(function () {
+      fr.contentWindow.focus();
+      fr.contentWindow.print();
+      setTimeout(function () { fr.remove(); }, 60000);   // 인쇄 창을 닫은 뒤에도 잠시 둔다(일부 브라우저는 print 가 바로 돌아온다)
+    });
+  }
+  /* 여러 양식을 차례로 채워 그려 한 번에 인쇄. onStep(i, n) 으로 진행을 알린다. 반환 { pages, skipped:[이름], failed:[이름] } */
+  function printForms(fms, V, host, title, onStep) {
+    var pages = [], skipped = [], failed = [];
+    return fms.reduce(function (p, fm, i) {
+      return p.then(function () {
+        if (onStep) onStep(i + 1, fms.length);
+        return fillForPrint(fm, V, host).then(function (doc) {
+          if (doc.xlsx) { skipped.push(doc.name); return; }
+          return pagesOf(doc, host).then(function (pgs) { pages = pages.concat(pgs); });
+        }).catch(function () { failed.push(fm.name || '양식'); });
+      });
+    }, Promise.resolve()).then(function () {
+      if (!pages.length) throw new Error(skipped.length ? '엑셀 양식은 엑셀로 열어 인쇄해 주세요 — ' + skipped.join(', ') : '인쇄할 쪽을 만들지 못했습니다');
+      return printPages(pages, title).then(function () { return { pages: pages.length, skipped: skipped, failed: failed }; });
+    });
+  }
+  function printNote(r) {
+    return '🖨 ' + r.pages + '쪽을 인쇄 창으로 보냈습니다'
+      + (r.skipped.length ? ' · 엑셀 ' + r.skipped.length + '개는 엑셀로 열어 인쇄(' + r.skipped.join(', ') + ')' : '')
+      + (r.failed.length ? ' · ⚠ 못 그린 양식: ' + r.failed.join(', ') : '');
+  }
   function zipName(title, V) {
     var head = fileSafe(title).replace(/^\.+/, '').slice(0, 40), tail = whoTail(V);
     return (head || '서식묶음') + (tail ? '_' + tail : '') + '.zip';
@@ -632,6 +709,13 @@
     /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
     + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
+    + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
+    + '.pcf-printb:hover{background:#f1f5f9}'
+    /* 채우기 창 «옆 미리보기» (대표 2026-10-09 「아래 팝업보다 옆에서 나오면 보기가 더 편할 것」) — 넓은 화면만, 좁으면 아래 그대로 */
+    + '@media(min-width:1100px){.pcf-m.side{width:min(1480px,96vw)!important}'
+    + '.pcf-m.side .pcf-mb{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px;align-items:start}'
+    + '.pcf-m.side .pcf-fcols{grid-template-columns:minmax(0,1fr)}'
+    + '.pcf-m.side .pcf-fprev{margin-top:0;position:sticky;top:0;max-height:calc(92vh - 140px);height:calc(92vh - 140px)}}'
     + '.pcf-att{display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1e40af;padding:3px 8px;border-radius:4px;font-size:10.5px;font-weight:600;text-decoration:none;margin:0 4px 4px 0}'
     + '.pcf-none{color:#94a3b8;font-size:11.5px;text-align:center;padding:48px;border:1px dashed #e2e8f0;margin:16px;border-radius:4px}'
     + '.pcf-mbg{position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:1200;display:flex;align-items:center;justify-content:center;padding:20px}'
@@ -1433,19 +1517,25 @@
       setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
       toast('내려받았습니다 — ' + name);
     }
+    function prevClose() {
+      prevBox.insertBefore(el('div', { style: 'position:sticky;top:-12px;z-index:2;display:flex;justify-content:flex-end;margin:-4px 0 6px' },
+        [el('button', { type: 'button', 'class': 'pcf-b', 'aria-label': '미리보기 닫기', text: '× 미리보기 닫기', onclick: function () { prevBox.hidden = true; prevBox.innerHTML = ''; m.classList.remove('side'); } })]), prevBox.firstChild);
+    }
     function doPreview() {
       var it = items[st.pick] || items[0];
       if (!it.src || it.state === 'fail') {   // 원본이 없거나 못 찾았으면 글자 본문을 채워 보여 준다
-        prevBox.hidden = false; prevBox.innerHTML = '';
+        prevBox.hidden = false; prevBox.innerHTML = ''; m.classList.add('side');
         prevBox.appendChild(el('pre', { 'class': 'pcf-body', text: CF.fillText(it.fm.body, values()) }));
+        prevClose();
         return;
       }
       note.textContent = '채우는 중…';
       fillOne(it).then(function (r) {
         refresh(); warnOf([r]);
-        prevBox.hidden = false; prevBox.innerHTML = '';
-        /* 미리보기는 «다시 나누기 전» 사본(preview, .hwpx)으로 — 그림 엔진이 바르게 그린다 */
-        return host.hwpShow(prevBox, r.preview || r.bytes, r.preview ? outName(it).replace(/\.[^.]+$/, '') + '.hwpx' : outName(it));
+        prevBox.hidden = false; prevBox.innerHTML = ''; m.classList.add('side');
+        /* 미리보기는 «다시 나누기 전» 사본(preview, .hwpx)으로 — 그림 엔진이 바르게 그린다.
+           엔진이 칸을 비우고 그리므로 「× 닫기」는 다 그린 뒤 맨 위에 붙인다 */
+        return Promise.resolve(host.hwpShow(prevBox, r.preview || r.bytes, r.preview ? outName(it).replace(/\.[^.]+$/, '') + '.hwpx' : outName(it))).then(prevClose);
       }).catch(function (e) { note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
     /* ✏ 한글처럼 손보기 (설계 2026-09-29 §6) — 지금 값으로 채운 문서를 편집기로. 다 고치면 받기·메일이 그것을 쓴다 */
@@ -1523,6 +1613,19 @@
         .then(function () { toast('받았습니다 — 보낸 서류에 「받기」로 기록했습니다' + (kind === '계약서' ? ' · 📬 서명본 대기에 올렸습니다' : '')); },
           function (e) { toast('받았습니다 — ⚠ 기록은 남기지 못했습니다: ' + ((e && e.message) || e)); });
     }
+    /* 🖨 인쇄 — 고른 회사·담당자 값으로(고르지 않았으면 빈 양식) 한 번에. 손본 문서가 있으면(하나일 때) 그것으로 */
+    function doPrint() {
+      if (busy) return;
+      if (loadingCount()) { note.textContent = '원본을 아직 살펴보는 중입니다 — 끝나면 인쇄할 수 있습니다'; return; }
+      if (!conflictsOkToGo()) return;
+      busy = true; refresh();
+      var V = values(), fms = items.map(function (x) { return x.fm; });
+      var run = (one && st.edited && !isXl(items[0]))
+        ? pagesOf({ bytes: st.edited.bytes, name: outName(items[0]) }, host).then(function (pgs) { return printPages(pgs, nameOf(items[0])).then(function () { return { pages: pgs.length, skipped: [], failed: [] }; }); })
+        : printForms(fms, V, host, one ? nameOf(items[0]) : (title || '서식묶음'), function (i, n) { note.textContent = '인쇄할 쪽을 그리는 중… (' + i + '/' + n + ')'; });
+      run.then(function (r) { busy = false; refresh(); note.textContent = printNote(r); },
+        function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
     function copyText() {
       var t = CF.fillText(items[0].fm.body, values());
       (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject(new Error('복사 기능이 없습니다')))
@@ -1546,6 +1649,7 @@
     var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': one ? '채워서 받기' : '묶음 채우기', style: 'width:980px' }, [
       el('div', { 'class': 'pcf-mh' }, head.concat([el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })])),
       el('div', { 'class': 'pcf-mb' }, [
+        el('div', { 'class': 'pcf-fleft' }, [
         srcSel ? el('div', { style: 'margin-bottom:8px' }, [el('span', { 'class': 'pcf-fh', text: '채울 원본 ' }), srcSel]) : null,
         el('div', { 'class': 'pcf-fcols' }, [
           el('div', null, [
@@ -1555,13 +1659,15 @@
           ]),
           el('div', null, [propBox, caseBox, valBox])
         ]),
-        note, prevBox
+        note]),
+        prevBox
       ]),
       el('div', { 'class': 'pcf-mf' }, [
         el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }),
         one && fm0.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
         pickSel,
         btnPrev = el('button', { type: 'button', 'class': 'pcf-b', onclick: doPreview }),
+        host.hwpShow ? el('button', { type: 'button', 'class': 'pcf-b', title: '지금 값으로 채워(비운 칸은 ＿＿＿ 밑줄) 인쇄합니다. 회사를 고르지 않으면 빈 양식으로 나옵니다.', text: one ? '🖨 인쇄' : '🖨 ' + items.length + '개 한 번에 인쇄', onclick: doPrint }) : null,
         (one && items[0].src && !isXl(items[0]) && host.hwpEdit) ? el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 한글처럼 손보기', onclick: doEdit }) : null,
         (one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ 메일로 보내기 →', onclick: doMail }) : null,
         btnDown = (one && !items[0].src) ? null : el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', onclick: doDownload })
@@ -2258,6 +2364,8 @@
         hasOrig ? el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
           chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
           chip('🔤 글자 본문', view === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
+        host.hwpShow && hwpSources(fm).some(function (x) { return !isXlsxName(x.name); })
+          ? el('button', { type: 'button', 'class': 'pcf-printb', title: '당사자 칸을 비운 채(＿＿＿ 밑줄) 바로 인쇄합니다 — 손으로 적을 때', text: '🖨 빈 양식 인쇄', onclick: function () { printBlank([fm]); } }) : null,
         host.cards ? el('button', { type: 'button', 'class': 'pcf-fillbig', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다. 채운 뒤 내려받거나 보냅니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
         moreMenu([
           { t: '✏ 수정', fn: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } },
@@ -2268,6 +2376,14 @@
           { t: '🗑 삭제', fn: function () { del(fm); } }
         ].concat(toolItems(kind)))
       ]);
+    }
+    /* 🖨 빈 양식 인쇄 — 창 없이 바로. 오늘 날짜도 넣지 않는다(손으로 적는다) */
+    var printing = false;
+    function printBlank(fms) {
+      if (printing || !fms.length) return;
+      printing = true; toast('🖨 인쇄할 쪽을 그리는 중…');
+      printForms(fms, {}, host, fms.length === 1 ? fms[0].name : '빈 양식 ' + fms.length + '개', function (i, n) { if (n > 1) toast('🖨 인쇄할 쪽을 그리는 중… (' + i + '/' + n + ')'); })
+        .then(function (r) { printing = false; toast(printNote(r)); }, function (e) { printing = false; toast('⚠ ' + ((e && e.message) || e)); });
     }
     /* 드물게 쓰는 도구 — ⋯ 메뉴 아래쪽 */
     function toolItems(kind) {
@@ -2496,6 +2612,8 @@
       else { b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 세트 이름', onclick: function () { editSet(st.id, true); } }));
         b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '🗑 세트 지우기', onclick: function () { editSet(st.id, false); } })); }
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
+      if (host.hwpShow) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', title: '고른 양식을 당사자 칸을 비운 채 한 번에 인쇄합니다(엑셀 양식은 건너뜀)', text: '🖨 빈 양식 ' + fms.length + '개 인쇄',
+        onclick: function () { printBlank(checkedForms()); } }));
       if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
         onclick: function () { openFill(checkedForms(), host, st ? st.name : (host.contractCtx ? host.contractCtx.label : '고른 양식')); } }));
       fitHeight();
