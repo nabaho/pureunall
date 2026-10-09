@@ -173,7 +173,7 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=51"></script>
+<script src="js/pu-ontology.js?v=52"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -187,6 +187,7 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.18.5/package/dist/xlsx.full.min.js"></script>
 <script src="js/utils.js?v=2"></script>
 <script src="js/pu-contract-vars.js?v=2"></script>
+<script src="js/pu-sign.js?v=1"></script>
 <script src="js/esign-crypto.js?v=1"></script>
 <script src="js/esign-docs.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
@@ -194,12 +195,12 @@
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=13"></script>
-<script src="js/pu-contract-forms.js?v=32"></script>
+<script src="js/pu-contract-forms.js?v=33"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=8"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=14"></script>
+<script src="js/pu-office-docs.js?v=15"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -344,6 +345,7 @@ function officeHost() {
     fileBytes: formFileBytes, mail: { mode: formMailMode, send: formMailSend, record: formMailRecord },
     zip: formZip, hwpShow: formFileShow,   /* 원본 보관함 — 고른 것 묶어 받기·오른쪽 미리보기 (2026-10-07) */
     contractList: formContractList,        /* 📎 서명본 올리기 — 이알피 계약 연결(읽기만) (2026-10-07) */
+    sign: formSignApi(),                   /* ✍ 서명 요청 진행·저장 (2026-10-09) */
     loadForms: function () { return PuContractForms.loadForms(db); },
     linkOriginal: function (formId, entry) { return trackedWrite(PuContractForms.linkOriginal(db, formId, entry)); } };
 }
@@ -542,6 +544,103 @@ function formMailRecord(row, V, o) {
     jobs.push(trackedWrite(PuOfficeStore.markAwait({ coName: coName, bz: (row && row.bz) || (V && V.사업자번호) || '', at: at, how: o.how === '받기' ? '받기' : '메일', names: o.names })));
   return Promise.all(jobs).then(function () { return keys.length; });
 }
+/* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) — 자리·규칙은 js/pu-sign.js 머리말 ══
+   만들기: 직원 칸(req) → 열쇠 칸(open) 차례(규칙이 open 제출 때 req 의 끝 4자리를 본다). 회사가 있으면 📬 서명본 대기에 「서명」으로.
+   저장: 제출된 것을 이 화면이 촘촘히 다시 그려(받은 값 채움) + 서명 확인서 한 쪽 → PDF → 🔒 서명본·기업별 계약서·계약 기록·회수 */
+var _signHost = null;
+function formSignHost() {
+  return _signHost || (_signHost = { hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow });
+}
+function formSignCreate(req, open) {
+  var ref = db.ref('pu_sign/req').push(), id = ref.key;
+  req.at = Date.now(); req.by = curUser.uid; req.byName = String(curUser.email || '').split('@')[0];
+  open.req = id;
+  return trackedWrite(ref.set(req)).then(function () { return trackedWrite(db.ref('pu_sign/open/' + req.t).set(open)); })
+    .then(function () {
+      if (!req.co) return;
+      return trackedWrite(PuOfficeStore.markAwait({ coName: req.co, at: req.at, how: '서명', names: [req.title] })).catch(function () {});
+    })
+    .then(function () { return { id: id, link: PuSign.linkOf(location.origin + location.pathname, req.t) }; });
+}
+function formSignList() {
+  return db.ref('pu_sign/req').orderByChild('at').limitToLast(300).once('value').then(function (s) {
+    var v = s.val() || {};
+    var rows = Object.keys(v).map(function (k) { return Object.assign({ id: k }, v[k]); });
+    return Promise.all(rows.map(function (r) {
+      r.o = {};
+      if (r.status === 'saved' || r.status === 'void') return r;
+      /* 상태만 콕 집어 읽는다 — 문서 그림(pages)은 받지 않는다 */
+      return Promise.all(['seen', 'sub/at', 'void'].map(function (c) { return db.ref('pu_sign/open/' + r.t + '/' + c).once('value').then(function (x) { return x.val(); }, function () { return null; }); }))
+        .then(function (x) { r.o = { seen: x[0], subAt: x[1], void: x[2] }; return r; });
+    })).then(function (rs) { return rs.sort(function (a, b) { return (b.at || 0) - (a.at || 0); }); });
+  });
+}
+function formSignVoid(r) {
+  return trackedWrite(db.ref('pu_sign/open/' + r.t + '/void').set(true)).then(function () { return trackedWrite(db.ref('pu_sign/req/' + r.id).update({ status: 'void' })); });
+}
+/* 서명 확인서 한 쪽 — 캔버스에 그린다(한글 글꼴 걱정 없이) */
+function formSignCert(r, sub, docHash, hashOk) {
+  var W = 1240, H = 1754, c = document.createElement('canvas'); c.width = W; c.height = H;
+  var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = '#1e293b'; g.font = 'bold 44px "Malgun Gothic", sans-serif'; g.fillText('전자서명 확인서', 90, 140);
+  g.font = '24px "Malgun Gothic", sans-serif'; g.fillStyle = '#475569'; g.fillText('푸른노무법인 계약서 서명 요청 기록 — 이 쪽은 위 문서와 한 묶음입니다', 90, 190);
+  var y = 270;
+  PuSign.certLines(r, sub, docHash).forEach(function (ln) {
+    g.fillStyle = '#64748b'; g.font = '24px "Malgun Gothic", sans-serif'; g.fillText(ln[0], 90, y);
+    g.fillStyle = '#1e293b'; g.font = '26px "Malgun Gothic", sans-serif';
+    var t = String(ln[1] || ''), max = 760, line = '';
+    for (var i = 0; i < t.length; i++) { if (g.measureText(line + t[i]).width > max) { g.fillText(line, 380, y); y += 36; line = ''; } line += t[i]; }
+    g.fillText(line, 380, y); y += 50;
+  });
+  g.fillStyle = hashOk ? '#166534' : '#991b1b'; g.font = 'bold 26px "Malgun Gothic", sans-serif';
+  g.fillText(hashOk ? '✓ 서명자가 본 문서 지문과 저장 시 지문이 같습니다' : '⚠ 문서 지문이 다릅니다 — 담당 노무사 확인 필요', 90, y + 10);
+  y += 70;
+  if (sub && sub.sig) {
+    return new Promise(function (res) {
+      var im = new Image();
+      im.onload = function () { g.strokeStyle = '#cbd5e1'; g.strokeRect(90, y, 700, 260); var s = Math.min(680 / im.width, 240 / im.height); g.drawImage(im, 100, y + 10, im.width * s, im.height * s);
+        g.fillStyle = '#64748b'; g.font = '22px "Malgun Gothic", sans-serif'; g.fillText('서명', 810, y + 40); res(c.toDataURL('image/jpeg', 0.9)); };
+      im.onerror = function () { res(c.toDataURL('image/jpeg', 0.9)); };
+      im.src = sub.sig;
+    });
+  }
+  g.fillStyle = '#1e293b'; g.font = '26px "Malgun Gothic", sans-serif'; g.fillText('☑ 내용을 확인했고 동의합니다 (동의만 받기)', 90, y + 20);
+  return Promise.resolve(c.toDataURL('image/jpeg', 0.9));
+}
+async function formSignFinalize(r) {
+  var o = (await db.ref('pu_sign/open/' + r.t).once('value')).val();
+  if (!o || !o.sub) throw new Error('아직 제출되지 않았습니다');
+  var hash = await PuSign.sha256Hex((o.pages || []).join('|'));
+  var hashOk = hash === o.docHash && o.sub.docHash === o.docHash;
+  var all = await PuContractForms.loadForms(db);
+  var fms = (r.forms || []).map(function (id) { return all.filter(function (f) { return f && f.id === id; })[0]; }).filter(Boolean);
+  if (!fms.length) throw new Error('양식을 찾지 못했습니다 — 지워졌을 수 있습니다');
+  var V = Object.assign({}, r.V || {}, o.sub.vals || {});
+  var rr = await PuContractForms.signRender(fms, V, formSignHost(), { dpr: 2, q: 0.88 });
+  var cert = await formSignCert(r, o.sub, o.docHash, hashOk);
+  if (!window.jspdf) throw new Error('PDF 도구를 불러오지 못했습니다');
+  var pdf = null;
+  rr.pages.concat([{ url: cert, land: false }]).forEach(function (pg) {
+    if (!pdf) pdf = new window.jspdf.jsPDF({ orientation: pg.land ? 'l' : 'p', unit: 'pt', format: 'a4' }); else pdf.addPage('a4', pg.land ? 'l' : 'p');
+    var pw = pdf.internal.pageSize.getWidth(), ph = pdf.internal.pageSize.getHeight();
+    pdf.addImage(pg.url, 'JPEG', 0, 0, pw, ph);
+  });
+  var bytes = new Uint8Array(pdf.output('arraybuffer'));
+  var who = (r.who && r.who.name) || '서명자', coName = r.co || who, d = new Date(o.sub.at || Date.now());
+  var day = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+  var fname = PuOfficeStore.safeFileName((r.title || '계약서') + '_' + who + '_전자서명_' + day) + '.pdf';
+  var put = await trackedWrite(PuOfficeStore.putOriginal({ name: fname, size: bytes.length, type: 'application/pdf', bytes: bytes }, { kind: 'co', coKey: PuOfficeStore.coKey(coName), coName: coName }, { secret: true }));
+  var cd = await trackedWrite(PuOfficeStore.addCoDoc({ coName: coName, fileId: put.fileId, title: String((r.title || '계약서') + ' — ' + who + ' (전자서명)').slice(0, 120), date: day, src: 'upload', secret: true }));
+  await trackedWrite(PuOfficeStore.updateCoDoc(cd.coKey, cd.docId, { kind: r.kind || '기타' })).catch(function () {});
+  await trackedWrite(PuOfficeStore.importCoRecs([{ coName: coName, date: day, kind: r.kind || '기타', docId: cd.docId, note: '전자서명 ' + who }])).catch(function () {});
+  if (r.co) await trackedWrite(PuOfficeStore.gotAwait(cd.coKey, cd.docId)).catch(function () {});
+  await trackedWrite(db.ref('pu_sign/req/' + r.id).update({ status: 'saved', docId: cd.docId, coKey: cd.coKey, savedAt: Date.now(), hashOk: hashOk }));
+  return { docId: cd.docId, coKey: cd.coKey, hashOk: hashOk };
+}
+function formSignApi() {
+  return { create: formSignCreate, list: formSignList, void: formSignVoid, finalize: formSignFinalize,
+    link: function (r) { return PuSign.linkOf(location.origin + location.pathname, r.t); } };
+}
 /* 📇 공단 연락처 (2026-10-09) — 보내기 창 「받는 사람」에 기관·지사별로. 읽기는 pu_docs/agency 한 칸.
    모으기는 사람이 누를 때만: 푸른메일함 목록(mailbox/msgs·mailbox/old/msgs, 읽기만)을 한 번 읽어 공단 주소만 추려 적는다 */
 function formAgencyLoad() {
@@ -710,7 +809,8 @@ function showPane(name) {
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
       openEsign: function () { if (location.hash !== '#esign') history.pushState(null, '', '#esign'); showPane('esign'); },
-      mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
+      mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect },
+      sign: formSignApi(), me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }

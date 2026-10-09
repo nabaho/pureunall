@@ -48,5 +48,5 @@ test('ⓓ 문서관리 #co:await → 서명본 대기 탭', () => {
   const h = read('docs-esign.html');
   assert.match(h, /h === '#co' \|\| h === '#co:await'\) return 'co'/);
   assert.match(h, /mountCompanies\(\$\('coRoot'\), officeHost\(\), \{ tab: location\.hash === '#co:await' \? 'await' : '' \}\)/);
-  assert.match(read('js/pu-office-docs.js'), /tab: opts && opts\.tab === 'await' \? 'await' : 'co'/);
+  assert.match(read('js/pu-office-docs.js'), /tab: opts && \(opts\.tab === 'await' \|\| opts\.tab === 'sign'\) \? opts\.tab : 'co'/);
 });

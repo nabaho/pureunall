@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#1e40af">
+<meta name="robots" content="noindex,nofollow">
+<title>계약서 서명 — 푸른노무법인</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>✍️</text></svg>">
+<!-- ✍ 계약서 서명 요청 — 받는 사람 폰 화면 (대표 「1단계부터 진행해라」 2026-10-09)
+     링크: sign-contract.html?t={열쇠}. 익명 로그인 → pu_sign/open/{열쇠} 한 칸만 읽는다.
+     1 본인 확인(휴대폰 끝 4자리) → 2 문서 확인·빈칸 적기 → 3 서명 또는 동의 → 제출(한 번만, 규칙이 막는다).
+     ⚠ 주민번호는 묻지 않는다. ⚠ 제출 뒤에는 고칠 수 없다(다시 받으려면 담당자가 새 링크를 만든다). -->
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:'Malgun Gothic','맑은 고딕',sans-serif;background:#f8fafc;color:#1e293b;font-size:15px;line-height:1.6}
+  .wrap{max-width:560px;margin:0 auto;min-height:100vh;background:#fff;padding:18px 16px 40px}
+  .head{padding:8px 0 14px;border-bottom:2px solid #1e40af;margin-bottom:16px}
+  .head h1{font-size:18px;color:#1e40af}.head .sub{font-size:12.5px;color:#64748b;margin-top:2px}
+  .steps{display:flex;gap:6px;font-size:12px;color:#94a3b8;margin-bottom:14px}.steps b{color:#1e40af}
+  .step{display:none}.step.on{display:block}
+  label{display:block;font-size:13px;font-weight:700;margin:14px 0 5px}
+  input[type=text],input[type=tel]{width:100%;padding:12px;border:1px solid #cbd5e1;border-radius:8px;font-size:16px}
+  input:focus{outline:none;border-color:#1e40af}
+  .btn{display:block;width:100%;padding:14px;border:none;border-radius:10px;background:#1e40af;color:#fff;font-size:16px;font-weight:700;margin-top:18px;cursor:pointer}
+  .btn:disabled{background:#94a3b8}.btn.sub{background:#f1f5f9;color:#334155;border:1px solid #cbd5e1}
+  .pages img{width:100%;display:block;border:1px solid #e2e8f0;margin-bottom:10px;background:#fff}
+  .note{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af;border-radius:8px;padding:10px 12px;font-size:13px;margin:10px 0}
+  .warn{background:#fff7ed;border-color:#fed7aa;color:#854d0e}
+  .err{color:#991b1b;font-size:13px;margin-top:6px;min-height:18px}
+  .agree{display:flex;gap:8px;align-items:flex-start;font-size:14px;margin-top:14px;font-weight:400}
+  .agree input{width:22px;height:22px;flex:none;margin-top:1px}
+  .fatal{text-align:center;padding:40px 10px;color:#475569}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="head"><h1 id="docTitle">계약서 서명</h1><div class="sub" id="docSub">푸른노무법인 · 불러오는 중…</div></div>
+  <div class="steps" id="steps"><span id="s1"><b>1 본인 확인</b></span>›<span id="s2">2 내용 확인</span>›<span id="s3">3 서명</span></div>
+
+  <div class="step on" id="step1">
+    <div class="note" id="hello">안내받은 분만 열 수 있습니다.</div>
+    <label for="p4">휴대폰 번호 끝 4자리</label>
+    <input type="tel" id="p4" inputmode="numeric" maxlength="4" placeholder="예: 5678" autocomplete="off">
+    <div class="err" id="e1"></div>
+    <button class="btn" id="go1">다음 — 내용 확인</button>
+  </div>
+
+  <div class="step" id="step2">
+    <div class="note">아래 계약서를 끝까지 확인해 주세요. 손가락으로 벌려 크게 볼 수 있습니다.</div>
+    <div class="pages" id="pages"></div>
+    <div id="fieldsBox"></div>
+    <div class="err" id="e2"></div>
+    <button class="btn" id="go2">다음 — 서명</button>
+  </div>
+
+  <div class="step" id="step3">
+    <div id="sigBox">
+      <label>서명</label>
+      <div class="note">아래 칸에 손가락으로 서명해 주세요.</div>
+      <div id="sigWrap"></div>
+    </div>
+    <label class="agree"><input type="checkbox" id="agree"> <span id="agreeTxt">위 계약서 내용을 모두 확인했고, 이에 동의하여 서명합니다.</span></label>
+    <div class="err" id="e3"></div>
+    <button class="btn" id="go3">제출</button>
+    <button class="btn sub" id="back3">← 내용 다시 보기</button>
+  </div>
+
+  <div class="step" id="step4">
+    <div class="note" style="background:#f0fdf4;border-color:#bbf7d0;color:#166534" id="doneMsg">제출했습니다. 감사합니다.</div>
+    <div style="font-size:13px;color:#475569">이 링크를 다시 열면 제출한 계약서를 볼 수 있습니다. 고칠 것이 있으면 담당자에게 연락해 주세요.</div>
+    <div class="pages" id="pagesDone" style="margin-top:12px"></div>
+  </div>
+
+  <div class="step" id="stepErr"><div class="fatal" id="fatalMsg"></div></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=52"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-sign.js?v=1"></script>
+<script>
+'use strict';
+/* Firebase — 위임장 제출 화면(sign.html)과 같은 프로젝트, 익명 인증 */
+var FB_CONFIG = {
+  apiKey: 'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',
+  databaseURL: 'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',
+  projectId: 'pureun-erp',
+  appId: '1:936817166182:web:9bd31f70d0afdf5fca2aa7',
+  messagingSenderId: '936817166182'
+};
+firebase.initializeApp(FB_CONFIG);
+var db = firebase.database();
+var $ = function (id) { return document.getElementById(id); };
+var t = new URLSearchParams(location.search).get('t') || '';
+var O = null, inputs = {}, built = false;
+
+function show(n) {
+  ['step1', 'step2', 'step3', 'step4', 'stepErr'].forEach(function (s) { $(s).classList.remove('on'); });
+  $(n === 'err' ? 'stepErr' : 'step' + n).classList.add('on');
+  ['s1', 's2', 's3'].forEach(function (s, i) { $(s).innerHTML = ''; var b = document.createElement(i + 1 === n ? 'b' : 'span'); b.textContent = (i + 1) + ' ' + ['본인 확인', '내용 확인', O && O.mode === 'agree' ? '동의' : '서명'][i]; $(s).appendChild(b); });
+  $('steps').style.display = n === 4 || n === 'err' ? 'none' : '';
+  window.scrollTo(0, 0);
+}
+function fatal(msg) { $('fatalMsg').textContent = msg; $('docSub').textContent = '푸른노무법인'; show('err'); }
+function drawPages(box) {
+  box.innerHTML = '';
+  (O.pages || []).forEach(function (u, i) { var im = document.createElement('img'); im.src = u; im.alt = (i + 1) + '쪽'; im.loading = 'lazy'; box.appendChild(im); });
+}
+
+if (!/^[0-9a-f]{32}$/.test(t)) fatal('잘못된 링크입니다. 안내받은 링크로 다시 열어 주세요.');
+else firebase.auth().signInAnonymously().then(function () {
+  return db.ref('pu_sign/open/' + t).once('value');
+}).then(function (s) {
+  O = s.val();
+  if (!O) { fatal('찾을 수 없는 링크입니다. 담당자에게 문의해 주세요.'); return; }
+  $('docTitle').textContent = O.title || '계약서 서명';
+  $('docSub').textContent = '푸른노무법인' + (O.co ? ' · ' + O.co : '') + ' · ' + PuSign.ymd(O.exp) + '까지';
+  if (O.sub) { $('doneMsg').textContent = PuSign.ymdhm(O.sub.at) + '에 제출하셨습니다.'; drawPages($('pagesDone')); show(4); return; }
+  if (O.void) { fatal('담당자가 취소한 요청입니다. 담당자에게 문의해 주세요.'); return; }
+  if (O.exp < Date.now()) { fatal('기한(' + PuSign.ymd(O.exp) + ')이 지났습니다. 담당자에게 새 링크를 받아 주세요.'); return; }
+  $('hello').textContent = (O.name ? O.name + '님, ' : '') + '안녕하십니까. 푸른노무법인입니다. 본인 확인을 위해 휴대폰 번호 끝 4자리를 넣어 주세요.';
+  if (O.mode === 'agree') { $('sigBox').style.display = 'none'; $('agreeTxt').textContent = '위 계약서 내용을 모두 확인했고, 이에 동의합니다.'; $('go2').textContent = '다음 — 동의'; }
+  show(1);
+  db.ref('pu_sign/open/' + t + '/seen').set(firebase.database.ServerValue.TIMESTAMP).catch(function () {});
+}).catch(function () { fatal('불러오지 못했습니다. 인터넷 연결을 확인하고 다시 열어 주세요.'); });
+
+$('go1').onclick = function () {
+  var v = $('p4').value.replace(/\D/g, '');
+  if (v.length !== 4) { $('e1').textContent = '숫자 4자리를 넣어 주세요'; return; }
+  $('e1').textContent = '';
+  if (built) { show(2); return; }   /* 끝 4자리만 고치러 돌아온 것 — 적은 칸·서명은 그대로 둔다 */
+  built = true;
+  drawPages($('pages'));
+  var fb = $('fieldsBox'); fb.innerHTML = ''; inputs = {};
+  (O.fields || []).forEach(function (f) {
+    var lb = document.createElement('label'); lb.textContent = f.label; fb.appendChild(lb);
+    var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 300; inp.placeholder = '비워 두면 밑줄로 남습니다';
+    fb.appendChild(inp); inputs[f.k] = inp;
+  });
+  if ((O.fields || []).length) fb.insertBefore(Object.assign(document.createElement('div'), { className: 'note', textContent: '계약서의 빈칸에 들어갈 내용을 적어 주세요.' }), fb.firstChild);
+  show(2);
+};
+$('go2').onclick = function () { show(3); if (sigPad) sigPad.resize(); };
+$('back3').onclick = function () { show(2); };
+
+/* 손서명 판 — 위임장 제출 화면(sign.html)과 같은 방식(터치·마우스, 화면 배율, 점 하나는 서명 아님) */
+var sigPad = (function () {
+  var wrap = $('sigWrap');
+  wrap.innerHTML = '<canvas id="sigCanvas" style="width:100%;height:200px;border:2px dashed #94a3b8;border-radius:10px;background:#fff;touch-action:none;display:block"></canvas>'
+    + '<button type="button" id="sigClear" style="margin-top:8px;padding:8px 16px;border:1px solid #cbd5e1;border-radius:8px;background:#f8fafc;font-size:13px">지우고 다시 서명</button>';
+  var cv = $('sigCanvas'), ctx = null, drawing = false, strokes = 0;
+  function resize() {
+    var r = cv.getBoundingClientRect(); if (!r.width || !r.height) return;
+    var dpr = window.devicePixelRatio || 1, snap = strokes > 0 ? cv.toDataURL('image/png') : null;
+    cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#1e293b';
+    if (snap) { var im = new Image(); im.onload = function () { ctx.drawImage(im, 0, 0, r.width, r.height); }; im.src = snap; } else strokes = 0;
+  }
+  window.addEventListener('resize', resize);
+  function pos(e) { var r = cv.getBoundingClientRect(), p = (e.touches && e.touches[0]) || e; return { x: p.clientX - r.left, y: p.clientY - r.top }; }
+  function start(e) { if (!ctx) resize(); e.preventDefault(); drawing = true; var p = pos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+  function move(e) { if (!drawing) return; e.preventDefault(); var p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); strokes++; }
+  function end() { drawing = false; }
+  cv.addEventListener('touchstart', start, { passive: false }); cv.addEventListener('touchmove', move, { passive: false }); cv.addEventListener('touchend', end);
+  cv.addEventListener('mousedown', start); cv.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+  $('sigClear').onclick = function () { if (ctx) ctx.clearRect(0, 0, cv.width, cv.height); strokes = 0; };
+  return { isEmpty: function () { return strokes < 5; }, toDataURL: function () { return cv.toDataURL('image/png'); }, resize: resize };
+})();
+
+var sending = false;
+$('go3').onclick = function () {
+  if (sending) return;
+  if (O.mode !== 'agree' && sigPad.isEmpty()) { $('e3').textContent = '서명해 주세요'; return; }
+  if (!$('agree').checked) { $('e3').textContent = '내용 확인·동의에 체크해 주세요'; return; }
+  var vals = {};
+  Object.keys(inputs).forEach(function (k) { var v = inputs[k].value.trim(); if (v) vals[k] = v.slice(0, 300); });
+  var sub = { vals: vals, p4: $('p4').value.replace(/\D/g, ''), docHash: O.docHash, agree: true,
+    at: firebase.database.ServerValue.TIMESTAMP, ua: String(navigator.userAgent || '').slice(0, 300) };
+  if (O.mode !== 'agree') sub.sig = sigPad.toDataURL();
+  sending = true; $('go3').disabled = true; $('go3').textContent = '보내는 중…'; $('e3').textContent = '';
+  db.ref('pu_sign/open/' + t + '/sub').set(sub).then(function () {
+    $('doneMsg').textContent = '제출했습니다. 감사합니다. (' + PuSign.ymdhm(Date.now()) + ')';
+    drawPages($('pagesDone')); show(4);
+  }, function () {
+    sending = false; $('go3').disabled = false; $('go3').textContent = '제출';
+    /* 끝 4자리 칸은 1단계에 있다 — 그리로 보낸다(적은 칸·서명은 남아 있다) */
+    $('e1').textContent = '제출하지 못했습니다 — 휴대폰 끝 4자리를 다시 확인해 주세요. 이미 제출했거나 기한이 지났으면 담당자에게 문의해 주세요.';
+    show(1); $('p4').focus();
+  });
+};
+</script>
+</body>
+</html>

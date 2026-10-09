@@ -1930,7 +1930,7 @@
             ".validate": "newData.isNumber()"
           },
           "how": {
-            ".validate": "newData.val() === '메일' || newData.val() === '받기'"
+            ".validate": "newData.val() === '메일' || newData.val() === '받기' || newData.val() === '서명'"
           },
           "names": {
             "$i": {
@@ -2030,6 +2030,62 @@
             },
             "byName": {
               ".validate": "newData.isString() && newData.val().length <= 60"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
+    "pu_sign": {
+      "req": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".indexOn": [
+          "at"
+        ],
+        "$r": {
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          ".validate": "newData.hasChildren(['t','co','who','p4','exp','at','by','forms'])",
+          "p4": {
+            ".validate": "newData.isString() && newData.val().matches(/^[0-9]{4}$/)"
+          }
+        }
+      },
+      "open": {
+        "$t": {
+          ".read": true,
+          ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+          ".validate": "$t.matches(/^[0-9a-f]{32}$/) && newData.hasChildren(['req','exp','pages','docHash','mode','title'])",
+          "seen": {
+            ".write": "auth != null && !data.exists()",
+            ".validate": "newData.val() === now"
+          },
+          "sub": {
+            ".write": "auth != null && !data.exists() && data.parent().child('void').val() !== true && data.parent().child('exp').val() > now && newData.child('p4').val() === root.child('pu_sign/req/' + data.parent().child('req').val() + '/p4').val() && newData.child('docHash').val() === data.parent().child('docHash').val()",
+            ".validate": "newData.hasChildren(['p4','docHash','at','agree'])",
+            "at": {
+              ".validate": "newData.val() === now"
+            },
+            "agree": {
+              ".validate": "newData.val() === true"
+            },
+            "sig": {
+              ".validate": "newData.isString() && newData.val().length < 300000"
+            },
+            "ua": {
+              ".validate": "newData.isString() && newData.val().length <= 300"
+            },
+            "vals": {
+              "$k": {
+                ".validate": "newData.isString() && newData.val().length <= 300"
+              }
+            },
+            "p4": {
+              ".validate": "newData.isString()"
+            },
+            "docHash": {
+              ".validate": "newData.isString()"
             },
             "$other": {
               ".validate": false
