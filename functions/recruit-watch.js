@@ -55,13 +55,13 @@ const BOARDS = [
      노동전환)은 재단 게시판이 아니라 «공문»으로 와서 여기 실린다(대표님 서류 폴더의 공문0157·0229 가 그것).
      실측 2026-10-04: 2015~2026 150건 중 사람 뽑는 글 37건. ⚠ 회원 공지(/bbs/news)는 로그인이 있어야 해 안 읽는다.
      ⚠ 여러 기관 글이 섞인 게시판이라 org 를 비우고 제목으로 정한다(ORG_HINTS). */
-  { id: 'kcplaa',  org: '',        name: '공인노무사회 공지(기관 모집 공문)', url: 'https://www.kcplaa.or.kr/bbs/notice/list' },
+  { id: 'kcplaa',  org: '',        name: '공인노무사회 공지(기관 모집 공문)', url: 'https://www.kcplaa.or.kr/bbs/notice/list', ai: true },
   /* ★ 공인노무사회 «회원» 공지 — 로그인해야 보인다(대표 지시 2026-10-04 「회원 공지 진행」).
      2024년 3월 뒤 일반 공지에 모집 공문이 뜸해져, 회원 공지로 옮겼는지 보려고 더했다.
      ⚠ 로그인은 뉴스레터가 쓰는 서버 비밀값(ILABOR_ID·ILABOR_PW)을 빌린다 — 코드는 값을 못 본다.
      ⚠ login 이 붙은 게시판은 부르는 쪽이 «로그인한 그릇»으로 읽는다(makeFetcher). 로그인이 안 되면
        이 게시판만 오류로 남기고 나머지는 그대로 돈다. */
-  { id: 'kcplaa_m', org: '',      name: '공인노무사회 회원 공지(로그인)', url: 'https://www.kcplaa.or.kr/bbs/news/list', login: 'kcplaa' },
+  { id: 'kcplaa_m', org: '',      name: '공인노무사회 회원 공지(로그인)', url: 'https://www.kcplaa.or.kr/bbs/news/list', login: 'kcplaa', ai: true },
   /* ★ 공인노무사회 «채용 정보» (대표 지시 2026-10-04 「공인노무사회에서 컨설턴트 모집 또는 고문 자문 노무사 모집등 공고도 수집」)
      로그인 없이 읽힌다. 기관이 노무사에게 «맡기는» 글(외부 조사자 선임·고문·자문)이 여기에도 올라온다.
      ⚠ 대부분은 노무법인의 직원·수습 채용이라 일반 잣대(isRecruit)를 쓰면 「노무사 모집」이 다 걸린다 —
@@ -149,7 +149,8 @@ function parseRows(html, base, board) {
      대표님은 진흥원·사회서비스원 이사에도 지원하셨다(실측: 「위촉직이사 모집 공고」를 놓쳤었다). */
 const WHO = /컨설턴트|전문가|전문위원|자문위원|평가위원|심사위원|외부위원|운영위원|조정위원|인력\s*풀|인력풀|\bpool\b|강사|멘토|현장\s*코치|코칭|외부\s*연구진|연구진|자문단|지원단|상담위원|노무사|위촉직\s*이사|비상임\s*이사|사외\s*이사|임원/i;
 const PICK = /모집|공모|선발|위촉|등록|구성|신청|추천|초빙/;
-const DONE = /결과|명단|합격|발표|개최|선정\s*안내|최종\s*선정|공모전/;
+/* ⚠ 「규정 개정 안내」 — 「등록심사위원회」의 «심사위원»·«등록»이 걸려 모집 글로 들어왔다(2026-10-09 실측) */
+const DONE = /결과|명단|합격|발표|개최|선정\s*안내|최종\s*선정|공모전|규정\s*개정|개정\s*안내/;
 /* ⚠ 배우러 오는 사람·자리 채우는 사람을 모으는 글 — 공인노무사회 공지에 많다(실측: 「고용노사관계 전문가과정
      교육생 모집」·「국제심포지엄 참가신청」·「위험성평가 컨설팅 전문가과정 강좌 신청 독려」). */
 const LEARN = /교육생|수강생|참가\s*신청|참석자|심포지엄|세미나|강좌|양성\s*과정|전문가\s*과정|기본\s*과정|시상|자격증|서식/;
@@ -167,6 +168,9 @@ function isKcplaa(title) {
   const t = String(title || '');
   return KC_WHO.test(t) && KC_PICK.test(t) && !KC_NOT.test(t);
 }
+/* 지금 잣대가 «일부러 빼는» 말이 든 제목 — 이미 들어온 글을 지울 때만 쓴다.
+   ⚠ 「안 맞는 것」 전부가 아니라 «빼는 말»에 걸린 것만 — 찾는 말(WHO·PICK)이 바뀌었다고 옛 글을 통째로 지우지 않는다. */
+function noise(board, title) { const t = String(title || ''); return board && board.rule === 'kcplaa' ? KC_NOT.test(t) : (DONE.test(t) || LEARN.test(t)); }
 /* 게시판마다 잣대를 고른다 — rule 이 없으면 일반 잣대 */
 function pass(board, title) { return board && board.rule === 'kcplaa' ? isKcplaa(title) : isRecruit(title); }
 
@@ -196,6 +200,7 @@ var PER_ONE = new RegExp(PER_D);
 var PER_ROLL = /^[\s:：\-]*(?:채용\s*시|수시|상시|ASAP|선착순|소진\s*시|충원\s*시)/i;
 var PER_NOT = /(?:사업|위촉|활동|계약|운영|교육|임기|근무|과업|용역|행사)\s*(?:기간|일정)[^가-힣]{0,20}$/;
 var PER_SHORT = new RegExp('[~∼～〜]\\s*' + PER_D + '|' + PER_D + '\\s*까지');
+var PER_UNTIL = new RegExp(PER_D + '\\s*까지[\\s\\S]{0,40}?(?:제출|신청|접수|회신|추천|송부|발송|응모|보내)');
 function perPad(n) { return (n < 10 ? '0' : '') + n; }
 function perDay(y, m, d) {
   m = Number(m); d = Number(d);
@@ -237,6 +242,13 @@ function periodOf(text, post) {
       if (!y) d2 = perShift(d2, post);
       if (d2) return { from: '', to: d2, rolling: false };
     }
+  }
+  /* 라벨 없이 「2026. 10. 15.(수)까지 이메일로 제출」 — 공문 문장 꼴. ⚠ 「까지」 뒤 40자 안에 «내는» 말이 있어야 한다 */
+  var u = t.match(PER_UNTIL);
+  if (u && !PER_NOT.test(t.slice(Math.max(0, u.index - 30), u.index))) {
+    var d3 = perDay(u[1] ? Number(u[1]) : baseY, u[2], u[3]);
+    if (!u[1]) d3 = perShift(d3, post);
+    if (d3) return { from: '', to: d3, rolling: false };
   }
   return null;
 }
@@ -291,6 +303,58 @@ function docsFromAttach(text) {
   return DOC_KINDS.map((d) => d.k).filter((k) => out.indexOf(k) >= 0);
 }
 
+/* ── 공문이 «그림»인 게시판 — AI 로 마감일을 짚는다 (대표 지시 2026-10-09 「진행해라」) ──
+   공인노무사회 공지(일반·회원)는 본문이 공문 사진(jpg)이고 내용은 압축 첨부에 있다 — 글자 규칙(periodOf)이 읽을 글이 없다.
+   실측 2026-10-09: 회원 공지 11건이 모두 「기간 모름」 · 일반 공지 본문 = <img> 둘 + .zip 하나.
+   ⚠ ai 가 붙은 게시판만 · 글자 규칙이 못 찾았을 때만 · 하루 LIMITS.aiMax 건까지 — AI 는 돈이 든다.
+   ⚠ AI 는 «날짜를 짚기만» 한다. 받은 답은 aiPerOf 가 걸러서(꼴·올린 날 앞뒤) 맞지 않으면 버린다 — 지어낸 날짜를 마감으로 쓰지 않는다.
+   ⚠ 한 번 물어본 글은 per.aiTried 를 남겨 날마다 다시 묻지 않는다(답을 못 받은 날 — 한도·고장 — 은 남기지 않아 다음 날 다시). */
+const IMG_MAX = 3, IMG_BYTES = 3 * 1024 * 1024;
+function imagesOf(html, base) {
+  const s = String(html || ''), out = [];
+  const i = s.search(/id\s*=\s*["']editor["']|class\s*=\s*["'][^"']*txt-box/i);
+  if (i < 0) return out;
+  let host = ''; try { host = new URL(base).host; } catch (_) { return out; }
+  const re = /<img\b[^>]*\bsrc\s*=\s*["']([^"']+)["']/gi, part = s.slice(i, i + 20000); let m;
+  while ((m = re.exec(part)) && out.length < IMG_MAX) {
+    let u; try { u = new URL(m[1].replace(/&amp;/g, '&'), base); } catch (_) { continue; }
+    if (u.protocol !== 'https:' || u.host !== host) continue;   // ⚠ 남의 서버 그림은 안 받는다
+    if (!/\.(jpe?g|png|gif|webp)$/i.test(u.pathname)) continue;
+    if (out.indexOf(u.href) < 0) out.push(u.href);
+  }
+  return out;
+}
+function mimeOf(u) { return /\.png$/i.test(u) ? 'image/png' : /\.gif$/i.test(u) ? 'image/gif' : /\.webp$/i.test(u) ? 'image/webp' : 'image/jpeg'; }
+/* 화면 머리(메뉴)는 빼고 제목부터 3,000자 */
+function bodyOf(txt, title) {
+  const t = String(txt || ''), k = String(title || '').slice(0, 12);
+  const i = k ? Math.max(0, t.indexOf(k)) : 0;
+  return t.slice(i, i + 3000);
+}
+function aiAsk(title, post, text) {
+  return '아래는 공고 게시글(제목·본문·공문 사진)입니다. 이 공고의 «접수·신청·추천·제출 마감일»만 찾아 주세요.\n' +
+    '사업 기간·위촉 기간·임기·교육 일정·행사 날짜는 마감이 아닙니다. 마감일이 없으면 지어내지 말고 to 를 비우세요.\n' +
+    '「수시·상시·채용 시 마감·선착순」이면 rolling 을 true 로 하세요.\n' +
+    '답은 JSON 한 줄만: {"from":"YYYY-MM-DD 또는 빈칸","to":"YYYY-MM-DD 또는 빈칸","rolling":false}\n' +
+    '제목: ' + String(title || '') + '\n올린 날: ' + String(post || '') + '\n본문:\n' + String(text || '').slice(0, 3000);
+}
+function aiDay(d) {
+  return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d) && !isNaN(Date.parse(d + 'T00:00:00Z')) &&
+    new Date(d + 'T00:00:00Z').toISOString().slice(0, 10) === d;
+}
+function aiPerOf(reply, post) {
+  const j = String(reply == null ? '' : reply).match(/\{[\s\S]*?\}/); if (!j) return null;
+  let o; try { o = JSON.parse(j[0]); } catch (_) { return null; }
+  if (!o || typeof o !== 'object') return null;
+  if (o.rolling === true && !o.to) return { from: '', to: '', rolling: true, by: 'ai' };
+  if (!aiDay(o.to)) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(String(post || ''))) {
+    const gap = daysBetween(post, o.to);
+    if (gap < -7 || gap > 180) return null;   // ⚠ 올린 날보다 한참 앞이거나 반년 넘게 뒤 — 마감이 아닌 날짜를 짚었다
+  }
+  return { from: aiDay(o.from) && o.from <= o.to ? o.from : '', to: o.to, rolling: false, by: 'ai' };
+}
+
 function hasDetail(h, b) {
   const u = String(h && h.href || '');
   return /^https:\/\//.test(u) && !!b && u !== b.url && u !== b.page;
@@ -299,7 +363,7 @@ function hasDetail(h, b) {
 /* 시간 셈 — 서버는 5분(300초)에 끊긴다. 끊기면 «그날 읽은 것을 하나도 못 남긴다»(쓰기가 맨 끝에 있다).
    ⚠ 그래서 ①몇 곳씩 함께 읽고 ②한 게시판이 오래 붙잡지 못하게 하고 ③전체 마감을 넘기면 남은 곳은
      «못 읽음»으로 적고 끝낸다 — 읽은 만큼은 반드시 남는다(검토 2026-10-04). */
-const LIMITS = { together: 4, boardMs: 45000, totalMs: 200000, detailMs: 20000, detailMax: 14 };
+const LIMITS = { together: 4, boardMs: 45000, totalMs: 200000, detailMs: 20000, detailMax: 14, aiMax: 6, aiMs: 40000, aiAgeDays: 60 };
 function 늦으면(ms, why) {
   let t; const p = new Promise((_, no) => { t = setTimeout(() => no(new Error(why)), Math.max(0, ms)); });
   return { p, stop: () => clearTimeout(t) };
@@ -364,14 +428,24 @@ async function run(o) {
      ⚠ o.details 일 때만(서버가 켠다) · 새 글 먼저, 남는 자리에 «아직 기간을 안 본» 옛 글을 하루 몇 건씩 메운다.
      ⚠ 목록 시간 셈과 같은 전체 마감 안에서만 — 남은 시간이 없으면 그만둔다(다음 날 다시).
      ⚠ 본문에서 못 찾으면 { none: true } 를 남겨 날마다 다시 열지 않는다(제목에서 찾은 것은 그대로 둔다). */
+  const byId = {}; boards.forEach((b) => { byId[b.id] = b; });
+  /* 지금 잣대로 안 맞는 옛 글은 뺀다 — 잣대를 고치면 이미 들어온 잡음도 나가야 한다(2026-10-09 「규정 개정안내」).
+     ⚠ 이번에 읽은 게시판의 글만 — 다른 판(검사·옛 판)의 글은 건드리지 않는다. */
+  const drops = {};
+  Object.keys(have).forEach((k) => { const x = have[k] || {}, b = byId[x.board]; if (b && x.title && noise(b, x.title)) drops[k] = true; });
   const pers = {}, docs = {};
+  let aiUsed = 0;
   if (o.details) {
-    const byId = {}; boards.forEach((b) => { byId[b.id] = b; });
     const max = o.detailMax || LIMITS.detailMax, dms = o.detailMs || LIMITS.detailMs;
+    const aiMax = o.aiMax == null ? LIMITS.aiMax : o.aiMax, aiMs = o.aiMs || LIMITS.aiMs;
+    /* 아직 AI 에게 안 물어본 «기간 모름» 글 — ai 게시판이고 두 달 안에 올라온 것만 */
+    const 다시AI = (x) => !!(o.ai && x.per && x.per.none && !x.per.aiTried && byId[x.board] && byId[x.board].ai &&
+      (!today || daysBetween(x.date || '', today) <= LIMITS.aiAgeDays));
     const todo = hits.filter((h) => hasDetail(h, byId[h.board])).map((h) => ({ h, fresh: true }));
     Object.keys(have).forEach((k) => {
+      if (drops[k]) return;
       const x = Object.assign({}, have[k] || {}, fixes[k] ? { href: fixes[k] } : {});
-      if (x.per && (x.per.to || x.per.rolling || x.per.none) && (x.docs || x.docsNone)) return;   // 기간·서류 둘 다 본 글만 건너뛴다
+      if (x.per && (x.per.to || x.per.rolling || x.per.none) && (x.docs || x.docsNone) && !다시AI(x)) return;   // 기간·서류 둘 다 본 글만 건너뛴다
       if (hasDetail(Object.assign({ key: k }, x), byId[x.board])) todo.push({ h: Object.assign({ key: k }, x), fresh: false });
     });
     const list = todo.slice(0, max);
@@ -382,11 +456,31 @@ async function run(o) {
         const left = totalMs - (now() - t0);
         if (left <= 1000) return;
         const 시계 = 늦으면(Math.min(dms, left), '본문을 늦게 줘 그만 읽었습니다');
-        let got = null, ds = null;
-        try { const txt = clean(await Promise.race([o.fetchText(it.h.href, b), 시계.p])); got = periodOf(txt, it.h.date); ds = docsOf(txt); if (!ds || !ds.length) { const a = docsFromAttach(txt); if (a.length) ds = Object.assign(a, { fromAttach: true }); } }
+        let got = null, ds = null, html = '', txt = '', aiTried = false;
+        try { html = await Promise.race([o.fetchText(it.h.href, b), 시계.p]); txt = clean(html); got = periodOf(txt, it.h.date); ds = docsOf(txt); if (!ds || !ds.length) { const a = docsFromAttach(txt); if (a.length) ds = Object.assign(a, { fromAttach: true }); } }
         catch (e) { continue; }   // 못 열면 다음 날 다시
         finally { 시계.stop(); }
-        const v = got || (it.h.per && it.h.per.to ? it.h.per : { none: true });
+        /* 글자 규칙이 못 찾았고 공문이 그림인 게시판 — AI 에게 마감일만 묻는다 */
+        if (!got && b && b.ai && o.ai && aiUsed < aiMax && !(it.h.per && (it.h.per.to || it.h.per.rolling))) {
+          const imgs = imagesOf(html, it.h.href), body = bodyOf(txt, it.h.title);
+          const left2 = totalMs - (now() - t0);
+          if ((imgs.length || body.length > 300) && left2 > 5000) {
+            aiUsed++;
+            const 시계2 = 늦으면(Math.min(aiMs, left2), 'AI 가 늦게 답해 그만두었습니다');
+            try {
+              const parts = [{ text: aiAsk(it.h.title, it.h.date, body) }];
+              for (const u of imgs) {
+                try { const by = await Promise.race([o.fetchText(u, b, true), 시계2.p]); if (by && by.length && by.length <= IMG_BYTES) parts.push({ inline_data: { mime_type: mimeOf(u), data: Buffer.from(by).toString('base64') } }); }
+                catch (_) { /* 그림 하나 못 받아도 나머지로 */ }
+              }
+              const reply = await Promise.race([o.ai(parts), 시계2.p]);
+              aiTried = true;   // ⚠ 답을 «받았을 때만» — 한도·고장이면 다음 날 다시 묻는다
+              got = aiPerOf(reply, it.h.date);
+            } catch (_) { /* 한도·고장·늦음 — 이번엔 넘어간다 */ }
+            finally { 시계2.stop(); }
+          }
+        }
+        const v = got || (it.h.per && it.h.per.to ? it.h.per : (aiTried ? { none: true, aiTried: true } : { none: true }));
         /* ⚠ 빈 배열은 RTDB 가 안 담는다 — 「못 찾음」은 docsNone 으로 남겨 날마다 다시 열지 않는다 */
         const dv = ds && ds.length ? (ds.fromAttach ? { docs: ds.slice(), docsFrom: 'attach' } : { docs: ds }) : { docsNone: true };
         if (it.fresh) { it.h.per = v; Object.assign(it.h, dv); } else { pers[it.h.key] = v; docs[it.h.key] = dv; }
@@ -394,7 +488,7 @@ async function run(o) {
     };
     await Promise.all(Array.from({ length: Math.min(together, list.length) }, 읽개));
   }
-  return { hits, errors, counts, pers, docs, fixes, checked: boards.length, ms: now() - t0 };
+  return { hits, errors, counts, pers, docs, fixes, drops, ai: aiUsed, checked: boards.length, ms: now() - t0 };
 }
 
 /* 게시판에 맞는 «읽는 손»을 고른다 — login 이 붙은 게시판만 로그인한 손으로.
@@ -402,11 +496,12 @@ async function run(o) {
    ⚠ 로그인이 실패하면 그 실패를 기억해 같은 날 다시 두드리지 않는다(남의 서버에 비밀번호를 거듭 보내지 않는다). */
 function makeFetcher(o) {
   let 손 = null;
-  return async function fetchText(url, board) {
-    if (!board || !board.login) return o.plain(url);
+  /* raw — 바이트(Uint8Array)로 달라는 것(공문 그림을 AI 에게 보낼 때) */
+  return async function fetchText(url, board, raw) {
+    if (!board || !board.login) return o.plain(url, raw);
     if (!손) 손 = Promise.resolve().then(() => o.login(board.login));
     const h = await 손;
-    return h(url);
+    return h(url, raw);
   };
 }
 
@@ -439,6 +534,8 @@ function updatesOf(result, existing, nowIso) {
     all.sort((a, b) => a.d.localeCompare(b.d));
     all.slice(0, all.length - MAX_KEEP).forEach((x) => { upd['hits/' + x.k] = null; });
   }
+  /* 지금 잣대로 안 맞는 옛 글을 뺀다 */
+  Object.keys(result.drops || {}).forEach((k) => { if (existing && existing[k]) upd['hits/' + k] = null; });
   /* 옛 글에 붙인 기간 — ⚠ 같은 쓰기에서 지우는 글(null)에는 안 붙인다(RTDB 는 부모·자식을 한 번에 못 쓴다) */
   Object.keys(result.fixes || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/href'] = result.fixes[k]; });
   Object.keys(result.docs || {}).forEach((k) => {
@@ -450,6 +547,9 @@ function updatesOf(result, existing, nowIso) {
   Object.keys(result.pers || {}).forEach((k) => { if (upd['hits/' + k] !== null && existing && existing[k]) upd['hits/' + k + '/per'] = result.pers[k]; });
   upd.last = { at: nowIso, checked: result.checked, added: result.hits.length,
     errors: result.errors, counts: result.counts };
+  if (result.ai) upd.last.ai = result.ai;   // AI 에게 물은 건수(돈)
+  const 뺀 = Object.keys(result.drops || {}).filter((k) => existing && existing[k]).length;
+  if (뺀) upd.last.dropped = 뺀;
   return upd;
 }
 
@@ -460,4 +560,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
+module.exports = { imagesOf, aiPerOf, aiAsk, bodyOf, docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };

@@ -1073,7 +1073,8 @@ exports.recruitWatch = functions
   .region(MAIL_REGION)
   /* ILABOR_ID·ILABOR_PW — 공인노무사회 «회원 공지»를 읽으려고 뉴스레터의 로그인 비밀값을 빌린다(2026-10-04).
      코드는 값을 못 본다. 로그인은 하루 한 번, 읽기만 한다. */
-  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
+  /* GEMINI_KEY — 공인노무사회 공문(그림)의 마감일을 읽으려고(2026-10-09). 하루 6건까지 · readDoc 과 같은 달 한도 */
+  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY"] })
   .pubsub.schedule("every day 07:20")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1084,9 +1085,13 @@ exports.recruitWatch = functions
     const nowIso = new Date().toISOString();
     const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
     const fetchText = RecruitWatch.makeFetcher({
-      plain: async (u) => {
-        const res = await fetch(u, { headers: { "User-Agent": RecruitWatch.UA }, signal: AbortSignal.timeout(30000) });
+      plain: async (u, raw) => {
+        let res;
+        /* ⚠ 「fetch failed」 한 줄로는 왜인지 모른다 — 까닭 코드를 붙인다(지방공기업평가원이 날마다 이것으로 빠진다, 2026-10-09) */
+        try { res = await fetch(u, { headers: { "User-Agent": RecruitWatch.UA }, signal: AbortSignal.timeout(30000) }); }
+        catch (e) { const 까닭 = e && e.cause && (e.cause.code || e.cause.message); throw new Error(String((e && e.message) || e) + (까닭 ? " [" + String(까닭).slice(0, 60) + "]" : "")); }
         if (!res.ok) throw new Error("HTTP " + res.status);
+        if (raw) return new Uint8Array(await res.arrayBuffer());
         return RecruitWatch.decode(new Uint8Array(await res.arrayBuffer()), res.headers.get("content-type"));
       },
       /* 공인노무사회 로그인 — 뉴스레터의 노무사회로그인 ①② 걸음만 쓴다(ilabor 로 넘어가지 않는다) */
@@ -1094,18 +1099,31 @@ exports.recruitWatch = functions
         const 아이디 = process.env.ILABOR_ID, 암호 = process.env.ILABOR_PW;
         if (!아이디 || !암호) throw new Error("공인노무사회 아이디·비밀번호가 서버에 없습니다");
         const 든것 = await 노무사회로그인(아이디, 암호, { 회원만: true });
-        return async (u) => {
+        return async (u, raw) => {
           const r = await 노무사회부르기(u, 든것.그릇들);
           const 곳 = r.headers.get("location") || "";
           if (r.status >= 300 && r.status < 400) throw new Error("로그인이 안 먹었다 — " + r.status + " → " + 곳.slice(0, 60));
           if (!r.ok) throw new Error("HTTP " + r.status);
+          if (raw) return new Uint8Array(await r.arrayBuffer());
           const 글 = await r.text();
           if (노무사회.막혔나(글)) throw new Error("회원 공지가 막혔다 — 로그인이 풀렸다");
           return 글;
         };
       },
     });
-    const result = await RecruitWatch.run({ existing, today, nowIso, fetchText, details: true });   // 새 글 본문을 열어 접수 기간까지
+    /* 공문이 그림인 글의 마감일 — AI 는 readDoc 과 «같은 문»(같은 열쇠 · 같은 달 한도 · 셈은 app:gov) */
+    const ai = async (parts) => {
+      const 몫 = await aiMonthSpend();
+      if (몫.known && 몫.over) throw new Error("이번 달 AI 한도를 다 썼습니다");
+      const key = await readGeminiKey();
+      if (!key) throw new Error("AI 키가 없습니다");
+      const r = await DR.callGemini(fetch, key, parts, [2000], {});
+      await bumpReadTally("gov", r.ok ? "n" : (DR.dailyQuotaGone(r.why) ? "quota" : "n"));
+      if (!r.ok) throw new Error(r.why || ("AI 오류 " + (r.status || "")));
+      const ps = (r.json && r.json.candidates && r.json.candidates[0] && r.json.candidates[0].content && r.json.candidates[0].content.parts) || [];
+      return ps.map((p) => (p && p.text) || "").join("");
+    };
+    const result = await RecruitWatch.run({ existing, today, nowIso, fetchText, details: true, ai });   // 새 글 본문을 열어 접수 기간까지
     await root.update(RecruitWatch.updatesOf(result, existing, nowIso));
     /* 처음 한 번만 — 회원 공지에 모집 공문이 정말 오는지 다섯 쪽을 훑어 남긴다(대표 확인용, 관리자만 읽힌다).
        ⚠ 로그인이 안 됐으면 남기지 않는다 — 다음 날 다시 해 본다. */

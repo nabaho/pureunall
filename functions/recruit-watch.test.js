@@ -443,7 +443,9 @@ const PER_CASES = [
   ['○ 접수 일정 : 12. 22.(월) ~ 1. 9.(금)', '2026-12-15', { from: '2026-12-22', to: '2027-01-09', rolling: false }],
   ['추천 기한: 10. 13.(월)까지 회신', '2026-10-01', { from: '', to: '2026-10-13', rolling: false }],
   ['모집기간: 상시 모집', '2026-05-01', { from: '', to: '', rolling: true }],
-  ['10.15(수)까지 접수 — 공정채용 컨설턴트 모집', '2026-10-01', { from: '', to: '2026-10-15', rolling: false }]
+  ['10.15(수)까지 접수 — 공정채용 컨설턴트 모집', '2026-10-01', { from: '', to: '2026-10-15', rolling: false }],
+  /* 2026-10-09 — 라벨 없는 공문 문장(200자 넘는 본문)도 「…까지 … 제출」이면 */
+  ['1. 귀 회원의 무궁한 발전을 기원합니다. 2. 관련하여 ○○시에서 위원회 위원 추천을 요청하여 왔는 바, 희망하시는 회원께서는 붙임 신청서를 작성하시어 2026. 10. 15.(수)까지 이메일(abc@kcplaa.or.kr)로 제출하여 주시기 바랍니다. 3. 위촉기간은 2027. 1. 1. ~ 2028. 12. 31.입니다. 선정 결과는 개별 통보합니다. 기타 문의는 사무국으로 연락 바랍니다.', '2026-10-01', { from: '', to: '2026-10-15', rolling: false }]
 ];
 const PER_NONE = [
   ['사업기간 2026.1.1~2026.12.31 위촉기간 2년', '2026-01-02'],   /* ⚠ 사업·위촉 기간은 마감이 아니다 */
@@ -451,7 +453,10 @@ const PER_NONE = [
   ['위촉기간: 2027.1.1~2028.12.31', '2026-10-01'],
   ['2027년 일터혁신 컨설팅 지원사업 컨설턴트 모집 공고', '2026-09-20'],
   /* ⚠ 라벨에서 한참 떨어진 날짜는 접수 기간이 아니다 */
-  ['모집기간 및 제출방법 등 자세한 사항은 붙임 공고문을 참고하시기 바랍니다. 사업기간: 2026.1.1~2026.12.31', '2026-01-02']
+  ['모집기간 및 제출방법 등 자세한 사항은 붙임 공고문을 참고하시기 바랍니다. 사업기간: 2026.1.1~2026.12.31', '2026-01-02'],
+  /* ⚠ 「까지」 뒤에 «내는» 말이 없으면 마감이 아니다 · 교육·사업 기간의 「까지」도 아니다 */
+  ['본 사업은 2026년 상반기부터 시작하여 지역 노사 관계를 살피고 노무 관리 수준을 높이려는 취지로 마련되었습니다. 참여 기업은 해마다 늘고 있으며 많은 관심 바랍니다. 사업 결과는 2026. 12. 31.까지 정리하여 누리집에 게시할 예정입니다. 자세한 사항은 붙임을 참고하여 주시기 바랍니다. 문의는 담당 부서로 하여 주십시오. 앞으로도 회원 여러분의 변함없는 성원을 부탁드립니다. 감사합니다.', '2026-10-01'],
+  ['교육 일정은 아래와 같습니다. 이번 과정은 실무 역량을 높이려는 것으로 회원 여러분의 많은 관심 바랍니다. 수강료는 없으며 수료증을 드립니다. 강의실은 회관 3층입니다. 교육기간 2026. 11. 30.까지 신청자에 한해 이수 처리합니다. 자세한 사항은 붙임 안내문을 참고하시기 바랍니다. 문의는 교육팀으로 하여 주십시오.', '2026-10-01']
 ];
 test('★★★ 접수 기간 읽기 — 실제 본문·제목 문구로', () => {
   PER_CASES.forEach(([t, d, want]) => assert.deepEqual(W.periodOf(t, d), want, t));
@@ -537,7 +542,7 @@ test('★ 본문 읽기도 전체 마감 안에서만 — 시간이 없으면 �
 });
 test('★ 서버는 본문 읽기를 켠다', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8');
-  assert.match(src, /RecruitWatch\.run\(\{ existing, today, nowIso, fetchText, details: true \}\)/);
+  assert.match(src, /RecruitWatch\.run\(\{ existing, today, nowIso, fetchText, details: true, ai \}\)/);
 });
 
 /* ── 필요서류 읽기 (대표 지시 2026-10-05 「필요서류 ↔ 갖고 있는 서류」) ── */
@@ -588,4 +593,127 @@ test('★★ 서버 — 단락이 없고 첨부 서식이 있으면 docs + docsF
   const have = { a: { date: '2026-09-01' } };
   const u = W.updatesOf({ hits: [], errors: [], counts: {}, checked: 0, docs: { a: { docs: ['apply'], docsFrom: 'attach' } } }, have, 'T');
   assert.equal(u['hits/a/docsFrom'], 'attach');
+});
+
+/* ── 공문이 «그림»인 게시판 — AI 로 마감일 (대표 지시 2026-10-09 「진행해라」) ──
+   실측: 공인노무사회 공지 본문 = <div class="txt-box" id="editor"><img src="/data/upload/…jpg"> + .zip 첨부. */
+const KC_VIEW = (imgs) => '<html><body><nav>일반 공지사항 회원 공지사항 추천신청 게시판</nav><table><tr><th>제목</th><td>[일반추천] 서울특별시 자문위원회 위원 일반추천의 건</td></tr>' +
+  '<tr><td colspan="4" class="cell-box"><div class="txt-box" id="editor">' + imgs + '</div></td></tr></table></body></html>';
+const KC_B = { id: 'kcm', org: '', name: '공인노무사회 회원 공지', url: 'https://www.kcplaa.or.kr/bbs/news/list', ai: true };
+const KC_L = '<table><tr><td><a href="/bbs/news/view/901">[일반추천] 서울특별시 자문위원회 위원 일반추천의 건</a></td><td>2026-10-08</td></tr></table>';
+test('★★ 본문 그림 주소 — 본문 칸(editor)의 같은 누리집 그림만, 셋까지', () => {
+  const h = '<img src="/logo.png">' + KC_VIEW('<img src="/data/upload/editor/a.jpg"><img src="https://evil.kr/b.jpg"><img src="/x/c.png"><img src="/x/f.svg"><img src="/x/d.jpg"><img src="/x/e.jpg">');
+  assert.deepEqual(W.imagesOf(h, 'https://www.kcplaa.or.kr/bbs/news/view/901'),
+    ['https://www.kcplaa.or.kr/data/upload/editor/a.jpg', 'https://www.kcplaa.or.kr/x/c.png', 'https://www.kcplaa.or.kr/x/d.jpg']);
+  assert.deepEqual(W.imagesOf('<img src="/a.jpg">', 'https://k.kr/'), [], '본문 칸이 없으면 머리·꼬리 그림을 안 줍는다');
+});
+test('★★★ AI 답은 걸러서 쓴다 — 꼴이 틀리거나 올린 날과 동떨어진 날짜는 버린다(지어낸 마감 금지)', () => {
+  assert.deepEqual(W.aiPerOf('{"from":"2026-10-01","to":"2026-10-15","rolling":false}', '2026-10-08'), { from: '2026-10-01', to: '2026-10-15', rolling: false, by: 'ai' });
+  assert.equal(W.aiPerOf('답: ```json\n{"from":"","to":"2026-10-15"}\n```', '2026-10-08').to, '2026-10-15');
+  assert.deepEqual(W.aiPerOf('{"from":"","to":"","rolling":true}', '2026-10-08'), { from: '', to: '', rolling: true, by: 'ai' });
+  assert.equal(W.aiPerOf('{"from":"","to":""}', '2026-10-08'), null, '모른다고 하면 null');
+  assert.equal(W.aiPerOf('{"to":"2026-02-30"}', '2026-01-08'), null, '없는 날');
+  assert.equal(W.aiPerOf('{"to":"2028-12-31"}', '2026-10-08'), null, '위촉 기간 끝을 마감으로 짚었다');
+  assert.equal(W.aiPerOf('{"to":"2026-09-01"}', '2026-10-08'), null, '올린 날보다 한참 앞');
+  assert.equal(W.aiPerOf('마감은 10월 15일입니다', '2026-10-08'), null, 'JSON 이 아니면 버린다');
+  assert.equal(W.aiPerOf('{"from":"2026-10-20","to":"2026-10-15"}', '2026-10-08').from, '', '시작이 끝보다 뒤면 시작만 버린다');
+});
+function kcFetch(log, img) {
+  return async (u, b, raw) => {
+    log.push([u, !!raw]);
+    if (u === KC_B.url) return KC_L;
+    if (raw) return img || new Uint8Array([1, 2, 3]);
+    return KC_VIEW('<img src="/data/upload/editor/p1.jpg"><img src="/data/upload/editor/p2.jpg">');
+  };
+}
+test('★★★ 글자로 못 찾으면 공문 그림을 AI 에게 — 그림은 바이트로 받아 함께 보낸다', async () => {
+  const log = [], asked = [];
+  const r = await W.run({ boards: [KC_B], today: '2026-10-09', details: true, fetchText: kcFetch(log),
+    ai: async (parts) => { asked.push(parts); return '{"from":"","to":"2026-10-17","rolling":false}'; } });
+  assert.deepEqual(r.hits[0].per, { from: '', to: '2026-10-17', rolling: false, by: 'ai' });
+  assert.equal(asked.length, 1);
+  assert.equal(asked[0].filter((p) => p.inline_data).length, 2, '그림 둘');
+  assert.equal(asked[0][1].inline_data.mime_type, 'image/jpeg'); assert.equal(asked[0][1].inline_data.data, 'AQID');
+  assert.match(asked[0][0].text, /마감일/); assert.match(asked[0][0].text, /올린 날: 2026-10-08/);
+  assert.match(asked[0][0].text, /서울특별시 자문위원회/); assert.doesNotMatch(asked[0][0].text, /추천신청 게시판/, '머리 메뉴를 보냈다');
+  assert.deepEqual(log.filter((x) => x[1]).map((x) => x[0]), ['https://www.kcplaa.or.kr/data/upload/editor/p1.jpg', 'https://www.kcplaa.or.kr/data/upload/editor/p2.jpg']);
+  assert.equal(r.ai, 1);
+});
+test('★★ AI 는 ai 게시판에서만 · 글자로 찾았으면 안 부른다 · 너무 큰 그림은 안 보낸다', async () => {
+  let n = 0; const ai = async () => { n++; return '{"to":"2026-10-17"}'; };
+  await W.run({ boards: [Object.assign({}, KC_B, { ai: false })], today: '2026-10-09', details: true, fetchText: kcFetch([]), ai });
+  assert.equal(n, 0, 'ai 표시 없는 게시판에서 불렀다');
+  await W.run({ boards: [KC_B], today: '2026-10-09', details: true, ai,
+    fetchText: async (u) => (u === KC_B.url ? KC_L : '<div id="editor">추천 기한: 10. 13.(월)까지 회신<img src="/a.jpg"></div>') });
+  assert.equal(n, 0, '글자로 이미 찾았는데 AI 를 불렀다');
+  let parts = null;
+  await W.run({ boards: [KC_B], today: '2026-10-09', details: true, fetchText: kcFetch([], new Uint8Array(3 * 1024 * 1024 + 1)),
+    ai: async (p) => { parts = p; return '{}'; } });
+  assert.equal(parts.filter((p) => p.inline_data).length, 0, '3MB 넘는 그림을 보냈다');
+});
+test('★★★ 답을 받으면 aiTried 를 남기고, 한도·고장이면 안 남긴다(다음 날 다시)', async () => {
+  const a = await W.run({ boards: [KC_B], today: '2026-10-09', details: true, fetchText: kcFetch([]), ai: async () => '{"from":"","to":""}' });
+  assert.deepEqual(a.hits[0].per, { none: true, aiTried: true });
+  const b = await W.run({ boards: [KC_B], today: '2026-10-09', details: true, fetchText: kcFetch([]), ai: async () => { throw new Error('이번 달 AI 한도를 다 썼습니다'); } });
+  assert.deepEqual(b.hits[0].per, { none: true });
+  const c = await W.run({ boards: [KC_B], today: '2026-10-09', details: true, fetchText: kcFetch([]) });
+  assert.deepEqual(c.hits[0].per, { none: true }, 'ai 문이 없으면 예전 그대로');
+});
+test('★★ 하루 aiMax 건까지만 묻는다', async () => {
+  const L = '<table>' + [1, 2, 3, 4].map((i) => '<tr><td><a href="/bbs/news/view/9' + i + '">[일반추천] 자문위원 추천의 건 ' + i + '</a></td><td>2026-10-08</td></tr>').join('') + '</table>';
+  let n = 0;
+  const r = await W.run({ boards: [KC_B], today: '2026-10-09', details: true, aiMax: 2,
+    fetchText: async (u, b, raw) => (u === KC_B.url ? L : raw ? new Uint8Array([1]) : KC_VIEW('<img src="/p.jpg">')),
+    ai: async () => { n++; return '{"to":"2026-10-20"}'; } });
+  assert.equal(n, 2); assert.equal(r.ai, 2);
+  assert.equal(r.hits.filter((h) => h.per && h.per.by === 'ai').length, 2);
+  assert.equal(r.hits.filter((h) => h.per && h.per.none && !h.per.aiTried).length, 2, '못 물은 글은 다음 날 다시');
+});
+test('★★★ 옛 「기간 모름」 글도 한 번은 AI 에게 — 물어본 글·두 달 지난 글은 다시 안 연다', async () => {
+  const mk = (id, date, per) => ({ board: 'kcm', title: '[일반추천] 위원 추천의 건 ' + id, date, href: 'https://www.kcplaa.or.kr/bbs/news/view/' + id, per, docsNone: true });
+  const have = { a: mk('a', '2026-09-30', { none: true }), b: mk('b', '2026-09-30', { none: true, aiTried: true }), c: mk('c', '2026-07-10', { none: true }) };
+  const opened = [];
+  const r = await W.run({ boards: [KC_B], existing: have, today: '2026-10-09', details: true,
+    fetchText: async (u, b, raw) => { opened.push(u); return u === KC_B.url ? '<table></table>' : raw ? new Uint8Array([1]) : KC_VIEW('<img src="/p.jpg">'); },
+    ai: async () => '{"to":"2026-10-06"}' });
+  assert.deepEqual(r.pers.a, { from: '', to: '2026-10-06', rolling: false, by: 'ai' });
+  assert.ok(!opened.some((u) => /view\/b$/.test(u)), '이미 물어본 글을 또 열었다');
+  assert.ok(!opened.some((u) => /view\/c$/.test(u)), '두 달 넘은 글까지 물었다');
+  const r2 = await W.run({ boards: [KC_B], existing: have, today: '2026-10-09', details: true, fetchText: async (u) => (u === KC_B.url ? '<table></table>' : '') });
+  assert.equal(r2.pers.a, undefined, 'ai 문이 없으면 옛 글을 다시 열 까닭이 없다');
+  assert.equal(W.updatesOf(r, have, 'T')['hits/a/per'].to, '2026-10-06');
+});
+test('★★ 잡음 — 「규정 개정안내」는 모집 글이 아니다 · 이미 들어온 것은 지운다(그 게시판 것만)', async () => {
+  assert.equal(W.isRecruit('등록심사위원회 규정 개정안내'), false);
+  assert.equal(W.isRecruit('[일반추천] 강원특별자치도 사무 수탁기관 선정심사위원 일반추천의 건'), true, '진짜 추천 글까지 막았다');
+  const have = {
+    n1: { board: 'kcm', title: '등록심사위원회 규정 개정안내', date: '2026-07-10' },
+    k1: { board: 'kcm', title: '[일반추천] 서울특별시 자문위원회 위원 일반추천의 건', date: '2026-10-08' },
+    o1: { board: 'other', title: '등록심사위원회 규정 개정안내', date: '2026-07-10' }
+  };
+  const r = await W.run({ boards: [KC_B], existing: have, today: '2026-10-09', fetchText: async () => '<table></table>' });
+  assert.deepEqual(Object.keys(r.drops), ['n1']);
+  const u = W.updatesOf(r, have, 'T');
+  assert.equal(u['hits/n1'], null); assert.equal(u['hits/k1'], undefined); assert.equal(u['hits/o1'], undefined);
+  assert.equal(u.last.dropped, 1);
+});
+test('★★ 읽는 손은 바이트(raw)도 넘긴다 — 로그인 게시판도', async () => {
+  const got = [];
+  const f = W.makeFetcher({ plain: async (u, raw) => { got.push(['p', raw]); return 'x'; }, login: async () => async (u, raw) => { got.push(['l', raw]); return 'y'; } });
+  await f('https://a', { id: 'a' }, true); await f('https://b', { id: 'b', login: 'kcplaa' }, true); await f('https://c', { id: 'b', login: 'kcplaa' });
+  assert.deepEqual(got, [['p', true], ['l', true], ['l', undefined]]);
+});
+test('★★ 서버 — AI 는 readDoc 과 같은 문(달 한도·열쇠·셈), 비밀값 GEMINI_KEY · 그림은 바이트로', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
+  const i = src.indexOf('exports.recruitWatch'); const body = src.slice(i, src.indexOf('\nexports.', i + 30));
+  assert.match(body, /secrets: \["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY"\]/);
+  assert.match(body, /aiMonthSpend\(\)[\s\S]*몫\.over[\s\S]*readGeminiKey\(\)[\s\S]*DR\.callGemini[\s\S]*bumpReadTally\("gov"/);
+  assert.match(body, /if \(raw\) return new Uint8Array\(await res\.arrayBuffer\(\)\)/);
+  assert.match(body, /if \(raw\) return new Uint8Array\(await r\.arrayBuffer\(\)\)/);
+  assert.match(body, /e\.cause/, '「fetch failed」 까닭 코드를 안 붙였다');
+});
+test('★★ 공인노무사회 두 공지판에만 ai 표시 — 공문이 그림이다(AI 는 돈이 든다)', () => {
+  ['kcplaa', 'kcplaa_m'].forEach((id) => assert.equal(W.BOARDS.find((b) => b.id === id).ai, true, id));
+  assert.equal(W.BOARDS.filter((b) => b.ai).length, 2, '다른 판에 AI 를 켰다');
+  assert.ok(W.LIMITS.aiMax > 0 && W.LIMITS.aiMax <= 10);
 });
