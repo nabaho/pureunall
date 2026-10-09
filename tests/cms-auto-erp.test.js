@@ -28,3 +28,57 @@ test('입금은 erpUpsertIncome 문으로만, 통장 줄은 처리됨 표시만'
 test('관리자만 돈다', () => {
   assert.match(cutFn('function erpCmsAutoRun('), /isAdminByUser\(\s*CURRENT_USER\s*\)/);
 });
+
+/* ── 실제로 돌려 본다 — 스텁을 꽂은 vm 안에서 erpCmsAutoRun 을 실행 ── */
+const vm = require('vm');
+function runErp(opts) {
+  const calls = { upsert: [], mark: [], ledgerSave: 0 };
+  const row = { _k: 'k1', code: '1001', name: '가나상사', amount: 220000, fee: 0, status: 'ok', wdate: '2026-10-10', setdate: '2026-10-12' };
+  const bankRow = Object.assign({ date: '2026-10-12 10:00', amount: 220000, memo: '더빌이체3572', type: 'income' }, opts.rowSrc ? { src: opts.rowSrc } : {});
+  const data = {
+    app_settings: { cmsAutoConfirm: opts.on },
+    companies: [{ id: 'co-1', name: '가나상사', status: 'active', monthlyAdvisoryFee: 220000, vatType: 'inclusive', cmsMemberCodes: ['1001'], managerMain: 'A-001' }],
+    finance_income: [],
+    ledger_batches: [{ src: 'bank', rows: [bankRow] }],
+  };
+  const ctx = {
+    console, Date, Math, Object, JSON, String, parseInt, Promise, Event: function () {},
+    CURRENT_USER: { sid: 'P-001', isAdmin: true },
+    isAdminByUser: () => true,
+    fbDb: { ref: () => ({ once: () => Promise.resolve({ val: () => ({ rows: { k1: row }, status: {} }) }) }) },
+    dbGet: (k, d) => (k in data ? data[k] : d),
+    erpCmsLedgerGet: () => null,
+    erpCmsLedgerSave: () => { calls.ledgerSave++; },
+    erpBankProcessedStore: () => ({}),
+    erpBankRowKey: (r) => String(r.date) + '|' + r.amount,
+    erpNormName: (s) => String(s || '').toLowerCase().replace(/\s+/g, ''),
+    erpCleanMemo: (s) => String(s || ''),
+    isIncomeLocked: () => false,
+    getActiveUsers: () => [],
+    erpUpsertIncome: (rec) => { calls.upsert.push(rec); },
+    erpMarkBankRowProcessed: (r, kind, label) => { calls.mark.push({ r, kind, label }); },
+  };
+  ctx.window = ctx; ctx.dispatchEvent = () => true;
+  vm.createContext(ctx);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-cms-auto.js'), 'utf8'), ctx);
+  vm.runInContext(cutFn('function erpCmsAutoRun('), ctx);
+  return ctx.erpCmsAutoRun(opts.run).then((res) => ({ res, calls }));
+}
+test('돌려 보기 — 스위치 켜짐 + write 면 입금 한 건·통장 줄 표시 한 건', async () => {
+  const { res, calls } = await runErp({ on: true, run: { write: true }, rowSrc: 'bank' });
+  assert.equal(calls.upsert.length, 1);
+  assert.equal(calls.upsert[0].cmsKey, 'k1');
+  assert.equal(calls.mark.length, 1);
+  assert.equal(res.preview, false);
+});
+test('돌려 보기 — 스위치 꺼짐이면 아무것도 쓰지 않고 미리보기', async () => {
+  const { res, calls } = await runErp({ on: false, run: { write: true }, rowSrc: 'bank' });
+  assert.equal(calls.upsert.length, 0);
+  assert.equal(calls.mark.length, 0);
+  assert.equal(calls.ledgerSave, 0);
+  assert.equal(res.preview, true);
+});
+test('돌려 보기 — 줄에 src 가 없어도 묶음이 bank 면 표시한다', async () => {
+  const { calls } = await runErp({ on: true, run: { write: true }, rowSrc: '' });
+  assert.equal(calls.mark.length, 1);
+});

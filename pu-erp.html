@@ -47629,8 +47629,10 @@ function erpCmsAutoRun(opts){
     });
     var store = erpBankProcessedStore(), bank = [];
     (dbGet('ledger_batches', []) || []).forEach(function(b){
-      ((b && b.rows) || []).forEach(function(r){
-        if(r && r.src === 'bank' && r.type === 'income' && !store[erpBankRowKey(r)]) bank.push(r);
+      if(!b || b._deleted === true) return;
+      (b.rows || []).forEach(function(r){
+        // 줄에 src 가 없으면 묶음의 src 를 따른다 — 둘 다 없으면 통장으로 본다(카드만 뺀다)
+        if(r && r.type === 'income' && (r.src || b.src || 'bank') !== 'card' && !store[erpBankRowKey(r)]) bank.push(r);
       });
     });
     var marks = PuCmsAuto.bankLinesToMark(bank, { cmsRows: rows, incomes: incomes,
@@ -85685,12 +85687,14 @@ function ERPMain(props){
 
   // 🤖 CMS 자동 처리 — 로그인 뒤 8초 후 한 번, 이후 30분마다 (관리자만 함수 안에서 걸러짐)
   useEffect(function(){
-    var t0 = null;
+    var t0 = null, t1 = null;
     try {
       t0 = setTimeout(function(){ erpCmsAutoRun({ write:true }); }, 8000);
+      // fbDb 가 아직 안 떴으면 함수가 null 을 돌려준다 — 60초에 한 번 더
+      t1 = setTimeout(function(){ if(!window.__erpCmsAutoLast) erpCmsAutoRun({ write:true }); }, 60000);
       if(!window.__erpCmsAutoTimer) window.__erpCmsAutoTimer = setInterval(function(){ erpCmsAutoRun({ write:true }); }, 30 * 60 * 1000);
     } catch(_e){}
-    return function(){ if(t0) clearTimeout(t0); if(window.__erpCmsAutoTimer){ clearInterval(window.__erpCmsAutoTimer); window.__erpCmsAutoTimer = null; } };
+    return function(){ if(t0) clearTimeout(t0); if(t1) clearTimeout(t1); if(window.__erpCmsAutoTimer){ clearInterval(window.__erpCmsAutoTimer); window.__erpCmsAutoTimer = null; } };
   }, []);
 
   // 키보드 단축키: Alt+1~5(그룹 이동), Ctrl+N(새 등록), Ctrl+S(모달 저장)
