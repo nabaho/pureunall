@@ -305,10 +305,6 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tile .nl-warn{position:absolute;top:6px;right:12px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;
   background:#dc2626;color:#fff;font-size:.66rem;font-weight:800;line-height:20px;display:flex;align-items:center;
   justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2);white-space:nowrap}
-/* 📥 연락처 정리 — «할 일» 수 (대표 결정 2026-10-04). 자리·크기는 위와 같고 «색만» 다르다.
-   ⚠ 빨강은 뉴스레터의 «경고»다. 할 일까지 빨강으로 두면 급한 것과 안 급한 것이 섞여,
-     곧 둘 다 안 보게 된다. 호박은 이미 기업정보함의 할 일 띠가 쓰는 결이다. */
-.tile .nl-warn.cn-todo{background:#d97706}
 /* 준비중 — 관리자 화면의 딱지 · 줄 오른쪽 끝으로 미는 자리 (대표 지시 2026-10-09) */
 .tile .tile-soon-pill{position:absolute;top:4px;left:50%;transform:translateX(2px);display:inline-block;
   background:#d97706;color:#fff;font-size:.6rem;font-weight:800;line-height:1;padding:3px 7px;
@@ -1504,36 +1500,9 @@ body.portal-mode #moreFab{display:flex;}
       if(t.href && t.href.indexOf('tab=') < 0 && t.href.slice(-1) !== '#') t.href += '&tab=' + t.dataset.warnTab;
     }).catch(function(){});
   }
-  /* ── 📥 연락처 정리 — 기업정보함 타일에 «할 일» 배지 (대표 결정 2026-10-04 「추천대로」) ──
-     ⚠ 왜 여기인가 — 그 화면은 기업정보함 «창 안»에 산다(pu-cards.html state.view='cnt').
-       메일 타일에 달면 타일과 열리는 창이 어긋나고, 둘 다 달면 같은 일을 두 번 알린다.
-     ⚠ 색은 호박(#d97706)이다 — 뉴스레터의 빨강은 «경고»고 이것은 «할 일»이라 갈라 둔다.
-       둘이 같은 색이면 급한 것과 안 급한 것이 섞인다.
-     ⚠ 0 이면 아무것도 안 그린다 — 늘 켜진 등은 아무것도 못 알린다(뉴스레터와 같은 규칙).
-     ⚠ 관리자만으로 좁히지 «않는다» — 기업정보함 옆줄의 그 칸이 이미 직원에게 보인다.
-       화면은 보이는데 배지만 안 보이면 잣대가 두 벌이 된다.
-     ★ 숫자는 기업정보함이 셀 때 적어 둔 것을 «한 번» 읽는다 — 포털이 직접 세지 않는다.
-       메일함을 다 훑어야 나오는 수라 포털에서 세면 첫 화면이 그만큼 늦어진다. */
-  function 연락처배지달기(){
-    var t = document.querySelector('a.tile[data-key="cards"]');
-    if(!t) return;
-    db.ref('pucards/config/mailNewCount').once('value').then(function(s){
-      var v = s.val() || {};
-      var n = Number(v.n) || 0;
-      var old = t.querySelector('.cn-todo'); if(old) old.remove();
-      if(!n) return;
-      var b = document.createElement('span');
-      b.className = 'nl-warn cn-todo';
-      b.textContent = String(n);
-      t.appendChild(b);
-      t.title = '📥 연락처 정리 — 아직 정할 것 ' + n + '건\n'
-        + '· 답장한 상대: 어느 업체인지 골라 주세요\n'
-        + '· 신규 문의: 아직 답장 안 함\n'
-        + '· 저절로 채운 것: 되돌릴 수 있습니다\n\n누르면 「📥 연락처 정리」로 갑니다';
-      /* 눌렀을 때 그 화면으로 — 기업정보함이 ?cnt=1 을 읽는다 */
-      if(t.href && t.href.indexOf('cnt=') < 0 && t.href.slice(-1) !== '#') t.href += '&cnt=1';
-    }).catch(function(){});
-  }
+  /* 📥 연락처 정리 «할 일» 숫자 배지(2026-10-04)는 걷었다 — 대표 지시 2026-10-09 「숫자 안보이게 정리해달라」.
+     기업정보함 타일에는 숫자를 달지 않는다. 할 일은 기업정보함 안 「📥 연락처 정리」에서 본다.
+     ⚠ 다시 달지 말 것 — tests/portal-contact-badge.test.js 가 막는다. */
   /* 포털 공용 설정(data/app_config) — 대표가 포털 설정에서 넣은 값을 각 앱이 함께 쓴다 */
   try{ db.ref("data/app_config").once("value").then(function(s){
     window.PU_CFG = s.val() || {};
@@ -3052,7 +3021,6 @@ body.portal-mode #moreFab{display:flex;}
 
     hideEmptyRows();
     뉴스레터경고달기();
-    연락처배지달기();
 
     // 타일 드래그 재배치 + 순서 고정 (사용자별 저장)
     initTileOrder();
