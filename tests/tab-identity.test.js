@@ -36,7 +36,7 @@ const PAGES = [
   'enter.html','pu-erp.html','gov-consulting.html','work.html','kcareer.html',
   'pu-cards.html','pu-photos.html','pu-camera.html','fund.html','rules.html',
   'chwieop.html','docs-esign.html','payroll-os.html','pu-paydata.html','pu-home.html',
-  'install.html','fund-poc.html','sign.html','ieum-view.html',
+  'install.html','sign.html','ieum-view.html',
 ];
 /* 고객·근로자가 여는 화면 — 여기엔 회사 이름을 남긴다 */
 const OUTSIDE = ['sign.html', 'ieum-view.html'];
