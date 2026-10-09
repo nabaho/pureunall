@@ -631,6 +631,25 @@ function scal() {
     직원은 남길 수 있고, 지우기는 관리자만. */
  'scal_photoLog']
   .forEach(function(k){ rules[k] = scal(); });
+/* 정부컨설팅 보고서 (2026-10-09, 2단계) — scal() 과 «다르다».
+   scal_reports/{업체}/{rid} — rid 가 _v숫자 로 끝나면 «확정본»(검토완료 사본)이다.
+   ★ 확정본은 한 번 만들면 직원은 덮어쓰지도 지우지도 못한다(없을 때만 쓰기). 지우기는 관리자만.
+   ★ 본기록(_v 없는 rid)은 직원이 만들고 고치되 지우기는 관리자만.
+   ★ 위쪽 칸(루트·$co)은 관리자 전용 — 위에서 열어 두면 아래 확정본 잠금을 «위에서 뚫는다».
+   (규칙은 위에서 아래로 내려가며 한 군데라도 허락하면 통과한다.) */
+rules.scal_reports = {
+  '.read': LOGIN,
+  '.write': ADMIN,
+  $co: {
+    '.write': ADMIN,
+    $rid: {
+      '.write': `(${LOGIN}) && ($rid.matches(/_v[0-9]+$/) ? (!data.exists() || (!newData.exists() && ${ADMIN})) : (newData.exists() || ${ADMIN}))`
+    }
+  }
+};
+/* 보고서 양식 서고 — 읽기는 로그인, 양식 등록·고침은 관리자만. */
+rules.scal_rptForms      = { '.read': LOGIN, '.write': ADMIN };
+rules.scal_rptFormsIndex = { '.read': LOGIN, '.write': ADMIN };
 
 /* ══ 백업 ══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).

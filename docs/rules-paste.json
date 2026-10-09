@@ -921,6 +921,24 @@
         }
       }
     },
+    "scal_reports": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "$co": {
+        ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+        "$rid": {
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && ($rid.matches(/_v[0-9]+$/) ? (!data.exists() || (!newData.exists() && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)) : (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true))"
+        }
+      }
+    },
+    "scal_rptForms": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+    },
+    "scal_rptFormsIndex": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+    },
     "serverBackups": {
       ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"

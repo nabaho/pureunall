@@ -58,6 +58,7 @@ function 만들기(처음) {
         const 옛 = 읽기(자리);
         const 새 = fn(옛 === undefined ? null : 복사(옛));
         if (새 === undefined) return { committed: false, snapshot: { val: () => 복사(옛) } };
+        쓴것.push({ 자리, 값: 복사(새), transaction: true });
         쓰기(자리, 새);
         return { committed: true, snapshot: { val: () => 복사(읽기(자리)) } };
       },

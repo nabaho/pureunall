@@ -150,8 +150,8 @@
                       {path:'data/cal_view/{uid}',entityType:'ViewState'},
                       {path:'data/my_schedules/v/{id}',entityType:'ScheduleEvent'},
                       {path:'data/attendance_records/v/{id}',entityType:'ScheduleEvent'}] },
-    consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],
-      sharedRoots:['data/consultings','puphotos'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
+    consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting','scal_rptForms','scal_rptFormsIndex','scal_reports'],
+      sharedRoots:['data/consultings','puphotos','pucards/coMail','pucards/sentDocs'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
        이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
