@@ -158,3 +158,13 @@ test('★ 서식 한 장 — [🖨 인쇄/PDF]·[⬇ 한글]도 관문 · 목록
   assert.ok(one.includes('표시를 넣지 못해 받지 않았습니다'), '「초안」 실패 때 깨끗한 원본이 나간다');
   assert.ok(strip(grabFn('formGateOk')).includes("else if(G.after==='hwpone') _hwpOneDl(0);"));
 });
+
+test('★ [📄 한글(HWPX)]도 관문 — 관문 없던 마지막 출구 · 「초안」 못 넣으면 안 받는다 (2026-10-09)', () => {
+  const d = strip(grabFn('docToHwpx'));
+  assert.ok(d.includes('if(!G) return _docToHwpxRun(kind,0);'), '미확인 없으면 바로 받아야 한다');
+  assert.ok(d.includes("after:'hwpx', kind:kind"));
+  const r = strip(grabFn('_docToHwpxRun'));
+  assert.ok(r.includes("_hwpDraftMark(HWPX.build([{body:body, landscape:false, margin:doc.margin}]),'초안 · 미확인 '+n)"), '「초안」이 안 들어간다');
+  assert.ok(r.includes('표시를 넣지 못해 받지 않았습니다'), '「초안」 실패 때 깨끗한 파일이 나간다');
+  assert.ok(strip(grabFn('formGateOk')).includes("else if(G.after==='hwpx') _docToHwpxRun(G.kind,0);"));
+});
