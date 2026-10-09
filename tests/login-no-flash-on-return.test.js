@@ -168,7 +168,9 @@ test('⑦ 로그인 화면을 드러낸 직후 로그인이 들어오면 «번�
 test('훅: 로그인 들어옴·로그인 없음 갈래가 지킴이를 부른다', () => {
   const a = enter.indexOf('auth.onAuthStateChanged(function(user){');
   const area = enter.slice(a, enter.indexOf('// ── 로그인 실행 ──', a));
-  assert.match(area, /if\(user && user\.email\)\{\s*try \{ _loginGuard\.userSeen\(\); \}/, '로그인이 들어오면 맨 먼저 알린다');
+  // 같은 사람 복원·다른 사람 전환을 먼저 가려도, 포털을 드러내기 전 지킴이에 알려야 한다.
+  assert.match(area, /if\(user && user\.email\)\{[\s\S]*?_loginGuard\.userSeen\(\)[\s\S]*?enterPortal\(user\)/,
+    '포털을 드러내기 전에 로그인 화면 지킴이에 알려야 한다');
   assert.match(area, /_rmBootSplash\(\);\s*try \{ if\(!window\.__kkReturning\) _loginGuard\.shown\(/, '로그인 화면을 드러낸 직후 알린다');
 });
 
