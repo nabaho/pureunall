@@ -146,7 +146,9 @@ async function runOnce(o) {
   Object.keys(tries).forEach((k) => {
     const n = Number((tries[k] || {}).n || 0);
     if (seen[k]) { skip[TRY + '/' + k] = null; return; }
-    if (n >= STUCK_MAX) {
+    /* 큰 메일(slow)은 «한 번»만 — 4분을 기다리고도 회차가 죽었으면 다시 해도 같다(2026-10-09 실측: 06:30 회차가
+       첫 큰 메일에서 9분에 잘렸다). 두 번씩 죽이면 36통에 하루 반이 든다. */
+    if (n >= ((tries[k] || {}).slow ? 1 : STUCK_MAX)) {
       const rec = (tries[k] || {}).slow
         ? { at: o.now(), docs: [], why: '멈춤 — 큰 메일, 4분 기다려도 안 옴(메일에서 직접 확인)', slow: true }
         : { at: o.now(), docs: [], why: '멈춤 ' + n + '번 — 건너뜀(메일에서 직접 확인)' };
@@ -182,6 +184,9 @@ async function runOnce(o) {
     requeued = await requeueStuck();
     if (requeued) allLeft = P.pickMails({ msgs: msgs || {}, old: old || {} }, seen, 1e9);
   }
+  /* 남은 수를 «먼저» 적는다 (2026-10-09) — 회차가 9분에 잘리면 끝의 run 기록을 못 쓰고, 30분 회차는 옛 기록(left 0)만 보고
+     「할 일 없음」으로 돌아갔다. 시작에 적어 두면 잘려도 다음 회차가 이어받는다. at 은 안 건드린다(하루 한 번 셈이 그것으로 잰다). */
+  try { await db.ref(LIB + '/run').update({ left: allLeft.length, startedAt: t0 }); } catch (_) { /* 못 적어도 회차는 돈다 */ }
   const picked = allLeft.slice(0, Math.max(0, Number(o.limit) || 0));
   const sum = { seen: Object.keys(seen || {}).length, mails: 0, stored: 0, held: 0, dup: 0, retry: 0, stuck, requeued, errors: [], at: t0 };
 
@@ -203,7 +208,9 @@ async function runOnce(o) {
     /* ② 손대기 전에 시도 표시 — 이 메일에서 회차가 죽으면 표시가 남아 다음 회차가 센다 */
     const tryKey = TRY + '/' + m.mailKey;
     try { await db.ref(tryKey).set(Object.assign({ at: o.now(), n: Number((tries[m.mailKey] || {}).n || 0) + 1 }, slow ? { slow: true } : {})); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
-    try { atts = await withTimeout(o.fetchAtts(m), waitMs); }
+    /* 어디서 멈추는지 남긴다 — 메일 번호·바이트만(이름·제목은 안 남긴다) */
+    if (o.trace) o.trace('받기 ' + m.mailKey + (slow ? ' (큰 메일)' : ''));
+    try { atts = await withTimeout(o.fetchAtts(m), waitMs); if (o.trace) o.trace('받음 ' + m.mailKey + ' ' + (atts || []).length + '개 ' + (atts || []).reduce((t, a) => t + ((a && a.data && a.data.length) || 0), 0) + 'B'); }
     catch (e) {
       if (isRetry(e)) {
         sum.retry++; sum.errors.push(errTag(e));
@@ -241,6 +248,7 @@ async function runOnce(o) {
         const sha = crypto.createHash('sha256').update(a.data).digest('hex');
         const id = P.docIdOf(sha);
         if (has(id)) { c.dup++; ids.push(id); continue; }
+        if (o.trace) o.trace('가리기 ' + m.mailKey + ' ' + ext + ' ' + a.data.length + 'B');
         const r = await X.redactOne(a.data, ext);   // impl(셋째 칸)은 검사 전용 — 여기서는 안 넘긴다
         if (!r.ok) {
           /* 무슨 까닭이든 ok:false 는 똑같이 보류 — 글·파일 아무것도 안 담는다 */

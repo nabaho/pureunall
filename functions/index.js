@@ -6630,6 +6630,7 @@ async function rulesCollectOnce(reason, chain) {
     limit: 60, budgetMs: 7 * 60 * 1000, contractVersion: OntologyServerWrite.CONTRACT_VERSION,
     fetchAtts: RulesCollectMail.makeFetchAtts(MAIL_DEPS),
     log: (s) => console.log("[취업규칙 모으기]", reason, s),
+    trace: (s) => console.log("[취업규칙 모으기·단계]", s),   // 어디서 멈추는지(2026-10-09) — 번호·바이트만
   });
   if (sum.alert) {
     /* 설계 §4-5 — 사흘째 하나도 못 담았다. 관리자에게 한 줄 (칸은 로그인 알림과 같게: kind·message) */
