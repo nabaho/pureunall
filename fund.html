@@ -814,7 +814,6 @@ function foundContribLive(f,sites){ return foundContrib(f,estabLiveSites(sites))
 
 function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
 function $(id){return document.getElementById(id);}
-function qp(k){try{return new URLSearchParams(location.search).get(k)||'';}catch(e){return '';}}
 function grp(f){return f.fund_type==='사내'?'사내':(f.region?'지역공동':'개별공동');}
 function nDone(f){return KEY5.filter(function(k){return f[k];}).length;}
 
@@ -1017,8 +1016,6 @@ function bindNavDrag(){
 /* ── 모바일 서랍 메뉴 ── 좁은 화면에서 사이드바를 밀어넣고 ☰로 여닫는다 */
 function toggleSide(){ document.body.classList.toggle('sideopen'); }
 function closeSide(){ document.body.classList.remove('sideopen'); }
-function _setTopUser(name,role){ var el=$('topuser'); if(!el)return;
-  el.innerHTML=esc(name||'푸른노무법인')+'<span class="role">'+esc(role||'기금 운영')+'</span>'; }
 /* ══ 푸른사진첩 연동 ══
    인가증·등기부·고유번호증 원본은 **사진첩이 보관**하고, 기금관리는 값과 참조만 갖는다.
    · 저장 층은 회사 공용 js/pu-photo-store.js — 사진첩·기업정보함·컨설팅이 같이 쓴다
@@ -3744,13 +3741,6 @@ function dropZoneSlim(id,label,hint,accept){
     +'<span class="muted" style="font-size:11px;white-space:nowrap">끌어다 놓기 · 클릭해 선택</span>'
     +'<span id="'+id+'-stat" style="font-size:11px"></span></div>';
 }
-function dropZone(id,label,hint,accept){
-  return '<div id="'+id+'" class="dropz" ondragover="dzOver(event,1)" ondragleave="dzOver(event,0)" ondrop="dzDrop(event,\''+id+'\')" onclick="dzPick(\''+id+'\',\''+accept+'\')" '
-    +'style="border:2px dashed var(--line);border-radius:10px;padding:16px;text-align:center;cursor:pointer;background:var(--bg);transition:.15s">'
-    +'<div style="font-size:13px;font-weight:700">⬇ '+label+'</div>'
-    +'<div class="muted" style="font-size:11.5px;margin-top:4px">여기로 <b>끌어다 놓기</b> · 또는 클릭해 선택'+(hint?'<br>'+hint:'')+'</div>'
-    +'<div id="'+id+'-stat" style="font-size:11.5px;margin-top:6px"></div></div>';
-}
 function dzOver(e,on){ e.preventDefault(); e.stopPropagation();
   var d=e.currentTarget; d.style.borderColor=on?'var(--acc)':'var(--line)'; d.style.background=on?'#f8fafc':'var(--bg)'; }
 function dzDrop(e,id){ dzOver(e,0);
@@ -4948,7 +4938,6 @@ var HWP_TPL_BLANK='＿＿＿';                     // 모르는 값 — HTML 서
 /* 표지를 여닫는 글자 — ⚠ 중괄호를 «그대로» 쓰지 않는다. 여러 검사가 중괄호 짝을 세어 함수를 잘라 내는데,
    짝 없는 「{{」 가 글이나 정규식에 들어가면 함수 끝을 못 찾는다(실제로 그렇게 멈췄다). */
 var HWP_MK_OPEN='{{', HWP_MK_CLOSE='}}';
-function _hwpMk(name){ return HWP_MK_OPEN+name+HWP_MK_CLOSE; }
 var HWP_TPL_MAXLIST=30;                         // 서명란 표지 번호를 어디까지 찾아보나
 /* 표지 이름의 «뜻» — 목록 표지는 끝 번호를 뗀다(근로자위원2 → 근로자위원) */
 function _hwpTplBase(name){ return String(name==null?'':name).replace(/\d+$/,''); }
@@ -6005,7 +5994,7 @@ function dgToday(){ var d=new Date(); return d.getFullYear()+'년 &nbsp; '+(d.ge
 /* ── 모든 서식은 A4 세로 기준 ──
    용지 210×297mm, 여백 20mm → 본문 폭 170mm. 화면 미리보기·인쇄·PDF가 같은 규격을 쓴다.
    ⚠ 여백이 «전부 20mm는 아니다» — DK_MARGIN_CSS() 가 서식마다 다른 진짜 여백을 준다. */
-var A4_W='210mm', A4_H='297mm', A4_PAD='20mm', A4_BODY_H='257mm';   // 본문 높이 = 297 - 20*2 (기본값)
+var A4_W='210mm', A4_H='297mm', A4_PAD='20mm';   // 본문 높이 = 297 - 20*2 = 257mm (기본값)
 /* ★ 서식마다 «제 여백»을 준다 (대표 지시 2026-09-20 「여백 등 이상하다 다시 원본 검토해서
      위치 크기 박스크기 등 모든영역다시 검토해라」 — 특수법인설립등기신청서 화면 확인).
    ⚠⚠ 이 통짜 주석에는 중괄호·대괄호를 «한 글자도» 안 쓴다. 바로 위 A4_W 선언과 바로 아래
@@ -9803,8 +9792,6 @@ function estabBundle(phase){
     _showDocHTML(inner);
   }).catch(function(e){ var w=$('docwrap'); if(w)w.innerHTML='<div class="msg err">'+esc(e.message)+'</div>'; });
 }
-// 예전 이름 — 인가 단계 묶음을 가리킨다(부르는 곳이 남아 있어 그대로 둔다)
-function sidePreviewAll(){ estabBundle('kinds'); }
 /* ★ 2026-09-27 묶음을 «원본 한글»로 — [🖨 전부 인쇄]는 HTML 서식이다(대표가 「줄칸 간격 정리가 안 된다」고 한 그 모양).
    한글 틀이 있는 서식은 번호 차례대로 원본 틀에 채워 ZIP 하나로 준다 — 한글에서 열어 그대로 인쇄한다.
    틀이 없거나 기금 유형에 안 맞는 서식(HWP_TPL_STRICT)은 빼고, 무엇을 뺐는지 알린다(그것은 [🖨 전부 인쇄]로). */
@@ -11794,7 +11781,6 @@ function saveWrepDocRef(fid,sid,ref,keepOpen){
     if(!keepOpen){ toast('재직증명서를 이 사업장에 연결했습니다'); editSite(sid); }
   }).catch(function(e){ toast('연결 저장 실패: '+e.message,'err'); });
 }
-function pickWrepDoc(sid){ _siteRepScope(); openAlbumPick('dz-siterep','wrep','','','',sid); }
 function openWrepDoc(sid){
   var r=(((S.sites||{})[sid])||{}).wrep_doc; if(!r) return;
   if(!photoStoreReady()){ toast('사진첩과 연결되지 않았습니다','err'); return; }
@@ -12189,14 +12175,6 @@ function bizregBulkSave(){
       toast(done+'곳을 만들었습니다'+(fail?(' · '+fail+'곳 실패'):'')+' — 출연 약정액을 넣어 주세요',fail?'warn':'');
     });
   });
-}
-/* 사진첩에서 재직증명서 고르기.
-   ⚠ 저장된 사업장이면 sid 를 넘겨 원본을 «잇기도» 한다(그 사람에 붙는 서류라 해마다 내지 않는다).
-     아직 저장 전이면 잇을 자리가 없으니 «읽기만» 한다 — 저장한 뒤 다시 고르면 이어진다. */
-function siteRepAlbum(){
-  _siteDocGrab(); _siteRepScope(); closeM();
-  var sid=_siteEditSid||'';
-  openAlbumPick('dz-siterep','wrep','','','',sid);
 }
 /* ── [👤 사람] 보기에서 서류 읽기 ── (대표 지시 2026-09-13)
    편집 창에서 판독 줄을 다 뺐으므로, 읽는 길은 «그 사업장 한 줄»에서 시작한다.
