@@ -111,3 +111,63 @@ test('⑤ 서버는 원본 주소 한 칸만 지운다 — 미리보기는 남�
   assert.deepEqual(hits.map((h) => h.id), ['a'], '회의 사진(kind photo)·이미 지운 서류는 안 건드린다');
   assert.deepEqual(Object.keys(pv.clearPaths(hits, 'puphotos')), ['puphotos/u/U1/items/2026/a/fullUrl']);
 });
+/* ⑥ 서버를 «실제로» 돌려 본다 — 가짜 DB 로 (2026-10-09 대표 「세어 보기」 → Failed to fetch)
+   뿌리(puphotos)를 통째로 읽다 메모리 512MB 를 넘겨 함수가 죽었다. 뿌리에는 열람 기록 같은 큰 묶음이 함께 있다. */
+function server(data, opt) {
+  opt = opt || {};
+  const reads = [];
+  let handler = null;
+  const chain = { region: () => chain, runWith: () => chain, https: { onRequest: (fn) => { handler = fn; return fn; } } };
+  const db = {
+    ref: (p) => ({
+      once: async () => { reads.push(p || '/'); if (opt.failRead && p !== 'puphotos/owners') throw new Error('읽기 실패'); return { val: () => (p in data ? data[p] : null) }; },
+      toString: () => 'https://db.example/' + p,
+      update: async (u) => { reads.push('update:' + Object.keys(u).length); },
+    }),
+  };
+  const c = {
+    exports: {}, functions: chain, MAIL_REGION: 'asia-northeast3', PHOTOS_DB_ROOT: 'puphotos', PV: pv,
+    setCors() {}, requirePhotoAdmin: async () => ({}), getDatabase: () => db,
+    getApps: () => [{ options: { credential: { getAccessToken: async () => ({ access_token: 't' }) } } }],
+    fetch: async (url) => { reads.push('shallow:' + url); return opt.shallow ? { ok: true, json: async () => opt.shallow } : { ok: false, status: 401 }; },
+    console: { log() {}, warn() {}, error() {} }, Set, Array, Object, String, Error, JSON,
+    require: () => ({}),   // 덩어리 끝(다음 exports 앞)에 딸려 오는 require 줄 — 이 검사와 상관없다
+  };
+  vm.createContext(c);
+  vm.runInContext(body(fnSrc, 'async function photoOwnerIds(') + '\n' + sweepFn, c);
+  async function call(mode) {
+    let st = 200, out = null;
+    const res = { status(s) { st = s; return res; }, json(j) { out = j; return res; }, send() { return res; } };
+    await handler({ method: 'POST', body: { mode } }, res);
+    return { st, out };
+  }
+  return { call, reads };
+}
+const 사진 = {
+  'puphotos/owners': { U1: { name: '가' }, U2: { name: '나' } },
+  'puphotos/u/U1/items': { 2026: { a: { kind: 'doc', fullUrl: 'https://x/a' }, b: { kind: 'photo', fullUrl: 'https://x/b' } } },
+  'puphotos/u/U2/items': { 2025: { c: { kind: 'doc', fullUrl: 'https://x/c' } } },
+  'puphotos/u/U3/items': { 2026: { d: { kind: 'doc', fullUrl: 'https://x/d' } } },
+};
+test('⑥★ 뿌리를 통째로 읽지 않는다 — 주인별 사진 항목만 나눠 읽는다', async () => {
+  const s = server(사진);
+  const r = await s.call('scan');
+  assert.equal(r.st, 200);
+  assert.equal(r.out.found, 2);
+  assert.ok(!s.reads.includes('puphotos') && !s.reads.includes('puphotos/u'), '★ 뿌리·사진 칸 통째 읽기 — 열람 기록까지 받아 메모리를 넘긴다: ' + s.reads.join(','));
+  assert.ok(s.reads.every((p) => /^(puphotos\/owners|puphotos\/u\/[^/]+\/items|shallow:.*|update:\d+)$/.test(p)), s.reads.join(','));
+});
+test('⑥ 주인 색인에 빠진 주인도 얕은 열쇠 읽기로 찾는다 · 지우기도 같은 대상', async () => {
+  const s = server(사진, { shallow: { U1: true, U3: true } });
+  const r = await s.call('scan');
+  assert.equal(r.out.found, 3, '색인에 없는 U3 의 서류를 놓쳤다');
+  assert.ok(s.reads.some((p) => /^shallow:https:\/\/db\.example\/puphotos\/u\.json\?shallow=true$/.test(p)));
+  const c = await s.call('clear');
+  assert.equal(c.out.cleared, 3);
+});
+test('⑥ 읽다 실패하면 죽지 않고 까닭을 답한다(화면에 「Failed to fetch」만 뜨지 않게)', async () => {
+  const s = server(사진, { failRead: true });
+  const r = await s.call('scan');
+  assert.equal(r.st, 500);
+  assert.match(r.out.error, /사진 목록을 읽지 못했습니다/);
+});

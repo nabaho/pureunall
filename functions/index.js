@@ -3630,6 +3630,33 @@ exports.photoView = functions
     }
   });
 
+/* 사진첩 «주인» 목록 — 뿌리를 통째로 읽지 않고 이름만 모은다.
+   ① 주인 색인(puphotos/owners — 사진을 올릴 때 화면이 적는다)
+   ② 사진 칸(puphotos/u)의 «열쇠만»(REST shallow — 내용은 안 받는다)
+   둘을 합친다: 색인에서 빠진 주인이 있어도, 얕은 읽기가 막혀도 다른 쪽이 메운다. 둘 다 실패하면 던진다. */
+async function photoOwnerIds(db) {
+  const ids = new Set();
+  let okIdx = false, okShallow = false;
+  try {
+    const s = await db.ref(PHOTOS_DB_ROOT + "/owners").once("value");
+    Object.keys(s.val() || {}).forEach((k) => ids.add(k));
+    okIdx = true;
+  } catch (e) { console.warn("photo owners index", e && e.message); }
+  try {
+    const app = getApps()[0];
+    const cred = app && app.options && app.options.credential;
+    if (cred && cred.getAccessToken) {
+      const tok = await cred.getAccessToken();
+      const url = db.ref(PHOTOS_DB_ROOT + "/u").toString() + ".json?shallow=true";
+      const r = await fetch(url, { headers: { Authorization: "Bearer " + tok.access_token } });
+      if (r.ok) { Object.keys((await r.json()) || {}).forEach((k) => ids.add(k)); okShallow = true; }
+      else console.warn("photo owners shallow", r.status);
+    }
+  } catch (e) { console.warn("photo owners shallow", e && e.message); }
+  if (!okIdx && !okShallow) throw new Error("사진 주인 목록을 못 읽었습니다");
+  return Array.from(ids).filter((k) => /^[A-Za-z0-9_-]{1,128}$/.test(k));
+}
+
 /* 이미 주소가 적힌 민감 서류를 훑고, 시키면 지운다 — 총괄관리자만.
    ⚠ **세어 보고한 다음에 지운다**(mode:'scan' → 대표 확인 → mode:'clear').
      지우면 그 사진들은 반드시 photoView 를 거쳐야 보인다. 몇 장인지 모르고
@@ -3650,14 +3677,30 @@ exports.photoSensitiveSweep = functions
     }
 
     const db = getDatabase();
-    const snap = await db.ref(PHOTOS_DB_ROOT).once("value");
-    const hits = PV.sweep(snap.val() || {});
+    /* ⚠★ 사진첩 뿌리(puphotos)를 «통째로» 읽지 않는다 (2026-10-09 대표 「세어 보기」 → Failed to fetch).
+       뿌리에는 사진 항목 말고도 열람 기록(access_log)·지운 기록(dellog) 같은 큰 묶음이 함께 있어,
+       통째로 읽다가 메모리 512MB 를 넘겨 함수가 죽었다(JSON 해석 중 힙 부족 — 응답이 아예 안 나가
+       화면에는 「Failed to fetch」만 떴다). 사진 항목(u/주인/items)만 «주인별로» 나눠 읽는다 — 한 사람 몇백 KB 다. */
+    let hits, owners;
+    try {
+      owners = await photoOwnerIds(db);
+      hits = [];
+      for (const uid of owners) {
+        const s = await db.ref(PHOTOS_DB_ROOT + "/u/" + uid + "/items").once("value");
+        const items = s.val();
+        if (items) hits = hits.concat(PV.sweep({ u: { [uid]: { items: items } } }));
+      }
+    } catch (e) {
+      console.error("photoSensitiveSweep read", e && e.message);
+      res.status(500).json({ ok: false, error: "사진 목록을 읽지 못했습니다 — " + String((e && e.message) || e) });
+      return;
+    }
     const byKind = {};
     hits.forEach(function (h) { byKind[h.kind] = (byKind[h.kind] || 0) + 1; });
 
     const mode = String((req.body && req.body.mode) || "scan");
     if (mode !== "clear") {
-      res.json({ ok: true, mode: "scan", found: hits.length, byKind: byKind });
+      res.json({ ok: true, mode: "scan", found: hits.length, byKind: byKind, owners: owners.length });
       return;
     }
     const u = PV.clearPaths(hits, PHOTOS_DB_ROOT);
