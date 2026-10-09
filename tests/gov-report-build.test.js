@@ -92,3 +92,12 @@ test('buildReport — 첨부 이름이 없는 메일도 제목이 개인 단위 
   assert.equal(f.find((x) => /근태/.test(x.text)).priv, true);
   assert.equal(f.find((x) => /개정안 회신/.test(x.text)).priv, false);
 });
+
+test('저장본 병합 — __proto__·constructor·prototype 키로 Object.prototype 을 오염시키지 않는다', () => {
+  const i = base();
+  i.saved = { formKey: 'simple', report: JSON.parse('{"__proto__":{"polluted":1},"constructor":{"prototype":{"polluted2":1}},"prototype":{"x":1}}') };
+  B.buildReport(i);
+  assert.equal({}.polluted, undefined);
+  assert.equal({}.polluted2, undefined);
+  assert.equal(Object.prototype.hasOwnProperty.call(Object.prototype, 'polluted'), false);
+});

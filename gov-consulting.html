@@ -1326,7 +1326,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
        hwpx-fill → gov-report(그것을 쓴다) → build → pack(gov-report 를 쓴다). hwpx-fill 판은 fund.html 과 같게. -->
   <script src="js/pu-hwpx-fill.js?v=6"></script>
   <script src="js/pu-gov-report.js?v=1"></script>
-  <script src="js/pu-gov-report-build.js?v=2"></script>
+  <script src="js/pu-gov-report-build.js?v=3"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
   <!-- 회사 열쇠(사업자번호) — 보고서 창이 기업정보함 메일·보낸 자료를 그 열쇠로만 찾는다 -->
   <script src="js/pu-cokey.js?v=1"></script>
@@ -7870,15 +7870,20 @@ async function grpSaveDraft(){
   if(!FB_READY||!_fbDB){ const m='클라우드 연결 전입니다 — 잠시 뒤 다시 해 주세요(화면 값은 그대로 있습니다)'; toast(m,'err'); return {ok:false,error:m}; }
   try{
     const ref=grpRptRef(st.coId,st.rid);
-    const cur=(await ref.once('value')).val();
-    /* 그 사이에 누가 확정했으면 덮지 않는다 — 내가 「새 판」으로 연 그 판일 때만 쓴다 */
-    if(cur&&cur.state==='검토완료'&&!(st.newVer&&Number(cur.ver||0)===Number(st.ver||0))){
+    const rec=grpRecord('초안');
+    /* 읽고-쓰기 사이에 남이 확정하면 본기록이 「검토완료 vN」 → 「초안 ver 0」으로 되돌아가 확정이 영영 막힌다.
+       그래서 본기록은 트랜잭션으로 쓴다 — 지금 값이 확정본이고 내가 연 판이 아니면 중단, ver 는 절대 낮추지 않는다 */
+    let blocked=false;
+    const tx=await ref.transaction(function(cur){
+      /* 내가 「새 판」으로 연 그 판일 때만 확정본 위에 쓴다 */
+      if(cur&&cur.state==='검토완료'&&!(st.newVer&&Number(cur.ver||0)===Number(st.ver||0))){ blocked=true; return undefined; }
+      return Object.assign({},rec,{ver:Math.max(Number(cur&&cur.ver)||0,Number(rec.ver)||0)});
+    });
+    if(blocked||!tx||!tx.committed){
       const m='그 사이에 확정본이 생겼습니다 — 덮지 않았습니다. 창을 닫고 다시 열어 주세요';
       toast(m,'err'); grpNote(escAttr(m)); return {ok:false,error:m};
     }
-    const rec=grpRecord('초안');
-    await ref.set(rec);
-    st.saved=rec; st.state='초안';
+    st.saved=tx.snapshot&&tx.snapshot.val()||rec; st.state='초안';
     grpNote(''); toast('임시 저장했습니다'); grpRenderTop();
     return {ok:true};
   }catch(e){ return grpWriteFail(e); }
@@ -7895,10 +7900,7 @@ async function grpConfirm(){
   if(!grpAsk('이 보고서를 확정할까요?'+(blanks?'\n비어 있는 칸 '+blanks+'개는 「＿＿＿」로 남습니다.':'')+'\n확정 뒤에는 칸이 잠기고 [새 판으로 고치기]로만 고칠 수 있습니다.')) return {ok:false,cancelled:true};
   if(!FB_READY||!_fbDB){ const m='클라우드 연결 전입니다 — 잠시 뒤 다시 해 주세요'; toast(m,'err'); return {ok:false,error:m}; }
   const ver=(Number(st.ver)||0)+1;
-  const prev=st.ver;
-  st.ver=ver;
-  const rec=Object.assign(grpRecord('검토완료'),{ver:ver,confirmedBy:grpWho(),confirmedById:myId(),confirmedAt:Date.now()});
-  st.ver=prev;
+  let rec;
   try{
     /* 그 사이에 남이 확정했으면 덮지 않는다 — 임시 저장과 같은 잣대 */
     const cur=(await grpRptRef(st.coId,st.rid).once('value')).val();
@@ -7906,13 +7908,17 @@ async function grpConfirm(){
       const m='그 사이에 다른 사람이 확정했습니다(v'+(cur.ver||'?')+') — 덮지 않았습니다. 창을 닫고 다시 열어 주세요';
       toast(m,'err'); grpNote(escAttr(m)); return {ok:false,error:m};
     }
+    rec=Object.assign(grpRecord('검토완료'),{ver:ver,confirmedBy:grpWho(),confirmedById:myId(),confirmedAt:Date.now()});
     /* 확정본 사본은 «없을 때만» 만든다 — 같은 판 번호가 이미 있으면 남이 먼저 확정한 것이다 */
     const tx=await grpRptRef(st.coId,st.rid+'_v'+ver).transaction(function(old){ return old===null?rec:undefined; });
     if(!tx||!tx.committed){
       const m='v'+ver+' 확정본이 이미 있습니다(다른 사람이 먼저 확정) — 덮지 않았습니다. 창을 닫고 다시 열어 주세요';
       toast(m,'err'); grpNote(escAttr(m)); return {ok:false,error:m};
     }
-    await grpRptRef(st.coId,st.rid).set(rec);
+    /* 본기록도 트랜잭션 — ver 는 큰 쪽을 지킨다(낮추지 않는다) */
+    await grpRptRef(st.coId,st.rid).transaction(function(c){
+      return Object.assign({},rec,{ver:Math.max(Number(c&&c.ver)||0,ver)});
+    });
   }catch(e){ return grpWriteFail(e); }
   st.ver=ver; st.state='검토완료'; st.locked=true; st.newVer=false; st.saved=rec;
   grpNote(''); toast('확정했습니다(v'+ver+')'); grpRender();
@@ -8327,7 +8333,7 @@ function renderTlZoom(){
   /* [📄 보고서 작성] — 간단형 양식을 고를 수 있는 사업에서만(대형 등은 숨긴다). 애매하면(ask) 창에서 고르게 한다 */
   { const b=q('#tzRptBtn'); if(b){
       let ok=false;
-      try{ const r=PuGovReportBuild.resolveFormKey(t,''); ok=!!(r.formKey||r.ask); }catch(e){ ok=false; }
+      try{ const pc=grpPickCons(co.id,t.id); const r=PuGovReportBuild.resolveFormKey(t,pc&&pc.programName); ok=!!(r.formKey||r.ask); }catch(e){ ok=false; }
       if(b.style) b.style.display=ok?'':'none';
       const coId=co.id, tid=t.id;
       b.onclick=function(){ grpOpenReport(coId,tid); };

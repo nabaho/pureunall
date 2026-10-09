@@ -194,7 +194,8 @@ function rptWorld(opts) {
     const ref0 = db.ref;
     db.ref = (p) => {
       const r = ref0(p);
-      r.set = async () => { const e = new Error('PERMISSION_DENIED: Permission denied'); e.code = 'PERMISSION_DENIED'; throw e; };
+      const deny = async () => { const e = new Error('PERMISSION_DENIED: Permission denied'); e.code = 'PERMISSION_DENIED'; throw e; };
+      r.set = deny; r.transaction = deny;
       return r;
     };
   }
@@ -444,6 +445,29 @@ test('보고서 ⑤-4 같은 판 번호의 확정본 사본이 이미 있으면(
   assert.strictEqual(r.ok, false);
   assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025_v1').report.company.name, '첫 확정본');
   assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025').state, '초안', '본 자리도 건드리지 않는다');
+});
+
+test('보고서 ⑤-5 내가 연 뒤 남이 확정했으면 임시 저장은 중단하고 본기록을 되돌리지 않는다(ver 유지)', async () => {
+  const w = rptWorld({ seed: mailSeed() });
+  await opened(w);                                   // ver 0 으로 열었다
+  const done = { state: '검토완료', ver: 1, confirmedBy: '박부담', report: { company: { name: '남의 확정본' } } };
+  await w.db.ref('scal_reports/c1/bxeyzrxm_2025').set(done);
+  const r = await w.ctx.grpSaveDraft();
+  assert.strictEqual(r.ok, false);
+  const main = w.db.읽기('scal_reports/c1/bxeyzrxm_2025');
+  assert.strictEqual(main.state, '검토완료', '확정 상태가 초안으로 되돌아가지 않는다');
+  assert.strictEqual(main.ver, 1);
+});
+
+test('보고서 ⑤-6 확정은 본기록 ver 를 낮추지 않는다(큰 쪽 유지)', async () => {
+  const w = rptWorld({ seed: mailSeed() });
+  await opened(w);
+  await w.db.ref('scal_reports/c1/bxeyzrxm_2025').set({ state: '초안', ver: 3, report: { company: { name: '남의 초안' } } });
+  const r = await w.ctx.grpConfirm();
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025').ver, 3);
+  assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025').state, '검토완료');
+  assert.ok(w.db.읽기('scal_reports/c1/bxeyzrxm_2025_v1'));
 });
 
 test('보고서 ①-3 열쇠는 있는데 클라우드 연결 전이면 조용히 비우지 않고 그렇다고 적는다', async () => {

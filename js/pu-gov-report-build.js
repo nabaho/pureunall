@@ -39,6 +39,8 @@
   /* 깊게 덮는다 — 객체는 안으로 들어가고, 배열·글자는 통째로 바꾼다(빈 문자열 포함) */
   function deepMerge(dst, src) {
     Object.keys(src || {}).forEach(function (k) {
+      /* 프로토타입 오염 방지 — JSON.parse 로 들어온 __proto__ 등은 건너뛴다 */
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') return;
       if (isObj(src[k]) && isObj(dst[k])) deepMerge(dst[k], src[k]);
       else dst[k] = isObj(src[k]) ? deepMerge({}, src[k]) : src[k];
     });
