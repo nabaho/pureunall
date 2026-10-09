@@ -49,6 +49,7 @@ function loadWiring(opts) {
       child(p) { return makeRef(path + '/' + p); },
       set(v) { calls.sets.push({ path: path, v: v }); return Promise.resolve(); },
       remove() { calls.sets.push({ path: path, v: null }); return Promise.resolve(); },
+      update(v) { Object.keys(v).forEach(function (k) { calls.sets.push({ path: path + '/' + k, v: v[k] }); }); return Promise.resolve(); },
       once(kind) {
         calls.once++;
         assert.equal(kind, 'value', '사건 목록은 value 로만 받아야 합니다');

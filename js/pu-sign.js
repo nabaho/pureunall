@@ -74,6 +74,15 @@
     if (o.seen) return 'seen';
     return 'sent';
   }
+  /* 서명 링크 칸(open/{t})을 지울 때인가 — 🔒 저장됨·취소함, 또는 기한이 하루 넘게 지났고 제출이 없을 때.
+     ⚠ 링크를 아는 사람은 문서 그림(미리 채운 값)·서명·적은 값을 계속 읽을 수 있었다(검토 2026-10-09 대표 「추천대로」).
+     o.err — 상태를 못 읽었으면 지우지 않는다(제출이 있는데 못 본 것일 수 있다). 하루 여유는 기기 시계 차이 */
+  function needClean(req, o, now) {
+    req = req || {}; o = o || {}; now = now || Date.now();
+    if (req.gone || !req.t) return false;
+    if (req.status === 'saved' || req.status === 'void') return true;
+    return !o.err && !o.subAt && !!req.exp && req.exp + DAY < now;
+  }
   var STATUS_TXT = { sent: '안 열어 봄', seen: '열어 봄 · 작성 중', submitted: '제출됨 · 저장 기다림', saved: '🔒 서명본 저장됨', expired: '기한 지남', 'void': '취소함' };
   function linkOf(base, t) { return String(base || '').replace(/[^/]*$/, '') + 'sign-contract.html?t=' + t; }
   function expAt(now, days) { return (now || Date.now()) + Math.max(1, Math.min(60, Number(days) || 7)) * DAY; }
@@ -95,7 +104,7 @@
       ['방식', req.mode === 'agree' ? '내용 확인 후 동의' : '내용 확인 후 손서명'],
       ['요청', ymdhm(req.at) + ' · ' + (req.byName || '')],
       ['제출', ymdhm(sub.at)],
-      ['본인 확인', '링크(사람마다 하나) + 휴대폰 끝 4자리'],
+      ['본인 확인', '링크(사람마다 하나) + 휴대폰 끝 4자리 입력(문자 인증 아님)'],
       ['문서 지문', String(docHash || '').slice(0, 32) + '…'],
       ['기기', String(sub.ua || '').slice(0, 80)]
     ];
@@ -135,7 +144,7 @@
     });
   }
 
-  var api = { newToken: newToken, p4Of: p4Of, parseRecipients: parseRecipients, signerFields: signerFields, signedVals: signedVals, recKindOf: recKindOf,
+  var api = { needClean: needClean, newToken: newToken, p4Of: p4Of, parseRecipients: parseRecipients, signerFields: signerFields, signedVals: signedVals, recKindOf: recKindOf,
     statusOf: statusOf, STATUS_TXT: STATUS_TXT, linkOf: linkOf, expAt: expAt, shareText: shareText, certLines: certLines,
     sha256Hex: sha256Hex, formSigText: formSigText, lockStep: lockStep, LOCK_MS: LOCK_MS, ymd: ymd, ymdhm: ymdhm, NOT_ASK: NOT_ASK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

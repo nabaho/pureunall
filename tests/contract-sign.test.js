@@ -137,3 +137,26 @@ test('ⓚ 양식 지문 글 — 열쇠 차례에 흔들리지 않는다', () => 
   assert.notEqual(S.formSigText([['f1', 'a.hwp', 'K1', '']]), S.formSigText([['f1', 'a.hwp', 'K2', '']]));
   assert.match(cf0(), /function signSigParts\(fms\)[\s\S]*hwpSources\(fm \|\| \{\}\)\[0\]/, '그리는 원본(첫 원본)으로 본다');
 });
+
+/* ⓛ 끝난 링크 칸 지우기 (검토 2026-10-09 대표 「추천대로」) — 🔒 저장·취소·기한 지남 뒤 open/{t} 를 통째로 */
+test('ⓛ 링크 칸 정리', () => {
+  const now = 100 * 864e5;
+  assert.equal(S.needClean({ t: 'a', status: 'saved' }, {}, now), true);
+  assert.equal(S.needClean({ t: 'a', status: 'void' }, {}, now), true);
+  assert.equal(S.needClean({ t: 'a', status: 'saved', gone: 5 }, {}, now), false, '한 번 지웠으면 다시 안 한다');
+  assert.equal(S.needClean({ t: 'a', exp: now - 2 * 864e5 }, {}, now), true, '기한 하루 넘게 지남 · 제출 없음');
+  assert.equal(S.needClean({ t: 'a', exp: now - 3600e3 }, {}, now), false, '하루 여유(시계 차이)');
+  assert.equal(S.needClean({ t: 'a', exp: now - 2 * 864e5 }, { subAt: 5 }, now), false, '제출이 있으면 저장 전까지 둔다');
+  assert.equal(S.needClean({ t: 'a', exp: now - 2 * 864e5 }, { err: true }, now), false, '상태를 못 읽었으면 지우지 않는다');
+  assert.equal(S.needClean({ t: 'a', exp: now + 864e5 }, {}, now), false);
+  const h = read('docs-esign.html');
+  const cut = (k) => h.slice(h.indexOf(k), h.indexOf('\n}\n', h.indexOf(k)));
+  assert.match(cut('function formSignClean('), /db\.ref\('pu_sign\/open\/' \+ r\.t\)\.remove\(\)[\s\S]*update\(\{ gone: Date\.now\(\) \}\)/);
+  const f = cut('async function formSignFinalize(');
+  assert.ok(f.indexOf('formSignClean(r)') > f.indexOf("status: 'saved'"), '🔒 저장을 적은 뒤에 지운다');
+  assert.match(cut('function formSignVoid('), /formSignClean\(r\)/);
+  const l = cut('function formSignList(');
+  assert.match(l, /err = true; return null;/); assert.match(l, /PuSign\.needClean\(r, r\.o\)/);
+  assert.match(read('sign-contract.html'), /이미 처리되었거나 찾을 수 없는 링크입니다/);
+  assert.match(read('js/pu-sign.js'), /휴대폰 끝 4자리 입력\(문자 인증 아님\)/, '확인서에 본인 확인 수준을 그대로 적는다');
+});
