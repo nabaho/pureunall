@@ -248,7 +248,7 @@ test('★ 틀 채우기는 HWPX(XML)에서 한다 — 표 안의 표까지 닿�
   const fill = grabFn('hwpTplFill');
   assert.match(fill, /_hwpTplBytes\(t\)/);
   /* 2026-09-27 header.xml(문단 정렬)을 함께 넘긴다 — 반복 묶음이 든 표를 풀 때 원래 가운데 정렬을 지키려고 */
-  assert.match(fill, /_hwpxEach\(hx,function\(x,h\)\{ return _hwpFillXml\(x,V,from,to,kind,h\); \}\)/);
+  assert.match(fill, /_hwpxEach\(hx,function\(x,h\)\{ var o=_hwpFillXml\(x,V,from,to,kind,h\); o\.xml=_hwpPageNum\(o\.xml\); return o; \}\)/, '채운 뒤 모든 쪽 번호(2026-10-09)');
   assert.doesNotMatch(fill, /replaceAll/, 'rhwp 의 replaceAll 길로 돌아가지 않는다');
   assert.match(grabFn('_hwpTplBytes'), /exportHwpx\(\)/, '옛 .hwp 틀도 HWPX 로 바꿔 같은 길을 탄다');
 });
