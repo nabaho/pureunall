@@ -90,7 +90,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=33"></script>
+<script src="js/pu-contract-forms.js?v=34"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -24691,6 +24691,7 @@ function ContractManagement(props){
   var m = useState(null); var modal = m[0]; var setModal = m[1];
   var pm = useState(null); var printModal = pm[0]; var setPrintModal = pm[1];
   var dm = useState(null); var docModal = dm[0]; var setDocModal = dm[1];   // 계약서 보관함(NAS 링크)
+  var sa = useState(null); var sendAsk = sa[0]; var setSendAsk = sa[1];    // ✅ 확정 → 서류 보내기 (2026-10-09)
   // 통합 검색 포커스
   var initFocus = useGlobalSearchFocus();
   useEffect(function(){ if(initFocus){ setQuery(initFocus); setKindFilter('all'); setMgrFilter('all'); } }, [initFocus]);
@@ -25143,9 +25144,12 @@ function ContractManagement(props){
       delete newOne._manualContractNo;
       if(!persistOne(newOne)) return false;
       showToast('계약 등록: ' + newOne.contractNo);
+      if(newOne.status === 'signed' && erpConfirmAskOn()) setSendAsk(newOne);   // ✅ 확정으로 바로 등록
     } else {
+      var before = contracts.find(function(x){ return x.id === form.id; });
       if(!persistOne(form)) return false;
       showToast('수정됨');
+      if(form.status === 'signed' && (!before || before.status !== 'signed') && form.id && erpConfirmAskOn()) setSendAsk(form);   // ✅ 수정 창에서 확정으로
     }
     close();
     return true;
@@ -25223,6 +25227,7 @@ function ContractManagement(props){
     if(!ct) return;
     if(ct.status === newStatus) return;
     if(!patchOne(id, { status:newStatus, orderTs: Date.now() })) return;
+    if(newStatus === 'signed' && ct.id && erpConfirmAskOn()) setSendAsk(Object.assign({}, ct, { status:'signed' }));   // ✅ 확정 → 서류 보내기 (2026-10-09)
     setJustMovedId(id);
     setTimeout(function(){ setJustMovedId(function(cur){ return cur===id ? null : cur; }); }, 3000);
     showToast(ct.companyName + ' → ' + contractStatusInfo(newStatus).label + ' · 맨 위로 이동');
@@ -26012,6 +26017,7 @@ function ContractManagement(props){
       style:{ position:'fixed', right:'16px', bottom:'76px', zIndex:900, width:'56px', height:'56px', borderRadius:'50%',
         border:'none', background:'#1e40af', color:'#fff', fontSize:'24px', boxShadow:'0 6px 16px rgba(30,64,175,.45)', cursor:'pointer' } }, '📷'),
     modal && h(ContractModal, { cur:modal.cur, seed:modal.seed, onSave:save, onClose:close }),
+    sendAsk && h(ErpConfirmSendAsk, { contract:sendAsk, onClose:function(){ setSendAsk(null); } }),
     printModal && h(ContractFormPrintModal, { contract:printModal, onClose:closePrintModal }),
     docModal && h(ContractDocVault, { contract:docModal, onClose:function(){ setDocModal(null); } }),
     dupSweep && h(DupSweepModal, { result:dupSweep, filter:dupFilter, onFilter:setDupFilter,
@@ -40474,6 +40480,36 @@ function ErpSignedDocs(props){
         h('span', { style:{ color:'#94a3b8', fontSize:'11px' } }, d.date || '날짜 없음'));
     }),
     list.length > 8 && h('div', { style:{ fontSize:'11px', color:'#94a3b8' } }, '외 ' + (list.length - 8) + '건'));
+}
+
+/* ── ✅ 계약 확정 → 서류 보내기 (대표 「2」 2026-10-09 — 「계약이 확정되면 계약자들에게 계약서와 나머지 서류를 보낼 수 있게」) ──
+   확정으로 옮기면(끌어 놓기·▶확정·수정 창) 이 창이 뜬다. 혼자 보내지 않는다 — 누르면 계약서등관리가
+   이 계약 자료로 세트(자문·급여·노조 …)를 골라 채운 창을 연다(#forms:contract=, 이미 있는 길). 거기서 ✉ 메일·✍ 서명 받기·🖨 인쇄.
+   ⚠ 계약 «id» 만 넘긴다(금액·이름은 주소에 안 싣는다). 「다음부터 묻지 않기」는 이 기기에만. */
+var ERP_CONFIRM_ASK_KEY = 'pu_erp_confirm_send_off';
+function erpConfirmAskOn(){ try{ return localStorage.getItem(ERP_CONFIRM_ASK_KEY) !== '1'; }catch(e){ return true; } }
+function ErpConfirmSendAsk(props){
+  useEscClose(props.onClose);
+  var c = props.contract || {};
+  var kinds = (c.kinds || (c.kind ? [c.kind] : [])).map(function(k){ var x = CONTRACT_KINDS.filter(function(z){ return z.v === k; })[0]; return x ? x.label : k; }).join(' · ');
+  var off = useState(false);
+  function close(){ if(off[0]){ try{ localStorage.setItem(ERP_CONFIRM_ASK_KEY, '1'); }catch(e){} } props.onClose(); }
+  return h('div', { className:'modal-bg', onClick:function(e){ if(e.target===e.currentTarget) close(); } },
+    h('div', { className:'modal', style:{ width:'460px', maxWidth:'94vw' }, onClick:function(e){ e.stopPropagation(); } },
+      h('div', { className:'modal-h', style:{ padding:'14px 18px', borderBottom:'1px solid #e2e8f0', display:'flex', justifyContent:'space-between', alignItems:'center' } },
+        h('div', { className:'t', style:{ fontWeight:700, color:'#1e293b' } }, '✅ 계약 확정 — 서류를 보낼까요?'),
+        h('button', { onClick:close, 'aria-label':'닫기', style:{ fontSize:'18px', color:'#94a3b8', cursor:'pointer', background:'none', border:'none' } }, '×')),
+      h('div', { style:{ padding:'16px 18px', fontSize:'13px', color:'#475569', lineHeight:'1.7' } },
+        h('div', null, h('b', null, c.companyName || ''), c.contractNo ? ' · ' + c.contractNo : ''),
+        kinds && h('div', { style:{ color:'#64748b' } }, kinds),
+        h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 12px', fontSize:'12px', color:'#1e40af', margin:'12px 0' } },
+          '계약서등관리가 이 계약의 세트(계약서·위임장·신청서 등)를 이 계약 자료로 채워 엽니다. 거기서 ✉ 메일로 보내기 · ✍ 서명 받기 · 🖨 인쇄 중에 고르세요. 누르기 전엔 아무것도 나가지 않습니다.'),
+        h('label', { style:{ display:'flex', gap:'6px', alignItems:'center', fontSize:'12px', color:'#64748b' } },
+          h('input', { type:'checkbox', checked:off[0], onChange:function(e){ off[1](e.target.checked); } }), '다음부터 묻지 않기 (이 기기) — 계약서 출력 창의 「📦 계약서등관리에서 묶음 채우기」로도 열 수 있습니다')),
+      h('div', { style:{ padding:'10px 18px 16px', display:'flex', gap:'8px', justifyContent:'flex-end' } },
+        h('button', { onClick:close, style:{ background:'#f8fafc', color:'#475569', border:'1px solid #cbd5e1', padding:'7px 14px', borderRadius:'6px', fontSize:'12.5px', cursor:'pointer' } }, '나중에'),
+        h('button', { onClick:function(){ window.open('docs-esign.html#forms:contract=' + encodeURIComponent(c.id), '_blank'); close(); },
+          style:{ background:'#166534', color:'#fff', border:'none', padding:'7px 14px', borderRadius:'6px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } }, '📦 서류 세트 채워 보내기'))));
 }
 
 // ============ 계약서 보관함 (NAS 링크 관리) ============
