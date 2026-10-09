@@ -129,8 +129,9 @@ test('★ [🖨 전부 인쇄(날인용)]도 관문을 지난다 — 미리 모�
   const p = strip(grabFn('estabBundlePrint'));
   assert.ok(p.includes("if(!f||f._sample||!G||G.fid!==S.formFund||!G.items.length) return printDoc();"), '미확인이 없으면 바로 인쇄해야 한다');
   assert.ok(p.includes("after:'print'"));
-  assert.ok(p.includes("printDoc({draft:'+its.length+'})"), '「초안」 인쇄 갈래가 없다');
-  assert.ok(p.includes('formGateOk()'));
+  assert.ok(p.includes("_gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})')"), '「초안」 인쇄 갈래가 없다');
+  const gm = strip(grabFn('_gateModal'));
+  assert.ok(gm.includes('formGateOk()') && gm.includes("closeM();'+draftCall+'"), '관문 창 세 갈래가 없다');
   const ok = strip(grabFn('formGateOk'));
   assert.ok(ok.includes("var pw=G.after==='print'?window.open('','_blank'):null;"), '저장 뒤에 창을 열면 팝업으로 막힌다');
   assert.ok(ok.includes('printDoc({w:pw})'));
@@ -140,4 +141,20 @@ test('★ [🖨 전부 인쇄(날인용)]도 관문을 지난다 — 미리 모�
   assert.ok(pd.includes(`opts.draft?'.a4{position:relative;z-index:0}.a4::before{content:"초안 · 미확인 '+(+opts.draft||0)+'"`), '「초안」 표시가 없다');
   assert.ok(pd.includes('z-index:-1'), '「초안」이 글 위를 덮는다 — 글 뒤에 둬야 한다');
   assert.ok(pd.includes('color:#CBD5E1'), '한글 묶음과 같은 색이 아니다');
+});
+
+test('★ 서식 한 장 — [🖨 인쇄/PDF]·[⬇ 한글]도 관문 · 목록은 열 때 미리 · 「초안」 못 넣으면 안 받는다 (2026-10-09)', () => {
+  assert.equal((SRC.match(/onclick="printDoc\(\)"/g) || []).length, 0, '관문 없이 인쇄하는 단추가 남았다');
+  assert.equal((SRC.match(/onclick="docPrintGated\(\)"/g) || []).length, 2, '한 장 인쇄 단추 둘(창·옆 화면)');
+  for (const fn of ['previewDoc', 'sidePreview', 'hwpSidePreview']) assert.ok(strip(grabFn(fn)).includes('_oneGatePrep(kind)'), fn + ': 목록을 미리 안 모은다');
+  const prep = strip(grabFn('_oneGatePrep'));
+  assert.ok(prep.includes("if(!f||f._sample||!fid||S.formsCtx!=='fund') return;"), '견본에도 관문이 걸린다');
+  assert.ok(prep.includes('_formUnconf(kind,f,r[0],r[1])'), '그 서식이 읽는 칸만 봐야 한다');
+  assert.ok(strip(grabFn('docPrintGated')).includes('if(!G) return printDoc();'));
+  const dl = strip(grabFn('hwpSideDownload'));
+  assert.ok(dl.includes("after:'hwpone'") && dl.includes("_gateModal(G.items,'받기','_hwpOneDl('+G.items.length+')')"));
+  const one = strip(grabFn('_hwpOneDl'));
+  assert.ok(one.includes("_hwpDraftMark(b,'초안 · 미확인 '+n)"), '한 장 한글에 「초안」이 안 들어간다');
+  assert.ok(one.includes('표시를 넣지 못해 받지 않았습니다'), '「초안」 실패 때 깨끗한 원본이 나간다');
+  assert.ok(strip(grabFn('formGateOk')).includes("else if(G.after==='hwpone') _hwpOneDl(0);"));
 });
