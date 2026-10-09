@@ -137,6 +137,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
+    + 'feedMthd,isSole,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -544,4 +545,61 @@ test('★★ 받는 사이 누른 ★ 이 되돌아가지 않는다 · 두 번 �
   assert.ok(feed.some((x) => x.no === 'NEW-1-000'), '새 공고는 들어온다');
   assert.equal(feed.filter((x) => x.no === 'NEW-1-000').length, 1, '두 번 받으면 안 된다');
   assert.equal(calls, 2, '한 번 받기 = 나라장터 한 번 + 알리오 한 번 — 두 번 눌러도 그대로');
+});
+
+/* ═══════ 수의계약 — 표시하고, 빼고 볼 수 있게 (대표 지시 2026-10-09) ═══════ */
+const SOLE = () => [
+  { id: 'S1', src: '나라장터', type: '새 공고', no: 'R1-000', nm: '노무 자문 용역', org: '갑기관', mthd: '수의계약', savedAt: '2026-10-05T01:37:00Z' },
+  { id: 'S2', src: '나라장터', type: '새 공고', no: 'R2-000', nm: '평가체계 기획연구', org: '을기관', mthd: '제한경쟁', savedAt: '2026-10-07T11:02:00Z' },
+  { id: 'S3', src: '나라장터', type: '새 공고', no: 'R3-000', nm: '인사 컨설팅', org: '병기관', mthd: '수의(소액)', savedAt: '2026-10-06T09:00:00Z' },
+  { id: 'S4', src: '알리오', type: '새 공고', no: 'A4', nm: '경영평가위원 모집', org: '정기관', savedAt: '2026-10-06T09:00:00Z' }
+];
+test('★★ 수의계약 가르기 — 계약방법에 「수의」(수의계약·수의(소액)), 경쟁·빈칸·알리오는 아니다', () => {
+  const r = runApp({});
+  assert.equal(r.api.isSole({ mthd: '수의계약' }), true);
+  assert.equal(r.api.isSole({ mthd: '수의(소액)' }), true);
+  ['제한경쟁', '일반경쟁', '지명경쟁', ''].forEach((m) => assert.equal(r.api.isSole({ mthd: m }), false, m));
+  assert.equal(r.api.isSole({ src: '알리오' }), false); assert.equal(r.api.isSole(null), false);
+});
+test('★★★ 목록에 「수의계약」 딱지 — 공고명 «앞»에(긴 이름에 잘려 안 보이면 안 된다)', () => {
+  const r = runApp({ feed: SOLE() });
+  r.api.draw();
+  const tb = r.el('tb').innerHTML;
+  const row = (nm) => tb.split('<tr').find((x) => x.indexOf(nm) >= 0) || '';
+  assert.match(row('노무 자문 용역'), /<td class="nm"[^>]*><span class="tag amber"[^>]*>수의계약<\/span> <b>노무 자문 용역<\/b>/);
+  assert.match(row('인사 컨설팅'), /수의계약<\/span> <b>인사 컨설팅/);
+  assert.doesNotMatch(row('평가체계 기획연구'), /tag amber/, '경쟁 입찰에 수의계약 딱지');
+  assert.doesNotMatch(row('경영평가위원 모집'), /tag amber/);
+  assert.match(row('노무 자문 용역'), /title="노무 자문 용역 · 수의계약"/, '이름 칸 풍선에도');
+});
+test('★★★ 「수의계약 빼기」 — 목록에서만 빼고(숨기지·지우지 않음) 몇 건 뺐는지 말한다 · 「수의계약만」', () => {
+  const r = runApp({ feed: SOLE() });
+  r.el('fMthd').value = 'nosole'; r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 2);
+  assert.doesNotMatch(r.el('tb').innerHTML, /노무 자문 용역|인사 컨설팅/);
+  assert.match(r.el('cnt').textContent, /수의계약 2건 뺌/);
+  assert.equal(JSON.parse(r.store.gov3_feed).filter((x) => x.hidden).length, 0, '숨김으로 바꿨다');
+  r.el('fMthd').value = 'sole'; r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 2); assert.match(r.el('cnt').textContent, /수의계약만/);
+  assert.doesNotMatch(r.el('tb').innerHTML, /평가체계|경영평가위원/);
+  r.el('fMthd').value = ''; r.api.draw();
+  assert.equal(rowCount(r.el('tb').innerHTML), 4); assert.doesNotMatch(r.el('cnt').textContent, /수의계약/);
+});
+test('★★ 고른 것은 이 기기에 기억하고(feed_mthd) 첫 쪽으로 · 이상한 값은 안 남긴다 · 부팅 때 되살린다', () => {
+  const r = runApp({ feed: many(120).map((x, i) => Object.assign(x, { mthd: i % 2 ? '수의계약' : '일반경쟁' })) });
+  r.api.draw(); r.api.feedPageTo(1);
+  r.el('fMthd').value = 'nosole'; r.api.feedMthd('nosole');
+  assert.equal(r.store.gov3_feed_mthd, 'nosole');
+  assert.match(r.el('tb').innerHTML, /<td class="rn">1<\/td>/, '거르면 첫 쪽부터');
+  assert.equal(rowCount(r.el('tb').innerHTML), 50); assert.match(r.el('cnt').textContent, /수의계약 60건 뺌/);
+  r.api.feedMthd('<x>'); assert.equal(r.store.gov3_feed_mthd, '');
+  assert.match(src, /function boot\(\)\{\s*recStickyWatch\(\);\s*var fmd=\$\('fMthd'\); if\(fmd\)\{ var fmv=lsGet\('feed_mthd'\); fmd\.value=\(fmv==='sole'\|\|fmv==='nosole'\)\?fmv:''; \}/);
+  assert.match(src, /<select id="fMthd" onchange="feedMthd\(this\.value\)"[^>]*><option value="">전체 계약<\/option>\s*<option value="nosole">수의계약 빼기<\/option><option value="sole">수의계약만<\/option><\/select>/);
+});
+test('★ 팝업 계약방법 칸에도 딱지', () => {
+  const r = runApp({ feed: SOLE() });
+  r.api.draw(); r.api.feedPop('S1');
+  assert.match(r.el('popBody').innerHTML, /계약방법[\s\S]{0,80}<span class="tag amber"[^>]*>수의계약<\/span> 수의계약/);
+  r.api.feedPop('S2');
+  assert.doesNotMatch(r.el('popBody').innerHTML, /tag amber/);
 });
