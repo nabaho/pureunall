@@ -25480,6 +25480,7 @@ function mbListHtml(){
     ${mbSentWhoLineHtml()}
     ${mbOpenOnlyLineHtml()}
     ${mbDocStripHtml()}
+    ${mbAwaitStripHtml()}
     <div class="dm-list ${mbDense()}">${body}</div>
     ${/* ── 아래 영역 — 쪽번호와 보기설정 (대표 지시 2026-08-30, 다음메일 캡처3·4) ──
          예전에는 「이전 메일 더 보기」 단추 하나였다. 몇 쪽인지도, 지금 몇 쪽인지도
@@ -27944,6 +27945,89 @@ function mbDocStripHtml(){
       : `<span class="none">계약서는 첨부 줄의 「→ 기업별 계약서」가 더 맞는 길입니다</span>`}
   </div>`;
 }
+/* ══ 📬 서명본 대기 ↔ 받은 메일 (대표 「3단계 하고」 2026-10-09) ══════════════════════
+   서명본을 기다리는 회사(pu_docs/await, 회수 전)에서 «보낸 뒤에» 계약서로 보이는 첨부가 온 메일을 찾아
+   메일함 위 띠에 보여 준다. 「모두 담기」 한 번이면 메일 첨부 담기(🏢 기업별 계약서에 담기)와 같은 길로
+   🔒 서명본 · 기업별 계약서 · 계약 기록 · 회수까지 한다.
+   ⚠ 혼자 담지 않는다 — 사람이 띠를 보고 누를 때만(엉뚱한 회사에 붙을 수 있다). 대기 목록은 작아 한 번 읽는다(읽기만).
+   ★ 회사 맞추기: 보낸 주소의 회사(mbCoNameOf) → 대기 열쇠(coKey). 안 맞으면 제목·보낸 이름에 회사 이름이 들어 있을 때 */
+let _mbAwait = null, _mbAwaitT = 0, _mbAwaitBusy = false;
+function mbAwaitLoad(){
+  if(_mbAwait || _mbAwaitT) return;
+  _mbAwaitT = 1;
+  try {
+    mbOfficeStore().listAwait().then(l => { _mbAwait = (l || []).filter(a => a && !a.got); if(_mbAwait.length) renderMailPage(); }, () => { _mbAwait = []; });
+  } catch(e){ _mbAwait = []; }
+}
+/* 순수 — rows: 메일 줄, waits: 대기 줄, coOf(e)→회사 이름, keyOf(이름)→열쇠, pick(v)→PuDocPick.보기.
+   돌려주는 것: 회사마다 가장 최근 한 통 [{ v, a, 이름 }] */
+function mbAwaitMatchesOf(rows, waits, coOf, keyOf, pick){
+  const byKey = {}, best = {};
+  (waits || []).forEach(a => { if(a && a.key && !a.got) byKey[a.key] = a; });
+  const nk = (x) => String(x || '').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s+/g, '').toLowerCase();
+  (rows || []).forEach(v => {
+    if(!v || !Number(v.a)) return;
+    const pk = pick(v) || {};
+    if(!pk.서류 || pk.갈래 !== '계약서') return;
+    let a = byKey[keyOf(coOf(String(v.e || '').trim().toLowerCase()))];
+    if(!a){
+      const txt = nk(String(v.s || '') + ' ' + String(v.f || ''));
+      a = (waits || []).filter(w => w && !w.got && nk(w.name).length >= 2 && txt.indexOf(nk(w.name)) >= 0)[0];
+    }
+    if(!a || Number(v.d || 0) < Number(a.at || 0)) return;
+    if(!best[a.key] || Number(v.d) > Number(best[a.key].v.d)) best[a.key] = { v: v, a: a, 이름: pk.이름 || '' };
+  });
+  return Object.keys(best).map(k => best[k]).sort((x, y) => Number(y.v.d) - Number(x.v.d));
+}
+function mbAwaitMatches(){
+  mbAwaitLoad();
+  if(!_mbAwait || !_mbAwait.length || !window.PuDocPick || !window.PuOfficeStore) return [];
+  const rows = [];
+  Object.keys(_mbMsgs || {}).forEach(slug => {
+    const f = mbFolderBy(slug) || {}; if(f.kind === 'sent') return;   /* 우리가 보낸 메일은 아니다 */
+    const box = _mbMsgs[slug] || {};
+    Object.keys(box).forEach(uid => { const v = box[uid]; if(v) rows.push(Object.assign({}, v, { _slug: slug, u: v.u || uid })); });
+  });
+  return mbAwaitMatchesOf(rows, _mbAwait, (em) => mbCoNameOf(em), (n) => PuOfficeStore.coKey(n), (v) => PuDocPick.보기(v));
+}
+function mbAwaitStripHtml(){
+  const m = mbAwaitMatches();
+  if(!m.length) return '';
+  return `<div class="mbdoc" style="background:#eff6ff;border-color:#bfdbfe;color:#1e40af">
+    <span>📬 서명본을 기다리는 회사에서 계약서로 보이는 메일 <b>${m.length}통</b> — ${m.slice(0, 3).map(x => esc(x.a.name) + '(' + esc(x.이름 || '첨부') + ')').join(' · ')}${m.length > 3 ? ' 외' : ''}</span>
+    <button onclick="mbAwaitTakeAll()" ${_mbAwaitBusy ? 'disabled' : ''} title="🔒 서명본으로 기업별 계약서에 담고 계약 기록 한 줄 · 서명본 대기에서 회수로 옮깁니다">${_mbAwaitBusy ? '담는 중…' : '📎 모두 담기 (' + m.length + ')'}</button>
+  </div>`;
+}
+async function mbAwaitTakeAll(){
+  if(_mbAwaitBusy) return;
+  const m = mbAwaitMatches(); if(!m.length) return;
+  if(!confirm('서명본을 기다리는 ' + m.length + '곳의 메일 첨부를 🔒 서명본으로 담고 회수로 옮길까요?\n\n' + m.map(x => '· ' + x.a.name + ' — ' + (x.이름 || x.v.s || '')).join('\n'))) return;
+  _mbAwaitBusy = true; renderMailPage();
+  let ok = 0; const 못한것 = [];
+  for(let i = 0; i < m.length; i++){
+    const x = m[i], v = x.v;
+    toast('📬 ' + (i + 1) + '/' + m.length + ' ' + x.a.name + ' 담는 중…', 4000);
+    try {
+      const o = { slug: v._slug, uid: v.u };
+      const 본 = await mbFetchBody(v._slug, v.u, true);
+      const atts = (본 && 본.atts) || [];
+      let at = -1;
+      for(let k = 0; k < atts.length; k++){
+        const nm = String((atts[k] && atts[k].name) || '');
+        if(x.이름 && nm === x.이름){ at = k; break; }
+        if(at < 0 && PuDocPick.이름갈래(nm) === '계약서') at = k;
+      }
+      if(at < 0) throw new Error('계약서 첨부를 못 찾음');
+      const kind = (window.PuCoRoster && PuCoRoster.guessKind(atts[at].name || '')) || '기타';
+      await mbAttToCoSave(o, at, atts[at], { co: x.a.name, kind: kind, date: mbYmd(v.d), secret: true, rec: true, got: x.a.key });
+      ok++;
+    } catch(e){ 못한것.push(x.a.name + ' (' + ((e && e.message) || e) + ')'); }
+  }
+  _mbAwaitBusy = false; _mbAwait = null; _mbAwaitT = 0;
+  toast('📬 ' + ok + '곳 서명본을 담고 회수로 옮겼습니다' + (못한것.length ? ' · ⚠ ' + 못한것.join(' · ') : ''), 11000);
+  renderMailPage();
+}
+
 /* 한꺼번에 보내기 — 한 통씩 ① 첨부 목록을 받아 ② 서류 첨부를 찾아 ③ 받아서 ④ 통로에 담는다.
    ⚠ 하나가 실패해도 나머지는 간다 — 「하나 때문에 전부 안 됐다」가 가장 나쁘다.
    ⚠ 한 번에 보내는 수를 막는다(PuDocPick.한번에) — 사진첩 자동 판독이 한 번에 20장이라
