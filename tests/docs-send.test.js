@@ -40,7 +40,7 @@ test('ⓓ 사본 보관 — kind co · src upload (규칙 안의 값)', () => {
 });
 test('ⓔ host 배선', () => {
   assert.match(H, /hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,/);
-  assert.match(H, /mail: \{ mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep \}/);
+  assert.match(H, /mail: \{ mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect \}/);
 });
 
 const CFJ = fs.readFileSync(path.join(R, 'js/pu-contract-forms.js'), 'utf8').replace(/\r\n/g, '\n');

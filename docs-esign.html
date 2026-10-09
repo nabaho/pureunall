@@ -194,8 +194,8 @@
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=11"></script>
-<script src="js/pu-contract-forms.js?v=30"></script>
+<script src="js/pu-form-cardfill.js?v=12"></script>
+<script src="js/pu-contract-forms.js?v=31"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=7"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -542,6 +542,24 @@ function formMailRecord(row, V, o) {
     jobs.push(trackedWrite(PuOfficeStore.markAwait({ coName: coName, bz: (row && row.bz) || (V && V.사업자번호) || '', at: at, how: o.how === '받기' ? '받기' : '메일', names: o.names })));
   return Promise.all(jobs).then(function () { return keys.length; });
 }
+/* 📇 공단 연락처 (2026-10-09) — 보내기 창 「받는 사람」에 기관·지사별로. 읽기는 pu_docs/agency 한 칸.
+   모으기는 사람이 누를 때만: 푸른메일함 목록(mailbox/msgs·mailbox/old/msgs, 읽기만)을 한 번 읽어 공단 주소만 추려 적는다 */
+function formAgencyLoad() {
+  return db.ref('pu_docs/agency').once('value').then(function (s) {
+    var v = s.val() || {}, l = v.list || [];
+    return { list: Array.isArray(l) ? l.filter(Boolean) : Object.keys(l).map(function (k) { return l[k]; }), at: v.at || 0 };
+  });
+}
+function formAgencyCollect() {
+  var rows = [];
+  function walk(o) { Object.keys(o || {}).forEach(function (k) { var x = o[k]; if (x && typeof x === 'object') { if (x.e !== undefined || x.s !== undefined) rows.push(x); else walk(x); } }); }
+  return Promise.all(['mailbox/msgs', 'mailbox/old/msgs'].map(function (p) { return db.ref(p).once('value').then(function (s) { walk(s.val()); }, function () {}); }))
+    .then(function () {
+      var list = PuFormCardFill.agencyBook(rows).slice(0, 300);
+      if (!list.length) throw new Error('메일함에서 공단 주소를 찾지 못했습니다');
+      return trackedWrite(db.ref('pu_docs/agency').set({ list: list, at: Date.now(), by: curUser.uid })).then(function () { return { list: list, at: Date.now() }; });
+    });
+}
 /* 그 회사에 보낸 서류 — 기업별 계약서 「✉ 보낸 서류」(설계 2026-10-03-계약서류-표준-기록 §3 (라)). 읽기만.
    쓸 때와 같은 열쇠(사업자번호 · 'n'+이름) 둘 다 읽어 합친다 — 이 앱·기업정보함에서 보낸 것 모두 */
 function formSentFor(coName, bz) {
@@ -689,7 +707,7 @@ function showPane(name) {
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), make: makeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
-      mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
+      mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
   if (name === 'arc' && !mounted.arc) { mounted.arc = true; PuOfficeDocs.mountArchive($('arcRoot'), officeHost()); }

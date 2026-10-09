@@ -1412,6 +1412,25 @@ rules.pu_docs = {
     gotDoc:   { '.validate': 'newData.isString() && newData.val().length <= 40' },
     $other:   { '.validate': false }
   } },
+  /* 📇 공단 연락처 (2026-10-09) — 푸른메일함(mailbox, 직원 읽기)에서 화면이 모아 한 칸에 적는다.
+     공단 직원의 업무 메일 주소·이름·지사뿐(받은 메일 본문·첨부는 담지 않는다). 재직 직원이 읽고, 「다시 모으기」로 통째로 바꾼다. */
+  agency: {
+    '.write': LOGIN,
+    '.validate': "newData.hasChildren(['list','at','by'])",
+    list: { $i: {
+      '.validate': "newData.hasChildren(['org','email'])",
+      org:    { '.validate': 'newData.isString() && newData.val().length <= 20' },
+      branch: { '.validate': 'newData.isString() && newData.val().length <= 20' },
+      email:  { '.validate': 'newData.isString() && newData.val().length <= 80' },
+      name:   { '.validate': 'newData.isString() && newData.val().length <= 20' },
+      last:   { '.validate': 'newData.isNumber()' },
+      n:      { '.validate': 'newData.isNumber()' },
+      $other: { '.validate': false }
+    } },
+    at:     { '.validate': 'newData.isNumber()' },
+    by:     { '.validate': 'newData.val() === auth.uid' },
+    $other: { '.validate': false }
+  },
   /* 🔒 서명본을 누가 언제 열었나 — 서버(관리자 SDK)만 쓴다. 총괄관리자만 읽는다 */
   secret_log: { '.read': ADMIN },
   co_docs: { $k: { $d: {
