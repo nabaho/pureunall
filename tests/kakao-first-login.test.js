@@ -480,6 +480,26 @@ test('⑨ ★★★ 인증이 15초 넘게 걸려도 실패 화면으로 되돌�
   assert.ok(w.ctx.유지.includes('enterPortal'), '늦게 도착한 성공을 버렸다');
 });
 
+test('⑨ ★★★ 직원명부는 Firebase 인증이 끝난 뒤 읽는다', async () => {
+  const w = 복귀세상(true);
+  let 인증됨 = false;
+  const 읽기 = [];
+  w.ctx.db.ref = (path) => ({ once: () => {
+    if(path === 'data/user_dir') {
+      읽기.push(인증됨 ? '인증 뒤' : '인증 전');
+      if(!인증됨) return Promise.reject(new Error('permission_denied'));
+    }
+    return Promise.resolve({ val: () => [] });
+  } });
+  w.ctx.auth.signInWithCustomToken = () => {
+    인증됨 = true;
+    return Promise.resolve({ user: { email: 'p001@pureun.kr', getIdToken: () => Promise.resolve('t') } });
+  };
+  w.ctx.kkHandleReturn();
+  for (let i = 0; i < 5; i++) await 틈();
+  assert.deepEqual(읽기, ['인증 뒤'], '인증 전 명부 읽기는 권한 거부와 불필요한 재시도를 부른다');
+});
+
 test('⑪ ★★★ 저장소가 실제로 실패하면 로그인하지 않고 이유와 다른 로그인 길을 보인다', async () => {
   const w = 복귀세상(true);
   w.ctx.auth.setPersistence = () => Promise.reject(new Error('IndexedDB unavailable'));

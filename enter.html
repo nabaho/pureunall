@@ -126,7 +126,10 @@
      아이폰은 길면 잘라 버린다(「푸른 통합 포…」). 짧게 박아 둔다. -->
 <meta name="apple-mobile-web-app-title" content="푸른포털">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+<link rel="preconnect" href="https://asia-northeast3-pureun-erp.cloudfunctions.net" crossorigin>
+<!-- 외부 글꼴 CSS가 느려도 인증 스크립트와 카카오 복귀를 막지 않는다. -->
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
@@ -2007,11 +2010,6 @@ body.portal-mode #moreFab{display:flex;}
       _freshLogin = true;
       /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
       try { db.ref('.info/connected').once('value'); } catch(_c){}
-      /* 인증표를 받는 동안 직원명부도 먼저 받는다. 인증 뒤 다시 통신하던 한 왕복을 없앤다. */
-      try {
-        window.__puRosterPrefetch = Promise.resolve(db.ref('data/user_dir').once('value'))
-          .catch(function(){ return null; });
-      } catch(_r){ window.__puRosterPrefetch = null; }
       /* 카카오 인증표와 저장 방식은 동시에 준비하되 둘 다 «실제로 끝난 뒤» 로그인한다.
          Firebase는 저장 방식 변경을 2초만 기다리는 척해도 signIn에서 다시 기다린다.
          로그인 유지 켠 경우에는 부팅 때 이미 시작한 LOCAL 작업을 재사용한다. */
@@ -2029,6 +2027,12 @@ body.portal-mode #moreFab{display:flex;}
       Promise.all([server, persist]).then(function(ready){
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
+        /* 공개 명부도 LOGIN 권한이 필요하다. 로그인 전 미리 읽으면 권한 거부를
+           «명부 없음»으로 삼아 관리자 전용 명부까지 다시 읽느라 수 초를 낭비했다. */
+        try {
+          window.__puRosterPrefetch = Promise.resolve(db.ref('data/user_dir').once('value'))
+            .catch(function(){ return null; });
+        } catch(_r){ window.__puRosterPrefetch = null; }
         // 개인 식별값 없이 이 탭에만 단계별 소요를 남겨 다음 지연 제보를 구별한다.
         try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({serverMs:kkServerMs, storeMs:kkStoreMs, totalMs:Date.now()-kkStarted})); } catch(_t){}
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
