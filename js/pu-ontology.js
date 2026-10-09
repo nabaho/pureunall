@@ -151,7 +151,7 @@
       writeContracts:[{path:'rules_mgmt/library/human/{id}',entityType:'RulesDocument'},
                       {path:'rules_mgmt/library/rounds/{id}',entityType:'RulesRound'},
                       {path:'rules_mgmt/library/ask/{id}',entityType:'Task'}] },
-    docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs'],
+    docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs','pu_sign'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
       sharedRoots:['data/contract_forms','data/contract_forms_removed'],
@@ -286,7 +286,10 @@
     clinic_intake:{ name:'현장클리닉 보내기', file:'clinic-intake.html', program:'erp',
       note:'중진공 현장클리닉 → data/contract_requests 요청 한 줄 (계약은 계약관리가 만든다)' },
     esign_submit:{ name:'전자위임장 제출', file:'sign.html', program:'docs',
-      note:'근로자가 폰으로 제출하는 쪽 — 문서관리가 받는다' }
+      note:'근로자가 폰으로 제출하는 쪽 — 문서관리가 받는다' },
+    /* ✍ 계약서 서명 요청 (2026-10-09) — 받는 사람이 폰으로 확인·서명하는 쪽. 쓰는 곳은 pu_sign/open/{열쇠}/seen·sub 뿐 */
+    contract_sign:{ name:'계약서 서명', file:'sign-contract.html', program:'docs',
+      note:'받는 사람이 폰으로 계약서를 확인·서명 — 문서관리(기업별 계약서 › 서명 요청)가 받아 🔒 서명본으로 저장' }
   };
   var EXCLUDED_SCREENS = {
     'install.html':'포털 설치 안내 — 업무 자료를 담지 않는다',

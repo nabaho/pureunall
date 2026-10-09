@@ -295,6 +295,9 @@
     + '.pod-kt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pod-ks{font-size:11.5px;white-space:nowrap}.pod-ks.ok{color:#166534}.pod-ks.missing{color:#b91c1c}.pod-ks.norec,.pod-ks.none{color:#92400e}'
     + '.pod-krow .pod-b{padding:2px 8px;font-size:11px}'
+    + '.pod-sgst{display:inline-block;border-radius:9px;padding:0 8px;font-size:11.5px;font-weight:600;background:#f1f5f9;color:#475569}'
+    + '.pod-sgst.seen{background:#dbeafe;color:#1e40af}.pod-sgst.submitted{background:#ede9fe;color:#5b21b6}.pod-sgst.saved{background:#dcfce7;color:#166534}'
+    + '.pod-sgst.expired,.pod-sgst.void{background:#fee2e2;color:#991b1b}'
     + '.pod-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:1400}'
     + '@media(max-width:700px){.pod-co{display:block}.pod-cl{width:auto;margin-bottom:10px;max-height:30vh;overflow-y:auto}.pod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pod th:nth-child(5),.pod td:nth-child(5){display:none}}';
   function css() {
@@ -659,13 +662,13 @@
     css();
     var store = host.store;
     var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false,
-      tab: opts && opts.tab === 'await' ? 'await' : 'co', aw: null, awErr: null, awPicked: {}, idx: null, grp: '', chk: '' };
+      tab: opts && (opts.tab === 'await' || opts.tab === 'sign') ? opts.tab : 'co', aw: null, awErr: null, awPicked: {}, idx: null, grp: '', chk: '', sg: null, sgErr: null, sgNote: '', sgBusy: false };
 
     function load(keepSel) {
       S.err = null;
       return store.probe().then(function (p) {
         if (p === 'denied') { S.denied = true; S.loaded = true; draw(); return; }
-        loadAwait(); loadIndex();
+        loadAwait(); loadIndex(); if (S.tab === 'sign') loadSign();
         return store.listCo().then(function (cos) {
           S.cos = cos.filter(function (c) { return c.n > 0 || c.r > 0; });
           if (!keepSel || !S.cos.some(function (c) { return c.key === S.sel; })) S.sel = S.cos.length ? S.cos[0].key : null;
@@ -687,6 +690,64 @@
         function (e) { S.recsDenied = !!(store.isDenied && store.isDenied(e)); return []; }) : Promise.resolve([]);
       return Promise.all([store.listCoDocs(key), recsP, sentP]).then(function (r) { if (key !== S.sel) return; S.docs = r[0]; S.recs = r[1]; S.sent = r[2]; draw(); },
         function (e) { if (key !== S.sel) return; S.docs = []; S.recs = []; S.sent = []; draw(); toast('❌ 이 회사 계약서를 불러오지 못했습니다 — ' + msg(e)); });
+    }
+    /* ✍ 서명 요청 (2026-10-09) — 목록을 읽고, 제출된 것은 이 화면이 차례로 🔒 서명본으로 저장한다(사람이 따로 누르지 않아도) */
+    function loadSign(auto) {
+      if (!host.sign) return Promise.resolve();
+      return host.sign.list().then(function (l) {
+        S.sg = l; S.sgErr = null; draw();
+        if (auto !== false) return saveSubmitted();
+      }, function (e) { S.sg = []; S.sgErr = store.isDenied && store.isDenied(e) ? '규칙이 아직 게시되지 않았습니다' : msg(e); draw(); });
+    }
+    function saveSubmitted() {
+      var W = w.PuSign; if (!W || S.sgBusy) return Promise.resolve();
+      var todo = (S.sg || []).filter(function (r) { return W.statusOf(r, r.o) === 'submitted'; });
+      if (!todo.length) return Promise.resolve();
+      S.sgBusy = true; var done = 0, bad = [];
+      return todo.reduce(function (p, r) {
+        return p.then(function () {
+          S.sgNote = '🔒 제출된 서명본을 저장하는 중… (' + (done + 1) + '/' + todo.length + ') ' + ((r.who && r.who.name) || ''); draw();
+          return host.sign.finalize(r).then(function (x) { done++; if (!x.hashOk) bad.push((r.who && r.who.name) + '(문서 지문 다름)'); },
+            function (e) { bad.push(((r.who && r.who.name) || '') + ' — ' + msg(e)); });
+        });
+      }, Promise.resolve()).then(function () {
+        S.sgBusy = false; S.sgNote = '✅ ' + done + '건을 🔒 서명본으로 저장했습니다' + (bad.length ? ' · ⚠ ' + bad.join(', ') : '');
+        loadIndex(); return loadSign(false);
+      });
+    }
+    function signPane() {
+      var W = w.PuSign, box = el('div', { 'class': 'pod-aw' });
+      box.appendChild(el('div', { 'class': 'pod-note' }, ['계약서 양식 › 「📝 찾아서 채우기」 › 「✍ 서명 받기」로 만든 링크입니다. 받는 사람이 폰에서 제출하면 이 화면을 열 때 🔒 서명본으로 저장되고 기업별 계약서·계약 기록·서명본 대기에 들어갑니다.']));
+      if (S.sgNote) box.appendChild(el('div', { 'class': 'pod-note', style: 'background:#f0fdf4;border-color:#bbf7d0;color:#166534', text: S.sgNote }));
+      if (S.sg == null) { box.appendChild(el('div', { 'class': 'pod-empty', text: '불러오는 중…' })); return box; }
+      if (S.sgErr) { box.appendChild(el('div', { 'class': 'pod-note pod-warn', text: '⚠ 서명 요청을 읽지 못했습니다 — ' + S.sgErr })); return box; }
+      if (!S.sg.length) { box.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '아직 서명 요청이 없습니다' })); return box; }
+      var tb = el('tbody');
+      S.sg.forEach(function (r, i) {
+        var st = W.statusOf(r, r.o), link = host.sign.link(r);
+        var txt = W.shareText({ name: r.who && r.who.name, title: r.title, mode: r.mode, link: link, exp: r.exp });
+        var acts = [];
+        if (st === 'sent' || st === 'seen' || st === 'expired') {
+          acts.push(el('button', { type: 'button', 'class': 'pod-b', text: '📋 안내 글 복사', onclick: function () {
+            (w.navigator.clipboard ? w.navigator.clipboard.writeText(txt) : Promise.reject(new Error('복사 기능이 없습니다'))).then(function () { toast('복사했습니다 — 카톡·문자에 붙이세요'); }, function (e) { toast('❌ ' + msg(e)); });
+          } }));
+          if (st !== 'expired') acts.push(el('button', { type: 'button', 'class': 'pod-b', text: '취소', title: '이 링크로 더는 제출하지 못하게 합니다', onclick: function () {
+            if (!w.confirm((r.who && r.who.name) + ' 님의 서명 요청을 취소할까요?\n(링크로 더는 제출할 수 없습니다)')) return;
+            host.sign.void(r).then(function () { toast('취소했습니다'); loadSign(false); }, function (e) { toast('❌ ' + msg(e)); });
+          } }));
+        }
+        if (st === 'submitted') acts.push(el('button', { type: 'button', 'class': 'pod-b p', text: '🔒 지금 저장', onclick: function () { saveSubmitted(); } }));
+        if (st === 'saved' && r.coKey) acts.push(el('button', { type: 'button', 'class': 'pod-b', text: '회사 보기', onclick: function () { S.tab = 'co'; S.sel = r.coKey; load(true); } }));
+        tb.appendChild(el('tr', null, [el('td', { style: 'color:#94a3b8', text: String(i + 1) }), el('td', { text: W.ymd(r.at) }),
+          el('td', null, [el('b', { text: (r.who && r.who.name) || '' }), el('div', { style: 'font-size:11px;color:#94a3b8', text: r.co || '(회사 없음)' })]),
+          el('td', { 'class': 'nm', text: r.title || '' }), el('td', { text: r.mode === 'agree' ? '동의' : '서명' }),
+          el('td', { text: W.ymd(r.exp) }),
+          el('td', null, [el('span', { 'class': 'pod-sgst ' + st, text: W.STATUS_TXT[st] + (st === 'saved' && r.hashOk === false ? ' ⚠지문' : '') })]),
+          el('td', { style: 'overflow:visible;white-space:nowrap' }, acts)]));
+      });
+      box.appendChild(el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '#' }), el('th', { text: '보낸 날' }),
+        el('th', { text: '서명자' }), el('th', { text: '서류' }), el('th', { text: '방식' }), el('th', { text: '기한' }), el('th', { text: '상태' }), el('th', { text: '' })])]), tb])]));
+      return box;
     }
     /* 갈래별 정리 — 기록·파일 연결 전체(작다)를 한 번 읽어 회사마다 나눈다. 못 읽어도 화면은 그대로(칩만 안 나온다) */
     function loadIndex() {
@@ -1542,8 +1603,12 @@
       wrap.appendChild(el('div', { 'class': 'pod-tabs', role: 'tablist' }, [
         el('button', { type: 'button', role: 'tab', 'aria-selected': S.tab === 'co' ? 'true' : 'false', 'class': S.tab === 'co' ? 'on' : null, text: '🏢 회사별', onclick: function () { S.tab = 'co'; draw(); } }),
         el('button', { type: 'button', role: 'tab', 'aria-selected': S.tab === 'await' ? 'true' : 'false', 'class': S.tab === 'await' ? 'on' : null, onclick: function () { S.tab = 'await'; draw(); loadAwait(); } },
-          ['📬 서명본 대기', nWait ? el('i', { text: String(nWait) }) : null])]));
+          ['📬 서명본 대기', nWait ? el('i', { text: String(nWait) }) : null]),
+        host.sign ? el('button', { type: 'button', role: 'tab', 'aria-selected': S.tab === 'sign' ? 'true' : 'false', 'class': S.tab === 'sign' ? 'on' : null, onclick: function () { S.tab = 'sign'; draw(); loadSign(); } },
+          ['✍ 서명 요청', S.sg && S.sg.filter(function (r) { var t = w.PuSign && w.PuSign.statusOf(r, r.o); return t === 'sent' || t === 'seen' || t === 'submitted'; }).length
+            ? el('i', { style: 'background:#ede9fe;color:#5b21b6', text: String(S.sg.filter(function (r) { var t = w.PuSign.statusOf(r, r.o); return t === 'sent' || t === 'seen' || t === 'submitted'; }).length) }) : null]) : null]));
       if (S.tab === 'await') { wrap.appendChild(awaitPane()); root.appendChild(wrap); return; }
+      if (S.tab === 'sign') { wrap.appendChild(signPane()); root.appendChild(wrap); return; }
       if (!S.cos.length) {
         wrap.appendChild(el('div', { 'class': 'pod-empty' }, ['엑셀 업체명단을 가져오거나, 사진첩의 계약서·파일을 올리면 회사별로 모입니다.']));
         root.appendChild(wrap); return;

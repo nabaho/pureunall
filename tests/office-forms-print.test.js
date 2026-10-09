@@ -29,7 +29,7 @@ test('ⓑ 채운 본 이름 — .hwp / 미리보기 사본 .hwpx', () => {
 });
 
 test('ⓒ 촘촘히 · 엑셀 알림 · 저장 없음', () => {
-  assert.match(cut('  function pagesOf('), /renderPreview\(box, doc\.bytes, doc\.name, \{ dpr: 2\.5 \}\)/);
+  assert.match(cut('  function pagesOf('), /renderPreview\(box, doc\.bytes, doc\.name, \{ dpr: opt\.dpr \|\| 2\.5 \}\)/, '인쇄는 기본 2.5배(서명 요청 그림만 가볍게)');
   assert.match(read('js/pu-hwp-engine.js'), /\(extra && extra\.dpr\) \|\| global\.devicePixelRatio/);
   assert.match(cut('  function printNote('), /엑셀로 열어 인쇄/);
   const pp = cut('  function printPages(');

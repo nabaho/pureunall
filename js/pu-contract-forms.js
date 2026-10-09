@@ -525,24 +525,27 @@
     if (isXlsxName(src.name)) return Promise.resolve({ xlsx: true, name: fm.name || src.name });
     var bytesP = src.data ? Promise.resolve(bytesOfDataUrl(src.data)) : (host.hwpBytes ? host.hwpBytes(src) : Promise.reject(new Error('원본을 불러올 길이 없습니다')));
     return bytesP.then(function (u8) {
-      return host.hwpMarkers(u8, src.name).then(function (ks) { return host.hwpFill(u8, src.name, CF.hwpValues(ks || [], V || {})); });
+      return host.hwpMarkers(u8, src.name).then(function (ks) {
+        return host.hwpFill(u8, src.name, CF.hwpValues(ks || [], V || {})).then(function (r) { r.markers = ks || []; return r; });
+      });
     }).then(function (r) {
       /* 미리보기·PDF 와 같이 «다시 나누기 전» 사본(preview, .hwpx)으로 그린다 — 그림 엔진이 바르게 그린다 */
       /* ⚠ 채운 본(r.bytes)은 원본이 .hwpx 여도 한글(.hwp)로 나온다(받기와 같다) — 이름을 원본 확장자로 붙이면 엔진이 거절한다 */
-      return { bytes: r.preview || r.bytes, name: String(src.name).replace(/\.[^.]+$/, '') + (r.preview ? '.hwpx' : '.hwp') };
+      return { bytes: r.preview || r.bytes, name: String(src.name).replace(/\.[^.]+$/, '') + (r.preview ? '.hwpx' : '.hwp'), markers: r.markers || [] };
     });
   }
   /* 문서 하나 → 쪽 그림들 [{url, land}] — 화면 밖 틀에 그려 캔버스를 그림으로 */
-  function pagesOf(doc, host) {
+  function pagesOf(doc, host, opt) {
+    opt = opt || {};
     var box = w.document.createElement('div');
     box.style.cssText = 'position:fixed;left:-99999px;top:0;width:900px';
     w.document.body.appendChild(box);
     /* 인쇄는 화면보다 촘촘히(약 200dpi) — 화면 배율(1)로 그리면 종이에서 글자가 흐리다 */
-    var draw = w.PureunHwp && w.PureunHwp.renderPreview ? w.PureunHwp.renderPreview(box, doc.bytes, doc.name, { dpr: 2.5 }) : host.hwpShow(box, doc.bytes, doc.name);
+    var draw = w.PureunHwp && w.PureunHwp.renderPreview ? w.PureunHwp.renderPreview(box, doc.bytes, doc.name, { dpr: opt.dpr || 2.5 }) : host.hwpShow(box, doc.bytes, doc.name);
     return Promise.resolve(draw).then(function () {
       var cv = box.querySelectorAll('canvas');
       if (!cv.length) throw new Error('쪽을 그리지 못했습니다');
-      return Array.prototype.map.call(cv, function (c) { return { url: c.toDataURL('image/jpeg', 0.92), land: c.width > c.height }; });
+      return Array.prototype.map.call(cv, function (c) { return { url: c.toDataURL('image/jpeg', opt.q || 0.92), land: c.width > c.height }; });
     }).then(function (pgs) { box.remove(); return pgs; }, function (e) { box.remove(); throw e; });
   }
   /* 쪽 그림들을 숨은 틀에 모아 인쇄 창 — 가로 쪽은 가로 용지로 */
@@ -590,6 +593,111 @@
     return '🖨 ' + r.pages + '쪽을 인쇄 창으로 보냈습니다'
       + (r.skipped.length ? ' · 엑셀 ' + r.skipped.length + '개는 엑셀로 열어 인쇄(' + r.skipped.join(', ') + ')' : '')
       + (r.failed.length ? ' · ⚠ 못 그린 양식: ' + r.failed.join(', ') : '');
+  }
+  /* ══ ✍ 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) — 규칙·자리는 js/pu-sign.js 머리말 ══
+     한글 양식만(엑셀은 폰에서 원본 모양으로 못 보여 준다 — 건너뛰고 알린다). 쪽 그림·적을 칸을 만든다 */
+  function signRender(fms, V, host, opt) {
+    var pages = [], markers = [], skipped = [];
+    return (fms || []).reduce(function (p, fm) {
+      return p.then(function () {
+        return fillForPrint(fm, V, host).then(function (doc) {
+          if (doc.xlsx) { skipped.push(doc.name); return; }
+          markers = markers.concat(doc.markers || []);
+          return pagesOf(doc, host, opt).then(function (pg) { pages = pages.concat(pg); });
+        });
+      });
+    }, Promise.resolve()).then(function () { return { pages: pages, markers: markers, skipped: skipped }; });
+  }
+  function signable(fm) { var src = hwpSources(fm || {})[0]; return !!src && !isXlsxName(src.name); }
+  /* 미리 채운 값 — 글자만, 300자까지, 열쇠에 못 쓰는 글자(. # $ [ ] /)는 뺀다 */
+  function cleanVals(V) {
+    var out = {};
+    Object.keys(V || {}).forEach(function (k) {
+      var v = V[k]; if (v == null || typeof v === 'object' || /[.#$\[\]\/]/.test(k) || !k) return;
+      v = String(v); if (v === '') return;
+      out[k] = v.slice(0, 300);
+    });
+    return out;
+  }
+  function openSignReq(fms, V, host, title) {
+    var SG = w.PuSign;
+    if (!SG || !host.sign) { toast('서명 요청 도구를 불러오지 못했습니다 — 새로고침해 주세요'); return; }
+    ensureCss();
+    var ok = fms.filter(signable), skip = fms.filter(function (f) { return !signable(f); });
+    if (!ok.length) { toast('서명 요청은 한글 양식만 됩니다 — 엑셀 양식은 내려받아 보내 주세요'); return; }
+    var isCase = ok.some(function (f) { return f.kind === 'case'; });
+    var first = isCase ? (V.근로자명 && (V.근로자연락처 || V.근로자휴대폰) ? V.근로자명 + ' ' + (V.근로자연락처 || V.근로자휴대폰) : '')
+      : (V.담당자 && (V.담당자휴대폰 || V.담당자연락처) ? V.담당자 + ' ' + (V.담당자휴대폰 || V.담당자연락처) : '');
+    var bg = el('div', { 'class': 'pcf-mbg', style: 'z-index:10001' });
+    var busy = false;
+    function close() { if (busy) return; document.removeEventListener('keydown', onKey); bg.remove(); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey);
+    var who = el('textarea', { rows: 5, 'aria-label': '받는 사람', placeholder: '한 줄에 한 사람 — 이름 휴대폰\n김가나 010-1200-0001\n이다라 010-1200-0002', style: 'width:100%;font:inherit;font-size:13px' });
+    who.value = first;
+    var mode = el('select', { 'aria-label': '방식' }, [el('option', { value: 'sign', text: '손서명 받기' }), el('option', { value: 'agree', text: '동의만 받기(체크)' })]);
+    var days = el('select', { 'aria-label': '기한' }, [3, 7, 14, 30].map(function (d) { return el('option', { value: String(d), text: d + '일 안에', selected: d === 7 }); }));
+    var note = el('div', { 'class': 'pcf-fnote' });
+    var out = el('div');
+    var go = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#1e40af;color:#fff;font-weight:700', text: '링크 만들기', onclick: run });
+    function run() {
+      if (busy) return;
+      var pr = SG.parseRecipients(who.value);
+      if (pr.bad.length) { note.textContent = '⚠ 이 줄은 이름·휴대폰을 못 읽었습니다: ' + pr.bad.join(' / '); return; }
+      if (!pr.ok.length) { note.textContent = '⚠ 받는 사람을 한 줄에 한 사람씩 적어 주세요(이름 휴대폰)'; return; }
+      if (pr.ok.length > 50) { note.textContent = '⚠ 한 번에 50명까지 — 나눠서 만들어 주세요'; return; }
+      busy = true; go.disabled = true; out.innerHTML = '';
+      var res = [], i = 0, md = mode.value, dd = +days.value;
+      function next() {
+        if (i >= pr.ok.length) return Promise.resolve();
+        var person = pr.ok[i++];
+        note.textContent = '문서를 그리는 중… (' + i + '/' + pr.ok.length + ') ' + person.name;
+        var Vp = Object.assign({}, V);
+        if (isCase) { Vp.근로자명 = person.name; Vp.근로자연락처 = person.phone; }
+        else if (!Vp.담당자) Vp.담당자 = person.name;
+        /* 서명자가 보는 그림은 가볍게(폰에서 받는다) — 저장본은 직원 화면이 촘촘히 다시 그린다 */
+        return signRender(ok, Vp, host, { dpr: 1.3, q: 0.78 }).then(function (r) {
+          var urls = r.pages.map(function (p) { return p.url; });
+          return SG.sha256Hex(urls.join('|')).then(function (hash) {
+            var t = SG.newToken(), exp = SG.expAt(Date.now(), dd), fields = SG.signerFields(r.markers, Vp);
+            var req = { t: t, co: String(Vp.회사명 || ''), who: { name: person.name, phone: person.phone }, p4: SG.p4Of(person.phone), exp: exp,
+              forms: ok.map(function (f) { return f.id; }), title: String(title || ok.map(function (f) { return f.name; }).join(' · ')).slice(0, 120),
+              mode: md, kind: SG.recKindOf(ok), V: cleanVals(Vp), fields: fields, status: 'sent' };
+            var open = { exp: exp, pages: urls, land: r.pages.map(function (p) { return !!p.land; }), docHash: hash, fields: fields, mode: md,
+              title: req.title, co: req.co, name: person.name };
+            return host.sign.create(req, open).then(function (x) { res.push({ name: person.name, link: x.link, exp: exp, mode: md, title: req.title }); });
+          });
+        }).then(next);
+      }
+      next().then(function () {
+        busy = false; go.disabled = false;
+        note.textContent = '✅ ' + res.length + '명 링크를 만들었습니다' + (skip.length ? ' · 엑셀 양식은 빠졌습니다: ' + skip.map(function (f) { return f.name; }).join(', ') : '')
+          + ' — 아래에서 보내세요. 진행은 기업별 계약서 › ✍ 서명 요청에서 봅니다.';
+        res.forEach(function (x) {
+          var txt = SG.shareText({ name: x.name, title: x.title, mode: x.mode, link: x.link, exp: x.exp });
+          out.appendChild(el('div', { 'class': 'pcf-srow' }, [el('b', { text: x.name }), el('span', { 'class': 'pcf-muted', text: x.link }),
+            el('button', { type: 'button', 'class': 'pcf-b', text: '📋 복사', onclick: function () {
+              (navigator.clipboard ? navigator.clipboard.writeText(txt) : Promise.reject(new Error('복사 기능이 없습니다'))).then(function () { toast(x.name + ' 안내 글을 복사했습니다 — 카톡·문자에 붙이세요'); }, function (e) { toast('⚠ ' + ((e && e.message) || e)); });
+            } }),
+            navigator.share ? el('button', { type: 'button', 'class': 'pcf-b', text: '📤 공유(카톡)', onclick: function () { navigator.share({ title: x.title, text: txt }).catch(function () {}); } }) : null,
+            el('a', { 'class': 'pcf-b', href: 'mailto:?subject=' + encodeURIComponent('[푸른노무법인] ' + x.title + ' 서명 요청') + '&body=' + encodeURIComponent(txt), text: '✉ 메일' })]));
+        });
+      }, function (e) { busy = false; go.disabled = false; note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
+    bg.appendChild(el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '서명 받기', style: 'width:720px' }, [
+      el('div', { 'class': 'pcf-mh' }, [el('span', { text: '✍ 서명 받기 — ' + (V.회사명 || title || '') }), el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
+      el('div', { 'class': 'pcf-mb' }, [
+        el('div', { 'class': 'pcf-fh', text: '서류 (' + ok.length + '개)' }), el('div', { 'class': 'pcf-muted', text: ok.map(function (f) { return f.name; }).join(' · ') }),
+        skip.length ? el('div', { 'class': 'pcf-muted', style: 'color:#b45309', text: '엑셀 양식은 폰에서 원본 모양으로 보여 줄 수 없어 빠집니다: ' + skip.map(function (f) { return f.name; }).join(', ') }) : null,
+        el('div', { 'class': 'pcf-fh', text: '받는 사람 — 한 줄에 한 사람(이름 휴대폰). 사람마다 링크가 따로 나옵니다' }), who,
+        el('div', { style: 'display:flex;gap:10px;margin-top:8px;flex-wrap:wrap' }, [el('label', null, ['방식 ', mode]), el('label', null, ['기한 ', days])]),
+        el('div', { 'class': 'pcf-muted', style: 'margin-top:8px', text: '지금 고른 회사·담당자·근로자 값으로 미리 채웁니다. 빈 칸(주소·연락처 등)은 받는 사람이 폰에서 적습니다 — 주민번호는 묻지 않습니다. 본인 확인: 링크 + 휴대폰 끝 4자리.' }),
+        note, out]),
+      el('div', { 'class': 'pcf-mf' }, [el('span', { 'class': 'pcf-muted', style: 'margin-right:auto', text: '링크는 직원이 복사·공유해 보낼 때만 나갑니다.' }),
+        el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }), go])
+    ]));
+    document.body.appendChild(bg);
+    setTimeout(function () { who.focus(); }, 0);
   }
   function zipName(title, V) {
     var head = fileSafe(title).replace(/^\.+/, '').slice(0, 40), tail = whoTail(V);
@@ -712,6 +820,8 @@
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
     + '.pcf-printb:hover{background:#f1f5f9}'
+    + '.pcf-srow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 0;border-top:1px solid #f1f5f9}.pcf-srow .pcf-muted{flex:1;min-width:200px;word-break:break-all;font-size:11.5px}'
+    + 'a.pcf-b{text-decoration:none;display:inline-block}'
     /* 채우기 창 «옆 미리보기» (대표 2026-10-09 「아래 팝업보다 옆에서 나오면 보기가 더 편할 것」) — 넓은 화면만, 좁으면 아래 그대로 */
     + '@media(min-width:1100px){.pcf-m.side{width:min(1480px,96vw)!important}'
     + '.pcf-m.side .pcf-mb{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:14px;align-items:start}'
@@ -1668,6 +1778,8 @@
         one && fm0.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
         pickSel,
         btnPrev = el('button', { type: 'button', 'class': 'pcf-b', onclick: doPreview }),
+        host.sign ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#7c3aed;color:#fff', title: '받는 사람마다 서명 링크를 만듭니다 — 폰에서 확인·서명하면 🔒 서명본으로 저장됩니다',
+          text: '✍ 서명 받기', onclick: function () { if (!conflictsOkToGo()) return; openSignReq(items.map(function (x) { return x.fm; }), values(), host, one ? nameOf(items[0]) : title); } }) : null,
         host.hwpShow ? el('button', { type: 'button', 'class': 'pcf-b', title: '지금 값으로 채워(비운 칸은 ＿＿＿ 밑줄) 인쇄합니다. 회사를 고르지 않으면 빈 양식으로 나옵니다.', text: one ? '🖨 인쇄' : '🖨 ' + items.length + '개 한 번에 인쇄', onclick: doPrint }) : null,
         (one && items[0].src && !isXl(items[0]) && host.hwpEdit) ? el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 한글처럼 손보기', onclick: doEdit }) : null,
         (one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ 메일로 보내기 →', onclick: doMail }) : null,
@@ -2789,6 +2901,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
+    signRender: signRender, cleanVals: cleanVals,
     CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TYPE_SET: TYPE_SET, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf, srcType: srcType, moreFilter: moreFilter,

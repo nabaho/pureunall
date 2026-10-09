@@ -1403,7 +1403,7 @@ rules.pu_docs = {
     name:     { '.validate': 'newData.isString() && newData.val().length <= 120' },
     bz:       { '.validate': 'newData.isString() && newData.val().length <= 12' },
     at:       { '.validate': 'newData.isNumber()' },
-    how:      { '.validate': "newData.val() === '메일' || newData.val() === '받기'" },
+    how:      { '.validate': "newData.val() === '메일' || newData.val() === '받기' || newData.val() === '서명'" },
     names:    { $i: { '.validate': 'newData.isString() && newData.val().length <= 200' } },
     by:       { '.validate': 'newData.val() === auth.uid' },
     byName:   { '.validate': 'newData.isString() && newData.val().length <= 60' },
@@ -1448,6 +1448,47 @@ rules.pu_docs = {
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },
     $other: { '.validate': false }
   } } }
+};
+
+/* ══ ✍ 계약서 서명 요청 (대표 「1단계부터 진행해라」 2026-10-09) ═════════════════
+   사람마다 링크 하나: sign-contract.html?t={열쇠(128비트)}. 열쇠를 아는 사람만 그 칸(open/{t})을 읽는다 —
+   open 은 «목록 읽기»가 막혀 있어 열쇠를 모르면 찾을 수 없다(위임장 링크처럼 meta 에 열쇠를 드러내지 않는다).
+   ★ 제출(sub)은 한 번만 · 기한 안에만 · 취소되지 않았을 때만 · 휴대폰 끝 4자리가 맞을 때만.
+     끝 4자리는 직원만 읽는 req 에 있다 — 규칙은 읽기 권한과 상관없이 견준다(서명자는 그 값을 못 본다).
+   ★ 서명자가 본 문서 그림의 지문(docHash)을 제출에 함께 묶는다 — 나중에 그림이 바뀌면 직원 화면이 알린다.
+   ⚠ 주민번호는 1단계에서 받지 않는다(칸을 만들지 않는다). 받는 것은 서명자가 적는 칸 값·서명 그림·동의뿐. */
+rules.pu_sign = {
+  req: {
+    '.read': LOGIN,
+    '.indexOn': ['at'],
+    $r: {
+      '.write': LOGIN,
+      '.validate': "newData.hasChildren(['t','co','who','p4','exp','at','by','forms'])",
+      p4: { '.validate': "newData.isString() && newData.val().matches(/^[0-9]{4}$/)" }
+    }
+  },
+  open: { $t: {
+    '.read': true,
+    '.write': LOGIN,
+    /* fields 는 필수가 아니다 — 적을 칸이 없는 문서면 빈 목록이라 남지 않는다 */
+    '.validate': "$t.matches(/^[0-9a-f]{32}$/) && newData.hasChildren(['req','exp','pages','docHash','mode','title'])",
+    seen: { '.write': "auth != null && !data.exists()", '.validate': 'newData.val() === now' },
+    sub: {
+      '.write': "auth != null && !data.exists() && data.parent().child('void').val() !== true && data.parent().child('exp').val() > now"
+        + " && newData.child('p4').val() === root.child('pu_sign/req/' + data.parent().child('req').val() + '/p4').val()"
+        + " && newData.child('docHash').val() === data.parent().child('docHash').val()",
+      /* vals 는 필수가 아니다 — 서명자가 아무 칸도 안 적으면 빈 묶음이라 실시간DB 에 남지 않는다 */
+      '.validate': "newData.hasChildren(['p4','docHash','at','agree'])",
+      at:    { '.validate': 'newData.val() === now' },
+      agree: { '.validate': 'newData.val() === true' },
+      sig:   { '.validate': 'newData.isString() && newData.val().length < 300000' },
+      ua:    { '.validate': 'newData.isString() && newData.val().length <= 300' },
+      vals:  { $k: { '.validate': 'newData.isString() && newData.val().length <= 300' } },
+      p4:      { '.validate': 'newData.isString()' },
+      docHash: { '.validate': 'newData.isString()' },
+      $other: { '.validate': false }
+    }
+  } }
 };
 
 process.stdout.write(JSON.stringify({ rules: rules }, null, 2) + '\n');
