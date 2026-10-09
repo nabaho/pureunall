@@ -176,7 +176,8 @@ public final class HanaSweepWorker extends Worker {
             /* ★ 상한(MAX_MESSAGES)에 닿았나 — 닿았으면 더 오래된 거래가 남아 있다. */
             ping.put("capped", capped);
             ping.put("newestAt", newestAt);
-            HanaUploadWorker.post(ping, token);
+            /* 답에 카톡 업무방 목록이 실려 온다(2026-10-09) — 받아 적는다. */
+            KakaoRooms.absorb(context, HanaUploadWorker.post(ping, token));
         } catch (Exception error) {
             /* 알림 한 번 못 보낸 것으로 다시 시도하지는 않는다 — 15분 뒤에 또 온다. */
             return Result.success();

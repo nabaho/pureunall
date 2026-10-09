@@ -92,7 +92,8 @@ public final class MainActivity extends Activity {
             ping.put("canReadSms", checkSelfPermission(Manifest.permission.READ_SMS)
                     == PackageManager.PERMISSION_GRANTED);
             ping.put("batteryFree", batteryFree());
-            HanaUploadWorker.post(ping, SecureStore.token(this));
+            /* 답에 카톡 업무방 목록이 실려 온다(2026-10-09) — 앱을 열면 곧바로 새 목록을 받는다. */
+            KakaoRooms.absorb(this, HanaUploadWorker.post(ping, SecureStore.token(this)));
         } catch (Exception ignored) {
             /* 인사 한 번 못 했다고 앱이 멈추지는 않는다 */
         }
