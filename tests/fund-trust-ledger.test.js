@@ -17,7 +17,7 @@ new Function([
   "var R={이자:{d:'현금성자산',c:'이자수익'}, 가나기계:{d:'현금성자산',c:'기본재산'}};",
   "function proposeAcct(m){ return R[m]||{d:'',c:''}; }",
   varSrc('TR'), 'var TR_RUN=30, TR_WIN=50, TR_AMT_MAX=1000000;', varSrc('TR_FIXED_FIELDS'),
-  fnSrc('_trEsc'), fnSrc('_trSrc'), fnSrc('_trProvRk'), fnSrc('_trTxnRk'), fnSrc('_trXferRk'), fnSrc('_trFixed'), fnSrc('_trOn'),
+  fnSrc('_trEsc'), fnSrc('_trSrc'), fnSrc('_trField'), fnSrc('_trProvRk'), fnSrc('_trTxnRk'), fnSrc('_trXferRk'), fnSrc('_trFixed'), fnSrc('_trOn'),
   fnSrc('_trStat'), fnSrc('_trState'), fnSrc('_trTxnEv'), fnSrc('_provState'),
   'this.TR=TR; this.src=_trSrc; this.prk=_trProvRk; this.trk=_trTxnRk; this.xrk=_trXferRk; this.fixed=_trFixed; this.on=_trOn;',
   'this.stat=_trStat; this.state=_trState; this.tev=_trTxnEv; this.pstate=_provState;',
@@ -28,6 +28,8 @@ test('★ 규칙 열쇠 — 서류 종류는 살리고, 그때그때 적은 설�
   assert.equal(box.src('list:대표 표·푸른메일함'), 'list');
   assert.equal(box.src('mail:재무현황(고객)·2025 결산서 전기'), 'mail');
   assert.equal(box.prk('scan:bizreg', 's|S1|biz_no'), 'p~scan:bizreg~biz_no');
+  assert.equal(box.prk('list:x', 's|-Nabc'), 'p~list~_site', '사업장 통째가 사업장 id 를 칸 이름으로 썼다');
+  assert.equal(box.prk('scan:결산서', 'f|years|2024|opening|basic'), 'p~scan:결산서~opening_basic', '해마다 다른 규칙이 됐다');
   assert.equal(box.trk('FUND-0001', true, '이자수익'), 't~FUND-0001~입~이자수익');
   assert.equal(box.xrk('FUND-0001', 'sure'), 'x~FUND-0001~sure');
   assert.ok(!/[.#$\[\]\/'"]/.test(box.prk("scan:a.b", "f|x'y")), 'RTDB 열쇠·onclick 에 못 쓰는 글자가 남았다');

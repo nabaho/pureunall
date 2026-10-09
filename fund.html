@@ -3097,13 +3097,23 @@ function _rvBindKeys(){
    ⚠ 부르는 쪽은 typeof 로 감싸 부른다 — 함수만 떼어 돌리는 검사들이 이 도우미 없이도 돌아가게. */
 var TR={rules:null, ref:null, data:null, at:0, loading:null};
 var TR_RUN=30, TR_WIN=50, TR_AMT_MAX=1000000;
+var TR_FLD={_site:'사업장 통째(가져온 자료)', lead:'대표사업장 표시', puerp_co_id:'업체관리 연결', mgr_main:'담당자', sme:'중소기업 여부',
+  opening_basic:'전기이월 기본재산', opening_cash:'전기이월 현금', opening_reserve:'전기이월 준비금1', opening_reserve2:'전기이월 준비금2',
+  opening_secu:'전기이월 유가증권', opening_savings:'전기이월 예적금', opening_retained:'전기이월 잉여금', opening_loan:'전기이월 대부금'};
 var TR_FIXED_FIELDS=['manager','chairman','worker_rep','rep_position','ceo','wrep_name','urep_name','wrep_birth','urep_birth','wrep_addr','urep_addr',
   'wrep_mobile','urep_mobile','contacts','officers','prep_committee','lease_lessor','contrib','contribution_total','contrib_per_worker',
   'svc_fee','lease_deposit','lease_rent','sales'];
 function _trEsc(s){ return String(s==null?'':s).replace(/[.#$\[\]\/~'"<>\\]/g,'_').slice(0,120); }
 /* 출처를 규칙 단위로 — 서류 종류·가져오기 종류는 살리고, 그때그때 적은 설명(list:… mail:…)은 앞말만 */
 function _trSrc(src){ src=String(src||''); if(/^(scan|import|rule|calc|guess|copy):/.test(src)) return src.slice(0,40); return src.split(':')[0]||'auto'; }
-function _trProvRk(src,key){ return 'p~'+_trEsc(_trSrc(src))+'~'+_trEsc(String(key||'').split('|').pop()); }
+/* 칸 — 끝 토막. 단 «s|사업장»(통째)은 _site, «f|years|연도|묶음|칸»은 묶음_칸(연도는 뺀다 — 해마다 같은 규칙) */
+function _trField(key){
+  var p=String(key||'').split('|');
+  if(p[0]==='s'&&p.length===2) return '_site';
+  if(p[0]==='f'&&p[1]==='years'&&p.length>4) return p.slice(3).join('_');
+  return p[p.length-1];
+}
+function _trProvRk(src,key){ return 'p~'+_trEsc(_trSrc(src))+'~'+_trEsc(_trField(key)); }
 function _trTxnRk(fid,dep,acct){ return 't~'+_trEsc(fid)+'~'+(dep?'입':'출')+'~'+_trEsc(acct); }
 function _trXferRk(fid,kind){ return 'x~'+_trEsc(fid)+'~'+(kind==='sure'?'sure':'guess'); }
 function _trFixed(rk){
@@ -3235,7 +3245,7 @@ function trSetAuto(rk,on){
 }
 function _trLabel(rk){
   var p=String(rk||'').split('~'), f=funds[p[1]]||{}, fn=f.short_name||f.name||p[1];
-  if(p[0]==='p') return '📄 '+_rvSrcLabel(p[1])+' → '+_rvLabel(p[2]);
+  if(p[0]==='p') return '📄 '+_rvSrcLabel(p[1])+' → '+(TR_FLD[p[2]]||_rvLabel(p[2]));
   if(p[0]==='t') return '🏦 '+fn+' · '+(p[2]==='입'?'입금':'출금')+' → '+p[3];
   if(p[0]==='x') return '🔁 '+fn+' · 계좌 사이 이체 짝'+(p[2]==='sure'?'':' (계좌번호 없음)');
   return rk;
@@ -3321,7 +3331,7 @@ function rvPage(p){ RV.page=p; if(p==='trust') renderTrust(); else if(p==='journ
    · 묶음이 있는 줄만 [펼치기]·[↶ 되돌리기]가 있다. 묶음이 여러 기금에 걸치면 기금마다 한 줄 — 되돌리기도 그 기금 칸만.
    · 되돌리기는 «지금 값이 그 묶음이 넣은 값 그대로인 칸»만 전 값으로 돌린다. 그 뒤 바뀐 칸은 건드리지 않는다.
      사람이 이미 ✓ 확인한 칸은 따로 묻는다(빼고 되돌리기가 기본).
-   · 되돌린 것도 _track(사람·src undo)으로 남아 다시 되돌릴 수 있다. 켜고 끄기처럼 대표·관리자만(_isBoss).
+   · 되돌린 것도 칸 출처 기록(사람·src undo)으로 남아 다시 되돌릴 수 있다. 켜고 끄기처럼 대표·관리자만(_isBoss).
    ⚠ 통장 가져오기(장부)는 묶음이 없어 여기서 되돌리지 못한다 — 장부는 승인 풀기·삭제로. */
 var JL={data:null, at:0, loading:null, range:'week', who:'all', q:'', open:{}, cur:{}};
 var JL_ROOT={f:'funds', s:'sites', y:'site_years', c:'subsidy_chk'};
