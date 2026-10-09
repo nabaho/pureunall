@@ -9753,7 +9753,7 @@ function estabBundle(phase){
     +'<span style="flex:1"></span>'
     +(nHwp&&!f._sample?'<button id="bundleHwpBtn" class="primary" onclick="estabBundleHwp(\''+ph[0]+'\')" style="padding:3px 10px" '
       +'title="한글 틀이 있는 '+nHwp+'종을 원본 모양으로 채워 한 묶음(ZIP)으로 받습니다 — 한글에서 열어 그대로 인쇄">⬇ 한글 원본 전부</button> ':'')
-    +'<button class="primary" onclick="printDoc()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
+    +'<button class="primary" onclick="estabBundlePrint()" style="padding:3px 10px">🖨 전부 인쇄(날인용)</button></div>'
     +'<div id="bundleGap"></div>'
     +'<div id="bundleSum" class="row" style="margin:0 0 6px;gap:5px;flex-wrap:wrap"></div>'
     /* 묶음은 여러 서식이 섞인다 — 서식마다 여백이 달라 «하나의 숫자»로는 못 보여 준다 */
@@ -9772,6 +9772,12 @@ function estabBundle(phase){
   }).then(function(sites){
     /* 빈칸이 «왜» 비는지 먼저 말한다 — 날인은 되돌릴 수 없어서, 찍기 전에 알아야 한다 */
     var gp=$('bundleGap'); if(gp) gp.innerHTML=estabGapHTML(f,sites);
+    S._bundleGate=null;
+    if(!f._sample){ var _gfid=S.formFund, _kinds=docsFor(ph[2](),f.fund_type||'공동');
+      fbDb.ref(NS+'/prov/'+_gfid).once('value').then(function(sn){ var P=sn.val()||{};
+        if(S.formFund!==_gfid) return;
+        S._bundleGate={phase:ph[0], fid:_gfid, P:P, items:_formUnconfMany(_kinds,f,sites,P)};
+      }).catch(function(){}); }
     // 서식마다 A4 한 장 — 화면에서도 낱장으로 보이고 인쇄 시 그대로 페이지가 나뉜다
     var lst=docsFor(ph[2](),f.fund_type||'공동'), tot=0, chips=[];
     var inner=lst.map(function(d,i){
@@ -9910,6 +9916,25 @@ function _formGatePaint(){
   _loadSites(fid,{withClosed:true}).then(function(ss){ FG.fid=fid; FG.sites=ss; FG.at=Date.now(); }).catch(function(){})
     .then(function(){ FG.busy=false; if(S.formFund===fid) paint(); });
 }
+/* [🖨 전부 인쇄(날인용)] — 한글 묶음과 같은 관문(대표 「연속해서해라」 2026-10-09 — 목업 5 에서 남은 것).
+   미확인 목록은 묶음을 그릴 때 미리 모아 두었다(S._bundleGate) — 여기서 기다리면 인쇄 창이 팝업으로 막힌다. */
+function estabBundlePrint(){
+  var f=curForm(), G=S._bundleGate;
+  if(!f||f._sample||!G||G.fid!==S.formFund||!G.items.length) return printDoc();
+  var its=G.items;
+  S._gate={phase:G.phase, fid:G.fid, items:its, P:G.P, after:'print'};
+  var rows=its.slice(0,40).map(function(it){
+    return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b>'+esc(_rvValText(it.val))+'</b> '+(it.est?'🧮':'🤖')
+      +' <span class="muted" style="font-size:11px">— '+esc(it.forms.join(' · '))+'</span></div>';
+  }).join('')+(its.length>40?'<div class="muted" style="font-size:11.5px;padding-top:4px">외 '+(its.length-40)+'칸 — 확인함에서 모두 볼 수 있습니다</div>':'');
+  showModal('<h3 style="margin:0 0 4px">날인용으로 인쇄하기 전에 — 확인 안 된 값 '+its.length+'칸</h3>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 인쇄하고, 아직이면 「초안」 표시로 인쇄하세요.</div>'
+    +'<div style="max-height:46vh;overflow:auto">'+rows+'</div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px;flex-wrap:wrap">'
+    +'<button onclick="closeM()">취소</button>'
+    +'<button onclick="closeM();printDoc({draft:'+its.length+'})" title="장마다 가운데 흐린 「초안 · 미확인 '+its.length+'」 — 제출본이 아닙니다">「초안」 표시 넣어 인쇄</button>'
+    +'<button class="primary" onclick="formGateOk()" title="값은 그대로, 확인 표시만 붙이고 깨끗하게 인쇄합니다">'+its.length+'칸 확인하고 인쇄 ▸</button></div>',{width:620});
+}
 /* [⬇ 한글 원본 전부] — 묶기 전에 관문을 지난다 */
 function estabBundleHwp(phase){
   var f=curForm(); if(!f||f._sample){ toast('기금을 먼저 고르세요','warn'); return; }
@@ -9919,7 +9944,7 @@ function estabBundleHwp(phase){
   Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; })]).then(function(r){
     var its=_formUnconfMany(plan.use.map(function(u){ return u.d; }),f,r[0],r[1]);
     if(!its.length) return _estabBundleHwpGo(phase,0);
-    S._gate={phase:phase, fid:fid, items:its};
+    S._gate={phase:phase, fid:fid, items:its, P:r[1]};
     var rows=its.slice(0,40).map(function(it){
       return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b>'+esc(_rvValText(it.val))+'</b> '+(it.est?'🧮':'🤖')
         +' <span class="muted" style="font-size:11px">— '+esc(it.forms.join(' · '))+(it.forms.length>1?' (같은 값 — 한 번 확인하면 모두)':'')+'</span></div>';
@@ -9936,19 +9961,23 @@ function estabBundleHwp(phase){
 /* [N칸 확인하고 받기] — 확인함의 「맞음」과 같은 자리에 쓴다(칸 값=prov/…/ok · 추정 출연금=기본 출연금으로 확정) */
 function formGateOk(){
   var G=S._gate; if(!G) return;
-  var up={}, cells=[], at=_nowStamp(), by=(S.user||''), nP=0, nE=0;
+  var pw=G.after==='print'?window.open('','_blank'):null;   // 누른 그 순간 연다 — 저장을 기다린 뒤 열면 팝업으로 막힌다
+  if(G.after==='print'&&!pw){ toast('팝업이 차단되었습니다','err'); return; }
+  var up={}, cells=[], at=_nowStamp(), by=(S.user||''), nP=0, nE=0, ev=[];
   G.items.forEach(function(it){
     if(it.est){ up['sites/'+G.fid+'/'+it.sid+'/contrib']=it.v; cells.push({path:'sites/'+G.fid+'/'+it.sid+'/contrib', a:it.v, m:1, src:'calc:rate', how:'list'}); nE++; }
-    else { up['prov/'+G.fid+'/'+it.key+'/ok']={by:by,at:at}; nP++; }
+    else { up['prov/'+G.fid+'/'+it.key+'/ok']={by:by,at:at}; nP++;
+      var _p=(G.P||{})[it.key]; if(_p&&typeof _trProvRk==='function') ev.push({rk:_trProvRk(_p.src,it.key), o:1, f:G.fid, r:it.key}); }
   });
   fbDb.ref(NS).update(up).then(function(){
     if(cells.length&&typeof _track==='function') _track(cells,{what:'추정 출연금 확정(서식 관문)', ok:true});
     _audit(G.fid,'서식 관문 확인',(nP?'칸 '+nP:'')+(nP&&nE?' · ':'')+(nE?'출연금 '+nE+'곳':''));
     if(nE) S.sitesFor=null;
     if(typeof RV!=='undefined') RV.at=0;
+    if(typeof _trEv==='function') _trEv(ev);   // 🛡 서식 관문에서 «맞음»도 규칙마다 센다
     FG.at=0; closeM();
-    _estabBundleHwpGo(G.phase,0);
-  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+    if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else _estabBundleHwpGo(G.phase,0);
+  }).catch(function(e){ try{ if(pw) pw.close(); }catch(x){} toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 /* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색(팔레트 #CBD5E1). 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
    한글로 정관 9쪽·인가신청서 2쪽을 열어 모든 쪽에 찍히고 줄 위치가 원본과 같은 것을 확인했다(2026-10-05).
@@ -10033,8 +10062,9 @@ function _docToHwpxRun(kind){
      통째로 그린 뒤 padding 으로 여백을 낸다(화면판과 같은 구조) — 예전에 여기서
      «화면처럼 보이게» 따로 덧입히던 @media screen 겹침이 이제 필요 없다. dgDocCss()
      의 기본 .a4 규칙이 이미 그 모양이라, 미리보기 창의 화면 표시도 그대로 맞다. */
-function printDoc(){ var ed=$('doced'); if(!ed)return;
-  var w=window.open('','_blank'); if(!w){ toast('팝업이 차단되었습니다','err'); return; }
+/* opts.w 미리 연 창(저장을 기다린 뒤 채울 때 — 그때 열면 팝업이 막힌다) · opts.draft N 이면 장마다 흐린 「초안 · 미확인 N」 */
+function printDoc(opts){ opts=opts||{}; var ed=$('doced'); if(!ed){ try{ if(opts.w) opts.w.close(); }catch(e){} return; }
+  var w=opts.w||window.open('','_blank'); if(!w){ toast('팝업이 차단되었습니다','err'); return; }
   var body=sanitizeDocHTML(ed.innerHTML);
   /* ⚠ 「a4」를 «낱말»로 찾는다. 종전에는 class="a4" 딱 그 모양만 찾았는데, 장마다
        서식 이름표가 붙어 class="a4 dk-charter" 가 되면서 못 찾고 «한 겹 더» 감쌌다.
@@ -10043,6 +10073,8 @@ function printDoc(){ var ed=$('doced'); if(!ed)return;
   w.document.write('<!doctype html><meta charset=utf-8><title>서식 인쇄</title><style>'+dgDocCss()
     +'.a4{box-shadow:none;border:0;background:#fff}.a4of{display:none}'   // 화면용 넘침배지는 인쇄 제외
     +'@media screen{body{background:#f8fafc;padding:16px}}'   // 미리보기 창의 바탕만 — .a4 는 이미 용지 그대로다
+    /* 「초안」 — 한글 묶음(_hwpDraftMarkXml)과 같은 글·같은 색(팔레트 #CBD5E1), 글 뒤에 */
+    +(opts.draft?'.a4{position:relative;z-index:0}.a4::before{content:"초안 · 미확인 '+(+opts.draft||0)+'";position:absolute;left:0;right:0;top:42%;text-align:center;font-size:54px;font-weight:800;color:#CBD5E1;transform:rotate(-28deg);z-index:-1;pointer-events:none}':'')
     +'</style>'+body);
   w.document.close(); setTimeout(function(){ w.print(); },400); }
 
