@@ -211,6 +211,30 @@ test('★★★ 되돌리기는 «저절로 넣은 줄»만 뺀다 — 사람이
   assert.ok(sets.some((s) => /mailAutoFill\/k1\/undone=/.test(s)));
 });
 
+test('★★★ 「업체에 잇기」로 넣은 줄(how:link → addedFrom:mail-new)도 되돌리면 실제로 빠진다', async () => {
+  /* 2026-10-09 — 예전엔 mail-auto 만 봐서, 잘못 이은 담당자를 되돌려도 아무것도 안 빠지고 표만 남았다 */
+  const c = box({ log: { k1: { em: 'lee@dara-ops.example', co: 'co1', coName: '가나상사', added: true, how: 'link' } } });
+  const company = { id: 'co1', name: '가나상사', primaryContactEmail: 'lee@dara-ops.example', primaryContactName: '이운영',
+    contacts: [{ email: 'lee@dara-ops.example', addedFrom: 'mail-new', isPrimary: true }, { email: 'boss@gana.example' }] };
+  const sets = [];
+  const fake = coFake([company]);
+  const fdb = fake.database();
+  c.window = { PuCompanyWrite: fake.PuCompanyWrite };
+  c.firebase = { auth: () => ({ currentUser: { email: 'me@pureun.kr' } }), database: () => ({
+    ref: (p) => (/^data\/companies/.test(String(p)) ? fdb.ref(p)
+      : { once: async () => ({ val: () => null }), set: async (v) => { sets.push(p + '=' + v); }, update: async () => {} }) }) };
+  c.mbWhoBust = () => {}; c.mbCardsRevBump = () => {};
+  vm.runInContext('ErpMatch.load = function(){};', c);
+  vm.runInContext(sliceFn(app, 'async function erpCoPatchMany('), c);
+  await c.mnewUndo('k1');
+  const up = fake.writes[0];
+  assert.ok(up, '★★★ 「업체에 잇기」로 넣은 줄을 되돌려도 아무것도 안 씁니다');
+  const merged = up['data/companies/v/co1'];
+  assert.ok(!merged.contacts.some((x) => x.email === 'lee@dara-ops.example'), '★★★ 이은 줄이 그대로 남습니다');
+  assert.ok(merged.contacts.some((x) => x.email === 'boss@gana.example'), '★★★ 남의 줄까지 뺍니다');
+  assert.equal(merged.primaryContactEmail, '', '★★ 대표 담당자 칸에 뺀 주소가 남습니다');
+});
+
 test('★★★ 이름으로는 저절로 안 잇는다 — 잇기는 사람이 누르고 업체 열쇠(id)로만', () => {
   const auto = strip(sliceFn(app, 'async function mnewAutoFill('));
   assert.match(auto, /r\.kind === 'dom'/, '★★★ 도메인 말고(이름 짐작까지) 저절로 잇습니다');
