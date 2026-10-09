@@ -274,3 +274,17 @@ test('★★ 운영상황보고서 검산(책 대조 D8) — ⑳ = 재무상태�
   assert.equal(c.length, 1); assert.equal(c[0].lv, 'warn'); assert.match(c[0].d, /㉟ 재원 합계/);
   assert.match(SRC, /var ck=f15Checks\(R\)/, '운영상황보고서 화면에 붙어 있다');
 });
+
+test('★ 기부금영수증(책 대조 D11) — 회사 출연은 손비(시행령 제19조제22호)라 짚지 않고, 사업주 외 출연만 짚는다(정부·지자체 지원금 제외)', () => {
+  const box = {};
+  new Function([grabFn('num'), grabDecl('GOV_FUND_RE'), grabFn('f15DonationOf'), 'this.d=f15DonationOf;'].join('\n')).call(box);
+  assert.equal(box.d([
+    { kind: 'employer', dir: '증가', amount: 50000000, memo: '회사 출연' },
+    { kind: 'other', dir: '증가', amount: 3000000, memo: '근로복지공단 지원금' },
+    { kind: 'other', dir: '증가', amount: 700000, memo: '제휴카드 적립금 출연' },
+    { kind: 'other', dir: '감소', amount: 100000, memo: '반환' },
+  ]), 700000);
+  assert.equal(box.d([]), 0);
+  assert.match(SRC, /var don=f15DonationOf\(R\.bfList\)/, '운영상황보고서 화면 ⑮ 아래');
+  assert.match(SRC, /'close\.donation':\{[^}]*제19조제22호[\s\S]*?제112조의2[\s\S]*?제75조의4/, 'ⓘ 근거');
+});
