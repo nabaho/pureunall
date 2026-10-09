@@ -199,7 +199,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
 <script src="js/pu-co-mismatch.js?v=3"></script>
-<script src="js/pu-cms-auto.js?v=1"></script>
+<script src="js/pu-cms-auto.js?v=2"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
@@ -7196,6 +7196,34 @@ function erpMarkBankRowProcessed(row, kind, targetLabel){
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
 }
 
+// 여러 줄을 한 번에 '처리됨'으로 — 저장은 «한 번»(dbSet 한 번). 🤖 CMS 자동 처리용 (2026-10-09)
+//   list: [{row, label, incomeId?}] · 모양은 erpMarkBankRowProcessed 와 같고 incomeId 만 더 붙는다(이미 가져간 입금 표시)
+function erpMarkBankRowsProcessed(list){
+  try {
+    if(!list || !list.length) return 0;
+    var st = erpBankProcessedStore(), n = 0, now = new Date().toISOString();
+    var by = ((typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.sid||'') : '');
+    list.forEach(function(m){
+      var row = m && m.row; var k = row ? erpBankRowKey(row) : '';
+      if(!k) return;
+      var e = { at:now, kind:'income',
+                target:String(m.label===null||m.label===undefined?'':m.label).slice(0,120), by:by,
+                date:String(row.date || '').slice(0,10),
+                amount:parseInt(row.amount, 10) || 0,
+                memo:String(row.memo || row.note || '').slice(0,60) };
+      if(m.incomeId) e.incomeId = String(m.incomeId);
+      st[k] = e; n++;
+    });
+    if(!n) return 0;
+    var keys = Object.keys(st);
+    if(keys.length > BANK_PROCESSED_MAX){
+      keys.sort(function(a,b){ return String((st[a]&&st[a].at)||'').localeCompare(String((st[b]&&st[b].at)||'')); });
+      keys.slice(0, keys.length - BANK_PROCESSED_MAX).forEach(function(x){ delete st[x]; });
+    }
+    return dbSet(BANK_PROCESSED_KEY, st) === false ? 0 : n;
+  } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return 0; }
+}
+
 // 이미 처리된 행이면 그 기록을 반환 (아니면 null) — 행 수가 많으면 store를 한 번 받아 직접 조회
 function erpIsBankRowProcessed(row){
   try {
@@ -8563,6 +8591,7 @@ window.erpFindFeeSubset = erpFindFeeSubset;
 window.erpBankRowKey = erpBankRowKey;
 window.erpBankProcessedStore = erpBankProcessedStore;
 window.erpMarkBankRowProcessed = erpMarkBankRowProcessed;
+window.erpMarkBankRowsProcessed = erpMarkBankRowsProcessed;
 window.erpIsBankRowProcessed = erpIsBankRowProcessed;
 window.erpForgetBankRow = erpForgetBankRow;
 window.erpClearBankProcessed = erpClearBankProcessed;
@@ -47599,7 +47628,7 @@ window.CMS_LEDGER_KEY = CMS_LEDGER_KEY;
    · scripts/thebill-pull.js 가 data/cms_pull 에 더한 더빌 줄을 cms_ledger 에 합치고 판정한다.
    · 쓰기는 «관리자 + 스위치(app_settings.cmsAutoConfirm) 켜짐 + opts.write» 일 때만.
      꺼져 있으면 같은 판정을 «미리보기»로만 둔다.
-   · 입금은 erpUpsertIncome 문으로만. 통장 줄은 erpMarkBankRowProcessed 로 «처리됨»만 —
+   · 입금은 erpUpsertIncome 문으로만. 통장 줄은 erpMarkBankRowsProcessed 로(한 번에 저장) «처리됨»만 —
      더빌 합계 줄을 입금으로 또 만들면 2026-01·02 의 겹침 43건이 된다. */
 function erpCmsAutoRun(opts){
   opts = opts || {};
@@ -47611,33 +47640,30 @@ function erpCmsAutoRun(opts){
     var st = dbGet('app_settings', {}) || {};
     var on = st.cmsAutoConfirm === true;
     var canWrite = on && !!opts.write;
+    /* 자동 시작일 — 스위치를 켠 날(app_settings.cmsAutoSince). 그 앞 줄은 미리보기만(old) */
+    var since = String(st.cmsAutoSince || '');
     // 스위치가 꺼져 있으면 cms_ledger 에도 쓰지 않는다 — 받은 줄과 저장분을 «메모리에서만» 합친다
     var led = erpCmsLedgerGet();
-    var have = {}, rows = [];
+    var have = {}, rows = [], ledgerHas = {};
+    ((led && led.rows) || []).forEach(function(r){ if(r && r._k) ledgerHas[r._k] = 1; });
     pulled.concat((led && led.rows) || []).forEach(function(r){ if(r && r._k && !have[r._k]){ have[r._k] = 1; rows.push(r); } });
-    if(canWrite && pulled.length) erpCmsLedgerSave('더빌 자동 받기', new Date().toISOString(), pulled);
+    // 새로 받은 줄이 있을 때만 cms_ledger 를 저장한다 — 30분마다 통째로 다시 쓰지 않게
+    var fresh = pulled.filter(function(r){ return r && r._k && !ledgerHas[r._k]; });
+    if(canWrite && fresh.length) erpCmsLedgerSave('더빌 자동 받기', new Date().toISOString(), fresh);
     var incomes = dbGet('finance_income', []) || [];
     var skipSrv = pull.skip || {}, skip = {};
-    rows.forEach(function(r){ if(skipSrv[String(r._k).replace(/[.#$\[\]\/]/g, '_')]) skip[r._k] = true; });
+    rows.forEach(function(r){ if(skipSrv[PuCmsAuto.safeKey(r._k)]) skip[r._k] = true; });
     var items = PuCmsAuto.judgeRows(rows, {
       companies: dbGet('companies', []) || [], incomes: incomes,
-      isLocked: function(ym){ return isIncomeLocked(ym); }, skip: skip });
+      isLocked: function(ym){ return isIncomeLocked(ym); }, skip: skip,
+      since: since, preview: !canWrite,
+      normName: function(s){ return erpNormName(s); } });
     items.forEach(function(it){
       if(it.verdict === 'done' && !it.incomeId){
         var f = incomes.find(function(x){ return x && x.cmsKey === it.row._k && !x._deleted; });
         if(f) it.incomeId = f.id;
       }
     });
-    var store = erpBankProcessedStore(), bank = [];
-    (dbGet('ledger_batches', []) || []).forEach(function(b){
-      if(!b || b._deleted === true) return;
-      (b.rows || []).forEach(function(r){
-        // 줄에 src 가 없으면 묶음의 src 를 따른다 — 둘 다 없으면 통장으로 본다(카드만 뺀다)
-        if(r && r.type === 'income' && (r.src || b.src || 'bank') !== 'card' && !store[erpBankRowKey(r)]) bank.push(r);
-      });
-    });
-    var marks = PuCmsAuto.bankLinesToMark(bank, { cmsRows: rows, incomes: incomes,
-      normName: function(s){ return erpNormName(erpCleanMemo(s)); } });
     var wrote = 0;
     if(canWrite){
       var users = getActiveUsers();
@@ -47648,12 +47674,36 @@ function erpCmsAutoRun(opts){
         rec.managerName = u ? u.name : '';
         if(erpUpsertIncome(rec) !== false){ wrote++; it.verdict = 'done'; it.incomeId = rec.id; }
       });
-      marks.forEach(function(m){
-        erpMarkBankRowProcessed(m.row, 'income', m.why === 'cms_sum'
-          ? ('더빌 CMS 명세 ' + m.day + ' 합계로 처리 (자동)') : ('이미 입금관리에 있음 (자동)'));
-      });
     }
-    var res = { items: items, marks: marks, wrote: wrote, preview: !on, status: pull.status || {}, at: Date.now() };
+    /* 통장 줄 — 입금관리에 들어간 더빌 줄(done·recorded, 미리보기면 auto 까지)만 «들어간 것»으로 친다 */
+    var recordedKeys = {};
+    items.forEach(function(it){
+      if(it.verdict === 'done' || it.verdict === 'recorded' || (!canWrite && it.verdict === 'auto')) recordedKeys[it.row._k] = true;
+    });
+    var store = erpBankProcessedStore(), bank = [], processedIncomeIds = {};
+    Object.keys(store).forEach(function(k){ var e = store[k]; if(e && e.incomeId) processedIncomeIds[e.incomeId] = true; });
+    /* 훑는 범위 — 시작일 7일 앞부터(없으면 최근 45일). 몇 년 치 통장을 매번 훑지 않는다 */
+    var kst = function(t){ return new Date(t + 9 * 3600e3).toISOString().slice(0, 10); };
+    var fromDay = since ? kst(Date.parse(since + 'T00:00:00+09:00') - 7 * 864e5) : kst(Date.now() - 45 * 864e5);
+    (dbGet('ledger_batches', []) || []).forEach(function(b){
+      if(!b || b._deleted === true) return;
+      (b.rows || []).forEach(function(r){
+        // 줄에 src 가 없으면 묶음의 src 를 따른다 — 둘 다 없으면 통장으로 본다(카드만 뺀다)
+        if(r && r.type === 'income' && (r.src || b.src || 'bank') !== 'card' && String(r.date || '').slice(0, 10) >= fromDay
+          && !store[erpBankRowKey(r)]) bank.push(r);
+      });
+    });
+    var marks = PuCmsAuto.bankLinesToMark(bank, { cmsRows: rows, incomes: incomes,
+      recordedKeys: recordedKeys, processedIncomeIds: processedIncomeIds,
+      normName: function(s){ return erpNormName(erpCleanMemo(s)); } });
+    if(canWrite && marks.length){
+      /* 한 번에 한 번만 저장 — 줄마다 bank_processed 통째를 다시 쓰지 않는다 */
+      erpMarkBankRowsProcessed(marks.map(function(m){
+        return { row: m.row, incomeId: m.incomeId || '', label: m.why === 'cms_sum'
+          ? ('더빌 CMS 명세 ' + m.day + ' 합계로 처리 (자동)') : ('이미 입금관리에 있음 (자동)') };
+      }));
+    }
+    var res = { items: items, marks: marks, wrote: wrote, preview: !on, since: since, status: pull.status || {}, at: Date.now() };
     window.__erpCmsAutoLast = res;
     try { window.dispatchEvent(new Event('erp-cms-auto')); } catch(_e){}
     return res;
@@ -47690,7 +47740,7 @@ function erpCmsUndo(incomeId, key){
     return false;
   };
   if(typeof fbDb === 'undefined' || !fbDb) return Promise.resolve(warn(null));
-  var sk = String(key).replace(/[.#$\[\]\/]/g, '_');
+  var sk = PuCmsAuto.safeKey(key);
   /* 서버 skip 에 적힌 것을 확인한 뒤에야 성공으로 친다 */
   return fbDb.ref('data/cms_pull/skip/' + sk).set(true).then(function(){ return true; }).catch(warn);
 }
@@ -67562,13 +67612,23 @@ function FinanceAuto(props){
     return function(){ window.removeEventListener('erp-cms-auto', on); };
   }, []);
   if(!isAdm) return h('div', { style:{ padding:'24px', color:'#64748b' } }, '관리자만 볼 수 있습니다.');
-  function setOn(v){ var cur = dbGet('app_settings', {}) || {}; dbSet('app_settings', Object.assign({}, cur, { cmsAutoConfirm: !!v })); onS[1](!!v); if(v) erpCmsAutoRun({ write:true }); }
+  /* 켤 때 «자동 시작일»(한국 날짜)을 함께 적는다 — 이미 있으면 그대로. 그 앞 줄은 자동 확정하지 않는다 */
+  function setOn(v){
+    var cur = dbGet('app_settings', {}) || {};
+    var patch = { cmsAutoConfirm: !!v };
+    if(v && !cur.cmsAutoSince) patch.cmsAutoSince = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+    dbSet('app_settings', Object.assign({}, cur, patch)); onS[1](!!v); if(v) erpCmsAutoRun({ write:true });
+  }
   var items = (last && last.items) || [];
   var CHECK = { new_member:'처음 보는 회원', amount:'금액 다름', dup_month:'그 달 입금 이미 있음', locked:'마감된 달' };
   var check = items.filter(function(x){ return CHECK[x.verdict]; });
   var fails = items.filter(function(x){ return x.verdict === 'fail'; });
   var autos = items.filter(function(x){ return x.verdict === 'auto' || x.verdict === 'done'; });
+  /* 확인할 것에도 자동 확정에도 안 넣는 두 갈래 — 띠에 회색 숫자로만 */
+  var olds = items.filter(function(x){ return x.verdict === 'old'; }).length;
+  var recs = items.filter(function(x){ return x.verdict === 'recorded'; }).length;
   var st = (last && last.status) || {};
+  var noTab = /탭/.test(String(st.error || ''));
   var ix = null;
   var DUAL = '회원코드가 두 업체에 이어져 있음';
   function hint(it){
@@ -67606,15 +67666,20 @@ function FinanceAuto(props){
   return h('div', { style:{ padding:'14px' } },
     h('div', { style:{ display:'flex', gap:'16px', alignItems:'center', flexWrap:'wrap', padding:'9px 12px', borderRadius:'8px',
       background: st.needLogin ? '#fef2f2' : '#eff6ff', border:'1px solid ' + (st.needLogin ? '#fecaca' : '#bfdbfe'), fontWeight:700 } },
-      st.needLogin ? h('span', { style:{ color:'#dc2626' } }, '더빌 로그인이 풀렸습니다 — Aside 에서 로그인해 주세요') : null,
+      st.needLogin ? h('span', { style:{ color:'#dc2626' } }, noTab ? 'Aside 를 켜고 더빌에 로그인해 주세요 (더빌 탭이 없음)' : '더빌 로그인이 풀렸습니다 — Aside 에서 로그인해 주세요') : null,
       h('span', null, '더빌 명세 ' + items.length + '건'),
       h('span', { style:{ color:'#16a34a' } }, '✓ 자동 확정 ' + autos.length),
       h('span', { style:{ color:'#d97706' } }, '● 확인할 것 ' + check.length),
       h('span', { style:{ color:'#dc2626' } }, '✕ 출금 실패 ' + fails.length),
+      recs ? h('span', { style:{ fontWeight:400, color:'#64748b' } }, '이미 들어간 줄 ' + recs) : null,
+      olds ? h('span', { style:{ fontWeight:400, color:'#64748b' } }, '시작일 이전 ' + olds + '줄' + (last && last.since ? ' (' + last.since + ' 부터 자동)' : '')) : null,
       h('span', { style:{ fontWeight:400, color:'#64748b' } }, '마지막으로 읽은 때 ' + (st.lastOkAt ? new Date(st.lastOkAt).toLocaleString('ko-KR') : '없음')),
       h('label', { style:{ marginLeft:'auto', fontWeight:700, color: onS[0] ? '#16a34a' : '#64748b' } },
         h('input', { type:'checkbox', checked:onS[0], onChange:function(e){ setOn(e.target.checked); } }),
         onS[0] ? ' 자동 확정 켜짐' : ' 자동 확정 꺼짐 (미리보기)')),
+    /* R14 — 수수료는 출금 쪽 일이다 */
+    h('div', { style:{ marginTop:'4px', fontSize:'11px', color:'#64748b', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+      'CMS 수수료는 자동으로 안 넣습니다 — 출금관리에서 따로'),
     h('div', { style:{ display:'flex', gap:'4px', marginTop:'12px' } },
       [['check', '● 확인할 것 ' + check.length], ['fail', '✕ 출금 실패 ' + fails.length], ['auto', '✓ 자동 확정 ' + autos.length]].map(function(t){
         return h('button', { key:t[0], onClick:function(){ setFaTab(t[0]); }, style:{ padding:'5px 11px', border:'1px solid #e2e8f0', borderBottom:'none',
@@ -85806,16 +85871,19 @@ function ERPMain(props){
     return function(){ window.removeEventListener('navigate', handler); };
   }, []);
 
-  // 🤖 CMS 자동 처리 — 로그인 뒤 8초 후 한 번, 이후 30분마다 (관리자만 함수 안에서 걸러짐)
+  // 🤖 CMS 자동 처리 — 첫 받기(fb_initial_done)가 끝난 뒤 한 번, 이후 30분마다 (관리자만 함수 안에서 걸러짐)
+  //   ⚠ 첫 받기 전에 돌면 이 기기의 옛 사본(finance_income)으로 판정한다 — 그래서 시계가 아니라 알림을 기다린다
   useEffect(function(){
-    var t0 = null, t1 = null;
+    var t1 = null;
+    function first(){ erpCmsAutoRun({ write:true }); }
     try {
-      t0 = setTimeout(function(){ erpCmsAutoRun({ write:true }); }, 8000);
-      // fbDb 가 아직 안 떴으면 함수가 null 을 돌려준다 — 60초에 한 번 더
-      t1 = setTimeout(function(){ if(!window.__erpCmsAutoLast) erpCmsAutoRun({ write:true }); }, 60000);
+      window.addEventListener('fb_initial_done', first);
+      if(_fbSynced === true) first();
+      // 알림을 못 받았거나 fbDb 가 늦게 떴으면 — 60초에 한 번 더 (한 번도 안 돌았을 때만)
+      t1 = setTimeout(function(){ if(!window.__erpCmsAutoLast && _fbSynced === true) first(); }, 60000);
       if(!window.__erpCmsAutoTimer) window.__erpCmsAutoTimer = setInterval(function(){ erpCmsAutoRun({ write:true }); }, 30 * 60 * 1000);
     } catch(_e){}
-    return function(){ if(t0) clearTimeout(t0); if(t1) clearTimeout(t1); if(window.__erpCmsAutoTimer){ clearInterval(window.__erpCmsAutoTimer); window.__erpCmsAutoTimer = null; } };
+    return function(){ window.removeEventListener('fb_initial_done', first); if(t1) clearTimeout(t1); if(window.__erpCmsAutoTimer){ clearInterval(window.__erpCmsAutoTimer); window.__erpCmsAutoTimer = null; } };
   }, []);
 
   // 키보드 단축키: Alt+1~5(그룹 이동), Ctrl+N(새 등록), Ctrl+S(모달 저장)
