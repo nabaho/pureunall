@@ -226,13 +226,17 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
 <script src="js/pu-whoami.js?v=3"></script>
 <script>
-/* ══ 「준비중」 — 주소를 직접 친 사람도 막는다 (대표 지시 2026-09-23) ══
-   포털의 「준비중」 딱지와 «짝»이다. 포털은 타일을 못 누르게 하고, 여기는
-   주소창에 payroll-os.html 를 직접 친 사람을 막는다. 둘 중 하나만 있으면 뚫린다.
-   ⚠ 잣대는 포털(enter.html appIsSoon)과 «같은 것» — 명부의 role === 'admin'.
-     사번으로 박지 않는다(바뀌는 날 대표님이 잠긴다).
-   ⚠ 역할을 모르는 동안에는 «안 씌운다» — 자세한 까닭은 js/pu-gate.js 의 soonUnlessAdmin. */
-try { PuGate.soonUnlessAdmin('급여관리'); } catch(_){}
+/* ══ 「준비중」 문은 걷었다 (대표 지시 2026-10-09) ══════════════════════════════
+   2026-09-23 부터 관리자 말고는 못 들어오게 막아 두었다. 그런데 공용 기록
+   (payroll-STATUS.md §6)이 「다음 할 일: 담당자 한 명이 이 앱으로 실제 업무를 한 바퀴
+   돌려 본다」라고 적어 둔 채, 정작 **담당자가 열 수조차 없었다.**
+   그래서 열었다 — 포털 타일의 `soon:true` 와 «짝»이라 둘을 함께 뺐다.
+   ⚠★ **문을 연 것이 곧 자료를 연 것은 아니다.** `payroll_os` 는 규칙이 따로 지킨다 —
+     읽기는 **재무(fin)·관리자**뿐이다. 권한 없는 사람은 들어와도 자료가 안 보이고,
+     아래 «못 읽을 때 하는 말»이 그 까닭을 사람 말로 알려 준다.
+   ⚠ 다시 막을 일이 생기면 **두 곳을 함께** 되살려야 한다 — 한 곳만 하면 주소를
+     직접 친 사람에게는 그냥 열린다(그 구멍 때문에 이 문이 생겼다).
+   `tests/app-soon-gate.test.js` ⑨ 가 「열려 있음」을 지킨다. */
 </script>
 <!-- ⚠ mount(false) = 「우리가 이미 그린다」 (대표 지적 2026-08-24 「화면 겹쳐지게 하지 마라」)
      자리를 안 알려 주면 이 부품이 화면 오른쪽 위에 **떠서** 붙는다(position:fixed).
@@ -393,7 +397,22 @@ function afterLogin(){
       cache.inbox=ss.val()||{}; if(ready) render();
     },function(e){ console.warn('[수신함 알림]', e&&e.code); });
   }).catch(function(e){
-    document.getElementById('main').innerHTML='<div class="empty">DB 접근 거부: '+e.code+'<br>규칙에 payroll_os 블록이 있는지, 재무/관리자 권한이 있는지 확인하세요.</div>'; });
+    /* ⚠★ 2026-10-09 — 여기 「DB 접근 거부: permission-denied · 규칙에 payroll_os 블록이
+         있는지 확인하세요」라고 적혀 있었다. 만든 사람에게 하는 말이다.
+         준비중 문을 걷으면서 **급여 담당자들이 이 화면을 보게 됐다** — 그분들에게
+         저 말은 「고장났다」로 읽힌다. 실제로는 고장이 아니라 **권한이 없는 것**이고,
+         할 일은 「대표께 급여관리 권한을 요청하는 것」 하나다.
+       ⚠ 시키는 대로 해도 아무것도 안 달라지는 안내가 가장 나쁘다(js/pu-gate.js 머리말).
+         그래서 «무엇을 하면 되는지»를 적는다. 만든 사람을 위한 코드는 작게 뒤에 둔다. */
+    var 권한없음 = String((e && e.code) || '').indexOf('permission') >= 0;
+    document.getElementById('main').innerHTML = 권한없음
+      ? '<div class="empty"><b>급여 자료를 볼 권한이 없습니다.</b><br><br>'
+        + '급여관리는 <b>재무·급여 권한</b>이 있는 분만 자료가 보입니다.<br>'
+        + '대표께 <b>「급여관리 권한」</b>을 요청해 주세요.<br>'
+        + '<span style="color:#94a3b8;font-size:12px">(권한이 생기면 바로 보입니다 — 다시 설치할 것은 없습니다)</span></div>'
+      : '<div class="empty"><b>급여 자료를 읽지 못했습니다.</b><br><br>'
+        + '잠시 뒤 새로고침해 주세요. 그래도 안 되면 이 말을 전해 주세요 — '
+        + '<span style="color:#94a3b8">' + ((e && e.code) || '알 수 없음') + '</span></div>'; });
 }
 function dbGet(k,fb){ return (cache[k]!=null)?cache[k]:fb; }
 
