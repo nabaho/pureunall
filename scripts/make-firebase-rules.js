@@ -1458,7 +1458,9 @@ rules.pu_docs = {
    ★ 제출(sub)은 한 번만 · 기한 안에만 · 취소되지 않았을 때만 · 휴대폰 끝 4자리가 맞을 때만.
      끝 4자리는 직원만 읽는 req 에 있다 — 규칙은 읽기 권한과 상관없이 견준다(서명자는 그 값을 못 본다).
    ★ 서명자가 본 문서 그림의 지문(docHash)을 제출에 함께 묶는다 — 나중에 그림이 바뀌면 직원 화면이 알린다.
-   ⚠ 주민번호는 1단계에서 받지 않는다(칸을 만들지 않는다). 받는 것은 서명자가 적는 칸 값·서명 그림·동의뿐. */
+   ⚠ 주민번호는 1단계에서 받지 않는다(칸을 만들지 않는다). 받는 것은 서명자가 적는 칸 값·서명 그림·동의뿐.
+   ★ (검토 2026-10-09 대표 「추천대로」) 읽기도 로그인(서명 화면은 익명 로그인)한 사람만. 손서명 방식(mode ≠ agree)은
+     서명 그림이 있어야 제출된다(화면만 막던 것). 🔒 저장·취소·기한 지남 뒤에는 직원 화면이 open/{t} 를 통째로 지운다. */
 rules.pu_sign = {
   req: {
     '.read': LOGIN,
@@ -1470,7 +1472,7 @@ rules.pu_sign = {
     }
   },
   open: { $t: {
-    '.read': true,
+    '.read': 'auth != null',
     '.write': LOGIN,
     /* fields 는 필수가 아니다 — 적을 칸이 없는 문서면 빈 목록이라 남지 않는다 */
     '.validate': "$t.matches(/^[0-9a-f]{32}$/) && newData.hasChildren(['req','exp','pages','docHash','mode','title'])",
@@ -1480,7 +1482,7 @@ rules.pu_sign = {
         + " && newData.child('p4').val() === root.child('pu_sign/req/' + data.parent().child('req').val() + '/p4').val()"
         + " && newData.child('docHash').val() === data.parent().child('docHash').val()",
       /* vals 는 필수가 아니다 — 서명자가 아무 칸도 안 적으면 빈 묶음이라 실시간DB 에 남지 않는다 */
-      '.validate': "newData.hasChildren(['p4','docHash','at','agree'])",
+      '.validate': "newData.hasChildren(['p4','docHash','at','agree']) && (data.parent().child('mode').val() === 'agree' || newData.child('sig').isString())",
       at:    { '.validate': 'newData.val() === now' },
       agree: { '.validate': 'newData.val() === true' },
       sig:   { '.validate': 'newData.isString() && newData.val().length < 300000' },

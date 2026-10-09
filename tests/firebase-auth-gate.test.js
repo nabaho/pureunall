@@ -127,7 +127,8 @@ test('★ 익명으로 열리는 자리는 «정해진 곳»뿐이다 (전자서
      새 자리가 늘면 사람이 봐야 하므로 여기서 걸린다. */
   /* 2026-10-09 대표 「1단계부터 진행해라」 — ✍ 계약서 서명 요청: 받는 사람이 폰(익명)으로 «열어 봄»·«제출» 한 번.
      제출은 한 번만·기한 안·취소 안 됨·휴대폰 끝 4자리 일치·문서 지문 일치일 때만(규칙이 막는다). */
-  const 허락 = ['/ieum_public', '/esign/cases/$caseId/meta', '/pu_sign/open/$t/seen', '/pu_sign/open/$t/sub'];
+  /* 2026-10-09 검토(대표 「추천대로」) — 서명 링크 칸 읽기를 «아무나»에서 «익명 로그인»으로 좁혔다(서명 화면은 익명 로그인 뒤 읽는다) */
+  const 허락 = ['/ieum_public', '/esign/cases/$caseId/meta', '/pu_sign/open/$t', '/pu_sign/open/$t/seen', '/pu_sign/open/$t/sub'];
   const 익명가능 = 모두.filter(function (x) {
     if (x.k === '.validate') return false;
     const v = x.v;
@@ -147,9 +148,8 @@ test('★ 익명으로 열리는 자리는 «정해진 곳»뿐이다 (전자서
 test('로그인도 없이 열리는 자리는 «판번호» 하나뿐이다', function () {
   /* 검사고정-허용: appBuild 는 «새 판이 나왔나»를 로그인 전에 보는 칸이다. */
   const 통째 = 모두.filter(function (x) { return x.k === '.read' && x.v === 'true'; }).map(function (x) { return x.p; });
-  /* 2026-10-09 — pu_sign/open/{열쇠}: 128비트 열쇠를 아는 사람만 그 한 칸을 읽는다(목록 읽기는 막혀 있어 열쇠를 모르면 못 찾는다).
-     서명 링크를 받은 사람이 로그인 없이 계약서를 봐야 하므로 뜻한 것이다 — 열쇠 모양(32자 16진수)도 규칙이 묶는다 */
-  assert.deepEqual(통째, ['/appBuild', '/pu_sign/open/$t'],
+  /* 2026-10-09 — pu_sign/open/{열쇠} 는 한때 여기 있었다(로그인 없이 읽기). 검토 뒤 익명 로그인으로 좁혀 빠졌다 — 위 «익명» 목록에 있다 */
+  assert.deepEqual(통째, ['/appBuild'],
     '로그인 없이 읽히는 자리가 늘었습니다');
 });
 

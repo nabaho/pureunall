@@ -159,8 +159,8 @@ test('★ 로그인하지 않으면 «업무 자료» 는 아무것도 못 읽�
     Object.keys(node).forEach((k) => { if (k[0] !== '.') walk(node[k], (at ? at + '/' : '') + k); });
   })(rules, '');
   /* appBuild 만 일부러 열려 있다 — 로그인 «전» 에 새 판이 나왔는지 보는 칸이다 */
-  /* 2026-10-09 — pu_sign/open/{열쇠}: 서명 링크(128비트 열쇠)를 받은 사람만 그 한 칸을 읽는다. 목록 읽기는 막혀 있다(tests/contract-sign.test.js) */
-  assert.deepEqual(열린곳, ['appBuild', 'pu_sign/open/$t'],
+  /* 2026-10-09 — pu_sign/open/{열쇠} 는 한때 여기 있었다. 검토 뒤 익명 로그인한 사람만 읽게 좁혔다(tests/contract-sign.test.js ⓓ) */
+  assert.deepEqual(열린곳, ['appBuild'],
     '★ 로그인 없이 읽히는 칸이 늘었습니다: ' + 열린곳.join(' · '));
 });
 
