@@ -2941,6 +2941,7 @@ function rvSel(i){ RV.sel=i; renderReview(); }
 function rvReload(){ _rvLoad(true).then(function(){ if(S.view==='review') renderReview(); _rvNavCount(); }).catch(function(e){ toast('읽지 못했습니다: '+((e&&e.message)||e),'err'); }); }
 function renderReview(){
   if(RV.page==='trust'&&typeof renderTrust==='function') return renderTrust();
+  if(RV.page==='journal'&&typeof renderJournal==='function') return renderJournal();
   $('crumb').textContent='확인함';
   var D=RV.data;
   if(!D){ $('app').innerHTML='<div class="panel">'+loadingHTML('기계가 넣은 값을 모으는 중…')+'</div>';
@@ -2971,6 +2972,7 @@ function renderReview(){
     +'<div class="row" style="flex-wrap:wrap;gap:8px;margin:0 0 10px"><h1 style="margin:0">✅ 확인함</h1>'+hlp('review.inbox')
     +'<span class="muted" style="font-size:12px">기계가 넣고 아직 원본과 대조하지 않은 것</span><span style="flex:1"></span>'
     +'<label style="font-size:12.5px;display:inline-flex;gap:4px;align-items:center"><input type="checkbox"'+(RV.mine?' checked':'')+' onchange="rvToggleMine()"> 내 기금만</label>'
+    +'<button onclick="rvPage(\'journal\')" title="기계·사람이 언제 무엇을 했는지 · 묶음째 되돌리기">📜 작업 일지</button>'
     +'<button onclick="rvPage(\'trust\')" title="규칙마다 맞힌 기록 · 어디까지 기계에 맡길지">🛡 자동 규칙</button>'
     +'<button onclick="rvReload()" title="서버에서 다시 모으기">↻ 다시 모으기</button></div>'
     +(D.fail?'<div class="msg warn" style="font-size:12px;margin:0 0 8px">일부 자료를 읽지 못했습니다 — 목록이 덜 찼을 수 있습니다. [↻ 다시 모으기]</div>':'')
@@ -3311,7 +3313,174 @@ function trBad(rk){
       return '<tr><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(i+1)+'</td><td style="white-space:nowrap">'+esc(String(e.at||'').slice(5,16))+'</td><td>'+esc(e.by||'?')+'</td><td>'+esc((f.short_name||f.name||e.f||'')+' · '+(e.r||''))+'</td></tr>'; }).join('')
     +'</tbody></table></div><div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="closeM()">닫기</button></div>',{width:640});
 }
-function rvPage(p){ RV.page=p; if(p==='trust') renderTrust(); else renderReview(); }
+function rvPage(p){ RV.page=p; if(p==='trust') renderTrust(); else if(p==='journal') renderJournal(); else renderReview(); }
+/* ══ 📜 작업 일지 · 묶음째 되돌리기 (자동화 확인 목업 7 · 대표 「연속해서해라」 2026-10-09) ══
+   기계·사람이 언제 무엇을 했는지 한 줄씩(모든 기금). 바탕은 둘:
+     audit/{기금}/{순번} = {at,by,what,detail,bid?} — 변경 기록(기금 화면 🕘 와 같은 것)
+     batches/{bid}       = {meta:{at,by,what,src,n}, cells:{기금|칸열쇠:{b 전,a 새}}} — 칸마다 전 값·새 값(_track)
+   · 묶음이 있는 줄만 [펼치기]·[↶ 되돌리기]가 있다. 묶음이 여러 기금에 걸치면 기금마다 한 줄 — 되돌리기도 그 기금 칸만.
+   · 되돌리기는 «지금 값이 그 묶음이 넣은 값 그대로인 칸»만 전 값으로 돌린다. 그 뒤 바뀐 칸은 건드리지 않는다.
+     사람이 이미 ✓ 확인한 칸은 따로 묻는다(빼고 되돌리기가 기본).
+   · 되돌린 것도 _track(사람·src undo)으로 남아 다시 되돌릴 수 있다. 켜고 끄기처럼 대표·관리자만(_isBoss).
+   ⚠ 통장 가져오기(장부)는 묶음이 없어 여기서 되돌리지 못한다 — 장부는 승인 풀기·삭제로. */
+var JL={data:null, at:0, loading:null, range:'week', who:'all', q:'', open:{}, cur:{}};
+var JL_ROOT={f:'funds', s:'sites', y:'site_years', c:'subsidy_chk'};
+function _jlLoad(force){
+  if(JL.loading) return JL.loading;
+  if(!force&&JL.data&&Date.now()-JL.at<60000) return Promise.resolve(JL.data);
+  var get=function(p){ return fbDb.ref(NS+'/'+p).once('value').then(function(sn){ return sn.val()||{}; }); };
+  JL.loading=Promise.all([get('audit'),get('batches')]).then(function(r){
+    JL.loading=null; JL.at=Date.now(); JL.data={audit:r[0], batches:r[1]}; return JL.data;
+  },function(e){ JL.loading=null; throw e; });
+  return JL.loading;
+}
+/* 묶음 칸 열쇠(기금|f|칸…) → 자료 경로 */
+function _jlPath(ck){
+  var p=String(ck||'').split('|'), root=JL_ROOT[p[1]];
+  if(!root||!p[0]||p.length<3) return null;
+  return {fid:p[0], key:p.slice(1).join('|'), path:root+'/'+p[0]+'/'+p.slice(2).join('/')};
+}
+function _jlSame(a,b){
+  var n=function(v){ return (v==null||v==='')?'':(typeof v==='object'?JSON.stringify(v):String(v)); };
+  return n(a)===n(b);
+}
+function _jlMachine(meta,what,by){ return !!(meta&&meta.src&&meta.src!=='hand')||/Claude|가져오기|자동/.test(String(what||'')+' '+String(by||'')); }
+/* 줄을 모은다 — 자료만 본다. now 는 'YYYY-MM-DD HH:MM:SS' */
+function _jlRows(D,o,now){
+  o=o||{}; D=D||{};
+  var A=D.audit||{}, B=D.batches||{}, out=[], seen={};
+  Object.keys(A).forEach(function(fid){ var L=A[fid]||{};
+    Object.keys(L).forEach(function(k){ var e=L[k]||{}, b=e.bid&&B[e.bid];
+      if(e.bid) seen[e.bid+'|'+fid]=1;
+      out.push({at:String(e.at||''), by:String(e.by||''), fid:fid, what:String(e.what||''), detail:String(e.detail||''), bid:b?e.bid:'', m:_jlMachine(b&&b.meta,e.what,e.by)});
+    });
+  });
+  /* 변경 기록 없이 남은 묶음(audit:false) — 기금마다 한 줄 */
+  Object.keys(B).forEach(function(bid){ var b=B[bid]||{}, m=b.meta||{}, per={};
+    Object.keys(b.cells||{}).forEach(function(ck){ var f=String(ck).split('|')[0]; per[f]=(per[f]||0)+1; });
+    Object.keys(per).forEach(function(fid){ if(seen[bid+'|'+fid]) return;
+      out.push({at:String(m.at||''), by:String(m.by||''), fid:fid, what:String(m.what||''), detail:per[fid]+'칸', bid:bid, m:_jlMachine(m,m.what,m.by)}); });
+  });
+  var since='';
+  if(o.range==='today') since=String(now||'').slice(0,10);
+  else if(o.range==='week'){ var d=new Date(String(now||'').slice(0,10)+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-6); since=d.toISOString().slice(0,10); }
+  var q=String(o.q||'').trim();
+  return out.filter(function(r){
+    if(since&&r.at<since) return false;
+    if(o.who==='m'&&!r.m) return false;
+    if(o.who==='h'&&r.m) return false;
+    if(q){ var f=(typeof funds!=='undefined'&&funds[r.fid])||{}; if((r.what+' '+r.detail+' '+r.by+' '+(f.short_name||'')+' '+(f.name||'')+' '+r.fid).indexOf(q)<0) return false; }
+    return true;
+  }).sort(function(a,b){ return b.at.localeCompare(a.at); });
+}
+/* 그 묶음의 그 기금 칸들 — 전·후·지금 값과 상태 */
+function _jlCells(bid,fid){
+  var b=((JL.data||{}).batches||{})[bid]||{}, C=b.cells||{};
+  return Object.keys(C).filter(function(ck){ return String(ck).split('|')[0]===fid; }).map(function(ck){
+    var c=C[ck]||{}, P=_jlPath(ck); return {ck:ck, P:P, b:c.b, a:c.a, x:!!c.x};
+  }).filter(function(c){ return c.P&&!c.x; });
+}
+/* 지금 값을 읽는다(칸 하나씩 — 묶음은 많아야 수십 칸) + 그 칸 출처(사람이 ✓ 했는지) */
+function _jlReadNow(cells){
+  return Promise.all(cells.map(function(c){
+    return Promise.all([fbDb.ref(NS+'/'+c.P.path).once('value'),fbDb.ref(NS+'/prov/'+c.P.fid+'/'+c.P.key).once('value')])
+      .then(function(r){ return {v:r[0].val(), p:r[1].val()}; },function(){ return {v:undefined, p:null}; });
+  }));
+}
+function _jlState(c,now){
+  if(!now||now.v===undefined) return 'unk';
+  if(!_jlSame(now.v,c.a)) return 'moved';
+  if(now.p&&now.p.ok&&!now.p.ok.rule) return 'okd';
+  return 'back';
+}
+function renderJournal(){
+  $('crumb').textContent='확인함 · 작업 일지';
+  if(!JL.data){ $('app').innerHTML='<div class="panel">'+loadingHTML('일지를 모으는 중…')+'</div>';
+    _jlLoad().then(function(){ if(S.view==='review'&&RV.page==='journal') renderJournal(); })
+      .catch(function(e){ $('app').innerHTML='<div class="panel"><div class="msg err">읽지 못했습니다: '+esc((e&&e.message)||e)+'</div></div>'; });
+    return; }
+  var rows=_jlRows(JL.data,{range:JL.range, who:JL.who, q:JL.q},_nowStamp()); JL.rows=rows;
+  var seg=function(k,v,lab){ var on=JL[k]===v; return '<button onclick="JL.'+k+'=\''+v+'\';JL.open={};renderJournal()" style="padding:4px 11px;border-radius:14px'+(on?';background:var(--acc2);color:#fff;border-color:var(--acc2)':'')+'">'+lab+'</button>'; };
+  var ST={back:['되돌릴 수 있음','ok'], moved:['그 뒤 바뀜 — 안 건드림','warn'], okd:['사람이 ✓ 확인함','warn'], unk:['읽는 중','']};
+  var body=rows.slice(0,300).map(function(r,i){
+    var f=funds[r.fid]||{}, op=JL.open[i];
+    var tr='<tr'+(op?' style="background:var(--acc-soft)"':'')+'><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap">'+esc(r.at.slice(5,16))+'</td><td style="white-space:nowrap">'+(r.m?'🤖 ':'✎ ')+esc(r.by||'?')+'</td>'
+      +'<td style="white-space:nowrap"><b>'+esc(f.short_name||f.name||r.fid)+'</b></td><td>'+esc(r.what)+'</td><td class="muted" style="font-size:11.5px">'+esc(r.detail)+'</td>'
+      +'<td style="white-space:nowrap">'+(r.bid?'<button onclick="jlToggle('+i+')" style="padding:2px 9px">'+(op?'접기':'펼치기')+'</button>':'')+'</td></tr>';
+    if(!op) return tr;
+    var cells=_jlCells(r.bid,r.fid), now=JL.cur[r.bid+'|'+r.fid]||[];
+    var nBack=0;
+    var inner=cells.map(function(c,j){ var st=_jlState(c,now[j]); if(st==='back'||st==='okd') nBack++; var s=ST[st];
+      return '<tr><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(j+1)+'</td>'
+        +'<td>'+esc(_jlCellLabel(c.P))+'</td><td class="muted">'+esc(_rvValText(c.b))+'</td><td>'+esc(_rvValText(c.a))+'</td>'
+        +'<td>'+(now[j]&&now[j].v!==undefined?esc(_rvValText(now[j].v)):'…')+'</td><td><span class="chip '+s[1]+'" style="font-size:10px">'+s[0]+'</span></td></tr>'; }).join('');
+    return tr+'<tr><td></td><td colspan="7" style="padding:6px 0 12px"><div style="overflow-x:auto;border:1px solid var(--line);border-radius:8px"><table>'
+      +'<thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>칸</th><th>전</th><th>이 묶음이 넣은 값</th><th>지금</th><th>상태</th></tr></thead><tbody>'+inner+'</tbody></table></div>'
+      +'<div class="row" style="justify-content:flex-end;gap:6px;margin-top:6px">'
+      +(_isBoss()?'<button onclick="jlUndo('+i+')"'+(nBack?'':' disabled')+' style="color:var(--danger)" title="지금도 이 묶음 값 그대로인 칸만 전 값으로">↶ 이 묶음 되돌리기'+(nBack?' ('+nBack+'칸)':'')+'</button>':'<span class="muted" style="font-size:11.5px">되돌리기는 대표·관리자만</span>')
+      +'</div></td></tr>';
+  }).join('');
+  $('app').innerHTML='<div class="panel">'
+    +'<div class="row" style="flex-wrap:wrap;gap:8px;margin:0 0 10px"><button onclick="rvPage(\'\')" style="padding:4px 10px">← 확인함</button>'
+    +'<h1 style="margin:0">📜 작업 일지</h1>'+hlp('journal.log')
+    +seg('range','today','오늘')+seg('range','week','이번 주')+seg('range','all','전체')
+    +'<span style="width:8px"></span>'+seg('who','all','모두')+seg('who','m','🤖 기계')+seg('who','h','✎ 사람')
+    +'<span style="flex:1"></span><input id="jlQ" placeholder="기금·무엇 찾기" value="'+esc(JL.q)+'" onkeydown="if(event.key===\'Enter\'&&!event.isComposing){JL.q=this.value;JL.open={};renderJournal();}" style="width:160px">'
+    +'<button onclick="JL.at=0;JL.data=null;JL.cur={};JL.open={};renderJournal()" title="서버에서 다시 읽기">↻</button></div>'
+    +(rows.length?'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table>'
+      +'<thead><tr><th style="width:34px">□</th><th style="width:40px">#</th><th>시각</th><th>누가</th><th>기금</th><th>무엇을</th><th>결과</th><th></th></tr></thead>'
+      +'<tbody>'+body+'</tbody></table></div>'+(rows.length>300?'<div class="muted" style="font-size:11.5px;margin-top:6px">앞의 300줄만 — 기간을 좁히거나 찾으세요</div>':'')
+      :'<div class="msg" style="font-size:13px">이 거르기에 맞는 기록이 없습니다.</div>')
+    +'</div>';
+}
+function _jlCellLabel(P){
+  var p=P.key.split('|'), sites=(S.sitesFor===P.fid&&S.sites)||{};
+  if(p[0]==='f') return (p[1]==='years'?p[2]+'년 ':'')+_rvLabel(p[p.length-1]);
+  if(p[0]==='s') return ((sites[p[1]]||{}).name||'사업장')+' · '+(p[2]?_rvLabel(p[2]):'통째');
+  if(p[0]==='y') return p[1]+'년 '+((sites[p[2]]||{}).name||'사업장')+' · '+_rvLabel(p[3]);
+  return '지원금 서류 체크';
+}
+function jlToggle(i){
+  var r=(JL.rows||[])[i]; if(!r) return;
+  if(JL.open[i]){ delete JL.open[i]; renderJournal(); return; }
+  JL.open[i]=1; renderJournal();
+  var cells=_jlCells(r.bid,r.fid);
+  _jlReadNow(cells).then(function(now){ JL.cur[r.bid+'|'+r.fid]=now; if(S.view==='review'&&RV.page==='journal') renderJournal(); });
+}
+function jlUndo(i){
+  if(!_isBoss()){ toast('되돌리기는 대표·관리자만 할 수 있습니다','warn'); return; }
+  var r=(JL.rows||[])[i]; if(!r||!r.bid) return;
+  var cells=_jlCells(r.bid,r.fid);
+  _jlReadNow(cells).then(function(now){
+    JL.cur[r.bid+'|'+r.fid]=now;
+    var back=[], okd=[], moved=0;
+    cells.forEach(function(c,j){ var st=_jlState(c,now[j]); if(st==='back') back.push(c); else if(st==='okd') okd.push(c); else moved++; });
+    if(!back.length&&!okd.length){ toast('되돌릴 칸이 없습니다 — 모두 그 뒤 바뀌었습니다','warn'); renderJournal(); return; }
+    var f=funds[r.fid]||{};
+    var go=function(withOk){
+      var list=back.concat(withOk?okd:[]); if(!list.length){ toast('되돌릴 칸이 없습니다','warn'); return; }
+      var up={};
+      list.forEach(function(c){ up[c.P.path]=_provEmpty(c.b)?null:c.b; });
+      fbDb.ref(NS).update(up).then(function(){
+        if(typeof _track==='function') _track(list.map(function(c){ return {path:c.P.path, a:_provEmpty(c.b)?null:c.b, b:c.a, m:0, src:'undo', how:''}; }),
+          {what:'묶음 되돌리기 — '+String(r.what||'').slice(0,40), detail:r.bid+(moved?' · 그 뒤 바뀐 '+moved+'칸은 그대로':'')});
+        if(S.fundId===r.fid){ S.sitesFor=null; }
+        JL.data=null; JL.cur={}; JL.open={}; if(typeof RV!=='undefined') RV.at=0;
+        toast(list.length+'칸을 전 값으로 되돌렸습니다'+(moved?' · 그 뒤 바뀐 '+moved+'칸은 그대로':''));
+        renderJournal();
+      }).catch(function(e){ toast('되돌리기 실패: '+((e&&e.message)||e),'err'); });
+    };
+    var msg='['+(f.short_name||f.name||r.fid)+'] «'+r.what+'»('+String(r.at).slice(0,16)+')을 되돌릴까요?\n\n'
+      +'· 전 값으로 돌릴 칸: '+back.length+(okd.length?'\n· 사람이 ✓ 확인한 칸: '+okd.length+' — 기본은 빼고 되돌립니다':'')+(moved?'\n· 그 뒤 바뀐 칸 '+moved+'개는 건드리지 않습니다':'')
+      +'\n\n되돌린 것도 일지에 남아 다시 되돌릴 수 있습니다.';
+    confirmM(msg,{ok:back.length?back.length+'칸 되돌리기':'되돌리기',danger:true}).then(function(ok){
+      if(!ok) return;
+      if(okd.length) confirmM('사람이 ✓ 확인한 '+okd.length+'칸도 함께 되돌릴까요?',{ok:'함께 되돌리기',cancel:'빼고 되돌리기'}).then(function(w){ go(!!w); });
+      else go(false);
+    });
+  });
+}
 // ── 청구 관리 (4단계) ──
 /* ══ 푸른이알피(pu-erp) 기금 청구 연동 ══
    원본은 푸른이알피 소유 — 여기서는 **읽기만** 한다(쓰면 사무관리 원장이 깨진다).
@@ -21115,6 +21284,10 @@ var HELP={
    +'<p><b>추정 출연금</b> — 사람수 × 1인당 단가로 계산한 값입니다. [맞음]을 누르면 그 금액을 기본 출연금으로 적습니다.</p>'
    +'<p><b>이체 짝 · 분개 승인</b> — 기금·연도마다 한 줄입니다. 눌러서 회계 화면으로 가 짝을 보고 승인합니다.</p>'
    +'<p>서류 확인 창에서 <b>원본 옆에 놓고</b> 넣은 값은 이미 사람이 대조한 것이라 여기 오지 않습니다. 2026-10-05 이전에 들어간 값은 누가 넣었는지 기록이 없어 여기 나오지 않습니다.</p>'},
+ 'journal.log':{t:'작업 일지 — 언제 무엇이 바뀌었나, 묶음째 되돌리기',h:'<p>모든 기금의 변경 기록을 시각 차례로 모았습니다. 🤖는 기계(서류 판독·가져오기·Claude), ✎는 사람이 한 일입니다. 오늘·이번 주·전체, 기계만·사람만으로 거르고 기금 이름으로 찾습니다.</p>'
+   +'<p>칸마다 전 값·새 값이 남은 줄(2026-10-05 이후)은 [펼치기]로 칸별 <b>전 → 이 묶음이 넣은 값 → 지금</b>을 봅니다.</p>'
+   +'<p><b>[↶ 이 묶음 되돌리기]</b>는 지금도 그 묶음 값 그대로인 칸만 전 값으로 돌립니다. 그 뒤 사람이 고친 칸은 건드리지 않고, 사람이 ✓ 확인한 칸은 따로 묻습니다(기본은 빼고). 되돌린 것도 일지에 남아 다시 되돌릴 수 있습니다. 대표·관리자만 누릅니다.</p>'
+   +'<p>통장 가져오기(장부)는 칸 묶음이 없어 여기서 되돌리지 않습니다 — 회계 화면에서 승인 풀기·삭제로 합니다.</p>'},
  'trust.ledger':{t:'자동 규칙 — 어디까지 기계에 맡길지',h:'<p>기계가 값을 넣는 길(어느 서류의 어느 칸 · 어느 기금의 어느 계정 분개 · 이체 짝)마다 <b>사람이 «맞음»을 누른 횟수와 고친 횟수</b>를 셉니다. 확인함 [맞음]·분개 승인·🎯 골라 승인 표본·이체 짝 고르기가 모두 여기에 쌓입니다.</p>'
    +'<p><b>올림</b> — 연속 30번 맞으면 «자동으로 올릴 수 있음». [자동 확정 켜기]는 대표만 누릅니다. 켜면 그 길로 들어오는 값은 확인함을 거치지 않고 ✓가 되고, 분개는 통장을 가져올 때 바로 승인됩니다(100만 원 이하만).</p>'
    +'<p><b>내림</b> — 자동 확정한 값을 사람이 한 번이라도 고치거나 승인을 풀면 그 규칙은 <b>바로 멈추고</b>, 그 규칙으로 확정된 것은 확인함으로 돌아옵니다(마감·확정한 달은 그대로).</p>'
