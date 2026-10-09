@@ -47666,26 +47666,33 @@ function erpCmsLinkMember(code, companyId){
   code = String(code || '').trim();
   if(!code || !companyId) return false;
   var cos = dbGet('companies', []) || [];
-  var other = cos.find(function(c){ return c && c.id !== companyId && (c.cmsMemberCodes || []).indexOf(code) >= 0; });
-  if(other && !window.confirm('회원코드 ' + code + ' 는 「' + other.name + '」에 이어져 있습니다. 옮길까요?')) return false;
-  if(other) dbPatch('companies', other.id, { cmsMemberCodes: (other.cmsMemberCodes || []).filter(function(x){ return x !== code; }) });
+  /* 순서: 대상 업체 확인 → 대상에 먼저 쓰기 → 성공한 뒤에만 다른 업체에서 빼기 (중간에 실패해도 코드가 양쪽에서 사라지지 않게) */
   var co = cos.find(function(c){ return c && c.id === companyId; });
   if(!co) return false;
+  var other = cos.find(function(c){ return c && c.id !== companyId && (c.cmsMemberCodes || []).indexOf(code) >= 0; });
+  if(other && !window.confirm('회원코드 ' + code + ' 는 「' + other.name + '」에 이어져 있습니다. 옮길까요?')) return false;
   var list = (co.cmsMemberCodes || []).slice();
   if(list.indexOf(code) < 0) list.push(code);
-  return dbPatch('companies', companyId, { cmsMemberCodes: list }) !== false;
+  if(dbPatch('companies', companyId, { cmsMemberCodes: list }) === false) return false;
+  if(other) dbPatch('companies', other.id, { cmsMemberCodes: (other.cmsMemberCodes || []).filter(function(x){ return x !== code; }) });
+  return true;
 }
 window.erpCmsLinkMember = erpCmsLinkMember;
 
 /* 자동 확정 되돌리기 — 휴지통으로, 그 줄은 skip 에 적어 다시 넣지 않는다 */
 function erpCmsUndo(incomeId, key){
-  if(!incomeId || !key) return false;
+  if(!incomeId || !key) return Promise.resolve(false);
   var ok = TrashBin.remove('finance_income', incomeId, 'CMS 자동 확정 되돌림');
-  if(ok !== false && typeof fbDb !== 'undefined' && fbDb){
-    var sk = String(key).replace(/[.#$\[\]\/]/g, '_');
-    fbDb.ref('data/cms_pull/skip/' + sk).set(true);
-  }
-  return ok !== false;
+  if(ok === false) return Promise.resolve(false);
+  var warn = function(e){
+    showToast('⚠ 되돌림 표시를 서버에 못 적었습니다 — 다음 자동 처리 때 다시 들어갈 수 있습니다. 다시 눌러 주세요');
+    if(e && window._erpErrLog) window._erpErrLog(e);
+    return false;
+  };
+  if(typeof fbDb === 'undefined' || !fbDb) return Promise.resolve(warn(null));
+  var sk = String(key).replace(/[.#$\[\]\/]/g, '_');
+  /* 서버 skip 에 적힌 것을 확인한 뒤에야 성공으로 친다 */
+  return fbDb.ref('data/cms_pull/skip/' + sk).set(true).then(function(){ return true; }).catch(warn);
 }
 window.erpCmsUndo = erpCmsUndo;
 
@@ -67563,13 +67570,15 @@ function FinanceAuto(props){
   var autos = items.filter(function(x){ return x.verdict === 'auto' || x.verdict === 'done'; });
   var st = (last && last.status) || {};
   var ix = null;
+  var DUAL = '회원코드가 두 업체에 이어져 있음';
   function hint(it){
-    if(it.verdict !== 'new_member') return it.why;
+    if(it.verdict !== 'new_member' || it.why === DUAL) return it.why;
     ix = ix || erpNicebillCoIndex();
     var out = {}; var c = erpNicebillMatchCo(ix, it.row.name, '', out);
     return c ? ('후보: ' + c.name + ' (' + (out.via === 'prev' ? '예전 이름' : '이름') + '으로 찾음 — 누르기 전엔 안 이음)') : '후보 없음';
   }
   function link(it){
+    if(it.why === DUAL){ showToast('회원코드가 두 업체에 이어져 있습니다 — 업체관리에서 한 업체만 남겨 주세요'); return; }
     ix = ix || erpNicebillCoIndex();
     var c = erpNicebillMatchCo(ix, it.row.name, '', {});
     if(!c){ showToast('후보가 없습니다 — 업체관리에서 업체를 먼저 확인해 주세요'); return; }
@@ -67616,7 +67625,7 @@ function FinanceAuto(props){
         h('thead', null, head),
         h('tbody', null, list.map(function(it, i){
           var act = it.verdict === 'new_member' ? h('button', { style:smallBtn, onClick:function(){ link(it); } }, '이 업체로 잇기')
-            : (it.verdict === 'done' && it.incomeId) ? h('button', { style:smallBtn, onClick:function(){ if(window.confirm('이 자동 확정을 휴지통으로 옮길까요?') && erpCmsUndo(it.incomeId, it.row._k)) erpCmsAutoRun({ write:false }); } }, '되돌리기')
+            : (it.verdict === 'done' && it.incomeId) ? h('button', { style:smallBtn, onClick:function(){ if(window.confirm('이 자동 확정을 휴지통으로 옮길까요?')) erpCmsUndo(it.incomeId, it.row._k).then(function(ok){ if(ok) erpCmsAutoRun({ write:false }); }); } }, '되돌리기')
             : (CHECK[it.verdict] ? h('button', { style:smallBtn, onClick:function(){ props.onNavigate && props.onNavigate('fin/income'); } }, '입금관리에서 보기') : null);
           return row(it, i, act);
         })))));

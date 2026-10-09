@@ -103,3 +103,18 @@ test('스위치는 관리자 화면 안, 기본은 꺼짐', () => {
   assert.match(s, /cmsAutoConfirm/);
   assert.doesNotMatch(s, /cmsAutoConfirm\s*:\s*true\s*\}\s*\)\s*;?\s*\}\s*,\s*\[\]/, '열 때 저절로 켜지 않는다');
 });
+
+test('잇기 순서 — 대상 업체에 먼저 쓰고, 성공한 뒤에만 다른 업체에서 뺀다', () => {
+  const b = cutFn('function erpCmsLinkMember(');
+  const iTarget = b.search(/dbPatch\(\s*['"]companies['"]\s*,\s*companyId/);
+  const iOther = b.search(/dbPatch\(\s*['"]companies['"]\s*,\s*other\.id/);
+  assert.ok(iTarget >= 0 && iOther >= 0);
+  assert.ok(iTarget < iOther, '대상 업체 쓰기가 먼저');
+  assert.ok(b.search(/if\(!co\) return false/) < iTarget, '대상이 없으면 아무것도 건드리기 전에 끝낸다');
+});
+test('되돌리기는 약속(Promise)을 돌려주고 skip 쓰기 실패를 알린다', () => {
+  const b = cutFn('function erpCmsUndo(');
+  assert.match(b, /\.set\(true\)\s*\.then\(/);
+  assert.match(b, /\.catch\(/);
+  assert.match(b, /showToast\(/);
+});
