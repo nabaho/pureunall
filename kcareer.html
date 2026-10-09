@@ -356,6 +356,10 @@ body.kc-staff .kc-staff-note{display:flex}
 /* ⚠ 환경설정만 따로 넓히던 규칙은 뺐다 — 이제 .page 하나가 모든 화면을 넓게 쓴다 */
 /* 제목·설명은 상단 빵부스러기와 세 번 중복이라 숨긴다 — 탭줄이 맨 위로 올라온다 */
 #page-settings>.page>h2,#page-settings>.page>.desc{display:none}
+/* 🔒 환경설정 잠금 — 잠겨 있으면 잠금 칸 «하나만» 보인다 (2026-10-09) */
+#cfgLock{display:none}
+body.cfg-locked #page-settings>.page>#cfgLock{display:block}
+body.cfg-locked #page-settings>.page>*:not(#cfgLock){display:none!important}
 #page-settings>.page>.tabrow{margin-top:0}
 .field input,.field select{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:6px;font-size:13px;outline:none}
 .field input:focus,.field select:focus{border-color:var(--navy)}
@@ -2427,6 +2431,23 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       </div></section>
       <section class="page-view" id="page-settings"><div class="page">
         <h2>환경설정</h2><div class="desc">개인정보·계좌·API·데이터·백업 관리</div>
+        <!-- ★ 환경설정 잠금 (대표 지시 2026-10-09 「혹시라도 다른 사람이 들어오면 안된다」)
+             로그인된 채 열린 대표 PC·폰에 앉은 사람을 막는다. PIN 은 신분증 PIN 하나를 함께 쓴다(외울 것 하나).
+             ⚠ 잠겨 있는 동안 이 칸 말고는 «아무것도» 안 보인다 — CSS(body.cfg-locked) 한 줄이 가린다. -->
+        <div id="cfgLock" class="card" style="text-align:center;padding:34px 16px;max-width:460px;margin:30px auto">
+          <div style="font-size:44px;margin-bottom:8px">🔒</div>
+          <div style="font-weight:700;color:var(--navy);margin-bottom:6px">환경설정이 잠겨 있습니다</div>
+          <div style="font-size:13px;color:var(--text-mute);margin-bottom:14px">신분증 PIN 을 넣어 주세요</div>
+          <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+            <input id="cfgPinInput" type="password" inputmode="numeric" maxlength="6" class="tb-input" placeholder="PIN" autocomplete="off" style="width:140px;font-size:16px" onkeydown="if(event.key==='Enter')kcCfgUnlock()">
+            <button class="btn primary" type="button" onclick="kcCfgUnlock()">잠금 해제</button>
+          </div>
+          <div style="font-size:11.5px;color:var(--text-mute);margin-top:12px;line-height:1.6">5분 동안 손대지 않거나, 다른 화면·다른 창으로 가면 다시 잠깁니다.</div>
+        </div>
+        <div id="cfgPinNudge" style="display:none;margin:0 0 10px;padding:9px 12px;border-radius:8px;background:#fef2f2;color:#991b1b;font-size:12.5px;line-height:1.6">
+          ⚠ 이 기기에는 아직 PIN 이 없어 <b>환경설정이 잠기지 않습니다</b> — 누구든 이 화면을 열 수 있습니다.
+          <button class="btn sm" type="button" onclick="kcCfgGoSetPin()" style="margin-left:6px">🔐 PIN 정하러 가기</button>
+        </div>
         <div class="tabrow">
           <button class="tab active" data-tab="personal">개인정보보관</button>
           <!-- ★ 법인정보 (대표 지시 2026-09-28 「환경설정에 법인정보도 필요하다 탭만들어서 넣을수 있게」) -->
@@ -2437,6 +2458,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="tab" data-tab="backup">백업관리</button>
           <button class="tab" data-tab="staff">👥 직원 관리</button>
           <button class="tab" data-tab="trash">🗑 휴지통<span id="trashTabCnt" style="font-size:10px;font-weight:700;padding:1px 6px;border-radius:999px;background:#fef2f2;color:#991b1b;margin-left:5px;display:none"></span></button>
+          <button class="btn sm" type="button" id="cfgLockNow" onclick="kcCfgLock(true)" style="margin-left:auto;align-self:center" title="자리를 비울 때 — 다시 열려면 PIN">🔒 지금 잠그기</button>
         </div>
         <div class="tabpanel active" id="tab-personal">
           <!-- 한 화면에 다 보이게 두 줄로 나눈다(대표 요청 2026-08-29).
@@ -6257,8 +6279,13 @@ function nav_to(id,label,grp){
   var _lk=(typeof kcApplyLock==='function')?kcApplyLock():'owner';
   if(_lk==='locked') return;
   if(_lk==='staff' && KC_PUB_PAGES.indexOf(id)<0){ toast('🔒 대표 경력관리만 보실 수 있습니다'); return; }
-  /* 환경설정은 관리자(대표)만 진입 가능 */
-  if(id==='page-settings' && typeof _me!=='undefined' && _me.resolved && !_me.isAdmin){ toast('🔒 환경설정은 관리자만 사용할 수 있습니다'); return; }
+  /* ★ 환경설정은 «대표 본인»만 (대표 지시 2026-10-09 「다른 사람이 들어오면 안된다」).
+     예전에는 «관리자»(부관리자·전체 보기 포함)면 들어왔고, 신원을 못 알아내면 대표로 보고 열어 주었다.
+     이제 대표 계정으로 확인된 때('owner')만 연다 — 확인 중이면 기다리게 한다. */
+  if(id==='page-settings' && _lk!=='owner'){
+    toast(_lk==='checking' ? '신원을 확인하는 중입니다 — 잠시 뒤 다시 눌러 주세요' : '🔒 환경설정은 대표 본인만 사용할 수 있습니다'); return; }
+  /* 환경설정을 떠나면 바로 잠근다 — 다시 들어올 때 PIN */
+  if(id!=='page-settings') _safe(function(){ kcCfgLock(); });
   document.querySelectorAll('.page-view').forEach(s=>s.classList.remove('active'));
   /* 빌려 쓰는 이름이면 «진짜 화면»을 켜고 이름표만 단다(NAV_ALIAS) */
   const real=NAV_ALIAS[id]||id;
@@ -6296,7 +6323,7 @@ function nav_to(id,label,grp){
   if(id==='page-bizdocs') _safe(renderBizDocs);
   if(id==='page-profile' && typeof renderDocStore==='function') renderDocStore('profile');
   if(id==='page-certdoc' && typeof renderDocStore==='function') renderDocStore('certdoc');
-  if(id==='page-settings'){ _safe(renderPersonal); _safe(renderAccounts); _safe(initIDSecurity); _safe(renderPubBox);
+  if(id==='page-settings'){ _safe(kcCfgApply); _safe(renderPersonal); _safe(renderAccounts); _safe(initIDSecurity); _safe(renderPubBox);
     /* 30일 지난 것을 여기서 비운다 — 시계로 돌리지 않는다(브라우저 안 자료다) */
     _safe(kcTrashSweep); _safe(renderTrash); _safe(()=>setTimeout(initTabScroll,80)); }
   if(id==='page-puagency'){ _safe(bindPuAgencyOcr); _safe(renderPuAgency); }
@@ -19649,6 +19676,72 @@ async function unlockIDDocs(){ var pin=(document.getElementById('idUnlockPinInpu
     _idUnlocked=true; document.getElementById('idUnlockPinInput').value=''; showIDOverlay(false);
   }catch(e){ _idKey=null; _idDocs=null; toast('잠금 해제 실패'); console.error(e); } }
 function lockIDDocs(){ _idUnlocked=false; _idKey=null; _idDocs=null; showIDOverlay(true); }
+/* ═══ 🔒 환경설정 잠금 (대표 지시 2026-10-09 「혹시라도 다른 사람이 들어오면 안된다」) ═══
+   막는 사람: 로그인된 채 열린 «대표 PC·폰»에 앉은 사람. (다른 계정은 이미 kcApplyLock 이 막는다.)
+   ■ PIN 은 신분증 PIN «하나»를 함께 쓴다 — 맞는지는 신분증 암호문을 풀어 본다(따로 적어 두는 PIN 이 없다).
+     한 번 풀면 신분증 보관함도 함께 열린다.
+   ■ 다시 잠그는 때: 다른 화면으로 갈 때(nav_to) · 창을 가리거나 다른 창으로 갈 때 · 5분 동안 손대지 않을 때 ·
+     「🔒 지금 잠그기」.
+   ⚠ PIN 은 기기마다다(id_salt 는 FB_SKIP) — PIN 이 없는 기기는 잠그지 못하므로 빨간 띠로 «말한다».
+   ⚠ 잠금은 «가리기»다 — 화면 자료는 이 기기 브라우저에 그대로 있다. 개발자 도구를 여는 사람까지는 못 막는다
+     (주민번호 서류는 그래서 따로 암호화한다). */
+var KC_CFG_IDLE_MS=5*60*1000, _cfgOpen=false, _cfgLastAct=0, _cfgTimer=null, _cfgBound=false;
+function _cfgActive(){ var s=document.getElementById('page-settings'); return !!(s && s.classList.contains('active')); }
+/* 환경설정에 들어올 때 — 잠글지 정한다 */
+function kcCfgApply(){
+  _cfgBind();
+  var nb=document.getElementById('cfgPinNudge'); if(nb) nb.style.display=hasIDPin()?'none':'';
+  var 잠금=hasIDPin() && !(_cfgOpen && Date.now()-_cfgLastAct<KC_CFG_IDLE_MS);
+  document.body.classList.toggle('cfg-locked', 잠금);
+  if(잠금){ _cfgOpen=false; setTimeout(function(){ var i=document.getElementById('cfgPinInput'); if(i){ i.value=''; i.focus(); } }, 60); }
+  else _cfgArm();
+  return !잠금;
+}
+function kcCfgLock(byHand){
+  if(_cfgTimer){ clearInterval(_cfgTimer); _cfgTimer=null; }
+  if(!hasIDPin()){ if(byHand) toast('🔐 PIN 이 없어 잠글 수 없습니다 — 먼저 PIN 을 정해 주세요', 5000); return; }
+  var 열려있었다=_cfgOpen; _cfgOpen=false;
+  if(_idUnlocked) _safe(lockIDDocs);
+  document.body.classList.add('cfg-locked');
+  var i=document.getElementById('cfgPinInput'); if(i) i.value='';
+  if(byHand) toast('🔒 환경설정을 잠갔습니다');
+  return 열려있었다;
+}
+async function kcCfgUnlock(){
+  var inp=document.getElementById('cfgPinInput'), pin=String((inp&&inp.value)||'').trim();
+  if(!pin){ toast('PIN 을 넣어 주세요'); return; }
+  if(!_idCryptoOK()){ toast('이 브라우저에서는 PIN 을 확인할 수 없습니다(https 주소에서 열어 주세요)'); return; }
+  try{
+    var salt=new Uint8Array(b64ToAb(LS.get(NS+'id_salt')));
+    _idKey=await _deriveIdKey(pin, salt);
+    if(!(await _decryptIdDocs())){ _idKey=null; _idDocs=null; if(inp) inp.value=''; toast('PIN 이 틀렸습니다'); return; }
+    _idUnlocked=true; _safe(function(){ showIDOverlay(false); });
+    if(inp) inp.value='';
+    _cfgOpen=true; document.body.classList.remove('cfg-locked'); _cfgArm();
+  }catch(e){ _idKey=null; _idDocs=null; toast('잠금 해제 실패'); console.error(e); }
+}
+/* 손을 댈 때마다 시계를 새로 — 환경설정이 열려 있을 때만 */
+function _cfgArm(){
+  _cfgLastAct=Date.now();
+  if(_cfgTimer) clearInterval(_cfgTimer);
+  _cfgTimer=setInterval(function(){
+    if(!_cfgOpen){ clearInterval(_cfgTimer); _cfgTimer=null; return; }
+    if(Date.now()-_cfgLastAct>=KC_CFG_IDLE_MS){ kcCfgLock(); if(_cfgActive()) toast('🔒 5분 동안 손대지 않아 환경설정을 잠갔습니다', 5000); }
+  }, 15000);
+}
+function _cfgBind(){
+  if(_cfgBound || typeof document.addEventListener!=='function') return; _cfgBound=true;
+  var 손=function(){ if(_cfgOpen) _cfgLastAct=Date.now(); };
+  ['pointerdown','keydown','wheel','touchstart'].forEach(function(ev){ document.addEventListener(ev, 손, {passive:true, capture:true}); });
+  /* 창을 가리거나 다른 창으로 가면 잠근다 — 폰은 화면을 끄면 여기로 온다 */
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') kcCfgLock(); });
+}
+/* PIN 이 없을 때 — 신분증·계좌 탭의 「보안 설정」으로 데려간다 */
+function kcCfgGoSetPin(){
+  var t=document.querySelector('#page-settings .tab[data-tab="idmgr"]'); if(t) t.click();
+  setTimeout(function(){ var c=document.getElementById('idPinCard'); if(c) c.scrollIntoView({block:'center'});
+    var i=document.getElementById('idPinInput'); if(i) i.focus(); }, 120);
+}
 function initIDSecurity(){
   const pinBtn=document.getElementById('idSetPin'); if(!pinBtn) return;
   pinBtn.onclick=async function(){ const pin=(document.getElementById('idPinInput').value||'').replace(/\D/g,'');
@@ -19665,7 +19758,8 @@ function initIDSecurity(){
       await _persistIdDocs();
       LS.remove(NS+'id_docs');
       _idUnlocked=true; document.getElementById('idPinInput').value='';
-      document.getElementById('idRemovePin').style.display=''; showIDOverlay(false); toast('PIN 설정 + 신분증 암호화 완료');
+      document.getElementById('idRemovePin').style.display=''; showIDOverlay(false); toast('PIN 설정 + 신분증 암호화 완료 — 이제 환경설정도 이 PIN 으로 잠깁니다', 6000);
+      _safe(function(){ _cfgOpen=true; kcCfgApply(); });   /* 지금은 열어 둔 채로 — 떠나면 잠긴다 */
     }catch(e){ LS.remove(NS+'id_salt'); _idKey=null; _idDocs=null; toast('PIN 설정 실패'); console.error(e); } };
   const lockBtn=document.getElementById('idLockBtn'); if(lockBtn) lockBtn.onclick=lockIDDocs;
   const unlockBtn=document.getElementById('idUnlockBtn'); if(unlockBtn) unlockBtn.onclick=function(){
@@ -19677,7 +19771,7 @@ function initIDSecurity(){
       const docs=_idDocs||[];
       LS.remove(NS+'id_salt'); LS.remove(NS+'id_docs_enc');
       set('id_docs', docs); _idKey=null;
-      removeBtn.style.display='none'; showIDOverlay(false); toast('PIN 해제됨 (평문 저장)');
+      removeBtn.style.display='none'; showIDOverlay(false); toast('PIN 해제됨 (평문 저장) — 환경설정도 잠기지 않습니다', 6000); _safe(kcCfgApply);
     }catch(e){ toast('PIN 해제 실패'); console.error(e); } };
   const maskChk=document.getElementById('idMaskNum'); if(maskChk){
     maskChk.checked=idMaskOn();
