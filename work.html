@@ -677,6 +677,57 @@
   .pesync.off{background:var(--bg);color:var(--faint)}
   td.rowno{color:var(--faint);width:34px;text-align:right;font-variant-numeric:tabular-nums;font-size:11.5px;padding-right:8px}
   th.rowno{width:34px;text-align:right;padding-right:8px}
+  /* ══ 📱 폰 보기 (대표 지시 2026-10-09 「업무관리 폰에서 보기 너무 힘들다」) ══════
+     표를 폰에 넣으니 칸을 둘만 켜 두고도 오른쪽이 잘렸다. 조종칸이 «세 줄»이라
+     표가 시작되기도 전에 화면 위 4분의 1을 먹었다(실측: 한 화면에 여덟 줄).
+     ⚠ 줄 모양은 «한 가지»다 — 묶기를 바꿔도 ☐·번호·회사·업무·기한 자리가 안 바뀐다.
+       눈이 다시 배울 것이 없어야 한다.
+     ⚠ 한 줄에서 넘치는 글은 «자르지 않고» … 로 줄인다(전문은 눌러서 본다). */
+  .phbar{display:flex;align-items:center;gap:7px;padding:6px 10px;background:var(--panel);
+    border:1px solid var(--line);border-radius:10px;margin:0 0 9px;font-size:12px}
+  .phbar .r{margin-left:auto;display:flex;gap:6px}
+  .phseg{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;flex:0 0 auto}
+  .phseg b{font-size:11.5px;padding:4px 10px;background:var(--acc);color:#fff;font-weight:700}
+  .phseg i{font-size:11.5px;padding:4px 10px;color:var(--sub);font-style:normal}
+  .phgb{font-size:11.5px;border:1px solid #bfdbfe;background:var(--acc-soft);color:var(--acc2);
+    border-radius:999px;padding:4px 10px;font-weight:700;white-space:nowrap;cursor:pointer}
+  .phic{width:29px;height:29px;border:1px solid var(--line);border-radius:9px;display:flex;
+    align-items:center;justify-content:center;font-size:13px;background:#fff;cursor:pointer;flex:0 0 auto}
+  .phl{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .phr{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid var(--line);
+    font-size:12.5px;cursor:pointer}
+  .phr:last-child{border-bottom:0}
+  .phr:active{background:var(--bg)}
+  .phr .ck{width:17px;flex:0 0 17px;margin:0}
+  .phr .no{font-size:10.5px;color:var(--faint);width:19px;flex:0 0 19px;text-align:right;
+    font-variant-numeric:tabular-nums}
+  .phr .co{font-weight:700;flex:0 0 auto;max-width:112px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phr .tt{flex:1;min-width:0;color:var(--sub);font-size:12px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .phr .dd{flex:0 0 auto}
+  .phr.ind{padding-left:30px}
+  .phg{background:var(--bg);padding:5px 11px;font-size:11px;font-weight:800;color:var(--sub);
+    border-bottom:1px solid var(--line);display:flex;align-items:center;gap:7px}
+  .phg .n{margin-left:auto;font-weight:600;color:var(--faint)}
+  .phhint{background:var(--panel);border-bottom:1px solid var(--line);padding:9px 11px;
+    font-size:11px;color:var(--sub);line-height:1.6}
+  /* ⚠ margin:0 을 빼지 말 것 — 다른 딱지 규칙이 위아래 14px 를 얹어 줄이 47px 로 부푼다
+     (실측 2026-10-09: 그대로 두면 한 화면에 열셋, 빼면 열아홉 줄). */
+  .phd{font-size:10px;font-weight:700;border-radius:999px;padding:1px 7px;white-space:nowrap;margin:0}
+  .phd.x{background:#fef2f2;color:#991b1b}       /* 지났거나 오늘 */
+  .phd.s{background:var(--warn-bg);color:var(--warn)}   /* 이레 안 */
+  .phd.o{background:var(--ok-bg);color:var(--ok);border:1px solid #bbf7d0}
+  .phd.n{background:var(--bg);color:var(--faint);border:1px solid var(--line)}
+  /* 고르기 시트 — 묶기·⚙ 가 같은 모양을 쓴다 */
+  .phsh .o{display:flex;align-items:center;gap:9px;padding:10px 2px;border-bottom:1px solid var(--line);
+    font-size:13px;cursor:pointer}
+  .phsh .o:last-child{border-bottom:0}
+  .phsh .o .k{font-weight:700;flex:0 0 76px}
+  .phsh .o .d{color:var(--sub);font-size:11.5px;flex:1;min-width:0}
+  .phsh .o.on{color:var(--acc2)}
+  .phsh .o.on .k::before{content:'✓ '}
+  /* 폰 입력칸은 16px 이상 — 작으면 누를 때마다 아이폰이 화면을 키운다 */
+  @media (max-width:560px){ #qbar input,#qbar textarea{font-size:16px} }
   /* 🧹 치울 것 — 고르기 칸과 번호는 «모든 목록»의 맨 왼쪽 (대표 지시 2026-10-05).
      좁게 둔다(고르기 28px · 번호 36px) — 「한 칸은 한 줄」과 함께 지킨다. */
   th.wsck,td.wsck{width:28px;text-align:center;padding:6px 0}
@@ -6056,9 +6107,159 @@ function focusCounts(){
    renderMy 가 만든 list 를 그대로 받아 그리므로, 세 보기가 늘 같은 것을 보여준다.
    (보기마다 따로 거르면 표에서 보이던 건이 보드에선 안 보이는 일이 생긴다) */
 var MYMODE_KEY='work_my_mode';
+/* 폰인가 — 창 너비로만 본다. 상자 안(검사)에서는 늘 «아니다». */
+function isPhone(){ try{ return window.innerWidth<=560; }catch(e){ return false; } }
 function myMode(){
   var v=''; try{ v=localStorage.getItem(MYMODE_KEY)||''; }catch(e){}
-  return (v==='board'||v==='timeline')?v:'table';
+  if(v==='board'||v==='timeline'||v==='phone'||v==='table') return v;
+  /* 아직 안 고른 사람 — 폰이면 폰 보기로 연다 (대표 지시 2026-10-09).
+     ⚠ 고른 적이 있으면 그 뜻을 지킨다. 넓은 화면은 예전처럼 표다.
+     ⚠ typeof 로 본다 — 검사가 이 함수만 떼어 상자에 넣고 돌 때 isPhone 이 없다.
+       없으면 예전처럼 표다(넓은 화면과 같은 값). */
+  return (typeof isPhone==='function'&&isPhone())?'phone':'table';
+}
+/* ══ 📱 폰 보기 — 줄은 한 가지, «묶기»만 바뀐다 (대표 지시 2026-10-09) ══════════
+   넷을 따로 만들지 않는다. 「가(한 줄)」는 줄 모양이고 「나·다·라」는 묶는 방법이라,
+   줄 그리개 하나에 묶기만 갈아 끼운다 — 묶기를 바꿔도 눈이 다시 배울 것이 없다.
+   ⚠ 빈 칸인 줄 모르고 고르지 않게, 묶기 고르개에 «지금 몇 건인지»를 미리 적는다
+     (실측 2026-10-09: 대표 업무에 기한 0건 · 다음 할 일 0건 — 모르고 고르면 빈 화면이다).
+   ⚠ 고른 묶기는 이 기기에만 남는다. 남의 화면은 안 바뀐다. */
+var MYGRP_KEY='work_my_group';
+function myGroup(){
+  var v=''; try{ v=localStorage.getItem(MYGRP_KEY)||''; }catch(e){}
+  return (v==='due'||v==='co'||v==='todo')?v:'';
+}
+function setMyGroup(v){
+  try{ localStorage.setItem(MYGRP_KEY,v); }catch(e){}
+  closeM(); route();
+}
+function phHasDue(it){ return !!itemDue(it); }
+function phHasTodo(it){ return !!(it.next&&String(it.next.text||'').trim()); }
+/* 묶기마다 «지금 몇 건인가» — 고르기 전에 보여 준다 */
+function phCounts(list){
+  var co={}; list.forEach(function(it){ var c=String(it.company||'').trim(); if(c) co[c]=1; });
+  return { none:list.length, due:list.filter(phHasDue).length,
+           co:Object.keys(co).length, todo:list.filter(phHasTodo).length };
+}
+/* 기한 딱지 — 색은 지났나·이레 안인가로만 가른다 */
+function phDue(it){
+  var d=itemDue(it); if(!d) return '<span class="phd n">—</span>';
+  var n=dday(d); if(n===null) return '<span class="phd n">—</span>';
+  var cls=n<0?'x':n===0?'x':n<=7?'s':'o';
+  var txt=n<0?('D+'+(-n)):n===0?'D-Day':('D-'+n);
+  return '<span class="phd '+cls+'" title="'+esc(d)+'">'+txt+'</span>';
+}
+/* 줄 하나 — ☐ + 번호 + 회사 + 업무 + 기한. 넘치면 … (「한 칸은 한 줄」)
+   ⚠ hideCo 는 «사업장으로 묶었을 때»만 참이다 — 머리줄이 이미 회사를 말하므로
+     같은 말을 두 번 하지 않는다. */
+function phRowHTML(it,no,hideCo){
+  return '<div class="phr'+(hideCo?' ind':'')+'" data-i="'+esc(it._id)+'" onclick="openDrawer(\''+escJ(it._id)+'\')">'
+    +'<input type="checkbox" class="ck" onclick="event.stopPropagation()">'
+    +'<span class="no">'+no+'</span>'
+    +(hideCo?'':'<span class="co">'+esc(it.company||it.client||'—')+'</span>')
+    +'<span class="tt">'+esc(itemName(it)||String(it.cat||''))+'</span>'
+    +phDue(it)+'</div>';
+}
+/* 묶기별로 «칸 + 줄»을 만든다. 돌려주는 것: 그린 HTML. */
+function phListHTML(list){
+  var g=myGroup(), h='', n=0;
+  if(g==='due'){
+    var pass=list.filter(phHasDue), none=list.filter(function(it){ return !phHasDue(it); });
+    if(!pass.length) h+='<div class="phhint">⚠ 기한이 적힌 업무가 <b>없습니다</b>. '
+      +'줄을 눌러 기한을 적으면 여기서 <b>오늘·이번 주</b>로 나뉩니다.</div>';
+    var bk=[['🔥 오늘·지남',function(x){ return x<=0; }],
+            ['📅 이레 안',function(x){ return x>0&&x<=7; }],
+            ['🗓 더 나중',function(x){ return x>7; }]];
+    bk.forEach(function(b){
+      var rows=pass.filter(function(it){ var d=dday(itemDue(it)); return d!==null&&b[1](d); });
+      if(!rows.length) return;
+      h+='<div class="phg">'+b[0]+'<span class="n">'+rows.length+'건</span></div>';
+      rows.forEach(function(it){ n++; h+=phRowHTML(it,n,false); });
+    });
+    if(none.length){
+      h+='<div class="phg">📌 기한 없음<span class="n">'+none.length+'건</span></div>';
+      none.forEach(function(it){ n++; h+=phRowHTML(it,n,false); });
+    }
+  } else if(g==='co'){
+    /* ⚠ 업무가 하나뿐인 곳은 «접지 않는다» — 머리줄만 늘어 줄 수가 되레 는다
+       (실측 2026-10-09: 대표 42건이 41곳에 흩어져 접어도 한 줄밖에 안 준다). */
+    var by={}, ord=[];
+    list.forEach(function(it){ var c=String(it.company||it.client||'—');
+      if(!by[c]){ by[c]=[]; ord.push(c); } by[c].push(it); });
+    var many=ord.filter(function(c){ return by[c].length>1; });
+    var one=ord.filter(function(c){ return by[c].length===1; });
+    many.forEach(function(c){
+      h+='<div class="phg">'+esc(c)+'<span class="n">'+by[c].length+'건</span></div>';
+      by[c].forEach(function(it){ n++; h+=phRowHTML(it,n,true); });
+    });
+    if(one.length){
+      h+='<div class="phg">업무가 하나인 곳<span class="n">'+one.length+'곳</span></div>';
+      one.forEach(function(c){ n++; h+=phRowHTML(by[c][0],n,false); });
+    }
+  } else if(g==='todo'){
+    var has=list.filter(phHasTodo), no2=list.filter(function(it){ return !phHasTodo(it); });
+    if(!has.length) h+='<div class="phhint">⚠ 「다음 할 일」을 적어 둔 업무가 <b>없습니다</b>. '
+      +'줄을 눌러 한 줄 적으면 위 칸으로 올라옵니다.</div>';
+    h+='<div class="phg">🔥 할 일이 있는 업무<span class="n">'+has.length+'건</span></div>';
+    has.forEach(function(it){ n++; h+=phRowHTML(it,n,false); });
+    if(no2.length){
+      h+='<div class="phg">✍ 아직 안 적은 업무<span class="n">'+no2.length+'건</span></div>';
+      no2.forEach(function(it){ n++; h+=phRowHTML(it,n,false); });
+    }
+  } else {
+    list.forEach(function(it){ n++; h+=phRowHTML(it,n,false); });
+  }
+  return '<div class="phl">'+(h||'<div class="phhint">보일 업무가 없습니다.</div>')+'</div>';
+}
+var PH_GRP=[['','안 묶기','기한 가까운 차례로 쭉','none'],
+            ['due','기한','오늘·이레 안·기한 없음','due'],
+            ['co','사업장','같은 회사끼리 묶기','co'],
+            ['todo','할 일','다음 할 일을 앞으로','todo']];
+function phGroupSheet(){
+  var list=S._phList||[], c=phCounts(list), g=myGroup();
+  showModal('<h2 style="margin:0 0 4px">묶기</h2>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 8px">줄 모양은 안 바뀝니다 — 칸만 달라집니다.</p>'
+    +'<div class="phsh">'+PH_GRP.map(function(x){
+        var n=c[x[3]];
+        return '<div class="o'+(g===x[0]?' on':'')+'" onclick="setMyGroup(\''+escJ(x[0])+'\')">'
+          +'<span class="k">'+esc(x[1])+'</span><span class="d">'+esc(x[2])+'</span>'
+          +'<span class="phd '+(n?'o':'n')+'">'+n+(x[0]==='co'?'곳':'건')+'</span></div>';
+      }).join('')+'</div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+}
+/* ⚙ — 폰에서 날마다 안 쓰는 것을 한 단추 안으로 접는다. 하는 일은 PC 와 같다. */
+function phMoreSheet(){
+  var m=myMode();
+  showModal('<h2 style="margin:0 0 4px">보기</h2>'
+    +'<p class="muted" style="font-size:12px;margin:0 0 8px">폰에서는 접어 둡니다 — 넓은 화면은 그대로입니다.</p>'
+    +'<div class="phsh">'
+    +'<div class="o'+(m==='phone'?' on':'')+'" onclick="setMyMode(\'phone\')">'
+      +'<span class="k">목록</span><span class="d">한 줄씩 — 폰에 맞춘 모양</span></div>'
+    +'<div class="o'+(m==='table'?' on':'')+'" onclick="setMyMode(\'table\')">'
+      +'<span class="k">표</span><span class="d">넓은 화면과 같은 표(옆으로 밀어 봅니다)</span></div>'
+    +'<div class="o'+(m==='board'?' on':'')+'" onclick="setMyMode(\'board\')">'
+      +'<span class="k">보드</span><span class="d">상태별 칸반</span></div>'
+    +'<div class="o'+(m==='timeline'?' on':'')+'" onclick="setMyMode(\'timeline\')">'
+      +'<span class="k">타임라인</span><span class="d">날짜 흐름으로</span></div>'
+    +'<div class="o" onclick="closeM();openCal()">'
+      +'<span class="k">주 고르기</span><span class="d">'+esc(weekLabel(S.week))+'</span></div>'
+    +'</div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>');
+}
+function phHeadHTML(nOpen,nDone,nClean){
+  var g=myGroup(), lab=(PH_GRP.find(function(x){ return x[0]===g; })||PH_GRP[0])[1];
+  return '<div class="phbar">'
+    +'<span class="phseg"><b>진행 '+nOpen+'</b><i>완료 '+nDone+'</i></span>'
+    +(nClean?'<span class="phd s" onclick="go(\'clean\')" style="cursor:pointer">🧹 '+nClean+'</span>':'')
+    +'<span class="phgb" onclick="phGroupSheet()">묶기'+(g?' · '+esc(lab):'')+' ▾</span>'
+    +'<span class="r"><span class="phic" onclick="phFind()" title="찾기">🔍</span>'
+    +'<span class="phic" onclick="phMoreSheet()" title="보기">⚙</span></span></div>';
+}
+/* 찾기 — 폰에서는 칸을 늘 띄워 두면 한 줄을 먹는다. 누를 때만 묻는다. */
+function phFind(){
+  var q=prompt('찾을 말 (기업명·업무명)', S.q||'');
+  if(q===null) return;
+  S.q=String(q||'').trim(); route();
 }
 function setMyMode(v){
   try{ localStorage.setItem(MYMODE_KEY,v); }catch(e){}
@@ -6298,6 +6499,22 @@ function renderMy(){
   //   대신 아래에서 그 날 것을 위로 모으고 그 요일 칸을 밝힌다.
   // 열 조건은 base에서 뺀다 — 어떤 열의 선택지 건수를 셀 때 그 열만 되살리기 위해서다
   var list=base.filter(function(it){ return fPass('my',it,''); });
+  /* ══ 📱 폰 보기 — 조종칸 한 줄, 줄은 한 줄 (대표 지시 2026-10-09) ═════════════
+     ⚠ 여기서 갈라진다 — 아래 PC 머리줄(칩 열댓 개)을 아예 안 만든다.
+       폰에서 그것을 접어 넣으려다 세 줄이 됐던 것이 이 화면의 병이었다.
+     ⚠ 자료·거르기·권한은 그대로다. «그리는 모양»만 다르다. */
+  if(myMode()==='phone'){
+    S._phList=list;                       // 묶기 고르개가 건수를 세는 데 쓴다
+    var ph=phHeadHTML(mine.length,fc.done.length,(typeof wsCleanCount==='function'?wsCleanCount():0));
+    if(on) ph+='<div class="histbanner">🔎 걸러 보기로 <b>'+list.length+'건</b>만 보입니다 (전체 '+total+'건)'
+      +'<span class="back" onclick="myReset()">모두 풀기 →</span></div>';
+    if(!isCurWeek()) ph+='<div class="histbanner">🕘 <b>'+esc(weekLabel(S.week))+'</b> 열람 중'
+      +'<span class="back" onclick="setWeek(null)">이번 주로 →</span></div>';
+    ph+=phListHTML(list);
+    if(advHid) ph+=advFoldHTML(advHid);
+    app.innerHTML=ph;
+    return;
+  }
   /* ⚠ 「내 업무」에는 담당자 고르개가 없다 (대표 지시 2026-09-05 「내 업무인데 남의 업무를 볼 수 있다」).
      예전에는 여기서 남을 골라 그 사람 업무를 열고 «기록까지» 쓸 수 있었다 —
      그러면 그 사람 화면에 남이 쓴 줄이 끼어들고, 「내 업무」라는 이름이 거짓이 된다.
