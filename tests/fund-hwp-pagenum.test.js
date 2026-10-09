@@ -47,13 +47,37 @@ test('★★ 틀이 꺼 둔 쪽번호를 푼다 — 위치 «없음» → 아래
     .replace('<hp:t>가나다 서식</hp:t>', '<hp:ctrl><hp:newNum num="0" numType="PAGE"/></hp:ctrl><hp:t>가나다 서식</hp:t>');
   const x = pn(tpl);
   assert.ok(x.includes('<hp:pageNum pos="BOTTOM_CENTER"'), '위치 없음 → 아래 가운데');
-  assert.ok(x.includes('hidePageNum="0"') && !x.includes('hidePageNum="1"'), '감춘 쪽도 번호');
+  assert.ok(!x.includes('hidePageNum="1"') && !x.includes('<hp:pageHiding'), '감춘 쪽도 번호 — 다른 것을 안 감추면 감추기째 걷는다');
   assert.ok(!x.includes('<hp:newNum'), '한 문서 안에서 1, 2, 3… 차례대로');
   assert.equal(x.split('<hp:pageNum').length - 1, 1, '틀의 것을 살리고 새로 넣지 않는다');
   assert.ok(x.includes('<hp:t>가나다 서식</hp:t>'), '글은 그대로');
 });
 
 test('★ 한글로 나가는 두 길에 붙어 있다 — 틀 채우기(hwpTplFill)·화면 서식 → 한글(docToHwpx)', () => {
-  assert.match(grabFn('hwpTplFill'), /o\.xml=_hwpPageNum\(o\.xml\)/);
+  assert.match(grabFn('hwpTplFill'), /o\.xml=_hwpPageNum\(o\.xml,!!HWP_COVER_KINDS\[key\]&&_sec\+\+===0\)/, '표지는 첫 구역에만');
   assert.match(SRC, /HWPXDOC\.begin\('gov',\{pageNum:true\}\)/);
+});
+
+test('★★ 표지만 뺀다(대표 지시 2026-10-09) — 첫 쪽 번호 감추기 + 그 쪽을 0 으로, 둘째 쪽이 «- 1 -»', () => {
+  const x = pn(SEC, true);
+  assert.equal(x.split('<hp:pageNum').length - 1, 1, '쪽번호는 하나');
+  assert.ok(x.includes('<hp:pageHiding hideHeader="0" hideFooter="0" hideMasterPage="0" hideBorder="0" hideFill="0" hidePageNum="1"/>'));
+  assert.ok(x.includes('<hp:newNum num="0" numType="PAGE"/>'));
+  assert.ok(x.indexOf('<hp:pageHiding') < x.indexOf('가나다 서식'), '첫 문단(첫 쪽)에');
+  /* 옛 정관 틀처럼 감추기·새 번호가 이미 있어도 겹치지 않는다 — 하나씩만 */
+  const old = SEC.replace('</hp:ctrl></hp:run>', '</hp:ctrl><hp:ctrl><hp:pageNum pos="BOTTOM_CENTER" formatType="DIGIT" sideChar="-"/></hp:ctrl>'
+    + '<hp:ctrl><hp:pageHiding hideHeader="0" hideFooter="0" hideMasterPage="0" hideBorder="0" hideFill="0" hidePageNum="1"/></hp:ctrl></hp:run>')
+    .replace('<hp:t>가나다 서식</hp:t>', '<hp:ctrl><hp:newNum num="1" numType="PAGE"/></hp:ctrl><hp:t>가나다 서식</hp:t>');
+  const y = pn(old, true);
+  assert.equal(y.split('<hp:pageHiding').length - 1, 1); assert.equal(y.split('<hp:newNum').length - 1, 1);
+  assert.ok(y.includes('<hp:newNum num="0"'));
+  /* 머리말까지 감추던 감추기는 남긴다 — 쪽 번호 몫만 푼다 */
+  const hdr = SEC.replace('</hp:ctrl></hp:run>', '</hp:ctrl><hp:ctrl><hp:pageHiding hideHeader="1" hideFooter="0" hideMasterPage="0" hideBorder="0" hideFill="0" hidePageNum="1"/></hp:ctrl></hp:run>');
+  assert.ok(pn(hdr).includes('hideHeader="1" hideFooter="0" hideMasterPage="0" hideBorder="0" hideFill="0" hidePageNum="0"'));
+  assert.equal(pn(SEC, false), pn(SEC), '표지 아님은 그대로');
+});
+
+test('★ 표지가 있는 틀 — 사업계획서·정관(공동·사내)·설립준비위원회 회의록만', () => {
+  const m = SRC.match(/var HWP_COVER_KINDS=\{([^}]*)\}/);
+  assert.ok(m); assert.deepEqual(m[1].split(',').map((x) => x.split(':')[0].trim()).sort(), ['bizplan', 'charter', 'charter_sane', 'minutes']);
 });
