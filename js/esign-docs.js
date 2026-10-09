@@ -55,6 +55,28 @@
     }
   };
 
+  /* ══ 👥 집단체불 세트 — 문구는 한 곳(계약서 양식 › 체당금 접수 세트)에서 (대표 「추천대로」 2026-10-09) ══
+     새 사건을 만들 때 그때의 체당금 양식 문구를 사건 meta.forms 에 고정한다 — 근로자 폰·서류가 그 문구를 쓴다.
+     예전 사건(meta.forms 없음)은 위 ESIGN_FORMS 그대로. 효성CMS 신청서는 폰으로 받지 않고 사람마다 채워 낸다(계좌 칸은 비움). */
+  var CHEDANG_IDS = { delegationAgreement: 'fm-case-cd-01', delegation: 'fm-case-cd-02', privacyConsent: 'fm-case-cd-03', cms: 'fm-case-cd-04' };
+  function normVars(body) {
+    return String(body || '').replace(/\{\{근로자명\}\}/g, '{{이름}}').replace(/\{\{주민번호\}\}/g, '{{주민등록번호}}')
+      .replace(/\{\{근로자주소\}\}/g, '{{주소}}').replace(/\{\{계약일\}\}/g, '{{작성일}}');
+  }
+  function formsFrom(list) {
+    var out = {};
+    Object.keys(CHEDANG_IDS).forEach(function (k) {
+      var f = (list || []).filter(function (x) { return x && x.id === CHEDANG_IDS[k]; })[0];
+      if (!f || f.enabled === false || !String(f.body || '').trim()) return;
+      out[k] = { title: String(ESIGN_FORMS[k] ? ESIGN_FORMS[k].title : (f.name || '서류')).slice(0, 80), body: normVars(f.body).slice(0, 20000) };
+    });
+    return out;
+  }
+  function formOf(caseMeta, k) {
+    var f = caseMeta && caseMeta.forms && caseMeta.forms[k];
+    return f && f.body ? f : (ESIGN_FORMS[k] || null);
+  }
+
   // ══════════ 2부: 서류 생성 (브라우저 전용 — html2canvas/jsPDF/XLSX는 호출 페이지가 CDN 로드) ══════════
   var IS_BROWSER = (typeof document !== 'undefined');
 
@@ -91,10 +113,10 @@
     var v = personVars(person, caseMeta);
     return pageWrap(
       '<h2 style="text-align:center;font-size:22px;letter-spacing:8px;margin-bottom:24px">위 임 장</h2>' +
-      '<div style="white-space:pre-wrap">' + fillVars(ESIGN_FORMS.delegation.body, v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>' +
+      '<div style="white-space:pre-wrap">' + fillVars(esc(formOf(caseMeta, 'delegation').body), v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>' +
       '<hr style="margin:26px 0;border:none;border-top:1px dashed #999">' +
-      '<h3 style="text-align:center;font-size:16px;margin-bottom:14px">' + ESIGN_FORMS.delegationAgreement.title + '</h3>' +
-      '<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.7">' + fillVars(ESIGN_FORMS.delegationAgreement.body, v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>' +
+      '<h3 style="text-align:center;font-size:16px;margin-bottom:14px">' + esc(formOf(caseMeta, 'delegationAgreement').title) + '</h3>' +
+      '<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.7">' + fillVars(esc(formOf(caseMeta, 'delegationAgreement').body), v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>' +
       sigBlock(person) +
       '<div style="margin-top:16px;font-size:12px;color:#555">작성일: ' + v['작성일'] + ' · 전자제출(푸른노무법인 전자위임 시스템)</div>'
     );
@@ -104,11 +126,19 @@
   function buildConsentHtml(person, caseMeta) {
     var v = personVars(person, caseMeta);
     return pageWrap(
-      '<h2 style="text-align:center;font-size:20px;margin-bottom:24px">' + ESIGN_FORMS.privacyConsent.title + '</h2>' +
-      '<div style="white-space:pre-wrap">' + fillVars(ESIGN_FORMS.privacyConsent.body, v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>' +
+      '<h2 style="text-align:center;font-size:20px;margin-bottom:24px">' + esc(formOf(caseMeta, 'privacyConsent').title) + '</h2>' +
+      '<div style="white-space:pre-wrap">' + fillVars(esc(formOf(caseMeta, 'privacyConsent').body), v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>' +
       '<div style="margin-top:24px">동의 일시: ' + esc(String(person.consentAt || '').replace('T', ' ').slice(0, 16)) + ' (전자 동의)</div>' +
       sigBlock(person)
     );
+  }
+
+  /* 효성CMS 자동이체 신청서 (1인분) — f = {title, body}. 이름·연락처·작성일만 채우고 계좌·생년월일·서명은 비운다
+     (금융정보는 폰으로 받지 않는다 · 위임장에 한 서명을 여기 옮겨 붙이지 않는다 — 본인이 직접 서명) */
+  function buildCmsHtml(person, caseMeta, f) {
+    var v = personVars(person || {}, caseMeta);
+    f = f || {};
+    return pageWrap('<div style="white-space:pre-wrap;font-size:12.5px;line-height:1.75">' + fillVars(esc(f.body || ''), v).replace(/\{\{[^}]+\}\}/g, '________') + '</div>');
   }
 
   // HTML 배열 → 각 1페이지 PDF (pu-erp buildPayslipPdfBase64 패턴: 화면 밖 렌더 → html2canvas → jsPDF)
@@ -205,7 +235,8 @@
   var api = {
     fmtIdNo: fmtIdNo, validateIdNo: validateIdNo, maskIdNo: maskIdNo,
     fillVars: fillVars, ESIGN_FORMS: ESIGN_FORMS, esc: esc,
-    buildDelegationHtml: buildDelegationHtml, buildConsentHtml: buildConsentHtml,
+    buildDelegationHtml: buildDelegationHtml, buildConsentHtml: buildConsentHtml, buildCmsHtml: buildCmsHtml,
+    CHEDANG_IDS: CHEDANG_IDS, normVars: normVars, formsFrom: formsFrom, formOf: formOf,
     htmlPagesToPdf: htmlPagesToPdf, downloadRosterXlsx: downloadRosterXlsx, downloadArrearsXlsx: downloadArrearsXlsx,
     arrearsTotal: arrearsTotal, personGaps: personGaps, progressSummary: progressSummary, folderNames: folderNames
   };
