@@ -82,3 +82,24 @@ test('돌려 보기 — 줄에 src 가 없어도 묶음이 bank 면 표시한다
   const { calls } = await runErp({ on: true, run: { write: true }, rowSrc: '' });
   assert.equal(calls.mark.length, 1);
 });
+test('메뉴·라우터에 🤖 자동 처리가 있다', () => {
+  assert.match(src, /id:'fin\/auto'/);
+  assert.match(src, /current === 'fin\/auto'[\s\S]{0,120}FinanceAuto/);
+});
+test('잇기는 사람이 누를 때 한 업체 한 칸만 — 후보는 보여 주기만', () => {
+  const b = cutFn('function erpCmsLinkMember(');
+  assert.match(b, /dbPatch\(\s*['"]companies['"]/);
+  assert.doesNotMatch(b, /dbSet\(\s*['"]companies/);
+  const s = cutFn('function FinanceAuto(');
+  assert.doesNotMatch(s, /useEffect\([^)]*erpCmsLinkMember/, '열자마자 잇지 않는다');
+});
+test('되돌리기는 휴지통으로, 그 줄은 다시 자동 확정하지 않게 skip 에 적는다', () => {
+  const b = cutFn('function erpCmsUndo(');
+  assert.match(b, /TrashBin\.remove\(\s*['"]finance_income/);
+  assert.match(b, /cms_pull\/skip\//);
+});
+test('스위치는 관리자 화면 안, 기본은 꺼짐', () => {
+  const s = cutFn('function FinanceAuto(');
+  assert.match(s, /cmsAutoConfirm/);
+  assert.doesNotMatch(s, /cmsAutoConfirm\s*:\s*true\s*\}\s*\)\s*;?\s*\}\s*,\s*\[\]/, '열 때 저절로 켜지 않는다');
+});
