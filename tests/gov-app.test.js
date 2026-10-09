@@ -138,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,'
+    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -722,4 +722,43 @@ test('★ 저장된 줄의 규격서 주소가 https 가 아니면 링크로 안
   const l = PLANS(); l[3].files = ['javascript:alert(1)'];
   const r = runApp({ plan: l }); r.el('pView').value = 'ahead'; r.api.planDraw();
   assert.doesNotMatch(r.el('ptb').innerHTML, /javascript:/); assert.doesNotMatch(r.el('ptb').innerHTML, /📎/);
+});
+
+/* ═══ 발주 예정 — 처음 열면 저절로 받고, 받는 동안 «이 탭»에 보인다 (2026-10-09 대표 화면: 「아직 받은 적이 없습니다」만 떠 있었다) ═══ */
+const tickP = (ms) => new Promise((ok) => setTimeout(ok, ms || 0));
+test('★★★ 인증키가 있고 한 번도 안 받았으면 탭을 여는 순간 받기 시작 — 진행이 이 탭에 보인다', async () => {
+  const r = runApp({ feed: [], key_data: 'K' }); let release; const gate = new Promise((ok) => { release = ok; }); const urls = [];
+  r.api.setPull(async (u) => { urls.push(u); await gate; return PLAN_ENV([]); });
+  r.api.setTab('plan');
+  await tickP();
+  assert.ok(urls.length >= 1 && /OrderPlanSttusService/.test(urls[0]), '탭을 열어도 안 받는다');
+  assert.match(r.el('planNote').innerHTML, /<b>⏳ 발주계획 받는 중… \(\d{4}-01-01 게시분부터, 1\/\d+\)<\/b>/);
+  release();
+  for (let i = 0; i < 100 && !r.store.gov3_plan_at; i++) await tickP(5);
+  assert.match(r.store.gov3_plan_at || '', /^\d{4}-/, '받은 때를 남긴다');
+  assert.match(r.el('planNote').innerHTML, /마지막으로 받은 때/);
+  assert.match(r.el('note').innerHTML, /📅 발주 예정 <b>0건<\/b> 새로 걸림/);
+});
+test('★★ 받은 적이 있으면 탭을 열어도 다시 안 받는다(하루 한 번 자동에 맡긴다) · 열쇠가 없으면 안 받는다', async () => {
+  let n = 0;
+  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z' }); r.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  r.api.setTab('plan'); await tickP(20);
+  assert.equal(n, 0);
+  const r2 = runApp({ feed: [] }); r2.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  r2.api.setTab('plan'); await tickP(20);
+  assert.equal(n, 0); assert.match(r2.el('ptb').innerHTML, /인증키를 먼저/);
+});
+test('★★ 「아직 받은 적이 없습니다」 옆과 빈 표에 «누르는» 단추 — 글자만 있으면 막다른 길', () => {
+  const r = runApp({ feed: [], key_data: 'K' }); r.api.planDraw();
+  assert.match(r.el('planNote').innerHTML, /아직 받은 적이 없습니다<\/b> <button class="btn sm" onclick="planFetchNow\(\)">🔄 지금 받기<\/button>/);
+  assert.match(r.el('ptb').innerHTML, /<button class="btn sm" onclick="planFetchNow\(\)">🔄 지금 받기<\/button>/);
+});
+test('★★ 지금 받기를 두 번 눌러도 한 번만 · 받는 중엔 새로 받기(전부)와 겹치지 않는다', async () => {
+  const r = runApp({ feed: [], key_data: 'K', plan_at: 'x' }); let calls = 0, release; const gate = new Promise((ok) => { release = ok; });
+  r.api.setPull(async () => { calls++; await gate; return PLAN_ENV([]); });
+  const a = r.api.planFetchNow(); const b = r.api.planFetchNow(); const c = r.api.fetchAll();
+  release(); await a; await b; await c;
+  const one = runApp({ feed: [], key_data: 'K', plan_at: 'x' }); let c1 = 0;
+  one.api.setPull(async () => { c1++; return PLAN_ENV([]); }); await one.api.planFetchNow();
+  assert.equal(calls, c1, '겹쳐 받았다');
 });

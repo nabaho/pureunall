@@ -562,7 +562,7 @@ async function planFetch(kd){
   var pw=GovPlan.windows(pFrom, now, 31);
   for(var i=0;i<pw.length;i++){
     var w=pw[i];
-    note('⏳ 발주계획 받는 중… ('+GovPlan.ymd(w[0])+' 게시분부터)');
+    planProg('⏳ 발주계획 받는 중… ('+GovPlan.ymd(w[0])+' 게시분부터, '+(i+1)+'/'+pw.length+')');
     var r=await planPull('발주계획','plan', function(p){ return GovPlan.planUrl({key:kd, ymFrom:y+'01', ymTo:(y+1)+'12', from:w[0], to:w[1], page:p}); }, PLAN_PAGE_MAX.plan);
     rows=rows.concat(r.rows);
     if(r.err){ errs.push(r.err); if(!/쪽 뚜껑/.test(r.err)){ okP=false; break; } }
@@ -570,7 +570,7 @@ async function planFetch(kd){
   var sw=GovPlan.windows(sFrom, now, 31);
   for(var j=0;j<sw.length;j++){
     var v=sw[j];
-    note('⏳ 사전규격 받는 중…');
+    planProg('⏳ 사전규격 받는 중…');
     var q=await planPull('사전규격','spec', function(p){ return GovPlan.specUrl({key:kd, from:v[0], to:v[1], page:p}); }, PLAN_PAGE_MAX.spec);
     rows=rows.concat(q.rows);
     if(q.err){ errs.push(q.err); if(!/쪽 뚜껑/.test(q.err)){ okS=false; break; } }
@@ -585,6 +585,21 @@ async function planFetch(kd){
   lsSet('plan_at', now.toISOString());
   lsSet('plan_err', errs.join(' · '));
   return {added:m.added, updated:m.updated, posted:posted, errs:errs, got:rows.length};
+}
+/* 받는 동안 — 공고 모아보기 쪽 알림(note)과 «이 탭»(planNote) 둘 다에 보인다.
+   ⚠ 이 탭에 안 보이면 「아직 받은 적이 없습니다」만 떠 있어 눌러도 아무 일이 없는 줄 안다(2026-10-09 대표 화면). */
+function planProg(m){ note(m); var n=$('planNote'); if(n) n.innerHTML='<b>'+esc(m)+'</b> <span class="sml">— 처음 한 번은 올해 1월부터라 1~2분 걸릴 수 있습니다</span>'; }
+/* 발주 예정만 받기 — 「새로 받기」(전부)와 같은 문(_fetching)을 쓴다: 둘이 겹쳐 돌면 같은 줄을 두 번 합친다 */
+async function planFetchNow(quiet){
+  if(_fetching){ if(!quiet) toast('받고 있습니다 — 잠시만 기다려 주세요'); return; }
+  var kd=keyData(); if(!kd){ toast('인증키를 먼저 넣어 주세요'); return; }
+  _fetching=true;
+  try{
+    var pl=await planFetch(kd);
+    note('📅 발주 예정 <b>'+pl.added+'건</b> 새로 걸림 <span class="sub">(받은 '+pl.got+'건)</span>'
+      +(pl.errs.length?'<br><span style="color:var(--red)">'+esc(pl.errs.join(' · '))+'</span>':''));
+    toast('발주 예정 '+pl.added+'건이 새로 걸렸습니다'+(pl.errs.length?' — 못 받은 것이 있습니다(안내 참고)':''));
+  } finally { _fetching=false; planDraw(); }
 }
 function planMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('fMthd')) $('fMthd').value=lsGet('feed_mthd'); planDraw(); draw(); }
 function planRows(){
@@ -624,7 +639,7 @@ function planDraw(){
   var at=lsGet('plan_at'), err=lsGet('plan_err');
   $('planNote').innerHTML='나라장터 <b>발주계획</b>(기관이 연초·분기마다 올리는 «언제 발주할지») · <b>사전규격</b>(입찰공고 직전 미리 공개)을 공고 모아보기와 «같은 찾는 말»로 거른 것입니다. '
     +'계획에 없던 공고가 나올 수도 있어 공고 모아보기를 대신하지 않습니다.'
-    +(at?' · 마지막으로 받은 때 <b>'+esc(at.slice(0,16).replace('T',' '))+'</b>':' · <b>아직 받은 적이 없습니다</b> — 🔄 새로 받기')
+    +(at?' · 마지막으로 받은 때 <b>'+esc(at.slice(0,16).replace('T',' '))+'</b>':' · <b>아직 받은 적이 없습니다</b> <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>')
     +(err?'<br><span style="color:var(--red)">'+esc(err)+'</span> — 활용신청: <a href="'+GovPlan.PLAN_PAGE+'" target="_blank" rel="noopener">발주계획(15129462)</a> · <a href="'+GovPlan.SPEC_PAGE+'" target="_blank" rel="noopener">사전규격(15129437)</a>':'');
   $('planSel').innerHTML = sn ? ('<div class="sel-bar">✔ <b>'+sn+'건</b> 선택'
       +' <button class="btn sm" onclick="planBulk(\'star\')">★ 관심</button>'
@@ -655,7 +670,7 @@ function planDraw(){
         +(r.files&&r.files.length&&/^https:\/\//.test(r.files[0])?'<a class="btn sm" href="'+esc(r.files[0])+'" target="_blank" rel="noopener" title="사전규격서 (나라장터)">📎</a> ':'')
         +(r.hidden?'<button class="btn sm" title="되살리기" onclick="planHide(\''+no+'\',false)">↩</button>'
                   :'<button class="btn sm" onclick="planHide(\''+no+'\',true)">🚫</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 — 🔄 새로 받기를 눌러 주세요':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요')+'</td></tr>';
+  }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요')+'</td></tr>';
 }
 function planTog(no,on){ if(on) _planSel[no]=1; else delete _planSel[no]; planDraw(); }
 function planSelAll(on){ if(!on){ _planSel={}; planDraw(); return; }
@@ -1082,7 +1097,7 @@ function setTab(t){
   $('pgFeed').style.display = (t==='feed'?'':'none');
   if($('pgPlan')) $('pgPlan').style.display = (t==='plan'?'':'none');
   if($('tbPlan')) $('tbPlan').className='tb'+(t==='plan'?' on':'');
-  if(t==='plan') planDraw();
+  if(t==='plan'){ planDraw(); if(keyData() && !lsGet('plan_at') && !_fetching) planFetchNow(true); }
   $('pgRec').style.display  = (t==='rec'?'':'none');
   $('tbFeed').className='tb'+(t==='feed'?' on':'');
   $('tbRec').className ='tb'+(t==='rec'?' on':'');
