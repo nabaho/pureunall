@@ -57,13 +57,13 @@ test('ⓒ 합치기 모양 — 한 번에, by=지금 사람, 규칙 칸만, 수 
   const d = {
     from: { name: '가나상사(천안)', n: 2, r: 1, bz: '1234567890' },
     to: { name: '가나상사', n: 1, r: 0 },
-    fromDocs: { dA: { fileId: 'Kf1', title: '자문계약서', date: '2026-01-02', src: 'folder', at: 5, by: 'old', byName: '김철수', secret: true, junk: 1 },
+    fromDocs: { dA: { fileId: 'Kf1', title: '자문계약서', date: '2026-01-02', src: 'folder', at: 5, by: 'old', byName: '김철수', secret: true, kind: '사건', junk: 1 },
       dB: { fileId: 'Kf2', title: '위임장', src: 'upload', at: 6, by: 'old', secret: false }, dC: { title: '파일 없음' } },
     toDocs: { dT: { fileId: 'Kf9' } },
     fromRecs: { rA: { date: '2026-01-02', kind: '자문', amount: 330000, src: 'import', at: 7, by: 'old', docId: 'dA' } },
     toRecs: {} };
   const up = plain(D.mergePlan('가나상사(천안)', '가나상사', d, { uid: 'U1', name: '홍길동' }, 99));
-  assert.deepStrictEqual(up['co_docs/가나상사/dA'], { fileId: 'Kf1', title: '자문계약서', date: '2026-01-02', src: 'folder', secret: true, at: 5, by: 'U1', byName: '홍길동' });
+  assert.deepStrictEqual(up['co_docs/가나상사/dA'], { fileId: 'Kf1', title: '자문계약서', date: '2026-01-02', src: 'folder', secret: true, kind: '사건', at: 5, by: 'U1', byName: '홍길동' }, '정해 둔 종류(kind)도 옮긴다');
   assert.deepStrictEqual(up['co_docs/가나상사/dB'], { fileId: 'Kf2', title: '위임장', src: 'upload', at: 6, by: 'U1', byName: '홍길동' }, 'secret:false 는 싣지 않는다(규칙은 true 만)');
   assert.ok(!('co_docs/가나상사/dC' in up), '파일 없는 줄은 옮기지 않는다');
   assert.deepStrictEqual(up['co_recs/가나상사/rA'], { date: '2026-01-02', kind: '자문', amount: 330000, docId: 'dA', src: 'import', at: 7, by: 'U1', byName: '홍길동' });

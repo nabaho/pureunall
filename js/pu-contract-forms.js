@@ -609,6 +609,10 @@
     }, Promise.resolve()).then(function () { return { pages: pages, markers: markers, skipped: skipped }; });
   }
   function signable(fm) { var src = hwpSources(fm || {})[0]; return !!src && !isXlsxName(src.name); }
+  /* 서명 요청 양식 지문 조각 — 서명본을 그릴 원본(fillForPrint 가 쓰는 첫 원본)만. 화면이 덧붙이는 칸에 흔들리지 않게 */
+  function signSigParts(fms) {
+    return (fms || []).map(function (fm) { var s = hwpSources(fm || {})[0] || {}; return [fm && fm.id, s.name || '', s.fileId || '', s.data || '']; });
+  }
   /* 미리 채운 값 — 글자만, 300자까지, 열쇠에 못 쓰는 글자(. # $ [ ] /)는 뺀다 */
   function cleanVals(V) {
     var out = {};
@@ -658,11 +662,12 @@
         /* 서명자가 보는 그림은 가볍게(폰에서 받는다) — 저장본은 직원 화면이 촘촘히 다시 그린다 */
         return signRender(ok, Vp, host, { dpr: 1.3, q: 0.78 }).then(function (r) {
           var urls = r.pages.map(function (p) { return p.url; });
-          return SG.sha256Hex(urls.join('|')).then(function (hash) {
+          return Promise.all([SG.sha256Hex(urls.join('|')), SG.sha256Hex(SG.formSigText(signSigParts(ok)))]).then(function (hs) {
+            var hash = hs[0];
             var t = SG.newToken(), exp = SG.expAt(Date.now(), dd), fields = SG.signerFields(r.markers, Vp);
             var req = { t: t, co: String(Vp.회사명 || ''), who: { name: person.name, phone: person.phone }, p4: SG.p4Of(person.phone), exp: exp,
               forms: ok.map(function (f) { return f.id; }), title: String(title || ok.map(function (f) { return f.name; }).join(' · ')).slice(0, 120),
-              mode: md, kind: SG.recKindOf(ok), V: cleanVals(Vp), fields: fields, status: 'sent' };
+              mode: md, kind: SG.recKindOf(ok), V: cleanVals(Vp), fields: fields, formSig: hs[1], status: 'sent' };
             var open = { exp: exp, pages: urls, land: r.pages.map(function (p) { return !!p.land; }), docHash: hash, fields: fields, mode: md,
               title: req.title, co: req.co, name: person.name };
             return host.sign.create(req, open).then(function (x) { res.push({ name: person.name, link: x.link, exp: exp, mode: md, title: req.title }); });
@@ -2927,7 +2932,7 @@
     changeRemoved: changeRemoved,
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
-    signRender: signRender, cleanVals: cleanVals,
+    signRender: signRender, signSigParts: signSigParts, cleanVals: cleanVals,
     CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TYPE_SET: TYPE_SET, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf, srcType: srcType, moreFilter: moreFilter,

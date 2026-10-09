@@ -41,6 +41,23 @@
     });
     return out.slice(0, 20);
   }
+  function fieldKeys(fields) {
+    var fl = Array.isArray(fields) ? fields : Object.keys(fields || {}).map(function (i) { return fields[i]; });
+    return fl.map(function (f) { return f && f.k; }).filter(function (k) { return k && !NOT_ASK.test(k); });
+  }
+  /* 저장본에 넣을 값 — 서명자가 적은 값은 «물어본 빈칸»에만 들어간다.
+     ⚠ 규칙은 sub/vals 칸 이름을 가리지 않는다 — 여기서 막지 않으면 서명자가 직원이 채운 금액·보수율을 바꿔 🔒 서명본에 남길 수 있다(검토 2026-10-09) */
+  function signedVals(V, fields, sub) {
+    var out = {}, has = Object.prototype.hasOwnProperty, k;
+    for (k in (V || {})) if (has.call(V, k)) out[k] = V[k];
+    fieldKeys(fields).forEach(function (key) {
+      if (!sub || !has.call(sub, key)) return;
+      if (out[key] != null && String(out[key]).trim() !== '') return;
+      var v = sub[key]; if (v == null || typeof v === 'object') return;
+      out[key] = String(v).slice(0, 300);
+    });
+    return out;
+  }
   /* 양식 갈래 → 계약 기록 종류(기업별 계약서 KINDS) */
   var KIND_OF_FORM = { company: '자문', 'case': '사건', consulting: '컨설팅', fund: '기금', consult: '제안서', other: '기타' };
   function recKindOf(forms) {
@@ -82,8 +99,28 @@
       ['문서 지문', String(docHash || '').slice(0, 32) + '…'],
       ['기기', String(sub.ua || '').slice(0, 80)]
     ];
-    Object.keys(sub.vals || {}).forEach(function (k) { lines.push(['적은 칸 · ' + k, String(sub.vals[k] || '(비움)')]); });
+    /* 물어본 칸만 적는다 — 물어보지 않은 이름으로 들어온 값은 저장본에도 확인서에도 넣지 않는다 */
+    var vals = sub.vals || {};
+    fieldKeys(req.fields).forEach(function (k) { if (Object.prototype.hasOwnProperty.call(vals, k)) lines.push(['적은 칸 · ' + k, String(vals[k] || '(비움)')]); });
     return lines;
+  }
+  /* 양식 지문 글 — 요청 때와 저장 때 «그리는 원본»이 같은지 본다. parts 는 PuContractForms.signSigParts(양식 id·원본 이름·자리) */
+  function canon(x) {
+    if (x == null || typeof x !== 'object') return JSON.stringify(x === undefined ? null : x);
+    if (Array.isArray(x)) return '[' + x.map(canon).join(',') + ']';
+    return '{' + Object.keys(x).filter(function (k) { return k.charAt(0) !== '_' && x[k] !== undefined; }).sort()
+      .map(function (k) { return JSON.stringify(k) + ':' + canon(x[k]); }).join(',') + '}';
+  }
+  function formSigText(parts) { return canon(parts || []); }
+  /* 서명본 저장 자물쇠 — 직원 둘이 같은 때 화면을 열어도 한 사람만 저장한다. 10분 넘게 풀리지 않으면 멈춘 것으로 보고 넘겨받는다.
+     반환 undefined = 손대지 않음(트랜잭션 그만), null = 비어 있는 자리(서버 값으로 다시 돈다) */
+  var LOCK_MS = 10 * 60 * 1000;
+  function lockStep(cur, uid, now) {
+    if (cur === null) return null;
+    if (!cur || cur.status === 'saved' || cur.status === 'void') return undefined;
+    if (cur.lock && cur.lock.by !== uid && now - (cur.lock.at || 0) < LOCK_MS) return undefined;
+    cur.lock = { by: uid, at: now };
+    return cur;
   }
   function ymdhm(ts) {
     if (!ts) return '';
@@ -98,9 +135,9 @@
     });
   }
 
-  var api = { newToken: newToken, p4Of: p4Of, parseRecipients: parseRecipients, signerFields: signerFields, recKindOf: recKindOf,
+  var api = { newToken: newToken, p4Of: p4Of, parseRecipients: parseRecipients, signerFields: signerFields, signedVals: signedVals, recKindOf: recKindOf,
     statusOf: statusOf, STATUS_TXT: STATUS_TXT, linkOf: linkOf, expAt: expAt, shareText: shareText, certLines: certLines,
-    sha256Hex: sha256Hex, ymd: ymd, ymdhm: ymdhm, NOT_ASK: NOT_ASK };
+    sha256Hex: sha256Hex, formSigText: formSigText, lockStep: lockStep, LOCK_MS: LOCK_MS, ymd: ymd, ymdhm: ymdhm, NOT_ASK: NOT_ASK };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   root.PuSign = api;
 })(typeof window !== 'undefined' ? window : this);

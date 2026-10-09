@@ -44,6 +44,7 @@ test('ⓒ 칩 거르기', () => {
   assert.deepStrictEqual(D.filterCosBy(cos, idx, 'case', '').map((c) => c.key), ['a']);
   assert.deepStrictEqual(D.filterCosBy(cos, idx, '', 'missing').map((c) => c.key), ['b']);
   assert.deepStrictEqual(D.filterCosBy(cos, idx, '', '').map((c) => c.key), ['a', 'b', 'c']);
+  assert.deepStrictEqual(D.filterCosBy(cos, null, 'case', 'missing').map((c) => c.key), ['a', 'b', 'c'], '색인을 못 읽으면 갈래 거르기를 걸지 않는다(풀 길 없이 갇히지 않게)');
 });
 
 test('ⓓ 저장 · 규칙', () => {

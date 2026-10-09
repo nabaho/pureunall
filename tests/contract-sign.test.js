@@ -14,6 +14,7 @@ const { test } = require('node:test');
 const R = path.join(__dirname, '..');
 const read = (f) => fs.readFileSync(path.join(R, f), 'utf8').replace(/\r\n/g, '\n');
 const S = require('../js/pu-sign.js');
+const cf0 = () => read('js/pu-contract-forms.js');
 
 test('ⓐ 받는 사람 · 끝 4자리 · 열쇠', () => {
   const r = S.parseRecipients('김가나 010-1200-0001\n이다라,01012000002\n\n박마바\n010-1200-0003');
@@ -75,10 +76,20 @@ test('ⓕ 직원 화면 — 만들기·저장', () => {
   const f = h.slice(h.indexOf('async function formSignFinalize('), h.indexOf('\n}\n', h.indexOf('async function formSignFinalize(')));
   assert.match(f, /PuSign\.sha256Hex\(\(o\.pages \|\| \[\]\)\.join\('\|'\)\)/);
   assert.match(f, /putOriginal\([^;]*\{ secret: true \}\)/);
-  assert.match(f, /addCoDoc\(\{[^}]*secret: true \}\)/);
+  assert.match(f, /addCoDoc\(\{[^}]*secret: put\.secret !== false \}\)/, '같은 파일이 일반 원본이면 🔒 표시를 붙이지 않는다');
   assert.match(f, /importCoRecs\(\[\{[^}]*docId: cd\.docId/);
   assert.match(f, /gotAwait\(cd\.coKey, cd\.docId\)/);
-  assert.match(f, /update\(\{ status: 'saved', docId: cd\.docId/);
+  assert.match(f, /update\(\{ status: 'saved', savedAt: Date\.now\(\), hashOk: hashOk, lock: null/);
+  assert.match(f, /reqRef\.transaction\(function \(cur\) \{ return PuSign\.lockStep\(cur, me, Date\.now\(\)\); \}/, '저장 전에 자물쇠');
+  assert.match(f, /PuSign\.signedVals\(r\.V \|\| \{\}, r\.fields, o\.sub\.vals \|\| \{\}\)/, '서명자 값은 물어본 빈칸에만');
+  assert.doesNotMatch(f, /Object\.assign\(\{\}, r\.V[^)]*o\.sub\.vals/, '서명자 값으로 미리 채운 값을 덮지 않는다');
+  assert.doesNotMatch(f.slice(0, f.indexOf('} catch (e) {')), /\.catch\(function \(\) \{\}\)/, '뒤따르는 단계 실패를 삼키지 않는다');
+  assert.match(f, /update\(\{ fileId: put\.fileId/, '원본을 만든 뒤 바로 적는다(다시 돌 때 또 만들지 않게)');
+  assert.match(f, /var put = r\.fileId \?/);
+  assert.match(f, /reqRef\.child\('lock'\)\.remove\(\)/, '실패하면 자물쇠를 푼다');
+  const od = read('js/pu-office-docs.js');
+  assert.match(od, /if \(e && e\.code === 'busy'\) return;/, '다른 화면이 저장 중이면 건너뛴다(실패로 세지 않는다)');
+  assert.match(cf0(), /formSig: hs\[1\]/, '요청 때 양식 지문을 남긴다');
   assert.match(h, /sign: formSignApi\(\), me:/);
   const cf = read('js/pu-contract-forms.js');
   assert.match(cf, /host\.sign \? el\('button', \{[^)]*text: '✍ 서명 받기'/);
@@ -90,4 +101,39 @@ test('ⓖ 안내 글', () => {
   assert.match(t, /김가나님/); assert.match(t, /sign-contract\.html\?t=abc/);
   assert.doesNotMatch(t, /010/);
   assert.equal(S.linkOf('https://a.b/docs-esign.html', 'abc'), 'https://a.b/sign-contract.html?t=abc');
+});
+
+/* 검토 2026-10-09 — 서명자가 미리 채운 계약 값을 바꾸던 구멍 · 서명본 2벌 · 확인서 칸 */
+test('ⓗ 서명자 값은 물어본 빈칸에만', () => {
+  const V = { 회사명: '가나상사', 계약금액: '3,300,000', 성공보수율: '10%' };
+  const fields = [{ k: '근로자주소', label: '근로자주소' }, { k: '가족연락처', label: '가족연락처' }];
+  const sub = { 계약금액: '0', 성공보수율: '1%', 근로자주소: '서울 어딘가 1', 주민번호: '000000-0000000', 가족연락처: { x: 1 } };
+  const out = JSON.parse(JSON.stringify(S.signedVals(V, fields, sub)));
+  assert.deepStrictEqual(out, { 회사명: '가나상사', 계약금액: '3,300,000', 성공보수율: '10%', 근로자주소: '서울 어딘가 1' });
+  const obj = JSON.parse(JSON.stringify(S.signedVals({}, { 0: { k: '근로자주소' } }, { 근로자주소: 'x'.repeat(400) })));
+  assert.equal(obj.근로자주소.length, 300, '실시간DB 가 배열을 묶음으로 돌려줘도 읽고, 300자까지');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(S.signedVals(V, [{ k: '서명' }], { 서명: 'x' }))), V, '묻지 않는 칸은 받지 않는다');
+});
+
+test('ⓘ 확인서에는 물어본 칸만', () => {
+  const ls = S.certLines({ title: '위임약정서', fields: [{ k: '근로자주소' }] }, { vals: { 근로자주소: '서울', 계약금액: '0' } }, 'ab');
+  const names = ls.map((l) => l[0]);
+  assert.ok(names.indexOf('적은 칸 · 근로자주소') >= 0);
+  assert.ok(names.indexOf('적은 칸 · 계약금액') < 0);
+});
+
+test('ⓙ 저장 자물쇠', () => {
+  const now = 1e6;
+  assert.strictEqual(S.lockStep(null, 'U1', now), null, '빈 자리는 서버 값으로 다시 돈다');
+  assert.strictEqual(S.lockStep({ status: 'saved' }, 'U1', now), undefined);
+  assert.strictEqual(S.lockStep({ status: 'void' }, 'U1', now), undefined);
+  assert.strictEqual(S.lockStep({ status: 'sent', lock: { by: 'U2', at: now - 1000 } }, 'U1', now), undefined, '다른 사람이 막 잡은 것');
+  assert.deepStrictEqual(S.lockStep({ status: 'sent', lock: { by: 'U2', at: now - S.LOCK_MS - 1 } }, 'U1', now).lock, { by: 'U1', at: now }, '멈춘 자물쇠는 넘겨받는다');
+  assert.deepStrictEqual(S.lockStep({ status: 'sent' }, 'U1', now).lock, { by: 'U1', at: now });
+});
+
+test('ⓚ 양식 지문 글 — 열쇠 차례에 흔들리지 않는다', () => {
+  assert.equal(S.formSigText([['f1', 'a.hwp', 'K1', '']]), S.formSigText([['f1', 'a.hwp', 'K1', '']]));
+  assert.notEqual(S.formSigText([['f1', 'a.hwp', 'K1', '']]), S.formSigText([['f1', 'a.hwp', 'K2', '']]));
+  assert.match(cf0(), /function signSigParts\(fms\)[\s\S]*hwpSources\(fm \|\| \{\}\)\[0\]/, '그리는 원본(첫 원본)으로 본다');
 });
