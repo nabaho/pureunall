@@ -88,3 +88,37 @@ test('읽기 — 서버 칸이 비어 있어도 빈 모양을 돌려준다', asy
   assert.equal(L.run, null);
   assert.equal(await S.text('rd_none'), '');
 });
+
+test('잇기 진행 알림 — 한 건마다 (n, 전체)', async () => {
+  const db = fakeDb(); const S = make(db); const seen = [];
+  await S.linkCompany(['rd_1', 'rd_2', 'rd_3'], 'co_gana', (n, t) => seen.push(n + '/' + t));
+  assert.deepEqual(seen, ['1/3', '2/3', '3/3']);
+});
+
+test('중간에 거절되면 몇 건 했는지 알리고 멈춘다', async () => {
+  const db = fakeDb(); const S = make(db);
+  const orig = db.ref;
+  db.ref = (p) => { const r = orig(p); if (p.endsWith('/rd_2')) r.transaction = async () => { throw new Error('막힘'); }; return r; };
+  await assert.rejects(() => S.linkCompany(['rd_1', 'rd_2', 'rd_3'], 'co_gana'), /1\/3건 저장한 뒤 멈춤/);
+  assert.equal(db.store.rules_mgmt.library.human.rd_1.companyLinkStatus, 'linked');
+  assert.equal(db.store.rules_mgmt.library.human.rd_3, undefined);
+});
+
+test('되돌리기 — 다시 미확정(pending), 회사 칸은 비운다', async () => {
+  const db = fakeDb(); const S = make(db);
+  await S.linkCompany(['rd_1'], 'co_gana');
+  await S.unlink(['rd_1']);
+  const h = db.store.rules_mgmt.library.human.rd_1;
+  assert.equal(h.companyLinkStatus, 'pending'); assert.equal(h.companyId, null);
+});
+
+test('최종본 없음 — noFinal 만 바꾸고 finalDocId 는 그대로', async () => {
+  const db = fakeDb(); const S = make(db);
+  await S.setNoFinal('co_gana', 'r202601', true);
+  let r = db.store.rules_mgmt.library.rounds.co_gana_r202601;
+  assert.equal(r.noFinal, true); assert.equal(r.entityType, 'RulesRound');
+  await S.setFinal('co_gana', 'r202601', 'rd_1');
+  await S.setNoFinal('co_gana', 'r202601', false);
+  r = db.store.rules_mgmt.library.rounds.co_gana_r202601;
+  assert.equal(r.noFinal, false); assert.equal(r.finalDocId, 'rd_1');
+});
