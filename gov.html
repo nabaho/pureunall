@@ -104,6 +104,9 @@ tr.sel-on td.rn{color:var(--navy);font-weight:700}
 #pgFeed table{width:100%}
 #pgFeed td{white-space:nowrap;vertical-align:middle}
 td.nm{width:42%;max-width:0;overflow:hidden;text-overflow:ellipsis}
+/* 📅 발주 예정 — 좁은 칸(담당·금액·예정)이 한 글자씩 접혀 줄이 97px 이 됐다(2026-10-09 실측). 사업명만 줄임표로 */
+#pgPlan td{white-space:nowrap}
+#pgPlan td.og{max-width:220px;overflow:hidden;text-overflow:ellipsis}
 /* 🧑‍💼 컨설턴트 모집 (2026-10-04) */
 #pgRec td{vertical-align:middle}
 .yr{display:inline-block;min-width:24px;text-align:center;padding:0 4px;margin:1px 2px 1px 0;border-radius:4px;
