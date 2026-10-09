@@ -16,6 +16,6 @@
 - 10/9 실측: 국세청 폐업 46·휴업 1 · 회사 도메인 864개 중 없어진 것 80(명함 113장) · 받은메일 반송 5통.
 - 검사: `tests/cards-gone.test.js`(7). 화면은 가짜 자료로 그려 PC·폰·정리한 것 갈래를 눈으로 확인.
 
-## 배포
-합친 뒤 `firebase deploy --only functions:goneWatch,functions:syncMailbox,functions:pullMailbox`.
+## 배포 — 끝 (2026-10-09)
+#2214 합친 뒤 `firebase deploy --only functions:goneWatch,functions:syncMailbox,functions:pullMailbox` 로 올렸다. 배포 뒤 첫 메일 동기화(12:10) 정상.
 도메인 목록은 다음 날 06:30 첫 회차 뒤에 찬다(그 전에는 국세청 근거만 보인다).
