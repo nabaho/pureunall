@@ -421,7 +421,8 @@ async function run(o) {
   boards.forEach((b, i) => {
     Object.assign(fixes, per[i].fix || {});
     if (per[i].count !== undefined) counts[b.id] = per[i].count;
-    if (per[i].error) errors.push({ board: b.id, why: per[i].error });
+    /* 이름·주소도 함께 — 화면이 「어느 게시판을 직접 열어야 하나」를 말할 수 있게 */
+    if (per[i].error) errors.push({ board: b.id, why: per[i].error, name: b.name || b.id, url: b.page || b.url });
     else per[i].hits.forEach((h) => hits.push(h));   // (오류 난 곳은 글이 비어 있지만 한 번 더 막아 둔다)
   });
   /* ── 본문 열어 «접수 기간» 붙이기 (대표 지시 2026-10-05 「기간 표시해서 날짜가 지났는지 반드시」) ──
@@ -525,8 +526,12 @@ async function probeBoard(o) {
 }
 
 /* RTDB 에 쓸 것 — 새 글만 더하고, 넘치면 «오래된 것부터» 지운다(있던 글을 고치지 않는다) */
-function updatesOf(result, existing, nowIso) {
+/* o.fails — 지금까지 «며칠째 못 읽는» 게시판(gov_watch/fails) · o.today — 서울 날짜.
+   ⚠ 하루 실패로는 다음 날 다시 읽으면 되지만, 여러 날 이어지면 사람이 «직접 열어» 봐야 한다(지방공기업평가원 2026-10-05~).
+     그래서 처음 못 읽은 날(since)·이어진 날 수(n)를 남기고, 다시 읽히면 지운다. 이번에 안 읽은 게시판은 건드리지 않는다. */
+function updatesOf(result, existing, nowIso, o) {
   const upd = {};
+  o = o || {};
   result.hits.forEach((h) => { upd['hits/' + h.key] = h; });
   const all = Object.keys(existing || {}).map((k) => ({ k, d: (existing[k] && existing[k].date) || '' }))
     .concat(result.hits.map((h) => ({ k: h.key, d: h.date })));
@@ -548,6 +553,16 @@ function updatesOf(result, existing, nowIso) {
   upd.last = { at: nowIso, checked: result.checked, added: result.hits.length,
     errors: result.errors, counts: result.counts };
   if (result.ai) upd.last.ai = result.ai;   // AI 에게 물은 건수(돈)
+  if (o.today) {
+    const fails = o.fails || {}, bad = {};
+    (result.errors || []).forEach((e) => {
+      bad[e.board] = true;
+      const p = fails[e.board] || {};
+      upd['fails/' + e.board] = { since: p.since || o.today, n: (p.last === o.today ? (p.n || 1) : (p.n || 0) + 1), last: o.today,
+        why: String(e.why || '').slice(0, 160), name: e.name || p.name || e.board, url: e.url || p.url || '' };
+    });
+    Object.keys(result.counts || {}).forEach((b) => { if (!bad[b] && fails[b]) upd['fails/' + b] = null; });
+  }
   const 뺀 = Object.keys(result.drops || {}).filter((k) => existing && existing[k]).length;
   if (뺀) upd.last.dropped = 뺀;
   return upd;

@@ -1069,6 +1069,29 @@ exports.rulesLawWatch = functions
    ⚠ 남기는 것은 기관 공지 «제목·날짜·주소»뿐(공개 정보). 대표 지원 이력은 여기 없다.
    ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › gov_watch). 화면은 정부사업신청 › 컨설턴트 모집.
    07:20 — 다른 아침 일들(06:00 법 감시·07:00·07:10)과 겹치지 않게. */
+/* 컨설턴트 모집 감시 — fetch(undici) 가 못 열 때 쓰는 «다른 길»(node https · IPv4 · 넘김 셋까지) */
+function 모집다른길(u, raw, 넘김) {
+  return new Promise((ok, no) => {
+    const req = require("https").get(u, { family: 4, timeout: 30000,
+      headers: { "User-Agent": RecruitWatch.UA, "Accept": "text/html,application/xhtml+xml,*/*", "Accept-Language": "ko-KR,ko;q=0.9" } }, (res) => {
+      const s = res.statusCode || 0;
+      if (s >= 300 && s < 400 && res.headers.location && 넘김 < 3) {
+        res.resume();
+        return 모집다른길(new URL(res.headers.location, u).href, raw, 넘김 + 1).then(ok, no);
+      }
+      if (s !== 200) { res.resume(); return no(new Error("HTTP " + s)); }
+      const 조각 = [];
+      res.on("data", (d) => 조각.push(d));
+      res.on("error", no);
+      res.on("end", () => {
+        const b = new Uint8Array(Buffer.concat(조각));
+        ok(raw ? b : RecruitWatch.decode(b, res.headers["content-type"]));
+      });
+    });
+    req.on("timeout", () => req.destroy(Object.assign(new Error("30초 안에 답이 없음"), { code: "TIMEOUT" })));
+    req.on("error", no);
+  });
+}
 exports.recruitWatch = functions
   .region(MAIL_REGION)
   /* ILABOR_ID·ILABOR_PW — 공인노무사회 «회원 공지»를 읽으려고 뉴스레터의 로그인 비밀값을 빌린다(2026-10-04).
@@ -1082,6 +1105,7 @@ exports.recruitWatch = functions
     const root = getDatabase().ref("gov_watch");
     const hSnap = await root.child("hits").once("value");
     const existing = hSnap.val() || {};
+    const fails = (await root.child("fails").once("value")).val() || {};   // 며칠째 못 읽는 게시판
     const nowIso = new Date().toISOString();
     const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
     const fetchText = RecruitWatch.makeFetcher({
@@ -1089,7 +1113,14 @@ exports.recruitWatch = functions
         let res;
         /* ⚠ 「fetch failed」 한 줄로는 왜인지 모른다 — 까닭 코드를 붙인다(지방공기업평가원이 날마다 이것으로 빠진다, 2026-10-09) */
         try { res = await fetch(u, { headers: { "User-Agent": RecruitWatch.UA }, signal: AbortSignal.timeout(30000) }); }
-        catch (e) { const 까닭 = e && e.cause && (e.cause.code || e.cause.message); throw new Error(String((e && e.message) || e) + (까닭 ? " [" + String(까닭).slice(0, 60) + "]" : "")); }
+        catch (e) {
+          const 까닭 = e && e.cause && (e.cause.code || e.cause.message);
+          const 첫말 = String((e && e.message) || e) + (까닭 ? " [" + String(까닭).slice(0, 60) + "]" : "");
+          /* ★ 다른 길로 한 번 더 — 지방공기업평가원은 이 PC·해외 8곳에선 열리는데 서버에서만 날마다 「fetch failed」(2026-10-05~).
+               undici(fetch) 대신 node https · IPv4 로 다시 부른다. 그래도 안 되면 두 까닭을 다 남긴다. */
+          try { return await 모집다른길(u, raw, 0); }
+          catch (e2) { throw new Error((첫말 + " / 다시: " + String((e2 && (e2.code || e2.message)) || e2)).slice(0, 160)); }
+        }
         if (!res.ok) throw new Error("HTTP " + res.status);
         if (raw) return new Uint8Array(await res.arrayBuffer());
         return RecruitWatch.decode(new Uint8Array(await res.arrayBuffer()), res.headers.get("content-type"));
@@ -1124,7 +1155,7 @@ exports.recruitWatch = functions
       return ps.map((p) => (p && p.text) || "").join("");
     };
     const result = await RecruitWatch.run({ existing, today, nowIso, fetchText, details: true, ai });   // 새 글 본문을 열어 접수 기간까지
-    await root.update(RecruitWatch.updatesOf(result, existing, nowIso));
+    await root.update(RecruitWatch.updatesOf(result, existing, nowIso, { fails, today }));
     /* 처음 한 번만 — 회원 공지에 모집 공문이 정말 오는지 다섯 쪽을 훑어 남긴다(대표 확인용, 관리자만 읽힌다).
        ⚠ 로그인이 안 됐으면 남기지 않는다 — 다음 날 다시 해 본다. */
     try {

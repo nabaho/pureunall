@@ -332,7 +332,7 @@ test('★★ 서버가 찾은 새 모집 글을 날짜 내림차순으로 보여
   const w = r.el('recWatch').innerHTML;
   assert.ok(w.indexOf('외부연구진') < w.indexOf('현장코칭'), '최근 글이 위');
   assert.match(w, /새 글 2</);
-  assert.match(w, /11곳/); assert.match(w, /못 읽은 곳 1\(lh\)/, '고장 난 게시판을 숨기지 않는다');
+  assert.match(w, /11곳/); assert.match(w, /못 읽은 곳 1\(LH 한국토지주택공사\)/, '고장 난 게시판을 숨기지 않는다(기관 이름으로)');
   assert.match(r.el('recTb').innerHTML, /🆕 새 글/);
   assert.equal(r.api.recNewFor('erc'), true);
 });
@@ -778,7 +778,7 @@ test('★★★ 출처로 두 탭에 가른다 — 공인노무사회 게시판(
   /* 게시판 이름은 짧게 */
   assert.match(kc, /<td class="src">회원 공지</);
   /* 못 읽은 곳은 그 탭에만 */
-  assert.match(pub, /못 읽은 곳 1\(erc\)/); assert.doesNotMatch(kc, /못 읽은 곳/);
+  assert.match(pub, /못 읽은 곳 1\(지방공기업평가원\)/); assert.doesNotMatch(kc, /못 읽은 곳/);
 });
 test('★★ 내용으로 갈래 — 단추를 누르면 그 갈래만, 개수가 맞는다', async () => {
   const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
@@ -1182,4 +1182,42 @@ test('★★ 한글 지원서는 표를 «한 행 = 한 줄»로 읽어 견준�
   const row = rowOf(r.el('recChkOut').innerHTML, '재단법인 충남경제진흥원 컨설턴트');
   assert.match(row, /2026\.03 ~ 현재<\/b> 재단법인 충남경제진흥원 컨설턴트 구조혁신 일자리전환 컨설팅/);
   assert.match(row, /✅ 동일/);
+});
+
+/* ═══ 여러 날 못 읽는 게시판 — 「다음 날 다시」로 넘기지 않고 직접 열 길을 준다 (2026-10-09, 지방공기업평가원 10-05~) ═══ */
+function watchStuck(n, url) {
+  return { last: { at: '2026-10-09T22:20:00Z', checked: 19, added: 0,
+      errors: [{ board: 'erc', why: 'fetch failed [UND_ERR_CONNECT_TIMEOUT] / 다시: TIMEOUT', name: '지방공기업평가원 공지', url: url }], counts: { semas: 10 } },
+    fails: n ? { erc: { since: '2026-10-05', n: n, last: '2026-10-10', why: 'fetch failed', name: '지방공기업평가원 공지', url: url } } : undefined,
+    hits: { k1: { key: 'k1', board: 'semas', org: 'semas', boardName: '소진공 공지', title: '소상공인시장진흥공단 비상임이사 모집공고', date: '2026-10-01', href: 'https://www.semas.or.kr/v?1' } } };
+}
+const ERC_URL = 'https://www.erc.re.kr/usr/com/prm/BBSList.do?bbsId=BBSMSTR_000000000251&menuNo=3000&upperMenuId=3';
+test('★★★ 여러 날 못 읽는 게시판은 크게 — 언제부터·며칠째·직접 열기·까닭', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
+  r.api.setFb(fbWith(watchStuck(5, ERC_URL)), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.match(w, /<div class="recban">⚠ 서버가 <b>지방공기업평가원 공지<\/b> 게시판을 10\.05부터 <b>5일째<\/b> 못 읽고/);
+  assert.ok(w.indexOf('<a href="' + ERC_URL.replace(/&/g, '&amp;') + '" target="_blank" rel="noopener">🔗 게시판 직접 열기</a>') > 0, '직접 열 링크가 없다');
+  assert.match(w, /까닭: fetch failed \[UND_ERR_CONNECT_TIMEOUT\]/);
+  assert.doesNotMatch(w, /다음 날 다시 읽습니다/, '닷새째인데 「다음 날 다시」라고 한다');
+  assert.ok(w.indexOf('5일째') < w.indexOf('rec-head'), '띠는 머리줄 위에');
+});
+test('★★ 하루 실패는 예전처럼 작게 — 「다음 날 다시 읽습니다」, 큰 띠 없음', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
+  r.api.setFb(fbWith(watchStuck(1, ERC_URL)), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.doesNotMatch(w, /일째/); assert.match(w, /못 읽은 곳 1\(지방공기업평가원 공지\) — 다음 날 다시 읽습니다/);
+  const r2 = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
+  r2.api.setFb(fbWith(watchStuck(0, ERC_URL)), 'U1');
+  await r2.api.recWatchPull();
+  assert.doesNotMatch(r2.el('recWatch').innerHTML, /일째/, 'fails 가 없으면(옛 서버) 큰 띠를 안 그린다');
+});
+test('★ 직접 열기 링크는 https 만 — 이상한 주소는 링크로 안 그린다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
+  r.api.setFb(fbWith(watchStuck(3, 'javascript:alert(1)')), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.match(w, /3일째/); assert.doesNotMatch(w, /javascript:/); assert.doesNotMatch(w, /직접 열기<\/a>/);
 });
