@@ -1366,7 +1366,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=4"></script>
+<script src="js/kcareer-biz.js?v=5"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=4"></script>
@@ -15329,7 +15329,8 @@ function renderBizDash(){
     box.innerHTML='<div class="fd-box" style="padding:22px;text-align:center;font-size:13px">아직 넣은 사업이 없습니다 — 7번 폴더의 사업 건을 골라 올리거나 새로 더하세요.'
       +'<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
       +'<button class="btn" type="button" onclick="navTile(\'page-bizlist\');bizPickCase()">📂 7번 폴더에서 사업 고르기</button>'
-      +'<button class="btn primary" type="button" onclick="bizOpen()">＋ 사업 추가</button></div></div>';
+      +'<button class="btn primary" type="button" onclick="bizOpen()">＋ 사업 추가</button></div></div>'
+      +_bizPerfHtml()+_bizMailHtml();
     return;
   }
   var 진행=Object.keys(s.openBy).map(function(k){ return k+' '+s.openBy[k]; }).join(' · ')||'없음';
@@ -15355,7 +15356,126 @@ function renderBizDash(){
       return '<div class="fd-bar" onclick="bizGo({year:\''+y+'\'})"><span class="k">'+y+'</span><span class="t"><i style="width:'+Math.round(b.n*100/mx)+'%"></i></span><span class="a">'+b.n+'건 · 선정 '+b.win+'</span></div>'; }).join('')+'</div></div>';
   html+='<div class="fd-box"><h4>구분별</h4>'+KcareerBiz.KINDS.map(function(k){
       return '<button class="btn sm" type="button" style="margin:0 6px 4px 0" onclick="bizGo({kind:\''+_jsAttr(k)+'\'})">'+escapeHtml(k)+' '+(s.byKind[k]||0)+'</button>'; }).join('')+'</div>';
+  html+=_bizPerfHtml()+_bizMailHtml();
   box.innerHTML=html;
+}
+/* ── 📊 사업별 수행 건수 (대표 지시 2026-10-09 「어떤사업을 몇건 얼마나 했는지 모두 잘 정리」) ──
+   바탕은 컨설팅 실적(consult = 컨설팅실적 + 외부기관 실적, 이알피에서 온다). 셈은 KcareerBiz.perfTable 한 곳.
+   ⚠ 사업 이름은 글자 그대로 — 비슷해 보여도 합치지 않는다(대표 결정). 연도는 최근 6해 + 그 앞은 「이전」. */
+var _bizPerfOpen='';
+function _bizPerfHtml(){
+  var t=KcareerBiz.perfTable(get('consult')||[]);
+  if(!t.total) return '<div class="fd-box"><h4>📊 사업별 수행 건수</h4><div style="font-size:12px;color:var(--text-mute)">컨설팅 실적이 아직 없습니다 — 이알피에서 받아 오면 여기 사업별로 셉니다</div></div>';
+  var ys=t.years.slice(-6), 앞=t.years.slice(0, Math.max(0, t.years.length-6));
+  var 금액=t.amt>0, mx=t.rows[0].total||1, Y=String(new Date().getFullYear());
+  var 칸=function(n){ return '<td style="text-align:right;font-variant-numeric:tabular-nums'+(n?'':';color:var(--text-mute)')+'">'+(n||'·')+'</td>'; };
+  var h='<div class="fd-box"><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📊 사업별 수행 건수'
+    +'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">전체 '+t.total+'건 · '+t.rows.length+'개 사업'
+    +(t.byYear[Y]?' · 올해 '+t.byYear[Y]+'건':'')+(t.unknown?' · 연도 모름 '+t.unknown+'건':'')+'</span>'
+    +'<span style="flex:1"></span><span style="font-size:11px;font-weight:400;color:var(--text-mute)">사업 이름은 이알피 «유형» 그대로 · 줄을 누르면 업체 목록</span></h4>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
+    +'<th class="rownum-h">№</th><th style="text-align:left">사업</th><th style="text-align:left">수행기관</th>'
+    +(앞.length?'<th style="text-align:right" title="'+escapeHtml(앞.join('·'))+'">이전</th>':'')
+    +ys.map(function(y){ return '<th style="text-align:right">'+y+'</th>'; }).join('')
+    +'<th style="text-align:right">모름</th><th style="text-align:right">합계</th>'+(금액?'<th style="text-align:right">금액</th>':'')+'<th style="text-align:left">담당</th></tr></thead><tbody>';
+  t.rows.forEach(function(g,i){
+    var 이전=앞.reduce(function(s,y){ return s+(g.byYear[y]||0); },0);
+    var 기관=KcareerBiz.topCounts(g.agency,2), 열림=(_bizPerfOpen===g.type);
+    h+='<tr style="cursor:pointer'+(열림?';background:var(--border-soft)':'')+'" onclick="bizPerfToggle(\''+_jsAttr(g.type)+'\')">'
+      +'<td class="rownum">'+(i+1)+'</td>'
+      +'<td style="white-space:nowrap"><span style="display:inline-block;height:7px;border-radius:4px;background:var(--blue);vertical-align:middle;margin-right:6px;width:'+Math.max(4,Math.round(g.total*70/mx))+'px"></span><b>'+escapeHtml(g.type)+'</b></td>'
+      +'<td style="white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="'+escapeHtml(Object.keys(g.agency).join(' · '))+'">'+escapeHtml(기관.map(function(a){ return a[0]; }).join(' · ')||'-')+'</td>'
+      +(앞.length?칸(이전):'')+ys.map(function(y){ return 칸(g.byYear[y]||0); }).join('')
+      +칸(g.unknown)+'<td style="text-align:right;font-weight:800">'+g.total+'</td>'
+      +(금액?'<td style="text-align:right;white-space:nowrap">'+(g.amt?g.amt.toLocaleString('ko-KR'):'·')+'</td>':'')
+      +'<td style="white-space:nowrap">'+KcareerBiz.topCounts(g.main,3).map(function(m){ return '<span class="tag" style="margin-right:3px">'+escapeHtml(m[0])+' '+m[1]+'</span>'; }).join('')+'</td></tr>';
+    if(열림){
+      var 줄=(get('consult')||[]).filter(function(r){ return r && !r.excluded && (String(r.type||'').trim()||'(유형 없음)')===g.type; })
+        .sort(function(a,b){ return String(KcareerBiz.perfYear(b)).localeCompare(String(KcareerBiz.perfYear(a))) || String(a.org||'').localeCompare(String(b.org||'')); });
+      h+='<tr><td></td><td colspan="'+(5+ys.length+(앞.length?1:0)+(금액?1:0))+'" style="padding:4px 0 10px">'
+        +줄.map(function(r){ return '<div style="display:flex;gap:10px;font-size:11.5px;padding:2px 0;white-space:nowrap">'
+          +'<span style="width:44px;color:var(--text-mute)">'+escapeHtml(KcareerBiz.perfYear(r)||'모름')+'</span>'
+          +'<span style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis" title="'+escapeHtml((r.org||'')+' '+(r.project||''))+'"><b>'+escapeHtml(r.org||'-')+'</b> '+escapeHtml(r.project||'')+'</span>'
+          +'<span style="color:var(--text-mute)">'+escapeHtml(r.main||'')+'</span></div>'; }).join('')+'</td></tr>';
+    }
+  });
+  h+='</tbody></table></div>'
+    +(금액?'':'<div style="font-size:11px;color:var(--amber);margin-top:6px">⚠ 금액 칸이 없습니다 — 이알피에서 실적 '+t.total+'건이 모두 금액 없이 와 있습니다. 금액이 오면 저절로 붙습니다.</div>')
+    +'</div>';
+  return h;
+}
+function bizPerfToggle(type){ _bizPerfOpen=(_bizPerfOpen===type)?'':type; renderBizDash(); }
+
+/* ── 📮 메일로 찾은 결과보고서 (대표 지시 2026-10-09) ──
+   푸른메일함 거울(mailbox/msgs 의 칸들 + 지난 메일 mailbox/old/msgs)의 «목록»만 읽는다 — 메일함은 안 연다.
+   ⚠ 무겁다(목록만 십수 MB) — «누를 때만» 읽고, 찾은 것만 이 기기에 적어 둔다(biz_mailrep, FB_SKIP).
+   ⚠ 「실적에 같은 이름」은 후보다 — 실적과 저절로 묶지 않는다. 「실적으로」는 입력 창을 채워 열기만. */
+var BIZ_MAILREP='biz_mailrep', _bizMailBusy=false, _bizMailOnlyNew=false, _bizMailMore=false;
+function _bizMailCache(){ try{ var o=JSON.parse(LS.get(NS+BIZ_MAILREP)||'null'); return (o&&Array.isArray(o.list))?o:null; }catch(e){ return null; } }
+async function bizMailScan(){
+  if(_bizMailBusy) return;
+  if(typeof fbDb==='undefined' || !fbDb){ toast('로그인 뒤에 메일함을 읽을 수 있습니다'); return; }
+  _bizMailBusy=true; _safe(renderBizDash);
+  try{
+    var rows=[];
+    var 담기=function(v, box){ if(!v||typeof v!=='object') return; Object.keys(v).forEach(function(k){ var m=v[k]; if(m&&typeof m==='object'&&('s' in m||'d' in m)){ m.k=k; m.box=box; rows.push(m); } }); };
+    var 칸들=(await fbDb.ref('mailbox/msgs').once('value')).val()||{};
+    Object.keys(칸들).forEach(function(slug){ 담기(칸들[slug], slug.replace(/-[0-9a-f]{6,}$/,'')); });
+    try{ 담기((await fbDb.ref('mailbox/old/msgs').once('value')).val(), '지난 메일'); }catch(e){ console.warn('지난 메일 읽기', e); }
+    var list=KcareerBiz.mailReports(rows, get('consult')||[]);
+    LS.set(NS+BIZ_MAILREP, JSON.stringify({ at:Date.now(), scanned:rows.length, list:list }));
+    toast('📮 메일 '+rows.length.toLocaleString('ko-KR')+'통에서 결과보고서 '+list.length+'건을 찾았습니다', 5000);
+  }catch(e){ toast('⚠ 메일함을 읽지 못했습니다 — '+String(e&&e.message||e), 7000); }
+  finally{ _bizMailBusy=false; _safe(renderBizDash); }
+}
+function bizMailOnlyNew(on){ _bizMailOnlyNew=!!on; _bizMailMore=false; renderBizDash(); }
+function bizMailShowMore(){ _bizMailMore=true; renderBizDash(); }
+function _bizMailHtml(){
+  var c=_bizMailCache();
+  var h='<div class="fd-box"><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📮 메일로 찾은 결과보고서'
+    +(c?'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">'+c.list.length+'건 · 실적에 같은 이름 '+c.list.filter(function(x){ return x.match; }).length
+      +' · 메일 '+Number(c.scanned||0).toLocaleString('ko-KR')+'통 중 · '+new Date(c.at).toLocaleString('ko-KR')+'</span>':'')
+    +'<span style="flex:1"></span>'
+    +(c?'<label style="font-size:11.5px;font-weight:400;display:inline-flex;gap:4px;align-items:center"><input type="checkbox"'+(_bizMailOnlyNew?' checked':'')+' onchange="bizMailOnlyNew(this.checked)">실적에 없어 보이는 것만</label>':'')
+    +'<button class="btn sm'+(c?'':' primary')+'" type="button" onclick="bizMailScan()"'+(_bizMailBusy?' disabled':'')+'>'+(_bizMailBusy?'⏳ 메일 읽는 중…':(c?'🔄 다시 찾기':'📮 메일에서 찾기'))+'</button></h4>';
+  if(!c){
+    return h+'<div style="font-size:12px;color:var(--text-mute);line-height:1.6">푸른메일함의 목록(제목·첨부 이름)에서 「결과·완료·최종 보고」가 든 메일을 모읍니다 — 메일함을 새로 열지 않습니다.<br>'
+      +'목록이 커서 한 번 읽는 데 몇 초 걸립니다. 찾은 것만 이 기기에 적어 둡니다.</div></div>';
+  }
+  var 줄=c.list.filter(function(x){ return !_bizMailOnlyNew || !x.match; });
+  var 보일=_bizMailMore?줄:줄.slice(0,30);
+  h+=보일.map(function(x){
+    var i=c.list.indexOf(x), d=x.d?new Date(x.d):null;
+    var 날=d?(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')):'-';
+    return '<div class="fd-row" style="cursor:default">'
+      +'<span style="width:78px;flex:none;color:var(--text-mute)">'+날+'</span>'
+      +'<span class="c" title="'+escapeHtml(x.s+(x.an&&x.an.length?'\n📎 '+x.an.join('\n📎 '):''))+'">'+escapeHtml(x.s||'(제목 없음)')
+        +(x.n>1?' <span style="color:var(--text-mute);font-size:11px">· '+x.n+'통</span>':'')
+        +(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</span>'
+      +(x.type?'<span class="tag" style="font-size:10.5px">'+escapeHtml(x.type)+'</span>':'')
+      +(x.match?'<span class="tag teal" style="font-size:10.5px" title="실적에 같은 업체 이름이 있습니다 — 같은 건인지는 사람이 봅니다">실적에 '+escapeHtml(x.match.org||'')+'</span>'
+        :'<span class="tag" style="font-size:10.5px;background:transparent;color:var(--amber);border:1px solid var(--amber)">실적에 없음?</span>'
+         +'<button class="btn sm primary" type="button" onclick="bizMailToPerf('+i+')">실적으로</button>')
+      +'</div>'; }).join('')||'<div style="font-size:12px;color:var(--text-mute)">보일 것이 없습니다</div>';
+  if(!_bizMailMore && 줄.length>보일.length) h+='<div style="text-align:center;margin-top:6px"><button class="btn sm" type="button" onclick="bizMailShowMore()">나머지 '+(줄.length-보일.length)+'건 더 보기</button></div>';
+  h+='<div style="font-size:11px;color:var(--text-mute);margin-top:6px;line-height:1.6">「실적에 ○○」은 같은 업체 이름이 보인다는 뜻일 뿐 — 같은 건인지는 직접 확인해 주세요. 「실적으로」는 컨설팅 실적 입력 창을 채워 열기만 하고, 저장은 직접 누릅니다.</div></div>';
+  return h;
+}
+/* 메일 한 줄 → 컨설팅 실적 입력 창을 채워 연다. 업체(고객사)는 비워 둔다 — 제목에서 짐작하면 틀린 업체가 실적이 된다 */
+function bizMailToPerf(i){
+  var c=_bizMailCache(), x=c&&c.list[i]; if(!x || !FORM_DEFS.consult) return;
+  var d=x.d?new Date(x.d):null;
+  openForm('consult');
+  var 넣기=function(k,v){ var el=document.getElementById('ff-'+k); if(!el||v==null||v==='') return;
+    if(el.tagName==='SELECT' && ![].some.call(el.options,function(o){ return o.value===String(v); })) return;   /* 고를 수 없는 유형은 넣지 않는다 */
+    el.value=String(v); };
+  /* ⚠ 사업을 모르거나 고를 수 없는 유형이면 «기타» — 그대로 두면 입력 창의 기본값(일터혁신)이 남아 틀린 사업이 된다 */
+  var 유형칸=document.getElementById('ff-type');
+  넣기('type', (유형칸 && x.type && [].some.call(유형칸.options||[],function(o){ return o.value===x.type; })) ? x.type : '기타');
+  넣기('project', String(x.s||'').replace(/^\s*((re|fw|fwd)\s*:\s*)+/i,'').trim());
+  넣기('year', d?String(d.getFullYear()):''); 넣기('status','완료');
+  넣기('note', '📮 메일 결과보고서 '+(d?d.toISOString().slice(0,10):'')+(x.an&&x.an.length?' · 📎 '+x.an.join(' · '):''));
+  toast('📮 컨설팅 실적 입력 창을 채워 열었습니다 — 고객사를 적고 「저장」을 누르세요', 6000);
 }
 /* 한눈에에서 누르면 목록이 «그 조건»으로 열린다 */
 function bizGo(o){
@@ -20677,7 +20797,9 @@ var FB_SKIP=['rh_drafts','rh_draft_meta','rh_draft_moved',
              '_pubcopy',
              /* 옛 첨부 조각을 IndexedDB 로 옮겼다는 표시 — 기기마다의 사정이다. 클라우드로 오가면
                 새 기기가 「이미 옮겼다」고 보고 영영 안 옮긴다(2026-10-07 검토) */
-             '_idb_migrated'];
+             '_idb_migrated',
+             /* 📮 메일에서 찾은 결과보고서 — 메일함 목록에서 다시 만들 수 있는 «사본»이고 기기마다 찾는다(2026-10-09) */
+             'biz_mailrep'];
 /* ★ «합쳐 받는» 목록 — 덮지 않고 번호(id)로 합친다 (대표 제보 2026-10-09 「왜 사진과 도장이 사라졌나」).
    도장은 2026-08-30 부터 «이 브라우저에만» 두었다 — 그래서 PC·브라우저를 바꾸면 도장이 없었다
    (대표 크롬 하나에 4개, 다른 브라우저에 1개). 이제 도장 그림은 «본인만 읽는» 창고 자리

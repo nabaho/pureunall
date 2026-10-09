@@ -222,7 +222,88 @@
     return null;
   }
 
+  /* ── 📊 사업별 수행 건수 (대표 지시 2026-10-09 「어떤사업을 몇건 얼마나 했는지 모두 잘 정리」) ──
+     바탕은 컨설팅 실적(이알피에서 오는 consult — 컨설팅실적 + 외부기관 실적).
+     ⚠★ 사업 이름(유형)은 «글자 그대로» 묶는다 — 「일터혁신」과 「일터혁신상생컨설팅」을 합치지 않는다
+        (사업이 다르면 절대 합치지 않는다 — 대표 결정). 앞뒤 빈칸만 다듬는다.
+     ⚠ 연도는 year → 없으면 period·date 속 20xx → 그래도 없으면 «모름»(지어내지 않는다).
+     ⚠ 지운(excluded) 줄은 세지 않는다 — 실적 화면과 같은 잣대. */
+  function perfYear(r) {
+    var y = String((r && r.year) || '').match(/20\d{2}/);
+    if (y) return y[0];
+    var p = String((r && (r.period || r.date)) || '').match(/20\d{2}/);
+    return p ? p[0] : '';
+  }
+  function _won(v) { return Number(String(v == null ? '' : v).replace(/[^\d]/g, '')) || 0; }
+  function perfTable(recs) {
+    var by = {}, ys = {}, out = { rows: [], years: [], total: 0, unknown: 0, amt: 0, byYear: {} };
+    (recs || []).forEach(function (r) {
+      if (!r || r.excluded) return;
+      var t = String(r.type || '').trim() || '(유형 없음)';
+      var g = by[t] = by[t] || { type: t, total: 0, unknown: 0, amt: 0, byYear: {}, agency: {}, main: {}, ids: [] };
+      var y = perfYear(r);
+      if (y) { g.byYear[y] = (g.byYear[y] || 0) + 1; ys[y] = 1; out.byYear[y] = (out.byYear[y] || 0) + 1; }
+      else { g.unknown++; out.unknown++; }
+      g.total++; out.total++; g.ids.push(r.id);
+      var a = _won(r.amt); g.amt += a; out.amt += a;
+      var ag = String(r.agency || '').trim(); if (ag) g.agency[ag] = (g.agency[ag] || 0) + 1;
+      var m = String(r.main || '').trim(); if (m) g.main[m] = (g.main[m] || 0) + 1;
+    });
+    out.rows = Object.keys(by).map(function (k) { return by[k]; })
+      .sort(function (a, b) { return b.total - a.total || a.type.localeCompare(b.type); });
+    out.years = Object.keys(ys).sort();
+    return out;
+  }
+  /* 많은 것부터 [이름, 수] — 칩·수행기관 칸에 쓴다 */
+  function topCounts(obj, n) {
+    return Object.keys(obj || {}).map(function (k) { return [k, obj[k]]; })
+      .sort(function (a, b) { return b[1] - a[1] || String(a[0]).localeCompare(String(b[0])); }).slice(0, n || 99);
+  }
+
+  /* ── 📮 메일로 찾은 결과보고서 (대표 지시 2026-10-09 「결과보고서 메일로 보낸것들 찾아보면 많이 있을것」) ──
+     푸른메일함 거울의 «목록»(제목 s · 첨부 이름 an · 날짜 d)만 본다 — 메일함을 새로 열지 않는다(요금 0원).
+     ⚠★ 「실적 있음」은 «같은 업체 이름이 보인다»는 «후보»일 뿐이다 — 이름으로 잇지 않는다(온톨로지 규칙).
+        그래서 실적과 저절로 묶지 않고, 사람이 「실적으로」를 눌러 입력 창을 채워 열 때만 쓴다.
+     ⚠ 업체 이름은 다듬어 3글자 이상일 때만 견준다 — 「MG」처럼 짧으면 아무 제목에나 걸린다. */
+  var REPORT_RE = /결과\s*보고|완료\s*보고|최종\s*보고/;
+  function flatName(s) {
+    return String(s || '').replace(/\(주\)|주식회사|㈜|\(유\)|유한회사|\(재\)|재단법인|\(사\)|사단법인|농업회사법인|영농조합법인/g, '')
+      .replace(/[\s·.,\-_()[\]{}「」『』<>"'’‘“”&/\\]/g, '').toLowerCase();
+  }
+  function _subjKey(s) { return String(s || '').replace(/^\s*((re|fw|fwd|회신|전달)\s*:\s*)+/i, '').replace(/\s+/g, ' ').trim(); }
+  function mailReports(rows, recs) {
+    var 업체 = [];
+    (recs || []).forEach(function (r) {
+      if (!r || r.excluded) return;
+      var f = flatName(r.org); if (f.length >= 3) 업체.push({ f: f, org: r.org, id: r.id, type: String(r.type || '').trim() });
+    });
+    업체.sort(function (a, b) { return b.f.length - a.f.length; });        /* 긴 이름부터 — 「가나」보다 「가나상사」 */
+    var 유형 = []; 업체.forEach(function (u) { var t = flatName(u.type); if (t.length >= 2 && 유형.every(function (x) { return x.f !== t; })) 유형.push({ f: t, type: u.type }); });
+    유형.sort(function (a, b) { return b.f.length - a.f.length; });
+    var seen = {}, out = [];
+    (rows || []).forEach(function (m) {
+      if (!m) return;
+      var an = Array.isArray(m.an) ? m.an : [];
+      if (!REPORT_RE.test(m.s || '') && !an.some(function (n) { return REPORT_RE.test(n); })) return;
+      /* 같은 이야기(RE·FW 꼬리)는 한 줄로 — 가장 늦은 것을 남기고 몇 통인지 센다 */
+      var key = _subjKey(m.s) || ('#' + (m.k || m.u || out.length));
+      var 글 = flatName((m.s || '') + ' ' + an.join(' '));
+      if (seen[key]) {
+        var o = seen[key]; o.n++;
+        if ((m.d || 0) > o.d) { o.d = m.d || 0; o.s = m.s || ''; o.an = an.slice(0, 4); }
+        return;
+      }
+      var hit = null; for (var i = 0; i < 업체.length; i++) if (글.indexOf(업체[i].f) >= 0) { hit = 업체[i]; break; }
+      var ty = null; for (var j = 0; j < 유형.length; j++) if (글.indexOf(유형[j].f) >= 0) { ty = 유형[j].type; break; }
+      seen[key] = { s: m.s || '', an: an.slice(0, 4), d: m.d || 0, n: 1, box: m.box || '',
+        match: hit ? { org: hit.org, id: hit.id } : null, type: ty || (hit && hit.type) || '' };
+      out.push(seen[key]);
+    });
+    return out.sort(function (a, b) { return b.d - a.d; });
+  }
+
   var api = {
+    perfYear: perfYear, perfTable: perfTable, topCounts: topCounts, flatName: flatName, mailReports: mailReports, REPORT_RE: REPORT_RE,
     xlsxLines: xlsxLines, perfFields: perfFields,
     KINDS: KINDS, STAGES: STAGES, DOC_KINDS: DOC_KINDS,
     isOpen: function (st) { return !!OPEN[st]; }, isWin: function (st) { return !!WIN[st]; },
