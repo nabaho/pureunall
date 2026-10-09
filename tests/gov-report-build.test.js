@@ -74,3 +74,21 @@ test('buildReport — 기술보호는 딱지를 단다', () => {
   const i = base(); i.type = { id: 't4', name: '기술보호', fullName: '기술보호울타리' };
   assert.equal(B.buildReport(i).techguard, true);
 });
+
+test('buildReport — 개인 단위 자료(급여대장 등)를 보낸 것은 산출물에 넣지 않는다(출처 목록에만 priv 로)', () => {
+  const i = base();
+  i.sent = [{ d: '2025-10-02', name: '임금체계 검토 의견서.hwp' }, { d: '2025-10-03', name: '급여대장_10월.xlsx' },
+    { d: '2025-10-04', name: '4대보험 명부.xlsx' }];
+  const r = B.buildReport(i);
+  assert.deepEqual(r.report.summary.outputs, ['임금체계 검토 의견서']);
+  const p = r.feed.filter((x) => x.kind === '보낸 서류' && x.priv).map((x) => x.text);
+  assert.deepEqual(p, ['급여대장_10월.xlsx', '4대보험 명부.xlsx']);
+});
+test('buildReport — 첨부 이름이 없는 메일도 제목이 개인 단위 자료면 priv', () => {
+  const i = base();
+  i.mail = [{ d: '2025-09-21', io: 'in', s: '10월 근태 자료 보냅니다', w: '홍길동', att: [] },
+    { d: '2025-09-22', io: 'out', s: '취업규칙 개정안 회신', w: '이푸른' }];
+  const f = B.buildReport(i).feed;
+  assert.equal(f.find((x) => /근태/.test(x.text)).priv, true);
+  assert.equal(f.find((x) => /개정안 회신/.test(x.text)).priv, false);
+});

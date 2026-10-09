@@ -90,7 +90,9 @@
     var report = {
       company: company, rounds: rounds, field: '', techField: {},
       summary: { inquiryDiag: '', review: '', action: '', etc: '', adviceAll: '', overall: '',
-        outputs: sent.map(function (x) { return stripExt(x && x.name); }).filter(Boolean) },
+        /* 개인 단위 자료(급여대장·명부 등)를 보낸 것은 산출물이 아니다 — 출처 목록에만 priv 로 남긴다 */
+        outputs: sent.filter(function (x) { return x && !PRIV_RE.test(str(x.name)); })
+          .map(function (x) { return stripExt(x.name); }).filter(Boolean) },
       consultant: str(input.staffName), writtenAt: str(input.today),
     };
     if (report.summary.outputs.length) src['산출물목록'] = FROM_SCHED;
@@ -114,7 +116,8 @@
       if (!m) return;
       var att = (m.att || []).map(str).filter(Boolean);
       feed.push({ d: str(m.d), kind: m.io === 'out' ? '보낸 메일' : '받은 메일', text: str(m.s), att: att,
-        priv: att.some(function (a) { return PRIV_RE.test(a); }) });
+        /* 메일 요약(coMail)에는 첨부 이름이 없다 — 제목으로도 가린다 */
+        priv: PRIV_RE.test(str(m.s)) || att.some(function (a) { return PRIV_RE.test(a); }) });
     });
     sent.forEach(function (x) {
       if (!x) return;

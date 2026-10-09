@@ -78,6 +78,10 @@ const allowTop = ['pu_sign' /* 계약서 서명 요청(직원 req · 열쇠 칸 
   /* 2026-09-06 정부컨설팅 「이어는 두되 일정관리에서 진행할지는 따로」 스위치(대표 지시).
      다른 scal_* 과 같은 권한 — 직원은 읽고 쓰고, 지우기는 관리자만. */
   'scal_erpTypeRun',
+  /* 2026-10-09 정부컨설팅 보고서 — 보고서 초안·확정본(scal_reports, 다른 scal_* 과 같은 권한)과
+     기관 빈 양식 서고(scal_rptForms 본문 · scal_rptFormsIndex 색인, 읽기 로그인 · 쓰기 관리자).
+     양식 b64 는 커서 FB_NODES·백업 밖 «따로 읽는» 자리다. */
+  'scal_reports', 'scal_rptForms', 'scal_rptFormsIndex',
   'puphotos',    /* 2026-08-02 사진첩 B단계 */
   /* 2026-09-05 공인노무사회에서 받아 둔 자료. 서버(ilaborPull)가 관리자 SDK 로
      담기만 하던 자리라 규칙이 아예 없었고, 뉴스레터 화면이 읽으려 하자

@@ -418,3 +418,38 @@ test('보고서 — 「크게 보기」 날짜 복사 옆에 [📄 보고서 작
 test('보고서 — 모바일 폭(≤860px)에서는 출처가 아래로 내려간다', () => {
   assert.ok(/@media\s*\(max-width:\s*860px\)\s*\{[^}]*\.grp-lay\{[^}]*grid-template-columns:\s*1fr/.test(SRC), '좁은 폭 규칙이 없다');
 });
+
+test('보고서 ⑤-3 남이 먼저 확정했으면 내 확정은 거절하고 덮지 않는다', async () => {
+  const w = rptWorld({ seed: mailSeed() });
+  const st = await opened(w);                       // 내가 연 판: ver 0, 초안
+  const theirs = { formKey: 'cci-north', typeId: 'bxeyzrxm', state: '검토완료', ver: 1, confirmedBy: '박부담',
+    report: { company: { name: '가나상사(남의 확정본)' } } };
+  await w.db.ref('scal_reports/c1/bxeyzrxm_2025').set(theirs);
+  await w.db.ref('scal_reports/c1/bxeyzrxm_2025_v1').set(theirs);
+  const r = await w.ctx.grpConfirm();
+  assert.strictEqual(r.ok, false);
+  assert.match(r.error, /다른 사람이/);
+  assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025').confirmedBy, '박부담');
+  assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025_v1').report.company.name, '가나상사(남의 확정본)');
+  assert.strictEqual(st.locked, false);
+});
+
+test('보고서 ⑤-4 같은 판 번호의 확정본 사본이 이미 있으면(남이 새 판을 연 뒤) 덮지 않는다', async () => {
+  const w = rptWorld({ seed: mailSeed() });
+  await opened(w);                                  // ver 0 으로 열었다
+  const kept = { state: '검토완료', ver: 1, confirmedBy: '박부담', report: { company: { name: '첫 확정본' } } };
+  await w.db.ref('scal_reports/c1/bxeyzrxm_2025_v1').set(kept);
+  await w.db.ref('scal_reports/c1/bxeyzrxm_2025').set({ state: '초안', ver: 1, report: { company: { name: '남의 새 판' } } });
+  const r = await w.ctx.grpConfirm();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025_v1').report.company.name, '첫 확정본');
+  assert.strictEqual(w.db.읽기('scal_reports/c1/bxeyzrxm_2025').state, '초안', '본 자리도 건드리지 않는다');
+});
+
+test('보고서 ①-3 열쇠는 있는데 클라우드 연결 전이면 조용히 비우지 않고 그렇다고 적는다', async () => {
+  const w = rptWorld({ seed: mailSeed() });
+  w.ctx.FB_READY = false;
+  const input = await w.ctx.grpCollect('c1', 'bxeyzrxm');
+  assert.strictEqual(input.mail.length, 0);
+  assert.ok(input.notes.some((n) => /클라우드 연결 전/.test(n)));
+});

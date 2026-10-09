@@ -281,8 +281,11 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      ★ 2026-09-28 — 서식 묶음 세트 자리(data/contract_form_sets)에 이름을 적었다(tests/rules-data-named).
        권한은 지금 $other 와 같다(재직 직원 읽기·쓰기) — 올리지 않아도 앱은 돈다. 다음 규칙 배포 때 함께 올라가면 이 줄을 뺀다.
      ★ 2026-10-03 — 올라갔다. 급여데이터함 「입퇴사 할 일」(paydata/hrtask·mailkind)을 올릴 때 함께
-       게시됐다(새로 생김 4 · 바뀜 0 · 사라짐 0, 올린 뒤 콘솔 다시 읽어 같음 확인) — 그래서 목록을 비운다. */
-  const PENDING = [];
+       게시됐다(새로 생김 4 · 바뀜 0 · 사라짐 0, 올린 뒤 콘솔 다시 읽어 같음 확인) — 그래서 목록을 비운다.
+     ★ 2026-10-09 — 정부컨설팅 보고서 자리 셋(scal_reports · scal_rptForms · scal_rptFormsIndex)을
+       만들개에 넣었다. 규칙 게시 대기 — 대표 승인 뒤 게시하고, 콘솔 원문을 새 판으로 갱신한 뒤 이 셋을 지울 것.
+       게시 전에는 보고서 창이 「아직 저장 자리가 열리지 않았습니다」를 띄운다(내려받기는 된다). */
+  const PENDING = ['/scal_reports', '/scal_rptForms', '/scal_rptFormsIndex'];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
