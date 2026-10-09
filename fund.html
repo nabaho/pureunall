@@ -9204,12 +9204,12 @@ function previewDoc(kind){
   var f=curForm();
   var label=docLabel(kind), ftype=(f.fund_type==='사내')?'사내':'공동';
   showModal('<div class="row"><h2 style="margin:0">'+esc(label)+' — '+esc(f.short_name||f.name)+'</h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'
-    +'<button onclick="printDoc()">🖨 인쇄/PDF</button> <button onclick="docToHwpx(\''+kind+'\')" title="화면에서 편집한 내용 그대로 한글 파일로 저장 — 한글 프로그램이 없어도 생성됩니다">📄 한글(HWPX)</button> <button onclick="resetDoc(\''+kind+'\')">↺ 되돌리기</button> '
+    +'<button onclick="docPrintGated()">🖨 인쇄/PDF</button> <button onclick="docToHwpx(\''+kind+'\')" title="화면에서 편집한 내용 그대로 한글 파일로 저장 — 한글 프로그램이 없어도 생성됩니다">📄 한글(HWPX)</button> <button onclick="resetDoc(\''+kind+'\')">↺ 되돌리기</button> '
     +'<button onclick="saveDocType(\''+kind+'\')" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button> '
     +'<button class="primary" onclick="saveDocEdit(\''+kind+'\')">💾 이 기금</button></div>'
     +'<div class="row" style="margin:6px 0 0;gap:6px"><span class="muted" style="font-size:11px">정렬</span>'+docAlignBar()+'</div>'
     +'<div id="docwrap" style="border:1px solid var(--line);border-radius:8px;max-height:64vh;overflow:auto;padding:14px;background:#fff;margin-top:8px">'+loadingHTML()+'</div>');
-  S._docKind=kind;
+  S._docKind=kind; _oneGatePrep(kind);
   _loadDocInto(kind);
 }
 // 저장된 서식 HTML 살균 — 스크립트·이벤트핸들러·위험 URL 제거(저장형 XSS 차단)
@@ -9545,6 +9545,7 @@ function hwpSidePreview(kind){
   if(!side||!f||f._sample||!HWP_TPL_KINDS[kind]||!_hwpTplHasFor(kind,f)||S._sideHtml===kind||!_hwpTplFits(kind,f)) return false;
   var fid=S.formFund, label=docLabel(kind);
   S._sideKind=kind; S._hwpSideBytes=null;
+  _oneGatePrep(kind);   // [⬇ 한글] 관문 목록을 미리
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)
       +' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2>'
       +'<span id="hwpSideChip" class="chip ok" style="font-size:10px">원본 한글 틀</span>'+hlp('forms.hwptpl')+'<span style="flex:1"></span>'
@@ -9596,8 +9597,9 @@ function hwpSidePreview(kind){
 }
 function hwpSideDownload(){
   if(!S._hwpSideBytes){ toast('아직 채우는 중입니다','warn'); return; }
-  var f=curForm()||{};
-  PureunHwp.download(S._hwpSideBytes,(f.short_name||f.name||'기금')+'_'+docLabel(S._sideKind)+'.hwpx','hwpx');
+  var G=(typeof _oneGateOf==='function')?_oneGateOf(S._sideKind):null; if(!G) return _hwpOneDl(0);   // 확인 안 된 값이 있으면 관문
+  S._gate={fid:G.fid, items:G.items, P:G.P, after:'hwpone'};
+  _gateModal(G.items,'받기','_hwpOneDl('+G.items.length+')');
 }
 function sidePreview(kind){
   var side=$('formSide');
@@ -9605,11 +9607,12 @@ function sidePreview(kind){
   if(hwpSidePreview(kind)) return;                     // 원본 한글 틀이 있으면 그쪽으로
   var f=curForm();
   S._sideKind=kind; S._docKind=kind; var label=docLabel(kind);
+  _oneGatePrep(kind);   // [🖨] 관문 목록을 미리
   var ftype=(f.fund_type==='사내')?'사내':'공동', smp=!!f._sample;
   var backHwp=(HWP_TPL_KINDS[kind]&&_hwpTplHasFor(kind,f)&&_hwpTplFits(kind,f)&&!smp)
     ? '<button class="primary" onclick="S._sideHtml=null;sidePreview(\''+kind+'\')" style="padding:3px 8px" title="원본 한글 모양으로 돌아가기">📄 원본 한글로 보기</button> ' : '';
   side.innerHTML='<div class="row" style="margin-bottom:6px;flex-wrap:wrap;gap:4px"><h2 style="margin:0;font-size:14px">'+esc(label)+' <span class="muted" style="font-weight:400;font-size:11px">'+esc(f.short_name||f.name||'')+'</span></h2><span id="docLayerBadge" class="chip" style="font-size:10px">…</span>'+hlp('forms.edit')+'<span style="flex:1"></span>'+backHwp
-    +'<button onclick="printDoc()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
+    +'<button onclick="docPrintGated()" style="padding:3px 8px" title="인쇄/PDF">🖨</button> <button onclick="docToHwpx(\''+kind+'\')" style="padding:3px 8px" title="한글(HWPX)로 저장">📄</button> <button onclick="resetDoc(\''+kind+'\')" style="padding:3px 8px" title="저장본 삭제(개별→공통→자동생성 순으로 되돌림)">↺</button> '
     +'<button '+(smp?'class="primary" ':'')+'onclick="saveDocType(\''+kind+'\')" style="padding:3px 10px" title="모든 '+ftype+'기금의 기본서식으로 저장">💾 '+ftype+' 공통</button>'
     +(smp?'':'<button class="primary" onclick="saveDocEdit(\''+kind+'\')" style="padding:3px 10px" title="이 기금에만 저장">💾 이 기금</button>')+'</div>'
     +(smp?'<p class="muted" style="font-size:11px;margin:0 0 6px">샘플(견본) 편집 중 — [💾 '+ftype+' 공통]이 모든 '+ftype+'기금 기본이 됩니다.</p>':'')
@@ -9921,19 +9924,48 @@ function _formGatePaint(){
 function estabBundlePrint(){
   var f=curForm(), G=S._bundleGate;
   if(!f||f._sample||!G||G.fid!==S.formFund||!G.items.length) return printDoc();
-  var its=G.items;
-  S._gate={phase:G.phase, fid:G.fid, items:its, P:G.P, after:'print'};
+  S._gate={phase:G.phase, fid:G.fid, items:G.items, P:G.P, after:'print'};
+  _gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})');
+}
+/* 관문 창 — 한글 묶음·전부 인쇄·한 장 인쇄·한 장 한글이 같은 세 갈래(취소 · 「초안」 표시 넣어 ○○ · N칸 확인하고 ○○) */
+function _gateModal(its,verb,draftCall){
   var rows=its.slice(0,40).map(function(it){
     return '<div style="padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px">· '+esc(it.lab)+' <b>'+esc(_rvValText(it.val))+'</b> '+(it.est?'🧮':'🤖')
-      +' <span class="muted" style="font-size:11px">— '+esc(it.forms.join(' · '))+'</span></div>';
+      +' <span class="muted" style="font-size:11px">— '+esc((it.forms||[]).join(' · '))+'</span></div>';
   }).join('')+(its.length>40?'<div class="muted" style="font-size:11.5px;padding-top:4px">외 '+(its.length-40)+'칸 — 확인함에서 모두 볼 수 있습니다</div>':'');
-  showModal('<h3 style="margin:0 0 4px">날인용으로 인쇄하기 전에 — 확인 안 된 값 '+its.length+'칸</h3>'
-    +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 인쇄하고, 아직이면 「초안」 표시로 인쇄하세요.</div>'
+  showModal('<h3 style="margin:0 0 4px">날인·제출용으로 '+verb+' 전에 — 확인 안 된 값 '+its.length+'칸</h3>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 '+verb+', 아직이면 「초안」 표시로 '+verb+'.</div>'
     +'<div style="max-height:46vh;overflow:auto">'+rows+'</div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px;flex-wrap:wrap">'
     +'<button onclick="closeM()">취소</button>'
-    +'<button onclick="closeM();printDoc({draft:'+its.length+'})" title="장마다 가운데 흐린 「초안 · 미확인 '+its.length+'」 — 제출본이 아닙니다">「초안」 표시 넣어 인쇄</button>'
-    +'<button class="primary" onclick="formGateOk()" title="값은 그대로, 확인 표시만 붙이고 깨끗하게 인쇄합니다">'+its.length+'칸 확인하고 인쇄 ▸</button></div>',{width:620});
+    +'<button onclick="closeM();'+draftCall+'" title="모든 쪽 가운데 흐린 「초안 · 미확인 '+its.length+'」 — 제출본이 아닙니다">「초안」 표시 넣어 '+verb+'</button>'
+    +'<button class="primary" onclick="formGateOk()" title="값은 그대로, 확인 표시만 붙이고 깨끗한 것으로 '+verb+'">'+its.length+'칸 확인하고 '+verb+' ▸</button></div>',{width:620});
+}
+/* ══ 서식 한 장 — [🖨 인쇄/PDF]·[⬇ 한글]도 같은 관문 (대표 「진행」 2026-10-09) ══
+   목록은 서식을 «열 때» 미리 모은다(S._oneGate) — 누른 순간 인쇄 창을 열어야 팝업이 안 막힌다.
+   ⚠ 견본(샘플)·기금 아닌 화면은 관문 없이 그대로. 목록을 아직 못 모았으면 그대로 인쇄한다(막지 않는다 — 묶음과 같다). */
+function _oneGatePrep(kind){
+  S._oneGate=null;
+  var f=curForm(), fid=S.formFund;
+  if(!f||f._sample||!fid||S.formsCtx!=='fund') return;
+  Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; })]).then(function(r){
+    if(S.formFund!==fid) return;
+    var its=(_formUnconf(kind,f,r[0],r[1])||[]).map(function(it){ return Object.assign({forms:[docLabel(kind)]},it); });
+    S._oneGate={kind:kind, fid:fid, P:r[1], items:its};
+  }).catch(function(){});
+}
+function _oneGateOf(kind){ var G=S._oneGate, f=curForm(); return (f&&!f._sample&&G&&G.kind===kind&&G.fid===S.formFund&&G.items.length)?G:null; }
+function docPrintGated(){
+  var G=_oneGateOf(S._docKind); if(!G) return printDoc();
+  S._gate={fid:G.fid, items:G.items, P:G.P, after:'print'};
+  _gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})');
+}
+/* 한 장 한글 받기 — 「초안」은 한글 묶음과 같은 머리말 글상자(_hwpDraftMark). 못 넣으면 받지 않는다(초안이 제출본처럼 나가면 안 된다) */
+function _hwpOneDl(n){
+  var b=S._hwpSideBytes; if(!b){ toast('아직 채우는 중입니다','warn'); return; }
+  var f=curForm()||{}, name=(n?'[초안] ':'')+(f.short_name||f.name||'기금')+'_'+docLabel(S._sideKind)+'.hwpx';
+  (n?_hwpDraftMark(b,'초안 · 미확인 '+n):Promise.resolve(b)).then(function(x){ PureunHwp.download(x,name,'hwpx'); })
+    .catch(function(e){ toast('「초안」 표시를 넣지 못해 받지 않았습니다: '+((e&&e.message)||e),'err'); });
 }
 /* [⬇ 한글 원본 전부] — 묶기 전에 관문을 지난다 */
 function estabBundleHwp(phase){
@@ -9976,7 +10008,8 @@ function formGateOk(){
     if(typeof RV!=='undefined') RV.at=0;
     if(typeof _trEv==='function') _trEv(ev);   // 🛡 서식 관문에서 «맞음»도 규칙마다 센다
     FG.at=0; closeM();
-    if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else _estabBundleHwpGo(G.phase,0);
+    S._oneGate=null;
+    if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else if(G.after==='hwpone') _hwpOneDl(0); else _estabBundleHwpGo(G.phase,0);
   }).catch(function(e){ try{ if(pw) pw.close(); }catch(x){} toast('저장 실패: '+((e&&e.message)||e),'err'); });
 }
 /* 「초안」 표시 — 모든 쪽 가운데, 글 뒤, 흐린 회색(팔레트 #CBD5E1). 머리말 안에 글상자를 둔다(바탕쪽과 달리 구조가 단순하고 글줄을 밀지 않는다).
