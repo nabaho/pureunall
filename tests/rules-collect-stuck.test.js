@@ -153,3 +153,34 @@ test('받기 한도 + 예산 < 9분 — 잘리기 전에 끝난다', () => {
   assert.equal(C.STUCK_MAX, 2);
   assert.ok(C.SLOW_MS <= 7 * 60 * 1000, '큰 메일 한도가 예산보다 길다 — 앞쪽에서 시작해도 못 끝난다');
 });
+
+/* ── 2026-10-09 실측 — 06:30 회차가 첫 큰 메일에서 9분에 잘렸고, 그 뒤 30분 회차들은 옛 기록(left 0)만 보고 돌아갔다 ── */
+test('⑥ 남은 수를 회차 «시작»에 적는다 — 회차가 잘려도 다음 30분 회차가 이어받는다', async () => {
+  const db = fakeDb(MAIL);
+  let leftSeen = null;
+  await C.run(opts(db, (m) => { if (leftSeen === null) leftSeen = (lib(db).run || {}).left; return Promise.resolve([]); }));
+  assert.equal(leftSeen, 2, '★ 받기 전에 남은 수가 안 적혔다 — 여기서 잘리면 30분 회차가 「할 일 없음」으로 돌아간다');
+  assert.ok(C.shouldRunScheduled({ at: 1e12, left: leftSeen }, 1e12 + 3600e3), '남은 게 적혀 있으면 30분 회차가 돈다');
+});
+
+test('⑥ 큰 메일은 한 번만 — 길게 기다리고도 회차가 죽었으면 바로 «큰 메일 — 직접»', async () => {
+  const db = fakeDb(Object.assign({}, MAIL, { rules_mgmt: { library: {
+    seen: { [B]: { at: 1, docs: [], why: '첨부 없음' } },
+    try: { [A]: { at: 1, n: 1, slow: true } } } } }));
+  let asked = 0;
+  const sum = await C.run(opts(db, (m) => { if (m.mailKey === A) asked++; return Promise.resolve([]); }));
+  assert.equal(asked, 0, '★ 회차를 죽인 큰 메일을 또 집었다 — 36통에 하루 반');
+  assert.equal(sum.stuck, 1);
+  assert.match(lib(db).seen[A].why, /^멈춤 — 큰 메일/);
+  assert.equal(sum.requeued, 0, '큰 메일을 또 세웠다');
+});
+
+test('⑥ 어디서 멈추는지 남긴다 — 번호·바이트만', async () => {
+  const db = fakeDb(MAIL), lines = [];
+  await C.run(opts(db, (m) => Promise.resolve(m.mailKey === A ? [{ name: '가나_취업규칙.hwpx', data: RULE }] : []),
+    { trace: (s) => lines.push(s) }));
+  assert.ok(lines.some((l) => l === '받기 ' + A));
+  assert.ok(lines.some((l) => /^받음 i_INBOX-4a1e411c_10 1개 \d+B$/.test(l)));
+  assert.ok(lines.some((l) => /^가리기 i_INBOX-4a1e411c_10 hwpx \d+B$/.test(l)));
+  assert.ok(!lines.join('|').includes('가나_취업규칙'), '★ 기록에 파일 이름이 남았다');
+});
