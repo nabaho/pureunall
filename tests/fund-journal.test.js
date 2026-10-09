@@ -72,3 +72,14 @@ test('★ 배선 — 되돌리기는 대표·관리자만 · 바뀐 칸 안 건�
   assert.match(SRC, /'journal\.log':\{t:'작업 일지/);
   assert.match(fnSrc('renderReview'), /rvPage\(\\'journal\\'\)/);
 });
+
+test('★ 되돌리기 — 원본 옆 확인·그 뒤 사람이 다시 쓴 칸도 «사람 확인», Esc 는 아무것도 안 함 (코드 검토 2026-10-09)', () => {
+  box.JL.data = D;
+  const c = box.cells('b2', 'F-2')[0];
+  assert.equal(box.state(c, { v: '최한결', p: { m: 1, how: 'dialog', bid: 'b2' } }, 'b2'), 'okd', '원본 옆에서 보고 넣은 값을 묻지 않고 되돌린다');
+  assert.equal(box.state(c, { v: '최한결', p: { m: 0, bid: 'b9' } }, 'b2'), 'okd', '그 뒤 사람이 다시 쓴 값을 묻지 않고 되돌린다');
+  assert.equal(box.state(c, { v: '최한결', p: { m: 0, bid: 'b2' } }, 'b2'), 'back', '사람이 한 묶음 자체는 되돌릴 수 있어야 한다');
+  const u = fnSrc('jlUndo');
+  assert.ok(u.includes('<button onclick="JL.pend=null;closeM()">취소</button>'), '세 갈래 창에 취소가 없다');
+  assert.doesNotMatch(u, /cancel:'빼고 되돌리기'/, 'Esc 가 «빼고 되돌리기»로 먹던 옛 길이 남았다');
+});

@@ -18,7 +18,7 @@ new Function([
   "function proposeAcct(m){ return R[m]||{d:'',c:''}; }",
   varSrc('TR'), 'var TR_RUN=30, TR_WIN=50, TR_AMT_MAX=1000000;', varSrc('TR_FIXED_FIELDS'),
   fnSrc('_trEsc'), fnSrc('_trSrc'), fnSrc('_trField'), fnSrc('_trProvRk'), fnSrc('_trTxnRk'), fnSrc('_trXferRk'), fnSrc('_trFixed'), fnSrc('_trOn'),
-  fnSrc('_trStat'), fnSrc('_trState'), fnSrc('_trTxnEv'), fnSrc('_provState'),
+  fnSrc('_trStat'), fnSrc('_trState'), fnSrc('_trTxnEv'), fnSrc('_provState'), fnSrc('_trOkLive'),
   'this.TR=TR; this.src=_trSrc; this.prk=_trProvRk; this.trk=_trTxnRk; this.xrk=_trXferRk; this.fixed=_trFixed; this.on=_trOn;',
   'this.stat=_trStat; this.state=_trState; this.tev=_trTxnEv; this.pstate=_provState;',
 ].join('\n')).call(box);
@@ -100,7 +100,7 @@ test('★ 배선 — 세는 자리·자동 확정 자리·멈춤', () => {
   assert.match(fnSrc('_sampleMark'), /_trTxnEv\(x,_SA\.fid,_SA\.names,0\)/);
   assert.match(fnSrc('_applyXfer'), /o:on\?1:0/);
   const ib = fnSrc('importBank');
-  assert.match(ib, /_trOn\(_rk\)&&Math\.max\(num\(x\.deposit\)\|\|0,num\(x\.withdraw\)\|\|0\)<=TR_AMT_MAX/, '100만 원 넘는 것도 자동 승인한다');
+  assert.match(ib, /&&!_lockedM\(x\.date\)&&Math\.max\(num\(x\.deposit\)\|\|0,num\(x\.withdraw\)\|\|0\)<=TR_AMT_MAX/, '100만 원 넘는 것도 자동 승인한다');
   assert.match(ib, /obj\[key\]\.ok_via='rule'; obj\[key\]\.ok_rule=_rk/);
   assert.match(ib, /applyTransfers\(_sure,_fid,_yr,true,_xrk\)/);
   assert.match(fnSrc('applyTransfers'), /if\(rule\)\{ up\[b\+'ok_via'\]='rule'; up\[b\+'ok_rule'\]=rule; \}/);
@@ -110,4 +110,25 @@ test('★ 배선 — 세는 자리·자동 확정 자리·멈춤', () => {
   assert.match(fnSrc('renderTrust'), /<th style="width:34px">□<\/th><th style="width:40px">#<\/th>/);
   assert.match(SRC, /'trust\.ledger':\{t:'자동 규칙 — 어디까지 기계에 맡길지'/);
   assert.match(fnSrc('start'), /_trSub\(\)/, '켜진 규칙을 안 읽는다');
+});
+
+/* ══ 코드 검토(2026-10-09)에서 고친 것 — 다시 안 깨지게 ══ */
+test('★ 고정 — 전기이월 금액(opening_*)·사업장 통째(_site)도 늘 사람 확인', () => {
+  for (const rk of ['p~scan:결산서~opening_basic', 'p~copy:prev~opening_cash', 'p~list~_site']) assert.ok(box.fixed(rk), rk);
+});
+
+test('★ 다시 켠 규칙 — 켜기 «전»에 자동 확정한 도장은 확인으로 안 친다', () => {
+  const p = { m: 1, src: 'scan:bizreg', how: 'list', ok: { by: '자동 확정', at: '2026-10-01 09:00:00', rule: 'p~scan:bizreg~biz_no' } };
+  box.TR.rules = { 'p~scan:bizreg~biz_no': { auto: true, at: '2026-09-30 09:00:00' } };
+  assert.equal(box.pstate(p), 'o', '켠 뒤 찍은 도장');
+  box.TR.rules = { 'p~scan:bizreg~biz_no': { auto: true, at: '2026-10-05 09:00:00' } };
+  assert.equal(box.pstate(p), 'a', '멈췄다 다시 켜자 옛 도장이 확인으로 되살아났다');
+});
+
+test('★ 통장 가져오기 자동 — 다른 기금 학습·마감한 달 빼기, 이체 짝은 새 줄·승인 전·마감 안 된 달만', () => {
+  const ib = fnSrc('importBank');
+  assert.ok(ib.includes("_trOn(_rk)&&p.src!=='learned_other'&&!_lockedM(x.date)&&"), '다른 기금 학습이나 마감한 달을 자동 승인한다');
+  assert.ok(ib.includes("fbDb.ref(NS+'/closing/'+_fid+'/'+_yr).once('value')"), '마감 상태를 안 읽는다');
+  assert.ok(ib.includes("return pr.kind==='sure'&&!a.approved&&!b.approved&&(obj[pr.inId]||obj[pr.outId])&&!_lockedM(pr.date);"), '사람이 승인한 줄까지 이체로 덮는다');
+  assert.ok(ib.includes('pairs=pairs.filter(function(pr){ return _sure.indexOf(pr)<0; });'), '자동에서 뺀 확실한 짝이 창에서 사라진다');
 });

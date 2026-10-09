@@ -43,7 +43,7 @@ test('★ 통장 가져오기는 이체 짝을 «묻고» 상계한다 — 확�
   const ib = fnSrc('importBank');
   /* 곧바로 상계는 🛡 «계좌 다른 이체 짝» 규칙을 대표가 켰을 때만(신뢰 장부 2026-10-09) */
   assert.equal(ib.split('applyTransfers(').length - 1, 1, '가져오기가 곧바로 상계·승인을 부른다');
-  assert.ok(ib.includes("if(_xrk&&_trOn(_xrk)){ var _sure=pairs.filter(function(pr){ return pr.kind==='sure'; });"), '규칙이 꺼져 있어도 상계한다');
+  assert.ok(ib.includes("if(_xrk&&_trOn(_xrk)){ var _sure=pairs.filter(function(pr){ var a=merged[pr.inId]||{}, b=merged[pr.outId]||{};"), '규칙이 꺼져 있어도 상계한다');
   assert.match(ib, /_xferModal\(pairs,_fid,_yr,/, '짝 확인 창을 띄우지 않는다');
   assert.match(ib, /_audit\(_fid,'통장 가져오기'/, '가져오기가 변경 기록에 안 남는다');
   assert.match(ib, /obj\[key\]\.sug=p\.src/, '기계가 고른 분개라는 표시를 안 남긴다');

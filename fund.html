@@ -2859,7 +2859,7 @@ function _rvItems(D,yr){
   var live=function(fid){ var f=funds[fid]; return !!f&&!isTrashed(f); };
   Object.keys(D.prov||{}).forEach(function(fid){ if(!live(fid)) return; var P=D.prov[fid]||{};
     Object.keys(P).sort().forEach(function(k){ var p=P[k]||{};
-      if(p.m!==1||(p.ok&&(!p.ok.rule||(typeof _trOn==='function'&&_trOn(p.ok.rule))))||p.how==='dialog') return;   // 멈춘 규칙이 자동 확정한 값은 다시 온다
+      if(p.m!==1||(p.ok&&(!p.ok.rule||(typeof _trOkLive==='function'&&_trOkLive(p.ok))))||p.how==='dialog') return;   // 멈춘 규칙이 자동 확정한 값은 다시 온다
       out.push({t:'prov', fid:fid, key:k, p:p});
     });
   });
@@ -3115,7 +3115,7 @@ function _trTxnRk(fid,dep,acct){ return 't~'+_trEsc(fid)+'~'+(dep?'입':'출')+'
 function _trXferRk(fid,kind){ return 'x~'+_trEsc(fid)+'~'+(kind==='sure'?'sure':'guess'); }
 function _trFixed(rk){
   var p=String(rk||'').split('~');
-  if(p[0]==='p') return /^(calc|guess)/.test(p[1]||'')||TR_FIXED_FIELDS.indexOf(p[2])>=0;
+  if(p[0]==='p') return /^(calc|guess)/.test(p[1]||'')||TR_FIXED_FIELDS.indexOf(p[2])>=0||/^opening_/.test(p[2]||'')||p[2]==='_site';   // 전기이월 금액·사업장 통째도 늘 사람
   if(p[0]==='x') return p[2]!=='sure';
   return false;
 }
@@ -3123,9 +3123,17 @@ function _trFixedWhy(rk){
   var p=String(rk||'').split('~');
   if(p[0]==='x') return '계좌번호 없는 짝 — 늘 사람 확인';
   if(/^(calc|guess)/.test(p[1]||'')) return '추정·계산 값 — 늘 사람 확인';
-  return /contrib|fee|deposit|rent|sales/.test(p[2]||'')?'돈 칸 — 늘 사람 확인':'사람 이름·연락처 — 늘 사람 확인';
+  if(p[2]==='_site') return '사업장 통째(이름·돈이 섞임) — 늘 사람 확인';
+  return /contrib|fee|deposit|rent|sales|^opening_/.test(p[2]||'')?'돈 칸 — 늘 사람 확인':'사람 이름·연락처 — 늘 사람 확인';
 }
 function _trOn(rk){ return !!(TR.rules&&TR.rules[rk]&&TR.rules[rk].auto)&&!_trFixed(rk); }
+/* 자동 확정 도장이 «지금도» 확인으로 치이는가 — 규칙이 켜져 있고, 그 도장이 «이번에 켠 뒤» 찍힌 것이어야 한다.
+   멈췄다가 다시 켜도 멈추기 전 도장은 확인함에 남는다(코드 검토 2026-10-09). 사람 도장(rule 없음)은 늘 확인. */
+function _trOkLive(ok){
+  if(!ok) return false; if(!ok.rule) return true;
+  if(!_trOn(ok.rule)) return false;
+  return String(ok.at||'')>=String(((TR.rules||{})[ok.rule]||{}).at||'');
+}
 function _trSub(){
   if(TR.ref||typeof fbDb==='undefined') return;
   TR.ref=fbDb.ref(NS+'/trust/rules');
@@ -3394,10 +3402,13 @@ function _jlReadNow(cells){
       .then(function(r){ return {v:r[0].val(), p:r[1].val()}; },function(){ return {v:undefined, p:null}; });
   }));
 }
-function _jlState(c,now){
+function _jlState(c,now,bid){
   if(!now||now.v===undefined) return 'unk';
   if(!_jlSame(now.v,c.a)) return 'moved';
-  if(now.p&&now.p.ok&&!now.p.ok.rule) return 'okd';
+  var p=now.p;
+  if(p&&p.ok&&!p.ok.rule) return 'okd';                                   // 사람이 ✓
+  if(p&&p.m===1&&p.how==='dialog') return 'okd';                         // 원본 옆에서 보고 넣은 값
+  if(p&&p.m===0&&p.bid&&bid&&p.bid!==bid) return 'okd';                  // 그 뒤 사람이 같은 값을 다시 씀
   return 'back';
 }
 function renderJournal(){
@@ -3418,7 +3429,7 @@ function renderJournal(){
     if(!op) return tr;
     var cells=_jlCells(r.bid,r.fid), now=JL.cur[r.bid+'|'+r.fid]||[];
     var nBack=0;
-    var inner=cells.map(function(c,j){ var st=_jlState(c,now[j]); if(st==='back'||st==='okd') nBack++; var s=ST[st];
+    var inner=cells.map(function(c,j){ var st=_jlState(c,now[j],r.bid); if(st==='back'||st==='okd') nBack++; var s=ST[st];
       return '<tr><td style="text-align:center"><input type="checkbox" disabled></td><td class="muted" style="font-size:11.5px">'+(j+1)+'</td>'
         +'<td>'+esc(_jlCellLabel(c.P))+'</td><td class="muted">'+esc(_rvValText(c.b))+'</td><td>'+esc(_rvValText(c.a))+'</td>'
         +'<td>'+(now[j]&&now[j].v!==undefined?esc(_rvValText(now[j].v)):'…')+'</td><td><span class="chip '+s[1]+'" style="font-size:10px">'+s[0]+'</span></td></tr>'; }).join('');
@@ -3462,7 +3473,7 @@ function jlUndo(i){
   _jlReadNow(cells).then(function(now){
     JL.cur[r.bid+'|'+r.fid]=now;
     var back=[], okd=[], moved=0;
-    cells.forEach(function(c,j){ var st=_jlState(c,now[j]); if(st==='back') back.push(c); else if(st==='okd') okd.push(c); else moved++; });
+    cells.forEach(function(c,j){ var st=_jlState(c,now[j],r.bid); if(st==='back') back.push(c); else if(st==='okd') okd.push(c); else moved++; });
     if(!back.length&&!okd.length){ toast('되돌릴 칸이 없습니다 — 모두 그 뒤 바뀌었습니다','warn'); renderJournal(); return; }
     var f=funds[r.fid]||{};
     var go=function(withOk){
@@ -3481,11 +3492,16 @@ function jlUndo(i){
     var msg='['+(f.short_name||f.name||r.fid)+'] «'+r.what+'»('+String(r.at).slice(0,16)+')을 되돌릴까요?\n\n'
       +'· 전 값으로 돌릴 칸: '+back.length+(okd.length?'\n· 사람이 ✓ 확인한 칸: '+okd.length+' — 기본은 빼고 되돌립니다':'')+(moved?'\n· 그 뒤 바뀐 칸 '+moved+'개는 건드리지 않습니다':'')
       +'\n\n되돌린 것도 일지에 남아 다시 되돌릴 수 있습니다.';
-    confirmM(msg,{ok:back.length?back.length+'칸 되돌리기':'되돌리기',danger:true}).then(function(ok){
-      if(!ok) return;
-      if(okd.length) confirmM('사람이 ✓ 확인한 '+okd.length+'칸도 함께 되돌릴까요?',{ok:'함께 되돌리기',cancel:'빼고 되돌리기'}).then(function(w){ go(!!w); });
-      else go(false);
-    });
+    /* 사람이 확인한 칸이 있으면 세 갈래 — 취소(Esc·바깥 누르기 포함)는 «아무것도 안 함»(코드 검토 2026-10-09) */
+    if(okd.length){
+      JL.pend=go;
+      showModal('<div style="font-size:14px;line-height:1.6;white-space:pre-line;margin-bottom:14px">'+esc(msg)+'</div>'
+        +'<div class="row" style="justify-content:flex-end;gap:8px;flex-wrap:wrap"><button onclick="JL.pend=null;closeM()">취소</button>'
+        +'<button onclick="var g=JL.pend;JL.pend=null;closeM();if(g)g(false)"'+(back.length?'':' disabled')+'>확인한 칸 빼고 '+back.length+'칸</button>'
+        +'<button class="primary" style="background:var(--danger)" onclick="var g=JL.pend;JL.pend=null;closeM();if(g)g(true)">확인한 칸까지 '+(back.length+okd.length)+'칸</button></div>',{width:460});
+      return;
+    }
+    confirmM(msg,{ok:back.length+'칸 되돌리기',danger:true}).then(function(ok){ if(ok) go(false); });
   });
 }
 // ── 청구 관리 (4단계) ──
@@ -9767,7 +9783,7 @@ function estabBundle(phase){
     S._bundleGate=null;
     if(!f._sample){ var _gfid=S.formFund, _kinds=docsFor(ph[2](),f.fund_type||'공동');
       fbDb.ref(NS+'/prov/'+_gfid).once('value').then(function(sn){ var P=sn.val()||{};
-        if(S.formFund!==_gfid) return;
+        if(S.formFund!==_gfid||S._bundlePhase!==ph[0]) return;   // 그 사이 다른 단계를 열었다
         S._bundleGate={phase:ph[0], fid:_gfid, P:P, items:_formUnconfMany(_kinds,f,sites,P)};
       }).catch(function(){}); }
     // 서식마다 A4 한 장 — 화면에서도 낱장으로 보이고 인쇄 시 그대로 페이지가 나뉜다
@@ -9910,10 +9926,13 @@ function _formGatePaint(){
    미확인 목록은 묶음을 그릴 때 미리 모아 두었다(S._bundleGate) — 여기서 기다리면 인쇄 창이 팝업으로 막힌다. */
 function estabBundlePrint(){
   var f=curForm(), G=S._bundleGate;
-  if(!f||f._sample||!G||G.fid!==S.formFund||!G.items.length) return printDoc();
+  if(!f||f._sample||!G||G.fid!==S.formFund||G.phase!==S._bundlePhase||!G.items.length) return printDoc();
   S._gate={phase:G.phase, fid:G.fid, items:G.items, P:G.P, after:'print'};
   _gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})');
 }
+/* 맨 위 창만 닫는다 — closeM 은 «첫» 창을 닫아, 편집 창(previewDoc) 위에 뜬 관문을 닫으면 편집 창이 사라졌다(코드 검토 2026-10-09) */
+function _closeTopM(){ var all=document.querySelectorAll('#modalbg'), m=all[all.length-1]; if(!m) return;
+  var cb=m._onclose; m._onclose=null; m.remove(); if(cb){ try{ cb(); }catch(e){} } }
 /* 관문 창 — 한글 묶음·전부 인쇄·한 장 인쇄·한 장 한글이 같은 세 갈래(취소 · 「초안」 표시 넣어 ○○ · N칸 확인하고 ○○) */
 function _gateModal(its,verb,draftCall){
   var rows=its.slice(0,40).map(function(it){
@@ -9924,8 +9943,8 @@ function _gateModal(its,verb,draftCall){
     +'<div class="muted" style="font-size:12px;margin-bottom:8px">기계가 넣고 아직 아무도 원본과 대조하지 않은 값입니다. 맞으면 확인하고 '+verb+', 아직이면 「초안」 표시로 '+verb+'.</div>'
     +'<div style="max-height:46vh;overflow:auto">'+rows+'</div>'
     +'<div class="row" style="justify-content:flex-end;margin-top:12px;gap:6px;flex-wrap:wrap">'
-    +'<button onclick="closeM()">취소</button>'
-    +'<button onclick="closeM();'+draftCall+'" title="모든 쪽 가운데 흐린 「초안 · 미확인 '+its.length+'」 — 제출본이 아닙니다">「초안」 표시 넣어 '+verb+'</button>'
+    +'<button onclick="_closeTopM()">취소</button>'
+    +'<button onclick="_closeTopM();'+draftCall+'" title="모든 쪽 가운데 흐린 「초안 · 미확인 '+its.length+'」 — 제출본이 아닙니다">「초안」 표시 넣어 '+verb+'</button>'
     +'<button class="primary" onclick="formGateOk()" title="값은 그대로, 확인 표시만 붙이고 깨끗한 것으로 '+verb+'">'+its.length+'칸 확인하고 '+verb+' ▸</button></div>',{width:620});
 }
 /* ══ 서식 한 장 — [🖨 인쇄/PDF]·[⬇ 한글]도 같은 관문 (대표 「진행」 2026-10-09) ══
@@ -9936,7 +9955,7 @@ function _oneGatePrep(kind){
   var f=curForm(), fid=S.formFund;
   if(!f||f._sample||!fid||S.formsCtx!=='fund') return;
   Promise.all([_loadSites(fid,{withClosed:true}),fbDb.ref(NS+'/prov/'+fid).once('value').then(function(sn){ return sn.val()||{}; })]).then(function(r){
-    if(S.formFund!==fid) return;
+    if(S.formFund!==fid||(S._docKind!==kind&&S._sideKind!==kind)) return;   // 그 사이 다른 서식을 열었다
     var its=(_formUnconf(kind,f,r[0],r[1])||[]).map(function(it){ return Object.assign({forms:[docLabel(kind)]},it); });
     S._oneGate={kind:kind, fid:fid, P:r[1], items:its};
   }).catch(function(){});
@@ -9994,7 +10013,7 @@ function formGateOk(){
     if(nE) S.sitesFor=null;
     if(typeof RV!=='undefined') RV.at=0;
     if(typeof _trEv==='function') _trEv(ev);   // 🛡 서식 관문에서 «맞음»도 규칙마다 센다
-    FG.at=0; closeM();
+    FG.at=0; _closeTopM();
     S._oneGate=null;
     if(G.after==='print'){ S._bundleGate=null; printDoc({w:pw}); } else if(G.after==='hwpone') _hwpOneDl(0); else if(G.after==='hwpx') _docToHwpxRun(G.kind,0); else _estabBundleHwpGo(G.phase,0);
   }).catch(function(e){ try{ if(pw) pw.close(); }catch(x){} toast('저장 실패: '+((e&&e.message)||e),'err'); });
@@ -13577,7 +13596,7 @@ function _provApplyPend(){
 var PV={fid:'', ref:null, v:{}};
 function _provState(p){
   if(!p) return '';
-  if((p.ok&&(!p.ok.rule||(typeof _trOn==='function'&&_trOn(p.ok.rule))))||(p.m===1&&p.how==='dialog')) return 'o';   // 확인함 _rvItems 와 같은 잣대
+  if((p.ok&&(!p.ok.rule||(typeof _trOkLive==='function'&&_trOkLive(p.ok))))||(p.m===1&&p.how==='dialog')) return 'o';   // 확인함 _rvItems 와 같은 잣대
   return p.m===1?'a':'h';
 }
 function _provSub(fid){
@@ -20954,8 +20973,10 @@ function importBank(){
         if(!txns){ toast('통장 형식을 인식하지 못했습니다 (입금·출금 열 없음)','err'); return; }
         if(!txns.length){ toast('거래 내역이 없습니다','warn'); return; }
         confirmM('['+_fname+' · '+_yr+'년] '+txns.length+'건의 거래를 읽었습니다.'+(sheets.length>1?'\n시트 '+sheets.length+'개: '+sheets.join(' / '):'')+'\n자동분개 제안과 함께 가져올까요?\n(이미 있는 거래는 승인·분개를 그대로 보존합니다)',{ok:'가져오기'}).then(function(ok){ if(!ok)return;
-          return Promise.all([loadLearned(),_siteNames(_fid)]).then(function(_pre){   // 배운 거래처·참여사업장명을 제안에 반영
-          var _snames=_pre[1];
+          return Promise.all([loadLearned(),_siteNames(_fid),
+            fbDb.ref(NS+'/closing/'+_fid+'/'+_yr).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return {}; })]).then(function(_pre){   // 배운 거래처·참여사업장명을 제안에 반영 · 마감 상태(자동 승인은 마감한 달·확정한 해를 안 건드린다)
+          var _snames=_pre[1], _cl=_pre[2]||{};
+          var _lockedM=function(d){ return !!(_cl.locked||(_cl.months||{})[_monthOf(d)]); };
           var path=NS+'/txns/'+_fid+'/'+_yr;
           fbDb.ref(path).once('value').then(function(snap){   // 서버 최신본 기준 중복검사 — 오래된 캐시로 승인 거래 덮어쓰기 방지
             var existing=snap.val()||{};
@@ -20981,7 +21002,7 @@ function importBank(){
               if(p.d&&p.c&&p.src) obj[key].sug=p.src;   // 이 분개는 기계가 골랐다 — 배운 것/규칙/사업장 이름
               /* 🛡 그 기금에서 이 계정 규칙이 «자동 확정»으로 켜져 있으면 100만 원 이하는 바로 승인한다(누가=자동 확정, 어느 규칙인지 남김) */
               if(p.d&&p.c&&p.src&&typeof _trOn==='function'){ var _dep=x.deposit>0, _rk=_trTxnRk(_fid,_dep,_dep?p.c:p.d);
-                if(_trOn(_rk)&&Math.max(num(x.deposit)||0,num(x.withdraw)||0)<=TR_AMT_MAX){
+                if(_trOn(_rk)&&p.src!=='learned_other'&&!_lockedM(x.date)&&Math.max(num(x.deposit)||0,num(x.withdraw)||0)<=TR_AMT_MAX){   // 다른 기금에서만 배운 것·마감한 달은 사람이
                   obj[key].approved=true; obj[key].approved_by='자동 확정'; obj[key].approved_at=_nowStamp(); obj[key].ok_via='rule'; obj[key].ok_rule=_rk; autoN++; } }
             });
             if(added===0){ toast('새로 추가할 거래가 없습니다 (기존 '+kept+'건 유지)','warn'); return; }
@@ -20996,9 +21017,12 @@ function importBank(){
               var msg='가져오기 완료: 신규 '+added+'건'+(kept?' · 기존 '+kept+'건 보존':'')+(autoN?' · 🛡 자동 승인 '+autoN+'건':'');
               /* 🛡 «계좌 다른 이체 짝» 규칙이 켜져 있으면 확실한 짝은 바로 상계하고, 추정 짝만 묻는다 */
               var _xrk=(typeof _trOn==='function')?_trXferRk(_fid,'sure'):'';
-              if(_xrk&&_trOn(_xrk)){ var _sure=pairs.filter(function(pr){ return pr.kind==='sure'; });
+              /* ⚠ 자동은 «이번에 새로 들인 줄이 낀 짝, 두 줄 다 승인 전, 마감 안 된 달»만 — 사람이 승인한 줄을 이체로 덮으면 안 된다(코드 검토 2026-10-09).
+                 나머지 확실한 짝은 예전처럼 창에서 사람이 고른다. */
+              if(_xrk&&_trOn(_xrk)){ var _sure=pairs.filter(function(pr){ var a=merged[pr.inId]||{}, b=merged[pr.outId]||{};
+                  return pr.kind==='sure'&&!a.approved&&!b.approved&&(obj[pr.inId]||obj[pr.outId])&&!_lockedM(pr.date); });
                 if(_sure.length){ applyTransfers(_sure,_fid,_yr,true,_xrk).catch(function(){}); msg+=' · 🛡 이체 '+_sure.length+'쌍 자동 상계'; }
-                pairs=pairs.filter(function(pr){ return pr.kind!=='sure'; }); }
+                pairs=pairs.filter(function(pr){ return _sure.indexOf(pr)<0; }); }
               if(pairs.length) _xferModal(pairs,_fid,_yr,msg+' — 계좌 간 이체로 보이는 짝 '+pairs.length+'쌍을 확인하세요.');
               else toast(msg);
             });

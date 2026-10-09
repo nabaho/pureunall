@@ -127,11 +127,11 @@ test('★ [🖨 전부 인쇄(날인용)]도 관문을 지난다 — 미리 모�
   assert.ok(eb.includes('onclick="estabBundlePrint()"'), '인쇄 단추가 관문을 건너뛴다');
   assert.ok(eb.includes('S._bundleGate={phase:ph[0], fid:_gfid, P:P, items:_formUnconfMany(_kinds,f,sites,P)}'), '미확인 목록을 미리 안 모은다');
   const p = strip(grabFn('estabBundlePrint'));
-  assert.ok(p.includes("if(!f||f._sample||!G||G.fid!==S.formFund||!G.items.length) return printDoc();"), '미확인이 없으면 바로 인쇄해야 한다');
+  assert.ok(p.includes("if(!f||f._sample||!G||G.fid!==S.formFund||G.phase!==S._bundlePhase||!G.items.length) return printDoc();"), '미확인이 없으면 바로 인쇄해야 한다');
   assert.ok(p.includes("after:'print'"));
   assert.ok(p.includes("_gateModal(G.items,'인쇄','printDoc({draft:'+G.items.length+'})')"), '「초안」 인쇄 갈래가 없다');
   const gm = strip(grabFn('_gateModal'));
-  assert.ok(gm.includes('formGateOk()') && gm.includes("closeM();'+draftCall+'"), '관문 창 세 갈래가 없다');
+  assert.ok(gm.includes('formGateOk()') && gm.includes("_closeTopM();'+draftCall+'"), '관문 창 세 갈래가 없다');
   const ok = strip(grabFn('formGateOk'));
   assert.ok(ok.includes("var pw=G.after==='print'?window.open('','_blank'):null;"), '저장 뒤에 창을 열면 팝업으로 막힌다');
   assert.ok(ok.includes('printDoc({w:pw})'));
@@ -167,4 +167,13 @@ test('★ [📄 한글(HWPX)]도 관문 — 관문 없던 마지막 출구 · �
   assert.ok(r.includes("_hwpDraftMark(HWPX.build([{body:body, landscape:false, margin:doc.margin}]),'초안 · 미확인 '+n)"), '「초안」이 안 들어간다');
   assert.ok(r.includes('표시를 넣지 못해 받지 않았습니다'), '「초안」 실패 때 깨끗한 파일이 나간다');
   assert.ok(strip(grabFn('formGateOk')).includes("else if(G.after==='hwpx') _docToHwpxRun(G.kind,0);"));
+});
+
+test('★ 관문 — 맨 위 창만 닫고(편집 창 보존), 단계·서식이 바뀐 늦은 목록은 버린다 (코드 검토 2026-10-09)', () => {
+  const t = strip(grabFn('_closeTopM'));
+  assert.ok(t.includes("all=document.querySelectorAll('#modalbg'), m=all[all.length-1]"), '첫 창(편집 창)을 닫는다');
+  assert.ok(strip(grabFn('formGateOk')).includes('FG.at=0; _closeTopM();'));
+  assert.ok(strip(grabFn('estabBundlePrint')).includes('G.phase!==S._bundlePhase'), '다른 단계 목록으로 관문을 연다');
+  assert.ok(strip(grabFn('estabBundle')).includes("if(S.formFund!==_gfid||S._bundlePhase!==ph[0]) return;"));
+  assert.ok(strip(grabFn('_oneGatePrep')).includes('(S._docKind!==kind&&S._sideKind!==kind)'), '앞 서식의 늦은 목록이 덮는다');
 });
