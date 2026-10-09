@@ -15269,7 +15269,7 @@ async function onImportFile(files){
     else { await needXLSX();
       const wb=XLSX.read(await f.arrayBuffer(),{type:'array'});
       rows = mapRows(XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{defval:''})); }
-    rows = rows.filter(r=>r.name||r.company||r.mobile||r.tel);
+    rows = rows.filter(r=>r.name||r.company||r.mobile||r.tel).map(importTidyRow);
     if (!rows.length) return toast('가져올 연락처를 찾지 못했습니다');
     previewImport(rows, f.name);
   }catch(e){ console.error(e); toast('파일을 읽지 못했습니다'); }
@@ -15420,6 +15420,53 @@ function parseVcf(text){
   return out;
 }
 
+/* ══════ 가져오기 전 다듬기 (대표 지시 2026-10-09 「고쳐라」) ══════
+   다음 주소록 1,039장을 가져온 뒤 드러난 것 — 주소록의 «표시 이름»에 회사가 붙어 있었다.
+     「TTT_김원미」(회사 칸 빔) · 「동원정윤성인」(회사 칸 ㈜동원정) · 「EVOLVE soft전석정」(회사 칸은 «다른» 회사)
+   그래서 ① 회사 칸이 비거나 같은 회사면 이름과 회사를 가르고, ② 회사 칸이 «다른» 회사면 가르지 않고
+   메모에 「[가져오기 확인]」을 단다 — 한 칸에 두 사람이 섞인 줄이다(사람이 본다, 기계가 고르지 않는다).
+   ⚠ 「_」로만 가른다 — 「/」는 두 회사를 잇는 데도 쓴다(「제이원인스트루먼트/지앤지」).
+   ⚠ 「3호_소망상사」(번호 꼬리표 + 가게) · 「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
+const IMP_ROLE_TAIL = /(담당|사무실|소개|대표|사장|팀장|과장|부장|이사|실장|센터|본부|경리|총무|회계|직원|원장|상사|푸드|누리|산업|건설|물산|상회|식품|기업|테크|전자|공업|상점|마트|약국|병원|의원)$/;
+const IMP_FLAG = '[가져오기 확인] 이름 앞의 회사와 회사 칸이 다릅니다 — 한 칸에 두 사람이 섞였을 수 있습니다';
+/* 회사 이름 견주기는 «맞출 때» 쓰는 다듬개(ErpMatch._norm) 하나로 — 새 다듬개를 만들지 않는다(tests/cards-norm-align) */
+const impCo = x => ErpMatch._norm(x);
+function importTidyRow(r){
+  if(!r) return r;
+  const name = String(r.name || '').trim(), co = String(r.company || '').trim();
+  const nc = impCo(co);
+  const same = pc => { const a = impCo(pc); return !nc || a === nc || a.indexOf(nc) === 0 || nc.indexOf(a) === 0; };
+  const flag = () => Object.assign({}, r, { memo: (String(r.memo || '') + '\n' + IMP_FLAG).trim() });
+  /* ① 「회사_이름」 */
+  let m = name.match(/^(.+?)\s*_\s*([가-힣]{2,5})$/);
+  if(m && !/_/.test(m[1]) && !/^[0-9０-９]/.test(m[1].trim()) && !IMP_ROLE_TAIL.test(m[2])){
+    const pc = m[1].trim();
+    if(!same(pc)) return flag();
+    return Object.assign({}, r, { name: m[2], company: co || pc });
+  }
+  /* ② 영문 회사가 붙은 「EVOLVE soft전석정」 */
+  m = name.match(/^([A-Za-z][A-Za-z0-9 .&-]{1,30}?)\s*([가-힣]{2,4})$/);
+  if(m && !IMP_ROLE_TAIL.test(m[2])){
+    if(!same(m[1])) return flag();
+    return Object.assign({}, r, { name: m[2], company: co || m[1].trim() });
+  }
+  /* ③ 회사 칸의 회사가 이름 앞에 붙은 「동원정윤성인」 */
+  const nn = impCo(name);
+  if(nc.length >= 2 && nn.length > nc.length && nn.indexOf(nc) === 0){
+    const rest = nn.slice(nc.length);
+    if(/^[가-힣]{2,4}$/.test(rest) && !IMP_ROLE_TAIL.test(rest)) return Object.assign({}, r, { name: rest });
+  }
+  return r;
+}
+/* 가져오기의 «이미 있는 사람» 열쇠 — 회사 이름의 (주)·㈜·띄어쓰기를 걷고 견준다.
+   ⚠ rowKeys 는 그대로 둔다 — 중복 정리(dupGroupsOf)도 그것을 쓴다. 여기만 넓힌다. */
+function importKeys(r){
+  const ks = rowKeys(r);
+  const n = impCo(r && r.name), c = impCo(r && r.company);
+  if(n && c) ks.push('m' + n + '|' + c);
+  return ks;
+}
+
 /* 중복 매칭 키: 휴대폰 → 이메일 → 이름+회사 */
 function rowKeys(r){
   const ks=[]; const d=digits(r.mobile);
@@ -15431,20 +15478,21 @@ function rowKeys(r){
 function buildKeyMap(){
   const map={};
   Object.values(state.items).filter(it=>it.kind==='card')
-    .forEach(it=>rowKeys(it).forEach(k=>{ if(!map[k]) map[k]=it.id; }));
+    .forEach(it=>importKeys(it).forEach(k=>{ if(!map[k]) map[k]=it.id; }));
   return map;
 }
-const matchExisting=(r,map)=>{ for(const k of rowKeys(r)) if(map[k]) return map[k]; return null; };
+const matchExisting=(r,map)=>{ for(const k of importKeys(r)) if(map[k]) return map[k]; return null; };
 
 let pendingImport=null;
 function previewImport(rows,fname){
   const map=buildKeyMap(); let add=0,merge=0;
   const seen={};
   rows.forEach(r=>{ const id=matchExisting(r,{...map,...seen});
-    if(id) merge++; else { add++; rowKeys(r).forEach(k=>seen[k]=k); } });
+    if(id) merge++; else { add++; importKeys(r).forEach(k=>seen[k]=k); } });
   /* 인코딩 깨짐 사전 감지 — 깨진 파일이면 가져오기 전에 경고 */
   const badN = rows.filter(r=>_hasMojibake(r.name)||_hasMojibake(r.company)||_hasMojibake(r.title)).length;
   const badRatio = rows.length ? badN/rows.length : 0;
+  const mixN = rows.filter(r=>String(r.memo||'').indexOf(IMP_FLAG) >= 0).length;
   const warnBox = badN>0 ? `
     <div style="background:#fef2f2;border:1px solid #fecaca;color:#991b1b;border-radius:10px;padding:11px 12px;margin:10px 0;font-size:13px;line-height:1.6">
       ⚠️ <b>글자가 깨진 것으로 보이는 명함 ${badN.toLocaleString()}건</b> 발견 (이름이 'ì¶œ…'처럼 보임).<br>
@@ -15457,6 +15505,7 @@ function previewImport(rows,fname){
       발견된 연락처 <b style="color:var(--ink)">${rows.length.toLocaleString()}</b>건<br>
       · 신규 등록 <b style="color:var(--green)">${add.toLocaleString()}</b>건<br>
       · 이미 있는 중복 <b style="color:var(--orange)">${merge.toLocaleString()}</b>건<br>
+      ${mixN ? `· 이름의 회사와 회사 칸이 다른 줄 <b style="color:#dc2626">${mixN.toLocaleString()}</b>건 — 메모에 「[가져오기 확인]」을 달아 넣습니다<br>` : ''}
       모두 <b style="color:var(--ink)">명함</b> 탭으로 들어갑니다.</p>
     ${warnBox}
     <div style="background:#f8fafc;border:1px solid #bfdbfe;border-radius:10px;padding:11px 12px">
@@ -15511,7 +15560,7 @@ async function runImport(){
       delete it.phones;
       if (!String(it.company||'').trim()) it.group = friendG.id;  /* 회사 없음 → 지인 폴더 */
       updates[it.id]=it; add++;
-      rowKeys(r).forEach(k=>{ if(!map[k]) map[k]=it.id; });
+      importKeys(r).forEach(k=>{ if(!map[k]) map[k]=it.id; });
     }
     if (i%300===0) toast(`가져오는 중… ${i.toLocaleString()}/${rows.length.toLocaleString()}`,4000);
   }
