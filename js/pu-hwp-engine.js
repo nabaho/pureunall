@@ -216,7 +216,8 @@
           if (!size.width || !size.height) continue;
           var available = Math.max(280, Math.min(container.clientWidth - 32 || size.width, size.width));
           var cssScale = available / size.width;
-          var dpr = Math.max(1, Math.min(global.devicePixelRatio || 1,
+          /* extra.dpr — 인쇄처럼 화면보다 촘촘히 그릴 때(2026-10-09 계약서 인쇄). 없으면 화면 배율 그대로 */
+          var dpr = Math.max(1, Math.min((extra && extra.dpr) || global.devicePixelRatio || 1,
             Math.sqrt(config(extra).maxCanvasPixels / (size.width * size.height))));
           var canvas = global.document.createElement('canvas');
           canvas.width = Math.round(size.width * dpr);
