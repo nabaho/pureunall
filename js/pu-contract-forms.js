@@ -405,7 +405,56 @@
         if (d) return d;
         if (ga !== gb) return ga.localeCompare(gb);
       }
-      return String(a.name || '').localeCompare(String(b.name || ''));
+      return orderOf(a) - orderOf(b) || String(a.name || '').localeCompare(String(b.name || ''));
+    });
+  }
+  /* ══ 끌어서 차례 바꾸기 (대표 「서류의 순서를 마우스 드래그로 위아래 순서 바꿀 수 있게 … 모든 계약서관리에 동일 적용」 2026-10-09) ══
+     양식 목록(갈래 안에서) · 세트 안 서류 · 왼쪽 세트 목록. 양식은 order(작을수록 위), 정하지 않은 것은 맨 뒤 이름순.
+     ⚠ 저장은 늘 거래(changeForms·changeSets) 한 길 — 그사이 남이 고친 다른 칸을 지우지 않는다(차례 칸만 바꾼다) */
+  function orderOf(f) { return f && typeof f.order === 'number' && isFinite(f.order) ? f.order : 1e9; }
+  /* ids 에서 from 을 to 의 앞(after=false)·뒤로 옮긴다. 없는 열쇠면 그대로 */
+  function moveIn(ids, from, to, after) {
+    var l = (ids || []).slice(), i = l.indexOf(from);
+    if (i < 0 || from === to || l.indexOf(to) < 0) return l;
+    l.splice(i, 1);
+    var j = l.indexOf(to) + (after ? 1 : 0);
+    l.splice(j, 0, from);
+    return l;
+  }
+  /* 양식 목록에 차례를 적는다 — ids 에 든 것만 0,1,2… (다른 양식·다른 칸은 그대로) */
+  function applyOrder(list, ids) {
+    var pos = {};
+    (ids || []).forEach(function (id, i) { pos[id] = i; });
+    (list || []).forEach(function (f) { if (f && pos[f.id] != null) f.order = pos[f.id]; });
+    return list;
+  }
+  /* 끌어 놓기 붙이기 — rows: [{ node, id }], onMove(from, to, after). 우리 종류(text/x-pcf-sort)만 받는다(파일 끌어 놓기와 섞이지 않게) */
+  var SORT_TYPE = 'text/x-pcf-sort';
+  function dragSort(rows, onMove) {
+    var from = null;
+    var clear = function () { rows.forEach(function (r) { r.node.classList.remove('pcf-dtop', 'pcf-dbot', 'pcf-dsrc'); }); };
+    rows.forEach(function (r) {
+      var n = r.node;
+      n.setAttribute('draggable', 'true');
+      n.addEventListener('dragstart', function (e) {
+        from = r.id; n.classList.add('pcf-dsrc');
+        try { e.dataTransfer.setData(SORT_TYPE, r.id); e.dataTransfer.effectAllowed = 'move'; } catch (x) {}
+      });
+      n.addEventListener('dragend', function () { from = null; clear(); });
+      n.addEventListener('dragover', function (e) {
+        if (from == null || from === r.id) return;
+        e.preventDefault();
+        var b = n.getBoundingClientRect(), after = e.clientY > b.top + b.height / 2;
+        n.classList.toggle('pcf-dbot', after); n.classList.toggle('pcf-dtop', !after);
+      });
+      n.addEventListener('dragleave', function () { n.classList.remove('pcf-dtop', 'pcf-dbot'); });
+      n.addEventListener('drop', function (e) {
+        if (from == null) return;
+        e.preventDefault(); e.stopPropagation();
+        var b = n.getBoundingClientRect(), after = e.clientY > b.top + b.height / 2, f0 = from;
+        from = null; clear();
+        if (f0 !== r.id) onMove(f0, r.id, after);
+      });
     });
   }
   /* 칩 개수 — 측 칩은 사건계약 전체에서, 사건유형 칩은 «고른 측 안에서» 센다 */
@@ -950,6 +999,9 @@
     + '.pcf-lt .pcf-ln2{width:28px;color:#94a3b8;font-size:11.5px}'
     + '.pcf-lt .pcf-lsrc{width:46px;font-size:11px;color:#64748b}.pcf-lt td.pcf-lsrc.hwp{color:#1e40af}.pcf-lt td.pcf-lsrc.xlsx{color:#166534}.pcf-lt td.pcf-lsrc.pdf{color:#991b1b}'
     + '.pcf-lt .pcf-lnm{display:flex;align-items:center;gap:4px;min-width:0}.pcf-lt .pcf-lnm .pcf-ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
+    + '.pcf-dtop td,.pcf-dtop{box-shadow:inset 0 2px 0 #2563eb}.pcf-dbot td,.pcf-dbot{box-shadow:inset 0 -2px 0 #2563eb}.pcf-dsrc{opacity:.5}'
+    + '.pcf-bchip{display:inline-block;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:99px;padding:1px 8px;margin:1px 2px;cursor:grab;white-space:nowrap}'
+    + '.pcf-grip{color:#94a3b8;cursor:grab;user-select:none;padding-right:2px}'
     + '.pcf-lrow{cursor:pointer}.pcf-lrow:hover td{background:#f8fafc}.pcf-lrow.on td{background:#dbeafe}.pcf-lrow.off td{color:#94a3b8}'
     + '.pcf-lgr td{padding:0;border-bottom:none}'
     + '.pcf-fsel{padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:11.5px;font-family:inherit;background:#fff;color:#475569}'
@@ -2513,11 +2565,14 @@
       });
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
-      S.sets.forEach(function (st) {
+      var setRows = S.sets.map(function (st) {
         var on = S.setId === st.id;
-        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), title: st.name + ' — 누르면 목록에 체크됩니다',
-          onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]));
+        var b = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), title: st.name + ' — 누르면 목록에 체크됩니다 · 끌어서 차례를 바꿉니다',
+          onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]);
+        t.appendChild(b);
+        return { id: st.id, node: b };
       });
+      dragSort(setRows, moveSet);
       t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk add', text: '+ 세트 만들기', onclick: function () {
         if (S.checked.length) saveAsSet(); else toast('목록에서 양식을 체크한 뒤 다시 누르세요 — 체크한 양식으로 세트를 만듭니다');
       } }));
@@ -2738,6 +2793,51 @@
       drawBar();
     }
     function setById(id) { return S.sets.filter(function (s) { return s.id === id; })[0] || null; }
+    /* 양식 줄 옮기기 — 같은 종류·같은 갈래 안에서만. 찾기·거르기로 가려진 것까지 그 갈래 전체 차례로 적는다 */
+    function moveForm(from, to, after) {
+      var fa = S.forms.filter(function (f) { return f.id === from; })[0], fb = S.forms.filter(function (f) { return f.id === to; })[0];
+      if (!fa || !fb) return;
+      if (hasGroups(S.kind) && groupOf(fa) !== groupOf(fb)) { toast('같은 갈래 안에서만 차례를 바꿀 수 있습니다 — 갈래를 바꾸려면 ✏ 수정'); return; }
+      var g = groupOf(fa), ids = filterForms(S.forms, { kind: S.kind }).filter(function (f) { return !hasGroups(S.kind) || groupOf(f) === g; }).map(function (f) { return f.id; });
+      ids = moveIn(ids, from, to, after);
+      applyOrder(S.forms, ids); drawList();   // 먼저 화면에서 — 저장이 끝나면 다시 그린다
+      change(function (list) { return applyOrder(list, ids); }, '차례를 바꿨습니다').catch(function () { load(); });
+    }
+    /* 고른 서류(세트) 차례 */
+    function moveChecked(from, to, after) {
+      S.checked = moveIn(S.checked, from, to, after);
+      var st = S.setId ? setById(S.setId) : null;
+      drawBar();
+      if (!st) return;
+      var ids = S.checked.slice(), id = st.id;
+      track(changeSets(db, function (doc) {
+        var at = -1;
+        doc.v.forEach(function (s, i) { if (s && s.id === id) at = i; });
+        /* 세트에 있었지만 지금 없는(지워진) 양식은 끝에 그대로 둔다 — 되살아나면 다시 쓰인다 */
+        var keep = function (old) { return ids.concat((old || []).filter(function (x) { return ids.indexOf(x) < 0; })); };
+        if (at >= 0) doc.v[at].formIds = keep(doc.v[at].formIds);
+        /* 기본 세트를 처음 고치면 — 세트 목록 «전체»를 저장본에 옮겨 담는다(그 세트만 담으면 목록 맨 위로 튄다) */
+        else if (isSeedSet(id) && doc.rm.indexOf(id) < 0) {
+          doc.v = setsOf(doc).map(function (s) { return JSON.parse(JSON.stringify(s)); });
+          doc.v.forEach(function (s) { if (s.id === id) s.formIds = keep(s.formIds); });
+        }
+        return doc;
+      })).then(function (list) { S.sets = list; drawTree(); toast('세트 차례를 바꿨습니다 — ' + st.name); },
+        function (e) { toast('⚠ 세트 차례를 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
+    }
+    /* 왼쪽 세트 목록 차례 — 기본 세트도 저장본에 옮겨 담아 차례를 고정한다(지운 기본 세트는 되살리지 않는다) */
+    function moveSet(from, to, after) {
+      var ids = moveIn(S.sets.map(function (s) { return s.id; }), from, to, after);
+      track(changeSets(db, function (doc) {
+        var all = setsOf(doc), by = {};
+        all.forEach(function (s) { by[s.id] = s; });
+        var v = ids.filter(function (id) { return by[id]; }).map(function (id) { return by[id]; });
+        all.forEach(function (s) { if (ids.indexOf(s.id) < 0) v.push(s); });   // 그사이 남이 만든 세트는 끝에
+        doc.v = v;
+        return doc;
+      })).then(function (list) { S.sets = list; drawTree(); toast('세트 차례를 바꿨습니다'); },
+        function (e) { toast('⚠ 세트 차례를 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
+    }
     function applySet(id) {
       var st = setById(id); if (!st) return;
       var have = {}; S.forms.forEach(function (f) { have[f.id] = 1; });
@@ -2817,7 +2917,10 @@
       if (!fms.length) { fitHeight(); return; }
       var st = S.setId ? setById(S.setId) : null;
       b.appendChild(el('b', { text: (st ? '📚 ' + st.name + ' · ' : '☑ ') + fms.length + '개 골랐습니다' }));
-      b.appendChild(el('span', { 'class': 'pcf-bnames', title: fms.map(function (f) { return f.name; }).join(', '), text: fms.map(function (f) { return f.name; }).join(' · ') }));
+      /* 고른 서류 차례 = 채우기·인쇄·받기 차례. 끌어서 바꾼다 — 세트를 연 것이면 세트에도 그 차례로 남긴다 */
+      var chips = fms.map(function (f, i) { return { id: f.id, node: el('span', { 'class': 'pcf-bchip', title: '끌어서 차례를 바꿉니다 — ' + f.name, text: (i + 1) + '. ' + f.name }) }; });
+      b.appendChild(el('span', { 'class': 'pcf-bnames', title: '끌어서 차례를 바꿉니다' }, chips.map(function (c) { return c.node; })));
+      dragSort(chips, moveChecked);
       if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: saveAsSet }));
       else { b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 세트 이름', onclick: function () { editSet(st.id, true); } }));
         b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '🗑 세트 지우기', onclick: function () { editSet(st.id, false); } })); }
@@ -2837,7 +2940,7 @@
       all.addEventListener('change', function () { list.forEach(function (f) { toggleCheck(f.id, all.checked); }); drawList(); });
       var tb = el('tbody');
       if (!list.length) tb.appendChild(el('tr', null, [el('td', { colspan: '4', 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: '맞는 양식이 없습니다' })]));
-      var prev = null, n = 0;
+      var prev = null, n = 0, rows = [];
       list.forEach(function (f) {
         if (S.kind === 'case') {
           var g = groupOf(f);
@@ -2850,14 +2953,16 @@
         ck.checked = S.checked.indexOf(f.id) >= 0;
         ck.addEventListener('click', function (e) { e.stopPropagation(); });
         ck.addEventListener('change', function () { toggleCheck(f.id, ck.checked); all.checked = list.every(function (x) { return S.checked.indexOf(x.id) >= 0; }); });
-        tb.appendChild(el('tr', { 'class': 'pcf-lrow' + (on ? ' on' : '') + (f.enabled === false ? ' off' : ''), title: f.name + (f.enabled === false ? ' (사용 안 함)' : '') + ' — 누르면 오른쪽에 크게',
+        var tr = el('tr', { 'class': 'pcf-lrow' + (on ? ' on' : '') + (f.enabled === false ? ' off' : ''), title: f.name + (f.enabled === false ? ' (사용 안 함)' : '') + ' — 누르면 오른쪽에 크게 · 끌어서 차례를 바꿉니다',
           'aria-current': on ? 'true' : null, onclick: function () { select(f.id); } }, [
           el('td', { 'class': 'pcf-lc' }, [ck]),
-          el('td', { 'class': 'pcf-ln2', text: String(n) }),
+          el('td', { 'class': 'pcf-ln2' }, [el('span', { 'class': 'pcf-grip', 'aria-hidden': 'true', text: '⠿' }), String(n)]),
           el('td', { 'class': 'pcf-lnm' }, [el('span', { 'class': 'pcf-ln', text: f.name }),
             sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null]),
-          el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]));
+          el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]);
+        tb.appendChild(tr); rows.push({ id: f.id, node: tr });
       });
+      dragSort(rows, moveForm);
       col.appendChild(el('table', { 'class': 'pcf-lt' }, [el('thead', null, [el('tr', null, [el('th', { 'class': 'pcf-lc' }, [all]),
         el('th', { 'class': 'pcf-ln2', text: '#' }), el('th', { text: '양식 (' + list.length + ')' }), el('th', { 'class': 'pcf-lsrc', text: '원본' })])]), tb]));
       col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
@@ -2950,6 +3055,7 @@
     facetCounts: facetCounts,
     setsOf: setsOf,
     changeSets: changeSets,
+    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder,
     bundleMarkers: bundleMarkers,
     bundleFileNames: bundleFileNames,
     zipName: zipName,
