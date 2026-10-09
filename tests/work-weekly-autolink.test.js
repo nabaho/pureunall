@@ -76,7 +76,9 @@ const FNS = [
   '_coDigits', '_coNorm', 'coKeysOf', 'cmNeed', 'cmLoad', 'cmDay', 'cmMatchKey', 'cmKey', 'cmLogLine',
   'sentNeed', 'sentLoad', 'sentKey', 'sentBrief', 'sentLogLine', '_mlkWho',
   'alWeeks', 'alIn', 'alItems', 'alMailSure', 'alNarrow', 'alCoNarrow', 'alCatNarrow', 'alMailRows', 'alGroups', 'alAddCand',
-  'alCoRows', 'alSentRows', 'alCoHits', 'alCalLine', 'alCalRows', 'alLogOf', 'alCachePut', 'alWrite',
+  'alCoRows', 'alSentRows', 'alCoHits', 'alCalLine', 'alCalRows', 'alLogOf', 'alCachePut',
+  /* 2026-10-09 — 같은 회사 업무 여럿이면 모두에(alSameCo·alSharePut), 쌓인 고를 것 풀기(alShareOld) */
+  'alSameCo', 'alShareLine', 'alSharePut', 'alShareOld', 'alWrite',
   'alChunks', 'alEvents', 'alFull', 'alWeekOnce', 'alToday', 'alCurOnce', 'alRun', 'alTook', 'alTookHTML', 'alAmbList',
   /* 2026-10-03 — 일정에 «만든이»를 함께 담는다(「고를 것」의 단서로만 쓴다).
      후보를 좁히는 데는 안 쓴다 — 그것은 tests/work-autolog-hint.test.js 가 돌려서 지킨다. */
@@ -101,7 +103,7 @@ function box(o) {
     S: { me: o.me || { sid: 'S1', name: '박한별' } },
     items: o.items || {}, maillink: o.maillink || {}, mailchk: o.mailchk || {}, mailaddr: {},
     mailSrc: o.mail || [], cmSrc: {}, _cmT: {}, sentSrc: {}, _sentT: {}, calSrc: {},
-    wkCache: {}, itemLogsCache: {}, alBox: {}, _alBusy: false,
+    wkCache: {}, itemLogsCache: {}, alBox: {}, _alBusy: false, _alShareDone: false,
     routed: 0, toasts: []
   };
   vm.createContext(b);
@@ -172,16 +174,20 @@ test('★ 두 번 돌아도 같은 줄이 또 생기지 않는다', async () => 
   assert.equal(logsOf(b2, 'I1').length, 1);
 });
 
-test('★ 같은 회사 업무가 둘이면 붙이지 않고 «고를 것» — 제목이 갈래를 말하면 그 갈래로', async () => {
+test('★ 같은 회사 업무가 둘이면 «둘 다에» 한 줄씩(대표 결정 2026-10-09 A) — 제목이 갈래를 말하면 그 갈래 하나로', async () => {
   const two = { I1: it('I1', '가나정밀', { contacts: [{ email: 'boss@gana.co.kr' }] }),
                 I2: it('I2', '가나정밀', { title: '노무자문', contacts: [{ email: 'boss@gana.co.kr' }], mgr_main: { sid: 'S2', name: '장한돌' } }) };
   const mail = [{ _k: 'M1', at: at(2026, 9, 29), from: 'boss@gana.co.kr', subject: '문의드립니다 회신' }];
   const b = box({ items: two, mail });
-  assert.equal(await b.alRun(), 0);
-  assert.equal(logsOf(b, 'I1').length + logsOf(b, 'I2').length, 0, '아무 업무에나 붙였습니다');
+  assert.equal(await b.alRun(), 2);
+  const l1 = logsOf(b, 'I1'), l2 = logsOf(b, 'I2');
+  assert.equal(l1.length, 1); assert.equal(l2.length, 1, '같은 회사 업무 하나에만 넣었습니다');
+  assert.match(l1[0].t, /같은 회사 업무 2건에 함께$/, '기계가 하나를 고른 것처럼 보입니다');
+  assert.equal(l1[0].shared, 2);
   const a = b.fbDb.root.work_erp.autolog[W40]['a|M1'];
-  assert.deepEqual(Object.keys(a.amb).sort(), ['I1', 'I2']);
-  assert.equal(b.alAmbList().length, 1, '내 업무가 걸린 고를 것이 칩에 안 셉니다');
+  assert.ok(!a.amb, '같은 회사뿐인데 고를 것으로 남겼습니다');
+  assert.deepEqual(Object.keys(a.items).sort(), ['I1', 'I2']);
+  assert.equal(b.alAmbList().length, 0);
 
   /* 한 회사에 급여·컨설팅 업무가 함께 있다 — 실측에서 고를 것 대부분이 이것이었다 */
   const cats = JSON.parse(JSON.stringify(two)); cats.I1.cat = '급여'; cats.I2.cat = '컨설팅';
@@ -191,12 +197,12 @@ test('★ 같은 회사 업무가 둘이면 붙이지 않고 «고를 것» — 
   const con = box({ items: cats, mail: [{ _k: 'C', at: at(2026, 9, 29), from: 'boss@gana.co.kr', subject: '컨설팅 보고서 검토' }] });
   assert.equal(await con.alRun(), 1);
   assert.equal(logsOf(con, 'I2').length, 1, '컨설팅 메일이 컨설팅 업무로 안 갔습니다');
-  /* ⚠ 수집함은 급여 전용이 아니다 — 갈래를 말하지 않는 제목은 급여로 몰지 않는다 */
+  /* ⚠ 수집함은 급여 전용이 아니다 — 갈래를 말하지 않는 제목은 급여로 몰지 않는다 → 둘 다에 (2026-10-09 A) */
   const none = box({ items: cats, mail });
-  assert.equal(await none.alRun(), 0, '갈래 낱말이 없는데 아무 업무로 몰았습니다');
-  /* 두 갈래가 함께 걸리면 고르지 않는다 */
+  assert.equal(await none.alRun(), 2, '갈래 낱말이 없으면 한쪽으로 몰지 말고 둘 다에 넣어야 합니다');
+  /* 두 갈래가 함께 걸리면 하나를 고르지 않는다 — 둘 다에 */
   const both = box({ items: cats, mail: [{ _k: 'B', at: at(2026, 9, 29), from: 'boss@gana.co.kr', subject: '컨설팅 보고서와 9월 급여' }] });
-  assert.equal(await both.alRun(), 0);
+  assert.equal(await both.alRun(), 2);
 });
 
 test('보낸 주소 하나가 두 회사에 걸리면 — 제목이 한 회사만 부를 때 그 회사, 둘 다 부르면 고를 것', async () => {
@@ -287,10 +293,12 @@ test('일정 — 같은 회사 업무가 둘이면 담당자로 가른다(사번
     sch: [{ id: 'sch1', date: '2026-10-02', sid: 'S1', title: '다라물산 방문' },
           { id: 'sch2', date: '2026-10-02', sid: 'S9', title: '다라물산 전화' }]
   });
-  assert.equal(await b.alRun(), 2);
-  assert.equal(logsOf(b, 'I2')[0].sourceId, 'G');
-  assert.equal(logsOf(b, 'I1')[0].sourceId, 'sch1');
-  assert.ok(b.fbDb.root.work_erp.autolog[W40]['c|sch2'].amb, '담당자로 못 가른 것은 고를 것이어야 합니다');
+  assert.equal(await b.alRun(), 4);   // G → I2 · sch1 → I1 · sch2(못 가름) → 같은 회사 둘 다에
+  assert.equal(logsOf(b, 'I2').filter((l) => l.sourceId === 'G').length, 1);
+  assert.equal(logsOf(b, 'I1').filter((l) => l.sourceId === 'G').length, 0, '담당자로 가른 것을 다른 업무에도 넣었습니다');
+  assert.equal(logsOf(b, 'I1').filter((l) => l.sourceId === 'sch1').length, 1);
+  const s2 = b.fbDb.root.work_erp.autolog[W40]['c|sch2'];
+  assert.ok(s2.items && !s2.amb, '담당자로 못 가른 같은 회사 일정은 둘 다에 넣어야 합니다(2026-10-09 A)');
 });
 
 test('사업장 요약 — 짐작 줄·수집함에 있는 통은 빼고 보낸 것은 넣는다 · 보낸 서류는 두 열쇠여도 한 줄', async () => {
@@ -436,4 +444,48 @@ test('이번 주에 넣은 줄은 다음 월요일 «통째로» 돌 때 또 들
   await mon.alRun();
   assert.equal(logsOf(mon, 'I1').length, 1, '같은 메일이 두 번 들어갔습니다');
   assert.ok(mon.fbDb.root.work_erp.autoweek['2026-W41'], '월요일에 W41 을 통째로 돌지 않았습니다');
+});
+
+/* ── 같은 회사 업무 여럿 «모두에» (대표 결정 2026-10-09 「추천대로」 A) ── */
+
+test('★ 서로 «다른» 회사가 걸리면 지금처럼 사람이 고른다', async () => {
+  const items = { I1: it('I1', '대성피앤티', { contacts: [{ email: 'staff@tax.kr' }] }),
+                  I2: it('I2', '제일산업', { contacts: [{ email: 'staff@tax.kr' }] }) };
+  const b = box({ items, mail: [{ _k: 'X', at: at(2026, 9, 29), from: 'staff@tax.kr', subject: '자료 송부' }] });
+  assert.equal(await b.alRun(), 0);
+  assert.ok(b.fbDb.root.work_erp.autolog[W40]['a|X'].amb);
+});
+
+test('★ 이미 쌓인 «같은 회사» 고를 것은 풀어서 모두에 넣는다 — 다른 회사 것은 그대로', async () => {
+  const items = { I1: it('I1', '다라물산'), I2: it('I2', '다라물산', { title: '컨설팅' }), I3: it('I3', '가나정밀') };
+  const seed = { work_erp: { autoweek: { [W40]: { n: 0 }, '2026-W39': { n: 0 } }, autolog: {
+    '2026-W38': { 'g|E1': { amb: { I1: 1, I2: 1 }, d: '2026-09-15', t: '📅 다라물산 미팅', k: 'cal', sourceKind: 'gcal', sourceId: 'E1' },
+                  'g|E2': { amb: { I1: 1, I3: 1 }, d: '2026-09-16', t: '📅 다라물산·가나정밀', k: 'cal' } } } } };
+  const b = box({ items, seed });
+  assert.equal(await b.alRun(), 2);
+  assert.equal(logsOf(b, 'I1')[0].w, '2026-W38', '그 주 칸에 들어가야 합니다');
+  assert.match(logsOf(b, 'I2')[0].t, /📅 다라물산 미팅 · 같은 회사 업무 2건에 함께/);
+  const al = b.fbDb.root.work_erp.autolog['2026-W38'];
+  assert.ok(al['g|E1'].items && !al['g|E1'].amb);
+  assert.ok(al['g|E2'].amb, '다른 회사가 걸린 것까지 풀었습니다');
+  /* 두 번 돌아도 또 넣지 않는다 */
+  const again = box({ items, seed: b.fbDb.root });
+  await again.alRun();
+  assert.equal(logsOf(again, 'I1').length, 1);
+});
+
+test('함께 넣은 줄을 한 업무에서 지우면 «그 업무에서만» 빠진다 — 원천 기록·다른 업무 담김은 그대로', () => {
+  const src = grab('_delLog');
+  assert.match(src, /if\(l\.shared\)\{[\s\S]*\/off\/'\+itemId/, '함께 넣은 줄을 지우면 원천 기록 통째를 덮습니다');
+  const t = grab('alTookHTML');
+  assert.match(t, /a\.items&&a\.items\[id\]&&!\(a\.off&&a\.off\[id\]\)/);
+  assert.match(grab('saveLogEdit'), /'shared'/, '고치면 함께 표시를 잃습니다');
+});
+
+test('자동 담김 — 함께 넣은 업무에는 뜨고, 그 업무에서 뺐으면 안 뜬다', () => {
+  const b = box();
+  b.alBox['2026-W38'] = { 'a|M': { items: { I1: 1, I2: 1 }, off: { I2: { at: 'x' } } } };
+  assert.match(b.alTookHTML('a|M', 'I1'), /자동 담김/);
+  assert.equal(b.alTookHTML('a|M', 'I2'), '');
+  assert.equal(b.alTookHTML('a|M', 'I9'), '');
 });

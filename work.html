@@ -5678,12 +5678,38 @@ function alCachePut(wk,id,lid,log){
   if(wkCache[wk]){ if(!wkCache[wk][id]) wkCache[wk][id]={}; wkCache[wk][id][lid]=log; }
   if(itemLogsCache[id]) itemLogsCache[id][lid]=Object.assign({w:wk},log);
 }
+/* ── 같은 회사 업무가 여럿이면 «모두에» 한 줄씩 (대표 결정 2026-10-09 「추천대로」 A) ──
+   실측(10-09): 「고를 것」 73건 중 49건이 «회사는 확실한데 그 회사의 어느 업무인지»만 모르는 것이었고,
+   사람이 고른 것은 0건이었다(주마다 20~30건씩 쌓였다).
+   ★ 업무 서랍의 메일 칸은 이미 그 회사 메일을 업무마다 다 보여 준다 — 기록도 그와 같게 한다.
+   ⚠ 줄에 「같은 회사 업무 n건에 함께」를 적는다 — 기계가 하나를 고른 것이 아님을 보이게.
+   ⚠ 한 업무에서 ✕ 로 지우면 «그 업무에서만» 빠진다(autolog …/off/{업무}) — 다른 업무 줄은 그대로.
+   ⚠ 서로 «다른» 회사가 걸린 것은 지금처럼 사람이 고른다(alAmbList). */
+function alSameCo(ids){
+  var cos={};
+  (ids||[]).forEach(function(id){ cos[_normCo((items[id]&&items[id].company)||'')]=1; });
+  var ks=Object.keys(cos);
+  return (ids||[]).length>1&&ks.length===1&&ks[0]!=='';
+}
+function alShareLine(t,n){ return String(t||'')+' · 같은 회사 업무 '+n+'건에 함께'; }
+/* 한 원천을 여러 업무에 — up·logs 에 담고 autolog 기록을 돌려준다 */
+function alSharePut(r,ids,wk,now,up,logs){
+  var y=weekYear(wk), lid='AL_'+r.src, its={};
+  ids.forEach(function(id){
+    var log=alLogOf(r,wk,now);
+    log.t=alShareLine(r.t,ids.length); log.shared=ids.length;
+    up[NS+'/logs/'+y+'/'+wk+'/'+id+'/'+lid]=log;
+    up[NS+'/itemlogs/'+id+'/'+lid]=Object.assign({w:wk},log);
+    logs.push([id,lid,log]); its[id]=1;
+  });
+  return {items:its, lid:lid, shared:ids.length, d:r.d, sourceKind:r.sk||'', sourceId:String(r.sid||''), at:now};
+}
 function alWrite(wk,rows,al){
   var y=weekYear(wk), now=new Date().toISOString(), up={}, put={}, logs=[], n=0;
   rows.forEach(function(r){
     var src=r.src, was=al[src]||put[src];
-    /* 이미 본 원천 — 다만 「고를 것」이었는데 이제 하나로 정해졌으면(사람이 메일을 이었다) 적는다 */
-    if(was&&!(was.amb&&r.cand.length===1)) return;
+    /* 이미 본 원천 — 다만 「고를 것」이었는데 이제 정해졌으면(사람이 메일을 이었다 · 같은 회사 업무뿐이다) 적는다 */
+    if(was&&!(was.amb&&(r.cand.length===1||alSameCo(r.cand)))) return;
     /* 사람이 이미 [✎ 기록에]로 담았다 — 같은 줄을 또 넣지 않는다 */
     if((r.ck||[]).some(function(c){ var x=mailchk&&mailchk[c]; return x&&x.log; })) return;
     if(r.cand.length===1){
@@ -5692,6 +5718,9 @@ function alWrite(wk,rows,al){
       up[NS+'/itemlogs/'+id+'/'+lid]=Object.assign({w:wk},log);
       put[src]={item:id, lid:lid, d:r.d, sourceKind:r.sk||'', sourceId:String(r.sid||''), at:now};
       logs.push([id,lid,log]); n++;
+    }else if(alSameCo(r.cand)){
+      var ids=r.cand.slice(0,AL_AMB_MAX);
+      put[src]=alSharePut(r,ids,wk,now,up,logs); n+=ids.length;
     }else if(!was){
       var c={}; r.cand.slice(0,AL_AMB_MAX).forEach(function(i){ c[i]=1; });
       put[src]={amb:c, d:r.d, t:r.t, k:r.kind, sourceKind:r.sk||'', sourceId:String(r.sid||''),
@@ -5776,6 +5805,34 @@ function alCurOnce(now){
     return alWrite(wk,rows,al);
   });
 }
+/* 이미 쌓인 「고를 것」 가운데 같은 회사 업무뿐인 것을 푼다 — 세션에 한 번.
+   ⚠ 지난 주들은 다시 훑지 않으므로(통째 표) 여기서 «적어 둔 후보»로 푼다. autolog 는 작다(주마다 수십 줄). */
+var _alShareDone=false;
+function alShareOld(){
+  if(_alShareDone||typeof fbDb==='undefined'||!fbDb) return Promise.resolve(0);
+  _alShareDone=true;
+  return fbDb.ref(NS+'/autolog').once('value').then(function(s){
+    var all=s.val()||{}, now=new Date().toISOString(), up={}, logs=[], puts=[], n=0;
+    Object.keys(all).forEach(function(wk){
+      var al=all[wk]||{};
+      Object.keys(al).forEach(function(src){
+        var a=al[src]; if(!a||!a.amb) return;
+        var ids=Object.keys(a.amb).filter(function(id){ return items[id]; });
+        if(!alSameCo(ids)) return;
+        var r={src:src, d:a.d||'', t:a.t||'', kind:a.k||'mail', sk:a.sourceKind||'', sid:a.sourceId||''};
+        var lg=[], rec=alSharePut(r,ids,wk,now,up,lg);
+        up[NS+'/autolog/'+wk+'/'+src]=rec;
+        puts.push([wk,src,rec]); lg.forEach(function(x){ logs.push([wk].concat(x)); }); n+=ids.length;
+      });
+    });
+    if(!puts.length) return 0;
+    return fbDb.ref().update(up).then(function(){
+      puts.forEach(function(p){ if(!alBox[p[0]]) alBox[p[0]]={}; alBox[p[0]][p[1]]=p[2]; });
+      logs.forEach(function(x){ alCachePut(x[0],x[1],x[2],x[3]); });
+      return n;
+    });
+  });
+}
 /* 한 바퀴 — 조용히 돈다(토스트를 띄우지 않는다). 업무·메일이 아직 안 왔으면 조금 뒤 다시 */
 function alRun(){
   if(_alBusy||typeof fbDb==='undefined'||!fbDb) return Promise.resolve(0);
@@ -5785,6 +5842,8 @@ function alRun(){
     return p.then(function(){ return alWeekOnce(mon).then(function(n){ total+=n; }); });
   },Promise.resolve()).then(function(){
     return alCurOnce(alToday()).then(function(n){ total+=n; });
+  }).then(function(){
+    return alShareOld().then(function(n){ total+=n; });
   }).then(function(){
     _alBusy=false;
     if(total) route();
@@ -5874,12 +5933,14 @@ function alMailSidLoad(){
 /* ── 화면: 자동 담김 표시 · 고를 것 ── */
 function alTook(src){
   var hit=null;
-  Object.keys(alBox).forEach(function(wk){ var a=(alBox[wk]||{})[src]; if(a&&a.item&&!hit) hit=a; });
+  Object.keys(alBox).forEach(function(wk){ var a=(alBox[wk]||{})[src]; if(a&&(a.item||a.items)&&!hit) hit=a; });
   return hit;
 }
 function alTookHTML(src,id){
-  var a=alTook(src);
-  if(!a||String(a.item)!==String(id||'')) return '';
+  var a=alTook(src); id=String(id||'');
+  /* 같은 회사 여러 업무에 함께 넣은 것 — 그 업무에서 ✕ 로 뺐으면(off) 담김이 아니다 */
+  var mine=a&&(String(a.item||'')===id||(a.items&&a.items[id]&&!(a.off&&a.off[id])));
+  if(!mine) return '';
   return '<span class="took" title="지난주 메일·일정을 모으면서 이 업무 기록에 저절로 넣었습니다">✎ 자동 담김</span>';
 }
 function alAmbList(){
@@ -6133,7 +6194,7 @@ function saveLogEdit(itemId,lid){
     ed_at:new Date().toISOString(),ed_by:(S.me&&S.me.name)||''};
   if(l.k) base.k=l.k;
   /* 자동 줄은 고쳐도 자동 줄이다 — 원천 열쇠를 잃으면 지울 때 「아님」을 못 남겨 다음 주에 되살아난다 */
-  ['auto','src','aw','sourceKind','sourceId','pick_by'].forEach(function(f){ if(l[f]!=null) base[f]=l[f]; });
+  ['auto','src','aw','sourceKind','sourceId','pick_by','shared'].forEach(function(f){ if(l[f]!=null) base[f]=l[f]; });
   var up={};
   up[NS+'/itemlogs/'+itemId+'/'+lid]=Object.assign({w:newWk},base);
   if(oldWk&&oldWk!==newWk) up[NS+'/logs/'+weekYear(oldWk)+'/'+oldWk+'/'+itemId+'/'+lid]=null;
@@ -6171,15 +6232,23 @@ function _delLog(itemId,lid){
   up[NS+'/itemlogs/'+itemId+'/'+lid]=null;
   if(wk) up[NS+'/logs/'+weekYear(wk)+'/'+wk+'/'+itemId+'/'+lid]=null;
   /* 자동 줄을 지우면 「이 업무 것 아님」으로 남긴다 — 안 남기면 다음에 돌 때 되살아난다 */
-  var aw=l&&l.auto&&l.src&&(l.aw||wk), anone=null;
+  var aw=l&&l.auto&&l.src&&(l.aw||wk), anone=null, aoff=null;
   if(aw){
     var who=_mlkWho();
-    anone={none:1, d:l.d||'', item:String(itemId), sourceKind:l.sourceKind||'', sourceId:l.sourceId||'',
-      at:who.at, by:who.by, byName:who.byName};
-    up[NS+'/autolog/'+aw+'/'+l.src]=anone;
+    /* 같은 회사 여러 업무에 함께 넣은 줄 — 원천 기록을 통째로 「아님」으로 덮으면 다른 업무의 «담김»까지 사라진다.
+       그 업무 칸(off/{업무})만 표시한다. 원천 기록이 남아 있어 다시 적히지도 않는다. */
+    if(l.shared){
+      aoff={at:who.at, by:who.by, byName:who.byName};
+      up[NS+'/autolog/'+aw+'/'+l.src+'/off/'+itemId]=aoff;
+    }else{
+      anone={none:1, d:l.d||'', item:String(itemId), sourceKind:l.sourceKind||'', sourceId:l.sourceId||'',
+        at:who.at, by:who.by, byName:who.byName};
+      up[NS+'/autolog/'+aw+'/'+l.src]=anone;
+    }
   }
   fbDb.ref().update(up).then(function(){
     if(anone){ if(!alBox[aw]) alBox[aw]={}; alBox[aw][l.src]=anone; }
+    if(aoff&&alBox[aw]&&alBox[aw][l.src]){ var _r=alBox[aw][l.src]; if(!_r.off) _r.off={}; _r.off[itemId]=aoff; }
     if(itemLogsCache[itemId]) delete itemLogsCache[itemId][lid];
     if(wk&&wkCache[wk]&&wkCache[wk][itemId]) delete wkCache[wk][itemId][lid];
     return refreshLast(itemId);
