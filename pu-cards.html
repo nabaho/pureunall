@@ -1193,6 +1193,25 @@ table.mstab2 tr:last-child td{border-bottom:none}
   background:#fff;font-size:12.5px;cursor:pointer}
 .mck .act button.pri{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
 .mck .act button+button{margin-left:5px}
+/* 🔗 이름으로만 맞은 명함 확인 (2026-10-09) — 한 칸은 한 줄, 넘치면 … */
+.mck.nck-box{width:min(1180px,100%)}
+.mck .nck-back{color:#2563eb;cursor:pointer;font-size:12.5px;white-space:nowrap}
+.mck table.nck{table-layout:fixed}
+.mck table.nck td{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mck .nck-why{display:inline-block;font-size:11px;color:#64748b;border:1px dashed #cbd5e1;border-radius:10px;padding:0 6px}
+.mck .act button.no{color:#991b1b}
+.mck .nck-bulk{display:flex;align-items:center;gap:8px;margin:0 0 10px;font-size:12.5px;color:#64748b;flex-wrap:wrap}
+.mck .nck-bulk button{height:28px;padding:0 10px;border:1px solid #e2e8f0;border-radius:7px;background:#fff;font-size:12.5px;cursor:pointer}
+.mck .nck-bulk button.pri{background:#2563eb;border-color:#2563eb;color:#fff;font-weight:600}
+.mck .nck-find td,.mck div.nck-find{background:#f8fafc;white-space:normal;font-size:12.5px}
+.mck .nck-find input{height:30px;border:1px solid #cbd5e1;border-radius:6px;padding:0 8px;font-size:16px;width:220px}
+.mck .nck-hit{height:28px;padding:0 9px;margin:2px 4px 2px 0;border:1px solid #e2e8f0;border-radius:6px;background:#fff;font-size:12.5px;cursor:pointer}
+.mck .nck-go{height:24px;padding:0 9px;margin-left:6px;border:1px solid #bfdbfe;border-radius:6px;background:#eff6ff;color:#2563eb;font-size:12px;cursor:pointer;white-space:nowrap}
+.mck .nck-m{padding:10px 0;border-bottom:1px solid #e2e8f0}
+.mck .nck-m .l1{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mck .nck-m .l2{margin-top:6px;text-align:left}
+.mck .nck-m .l2 button{height:34px}
+.mck div.nck-find{margin-top:6px;padding:8px}
 /* ── 첨부 미리보기 창 (대표 승인 목업 2026-09-05) ──
    ⚠ 창을 크게 잡는다. 서식이 든 문서는 좁으면 줄이 접혀 무엇인지 더 알기 어렵다. */
 .mck.pvbox{width:min(1060px,100%);max-height:92vh}
@@ -11900,7 +11919,9 @@ function cardOwnGuess(it){
   /* ④ 회사 «이름»으로만 — 겹치는 이름은 아예 안 짚는다(남의 회사 담당이 붙는다) */
   if(EM && EM.byName && EM._norm){
     const n = EM._norm(it.company);
-    if(n && EM.byName[n] && Number((EM.nameN||{})[n]||0) <= 1){
+    /* ⚠ 「🔗 한 장씩 확인」에서 «아님»으로 적은 명함은 이름으로 다시 짚지 않는다(2026-10-09) */
+    const said = (typeof _nameChk !== 'undefined' && _nameChk && it.id) ? _nameChk[it.id] : null;
+    if(n && EM.byName[n] && Number((EM.nameN||{})[n]||0) <= 1 && !(said && said.v === 'no')){
       const rec = EM.byName[n];
       if(!rec.left){ const w = cardOwnLive(rec.main); if(w) return { who:w, why:'name' }; }
     }
@@ -11942,6 +11963,8 @@ function cardOwnPicked(){
 }
 function cardOwnOpen(){
   cardOwnBust();
+  state.coFillView = '';
+  if(typeof nameChkLoad === 'function') nameChkLoad(function(){ cardOwnBust(); cardOwnMount(); });
   const pick = {};
   CARDOWN_WHY.forEach(([k,, sure])=>{ pick[k] = !!sure; });   /* 얇은 근거는 미리 꺼 둔다 */
   state.coFillPick = pick;
@@ -11968,6 +11991,7 @@ function cardOwnMount(){
 }
 function cardOwnHtml(){
   if(!state.coFillOpen) return '';
+  if(state.coFillView === 'name') return nameChkHtml();
   const plan = cardOwnPlan();
   const pick = state.coFillPick || {};
   const got = cardOwnPicked();
@@ -11979,7 +12003,8 @@ function cardOwnHtml(){
       +   ' onclick="cardOwnToggle(\'' + k + '\')"></td>'
       + '<td class="co"><b>' + b.n.toLocaleString() + '</b>장</td>'
       + '<td><span class="t">' + (sure ? '확실' : '짐작') + '</span> ' + esc(label) + '</td>'
-      + '<td class="em">' + desc + (sure ? '' : ' — <b>미리 꺼 두었습니다</b>') + '</td>'
+      + '<td class="em">' + desc + (sure ? '' : ' — <b>미리 꺼 두었습니다</b>')
+      + (k === 'name' && b.n ? ' <button class="nck-go" onclick="nameChkOpen()">한 장씩 확인 ›</button>' : '') + '</td>'
       + '<td class="em">' + ex + '</td></tr>';
   }).join('')
     + '<tr class="thin"><td></td><td class="co"><b>' + plan.none.toLocaleString() + '</b>장</td>'
@@ -12032,6 +12057,217 @@ function cardOwnApply(){
   bulkPatchFlush(hit, ['owner'])
     .then(()=>toast('👤 명함 ' + hit.length.toLocaleString() + '장에 담당자를 채웠습니다', 9000))
     .catch(e=>toast('저장 실패: ' + ((e&&e.message)||''), 9000));
+}
+
+/* ══════ 🔗 이름으로만 맞은 명함 — 한 장씩 확인 (대표 결정 2026-10-07 점검 4절 「확인 목록」, 목업 승인 2026-10-09) ══════
+   명함의 회사 «이름»만 업체관리 업체 이름과 같아 짚은 것(cardOwnGuess 의 'name') — 사업자번호·메일로는 확인 안 됨.
+   ★ 저절로 잇지 않는다(온톨로지 규칙: 이름으로 관계를 확정하지 않는다). 사람이 누른 것만:
+     ✓ 맞음     — 명함에 그 업체 열쇠(erpCoId)를 적고(「이 회사가 맞나요?」와 같은 자리·같은 함수),
+                  담당자 칸이 비었으면 그 업체 주담당을 채운다. 업체관리 기록은 안 고친다.
+     다른 업체  — 줄 아래 찾기 칸에서 고른 업체로 같은 일을 한다.
+     아님       — 이 명함은 이름으로 다시 짚지 않는다(cardOwnGuess 가 본다).
+   ★ 한 일은 pucards/config/nameCheck/{명함} 에 남긴다 — 「맞음」·「아님」 갈래에서 ↩ 되돌린다.
+     되돌리기는 «우리가 넣은 값 그대로»일 때만 비운다(그 뒤 사람이 고친 열쇠·담당은 둔다).
+   ⚠ 여기서 확정한 명함은 다음부터 ①(업체 번호)로 «확실» 묶음에 든다 — 목록이 저절로 준다. */
+let _nameChk = null, _nameChkAsk = false;
+const NAMECHK_PAGE = 50;
+function nameChkLoad(cb){
+  if(_nameChk !== null){ cb && cb(); return; }
+  if(_nameChkAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
+  _nameChkAsk = true;
+  Store.db.ref(DB_ROOT + '/config/nameCheck').once('value')
+    .then(function(snap){ _nameChk = snap.val() || {}; cb && cb(); })
+    .catch(function(){ _nameChkAsk = false; });
+}
+/* 확인할 것 — 담당자 채우기의 「회사 이름」 묶음과 «같은 잣대»(cardOwnGuess 한 곳) */
+function nameChkRows(){
+  const EM = (typeof ErpMatch !== 'undefined') ? ErpMatch : null;
+  if(!EM || !EM.byName) return [];
+  const out = [];
+  Object.keys(state.items || {}).forEach(function(id){
+    const it = state.items[id];
+    if(!it || it.kind !== 'card' || inHiddenLocked(it)) return;
+    const g = cardOwnGuess(it);
+    if(!g || g.why !== 'name') return;
+    const rec = EM.byName[EM._norm(it.company)];
+    if(rec) out.push({ id:id, it:it, rec:rec, who:g.who });
+  });
+  const nm = r => String(r.rec.coName || r.rec.company || '');
+  out.sort((a,b)=> nm(a).localeCompare(nm(b), 'ko') || String(a.it.name||'').localeCompare(String(b.it.name||''), 'ko'));
+  return out;
+}
+function nameChkDone(v){
+  return Object.keys(_nameChk || {}).filter(id => (_nameChk[id] || {}).v === v)
+    .sort((a,b)=> Number(_nameChk[b].at||0) - Number(_nameChk[a].at||0));
+}
+function nameChkOpen(){
+  state.coFillView = 'name'; state.nameTab = 'todo'; state.nameSel = {}; state.nameFind = ''; state.namePage = 1;
+  nameChkLoad(function(){ cardOwnMount(); });
+  cardOwnMount();
+}
+function nameChkBack(){ state.coFillView = ''; cardOwnBust(); cardOwnMount(); }
+function nameChkTab(t){ state.nameTab = t; state.nameSel = {}; state.nameFind = ''; state.namePage = 1; cardOwnMount(); }
+function nameChkSel(id){ state.nameSel = state.nameSel || {}; if(state.nameSel[id]) delete state.nameSel[id]; else state.nameSel[id] = 1; cardOwnMount(); }
+function nameChkSelAll(on){
+  state.nameSel = {};
+  if(on) nameChkRows().slice(0, (state.namePage||1) * NAMECHK_PAGE).forEach(r => { state.nameSel[r.id] = 1; });
+  cardOwnMount();
+}
+function nameChkMore(){ state.namePage = (state.namePage||1) + 1; cardOwnMount(); }
+/* 명함 하나를 업체 하나로 확정 — 열쇠를 적고, 담당이 비었으면 그 업체 주담당. 기록을 남긴다. */
+async function nameChkPin(ids, coIdOf, how){
+  if(!_nameChk){ toast('확인 기록을 아직 못 읽었습니다 — 잠시 뒤 다시 눌러 주세요'); return 0; }
+  const EM = ErpMatch, byCo = {}, owners = [], rec = {};
+  ids.forEach(function(id){
+    const it = state.items[id]; const coId = coIdOf(id);
+    const co = coId && EM.byId && EM.byId[coId];
+    if(!it || !co) return;
+    (byCo[coId] = byCo[coId] || []).push(id);
+    let setOwner = '';
+    if(!String(it.owner||'').trim()){ setOwner = cardOwnLive(co.main) || ''; if(setOwner){ it.owner = setOwner; owners.push(it); } }
+    rec[id] = { v:'ok', co:String(coId), coName:String(co.coName || co.company || ''), card:String(it.name || ''),
+      owner:setOwner, how:how, at:Date.now(), by:String(myEmail||'') };
+  });
+  const n = Object.keys(rec).length;
+  if(!n) return 0;
+  for(const coId of Object.keys(byCo)) await cardErpPinCards(byCo[coId], coId);
+  if(owners.length) await bulkPatchFlush(owners, ['owner']);
+  const up = {}; Object.keys(rec).forEach(id => { up[id] = rec[id]; _nameChk[id] = rec[id]; });
+  await Store.db.ref(DB_ROOT + '/config/nameCheck').update(up);
+  return n;
+}
+async function nameChkOk(ids){
+  ids = (ids || []).slice();
+  const rows = {}; nameChkRows().forEach(r => { rows[r.id] = r; });
+  ids = ids.filter(id => rows[id]);
+  if(!ids.length) return toast('고른 명함이 없습니다');
+  if(ids.length > 1 && !confirm('명함 ' + ids.length + '장을 짚은 업체로 확정합니다.\n\n담당자 칸이 비어 있으면 그 업체 주담당을 채웁니다. 업체관리 기록은 고치지 않습니다.\n「맞음」 갈래에서 되돌릴 수 있습니다.')) return;
+  try{
+    const n = await nameChkPin(ids, id => String(rows[id].rec.id), 'name');
+    state.nameSel = {}; cardOwnBust(); cardOwnMount(); render();
+    if(n) toast('✓ 명함 ' + n + '장을 업체로 확정했습니다', 6000);
+  }catch(e){ toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+async function nameChkPick(id, coId){
+  try{
+    const n = await nameChkPin([id], () => String(coId), 'pick');
+    state.nameFind = ''; delete (state.nameSel || {})[id]; cardOwnBust(); cardOwnMount(); render();
+    if(n) toast('✓ 고른 업체로 확정했습니다', 5000);
+  }catch(e){ toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+async function nameChkNo(ids){
+  ids = (ids || []).filter(id => state.items[id]);
+  if(!ids.length) return toast('고른 명함이 없습니다');
+  if(!_nameChk) return toast('확인 기록을 아직 못 읽었습니다 — 잠시 뒤 다시 눌러 주세요');
+  const rows = {}; nameChkRows().forEach(r => { rows[r.id] = r; });
+  const up = {};
+  ids.forEach(function(id){
+    const r = rows[id];
+    up[id] = { v:'no', co:String((r && r.rec.id) || ''), coName:String((r && (r.rec.coName || r.rec.company)) || ''),
+      card:String(state.items[id].name || ''), at:Date.now(), by:String(myEmail||'') };
+  });
+  try{
+    await Store.db.ref(DB_ROOT + '/config/nameCheck').update(up);
+    Object.assign(_nameChk, up);
+    state.nameSel = {}; cardOwnBust(); cardOwnMount();
+    toast('「아님」으로 적었습니다 — 이 명함은 이름으로 다시 짚지 않습니다', 6000);
+  }catch(e){ toast('저장하지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+/* 되돌리기 — 우리가 넣은 값 «그대로»일 때만 비운다 */
+async function nameChkUndo(id){
+  const r = (_nameChk || {})[id]; if(!r) return;
+  const it = state.items[id];
+  try{
+    if(r.v === 'ok' && it){
+      if(String(it.erpCoId || '') === String(r.co)) await cardErpPinCards([id], '');
+      if(r.owner && String(it.owner || '') === String(r.owner)){ it.owner = ''; await bulkPatchFlush([it], ['owner']); }
+    }
+    await Store.db.ref(DB_ROOT + '/config/nameCheck/' + id).remove();
+    delete _nameChk[id];
+    cardOwnBust(); cardOwnMount(); render();
+    toast('↩ 되돌렸습니다', 4000);
+  }catch(e){ toast('되돌리지 못했습니다 — ' + ((e && e.message) || e), 8000); }
+}
+function nameChkFind(id, q){
+  state.nameFind = id; state.nameQ = String(q || '');
+  const el = document.getElementById('nck-hits');
+  if(el) el.innerHTML = nameChkHitsHtml(id, state.nameQ); else cardOwnMount();
+}
+function nameChkFindOpen(id){ state.nameFind = (state.nameFind === id) ? '' : id; state.nameQ = ''; cardOwnMount(); }
+function nameChkHitsHtml(id, q){
+  const hits = coErpSearch((ErpMatch && ErpMatch.companies) || [], q, 8);
+  if(!String(q || '').trim()) return '<span class="em">업체 이름이나 사업자번호를 치세요</span>';
+  if(!hits.length) return '<span class="em">찾는 업체가 없습니다</span>';
+  return hits.map(function(co){
+    const r = (ErpMatch.byId || {})[co.id] || {};
+    return '<button class="nck-hit" onclick="nameChkPick(\'' + id + '\',\'' + esc(String(co.id)) + '\')">' + esc(co.name || '')
+      + (r.main ? ' · ' + esc(r.main) : '') + '</button>';
+  }).join('');
+}
+function nameChkHtml(){
+  const tab = state.nameTab || 'todo', sel = state.nameSel || {};
+  const todo = nameChkRows(), okIds = nameChkDone('ok'), noIds = nameChkDone('no');
+  const pc = document.body.classList.contains('pc');
+  const btn = (cls, on, t) => '<button class="' + cls + '" onclick="' + on + '">' + t + '</button>';
+  let body = '';
+  if(_nameChk === null) body = '<p class="em">확인 기록을 읽는 중입니다…</p>';
+  else if(tab === 'todo'){
+    const show = todo.slice(0, (state.namePage || 1) * NAMECHK_PAGE);
+    const nSel = Object.keys(sel).length;
+    body = '<div class="nck-bulk"><label><input type="checkbox" ' + (nSel && nSel === show.length ? 'checked' : '')
+      + ' onclick="nameChkSelAll(this.checked)"> 전체</label> · <b>' + nSel + '장</b> 고름 '
+      + btn('pri', "nameChkOk(Object.keys(state.nameSel||{}))", '✓ 고른 ' + nSel + '장 맞음')
+      + btn('', "nameChkNo(Object.keys(state.nameSel||{}))", '아님')
+      + (pc ? '<span class="em" style="margin-left:auto">차례: 업체 이름 순 — 같은 업체 명함이 모여 있습니다</span>' : '') + '</div>';
+    if(!todo.length) body += '<p class="em">✓ 확인할 명함이 없습니다</p>';
+    const rowBtns = r => btn('pri', "nameChkOk(['" + r.id + "'])", '✓ 맞음') + btn('', "nameChkFindOpen('" + r.id + "')", '다른 업체')
+      + btn('no', "nameChkNo(['" + r.id + "'])", '아님');
+    const find = r => state.nameFind !== r.id ? '' : (pc ? '<tr class="nck-find"><td></td><td></td><td colspan="6">' : '<div class="nck-find">')
+      + '업체 찾기 <input value="' + esc(state.nameQ || '') + '" oninput="nameChkFind(\'' + r.id + '\', this.value)" autofocus> '
+      + '<span id="nck-hits">' + nameChkHitsHtml(r.id, state.nameQ || '') + '</span>' + (pc ? '</td></tr>' : '</div>');
+    if(pc){
+      body += '<table class="nck"><colgroup><col style="width:30px"><col style="width:42px"><col style="width:17%"><col style="width:17%">'
+        + '<col style="width:30px"><col style="width:21%"><col style="width:10%"><col style="width:236px"></colgroup>'
+        + '<tr><th></th><th>#</th><th>명함 (이름·직함)</th><th>명함에 적힌 회사</th><th></th><th>짚은 업체 (업체관리)</th><th>담당</th><th>한 장씩</th></tr>'
+        + show.map(function(r, i){
+          return '<tr><td><input type="checkbox" ' + (sel[r.id] ? 'checked' : '') + ' onclick="nameChkSel(\'' + r.id + '\')"></td>'
+            + '<td class="em" style="text-align:right">' + (i + 1) + '</td>'
+            + '<td title="' + esc(r.it.name || '') + '">' + esc(r.it.name || '(이름 없음)') + (r.it.title ? ' <span class="em">' + esc(r.it.title) + '</span>' : '') + '</td>'
+            + '<td title="' + esc(r.it.company || '') + '">' + esc(r.it.company || '') + '</td><td class="em">→</td>'
+            + '<td title="' + esc(r.rec.coName || r.rec.company || '') + '">' + esc(r.rec.coName || r.rec.company || '') + ' <span class="nck-why">이름 같음</span></td>'
+            + '<td><span class="t">' + esc(r.who) + '</span></td><td class="act">' + rowBtns(r) + '</td></tr>' + find(r);
+        }).join('') + '</table>';
+    }else{
+      body += show.map(function(r, i){
+        return '<div class="nck-m"><div class="l1"><input type="checkbox" ' + (sel[r.id] ? 'checked' : '') + ' onclick="nameChkSel(\'' + r.id + '\')">'
+          + ' <span class="em">' + (i + 1) + '</span> <b>' + esc(r.it.name || '(이름 없음)') + '</b> · ' + esc(r.it.company || '')
+          + ' <span class="em">→</span> ' + esc(r.rec.coName || r.rec.company || '') + ' <span class="t">' + esc(r.who) + '</span></div>'
+          + '<div class="l2 act">' + rowBtns(r) + '</div>' + find(r) + '</div>';
+      }).join('');
+    }
+    if(todo.length > show.length) body += '<div style="text-align:center;margin-top:10px">' + btn('', 'nameChkMore()', '더 보기 (' + (todo.length - show.length) + '장 남음)') + '</div>';
+  }else{
+    const ids = tab === 'ok' ? okIds : noIds;
+    if(!ids.length) body = '<p class="em">' + (tab === 'ok' ? '「맞음」으로 확정한 명함이 없습니다' : '「아님」으로 적은 명함이 없습니다') + '</p>';
+    else body = '<table class="nck"><colgroup><col style="width:42px"><col style="width:22%"><col><col style="width:12%"><col style="width:14%"><col style="width:110px"></colgroup>'
+      + '<tr><th>#</th><th>명함</th><th>' + (tab === 'ok' ? '확정한 업체' : '짚었던 업체') + '</th><th>담당</th><th>언제</th><th></th></tr>'
+      + ids.map(function(id, i){
+        const r = _nameChk[id], it = state.items[id];
+        return '<tr><td class="em" style="text-align:right">' + (i + 1) + '</td><td>' + esc((it && it.name) || r.card || '(지운 명함)') + '</td>'
+          + '<td>' + esc(r.coName || '') + (r.how === 'pick' ? ' <span class="nck-why">골라서</span>' : '') + '</td>'
+          + '<td>' + (r.owner ? '<span class="t">' + esc(r.owner) + '</span>' : '<span class="em">그대로</span>') + '</td>'
+          + '<td class="em">' + new Date(Number(r.at || 0)).toLocaleDateString('ko-KR') + '</td>'
+          + '<td class="act">' + btn('', "nameChkUndo('" + id + "')", '↩ 되돌리기') + '</td></tr>';
+      }).join('') + '</table>';
+  }
+  const tabH = (t, label, n) => '<span class="tab' + (tab === t ? ' on' : '') + '" onclick="nameChkTab(\'' + t + '\')">' + label + '<span class="n">' + n + '</span></span>';
+  return '<div class="mck-dim" onclick="if(event.target===this)cardOwnClose()"><div class="mck nck-box">'
+    + '<header><span class="nck-back" onclick="nameChkBack()">‹ 담당자 채우기로</span><span>🔗</span><h2>이름으로만 맞은 명함 확인</h2>'
+    + '<span class="x" onclick="cardOwnClose()" title="닫기">✕</span></header>'
+    + '<div class="tabs">' + tabH('todo', '확인할 것', todo.length) + tabH('ok', '맞음', okIds.length) + tabH('no', '아님', noIds.length) + '</div>'
+    + '<div class="body"><div class="why">명함의 <b>회사 이름</b>만 업체관리의 업체 이름과 같아서 짚은 것입니다 — 사업자번호·메일 주소로는 확인되지 않았습니다. '
+    + '<b>저절로 잇지 않습니다.</b> 「✓ 맞음」을 누른 명함만 그 업체로 확정하고, 담당자 칸이 비어 있으면 그 업체 주담당을 채웁니다.</div>'
+    + body + '</div></div></div>';
 }
 
 /* 선택 명함 일괄 담당자 지정 */
