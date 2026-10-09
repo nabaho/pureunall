@@ -26197,7 +26197,7 @@ function reorderConsultingNos(){
     groups[key].push(item);
   });
   var changed = 0;
-  var changedItems = [];
+  var changedItems = [], olds = [];
   Object.keys(groups).forEach(function(key){
     var items = groups[key];
     // startDate 빠른 순으로 정렬 (없으면 contractDate→createdAt fallback)
@@ -26209,10 +26209,12 @@ function reorderConsultingNos(){
     });
     items.forEach(function(item, idx){
       var newNo = key + '-' + ('00'+(idx+1)).slice(-3);
-      if(item.no !== newNo){ item.no = newNo; changed++; changedItems.push(item); }
+      if(item.no !== newNo){ olds.push({ id:item.id, from:item.no, to:newNo }); item.no = newNo; changed++; changedItems.push(item); }
     });
   });
   if(changed > 0) dbUpsertMany('consultings', changedItems);
+  /* 번호가 밀린 것은 다른 곳의 사본도 따라 고친다(2026-10-09) — 안 그러면 계약·업무관리·메일에 옛 번호가 남는다 */
+  if(changed > 0 && typeof bizNoCascade === 'function'){ try { bizNoCascade('consulting', olds, { quiet:true }); } catch(_c){} }
   return changed;
 }
 
@@ -37423,7 +37425,159 @@ function bizTypeMergeRun(plan, who){
       return t;
     });
   });
-  return { done:done, failed:failed };
+  /* 번호가 바뀐 것은 «다른 곳에 베껴 둔 번호»도 함께 (2026-10-09) — 아래 bizNoCascade */
+  var _noChanges = done.moves.concat(done.renum).map(function(x){ return { id:x.id, from:x.fromNo, to:x.toNo }; });
+  var cascade = (typeof bizNoCascade === 'function') ? bizNoCascade(plan.kind, _noChanges) : null;
+  return { done:done, failed:failed, cascade:cascade };
+}
+/* ══════ 🔤 약어를 바꾸면 «과거 번호까지» · 다른 곳에 베껴 둔 번호도 함께 (대표 지시 2026-10-09) ══════
+   「지금 바꾸는제목은 과거도 모두 바꾸게 하고 싶다 … 모두 바꿀것인지 앞으로 바꿀것인지
+    그리고 모두 과거도 바꾸면 모든 푸른통합시스템에 모든 연결되어 있는 이름도 같이 바뀌게」
+   ■ 번호가 바뀌는 길은 셋이다 — ① 약어 바꾸기(과거까지) ② 🔀 유형 합치기 ③ 컨설팅 저장 때마다의
+     시작일 순 재정렬(reorderConsultingNos). 셋 다 bizNoCascade «하나»로 사본을 따라 고친다.
+   ■ 번호 사본이 있는 곳 (2026-10-09 통합시스템 전수 조사) — 대부분은 id 로 잇고 번호는 «사본»이다:
+     · 계약 contracts.transferredTo 「consulting:일터-2026-006, case:…」 토막 · contracts.arrivedNo
+     · 입금 finance_income.caseNo (sourceId 가 그 건일 때) · 진행 project_progress.projectNo (projectId 가 그 건일 때)
+     · 업무관리 work_erp/items/{wid} 의 no · pe_m/no (ref 가 그 건일 때) · end_to(이관 토막)
+     · 푸른 메일 pucards/coInfo/{회사}/docPin·docRule = 「종류~번호」 — ★ 번호로 «찾는» 유일한 곳.
+       안 고치면 그 사업에 고정해 둔 서류가 조용히 풀린다.
+     경력관리 sourceNo 는 다음 동기화 때 스스로 맞춘다. 정부사업일정·기금·사진첩은 번호를 안 쓴다.
+   ⚠ 메모·휴지통 사본·되돌림 기록 같은 «그때 적은 글»은 안 바꾼다.
+   ⚠ 바꿀 짝은 «지도 한 장»으로 한 번에 바꾼다 — 006→007 과 001→006 이 함께 있을 때
+     차례로 바꾸면 001 이 006 이 됐다가 다시 007 이 된다. */
+function bizNoMapOf(changes){
+  var m = {};
+  (changes || []).forEach(function(c){ if(c && c.from && c.to && c.from !== c.to) m[c.from] = c.to; });
+  return m;
+}
+/* 「consulting:일터-2026-006, case:산재등-2026-001」 에서 그 종류의 토막만 바꾼다 */
+function bizNoTokenSwap(str, kind, map){
+  if(!str) return str;
+  return String(str).split(',').map(function(part){
+    var mm = /^(\s*)([a-z]+):(.*?)(\s*)$/.exec(part);
+    if(!mm || mm[2] !== kind || !Object.prototype.hasOwnProperty.call(map, mm[3])) return part;
+    return mm[1] + kind + ':' + map[mm[3]] + mm[4];
+  }).join(',');
+}
+/* 푸른 메일의 사업 열쇠 — pu-cards.html caseKeyOf 와 «같은 꼴»이어야 한다(종류~번호, 금지 글자는 _) */
+function bizNoPinKey(kind, no){ return String(kind + '~' + no).replace(/[.#$/[\]\x00-\x1f\x7f]/g, '_'); }
+/* 이알피 안(data/*)에서 고칠 것 — [{store,id,fields}]. 순수 함수(검사가 돌린다). */
+function bizNoCascadeLocal(kind, changes, get){
+  get = get || dbGet;
+  var map = bizNoMapOf(changes), of = {}, out = [];
+  if(!Object.keys(map).length) return out;
+  (changes || []).forEach(function(c){ if(c && c.id && map[c.from]) of[c.id] = c.from; });
+  (get('contracts', []) || []).forEach(function(c){
+    if(!c || !c.id) return;
+    var f = {};
+    if(c.transferredTo){ var t2 = bizNoTokenSwap(c.transferredTo, kind, map); if(t2 !== c.transferredTo) f.transferredTo = t2; }
+    if(c.arrivedNo && Object.prototype.hasOwnProperty.call(map, c.arrivedNo)) f.arrivedNo = map[c.arrivedNo];
+    if(Object.keys(f).length) out.push({ store:'contracts', id:c.id, fields:f });
+  });
+  (get('finance_income', []) || []).forEach(function(r){
+    if(r && r.id && of[r.sourceId] && r.caseNo === of[r.sourceId]) out.push({ store:'finance_income', id:r.id, fields:{ caseNo:map[r.caseNo] } });
+  });
+  (get('project_progress', []) || []).forEach(function(r){
+    if(r && r.id && of[r.projectId] && r.projectNo === of[r.projectId]) out.push({ store:'project_progress', id:r.id, fields:{ projectNo:map[r.projectNo] } });
+  });
+  return out;
+}
+/* 이알피 «밖»(업무관리·푸른 메일) — 한 번에 올릴 경로:값. 순수 함수(검사가 돌린다). */
+function bizNoCascadeRemote(kind, changes, items, coInfo){
+  var map = bizNoMapOf(changes), of = {}, up = {};
+  if(!Object.keys(map).length) return up;
+  (changes || []).forEach(function(c){ if(c && c.id && map[c.from]) of[c.id] = c.from; });
+  Object.keys(items || {}).forEach(function(wid){
+    var w = items[wid]; if(!w) return;
+    var P = 'work_erp/items/' + wid + '/';
+    if(w.ref && w.ref.type === kind && of[w.ref.id]){
+      var from = of[w.ref.id];
+      if(w.no === from) up[P + 'no'] = map[from];
+      if(w.pe_m && w.pe_m.no === from) up[P + 'pe_m/no'] = map[from];
+    }
+    if(w.end_to){ var e2 = bizNoTokenSwap(w.end_to, kind, map); if(e2 !== w.end_to) up[P + 'end_to'] = e2; }
+  });
+  var pin = {};
+  Object.keys(map).forEach(function(f){ pin[bizNoPinKey(kind, f)] = bizNoPinKey(kind, map[f]); });
+  Object.keys(coInfo || {}).forEach(function(co){
+    var c = coInfo[co]; if(!c) return;
+    ['docPin', 'docRule'].forEach(function(fld){
+      var box = c[fld]; if(!box || typeof box !== 'object') return;
+      Object.keys(box).forEach(function(k){
+        var v = box[k];
+        if(typeof v === 'string' && Object.prototype.hasOwnProperty.call(pin, v)) up['pucards/coInfo/' + co + '/' + fld + '/' + k] = pin[v];
+      });
+    });
+  });
+  return up;
+}
+/* 실제로 고친다 — 이알피 안은 한 건씩(dbPatch), 밖은 한 번에(update). 돌려주는 것은 Promise({local,work,mail,...}). */
+function bizNoCascade(kind, changes, opts){
+  opts = opts || {};
+  var res = { local:0, work:0, mail:0, failed:[], remote:'' };
+  if(!Object.keys(bizNoMapOf(changes)).length) return Promise.resolve(res);
+  bizNoCascadeLocal(kind, changes).forEach(function(p){
+    if(dbPatch(p.store, p.id, p.fields)) res.local++; else res.failed.push(p.store + '/' + p.id);
+  });
+  var tell = function(){
+    if(opts.quiet && !res.failed.length && !res.remote) return res;
+    try { showToast('🔤 다른 곳의 번호도 맞춤 — 이알피 ' + res.local + '곳 · 업무관리 ' + res.work + '곳 · 메일 ' + res.mail + '곳'
+      + (res.failed.length ? ' · ⚠ 못 고친 것 ' + res.failed.length : '') + (res.remote ? ' · ⚠ ' + res.remote : ''), 8000); } catch(_){}
+    return res;
+  };
+  if(typeof fbDb === 'undefined' || !fbDb){ res.remote = '서버 연결이 없어 업무관리·메일은 못 고침'; return Promise.resolve(tell()); }
+  return Promise.all([fbDb.ref('work_erp/items').once('value'), fbDb.ref('pucards/coInfo').once('value')]).then(function(s){
+    var up = bizNoCascadeRemote(kind, changes, s[0].val(), s[1].val());
+    Object.keys(up).forEach(function(p){ if(p.indexOf('work_erp/') === 0) res.work++; else res.mail++; });
+    return Object.keys(up).length ? fbDb.ref().update(up) : null;
+  }).then(tell, function(e){ res.remote = '업무관리·메일 못 고침(' + String((e && e.message) || e).slice(0, 60) + ')'; return tell(); });
+}
+/* 약어를 «과거까지» 바꿀 계획 — 연도·순번은 그대로, 앞 글자만. 겹치면 하나도 안 바꾼다(ok:false). */
+function bizTypeRenamePlan(kind, code, newShort, get){
+  get = get || dbGet;
+  var m = BIZ_TYPE_MERGE_MAP[kind];
+  if(!m || !m.noKey) return { ok:false, why:'관리번호가 없는 종류입니다' };
+  var target = String(newShort || '').trim();
+  if(!target) return { ok:false, why:'새 약어가 비었습니다' };
+  var key = m.noKey, list = get(m.store, []) || [], taken = {}, changes = [], clash = [];
+  list.forEach(function(r){ if(r && r[key]) taken[String(r[key])] = r.id; });
+  list.forEach(function(r){
+    if(!r || !r.id || bizTypeCodeOf(r, kind) !== code) return;
+    var no = String(r[key] || ''), mm = BIZ_NO_RE.exec(no);
+    if(!mm || mm[1] === target) return;
+    changes.push({ id:r.id, from:no, to:target + '-' + mm[2] + '-' + mm[3], label:String(r.companyName || r.name || r.title || '').slice(0, 30) });
+  });
+  var moving = {}, seen = {};
+  changes.forEach(function(c){ moving[c.id] = 1; });
+  changes.forEach(function(c){
+    var owner = taken[c.to];
+    if((owner && !moving[owner]) || seen[c.to]) clash.push(c);
+    seen[c.to] = 1;
+  });
+  return { ok:!clash.length, why:clash.length ? ('바꾼 번호가 이미 있습니다 — ' + clash.map(function(c){ return c.to; }).join(', ')) : '',
+    kind:kind, store:m.store, types:m.types, noKey:key, code:code, target:target, changes:changes, clash:clash,
+    local:bizNoCascadeLocal(kind, changes, get).length };
+}
+/* 계획대로 한 건씩 — 멈추면 한 데까지만 사본을 고치고 기록한다(다시 누르면 남은 것만 바뀐다). */
+function bizTypeRenameRun(plan, who, fromShort){
+  var done = [], failed = null;
+  for(var i = 0; i < plan.changes.length; i++){
+    var c = plan.changes[i], f = {};
+    f[plan.noKey] = c.to;
+    if(!dbPatch(plan.store, c.id, f)){ failed = { id:c.id, why:'저장 실패' }; break; }
+    done.push(c);
+  }
+  var at = new Date().toISOString();
+  bizTypeApply(plan.types, [], function(cur){
+    return cur.map(function(t){
+      if(t.code !== plan.code) return t;
+      var log = (t.renameLog || []).concat([{ at:at, by:who || '', from:fromShort || '', to:plan.target,
+        nos:done.map(function(x){ return { id:x.id, no0:x.from, no1:x.to }; }), partial:failed ? true : undefined }]);
+      if(log.length > 10) log = log.slice(log.length - 10);
+      return Object.assign({}, t, { renameLog:log });
+    });
+  });
+  return { done:done, failed:failed, cascade:bizNoCascade(plan.kind, done) };
 }
 /* ══════ 🧹 사전에 없는 유형(고아) 정리 — 업무유형 정리 4단계 (대표 2026-10-07 「4단계」) ══════
    지워진 유형 번호를 아직 쓰는 기록이 13건 있었다(모두 종료·이관된 옛 건). 대표 결정:
@@ -37762,10 +37916,29 @@ function BizTypeCard(props){
       showToast('⚠ 「' + dupE.short + ' ' + dupE.name + '」 와 약어나 이름이 겹칩니다 — 고치지 않았습니다. 같은 사업이면 합치기로 정리합니다', 8000);
       return;
     }
-    /* 약어를 바꾸면 번호가 두 갈래가 된다 — 몇 건이 옛 약어로 남는지 보여 주고 묻는다 */
-    if(bizTypeNorm(sh) !== bizTypeNorm(x.short)){
+    /* 약어를 바꾸면 — «과거까지 모두» 바꿀지 «앞으로만» 바꿀지 고른다 (대표 지시 2026-10-09).
+       ⚠ 「앞으로만」은 예전 그대로다 — 이미 붙은 번호는 옛 약어로 남아 번호가 두 갈래가 된다.
+       ⚠ 「과거까지」는 연도·순번은 그대로 두고 앞 글자만 바꾸며, 다른 곳의 사본도 bizNoCascade 가 함께 고친다.
+         바꾼 번호가 이미 있으면 하나도 안 바꾸고 멈춘다(bizTypeRenamePlan). */
+    /* ⚠ 약어가 «그대로»여도 옛 약어로 남은 번호가 있으면 묻는다 — 예전에 「앞으로만」 바꿨거나
+         중간에 멈춘 것을 여기서 마저 바꾼다(다른 길을 따로 두지 않는다). */
+    var renamePlan = null;
+    var shortChanged = bizTypeNorm(sh) !== bizTypeNorm(x.short);
+    var rp = BIZ_TYPE_MERGE_MAP[cat.key] && BIZ_TYPE_MERGE_MAP[cat.key].noKey ? bizTypeRenamePlan(cat.key, x.code, sh) : null;
+    if(shortChanged || (rp && rp.changes.length)){
       var usedE = countUsage(x.code);
-      if(usedE > 0 && !(await showConfirm('약어 「' + (x.short || '') + '」 → 「' + sh + '」\n\n이미 붙은 관리번호(' + usedE + '건 사용 중)는 「' + (x.short || '') + '-」 그대로 남고,\n새로 만드는 것부터 「' + sh + '-」 가 붙습니다 — 같은 사업의 번호가 두 갈래가 됩니다.\n\n그래도 바꿀까요?', { title:'약어 변경 주의', confirmText:'그래도 바꾸기', danger:true }))) return;
+      if(rp && rp.changes.length){
+        var ex = rp.changes.slice(0, 3).map(function(c){ return c.from + ' → ' + c.to; }).join('\n') + (rp.changes.length > 3 ? '\n… 모두 ' + rp.changes.length + '건' : '');
+        var pick = await popConfirm((shortChanged ? '약어 「' + (x.short || '') + '」 → 「' + sh + '」' : '약어 「' + sh + '」 — 다른 약어로 남은 번호가 있습니다')
+          + '\n\n이 유형으로 이미 붙은 관리번호 ' + rp.changes.length + '건\n' + ex
+          + '\n\n「과거까지」 — 연도·순번은 그대로, 앞 글자만 바뀝니다. 계약·입금·진행기록 사본 ' + rp.local + '곳과 업무관리·푸른 메일의 사본도 함께 고칩니다.'
+          + '\n「앞으로만」 — 과거 ' + rp.changes.length + '건은 「' + (x.short || '') + '-」 그대로, 새로 만드는 것부터 「' + sh + '-」.'
+          + (rp.ok ? '' : '\n\n⚠ ' + rp.why + ' — 과거까지 바꿀 수 없습니다.'),
+          { title:'약어 변경', cancelText:'취소',
+            choices:(rp.ok ? [{ key:'all', label:'과거까지 모두 바꾸기' }] : []).concat([{ key:'future', label:shortChanged ? '앞으로만' : '그대로 두기' }]) });
+        if(pick !== 'all' && pick !== 'future') return;
+        if(pick === 'all') renamePlan = rp;
+      } else if(usedE > 0 && !(await showConfirm('약어 「' + (x.short || '') + '」 → 「' + sh + '」\n\n이미 붙은 관리번호(' + usedE + '건 사용 중)는 「' + (x.short || '') + '-」 그대로 남고,\n새로 만드는 것부터 「' + sh + '-」 가 붙습니다 — 같은 사업의 번호가 두 갈래가 됩니다.\n\n그래도 바꿀까요?', { title:'약어 변경 주의', confirmText:'그래도 바꾸기', danger:true }))) return;
     }
     var ag = null, df = null, unitIn = '', vatIn = '', roleIn = '';
     if(cat.key === 'consulting'){
@@ -37808,6 +37981,14 @@ function BizTypeCard(props){
         return bizTypeHist(nx, '수정', it, who());
       });
     });
+    if(renamePlan){
+      /* 물은 사이 누가 새 건을 만들었을 수 있다 — 바꾸기 직전에 «다시» 세운다 */
+      var rp2 = bizTypeRenamePlan(cat.key, x.code, sh);
+      if(!rp2.ok){ showToast('⚠ ' + rp2.why + ' — 약어만 바뀌고 과거 번호는 그대로입니다', 9000); return; }
+      var rr = bizTypeRenameRun(rp2, who(), x.short || '');
+      showToast('🔤 과거 번호 ' + rr.done.length + '건을 「' + sh + '-」 로 바꿨습니다' + (rr.failed ? ' · ⚠ 중간에 멈춤 — 다시 고치면 남은 것만 바뀝니다' : ''), 8000);
+      return;
+    }
     showToast('✏ 수정됨 — 코드 유지, 기존 사건·컨설팅 연결 그대로');
   }
   /* 「복원」 — 빠진 기본 유형만 더한다. 지금 목록은 하나도 안 지운다(bizTypeMissingSeeds 머리글).
