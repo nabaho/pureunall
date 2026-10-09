@@ -1243,7 +1243,7 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=53"></script>
+<script src="js/pu-ontology.js?v=54"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
@@ -1269,6 +1269,12 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=3"></script>
+  <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
+       hwpx-fill → gov-report(그것을 쓴다) → build → pack(gov-report 를 쓴다). hwpx-fill 판은 fund.html 과 같게. -->
+  <script src="js/pu-hwpx-fill.js?v=6"></script>
+  <script src="js/pu-gov-report.js?v=1"></script>
+  <script src="js/pu-gov-report-build.js?v=1"></script>
+  <script src="js/pu-gov-report-pack.js?v=1"></script>
   <script>
   /* 이 앱은 제 상단바에 이미 로그인한 사람을 그린다 — 표를 두 번 띄우지 않는다 (2026-08-16) */
   (function(){ function go(){ if(window.PuWhoami){ PuWhoami.mount(false); return true; } return false; }
@@ -1852,11 +1858,29 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
   <div class="modal md" style="max-height:88vh;display:flex;flex-direction:column;padding:0;">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;">
       <div id="tzHead" style="flex:1;min-width:0;"></div>
+      <button type="button" id="tzFormsBtn" class="btn btn-s" onclick="grpOpenForms()" style="display:none;margin:12px 0 0;font-size:11px;padding:3px 9px;" title="기관 빈 양식(HWPX)을 해마다 등록합니다 — 관리자만">⚙ 양식 서고</button>
       <button class="mclose" onclick="closeModal('mbTlZoom')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);padding:12px 14px;">✕</button>
     </div>
     <div id="tzSum"></div>
     <div id="tzList" style="overflow:auto;flex:1;min-height:80px;"></div>
     <div id="tzFoot"></div>
+  </div>
+</div>
+<!-- 정부컨설팅 보고서 「양식 서고」 (관리자, 2026-10-09)
+     기관이 해마다 보내는 빈 양식(HWPX)을 등록한다. 등록 때 칸 지도와 대조해 안 맞으면 저장하지 않는다.
+     ⚠ 「크게 보기」 위에 뜨므로 그 창보다 «뒤»에 둔다(같은 층이면 DOM 뒤 것이 위다 — Esc 도 이것부터 닫는다). -->
+<div class="mb" id="mbRptForms">
+  <div class="modal md" style="max-height:84vh;display:flex;flex-direction:column;">
+    <div class="mhead" style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);">
+      <div>
+        <div style="font-size:15px;font-weight:800;">⚙ 양식 서고</div>
+        <div style="font-size:11px;color:var(--t2);margin-top:2px;">기관 빈 양식을 해마다 등록합니다 — 한글(.hwp)은 HWPX 로 바꿔 올려 주세요</div>
+      </div>
+      <button class="mclose" onclick="closeModal('mbRptForms')" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);">✕</button>
+    </div>
+    <div id="rfMsg"></div>
+    <div id="rfBody" style="overflow:auto;flex:1;min-height:110px;padding:8px 16px;"></div>
+    <input type="file" id="rfFile" accept=".hwpx" style="display:none" onchange="grpPickedForm(this)">
   </div>
 </div>
 <div class="mb" id="mbNewAssign">
@@ -7370,10 +7394,132 @@ function tzDow(ds){
   const d=new Date(String(ds||'')+'T00:00:00');
   return isNaN(d)?'':TZ_DOW[d.getDay()];
 }
+/* ══ 정부컨설팅 보고서 「양식 서고」 (관리자, 2026-10-09) ══════════════════════
+   기관이 해마다 보내는 빈 양식(HWPX)을 실시간DB 에 둔다(기금 원본 서식과 같은 방식).
+     본문  scal_rptForms/{formKey}/{fileKey}/{year}      = {b64, at, size, name, by}
+     색인  scal_rptFormsIndex/{formKey}/{fileKey}/{year} = {at, size, name, by}
+   ★ 등록 때 칸 지도(PuGovReport.FORMS)와 대조한다 — 하나라도 안 맞으면(missing) 저장하지 않는다.
+     틀린 양식에 채운 보고서가 기관으로 나가는 것보다 «등록이 막히는» 편이 낫다.
+   ★ 본문을 먼저, 색인을 나중에 쓴다(fund.html tplCloudPut) — 색인이 있으면 본문도 있다.
+   ⚠ 이 두 자리는 FB_NODES·BK_KEYS 에 넣지 않는다(양식 b64 는 크다 — 구독·백업·localStorage 밖).
+   ⚠ 규칙: 읽기 로그인 · 쓰기 관리자(scripts/make-firebase-rules.js). */
+var _grpJsZipP=null;
+function grpLoadJsZip(){
+  if(window.JSZip) return Promise.resolve(window.JSZip);
+  if(_grpJsZipP) return _grpJsZipP;
+  _grpJsZipP=new Promise(function(res,rej){ var s=document.createElement('script'); s.src='vendor/jszip.min.js';
+    s.onload=function(){ window.JSZip?res(window.JSZip):rej(new Error('zip 도구를 못 읽었습니다')); };
+    s.onerror=function(){ _grpJsZipP=null; rej(new Error('zip 도구를 못 불러왔습니다')); };
+    document.head.appendChild(s); });
+  return _grpJsZipP;
+}
+function grpFormsRef(formKey,fileKey,year){ return _fbDB.ref('scal_rptForms/'+formKey+'/'+fileKey+'/'+year); }
+function grpFormsIndexRef(){ return _fbDB.ref('scal_rptFormsIndex'); }
+/* 그 해 양식 — 없으면 그 이전 가장 최근 해(뒤 해 양식은 쓰지 않는다). 없거나 못 읽으면 null */
+function grpLoadTemplate(formKey,fileKey,year){
+  if(!FB_READY||!_fbDB) return Promise.resolve(null);
+  const y=parseInt(year,10);
+  return grpFormsIndexRef().child(formKey).child(fileKey).once('value').then(function(s){
+    const idx=s.val()||{};
+    const ys=Object.keys(idx).filter(function(k){ return idx[k]&&/^\d{4}$/.test(k)&&parseInt(k,10)<=y; })
+      .map(function(k){ return parseInt(k,10); }).sort(function(a,b){ return b-a; });
+    if(!ys.length) return null;
+    return grpFormsRef(formKey,fileKey,ys[0]).once('value').then(function(b){
+      const v=b.val();
+      return v&&v.b64?PuGovReportPack.b64ToBytes(v.b64):null;
+    });
+  }).catch(function(e){ console.warn('[양식 서고] 못 읽음',formKey,fileKey,e); return null; });
+}
+/* 서고 창 위 알림줄 — html 은 이미 걸러 넣는다 */
+function grpFormsNote(html){
+  const el=q('#rfMsg'); if(!el) return;
+  el.innerHTML=html?`<div style="margin:10px 16px 0;padding:9px 12px;border:1px solid var(--danger);border-radius:8px;background:rgba(220,38,38,.06);font-size:12px;line-height:1.55;">${html}</div>`:'';
+}
+/* 등록 — .hwpx 만. 대조해 missing 이 있으면 저장하지 않고 목록을 보인다. → {missing} (거절이면 {missing:null, error}) */
+function grpSaveTemplate(formKey,fileKey,year,file){
+  const name=String((file&&file.name)||'');
+  const fail=function(m){ toast(m,'err'); grpFormsNote(escAttr(m)); return Promise.resolve({missing:null,error:m}); };
+  if(!isAdmin()) return fail('양식 등록은 관리자만 합니다');
+  if(!/\.hwpx$/i.test(name)) return fail(/\.hwp$/i.test(name)?'한글에서 HWPX 로 바꿔 올려 주세요 (.hwp 는 받지 않습니다)':'HWPX 파일만 받습니다 — 한글에서 HWPX 로 바꿔 올려 주세요');
+  if(!/^\d{4}$/.test(String(year))) return fail('연도를 네 자리로 넣어 주세요');
+  const form=((typeof PuGovReport!=='undefined'&&PuGovReport.FORMS)||{})[formKey];
+  if(!form||!form.files||!form.files[fileKey]) return fail('모르는 양식입니다: '+formKey+'/'+fileKey);
+  if(!FB_READY||!_fbDB) return fail('클라우드 연결 전입니다 — 잠시 뒤 다시 해 주세요');
+  let bytes=null;
+  return file.arrayBuffer().then(function(buf){ bytes=new Uint8Array(buf); return grpLoadJsZip(); })
+    .then(function(JSZ){ return PuGovReportPack.checkTemplate(bytes,formKey,fileKey,JSZ); })
+    .then(function(chk){
+      const missing=(chk&&chk.missing)||[];
+      if(missing.length){
+        grpFormsNote(`<b>올해 양식이 바뀌었습니다 — 이 방에 지도를 고쳐 달라고 하세요.</b> 저장하지 않았습니다.<br>
+          <span style="color:var(--t2);">안 맞는 칸 ${missing.length}곳:</span> ${missing.map(function(m){ return '<code>'+escAttr(m)+'</code>'; }).join(' · ')}`);
+        toast('올해 양식이 바뀌었습니다 — 저장하지 않았습니다','err');
+        return {missing:missing};
+      }
+      const meta={at:Date.now(),size:bytes.length,name:name,by:String((getSession()||{}).name||'')};
+      return grpFormsRef(formKey,fileKey,year).set(Object.assign({b64:PuGovReportPack.bytesToB64(bytes)},meta))
+        .then(function(){ return grpFormsIndexRef().child(formKey).child(fileKey).child(String(year)).set(meta); })
+        .then(function(){ grpFormsNote(''); toast(`${year}년 양식을 등록했습니다`); return {missing:[]}; });
+    })
+    .catch(function(e){ console.warn('[양식 서고] 등록 실패',e); return fail('등록하지 못했습니다 — '+((e&&e.message)||e)); });
+}
+const GRP_FILE_KO={main:'본문',visit:'업체 방문 확인서',report:'결과보고서'};
+let _grpPick=null;   // 지금 등록하려고 고른 {formKey,fileKey,year}
+/* 서고 창 — 양식별·파일별·연도별 등록 상태 */
+function grpRenderForms(){
+  const body=q('#rfBody'); if(!body) return Promise.resolve();
+  const FORMS=(typeof PuGovReport!=='undefined'&&PuGovReport.FORMS)||{};
+  const yNow=String(todayStr()).slice(0,4);
+  const read=(FB_READY&&_fbDB)?grpFormsIndexRef().once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return null; }):Promise.resolve(null);
+  return read.then(function(idx){
+    body.innerHTML=(idx===null?`<div style="font-size:12px;color:var(--danger);margin:6px 0;">서고 색인을 못 읽었습니다 — 연결을 확인해 주세요</div>`:'')+
+      Object.keys(FORMS).map(function(fk){
+        const f=FORMS[fk];
+        return `<div style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;margin:8px 0;">
+          <div style="font-size:13px;font-weight:800;">${escAttr(f.name)}</div>
+          <div style="font-size:11px;color:var(--t2);margin-bottom:6px;">${escAttr(f.agency||'')}</div>
+          ${Object.keys(f.files||{}).map(function(fl){
+            const got=((idx||{})[fk]||{})[fl]||{};
+            const ys=Object.keys(got).filter(function(y){ return got[y]; }).sort().reverse();
+            const id=fk+'__'+fl;
+            return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:12px;">
+              <span style="min-width:110px;font-weight:700;">${escAttr(GRP_FILE_KO[fl]||fl)}</span>
+              <span style="flex:1;min-width:120px;">${ys.length?ys.map(function(y){ return `<span class="att-label" style="background:var(--ok);" title="${escAttr((got[y].name||'')+' · '+(got[y].size||0)+'바이트')}">${escAttr(y)}</span>`; }).join(' '):'<span style="color:var(--t2);">등록된 양식 없음</span>'}</span>
+              <input type="number" id="rfYr_${escAttr(id)}" value="${escAttr(yNow)}" min="2020" max="2100" style="width:70px;font-size:12px;padding:3px 5px;">
+              <button type="button" class="btn btn-s" style="font-size:11px;padding:3px 10px;" onclick="grpPickForm('${escAttr(fk)}','${escAttr(fl)}')">등록</button>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('');
+  });
+}
+function grpOpenForms(){
+  if(!isAdmin()){ toast('양식 서고는 관리자만 엽니다','err'); return Promise.resolve(false); }
+  grpFormsNote('');
+  q('#mbRptForms').classList.add('open');
+  return grpRenderForms().then(function(){ return true; });
+}
+/* [등록] — 연도를 읽고 파일 고르기를 연다. 고른 뒤 grpPickedForm 이 대조·저장한다 */
+function grpPickForm(formKey,fileKey){
+  const inp=q('#rfYr_'+formKey+'__'+fileKey);
+  _grpPick={formKey:formKey,fileKey:fileKey,year:String((inp&&inp.value)||'').trim()};
+  const f=q('#rfFile'); if(f){ f.value=''; f.click(); }
+}
+function grpPickedForm(inp){
+  const file=inp&&inp.files&&inp.files[0], p=_grpPick;
+  _grpPick=null;
+  if(!file||!p) return Promise.resolve();
+  return grpSaveTemplate(p.formKey,p.fileKey,p.year,file).then(function(r){
+    if(inp) inp.value='';
+    if(r&&r.missing&&!r.missing.length) return grpRenderForms();
+  });
+}
 let _tzKey=null;   // 지금 크게 보고 있는 {coId,tid}
 function openTlZoom(coId,tid){
   _tzKey={coId,tid};
   renderTlZoom();
+  /* 「⚙ 양식 서고」 단추는 관리자에게만 보인다 */
+  try{ const fb=q('#tzFormsBtn'); if(fb) fb.style.display=isAdmin()?'':'none'; }catch(e){}
   q('#mbTlZoom').classList.add('open');
 }
 /* 「년월일요일을 복사할 수 있는 기능 — 다른 곳에 붙여넣게」 (대표 지시 2026-09-14)
