@@ -205,3 +205,11 @@ test('⑬ 제정 서류 세트 — 신구대조표·동의서를 끄고, 불이�
   assert.match(go, /DOCSET\.daejo=!isEnact\(\)/, '★ 「확인하고 서류 만들기」가 제정에도 대조표를 켠다');
   assert.match(go, /if\(!isEnact\(\)&&disadvantageScan\(\)\.length\)DOCSET\.consent=true;/);
 });
+
+/* ── 신고서 ↔ 변경신고서 (대표 결정 2026-10-09 「변경신고서로」) — 제정만 신고서, 일부·전부개정은 변경신고서 ── */
+test('⑭ 제정만 「신고서」 — 전부개정도 「변경신고서」', () => {
+  const f = RAW.slice(RAW.indexOf('const isChange='), RAW.indexOf('const isChange=') + 40);
+  assert.match(f, /^const isChange=!isEnact\(\);/, '★ 전부개정이 아직 「신고서」로 찍힌다');
+  assert.match(RAW, /return "취업규칙 "\+\(!isEnact\(\)\?"\[ \] 신고서   \[√\] 변경신고서":"\[√\] 신고서   \[ \] 변경신고서"\)/);
+  assert.ok(!/REV_MODE==="partial"\?"\[ \] 신고서/.test(RAW), '옛 잣대(일부개정만 변경신고)가 남았다');
+});

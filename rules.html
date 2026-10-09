@@ -2122,7 +2122,9 @@ function applyFormHwpx(site,asof,pageBreak){
      빈칸은 제출 후 수기 기입하는 자리다(서식에 원래 비어 있다). */
   try{
     const c=(typeof SITE_INFO!=="undefined"&&SITE_INFO)||{};
-    const isChange=REV_MODE==="partial";           // 일부개정 = 변경신고
+    /* 신고서 ↔ 변경신고서 — «제정만» 신고서, 일부개정·전부개정은 변경신고서 (대표 결정 2026-10-09 「변경신고서로」).
+       예전엔 일부개정만 변경신고였다 — 이미 신고된 규칙을 전부 고쳐도 「신고서」에 찍혔다. */
+    const isChange=!isEnact();
     const chk=on=>on?"[√]":"[  ]";
     const emp=c.empTotal||"";
     const addr=(c.address||"")+(c.addressDetail?" "+c.addressDetail:"");
@@ -2220,7 +2222,7 @@ function applyFormHwpx(site,asof,pageBreak){
 }
 
 function applyDoc(site,asof){
-  return "취업규칙 "+(REV_MODE==="partial"?"[ ] 신고서   [√] 변경신고서":"[√] 신고서   [ ] 변경신고서")
+  return "취업규칙 "+(!isEnact()?"[ ] 신고서   [√] 변경신고서":"[√] 신고서   [ ] 변경신고서")   // 제정만 신고서(2026-10-09)
     +"\n(근로기준법 시행규칙 별지 제15호서식)"
     +"\n\n■ 사업장 개요"
     +"\n사업장명: "+((SITE_INFO&&SITE_INFO.name)||site)
