@@ -159,6 +159,10 @@
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
         ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
       },
+      "cms_pull": {
+        ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
+        ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
+      },
       "payroll_audit_log": {
         ".read": "root.child('uid_roles').child(auth.uid).child('fin').val() == true",
         ".write": "root.child('uid_roles').child(auth.uid).child('fin').val() == true"
@@ -211,6 +215,10 @@
       "user_dir": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
         ".write": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true"
+      },
+      "biz_case_types": {
+        ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
       },
       "companies": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
@@ -2054,7 +2062,7 @@
       },
       "open": {
         "$t": {
-          ".read": true,
+          ".read": "auth != null",
           ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
           ".validate": "$t.matches(/^[0-9a-f]{32}$/) && newData.hasChildren(['req','exp','pages','docHash','mode','title'])",
           "seen": {
@@ -2063,7 +2071,7 @@
           },
           "sub": {
             ".write": "auth != null && !data.exists() && data.parent().child('void').val() !== true && data.parent().child('exp').val() > now && newData.child('p4').val() === root.child('pu_sign/req/' + data.parent().child('req').val() + '/p4').val() && newData.child('docHash').val() === data.parent().child('docHash').val()",
-            ".validate": "newData.hasChildren(['p4','docHash','at','agree'])",
+            ".validate": "newData.hasChildren(['p4','docHash','at','agree']) && (data.parent().child('mode').val() === 'agree' || newData.child('sig').isString())",
             "at": {
               ".validate": "newData.val() === now"
             },

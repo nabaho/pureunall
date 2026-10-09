@@ -1355,9 +1355,9 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=55"></script>
+<script src="js/pu-ontology.js?v=56"></script>
 <script src="js/pu-addr.js?v=2"></script>
-<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
@@ -1371,7 +1371,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=4"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
-<script src="js/kcareer-pusync.js?v=6"></script>
+<script src="js/kcareer-pusync.js?v=7"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
@@ -1414,7 +1414,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=21"></script>
+  <script src="js/pu-appbar.js?v=22"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -5341,10 +5341,12 @@ async function _puFetchPlan(){
   var ups = KcareerPuSync.buildStatusUpdates(collData, after);
   /* 관리번호는 이름표라 이알피에서 다시 매겨질 수 있다 — 영구 열쇠로 이어진 건만 따라 고친다 */
   var noUps = KcareerPuSync.buildNoUpdates(collData, after);
+  /* 💰 금액도 이알피에 맞춘다(대표 지시 2026-10-09) — 비었거나 이알피에서 받은 금액만. 손으로 적은 것은 그대로 */
+  var amtUps = KcareerPuSync.buildAmtUpdates(collData, after);
   /* 자문·고문 창고에서 «지금 이알피의 자문 업체»와 이어지지 않은 줄 — 급여·기금 고객, 옛 번호로 겹친 줄 (2026-10-03) */
   var advPrune = KcareerPuSync.buildAdvisoryPrune(collData, get('advisory'), typeMap);
   return { advPrune: advPrune, syncId: 'PS' + new Date().toISOString().slice(0,10).replace(/-/g,'') + '-' + String(Date.now()).slice(-4),
-           plan: plan, statusUps: ups, mig: mig, noUps: noUps, picks: {} };
+           plan: plan, statusUps: ups, mig: mig, noUps: noUps, amtUps: amtUps, picks: {} };
 }
 /* 연결 제안 한 줄의 선택 — '' 보류(기본) · 'add' 새 실적 · 'L|store|id' 그 실적에 연결 */
 function puSuggestPick(i, v){ if(_puSyncCtx) _puSyncCtx.picks[i] = v; }
@@ -5390,6 +5392,7 @@ function _puMigNote(ctx){
         }).join('');
   }
   if(ctx.noUps && ctx.noUps.length) h += '<div style="margin-top:6px;color:var(--text-mute)">🏷 이알피에서 관리번호가 바뀐 <b>' + ctx.noUps.length + '건</b>을 따라 고칩니다</div>';
+  if(ctx.amtUps && ctx.amtUps.length) h += '<div style="margin-top:6px;color:var(--teal)">💰 이알피 금액(부가세 뺀 공급가액)을 <b>' + ctx.amtUps.length + '건</b>에 받아 옵니다 — 손으로 적은 금액은 그대로 둡니다</div>';
   return h;
 }
 /* 연결 제안 — 이름이 같다고 자동으로 붙이지 않는다. 사람이 한 줄씩 고른다(기본은 보류). */
@@ -5556,13 +5559,19 @@ function puSyncCommit(){
   PU_SYNC_STORES.forEach(function(k){
     buf[k].forEach(function(r){ if(r.puRef && noMap[r.puRef] && !r.puRefCheck) r.sourceNo = noMap[r.puRef]; });
   });
+  /* 💰 금액 — 판정은 KcareerPuSync.buildAmtUpdates 한 곳(비었거나 이알피에서 받은 것만) */
+  var amtMap = {}, amtN = 0;
+  (_puSyncCtx.amtUps || []).forEach(function(u){ amtMap[u.puRef] = u.amt; });
+  PU_SYNC_STORES.forEach(function(k){
+    buf[k].forEach(function(r){ if(r.puRef && amtMap[r.puRef] && !r.puRefCheck){ r.amt = amtMap[r.puRef]; r.amtFrom = 'erp'; amtN++; } });
+  });
 
   PU_SYNC_STORES.forEach(function(k){ set(k, buf[k]); });
   LS.set(NS + 'pu_sync_last', new Date().toISOString());
   LS.set(NS + 'pu_sync_last_id', syncId);
   closePuSync();
   PU_SYNC_STORES.forEach(function(k){ try{ if(CAREER_CFG[k]) renderCareer(k); }catch(e){} });
-  toast('✅ 실적 ' + n + '건 들어옴' + (linkN ? ' · 기존 ' + linkN + '건에 연결' : '') + (upN ? ' · ' + upN + '건 완료로 갱신' : '')
+  toast('✅ 실적 ' + n + '건 들어옴' + (linkN ? ' · 기존 ' + linkN + '건에 연결' : '') + (upN ? ' · ' + upN + '건 완료로 갱신' : '') + (amtN ? ' · 💰 금액 ' + amtN + '건' : '')
     + (migN ? ' · 옛 연결 ' + migN + '건 영구 번호로' : '') + (badN ? ' · ⚠ 연결 확인 필요 ' + badN + '건' : '')
     + (heldN ? ' · 🔗 같은 건 확인 ' + heldN + '건은 🔄 실적 동기화에서 골라 주세요' : '')
     + (advOut ? ' · 🧹 자문·고문이 아닌 업체 ' + advOut + '건을 휴지통으로(환경설정 › 휴지통에서 되살립니다)' : '')
@@ -5858,7 +5867,7 @@ async function puSyncAuto(){
     var mg = ctx && ctx.mig;
     /* ⚠ 자문·고문 정리도 «할 일»이다 — 빠뜨리면 새 실적이 없는 날엔 정리가 영영 안 돈다(2026-10-03 실측) */
     var ap = ctx && ctx.advPrune;
-    var work = ctx && (ctx.plan.adds.length || (ctx.statusUps||[]).length || (ctx.noUps||[]).length
+    var work = ctx && (ctx.plan.adds.length || (ctx.statusUps||[]).length || (ctx.noUps||[]).length || (ctx.amtUps||[]).length
       || (mg && (mg.upgrades.length || mg.broken.length)) || (ap && (ap.drop.length || ap.retype.length)));
     if(!work){ LS.set(NS + 'pu_sync_last', new Date().toISOString()); return; }
     if(!LS.get(NS + 'pu_sync_last_id')){                    /* 첫 실행 → 미리보기 */
@@ -15498,13 +15507,30 @@ async function _bizMbCall(fn, body){
   if(!j.ok) throw new Error(j.error||'메일을 열지 못했습니다');
   return j;
 }
-async function _bizAttText(x, att, idx){
+async function _bizAttText(x, att, idx, 이름){
   var old=(x.box==='*old');
   var j=await _bizMbCall(old?'readOldMail':'readMailAttachment', old?{ key:x.k, index:idx }:{ slug:x.box, uid:x.k, index:idx, part:String(att.part||'') });
   var bin=atob(j.b64||''), bytes=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) bytes[i]=bin.charCodeAt(i);
   var nm=String(att.name||'');
-  if(/\.pdf$/i.test(nm)) return await _pkPdfText(bytes);
-  return (await _hwpTextOf(bytes, nm))||'';
+  if(!/\.pdf$/i.test(nm)) return { text:(await _hwpTextOf(bytes, nm))||'', ai:false };
+  var t=''; try{ t=await _pkPdfText(bytes); }catch(e){ t=''; }
+  /* ★ 스캔한 PDF — 글자 층이 없다(실측 2026-10-09: 날인본 결과보고서가 글자 2개).
+       그때만 AI 에게 «담당자 이름»만 묻는다. 고를 이름을 함께 주고, 답도 ownerGuess 로 다시 걸러
+       명부에 없는 이름은 버린다(AI 가 지어내도 들어오지 않는다). */
+  if(String(t).replace(/\s/g,'').length>=50 || !aiReady() || bytes.length>12*1024*1024) return { text:t, ai:false };
+  try{
+    var 질문='이 문서는 컨설팅 결과보고서입니다. 이 컨설팅을 «수행한» 담당자(컨설턴트·노무사·전문위원·작성자)의 이름을 찾아 '
+      +'「담당: 이름」 꼴로 한 줄씩만 답하세요. 다음 사람 가운데에서만 고르세요: '+(이름||[]).join(', ')
+      +'. 대표자 서명·직인만 있는 사람은 빼고, 문서에 없으면 「없음」이라고만 답하세요.';
+    var reply=await PuAiCall.ask([{text:질문},{inline_data:{mime_type:'application/pdf',data:String(j.b64||'')}}],
+      { auth: firebase.auth(), fetch: kcFetch, generationConfig:{temperature:0,maxOutputTokens:120} });
+    return { text:PuAiCall.textOf(reply)||'', ai:true };
+  }catch(e){ console.warn('보고서 AI 판독', e); return { text:t, ai:false }; }
+}
+/* 메일 본문이 html 로만 올 때 — 글자만 (태그·스크립트는 버린다. 화면에 넣지 않으므로 정화는 필요 없다) */
+function _bizHtmlText(h){
+  try{ var d=new DOMParser().parseFromString(String(h||''),'text/html'); d.querySelectorAll('script,style').forEach(function(n){ n.remove(); });
+    return (d.body&&d.body.textContent)||''; }catch(e){ return String(h||'').replace(/<[^>]+>/g,' '); }
 }
 async function bizMailOwner(i, quiet){
   var c=_bizMailCache(), x=c&&c.list[i]; if(!x) return null;
@@ -15512,14 +15538,16 @@ async function bizMailOwner(i, quiet){
   var 이름=_bizOwnerNames(), 결과={ at:Date.now(), names:[], src:'' };
   try{
     var j=await _bizMbCall(x.box==='*old'?'readOldMail':'readMailMessage', x.box==='*old'?{ key:x.k }:{ slug:x.box, uid:x.k, peek:1 });
-    var 후보=KcareerBiz.ownerGuess([x.s, j.text||'', (j.atts||[]).map(function(a){ return a&&a.name; }).join(' ')].join('\n'), 이름);
+    /* ⚠ 본문이 html 로만 오는 메일이 많다(실측: text 0자 · html 2만 자) — 글자로 바꿔 본다 */
+    var 본문=String(j.text||'').trim() || _bizHtmlText(j.html);
+    var 후보=KcareerBiz.ownerGuess([x.s, 본문, (j.atts||[]).map(function(a){ return a&&a.name; }).join(' ')].join('\n'), 이름);
     if(후보.some(function(h){ return h.near; })){ 결과.names=후보.slice(0,3); 결과.src='본문'; }
     else{
       var ra=KcareerBiz.reportAtt(j.atts);
       if(ra){
-        var 글=''; try{ 글=await _bizAttText(x, ra.a, ra.i); }catch(e){ console.warn('보고서 첨부', e); }
-        var 후2=KcareerBiz.ownerGuess(글, 이름);
-        if(후2.length){ 결과.names=후2.slice(0,3); 결과.src='📎 '+String(ra.a.name||'').slice(0,40); }
+        var 읽음={ text:'', ai:false }; try{ 읽음=await _bizAttText(x, ra.a, ra.i, Array.from(new Set(이름))); }catch(e){ console.warn('보고서 첨부', e); }
+        var 후2=KcareerBiz.ownerGuess(읽음.text, 이름);
+        if(후2.length){ 결과.names=후2.slice(0,3); 결과.src='📎 '+String(ra.a.name||'').slice(0,40)+(읽음.ai?' (AI 판독)':''); }
       }
       if(!결과.names.length && 후보.length){ 결과.names=후보.slice(0,3); 결과.src='본문(담당 표시 없음)'; }
     }
@@ -20581,8 +20609,9 @@ function _puItemFields(coll,c){
      자동으로 얹을 수 없고, 얹어서도 안 된다(경력은 본인이 책임지는 자료다).
      그래서 «본인 이름 묶음»에만 단추를 내고, 본인이 눌러 담는다.
    ⚠ 끝난 것만 담는다. 진행 중인 일을 경력에 적으면 거짓이 된다.
-   ⚠ 금액은 안 담는다. 계약금·성공보수는 계약서와 엮인 값이라 pu-erp 가 원본이고,
-     증명서에 자동으로 박히면 틀린 채로 나간다. 필요하면 본인이 적는다.
+   💰 금액 (2026-10-09 대표 지시 「이알피금액도 받아오게」로 바뀜 — 예전엔 «안 담는다»였다).
+     이알피가 원본인 것은 그대로다: 셈은 KcareerPuSync.amountOf 한 곳(계약금+잔금, 공급가액),
+     amtFrom:'erp' 를 달아 다음 동기화가 따라 고치고, 사람이 적은 금액은 덮지 않는다. 사건은 안 받는다(성공보수 %).
    ⚠ 두 번 담기지 않게 원본 표식(peRef)을 심는다. */
 var PU_ADOPT={ cases:'case', consultings:'consult', funds:'fund', other_projects:'etc' };
 function _puClosed(c){ return !!(c && (c.closedDate || c.status==='closed')); }
@@ -20607,6 +20636,8 @@ function _puToRec(coll,c){
   // 종류 칸이 있는 것에만 유형을 적는다 — 없는 칸에 넣으면 화면에 안 나오고 파일만 커진다
   if(coll==='cases'||coll==='consultings'||coll==='other_projects') rec.type=f.type||'';
   if(coll==='consultings') rec.main=_me.name||'';
+  var 돈=(window.KcareerPuSync&&KcareerPuSync.amountOf)?KcareerPuSync.amountOf(coll,c):0;
+  if(돈){ rec.amt=String(돈); rec.amtFrom='erp'; }
   return rec;
 }
 function puAdopt(coll,name){
@@ -20620,7 +20651,8 @@ function puAdopt(coll,name){
   if(!todo.length){ toast('담을 것이 없습니다 — 끝난 건은 이미 다 담겨 있습니다'); return; }
   if(!confirm('끝난 '+cfg.label+' '+todo.length+'건을 내 '+cfg.label+'실적에 담습니다.\n\n'
     +'· 상태는 「완료」로 들어갑니다\n'
-    +'· 금액은 담지 않습니다 (계약서와 엮인 값이라 본인이 확인해 적어야 합니다)\n'
+    +(coll==='cases' ? '· 금액은 담지 않습니다 (성공보수가 % 라 확정 금액이 아닙니다)\n'
+                     : '· 금액은 이알피 금액(부가세 뺀 공급가액)으로 담습니다\n')
     +'· 이미 담은 건은 건너뜁니다\n\n담을까요?')) return;
   var db=get(store), n=0;
   todo.forEach(function(c){

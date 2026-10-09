@@ -97,6 +97,7 @@
       대표근로자주소: String((caseMeta._rep && caseMeta._rep.addr) || ''),
       진정인수: caseMeta._count ? String(caseMeta._count) : '',
       관할관서: String(caseMeta.office || ''),
+      공인노무사명단: String(caseMeta._lawyers || (root.PuFormCardFill && root.PuFormCardFill.lawyersNow ? root.PuFormCardFill.lawyersNow() : '')),
       생년월일: birthOf(person.idNo)
     };
   }

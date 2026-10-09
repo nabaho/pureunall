@@ -34,7 +34,12 @@
        손잡이가 붙어도 그 앱이 목록에 안 보이고, script 를 안 실으면 손잡이 자체가
        없다 — 이번엔 둘 다였다. 이름도 포털 개명(2026-08-11)을 따라잡았다. */
   var APPS = [
-    { key: 'erp',     name: '푸른이알피',   icon: '🏢', url: 'pu-erp.html',         desc: '인사·급여·재무' },
+    { key: 'erp',     name: '푸른이알피',   icon: '🏢', url: 'pu-erp.html',         desc: '계약·업체·사건' },
+    /* 직원 인사 · 재무 — 이알피와 같은 파일이고 주소 꼬리(?app=hr·fin)만 다르다(대표 지시 2026-10-09, 메일과 같은 방식).
+       perm — 관리자이거나 그 권한이 있을 때만 보인다. 잣대는 포털과 같은 서버 권한표(uid_roles)이고,
+       포털이 마지막으로 읽은 값(pu_app_perm_<uid>)을 빌려 본다. */
+    { key: 'hr',      name: '직원 인사',    icon: '👥', url: 'pu-erp.html?app=hr',  desc: '명부·급여·근태', perm: 'hr' },
+    { key: 'fin',     name: '재무',        icon: '📒', url: 'pu-erp.html?app=fin', desc: '입출금·마감', perm: 'fin' },
     { key: 'cal',     name: '푸른 캘린더',  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
     { key: 'consult', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
     { key: 'work',    name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
@@ -94,10 +99,21 @@
     } catch (e) { return false; }
   }
 
+  /* 직원 인사·재무 줄을 볼 수 있나 — 포털이 서버 권한표(uid_roles)에서 읽어 둔 값을 빌린다.
+     ★ 모를 때는 «감춘다»(닫는 쪽으로 실패) — 관리자는 위 잣대로 늘 보인다. */
+  function permOk(perm) {
+    try {
+      var u = global.firebase && global.firebase.auth && global.firebase.auth().currentUser;
+      if (!u || !u.uid) return false;
+      var p = lsGet('pu_app_perm_' + u.uid, null);
+      return !!(p && (p.isAdmin === true || p.isSubAdmin === true || p[perm] === true));
+    } catch (e) { return false; }
+  }
+
   function ordered() {
     var f = favs();
     var admin = isAdminNow();
-    return APPS.filter(function (a) { return !a.adminOnly || admin; }).sort(function (a, b) {
+    return APPS.filter(function (a) { return (!a.adminOnly || admin) && (!a.perm || admin || permOk(a.perm)); }).sort(function (a, b) {
       var fa = f.indexOf(a.key) >= 0 ? 0 : 1, fb = f.indexOf(b.key) >= 0 ? 0 : 1;
       return fa - fb;   // 같으면 원래 차례 (안정 정렬)
     });

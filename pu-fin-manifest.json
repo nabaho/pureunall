@@ -1,0 +1,30 @@
+{
+  "name": "재무",
+  "short_name": "재무",
+  "description": "푸른노무법인 재무 — 거래내역·입출금·손익·세금계산서·미수금·부가세·월말 마감",
+  "_왜_따로_있나": "코드는 푸른이알피(pu-erp.html) 한 벌 그대로다. 입금 자료를 사건·업체·성과·급여 화면이 함께 고치고 월말 마감 잠금을 여러 화면이 함께 쓰기 때문에 코드를 두 벌로 만들면 같은 자료를 다른 코드가 고치게 된다. 나누는 것은 «들어가는 문»(?app=fin)이라 이름·아이콘·첫 화면만 따로 준다(대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 푸른 메일과 같은 방식).",
+  "id": "./pu-erp.html?app=fin",
+  "start_url": "./pu-erp.html?app=fin",
+  "scope": "./",
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
+  "display": "standalone",
+  "background_color": "#101010",
+  "theme_color": "#1e40af",
+  "lang": "ko-KR",
+  "icons": [
+    {
+      "src": "icon-fin-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-fin-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

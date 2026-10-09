@@ -1190,11 +1190,11 @@ ok('이체 자동매칭 버튼', src.includes('onclick="autoMatchTransfers()"'))
 ok('확실/추정 구분', src.includes("kind='sure'") && src.includes("kind='guess'"));
 // 2026-10-05 바닥 공사: 가져오기 직후에도 «묻고» 상계 — 확실한 짝은 골라 둔 채 창을 띄운다(사람 확인 없이 승인 금지)
 ok('가져오기 직후 이체 짝은 창으로 묻는다', src.includes('if(pairs.length) _xferModal(pairs,_fid,_yr,') && !/applyTransfers\(sure,/.test(src));
-ok('확실한 짝만 처음부터 골라 둔다', src.includes(`(pr.kind==='sure'?' checked':'')`));
+ok('확실한 짝만 처음부터 골라 둔다', src.includes(`(pr.kind==='sure'&&!pr.appr?' checked':'')`));
 // 상계는 현금↔현금 — 재무제표 영향 0이면서 통장 입·출금 합계는 그대로 남아야 한다
 ok('상계는 현금성자산 ↔ 현금성자산', /up\[b\+'debit'\]='현금성자산'; up\[b\+'credit'\]='현금성자산';/.test(src));
 ok('거래 목록에 이체 칩', src.includes('x.xfer?'));
-ok('이미 처리된 이체는 다시 잡지 않음', src.includes('return !x.xfer;'));
+ok('이미 처리된 이체는 다시 잡지 않음', src.includes('return !x.xfer&&!((x.splits||[]).length);'));
 
 // ── ⑪ 분개 학습(거래처 기억) ──
 ok('_learnKey 존재', src.includes('function _learnKey'));

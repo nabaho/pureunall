@@ -34,6 +34,29 @@ const SECRET_KEY_RE = /api_key|api_keys|nas_config|token|secret|passwd|password/
      이미 있다(pu-erp.html serverBackupEvening). */
 const DATE_RE = /^\d{4}-\d{2}-\d{2}(-pm)?$/;
 
+/* ══ 앱별로 따로 받기 — ?app=hr|fin|erp (대표 지시 2026-10-09 「파이어베이스와 나스 등 … 각자 데이터를 잘 관리」) ══
+   직원 인사·재무가 푸른이알피에서 갈라졌다. 나스도 앱마다 폴더를 따로 두고 받아 간다.
+   ★ 어느 표가 어느 앱 것인지는 «백업에 함께 적힌 목차»(serverBackups/{날짜}/apps)를 따른다 —
+     관리자 기기가 백업을 뜰 때 온톨로지 등록부(PuOntology.PROGRAMS.hr·fin)에서 만든다.
+     여기에 표 이름을 따로 적지 않는다(두 곳에 적으면 언젠가 어긋나 한 앱의 표가 어느 폴더에도 안 간다).
+   ⚠ 목차가 없는 옛 백업은 앱별로 «안» 준다(409) — 어림으로 갈라 주면 빠진 표를 모른 채 보관하게 된다.
+     통째 받기(app 없이)는 예전 그대로 된다. */
+const APP_RE = /^(erp|hr|fin)$/;
+function 앱으로거르기(자료, 목차, 앱) {
+  if (!앱) return 자료;
+  if (!목차 || typeof 목차 !== 'object' || !Array.isArray(목차.hr) || !Array.isArray(목차.fin)) return null;
+  const 남의것 = {};
+  ['erp', 'hr', 'fin'].forEach((a) => { if (a !== 앱) (목차[a] || []).forEach((k) => { 남의것[k] = 1; }); });
+  const 내것 = {};
+  (목차[앱] || []).forEach((k) => { 내것[k] = 1; });
+  const 남길것 = {};
+  Object.keys(자료 || {}).forEach((k) => {
+    /* 이알피는 «목차에서 남의 것이 아닌 것 전부» — 목차 뒤에 새로 생긴 표도 이알피 폴더에는 들어간다 */
+    if (앱 === 'erp' ? !남의것[k] : 내것[k]) 남길것[k] = 자료[k];
+  });
+  return 남길것;
+}
+
 /* 열쇠 견주기 — 길이가 같아도 «몇 글자까지 맞았는지»가 시간으로 새지 않게.
    ⚠ 길이가 다르면 timingSafeEqual 이 던진다. 먼저 길이를 보고, 그때도 한 번은 견준다. */
 function 열쇠맞나(받은것, 참값) {
@@ -149,6 +172,11 @@ function 핸들러만들기(옵션) {
         res.status(400).json({ ok: false, error: '날짜는 2026-09-18 꼴이어야 합니다' });
         return;
       }
+      const 앱 = (req.query && req.query.app) || '';
+      if (앱 && !APP_RE.test(앱)) {
+        res.status(400).json({ ok: false, error: 'app 은 erp · hr · fin 가운데 하나여야 합니다' });
+        return;
+      }
       if (!날짜) {
         날짜 = await 최신날짜고르기(데이터베이스);
         if (!날짜) {
@@ -164,14 +192,21 @@ function 핸들러만들기(옵션) {
       }
 
       const 걸러진 = 비밀걸러내기(백업.data);
-      const 몸통 = 내보낼모양(날짜, { savedAt: 백업.savedAt, version: 백업.version, data: 걸러진.자료 }, 걸러진.뺀것);
+      const 앱자료 = 앱으로거르기(걸러진.자료, 백업.apps, 앱);
+      if (앱자료 === null) {
+        res.status(409).json({ ok: false, error: '이 백업(' + 날짜 + ')에는 앱별 목차가 없습니다 — 다음 백업부터 앱별로 받을 수 있습니다. 통째 받기는 그대로 됩니다' });
+        return;
+      }
+      const 몸통 = 내보낼모양(날짜, { savedAt: 백업.savedAt, version: 백업.version, data: 앱자료 }, 걸러진.뺀것);
+      if (앱) 몸통.app = 앱;
+      if (백업.apps) 몸통.apps = 백업.apps;           // 표 이름 목차 — 받는 쪽이 「무엇이 어디로 갔나」를 본다
       const 글자 = JSON.stringify(몸통);
 
       /* 흔적 — 누가 언제 얼마를 받아 갔는지. 열쇠가 샜을 때 이것만이 알려 준다.
          ⚠ 흔적을 못 남겨도 자료는 준다(흔적 때문에 백업이 멎으면 안 된다). */
       try {
         await 데이터베이스.ref('nas_backup_log/' + 지금()).set({
-          at: 지금(), date: 날짜, bytes: Buffer.byteLength(글자, 'utf8'),
+          at: 지금(), date: 날짜, app: 앱 || 'all', bytes: Buffer.byteLength(글자, 'utf8'),
           ip: (req.headers && (req.headers['x-forwarded-for'] || req.headers['X-Forwarded-For'])) || null,
           ua: (req.headers && req.headers['user-agent']) || null,
         });
@@ -190,4 +225,4 @@ function 핸들러만들기(옵션) {
   };
 }
 
-module.exports = { SECRET_KEY_RE, DATE_RE, 꼬리수, 열쇠맞나, 최신날짜, 최신날짜고르기, 비밀걸러내기, 내보낼모양, 핸들러만들기 };
+module.exports = { SECRET_KEY_RE, DATE_RE, APP_RE, 꼬리수, 열쇠맞나, 최신날짜, 최신날짜고르기, 비밀걸러내기, 앱으로거르기, 내보낼모양, 핸들러만들기 };

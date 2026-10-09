@@ -28,6 +28,8 @@ firebase.messaging().onBackgroundMessage(function (payload) {
     badge: '/pureunall/icon-192.png',
     tag: d.tag || 'pu-suggestion',      // 같은 tag면 알림이 쌓이지 않고 최신 것으로 갈린다
     renotify: true,
+    /* 🚗 출장 출발 알림은 누를 때까지 남긴다 — 운전 준비 중에 사라지면 못 찾는다(2026-10-09) */
+    requireInteraction: /^pu-trip-/.test(d.tag || ''),
     data: { url: d.url || PORTAL_URL }
   });
 });
@@ -42,8 +44,12 @@ self.addEventListener('notificationclick', function (e) {
   var path = String(url).split('?')[0];
   e.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
-      for (var i = 0; i < list.length; i++) {
-        if (list[i].url.indexOf(path) >= 0 && 'focus' in list[i]) return list[i].focus();
+      /* 🚗 출장 알림(trip=)은 «그 일정»을 열어야 한다 — 이미 열린 달력 탭으로 가면 출장 카드가 안 뜬다.
+           달력 탭은 이 워커가 다스리지 않아(scope /push/) 주소를 바꿔 줄 수도 없다 → 새로 연다 */
+      if (String(url).indexOf('trip=') < 0) {
+        for (var i = 0; i < list.length; i++) {
+          if (list[i].url.indexOf(path) >= 0 && 'focus' in list[i]) return list[i].focus();
+        }
       }
       return self.clients.openWindow(url);
     })

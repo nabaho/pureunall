@@ -121,7 +121,7 @@ function runApp(seed) {
                     setItem: (k, v) => { store[k] = v; } },
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }) },
     location: { protocol: 'https:' },
-    GovG2b: require('../js/gov-g2b.js'),
+    GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'),
     GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'),
     Promise, navigator: {},
@@ -129,7 +129,8 @@ function runApp(seed) {
     GovBizinfo: require('../js/gov-bizinfo.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort=()=>{}; this.signal=null; },
-    URL: { createObjectURL: () => 'blob:x' }, Blob: function(parts){ if(hooks.blob) hooks.blob(parts); }
+    URL: { createObjectURL: () => 'blob:x' }, Blob: function(parts){ if(hooks.blob) hooks.blob(parts); },
+    confirm: () => true
   };
   ctx.window = ctx;
   const code = [...src.matchAll(/<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g)]
@@ -137,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,'
+    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -544,7 +545,12 @@ test('★★ 받는 사이 누른 ★ 이 되돌아가지 않는다 · 두 번 �
   assert.equal(feed.find((x) => x.no === 'OLD-1').type, '관심', '받는 사이 누른 ★ 이 지워졌다');
   assert.ok(feed.some((x) => x.no === 'NEW-1-000'), '새 공고는 들어온다');
   assert.equal(feed.filter((x) => x.no === 'NEW-1-000').length, 1, '두 번 받으면 안 된다');
-  assert.equal(calls, 2, '한 번 받기 = 나라장터 한 번 + 알리오 한 번 — 두 번 눌러도 그대로');
+  /* 한 번 받기 = 나라장터 + 알리오 + 발주계획(올해 1월부터 31일씩) + 사전규격 — 두 번 눌러도 «한 번 받기»와 같아야 한다 */
+  const one = runApp({ feed: [], key_data: 'K' }); let calls1 = 0;
+  one.api.setPull(async () => { calls1++; return { response: { header: { resultCode: '00' }, body: { totalCount: 0, items: [] } } }; });
+  await one.api.fetchAll();
+  assert.ok(calls1 >= 3, '발주계획·사전규격도 부른다');
+  assert.equal(calls, calls1, '두 번 눌렀더니 더 불렀다');
 });
 
 /* ═══════ 수의계약 — 표시하고, 빼고 볼 수 있게 (대표 지시 2026-10-09) ═══════ */
@@ -602,4 +608,157 @@ test('★ 팝업 계약방법 칸에도 딱지', () => {
   assert.match(r.el('popBody').innerHTML, /계약방법[\s\S]{0,80}<span class="tag amber"[^>]*>수의계약<\/span> 수의계약/);
   r.api.feedPop('S2');
   assert.doesNotMatch(r.el('popBody').innerHTML, /tag amber/);
+});
+
+/* ═══════ 📅 발주 예정 — 나라장터 발주계획·사전규격 (대표 지시 2026-10-09) ═══════ */
+const ymAdd = (n) => { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0'); };
+const futureDt = () => { const d = new Date(Date.now() + 5 * 86400000); return d.toISOString().slice(0, 10) + ' 18:00:00'; };
+const PLANS = () => [
+  { kind: 'plan', no: 'P1', nm: '노무 자문 용역', org: '갑공단', ym: ymAdd(0), prc: 30000000, mthd: '수의계약', dept: '경영지원팀', tel: '02-000-0000', bids: [], kw: '노무' },
+  { kind: 'plan', no: 'P2', nm: '직무분석 용역', org: '을공사', ym: ymAdd(3), prc: 60000000, mthd: '협상에의한계약', bids: [], kw: '직무분석' },
+  { kind: 'plan', no: 'P3', nm: '조직진단 용역', org: '병재단', ym: ymAdd(-2), prc: 50000000, mthd: '제한경쟁', bids: [], kw: '조직진단' },
+  { kind: 'spec', no: 'S9', nm: '인사평가체계 개선 컨설팅', org: '정시', prc: 20000000, rcptDt: '2026-10-07 09:00:00', closeDt: futureDt(), bids: [], kw: '평가체계',
+    files: ['https://www.g2b.go.kr:8082/ep/co/fileDownload.do?fileTask=PS&fileSeq=9::1'] },
+  { kind: 'plan', no: 'P4', nm: '임금체계 개편 용역', org: '무원', ym: ymAdd(-1), prc: 40000000, mthd: '일반경쟁', bids: ['R26BK00000001'], kw: '임금' },
+  { kind: 'plan', no: 'P5', nm: '숨긴 노무 용역', org: '기관', ym: ymAdd(1), bids: [], hidden: true, kw: '노무' }
+];
+const planRowsOf = (h) => (h.match(/class="row-chk"/g) || []).length;
+test('★★ 「📅 발주 예정」 탭이 있고 고르면 그 화면만 보인다', () => {
+  assert.match(src, /<button class="tb" id="tbPlan" onclick="setTab\('plan'\)">📅 발주 예정<\/button>/);
+  assert.match(src, /<script src="js\/gov-plan\.js\?v=\d+"><\/script>/);
+  const r = runApp({ plan: PLANS() });
+  r.api.setTab('plan');
+  assert.equal(r.el('pgPlan').style.display, ''); assert.equal(r.el('pgFeed').style.display, 'none'); assert.equal(r.el('pgRec').style.display, 'none');
+  assert.equal(r.el('tbPlan').className, 'tb on');
+  r.api.setTab('feed'); assert.equal(r.el('pgPlan').style.display, 'none');
+});
+test('★★★ 공고 전(기본) — 임박·이번 달·예정월 지남·몇 달 뒤 차례, 공고 나온 것·숨긴 것은 빼고 ㅁ·№ · 탭에 임박 건수', () => {
+  const r = runApp({ plan: PLANS() });
+  r.el('pView').value = 'ahead'; r.api.planDraw();
+  const h = r.el('ptb').innerHTML;
+  assert.equal(planRowsOf(h), 4);
+  const order = ['인사평가체계', '노무 자문', '조직진단', '직무분석'].map((t) => h.indexOf(t));
+  assert.ok(order.every((x, i) => x > 0 && (i === 0 || x > order[i - 1])), '차례: 임박 → 이번 달 → 지남 → 뒤 ' + order);
+  assert.doesNotMatch(h, /임금체계|숨긴 노무/);
+  assert.match(h, /<td class="rn">1<\/td>[\s\S]*<td class="rn">4<\/td>/);
+  assert.match(h, /<span class="tag red">사전규격<\/span>[\s\S]*🔔 공고 임박 · 의견 마감/);
+  assert.match(h, /<span class="tag amber"[^>]*>수의계약<\/span> <b>노무 자문 용역<\/b>/, '수의계약 딱지');
+  assert.match(h, /⏳ 이번 달 발주 예정/); assert.match(h, /⚠ 예정월 지남 · 아직 공고 없음/); assert.match(h, /3개월 뒤 발주 예정/);
+  assert.match(h, /경영지원팀<div>02-000-0000<\/div>/, '담당 부서·전화');
+  assert.match(h, /href="https:\/\/www\.g2b\.go\.kr:8082\/ep\/co\/fileDownload\.do\?fileTask=PS&amp;fileSeq=9::1"/, '사전규격서 링크');
+  assert.match(r.el('tbPlan').innerHTML, /📅 발주 예정 <span class="tag red"[^>]*>2<\/span>/, '임박 1 + 이번 달 1');
+  assert.match(r.el('pCnt').textContent, /전체 5건 · 지금 4건 · 숨김 1건/);
+});
+test('★★★ 「공고 나옴」 보기 — 공고 모아보기에 그 공고가 있으면 「공고 보기」로 바로 연다', () => {
+  const r = runApp({ plan: PLANS(), feed: [{ id: 'G0001', src: '나라장터', type: '새 공고', no: 'R26BK00000001-000', nm: '임금체계 개편 용역', org: '무원' }] });
+  r.el('pView').value = 'posted'; r.api.planDraw();
+  const h = r.el('ptb').innerHTML;
+  assert.equal(planRowsOf(h), 1); assert.match(h, /✅ 공고 나옴/); assert.match(h, /title="입찰공고번호 R26BK00000001"/);
+  assert.match(h, /onclick="planGoFeed\('G0001'\)"[^>]*>공고 보기<\/button>/);
+  r.api.planGoFeed('G0001');
+  assert.equal(r.el('pgFeed').style.display, ''); assert.equal(r.el('pop').className, 'pop on');
+  r.el('pView').value = 'hidden'; r.api.planDraw();
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 1); assert.match(r.el('ptb').innerHTML, /숨긴 노무 용역/);
+});
+test('★★ 수의계약 고르개는 두 탭이 «한 값» — 발주 예정에서 빼면 공고 모아보기도 빠진다', () => {
+  const r = runApp({ plan: PLANS() });
+  r.el('pView').value = 'ahead'; r.el('pMthd').value = 'nosole'; r.api.planMthd('nosole');
+  assert.doesNotMatch(r.el('ptb').innerHTML, /노무 자문 용역/);
+  assert.match(r.el('pCnt').textContent, /수의계약 1건 뺌/);
+  assert.equal(r.store.gov3_feed_mthd, 'nosole'); assert.equal(r.el('fMthd').value, 'nosole');
+  r.api.feedMthd(''); assert.equal(r.el('pMthd').value, '', '반대쪽도 따라온다');
+});
+test('★★ ★ 관심 · 숨기기(지우지 않음) · 골라서 한꺼번에', () => {
+  const r = runApp({ plan: PLANS() });
+  r.el('pView').value = 'ahead'; r.api.planDraw();
+  r.api.planStar('P2'); assert.equal(JSON.parse(r.store.gov3_plan).find((x) => x.no === 'P2').star, true);
+  r.api.planTog('P1', true); r.api.planTog('P3', true);
+  assert.match(r.el('planSel').innerHTML, /<b>2건<\/b> 선택/);
+  r.api.planBulk('hide');
+  const after = JSON.parse(r.store.gov3_plan);
+  assert.equal(after.length, 6, '지우지 않는다'); assert.equal(after.filter((x) => x.hidden).length, 3);
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 2);
+  r.api.planHide('P1', false); assert.equal(JSON.parse(r.store.gov3_plan).find((x) => x.no === 'P1').hidden, false);
+  r.el('pView').value = 'star'; r.api.planDraw(); assert.equal(planRowsOf(r.el('ptb').innerHTML), 1);
+});
+const PLAN_ENV = (items) => ({ response: { header: { resultCode: '00' }, body: { totalCount: items.length, items } } });
+test('★★★ 새로 받기 — 발주계획(올해 1월부터 31일씩)·사전규격을 받아 «같은 찾는 말»로 거르고, 다음부터는 지난 며칠치만', async () => {
+  const r = runApp({ feed: [], key_data: 'K' }); const urls = [];
+  r.api.setPull(async (u) => { urls.push(u);
+    if (/OrderPlanSttusService/.test(u)) return PLAN_ENV([
+      { orderPlanUntyNo: 'R26DD1', bizNm: '근무평정 대행 용역', orderInsttNm: '갑', orderYear: '2026', orderMnth: '12', sumOrderAmt: '10000000', cntrctMthdNm: '수의계약' },
+      { orderPlanUntyNo: 'R26DD2', bizNm: '청사 청소 용역', orderInsttNm: '을', orderYear: '2026', orderMnth: '12' }]);
+    if (/HrcspSsstndrdInfoService/.test(u)) return PLAN_ENV([{ bfSpecRgstNo: '77', prdctClsfcNoNm: '노사관계 진단 컨설팅', rlDminsttNm: '병', opninRgstClseDt: '2099-01-01 18:00:00', rcptDt: '2026-10-08 09:00:00' }]);
+    return PLAN_ENV([]); });
+  await r.api.fetchAll();
+  const plan = JSON.parse(r.store.gov3_plan);
+  assert.deepEqual(plan.map((x) => x.no).sort(), ['R26DD1', 'S77'], '청소 용역은 안 걸린다');
+  const y = new Date().getFullYear();
+  const pu = urls.filter((u) => /OrderPlanSttusService/.test(u));
+  assert.ok(pu.length >= 1 && pu.length === Math.ceil(((Date.now() - new Date(y, 0, 1)) / 86400000 + 1) / 31), '처음엔 올해 1월부터 31일씩: ' + pu.length);
+  assert.match(pu[0], new RegExp('inqryBgnDt=' + y + '01010000'));
+  assert.match(pu[0], new RegExp('orderBgnYm=' + y + '01&orderEndYm=' + (y + 1) + '12'));
+  assert.match(r.store.gov3_plan_since, /^\d{4}-\d{2}-\d{2}$/);
+  assert.match(r.el('note').innerHTML, /📅 발주 예정 <b>2건<\/b> 새로 걸림/);
+  urls.length = 0; await r.api.fetchAll();
+  assert.equal(urls.filter((u) => /OrderPlanSttusService/.test(u)).length, 1, '두 번째부터는 지난 며칠치 한 묶음');
+  assert.equal(JSON.parse(r.store.gov3_plan).length, 2, '같은 줄이 또 들어왔다');
+});
+test('★★★ 활용신청 승인 전 — 「승인을 기다리는 중」이라 말하고 신청 자리를 알려 주며, 받은 범위를 남기지 않는다', async () => {
+  const r = runApp({ feed: [], key_data: 'K' });
+  r.api.setPull(async (u) => (/\/ao\//.test(u)
+    ? { OpenAPI_ServiceResponse: { cmmMsgHeader: { errMsg: 'SERVICE_ACCESS_DENIED_ERROR', returnAuthMsg: '서비스 접근거부', returnReasonCode: '20' } } }
+    : PLAN_ENV([])));
+  await r.api.fetchAll();
+  assert.equal(r.store.gov3_plan_since || '', '', '못 받았는데 받은 범위를 남겼다 — 승인 뒤 1월부터 못 채운다');
+  assert.equal(r.store.gov3_spec_since || '', '');
+  assert.match(r.store.gov3_plan_err, /발주계획: 아직 못 받습니다 — 공공데이터포털 «활용신청 승인»을 기다리는 중/);
+  assert.match(r.store.gov3_plan_err, /사전규격: 아직 못 받습니다/);
+  r.api.planDraw();
+  assert.match(r.el('planNote').innerHTML, /href="https:\/\/www\.data\.go\.kr\/data\/15129462\/openapi\.do"[\s\S]*15129437/);
+  assert.match(r.el('note').innerHTML, /활용신청 승인/);
+});
+test('★ 저장된 줄의 규격서 주소가 https 가 아니면 링크로 안 그린다(다른 기기·옛 자료)', () => {
+  const l = PLANS(); l[3].files = ['javascript:alert(1)'];
+  const r = runApp({ plan: l }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.doesNotMatch(r.el('ptb').innerHTML, /javascript:/); assert.doesNotMatch(r.el('ptb').innerHTML, /📎/);
+});
+
+/* ═══ 발주 예정 — 처음 열면 저절로 받고, 받는 동안 «이 탭»에 보인다 (2026-10-09 대표 화면: 「아직 받은 적이 없습니다」만 떠 있었다) ═══ */
+const tickP = (ms) => new Promise((ok) => setTimeout(ok, ms || 0));
+test('★★★ 인증키가 있고 한 번도 안 받았으면 탭을 여는 순간 받기 시작 — 진행이 이 탭에 보인다', async () => {
+  const r = runApp({ feed: [], key_data: 'K' }); let release; const gate = new Promise((ok) => { release = ok; }); const urls = [];
+  r.api.setPull(async (u) => { urls.push(u); await gate; return PLAN_ENV([]); });
+  r.api.setTab('plan');
+  await tickP();
+  assert.ok(urls.length >= 1 && /OrderPlanSttusService/.test(urls[0]), '탭을 열어도 안 받는다');
+  assert.match(r.el('planNote').innerHTML, /<b>⏳ 발주계획 받는 중… \(\d{4}-01-01 게시분부터, 1\/\d+\)<\/b>/);
+  release();
+  for (let i = 0; i < 100 && !r.store.gov3_plan_at; i++) await tickP(5);
+  assert.match(r.store.gov3_plan_at || '', /^\d{4}-/, '받은 때를 남긴다');
+  assert.match(r.el('planNote').innerHTML, /마지막으로 받은 때/);
+  assert.match(r.el('note').innerHTML, /📅 발주 예정 <b>0건<\/b> 새로 걸림/);
+});
+test('★★ 받은 적이 있으면 탭을 열어도 다시 안 받는다(하루 한 번 자동에 맡긴다) · 열쇠가 없으면 안 받는다', async () => {
+  let n = 0;
+  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z' }); r.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  r.api.setTab('plan'); await tickP(20);
+  assert.equal(n, 0);
+  const r2 = runApp({ feed: [] }); r2.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  r2.api.setTab('plan'); await tickP(20);
+  assert.equal(n, 0); assert.match(r2.el('ptb').innerHTML, /인증키를 먼저/);
+});
+test('★★ 「아직 받은 적이 없습니다」 옆과 빈 표에 «누르는» 단추 — 글자만 있으면 막다른 길', () => {
+  const r = runApp({ feed: [], key_data: 'K' }); r.api.planDraw();
+  assert.match(r.el('planNote').innerHTML, /아직 받은 적이 없습니다<\/b> <button class="btn sm" onclick="planFetchNow\(\)">🔄 지금 받기<\/button>/);
+  assert.match(r.el('ptb').innerHTML, /<button class="btn sm" onclick="planFetchNow\(\)">🔄 지금 받기<\/button>/);
+});
+test('★★ 지금 받기를 두 번 눌러도 한 번만 · 받는 중엔 새로 받기(전부)와 겹치지 않는다', async () => {
+  const r = runApp({ feed: [], key_data: 'K', plan_at: 'x' }); let calls = 0, release; const gate = new Promise((ok) => { release = ok; });
+  r.api.setPull(async () => { calls++; await gate; return PLAN_ENV([]); });
+  const a = r.api.planFetchNow(); const b = r.api.planFetchNow(); const c = r.api.fetchAll();
+  release(); await a; await b; await c;
+  const one = runApp({ feed: [], key_data: 'K', plan_at: 'x' }); let c1 = 0;
+  one.api.setPull(async () => { c1++; return PLAN_ENV([]); }); await one.api.planFetchNow();
+  assert.equal(calls, c1, '겹쳐 받았다');
 });

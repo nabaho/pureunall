@@ -179,6 +179,8 @@ rules.data = {
      쓰는 화면은 모두 이알피 재무·급여 화면뿐이다(2026-10-04 코드 전수 확인) — 재무 권한 없는 직원 일은 안 멈춘다. */
   /* 재무 전용 휴지통 — 지운 돈 기록(자문료 수입 등)은 여기로. 일반 휴지통(trash_bin)은 업체 기록만 (2026-10-04 보안 점검 — 일반 휴지통(trash_bin, 재직 직원 누구나 읽음)에 지운 자문료 수입 270건이 통째로 있었다) */
   trash_fin: finOnly,
+  /* 더빌 출금결과 받은 줄(재무 자동화 1단계, 2026-10-09) — 회사명·금액이라 재무 권한자만 */
+  cms_pull: finOnly,
   payroll_audit_log: finOnly, cms_ledger: finOnly, bank_processed: finOnly, ledger_held: finOnly, ledger_picks: finOnly, ledger_split_recipes: finOnly, payer_aliases: finOnly, finance_bank_fee_last: finOnly, accounts: finOnly,
   /* ★ 2026-10-04 (대표 「2」 — 지난 점검에서 «구조를 바꿔야» 해서 미뤘던 둘)
      연차 대장 — 직원 16명 실명·부여·사용·잔여·비고(육아휴직·출산휴가 사유까지). 읽는 화면은 급여(재무)와
@@ -192,6 +194,8 @@ rules.data = {
 
   /* 직원 명부 — 모두 보고, 관리자·위임관리인만 고친다 */
   user_dir: { '.read': LOGIN, '.write': `${ADMIN} || ${SUB}` },
+  /* 이알피 환경설정 «사건 유형» — 계약서등관리 사건계약 갈래가 읽는다(2026-10-09). 권한은 «그대로»(여태 $other: 재직 직원 읽기·쓰기 — 이알피가 고친다) — 이름만 적는다 */
+  biz_case_types: { '.read': LOGIN, '.write': LOGIN },
 
   /* 그 밖의 업무 칸 — 이름이 안 붙은 것은 전부 여기로 온다.
      ⚠ 이름 붙은 칸이 «먼저» 잡히므로 위의 재무 칸들은 여기에 안 걸린다. */
@@ -1475,7 +1479,9 @@ rules.pu_docs = {
    ★ 제출(sub)은 한 번만 · 기한 안에만 · 취소되지 않았을 때만 · 휴대폰 끝 4자리가 맞을 때만.
      끝 4자리는 직원만 읽는 req 에 있다 — 규칙은 읽기 권한과 상관없이 견준다(서명자는 그 값을 못 본다).
    ★ 서명자가 본 문서 그림의 지문(docHash)을 제출에 함께 묶는다 — 나중에 그림이 바뀌면 직원 화면이 알린다.
-   ⚠ 주민번호는 1단계에서 받지 않는다(칸을 만들지 않는다). 받는 것은 서명자가 적는 칸 값·서명 그림·동의뿐. */
+   ⚠ 주민번호는 1단계에서 받지 않는다(칸을 만들지 않는다). 받는 것은 서명자가 적는 칸 값·서명 그림·동의뿐.
+   ★ (검토 2026-10-09 대표 「추천대로」) 읽기도 로그인(서명 화면은 익명 로그인)한 사람만. 손서명 방식(mode ≠ agree)은
+     서명 그림이 있어야 제출된다(화면만 막던 것). 🔒 저장·취소·기한 지남 뒤에는 직원 화면이 open/{t} 를 통째로 지운다. */
 rules.pu_sign = {
   req: {
     '.read': LOGIN,
@@ -1487,7 +1493,7 @@ rules.pu_sign = {
     }
   },
   open: { $t: {
-    '.read': true,
+    '.read': 'auth != null',
     '.write': LOGIN,
     /* fields 는 필수가 아니다 — 적을 칸이 없는 문서면 빈 목록이라 남지 않는다 */
     '.validate': "$t.matches(/^[0-9a-f]{32}$/) && newData.hasChildren(['req','exp','pages','docHash','mode','title'])",
@@ -1497,7 +1503,7 @@ rules.pu_sign = {
         + " && newData.child('p4').val() === root.child('pu_sign/req/' + data.parent().child('req').val() + '/p4').val()"
         + " && newData.child('docHash').val() === data.parent().child('docHash').val()",
       /* vals 는 필수가 아니다 — 서명자가 아무 칸도 안 적으면 빈 묶음이라 실시간DB 에 남지 않는다 */
-      '.validate': "newData.hasChildren(['p4','docHash','at','agree'])",
+      '.validate': "newData.hasChildren(['p4','docHash','at','agree']) && (data.parent().child('mode').val() === 'agree' || newData.child('sig').isString())",
       at:    { '.validate': 'newData.val() === now' },
       agree: { '.validate': 'newData.val() === true' },
       sig:   { '.validate': 'newData.isString() && newData.val().length < 300000' },

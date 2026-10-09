@@ -53,7 +53,7 @@ function runApp() {
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = v; } },
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }) },
     location: { protocol: 'https:' }, navigator: {},
-    GovG2b: require('../js/gov-g2b.js'), GovAlio: require('../js/gov-alio.js'),
+    GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),

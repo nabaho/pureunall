@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=55"></script>
+<script src="js/pu-ontology.js?v=56"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
-<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -375,6 +375,12 @@
   .rrow.off{opacity:.45}
   .rrow .btn{padding:4px 8px;font-size:11.5px;flex-shrink:0}
   .rnone{padding:18px 14px;color:var(--gsub);font-size:12.5px}
+  /* 🚗 출장 카드 — 운전 전에 폰으로 보는 창이라 글과 단추를 크게 */
+  .trip .trbody{padding:14px 16px 12px}
+  .trip .trwhen{font-size:13px;color:var(--gsub)}
+  .trip .trttl{font-size:17px;font-weight:700;margin:4px 0 8px;word-break:break-word}
+  .trip .trplace{font-size:14px;word-break:break-word;user-select:all}
+  .trip .trgo{display:block;width:100%;margin-top:14px;padding:14px;font-size:15px}
   /* 폰 — 시각 칸을 글 길이만큼만, 단추를 좁게(제목·주소에 자리를 준다) */
   @media (max-width:520px){ .rrow{gap:4px;padding:7px 8px} .rrow .rtm{width:auto;white-space:nowrap} .rrow .btn{padding:4px 6px} }
   .mypal{display:grid;grid-template-columns:repeat(9,1fr);gap:6px;margin:8px 0 9px}
@@ -745,6 +751,8 @@ var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toa
           scope:'month', showLeft:false, openRows:{},
           /* map — 주소 지도 창 { place, title } · route — 하루 동선 창 { date, off:{열쇠:true} } (2026-10-09) */
           map:null, route:null,
+          /* trip — 🚗 출장 카드 { key:'gcal:…', date } — 출장 알림을 누르고 들어왔을 때(2026-10-09) */
+          trip:null,
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'',
           /* pick — 폰에서 «고른 날»(그날 목록이 보여 주는 날). 주·일 보기의 date 와 따로 둔다:
@@ -3085,6 +3093,74 @@ function 글복사(글, 됨){
   }catch(e){}
   실패();
 }
+/* ── 🚗 출장 카드 — 출장 알림(functions/trip-remind.js)을 누르면 뜬다 ──────────────
+   대표 지시 2026-10-09 「출장장소가 잡히면 한두 시간 이전에 … 폰에 자동으로 이동장소 주소가 연결되게」.
+   ★ 알림 주소에는 «일정 번호»만 온다(?trip=gcal:번호&d=날짜) — 주소 글은 여기서 달력을 읽어 다시 찾는다.
+   ★ [주소 복사하고 제네시스 앱 열기] — 복사한 뒤 안드로이드면 MY GENESIS(com.genesis.apps)를 연다.
+     앱 안에서 맵 → 검색칸에 붙여 넣기 → 「내 차로 전송」. 남이 앱에 목적지를 넣는 공개된 길은 없다. */
+var GENESIS_PKG = "com.genesis.apps";   /* 제네시스 공식 설치 안내의 구글 플레이 주소에서 확인(2026-10-09) */
+function 출장받기(q){
+  try{
+    var p = new URLSearchParams(q || ""), k = p.get("trip"), d = p.get("d");
+    if(!k || !/^(gcal|sch|priv):[^\s]{1,200}$/.test(k) || !/^\d{4}-\d{2}-\d{2}$/.test(d || "")) return false;
+    S.trip = { key:k, date:d };
+    S.ym = d.slice(0, 7); S.date = d;
+    return true;
+  }catch(e){ return false; }
+}
+function 출장닫기(){
+  S.trip = null;
+  try{
+    var u = new URL(location.href); u.searchParams.delete("trip"); u.searchParams.delete("d");
+    history.replaceState(history.state, "", u.pathname + u.search + u.hash);
+  }catch(e){}
+  render();
+}
+function 출장하나(){
+  var t = S.trip; if(!t) return null;
+  return 동선들(t.date).filter(function(x){ return x.key === t.key; })[0] || null;
+}
+/* 주소를 복사하고 제네시스 앱으로 — 안드로이드가 아니면 복사만 한다 */
+function 제네시스로(place){
+  var 안드로이드 = /Android/i.test(navigator.userAgent || "");
+  function 열기(){
+    if(!안드로이드) return;
+    location.href = "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package="
+      + GENESIS_PKG + ";S.browser_fallback_url="
+      + encodeURIComponent("https://play.google.com/store/apps/details?id=" + GENESIS_PKG) + ";end";
+  }
+  var 말 = 안드로이드 ? "📋 주소 복사 — 제네시스 앱 → 맵 → 붙여 넣기 → 「내 차로 전송」"
+                     : "📋 주소를 복사했습니다 — 폰의 제네시스 앱 → 맵에 붙여 넣으세요";
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(place).then(function(){ toast(말); 열기(); },
+        function(){ toast("복사가 안 됩니다 — 주소를 길게 눌러 복사한 뒤 제네시스 앱에 붙여 넣으세요"); 열기(); });
+      return;
+    }
+  }catch(e){}
+  toast("복사가 안 됩니다 — 주소를 길게 눌러 복사한 뒤 제네시스 앱에 붙여 넣으세요"); 열기();
+}
+function tripHtml(){
+  var t = S.trip; if(!t) return "";
+  var x = 출장하나();
+  var 몸 = x
+    ? '<div class="trwhen">' + esc(긴날짜(t.date) + (x.time ? " · " + x.time + (x.endTime ? "~" + x.endTime : "") : "")) + '</div>'
+      + '<div class="trttl">' + esc(x.title) + '</div>'
+      + '<div class="trplace">📍 <span>' + esc(x.place) + '</span></div>'
+      + '<button class="btn trgo" data-tripgo="1">📋 주소 복사하고 제네시스 앱 열기</button>'
+      + '<div class="dhint" style="margin:10px 0 0">제네시스 앱 → <b>맵</b> → 검색칸에 붙여 넣기 → <b>「내 차로 전송」</b></div>'
+    : '<div class="rnone">' + (GCAL.loading || !GCAL.ym ? "⏳ 일정을 불러오는 중…"
+        : "이 일정을 찾지 못했습니다 — 지워졌거나 주소·날짜가 바뀌었을 수 있습니다.") + '</div>';
+  return '<div class="veil top" data-close="1"></div>'
+    + '<div class="modal mapw trip">'
+    + '<div class="mwhd"><b>🚗 출장 출발</b><button class="gx" data-close="1" title="닫기">✕</button></div>'
+    + '<div class="trbody">' + 몸 + '</div>'
+    + '<div class="mbtns">'
+    +   (x ? '<button class="btn ghost" data-tripmap="1">🗺 지도</button>' : '')
+    +   '<button class="btn ghost" data-route="' + esc(t.date) + '">🚗 이날 동선</button>'
+    +   '<span class="sp"></span><button class="btn" data-close="1">닫기</button>'
+    + '</div></div>';
+}
 function mapHtml(){
   var m = S.map; if(!m) return "";
   var L = PuCalMap.links(m.place);
@@ -3095,6 +3171,7 @@ function mapHtml(){
     + '<iframe src="' + esc(PuCalMap.embedUrl(m.place)) + '" referrerpolicy="no-referrer-when-downgrade" title="지도"></iframe>'
     + '<div class="mbtns">'
     +   '<button class="btn ghost" data-mapcopy="1" title="마이 제네시스 앱 «내 차로 전송»에 붙여 넣기">📋 주소 복사</button>'
+    +   (/Android/i.test(navigator.userAgent || "") ? '<button class="btn ghost" data-mapgen="1">🚗 제네시스 앱</button>' : '')
     +   '<a class="btn ghost" href="' + esc(L.kakao) + '" target="_blank" rel="noopener">카카오맵</a>'
     +   '<a class="btn ghost" href="' + esc(L.naver) + '" target="_blank" rel="noopener">네이버지도</a>'
     +   '<a class="btn ghost" href="' + esc(L.googleGo) + '" target="_blank" rel="noopener">구글 길찾기</a>'
@@ -3944,7 +4021,7 @@ function render(){
   html += colorsHtml();
   html += myColorHtml();
   html += detailHtml();
-  if(typeof PuCalMap !== "undefined") html += routeHtml();   /* 상세 창 «위»에. 지도 창은 판 «밖»(지도그리기) */
+  if(typeof PuCalMap !== "undefined"){ html += tripHtml(); html += routeHtml(); }   /* 상세 창 «위»에. 지도 창은 판 «밖»(지도그리기) */
   html += noteHtml();
   html += 구글연결창Html();
   if(S.toast) html += '<div id="toast">' + esc(S.toast) + '</div>';
@@ -4058,13 +4135,16 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
-  if(t.hasAttribute('data-close') && (S.map || S.route)){
-    if(S.map) S.map = null; else S.route = null;
+  if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
+    if(S.map) S.map = null; else if(S.route) S.route = null; else { 출장닫기(); return; }
     render(); return;
   }
+  if(t.hasAttribute('data-tripgo')){ var _tx = 출장하나(); if(_tx) 제네시스로(_tx.place); return; }
+  if(t.hasAttribute('data-tripmap')){ var _tm = 출장하나(); if(_tm) openMap(_tm.place, (_tm.time ? _tm.time + " " : "") + _tm.title); return; }
+  if(t.hasAttribute('data-mapgen')){ if(S.map) 제네시스로(S.map.place); return; }
   if(t.hasAttribute('data-map')){
     e.preventDefault();
     if(t.getAttribute('data-map') === 'form'){
@@ -4279,8 +4359,12 @@ function copyLink(url){
 
 /* 이알피로 — 창은 «하나»만 쓴다(새 탭을 자꾸 만들지 않는다) */
 function goErp(menu){
-  var url = 'pu-erp.html?sso=1' + (menu ? '#menu='+encodeURIComponent(menu) : '');
-  try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, 'erp'); return; } } catch(e){}
+  /* 직원 인사·재무 화면은 «그 앱»으로 연다 (2026-10-09 이알피에서 갈라 냄 — pu-erp.html PU_APPS 머리글).
+     이알피로 열면 이알피가 다시 그 앱 창으로 넘겨, 창이 하나 더 열린다. */
+  var g = String(menu || '').split('/')[0];
+  var app = (g === 'hr' || g === 'fin') ? g : '';
+  var url = 'pu-erp.html?sso=1' + (app ? '&app=' + app : '') + (menu ? '#menu='+encodeURIComponent(menu) : '');
+  try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, app || 'erp'); return; } } catch(e){}
   location.href = url;
 }
 /* 유형을 시간연차로 바꾸면 «몇 시간» 칸이 생긴다 — 바뀔 때 다시 그린다.
@@ -4332,6 +4416,7 @@ document.addEventListener('keydown', function(e){
   if(e.key !== 'Escape') return;
   if(S.map){ e.preventDefault(); S.map = null; render(); return; }
   if(S.route){ e.preventDefault(); S.route = null; render(); return; }
+  if(S.trip){ e.preventDefault(); 출장닫기(); return; }
   if(S.detail){ e.preventDefault(); closeDetail(); return; }
   if(S.mycolor){ e.preventDefault(); if(S.mycolor.겹침){ S.mycolor.겹침 = null; render(); } else closeMyColor(); return; }
   if(S.note){ e.preventDefault(); closeNote(); return; }
@@ -4368,6 +4453,7 @@ function start(user){
   /* ★ 구글 «늘 연결» — 서버에서 한 시간짜리 표를 받아 두고, 끝나기 전에 또 받는다(2026-10-04) */
   try{ 구글이어가기(user); }catch(e){ console.warn("[구글 연결]", e && e.message); }
   S.ym = ymOf(new Date()); S.date = todayYMD();
+  출장받기(location.search);          /* 🚗 출장 알림에서 왔으면 그 날의 달로 */
   setConn(true, '연결됨');
   PuCalRead.readMany(KEYS).then(function(r){
     D = r.data; FAILED = r.failed;
@@ -4429,7 +4515,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=21"></script>
+<script src="js/pu-appbar.js?v=22"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script>try{

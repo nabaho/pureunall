@@ -164,6 +164,7 @@
     if (/^담당자/.test(key)) return o.contact ? { label: o.contact.k === 'card' ? '명함' : '이알피' } : { label: '없음', miss: true };
     if (/^근로자|^이름$/.test(key)) return o.worker ? { label: '근로자' } : { label: '없음', miss: true };
     if (/^(오늘날짜|오늘|작성일|계약일)$/.test(key)) return { label: '오늘' };
+    if (key === '공인노무사명단') return { label: '푸른 명부' };
     return { label: '' };
   }
 
@@ -235,6 +236,32 @@
   function pad2(n) { return String(n).padStart(2, '0'); }
   function ymd(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
 
+  /* ══ {{공인노무사명단}} — 푸른노무법인에 «재직 중인» 공인노무사 전원 (대표 지시 2026-10-09 「위임장에는 기본적으로 … 모든 이름」) ══
+     명부(data/user_dir): 사번 P-… 이거나 직책에 「노무사」(A- 직원 제외) · 상태 재직(active·휴직 leave).
+     대표노무사가 앞, 나머지는 사번 차례. 명부를 못 읽으면 FALLBACK(2026-10-09 명부 기준) — 바뀌면 명부가 이긴다. */
+  var LAWYERS_FALLBACK = '대표 공인노무사 권형하, 공인노무사 박한별·김혜민·박재원·김동현';
+  var lawyersLineNow = '';
+  function lawyersLine(dir) {
+    var list = (Array.isArray(dir) ? dir : (dir && typeof dir === 'object' ? Object.keys(dir).map(function (k) { return dir[k]; }) : []))
+      .filter(function (u) {
+        if (!u || !u.name) return false;
+        var sid = String(u.sid || ''), t = String(u.title || u.position || '');
+        if (u.status !== 'active' && u.status !== 'leave') return false;
+        if (sid.indexOf('A-') === 0) return false;
+        return sid.indexOf('P-') === 0 || /노무사/.test(t);
+      })
+      .sort(function (a, b) {
+        var ra = /대표/.test(String(a.title || a.position || '')) ? 0 : 1, rb = /대표/.test(String(b.title || b.position || '')) ? 0 : 1;
+        return ra - rb || String(a.sid || '').localeCompare(String(b.sid || ''));
+      });
+    if (!list.length) return '';
+    var head = list[0], rest = list.slice(1).map(function (u) { return String(u.name).replace(/\s+/g, ''); });
+    var first = (/대표/.test(String(head.title || head.position || '')) ? '대표 공인노무사 ' : '공인노무사 ') + String(head.name).replace(/\s+/g, '');
+    return rest.length ? first + ', 공인노무사 ' + rest.join('·') : first;
+  }
+  function setLawyers(dirOrLine) { lawyersLineNow = typeof dirOrLine === 'string' ? dirOrLine : lawyersLine(dirOrLine); return lawyersLineNow; }
+  function lawyersNow() { return lawyersLineNow || LAWYERS_FALLBACK; }
+
   /* 표지 이름 → 값. co 는 회사 한 벌(사업자등록증 줄 + coInfo 를 합친 것), contact·worker 는 명함 줄
      (worker 는 사람이 적은 {n,m,ad} 이어도 된다). 모르는 값은 '' — 채울 때 밑줄로 바뀐다. */
   function valuesFrom(o) {
@@ -253,7 +280,8 @@
       근로자수: wk.n ? '1' : '',
       /* 기업정보함에 없는 값 — 사람이 적는다 */
       주민번호: '', 근로자주민: '', 주민등록번호: '', 가족연락처: '',
-      오늘날짜: today, 오늘: today, 작성일: today, 계약일: today
+      오늘날짜: today, 오늘: today, 작성일: today, 계약일: today,
+      공인노무사명단: s(o.lawyers) || lawyersNow()
     };
     /* 엑셀 틀(급여위임계약서_양식)은 주소를 MID(주소,8,…) 로 잘라 쓴다 — 앞 8글자가 「(31068) 」 꼴이라 여긴다.
        우편번호가 없으면 같은 길이의 빈 괄호를 붙여 글자가 잘리지 않게 한다. */
@@ -595,7 +623,8 @@
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
     CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,
-    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook, agencyOrgOf: agencyOrgOf
+    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook, agencyOrgOf: agencyOrgOf,
+    lawyersLine: lawyersLine, setLawyers: setLawyers, lawyersNow: lawyersNow, LAWYERS_FALLBACK: LAWYERS_FALLBACK
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
