@@ -31,6 +31,7 @@ function fakeStore(log, opt) {
     listCoDocs: () => Promise.resolve(opt.dup ? [{ id: 'd0', fileId: 'f1' }] : []),
     addCoDoc: (o) => { log.push(['addCoDoc', o.secret]); return Promise.resolve({ docId: 'd9' }); },
     importCoRecs: (rows) => { log.push(['rec', rows[0].docId]); return Promise.resolve({ added: 1 }); },
+    listCoRecs: () => Promise.resolve(opt.recHas ? [{ id: 'r0', docId: 'd0' }] : []),
     gotAwait: (k, d) => { log.push(['got', k, d]); return opt.gotFail ? Promise.reject(new Error('x')) : Promise.resolve(); }
   };
 }
@@ -58,9 +59,24 @@ test('ⓑ 담기 → 회수', async () => {
   assert.match(msg, /담았습니다/); assert.match(msg, /⚠ 서명본 대기는 못 옮김/);
 
   log = [];
-  msg = await box(fakeStore(log, { dup: true })).mbAttToCoSave({}, 0, {}, { co: '가나상사', secret: true, rec: true, got: '가나상사' });
+  msg = await box(fakeStore(log, { dup: true, recHas: true })).mbAttToCoSave({}, 0, {}, { co: '가나상사', secret: true, rec: true, got: '가나상사' });
   assert.deepStrictEqual(log, [['got', '가나상사', 'd0']], '이미 담긴 파일이면 그 카드로 회수만');
-  assert.match(msg, /이미 담긴 파일입니다 · 📬/);
+  assert.match(msg, /이미 「가나상사」 기업별 계약서에 있는 파일입니다 · 📬/);
+
+  /* 검토 2026-10-09 — 앞에서 기록만 실패했으면(파일엔 기록이 없다) 다시 담을 때 기록을 남긴다 */
+  log = [];
+  await box(fakeStore(log, { dup: true })).mbAttToCoSave({}, 0, {}, { co: '가나상사', kind: '자문', date: '2026-10-08', secret: true, rec: true, got: '가나상사' });
+  assert.deepStrictEqual(log, [['got', '가나상사', 'd0'], ['rec', 'd0']]);
+
+  /* 같은 파일이 일반 원본으로 이미 있으면(secret:false) 카드에 🔒 를 붙이지 않고 알린다 · full 이면 결과째 */
+  log = [];
+  const st = fakeStore(log); st.putOriginal = () => Promise.resolve({ fileId: 'f1', secret: false });
+  const r = await box(st).mbAttToCoSave({}, 0, {}, { co: '가나상사', secret: true, rec: false, got: '가나상사' }, true);
+  assert.deepStrictEqual(log[0], ['addCoDoc', false]);
+  assert.equal(r.got, true); assert.equal(r.secret, false); assert.match(r.msg, /🔒 가 아닙니다/); assert.doesNotMatch(r.msg, /\(🔒 서명본\)/);
+  log = [];
+  const r2 = await box(fakeStore(log, { gotFail: true })).mbAttToCoSave({}, 0, {}, { co: '가나상사', secret: true, rec: false, got: '가나상사' }, true);
+  assert.equal(r2.got, false, '회수 실패는 got:false — 묶어 담기가 성공으로 세지 않는다');
 });
 
 test('ⓒ 창 — 읽기만 · 확인칸', () => {

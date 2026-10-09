@@ -27951,31 +27951,54 @@ function mbDocStripHtml(){
    🔒 서명본 · 기업별 계약서 · 계약 기록 · 회수까지 한다.
    ⚠ 혼자 담지 않는다 — 사람이 띠를 보고 누를 때만(엉뚱한 회사에 붙을 수 있다). 대기 목록은 작아 한 번 읽는다(읽기만).
    ★ 회사 맞추기: 보낸 주소의 회사(mbCoNameOf) → 대기 열쇠(coKey). 안 맞으면 제목·보낸 이름에 회사 이름이 들어 있을 때 */
+/* ⚠ (검토 2026-10-09) 한 번 못 읽으면 그 창 내내 띠가 안 떴다 — 못 읽으면 1분 뒤, 읽었으면 5분 뒤 다시 읽는다(다른 화면에서 바뀐 대기) */
 let _mbAwait = null, _mbAwaitT = 0, _mbAwaitBusy = false;
 function mbAwaitLoad(){
-  if(_mbAwait || _mbAwaitT) return;
-  _mbAwaitT = 1;
+  const now = Date.now();
+  if(_mbAwaitT && now - _mbAwaitT < (_mbAwait ? 300000 : 60000)) return;
+  _mbAwaitT = now;
   try {
-    mbOfficeStore().listAwait().then(l => { _mbAwait = (l || []).filter(a => a && !a.got); if(_mbAwait.length) renderMailPage(); }, () => { _mbAwait = []; });
-  } catch(e){ _mbAwait = []; }
+    mbOfficeStore().listAwait().then(l => {
+      const n0 = _mbAwait ? _mbAwait.length : 0;
+      _mbAwait = (l || []).filter(a => a && !a.got);
+      if(_mbAwait.length || n0) renderMailPage();
+    }, () => {});
+  } catch(e){}
 }
 /* 순수 — rows: 메일 줄, waits: 대기 줄, coOf(e)→회사 이름, keyOf(이름)→열쇠, pick(v)→PuDocPick.보기.
    돌려주는 것: 회사마다 가장 최근 한 통 [{ v, a, 이름 }] */
-function mbAwaitMatchesOf(rows, waits, coOf, keyOf, pick){
+/* (검토 2026-10-09) ⚠ 고친 것 — ① 첨부 «하나라도» 계약서면(사업자등록증이 먼저 붙어도) ② 보낸 주소로 회사를 알면 이름 짐작을 하지 않는다
+   ③ 이름 짐작은 낱말이 같을 때만(4자 이상은 들어 있기만 해도) · 여럿이면 가장 긴 이름, 같은 길이로 갈리면 버린다(「가나」가 「가나다상사」에 붙던 것)
+   ④ ✍ 전자서명 요청(how '서명')은 서명 화면이 회수한다 — 메일로 담지 않는다. nameKind(n) — 첨부 이름 갈래(없으면 pick 만) */
+function mbAwaitMatchesOf(rows, waits, coOf, keyOf, pick, nameKind){
   const byKey = {}, best = {};
-  (waits || []).forEach(a => { if(a && a.key && !a.got) byKey[a.key] = a; });
+  const live = (waits || []).filter(a => a && a.key && !a.got && a.how !== '서명');
+  live.forEach(a => { byKey[a.key] = a; });
   const nk = (x) => String(x || '').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s+/g, '').toLowerCase();
+  const names = (v) => Array.isArray(v.an) ? v.an : (v.an && typeof v.an === 'object' ? Object.keys(v.an).map(k => v.an[k]) : []);
   (rows || []).forEach(v => {
     if(!v || !Number(v.a)) return;
-    const pk = pick(v) || {};
-    if(!pk.서류 || pk.갈래 !== '계약서') return;
-    let a = byKey[keyOf(coOf(String(v.e || '').trim().toLowerCase()))];
-    if(!a){
-      const txt = nk(String(v.s || '') + ' ' + String(v.f || ''));
-      a = (waits || []).filter(w => w && !w.got && nk(w.name).length >= 2 && txt.indexOf(nk(w.name)) >= 0)[0];
+    let 이름 = '';
+    const an = names(v);
+    if(nameKind && an.length){
+      이름 = an.filter(n => nameKind(n) === '계약서')[0] || '';
+      if(!이름) return;
+    } else {
+      const pk = pick(v) || {};
+      if(!pk.서류 || pk.갈래 !== '계약서') return;
+      이름 = pk.이름 || '';
+    }
+    const co = coOf(String(v.e || '').trim().toLowerCase());
+    let a = co ? byKey[keyOf(co)] : null;
+    if(!a && !co){
+      const raw = String(v.s || '') + ' ' + String(v.f || '');
+      const txt = nk(raw), toks = raw.split(/[\s_.,()\[\]{}<>\-·「」『』"'\/|]+/).map(nk).filter(Boolean);
+      const hit = live.filter(w => { const n = nk(w.name); return n.length >= 2 && (toks.indexOf(n) >= 0 || (n.length >= 4 && txt.indexOf(n) >= 0)); })
+        .sort((x, y) => nk(y.name).length - nk(x.name).length);
+      if(hit.length && !(hit[1] && nk(hit[1].name).length === nk(hit[0].name).length)) a = hit[0];
     }
     if(!a || Number(v.d || 0) < Number(a.at || 0)) return;
-    if(!best[a.key] || Number(v.d) > Number(best[a.key].v.d)) best[a.key] = { v: v, a: a, 이름: pk.이름 || '' };
+    if(!best[a.key] || Number(v.d) > Number(best[a.key].v.d)) best[a.key] = { v: v, a: a, 이름: 이름 };
   });
   return Object.keys(best).map(k => best[k]).sort((x, y) => Number(y.v.d) - Number(x.v.d));
 }
@@ -27988,7 +28011,7 @@ function mbAwaitMatches(){
     const box = _mbMsgs[slug] || {};
     Object.keys(box).forEach(uid => { const v = box[uid]; if(v) rows.push(Object.assign({}, v, { _slug: slug, u: v.u || uid })); });
   });
-  return mbAwaitMatchesOf(rows, _mbAwait, (em) => mbCoNameOf(em), (n) => PuOfficeStore.coKey(n), (v) => PuDocPick.보기(v));
+  return mbAwaitMatchesOf(rows, _mbAwait, (em) => mbCoNameOf(em), (n) => PuOfficeStore.coKey(n), (v) => PuDocPick.보기(v), (n) => PuDocPick.이름갈래(n));
 }
 function mbAwaitStripHtml(){
   const m = mbAwaitMatches();
@@ -28001,9 +28024,10 @@ function mbAwaitStripHtml(){
 async function mbAwaitTakeAll(){
   if(_mbAwaitBusy) return;
   const m = mbAwaitMatches(); if(!m.length) return;
-  if(!confirm('서명본을 기다리는 ' + m.length + '곳의 메일 첨부를 🔒 서명본으로 담고 회수로 옮길까요?\n\n' + m.map(x => '· ' + x.a.name + ' — ' + (x.이름 || x.v.s || '')).join('\n'))) return;
+  if(!confirm('서명본을 기다리는 ' + m.length + '곳의 메일 첨부를 🔒 서명본으로 담고 회수로 옮길까요?\n\n' + m.map(x => '· ' + x.a.name + ' — ' + (x.이름 || x.v.s || '')).join('\n')
+    + '\n\n⚠ 서명·날인이 된 파일인지 먼저 확인해 주세요(보낸 원본을 그대로 돌려보낸 것일 수 있습니다)')) return;
   _mbAwaitBusy = true; renderMailPage();
-  let ok = 0; const 못한것 = [];
+  let ok = 0; const 못한것 = [], 알림 = [];
   for(let i = 0; i < m.length; i++){
     const x = m[i], v = x.v;
     toast('📬 ' + (i + 1) + '/' + m.length + ' ' + x.a.name + ' 담는 중…', 4000);
@@ -28019,12 +28043,14 @@ async function mbAwaitTakeAll(){
       }
       if(at < 0) throw new Error('계약서 첨부를 못 찾음');
       const kind = (window.PuCoRoster && PuCoRoster.guessKind(atts[at].name || '')) || '기타';
-      await mbAttToCoSave(o, at, atts[at], { co: x.a.name, kind: kind, date: mbYmd(v.d), secret: true, rec: true, got: x.a.key });
+      const r = await mbAttToCoSave(o, at, atts[at], { co: x.a.name, kind: kind, date: mbYmd(v.d), secret: true, rec: true, got: x.a.key }, true);
+      if(!r.got){ 못한것.push(x.a.name + ' (담았지만 회수로 못 옮김)'); continue; }
       ok++;
+      if(r.warn.length) 알림.push(x.a.name + ' — ' + r.warn.join(', '));
     } catch(e){ 못한것.push(x.a.name + ' (' + ((e && e.message) || e) + ')'); }
   }
   _mbAwaitBusy = false; _mbAwait = null; _mbAwaitT = 0;
-  toast('📬 ' + ok + '곳 서명본을 담고 회수로 옮겼습니다' + (못한것.length ? ' · ⚠ ' + 못한것.join(' · ') : ''), 11000);
+  toast('📬 ' + ok + '곳 서명본을 담고 회수로 옮겼습니다' + (알림.length ? ' · ⚠ ' + 알림.join(' · ') : '') + (못한것.length ? ' · ❌ ' + 못한것.join(' · ') : ''), 12000);
   renderMailPage();
 }
 
@@ -28163,31 +28189,40 @@ function mbAwaitFor(list, co){
   return (list||[]).filter(x => x && x.key === k && !x.got)[0] || null;
 }
 /* 담기 — ① 첨부 가져오기 ② 원본 보관함(기본 🔒) ③ 그 회사 기업별 계약서 카드(같은 파일이 있으면 건너뜀) ④ 계약 기록 한 줄
-   ⑤ p.got(대기 열쇠)이 있으면 📬 서명본 대기에서 회수로 — 실패해도 담은 것은 그대로(알림만) */
-function mbAttToCoSave(o, i, a, p){
+   ⑤ p.got(대기 열쇠)이 있으면 📬 서명본 대기에서 회수로 — 실패해도 담은 것은 그대로(알림만)
+   full 이면 { msg, got, gotErr, secret, warn[] }(아니면 msg 글만) — 묶어 담기가 «정말 회수됐는지» 센다(검토 2026-10-09: 실패도 성공으로 셌다).
+   ⚠ 같은 파일이 일반 원본으로 이미 있으면 putOriginal 이 secret:false — 카드에도 🔒 를 붙이지 않고 알린다(계약서등관리와 같게).
+   ⚠ 이미 담긴 파일이어도 그 파일에 이어진 계약 기록이 없으면 기록은 다시 남긴다(앞에서 기록만 실패했던 것) */
+function mbAttToCoSave(o, i, a, p, full){
   let store;
   try { store = mbOfficeStore(); } catch(e){ return Promise.reject(e); }
   const key = store.coKey(p.co);
   return mbAttFetch(o, i, a).then(f =>
     store.putOriginal({ name: f.name, size: f.bytes.length, type: f.mime, bytes: f.bytes }, { kind: MB_ARC_FROM_CO, coKey: key, coName: p.co }, { secret: !!p.secret })
       .then(r => store.listCoDocs(key).then(have => {
+        const sec = !!p.secret && r.secret !== false;
         const dup = (have||[]).filter(d => d && d.fileId === r.fileId)[0];
-        if(dup) return { docId: dup.id || '', dup: true, name: f.name };
-        return store.addCoDoc({ coName: p.co, fileId: r.fileId, title: '[메일] ' + f.name, date: p.date, src: 'upload', secret: !!p.secret })
-          .then(d => ({ docId: d.docId, dup: false, name: f.name }));
+        if(dup) return { docId: dup.id || '', dup: true, name: f.name, secret: dup.secret === true };
+        return store.addCoDoc({ coName: p.co, fileId: r.fileId, title: '[메일] ' + f.name, date: p.date, src: 'upload', secret: sec })
+          .then(d => ({ docId: d.docId, dup: false, name: f.name, secret: sec }));
       }))
   ).then(x => {
     if(!p.got || !x.docId) return x;
     return store.gotAwait(p.got, x.docId).then(() => Object.assign({ got: true }, x), () => Object.assign({ gotErr: true }, x));
   }).then(x => {
-    if(x.dup && !x.got) return '이미 「' + p.co + '」 기업별 계약서에 있는 파일입니다 — 다시 담지 않았습니다';
-    const done = (x.dup ? '이미 담긴 파일입니다' : '🏢 「' + p.co + '」 기업별 계약서에 담았습니다' + (p.secret ? ' (🔒 서명본)' : ''))
-      + (x.got ? ' · 📬 서명본 대기에서 회수로 옮겼습니다' : x.gotErr ? ' · ⚠ 서명본 대기는 못 옮김' : '');
-    if(x.dup || !p.rec) return done;
-    return store.importCoRecs([{ coName: p.co, date: p.date, kind: p.kind, src: 'manual', docId: x.docId, note: '메일 첨부에서' }])
-      .then(r => done + (r && r.added ? ' · 계약 기록 한 줄' : ' · 같은 날짜·종류 계약 기록이 이미 있어 기록은 건너뜀'),
-            e => done + ' · ⚠ 계약 기록은 못 남김: ' + ((e&&e.message)||e));
-  });
+    const warn = [];
+    if(p.secret && !x.secret) warn.push('같은 파일이 일반 원본으로 이미 있어 🔒 가 아닙니다 — 계약서등관리 「🔒 서명본으로 옮기기」로 옮기세요');
+    if(x.gotErr) warn.push('서명본 대기는 못 옮김');
+    const out = (msg) => ({ msg: msg + (warn.length ? ' · ⚠ ' + warn.join(' · ') : ''), got: !!x.got, gotErr: !!x.gotErr, secret: !!x.secret, warn: warn });
+    const done = (x.dup ? '이미 「' + p.co + '」 기업별 계약서에 있는 파일입니다' : '🏢 「' + p.co + '」 기업별 계약서에 담았습니다' + (x.secret ? ' (🔒 서명본)' : ''))
+      + (x.got ? ' · 📬 서명본 대기에서 회수로 옮겼습니다' : '');
+    if(!p.rec) return out(done);
+    const recIt = () => store.importCoRecs([{ coName: p.co, date: p.date, kind: p.kind, src: 'manual', docId: x.docId, note: '메일 첨부에서' }])
+      .then(r => out(done + (r && r.added ? ' · 계약 기록 한 줄' : ' · 같은 날짜·종류 계약 기록이 이미 있어 기록은 건너뜀')),
+            e => { warn.push('계약 기록은 못 남김: ' + ((e&&e.message)||e)); return out(done); });
+    if(!x.dup) return recIt();
+    return store.listCoRecs(key).then(rs => (rs||[]).some(r => r && r.docId === x.docId) ? out(done) : recIt(), () => out(done));
+  }).then(r => full ? r : r.msg);
 }
 
 function mbAttToPay(i){
