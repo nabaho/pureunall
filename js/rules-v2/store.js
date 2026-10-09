@@ -15,9 +15,19 @@
         return Object.assign({}, prev || {}, patch, { id: id });
       }, Object.assign({ entityType: 'RulesDocument', allowPendingCompany: true }, ctx || {}));
     }
-    // 여러 건은 한 건씩 차례로 — 한 건이 거절되면 거기서 멈춘다.
-    function each(ids, fn) {
-      return ids.reduce(function (p, id) { return p.then(function () { return fn(id); }); }, Promise.resolve());
+    // 여러 건은 한 건씩 차례로 — 한 건이 거절되면 거기서 멈추고 «몇 건 했는지» 알린다(일괄 정리 때 사람이 알아야 한다).
+    function each(ids, fn, onProgress) {
+      var done = 0, total = ids.length;
+      return ids.reduce(function (p, id) {
+        return p.then(function () {
+          return fn(id).then(function () {
+            done++;
+            if (onProgress) { try { onProgress(done, total); } catch (e) { /* 알림 실패는 무시 */ } }
+          });
+        });
+      }, Promise.resolve()).catch(function (e) {
+        throw new Error(done + '/' + total + '건 저장한 뒤 멈춤 — ' + ((e && e.message) || e));
+      });
     }
     var S = {
       load: function () {
@@ -49,27 +59,44 @@
         for (var i = 0; i < Math.min(6, total); i++) workers.push(worker());
         return Promise.all(workers).then(function () { return { texts: out, failed: failed }; });
       },
-      linkCompany: function (ids, companyId) {
+      linkCompany: function (ids, companyId, onProgress) {
         var chk = root.PuOntology.validateCompanyLink({ companyId: companyId }, o.companies());
         if (!chk.ok) return Promise.reject(new Error(chk.message));
         var at = o.now(), by = o.actor();
         return each(ids, function (id) {
           return saveHuman(id, { companyId: companyId, companyLinkStatus: 'linked', linkedBy: by, linkedAt: at });
-        });
+        }, onProgress);
       },
-      notRequired: function (ids) {
+      notRequired: function (ids, onProgress) {
         var at = o.now(), by = o.actor();
         return each(ids, function (id) {
           return saveHuman(id, { companyId: null, companyLinkStatus: 'not_required', linkedBy: by, linkedAt: at });
-        });
+        }, onProgress);
+      },
+      // 되돌리기(🧹 방금 한 일) — 다시 «미확정». 지우지 않고 칸만 돌린다.
+      unlink: function (ids, onProgress) {
+        var at = o.now(), by = o.actor();
+        return each(ids, function (id) {
+          return saveHuman(id, { companyId: null, companyLinkStatus: 'pending', linkedBy: by, linkedAt: at });
+        }, onProgress);
       },
       setKind: function (id, kind) { return saveHuman(id, { kindFix: String(kind || '') }); },
       setRound: function (id, roundKey) { return saveHuman(id, { round: String(roundKey || '') }); },
       setFinal: function (companyId, roundKey, docId) {
         var rid = companyId + '_' + roundKey;
         return gw.save(db.ref(LIB + '/rounds/' + rid), function (prev) {
-          return Object.assign({}, prev || {}, { id: rid, companyId: companyId, roundKey: roundKey,
-            finalDocId: docId || null, finalBy: docId ? o.actor() : '', finalAt: docId ? o.now() : 0 });
+          // 최종본을 정하면 «최종본 없음»은 꺼진다 — 안 그러면 나중에 최종본을 풀 때 회차가 정리 목록에서 사라진다
+          var patch = { id: rid, companyId: companyId, roundKey: roundKey,
+            finalDocId: docId || null, finalBy: docId ? o.actor() : '', finalAt: docId ? o.now() : 0 };
+          if (docId) patch.noFinal = false;
+          return Object.assign({}, prev || {}, patch);
+        }, { entityType: 'RulesRound' });
+      },
+      // 「최종본 없음」 — 중간에 멈춘 회차를 정리하기 목록에서 닫는다. 최종본(finalDocId)은 건드리지 않는다.
+      setNoFinal: function (companyId, roundKey, on) {
+        var rid = companyId + '_' + roundKey;
+        return gw.save(db.ref(LIB + '/rounds/' + rid), function (prev) {
+          return Object.assign({}, prev || {}, { id: rid, companyId: companyId, roundKey: roundKey, noFinal: on === true });
         }, { entityType: 'RulesRound' });
       },
       ask: function () {

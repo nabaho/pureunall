@@ -1,0 +1,168 @@
+// 취업규칙(새) 「🧹 정리하기」 셈 — 순수 모듈 검사. 이름·주소는 가짜만.
+// ★ 못 박는 것은 규칙: 우리 쪽 메일은 한 통씩 · 이름 단서는 골라 두지 않는다 · 섞이면 골라 두지 않는다 · 일괄은 주소 일치만
+const test = require('node:test');
+const assert = require('node:assert/strict');
+global.PuRulesV2Order = require('../js/rules-v2/lib-order.js');
+global.PuRulesV2Topics = require('../js/rules-v2/lib-topics.js');
+const T = require('../js/rules-v2/lib-tidy.js');
+
+const D = (n) => Date.UTC(2026, 0, 1) + n * 864e5;
+function doc(id, o) {
+  o = o || {};
+  return Object.assign({ id, kind: '규칙본문', status: '담김', name: o.name || id + '.hwp', dir: o.dir || '받음', createdAt: 1,
+    mail: { src: 'pop3', box: '', key: o.mk || id, date: D(o.d || 0), from: o.from || '', to: o.to || '', subject: o.subj || '' },
+    companyCand: o.cand || [] }, o.doc || {});
+}
+function pack(list, human, rounds) { const docs = {}; list.forEach((d) => { docs[d.id] = d; }); return { docs, human: human || {}, rounds: rounds || {} }; }
+const LINK = (co) => ({ companyId: co, companyLinkStatus: 'linked' });
+const CO = [{ id: 'c1', name: '(주)가나상사', bizNo: '123-45-67890' }, { id: 'c2', name: '다라산업' },
+  { id: 'c3', name: '가나' }, { id: 'c9', name: '지운회사', _deleted: true }];
+const g = (list, key) => list.find((x) => x.key === key);
+
+test('주소 — 받음은 보낸 사람, 보냄은 우리 쪽이 아닌 첫 받는 사람, 꺾쇠 안만·소문자', () => {
+  assert.equal(T.addrOf(doc('a', { from: '홍길동 <Hong@GanaSangsa.co.kr>' })), 'hong@ganasangsa.co.kr');
+  assert.equal(T.addrOf(doc('b', { dir: '보냄', from: T.SELF, to: '370-6@daum.net, dara.hr@naver.com' })), 'dara.hr@naver.com');
+  assert.equal(T.addrOf(doc('c', { from: 'staff@fairrunlabor.com' })), '', '우리 직원이 전달한 메일');
+  assert.equal(T.addrOf(doc('d', { from: '' })), '');
+  assert.equal(T.isOurs('370-6@daum.net'), true);
+  assert.equal(T.isOurs('kim@naver.com'), false);
+});
+
+test('열린 서류 — 기타·확정·사업장 없음은 빼고, 보류는 넣는다', () => {
+  const data = pack([doc('a'), doc('b', { doc: { kind: '기타' } }), doc('c'), doc('d'), doc('e', { doc: { status: '보류', kind: '신고서' } })],
+    { c: LINK('c1'), d: { companyId: null, companyLinkStatus: 'not_required' } });
+  const ids = T.groups(data, CO).flatMap((x) => x.ids).sort();
+  assert.deepEqual(ids, ['a', 'e']);
+});
+
+test('묶음 — 같은 주소는 한 묶음, 우리 쪽·빈 주소는 메일 한 통씩', () => {
+  const data = pack([doc('a', { from: 'hong@ganasangsa.co.kr', mk: 'm1' }), doc('b', { from: 'hong@ganasangsa.co.kr', mk: 'm2' }),
+    doc('c', { from: 'staff@fairrunlabor.com', mk: 'm3' }), doc('d', { from: 'staff@fairrunlabor.com', mk: 'm4' })]);
+  const list = T.groups(data, CO);
+  const a = g(list, 'a:hong@ganasangsa.co.kr');
+  assert.deepEqual(a.ids.sort(), ['a', 'b']);
+  assert.ok(a.mails >= 2);
+  assert.equal(list.filter((x) => x.ours).length, 2, '우리 쪽 메일은 한 통씩');
+});
+
+test('주소 일치 — 골라 두고(pre) 층 1, 모두 주소 일치면 일괄 가능', () => {
+  const cand = [{ companyId: 'c1', why: '주소' }];
+  const data = pack([doc('a', { from: 'hong@ganasangsa.co.kr', cand }), doc('b', { from: 'hong@ganasangsa.co.kr', cand })]);
+  const x = T.groups(data, CO)[0];
+  assert.equal(x.pre, 'c1'); assert.equal(x.tier, 1); assert.equal(x.bulkOk, true);
+  assert.ok(x.cands.find((c) => c.companyId === 'c1').whys.includes(T.W_ADDR));
+});
+
+test('이름 단서만 — 보이되 골라 두지 않고 일괄에도 없다 · 짧은 이름은 긴 이름에 먹힌다', () => {
+  const data = pack([doc('a', { from: 'kim@naver.com', subj: '[가나상사] 취업규칙 개정안' })]);
+  const x = T.groups(data, CO)[0];
+  const ids = x.cands.map((c) => c.companyId);
+  assert.ok(ids.includes('c1'), '가나상사가 단서로 보인다');
+  assert.equal(ids.includes('c3'), false, '「가나」는 「가나상사」 안에 들어가 버린다');
+  assert.equal(x.pre, ''); assert.equal(x.tier, 4); assert.equal(x.bulkOk, false);
+});
+
+test('앞서 확정 — 같은 주소를 사람이 이은 회사가 후보(층 2), 일괄은 아니다', () => {
+  const data = pack([doc('a', { from: 'sajang77@hanmail.net', mk: 'm1' }), doc('b', { from: 'sajang77@hanmail.net', mk: 'm2' })], { a: LINK('c2') });
+  const x = T.groups(data, CO)[0];
+  assert.deepEqual(x.ids, ['b']);
+  assert.equal(x.pre, 'c2'); assert.equal(x.tier, 2); assert.equal(x.bulkOk, false);
+  assert.ok(x.cands[0].whys.includes(T.W_LEARN));
+});
+
+test('섞임 — 이름 단서가 두 회사거나 서류마다 서버 후보가 다르면 골라 두지 않는다', () => {
+  const two = pack([doc('a', { from: 'tax@naver.com', subj: '가나상사 규칙' }), doc('b', { from: 'tax@naver.com', mk: 'm2', subj: '다라산업 규칙' })]);
+  const x = T.groups(two, CO)[0];
+  assert.equal(x.mixed, true); assert.equal(x.pre, '');
+  const diff = pack([doc('a', { from: 'x@y.kr', cand: [{ companyId: 'c1', why: '주소' }] }),
+    doc('b', { from: 'x@y.kr', mk: 'm2', cand: [{ companyId: 'c2', why: '주소' }] })]);
+  const y = T.groups(diff, CO)[0];
+  assert.equal(y.mixed, true); assert.equal(y.pre, ''); assert.equal(y.bulkOk, false);
+});
+
+test('이름 단서가 주소 일치와 다른 회사면 골라 두지 않는다 · 지운 회사는 후보에서 뺀다', () => {
+  const data = pack([doc('a', { from: 'hong@ganasangsa.co.kr', subj: '다라산업 건', cand: [{ companyId: 'c1', why: '주소' }, { companyId: 'c9', why: '도메인' }] })]);
+  const x = T.groups(data, CO)[0];
+  assert.equal(x.pre, '');
+  assert.equal(x.cands.some((c) => c.companyId === 'c9'), false);
+});
+
+test('차례 — 층 → 서류 많은 묶음 → 최근', () => {
+  const addr = [{ companyId: 'c1', why: '주소' }];
+  const data = pack([
+    doc('n1', { from: 'none@naver.com', d: 9 }),
+    doc('a1', { from: 'a@ganasangsa.co.kr', cand: addr, d: 1 }),
+    doc('s1', { from: 'small@naver.com', subj: '다라산업', d: 5 }),
+    doc('b1', { from: 'big@naver.com', subj: '다라산업', d: 2 }), doc('b2', { from: 'big@naver.com', mk: 'mb', subj: '다라산업', d: 3 })]);
+  const keys = T.groups(data, CO).map((x) => x.key);
+  assert.deepEqual(keys, ['a:a@ganasangsa.co.kr', 'a:big@naver.com', 'a:small@naver.com', 'a:none@naver.com']);
+});
+
+/* ── ② 회차 ── */
+const RD = (id, o) => doc(id, Object.assign({ dir: '보냄' }, o));
+const L1 = { a: LINK('c1'), b: LINK('c1'), c: LINK('c1'), r: LINK('c1') };
+
+test('회차 — 신고서 바로 앞 판을 골라 두고 일괄 가능', () => {
+  const data = pack([RD('a', { d: 0, dir: '받음' }), RD('b', { d: 2 }), RD('c', { d: 4, name: 'c(최종).hwp' }),
+    RD('r', { d: 6, mk: 'mr', doc: { kind: '신고서' } })], L1);
+  const r = T.rounds(data)[0];
+  assert.equal(r.pre, 'c'); assert.ok(r.why.includes(global.PuRulesV2Order.R_REPORT)); assert.equal(r.bulkOk, true);
+});
+
+test('회차 — 근거가 없으면 마지막 판, 일괄은 아니다', () => {
+  const data = pack([RD('a', { d: 0, dir: '받음' }), RD('b', { d: 2 })], { a: LINK('c1'), b: LINK('c1') });
+  const r = T.rounds(data)[0];
+  assert.equal(r.pre, 'b'); assert.deepEqual(r.why, []); assert.equal(r.bulkOk, false);
+});
+
+test('회차 — 최종본이 있거나 「최종본 없음」으로 닫은 회차는 빠진다', () => {
+  const docs = [RD('a', { d: 0 }), RD('b', { d: 2 })];
+  const H = { a: LINK('c1'), b: LINK('c1') };
+  const items = global.PuRulesV2Order.merge(pack(docs).docs, H);
+  const rk = global.PuRulesV2Order.companyGroups(items, {})[0].roundKey;
+  const rid = 'c1_' + rk;
+  assert.equal(T.rounds(pack(docs, H, { [rid]: { finalDocId: 'b' } })).length, 0);
+  assert.equal(T.rounds(pack(docs, H, { [rid]: { noFinal: true } })).length, 0);
+  assert.equal(T.rounds(pack(docs, H, { [rid]: { noFinal: false } })).length, 1);
+});
+
+test('lib-order — 최종본이 있으면 noFinal 은 무시한다', () => {
+  const docs = [RD('a', { d: 0 })];
+  const items = global.PuRulesV2Order.merge(pack(docs).docs, { a: LINK('c1') });
+  const rk = global.PuRulesV2Order.companyGroups(items, {})[0].roundKey;
+  const g1 = global.PuRulesV2Order.companyGroups(items, { ['c1_' + rk]: { noFinal: true } })[0];
+  assert.equal(g1.noFinal, true);
+  const g2 = global.PuRulesV2Order.companyGroups(items, { ['c1_' + rk]: { noFinal: true, finalDocId: 'a' } })[0];
+  assert.equal(g2.noFinal, false);
+});
+
+test('셈 — 남은 묶음·서류·회차', () => {
+  const data = pack([doc('x', { from: 'kim@naver.com' }), RD('a', { d: 0 })], { a: LINK('c1') });
+  const n = T.counts(data, CO);
+  assert.equal(n.groups, 1); assert.equal(n.docs, 1); assert.equal(n.rounds, 1);
+});
+
+/* ── 일괄·도메인 규칙 (R2) — 이미 있는 규칙을 못 박는 검사 ── */
+test('일괄 — 주소 후보가 없는 서류가 하나라도 있으면 일괄 불가', () => {
+  const cand = [{ companyId: 'c1', why: '주소' }];
+  const data = pack([doc('a', { from: 'hong@ganasangsa.co.kr', cand }), doc('b', { from: 'hong@ganasangsa.co.kr', mk: 'm2' })]);
+  const x = T.groups(data, CO)[0];
+  assert.equal(x.pre, 'c1'); assert.equal(x.tier, 1); assert.equal(x.bulkOk, false);
+});
+
+test('도메인만 — 층 3, 골라 두지 않고, 이름 단서보다 앞에 놓인다', () => {
+  const data = pack([doc('x', { from: 'x@dara.kr', subj: '가나상사 자료', cand: [{ companyId: 'c2', why: '도메인' }] })]);
+  const x = T.groups(data, CO)[0];
+  assert.equal(x.tier, 3); assert.equal(x.pre, '');
+  assert.equal(x.cands[0].companyId, 'c2'); assert.ok(x.cands[0].whys.includes(T.W_DOM));
+  const i1 = x.cands.findIndex((c) => c.companyId === 'c1');
+  assert.ok(i1 > 0 && x.cands[i1].whys.includes(T.W_NAME));
+});
+
+test('회차 — 신고서 바로 앞 판이 고객이 보낸 현행(0)이면 줄엔 골라 두되 일괄(★)엔 넣지 않는다', () => {
+  const data = pack([RD('a', { d: 0, dir: '받음' }), RD('r', { d: 6, mk: 'mr', doc: { kind: '신고서' } })], { a: LINK('c1'), r: LINK('c1') });
+  const r = T.rounds(data)[0];
+  assert.equal(r.pre, 'a'); assert.equal(r.preNo, 0);
+  assert.ok(r.why.includes(global.PuRulesV2Order.R_REPORT), '근거는 그대로 보인다');
+  assert.equal(r.bulkOk, false, '고객의 옛 규칙을 띠로 ★ 하지 않는다');
+});
