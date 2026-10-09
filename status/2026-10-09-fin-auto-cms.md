@@ -7,9 +7,14 @@
 - 재무관리 › 🤖 자동 처리 화면 — 확인 상자(새 회원코드·중복 달·잇기 제안)와 되돌리기.
 - 규칙 — `scripts/make-firebase-rules.js` 에 `cms_pull: finOnly`. `docs/firebase-rules-전체-적용본.json`·`docs/rules-paste.json` 재생성.
 
+## 누가 볼 수 있나
+- `data/cms_pull`(더빌 출금 줄: 회사명·금액) — 규칙이 없어 `data/$other` 로 «재직 직원 누구나» 읽고 쓰던 자리였다. 이제 재무 권한자(fin)만.
+
 ## 검사
 `tests/cms-auto-core.test.js` · `cms-auto-erp.test.js` · `cms-auto-pull.test.js` 추가.
-⚠ `tests/photos-staff-share.test.js` 「콘솔과 한 곳도 다르지 않다」는 `/data/cms_pull` 때문에 규칙 배포 전까지 걸린다(배포 직후 해소 — PENDING 에 넣지 않음).
+규칙을 콘솔에 올린 뒤 `tests/photos-staff-share.test.js` 도 통과한다(확인함).
+
+- 자동 처리 화면 탭 이름을 `faTab`/`setFaTab` 으로 했다(다른 컴포넌트의 `setTab` 과 이름이 겹쳐 `state-declared-in-own-component` 검사가 걸렸다). 탭 기억(`finauto_tab`)은 유지.
 
 ## 판단 요약 (R1–R13)
 - R1 click() 은 허용 두 함수(clickAllowed·clickPage) 안에서만.
@@ -25,8 +30,9 @@
 - R13 `data/cms_pull` 은 finOnly, 규칙 배포는 합친 뒤.
 
 ## 남은 일
-- [ ] 규칙 배포 (`node scripts/rules-deploy.js --deploy`)
+- [x] 규칙 배포 — 2026-10-09 콘솔에 올림, 새 기준 `docs/firebase-rules-콘솔원문-2026-10-09.json`
 - [ ] 대표 Aside 더빌 로그인 뒤 `node scripts/thebill-pull.js --dry` 실측
 - [ ] 첫 잇기 제안 목록 확인
 - [ ] 스위치 켜기
 - [ ] 작업 스케줄러(30분마다, R10)
+- [ ] 더빌 로그인 유지 시간 재기(첫 주)

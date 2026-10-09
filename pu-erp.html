@@ -67552,7 +67552,7 @@ function MonthClose(props){
 function FinanceAuto(props){
   var isAdm = typeof CURRENT_USER !== 'undefined' && CURRENT_USER && isAdminByUser(CURRENT_USER);
   var lastS = useState(window.__erpCmsAutoLast || null); var last = lastS[0], setLast = lastS[1];
-  var tabS = useState('check'); var tab = tabS[0], setTab = tabS[1];
+  var ftS = usePersistedState('finauto_tab', 'check'); var faTab = ftS[0], setFaTab = ftS[1];
   var onS = useState(function(){ return (dbGet('app_settings', {}) || {}).cmsAutoConfirm === true; });
   var pickS = useState({}); var pick = pickS[0], setPick = pickS[1];
   useEffect(function(){
@@ -67602,7 +67602,7 @@ function FinanceAuto(props){
       h('td', { style:cell }, act));
   }
   var head = h('tr', null, ['☐', '번호', '무엇', '출금일', '더빌 회원명', '금액', '이알피에서 본 것', '할 일'].map(function(t){ return h('th', { key:t, style:th }, t); }));
-  var list = tab === 'fail' ? fails : (tab === 'auto' ? autos : check);
+  var list = faTab === 'fail' ? fails : (faTab === 'auto' ? autos : check);
   return h('div', { style:{ padding:'14px' } },
     h('div', { style:{ display:'flex', gap:'16px', alignItems:'center', flexWrap:'wrap', padding:'9px 12px', borderRadius:'8px',
       background: st.needLogin ? '#fef2f2' : '#eff6ff', border:'1px solid ' + (st.needLogin ? '#fecaca' : '#bfdbfe'), fontWeight:700 } },
@@ -67617,8 +67617,8 @@ function FinanceAuto(props){
         onS[0] ? ' 자동 확정 켜짐' : ' 자동 확정 꺼짐 (미리보기)')),
     h('div', { style:{ display:'flex', gap:'4px', marginTop:'12px' } },
       [['check', '● 확인할 것 ' + check.length], ['fail', '✕ 출금 실패 ' + fails.length], ['auto', '✓ 자동 확정 ' + autos.length]].map(function(t){
-        return h('button', { key:t[0], onClick:function(){ setTab(t[0]); }, style:{ padding:'5px 11px', border:'1px solid #e2e8f0', borderBottom:'none',
-          borderRadius:'7px 7px 0 0', background: tab === t[0] ? '#ffffff' : '#f8fafc', color: tab === t[0] ? '#2563eb' : '#475569', fontWeight:700, cursor:'pointer' } }, t[1]);
+        return h('button', { key:t[0], onClick:function(){ setFaTab(t[0]); }, style:{ padding:'5px 11px', border:'1px solid #e2e8f0', borderBottom:'none',
+          borderRadius:'7px 7px 0 0', background: faTab === t[0] ? '#ffffff' : '#f8fafc', color: faTab === t[0] ? '#2563eb' : '#475569', fontWeight:700, cursor:'pointer' } }, t[1]);
       })),
     h('div', { style:{ background:'#ffffff', border:'1px solid #e2e8f0', overflowX:'auto' } },
       h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'12px' } },
