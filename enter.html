@@ -307,6 +307,11 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
    ⚠ 빨강은 뉴스레터의 «경고»다. 할 일까지 빨강으로 두면 급한 것과 안 급한 것이 섞여,
      곧 둘 다 안 보게 된다. 호박은 이미 기업정보함의 할 일 띠가 쓰는 결이다. */
 .tile .nl-warn.cn-todo{background:#d97706}
+/* 준비중 — 관리자 화면의 딱지 · 줄 오른쪽 끝으로 미는 자리 (대표 지시 2026-10-09) */
+.tile .tile-soon-pill{position:absolute;top:4px;left:50%;transform:translateX(2px);display:inline-block;
+  background:#d97706;color:#fff;font-size:.6rem;font-weight:800;line-height:1;padding:3px 7px;
+  border-radius:99px;white-space:nowrap;max-width:none;overflow:visible}
+.tile.tile-soon-first{margin-left:auto}
 /* ── 타일에 붙는 알림 표시 (대표 지시 2026-08-24, 다안) ─────────────────
    ★ 예전에는 화면 왼쪽 «아래 구석» 에 빨간 알약으로 띄웠다. 타일과 떨어져 있어
      어느 프로그램 일인지 바로 안 보였고, 구석을 한 칸 차지했다.
@@ -352,6 +357,7 @@ body.portal-mode #camFab{display:flex;}
        예전 380px 구간이 repeat(4,1fr) 이라 바로 그 이유로 넘쳤다. */
   .tiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 4px;}
   .tile{width:auto;min-width:0;}
+  .tile.tile-soon-first{margin-left:0}   /* 격자에서는 밀지 않는다 — 맨 뒤 칸이면 충분하다 */
   .tile b{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;}
   .sec{flex-wrap:wrap;}
 }
@@ -2911,6 +2917,11 @@ body.portal-mode #moreFab{display:flex;}
       // 로컬 앱(기금관리 등, localhost 실행)은 폰에서 열 수 없음 → 이동 대신 안내
       var mobileLocal = isMobile() && app.local && !isAct;
       var 준비중 = appIsSoon(app, _isAdm);
+      /* 「준비중」인 앱인가 — 보는 사람과 «상관없이» (대표 지시 2026-10-09
+         「관리자도 준비중인게 확인되게」「준비중인것은 항상 오른쪽으로 … 모든 직원들에게도」).
+         ⚠ 잣대는 같은 함수다 — 관리자 여부만 빼고 묻는다(app.soon 을 직접 보지 않는다). */
+      var 준비중앱 = appIsSoon(app, false);
+      if(준비중앱) a.dataset.soonApp = '1';
       /* ── 설명 줄을 뺀다 (대표 지시 2026-08-24 「아이콘 제목 아래 설명 필요 없다.
             차라리 PC에서는 마우스 올리면 나오게 하고, 폰에서는 두 번째 줄 없애라」) ──
          ★ 없애는 것이 아니라 «옮기는» 것이다 — PC 에서는 마우스를 올리면 나온다.
@@ -2925,7 +2936,10 @@ body.portal-mode #moreFab{display:flex;}
         '<div class="ic"' + (mobileLocal || 준비중 ? ' style="opacity:.45"' : '') + '>' + app.icon + '</div>' +
         '<div class="tx"><b>' + app.name + '</b>' +
         (mobileLocal ? '<span>PC 전용</span>' : (준비중 ? '<span>준비중</span>' : '')) + '</div>' +
-        ((isMobile() || 준비중) ? '' : '<div class="newtab">탭 이동 ↗</div>');
+        ((isMobile() || 준비중) ? '' : '<div class="newtab">탭 이동 ↗</div>') +
+        /* 관리자에게는 «딱지»만 — 흐리게 하거나 막지 않는다(그대로 열린다) */
+        ((준비중앱 && !준비중) ? '<span class="tile-soon-pill">준비중</span>' : '');
+      if(준비중앱 && !준비중) a.title = app.name + ' — 직원에게는 준비중으로 보입니다 (관리자만 열림)';
       if(준비중){
         a.style.opacity = '.55';
         a.style.cursor = 'not-allowed';
@@ -3561,8 +3575,24 @@ body.portal-mode #moreFab{display:flex;}
     if(auth.currentUser) db.ref(tilePrefPath()).set(tilePrefs).catch(function(){});
   }
   // 저장된 순서(키 배열)대로 DOM 재정렬 — 저장에 없는 새 타일은 맨 뒤에 기본 순서로
+  /* ── 준비중 앱은 «늘 줄의 오른쪽 끝» (대표 지시 2026-10-09) ─────────────────
+     「준비중인것은 항상 오른쪽 화면으로 다 보내라 모든 직원들에게도 오른쪽으로 정렬」
+     ★ 사람이 끌어 옮긴 순서(tilePrefs.order)보다 «앞선다» — 순서를 적용한 «뒤»에 부른다.
+       그래서 누가 준비중 앱을 왼쪽으로 끌어도 놓는 순간 다시 오른쪽으로 간다.
+     ★ 첫 준비중 타일에 tile-soon-first 를 달아 PC 에서는 그 묶음을 화면 오른쪽 끝으로 민다
+       (margin-left:auto). 폰은 네 칸 격자라 «맨 뒤»로만 간다.
+     ⚠ 줄 안에서만 옮긴다 — 다른 줄로 보내지 않는다. */
+  function soonToEnd(){
+    tileConts().forEach(function(c){
+      var kids = Array.prototype.slice.call(c.children);
+      var soon = kids.filter(function(t){ return t.dataset && t.dataset.soonApp === '1'; });
+      kids.forEach(function(t){ if(t.classList) t.classList.remove('tile-soon-first'); });
+      soon.forEach(function(t){ c.appendChild(t); });
+      if(soon.length && soon.length < kids.length) soon[0].classList.add('tile-soon-first');
+    });
+  }
   function applyTileOrder(){
-    if(!tilePrefs.order || !tilePrefs.order.length) return;
+    if(!tilePrefs.order || !tilePrefs.order.length){ soonToEnd(); return; }
     var all = allTiles();
     var byKey = {};
     all.forEach(function(t){ byKey[t.dataset.key] = t; });
@@ -3577,8 +3607,10 @@ body.portal-mode #moreFab{display:flex;}
       var row = savedRowOf(t.dataset.key, t.dataset.row);
       tileCont(row).appendChild(t);
     });
+    soonToEnd();
   }
   function persistOrderFromDom(){
+    soonToEnd();   /* 끌어 옮긴 뒤에도 준비중은 오른쪽 끝 — 그 자리를 저장한다 */
     var order = [], rows = {};
     tileConts().forEach(function(c){
       /* 옛 기본값 support 는 이제 없는 줄이다 — 첫 줄로 되돌린다. */
