@@ -15429,16 +15429,13 @@ function parseVcf(text){
    ⚠ 「3호_소망상사」(번호 꼬리표 + 가게) · 「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
 const IMP_ROLE_TAIL = /(담당|사무실|소개|대표|사장|팀장|과장|부장|이사|실장|센터|본부|경리|총무|회계|직원|원장|상사|푸드|누리|산업|건설|물산|상회|식품|기업|테크|전자|공업|상점|마트|약국|병원|의원)$/;
 const IMP_FLAG = '[가져오기 확인] 이름 앞의 회사와 회사 칸이 다릅니다 — 한 칸에 두 사람이 섞였을 수 있습니다';
-function importNormCo(x){
-  return String(x || '').toLowerCase()
-    .replace(/\(\s*(주|유|재|사|합)\s*\)|㈜|주식회사|유한회사|유한책임회사|농업회사법인|사단법인|재단법인/g, '')
-    .replace(/[\s\-_.,·()&\/]/g, '');
-}
+/* 회사 이름 견주기는 «맞출 때» 쓰는 다듬개(ErpMatch._norm) 하나로 — 새 다듬개를 만들지 않는다(tests/cards-norm-align) */
+const impCo = x => ErpMatch._norm(x);
 function importTidyRow(r){
   if(!r) return r;
   const name = String(r.name || '').trim(), co = String(r.company || '').trim();
-  const nc = importNormCo(co);
-  const same = pc => { const a = importNormCo(pc); return !nc || a === nc || a.indexOf(nc) === 0 || nc.indexOf(a) === 0; };
+  const nc = impCo(co);
+  const same = pc => { const a = impCo(pc); return !nc || a === nc || a.indexOf(nc) === 0 || nc.indexOf(a) === 0; };
   const flag = () => Object.assign({}, r, { memo: (String(r.memo || '') + '\n' + IMP_FLAG).trim() });
   /* ① 「회사_이름」 */
   let m = name.match(/^(.+?)\s*_\s*([가-힣]{2,5})$/);
@@ -15454,7 +15451,7 @@ function importTidyRow(r){
     return Object.assign({}, r, { name: m[2], company: co || m[1].trim() });
   }
   /* ③ 회사 칸의 회사가 이름 앞에 붙은 「동원정윤성인」 */
-  const nn = importNormCo(name);
+  const nn = impCo(name);
   if(nc.length >= 2 && nn.length > nc.length && nn.indexOf(nc) === 0){
     const rest = nn.slice(nc.length);
     if(/^[가-힣]{2,4}$/.test(rest) && !IMP_ROLE_TAIL.test(rest)) return Object.assign({}, r, { name: rest });
@@ -15465,7 +15462,7 @@ function importTidyRow(r){
    ⚠ rowKeys 는 그대로 둔다 — 중복 정리(dupGroupsOf)도 그것을 쓴다. 여기만 넓힌다. */
 function importKeys(r){
   const ks = rowKeys(r);
-  const n = importNormCo(r && r.name), c = importNormCo(r && r.company);
+  const n = impCo(r && r.name), c = impCo(r && r.company);
   if(n && c) ks.push('m' + n + '|' + c);
   return ks;
 }

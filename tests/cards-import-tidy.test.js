@@ -18,10 +18,13 @@ const { sliceFn } = require('./fnslice');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').split('\r\n').join('\n');
 const line = (re) => { const m = SRC.match(re); assert.ok(m, re); return m[0]; };
 function box(items) {
+  /* ErpMatch._norm 은 파일에서 그대로 떠 온다 — 베끼면 진짜와 어긋난다 */
+  const nm = SRC.match(/\n  _norm\(s\)\{([\s\S]*?)\},\n/);
+  assert.ok(nm, 'ErpMatch._norm 을 못 찾음');
   const ctx = { state: { items: items || {} }, digits: (s) => String(s || '').replace(/\D/g, '') };
   vm.createContext(ctx);
-  vm.runInContext([line(/const IMP_ROLE_TAIL = [^\n]*/), line(/const IMP_FLAG = [^\n]*/),
-    sliceFn(SRC, 'function importNormCo('), sliceFn(SRC, 'function importTidyRow('), sliceFn(SRC, 'function importKeys('),
+  vm.runInContext(['var ErpMatch = { _norm(s){' + nm[1] + '} };', line(/const IMP_ROLE_TAIL = [^\n]*/), line(/const IMP_FLAG = [^\n]*/),
+    line(/const impCo = [^\n]*/), sliceFn(SRC, 'function importTidyRow('), sliceFn(SRC, 'function importKeys('),
     sliceFn(SRC, 'function rowKeys('), sliceFn(SRC, 'function buildKeyMap('), line(/const matchExisting=[^\n]*/)].join('\n'), ctx);
   return ctx;
 }
@@ -63,5 +66,5 @@ test('★ 파일을 읽은 자리에서 다듬고, 미리보기·가져오기가
   assert.match(sliceFn(SRC, 'async function onImportFile('), /\.map\(importTidyRow\)/);
   assert.match(sliceFn(SRC, 'function previewImport('), /importKeys\(r\)/);
   assert.match(sliceFn(SRC, 'async function runImport('), /importKeys\(r\)/);
-  assert.ok(!/importNormCo/.test(sliceFn(SRC, 'function rowKeys(')), '중복 정리의 잣대까지 바뀌었다');
+  assert.ok(!/impCo/.test(sliceFn(SRC, 'function rowKeys(')), '중복 정리의 잣대까지 바뀌었다');
 });
