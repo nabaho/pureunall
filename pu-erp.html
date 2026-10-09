@@ -199,6 +199,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
 <script src="js/pu-co-mismatch.js?v=3"></script>
+<script src="js/pu-cms-auto.js?v=1"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
@@ -47592,6 +47593,70 @@ window.erpCmsLedgerGet = erpCmsLedgerGet;
 window.erpCmsLedgerSave = erpCmsLedgerSave;
 window.erpCmsLedgerForDeposit = erpCmsLedgerForDeposit;
 window.CMS_LEDGER_KEY = CMS_LEDGER_KEY;
+/* ══ 🤖 CMS 자동 처리 (2026-10-09 · 재무 자동화 1단계) ═══════════════════════
+   설계: docs/superpowers/specs/2026-10-09-재무자동화-CMS-design.md §4-3
+   · scripts/thebill-pull.js 가 data/cms_pull 에 더한 더빌 줄을 cms_ledger 에 합치고 판정한다.
+   · 쓰기는 «관리자 + 스위치(app_settings.cmsAutoConfirm) 켜짐 + opts.write» 일 때만.
+     꺼져 있으면 같은 판정을 «미리보기»로만 둔다.
+   · 입금은 erpUpsertIncome 문으로만. 통장 줄은 erpMarkBankRowProcessed 로 «처리됨»만 —
+     더빌 합계 줄을 입금으로 또 만들면 2026-01·02 의 겹침 43건이 된다. */
+function erpCmsAutoRun(opts){
+  opts = opts || {};
+  if(!(typeof CURRENT_USER !== 'undefined' && CURRENT_USER && isAdminByUser(CURRENT_USER))) return Promise.resolve(null);
+  if(!window.PuCmsAuto || typeof fbDb === 'undefined' || !fbDb) return Promise.resolve(null);
+  return fbDb.ref('data/cms_pull').once('value').then(function(snap){
+    var pull = snap.val() || {};
+    var pulled = Object.keys(pull.rows || {}).map(function(k){ return pull.rows[k]; }).filter(Boolean);
+    var st = dbGet('app_settings', {}) || {};
+    var on = st.cmsAutoConfirm === true;
+    var canWrite = on && !!opts.write;
+    // 스위치가 꺼져 있으면 cms_ledger 에도 쓰지 않는다 — 받은 줄과 저장분을 «메모리에서만» 합친다
+    var led = erpCmsLedgerGet();
+    var have = {}, rows = [];
+    pulled.concat((led && led.rows) || []).forEach(function(r){ if(r && r._k && !have[r._k]){ have[r._k] = 1; rows.push(r); } });
+    if(canWrite && pulled.length) erpCmsLedgerSave('더빌 자동 받기', new Date().toISOString(), pulled);
+    var incomes = dbGet('finance_income', []) || [];
+    var skipSrv = pull.skip || {}, skip = {};
+    rows.forEach(function(r){ if(skipSrv[String(r._k).replace(/[.#$\[\]\/]/g, '_')]) skip[r._k] = true; });
+    var items = PuCmsAuto.judgeRows(rows, {
+      companies: dbGet('companies', []) || [], incomes: incomes,
+      isLocked: function(ym){ return isIncomeLocked(ym); }, skip: skip });
+    items.forEach(function(it){
+      if(it.verdict === 'done' && !it.incomeId){
+        var f = incomes.find(function(x){ return x && x.cmsKey === it.row._k && !x._deleted; });
+        if(f) it.incomeId = f.id;
+      }
+    });
+    var store = erpBankProcessedStore(), bank = [];
+    (dbGet('ledger_batches', []) || []).forEach(function(b){
+      ((b && b.rows) || []).forEach(function(r){
+        if(r && r.src === 'bank' && r.type === 'income' && !store[erpBankRowKey(r)]) bank.push(r);
+      });
+    });
+    var marks = PuCmsAuto.bankLinesToMark(bank, { cmsRows: rows, incomes: incomes,
+      normName: function(s){ return erpNormName(erpCleanMemo(s)); } });
+    var wrote = 0;
+    if(canWrite){
+      var users = getActiveUsers();
+      items.forEach(function(it){
+        if(it.verdict !== 'auto') return;
+        var rec = PuCmsAuto.buildIncome(it, Date.now(), CURRENT_USER.sid || '');
+        var u = users.find(function(x){ return x.sid === rec.managerSid; });
+        rec.managerName = u ? u.name : '';
+        if(erpUpsertIncome(rec) !== false){ wrote++; it.verdict = 'done'; it.incomeId = rec.id; }
+      });
+      marks.forEach(function(m){
+        erpMarkBankRowProcessed(m.row, 'income', m.why === 'cms_sum'
+          ? ('더빌 CMS 명세 ' + m.day + ' 합계로 처리 (자동)') : ('이미 입금관리에 있음 (자동)'));
+      });
+    }
+    var res = { items: items, marks: marks, wrote: wrote, preview: !on, status: pull.status || {}, at: Date.now() };
+    window.__erpCmsAutoLast = res;
+    try { window.dispatchEvent(new Event('erp-cms-auto')); } catch(_e){}
+    return res;
+  }).catch(function(e){ if(window._erpErrLog) window._erpErrLog(e); return null; });
+}
+window.erpCmsAutoRun = erpCmsAutoRun;
 
 // props: {onClose, onApplied(등록수)}
 function CmsDetectModal(props){
@@ -85616,6 +85681,16 @@ function ERPMain(props){
     function handler(e){ if(e && e.detail) selectMenu(e.detail); }
     window.addEventListener('navigate', handler);
     return function(){ window.removeEventListener('navigate', handler); };
+  }, []);
+
+  // 🤖 CMS 자동 처리 — 로그인 뒤 8초 후 한 번, 이후 30분마다 (관리자만 함수 안에서 걸러짐)
+  useEffect(function(){
+    var t0 = null;
+    try {
+      t0 = setTimeout(function(){ erpCmsAutoRun({ write:true }); }, 8000);
+      if(!window.__erpCmsAutoTimer) window.__erpCmsAutoTimer = setInterval(function(){ erpCmsAutoRun({ write:true }); }, 30 * 60 * 1000);
+    } catch(_e){}
+    return function(){ if(t0) clearTimeout(t0); if(window.__erpCmsAutoTimer){ clearInterval(window.__erpCmsAutoTimer); window.__erpCmsAutoTimer = null; } };
   }, []);
 
   // 키보드 단축키: Alt+1~5(그룹 이동), Ctrl+N(새 등록), Ctrl+S(모달 저장)
