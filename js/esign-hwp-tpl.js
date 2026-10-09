@@ -109,7 +109,35 @@
     return cen + d.slice(0, 2) + '.' + d.slice(2, 4) + '.' + d.slice(4, 6);
   }
 
+  /* ══ 계약서 양식(사건계약)에서 함께 채워 내기 (대표 「추천」 2026-10-09) ══
+     사건마다 이 PC 에만 두던 한글 원본 대신, 계약서 양식 › 사건계약에 올린 양식(어느 PC 에서나 같다)을 고른다.
+     계약서 양식은 이름표가 조금 다르다({{근로자명}}·{{주민번호}}·{{근로자주소}} …) — 같은 값으로 잇는다. */
+  var FORM_ALIASES = { 근로자명: '이름', 근로자이름: '이름', 주민번호: '주민등록번호', 근로자주민: '주민등록번호', 근로자주소: '주소', 오늘날짜: '오늘', 계약일: '작성일' };
+  function withAliases(V) {
+    var out = {}; V = V || {};
+    Object.keys(FORM_ALIASES).forEach(function (k) { out[k] = V[FORM_ALIASES[k]] == null ? '' : V[FORM_ALIASES[k]]; });
+    Object.keys(V).forEach(function (k) { out[k] = V[k]; });
+    return out;
+  }
+  /* 사람마다 다른 칸 — 이 가운데 하나라도 있으면 «사람마다», 없으면(대표·사건 칸만) «사건에 한 벌» */
+  var PERSON_KEYS = ['이름', '주민등록번호', '근로자연락처', '주소', '입금계좌', '입사일', '퇴사일', '동의일시', '생년월일',
+    '체불임금1개월차', '체불임금2개월차', '체불임금3개월차', '체불퇴직금', '체불총액', '근로자명', '근로자이름', '주민번호', '근로자주민', '근로자주소'];
+  function fillMode(markers) {
+    return (markers || []).some(function (k) { return PERSON_KEYS.indexOf(k) >= 0; }) ? 'person' : 'case';
+  }
+  /* 사건계약 양식 중 채울 수 있는 것 — 켜 둔 것 · 한글(hwp/hwpx) 원본이 있는 것. sourcesOf = PuContractForms.hwpSources */
+  function caseForms(forms, sourcesOf) {
+    return (forms || []).filter(function (f) { return f && f.id && f.kind === 'case' && f.enabled !== false; }).map(function (f) {
+      var src = (sourcesOf(f) || []).filter(function (x) { return x && !/\.xlsx?$/i.test(x.name || ''); })[0];
+      return src ? { id: f.id, name: String(f.name || '양식'), group: String(f.groupName || ''), src: src } : null;
+    }).filter(Boolean);
+  }
+  /* 대표 선정 서식(진정서·연명부·당사자 선정서·대리인선임신고서)이 사건계약에 올라 있나 — 안내 글에 쓴다 */
+  var REP_FORM_RE = /선정|연명부|대리인\s*선임/;
+  function hasRepForms(list) { return (list || []).some(function (f) { return REP_FORM_RE.test(f.name || ''); }); }
+
   var api = {
+    withAliases: withAliases, fillMode: fillMode, caseForms: caseForms, hasRepForms: hasRepForms, PERSON_KEYS: PERSON_KEYS,
     MK_OPEN: MK_OPEN, MK_CLOSE: MK_CLOSE, BLANK: BLANK,
     mk: mk, markerAt: markerAt, markersOf: markersOf, fillDoc: fillDoc,
     stripLinesegs: stripLinesegs, valuesOf: valuesOf, birthOf: birthOf

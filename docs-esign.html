@@ -136,6 +136,8 @@
       <thead><tr><th>사건명</th><th>회사</th><th>제출</th><th>상태</th><th>생성일</th><th></th></tr></thead>
       <tbody id="caseRows"><tr><td colspan="6" style="color:#94a3b8">불러오는 중…</td></tr></tbody>
     </table>
+    <!-- 받는 서류와 순서 · 함께 채워 낼 사건계약 양식 (2026-10-09) — renderEsignIntro 가 그린다 -->
+    <div id="esignIntro" style="margin-top:14px"></div>
   </div>
   <div id="viewDetail" style="display:none"></div> <!-- Task 10 -->
 </div>
@@ -192,7 +194,7 @@
 <script src="js/esign-docs.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
-<script src="js/esign-hwp-tpl.js?v=2"></script>
+<script src="js/esign-hwp-tpl.js?v=3"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=14"></script>
 <script src="js/pu-contract-forms.js?v=36"></script>
@@ -905,7 +907,50 @@ window.addEventListener('popstate', function () {
 // ── 사건 목록 ──
 // 캐시(casesCache)를 화면 표로 그린다. once 로 받은 뒤에도, 내가 한 일(사건
 // 생성·마감·파기)로 캐시를 직접 고친 다음에도 이 함수 하나로 다시 그린다.
+/* ══ ⓐ 안내 — 사건이 없어도 «무엇을 어떤 차례로 받는지» (대표 「추천」 2026-10-09 「집단체불 위임장은 왜 아직 제대로 안 들어가 있나」)
+   사건 목록 밑에 늘 둔다(사건이 없으면 펼쳐서). 사건계약 양식 목록은 한 번 읽는다(읽기만) ══ */
+var _esignCaseForms = null;
+function esignCaseFormsLoad() {
+  if (_esignCaseForms) return Promise.resolve(_esignCaseForms);
+  return PuContractForms.loadForms(db).then(function (all) { return (_esignCaseForms = EsignHwpTpl.caseForms(all, PuContractForms.hwpSources)); });
+}
+function renderEsignIntro() {
+  var box = $('esignIntro'); if (!box) return;
+  var F = EsignDocs.ESIGN_FORMS, n = Object.keys(casesCache || {}).length;
+  box.innerHTML = '<details' + (n ? '' : ' open') + ' style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc">'
+    + '<summary style="cursor:pointer;font-weight:700;font-size:13.5px">ℹ 집단체불 위임장 — 받는 서류와 순서</summary>'
+    + '<ol style="margin:8px 0 10px 20px;font-size:13px;line-height:1.8">'
+    + '<li><b>+ 새 사건</b> — 사건명·회사·사건 비밀번호(제출 내용을 여는 열쇠입니다. 잊으면 열 수 없습니다)</li>'
+    + '<li><b>🔗 링크</b>를 근로자 단톡방·문자로 보냅니다 — 근로자가 폰에서 인적사항을 적고 손가락으로 서명합니다</li>'
+    + '<li>사건을 열어 제출을 ✅ 확인하고 <b>👤 대표 정하기</b> · <b>💰 체불내역</b>을 적습니다</li>'
+    + '<li><b>📑 서류 일괄 생성</b> — 사람별 위임장·동의서 PDF, 연명부·체불 정리 엑셀, 아래 사건계약 양식을 채워 .zip 하나로 받습니다</li></ol>'
+    + '<div style="font-size:13px;font-weight:700;margin:6px 0 4px">근로자 폰으로 받는 서류</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
+    + ['delegationAgreement', 'delegation', 'privacyConsent'].map(function (k) { return '<button class="btn btn-sub" onclick="esignFormPeek(\'' + k + '\')">👁 ' + EsignDocs.esc(F[k].title) + '</button>'; }).join('')
+    + '</div><div style="font-size:13px;font-weight:700;margin:10px 0 4px">함께 채워 낼 사건계약 양식 <span style="font-weight:400;color:#64748b">(계약서 양식 › ⚖️ 사건계약 — 어느 PC 에서나 같습니다)</span></div>'
+    + '<div id="esignIntroForms" style="font-size:12.5px;color:#64748b">불러오는 중…</div></details>';
+  esignCaseFormsLoad().then(function (l) {
+    var el = $('esignIntroForms'); if (!el) return;
+    el.innerHTML = (l.length ? l.map(function (f) { return '<span style="display:inline-block;border:1px solid #cbd5e1;border-radius:9px;padding:1px 8px;margin:2px;color:#1e293b">' + EsignDocs.esc(f.name) + '</span>'; }).join('')
+        : '한글 원본이 붙은 사건계약 양식이 아직 없습니다.')
+      + (EsignHwpTpl.hasRepForms(l) ? '' : '<div style="margin-top:6px;color:#854d0e">⚠ 대표 선정 서식(진정서·연명부 · 당사자 선정서 · 대리인선임신고서)이 아직 없습니다 — 계약서 양식 › ⚖️ 사건계약 › ⋯ › 「📎 파일 올려 양식 만들기」로 올리면 여기와 📑 서류 일괄 생성에 나옵니다.</div>');
+  }, function (e) { var el = $('esignIntroForms'); if (el) el.textContent = '사건계약 양식을 불러오지 못했습니다 — ' + ((e && e.message) || e); });
+}
+/* 👁 기본 서류 글 보기 — 글만(textContent). [ ] 칸은 근로자가 적거나 사건 값으로 채워진다 */
+function esignFormPeek(k) {
+  var f = EsignDocs.ESIGN_FORMS[k]; if (!f) return;
+  var bg = document.createElement('div'); bg.className = 'modal-bg';
+  var md = document.createElement('div'); md.className = 'modal'; md.style.maxWidth = '640px';
+  var h = document.createElement('h3'); h.textContent = f.title;
+  var note = document.createElement('div'); note.style.cssText = 'font-size:12px;color:#64748b'; note.textContent = '[ ] 칸은 근로자가 폰에서 적거나 사건 값으로 채워집니다.';
+  var body = document.createElement('div'); body.style.cssText = 'white-space:pre-wrap;font-size:12.5px;line-height:1.7;max-height:60vh;overflow:auto;border:1px solid #e2e8f0;border-radius:8px;padding:12px;margin:8px 0';
+  body.textContent = String(f.body || '').replace(/\x7b\x7b([^\x7b\x7d]+)\x7d\x7d/g, '[$1]');
+  var x = document.createElement('button'); x.className = 'btn btn-sub'; x.textContent = '닫기'; x.onclick = function () { bg.remove(); };
+  md.appendChild(h); md.appendChild(note); md.appendChild(body); md.appendChild(x); bg.appendChild(md);
+  bg.addEventListener('click', function (e) { if (e.target === bg) bg.remove(); });
+  document.body.appendChild(bg);
+}
 function renderCaseList() {
+  try { renderEsignIntro(); } catch (e) {}
   var ids = Object.keys(casesCache).sort(function (a, b) {
     return ((casesCache[b].meta || {}).createdAt || 0) - ((casesCache[a].meta || {}).createdAt || 0);
   });
@@ -1551,12 +1596,24 @@ function openExportPicker(pool) {
     + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xRoster" checked> 진정인 연명부 (엑셀)</label>'
     + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xArrears" checked> 체불임금 정리 (엑셀)</label>'
     + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xHwp"> 이 사건 한글 원본을 사람마다 채워 넣기 <span style="color:#64748b">(📄 한글 원본을 이 PC 에 등록한 경우)</span></label>'
+    + '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">계약서 양식(⚖️ 사건계약)에서 채워 넣기 <span style="font-weight:400;color:#64748b">— 근로자 칸이 있으면 사람마다, 대표·사건 칸만 있으면 사건에 한 벌</span></div>'
+    + '<div id="xForms" style="font-size:12.5px;color:#64748b">불러오는 중…</div>'
     + '<div id="xNote" style="font-size:12px;color:#64748b;min-height:16px;margin-top:8px"></div>'
     + '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn btn-sub" id="xNo">취소</button><button class="btn btn-pri" id="xGo">📦 .zip 하나로 받기</button></div></div>';
   document.body.appendChild(bg);
   var $x = function (id) { return bg.querySelector('#' + id); };
   var busy = false;
   $x('xNo').onclick = function () { if (!busy) bg.remove(); };
+  /* 고른 양식은 사건에 남긴다(secret/forms — 직원만, 어느 PC 에서나 같은 고름). 처음이면 대표 선정 서식을 켜 둔다 */
+  var saved = ((casesCache[curCaseId] || {}).secret || {}).forms || null;
+  esignCaseFormsLoad().then(function (l) {
+    var box = $x('xForms'); if (!box) return;
+    if (!l.length) { box.textContent = '한글 원본이 붙은 사건계약 양식이 없습니다 — 계약서 양식 › ⚖️ 사건계약에 올리면 여기 나옵니다.'; return; }
+    box.innerHTML = l.map(function (f) {
+      var on = saved ? !!saved[f.id] : /선정|연명부|대리인\s*선임/.test(f.name);
+      return '<label style="display:block;margin:3px 0;color:#1e293b"><input type="checkbox" class="xForm" data-id="' + EsignDocs.esc(f.id) + '"' + (on ? ' checked' : '') + '> ' + EsignDocs.esc(f.name) + '</label>';
+    }).join('');
+  }, function (e) { var box = $x('xForms'); if (box) box.textContent = '불러오지 못했습니다 — ' + ((e && e.message) || e); });
   PureunHwpStore.get('esign-case', curCaseId).then(function (rec) {
     var cb = $x('xHwp');
     if (!rec) { cb.disabled = true; cb.parentNode.style.color = '#94a3b8'; } else cb.checked = true;
@@ -1565,7 +1622,14 @@ function openExportPicker(pool) {
     if (busy) return;
     busy = true; $x('xGo').disabled = true;
     var shape = (bg.querySelector('input[name="xShape"]:checked') || {}).value || 'person';
-    runExport(pool, { shape: shape, roster: $x('xRoster').checked, arrears: $x('xArrears').checked, hwp: $x('xHwp').checked && !$x('xHwp').disabled },
+    var pick = {}, forms = [];
+    Array.prototype.forEach.call(bg.querySelectorAll('.xForm'), function (c) { if (c.checked) pick[c.getAttribute('data-id')] = true; });
+    (_esignCaseForms || []).forEach(function (f) { if (pick[f.id]) forms.push(f); });
+    if (bg.querySelector('.xForm')) {
+      var c0 = casesCache[curCaseId] || {}; c0.secret = c0.secret || {}; c0.secret.forms = forms.length ? pick : null;
+      trackedWrite(db.ref('esign/cases/' + curCaseId + '/secret/forms').set(forms.length ? pick : null)).catch(function () {});
+    }
+    runExport(pool, { shape: shape, roster: $x('xRoster').checked, arrears: $x('xArrears').checked, hwp: $x('xHwp').checked && !$x('xHwp').disabled, forms: forms },
       function (t) { $x('xNote').textContent = t; })
       .then(function (msg) { busy = false; bg.remove(); showToast(msg); },
         function (e) { busy = false; $x('xGo').disabled = false; $x('xNote').textContent = '⚠ ' + ((e && e.message) || e); });
@@ -1584,6 +1648,27 @@ async function runExport(pool, o, say) {
   var record = o.hwp ? await PureunHwpStore.get('esign-case', curCaseId) : null;
   var folders = EsignDocs.folderNames(pool);
   var hwpOut = [], unknownAll = {};
+  /* 사건계약 양식 — 근로자 칸이 있으면 사람마다(person), 없으면 사건에 한 벌(case: 대표 근로자 값으로). 하나가 안 되면 알리고 나머지는 낸다 */
+  var formOut = [], formErr = [];
+  for (var fi = 0; fi < (o.forms || []).length; fi++) {
+    var fm = o.forms[fi];
+    try {
+      say('「' + fm.name + '」 채우는 중…');
+      var u8 = await formHwpBytes(fm.src);
+      var mode = EsignHwpTpl.fillMode(await formHwpMarkers(u8, fm.src.name));
+      var mf = _esignMetaForFill(m), one = { name: _esignSafeName(fm.name), mode: mode, list: [] };
+      var who = mode === 'case' ? [mf._rep || {}] : pool;
+      for (var pi = 0; pi < who.length; pi++) {
+        if (mode === 'person') say('「' + fm.name + '」 채우는 중… (' + (pi + 1) + '/' + pool.length + ')');
+        var V = EsignHwpTpl.withAliases(EsignHwpTpl.valuesOf(who[pi], mf, (who[pi]._subId && arrearsCache[who[pi]._subId]) || {}));
+        var fr = await formHwpFill(u8, fm.src.name, V);
+        (fr.unknown || []).forEach(function (k) { unknownAll[k] = 1; });
+        one.list.push(fr.bytes);
+      }
+      formOut.push(one);
+    } catch (e) { formErr.push(fm.name + '(' + ((e && e.message) || e) + ')'); }
+  }
+  formOut.forEach(function (f) { if (f.mode === 'case') zip.file('사건 서류/' + f.name + '.hwp', f.list[0]); });
   if (record) {
     for (var i = 0; i < pool.length; i++) {
       say('한글 원본 채우는 중… (' + (i + 1) + '/' + pool.length + ')');
@@ -1599,6 +1684,7 @@ async function runExport(pool, o, say) {
       zip.file(dir + '위임장.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildDelegationHtml(d, m)], '', { bytes: true }));
       zip.file(dir + '개인정보동의서.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildConsentHtml(d, m)], '', { bytes: true }));
       if (hwpOut[j]) zip.file(dir + '한글원본_' + folders[j].replace(/^\d+_/, '') + '.hwp', hwpOut[j]);
+      formOut.forEach(function (f) { if (f.mode === 'person' && f.list[j]) zip.file(dir + f.name + '.hwp', f.list[j]); });
     }
   }
   if (shape === 'merged' || shape === 'both') {
@@ -1611,6 +1697,11 @@ async function runExport(pool, o, say) {
       say('한글 원본 합본 PDF 만드는 중…');
       zip.file(mdir + '한글원본_전원(' + pool.length + '명).pdf', await _esignHwpMergedPdf(hwpOut));
     }
+    for (var fj = 0; fj < formOut.length; fj++) {
+      if (formOut[fj].mode !== 'person') continue;
+      say('「' + formOut[fj].name + '」 합본 PDF 만드는 중…');
+      zip.file(mdir + formOut[fj].name + '_전원(' + pool.length + '명).pdf', await _esignHwpMergedPdf(formOut[fj].list));
+    }
   }
   if (o.roster) zip.file('진정인연명부.xlsx', EsignDocs.downloadRosterXlsx(pool, m, { bytes: true }));
   if (o.arrears) zip.file('체불임금정리.xlsx', EsignDocs.downloadArrearsXlsx(pool, arrearsCache, m, { bytes: true }));
@@ -1621,7 +1712,8 @@ async function runExport(pool, o, say) {
   document.body.appendChild(a); a.click();
   setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
   var unk = Object.keys(unknownAll);
-  return '✅ ' + pool.length + '명 서류 묶음을 받았습니다' + (unk.length ? ' · 한글 원본의 모르는 표지 ' + unk.length + '가지: ' + unk.slice(0, 5).join(', ') + (unk.length > 5 ? ' 외' : '') : '');
+  return '✅ ' + pool.length + '명 서류 묶음을 받았습니다' + (formOut.length ? ' · 사건계약 양식 ' + formOut.length + '가지' : '')
+    + (formErr.length ? ' · ⚠ 못 채운 양식: ' + formErr.join(', ') : '') + (unk.length ? ' · 한글 원본의 모르는 표지 ' + unk.length + '가지: ' + unk.slice(0, 5).join(', ') + (unk.length > 5 ? ' 외' : '') : '');
 }
 /* 채운 한글 원본 여러 벌 → PDF 하나(그림 PDF). 화면 밖에서 쪽마다 그린다 — 한 벌씩 차례로 */
 async function _esignHwpMergedPdf(list) {
