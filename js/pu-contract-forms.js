@@ -1711,6 +1711,29 @@
       .concat([el('option', { value: '', text: '직접 적기…' })]));
     var toIn = el('input', { type: 'email', placeholder: '받는 메일 주소', 'aria-label': '받는 메일 주소', hidden: d.to.length > 0 });
     toSel.addEventListener('change', function () { toIn.hidden = !!toSel.value; if (!toSel.value) toIn.focus(); });
+    /* 📇 공단 연락처 (2026-10-09) — 푸른메일함에서 모은 공단 직원 주소를 기관·지사별로 덧붙인다 */
+    var agNote = el('span', { 'class': 'pcf-muted', style: 'font-size:11.5px' });
+    function agencyFill(book) {
+      Array.prototype.slice.call(toSel.querySelectorAll('optgroup')).forEach(function (g) { g.remove(); });
+      var groups = {};
+      (book.list || []).forEach(function (a) {
+        var g = a.org + (a.branch ? ' ' + a.branch : ' (지사 모름)');
+        (groups[g] = groups[g] || []).push(a);
+      });
+      var hand = toSel.querySelector('option[value=""]');
+      Object.keys(groups).forEach(function (g) {
+        toSel.insertBefore(el('optgroup', { label: '📇 ' + g }, groups[g].slice(0, 12).map(function (a) {
+          return el('option', { value: a.email, text: (a.name || a.email.split('@')[0]) + ' · ' + a.email + (a.last ? ' · 최근 ' + new Date(a.last).toISOString().slice(0, 7) : '') });
+        })), hand);
+      });
+      agNote.textContent = book.list && book.list.length ? '공단 연락처 ' + book.list.length + '명 (메일함에서 ' + (book.at ? new Date(book.at).toISOString().slice(0, 10) : '') + ' 모음)' : '공단 연락처가 아직 없습니다';
+    }
+    var agBtn = host.mail.agencyCollect ? el('button', { type: 'button', 'class': 'pcf-b', title: '푸른메일함에서 근로복지공단·건강보험·국민연금 직원 주소를 다시 모읍니다(메일함은 읽기만)', text: '📇 공단 연락처 다시 모으기', onclick: function () {
+      if (busy) return;
+      agBtn.disabled = true; agNote.textContent = '메일함을 읽는 중… (처음엔 10초쯤)';
+      host.mail.agencyCollect().then(function (b) { agBtn.disabled = false; agencyFill(b); }, function (e) { agBtn.disabled = false; agNote.textContent = '⚠ ' + ((e && e.message) || e); });
+    } }) : null;
+    if (host.mail.agency) host.mail.agency().then(agencyFill, function () { agNote.textContent = ''; });
     var ccIn = el('input', { type: 'text', placeholder: '(선택) 참조 메일', 'aria-label': '참조 메일' });
     var subIn = el('input', { type: 'text', 'aria-label': '제목' }); subIn.value = d.subject;
     var bodyIn = el('textarea', { 'aria-label': '본문', rows: 9, style: 'width:100%;font:inherit;font-size:12.5px;margin-top:6px' }); bodyIn.value = d.body;
@@ -1748,6 +1771,24 @@
       if (w.confirm('메일 창에서 보내셨으면 「보낸 서류」에 기록을 남길까요?')) return after(fs, '기록했습니다');
       return Promise.resolve();
     }
+    /* 📠 엔팩스로 (2026-10-09) — 법인 엔팩스는 «수신» 요금제이고 메일·연동 발송 길이 확인되지 않았다.
+       그래서 PDF 를 받아 두고 엔팩스 누리집을 연다 — 받는 팩스번호를 넣고 이 PDF 를 붙여 보내면 된다(사람이 보낸다).
+       보냈다고 하면 「보낸 서류」에 받는 분 칸 「(팩스)」로 남긴다(번호는 남기지 않는다) */
+    function viaFax() {
+      if (busy || !o.isHwp || !host.hwpPdf) return;
+      busy = true; note.textContent = 'PDF 만드는 중…';
+      host.hwpPdf(o.pdfSrc || o.bytes, o.pdfSrc ? o.name.replace(/\.[^.]+$/, '') + '.hwpx' : o.name).then(function (b) {
+        var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([b], { type: 'application/pdf' })); a.download = pdfName();
+        document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+        w.open('https://www.enfax.com', '_blank', 'noopener');
+        note.textContent = '📠 PDF 를 받았고 엔팩스를 새 창으로 열었습니다 — 받는 팩스번호를 넣고 「' + pdfName() + '」를 붙여 보내세요.';
+        busy = false;
+        if (w.confirm('엔팩스로 보내셨으면 「보낸 서류」에 기록을 남길까요? (팩스번호는 남기지 않습니다)')) {
+          var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
+          return host.mail.record(o.row, V, { kind: kind, names: [pdfName()], who: '(팩스)', await: true }).then(function () { note.textContent += ' · 보낸 서류에 기록했습니다'; });
+        }
+      }).catch(function (e) { busy = false; note.textContent = '⚠ ' + ((e && e.message) || e); });
+    }
     function send() {
       if (busy) return;
       var to = toAddr();
@@ -1779,7 +1820,8 @@
       el('div', { 'class': 'pcf-mh' }, [el('span', { text: '✉ 메일로 보내기 — ' + (V.회사명 || '') }),
         el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: function () { if (!busy) close(); } })]),
       el('div', { 'class': 'pcf-mb' }, [
-        el('label', { 'class': 'pcf-frow' }, [el('span', { text: '받는 사람' }), el('div', null, [toSel, toIn])]),
+        el('label', { 'class': 'pcf-frow' }, [el('span', { text: '받는 사람' }), el('div', null, [toSel, toIn,
+          el('div', { style: 'display:flex;gap:8px;align-items:center;margin-top:4px' }, [agBtn, agNote])])]),
         el('label', { 'class': 'pcf-frow' }, [el('span', { text: '참조' }), ccIn]),
         el('label', { 'class': 'pcf-frow' }, [el('span', { text: '제목' }), subIn]),
         bodyIn,
@@ -1792,7 +1834,9 @@
         note]),
       el('div', { 'class': 'pcf-mf' }, [
         el('span', { 'class': 'pcf-muted', style: 'margin-right:auto', text: '「✉ 보내기」를 누르기 전엔 아무것도 나가지 않습니다.' }),
-        el('button', { type: 'button', 'class': 'pcf-b', text: '취소', onclick: function () { if (!busy) close(); } }), btnSend])
+        el('button', { type: 'button', 'class': 'pcf-b', text: '취소', onclick: function () { if (!busy) close(); } }),
+        (o.isHwp && host.hwpPdf) ? el('button', { type: 'button', 'class': 'pcf-b', title: 'PDF 를 받고 법인 엔팩스(enfax.com)를 엽니다 — 팩스번호를 넣고 붙여 보내세요', text: '📠 엔팩스로 팩스', onclick: viaFax }) : null,
+        btnSend])
     ]);
     bg.appendChild(m); document.body.appendChild(bg);
     host.mail.mode().then(function (md) {

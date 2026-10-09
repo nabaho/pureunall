@@ -359,6 +359,35 @@
     return { at: Number(o.at) || 0, by: String(o.by || ''), kind: String(o.kind || '그 밖'),
       names: (o.names || []).map(function (v) { return String(v || ''); }).filter(Boolean), card: '', who: String(o.who || '').trim() };
   }
+  /* ══ 📇 공단 연락처 (대표 2026-10-09 「공단지사도 메일함에서 찾아서 연결시켜라」) ══
+     푸른메일함 목록(mailbox 의 한 줄: e 보낸 주소, f 보낸 이름, d 날짜, s 제목, p 미리보기)에서
+     공단 도메인 주소만 모아 «기관 · 지사 · 이름 · 주소 · 마지막으로 주고받은 날»로 만든다.
+     ⚠ 지사는 미리보기·제목 글에 「○○지사/지역본부/센터」가 있을 때만 — 없으면 빈칸(지어내지 않는다).
+     ⚠ 자동 발신 주소(noreply·webmaster·master 등)는 사람이 아니라 뺀다. 팩스번호는 미리보기에 없어 모으지 않는다. */
+  var AGENCY_ORGS = { 'kcomwel.or.kr': '근로복지공단', 'nhis.or.kr': '국민건강보험공단', 'nps.or.kr': '국민연금공단' };
+  var AGENCY_SKIP = /^(no-?reply|webmaster|master|admin|mailadmin|pension_master|welco|postmaster|help|info)@/i;
+  function agencyBook(rows) {
+    var by = {};
+    (rows || []).forEach(function (r) {
+      if (!r) return;
+      var e = String(r.e || '').trim().toLowerCase(), m = /@([a-z0-9.-]+)$/.exec(e);
+      var org = m && AGENCY_ORGS[m[1]];
+      if (!org || AGENCY_SKIP.test(e)) return;
+      var txt = String(r.p || '') + ' ' + String(r.s || '') + ' ' + String(r.f || '');
+      var br = (/([가-힣]{2,6}(?:지사|지역본부|지부|센터))/.exec(txt.replace(/근로복지공단|국민건강보험공단|국민연금공단/g, ' ')) || [])[1] || '';
+      var d = Number(r.d) || 0;
+      var x = by[e] || (by[e] = { org: org, branch: '', email: e, name: '', last: 0, n: 0, brs: {} });
+      x.n++;
+      if (br) x.brs[br] = (x.brs[br] || 0) + 1;
+      if (d >= x.last) { x.last = d; var nm = String(r.f || '').trim(); if (nm && !/공단|위원회|관리자/.test(nm)) x.name = nm.slice(0, 20); }
+    });
+    return Object.keys(by).map(function (k) {
+      var x = by[k], best = Object.keys(x.brs).sort(function (a, b) { return x.brs[b] - x.brs[a]; })[0] || '';
+      return { org: x.org, branch: best, email: x.email, name: x.name, last: x.last, n: x.n };
+    }).sort(function (a, b) {
+      return a.org.localeCompare(b.org) || (a.branch ? 0 : 1) - (b.branch ? 0 : 1) || a.branch.localeCompare(b.branch) || b.last - a.last;
+    });
+  }
   function SENT_KIND_OF(group) { return group === '제안서·견적서' ? '제안서' : '계약서'; }
 
   var RE = /\x7b\x7b([^\x7b\x7d\n]{1,30})\x7d\x7d/g;
@@ -549,7 +578,7 @@
     xlsxMarkersParts: xlsxMarkersParts, xlsxFillParts: xlsxFillParts, excelDate: excelDate,
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
     CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,
-    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF
+    mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;

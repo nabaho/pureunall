@@ -1957,6 +1957,45 @@
           }
         }
       },
+      "agency": {
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        ".validate": "newData.hasChildren(['list','at','by'])",
+        "list": {
+          "$i": {
+            ".validate": "newData.hasChildren(['org','email'])",
+            "org": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "branch": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "email": {
+              ".validate": "newData.isString() && newData.val().length <= 80"
+            },
+            "name": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "last": {
+              ".validate": "newData.isNumber()"
+            },
+            "n": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "by": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "$other": {
+          ".validate": false
+        }
+      },
       "secret_log": {
         ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
       },
