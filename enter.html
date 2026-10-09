@@ -1514,7 +1514,7 @@ body.portal-mode #moreFab{display:flex;}
   // row: APP_ROWS 의 id 하나 (client 의뢰인 업무 / store 자료함 / office 우리 사무실 / outside 대외)
   // 줄이 다르면 서로 자리를 못 옮긴다(관리자가 설정에서 풀 수 있다).
   var APPS = [
-    { key:'erp',     name:'푸른이알피',   desc:'인사·급여·재무',   icon:'🏢', url:'pu-erp.html',         roles:null, row:'client' },
+    { key:'erp',     name:'푸른이알피',   desc:'계약·업체·사건',   icon:'🏢', url:'pu-erp.html',         roles:null, row:'client' },
     /* 푸른 캘린더 — 정부사업일정과 «같은 📅» 였다가 ⏰ 로 갔다(2026-09-19).
        그 뒤 «달력붙이 스무 가지»를 그려 보여 드렸고 대표가 2번(빨강 머리띠)을 골랐다
        (대표 지시 2026-09-19 「2」). 그림글자가 아니라 «SVG 로 그린» 아이콘이다 —
@@ -1524,6 +1524,14 @@ body.portal-mode #moreFab{display:flex;}
     { key:'cal',     name:'푸른 캘린더',  desc:'일정·근태·이음센터', icon:'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url:'pu-cal.html',         roles:null, row:'client' },
     { key:'consult', name:'정부사업일정',  desc:'보고서 일정및사진관리',    icon:'📅', url:'gov-consulting.html', roles:null, row:'client' },
     { key:'work',    name:'업무관리',     desc:'주간 업무기록',    icon:'📋', url:'work.html',           roles:null, row:'store' },
+    /* 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로」, 목업 그대로).
+       ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다 — 푸른 메일(pu-cards.html?view=mail)과 같은 집안 방식.
+         창(pureun-hr·pureun-fin)·탭 이름·왼쪽 메뉴·환경설정 탭이 따로다(pu-erp.html PU_APPS 머리글).
+       ★ perm — 관리자·위임관리인, 또는 그 메뉴 권한(security_perms 의 hr/…·fin/…)을 받은 직원에게만 보인다.
+         잣대는 서버 권한표 uid_roles/{uid}.hr·fin(이알피가 로그인 때 적는다) — 이알피 메뉴를 고르는 잣대와 같다.
+       ⚠ «급여관리»(payroll-os.html, 의뢰인 급여 아웃소싱)와 헷갈리지 않게 «직원» 을 붙였다. */
+    { key:'hr',      name:'직원 인사',    desc:'명부·급여·근태',   icon:'👥', url:'pu-erp.html?app=hr',  roles:null, perm:'hr',  row:'inout' },
+    { key:'fin',     name:'재무',        desc:'입출금·마감',      icon:'📒', url:'pu-erp.html?app=fin', roles:null, perm:'fin', row:'inout' },
     { key:'career',  name:'경력관리',     desc:'개인 이력서',      icon:'👤', url:'kcareer.html',        roles:null, adminOnly:true, row:'inout' },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-06 「내외관리에 만들어라」).
        ⚠ 「정부사업일정」(gov-consulting.html)과 «다른 앱»이다 — 그쪽은 이미 맡은 사업의 일정·사진이고
@@ -2682,7 +2690,9 @@ body.portal-mode #moreFab{display:flex;}
     portalHanaRemoveBadge();
     var items = portalHanaItems;
     if(!items || !items.length) return;
-    var tile = document.querySelector('.tile[data-key="erp"]');
+    /* 입금은 이제 «재무» 앱 일이다 (대표 지시 2026-10-09 「인사 재무 각각 관리」) — 재무 타일에 붙인다.
+       재무 타일이 없을 때(옛 판 화면 등)만 예전처럼 이알피 타일에. */
+    var tile = document.querySelector('.tile[data-key="fin"]') || document.querySelector('.tile[data-key="erp"]');
     if(!tile) return;                       // 타일이 아직 안 그려졌으면 다음 조회 때
     var missing = items.filter(function(x){ return x.officeStatus !== 'matched'; }).length;
     var b = document.createElement('span');
@@ -2730,13 +2740,15 @@ body.portal-mode #moreFab{display:flex;}
     });
   }
   function openHanaLedger(){
-    var erp = null;
-    for(var i=0;i<APPS.length;i++){ if(APPS[i].key === 'erp'){ erp = APPS[i]; break; } }
-    if(!erp) return;
+    /* 거래내역은 재무 앱에서 연다(재무 창 pureun-fin) — 재무 타일이 없으면 이알피로(이알피가 재무 창으로 넘긴다) */
+    var app = null;
+    for(var i=0;i<APPS.length;i++){ if(APPS[i].key === 'fin'){ app = APPS[i]; break; } }
+    if(!app){ for(var j=0;j<APPS.length;j++){ if(APPS[j].key === 'erp'){ app = APPS[j]; break; } } }
+    if(!app) return;
     var v = Math.floor(Date.now()/600000);
-    var url = erp.url + '?sso=1&hanaAlert=1&v=' + v + '#menu=fin/ledger';
+    var url = app.url + (app.url.indexOf('?') >= 0 ? '&' : '?') + 'sso=1&hanaAlert=1&v=' + v + '#menu=fin/ledger';
     if(isMobile()) location.href = url;
-    else openPortalApp(erp, url);
+    else openPortalApp(app, url);
   }
   function closePortalHanaModal(){ var m=$('portalHanaModal'); if(m) m.style.display='none'; }
   function showPortalHanaModal(items){
@@ -2924,6 +2936,10 @@ body.portal-mode #moreFab{display:flex;}
       var _isAdm = (role === 'admin') ||
                    (typeof sgIsAdmin === 'function' && sgIsAdmin());
       if(app.adminOnly && !_isAdm) return;
+      /* 직원 인사·재무 — 관리자이거나 그 권한이 있을 때만(APPS 의 perm 머리글).
+         권한표(uid_roles)는 뒤에서 읽는다 — 그래서 타일은 만들어 두고 «감춰» 둔다(포털을 통째로 다시 그리지 않게).
+         읽고 나면 portalApplyAppPerm 이 보이거나 감춘다. */
+      var _permHide = !!(app.perm && !_isAdm && !(typeof portalAppPermOk === 'function' && portalAppPermOk(app.perm)));
       /* ⚠ 전에는 기금관리·업무관리에만 «주소로» 이름·역할을 넘겼다:
              fund.html?sso=1&user=최기운&role=사무장
          그런데 주소는 «누른 순간의 사진» 이다. 사람이 바뀌어도 주소는 안 바뀌고,
@@ -2936,6 +2952,7 @@ body.portal-mode #moreFab{display:flex;}
       var a = document.createElement('a');
       a.className = 'tile';
       a.dataset.key = app.key;
+      if(app.perm){ a.dataset.perm = app.perm; if(_isAdm) a.dataset.permAdmin = '1'; if(_permHide) a.style.display = 'none'; }
       a.dataset.row = appRowOf(app);
       /* 「누르면 하는 일」 타일(act)은 갈 주소가 없다 — 나머지는 아래와 «같은 길»로 그린다.
          두 길로 그리면 「PC 전용」 경고 같은 것이 한쪽에만 남는다. */
@@ -3029,6 +3046,7 @@ body.portal-mode #moreFab{display:flex;}
     if(window.sgSetUser) window.sgSetUser(acct);
     initPortalHanaAlerts(role);
     initPortalExpAlerts();
+    portalLoadAppPerm();      // 직원 인사·재무 타일 — 권한표를 읽어 보이거나 감춘다
     mfaOfferAfterLogin(role, info.via);
     /* 타일을 방금 새로 만들었으므로 이미 아는 알림은 곧바로 다시 붙인다 —
        다음 조회(3분)까지 기다리면 그 사이에는 표시가 사라져 있다. */
@@ -3061,8 +3079,39 @@ body.portal-mode #moreFab{display:flex;}
     APP_ROWS.forEach(function(r){
       var c = $('appTiles_' + r.id); if(!c) return;
       var box = c.closest ? c.closest('.tilerow') : c.parentNode;
-      if(box) box.style.display = c.children.length ? '' : 'none';
+      /* 감춰 둔 타일(권한 기다리는 직원 인사·재무)은 «없는 것»으로 센다 */
+      var shown = Array.prototype.some.call(c.children, function(t){ return !t.style || t.style.display !== 'none'; });
+      if(box) box.style.display = shown ? '' : 'none';
     });
+  }
+
+  /* ── 직원 인사·재무 타일 — 서버 권한표 uid_roles/{uid}.hr·fin (이알피가 로그인 때 적는다) ──
+     ⚠ 이 기기에 마지막으로 읽은 값을 둔다(pu_app_perm_<uid>) — 다음에 열 때 곧바로 보이게.
+     ⚠ 권한이 «빠졌으면» 감춘다 — 권한을 거둔 직원에게 타일이 남지 않게. */
+  var _portalAppPerm = null;
+  function _portalPermCache(uid){
+    try { return JSON.parse(localStorage.getItem('pu_app_perm_' + uid) || 'null'); } catch(e){ return null; }
+  }
+  function portalAppPermOk(perm){
+    var uid = (auth.currentUser && auth.currentUser.uid) || '';
+    var p = _portalAppPerm || (uid ? _portalPermCache(uid) : null);
+    return !!(p && (p.isAdmin === true || p.isSubAdmin === true || p[perm] === true));
+  }
+  function portalApplyAppPerm(){
+    allTiles().forEach(function(t){
+      if(!t.dataset || !t.dataset.perm || t.dataset.permAdmin === '1') return;
+      t.style.display = portalAppPermOk(t.dataset.perm) ? '' : 'none';
+    });
+    hideEmptyRows();
+  }
+  function portalLoadAppPerm(){
+    var u = auth.currentUser; if(!u || !u.uid) return;
+    db.ref('uid_roles/' + u.uid).once('value').then(function(s){
+      var v = s.val() || {};
+      _portalAppPerm = { hr: v.hr === true, fin: v.fin === true, isAdmin: v.isAdmin === true, isSubAdmin: v.isSubAdmin === true };
+      try { localStorage.setItem('pu_app_perm_' + u.uid, JSON.stringify(_portalAppPerm)); } catch(e){}
+      portalApplyAppPerm();
+    }).catch(function(){ /* 못 읽으면 마지막으로 아는 값 그대로 — 감춘 타일은 감춘 채 */ });
   }
 
   function tileConts(){

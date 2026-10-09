@@ -121,6 +121,7 @@ let t, tiles = 0, mismatch = [];
 while((t = tileRe.exec(portal))){
   const [, key, name, icon, url] = t;
   if(key === 'mail') continue;                 // 메일은 같은 파일을 주소로 갈라 쓴다(아래에서 따로 본다)
+  if(key === 'hr' || key === 'fin') continue;  // 직원 인사·재무도 이알피 파일을 주소로 갈라 쓴다(아래 ⑦)
   if(!info[url] || !info[url].emoji) continue;
   tiles++;
   if(info[url].emoji !== icon) mismatch.push(name + ' — 타일 ' + icon + ' / 탭 ' + info[url].emoji + ' (' + url + ')');
@@ -134,6 +135,21 @@ console.log('\n[⑥ 메일은 같은 파일을 주소로 갈라 쓴다]');
 const cards = fs.readFileSync(path.join(ROOT, 'pu-cards.html'), 'utf8');
 ok('메일 주소일 때 제목을 바꿔 단다', /view=mail[\s\S]{0,400}?document\.title\s*=/.test(cards));
 ok('메일 주소일 때 아이콘도 바꿔 단다', /view=mail[\s\S]{0,700}?link\[rel=icon\]/.test(cards));
+
+console.log('\n[⑦ 직원 인사·재무도 이알피 파일을 주소(?app=hr·fin)로 갈라 쓴다 — 2026-10-09]');
+/* <head> 에서 제 이름·탭 그림을 바꿔 단다. 그 그림(\\u 로 적힌 그림글자)이 포털 타일 그림과 같아야 한다 */
+const erpHtml = fs.readFileSync(path.join(ROOT, 'pu-erp.html'), 'utf8');
+const unesc = (s) => s.replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+const headSwap = (erpHtml.match(/app=\(hr\|fin\)[\s\S]{0,1400}?<\/script>/) || [''])[0];
+ok('이알피 머리말에 직원 인사·재무 바꿔 달기가 있다', /document\.title\s*=/.test(headSwap) && /link\[rel=icon\]/.test(headSwap));
+['hr', 'fin'].forEach(function(key){
+  const tm = portal.match(new RegExp("\\{ key:'" + key + "',\\s*name:'([^']*)',\\s*desc:'[^']*',\\s*icon:'([^']*)',\\s*url:'pu-erp\\.html\\?app=" + key + "'"));
+  ok(key + ' 타일이 이알피 파일을 ?app=' + key + ' 로 가리킨다', !!tm);
+  if(!tm) return;
+  const sm = headSwap.match(new RegExp("title:'" + tm[1] + "',\\s*emo:'([^']*)'"));
+  ok('★ ' + tm[1] + ' — 타일 그림과 탭 그림이 같다', !!sm && unesc(sm[1]) === tm[2],
+     '타일 ' + tm[2] + ' / 탭 ' + (sm ? unesc(sm[1]) : '(못 찾음)'));
+});
 
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
 process.exit(fail ? 1 : 0);

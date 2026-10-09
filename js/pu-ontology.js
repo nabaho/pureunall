@@ -71,6 +71,25 @@
     }
   };
 
+  /* ══ 직원 인사 · 재무가 맡는 표 이름 (2026-10-09 — 아래 PROGRAMS.hr·fin 머리글) ══
+     data/ 밑 «표 이름»만 적고 경로는 한 번에 만든다(dataRoots). 이 목록 하나를
+     이알피 백업의 앱별 목차·나스 앱별 받기가 함께 쓴다 — 표를 옮기면 «여기 한 곳»만 고친다.
+     ⚠ 표 자리(data/…)를 옮기는 것이 아니다 — «어느 앱이 맡는가»의 장부다. */
+  var HR_DATA_KEYS = ['user_accounts','user_dir','external_staff','employment_contracts','cert_log',
+    'attendance_records','overtime_records','comp_leave_records','holidays',
+    'leave_grants','leave_ledger','leave_promotion','leave_of_absence','special_leave_grants',
+    'payroll_monthly','payroll_irregular','payroll_audit_log','payslip_sent_log','pay_items',
+    'min_wage','insurance_rates','withholding_brackets','dc_contributions','pension_policy',
+    'retirement_settlements','mgr_rates','policy_perf','policy_leave','policy_loa',
+    'policy_special_leave','perf_confirm',
+    'locked_payroll_months','locked_irregular_months','locked_attend_months'];
+  var FIN_DATA_KEYS = ['finance_income','finance_expense','finance_invoice','ledger_batches','cms_ledger',
+    'bank_txn','ledger_held','bank_processed','ledger_picks','ledger_split_recipes',
+    'payer_aliases','expense_cat_aliases','combo_whitelist','income_categories','expense_categories',
+    'accounts','policy_vat','finance_bank_fee','finance_bank_fee_last','recurring_expenses',
+    'expense_budget','locked_income_months','locked_expense_months','month_close_log','trash_fin'];
+  function dataRoots(keys, tail){ return keys.map(function(k){ return 'data' + '/' + k + (tail || ''); }); }
+
   /* 포털 APPS의 key와 1:1로 맞춘다. 한 프로그램이 여러 뿌리를 읽어도
      자신이 정본으로 소유하는 뿌리는 primaryRoots에만 적는다. */
   var PROGRAMS = {
@@ -83,8 +102,35 @@
          규칙은 일부러 안 건드렸다 — 규칙 지우기는 안전장치를 건드리는 별개의 일이다.
          다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
-      primaryRoots:['data','improve_requests','hanaSmsBridge','ieum_public'],
+      primaryRoots:['data','improve_requests','ieum_public'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
+    /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
+         파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
+       ★ 코드는 이알피 한 벌이고 «들어가는 문»(?app=hr·fin)이 다르다(pu-erp.html PU_APPS 머리글).
+       ★ 여기 적은 primaryRoots 가 «그 앱의 자료»다 — 이 한 목록을 이알피가 읽어
+         서버 백업에 앱별 목차(apps)를 달고, 나스가 앱별 폴더로 따로 받아 간다(functions/nas-backup-export.js).
+         자료 자리(data/…)는 옮기지 않는다 — 스무 개 넘는 앱이 그 자리를 읽는다.
+       ⚠ 이알피의 'data' 밑에 «한 칸씩» 소유를 밝힌 것이다(겹침이 아니라 아래 칸 — auditRoots 의 nested).
+       ⚠ 다른 앱도 이 칸에 쓴다(캘린더의 근태, 업무관리의 성과 확인) — 그쪽은 제 writeContracts 로 쓴다.
+       ⚠ 저장 관문은 이알피와 같은 «관찰» 모드다 — 같은 저장 엔진(dbSet)을 쓰므로 하나만 막으면 둘이 갈라진다
+         (pu-ontology-write.js LEGACY_OBSERVE_PROGRAMS). */
+    hr:{ name:'직원 인사', file:'pu-erp.html?app=hr',
+      primaryRoots:dataRoots(HR_DATA_KEYS),
+      sharedRoots:dataRoots(['finance_income','finance_expense','companies','contracts','cases','consultings','funds',
+        'other_projects','company_info','security_perms','month_close_log']),
+      entityTypes:['Person','Employment','PayrollRecord','ScheduleEvent','Policy','Document'],
+      writeContracts:[{path:dataRoots(['payroll_monthly'], '/v/{id}')[0],entityType:'PayrollRecord'},
+                      {path:dataRoots(['attendance_records'], '/v/{id}')[0],entityType:'ScheduleEvent'},
+                      {path:dataRoots(['user_accounts'])[0],entityType:'Person'}] },
+    fin:{ name:'재무', file:'pu-erp.html?app=fin',
+      primaryRoots:dataRoots(FIN_DATA_KEYS).concat(['hanaSmsBridge']),
+      sharedRoots:dataRoots(['companies','contracts','cases','consultings','funds','other_projects','payroll_monthly',
+        'user_accounts','mgr_rates','policy_perf','locked_payroll_months','locked_attend_months','locked_irregular_months',
+        'locked_contract_months','app_settings']),
+      entityTypes:['FinancialTransaction','Invoice','Organization','Policy'],
+      writeContracts:[{path:dataRoots(['finance_income'], '/v/{id}')[0],entityType:'FinancialTransaction'},
+                      {path:dataRoots(['finance_expense'], '/v/{id}')[0],entityType:'FinancialTransaction'},
+                      {path:dataRoots(['finance_invoice'], '/v/{id}')[0],entityType:'Invoice'}] },
     /* 푸른 캘린더 — 법인 대시보드와 이음센터를 이알피에서 떼어 낸 앱 (대표 지시 2026-09-18).
        ⚠ 업무 자료의 주인은 «이알피»다. 여기는 그 칸을 빌려 읽는다(sharedRoots).
          일정·근태를 새로 만들 때도 이알피의 칸에 쓴다 — 두 벌로 갈리면 급여가 틀어진다.
@@ -437,6 +483,10 @@
     home_members:{program:'home',strategy:'remote',path:'homepage/members',parser:'homeMembers'},
     home_pages:{program:'home',strategy:'remote',path:'homepage/config/pages',parser:'homePages'},
     mail_private:{program:'mail',strategy:'in_app',parser:'mailHeaders'},
+    /* 직원 인사·재무 — 자료는 erp_core 가 이미 읽는다(같은 data 자리). 급여·주민번호·계좌·금액이라
+       통합 화면에서 따로 열지 않는다 — 앱 안에서만(in_app). */
+    hr_private:{program:'hr',strategy:'in_app',parser:'hrMetadata'},
+    fin_private:{program:'fin',strategy:'in_app',parser:'finMetadata'},
     rules_documents:{program:'rules',strategy:'in_app',parser:'ruleMetadata'},
     esign_cases:{program:'docs',strategy:'in_app',parser:'esignMetadata'},
     newsletter_issues:{program:'news',strategy:'in_app',parser:'newsletterMetadata'}

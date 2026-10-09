@@ -16,9 +16,9 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=53"></script>
+<script src="js/pu-ontology.js?v=54"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
-<script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -4359,8 +4359,12 @@ function copyLink(url){
 
 /* 이알피로 — 창은 «하나»만 쓴다(새 탭을 자꾸 만들지 않는다) */
 function goErp(menu){
-  var url = 'pu-erp.html?sso=1' + (menu ? '#menu='+encodeURIComponent(menu) : '');
-  try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, 'erp'); return; } } catch(e){}
+  /* 직원 인사·재무 화면은 «그 앱»으로 연다 (2026-10-09 이알피에서 갈라 냄 — pu-erp.html PU_APPS 머리글).
+     이알피로 열면 이알피가 다시 그 앱 창으로 넘겨, 창이 하나 더 열린다. */
+  var g = String(menu || '').split('/')[0];
+  var app = (g === 'hr' || g === 'fin') ? g : '';
+  var url = 'pu-erp.html?sso=1' + (app ? '&app=' + app : '') + (menu ? '#menu='+encodeURIComponent(menu) : '');
+  try { if(window.PuAppBar && PuAppBar.goApp){ PuAppBar.goApp(url, app || 'erp'); return; } } catch(e){}
   location.href = url;
 }
 /* 유형을 시간연차로 바꾸면 «몇 시간» 칸이 생긴다 — 바뀔 때 다시 그린다.
@@ -4511,7 +4515,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=21"></script>
+<script src="js/pu-appbar.js?v=22"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script>try{
