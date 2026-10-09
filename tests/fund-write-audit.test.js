@@ -72,3 +72,15 @@ test('⑦ 분할 — 잠긴 달·확정한 해는 열지도 풀지도 못한다'
   assert.match(fnSrc('splitForm'), /if\(txnLocked\(id\)\)\{ _lockStop/);
   assert.match(fnSrc('splitClear'), /if\(txnLocked\(id\)\)\{ closeM\(\); _lockStop/);
 });
+
+test('⑧ 결산 확정한 해 — 운영상황보고서 입력값·사업장 연도 기록도 못 고친다 (대표 「계속」 2026-10-09)', () => {
+  assert.match(fnSrc('f15Save'), /if\(_yearLocked\(\)\)\{ _lockStop\(''\); return; \}/);
+  assert.match(fnSrc('f15SetBf'), /if\(_yearLocked\(\)\)\{ _lockStop\(''\); return; \}/);
+  /* 사업장 연도 기록은 마감 자료를 안 읽은 탭이라 저장 직전에 서버에서 본다 */
+  const sy = fnSrc('sySet');
+  assert.ok(sy.indexOf('_yearLockedP(fid,yr)') >= 0 && sy.indexOf('_yearLockedP(fid,yr)') < sy.indexOf("/site_years/'+fid"), '확인보다 쓰기가 먼저다');
+  assert.match(fnSrc('syCopyPrev'), /_yearLockedP\(fid,yr\)\.then\(function\(lk\)\{ if\(lk\)/);
+  const p = fnSrc('_yearLockedP');
+  assert.ok(p.includes("'/locked').once('value')"), '서버에서 안 읽는다');
+  assert.ok(p.includes('function(){ return false; }'), '못 읽으면 저장까지 멈춘다');
+});
