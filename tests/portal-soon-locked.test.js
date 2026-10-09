@@ -73,10 +73,12 @@ function 그려보기(role) {
   return { 타일: m, 외침 };
 }
 
-/* 문서관리(docs)는 2026-10-04 대표 「직원도 문서관리 모두 본다」로 열었다 — tests/app-soon-gate.test.js ⑦ */
-const 준비중앱 = ['rules', 'payroll', 'mail', 'paydata'];
+/* ⚠ 처음 지목은 다섯이었는데 둘이 열렸다 — 수가 아니라 «이 목록»이 기준이다.
+   · 문서관리(docs) 2026-10-04 대표 「직원도 문서관리 모두 본다」 — app-soon-gate ⑦
+   · 푸른 메일(mail) 2026-10-09 대표 「푸른메일은 준비중 풀어도 된다」 — app-soon-gate ⑧ */
+const 준비중앱 = ['rules', 'payroll', 'paydata'];
 
-test('①★★ 대표가 지목한 다섯에 표가 붙어 있다', () => {
+test('①★★ 아직 준비중인 앱에 표가 붙어 있다', () => {
   const A = SRC.indexOf('var APPS = [');
   const 목록 = SRC.slice(A, SRC.indexOf('\n  ];', A));
   준비중앱.forEach(k => {
