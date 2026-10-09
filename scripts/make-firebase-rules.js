@@ -1441,6 +1441,8 @@ rules.pu_docs = {
     date:   { '.validate': 'newData.isString() && newData.val().length <= 10' },
     src:    { '.validate': "newData.val() === 'photo' || newData.val() === 'upload' || newData.val() === 'folder'" },
     secret: { '.validate': 'newData.isBoolean() && newData.val() === true' },
+    /* 계약 종류(2026-10-09 갈래별 정리) — 계약 기록 kind 와 같은 말(자문·급여관리·사건·컨설팅·기금·CMS·EDI·제안서·기타) */
+    kind:   { '.validate': 'newData.isString() && newData.val().length <= 20' },
     at:     { '.validate': 'newData.isNumber()' },
     by:     { '.validate': 'newData.val() === auth.uid' },
     byName: { '.validate': 'newData.isString() && newData.val().length <= 60' },

@@ -290,9 +290,18 @@
   }
   function updateCoDoc(key, docId, patch) {
     needDb();
-    return deps.db.ref(ROOT + '/co_docs/' + key + '/' + docId).update(clean({
+    var up = clean({
       title: patch.title == null ? undefined : String(patch.title).slice(0, 120),
-      date: patch.date == null ? undefined : String(patch.date).slice(0, 10) }));
+      date: patch.date == null ? undefined : String(patch.date).slice(0, 10) });
+    /* 종류(2026-10-09 갈래별 정리) — '' 이면 지운다(짐작으로 돌아감) */
+    if ('kind' in (patch || {})) up.kind = patch.kind ? String(patch.kind).slice(0, 20) : null;
+    return deps.db.ref(ROOT + '/co_docs/' + key + '/' + docId).update(up);
+  }
+  /* 갈래별 정리·대조표 (2026-10-09) — 계약 기록·파일 연결 «전체»를 한 번에. 둘 다 작다(파일 바이트 없음) */
+  function listAllCoData() {
+    needDb();
+    return Promise.all([deps.db.ref(ROOT + '/co_recs').once('value'), deps.db.ref(ROOT + '/co_docs').once('value')])
+      .then(function (r) { return { recs: r[0].val() || {}, docs: r[1].val() || {} }; });
   }
   function unlinkCoDoc(key, docId) {
     needDb();
@@ -374,7 +383,7 @@
     init: init, putOriginal: putOriginal, getOriginal: getOriginal, listOriginals: listOriginals,
     fileUrl: fileUrl, download: download, isSecret: isSecret, secretBlob: secretBlob, saveBlob: saveBlob, hasHash: hasHash,
     addCoDoc: addCoDoc, updateCoDoc: updateCoDoc, unlinkCoDoc: unlinkCoDoc,
-    listCo: listCo, listCoDocs: listCoDocs, probe: probe,
+    listCo: listCo, listCoDocs: listCoDocs, probe: probe, listAllCoData: listAllCoData,
     awaitRecord: awaitRecord, markAwait: markAwait, listAwait: listAwait, remindAwait: remindAwait, gotAwait: gotAwait,
     keepCo: keepCo, recRecord: recRecord, listCoRecs: listCoRecs, importCoRecs: importCoRecs, updateCoRec: updateCoRec, removeCoRec: removeCoRec
   };

@@ -2019,6 +2019,9 @@
             "secret": {
               ".validate": "newData.isBoolean() && newData.val() === true"
             },
+            "kind": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
             "at": {
               ".validate": "newData.isNumber()"
             },
