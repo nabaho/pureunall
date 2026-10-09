@@ -422,3 +422,17 @@ test('ⓔ 국세청 배선 — 번호만 보내고 기업정보함에 쓰지 않
   assert.match(s, /function conflictsOkToGo\(\) \{\s*var nv = ntsNow\(\);\s*if \(nv && nv\.bad && !w\.confirm/);
   assert.match(s, /st\.ntsLive = null;/, '회사를 바꾸면 방금 물어본 값이 지워져야 한다');
 });
+/* 2026-10-09 — 위임장·계약서에 「공동근로복지기금 설립과 관련하여」가 붙던 것 바로잡음 · 공단에 보낼 때 본문 */
+test('ⓕ 메일 기본값 — 기금 서류만 기금 문장, 공단이면 「담당자님 … 제출합니다」', () => {
+  const V = { 회사명: '가나상사(주)', 담당노무사: '홍길동' };
+  const a = CF.mailDefaults(V, '건강보험 EDI 업무대행 위임장');
+  assert.doesNotMatch(a.body, /공동근로복지기금/);
+  assert.match(a.body, /가나상사\(주\) 관련 건강보험 EDI 업무대행 위임장을 보내드립니다/);
+  const b = CF.mailDefaults({}, '위임장');
+  assert.match(b.body, /요청하신 위임장을 보내드립니다/);
+  const g = CF.mailDefaults(V, '고용·산재 보험사무대행 위임장', { agency: true });
+  assert.match(g.body, /^담당자님, 안녕하십니까\./);
+  assert.match(g.body, /가나상사\(주\) 사업장의 고용·산재 보험사무대행 위임장을 제출합니다\./);
+  assert.match(CF.mailDefaults(V, '공동근로복지기금 제안서').body, /공동근로복지기금 설립과 관련하여/);
+  assert.match(CF.mailDefaults({}, '자문계약서 (푸른 표준)').body, /자문계약서 \(푸른 표준\)를 보내드립니다/);
+});
