@@ -2435,7 +2435,7 @@ function _impPlan(data, over){
   return {plan:plan, unmatched:unmatched, cells:totalCells};
 }
 function _impPreview(data, fname){
-  window._impData=data;
+  window._impData=data; window._impFname=fname||'';   // 덮어쓰기 칸이 다시 부를 때 쓴다(따옴표를 속성에 넣지 않으려고)
   var over=!!S._impOver, r=_impPlan(data,over);
   var LBL={inka_no:'인가번호',inka_date:'인가일',corp_reg_no:'법인등록번호',reg_date:'설립등기일',
     registry_office:'관할등기소',tax_id_no:'고유번호',tax_office:'관할세무서',address:'소재지',phone:'전화',
@@ -2449,7 +2449,7 @@ function _impPreview(data, fname){
     +'<p class="muted" style="font-size:12px;margin:0 0 8px">파일: <b>'+esc(fname||'')+'</b> · 대상 기금 <b>'+r.plan.length+'</b>개 · 채울 항목 <b>'+r.cells+'</b>칸'
     +(r.unmatched.length?'<br>매칭 실패 '+r.unmatched.length+'건(기금ID·기금법인명 불일치): '+esc(r.unmatched.slice(0,6).join(', '))+(r.unmatched.length>6?' 외':''):'')+'</p>'
     +'<label style="font-size:12px;display:flex;align-items:center;gap:6px;margin:0 0 10px;cursor:pointer">'
-    +'<input type="checkbox"'+(over?' checked':'')+' onchange="S._impOver=this.checked;_impPreview(window._impData,'+JSON.stringify(fname||'')+')"> '
+    +'<input type="checkbox"'+(over?' checked':'')+' onchange="S._impOver=this.checked;_impPreview(window._impData,window._impFname)"> '
     +'<span>이미 값이 있는 칸도 <b>덮어쓰기</b> (기본: 빈 칸만 채움 — 웹에서 입력한 값 보호)</span></label>'
     +(r.plan.length
       ? '<div style="max-height:44vh;overflow:auto;border:1px solid var(--line);border-radius:8px"><table><thead><tr><th>기금</th><th>채울 항목</th><th class="center">칸</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
@@ -11693,13 +11693,17 @@ function _dataUrlToFile(src,name){
      화면에서 막는다. 실수로 고치는 것을 막는 것이 목적이다. */
 function _monthOf(d){ var m=String(d||'').slice(5,7); return /^(0[1-9]|1[0-2])$/.test(m)?m:''; }
 function monthLocked(mm){ return !!(((S.f15Close||{}).months||{})[mm]); }
-/* 그 거래의 달이 잠겼는가 — 막는 자리마다 이 하나만 부른다 */
+/* 보고 있는 해가 «결산 확정»됐는가 — 확정한 해는 달 잠금과 상관없이 장부를 못 고친다(점검 2026-10-09: 확정만 하고 달을 안 잠그면 다 고쳐졌다).
+   ⚠ 지금 기금·연도의 마감 자료(S.f15Close)일 때만 본다 — 다른 해 것이 남아 있으면 엉뚱하게 막는다. */
+function _yearLocked(){ return !!(S.f15For===S.fundId+'/'+S.year&&S.f15Close&&S.f15Close.locked); }
+/* 그 거래의 달이 잠겼는가 — 막는 자리마다 이 하나만 부른다(결산 확정한 해도 잠김) */
 function txnLocked(id){
   var x=(S.txns||{})[id]; if(!x) return false;
-  return monthLocked(_monthOf(x.date));
+  return (typeof _yearLocked==='function'&&_yearLocked())||monthLocked(_monthOf(x.date));
 }
 function _lockStop(mm){
-  toast((+mm)+'월은 마감되어 고칠 수 없습니다 — 월마감을 풀고 고치세요','warn');
+  if(_yearLocked()) toast(S.year+'년은 결산 확정되어 장부를 고칠 수 없습니다 — 확정을 풀고 고치세요','warn');
+  else toast((+mm)+'월은 마감되어 고칠 수 없습니다 — 월마감을 풀고 고치세요','warn');
   renderFund();
 }
 function monthLockSet(mm,on){
@@ -12958,7 +12962,7 @@ function applyCardsMulti(){
     rows.reduce(function(p,r){
       return p.then(function(){
         return cardFull(r).then(function(e){
-          var rec=_cardIntoRec(T,e,{status:'active'});
+          var rec=_cardIntoRec(T,e,{status:'active'}).rec;   // ⚠ {rec,got,keys} 로 돌아온다 — 통째로 저장하던 것(2026-09-13~, 점검 2026-10-09)
           if(!String(rec.name||'').trim()) rec.name=String(r.c||'').trim();
           if(!rec.name) { fail++; return; }
           var _ref=fbDb.ref(NS+'/sites/'+fid).push();
@@ -14969,7 +14973,18 @@ function importSites(){
   inp.onchange=function(ev){ var f=ev.target.files&&ev.target.files[0]; if(!f) return;
     var rd=new FileReader(); rd.onload=function(){
       try{ var data=JSON.parse(rd.result);
-        confirmM('사업장 데이터를 Firebase로 가져올까요?\n(기금별 사업장 전체 덮어쓰기)',{ok:'가져오기'}).then(function(ok){ if(!ok)return;
+        /* ⚠ 모양부터 본다 — 다른 모양(한 기금의 {사업장:…}, 기금 백업)을 그대로 sites/ 아래에 쓰면 가짜 기금이 생긴다(점검 2026-10-09) */
+        var _fids=Object.keys(data||{}), _bad=_fids.filter(function(k){ var v=data[k]; return !funds[k]||!v||typeof v!=='object'||Array.isArray(v)
+          ||Object.keys(v).some(function(s){ return !v[s]||typeof v[s]!=='object'||Array.isArray(v[s]); }); });
+        if(!_fids.length||_bad.length){ toast('사업장 백업 모양이 아닙니다'+(_bad.length?' — 모르는 기금·모양: '+_bad.slice(0,3).join(', '):''),'err'); return; }
+        fbDb.ref(NS+'/sites').once('value').then(function(sn){ var cur=sn.val()||{};
+          var lines=_fids.map(function(k){ var a=cur[k]||{}, b=data[k]||{};
+            var add=Object.keys(b).filter(function(s){ return !a[s]; }).length, gone=Object.keys(a).filter(function(s){ return !b[s]; }).length;
+            return '· '+((funds[k]||{}).short_name||(funds[k]||{}).name||k)+': 지금 '+Object.keys(a).length+'곳 → '+Object.keys(b).length+'곳'+(add?' (새로 '+add+')':'')+(gone?' — 없어지는 곳 '+gone:''); });
+          var goneAll=_fids.reduce(function(n,k){ var a=cur[k]||{}, b=data[k]||{}; return n+Object.keys(a).filter(function(s){ return !b[s]; }).length; },0);
+          return confirmM('사업장 백업으로 기금 '+_fids.length+'곳의 사업장 목록을 «통째로» 바꿉니다.\n\n'+lines.slice(0,12).join('\n')+(lines.length>12?'\n· 외 '+(lines.length-12)+'곳':'')
+            +(goneAll?'\n\n⚠ 백업 뒤에 더한 사업장 '+goneAll+'곳이 없어집니다.':''),{ok:'가져오기',danger:!!goneAll});
+        }).then(function(ok){ if(!ok)return;
           fbDb.ref(NS+'/sites').update(data).then(function(){
               /* 사업장 «통째» 덮어쓰기다 — 칸이 아니라 사업장 단위로 출처를 남기고 기금마다 기록 한 줄 */
               var _cells=[]; Object.keys(data||{}).forEach(function(fid){ Object.keys(data[fid]||{}).forEach(function(sid){
@@ -20505,6 +20520,7 @@ function _rsvSetOf(fid,yr){
 }
 function saveOpening(){
   var _fid=S.fundId,_yr=S.year;
+  if(_yearLocked()){ _lockStop(''); return; }   // 결산 확정한 해의 전기이월은 못 고친다
   /* 저장 목록을 손으로 적어 두었더니 칸을 늘릴 때 빠졌다(매도가능증권 전기이월이 저장되지 않았다).
      OPEN_ACCT에서 뽑아 쓰면 칸과 저장이 어긋날 수 없다. */
   var o={}; Object.keys(OPEN_ACCT).forEach(function(k){var el=$('op-'+k);if(el)o[k]=num(el.value)||0;});
@@ -20785,7 +20801,7 @@ function parseBank(rows){
    하한 미만은 확실(sure)로 보지 않고 추정(guess)으로 내려 사람이 확인하게 한다. */
 var XFER_MIN=10000;
 function findTransfers(arr){
-  var pool=(arr||[]).filter(function(x){ return !x.xfer; });
+  var pool=(arr||[]).filter(function(x){ return !x.xfer&&!((x.splits||[]).length); });   // 이미 처리된 이체 · 쪼갠 거래는 이체가 아니다
   var deps=pool.filter(function(x){ return (num(x.deposit)||0)>0; });
   var wds =pool.filter(function(x){ return (num(x.withdraw)||0)>0; });
   var used={}, pairs=[];
@@ -20805,7 +20821,7 @@ function findTransfers(arr){
     if(!pick){ pick=cands.filter(function(w){ return !d.acct || !w.acct || d.acct!==w.acct; })[0]; kind='guess'; }
     if(!pick) return;
     used[pick._id]=used[d._id]=1;
-    pairs.push({inId:d._id, outId:pick._id, date:d.date, amount:amt, kind:kind,
+    pairs.push({inId:d._id, outId:pick._id, date:d.date, amount:amt, kind:kind, appr:!!(d.approved||pick.approved),
                 inMemo:String(d.memo||''), outMemo:String(pick.memo||'')});
   });
   return pairs;
@@ -20845,14 +20861,14 @@ function autoMatchTransfers(){
    · 통장 가져오기 직후에도 같은 창이 뜬다(예전엔 확실한 짝을 묻지 않고 승인까지 했다). */
 function _xferModal(pairs,fid,yr,lead){
   var rows=pairs.map(function(pr,i){
-    return '<tr><td style="text-align:center"><input type="checkbox" class="xfer-pick" data-i="'+i+'"'+(pr.kind==='sure'?' checked':'')+' onchange="_xferCount()"></td>'
+    return '<tr><td style="text-align:center"><input type="checkbox" class="xfer-pick" data-i="'+i+'"'+(pr.kind==='sure'&&!pr.appr?' checked':'')+' onchange="_xferCount()"></td>'
       +'<td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
       +'<td>'+esc(pr.date)+'</td><td style="text-align:right">'+pr.amount.toLocaleString()+'</td>'
       +'<td class="muted" style="font-size:11.5px">'+esc(pr.outMemo.slice(0,26))+' → '+esc(pr.inMemo.slice(0,26))+'</td>'
-      +'<td>'+(pr.kind==='sure'?'<span class="chip ok" style="font-size:10px">계좌 다름</span>'
+      +'<td>'+(pr.appr?'<span class="chip warn" style="font-size:10px" title="이미 승인한 줄이 있습니다 — 고르면 그 분개가 현금↔현금 이체로 바뀝니다">승인된 줄 있음</span> ':'')+(pr.kind==='sure'?'<span class="chip ok" style="font-size:10px">계좌 다름</span>'
         :'<span class="chip warn" style="font-size:10px">추정(계좌번호 없음)</span>')+'</td></tr>';
   }).join('');
-  var nSure=pairs.filter(function(p){return p.kind==='sure';}).length;
+  var nSure=pairs.filter(function(p){return p.kind==='sure'&&!p.appr;}).length;
   window._xferPairs={pairs:pairs,fid:fid,yr:yr};
   showModal('<div class="row" style="margin:0 0 6px"><h2 style="margin:0">계좌 간 이체 자동매칭</h2>'
     +'<span class="chip" style="font-size:10px">'+pairs.length+'쌍</span>'+hlp('xfer.pick')+'</div>'
@@ -20873,6 +20889,11 @@ function _xferPicked(){
 function _xferCount(){ var b=$('xferGo'); if(b) b.textContent=_xferPicked().length+'쌍 상계 처리'; }
 function _applyXfer(){
   var d=window._xferPairs||{}, pairs=_xferPicked();
+  /* 잠긴 달·확정한 해의 짝은 상계하지 않는다(점검 2026-10-09) — 보고 있는 기금·연도일 때만 잠금을 안다 */
+  if((d.fid||S.fundId)===S.fundId&&(d.yr||S.year)===S.year){
+    var _lk=pairs.filter(function(pr){ return _yearLocked()||monthLocked(_monthOf(pr.date)); });
+    if(_lk.length){ pairs=pairs.filter(function(pr){ return _lk.indexOf(pr)<0; }); toast('마감한 달의 짝 '+_lk.length+'쌍은 빼고 상계합니다','warn'); }
+  }
   if(!pairs.length){ toast('상계할 짝을 고르세요','warn'); return; }
   window._xferPairs=null; closeM();
   if(typeof _trEv==='function'){ var _fid=d.fid||S.fundId;
@@ -20909,7 +20930,7 @@ function addTxnSave(){
   /* 새 거래도 «그 거래의 달»이 잠겼으면 못 넣는다 — 마감한 달에 뒤늦게 끼워 넣으면
      이미 낸 월계표·시산표와 어긋난다. */
   var _nd=$('nt-date'), _nm=_monthOf(_nd&&_nd.value);
-  if(_nm&&monthLocked(_nm)){ _lockStop(_nm); return; }
+  if(_yearLocked()||(_nm&&monthLocked(_nm))){ _lockStop(_nm); return; }
   var v=function(id){ var e=$(id); return e?String(e.value||'').trim():''; };
   var date=v('nt-date'), memo=v('nt-memo');
   var dep=num(v('nt-dep'))||0, wd=num(v('nt-wd'))||0, bal=num(v('nt-bal'))||0;
@@ -20924,9 +20945,20 @@ function addTxnSave(){
   var rec={date:date,memo:memo,deposit:dep,withdraw:wd,balance:bal,acct:acct,
            debit:p.d,credit:p.c,approved:false,manual:1};
   if(p.d&&p.c&&p.src) rec.sug=p.src;
-  fbDb.ref(NS+'/txns/'+fid+'/'+yr+'/'+key).set(rec).then(function(){
-    S.txnsFor=null; closeM(); renderFund();
-    toast('거래를 추가했습니다'+(p.d&&p.c?' · 계정 제안 '+p.d+'/'+p.c:' — 계정을 지정하세요'));
+  /* ⚠ 같은 키가 이미 있으면 덮지 않는다 — 덮으면 승인·분개·증빙이 날아간다(점검 2026-10-09). 묻고, 따로 넣기로 하면 가져오기처럼 번호를 붙인다 */
+  var _base=NS+'/txns/'+fid+'/'+yr+'/';
+  fbDb.ref(_base).once('value').then(function(sn){
+    var ex=sn.val()||{};
+    var put=function(k){ return fbDb.ref(_base+k).set(rec).then(function(){
+      S.txnsFor=null; closeM(); renderFund();
+      toast('거래를 추가했습니다'+(p.d&&p.c?' · 계정 제안 '+p.d+'/'+p.c:' — 계정을 지정하세요'));
+    }); };
+    if(!ex[key]) return put(key);
+    return confirmM('같은 날·같은 금액·같은 적요의 거래가 이미 있습니다.\n\n같은 거래를 두 번 넣는 것이면 [취소] — 이미 있는 줄(승인·분개)은 그대로 둡니다.\n정말 따로 있는 거래면 [따로 하나 더].',{ok:'따로 하나 더'}).then(function(ok){
+      if(!ok) return;
+      var n=2, k2=hkey(base+'|'+n); while(ex[k2]){ n++; k2=hkey(base+'|'+n); }
+      return put(k2);
+    });
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
 function importBank(){
@@ -20977,6 +21009,7 @@ function importBank(){
             fbDb.ref(NS+'/closing/'+_fid+'/'+_yr).once('value').then(function(sn){ return sn.val()||{}; }).catch(function(){ return {}; })]).then(function(_pre){   // 배운 거래처·참여사업장명을 제안에 반영 · 마감 상태(자동 승인은 마감한 달·확정한 해를 안 건드린다)
           var _snames=_pre[1], _cl=_pre[2]||{};
           var _lockedM=function(d){ return !!(_cl.locked||(_cl.months||{})[_monthOf(d)]); };
+          if(_cl.locked){ toast(_yr+'년은 결산 확정되어 통장을 가져올 수 없습니다 — 확정을 풀고 가져오세요','warn'); return; }
           var path=NS+'/txns/'+_fid+'/'+_yr;
           fbDb.ref(path).once('value').then(function(snap){   // 서버 최신본 기준 중복검사 — 오래된 캐시로 승인 거래 덮어쓰기 방지
             var existing=snap.val()||{};
@@ -21109,6 +21142,7 @@ function _sampleSize(n){ return n<=5?n:Math.min(10,Math.max(5,Math.ceil(n*0.05))
 var _SA=null;
 function sampleApprove(){
   var fid=S.fundId, yr=S.year;
+  if(_yearLocked()){ _lockStop(''); return; }
   if(!S.txns||S.txnsFor!==fid+'/'+yr){ toast('거래를 아직 읽는 중입니다 — 잠시 뒤 다시 누르세요','warn'); return; }
   Promise.all([loadLearned(),_siteNames(fid)]).then(function(pre){
     var names=pre[1];
@@ -21180,6 +21214,7 @@ function delTxn(id){
 var _splitId=null, _splitRows=[];
 function splitForm(id){
   var x=(S.txns||{})[id]; if(!x){ toast('거래를 찾지 못했습니다','err'); return; }
+  if(txnLocked(id)){ _lockStop(_monthOf(x.date)); return; }
   var total=(num(x.deposit)||0)+(num(x.withdraw)||0);
   if(!total){ toast('금액이 없는 거래는 쪼갤 수 없습니다','warn'); return; }
   _splitId=id;
@@ -21251,6 +21286,7 @@ function splitSave(){
 }
 function splitClear(){
   var id=_splitId, _key=S.fundId+'/'+S.year;
+  if(txnLocked(id)){ closeM(); _lockStop(_monthOf(((S.txns||{})[id]||{}).date)); return; }   // 잠긴 달·확정한 해는 분할도 못 푼다
   fbDb.ref(NS+'/txns/'+_key+'/'+id+'/splits').remove().then(function(){
     if(S.txnsFor===_key&&S.txns&&S.txns[id]) S.txns[id].splits=null;
     closeM(); renderFund(); toast('분할을 해제했습니다');
