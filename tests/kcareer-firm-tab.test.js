@@ -32,6 +32,8 @@ function 세상(이알피, 여기) {
     NS: 'cm3_',
     LS: { get: (k) => 저장[k] || '', set: (k, v) => { 저장[k] = v; } },
     toast: (m) => 알림.push(String(m)),
+    /* 🏢 법인 도장 칸은 이 검사 밖 — kcareer-own-files.test.js 가 본다 */
+    _safe: (f) => f(), renderFirmSeal: () => {},
     escapeHtml: (x) => String(x == null ? '' : x), _jsAttr: (x) => String(x == null ? '' : x),
     document: {
       getElementById: (id) => (id === 'firmGrid' ? grid : id === 'firmState' ? state : null),
