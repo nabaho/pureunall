@@ -295,14 +295,48 @@
       }
       var hit = null; for (var i = 0; i < 업체.length; i++) if (글.indexOf(업체[i].f) >= 0) { hit = 업체[i]; break; }
       var ty = null; for (var j = 0; j < 유형.length; j++) if (글.indexOf(유형[j].f) >= 0) { ty = 유형[j].type; break; }
-      seen[key] = { s: m.s || '', an: an.slice(0, 4), d: m.d || 0, n: 1, box: m.box || '',
+      /* k·box 는 «그 메일을 다시 여는» 열쇠다(담당자 읽기) — 가장 늦은 한 통이 아니라 처음 본 통을 든다 */
+      seen[key] = { s: m.s || '', an: an.slice(0, 4), d: m.d || 0, n: 1, box: m.box || '', k: m.k == null ? '' : String(m.k),
         match: hit ? { org: hit.org, id: hit.id } : null, type: ty || (hit && hit.type) || '' };
       out.push(seen[key]);
     });
     return out.sort(function (a, b) { return b.d - a.d; });
   }
 
+  /* ── 👤 결과보고서 속 담당자 (대표 지시 2026-10-09 「결과보고서에 담당자 이름이 있는데 이부분검토」) ──
+     글(메일 본문·보고서 첨부)에서 «아는 사람 이름»(직원 명부 + 실적의 담당)을 찾아 점수를 매긴다.
+     ⚠ 이름을 지어내지 않는다 — 명부에 있는 이름만 찾는다.
+     ⚠ 「담당·수행·컨설턴트·노무사·작성·책임·참여·PM」 가까이(앞뒤 25자) 있으면 +3,
+        「대표」 가까이면 −3 — 대표노무사 서명은 모든 메일에 붙어 있어 그대로 세면 늘 대표가 1등이다.
+     ⚠ 결과는 «후보»다 — 실적 기록을 고치지 않는다(실적은 이알피에서 오고, 담당은 이알피에서 고친다). */
+  var OWNER_NEAR = /담당|수행|컨설턴트|노무사|작성|책임|참여|PM|전문위원|코치/;
+  function ownerGuess(text, names) {
+    var t = String(text || ''), out = [];
+    var 이름들 = []; (names || []).forEach(function (n) { n = String(n || '').trim(); if (n.length >= 2 && 이름들.indexOf(n) < 0) 이름들.push(n); });
+    이름들.forEach(function (n) {
+      var at = 0, score = 0, ctx = '', near = false, best = -99;
+      while ((at = t.indexOf(n, at)) >= 0) {
+        var 앞 = t.slice(Math.max(0, at - 25), at), 뒤 = t.slice(at + n.length, at + n.length + 25), 둘레 = 앞 + ' ' + 뒤;
+        var s = 1;
+        if (OWNER_NEAR.test(둘레)) { s += 3; near = true; }
+        if (/대표/.test(앞.slice(-8))) s -= 3;
+        if (s > best) { best = s; ctx = (앞 + n + 뒤).replace(/\s+/g, ' ').trim(); }   /* 가장 그럴듯한 자리 하나를 보여 준다 */
+        score += s; at += n.length;
+      }
+      if (score > 0) out.push({ name: n, score: score, near: near, ctx: ctx.slice(0, 70) });
+    });
+    return out.sort(function (a, b) { return b.score - a.score || a.name.localeCompare(b.name); });
+  }
+  /* 담당을 읽을 첨부 하나 — 이름에 결과·완료·최종 보고가 들고, 글자를 꺼낼 수 있는 꼴(pdf·hwp·hwpx)인 것 */
+  function reportAtt(atts) {
+    var list = (atts || []).map(function (a, i) { return { a: a, i: i }; })
+      .filter(function (x) { return x.a && /\.(pdf|hwpx?)$/i.test(String(x.a.name || '')) && Number(x.a.size || 0) < 15 * 1024 * 1024; });
+    var 보고 = list.filter(function (x) { return REPORT_RE.test(String(x.a.name || '')); });
+    return (보고[0] || null);
+  }
+
   var api = {
+    ownerGuess: ownerGuess, reportAtt: reportAtt,
     perfYear: perfYear, perfTable: perfTable, topCounts: topCounts, flatName: flatName, mailReports: mailReports, REPORT_RE: REPORT_RE,
     xlsxLines: xlsxLines, perfFields: perfFields,
     KINDS: KINDS, STAGES: STAGES, DOC_KINDS: DOC_KINDS,
