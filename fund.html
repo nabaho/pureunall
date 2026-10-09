@@ -11267,7 +11267,7 @@ var _dfFound={}, _dfScanned=0;
    ⚠ 메일을 보내거나 지우지 않는다. 읽기만. 칸에 넣는 것은 늘 사람이 확인 창에서. */
 var MF_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/';
 var MF_TOP=12;
-var MF_KINDS=[['corpreg',/등기사항|등기부|법인등기/],['taxid',/고유번호/],['inka',/인가증|설립인가/],
+var MF_KINDS=[['corpreg',/등기사항|등기부|법인등기/],['taxid',/고유번호/],['inka',/인가증|설립인가(?![ ·_-]*신청)/],
   ['wrep',/재직증명/],['urep',null],['smecert',/중소기업확인/],['bizreg',/사업자등록증/]];
 /* 사업장 서류(대표 「사업장서류까지」 2026-10-09) — 그 사업장 편집 창으로 간다. 사진첩에서 고를 때와 같은 범위·같은 확인 창.
    재직증명서는 근로자대표가 기본(사용자대표 것이면 사람이 바꾼다 — 이름만으로는 못 가른다). */

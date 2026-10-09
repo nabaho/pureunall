@@ -20,6 +20,8 @@ test('★ 서류 종류 — 첨부·제목 글자로 (기금 서류 + 🏢 사�
   assert.equal(box.kind('법인등기부등본(말소포함).pdf'), 'corpreg');
   assert.equal(box.kind('고유번호증 사본.jpg'), 'taxid');
   assert.equal(box.kind('설립인가증.pdf'), 'inka');
+  assert.equal(box.kind('충남10호 설립인가 서류.zip'), 'inka');
+  assert.equal(box.kind('설립인가신청서-10호.pdf'), '', '신청서를 인가증으로 잡았다');
   assert.equal(box.kind('재직증명서-10호.pdf'), 'wrep', '재직증명서는 근로자대표가 기본');
   assert.equal(box.kind('중소기업확인서.pdf'), 'smecert');
   assert.equal(box.kind('사업자등록증(가나산업).png'), 'bizreg');
