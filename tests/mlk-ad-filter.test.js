@@ -47,14 +47,18 @@ function box(opt) {
   /* 반송 잣대는 «진짜 것»을 그대로 꺼내 쓴다 — 흉내를 내면 검사가 검사를 검사하게 된다 */
   const bot = W.match(/var MLK_BOT=[^\n]*/);
   assert.ok(bot, 'MLK_BOT 을 못 찾았습니다');
-  vm.runInContext([bot[0], grab('mlkAuto'), grab('mlkIsNo'), grab('mlkWhyOut'), grab('mlkCanNo')].join('\n'), b);
+  /* 2026-10-09 — 알림 주소 앞부분·이름 있는 발송 회사·공공기관 잣대도 «진짜 것»을 꺼내 쓴다 */
+  const pub = W.match(/var MAIL_PUBLIC=\{[^}]*\};/); assert.ok(pub, 'MAIL_PUBLIC 을 못 찾았습니다');
+  const more = [pub[0].replace(/^var MAIL_PUBLIC=/, 'var MAIL_PUBLIC=')].concat(['MLK_NOTI', 'MLK_BULKDOM', 'MLK_PUBLIC_DOM'].map((n) => {
+    const m = W.match(new RegExp('var ' + n + '=[^\\n]*')); assert.ok(m, n + ' 을 못 찾았습니다'); return m[0]; }));
+  vm.runInContext([bot[0]].concat(more, [grab('mlkAuto'), grab('mlkIsNo'), grab('mlkWhyOut'), grab('mlkCanNo')]).join('\n'), b);
   return b;
 }
 
 /* 판정이 쓰는 글자 — 돌려주는 «이름표»는 빼고 본다.
    ⚠ '광고'·'반송'은 가리는 낱말이 아니라 «왜 뺐는지 적는 말»이다. 그것까지 금지하면
      화면에 이유를 못 적는데, 이유를 안 적으면 사람이 기계를 못 믿는다. */
-const LABELS = ["'광고'", "'반송'", "'앞으로도 아님'"];
+const LABELS = ["'광고'", "'반송'", "'앞으로도 아님'", "'알림'"];   /* 「알림」 — 2026-10-09 */
 function judgeSrc() {
   let t = noComment([grab('mlkAuto'), grab('mlkWhyOut'), grab('mlkIsNo')].join('\n'));
   LABELS.forEach(l => { t = t.split(l).join(' '); });
@@ -210,4 +214,43 @@ test('★ 자리와 구독이 «둘 다» 있다 — 읽기 실패는 조용하�
 test('고른 것을 인라인에 실어 보내지 않는다 — 따옴표가 핸들러를 깨뜨린다', () => {
   assert.ok(W.indexOf('mlkNoneSel()') >= 0, '고른 것을 읽어 가는 함수가 없습니다');
   assert.equal(W.indexOf('mlkNone('+"'"+'+JSON.stringify(picked)'), -1);
+});
+
+/* ── 알림 주소·대량 발송 회사 (대표 지시 2026-10-09 → 추천대로) ──────────────
+   실측: 이어 줄 메일 87통 중 17통이 이 둘이었다. 제목·본문은 여전히 안 본다(위 ★★). */
+
+test('기계 발신 주소(noreply·newsletter·marketing …)는 「알림」으로 뺀다', () => {
+  const b = box();
+  ['no-reply@claude.com', 'noreply@synology.com', 'Synology Marketing <marketing@synology.com>',
+   'no-reply-accounts@hancom.com', 'newsletter@example.com'].forEach(f => {
+    assert.equal(b.mlkAuto({ from: f }), '알림', '못 뺐습니다: ' + f);
+  });
+});
+
+test('이름 있는 대량 발송 회사·뉴스 하위 도메인은 「광고」로 뺀다', () => {
+  const b = box();
+  ['인크루트 <recommend@incruit-email.com>', 'Synology Newsletter <hello@news.synology.com>', 'x@balsong.com'].forEach(f => {
+    assert.equal(b.mlkAuto({ from: f }), '광고', '못 뺐습니다: ' + f);
+  });
+});
+
+test('★★ 공공기관 주소는 noreply 라도 «절대» 안 뺀다 — 고용노동부·공단 알림은 일이다', () => {
+  const b = box();
+  ['noreply-notice@moel.go.kr', 'no-reply@comwel.or.kr', 'newsletter@kosha.or.kr', 'noreply@korea.kr'].forEach(f => {
+    assert.equal(b.mlkAuto({ from: f }), '', '공공기관 메일을 뺐습니다: ' + f);
+  });
+});
+
+test('★★ 업체에 걸린 주소는 noreply 라도 안 뺀다 — 고객사의 전자계약·급여 시스템 알림', () => {
+  const b = box({ cosOf: () => ({ cos: ['가나상사'], agent: false }) });
+  assert.equal(b.mlkAuto({ from: 'noreply@ganasa.co.kr' }), '', '업체 주소의 알림을 뺐습니다');
+  const t = box({ cosOf: () => ({ cos: [], agent: true }) });
+  assert.equal(t.mlkAuto({ from: 'newsletter@taxoffice.kr' }), '', '세무사무소 주소를 뺐습니다');
+});
+
+test('흔한 메일 도메인은 발송 회사가 아니다 — naver·gmail 사람 메일은 안 뺀다', () => {
+  const b = box();
+  ['박과장 <park@naver.com>', 'kim@gmail.com', 'lee@hanmail.net', 'news.reporter@daum.net'].forEach(f => {
+    assert.equal(b.mlkAuto({ from: f }), '', '사람 메일을 뺐습니다: ' + f);
+  });
 });

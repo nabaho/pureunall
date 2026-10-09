@@ -183,8 +183,12 @@ test('★ 서버가 적는 곳과 화면이 읽는 곳이 «둘 다» 있다', (
 });
 
 test('지운 표가 광고 표보다 «먼저»다 — 왜 빠졌는지가 거짓말이 되면 안 된다', () => {
+  /* 2026-10-09 — mlkAuto 가 알림·발송 회사 판정으로 길어졌다. 고정 700자로 자르면 끝을 못 본다
+     (test-cut-truncation 가드) — 함수를 괄호 짝으로 «통째로» 꺼낸다. */
   const i = W.indexOf('function mlkAuto(');
-  const src = W.slice(i, i + 700);
+  let d = 0, j = i;
+  for (;; j++) { if (W[j] === '{') d++; else if (W[j] === '}') { d--; if (!d) { j++; break; } } }
+  const src = W.slice(i, j);
   assert.ok(src.indexOf('m.gone===true') < src.indexOf('m.bulk===true'),
     '지운 메일을 「광고」라고 적습니다');
 });
