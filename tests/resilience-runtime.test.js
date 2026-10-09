@@ -28,7 +28,7 @@ test('locks and presence records are excluded from delayed replay', () => {
 
 test('every Firebase HTML entry loads resilience and health runtimes in safe order', () => {
   const entries = [
-    'chwieop.html', 'docs-esign.html', 'enter.html', 'fund-poc.html', 'fund.html',
+    'chwieop.html', 'docs-esign.html', 'enter.html', 'fund.html',
     'gov-consulting.html', 'ieum-view.html', 'kcareer.html', 'payroll-os.html',
     /* ⚠ 2026-08-08 pu-camera.html 을 뺐다 — 촬영 코드를 사진첩 하나로 합치면서
        문패만 남는 넘김 페이지가 됐다(pu-photos.html?cam=1 로 replace).
