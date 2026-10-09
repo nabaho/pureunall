@@ -328,8 +328,10 @@
   }
 
   /* ── ✉ 메일 기본값 · 보낸 기록 (설계 2026-09-29 §7) ── 저장하지 않는 기본값이다. 창에서 고친다. */
-  function mailDefaults(V, formName) {
-    V = V || {};
+  /* opts.agency — 받는 곳이 공단(근로복지공단·건강보험·국민연금) 직원일 때: 「담당자님」·「제출합니다」.
+     ⚠ 「공동근로복지기금 설립과 관련하여」는 기금 서류(이름에 「기금」)일 때만 — 위임장·계약서에 붙던 것을 바로잡음(2026-10-09) */
+  function mailDefaults(V, formName, opts) {
+    V = V || {}; opts = opts || {};
     var to = [], seen = {};
     function add(v, label) { v = String(v || '').trim(); if (!v || seen[v.toLowerCase()]) return; seen[v.toLowerCase()] = 1; to.push({ v: v, label: label + ' · ' + v }); }
     add(V.담당자이메일, '담당자 메일' + (V.담당자 ? ' · ' + V.담당자 : ''));
@@ -337,10 +339,18 @@
     var co = String(V.회사명 || '').trim();
     var dear = (V.참조 && V.참조 !== '-') ? V.참조 : (V.수신자 || '담당자');
     var staff = String(V.담당노무사 || '').trim();
+    var fname = String(formName || '서류'), fund = /기금/.test(fname);
+    /* 을/를 — 끝 글자 받침으로(괄호 꼬리 「(푸른 표준)」은 떼고 본다) */
+    var ul = function (t) { var c = String(t).replace(/\s*\([^)]*\)\s*$/, '').slice(-1).charCodeAt(0); return c >= 0xAC00 && c <= 0xD7A3 && (c - 0xAC00) % 28 ? '을' : '를'; };
+    if (opts.agency) dear = '담당자님';
+    var what = opts.agency
+      ? (co ? co + ' 사업장의 ' : '') + fname + ul(fname) + ' 제출합니다.'
+      : fund ? (V.호칭 || '귀사') + '의 공동근로복지기금 설립과 관련하여 ' + String(formName || '제안서 및 견적서') + '를 보내드립니다.'
+        : (co ? co + ' 관련 ' : '요청하신 ') + fname + ul(fname) + ' 보내드립니다.';
     var body = [dear + ', 안녕하십니까.',
       '푸른노무법인 ' + (staff ? staff + ' ' : '') + '노무사입니다.', '',
-      (V.호칭 || '귀사') + '의 공동근로복지기금 설립과 관련하여 ' + String(formName || '제안서 및 견적서') + '를 보내드립니다.',
-      '검토하시고 궁금하신 점은 편하게 연락 주십시오.', '',
+      what,
+      opts.agency ? '확인하시고 보완할 점이 있으면 연락 주십시오.' : '검토하시고 궁금하신 점은 편하게 연락 주십시오.', '',
       '푸른노무법인 ' + (staff ? staff + ' ' : '') + '드림' + (V.노무사연락처 ? ' · ' + V.노무사연락처 : '')].join('\n');
     return { to: to, subject: '[푸른노무법인] ' + String(formName || '서류') + (co ? ' — ' + co : ''), body: body };
   }

@@ -110,11 +110,10 @@
 <!-- 왼쪽 목록 — 「사무관리서류」 아래에 서류 종류를 더해 간다(대표 지시 2026-09-26) -->
 <nav class="side" aria-label="계약서등관리 메뉴">
   <!-- 메뉴는 «묶음 › 메뉴» 두 단(이알피 메뉴와 같은 모양). 계약유형(3단)까지만 두고 양식 이름은 본문 목록 (C안 2026-09-27) -->
-  <!-- 집단체불 위임장은 사건 일이라 「사건관리」 묶음 (대표 지시 2026-09-27, 옛 이름 「전자송부」) -->
-  <div class="nav-grp">⚖ 사건관리</div>
-  <button type="button" class="nav sub on" data-pane="esign">✍ 집단체불 위임장</button>
+  <!-- 집단체불 위임장은 «사건계약» 아래로 (대표 지시 2026-10-09 「사무관리서류에서 사건계약에 넣으면 된다」 — 「사건관리」 묶음은 없앴다).
+       단추는 계약유형 나무(formsTree)의 사건계약 바로 아래에 js/pu-contract-forms.js 가 그린다(host.openEsign). 앱의 첫 칸은 계약서 양식 -->
   <div class="nav-grp">🗂 사무관리서류</div>
-  <button type="button" class="nav sub" data-pane="forms">📄 계약서 양식</button>
+  <button type="button" class="nav sub on" data-pane="forms">📄 계약서 양식</button>
   <!-- 계약유형 6종 — 계약서 양식을 처음 열 때 js/pu-contract-forms.js 가 채운다 -->
   <div id="formsTree" class="nav-tree"></div>
   <!-- 서식집 — 노무사 검토(Phase 1) 전이라 누를 수 없다. data-pane 이 없어 칸 오가기에 끼지 않는다.
@@ -194,8 +193,8 @@
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=1"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=12"></script>
-<script src="js/pu-contract-forms.js?v=31"></script>
+<script src="js/pu-form-cardfill.js?v=13"></script>
+<script src="js/pu-contract-forms.js?v=32"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=7"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -276,7 +275,8 @@ function paneFromHash() {
   if (h === '#co' || h === '#co:await') return 'co';   /* #co:await — 업무관리 「📬 서명본 대기」 알림에서 (2026-10-08) */
   if (h === '#arc') return 'arc';
   if (h === '#lib' && libIndex && libIndex.length) return 'lib';
-  return 'esign';
+  if (h === '#esign') return 'esign';   /* 집단체불 위임장 — 사건계약 아래 단추 (2026-10-09) */
+  return 'forms';
 }
 /* 기업정보함 「📨 제안서 보내기」 (설계 2026-09-29 §8) — #forms:propose={회사 열쇠}. 열쇠만 온다(양식 목록은 여기 한 곳) */
 function proposeFromHash() {
@@ -696,6 +696,8 @@ function onFormSelect(id) {
 }
 function showPane(name) {
   Object.keys(PANES).forEach(function (k) { $(PANES[k]).hidden = k !== name; });
+  /* 사건계약 아래 「✍ 집단체불 위임장」(나무 안 단추)도 켜고 끈다 — 그 칸일 때는 「계약서 양식」을 끈다 */
+  document.querySelectorAll('#formsTree [data-pane="esign"]').forEach(function (b) { b.classList.toggle('on', name === 'esign'); });
   document.querySelectorAll('.side .nav[data-pane]').forEach(function (b) {
     var on = b.getAttribute('data-pane') === name;
     b.classList.toggle('on', on);
@@ -707,6 +709,7 @@ function showPane(name) {
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), make: makeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
+      openEsign: function () { if (location.hash !== '#esign') history.pushState(null, '', '#esign'); showPane('esign'); },
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect }, me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
   if (name === 'co' && !mounted.co) { mounted.co = true; PuOfficeDocs.mountCompanies($('coRoot'), officeHost(), { tab: location.hash === '#co:await' ? 'await' : '' }); }
@@ -741,7 +744,7 @@ function bindNav(b) {
        popstate 만 일으켜 pu-back.js 가 앱을 나가 버린다(대표 제보). 그럴 땐 그냥
        다시 그린다 — 걸음을 심지 않는다. */
     if (paneFromHash() === name) { showPane(name); return; }
-    var want = name === 'esign' ? '' : '#' + name;
+    var want = name === 'forms' ? '' : '#' + name;
     if (location.hash !== want) history.pushState(null, '', want || (location.pathname + location.search));
     showPane(name);
   });

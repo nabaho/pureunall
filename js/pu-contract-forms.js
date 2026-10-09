@@ -708,6 +708,7 @@
     + '.pcf-act{border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}'
     /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
     + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
+    + '.pcf-tsub{padding-left:26px!important;font-size:12px}'
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
     + '.pcf-printb:hover{background:#f1f5f9}'
@@ -1710,7 +1711,15 @@
     var toSel = el('select', { 'aria-label': '받는 사람' }, d.to.map(function (x) { return el('option', { value: x.v, text: x.label }); })
       .concat([el('option', { value: '', text: '직접 적기…' })]));
     var toIn = el('input', { type: 'email', placeholder: '받는 메일 주소', 'aria-label': '받는 메일 주소', hidden: d.to.length > 0 });
-    toSel.addEventListener('change', function () { toIn.hidden = !!toSel.value; if (!toSel.value) toIn.focus(); });
+    toSel.addEventListener('change', function () { toIn.hidden = !!toSel.value; if (!toSel.value) toIn.focus(); bodyFor(); });
+    /* 받는 곳이 공단이면 본문을 「담당자님 … 제출합니다」로 — 손으로 고친 본문은 건드리지 않는다 */
+    var autoBody = d.body, autoSub = d.subject;
+    function bodyFor() {
+      var opt = toSel.options[toSel.selectedIndex], ag = !!(opt && opt.parentNode && opt.parentNode.tagName === 'OPTGROUP');
+      var nd = CF.mailDefaults(V, o.fm.name || '서류', { agency: ag });
+      if (bodyIn.value === autoBody) { bodyIn.value = nd.body; autoBody = nd.body; }
+      if (subIn.value === autoSub) { subIn.value = nd.subject; autoSub = nd.subject; }
+    }
     /* 📇 공단 연락처 (2026-10-09) — 푸른메일함에서 모은 공단 직원 주소를 기관·지사별로 덧붙인다 */
     var agNote = el('span', { 'class': 'pcf-muted', style: 'font-size:11.5px' });
     function agencyFill(book) {
@@ -1738,7 +1747,8 @@
     var subIn = el('input', { type: 'text', 'aria-label': '제목' }); subIn.value = d.subject;
     var bodyIn = el('textarea', { 'aria-label': '본문', rows: 9, style: 'width:100%;font:inherit;font-size:12.5px;margin-top:6px' }); bodyIn.value = d.body;
     var pdfCk = el('input', { type: 'checkbox', checked: !!o.isHwp, disabled: !o.isHwp, 'aria-label': 'PDF도 붙이기' });
-    var keepCk = el('input', { type: 'checkbox', checked: true, 'aria-label': '사본 보관' });
+    /* 회사를 고르지 않았으면 보관할 곳이 없다 — 끄고 막는다(「(회사명 없음)」 카드를 만들지 않게) */
+    var keepCk = el('input', { type: 'checkbox', checked: !!V.회사명, disabled: !V.회사명, 'aria-label': '사본 보관' });
     var note = el('div', { 'class': 'pcf-fnote' });
     var btnSend = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff;font-weight:700', text: '✉ 보내기', onclick: send });
     function toAddr() { return String(toSel.value || toIn.value || '').trim(); }
@@ -1817,7 +1827,7 @@
       });
     }
     var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '메일로 보내기', style: 'width:760px' }, [
-      el('div', { 'class': 'pcf-mh' }, [el('span', { text: '✉ 메일로 보내기 — ' + (V.회사명 || '') }),
+      el('div', { 'class': 'pcf-mh' }, [el('span', { text: '✉ 메일로 보내기' + (V.회사명 ? ' — ' + V.회사명 : ' — ' + (o.fm.name || '서류')) }),
         el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: function () { if (!busy) close(); } })]),
       el('div', { 'class': 'pcf-mb' }, [
         el('label', { 'class': 'pcf-frow' }, [el('span', { text: '받는 사람' }), el('div', null, [toSel, toIn,
@@ -1829,7 +1839,7 @@
         el('div', { 'class': 'pcf-muted', text: '📄 ' + o.name + ' · ' + Math.max(1, Math.round(o.bytes.length / 1024)) + ' KB' }),
         el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [pdfCk, '📕 같은 내용 PDF도 붙이기 (한글 없는 곳용 · 그림 PDF)']),
         el('div', { 'class': 'pcf-fh', text: '보낸 뒤' }),
-        el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [keepCk, '보낸 사본을 기업별 서류 › ' + (V.회사명 || '(회사명 없음)') + ' 에 보관']),
+        el('label', { 'class': 'pcf-muted', style: 'display:flex;gap:6px;align-items:center' }, [keepCk, V.회사명 ? '보낸 사본을 기업별 서류 › ' + V.회사명 + ' 에 보관' : '보낸 사본 보관 — 회사를 고르지 않아 보관하지 않습니다']),
         el('div', { 'class': 'pcf-muted', text: '✔ 기업정보함 「보낸 서류」에 기록합니다 (언제·누가·무슨 서류 — 받는 주소는 남기지 않음)' }),
         note]),
       el('div', { 'class': 'pcf-mf' }, [
@@ -2344,6 +2354,9 @@
         var on = S.kind === k.v;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
+        /* ✍ 집단체불 위임장 — 사건계약 아래 (대표 2026-10-09 「사무관리서류에서 사건계약에 넣으면 된다」). 문서관리만 길을 준다 */
+        if (k.v === 'case' && host.openEsign) t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (w.location && w.location.hash === '#esign' ? ' on' : ''), 'data-pane': 'esign',
+          title: '근로자 여러 명에게 위임장을 보내 전자서명을 받습니다', onclick: function () { host.openEsign(); } }, [el('span', { text: '└ ✍ 집단체불 위임장' })]));
       });
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
