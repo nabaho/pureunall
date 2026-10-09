@@ -18,7 +18,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=50"></script>
+<script src="js/pu-ontology.js?v=51"></script>
+<script src="js/pu-kakao-work.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=4" data-mode="observe"></script>
@@ -686,6 +687,15 @@
   .wscard.on{border-color:var(--acc);box-shadow:0 0 0 2px var(--acc-soft)}
   .wscard .big{font-size:22px;font-weight:800;line-height:1.2;font-variant-numeric:tabular-nums}
   .wscard .lb{font-size:11.5px;color:var(--sub);margin-top:2px;line-height:1.5}
+  /* 💬 카톡정리 (2026-10-09) — 칸은 한 줄, 요약만 늘어나고 넘치면 … */
+  .kkt td,.kkt th{white-space:nowrap}
+  .kkt .kkfit{width:1%}
+  .kkt .kkcut{max-width:0;overflow:hidden;text-overflow:ellipsis}
+  .kkc{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;border:1px solid #e2e8f0;background:#f8fafc;color:#475569}
+  .kkc.b{background:#eff6ff;border-color:#bfdbfe;color:#1e40af}
+  .kkc.a{background:#fffbeb;border-color:#fde68a;color:#854d0e}
+  .kkc.g{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
+  .kksm{padding:2px 8px;font-size:11.5px}
   .wsbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);
     border:1px solid var(--line);border-radius:9px;padding:8px 12px;margin:0 0 10px}
   .wsbar .n{margin-left:auto;font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
@@ -1488,6 +1498,7 @@ function shell(){
     +'<div class="sitem" id="nav-team" onclick="go(\'team\')">👥 팀 전체</div>'
     +'<div class="sitem" id="nav-stats" onclick="go(\'stats\')">📊 업무량</div>'
     +'<div class="sitem" id="nav-mlk" onclick="go(\'mlk\')" title="기계가 어느 사업장인지 못 정한 메일 — 담당자가 짚어 주면 그 업무에 붙습니다">📬 이어 줄 메일 <span class="cnt" id="cnt-mlk"></span></div>'
+    +'<div class="sitem" id="nav-kakao" style="display:none" onclick="go(\'kakao\')" title="카톡 업무방 알림을 누가·언제·무엇을로 묶어 봅니다 — 총괄관리자만">💬 카톡정리</div>'
     +'<div class="sitem" id="nav-ho" onclick="go(\'ho\')">🔄 인수인계 <span class="cnt" id="cnt-ho"></span></div>'
     +'<div class="sitem" id="nav-clean" onclick="go(\'clean\')" title="오래 멈춘 업무를 «왜 멈췄는지»로 갈라 놓고 한꺼번에 정리합니다">🧹 치울 것 <span class="cnt" id="cnt-clean"></span></div>'
     +'<div class="sitem" id="nav-archive" onclick="go(\'archive\')" title="종료·취소·이관된 업무">✅ 종료 <span class="cnt" id="cnt-ar"></span></div>'
@@ -2871,14 +2882,217 @@ function pcRowHTML(ym,p,fid){
   return h;
 }
 
+/* ══ 💬 카톡정리 — 업무방 알림을 «누가·언제·무엇을»로 (2026-10-09) ══════════════════
+   대표 지시 2026-10-09 「카톡으로 대화를 많이 하는데 매번 보고 정리가 안 된다 … 무슨 일 했고
+   언제 했고 관련사항을 항상 정리하고 싶다」 → 목업 승인 → 「니가 진행해라」
+
+   ■ 자료는 어디서
+     권형하 휴대폰 하나문자 앱이 카톡 알림 가운데 «정해 둔 방»의 것만 서버로 보낸다
+     (functions/kakao-work-server.js). 이 화면은 hanaMessageBridge 의 kakaoList 로만 받는다 —
+     kakaoWork 는 규칙이 없는 서버 전용 자리라 RTDB 를 직접 못 읽는다(총괄관리자만 받는다).
+   ■ 지키는 것
+     · 「원래 보낸 곳」은 짐작이다 — 직원이 붙인 「[전달] 업체명 담당자」만 확실(파랑)하다.
+       업체 id 를 이름으로 채우지 않는다. 「할 일로」는 새 업무 창을 «채워서 열기만» 하고,
+       저장은 사람이 한다.
+     · 처리 표(할 일로 넘김·숨김)는 이 PC 에만 둔다(localStorage) — 1단계.
+       ⚠ 다른 PC 에서는 다시 «확인 필요»로 보인다. 서버에 둘지는 쓰면서 정한다.
+   ⚠ 갈래·묶기·기한 셈은 js/pu-kakao-work.js 한 곳 — 여기서 다시 짓지 않는다. */
+var KK_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/hanaMessageBridge';
+var KK_MARK_KEY='pu-kakao-mark-v1';
+var KK={days:1,items:null,rooms:null,err:'',busy:false,show:'todo',sel:{}};
+function kkMarks(){ try{ return JSON.parse(localStorage.getItem(KK_MARK_KEY)||'{}')||{}; }catch(e){ return {}; } }
+function kkMarkSet(id,v){ var m=kkMarks(); if(v) m[id]=v; else delete m[id];
+  try{ localStorage.setItem(KK_MARK_KEY,JSON.stringify(m)); }catch(e){} }
+function kkCall(action,payload){
+  var u=(typeof firebase!=='undefined'&&firebase.auth)?firebase.auth().currentUser:null;
+  if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  return u.getIdToken().then(function(t){
+    return aiFetch(KK_FN,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+t},
+      body:JSON.stringify(Object.assign({action:action},payload||{}))});
+  }).then(function(r){ return r.json().catch(function(){ return {ok:false,error:'HTTP '+r.status}; }); })
+    .then(function(j){ if(!j||!j.ok) throw new Error((j&&j.error)||'서버가 답하지 않았습니다'); return j; });
+}
+/* 메뉴는 총괄관리자에게만 보인다 — 서버도 막지만, 못 쓸 메뉴를 보여 주지 않는다. */
+function kkNav(){ var n=$('nav-kakao'); if(!n) return;
+  pcAmFin().then(function(ok){ n.style.display=ok?'':'none'; }); }
+function kkLoad(){
+  if(KK.busy) return; KK.busy=true; KK.err='';
+  Promise.all([kkCall('kakaoList',{days:KK.days}),kkCall('kakaoRooms')]).then(function(r){
+    KK.items=r[0].items||[]; KK.rooms=r[1].rooms||[];
+  }).catch(function(e){ KK.err=e.message||String(e); })
+    .then(function(){ KK.busy=false; if(S.view==='kakao') renderKakao(); });
+}
+function kkTime(ms){ var d=new Date(ms); return (d.getMonth()+1)+'/'+d.getDate()+' '+('0'+d.getHours()).slice(-2)+':'+('0'+d.getMinutes()).slice(-2); }
+function kkKindChip(g){
+  if(g.kind==='mark') return '<span class="kkc b">↪ 전달 · 표시</span>';
+  if(g.kind==='guess') return '<span class="kkc a">↪ 전달?</span>';
+  if(g.kind==='media') return '<span class="kkc">📷 사진·파일</span>';
+  return '<span class="kkc">직원 글</span>';
+}
+function kkRows(){
+  var K=window.PuKakaoWork; if(!K||!KK.items) return [];
+  var marks=kkMarks();
+  return K.groupBursts(KK.items).reverse().map(function(g){
+    g.key=g.ids[0]; g.mark=marks[g.key]||'';
+    g.summary=g.texts.join(' / ').replace(/\s+/g,' ').trim()||(g.media?'📷 '+g.media+'장':'');
+    g.due=K.findDue(g.texts.join('\n'),Date.now());
+    return g;
+  }).filter(function(g){
+    if(KK.show==='all') return true;
+    if(KK.show==='done') return !!g.mark;
+    return !g.mark && g.kind!=='media';
+  });
+}
+function renderKakao(){
+  var app=$('app'); if(!app) return;
+  if(KK.items===null&&!KK.busy&&!KK.err) kkLoad();
+  var rows=kkRows();
+  var h='<div class="row" style="flex-wrap:wrap;margin-bottom:10px;gap:8px"><h1>💬 카톡정리</h1>'
+    +'<span class="statbar" style="margin:0">업무방 알림을 <b>누가 · 언제 · 무엇을</b>로 묶었습니다 — '
+    +'<b>✓ 할 일로</b>를 누르면 새 업무 창이 채워져 열립니다(저장은 직접).</span></div>';
+  h+='<div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:10px">'
+    +[[1,'오늘'],[7,'7일'],[30,'30일']].map(function(d){
+      return '<span class="chipbtn'+(KK.days===d[0]?' on':'')+'" onclick="kkDays('+d[0]+')">'+d[1]+'</span>'; }).join('')
+    +'<span style="width:10px"></span>'
+    +[['todo','확인할 것'],['done','처리함'],['all','전부']].map(function(s){
+      return '<span class="chipbtn'+(KK.show===s[0]?' on':'')+'" onclick="kkShow(\''+s[0]+'\')">'+s[1]+'</span>'; }).join('')
+    +'<span style="flex:1"></span>'
+    +'<span class="muted" style="font-size:12px;white-space:nowrap">받는 방: '
+      +(KK.rooms===null?'…':(KK.rooms.length?KK.rooms.map(esc).join(' · '):'<b style="color:#dc2626">없음 — 아무것도 안 받습니다</b>'))+'</span>'
+    +'<button onclick="kkRoomsModal()">⚙ 받을 방</button>'
+    +'<button onclick="kkObsRun()" title="고른 기간을 날짜별 노트로 옵시디언 금고(업무관리/카톡일지)에 씁니다">🪨 옵시디언 일지</button>'
+    +'<button onclick="KK.items=null;renderKakao()">↻</button></div>';
+  if(KK.err) h+='<div class="panel" style="color:#991b1b">불러오지 못했습니다: '+esc(KK.err)+'</div>';
+  else if(KK.items===null) h+='<div class="panel muted">불러오는 중…</div>';
+  else if(!rows.length) h+='<div class="panel muted">'+(KK.items.length?'이 보기에 해당하는 것이 없습니다.':
+      (KK.rooms&&KK.rooms.length?'아직 받은 업무방 알림이 없습니다. 폰 앱이 2.4.0 이상인지 확인하세요.':'⚙ 받을 방을 먼저 정하세요.'))+'</div>';
+  else {
+    var nSel=rows.filter(function(g){ return KK.sel[g.key]; }).length;
+    h+='<div class="row" style="gap:8px;margin-bottom:6px;min-height:28px">'
+      +(nSel?'<b style="font-size:12.5px">'+nSel+'건 고름</b><button onclick="kkBulk(\'skip\')">숨기기</button>'
+        +'<button onclick="kkBulk(\'\')">확인할 것으로 되돌리기</button>':'<span class="muted" style="font-size:12px">'+rows.length+'건</span>')+'</div>';
+    h+='<div class="panel tbl"><table class="kkt"><thead><tr>'
+      +'<th class="kkfit"><input type="checkbox" onclick="kkSelAll(this.checked)"'+(nSel&&nSel===rows.length?' checked':'')+'></th>'
+      +'<th class="kkfit">번호</th><th class="kkfit">시각</th><th class="kkfit">올린 직원</th><th class="kkfit">갈래</th>'
+      +'<th class="kkfit">원래 보낸 곳</th><th>요약</th><th class="kkfit">기한</th><th class="kkfit">처리</th></tr></thead><tbody>';
+    KK.rows=rows;
+    rows.forEach(function(g,i){
+      var origin=g.origin?'<span class="kkc '+(g.sure?'b':'a')+'" title="'+esc(g.sure?'직원이 붙인 [전달] 한 줄':'글 끝 서명·말투로 짐작 — 확인 필요')+'">'
+        +esc(g.origin)+(g.sure?'':'?')+'</span>':(g.kind==='guess'?'<span class="kkc a">모름</span>':'<span class="muted">—</span>');
+      var act=g.mark==='task'?'<span class="kkc g">✓ 할 일 창 열었음</span> <button class="kksm" onclick="kkUnmark('+i+')">되돌리기</button>'
+        :g.mark==='skip'?'<span class="kkc">숨김</span> <button class="kksm" onclick="kkUnmark('+i+')">되돌리기</button>'
+        :'<button class="kksm primary" onclick="kkTask('+i+')">✓ 할 일로</button> <button class="kksm" onclick="kkSkip('+i+')">숨기기</button>';
+      h+='<tr><td class="kkfit"><input type="checkbox"'+(KK.sel[g.key]?' checked':'')+' onclick="kkSel('+i+',this.checked)"></td>'
+        +'<td class="kkfit muted" style="text-align:right">'+(i+1)+'</td>'
+        +'<td class="kkfit">'+kkTime(g.firstAt)+'</td>'
+        +'<td class="kkfit">'+esc(g.sender||'(이름 없음)')+'</td>'
+        +'<td class="kkfit">'+kkKindChip(g)+'</td>'
+        +'<td class="kkfit">'+origin+'</td>'
+        +'<td class="kkcut" title="'+esc(g.texts.join('\n'))+'">'+esc(g.summary)+(g.media&&g.texts.length?' <span class="muted">· 📷 '+g.media+'</span>':'')+'</td>'
+        +'<td class="kkfit"'+(g.due?' style="color:#dc2626;font-weight:600"':'')+'>'+(g.due?esc(g.due.slice(5).replace('-','/')):'—')+'</td>'
+        +'<td class="kkfit">'+act+'</td></tr>';
+    });
+    h+='</tbody></table></div>';
+  }
+  h+='<div class="muted" style="font-size:11.5px;line-height:1.7;margin-top:8px">'
+    +'· <b>대표님이 보낸 글은 안 들어옵니다</b> — 카톡은 내가 보낸 글에 알림을 띄우지 않습니다.<br>'
+    +'· 주민번호·카드·계좌처럼 보이는 숫자는 폰과 서버에서 가려집니다. 원래 알림 글은 30일 뒤 지워집니다.<br>'
+    +'· 처리 표(할 일로·숨김)는 <b>이 PC 에만</b> 남습니다.</div>';
+  app.innerHTML=h;
+}
+function kkDays(d){ KK.days=d; KK.items=null; KK.sel={}; renderKakao(); }
+function kkShow(s){ KK.show=s; KK.sel={}; renderKakao(); }
+function kkSel(i,on){ var g=KK.rows[i]; if(!g) return; if(on) KK.sel[g.key]=1; else delete KK.sel[g.key]; renderKakao(); }
+function kkSelAll(on){ KK.sel={}; if(on) (KK.rows||[]).forEach(function(g){ KK.sel[g.key]=1; }); renderKakao(); }
+function kkBulk(v){
+  var keys=(KK.rows||[]).filter(function(g){ return KK.sel[g.key]; }).map(function(g){ return g.key; });
+  if(!keys.length) return;
+  if(!confirm(keys.length+'건을 '+(v?'숨길까요?':'확인할 것으로 되돌릴까요?'))) return;
+  keys.forEach(function(k){ kkMarkSet(k,v); }); KK.sel={}; renderKakao();
+}
+function kkSkip(i){ var g=KK.rows[i]; if(g){ kkMarkSet(g.key,'skip'); renderKakao(); } }
+function kkUnmark(i){ var g=KK.rows[i]; if(g){ kkMarkSet(g.key,''); renderKakao(); } }
+/* 새 업무 창을 «채워서» 연다 — 저장은 사람이 한다.
+   ⚠ 업체 칸은 직원이 붙인 [전달] 한 줄(확실)일 때만, 그 줄의 첫 낱말을 넣는다. 짐작이면 비워 둔다. */
+function kkTask(i){
+  var g=KK.rows[i]; if(!g) return;
+  kkMarkSet(g.key,'task');
+  itemModal();
+  var tries=0;
+  (function fill(){
+    var t=$('if-title');
+    if(!t){ if(++tries<40) setTimeout(fill,75); return; }
+    t.value=g.summary.slice(0,60);
+    var b=$('if-brief'); if(b) b.value=('카톡 '+kkTime(g.firstAt)+' '+(g.sender||'')+(g.origin?' ← '+g.origin:'')).slice(0,b.maxLength>0?b.maxLength:120);
+    var d=$('if-due'); if(d&&g.due) d.value=g.due;
+    var c=$('if-co'); if(c&&g.sure&&g.origin) c.value=g.origin.split(' ')[0];
+    var cl=$('if-client'); if(cl&&g.origin) cl.value=g.origin;
+  })();
+  renderKakao();
+}
+function kkRoomsModal(){
+  var list=(KK.rooms||[]).join('\n');
+  showModal('<h2 style="margin:0 0 8px">⚙ 받을 카톡 방</h2>'
+    +'<p class="muted" style="font-size:12.5px;line-height:1.6;margin:0 0 10px">한 줄에 방 하나. 카톡에 보이는 방 이름과 <b>글자 그대로 같아야</b> 받습니다.<br>'
+    +'여기 없는 방(가족·친구 대화)은 폰에서 바로 버리고 서버로 보내지 않습니다. 비우면 아무것도 안 받습니다.</p>'
+    +'<textarea id="kk-rooms" rows="6" style="width:100%;font-size:16px;padding:8px;border:1px solid var(--line);border-radius:8px" placeholder="푸른노무법인 업무채팅방">'+esc(list)+'</textarea>'
+    +'<div id="kk-rmsg" class="muted" style="font-size:12px;min-height:18px;margin-top:6px">폰은 15분 안에(또는 앱을 열면 곧바로) 새 목록을 받습니다.</div>'
+    +'<div class="row" style="justify-content:flex-end;margin-top:12px"><button onclick="closeM()">취소</button>'
+    +'<button class="primary" onclick="kkRoomsSave()">저장</button></div>');
+}
+function kkRoomsSave(){
+  var ta=$('kk-rooms'), msg=$('kk-rmsg'); if(!ta) return;
+  var rooms=ta.value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean);
+  if(msg) msg.textContent='저장하는 중…';
+  kkCall('kakaoRoomsSet',{rooms:rooms}).then(function(j){
+    KK.rooms=j.rooms||[]; closeM(); toast('받을 방 '+KK.rooms.length+'곳을 저장했습니다'); renderKakao();
+  }).catch(function(e){ if(msg) msg.textContent='저장하지 못했습니다: '+e.message; });
+}
+/* 옵시디언 — 날짜마다 노트 하나(업무관리/카톡일지/YYYY-MM-DD.md). 한 방향, 덮어쓴다(그날 것을 새로 짓는다).
+   ⚠ 금고 폴더·허락·주민번호 지우개는 🪨 옵시디언으로(obsModal)와 «같은 것»을 쓴다. */
+function kkObsMD(day,groups,marks){
+  var ask=[],own=[],media=0;
+  groups.forEach(function(g){
+    var line=kkTime(g.firstAt).split(' ')[1]+' '+(g.sender||'')+' — '+(g.texts.join(' / ').replace(/\s+/g,' ').trim()||'📷');
+    if(g.origin) line+=' ← '+g.origin+(g.sure?'':'?');
+    var due=window.PuKakaoWork.findDue(g.texts.join('\n'),g.firstAt);
+    if(due) line+=' 📅 '+due;
+    if(g.kind==='media'&&!g.texts.length){ media+=g.media; return; }
+    var box=marks[g.ids[0]]==='task'?'- [x] ':'- [ ] ';
+    if(g.kind==='mark'||g.kind==='guess') ask.push(box+line); else own.push('- '+line);
+  });
+  return '---\n날짜: '+day+'\n출처: 푸른 업무관리 · 카톡정리\n---\n# '+day+' 카톡 업무일지\n\n'
+    +'## 전달로 들어온 요청\n'+(ask.length?ask.join('\n'):'- (없음)')+'\n\n'
+    +'## 직원 글\n'+(own.length?own.join('\n'):'- (없음)')+'\n'
+    +(media?'\n사진·파일 '+media+'건 (알림에는 알맹이가 없습니다)\n':'');
+}
+function kkObsRun(){
+  if(!obsSupported()){ toast('크롬이나 엣지에서 열어 주세요','err'); return; }
+  if(!KK.items||!KK.items.length){ toast('쓸 알림이 없습니다'); return; }
+  var K=window.PuKakaoWork, marks=kkMarks(), byDay={};
+  K.groupBursts(KK.items).forEach(function(g){ var d=ymd(new Date(g.firstAt)); (byDay[d]=byDay[d]||[]).push(g); });
+  (_obsRoot?Promise.resolve(_obsRoot):obsGet()).then(function(h){
+    if(!h) return obsPick();
+    return obsOk(h,true).then(function(ok){ return ok?h:obsPick(); });
+  }).then(function(h){
+    _obsRoot=h;
+    return h.getDirectoryHandle(OBS_DIR,{create:true}).then(function(r){ return r.getDirectoryHandle('카톡일지',{create:true}); });
+  }).then(function(dir){
+    var days=Object.keys(byDay).sort();
+    return days.reduce(function(p,d){ return p.then(function(){ return obsWrite(dir,d,kkObsMD(d,byDay[d],marks)); }); },Promise.resolve())
+      .then(function(){ return days.length; });
+  }).then(function(n){ toast('옵시디언에 '+n+'일치 일지를 썼습니다'); })
+    .catch(function(e){ if(e&&e.name!=='AbortError') toast('쓰지 못했습니다: '+e.message,'err'); });
+}
+
 /* ── 라우팅 ── */
 function go(v){ S.view=v; S.f=null; S.q=''; sideDrawer(false);
   try{history.pushState({view:v},'');}catch(e){} route(); }
 function goBack(){ if(history.length>1) history.back(); else { S.view='my'; route(); } }
 window.addEventListener('popstate',function(ev){ try{ window.__puBackNav = true; }catch(e){}  /* 이 걸음은 우리가 썼다 — 공통 뒤로가기는 비켜선다 */ var st=ev.state; S.view=(st&&st.view)||'my'; route(); });
 function route(){
-  ['my','visits','team','stats','mlk','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
-  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
+  ['my','visits','team','stats','mlk','kakao','ho','clean','archive','perf'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
+  var crumbs={my:'내 업무',visits:'내 현장 방문',team:'팀 전체',stats:'업무량',kb:'지식',mlk:'이어 줄 메일',kakao:'카톡정리',ho:'인수인계',clean:'치울 것',archive:'종료',perf:'내 성과급'};
   var c=$('crumb'); if(c)c.textContent=crumbs[S.view]||'업무관리';
   var qw=$('qwrap'); if(qw)qw.style.display=(S.view==='my'||S.view==='team')?'':'none';
   var cm=$('cnt-my'); if(cm)cm.textContent=viewOpen().length||'';
@@ -2888,6 +3102,7 @@ function route(){
   var cl=$('cnt-mlk'); if(cl){ var n4=mailSrc?mlkBadge():0;
     cl.textContent=n4||''; cl.style.color=n4?'#dc2626':''; cl.style.fontWeight=n4?'800':''; }
   visBadge();
+  kkNav();                      /* 💬 카톡정리는 총괄관리자에게만 보인다 */
   /* 🧹 치울 것 — 끝낼 수 있는 것만 센다(자문·급여는 빼고 센다, 끝내는 일이 아니다) */
   var cc=$('cnt-clean'); if(cc){ var n5=wsCleanCount(); cc.textContent=n5||''; }
   wsLeave(S.view);              /* 고른 것은 화면을 떠나면 비운다 */
@@ -2903,6 +3118,7 @@ function route(){
      ⚠ 지식은 없어진 것이 아니라 «업무 안»으로 들어갔다. */
   else if(S.view==='kb'){ S.view='my'; renderMy(); }
   else if(S.view==='mlk') renderMlk();
+  else if(S.view==='kakao') renderKakao();
   else if(S.view==='ho') renderHo();
   else if(S.view==='clean') renderClean();
   else if(S.view==='archive') renderArchive();

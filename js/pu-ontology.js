@@ -106,8 +106,10 @@
                       {path:'data/attendance_records/v/{id}',entityType:'ScheduleEvent'}] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting'],
       sharedRoots:['data/consultings','puphotos'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
-    work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp'], sharedRoots:['data','pucards/idx'],
-      entityTypes:['Person','Organization','Task','ScheduleEvent'] },
+    /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
+       이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
+    work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
+      entityTypes:['Person','Organization','Task','ScheduleEvent','Message'] },
     career:{ name:'경력관리', file:'kcareer.html', primaryRoots:['kcareer/{uid}','kcareer_inbox','kcareer_pub'], sharedRoots:['data'],
       entityTypes:['Person','Employment','Project','Document'] },
     /* 정부사업신청 — 나라장터·알리오·기업마당 공고를 모아 본다(대표 지시 2026-09-05).

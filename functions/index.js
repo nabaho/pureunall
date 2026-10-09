@@ -27,6 +27,7 @@ const { MAX_BYTES, MAX_IMAGE_BYTES, SITE_REPO, 홈페이지자리,
         올릴자리인가, 올릴그림자리인가, 사연, 올리기 } = require("./site-publish");
 const { homepageUrl } = require("./homepage-fetch");
 const HanaMessage = require("./hana-message");
+const KakaoWork = require("./kakao-work-server");   /* 카톡 업무방 알림 받기 (2026-10-09) */
 const PUSH = require("./push-admins");   /* 관리자 폰 알림 — 건의·메일 신규 문의가 함께 쓴다 */
 const OntologyServerWrite = require("./ontology-write-server");
 const NewsletterWeekly = require("./newsletter-weekly");
@@ -6339,23 +6340,6 @@ exports.hanaMessageBridge = functions
         hanaJson(res, 200, { ok: true }); return;
       }
 
-      const staff = await requireFinanceStaff(req);
-      const base = db.ref(`hanaSmsBridge`);
-
-      if (action === "pairStart") {
-        const code = String(crypto.randomInt(10000000, 100000000));
-        const expiresAt = Date.now() + HANA_PAIR_TTL_MS;
-        const codeHash = hanaHash(code);
-        const oldPair = await base.child(`pairByUid/${staff.uid}`).once("value");
-        const oldHash = String(oldPair.val() || "");
-        const updates = {};
-        if (/^[a-f0-9]{64}$/.test(oldHash)) updates[`pairs/${oldHash}`] = null;
-        updates[`pairs/${codeHash}`] = { uid: staff.uid, createdAt: Date.now(), expiresAt };
-        updates[`pairByUid/${staff.uid}`] = codeHash;
-        await base.update(updates);
-        hanaJson(res, 200, { ok: true, code, expiresAt }); return;
-      }
-
       /* ══ 훑기가 「살아 있다」고 알린다 (2026-08-30) ══════════════════════
          ⚠★ 찾은 것이 없어도 «반드시» 온다. 이것이 없으면 서버는
             「폰이 죽었다」와 「문자가 안 왔다」를 못 가른다 —
@@ -6363,6 +6347,13 @@ exports.hanaMessageBridge = functions
             그 둘을 못 갈라, 할 수 있는 말이 「알림 권한을 다시 보세요」뿐이었다.
          ★ requireHanaDevice 가 lastSeenAt 을 찍어 준다 — 열쇠가 살아 있다는 뜻이다.
            여기서는 «훑기가 돌았다»는 것과 «문자함을 읽을 수 있나»를 더 적는다. */
+      /* ★★ 이 갈래는 «재무 담당자 검사보다 앞»에 있어야 한다 (2026-10-09 에 옮김).
+         ⚠ 2026-08-30 에 만들 때 pairStart 뒤 — 곧 requireFinanceStaff 뒤 — 에 놓였다.
+           폰은 로그인 표(Bearer)가 아니라 기기 열쇠(Device)로 말을 건다. 그래서 이 인사는
+           만든 날부터 «한 번도» 통과하지 못하고 401 로 튕겼다 — 폰은 그 실패를 조용히 삼켰다.
+           실측(2026-10-09): 기기 기록에 sweepCanReadSms·sweepFound·sweepBatteryFree 가 아예 없었다.
+           lastSweepAt 이 찍혀 보였던 것은 훑기의 «중복 문자» 갈래(hanaStampAlive)가 대신 찍어서다.
+         ★ 카톡 방 목록(kakaoRooms)도 이 인사의 답으로 폰에 내려간다 — 막히면 폰이 목록을 영영 못 받는다. */
       if (action === "sweepPing") {
         const linked = await requireHanaDevice(req, body);
         /* ★★ 「폰에 문자가 있기는 한가」를 폰이 «직접» 알려 준다 (2026-08-30).
@@ -6412,8 +6403,58 @@ exports.hanaMessageBridge = functions
           ...(typeof body.batteryFree === "boolean"
             ? { sweepBatteryFree: body.batteryFree } : {}),
         }).catch(() => {});
-        hanaJson(res, 200, { ok: true, pong: true }); return;
+        /* 카톡 업무방 목록을 함께 내려 준다 — 폰은 이 목록에 «정확히» 있는 방만 보낸다.
+           ⚠ 못 읽으면 kakaoRooms 를 아예 안 싣는다(빈 목록과 다르다) — 폰은 가진 목록을 그대로 쓴다. */
+        const kakaoRooms = await KakaoWork.readRooms(db).catch(() => null);
+        hanaJson(res, 200, { ok: true, pong: true, ...(kakaoRooms ? { kakaoRooms } : {}) }); return;
       }
+
+      /* ══ 카톡 업무방 알림 (2026-10-09) ═══════════════════════════════════════
+         폰이 카톡 알림 가운데 «정해 둔 방»의 것만 보낸다. 서버가 방 목록을 다시 견준다.
+         ⚠ 하나 거래 갈래(ingest)와 섞지 않는다 — 해석기·대기함·중복막이가 전부 다르다. */
+      if (action === "kakaoIngest") {
+        const linked = await requireHanaDevice(req, body);
+        const out = await KakaoWork.ingest(db, linked, body, Date.now());
+        await hanaDeviceRef(linked).update({
+          lastTalkAt: Date.now(),
+          kakaoLastAt: Date.now(),
+          ...(out.ignored ? { kakaoLastSkip: out.reason } : { kakaoLastSkip: null }),
+        }).catch(() => {});
+        hanaJson(res, 200, out); return;
+      }
+
+      /* 카톡 업무방 — 총괄관리자만 (직원끼리 나눈 업무 대화다. 2026-10-09) */
+      if (action === "kakaoRooms") {
+        await requireTotalAdmin(req);
+        hanaJson(res, 200, { ok: true, rooms: await KakaoWork.readRooms(db) }); return;
+      }
+      if (action === "kakaoRoomsSet") {
+        const admin = await requireTotalAdmin(req);
+        const rooms = await KakaoWork.setRooms(db, body.rooms, admin.uid, Date.now());
+        hanaJson(res, 200, { ok: true, rooms }); return;
+      }
+      if (action === "kakaoList") {
+        await requireTotalAdmin(req);
+        hanaJson(res, 200, await KakaoWork.list(db, body.days, Date.now())); return;
+      }
+
+      const staff = await requireFinanceStaff(req);
+      const base = db.ref(`hanaSmsBridge`);
+
+      if (action === "pairStart") {
+        const code = String(crypto.randomInt(10000000, 100000000));
+        const expiresAt = Date.now() + HANA_PAIR_TTL_MS;
+        const codeHash = hanaHash(code);
+        const oldPair = await base.child(`pairByUid/${staff.uid}`).once("value");
+        const oldHash = String(oldPair.val() || "");
+        const updates = {};
+        if (/^[a-f0-9]{64}$/.test(oldHash)) updates[`pairs/${oldHash}`] = null;
+        updates[`pairs/${codeHash}`] = { uid: staff.uid, createdAt: Date.now(), expiresAt };
+        updates[`pairByUid/${staff.uid}`] = codeHash;
+        await base.update(updates);
+        hanaJson(res, 200, { ok: true, code, expiresAt }); return;
+      }
+
 
       if (action === "pairStatus") {
         const snap = await base.child(`devices/${staff.uid}`).once("value");
