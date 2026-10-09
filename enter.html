@@ -965,7 +965,14 @@ body.portal-mode #moreFab{display:flex;}
     b.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
     b.onclick=function(){ var s3=document.getElementById('pu-boot-splash'); if(s3) s3.remove(); };
     s2.appendChild(b);
-    setTimeout(function(){ var s4=document.getElementById('pu-boot-splash'); if(s4) s4.remove(); }, 32000);   // 8초 + 32초 = 40초
+    /* 8초 + 32초 = 40초. ⚠ 숨은 탭에서는 걷지 않는다 (대표 지시 2026-10-09 「앱을 클릭하면 잠깐 카카오 로그인
+       화면이 나온다」) — 숨은 탭은 인증 확인이 느려 40초를 넘기기 쉽고, 거기서 걷어 둔 로그인 화면이
+       그 탭이 다시 앞으로 나올 때 번쩍인다. 보일 때까지 미뤘다가 걷는다. */
+    setTimeout(function s4go(){
+      var s4=document.getElementById('pu-boot-splash'); if(!s4) return;
+      if(document.hidden){ setTimeout(s4go, 2000); return; }
+      s4.remove();
+    }, 32000);
   }, kk ? 20000 : 8000);
 })();
 </script>
@@ -1837,9 +1844,84 @@ body.portal-mode #moreFab{display:flex;}
   var _freshLogin = false;
   window._puAuthAt = 0;   // 이 탭이 마지막으로 로그인한 사람을 본 때 — 다른 탭의 «지금 나갔다»와 견준다 (스코프에 안 매이게 window 에)
   function _rmBootSplash(){ try { var s=document.getElementById('pu-boot-splash'); if(s) s.remove(); } catch(_e){} }
+  /* ══ 로그인 화면은 «지금 이 순간 로그인이 없다»를 확인한 뒤에만 보인다 (대표 지시 2026-10-09
+       「앱을 클릭하면 아주 잠깐 카카오톡 로그인 화면이 팝업처럼 나온다 — 완전히 안 나오게 해라.
+         모든 앱들에서 계속 한 번씩 나온다」) ══
+     ■ 왜 나왔나 — 로그인 화면이 «다시 확인하지 않고» 보이는 길이 셋 있었다
+       ① 로그아웃하면 열려 있던 앱 탭들이 모두 이 화면(로그인)으로 밀려난다(pu-authsync). 그 탭들은
+          뒤에 숨은 채 로그인 화면을 «그려 둔» 상태로 남는다. 다시 로그인한 뒤 그 탭이 앞으로 나오면
+          브라우저는 예전에 그려 둔 로그인 화면부터 보이고, 그다음에야 파이어베이스가 다른 탭의 로그인을
+          알아채 포털로 바뀐다 = 노란 카카오 단추가 있는 화면이 잠깐 번쩍. 앱마다 한 번씩인 까닭이다.
+       ② 숨은 탭에서 40초 안전망이 가림막을 걷는다 — 숨은 탭은 인증 확인이 느리다(아래 부팅 스크립트).
+       ③ 숨은 동안 «로그인 없음»이 잡혔다가 다른 탭의 로그인이 뒤따라 들어온다.
+     ■ 그래서 — 탭이 숨을 때 로그인 화면 위에 가림막을 «다시» 세운다. 다시 보일 때는 파이어베이스가
+       다른 탭의 로그인을 알아챌 시간(약 0.8초마다 저장소를 다시 읽는다)을 준 뒤, 그래도 없을 때만 걷는다.
+       로그인이 들어오면 enterPortal 이 포털을 다 그린 뒤 가림막을 걷는다(같은 id — 같은 걷는 길).
+     ⚠ 입력하던 아이디·비밀번호가 있으면 가리지 않는다 — 비밀번호를 보러 다른 창에 다녀온 사람이다.
+     ⚠ 카카오 복귀 중(__kkReturning)은 건드리지 않는다 — 그 길은 제 가림막을 따로 쥐고 있다.
+     ★ 그래도 번쩍이면 «어느 길이었는지» 이 기기에 남긴다(pu_login_flash_log · 최근 20건 · 이름·주소 없음).
+       다음에는 추측하지 않고 그것을 읽는다. */
+  var _loginGuard = (function(){
+    var RECHECK_MS = 2000, FLASH_MS = 20000, LOG_KEY = 'pu_login_flash_log';
+    var lastShownAt = 0, lastWhy = '', lastHidden = false, covered = false, recheckT = 0;
+    function signedIn(){ try { var u = auth.currentUser; return !!(u && u.email); } catch(e){ return false; } }
+    function typing(){ var i = $('loginId'), p = $('loginPw'); return !!((i && i.value) || (p && p.value)); }
+    function loginOnTop(){
+      var lv = $('loginView');
+      return !_handled && !window.__kkReturning && !!lv && lv.style.display !== 'none'
+        && !document.getElementById('pu-boot-splash');
+    }
+    function cover(){
+      if(document.getElementById('pu-boot-splash')) return;
+      var s = document.createElement('div');
+      s.id = 'pu-boot-splash';
+      s.setAttribute('role', 'status');
+      s.style.cssText = 'display:flex;position:fixed;inset:0;z-index:2147483000;background:#f8fafc;align-items:center;justify-content:center;flex-direction:column;gap:14px';
+      s.innerHTML = '<div style="width:48px;height:48px;border-radius:13px;background:linear-gradient(135deg,#1e40af,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:21px;font-family:sans-serif">푸</div>'
+        + '<div style="font-size:14px;font-weight:600;color:#475569;font-family:sans-serif">로그인 상태 확인 중…</div>';
+      document.body.appendChild(s);
+      covered = true;
+    }
+    function hide(){ if(loginOnTop() && !typing()) cover(); }
+    /* 다시 보일 때 — 곧바로 걷지 않고 다른 탭의 로그인이 들어올 틈을 준다 */
+    function show(){
+      if(!covered) return;
+      clearTimeout(recheckT);
+      recheckT = setTimeout(function(){
+        if(!covered) return;
+        covered = false;
+        if(_handled || signedIn()) return;          // 그새 들어왔다 — 포털이 다 그린 뒤 걷는다
+        _rmBootSplash();
+        shown('다시 보임');
+      }, RECHECK_MS);
+    }
+    /* 로그인 화면을 드러낸 직후 부른다 — 숨은 탭에서 드러냈으면 곧바로 다시 가린다(아무도 못 봤다) */
+    function shown(why){
+      lastShownAt = Date.now(); lastWhy = why || ''; lastHidden = !!document.hidden;
+      if(document.hidden) hide();
+    }
+    /* 로그인이 들어왔다 — 방금 로그인 화면을 드러냈었다면 «번쩍였다»로 적는다 */
+    function userSeen(){
+      covered = false; clearTimeout(recheckT);
+      if(lastShownAt && Date.now() - lastShownAt < FLASH_MS){
+        try {
+          var a = JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); if(!Array.isArray(a)) a = [];
+          var app = false; try { app = !!(window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); } catch(_m){}
+          a.push({ at: Date.now(), why: lastWhy, ms: Date.now() - lastShownAt, hidden: lastHidden, app: app });
+          localStorage.setItem(LOG_KEY, JSON.stringify(a.slice(-20)));
+        } catch(_l){}
+      }
+      lastShownAt = 0;
+    }
+    document.addEventListener('visibilitychange', function(){ if(document.hidden) hide(); else show(); });
+    window.addEventListener('pagehide', hide);
+    window.addEventListener('pageshow', function(e){ if(e && e.persisted && !document.hidden) show(); });
+    return { shown: shown, userSeen: userSeen, _hide: hide, _show: show };
+  })();
   _persistenceReady.then(function(){
     auth.onAuthStateChanged(function(user){
       if(user && user.email){
+        try { _loginGuard.userSeen(); } catch(_g){}
         window._puAuthAt = Date.now();
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
@@ -1862,6 +1944,7 @@ body.portal-mode #moreFab{display:flex;}
         //   사람이 로그아웃 질문을 받게 된다. 앞 사람 카카오 문제는 «처음 쓰는 기기면 다시 묻기»(kkLogin)와
         //   포털 「로그아웃」 단추(kkLogoutFlow)가 맡는다. 대표 선택: 「바로 들어가게」.
         if(!window.__kkReturning) _rmBootSplash();
+        try { if(!window.__kkReturning) _loginGuard.shown('로그인 없음'); } catch(_g){}   // 숨은 탭이면 곧바로 다시 가린다
         try { var _lw=$('logoutWhy'), _lt=window.PuLogoutWhy?PuLogoutWhy.text():''; if(_lw&&_lt){ _lw.textContent=_lt; _lw.style.display=''; } } catch(_w){}
         // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
         try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
