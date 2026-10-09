@@ -39,3 +39,7 @@ test('표·조회 단추를 못 찾으면 오류로 돌린다', () => {
   assert.match(code, /조회 단추 없음/);
   assert.match(code, /표를 못 찾음/);
 });
+test('더빌 탭이 아예 없으면 noTab → 로그인 필요 + 탭 없음 오류', () => {
+  assert.match(code, /JSON\.stringify\(\{noTab:true\}\)/);
+  assert.match(code, /if \(res\.noTab\) res = \{ needLogin: true, error: '[^']*탭[^']*' \}/);
+});

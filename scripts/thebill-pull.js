@@ -9,7 +9,7 @@
 'use strict';
 const { execFileSync } = require('child_process');
 const fs = require('fs'), os = require('os'), path = require('path');
-const { parsePayTable } = require('../js/pu-cms-auto.js');
+const { parsePayTable, safeKey } = require('../js/pu-cms-auto.js');
 
 const ASIDE = path.join(process.env.LOCALAPPDATA || '', 'Aside', 'CLI', 'current', 'aside.exe');
 const ALLOWED_BUTTONS = ['조회'];
@@ -28,7 +28,7 @@ async function clickAllowed(v){ if(!ALLOWED.includes(v)) throw new Error('허용
 async function clickPage(n){ return page.evaluate((k)=>{ const a=[...document.querySelectorAll('a')].find(x=>x.innerText.trim()===String(k)&&/page|Page|goPage|fn_/.test(x.getAttribute('href')||x.getAttribute('onclick')||'')); if(a){ a.click(); return true; } return false; }, n); }
 const tabsNow = await listBrowserTabs();
 const tb = tabsNow.find(t=>/thebill\\.co\\.kr:444/.test(t.url));
-if(!tb){ console.log('@@JSON@@'+JSON.stringify({needLogin:true})); }
+if(!tb){ console.log('@@JSON@@'+JSON.stringify({noTab:true})); }
 else {
   await attachBrowserTab(tb.targetId);
   await page.goto('https://www.thebill.co.kr:444/cms2/defaultSummary.tb?menucd=CMS',{waitUntil:'domcontentloaded'});
@@ -67,7 +67,6 @@ function firebaseUpdate(p, obj) {
       { stdio: 'pipe', shell: true, env: Object.assign({}, process.env, { MSYS_NO_PATHCONV: '1' }) });
   } finally { try { fs.unlinkSync(f); } catch (_) {} }
 }
-const safeKey = k => String(k).replace(/[.#$\[\]\/]/g, '_');
 
 function main() {
   const now = Date.now();
@@ -78,6 +77,8 @@ function main() {
     res = line ? JSON.parse(line.slice(line.indexOf('@@JSON@@') + 8)) : { error: 'Aside 응답 없음' };
   } catch (e) { res = { error: String(e.message || e).slice(0, 200) }; }
 
+  /* 더빌 탭이 아예 없으면 — Aside 가 꺼졌거나 더빌을 안 열었다. 로그인 풀림과 같은 길(사람 몫)로 알린다 */
+  if (res.noTab) res = { needLogin: true, error: 'Aside 에 더빌 탭이 없음' };
   const status = { lastRunAt: now, needLogin: !!res.needLogin, read: 0, error: res.error || '' };
   let ok = false;
   let rows = [];
