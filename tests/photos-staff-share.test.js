@@ -285,7 +285,9 @@ test('★ 콘솔과 «한 곳도» 다르지 않다', () => {
      ★ 2026-10-09 — 정부컨설팅 보고서 자리 셋(scal_reports · scal_rptForms · scal_rptFormsIndex)을
        만들개에 넣었다. 규칙 게시 대기 — 대표 승인 뒤 게시하고, 콘솔 원문을 새 판으로 갱신한 뒤 이 셋을 지울 것.
        게시 전에는 보고서 창이 「아직 저장 자리가 열리지 않았습니다」를 띄운다(내려받기는 된다). */
-  const PENDING = ['/scal_reports', '/scal_rptForms', '/scal_rptFormsIndex'];
+  /* ★ 2026-10-10 — 올라갔다. 대표 승인 뒤 rules-deploy.js 로 게시(새로 생김 3 · 바뀜 0 · 사라짐 0,
+       올린 뒤 콘솔 다시 읽어 같음 확인) — 그래서 목록을 비운다. */
+  const PENDING = [];
   assert.deepEqual(diff.sort(), PENDING.sort(),
     '★ 뜻하지 않은 곳이 바뀌었습니다: ' + diff.join(', ') +
      '\n  규칙은 한 번에 통째로 바뀝니다 — 곁다리 변경이 섞이면 무엇이 깨졌는지 못 짚습니다.');
