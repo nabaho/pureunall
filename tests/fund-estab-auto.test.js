@@ -248,7 +248,7 @@ test('묶음 화면이 번호와 채울 자리 수를 함께 보여 준다 — �
   const fn = grabFn('estabBundle');
   assert.match(fn, /docBlanks\(/, '서류마다 빈칸을 세야 한다');
   assert.match(fn, /\(i\+1\)/, '번호 차례를 매겨야 한다');
-  assert.match(fn, /printDoc\(\)/, '그대로 인쇄해 날인할 수 있어야 한다');
+  assert.match(fn, /estabBundlePrint\(\)/, '그대로 인쇄해 날인할 수 있어야 한다(미확인 값 관문을 지나 — 2026-10-09)');
 });
 
 /* ⚠ 여기 서식을 «함부로» 더하지 말 것. 장부를 읽어야 채워지는 서식을 묶음에 넣으면
@@ -446,7 +446,7 @@ function renderBundle(phase) {
 test('묶음 화면을 «정말 그리면» 단추가 성한 채로 나온다 — 변수가 새지 않는다', () => {
   ['kinds', 'reg', 'tax', 'ops', 'sub'].forEach((p) => {
     const html = renderBundle(p);
-    assert.ok(html.includes('printDoc()'), p + ': 인쇄 단추가 없다');
+    assert.ok(html.includes('estabBundlePrint()'), p + ': 인쇄 단추가 없다');
     assert.ok(html.includes('id="docwrap"'), p + ': 서류 자리가 없다');
     assert.ok(html.includes('id="bundleSum"'), p + ': 요약 자리가 없다');
     /* 누출 자국 — 소스의 변수 이름이 «글자로» 실려 나오면 여기 걸린다 */

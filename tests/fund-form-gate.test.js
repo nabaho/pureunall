@@ -121,3 +121,23 @@ test('★★ 배선 — 묶기 전에 관문, 확인은 확인함과 같은 자�
   assert.match(strip(grabFn('renderForms')), /if\(fundMode\) setTimeout\(function\(\)\{ if\(typeof _formGatePaint==='function'\) _formGatePaint\(\); \},0\);/);
   assert.match(strip(grabFn('_provSub')), /_formGatePaint\(\)/, '출처가 바뀌면 서식 목록 숫자도');
 });
+
+test('★ [🖨 전부 인쇄(날인용)]도 관문을 지난다 — 미리 모은 목록·누른 순간 창 열기·「초안」 표시 (2026-10-09)', () => {
+  const eb = strip(grabFn('estabBundle'));
+  assert.ok(eb.includes('onclick="estabBundlePrint()"'), '인쇄 단추가 관문을 건너뛴다');
+  assert.ok(eb.includes('S._bundleGate={phase:ph[0], fid:_gfid, P:P, items:_formUnconfMany(_kinds,f,sites,P)}'), '미확인 목록을 미리 안 모은다');
+  const p = strip(grabFn('estabBundlePrint'));
+  assert.ok(p.includes("if(!f||f._sample||!G||G.fid!==S.formFund||!G.items.length) return printDoc();"), '미확인이 없으면 바로 인쇄해야 한다');
+  assert.ok(p.includes("after:'print'"));
+  assert.ok(p.includes("printDoc({draft:'+its.length+'})"), '「초안」 인쇄 갈래가 없다');
+  assert.ok(p.includes('formGateOk()'));
+  const ok = strip(grabFn('formGateOk'));
+  assert.ok(ok.includes("var pw=G.after==='print'?window.open('','_blank'):null;"), '저장 뒤에 창을 열면 팝업으로 막힌다');
+  assert.ok(ok.includes('printDoc({w:pw})'));
+  assert.ok(ok.includes('_trEv(ev)'), '관문에서 «맞음»을 신뢰 장부에 안 센다');
+  const pd = grabFn('printDoc');
+  assert.ok(pd.includes('var w=opts.w||window.open'), '미리 연 창을 안 쓴다');
+  assert.ok(pd.includes(`opts.draft?'.a4{position:relative;z-index:0}.a4::before{content:"초안 · 미확인 '+(+opts.draft||0)+'"`), '「초안」 표시가 없다');
+  assert.ok(pd.includes('z-index:-1'), '「초안」이 글 위를 덮는다 — 글 뒤에 둬야 한다');
+  assert.ok(pd.includes('color:#CBD5E1'), '한글 묶음과 같은 색이 아니다');
+});
