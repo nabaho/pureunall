@@ -319,6 +319,18 @@ test('_cdGuessIssuer는 폴더 경로에서 먼저 찾고 파일명으로 보완
   assert.equal(ctx._cdGuessIssuer({ name: '실적증명서.pdf', relPath: '6. 컨설팅 실적증명/실적증명서.pdf' }), '');
 });
 
+test('_cdGuessIssuer는 우리 법인 이름(받는 쪽)을 발급기관으로 적지 않는다', () => {
+  /* 실측 2026-10-09: 「2024년 일터혁신 컨설팅 실적 증명서_푸른노무법인」의 발급기관이 「푸른노무법인」으로 적혔다 */
+  const src = funcSource('_cdGuessIssuer');
+  const ctx = {
+    _cdAgencyNames: () => ['한국능률협회', '푸른노무법인', '의뢰기관 직접', '노사발전재단'],
+    _agencyNorm: (s) => String(s || '').replace(/[\s\(\)（）\-·]/g, '').toLowerCase()
+  };
+  vm.runInNewContext(src, ctx);
+  assert.equal(ctx._cdGuessIssuer({ name: '2024년 일터혁신 컨설팅 실적 증명서_푸른노무법인.pdf', relPath: '6. 컨설팅 실적증명/일터혁신/법인노무사 수행/2024년 일터혁신 컨설팅 실적 증명서_푸른노무법인.pdf' }), '');
+  assert.equal(ctx._cdGuessIssuer({ name: '수행 확인_노사발전재단_푸른노무법인.pdf', relPath: '6. 컨설팅 실적증명/수행 확인_노사발전재단_푸른노무법인.pdf' }), '노사발전재단');
+});
+
 test('증명서 스캔은 외부기관과 본인 것을 갈라 담는다', () => {
   const m = source.match(/async function cdScanNow\([\s\S]*?\n\}/);
   assert.ok(m, 'cdScanNow 함수가 있어야 합니다');

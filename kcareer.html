@@ -7720,7 +7720,10 @@ function _cdAgencyNames(){
 
 /* 발급기관 추정 — 폴더 경로에서 먼저, 없으면 파일명에서. 못 찾으면 빈 문자열(행의 🔍로 보정) */
 function _cdGuessIssuer(f){
-  var names = _cdAgencyNames();
+  /* ⚠ 우리 법인·대표 이름은 «받는 쪽»이다 — 발급기관 후보에서 뺀다 (2026-10-09).
+     실적 수행기관 칸에 「푸른노무법인」이 적힌 줄이 있어 후보에 섞였고, 파일 이름의
+     「…실적증명서_푸른노무법인_권형하」에 걸려 받는 쪽이 발급기관으로 적혔다(실측 3건). */
+  var names = _cdAgencyNames().filter(function(n){ return !/푸른|권형하|직접/.test(n); });
   if(!names.length) return '';
   var dir = String(f.relPath || '');
   var i = dir.lastIndexOf('/');
