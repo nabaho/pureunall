@@ -72,6 +72,7 @@
     { code:'{{주담당}}',     desc:'노무사 주담당' },
     { code:'{{부담당}}',     desc:'노무사 부담당' },
     { code:'{{오늘날짜}}',   desc:'오늘 날짜 (YYYY-MM-DD)' },
+    { code:'{{공인노무사명단}}', desc:'재직 공인노무사 전원 (대표 먼저 · 직원 명부)' },
     // 의뢰인(근로자) 변수
     { code:'{{근로자수}}',     desc:'의뢰인(근로자) 인원 수' },
     { code:'{{근로자이름}}',   desc:'대표 의뢰인 이름' },
@@ -134,7 +135,7 @@
     {
       id:'fm-case-cd-02', kind:'case', groupName:'체당금',
       name:'위임장',
-      body: '위        임        장\n\n사 무 소 명 : 푸른 노무법인\n소   재   지 : 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층\n연   락   처 : TEL 041-556-0035   FAX 041-556-3656\n이메일주소 : 370-6@daum.net\n\n성         명 : 대표 / 공인노무사   권 형 하\n                           공인노무사   박 한 별\n                           공인노무사   김 혜 민\n                           공인노무사   박 재 원\n\n상기인을 공인노무사법 제2조 제1항의 규정에 의하여 대리인으로 선임하고 아래 사항의 처리에 관한 일체의 권한을 위임합니다.\n\n---------------- 아         래 ----------------\n\n미지급임금 등 체불 처리에 대한 일체의 사항 위임\n\n{{계약일}}\n\n위임인 :  {{근로자명}}                  ( 서 명 )\n연락처 :  {{근로자연락처}}',
+      body: '위        임        장\n\n사 무 소 명 : 푸른 노무법인\n소   재   지 : 충남 천안시 서북구 원두정8길 6, 두정빌딩 3층\n연   락   처 : TEL 041-556-0035   FAX 041-556-3656\n이메일주소 : 370-6@daum.net\n\n성         명 : {{공인노무사명단}}\n\n상기인을 공인노무사법 제2조 제1항의 규정에 의하여 대리인으로 선임하고 아래 사항의 처리에 관한 일체의 권한을 위임합니다.\n\n---------------- 아         래 ----------------\n\n미지급임금 등 체불 처리에 대한 일체의 사항 위임\n\n{{계약일}}\n\n위임인 :  {{근로자명}}                  ( 서 명 )\n연락처 :  {{근로자연락처}}',
       attachments:[], enabled:true, createdAt:'2026-05-08'
     },
     {
@@ -292,6 +293,28 @@
        이알피 「계약서 출력」이 양식 그룹명을 계약의 사건유형 이름과 맞춰 자동 체크하기 때문이다.
        그래서 새 칸을 만들지 않고 그룹명을 이 목록에서 고르게 한다. */
   var CASE_TYPES = ['인사', '부해등', '체불', '체당금', '산재등', '산안', '노사', '지원', '교육', '조사', '행심', '징계', '기타'];
+  /* ══ 사건 유형은 이알피 환경설정(data/biz_case_types — 화면에서 고친 그대로)을 따른다 (대표 지시 2026-10-09) ══
+     갈래 이름 = 유형의 약어(short: 임금체불·대지급금·부해등 …), 차례 = sortOrder. 못 읽으면 위 CASE_TYPES(옛 기본).
+     옛 갈래 이름으로 적힌 양식(체당금 시드 등)은 새 약어로 보인다(CASE_ALIAS — 저장값은 그대로). */
+  var CASE_ALIAS = { '체당금': '대지급금', '체불': '임금체불', '산안': '산업안전', '행심': '기타행심' };
+  var caseLive = null;   // { list:[약어…], byName:{이름·약어 → 약어} }
+  function setCaseTypes(types) {
+    if (types && !Array.isArray(types) && types.v) types = types.v;   // {u, v:[…]} 로 싸여 와도
+    var l = (Array.isArray(types) ? types : listOf(types)).filter(function (t) { return t && (t.short || t.name); })
+      .sort(function (a, b) { return (+a.sortOrder || 0) - (+b.sortOrder || 0); });
+    if (!l.length) { caseLive = null; return null; }
+    var byName = {};
+    l.forEach(function (t) { var sh = String(t.short || t.name).trim(); byName[sh] = sh; if (t.name) byName[String(t.name).trim()] = sh; if (t.code) byName[String(t.code)] = sh; });
+    caseLive = { list: l.map(function (t) { return String(t.short || t.name).trim(); }), byName: byName };
+    return caseLive.list.slice();
+  }
+  function caseTypeList() { return caseLive ? caseLive.list : CASE_TYPES; }
+  /* 이알피 사건의 유형(이름·약어·코드) → 갈래 약어. 모르면 '' */
+  function caseShortOf(name) {
+    var n = String(name || '').trim(); if (!n) return '';
+    if (caseLive && caseLive.byName[n]) return caseLive.byName[n];
+    return CASE_ALIAS[n] && caseLive && caseLive.list.indexOf(CASE_ALIAS[n]) >= 0 ? CASE_ALIAS[n] : (caseTypeList().indexOf(n) >= 0 ? n : '');
+  }
   var SIDES = [{ v: 'worker', label: '근로자측' }, { v: 'employer', label: '사용자측' }, { v: 'both', label: '공통' }];
   var NO_GROUP = '(미지정)';
   /* 기금관리 안의 묶음 (설계 2026-09-29 §3) — 이알피 계약서 출력은 「제안서·견적서」를 자동 체크하지 않는다(pu-erp.html).
@@ -327,8 +350,8 @@
         || (kv === 'company' ? (info.typeCode === '자문' ? CONTRACT_SETS.advisory : info.typeCode === '급여' ? CONTRACT_SETS.payroll : null) : null);
       if (set) { var a = set.filter(function (id) { return ids.indexOf(id) >= 0; }); if (a.length) pick = a; }   // 세트에 적힌 차례대로
       else if (kv === 'case' && info.caseName) {
-        var cn = String(info.caseName);
-        var m = list.filter(function (f) { var g = f.groupName || ''; return g && (g === cn || cn.indexOf(g) >= 0 || g.indexOf(cn) >= 0); }).map(function (f) { return f.id; });
+        var cn = String(info.caseName), sh = caseShortOf(cn);
+        var m = list.filter(function (f) { var g = groupOf(f); return g && g !== NO_GROUP && (g === sh || g === cn || cn.indexOf(g) >= 0 || g.indexOf(cn) >= 0); }).map(function (f) { return f.id; });
         if (m.length) pick = m;
       }
       pick.forEach(function (id) { if (out.indexOf(id) < 0) out.push(id); });
@@ -381,11 +404,12 @@
   }
   function groupOf(f) {
     var g = (f && String(f.groupName || '').trim()) || '';
+    if (g && f.kind === 'case' && caseLive && CASE_ALIAS[g] && caseLive.list.indexOf(CASE_ALIAS[g]) >= 0) return CASE_ALIAS[g];
     if (g) return g;
     return f && twoGroups(f.kind) ? FUND_GROUPS[0] : NO_GROUP;   // 묶음이 없으면 계약서(기금 시드 fm-5 · 업체 표준 계약서들)
   }
   function groupRank(g, kind) {
-    var list = twoGroups(kind) ? FUND_GROUPS : CASE_TYPES, i = list.indexOf(g);
+    var list = twoGroups(kind) ? FUND_GROUPS : caseTypeList(), i = list.indexOf(g);
     return i >= 0 ? i : (g === NO_GROUP ? 1000 : 500);
   }
   /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어 } */
@@ -463,6 +487,7 @@
     var sides = { all: list.length, worker: 0, employer: 0, both: 0 };
     var by = {};
     if (twoGroups(kind)) FUND_GROUPS.forEach(function (g) { by[g] = 0; });   // 0개 묶음도 칩으로 보인다
+    if (kind === 'case' && caseLive) caseLive.list.forEach(function (g) { by[g] = 0; });   // 이알피 사건 유형은 모두 칩으로(0개도)
     list.forEach(function (f) {
       var s = sideOf(f);
       if (s) sides[s]++;
@@ -1214,7 +1239,7 @@
         el('div', { style: 'display:grid;grid-template-columns:' + (grpIn ? '1fr 180px' : '1fr') + ';gap:10px' }, [
           el('div', null, [el('label', { 'class': 'l', text: '양식 이름 *' }), nameIn]),
           grpIn ? el('div', null, [el('label', { 'class': 'l', text: twoGroups(f.kind) ? '묶음' : '사건유형 (이알피 사건유형과 같은 이름)' }), grpIn,
-            f.kind === 'case' ? el('datalist', { id: 'pcf-case-groups' }, CASE_TYPES.map(function (g) { return el('option', { value: g }); })) : null]) : null
+            f.kind === 'case' ? el('datalist', { id: 'pcf-case-groups' }, caseTypeList().map(function (g) { return el('option', { value: g }); })) : null]) : null
         ]),
         sideBox ? el('div', null, [el('label', { 'class': 'l', text: '측 (누가 의뢰하는 계약인가)' }), sideBox]) : null,
         el('label', { style: 'display:flex;align-items:center;gap:6px;cursor:pointer;margin-top:10px;font-size:12.5px' }, [onIn, '활성 (계약서 출력 때 고를 수 있음)']),
@@ -2275,8 +2300,12 @@
 
     function load() {
       S.err = null;
-      return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value')]).then(function (r) {
+      /* 이알피 사건 유형 · 직원 명부(재직 공인노무사) — 못 읽어도 양식은 뜬다(옛 기본 유형 · 기본 명단) */
+      var soft = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
+      return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir')]).then(function (r) {
         var cf = r[0].val(), rm = r[1].val();
+        if (r[2]) setCaseTypes(r[2].v || r[2]);
+        if (r[3] && w.PuFormCardFill && w.PuFormCardFill.setLawyers) w.PuFormCardFill.setLawyers(r[3].v || r[3]);
         S.removed = listOf(rm && rm.v);
         S.forms = mergeSeeds(listOf(cf && cf.v), S.removed).list;
         S.loaded = true;
@@ -2560,6 +2589,13 @@
         var on = S.kind === k.v;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
+        /* 사건은 근로자측·사용자측 두 갈래 (대표 지시 2026-10-09) — 누르면 그 측만(공통 양식은 칩 「공통」) */
+        if (k.v === 'case') [['worker', '👷 근로자측'], ['employer', '🏢 사용자측']].forEach(function (sd) {
+          var c = S.forms.filter(function (f) { return f.kind === 'case' && sideOf(f) === sd[0]; }).length;
+          var son = S.kind === 'case' && S.side === sd[0];
+          t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (son ? ' on' : ''), title: '사건계약 — ' + sd[1].slice(3) + ' 양식만',
+            onclick: function () { if (S.kind !== 'case') pickKind('case'); setFilter({ side: sd[0], grp: 'all' }); drawTree(); } }, [el('span', { text: '└ ' + sd[1] }), el('i', { text: String(c) })]));
+        });
       });
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
@@ -3057,7 +3093,7 @@
     extractTemplateText: extractTemplateText,
     treeModel: treeModel,
     signRender: signRender, signSigParts: signSigParts, cleanVals: cleanVals,
-    CASE_TYPES: CASE_TYPES, FUND_GROUPS: FUND_GROUPS, TYPE_SET: TYPE_SET, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
+    CASE_TYPES: CASE_TYPES, setCaseTypes: setCaseTypes, caseTypeList: caseTypeList, caseShortOf: caseShortOf, CASE_ALIAS: CASE_ALIAS, FUND_GROUPS: FUND_GROUPS, TYPE_SET: TYPE_SET, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf, srcType: srcType, moreFilter: moreFilter,
     filterForms: filterForms,
