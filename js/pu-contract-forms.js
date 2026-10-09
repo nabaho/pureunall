@@ -509,6 +509,7 @@
       });
     });
   }
+  var CHEDANG_SET_ID = 'fs-chedang';
   function isSeedSet(id) { return SET_SEED.some(function (s) { return s.id === id; }); }
   /* 양식들의 채울 자리 합집합 — items:[{name, markers:[…]}] → [{key, forms:[양식 이름…]}] (나온 차례) */
   function bundleMarkers(items) {
@@ -2559,9 +2560,6 @@
         var on = S.kind === k.v;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
-        /* ✍ 집단체불 위임장 — 사건계약 아래 (대표 2026-10-09 「사무관리서류에서 사건계약에 넣으면 된다」). 문서관리만 길을 준다 */
-        if (k.v === 'case' && host.openEsign) t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (w.location && w.location.hash === '#esign' ? ' on' : ''), 'data-pane': 'esign',
-          title: '근로자 여러 명에게 위임장을 보내 전자서명을 받습니다', onclick: function () { host.openEsign(); } }, [el('span', { text: '└ ✍ 집단체불 위임장' })]));
       });
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
@@ -2570,9 +2568,18 @@
         var b = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), title: st.name + ' — 누르면 목록에 체크됩니다 · 끌어서 차례를 바꿉니다',
           onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]);
         t.appendChild(b);
+        if (st.id === CHEDANG_SET_ID) esignTk();   // 👥 집단체불 세트는 체당금 접수 세트 바로 밑
         return { id: st.id, node: b };
       });
       dragSort(setRows, moveSet);
+      if (!S.sets.some(function (s) { return s.id === CHEDANG_SET_ID; })) esignTk();
+      /* 👥 집단체불 세트 (대표 「추천대로」 2026-10-09 — 사건계약 밑에서 세트 칸으로) — 체당금 접수 세트를 여러 근로자에게 링크로.
+         끌어서 옮기는 세트가 아니다(사건 목록 화면으로 가는 길). 문서관리만 길을 준다 */
+      function esignTk() {
+        if (!host.openEsign) return;
+        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (w.location && w.location.hash === '#esign' ? ' on' : ''), 'data-pane': 'esign',
+          title: '체당금 접수 세트를 근로자 여러 명에게 링크로 보내 폰에서 받습니다(사건별)', onclick: function () { host.openEsign(); } }, [el('span', { text: '└ 👥 집단체불 세트' })]));
+      }
       t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk add', text: '+ 세트 만들기', onclick: function () {
         if (S.checked.length) saveAsSet(); else toast('목록에서 양식을 체크한 뒤 다시 누르세요 — 체크한 양식으로 세트를 만듭니다');
       } }));
@@ -2924,6 +2931,8 @@
       if (!st) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '세트로 저장', onclick: saveAsSet }));
       else { b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 세트 이름', onclick: function () { editSet(st.id, true); } }));
         b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '🗑 세트 지우기', onclick: function () { editSet(st.id, false); } })); }
+      if (st && st.id === CHEDANG_SET_ID && host.openEsign) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', title: '근로자 여러 명에게 링크를 보내 폰에서 받습니다 — 👥 집단체불 세트 새 사건',
+        text: '👥 여러 명에게 링크로 받기', onclick: function () { host.openEsign({ newCase: true }); } }));
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
       if (host.hwpShow) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', title: '고른 양식을 당사자 칸을 비운 채 한 번에 인쇄합니다(엑셀 양식은 건너뜀)', text: '🖨 빈 양식 ' + fms.length + '개 인쇄',
         onclick: function () { printBlank(checkedForms()); } }));

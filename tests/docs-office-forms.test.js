@@ -252,7 +252,7 @@ test('★★ 왼쪽 메뉴는 화면 왼쪽 끝에 붙는다 — 틀을 가운�
 });
 
 /* 2026-10-09 대표 「사건관리 집단체불 위임장은 사무관리서류에서 사건계약에 넣으면 된다」 — 사건관리 묶음을 없애고 사건계약 아래로 */
-test('★ 메뉴 묶음 — 사무관리서류 › 계약서 양식(사건계약 › 집단체불 위임장)·서식집(검토 후)·기업별·보관함', function () {
+test('★ 메뉴 묶음 — 사무관리서류 › 계약서 양식(세트 › 👥 집단체불 세트)·서식집(검토 후)·기업별·보관함', function () {
   const nav = DOCS.slice(DOCS.indexOf('<nav class="side"'), DOCS.indexOf('</nav>'));
   const at = (s) => nav.indexOf(s);
   assert.ok(at('<div class="nav-grp">⚖ 사건관리') < 0, '사건관리 묶음이 남아 있습니다');
@@ -262,9 +262,12 @@ test('★ 메뉴 묶음 — 사무관리서류 › 계약서 양식(사건계약
   assert.ok(at('id="formsTree"') < at('서식집') && at('서식집') < at('data-pane="co"'), '서식집 자리가 없거나 순서가 다릅니다');
   assert.match(nav, /서식집[\s\S]{0,200}aria-disabled="true"|aria-disabled="true"[\s\S]{0,200}서식집/, '서식집은 검토 전이라 누를 수 없어야 합니다');
   const CFJ = fs.readFileSync(path.join(__dirname, '..', 'js/pu-contract-forms.js'), 'utf8');
-  assert.match(CFJ, /if \(k\.v === 'case' && host\.openEsign\) t\.appendChild\(el\('button', \{ type: 'button', 'class': 'pcf-tk pcf-tsub'/, '사건계약 바로 아래 단추');
+  /* 2026-10-09 대표 「추천대로」 — 사건계약 밑에서 세트 칸으로: 👥 집단체불 세트(체당금 접수 세트 바로 밑) */
+  assert.doesNotMatch(CFJ, /if \(k\.v === 'case' && host\.openEsign\)/, '사건계약 밑 단추는 세트 칸으로 옮겼다');
+  assert.match(CFJ, /if \(st\.id === CHEDANG_SET_ID\) esignTk\(\);/, '체당금 접수 세트 바로 밑');
+  assert.match(CFJ, /text: '└ 👥 집단체불 세트'/);
   assert.match(DOCS, /if \(h === '#esign'\) return 'esign';[^\n]*\r?\n  return 'forms';/, '#esign 로 위임장, 주소가 비면 계약서 양식');
-  assert.match(DOCS, /openEsign: function \(\) \{ if \(location\.hash !== '#esign'\) history\.pushState\(null, '', '#esign'\); showPane\('esign'\); \}/);
+  assert.match(DOCS, /openEsign: function \(o\) \{\r?\n        if \(location\.hash !== '#esign'\) history\.pushState\(null, '', '#esign'\); showPane\('esign'\);/);
 });
 
 test('★ 누를 수 없는 메뉴(서식집)는 칸 오가기에 끼지 않는다', function () {

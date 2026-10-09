@@ -128,7 +128,7 @@
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/esign-crypto.js?v=1"></script>
-<script src="js/esign-docs.js?v=2"></script>
+<script src="js/esign-docs.js?v=3"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
@@ -183,8 +183,9 @@ if (!caseId || !linkToken) {
       + '푸른노무법인에 업무를 위임하는 전자위임장입니다.<br><br>'
       + '성명·주민등록번호 등 인적사항을 입력하고 화면에 서명하시면 제출이 완료됩니다. '
       + '입력하신 정보는 <b>암호화되어</b> 담당 노무사만 열람할 수 있습니다.';
-    $('privacyFull').textContent = EsignDocs.ESIGN_FORMS.privacyConsent.body;
-    $('delegFull').textContent = EsignDocs.ESIGN_FORMS.delegationAgreement.body;
+    /* 사건을 만들 때 고정한 문구(meta.forms — 계약서 양식 체당금 접수 세트) · 예전 사건은 기본 문구 (2026-10-09) */
+    $('privacyFull').textContent = EsignDocs.formOf(m, 'privacyConsent').body;
+    $('delegFull').textContent = EsignDocs.formOf(m, 'delegationAgreement').body;
     $('btnStart').disabled = false;
   }).catch(function (e) {
     fatal('사건 정보를 불러올 수 없습니다. 네트워크를 확인한 뒤 다시 시도해 주세요.');

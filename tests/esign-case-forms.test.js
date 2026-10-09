@@ -46,7 +46,7 @@ test('ⓒ 내보내기', () => {
   const o = cut('function openExportPicker(');
   assert.match(o, /id="xForms"/);
   assert.match(o, /db\.ref\('esign\/cases\/' \+ curCaseId \+ '\/secret\/forms'\)\.set\(forms\.length \? pick : null\)/, '고른 양식(아이디만)을 사건에');
-  assert.match(o, /forms: forms \}/);
+  assert.match(o, /forms: forms, cms: /);
   const x = H.slice(H.indexOf('async function runExport('), H.indexOf('async function _esignHwpMergedPdf('));
   assert.match(x, /EsignHwpTpl\.fillMode\(await formHwpMarkers\(u8, fm\.src\.name\)\)/);
   assert.match(x, /var who = mode === 'case' \? \[mf\._rep \|\| \{\}\] : pool;/);

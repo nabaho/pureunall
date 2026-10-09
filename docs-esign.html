@@ -191,13 +191,13 @@
 <script src="js/pu-contract-vars.js?v=2"></script>
 <script src="js/pu-sign.js?v=3"></script>
 <script src="js/esign-crypto.js?v=1"></script>
-<script src="js/esign-docs.js?v=2"></script>
+<script src="js/esign-docs.js?v=3"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=3"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=14"></script>
-<script src="js/pu-contract-forms.js?v=37"></script>
+<script src="js/pu-contract-forms.js?v=38"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -852,7 +852,11 @@ function showPane(name) {
     formsUi = PuContractForms.mount($('formsRoot'), { db: db, track: trackedWrite, tree: $('formsTree'), selected: formFromHash(), propose: proposeFromHash(), make: makeFromHash(), contract: contractFromHash(), contractLoad: formContract, contractList: formContractList,
       onSelect: onFormSelect, archive: archiveOriginal, downloadOriginal: downloadOriginal,
       cards: formCards(), ntsCheck: formNtsCheck, hwpBytes: formHwpBytes, hwpMarkers: formHwpMarkers, hwpFill: formHwpFill, hwpShow: formHwpShow, zip: formZip, hwpFind: formHwpFind, hwpMark: formHwpMark, hwpEdit: formHwpEdit, hwpPdf: formHwpPdf,
-      openEsign: function () { if (location.hash !== '#esign') history.pushState(null, '', '#esign'); showPane('esign'); },
+      openEsign: function (o) {
+        if (location.hash !== '#esign') history.pushState(null, '', '#esign'); showPane('esign');
+        /* 체당금 접수 세트 「👥 여러 명에게 링크로 받기」 — 바로 새 사건 창 */
+        if (o && o.newCase) setTimeout(function () { var b = $('btnNewCase'); if (b && b.onclick) b.onclick(); }, 0);
+      },
       mail: { mode: formMailMode, send: formMailSend, record: formMailRecord, keep: formMailKeep, agency: formAgencyLoad, agencyCollect: formAgencyCollect },
       sign: formSignApi(), me: function () { return window.PuWhoami && PuWhoami.get(); } });
   } else if (name === 'forms' && formsUi && formsUi.fit) formsUi.fit();   // 다른 칸에 있다 돌아오면 화면 높이를 다시 잰다
@@ -924,6 +928,7 @@ function renderEsignIntro() {
     + '<li><b>🔗 링크</b>를 근로자 단톡방·문자로 보냅니다 — 근로자가 폰에서 인적사항을 적고 손가락으로 서명합니다</li>'
     + '<li>사건을 열어 제출을 ✅ 확인하고 <b>👤 대표 정하기</b> · <b>💰 체불내역</b>을 적습니다</li>'
     + '<li><b>📑 서류 일괄 생성</b> — 사람별 위임장·동의서 PDF, 연명부·체불 정리 엑셀, 아래 사건계약 양식을 채워 .zip 하나로 받습니다</li></ol>'
+    + '<div style="font-size:12.5px;color:#64748b;margin:0 0 6px">👥 집단체불 세트 = 계약서 양식의 <b>체당금 접수 세트</b>를 여러 근로자에게 링크로 받는 길입니다. 문구는 그 세트에서 고치시면 다음 새 사건부터 반영됩니다(만든 사건은 그때 문구 그대로). 효성CMS 신청서는 폰으로 받지 않고 서류 일괄 생성 때 사람마다 채워 냅니다.</div>'
     + '<div style="font-size:13px;font-weight:700;margin:6px 0 4px">근로자 폰으로 받는 서류</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
     + ['delegationAgreement', 'delegation', 'privacyConsent'].map(function (k) { return '<button class="btn btn-sub" onclick="esignFormPeek(\'' + k + '\')">👁 ' + EsignDocs.esc(F[k].title) + '</button>'; }).join('')
     + '</div><div style="font-size:13px;font-weight:700;margin:10px 0 4px">함께 채워 낼 사건계약 양식 <span style="font-weight:400;color:#64748b">(계약서 양식 › ⚖️ 사건계약 — 어느 PC 에서나 같습니다)</span></div>'
@@ -1046,6 +1051,9 @@ $('btnNewCase').onclick = function () {
     if (pw !== pw2) { showToast('비밀번호 확인이 일치하지 않습니다'); return; }
     this.textContent = '키 생성 중…'; this.disabled = true;
     try {
+      /* 👥 집단체불 세트 — 그때의 체당금 접수 세트 문구를 사건에 고정(못 읽으면 기본 문구) */
+      var fixed = {};
+      try { fixed = EsignDocs.formsFrom(await PuContractForms.loadForms(db)); } catch (e0) { fixed = {}; }
       var keys = await EsignCrypto.generateCaseKeys();
       var prot = await EsignCrypto.protectPrivKey(keys.privKeyJwk, pw);
       var ref = db.ref('esign/cases').push();
@@ -1056,6 +1064,7 @@ $('btnNewCase').onclick = function () {
         pubKey: keys.pubKeyJwk, linkToken: linkToken,
         createdAt: firebase.database.ServerValue.TIMESTAMP, status: 'active'
       };
+      if (Object.keys(fixed).length) meta.forms = fixed;
       await trackedWrite(ref.child('meta').set(meta));
       await trackedWrite(ref.child('secret/encPrivKey').set(prot));
       var rep = repRecord($('ncRep').value, $('ncOffice').value);
@@ -1595,6 +1604,7 @@ function openExportPicker(pool) {
     + '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">함께 넣기</div>'
     + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xRoster" checked> 진정인 연명부 (엑셀)</label>'
     + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xArrears" checked> 체불임금 정리 (엑셀)</label>'
+    + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xCms" checked> 효성CMS 자동이체 신청서 (사람마다 · 계좌·생년월일·서명 칸은 비워 둠 — 본인이 직접)</label>'
     + '<label style="display:block;margin:3px 0"><input type="checkbox" id="xHwp"> 이 사건 한글 원본을 사람마다 채워 넣기 <span style="color:#64748b">(📄 한글 원본을 이 PC 에 등록한 경우)</span></label>'
     + '<div style="font-weight:700;font-size:13px;margin:10px 0 6px">계약서 양식(⚖️ 사건계약)에서 채워 넣기 <span style="font-weight:400;color:#64748b">— 근로자 칸이 있으면 사람마다, 대표·사건 칸만 있으면 사건에 한 벌</span></div>'
     + '<div id="xForms" style="font-size:12.5px;color:#64748b">불러오는 중…</div>'
@@ -1629,7 +1639,7 @@ function openExportPicker(pool) {
       var c0 = casesCache[curCaseId] || {}; c0.secret = c0.secret || {}; c0.secret.forms = forms.length ? pick : null;
       trackedWrite(db.ref('esign/cases/' + curCaseId + '/secret/forms').set(forms.length ? pick : null)).catch(function () {});
     }
-    runExport(pool, { shape: shape, roster: $x('xRoster').checked, arrears: $x('xArrears').checked, hwp: $x('xHwp').checked && !$x('xHwp').disabled, forms: forms },
+    runExport(pool, { shape: shape, roster: $x('xRoster').checked, arrears: $x('xArrears').checked, hwp: $x('xHwp').checked && !$x('xHwp').disabled, forms: forms, cms: $x('xCms').checked },
       function (t) { $x('xNote').textContent = t; })
       .then(function (msg) { busy = false; bg.remove(); showToast(msg); },
         function (e) { busy = false; $x('xGo').disabled = false; $x('xNote').textContent = '⚠ ' + ((e && e.message) || e); });
@@ -1669,6 +1679,14 @@ async function runExport(pool, o, say) {
     } catch (e) { formErr.push(fm.name + '(' + ((e && e.message) || e) + ')'); }
   }
   formOut.forEach(function (f) { if (f.mode === 'case') zip.file('사건 서류/' + f.name + '.hwp', f.list[0]); });
+  /* 효성CMS 신청서 문구 — 사건에 고정한 것 > 지금 체당금 양식 > 기본 시드 */
+  var cmsF = null;
+  if (o.cms) {
+    cmsF = EsignDocs.formOf(m, 'cms');
+    if (!cmsF) { try { cmsF = EsignDocs.formsFrom(await PuContractForms.loadForms(db)).cms || null; } catch (e) { cmsF = null; } }
+    if (!cmsF) cmsF = EsignDocs.formsFrom(PuContractForms.CHEDANG || []).cms || null;
+    if (!cmsF) formErr.push('효성CMS 신청서(양식을 찾지 못함)');
+  }
   if (record) {
     for (var i = 0; i < pool.length; i++) {
       say('한글 원본 채우는 중… (' + (i + 1) + '/' + pool.length + ')');
@@ -1683,6 +1701,7 @@ async function runExport(pool, o, say) {
       var d = pool[j], dir = (shape === 'both' ? '사람별/' : '') + folders[j] + '/';
       zip.file(dir + '위임장.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildDelegationHtml(d, m)], '', { bytes: true }));
       zip.file(dir + '개인정보동의서.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildConsentHtml(d, m)], '', { bytes: true }));
+      if (cmsF) zip.file(dir + '효성CMS자동이체신청서.pdf', await EsignDocs.htmlPagesToPdf([EsignDocs.buildCmsHtml(d, m, cmsF)], '', { bytes: true }));
       if (hwpOut[j]) zip.file(dir + '한글원본_' + folders[j].replace(/^\d+_/, '') + '.hwp', hwpOut[j]);
       formOut.forEach(function (f) { if (f.mode === 'person' && f.list[j]) zip.file(dir + f.name + '.hwp', f.list[j]); });
     }
@@ -1693,6 +1712,7 @@ async function runExport(pool, o, say) {
     zip.file(mdir + '위임장_전원(' + pool.length + '명).pdf', await EsignDocs.htmlPagesToPdf(pool.map(function (d) { return EsignDocs.buildDelegationHtml(d, m); }), '', { bytes: true }));
     say('동의서 합본 만드는 중…');
     zip.file(mdir + '개인정보동의서_전원(' + pool.length + '명).pdf', await EsignDocs.htmlPagesToPdf(pool.map(function (d) { return EsignDocs.buildConsentHtml(d, m); }), '', { bytes: true }));
+    if (cmsF) { say('효성CMS 신청서 합본 만드는 중…'); zip.file(mdir + '효성CMS자동이체신청서_전원(' + pool.length + '명).pdf', await EsignDocs.htmlPagesToPdf(pool.map(function (d) { return EsignDocs.buildCmsHtml(d, m, cmsF); }), '', { bytes: true })); }
     if (hwpOut.length) {
       say('한글 원본 합본 PDF 만드는 중…');
       zip.file(mdir + '한글원본_전원(' + pool.length + '명).pdf', await _esignHwpMergedPdf(hwpOut));
