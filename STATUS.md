@@ -242,7 +242,8 @@ Firebase Auth 「승인된 도메인」에도 새 주소를 등록해야 한다(
 Firebase 저장 방식 변경은 2초 우회 약속을 없애고 실제 완료를 기다린다. 로그인 유지가 켜진
 기기는 부팅 때 시작한 LOCAL 변경을 재사용한다. 저장 실패는 숨기지 않고 다른 로그인 길을 보인다.
 10초 이상 지연 제보 뒤에는 카카오 복귀 중 권한이 없는 상태에서 직원명부를 먼저 읽던 일을 인증 성공 뒤로 옮기고, 외부 글꼴 CSS가 인증 스크립트를 막지 않게 고쳤다. 서버 처리 약 1.2초 외의 지연을 줄이는 변경이다.
-- 검사: `tests/kakao-first-login.test.js` · `tests/kakao-login-fast.test.js` · `tests/login-slow-auth-no-flash.test.js`
+포털 진입 뒤 인증 알림이 잠깐 `없음`으로 바뀌는 경우에도 즉시 새 로그인 화면으로 이동하던 경로를 막았다. 이전 사람 화면은 곧바로 가리고 2.5초 안에 같은 계정이 복원되면 포털을 유지한다. 실제 로그아웃·다른 계정 전환이면 화면을 계속 가린 채 새로 연다.
+- 검사: `tests/kakao-first-login.test.js` · `tests/kakao-login-fast.test.js` · `tests/login-slow-auth-no-flash.test.js` · `tests/portal-auth-return-bounce.test.js`
 - [ ] 배포 후 대표 휴대전화에서 카카오 버튼→복귀→포털 진입 시간을 다시 확인. 카카오 화면·네트워크 왕복까지 줄었다고 단정하지 않는다.
 
 ### ✅ 구글 «늘 연결» — 켜졌다 (2026-10-04)

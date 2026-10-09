@@ -1841,6 +1841,9 @@ body.portal-mode #moreFab{display:flex;}
 
   // ── 세션 자동 감지: 이메일 계정으로 로그인돼 있으면 포털 표시, 로그아웃되면(다른 탭 포함) 로그인 화면으로 복귀 ──
   var _handled = false;
+  var _portalUid = '';
+  var _portalReady = false;
+  var _authRecheckTimer = null;
   /* 방금 아이디를 «쳐서» 들어왔는가, 남아 있던 세션으로 «저절로» 들어왔는가.
      저절로 들어온 것이면 그렇게 말해 줘야 한다 — 전 사람 세션이 남은 폰에서
      포털이 말없이 열리면, 본인은 자기가 로그인한 줄 안다. */
@@ -1919,25 +1922,43 @@ body.portal-mode #moreFab{display:flex;}
     document.addEventListener('visibilitychange', function(){ if(document.hidden) hide(); else show(); });
     window.addEventListener('pagehide', hide);
     window.addEventListener('pageshow', function(e){ if(e && e.persisted && !document.hidden) show(); });
-    return { shown: shown, userSeen: userSeen, _hide: hide, _show: show };
+    return { shown: shown, userSeen: userSeen, cover: cover, _hide: hide, _show: show };
   })();
   _persistenceReady.then(function(){
     auth.onAuthStateChanged(function(user){
       if(user && user.email){
+        if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
+        if(_handled && _portalUid && user.uid !== _portalUid){
+          // 다른 사람이 들어온 경우 이전 사람의 타일을 다시 드러내지 않는다.
+          _loginGuard.cover();
+          location.replace(location.pathname + '?v=' + Date.now());
+          return;
+        }
         try { _loginGuard.userSeen(); } catch(_g){}
         window._puAuthAt = Date.now();
         try { sessionStorage.setItem('pu_auth_hint','1'); localStorage.setItem('pu_auth_hint','1'); } catch(_e){}   // 다음 포털 복귀 때 로그인화면 번쩍임 방지
         try { if(window.PuLogoutWhy){ PuLogoutWhy.seen(); PuLogoutWhy.persist(); } } catch(_w){}   // 로그인 유지 켠 기기 — 크롬에 저장소를 비우지 말라고 청한다
         // 카카오 복귀 중에는 이전에 남은 세션으로 포털을 먼저 열지 않는다.
         if(!_handled && !window.__kkReturning){ _handled = true; enterPortal(user); }
+        else if(_handled && _portalReady && _portalUid === user.uid) _rmBootSplash();
       } else if(_handled){
-        // 로그아웃됨(유휴 60분·다른 탭 로그아웃 포함) → 화면 바꿔치기 대신 '완전 새로고침'.
-        // 오래 방치된 탭은 브라우저 절전으로 얼어 있어, 그 안에서 화면만 바꿔치기하면
-        // 입력이 안 먹는 반깨움 상태가 됨. ERP·컨설팅·기업정보함과 동일하게 fresh load로 통일.
-        _handled = false;
-        try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
-        try { location.replace(location.pathname + '?v=' + Date.now()); }
-        catch(_) { location.reload(); }
+        // 탭 복원·저장 방식 전환 중에는 인증이 잠깐 비었다가 같은 사람으로 돌아올 수 있다.
+        // 즉시 로그인 화면으로 보내지 않고 기존 화면을 먼저 가린 뒤 재확인한다.
+        // 실제 로그아웃 신호가 있으면 기다리지 않는다.
+        _loginGuard.cover();
+        if(_authRecheckTimer) clearTimeout(_authRecheckTimer);
+        var logoutAt = 0;
+        try { logoutAt = Number(localStorage.getItem('pu_auth_logout_at') || 0); } catch(_e){}
+        _authRecheckTimer = setTimeout(function(){
+          _authRecheckTimer = null;
+          if(auth.currentUser && auth.currentUser.uid === _portalUid){ if(_portalReady) _rmBootSplash(); return; }
+          _handled = false;
+          _portalUid = '';
+          _portalReady = false;
+          try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
+          try { location.replace(location.pathname + '?v=' + Date.now()); }
+          catch(_) { location.reload(); }
+        }, logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt ? 0 : 2500);
       } else {
         // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시
         try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
@@ -2488,6 +2509,8 @@ body.portal-mode #moreFab{display:flex;}
 
   // ── 포털 진입: 로그인된 사용자의 계정 정보 조회 후 타일 렌더 ──
   function enterPortal(user){
+    _portalUid = user.uid || '';
+    _portalReady = false;
     // 데이터가 준비될 때까지 화면은 민무늬 배경만 (빈 껍데기 헤더 번쩍임 방지)
     $('loginView').style.display = 'none';
     document.body.classList.add('portal-mode');   // 포털 화면 상단 정렬
@@ -2501,6 +2524,7 @@ body.portal-mode #moreFab{display:flex;}
     function _show(m){
       renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
       $('portalView').style.display = 'block';
+      _portalReady = true;
       _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
     }
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
