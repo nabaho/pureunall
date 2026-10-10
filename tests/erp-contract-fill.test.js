@@ -62,7 +62,7 @@ test('ⓒ 자문·급여 묶음 번호가 이알피와 같은 글자', () => {
 test('ⓓ 채우기 창 — 계약 값을 섞는다(계약 칸은 계약이, 나머지는 비었을 때만), 고친 값이 마지막', () => {
   const f = cutFn(stripJs(CFJ), 'function openFill(');
   const v = cutFn(f, 'function values(');
-  const iC = v.indexOf('host.contractCtx'), iE = v.indexOf('st.edits');
+  const iC = v.indexOf('ctxOf()'), iE = v.indexOf('st.edits');   // ctxOf() = 창에서 고른 계약(st.ct) 또는 host.contractCtx (2026-10-10)
   assert.ok(iC > 0 && iE > iC, '계약 값이 고친 값보다 뒤에 섞입니다');
   assert.match(v, /CONTRACT_WINS\.test\(k\) \|\| !V\[k\]/);
   assert.match(f, /host\.propose \|\| host\.make \|\| \(host\.contractCtx && host\.contractCtx\.coKey\)/, '계약 회사를 골라 두지 않습니다');

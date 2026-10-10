@@ -237,16 +237,31 @@
   function ymd(d) { return d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()); }
 
   /* ══ {{공인노무사명단}} — 푸른노무법인에 «재직 중인» 공인노무사 전원 (대표 지시 2026-10-09 「위임장에는 기본적으로 … 모든 이름」) ══
-     명부(data/user_dir): 사번 P-… 이거나 직책에 「노무사」(A- 직원 제외) · 상태 재직(active·휴직 leave).
+     명부(data/user_dir): 사번 P-… 이거나 직책에 「노무사」(A- 직원 제외) · 상태 재직(active)만.
+     ★ 퇴사·휴직하면 자동으로 빠진다 (대표 지시 2026-10-10) — 명부 상태가 active 가 아니거나,
+       이알피 휴가관리 휴직(data/leave_of_absence: status active · 오늘이 시작~끝 사이)이면 뺀다(이알피 effStatus 와 같은 잣대).
      대표노무사가 앞, 나머지는 사번 차례. 명부를 못 읽으면 FALLBACK(2026-10-09 명부 기준) — 바뀌면 명부가 이긴다. */
   var LAWYERS_FALLBACK = '대표 공인노무사 권형하, 공인노무사 박한별·김혜민·박재원·김동현';
   var lawyersLineNow = '';
-  function lawyersLine(dir) {
-    var list = (Array.isArray(dir) ? dir : (dir && typeof dir === 'object' ? Object.keys(dir).map(function (k) { return dir[k]; }) : []))
+  var sidKey = function (s) { return String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(); };
+  var listOfAny = function (x) { return Array.isArray(x) ? x : (x && typeof x === 'object' ? Object.keys(x).map(function (k) { return x[k]; }) : []); };
+  /* 오늘 휴직 중인 사번 — {SID:1}. today 는 'YYYY-MM-DD'(시험용) */
+  function onLeaveSet(loa, today) {
+    var d = today || ymd(new Date()), out = {};
+    listOfAny(loa).forEach(function (x) {
+      if (!x || x.status !== 'active' || !x.sid || !x.startDate) return;
+      if (String(x.startDate) <= d && (!x.endDate || String(x.endDate) >= d)) out[sidKey(x.sid)] = 1;
+    });
+    return out;
+  }
+  function lawyersLine(dir, loa, today) {
+    var away = onLeaveSet(loa, today);
+    var list = listOfAny(dir)
       .filter(function (u) {
         if (!u || !u.name) return false;
         var sid = String(u.sid || ''), t = String(u.title || u.position || '');
-        if (u.status !== 'active' && u.status !== 'leave') return false;
+        if (u.status !== 'active') return false;
+        if (away[sidKey(sid)]) return false;
         if (sid.indexOf('A-') === 0) return false;
         return sid.indexOf('P-') === 0 || /노무사/.test(t);
       })
@@ -259,7 +274,7 @@
     var first = (/대표/.test(String(head.title || head.position || '')) ? '대표 공인노무사 ' : '공인노무사 ') + String(head.name).replace(/\s+/g, '');
     return rest.length ? first + ', 공인노무사 ' + rest.join('·') : first;
   }
-  function setLawyers(dirOrLine) { lawyersLineNow = typeof dirOrLine === 'string' ? dirOrLine : lawyersLine(dirOrLine); return lawyersLineNow; }
+  function setLawyers(dirOrLine, loa) { lawyersLineNow = typeof dirOrLine === 'string' ? dirOrLine : lawyersLine(dirOrLine, loa); return lawyersLineNow; }
   function lawyersNow() { return lawyersLineNow || LAWYERS_FALLBACK; }
 
   /* 표지 이름 → 값. co 는 회사 한 벌(사업자등록증 줄 + coInfo 를 합친 것), contact·worker 는 명함 줄
@@ -624,7 +639,7 @@
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
     CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,
     mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook, agencyOrgOf: agencyOrgOf,
-    lawyersLine: lawyersLine, setLawyers: setLawyers, lawyersNow: lawyersNow, LAWYERS_FALLBACK: LAWYERS_FALLBACK
+    lawyersLine: lawyersLine, setLawyers: setLawyers, onLeaveSet: onLeaveSet, lawyersNow: lawyersNow, LAWYERS_FALLBACK: LAWYERS_FALLBACK
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;
