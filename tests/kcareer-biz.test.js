@@ -149,9 +149,10 @@ test('⑥ 옆줄 — 이력서관리 바로 아래 · 화면 셋 · 직원 보�
   const 이력 = nav.indexOf("{g:'이력서관리'"), 사업 = nav.indexOf("{g:'사업관리'");
   assert.ok(이력 > 0 && 사업 > 이력, '사업관리가 있어야 하고 이력서관리 뒤여야 합니다');
   assert.ok(nav.indexOf('{g:', 이력 + 1) === 사업, '★ 바로 아래 — 사이에 다른 무리가 끼면 안 됩니다');
-  ['page-bizdash', 'page-bizlist', 'page-bizdocs'].forEach((id) => {
+  /* 2026-10-10 탭 나누기 — 한눈에·수행 실적·결과보고서 메일은 renderBizDash 한 곳이 함께 그린다 */
+  ['page-bizdash', 'page-bizperf', 'page-bizmail', 'page-bizlist', 'page-bizdocs'].forEach((id) => {
     assert.ok(SRC.indexOf('id="' + id + '"') > 0, id + ' 화면');
-    assert.match(떼기('function nav_to('), new RegExp("id==='" + id + "'\\) _safe\\(render"), id + ' 를 열면 그려야 합니다');
+    assert.match(떼기('function nav_to('), new RegExp("id==='" + id + "'[^\\n]*\\) _safe\\(render"), id + ' 를 열면 그려야 합니다');
   });
   const pub = (bare.match(/var KC_PUB_STORES=\[([^\]]*)\]/) || [])[1] || '';
   assert.ok(pub && pub.indexOf('bizapp') < 0, '★ 사업(금액·서류)은 직원 보기 사본에 안 나간다');
