@@ -293,13 +293,14 @@ table.cmp td{white-space:nowrap}
 <div class="wrap" id="pgPlan" style="display:none">
   <div class="card">
     <div class="bar">
-      <input id="pq" placeholder="사업명·기관 검색" style="min-width:190px" oninput="planDraw()">
-      <select id="pView" onchange="planDraw()"><option value="ahead">공고 전 (앞으로)</option><option value="posted">✅ 공고 나옴</option>
+      <input id="pq" placeholder="사업명·기관 검색" style="min-width:190px" oninput="_planPage=0;planDraw()">
+      <select id="pView" onchange="_planPage=0;planDraw()"><option value="ahead">공고 전 (앞으로)</option><option value="posted">✅ 공고 나옴</option>
         <option value="star">★ 관심</option><option value="all">모두</option><option value="hidden">🙈 숨긴 것</option></select>
       <select id="pMthd" onchange="planMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
         <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
       <div class="sp"></div>
       <span id="pCnt" class="sub"></span>
+      <span id="pPerBox"></span>
       <button class="btn" onclick="fetchAll()">🔄 새로 받기</button>
     </div>
     <div class="sml" id="planNote" style="margin:0 0 8px"></div>
@@ -309,6 +310,7 @@ table.cmp td{white-space:nowrap}
         <th style="text-align:right">금액</th><th>계약방법</th><th>담당</th><th>상태</th><th>관리</th></tr></thead>
       <tbody id="ptb"></tbody>
     </table></div>
+    <div id="planPager"></div>
   </div>
 </div>
 
@@ -562,7 +564,13 @@ var PLAN_PAGE_MAX={plan:80, spec:40};
    → 옛 판으로 받은 기기는 한 번 1월부터 다시 받아 잘린 줄과 자세한 칸을 채운다. ⚠ 판을 올리면 모든 기기가 한 번 다시 받는다. */
 var PLAN_VER='2';
 function planSince(){ return lsGet('plan_ver')===PLAN_VER ? lsGet('plan_since') : ''; }
-var _planSum=null, _planSel={};
+var _planSum=null, _planSel={}, _planPage=0;
+/* 표시 개수 — 공고 모아보기와 같은 고르개(20·50·100·전체), 값은 따로(plan_per · 이 기기만) */
+function planPer(v){ lsSet('plan_per', String(v)); _planPage=0; planDraw(); }
+function planPageTo(p){ _planPage=p; planDraw(); }
+function _planPaged(rows){ var per=perOf('plan_per'), n=rows.length;
+  var pages=per?Math.max(1,Math.ceil(n/per)):1, p=Math.min(_planPage,pages-1); _planPage=p;
+  var from=per?p*per:0; return {per:per, pages:pages, p:p, from:from, page:per?rows.slice(from,from+per):rows, n:n}; }
 async function planPull(name, kind, urlOf, max){
   var rows=[], err='';
   for(var p=1;p<=max;p++){
@@ -623,7 +631,7 @@ async function planFetchNow(quiet){
     toast('발주 예정 '+pl.added+'건이 새로 걸렸습니다'+(pl.errs.length?' — 못 받은 것이 있습니다(안내 참고)':''));
   } finally { _fetching=false; planDraw(); }
 }
-function planMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('fMthd')) $('fMthd').value=lsGet('feed_mthd'); planDraw(); draw(); }
+function planMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('fMthd')) $('fMthd').value=lsGet('feed_mthd'); _planPage=0; planDraw(); draw(); }
 function planRows(){
   var q=(($('pq')&&$('pq').value)||'').toLowerCase(), v=($('pView')&&$('pView').value)||'ahead', fm=($('pMthd')&&$('pMthd').value)||'';
   var today=GovPlan.ymd(new Date()), every=get('plan').filter(Boolean), soleOut=0;
@@ -650,13 +658,13 @@ function planRows(){
 }
 function planDraw(){
   if(!$('ptb')) return;
-  var o=planRows(), rows=o.rows, today=o.today, feed=get('feed');
+  var o=planRows(), today=o.today, feed=get('feed'), pg=_planPaged(o.rows), rows=pg.page;
   var soon=o.every.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;
   if($('tbPlan')) $('tbPlan').innerHTML='📅 발주 예정'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
-  var vis={}; rows.forEach(function(r){ vis[r.no]=1; });
+  var vis={}; o.rows.forEach(function(r){ vis[r.no]=1; });
   Object.keys(_planSel).forEach(function(k){ if(!vis[k]) delete _planSel[k]; });
   var sn=Object.keys(_planSel).length, hid=o.every.filter(function(r){ return r.hidden; }).length;
-  $('pCnt').textContent='전체 '+o.every.filter(function(r){ return !r.hidden; }).length+'건 · 지금 '+rows.length+'건'
+  $('pCnt').textContent='전체 '+o.every.filter(function(r){ return !r.hidden; }).length+'건 · 지금 '+o.rows.length+'건'
     +(hid?' · 숨김 '+hid+'건':'')+(o.soleOut?' · 수의계약 '+o.soleOut+'건 뺌':'');
   var at=lsGet('plan_at'), err=lsGet('plan_err');
   $('planNote').innerHTML='나라장터 <b>발주계획</b>(기관이 연초·분기마다 올리는 «언제 발주할지») · <b>사전규격</b>(입찰공고 직전 미리 공개)을 공고 모아보기와 «같은 찾는 말»로 거른 것입니다. '
@@ -668,6 +676,7 @@ function planDraw(){
       +' <button class="btn sm" onclick="planBulk(\'hide\')">🚫 숨기기</button>'
       +' <button class="btn sm" onclick="planBulk(\'unhide\')">↩ 되살리기</button>'
       +' <button class="btn sm" onclick="planSelAll(false)">선택 해제</button></div>') : '';
+  if($('pPerBox')) $('pPerBox').innerHTML=perSel('plan_per','planPer');
   var sa=$('pSelAll'); if(sa) sa.checked = rows.length>0 && rows.every(function(r){ return _planSel[r.no]; });
   $('ptb').innerHTML = rows.length ? rows.map(function(r,i){
     var no=esc(r.no), on=!!_planSel[r.no], st=GovPlan.state(r,today), lk=GovPlan.linked(r,feed);
@@ -678,7 +687,7 @@ function planDraw(){
       +(lk.length?' <button class="btn sm" onclick="planGoFeed(\''+esc(lk[0].id)+'\')" title="공고 모아보기에서 엽니다">공고 보기</button>':'');
     return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+'" onclick="planRowClick(event,\''+no+'\')">'
       +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="planTog(\''+no+'\',this.checked)"></td>'
-      +'<td class="rn">'+(i+1)+'</td>'
+      +'<td class="rn">'+(pg.from+i+1)+'</td>'
       +'<td><span class="tag '+(r.kind==='spec'?'red':'navy')+'">'+(r.kind==='spec'?'사전규격':'발주계획')+'</span></td>'
       +'<td class="dt">'+when+'</td>'
       +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
@@ -693,10 +702,11 @@ function planDraw(){
         +(r.hidden?'<button class="btn sm" title="되살리기" onclick="planHide(\''+no+'\',false)">↩</button>'
                   :'<button class="btn sm" onclick="planHide(\''+no+'\',true)">🚫</button>')+'</td></tr>';
   }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요')+'</td></tr>';
+  if($('planPager')) $('planPager').innerHTML=_pager(pg.p, pg.pages, pg.from, rows.length, pg.n, 'planPageTo');
 }
 function planTog(no,on){ if(on) _planSel[no]=1; else delete _planSel[no]; planDraw(); }
 function planSelAll(on){ if(!on){ _planSel={}; planDraw(); return; }
-  planRows().rows.forEach(function(r){ _planSel[r.no]=1; }); planDraw(); }
+  _planPaged(planRows().rows).page.forEach(function(r){ _planSel[r.no]=1; }); planDraw(); }
 function _planEdit(nos, fn){ var a=get('plan'), n=0;
   a.forEach(function(r){ if(r && nos.indexOf(r.no)>=0 && fn(r)!==false) n++; });
   if(n) set('plan', a); return n; }
