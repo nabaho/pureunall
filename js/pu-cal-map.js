@@ -54,6 +54,20 @@
     };
   }
 
+  /* 제목 앞 시각 — 「1000 가나상사」「0930-1500 …」「10:30 …」 → 「HH:MM」, 없으면 "".
+     pu-cal.html 제목시각 과 «같은 꼴»만 시각으로 본다(연도 「2026년」·날짜 「2026-10」은 시각이 아니다).
+     ⚠ 화면(js/pu-cal-map.js titleTime) ↔ 서버(functions/trip-remind.js titleTime) 같은 셈 — 검사가 맞대 본다. */
+  function titleTime(title) {
+    var m = /^\s*([01]\d|2[0-3]):?([0-5]\d)(?![\d년.\/]|-\d{1,2}(?!\d))/.exec(s(title));
+    return m ? m[1] + ':' + m[2] : '';
+  }
+
+  /* 종일 일정의 제목 시각 — 「2026 일터혁신 31차 신청 마감」 같은 «연도»(2020~2039, 쌍점 없음)는 시각이 아니다.
+     새벽 구글 시각을 고칠 때(화면 제목시각)는 구글 시각이 이미 있어 이 걱정이 없지만, 종일 일정은 제목이 전부다 */
+  function allDayTime(title) {
+    return /^\s*20[23]\d(?![:\d])/.test(s(title)) ? '' : titleTime(title);
+  }
+
   function hm(v) {
     var m = /^(\d{2}):(\d{2})/.exec(s(v));
     return m && m[0] !== '00:00' ? m[0] : '';
@@ -67,7 +81,10 @@
     (o.gcal || []).forEach(function (e) {
       if (!e || e.date !== ymd) return;                       /* 여러 날 일정은 첫날에만 */
       var p = cleanPlace(e.place);
-      if (p) out.push({ key: 'gcal:' + e.id, time: hm(e.time), endTime: '', title: s(e.text) || '일정', place: p });
+      /* 종일 일정이라도 제목 앞에 시각을 적었으면(「1000 …」) 그 시각으로 줄 세운다(2026-10-10).
+         새벽 구글 시각은 화면(gcalToEvent)이 이미 제목 시각으로 바꿔 둔다. 여러 날 종일은 안 읽는다 */
+      var 시각 = hm(e.time) || ((!e.end || e.end === e.date) ? allDayTime(e.text) : '');
+      if (p) out.push({ key: 'gcal:' + e.id, time: 시각, endTime: '', title: s(e.text) || '일정', place: p });
     });
     [['sch', o.sch], ['priv', o.priv]].forEach(function (pair) {
       (pair[1] || []).forEach(function (x) {
@@ -124,7 +141,7 @@
   }
 
   return {
-    MAX_WAYPOINTS: MAX_WAYPOINTS,
+    MAX_WAYPOINTS: MAX_WAYPOINTS, titleTime: titleTime, allDayTime: allDayTime,
     cleanPlace: cleanPlace, embedUrl: embedUrl, links: links,
     stopsOn: stopsOn, dedupe: dedupe, routeUrls: routeUrls, routeText: routeText
   };

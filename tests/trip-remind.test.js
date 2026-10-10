@@ -155,3 +155,64 @@ test('⑥ 화면 — 출장 카드·제네시스 앱·워커', () => {
   assert.match(sw, /indexOf\('trip='\) < 0/);
   assert.match(sw, /requireInteraction: \/\^pu-trip-\//);
 });
+
+/* ══ 제목 앞 시각 (2026-10-10 「추천대로」) ════════════════════════════════════
+   직원들은 시각을 제목 앞에 적는다(「1000 에스에이씨 최종보고 (권별)」은 구글에 «종일»로 들어 있다).
+   ⑦ 제목 시각 셈은 화면 제목시각 · 동선(PuCalMap) · 서버(trip-remind) 셋이 같다
+   ⑧ 종일 하루짜리 + 제목 시각 → 알림, 여러 날 종일·제목 시각 없음 → 안 울림
+   ⑨ 새벽 구글 시각 + 제목 시각 → 제목 시각(전날 밤에 안 울린다), 낮 구글 시각은 그대로
+   ⑩ 동선 창도 종일 일정을 제목 시각으로 줄 세운다
+   ⑪ 서버는 오늘 0시부터 받는다(새벽·종일 일정이 «이미 지남»으로 빠지지 않게) */
+const MAP = require(path.join(ROOT, 'js', 'pu-cal-map.js'));
+
+test('⑦ 제목 시각 — 화면·동선·서버가 같은 셈', () => {
+  const vm = require('node:vm');
+  const 캘 = fs.readFileSync(path.join(ROOT, 'pu-cal.html'), 'utf8');
+  const i = 캘.indexOf('function 제목시각(');
+  let d = 0, j = 캘.indexOf('{', i);
+  for (; j < 캘.length; j++) { if (캘[j] === '{') d++; else if (캘[j] === '}' && --d === 0) break; }
+  const 상자 = {}; vm.createContext(상자); vm.runInContext(캘.slice(i, j + 1), 상자);
+  const 제목들 = ['1000 에스에이씨 최종보고 (권별)', '0930-1500 서산시설관리공단', '1400-1700 서울여성플라자', '10:30 미팅',
+    '1000가나상사', '2026 일터혁신 31차 신청 마감', '2026년 계획', '2026-10 점검', '1300-1600 강의', '김완재 이음센터', '15 00 노사', '2400 이상', '0960 이상', ''];
+  for (const t of 제목들) {
+    const 화면 = 상자.제목시각(t, '00:30');
+    assert.strictEqual(MAP.titleTime(t), 화면, '동선: ' + t);
+    assert.strictEqual(T.titleTime(t), 화면, '서버: ' + t);
+  }
+  assert.strictEqual(T.titleTime('1000 에스에이씨'), '10:00');
+  /* 종일 일정 — 연도는 시각이 아니다(화면 제목시각 은 새벽 구글 시각에만 쓰여 이 걱정이 없다) */
+  for (const t of 제목들) assert.strictEqual(MAP.allDayTime(t), T.allDayTime(t), '종일: ' + t);
+  assert.strictEqual(T.allDayTime('2026 일터혁신 31차 신청 마감'), '', '연도를 시각으로 읽었다');
+  assert.strictEqual(T.allDayTime('2000 회식'), '20:00');
+  assert.strictEqual(T.allDayTime('20:26 쌍점은 시각'), '20:26');
+});
+
+test('⑧⑨ 종일·새벽 일정도 제목 시각으로 알린다', () => {
+  const now = Date.parse('2026-10-12T08:45:00+09:00');
+  const mailSid = { 'boss@x,com': 'P-001' };
+  const 공 = { location: '충남 아산시 인주면 인주산단로 123-81', creator: { email: 'boss@x.com' } };
+  const xs = T.pickTrips({ now, mailSid, gcal: [
+    Object.assign({ id: 'allday', summary: '1000 에스에이씨 최종보고 (권별)', start: { date: '2026-10-12' }, end: { date: '2026-10-13' } }, 공),
+    Object.assign({ id: 'notime', summary: '에스에이씨 방문', start: { date: '2026-10-12' }, end: { date: '2026-10-13' } }, 공),
+    Object.assign({ id: 'multi', summary: '0900 출장', start: { date: '2026-10-12' }, end: { date: '2026-10-15' } }, 공),
+    Object.assign({ id: 'dawn', summary: '0930 가나상사 방문', start: { dateTime: '2026-10-12T00:30:00+09:00' } }, 공),
+    Object.assign({ id: 'day', summary: '1000 낮 시각은 구글 그대로', start: { dateTime: '2026-10-12T11:30:00+09:00' } }, 공),
+  ] });
+  assert.deepStrictEqual(xs.map((x) => x.id + '@' + x.time), ['dawn@09:30', 'allday@10:00']);
+  /* 전날 밤 23:00 에는 «새벽 00:30» 으로 울리지 않는다 */
+  const 전날 = Date.parse('2026-10-11T23:00:00+09:00');
+  assert.deepStrictEqual(T.pickTrips({ now: 전날, mailSid, gcal: [
+    Object.assign({ id: 'dawn', summary: '0930 가나상사 방문', start: { dateTime: '2026-10-12T00:30:00+09:00' } }, 공)] }), []);
+});
+
+test('⑩ 동선 창 — 종일 일정을 제목 시각으로 줄 세운다 · ⑪ 오늘 0시부터 받는다', () => {
+  const xs = MAP.stopsOn('2026-10-12', { gcal: [
+    { id: 'b', date: '2026-10-12', end: '2026-10-12', time: '14:00', text: '오후', place: '천안시청' },
+    { id: 'a', date: '2026-10-12', end: '2026-10-12', time: '', text: '1000 에스에이씨 최종보고 (권별)', place: '아산시 인주면' },
+    { id: 'c', date: '2026-10-12', end: '2026-10-14', time: '', text: '0800 여러 날', place: '세종시' },
+  ] });
+  assert.deepStrictEqual(xs.map((x) => x.key + '@' + x.time), ['gcal:a@10:00', 'gcal:b@14:00', 'gcal:c@']);
+  const src = fs.readFileSync(path.join(ROOT, 'functions', 'trip-remind.js'), 'utf8');
+  assert.match(src, /const timeMin = new Date\(Date\.parse\(서울날\(now\) \+ 'T00:00:00\+09:00'\)\)/);
+  assert.match(fs.readFileSync(path.join(ROOT, 'pu-cal.html'), 'utf8'), /js\/pu-cal-map\.js\?v=\d+/);
+});
