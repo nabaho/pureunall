@@ -153,6 +153,15 @@ details.recban[open]>summary::before{content:'▾ '}
 .rsub.on{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
 .rsub .n{font-size:11px;background:#fee2e2;color:#991b1b;border-radius:9px;padding:1px 7px;margin-left:4px;font-weight:600}
 .rsub .n.amb{background:#fef3c7;color:#854d0e}
+/* 지원 이력·메일 — 「기관별」·「메일 정리」 두 보기 고르개(2026-10-10 대표 「b」). 머리 줄(.bar) 안에 들어가 같이 붙는다 */
+.hseg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+.hseg button{padding:6px 13px;border:0;background:var(--card);font:inherit;font-size:13px;cursor:pointer;color:var(--text)}
+.hseg button+button{border-left:1px solid var(--border)}
+.hseg button.on{background:var(--navy);color:#FFFFFF;font-weight:700}
+.hseg .n{font-size:11px;background:#e2e8f0;color:#334155;border-radius:9px;padding:1px 7px;margin-left:4px;font-weight:600}
+.hseg .n.amb{background:#fef3c7;color:#854d0e}
+.mgrp{font-size:13.5px;margin:12px 0 2px}
+.rec-ref td{color:var(--text-mute)}
 /* 표 열 맞춤 (대표 지시 2026-10-05 「열을 좀 정리」) — 칸 너비를 못박아 줄마다 같은 자리에 선다 */
 .rec-fixed{table-layout:fixed;width:100%}
 .rec-fixed td{vertical-align:middle}
@@ -324,20 +333,22 @@ table.cmp td{white-space:nowrap}
     <div id="recPaneKc"><div id="recWatchKc"></div></div>
     <div id="recPaneHist" style="display:none">
       <div class="bar">
-        <b style="color:var(--navy)">해마다 지원하던 곳</b>
-        <span class="sml" id="recAt"></span>
+        <span id="recHistSeg"></span>
         <div class="sp"></div>
-        <button class="btn primary" onclick="recScan()">📂 서류 폴더에서 읽기</button>
-        <button class="btn" onclick="recAddOrg()">＋ 기관 더하기</button>
+        <span id="recOrgBtns"><span class="sml" id="recAt"></span>
+          <button class="btn primary" onclick="recScan()">📂 서류 폴더에서 읽기</button>
+          <button class="btn" onclick="recAddOrg()">＋ 기관 더하기</button></span>
       </div>
+      <div id="recViewMail" style="display:none"><div id="recMail"></div></div>
+      <div id="recViewOrg">
       <div id="recBan"></div>
-      <div id="recMail"></div>
       <div id="recOrgBar"></div>
       <div class="scroll"><table>
         <thead><tr><th class="chk"><input type="checkbox" id="recOrgAll" title="보이는 것 모두" onchange="recSelAll('org',this.checked)"></th><th class="rn">№</th><th>기관 · 하는 일</th><th>보통</th><th>지원한 해</th><th>올해</th><th>할 일</th></tr></thead>
         <tbody id="recTb"></tbody>
       </table></div>
       <div id="recRest" style="margin-top:10px"></div>
+      </div>
     </div>
     <!-- ⚠ id 「recWatch」는 공공기관 쪽 목록이다(옛 이름을 그대로 둔다) -->
     <div id="recPanePub" style="display:none"><div id="recWatch"></div></div>
@@ -385,7 +396,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-bizinfo.js?v=1"></script>
 <script src="js/gov-recruit.js?v=6"></script>
 <script src="js/gov-submit.js?v=3"></script>
-<script src="js/gov-sync.js?v=6"></script>
+<script src="js/gov-sync.js?v=7"></script>
 <script src="js/gov-match.js?v=2"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
@@ -1332,6 +1343,8 @@ function recDraw(){
   matchEnsure();
   var mnr=$('matchNoteR'); if(mnr) mnr.innerHTML=matchNoteHtml();
   if($('recMail')) $('recMail').innerHTML=recMailHtml();
+  var _orgN=0; try{ _orgN=scan.length ? GovRecruit.order(recGroups().orgs, today).length : 0; }catch(e){}
+  recHistSegDraw(_orgN, recMailSplit().todo);
   if(!scan.length){
     $('recBan').innerHTML='<div class="recban calm">📂 아직 서류 폴더를 읽지 않았습니다. <b>📂 서류 폴더에서 읽기</b>를 눌러 '
       +'<b>'+esc(REC_DIR)+'</b> 폴더(또는 그 위 서류 폴더)를 골라 주세요.<br>'
@@ -1597,7 +1610,7 @@ function recSelKeys(set){ return Object.keys(_recSel[set]||{}); }
 /* 고른 것 한꺼번에 — 알림은 끝에 한 번 */
 function recSelSeen(set, on){
   var s=recObj('recruit_seen'), n=0, now=Date.now();
-  recSelKeys(set).forEach(function(k){ var sk=set==='nt'?GovSync.safeKey('m|'+k):k;
+  recSelKeys(set).forEach(function(k){ var sk=/^nt/.test(set)?GovSync.safeKey('m|'+k):k;
     if(on && !s[sk]){ s[sk]=now; n++; } else if(!on && s[sk]){ delete s[sk]; n++; } });
   _recSel[set]={}; if(n) recObjSet('recruit_seen', s); recDraw();
   toast(n ? (on?'고른 '+n+'건을 봤음으로 적었습니다':'고른 '+n+'건을 안 본 것으로 되돌렸습니다') : '바뀐 것이 없습니다'); }
@@ -1653,7 +1666,7 @@ function recSub(k){ lsSet('rec_sub', k); recSubDraw(); }
 function recSubDraw(){
   if(!$('recSubs')) return;
   var cur=recSubCur(), need=0;
-  try{ var mp=recMailPlan(); need=mp.ask.length+mp.pick.length; }catch(e){}
+  try{ need=recMailSplit().todo; }catch(e){}
   var badge={ kc:recFresh('kc').length, pub:recFresh('pub').length, hist:need };
   $('recSubs').innerHTML=REC_SUBS.map(function(t){
     var n=badge[t.k];
@@ -1777,6 +1790,19 @@ function recWatchCal(key){
    ⚠ 하루 한 번만 저절로 읽는다(폴더 몇 개 × 400통). 「📬 다시 찾기」로 언제든. */
 var REC_MAIL_RE=/컨설팅|공공기관|노무사회|이력서|개인메일|사무실업무/;
 var REC_MAIL_EVERY=12*3600e3;
+/* ═══ 지원 이력·메일 — 두 보기 (대표 「b」 2026-10-10) ═══
+   「메일에서 찾은 것」이 길게 열려 «해마다 지원하던 곳» 표를 한참 아래로 밀어 냈다 → 서로 밀어내지 않게 두 보기로 나눈다.
+   ⚠ 고른 보기는 이 기기에만 기억한다(rec_hist — 클라우드로 안 간다). 기본은 기관별. */
+function recHistCur(){ return lsGet('rec_hist')==='mail' ? 'mail' : 'org'; }
+function recHist(v){ lsSet('rec_hist', v==='mail'?'mail':'org'); recDraw(); }
+function recHistSegDraw(orgN, todo){
+  var cur=recHistCur(), el=$('recHistSeg'); if(!el) return;
+  el.innerHTML='<span class="hseg"><button class="'+(cur==='org'?'on':'')+'" onclick="recHist(\'org\')">📅 기관별'+(orgN?' <span class="n">'+orgN+'</span>':'')+'</button>'
+    +'<button class="'+(cur==='mail'?'on':'')+'" onclick="recHist(\'mail\')">📬 메일 정리'+(todo?' <span class="n amb">할 일 '+todo+'</span>':'')+'</button></span>';
+  if($('recViewOrg')) $('recViewOrg').style.display=(cur==='org'?'':'none');
+  if($('recViewMail')) $('recViewMail').style.display=(cur==='mail'?'':'none');
+  if($('recOrgBtns')) $('recOrgBtns').style.display=(cur==='org'?'':'none');
+}
 var _recMailBusy=false, _recMailErr='';
 function recMailFolders(all){
   return Object.keys(all||{}).map(function(k){ var f=all[k]||{}; return { slug:f.slug||k, name:String(f.name||k), kind:String(f.kind||'') }; })
@@ -1856,69 +1882,135 @@ function recCalAsk(title, sub, href, dueKey){
 }
 function recMailNoticeCal(key){ var it=recMailItem(key); if(it) recCalAsk(it.subject, '메일로 온 모집 공고 · '+it.date, '', 'm|'+key); }
 function recMailNoticeSeen(key){ var s=recObj('recruit_seen'); s[GovSync.safeKey('m|'+key)]=Date.now(); recObjSet('recruit_seen', s); recDraw(); }
+/* ═══ 📬 메일 정리 — «지금 할 일»과 «참고용»을 가른다 (대표 「b」·「기준 1년」 2026-10-10) ═══
+   ⚠ 3년 전 결과 메일과 이번 달 결과 메일이 똑같이 «할 일»처럼 보여, 무엇을 먼저 할지 판단이 안 섰다.
+   · 결과·기관 모름 메일: 받은 지 «1년»(REC_KEEP_MONTHS) 넘으면 참고용. ⚠ 날짜를 모르면 «지금 할 일»(숨기지 않는다)
+   · 모집 공고 메일: 마감이 지났으면 참고용 · 마감을 모르면 받은 지 45일(REC_NOTICE_DAYS) 넘으면 참고용 · 접수 중·곧 마감·수시는 할 일
+   · ⚠ 참고용도 지우지 않는다 — 접어 두고, 「치우기」는 목록에서만 빼며 ↩ 되살릴 수 있다(recruit_mailtidy에 «치운 것만» 적는다) */
+var REC_KEEP_MONTHS=12, REC_NOTICE_DAYS=45, REC_REF_SETS=['ask_ref','pick_ref','nt_ref'];
+function recTime(d){ var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(String(d||'')); return m ? new Date(Number(m[1]), Number(m[2])-1, Number(m[3])).getTime() : 0; }
+function recOldMail(d, today){ var t=recTime(d); if(!t) return false;
+  return t < new Date(today.getFullYear(), today.getMonth()-REC_KEEP_MONTHS, today.getDate()).getTime(); }
+function recOldNotice(n, today){
+  var st=GovRecruit.dueState(recPer('m|'+n.key, null, n.subject, n.date), recYmd(today));
+  if(st.k==='past') return true;
+  if(st.k!=='unknown') return false;
+  var t=recTime(n.date); return !!t && (today.getTime()-t)/864e5 > REC_NOTICE_DAYS; }
+/* 지금 할 일 / 참고용으로 가른다 — 건수 배지와 화면이 «같은 것»을 본다 */
+function recMailSplit(){
+  var today=recToday(), p=recMailPlan(), seen=recObj('recruit_seen');
+  var s={ p:p, now:{ ask:[], pick:[], nt:[] }, ref:{ ask:[], pick:[], nt:[] } };
+  p.ask.forEach(function(a){ (recOldMail(a.item.date, today)?s.ref:s.now).ask.push(a); });
+  p.pick.forEach(function(it){ (recOldMail(it.date, today)?s.ref:s.now).pick.push(it); });
+  p.notices.filter(function(n){ return !seen[GovSync.safeKey('m|'+n.key)]; })
+    .forEach(function(n){ (recOldNotice(n, today)?s.ref:s.now).nt.push(n); });
+  s.todo=s.now.ask.length+s.now.pick.length;
+  s.refN=s.ref.ask.length+s.ref.pick.length+s.ref.nt.length;
+  return s;
+}
+/* 참고용 치우기 — 목록에서만 뺀다(메일은 그대로). 치운 것만 recruit_mailtidy 에 적어 둔다 → ↩ 되살리기가 «그것만» 되돌린다.
+   ⚠ 이미 «무시»·«봤음»으로 빠져 있던 것은 적지 않는다 — 되살릴 때 따로 정한 것까지 살아나면 안 된다. */
+function recMailTidy(){
+  var S=recMailSplit(), sk=recObj('recruit_mailskip'), sn=recObj('recruit_seen'), td=recObj('recruit_mailtidy'), n=0, now=Date.now();
+  var skip=function(key){ var k=GovSync.safeKey(key); if(!sk[k]){ sk[k]=1; td['s|'+k]=1; n++; } };
+  S.ref.ask.forEach(function(a){ skip(a.item.key); });
+  S.ref.pick.forEach(function(it){ skip(it.key); });
+  S.ref.nt.forEach(function(x){ var k=GovSync.safeKey('m|'+x.key); if(!sn[k]){ sn[k]=now; td['n|'+k]=1; n++; } });
+  if(!n){ toast('치울 참고용이 없습니다'); return; }
+  recObjSet('recruit_mailskip', sk); recObjSet('recruit_seen', sn); recObjSet('recruit_mailtidy', td);
+  REC_REF_SETS.forEach(function(s){ _recSel[s]={}; });
+  recDraw(); toast('참고용 '+n+'건을 치웠습니다 — 메일은 그대로이고 「↩ 치운 것 되살리기」로 다시 볼 수 있습니다');
+}
+function recMailTidyUndo(){
+  var td=recObj('recruit_mailtidy'), ks=Object.keys(td); if(!ks.length) return;
+  var sk=recObj('recruit_mailskip'), sn=recObj('recruit_seen');
+  ks.forEach(function(k){ var id=k.slice(2); if(k.indexOf('s|')===0) delete sk[id]; else if(k.indexOf('n|')===0) delete sn[id]; });
+  recObjSet('recruit_mailskip', sk); recObjSet('recruit_seen', sn); recObjSet('recruit_mailtidy', {});
+  recDraw(); toast('치웠던 '+ks.length+'건을 되살렸습니다');
+}
 function recMailHtml(){
   var at=Number(lsGet('recruit_mail_at'))||0, nf=lsGet('recruit_mailfolders')||0;
-  var head='<b>📬 메일에서 찾은 것</b> <span class="sml">— 푸른 메일 '+nf+'개 폴더의 «제목»만 읽습니다(폴더마다 최근 400통, 메일함은 안 고칩니다)'
+  var tidyN=Object.keys(recObj('recruit_mailtidy')).length;
+  var head='<div class="mgrp" style="margin-top:0"><b>📬 메일 정리</b> <span class="sml">— 푸른 메일 '+nf+'개 폴더의 «제목»만 읽습니다(폴더마다 최근 400통, 메일함은 안 고칩니다)'
     +(at?' · 마지막 '+esc(new Date(at).toLocaleString('ko-KR')):'')+'</span> '
-    /* ⚠ 접는 칸 머리(summary) 안의 단추 — 누르면 칸이 접히지 않게 막는다 */
-    +'<button class="btn sm" onclick="event.preventDefault();event.stopPropagation();recMailScan(true)">'+(_recMailBusy?'읽는 중…':'📬 다시 찾기')+'</button>';
-  if(_recMailErr) return '<div class="recban calm">'+head+'<br>'+esc(_recMailErr)+'</div>';
-  if(!at) return '<div class="recban calm">'+head+'<br>'+(_recMailBusy?'메일함을 읽고 있습니다…':'아직 안 읽었습니다.')+'</div>';
-  var p=recMailPlan(), lg=recObj('recruit_log'), seen=recObj('recruit_seen'), parts=[];
+    +'<button class="btn sm" onclick="recMailScan(true)">'+(_recMailBusy?'읽는 중…':'📬 다시 찾기')+'</button>'
+    +(tidyN?' <button class="btn sm" onclick="recMailTidyUndo()" title="참고용으로 치웠던 메일을 목록으로 되돌립니다">↩ 치운 것 '+tidyN+'건 되살리기</button>':'')+'</div>';
+  if(_recMailErr) return '<div class="recban calm">'+head+esc(_recMailErr)+'</div>';
+  if(!at) return '<div class="recban calm">'+head+(_recMailBusy?'메일함을 읽고 있습니다…':'아직 안 읽었습니다.')+'</div>';
+  var S=recMailSplit(), lg=recObj('recruit_log'), parts=[], LIM=30;
   var orgs=GovRecruit.allOrgs(get('recruit_custom'));
   var opt=function(key){ return '<select onchange="recMailPick(\''+esc(key)+'\',this.value)" style="padding:2px 5px;font-size:11.5px;max-width:150px"><option value="">기관 고르기…</option>'
     + orgs.map(function(o){ return '<option value="'+esc(o.id)+'">'+esc(o.name)+'</option>'; }).join('')+'</select>'; };
-  /* ⚠ 네 묶음 모두 «같은 열» 표 — 날짜 · 기관·구분 · 메일 제목 · 판단 · 할 일 (대표 지시 2026-10-05 「열을 좀 정리」) */
+  var more=function(n){ return n>LIM?'<div class="sml" style="margin:4px 0">… '+LIM+'건만 보입니다 — 처리하면 다음 것이 나옵니다(전체 '+n+'건)</div>':''; };
+  /* ⚠ 모든 묶음이 «같은 열» 표 — 날짜 · 기관·구분 · 메일 제목 · 기간 · 판단 · 할 일 (2026-10-05 「열을 좀 정리」) */
   var mtable=function(set, title, rows, acts){
-    return '<div class="pop-sub" style="margin:10px 0 4px">'+title+'</div>'+recSelBar(set, acts)
+    return (title?'<div class="pop-sub" style="margin:10px 0 4px">'+title+'</div>':'')+recSelBar(set, acts)
       +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col><col style="width:130px"><col style="width:96px"><col style="width:224px"></colgroup>'
       +'<thead><tr>'+recChkHead(set)+'<th>날짜</th><th>기관 · 구분</th><th>메일 제목</th><th>기간</th><th>판단</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
       +rows.join('')+'</tbody></table></div>'; };
   var mrow=function(set, k, i, d, who, subj, judge, act){
     return '<tr>'+recChk(set, k)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(d)+'</td><td class="src">'+who+'</td><td class="tt">「'+esc(subj)+'」</td>'
     +recDueCell(recPer('m|'+k, null, subj, d))+'<td>'+(judge||'')+'</td><td class="act">'+act+'</td></tr>'; };
-  /* 저절로 적은 것 */
+  var askTable=function(set, list, title){
+    var L=list.slice(0, LIM); recSelShown(set, L.map(function(a){ return a.item.key; }));
+    return mtable(set, title, L.map(function(a, i){ var k=a.item.key;
+      return mrow(set, k, i, a.item.date, '<b>'+esc(recOrgName(a.org))+'</b>', a.item.subject,
+        a.guess?'<span class="tag teal">'+esc(a.guess)+' 같음</span>':'<span class="tag amber">열어 봐야 앎</span>',
+        '<button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'선정\')">✓ 선정</button>'
+        +'<button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'탈락\')">✗ 탈락</button>'
+        +'<button class="btn sm" onclick="recMailSkip(\''+esc(k)+'\')">무시</button>'); }),
+      '<button class="btn sm" onclick="recSelSkip(\''+set+'\')">고른 것 무시</button>')+more(list.length); };
+  var pickTable=function(set, list, title){
+    var L=list.slice(0, LIM); recSelShown(set, L.map(function(it){ return it.key; }));
+    return mtable(set, title, L.map(function(it, i){
+      return mrow(set, it.key, i, it.date, it.kind==='submit'?'📨 지원':'🏅 결과', it.subject, '',
+        opt(it.key)+'<button class="btn sm" onclick="recMailSkip(\''+esc(it.key)+'\')">무시</button>'); }),
+      '<button class="btn sm" onclick="recSelSkip(\''+set+'\')">고른 것 무시</button>')+more(list.length); };
+  var ntTable=function(set, list, title){
+    var L=list.slice(0, LIM); recSelShown(set, L.map(function(n){ return n.key; }));
+    return '<div class="pop-sub" style="margin:10px 0 4px">'+title+'</div>'
+      +recSelBar(set, '<button class="btn sm" onclick="recSelSeen(\''+set+'\',true)">✓ 고른 것 봤음</button>')
+      +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:124px"><col><col style="width:130px"><col style="width:200px"></colgroup>'
+      +'<thead><tr>'+recChkHead(set)+'<th>날짜</th><th>갈래</th><th>메일 제목</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
+      + L.map(function(n, i){ var ki=GovRecruit.kindInfo(GovRecruit.kindOf(n.subject));
+        return '<tr>'+recChk(set, n.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(n.date)+'</td><td><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td><td class="tt">「'+esc(n.subject)+'」</td>'
+          +recDueCell(recPer('m|'+n.key, null, n.subject, n.date))
+          +'<td class="act"><button class="btn sm" onclick="recMailNoticeCal(\''+esc(n.key)+'\')">📅 마감일</button>'
+          +'<button class="btn sm" onclick="recMailNoticeSeen(\''+esc(n.key)+'\')">✓ 봤음</button></td></tr>'; }).join('')+'</tbody></table></div>'+more(list.length); };
+
+  /* ① 저절로 적은 것 — 맞는지 확인(접어 둔다. 할 일 건수에는 안 센다) */
   var done=[]; Object.keys(lg).forEach(function(o){ Object.keys(lg[o]||{}).forEach(function(y){ var c=lg[o][y]; if(c&&c.via==='mail'&&c.mail) done.push({o:o,y:y,c:c}); }); });
   done.sort(function(a,b){ return String(b.c.mail.date).localeCompare(String(a.c.mail.date)); });
   var doneS=done.slice(0,10); recSelShown('done', doneS.map(function(d){ return d.o+'|'+d.y; }));
-  if(done.length) parts.push(mtable('done', '✅ 「지원함」으로 저절로 적은 것 '+done.length, doneS.map(function(d, i){
-    return mrow('done', d.o+'|'+d.y, i, d.c.mail.date, '<b>'+esc(recOrgName(d.o))+'</b><div class="sml">'+esc(d.y)+'년</div>', d.c.mail.subject,
-      d.c.mail.att?'<span class="sml">첨부 '+d.c.mail.att+'</span>':'',
-      '<button class="btn sm" onclick="recMailUndo(\''+esc(d.o)+'\',\''+esc(d.y)+'\')">↩ 되돌리기</button>'); }),
-    '<button class="btn sm" onclick="recSelUndo()">↩ 고른 것 되돌리기</button>'));
-  /* 결과 — 묻는다 */
-  var askS=p.ask.slice(0,12); recSelShown('ask', askS.map(function(a){ return a.item.key; }));
-  if(p.ask.length) parts.push(mtable('ask', '🏅 결과 메일 '+p.ask.length+' <span class="sml">— 열어 보고 고르세요(저절로 적지 않습니다)</span>', askS.map(function(a, i){ var k=a.item.key;
-    return mrow('ask', k, i, a.item.date, '<b>'+esc(recOrgName(a.org))+'</b>', a.item.subject,
-      a.guess?'<span class="tag teal">'+esc(a.guess)+' 같음</span>':'<span class="tag amber">열어 봐야 앎</span>',
-      '<button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'선정\')">✓ 선정</button>'
-      +'<button class="btn sm" onclick="recMailResult(\''+esc(k)+'\',\''+esc(a.org)+'\',\'탈락\')">✗ 탈락</button>'
-      +'<button class="btn sm" onclick="recMailSkip(\''+esc(k)+'\')">무시</button>'); }),
-    '<button class="btn sm" onclick="recSelSkip(\'ask\')">고른 것 무시</button>'));
-  /* 기관 모름 */
-  var pickS=p.pick.slice(0,12); recSelShown('pick', pickS.map(function(it){ return it.key; }));
-  if(p.pick.length) parts.push(mtable('pick', '❓ 기관을 모르는 지원·결과 메일 '+p.pick.length+' <span class="sml">— 한 번 고르면 기억합니다</span>', pickS.map(function(it, i){
-    return mrow('pick', it.key, i, it.date, it.kind==='submit'?'📨 지원':'🏅 결과', it.subject, '',
-      opt(it.key)+'<button class="btn sm" onclick="recMailSkip(\''+esc(it.key)+'\')">무시</button>'); }),
-    '<button class="btn sm" onclick="recSelSkip(\'pick\')">고른 것 무시</button>'));
-  /* 메일로 온 모집 공고 */
-  var nts=p.notices.filter(function(n){ return !seen[GovSync.safeKey('m|'+n.key)]; });
-  var ntS=nts.slice(0,30); recSelShown('nt', ntS.map(function(n){ return n.key; }));
-  if(nts.length) parts.push('<details class="sec" style="margin-top:10px"'+(recFoldOpen('nt', false)?' open':'')+' ontoggle="recFold(\'nt\',this.open)"><summary><span class="nm">✉ 메일로 온 모집 공고 '+nts.length+'</span>'
-    +'<span class="sml">게시판 감시가 못 읽는 기관도 메일로 알려 옵니다</span></summary><div class="body">'
-    +recSelBar('nt', '<button class="btn sm" onclick="recSelSeen(\'nt\',true)">✓ 고른 것 봤음</button>')
-    +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:124px"><col><col style="width:130px"><col style="width:200px"></colgroup>'
-    +'<thead><tr>'+recChkHead('nt')+'<th>날짜</th><th>갈래</th><th>메일 제목</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
-    + ntS.map(function(n, i){ var ki=GovRecruit.kindInfo(GovRecruit.kindOf(n.subject));
-      return '<tr>'+recChk('nt', n.key)+'<td class="rn">'+(i+1)+'</td><td class="sml">'+esc(n.date)+'</td><td><span class="sml">'+ki.icon+' '+esc(ki.name)+'</span></td><td class="tt">「'+esc(n.subject)+'」</td>'
-        +recDueCell(recPer('m|'+n.key, null, n.subject, n.date))
-        +'<td class="act"><button class="btn sm" onclick="recMailNoticeCal(\''+esc(n.key)+'\')">📅 마감일</button>'
-        +'<button class="btn sm" onclick="recMailNoticeSeen(\''+esc(n.key)+'\')">✓ 봤음</button></td></tr>'; }).join('')+'</tbody></table></div></div></details>');
-  if(!parts.length) parts.push('<div class="note">지원·결과·모집 메일을 찾지 못했습니다.</div>');
-  var need=p.ask.length+p.pick.length;
-  return '<details class="recban'+(need?'':' calm')+'"'+(recFoldOpen('mail', need)?' open':'')+' ontoggle="recFold(\'mail\',this.open)">'
-    +'<summary>'+head+(need?' <span class="tag amber">고를 것 '+need+'</span>':'')+'</summary>'
-    +'<div style="margin:6px 0 2px">'+parts.join('')+'</div></details>';
+  if(done.length) parts.push('<details class="sec" style="margin-top:10px"'+(recFoldOpen('done', false)?' open':'')+' ontoggle="recFold(\'done\',this.open)"><summary><span class="nm">✅ 「지원함」으로 저절로 적은 것 '+done.length+'</span>'
+    +'<span class="sml">틀렸으면 ↩ 되돌리기</span></summary><div class="body">'
+    +mtable('done', '', doneS.map(function(d, i){
+      return mrow('done', d.o+'|'+d.y, i, d.c.mail.date, '<b>'+esc(recOrgName(d.o))+'</b><div class="sml">'+esc(d.y)+'년</div>', d.c.mail.subject,
+        d.c.mail.att?'<span class="sml">첨부 '+d.c.mail.att+'</span>':'',
+        '<button class="btn sm" onclick="recMailUndo(\''+esc(d.o)+'\',\''+esc(d.y)+'\')">↩ 되돌리기</button>'); }),
+      '<button class="btn sm" onclick="recSelUndo()">↩ 고른 것 되돌리기</button>')+'</div></details>');
+
+  /* ② 지금 할 일 */
+  var N=S.now, nowN=N.ask.length+N.pick.length+N.nt.length;
+  parts.push('<div class="mgrp"><b>✅ 지금 할 일</b> <span class="sml">최근 12개월 · '+nowN+'건</span></div>');
+  if(!nowN) parts.push('<div class="note">✓ 지금 처리할 메일이 없습니다.'+(S.refN?' 오래된 '+S.refN+'건은 아래 「참고용」에 있습니다.':'')+'</div>');
+  if(N.ask.length) parts.push(askTable('ask', N.ask, '🏅 결과 메일 '+N.ask.length+' <span class="sml">— 열어 보고 고르세요(저절로 적지 않습니다)</span>'));
+  if(N.pick.length) parts.push(pickTable('pick', N.pick, '❓ 기관을 모르는 지원·결과 메일 '+N.pick.length+' <span class="sml">— 한 번 고르면 기억합니다</span>'));
+  if(N.nt.length) parts.push(ntTable('nt', N.nt, '✉ 메일로 온 모집 공고 '+N.nt.length+' <span class="sml">— 게시판 감시가 못 읽는 기관도 메일로 알려 옵니다</span>'));
+
+  /* ③ 참고용 — 접어 둔다. 지우지 않는다 */
+  var Rf=S.ref;
+  if(S.refN){
+    var inner='<div class="bar" style="margin:6px 0"><button class="btn sm" onclick="recMailTidy()">✓ 참고용 '+S.refN+'건 모두 확인함으로 치우기</button>'
+      +'<span class="sml">목록에서만 빠집니다 — 메일은 그대로이고 되살릴 수 있습니다</span></div><div class="rec-ref">'
+      +(Rf.ask.length?askTable('ask_ref', Rf.ask, '🏅 지난 결과 메일 '+Rf.ask.length+' <span class="sml">— 그해 기록으로 남기려면 선정·탈락을 누르세요</span>'):'')
+      +(Rf.pick.length?pickTable('pick_ref', Rf.pick, '❓ 기관을 모르는 지난 메일 '+Rf.pick.length):'')
+      +(Rf.nt.length?ntTable('nt_ref', Rf.nt, '✉ 지난 모집 공고 '+Rf.nt.length+' <span class="sml">— 마감이 지났거나, 마감을 모르고 받은 지 '+REC_NOTICE_DAYS+'일이 넘었습니다</span>'):'')+'</div>';
+    parts.push('<details class="sec" style="margin-top:14px"'+(recFoldOpen('ref', false)?' open':'')+' ontoggle="recFold(\'ref\',this.open)"><summary><span class="nm">📚 참고용 '+S.refN+'건</span>'
+      +'<span class="sml">받은 지 1년이 넘은 결과·기관 모름 메일, 마감이 지난 공고 — 보고만 두면 됩니다</span></summary><div class="body">'+inner+'</div></details>');
+  }
+  if(!done.length && !nowN && !S.refN) parts.push('<div class="note">지원·결과·모집 메일을 찾지 못했습니다.</div>');
+  return '<div class="recban'+(S.todo?'':' calm')+'" style="display:block">'+head+parts.join('')+'</div>';
 }
 
 /* ═══ 📤 내기 전에 점검 (대표 선택 「②-가 — 정부사업신청 안에」) ═══

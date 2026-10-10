@@ -44,7 +44,7 @@ function runApp(seed, opt) {
     .map((m) => m[1]).join('\n').replace(/\bboot\(\);\s*$/, '');
   vm.runInNewContext(code + '\n;globalThis.__api={recDraw,recSetSt,recSetUrl,recAddOrg,recDelOrg,recPrep,recToForm,'
     + 'recGroups,recObj,kwReset,kwIsDefault,drawKw,rejudge,setTab,draw,recCal,recCalDue,recSetDue,recDue,recWatchPull,recWatchHtml,recSeen,recWatchCal,recNewFor,'
-    + 'cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
+    + 'recMailSplit,recSelN,recOldMail,recOldNotice,recMailTidy,recMailTidyUndo,recHist,recHistCur,recSubDraw,cloudPull,recMailScan,recMailHtml,recMailUndo,recMailResult,recMailPick,recMailSkip,recMailMark,recMailFolders,recNeedTog,recNeedOf,recCheckRun,recCheckDraw,'
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
@@ -529,11 +529,13 @@ test('★ 권한이 없으면 까닭을 말한다', async () => {
   await r.api.recMailScan(true);
   assert.match(r.el('recMail').innerHTML, /메일함을 읽을 권한이 없습니다/);
 });
-test('★ 메일로 온 모집 공고 — 접어 두고 보여 준다', async () => {
+test('★ 마감이 지난 모집 공고 메일은 «참고용»(접어 둔다) — 지금 할 일에는 없다', async () => {
   const r = runApp({}, { Date: FixedDate('2026-10-04T09:00:00') });
   r.api.setFb(mailDb().db, 'U1');
   await r.api.recMailScan(true);
-  assert.match(r.el('recMail').innerHTML, /메일로 온 모집 공고 1/);
+  const h = r.el('recMail').innerHTML;
+  assert.match(h, /지난 모집 공고 1/); assert.doesNotMatch(h, /✉ 메일로 온 모집 공고/, '마감이 지난 공고가 지금 할 일에 섞였다');
+  assert.match(h, /<details class="sec" style="margin-top:14px" ontoggle="recFold\('ref',this\.open\)"><summary><span class="nm">📚 참고용 /, '참고용은 접혀 있다(open 이 없다)');
 });
 
 function fakeFile(name, text, size) {
@@ -683,14 +685,15 @@ test('★★ 새 글은 30건이 넘어도 «모두» 보이고, 「모두 봤�
   assert.equal((w2.match(/<tbody>[\s\S]*<\/tbody>/)[0].match(/<tr/g) || []).length, 30, '본 옛 글은 30건까지만');
   assert.match(w2, /옛 글 10건은 줄였습니다/);
 });
-test('★★ 접는 칸(메일) — 사람이 접으면 다시 그려도 접힌 채, 손대기 전엔 볼 것이 있을 때만 열림', () => {
+test('★★ 접는 칸(참고용·저절로 적은 것) — 기본은 접힘, 사람이 열면 다시 그려도 열린 채', () => {
   const r = runApp({});
-  assert.equal(r.api.recFoldOpen('mail', 3), true);
-  assert.equal(r.api.recFoldOpen('mail', 0), false);
-  r.api.recFold('mail', false);
-  assert.equal(r.api.recFoldOpen('mail', 3), false, '사람이 접은 것을 다시 열면 안 된다');
-  /* 메일 칸 머리의 「다시 찾기」는 칸을 접지 않는다 */
-  assert.match(require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8'), /event\.preventDefault\(\);event\.stopPropagation\(\);recMailScan\(true\)/);
+  assert.equal(r.api.recFoldOpen('ref', false), false); assert.equal(r.api.recFoldOpen('done', false), false);
+  r.api.recFold('ref', true);
+  assert.equal(r.api.recFoldOpen('ref', false), true, '사람이 연 것을 다시 접으면 안 된다');
+  /* 메일 정리의 머리(다시 찾기)는 접는 칸 안이 아니다 — 눌러도 칸이 접히지 않는다 */
+  const html = require('fs').readFileSync(require('path').join(__dirname, '..', 'gov.html'), 'utf8');
+  const head = html.slice(html.indexOf('function recMailHtml(){'), html.indexOf('if(_recMailErr) return'));
+  assert.doesNotMatch(head, /<summary>/);
 });
 
 test('★★ 올해 칸 — 서류 폴더에 올해 것이 있어도 «고를 수» 있다(선정·탈락을 적는 길)', () => {
@@ -1267,4 +1270,132 @@ test('★★ 틀고정 CSS — 한 줄은 하위 탭 밑, 표 머리는 그 밑(
   assert.match(src, /@media \(min-width:1100px\)\{\s*#recPaneKc \.scroll,#recPanePub \.scroll\{overflow:visible\}\s*#recPaneKc \.rec-hits thead th,#recPanePub \.rec-hits thead th\{position:sticky;z-index:12;background:var\(--card\);\s*top:calc\(var\(--headH,94px\) \+ var\(--rsubH,44px\) \+ var\(--rbarH,44px\)\)\}/);
   assert.match(src, /@media \(max-width:640px\)\{ \.rec-stick\{position:static;border-bottom:0\} \}/);
   assert.match(src, /\$\('recWatch'\)\.innerHTML=recWatchHtml\('pub'\);\s*recStickySync\(\);/, '그린 뒤 높이를 다시 잰다');
+});
+
+/* ═══ 📬 메일 정리 — 두 보기 · 지금 할 일 / 참고용(1년) (대표 「b」·「기준 1년」 2026-10-10) ═══ */
+const OLDMAIL = [
+  { key: 'r|1', subject: '[세종] 현장코칭 전문위원 선정 안내', date: '2026-03-20', kind: 'result', guess: '선정', org: 'agri6' },
+  { key: 'r|2', subject: '[지방공기업평가원] 상시자문 위원 심사 결과 안내', date: '2026-02-10', kind: 'result', guess: '', org: 'erc' },
+  { key: 'r|3', subject: '[충남6차산업센터] 전문위원 재위촉 동의서', date: '2025-02-21', kind: 'result', guess: '', org: 'agri6' },
+  { key: 'r|4', subject: '[한국공인노무사회] 노동시간 단축전문가 미선정 안내', date: '2023-08-11', kind: 'result', guess: '탈락', org: 'kplaa' },
+  { key: 'p|1', subject: '[어느곳] 컨설턴트 지원서 제출합니다', date: '2026-08-01', kind: 'submit' },
+  { key: 'p|2', subject: '[어느곳] 옛날 컨설턴트 지원서 제출', date: '2024-08-01', kind: 'submit' },
+  { key: 'n|1', subject: '[충남] 컨설턴트 모집 공고(~2026.10.20까지)', date: '2026-10-01', kind: 'notice' },
+  { key: 'n|2', subject: '[경기] 평가위원 모집 공고', date: '2026-09-25', kind: 'notice' },
+  { key: 'n|3', subject: '[서울] 평가위원 모집 공고', date: '2026-07-01', kind: 'notice' },
+  { key: 'n|4', subject: '[부산] 평가위원 모집 공고(~2026.03.10까지)', date: '2026-02-20', kind: 'notice' }
+];
+const mailApp = (extra) => runApp(Object.assign({ recruit_scan: SCAN, recruit_mailitems: OLDMAIL, recruit_mail_at: String(Date.now()), recruit_mailfolders: '9' }, extra || {}),
+  { Date: FixedDate('2026-10-10T09:00:00') });
+test('★★★ 1년 기준 — 결과·기관 모름 메일은 최근 12개월이면 «지금 할 일», 넘으면 «참고용». 날짜를 모르면 지금 할 일', () => {
+  const r = mailApp(); const S = r.api.recMailSplit();
+  assert.deepEqual(Array.from(S.now.ask.map((a) => a.item.key).sort()), ['r|1', 'r|2']);
+  assert.deepEqual(Array.from(S.ref.ask.map((a) => a.item.key).sort()), ['r|3', 'r|4']);
+  assert.deepEqual(Array.from(S.now.pick.map((x) => x.key)), ['p|1']); assert.deepEqual(Array.from(S.ref.pick.map((x) => x.key)), ['p|2']);
+  assert.equal(S.todo, 3, '할 일 = 지금 결과 2 + 기관 고르기 1 (공고는 안 센다)');
+  assert.equal(r.api.recOldMail('2025-10-11', new Date(2026, 9, 10)), false, '딱 1년이 안 된 것');
+  assert.equal(r.api.recOldMail('2025-10-09', new Date(2026, 9, 10)), true, '1년을 넘긴 것');
+  assert.equal(r.api.recOldMail('', new Date(2026, 9, 10)), false, '날짜를 모르면 숨기지 않는다');
+  assert.equal(r.api.recOldMail('날짜아님', new Date(2026, 9, 10)), false);
+});
+test('★★★ 모집 공고 메일 — 마감 지남 → 참고용 · 접수 중 → 할 일 · 마감을 모르면 45일 지나야 참고용', () => {
+  const S = mailApp().api.recMailSplit();
+  assert.deepEqual(Array.from(S.now.nt.map((n) => n.key).sort()), ['n|1', 'n|2'], '접수 중(10.20까지)·받은 지 15일(마감 모름)');
+  assert.deepEqual(Array.from(S.ref.nt.map((n) => n.key).sort()), ['n|3', 'n|4'], '마감 지남 · 마감 모르고 101일');
+  assert.equal(S.refN, 2 + 1 + 2);
+});
+test('★★ 두 보기 — 기본은 기관별, 고르개에 건수, 고른 보기는 기억 · 보이는 쪽만 보인다', () => {
+  const r = mailApp(); r.api.recDraw();
+  assert.equal(r.el('recViewOrg').style.display, ''); assert.equal(r.el('recViewMail').style.display, 'none'); assert.equal(r.el('recOrgBtns').style.display, '');
+  const seg = r.el('recHistSeg').innerHTML;
+  assert.match(seg, /<button class="on" onclick="recHist\('org'\)">📅 기관별 <span class="n">\d+<\/span><\/button>/);
+  assert.match(seg, /<button class="" onclick="recHist\('mail'\)">📬 메일 정리 <span class="n amb">할 일 3<\/span>/);
+  r.api.recHist('mail');
+  assert.equal(r.store.gov3_rec_hist, 'mail');
+  assert.equal(r.el('recViewOrg').style.display, 'none'); assert.equal(r.el('recViewMail').style.display, ''); assert.equal(r.el('recOrgBtns').style.display, 'none');
+  assert.match(r.el('recHistSeg').innerHTML, /<button class="on" onclick="recHist\('mail'\)">/);
+  r.api.recHist('org'); assert.equal(r.el('recViewMail').style.display, 'none');
+});
+test('★★ 하위 탭 배지도 «지금 할 일»만 센다 — 1년 넘은 메일이 「고를 것」을 부풀리지 않는다', () => {
+  const r = mailApp(); r.api.recSubDraw();
+  assert.match(r.el('recSubs').innerHTML, /고를 것 3</);
+});
+test('★★★ 메일 정리 화면 — 지금 할 일(최근 것만) 위, 참고용(접힘) 아래 · 오래된 결과 메일은 참고용에만', () => {
+  const r = mailApp(); r.api.recDraw();
+  const h = r.el('recMail').innerHTML, a = h.indexOf('✅ 지금 할 일'), b = h.indexOf('📚 참고용');
+  assert.ok(a >= 0 && b > a, '지금 할 일이 참고용보다 위');
+  const now = h.slice(a, b), ref = h.slice(b);
+  assert.match(now, /최근 12개월 · 5건/); assert.match(now, /🏅 결과 메일 2/); assert.match(now, /❓ 기관을 모르는 지원·결과 메일 1/); assert.match(now, /✉ 메일로 온 모집 공고 2/);
+  assert.doesNotMatch(now, /2025-02-21|2023-08-11|2024-08-01|2026-02-20/, '오래된 것이 지금 할 일에 있다');
+  assert.match(ref, /📚 참고용 5건/); assert.match(ref, /🏅 지난 결과 메일 2/); assert.match(ref, /2023-08-11/); assert.match(ref, /✉ 지난 모집 공고 2/);
+  assert.match(ref, /recMailTidy\(\)">✓ 참고용 5건 모두 확인함으로 치우기/);
+  assert.doesNotMatch(ref, /2026-03-20|2026-10-01/, '최근 것이 참고용에 있다');
+});
+test('★★ 지금 할 일이 없으면 그렇다고 말하고, 오래된 것은 참고용에 있다고 알려 준다', () => {
+  const r = mailApp({ recruit_mailitems: OLDMAIL.filter((x) => x.key === 'r|4' || x.key === 'p|2') }); r.api.recDraw();
+  const h = r.el('recMail').innerHTML;
+  assert.match(h, /✓ 지금 처리할 메일이 없습니다\. 오래된 2건은 아래 「참고용」에 있습니다/);
+  assert.match(r.el('recHistSeg').innerHTML, /📬 메일 정리<\/button>/, '할 일이 0이면 배지가 없다');
+});
+test('★★★ 참고용 치우기 — 목록에서만 빠지고(지우지 않음), 치운 것만 ↩ 되살린다 · 따로 무시한 것은 그대로', () => {
+  const r = mailApp({ recruit_mailskip: { 'r|4': 1 } }); r.api.recDraw();
+  r.api.recMailTidy();
+  const sk = r.api.recObj('recruit_mailskip'), sn = r.api.recObj('recruit_seen'), td = r.api.recObj('recruit_mailtidy');
+  assert.ok(sk['r|3'] && sk['p|2'], '참고용 결과·기관 모름이 빠졌다');
+  assert.ok(sn['m|n|3'] && sn['m|n|4'], '참고용 공고는 «봤음»');
+  assert.deepEqual(Object.keys(td).sort(), ['n|m|n|3', 'n|m|n|4', 's|p|2', 's|r|3'], '이미 무시한 r|4 는 적지 않는다');
+  assert.equal(r.api.recMailSplit().refN, 0);
+  assert.equal(r.api.recMailSplit().now.ask.length, 2, '지금 할 일은 그대로');
+  assert.equal(JSON.parse(r.store.gov3_recruit_mailitems).length, OLDMAIL.length, '메일 목록 자체는 안 지운다');
+  assert.match(r.el('recMail').innerHTML, /↩ 치운 것 4건 되살리기/);
+  r.api.recMailTidyUndo();
+  assert.equal(r.api.recMailSplit().refN, 4, '치운 4건이 돌아왔다(이미 무시한 r|4 는 그대로 무시)');
+  assert.ok(r.api.recObj('recruit_mailskip')['r|4'], '따로 무시한 것은 되살아나지 않는다');
+  assert.equal(Object.keys(r.api.recObj('recruit_mailtidy')).length, 0);
+  assert.doesNotMatch(r.el('recMail').innerHTML, /치운 것 \d+건 되살리기/, '되살린 뒤에는 되살리기 단추가 없다');
+});
+test('★ 참고용을 아무것도 안 치울 게 없으면 알리고 아무것도 안 바꾼다', () => {
+  const r = mailApp({ recruit_mailitems: OLDMAIL.filter((x) => x.key === 'r|1') });
+  r.api.recMailTidy();
+  assert.ok(r.toasts.some((t) => /치울 참고용이 없습니다/.test(t)));
+  assert.equal(r.store.gov3_recruit_mailtidy, undefined);
+});
+test('★★ 참고용의 고른 것 — 무시·봤음이 «고른 것만» 처리하고, 지금 할 일의 선택과 섞이지 않는다', () => {
+  const r = mailApp(); r.api.recDraw();
+  r.api.recSelTog('ask_ref', 'r|3', true); r.api.recSelTog('ask', 'r|1', true);
+  r.api.recSelSkip('ask_ref');
+  const sk = r.api.recObj('recruit_mailskip');
+  assert.ok(sk['r|3']); assert.equal(sk['r|1'], undefined, '다른 묶음의 선택까지 무시됐다');
+  r.api.recSelTog('nt_ref', 'n|3', true); r.api.recSelSeen('nt_ref', true);
+  assert.ok(r.api.recObj('recruit_seen')['m|n|3'], '지난 공고 «봤음»은 공고 열쇠(m|)로 적는다');
+});
+test('★★ 메일 정리 맨 위(다시 찾기·되살리기)는 접는 칸 밖 — 모든 메일 묶음의 «№»가 묶음마다 1부터', () => {
+  const r = mailApp(); r.api.recDraw();
+  const h = r.el('recMail').innerHTML;
+  assert.match(h, /^<div class="recban[^"]*" style="display:block"><div class="mgrp" style="margin-top:0"><b>📬 메일 정리<\/b>/);
+  assert.match(h, /recMailScan\(true\)">📬 다시 찾기<\/button>/);
+  assert.equal((h.match(/<td class="rn">1<\/td>/g) || []).length >= 4, true, '묶음마다 1부터');
+});
+
+test('★★ 접수 중인 공고는 받은 지 오래돼도 «할 일» — 마감을 아는 공고는 45일 규칙을 안 탄다', () => {
+  const items = [{ key: 'n|9', subject: '[대전] 위원 모집 공고(~2026.10.30까지)', date: '2026-08-15', kind: 'notice' }];
+  const S = mailApp({ recruit_mailitems: items }).api.recMailSplit();
+  assert.equal(S.now.nt.length, 1, '받은 지 56일이지만 접수 중이다'); assert.equal(S.ref.nt.length, 0);
+});
+test('★★ 치운 뒤 «참고용의 고른 것»이 남지 않는다 — 안 보이게 된 줄이 다음에 함께 처리되면 안 된다', () => {
+  const r = mailApp(); r.api.recDraw();
+  r.api.recSelTog('ask_ref', 'r|3', true); r.api.recSelTog('nt_ref', 'n|3', true);
+  assert.equal(r.api.recSelN('ask_ref'), 1);
+  r.api.recMailTidy();
+  assert.equal(r.api.recSelN('ask_ref'), 0); assert.equal(r.api.recSelN('nt_ref'), 0);
+});
+test('★★ 참고용 표의 선택 줄 단추는 «참고용 묶음»을 가리킨다 — 지금 할 일 묶음을 건드리지 않는다', () => {
+  const r = mailApp(); r.api.recDraw();
+  r.api.recSelTog('ask_ref', 'r|3', true);
+  const h = r.el('recMail').innerHTML, ref = h.slice(h.indexOf('📚 참고용'));
+  assert.match(ref, /recSelSkip\('ask_ref'\)">고른 것 무시/); assert.doesNotMatch(ref, /recSelSkip\('ask'\)/);
+  r.api.recSelTog('pick_ref', 'p|2', true);
+  assert.match(r.el('recMail').innerHTML, /recSelSkip\('pick_ref'\)">고른 것 무시/);
+  r.api.recSelTog('nt_ref', 'n|3', true);
+  assert.match(r.el('recMail').innerHTML, /recSelSeen\('nt_ref',true\)">✓ 고른 것 봤음/);
 });
