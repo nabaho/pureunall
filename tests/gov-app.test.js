@@ -138,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,'
+    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -901,4 +901,33 @@ test('★ 받지 못했으면 판도 남기지 않는다(승인 전) — 다음�
 });
 test('★ 폰에서는 상세 팝업의 칸 이름도 접힌다 — 「사전규격 등록번호」가 375px 에서 6px 삐져나갔다', () => {
   assert.match(src, /@media \(max-width:640px\)\{ table\.kv th\{width:84px;white-space:normal;word-break:keep-all\} \}/);
+});
+
+/* ═══ 발주 예정 — 표시 20·50·100·전체 (대표 2026-10-10 「우선 20 50 100 개를 보는 것을 두고」) ═══ */
+const MANY = (n) => Array.from({ length: n }, (_, i) => ({ kind: 'plan', no: 'M' + i, nm: '노무 용역 ' + i, org: '기관' + i, ym: ymAdd(1), bids: [], kw: '노무' }));
+test('★★★ 기본 50건씩 · 고르개 20·50·100·전체 · 쪽 넘기면 번호가 이어진다', () => {
+  const r = runApp({ plan: MANY(120) }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 50);
+  assert.match(r.el('pPerBox').innerHTML, /<select onchange="planPer\(this\.value\)">[\s\S]*value="20"[\s\S]*value="50" selected[\s\S]*value="100"[\s\S]*value="0"[^>]*>전체/);
+  assert.match(r.el('pCnt').textContent, /지금 120건/, '건수는 쪽이 아니라 걸린 것 전부');
+  assert.match(r.el('planPager').innerHTML, /onclick="planPageTo\(2\)">3<\/button>[\s\S]*1–50 \/ 120건/);
+  r.api.planPageTo(2);
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 20); assert.match(r.el('ptb').innerHTML, /<td class="rn">101<\/td>/);
+  r.api.planPer('20'); assert.equal(planRowsOf(r.el('ptb').innerHTML), 20); assert.match(r.el('ptb').innerHTML, /<td class="rn">1<\/td>/, '고르면 첫 쪽으로');
+  assert.equal(r.store.gov3_plan_per, '20');
+  r.api.planPer('0'); assert.equal(planRowsOf(r.el('ptb').innerHTML), 120); assert.equal(r.el('planPager').innerHTML, '');
+});
+test('★★ 머리 ㅁ 은 «이 쪽»만 고른다 · 다른 쪽에서 고른 것은 남는다', () => {
+  const r = runApp({ plan: MANY(70) }); r.el('pView').value = 'ahead'; r.api.planPer('20');
+  r.api.planPageTo(1); r.api.planSelAll(true);
+  assert.match(r.el('planSel').innerHTML, /<b>20건<\/b> 선택/);
+  r.api.planPageTo(0); r.api.planTog('M0', true);
+  assert.match(r.el('planSel').innerHTML, /<b>21건<\/b> 선택/);
+});
+test('★ 거르는 조건을 바꾸면 첫 쪽으로(빈 쪽에 남지 않게)', () => {
+  assert.match(src, /<input id="pq"[^>]*oninput="_planPage=0;planDraw\(\)">/);
+  assert.match(src, /<select id="pView" onchange="_planPage=0;planDraw\(\)">/);
+  const r = runApp({ plan: MANY(120) }); r.el('pView').value = 'ahead'; r.api.planDraw(); r.api.planPageTo(2);
+  r.el('pq').value = '노무 용역 1'; r.api.planDraw();
+  assert.ok(planRowsOf(r.el('ptb').innerHTML) > 0, '걸린 것이 있는데 빈 쪽');
 });
