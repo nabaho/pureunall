@@ -5,22 +5,26 @@
    줄 다시 세우기: 같은 쪽·같은 높이(글자 높이의 절반 안) 조각을 한 줄로, 왼쪽부터. 틈이 글자 높이의 0.25배를 넘으면 빈칸.
    그래야 「제N조」가 줄 머리에 와서 조 나누기·조별 문안·판 견주기가 돈다. */
 'use strict';
+const fs = require('fs');
 const path = require('path');
 const SCAN_MIN = 30;     // 공백을 뺀 글자가 이보다 적으면 글 없는(스캔) PDF
 const MAX_PAGES = 300;
 
 let mod = null;
-function load() {
-  if (!mod) {
-    mod = import('pdfjs-dist/legacy/build/pdf.mjs').catch(() => {
-      mod = null;
-      throw Object.assign(new Error('pdf.js 를 싣지 못함'), { code: 'PDFJS_MISSING' });
-    });
-  }
-  return mod;
-}
+const missing = () => Object.assign(new Error('pdf.js 를 싣지 못함'), { code: 'PDFJS_MISSING' });
 function assetDir(sub) {
   return path.join(path.dirname(require.resolve('pdfjs-dist/package.json')), sub) + path.sep;
+}
+/* ⚠ 모듈만 싣고 글꼴·cmap 자료가 없으면 한글 PDF 가 «글 없음(스캔)» 으로 읽혀 영영 닫힌다 — 자료 폴더까지 확인하고, 없으면 못 실은 것으로 본다 */
+async function load() {
+  if (!mod) {
+    mod = import('pdfjs-dist/legacy/build/pdf.mjs').catch(() => { mod = null; throw missing(); });
+  }
+  const m = await mod;
+  try {
+    for (const sub of ['cmaps', 'standard_fonts']) if (!fs.existsSync(assetDir(sub))) throw missing();
+  } catch (e) { throw e && e.code === 'PDFJS_MISSING' ? e : missing(); }
+  return m;
 }
 
 function linesOf(items) {

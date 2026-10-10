@@ -1,5 +1,5 @@
 /* 검사용 작은 PDF 만들개 — 글꼴은 PDF 기본(Helvetica)이라 영문·숫자만 쓴다(한글 글꼴을 심지 않는다).
-   pages: [[{x, y, s, size}]] — 한 조각이 Tj 하나. 쪽 크기 A4(595×842). */
+   pages: [[{x, y, s, size, tc?, glyphs?}]] — 한 조각이 Tj 하나(tc: 글자 벌림, glyphs: 글자마다 따로). 쪽 크기 A4(595×842). */
 'use strict';
 function esc(s) { return String(s).replace(/([()\\])/g, '\\$1'); }
 function makePdf(pages) {
@@ -9,8 +9,16 @@ function makePdf(pages) {
   bodies.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>');      // 3
   const kids = [];
   (pages || []).forEach((items) => {
-    const content = (items || []).map((t) =>
-      'BT /F1 ' + (t.size || 12) + ' Tf ' + t.x + ' ' + t.y + ' Td (' + esc(t.s) + ') Tj ET').join('\n');
+    /* 조각 하나: 기본은 Tj 하나. tc = 글자 사이 벌림(Tc), glyphs:true = 글자마다 Td/Tj 따로(step 간격, 기본 14) */
+    const content = (items || []).map((t) => {
+      const size = t.size || 12;
+      if (t.glyphs) {
+        const step = t.step || 14;
+        return String(t.s).split('').map((ch, i) =>
+          'BT /F1 ' + size + ' Tf ' + (t.x + i * step) + ' ' + t.y + ' Td (' + esc(ch) + ') Tj ET').join('\n');
+      }
+      return 'BT /F1 ' + size + ' Tf ' + (t.tc ? t.tc + ' Tc ' : '') + t.x + ' ' + t.y + ' Td (' + esc(t.s) + ') Tj ET';
+    }).join('\n');
     bodies.push('<< /Length ' + Buffer.byteLength(content, 'latin1') + ' >>\nstream\n' + content + '\nendstream');
     const cid = bodies.length;
     bodies.push('<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R >> >> /Contents ' + cid + ' 0 R >>');

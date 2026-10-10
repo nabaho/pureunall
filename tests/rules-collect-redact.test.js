@@ -48,11 +48,64 @@ test('PDF — 글을 뽑아 가린 글만, 파일은 안 담는다', { skip: !HA
   assert.match(r.text, /Article 1 \(Purpose\)/);
 });
 
+/* ★ 글자 사이가 벌어진 PDF — pdf.js 가 「9 0 0 1 0 1 - 1 2 3 …」 으로 뽑아 번호 규칙·RAW_RE 가 못 잡는다(최종 검토 실측) */
+const SPACED = RRN.split('').join(' ');
+const SPACED_NET = /주민번호 꼴/;
+for (const [label, spec] of [['글자 간격(Tc)', { tc: 8 }], ['글자마다 따로(Td/Tj)', { glyphs: true }]]) {
+  test('PDF — 벌어진 주민번호는 보류 (' + label + ')', { skip: !HAS_PDFJS && 'pdfjs-dist 없음' }, async () => {
+    /* 벌어진 줄은 짧게(쪽 밖으로 나가면 잘린다) — 스캔 한도(30자)는 평범한 둘째 줄이 채운다 */
+    const buf = makePdf([[{ x: 40, y: 800, s: 'Article 1 (Purpose) of the work rules for all employees' },
+      Object.assign({ x: 40, y: 780, s: 'RRN ' + RRN }, spec)]]);
+    const r = await X.redactOne(buf, 'pdf');
+    assert.equal(r.ok, false, '★ 벌어진 주민번호가 담기게 됐다');
+    assert.match(r.holdWhy, SPACED_NET);
+    assert.equal(r.text, undefined, '★ 보류인데 글을 돌려준다');
+  });
+}
+
+test('PDF — 벌어진 주민번호 꼴이 가린 글에 남으면 보류(가짜 글)', async () => {
+  const spaced = { pdfText: async () => ({ text: 'x'.repeat(40) + ' ' + SPACED, chars: 60, pages: 1 }),
+    redactFile: async (b, t) => ({ text: t, count: {}, total: 0, residual: 0, unscanned: 0, data: null }) };
+  const r = await X.redactOne(Buffer.from('x'), 'pdf', spaced);
+  assert.equal(r.ok, false);
+  assert.match(r.holdWhy, SPACED_NET);
+  /* 숫자에 붙은 더 긴 수·번호 꼴이 아닌 숫자 열은 걸리지 않는다 */
+  const fine = { pdfText: async () => ({ text: 'Article ' + 'x'.repeat(40) + ' 1 2 3 4 5 6 7 8 9 0 and page 1 - 2', chars: 60, pages: 1 }),
+    redactFile: async (b, t) => ({ text: t, count: {}, total: 0, residual: 0, unscanned: 0, data: null }) };
+  assert.equal((await X.redactOne(Buffer.from('x'), 'pdf', fine)).ok, true);
+});
+
 test('PDF — 글 없으면 스캔 보류, 못 열면 열지 못함 보류', async () => {
   const scan = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => ({ text: ' ', chars: 0, pages: 1 }) });
   assert.deepEqual([scan.ok, scan.holdWhy], [false, '스캔 PDF — 글 없음']);
-  const bad = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw new Error('깨짐'); } });
-  assert.deepEqual([bad.ok, bad.holdWhy], [false, 'PDF 를 열지 못함']);
+  /* pdf.js 가 «문서가 나쁨» 으로 던지는 이름만 열지 못함 */
+  for (const name of ['InvalidPDFException', 'PasswordException', 'FormatError', 'MissingPDFException', 'UnexpectedResponseException']) {
+    const bad = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw Object.assign(new Error('깨짐'), { name }); } });
+    assert.deepEqual([bad.ok, bad.holdWhy], [false, 'PDF 를 열지 못함'], name);
+  }
+});
+
+test('PDF — 문서 탓이 아닌 오류(싣기·메모리·모르는 실패)는 옛 까닭으로 남겨 다시 본다', async () => {
+  for (const e of [new Error('메모리'), Object.assign(new TypeError('x is not a function'), {}), Object.assign(new Error('없음'), { name: 'InvalidPDFException', code: 'PDFJS_MISSING' })]) {
+    const r = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw e; } });
+    assert.deepEqual([r.ok, r.holdWhy], [false, 'PDF — 아직 못 읽음'], '★ 환경 탓인데 영영 닫았다: ' + e.name);
+  }
+});
+
+test('PDF — 깨진 실제 파일은 열지 못함으로 닫는다', { skip: !HAS_PDFJS && 'pdfjs-dist 없음' }, async () => {
+  for (const junk of ['%PDF-1.7 not really', 'garbage', '']) {
+    const r = await X.redactOne(Buffer.from(junk), 'pdf');
+    assert.deepEqual([r.ok, r.holdWhy], [false, 'PDF 를 열지 못함'], JSON.stringify(junk));
+  }
+});
+
+test('PDF — 쪽 한도에 잘렸는지(truncated·pages)를 돌려준다', async () => {
+  const mk = (extra) => ({ pdfText: async () => Object.assign({ text: '제1조 ' + 'x'.repeat(40), chars: 60, pages: 301 }, extra),
+    redactFile: async (b, t) => ({ text: t, count: {}, total: 0, residual: 0, unscanned: 0, data: null }) });
+  const cut = await X.redactOne(Buffer.from('x'), 'pdf', mk({ truncated: true }));
+  assert.deepEqual([cut.ok, cut.truncated, cut.pages], [true, true, 301]);
+  const whole = await X.redactOne(Buffer.from('x'), 'pdf', mk({ pages: 3 }));
+  assert.deepEqual([whole.ok, whole.truncated, whole.pages], [true, false, 3]);
 });
 
 test('PDF — pdf.js 를 못 실으면 옛 까닭으로 남긴다(다음에 다시 본다)', async () => {

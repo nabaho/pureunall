@@ -44,6 +44,18 @@ test('실제 PDF — 글 없는 쪽은 셈이 스캔 한도 밑', { skip: !HAS_P
   assert.ok(r.chars < P.SCAN_MIN);
 });
 
+test('pdf.js 자료 폴더(cmaps·standard_fonts)가 없으면 못 실음(PDFJS_MISSING) — 한글 PDF 가 「글 없음」으로 닫히면 안 된다', { skip: !HAS_PDFJS && 'pdfjs-dist 없음' }, async () => {
+  const fs = require('node:fs');
+  const real = fs.existsSync;
+  for (const sub of ['cmaps', 'standard_fonts']) {
+    fs.existsSync = (p) => (String(p).replace(/[\\/]+$/, '').endsWith(sub) ? false : real(p));
+    try { await assert.rejects(() => P.load(), (e) => e.code === 'PDFJS_MISSING', sub); }
+    finally { fs.existsSync = real; }
+  }
+  assert.ok(await P.load(), '자료가 있으면 싣는다');
+});
+
 test('실제 PDF — 깨진 파일은 던진다', { skip: !HAS_PDFJS && 'pdfjs-dist 없음' }, async () => {
-  await assert.rejects(() => P.pdfText(Buffer.from('%PDF-1.7 not really')));
+  /* 깨진 문서는 pdf.js 의 문서 오류 이름(InvalidPDFException)으로 던진다 — redactOne 이 이 이름만 「열지 못함」으로 닫는다 */
+  await assert.rejects(() => P.pdfText(Buffer.from('%PDF-1.7 not really')), (e) => e.name === 'InvalidPDFException');
 });
