@@ -138,6 +138,7 @@
      기금 머리(#fundhead) 바로 아래에 붙인다 — 그 높이를 --fundhead-h, 회계 머리 높이를 --closehead-h 로 잰다(_syncTopbarH).
      ⚠ 넓은 화면만 — 폰에서는 세 겹이 화면을 다 차지한다. 표는 넓은 화면에서 가로 스크롤 상자를 풀어야 제목 줄이 붙는다. */
   .ledgerwrap{overflow-x:auto}
+  .ledbulk{position:sticky;bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin-top:10px;z-index:6;font-size:12.5px}
   @media(min-width:1000px){
     .closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px));z-index:11}
     .ledgerwrap{overflow:visible}
@@ -3350,7 +3351,8 @@ function rvPage(p){ RV.page=p; if(p==='trust') renderTrust(); else if(p==='journ
    · 되돌린 것도 칸 출처 기록(사람·src undo)으로 남아 다시 되돌릴 수 있다. 켜고 끄기처럼 대표·관리자만(_isBoss).
    ⚠ 통장 가져오기(장부)는 묶음이 없어 여기서 되돌리지 못한다 — 장부는 승인 풀기·삭제로. */
 var JL={data:null, at:0, loading:null, range:'week', who:'all', q:'', open:{}, cur:{}};
-var JL_ROOT={f:'funds', s:'sites', y:'site_years', c:'subsidy_chk'};
+/* t — 장부 계정 한꺼번에 바꾸기 묶음(ledBulkAcct 가 직접 쓴다 — 장부엔 칸 출처를 두지 않는다) */
+var JL_ROOT={f:'funds', s:'sites', y:'site_years', c:'subsidy_chk', t:'txns'};
 function _jlLoad(force){
   if(JL.loading) return JL.loading;
   if(!force&&JL.data&&Date.now()-JL.at<60000) return Promise.resolve(JL.data);
@@ -3468,6 +3470,7 @@ function _jlCellLabel(P){
   if(p[0]==='f') return (p[1]==='years'?p[2]+'년 ':'')+_rvLabel(p[p.length-1]);
   if(p[0]==='s') return ((sites[p[1]]||{}).name||'사업장')+' · '+(p[2]?_rvLabel(p[2]):'통째');
   if(p[0]==='y') return p[1]+'년 '+((sites[p[2]]||{}).name||'사업장')+' · '+_rvLabel(p[3]);
+  if(p[0]==='t'){ var tx=((S.txnsFor===P.fid+'/'+p[1])&&(S.txns||{})[p[2]])||{}; return p[1]+'년 장부 '+(tx.date||'')+' '+String(tx.memo||'').slice(0,14)+' · '+(p[3]==='debit'?'차변':p[3]==='credit'?'대변':p[3]); }
   return '지원금 서류 체크';
 }
 function jlToggle(i){
@@ -3494,7 +3497,10 @@ function jlUndo(i){
       fbDb.ref(NS).update(up).then(function(){
         if(typeof _track==='function') _track(list.map(function(c){ return {path:c.P.path, a:_provEmpty(c.b)?null:c.b, b:c.a, m:0, src:'undo', how:''}; }),
           {what:'묶음 되돌리기 — '+String(r.what||'').slice(0,40), detail:r.bid+(moved?' · 그 뒤 바뀐 '+moved+'칸은 그대로':'')});
-        if(S.fundId===r.fid){ S.sitesFor=null; }
+        /* 장부(txns) 칸은 칸 출처를 안 두므로 _track 이 기록하지 않는다 — 되돌린 일을 변경 기록에 따로 남긴다 */
+        var _tx=list.filter(function(c){ return c.P.path.indexOf('txns/')===0; }).length;
+        if(_tx) _audit(r.fid,'묶음 되돌리기(장부)',String(r.what||'').slice(0,40)+' · '+_tx+'칸 · '+r.bid);
+        if(S.fundId===r.fid){ S.sitesFor=null; S.txnsFor=null; }
         JL.data=null; JL.cur={}; JL.open={}; if(typeof RV!=='undefined') RV.at=0;
         toast(list.length+'칸을 전 값으로 되돌렸습니다'+(moved?' · 그 뒤 바뀐 '+moved+'칸은 그대로':''));
         renderJournal();
@@ -20161,6 +20167,108 @@ function _bankLastBal(arr){
   var ks=Object.keys(last);
   return {sum:ks.length?ks.reduce(function(s,k){ return s+last[k]; },0):'', n:ks.length};
 }
+/* ══ 장부 거르기 · 한꺼번에 정리 (대표 「확인시 가장왼쪽 ㅁ 표시와 넘버링 필요… 필요한사항이나 문제되는부분만 필터링해서 한번에 정리」
+     2026-10-10, 목업 docs/목업-기금관리-장부거르기 → 「진행」) ══
+   · 줄마다 «손볼 것» 딱지(_ledIssues) — 판정은 이미 있는 것과 같다: 미분류(_txnDone) · 미승인 · 차·대 같음 · 증빙 없음(출금인데 scan 없음)
+     · 🤖 기계 제안(sug) · 임금성 의심(closeRisks 와 같은 잣대) · 차입 의심(CF_FINANCE 대변) · 100만 원 넘는 출금 · 이체 짝(findTransfers)
+   · 칩 하나를 누르면 그 줄만(다시 누르면 전체). «⚠ 문제만» = 미분류·미승인·차·대 같음·임금성·차입.
+   · 고른 줄 한꺼번에: ✓ 승인(차·대가 정해지고 100만↑·임금성·차입이 아닌 줄만 — 나머지는 빼고 몇 줄인지 알림) · 차변/대변 한꺼번에(승인한 줄·쪼갠 거래·이체는 뺌,
+     바꾸기 전 값은 _track 묶음으로 남아 📜 작업 일지에서 되돌림). 마감한 달·결산 확정한 해 줄은 고를 수 없다. */
+var LED_KINDS=[['all','전체'],['issues','⚠ 문제만'],['unclass','미분류'],['unappr','미승인'],['noev','📎 증빙 없음'],['sug','🤖 기계 제안'],
+  ['wage','임금성 의심'],['borrow','차입 의심'],['big','100만 원 넘는 출금'],['xfer','🔁 이체 짝']];
+var LED_ISSUE=['unclass','unappr','same','wage','borrow'];
+var LED_BIG=1000000;
+var LED_TAG={unclass:['미분류','dg'],unappr:['미승인','warn'],same:['차·대 같음','dg'],wage:['임금성 의심','dg'],borrow:['차입 의심','dg'],big:['100만↑',''],noev:['증빙 없음',''],xfer:['이체 짝',''],sug:['🤖','']};
+function _ledIssues(x,xferIds){
+  var o=[], sp=_splitsOf(x), wd=num(x.withdraw)||0, dep=num(x.deposit)||0;
+  if(!_txnDone(x)) o.push('unclass');
+  if(!x.approved) o.push('unappr');
+  if(!sp.length&&x.debit&&x.debit===x.credit&&!x.xfer) o.push('same');
+  if(wd>0&&(x.debit==='격려금'||WAGE_LIKE_RE.test(String(x.memo||'')))) o.push('wage');
+  if((!sp.length&&CF_FINANCE.indexOf(x.credit)>=0)||(dep>0&&sp.some(function(s){ return CF_FINANCE.indexOf(s.acct)>=0; }))) o.push('borrow');
+  if(wd>LED_BIG) o.push('big');
+  if(wd>0&&!x.scan) o.push('noev');
+  if(xferIds&&xferIds[x._id]) o.push('xfer');
+  if(x.sug&&!x.approved) o.push('sug');
+  return o;
+}
+function _ledMatch(iss,k){ if(!k||k==='all') return true; if(k==='issues') return LED_ISSUE.some(function(c){ return iss.indexOf(c)>=0; }); return iss.indexOf(k)>=0; }
+function _ledTags(iss){ return (iss||[]).filter(function(c){ return LED_TAG[c]; }).map(function(c){ var t=LED_TAG[c];
+  return '<span class="chip'+(t[1]?' '+t[1]:'')+'" style="font-size:10px;padding:0 6px">'+t[0]+'</span>'; }).join(' '); }
+function _ledChips(){
+  var c=S._ledCnt||{}, cur=S.ledFilter||'all';
+  return '<div class="row" style="gap:6px;flex-wrap:wrap;margin:0 0 8px"><b style="font-size:12.5px">거르기</b>'+hlp('led.filter')
+    +LED_KINDS.map(function(k){ var n=c[k[0]]||0;
+      if(!n&&k[0]!=='all'&&k[0]!=='issues'&&cur!==k[0]) return '';
+      if(k[0]==='issues'&&!n) return '<span class="chip ok" style="font-size:11.5px">✅ 문제 없음</span>';
+      return '<button onclick="ledFilter(\''+k[0]+'\')" class="chip'+(cur===k[0]?' on':'')+'" style="font-size:11.5px;cursor:pointer'+(cur===k[0]?';background:var(--acc2);color:#fff;border-color:var(--acc2)':'')+(k[0]==='issues'&&cur!=='issues'?';border:2px solid var(--danger);font-weight:700':'')+'">'+k[1]+' <b>'+n+'</b></button>'; }).join('')
+    +'</div>';
+}
+function ledFilter(k){ S.ledFilter=(S.ledFilter===k?'all':k); S.ledSel={}; renderFund(); }
+function ledPick(id,on){ S.ledSel=S.ledSel||{}; if(on) S.ledSel[id]=1; else delete S.ledSel[id]; _ledBulkBar(); }
+function ledPickAll(on){ S.ledSel={}; if(on) (S._ledVis||[]).forEach(function(id){ S.ledSel[id]=1; }); renderFund(); }
+function _ledSelIds(){ return Object.keys(S.ledSel||{}).filter(function(id){ return (S.txns||{})[id]; }); }
+function _ledBulkHTML(){
+  var ids=_ledSelIds(); if(!ids.length) return '';
+  var dep=0, wd=0; ids.forEach(function(id){ var x=S.txns[id]; dep+=num(x.deposit)||0; wd+=num(x.withdraw)||0; });
+  var opt=function(lab){ return '<option value="">'+lab+'</option>'+ACCTS.map(function(a){ return '<option>'+esc(a)+'</option>'; }).join(''); };
+  return '<div class="ledbulk"><span>'+ids.length+'건 선택'+(dep?' · 입금 '+dep.toLocaleString()+'원':'')+(wd?' · 출금 '+wd.toLocaleString()+'원':'')+'</span>'
+    +'<button class="primary" onclick="ledBulkApprove()" style="padding:4px 11px">✓ 고른 것 승인</button>'
+    +'<select onchange="ledBulkAcct(\'debit\',this.value);this.value=\'\'" style="padding:3px 6px">'+opt('차변 한꺼번에 ▾')+'</select>'
+    +'<select onchange="ledBulkAcct(\'credit\',this.value);this.value=\'\'" style="padding:3px 6px">'+opt('대변 한꺼번에 ▾')+'</select>'
+    +'<span style="flex:1"></span><button onclick="ledPickAll(false)" style="padding:3px 9px">✕ 선택 풀기</button></div>';
+}
+function _ledBulkBar(){ var b=$('ledBulk'); if(b) b.innerHTML=_ledBulkHTML(); }
+function ledBulkApprove(){
+  var fid=S.fundId, yr=S.year, key=fid+'/'+yr; if(S.txnsFor!==key) return;
+  var up={}, who=(S.user||''), at=_nowStamp(), ok=[], sk={done:0,lock:0,undone:0,risky:0};
+  _ledSelIds().forEach(function(id){ var x=S.txns[id];
+    if(x.approved){ sk.done++; return; }
+    if(txnLocked(id)){ sk.lock++; return; }
+    if(!_txnDone(x)||(!_splitsOf(x).length&&x.debit===x.credit&&!x.xfer)){ sk.undone++; return; }
+    var iss=_ledIssues(x); if(iss.indexOf('big')>=0||iss.indexOf('wage')>=0||iss.indexOf('borrow')>=0){ sk.risky++; return; }
+    var b='txns/'+key+'/'+id+'/'; up[b+'approved']=true; up[b+'approved_by']=who; up[b+'approved_at']=at; up[b+'ok_via']='bulk';
+    ok.push(Object.assign({_id:id},x));
+  });
+  var why=(sk.undone?'\n· 차·대가 안 정해진 줄 '+sk.undone+'건':'')+(sk.risky?'\n· 100만 원 넘는 출금·임금성·차입 의심 '+sk.risky+'건 — 하나씩 보세요':'')
+    +(sk.lock?'\n· 마감한 달 '+sk.lock+'건':'')+(sk.done?'\n· 이미 승인 '+sk.done+'건':'');
+  if(!ok.length){ toast('승인할 줄이 없습니다'+why.replace(/\n· /g,' · '),'warn'); return; }
+  confirmM(ok.length+'건을 승인할까요?'+(why?'\n\n빼는 것:'+why:''),{ok:ok.length+'건 승인'}).then(function(y){ if(!y) return;
+    var names=(typeof _trSiteNames==='function')?_trSiteNames(fid):[];
+    var ev=(typeof _trTxnEv==='function')?ok.map(function(x){ return _trTxnEv(x,fid,names); }).filter(Boolean):[];   // 배우기 «전»에 센다
+    fbDb.ref(NS).update(up).then(function(){
+      ok.forEach(function(x){ var t=S.txns[x._id]; if(t){ t.approved=true; t.approved_by=who; t.approved_at=at; t.ok_via='bulk'; }
+        if(!x.xfer&&!_splitsOf(x).length) learnAcct(x.memo,(num(x.deposit)||0)>0,x.debit,x.credit,fid); });
+      if(ev.length&&typeof _trEv==='function') _trEv(ev);
+      _audit(fid,'분개 한꺼번에 승인',yr+'년 '+ok.length+'건 — 장부 거르기에서 골라'+(why?' (뺀 줄 있음)':''));
+      S.ledSel={}; renderFund(); toast(ok.length+'건을 승인했습니다');
+      if(typeof RV!=='undefined') RV.at=0;
+    }).catch(function(e){ toast('승인 실패: '+((e&&e.message)||e),'err'); });
+  });
+}
+function ledBulkAcct(side,acct){
+  if(!acct) return;
+  var fid=S.fundId, yr=S.year, key=fid+'/'+yr; if(S.txnsFor!==key) return;
+  /* 되돌리기 묶음은 장부 변경과 «같은 저장»에 쓴다(batches/{bid} — 일지가 읽는 자리). 장부엔 칸 출처(prov)를 두지 않는다(바닥 공사 때 정함) */
+  var up={}, cells=[], skip=0, bid=(typeof _provBid==='function')?_provBid():('b'+Date.now().toString(36)), at=_nowStamp(), bc={};
+  _ledSelIds().forEach(function(id){ var x=S.txns[id];
+    if(x.approved||txnLocked(id)||_splitsOf(x).length||x.xfer){ skip++; return; }
+    if(x[side]===acct) return;
+    var p='txns/'+key+'/'+id; up[p+'/'+side]=acct; up[p+'/sug']=null; cells.push({id:id});
+    var c={a:acct}; if(x[side]) c.b=x[side]; bc[fid+'|t|'+yr+'|'+id+'|'+side]=c;
+  });
+  var lab=side==='debit'?'차변':'대변';
+  if(!cells.length){ toast(skip?'바꿀 줄이 없습니다 — 승인한 줄·마감한 달·쪼갠 거래·이체는 빼요':'이미 모두 «'+acct+'»입니다','warn'); return; }
+  up['batches/'+bid]={meta:{at:at, by:(S.user||''), what:'분개 계정 한꺼번에 — '+lab+' '+acct, src:'', n:cells.length}, cells:bc};
+  up['audit/'+fid+'/'+fbDb.ref(NS+'/audit/'+fid).push().key]={at:at, by:(S.user||'?'), what:'분개 계정 한꺼번에', bid:bid, detail:yr+'년 '+cells.length+'건 · '+lab+' → '+acct};
+  confirmM(cells.length+'건의 '+lab+'을 «'+acct+'»(으)로 바꿀까요?'+(skip?'\n(승인한 줄·마감한 달·쪼갠 거래·이체 '+skip+'건은 빼요)':'')+'\n\n바꾸기 전 값은 📜 작업 일지에 남아 묶음째 되돌릴 수 있습니다.',{ok:cells.length+'건 바꾸기'}).then(function(y){ if(!y) return;
+    fbDb.ref(NS).update(up).then(function(){
+      cells.forEach(function(c){ var t=S.txns[c.id]; if(t){ t[side]=acct; delete t.sug; } });
+      if(typeof JL!=='undefined') JL.data=null;
+      renderFund(); toast(cells.length+'건의 '+lab+'을 바꿨습니다');
+    }).catch(function(e){ toast('바꾸기 실패: '+((e&&e.message)||e),'err'); });
+  });
+}
 function closingTab(f){
   var key=S.fundId+'/'+S.year;
   if(S.txnsFor!==key){ var _k=key; S.txnsFor=_k; S.txns=null;
@@ -20184,14 +20292,24 @@ function closingTab(f){
     : '';
   /* 🔒 잠긴 줄은 처음부터 흐리게 — 눌러 보고서야 「고칠 수 없습니다」가 뜨던 것(점검 2026-10-09). 증빙(📎·⬇)은 마감 뒤에도 붙인다 */
   var _yl=(typeof _yearLocked==='function')&&_yearLocked();
-  var rows=arr.map(function(x){
+  /* 거르기 — 줄마다 «손볼 것», 칩마다 수, 보이는 줄·고를 수 있는 줄(잠긴 줄 뺌). 기금·연도가 바뀌면 고른 것을 비운다 */
+  var _xf={}; findTransfers(arr).forEach(function(p){ _xf[p.inId]=_xf[p.outId]=1; });
+  if(S._ledKey!==S.fundId+'/'+S.year){ S._ledKey=S.fundId+'/'+S.year; S.ledSel={}; S.ledFilter='all'; }
+  var _lf=S.ledFilter||'all', _cnt={};
+  arr.forEach(function(x){ x._iss=_ledIssues(x,_xf); LED_KINDS.forEach(function(k){ if(_ledMatch(x._iss,k[0])) _cnt[k[0]]=(_cnt[k[0]]||0)+1; }); });
+  S._ledCnt=_cnt;
+  var _vis=arr.filter(function(x){ return _ledMatch(x._iss,_lf); });
+  S._ledVis=_vis.filter(function(x){ return !(_yl||monthLocked(_monthOf(x.date))); }).map(function(x){ return x._id; });
+  S.ledSel=S.ledSel||{}; Object.keys(S.ledSel).forEach(function(id){ if(S._ledVis.indexOf(id)<0) delete S.ledSel[id]; });
+  var rows=_vis.length?_vis.map(function(x,_i){
     var sp=_splitsOf(x), lk=_yl||monthLocked(_monthOf(x.date)), dis=lk?' disabled':'';
     /* 쪼갠 거래는 차·대 선택 대신 조각을 그대로 보여 준다 — 무엇이 얼마인지가 그 줄의 정보다 */
     var acctCells = sp.length
       ? '<td colspan="2">'+sp.map(function(s){ return '<span class="chip" style="font-size:10px">'+esc(s.acct)+' '+(num(s.amount)||0).toLocaleString()+'</span>'; }).join(' ')
           +(_txnDone(x)?'':' <span class="chip warn" style="font-size:10px">조각 합계가 거래금액과 다릅니다</span>')+'</td>'
       : '<td>'+(lk?acctSel(x._id,'debit',x.debit).replace('<select','<select disabled'):acctSel(x._id,'debit',x.debit))+(x.xfer?' <span class="chip" style="font-size:10px" title="계좌 간 이체로 상계 처리됨">이체</span>':'')+'</td><td>'+(lk?acctSel(x._id,'credit',x.credit).replace('<select','<select disabled'):acctSel(x._id,'credit',x.credit))+'</td>';
-    return '<tr'+(x.approved?' style="background:#f8fafc"':'')+(lk?' title="🔒 '+(_yl?'결산 확정한 해':'마감한 달')+' — 고칠 수 없습니다"':'')+'><td style="white-space:nowrap">'+(lk?'🔒 ':'')+esc(x.date||'')+'</td>'
+    return '<tr'+(x.approved?' style="background:#f8fafc"':'')+(lk?' title="🔒 '+(_yl?'결산 확정한 해':'마감한 달')+' — 고칠 수 없습니다"':'')+'><td style="text-align:center">'+(lk?'🔒':'<input type="checkbox"'+(S.ledSel[x._id]?' checked':'')+' onchange="ledPick(\''+x._id+'\',this.checked)">')+'</td>'
+      +'<td class="muted" style="font-size:11.5px">'+(_i+1)+'</td><td style="white-space:nowrap">'+esc(x.date||'')+'</td>'
       +'<td style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(x.memo||'')+'">'+(x.manual?'<span class="chip" style="font-size:9.5px" title="직접 입력한 거래">직접</span> ':'')+esc(x.memo||'')+'</td>'
       +'<td style="text-align:right;color:#166534">'+(num(x.deposit)?num(x.deposit).toLocaleString():'')+'</td>'
       +'<td style="text-align:right;color:#dc2626">'+(num(x.withdraw)?num(x.withdraw).toLocaleString():'')+(x.nocash&&num(x.amount)?'<span class="chip" style="font-size:10px" title="현금이 오가지 않는 대체분개 — 통장 잔액 대사에서 제외">대체 '+num(x.amount).toLocaleString()+'</span>':'')+'</td>'
@@ -20204,8 +20322,9 @@ function closingTab(f){
                 :'<button onclick="openAlbumPick(\'\',\'\',null,\'\',\''+x._id+'\')" title="사진첩에서 영수증 고르기" style="padding:2px 6px;font-size:11px;opacity:.5">⬇</button>')
         +'</td>'
       +'<td style="white-space:nowrap"><button'+dis+' onclick="splitForm(\''+x._id+'\')" style="padding:2px 6px" title="한 줄에 성격이 다른 금액이 섞여 있으면 계정별로 쪼갠다(원금+수수료)">✂</button>'
-      +'<button'+dis+' onclick="delTxn(\''+x._id+'\')" style="padding:2px 7px">×</button></td></tr>';
-  }).join('');
+      +'<button'+dis+' onclick="delTxn(\''+x._id+'\')" style="padding:2px 7px">×</button></td>'
+      +'<td style="white-space:nowrap">'+_ledTags(x._iss)+'</td></tr>';
+  }).join(''):'<tr><td colspan="13" class="muted" style="padding:14px;text-align:center">이 거르기에 맞는 줄이 없습니다 — 칩을 다시 누르면 전체</td></tr>';
   return '<div class="panel closehead"><div class="row"><h2>회계·결산</h2>'+hlp('close.bank')+yearSel()
     +(_yl?'<span class="chip warn" style="font-size:11px" title="결산을 확정한 해는 장부·전기이월·보고서 입력값·사업장 연도 기록을 고칠 수 없습니다. 고치려면 확정을 푸세요.">🔒 결산 확정</span>':'')
     +'<span style="flex:1"></span><button onclick="addTxnForm()" title="통장을 엑셀로 못 받는 경우 한 줄씩 직접 넣기">＋ 거래 추가</button>'+'<button onclick="learnedPanel()" title="승인할 때 기억한 거래처·계정 보기·지우기">📚 분개 학습</button>'+'<button onclick="autoMatchTransfers()" title="같은 날·같은 금액이 서로 반대 방향인 계좌 간 이체를 찾아 상계 처리">🔁 이체 자동매칭</button>'+'<button onclick="sampleApprove()" title="규칙과 같은 분개만 골라, 표본 몇 건을 먼저 보고 한꺼번에 승인">🎯 골라 승인</button>'+'<button class="primary" onclick="importBank()">📥 통장 엑셀 가져오기</button></div>'
@@ -20247,7 +20366,8 @@ function closeBodyHTML(arr,rows){
     case 'flow':    return flowView();
     default:
       return '<div class="panel">'+(arr.length
-          ? '<div class="ledgerwrap"><table><thead><tr><th>일자</th><th>적요</th><th style="text-align:right">입금</th><th style="text-align:right">출금</th><th>차변</th><th>대변</th><th>승인</th><th style="white-space:nowrap">증빙'+hlp('txn.scan')+'</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+          ? _ledChips()+'<div class="ledgerwrap"><table><thead><tr><th style="width:34px"><input type="checkbox" onchange="ledPickAll(this.checked)" title="보이는 줄(잠긴 줄 빼고) 모두 고르기"></th><th style="width:40px">#</th><th>일자</th><th>적요</th><th style="text-align:right">입금</th><th style="text-align:right">출금</th><th>차변</th><th>대변</th><th>승인</th><th style="white-space:nowrap">증빙'+hlp('txn.scan')+'</th><th></th><th>손볼 것</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+            +'<div id="ledBulk">'+_ledBulkHTML()+'</div>'
           : '<div class="muted" style="padding:16px 4px">거래가 없습니다. [📥 통장 엑셀 가져오기]로 시작하세요.</div>')+'</div>'
         +finPanel(arr);
   }
@@ -21655,6 +21775,10 @@ var HELP={
    +'<p>칸마다 전 값·새 값이 남은 줄(2026-10-05 이후)은 [펼치기]로 칸별 <b>전 → 이 묶음이 넣은 값 → 지금</b>을 봅니다.</p>'
    +'<p><b>[↶ 이 묶음 되돌리기]</b>는 지금도 그 묶음 값 그대로인 칸만 전 값으로 돌립니다. 그 뒤 사람이 고친 칸은 건드리지 않고, 사람이 ✓ 확인한 칸은 따로 묻습니다(기본은 빼고). 되돌린 것도 일지에 남아 다시 되돌릴 수 있습니다. 대표·관리자만 누릅니다.</p>'
    +'<p>통장 가져오기(장부)는 칸 묶음이 없어 여기서 되돌리지 않습니다 — 회계 화면에서 승인 풀기·삭제로 합니다.</p>'},
+ 'led.filter':{t:'장부 거르기 · 한꺼번에 정리',h:'<p>줄마다 맨 오른쪽 «손볼 것»에 그 줄이 왜 걸렸는지 딱지가 붙습니다 — 미분류·미승인·차·대 같음·임금성 의심·차입 의심·100만 원 넘는 출금·증빙 없음·이체 짝·🤖 기계 제안.</p>'
+   +'<p>위 칩을 누르면 그 줄만 보입니다(다시 누르면 전체). <b>⚠ 문제만</b>은 결산을 막는 줄(미분류·미승인·차·대 같음)과 법 위반 의심(임금성·차입)만 모읍니다.</p>'
+   +'<p>맨 왼쪽 □로 줄을 고르면 아래에 띠가 뜹니다. <b>✓ 고른 것 승인</b>은 차·대가 정해진 줄만 승인하고, 100만 원 넘는 출금·임금성·차입 의심은 빼서 하나씩 보게 합니다. <b>차변/대변 한꺼번에</b>는 승인한 줄·쪼갠 거래·이체를 빼고 바꾸며, 바꾸기 전 값은 📜 작업 일지에서 묶음째 되돌릴 수 있습니다.</p>'
+   +'<p>마감한 달·결산 확정한 해의 줄은 🔒로 보이고 고를 수 없습니다.</p>'},
  'trust.ledger':{t:'자동 규칙 — 어디까지 기계에 맡길지',h:'<p>기계가 값을 넣는 길(어느 서류의 어느 칸 · 어느 기금의 어느 계정 분개 · 이체 짝)마다 <b>사람이 «맞음»을 누른 횟수와 고친 횟수</b>를 셉니다. 확인함 [맞음]·분개 승인·🎯 골라 승인 표본·이체 짝 고르기가 모두 여기에 쌓입니다.</p>'
    +'<p><b>올림</b> — 연속 30번 맞으면 «자동으로 올릴 수 있음». [자동 확정 켜기]는 대표만 누릅니다. 켜면 그 길로 들어오는 값은 확인함을 거치지 않고 ✓가 되고, 분개는 통장을 가져올 때 바로 승인됩니다(100만 원 이하만).</p>'
    +'<p><b>내림</b> — 자동 확정한 값을 사람이 한 번이라도 고치거나 승인을 풀면 그 규칙은 <b>바로 멈추고</b>, 그 규칙으로 확정된 것은 확인함으로 돌아옵니다(마감·확정한 달은 그대로).</p>'
