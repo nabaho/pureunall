@@ -158,9 +158,12 @@
        ⚠ 소유 자리 activeWriter/gov_report 는 등록부 계약(소유 자리 필수)을 맞추는 이름 자리다 — 이번 판은 쓰지 않는다.
          규칙은 activeWriter 통째(로그인)로 이미 열려 있다(scripts/make-firebase-rules.js).
        ⚠ scal_cos·scal_types·scal_scheds·scal_staff 는 정부사업일정이 FB_NODES 로 부르는 자리라 등록부에 주인이 아직 안 적혀 있다.
-         이 화면도 같은 꼴(GR_NODES)로 부른다 — 주인 정리는 정부사업일정 몫이다(이번 범위 밖). */
+         이 화면도 같은 꼴(GR_NODES)로 부른다 — 주인 정리는 정부사업일정 몫이다(이번 범위 밖).
+       ★ 서류 관리(2026-10-10, 설계 2026-10-10-gov-report-docs-design.md) — 왼쪽 패널·목차가 이알피 컨설팅 사업(data/biz_cons_types)·
+         컨설팅(data/consultings, 목차 머리말만)·ERP 연결(scal_erpTypeMap)을 빌려 읽는다. 쓰지 않는다(주인은 erp·consult). */
     govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report'],
-      sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir'],
+      sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir',
+                   'data/biz_cons_types','data/consultings','scal_erpTypeMap'],
       writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'}],
       entityTypes:['Organization','Project','Document'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
