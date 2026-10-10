@@ -78,4 +78,5 @@ test('★ 이벤트 — 놓을 곳이 없어도 브라우저가 파일을 열지
   assert.ok(fnSrc('_dndRun').includes('okc.length===1') && fnSrc('_dndRun').includes('cands.length===1'), '여러 곳일 때 아무 데나 놓으면 엉뚱한 곳으로 간다');
   assert.ok(fnSrc('dzOver').includes('e.stopPropagation()'), '기존 끌어놓기 칸이 이중으로 받는다');
   assert.ok(SRC.includes('.dnd-ok{outline:2px dashed #fbbf24!important'));
+  assert.ok(/\.dnd-ok\{[^}]*color:var\(--ink\)!important/.test(SRC), '켜진 단추 글씨가 배경에 묻힌다');
 });
