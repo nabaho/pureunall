@@ -1162,7 +1162,21 @@ function popKey(id) {
      새로 생기지 않고 지워지기만 하므로, 못 찾으면 «새로 붙어 한 번 더» 본 뒤에야 없다고 한다.
    ⚠ 오래 붙들지 않는다(OLD_POP_IDLE_MS) — POP3 는 붙어 있는 동안 그 메일함을 «잠근다».
    ⚠ DELE 는 여기에도 없다(popOpen 머리글). QUIT 앞에 RSET 을 보내는 것도 그대로다. */
-const OLD_POP_IDLE_MS = 3 * 60 * 1000;
+const OLD_POP_IDLE_MS = 90 * 1000;      /* 길게 붙들면 다른 그릇의 로그인이 잠금에 걸린다 */
+const OLD_FULL_MAX = 1536 * 1024;       /* 이보다 큰 지난 메일은 앞부분(TOP)만 먼저 */
+const OLD_TOP_LINES = 700;
+/* 로그인이 «잠겨서» 거절되면(-ERR) 잠깐 기다렸다 다시 — 다른 그릇이 붙어 있는 동안 생긴다 */
+async function oldPopOpen(open) {
+  let last = null;
+  for (let i = 0; i < 5; i++) {
+    try { return await open(); } catch (e) {
+      last = e;
+      if (!(e && e.pop)) throw e;               /* 답(-ERR)이 아니라 연결 문제면 그대로 올린다 */
+      await new Promise((r) => setTimeout(r, 3000));
+    }
+  }
+  throw last;
+}
 let _oldPop = null;                    /* { pop, idx: Map(열쇠→번호), at, size } */
 function oldPopForget() {
   const w = _oldPop; _oldPop = null;
@@ -2131,10 +2145,11 @@ module.exports = function build(deps) {
        ⚠ DELE 는 여기에도 없다(popOpen 머리글). 원본 보관 설정도 확인했다. */
     readOldMail: F
       .region(REGION)
-      /* ⚠ maxInstances 1 — 그릇이 둘 뜨면 둘이 «따로» 로그인한다. POP3 는 붙어 있는 동안 메일함을
-           잠가서, 둘째는 첫째가 끝날 때까지 기다렸다(실측 2026-10-05·10-09: 같은 때 두 통이 75~137초).
-           한 그릇에 줄을 세우면 둘째는 첫째가 붙여 둔 연결을 «물려받아» 곧바로 연다. */
-      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 300, memory: '1GB', maxInstances: 1 })
+      /* ⚠⚠ maxInstances 를 걸지 않는다 (2026-10-10 되돌림). 1 로 묶었더니 큰 메일 한 통(12MB 195초)이
+           도는 동안 다른 요청이 «줄을 서지 않고 그냥 끊겼다»(「사용 가능한 인스턴스 없음」 10건).
+           이 함수는 경력관리 화면(kcareer.html)도 쓴다. 둘이 따로 로그인해 POP3 잠금에 걸리면
+           oldPopOpen 이 잠깐 기다렸다 다시 붙는다. */
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 300, memory: '1GB' })
       .https.onRequest((req, res) => gate(req, res, async () => {
         const b = req.body || {};
         const key = String(b.key || '');
@@ -2146,7 +2161,7 @@ module.exports = function build(deps) {
         const user = await deps.mailUserAsync();
         const pass = deps.mailPass();
         if (!user || !pass) { reply(res, 500, { ok: false, error: '메일 계정이 설정되지 않았습니다.' }); return; }
-        const open = () => popOpen(user, pass, 240000);
+        const open = () => oldPopOpen(() => popOpen(user, pass, 240000));
 
         /* ☕ 「지난 메일」 칸을 연 순간 화면이 부른다 — 붙고 이름표 표만 만들어 둔다(메일은 안 읽는다) */
         if (warm) {
@@ -2165,6 +2180,8 @@ module.exports = function build(deps) {
           const pop = got.s.pop;
           const hit = { n: got.n };
           if (!hit.n) {
+            /* 번호가 «어떤 모양»으로 왔는지만 남긴다(내용은 안 남긴다) — 화면이 엉뚱한 번호를 보내는지 가린다 */
+            console.log('MB_OLD_MISS', JSON.stringify({ len: key.length, digits: /^\d+$/.test(key), listed: got.s.size }));
             reply(res, 404, { ok: false, error: '그 메일이 다음메일에 없습니다 — 지워졌을 수 있습니다.' });
             return;
           }
@@ -2183,10 +2200,14 @@ module.exports = function build(deps) {
                 error: '이 지난 메일은 ' + Math.round(size / 1024 / 1024) + 'MB 라 여기서 못 엽니다 — 다음메일에서 보십시오.' });
               return;
             }
+            /* ★ 큰 메일은 «앞부분만» 먼저 — POP3 는 1초에 60KB 쯤이라 4MB 가 73초, 12MB 가 195초였다.
+               글은 대개 맨 앞에 있다(TOP 은 머리글 + 앞 몇 줄). 화면이 「전체 받기」를 누르면(full) 통째로 받는다.
+               ⚠ 첨부를 내려받을 때(wantAtt)는 어차피 통째로 받아야 한다. */
+            const partial = size > OLD_FULL_MAX && !b.full && wantAtt < 0;
             const t1 = nowMs();
-            const raw = (await pop.cmd('RETR ' + hit.n, true)).body;
+            const raw = (await pop.cmd(partial ? 'TOP ' + hit.n + ' ' + OLD_TOP_LINES : 'RETR ' + hit.n, true)).body;
             got.s.at = nowMs();
-            console.log('MB_TIME_OLD', JSON.stringify({ find: tFind, retr: nowMs() - t1, reused: got.reused, kb: Math.round(raw.length / 1024) }));
+            console.log('MB_TIME_OLD', JSON.stringify({ find: tFind, retr: nowMs() - t1, reused: got.reused, kb: Math.round(raw.length / 1024), partial: partial }));
             const { simpleParser } = require('mailparser');
             const p = await simpleParser(Buffer.from(raw, 'binary'));
             const atts = (p.attachments || []).map((a, i) => ({
@@ -2202,7 +2223,7 @@ module.exports = function build(deps) {
               return;
             }
             reply(res, 200, { ok: true, html: p.html || '', text: String(p.text || ''),
-              atts: atts, full: true, old: true });
+              atts: atts, full: !partial, partial: partial, size: size, old: true });
             return;
           } catch (e) {
             oldPopForget();
@@ -2275,5 +2296,6 @@ module.exports.ATT_MAX = ATT_MAX;
 module.exports.oldPopSession = oldPopSession;
 module.exports.oldPopFind = oldPopFind;
 module.exports.oldPopForget = oldPopForget;
+module.exports.oldPopOpen = oldPopOpen;
 /* 연 메일이 «없을» 때 가르기 — 지운 것(뺀다)·창 밖(남긴다)을 돌려 본다(2026-10-10) */
 module.exports.notHere = notHere;

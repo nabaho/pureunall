@@ -44,6 +44,7 @@
     /* 📅 발주 예정 — 나라장터 발주계획·사전규격 (2026-10-09). 받은 범위(since)도 함께 — 폰이 올해 1월부터 또 받지 않게 */
     { ls: 'plan',               path: 'plan',               kind: 'rows', idf: 'no' },
     { ls: 'plan_since',         path: 'plan_since',         kind: 'scalar' },
+    { ls: 'plan_ver',           path: 'plan_ver',           kind: 'scalar' },   /* 받은 범위를 «어느 판»으로 받았나 — 폰이 또 처음부터 받지 않게 (2026-10-10) */
     { ls: 'spec_since',         path: 'spec_since',         kind: 'scalar' },
     { ls: 'plan_at',            path: 'plan_at',            kind: 'scalar' },
     /* 받기 실패 안내(「발주계획: 아직 못 받습니다 … [코드 20 · 서비스 접근거부]」) — 원격으로 갈라 보려고. ⚠ 열쇠는 들어 있지 않다 */

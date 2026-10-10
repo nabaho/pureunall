@@ -70,8 +70,8 @@ test('③ 메일 — 결과·완료·최종 보고만 · RE/FW 는 한 줄 · �
 
 test('④ 메일은 누를 때만 읽고 · 찾은 것은 기기에만 · 실적으로는 채워 열기만', () => {
   const dash = strip(떼기('function renderBizDash('));
-  assert.ok(/_bizPerfHtml\(\)\+_bizMailHtml\(\)/.test(dash), '한눈에에 두 칸');
-  assert.ok((dash.match(/_bizPerfHtml\(\)/g) || []).length >= 2, '사업을 아직 안 넣었어도 보인다');
+  assert.ok(/_bizPerfSummary\(\)/.test(dash), '한눈에에는 수행 실적 요약 한 칸');
+  assert.ok((dash.match(/renderBizPerf/g) || []).length >= 2 && (dash.match(/renderBizMail/g) || []).length >= 2, '사업을 아직 안 넣었어도 두 탭이 그려진다');
   ['function renderBizDash(', 'function _bizMailHtml(', 'function _bizPerfHtml('].forEach((h) => {
     const f = strip(떼기(h));
     assert.ok(!/mailbox/.test(f), h + ' — 그릴 때마다 메일함 목록(십수 MB)을 읽으면 안 된다');

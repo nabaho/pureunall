@@ -68,6 +68,10 @@
     { code:'{{대표주민번호}}', desc:'대표 주민번호 앞7자리+마스킹 (생년월일+성별)' },
     { code:'{{계약금액}}',   desc:'계약금액 (콤마 포함)' },
     { code:'{{계약금액한글}}', desc:'계약금액 한글 표기 (예: 일백만)' },
+    /* 급여관리업무 위임계약서 (2026-10-10 대표 「계약금액과 추가금액 … 급여관련업무」 — 옛 급여 계약서 제2조 ②) — 채우기 창에서 손으로 적는다 */
+    { code:'{{기준인원}}',   desc:'급여 계약: 계약 당시 근로자 수 (명)' },
+    { code:'{{추가인원단위}}', desc:'급여 계약: 추가 보수를 셈하는 근로자 수 단위 (예: 5 → 5명당)' },
+    { code:'{{추가금액}}',   desc:'급여 계약: 추가 단위당 추가 보수 (원)' },
     { code:'{{성공보수}}',   desc:'성공보수 (정액/정률)' },
     { code:'{{주담당}}',     desc:'노무사 주담당' },
     { code:'{{부담당}}',     desc:'노무사 부담당' },
@@ -652,11 +656,13 @@
   function withLawyerNames(u8, name) {
     var CF = w.PuFormCardFill, T = w.EsignHwpTpl, H = w.PureunHwp;
     var line = CF && CF.lawyersNow ? CF.lawyersNow() : '';
+    var lines = CF && CF.lawyerLinesNow ? CF.lawyerLinesNow() : [];
     var same = { bytes: u8, name: name };
     if (!line || !H || !H.openDoc || isXlsxName(name)) return Promise.resolve(same);
     return H.openDoc(u8, name).then(function (doc) {
       try {
-        var n = T && T.applyLawyerLine ? T.applyLawyerLine(doc, line) : 0;
+        var n = T && T.applyLawyerLine ? T.applyLawyerLine(doc, line, lines) : 0;
+        if (T && T.expandLawyerMarker) n += T.expandLawyerMarker(doc, lines);
         try { n += (JSON.parse(doc.replaceAll('{{공인노무사명단}}', line, true)) || {}).count || 0; } catch (_) {}
         if (!n) return same;
         return { bytes: new Uint8Array(doc.exportHwpx()), name: String(name).replace(/\.[^.]+$/, '') + '.hwpx' };
@@ -2352,6 +2358,55 @@
         list = ls.sort(function (x, y) { return String(y.signDate).localeCompare(String(x.signDate)); }); draw();
       }, function (e) { note.textContent = '⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e); });
     }
+    /* 👥 위임장에 들어가는 공인노무사 — 이알피 직원 명부와 이어진 «지금 명단»을 보고, 빠진 사람은 까닭까지 본다
+       (대표 지시 2026-10-10 「계약서 전체 사람 이름 넣는 것 UI 측면 관리」). 읽기 전용 — 바꾸는 곳은 이알피 직원 명부(재직 상태)·휴가관리(휴직)다.
+       ★ 모든 위임장·계약서의 {{공인노무사명단}} 은 이 명단 «하나»를 쓴다 — 그래서 여기서 보는 줄이 곧 서류에 찍히는 줄이다. */
+    function openLawyers() {
+      ensureCss();
+      var CF = w.PuFormCardFill; if (!CF || !CF.lawyersRoster) return;
+      var bg = el('div', { 'class': 'pcf-mbg' });
+      function close() { document.removeEventListener('keydown', onKey); bg.remove(); }
+      function onKey(e) { if (e.key === 'Escape') close(); }
+      document.addEventListener('keydown', onKey);
+      var listBox = el('div', { style: 'display:flex;flex-direction:column;gap:4px' }), prevBox = el('div', { style: 'border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:10px 14px;font-family:serif;font-size:13.5px;line-height:1.9;white-space:pre' });
+      var note = el('div', { 'class': 'pcf-fnote' }), showGone = false;
+      function draw() {
+        var ros = CF.lawyersRoster(S.lawDir, S.lawLoa);
+        listBox.innerHTML = ''; var on = ros.filter(function (r) { return r.on; });
+        if (!ros.length) listBox.appendChild(el('div', { 'class': 'pcf-muted', text: '직원 명부를 읽지 못했습니다 — 기본 명단(' + CF.lawyersNow() + ')을 씁니다' }));
+        /* 퇴사한 사람은 접어 둔다 — 옛 명부가 길다(스물 남짓). 들어가는 사람·휴직 중인 사람만 먼저 */
+        var gone = ros.filter(function (r) { return r.why === '퇴사'; });
+        if (gone.length) listBox.appendChild(el('button', { type: 'button', 'class': 'pcf-b', style: 'align-self:flex-start;margin-bottom:2px', text: (showGone ? '▾ 퇴사 ' : '▸ 퇴사 ') + gone.length + '명 ' + (showGone ? '접기' : '보기'), onclick: function () { showGone = !showGone; draw(); } }));
+        ros.filter(function (r) { return showGone || r.why !== '퇴사'; }).forEach(function (r, i) {
+          listBox.appendChild(el('div', { style: 'display:flex;gap:10px;align-items:center;padding:5px 8px;border:1px solid ' + (r.on ? '#bbf7d0' : '#e2e8f0') + ';border-radius:6px;background:' + (r.on ? '#f0fdf4' : '#f8fafc') + ';' + (r.on ? '' : 'color:#94a3b8') }, [
+            el('span', { style: 'width:20px;text-align:right', text: r.on ? String(on.indexOf(r) + 1) : '–' }),
+            el('b', { text: r.name }), el('span', { style: 'font-size:12px', text: r.title || r.sid }),
+            el('span', { style: 'margin-left:auto;font-size:12px;font-weight:700;color:' + (r.on ? '#166534' : '#b45309'), text: r.on ? '✔ 위임장에 들어감' + (r.rep ? ' · 맨 위' : '') : '✕ 빠짐 — ' + r.why })]));
+        });
+        var lines = ros.length ? CF.lawyerLines(CF.lawyerPeople(S.lawDir, S.lawLoa)) : CF.lawyerLinesNow();
+        prevBox.textContent = ['위 임 장', '', '  성        명 : ' + (lines[0] || '(명단 없음)')].concat(lines.slice(1).map(function (x) { return new Array(18).join(' ') + x; })).join('\n');
+      }
+      function reread() {
+        note.textContent = '직원 명부를 다시 읽는 중…';
+        var soft = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
+        Promise.all([soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
+          if (r[0]) { S.lawDir = r[0].v || r[0]; S.lawLoa = r[1] && (r[1].v || r[1]); CF.setLawyers(S.lawDir, S.lawLoa); }
+          draw(); note.textContent = r[0] ? '✔ 지금 명부로 새로 읽었습니다' : '⚠ 명부를 읽지 못했습니다';
+        });
+      }
+      var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '위임장 공인노무사 명단', style: 'width:640px' }, [
+        el('div', { 'class': 'pcf-mh' }, [el('span', { text: '👥 위임장에 들어가는 공인노무사' }), el('button', { type: 'button', 'aria-label': '닫기', text: '×', onclick: close })]),
+        el('div', { 'class': 'pcf-mb' }, [
+          el('div', { 'class': 'pcf-muted', style: 'margin-bottom:8px', text: '이알피 직원 명부에서 재직 중인 공인노무사가 «자동으로», 한 줄에 한 명씩 세로로 모든 위임장·계약서에 들어갑니다. 퇴사하거나 휴직(이알피 휴가관리)하면 자동으로 빠지고, 복직하면 다시 들어갑니다.' }),
+          listBox,
+          el('div', { 'class': 'pcf-fh', style: 'margin-top:12px', text: '위임장에 찍히는 모양' }), prevBox,
+          el('div', { 'class': 'pcf-muted', style: 'margin-top:8px', text: '명단을 바꾸려면 푸른이알피 › 직원 명부에서 재직 상태를, 휴가관리에서 휴직을 고치세요 — 이 화면과 모든 서류에 바로 따라옵니다. 채우기 창에서는 이번 서류만 직접 고쳐 쓸 수도 있습니다(쉼표로 나눠 적음).' }),
+          note]),
+        el('div', { 'class': 'pcf-mf' }, [el('button', { type: 'button', 'class': 'pcf-b', text: '다시 읽기', onclick: reread }), el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close })])
+      ]);
+      bg.appendChild(m); document.body.appendChild(bg);
+      draw();
+    }
     function openContract() {
       if (!host.contractLoad) return;
       toast('이알피 계약 자료를 읽는 중…');
@@ -2389,6 +2444,7 @@
       return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
         var cf = r[0].val(), rm = r[1].val();
         if (r[2]) setCaseTypes(r[2].v || r[2]);
+        if (r[3]) { S.lawDir = r[3].v || r[3]; S.lawLoa = r[4] && (r[4].v || r[4]); }
         if (r[3] && w.PuFormCardFill && w.PuFormCardFill.setLawyers) w.PuFormCardFill.setLawyers(r[3].v || r[3], r[4] && (r[4].v || r[4]));   // 퇴사·휴직은 빠진다
         S.removed = listOf(rm && rm.v);
         S.forms = mergeSeeds(listOf(cf && cf.v), S.removed).list;
@@ -2784,6 +2840,7 @@
       return [el('hr'),
         { t: '📎 파일 올려 양식 만들기', title: 'HWPX · HWP · XLSX · DOCX · DOC · PDF — 올리면 원본 보관함에 사본이 남습니다', fn: function () { upIn.click(); } }, upIn,
         host.contractList ? { t: '📦 계약 여러 건 채우기', title: '이알피 계약 여러 건을 골라 계약마다 서류 묶음을 .zip 하나로', fn: openContracts } : null,
+        { t: '👥 위임장 노무사 명단', title: '위임장·계약서에 자동으로 들어가는 공인노무사(이알피 직원 명부)를 보고 확인합니다', fn: openLawyers },
         { t: 'rhwp v' + rhwpVer() + ' 새 판 확인', fn: rhwpUpdatePrompt },
         kind === 'case' ? { t: '📥 체당금 기본 양식 다시 넣기', fn: reseedChedang } : null];
     }

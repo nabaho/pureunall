@@ -41,7 +41,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=59"></script>
+<script src="js/pu-ontology.js?v=60"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
@@ -24360,7 +24360,40 @@ function mbLoadingBox(){
 
 /* 주소로 온 찾는 말 — 한 번만 쓰고 비운다(null 은 «아직 안 읽음») */
 let _mbUrlQ = null;
+/* ══════ ◀ 메일 «뒤로가기 한 걸음» (대표 지시 2026-10-10) ══════
+   「받은메일함 자료를 보다가 백 버튼을 누르면 받은메일로 가야 하는데 계속 전체메일로 간다」
+   ★ 왜 그랬나 — 메일 화면은 칸을 옮기거나 메일을 열어도 브라우저 기록에 아무것도 남기지 않는다.
+     뒤로가기는 앱을 통째로 나갔고, 메일을 다시 열면 첫 화면이 늘 「전체메일」이다.
+   ★ 이제 뒤로가기(pu-back 파수꾼)가 이 함수를 먼저 부른다 —
+     ① 메일을 읽는 중이면 «그 칸의 목록»으로 ② 아니면 «바로 전에 보던 칸»으로.
+     더 갈 곳이 없을 때만 false 를 돌려 앱을 나간다.
+   ⚠ 칸 기록(_mbNav)은 「사람이 칸을 옮길 때」만 쌓는다 — 뒤로가기가 여는 것(_mbNavQuiet)과
+     처음 문이 여는 것(state.mbBox 가 비어 있음)은 안 쌓는다. 안 그러면 뒤로가기가 제자리를 맴돈다.
+   ⚠ 참(true)을 돌려줘야 pu-back 이 「우리가 처리했다」로 보고 앱을 안 나간다. */
+let _mbNav = [];
+let _mbNavQuiet = false;
+function mbNavNote(next){
+  if(_mbNavQuiet || state.view !== 'mail') return;
+  const prev = String(state.mbBox || '');
+  if(!prev || prev === String(next)) return;
+  if(_mbNav[_mbNav.length - 1] === prev) return;
+  _mbNav.push(prev);
+  if(_mbNav.length > 30) _mbNav.shift();
+}
+function mbBackStep(){
+  if(state.view !== 'mail' || state.mailSent !== 'box') return false;
+  if(state.mbOpen){ mbBack(); return true; }
+  while(_mbNav.length){
+    const p = _mbNav.pop();
+    if(!p || p === mbNow()) continue;
+    _mbNavQuiet = true;
+    try{ openMailBox(p); } finally{ _mbNavQuiet = false; }
+    return true;
+  }
+  return false;
+}
 function openMailBox(id){
+  mbNavNote(id);
   state.view='mail'; state.mailSent='box'; state.mbBox=id; state.mbOpen=null;
   /* ✉ 다른 앱이 「이 말로 찾아 달라」고 보냈으면 찾기 칸에 담는다 (2026-10-07).
      ⚠ «한 번»만 쓴다 — 주소에서 지우지 않으면, 칸을 바꿀 때마다 찾는 말이 되살아나
@@ -25732,7 +25765,7 @@ function mbBodyPut(slug, uid, o){
   if((String(o.html||'').length + String(o.text||'').length) > MB_BODY_MAX) return;
   const k = mbBodyKey(slug, uid);
   if(!_mbBody[k]) _mbBodyOrder.push(k);
-  _mbBody[k] = { html:o.html||'', text:o.text||'', atts:o.atts||[] };
+  _mbBody[k] = { html:o.html||'', text:o.text||'', atts:o.atts||[], partial:!!o.partial, size:Number(o.size||0) };
   while(_mbBodyOrder.length > MB_BODY_KEEP){
     const old = _mbBodyOrder.shift(); if(old !== k) delete _mbBody[old];
   }
@@ -25774,7 +25807,7 @@ function mbFetchBodyNow(slug, uid, peek){
       .then(r=>r.json().catch(()=>({})))
       .then(j=>{
         if(!j.ok) throw new Error(j.error||'열지 못했습니다');
-        const o = { html:j.html||'', text:j.text||'', atts:j.atts||[] };
+        const o = { html:j.html||'', text:j.text||'', atts:j.atts||[], partial:!!j.partial, size:Number(j.size||0) };
         mbBodyPut(slug, uid, o);
         return o;
       });
@@ -27443,6 +27476,38 @@ function taxSaveHtml(){
   </div>`;
 }
 
+/* 📦 큰 지난 메일 — 글 앞부분만 먼저 보인 것을 말하고, 통째로 받는 단추를 둔다 (2026-10-10)
+   다음메일 옛 메일 받기(POP3)는 1초에 60KB 쯤이라 12MB 가 195초다. 그래서 글(맨 앞)만 먼저 보여 준다.
+   ⚠ 첨부 목록도 앞부분에서 «보인 것까지만»이다 — 전체를 받으면 완전해진다. */
+function mbOldPartialHtml(o){
+  const mb = o.size ? (Math.round(o.size/1024/1024*10)/10) + 'MB ' : '';
+  const busy = !!o.fullBusy;
+  return `<div class="dm-hint" style="text-align:left;padding:6px 10px;margin:6px 0;background:#fffbeb;border:1px solid #fde68a;border-radius:6px;color:#854d0e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+    📦 ${mb}큰 메일이라 글 앞부분만 보입니다 — 첨부와 나머지는 전체를 받아야 합니다
+    <button type="button" class="btn" style="margin-left:8px" ${busy?'disabled':''} onclick="mbOldFull()">${busy?'받는 중… (1~3분)':'전체 받기'}</button>
+  </div>`;
+}
+function mbOldFull(){
+  const o = state.mbOpen; if(!o || String(o.slug) !== MB_OLD_ID || o.fullBusy) return;
+  const u = firebase.auth && firebase.auth().currentUser; if(!u) return toast('로그인이 필요합니다');
+  const uid = String(o.uid);
+  o.fullBusy = true; renderMailPage();
+  u.getIdToken().then(tok=>fetch(MB_FN+'readOldMail', { method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+    body: JSON.stringify({ key:uid, full:1 }) }))
+    .then(r=>r.json().catch(()=>({})))
+    .then(j=>{
+      if(!j.ok) throw new Error(j.error||'받지 못했습니다');
+      const r = { html:j.html||'', text:j.text||'', atts:j.atts||[], partial:false, size:Number(j.size||0) };
+      mbBodyPut(MB_OLD_ID, uid, r);
+      if(state.mbOpen && String(state.mbOpen.uid) === uid) state.mbOpen = Object.assign(state.mbOpen, r, { fullBusy:false });
+      renderMailPage();
+    })
+    .catch(e=>{
+      if(state.mbOpen && String(state.mbOpen.uid) === uid) state.mbOpen.fullBusy = false;
+      renderMailPage(); toast('전체를 받지 못했습니다 — ' + ((e && e.message) || e), 8000);
+    });
+}
 function mbReadHtml(){
   const o = state.mbOpen||{};
   const box = _mbMsgs[o.slug]||{};
@@ -27566,6 +27631,7 @@ function mbReadHtml(){
     ${/* ⚠ 여기 있던 「🖼 바깥에서 오는 그림 N개를 막았습니다 · 그림 보기」 띠를
          2026-09-06 에 없앴다 — 대표 지시 「자꾸 나온다」. 되살리지 말 것.
          까닭은 mbCleanHtml 의 그림 대목에 실측과 함께 적어 두었다(보낸이 185명). */''}
+    ${(o.partial && !o.loading) ? mbOldPartialHtml(o) : ''}
     <div class="body">${o.loading ? '<div class="wait">본문을 가져오고 있습니다…'
         + (String(o.slug)===MB_OLD_ID ? ' <span style="color:#94a3b8">(지난 메일은 처음 한 통만 10초쯤 걸리고, 다음 통부터는 바로 열립니다)</span>' : '')
         + '</div>'
@@ -40662,7 +40728,9 @@ function delMailBlock(email){
   /* ⚠ «한 걸음 물러서기»가 «닫기»보다 먼저다. 순서를 바꾸면 기업 상세에서 연 명함이
      ✕ 로 닫혀 회사까지 사라진다(2026-09-12). */
   if(coBackStep()) return true;
-  return PuBack.closeTopVisible();
+  /* 떠 있는 창(덮개)이 먼저다 — 메일을 읽다 연 창을 닫고, 그다음 뒤로가기가 목록으로 간다 */
+  if(PuBack.closeTopVisible()) return true;
+  return mbBackStep();
 }); }catch(e){}</script>
 </body>
 </html>

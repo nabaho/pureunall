@@ -254,28 +254,47 @@
     });
     return out;
   }
-  function lawyersLine(dir, loa, today) {
+  var isLawyerRow = function (u) {
+    var sid = String((u && u.sid) || ''), t = String((u && (u.title || u.position)) || '');
+    if (!u || !u.name || sid.indexOf('A-') === 0) return false;
+    return sid.indexOf('P-') === 0 || /노무사/.test(t);
+  };
+  var isRep = function (u) { return /대표/.test(String((u && (u.title || u.position)) || '')); };
+  var byRep = function (a, b) { return (isRep(a) ? 0 : 1) - (isRep(b) ? 0 : 1) || String(a.sid || '').localeCompare(String(b.sid || '')); };
+  /* 위임장에 들어갈 사람들 [{sid,name,rep}] — 재직(active)이고 오늘 휴직이 아닌 공인노무사, 대표 먼저 */
+  function lawyerPeople(dir, loa, today) {
     var away = onLeaveSet(loa, today);
-    var list = listOfAny(dir)
-      .filter(function (u) {
-        if (!u || !u.name) return false;
-        var sid = String(u.sid || ''), t = String(u.title || u.position || '');
-        if (u.status !== 'active') return false;
-        if (away[sidKey(sid)]) return false;
-        if (sid.indexOf('A-') === 0) return false;
-        return sid.indexOf('P-') === 0 || /노무사/.test(t);
-      })
-      .sort(function (a, b) {
-        var ra = /대표/.test(String(a.title || a.position || '')) ? 0 : 1, rb = /대표/.test(String(b.title || b.position || '')) ? 0 : 1;
-        return ra - rb || String(a.sid || '').localeCompare(String(b.sid || ''));
-      });
+    return listOfAny(dir).filter(function (u) { return isLawyerRow(u) && u.status === 'active' && !away[sidKey(u.sid)]; })
+      .sort(byRep).map(function (u) { return { sid: String(u.sid || ''), name: String(u.name).replace(/\s+/g, ''), rep: isRep(u) }; });
+  }
+  /* 관리 화면용 — 명부의 «모든» 공인노무사와 들어가는지·왜 빠지는지 */
+  function lawyersRoster(dir, loa, today) {
+    var away = onLeaveSet(loa, today);
+    return listOfAny(dir).filter(isLawyerRow).sort(byRep).map(function (u) {
+      var on = u.status === 'active' && !away[sidKey(u.sid)];
+      return { sid: String(u.sid || ''), name: String(u.name).replace(/\s+/g, ''), rep: isRep(u), title: String(u.title || u.position || ''), on: on,
+        why: on ? '' : (u.status !== 'active' ? (u.status === 'resigned' || u.status === 'retired' ? '퇴사' : '재직 아님(' + (u.status || '상태 없음') + ')') : '휴직 중') };
+    });
+  }
+  function lawyersLine(dir, loa, today) {
+    var list = lawyerPeople(dir, loa, today);
     if (!list.length) return '';
-    var head = list[0], rest = list.slice(1).map(function (u) { return String(u.name).replace(/\s+/g, ''); });
-    var first = (/대표/.test(String(head.title || head.position || '')) ? '대표 공인노무사 ' : '공인노무사 ') + String(head.name).replace(/\s+/g, '');
+    var head = list[0], rest = list.slice(1).map(function (u) { return u.name; });
+    var first = (head.rep ? '대표 공인노무사 ' : '공인노무사 ') + head.name;
     return rest.length ? first + ', 공인노무사 ' + rest.join('·') : first;
   }
-  function setLawyers(dirOrLine, loa) { lawyersLineNow = typeof dirOrLine === 'string' ? dirOrLine : lawyersLine(dirOrLine, loa); return lawyersLineNow; }
+  /* 한 줄에 한 명 — 「공인노무사 ○○○」 (대표 지시 2026-10-10 「세로로 열을 맞추어 한 줄에 1명씩 공인노무사로」) */
+  function lawyerLines(people) { return (people || []).map(function (u) { return '공인노무사 ' + u.name; }); }
+  var LAWYERS_FALLBACK_LIST = [{ sid: 'P-001', name: '권형하', rep: true }, { sid: 'P-003', name: '박한별' }, { sid: 'P-004', name: '김혜민' }, { sid: 'P-005', name: '박재원' }, { sid: 'P-007', name: '김동현' }];
+  var lawyersListNowArr = null;
+  function setLawyers(dirOrLine, loa) {
+    if (typeof dirOrLine === 'string') { lawyersLineNow = dirOrLine; lawyersListNowArr = null; return lawyersLineNow; }
+    lawyersListNowArr = lawyerPeople(dirOrLine, loa); lawyersLineNow = lawyersLine(dirOrLine, loa); return lawyersLineNow;
+  }
   function lawyersNow() { return lawyersLineNow || LAWYERS_FALLBACK; }
+  function lawyersListNow() { return lawyersListNowArr && lawyersListNowArr.length ? lawyersListNowArr : (lawyersLineNow ? [] : LAWYERS_FALLBACK_LIST); }
+  /* 지금 위임장에 들어갈 줄들 [‘공인노무사 권형하’, …] — 명부를 못 읽었으면(줄만 있고 목록 없음) 빈 목록 → 호출한 쪽이 줄 하나로 쓴다 */
+  function lawyerLinesNow() { return lawyerLines(lawyersListNow()); }
 
   /* 표지 이름 → 값. co 는 회사 한 벌(사업자등록증 줄 + coInfo 를 합친 것), contact·worker 는 명함 줄
      (worker 는 사람이 적은 {n,m,ad} 이어도 된다). 모르는 값은 '' — 채울 때 밑줄로 바뀐다. */
@@ -639,7 +658,8 @@
     proposalValues: proposalValues, PROPOSAL_KEYS: PROPOSAL_KEYS, sendDate: sendDate,
     CASE_TASKS: CASE_TASKS, WORKER_TASKS: WORKER_TASKS, CASE_KEYS: CASE_KEYS, caseValues: caseValues,
     mailDefaults: mailDefaults, sentKeys: sentKeys, sentRecord: sentRecord, SENT_KIND_OF: SENT_KIND_OF, agencyBook: agencyBook, agencyOrgOf: agencyOrgOf,
-    lawyersLine: lawyersLine, setLawyers: setLawyers, onLeaveSet: onLeaveSet, lawyersNow: lawyersNow, LAWYERS_FALLBACK: LAWYERS_FALLBACK
+    lawyersLine: lawyersLine, setLawyers: setLawyers, onLeaveSet: onLeaveSet, lawyersNow: lawyersNow, LAWYERS_FALLBACK: LAWYERS_FALLBACK,
+    lawyerPeople: lawyerPeople, lawyersRoster: lawyersRoster, lawyerLines: lawyerLines, lawyersListNow: lawyersListNow, lawyerLinesNow: lawyerLinesNow
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuFormCardFill = api;

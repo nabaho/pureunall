@@ -1179,22 +1179,56 @@ exports.recruitWatch = functions
   });
 
 /* 회생광고 — 전국 회생 관할 법원 공고에서 «법인회생 포괄적 금지명령» 기업을 모은다 (2026-10-10).
-   대표 지시 「포괄금지명령 나온 기업들만 모아서 … 푸른통합시스템에 앱 만든다. 회생광고로」.
+   대표 지시 「포괄금지명령 나온 기업들만 모아서 … 푸른통합시스템에 앱 만든다. 회생광고로」
+        「주소가 있으면 기업 홈페이지 등을 직접 찾아서 연락처·메일·팩스를 정렬해서 볼 수 있게」.
    ⚠ 법원 공고는 «읽기만» 한다(로그인 없음 · 요청 사이 0.8초). 남기는 것은 회사명·주소·사건 정보뿐.
+   ⚠ 연락처는 «회사가 공개한» 홈페이지·업체 등록 정보에서만 찾는다(functions/rehab-contact.js).
+     찾기만 한다 — 이메일·문자를 보내는 일은 없다(정보통신망법 제50조).
    ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › rehab_ad). 화면은 rehab-ad.html.
-   ⚠ 발송은 하지 않는다 — 사람이 고른 건만 화면에서 우편 라벨로 뽑는다(정보통신망법 제50조).
-   07:40 — 다른 아침 일들(07:20 모집 감시)과 겹치지 않게. 최근 10일을 다시 훑어 늦게 뜬 공고도 줍는다. */
+   07:40 — 다른 아침 일들(07:20 모집 감시)과 겹치지 않게. 최근 10일을 다시 훑어 늦게 뜬 공고도 줍는다.
+   ★ 검색은 서버에 «이미 있는» 열쇠(KAKAO_REST_KEY — 카카오 로그인용)로 다음 웹검색·카카오맵 업체검색을 부른다.
+     새로 신청할 것이 없다. 네이버 열쇠는 서버에 없다(대표 결정 「가입 안 하고 진행 안 한다」). */
+const RehabContact = require("./rehab-contact");
+
+function rehabProviders() {
+  const key = process.env.KAKAO_REST_KEY;
+  return key ? RehabContact.kakaoProviders({ key }) : null;
+}
+async function rehabFindContact(n, hint, providers) {
+  return RehabContact.lookup({ name: n.debtorName, address: n.address, providers: providers || {}, hint: hint || {},
+    getPage: (u) => RehabContact.fetchPage(u), wait: () => new Promise((ok) => setTimeout(ok, 250)) });
+}
+/* 검색 서비스 자체가 거절(401·403·429)한 결과는 «못 찾음»이 아니다 — 저장하면 7일 동안 다시 안 본다 */
+function rehabSearchRefused(found) { return /실패\((401|403|429)\)/.test(String((found && found.note) || "")); }
+function rehabInfoRecord(n, found, nowMs) {
+  return Object.assign({ id: n.id, entityType: "Document", docKind: "rehabContact", sourceKind: "rehabNotice", sourceId: n.id,
+    schemaVersion: 3, contractVersion: OntologyServerWrite.CONTRACT_VERSION, createdAt: nowMs, updatedAt: nowMs, revision: 1 }, found);
+}
+/* 일을 «동시에 몇 개씩» 하되 시간 상자(deadline) 안에서만 — 서버가 끊기기 전에 멈춘다 */
+async function rehabPool(list, limit, deadline, worker) {
+  let i = 0;
+  const loop = async () => {
+    while (i < list.length && Date.now() < deadline) {
+      const it = list[i++];
+      try { await worker(it); } catch (e) { console.warn("[회생광고 연락처]", String((e && e.message) || e).slice(0, 120)); }
+    }
+  };
+  await Promise.all(Array.from({ length: limit }, loop));
+}
+
 exports.rehabWatch = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .runWith({ timeoutSeconds: 540, memory: "512MB", secrets: ["KAKAO_REST_KEY"] })
   .pubsub.schedule("every day 07:40")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
+    const t0 = Date.now();
     const root = getDatabase().ref("rehab_ad");
     const existing = (await root.child("notices").once("value")).val() || {};
     const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
     const today = new Date(nowMs + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
-    const since = new Date(nowMs + 9 * 3600e3 - 10 * 864e5).toISOString().slice(0, 10);
+    const first = !(await root.child("runs").limitToFirst(1).once("value")).exists();
+    const since = new Date(nowMs + 9 * 3600e3 - (first ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면 한 달 치
     const post = async (u, body) => {
       const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
         headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
@@ -1205,9 +1239,73 @@ exports.rehabWatch = functions
       wait: () => new Promise((ok) => setTimeout(ok, 800)) });
     /* 온톨로지 판 표시 — 서버는 관리자 SDK 라 규칙을 건너뛰므로 레코드 모양을 여기서 갖춘다 */
     result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
-    await root.update(RehabWatch.updatesOf(result, today, nowIso));
-    console.log("[회생광고 수집]", { checked: result.checked, found: result.found, added: result.added.length, errors: result.errors });
+    const upd = RehabWatch.updatesOf(result, today, nowIso, nowMs);
+
+    /* ── 연락처 찾기 — 아직 안 찾은 곳(또는 «못 찾음»이 이레 지난 곳)을 최신 공고부터, 시간 상자 안에서 ── */
+    const providers = rehabProviders();
+    let found = 0, refused = 0, tried = 0;
+    if (providers) {
+      const info = (await root.child("info").once("value")).val() || {};
+      const week = 7 * 864e5;
+      const all = Object.keys(existing).map((k) => existing[k]).concat(result.added).filter((n) => n && n.id && !n._deleted);
+      const todo = all.filter((n) => { const x = info[n.id]; return !x || (x.status === "none" && nowMs - (x.checkedAt || 0) > week); })
+        .sort((a, b) => String(b.noticeDate).localeCompare(String(a.noticeDate)));
+      await rehabPool(todo, 3, t0 + 470 * 1000, async (n) => {
+        if (refused >= 3 && !found) return;   // 검색 서비스가 계속 거절하면 그만 둔다
+        tried++;
+        const r = await rehabFindContact(n, {}, providers);
+        if (rehabSearchRefused(r)) { refused++; return; }
+        if (r.status !== "none" || r.note) found += r.status === "found" ? 1 : 0;
+        upd["info/" + n.id] = rehabInfoRecord(n, r, Date.now());
+      });
+      upd["runs/" + today].contact = { tried, found, refused, left: Math.max(0, todo.length - tried) };
+      if (refused >= 3 && !found) upd["runs/" + today].contactNote = "검색 서비스(카카오)가 거절했습니다 — 앱의 카카오맵 사용 설정을 확인하세요";
+    } else {
+      upd["runs/" + today].contactNote = "검색 열쇠(KAKAO_REST_KEY)가 서버에 없어 연락처를 찾지 않았습니다";
+    }
+    await root.update(upd);
+    console.log("[회생광고 수집]", { checked: result.checked, found: result.found, added: result.added.length,
+      updated: Object.keys(result.eventUpdates).length, contact: upd["runs/" + today].contact, errors: result.errors });
     return null;
+  });
+
+/* 회생광고 연락처 «지금 찾기» — 대표가 화면에서 누를 때(한 곳 또는 몇 곳). 사람이 알려 준 홈페이지(hints)가 있으면 그것을 읽는다.
+   ⚠ 관리자만. 한 번에 8곳까지. 찾은 것은 rehab_ad/info 에 남기고 화면이 다시 읽는다. */
+exports.rehabEnrich = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["KAKAO_REST_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setAutomationCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(m[1], true);
+      const role = (await getDatabase().ref("uid_roles/" + decoded.uid).once("value")).val() || {};
+      if (role.isAdmin !== true) { res.status(403).json({ error: "총괄관리자만 부를 수 있습니다." }); return; }
+      const ids = ((req.body && req.body.ids) || []).map((x) => String(x)).filter((x) => /^c\d{6}_\d+$/.test(x)).slice(0, 8);
+      const hints = (req.body && req.body.hints) || {};
+      if (!ids.length) { res.status(400).json({ error: "찾을 회사가 없습니다." }); return; }
+      const root = getDatabase().ref("rehab_ad");
+      const providers = rehabProviders();
+      const out = [], upd = {};
+      const t0 = Date.now();
+      const notices = {};
+      await Promise.all(ids.map(async (id) => { notices[id] = (await root.child("notices/" + id).once("value")).val(); }));
+      await rehabPool(ids.filter((id) => notices[id]), 3, t0 + 250 * 1000, async (id) => {
+        const hint = hints[id] && typeof hints[id].homepage === "string" ? { homepage: hints[id].homepage.slice(0, 300) } : {};
+        const r = await rehabFindContact(notices[id], hint, providers);
+        const refusedNow = rehabSearchRefused(r);
+        if (!refusedNow) upd["info/" + id] = rehabInfoRecord(notices[id], r, Date.now());
+        out.push({ id, status: r.status, homepage: r.homepage, phone: r.phone, fax: r.fax, email: r.email, note: r.note, refused: refusedNow });
+      });
+      if (Object.keys(upd).length) await root.update(upd);
+      res.json({ ok: true, providers: providers ? providers.name : "없음", results: out });
+    } catch (err) {
+      console.error("[rehabEnrich]", err);
+      res.status(500).json({ error: String((err && err.message) || "찾지 못했습니다.").slice(0, 160) });
+    }
   });
 
 /* 월요일 거래처 뉴스레터 — 화면에서 «확정본 준비»를 한 경우에만 예약 대기열에 건다.

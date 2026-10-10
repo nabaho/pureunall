@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <script>
+/* 로그인 진단은 HTML 파싱이 시작되기 전의 탐색 시각부터 잰다. 사람·토큰은 기록하지 않는다. */
+window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeOrigin)
+  ? Math.round(performance.timeOrigin) : Date.now();
 /* ── 폰에서 「PC 화면」 설정을 따른다 (단추는 없앴다) ──
    대표 지시 2026-08-30: 「상단 박스 피시화면 셀 없애라」.
    머리줄에 단추가 다섯이나 붙어 폰에서 두 줄로 접혔다 — 하루에 한 번도 안 누르는
@@ -1292,6 +1295,15 @@ body.portal-mode #moreFab{display:flex;}
         <button type="button" id="cfgKakao">열어보기</button>
       </div>
 
+      <div class="cfg-tool">
+        <div>
+          <b>휴대폰 로그인 속도</b>
+          <span>이 기기의 마지막 로그인 단계별 시간만 봅니다. 계정·토큰은 저장하지 않습니다.</span>
+        </div>
+        <button type="button" id="cfgLoginTiming" aria-controls="cfgLoginTimingResult">시간 보기</button>
+      </div>
+      <div class="cfg-note" id="cfgLoginTimingResult" role="status" style="white-space:pre-line" hidden></div>
+
       <!-- 📲 이 기기에 앱으로 깔기 (대표 결정 2026-09-23 ③안) — 폰에서, 아직 안 깔았을 때만 보인다.
            저장하는 값이 아니라 «이 기기»에서 하는 일이다. 직원은 폰 ⋯ 안에서 깐다. -->
       <div class="cfg-tool" id="cfgAppInstallRow" hidden>
@@ -1771,18 +1783,11 @@ body.portal-mode #moreFab{display:flex;}
     el.style.color = cb.checked ? '#64748b' : '#854d0e';   // 팔레트 «주의» 글자색
   }
 
-  // 브라우저를 다시 열었을 때도 저장된 Firebase 세션을 LOCAL 방식으로 복원한다.
-  // 다른 통합 앱이 같은 인증 저장소를 사용하므로, 인증 상태를 관찰하기 전에 먼저 맞춘다.
-  var _persistenceReady = Promise.resolve();
-  var _persistenceBootError = null;
-  try {
-    if(localStorage.getItem('pu_portal_auto') === '1'){
-      _persistenceReady = auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(function(err){
-        _persistenceBootError = err;
-        console.warn('자동로그인 저장소를 복원하지 못했습니다.', err);
-      });
-    }
-  } catch(_persistBootErr){}
+  // Firebase가 이미 저장한 세션을 그대로 복원한다. 매 부팅마다 LOCAL로 다시
+  // 옮기면 휴대전화 IndexedDB 작업이 인증 관찰까지 수십 초 막을 수 있다.
+  function puLoginTimingSave(value){
+    try { localStorage.setItem('pu_login_' + value.mode + '_timing', JSON.stringify(value)); } catch(_e){}
+  }
 
   // ── 비번 표시 토글 ──
   $('eyeBtn').addEventListener('click', function(){
@@ -1915,8 +1920,7 @@ body.portal-mode #moreFab{display:flex;}
     window.addEventListener('pageshow', function(e){ if(e && e.persisted && !document.hidden) show(); });
     return { shown: shown, userSeen: userSeen, cover: cover, _hide: hide, _show: show };
   })();
-  _persistenceReady.then(function(){
-    auth.onAuthStateChanged(function(user){
+  auth.onAuthStateChanged(function(user){
       if(user && user.email){
         if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
         if(_handled && _portalUid && user.uid !== _portalUid){
@@ -1963,11 +1967,7 @@ body.portal-mode #moreFab{display:flex;}
         try { var _lw=$('logoutWhy'), _lt=window.PuLogoutWhy?PuLogoutWhy.text():''; if(_lw&&_lt){ _lw.textContent=_lt; _lw.style.display=''; } } catch(_w){}
         // 카카오를 쓰는 기기면 로그인 서버를 미리 깨워 둔다 — 노란 단추를 누르기 전부터 (2026-09-29)
         try { if(!window.__kkReturning && localStorage.getItem('pu_kakao_used') === '1' && window.PuKakao && PuKakao.warm) PuKakao.warm(); } catch(_w){}
-        if(_persistenceBootError){
-          showErr('자동로그인 저장소를 열 수 없습니다. 삼성 인터넷 또는 Chrome에서 다시 로그인해 주세요.');
-        }
       }
-    });
   });
 
   // ── 로그인 실행 ──
@@ -1996,7 +1996,13 @@ body.portal-mode #moreFab{display:flex;}
        ⚠ 여기서 고른 값을 «기록만» 해 둔다: 화면이 카카오로 떠났다 돌아오면 새 페이지라, 여기서 정한
          유지 방식은 사라진다. 실제로 정하는 곳은 돌아온 뒤 표를 받기 직전(kkHandleReturn)이다. */
     var keep = !!($('autoLogin') && $('autoLogin').checked);
-    try { localStorage.setItem('pu_portal_auto', keep ? '1' : '0'); } catch(e){}
+    try {
+      // 이전에 SESSION을 골랐다가 유지로 바꾼 경우에만 복귀 뒤 LOCAL 전환이 필요하다.
+      if(keep && localStorage.getItem('pu_portal_auto') === '0')
+        sessionStorage.setItem('pu_kakao_force_local', '1');
+      if(!keep) sessionStorage.removeItem('pu_kakao_force_local');
+      localStorage.setItem('pu_portal_auto', keep ? '1' : '0');
+    } catch(e){}
     /* 카카오로 떠나기 전에는 Firebase 인증 저장소를 바꿀 필요가 없다.
        특히 휴대전화 IndexedDB 가 느리면 노란 단추가 여기서 멈춘 듯 보였다.
        유지 방식은 복귀 뒤 인증표로 실제 로그인하기 직전에 적용한다. */
@@ -2024,14 +2030,27 @@ body.portal-mode #moreFab{display:flex;}
       /* 서버가 표를 만드는 «동안» 이 화면의 DB 연결을 먼저 연다 — 들어가자마자 명부를 읽는다 (2026-09-29) */
       try { db.ref('.info/connected').once('value'); } catch(_c){}
       /* 카카오 인증표와 저장 방식은 동시에 준비하되 둘 다 «실제로 끝난 뒤» 로그인한다.
-         Firebase는 저장 방식 변경을 2초만 기다리는 척해도 signIn에서 다시 기다린다.
-         로그인 유지 켠 경우에는 부팅 때 이미 시작한 LOCAL 작업을 재사용한다. */
+         Firebase 기본 저장 방식은 LOCAL이다. 같은 선택을 매 복귀마다 다시 적용하면
+         모바일 IndexedDB가 수십 초 막히므로 SESSION→LOCAL 전환 때만 옮긴다. */
       var keep = false;
       try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
       var kkStarted = Date.now(), kkServerMs = 0, kkStoreMs = 0, kkProfile = null;
-      var persist = _persistenceReady.then(function(){
-        if(_persistenceBootError) throw _persistenceBootError;
-        if(!keep) return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
+      var kkFirebaseStarted = 0, kkFirebaseMs = 0;
+      var persist = Promise.resolve().then(function(){
+        if(!keep) return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function(){
+          try { localStorage.setItem('pu_portal_persistence_applied', 'session'); } catch(_e){}
+        });
+        var forceLocal = false;
+        try {
+          forceLocal = sessionStorage.getItem('pu_kakao_force_local') === '1' ||
+            localStorage.getItem('pu_portal_persistence_applied') === 'session';
+        } catch(_e){}
+        if(forceLocal) return auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).then(function(){
+          try {
+            localStorage.setItem('pu_portal_persistence_applied', 'local');
+            sessionStorage.removeItem('pu_kakao_force_local');
+          } catch(_e){}
+        });
       }).then(function(){ kkStoreMs = Date.now() - kkStarted; }).catch(function(err){
         if(err && typeof err === 'object') err.puPersistence = true;
         throw err;
@@ -2042,8 +2061,10 @@ body.portal-mode #moreFab{display:flex;}
         return result && result.token ? result.token : result;
       });
       Promise.all([server, persist]).then(function(ready){
+        kkFirebaseStarted = Date.now();
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
+        kkFirebaseMs = Date.now() - kkFirebaseStarted;
         /* 공개 명부도 LOGIN 권한이 필요하다. 로그인 전 미리 읽으면 권한 거부를
            «명부 없음»으로 삼아 관리자 전용 명부까지 다시 읽느라 수 초를 낭비했다. */
         if(!kkProfile){
@@ -2053,7 +2074,11 @@ body.portal-mode #moreFab{display:flex;}
           } catch(_r){ window.__puRosterPrefetch = null; }
         }
         // 개인 식별값 없이 이 탭에만 단계별 소요를 남겨 다음 지연 제보를 구별한다.
-        try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({at:kkStarted, serverMs:kkServerMs, storeMs:kkStoreMs, totalMs:Date.now()-kkStarted})); } catch(_t){}
+        try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({
+          at:kkStarted, serverMs:kkServerMs, storeMs:kkStoreMs,
+          callbackBootMs:Math.max(0, kkStarted - (window.__puLoginNavAt || kkStarted)),
+          firebaseMs:kkFirebaseMs, totalMs:Date.now()-kkStarted
+        })); } catch(_t){}
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
         /* signIn 성공 결과를 이미 받았다. 인증 상태 알림이 한 번 더 올 때까지 기다리지 않고
@@ -2328,9 +2353,7 @@ body.portal-mode #moreFab{display:flex;}
       setTimeout(function(){ if(_settled) return; location.replace(location.pathname + '?v=' + Date.now()); }, 900);
     }, 12000);
 
-    _persistenceReady.then(function(){
-      return auth.setPersistence(persistence);
-    }).catch(function(err){
+    auth.setPersistence(persistence).catch(function(err){
       // 자동로그인이 저장되지 않았는데 성공한 것처럼 로그인시키지 않는다.
       if(err && typeof err === 'object') err.puPersistence = true;
       throw err;
@@ -2358,6 +2381,7 @@ body.portal-mode #moreFab{display:flex;}
         }
         // 자동 로그인 체크 상태 저장 (포털 전용)
         localStorage.setItem('pu_portal_auto', wantsAutoLogin ? '1' : '0');
+        localStorage.setItem('pu_portal_persistence_applied', wantsAutoLogin ? 'local' : 'session');
         if(wantsAutoLogin) localStorage.setItem('pureun_v6_auto_flag','1');
         else localStorage.removeItem('pureun_v6_auto_flag');
       } catch(e){}
@@ -2544,6 +2568,7 @@ body.portal-mode #moreFab{display:flex;}
   // ── 포털 진입: 로그인된 사용자의 계정 정보 조회 후 타일 렌더 ──
   function enterPortal(user, verifiedProfile){
     if(_returnToApp(user)) return;     // 로그아웃으로 밀려났던 앱 탭 — 하던 앱으로 돌아간다
+    var portalEntryAt = Date.now();
     _portalUid = user.uid || '';
     _portalReady = false;
     // 데이터가 준비될 때까지 화면은 민무늬 배경만 (빈 껍데기 헤더 번쩍임 방지)
@@ -2568,9 +2593,18 @@ body.portal-mode #moreFab{display:flex;}
           var tapAt = Number(sessionStorage.getItem('pu_kakao_login_tap_at') || 0);
           if(tapAt && Date.now() - tapAt < 600000) timing.fromTapMs = Date.now() - tapAt;
           sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify(timing));
+          puLoginTimingSave({mode:'kakao', savedAt:Date.now(), callbackBootMs:timing.callbackBootMs,
+            serverMs:timing.serverMs, storeMs:timing.storeMs, firebaseMs:timing.firebaseMs,
+            portalMs:Math.max(0, timing.portalMs - timing.totalMs), callbackToPortalMs:timing.portalMs,
+            fromTapMs:timing.fromTapMs});
           sessionStorage.removeItem('pu_kakao_login_tap_at');
         }
       } catch(_t){}
+      if(_via === 'auto'){
+        var navAt = window.__puLoginNavAt || portalEntryAt;
+        puLoginTimingSave({mode:'session', savedAt:Date.now(), authRestoreMs:Math.max(0, portalEntryAt-navAt),
+          profileAndTilesMs:Date.now()-portalEntryAt, totalMs:Date.now()-navAt});
+      }
       _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
     }
     /* 이 정보는 카카오 인가코드·재직 확인을 마친 서버가 같은 응답으로 보낸 것만 쓴다.
@@ -5234,6 +5268,33 @@ body.portal-mode #moreFab{display:flex;}
   if($('kkAdminClose')) $('kkAdminClose').addEventListener('click', function(){ $('kkAdminModal').style.display = 'none'; });
   var _cfgKakao = $('cfgKakao');
   if(_cfgKakao) _cfgKakao.addEventListener('click', kkOpenAdmin);
+  var _cfgLoginTiming = $('cfgLoginTiming');
+  if(_cfgLoginTiming) _cfgLoginTiming.addEventListener('click', function(){
+    if(!sgIsAdmin()) return;
+    var box = $('cfgLoginTimingResult'), lines = [];
+    function ms(v){ return Number.isFinite(Number(v)) && Number(v) >= 0 ? (Math.round(Number(v)) + 'ms') : '기록 없음'; }
+    function read(mode){
+      try { return JSON.parse(localStorage.getItem('pu_login_' + mode + '_timing') || 'null'); }
+      catch(_e){ return null; }
+    }
+    var k = read('kakao'), s = read('session');
+    if(k){
+      lines.push('카카오 로그인 · ' + new Date(k.savedAt).toLocaleString('ko-KR'));
+      lines.push('버튼→포털 ' + ms(k.fromTapMs) + ' (카카오 화면에서 보낸 시간 포함)');
+      lines.push('복귀 화면 준비 ' + ms(k.callbackBootMs) + ' · 서버 ' + ms(k.serverMs)
+        + ' · 저장소 ' + ms(k.storeMs) + ' (서버와 병렬)');
+      lines.push('Firebase 로그인 ' + ms(k.firebaseMs) + ' · 타일 표시 ' + ms(k.portalMs));
+      lines.push('카카오 복귀→포털 ' + ms(k.callbackToPortalMs));
+    }
+    if(s){
+      if(lines.length) lines.push('');
+      lines.push('저장된 로그인 재방문 · ' + new Date(s.savedAt).toLocaleString('ko-KR'));
+      lines.push('인증 복원 ' + ms(s.authRestoreMs) + ' · 본인 정보·타일 ' + ms(s.profileAndTilesMs));
+      lines.push('화면 열기→포털 ' + ms(s.totalMs));
+    }
+    box.textContent = lines.length ? lines.join('\n') : '이 기기의 로그인 기록이 아직 없습니다. 한 번 로그인한 뒤 다시 확인해 주세요.';
+    box.hidden = false;
+  });
   // 이름·아바타를 누르면 「내 정보」 — 로그인 뒤에만 뜻이 있으므로 포털 안에서만 있는 요소지만
   // 로그인 전에도 눌릴 수는 있어 kkOpenProfile 이 스스로 uid 없음을 가려낸다.
   if($('userAvatar')) $('userAvatar').addEventListener('click', kkOpenProfile);

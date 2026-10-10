@@ -1363,7 +1363,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=59"></script>
+<script src="js/pu-ontology.js?v=60"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -1374,7 +1374,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=7"></script>
+<script src="js/kcareer-biz.js?v=8"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=4"></script>
@@ -2039,6 +2039,14 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <section class="page-view" id="page-bizdash"><div class="page">
         <div class="page-head"><div class="page-title">🏢 사업관리 — 한눈에</div><div class="page-desc">법인으로 낸 입찰·용역·수행기관·공모 사업 · 개인 지원(컨설턴트·위원·강사 모집)은 이력서관리·제출서류</div></div>
         <div id="bizDash"></div>
+      </div></section>
+      <section class="page-view" id="page-bizperf"><div class="page">
+        <div class="page-head"><div class="page-title">🏆 수행 실적</div><div class="page-desc">이알피에서 온 수행 실적 — 사업별·담당자별·연도별로 몇 건, 얼마나 했는지 (금액은 부가세 뺀 공급가액)</div></div>
+        <div id="bizPerf"></div>
+      </div></section>
+      <section class="page-view" id="page-bizmail"><div class="page">
+        <div class="page-head"><div class="page-title">📮 결과보고서 메일</div><div class="page-desc">푸른메일함에서 찾은 결과·완료·최종 보고 메일 — 실적에 있는지, 담당자는 누구인지</div></div>
+        <div id="bizMail"></div>
       </div></section>
       <section class="page-view" id="page-bizlist"><div class="page">
         <div class="page-head"><div class="page-title">📋 사업 목록</div><div class="page-desc">줄을 누르면 그 사업에 냈던 서류가 갈래별로 — 공고문·제안서·입찰서식·가격·증빙·결과</div></div>
@@ -6071,7 +6079,7 @@ let NAV=[
      ⚠ 빠른 이력서를 «지우지는» 않는다. 순서만 바꾼다. */
   {g:'이력서관리', items:[['page-resume-hub','✍️ 서류 만들기'],['page-docbox','📁 서류 보관함'],['page-profile1','👤 프로필 1장']]},
   /* ★ 사업관리 — 이력서관리 «아래» (대표 지시 2026-10-05). 개인 지원과 갈라 법인 사업(입찰·용역·공모)을 따로 */
-  {g:'사업관리', items:[['page-bizdash','📊 한눈에'],['page-bizlist','📋 사업 목록'],['page-bizdocs','🗂 서류 찾기']]},
+  {g:'사업관리', items:[['page-bizdash','📊 한눈에'],['page-bizperf','🏆 수행 실적'],['page-bizmail','📮 결과보고서 메일'],['page-bizlist','📋 사업 목록'],['page-bizdocs','🗂 서류 찾기']]},
   /* 회의비용·기타비용을 한 화면으로 합쳤다(2026-08-29) — 「구분」이 이미 가른다.
      ⚠ 기록은 옮기지 않았다. page-etcfee 는 남겨 두어 옛 기록을 그 화면으로 고칠 수 있다. */
   /* ★ 한눈에 · 정산 (대표 지시 2026-10-03 「회의비용관리도 대시보드 탭 메인등을 만들어라」 → 목업 A+C 승인).
@@ -6247,7 +6255,7 @@ function navCount(id){
     var page=String(id||'').replace(/^page-/,'');
     /* 사업관리 — 숫자는 «사업 목록» 한 줄에만(한눈에·서류 찾기는 같은 사업을 다시 세는 것이라 안 단다) */
     if(page==='bizlist') return (typeof bizAll==='function') ? bizAll().length : null;
-    if(page==='bizdash' || page==='bizdocs') return null;
+    if(page==='bizdash' || page==='bizdocs' || page==='bizperf' || page==='bizmail') return null;
     /* 외부기관 실적은 담긴 통이 없다 — 실적 넷에서 «수행기관이 적힌» 것을 모은 화면이다 */
     if(page==='puagency'){
       if(typeof PU_SYNC_STORES==='undefined' || typeof _isExternal!=='function') return null;
@@ -6455,7 +6463,7 @@ function nav_to(id,label,grp){
   /* 비용 서류는 보관함의 한 탭이다 — 들어온 문에 맞는 탭만 보인다(CSS data-nav-as) */
   if(real==='page-docbox') _safe(function(){ dbTab(id==='page-feebox'?'feedoc':(_dbDomain==='feedoc'?'resume':_dbDomain)); });
   if(id==='page-feedash') _safe(renderFeeDash);
-  if(id==='page-bizdash') _safe(renderBizDash);
+  if(id==='page-bizdash' || id==='page-bizperf' || id==='page-bizmail') _safe(renderBizDash);
   if(id==='page-profile1') _safe(renderProfile1);
   if(id==='page-bizlist') _safe(renderBizList);
   if(id==='page-bizdocs') _safe(renderBizDocs);
@@ -6584,7 +6592,7 @@ function renderHomeTiles(){ const box=document.getElementById('homeTiles'); if(!
       if(id==='page-docbox') cnt=_g('resume')+_g('profile')+_g('certdoc');
       else if(id==='page-feebox') cnt=_g('feedoc');
       else if(id==='page-bizlist') cnt=_g('bizapp');
-      else if(id==='page-bizdash' || id==='page-bizdocs') cnt=null;
+      else if(id==='page-bizdash' || id==='page-bizdocs' || id==='page-bizperf' || id==='page-bizmail') cnt=null;
       /* ⚠ 옆줄 숫자와 «같은 셈»(navCount) — 통 이름으로만 세면 표창(위촉장 통을 거름)·자격증·수료(cert 통을 가름)가
            0 이나 다른 수로 나왔다(2026-10-07 검토). 셀 수 없는 화면만 옛 셈으로 */
       else if(!(id in NAV_ALIAS) && id!=='page-resume-hub'){ const nc=(typeof navCount==='function')?navCount(id):null; cnt=(nc!=null)?nc:_g(id.slice(5)); }
@@ -15605,7 +15613,8 @@ function renderBizDash(){
       +'<div style="margin-top:12px;display:flex;gap:8px;justify-content:center;flex-wrap:wrap">'
       +'<button class="btn" type="button" onclick="navTile(\'page-bizlist\');bizPickCase()">📂 7번 폴더에서 사업 고르기</button>'
       +'<button class="btn primary" type="button" onclick="bizOpen()">＋ 사업 추가</button></div></div>'
-      +_bizPerfHtml()+_bizMailHtml();
+      +_bizPerfSummary();
+    _safe(renderBizPerf); _safe(renderBizMail);
     return;
   }
   var 진행=Object.keys(s.openBy).map(function(k){ return k+' '+s.openBy[k]; }).join(' · ')||'없음';
@@ -15631,15 +15640,16 @@ function renderBizDash(){
       return '<div class="fd-bar" onclick="bizGo({year:\''+y+'\'})"><span class="k">'+y+'</span><span class="t"><i style="width:'+Math.round(b.n*100/mx)+'%"></i></span><span class="a">'+b.n+'건 · 선정 '+b.win+'</span></div>'; }).join('')+'</div></div>';
   html+='<div class="fd-box"><h4>구분별</h4>'+KcareerBiz.KINDS.map(function(k){
       return '<button class="btn sm" type="button" style="margin:0 6px 4px 0" onclick="bizGo({kind:\''+_jsAttr(k)+'\'})">'+escapeHtml(k)+' '+(s.byKind[k]||0)+'</button>'; }).join('')+'</div>';
-  html+=_bizPerfHtml()+_bizMailHtml();
+  html+=_bizPerfSummary();
   box.innerHTML=html;
+  _safe(renderBizPerf); _safe(renderBizMail);
 }
 /* ── 📊 사업별 수행 건수 (대표 지시 2026-10-09 「어떤사업을 몇건 얼마나 했는지 모두 잘 정리」) ──
    바탕은 컨설팅 실적(consult = 컨설팅실적 + 외부기관 실적, 이알피에서 온다). 셈은 KcareerBiz.perfTable 한 곳.
    ⚠ 사업 이름은 글자 그대로 — 비슷해 보여도 합치지 않는다(대표 결정). 연도는 최근 6해 + 그 앞은 「이전」. */
 var _bizPerfOpen='';
 function _bizPerfHtml(){
-  var t=KcareerBiz.perfTable(get('consult')||[]);
+  var t=KcareerBiz.perfTable(_bizPerfRecs());
   if(!t.total) return '<div class="fd-box"><h4>📊 사업별 수행 건수</h4><div style="font-size:12px;color:var(--text-mute)">컨설팅 실적이 아직 없습니다 — 이알피에서 받아 오면 여기 사업별로 셉니다</div></div>';
   var ys=t.years.slice(-6), 앞=t.years.slice(0, Math.max(0, t.years.length-6));
   var 금액=t.amt>0, mx=t.rows[0].total||1, Y=String(new Date().getFullYear());
@@ -15665,7 +15675,7 @@ function _bizPerfHtml(){
       +(금액?'<td style="text-align:right;white-space:nowrap">'+(g.amt?g.amt.toLocaleString('ko-KR'):'·')+'</td>':'')
       +'<td style="white-space:nowrap">'+KcareerBiz.topCounts(g.main,3).map(function(m){ return '<span class="tag" style="margin-right:3px">'+escapeHtml(m[0])+' '+m[1]+'</span>'; }).join('')+'</td></tr>';
     if(열림){
-      var 줄=(get('consult')||[]).filter(function(r){ return r && !r.excluded && (String(r.type||'').trim()||'(유형 없음)')===g.type; })
+      var 줄=_bizPerfRecs().filter(function(r){ return (String(r.type||'').trim()||'(유형 없음)')===g.type; })
         .sort(function(a,b){ return String(KcareerBiz.perfYear(b)).localeCompare(String(KcareerBiz.perfYear(a))) || String(a.org||'').localeCompare(String(b.org||'')); });
       h+='<tr><td></td><td colspan="'+(5+ys.length+(앞.length?1:0)+(금액?1:0))+'" style="padding:4px 0 10px">'
         +줄.map(function(r){ return '<div style="display:flex;gap:10px;font-size:11.5px;padding:2px 0;white-space:nowrap">'
@@ -15679,13 +15689,13 @@ function _bizPerfHtml(){
     +'</div>';
   return h;
 }
-function bizPerfToggle(type){ _bizPerfOpen=(_bizPerfOpen===type)?'':type; renderBizDash(); }
+function bizPerfToggle(type){ _bizPerfOpen=(_bizPerfOpen===type)?'':type; renderBizPerf(); }
 
 /* ── 📮 메일로 찾은 결과보고서 (대표 지시 2026-10-09) ──
    푸른메일함 거울(mailbox/msgs 의 칸들 + 지난 메일 mailbox/old/msgs)의 «목록»만 읽는다 — 메일함은 안 연다.
    ⚠ 무겁다(목록만 십수 MB) — «누를 때만» 읽고, 찾은 것만 이 기기에 적어 둔다(biz_mailrep, FB_SKIP).
    ⚠ 「실적에 같은 이름」은 후보다 — 실적과 저절로 묶지 않는다. 「실적으로」는 입력 창을 채워 열기만. */
-var BIZ_MAILREP='biz_mailrep', _bizMailBusy=false, _bizMailOnlyNew=false, _bizMailMore=false;
+var BIZ_MAILREP='biz_mailrep', _bizMailBusy=false;
 /* ★ 읽은 담당자는 «작게» 따로 적어 클라우드로도 보낸다 (대표 지시 2026-10-10 「3」 — 다른 PC 에서 다시 읽지 않게).
    biz_mailrep(찾은 메일 목록)은 커서 기기마다 두지만, 담당자 결과(메일 칸|번호 → 이름 후보)는 몇십 KB 라 오간다.
    ⚠ 못 연 것(err)은 적지 않는다 — 다른 기기에서 다시 해 볼 수 있게. */
@@ -15734,27 +15744,110 @@ function _bizOwnerChip(x, i){
   return '<span class="tag navy" style="font-size:10.5px" title="'+escapeHtml(o.src+(첫.ctx?'\n「'+첫.ctx+'」':'')+(o.names.length>1?'\n다른 후보: '+o.names.slice(1).map(function(h){ return h.name; }).join(', '):''))+'">👤 '+escapeHtml(첫.name)+(첫.near?'':'?')+'</span>'
     +(다름?'<span class="tag" style="font-size:10.5px;color:var(--amber);border:1px solid var(--amber);background:transparent;padding:0 5px" title="실적 기록의 담당은 '+escapeHtml(실)+' — 고치려면 푸른이알피에서">≠</span>':'');
 }
-function bizMailOnlyNew(on){ _bizMailOnlyNew=!!on; _bizMailMore=false; renderBizDash(); }
-function bizMailShowMore(){ _bizMailMore=true; renderBizDash(); }
-function _bizMailHtml(){
-  var c=_bizMailCache();
-  var h='<div class="fd-box"><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📮 메일로 찾은 결과보고서'
-    +(c?'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">'+c.list.length+'건 · 실적에 같은 이름 '+c.list.filter(function(x){ return x.match; }).length
-      +' · 메일 '+Number(c.scanned||0).toLocaleString('ko-KR')+'통 중 · '+new Date(c.at).toLocaleString('ko-KR')+'</span>':'')
-    +'<span style="flex:1"></span>'
-    +(c?'<label style="font-size:11.5px;font-weight:400;display:inline-flex;gap:4px;align-items:center"><input type="checkbox"'+(_bizMailOnlyNew?' checked':'')+' onchange="bizMailOnlyNew(this.checked)">실적에 없어 보이는 것만</label>':'')
-    +(c&&(_bizOwnBusy||_bizOwnLeft(c))?'<button class="btn sm'+(_bizOwnBusy?'':' primary')+'" type="button" onclick="bizMailOwnerBatch(\'all\')" title="결과보고서 메일을 한 통씩 열어 담당자 이름을 찾습니다 — 지난 메일은 한 통에 20초쯤, 창을 열어 두세요">'
-      +(_bizOwnBusy?('⏹ 멈추기'+(_bizOwnProg?' ('+_bizOwnProg+')':'')):('👤 남은 '+_bizOwnLeft(c)+'건 모두 읽기'))+'</button>':'')
-    +'<button class="btn sm'+(c?'':' primary')+'" type="button" onclick="bizMailScan()"'+(_bizMailBusy?' disabled':'')+'>'+(_bizMailBusy?'⏳ 메일 읽는 중…':(c?'🔄 다시 찾기':'📮 메일에서 찾기'))+'</button></h4>';
-  if(!c){
-    return h+'<div style="font-size:12px;color:var(--text-mute);line-height:1.6">푸른메일함의 목록(제목·첨부 이름)에서 「결과·완료·최종 보고」가 든 메일을 모읍니다 — 메일함을 새로 열지 않습니다.<br>'
-      +'목록이 커서 한 번 읽는 데 몇 초 걸립니다. 찾은 것만 이 기기에 적어 둡니다.</div></div>';
-  }
-  var 줄=c.list.filter(function(x){ return !_bizMailOnlyNew || !x.match; });
-  var 보일=_bizMailMore?줄:줄.slice(0,30);
-  h+='<div class="bz-mr bz-h"><span>날짜</span><span>제목</span><span>사업</span><span>담당(후보)</span><span>실적</span><span></span></div>';
-  h+=보일.map(function(x){
-    var i=c.list.indexOf(x), d=x.d?new Date(x.d):null;
+/* ═══ 🏢 사업관리 탭 나누기 (대표 지시 2026-10-10 「사업관리 내 탭으로 정리해서 구분해서 볼 수 있게」 → 목업 승인) ═══
+   한눈에 한 장에 «법인이 낸 입찰·신청 사업(bizapp 18건)»과 «이알피에서 온 수행 실적(consult 189건)»이 섞여
+   「수행기관 0」(위)과 표의 「수행기관」 열(아래)처럼 이름만 같고 뜻이 다른 것이 한 화면에 나왔다.
+   → 한눈에(신청) · 🏆 수행 실적 · 📮 결과보고서 메일 · 사업 목록 · 서류 찾기 — 다섯 탭(NAV 의 사업관리 묶음).
+   ⚠ renderBizDash 한 곳이 «세 칸(한눈에·수행 실적·결과보고서 메일)을 모두» 다시 그린다 — 기록을 고치고 부르는 자리가 열 곳이 넘어
+     한 곳만 고치면 어긋난다. 화면 안에서 필터를 바꿀 때만 각 칸을 따로 그린다. */
+var _bizPerfMode='project', _bizPerfYear='', _bizPerfQ='';
+function _bizPerfRecs(){
+  var q=String(_bizPerfQ||'').trim().toLowerCase();
+  return (get('consult')||[]).filter(function(r){
+    if(!r || r.excluded) return false;
+    if(_bizPerfYear){ var y=KcareerBiz.perfYear(r); if(_bizPerfYear==='모름' ? !!y : y!==_bizPerfYear) return false; }
+    if(q && ![r.org,r.project,r.type,r.agency,r.main].some(function(x){ return String(x||'').toLowerCase().indexOf(q)>=0; })) return false;
+    return true;
+  });
+}
+/* 한눈에 안의 «수행 실적 요약» — 자세한 것은 🏆 탭으로 */
+function _bizPerfSummary(){
+  var t=KcareerBiz.perfTable(get('consult')||[]), Y=String(new Date().getFullYear());
+  return '<div class="fd-box" style="background:#f0fdf4;border-color:#bbf7d0"><h4 style="margin:0 0 6px">🏆 수행 실적 요약</h4>'
+    +(t.total?'<div style="font-size:12.5px">전체 <b>'+t.total+'건</b> · '+t.rows.length+'개 사업'+(t.byYear[Y]?' · 올해 <b>'+t.byYear[Y]+'건</b>':'')
+      +(t.amt>0?' · 금액 합계(공급가액) <b>'+t.amt.toLocaleString('ko-KR')+'원</b>':'')+(t.unknown?' · 연도 모름 '+t.unknown+'건':'')
+      :'<div style="font-size:12.5px;color:var(--text-mute)">컨설팅 실적이 아직 없습니다 — 이알피에서 받아 오면 여기 사업별로 셉니다')
+    +' &nbsp; <button class="btn sm" type="button" onclick="navTile(\'page-bizperf\')">🏆 자세히 보기 →</button></div></div>';
+}
+function bizPerfMode(m){ _bizPerfMode=m; renderBizPerf(); }
+function bizPerfYear(y){ _bizPerfYear=String(y||''); renderBizPerf(); }
+function bizPerfQ(v){ _bizPerfQ=String(v||''); var b=document.getElementById('bizPerfBody'); if(b) b.innerHTML=_bizPerfBody(); }
+function bizPerfDrill(y){ _bizPerfYear=String(y||''); _bizPerfMode='project'; renderBizPerf(); }
+function renderBizPerf(){
+  var box=document.getElementById('bizPerf'); if(!box) return;
+  var ae=document.activeElement;
+  if(ae && ae.id==='bizPerfQ' && document.getElementById('bizPerfBody')){ document.getElementById('bizPerfBody').innerHTML=_bizPerfBody(); return; }
+  var ys={}; (get('consult')||[]).forEach(function(r){ if(r && !r.excluded){ ys[KcareerBiz.perfYear(r)||'모름']=1; } });
+  var 연도들=Object.keys(ys).sort().reverse();
+  var 칸=function(k,t){ return '<span data-m="'+k+'" onclick="bizPerfMode(\''+k+'\')" style="padding:4px 12px;font-size:12px;cursor:pointer;'+(_bizPerfMode===k?'background:var(--navy);color:#fff':'background:var(--card)')+'">'+t+'</span>'; };
+  box.innerHTML='<div class="toolbar" style="margin-bottom:10px">'
+    +'<span style="display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden">'+칸('project','사업별')+칸('main','담당자별')+칸('year','연도별')+'</span>'
+    +'<select class="tb-select" onchange="bizPerfYear(this.value)"><option value="">전체 연도</option>'+연도들.map(function(y){ return '<option value="'+escapeHtml(y)+'"'+(_bizPerfYear===y?' selected':'')+'>'+escapeHtml(y)+'</option>'; }).join('')+'</select>'
+    +'<input class="tb-input" id="bizPerfQ" placeholder="사업·업체·담당 검색" style="min-width:170px" value="'+escapeHtml(_bizPerfQ)+'" oninput="bizPerfQ(this.value)">'
+    +'<div class="tb-spacer"></div>'
+    +'<button class="btn" type="button" onclick="openAmtPaste()" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다">💰 금액 붙여넣어 채우기</button></div>'
+    +'<div id="bizPerfBody">'+_bizPerfBody()+'</div>';
+}
+function _bizPerfBody(){
+  if(_bizPerfMode==='main') return _bizPerfGroupHtml('main');
+  if(_bizPerfMode==='year') return _bizPerfGroupHtml('year');
+  return _bizPerfHtml();
+}
+/* 담당자별 · 연도별 표 — 셈은 KcareerBiz.perfBy 한 곳 */
+function _bizPerfGroupHtml(by){
+  var rows=KcareerBiz.perfBy(_bizPerfRecs(), by);
+  if(!rows.length) return '<div class="fd-box"><div style="font-size:12px;color:var(--text-mute)">조건에 맞는 실적이 없습니다</div></div>';
+  var 연도=Object.keys(rows.reduce(function(m,g){ Object.keys(g.byYear).forEach(function(y){ m[y]=1; }); return m; },{})).sort(), ys=연도.slice(-6);
+  var 합={ n:0, amt:0 }; rows.forEach(function(g){ 합.n+=g.total; 합.amt+=g.amt; });
+  var 칩=function(g){ return KcareerBiz.topCounts(g.type,3).map(function(m){ return '<span class="tag" style="margin-right:3px">'+escapeHtml(m[0])+' '+m[1]+'</span>'; }).join(''); };
+  var h='<div class="fd-box"><h4 style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+(by==='main'?'👤 담당자별 수행 건수':'📅 연도별 수행 건수')
+    +'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">전체 '+합.n+'건'+(합.amt?' · 금액 합계 '+합.amt.toLocaleString('ko-KR')+'원':'')+'</span></h4><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
+    +'<th class="rownum-h">№</th><th style="text-align:left">'+(by==='main'?'담당자':'연도')+'</th>'
+    +(by==='main'?ys.map(function(y){ return '<th style="text-align:right">'+y+'</th>'; }).join('')+'<th style="text-align:right">모름</th>':'<th style="text-align:right">사업 수</th>')
+    +'<th style="text-align:right">합계</th><th style="text-align:right">금액(공급가)</th><th style="text-align:left">많이 한 사업</th></tr></thead><tbody>';
+  rows.forEach(function(g,i){
+    h+='<tr'+(by==='year'?' style="cursor:pointer" title="누르면 그 해의 사업별 표" onclick="bizPerfDrill(\''+_jsAttr(g.key==='모름'?'모름':g.key)+'\')"':'')+'><td class="rownum">'+(i+1)+'</td><td style="white-space:nowrap"><b>'+escapeHtml(g.key)+'</b></td>'
+      +(by==='main'?ys.map(function(y){ var n=g.byYear[y]||0; return '<td style="text-align:right'+(n?'':';color:var(--text-mute)')+'">'+(n||'·')+'</td>'; }).join('')+'<td style="text-align:right'+(g.unknown?'':';color:var(--text-mute)')+'">'+(g.unknown||'·')+'</td>'
+        :'<td style="text-align:right">'+Object.keys(g.type).length+'</td>')
+      +'<td style="text-align:right;font-weight:800">'+g.total+'</td><td style="text-align:right;white-space:nowrap">'+(g.amt?g.amt.toLocaleString('ko-KR'):'·')+'</td><td style="white-space:nowrap">'+칩(g)+'</td></tr>';
+  });
+  return h+'</tbody></table></div></div>';
+}
+
+/* ── 📮 결과보고서 메일 탭: 거르기(상태·연도·사업·담당·검색) + 쪽 넘기기 ── */
+var _bizMailF={ st:'', year:'', type:'', own:'', q:'', page:1 }, BIZ_MAIL_PAGE=30;
+function _bizMailOwnName(x){ return (x.owner && x.owner.names && x.owner.names[0]) ? x.owner.names[0].name : ''; }
+function _bizMailYear(x){ return x.d?String(new Date(x.d).getFullYear()):''; }
+function _bizMailRows(c){
+  var f=_bizMailF, q=String(f.q||'').trim().toLowerCase(), out=[];
+  c.list.forEach(function(x,i){
+    if(f.st==='none' && x.match) return;
+    if(f.st==='match' && !x.match) return;
+    if(f.st==='unread' && x.owner && !x.owner.err) return;
+    if(f.year && _bizMailYear(x)!==f.year) return;
+    if(f.type && (x.type||'(없음)')!==f.type) return;
+    if(f.own && _bizMailOwnName(x)!==f.own) return;
+    if(q && (String(x.s||'')+' '+(x.an||[]).join(' ')+' '+(x.match?x.match.org:'')).toLowerCase().indexOf(q)<0) return;
+    out.push({ x:x, i:i });
+  });
+  return out;
+}
+function bizMailF(k,v){ _bizMailF[k]=String(v==null?'':v); _bizMailF.page=1; renderBizMail(); }
+function bizMailQ(v){ _bizMailF.q=String(v||''); _bizMailF.page=1; var c=_bizMailCache(), b=document.getElementById('bizMailBody'); if(c&&b) b.innerHTML=_bizMailBody(c); }
+function bizMailPage(p){ _bizMailF.page=Math.max(1,Number(p)||1); var c=_bizMailCache(), b=document.getElementById('bizMailBody'); if(c&&b) b.innerHTML=_bizMailBody(c); }
+function renderBizMail(){
+  var box=document.getElementById('bizMail'); if(!box) return;
+  var c=_bizMailCache(), ae=document.activeElement;
+  if(c && ae && ae.id==='bizMailQ' && document.getElementById('bizMailBody')){ document.getElementById('bizMailBody').innerHTML=_bizMailBody(c); return; }
+  box.innerHTML=_bizMailHtml();
+}
+function _bizMailBody(c){
+  var 줄=_bizMailRows(c), 쪽수=Math.max(1,Math.ceil(줄.length/BIZ_MAIL_PAGE));
+  if(_bizMailF.page>쪽수) _bizMailF.page=쪽수;
+  var 보일=줄.slice((_bizMailF.page-1)*BIZ_MAIL_PAGE, _bizMailF.page*BIZ_MAIL_PAGE);
+  var h='<div class="fd-box"><div class="bz-mr bz-h"><span>날짜</span><span>제목</span><span>사업</span><span>담당(후보)</span><span>실적</span><span></span></div>';
+  h+=보일.map(function(o){
+    var x=o.x, i=o.i, d=x.d?new Date(x.d):null;
     var 날=d?(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')):'-';
     return '<div class="bz-mr">'
       +'<span style="color:var(--text-mute)">'+날+'</span>'
@@ -15766,10 +15859,39 @@ function _bizMailHtml(){
       +'<span>'+(x.match?'<span class="tag teal" style="font-size:10.5px" title="실적에 같은 업체 이름이 있습니다('+escapeHtml(x.match.org||'')+') — 같은 건인지는 사람이 봅니다">실적에 '+escapeHtml(x.match.org||'')+'</span>'
         :'<span class="tag" style="font-size:10.5px;background:transparent;color:var(--amber);border:1px solid var(--amber)">실적에 없음?</span>')+'</span>'
       +'<span>'+(x.match?'':'<button class="btn sm primary" type="button" onclick="bizMailToPerf('+i+')">실적으로</button>')+'</span>'
-      +'</div>'; }).join('')||'<div style="font-size:12px;color:var(--text-mute)">보일 것이 없습니다</div>';
-  if(!_bizMailMore && 줄.length>보일.length) h+='<div style="text-align:center;margin-top:6px"><button class="btn sm" type="button" onclick="bizMailShowMore()">나머지 '+(줄.length-보일.length)+'건 더 보기</button></div>';
+      +'</div>'; }).join('')||'<div style="font-size:12px;color:var(--text-mute);padding:8px 0">조건에 맞는 메일이 없습니다</div>';
+  if(쪽수>1){
+    var p=_bizMailF.page, 시작=Math.max(1,Math.min(p-2,쪽수-4)), 끝=Math.min(쪽수,시작+4), 번호='';
+    for(var k=시작;k<=끝;k++) 번호+='<button class="btn sm'+(k===p?' primary':'')+'" type="button" onclick="bizMailPage('+k+')">'+k+'</button>';
+    h+='<div style="display:flex;gap:5px;justify-content:center;align-items:center;margin-top:10px;font-size:12px;color:var(--text-mute)">'
+      +'<button class="btn sm" type="button"'+(p<=1?' disabled':'')+' onclick="bizMailPage('+(p-1)+')">‹</button>'+번호
+      +'<button class="btn sm" type="button"'+(p>=쪽수?' disabled':'')+' onclick="bizMailPage('+(p+1)+')">›</button>'
+      +'<span style="margin-left:8px">'+줄.length+'건 · '+p+' / '+쪽수+' 쪽</span></div>';
+  }else h+='<div style="text-align:center;margin-top:8px;font-size:11.5px;color:var(--text-mute)">'+줄.length+'건</div>';
   h+='<div style="font-size:11px;color:var(--text-mute);margin-top:6px;line-height:1.6">「실적에 ○○」은 같은 업체 이름이 보인다는 뜻일 뿐 — 같은 건인지는 직접 확인해 주세요. 「실적으로」는 컨설팅 실적 입력 창을 채워 열기만 하고, 저장은 직접 누릅니다.</div></div>';
   return h;
+}
+function _bizMailHtml(){
+  var c=_bizMailCache();
+  var 버튼=(c&&(_bizOwnBusy||_bizOwnLeft(c))?'<button class="btn sm'+(_bizOwnBusy?'':' primary')+'" type="button" onclick="bizMailOwnerBatch(\'all\')" title="결과보고서 메일을 한 통씩 열어 담당자 이름을 찾습니다 — 지난 메일은 한 통에 20초쯤, 창을 열어 두세요">'
+      +(_bizOwnBusy?('⏹ 멈추기'+(_bizOwnProg?' ('+_bizOwnProg+')':'')):('👤 남은 '+_bizOwnLeft(c)+'건 모두 읽기'))+'</button>':'')
+    +'<button class="btn sm'+(c?'':' primary')+'" type="button" onclick="bizMailScan()"'+(_bizMailBusy?' disabled':'')+'>'+(_bizMailBusy?'⏳ 메일 읽는 중…':(c?'🔄 다시 찾기':'📮 메일에서 찾기'))+'</button>';
+  if(!c){
+    return '<div class="fd-box"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">📮 메일로 찾은 결과보고서<span style="flex:1"></span>'+버튼+'</h4>'
+      +'<div style="font-size:12px;color:var(--text-mute);line-height:1.6">푸른메일함의 목록(제목·첨부 이름)에서 「결과·완료·최종 보고」가 든 메일을 모읍니다 — 메일함을 새로 열지 않습니다.<br>'
+      +'목록이 커서 한 번 읽는 데 몇 초 걸립니다. 찾은 것만 이 기기에 적어 둡니다.</div></div>';
+  }
+  var f=_bizMailF, 없음=0, 같음=0, 못읽음=0, 연도={}, 사업={}, 담당={};
+  c.list.forEach(function(x){ if(x.match) 같음++; else 없음++; if(!x.owner || x.owner.err) 못읽음++;
+    var y=_bizMailYear(x); if(y) 연도[y]=1; 사업[x.type||'(없음)']=1; var o=_bizMailOwnName(x); if(o) 담당[o]=1; });
+  var 알약=function(k,t,n){ return '<span class="tag'+(f.st===k?' navy':'')+'" style="cursor:pointer;font-size:11px;padding:2px 9px'+(f.st===k?';font-weight:700':'')+'" onclick="bizMailF(\'st\',\''+k+'\')">'+t+' '+n+'</span>'; };
+  var 고르개=function(k,머리,목록){ return '<select class="tb-select" onchange="bizMailF(\''+k+'\',this.value)"><option value="">'+머리+'</option>'+목록.map(function(v){ return '<option value="'+escapeHtml(v)+'"'+(f[k]===v?' selected':'')+'>'+escapeHtml(v)+'</option>'; }).join('')+'</select>'; };
+  return '<div class="fd-box"><h4 style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">📮 메일로 찾은 결과보고서'
+    +'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">메일 '+Number(c.scanned||0).toLocaleString('ko-KR')+'통 중 · '+new Date(c.at).toLocaleString('ko-KR')+'</span><span style="flex:1"></span>'+버튼+'</h4>'
+    +'<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">'+알약('','전체',c.list.length)+알약('none','실적에 없어 보임',없음)+알약('match','실적에 같은 이름',같음)+알약('unread','담당자 못 읽음',못읽음)+'</div>'
+    +'<div class="toolbar" style="margin-bottom:8px">'+고르개('year','전체 연도',Object.keys(연도).sort().reverse())+고르개('type','전체 사업',Object.keys(사업).sort())+고르개('own','전체 담당(후보)',Object.keys(담당).sort())
+    +'<input class="tb-input" id="bizMailQ" placeholder="제목·업체 검색" style="min-width:170px" value="'+escapeHtml(f.q)+'" oninput="bizMailQ(this.value)"></div>'
+    +'</div><div id="bizMailBody">'+_bizMailBody(c)+'</div>';
 }
 /* ── 👤 결과보고서 속 담당자 읽기 (대표 지시 2026-10-09 「3」) ──
    ① 메일을 «미리 받기(peek)»로 연다 — 읽음 표시를 안 건드린다. 지난 메일(*old)은 POP3 창구.
