@@ -1165,7 +1165,9 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck-chip b{color:#854d0e}
 .mck-dim{position:fixed;inset:0;background:rgba(20,22,28,.34);z-index:70;
   display:flex;align-items:center;justify-content:center;padding:28px}
-.mck{background:#fff;border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.22);
+/* ⚠ 글자색을 «꼭» 적는다 — body 글자색이 어두운 화면용 흰색(var(--ink)=#f8fafc)이라, 안 적으면
+   색을 따로 안 준 글자(회사 이름·제목·갈래 숫자·「살아 있음」 단추)가 흰 바탕에 흰 글자가 된다(2026-10-10 대표 화면). */
+.mck{color:#1e293b;background:#fff;border-radius:12px;box-shadow:0 18px 44px rgba(0,0,0,.22);
   width:min(1000px,100%);max-height:88vh;display:flex;flex-direction:column;overflow:hidden}
 .mck>header{display:flex;align-items:center;gap:10px;padding:15px 18px;border-bottom:1px solid #e2e8f0}
 .mck>header h2{font-size:15px;margin:0;flex:1}
@@ -12523,7 +12525,7 @@ function goneHtml(){
       + (pc ? '<span class="em" style="margin-left:auto">차례: 근거가 센 것부터 (국세청 → 도메인 → 반송)</span>' : '') + '</div>');
     if(pc){
       body += '<table class="gn"><colgroup><col style="width:30px"><col style="width:42px"><col style="width:16%"><col style="width:58px">'
-        + '<col><col style="width:76px"><col style="width:72px"><col style="width:392px"></colgroup>'
+        + '<col><col style="width:76px"><col style="width:72px"><col style="width:448px"></colgroup>'
         + '<tr><th></th><th>#</th><th>회사</th><th>명함</th><th>근거</th><th>확인한 날</th><th>담당</th><th>처리</th></tr>'
         + show.map(function(r, i){
           return '<tr><td>' + (tab === 'done' ? '' : '<input type="checkbox" ' + (sel[r.key] ? 'checked' : '') + ' onclick="goneSel(\'' + esc(r.key) + '\')">') + '</td>'
