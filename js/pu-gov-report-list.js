@@ -75,7 +75,7 @@
     return out;
   }
   function reportKeys(input) {
-    return candidates(input).filter(function (c) { return c.fk.formKey || c.fk.ask; })
+    return candidates(input)
       .map(function (c) { return { coId: c.co.id, typeId: c.type.id, year: c.year, rid: c.rid }; });
   }
 

@@ -174,3 +174,16 @@ test('⑧ 연도를 바꾸면 그 해 줄 — 검토완료는 ⬇ HWPX', async (
   w.ctx.grReset();
   assert.equal(w.ctx.GR.f.year, '2026');
 });
+
+test('⑨ 겹친 불러오기 — 먼저 시작해 늦게 실패한 읽기는 나중 성공을 덮지 못한다', async () => {
+  let n = 0;
+  const w = world({ db: (db) => ({ ref: (p) => (p === 'scal_cos' && ++n === 1
+    ? { once: () => new Promise((_, rej) => setTimeout(() => rej(new Error('slow_fail')), 30)) } : db.ref(p)) }) });
+  const a = w.ctx.grLoad();
+  const b = w.ctx.grLoad();
+  await Promise.all([a, b]);
+  assert.equal(w.ctx.GR.err, '');
+  assert.equal(w.ctx.GR.rows.length, 4);
+  assert.equal(w.els.err.style.display, 'none');
+  assert.notEqual(w.els.board.style.display, 'none');
+});

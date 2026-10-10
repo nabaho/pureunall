@@ -148,7 +148,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <!-- 보고서 양식 표(FORMS) · 양식 고르기(resolveFormKey) · 현황판 계산 — 정부사업일정과 같은 번호 -->
 <script src="js/pu-gov-report.js?v=1"></script>
 <script src="js/pu-gov-report-build.js?v=3"></script>
-<script src="js/pu-gov-report-list.js?v=1"></script>
+<script src="js/pu-gov-report-list.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script>
@@ -157,7 +157,7 @@ var fbDb=null;
 /* 정부사업일정이 FB_NODES 로 부르는 그 자리 — 읽기만, 한 번씩 */
 var GR_NODES={cos:'scal_cos',types:'scal_types',scheds:'scal_scheds',staff:'scal_staff'};
 var GR_FIELDS={fYear:'year',fType:'type',fAtt:'att',fStatus:'status'};
-var GR={rows:[],staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',f:{year:'',type:'',att:'',status:'',co:'',mine:false}};
+var GR={seq:0,rows:[],staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',f:{year:'',type:'',att:'',status:'',co:'',mine:false}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -253,7 +253,8 @@ function grReset(){
 /* ═══ 읽기 — 일정 넷을 한 번씩, 보고서는 줄마다 한 자리씩(확정본 사본 _v 는 안 읽는다) ═══ */
 async function grLoad(){
   var L=PuGovReportList, input={}, keys=Object.keys(GR_NODES);
-  GR.err=''; GR.today=grToday();
+  var seq=++GR.seq;
+  GR.err=''; GR.today=grToday(); grRender();
   try{
     var vals=await Promise.all(keys.map(function(k){ return fbDb.ref(GR_NODES[k]).once('value').then(function(s){ return s.val(); }); }));
     keys.forEach(function(k,i){ input[k]=vals[i]; });
@@ -264,16 +265,23 @@ async function grLoad(){
         var v=s.val(); if(v){ reps[x.coId]=reps[x.coId]||{}; reps[x.coId][x.rid]=v; }
       });
     }));
+    if(seq!==GR.seq) return;
     input.reports=reps;
     GR.rows=L.buildRows(input);
     GR.staffMap=L.staffNames(input.staff);
     if(!GR.f.year) GR.f.year=GR.today.slice(0,4);
-  }catch(e){ console.warn('[컨설팅보고서] 못 읽음',e); GR.err=String((e&&e.message)||e); GR.rows=[]; }
-  try{ GR.index=(await fbDb.ref('scal_rptFormsIndex').once('value')).val()||{}; GR.indexErr=false; }
-  catch(e){ GR.index=null; GR.indexErr=true; }
+  }catch(e){ if(seq!==GR.seq) return; console.warn('[컨설팅보고서] 못 읽음',e); GR.err=String((e&&e.message)||e); GR.rows=[]; }
+  var idx=null, idxErr=false;
+  try{ idx=(await fbDb.ref('scal_rptFormsIndex').once('value')).val()||{}; }
+  catch(e){ idx=null; idxErr=true; }
+  if(seq!==GR.seq) return;
+  GR.index=idx; GR.indexErr=idxErr;
   GR.me='';
   if(!GR.err&&GR.email){
-    try{ GR.me=L.staffIdFor(input.staff,(await fbDb.ref('data/user_dir').once('value')).val(),GR.email); }catch(e){ GR.me=''; }
+    var me='';
+    try{ me=L.staffIdFor(input.staff,(await fbDb.ref('data/user_dir').once('value')).val(),GR.email); }catch(e){ me=''; }
+    if(seq!==GR.seq) return;
+    GR.me=me;
   }
   GR.loaded=true;
   grRender();

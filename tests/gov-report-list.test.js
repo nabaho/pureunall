@@ -12,9 +12,31 @@ const T = '2026-10-10';
 const rowsAll = () => L.buildRows(F.input(T));
 const key = (r) => r.coId + '/' + r.typeId;
 
-test('reportKeys — 간단형 후보만, 열쇠는 사업_첫회차해(사전진단 뺌)', () => {
-  assert.deepEqual(L.reportKeys(F.input(T)).map((x) => x.coId + '/' + x.rid),
-    ['c1/t1_2026', 'c2/t3_2026', 'c3/t4_2026', 'c5/t1_2025']);
+test('reportKeys — 일정 있는 업체×사업 쌍을 모두(종류 이름으로 못 가려도), 열쇠는 사업_첫회차해(사전진단 뺌) · 겹침 없음', () => {
+  const ks = L.reportKeys(F.input(T)).map((x) => x.coId + '/' + x.rid);
+  assert.deepEqual(ks, ['c1/t1_2026', 'c1/t2_2026', 'c2/t3_2026', 'c3/t4_2026', 'c5/t1_2025']);
+  assert.equal(new Set(ks).size, ks.length);
+});
+
+test('buildRows — 종류 이름으로 못 가려도 저장본에 formKey 가 있으면 줄이 생기고, 저장본이 없으면 줄이 없다', () => {
+  const mk = (withSaved) => {
+    const i = F.input(T);
+    i.types = [{ id: 'tx', name: '미정사업', fullName: '', agency: '', rounds: 1 }];
+    i.cos = [{ id: 'cx', name: '가상상사', types: ['tx'], defAtt: 'a1' }];
+    i.scheds = [{ id: 'sx', coId: 'cx', typeId: 'tx', date: '2026-04-01', round: 1, isField: true }];
+    i.reports = withSaved ? { cx: { tx_2026: { formKey: 'cci-seosan', state: '초안', ver: 0, updatedAt: Date.UTC(2026, 8, 20, 3) } } } : {};
+    return i;
+  };
+  assert.equal(L.buildRows(mk(false)).length, 0, '못 가리고 저장본도 없으면 줄이 없다');
+  assert.deepEqual(L.reportKeys(mk(false)).map((x) => x.rid), ['tx_2026'], '그래도 저장본은 읽으러 간다');
+  const rows = L.buildRows(mk(true));
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].formKey, 'cci-seosan');
+  assert.equal(rows[0].st.key, 'draft');
+});
+
+test('buildRows — 대형 양식 사업은 저장본이 없으면 줄이 없다(키는 읽으러 가도)', () => {
+  assert.ok(!rowsAll().some((r) => r.typeId === 't2'));
 });
 
 test('buildRows — 대형·지운 업체는 줄이 없고, 차례는 미작성 → 초안 → 작성 전 → 검토완료', () => {
