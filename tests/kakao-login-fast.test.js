@@ -196,6 +196,14 @@ test('★★ 카카오 단추는 인증 저장소를 먼저 기다리지 않고 
     '복귀 뒤 로그인 유지 끄기는 SESSION 으로 적용해야 한다');
 });
 
+test('★★ 저장된 모바일 세션은 부팅 때 LOCAL 재설정 없이 즉시 인증을 관찰한다', () => {
+  const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
+  const boot = enter.slice(enter.indexOf('function puLoginTimingSave('), enter.indexOf('auth.onAuthStateChanged(function(user)'));
+  assert.ok(boot.length > 0, '인증 부팅 구간을 찾지 못했다');
+  assert.doesNotMatch(boot, /auth\.setPersistence|_persistenceReady/,
+    '부팅 시 저장소를 다시 옮겨 인증 복원을 막고 있다');
+});
+
 test('★★ ⑤ 서버 답을 기다리는 «동안» 화면의 DB 연결을 먼저 연다 · 로그인 화면은 카카오 쓰는 기기만 깨운다', () => {
   const enter = fs.readFileSync(path.join(ROOT, 'enter.html'), 'utf8');
   const at = enter.indexOf('PuKakao.loginFinish(p.code)');

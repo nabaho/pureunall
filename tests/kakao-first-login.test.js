@@ -430,16 +430,47 @@ test('⑪ ★★ 카카오 단추는 유지 선택만 기록하고 바로 이동
   assert.equal(켬.w.ctx.유지.length, 0);
 });
 
-test('⑪ ★★ 카카오에서 돌아와 표를 받기 «직전» 에 고른 유지 방식을 정한다', async () => {
-  for (const [저장값, 기대] of [['0', 'session'], ['1', 'local'], [undefined, 'session']]) {
+test('⑪ ★★ 카카오 복귀 때 유지 켬은 기본 LOCAL을 재설정하지 않고, 끔은 SESSION을 적용한다', async () => {
+  for (const [저장값, 기대] of [['0', 'session'], ['1', null], [undefined, 'session']]) {
     const w = 복귀세상(true);
     if (저장값 === undefined) delete w.ctx.localStorage._m.pu_portal_auto; else w.ctx.localStorage._m.pu_portal_auto = 저장값;
-    if (저장값 === '1') w.ctx._persistenceReady = w.ctx.auth.setPersistence('local'); // 실제 화면의 첫 부팅이 이미 시작한 작업
     w.ctx.kkHandleReturn();
     for (let i = 0; i < 5; i++) await 틈();
-    assert.deepEqual([...w.ctx.유지].slice(0, 2), [기대, 'signIn'],
-      '★★ 「로그인 유지」 가 ' + (저장값 || '없음') + ' 인데 ' + JSON.stringify(w.ctx.유지) + ' — 새 페이지는 기본이 «유지» 라, 표 받기 전에 안 정하면 끈 것이 안 먹습니다');
+    const 첫단계 = 기대 ? [기대, 'signIn'] : ['signIn'];
+    assert.deepEqual([...w.ctx.유지].slice(0, 첫단계.length), 첫단계,
+      '★★ 「로그인 유지」 가 ' + (저장값 || '없음') + ' 인데 ' + JSON.stringify(w.ctx.유지));
   }
+});
+
+test('⑪ ★★★ SESSION에서 유지 켬으로 바꾼 경우에만 LOCAL 전환을 기다린다', async () => {
+  const w = 단추세상({ 저장: { pu_portal_auto: '0', pu_kakao_used: '1' }, 유지켬: true }).w;
+  w.ctx.kkLogin();
+  assert.equal(w.ctx.sessionStorage._m.pu_kakao_force_local, '1');
+  const back = 복귀세상(true);
+  back.ctx.localStorage._m.pu_portal_auto = '1';
+  back.ctx.sessionStorage._m.pu_kakao_force_local = '1';
+  let 완료;
+  back.ctx.auth.setPersistence = (mode) => {
+    back.ctx.유지.push(mode);
+    return new Promise(resolve => { 완료 = resolve; });
+  };
+  back.ctx.kkHandleReturn();
+  for(let i=0; i<4; i++) await 틈();
+  assert.deepEqual([...back.ctx.유지], ['local']);
+  완료();
+  for(let i=0; i<4; i++) await 틈();
+  assert.deepEqual([...back.ctx.유지].slice(0,2), ['local', 'signIn']);
+  assert.equal(back.ctx.localStorage._m.pu_portal_persistence_applied, 'local');
+  assert.equal(back.ctx.sessionStorage._m.pu_kakao_force_local, undefined);
+});
+
+test('⑪ ★★★ 같은 기기의 반복 카카오 로그인은 느린 LOCAL 재설정을 기다리지 않는다', async () => {
+  const w = 복귀세상(true);
+  w.ctx.localStorage._m.pu_portal_auto = '1';
+  w.ctx.auth.setPersistence = () => { throw new Error('반복 LOCAL 설정'); };
+  w.ctx.kkHandleReturn();
+  for(let i=0; i<4; i++) await 틈();
+  assert.ok(w.ctx.유지.includes('signIn'));
 });
 
 test('⑪ ★★★ 저장 방식 변경이 실제로 끝나기 전에는 인증표가 와도 Firebase 로그인을 시작하지 않는다', async () => {
