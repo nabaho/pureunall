@@ -72,6 +72,12 @@ test('ⓓ 휴직 · 이름표 없는 위임장 · 회사 계약', () => {
   assert.deepStrictEqual(e, [{ key: 5, text: '  성        명 : ' + L }, { key: 6, text: '' }, { key: 7, text: '' }], '이름 줄은 명단으로, 밑의 옛 이름 줄은 비운다');
   assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 1, text: '성 명 : 공인노무사 권 형 하' }], L))).map((x) => x.text), ['성 명 : ' + L]);
   assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 1, text: '대리인 성명 : 홍길동' }], L))), [], '노무사 줄이 아니면 건드리지 않는다');
+  /* 표 칸에 이름만 — 「공인노무사명 | 권형하노무사」 (2026-10-10) */
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 0, text: '권형하노무사' }], L, true))), [{ key: 0, text: L }], '칸 안 이름만 든 줄은 명단으로');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 0, text: ' 권 형 하 공인노무사 ' }], L, true))).map((x) => x.text), [L]);
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 0, text: '권형하노무사' }], L, false))), [], '본문에서는 안 바꾼다');
+  ['공인노무사', '대표노무사', '공인노무사명', '푸른노무법인 대표 권형하노무사'].forEach((t) =>
+    assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 0, text: t }], L, true))), [], '이름표·서명 줄은 그대로: ' + t));
   const H = fs.readFileSync(path.join(__dirname, '..', 'docs-esign.html'), 'utf8');
   assert.match(H, /EsignHwpTpl\.applyLawyerLine\(doc, lawLine\); r = EsignHwpTpl\.fillDoc\(doc, V\);/, '계약서 양식 채우기에서');
   assert.match(H, /EsignHwpTpl\.applyLawyerLine\(doc, V\.공인노무사명단\);/, '집단체불 서류에서');
