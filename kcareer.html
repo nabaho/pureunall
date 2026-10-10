@@ -670,6 +670,13 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .fd-mlab span{flex:1;text-align:center}
 .fd-row{display:flex;gap:10px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;cursor:pointer;white-space:nowrap}
 .fd-row:last-child{border-bottom:0}
+/* 📮 메일로 찾은 결과보고서 — 오른쪽 칸을 «고정 폭»으로(대표 지시 2026-10-10 「오른쪽 열 정리」): 줄마다 폭이 달라 안 맞던 것 */
+.bz-mr{display:grid;grid-template-columns:76px minmax(0,1fr) 124px 112px 156px 74px;gap:8px;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;white-space:nowrap}
+.bz-mr>*{min-width:0;overflow:hidden;text-overflow:ellipsis}
+.bz-mr .tag{display:inline-block;max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:middle}
+.bz-mr.bz-h{font-size:11px;color:var(--text-mute);border-bottom:1px solid var(--border);padding-bottom:4px}
+.bz-mr .bz-own{display:flex;gap:4px;align-items:center}
+@media(max-width:760px){.bz-mr{display:flex;flex-wrap:wrap}.bz-mr>.c{flex:1 1 100%}.bz-mr.bz-h{display:none}}
 .fd-row .c{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
 .fd-row:hover .c{color:var(--ink);text-decoration:underline}
 .fd-miss{color:var(--amber);font-weight:700}
@@ -15557,13 +15564,13 @@ async function bizMailScan(){
 function _bizOwnerChip(x, i){
   var o=x.owner;
   if(!o) return '<button class="btn sm" type="button" title="이 메일을 열어 담당자 이름을 찾습니다" onclick="bizMailOwner('+i+')">👤 읽기</button>';
-  if(o.err) return '<span class="tag" style="font-size:10.5px;color:var(--red)" title="'+escapeHtml(o.err)+'">못 열음</span><button class="btn sm" type="button" onclick="bizMailOwner('+i+')">↻</button>';
+  if(o.err) return '<span class="tag" style="font-size:10.5px;color:var(--red)" title="'+escapeHtml(o.err)+'">못 열음</span><button class="btn sm" type="button" style="padding:0 6px" title="다시 열어 보기" onclick="bizMailOwner('+i+')">↻</button>';
   if(!o.names.length) return '<span class="tag" style="font-size:10.5px;color:var(--text-mute)" title="본문·보고서에서 아는 이름을 못 찾았습니다">👤 이름 없음</span>';
   var 첫=o.names[0], 실=null;
   if(x.match && x.match.id){ var r=(get('consult')||[]).filter(function(y){ return y && y.id===x.match.id; })[0]; 실=r?String(r.main||'').trim():null; }
   var 다름=(실!=null && 실!=='' && 실!==첫.name);
   return '<span class="tag navy" style="font-size:10.5px" title="'+escapeHtml(o.src+(첫.ctx?'\n「'+첫.ctx+'」':'')+(o.names.length>1?'\n다른 후보: '+o.names.slice(1).map(function(h){ return h.name; }).join(', '):''))+'">👤 '+escapeHtml(첫.name)+(첫.near?'':'?')+'</span>'
-    +(다름?'<span class="tag" style="font-size:10.5px;color:var(--amber);border:1px solid var(--amber);background:transparent" title="실적 기록의 담당은 '+escapeHtml(실)+' — 고치려면 푸른이알피에서">실적엔 '+escapeHtml(실)+'</span>':'');
+    +(다름?'<span class="tag" style="font-size:10.5px;color:var(--amber);border:1px solid var(--amber);background:transparent;padding:0 5px" title="실적 기록의 담당은 '+escapeHtml(실)+' — 고치려면 푸른이알피에서">≠</span>':'');
 }
 function bizMailOnlyNew(on){ _bizMailOnlyNew=!!on; _bizMailMore=false; renderBizDash(); }
 function bizMailShowMore(){ _bizMailMore=true; renderBizDash(); }
@@ -15583,19 +15590,20 @@ function _bizMailHtml(){
   }
   var 줄=c.list.filter(function(x){ return !_bizMailOnlyNew || !x.match; });
   var 보일=_bizMailMore?줄:줄.slice(0,30);
+  h+='<div class="bz-mr bz-h"><span>날짜</span><span>제목</span><span>사업</span><span>담당(후보)</span><span>실적</span><span></span></div>';
   h+=보일.map(function(x){
     var i=c.list.indexOf(x), d=x.d?new Date(x.d):null;
     var 날=d?(d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0')):'-';
-    return '<div class="fd-row" style="cursor:default">'
-      +'<span style="width:78px;flex:none;color:var(--text-mute)">'+날+'</span>'
+    return '<div class="bz-mr">'
+      +'<span style="color:var(--text-mute)">'+날+'</span>'
       +'<span class="c" title="'+escapeHtml(x.s+(x.an&&x.an.length?'\n📎 '+x.an.join('\n📎 '):''))+'">'+escapeHtml(x.s||'(제목 없음)')
         +(x.n>1?' <span style="color:var(--text-mute);font-size:11px">· '+x.n+'통</span>':'')
         +(x.an&&x.an.length?' <span style="color:var(--text-mute);font-size:11px">📎'+x.an.length+'</span>':'')+'</span>'
-      +(x.type?'<span class="tag" style="font-size:10.5px">'+escapeHtml(x.type)+'</span>':'')
-      +_bizOwnerChip(x, i)
-      +(x.match?'<span class="tag teal" style="font-size:10.5px" title="실적에 같은 업체 이름이 있습니다 — 같은 건인지는 사람이 봅니다">실적에 '+escapeHtml(x.match.org||'')+'</span>'
-        :'<span class="tag" style="font-size:10.5px;background:transparent;color:var(--amber);border:1px solid var(--amber)">실적에 없음?</span>'
-         +'<button class="btn sm primary" type="button" onclick="bizMailToPerf('+i+')">실적으로</button>')
+      +'<span>'+(x.type?'<span class="tag" style="font-size:10.5px" title="'+escapeHtml(x.type)+'">'+escapeHtml(x.type)+'</span>':'')+'</span>'
+      +'<span class="bz-own">'+_bizOwnerChip(x, i)+'</span>'
+      +'<span>'+(x.match?'<span class="tag teal" style="font-size:10.5px" title="실적에 같은 업체 이름이 있습니다('+escapeHtml(x.match.org||'')+') — 같은 건인지는 사람이 봅니다">실적에 '+escapeHtml(x.match.org||'')+'</span>'
+        :'<span class="tag" style="font-size:10.5px;background:transparent;color:var(--amber);border:1px solid var(--amber)">실적에 없음?</span>')+'</span>'
+      +'<span>'+(x.match?'':'<button class="btn sm primary" type="button" onclick="bizMailToPerf('+i+')">실적으로</button>')+'</span>'
       +'</div>'; }).join('')||'<div style="font-size:12px;color:var(--text-mute)">보일 것이 없습니다</div>';
   if(!_bizMailMore && 줄.length>보일.length) h+='<div style="text-align:center;margin-top:6px"><button class="btn sm" type="button" onclick="bizMailShowMore()">나머지 '+(줄.length-보일.length)+'건 더 보기</button></div>';
   h+='<div style="font-size:11px;color:var(--text-mute);margin-top:6px;line-height:1.6">「실적에 ○○」은 같은 업체 이름이 보인다는 뜻일 뿐 — 같은 건인지는 직접 확인해 주세요. 「실적으로」는 컨설팅 실적 입력 창을 채워 열기만 하고, 저장은 직접 누릅니다.</div></div>';
