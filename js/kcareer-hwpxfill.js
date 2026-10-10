@@ -53,6 +53,8 @@
     { re: /^(복무기간|군복무기간|복무년월|복무연월)$/, key: 'militaryPeriod' },
     { re: /^(보훈대상|보훈|보훈여부|보훈대상여부|취업지원대상|국가유공자)$/, key: 'veteran' },
     { re: /^(장애여부|장애|장애유무|장애인여부|장애등급|장애정도)$/, key: 'disability' },
+    /* 노무사 기수(자격시험 기수) — 강사카드 「기수 ※노무사만 기입」 (대표 지시 2026-10-10 「노무사 19기」) */
+    { re: /^(기수|노무사기수|공인노무사기수)$/, key: 'licenseGen' },
     /* ★ 「노무법인」 표 — 사람이 아니라 «우리 법인» 것이다 (대표 지시 2026-09-13
        「노무법인 등에 대한 정보는 현재 이알피의 내용을 가지고 와라」).
        기관 서식은 인적사항 아래에 법인 칸을 따로 두고 명칭·대표 노무사·법인번호·사업자번호를 묻는다.
@@ -126,7 +128,7 @@
                          'email', 'emailWork', 'addr', 'addrWork', 'zip', 'zipWork',
                          'org', 'dept', 'title', 'orgTitle', 'license',
                          'military', 'militaryBranch', 'militaryRank', 'militaryPeriod',
-                         'veteran', 'disability',
+                         'veteran', 'disability', 'licenseGen',
                          /* 우리 법인 것 — 이알피 법인정보에서 온다 */
                          'firmName', 'firmCeo', 'firmCorpNo', 'firmBizNo', 'firmEst', 'firmCapital',
                          'firmZip', 'firmAcct',
