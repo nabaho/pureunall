@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 회생광고</title>
+<!-- ══════════════════════════════════════════════════════════════
+     푸른노무법인 회생광고 (rehab-ad.html) — 2026-10-10
+     대표 지시 「법인회생이 발생하면 재기지원컨설팅으로 연결 … 포괄금지명령 나온 기업들만 모아서
+     홍보물 보내고 … 푸른통합시스템에 앱 만든다. 회생광고로」
+     방식 결정 「추천대로」 = ① 서버가 매일 모은다 ② 사람이 고른다 ③ 우편으로 보낸다.
+
+     ★ 자료가 오는 길
+       서버 rehabWatch(functions/rehab-watch.js, 매일 07:40)가 전국 회생 관할 법원 공고에서
+       «법인회생 · 포괄적 금지명령» 사건을 rehab_ad/notices 에 담는다. 이 화면은 «읽기만» 한다.
+       사람이 정하는 것(발송 예정·보류·제외·발송 완료)만 rehab_ad/marks 에 쓴다.
+
+     ⚠ 이메일·문자 발송 단추를 넣지 말 것 — 정보통신망법 제50조: 영리 목적 광고성 정보를
+       전자적으로 보내려면 «받는 사람의 사전 동의»가 있어야 한다. 이 기업들은 동의한 적이 없다.
+       우편(서면)은 그 조항의 대상이 아니다. 동의를 받은 뒤에는 푸른 메일로 옮겨 보낸다.
+     ⚠ 혁신바우처 관리지침 제37조 — 수요기업에게 «과도한 영업»은 참여제한 사유다.
+       바우처 영업물로 대량 발송하지 않는다. 노무(대지급금·고용조정·임금 정리) 안내가 중심이다.
+     ⚠ 회사명은 «보이는 이름»이다. 기업정보함과 이름으로 잇지 않는다(사업자번호가 없다 — 온톨로지 규칙).
+     ⚠ 대표 전용(uid_roles 의 isAdmin). 모르면 잠근다(fail-closed).
+     ══════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --navy:#1e293b; --mute:#64748b; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-bg:#eff6ff; --green:#166534; --green-bg:#f0fdf4;
+  --amber:#854d0e; --amber-bg:#fffbeb; --red:#991b1b; --red-bg:#fef2f2; --gray-bg:#e2e8f0;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--navy);font-size:14px}
+#head{position:sticky;top:0;z-index:20;background:var(--card);box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.top{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0}
+.top .sp{flex:1}
+#who{font-size:13px;color:var(--mute)}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--navy);border-radius:8px;padding:6px 12px}
+button:hover{border-color:#94a3b8}
+button.pri{background:var(--blue);border-color:var(--blue);color:#ffffff}
+button:disabled{opacity:.5;cursor:default}
+main{max-width:1180px;margin:0 auto;padding:14px 16px 60px}
+.note{background:var(--amber-bg);border:1px solid #fde68a;color:var(--amber);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.55;margin-bottom:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--mute)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.filters select,.filters input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card)}
+.filters input{min-width:200px}
+#selbar{display:none;position:sticky;top:52px;z-index:10;background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:10px;padding:8px 10px;margin-bottom:10px;gap:6px;flex-wrap:wrap;align-items:center}
+#selbar.on{display:flex}
+#selbar b{margin-right:6px}
+.tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600;position:sticky;top:0}
+td.ck,th.ck{width:36px;text-align:center;padding:0}
+td.no,th.no{width:40px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+td.ck input,th.ck input{width:18px;height:18px;cursor:pointer}
+td.addr{max-width:360px;overflow:hidden;text-overflow:ellipsis}
+td.co{font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
+.st{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px}
+.st-new{background:var(--gray-bg);color:#475569}
+.st-send{background:var(--blue-bg);color:var(--blue)}
+.st-hold{background:var(--amber-bg);color:var(--amber)}
+.st-skip{background:var(--red-bg);color:var(--red)}
+.st-sent{background:var(--green-bg);color:var(--green)}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+#lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+#lock p{color:var(--mute);font-size:13px}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+#toast.on{opacity:1}
+.run{font-size:12px;color:var(--mute);margin:-4px 0 10px}
+@media (max-width:640px){ input,select,textarea{font-size:16px} .filters input{min-width:0;flex:1} td.addr{max-width:200px} }
+</style>
+</head>
+<body>
+<div id="head">
+  <div class="top">
+    <h1>⚖️ 회생광고</h1>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <button id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </div>
+</div>
+
+<div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>회생광고는 대표 전용입니다.</p></div>
+
+<main id="app" style="display:none">
+  <div class="note">
+    ⚖️ 전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조) 기업을 매일 아침 모읍니다.<br>
+    ✉️ 안내는 <b>우편</b>으로 보냅니다. 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조).
+  </div>
+  <div class="kpis">
+    <div class="kpi"><b id="kNew">-</b><span>미검토</span></div>
+    <div class="kpi"><b id="kSend">-</b><span>발송 예정</span></div>
+    <div class="kpi"><b id="kSent">-</b><span>발송 완료</span></div>
+    <div class="kpi"><b id="kAll">-</b><span>모은 기업(전체)</span></div>
+  </div>
+  <div class="run" id="runNote"></div>
+  <div class="filters">
+    <select id="fDays" aria-label="기간">
+      <option value="7">최근 7일</option><option value="14" selected>최근 14일</option>
+      <option value="30">최근 30일</option><option value="0">전체 기간</option>
+    </select>
+    <select id="fStatus" aria-label="상태">
+      <option value="">모든 상태</option><option value="new">미검토</option><option value="send">발송 예정</option>
+      <option value="hold">보류</option><option value="skip">제외</option><option value="sent">발송 완료</option>
+    </select>
+    <select id="fCourt" aria-label="법원"><option value="">모든 법원</option></select>
+    <select id="fType" aria-label="사건종류"><option value="">회생·간이회생</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
+    <input id="fText" type="search" placeholder="회사명·주소 찾기">
+    <button onclick="resetFilters()">거르개 풀기</button>
+  </div>
+  <div id="selbar">
+    <b id="selCount">0건 선택</b>
+    <button onclick="bulk('send')">📮 발송 예정</button>
+    <button onclick="bulk('hold')">⏸ 보류</button>
+    <button onclick="bulk('skip')">🚫 제외</button>
+    <button onclick="bulk('new')">↩ 미검토로</button>
+    <button class="pri" onclick="printLabels()">🏷 우편 라벨 인쇄</button>
+    <button onclick="bulk('sent')">✅ 발송 완료로</button>
+    <button onclick="downloadCsv()">⬇ CSV</button>
+    <button onclick="clearSel()">선택 풀기</button>
+  </div>
+  <div class="tbl">
+    <table>
+      <thead><tr>
+        <th class="ck"><input type="checkbox" id="ckAll" aria-label="보이는 줄 전체 선택"></th>
+        <th class="no">번호</th><th>공고일</th><th>법원</th><th>사건번호</th><th>종류</th>
+        <th>회사명</th><th>주소</th><th>상태</th>
+      </tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+    <div class="empty" id="empty" style="display:none">조건에 맞는 기업이 없습니다.</div>
+  </div>
+</main>
+<div id="toast"></div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=57"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
+     없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=23"></script>
+<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=3"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  try{ if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } }catch(e){} })();
+</script>
+<script src="js/pu-back.js?v=2"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+var fbDb=null, fbUid=null, gate=null;
+var NOTICES={}, MARKS={}, VIEW=[], SEL={};
+var ST_NAME={new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
+
+function $(id){ return document.getElementById(id); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove('on');},2600); }
+function statusOf(id){ var m=MARKS[id]; return (m && !m._deleted && ST_NAME[m.status]) ? m.status : 'new'; }
+function seoulToday(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,10); }
+function daysAgo(n){ return new Date(Date.now()+9*3600e3-n*864e5).toISOString().slice(0,10); }
+
+/* ═══ 그리기 ═══ */
+function filtered(){
+  var days=Number($('fDays').value), st=$('fStatus').value, court=$('fCourt').value, type=$('fType').value;
+  var q=$('fText').value.trim().toLowerCase(), since=days?daysAgo(days):'';
+  return Object.keys(NOTICES).map(function(k){ return NOTICES[k]; }).filter(function(n){
+    if(!n || n._deleted) return false;
+    if(since && (n.noticeDate||'') < since) return false;
+    if(st && statusOf(n.id)!==st) return false;
+    if(court && n.courtCode!==court) return false;
+    if(type && n.caseType!==type) return false;
+    if(q && ((n.debtorName||'')+' '+(n.address||'')).toLowerCase().indexOf(q)<0) return false;
+    return true;
+  }).sort(function(a,b){ return (b.noticeDate||'').localeCompare(a.noticeDate||'') || (a.courtName||'').localeCompare(b.courtName||''); });
+}
+function draw(){
+  VIEW=filtered();
+  var html=VIEW.map(function(n,i){
+    var st=statusOf(n.id);
+    return '<tr><td class="ck"><input type="checkbox" data-id="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
+      '<td class="no">'+(i+1)+'</td><td>'+esc(n.noticeDate)+'</td><td>'+esc(n.courtName)+'</td><td>'+esc(n.caseNo)+'</td>'+
+      '<td>'+esc(n.caseType)+'</td><td class="co" title="'+esc(n.debtorName)+'">'+esc(n.debtorName)+'</td>'+
+      '<td class="addr" title="'+esc(n.address)+'">'+(n.zip?'('+esc(n.zip)+') ':'')+esc(n.address)+'</td>'+
+      '<td><span class="st st-'+st+'">'+ST_NAME[st]+'</span></td></tr>';
+  }).join('');
+  $('rows').innerHTML=html;
+  $('empty').style.display=VIEW.length?'none':'';
+  /* 보이지 않게 된 줄은 고른 것에서 뺀다 — 안 보이는 것이 골라져 있으면 안 된다 */
+  var vis={}; VIEW.forEach(function(n){ vis[n.id]=1; });
+  Object.keys(SEL).forEach(function(k){ if(!vis[k]) delete SEL[k]; });
+  drawSel(); drawKpi();
+}
+function drawKpi(){
+  var c={new:0,send:0,sent:0}, all=0;
+  Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(!n||n._deleted) return; all++; var s=statusOf(k); if(c[s]!=null) c[s]++; });
+  $('kNew').textContent=c.new; $('kSend').textContent=c.send; $('kSent').textContent=c.sent; $('kAll').textContent=all;
+}
+function drawSel(){
+  var n=Object.keys(SEL).length;
+  $('selCount').textContent=n+'건 선택';
+  $('selbar').classList.toggle('on', n>0);
+  $('ckAll').checked = VIEW.length>0 && n===VIEW.length;
+  $('ckAll').indeterminate = n>0 && n<VIEW.length;
+}
+function fillCourts(){
+  var seen={}; Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(n&&n.courtCode) seen[n.courtCode]=n.courtName; });
+  var cur=$('fCourt').value;
+  $('fCourt').innerHTML='<option value="">모든 법원</option>'+Object.keys(seen).sort(function(a,b){return seen[a].localeCompare(seen[b]);})
+    .map(function(c){ return '<option value="'+esc(c)+'">'+esc(seen[c])+'</option>'; }).join('');
+  $('fCourt').value=cur;
+}
+function resetFilters(){ $('fDays').value='14'; $('fStatus').value=''; $('fCourt').value=''; $('fType').value=''; $('fText').value=''; draw(); }
+function clearSel(){ SEL={}; draw(); }
+function selected(){ return VIEW.filter(function(n){ return SEL[n.id]; }); }
+
+/* ═══ 한꺼번에 표시 — 건수를 묻고 한 번에 저장한다 ═══ */
+async function bulk(st){
+  var list=selected(); if(!list.length) return;
+  if(!confirm(list.length+'건을 「'+ST_NAME[st]+'」(으)로 표시할까요?')) return;
+  var now=Date.now();
+  var jobs=list.map(function(n){
+    var ref=fbDb.ref('rehab_ad/marks/'+n.id);
+    return gate.save(ref, function(prev){
+      prev=prev||{};
+      return Object.assign({}, prev, { id:n.id, entityType:'Task', taskKind:'rehabOutreach',
+        sourceKind:'rehabNotice', sourceId:n.id, status:st, statusAt:now,
+        sentAt: st==='sent' ? now : (prev.sentAt||null) });
+    }, { entityType:'Task' }).then(function(r){ MARKS[n.id]=r.snapshot ? r.snapshot.val() : MARKS[n.id]; return true; });
+  });
+  var res=await Promise.allSettled(jobs);
+  var fail=res.filter(function(r){ return r.status==='rejected'; });
+  await loadMarks();
+  SEL={}; draw();
+  toast(fail.length ? ((list.length-fail.length)+'건 저장 · '+fail.length+'건 실패: '+String(fail[0].reason&&fail[0].reason.message||fail[0].reason)) : list.length+'건을 「'+ST_NAME[st]+'」(으)로 표시했습니다');
+}
+
+/* ═══ 우편 라벨 — A4 한 장에 2열 × 8줄(가로 99.1 × 세로 34mm 계열 라벨지) ═══
+   ⚠ 인쇄만 한다. «발송 완료» 표시는 실제로 부친 뒤 사람이 누른다. */
+function printLabels(){
+  var list=selected(); if(!list.length) return;
+  var cells=list.map(function(n){
+    return '<div class="lb"><div class="zip">(우) '+esc(n.zip||'')+'</div><div class="ad">'+esc(n.address||'')+'</div>'+
+      '<div class="to">'+esc(n.debtorName||'')+' 귀중</div><div class="ceo">대표이사님 앞</div></div>';
+  }).join('');
+  var w=window.open('', '_blank');
+  if(!w){ toast('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요'); return; }
+  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>우편 라벨 '+list.length+'장</title><style>'+
+    '@page{size:A4;margin:12mm 4.5mm}body{margin:0;font-family:"Malgun Gothic",sans-serif}'+
+    '.sheet{display:grid;grid-template-columns:99.1mm 99.1mm;grid-auto-rows:34mm;column-gap:3mm}'+
+    '.lb{padding:4mm 6mm;overflow:hidden;break-inside:avoid}.zip{font-size:10pt}.ad{font-size:10pt;margin:1mm 0 2mm;line-height:1.35}'+
+    '.to{font-size:12pt;font-weight:700}.ceo{font-size:10pt}</style></head><body><div class="sheet">'+cells+'</div>'+
+    '<script>window.onload=function(){window.print();}<\/script></body></html>');
+  w.document.close();
+}
+
+/* ═══ CSV — 우체국 대량 발송·라벨 프로그램에 넣을 때 ═══ */
+function downloadCsv(){
+  var list=selected(); if(!list.length) return;
+  var head=['공고일','법원','사건번호','사건종류','회사명','우편번호','주소','상태'];
+  var q=function(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
+  var body=list.map(function(n){ return [n.noticeDate,n.courtName,n.caseNo,n.caseType,n.debtorName,n.zip,n.address,ST_NAME[statusOf(n.id)]].map(q).join(','); });
+  var blob=new Blob(['﻿'+[head.join(',')].concat(body).join('\r\n')],{type:'text/csv;charset=utf-8'});
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_'+seoulToday()+'_'+list.length+'건.csv';
+  document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
+}
+
+/* ═══ 불러오기 ═══ */
+async function loadMarks(){ MARKS=(await fbDb.ref('rehab_ad/marks').once('value')).val()||{}; }
+async function loadAll(){
+  var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(),
+    fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
+  NOTICES=r[0].val()||{};
+  var runs=r[2].val()||{}, last=Object.keys(runs).pop();
+  $('runNote').textContent = last
+    ? '마지막 수집 '+last+' · 새로 담음 '+(runs[last].added||0)+'건'+((runs[last].errors||[]).length?' · ⚠ 못 읽은 법원 '+runs[last].errors.length+'곳':'')
+    : '아직 서버 수집 기록이 없습니다(매일 07:40).';
+  fillCourts(); draw();
+}
+
+/* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
+async function isAdmin(u){
+  try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; return v.isAdmin===true; }catch(e){ return false; }
+}
+function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+function boot(){
+  ['fDays','fStatus','fCourt','fType'].forEach(function(id){ $(id).addEventListener('change',draw); });
+  $('fText').addEventListener('input',draw);
+  $('rows').addEventListener('change',function(e){
+    var id=e.target && e.target.getAttribute('data-id'); if(!id) return;
+    if(e.target.checked) SEL[id]=1; else delete SEL[id]; drawSel();
+  });
+  $('ckAll').addEventListener('change',function(){
+    SEL={}; if(this.checked) VIEW.forEach(function(n){ SEL[n.id]=1; }); draw();
+  });
+  window.addEventListener('pagehide',function(){ SEL={}; });
+  if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
+  if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  fbDb=firebase.database();
+  try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
+  firebase.auth().onAuthStateChanged(async function(u){
+    fbUid=u?u.uid:null;
+    $('outBtn').style.display=u?'':'none';
+    if(!u){ $('who').textContent=''; PuGate.show(); return; }
+    PuGate.hide();
+    if(!(await isAdmin(u))){ lock('접속: '+(u.email||'-')); return; }
+    gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:u.uid });
+    $('lock').style.display='none'; $('app').style.display='';
+    try{ await loadAll(); }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
+  });
+}
+boot();
+</script>
+</body>
+</html>

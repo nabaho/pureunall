@@ -1081,6 +1081,15 @@ rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'a
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 고쳐 쓸 일이 없다. */
 rules.gov_watch = { '.read': 'auth != null && ' + ADMIN, '.write': false };
 
+/* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
+   담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
+   ⚠ 읽기 = 관리자만. 누구에게 무엇을 보낼지는 대표가 정한다 — 직원 화면엔 안 보인다.
+   ⚠ notices·runs 쓰기 = 아무도(서버가 관리자 권한으로 담는다). 화면이 공고를 고치면 원본이 사라진다.
+   ⚠ marks(발송·보류·제외 표시) = 관리자만 쓴다. */
+rules.rehab_ad = { '.read': 'auth != null && ' + ADMIN,
+  notices: { '.write': false }, runs: { '.write': false },
+  marks: { '.write': 'auth != null && ' + ADMIN } };
+
 /* ══ 경력관리 «직원 공개용 사본» ═══════════════════════════════════════
    대표 지시 2026-09-02: 「경력관리 이부분만 다른 직원들이 볼 수 있게」 → 방식 「나」 승인.
 

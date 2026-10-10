@@ -167,6 +167,14 @@
     govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */],
       sharedRoots:['data/user_dir','uid_roles','kcareer/{uid}/ls'],
       entityTypes:['Organization','Project','Document'] },
+    /* 회생광고 — 법원 회생 공고(법인회생 «포괄적 금지명령»)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
+       notices = 서버(rehabWatch)가 담는 공고(Document) — 화면은 «읽기만». marks = 사람이 정한 발송·보류·제외(Task).
+       ⚠ 회사명(debtorName)은 «보이는 이름»일 뿐 관계 열쇠가 아니다 — 기업정보함과 이름으로 잇지 않는다(사업자번호가 없다).
+       빌려 읽는 곳: uid_roles(관리자인지 확인). */
+    rehabad:{ name:'회생광고', file:'rehab-ad.html', primaryRoots:['rehab_ad'],
+      sharedRoots:['uid_roles'],
+      writeContracts:[{path:'rehab_ad/marks/{id}',entityType:'Task'}],
+      entityTypes:['Document','Task'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
@@ -448,6 +456,9 @@
     /* ⚠★ strategy:'local' 이다 — gov/{uid} 안에는 공공데이터포털·기업마당 «인증키»가 있다.
        remote 로 바꾸면 통합진단이 열쇠를 통째로 읽어 간다. 바꾸지 말 것. */
     gov_feed:{program:'govbid',strategy:'local',path:'gov/{uid}/feed',parser:'coverage'},
+    /* 회생광고 — 관리자만 읽는 영업 대상 목록이다. 통합 진단에 섞지 않는다(그 앱 안에서만 본다). */
+    rehab_core:{program:'rehabad',strategy:'in_app',path:'rehab_ad',parser:'coverage',
+      gives:'회생 공고 기업·발송 표시 (관리자 전용 — 통합 진단에서 읽지 않는다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

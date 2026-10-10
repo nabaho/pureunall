@@ -1421,6 +1421,18 @@
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       ".write": false
     },
+    "rehab_ad": {
+      ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
+      "notices": {
+        ".write": false
+      },
+      "runs": {
+        ".write": false
+      },
+      "marks": {
+        ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
+      }
+    },
     "kcareer_pub": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('sid').exists() && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       ".write": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true"
