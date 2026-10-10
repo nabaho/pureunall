@@ -94,6 +94,6 @@ test('ⓓ 문서관리 길 — 읽기 once, 쓰기는 pu_docs 한 번, 사업자
   assert.match(l, /db\.ref\('pu_docs\/co\/' \+ key \+ '\/bz'\)\.set\(d\)/);
   assert.match(html, /coLink: formCoLink, coMerge: formCoMerge/);
   const docs = read('js/pu-office-docs.js');
-  assert.match(docs, /host\.coLink \? el\('button'[^\n]*onclick: openLink/);
+  assert.match(docs, /host\.coLink \? \['🔗 이알피 업체와 맞추기'[^\n]*openLink\]/, '「가져오기·정리」 메뉴 안에 있다(2026-10-10)');
   assert.match(docs, /host\.coMerge \? el\('button'[^\n]*onclick: openMerge/);
 });

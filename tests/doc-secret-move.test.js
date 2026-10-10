@@ -71,5 +71,5 @@ test('ⓓ 화면 — 서버 길, 버튼, 20개씩, 옮긴 뒤 주소 캐시 비�
   assert.match(f, /i \+= 20/);
   assert.match(f, /w\.confirm\(/);
   assert.match(f, /urlCache = \{\};/);
-  assert.match(docs, /host\.secretMove \? el\('button'[^\n]*onclick: openSecretMove/);
+  assert.match(docs, /host\.secretMove \? \['🔒 서명본으로 옮기기'[^\n]*openSecretMove\]/, '「가져오기·정리」 메뉴 안에 있다(2026-10-10)');
 });

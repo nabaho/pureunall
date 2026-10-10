@@ -31,9 +31,18 @@ test('ⓐ 사건 유형은 이알피 설정을 따른다', () => {
   assert.match(SRC, /soft\('data\/biz_case_types'\), soft\('data\/user_dir'\)/, '화면이 이알피 설정·명부를 읽는다(못 읽어도 뜬다)');
 });
 
-test('ⓑ 근로자측 · 사용자측', () => {
-  assert.match(SRC, /if \(k\.v === 'case'\) \[\['worker', '👷 근로자측'\], \['employer', '🏢 사용자측'\]\]\.forEach/);
-  assert.match(SRC, /setFilter\(\{ side: sd\[0\], grp: 'all' \}\)/);
+test('ⓑ 근로자측 · 사용자측 — 「① 누구를 대리하나요? ② 어떤 사건인가요?」 두 칸으로(2026-10-10 정리)', () => {
+  const lh = SRC.slice(SRC.indexOf('function listHead() {'), SRC.indexOf('/* ── 묶음 채우기 (설계 2026-09-28'));
+  assert.match(lh, /seg\('① 누구를 대리하나요\?'/, '측은 큰 가름 단추 하나');
+  assert.match(lh, /label: '👷 근로자 쪽'/); assert.match(lh, /label: '🏢 사용자 쪽'/);
+  assert.match(lh, /setFilter\(\{ side: v, grp: 'all' \}\)/, '측을 바꾸면 사건 종류는 처음으로');
+  assert.match(lh, /② 어떤 사건인가요\?/);
+  assert.match(lh, /fc\.groups\.filter\(function \(g\) \{ return g\.count > 0 \|\| g\.name === S\.grp; \}\)/, '양식이 없는 사건 종류는 보이지 않는다(고른 것은 남는다)');
+  assert.match(lh, /if \(S\.moreOpen \|\| moreOn\)/, '원본·사용 거르개는 접어 둔다');
+  /* 왼쪽 메뉴에는 사건계약 밑 「└ 근로자측 / 사용자측」이 없다 — 한 곳에서만 고른다 */
+  const tree = SRC.slice(SRC.indexOf('function drawTree() {'), SRC.indexOf('/* ── 오른쪽 ── */'));
+  assert.ok(tree.indexOf('👷 근로자측') < 0, '왼쪽 메뉴에 측 단추가 남아 있다');
+  assert.match(SRC, /function shownName\(f\)/);
 });
 
 test('ⓒ 재직 공인노무사 전원', () => {
@@ -165,4 +174,15 @@ test('ⓖ 세로 명단', () => {
   assert.equal(paras[1].indexOf('공'), paras[2].indexOf('공'), '첫 글자가 한 줄로 선다');
   assert.equal(paras[3], '신고서 담당: {{공인노무사명단}} 외', '「성 명 :」 줄이 아닌 칸은 그대로 두어 한 줄로 채운다');
   assert.deepStrictEqual(log.filter((x) => x[0] === 'split').map((x) => x[2]), [7, 7], '새 문단은 원래 문단 모양을 따른다');
+});
+
+test('ⓗ 이름 줄이기 — 「 - 푸른 표준」·끝의 (근로자)/(사용자)를 덜고 전체 이름은 title 로', () => {
+  const i = SRC.indexOf('function shownName(f) {'), j = SRC.indexOf('\n    }', i);
+  const fn = new Function('f', SRC.slice(i + 'function shownName(f) {'.length, j));
+  assert.equal(fn({ name: '임금체불 위임약정서·위임장(사용자) - 푸른 표준' }), '임금체불 위임약정서·위임장');
+  assert.equal(fn({ name: '산재 위임약정서·위임장·개인정보동의서(근로자) - 푸른 표준' }), '산재 위임약정서·위임장·개인정보동의서');
+  assert.equal(fn({ name: '위임약정서 (근로자측)' }), '위임약정서');
+  assert.equal(fn({ name: '자문계약서 (푸른 표준)' }), '자문계약서 (푸른 표준)', '괄호 속 푸른 표준은 건드리지 않는다');
+  assert.equal(fn({ name: '' }), '');
+  assert.match(SRC, /title: f\.name, text: shownName\(f\)/, '전체 이름은 마우스를 올리면');
 });

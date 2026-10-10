@@ -1087,6 +1087,13 @@
     + '.pcf-lrow{cursor:pointer}.pcf-lrow:hover td{background:#f8fafc}.pcf-lrow.on td{background:#dbeafe}.pcf-lrow.off td{color:#94a3b8}'
     + '.pcf-lgr td{padding:0;border-bottom:none}'
     + '.pcf-fsel{padding:3px 6px;border:1px solid #cbd5e1;border-radius:6px;font-size:11.5px;font-family:inherit;background:#fff;color:#475569}'
+    + '.pcf-lh .pcf-crow{flex-direction:column;align-items:stretch;gap:9px;padding:2px 0 4px}'
+    + '.pcf-stepbox{display:flex;flex-direction:column;gap:3px}.pcf-step{font-size:11.5px;font-weight:700;color:#64748b}'
+    + '.pcf-seg{display:flex;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;background:#fff}'
+    + '.pcf-seg button{flex:1;min-width:0;padding:8px 4px;border:0;background:#fff;color:#334155;font-size:12.5px;font-weight:700;font-family:inherit;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.pcf-seg button+button{border-left:1px solid #e2e8f0}.pcf-seg button:hover{background:#eff6ff}'
+    + '.pcf-seg button.on{background:#1e40af;color:#fff}.pcf-seg button small{font-weight:500;opacity:.75;margin-left:4px;font-size:11px}'
+    + '.pcf-tsel{width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-family:inherit;background:#fff;color:#334155;font-weight:600}'
     + '.pcf-lp{width:330px;flex:none;display:flex;flex-direction:column;border:1px solid #e2e8f0;border-right:none;border-radius:8px 0 0 8px;background:#fff;min-height:0}'
     + '.pcf-cols.card .pcf-lp{width:auto;flex:1;border-right:1px solid #e2e8f0;border-radius:8px}'
     + '.pcf-lh{padding:6px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;flex-direction:column;gap:5px}'
@@ -1112,7 +1119,7 @@
     + '.pcf-msel{display:none;gap:6px;margin-bottom:10px}.pcf-msel select{flex:1;min-width:0;padding:7px 8px;border:1px solid #cbd5e1;border-radius:6px;font-size:13px}'
     + '@media(max-width:700px){.pcf-msel{display:flex}.pcf-cols{flex-direction:column;align-items:stretch}'
     + '.pcf-cols{height:auto}.pcf-list{width:auto;height:auto;max-height:40vh;border-right:1px solid #e2e8f0}.pcf-cols .pcf-sheetwrap{height:auto;overflow:visible}.pcf-cards{height:auto}.pcf-tools{margin-left:0}.pcf-top b{max-width:none;flex:1 1 100%}'
-    + '.pcf-crow{flex-wrap:nowrap;overflow-x:auto}.pcf-q{max-width:none}'
+    + '.pcf-crow{flex-wrap:nowrap;overflow-x:auto}.pcf-lh .pcf-crow{overflow-x:visible}.pcf-q{max-width:none}'
     + '.pcf-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}'
     + '.pcf-sheetwrap{padding:8px}.pcf-sheet{padding:24px 18px;min-height:0}.pcf-body{font-size:12.5px}}';
 
@@ -2729,13 +2736,6 @@
         var on = S.kind === k.v;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
-        /* 사건은 근로자측·사용자측 두 갈래 (대표 지시 2026-10-09) — 누르면 그 측만(공통 양식은 칩 「공통」) */
-        if (k.v === 'case') [['worker', '👷 근로자측'], ['employer', '🏢 사용자측']].forEach(function (sd) {
-          var c = S.forms.filter(function (f) { return f.kind === 'case' && sideOf(f) === sd[0]; }).length;
-          var son = S.kind === 'case' && S.side === sd[0];
-          t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (son ? ' on' : ''), title: '사건계약 — ' + sd[1].slice(3) + ' 양식만',
-            onclick: function () { if (S.kind !== 'case') pickKind('case'); setFilter({ side: sd[0], grp: 'all' }); drawTree(); } }, [el('span', { text: '└ ' + sd[1] }), el('i', { text: String(c) })]));
-        });
       });
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
@@ -2918,6 +2918,11 @@
         ondrop: function (e) { var fl = filesOf(e); if (fl) { e.preventDefault(); quickUpload(fm.kind, fl); } } }, [sheet]);
       return wrap;
     }
+    /* 화면에 보이는 이름 — 「 - 푸른 표준」·끝의 (근로자)·(사용자) 같은 군더더기를 덜어 짧게(전체 이름은 마우스를 올리면). 측은 이름표(근로자·사용자)가 따로 있다 */
+    function shownName(f) {
+      var n = String(f.name || '').replace(/\s*-\s*푸른\s*표준\s*$/, '').replace(/\s*\((?:근로자|사용자|근로자측|사용자측|근로자·노동조합|사용자·근로자)\)\s*$/, '').trim();
+      return n || String(f.name || '');
+    }
     function sideShort(v) { return v === 'worker' ? '근로자' : v === 'employer' ? '사용자' : '공통'; }
     function chip(label, on, fn) {
       return el('button', { type: 'button', 'class': 'pcf-chip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: fn }, [label]);
@@ -2925,31 +2930,49 @@
     /* 칩 줄 «하나» — 사건계약: 측 칩 | 사건유형 칩(고른 측 안에서 센 수). 모든 종류: 이름 찾기 · 목록/카드 · 올리기·추가 도구.
        넓은 화면에서는 한 줄, 좁으면 줄바꿈한다(한 화면에 보이게, 2026-09-27) */
     /* 목록 칸 머리 (2026-10-07 화면 개편) — 찾기 · 묶음/측/사건유형 칩 · 목록/카드. 세트는 왼쪽 나무로 갔다(휴대폰은 위 고르기 칸) */
+    /* ★ 목록 칸 머리 — 「어떤 걸 골라야 할지 모르겠다」를 없앤다 (대표 지시 2026-10-10 「사건계약 근로자측 사용자측 너무 내용도 많고
+       어떤 선택을 해야 할지 판단이 어렵다 … 최대한 깔끔하게, 다른 모든 서류관리 형태도 같이」).
+       전에는 측 칩 4개 + 사건유형 칩 12개 + 원본·사용 거르개가 한꺼번에 떠 있었다. 이제:
+         ① 누구를 대리하나요?  [전체 | 👷 근로자 쪽 | 🏢 사용자 쪽 | 공통]   ← 큰 가름 단추 하나
+         ② 어떤 사건인가요?    [모든 사건 종류 ▾]                       ← 양식이 있는 종류만 든 고르기 하나
+       원본·사용 거르개는 「거르기 ▾」 뒤로 접는다(켜 둔 것이 있으면 단추가 눌린 채 보인다).
+       묶음이 있는 종류(업체계약·컨설팅·기금·기타사업)도 «같은 가름 단추»로 — 모든 서류 종류가 한 모양이다. */
     function listHead() {
       var kind = S.kind, row = [];
       if (host.contractCtx) row.push(chip('📄 ' + host.contractCtx.label + ' 자료로 채움 ✕', true, function () { host.contractCtx = null; drawMain(); toast('계약 자료를 풀었습니다 — 이제 기업정보함 값만으로 채웁니다'); }));
       var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
       /* 글자를 칠 때마다 목록만 다시 그린다 — 머리까지 그리면 찾기 칸 커서가 사라진다 */
       q.addEventListener('input', function () { S.q = q.value; drawList(); });
+      function seg(label, items, curV, onPick) {
+        return el('div', { 'class': 'pcf-stepbox' }, [
+          el('div', { 'class': 'pcf-step', text: label }),
+          el('div', { 'class': 'pcf-seg', role: 'group', 'aria-label': label }, items.map(function (it) {
+            return el('button', { type: 'button', 'class': curV === it.v ? 'on' : '', 'aria-pressed': curV === it.v ? 'true' : 'false', title: it.title || '', onclick: function () { onPick(it.v); } },
+              [it.label, el('small', { text: String(it.n) })]);
+          }))]);
+      }
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
-        row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '측' },
-          [chip('전체 ' + fc.sides.all, S.side === 'all', function () { setFilter({ side: 'all', grp: 'all' }); })].concat(SIDES.map(function (sd) {
-            return chip(sd.label + ' ' + fc.sides[sd.v], S.side === sd.v, function () { setFilter({ side: sd.v, grp: 'all' }); });
-          }))));
-        row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '사건유형' },
-          [chip('모든 유형', S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(fc.groups.map(function (g) {
-            return chip(g.name + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
-          }))));
+        var sideItems = [{ v: 'all', label: '전체', n: fc.sides.all, title: '근로자측·사용자측 모두' },
+          { v: 'worker', label: '👷 근로자 쪽', n: fc.sides.worker, title: '근로자(노동조합 포함)를 대리할 때' },
+          { v: 'employer', label: '🏢 사용자 쪽', n: fc.sides.employer, title: '회사(사용자)를 대리할 때' }];
+        if (fc.sides.both || S.side === 'both') sideItems.push({ v: 'both', label: '공통', n: fc.sides.both, title: '어느 쪽이든 쓰는 서식(대리인선임신고서 등)' });
+        row.push(seg('① 누구를 대리하나요?', sideItems, S.side, function (v) { setFilter({ side: v, grp: 'all' }); }));
+        var tsel = el('select', { 'class': 'pcf-tsel', 'aria-label': '사건 종류' },
+          [el('option', { value: 'all', text: '모든 사건 종류' })].concat(fc.groups.filter(function (g) { return g.count > 0 || g.name === S.grp; }).map(function (g) {
+            return el('option', { value: g.name, text: g.name + ' · ' + g.count + '개' });
+          })));
+        tsel.value = S.grp;
+        tsel.addEventListener('change', function () { setFilter({ grp: tsel.value }); });
+        row.push(el('div', { 'class': 'pcf-stepbox' }, [el('div', { 'class': 'pcf-step', text: '② 어떤 사건인가요?' }), tsel]));
       }
       if (twoGroups(kind)) {
         var ff = facetCounts(S.forms, kind);
-        row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '묶음' },
-          [chip('전체 ' + ff.sides.all, S.grp === 'all', function () { setFilter({ grp: 'all' }); })].concat(ff.groups.map(function (g) {
-            return chip(g.name.replace('제안서·견적서', '견적') + ' ' + g.count, S.grp === g.name, function () { setFilter({ grp: g.name }); });
-          }))));
+        row.push(seg('종류', [{ v: 'all', label: '전체', n: ff.sides.all }].concat(ff.groups.map(function (g) {
+          return { v: g.name, label: g.name.replace('제안서·견적서', '견적서'), n: g.count };
+        })), S.grp, function (v) { setFilter({ grp: v }); }));
       }
-      /* 원본 형식 · 사용 여부 (원본 보관함과 같은 걸러 보기) */
+      /* 원본 형식 · 사용 여부 (원본 보관함과 같은 걸러 보기) — 접어 둔다 */
       function pick(label, val, opts, key) {
         var se = el('select', { 'class': 'pcf-fsel', 'aria-label': label }, [el('option', { value: '', text: label + ' 전체' })].concat(opts.map(function (o) {
           return el('option', { value: o[0], text: o[1] });
@@ -2958,10 +2981,12 @@
         se.addEventListener('change', function () { var p = {}; p[key] = se.value; setFilter(p); });
         return se;
       }
-      row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '더 거르기' }, [
+      var moreOn = !!(S.src || S.use);
+      if (S.moreOpen || moreOn) row.push(el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '더 거르기' }, [
         pick('원본', S.src, SRC_TYPES, 'src'), pick('사용', S.use, [['on', '사용'], ['off', '사용 안 함']], 'use')]));
       return el('div', { 'class': 'pcf-lh' }, [
         el('div', { 'class': 'pcf-lhr' }, [q, el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
+          chip('거르기 ' + (S.moreOpen || moreOn ? '▴' : '▾'), moreOn, function () { S.moreOpen = !S.moreOpen; drawMain(); }),
           chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
           chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
         row.length ? el('div', { 'class': 'pcf-crow' }, row) : null]);
@@ -3151,7 +3176,7 @@
           'aria-current': on ? 'true' : null, onclick: function () { select(f.id); } }, [
           el('td', { 'class': 'pcf-lc' }, [ck]),
           el('td', { 'class': 'pcf-ln2' }, [el('span', { 'class': 'pcf-grip', 'aria-hidden': 'true', text: '⠿' }), String(n)]),
-          el('td', { 'class': 'pcf-lnm' }, [el('span', { 'class': 'pcf-ln', text: f.name }),
+          el('td', { 'class': 'pcf-lnm' }, [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }),
             sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null]),
           el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]);
         tb.appendChild(tr); rows.push({ id: f.id, node: tr });
@@ -3170,7 +3195,7 @@
         grid.appendChild(el('button', { type: 'button', 'class': 'pcf-card' + (S.sel === f.id ? ' on' : ''), title: f.name + ' — 누르면 크게 봅니다',
           onclick: function () { S.view = 'list'; saveView(); select(f.id); } }, [
           el('div', { 'class': 'pcf-thumb', text: String(f.body || '본문 없음').slice(0, 260) }),
-          el('div', { 'class': 'pcf-cn' }, [el('span', { 'class': 'pcf-ln', text: f.name }), sd ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null])]));
+          el('div', { 'class': 'pcf-cn' }, [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }), sd ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null])]));
       });
       return grid;
     }

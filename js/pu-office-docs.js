@@ -209,6 +209,9 @@
   var CSS = ''
     + '.pod,.pod *{box-sizing:border-box}.pod{font-size:13px;color:#1e293b}'
     + '.pod-bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px}'
+    + '.pod-menu{display:flex;flex-wrap:wrap;gap:6px;margin:-4px 0 10px;padding:8px;border:1px solid #e2e8f0;border-radius:8px;background:#f8fafc}'
+    + '.pod-menu button{padding:7px 12px;border:1px solid #cbd5e1;border-radius:6px;background:#fff;font-size:12.5px;font-family:inherit;cursor:pointer}.pod-menu button:hover{background:#eff6ff;border-color:#93c5fd}'
+    + '.pod-b.on{background:#dbeafe;border-color:#93c5fd}'
     + '.pod-bar b{flex:1 1 auto;font-size:15px;white-space:nowrap}'
     + '.pod-bar input[type=search]{padding:7px 10px;border:1px solid #cbd5e1;border-radius:6px;font-size:12.5px;width:200px;max-width:100%}'
     + '.pod-b{border:1px solid #cbd5e1;background:#f8fafc;color:#475569;padding:6px 12px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap}'
@@ -1619,13 +1622,20 @@
     function draw() {
       root.innerHTML = '';
       var wrap = el('div', { 'class': 'pod' });
+      /* 위 줄은 «📎 업로드» 하나와 「가져오기·정리 ▾」 하나 — 드물게 쓰는 다섯 가지를 메뉴 안으로 (대표 지시 2026-10-10 「서류관리 화면 깔끔하게, 다른 형태도 같이」) */
+      var menuItems = [
+        ['📥 엑셀 명단 가져오기', '「업체명단」 시트가 있는 엑셀에서 계약 기록을 가져옵니다', openRosterImport],
+        ['📂 PC 폴더 가져오기', '회사별 폴더에서 계약서류만 골라 올립니다(기본 🔒 서명본)', openFolderImport],
+        ['🖼 사진첩에서 가져오기', '내 사진첩의 계약서를 가져옵니다', openPhotoImport],
+        host.coLink ? ['🔗 이알피 업체와 맞추기', '사업자번호를 넣고, 같은 회사가 다른 이름으로 들어온 것을 합칩니다', openLink] : null,
+        host.secretMove ? ['🔒 서명본으로 옮기기', '이미 올린 사진첩 계약서 중 직원 누구나 여는 것을 🔒 서명본으로 옮깁니다(대표·관리자)', openSecretMove] : null].filter(Boolean);
       wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { text: '🏢 기업별 계약서' }),
-        el('button', { type: 'button', 'class': 'pod-b', text: '📥 엑셀 명단 가져오기', title: '「업체명단」 시트가 있는 엑셀에서 계약 기록을 가져옵니다', onclick: openRosterImport }),
-        el('button', { type: 'button', 'class': 'pod-b', text: '📂 PC 폴더 가져오기', title: '회사별 폴더에서 계약서류만 골라 올립니다(기본 🔒 서명본)', onclick: openFolderImport }),
-        el('button', { type: 'button', 'class': 'pod-b g', text: '🖼 사진첩에서 가져오기', onclick: openPhotoImport }),
-        host.coLink ? el('button', { type: 'button', 'class': 'pod-b', text: '🔗 이알피 업체와 맞추기', title: '사업자번호를 넣고, 같은 회사가 다른 이름으로 들어온 것을 합칩니다', onclick: openLink }) : null,
-        host.secretMove ? el('button', { type: 'button', 'class': 'pod-b', text: '🔒 서명본으로 옮기기', title: '이미 올린 사진첩 계약서 중 직원 누구나 여는 것을 🔒 서명본으로 옮깁니다(대표·관리자)', onclick: openSecretMove }) : null,
+        el('button', { type: 'button', 'class': 'pod-b' + (S.menuOpen ? ' on' : ''), 'aria-haspopup': 'menu', 'aria-expanded': S.menuOpen ? 'true' : 'false',
+          text: '📥 가져오기·정리 ' + (S.menuOpen ? '▴' : '▾'), onclick: function () { S.menuOpen = !S.menuOpen; draw(); } }),
         el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
+      if (S.menuOpen) wrap.appendChild(el('div', { 'class': 'pod-menu', role: 'menu' }, menuItems.map(function (it) {
+        return el('button', { type: 'button', role: 'menuitem', title: it[1], text: it[0], onclick: function () { S.menuOpen = false; draw(); it[2](); } });
+      })));
       if (S.denied) { wrap.appendChild(deniedBanner()); root.appendChild(wrap); return; }
       if (S.err) { wrap.appendChild(el('div', { 'class': 'pod-empty', style: 'color:#991b1b', text: '불러오지 못했습니다 — ' + S.err })); root.appendChild(wrap); return; }
       if (!S.loaded) { wrap.appendChild(el('div', { 'class': 'pod-empty', text: '불러오는 중…' })); root.appendChild(wrap); return; }
