@@ -14,13 +14,23 @@ test('① 안내문에 회사명이 들어가고, 이름 속 태그는 글자로
   assert.ok(!/<b>가나<\/b>/.test(h), '회사명이 태그로 해석되면 안 된다');
 });
 
-test('② 비용(자부담)을 안내한다 — 비율·부가가치세·예시·근거·«공고에 따른다» 단서', () => {
+test('② 핵심 두 가지 — 대지급금 1개월, 회사 부담 12만원(+부가가치세) · 비용 근거와 «공고에 따른다» 단서', () => {
   const h = L.buildLetter(co('주식회사 가나'));
-  assert.match(h, /정부 지원/); assert.match(h, /기업 자부담/);
-  assert.match(h, /10% \+ 부가가치세/);
+  assert.match(h, /간이대지급금·대지급금/); assert.match(h, /빠르면 1개월 내/);
+  assert.match(h, /회사는 12만원\(\+부가가치세\)만 부담/);
+  assert.match(h, /정부 지원 90% · 기업 자부담 10% \+ 부가가치세/);
   assert.match(h, /120만원 → 기업 자부담 12만원 \+ 부가가치세 12만원/);
   assert.match(h, /해당 연도 공고에 따라 달라질 수 있어/);
   assert.match(h, /2024년 혁신바우처 지원계획 공고/);
+});
+
+test('②-2 사무소 네 곳 주소, 전화는 천안·서산만', () => {
+  const h = L.buildLetter(co('주식회사 가나'));
+  ['천안본사', '서산지사', '세종지사', '대전지사'].forEach(n => assert.match(h, new RegExp(n)));
+  assert.match(h, /041-556-0035/); assert.match(h, /041-429-0123/);
+  assert.ok(!/042-488-5211/.test(h), '대전 전화번호는 싣지 않는다');
+  assert.match(h, /둔산서로 79/); assert.match(h, /한누리대로 312/);
+  assert.equal(L.OFFICES.filter(o => o.tel).length, 2);
 });
 
 test('③ 이메일·문자 안내가 아니라 우편이다 — 수신거부 한 줄이 있다', () => {
@@ -55,13 +65,14 @@ test('⑥ 문서 한 통 — 안내문은 회사마다 한 쪽, 인쇄 창을 �
 test('⑦ 메일 본문(글자 판) — 회사명·대표자·비용·수신거부, 거래 관계면 첫 인사가 다르다', () => {
   const p = L.buildPlainText(co('주식회사 가나'), { ceo: '홍길동' });
   assert.match(p, /^주식회사 가나 홍길동 대표이사님께/);
-  assert.match(p, /기업 자부담 10% \+ 부가가치세/);
+  assert.match(p, /회사는 12만원\(\+부가가치세\)만 부담/);
+  assert.match(p, /빠르면 1개월 내/);
   assert.match(p, /120만원 → 기업 자부담 12만원 \+ 부가가치세 12만원/);
   assert.match(p, /원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다/);
   assert.ok(!/평소 .*거래해 주셔서/.test(p));
   assert.match(L.buildPlainText(co('주식회사 가나'), { existing: true }), /평소 푸른노무법인과 거래해 주셔서 감사드립니다/);
   assert.ok(!/<[a-z]+/.test(p), '글자 판에 태그가 섞이면 안 된다');
-  assert.match(L.MAIL_SUBJECT, /회생절차 중 근로자 임금·고용 및 재기컨설팅 안내/);
+  assert.match(L.MAIL_SUBJECT, /회생절차 중 근로자 임금\(대지급금\) 및 노무 상담 안내/);
 });
 
 test('⑧ 화면 안 미리보기는 인쇄 창을 부르지 않는다(noPrint)', () => {
