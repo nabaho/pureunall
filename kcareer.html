@@ -1395,7 +1395,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-svgtext.js?v=1"></script>
 <script src="js/kcareer-formmap.js?v=22"></script>
 <script src="js/kcareer-hanja.js?v=1"></script>
-<script src="js/kcareer-hwpstamp.js?v=9"></script>
+<script src="js/kcareer-hwpstamp.js?v=10"></script>
 <script src="js/kcareer-hwpxphoto.js?v=2"></script>
 <script src="js/kcareer-formhtml.js?v=4"></script>
 <script src="js/kcareer-colmap-ai.js?v=2"></script>
@@ -18008,8 +18008,19 @@ var _rhPhotoOn=false;    /* 🖼 사진을 넣기로 했나 */
 var _rhAttachMarks=null; /* 📎 표 끝에 적을 「(첨부 n)」 — [{sig,text}] · null 이면 안 적는다 */
 var _rhPhotoDone=false;  /* 마지막으로 지을 때 정말 들어갔나 */
 var _rhPhotoWhy='', _rhPhotoNoCell=false;   /* 못 넣은 까닭 · 서식에 사진 칸이 «없어서»인가 */
+/* ✍ 서명 줄 정돈 — 이름이 밑줄 «위»에 앉게(대표 지적 2026-10-10 「줄이 제대로 안 맞다」). 못 찾으면 그대로 둔다 */
+async function rhSignTidyZip(zip){
+  if(window.KcareerHwpStamp && KcareerHwpStamp.tidySignLine){
+    var 구역들=Object.keys(zip.files).filter(function(n){ return /^Contents\/section\d+\.xml$/i.test(n); });
+    for(var q=0;q<구역들.length;q++){
+      try{ var 정돈=KcareerHwpStamp.tidySignLine(await zip.file(구역들[q]).async('string'));
+        if(정돈.n) zip.file(구역들[q], 정돈.xml); }catch(e){ console.warn('서명 줄 정돈', e); }
+    }
+  }
+}
 async function rhFinishZip(zip){
   await rhTidyZip(zip);
+  await rhSignTidyZip(zip);   /* ✍ 서명 줄 정돈 — 이름이 밑줄 위에 앉게(2026-10-10) */
   /* 📎 「(첨부 n)」 — 지을 때마다 원본에서 새로 붙인다(다시 채워도 남고, 두 번 안 적힌다) */
   if(typeof rhAttachMarkZip==='function') await rhAttachMarkZip(zip);
   /* ★ 사진은 쪽 빼기 «뒤»·도장 «앞» — 뺀 쪽의 사진 칸에 넣으면 사라지고,
@@ -18599,6 +18610,13 @@ async function rhFillByMap(o){
   if(_rhSignedLine){
     try{ 찍음=await rhStampDoc(true); }catch(e){ console.warn('도장 자동', e); }
   }
+  /* ★ 서명 줄이 «표 칸 안»에 있어도 — 그 줄의 이름이 «내 이름»이면 내 도장을 찍는다 (대표 지시 2026-10-10
+     「서명 날인이 빠졌다 — 자동으로 들어가게」). 강사카드·위촉 서류는 서명 줄이 표 안이라 옛 판정(_rhSignedLine)이 못 잡았다.
+     ⚠ 남의 이름 줄·이름 없는 줄은 건드리지 않는다 — 잘못 날인한 서류는 되돌릴 수 없다. */
+  if(!찍음 && !_rhSignedLine){
+    try{ 찍음=await rhAutoStampMine(); }catch(e){ console.warn('도장 자동(내 줄)', e); }
+    if(찍음) _rhSignedLine=true;
+  }
   /* ⚠ 도장을 «못» 찍었으면 까닭을 함께 말한다 — 조용히 건너뛰면 도장이 없어서인지
      자리를 못 찾아서인지 알 길이 없다(대표 제보 2026-09-27 「도장찍기 잘 안된다」). */
   var 도장말 = 찍음 ? ' · 🖋 도장까지 찍었습니다'
@@ -19076,6 +19094,26 @@ async function rhStampDoc(quiet){
   말('🖋 도장을 찍었습니다 — 한글로 보기·완성본에 들어갑니다 · 자리는 환경설정 › 도장 보관함에서 맞춥니다');
   _rhStampWhy='';                       /* 됐으니 까닭을 지운다 */
   return true;
+}
+
+/* 서명 줄의 이름이 «내 이름»인 자리에만 내 도장 — 자리마다 그 도장(이름 맞는 도장·법인 자리면 법인 도장·없으면 기본 도장).
+   돌려주는 것: 찍었나 */
+async function rhAutoStampMine(){
+  if(_rhStampOn) return false;
+  var 나=''; try{ 나=String((piObj()||{}).name||'').replace(/\s+/g,''); }catch(e){ 나=''; }
+  if(!나) return false;
+  var 기본=(typeof getDefaultStamp==='function')?getDefaultStamp():null;
+  var 자리=await rhStampSpotsNow();
+  var 내것=자리.filter(function(s){ return String(s.who||'').replace(/\s+/g,'')===나; });
+  if(!내것.length) return false;
+  var pick=[];
+  내것.forEach(function(s){ var st=stampForSpot(s)||기본; if(st) pick.push(s.key+'='+st.id); });
+  if(!pick.length) return false;
+  _rhStampPick=pick;
+  var ok=false;
+  try{ ok=await rhStampDoc(true); }catch(e){ ok=false; }
+  if(!ok){ _rhStampPick=null; _rhStampOn=false; }
+  return ok;
 }
 
 /* 지금 문서의 도장 자리를 모두 — 도장 «없이» 지은 것에서 찾는다(찍힌 도장 그림에 속지 않게).

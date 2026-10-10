@@ -126,7 +126,7 @@ function 세상(opt) {
    /* 구역별로 가르는 셈·이름 꼬리 맞추기 (2026-10-07) */
    'function rhSecTag(', 'function rhSecId(', 'function rhValsFor(', 'function _rhKindOf(', 'function _rhFixExt(',
    'function rhParaFill(', 'function rhOutTail(', 'async function rhOutRefresh(',
-   'async function rhTidyZip(', 'function rhTidyReset(', 'async function rhStampDoc(',
+   'async function rhTidyZip(', 'async function rhSignTidyZip(', 'function rhTidyReset(', 'async function rhStampDoc(',
    'async function _rhStampPx(', 'async function rhStampZip(', 'function stampFit(', 'function _rhPickSplit(', 'function stampOfWho(', 'function stampForSpot(', 'function stampFirmFor(', 'function _isFirmSeal(',
    'async function rhStampSpotsNow(', 'function rhStampPickAsk(',
    'function rhCleanName(', 'async function rhPagesOpen(', 'function rhPagesRender(',
