@@ -78860,7 +78860,13 @@ function dcBankOutflows(){
 function dcFirmCheck(year){
   var y = String(year);
   var bank = dcBankOutflows();
-  var bankLastYm = bank.lastDate.slice(0, 7);
+  /* 통장이 «그 달 끝까지» 덮은 달만 본 달이다 — 7/15 까지 올렸으면 7월 25일 무렵 이체는 못 본 것 (2026-10-10 실제 화면에서 찾음) */
+  var bankLastYm = '';
+  if(bank.lastDate){
+    var _ld = new Date(+bank.lastDate.slice(0, 4), +bank.lastDate.slice(5, 7), 0).getDate();
+    var _pv = new Date(+bank.lastDate.slice(0, 4), +bank.lastDate.slice(5, 7) - 2, 1);
+    bankLastYm = +bank.lastDate.slice(8, 10) >= _ld ? bank.lastDate.slice(0, 7) : _pv.getFullYear() + '-' + String(_pv.getMonth() + 1).padStart(2, '0');
+  }
   var exp = (dbGet('finance_expense', []) || []).filter(function(e){ return e && e.category === 'exp-pension' && String(e.date || '').slice(0, 4) === y; });
   var pays = dbGet('payroll_monthly', []) || [];
   var dcSet = {};
