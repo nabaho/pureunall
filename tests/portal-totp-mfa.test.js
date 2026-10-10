@@ -2,12 +2,43 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const vm = require('node:vm');
+const { 함수몸 } = require('./strip-comments');
 const root = path.join(__dirname, '..');
 const html = fs.readFileSync(path.join(root, 'enter.html'), 'utf8');
 const mfa = fs.readFileSync(path.join(root, 'js', 'pu-mfa.js'), 'utf8');
 
 test('포털이 인증 앱 모듈을 판 번호와 함께 불러온다', () => {
   assert.match(html, /js\/pu-mfa\.js\?v=\d+/);
+  assert.doesNotMatch(html, /<script[^>]+src="js\/pu-mfa\.js/,
+    '카카오 로그인 중 2단계 인증의 별도 Firebase Auth를 미리 초기화하면 안 됩니다');
+  assert.match(html, /function puLoadMFA\(\)/);
+  assert.match(html, /script\.type = 'module'/);
+  assert.match(html, /if\(_puMfaLoad\) return _puMfaLoad/,
+    '동시 요청은 인증 모듈을 한 번만 불러와야 합니다');
+  assert.match(html, /puLoadMFA\(\)\.then\(function\(mfa\)\{ return mfa\.beginLogin/,
+    '2단계 로그인이 필요한 계정은 모듈을 그때 불러올 수 있어야 합니다');
+});
+test('2단계 인증 모듈 요청이 겹쳐도 스크립트 한 개를 쓰고 로드 후 같은 모듈을 돌려준다', async () => {
+  const scripts = [];
+  const ctx = {
+    Promise, Error, _puMfaLoad: null, window: {},
+    document: {
+      createElement: () => ({}),
+      head: { appendChild: (script) => { scripts.push(script); } },
+    },
+  };
+  vm.createContext(ctx);
+  vm.runInContext(함수몸(html, 'puLoadMFA'), ctx);
+  const first = ctx.puLoadMFA();
+  const second = ctx.puLoadMFA();
+  assert.equal(first, second);
+  assert.equal(scripts.length, 1);
+  assert.equal(scripts[0].type, 'module');
+  ctx.window.PuMFA = { status: () => Promise.resolve({ enrolled:false }) };
+  scripts[0].onload();
+  assert.equal(await first, ctx.window.PuMFA);
+  assert.equal(await ctx.puLoadMFA(), ctx.window.PuMFA);
 });
 test('등록된 계정만 2단계 로그인 창으로 이어진다', () => {
   assert.match(html, /auth\/multi-factor-auth-required/);
