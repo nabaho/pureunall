@@ -3,7 +3,7 @@
    ⚠ 원본 바이트는 이 함수 안에서만 산다. 담는 것은 redactOne 이 돌려준 가린 것뿐.
    ⚠ 다시 시도할 실패(연결·시간)는 seen 에 안 적는다 — 적으면 영영 다시 안 본다.
    ⚠ 겹침은 원본 지문(sha256)으로 — 답장마다 같은 파일이 붙어 온다.
-   ⚠ 담는 것은 규칙 본문·신구대조표뿐(글 + 한글이면 파일). 동의서·신고서·의견청취·기타는
+   ⚠ 담는 것은 규칙 본문·신구대조표뿐(글 + 한글이면 파일, PDF 는 글만 — 설계 §11). 동의서·신고서·의견청취·기타는
      근로자 이름·서명이 들거나 취업규칙 서류가 아니라 글도 파일도 안 담는다 — 보류 줄만(NO_TEXT_KINDS).
    ⚠ 사업장은 후보 목록을 «그대로» 담는다. 첫 후보를 사업장으로 고르지 않는다(확정은 사람). */
 'use strict';
@@ -21,6 +21,14 @@ const NO_TEXT_KINDS = {
   '신고서': NAMES + '(신고서) — 담지 않음',
   '의견청취': NAMES + '(의견청취) — 담지 않음',
 };
+/* PDF (설계 §11) — 보류 까닭 글은 화면·검사가 본다. OLD 는 옛 까닭이자 «다시 보기» 대상 표시다. */
+const PDF_HOLD = {
+  OLD: 'PDF — 아직 못 읽음',
+  COPY: '같은 메일에 한글 본문 있음 — PDF 사본',
+  LOST: '메일에서 PDF 를 다시 못 찾음',
+  STUCK: 'PDF 다시 읽기 — 멈춤(메일에서 직접)',
+};
+function isPdfName(n) { return /.pdf$/i.test(String(n || '')); }
 
 const val = async (db, p) => (await db.ref(p).once('value')).val();
 function isRetry(e) {
@@ -227,8 +235,11 @@ async function runOnce(o) {
     const mail = { src: m.src, box: m.slug || '', key: m.src === 'imap' ? m.uid : m.key,
       date: Number(m.row.d || 0), from: String(m.row.e || ''), to: String(m.row.t || ''),
       subject: String(m.row.s || '').slice(0, 200) };
+    /* PDF 는 맨 뒤 (설계 §11-3) — 같은 메일의 한글·워드 본문이 먼저 담겨야 PDF 사본을 알아본다 */
+    const ordered = (atts || []).slice().sort((x, y) => (isPdfName(x && x.name) ? 1 : 0) - (isPdfName(y && y.name) ? 1 : 0));
+    let bodyStored = false;
     try {
-      for (const a of atts || []) {
+      for (const a of ordered) {
         const ext = P.wantAtt(a.name);
         if (!ext) continue;
         const now = o.now();
@@ -249,7 +260,7 @@ async function runOnce(o) {
         const id = P.docIdOf(sha);
         if (has(id)) { c.dup++; ids.push(id); continue; }
         if (o.trace) o.trace('가리기 ' + m.mailKey + ' ' + ext + ' ' + a.data.length + 'B');
-        const r = await X.redactOne(a.data, ext);   // impl(셋째 칸)은 검사 전용 — 여기서는 안 넘긴다
+        const r = await (o.redact || X.redactOne)(a.data, ext);   // o.redact 는 검사 전용 이음매(가짜 PDF 글 주입) — index.js 는 안 넘긴다
         if (!r.ok) {
           /* 무슨 까닭이든 ok:false 는 똑같이 보류 — 글·파일 아무것도 안 담는다 */
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
@@ -267,7 +278,8 @@ async function runOnce(o) {
            ★★★ 동의서·신고서·의견청취도 같다 (2026-10-04 대표 결정 「둘다 26 지움」).
            근로자 이름·서명이 든 서류다. 결정은 첫 회차 것을 «손으로» 지우는 데만 쓰였고 여기엔 안 들어와,
            10-04 새벽 회차가 신고서 1건을 또 담았다. 결정은 손이 아니라 이 자리에 둔다. */
-        const HOLD = NO_TEXT_KINDS[kind];
+        /* 같은 메일에 한글·워드 규칙본문이 이미 담겼으면 PDF 규칙본문은 사본 — 담으면 회차에 가짜 판이 생긴다 */
+        const HOLD = NO_TEXT_KINDS[kind] || (ext === 'pdf' && kind === '규칙본문' && bodyStored ? PDF_HOLD.COPY : '');
         if (HOLD) {
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
             { kind, sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
@@ -285,6 +297,7 @@ async function runOnce(o) {
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
           { kind, sha, file, textLen: r.text.length,
             pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' }) });
+        if (ext !== 'pdf' && kind === '규칙본문') bodyStored = true;
         staged[id] = 1; c.stored++; ids.push(id);
       }
       up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: ids, why: ids.length ? '' : '첨부 없음' };
@@ -315,4 +328,4 @@ async function runOnce(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS, PDF_HOLD, isPdfName };
