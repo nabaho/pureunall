@@ -84,6 +84,9 @@ test('★★ 공인노무사회·공공기관 탭의 한 줄(.rec-stick) 높이�
   vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 0 }, { offsetHeight: 46 }]));
   assert.equal(props['--rbarH'], '46px');
   delete props['--rbarH'];
+  vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 46 }, { offsetHeight: 0 }]));
+  assert.equal(props['--rbarH'], '46px', '뒤에 있는 숨은 탭(0)이 보이는 줄 높이를 덮었다');
+  delete props['--rbarH'];
   vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 0 }]));
   assert.ok(!('--rbarH' in props), '다 숨었는데 0px 을 박으면 표 머리가 고정 줄을 덮는다');
 });

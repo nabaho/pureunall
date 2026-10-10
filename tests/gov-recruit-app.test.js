@@ -1223,7 +1223,13 @@ test('★ 직접 열기 링크는 https 만 — 이상한 주소는 링크로 �
 });
 
 /* ═══ 공인노무사회·공공기관 탭 머리 — 한 줄 + 틀고정 (대표 「a」 2026-10-10 목업 안 A) ═══ */
-function stickOf(h) { const i = h.indexOf('<div class="rec-stick">'); const j = h.indexOf('<div class="scroll">', i); return i < 0 ? '' : h.slice(i, j < 0 ? h.length : j); }
+/* 고정 칸(.rec-stick) «안»만 — div 를 여닫는 수를 세어 그 칸이 닫히는 자리까지 자른다 */
+function stickOf(h) {
+  const i = h.indexOf('<div class="rec-stick">'); if (i < 0) return '';
+  const re = /<\/?div\b/g; re.lastIndex = i; let d = 0, m;
+  while ((m = re.exec(h))) { d += m[0] === '<div' ? 1 : -1; if (!d) return h.slice(i, m.index + 6); }
+  return h.slice(i);
+}
 test('★★★ 머리는 «한 줄» — 탭과 같은 말(제목줄)은 없고, 갈래 → 모두 봤음 → 🕒 서버 시각 차례로 한 고정 칸에', async () => {
   const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
   r.api.setFb(fbWith(WATCH), 'U1');
