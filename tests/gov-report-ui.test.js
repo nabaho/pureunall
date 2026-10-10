@@ -489,7 +489,7 @@ test('보고서 ①-3 열쇠는 있는데 클라우드 연결 전이면 조용�
  * 가짜 프록시(fetch 바꿔치기) — 실제로 밖에 나가지 않는다. 합성 자료만. */
 const Ai = require('../js/pu-gov-report-ai.js');
 const AI_NAMES = ['grpAiProxyUrl', 'grpAiConsent', 'grpAiFetch', 'grpAiCall', 'grpAiNames', 'grpAiMemos', 'grpAiCan',
-  'grpAiDraft', 'grpAiUndo', 'grpAiAllow'];
+  'grpAiDraft', 'grpAiUndo', 'grpAiAllow', 'grpAddRound', 'grpDelRound'];
 const SCREEN_NAMES = ['grpRenderTop', 'grpFileLabel', 'grpFieldHtml', 'grpSrcLabel', 'grpWarnings', 'grpAiButtons', 'grpAiFoot'];
 const aiBtn = (h) => (h.match(/<button[^>]*data-grp-act="ai"[^>]*>/) || [''])[0];
 const aiText = (text) => ({ content: [{ type: 'text', text }] });
@@ -508,13 +508,15 @@ function aiWorld(opts) {
   const replies = (o.replies || [okReply()]).slice();
   const store = Object.assign({}, o.ls || { gov_ai_ok: '1' });
   Object.assign(w.ctx, {
-    PuGovReportAi: Ai, setTimeout, clearTimeout,
+    PuGovReportAi: Ai, clearTimeout, AbortController: o.noAbort ? undefined : AbortController,
+    setTimeout: o.fastTimeout ? (fn, ms) => setTimeout(fn, ms >= 90000 ? 5 : ms) : setTimeout,
     window: { PU_CFG: { aiProxyUrl: o.noProxy ? '' : 'https://proxy.example.com/ai' } },
     localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
     fetch: async (url, init) => {
       fetched.push({ url, body: JSON.parse(init.body) });
       const r = replies.shift();
       if (r instanceof Error) throw r;
+      if (r && r.hang) return { json: () => new Promise(() => {}) };
       return { json: async () => r };
     },
   });
@@ -729,4 +731,60 @@ test('AI ⑩ 화면 — 칸을 고치면(change) AI 표시를 맞추고 그 딱�
   const b = grab('grpBind');
   assert.match(b, /grpReadForm\(\);[\s\S]*grpAiSync\(_grp\)[\s\S]*data-grp-ai/);
   assert.match(SRC, /\.grp-tag\.ai\{/);
+});
+test('AI ⑪ 쓰는 중에는 회차 추가·빼기가 막히고, 단추도 잠긴다', async () => {
+  const w = aiWorld({ screen: true });
+  const st = await opened(w);
+  w.ctx.grpAddRound();
+  const n = st.report.rounds.length;
+  st.aiBusy = true;
+  assert.strictEqual(w.ctx.grpAddRound(), 0);
+  assert.strictEqual(w.ctx.grpDelRound(n - 1), false);
+  assert.strictEqual(st.report.rounds.length, n, '쓰는 중에는 회차가 그대로');
+  assert.ok(w.ctx.__toasts.some((x) => x.m === 'AI 초안을 쓰는 중입니다 — 끝난 뒤 다시'));
+  st.aiBusy = false;
+  assert.strictEqual(w.ctx.grpDelRound(n - 1), true);
+  const html = SRC.replace(/\r/g, '');
+  assert.ok(html.includes('data-grp-act="addRound"${st.aiBusy'), '추가 단추가 쓰는 중이면 disabled');
+  assert.ok(html.includes('data-arg="${i}"${st.aiBusy'), '빼기 단추가 쓰는 중이면 disabled');
+});
+
+test('AI ⑫ 기다리는 동안 회차가 바뀌었으면 아무것도 넣지 않는다', async () => {
+  const w = aiWorld();
+  const st = await opened(w);
+  const orig = w.ctx.fetch;
+  w.ctx.fetch = async (u, i) => { st.report.rounds[0].date = '2099-01-01'; return orig(u, i); };
+  const before = JSON.stringify(st.report.rounds.map((r) => r.inquiry));
+  const r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.ok(w.ctx.__toasts.some((x) => x.m === '회차가 바뀌어 AI 초안을 넣지 않았습니다 — 다시 눌러 주세요'));
+  assert.strictEqual(JSON.stringify(st.report.rounds.map((x) => x.inquiry)), before);
+  assert.deepStrictEqual(Object.keys(st.aiSrc), []);
+  assert.strictEqual(st.aiBusy, false);
+});
+
+test('AI ⑬ 확정된 판에는 「노무사가 읽고 고친 뒤」 경고를 띄우지 않는다(딱지만)', async () => {
+  const w = aiWorld({ screen: true });
+  const st = await opened(w);
+  await w.ctx.grpAiDraft();
+  st.aiWarn['summary.review'] = ['확인 필요 — 테스트'];
+  const f = w.ctx.grpFieldsFor('cci-north').find((x) => x.path === 'summary.review');
+  assert.ok(w.ctx.grpWarnings(st).some((x) => /노무사가 읽고 고친 뒤/.test(x.t)));
+  assert.strictEqual((await w.ctx.grpConfirm()).ok, true);
+  assert.ok(!w.ctx.grpWarnings(st).some((x) => /노무사가 읽고 고친 뒤/.test(x.t)), '확정본에 검토 요청 경고');
+  const foot = w.ctx.grpFieldHtml(st, f);
+  assert.match(foot, /grp-tag ai">AI 초안/);
+  assert.ok(!/확인 필요/.test(foot));
+});
+
+test('AI ⑭ 응답 본문이 멈춰도 시간 제한으로 끊기고 aiBusy 가 풀린다', async () => {
+  for (const noAbort of [false, true]) {
+    const w = aiWorld({ replies: [{ hang: 1 }], fastTimeout: true, noAbort });
+    const st = await opened(w);
+    const r = await w.ctx.grpAiDraft();
+    assert.strictEqual(r.ok, false);
+    assert.ok(w.ctx.__toasts.some((x) => x.m === 'AI 응답이 없습니다 — 잠시 뒤 다시'));
+    assert.strictEqual(st.aiBusy, false);
+    assert.strictEqual(w.fetched.length, 1, '끊긴 것은 다음 모델로 넘기지 않는다');
+  }
 });

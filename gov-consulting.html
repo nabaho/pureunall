@@ -7612,7 +7612,7 @@ const GRP_ACTS={save:'grpSaveDraft',dl:'grpDownload',confirm:'grpConfirm',addRou
 const GRP_AI_MODELS=['claude-opus-5','claude-sonnet-4-20250514'];
 const GRP_AI_WAIT_MS=90000;
 const GRP_AI_OK='gov_ai_ok';
-const GRP_AI_MSG={noProxy:'AI 프록시가 설정되지 않았습니다 — 포털 ⚙ 설정',net:'AI 응답이 없습니다 — 잠시 뒤 다시',parse:'AI 답을 읽지 못했습니다',locked:'확정된 판입니다 — AI 초안은 [새 판으로 고치기] 뒤에 씁니다',tg:'기술보호 사업장입니다 — 「이번 건 AI 사용」을 켜야 AI 초안을 씁니다(켜도 회차 날짜·메모만 보냅니다)',none:'AI 가 채울 빈 칸이 없습니다 — 사람이 쓴 칸은 덮지 않습니다'};
+const GRP_AI_MSG={noProxy:'AI 프록시가 설정되지 않았습니다 — 포털 ⚙ 설정',net:'AI 응답이 없습니다 — 잠시 뒤 다시',parse:'AI 답을 읽지 못했습니다',locked:'확정된 판입니다 — AI 초안은 [새 판으로 고치기] 뒤에 씁니다',tg:'기술보호 사업장입니다 — 「이번 건 AI 사용」을 켜야 AI 초안을 씁니다(켜도 회차 날짜·메모만 보냅니다)',busyRound:'AI 초안을 쓰는 중입니다 — 끝난 뒤 다시',moved:'회차가 바뀌어 AI 초안을 넣지 않았습니다 — 다시 눌러 주세요',none:'AI 가 채울 빈 칸이 없습니다 — 사람이 쓴 칸은 덮지 않습니다'};
 const GRP_AI_PATH=/^(?:rounds\.\d+\.(?:inquiry|diagnosis|advice|result|next)|summary\.(?:inquiryDiag|review|action|etc|adviceAll|overall))$/;
 function grpRptRef(coId,rid){ return _fbDB.ref('scal_reports/'+coId+'/'+rid); }
 function grpRid(typeId,year){ return String(typeId)+'_'+String(year); }
@@ -7958,6 +7958,7 @@ function grpNewVersion(){
 function grpAddRound(){
   const st=_grp;
   if(!st||!st.report||st.locked) return 0;
+  if(st.aiBusy){ toast(GRP_AI_MSG.busyRound); return 0; }
   grpReadForm();
   st.report.rounds.push({date:'',visit:null,inquiry:'',diagnosis:'',advice:'',result:'',next:''});
   st.meta.push({added:true});
@@ -7968,6 +7969,7 @@ function grpAddRound(){
 function grpDelRound(i){
   const st=_grp; i=Number(i);
   if(!st||!st.report||st.locked||!(st.meta[i]&&st.meta[i].added)) return false;
+  if(st.aiBusy){ toast(GRP_AI_MSG.busyRound); return false; }
   grpReadForm();
   st.report.rounds.splice(i,1); st.meta.splice(i,1); grpAiDropRound(st,i);
   grpRender();
@@ -8126,16 +8128,16 @@ function grpAiConsent(){
   if(ok){ try{ localStorage.setItem(GRP_AI_OK,'1'); }catch(e){} }
   return !!ok;
 }
+/* 응답 본문(JSON)까지 읽은 뒤에야 시간 제한을 푼다 — 본문이 멈춰도 90초 뒤 끊긴다 */
 function grpAiFetch(url,opts){
-  if(typeof AbortController==='undefined') return fetch(url,opts);
-  const ac=new AbortController();
-  const timer=setTimeout(function(){ ac.abort(); },GRP_AI_WAIT_MS);
-  return fetch(url,Object.assign({},opts,{signal:ac.signal})).then(function(r){ clearTimeout(timer); return r; },
-    function(e){
-      clearTimeout(timer);
-      if(e&&e.name==='AbortError'){ const t=new Error(GRP_AI_MSG.net+' ('+Math.round(GRP_AI_WAIT_MS/1000)+'초)'); t.timeout=true; throw t; }
-      throw e;
-    });
+  const ac=(typeof AbortController!=='undefined')?new AbortController():null;
+  let timer=null;
+  const tmo=function(){ const t=new Error(GRP_AI_MSG.net+' ('+Math.round(GRP_AI_WAIT_MS/1000)+'초)'); t.timeout=true; return t; };
+  const limit=new Promise(function(_,rej){ timer=setTimeout(function(){ if(ac){ try{ ac.abort(); }catch(e){} } rej(tmo()); },GRP_AI_WAIT_MS); });
+  const work=fetch(url,ac?Object.assign({},opts,{signal:ac.signal}):opts).then(function(r){ return r.json(); });
+  work.catch(function(){});
+  return Promise.race([work,limit]).then(function(d){ clearTimeout(timer); return d; },
+    function(e){ clearTimeout(timer); if(e&&e.name==='AbortError') throw tmo(); throw e; });
 }
 function grpAiCall(system,messages){
   const url=grpAiProxyUrl();
@@ -8144,7 +8146,6 @@ function grpAiCall(system,messages){
   function attempt(){
     return grpAiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:GRP_AI_MODELS[i],max_tokens:8000,system:system,messages:messages})})
-      .then(function(r){ return r.json(); })
       .then(function(d){
         if(d&&d.error) throw new Error(d.error.message||'AI 오류');
         const t=d&&(d.reply||d.text||((d.content||[]).filter(function(b){ return b&&b.type==='text'; }).map(function(b){ return b.text; }).join('')));
@@ -8251,7 +8252,8 @@ async function grpAiDraft(){
   if(!req.want.length){ toast(GRP_AI_MSG.none); return {ok:false,error:GRP_AI_MSG.none}; }
   if(!grpAiProxyUrl()){ toast(GRP_AI_MSG.noProxy,'err'); grpNote(escAttr(GRP_AI_MSG.noProxy)); return {ok:false,error:GRP_AI_MSG.noProxy}; }
   if(!grpAiConsent()) return {ok:false,cancelled:true};                 // 동의 안 하면 아무것도 보내지 않는다
-  st.aiBusy=true; grpRenderTop();
+  const sig=JSON.stringify((st.report.rounds||[]).map(function(r){ return r&&r.date; }));
+  st.aiBusy=true; grpRenderTop(); grpRender();
   let draft=null, err=null;
   try{
     for(let k=0;k<2&&!draft;k++){                                      // 못 읽으면 한 번 더 묻는다
@@ -8268,6 +8270,7 @@ async function grpAiDraft(){
     return {ok:false,error:m};
   }
   if(st.locked){ toast(GRP_AI_MSG.locked,'err'); grpRenderTop(); return {ok:false,error:GRP_AI_MSG.locked}; }
+  if(JSON.stringify((st.report.rounds||[]).map(function(r){ return r&&r.date; }))!==sig){ toast(GRP_AI_MSG.moved,'err'); grpRenderTop(); return {ok:false,error:GRP_AI_MSG.moved}; }
   grpReadForm(); grpAiSync(st);                                        // 기다리는 동안 사람이 고친 칸
   const res=A.applyDraft(st.report,st.aiSrc,draft,req.fields);
   st.report=res.report; st.aiSrc=res.src;
@@ -8309,6 +8312,7 @@ function grpAiFoot(st,paths,key){
     const lab=(GRP_RLAB.find(function(k){ return k[0]===last; })||[])[1];
     ((st.aiWarn||{})[p]||[]).forEach(function(w){ ws.push((paths.length>1&&lab?lab+' — ':'')+w); });
   });
+  if(st.locked) return `<div class="grp-aiw" data-grp-ai="${escAttr(key)}"><span class="grp-tag ai">AI 초안</span></div>`;
   return `<div class="grp-aiw" data-grp-ai="${escAttr(key)}"><span class="grp-tag ai">AI 초안</span>${ws.map(function(w){ return `<div class="grp-aiw-w">⚠ ${escAttr(w)}</div>`; }).join('')}</div>`;
 }
 /* 머리줄 AI 단추들 — 기술보호 켜기 · ✨ · ↶ 되돌리기 */
@@ -8361,7 +8365,7 @@ function grpWarnings(st){
   if(st.techguard) W.push({k:'lock',t:'🔒 기술보호 자료 — 이 사업장의 자료·보고서는 기술보호 자료로 다룹니다'});
   if(st.techguard&&st.aiAllow&&!st.locked) W.push({k:'lock',t:'🔒 이번 건 AI 사용 켬 — 회차 날짜·메모만 보냅니다(메일·보낸 서류는 보내지 않습니다)'});
   const aiOn=Object.keys(st.aiSrc||{}).filter(function(p){ return st.aiSrc[p]==='ai'; });
-  if(aiOn.length){
+  if(aiOn.length&&!st.locked){
     const wn=aiOn.filter(function(p){ return (st.aiWarn||{})[p]&&st.aiWarn[p].length; }).length;
     W.push({k:wn?'warn':'',t:'✨ AI 초안 '+aiOn.length+'칸 — 노무사가 읽고 고친 뒤 저장·확정하세요'+(wn?' · 확인 필요 '+wn+'칸':'')});
   }
@@ -8437,7 +8441,7 @@ function grpRender(){
     const vis=r.visit===true?'1':r.visit===false?'0':'';
     return `<tr>
       <td class="grp-rno">${i+1}회<br><span class="grp-tag${added?' add':''}">${added?'보고서에서 추가':'일정'}</span>
-        ${added&&!st.locked?`<br><button type="button" class="grp-del" data-grp-act="delRound" data-arg="${i}" title="이 회차를 보고서에서 뺍니다">빼기</button>`:''}</td>
+        ${added&&!st.locked?`<br><button type="button" class="grp-del" data-grp-act="delRound" data-arg="${i}"${st.aiBusy?' disabled':''} title="이 회차를 보고서에서 뺍니다">빼기</button>`:''}</td>
       <td><input class="fi grp-in${r.date?'':' grp-blank'}" type="date" data-grp="rounds.${i}.date" value="${escAttr(r.date||'')}"${dis}></td>
       ${showVisit?`<td><select class="fsel grp-in" data-grp="rounds.${i}.visit" data-kind="visit"${dis}>
         <option value=""${vis===''?' selected':''}>모름</option><option value="1"${vis==='1'?' selected':''}>■방문</option><option value="0"${vis==='0'?' selected':''}>■사무활동</option></select></td>`:''}
@@ -8457,7 +8461,7 @@ function grpRender(){
     <div>
       <div class="grp-card"><h3>① 기업 정보 <span class="grp-src">이알피 계약에서 가져옴 — 고치면 이 보고서에만 남습니다</span></h3>
         <div class="grp-grid">${sec(1)}</div></div>
-      <div class="grp-card"><h3>② 회차별 수행 ${st.locked?'':'<button type="button" class="btn btn-s grp-b grp-add" data-grp-act="addRound">+ 회차 추가</button>'}</h3>
+      <div class="grp-card"><h3>② 회차별 수행 ${st.locked?'':`<button type="button" class="btn btn-s grp-b grp-add" data-grp-act="addRound"${st.aiBusy?' disabled':''}>+ 회차 추가</button>`}</h3>
         <div class="grp-tblw"><table class="grp-tbl"><thead><tr><th>회차</th><th style="width:140px">일자</th>${showVisit?'<th style="width:110px">방식</th>':''}<th>수행 내역(${escAttr((GRP_RUSE[fk]||[]).join('·'))})</th></tr></thead>
         <tbody>${rows||`<tr><td colspan="${showVisit?4:3}" class="grp-src">일정에 회차가 없습니다 — [+ 회차 추가]</td></tr>`}</tbody></table></div></div>
       <div class="grp-card"><h3>③ 종합</h3><div class="grp-grid">${sec(3)}</div></div>
