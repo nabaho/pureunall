@@ -42,7 +42,7 @@ function 상자() {
     GCAL: { evs: [] },
   };
   vm.createContext(ctx);
-  vm.runInContext(함수몸('function 제목시각(') + '\n' + 함수몸('function gcalToEvent(ev){') + '\n'
+  vm.runInContext(함수몸('function 제목시각(') + '\n' + 함수몸('function 일정담당(ev){') + '\n' + 함수몸('function gcalToEvent(ev){') + '\n'
     + 함수몸('function 구글상세(id){') + '\n' + 함수몸('function 언제적(iso){'), ctx);
   return ctx;
 }

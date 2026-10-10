@@ -64,6 +64,14 @@ function 표식있음(title, marks) {
   return 괄호들.some((g) => marks.some((m) => g.indexOf(m) >= 0));
 }
 
+/* 일정의 담당 번호 — 서버 대신 넣기(gcal-proxy)가 남긴 것. shared.puSid, 없으면 설명 끝줄 「푸른 담당: 이름 (P-005)」 */
+function 담당번호(ev) {
+  const sp = ev && ev.extendedProperties && ev.extendedProperties.shared && ev.extendedProperties.shared.puSid;
+  if (/^[A-Z]-\d{3}$/.test(s(sp))) return s(sp);
+  const m = /푸른 담당:[^\n(]*\(([A-Z]-\d{3})\)/.exec(s(ev && ev.description));
+  return m ? m[1] : '';
+}
+
 /* 고르기 — 순수 함수(검사가 그대로 부른다).
    in: { now, cfg, gcal:[구글 events 항목], mailSid:{메일열쇠:sid}, schedules:{id:{…}}, priv:{id:{…}} }
    out: [{ key, src, id, date, time, startMs, title, place }] 시작 순 */
@@ -81,15 +89,19 @@ function pickTrips(input) {
   (o.gcal || []).forEach((ev) => {
     if (!ev || ev.status === 'cancelled' || !ev.start || !ev.start.dateTime) return;  /* 종일 일정은 출발 시각이 없다 */
     const 만든이 = (ev.creator && ev.creator.email) || (ev.organizer && ev.organizer.email) || '';
+    /* 서버가 직원 대신 넣은 일정(gcal-proxy)은 만든이가 대표 계정이다 — 담당 번호(puSid)가 이긴다 */
+    const 담당 = 담당번호(ev);
     const 참석 = (ev.attendees || []).some((a) => a && a.responseStatus !== 'declined' && 대표메일(a.email));
-    if (!(대표메일(만든이) || 참석 || 표식있음(ev.summary, cfg.titleMarks))) return;
+    const 내것 = 담당 ? 담당 === cfg.ownerSid : 대표메일(만든이);
+    if (!(내것 || 참석 || 표식있음(ev.summary, cfg.titleMarks))) return;
     const ms = Date.parse(ev.start.dateTime);
     if (!isFinite(ms)) return;
     넣기('gcal', ev.id, 서울날(ms), 서울hm(ms), ev.summary, ev.location);
   });
   Object.keys(o.schedules || {}).forEach((id) => {
     const x = o.schedules[id];
-    if (!x || x._deleted || x.externalId || s(x.sid) !== cfg.ownerSid) return;
+    /* 구글로 옮긴 것(movedToGcal)은 구글 쪽 일정으로 잡는다 — 두 번 울리지 않게 */
+    if (!x || x._deleted || x.externalId || x.movedToGcal || s(x.sid) !== cfg.ownerSid) return;
     넣기('sch', x.id || id, x.date, x.time, x.title, x.place);
   });
   Object.keys(o.priv || {}).forEach((id) => {

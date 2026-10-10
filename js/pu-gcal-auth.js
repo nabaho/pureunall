@@ -223,6 +223,12 @@
     if (ev.source && ev.source.kind && ev.source.id) {
       몸.extendedProperties = { private: { puSourceKind: String(ev.source.kind), puSourceId: String(ev.source.id) } };
     }
+    /* 담당 번호 — 만든이 메일과 담당이 다를 때(대표가 직원 일정을 넣거나, 서버가 대신 넣을 때) 이것이 이긴다
+       (2026-10-10). functions/gcal-proxy.js bodyOf 와 같은 셈이다. */
+    if (/^[A-Z]-\d{3}$/.test(String(ev.puSid || ''))) {
+      몸.extendedProperties = 몸.extendedProperties || {};
+      몸.extendedProperties.shared = { puSid: String(ev.puSid) };
+    }
     return 몸;
   }
   function 몸검사(calId, ev) {
@@ -395,7 +401,7 @@
   return {
     hasToken: hasToken, token: token, capture: capture,
     signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent,
-    getEvent: getEvent,
+    getEvent: getEvent, bodyOf: 몸만들기,   /* bodyOf — 서버 대신 넣기와 «같은 셈»인지 검사가 맞대 본다 */
     fromServer: fromServer, linkStart: linkStart, captureCode: captureCode, linkFinish: linkFinish,
     unlink: unlink, email: email, keepAlive: keepAlive
   };

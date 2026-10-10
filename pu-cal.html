@@ -25,7 +25,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=9"></script>
+<script src="js/pu-gcal-auth.js?v=10"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
@@ -1757,6 +1757,13 @@ function 제목시각(title, 구글시각){
   var m = /^\s*([01]\d|2[0-3]):?([0-5]\d)(?![\d년.\/]|-\d{1,2}(?!\d))/.exec(String(title || ""));
   return m ? m[1] + ":" + m[2] : "";
 }
+/* 구글 일정의 담당 번호 — shared.puSid, 없으면 설명의 「푸른 담당: 이름 (P-005)」. 명부에 있는 번호만 */
+function 일정담당(ev){
+  var sp = ev && ev.extendedProperties && ev.extendedProperties.shared && ev.extendedProperties.shared.puSid;
+  var m = /푸른 담당:[^\n(<]*\(([A-Z]-\d{3})\)/.exec(String((ev && ev.description) || ""));
+  var sid = /^[A-Z]-\d{3}$/.test(String(sp || "")) ? String(sp) : (m ? m[1] : "");
+  return sid && nameOf(sid) && nameOf(sid) !== sid ? sid : "";
+}
 function gcalToEvent(ev){
   var date = (ev.start.date || ev.start.dateTime || "").slice(0,10);
   var timeStr = ev.start.dateTime ? ev.start.dateTime.slice(11,16) : "";
@@ -1767,7 +1774,10 @@ function gcalToEvent(ev){
   if(!title) title = "일정";
   var gColor = (window._gcalColors && ev.colorId) ? (window._gcalColors[String(ev.colorId)] || "") : "";
   var mail = (ev.creator && ev.creator.email) || (ev.organizer && ev.organizer.email) || "";
-  var mailSid = gcalSidByMail(mail);
+  /* ★ 담당 번호가 있으면 그것이 이긴다 — 서버가 직원 대신 넣은 일정(functions/gcal-proxy.js)은
+       만든이가 대표 계정이다(2026-10-10). 번호가 명부에 없으면 쓰지 않는다. */
+  var 담당 = 일정담당(ev);
+  var mailSid = 담당 || gcalSidByMail(mail);
   var color = gColor || (mailSid ? (colorOf(mailSid) || "") : "")
     || gcalMailColor(mail) || (ev.summary ? "#2563eb" : "#94a3b8");
   var sid = mailSid || "GCAL";
@@ -1845,6 +1855,8 @@ function eventsOn(ymd, eumOnly){
              + (ext.note ? "\n📝 요구사항: " + ext.note : "") });
       return;
     }
+    /* 구글로 옮긴 것(서버 대신 넣기)은 구글 것을 그린다 — 두 번 안 뜨게. 구글을 못 받았으면 이것이라도 */
+    if(s.movedToGcal && s.gcalEventId && !GCAL.err) return;
     var hm = String(s.time || "").slice(0,5);
     out.push({ kind:"sch", store:"my_schedules", id:s.id, sid:s.sid,
       text: s.title || "일정",
@@ -3068,7 +3080,7 @@ function 동선들(ymd){
   if(typeof PuCalMap === "undefined" || !ymd) return [];
   return PuCalMap.stopsOn(ymd, {
     gcal: GCAL.evs || [],
-    sch: arr(D.my_schedules).filter(function(s){ return s && !s.externalId; }),
+    sch: arr(D.my_schedules).filter(function(s){ return s && !s.externalId && !(s.movedToGcal && s.gcalEventId && !GCAL.err); }),
     priv: arr(D.cal_private)
   });
 }
@@ -3682,11 +3694,12 @@ function 구글에넣기(m){
   if(String(m.contact||"").trim()) 설명.push("담당자: " + String(m.contact).trim());
   if(String(m.note||"").trim()) 설명.push(String(m.note).trim());
   var 사람 = nameOf(m.sid);
-  if(사람) 설명.push("푸른 담당: " + 사람);
+  /* 담당 번호를 함께 — 구글에는 만든이가 «넣은 사람»으로 찍혀, 대표가 직원 일정을 넣으면 대표 것으로 보였다(2026-10-10) */
+  if(사람) 설명.push("푸른 담당: " + 사람 + (/^[A-Z]-\d{3}$/.test(String(m.sid||"")) ? " (" + m.sid + ")" : ""));
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
     date: m.date, time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
-    location: String(m.place||"").trim(), description: 설명.join("\n"),
+    location: String(m.place||"").trim(), description: 설명.join("\n"), puSid: String(m.sid||""),
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
   }).then(function(){
     S.busy = false;
@@ -3758,8 +3771,11 @@ function doSave(){
     if(m.옮김) 개인지우기조용히(m.옮김);
     closeModal();
     toast(고침 ? "✅ 고쳤습니다"
-      : (일정 ? "✅ 넣었습니다 — 구글 로그인하면 다음부터 폰 구글 캘린더에도 뜹니다" : "✅ 넣었습니다"));
+      : (일정 ? "✅ 넣었습니다 — 구글 공용 달력으로 옮기는 중(몇 초)" : "✅ 넣었습니다"));
     refreshOne(store);
+    /* 👥 서버가 구글 공용 달력에 대신 넣는다(functions/gcal-proxy.js) — 조금 뒤 구글을 다시 받아 맞춘다 */
+    if(일정 && !고침){ setTimeout(function(){ gcalLoad(true); refreshOne(store); }, 6000);
+                      setTimeout(function(){ gcalLoad(true); refreshOne(store); }, 20000); }
     /* 이음 근무가 바뀌면 외부 공유 뷰도 따라가야 한다 — 안 걸면 옛 일정이 그대로 뜬다 */
     if(store === "attendance_records") 발행예약();
   });
