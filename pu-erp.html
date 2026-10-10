@@ -28588,7 +28588,9 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   }, []);
 
   var users = getAssignableUsers();
-  function userName(sid){ var u = users.find(function(x){return x.sid===sid;}); return u ? u.name : '-'; }
+  /* ★ 이 함수는 위쪽(주담당 폴백 — 입금의 managerName 이 빌 때)에서 «users 를 만들기 전»에도 불린다.
+     함수 선언은 끌어올려지지만 var users 의 값은 아직 undefined 라 업체관리 화면이 통째로 멎었다(2026-10-10). */
+  function userName(sid){ var u = (users || getAssignableUsers()).find(function(x){return x.sid===sid;}); return u ? u.name : '-'; }
   function typeName(code){
     var types = dbGet('biz_company_types', COMPANY_TYPE_SEED);
     var t = types.find(function(x){return x.code===code;});
