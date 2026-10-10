@@ -247,7 +247,7 @@ test('★★★ 사전이 짚은 칸을 AI 가 «절대» 덮지 못한다 — �
      그것이 바로 대표가 말한 「자기 마음데로 입력된다」다. */
   const slots = [
     { id: 'a', kind: '빈칸', guess: 'name' },      /* 사전이 짚었다 */
-    { id: 'b', kind: '빈칸', guess: '' },          /* 모른다 */
+    { id: 'b', kind: '빈칸', guess: '', left: '전화' },          /* 모른다(라벨은 있다) */
     { id: 'c', kind: '글자칸', guess: '' }         /* 사람이 고치는 자리 */
   ];
   const n = A.mergeInto(slots, { a: 'phoneWork', b: 'phoneWork', c: 'addr' });
@@ -430,7 +430,7 @@ test('★★ 담아 둔 답에 «낡은 열쇠»가 있어도 받지 않는다 �
   const slots = [
     { id: 'a', kind: '빈칸', guess: '' },
     { id: 'b', kind: '빈칸', guess: '' },
-    { id: 'c', kind: '빈칸', guess: '' }
+    { id: 'c', kind: '빈칸', guess: '', left: '전화' }
   ];
   const n = A.mergeInto(slots, { a: '옛날열쇠', b: 'rrn', c: 'phoneWork' });
   assert.equal(slots[0].guess, '', '★ 모르는 열쇠를 그대로 얹었습니다: ' + slots[0].guess);

@@ -60,3 +60,14 @@ test('④ 짓는 길이 정돈하고, 채운 뒤 «내 이름» 서명 줄에 �
   assert.ok(/stampForSpot\(s\)\|\|기본/.test(auto), '자리마다 맞는 도장');
   assert.ok(!/_rhStampOn\s*=\s*true/.test(auto), '표시는 rhStampDoc 한 곳에서만 켠다');
 });
+
+test('⑤ 문맥 없는 빈칸은 AI 가 짚어도 안 채운다 — 강의경력 표에 인적사항이 박히던 것', () => {
+  const AI = require('../js/kcareer-slotai.js');
+  const slots = [
+    { id: 't0r14c1', tbl: 0, row: 14, col: 1, kind: '빈칸', left: '', up: '', sec: 'Contents/section0.xml', rawId: 't0r14c1' },
+    { id: 't0r1c2', tbl: 0, row: 1, col: 2, kind: '빈칸', left: '성 명', up: '', sec: 'Contents/section0.xml', rawId: 't0r1c2' }];
+  const picks = {};
+  slots.forEach((s) => { picks[s.sec + '#' + s.id] = 'name'; picks[s.id] = 'name'; });
+  AI.mergeInto(slots, picks);
+  assert.ok(!slots[0].guess, '라벨도 머리글도 없는 칸은 비워 둔다');
+});
