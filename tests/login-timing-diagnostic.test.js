@@ -20,10 +20,21 @@ test('카카오 복귀의 서버·저장소·Firebase·타일과 재방문의 �
   assert.match(ret, /kkServerMs/);
   assert.match(ret, /kkStoreMs/);
   assert.match(ret, /kkFirebaseMs/);
+  assert.match(ret, /firebaseNetworkMs:kkFirebaseNetworkMs/);
+  assert.match(ret, /authReadyBeforeSignIn:kkAuthReadyBeforeSignIn/);
+  assert.match(ret, /identitytoolkit\|securetoken/);
   const portal = html.slice(html.indexOf('function enterPortal(user'), html.indexOf('function renderPortal(acct'));
   assert.match(portal, /mode:'kakao'/);
   assert.match(portal, /mode:'session'/);
   assert.match(portal, /puLoginTimingSave/);
+});
+
+test('Firebase 네트워크 진단은 요청 주소·인증표를 저장하지 않고 시간과 건수만 기록한다', () => {
+  const measured = html.slice(html.indexOf('var resources = window.performance.getEntriesByType'),
+    html.indexOf('window.__kkReturning = false;', html.indexOf('var resources = window.performance.getEntriesByType')));
+  assert.match(measured, /kkFirebaseNetworkCount\+\+/);
+  assert.match(measured, /kkFirebaseNetworkMs \+=/);
+  assert.doesNotMatch(measured, /entry\.name\s*[,}]/);
 });
 
 test('관리자만 로컬 측정치를 보고, 진단 저장에는 계정과 인증표를 담지 않는다', () => {
