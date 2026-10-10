@@ -16,7 +16,7 @@ test('① 안내문에 회사명이 들어가고, 이름 속 태그는 글자로
 
 test('② 핵심 두 가지 — 대지급금 1개월, 회사 부담 12만원(+부가가치세) · 비용 근거와 «공고에 따른다» 단서', () => {
   const h = L.buildLetter(co('주식회사 가나'));
-  assert.match(h, /간이대지급금·대지급금/); assert.match(h, /법에서 정한 최대 금액까지/); assert.match(h, /빠르면 1개월 내/);
+  assert.match(h, /간이대지급금·대지급금/); assert.match(h, /법에서 정한 최대 금액까지/); assert.match(h, /간이대지급금 최대 <b>1,000만원<\/b> · 도산대지급금 최대 <b>3,150만원<\/b>/); assert.match(h, /빠르면 1개월 내/);
   assert.match(h, /회사는 12만원\(\+부가가치세\)만 부담/);
   assert.match(h, /정부 지원 90% · 기업 자부담 10% \+ 부가가치세/);
   assert.match(h, /120만원 → 기업 자부담 12만원 \+ 부가가치세 12만원/);
