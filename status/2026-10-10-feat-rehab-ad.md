@@ -23,7 +23,7 @@
 - 회사명은 관계 열쇠가 아니다 — 사업자번호가 없어 기업정보함과 잇지 않는다.
 
 ## 남은 일
-- [ ] **규칙 올리기** `node scripts/rules-deploy.js --deploy` — 미리보기: «새로 생기는 규칙 1개 /rehab_ad · 바뀜 0 · 사라짐 0».
+- [x] **규칙 올리기**(2026-10-10 올림 · 콘솔 재확인 일치) `node scripts/rules-deploy.js --deploy` — 미리보기: «새로 생기는 규칙 1개 /rehab_ad · 바뀜 0 · 사라짐 0».
       auto 모드 분류기가 막아 대표 승인 대기(2026-10-10). 올리면 콘솔원문·rules-paste 가 새로 써진다 → 같은 PR 에 넣는다.
-- [ ] **함수 올리기** `firebase deploy --only functions:rehabWatch` — 올리기 전에는 07:40 수집이 안 돈다(화면은 «수집 기록 없음»).
+- [x] **함수 올리기**(2026-10-10 rehabWatch 생성, asia-northeast3 · 첫 수집은 다음 날 07:40) `firebase deploy --only functions:rehabWatch` — 올리기 전에는 07:40 수집이 안 돈다(화면은 «수집 기록 없음»).
 - [ ] 회생기업용 안내문(대지급금·고용조정·재기 단계) — 라벨과 함께 넣을 편지. 재기컨설팅 공급기업 선정 전이라 바우처는 «정부지원제도 안내»만.
