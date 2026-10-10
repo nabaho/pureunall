@@ -385,6 +385,22 @@
     var first = checked.map(function (id) { return all.filter(function (f) { return f.id === id; })[0]; }).filter(Boolean);
     return { list: first.concat(rest), checked: checked.slice() };
   }
+  /* ══ 사건계약에는 위임장이 늘 함께 (대표 지시 2026-10-10 「사건 진행시에는 위임장이 항상 함께 있어야 한다」) ══
+     고른 사건 양식에 약정서·계약서는 있는데 위임장이 없으면 — 같은 갈래·같은 측의 «위임장만 있는» 양식,
+     없으면 그 측 공통 위임장(「위임장(근로자 공통)」·「위임장(사용자 공통)」)을 함께 넣는다. 신고서만 고른 것은 넣지 않는다 */
+  var POWER_RE = /위임장/, CONTRACT_RE = /약정서|계약서/;
+  function hasPower(f) { return POWER_RE.test(String((f && f.name) || '')); }
+  function isPowerOnly(f) { var n = String((f && f.name) || ''); return POWER_RE.test(n) && !CONTRACT_RE.test(n) && !/선임|신고서/.test(n); }
+  function powerFor(fms, all) {
+    fms = (fms || []).filter(Boolean);
+    var deals = fms.filter(function (f) { return f.kind === 'case' && CONTRACT_RE.test(String(f.name || '')); });
+    if (!deals.length || fms.some(hasPower)) return null;
+    var g = groupOf(deals[0]), sd = sideOf(deals[0]) === 'employer' ? 'employer' : 'worker';
+    var pool = (all || []).filter(function (f) { return f && f.kind === 'case' && f.enabled !== false && isPowerOnly(f) && fms.indexOf(f) < 0; });
+    return pool.filter(function (f) { return groupOf(f) === g && sideOf(f) === sd; })[0]
+      || pool.filter(function (f) { return /공통/.test(f.name || '') && sideOf(f) === sd; })[0]
+      || pool.filter(function (f) { return sideOf(f) === sd; })[0] || null;
+  }
   /* ══ 채우기 창 «이 회사 이알피 계약» (대표 「이알피 또는 기업정보함에서 찾아야 할 것 같은데」 2026-10-10) ══
      고른 회사(사업자번호·이름)에 맞는 이알피 계약 — 최근 계약일 먼저. 이름은 (주)·㈜·주식회사·빈칸을 떼고 견준다 */
   function contractsForCo(list, co) {
@@ -2201,7 +2217,7 @@
         var mk = MAKE_KINDS.filter(function (x) { return x.v === cur; })[0];
         close();
         S.kind = mk.kind; resetFilters(); S.checked = list.map(function (f) { return f.id; }); select(list[0].id);
-        openFill(list, host, mk.icon + ' ' + mk.label + ' 계약서');
+        openFill(withPower(list), host, mk.icon + ' ' + mk.label + ' 계약서');
       }
       var m = el('div', { 'class': 'pcf-m', role: 'dialog', 'aria-label': '계약서 만들기', style: 'width:760px' }, [
         el('div', { 'class': 'pcf-mh' }, [el('span', { text: '📄 계약서 만들기 — 기업정보함에서 고른 회사' }),
@@ -2721,8 +2737,8 @@
           chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
           chip('🔤 글자 본문', view === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
         host.hwpShow && hwpSources(fm).some(function (x) { return !isXlsxName(x.name); })
-          ? el('button', { type: 'button', 'class': 'pcf-printb', title: '당사자 칸을 비운 채(＿＿＿ 밑줄) 바로 인쇄합니다 — 손으로 적을 때', text: '🖨 빈 양식 인쇄', onclick: function () { printBlank([fm]); } }) : null,
-        host.cards ? el('button', { type: 'button', 'class': 'pcf-fillbig', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다. 채운 뒤 내려받거나 보냅니다.', text: '📝 찾아서 채우기', onclick: function () { openFill([fm], host); } }) : null,
+          ? el('button', { type: 'button', 'class': 'pcf-printb', title: '당사자 칸을 비운 채(＿＿＿ 밑줄) 바로 인쇄합니다 — 손으로 적을 때', text: '🖨 빈 양식 인쇄', onclick: function () { printBlank(withPower([fm])); } }) : null,
+        host.cards ? el('button', { type: 'button', 'class': 'pcf-fillbig', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다. 채운 뒤 내려받거나 보냅니다.', text: '📝 찾아서 채우기', onclick: function () { openFill(withPower([fm]), host); } }) : null,
         moreMenu([
           { t: '✏ 수정', fn: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } },
           { t: '⧉ 복제', fn: function () { copy(fm); } },
@@ -2884,6 +2900,13 @@
       drawBar();
     }
     function setById(id) { return S.sets.filter(function (s) { return s.id === id; })[0] || null; }
+    /* 위임장 함께 — 빠졌으면 넣고 알린다(powerFor) */
+    function withPower(fms) {
+      var p = powerFor(fms, S.forms);
+      if (!p) return fms;
+      toast('⚖️ 사건계약에는 위임장이 함께 있어야 합니다 — 「' + p.name + '」을 함께 넣었습니다', 6000);
+      return fms.concat([p]);
+    }
     /* 양식 줄 옮기기 — 같은 종류·같은 갈래 안에서만. 찾기·거르기로 가려진 것까지 그 갈래 전체 차례로 적는다 */
     function moveForm(from, to, after) {
       var fa = S.forms.filter(function (f) { return f.id === from; })[0], fb = S.forms.filter(function (f) { return f.id === to; })[0];
@@ -3019,9 +3042,9 @@
         text: '👥 여러 명에게 링크로 받기', onclick: function () { host.openEsign({ newCase: true }); } }));
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
       if (host.hwpShow) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', title: '고른 양식을 당사자 칸을 비운 채 한 번에 인쇄합니다(엑셀 양식은 건너뜀)', text: '🖨 빈 양식 ' + fms.length + '개 인쇄',
-        onclick: function () { printBlank(checkedForms()); } }));
+        onclick: function () { printBlank(withPower(checkedForms())); } }));
       if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
-        onclick: function () { openFill(checkedForms(), host, st ? st.name : (host.contractCtx ? host.contractCtx.label : '고른 양식')); } }));
+        onclick: function () { openFill(withPower(checkedForms()), host, st ? st.name : (host.contractCtx ? host.contractCtx.label : '고른 양식')); } }));
       fitHeight();
     }
     /* 목록 — 원본 보관함과 같은 표(2026-10-07 대표 「계약서 양식도 같은 방식」): ☐(모두) · # · 양식 · 원본.
@@ -3148,7 +3171,7 @@
     facetCounts: facetCounts,
     setsOf: setsOf,
     changeSets: changeSets,
-    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder, contractsForCo: contractsForCo,
+    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder, contractsForCo: contractsForCo, powerFor: powerFor,
     bundleMarkers: bundleMarkers,
     bundleFileNames: bundleFileNames,
     zipName: zipName,

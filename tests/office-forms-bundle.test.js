@@ -103,7 +103,7 @@ test('ⓔ 묶음 창은 양식 여러 개를 받는다 — 한 장 창은 그 �
   assert.match(f, /bundleMarkers\(/, '채울 자리를 양식들 합집합으로 모으지 않습니다');
   assert.match(f, /host\.zip\(/, '여러 양식을 압축으로 묶지 않습니다');
   const m = cutFn(s, 'function mount(');
-  assert.match(m, /openFill\(\[fm\], host/, '한 장 「채워서 받기」가 같은 창을 쓰지 않습니다');
+  assert.match(m, /openFill\((?:withPower\()?\[fm\]\)?, host/, '한 장 「채워서 받기」가 같은 창을 쓰지 않습니다');
 });
 
 test('목록 체크·아래 막대·세트 고르기', () => {
