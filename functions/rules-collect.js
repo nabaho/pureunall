@@ -115,6 +115,26 @@ async function heal(o, db, bucket, docs) {
   }
   return n;
 }
+/* ══════ PDF 다시 보기 (설계 §11-4 · 2026-10-10 대표 「추천대로」) ══════
+   옛 회차가 「PDF — 아직 못 읽음」으로 보류한 규칙본문·신구대조표 PDF 를 살린다. 그 메일만 다시 받아
+   «지문(sha)이 같은 첨부»만 읽는다 — 다른 첨부는 건드리지 않는다(겹침·범위). 동의서·신고서 PDF 는 읽지 않는다. */
+function pdfTargets(docs) {
+  const by = {};
+  Object.keys(docs || {}).forEach((id) => {
+    const d = docs[id];
+    if (!d || d.status !== '보류' || d.holdWhy !== PDF_HOLD.OLD) return;
+    if (FILE_KINDS.indexOf(d.kind) < 0 || !isPdfName(d.name) || !d.sha || !d.mail) return;
+    const k = d.mail.src === 'imap' ? 'i_' + d.mail.box + '_' + d.mail.key : 'p_' + d.mail.key;
+    (by[k] = by[k] || { mailKey: k, mail: d.mail, dir: d.dir, ids: [] }).ids.push(id);
+  });
+  return Object.keys(by).sort().map((k) => by[k]);
+}
+function sameMailBody(seenRec, docs, exceptId) {
+  return ((seenRec && seenRec.docs) || []).some((id) => {
+    const d = (docs || {})[id];
+    return id !== exceptId && d && d.kind === '규칙본문' && d.status === '담김' && !isPdfName(d.name);
+  });
+}
 const MAX_CHAIN = 150;
 /* 정해진 회차(30분마다 깨움)가 «돌지» 가른다 (2026-10-05 대표 「2020년 부터 찾아라」) — 작은 기록(run) 하나만 보고.
    밀린 것이 있거나 모르면 돈다(이어 달리기가 이어받는다) · 없으면 하루 한 번(새 메일) · 사흘째 0(고장)이면 하루 한 번.
@@ -152,6 +172,7 @@ async function runOnce(o) {
   /* ② 두 번 회차를 죽인 메일은 건너뛴다 — seen 에 까닭을 적어 «다 본 것»으로 센다. 이미 seen 인 표시는 치운다 */
   const tries = tries0 || {}, seen = Object.assign({}, seen0 || {}), skip = {};
   Object.keys(tries).forEach((k) => {
+    if (k.indexOf('pdf_') === 0) return;   // PDF 다시 보기 표시 — 다시 보기가 스스로 센다
     const n = Number((tries[k] || {}).n || 0);
     if (seen[k]) { skip[TRY + '/' + k] = null; return; }
     /* 큰 메일(slow)은 «한 번»만 — 4분을 기다리고도 회차가 죽었으면 다시 해도 같다(2026-10-09 실측: 06:30 회차가
@@ -323,8 +344,83 @@ async function runOnce(o) {
     bodyIds.forEach((x) => roundBody.add(x));
     sum.stored += c.stored; sum.held += c.held; sum.dup += c.dup;
   }
+  const newMails = sum.mails, newRetry = sum.retry;   // 새 메일 몫 — 다시 보기 메일은 따로 센다
+  /* ── PDF 다시 보기 — 남은 예산 안에서 메일 한 통씩 ── */
+  const pdfQ = pdfTargets(docs || {});   // 처음 읽은 문서만 — 이번 회차에 새로 담은 것은 이미 새 규칙으로 읽혔다
+  const pdfSum = { done: 0, stored: 0, held: 0, left: pdfQ.length };
+  for (const g of pdfQ) {
+    if (o.now() - t0 > Math.max(0, o.budgetMs - (o.fetchMs || FETCH_MS))) break;   // 끝에서 시작하지 않는다
+    const tk = TRY + '/pdf_' + g.mailKey;
+    const n0 = Number(((tries0 || {})['pdf_' + g.mailKey] || {}).n || 0);
+    const P0 = (id) => LIB + '/docs/' + id + '/';
+    const now = o.now();
+    const close = (up, id, fields) => {
+      const d = docs[id];
+      Object.keys(fields).forEach((f) => { up[P0(id) + f] = fields[f]; });
+      up[P0(id) + 'revision'] = Number(d.revision || 1) + 1;
+      up[P0(id) + 'updatedAt'] = now;
+      up[P0(id) + 'pdfAt'] = now;
+    };
+    const up = {};
+    if (n0 >= STUCK_MAX) {
+      g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.STUCK }));
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
+      continue;
+    }
+    const src = g.mail.src === 'imap' ? 'imap' : 'pop3';
+    const row = src === 'imap' ? (((msgs || {})[g.mail.box] || {})[g.mail.key]) : ((old || {})[g.mail.key]);
+    if (!row) {
+      g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.LOST }));
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
+      continue;
+    }
+    const m = { src, slug: src === 'imap' ? g.mail.box : '', uid: src === 'imap' ? String(g.mail.key) : '',
+      key: src === 'pop3' ? String(g.mail.key) : '', row, mailKey: g.mailKey, dir: g.dir };
+    sum.mails++;
+    try { await db.ref(tk).set({ at: now, n: n0 + 1 }); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
+    let atts;
+    try { atts = await withTimeout(o.fetchAtts(m), o.fetchMs || FETCH_MS); }
+    catch (e) {
+      if (isRetry(e)) {
+        sum.retry++; sum.errors.push(errTag(e));
+        if (!e.hang) { try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ } }
+        continue;
+      }
+      g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.LOST }));
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
+      continue;
+    }
+    try {
+      const bySha = {};
+      (atts || []).forEach((a) => { if (a && a.data && isPdfName(a.name)) bySha[crypto.createHash('sha256').update(a.data).digest('hex')] = a; });
+      for (const id of g.ids) {
+        const d = docs[id], a = bySha[d.sha];
+        if (!a) { close(up, id, { holdWhy: PDF_HOLD.LOST }); pdfSum.held++; continue; }
+        const r = await (o.redact || X.redactOne)(a.data, 'pdf');
+        if (!r.ok) { close(up, id, { holdWhy: r.holdWhy, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
+        const kind = P.kindOf(d.name, r.text);
+        const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
+        if (why) { close(up, id, { kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
+        up[LIB + '/text/' + id] = r.text;
+        close(up, id, { kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null });
+        pdfSum.stored++;
+      }
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.left--;
+    } catch (e) {
+      sum.retry++; sum.errors.push(errTag(e));
+      try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ }
+    }
+  }
+  sum.pdf = pdfSum;
   sum.errors = sum.errors.slice(0, 10);
-  sum.left = Math.max(0, allLeft.length - (sum.mails - sum.retry));
+  sum.left = Math.max(0, allLeft.length - (newMails - newRetry)) + pdfSum.left;
   if (!sum.left && !requeued) {   // 다 본 뒤 줄이 비었다 — 이제 세운다(다음 회차가 길게 기다리며 본다)
     const n2 = await requeueStuck();
     sum.requeued += n2; sum.left += n2;
@@ -338,4 +434,4 @@ async function runOnce(o) {
   if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
   return sum;
 }
-module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS, PDF_HOLD, isPdfName };
+module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS, PDF_HOLD, isPdfName, pdfTargets };
