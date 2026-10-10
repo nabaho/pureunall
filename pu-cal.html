@@ -25,7 +25,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=11"></script>
+<script src="js/pu-gcal-auth.js?v=12"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
@@ -3054,8 +3054,10 @@ function openGcalEdit(gid){
     else if(!/^푸른 담당:/.test(x)) 남음.push(x);
   });
   var 시작 = 구글시분(e.gStart), 끝 = 구글시분(e.gEnd);
+  /* 끝나는 날 — 시각 일정은 구글 끝 시각의 날, 종일은 이미 «마지막 날»로 당겨 둔 e.end */
+  var 끝날 = e.gEnd ? new Date(Date.parse(e.gEnd) + 9 * 3600000).toISOString().slice(0, 10) : (e.end || e.date);
   S.detail = null;
-  S.modal = { mode:"edit", store:"gcal", id:gid, gid:gid, kind:"sch", date:e.date, sid:e.mailSid || "",
+  S.modal = { mode:"edit", store:"gcal", id:gid, gid:gid, kind:"sch", date:e.date, endDate:끝날 > e.date ? 끝날 : e.date, sid:e.mailSid || "",
     title:e.text || "", note:남음.join("\n").trim(), time:시작, endTime:끝, place:e.place || "", contact:담당자,
     vis:"shared", timed:!!시작, recur:!!e.recur, type:"leave", hours:1 };
   render();
@@ -3073,7 +3075,7 @@ function 구글대신(body){
 }
 function 구글고치기(m){
   S.busy = true; m.err = ""; render();
-  구글대신({ action:"update", eventId:m.gid, fields:{ date:m.date, time:m.timed ? String(m.time||"") : "", endTime:m.timed ? String(m.endTime||"") : "",
+  구글대신({ action:"update", eventId:m.gid, fields:{ date:m.date, endDate:String(m.endDate||""), time:m.timed ? String(m.time||"") : "", endTime:m.timed ? String(m.endTime||"") : "",
     title:String(m.title||"").trim(), place:String(m.place||"").trim(), contact:String(m.contact||"").trim(), note:String(m.note||""), sid:String(m.sid||"") } })
     .then(function(r){
       S.busy = false; closeModal();
@@ -3475,8 +3477,8 @@ function detailHtml(){
         ? '<button class="btn ghost" data-route="' + esc(d.date) + '" title="이날 방문지를 시각 순서로">🚗 이날 동선</button>' : "")
     + '<span class="sp"></span>'
     /* ✏️·🗑 구글 일정 고치기·지우기 — 서버가 대표 늘 연결로 대신 한다(functions/gcal-proxy.js gcalEdit).
-       여러 날 일정은 이 창(날짜 하나)으로 못 담아 구글에서 고친다 */
-    + (d.kind === "gcal" && d.gid && !(d.end && d.end !== d.date)
+       여러 날 일정은 창의 «끝나는 날» 칸으로 (2026-10-10) */
+    + (d.kind === "gcal" && d.gid
         ? '<button class="btn ghost" data-gedit="1" title="고치기">✏️</button><button class="btn ghost" data-gdel="1" title="지우기">🗑</button>' : "")
     + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
     /* 모집 공지 — http(s) 만(PuCalRecruit.safeUrl 이 거른 값) */
@@ -3547,7 +3549,10 @@ function modalHtml(){
     + (새것 ? "<div class=\"gtabs\"><button data-mk=\"sch\""+(일정?" class=\"on\"":"")+">일정</button>"
         + "<button data-mk=\"att\""+(일정?"":" class=\"on\"")+">연차·근태</button></div>" : "")
     + "<div class=\"gcols\"><div class=\"gmain\">"
-    +   줄("🕒", "<input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\">" + 시각, "날짜·시각")
+    +   줄("🕒", "<input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\">"
+          /* 구글 일정은 여러 날일 수 있다 — 끝나는 날(2026-10-10). 시작과 같으면 하루짜리 */
+          + (m.store === "gcal" ? "<span>~</span><input type=\"date\" data-m=\"endDate\" value=\""+esc(m.endDate||m.date)+"\" title=\"끝나는 날\">" : "")
+          + 시각, "날짜·시각")
     +   (일정 && 새것 ? 줄("🏢", 명함칸Html(m), "기업정보함에서 불러오기") : "")
     +   (일정 ? 줄("📍", "<input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"위치 추가\">"
           /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
@@ -3778,7 +3783,7 @@ function 구글에넣기(m){
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
 function modalRead(){
   var m = S.modal; if(!m) return;
-  ["kind","date","sid","type","title","note","hours","time","endTime","place","contact","vis"].forEach(function(f){
+  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -3792,7 +3797,14 @@ function doSave(){
   if(!m.date){ m.err = "날짜를 골라 주세요"; render(); return; }
   if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
   /* 시작 ~ 끝: 끝만 적고 시작이 없으면 묻는다, 끝이 비면 한 시간 뒤, 끝이 시작보다 이르면 막는다 */
-  if(일정){
+  /* 구글 일정의 끝나는 날 — 시작보다 앞이면 막는다. 뒤면 «여러 날»: 끝 시각이 시작보다 일러도 된다(다른 날이다) */
+  var 여러날 = m.store === "gcal" && /^\d{4}-\d{2}-\d{2}$/.test(String(m.endDate||"")) && m.endDate !== m.date;
+  if(여러날 && m.endDate < m.date){ m.err = "끝나는 날이 시작보다 앞입니다"; render(); return; }
+  if(일정 && 여러날){
+    var 꼴 = /^\d{2}:\d{2}$/;
+    if(m.timed && !꼴.test(String(m.time||""))){ m.err = "시작 시각을 적어 주세요"; render(); return; }
+    if(m.timed && m.endTime && !꼴.test(String(m.endTime))){ m.err = "끝 시각이 올바르지 않습니다"; render(); return; }
+  } else if(일정){
     var 시끝 = 시각범위(m.time, m.endTime);
     if(시끝.err){ m.err = 시끝.err; render(); return; }
     m.time = 시끝.start; m.endTime = 시끝.end;

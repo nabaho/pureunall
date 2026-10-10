@@ -200,7 +200,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-labor-core.js?v=6"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-case-due.js?v=2"></script>
-<script src="js/pu-gcal-auth.js?v=11"></script>
+<script src="js/pu-gcal-auth.js?v=12"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-billing.js?v=11"></script>
@@ -71540,7 +71540,7 @@ var LEAVE_REASONS = ['자발적 퇴사','권고사직','계약만료','해고','
 var DOC_LABELS = { settlement:'퇴직정산서', career:'경력증명서', employment:'이직확인서 (고용보험)', withholding:'근로소득 원천징수영수증', dismissal:'해고예고수당 정산서' };
 
 // ★ 퇴직자 입사일 기준 연차 재산정 헬퍼 (근기법 §60)
-// 회계년도 기준 정책이라도 퇴직자는 입사일 기준 비례 계산이 원칙
+// 회계년도 기준 정책이라도 퇴직자는 입사일 기준 비례 계산이 원칙
 function calcRetirementLeaveJoinBasis(hireDate, retireDateStr, policy, u){
   /* ★★ 퇴직 때 남은 연차 = 발생 장부(erpLeaveGrants)에서 «기한이 남은 것» − 그동안 쓴 것 (2026-10-10 인사관리 2단계)
        예전 식은 ① 365.25 로 나눠 정확히 1년 다닌 사람을 «1년 미만»으로 보고 ② 마지막 기념일 «뒤» 구간을

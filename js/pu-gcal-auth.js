@@ -204,10 +204,15 @@
     if (ev.visibility === 'private') 몸.visibility = 'private';
     if (ev.location) 몸.location = String(ev.location);
     if (ev.description) 몸.description = String(ev.description);
+    /* 여러 날 일정 — 끝나는 날(endDate)이 시작보다 뒤면 그 날까지(2026-10-10). 없으면 예전 그대로 */
+    var 끝날짜 = /^\d{4}-\d{2}-\d{2}$/.test(String(ev.endDate || '')) && ev.endDate > ev.date ? ev.endDate : '';
     if (/^\d{2}:\d{2}$/.test(String(ev.time || ''))) {
       var h = +ev.time.slice(0, 2), mi = ev.time.slice(3, 5);
       var 끝, 끝날;
-      if (/^\d{2}:\d{2}$/.test(String(ev.endTime || ''))) {
+      if (끝날짜) {
+        끝 = /^\d{2}:\d{2}$/.test(String(ev.endTime || '')) ? ev.endTime : ev.time;
+        끝날 = 끝날짜;
+      } else if (/^\d{2}:\d{2}$/.test(String(ev.endTime || ''))) {
         끝 = ev.endTime;
         끝날 = 끝 <= ev.time ? addDays(ev.date, 1) : ev.date;
       } else {
@@ -218,7 +223,7 @@
       몸.end = { dateTime: 끝날 + 'T' + 끝 + ':00', timeZone: 'Asia/Seoul' };
     } else {
       몸.start = { date: ev.date };
-      몸.end = { date: addDays(ev.date, 1) };
+      몸.end = { date: addDays(끝날짜 || ev.date, 1) };
     }
     if (ev.source && ev.source.kind && ev.source.id) {
       몸.extendedProperties = { private: { puSourceKind: String(ev.source.kind), puSourceId: String(ev.source.id) } };
