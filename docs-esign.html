@@ -194,10 +194,10 @@
 <script src="js/esign-docs.js?v=4"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-store.js?v=1"></script>
-<script src="js/esign-hwp-tpl.js?v=6"></script>
+<script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=16"></script>
-<script src="js/pu-contract-forms.js?v=43"></script>
+<script src="js/pu-form-cardfill.js?v=17"></script>
+<script src="js/pu-contract-forms.js?v=44"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -443,8 +443,10 @@ async function formHwpFill(bytes, name, V) {
   }
   var doc = await PureunHwp.openDoc(bytes, name), r;
   var lawLine = (window.PuFormCardFill && PuFormCardFill.lawyersNow) ? PuFormCardFill.lawyersNow() : '';
-  try { EsignHwpTpl.applyLawyerLine(doc, lawLine); r = EsignHwpTpl.fillDoc(doc, V); } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
-  var vals = Object.keys(V).map(function (k) { return V[k] === '' || V[k] == null ? EsignHwpTpl.BLANK : V[k]; }).concat(lawLine ? [lawLine] : []);
+  /* 노무사 이름은 한 줄에 한 명씩 세로로 (대표 2026-10-10) — 채우기 창에서 고친 값이 있으면 그것을 따른다 */
+  var lawLines = EsignHwpTpl.lawyerLinesOf(V.공인노무사명단 != null && V.공인노무사명단 !== '' ? V.공인노무사명단 : lawLine, lawLine, PuFormCardFill.lawyerLinesNow ? PuFormCardFill.lawyerLinesNow() : []);
+  try { EsignHwpTpl.applyLawyerLine(doc, lawLine, lawLines); EsignHwpTpl.expandLawyerMarker(doc, lawLines); r = EsignHwpTpl.fillDoc(doc, V); } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
+  var vals = Object.keys(V).map(function (k) { return V[k] === '' || V[k] == null ? EsignHwpTpl.BLANK : V[k]; }).concat(lawLine ? [lawLine] : [], lawLines);
   var keep = {};
   try { r.bytes = await formRelayout(doc, vals, undefined, keep); r.preview = keep.preview || null; r.relayoutFailed = false; }
   catch (e) { r.bytes = doc.exportHwp(); r.relayoutFailed = true; }
@@ -1463,7 +1465,9 @@ async function _esignFillOne(record, meta, person) {
   var r;
   try {
     var V = EsignHwpTpl.valuesOf(person, meta, arrearsCache[person._subId] || {});
-    EsignHwpTpl.applyLawyerLine(doc, V.공인노무사명단);   // 이름표 없는 위임장도 재직 명단으로(2026-10-10)
+    var lawLines = EsignHwpTpl.lawyerLinesOf(V.공인노무사명단, window.PuFormCardFill && PuFormCardFill.lawyersNow ? PuFormCardFill.lawyersNow() : '', window.PuFormCardFill && PuFormCardFill.lawyerLinesNow ? PuFormCardFill.lawyerLinesNow() : []);
+    EsignHwpTpl.applyLawyerLine(doc, V.공인노무사명단, lawLines);   // 이름표 없는 위임장도 재직 명단으로 · 한 줄에 한 명(2026-10-10)
+    EsignHwpTpl.expandLawyerMarker(doc, lawLines);
     r = EsignHwpTpl.fillDoc(doc, V);
   } catch (e) { try { doc.free(); } catch (e2) {} throw e; }
   try { r.bytes = await _esignRelayout(doc); r.relayoutFailed = false; }

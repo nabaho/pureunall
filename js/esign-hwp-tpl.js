@@ -157,10 +157,108 @@
     }
     return out;
   }
-  function applyLawyerLine(doc, line) {
-    if (!line || !doc) return 0;
+  /* ── 한 줄에 한 명씩 세로로 (대표 지시 2026-10-10 「세로로 열을 맞추어 노무사 이름을 아래로 한 줄에 1명씩 공인노무사로 … 모든 위임장은 똑같이」) ──
+     「성 명 : 공인노무사 권형하」 줄 밑에 「공인노무사 박한별」… 을 «새 문단»으로 이어 붙이고, 앞을 띄어쓰기로 맞춰 이름 첫 글자가 한 줄로 서게 한다.
+     ⚠ 줄 수는 사람 수를 따라 늘고 준다(휴직·퇴사하면 한 줄이 빠진다). 표 칸(위임장 상자)은 칸이 자라서 따라 늘어난다. */
+  var SPLIT_META = { style_id: 0, column_type: 'None', raw_break_type: 0, raw_header_extra: [], tab_extended: [] };
+  /* 앞(「성 명 : 」)과 같은 너비의 빈칸 수 — 한글 글자 1, 띄어쓰기·영문·숫자 0.5, 글자 사이 -5%(위임장 틀 모두 같다). 한 칸 0.45 */
+  function spacesFor(prefix) {
+    var w = 0, s = String(prefix || '');
+    for (var i = 0; i < s.length; i++) { var c = s.charCodeAt(i); w += (c >= 0x1100 ? 1 : (/[:;.,]/.test(s.charAt(i)) ? 0.3 : 0.5)) - 0.05; }
+    return Math.max(0, Math.floor(w / 0.45));   // 모자라게(왼쪽으로 반 칸 안쪽) — 넘치면 이름이 오른쪽으로 삐져 보인다
+  }
+  function acc(doc, sec, c) {
+    return {
+      len: function (k) { return c ? doc.getCellParagraphLength(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k) : doc.getParagraphLength(sec, k); },
+      get: function (k) { try { var L = this.len(k); return c ? doc.getTextInCell(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0, L) : doc.getTextRange(sec, k, 0, L); } catch (e) { return null; } },
+      set: function (k, t) {
+        var L = this.len(k);
+        if (c) { if (L) doc.deleteTextInCell(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0, L); if (t) doc.insertTextInCell(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0, t); }
+        else { if (L) doc.deleteText(sec, k, 0, L); if (t) doc.insertText(sec, k, 0, t); }
+      },
+      merge: function (k) { if (c) doc.mergeParagraphInCell(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k); else doc.mergeParagraph(sec, k); },
+      shape: function (k) { try { return JSON.parse(c ? doc.getCellParaPropertiesAt(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0) : doc.getParaPropertiesAt(sec, k, 0)).paraShapeId; } catch (e) { return 0; } },
+      setShape: function (k, id) { try { if (c) doc.setCellParaShapeId(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, id); else doc.setParaShapeId(sec, k, id); } catch (e) {} },
+      split: function (k, shapeId) {
+        var meta = JSON.stringify(Object.assign({ para_shape_id: shapeId || 0 }, SPLIT_META));
+        if (c) doc.splitParagraphInCell(sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, this.len(k), meta);
+        else doc.splitParagraph(sec, k, this.len(k), meta);
+      }
+    };
+  }
+  /* 문단 k 에 lines[0], 이어서 lines[1..] — reuse 는 이미 있는 이어진 빈 문단 번호들(있으면 새로 쪼개지 않고 거기에 쓴다).
+     돌려주는 값: 새로 생긴 문단 수 */
+  function writeLines(A, k, prefix, lines, reuse) {
+    var pad = new Array(spacesFor(prefix) + 1).join(' '), sh = A.shape(k), added = 0, cur = k, used = 0;
+    A.set(k, prefix + lines[0]);
+    for (var i = 1; i < lines.length; i++) {
+      var next;
+      if (reuse && used < reuse.length) { next = reuse[used++]; }
+      else { A.split(cur, sh); next = cur + 1; added++; if (reuse) for (var r = used; r < reuse.length; r++) reuse[r]++; }
+      A.set(next, pad + lines[i]); A.setShape(next, sh); cur = next;
+    }
+    for (var u = used; reuse && u < reuse.length; u++) A.set(reuse[u], '');
+    return added;
+  }
+  /* 줄이 늘어난 만큼 위임장 상자 아래쪽의 빈 줄을 덜어낸다 — 안 그러면 상자가 쪽 끝을 넘어 다음 쪽으로 밀린다.
+     명단 바로 밑 빈 줄 하나는 남기고, 그 밑 빈 줄을 뒤에서부터 최대 3개(같은 칸 안에서만) */
+  function trimBlanks(A, lastKey, want) {
+    var left = Math.min(Math.max(0, want), 3), idx = [];
+    for (var k = lastKey + 2; ; k++) { var t = A.get(k); if (t == null) break; if (!String(t).trim() && !/아\s*래/.test(String(A.get(k - 1) || ''))) idx.push(k); }   // 「아 래」 밑 빈 줄은 남긴다(내용과 붙어 보인다)
+    var gone = 0;
+    for (var i = idx.length - 1; i >= 0 && left > 0; i--, left--) { try { A.merge(idx[i]); gone++; } catch (e) { break; } }
+    return gone;
+  }
+  /* 그래도 모자라면(줄이 빈 줄보다 많이 늘었으면) 칸 높이를 한 줄(약 2800)씩 키운다 — 위임장 상자는 칸이 쪽 한 장 높이라 글이 상자 밖으로 삐져나온다.
+     쪽 끝을 넘지 않게 72500 까지만 */
+  function growCell(doc, sec, c, lines) {
+    if (!c || lines < 1) return;
+    try {
+      var cp = JSON.parse(doc.getCellProperties(sec, c.parentPara, c.ctrlIdx, c.cellIdx)), h = Number(cp.height) || 0;
+      if (h < 40000) return;   // 작은 칸(신고서 등)은 건드리지 않는다
+      var nh = Math.min(h + lines * 2800, Math.max(h, 72500));
+      if (nh > h) doc.setCellProperties(sec, c.parentPara, c.ctrlIdx, c.cellIdx, JSON.stringify({ height: nh }));
+    } catch (e) {}
+  }
+  var MARKER_LAWYERS = '{{공인노무사명단}}';
+  /* 채우기 창에서 고칠 수 있는 한 줄 값 → 줄들. 그대로면 기본 줄들, 고쳤으면 쉼표·줄바꿈·가운뎃점으로 나눠 「공인노무사 ○○○」 꼴로 */
+  function lawyerLinesOf(value, defLine, defLines) {
+    var v = String(value == null ? '' : value).trim();
+    if (!v) return [];
+    if (defLines && defLines.length && v === String(defLine || '').trim()) return defLines.slice();
+    var out = [];
+    v.split(/\s*[,\n]\s*/).forEach(function (part) {
+      part = part.replace(/^\s*대표\s+/, '').trim(); if (!part) return;
+      var m = /^공인노무사\s*(.+)$/.exec(part), names = (m ? m[1] : part).split(/\s*[·ㆍ]\s*/);
+      names.forEach(function (n) { n = n.trim(); if (n) out.push('공인노무사 ' + n); });
+    });
+    return out;
+  }
+  /* {{공인노무사명단}} 이 「성 명 : 」 뒤에 홀로 선 줄이면 세로 명단으로 — 아니면(신고서 칸 등) 그대로 두어 fillDoc 이 한 줄로 채운다 */
+  function expandLawyerMarker(doc, lines) {
+    if (!doc || !lines || lines.length < 1) return 0;
+    var n = 0, guard = 0;
+    for (;;) {
+      if (guard++ > 40) break;
+      var hits; try { hits = JSON.parse(doc.searchAllText(MARKER_LAWYERS, false, true)) || []; } catch (e) { hits = []; }
+      var done = false;
+      for (var h = 0; h < hits.length && !done; h++) {
+        var ht = hits[h], c = ht.cellContext || null, A = acc(doc, ht.sec, c), k = c ? c.cellPara : ht.para;
+        var t = A.get(k); if (t == null) continue;
+        var at = t.indexOf(MARKER_LAWYERS); if (at < 0) continue;
+        var prefix = t.slice(0, at), suffix = t.slice(at + MARKER_LAWYERS.length);
+        if (!/[:：]\s*$/.test(prefix) || suffix.trim()) continue;
+        try { var added = writeLines(A, k, prefix, lines), gone = trimBlanks(A, k + added, added - 1); growCell(doc, ht.sec, c, added - gone); n++; done = true; } catch (e) { continue; }
+      }
+      if (!done) break;
+    }
+    return n;
+  }
+  function applyLawyerLine(doc, line, lines) {
+    if ((!line && !(lines && lines.length)) || !doc) return 0;
     var js = function (q) { try { return JSON.parse(doc.searchAllText(q, false, true)) || []; } catch (e) { return []; } };
     if (!js('공인노무사법').length) return 0;
+    var vertical = (lines && lines.length > 1) ? lines : null;
     var groups = {};
     js('노무사').forEach(function (h) {
       var c = h.cellContext, g = c ? [h.sec, c.parentPara, c.ctrlIdx, c.cellIdx].join('.') : 'b' + h.sec;
@@ -169,24 +267,29 @@
     var n = 0;
     Object.keys(groups).forEach(function (g) {
       var G = groups[g], c = G.c, lo = Math.min.apply(null, G.idx), hi = Math.max.apply(null, G.idx);
-      var len = function (k) { return c ? doc.getCellParagraphLength(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, k) : doc.getParagraphLength(G.sec, k); };
-      var get = function (k) { try { var L = len(k); return c ? doc.getTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0, L) : doc.getTextRange(G.sec, k, 0, L); } catch (e) { return null; } };
-      var paras = [];
-      for (var k = lo; k <= hi + 4; k++) { var t = get(k); if (t == null) break; paras.push({ key: k, text: t }); }
-      lawyerLineEdits(paras, line, !!c).forEach(function (e) {
+      var A = acc(doc, G.sec, c), paras = [];
+      for (var k = lo; k <= hi + 4; k++) { var t = A.get(k); if (t == null) break; paras.push({ key: k, text: t }); }
+      if (!vertical) {
+        lawyerLineEdits(paras, line, !!c).forEach(function (e) { try { A.set(e.key, e.text); n++; } catch (x) {} });
+        return;
+      }
+      /* 세로 — 아래 문단부터(쪼개면 뒤 번호가 밀리므로) */
+      for (var i = paras.length - 1; i >= 0; i--) {
+        var tx = String(paras[i].text || '');
         try {
-          var L = len(e.key);
-          if (c) { if (L) doc.deleteTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, e.key, 0, L); if (e.text) doc.insertTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, e.key, 0, e.text); }
-          else { if (L) doc.deleteText(G.sec, e.key, 0, L); if (e.text) doc.insertText(G.sec, e.key, 0, e.text); }
-          n++;
+          if (c && NAME_CELL.test(tx)) { writeLines(A, paras[i].key, '', vertical); n++; continue; }
+          var m = NAMES_LINE.exec(tx); if (!m) continue;
+          var reuse = [];
+          for (var j = i + 1; j < paras.length && NAME_ONLY.test(String(paras[j].text || '')); j++) reuse.push(paras[j].key);
+          writeLines(A, paras[i].key, m[1], vertical, reuse); n++;
         } catch (x) {}
-      });
+      }
     });
     return n;
   }
 
   var api = {
-    lawyerLineEdits: lawyerLineEdits, applyLawyerLine: applyLawyerLine,
+    lawyerLineEdits: lawyerLineEdits, applyLawyerLine: applyLawyerLine, expandLawyerMarker: expandLawyerMarker, spacesFor: spacesFor, lawyerLinesOf: lawyerLinesOf,
     withAliases: withAliases, fillMode: fillMode, caseForms: caseForms, hasRepForms: hasRepForms, PERSON_KEYS: PERSON_KEYS,
     MK_OPEN: MK_OPEN, MK_CLOSE: MK_CLOSE, BLANK: BLANK,
     mk: mk, markerAt: markerAt, markersOf: markersOf, fillDoc: fillDoc,
