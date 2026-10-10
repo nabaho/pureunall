@@ -181,3 +181,10 @@ test('★★ 서식 채우기가 «합친 값»을 쓴다 — 여기 적은 팩�
   assert.equal(f.fax, '041-000-0002', '★★ 여기서 적은 법인 팩스가 서식에 안 갑니다');
   assert.equal(f.firmCorpNo, '000000-0000000', '★★ 여기서 적은 법인등록번호가 서식에 안 갑니다');
 });
+
+test('★ 법인정보를 고치면 클라우드로도 올린다 — LS.set 만으로는 «올릴 것» 표시가 안 된다(2026-10-10 실측)', () => {
+  ['function firmTabSave(', 'function firmOcrApply('].forEach((h) => {
+    const f = cutFn(CODE, h);
+    assert.ok(f.indexOf('fbScheduleAuto(FIRM_LOCAL)') > f.indexOf('LS.set(NS+FIRM_LOCAL'), h + ' — 담은 뒤 올릴 것으로 표시');
+  });
+});
