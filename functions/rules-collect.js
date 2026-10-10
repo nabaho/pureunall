@@ -349,9 +349,11 @@ async function runOnce(o) {
   const pdfQ = pdfTargets(docs || {});   // 처음 읽은 문서만 — 이번 회차에 새로 담은 것은 이미 새 규칙으로 읽혔다
   const pdfSum = { done: 0, stored: 0, held: 0, left: pdfQ.length };
   for (const g of pdfQ) {
-    if (o.now() - t0 > Math.max(0, o.budgetMs - (o.fetchMs || FETCH_MS))) break;   // 끝에서 시작하지 않는다
     const tk = TRY + '/pdf_' + g.mailKey;
-    const n0 = Number(((tries0 || {})['pdf_' + g.mailKey] || {}).n || 0);
+    const mk = ((tries0 || {})['pdf_' + g.mailKey]) || {};
+    const slow = !!mk.slow;                       // 큰 메일(앞 회차에 받다 멈춘 메일)은 길게 기다리되 «한 번»만
+    const n0 = Number(mk.n || 0);
+    const waitMs = slow ? (o.slowMs || SLOW_MS) : (o.fetchMs || FETCH_MS);
     const P0 = (id) => LIB + '/docs/' + id + '/';
     const now = o.now();
     const close = (up, id, fields) => {
@@ -362,17 +364,19 @@ async function runOnce(o) {
       up[P0(id) + 'pdfAt'] = now;
     };
     const up = {};
-    if (n0 >= STUCK_MAX) {
+    if (slow ? n0 >= 1 : n0 >= STUCK_MAX) {
       g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.STUCK }));
       up[tk] = null;
       await db.ref().update(up);
       pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
       continue;
     }
+    if (o.now() - t0 > Math.max(0, o.budgetMs - waitMs)) { if (slow) continue; break; }   // 끝에서 시작하지 않는다 — 큰 메일은 건너뛰고 작은 것을 본다
     const src = g.mail.src === 'imap' ? 'imap' : 'pop3';
     const row = src === 'imap' ? (((msgs || {})[g.mail.box] || {})[g.mail.key]) : ((old || {})[g.mail.key]);
     if (!row) {
       g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.LOST }));
+      up[tk] = null;
       await db.ref().update(up);
       pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
       continue;
@@ -380,14 +384,15 @@ async function runOnce(o) {
     const m = { src, slug: src === 'imap' ? g.mail.box : '', uid: src === 'imap' ? String(g.mail.key) : '',
       key: src === 'pop3' ? String(g.mail.key) : '', row, mailKey: g.mailKey, dir: g.dir };
     sum.mails++;
-    try { await db.ref(tk).set({ at: now, n: n0 + 1 }); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
+    try { await db.ref(tk).set(Object.assign({ at: now, n: n0 + 1 }, slow ? { slow: true } : {})); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
     let atts;
-    try { atts = await withTimeout(o.fetchAtts(m), o.fetchMs || FETCH_MS); }
+    try { atts = await withTimeout(o.fetchAtts(m), waitMs); }
     catch (e) {
       if (isRetry(e)) {
         sum.retry++; sum.errors.push(errTag(e));
-        if (!e.hang) { try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ } }
-        continue;
+        if (!e.hang) { try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ } }   // 끊김 같은 보통 실패는 지운다
+        else if (!slow) { try { await db.ref(tk).set({ at: now, n: 0, slow: true }); } catch (_) { /* 다음 회차가 치운다 */ } }   // 처음 멈춤 — 큰 메일로 올려 한 번 더
+        continue;   // 큰 메일이 또 멈췄으면 표시(n+1, slow)를 남겨 다음 회차가 멈춤으로 닫는다
       }
       g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.LOST }));
       up[tk] = null;
@@ -398,10 +403,13 @@ async function runOnce(o) {
     try {
       const bySha = {};
       (atts || []).forEach((a) => { if (a && a.data && isPdfName(a.name)) bySha[crypto.createHash('sha256').update(a.data).digest('hex')] = a; });
+      let noPdfJs = false;
       for (const id of g.ids) {
         const d = docs[id], a = bySha[d.sha];
         if (!a) { close(up, id, { holdWhy: PDF_HOLD.LOST }); pdfSum.held++; continue; }
         const r = await (o.redact || X.redactOne)(a.data, 'pdf');
+        /* ★ 옛 까닭(OLD)이 돌아오면 «pdf.js 를 못 실은» 환경 문제다 — 문서가 아니라 서버 탓이므로 아무것도 안 쓴다 */
+        if (!r.ok && r.holdWhy === PDF_HOLD.OLD) { noPdfJs = true; break; }
         if (!r.ok) { close(up, id, { holdWhy: r.holdWhy, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
         const kind = P.kindOf(d.name, r.text);
         const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
@@ -410,12 +418,19 @@ async function runOnce(o) {
         close(up, id, { kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null });
         pdfSum.stored++;
       }
+      if (noPdfJs) {
+        /* 이 묶음은 아무것도 안 쓰고(up 버림) 표시를 치우며, 이번 회차 다시 보기는 여기서 멈춘다 — 남은 것은 그대로 센다.
+           안 멈추면 같은 앞머리를 계속 다시 받는다. 이 메일은 retry 로 세어 이어 달리기가 이것만으로 이어지지 않게 한다. */
+        sum.retry++; sum.errors.push('PDFJS_MISSING');
+        try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ }
+        break;
+      }
       up[tk] = null;
       await db.ref().update(up);
       pdfSum.done++; pdfSum.left--;
     } catch (e) {
+      /* 표시는 «남긴다» — 같은 메일에서 읽다 계속 터지면 STUCK_MAX 번째에 멈춤으로 닫는다 */
       sum.retry++; sum.errors.push(errTag(e));
-      try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ }
     }
   }
   sum.pdf = pdfSum;

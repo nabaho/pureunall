@@ -188,3 +188,89 @@ test('다시 보기 — 예산이 다 되면 시작하지 않는다', async () =
   assert.equal(db.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.OLD);
   assert.equal(sum.pdf.left, 1);
 });
+
+/* ── 다시 보기 보강 (검토 1차) ── */
+const KEY20 = 'i_INBOX-4a1e411c_20', KEY21 = 'i_INBOX-4a1e411c_21';
+const ROWS2 = { 20: { s: '가나상사 취업규칙', d: 3000, e: 'hr@gana.co.kr', a: 1 }, 21: { s: '가나상사 취업규칙 둘', d: 3001, e: 'hr@gana.co.kr', a: 1 } };
+const seenOf = (...ks) => { const o = {}; ks.forEach((k) => { o[k] = { at: 1, docs: [], why: '' }; }); return o; };
+const tryOf = (db) => ((db.store.rules_mgmt.library || {}).try) || {};
+
+test('다시 보기 — pdf.js 를 못 실으면(OLD 가 돌아옴) 아무것도 안 쓰고 멈춘다, 이어 달리지 않는다', async () => {
+  const idA = 'rd_a', idB = 'rd_b';
+  const db = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' }), heldDoc(idB, { name: '규칙.pdf', sha: sha(PB), uid: '21' })],
+    seenOf(KEY20, KEY21), ROWS2));
+  let fetched = 0;
+  const sum = await C.run(base(db, fakeBucket(), {}, {
+    fetchAtts: async (m) => { fetched++; return [{ name: '취업규칙.pdf', data: PA }, { name: '규칙.pdf', data: PB }]; },
+    redact: async () => ({ ok: false, holdWhy: C.PDF_HOLD.OLD, count: {}, total: 0 }),
+  }));
+  const lib = db.store.rules_mgmt.library;
+  [idA, idB].forEach((id) => { assert.equal(lib.docs[id].holdWhy, C.PDF_HOLD.OLD); assert.equal(lib.docs[id].revision, 1, '★ 환경 탓인데 문서를 고쳐 썼다'); });
+  assert.equal(fetched, 1, '★ 멈추지 않고 다음 메일도 받았다');
+  assert.deepEqual(Object.keys(tryOf(db)).filter((k) => k.indexOf('pdf_') === 0), [], '표시가 남았다');
+  assert.equal(sum.pdf.done, 0); assert.equal(sum.pdf.left, 2);
+  assert.ok(sum.errors.indexOf('PDFJS_MISSING') >= 0);
+  assert.equal(C.shouldChain(sum, 0), false, '★ pdf.js 없는 환경에서 이어 달린다');
+});
+
+test('다시 보기 — 큰 메일: 처음 멈춤은 큰 메일 표시로 올리고, 다음엔 길게 기다려 읽고, 또 멈추면 닫는다', async () => {
+  const idA = 'rd_' + sha(PA).slice(0, 24);
+  const mk = () => seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seenOf(KEY20));
+  const db = fakeDb(mk());
+  const s1 = await C.run(base(db, fakeBucket(), {}, { fetchAtts: async () => { throw Object.assign(new Error('멈춤'), { code: 'FETCH_TIMEOUT', hang: true }); } }));
+  assert.equal(db.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.OLD);
+  assert.equal(tryOf(db)['pdf_' + KEY20].slow, true);
+  assert.equal(tryOf(db)['pdf_' + KEY20].n, 0);
+  assert.equal(s1.retry, 1);
+  const waits = [];
+  const s2 = await C.run(base(db, fakeBucket(), { [KEY20]: [{ name: '취업규칙.pdf', data: PA }] }, { slowMs: 7777,
+    fetchAtts: async () => { waits.push(1); return [{ name: '취업규칙.pdf', data: PA }]; } }));
+  assert.equal(db.store.rules_mgmt.library.docs[idA].status, '담김');
+  assert.equal(s2.pdf.stored, 1);
+  assert.equal(tryOf(db)['pdf_' + KEY20], undefined);
+  const db3 = fakeDb(mk());
+  db3.store.rules_mgmt.library.try = { ['pdf_' + KEY20]: { at: 1, n: 1, slow: true } };
+  await C.run(base(db3, fakeBucket(), { [KEY20]: [{ name: '취업규칙.pdf', data: PA }] }));
+  assert.equal(db3.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.STUCK);
+});
+
+test('다시 보기 — 큰 메일은 긴 기다림이 남은 예산에 안 들어가면 시작하지 않는다', async () => {
+  const idA = 'rd_' + sha(PA).slice(0, 24);
+  const db = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seenOf(KEY20)));
+  db.store.rules_mgmt.library.try = { ['pdf_' + KEY20]: { at: 1, n: 0, slow: true } };
+  let fetched = 0, t = 0;
+  const sum = await C.run(base(db, fakeBucket(), {}, { now: () => (t += 2000), budgetMs: 6000, slowMs: 5000, fetchMs: 10, fetchAtts: async () => { fetched++; return []; } }));
+  assert.equal(fetched, 0);
+  assert.equal(sum.pdf.left, 1);
+});
+
+test('다시 보기 — 읽다 터지면 표시를 남겨 STUCK_MAX 번째에 멈춤으로 닫는다', async () => {
+  const idA = 'rd_' + sha(PA).slice(0, 24);
+  const db = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seenOf(KEY20)));
+  const opt = { fetchAtts: async () => [{ name: '취업규칙.pdf', data: PA }], redact: async () => { throw Object.assign(new Error('깨짐'), { code: 'BOOM' }); } };
+  const s1 = await C.run(base(db, fakeBucket(), {}, opt));
+  assert.equal(tryOf(db)['pdf_' + KEY20].n, 1, '★ 터졌는데 표시를 지웠다 — 영영 안 멈춘다');
+  assert.equal(s1.retry, 1);
+  for (let i = 1; i < C.STUCK_MAX; i++) await C.run(base(db, fakeBucket(), {}, opt));
+  assert.equal(tryOf(db)['pdf_' + KEY20].n, C.STUCK_MAX);
+  assert.equal(db.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.OLD);
+  await C.run(base(db, fakeBucket(), {}, opt));
+  assert.equal(db.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.STUCK);
+  assert.equal(tryOf(db)['pdf_' + KEY20], undefined);
+});
+
+test('다시 보기 — 메일 줄이 없어 못 찾음으로 닫으면 표시도 치운다', async () => {
+  const idZ = 'rd_z';
+  const db = fakeDb(seeded([heldDoc(idZ, { name: '규칙.pdf', sha: 'zz', uid: '99' })], {}));
+  db.store.rules_mgmt.library.try = { 'pdf_i_INBOX-4a1e411c_99': { at: 1, n: 1 } };
+  await C.run(base(db, fakeBucket(), {}));
+  assert.equal(db.store.rules_mgmt.library.docs[idZ].holdWhy, C.PDF_HOLD.LOST);
+  assert.equal(tryOf(db)['pdf_i_INBOX-4a1e411c_99'], undefined);
+});
+
+test('다시 보기 — 대상이 없으면 셈은 옛 그대로(pdf 0, left 0)', async () => {
+  const db = fakeDb(MAIL({ 30: { s: '가나상사 취업규칙', d: 3000, e: 'hr@gana.co.kr', a: 1 } }));
+  const sum = await C.run(base(db, fakeBucket(), { 'i_INBOX-4a1e411c_30': [{ name: '가나상사_취업규칙.pdf', data: fakePdf('n') }] }));
+  assert.deepEqual(sum.pdf, { done: 0, stored: 0, held: 0, left: 0 });
+  assert.equal(sum.mails, 1); assert.equal(sum.retry, 0); assert.equal(sum.left, 0);
+});
