@@ -87,6 +87,10 @@ test('★④ 다시 셀 때도 «손으로 적어 둔 값»은 안 건드린다'
                   { empSid: 'P-7', ym: '2026-06', grossPay: 3000000 },
                   { empSid: 'P-7', ym: '2026-07', grossPay: 3000000 }],
     calcPayroll: (p) => ({ grossPay: p.grossPay }),
+    /* 2026-10-10: 다시 셀 때도 «한 곳»(calcLegalSeverance)을 부른다 — 셈 자체는 hr-stage3-retire 가 돌려 본다.
+       여기서 지키는 것은 «손으로 적어 둔 값을 안 덮는다» 하나다 */
+    USERS_SEED: [],
+    calcLegalSeverance: () => ({ eligible: true, dailyApplied: 100000, severance: 9000000, workDays: 1100, years: 3.01, due: '' }),
     showToast: () => {}
   });
   let 나온것 = null;

@@ -121,24 +121,22 @@ test('★★ 명세서·일괄메일 목록·퇴직정산 누적이 «같은 자
 /* ⚠ 이름이 나오는지만 보면 안 된다 — 「0*(p.overtimePay)」 처럼 «쓰는 척»만 해도
      통과한다(2026-09-03 일부러 깨 보고 알았다). 실제로 «돌려서» 금액으로 본다. */
 function avgWageOf(rows, retireDate){
-  const c2 = {
-    dbGet: (k, d) => (k === 'payroll_monthly' ? rows : d),
-    /* 시간으로 셈하는 갈래 — 실제 함수를 그대로 싣는다 */
-    Date, Math, parseInt, parseFloat, isFinite,
-  };
-  vm.createContext(c2);
-  vm.runInContext(
-    cutFn(src, 'function calcLegalAllowances(') + '\n'
-    + cutFn(src, 'function calcAverageWage(') + '\n'
-    + 'this.run = calcAverageWage;', c2);
-  return c2.run('A-001', retireDate);
+  /* 2026-10-10 인사관리 3단계: 평균임금은 이제 급여 계산(calcPayroll — 멈춘 달은 실제 지급값)을 거친다.
+     함수 둘만 잘라 싣으면 그 길을 못 돈다 — 급여·퇴직 계산 한 벌을 싣는 공용 도우미를 쓴다. */
+  const c2 = require('./lib-hr-env.js').hrEnv({ payroll_monthly: rows });
+  return c2.calcAverageWage('A-001', retireDate);
 }
 const PAY = (o) => Object.assign({ empSid: 'A-001', status: 'confirmed', baseSalary: 3000000 }, o);
+/* «지급 끝난» 급여대장 달 — 실제로 나간 금액(지급총액·공제·실수령)이 칸에 있다 */
+const PAID = (o) => { const x = Object.assign({ empSid: 'A-001', status: 'paid', baseSalary: 3000000, bonus: 0 }, o);
+  x.grossPay = x.baseSalary + (x.overtimePay || 0) + (x.nightPay || 0) + (x.holidayPay || 0);
+  return Object.assign(x, { totalDeduction: 0, netPay: x.grossPay, nationalPension: 0, healthInsurance: 0, longTermCare: 0,
+    employmentInsurance: 0, incomeTax: 0, localTax: 0 }); };
 
 test('★★ 평균임금에 연장·야간·휴일수당이 «들어간다» (금액으로 확인)', () => {
   const months = ['2026-04', '2026-05', '2026-06'];
-  const plain = months.map((ym) => PAY({ ym: ym }));
-  const withOT = months.map((ym) => PAY({ ym: ym, overtimePay: 300000 }));
+  const plain = months.map((ym) => PAID({ ym: ym }));
+  const withOT = months.map((ym) => PAID({ ym: ym, overtimePay: 300000 }));
   const a = avgWageOf(plain, '2026-06-30');
   const b = avgWageOf(withOT, '2026-06-30');
   assert.ok(b.totalWage > a.totalWage,
@@ -147,9 +145,9 @@ test('★★ 평균임금에 연장·야간·휴일수당이 «들어간다» (�
     '★★ 세 달치 연장수당 90만원이 그대로 더해져야 합니다');
 
   /* 야간·휴일도 같은 자리에서 들어간다 */
-  const night = avgWageOf(months.map((ym) => PAY({ ym: ym, nightPay: 100000 })), '2026-06-30');
+  const night = avgWageOf(months.map((ym) => PAID({ ym: ym, nightPay: 100000 })), '2026-06-30');
   assert.equal(night.totalWage - a.totalWage, 300000, '★ 야간수당이 빠집니다');
-  const hol = avgWageOf(months.map((ym) => PAY({ ym: ym, holidayPay: 100000 })), '2026-06-30');
+  const hol = avgWageOf(months.map((ym) => PAID({ ym: ym, holidayPay: 100000 })), '2026-06-30');
   assert.equal(hol.totalWage - a.totalWage, 300000, '★ 휴일수당이 빠집니다');
 });
 
@@ -166,9 +164,10 @@ test('★★ 저장된 금액이 없는 달은 «시간×통상시급»으로 �
 test('★★ 실제 지급액이 있으면 «그것을» 쓴다 — 다시 셈하면 옛 달이 틀어진다', () => {
   const months = ['2026-04', '2026-05', '2026-06'];
   /* 실제로는 30만원이 나갔는데 시간으로 셈하면 21만원대다. 30만원이 이겨야 한다. */
-  const rows = months.map((ym) => PAY({ ym: ym, overtimePay: 300000,
+  /* 2026-10-10: «실제 지급액»은 지급 끝난 급여대장 달(PAID)에 있다 — 그 달은 다시 셈하지 않고 그대로 쓴다 */
+  const rows = months.map((ym) => PAID({ ym: ym, overtimePay: 300000,
     legalAllowances: { overtimeHours: 10 } }));
-  const base = avgWageOf(months.map((ym) => PAY({ ym: ym })), '2026-06-30');
+  const base = avgWageOf(months.map((ym) => PAID({ ym: ym })), '2026-06-30');
   const got = avgWageOf(rows, '2026-06-30');
   assert.equal(got.totalWage - base.totalWage, 900000,
     '★★ 실제 지급액을 두고 오늘 요율로 다시 셈했습니다 — 통장 금액과 다른 퇴직금이 나옵니다');
