@@ -96,7 +96,8 @@ test('★ 무엇이 자동으로 도는지 «구체적으로» 말한다', () =>
   const i = P.indexOf('var _auto =');
   assert.ok(i > 0, '줄 설명을 만드는 자리가 없다');
   const line = P.slice(i, P.indexOf('\n', i));
-  assert.match(line, /메일 받기 07~21시 10분마다/, '메일 받기의 업무시간 제한을 안 알려 준다');
+  /* 주기 «값»은 billing-auto-truth 가 코드와 견준다 — 여기는 업무시간을 말하는지만 본다 */
+  assert.match(line, /메일 받기 07~21시 \d+분마다/, '메일 받기의 업무시간 제한을 안 알려 준다');
   assert.match(line, /메일 보내기 15분마다/);
   assert.match(line, /급여자료 30분마다/);
 });

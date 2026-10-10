@@ -122,7 +122,7 @@ test('⑤ 화면 — 미리 받기(읽음 표시 안 건드림) · 같은 창구
   const batch = strip(떼기('async function bizMailOwnerBatch('));
   assert.ok(/for\(/.test(batch) && /await bizMailOwner\(/.test(batch) && /_bizOwnStop/.test(batch), '한 통씩 · 멈출 수 있다');
   const chip = strip(떼기('function _bizOwnerChip('));
-  assert.ok(/실적엔/.test(chip), '실적 담당과 다르면 «다르다»고만');
+  assert.ok(/≠/.test(chip) && /실적 기록의 담당은/.test(chip), '실적 담당과 다르면 «≠»로 다르다고만(설명은 마우스를 올리면)');
   assert.ok(/넣기\('main'/.test(strip(떼기('function bizMailToPerf('))), '실적으로 열 때 담당 칸에 후보');
 });
 

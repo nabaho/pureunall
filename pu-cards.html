@@ -15427,25 +15427,60 @@ function parseVcf(text){
      「TTT_김원미」(회사 칸 빔) · 「동원정윤성인」(회사 칸 ㈜동원정) · 「EVOLVE soft전석정」(회사 칸은 «다른» 회사)
    그래서 ① 회사 칸이 비거나 같은 회사면 이름과 회사를 가르고, ② 회사 칸이 «다른» 회사면 가르지 않고
    메모에 「[가져오기 확인]」을 단다 — 한 칸에 두 사람이 섞인 줄이다(사람이 본다, 기계가 고르지 않는다).
-   ⚠ 「_」로만 가른다 — 「/」는 두 회사를 잇는 데도 쓴다(「제이원인스트루먼트/지앤지」).
-   ⚠ 「3호_소망상사」(번호 꼬리표 + 가게) · 「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
+   ⚠ 「_」·「-」로 가른다 — 「/」는 두 회사를 잇는 데도 쓴다(「제이원인스트루먼트/지앤지」). 「-」는 한쪽이 사람 이름 모양일 때만.
+   ⚠ 「3호_소망상사」(번호 꼬리표 + 가게)는 회사 칸으로 옮기고 꼬리표는 메모에(2026-10-10 「추천대로」).
+     「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
 const IMP_ROLE_TAIL = /(담당|사무실|소개|대표|사장|팀장|과장|부장|이사|실장|센터|본부|경리|총무|회계|직원|원장|상사|푸드|누리|산업|건설|물산|상회|식품|기업|테크|전자|공업|상점|마트|약국|병원|의원)$/;
 const IMP_FLAG = '[가져오기 확인] 이름 앞의 회사와 회사 칸이 다릅니다 — 한 칸에 두 사람이 섞였을 수 있습니다';
 /* 회사 이름 견주기는 «맞출 때» 쓰는 다듬개(ErpMatch._norm) 하나로 — 새 다듬개를 만들지 않는다(tests/cards-norm-align) */
 const impCo = x => ErpMatch._norm(x);
+/* 사람 이름 모양인가 — 성씨 + 세 글자(직함이 붙어 있으면 두·네 글자도). 직함은 떼어 돌려준다.
+   (대표 「추천대로」 2026-10-10 — 「회사-사람차장」·「사람-회사」·「김철수노무사」도 가져올 때 가른다)
+   ⚠ 「-」 는 회사 이름 안에도 쓰여(「가나-다라」) «사람 이름 모양»일 때만 가른다. 애매하면 그대로 둔다. */
+const IMP_SUR = '김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경';
+const IMP_TITLE = /^(.+?)\s*(대표이사|대표|회장|부사장|사장|전무|상무|이사장|이사|본부장|센터장|관리소장|실장|부장|차장|과장|대리|주임|사원|팀장|원장|소장|국장|관장|노무사|세무사|변호사|회계사|교수|매니저|총무|사무국장|사무장|지점장|점장|계장|주무관|사무관|조사관|감독관|시설장|책임|선임|수석|연구원|담당자)님?$/;
+function impPerson(t){
+  t = String(t || '').trim();
+  let title = '';
+  const m = t.match(IMP_TITLE);
+  if(m){ t = m[1].trim(); title = m[2]; }
+  if(!/^[가-힣]{2,4}$/.test(t) || IMP_SUR.indexOf(t[0]) < 0 || IMP_ROLE_TAIL.test(t)) return null;
+  if(t.length !== 3 && !title) return null;
+  return { name: t, title: title };
+}
 function importTidyRow(r){
   if(!r) return r;
   const name = String(r.name || '').trim(), co = String(r.company || '').trim();
   const nc = impCo(co);
   const same = pc => { const a = impCo(pc); return !nc || a === nc || a.indexOf(nc) === 0 || nc.indexOf(a) === 0; };
   const flag = () => Object.assign({}, r, { memo: (String(r.memo || '') + '\n' + IMP_FLAG).trim() });
+  /* 직함은 직함 칸이 비었을 때만 넣는다 — 사람이 적어 둔 값을 덮지 않는다 */
+  const put = (p, pc) => {
+    if(!same(pc)) return flag();
+    const o = Object.assign({}, r, { name: p.name, company: co || pc });
+    if(p.title && !String(r.title || '').trim()) o.title = p.title;
+    return o;
+  };
+  /* ⓪ 「2호_회사」 — 번호 꼬리표 + 회사(사람 없음). 회사 칸이 빌 때만 회사 칸으로, 꼬리표는 메모 맨 앞에 */
+  let m = name.match(/^(\d+호)\s*_\s*(.+)$/);
+  if(m && !co) return Object.assign({}, r, { name: '', company: m[2].trim(), memo: (m[1] + '\n' + String(r.memo || '')).trim() });
   /* ① 「회사_이름」 */
-  let m = name.match(/^(.+?)\s*_\s*([가-힣]{2,5})$/);
+  m = name.match(/^(.+?)\s*_\s*([가-힣]{2,5})$/);
   if(m && !/_/.test(m[1]) && !/^[0-9０-９]/.test(m[1].trim()) && !IMP_ROLE_TAIL.test(m[2])){
     const pc = m[1].trim();
     if(!same(pc)) return flag();
     return Object.assign({}, r, { name: m[2], company: co || pc });
   }
+  /* ①′ 「회사-사람차장」 · 「사람-회사」 · 「회사_사람주무관」 — 한쪽만 사람 이름 모양일 때 */
+  m = name.match(/^([^-_]+?)\s*[-_]\s*([^-_]+)$/);
+  if(m){
+    const L = m[1].trim(), R = m[2].trim(), pl = impPerson(L), pr = impPerson(R);
+    if(pr && !pl && !/^[0-9０-９]/.test(L)) return put(pr, L);
+    if(pl && !pr && R.length >= 3 && !/(담당|사무실|소개|직원)$/.test(R)) return put(pl, R);
+  }
+  /* ①″ 「김철수노무사」 — 이름에 직함만 붙은 것 */
+  const pt = impPerson(name);
+  if(pt && pt.title) return Object.assign({}, r, String(r.title || '').trim() ? { name: pt.name } : { name: pt.name, title: pt.title });
   /* ② 영문 회사가 붙은 「EVOLVE soft전석정」 */
   m = name.match(/^([A-Za-z][A-Za-z0-9 .&-]{1,30}?)\s*([가-힣]{2,4})$/);
   if(m && !IMP_ROLE_TAIL.test(m[2])){
@@ -17787,7 +17822,7 @@ function renderPCSide(){
 
    ★ 무엇이 진짜인가
    메일함은 **다음메일이 진짜**다. 여기는 그것을 비추는 거울이다. 서버(functions
-   mail-sync.js)가 10분마다 IMAP 으로 붙어 «목록만» 실시간DB(mailbox/)에 옮겨 적고,
+   mail-sync.js)가 업무 시간 3분마다 IMAP 으로 붙어 «목록만» 실시간DB(mailbox/)에 옮겨 적고,
    본문은 열어 볼 때 그 자리에서 가져온다. 본문을 쌓아 두면 요금이 뛰고 백업 한도를
    그 자리에서 넘긴다(2026-08-16 사고).
 
@@ -17920,6 +17955,20 @@ function mbOldLoad(cb){
       mbMemoClear(); renderPCSide(); renderMailPage();
       if(cb) cb();
     });
+}
+/* ☕ 「지난 메일」 칸을 여는 순간 서버를 미리 붙여 둔다 (대표 지시 2026-10-10 「메일을 읽는데 너무 늦다」)
+   지난 메일은 다음메일 POP3 에 로그인하고 이름표 3만 줄을 받아야 한 통을 찾는다 — 10초 남짓.
+   그 일을 «누르기 전», 목록을 훑는 동안 해 둔다. 서버는 붙은 채로 몇 분 들고 있다(readOldMail).
+   ⚠ 메일은 한 통도 안 읽는다(warm). ⚠ 실패해도 아무 말 안 한다 — 누를 때 다시 붙는다.
+   ⚠ 2분 안에 또 열면 안 부른다 — 서버가 아직 붙어 있다. */
+let _mbOldWarmAt = 0;
+function mbOldWarm(){
+  if(Date.now() - _mbOldWarmAt < 120000) return;
+  const u = firebase.auth && firebase.auth().currentUser; if(!u) return;
+  _mbOldWarmAt = Date.now();
+  u.getIdToken().then(tok=>fetch(MB_FN+'readOldMail', { method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+    body: JSON.stringify({ warm: 1 }) })).catch(()=>{ _mbOldWarmAt = 0; });
 }
 /* 지난 메일에서 온 줄인가 — 손대면 안 되는 것을 가릴 때 쓴다 */
 function mbIsOld(v){
@@ -18179,7 +18228,7 @@ function mbBackfillRun(days, fresh, auto){
 function mbOldHtml(){
   /* ⚠★ 이 덩이는 «늘» 그린다. 표가 없다고 통째로 안 그리면 그 안의 [채우기] 단추까지
        함께 사라진다 — 대표께서 채우기를 누르실 수가 없게 된다(2026-09-06 그렇게 됐다).
-       ★ 표는 서버가 칸의 기간을 적어 둔 «뒤에» 나온다(동기화가 10분마다 채운다).
+       ★ 표는 서버가 칸의 기간을 적어 둔 «뒤에» 나온다(동기화가 업무 시간 3분마다 채운다).
          그때까지는 표 대신 «왜 아직 없는지»를 적는다 — 빈자리는 고장으로 읽힌다. */
   if(_mbSync === null) mbSyncLoad();
   const rows = (_mbSync === null) ? [] : mbOldSpans();
@@ -18213,7 +18262,7 @@ function mbOldHtml(){
         </table>`
         : (rows.length ? '<div class="mshint">모든 칸이 이미 1년을 넘겼습니다.</div>'
         : `<div class="mshint">칸마다 «얼마나 오래된 것까지 있나»는 서버가
-             동기화하면서 적습니다(10분마다). 아직 적히지 않아 표를 안 보여 드립니다 —
+             동기화하면서 적습니다(업무 시간 3분마다). 아직 적히지 않아 표를 안 보여 드립니다 —
              <b>틀린 값을 보여 드리느니 안 보여 드리는 편이 낫습니다.</b>
              ${/* ⚠ 다 찼으면 이 말을 «하지 않는다» — 아래에 채우기 단추가 없다.
                     같은 칸에서 「누르실 수 있습니다」와 「더 누르실 것이 없습니다」가
@@ -22370,7 +22419,10 @@ function mbAllRows(){
     const f = mbFolderBy(slug)||{};
     Object.keys(box).forEach(uid=>{
       const v = box[uid]; if(!v) return;
-      out.push(Object.assign({}, v, { _slug:slug, _box:mbFolderLabel(f), _key:slug+':'+uid, _src:v }));   /* _src: 원본 — 판정 기억의 열쇠 */
+      /* ⚠ u 는 «열쇠»로 채운다 — 📦 지난 메일 줄은 u 가 0 이다(번호가 아니라 이름표가 열쇠).
+           0 을 그대로 들고 가면 누를 때 「0」을 열려다 머리글이 비고(1970.01.01) 10초 뒤
+           「없습니다」가 왔다(대표 화면 2026-10-10). 다음메일 줄은 u 와 열쇠가 같아 그대로다. */
+      out.push(Object.assign({}, v, { u:(v.u || uid), _slug:slug, _box:mbFolderLabel(f), _key:slug+':'+uid, _src:v }));   /* _src: 원본 — 판정 기억의 열쇠 */
     });
   };
   /* ⚠ 우리 칸은 «여러 폴더»에서 옮겨 온 것이 섞인다 — 읽어 둔 폴더를 다 훑은 뒤
@@ -24327,6 +24379,8 @@ function openMailBox(id){
      붙은 뒤 restoreLastScreen·render 가 다시 연다. 안 막으면 아래 «못 읽으면 다시
      연다» 고리가 로그인 없는 채로 끝없이 돈다(거절 → 다시 → 거절 …). */
   if(!mbAuthOk()) return;
+  /* 🔄 서버 회차를 듣기 시작한다 — 지운 것·새 것이 새로고침 없이 따라온다(mbLiveStart 머리글). 한 번만 붙는다. */
+  mbLiveStart();
   /* ★ 지난 메일이 «몇 통 담겼나»를 한 번 물어 둔다 — 옆줄에 그 칸을 내놓을지 정하는 값이다.
      ⚠★ 이것을 «그리는 함수»(renderPCSide) 안에서 부르지 않는다. 그리기는 자료를
        읽어 오는 자리가 아니다 — 그렇게 두었더니 그릴 때마다 서버를 두드리고,
@@ -24338,7 +24392,7 @@ function openMailBox(id){
   if(!_mbOpen){ const f0 = mbFolderBy(id); if(f0 && f0.kind === 'sent') mbTrackLoad(); }
   /* 📦 지난 메일 — 다음메일 폴더가 아니라 우리가 따로 담아 둔 자리에서 읽는다.
      ⚠ 아래 폴더 사슬을 «타지 않는다». 타면 「*old 폴더를 열어 달라」가 되어 오류가 난다. */
-  if(id === MB_OLD_ID){ mbOldLoad(); return; }
+  if(id === MB_OLD_ID){ mbOldWarm(); mbOldLoad(); return; }
   /* 📬 이 창에서 처음 여는 것이면 «씨앗»부터 본다 — 있으면 그것으로 곧바로 그리고,
        최신본은 뒤에서 받아 갈아 끼운다(mbSeedRefresh). 까닭은 mbSeedGet 머리글.
      ⚠ 한 번만 찾는다(_mbSeedTried) — 없으면 예전 길 그대로다. */
@@ -24509,6 +24563,82 @@ function mbPull(){
       done('📥 '+bits.join(' · ')+(Number(j.waiting||0)?` — 옛 메일 ${Number(j.waiting)}개 폴더는 다음 회차에 이어집니다`:''), 8000);
     })
     .catch(e=>{ _mbBusy=false; renderMailPage(); toast('가져오지 못했습니다 — '+((e&&e.message)||e), 8000); });
+}
+
+/* ══════════════ 🔄 화면이 다음메일을 «저절로» 따라온다 (대표 지시 2026-10-10) ══════════════
+   「다음 메일에서 삭제하면 연결해서 자동으로 삭제하고 실시간 연동되게 해 달라」
+
+   ★ 왜 새로고침해야만 보였나 — 목록은 칸을 열 때 «한 번» 읽고(loadMailBox) 다시 안 읽는다.
+     서버가 지운 것을 빼고 새 메일을 넣어도, 떠 있는 화면은 처음 읽은 그대로였다.
+   ★ 이제 서버가 회차를 마칠 때마다 적는 기록(mailbox/meta, 200바이트 남짓) 하나만 «듣는다».
+     바뀌면 ①그 회차가 뺀 메일(meta.gone)을 화면에서도 빼고 ②읽어 둔 칸마다 «새 번호만»
+     받아 붙인다(startAt) — 칸을 통째로 다시 읽지 않는다. 사람마다 몇 분에 한 번, 거의 0 바이트다.
+   ⚠ 그리는 때를 고른다 — 메일을 읽는 중이거나 글을 치는 중이면 목록을 다시 그리지 않는다
+     (읽던 자리가 튀거나 치던 글자가 날아간다). 옆줄 수만 고치고, 목록은 돌아올 때 새것으로 그려진다.
+   ⚠ 첫 값은 «이미 받은 것»이라 건너뛴다 — 열자마자 같은 것을 또 받지 않는다. */
+function mbDropRow(slug, uid){
+  const box = _mbMsgs && _mbMsgs[slug];
+  if(!box || !box[String(uid)]) return false;
+  delete box[String(uid)];
+  mbMemoClear();
+  if(state.view==='mail'){
+    renderPCSide();
+    if(!state.mbOpen) renderMailPage();
+  }
+  return true;
+}
+let _mbLiveOn = false, _mbLiveAt = 0;
+function mbLiveStart(){
+  if(_mbLiveOn || typeof Store==='undefined' || Store.mode!=='firebase' || !mbAuthOk()) return;
+  _mbLiveOn = true;
+  /* ⚠ 듣기를 못 붙여도 메일함은 멀쩡해야 한다 — 그때는 예전처럼 새로고침으로 따라온다 */
+  try{ firebase.database().ref(MB_ROOT+'/meta').on('value', s=>{
+    const m = (s && s.val()) || {};
+    const at = Number(m.at||0);
+    if(!_mbLiveAt){ _mbLiveAt = at || 1; return; }
+    if(!at || at <= _mbLiveAt) return;
+    _mbLiveAt = at;
+    mbLiveApply(m);
+  }, ()=>{ _mbLiveOn = false; }); }catch(_){ _mbLiveOn = false; }
+}
+function mbLiveApply(m){
+  _mbMeta = Object.assign({}, _mbMeta||{}, m);
+  /* ① 그 회차가 뺀 메일 — 「칸:번호」 */
+  let dropped = 0, openGone = false;
+  /* ⚠ 실시간DB 는 배열을 {0:…,1:…} 로 돌려줄 때가 있다 — 둘 다 받는다 */
+  const gl = Array.isArray(m.gone) ? m.gone : (m.gone && typeof m.gone==='object' ? Object.values(m.gone) : []);
+  gl.forEach(k=>{
+    const i = String(k).lastIndexOf(':'); if(i < 1) return;
+    const slug = String(k).slice(0, i), uid = String(k).slice(i+1);
+    const box = _mbMsgs && _mbMsgs[slug];
+    if(box && box[uid]){
+      delete box[uid]; dropped++;
+      if(state.mbOpen && state.mbOpen.slug===slug && String(state.mbOpen.uid)===uid) openGone = true;
+    }
+  });
+  /* ② 새로 온 것 — 읽어 둔 칸마다 «가장 큰 번호 다음부터»만 */
+  const slugs = Object.keys(_mbMsgs||{}).filter(s=>s !== MB_OLD_ID);
+  const asks = Number(m.rows||0) > 0 ? slugs.map(slug=>{
+    const ks = Object.keys(_mbMsgs[slug]||{}).map(Number).filter(n=>n>0);
+    if(!ks.length) return Promise.resolve();
+    const top = Math.max.apply(null, ks);
+    return firebase.database().ref(MB_ROOT+'/msgs/'+slug).orderByKey().startAt(String(top+1)).once('value')
+      .then(s=>{ const got = (s && s.val()) || {};
+        Object.keys(got).forEach(u=>{ if(got[u]) _mbMsgs[slug][u] = got[u]; }); })
+      .catch(()=>{ /* 다음 회차에 또 본다 */ });
+  }) : [];
+  /* 옆줄 수(안 읽음·통수)도 새것으로 */
+  const fold = (dropped || asks.length) ? new Promise(ok=>loadMailFolders(ok)) : Promise.resolve();
+  return Promise.all(asks.concat([fold])).then(()=>{
+    if(!dropped && !asks.length) return;
+    mbMemoClear();
+    if(state.view!=='mail') return;
+    renderPCSide();
+    const ae = typeof document!=='undefined' ? document.activeElement : null;
+    const typing = !!(ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName||''));
+    if(state.mailSent==='box' && !state.mbOpen && !typing) renderMailPage();
+    if(openGone) toast('🗑 지금 보시는 메일은 다음메일에서 지웠거나 다른 칸으로 옮겼습니다', 8000);
+  });
 }
 
 /* ══════════════ 폰 메일함 — 다음메일 «앱»과 같은 차림 ══════════════
@@ -25655,6 +25785,9 @@ function mbFetchBodyNow(slug, uid, peek){
       body: JSON.stringify({ slug:slug, uid:String(uid), peek: peek?1:0 }) }))
     .then(r=>r.json().catch(()=>({})))
     .then(j=>{
+      /* 🗑 다음메일에서 지웠거나 옮긴 메일 — 서버가 목록에서 뺐다. 화면에서도 그 자리에서 뺀다
+         (미리 받기로 알게 된 것도 같다). 까닭은 functions/mail-sync.js notHere 머리글. */
+      if(!j.ok && j.gone) mbDropRow(slug, uid);
       if(!j.ok) throw new Error(j.error||'열지 못했습니다');
       const o = { html:j.html||'', text:j.text||'', atts:j.atts||[] };
       mbBodyPut(slug, uid, o);
@@ -27433,7 +27566,9 @@ function mbReadHtml(){
     ${/* ⚠ 여기 있던 「🖼 바깥에서 오는 그림 N개를 막았습니다 · 그림 보기」 띠를
          2026-09-06 에 없앴다 — 대표 지시 「자꾸 나온다」. 되살리지 말 것.
          까닭은 mbCleanHtml 의 그림 대목에 실측과 함께 적어 두었다(보낸이 185명). */''}
-    <div class="body">${o.loading ? '<div class="wait">본문을 가져오고 있습니다…</div>'
+    <div class="body">${o.loading ? '<div class="wait">본문을 가져오고 있습니다…'
+        + (String(o.slug)===MB_OLD_ID ? ' <span style="color:#94a3b8">(지난 메일은 처음 한 통만 10초쯤 걸리고, 다음 통부터는 바로 열립니다)</span>' : '')
+        + '</div>'
       : o.err ? '<div class="wait">열지 못했습니다 — '+esc(o.err)+'</div>'
       : (bodyHtml || '<div class="wait">본문이 없습니다.</div>')}</div>
     ${/* ⚠ 여기 「답장은 다음메일에서 하십니다 … 이 자리에서는 전달·다시보내기와 휴지통

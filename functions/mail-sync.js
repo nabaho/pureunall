@@ -119,11 +119,48 @@ async function connect(deps, user, pass) {
 /* ── 한 회차 ──
    scheduled(자동)와 HTTP(지금 가져오기)가 **같은 코드**를 쓴다. 두 벌이면 한쪽만
    고치고 지나간다. */
+/* ══════ 다음메일에서 지운 것을 «회차마다» 따라 뺀다 (대표 지시 2026-10-10) ══════
+   「다음 메일에서 삭제하면 연결해서 자동으로 삭제하고 실시간 연동되게 해 달라」
+
+   ★ 왜 하루씩 늦었나 (실측 2026-10-10 mailbox/sync)
+     아래 ④ 정리는 «통수가 줄었을 때»만 돈다. 그런데 칸 31개 중 13개가 다음메일 창(400통)에
+     꽉 차 있어, 한 통을 지우면 창 밖 옛것 한 통이 되돌아와 통수가 400 그대로다. 그 칸들은
+     하루 한 번 그물에서만 지워졌고(지운 것이 모두 같은 시각에 몰려 빠졌다), 그마저 한 회차에
+     한 칸뿐이었다(pruned < 1).
+   ★ 그래서 칸마다 «지난 회차에 살아 있던 번호 목록»을 alive/{칸} 에 짧게 적어 두고 이번 목록과
+     견준다. 판정은 goneKeys 그대로 — 지난번에 있었고 이번에 없고 창 바닥보다 위면 지운(옮긴) 것.
+   ⚠ 폴더 전체(msgs)를 안 읽는다 — 1~2KB 한 줄이다. 목록이 그대로면(지문 aliveSig 같음) 그것도 안 읽는다.
+   ⚠ 처음 도는 칸은 적기만 한다 — 견줄 것이 없을 때 지우면 «처음»이 곧 «전부 지움»이 된다.
+   ⚠ 다른 칸으로 옮긴 것도 이 칸에서는 빠진다 — 옮겨 간 칸이 새 번호로 받아 온다(다음메일과 같다). */
+async function followGone(db, p, out) {
+  const enc = MB.aliveEncode(p.uids);
+  const sig = MB.hash8(enc);
+  const before = String(p.sync.aliveSig || '');
+  if (before === sig) return 0;
+  let dead = [];
+  if (before) {
+    const prev = (await db.ref(ROOT + '/alive/' + p.slug).once('value')).val();
+    dead = MB.goneKeys(MB.aliveDecode(prev).map(String), p.uids);
+  }
+  const up = {};
+  dead.forEach((k) => { up[ROOT + '/msgs/' + p.slug + '/' + k] = null; });
+  up[ROOT + '/alive/' + p.slug] = enc;
+  await db.ref().update(up);
+  p.sync.aliveSig = sig;
+  if (dead.length) {
+    out.removed += dead.length;
+    dead.forEach((k) => out.gone.push(p.slug + ':' + k));
+    /* 「이 칸에 모두 몇 통」 — 다음 하루 그물이 다시 셀 때까지 뺀 만큼 줄여 둔다 */
+    if (p.sync.kept) { const left = Number(p.sync.kept) - dead.length; p.sync.kept = left > 0 ? left : 0; }
+  }
+  return dead.length;
+}
+
 async function runSync(deps, opts) {
   const o = opts || {};
   const deadline = nowMs() + Math.max(20000, Number(o.deadlineMs || 460000));
   const db = deps.getDatabase();
-  const out = { ok: true, folders: 0, rows: 0, removed: 0, ready: 0, waiting: 0, err: '' };
+  const out = { ok: true, folders: 0, rows: 0, removed: 0, ready: 0, waiting: 0, err: '', gone: [] };
 
   const user = await deps.mailUserAsync();
   const pass = deps.mailPass();
@@ -352,6 +389,13 @@ async function runSync(deps, opts) {
             console.warn('syncMailbox 번호 목록을 못 받았습니다:', p.box.path, String((e && e.message) || e));
             p.uids = [];
           }
+          /* ★ 다음메일에서 지운 것을 «이 회차에» 따라 뺀다 — 까닭은 followGone 머리글.
+             ⚠ 번호 목록을 못 받았으면(빈 배열) 건너뛴다 — 지난 목록도 안 덮는다. */
+          if (p.uids.length) {
+            try { await followGone(db, p, out); } catch (e) {
+              console.warn('syncMailbox 지운 것 따라 빼기 실패:', p.box.path, String((e && e.message) || e));
+            }
+          }
         }
         const pick = MB.pickToFetch(p.uids, p.sync, CHUNK);
         /* 어느 방향인지 함께 들고 간다 — 중간에 끊겼을 때 표시를 옮겨도 되는지가
@@ -564,7 +608,7 @@ async function runSync(deps, opts) {
                까닭은 mail-box.js goneKeys 머리글(대표 지시 2026-08-28). */
             const dead = MB.goneKeys(haveKeys, p.uids);
             const gone = {};
-            dead.forEach((k) => { gone[ROOT + '/msgs/' + p.slug + '/' + k] = null; });
+            dead.forEach((k) => { gone[ROOT + '/msgs/' + p.slug + '/' + k] = null; out.gone.push(p.slug + ':' + k); });
             if (dead.length) await db.ref().update(gone);
             out.removed += dead.length;
             /* 우리가 «실제로 들고 있는» 줄 수 — 화면의 「이 칸에 모두 몇 통」이 이것이다.
@@ -717,6 +761,9 @@ async function runSync(deps, opts) {
     await db.ref(ROOT + '/meta').update({
       at: nowMs(), ok: true, folders: out.folders, rows: out.rows,
       removed: out.removed, ready: out.ready, waiting: out.waiting, turns: turns, err: '',
+      /* 이 회차에 뺀 메일(칸:번호) — 열려 있는 화면이 이것을 보고 새로고침 없이 지운다.
+         ⚠ 없으면 null 로 «지운다» — 남겨 두면 화면이 지난 회차 것을 또 지운다. */
+      gone: out.gone.length ? out.gone.slice(-200) : null,
     });
 
     /* ══ POP3 로는 더 주는가 — «그릇당 한 번», 일이 다 끝난 뒤에만 (2026-09-02) ══
@@ -892,6 +939,8 @@ async function withFolder(deps, slug, fn, opts) {
       /* 물려받은 것이 죽어 실패했을 때만 다시 해 본다 — 새로 붙어서도 실패했으면 진짜다.
          ⚠ 진짜 실패면 담아 둔 폴더 주소를 «버린다» — 폴더 이름이 바뀌어 낡은 주소로
            실패했을 수 있다. 안 버리면 10분 내내 같은 자리에서 넘어진다. */
+      /* ⚠ «그 메일이 없다»(noRetry)는 연결 탓이 아니다 — 새로 붙어 다시 물어도 같은 답이라 바로 올린다 */
+      if (e && e.noRetry) throw e;
       if (!got.reused || attempt >= 1) { folderPathForget(slug); throw e; }
       console.warn('withFolder 물려받은 연결이 죽어 다시 붙습니다:', String((e && e.message) || e));
     } finally {
@@ -901,6 +950,38 @@ async function withFolder(deps, slug, fn, opts) {
     }
   }
   throw lastErr || new Error('메일함을 열지 못했습니다');
+}
+
+/* ══════ 연 메일이 다음메일 그 칸에 «없을» 때 (대표 지시 2026-10-10 「다음 메일에서 삭제하면 자동으로 삭제」) ══════
+   두 가지가 같은 «없다»로 온다 — 가르지 않으면 고칠 수가 없다.
+   ① 지웠거나 다른 칸으로 옮겼다 — 번호가 지금 창 바닥보다 «위»다. 그 자리에서 우리 목록에서도 뺀다.
+      그래야 다음 회차(몇 분)를 기다리지 않고, 누른 사람이 같은 것을 또 누르지 않는다.
+   ② 다음메일 400통 창 «밖»으로 밀려났다 — 번호가 창 바닥보다 «아래»다. 지운 것이 아니므로
+      절대 안 뺀다(2026-08-28 규칙). 화면에는 까닭을 말한다.
+   ⚠ 판정은 goneKeys 하나로 — 동기화와 두 벌이면 한쪽만 고쳐진다.
+   ⚠ 번호 목록을 못 받으면 아무것도 안 뺀다(빈 목록 = 「전부 지웠다」로 읽히는 길을 막는다).
+   ⚠ 미리 받기(peek)에서도 뺀다 — 이웃 통을 미리 받다 알게 된 것도 같은 사실이다.
+   MB_404 로그로 둘이 얼마나 나는지 센다(창 밖을 열 수 있는지 아직 재 보지 못했다). */
+async function notHere(deps, client, slug, uid, peek) {
+  let all = [];
+  try { all = (await client.search({ all: true }, { uid: true })) || []; } catch (_) { all = []; }
+  const nums = all.map(Number).filter((n) => n > 0);
+  const floor = nums.length ? Math.min.apply(null, nums) : 0;
+  const gone = MB.goneKeys([String(uid)], nums).length > 0;
+  let removed = false;
+  if (gone) {
+    try { await deps.getDatabase().ref(ROOT + '/msgs/' + slug + '/' + uid).remove(); removed = true; }
+    catch (e) { console.warn('readMailMessage 지운 메일 빼기 실패:', String((e && e.message) || e)); }
+  }
+  const below = !!(nums.length && Number(uid) < floor);
+  console.log('MB_404', JSON.stringify({ slug: slug, gone: gone, removed: removed, below: below, peek: !!peek, n: nums.length }));
+  const msg = gone
+    ? '다음메일에서 지웠거나 다른 칸으로 옮긴 메일입니다 — 목록에서도 뺐습니다'
+    : below
+      ? '다음메일이 이 칸에서는 최근 400통만 열어 줍니다 — 이 메일은 그 밖이라 여기서 못 엽니다. 다음메일에서 보십시오'
+      : '그 메일이 없습니다 — 다음메일에서 지워졌을 수 있습니다';
+  return Object.assign(new Error(msg), { status: 404, noRetry: true,
+    extra: { gone: removed, below: below } });
 }
 
 /* 흐르는 것을 한 덩이로. 상한을 넘으면 멈춘다 — 메모리를 다 먹고 죽는 것보다 낫다. */
@@ -1070,6 +1151,47 @@ function popUidlList(body) {
 /* 이름표를 실시간DB 열쇠로 — . $ # [ ] / 는 못 쓴다 */
 function popKey(id) {
   return String(id || '').replace(/[.$#[\]/\s]/g, '_').slice(0, 120);
+}
+/* ══════ 📦 지난 메일 — POP3 를 «붙어 둔 채» 쓴다 (대표 지시 2026-10-10 「메일을 읽는데 너무 늦다」) ══════
+   ★ 실측(서버 기록): 지난 메일 한 통 열기가 13~18초, 겹치면 75~137초였다. 다음메일 IMAP 글
+     받기는 0.4~1.2초인데 POP3 만 그랬다 — 한 통을 열 때마다 ①새로 로그인하고 ②이름표 목록
+     «3만 줄»(UIDL)을 처음부터 받아 그 안에서 한 줄을 찾았기 때문이다. 같은 일을 매번 다시 했다.
+   ★ 이제 한 번 붙어 이름표 표(열쇠 → 번호)를 그릇에 들고 있다가, 다음 통은 RETR 하나로 연다.
+     화면은 「지난 메일」 칸을 여는 순간 미리 붙여 둔다(warm) — 목록을 고르는 동안 준비가 끝난다.
+   ⚠ POP3 는 로그인한 순간의 «사진»을 본다 — 붙어 둔 동안 지운 것은 이 표에 남는다. 지난 메일은
+     새로 생기지 않고 지워지기만 하므로, 못 찾으면 «새로 붙어 한 번 더» 본 뒤에야 없다고 한다.
+   ⚠ 오래 붙들지 않는다(OLD_POP_IDLE_MS) — POP3 는 붙어 있는 동안 그 메일함을 «잠근다».
+   ⚠ DELE 는 여기에도 없다(popOpen 머리글). QUIT 앞에 RSET 을 보내는 것도 그대로다. */
+const OLD_POP_IDLE_MS = 3 * 60 * 1000;
+let _oldPop = null;                    /* { pop, idx: Map(열쇠→번호), at, size } */
+function oldPopForget() {
+  const w = _oldPop; _oldPop = null;
+  if (w) { try { w.pop.close().catch(() => {}); } catch (_) { /* 이미 끊겼다 */ } }
+}
+async function oldPopSession(open, fresh) {
+  const w = _oldPop;
+  if (!fresh && w && (nowMs() - w.at) < OLD_POP_IDLE_MS) return { s: w, reused: true };
+  oldPopForget();
+  const pop = await open();
+  let list;
+  try { list = popUidlList((await pop.cmd('UIDL', true)).body); } catch (e) {
+    try { await pop.close(); } catch (_) { /* 이미 끊겼다 */ }
+    throw e;
+  }
+  const idx = new Map();
+  list.forEach((x) => idx.set(popKey(x.id), x.n));
+  _oldPop = { pop: pop, idx: idx, at: nowMs(), size: list.length };
+  return { s: _oldPop, reused: false };
+}
+/* 열쇠 → 지금 번호. { s, n, reused } — n 이 0 이면 «새로 붙어 봐도» 없다. */
+async function oldPopFind(open, key) {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const got = await oldPopSession(open, attempt > 0);
+    const n = got.s.idx.get(key) || 0;
+    if (n || !got.reused) return { s: got.s, n: n, reused: got.reused };
+    /* 붙어 둔 표에 없다 — 그 표가 낡았을 수 있으니 새로 붙어 한 번만 더 본다 */
+  }
+  return { s: _oldPop, n: 0, reused: false };
 }
 /* 같은 메일인가 — IMAP 으로 이미 든 줄과 견줄 지문.
    ⚠ 제목은 «푼 뒤»로 견딘다(=?UTF-8?B?…?= 를 그대로 두면 영영 안 맞는다).
@@ -1339,7 +1461,9 @@ module.exports = function build(deps) {
       await fn();
     } catch (e) {
       console.error('mailbox:', String((e && e.message) || e));
-      reply(res, e && e.status ? e.status : 500, { ok: false, error: (e && e.message) || '처리하지 못했습니다.' });
+      /* e.extra — 화면이 알아야 할 것을 함께 싣는다(예: gone — 목록에서 뺐다) */
+      reply(res, e && e.status ? e.status : 500, Object.assign(
+        { ok: false, error: (e && e.message) || '처리하지 못했습니다.' }, (e && e.extra) || {}));
     }
   }
 
@@ -1414,17 +1538,21 @@ module.exports = function build(deps) {
   }
 
   return {
-    /* ══════ 자동 — 업무 시간 10분마다 (2026-10-04 비용 점검) ══════
+    /* ══════ 자동 — 업무 시간 3분마다 (2026-10-10 대표 지시 「실시간 연동」 · 밤은 2026-10-04 비용 점검 그대로) ══════
        보낸 메일까지 함께 따라오게 하려면 업무 중에는 자주 봐야 한다.
+       ★ 10분 → 3분 (2026-10-10). 「다음 메일에서 삭제하면 자동으로 삭제하고 실시간 연동되게」.
+         다음메일은 우리에게 «알려 주지» 않는다(밀어 주는 길이 없다) — 우리가 자주 묻는 것이
+         실시간에 가장 가깝다. 지운 것 따라 빼기(followGone)는 번호 목록 한 줄만 견주므로
+         회차가 잦아도 싸다. 한 회차 8~10초 × 하루 300번 — 무료 몫(40만 GB초/달) 안이다.
        ⚠ 밤 22:00~06:59에는 직원이 보지 않는데도 32개 폴더를 매번 훑고, 실측으로
           새 메일 0건인 실행도 8~10초 걸렸다. 밤에는 멈추고 오전 7시에 다시 받는다.
-       마지막 실행은 21:50, 첫 실행은 07:00 이다. 업무 중 10분 반영 속도는 그대로다. */
+       마지막 실행은 21:57, 첫 실행은 07:00 이다. */
     syncMailbox: F
       .region(REGION)
       /* ⚠ TYPESAFE_API_KEY — 받은메일함 자동분류(mail-ai-classify)가 쓴다.
            config/mailAiClassify.on 이 꺼져 있으면 이 열쇠는 «읽히기만 하고 안 쓰인다». */
       .runWith({ secrets: ['DAUM_MAIL_PASSWORD', 'TYPESAFE_API_KEY'], timeoutSeconds: 540, memory: '512MB' })
-      .pubsub.schedule('*/10 7-21 * * *')
+      .pubsub.schedule('*/3 7-21 * * *')
       .timeZone('Asia/Seoul')
       .onRun(async () => {
         const r = await runSync(deps, { deadlineMs: 460000 });
@@ -1490,7 +1618,7 @@ module.exports = function build(deps) {
 
         const got = await withFolder(deps, slug, async (client) => {
           const head = await client.fetchOne(uid, { uid: true, size: true, bodyStructure: true, envelope: true }, { uid: true });
-          if (!head) throw Object.assign(new Error('그 메일이 없습니다 — 다음메일에서 지워졌을 수 있습니다'), { status: 404 });
+          if (!head) throw await notHere(deps, client, slug, uid, peek);
 
           /* 읽음 표시 — 다음메일에서 열었을 때와 «같게» 만든다. 이것을 안 하면 앱에서
              다 읽었는데도 옆줄의 「안읽음」이 영원히 그 수로 남는다.
@@ -2003,56 +2131,84 @@ module.exports = function build(deps) {
        ⚠ DELE 는 여기에도 없다(popOpen 머리글). 원본 보관 설정도 확인했다. */
     readOldMail: F
       .region(REGION)
-      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 300, memory: '1GB' })
+      /* ⚠ maxInstances 1 — 그릇이 둘 뜨면 둘이 «따로» 로그인한다. POP3 는 붙어 있는 동안 메일함을
+           잠가서, 둘째는 첫째가 끝날 때까지 기다렸다(실측 2026-10-05·10-09: 같은 때 두 통이 75~137초).
+           한 그릇에 줄을 세우면 둘째는 첫째가 붙여 둔 연결을 «물려받아» 곧바로 연다. */
+      .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 300, memory: '1GB', maxInstances: 1 })
       .https.onRequest((req, res) => gate(req, res, async () => {
         const b = req.body || {};
         const key = String(b.key || '');
         const wantAtt = Number.isInteger(Number(b.index)) && Number(b.index) >= 0 ? Number(b.index) : -1;
-        if (!key || !/^[A-Za-z0-9_+=@:~-]{1,120}$/.test(key)) {
+        const warm = !!b.warm;
+        if (!warm && (!key || !/^[A-Za-z0-9_+=@:~-]{1,120}$/.test(key))) {
           reply(res, 400, { ok: false, error: '어느 메일인지 알 수 없습니다.' }); return;
         }
         const user = await deps.mailUserAsync();
         const pass = deps.mailPass();
         if (!user || !pass) { reply(res, 500, { ok: false, error: '메일 계정이 설정되지 않았습니다.' }); return; }
+        const open = () => popOpen(user, pass, 240000);
 
-        const pop = await popOpen(user, pass, 120000);
-        try {
-          const list = popUidlList((await pop.cmd('UIDL', true)).body);
-          const hit = list.filter((x) => popKey(x.id) === key)[0];
-          if (!hit) {
+        /* ☕ 「지난 메일」 칸을 연 순간 화면이 부른다 — 붙고 이름표 표만 만들어 둔다(메일은 안 읽는다) */
+        if (warm) {
+          const t0 = nowMs();
+          const got = await oldPopSession(open, false);
+          console.log('MB_TIME_OLD', JSON.stringify({ warm: 1, ms: nowMs() - t0, reused: got.reused, n: got.s.size }));
+          reply(res, 200, { ok: true, warm: true, reused: got.reused });
+          return;
+        }
+
+        /* 붙어 둔 연결이 그새 끊겼으면 «한 번만» 새로 붙어 다시 해 본다 (withFolder 와 같은 결) */
+        for (let attempt = 0; attempt < 2; attempt++) {
+          const t0 = nowMs();
+          const got = await oldPopFind(open, key);
+          const tFind = nowMs() - t0;
+          const pop = got.s.pop;
+          const hit = { n: got.n };
+          if (!hit.n) {
             reply(res, 404, { ok: false, error: '그 메일이 다음메일에 없습니다 — 지워졌을 수 있습니다.' });
             return;
           }
-          /* 얼마나 큰가 — POP3 는 한 통을 통째로만 준다 */
-          let size = 0;
           try {
-            const l = await pop.cmd('LIST ' + hit.n, false);
-            size = Number((String(l.head).match(/\d+\s+(\d+)/) || [])[1] || 0);
-          } catch (_) { /* 크기를 몰라도 받아는 본다 */ }
-          if (size > ATT_MAX) {
-            reply(res, 413, { ok: false,
-              error: '이 지난 메일은 ' + Math.round(size / 1024 / 1024) + 'MB 라 여기서 못 엽니다 — 다음메일에서 보십시오.' });
+            /* 얼마나 큰가 — POP3 는 한 통을 통째로만 준다 */
+            let size = 0;
+            try {
+              const l = await pop.cmd('LIST ' + hit.n, false);
+              size = Number((String(l.head).match(/\d+\s+(\d+)/) || [])[1] || 0);
+            } catch (e) {
+              if (!(e && e.pop)) throw e;          /* 연결이 끊긴 것 — 아래에서 새로 붙는다 */
+              /* 답(-ERR)일 뿐이면 크기를 몰라도 받아는 본다 */
+            }
+            if (size > ATT_MAX) {
+              reply(res, 413, { ok: false,
+                error: '이 지난 메일은 ' + Math.round(size / 1024 / 1024) + 'MB 라 여기서 못 엽니다 — 다음메일에서 보십시오.' });
+              return;
+            }
+            const t1 = nowMs();
+            const raw = (await pop.cmd('RETR ' + hit.n, true)).body;
+            got.s.at = nowMs();
+            console.log('MB_TIME_OLD', JSON.stringify({ find: tFind, retr: nowMs() - t1, reused: got.reused, kb: Math.round(raw.length / 1024) }));
+            const { simpleParser } = require('mailparser');
+            const p = await simpleParser(Buffer.from(raw, 'binary'));
+            const atts = (p.attachments || []).map((a, i) => ({
+              i: i, part: '', name: String((a && a.filename) || '이름없는첨부'),
+              mime: String((a && a.contentType) || ''), size: Number((a && a.size) || 0),
+            }));
+            if (wantAtt >= 0) {
+              const a = (p.attachments || [])[wantAtt];
+              if (!a) { reply(res, 404, { ok: false, error: '그 첨부가 없습니다' }); return; }
+              reply(res, 200, { ok: true, name: String(a.filename || '첨부'),
+                mime: String(a.contentType || 'application/octet-stream'),
+                b64: Buffer.from(a.content).toString('base64') });
+              return;
+            }
+            reply(res, 200, { ok: true, html: p.html || '', text: String(p.text || ''),
+              atts: atts, full: true, old: true });
             return;
+          } catch (e) {
+            oldPopForget();
+            if (!got.reused || attempt >= 1) throw e;
+            console.warn('readOldMail 붙어 둔 연결이 죽어 다시 붙습니다:', String((e && e.message) || e));
           }
-          const raw = (await pop.cmd('RETR ' + hit.n, true)).body;
-          const { simpleParser } = require('mailparser');
-          const p = await simpleParser(Buffer.from(raw, 'binary'));
-          const atts = (p.attachments || []).map((a, i) => ({
-            i: i, part: '', name: String((a && a.filename) || '이름없는첨부'),
-            mime: String((a && a.contentType) || ''), size: Number((a && a.size) || 0),
-          }));
-          if (wantAtt >= 0) {
-            const a = (p.attachments || [])[wantAtt];
-            if (!a) { reply(res, 404, { ok: false, error: '그 첨부가 없습니다' }); return; }
-            reply(res, 200, { ok: true, name: String(a.filename || '첨부'),
-              mime: String(a.contentType || 'application/octet-stream'),
-              b64: Buffer.from(a.content).toString('base64') });
-            return;
-          }
-          reply(res, 200, { ok: true, html: p.html || '', text: String(p.text || ''),
-            atts: atts, full: true, old: true });
-        } finally {
-          try { await pop.close(); } catch (_) { /* 이미 끊겼다 */ }
         }
       })),
 
@@ -2115,3 +2271,9 @@ module.exports.CHUNK = CHUNK;
 module.exports.popOpen = popOpen;
 module.exports.drain = drain;
 module.exports.ATT_MAX = ATT_MAX;
+/* 📦 지난 메일 «붙어 둔 POP3» — 한 번 붙고 다음 통부터는 이어 쓰는지 돌려 본다(2026-10-10) */
+module.exports.oldPopSession = oldPopSession;
+module.exports.oldPopFind = oldPopFind;
+module.exports.oldPopForget = oldPopForget;
+/* 연 메일이 «없을» 때 가르기 — 지운 것(뺀다)·창 밖(남긴다)을 돌려 본다(2026-10-10) */
+module.exports.notHere = notHere;

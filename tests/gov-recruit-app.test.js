@@ -1240,7 +1240,8 @@ test('★★★ 머리는 «한 줄» — 탭과 같은 말(제목줄)은 없고
   assert.equal((w.match(/class="rec-stick"/g) || []).length, 1, '고정 칸은 하나');
   const a = st.indexOf('class="mchips"'), b = st.indexOf('✓ 새 글 2건 모두 봤음'), c = st.indexOf('class="rec-at"');
   assert.ok(a >= 0 && b > a && c > b, '차례: 갈래 → 모두 봤음 → 시각 ' + [a, b, c]);
-  assert.match(st, /<span class="rec-at" title="서버가 매일 아침 7시 20분에 11곳 게시판을 읽습니다 · 마지막 [^"]+">🕒 10\.05 \d\d:\d\d<\/span>/);
+  /* ⚠ 날짜·시각은 «모양»만 본다 — 검사 기계(CI)는 UTC 라 한국 10.05 07:20 이 10.04 22:20 으로 찍힌다(2026-10-10 main 이 빨개졌다) */
+  assert.match(st, /<span class="rec-at" title="서버가 매일 아침 7시 20분에 11곳 게시판을 읽습니다 · 마지막 [^"]+">🕒 \d\d\.\d\d \d\d:\d\d<\/span>/);
   assert.match(st, /못 읽은 곳 1\(LH 한국토지주택공사\)/, '못 읽은 곳은 고정 칸에 빨갛게');
   assert.ok(w.indexOf('<thead>') > w.indexOf('rec-stick'), '표는 고정 칸 아래');
 });
