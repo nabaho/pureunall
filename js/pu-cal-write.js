@@ -141,6 +141,8 @@
     var ref = _db.ref('data/' + table + '/v/' + id);
     /* 새것이면 «서버에 없어야» 한다(-1) — 같은 번호가 이미 있으면 덮지 않고 멈춘다 */
     var ctx = { entityType: 'ScheduleEvent' };
+    /* 이알피 근태(attendance_records)의 createdAt 은 글자(ISO) — 처음 찍는 도장도 같은 모양으로(2026-10-10) */
+    if (table === 'attendance_records') ctx.timeFormat = 'iso';
     if (!prev) ctx.expectedRevision = -1;
     return gate().save(ref, function (server) { return overlay(id, fields, prev, server); }, ctx)
       .then(function () {
@@ -293,7 +295,7 @@
     return gate().save(ref, function (server) {
       var base = (server && typeof server === 'object') ? server : (prev || {});
       return Object.assign({}, base, { id: id, _deleted: true, deletedAt: Date.now(), deletedBy: who });
-    }, { entityType: 'ScheduleEvent' })
+    }, { entityType: 'ScheduleEvent', timeFormat: table === 'attendance_records' ? 'iso' : undefined })
       .then(function () { return _db.ref('data/' + table + '/u').set(Date.now()); })
       .then(function () { return OK; })
       .catch(function (e) { return fail('server', (e && e.message) || String(e)); });

@@ -88,6 +88,19 @@
     return {ok:out.length===0,issues:out};
   }
 
+  function timeFormatOf(out,previous,options){
+    var f=options&&options.timeFormat;
+    if(f==='iso'||f==='number') return f;
+    if(clean(options&&options.entityType||out&&out.entityType)==='Organization') return 'iso';
+    if(typeof (previous&&previous.updatedAt)==='string'||typeof (out&&out.updatedAt)==='string') return 'iso';
+    return 'number';
+  }
+  function stampTime(now,format){
+    if(format!=='iso') return now;
+    var d=new Date(now);
+    return isFinite(d.getTime())?d.toISOString():now;
+  }
+
   function prepareRecord(record, options){
     options=options||{};
     var previous=options.previous||null, now=options.now==null?Date.now():options.now;
@@ -105,7 +118,14 @@
     out.entityType=clean(options.entityType||out.entityType);
     out.schemaVersion=currentSchema();
     out.contractVersion=CONTRACT_VERSION;
-    out.createdAt=previous&&previous.createdAt!=null?previous.createdAt:(out.createdAt!=null?out.createdAt:now);
+    /* createdAt 이 «없던» 레코드에 처음 도장을 찍을 때만 모양을 고른다 — 있던 값은 한 글자도 안 건드린다.
+       이알피 업체(data/companies)는 글자(ISO)로 저장·비교한다((a.createdAt||'').localeCompare). 숫자를 찍으면
+       정렬이 «localeCompare is not a function» 으로 죽는다(2026-10-10 업체 6건). 그래서
+       ① options.timeFormat('iso'|'number') 가 있으면 그대로, ② 업체(Organization)는 iso,
+       ③ 그 밖에는 레코드가 이미 글자 updatedAt 을 쓰면 iso, 아니면 숫자(캘린더 등 기존 모양). */
+    var created=previous&&previous.createdAt!=null?previous.createdAt:out.createdAt;
+    if(created==null) created=stampTime(now,timeFormatOf(out,previous,options));
+    out.createdAt=created;
     out.updatedAt=now;
     if(previous&&previous.createdBy!=null) out.createdBy=previous.createdBy;
     else if(out.createdBy==null&&clean(options.actor)) out.createdBy=clean(options.actor);
