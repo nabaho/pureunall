@@ -206,7 +206,7 @@ test("⑳ 게시판·글 주소는 홈페이지가 아니다 — 첫 화면 꼴�
 });
 
 test("㉑ 웹검색 조각글에서 얻은 번호는 홈페이지에 회사명이 없으면 함께 버린다(엉뚱한 사이트 방어)", async () => {
-  const providers = { web: async () => [{ title: "주식회사 가나다 홈페이지", link: "https://other-site.example/", snippet: "가나다 서울 서초구 TEL 02-111-2222" }] };
+  const providers = { web: async () => [{ title: "가나다 홈페이지", link: "https://other-site.example/", snippet: "가나다 서울 서초구 TEL 02-111-2222" }] };
   const getPage = async (u) => ({ url: u, html: "<html><body>전혀 다른 회사 소개 서울 서초구 02-999-8888</body></html>" });
   const r = await C.lookup({ name: "주식회사 가나다", address: "서울 서초구 매헌로 16", providers, getPage });
   assert.equal(r.homepage, "");
@@ -215,7 +215,7 @@ test("㉑ 웹검색 조각글에서 얻은 번호는 홈페이지에 회사명�
 });
 
 test("㉒ 홈페이지를 열지 못하면 웹검색 홈페이지의 확신을 낮춘다", async () => {
-  const providers = { web: async () => [{ title: "주식회사 가나다", link: "https://ganada.example/", snippet: "가나다 서울 서초구" }] };
+  const providers = { web: async () => [{ title: "가나다 공식", link: "https://ganada.example/", snippet: "가나다 서울 서초구" }] };
   const getPage = async () => { throw new Error("timeout"); };
   const r = await C.lookup({ name: "주식회사 가나다", address: "서울 서초구 매헌로 16", providers, getPage });
   assert.equal(r.confidence, "low");
