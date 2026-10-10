@@ -138,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,'
+    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -741,7 +741,7 @@ test('★★★ 인증키가 있고 한 번도 안 받았으면 탭을 여는 �
 });
 test('★★ 받은 적이 있으면 탭을 열어도 다시 안 받는다(하루 한 번 자동에 맡긴다) · 열쇠가 없으면 안 받는다', async () => {
   let n = 0;
-  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z', plan_since: '2026-10-09' }); r.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z', plan_since: '2026-10-09', plan_ver: 2 }); r.api.setPull(async () => { n++; return PLAN_ENV([]); });
   r.api.setTab('plan'); await tickP(20);
   assert.equal(n, 0);
   const r2 = runApp({ feed: [] }); r2.api.setPull(async () => { n++; return PLAN_ENV([]); });
@@ -784,4 +784,118 @@ test('★★ 실패 안내(plan_err)는 클라우드로 간다 — 열쇠는 안
   await r.api.fetchAll();
   assert.match(r.store.gov3_plan_err, /\[코드 20 · 서비스 접근거부\]/);
   assert.doesNotMatch(r.store.gov3_plan_err, /SECRET-KEY-123/);
+});
+
+/* ═══ 발주 예정 상세 팝업 (대표 2026-10-10 「발주예정에 대한 팝업창이나 다른 내용이 있으면 그 부분도 볼 수 있게」) ═══ */
+const FULL = () => [
+  { kind: 'plan', no: 'R26DD9', nm: '직무분석 용역', org: '갑공단', top: '고용노동부', ym: ymAdd(2), prc: 45000000, cAmt: 40000000,
+    mthd: '수의계약', how: '자체조달', dept: '기획조정실', ofcl: '홍길동', tel: '052-000-0000', bids: ['R26BK00000009'],
+    postDt: '2026-02-03 10:00:00', chgDt: '2026-03-04 11:00:00', kw: '직무분석',
+    use: '조직 진단을 위한 직무분석', specTx: '직무기술서 30종\n역량모델', qty: '1식', rmk: '예산 확정 전 — 바뀔 수 있음',
+    bizDiv: '용역', jrsd: '중앙', dcls: '경영컨설팅서비스', period: '착수일부터 5개월' },
+  { kind: 'spec', no: 'S555', nm: '갑공단 인사평가 컨설팅', org: '갑공단', ntce: '조달청', prc: 30000000,
+    rcptDt: '2026-10-07 09:00:00', rgstDt: '2026-10-07 08:50:00', closeDt: '2026-10-14 18:00:00', dlvrDt: '2026-12-31', dlvrDays: '90',
+    sw: 'Y', items: '인사평가 컨설팅 1식', refNo: 'REF-1', bids: [],
+    files: ['https://www.g2b.go.kr/f1', 'javascript:alert(1)', 'https://www.g2b.go.kr/f2'] },
+  { kind: 'plan', no: 'R26DD8', nm: '숨긴 갑공단 용역', org: '갑공단', ym: ymAdd(1), bids: [], hidden: true },
+  { kind: 'plan', no: 'R26DD7', nm: '옛 줄 노무 용역', org: '을공사', ym: ymAdd(1), prc: 1000000, bids: [] }
+];
+const TD = { target: { closest: () => null } };
+test('★★★ 발주계획 줄을 누르면 상세 — 표에 없는 용도·규격·비고·관할·조달방식·바뀐 날·계약금액까지', () => {
+  const r = runApp({ plan: FULL(), feed: [{ id: 'G9', src: '나라장터', type: '새 공고', no: 'R26BK00000009-000', nm: '직무분석 용역', org: '갑공단' }] });
+  r.el('pView').value = 'all'; r.api.planDraw();
+  assert.match(r.el('ptb').innerHTML, /<tr class="fr[^"]*" onclick="planRowClick\(event,'R26DD9'\)">/, '줄에 누르는 길이 없다');
+  r.api.planRowClick(TD, 'R26DD9');
+  assert.equal(r.el('pop').className, 'pop on', '팝업이 안 떴다');
+  assert.equal(r.el('popTtl').textContent, '📅 발주계획 상세');
+  const h = r.el('popBody').innerHTML;
+  for (const [k, v] of [['총괄기관', '고용노동부'], ['조달방식', '자체조달'], ['업무구분', '용역'], ['관할', '중앙'], ['세부품명', '경영컨설팅서비스'],
+    ['담당', '기획조정실 · 홍길동 · 052-000-0000'], ['수량', '1식'], ['공사·용역 기간', '착수일부터 5개월'], ['걸린 낱말', '직무분석'], ['발주계획 번호', 'R26DD9']])
+    assert.match(h, new RegExp('<th>' + k + '</th><td>(<div[^>]*>)?' + v), k + ' 칸');
+  assert.match(h, /<th>용도<\/th><td><div style="white-space:pre-wrap">조직 진단을 위한 직무분석<\/div>/);
+  assert.match(h, /<th>규격<\/th><td><div style="white-space:pre-wrap">직무기술서 30종\n역량모델<\/div>/, '줄바꿈을 살린다');
+  assert.match(h, /<th>비고<\/th><td><div style="white-space:pre-wrap">예산 확정 전 — 바뀔 수 있음/);
+  assert.match(h, /<th>바뀐 날<\/th><td>2026-03-04 11:00/);
+  assert.match(h, /<th>발주 금액\(합계\)<\/th><td>4,500만원/); assert.match(h, /<th>계약금액<\/th><td>4,000만원/);
+  assert.match(h, /<th>계약방법<\/th><td><span class="tag amber"[^>]*>수의계약<\/span>/);
+  assert.match(h, /<th>입찰공고번호<\/th><td>R26BK00000009 <button class="btn sm" onclick="planGoFeed\('G9'\)">공고 보기<\/button>/);
+  assert.doesNotMatch(h, /다시 받을 때/, '자세한 칸이 있는데 «다시 받을 때 채워진다»고 한다');
+  r.api.planGoFeed('G9');
+  assert.equal(r.el('popTtl').textContent, '📋 공고 상세', '공고 보기 → 공고 상세로');
+});
+test('★★ 같은 기관의 다른 발주계획·사전규격(숨긴 것 포함)을 견주고, 누르면 그 상세로', () => {
+  const r = runApp({ plan: FULL() });
+  r.api.planPop('R26DD9');
+  const h = r.el('popBody').innerHTML, cmp = h.slice(h.indexOf('같은 기관의 다른 발주계획·사전규격'));
+  assert.match(cmp, /<span class="sml">2건 \(숨긴 것 포함\)<\/span>/);
+  assert.match(cmp, /onclick="planPop\('S555'\)"/); assert.match(cmp, /onclick="planPop\('R26DD8'\)"[\s\S]*?<span class="tag red">숨김<\/span>/);
+  assert.doesNotMatch(cmp, /R26DD7|R26DD9'/, '다른 기관·자기 자신이 섞였다');
+  r.api.planPop('R26DD7');
+  assert.match(r.el('popBody').innerHTML, /같은 기관의 다른 발주계획·사전규격 — 없습니다/);
+});
+test('★★ 사전규격 상세 — 의견 마감·납품기한·SW사업·품목·규격서 전부(https 만)·등록번호', () => {
+  const r = runApp({ plan: FULL() });
+  r.api.planPop('S555');
+  assert.equal(r.el('popTtl').textContent, '🔔 사전규격 상세');
+  const h = r.el('popBody').innerHTML;
+  assert.match(h, /<th>의견 등록 마감<\/th><td>2026-10-14 18:00/); assert.match(h, /<th>납품기한<\/th><td>2026-12-31/);
+  assert.match(h, /<th>납품일수<\/th><td>90일/); assert.match(h, /<th>SW사업<\/th><td>예/);
+  assert.match(h, /<th>공고기관<\/th><td>조달청/); assert.match(h, /<th>사전규격 등록번호<\/th><td>555</);
+  assert.match(h, /<th>참조번호<\/th><td>REF-1/); assert.match(h, /<th>배정예산<\/th><td>3,000만원/);
+  assert.match(h, /📎 규격서 1<\/a> · <a href="https:\/\/www\.g2b\.go\.kr\/f2"[^>]*>📎 규격서 2<\/a>/);
+  assert.doesNotMatch(h, /javascript:/);
+});
+test('★★ 옛 줄(자세한 칸 없음)은 «다시 받을 때 채워진다»고 밝힌다 · 체크칸·단추를 누르면 안 열린다', () => {
+  const r = runApp({ plan: FULL() });
+  r.api.planRowClick({ target: { closest: (sel) => (sel.indexOf('input') >= 0 ? {} : null) } }, 'R26DD7');
+  assert.notEqual(r.el('pop').className, 'pop on', '체크칸을 눌렀는데 팝업이 떴다');
+  r.api.planRowClick(TD, 'R26DD7');
+  assert.match(r.el('popBody').innerHTML, /자세한 칸은 이 줄을 «다시 받을 때» 채워집니다/);
+  assert.match(r.el('popBody').innerHTML, /<th>발주 예정월<\/th><td><b>\d{4}\.\d\d<\/b>/);
+});
+test('★★ 상세에서 ★ 관심·숨기기 — 저장되고 팝업이 따라간다', () => {
+  const r = runApp({ plan: FULL() });
+  r.api.planPop('R26DD9');
+  assert.match(r.el('popBody').innerHTML, /onclick="planStar\('R26DD9'\);planPop\('R26DD9'\)">☆ 관심<\/button>/);
+  r.api.planStar('R26DD9'); r.api.planPop('R26DD9');
+  assert.match(r.el('popBody').innerHTML, />★ 관심 끄기<\/button>/);
+  assert.match(r.el('popBody').innerHTML, /onclick="planHide\('R26DD9',true\);popClose\(\)">🚫 숨기기<\/button>/);
+  r.api.planPop('R26DD8');
+  assert.match(r.el('popBody').innerHTML, /onclick="planHide\('R26DD8',false\);planPop\('R26DD8'\)">↩ 되살리기<\/button>/);
+});
+
+/* ═══ 쪽 뚜껑 — 1월 한 묶음 49,594건 중 39,960건에서 잘렸다(2026-10-10 대표 화면) ═══ */
+test('★★★ 한 묶음이 40쪽을 넘어도 끝까지 받는다(80쪽까지) — 「쪽 뚜껑」이 안 뜬다', async () => {
+  const r = runApp({ feed: [], key_data: 'K' }); const y = new Date().getFullYear(); let firstWin = 0;
+  r.api.setPull(async (u) => {
+    if (/OrderPlanSttusService/.test(u) && u.indexOf('inqryBgnDt=' + y + '01010000') >= 0) {
+      firstWin++; const p = Number(/pageNo=(\d+)/.exec(u)[1]);
+      return { response: { header: { resultCode: '00' }, body: { totalCount: 60, items: [{ orderPlanUntyNo: 'N' + p, bizNm: '노무 용역 ' + p, orderInsttNm: '갑', orderYear: String(y), orderMnth: '12' }] } } };
+    }
+    return PLAN_ENV([]); });
+  await r.api.planFetchNow(true);
+  assert.equal(firstWin, 60, '60쪽 중 ' + firstWin + '쪽만 받았다');
+  assert.doesNotMatch(r.store.gov3_plan_err || '', /쪽 뚜껑/);
+  assert.equal(JSON.parse(r.store.gov3_plan).length, 60);
+  assert.ok(r.api.PLAN_PAGE_MAX.plan >= 80 && r.api.PLAN_PAGE_MAX.spec >= 40);
+});
+test('★★★ 옛 판으로 받은 범위(plan_ver 없음)는 안 믿는다 — 탭을 열면 1월부터 한 번 다시 받고, 판을 남긴다', async () => {
+  const urls = [];
+  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z', plan_since: '2026-10-09' });
+  assert.equal(r.api.planSince(), '', '판이 없는데 받은 범위를 믿었다');
+  r.api.setPull(async (u) => { urls.push(u); return PLAN_ENV([]); });
+  r.api.setTab('plan');
+  for (let i = 0; i < 100 && r.store.gov3_plan_ver !== '2'; i++) await tickP(5);
+  const y = new Date().getFullYear();
+  assert.match(urls.find((u) => /OrderPlanSttusService/.test(u)) || '', new RegExp('inqryBgnDt=' + y + '01010000'), '1월부터가 아니다');
+  assert.equal(r.store.gov3_plan_ver, '2');
+  assert.match(r.api.planSince(), /^\d{4}-\d\d-\d\d$/);
+  urls.length = 0; await r.api.planFetchNow(true);
+  assert.equal(urls.filter((u) => /OrderPlanSttusService/.test(u)).length, 1, '판을 남긴 뒤엔 지난 며칠치만');
+});
+test('★ 받지 못했으면 판도 남기지 않는다(승인 전) — 다음에 다시 1월부터', async () => {
+  const r = runApp({ feed: [], key_data: 'K' });
+  r.api.setPull(async (u) => (/\/ao\//.test(u) ? { OpenAPI_ServiceResponse: { cmmMsgHeader: { returnAuthMsg: '서비스 접근거부', returnReasonCode: '20' } } } : PLAN_ENV([])));
+  await r.api.planFetchNow(true);
+  assert.equal(r.store.gov3_plan_ver || '', '');
 });

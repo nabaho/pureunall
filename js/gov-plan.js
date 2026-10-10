@@ -94,11 +94,29 @@
     return y + '-' + pad(mi);
   }
 
+  /* 자세한 칸 — 팝업(상세)에서만 보인다. ⚠ «값이 있는 칸만» 담는다(빈 칸까지 담으면 줄마다 스무 칸이 붙어 저장이 부푼다).
+     ⚠ 긴 글은 1,500자에서 자른다(규격·비고에 공문 통째가 들어오는 일이 있다). */
+  var LONG = 1500;
+  function extra(out, it, map) {
+    Object.keys(map).forEach(function (k) {
+      var v = s(it[map[k]]).replace(/\s+\n/g, '\n');
+      if (v) out[k] = v.length > LONG ? v.slice(0, LONG) + '…' : v;
+    });
+    return out;
+  }
+  /* 발주계획 — 원문 명세(15129462)의 칸 이름 그대로 */
+  var PLAN_MORE = { use: 'usgCntnts', specTx: 'specCntnts', qty: 'qtyCntnts', rmk: 'rmrkCntnts', period: 'cnstwkPrdCntnts',
+    bizTy: 'bsnsTyNm', bizDiv: 'bsnsDivNm', jrsd: 'jrsdctnDivNm', cls: 'prdctClsfcNoNm', dcls: 'dtilPrdctClsfcNoNm',
+    rdPlace: 'dsgnDocRdngPlceNm', rdPrd: 'dsgnDocRdngPrdCntnts' };
+  /* 사전규격 — 원문 명세(15129437) */
+  var SPEC_MORE = { rgstDt: 'rgstDt', dlvrDt: 'dlvrTmlmtDt', dlvrDays: 'dlvrDaynum', sw: 'swBizObjYn', items: 'prdctDtlList',
+    bizDiv: 'bsnsDivNm' };
+
   function normPlan(it) {
     it = it || {};
     var no = s(it.orderPlanUntyNo) ||
       (s(it.orderInsttCd) && s(it.orderPlanSno) ? 'P' + s(it.orderInsttCd) + '-' + s(it.orderYear) + '-' + s(it.orderPlanSno) : '');
-    return {
+    var o = extra({
       kind: 'plan', no: no, nm: s(it.bizNm) || s(it.prdctClsfcNoNm),
       org: s(it.orderInsttNm), top: s(it.totlmngInsttNm),
       ym: ymOf(it.orderYear, it.orderMnth),
@@ -106,7 +124,11 @@
       mthd: s(it.cntrctMthdNm), how: s(it.prcrmntMethd),
       dept: s(it.deptNm), ofcl: s(it.ofclNm), tel: s(it.telNo),
       bids: bidsOf(it.bidNtceNoList), postDt: s(it.nticeDt), chgDt: s(it.chgDt)
-    };
+    }, it, PLAN_MORE);
+    var cAmt = amount(it.orderContrctAmt);
+    if (cAmt && cAmt !== o.prc) o.cAmt = cAmt;   /* 합계와 다를 때만 — 같으면 두 번 적을 까닭이 없다 */
+    if (o.cls === o.nm) delete o.cls;
+    return o;
   }
   function normSpec(it) {
     it = it || {};
@@ -115,13 +137,13 @@
       var f = s(it['specDocFileUrl' + i]);
       if (/^https:\/\//.test(f) && files.indexOf(f) < 0) files.push(f);
     }
-    return {
+    return extra({
       kind: 'spec', no: s(it.bfSpecRgstNo) ? 'S' + s(it.bfSpecRgstNo) : '',
       nm: s(it.prdctClsfcNoNm), org: s(it.rlDminsttNm) || s(it.orderInsttNm), ntce: s(it.orderInsttNm),
       prc: amount(it.asignBdgtAmt), rcptDt: s(it.rcptDt), closeDt: s(it.opninRgstClseDt),
       ofcl: s(it.ofclNm), tel: s(it.ofclTelNo), refNo: s(it.refNo),
       bids: bidsOf(it.bidNtceNoList), files: files, chgDt: s(it.chgDt)
-    };
+    }, it, SPEC_MORE);
   }
 
   /* 응답 풀기 — 나라장터 입찰공고와 같은 봉투(GovG2b.parse 와 같은 잣대).
@@ -224,7 +246,7 @@
   var api = { PLAN_BASE: PLAN_BASE, SPEC_BASE: SPEC_BASE, PLAN_PAGE: PLAN_PAGE, SPEC_PAGE: SPEC_PAGE,
               encKey: encKey, planUrl: planUrl, specUrl: specUrl, windows: windows, bidsOf: bidsOf, ymOf: ymOf,
               normPlan: normPlan, normSpec: normSpec, parse: parse, errSay: errSay, merge: merge,
-              state: state, linked: linked, prune: prune, ymd: ymd };
+              state: state, linked: linked, prune: prune, ymd: ymd, PLAN_MORE: PLAN_MORE, SPEC_MORE: SPEC_MORE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovPlan = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
