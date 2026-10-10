@@ -2546,7 +2546,9 @@ function _cardMatch(f){
   // ② 이름 — 완전히 같을 때만. 부분일치는 「충남 4호」와 「충남 40호」를 섞을 수 있다
   var k=_cardFundKey(f.name||f.short_name);
   if(k.length<3) return null;
-  var exact=cands.filter(function(r){ return _cardFundKey(r.c)===k; });
+  /* ⚠ 이름에서 «사내근로복지기금»을 떼고 견주므로 출연 «회사»(주식회사 ○○산업)와도 같아진다 — 기금 카드만 본다:
+       이름에 «기금»이 있거나 사업자번호 가운데 두 자리가 82(비영리 고유번호)인 것. 회사(81·86 등) 번호가 기금 고유번호로 박히면 안 된다(2026-10-09 발견) */
+  var exact=cands.filter(function(r){ return _cardFundKey(r.c)===k&&(/기금/.test(String(r.c||''))||dig(r.bz).slice(3,5)==='82'); });
   return exact.length===1?exact[0]:null;
 }
 function bulkFromCards(){
