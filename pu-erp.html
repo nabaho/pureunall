@@ -28602,7 +28602,9 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     /* 방금 이관된 업체를 맨 위로 — 나머지는 등록일 최신순 그대로
        (사건·컨설팅·기금·기타가 쓰는 규칙 그대로다. 표시는 이틀 뒤 저절로 사라진다) */
     fresh.sort(function(a,b){ return arvSort(a, b, function(x,y){
-      return (y.createdAt||'').localeCompare(x.createdAt||''); }); });
+      /* createdAt 이 숫자(밀리초)로 든 업체가 있다 — 공용 저장 관문이 옛 업체에 Date.now() 를 채운다(2026-10-10). 글자·숫자 다 받는다 */
+      function _ca(v){ return typeof v === 'number' ? new Date(v).toISOString() : String(v||''); }
+      return _ca(y.createdAt).localeCompare(_ca(x.createdAt)); }); });
     setCompanies(fresh);
   }
   /* 유형·사무대행이 바뀌면 고유번호의 «머리»가 따라 바뀐다 — 그 바뀜을 그 자리에 남긴다
