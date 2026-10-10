@@ -176,7 +176,7 @@
         agency: (t && t.agency) || '',
         org: c.companyName || c.payee || '',
         project: proj,
-        year: String(dateRaw).slice(0, 4) || (cn ? cn.year : ''),
+        year: String(dateRaw).slice(0, 4) || (cn ? cn.year : '') || yearOf(coll, c),
         main: (userMap && userMap[sid]) || sid,
         /* 진행중도 가져온다(실사용: 사건 13건 중 11건이 진행중이었다).
            상태를 그대로 옮겨 두고, 증명서 발급은 '완료' 건만 고르게 한다. */
@@ -430,7 +430,34 @@
     return out;
   }
 
-  var api = { amountOf: amountOf, buildAmtUpdates: buildAmtUpdates,
+  /* ===== 📅 연도 (대표 지시 2026-10-10 「년도모름도 채워라」) =====
+     실적 연도는 «끝난 해»(closedDate·endDate)다 — 그대로다. 아직 안 끝난 건은 그동안 빈칸(«모름»)이었다
+     (실측: 모름 58건이 모두 이알피의 «진행 중» 건, 시작일은 57건에 있다).
+     → 끝난 날이 없으면 «시작한 해»(startDate·contractDate·signDate), 그것도 없으면 관리번호 속 해(기술보호-2026-015).
+     ⚠ 지어내지 않는다 — 이알피에 적힌 날짜·번호에서만 읽는다. 아무것도 없으면 그대로 «모름».
+     ⚠ 나중에 끝나면 buildStatusUpdates 가 «끝난 해»로 고친다(완료 갱신 때 연도도 함께). */
+  function _y(v) { var m = String(v || '').match(/(19|20)\d{2}/); return m ? m[0] : ''; }
+  function yearOf(coll, c) {
+    if (!c) return '';
+    return _y(c.closedDate) || _y(c.endDate) || _y(c.startDate) || _y(c.contractDate) || _y(c.signDate)
+      || _y(sourceNoOf(coll, c));
+  }
+  /* 이미 가져온 실적 중 연도가 «비어 있는» 것만 채운다 — 영구 열쇠로 이어진 건만. 적혀 있는 연도는 안 건드린다 */
+  function buildYearUpdates(collData, existingRecords) {
+    var byRef = _indexByRef(collData), out = [];
+    (existingRecords || []).forEach(function (r) {
+      if (!r || !isIdRef(r.puRef) || r.puRefCheck) return;
+      if (String(r.year || '').trim()) return;
+      var hit = byRef[r.puRef]; if (!hit) return;
+      if ((COLL_MAP[hit.coll] || {}).kind === 'company') return;     /* 자문은 «시작한 해»를 이미 따로 다룬다 */
+      var y = yearOf(hit.coll, hit.c);
+      if (y) out.push({ puRef: r.puRef, year: y });
+    });
+    return out;
+  }
+
+  var api = { yearOf: yearOf, buildYearUpdates: buildYearUpdates,
+              amountOf: amountOf, buildAmtUpdates: buildAmtUpdates,
               isClosed: isClosed, isCoClosed: isCoClosed, mapRecord: mapRecord, buildSyncPlan: buildSyncPlan,
               buildStatusUpdates: buildStatusUpdates, unwrap: unwrap, fromCaseNo: fromCaseNo,
               refOf: refOf, isIdRef: isIdRef, sourceNoOf: sourceNoOf,
