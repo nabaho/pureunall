@@ -209,7 +209,79 @@
     return { rounds: rounds, summary: summary };
   }
 
+  /* 칸에 넣기 — 비었거나 src[path]==='ai'(전에 AI 가 넣고 사람이 안 고친) 칸만 */
+  function applyDraft(report, src, draft, fields) {
+    var rep = JSON.parse(JSON.stringify(report || {}));
+    var s = {};
+    Object.keys(src || {}).forEach(function (k) { s[k] = src[k]; });
+    var f = fields || { rounds: ROUND_KEYS, summary: SUMMARY_KEYS };
+    var undo = { prev: {}, prevSrc: {}, put: {} }, filled = [];
+    function put(obj, key, path, v) {
+      var cur = obj[key] == null ? '' : String(obj[key]);
+      if (str(cur) && s[path] !== 'ai') return;          // 사람이 쓴 칸 — 덮지 않는다
+      if (cur === v) return;
+      undo.prev[path] = cur; undo.prevSrc[path] = s[path] == null ? null : s[path]; undo.put[path] = v;
+      obj[key] = v; s[path] = 'ai'; filled.push(path);
+    }
+    if (!Array.isArray(rep.rounds)) rep.rounds = [];
+    ((draft && draft.rounds) || []).forEach(function (r) {
+      var o = rep.rounds[r && r.i];
+      if (!o || typeof o !== 'object') return;            // AI 는 회차를 만들지 못한다
+      f.rounds.forEach(function (k) { var v = str(r[k]); if (v) put(o, k, 'rounds.' + r.i + '.' + k, v); });
+    });
+    if (!rep.summary || typeof rep.summary !== 'object') rep.summary = {};
+    var ds = (draft && draft.summary) || {};
+    f.summary.forEach(function (k) { var v = str(ds[k]); if (v) put(rep.summary, k, 'summary.' + k, v); });
+    return { report: rep, src: s, undo: undo, filled: filled };
+  }
+
+  /* 되돌리기 — 지금 값이 AI 가 넣은 그대로인 칸만 넣기 전 값으로 */
+  function undoDraft(report, src, undo) {
+    var rep = JSON.parse(JSON.stringify(report || {})), s = {};
+    Object.keys(src || {}).forEach(function (k) { s[k] = src[k]; });
+    var restored = [], kept = [], u = undo || {};
+    Object.keys(u.put || {}).forEach(function (p) {
+      var ks = p.split('.'), last = ks.pop();
+      var obj = ks.reduce(function (o, k) { return o == null ? o : o[k]; }, rep);
+      if (!obj || typeof obj !== 'object') return;
+      if (String(obj[last] == null ? '' : obj[last]) !== u.put[p]) { kept.push(p); return; }
+      obj[last] = u.prev[p] == null ? '' : u.prev[p];
+      if (u.prevSrc[p] == null) delete s[p]; else s[p] = u.prevSrc[p];
+      restored.push(p);
+    });
+    return { report: rep, src: s, restored: restored, kept: kept };
+  }
+
+  /* 점검(경고만) — 숫자는 쉼표를 떼고 앞 0 을 떼어 견준다. 줄머리 번호(「1. 」「2) 」)는 세지 않는다 */
+  function numsOf(t) {
+    var s = String(t || '').replace(/(\d),(?=\d{3}(?!\d))/g, '$1').replace(/^\s*\d{1,2}[.)]\s/gm, ' ');
+    return (s.match(/\d+/g) || []).map(function (n) { return n.replace(/^0+(?=\d)/, ''); });
+  }
+  function checkDraft(draft, sentText, limits) {
+    var lim = {}, have = {}, out = {};
+    Object.keys(LIMITS).forEach(function (k) { lim[k] = LIMITS[k]; });
+    Object.keys(limits || {}).forEach(function (k) { if (+limits[k] > 0) lim[k] = +limits[k]; });
+    numsOf(sentText).forEach(function (n) { have[n] = 1; });
+    function see(path, key, v) {
+      v = str(v); if (!v) return;
+      var w = [], seen = {};
+      var nu = numsOf(v).filter(function (n) { if (have[n] || seen[n]) return false; seen[n] = 1; return true; });
+      if (nu.length) w.push('확인 필요 — 입력에 없던 날짜·숫자: ' + nu.slice(0, 5).join(', '));
+      if (lim[key] && v.length > lim[key]) w.push('글자 수 ' + v.length + '자 — 한도 ' + lim[key] + '자 초과');
+      if (v.indexOf(GARIM) >= 0) w.push(GARIM + ' 이 남았습니다 — 원래 값을 직접 넣어 주세요');
+      if (v === NO_RECORD) w.push('기록 없는 회차 — 직접 입력 필요');
+      if (w.length) out[path] = w;
+    }
+    ((draft && draft.rounds) || []).forEach(function (r) {
+      ROUND_KEYS.forEach(function (k) { see('rounds.' + r.i + '.' + k, k, r[k]); });
+    });
+    var sm = (draft && draft.summary) || {};
+    SUMMARY_KEYS.forEach(function (k) { see('summary.' + k, k, sm[k]); });
+    return out;
+  }
+
   var api = { fieldsFor: fieldsFor, mask: mask, unmask: unmask, buildRequest: buildRequest, parseDraft: parseDraft,
+    applyDraft: applyDraft, undoDraft: undoDraft, checkDraft: checkDraft,
     ROUND_KEYS: ROUND_KEYS, SUMMARY_KEYS: SUMMARY_KEYS, USES: USES, LIMITS: LIMITS, GARIM: GARIM, NO_RECORD: NO_RECORD,
     BODY_MAX: BODY_MAX, GUIDE: GUIDE, COMMON_GUIDE: COMMON_GUIDE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

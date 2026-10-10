@@ -164,3 +164,72 @@ test('buildRequest — 본문은 가린 뒤 자른다(경계에 걸친 전화번
   const emoji = [{ d: '2025-09-02', kind: '받은 메일', text: '제목', att: [], priv: false, body: 'x'.repeat(1499) + '😀😀' }];
   assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])/.test(A.buildRequest(rep(), emoji, 'cci-north', {}).sent), '서로게이트 쌍이 갈라졌다');
 });
+
+test('applyDraft — 빈 칸과 AI 칸만 채우고, 사람이 쓴 칸·양식 밖 칸·없는 회차는 건드리지 않는다', () => {
+  const r = rep();
+  r.summary.action = '전에 AI 가 쓴 조치';
+  const src = { 'summary.action': 'ai' };
+  const draft = {
+    rounds: [{ i: 0, inquiry: '문의 초안', advice: '덮으면 안 됨' }, { i: 5, inquiry: '없는 회차' }],
+    summary: { review: '덮으면 안 됨', action: '새 조치', etc: '없음', overall: '양식이 안 씀' },
+  };
+  const res = A.applyDraft(r, src, draft, A.fieldsFor('cci-north'));
+  assert.equal(res.report.rounds[0].inquiry, '문의 초안');
+  assert.equal(res.report.rounds[0].advice, rep().rounds[0].advice);
+  assert.equal(res.report.summary.review, '사람이 쓴 검토');
+  assert.equal(res.report.summary.action, '새 조치');
+  assert.equal(res.report.summary.etc, '없음');
+  assert.equal(res.report.summary.overall, '');
+  assert.equal(res.report.rounds.length, 2);
+  assert.deepEqual(res.filled.slice().sort(), ['rounds.0.inquiry', 'summary.action', 'summary.etc']);
+  assert.equal(res.src['rounds.0.inquiry'], 'ai');
+  assert.equal(r.rounds[0].inquiry, '', '받은 report 는 그대로(새 객체를 돌려준다)');
+  assert.equal(src['rounds.0.inquiry'], undefined, '받은 src 도 그대로');
+  assert.equal(res.undo.prev['summary.action'], '전에 AI 가 쓴 조치');
+  assert.equal(res.undo.prevSrc['summary.etc'], null);
+  assert.equal(res.undo.put['summary.etc'], '없음');
+});
+
+test('applyDraft — 양식이 안 쓰는 회차 칸(techguard 의 inquiry)·종합 칸(inquiryDiag)·범위 밖 회차 번호는 받지 않는다', () => {
+  const draft = {
+    rounds: [{ i: 0, inquiry: '양식이 안 씀', diagnosis: '문제점 초안' }, { i: 2, diagnosis: '범위 밖' }, { i: -1, diagnosis: '음수' }],
+    summary: { inquiryDiag: '양식이 안 씀', overall: '총평 초안' },
+  };
+  const res = A.applyDraft(rep(), {}, draft, A.fieldsFor('techguard'));
+  assert.equal(res.report.rounds[0].inquiry, '');
+  assert.equal(res.report.rounds[0].diagnosis, '문제점 초안');
+  assert.equal(res.report.summary.inquiryDiag, '');
+  assert.equal(res.report.summary.overall, '총평 초안');
+  assert.equal(res.report.rounds.length, 2);
+  assert.deepEqual(res.filled.slice().sort(), ['rounds.0.diagnosis', 'summary.overall']);
+  assert.deepEqual(Object.keys(res.undo.put).sort(), ['rounds.0.diagnosis', 'summary.overall']);
+});
+
+test('undoDraft — 직전 넣기를 되돌리되, 그 뒤 사람이 고친 칸은 그대로', () => {
+  const a = A.applyDraft(rep(), {}, { rounds: [{ i: 1, inquiry: 'AI 문의', next: 'AI 향후' }], summary: { etc: 'AI 기타' } },
+    A.fieldsFor('cci-north'));
+  a.report.rounds[1].next = '사람이 고친 향후';
+  const u = A.undoDraft(a.report, a.src, a.undo);
+  assert.equal(u.report.rounds[1].inquiry, '');
+  assert.equal(u.report.summary.etc, '');
+  assert.equal(u.report.rounds[1].next, '사람이 고친 향후');
+  assert.deepEqual(u.restored.slice().sort(), ['rounds.1.inquiry', 'summary.etc']);
+  assert.deepEqual(u.kept, ['rounds.1.next']);
+  assert.ok(!('rounds.1.inquiry' in u.src));
+  assert.equal(a.report.rounds[1].inquiry, 'AI 문의', '받은 report 는 그대로');
+});
+
+test('checkDraft — 입력에 없던 날짜·숫자, 한도 초과, [가림] 남음, 기록 없음', () => {
+  const sent = '{"회차":[{"i":0,"날짜":"2025-09-04","메모":"직원 12명 취업규칙 1,000,000원"}]}';
+  const d = {
+    rounds: [{ i: 0, inquiry: '2025년 9월 4일 직원 12명 문의(1,000,000원)', result: '2026년 3월 시행 예정', next: '기록 없음 — 입력 필요' }],
+    summary: { etc: 'x'.repeat(301), overall: '[가림] 으로 연락 요망' },
+  };
+  const w = A.checkDraft(d, sent, {});
+  assert.equal(w['rounds.0.inquiry'], undefined);
+  assert.match(w['rounds.0.result'].join(' '), /확인 필요 — 입력에 없던 날짜·숫자: 2026, 3/);
+  assert.match(w['rounds.0.next'].join(' '), /직접 입력 필요/);
+  assert.match(w['summary.etc'].join(' '), /301자 — 한도 300자 초과/);
+  assert.match(w['summary.overall'].join(' '), /\[가림\] 이 남았습니다/);
+  assert.equal(A.checkDraft({ rounds: [], summary: { etc: 'x'.repeat(301) } }, sent, { etc: 400 })['summary.etc'], undefined);
+});
