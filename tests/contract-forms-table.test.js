@@ -39,6 +39,6 @@ test('목록 화면 — 표(☐·#·양식·원본), 머리줄 고정, 체크는
   assert.match(f, /ck\.addEventListener\('click', function \(e\) \{ e\.stopPropagation\(\); \}\);/, '체크할 때 그 양식이 골라지면 안 된다');
   assert.match(f, /onclick: function \(\) \{ select\(f\.id\); \}/);
   assert.match(SRC, /\.pcf-lt thead th\{position:sticky;top:0/);
-  assert.match(SRC, /function shown\(\) \{ return moreFilter\(filterForms\(/);
+  assert.match(SRC, /function shown\(\) \{ var cv = S\.kind === '_closed'; return moreFilter\(filterForms\(/, '목록은 거르기 한 길(종료 서식 보기 포함)');
   assert.match(SRC, /function resetFilters\(\) \{[^}]*S\.src = ''; S\.use = '';/);
 });
