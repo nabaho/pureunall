@@ -37,8 +37,9 @@ jobs:
       #
       # ⚠ || true 를 뗄 것 — npm 이 잠깐 죽었다고 배포까지 멎으면 안 된다.
       #   못 깔면 검사기들이 스스로 SKIP 으로 물러난다(그 관례는 그대로 둔다).
+      # pdfjs-dist 는 PDF 읽기 검사(rules-collect-pdf)용 — 못 깔면 그 검사만 SKIP 으로 물러난다.
       - name: Install jsdom for the checks that actually render the page
-        run: npm i jsdom --no-save --no-audit --no-fund || true
+        run: npm i jsdom pdfjs-dist@4.10.38 --no-save --no-audit --no-fund || true
       - name: Run all automated checks
         run: node --test tests/*.test.js
       - name: Create deployed version metadata
