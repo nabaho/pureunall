@@ -79234,7 +79234,8 @@ function RetirementSettlement(){
       var firm = dcFirmCheck(selYear);
       var cS = { padding:'4px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'11px', textAlign:'right', fontFamily:'monospace' };
       var firmBox = firm.length ? h('div', { style:{ background:'#fff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'10px 12px', marginBottom:'10px' } },
-        h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', marginBottom:'6px' } }, '🏦 법인 DC 납입 대조 — 출금관리의 퇴직연금 «근로자» 몫 vs DC 가입자 임금총액 ÷ 12',
+        /* 제목 줄은 «한 줄» — 넘치면 … 으로 줄이고 전문은 title 에 (CLAUDE.md 한 칸 한 줄 규칙) */
+        h('div', { title:'근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요', style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', marginBottom:'6px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, '🏦 법인 DC 납입 대조 — 퇴직연금 출금 «근로자» 몫 vs DC 가입자 임금총액 ÷ 12',
           h('span', { style:{ fontWeight:400, color:'#64748b', marginLeft:'8px', fontSize:'10.5px' } }, '근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요')),
         h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
           h('thead', null, h('tr', { style:{ background:'#f8fafc' } }, ['달', '낸 근로자 몫', '그달 임금총액÷12', '비율', '전달 임금총액÷12', '비율'].map(function(t){ return h('th', { key:t, style:Object.assign({}, cS, { fontFamily:'inherit', color:'#475569', fontWeight:700 }) }, t); }))),
@@ -79243,7 +79244,7 @@ function RetirementSettlement(){
             var low = r.paid > 0 && r.need > 0 && r.paid < r.need * 0.95 && r.paid < r.needPrev * 0.95;
             return h('tr', { key:r.ym },
               h('td', { style:Object.assign({}, cS, { textAlign:'left', fontFamily:'inherit' }) }, r.ym),
-              h('td', { style:Object.assign({}, cS, { color: r.noOutflow ? '#d97706' : '#1e293b', fontWeight:700 }) }, r.noOutflow ? '출금 기록 없음' : r.paid.toLocaleString()),
+              h('td', { style:Object.assign({}, cS, { color: r.noOutflow ? '#d97706' : '#1e293b', fontWeight:700, fontFamily: r.noOutflow ? 'inherit' : 'monospace' }) }, r.noOutflow ? '출금 기록 없음' : r.paid.toLocaleString()),
               h('td', { style:cS }, r.need.toLocaleString()),
               h('td', { style:Object.assign({}, cS, { color: low ? '#dc2626' : '#475569' }) }, pct(r.paid, r.need)),
               h('td', { style:cS }, r.needPrev.toLocaleString()),
