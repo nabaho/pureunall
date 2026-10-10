@@ -550,6 +550,10 @@
     { id: 'fs-advisory', name: '자문 세트', kind: 'company', formIds: ['fm-pr-advisory', 'fm-pr-cms'] },
     { id: 'fs-payroll', name: '급여 세트', kind: 'company', formIds: ['fm-pr-payroll', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-employment', 'fm-pr-cms'] },
     { id: 'fs-fund', name: '기금 세트', kind: 'fund', formIds: ['fm-5', 'fm-pq-07'] },
+    /* 기금 계약은 갈래가 달라 세트를 나눈다(대표 「세트 만들어라」 2026-10-10) — fs-fund 는 이알피 계약서 출력이 읽으므로 그대로 둔다 */
+    { id: 'fs-fund-company', name: '사내기금 세트', kind: 'fund', formIds: ['fm-fund-found', 'fm-fund-company', 'fm-fund-loan', 'fm-pq-07'] },
+    { id: 'fs-fund-joint', name: '공동기금 운영·결산 세트', kind: 'fund', formIds: ['fm-5', 'fm-fund-closing', 'fm-fund-annual', 'fm-fund-year'] },
+    { id: 'fs-fund-project', name: '공동기금 지원사업 세트', kind: 'fund', formIds: ['fm-fund-project', 'fm-fund-multi'] },
     { id: 'fs-union', name: '노조 세트', kind: 'company', formIds: ['fm-pr-union'] },
     { id: 'fs-office', name: '사무대행 세트', kind: 'company', formIds: ['fm-pr-employment', 'fm-pr-pension', 'fm-pr-health', 'fm-pr-cms'] },
     { id: 'fs-chedang', name: '체당금 접수 세트', kind: 'case', side: 'worker', groupName: '체당금',

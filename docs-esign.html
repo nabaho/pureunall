@@ -126,7 +126,8 @@
 <div id="paneEsign">
   <div class="card" id="viewList">
     <div style="display:flex;align-items:center;margin-bottom:12px">
-      <b style="flex:1;font-size:15px">사건 목록</b>
+      <div style="flex:1"><b style="font-size:15px">👥 집단체불 위임장 — 신청자에게 링크 보내기</b>
+        <div style="font-size:12px;color:#64748b;margin-top:2px">사건을 만들고 링크를 카톡·문자·메일로 보내면, 신청자가 폰에서 적고 서명합니다.</div></div>
       <!-- 목록이 once 로만 받으므로(비용 절감, 2026-08-13) 다른 직원이 만들거나
            마감한 사건은 스스로 안 나타난다 — 눌러서 새로 받는 길을 열어 둔다. -->
       <button class="btn btn-sub" id="btnRefreshCases" title="다른 직원이 만들거나 마감한 사건도 봅니다" style="margin-right:8px">🔄 새로고침</button>
@@ -197,7 +198,7 @@
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=17"></script>
-<script src="js/pu-contract-forms.js?v=48"></script>
+<script src="js/pu-contract-forms.js?v=49"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -931,20 +932,24 @@ function esignCaseFormsLoad() {
 function renderEsignIntro() {
   var box = $('esignIntro'); if (!box) return;
   var F = EsignDocs.ESIGN_FORMS, n = Object.keys(casesCache || {}).length;
-  box.innerHTML = '<details' + (n ? '' : ' open') + ' style="border:1px solid #e2e8f0;border-radius:10px;padding:10px 14px;background:#f8fafc">'
-    + '<summary style="cursor:pointer;font-weight:700;font-size:13.5px">ℹ 집단체불 위임장 — 받는 서류와 순서</summary>'
-    + '<ol style="margin:8px 0 10px 20px;font-size:13px;line-height:1.8">'
-    + '<li><b>+ 새 사건</b> — 사건명·회사·사건 비밀번호(제출 내용을 여는 열쇠입니다. 잊으면 열 수 없습니다)</li>'
-    + '<li><b>🔗 링크</b>를 근로자 단톡방·문자로 보냅니다 — 근로자가 폰에서 인적사항을 적고 손가락으로 서명합니다</li>'
-    + '<li>사건을 열어 제출을 ✅ 확인하고 <b>👤 대표 정하기</b> · <b>💰 체불내역</b>을 적습니다</li>'
-    + '<li><b>📑 서류 일괄 생성</b> — 사람별 위임장·동의서 PDF, 연명부·체불 정리 엑셀, 아래 사건계약 양식을 채워 .zip 하나로 받습니다</li></ol>'
-    + '<div style="font-size:12.5px;color:#64748b;margin:0 0 6px">👥 집단체불 세트 = 계약서 양식의 <b>체당금 접수 세트</b>를 여러 근로자에게 링크로 받는 길입니다. 문구는 그 세트에서 고치시면 다음 새 사건부터 반영됩니다(만든 사건은 그때 문구 그대로). 효성CMS 신청서는 폰으로 받지 않고 서류 일괄 생성 때 사람마다 채워 냅니다.</div>'
-    + '<div style="font-size:13px;font-weight:700;margin:6px 0 4px">근로자 폰으로 받는 서류</div><div style="display:flex;gap:6px;flex-wrap:wrap">'
+  /* 보내는 쪽 순서는 한눈에 4칸 — 길게 설명하지 않는다(대표 「집단체불 UI 너무 이상하다」 2026-10-10) */
+  var step = function (no, t, d) { return '<div style="flex:1;min-width:150px;border:1px solid #e2e8f0;border-radius:10px;padding:9px 11px;background:#fff"><div style="font-size:12px;color:#2563eb;font-weight:700">' + no + '</div><div style="font-weight:700;font-size:13px;margin:2px 0">' + t + '</div><div style="font-size:12px;color:#64748b;line-height:1.5">' + d + '</div></div>'; };
+  box.innerHTML = '<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    + step('① 사건 만들기', '+ 새 사건', '사건명·회사·사건 비밀번호(제출 내용을 여는 열쇠 — 잊으면 열 수 없습니다)')
+    + step('② 링크 보내기', '🔗 링크 → 카톡·문자·메일', '안내 문구와 링크가 자동으로 만들어집니다. 신청자가 폰에서 인적사항을 적고 손가락으로 서명합니다')
+    + step('③ 제출 확인', '사건 열기', '제출을 ✅ 확인하고 👤 대표 정하기 · 💰 체불내역을 적습니다')
+    + step('④ 서류 한 번에', '📑 서류 일괄 생성', '사람별 위임장·동의서 PDF, 연명부·체불 정리 엑셀, 사건계약 양식을 채워 .zip 하나로')
+    + '</div>'
+    + '<details style="margin-top:10px;border:1px solid #e2e8f0;border-radius:10px;padding:8px 12px;background:#f8fafc">'
+    + '<summary style="cursor:pointer;font-weight:700;font-size:13px">📑 받는 서류와 함께 채울 양식 보기 <span id="esignIntroN" style="font-weight:400;color:#64748b"></span></summary>'
+    + '<div style="font-size:12.5px;color:#64748b;margin:8px 0 6px">👥 집단체불 세트 = 계약서 양식의 <b>체당금 접수 세트</b>를 여러 근로자에게 링크로 받는 길입니다. 신청자 폰으로 받는 서류는 아래 3종이고, 문구는 그 세트에서 고칩니다(다음 새 사건부터 반영, 만든 사건은 그때 문구 그대로). 효성CMS 신청서는 폰으로 받지 않고 서류 일괄 생성 때 사람마다 채웁니다.</div>'
+    + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
     + ['delegationAgreement', 'delegation', 'privacyConsent'].map(function (k) { return '<button class="btn btn-sub" onclick="esignFormPeek(\'' + k + '\')">👁 ' + EsignDocs.esc(F[k].title) + '</button>'; }).join('')
-    + '</div><div style="font-size:13px;font-weight:700;margin:10px 0 4px">함께 채워 낼 사건계약 양식 <span style="font-weight:400;color:#64748b">(계약서 양식 › ⚖️ 사건계약 — 어느 PC 에서나 같습니다)</span></div>'
-    + '<div id="esignIntroForms" style="font-size:12.5px;color:#64748b">불러오는 중…</div></details>';
+    + '</div><div style="font-size:13px;font-weight:700;margin:10px 0 4px">일괄 생성 때 함께 채울 사건계약 양식 <span style="font-weight:400;color:#64748b">(계약서 양식 › ⚖️ 사건계약 — 어느 PC 에서나 같습니다)</span></div>'
+    + '<div id="esignIntroForms" style="font-size:12.5px;color:#64748b;max-height:160px;overflow:auto">불러오는 중…</div></details>';
   esignCaseFormsLoad().then(function (l) {
     var el = $('esignIntroForms'); if (!el) return;
+    var cnt = $('esignIntroN'); if (cnt) cnt.textContent = '· 양식 ' + l.length + '개';
     el.innerHTML = (l.length ? l.map(function (f) { return '<span style="display:inline-block;border:1px solid #cbd5e1;border-radius:9px;padding:1px 8px;margin:2px;color:#1e293b">' + EsignDocs.esc(f.name) + '</span>'; }).join('')
         : '한글 원본이 붙은 사건계약 양식이 아직 없습니다.')
       + (EsignHwpTpl.hasRepForms(l) ? '' : '<div style="margin-top:6px;color:#854d0e">⚠ 대표 선정 서식(진정서·연명부 · 당사자 선정서 · 대리인선임신고서)이 아직 없습니다 — 계약서 양식 › ⚖️ 사건계약 › ⋯ › 「📎 파일 올려 양식 만들기」로 올리면 여기와 📑 서류 일괄 생성에 나옵니다.</div>');
@@ -970,7 +975,7 @@ function renderCaseList() {
     return ((casesCache[b].meta || {}).createdAt || 0) - ((casesCache[a].meta || {}).createdAt || 0);
   });
   var tb = $('caseRows');
-  if (!ids.length) { tb.innerHTML = '<tr><td colspan="6" style="color:#94a3b8">사건이 없습니다. [+ 새 사건]으로 시작하세요.</td></tr>'; return; }
+  if (!ids.length) { tb.innerHTML = '<tr><td colspan="6" style="padding:18px 8px;text-align:center;color:#64748b">아직 사건이 없습니다. <b>+ 새 사건</b>을 눌러 시작하세요 — 사건을 만들면 신청자에게 보낼 링크가 생깁니다.</td></tr>'; return; }
   tb.innerHTML = ids.map(function (id) {
     var c = casesCache[id], m = c.meta || {};
     var n = Object.keys(c.submissions || {}).length;
@@ -1104,18 +1109,28 @@ function shareCase(caseId) {
   bg.innerHTML = '<div class="modal" style="text-align:center">'
     + '<h3>' + EsignDocs.esc(m.title || '') + '</h3>'
     + '<div id="qrBox" style="display:flex;justify-content:center;margin:16px 0"></div>'
-    + '<input readonly value="' + url + '" style="width:100%;font-size:12px;color:#475569" onclick="this.select()">'
-    + '<div style="display:flex;gap:8px;justify-content:center;margin-top:14px">'
-    + '<button class="btn btn-pri" id="shCopy">📋 링크 복사</button>'
-    + '<button class="btn btn-sub" id="shShare">📤 공유(카톡)</button>'
-    + '<button class="btn btn-sub" id="shClose">닫기</button></div></div>';
+    + '<div style="text-align:left;font-size:12px;color:#64748b;margin:0 0 4px">신청자에게 보낼 안내 문구 (고쳐서 보내도 됩니다)</div>'
+    + '<textarea id="shMsg" rows="6" style="width:100%;font-size:13px;line-height:1.6;box-sizing:border-box"></textarea>'
+    + '<div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:12px">'
+    + '<button class="btn btn-pri" id="shCopy">📋 안내문 복사 (카톡에 붙여넣기)</button>'
+    + '<button class="btn btn-sub" id="shSms">💬 문자</button>'
+    + '<button class="btn btn-sub" id="shMail">✉ 메일</button>'
+    + '<button class="btn btn-sub" id="shShare" hidden>📤 공유</button>'
+    + '<button class="btn btn-sub" id="shLink">🔗 링크만 복사</button>'
+    + '<button class="btn btn-sub" id="shClose">닫기</button></div>'
+    + '<div style="font-size:11.5px;color:#94a3b8;margin-top:8px">받는 사람 번호·주소는 저장하지 않습니다 — 문자·메일은 쓰시는 앱이 열리고, 보내기는 직접 누르셔야 합니다.</div></div>';
   document.body.appendChild(bg);
-  new QRCode($('qrBox'), { text: url, width: 180, height: 180 });
-  $('shCopy').onclick = function () { copyToClipboard(url); };
-  $('shShare').onclick = function () {
-    if (navigator.share) navigator.share({ title: m.title, text: '푸른노무법인 전자위임장 제출 링크입니다.', url: url });
-    else copyToClipboard(url);
-  };
+  new QRCode($('qrBox'), { text: url, width: 160, height: 160 });
+  var msg = $('shMsg');
+  msg.value = '[푸른노무법인] ' + (m.title || '') + ' 위임장 제출 안내\n\n아래 링크를 눌러 휴대폰에서 인적사항을 입력하고 손가락으로 서명해 주세요. 입력한 내용은 암호화되어 보관됩니다.\n\n' + url;
+  $('shCopy').onclick = function () { copyToClipboard(msg.value); };
+  $('shLink').onclick = function () { copyToClipboard(url); };
+  $('shSms').onclick = function () { location.href = 'sms:?&body=' + encodeURIComponent(msg.value); };
+  $('shMail').onclick = function () { location.href = 'mailto:?subject=' + encodeURIComponent('[푸른노무법인] ' + (m.title || '') + ' 위임장 제출 안내') + '&body=' + encodeURIComponent(msg.value); };
+  if (navigator.share) {
+    $('shShare').hidden = false;
+    $('shShare').onclick = function () { navigator.share({ title: m.title, text: msg.value }); };
+  }
   $('shClose').onclick = function () { bg.remove(); };
 }
 

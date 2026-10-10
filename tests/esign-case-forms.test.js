@@ -34,7 +34,9 @@ test('ⓐ 안내', () => {
   assert.match(H, /<div id="esignIntro" style="margin-top:14px"><\/div>/);
   assert.match(cut('function renderCaseList('), /renderEsignIntro\(\)/, '목록을 그릴 때마다');
   const r = cut('function renderEsignIntro(');
-  assert.match(r, /'<details' \+ \(n \? '' : ' open'\)/, '사건이 없으면 펼쳐서');
+  assert.match(r, /순서는 한눈에 4칸|step\('① 사건 만들기'/, '보내는 순서는 항상 한눈에 4칸');
+  assert.match(r, /<details style=/, '서류·양식 목록은 접어 둔다');
+  assert.doesNotMatch(r, /<details' \+ \(n/, '사건이 없어도 길게 펼치지 않는다');
   assert.match(r, /\['delegationAgreement', 'delegation', 'privacyConsent'\]/);
   assert.match(r, /EsignHwpTpl\.hasRepForms\(l\)/); assert.match(r, /📎 파일 올려 양식 만들기/);
   assert.doesNotMatch(r, /\.(set|update|push|remove)\(/, '안내는 읽기만');
@@ -56,4 +58,14 @@ test('ⓒ 내보내기', () => {
   assert.match(x, /_전원\(' \+ pool\.length \+ '명\)\.pdf', await _esignHwpMergedPdf\(formOut\[fj\]\.list\)/);
   assert.match(x, /못 채운 양식/);
   assert.doesNotMatch(x, /db\.ref\(/, '채운 서류는 서버로 보내지 않는다');
+});
+
+test('ⓓ 링크 보내기 — 안내 문구 + 복사(카톡)·문자·메일, 받는 사람은 저장하지 않는다', () => {
+  const s = cut('function shareCase(');
+  assert.match(s, /id="shMsg"/); assert.match(s, /msg\.value = '\[푸른노무법인\] '/);
+  assert.match(s, /copyToClipboard\(msg\.value\)/, '카톡용 복사');
+  assert.match(s, /'sms:\?&body=' \+ encodeURIComponent\(msg\.value\)/);
+  assert.match(s, /'mailto:\?subject=' \+ encodeURIComponent/);
+  assert.doesNotMatch(s, /db\.ref\(|\.set\(|\.push\(/, '받는 사람 정보는 어디에도 남기지 않는다');
+  assert.doesNotMatch(s, /mailto:[^?]/, '받는 사람 주소를 넣지 않는다');
 });
