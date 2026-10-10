@@ -33,7 +33,7 @@
 ## 검사
 새 검사 넷 — `mail-delete-follow`(9) · `mail-old-fast`(9) · `mail-open-gone`(5) · `mail-live-follow`(10).
 되돌려 우는지 18가지 중 17가지 운다(남은 하나는 다음 줄이 같은 일을 막는 «같은 뜻» 변형).
-고친 검사: `billing-auto-truth`(3분·하루 507번, 검사고정-허용) · `billing-who`(주기 값은 빼고 업무시간만 본다).
+고친 검사: `billing-auto-truth`(3분·하루 508번, 검사고정-허용) · `billing-who`(주기 값은 빼고 업무시간만 본다).
 
 ## 남은 일
 - 400통 창 «밖»의 메일(칸에 400 넘게 쌓인 옛 줄, 약 1,900통)을 IMAP 으로 열 수 있는지 아직 모른다.
