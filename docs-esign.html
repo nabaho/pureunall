@@ -198,7 +198,7 @@
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=17"></script>
-<script src="js/pu-contract-forms.js?v=49"></script>
+<script src="js/pu-contract-forms.js?v=50"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -946,14 +946,28 @@ function renderEsignIntro() {
     + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
     + ['delegationAgreement', 'delegation', 'privacyConsent'].map(function (k) { return '<button class="btn btn-sub" onclick="esignFormPeek(\'' + k + '\')">👁 ' + EsignDocs.esc(F[k].title) + '</button>'; }).join('')
     + '</div><div style="font-size:13px;font-weight:700;margin:10px 0 4px">일괄 생성 때 함께 채울 사건계약 양식 <span style="font-weight:400;color:#64748b">(계약서 양식 › ⚖️ 사건계약 — 어느 PC 에서나 같습니다)</span></div>'
-    + '<div id="esignIntroForms" style="font-size:12.5px;color:#64748b;max-height:160px;overflow:auto">불러오는 중…</div></details>';
+    + '<div id="esignIntroForms" style="font-size:12.5px;color:#64748b">불러오는 중…</div></details>';
   esignCaseFormsLoad().then(function (l) {
     var el = $('esignIntroForms'); if (!el) return;
     var cnt = $('esignIntroN'); if (cnt) cnt.textContent = '· 양식 ' + l.length + '개';
-    el.innerHTML = (l.length ? l.map(function (f) { return '<span style="display:inline-block;border:1px solid #cbd5e1;border-radius:9px;padding:1px 8px;margin:2px;color:#1e293b">' + EsignDocs.esc(f.name) + '</span>'; }).join('')
-        : '한글 원본이 붙은 사건계약 양식이 아직 없습니다.')
+    el.innerHTML = (l.length ? esignFormGroups(l) : '한글 원본이 붙은 사건계약 양식이 아직 없습니다.')
       + (EsignHwpTpl.hasRepForms(l) ? '' : '<div style="margin-top:6px;color:#854d0e">⚠ 대표 선정 서식(진정서·연명부 · 당사자 선정서 · 대리인선임신고서)이 아직 없습니다 — 계약서 양식 › ⚖️ 사건계약 › ⋯ › 「📎 파일 올려 양식 만들기」로 올리면 여기와 📑 서류 일괄 생성에 나옵니다.</div>');
   }, function (e) { var el = $('esignIntroForms'); if (el) el.textContent = '사건계약 양식을 불러오지 못했습니다 — ' + ((e && e.message) || e); });
+}
+/* 사건계약 양식 — 갈래별 칸으로 묶어 «무슨 갈래에 몇 개, 어느 쪽 서류인지» 한눈에(대표 「정리해라 눈에 안 들어온다」 2026-10-10).
+   이름 끝 「- 푸른 표준」은 떼고 (근로자)/(사용자) 쪽은 글자로 따로 둔다. 색은 쓰지 않는다. */
+function esignFormGroups(l) {
+  var order = [], by = {};
+  l.forEach(function (f) { var g = f.group || '기타'; if (!by[g]) { by[g] = []; order.push(g); } by[g].push(f); });
+  return '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px">' + order.map(function (g) {
+    return '<div style="border:1px solid #e2e8f0;border-radius:8px;background:#fff;padding:7px 10px">'
+      + '<div style="font-weight:700;font-size:12.5px;color:#1e293b;margin-bottom:3px">' + EsignDocs.esc(g) + ' <span style="font-weight:400;color:#64748b">' + by[g].length + '개</span></div>'
+      + by[g].map(function (f) {
+        var n = String(f.name || '').replace(/\s*-\s*푸른\s*표준\s*$/, ''), side = '';
+        n = n.replace(/\s*\((근로자|사용자|근로자측|사용자측|근로자·노동조합|사용자·근로자|근로자 공통|사용자 공통|근로자\s*공통|사용자\s*공통)\)\s*$/, function (_, t) { side = t.replace(/측$/, ''); return ''; });
+        return '<div style="font-size:12px;color:#334155;line-height:1.55;padding:1px 0">· ' + EsignDocs.esc(n) + (side ? ' <span style="color:#64748b">(' + EsignDocs.esc(side) + ')</span>' : '') + '</div>';
+      }).join('') + '</div>';
+  }).join('') + '</div>';
 }
 /* 👁 기본 서류 글 보기 — 글만(textContent). [ ] 칸은 근로자가 적거나 사건 값으로 채워진다 */
 function esignFormPeek(k) {
