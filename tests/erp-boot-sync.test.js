@@ -195,6 +195,18 @@ test('★ 재무 권한이 없으면(fin=false) 급여·수입·장부를 계획
   assert.ok(plan.keys.indexOf('companies') >= 0, '업무 데이터까지 빠지면 화면이 깨집니다');
 });
 
+test('★ 일정 보관함은 ERP 부팅에서 통째로 받지 않는다 — 달력의 날짜별 조회 몫이다', async () => {
+  const env = makeEnv({ serverKeys: ['companies', 'gcal_archive', 'gcal_archive_meta'] });
+  const plan = await env.plan();
+  assert.ok(plan.keys.includes('companies'), '업무 자료까지 빠지면 안 됩니다');
+  assert.ok(!plan.keys.includes('gcal_archive'), '일정 보관함 전체가 부팅 계획에 들어갔습니다');
+  assert.ok(!plan.keys.includes('gcal_archive_meta'), '일정 보관함 메타가 부팅 계획에 들어갔습니다');
+  await env.sync();
+  assert.ok(!env.reads.watch.includes('gcal_archive'), '보관함 전체를 다시 받을 감시가 붙었습니다');
+  assert.ok(!env.reads.live.includes('gcal_archive'), '보관함 전체 구독이 붙었습니다');
+  assert.ok(env.reads.watch.includes('companies'), '업무 자료의 감시는 유지해야 합니다');
+});
+
 test('★ funds·mgr_rates 는 fin=false 여도 받는다 — 기금 «업무» 목록은 전 직원 화면이 쓴다', async () => {
   const env = makeEnv({ fin: false });
   const plan = await env.plan();

@@ -42,7 +42,12 @@ function grabVar(name) {
 const bare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 
 const DAY = 864e5;
-const ymd = (t) => new Date(t).toISOString().slice(0, 10);
+/* 화면의 dday 는 기기 현지 날짜를 쓴다. UTC 날짜를 만들면 한국 자정 무렵 하루 어긋난다. */
+const ymd = (t) => {
+  const d = new Date(t);
+  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, '0'),
+    String(d.getDate()).padStart(2, '0')].join('-');
+};
 const inDays = (n) => ymd(Date.now() + n * DAY);
 
 /* 업무 한 벌 — 기한 있는 것·없는 것, 같은 회사 둘, 할 일 적은 것 하나. 예시는 가나상사·홍길동. */

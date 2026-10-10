@@ -2886,7 +2886,9 @@ function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나
    받는다 — 새 이름이 생기면 저절로 포함되게 만들어 두었다. 전달함은 표가 아니라 사람별 쪽지함이라
    그 길로 들어오면 온 직원이 남의 쪽지까지 매번 내려받는다. 여기 넣으면 fbShouldSync 가 걸러 준다.
    전달함은 자기 몫만 따로 구독한다(_handoffWatch). */
-var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours','audit_log'];
+/* gcal_archive(메타 포함)는 달력·업무관리에서 날짜 범위로 직접 읽는다.
+   ERP 표가 아닌 원자료를 부팅 계획에 넣으면 매번 보관함 전체를 받고도 적용하지 못한다. */
+var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours','audit_log','gcal_archive'];
 /* ⚠ audit_log(수정 기록) — 2026-10-04 부터 «한 줄씩 따로» 적는다(AuditLog.write → data/audit_log/v/{id}).
    통째로 받고 통째로 올리는 동기화에 태우면, 재무 권한 기기가 옛 사본을 한 번 올리는 순간 그 사이 다른 직원이 적은 줄이 지워진다.
    그래서 받지도 올리지도 않는다 — 보는 화면(AuditLogSection)이 열 때 서버에서 바로 읽는다. */
