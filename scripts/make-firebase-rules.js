@@ -458,6 +458,8 @@ rules.data = {
   leave_grants:            { '.read': LOGIN, '.write': HRW },   /* 연차 부여일수 수기 조정 — 대시보드가 읽는다 */
   employment_contracts:    { '.read': HRW,   '.write': HRW },   /* 근로계약서 — 임금 칸 */
   cert_log:                { '.read': HRW,   '.write': HRW },   /* 증명서 발급대장 */
+  /* 특별휴가 부여(배우자 출산휴가 등 — 출산일·결혼일 같은 사유가 담긴다) — 2026-10-10 인사관리 6단계에서 처음 쓰기 시작. 이알피 휴가관리만 읽고 쓴다 */
+  special_leave_grants:    { '.read': HRW,   '.write': HRW },
   /* 인사·급여 «설정» — 지금은 계산에 안 쓰이지만(검토 결과), 1단계에서 계산에 잇는 순간
      «직원 누구나 요율을 바꾸는 길»이 된다. 잇기 전에 먼저 잠근다. */
   insurance_rates:         { '.read': LOGIN, '.write': HRW },

@@ -134,7 +134,10 @@ test('5단계 — 주 12시간 연장근로(휴일근로 포함, 월~일)를 넘
   assert.equal(w.from, '2026-10-05');   // 월요일
   assert.equal(w.to, '2026-10-11');
   assert.equal(w.hours, 13, '야간(가산만)은 빼고 연장 9 + 휴일 4 = 13');   // 검사고정-허용: 제53조 주 12시간
-  assert.match(inner('function addOTRecord(date, kind, hours, note){', 1200), /erpWeekOvertime\(/);
+  /* 함수 머리를 글자 그대로 찾지 않는다 — 6단계에서 시각(clock) 인자가 늘었다 */
+  const at = CODE.search(/function addOTRecord\(date, kind, hours, note[^)]*\)\{/);
+  assert.ok(at >= 0, 'addOTRecord 를 못 찾았습니다');
+  assert.match(CODE.slice(at, at + 1600), /erpWeekOvertime\(/);
 });
 
 test('5단계 — 이미 쓴 보상휴가는 전환 취소 불가 (임금·휴가 이중 보상)', () => {
