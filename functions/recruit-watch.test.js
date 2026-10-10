@@ -750,3 +750,23 @@ test('★★ 서버 — fetch 가 못 열면 node https(IPv4)로 한 번 더 · 
   assert.match(body, /root\.child\("fails"\)\.once\("value"\)/);
   assert.match(body, /RecruitWatch\.updatesOf\(result, existing, nowIso, \{ fails, today \}\)/);
 });
+
+/* ── 중간 인증서를 빠뜨리는 서버 — 지방공기업평가원 (2026-10-10 원인 확정: UNABLE_TO_VERIFY_LEAF_SIGNATURE) ── */
+test('★★★ 더하는 중간 인증서는 «Sectigo DV R36» 하나 — Node 기본 뿌리(R46)로 서명된 진짜이고 2036년까지', () => {
+  const c = require('crypto'), tls = require('tls');
+  assert.equal(W.EXTRA_CA.length, 1);
+  const x = new c.X509Certificate(W.EXTRA_CA[0]);
+  assert.match(x.subject, /CN=Sectigo Public Server Authentication CA DV R36/);
+  assert.equal(x.fingerprint256, '8C:54:C3:34:B6:6B:A4:E4:26:77:2A:F4:A3:F9:13:6C:19:A1:AE:C7:29:FD:B2:8C:53:5C:07:A5:A4:EF:22:E0');
+  const root = tls.rootCertificates.map((p) => new c.X509Certificate(p)).find((r) => x.checkIssued(r) && x.verify(r.publicKey));
+  assert.ok(root, '기본 뿌리로 서명되지 않은 것을 넣었다'); assert.match(root.subject, /Root R46/);
+  assert.ok(Date.parse(x.validTo) > Date.parse('2036-01-01'));
+  assert.equal(W.caList().length, tls.rootCertificates.length + 1, '기본 뿌리를 빼먹으면 다른 기관이 다 막힌다');
+  assert.ok(W.caList().indexOf(W.EXTRA_CA[0]) >= 0);
+});
+test('★★ 서버 — 다른 길이 그 목록(ca)으로 검증한다 · 검증을 «끄지» 않는다', () => {
+  const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
+  const i = src.indexOf('function 모집다른길'); const body = src.slice(i, src.indexOf('\nexports.', src.indexOf('exports.recruitWatch') + 30));
+  assert.match(body, /require\("https"\)\.get\(u, \{ family: 4, timeout: 30000, ca: RecruitWatch\.caList\(\),/);
+  assert.doesNotMatch(body, /rejectUnauthorized/, '검증을 끄면 가짜 서버도 통과한다');
+});
