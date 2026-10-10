@@ -153,6 +153,10 @@
     .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
   }
   .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
+  /* 파일 끌어다 놓기 — 받는 단추가 노란 점선으로 켜진다 (팔레트 노랑) */
+  .dnd-ok{outline:2px dashed #fbbf24!important;outline-offset:2px;background-color:#fffbeb!important}
+  .dnd-hot{outline-style:solid!important;background-color:#fde68a!important}
+  #dndbar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none;max-width:92vw}
   /* 묶음마다 표가 따로라, 폭을 안 정하면 충남과 경기의 열이 어긋난다 */
   table.fixcol{table-layout:fixed}
   table.fixcol td{overflow:hidden;text-overflow:ellipsis}
@@ -2407,7 +2411,8 @@ var _IMP_LIST={officers:1};
    웹은 계약관계를 lifecycle('계약종료'/'기록보관')로 따로 관리하므로, status를 넣으면 죽은 값만 쌓인다.
    기록보관 지정은 기금 현황의 [계약관계] 드롭다운으로 사람이 판단해 바꾼다. */
 var IMP_IDENTITY=['name','short_name','fund_type'];    // 채우기만(덮어쓰기 제외)
-function importFundsInfo(){
+
+function importFundsInfo(dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file)return;
     var rd=new FileReader();
@@ -2418,7 +2423,7 @@ function importFundsInfo(){
     };
     rd.readAsText(file);
   };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function _impNorm(s){ return String(s==null?'':s).replace(/\s+/g,'').trim(); }
 function _impMatch(key, rec){          // ① ID 일치 ② 기금법인명 정확 일치(공백 무시)
@@ -2666,7 +2671,8 @@ function fillOfficesAll(){
    · site_years   : site_years/{기금}/{연도}/{사업장}/contrib — 그 해 출연금
    · chk          : subsidy_chk/{기금}/{연도} — 제출서류 체크(기금 단위·참여사별)
    **빈 칸만 채운다** — 웹에서 이미 입력한 값은 덮지 않는다. */
-function importSubsidy(){
+
+function importSubsidy(dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='application/json,.json';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file)return;
     var rd=new FileReader();
@@ -2677,7 +2683,7 @@ function importSubsidy(){
     };
     rd.readAsText(file);
   };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function _subImpPreview(d,fname){
   var SUBK={request_amount:'신청액',decided_amount:'결정액',gov_contrib:'지자체 출연금',req_type:'지원요건',prev_per_worker:'③1인누계',paid_date:'교부일',spent_amount:'집행액'};
@@ -3843,6 +3849,98 @@ function dropZoneSlim(id,label,hint,accept){
     +'<span class="muted" style="font-size:11px;white-space:nowrap">끌어다 놓기 · 클릭해 선택</span>'
     +'<span id="'+id+'-stat" style="font-size:11px"></span></div>';
 }
+/* ══ 파일은 «끌어다 놓기»가 먼저 (대표 지시 2026-10-10 「데이터 가지고 올 경우 마우스로 드래그하면 되게 … 팝업창으로 폴더 찾기보다 우선」) ══
+   파일을 받는 단추는 예전 그대로 누르면 «폴더 찾기» 창이 뜬다. 그 위에 «끌어다 놓기»를 얹는다 — 새 단추를 만들지 않는다.
+   · 파일을 끌어 오면 이 화면에서 파일을 받는 단추가 노란 점선으로 켜진다(DND_RULES 에 있는 것만 — 단추의 onclick 글자를 읽어 알아본다).
+   · 켜진 단추 «위에» 놓으면 그 단추가 하는 일을 그 파일로 바로 한다. 받는 단추가 «한 곳»뿐이면 화면 아무 데나 놓아도 된다.
+   · 형식이 안 맞으면(예: 통장 자리에 PDF) 무엇을 받는지 알리고 아무것도 안 한다.
+   · 창(모달)이 떠 있으면 그 안의 단추만 본다. 기존 끌어놓기 칸(.dropz)은 그쪽이 먼저 받는다(dzOver 가 멈춰 세운다).
+   ⚠ 놓을 곳이 없어도 브라우저가 파일을 «열어 버리지» 않게 늘 preventDefault 한다.
+   ⚠ 받는 함수는 마지막 인자로 파일 배열(dropped)을 받는다 — 없으면 예전처럼 폴더 찾기를 연다(_pickGo). */
+var DND_RULES={
+  importBank:{ext:['xls','xlsx'],argc:0}, importFundsInfo:{ext:['json'],argc:0}, importSubsidy:{ext:['json'],argc:0}, importSites:{ext:['json'],argc:0},
+  pickTpl:{ext:['xlsx'],argc:1}, pickHwp:{ext:['hwp','hwpx'],argc:1}, hwpTplUpload:{ext:['hwpx','hwp'],argc:1},
+  pickHwpBulk:{ext:['hwp','hwpx'],argc:0,multi:true}, wrepBulkPick:{ext:['pdf','jpg','jpeg','png'],argc:0,multi:true},
+  cmImportPick:{ext:['hwp','hwpx','pdf','jpg','jpeg','png'],argc:0,multi:true}, uploadSubDoc:{ext:null,argc:0}
+};
+var _dnd={on:false, cands:[], hot:null, t:0};
+/* 파일 입력 상자에 끌어온 파일을 «골라 준 것처럼» 넣는다 — 받는 쪽 코드(ev.target.files / inp.files)가 그대로 돈다 */
+function _pickGo(inp,dropped){
+  if(dropped&&dropped.length){ Object.defineProperty(inp,'files',{value:dropped,configurable:true}); if(inp.onchange) inp.onchange({target:inp}); return; }
+  inp.click();
+}
+function _dndExt(f){ var m=/\.([^.\\/]+)$/.exec(String(f&&f.name||'')); return m?m[1].toLowerCase():''; }
+/* 단추의 onclick 글자 «이름('글자')» 를 읽는다 — 규칙에 있고 인자 수가 맞을 때만 */
+function _dndParse(el){
+  var m=/^\s*([A-Za-z_]\w*)\(((?:\s*'[^'\\]*'\s*,?)*)\s*\)\s*;?\s*$/.exec((el&&el.getAttribute&&el.getAttribute('onclick'))||'');
+  if(!m||!Object.prototype.hasOwnProperty.call(DND_RULES,m[1])) return null;
+  var args=[]; String(m[2]||'').replace(/'([^'\\]*)'/g,function(_,a){ args.push(a); return ''; });
+  if(args.length!==DND_RULES[m[1]].argc) return null;
+  return {fn:m[1], args:args, el:el};
+}
+/* 놓은 파일이 이 단추에 맞는가 → {ok, files, note} */
+function _dndFit(info,files){
+  var R=DND_RULES[info.fn], bad=R.ext?files.filter(function(f){ return R.ext.indexOf(_dndExt(f))<0; }):[];
+  if(bad.length) return {ok:false, note:'이 단추는 .'+R.ext.join(' .')+' 파일만 받습니다 — '+bad[0].name+(bad.length>1?' 외 '+(bad.length-1)+'개':'')};
+  if(!R.multi&&files.length>1) return {ok:true, files:[files[0]], note:'여러 개를 놓았습니다 — 첫 파일 «'+files[0].name+'»만 받습니다'};
+  return {ok:true, files:files, note:''};
+}
+function _dndCands(){
+  var sel=Object.keys(DND_RULES).map(function(k){ return '[onclick^="'+k+'("]'; }).join(',');
+  var root=document.getElementById('modalbg')||document;   // 창이 떠 있으면 그 안만
+  return Array.prototype.slice.call(root.querySelectorAll(sel)).filter(function(el){ return el.offsetParent!==null||getComputedStyle(el).position==='fixed'; })
+    .map(_dndParse).filter(Boolean);
+}
+function _dndBar(txt){ var b=document.getElementById('dndbar'); if(!b){ b=document.createElement('div'); b.id='dndbar'; document.body.appendChild(b); } b.textContent=txt; }
+function _dndStart(){
+  if(_dnd.on) return; _dnd.on=true; _dnd.cands=_dndCands();
+  _dnd.cands.forEach(function(c){ c.el.classList.add('dnd-ok'); });
+  var n=_dnd.cands.length;
+  _dndBar(n===0?'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요'
+    :n===1?'📥 여기 아무 데나 놓으면 «'+String(_dnd.cands[0].el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»'
+    :'📥 노란 점선 단추 위에 놓으세요 ('+n+'곳)');
+}
+function _dndEnd(){
+  if(!_dnd.on) return; _dnd.on=false; clearTimeout(_dnd.t);
+  Array.prototype.forEach.call(document.querySelectorAll('.dnd-ok,.dnd-hot'),function(el){ el.classList.remove('dnd-ok','dnd-hot'); });
+  var b=document.getElementById('dndbar'); if(b) b.remove(); _dnd.hot=null;
+}
+/* 놓았다 — 단추 위면 그 단추, 아니면 «받는 곳이 한 곳»일 때만 그 한 곳 */
+function _dndRun(files,hot,cands){
+  files=Array.prototype.slice.call(files||[]); if(!files.length) return;
+  var info=null, fit=null;
+  if(hot){ info=_dndParse(hot); }
+  else {
+    var okc=cands.filter(function(c){ return _dndFit(c,files).ok; });
+    if(okc.length===1) info=okc[0];
+    else if(cands.length===1) info=cands[0];
+    else { toast(cands.length?'받는 곳이 여러 곳입니다 — 노란 점선 단추 위에 놓으세요':'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요','warn'); return; }
+    if(!hot&&info) toast('«'+String(info.el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»(으)로 받습니다');
+  }
+  if(!info){ toast('이 자리는 파일을 받지 않습니다','warn'); return; }
+  fit=_dndFit(info,files);
+  if(!fit.ok){ toast(fit.note,'warn'); return; }
+  if(fit.note) toast(fit.note,'warn');
+  window[info.fn].apply(null,info.args.concat([fit.files]));
+}
+(function _dndInit(){
+  var has=function(e){ var t=e.dataTransfer&&e.dataTransfer.types; return !!t&&Array.prototype.indexOf.call(t,'Files')>=0; };
+  document.addEventListener('dragenter',function(e){ if(has(e)) _dndStart(); });
+  document.addEventListener('dragover',function(e){
+    if(!has(e)) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy';
+    if(!_dnd.on) _dndStart();
+    var hot=(e.target&&e.target.closest)?e.target.closest('.dnd-ok'):null;
+    if(hot!==_dnd.hot){ if(_dnd.hot) _dnd.hot.classList.remove('dnd-hot'); _dnd.hot=hot; if(hot) hot.classList.add('dnd-hot'); }
+    clearTimeout(_dnd.t); _dnd.t=setTimeout(_dndEnd,1500);   // 끌기를 그만두면(Esc·창 밖) 알아서 꺼진다
+  });
+  document.addEventListener('dragleave',function(e){ if(_dnd.on&&e.relatedTarget===null) _dndEnd(); });
+  document.addEventListener('dragend',_dndEnd);
+  document.addEventListener('drop',function(e){
+    if(!has(e)) return; e.preventDefault();
+    var hot=(e.target&&e.target.closest)?e.target.closest('.dnd-ok'):null, cands=_dnd.cands.slice(), files=(e.dataTransfer&&e.dataTransfer.files)||[];
+    _dndEnd(); _dndRun(files,hot,cands);
+  });
+})();
 function dzOver(e,on){ e.preventDefault(); e.stopPropagation();
   var d=e.currentTarget; d.style.borderColor=on?'var(--acc)':'var(--line)'; d.style.background=on?'#f8fafc':'var(--bg)'; }
 function dzDrop(e,id){ dzOver(e,0);
@@ -4511,7 +4609,8 @@ function curForm(){ if(S.formsCtx==='fund'&&funds[S.formFund]) return funds[S.fo
 // 기금 상세 [📑 서식] → 그 기금의 서식 화면
 function openFundDocs(){ S.formFund=S.fundId; S.formsCtx='fund'; S.tab='docs'; _go('fund',S.fundId); S.tab='docs'; renderFund(); }
 // (backToFund 제거 — 기금 서식이 상세 탭 안에서 렌더되면서 쓰이지 않게 됨)
-function pickTpl(key){
+
+function pickTpl(key,dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.xlsx';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file)return;
     var rd=new FileReader();
@@ -4520,7 +4619,7 @@ function pickTpl(key){
         toast('원본 등록 완료: '+file.name); })
       .catch(function(e){ toast('저장 실패: '+e.message,'err'); }); };
     rd.readAsArrayBuffer(file); };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function clearTpl(key){ confirmM('등록된 원본 서식을 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) tplDel(key).then(function(){ S._tplChk=false; _formsRerender(); toast('삭제되었습니다'); }); }); }
 
@@ -4532,7 +4631,8 @@ function clearTpl(key){ confirmM('등록된 원본 서식을 삭제할까요?',{
    같은 날 kcareer.html 에서 먼저 잡았다. tests/kcareer-noexternal-editor.test.js 참고).
    게다가 그 편집기는 실측(2026-09-05, kcareer 쪽) 읽기 전용이었다 — 위험만 있고 편집은
    안 됐다. 아래처럼 vendor/rhwp-editor/index.js 를 studioUrl 을 우리 것으로 줘서 직접 부른다. */
-function pickHwp(kind){
+
+function pickHwp(kind,dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp,.hwpx';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file)return;
     var rd=new FileReader();
@@ -4541,11 +4641,12 @@ function pickHwp(kind){
       _formsRerender(); toast('원본 HWP 등록: '+file.name); })
       .catch(function(e){ toast('저장 실패: '+e.message,'err'); }); };
     rd.readAsArrayBuffer(file); };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function clearHwp(kind){ confirmM('등록된 원본 HWP를 삭제할까요?',{ok:'삭제',danger:true}).then(function(ok){ if(ok) tplDel('hwp:'+kind).then(function(){ S._hwpChk=false; _formsRerender(); toast('삭제되었습니다'); }); }); }
 // 여러 .hwp를 파일명으로 서식에 자동 매칭해 일괄 등록
-function pickHwpBulk(){
+
+function pickHwpBulk(dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.hwp,.hwpx'; inp.multiple=true;
   inp.onchange=function(ev){ var files=Array.prototype.slice.call(ev.target.files||[]); if(!files.length)return;
     // 파일명 → 서식 자동 매칭. 구체적인 규칙을 앞에 둬야 함(예: '기금사용내용' 회의록이 '준비위 회의록'으로 가지 않게)
@@ -4577,7 +4678,7 @@ function pickHwpBulk(){
         var un=plan.filter(function(p){return !p[0];}).map(function(p){return p[1].name;});
         if(!okN){ toast('저장 실패 — 브라우저 저장공간(IndexedDB)을 확인하세요','err'); return; }
         toast(okN+'개 자동 등록'+(failN?' · 실패 '+failN+'개':'')+(un.length?' · 미매칭 '+un.length+'개는 개별 등록':''), failN?'warn':''); }); };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 var _hwpEditor=null, _hwpName='서식', _hwpOriginalBuf=null, _hwpOriginalFormat='hwp', _hwpSaveKind=null;
 /* ★ 2026-09-27 「기존 자료를 불러오면 이름이 모두 다 잘못돼 있다」 — 서식마다 [⬆ 원본 .hwp 등록]·[📁 .hwp 여러 개]로
@@ -5911,7 +6012,8 @@ function hwpSaveToFund(){
 }
 /* [⬆ 한글 틀 올리기] — 글자 표지({{…}})가 든 .hwpx(한글이 저장한 것)·.hwp 를 받는다.
    모르는 이름이 있으면 올리기 전에 보여 준다. */
-function hwpTplUpload(kind){
+
+function hwpTplUpload(kind,dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='.hwpx,.hwp';
   inp.onchange=function(ev){ var file=ev.target.files&&ev.target.files[0]; if(!file) return;
     var rd=new FileReader();
@@ -5935,7 +6037,7 @@ function hwpTplUpload(kind){
       }).catch(function(e){ toast('틀 검사 실패: '+((e&&e.message)||e),'err'); });
     };
     rd.readAsArrayBuffer(file); };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function dlBuf(buf,fname){ var blob=new Blob([buf],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=fname; document.body.appendChild(a); a.click();
@@ -12542,10 +12644,11 @@ function _wrepBulkPatch(o,s,side){
     if(!String((s||{})[pre+k]||'').trim()) p[pre+k]=v; });
   return p;
 }
-function wrepBulkPick(){
+
+function wrepBulkPick(dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='.pdf,.jpg,.jpeg,.png';
   inp.onchange=function(){ var files=[].slice.call(inp.files||[]); if(files.length) wrepBulkRun(files); };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function wrepBulkRun(files){
   var fid=S.fundId, sites=_fundSitesId(fid)||[], rows=[], fail=[];
@@ -12693,10 +12796,11 @@ function _cmFileText(file,stat){
   return _wrepBulkPages(file,stat).then(function(pages){ return pages.map(function(p){ return p.text; }).join('\n'); });
 }
 var _cmImp=null;
-function cmImportPick(){
+
+function cmImportPick(dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.accept='.hwp,.hwpx,.pdf,.jpg,.jpeg,.png';
   inp.onchange=function(){ var files=[].slice.call(inp.files||[]); if(files.length) cmImportRun(files); };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function cmImportRun(files){
   var fid=S.fundId, sites=_fundSitesId(fid)||[], list=[], fail=[], seen={};
@@ -15238,7 +15342,8 @@ function commitSiteXlsx(){
     }).catch(function(e){ toast('등록 실패: '+(e&&e.message||e),'err'); });
   });
 }
-function importSites(){
+
+function importSites(dropped){
   var inp=document.createElement('input'); inp.type='file'; inp.accept='application/json';
   inp.onchange=function(ev){ var f=ev.target.files&&ev.target.files[0]; if(!f) return;
     var rd=new FileReader(); rd.onload=function(){
@@ -15265,7 +15370,7 @@ function importSites(){
       }catch(e){ toast('JSON 파싱 실패: '+e.message,'err'); }
     }; rd.readAsText(f);
   };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 
 // ── 연도 선택 (연간/지원금 공용) ──
@@ -16193,7 +16298,8 @@ function subCopyMissing(){
      그것을 막아 둔 브라우저에서는 조용히 아무 일도 안 일어났다. */
   _copyText(txt, lines.length+'개사 명단을 복사했습니다 — 엑셀·메일에 붙여넣기');
 }
-function uploadSubDoc(){
+
+function uploadSubDoc(dropped){
   if(!fbStore){ toast('Storage 미설정','err'); return; }
   var _fid=S.fundId, _yr=S.year, kind=($('subdoc-kind')&&$('subdoc-kind').value)||'기타';
   var inp=document.createElement('input'); inp.type='file';
@@ -16208,7 +16314,7 @@ function uploadSubDoc(){
     }).then(function(){ S.subDocFor=null; renderFund(); toast('올렸습니다'); })
       .catch(function(e){ toast('업로드 실패: '+e.message,'err'); });
   };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function delSubDoc(id){
   var d=(S.subDocs||{})[id]; if(!d) return;
@@ -21439,7 +21545,8 @@ function addTxnSave(){
     });
   }).catch(function(e){ toast('저장 실패: '+e.message,'err'); });
 }
-function importBank(){
+
+function importBank(dropped){
   var _fid=S.fundId, _yr=S.year;   // 클릭 시점 고정 — 로딩 중 기금·연도 이동해도 원래 경로에 저장
   if(!_fid){ toast('기금을 먼저 선택하세요','warn'); return; }
   var _fname=(funds[_fid]&&(funds[_fid].short_name||funds[_fid].name))||_fid;
@@ -21547,7 +21654,7 @@ function importBank(){
     };
     rd.readAsArrayBuffer(file);
   };
-  inp.click();
+  _pickGo(inp,dropped);
 }
 function setTxnAcct(id,side,val){ var _key=S.fundId+'/'+S.year;
   if(txnLocked(id)){ _lockStop(_monthOf((S.txns[id]||{}).date)); return; }
