@@ -197,3 +197,26 @@ test("⑲ 홈페이지를 읽으면 대표자도 함께 담는다", async () => 
     getPage: async (u) => ({ url: new URL(u).toString(), html: "<p>(주)가나 서울 서초구 대표이사 홍길동 TEL 02-1234-5678</p>" }) });
   assert.equal(r.ceo, "홍길동");
 });
+test("⑳ 게시판·글 주소는 홈페이지가 아니다 — 첫 화면 꼴만", () => {
+  assert.equal(C.looksLikePost("https://weseb.com/SJB/m.php?board=facto&command=body&no=160347"), true);
+  assert.equal(C.looksLikePost("https://wwv.soonwidot.co.kr/rank/board.php?id=109177"), true);
+  assert.equal(C.looksLikePost("https://example-corp.co.kr/"), false);
+  assert.equal(C.looksLikePost("https://example-corp.co.kr/kr/index.html"), false);
+  assert.equal(C.looksLikePost("https://example-corp.co.kr/a/b/c/d"), true);
+});
+
+test("㉑ 웹검색 조각글에서 얻은 번호는 홈페이지에 회사명이 없으면 함께 버린다(엉뚱한 사이트 방어)", async () => {
+  const providers = { web: async () => [{ title: "주식회사 가나다 홈페이지", link: "https://other-site.example/", snippet: "가나다 서울 서초구 TEL 02-111-2222" }] };
+  const getPage = async (u) => ({ url: u, html: "<html><body>전혀 다른 회사 소개 서울 서초구 02-999-8888</body></html>" });
+  const r = await C.lookup({ name: "주식회사 가나다", address: "서울 서초구 매헌로 16", providers, getPage });
+  assert.equal(r.homepage, "");
+  assert.equal(r.phone, "");
+  assert.match(r.note, /회사명이 없어 버림/);
+});
+
+test("㉒ 홈페이지를 열지 못하면 웹검색 홈페이지의 확신을 낮춘다", async () => {
+  const providers = { web: async () => [{ title: "주식회사 가나다", link: "https://ganada.example/", snippet: "가나다 서울 서초구" }] };
+  const getPage = async () => { throw new Error("timeout"); };
+  const r = await C.lookup({ name: "주식회사 가나다", address: "서울 서초구 매헌로 16", providers, getPage });
+  assert.equal(r.confidence, "low");
+});
