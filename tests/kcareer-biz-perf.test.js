@@ -142,3 +142,18 @@ test('⑦ 2026-10-10 검토 — 담당자는 «그 메일»(칸+번호)에 적�
   assert.ok(/_bizOwnBusy/.test(strip(떼기('async function bizMailScan('))), '읽는 중 다시 찾으면 덮는다 — 막는다');
   assert.equal(B.perfYear({ year: '1999' }), '1999', '이알피 연도 셈과 같은 잣대(19xx)');
 });
+
+test('⑧ 2026-10-10 「3」 — 남은 것 모두 읽기 · 읽은 담당자는 작게 따로 클라우드로(다른 PC 에서 다시 안 읽게)', () => {
+  const html = strip(떼기('function _bizMailHtml('));
+  assert.ok(/bizMailOwnerBatch\(\\'all\\'\)/.test(html), '모두 읽기 단추');
+  const batch = strip(떼기('async function bizMailOwnerBatch('));
+  assert.ok(/n==='all'\)\?Infinity/.test(batch), '남은 것 모두');
+  assert.ok(/_bizOwnStop/.test(batch), '멈출 수 있다');
+  const put = strip(떼기('function _bizOwnPut('));
+  assert.ok(/결과\.err\) return;/.test(put), '못 연 것은 적지 않는다 — 다른 기기에서 다시 해 볼 수 있게');
+  assert.ok(/fbScheduleAuto\(BIZ_MAILOWN\)/.test(put), '클라우드로 올린다');
+  assert.ok(!/'biz_mailowner'/.test(SRC.match(/var FB_SKIP=\[[\s\S]*?\];/)[0]), 'FB_SKIP 에 넣지 않는다');
+  assert.ok(/'biz_mailrep'/.test(SRC.match(/var FB_SKIP=\[[\s\S]*?\];/)[0]), '큰 메일 목록은 그대로 기기에만');
+  assert.ok(/_bizOwnPut\(x, 결과\)/.test(strip(떼기('async function bizMailOwner('))), '읽을 때마다 적는다');
+  assert.ok(/m\[x\.box\+'\|'\+x\.k\]/.test(strip(떼기('function _bizMailCache('))), '다른 기기에서 읽은 것도 보인다');
+});

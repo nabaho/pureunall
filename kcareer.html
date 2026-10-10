@@ -15517,7 +15517,22 @@ function bizPerfToggle(type){ _bizPerfOpen=(_bizPerfOpen===type)?'':type; render
    ⚠ 무겁다(목록만 십수 MB) — «누를 때만» 읽고, 찾은 것만 이 기기에 적어 둔다(biz_mailrep, FB_SKIP).
    ⚠ 「실적에 같은 이름」은 후보다 — 실적과 저절로 묶지 않는다. 「실적으로」는 입력 창을 채워 열기만. */
 var BIZ_MAILREP='biz_mailrep', _bizMailBusy=false, _bizMailOnlyNew=false, _bizMailMore=false;
-function _bizMailCache(){ try{ var o=JSON.parse(LS.get(NS+BIZ_MAILREP)||'null'); return (o&&Array.isArray(o.list))?o:null; }catch(e){ return null; } }
+/* ★ 읽은 담당자는 «작게» 따로 적어 클라우드로도 보낸다 (대표 지시 2026-10-10 「3」 — 다른 PC 에서 다시 읽지 않게).
+   biz_mailrep(찾은 메일 목록)은 커서 기기마다 두지만, 담당자 결과(메일 칸|번호 → 이름 후보)는 몇십 KB 라 오간다.
+   ⚠ 못 연 것(err)은 적지 않는다 — 다른 기기에서 다시 해 볼 수 있게. */
+var BIZ_MAILOWN='biz_mailowner';
+function _bizOwnMap(){ try{ var m=JSON.parse(LS.get(NS+BIZ_MAILOWN)||'{}'); return (m&&typeof m==='object'&&!Array.isArray(m))?m:{}; }catch(e){ return {}; } }
+function _bizOwnPut(x, 결과){
+  if(!x || !x.box || !x.k || !결과 || 결과.err) return;
+  var m=_bizOwnMap();
+  m[x.box+'|'+x.k]={ at:결과.at, src:String(결과.src||'').slice(0,60),
+    names:(결과.names||[]).slice(0,3).map(function(h){ return { name:h.name, score:h.score, near:!!h.near, ctx:String(h.ctx||'').slice(0,70) }; }) };
+  try{ if(LS.set(NS+BIZ_MAILOWN, JSON.stringify(m))!==false && typeof fbScheduleAuto==='function') fbScheduleAuto(BIZ_MAILOWN); }catch(e){}
+}
+function _bizMailCache(){ try{ var o=JSON.parse(LS.get(NS+BIZ_MAILREP)||'null'); if(!(o&&Array.isArray(o.list))) return null;
+  /* 다른 기기에서 읽은 담당자도 보이게 — 이 기기 목록에 없으면 클라우드에서 온 것으로 채운다 */
+  var m=_bizOwnMap(); o.list.forEach(function(x){ if(x && !x.owner && x.box && x.k && m[x.box+'|'+x.k]) x.owner=m[x.box+'|'+x.k]; });
+  return o; }catch(e){ return null; } }
 async function bizMailScan(){
   if(_bizMailBusy) return;
   /* ⚠ 담당자를 읽는 중에 다시 찾으면 그사이 읽은 것을 덮는다 — 끝나거나 멈춘 뒤에 */
@@ -15559,8 +15574,8 @@ function _bizMailHtml(){
       +' · 메일 '+Number(c.scanned||0).toLocaleString('ko-KR')+'통 중 · '+new Date(c.at).toLocaleString('ko-KR')+'</span>':'')
     +'<span style="flex:1"></span>'
     +(c?'<label style="font-size:11.5px;font-weight:400;display:inline-flex;gap:4px;align-items:center"><input type="checkbox"'+(_bizMailOnlyNew?' checked':'')+' onchange="bizMailOnlyNew(this.checked)">실적에 없어 보이는 것만</label>':'')
-    +(c?'<button class="btn sm" type="button" onclick="bizMailOwnerBatch(10)" title="결과보고서 메일을 열어 담당자 이름을 찾습니다 — 한 통씩, 아직 안 읽은 것부터">'
-      +(_bizOwnBusy?'⏹ 멈추기':'👤 담당자 읽기 10건')+'</button>':'')
+    +(c&&(_bizOwnBusy||_bizOwnLeft(c))?'<button class="btn sm'+(_bizOwnBusy?'':' primary')+'" type="button" onclick="bizMailOwnerBatch(\'all\')" title="결과보고서 메일을 한 통씩 열어 담당자 이름을 찾습니다 — 지난 메일은 한 통에 20초쯤, 창을 열어 두세요">'
+      +(_bizOwnBusy?('⏹ 멈추기'+(_bizOwnProg?' ('+_bizOwnProg+')':'')):('👤 남은 '+_bizOwnLeft(c)+'건 모두 읽기'))+'</button>':'')
     +'<button class="btn sm'+(c?'':' primary')+'" type="button" onclick="bizMailScan()"'+(_bizMailBusy?' disabled':'')+'>'+(_bizMailBusy?'⏳ 메일 읽는 중…':(c?'🔄 다시 찾기':'📮 메일에서 찾기'))+'</button></h4>';
   if(!c){
     return h+'<div style="font-size:12px;color:var(--text-mute);line-height:1.6">푸른메일함의 목록(제목·첨부 이름)에서 「결과·완료·최종 보고」가 든 메일을 모읍니다 — 메일함을 새로 열지 않습니다.<br>'
@@ -15592,6 +15607,8 @@ function _bizMailHtml(){
    ⚠ 창구는 푸른메일함과 «같은» 함수다(readMailMessage·readMailAttachment·readOldMail) — 새로 만들지 않는다.
    ⚠ 첨부는 «조각 이름(part)»으로 집는다 — 차례로만 집으면 다른 파일이 올 수 있다(메일함과 같은 규칙).
    ⚠ 결과는 «후보»로 이 기기 사본(biz_mailrep)에만 적는다. 실적의 담당은 고치지 않는다 — 다르면 «다르다»고만 보인다. */
+var _bizOwnProg='';
+function _bizOwnLeft(c){ return c?c.list.filter(function(x){ return x && !x.owner && x.box && x.k; }).length:0; }
 var BIZ_MB_FN='https://asia-northeast3-pureun-erp.cloudfunctions.net/', _bizOwnBusy=false, _bizOwnStop=false;
 function _bizOwnerNames(){
   var n=[]; (typeof getStaffRoster==='function'?getStaffRoster():[]).forEach(function(r){ if(r&&r.name) n.push(String(r.name)); });
@@ -15654,6 +15671,7 @@ async function bizMailOwner(i, quiet){
   /* ⚠ 차례(i)가 아니라 «그 메일»(칸+번호)로 찾아 적는다 — 그사이 다시 찾기로 줄 차례가 바뀌었을 수 있다(2026-10-10 검토) */
   var c2=_bizMailCache(), 그줄=c2?c2.list.filter(function(y){ return y && y.k===x.k && y.box===x.box; })[0]:null;
   if(그줄){ 그줄.owner=결과; try{ LS.set(NS+BIZ_MAILREP, JSON.stringify(c2)); }catch(e){} }
+  _bizOwnPut(x, 결과);   /* 클라우드로도 — 다른 PC 에서 다시 읽지 않게 */
   if(!quiet){ _safe(renderBizDash); toast(결과.err?('⚠ '+결과.err):(결과.names.length?('👤 '+결과.names.map(function(h){ return h.name; }).join(' · ')+' — '+결과.src):'이름을 찾지 못했습니다')); }
   return 결과;
 }
@@ -15661,19 +15679,21 @@ async function bizMailOwner(i, quiet){
 async function bizMailOwnerBatch(n){
   if(_bizOwnBusy){ _bizOwnStop=true; toast('멈추는 중…'); return; }
   var c=_bizMailCache(); if(!c) return;
-  var 할=[]; c.list.forEach(function(x,i){ if(!x.owner && x.box && x.k && 할.length<(n||10)) 할.push(i); });
+  var 끝=(n==='all')?Infinity:(n||10);
+  var 할=[]; c.list.forEach(function(x,i){ if(!x.owner && x.box && x.k && 할.length<끝) 할.push(i); });
   if(!할.length){ toast('읽을 줄이 없습니다 — 모두 읽었거나, 🔄 다시 찾기를 한 번 눌러 주세요'); return; }
   _bizOwnBusy=true; _bizOwnStop=false; _safe(renderBizDash);
   var 찾음=0, 실패=0;
   try{
     for(var k=0;k<할.length;k++){
       if(_bizOwnStop) break;
-      toast('👤 담당자 읽는 중 '+(k+1)+'/'+할.length, 2500);
+      _bizOwnProg=(k+1)+'/'+할.length; if(k%5===0) _safe(renderBizDash);
+      toast('👤 담당자 읽는 중 '+_bizOwnProg, 2500);
       var r=await bizMailOwner(할[k], true);
       if(r && r.err){ 실패++; if(실패>=3 && !찾음){ toast('⚠ 메일을 연달아 못 열었습니다 — '+r.err, 7000); break; } }
       else if(r && r.names.length) 찾음++;
     }
-  }finally{ _bizOwnBusy=false; _bizOwnStop=false; _safe(renderBizDash); }
+  }finally{ _bizOwnBusy=false; _bizOwnStop=false; _bizOwnProg=''; _safe(renderBizDash); }
   toast('👤 '+할.length+'건 중 '+찾음+'건에서 담당자 후보를 찾았습니다'+(실패?' · 못 연 것 '+실패+'건':''), 6000);
 }
 /* 메일 한 줄 → 컨설팅 실적 입력 창을 채워 연다. 업체(고객사)는 비워 둔다 — 제목에서 짐작하면 틀린 업체가 실적이 된다 */
