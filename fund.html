@@ -20563,7 +20563,7 @@ function closingTab(f){
   }).join(''):'<tr><td colspan="13" class="muted" style="padding:14px;text-align:center">이 거르기에 맞는 줄이 없습니다 — 칩을 다시 누르면 전체</td></tr>';
   return '<div class="panel closehead"><div class="row"><h2>회계·결산</h2>'+hlp('close.bank')+yearSel()
     +(_yl?'<span class="chip warn" style="font-size:11px" title="결산을 확정한 해는 장부·전기이월·보고서 입력값·사업장 연도 기록을 고칠 수 없습니다. 고치려면 확정을 푸세요.">🔒 결산 확정</span>':'')
-    +'<span style="flex:1"></span><button onclick="addTxnForm()" title="통장을 엑셀로 못 받는 경우 한 줄씩 직접 넣기">＋ 거래 추가</button>'+'<button onclick="learnedPanel()" title="승인할 때 기억한 거래처·계정 보기·지우기">📚 분개 학습</button>'+'<button onclick="autoMatchTransfers()" title="같은 날·같은 금액이 서로 반대 방향인 계좌 간 이체를 찾아 상계 처리">🔁 이체 자동매칭</button>'+'<button onclick="sampleApprove()" title="규칙과 같은 분개만 골라, 표본 몇 건을 먼저 보고 한꺼번에 승인">🎯 골라 승인</button>'+'<button class="primary" onclick="importBank()">📥 통장 엑셀 가져오기</button></div>'
+    +'<span style="flex:1"></span><button onclick="addTxnForm()" title="통장을 엑셀로 못 받는 경우 한 줄씩 직접 넣기">＋ 거래 추가</button>'+'<button onclick="importsPanel()" title="가져온 통장 파일 목록 — 잘못 가져온 것을 통째로 걷어냅니다">↶ 가져온 기록</button>'+'<button onclick="learnedPanel()" title="승인할 때 기억한 거래처·계정 보기·지우기">📚 분개 학습</button>'+'<button onclick="autoMatchTransfers()" title="같은 날·같은 금액이 서로 반대 방향인 계좌 간 이체를 찾아 상계 처리">🔁 이체 자동매칭</button>'+'<button onclick="sampleApprove()" title="규칙과 같은 분개만 골라, 표본 몇 건을 먼저 보고 한꺼번에 승인">🎯 골라 승인</button>'+'<button class="primary" onclick="importBank()">📥 통장 엑셀 가져오기</button></div>'
     +'<div class="row" style="margin-top:8px;flex-wrap:wrap;gap:8px">'
     +'<span class="stat" style="background:var(--ok-bg);color:var(--ok)">입금 '+dep.toLocaleString()+'원</span>'
     +'<span class="stat" style="background:var(--danger-bg);color:var(--danger)">출금 '+wd.toLocaleString()+'원</span>'
@@ -21289,6 +21289,89 @@ function _applyXfer(){
   applyTransfers(pairs,d.fid||S.fundId,d.yr||S.year).catch(function(e){ toast('처리 실패: '+e.message,'err'); });
 }
 function hkey(s){var h=0;for(var i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return 't'+(h>>>0).toString(36);}
+/* ══ ↶ 통장 가져온 기록 (대표 지시 2026-10-10 — 목업 승인 «진행») ══
+   잘못 가져온 파일을 통째로 걷어낸다. 앞으로 가져오는 줄마다 imp(가져오기 번호)를 붙이고,
+   가져온 일은 imports/{기금}/{연도}/{번호} = {at,by,file,n} 에 적는다. 그 전에 가져온 줄은 번호가 없어 여기 안 나온다.
+   ⚠ 걷어내지 않는 것: 사람이 승인한 줄 · 증빙을 붙인 줄 · 쪼갠 거래 · 마감한 달·확정한 해.
+     🛡 자동 확정(ok_via:'rule')으로 승인된 줄은 기계 일이라 걷어낸다.
+   ⚠ 걷어내는 줄이 이체 짝이면 «남는 상대 줄»의 이체 표시를 풀어 미분류로 돌린다 — 안 그러면 짝 없는 상계가 남는다. */
+var IMP={fid:'', yr:'', list:{}, T:{}, cl:null};
+function _impRowWhy(x,cl){
+  if(!cl||cl.locked||(cl.months||{})[_monthOf(x.date)]) return 'lock';
+  if(_splitsOf(x).length) return 'split';
+  if(x.scan) return 'ev';
+  if(x.approved&&x.ok_via!=='rule') return 'human';
+  return '';
+}
+/* 한 가져오기 번호의 줄 형편 — 순수 계산(자료만 본다) */
+function _impSummary(T,id,cl){
+  var s={have:0, rm:[], human:0, ev:0, split:0, lock:0};
+  Object.keys(T||{}).forEach(function(k){ var x=T[k]||{}; if(x.imp!==id) return; s.have++;
+    var w=_impRowWhy(x,cl); if(!w) s.rm.push(k); else s[w]++; });
+  return s;
+}
+/* 걷어낼 줄의 이체 짝 중 «남는» 상대 줄 — 같은 날·같은 금액·반대 방향. 한 줄은 한 번만 짝이 된다 */
+function _impPartners(T,rmIds){
+  var rm={}; rmIds.forEach(function(k){ rm[k]=1; }); var used={}, out=[];
+  rmIds.forEach(function(k){ var x=T[k]||{}; if(!x.xfer) return;
+    var amt=(num(x.deposit)||0)||(num(x.withdraw)||0), dep=(num(x.deposit)||0)>0;
+    var hit=Object.keys(T).filter(function(j){ var y=T[j]||{};
+      return !rm[j]&&!used[j]&&y.xfer&&y.date===x.date&&(dep?(num(y.withdraw)||0)===amt:(num(y.deposit)||0)===amt); })[0];
+    if(hit){ used[hit]=1; out.push(hit); } });
+  return out;
+}
+function importsPanel(){
+  var fid=S.fundId, yr=S.year; if(!fid) return;
+  showModal('<div class="loading"><span class="spin"></span>가져온 기록을 읽는 중…</div>',{width:780});
+  var rd=function(p){ return fbDb.ref(NS+'/'+p).once('value').then(function(s){ return s.val(); }); };
+  Promise.all([rd('imports/'+fid+'/'+yr),rd('txns/'+fid+'/'+yr),rd('closing/'+fid+'/'+yr+'/locked'),rd('closing/'+fid+'/'+yr+'/months')]).then(function(r){
+    IMP={fid:fid, yr:yr, list:r[0]||{}, T:r[1]||{}, cl:{locked:!!r[2], months:r[3]||{}}};
+    _impRender();
+  }).catch(function(e){ closeM(); toast('가져온 기록을 읽지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+function _impRender(){
+  var f=funds[IMP.fid]||{}, ids=Object.keys(IMP.list).sort().reverse(), boss=_isBoss();
+  var rows=ids.map(function(id,i){ var m=IMP.list[id]||{}, s=_impSummary(IMP.T,id,IMP.cl), done=!!m.undone;
+    var kept=[]; if(s.human) kept.push('사람이 승인한 '+s.human+'건'); if(s.ev) kept.push('증빙 붙인 '+s.ev+'건'); if(s.split) kept.push('쪼갠 '+s.split+'건'); if(s.lock) kept.push('🔒 마감 '+s.lock+'건');
+    var st=done?'<span class="chip ok" style="font-size:10.5px">이미 걷어냄 '+esc(String((m.undone||{}).at||'').slice(5,16))+'</span>'
+      :'<b>'+s.rm.length+'건</b>'+(kept.length?' <span class="chip'+(s.lock&&!s.rm.length?' warn':'')+'" style="font-size:10.5px">남김: '+esc(kept.join(' · '))+'</span>':'');
+    return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap">'+esc(String(m.at||'').slice(5,16))+'</td><td>'+esc(m.by||'')+'</td>'
+      +'<td>'+esc(m.file||'')+'</td><td>'+(num(m.n)||0)+'건</td><td>'+st+'</td>'
+      +'<td><button onclick="impUndo(\''+id+'\')"'+(done||!s.rm.length||!boss?' disabled style="opacity:.5"':' class="primary" style="background:var(--danger);border-color:var(--danger)"')+'>↶ 되돌리기</button></td></tr>'; }).join('');
+  showModal('<div class="row" style="margin:0 0 8px"><h2 style="margin:0;font-size:15px">↶ 통장 가져온 기록</h2>'
+    +'<span class="chip" style="font-size:10px">'+esc(f.short_name||f.name||'')+' · '+esc(IMP.yr)+'년</span>'+hlp('imp.undo')+'</div>'
+    +(ids.length?'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>언제</th><th>누가</th><th>파일</th><th>들인 줄</th><th>지금 걷어낼 수 있는 줄</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      :'<div class="msg" style="font-size:12.5px">이 해에 기록된 가져오기가 없습니다.</div>')
+    +(boss?'':'<div class="muted" style="font-size:11.5px;margin-top:8px">되돌리기는 대표·관리자만 할 수 있습니다.</div>')
+    +'<div class="row" style="justify-content:flex-end;margin-top:10px"><button onclick="closeM()">닫기</button></div>',{width:780});
+}
+function impUndo(id){
+  if(!_isBoss()){ toast('되돌리기는 대표·관리자만 할 수 있습니다','warn'); return; }
+  var fid=IMP.fid, yr=IMP.yr, m=IMP.list[id]; if(!m) return;
+  /* 누르는 순간 다시 읽는다 — 그 사이 승인·마감이 바뀌었을 수 있다 */
+  var rd=function(p){ return fbDb.ref(NS+'/'+p).once('value').then(function(s){ return s.val(); }); };
+  Promise.all([rd('txns/'+fid+'/'+yr),rd('closing/'+fid+'/'+yr+'/locked'),rd('closing/'+fid+'/'+yr+'/months'),rd('imports/'+fid+'/'+yr+'/'+id+'/undone')]).then(function(r){
+    var T=r[0]||{}, cl={locked:!!r[1], months:r[2]||{}};
+    if(r[3]){ toast('이미 걷어낸 가져오기입니다','warn'); return; }
+    var s=_impSummary(T,id,cl); if(!s.rm.length){ toast('걷어낼 줄이 없습니다 — 모두 사람이 승인했거나 마감됐습니다','warn'); return; }
+    var pt=_impPartners(T,s.rm), kept=[];
+    if(s.human) kept.push('사람이 승인한 '+s.human+'건'); if(s.ev) kept.push('증빙을 붙인 '+s.ev+'건'); if(s.split) kept.push('쪼갠 '+s.split+'건'); if(s.lock) kept.push('마감한 달 '+s.lock+'건');
+    confirmM('«'+(m.file||'')+'»('+String(m.at||'').slice(0,16)+')에서 들인 줄을 걷어낼까요?\n\n· 걷어낼 줄: '+s.rm.length+'건'
+      +(kept.length?'\n· 남기는 줄: '+kept.join(' · '):'')+(pt.length?'\n· 이체 짝이 남는 상대 줄 '+pt.length+'건은 이체 표시를 풀어 미분류로 돌립니다':'')
+      +'\n\n걷어낸 일은 변경 기록에 남습니다. 같은 파일을 다시 가져오면 그대로 다시 들어옵니다.',{ok:s.rm.length+'건 걷어내기',danger:true}).then(function(ok){ if(!ok) return;
+      var up={}, at=_nowStamp(), who=(S.user||'');
+      s.rm.forEach(function(k){ up['txns/'+fid+'/'+yr+'/'+k]=null; });
+      pt.forEach(function(k){ var b='txns/'+fid+'/'+yr+'/'+k+'/';
+        up[b+'xfer']=null; up[b+'approved']=false; up[b+'approved_by']=null; up[b+'approved_at']=null; up[b+'ok_via']=null; up[b+'ok_rule']=null; up[b+'debit']=null; up[b+'credit']=null; up[b+'sug']=null; });
+      up['imports/'+fid+'/'+yr+'/'+id+'/undone']={at:at, by:who, n:s.rm.length};
+      up['audit/'+fid+'/'+fbDb.ref(NS+'/audit/'+fid).push().key]={at:at, by:(who||'?'), what:'통장 가져오기 되돌림', detail:yr+'년 '+String(m.file||'').slice(0,60)+' · '+s.rm.length+'건 걷어냄'+(kept.length?' (남김: '+kept.join(', ')+')':'')+(pt.length?' · 이체 짝 풀림 '+pt.length+'건':'')};
+      fbDb.ref(NS).update(up).then(function(){
+        S.txnsFor=null; if(S.fundId===fid) renderFund(); closeM();
+        toast(s.rm.length+'건을 걷어냈습니다'+(kept.length?' — '+kept.join(' · ')+'은 남겼습니다':''));
+      }).catch(function(e){ toast('걷어내기 실패: '+((e&&e.message)||e),'err'); });
+    });
+  }).catch(function(e){ toast('읽지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
 /* ══ 거래 직접 추가 ══
    통장을 엑셀로 못 받는 은행이 있다(새마을금고는 PDF만 — H사내가 그렇다).
    그런 기금은 [통장 엑셀 가져오기]로 아무것도 넣을 수 없어 회계를 시작조차 못 했다.
@@ -21400,7 +21483,7 @@ function importBank(){
           var path=NS+'/txns/'+_fid+'/'+_yr;
           fbDb.ref(path).once('value').then(function(snap){   // 서버 최신본 기준 중복검사 — 오래된 캐시로 승인 거래 덮어쓰기 방지
             var existing=snap.val()||{};
-            var obj={}, added=0, kept=0, seen={}, autoN=0;
+            var obj={}, added=0, kept=0, seen={}, autoN=0, impId='i'+Date.now().toString(36);   // 이번 가져오기 번호 — 줄마다 붙여 둬야 나중에 통째로 걷어낼 수 있다
             txns.forEach(function(x){ var base=x.date+'|'+x.deposit+'|'+x.withdraw+'|'+x.memo;
               var n=(seen[base]=(seen[base]||0)+1);
               var key=hkey(n>1?base+'|'+n:base);   // 같은 날 동일 금액·적요 거래도 각각 보존
@@ -21418,7 +21501,7 @@ function importBank(){
               seen[base]=n;
               if(dup){ kept++; return; }
               var p=proposeAcct(x.memo,x.deposit>0,_snames,x.kind,_fid);
-              obj[key]={date:x.date,memo:x.memo,deposit:x.deposit,withdraw:x.withdraw,balance:x.balance,acct:(x.acct||''),kind:(x.kind||''),debit:p.d,credit:p.c,approved:false}; added++;
+              obj[key]={date:x.date,memo:x.memo,deposit:x.deposit,withdraw:x.withdraw,balance:x.balance,acct:(x.acct||''),kind:(x.kind||''),debit:p.d,credit:p.c,approved:false,imp:impId}; added++;
               if(p.d&&p.c&&p.src) obj[key].sug=p.src;   // 이 분개는 기계가 골랐다 — 배운 것/규칙/사업장 이름
               /* 🛡 그 기금에서 이 계정 규칙이 «자동 확정»으로 켜져 있으면 100만 원 이하는 바로 승인한다(누가=자동 확정, 어느 규칙인지 남김) */
               if(p.d&&p.c&&p.src&&typeof _trOn==='function'){ var _dep=x.deposit>0, _rk=_trTxnRk(_fid,_dep,_dep?p.c:p.d);
@@ -21426,7 +21509,10 @@ function importBank(){
                   obj[key].approved=true; obj[key].approved_by='자동 확정'; obj[key].approved_at=_nowStamp(); obj[key].ok_via='rule'; obj[key].ok_rule=_rk; autoN++; } }
             });
             if(added===0){ toast('새로 추가할 거래가 없습니다 (기존 '+kept+'건 유지)','warn'); return; }
-            return fbDb.ref(path).update(obj).then(function(){
+            /* 줄과 «가져온 기록»을 한 번에 쓴다 — 기록만 없거나 줄만 없는 반쪽이 남지 않게 */
+            var upI={}; Object.keys(obj).forEach(function(k){ upI['txns/'+_fid+'/'+_yr+'/'+k]=obj[k]; });
+            upI['imports/'+_fid+'/'+_yr+'/'+impId]={at:_nowStamp(), by:(S.user||''), file:String(file.name||'').slice(0,80), n:added};
+            return fbDb.ref(NS).update(upI).then(function(){
               _audit(_fid,'통장 가져오기',_yr+'년 '+String(file.name||'').slice(0,60)+' · 신규 '+added+'건'+(kept?' · 기존 '+kept+'건 보존':'')+(autoN?' · 🛡 자동 승인 '+autoN+'건':''));
               /* 계좌 간 이체 짝은 «묻고» 상계한다 — 확실한 짝은 골라 둔 채로 창을 띄운다.
                  예전엔 확실한 짝을 사람 확인 없이 승인까지 했다(바닥 공사 2026-10-05). */
@@ -22016,6 +22102,9 @@ var HELP={
    +'<p>칸마다 전 값·새 값이 남은 줄(2026-10-05 이후)은 [펼치기]로 칸별 <b>전 → 이 묶음이 넣은 값 → 지금</b>을 봅니다.</p>'
    +'<p><b>[↶ 이 묶음 되돌리기]</b>는 지금도 그 묶음 값 그대로인 칸만 전 값으로 돌립니다. 그 뒤 사람이 고친 칸은 건드리지 않고, 사람이 ✓ 확인한 칸은 따로 묻습니다(기본은 빼고). 되돌린 것도 일지에 남아 다시 되돌릴 수 있습니다. 대표·관리자만 누릅니다.</p>'
    +'<p>통장 가져오기(장부)는 칸 묶음이 없어 여기서 되돌리지 않습니다 — 회계 화면에서 승인 풀기·삭제로 합니다.</p>'},
+ 'imp.undo':{t:'통장 가져온 기록',h:'<p>가져온 통장 파일마다 한 줄입니다. 잘못 가져온 파일은 <b>↶ 되돌리기</b>로 통째로 걷어냅니다.</p>'
+   +'<p><b>남기는 줄</b> — 사람이 승인한 줄 · 증빙을 붙인 줄 · 쪼갠 거래 · 마감한 달·확정한 해. 🛡 자동 확정으로 승인된 줄은 기계 일이라 걷어냅니다.</p>'
+   +'<p>이 기능을 넣기 «전»에 가져온 줄은 어느 파일인지 기록이 없어 여기 안 나옵니다 — 장부에서 고르고 지웁니다. 되돌리기는 대표·관리자만.</p>'},
  'led.filter':{t:'장부 거르기 · 한꺼번에 정리',h:'<p>줄마다 맨 오른쪽 «손볼 것»에 그 줄이 왜 걸렸는지 딱지가 붙습니다 — 미분류·미승인·차·대 같음·임금성 의심·차입 의심·100만 원 넘는 출금·증빙 없음·이체 짝·🤖 기계 제안.</p>'
    +'<p>위 칩을 누르면 그 줄만 보입니다(다시 누르면 전체). <b>⚠ 문제만</b>은 결산을 막는 줄(미분류·미승인·차·대 같음)과 법 위반 의심(임금성·차입)만 모읍니다.</p>'
    +'<p>맨 왼쪽 □로 줄을 고르면 아래에 띠가 뜹니다. <b>✓ 고른 것 승인</b>은 차·대가 정해진 줄만 승인하고, 100만 원 넘는 출금·임금성·차입 의심은 빼서 하나씩 보게 합니다. <b>차변/대변 한꺼번에</b>는 승인한 줄·쪼갠 거래·이체를 빼고 바꾸며, 바꾸기 전 값은 📜 작업 일지에서 묶음째 되돌릴 수 있습니다.</p>'
