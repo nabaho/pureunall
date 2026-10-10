@@ -114,3 +114,22 @@ test('★★ 오래된 것 덜기 — 예정월 13달 넘게 지난 계획·접�
     { no: 'd', kind: 'spec', rcptDt: '2026-06-01 09:00:00' }, { no: 'e', kind: 'spec', rcptDt: '2026-06-30 09:00:00' }, null];
   assert.deepEqual(P.prune(l, '2026-10-09').map((r) => r.no), ['b', 'c', 'e']);
 });
+
+/* ═══ 자세한 칸 — 팝업(상세)에 보일 것 (2026-10-10) ═══ */
+test('★★★ 발주계획의 자세한 칸(용도·규격·비고·관할…)도 담되 «값 있는 칸만» · 긴 글은 자른다 · 계약금액은 합계와 다를 때만', () => {
+  const it = Object.assign({}, PLAN_IT, { usgCntnts: '조직 진단', specCntnts: '직무기술서  \n\n30종', rmrkCntnts: 'x'.repeat(2000), jrsdctnDivNm: '중앙',
+    bsnsDivNm: '용역', dtilPrdctClsfcNoNm: '경영컨설팅서비스', prdctClsfcNoNm: '2026년 직무분석 및 조직진단 용역', orderContrctAmt: '40000000', qtyCntnts: '' });
+  const r = P.parse(env([it]), 'plan').rows[0];
+  assert.equal(r.use, '조직 진단'); assert.equal(r.specTx, '직무기술서\n30종', '빈 줄·끝 공백 정리');
+  assert.equal(r.rmk.length, 1501); assert.ok(r.rmk.endsWith('…'));
+  assert.equal(r.jrsd, '중앙'); assert.equal(r.bizDiv, '용역'); assert.equal(r.dcls, '경영컨설팅서비스');
+  assert.equal(r.cls, undefined, '사업명과 같은 품명은 두 번 안 담는다');
+  assert.ok(!('qty' in r), '빈 칸을 담았다'); assert.equal(r.cAmt, 40000000);
+  const same = P.parse(env([Object.assign({}, PLAN_IT, { orderContrctAmt: '45000000' })]), 'plan').rows[0];
+  assert.ok(!('cAmt' in same), '합계와 같은 계약금액을 또 담았다');
+});
+test('★★ 사전규격의 자세한 칸 — 등록일·납품기한·납품일수·SW사업·품목', () => {
+  const it = Object.assign({}, SPEC_IT, { rgstDt: '2026-10-07 08:50:00', dlvrTmlmtDt: '2026-12-31', dlvrDaynum: '90', swBizObjYn: 'Y', prdctDtlList: '컨설팅 1식', bsnsDivNm: '용역' });
+  const s = P.parse(env([it]), 'spec').rows[0];
+  assert.deepEqual([s.rgstDt, s.dlvrDt, s.dlvrDays, s.sw, s.items, s.bizDiv], ['2026-10-07 08:50:00', '2026-12-31', '90', 'Y', '컨설팅 1식', '용역']);
+});
