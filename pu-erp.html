@@ -5158,7 +5158,8 @@ function _shrinkExempt(k){ return SHRINK_EXEMPT_KEYS.indexOf(k) >= 0; }
 try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){
   try { var tb = dbGet('trash_bin', []) || []; if(_erpCanFin() && tb.some(_trashIsFin)) dbSet('trash_bin', tb); } catch(e){}
 }, 4000); }); } catch(e){}
-var DIFF_KEYS = ['companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos'];
+/* user_accounts — 2026-10-10 사번 열쇠 지도로(번호 = 사번, dbSet 이 붙인다) */
+var DIFF_KEYS = ['user_accounts','companies','cases','consultings','funds','other_projects','payroll_monthly','finance_income','finance_expense','contracts','attendance_records','overtime_records','leave_grants','comp_leave_records','leave_of_absence','retirement_settlements','finance_invoice','external_staff','payroll_irregular','employment_contracts','ledger_batches','my_schedules','case_memos'];
 function dbSet(k, v){
   /* ★★ 번호 없는 항목에는 저장 «전»에 번호를 붙인다 (2026-09-16 대표 「데이터가 들어갈 때마다·
      다른 직원이 넣을 때마다 충돌 — 해결책까지 전체 검토」).
@@ -5180,6 +5181,10 @@ function dbSet(k, v){
   if(k === 'companies' && Array.isArray(v) && typeof _coTombStrip === 'function') v = _coTombStrip(k, v);
   /* 일반 휴지통에 돈 기록이 섞이면 재무 전용 휴지통으로 옮긴다(재무 권한 기기만 — 아니면 그대로 둔다, 잃지 않게) */
   if(k === 'trash_bin' && Array.isArray(v) && typeof _trashFinSplit === 'function') v = _trashFinSplit(v);
+  /* 근로자명부는 번호 = 사번(사번 열쇠 지도로 바뀐 사람만 주고받는다 — 2026-10-10, 사번정리 뒤에도 맞게 늘 다시 붙인다) */
+  if(k === 'user_accounts' && Array.isArray(v)){
+    v = v.map(function(x){ return (x && typeof x === 'object' && x.sid && x.id !== x.sid) ? Object.assign({}, x, { id:String(x.sid) }) : x; });
+  }
   if(Array.isArray(v) && DIFF_KEYS.indexOf(k) >= 0){
     var _noId = 0;
     v = v.map(function(x){
@@ -70960,10 +70965,13 @@ function StaffRosterModal(props){
             style:{ width:'100%', padding:'7px 8px', border:'1px solid #bfdbfe', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } })),
           fld('종업 시각', h('input', { type:'time', value:f.workEnd||'18:00', onChange:set('workEnd'),
             style:{ width:'100%', padding:'7px 8px', border:'1px solid #bfdbfe', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } })),
-          fld('휴게시간', h('div',{style:{display:'flex',alignItems:'center',gap:'4px'}},
+          fld('휴게시간', h('div',{style:{display:'flex',alignItems:'center',gap:'4px',whiteSpace:'nowrap'}},
             h('input', { type:'number', min:0, max:480, value:f.breakMinutes||60, onChange:setNum('breakMinutes'),
               style:{ width:'70px', padding:'7px 8px', border:'1px solid #bfdbfe', borderRadius:'4px', fontSize:'12.5px', textAlign:'right', fontFamily:'monospace', boxSizing:'border-box' } }),
-            h('span', { style:{ fontSize:'12px', color:'#475569' } }, '분')
+            h('span', { style:{ fontSize:'12px', color:'#475569' } }, '분'),
+            /* ★ 소정 근무시간에 견줘 휴게가 법정보다 짧으면 알린다 (근로기준법 제54조, 2026-10-10) */
+            (function(){ var c = erpClockSpan(f.workStart||'09:00', f.workEnd||'18:00', f.breakMinutes||60);
+              return (c && c.breakShort) ? h('span', { style:{ fontSize:'11px', color:'#dc2626', fontWeight:700 } }, '근로 ' + c.hours + '시간 → 휴게 ' + c.breakNeed + '분 이상') : null; })()
           ))
         )
       ),
@@ -74399,6 +74407,26 @@ function getCompLeaveBalance(sid){
   return { generated:generated, used:used, balance:Math.max(0, generated - used), raw:generated - used };
 }
 
+/* ══ 시각으로 근로시간 셈하기 · 휴게 (2026-10-10 인사관리 6단계) ══════════════════════
+   근로기준법 제54조①: 근로시간 4시간이면 30분 이상, 8시간이면 1시간 이상의 휴게를 «근로시간 도중에» 준다.
+   제56조③: 야간근로 = 오후 10시 ~ 오전 6시. 끝 시각이 시작보다 이르면 다음날로 넘어간 것으로 본다. */
+function erpBreakRequired(workMin){ var m = +workMin || 0; return m >= 480 ? 60 : m >= 240 ? 30 : 0; }
+function erpClockSpan(start, end, breakMin){
+  var p = function(t){ var m = String(t || '').match(/^(\d{1,2}):(\d{2})$/); return m ? (+m[1]) * 60 + (+m[2]) : null; };
+  var a = p(start), b = p(end);
+  if(a == null || b == null) return null;
+  if(b <= a) b += 1440;                              // 자정을 넘김
+  var gross = b - a, brk = Math.max(0, +breakMin || 0);
+  var work = Math.max(0, gross - brk);
+  var night = 0;
+  for(var t = a; t < b; t++){ var h = (t % 1440) / 60; if(h >= 22 || h < 6) night++; }
+  /* 휴게는 근로시간에 들지 않는다 — 야간 몫에서도 휴게를 빼되, 어디에 쉬었는지 모르므로 야간 비율만큼만 뺀다 */
+  var nightWork = gross > 0 ? Math.max(0, Math.round(night - brk * night / gross)) : 0;
+  var need = erpBreakRequired(work);
+  return { workMin:work, hours:Math.round(work / 60 * 100) / 100, nightHours:Math.round(nightWork / 60 * 100) / 100,
+    breakMin:brk, breakNeed:need, breakShort:brk < need };
+}
+
 /* ★ 주 12시간 연장근로 한도 (근로기준법 제53조① · 1주 = 월~일, 휴일근로도 연장근로에 든다 — 2018 개정 제2조①7)
      예전에는 연장·휴일 시간을 숫자로만 받고 주 합계·한도 경고가 어디에도 없었다 (2026-10-10 인사관리 5단계).
      막지는 않는다(특별연장근로 인가 등 예외가 있다) — 넘으면 «알린다». */
@@ -75528,14 +75556,17 @@ function AttendanceManagement(){
       dbUpsert('payroll_monthly', { id:'pay-'+selSid+'-'+selYM, empSid:selSid, ym:selYM, status:'draft', legalAllowances:la });
     }
   }
-  function addOTRecord(date, kind, hours, note){
+  function addOTRecord(date, kind, hours, note, clock){
     if(isPayrollLocked(selYM)){ showToast('🔒 잠긴 월은 수정 불가'); return; }
     var all = dbGet('overtime_records', []);
-    dbUpsert('overtime_records', {
+    var _rec = {
       id:'ot-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)+'-'+Math.random().toString(36).slice(2,5),
       sid:selSid, date:date, kind:kind, hours:parseFloat(hours)||0, note:note||'',
       createdAt:(new Date()).toISOString()
-    });
+    };
+    /* 시각을 적었으면 그대로 남긴다 — 나중에 «몇 시부터 몇 시까지»를 물으면 답할 수 있게 (2026-10-10) */
+    if(clock && clock.startTime && clock.endTime){ _rec.startTime = clock.startTime; _rec.endTime = clock.endTime; _rec.breakMinutes = +clock.breakMinutes || 0; }
+    dbUpsert('overtime_records', _rec);
     syncOTToPayroll();
     if(kind === 'overtime' || kind === 'holiday'){
       var _wk = erpWeekOvertime(selSid, date);
@@ -76305,8 +76336,11 @@ function AttendanceManagement(){
         if((otAddForm.date||'').slice(0,7) !== selYM){
           if(!(await popConfirm('선택한 달('+selYM+')과 다른 날짜입니다. 그래도 추가할까요?'))) return;
         }
-        addOTRecord(otAddForm.date, otAddForm.kind, otAddForm.hours, otAddForm.note);
-        setOtAddForm({date:todayYMD(), kind:'overtime', hours:1, note:''});
+        var _clk = (otAddForm.startTime && otAddForm.endTime) ? erpClockSpan(otAddForm.startTime, otAddForm.endTime, otAddForm.breakMinutes) : null;
+        if(_clk && _clk.breakShort && !(await popConfirm('휴게 ' + _clk.breakMin + '분 — 근로 ' + _clk.hours + '시간이면 ' + _clk.breakNeed + '분 이상 쉬어야 합니다(근로기준법 제54조).\n그래도 추가할까요?'))) return;
+        addOTRecord(otAddForm.date, otAddForm.kind, otAddForm.hours, otAddForm.note, _clk ? otAddForm : null);
+        if(_clk && _clk.nightHours > 0 && otAddForm.kind !== 'night') showToast('🌙 이 시간 중 야간(22~06시) ' + _clk.nightHours + '시간 — 야간 가산 기록도 따로 넣어 주세요');
+        setOtAddForm({date:todayYMD(), kind:'overtime', hours:1, note:'', startTime:'', endTime:'', breakMinutes:0});
         showToast('추가됨');
       }
       return h('div',{className:'modal-bg',onClick:function(){setOtModal(false);}},
@@ -76357,7 +76391,22 @@ function AttendanceManagement(){
                   style:{padding:'5px 8px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'}}),
                 h('button',{onClick:doAdd,
                   style:{padding:'5px 10px',background:'#1e40af',color:'#fff',border:'none',borderRadius:'4px',cursor:'pointer',fontSize:'12px',fontWeight:700}},'+ 추가')
-              )
+              ),
+              /* ★ 시각으로 적기(선택) — 시작·끝·휴게를 넣으면 시간이 저절로 들어가고, 휴게가 모자라면 알린다 (근로기준법 제54조) */
+              (function(){
+                var c = (otAddForm.startTime && otAddForm.endTime) ? erpClockSpan(otAddForm.startTime, otAddForm.endTime, otAddForm.breakMinutes) : null;
+                function setT(k){ return function(e){ var o = Object.assign({}, otAddForm); o[k] = e.target.value;
+                  var cc = (o.startTime && o.endTime) ? erpClockSpan(o.startTime, o.endTime, o.breakMinutes) : null;
+                  if(cc) o.hours = cc.hours; setOtAddForm(o); }; }
+                var tS = {padding:'4px 6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'};
+                return h('div',{style:{display:'flex',gap:'6px',alignItems:'center',marginTop:'6px',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'}},
+                  '시각(선택)',
+                  h('input',{type:'time',value:otAddForm.startTime||'',onChange:setT('startTime'),style:tS}), '~',
+                  h('input',{type:'time',value:otAddForm.endTime||'',onChange:setT('endTime'),style:tS}),
+                  '휴게', h('input',{type:'number',min:0,step:10,value:otAddForm.breakMinutes||0,onChange:setT('breakMinutes'),style:Object.assign({},tS,{width:'56px',textAlign:'right'})}), '분',
+                  c && h('span',{style:{color:c.breakShort?'#dc2626':'#166534',fontWeight:700,overflow:'hidden',textOverflow:'ellipsis'}},
+                    c.hours + '시간' + (c.nightHours ? ' · 야간 ' + c.nightHours + '시간' : '') + (c.breakShort ? ' · 휴게 ' + c.breakNeed + '분 이상 필요' : '')));
+              })()
             ),
             // 일자별 리스트
             h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'6px',maxHeight:'320px',overflowY:'auto'}},
@@ -77483,6 +77532,110 @@ function 내메일주소(){
   return '';
 }
 
+/* ══ 특별휴가 부여·사용 (2026-10-10 인사관리 6단계) ═══════════════════════════════
+   예전에는 특별휴가 «정책표»만 있고 부여·사용을 관리하는 곳이 없었다(special_leave_grants 에 쓰는 코드 0곳).
+   배우자 출산휴가(20일, 출산 후 120일 이내, 3회 분할 — 남녀고용평등법 제18조의2) 같은 법정 휴가의
+   기한·남은 날을 아무도 셀 수 없었다.
+   · 부여 = { id, sid, code, eventDate(사유 발생일 — 출산일·결혼일 등), days, expiry, createdAt, by }
+   · 사용 = 근태 기록(attendance_records) type 'special-leave' 에 specialGrantId·specialCode 를 붙여 남긴다 —
+            근태·캘린더가 이미 그 기록을 그린다(새 그림 길을 만들지 않는다).
+   · 기한(expiry) = 사유 발생일 + 정책의 사용기한(expireDays) − 1일. 0 이면 기한 없음.
+   · 배우자 출산휴가는 최대 4번(3회 분할)까지만 나눠 쓴다. */
+var SPECIAL_LEAVE_MAX_USES = { 'spouse-birth':4 };
+function spGrantExpiry(eventDate, expireDays){
+  var n = +expireDays || 0;
+  var m = String(eventDate || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m || !n) return '';
+  var d = new Date(+m[1], +m[2]-1, +m[3] + n - 1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+/* 부여 하나의 사용 현황 — 근태 기록에서 그 부여에 붙은 것만 */
+function spGrantUsage(g, atts){
+  var uses = (atts || dbGet('attendance_records', []) || []).filter(function(r){
+    return r && r.type === 'special-leave' && r.specialGrantId === g.id && !r._deleted;
+  });
+  var used = uses.reduce(function(s, r){ return s + (parseFloat(r.days) || 1); }, 0);
+  return { used:used, left:Math.max(0, (+g.days || 0) - used), uses:uses.length, list:uses };
+}
+/* 사용을 더할 수 있나 — 막을 까닭(문자열) 또는 null */
+function spUseBlock(g, date, days, atts){
+  if(!g) return '부여를 고르세요';
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(String(date || ''))) return '날짜를 고르세요';
+  if(g.eventDate && date < g.eventDate && g.code !== 'maternity' && g.code !== 'maternity-twin' && g.code !== 'maternity-prema') return '사유 발생일(' + g.eventDate + ') 전입니다';
+  if(g.expiry && date > g.expiry) return '사용 기한(' + g.expiry + ')이 지났습니다';
+  var u = spGrantUsage(g, atts);
+  if((+days || 1) > u.left + 1e-9) return '남은 날(' + u.left + '일)보다 많습니다';
+  var mx = SPECIAL_LEAVE_MAX_USES[g.code];
+  if(mx && u.uses >= mx) return '최대 ' + mx + '번(' + (mx - 1) + '회 분할)까지 나눠 쓸 수 있습니다';
+  return null;
+}
+function SpecialLeavePanel(props){
+  var u = props.user;
+  var rf = useState(0); var refresh = rf[0]; var setRefresh = rf[1];
+  var fs = useState({ code:'spouse-birth', eventDate:'', useDate:todayYMD(), grantId:'' }); var f = fs[0]; var setF = fs[1];
+  var policy = (getSpecialLeavePolicy() || []).filter(function(p){ return p && p.code; });
+  var pmap = {}; policy.forEach(function(p){ pmap[p.code] = p; });
+  var grants = (getSpecialLeaveGrants() || []).filter(function(g){ return g && g.sid === u.sid && !g._deleted; })
+    .sort(function(a, b){ return String(b.eventDate || '').localeCompare(String(a.eventDate || '')); });
+  var atts = dbGet('attendance_records', []) || [];
+  function set(k, v){ var o = Object.assign({}, f); o[k] = v; setF(o); }
+  function addGrant(){
+    var p = pmap[f.code];
+    if(!p){ showToast('종류를 고르세요'); return; }
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(String(f.eventDate || ''))){ showToast('사유 발생일(출산일·결혼일 등)을 넣으세요'); return; }
+    var g = { id:'slg-' + u.sid + '-' + Date.now().toString(36), entityType:'Employment', sid:u.sid, code:p.code, name:p.name,
+      eventDate:f.eventDate, days:+p.days || 0, expiry:spGrantExpiry(f.eventDate, p.expireDays),
+      createdAt:new Date().toISOString(), by:(CURRENT_USER && CURRENT_USER.name) || '' };
+    if(!dbUpsert('special_leave_grants', g)) dbSet('special_leave_grants', (getSpecialLeaveGrants() || []).concat([g]));
+    setF(Object.assign({}, f, { grantId:g.id }));
+    setRefresh(refresh + 1);
+    showToast('🎁 ' + p.name + ' ' + g.days + '일 부여' + (g.expiry ? ' · ' + g.expiry + '까지' : ''));
+  }
+  function addUse(){
+    var g = grants.find(function(x){ return x.id === f.grantId; }) || grants[0];
+    var why = spUseBlock(g, f.useDate, 1, atts);
+    if(why){ showToast('🔒 ' + why); return; }
+    if(typeof _attendLockDenied === 'function' && _attendLockDenied('attendance_records', f.useDate)){ showToast('🔒 마감된 달입니다'); return; }
+    var rec = { id:'att-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), date:f.useDate, sid:u.sid,
+      type:'special-leave', days:1, specialCode:g.code, specialGrantId:g.id, note:g.name || '', createdAt:new Date().toISOString() };
+    dbUpsert('attendance_records', rec);
+    setRefresh(refresh + 1);
+    showToast('🎁 ' + (g.name || '특별휴가') + ' ' + f.useDate + ' 사용 기록');
+  }
+  var cell = { padding:'4px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'11.5px' };
+  var inS = { padding:'4px 6px', border:'1px solid #cbd5e1', borderRadius:'5px', fontSize:'11.5px' };
+  var today = todayYMD();
+  return h('div', { style:{ background:'#fff', border:'1.5px solid #bbf7d0', borderRadius:'8px', overflow:'hidden', marginBottom:'10px' } },
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', padding:'9px 12px', background:'#f0fdf4', borderBottom:'1px solid #bbf7d0' } },
+      h('span', null, '🎁'), h('div', { style:{ fontSize:'12.5px', fontWeight:800, color:'#166534' } }, '특별휴가 부여·사용'),
+      h('span', { style:{ marginLeft:'auto', fontSize:'10.5px', color:'#64748b' } }, '배우자 출산휴가 20일 · 출산 후 120일 · 3회 분할')),
+    grants.length ? h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+      h('thead', null, h('tr', { style:{ background:'#f8fafc' } },
+        ['종류', '사유 발생일', '부여', '사용', '남음', '기한'].map(function(t){ return h('th', { key:t, style:Object.assign({}, cell, { textAlign:'left', color:'#475569', fontWeight:700 }) }, t); }))),
+      h('tbody', null, grants.map(function(g){
+        var us = spGrantUsage(g, atts);
+        var late = g.expiry && today > g.expiry && us.left > 0;
+        return h('tr', { key:g.id },
+          h('td', { style:cell }, g.name || (pmap[g.code] || {}).name || g.code),
+          h('td', { style:Object.assign({}, cell, { fontFamily:'monospace' }) }, g.eventDate || '-'),
+          h('td', { style:cell }, (g.days || 0) + '일'),
+          h('td', { style:cell }, us.used + '일' + (SPECIAL_LEAVE_MAX_USES[g.code] ? ' (' + us.uses + '/' + SPECIAL_LEAVE_MAX_USES[g.code] + '번)' : '')),
+          h('td', { style:Object.assign({}, cell, { fontWeight:700, color: us.left > 0 ? '#166534' : '#94a3b8' }) }, us.left + '일'),
+          h('td', { style:Object.assign({}, cell, { color: late ? '#dc2626' : '#475569', fontWeight: late ? 700 : 400 }) }, g.expiry ? (g.expiry + (late ? ' 지남' : '')) : '기한 없음'));
+      }))) : h('div', { style:{ padding:'10px 12px', fontSize:'11.5px', color:'#94a3b8' } }, '부여한 특별휴가가 없습니다.'),
+    h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', padding:'8px 12px', borderTop:'1px solid #e2e8f0', whiteSpace:'nowrap', flexWrap:'wrap' } },
+      h('select', { value:f.code, onChange:function(e){ set('code', e.target.value); }, style:inS },
+        policy.map(function(p){ return h('option', { key:p.code, value:p.code }, p.name + ' ' + p.days + '일'); })),
+      h('input', { type:'date', value:f.eventDate, onChange:function(e){ set('eventDate', e.target.value); }, style:inS, title:'사유 발생일(출산일·결혼일 등)' }),
+      h('button', { onClick:addGrant, style:{ padding:'5px 10px', background:'#16a34a', color:'#fff', border:'none', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, cursor:'pointer' } }, '+ 부여'),
+      grants.length ? h('span', { style:{ marginLeft:'10px', color:'#64748b', fontSize:'11px' } }, '사용') : null,
+      grants.length ? h('select', { value:f.grantId || (grants[0] && grants[0].id), onChange:function(e){ set('grantId', e.target.value); }, style:inS },
+        grants.map(function(g){ return h('option', { key:g.id, value:g.id }, (g.name || g.code) + ' (' + (g.eventDate || '') + ')'); })) : null,
+      grants.length ? h('input', { type:'date', value:f.useDate, onChange:function(e){ set('useDate', e.target.value); }, style:inS }) : null,
+      grants.length ? h('button', { onClick:addUse, style:{ padding:'5px 10px', background:'#fff', color:'#166534', border:'1px solid #4ade80', borderRadius:'5px', fontSize:'11.5px', fontWeight:700, cursor:'pointer' } }, '1일 사용') : null)
+  );
+}
+
 function LeaveManagement(){
   var tbs = useState('annual'); var tab = tbs[0]; var setTab = tbs[1];
   /* 재직 / 퇴사자를 탭으로 가른다 (환경설정 사용자 관리와 같은 방식).
@@ -78101,6 +78254,9 @@ function LeaveManagement(){
                 )
           );
         })(),
+
+        // 🎁 특별휴가 부여·사용 (2026-10-10)
+        selUser && selUser.status!=='retired' && h(SpecialLeavePanel, { key:'sp-'+selUser.sid, user:selUser }),
 
         // 연도별 사용 이력 + 시각화 대시보드
         selUser&&(function(){
@@ -83705,6 +83861,39 @@ function PayslipAuditViewer(props){
   );
 }
 
+/* ══ 근로계약서 — 서면 명시·교부 항목과 기간제 2년 (2026-10-10 인사관리 6단계) ══════════════
+   근로기준법 제17조①②: 임금(구성항목·계산방법·지급방법), 소정근로시간, 제55조 휴일, 제60조 연차는 «서면으로 명시해 교부».
+   같은 법 시행령 제8조: 취업 장소·종사 업무 등도 명시. 단시간 근로자는 «근로일·근로일별 근로시간»(기간제법 제17조).
+   기간제는 «2년»을 넘으면 기간의 정함이 없는 근로자로 본다(기간제법 제4조②) — 갱신해 이어 붙인 기간을 합쳐 본다. */
+var EC_REQUIRED = [
+  ['workPlace', '근무 장소'], ['jobDuty', '업무 내용'], ['workHours', '소정근로시간'], ['workDays', '근무일'],
+  ['payComposition', '임금 구성(기본급·수당)'], ['payMethod', '임금 계산·지급 방법'], ['payDay', '임금 지급일'],
+  ['holidays', '휴일'], ['annualLeave', '연차유급휴가'], ['deliveredDate', '교부일']
+];
+function ecMissing(c){
+  var out = EC_REQUIRED.filter(function(p){ return !String((c && c[p[0]]) || '').trim(); }).map(function(p){ return p[1]; });
+  var wh = parseFloat(String((c && c.workHours) || '').replace(/[^0-9.]/g, ''));
+  if(wh > 0 && wh < 40 && !String((c && c.dailySchedule) || '').trim()) out.push('근로일별 근로시간(단시간)');
+  return out;
+}
+/* 기간제 계약을 이어 붙인 기간 — 계약 사이가 비지 않고 이어진 것끼리 묶어, 이 계약까지의 첫 시작일부터 끝날까지 */
+function ecFixedTermSpan(list, c){
+  if(!c || !c.endDate || !c.startDate) return null;
+  var fixed = (list || []).filter(function(x){ return x && x.startDate && x.endDate && x.status !== 'terminated'; })
+    .sort(function(a, b){ return String(a.startDate).localeCompare(String(b.startDate)); });
+  var start = c.startDate;
+  for(var i = fixed.length - 1; i >= 0; i--){
+    var x = fixed[i];
+    if(x.id === c.id || x.startDate >= start) continue;
+    var gapOk = (function(){ var e = new Date(+x.endDate.slice(0,4), +x.endDate.slice(5,7)-1, +x.endDate.slice(8,10) + 1);
+      var nx = e.getFullYear() + '-' + String(e.getMonth()+1).padStart(2,'0') + '-' + String(e.getDate()).padStart(2,'0');
+      return nx >= start; })();
+    if(gapOk) start = x.startDate;
+  }
+  var two = (parseInt(start.slice(0,4), 10) + 2) + start.slice(4);
+  return { start:start, end:c.endDate, over2y:c.endDate >= two, twoYear:two };
+}
+
 // ============================================================
 // 📝 근로계약서 관리 모달
 // ============================================================
@@ -83715,10 +83904,16 @@ function EmploymentContractModal(props){
   var list = listS[0]; var setList = listS[1];
   var fs = useState(null); var form = fs[0]; var setForm = fs[1];
 
-  function persistList(arr){
-    // 전체 employment_contracts에서 해당 sid 항목 교체
-    var all = dbGet('employment_contracts', []).filter(function(c){return c.sid!==u.sid;});
-    dbSet('employment_contracts', all.concat(arr));
+  function persistList(arr, changed, removedIds){
+    /* ★ 바뀐 «그 건»만 올린다 (2026-10-10) — 예전에는 그 직원 것을 빼고 «전체를 다시» 써서 같은 때 다른 사람이 고친 계약이 사라졌다.
+         한 건 경로가 안 되면(옛 꼴) 예전처럼 통째로. */
+    var ok = true;
+    if(changed && changed.length) changed.forEach(function(c){ if(!dbUpsert('employment_contracts', c)) ok = false; });
+    if(removedIds && removedIds.length && !dbRemoveMany('employment_contracts', removedIds)) ok = false;
+    if(!ok || (!changed && !removedIds)){
+      var all = dbGet('employment_contracts', []).filter(function(c){return c.sid!==u.sid;});
+      dbSet('employment_contracts', all.concat(arr));
+    }
     setList(arr);
   }
   function openNew(){
@@ -83735,22 +83930,39 @@ function EmploymentContractModal(props){
       workHours: '주 40시간',
       workDays: '월~금',
       probationPeriod: '',
+      workPlace: u.branch || '',
+      jobDuty: u.jobDuty || '',
+      payComposition: '',
+      payMethod: '월급제 · 통상시급 = 월 통상임금 ÷ 209시간 · 근로자 명의 계좌 입금',
+      payDay: '',
+      holidays: '주휴일(일요일), 근로자의 날, 관공서 공휴일',
+      annualLeave: '근로기준법 제60조에 따름 (입사일 기준)',
+      dailySchedule: '',
+      deliveredDate: '',
+      deliveryMethod: '',
       status: 'active',
       notes: ''
     });
   }
   function openEdit(c){ setForm(Object.assign({}, c, {isNew:false})); }
-  function save(){
+  async function save(){
     if(!form.signedDate || !form.startDate){
       showToast('체결일·시작일은 필수');
       return;
     }
+    if(form.endDate && form.endDate < form.startDate){ showToast('종료일이 시작일보다 빠릅니다'); return; }
+    /* ★ 서면 명시 항목이 비었으면 «알린다» (근로기준법 제17조) — 막지는 않는다(초안을 먼저 적어 둘 수 있다) */
+    var _miss = ecMissing(form);
+    if(_miss.length && !(await popConfirm('근로기준법 제17조의 서면 명시 항목이 비어 있습니다:\n· ' + _miss.join('\n· ') + '\n\n이대로 저장할까요? (교부 전에 채워야 합니다)'))) return;
+    var _rec = Object.assign({}, form); delete _rec.isNew;
     var next = form.isNew
-      ? [form].concat(list)
-      : list.map(function(c){return c.id===form.id ? form : c;});
+      ? [_rec].concat(list)
+      : list.map(function(c){return c.id===form.id ? _rec : c;});
     // 시간순 정렬
     next.sort(function(a,b){return (b.signedDate||'').localeCompare(a.signedDate||'');});
-    persistList(next);
+    persistList(next, [_rec]);
+    var _span = ecFixedTermSpan(next, _rec);
+    if(_span && _span.over2y) showToast('⚠ 기간제 계약을 이어 붙인 기간이 2년(' + _span.twoYear + ')을 넘습니다 — 기간의 정함이 없는 근로자로 봅니다(기간제법 제4조②)');
     if(typeof AuditLog !== 'undefined' && AuditLog.write){
       AuditLog.write('contract', form.id, 'contract', '', form.type+' '+(form.startDate||''), '근로계약 ' + (form.isNew?'등록':'수정'));
     }
@@ -83759,12 +83971,14 @@ function EmploymentContractModal(props){
   }
   async function del(id){
     if(!(await popConfirm('이 계약서를 삭제하시겠습니까?'))) return;
-    var _ud=list.slice(); persistList(list.filter(function(c){return c.id!==id;}));
-    showToastUndo('🗑️ 계약서 삭제됨', function(){persistList(_ud);});
+    var _ud=list.slice(); var _gone = list.find(function(c){ return c.id===id; });
+    persistList(list.filter(function(c){return c.id!==id;}), null, [id]);
+    showToastUndo('🗑️ 계약서 삭제됨', function(){ persistList(_ud, _gone ? [_gone] : null); });
   }
   async function expire(id){
     if(!(await popConfirm('이 계약을 만료 처리하시겠습니까? (status: expired)'))) return;
-    persistList(list.map(function(c){return c.id===id ? Object.assign({}, c, {status:'expired'}) : c;}));
+    var _ex = list.map(function(c){return c.id===id ? Object.assign({}, c, {status:'expired'}) : c;});
+    persistList(_ex, _ex.filter(function(c){ return c.id === id; }));
   }
 
   // 만료 임박 체크 (1개월 이내)
@@ -83789,6 +84003,12 @@ function EmploymentContractModal(props){
         ['계약 기간', (c.startDate||'')+' ~ '+(c.endDate||'기한 없음')],
         ['연봉', c.salary?c.salary.toLocaleString()+'원':'', '수습 기간', c.probationPeriod||''],
         ['근무시간', c.workHours||'', '근무일', c.workDays||''],
+        ['근무 장소', c.workPlace||'', '업무 내용', c.jobDuty||''],
+        ['임금 구성', c.payComposition||''],
+        ['계산·지급 방법', c.payMethod||'', '지급일', c.payDay||''],
+        ['휴일', c.holidays||''],
+        ['연차유급휴가', c.annualLeave||''],
+        ['근로일별 시간', c.dailySchedule||''],
         ['특이사항', c.notes||'']
       ], doc)
       +HWPXDOC.note('※ 실제 근로조건과 법정 필수사항을 최종 확인한 뒤 서명·교부해 주세요.')
@@ -83834,7 +84054,11 @@ function EmploymentContractModal(props){
                           (c.startDate||'-') + ' ~ ' + (c.endDate||'기한없음')),
                         h('td', { style:{padding:'7px 8px', textAlign:'right', fontFamily:'monospace'} },
                           c.salary ? (c.salary).toLocaleString()+'원' : '-'),
-                        h('td', { style:{padding:'7px 8px', textAlign:'center'} },
+                        h('td', { style:{padding:'7px 8px', textAlign:'center', whiteSpace:'nowrap'} },
+                          (function(){ var sp = ecFixedTermSpan(list, c); return (sp && sp.over2y && c.status === 'active')
+                            ? h('span', { title:'기간제 계약을 이어 붙인 기간이 2년을 넘었습니다 (기간제법 제4조②)', style:{background:'#fef2f2', color:'#dc2626', padding:'2px 7px', borderRadius:'8px', fontSize:'10px', fontWeight:700, marginRight:'3px'} }, '2년 초과') : null; })(),
+                          ecMissing(c).length
+                            ? h('span', { title:'서면 명시 항목 빈칸: ' + ecMissing(c).join(', '), style:{background:'#fffbeb', color:'#854d0e', padding:'2px 7px', borderRadius:'8px', fontSize:'10px', fontWeight:700, marginRight:'3px'} }, '명시 ' + ecMissing(c).length + '칸 빔') : null,
                           ex
                             ? h('span', { style:{background:ex.bg, color:ex.color, padding:'2px 7px', borderRadius:'8px', fontSize:'10px', fontWeight:700} }, ex.label)
                             : h('span', { style:{background: c.status==='active'?'#f0fdf4':'#f8fafc', color: c.status==='active'?'#166534':'#94a3b8', padding:'2px 7px', borderRadius:'8px', fontSize:'10px', fontWeight:700} },
@@ -83895,6 +84119,19 @@ function EmploymentContractModal(props){
                   h('input', { type:'text', value:form.workDays||'', onChange:function(e){set('workDays',e.target.value);}, style:iS, placeholder:'월~금' })),
                 h('div', { style:rs }, h('label', { style:lS }, '수습 기간'),
                   h('input', { type:'text', value:form.probationPeriod||'', onChange:function(e){set('probationPeriod',e.target.value);}, style:iS, placeholder:'예: 3개월' })),
+                /* ★ 서면 명시·교부 항목 (근로기준법 제17조 · 시행령 제8조, 2026-10-10) */
+                h('div', { style:{fontSize:'11px', fontWeight:700, color:'#1e40af', margin:'12px 0 6px'} }, '서면 명시 항목 (근로기준법 제17조)'),
+                [['workPlace','근무 장소 *','천안본사'],['jobDuty','업무 내용 *','노무 상담·사건 수행'],
+                 ['payComposition','임금 구성 *','기본급 ○원 + 직책수당 ○원 + 식대 ○원'],['payMethod','계산·지급 방법 *','월급제 · 계좌 입금'],
+                 ['payDay','임금 지급일 *','매월 ○일'],['holidays','휴일 *','주휴일(일요일), 근로자의 날, 공휴일'],
+                 ['annualLeave','연차유급휴가 *','근로기준법 제60조에 따름'],['dailySchedule','근로일별 시간','단시간이면: 월·수·금 09~13시 (기간제법 제17조)'],
+                 ['deliveryMethod','교부 방법','서면 직접 교부 / 전자문서']].map(function(p){
+                  return h('div', { key:p[0], style:rs }, h('label', { style:lS }, p[1]),
+                    h('input', { type:'text', value:form[p[0]]||'', onChange:function(e){set(p[0],e.target.value);}, style:iS, placeholder:p[2] }));
+                }),
+                h('div', { style:rs }, h('label', { style:lS }, '교부일 *'),
+                  h('div', { style:{flex:1} }, h(KoreanDatePicker, { value:form.deliveredDate||'',
+                    onChange:function(e){set('deliveredDate',e.target.value);} }))),
                 h('div', { style:rs }, h('label', { style:lS }, '상태'),
                   h('select', { value:form.status, onChange:function(e){set('status',e.target.value);}, style:iS },
                     h('option', { value:'active' }, '유효'),
