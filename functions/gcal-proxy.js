@@ -78,7 +78,7 @@ function eventOf(rec, id, nameOf) {
   const sid = SID_RE.test(s(rec.sid)) ? s(rec.sid) : '';
   if (sid) 설명.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid) + ' (' + sid + ')');
   return {
-    date: s(rec.date), time: 시각, endTime: 시각 && /^\d{2}:\d{2}/.test(s(rec.endTime)) ? s(rec.endTime).slice(0, 5) : '',
+    date: s(rec.date), endDate: /^\d{4}-\d{2}-\d{2}$/.test(s(rec.endDate)) ? s(rec.endDate) : '', time: 시각, endTime: 시각 && /^\d{2}:\d{2}/.test(s(rec.endTime)) ? s(rec.endTime).slice(0, 5) : '',
     summary: s(rec.title).trim(), location: s(rec.place).trim(), description: 설명.join('\n'), puSid: sid,
     source: (rec.sourceKind === 'card' && rec.sourceId) ? { kind: 'card', id: s(rec.sourceId) } : null,
     recId: s(rec.id || id),
@@ -290,7 +290,7 @@ function make(deps) {
     if (after.gcalEditAt && after.gcalEditAt === after.updatedAt) return { done: false, why: 'from-edit' };
     const db = getDatabase();
     try {
-      const f = cleanFields({ date: after.date, time: s(after.time).slice(0, 5) === '00:00' ? '' : s(after.time).slice(0, 5),
+      const f = cleanFields({ date: after.date, endDate: after.endDate, time: s(after.time).slice(0, 5) === '00:00' ? '' : s(after.time).slice(0, 5),
         endTime: s(after.endTime).slice(0, 5), title: after.title, place: after.place, contact: after.contact, note: after.note, sid: after.sid });
       const at = await ownerAccess(db);
       const cur = await 구글받기(at, after.gcalEventId);

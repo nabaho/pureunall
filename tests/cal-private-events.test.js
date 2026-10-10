@@ -92,8 +92,8 @@ test('③ 거르개 — 🔒 개인은 나만 보기만, 👥 공용은 나만 �
 
 test('④ 창에 «누가 보나» 고르기가 있고, 나만 보기는 구글에 안 넣는다', () => {
   const 창 = 함수몸(캘린더, 'function modalHtml(){');
-  assert.match(창, /data-m=\\"vis\\"/, '누가 보나 고르기가 없습니다');
-  assert.match(창, /value=\\"private\\"/, '나만 보기 고르기가 없습니다');
+  assert.match(창, /data-m=\\?"vis\\?"/, '누가 보나 고르기가 없습니다');
+  assert.match(창, /value=\\?"private\\?"/, '나만 보기 고르기가 없습니다');
   const 저장 = 함수몸(캘린더, 'function doSave(){');
   const i = 저장.indexOf('m.vis === "private"'), j = 저장.indexOf('구글에넣기(m)');
   assert.ok(i >= 0 && j > i, '나만 보기를 가르기 전에 구글로 보냅니다(남이 봅니다)');

@@ -268,7 +268,7 @@ test('⑬ 여러 날 — 화면과 서버가 같은 셈, 끝나는 날 검사', 
   assert.strictEqual(P.cleanFields({ date: '2026-10-12', endDate: '2026-10-14', title: 't' }).endDate, '2026-10-14');
   assert.strictEqual(P.cleanFields({ date: '2026-10-12', endDate: '2026-10-12', title: 't' }).endDate, '', '같은 날은 하루짜리');
   assert.throws(() => P.cleanFields({ date: '2026-10-12', endDate: '2026-10-11', title: 't' }), /끝나는 날이 시작보다 앞/);
-  assert.match(캘린더, /data-m=\\"endDate\\"/);
+  assert.match(캘린더, /날짜칸\("endDate"/);
   assert.match(캘린더, /\["kind","date","endDate",/);
   assert.match(캘린더, /끝나는 날이 시작보다 앞입니다/);
 });
