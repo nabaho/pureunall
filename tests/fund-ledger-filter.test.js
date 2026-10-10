@@ -70,3 +70,16 @@ test('★ 계정 한꺼번에 — 승인한 줄·잠긴 달·쪼갠 거래·이�
   assert.ok(SRC.includes("var PROV_ROOT={funds:'f',sites:'s',site_years:'y',subsidy_chk:'c'};"), '장부에 칸 출처를 두면 안 된다(바닥 공사 결정)');
   assert.ok(SRC.includes("var JL_ROOT={f:'funds', s:'sites', y:'site_years', c:'subsidy_chk', t:'txns'};"), '일지가 장부 묶음을 되돌리지 못한다');
 });
+
+test('★ 다른 업무 목록도 맨 왼쪽 □·# (분개장·계정별원장·변경 기록·서류함·목적사업·기본재산 변동)', () => {
+  assert.ok(fnSrc('_ckTh').includes('onclick="_ckAll(this)"') && fnSrc('_ckTd').includes('event.stopPropagation()'), '□ 를 누르면 줄이 열린다');
+  for (const fn of ['journalView', 'ledgerView', 'openAudit', 'subsidyDocsPanel', 'welfareTab', 'f15View']) {
+    const s = fnSrc(fn);
+    assert.ok(s.includes("'+_ckTh()+'") && s.includes("'+_ckTd()+'"), fn + ' 에 □ 가 없다');
+    assert.ok(s.includes('<td class="no">'), fn + ' 에 번호가 없다');
+  }
+  assert.ok(fnSrc('ledgerView').includes('<td class="ckcol"></td><td colspan="3">합계 / 기말잔액</td>'), '합계 줄 칸이 밀린다');
+  assert.ok(fnSrc('f15View').includes('<td colspan="7" class="muted">기본재산 변동'), '빈 줄 칸이 모자란다');
+  assert.ok(fnSrc('printLedger').includes('.ckcol{display:none}'), '인쇄에 □ 가 나간다');
+  assert.ok(fnSrc('journalView').includes("_n(daySum)+'</td><td class=\"mo\"></td></tr>'"), '분개장 소계 줄이 한 칸 모자란다');
+});
