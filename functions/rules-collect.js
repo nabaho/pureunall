@@ -421,13 +421,16 @@ async function runOnce(o) {
     try {
       const bySha = {};
       (atts || []).forEach((a) => { if (a && a.data && isPdfName(a.name)) bySha[crypto.createHash('sha256').update(a.data).digest('hex')] = a; });
-      let noPdfJs = false;
+      let noPdfJs = false, unknownOld = false;
+      const snap = { stored: pdfSum.stored, held: pdfSum.held };   // 묶음을 버릴 때 이 묶음에서 센 것도 되돌린다
       for (const id of g.ids) {
         const d = docs[id], a = bySha[d.sha];
         if (!a) { close(up, id, { holdWhy: PDF_HOLD.LOST }); pdfSum.held++; continue; }
         const r = await (o.redact || X.redactOne)(a.data, 'pdf');
-        /* ★ 옛 까닭(OLD)이 돌아오면 «pdf.js 를 못 실은» 환경 문제다 — 문서가 아니라 서버 탓이므로 아무것도 안 쓴다 */
-        if (!r.ok && r.holdWhy === PDF_HOLD.OLD) { noPdfJs = true; break; }
+        /* ★ env:true 는 «pdf.js 를 못 실은» 환경 문제다 — 문서가 아니라 서버 탓이므로 아무것도 안 쓴다.
+           env 없는 옛 까닭(모르는 실패)은 이 문서 탓일 수 있다 — 이 묶음은 쓰지 않고 표시(n)를 남기되 다음 묶음은 계속 읽는다(STUCK_MAX 에 닿게) */
+        if (!r.ok && r.holdWhy === PDF_HOLD.OLD && r.env) { noPdfJs = true; break; }
+        if (!r.ok && r.holdWhy === PDF_HOLD.OLD) { unknownOld = true; break; }
         if (!r.ok) { close(up, id, { holdWhy: r.holdWhy, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
         const kind = P.kindOf(d.name, r.text);
         const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
@@ -437,12 +440,18 @@ async function runOnce(o) {
           r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}));
         pdfSum.stored++;
       }
+      if (noPdfJs || unknownOld) { pdfSum.stored = snap.stored; pdfSum.held = snap.held; }
       if (noPdfJs) {
         /* 이 묶음은 아무것도 안 쓰고(up 버림) 표시를 치우며, 이번 회차 다시 보기는 여기서 멈춘다 — 남은 것은 그대로 센다.
            안 멈추면 같은 앞머리를 계속 다시 받는다. 이 메일은 retry 로 세어 이어 달리기가 이것만으로 이어지지 않게 한다. */
         sum.retry++; sum.errors.push('PDFJS_MISSING');
         try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ }
         break;
+      }
+      if (unknownOld) {
+        /* 아무것도 안 쓰고(up 버림) 표시는 «남긴다»(받을 때 이미 n+1) — 계속 터지면 STUCK_MAX 번째에 멈춤으로 닫힌다. 다음 묶음은 계속 본다 */
+        sum.retry++; sum.errors.push('PDF_UNKNOWN');
+        continue;
       }
       up[tk] = null;
       await db.ref().update(up);

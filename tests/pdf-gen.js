@@ -2,7 +2,7 @@
    pages: [[{x, y, s, size, tc?, glyphs?}]] — 한 조각이 Tj 하나(tc: 글자 벌림, glyphs: 글자마다 따로). 쪽 크기 A4(595×842). */
 'use strict';
 function esc(s) { return String(s).replace(/([()\\])/g, '\\$1'); }
-function makePdf(pages) {
+function makePdf(pages, opts) {
   const bodies = [];
   bodies.push('<< /Type /Catalog /Pages 2 0 R >>');                          // 1
   bodies.push(null);                                                           // 2 (Pages — 뒤에 채운다)
@@ -28,10 +28,16 @@ function makePdf(pages) {
   let out = '%PDF-1.4\n';
   const offs = [];
   bodies.forEach((b, i) => { offs.push(Buffer.byteLength(out, 'latin1')); out += (i + 1) + ' 0 obj\n' + b + '\nendobj\n'; });
+  let encId = 0;
+  if (opts && opts.encrypt) {   // 모르는 암호 필터 — pdf.js 는 UnknownErrorException('unknown encryption method') 로 던진다
+    offs.push(Buffer.byteLength(out, 'latin1')); encId = bodies.length + 1;
+    out += encId + ' 0 obj\n<< /Filter /FooDRM /V 1 /R 2 /P -4 /O (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) /U (bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb) >>\nendobj\n';
+  }
   const xref = Buffer.byteLength(out, 'latin1');
-  out += 'xref\n0 ' + (bodies.length + 1) + '\n0000000000 65535 f \n'
+  const total = bodies.length + (encId ? 1 : 0);
+  out += 'xref\n0 ' + (total + 1) + '\n0000000000 65535 f \n'
     + offs.map((o) => String(o).padStart(10, '0') + ' 00000 n \n').join('');
-  out += 'trailer\n<< /Size ' + (bodies.length + 1) + ' /Root 1 0 R >>\nstartxref\n' + xref + '\n%%EOF\n';
+  out += 'trailer\n<< /Size ' + (total + 1) + ' /Root 1 0 R' + (encId ? ' /Encrypt ' + encId + ' 0 R /ID [<00112233445566778899aabbccddeeff> <00112233445566778899aabbccddeeff>]' : '') + ' >>\nstartxref\n' + xref + '\n%%EOF\n';
   return Buffer.from(out, 'latin1');
 }
 module.exports = { makePdf };

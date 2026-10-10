@@ -75,6 +75,31 @@ test('PDF — 벌어진 주민번호 꼴이 가린 글에 남으면 보류(가�
   assert.equal((await X.redactOne(Buffer.from('x'), 'pdf', fine)).ok, true);
 });
 
+test('PDF — 한 줄에 걸친 벌어진 번호만 잡는다(줄바꿈을 넘는 숫자 표는 안 잡는다)', async () => {
+  const mk = (t) => ({ pdfText: async () => ({ text: 'Article ' + 'x'.repeat(40) + '\n' + t, chars: 60, pages: 1 }),
+    redactFile: async (b, x) => ({ text: x, count: {}, total: 0, residual: 0, unscanned: 0, data: null }) });
+  const table = await X.redactOne(Buffer.from('x'), 'pdf', mk('1 2 3 4 5 6\n- 7 8 9 0 1 2 3'));
+  assert.equal(table.ok, true, '★ 줄이 갈린 숫자 표를 주민번호로 보고 영구 보류했다');
+  const one = await X.redactOne(Buffer.from('x'), 'pdf', mk('9 0 0 1 0 1 - 1 2 3 4 5 6 7'));
+  assert.equal(one.ok, false);
+});
+
+test('PDF — 모르는 암호 방식은 열지 못함(문서 탓) · 그 밖의 모르는 실패는 env 없는 옛 까닭', async () => {
+  const enc = Object.assign(new Error('unknown encryption method'), { name: 'UnknownErrorException' });
+  const r = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw enc; } });
+  assert.deepEqual([r.ok, r.holdWhy], [false, 'PDF 를 열지 못함']);
+  const other = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw Object.assign(new Error('out of memory'), { name: 'UnknownErrorException' }); } });
+  assert.deepEqual([other.holdWhy, !!other.env], ['PDF — 아직 못 읽음', false]);
+  const miss = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw Object.assign(new Error('없음'), { code: 'PDFJS_MISSING' }); } });
+  assert.deepEqual([miss.holdWhy, miss.env], ['PDF — 아직 못 읽음', true]);
+});
+
+test('PDF — 실제 암호 PDF(모르는 필터)는 열지 못함으로 닫는다', { skip: !HAS_PDFJS && 'pdfjs-dist 없음' }, async () => {
+  const buf = makePdf([[{ x: 40, y: 800, s: 'Article 1 (Purpose) of the work rules for all employees' }]], { encrypt: true });
+  const r = await X.redactOne(buf, 'pdf');
+  assert.deepEqual([r.ok, r.holdWhy], [false, 'PDF 를 열지 못함']);
+});
+
 test('PDF — 글 없으면 스캔 보류, 못 열면 열지 못함 보류', async () => {
   const scan = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => ({ text: ' ', chars: 0, pages: 1 }) });
   assert.deepEqual([scan.ok, scan.holdWhy], [false, '스캔 PDF — 글 없음']);

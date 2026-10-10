@@ -202,7 +202,7 @@ test('다시 보기 — pdf.js 를 못 실으면(OLD 가 돌아옴) 아무것도
   let fetched = 0;
   const sum = await C.run(base(db, fakeBucket(), {}, {
     fetchAtts: async (m) => { fetched++; return [{ name: '취업규칙.pdf', data: PA }, { name: '규칙.pdf', data: PB }]; },
-    redact: async () => ({ ok: false, holdWhy: C.PDF_HOLD.OLD, count: {}, total: 0 }),
+    redact: async () => ({ ok: false, holdWhy: C.PDF_HOLD.OLD, env: true, count: {}, total: 0 }),
   }));
   const lib = db.store.rules_mgmt.library;
   [idA, idB].forEach((id) => { assert.equal(lib.docs[id].holdWhy, C.PDF_HOLD.OLD); assert.equal(lib.docs[id].revision, 1, '★ 환경 탓인데 문서를 고쳐 썼다'); });
@@ -365,4 +365,27 @@ test('마지막 로그 줄에 pdf 셈이 들어 있다', async () => {
   await C.run(base(db, fakeBucket(), {}, { log: (l) => lines.push(l) }));
   const last = JSON.parse(lines[lines.length - 1]);
   assert.deepEqual(last.pdf, { done: 0, stored: 0, held: 0, left: 0 });
+});
+
+test('다시 보기 — 모르는 실패(env 없는 옛 까닭)는 그 묶음만 건너뛰고 표시를 남긴다 — 다음 묶음은 읽고, STUCK_MAX 번째에 멈춤으로 닫는다', async () => {
+  const idA = 'rd_a', idB = 'rd_b';
+  const mk = () => fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' }), heldDoc(idB, { name: '규칙.pdf', sha: sha(PB), uid: '21' })],
+    seenOf(KEY20, KEY21), ROWS2));
+  const db = mk();
+  const red = fakeRedact(X.redactOne);
+  const opt = { fetchAtts: async (m) => [{ name: m.mailKey === KEY20 ? '취업규칙.pdf' : '규칙.pdf', data: m.mailKey === KEY20 ? PA : PB }],
+    redact: async (b, ext) => (b.equals(PA) ? { ok: false, holdWhy: C.PDF_HOLD.OLD, count: {}, total: 0 } : red(b, ext)) };
+  const s1 = await C.run(base(db, fakeBucket(), {}, opt));
+  const lib = db.store.rules_mgmt.library;
+  assert.equal(lib.docs[idB].status, '담김', '★ 첫 묶음이 뒤 묶음을 막았다');
+  assert.equal(lib.docs[idA].holdWhy, C.PDF_HOLD.OLD); assert.equal(lib.docs[idA].revision, 1);
+  assert.equal(tryOf(db)['pdf_' + KEY20].n, 1, '★ 표시를 지웠다 — 영영 안 멈춘다');
+  assert.equal(tryOf(db)['pdf_' + KEY21], undefined);
+  assert.equal(s1.pdf.stored, 1); assert.equal(s1.pdf.left, 1); assert.equal(s1.retry, 1);
+  for (let i = 1; i < C.STUCK_MAX; i++) await C.run(base(db, fakeBucket(), {}, opt));
+  assert.equal(tryOf(db)['pdf_' + KEY20].n, C.STUCK_MAX);
+  assert.equal(lib.docs[idA].holdWhy, C.PDF_HOLD.OLD);
+  await C.run(base(db, fakeBucket(), {}, opt));
+  assert.equal(db.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.STUCK);
+  assert.equal(tryOf(db)['pdf_' + KEY20], undefined);
 });

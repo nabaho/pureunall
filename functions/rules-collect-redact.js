@@ -22,7 +22,7 @@ function load() {
 const RAW_RE = /(?<!\d)\d{6}\s*-\s*[1-8]\d{6}(?!\d)/;
 /* PDF 전용 두 번째 그물 — 글자 사이가 벌어진 PDF(자간·글자마다 위치)는 pdf.js 가 「9 0 0 1 0 1 - 1 2 3 4 5 6 7」 로 뽑아
    번호 규칙·RAW_RE 가 못 잡는다(최종 검토 실측). 숫자 사이 공백을 허락하고 «가린 글»에서 한 번 더 본다. */
-const SPACED_RRN_RE = /(?<!\d)\d(?:\s*\d){5}\s*-\s*[1-8](?:\s*\d){6}(?!\d)/;
+const SPACED_RRN_RE = /(?<!\d)\d(?:[ \t]*\d){5}[ \t]*-[ \t]*[1-8](?:[ \t]*\d){6}(?!\d)/;   // 한 줄 안에서만 — \s 는 줄바꿈을 넘어 숫자 표를 잘못 잡는다
 /* pdf.js 가 «문서 자체가 나쁨»으로 던지는 이름 — 이것만 「열지 못함」으로 닫는다. 그 밖(싣기·메모리·환경)은 문서 탓이 아니므로 다시 본다 */
 const PDF_DOC_ERRORS = ['InvalidPDFException', 'PasswordException', 'FormatError', 'MissingPDFException', 'UnexpectedResponseException'];
 
@@ -39,9 +39,12 @@ async function redactOne(buf, ext, impl) {
     let got;
     try { got = await pdfText(buf); }
     catch (e) {
-      /* 문서 오류만 「열지 못함」 — 그 밖의 모든 실패(pdf.js 못 실음 포함)는 옛 까닭으로 남겨 다음에 다시 본다 */
-      if (e && PDF_DOC_ERRORS.indexOf(e.name) >= 0 && e.code !== 'PDFJS_MISSING') return { ok: false, holdWhy: 'PDF 를 열지 못함', count: {}, total: 0 };
-      return { ok: false, holdWhy: 'PDF — 아직 못 읽음', count: {}, total: 0 };
+      /* 문서 오류만 「열지 못함」(영구). 모르는 암호 방식은 pdf.js 가 UnknownErrorException(…encrypt…) 로 던지므로 문서 탓이다.
+         pdf.js 못 실음(PDFJS_MISSING)은 env:true — 부르는 쪽이 이번 다시 보기를 통째로 멈춘다. 그 밖의 모르는 실패는 옛 까닭이되 env 없음 */
+      const docBad = e && e.code !== 'PDFJS_MISSING' && (PDF_DOC_ERRORS.indexOf(e.name) >= 0
+        || (e.name === 'UnknownErrorException' && /encrypt|password/i.test(String(e.message || ''))));
+      if (docBad) return { ok: false, holdWhy: 'PDF 를 열지 못함', count: {}, total: 0 };
+      return { ok: false, holdWhy: 'PDF — 아직 못 읽음', env: !!(e && e.code === 'PDFJS_MISSING'), count: {}, total: 0 };
     }
     if (!got || !(Number(got.chars) >= PDF.SCAN_MIN)) return { ok: false, holdWhy: '스캔 PDF — 글 없음', count: {}, total: 0 };
     read = { text: got.text };
