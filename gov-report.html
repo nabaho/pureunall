@@ -12,7 +12,7 @@
 
      ★ 이 화면은 «읽기만» 한다 — 모든 사업장·사업의 보고서 상태를 보고, 쓰는 일은
        정부사업일정의 보고서 창(gov-consulting.html#rpt=업체|사업)으로 건너가서 한다.
-     ★ 계산은 js/pu-gov-report-list.js(순수 함수)가 한다. 이 파일은 읽고 그린다.
+     ★ 계산은 현황판 계산 모듈(순수 함수, 아래 script 로 싣는다)이 한다. 이 파일은 읽고 그린다.
      ⚠ 목록에는 업체·사업·담당 이름과 상태만 — 보고서 본문을 그리지 않는다(기술보호도 같다).
      ⚠ scal_cos 등은 GR_NODES 로 부른다(정부사업일정 FB_NODES 꼴) — 등록부 js/pu-ontology.js govreport 주석.
      ══════════════════════════════════════════════════════════════ -->
@@ -35,6 +35,51 @@ main{max-width:1280px;margin:0 auto;padding:14px 16px 60px}
 #lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
 #lock p{color:var(--mute);font-size:13px}
 .loading{padding:30px;text-align:center;color:var(--mute)}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+.kpis{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.kpi{text-align:left;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.kpi b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.kpi span{font-size:12px;color:var(--mute)}
+.kpi.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-ink)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+.filters select,.filters input[type=search]{font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card)}
+.filters label{font-size:13px;display:flex;align-items:center;gap:4px}
+.tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
+table{border-collapse:collapse;width:100%}
+th,td{padding:8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600}
+td.co{font-weight:600;max-width:200px;overflow:hidden;text-overflow:ellipsis}
+td.ty{max-width:220px;overflow:hidden;text-overflow:ellipsis}
+td.num{text-align:right;font-variant-numeric:tabular-nums}
+.st{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px}
+.st-todo{background:var(--red-bg);color:var(--red)}
+.st-wait{background:var(--line);color:#475569}
+.st-draft{background:var(--amber-bg);color:var(--amber)}
+.st-done{background:var(--green-bg);color:var(--green)}
+.tag,.tag-ai{display:inline-block;border-radius:6px;padding:1px 6px;font-size:11px;border:1px solid var(--line);color:var(--mute)}
+.tag-ai{background:var(--blue-bg);color:var(--blue-ink);border-color:var(--blue-line)}
+.days{font-size:12px;color:var(--mute)}
+.steps{display:inline-flex;gap:3px}
+.stp{width:14px;height:6px;border-radius:3px;background:var(--line)}
+.stp.on{background:var(--blue)}
+.act{display:inline-block;font-size:12px;border:1px solid var(--blue-line);background:var(--blue-bg);color:var(--blue-ink);border-radius:8px;padding:4px 10px;text-decoration:none}
+button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
+.empty{padding:30px;text-align:center;color:var(--mute)}
+#err{background:var(--red-bg);border:1px solid #fecaca;color:var(--red);border-radius:10px;padding:16px;text-align:center}
+#err button{margin-top:8px}
+.side section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:12px}
+.side h2{font-size:14px;margin:0 0 8px}
+.fm{padding:6px 0;border-bottom:1px solid var(--line)}
+.fm-n{font-size:13px;font-weight:600}
+.fm-f{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0}
+.yr.none{color:var(--mute)}
+.more{display:block;margin-top:8px;font-size:12px;color:var(--blue-ink)}
+.err-s{font-size:12px;color:var(--red)}
+.al-h{font-size:13px;margin:8px 0 4px}
+#alerts ul{margin:0;padding-left:18px;font-size:12px}
+#alerts a{color:var(--blue-ink)}
+@media (max-width:900px){ .grid{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} }
+@media (max-width:640px){ input,select{font-size:16px} }
 /* 폰에서 입력칸을 누를 때 화면이 확대되지 않게(tests/phone-input-zoom) */
 @media (max-width:768px){ input,select,textarea{font-size:16px} }
 </style>
@@ -53,6 +98,35 @@ main{max-width:1280px;margin:0 auto;padding:14px 16px 60px}
 
 <main id="app" style="display:none">
   <div class="loading" id="loading">불러오는 중…</div>
+  <div id="err" style="display:none"></div>
+  <div class="grid" id="board" style="display:none">
+    <div>
+      <div class="kpis" id="kpis"></div>
+      <div class="filters">
+        <select id="fYear" aria-label="연도"></select>
+        <select id="fType" aria-label="사업"></select>
+        <select id="fAtt" aria-label="담당"></select>
+        <select id="fStatus" aria-label="상태">
+          <option value="">모든 상태</option><option value="todo">미작성</option><option value="wait">작성 전</option>
+          <option value="draft">초안</option><option value="done">검토완료</option>
+        </select>
+        <input id="fCo" type="search" placeholder="업체 찾기">
+        <label id="mineWrap" style="display:none"><input type="checkbox" id="fMine"> 내 담당만</label>
+        <button type="button" id="fReset">거르개 풀기</button>
+      </div>
+      <div class="tbl">
+        <table>
+          <thead><tr><th>업체</th><th>사업</th><th>연도</th><th>담당</th><th>회차</th><th>상태</th><th>진행</th><th>마지막 고침</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+        <div class="empty" id="empty" style="display:none"></div>
+      </div>
+    </div>
+    <div class="side">
+      <section><h2>⚙ 양식 서고 현황</h2><div id="forms"></div></section>
+      <section><h2>⏰ 챙길 것</h2><div id="alerts"></div></section>
+    </div>
+  </div>
 </main>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -71,14 +145,151 @@ main{max-width:1280px;margin:0 auto;padding:14px 16px 60px}
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   try{ if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } }catch(e){} })();
 </script>
+<!-- 보고서 양식 표(FORMS) · 양식 고르기(resolveFormKey) · 현황판 계산 — 정부사업일정과 같은 번호 -->
+<script src="js/pu-gov-report.js?v=1"></script>
+<script src="js/pu-gov-report-build.js?v=3"></script>
+<script src="js/pu-gov-report-list.js?v=1"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null;
+/* 정부사업일정이 FB_NODES 로 부르는 그 자리 — 읽기만, 한 번씩 */
+var GR_NODES={cos:'scal_cos',types:'scal_types',scheds:'scal_scheds',staff:'scal_staff'};
+var GR_FIELDS={fYear:'year',fType:'type',fAtt:'att',fStatus:'status'};
+var GR={rows:[],staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',f:{year:'',type:'',att:'',status:'',co:'',mine:false}};
+
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+function grEsc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return '&#'+c.charCodeAt(0)+';'; }); }
+function grToday(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,10); }
+function grFilter(){ var f=GR.f; return {year:f.year,type:f.type,att:f.att,status:f.status,co:f.co,mine:f.mine?GR.me:''}; }
+
+/* ═══ 그리기 ═══ */
+function grRenderFilters(){
+  var L=PuGovReportList, seenT={}, seenA={};
+  $('fYear').innerHTML=L.yearsOf(GR.rows,GR.today).map(function(y){ return '<option value="'+y+'"'+(y===GR.f.year?' selected':'')+'>'+y+'년</option>'; }).join('');
+  GR.rows.forEach(function(r){ seenT[r.typeId]=r.typeName; r.attIds.forEach(function(id){ if(GR.staffMap[id]) seenA[id]=GR.staffMap[id]; }); });
+  var opts=function(all,seen,cur){ return '<option value="">'+all+'</option>'+Object.keys(seen).sort(function(a,b){ return seen[a].localeCompare(seen[b],'ko'); })
+    .map(function(id){ return '<option value="'+grEsc(id)+'"'+(id===cur?' selected':'')+'>'+grEsc(seen[id])+'</option>'; }).join(''); };
+  $('fType').innerHTML=opts('모든 사업',seenT,GR.f.type);
+  $('fAtt').innerHTML=opts('모든 담당',seenA,GR.f.att);
+  $('fStatus').value=GR.f.status;
+  $('mineWrap').style.display=GR.me?'':'none';
+}
+function grRenderKpis(){
+  var L=PuGovReportList, base=grFilter(); base.status='';
+  var k=L.kpis(L.filterRows(GR.rows,base));
+  var cells=[['','전체',k.all],['todo','미작성',k.todo],['draft','초안',k.draft],['done','검토완료',k.done],['signed','서명',k.signed],['submitted','제출',k.submitted]];
+  $('kpis').innerHTML=cells.map(function(c){
+    var off=c[0]==='signed'||c[0]==='submitted';
+    return '<button type="button" class="kpi'+(c[0]&&GR.f.status===c[0]?' on':'')+'" data-st="'+c[0]+'"'
+      +(off?' disabled title="서명·제출은 다음 단계에서 셉니다"':'')+'><b>'+c[2]+'</b><span>'+c[1]+'</span></button>';
+  }).join('');
+}
+/* 숫자 칸 — 누르면 그 상태로, 같은 칸을 다시 누르면 풀린다. 「전체」는 풀기 */
+function grSetStatus(st){
+  if(st==='signed'||st==='submitted') return;
+  GR.f.status=(st&&GR.f.status!==st)?st:'';
+  grRender();
+}
+function grRenderRows(){
+  var L=PuGovReportList, view=L.filterRows(GR.rows,grFilter());
+  var STEP=['① 초안','② 검토완료','③ 서명','④ 제출'];
+  $('rows').innerHTML=view.map(function(r){
+    var s=r.st;
+    var steps=s.steps.map(function(on,i){ return '<span class="stp'+(on?' on':'')+'" title="'+STEP[i]+'"></span>'; }).join('');
+    var act=s.action.enabled
+      ? '<a class="act" href="'+grEsc(L.reportHref(r.coId,r.typeId))+'" title="'+grEsc(s.action.why||'정부사업일정의 보고서 창으로 갑니다')+'">'+grEsc(s.action.label)+'</a>'
+      : '<button type="button" class="act" disabled title="'+grEsc(s.action.why)+'">'+grEsc(s.action.label)+'</button>';
+    var badge='<span class="st st-'+s.key+'">'+grEsc(s.label)+'</span>'
+      +(s.ai?' <span class="tag-ai">AI 초안</span>':'')+(r.askForm?' <span class="tag">양식 고르기</span>':'')
+      +(s.days!=null&&s.key!=='done'?' <span class="days">'+(s.key==='todo'?'종료 '+s.days+'일':s.days+'일 전')+'</span>':'');
+    return '<tr><td class="co" title="'+grEsc(r.coName)+'">'+grEsc(r.coName)+'</td>'
+      +'<td class="ty" title="'+grEsc(r.typeName)+'">'+grEsc(r.typeName)+'</td>'
+      +'<td>'+grEsc(r.year)+'</td><td>'+grEsc(r.attNames.join('·'))+'</td>'
+      +'<td class="num">'+r.rounds+(r.maxRounds?'/'+r.maxRounds:'')+'</td>'
+      +'<td>'+badge+'</td><td><span class="steps">'+steps+'</span></td>'
+      +'<td>'+grEsc(r.updatedBy?(L.dayOf(r.updatedAt)+' '+r.updatedBy):'')+'</td><td>'+act+'</td></tr>';
+  }).join('');
+  var yearRows=L.filterRows(GR.rows,{year:GR.f.year}).length;
+  $('empty').textContent=yearRows?'조건에 맞는 보고서가 없습니다.':'올해 걸린 보고서가 없습니다 — 사업 걸기는 정부사업일정에서';
+  $('empty').style.display=(GR.loaded&&!view.length)?'':'none';
+}
+/* 양식 서고 — 읽기만. 등록·바꾸기는 정부사업일정의 ⚙ 양식 서고(#forms, 관리자) */
+function grRenderForms(){
+  var L=PuGovReportList, FORMS=(window.PuGovReport&&window.PuGovReport.FORMS)||{};
+  var head=GR.indexErr?'<div class="err-s">서고 색인을 못 읽었습니다 — 연결을 확인해 주세요</div>':'';
+  $('forms').innerHTML=head+L.formsStatus(GR.index,FORMS).map(function(f){
+    return '<div class="fm"><div class="fm-n">'+(f.ready?'✅ ':'⚠ ')+grEsc(f.name)+'</div>'+f.files.map(function(x){
+      return '<div class="fm-f"><span>'+grEsc(x.label)+'</span><span class="yr'+(x.latest?'':' none')+'">'+(x.latest?grEsc(x.years.join(' · ')):'등록된 양식 없음')+'</span></div>';
+    }).join('')+'</div>';
+  }).join('')+'<a class="more" href="'+L.FORMS_HREF+'">⚙ 등록·바꾸기 — 정부사업일정 양식 서고</a>';
+}
+function grRenderAlerts(){
+  var L=PuGovReportList, a=L.alerts(L.filterRows(GR.rows,{year:GR.f.year}),GR.today);
+  var line=function(r,txt){ return '<li><a href="'+grEsc(L.reportHref(r.coId,r.typeId))+'">'+grEsc(r.coName)+' · '+grEsc(r.typeName)+'</a> <span class="days">'+txt+'</span></li>'; };
+  $('alerts').innerHTML='<div class="al-h">종료 후 '+L.UNWRITTEN_DAYS+'일 넘은 미작성 <b>'+a.unwritten.length+'</b></div><ul>'
+    +a.unwritten.map(function(r){ return line(r,'종료 '+r.st.days+'일'); }).join('')+'</ul>'
+    +'<div class="al-h">초안 '+L.DRAFT_DAYS+'일 넘음 <b>'+a.staleDraft.length+'</b></div><ul>'
+    +a.staleDraft.map(function(r){ return line(r,r.st.days+'일 전 고침'); }).join('')+'</ul>'
+    +'<div class="al-h">서명 기다림 <b>0</b> <span class="days">서명 단계가 생기면 셉니다</span></div>';
+}
+function grRender(){
+  $('loading').style.display=GR.loaded?'none':'';
+  if(GR.err){
+    $('err').innerHTML='<div>불러오지 못했습니다 — 연결을 확인해 주세요</div><button type="button" onclick="grLoad()">다시 시도</button>';
+    $('err').style.display=''; $('board').style.display='none'; return;
+  }
+  $('err').style.display='none'; $('board').style.display=GR.loaded?'':'none';
+  grRenderFilters(); grRenderKpis(); grRenderRows(); grRenderForms(); grRenderAlerts();
+}
+function grReset(){
+  GR.f.year=GR.today.slice(0,4); GR.f.type=''; GR.f.att=''; GR.f.status=''; GR.f.co=''; GR.f.mine=false;
+  $('fCo').value=''; $('fMine').checked=false;
+  grRender();
+}
+
+/* ═══ 읽기 — 일정 넷을 한 번씩, 보고서는 줄마다 한 자리씩(확정본 사본 _v 는 안 읽는다) ═══ */
+async function grLoad(){
+  var L=PuGovReportList, input={}, keys=Object.keys(GR_NODES);
+  GR.err=''; GR.today=grToday();
+  try{
+    var vals=await Promise.all(keys.map(function(k){ return fbDb.ref(GR_NODES[k]).once('value').then(function(s){ return s.val(); }); }));
+    keys.forEach(function(k,i){ input[k]=vals[i]; });
+    input.today=GR.today;
+    var reps={};
+    await Promise.all(L.reportKeys(input).map(function(x){
+      return fbDb.ref('scal_reports/'+x.coId+'/'+x.rid).once('value').then(function(s){
+        var v=s.val(); if(v){ reps[x.coId]=reps[x.coId]||{}; reps[x.coId][x.rid]=v; }
+      });
+    }));
+    input.reports=reps;
+    GR.rows=L.buildRows(input);
+    GR.staffMap=L.staffNames(input.staff);
+    if(!GR.f.year) GR.f.year=GR.today.slice(0,4);
+  }catch(e){ console.warn('[컨설팅보고서] 못 읽음',e); GR.err=String((e&&e.message)||e); GR.rows=[]; }
+  try{ GR.index=(await fbDb.ref('scal_rptFormsIndex').once('value')).val()||{}; GR.indexErr=false; }
+  catch(e){ GR.index=null; GR.indexErr=true; }
+  GR.me='';
+  if(!GR.err&&GR.email){
+    try{ GR.me=L.staffIdFor(input.staff,(await fbDb.ref('data/user_dir').once('value')).val(),GR.email); }catch(e){ GR.me=''; }
+  }
+  GR.loaded=true;
+  grRender();
+}
+
+/* ═══ 로그인 — 포털 앱과 같은 문 ═══ */
 function grBoot(){
+  $('kpis').addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('[data-st]'):null;
+    if(!b||b.disabled) return;
+    grSetStatus(b.getAttribute('data-st'));
+  });
+  Object.keys(GR_FIELDS).forEach(function(id){ $(id).addEventListener('change',function(){ GR.f[GR_FIELDS[id]]=this.value; grRender(); }); });
+  $('fCo').addEventListener('input',function(){ GR.f.co=this.value; grRender(); });
+  $('fMine').addEventListener('change',function(){ GR.f.mine=this.checked; grRender(); });
+  $('fReset').addEventListener('click',grReset);
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
@@ -88,7 +299,9 @@ function grBoot(){
     $('outBtn').style.display=u?'':'none';
     if(!u||u.isAnonymous){ PuGate.show(); return; }
     PuGate.hide();
+    GR.email=String(u.email||'').toLowerCase();
     $('lock').style.display='none'; $('app').style.display='';
+    grLoad();
   });
 }
 grBoot();
