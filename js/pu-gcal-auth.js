@@ -401,7 +401,7 @@
   return {
     hasToken: hasToken, token: token, capture: capture,
     signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent,
-    getEvent: getEvent, bodyOf: 몸만들기,   /* bodyOf — 서버 대신 넣기와 «같은 셈»인지 검사가 맞대 본다 */
+    getEvent: getEvent, bodyOf: 몸만들기, callServer: 서버,   /* callServer — gcalEdit(고치기·지우기 대신) 부르기 */   /* bodyOf — 서버 대신 넣기와 «같은 셈»인지 검사가 맞대 본다 */
     fromServer: fromServer, linkStart: linkStart, captureCode: captureCode, linkFinish: linkFinish,
     unlink: unlink, email: email, keepAlive: keepAlive
   };

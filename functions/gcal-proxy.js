@@ -81,6 +81,64 @@ function eventOf(rec, id, nameOf) {
   };
 }
 
+/* ── 고치기·지우기(2026-10-10 「23 연동」) 가 함께 쓰는 셈 ───────────────────────── */
+
+/* 우리가 구글 설명에 적는 꼴 — 「담당자: …」 · 메모 · 「푸른 담당: 이름 (P-005)」 */
+function descOf(contact, note, sid, nameOf) {
+  const 줄 = [];
+  if (s(contact).trim()) 줄.push('담당자: ' + s(contact).trim());
+  if (s(note).trim()) 줄.push(s(note).trim());
+  if (SID_RE.test(s(sid))) 줄.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid) + ' (' + sid + ')');
+  return 줄.join('\n');
+}
+/* 구글 설명 → { contact, note } — descOf 의 거꾸로. 「푸른 담당」 줄은 뺀다(담당은 sid 로 따로 온다) */
+function splitDesc(desc) {
+  const 줄 = s(desc).replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').split('\n');
+  let contact = '';
+  const 남음 = [];
+  줄.forEach((x) => {
+    if (!contact && /^담당자:\s*/.test(x)) contact = x.replace(/^담당자:\s*/, '').trim();
+    else if (!/^푸른 담당:/.test(x)) 남음.push(x);
+  });
+  return { contact, note: 남음.join('\n').trim() };
+}
+/* 일정의 주인 번호 — 담당 번호(puSid·설명) → 만든이 메일(계정 잇기) */
+function ownerOf(ev, mailSid) {
+  const sp = ev && ev.extendedProperties && ev.extendedProperties.shared && ev.extendedProperties.shared.puSid;
+  if (SID_RE.test(s(sp))) return s(sp);
+  const m = /푸른 담당:[^\n(]*\(([A-Z]-\d{3})\)/.exec(s(ev && ev.description));
+  if (m) return m[1];
+  const mail = s((ev && ev.creator && ev.creator.email) || (ev && ev.organizer && ev.organizer.email)).trim().toLowerCase().replace(/[.#$\[\]\/]/g, ',');
+  return (mailSid || {})[mail] || '';
+}
+/* 고친 칸 → 구글에 «통째로» 다시 넣을 일정(참석자·알림·반복 등 나머지는 그대로) */
+function mergedEvent(cur, f, nameOf) {
+  const 몸 = bodyOf({ date: f.date, time: f.time, endTime: f.endTime, summary: f.title, location: f.place,
+    description: descOf(f.contact, f.note, f.sid, nameOf), puSid: f.sid });
+  const out = Object.assign({}, cur, { summary: 몸.summary, start: 몸.start, end: 몸.end });
+  if (몸.location) out.location = 몸.location; else delete out.location;
+  if (몸.description) out.description = 몸.description; else delete out.description;
+  const ext = Object.assign({}, cur.extendedProperties || {});
+  const shared = Object.assign({}, ext.shared || {});
+  if (SID_RE.test(s(f.sid))) shared.puSid = s(f.sid); else delete shared.puSid;
+  if (Object.keys(shared).length) ext.shared = shared; else delete ext.shared;
+  if (Object.keys(ext).length) out.extendedProperties = ext; else delete out.extendedProperties;
+  return out;
+}
+const 내용칸 = ['date', 'time', 'endTime', 'title', 'place', 'contact', 'note', 'sid'];
+function 내용바뀜(a, b) { return 내용칸.some((k) => s((a || {})[k]) !== s((b || {})[k])); }
+/* 고칠 칸 검사 — 화면에서 온 것이다 */
+function cleanFields(f) {
+  const o = f || {};
+  const hm = (v) => (/^\d{2}:\d{2}$/.test(s(v)) ? s(v) : '');
+  const out = { date: s(o.date), time: hm(o.time), endTime: hm(o.time) ? hm(o.endTime) : '',
+    title: s(o.title).trim().slice(0, 300), place: s(o.place).trim().slice(0, 300),
+    contact: s(o.contact).trim().slice(0, 200), note: s(o.note).slice(0, 4000), sid: SID_RE.test(s(o.sid)) ? s(o.sid) : '' };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(out.date)) throw new Error('날짜가 올바르지 않습니다');
+  if (!out.title) throw new Error('무슨 일인지 적어 주세요');
+  return out;
+}
+
 function make(deps) {
   const { functions, getDatabase } = deps;
   const doFetch = deps.fetch || ((...a) => fetch(...a));
@@ -169,6 +227,94 @@ function make(deps) {
     }
   }
 
+  const 일정주소 = (eid) => 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(GARCH.CAL_ID)
+    + '/events/' + encodeURIComponent(eid);
+  async function 구글받기(at, eid) {
+    const r = await doFetch(일정주소(eid), { headers: { Authorization: 'Bearer ' + at } });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.id) throw new Error('구글에서 그 일정을 못 찾았습니다(' + r.status + ')');
+    return j;
+  }
+  async function 구글고침(at, eid, cur, f, nameOf) {
+    const r = await doFetch(일정주소(eid) + '?sendUpdates=none', {
+      method: 'PUT', headers: { Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
+      body: JSON.stringify(mergedEvent(cur, f, nameOf)),
+    });
+    const j = await r.json().catch(() => null);
+    if (!r.ok || !j || !j.id) throw new Error('구글이 고치지 않았습니다(' + ((j && j.error && j.error.message) || r.status) + ')');
+    return j;
+  }
+
+  /* 이알피 등에서 «옮긴 줄»의 내용을 고치면 구글도 고친다.
+     ⚠ 화면 고치기(gcalEdit)가 구글을 먼저 고치고 이 줄을 맞춘 것이면(gcalEditAt === updatedAt) 다시 안 보낸다. */
+  async function syncEdit(id, before, after) {
+    if (!after || after._deleted || !after.movedToGcal || !after.gcalEventId) return { done: false, why: 'skip' };
+    if (!내용바뀜(before, after)) return { done: false, why: 'same' };
+    if (after.gcalEditAt && after.gcalEditAt === after.updatedAt) return { done: false, why: 'from-edit' };
+    const db = getDatabase();
+    try {
+      const f = cleanFields({ date: after.date, time: s(after.time).slice(0, 5) === '00:00' ? '' : s(after.time).slice(0, 5),
+        endTime: s(after.endTime).slice(0, 5), title: after.title, place: after.place, contact: after.contact, note: after.note, sid: after.sid });
+      const at = await ownerAccess(db);
+      const cur = await 구글받기(at, after.gcalEventId);
+      await 구글고침(at, after.gcalEventId, cur, f, await nameMap(db));
+      await db.ref('data/my_schedules/v/' + id).update({ gcalSyncedAt: Date.now(), gcalProxyErr: null });
+      return { done: true };
+    } catch (e) {
+      const msg = s((e && e.message) || e).slice(0, 200);
+      console.warn('[직원 일정 → 구글] 고치기 실패', id, msg);
+      await db.ref('data/my_schedules/v/' + id).update({ gcalProxyErr: '구글 쪽 고치기 실패 — ' + msg }).catch(() => {});
+      return { done: false, why: 'error', error: msg };
+    }
+  }
+
+  /* ✏️·🗑 화면에서 구글 일정 고치기·지우기 — 대표 늘 연결로 대신 한다(직원은 구글 연결이 없다).
+     ★ 본인 일정만(주인 = 담당 번호 → 만든이 메일). 관리자·부관리자는 모두.
+     ★ 이어진 우리 줄(my_schedules, gcalEventId 같음)이 있으면 같이 맞춘다 — 이알피에도 보이게.
+     in: { uid, action:'update'|'delete', eventId, fields } */
+  async function editOne(uid, body) {
+    const db = getDatabase();
+    const b = body || {};
+    const eid = s(b.eventId);
+    if (!/^[A-Za-z0-9_]{1,1024}$/.test(eid)) throw Object.assign(new Error('일정 번호가 이상합니다'), { code: 400 });
+    const role = (await db.ref('uid_roles/' + s(uid).replace(/[.#$\/\[\]]/g, '_')).once('value')).val() || {};
+    if (role.status !== 'active') throw Object.assign(new Error('재직 중인 사람만 고칠 수 있습니다'), { code: 403 });
+    const 관리 = role.isAdmin === true || role.isSubAdmin === true;
+    const at = await ownerAccess(db);
+    const cur = await 구글받기(at, eid);
+    const mailSid = ((await db.ref('data/gcal_mail_sid/v').once('value')).val()) || {};
+    const 주인 = ownerOf(cur, mailSid);
+    if (!관리 && (!주인 || 주인 !== s(role.sid))) {
+      throw Object.assign(new Error('본인 일정만 고칠 수 있습니다' + (주인 ? '' : ' — 누구 일정인지 몰라 관리자만 고칠 수 있습니다')), { code: 403 });
+    }
+    const all = ((await db.ref('data/my_schedules/v').once('value')).val()) || {};
+    const 이은 = Object.keys(all).find((k) => all[k] && all[k].gcalEventId === eid && !all[k]._deleted) || '';
+    const now = Date.now();
+    if (b.action === 'delete') {
+      const r = await doFetch(일정주소(eid) + '?sendUpdates=none', { method: 'DELETE', headers: { Authorization: 'Bearer ' + at } });
+      if (!r.ok && r.status !== 404 && r.status !== 410) throw new Error('구글이 지우지 않았습니다(' + r.status + ')');
+      if (이은) {
+        await db.ref('data/my_schedules/v/' + 이은).transaction((x) => (!x || x._deleted) ? x : Object.assign({}, x, {
+          _deleted: true, deletedAt: now, deletedBy: 'gcal-edit:' + s(role.sid), gcalRemovedAt: now,
+          updatedAt: now, revision: (Number(x.revision) || 0) + 1 }));
+        await db.ref('data/my_schedules/u').set(now);
+      }
+      console.log('[구글 일정 지움]', { by: role.sid, gcal: eid, linked: !!이은 });
+      return { ok: true, deleted: true, linked: !!이은 };
+    }
+    if (b.action !== 'update') throw Object.assign(new Error('무엇을 할지 모릅니다'), { code: 400 });
+    const f = cleanFields(b.fields);
+    if (!관리 && f.sid && f.sid !== s(role.sid)) throw Object.assign(new Error('담당을 다른 사람으로 바꾸는 것은 관리자만 됩니다'), { code: 403 });
+    await 구글고침(at, eid, cur, f, await nameMap(db));
+    if (이은) {
+      await db.ref('data/my_schedules/v/' + 이은).transaction((x) => (!x || x._deleted) ? x : Object.assign({}, x, f, {
+        gcalEditAt: now, updatedAt: now, revision: (Number(x.revision) || 0) + 1 }));
+      await db.ref('data/my_schedules/u').set(now);
+    }
+    console.log('[구글 일정 고침]', { by: role.sid, gcal: eid, linked: !!이은 });
+    return { ok: true, updated: true, linked: !!이은 };
+  }
+
   const gcalProxy = functions
     .region(REGION)
     .runWith({ secrets: ['GCAL_OAUTH_SECRET'], timeoutSeconds: 60, memory: '256MB' })
@@ -176,13 +322,46 @@ function make(deps) {
     .onWrite(async (change, context) => {
       const id = context.params.id;
       if (!change.before.exists() && change.after.exists()) { await proxyOne(id, change.after.val()); return null; }
-      if (change.before.exists()) await removeOne(id, change.before.val(), change.after.exists() ? change.after.val() : null);
+      if (!change.before.exists()) return null;
+      const before = change.before.val(), after = change.after.exists() ? change.after.val() : null;
+      const r = await removeOne(id, before, after);
+      if (r.why === 'skip') await syncEdit(id, before, after);
       return null;
     });
 
-  return { gcalProxy, proxyOne, removeOne };
+  const gcalEdit = functions
+    .region(REGION)
+    .runWith({ secrets: ['GCAL_OAUTH_SECRET'], timeoutSeconds: 60, memory: '256MB' })
+    .https.onRequest(async (req, res) => {
+      const origin = s(req.headers && req.headers.origin);
+      if (origin === 'https://nabaho.github.io' || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        res.set('Access-Control-Allow-Origin', origin); res.set('Vary', 'Origin');
+      }
+      res.set('Access-Control-Allow-Methods', 'POST,OPTIONS');
+      res.set('Access-Control-Allow-Headers', 'Content-Type,Authorization');
+      res.set('Cache-Control', 'no-store');
+      if (req.method === 'OPTIONS') return res.status(204).send('');
+      if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'POST 만 받습니다' });
+      const m = s(req.headers.authorization).match(/^Bearer\s+(.+)$/i);
+      let user = null;
+      try { user = m ? await (deps.verifyIdToken || ((t) => require('firebase-admin/auth').getAuth().verifyIdToken(t, true)))(m[1]) : null; } catch (e) { user = null; }
+      if (!user) return res.status(401).json({ ok: false, error: '먼저 푸른 통합시스템에 로그인해 주세요' });
+      try {
+        return res.json(await editOne(user.uid, req.body));
+      } catch (e) {
+        return res.status(Number(e && e.code) >= 400 && Number(e.code) < 500 ? Number(e.code) : 502)
+          .json({ ok: false, error: s((e && e.message) || e).slice(0, 200) });
+      }
+    });
+
+  return { gcalProxy, gcalEdit, proxyOne, removeOne, syncEdit, editOne };
 }
 
 module.exports = make;
 module.exports.bodyOf = bodyOf;
 module.exports.eventOf = eventOf;
+module.exports.descOf = descOf;
+module.exports.splitDesc = splitDesc;
+module.exports.ownerOf = ownerOf;
+module.exports.mergedEvent = mergedEvent;
+module.exports.cleanFields = cleanFields;
