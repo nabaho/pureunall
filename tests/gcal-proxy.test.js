@@ -68,7 +68,7 @@ function run(fetchImpl) {
     data: { user_dir: { v: { a: { sid: 'P-005', name: '박한별' } } }, my_schedules: { v: { sch_1: 줄() } } } });
   const sent = [];
   const fetch = async (url, opt) => { sent.push({ url, opt }); return fetchImpl(url, opt); };
-  const R = P({ functions: { region: () => ({ runWith: () => ({ database: { ref: () => ({ onWrite: (f) => f }) } }) }) },
+  const R = P({ functions: { region: () => ({ runWith: () => ({ database: { ref: () => ({ onWrite: (f) => f }) }, https: { onRequest: (f) => f } }) }) },
     getDatabase: () => db, fetch, secretOf: () => 'GOCSPX-xxxxxxxxxxxxxxxxxxxx', clientId: 'CID' });
   return { db, sent, R };
 }
@@ -138,4 +138,116 @@ test('⑦ 출장 알림 — 대표 계정이 대신 넣은 직원 일정은 대�
   assert.deepStrictEqual(xs.map((x) => x.id).sort(), ['boss', 'plain']);
   assert.deepStrictEqual(T.pickTrips({ now, mailSid, schedules: { a: { id: 'a', sid: 'P-001', date: '2026-10-12', time: '10:00',
     title: 't', place: '아산', movedToGcal: true, gcalEventId: 'g' } } }), [], '옮긴 줄은 구글 쪽으로 한 번만');
+});
+
+/* ══ 고치기·지우기 연동 (2026-10-10 「23 연동」) ══════════════════════════════
+   ⑧ 설명 꼴 왕복 · 주인 찾기 · 나머지(참석자·알림)는 그대로 두고 고친다
+   ⑨ 본인 일정만 — 남의 것은 거절, 관리자는 모두, 담당 바꾸기는 관리자만
+   ⑩ 이어진 우리 줄(이알피)도 함께 맞춘다 — 고치면 같은 칸, 지우면 삭제표시
+   ⑪ 이알피에서 옮긴 줄을 고치면 구글도 고친다 — 화면 고치기가 맞춘 것은 다시 안 보낸다
+   ⑫ 화면: 상세 창 ✏️·🗑, 고치는 창은 서버(gcalEdit)로 */
+
+test('⑧ 설명 왕복 · 주인 · 나머지 보존', () => {
+  const d = P.descOf('김과장 010', '자료 지참\n둘째 줄', 'P-005', 이름);
+  assert.strictEqual(d, '담당자: 김과장 010\n자료 지참\n둘째 줄\n푸른 담당: 박한별 (P-005)');
+  assert.deepStrictEqual(P.splitDesc(d), { contact: '김과장 010', note: '자료 지참\n둘째 줄' });
+  assert.strictEqual(P.ownerOf({ extendedProperties: { shared: { puSid: 'P-003' } }, creator: { email: 'boss@x.com' } }, { 'boss@x,com': 'P-001' }), 'P-003');
+  assert.strictEqual(P.ownerOf({ description: '푸른 담당: 홍 (A-002)' }, {}), 'A-002');
+  assert.strictEqual(P.ownerOf({ creator: { email: 'Boss@X.com' } }, { 'boss@x,com': 'P-001' }), 'P-001');
+  assert.strictEqual(P.ownerOf({ creator: { email: 'who@x.com' } }, {}), '');
+  const cur = { id: 'G', summary: '옛', location: '옛곳', attendees: [{ email: 'a@b.c' }], reminders: { useDefault: false },
+    extendedProperties: { private: { puSourceKind: 'card', puSourceId: 'k1' }, shared: { puSid: 'P-005', other: 'x' } } };
+  const f = P.cleanFields({ date: '2026-10-20', time: '14:00', endTime: '15:00', title: '새 제목', place: '', contact: '', note: '메모', sid: 'P-003' });
+  const out = P.mergedEvent(cur, f, 이름);
+  assert.strictEqual(out.summary, '새 제목');
+  assert.ok(!('location' in out), '빈 장소는 지운다');
+  assert.deepStrictEqual(out.attendees, cur.attendees);
+  assert.deepStrictEqual(out.reminders, cur.reminders);
+  assert.deepStrictEqual(out.extendedProperties, { private: { puSourceKind: 'card', puSourceId: 'k1' }, shared: { puSid: 'P-003', other: 'x' } });
+  assert.strictEqual(out.start.dateTime, '2026-10-20T14:00:00');
+  assert.throws(() => P.cleanFields({ date: 'x', title: 't' }), /날짜/);
+  assert.throws(() => P.cleanFields({ date: '2026-10-20', title: ' ' }), /무슨 일/);
+  assert.strictEqual(P.cleanFields({ date: '2026-10-20', title: 't', time: '', endTime: '10:00' }).endTime, '', '시각 없이 끝만은 버린다');
+});
+
+function editRig(opts) {
+  const o = opts || {};
+  const db = fakeDb({
+    uid_roles: { U1: { sid: 'P-001', status: 'active', isAdmin: true }, U5: { sid: 'P-005', status: 'active' }, U3: { sid: 'P-003', status: 'active' } },
+    gcal_tokens: { U1: { rt: 'RT' } },
+    data: { user_dir: { v: { a: { sid: 'P-005', name: '박한별' } } }, gcal_mail_sid: { v: { 'boss@x,com': 'P-001' } },
+      my_schedules: { v: o.linked ? { s9: 줄({ id: 's9', movedToGcal: true, gcalEventId: 'GEV9', revision: 2 }) } : {} } },
+  });
+  const sent = [];
+  const cur = Object.assign({ id: 'GEV9', summary: '옛', creator: { email: 'boss@x.com' }, attendees: [{ email: 'a@b.c' }],
+    start: { dateTime: '2026-10-12T10:00:00+09:00' }, end: { dateTime: '2026-10-12T11:00:00+09:00' },
+    extendedProperties: { shared: { puSid: 'P-005' } } }, o.cur || {});
+  const fetch = async (url, opt) => {
+    sent.push({ url, opt: opt || {} });
+    if (/oauth2/.test(url)) return ok({ access_token: 'AT' });
+    const m = (opt && opt.method) || 'GET';
+    if (m === 'GET') return ok(cur);
+    if (m === 'PUT') return ok(Object.assign({}, JSON.parse(opt.body), { id: 'GEV9' }));
+    if (m === 'DELETE') return { ok: true, status: 204, json: async () => null };
+    return { ok: false, status: 500, json: async () => null };
+  };
+  const R = P({ functions: { region: () => ({ runWith: () => ({ database: { ref: () => ({ onWrite: (f) => f }) }, https: { onRequest: (f) => f } }) }) },
+    getDatabase: () => db, fetch, secretOf: () => 'GOCSPX-xxxxxxxxxxxxxxxxxxxx', clientId: 'CID' });
+  return { db, sent, R };
+}
+const 고칠칸 = { date: '2026-10-13', time: '15:00', endTime: '16:00', title: '고친 제목', place: '천안시청', contact: '', note: '새 메모', sid: 'P-005' };
+
+test('⑨ 본인 일정만 · 관리자는 모두 · 담당 바꾸기는 관리자만', async () => {
+  const a = editRig();
+  assert.strictEqual((await a.R.editOne('U5', { action: 'update', eventId: 'GEV9', fields: 고칠칸 })).ok, true, '본인');
+  await assert.rejects(a.R.editOne('U3', { action: 'update', eventId: 'GEV9', fields: 고칠칸 }), /본인 일정만/);
+  await assert.rejects(a.R.editOne('U3', { action: 'delete', eventId: 'GEV9' }), /본인 일정만/);
+  assert.strictEqual((await a.R.editOne('U1', { action: 'delete', eventId: 'GEV9' })).ok, true, '관리자');
+  await assert.rejects(a.R.editOne('U5', { action: 'update', eventId: 'GEV9', fields: Object.assign({}, 고칠칸, { sid: 'P-003' }) }), /관리자만/);
+  await assert.rejects(a.R.editOne('U5', { action: 'update', eventId: '../x', fields: 고칠칸 }), /번호가 이상/);
+  const b = editRig({ cur: { extendedProperties: undefined, creator: { email: 'nobody@x.com' } } });
+  await assert.rejects(b.R.editOne('U5', { action: 'update', eventId: 'GEV9', fields: 고칠칸 }), /관리자만 고칠 수/);
+  const put = a.sent.find((x) => x.opt.method === 'PUT');
+  const body = JSON.parse(put.opt.body);
+  assert.deepStrictEqual(body.attendees, [{ email: 'a@b.c' }], '참석자가 날아갔다');
+  assert.match(body.description, /새 메모\n푸른 담당: 박한별 \(P-005\)/);
+});
+
+test('⑩ 이어진 이알피 줄도 함께 — 고치면 같은 칸, 지우면 삭제표시', async () => {
+  const a = editRig({ linked: true });
+  const r = await a.R.editOne('U5', { action: 'update', eventId: 'GEV9', fields: 고칠칸 });
+  assert.strictEqual(r.linked, true);
+  const rec = a.db.data.data.my_schedules.v.s9;
+  assert.strictEqual(rec.title, '고친 제목'); assert.strictEqual(rec.date, '2026-10-13'); assert.strictEqual(rec.place, '천안시청');
+  assert.strictEqual(rec.gcalEditAt, rec.updatedAt, '서버가 맞춘 표');
+  assert.strictEqual(rec.revision, 3);
+  const b = editRig({ linked: true });
+  await b.R.editOne('U5', { action: 'delete', eventId: 'GEV9' });
+  const del = b.db.data.data.my_schedules.v.s9;
+  assert.strictEqual(del._deleted, true); assert.match(del.deletedBy, /^gcal-edit:P-005$/);
+  assert.ok(b.sent.some((x) => x.opt.method === 'DELETE' && /\/events\/GEV9\?/.test(x.url)));
+});
+
+test('⑪ 이알피에서 고치면 구글도 — 화면 고치기가 맞춘 것은 다시 안 보낸다', async () => {
+  const a = editRig({ linked: true });
+  const before = a.db.data.data.my_schedules.v.s9;
+  const after = Object.assign({}, before, { title: '이알피에서 고침', updatedAt: 5 });
+  assert.strictEqual((await a.R.syncEdit('s9', before, after)).done, true);
+  assert.strictEqual(JSON.parse(a.sent.find((x) => x.opt.method === 'PUT').opt.body).summary, '이알피에서 고침');
+  const n = a.sent.length;
+  assert.strictEqual((await a.R.syncEdit('s9', before, Object.assign({}, after, { gcalEditAt: 5 }))).why, 'from-edit');
+  assert.strictEqual((await a.R.syncEdit('s9', before, Object.assign({}, before, { gcalSyncedAt: 9 }))).why, 'same', '내용 안 바뀜');
+  assert.strictEqual((await a.R.syncEdit('s9', 줄(), Object.assign(줄(), { title: 'x' }))).why, 'skip', '안 옮긴 줄');
+  assert.strictEqual(a.sent.length, n, '보내지 말아야 할 때 보냈다');
+});
+
+test('⑫ 화면 — 상세 ✏️·🗑, 고치는 창은 서버로', () => {
+  assert.match(캘린더, /data-gedit="1"/);
+  assert.match(캘린더, /data-gdel="1"/);
+  assert.match(캘린더, /if\(m\.store === "gcal"\)\{ 구글고치기\(m\); return; \}/);
+  assert.match(캘린더, /if\(m\.store === "gcal"\)\{ 구글지우기\(m\.gid, m\.title\); return; \}/);
+  assert.match(캘린더, /callServer\("gcalEdit"/);
+  assert.match(캘린더, /gStart: ev\.start\.dateTime/);
+  const idx = fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8');
+  assert.match(idx, /exports\.gcalEdit\s*=/);
 });

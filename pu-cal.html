@@ -25,7 +25,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=10"></script>
+<script src="js/pu-gcal-auth.js?v=11"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
@@ -1829,6 +1829,8 @@ function gcalToEvent(ev){
     desc: String(ev.description || "").replace(/<br\s*\/?>/gi, "\n").replace(/<[^>]+>/g, "").trim(),
     /* 언제 넣고 언제 고쳤나 — 열쇠로 읽어도 구글이 준다(2026-10-04 상세 창 🕒) */
     created: ev.created || "", updated: ev.updated || "",
+    /* ✏️ 고치기(2026-10-10)가 쓰는 «구글에 실제로 든» 시각 — 위의 time·endAt 은 제목 시각으로 옮겨졌을 수 있다 */
+    gStart: ev.start.dateTime || "", gEnd: (ev.end && ev.end.dateTime) || "", recur: !!ev.recurringEventId,
     tip: title + (ev.location ? "\n📍 " + ev.location : "")
          /* 설명 앞 두 줄(담당자 등 — 이 앱이 넣은 미팅이면 「담당자: …」가 첫 줄이다) */
          + (ev.description ? "\n" + String(ev.description).replace(/<[^>]+>/g, "").split("\n").slice(0, 2).join("\n") : "")
@@ -3039,6 +3041,59 @@ function openNew(ymd){
   if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
 }
+/* ✏️ 구글 일정을 고치는 창 — 우리 일정 창을 그대로 쓴다(store:"gcal").
+   설명은 「담당자: …」 줄과 나머지(메모)로 가른다 — 서버가 같은 꼴로 다시 적는다(descOf ↔ splitDesc). */
+function 구글시분(iso){ var t = Date.parse(String(iso || "")); return t ? new Date(t + 9 * 3600000).toISOString().slice(11, 16) : ""; }
+function openGcalEdit(gid){
+  var e = null;
+  for(var i = 0; i < GCAL.evs.length; i++) if(GCAL.evs[i].id === gid) e = GCAL.evs[i];
+  if(!e){ toast("그 일정을 못 찾았습니다 — 달력을 다시 받아 오는 중일 수 있습니다"); return; }
+  var 줄들 = String(e.desc || "").split("\n"), 담당자 = "", 남음 = [];
+  줄들.forEach(function(x){
+    if(!담당자 && /^담당자:\s*/.test(x)) 담당자 = x.replace(/^담당자:\s*/, "").trim();
+    else if(!/^푸른 담당:/.test(x)) 남음.push(x);
+  });
+  var 시작 = 구글시분(e.gStart), 끝 = 구글시분(e.gEnd);
+  S.detail = null;
+  S.modal = { mode:"edit", store:"gcal", id:gid, gid:gid, kind:"sch", date:e.date, sid:e.mailSid || "",
+    title:e.text || "", note:남음.join("\n").trim(), time:시작, endTime:끝, place:e.place || "", contact:담당자,
+    vis:"shared", timed:!!시작, recur:!!e.recur, type:"leave", hours:1 };
+  render();
+}
+/* 서버(gcalEdit)에 맡긴다 — 돌려주는 것: Promise<{ok}> */
+function 구글대신(body){
+  var u = null;
+  try{ u = firebase.auth().currentUser; }catch(_){}
+  if(!u || typeof PuGcalAuth === "undefined" || !PuGcalAuth.callServer) return Promise.reject(new Error("로그인 정보를 못 찾았습니다"));
+  return u.getIdToken().then(function(t){ return PuGcalAuth.callServer("gcalEdit", t, body); }).then(function(r){
+    if(r && r.off) throw new Error("서버 고치기 기능이 아직 켜지지 않았습니다");
+    if(!r || !r.ok) throw new Error((r && r.error) || "서버가 답하지 않았습니다");
+    return r;
+  });
+}
+function 구글고치기(m){
+  S.busy = true; m.err = ""; render();
+  구글대신({ action:"update", eventId:m.gid, fields:{ date:m.date, time:m.timed ? String(m.time||"") : "", endTime:m.timed ? String(m.endTime||"") : "",
+    title:String(m.title||"").trim(), place:String(m.place||"").trim(), contact:String(m.contact||"").trim(), note:String(m.note||""), sid:String(m.sid||"") } })
+    .then(function(r){
+      S.busy = false; closeModal();
+      toast("✅ 구글 공용 달력을 고쳤습니다" + (r.linked ? " (이알피 일정도 함께)" : ""));
+      gcalLoad(true); refreshOne("my_schedules");
+    })["catch"](function(e){ S.busy = false; m.err = (e && e.message) || String(e); render(); });
+}
+function 구글지우기(gid, 제목){
+  if(!confirm("「" + (제목 || "이 일정") + "」을 구글 공용 달력에서 지울까요?")) return;
+  S.busy = true; render();
+  구글대신({ action:"delete", eventId:gid }).then(function(r){
+    S.busy = false; S.modal = null; S.detail = null;
+    toast("🗑 구글 공용 달력에서 지웠습니다" + (r.linked ? " (이알피 일정도 함께)" : ""));
+    gcalLoad(true); refreshOne("my_schedules");
+  })["catch"](function(e){
+    S.busy = false;
+    if(S.modal) { S.modal.err = (e && e.message) || String(e); render(); }
+    else toast("⚠ 못 지웠습니다 — " + ((e && e.message) || ""));
+  });
+}
 function openEdit(store, id){
   var r = store === "cal_private" ? 개인하나(id) : recOf(store, id);
   if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
@@ -3419,6 +3474,10 @@ function detailHtml(){
     + (typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length
         ? '<button class="btn ghost" data-route="' + esc(d.date) + '" title="이날 방문지를 시각 순서로">🚗 이날 동선</button>' : "")
     + '<span class="sp"></span>'
+    /* ✏️·🗑 구글 일정 고치기·지우기 — 서버가 대표 늘 연결로 대신 한다(functions/gcal-proxy.js gcalEdit).
+       여러 날 일정은 이 창(날짜 하나)으로 못 담아 구글에서 고친다 */
+    + (d.kind === "gcal" && d.gid && !(d.end && d.end !== d.date)
+        ? '<button class="btn ghost" data-gedit="1" title="고치기">✏️</button><button class="btn ghost" data-gdel="1" title="지우기">🗑</button>' : "")
     + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
     /* 모집 공지 — http(s) 만(PuCalRecruit.safeUrl 이 거른 값) */
     + (/^https?:\/\//i.test(d.link || "") ? '<a class="btn ghost" href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a>' : "")
@@ -3497,7 +3556,9 @@ function modalHtml(){
     +   줄("≡", "<textarea data-m=\"note\" rows=\""+(넓게?6:2)+"\" placeholder=\"설명 추가\">"+esc(m.note||"")+"</textarea>", "설명")
     + "</div><div class=\"gside\">"
     +   줄("👥", 누가, "누구")
-    +   (일정 ? 줄("📅", 달력, "누가 보나") : "")
+    +   (일정 && m.store !== "gcal" ? 줄("📅", 달력, "누가 보나") : "")
+    +   (m.store === "gcal" ? "<div class=\"ghint\">구글 공용 달력의 일정입니다 — 저장하면 구글이 바로 바뀝니다"
+          + (m.recur ? " (반복 일정은 «이 날 것만» 바뀝니다)" : "") + ".</div>" : "")
     + "</div></div>"
     + "<div class=\"mbtns\">"
     +   (새것 ? "" : "<button class=\"btn danger\" data-act=\"del\""+(S.busy?" disabled":"")+">지우기</button>")
@@ -3741,6 +3802,8 @@ function doSave(){
        그리므로 두 곳에 똑같이 뜨고, 두 번 들어가지도 않는다.
      ⚠ 로그인이 안 돼 있으면 우리 표(my_schedules)에 넣고 «폰 위젯에는 안 뜬다»고 말한다. */
   if(일정 && !m.timed){ m.time = ""; m.endTime = ""; }
+  /* ✏️ 구글 일정 고치기 — 서버가 대신(gcalEdit) */
+  if(m.store === "gcal"){ 구글고치기(m); return; }
   /* 🔒 나만 보기 — 구글에도 우리 공용 표에도 안 넣고 «내 칸»에만(PuCalWrite.savePrivate) */
   if(일정 && m.vis === "private"){ 개인에넣기(m); return; }
   /* 나만 보기였던 것을 «모두 보기»로 바꿨다 — 공용으로 새로 넣고 내 칸의 것은 지운다 */
@@ -3783,6 +3846,7 @@ function doSave(){
 
 function doDelete(){
   var m = S.modal; if(!m || m.mode!=="edit" || S.busy) return;
+  if(m.store === "gcal"){ 구글지우기(m.gid, m.title); return; }
   if(!confirm("이 건을 지울까요?")) return;
   if(m.store === "cal_private"){
     S.busy = true; m.err = ""; render();
@@ -4151,13 +4215,15 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
     if(S.map) S.map = null; else if(S.route) S.route = null; else { 출장닫기(); return; }
     render(); return;
   }
+  if(t.hasAttribute('data-gedit')){ if(S.detail && S.detail.gid) openGcalEdit(S.detail.gid); return; }
+  if(t.hasAttribute('data-gdel')){ if(S.detail && S.detail.gid) 구글지우기(S.detail.gid, S.detail.title); return; }
   if(t.hasAttribute('data-tripgo')){ var _tx = 출장하나(); if(_tx) 제네시스로(_tx.place); return; }
   if(t.hasAttribute('data-tripmap')){ var _tm = 출장하나(); if(_tm) openMap(_tm.place, (_tm.time ? _tm.time + " " : "") + _tm.title); return; }
   if(t.hasAttribute('data-mapgen')){ if(S.map) 제네시스로(S.map.place); return; }
