@@ -200,7 +200,27 @@
     return 'image999';
   }
 
-  var api = { PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot, findSpots: findSpots, whoOf: whoOf,
+  /* ★ 🏢 법인 자리인가 (대표 지시 2026-10-10 「법인 도장을 서류에 쓰기」)
+     법인 «명의»로 서명하는 자리에는 노무사 개인 직인이 아니라 법인 도장이 들어가야 한다.
+       「푸른노무법인 대표노무사 권형하 (인)」 → 법인 자리 (법인 이름 뒤에 직함·이름만 있다)
+       「소속: 푸른노무법인  성명: 권형하 (인)」 → 개인 자리 (법인 이름 뒤에 «성명:» 이 끼었다)
+       「법인 인감 (인)」·「직인」 → 법인 자리
+     ⚠ 확실할 때만 «법인»이라 한다 — 아니면 예전대로(이름 맞는 도장·기본 도장). 자리 고르기 창에서 사람이 바꿀 수 있다. */
+  function isFirmSpot(label, firmName) {
+    var t = String(label || '').replace(/\s*([（(]\s*(인|서명|날인)\s*[)）]|서명\s*(또는|및)\s*인|서명란|날인란|印|서명)\s*$/, '');
+    if (/직인|법인\s*인감|법인\s*도장|법인\s*날인/.test(t)) return true;
+    var 붙인 = t.replace(/\s+/g, ''), 이름 = String(firmName || '').replace(/\s+/g, '');
+    if (이름.length < 3) return false;
+    var at = 붙인.lastIndexOf(이름);
+    if (at < 0) return false;
+    var 뒤 = 붙인.slice(at + 이름.length);
+    if (/[:：]|성명|이름|신청인|작성자|서약자|확인자|참여자|위원/.test(뒤)) return false;
+    /* 법인 이름 뒤에는 직함(대표…·공인노무사)과 이름(2~4자)만 — 그 밖의 말이 길게 붙으면 법인 서명 줄이 아니다 */
+    return /^((대표[가-힣]{0,4}|공인노무사|노무사|사원)?[가-힣]{0,4})?$/.test(뒤);
+  }
+
+  var api = { isFirmSpot: isFirmSpot,
+              PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot, findSpots: findSpots, whoOf: whoOf,
               insertPic: insertPic, addToManifest: addToManifest, nextImageId: nextImageId };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerHwpStamp = api;

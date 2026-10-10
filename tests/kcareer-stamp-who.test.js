@@ -60,7 +60,8 @@ test('④ 자리마다 그 도장으로 — 도장 둘이면 그림 둘 · 옛 �
     stampFit: () => ({ size: 3400, dx: 0, dy: -700 }),
   };
   vm.createContext(ctx);
-  vm.runInContext(['function _rhPickSplit(', 'async function rhStampZip('].map(떼기).join('\n'), ctx);
+  /* 법인 도장을 안 정한 상태(firmSealStamp 없음) — 예전대로 기본 도장이어야 한다 */
+  vm.runInContext(['function _rhPickSplit(', 'function stampFirmFor(', 'async function rhStampZip('].map(떼기).join('\n'), ctx);
   const 지어 = async (pick) => {
     const z = new JSZip();
     z.file('Contents/section0.xml', 동의서);
