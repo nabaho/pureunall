@@ -221,3 +221,23 @@ test('ⓘ 내용 고치기 — 한글 원본을 저장소 안 편집기로 고�
   assert.match(g, /keep\.originals = \(Array\.isArray\(keep\.originals\)/, '이전 원본 이력을 남긴다');
   assert.match(g, /withNewOriginal\(keep, nu\)/);
 });
+
+/* ⓙ 왼쪽 메뉴 — 한 곳만 눌림 · 세트 보기 · 세트마다 색 (대표 지시 2026-10-10) */
+test('ⓙ 왼쪽 메뉴 — 종류·종료 서식·세트 중 한 곳만 눌리고, 세트를 누르면 목록이 그 세트의 서류만 보인다', () => {
+  assert.match(SRC, /S\.kind = v; S\.setView = null; resetFilters\(\);/, '종류를 누르면 세트 보기가 풀린다');
+  assert.match(SRC, /var on = !S\.setView && S\.kind === k\.v;/, '종류는 세트 보기 중엔 눌림 표시를 하지 않는다');
+  assert.match(SRC, /!S\.setView && S\.kind === '_closed' \? ' on'/, '종료 서식도 마찬가지');
+  assert.match(SRC, /var on = S\.setView === st\.id, col = setColor\(st\.id\);/, '세트는 세트 보기일 때만 눌림');
+  assert.match(SRC, /S\.setView = st\.id;/, '세트를 누르면 세트 보기로');
+  const i = SRC.indexOf('function setViewList() {'), j = SRC.indexOf('function shown() {', i);
+  const f = SRC.slice(i, j);
+  assert.match(f, /\(st\.formIds \|\| \[\]\)\.map/, '세트에 든 순서대로');
+  assert.match(f, /!isClosed\(f\)/, '종료한 서식은 세트 보기에서도 빠진다');
+});
+test('ⓙ 세트마다 다른 색 — 같은 세트는 늘 같은 색, 차례를 바꿔도 그대로', () => {
+  assert.match(SRC, /var SET_COLORS = \['#2563eb'/);
+  const i = SRC.indexOf('function setColor(id) {'), g = SRC.slice(i, SRC.indexOf('function drawTree()', i));
+  assert.match(g, /\.sort\(\)/, '열쇠 글자 차례로 색을 정한다(끌어 바꾼 차례와 무관)');
+  assert.match(SRC, /pcf-tk pcf-tset/);
+  assert.match(SRC, /border-left-color:' \+ col/);
+});
