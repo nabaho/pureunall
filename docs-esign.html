@@ -965,7 +965,7 @@ function esignFormGroups(l) {
       + by[g].map(function (f) {
         var n = String(f.name || '').replace(/\s*-\s*푸른\s*표준\s*$/, ''), side = '';
         n = n.replace(/\s*\((근로자|사용자|근로자측|사용자측|근로자·노동조합|사용자·근로자|근로자 공통|사용자 공통|근로자\s*공통|사용자\s*공통)\)\s*$/, function (_, t) { side = t.replace(/측$/, ''); return ''; });
-        return '<div style="font-size:12px;color:#334155;line-height:1.55;padding:1px 0">· ' + EsignDocs.esc(n) + (side ? ' <span style="color:#64748b">(' + EsignDocs.esc(side) + ')</span>' : '') + '</div>';
+        return '<div style="font-size:12px;color:#1e293b;line-height:1.55;padding:1px 0">· ' + EsignDocs.esc(n) + (side ? ' <span style="color:#64748b">(' + EsignDocs.esc(side) + ')</span>' : '') + '</div>';
       }).join('') + '</div>';
   }).join('') + '</div>';
 }
