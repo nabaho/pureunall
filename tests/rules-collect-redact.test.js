@@ -1,10 +1,16 @@
 /* 서버가 첨부 하나를 가린다 — 지키는 선(설계 §4-2):
    ① 원래 번호가 돌려주는 것(글·파일·셈) 어디에도 없다 ② 남거나 못 읽으면 담지 않는다
-   ③ 한글만 파일째, 워드는 글만 ④ PDF 는 1판에서 보류 */
+   ③ 한글만 파일째, 워드는 글만 ④ PDF 는 글만 가려 담는다(설계 §11) */
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const path = require('node:path');
 const H = require('../hwpx_gen.js');
 const X = require('../functions/rules-collect-redact.js');
+const { makePdf } = require('./pdf-gen.js');
+const HAS_PDFJS = (() => {
+  try { require.resolve('pdfjs-dist/package.json', { paths: [path.join(__dirname, '../functions')] }); return true; }
+  catch (_) { return false; }
+})();
 
 const RRN = '900101-1234567', PHONE = '010-9876-5432';
 const hwpx = (s) => H.build(H.para('제1조(목적) 이 규칙은 가나상사 사원의 근로조건을 정한다.') + H.para(s));
@@ -30,11 +36,39 @@ test('찾은 것이 없으면 원본 그대로(가린 것과 같다)', async () 
   assert.ok(Buffer.from(r.data).equals(Buffer.from(src)));
 });
 
-test('PDF 는 보류, 못 읽는 것도 보류 — 담을 것을 돌려주지 않는다', async () => {
-  const p = await X.redactOne(Buffer.from('%PDF-1.7 ' + RRN), 'pdf');
-  assert.equal(p.ok, false);
-  assert.match(p.holdWhy, /PDF/);
-  assert.equal(p.text, undefined);
+test('PDF — 글을 뽑아 가린 글만, 파일은 안 담는다', { skip: !HAS_PDFJS && 'pdfjs-dist 없음' }, async () => {
+  const buf = makePdf([[{ x: 40, y: 800, s: 'Article 1 (Purpose) of the work rules for all employees' },
+    { x: 40, y: 780, s: 'RRN ' + RRN + ' phone 010-9876-5432' }]]);
+  const r = await X.redactOne(buf, 'pdf');
+  assert.equal(r.ok, true);
+  assert.equal(r.format, 'pdf');
+  assert.equal(r.data, null, '★ PDF 파일을 내보냈다');
+  assert.ok(!r.text.includes(RRN), '★ 주민번호가 남았다');
+  assert.ok(r.total >= 1);
+  assert.match(r.text, /Article 1 \(Purpose\)/);
+});
+
+test('PDF — 글 없으면 스캔 보류, 못 열면 열지 못함 보류', async () => {
+  const scan = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => ({ text: ' ', chars: 0, pages: 1 }) });
+  assert.deepEqual([scan.ok, scan.holdWhy], [false, '스캔 PDF — 글 없음']);
+  const bad = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw new Error('깨짐'); } });
+  assert.deepEqual([bad.ok, bad.holdWhy], [false, 'PDF 를 열지 못함']);
+});
+
+test('PDF — pdf.js 를 못 실으면 옛 까닭으로 남긴다(다음에 다시 본다)', async () => {
+  const r = await X.redactOne(Buffer.from('x'), 'pdf', { pdfText: async () => { throw Object.assign(new Error('없음'), { code: 'PDFJS_MISSING' }); } });
+  assert.deepEqual([r.ok, r.holdWhy], [false, 'PDF — 아직 못 읽음']);
+});
+
+test('PDF — 가린 글에 주민번호 꼴이 남으면 보류(마지막 그물)', async () => {
+  const leaky = { pdfText: async () => ({ text: 'x'.repeat(40) + ' ' + RRN, chars: 60, pages: 1 }),
+    redactFile: async (b, t) => ({ text: t, count: {}, total: 0, residual: 0, unscanned: 0, data: null }) };
+  const r = await X.redactOne(Buffer.from('x'), 'pdf', leaky);
+  assert.equal(r.ok, false);
+  assert.match(r.holdWhy, /주민번호/);
+});
+
+test('못 읽는 한글 — 글을 못 읽으면 보류', async () => {
   const junk = await X.redactOne(Buffer.from('PK\u0003\u0004 not a real zip'), 'hwpx');
   assert.equal(junk.ok, false);
   assert.match(junk.holdWhy, /읽지 못/);
