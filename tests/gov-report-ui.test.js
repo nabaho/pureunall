@@ -235,7 +235,7 @@ function rptWorld(opts) {
     grpRender: () => {}, grpRenderTop: () => {}, grpRenderWarn: () => {},
   };
   vm.createContext(ctx);
-  const consts = (SRC.match(/^const GRP_(?:DENIED|HINT|RLAB|FILE_KO|AI_MODELS|AI_WAIT_MS|AI_OK|AI_MSG|AI_PATH)=.*;$/gm) || []).join('\n');
+  const consts = (SRC.match(/^const GRP_(?:DENIED|HINT|RLAB|FILE_KO|AI_WAIT_MS|AI_OK|AI_MSG|AI_PATH)=.*;$/gm) || []).join('\n');
   vm.runInContext('var _grp=null;\n' + consts + '\n' + grab('getCoAtts') + '\n' + RPT_NAMES.map(grab).join('\n'), ctx);
   return { ctx, db, els, calls };
 }
@@ -481,18 +481,18 @@ test('보고서 ①-3 열쇠는 있는데 클라우드 연결 전이면 조용�
 
 /* ══ ✨ AI 초안 (3단계) ══════════════════════════════════════════════════════
  * ★ 지키는 것
- *   ① 밖으로 나가는 글(프록시로 가는 body 전부)에 업체·사람 이름·전화·메일·사업자번호가 없다.
+ *   ① 밖으로 나가는 글(PuAiCall.ask 로 가는 parts 전부)에 업체·사람 이름·전화·메일·사업자번호가 없다.
  *   ② 사람이 쓴 칸은 덮지 않는다 — 처음부터 쓴 칸도, AI 칸을 사람이 고친 것도.
  *   ③ 기술보호는 켜기 전엔 아무것도 안 보내고, 켜도 메일·보낸 서류는 안 보낸다.
  *   ④ 확정된 판은 부르지 않는다.
  *   ⑤ 오류 문구는 설계서 §5 그대로, 칸은 그대로.
- * 가짜 프록시(fetch 바꿔치기) — 실제로 밖에 나가지 않는다. 합성 자료만. */
+ * 가짜 PuAiCall(ask/textOf 바꿔치기) — 실제로 밖에 나가지 않는다. 합성 자료만. */
 const Ai = require('../js/pu-gov-report-ai.js');
-const AI_NAMES = ['grpAiProxyUrl', 'grpAiConsent', 'grpAiFetch', 'grpAiCall', 'grpAiNames', 'grpAiMemos', 'grpAiCan',
+const AI_NAMES = ['grpAiConsent', 'grpAiCall', 'grpAiErrMsg', 'grpAiNames', 'grpAiMemos', 'grpAiCan',
   'grpAiDraft', 'grpAiUndo', 'grpAiAllow', 'grpAddRound', 'grpDelRound'];
 const SCREEN_NAMES = ['grpRenderTop', 'grpFileLabel', 'grpFieldHtml', 'grpSrcLabel', 'grpWarnings', 'grpAiButtons', 'grpAiFoot'];
 const aiBtn = (h) => (h.match(/<button[^>]*data-grp-act="ai"[^>]*>/) || [''])[0];
-const aiText = (text) => ({ content: [{ type: 'text', text }] });
+const aiText = (text) => text;
 const aiReply = (o) => aiText(JSON.stringify(o));
 const okReply = () => aiReply({
   rounds: [{ i: 0, inquiry: '[해당 기업] [담당자] 취업규칙 문의', diagnosis: '연장근로 규정 미비', advice: '덮으면 안 됨' }],
@@ -510,15 +510,19 @@ function aiWorld(opts) {
   Object.assign(w.ctx, {
     PuGovReportAi: Ai, clearTimeout, AbortController: o.noAbort ? undefined : AbortController,
     setTimeout: o.fastTimeout ? (fn, ms) => setTimeout(fn, ms >= 90000 ? 5 : ms) : setTimeout,
-    window: { PU_CFG: { aiProxyUrl: o.noProxy ? '' : 'https://proxy.example.com/ai' } },
-    localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
-    fetch: async (url, init) => {
-      fetched.push({ url, body: JSON.parse(init.body) });
-      const r = replies.shift();
-      if (r instanceof Error) throw r;
-      if (r && r.hang) return { json: () => new Promise(() => {}) };
-      return { json: async () => r };
+    window: {},
+    firebase: { auth: () => ({ currentUser: o.noUser ? null : { uid: 'u1' } }) },
+    PuAiCall: o.noAi ? undefined : {
+      textOf: (reply) => (reply && reply.text) || '',
+      ask: async (parts, opts) => {
+        fetched.push({ parts, opts });
+        const r = replies.shift();
+        if (r instanceof Error) throw r;
+        if (r && r.hang) return new Promise(() => {});
+        return { text: r };
+      },
     },
+    localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
   });
   vm.runInContext(AI_NAMES.map(grab).join('\n'), w.ctx);
   if (o.screen) vm.runInContext(SCREEN_NAMES.map(grab).join('\n'), w.ctx);
@@ -532,14 +536,17 @@ test('AI ① 밖으로 나가는 글 전부에 가림 — 업체·사람 이름�
   const r = await w.ctx.grpAiDraft();
   assert.strictEqual(r.ok, true, JSON.stringify(r));
   assert.strictEqual(w.fetched.length, 1);
-  assert.strictEqual(w.fetched[0].url, 'https://proxy.example.com/ai');
-  const out = JSON.stringify(w.fetched[0].body);
+  const out = JSON.stringify(w.fetched[0].parts);
   for (const bad of ['가나상사', '홍길동', '김가나', '041-000-0000', '010-0000-0000', 'hong@example.com', BIZ, '1234567891']) {
     assert.ok(!out.includes(bad), bad + ' 이(가) 나갔다');
   }
   assert.ok(out.includes('[가림]'), '전화·메일 자리는 [가림]');
-  assert.strictEqual(w.fetched[0].body.model, 'claude-opus-5');
-  assert.strictEqual(w.fetched[0].body.max_tokens, 8000);
+  assert.strictEqual(w.fetched[0].parts.length, 2);
+  assert.ok(w.fetched[0].parts.every((p) => typeof p.text === 'string' && p.text));
+  assert.strictEqual(w.fetched[0].opts.app, 'erp');
+  assert.strictEqual(w.fetched[0].opts.generationConfig.temperature, 0.2);
+  assert.strictEqual(w.fetched[0].opts.generationConfig.maxOutputTokens, 8192);
+  assert.strictEqual(w.fetched[0].opts.auth.currentUser.uid, 'u1');
   assert.strictEqual(st.report.rounds[0].inquiry, '가나상사 홍길동 취업규칙 문의', '받은 글에서 이름을 되돌린다');
   assert.strictEqual(st.aiSrc['rounds.0.inquiry'], 'ai');
 });
@@ -577,7 +584,7 @@ test('AI ③ 기술보호 — 켜기 전엔 아무것도 안 보내고, 켜도 �
   assert.strictEqual(w.ctx.grpAiAllow(), true);
   assert.strictEqual(st.aiAllow, true);
   assert.strictEqual((await w.ctx.grpAiDraft()).ok, true);
-  const sent = JSON.stringify(w.fetched[0].body);
+  const sent = JSON.stringify(w.fetched[0].parts);
   for (const bad of ['취업규칙 검토 요청', '임금체계 검토 의견서', '취업규칙 개정안', '연락처']) {
     assert.ok(!sent.includes(bad), bad + ' 이(가) 나갔다');
   }
@@ -594,13 +601,22 @@ test('AI ④ 확정된 판은 부르지 않는다', async () => {
   assert.strictEqual(w.ctx.grpAiCan(w.ctx._grp).ok, false);
 });
 
-test('AI ⑤ 오류 — 프록시 없음·동의 안 함·응답 없음·JSON 못 읽음(한 번 더 물은 뒤), 칸은 그대로', async () => {
-  let w = aiWorld({ noProxy: true });
-  await opened(w);
+test('AI ⑤ 오류 — 로그인 없음·동의 안 함·응답 없음·JSON 못 읽음(한 번 더 물은 뒤), 칸은 그대로', async () => {
+  let w = aiWorld({ noUser: true });
+  const st0 = await opened(w);
+  const b0 = JSON.stringify(st0.report);
   let r = await w.ctx.grpAiDraft();
   assert.strictEqual(r.ok, false);
   assert.strictEqual(w.fetched.length, 0);
-  assert.ok(w.ctx.__toasts.some((t) => t.m === 'AI 프록시가 설정되지 않았습니다 — 포털 ⚙ 설정'));
+  assert.ok(w.ctx.__toasts.some((t) => t.m === '로그인을 확인해 주세요'));
+  assert.strictEqual(JSON.stringify(st0.report), b0);
+  assert.strictEqual(st0.aiBusy, false);
+
+  w = aiWorld({ noAi: true });
+  await opened(w);
+  r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.ok(w.ctx.__toasts.some((t) => t.m === '로그인을 확인해 주세요'));
 
   w = aiWorld({ ls: {} });
   w.ctx.confirm = () => false;
@@ -752,8 +768,8 @@ test('AI ⑪ 쓰는 중에는 회차 추가·빼기가 막히고, 단추도 잠�
 test('AI ⑫ 기다리는 동안 회차가 바뀌었으면 아무것도 넣지 않는다', async () => {
   const w = aiWorld();
   const st = await opened(w);
-  const orig = w.ctx.fetch;
-  w.ctx.fetch = async (u, i) => { st.report.rounds[0].date = '2099-01-01'; return orig(u, i); };
+  const orig = w.ctx.PuAiCall.ask;
+  w.ctx.PuAiCall.ask = async (p, o) => { st.report.rounds[0].date = '2099-01-01'; return orig(p, o); };
   const before = JSON.stringify(st.report.rounds.map((r) => r.inquiry));
   const r = await w.ctx.grpAiDraft();
   assert.strictEqual(r.ok, false);
@@ -785,6 +801,34 @@ test('AI ⑭ 응답 본문이 멈춰도 시간 제한으로 끊기고 aiBusy 가
     assert.strictEqual(r.ok, false);
     assert.ok(w.ctx.__toasts.some((x) => x.m === 'AI 응답이 없습니다 — 잠시 뒤 다시'));
     assert.strictEqual(st.aiBusy, false);
-    assert.strictEqual(w.fetched.length, 1, '끊긴 것은 다음 모델로 넘기지 않는다');
+    assert.strictEqual(w.fetched.length, 1, '끊긴 것은 다시 묻지 않는다');
   }
+});
+
+test('AI ⑮ 월 한도(overBudget)·401/403 — 정해진 문구, 칸 그대로, aiBusy 풀림', async () => {
+  const mk = (props) => Object.assign(new Error('x'), props);
+  const cases = [
+    [mk({ status: 429, overBudget: true }), '이번 달 AI 사용 한도를 넘었습니다 — 대표에게 문의'],
+    [mk({ overBudget: true }), '이번 달 AI 사용 한도를 넘었습니다 — 대표에게 문의'],
+    [mk({ status: 401 }), '로그인을 확인해 주세요'],
+    [mk({ status: 403 }), '로그인을 확인해 주세요'],
+    [mk({ status: 500 }), 'AI 응답이 없습니다 — 잠시 뒤 다시'],
+  ];
+  for (const [err, msg] of cases) {
+    const w = aiWorld({ replies: [err, err] });
+    const st = await opened(w);
+    const before = JSON.stringify(st.report);
+    const r = await w.ctx.grpAiDraft();
+    assert.strictEqual(r.ok, false);
+    assert.ok(w.ctx.__toasts.some((x) => x.m === msg), msg);
+    assert.strictEqual(w.fetched.length, 1, '서버 오류는 다시 묻지 않는다');
+    assert.strictEqual(JSON.stringify(st.report), before);
+    assert.strictEqual(st.aiBusy, false);
+  }
+});
+
+test('AI ⑯ 동의 문구는 Google Gemini', () => {
+  const h = SRC.replace(/\r/g, '');
+  assert.ok(h.includes('외부 AI(Google Gemini)') && !h.includes('Anthropic') && !h.includes('aiProxyUrl'));
+  assert.match(HTML, /<script src="js\/pu-ai-call\.js\?v=\d+"><\/script>/);
 });
