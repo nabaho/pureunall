@@ -6770,6 +6770,13 @@ exports.gcalArchiveDaily = GARCH.gcalArchiveDaily;
 const TRIP = require("./trip-remind")({ functions, getDatabase, MAIL_REGION });
 exports.tripRemind = TRIP.tripRemind;
 
+/* 👥 직원 일정 → 구글 공용 달력 «서버가 대신 넣기» (대표 지시 2026-10-10 「직원구글연결되게 해라」 → 「서버가 대신 넣기」).
+   my_schedules 에 새 일정이 생기면 대표 늘 연결 표로 구글에 넣고 movedToGcal 표를 단다. 실제 코드는 gcal-proxy.js. */
+const GPROXY = require("./gcal-proxy")({ functions, getDatabase });
+exports.gcalProxy = GPROXY.gcalProxy;
+/* ✏️·🗑 화면에서 구글 일정 고치기·지우기 — 대표 늘 연결로 대신(본인 일정만, 관리자는 모두). 같은 파일. */
+exports.gcalEdit = GPROXY.gcalEdit;
+
 /* 🔗 구글 캘린더 «늘 연결» (대표 지시 2026-10-04 「항상 구글로 로그인되어 있어야 한다」) —
    서버가 사람마다 갱신 열쇠를 들고, 화면은 한 시간짜리 표만 받아 간다. 실제 코드는 gcal-link.js.
    ⚠ 여기 줄을 안 적으면 배포가 안 된다. 갱신 열쇠 자리(gcal_tokens)는 보안규칙에 «일부러» 없다. */

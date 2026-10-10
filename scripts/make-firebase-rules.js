@@ -42,6 +42,8 @@ const ADMIN = "root.child('uid_roles').child(auth.uid).child('isAdmin').val() ==
 const SUB   = "root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true";
 const MGR   = `auth != null && (${ADMIN} || ${SUB})`;      // 관리자 또는 위임관리인
 const FIN   = "root.child('uid_roles').child(auth.uid).child('fin').val() == true";
+/* 푸른 자기 직원 인사 자료를 고치는 사람 — 재무 권한자 또는 관리자·위임관리인 (2026-10-10) */
+const HRW   = `auth != null && (${FIN} || ${ADMIN} || ${SUB})`;
 const MAIL  = "auth != null && auth.token.email != null";
 
 /* 「업무 칸」 한 벌 — 읽기는 전 직원, 새로 만들고 고치는 것도 전 직원,
@@ -196,6 +198,9 @@ rules.data = {
   user_dir: { '.read': LOGIN, '.write': `${ADMIN} || ${SUB}` },
   /* 이알피 환경설정 «사건 유형» — 계약서등관리 사건계약 갈래가 읽는다(2026-10-09). 권한은 «그대로»(여태 $other: 재직 직원 읽기·쓰기 — 이알피가 고친다) — 이름만 적는다 */
   biz_case_types: { '.read': LOGIN, '.write': LOGIN },
+  /* 이알피 휴가관리 «휴직» — 계약서등관리 위임장 노무사 명단이 휴직자를 빼려고 읽는다(2026-10-10). 권한은 «그대로»(여태 $other) — 이름만 */
+  /* ⚠ 권한은 아래 «푸른 자기 직원 인사 자료» 묶음에 있다(2026-10-10 쓰기를 HRW 로 좁힘, 읽기는 그대로) —
+       같은 열쇠를 두 번 적으면 JS 객체는 «뒤의 것»이 조용히 이긴다. 한 곳에만 적는다. */
 
   /* 그 밖의 업무 칸 — 이름이 안 붙은 것은 전부 여기로 온다.
      ⚠ 이름 붙은 칸이 «먼저» 잡히므로 위의 재무 칸들은 여기에 안 걸린다. */
@@ -254,7 +259,9 @@ rules.data = {
      ⚠ 쓰기를 관리자로 좁힐 만한 자리다(법인 주소는 아무나 고칠 것이 아니다). 다만 그 변경은
        이알피 회사정보 화면을 누가 쓰는지 확인한 뒤 따로 한다 — 여기서 겸사겸사 좁히면
        조용히 저장이 막힌다. */
-  company_info:   { '.read': LOGIN, '.write': LOGIN },   /* 푸른노무법인 자신의 정보 */
+  /* ★ 2026-10-10 쓰기를 HRW(재무·관리자·위임관리인)로 좁혔다 — 쓰는 곳은 이알피 환경설정 «회사 정보»
+       (pu-erp.html CompanyInfoForm) 한 곳뿐이고, 경력관리는 «읽기만» 한다(kcareer.html 19128 주석). */
+  company_info:   { '.read': LOGIN, '.write': HRW },   /* 푸른노무법인 자신의 정보 */
 
   /* 포털 — 앱 공용 설정과 개인 타일 순서 (대표 지시 2026-08-29 「셋 좁」으로 좁혔다) */
 
@@ -428,6 +435,38 @@ rules.data = {
      ⚠ 승인은 앱이 관리자에게만 단추를 준다(일하는 순서의 문). 업체 자료(companies) 자체의 쓰기 권한은
        예전 그대로다 — 이 자리를 좁혀도 담당이 바뀌는 길이 막히지는 않는다. */
   co_mgr_requests: { '.read': LOGIN, '.write': LOGIN },
+
+  /* 🧑‍💼 푸른 자기 직원 인사 자료 (2026-10-10 대표 지시 「인사관리 전체 검토」 → 0단계).
+     여태 이름이 없어 $other(재직 직원 누구나 읽고 «쓰기»)로 떨어져 있었다 — 그래서 직원 누구나
+     급여·근태 «마감 자물쇠»를 풀고, 남의 연장근로 시간(급여로 흘러간다)·휴직·연차 부여일수를
+     고치고, 법인 정보(직인 그림 포함)를 바꿀 수 있었다.
+     ★ 쓰기는 «재무 권한자·관리자·위임관리인»(HRW)만. 이 자리들을 쓰는 화면은 전부 이알피 인사·환경설정
+       화면이고(2026-10-10 저장 경로 전수 grep), 그 화면들은 근로자명부(user_accounts, finOnly)가
+       있어야 돌아간다 — 재무 권한 없는 직원은 애초에 그 화면을 못 쓴다. 그래서 막히는 사람이 없다.
+     ★ 읽기는 대부분 «그대로»(LOGIN) 둔다 — 캘린더(pu-cal)는 휴직·근태 마감을, 업무관리(work)는 휴직을,
+       대시보드 «내 휴가»는 연차 부여를, 경력관리는 법인 정보를 읽는다. 읽기를 좁히면 그쪽이 조용히 빈다.
+     ★ 읽기까지 좁힌 것은 둘 — 근로계약서(임금 칸이 있다)·증명서 발급대장(누가 무슨 용도로 뗐나).
+       이알피 인사 화면 말고 읽는 곳이 없다(2026-10-10 전수 grep). 보는 사람이 «줄어드는» 변경이다.
+     ⚠ 휴직(leave_of_absence)에는 병가 «종류»가 들어 있어 직원 누구나 읽는다 — 캘린더가 쓰므로 이번엔
+       그대로 둔다. 좁히려면 캘린더가 «휴직 중» 여부만 받는 길부터 만들어야 한다(따로 할 일). */
+  locked_payroll_months:   { '.read': LOGIN, '.write': HRW },   /* 급여 마감 */
+  locked_irregular_months: { '.read': LOGIN, '.write': HRW },   /* 비정기 급여 마감 */
+  locked_attend_months:    { '.read': LOGIN, '.write': HRW },   /* 근태 마감 — 캘린더가 읽는다 */
+  overtime_records:        { '.read': LOGIN, '.write': HRW },   /* 연장·야간·휴일 시간 → 급여 법정수당 */
+  comp_leave_records:      { '.read': LOGIN, '.write': HRW },   /* 보상휴가 사용 */
+  leave_of_absence:        { '.read': LOGIN, '.write': HRW },   /* 휴직·출산·병가 — 캘린더·업무관리·위임장 노무사 명단이 읽는다 */
+  leave_grants:            { '.read': LOGIN, '.write': HRW },   /* 연차 부여일수 수기 조정 — 대시보드가 읽는다 */
+  employment_contracts:    { '.read': HRW,   '.write': HRW },   /* 근로계약서 — 임금 칸 */
+  cert_log:                { '.read': HRW,   '.write': HRW },   /* 증명서 발급대장 */
+  /* 인사·급여 «설정» — 지금은 계산에 안 쓰이지만(검토 결과), 1단계에서 계산에 잇는 순간
+     «직원 누구나 요율을 바꾸는 길»이 된다. 잇기 전에 먼저 잠근다. */
+  insurance_rates:         { '.read': LOGIN, '.write': HRW },
+  min_wage:                { '.read': LOGIN, '.write': HRW },
+  withholding_brackets:    { '.read': LOGIN, '.write': HRW },
+  pension_policy:          { '.read': LOGIN, '.write': HRW },
+  policy_leave:            { '.read': LOGIN, '.write': HRW },
+  policy_special_leave:    { '.read': LOGIN, '.write': HRW },
+  policy_loa:              { '.read': LOGIN, '.write': HRW },
 
   /* ⚠ 여기 이름이 없는 자리는 아래로 떨어져 «재직 직원 누구나» 읽고 쓴다.
      새 자리를 만들 때는 권한을 정해 위에 이름을 적을 것 —

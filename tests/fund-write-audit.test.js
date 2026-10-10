@@ -94,3 +94,17 @@ test('⑨ 잠긴 줄은 처음부터 흐리게 — 승인·계정·✂·× 는 d
   assert.ok(!c.includes("<button'+dis+' onclick=\"openAlbumPick("), '증빙 붙이기까지 막았다');
   assert.ok(c.includes('🔒 결산 확정</span>'));
 });
+
+test('⑩ 회계·결산 틀 고정 — 회계 머리·표 제목 줄이 기금 머리 아래에 붙는다(넓은 화면만) (대표 「틀고정」 2026-10-10)', () => {
+  assert.ok(fnSrc('closingTab').includes('<div class="panel closehead">'), '회계 머리에 closehead 가 없다');
+  assert.ok(fnSrc('closeBodyHTML').includes('<div class="ledgerwrap"><table><thead>'), '장부 표가 가로 스크롤 상자에 갇혀 제목 줄이 안 붙는다');
+  const css = SRC.slice(SRC.indexOf('.ledgerwrap{overflow-x:auto}'), SRC.indexOf('.ledgerwrap{overflow-x:auto}') + 600);
+  assert.ok(css.includes('@media(min-width:1000px)'), '폰에서도 세 겹이 붙는다');
+  assert.ok(css.includes('.closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px))'));
+  assert.ok(css.includes('var(--closehead-h,156px)'));
+  const t = fnSrc('_syncTopbarH');
+  assert.ok(t.includes("_setCssVar('--fundhead-h'") && t.includes("_setCssVar('--closehead-h'"), '머리 높이를 안 잰다');
+  /* 분개장·계정별원장·월계표 표도 같은 틀 고정(2026-10-10 「계속」) */
+  for (const fn of ['journalView', 'ledgerView', 'monthlyView'])
+    assert.ok(fnSrc(fn).includes('<div class="ledgerwrap" style="margin-top:8px">'), fn + ' 표 제목 줄이 안 붙는다');
+});

@@ -137,7 +137,51 @@
   var REP_FORM_RE = /선정|연명부|대리인\s*선임/;
   function hasRepForms(list) { return (list || []).some(function (f) { return REP_FORM_RE.test(f.name || ''); }); }
 
+  /* ══ 이름표({{공인노무사명단}})가 없는 위임장 — 노무사 이름 줄을 재직 명단으로 바꾼다 (대표 지시 2026-10-10
+       「모든 위임장은 푸른노무법인 담당노무사들 자동으로 … 퇴사하거나 휴직시 이름이 자동으로 빠지게」) ══
+     「성 명 : (대표 /) 공인노무사 권 형 하」 줄 → 「성 명 : 〈재직 명단〉」, 그 밑에 이어진 「공인노무사 ○ ○ ○」 줄은 비운다.
+     ⚠ 「공인노무사법」 문장이 든 문서(위임장)에서만 · 같은 칸(또는 본문) 안 차례로만 본다. 직접 올린 원본은 고치지 않는다(채울 때만) */
+  var NAMES_LINE = /^(\s*성\s*명\s*[:：]\s*)(?:대표\s*\/?\s*)?공인노무사\s*[가-힣](?:\s*[가-힣]){1,3}\s*$/;
+  var NAME_ONLY = /^\s*공인노무사\s*[가-힣](?:\s*[가-힣]){1,3}\s*$/;
+  function lawyerLineEdits(paras, line) {
+    var out = [];
+    for (var i = 0; i < (paras || []).length; i++) {
+      var m = NAMES_LINE.exec(String(paras[i].text || '')); if (!m) continue;
+      out.push({ key: paras[i].key, text: m[1] + line });
+      for (var j = i + 1; j < paras.length && NAME_ONLY.test(String(paras[j].text || '')); j++) out.push({ key: paras[j].key, text: '' });
+    }
+    return out;
+  }
+  function applyLawyerLine(doc, line) {
+    if (!line || !doc) return 0;
+    var js = function (q) { try { return JSON.parse(doc.searchAllText(q, false, true)) || []; } catch (e) { return []; } };
+    if (!js('공인노무사법').length) return 0;
+    var groups = {};
+    js('공인노무사').forEach(function (h) {
+      var c = h.cellContext, g = c ? [h.sec, c.parentPara, c.ctrlIdx, c.cellIdx].join('.') : 'b' + h.sec;
+      (groups[g] = groups[g] || { sec: h.sec, c: c, idx: [] }).idx.push(c ? c.cellPara : h.para);
+    });
+    var n = 0;
+    Object.keys(groups).forEach(function (g) {
+      var G = groups[g], c = G.c, lo = Math.min.apply(null, G.idx), hi = Math.max.apply(null, G.idx);
+      var len = function (k) { return c ? doc.getCellParagraphLength(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, k) : doc.getParagraphLength(G.sec, k); };
+      var get = function (k) { try { var L = len(k); return c ? doc.getTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0, L) : doc.getTextRange(G.sec, k, 0, L); } catch (e) { return null; } };
+      var paras = [];
+      for (var k = lo; k <= hi + 4; k++) { var t = get(k); if (t == null) break; paras.push({ key: k, text: t }); }
+      lawyerLineEdits(paras, line).forEach(function (e) {
+        try {
+          var L = len(e.key);
+          if (c) { if (L) doc.deleteTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, e.key, 0, L); if (e.text) doc.insertTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, e.key, 0, e.text); }
+          else { if (L) doc.deleteText(G.sec, e.key, 0, L); if (e.text) doc.insertText(G.sec, e.key, 0, e.text); }
+          n++;
+        } catch (x) {}
+      });
+    });
+    return n;
+  }
+
   var api = {
+    lawyerLineEdits: lawyerLineEdits, applyLawyerLine: applyLawyerLine,
     withAliases: withAliases, fillMode: fillMode, caseForms: caseForms, hasRepForms: hasRepForms, PERSON_KEYS: PERSON_KEYS,
     MK_OPEN: MK_OPEN, MK_CLOSE: MK_CLOSE, BLANK: BLANK,
     mk: mk, markerAt: markerAt, markersOf: markersOf, fillDoc: fillDoc,
