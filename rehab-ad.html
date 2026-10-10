@@ -8,81 +8,145 @@
      푸른노무법인 회생광고 (rehab-ad.html) — 2026-10-10
      대표 지시 「법인회생이 발생하면 재기지원컨설팅으로 연결 … 포괄금지명령 나온 기업들만 모아서
      홍보물 보내고 … 푸른통합시스템에 앱 만든다. 회생광고로」
+     · 「UI 깔끔하고 구체적으로 정리」 · 「대법원 정보 한 달 치」 · 「주소가 있으면 홈페이지를 찾아 연락처·메일·팩스를 정렬해서」
      방식 결정 「추천대로」 = ① 서버가 매일 모은다 ② 사람이 고른다 ③ 우편으로 보낸다.
 
      ★ 자료가 오는 길
        서버 rehabWatch(functions/rehab-watch.js, 매일 07:40)가 전국 회생 관할 법원 공고에서
-       «법인회생 · 포괄적 금지명령» 사건을 rehab_ad/notices 에 담는다. 이 화면은 «읽기만» 한다.
-       사람이 정하는 것(발송 예정·보류·제외·발송 완료)만 rehab_ad/marks 에 쓴다.
+       «법인회생 · 포괄적 금지명령» 사건을 rehab_ad/notices 에 담고, 같은 사건의 개시결정·인가 같은 공고는 «이력(events)»과
+       «단계(stage)»로 붙인다. 회사 연락처는 rehab_ad/info 에 담긴다(functions/rehab-contact.js — 홈페이지·업체 정보에서만).
+       이 화면은 notices·info 를 «읽기만» 한다. 사람이 정하는 것(상태·메모·손으로 고친 연락처)만 rehab_ad/marks 에 쓴다.
 
      ⚠ 이메일·문자 발송 단추를 넣지 말 것 — 정보통신망법 제50조: 영리 목적 광고성 정보를
        전자적으로 보내려면 «받는 사람의 사전 동의»가 있어야 한다. 이 기업들은 동의한 적이 없다.
-       우편(서면)은 그 조항의 대상이 아니다. 동의를 받은 뒤에는 푸른 메일로 옮겨 보낸다.
-     ⚠ 혁신바우처 관리지침 제37조 — 수요기업에게 «과도한 영업»은 참여제한 사유다.
-       바우처 영업물로 대량 발송하지 않는다. 노무(대지급금·고용조정·임금 정리) 안내가 중심이다.
+       우편(서면)은 그 조항의 대상이 아니다. 찾은 이메일은 «복사해 두는» 용도다(상담 때 동의를 받은 뒤 푸른 메일로).
+     ⚠ 혁신바우처 관리지침 제37조 — 수요기업에게 «과도한 영업»은 참여제한 사유다. 노무(대지급금·고용조정·임금 정리) 안내가 중심이다.
+     ⚠ 라벨은 «본점 주소»로 만든다. 법원 송달주소는 대리인 법률사무소인 일이 많아 따로 보여 주기만 한다.
      ⚠ 회사명은 «보이는 이름»이다. 기업정보함과 이름으로 잇지 않는다(사업자번호가 없다 — 온톨로지 규칙).
      ⚠ 대표 전용(uid_roles 의 isAdmin). 모르면 잠근다(fail-closed).
      ══════════════════════════════════════════════════════════════ -->
 <style>
 :root{
-  --navy:#1e293b; --mute:#64748b; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
-  --blue:#2563eb; --blue-bg:#eff6ff; --green:#166534; --green-bg:#f0fdf4;
-  --amber:#854d0e; --amber-bg:#fffbeb; --red:#991b1b; --red-bg:#fef2f2; --gray-bg:#e2e8f0;
+  --ink:#1e293b; --ink2:#475569; --mute:#64748b; --line:#e2e8f0; --line2:#cbd5e1; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-d:#1e40af; --blue-bg:#eff6ff; --blue-line:#bfdbfe;
+  --green:#166534; --green-bg:#f0fdf4; --green-line:#bbf7d0;
+  --amber:#854d0e; --amber-bg:#fffbeb; --amber-line:#fde68a;
+  --red:#991b1b; --red-bg:#fef2f2; --red-line:#fecaca; --gray-bg:#e2e8f0;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--navy);font-size:14px}
-#head{position:sticky;top:0;z-index:20;background:var(--card);box-shadow:0 1px 3px rgba(15,23,42,.06)}
-.top{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--ink);font-size:14px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line2);background:var(--card);color:var(--ink);border-radius:8px;padding:6px 12px;line-height:1.3}
+button:hover{border-color:var(--mute)}
+button.pri{background:var(--blue);border-color:var(--blue);color:#ffffff}
+button.pri:hover{background:var(--blue-d)}
+button.sm{padding:3px 9px;font-size:12px}
+button:disabled{opacity:.5;cursor:default}
+a{color:var(--blue)}
+#head{position:sticky;top:0;z-index:20;background:var(--card);box-shadow:0 1px 3px rgba(15,23,42,.08)}
+.top{display:flex;align-items:center;gap:10px;padding:9px 16px;flex-wrap:wrap}
 .top h1{font-size:17px;margin:0}
+.top .sub{font-size:12px;color:var(--mute)}
 .top .sp{flex:1}
 #who{font-size:13px;color:var(--mute)}
-button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--navy);border-radius:8px;padding:6px 12px}
-button:hover{border-color:#94a3b8}
-button.pri{background:var(--blue);border-color:var(--blue);color:#ffffff}
-button:disabled{opacity:.5;cursor:default}
-main{max-width:1180px;margin:0 auto;padding:14px 16px 60px}
-.note{background:var(--amber-bg);border:1px solid #fde68a;color:var(--amber);border-radius:10px;padding:10px 12px;font-size:13px;line-height:1.55;margin-bottom:12px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:12px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
-.kpi b{display:block;font-size:22px;font-variant-numeric:tabular-nums}
-.kpi span{font-size:12px;color:var(--mute)}
-.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
-.filters select,.filters input{font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card)}
-.filters input{min-width:200px}
-#selbar{display:none;position:sticky;top:52px;z-index:10;background:var(--blue-bg);border:1px solid #bfdbfe;border-radius:10px;padding:8px 10px;margin-bottom:10px;gap:6px;flex-wrap:wrap;align-items:center}
+main{max-width:1560px;margin:0 auto;padding:12px 16px 60px}
+.note{display:flex;gap:10px;align-items:flex-start;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.55;margin-bottom:10px}
+.note b{font-weight:700}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.tab{display:flex;align-items:baseline;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 13px;cursor:pointer}
+.tab b{font-size:19px;font-variant-numeric:tabular-nums}
+.tab span{font-size:12.5px;color:var(--ink2)}
+.tab.on{background:var(--blue-bg);border-color:var(--blue);}
+.tab.on span{color:var(--blue-d);font-weight:700}
+.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.tools select,.tools input{font:inherit;border:1px solid var(--line2);border-radius:8px;padding:6px 8px;background:var(--card);color:var(--ink)}
+.tools input{min-width:190px}
+.tools .sp{flex:1}
+.runline{font-size:12px;color:var(--mute);margin:0 0 8px;display:flex;gap:14px;flex-wrap:wrap}
+#prog{display:none;background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px}
+#selbar{display:none;position:sticky;top:50px;z-index:10;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px;padding:7px 10px;margin-bottom:8px;gap:6px;flex-wrap:wrap;align-items:center}
 #selbar.on{display:flex}
-#selbar b{margin-right:6px}
+#selbar .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#selbar .div{width:1px;height:22px;background:var(--blue-line)}
+#selbar label{font-size:12px;color:var(--ink2);display:flex;gap:4px;align-items:center}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:12px;align-items:start}
 .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
 table{border-collapse:collapse;width:100%}
-th,td{padding:8px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
-th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600;position:sticky;top:0}
-td.ck,th.ck{width:36px;text-align:center;padding:0}
-td.no,th.no{width:40px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--bg)}
+tbody tr.cur{background:var(--blue-bg)}
+td.ck,th.ck{width:34px;text-align:center;padding:0}
+td.no,th.no{width:38px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
 td.ck input,th.ck input{width:18px;height:18px;cursor:pointer}
-td.addr{max-width:360px;overflow:hidden;text-overflow:ellipsis}
-td.co{font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
-.st{display:inline-block;border-radius:999px;padding:2px 9px;font-size:12px}
-.st-new{background:var(--gray-bg);color:#475569}
-.st-send{background:var(--blue-bg);color:var(--blue)}
-.st-hold{background:var(--amber-bg);color:var(--amber)}
-.st-skip{background:var(--red-bg);color:var(--red)}
-.st-sent{background:var(--green-bg);color:var(--green)}
-.empty{padding:30px;text-align:center;color:var(--mute)}
+td.co{font-weight:600;max-width:250px;overflow:hidden;text-overflow:ellipsis}
+td.rg{max-width:130px;overflow:hidden;text-overflow:ellipsis}
+td.ct{letter-spacing:2px}
+.chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;margin-left:5px;font-weight:500}
+.c-gray{background:var(--gray-bg);color:var(--ink2)}
+.c-blue{background:var(--blue-bg);color:var(--blue-d)}
+.c-green{background:var(--green-bg);color:var(--green)}
+.c-amber{background:var(--amber-bg);color:var(--amber)}
+.c-red{background:var(--red-bg);color:var(--red)}
+.ico{display:inline-block;width:20px;text-align:center;font-size:13px}
+.ico.off{opacity:.25}
+.empty{padding:34px;text-align:center;color:var(--mute);line-height:1.7}
+/* 상세 패널 */
+.detail{position:sticky;top:60px;max-height:calc(100vh - 76px);overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 15px}
+.detail .ph{color:var(--mute);text-align:center;padding:40px 10px;line-height:1.7}
+.detail h2{font-size:16px;margin:0 0 4px;word-break:keep-all}
+.detail .meta{font-size:12.5px;color:var(--ink2);margin-bottom:8px}
+.dclose{display:none;float:right}
+.sec{margin-top:12px;padding-top:10px;border-top:1px solid var(--line)}
+.sec h3{font-size:12.5px;margin:0 0 6px;color:var(--mute);font-weight:700;display:flex;align-items:center;gap:8px}
+.sec h3 .sp{flex:1}
+.kv{display:grid;grid-template-columns:78px 1fr;gap:4px 8px;font-size:13px;line-height:1.5}
+.kv dt{color:var(--mute)}
+.kv dd{margin:0;word-break:break-all}
+.row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:3px 0}
+.row .lab{width:54px;font-size:12px;color:var(--mute)}
+.row .val{font-weight:600;font-variant-numeric:tabular-nums;word-break:break-all}
+.row .none{color:var(--mute);font-weight:400}
+.warn{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:8px;padding:6px 9px;font-size:12px;line-height:1.5;margin:6px 0}
+.okline{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green);border-radius:8px;padding:5px 9px;font-size:12px;margin:6px 0}
+.links{display:flex;gap:6px;flex-wrap:wrap}
+.links a{font-size:12.5px;border:1px solid var(--line2);border-radius:999px;padding:2px 10px;text-decoration:none;color:var(--ink2);background:var(--card)}
+.links a:hover{border-color:var(--blue);color:var(--blue)}
+.tl{margin:0;padding:0;list-style:none;font-size:12.5px}
+.tl li{display:flex;gap:8px;padding:2px 0}
+.tl .d{color:var(--mute);width:48px;flex:none;font-variant-numeric:tabular-nums}
+.f{display:grid;grid-template-columns:54px 1fr;gap:5px 8px;align-items:center;font-size:12.5px}
+.f input,.f textarea{font:inherit;border:1px solid var(--line2);border-radius:6px;padding:5px 7px;width:100%;background:var(--card);color:var(--ink)}
+.f textarea{min-height:54px;resize:vertical}
+.st-btns{display:flex;gap:6px;flex-wrap:wrap}
+.st-btns button.on{background:var(--blue);border-color:var(--blue);color:#ffffff}
 #lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
 #lock p{color:var(--mute);font-size:13px}
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--navy);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:50;max-width:90vw}
 #toast.on{opacity:1}
-.run{font-size:12px;color:var(--mute);margin:-4px 0 10px}
-@media (max-width:640px){ input,select,textarea{font-size:16px} .filters input{min-width:0;flex:1} td.addr{max-width:200px} }
+@media (max-width:1100px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .detail{display:none;position:fixed;inset:0;z-index:30;max-height:none;border-radius:0;border:0}
+  .detail.open{display:block}
+  .dclose{display:inline-block}
+}
+@media (max-width:640px){
+  input,select,textarea{font-size:16px}
+  .tools input{min-width:0;flex:1}
+  main{padding:10px 10px 60px}
+  #selbar{top:56px}
+}
 </style>
 </head>
 <body>
 <div id="head">
   <div class="top">
     <h1>⚖️ 회생광고</h1>
+    <span class="sub">법인회생 · 포괄적 금지명령 기업 → 우편 안내</span>
     <span id="who"></span>
     <span class="sp"></span>
-    <button id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+    <button class="sm" id="refreshBtn" onclick="reload()">새로고침</button>
+    <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
 </div>
 
@@ -90,51 +154,73 @@ td.co{font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
 
 <main id="app" style="display:none">
   <div class="note">
-    ⚖️ 전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조) 기업을 매일 아침 모읍니다.<br>
-    ✉️ 안내는 <b>우편</b>으로 보냅니다. 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조).
+    <span>⚖️</span>
+    <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조) 기업을 매일 아침 모읍니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
+    안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
   </div>
-  <div class="kpis">
-    <div class="kpi"><b id="kNew">-</b><span>미검토</span></div>
-    <div class="kpi"><b id="kSend">-</b><span>발송 예정</span></div>
-    <div class="kpi"><b id="kSent">-</b><span>발송 완료</span></div>
-    <div class="kpi"><b id="kAll">-</b><span>모은 기업(전체)</span></div>
-  </div>
-  <div class="run" id="runNote"></div>
-  <div class="filters">
+
+  <div class="tabs" id="tabs"></div>
+
+  <div class="tools">
     <select id="fDays" aria-label="기간">
-      <option value="7">최근 7일</option><option value="14" selected>최근 14일</option>
-      <option value="30">최근 30일</option><option value="0">전체 기간</option>
-    </select>
-    <select id="fStatus" aria-label="상태">
-      <option value="">모든 상태</option><option value="new">미검토</option><option value="send">발송 예정</option>
-      <option value="hold">보류</option><option value="skip">제외</option><option value="sent">발송 완료</option>
+      <option value="7">최근 7일</option><option value="14">최근 14일</option>
+      <option value="31" selected>최근 1개월</option><option value="0">전체 기간</option>
     </select>
     <select id="fCourt" aria-label="법원"><option value="">모든 법원</option></select>
+    <select id="fSido" aria-label="지역"><option value="">모든 지역</option></select>
     <select id="fType" aria-label="사건종류"><option value="">회생·간이회생</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
-    <input id="fText" type="search" placeholder="회사명·주소 찾기">
-    <button onclick="resetFilters()">거르개 풀기</button>
+    <select id="fStage" aria-label="단계"><option value="">모든 단계</option></select>
+    <select id="fContact" aria-label="연락처">
+      <option value="">연락처 전체</option><option value="has">연락처 있음</option><option value="none">연락처 없음</option><option value="check">확인 필요</option>
+    </select>
+    <select id="fSort" aria-label="정렬">
+      <option value="date">공고일 최신순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
+    </select>
+    <input id="fText" type="search" placeholder="회사명·주소·대리인 찾기">
+    <button class="sm" onclick="resetFilters()">거르개 풀기</button>
+    <span class="sp"></span>
+    <button class="pri" id="findBtn" onclick="findContacts()">🔎 연락처 찾기</button>
   </div>
+  <div class="runline" id="runline"></div>
+  <div id="prog"></div>
+
   <div id="selbar">
-    <b id="selCount">0건 선택</b>
-    <button onclick="bulk('send')">📮 발송 예정</button>
-    <button onclick="bulk('hold')">⏸ 보류</button>
-    <button onclick="bulk('skip')">🚫 제외</button>
-    <button onclick="bulk('new')">↩ 미검토로</button>
-    <button class="pri" onclick="printLabels()">🏷 우편 라벨 인쇄</button>
-    <button onclick="bulk('sent')">✅ 발송 완료로</button>
-    <button onclick="downloadCsv()">⬇ CSV</button>
-    <button onclick="clearSel()">선택 풀기</button>
+    <b id="selCount">0곳 선택</b>
+    <span class="div"></span>
+    <span class="grp">
+      <button class="sm" onclick="bulk('send')">📮 발송 예정</button>
+      <button class="sm" onclick="bulk('hold')">⏸ 보류</button>
+      <button class="sm" onclick="bulk('skip')">🚫 제외</button>
+      <button class="sm" onclick="bulk('new')">↩ 미검토로</button>
+      <button class="sm" onclick="bulk('sent')">✅ 발송 완료로</button>
+    </span>
+    <span class="div"></span>
+    <span class="grp">
+      <button class="pri sm" onclick="printDocs('both')">🖨 안내문 + 라벨</button>
+      <button class="sm" onclick="printDocs('letters')">안내문만</button>
+      <button class="sm" onclick="printDocs('labels')">라벨만</button>
+      <label><input type="checkbox" id="draftCk" checked> 초안 표시</label>
+    </span>
+    <span class="div"></span>
+    <span class="grp">
+      <button class="sm" onclick="findContacts(true)">🔎 선택 연락처 찾기</button>
+      <button class="sm" onclick="downloadCsv()">⬇ CSV</button>
+      <button class="sm" onclick="clearSel()">선택 풀기</button>
+    </span>
   </div>
-  <div class="tbl">
-    <table>
-      <thead><tr>
-        <th class="ck"><input type="checkbox" id="ckAll" aria-label="보이는 줄 전체 선택"></th>
-        <th class="no">번호</th><th>공고일</th><th>법원</th><th>사건번호</th><th>종류</th>
-        <th>회사명</th><th>주소</th><th>상태</th>
-      </tr></thead>
-      <tbody id="rows"></tbody>
-    </table>
-    <div class="empty" id="empty" style="display:none">조건에 맞는 기업이 없습니다.</div>
+
+  <div class="layout">
+    <div class="tbl">
+      <table>
+        <thead><tr>
+          <th class="ck"><input type="checkbox" id="ckAll" aria-label="보이는 줄 전체 선택"></th>
+          <th class="no">번호</th><th>공고일</th><th>회사명</th><th>지역</th><th>법원</th><th>사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none"></div>
+    </div>
+    <aside class="detail" id="detail"></aside>
   </div>
 </main>
 <div id="toast"></div>
@@ -157,167 +243,342 @@ td.co{font-weight:600;max-width:240px;overflow:hidden;text-overflow:ellipsis}
 </script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script src="js/rehab-letter.js?v=1"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
-var fbDb=null, fbUid=null, gate=null;
-var NOTICES={}, MARKS={}, VIEW=[], SEL={};
-var ST_NAME={new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
+var ENRICH_URL='https://asia-northeast3-pureun-erp.cloudfunctions.net/rehabEnrich';
+var fbDb=null, gate=null;
+var NOTICES={}, MARKS={}, INFO={}, LASTRUN=null;
+var VIEW=[], SEL={}, CUR='', TAB='all';
+var STATUS={new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
+var ST_CHIP={new:'c-gray',send:'c-blue',hold:'c-amber',skip:'c-red',sent:'c-green'};
+var STAGE_CHIP={'금지명령':'c-amber','개시':'c-blue','인가':'c-green','종결':'c-gray','폐지·기각':'c-red'};
+var STAGES=['금지명령','개시','인가','종결','폐지·기각'];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
-function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove('on');},2600); }
-function statusOf(id){ var m=MARKS[id]; return (m && !m._deleted && ST_NAME[m.status]) ? m.status : 'new'; }
+function safeHref(u){ u=String(u||'').trim(); return /^https?:\/\//i.test(u)?u:''; }
+function toast(m){ var t=$('toast'); t.textContent=m; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(function(){t.classList.remove('on');},3200); }
+function uniq(a){ var o=[]; (a||[]).forEach(function(x){ if(x && o.indexOf(x)<0) o.push(x); }); return o; }
 function seoulToday(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,10); }
 function daysAgo(n){ return new Date(Date.now()+9*3600e3-n*864e5).toISOString().slice(0,10); }
+function lsGet(k){ try{ return localStorage.getItem('rehabad_'+k)||''; }catch(e){ return ''; } }
+function lsSet(k,v){ try{ localStorage.setItem('rehabad_'+k,v); }catch(e){} }
 
-/* ═══ 그리기 ═══ */
-function filtered(){
-  var days=Number($('fDays').value), st=$('fStatus').value, court=$('fCourt').value, type=$('fType').value;
-  var q=$('fText').value.trim().toLowerCase(), since=days?daysAgo(days):'';
+function statusOf(id){ var m=MARKS[id]; return (m && !m._deleted && STATUS[m.status]) ? m.status : 'new'; }
+
+/* ── 연락처 합치기: 사람이 손으로 적은 것(marks.contact)이 서버가 찾은 것(info)보다 앞선다 ── */
+function contactOf(id){
+  var i=INFO[id]||{}, m=(MARKS[id]&&MARKS[id].contact)||{};
+  var phones=uniq([m.phone].concat(i.phones||[]));
+  var faxes=uniq([m.fax].concat(i.faxes||[]));
+  var emails=uniq([m.email].concat(i.emails||[]));
+  var homepage=m.homepage||i.homepage||'';
+  var manual=!!(m.phone||m.fax||m.email||m.homepage);
+  var any=phones.length||faxes.length||emails.length;
+  return { phones:phones, faxes:faxes, emails:emails, homepage:homepage, manual:manual, any:!!any,
+    check: !manual && i.confidence==='low' && !!(any||homepage), conf:i.confidence||'', note:i.note||'', refs:i.refs||[],
+    sources:i.sources||[], checkedAt:i.checkedAt||0, status:i.status||'', searched:!!INFO[id] };
+}
+
+/* ═══ 거르기·정렬 ═══ */
+function baseList(){
+  var days=Number($('fDays').value), court=$('fCourt').value, sido=$('fSido').value, type=$('fType').value, stage=$('fStage').value,
+      ct=$('fContact').value, q=$('fText').value.trim().toLowerCase(), since=days?daysAgo(days):'';
   return Object.keys(NOTICES).map(function(k){ return NOTICES[k]; }).filter(function(n){
     if(!n || n._deleted) return false;
-    if(since && (n.noticeDate||'') < since) return false;
-    if(st && statusOf(n.id)!==st) return false;
+    if(since && (n.noticeDate||'')<since) return false;
     if(court && n.courtCode!==court) return false;
+    if(sido && n.sido!==sido) return false;
     if(type && n.caseType!==type) return false;
-    if(q && ((n.debtorName||'')+' '+(n.address||'')).toLowerCase().indexOf(q)<0) return false;
+    if(stage && n.stage!==stage) return false;
+    if(ct){ var c=contactOf(n.id); if(ct==='has' && !c.any) return false; if(ct==='none' && c.any) return false; if(ct==='check' && !c.check) return false; }
+    if(q && ((n.debtorName||'')+' '+(n.address||'')+' '+(n.counsel||'')+' '+(n.dlvAddress||'')).toLowerCase().indexOf(q)<0) return false;
     return true;
-  }).sort(function(a,b){ return (b.noticeDate||'').localeCompare(a.noticeDate||'') || (a.courtName||'').localeCompare(b.courtName||''); });
+  });
+}
+function sortList(list){
+  var s=$('fSort').value;
+  return list.slice().sort(function(a,b){
+    if(s==='name') return (a.debtorName||'').localeCompare(b.debtorName||'','ko');
+    if(s==='region') return ((a.sido||'')+(a.sigungu||'')).localeCompare((b.sido||'')+(b.sigungu||''),'ko') || (b.noticeDate||'').localeCompare(a.noticeDate||'');
+    if(s==='contact'){ var d=(contactOf(b.id).any?1:0)-(contactOf(a.id).any?1:0); if(d) return d; }
+    return (b.noticeDate||'').localeCompare(a.noticeDate||'') || (a.courtName||'').localeCompare(b.courtName||'');
+  });
+}
+
+/* ═══ 그리기 ═══ */
+function drawTabs(base){
+  var c={all:base.length,new:0,send:0,hold:0,skip:0,sent:0};
+  base.forEach(function(n){ c[statusOf(n.id)]++; });
+  var names={all:'전체',new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
+  $('tabs').innerHTML=['all','new','send','hold','skip','sent'].map(function(k){
+    return '<div class="tab'+(TAB===k?' on':'')+'" data-tab="'+k+'"><b>'+c[k]+'</b><span>'+names[k]+'</span></div>';
+  }).join('');
+}
+function iconsOf(c){
+  function ic(on,ch,t){ return '<span class="ico'+(on?'':' off')+'" title="'+esc(t)+'">'+ch+'</span>'; }
+  return ic(c.phones.length,'☎',c.phones[0]||'전화 없음')+ic(c.faxes.length,'📠',c.faxes[0]||'팩스 없음')+
+    ic(c.emails.length,'✉',c.emails[0]||'메일 없음')+ic(!!c.homepage,'🌐',c.homepage||'홈페이지 없음');
 }
 function draw(){
-  VIEW=filtered();
+  var base=baseList(); drawTabs(base);
+  VIEW=sortList(base.filter(function(n){ return TAB==='all' || statusOf(n.id)===TAB; }));
   var html=VIEW.map(function(n,i){
-    var st=statusOf(n.id);
-    return '<tr><td class="ck"><input type="checkbox" data-id="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
-      '<td class="no">'+(i+1)+'</td><td>'+esc(n.noticeDate)+'</td><td>'+esc(n.courtName)+'</td><td>'+esc(n.caseNo)+'</td>'+
-      '<td>'+esc(n.caseType)+'</td><td class="co" title="'+esc(n.debtorName)+'">'+esc(n.debtorName)+'</td>'+
-      '<td class="addr" title="'+esc(n.address)+'">'+(n.zip?'('+esc(n.zip)+') ':'')+esc(n.address)+'</td>'+
-      '<td><span class="st st-'+st+'">'+ST_NAME[st]+'</span></td></tr>';
+    var st=statusOf(n.id), c=contactOf(n.id);
+    return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
+      '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
+      '<td class="no">'+(i+1)+'</td><td>'+esc((n.noticeDate||'').slice(5))+'</td>'+
+      '<td class="co" title="'+esc(n.debtorName)+'">'+esc(n.debtorName)+'<span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></td>'+
+      '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc((n.courtName||'').replace('지방법원','지법'))+'</td><td>'+esc(n.caseNo)+'</td>'+
+      '<td><span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span></td>'+
+      '<td class="ct">'+iconsOf(c)+(c.check?'<span class="chip c-amber" title="확인 필요">⚠</span>':'')+'</td>'+
+      '<td><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td></tr>';
   }).join('');
   $('rows').innerHTML=html;
-  $('empty').style.display=VIEW.length?'none':'';
-  /* 보이지 않게 된 줄은 고른 것에서 뺀다 — 안 보이는 것이 골라져 있으면 안 된다 */
+  var e=$('empty');
+  if(VIEW.length){ e.style.display='none'; }
+  else{
+    e.style.display='';
+    e.innerHTML = Object.keys(NOTICES).length ? '조건에 맞는 기업이 없습니다.<br>위의 거르개를 풀어 보세요.'
+      : '아직 모은 기업이 없습니다.<br>서버가 매일 아침 07:40 법원 공고를 모읍니다.';
+  }
   var vis={}; VIEW.forEach(function(n){ vis[n.id]=1; });
-  Object.keys(SEL).forEach(function(k){ if(!vis[k]) delete SEL[k]; });
-  drawSel(); drawKpi();
-}
-function drawKpi(){
-  var c={new:0,send:0,sent:0}, all=0;
-  Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(!n||n._deleted) return; all++; var s=statusOf(k); if(c[s]!=null) c[s]++; });
-  $('kNew').textContent=c.new; $('kSend').textContent=c.send; $('kSent').textContent=c.sent; $('kAll').textContent=all;
+  Object.keys(SEL).forEach(function(k){ if(!vis[k]) delete SEL[k]; });   /* 안 보이는 줄이 골라져 있으면 안 된다 */
+  drawSel(); drawDetail(); drawRunline();
 }
 function drawSel(){
   var n=Object.keys(SEL).length;
-  $('selCount').textContent=n+'건 선택';
+  $('selCount').textContent=n+'곳 선택';
   $('selbar').classList.toggle('on', n>0);
   $('ckAll').checked = VIEW.length>0 && n===VIEW.length;
   $('ckAll').indeterminate = n>0 && n<VIEW.length;
+  var left=Object.keys(NOTICES).filter(function(k){ return !INFO[k]; }).length;
+  $('findBtn').textContent = n ? '🔎 선택 '+n+'곳 연락처 찾기' : '🔎 연락처 찾기'+(left?' (미확인 '+left+'곳)':'');
 }
-function fillCourts(){
-  var seen={}; Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(n&&n.courtCode) seen[n.courtCode]=n.courtName; });
-  var cur=$('fCourt').value;
-  $('fCourt').innerHTML='<option value="">모든 법원</option>'+Object.keys(seen).sort(function(a,b){return seen[a].localeCompare(seen[b]);})
-    .map(function(c){ return '<option value="'+esc(c)+'">'+esc(seen[c])+'</option>'; }).join('');
-  $('fCourt').value=cur;
+function drawRunline(){
+  var all=Object.keys(NOTICES).length, got=Object.keys(NOTICES).filter(function(k){ return contactOf(k).any; }).length;
+  var r=LASTRUN, bits=['모은 기업 '+all+'곳','연락처 확보 '+got+'곳'];
+  if(r) bits.push('마지막 수집 '+r.date+(r.added?' · 새로 '+r.added+'곳':'')+((r.errors||[]).length?' · ⚠ 못 읽은 법원 '+r.errors.length+'곳':''));
+  if(r && r.contactNote) bits.push('⚠ '+r.contactNote);
+  $('runline').innerHTML=bits.map(function(b){ return '<span>'+esc(b)+'</span>'; }).join('');
 }
-function resetFilters(){ $('fDays').value='14'; $('fStatus').value=''; $('fCourt').value=''; $('fType').value=''; $('fText').value=''; draw(); }
-function clearSel(){ SEL={}; draw(); }
-function selected(){ return VIEW.filter(function(n){ return SEL[n.id]; }); }
+function fillFilters(){
+  var courts={}, sidos={}, stages={};
+  Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(!n) return; if(n.courtCode) courts[n.courtCode]=n.courtName; if(n.sido) sidos[n.sido]=1; if(n.stage) stages[n.stage]=1; });
+  function fill(id,first,items,labels){
+    var cur=$(id).value;
+    $(id).innerHTML='<option value="">'+first+'</option>'+items.map(function(v){ return '<option value="'+esc(v)+'">'+esc(labels?labels[v]:v)+'</option>'; }).join('');
+    $(id).value=cur;
+  }
+  fill('fCourt','모든 법원',Object.keys(courts).sort(function(a,b){ return courts[a].localeCompare(courts[b],'ko'); }),courts);
+  fill('fSido','모든 지역',Object.keys(sidos).sort(function(a,b){ return a.localeCompare(b,'ko'); }));
+  fill('fStage','모든 단계',STAGES.filter(function(s){ return stages[s]; }));
+}
 
-/* ═══ 한꺼번에 표시 — 건수를 묻고 한 번에 저장한다 ═══ */
+/* ═══ 상세 패널 ═══ */
+function copyBtn(txt){ return txt ? '<button class="sm" data-copy="'+esc(txt)+'">복사</button>' : ''; }
+function ago(ms){ if(!ms) return ''; var d=Math.floor((Date.now()-ms)/864e5); return d<=0?'오늘':d+'일 전'; }
+function drawDetail(){
+  var el=$('detail'), n=NOTICES[CUR];
+  if(!n){ el.innerHTML='<div class="ph">왼쪽 목록에서 회사를 누르면<br>주소·연락처·사건 이력이 여기에 나옵니다.</div>'; return; }
+  var c=contactOf(n.id), st=statusOf(n.id), mk=MARKS[n.id]||{}, mc=mk.contact||{};
+  var addrQ=encodeURIComponent(n.address||''), nameQ=encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim()+' '+(n.sigungu||''));
+  var h='<button class="sm close dclose" onclick="closeDetail()">닫기</button>';
+  h+='<h2>'+esc(n.debtorName)+'</h2>';
+  h+='<div class="meta"><span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div>';
+  h+='<dl class="kv"><dt>법원</dt><dd>'+esc(n.courtName)+(n.division?' · '+esc(n.division):'')+'</dd><dt>사건번호</dt><dd>'+esc(n.caseNo)+'</dd><dt>공고일</dt><dd>'+esc(n.noticeDate)+' · '+esc(n.noticeTitle)+'</dd></dl>';
+
+  h+='<div class="sec"><h3>본점 주소 <span class="sp"></span>'+copyBtn((n.zip?'('+n.zip+') ':'')+(n.address||''))+'</h3>';
+  h+='<div style="font-size:13px;line-height:1.5">'+(n.zip?'('+esc(n.zip)+') ':'')+esc(n.address)+'</div>';
+  if(n.dlvAddress){
+    h+='<div class="warn">법원 <b>송달주소</b>가 달라요'+(n.counsel?' — 대리인 <b>'+esc(n.counsel)+'</b>':'')+'<br>'+(n.dlvZip?'('+esc(n.dlvZip)+') ':'')+esc(n.dlvAddress)+'<br>안내문·라벨은 본점 주소로 만듭니다.</div>';
+  }
+  h+='</div>';
+
+  h+='<div class="sec"><h3>연락처 <span class="sp"></span><button class="sm" onclick="findContacts(false,\''+esc(n.id)+'\')">🔎 '+(c.searched?'다시 찾기':'찾기')+'</button></h3>';
+  function line(lab,list,link){
+    var v=list.length ? list.map(function(x){ return link? '<a href="'+esc(safeHref(x))+'" target="_blank" rel="noopener noreferrer">'+esc(x.replace(/^https?:\/\//,'').replace(/\/$/,''))+'</a>' : esc(x); }).join(' / ') : '<span class="none">찾지 못함</span>';
+    return '<div class="row"><span class="lab">'+lab+'</span><span class="val">'+v+'</span>'+(list.length&&!link?copyBtn(list[0]):'')+'</div>';
+  }
+  h+=line('전화',c.phones)+line('팩스',c.faxes)+line('이메일',c.emails)+line('홈페이지',c.homepage?[c.homepage]:[],true);
+  if(c.check) h+='<div class="warn">⚠ 확인 필요 — '+esc(c.note||'같은 회사인지 확인하세요')+'</div>';
+  else if(c.note && !c.any) h+='<div class="warn">'+esc(c.note)+'</div>';
+  else if(c.any && c.conf==='high') h+='<div class="okline">회사명·주소가 맞는 곳에서 찾았습니다</div>';
+  if(c.note && c.any && !c.check) h+='<div class="warn">'+esc(c.note)+'</div>';
+  if(c.searched) h+='<div style="font-size:11.5px;color:var(--mute);margin-top:4px">'+esc(c.sources.join(' · '))+(c.checkedAt?' · '+ago(c.checkedAt)+' 확인':'')+'</div>';
+  else h+='<div style="font-size:11.5px;color:var(--mute);margin-top:4px">아직 찾아보지 않았습니다 — 매일 아침 서버가 자동으로 찾고, 위 단추로 바로 찾을 수도 있습니다.</div>';
+  if((c.refs||[]).length) h+='<div class="links" style="margin-top:6px">'+c.refs.map(function(r){ return '<a href="'+esc(safeHref(r.url))+'" target="_blank" rel="noopener noreferrer" title="'+esc(r.title)+'">'+({dir:'기업정보',sns:'SNS',map:'지도'}[r.type]||'참고')+'</a>'; }).join('')+'</div>';
+  h+='</div>';
+
+  h+='<div class="sec"><h3>직접 확인하고 고치기</h3><div class="f">'+
+    '<span>전화</span><input id="mcPhone" value="'+esc(mc.phone||'')+'" placeholder="02-000-0000">'+
+    '<span>팩스</span><input id="mcFax" value="'+esc(mc.fax||'')+'" placeholder="02-000-0000">'+
+    '<span>이메일</span><input id="mcEmail" value="'+esc(mc.email||'')+'" placeholder="name@company.co.kr">'+
+    '<span>홈페이지</span><input id="mcHome" value="'+esc(mc.homepage||'')+'" placeholder="https://">'+
+    '<span>메모</span><textarea id="mcMemo" placeholder="통화 내용·담당자 등">'+esc(mk.memo||'')+'</textarea></div>'+
+    '<div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="sm pri" onclick="saveManual()">저장</button>'+
+    '<button class="sm" onclick="readHome()" title="홈페이지 주소를 입력하면 그 사이트를 읽어 전화·팩스·메일을 뽑습니다">입력한 홈페이지 읽기</button></div></div>';
+
+  h+='<div class="sec"><h3>바로 찾아보기</h3><div class="links">'+
+    '<a href="https://search.naver.com/search.naver?query='+nameQ+'" target="_blank" rel="noopener noreferrer">네이버 검색</a>'+
+    '<a href="https://map.naver.com/p/search/'+addrQ+'" target="_blank" rel="noopener noreferrer">네이버 지도</a>'+
+    '<a href="https://map.kakao.com/?q='+addrQ+'" target="_blank" rel="noopener noreferrer">카카오맵</a>'+
+    '<a href="https://bizno.net/?query='+encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim())+'" target="_blank" rel="noopener noreferrer">사업자번호 조회</a>'+
+    '<a href="https://www.saramin.co.kr/zf_user/search/company?searchword='+encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim())+'" target="_blank" rel="noopener noreferrer">사람인</a>'+
+    '<a href="https://www.iros.go.kr/" target="_blank" rel="noopener noreferrer">인터넷등기소</a>'+
+    '<a href="https://ssgo.scourt.go.kr/ssgo/ssgo930/rhblBnkp.on" target="_blank" rel="noopener noreferrer">대법원 공고</a></div></div>';
+
+  var ev=n.events||[];
+  if(ev.length){ h+='<div class="sec"><h3>사건 진행 이력</h3><ul class="tl">'+ev.map(function(e){ return '<li><span class="d">'+esc(e.d.slice(5))+'</span><span>'+esc(e.t)+'</span></li>'; }).join('')+'</ul></div>'; }
+
+  h+='<div class="sec"><h3>상태</h3><div class="st-btns">'+['new','send','hold','skip','sent'].map(function(k){
+    return '<button class="sm'+(st===k?' on':'')+'" onclick="setStatus(\''+esc(n.id)+'\',\''+k+'\')">'+STATUS[k]+'</button>'; }).join('')+'</div>'+
+    '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="sm" onclick="printOne(\'both\')">🖨 이 회사 안내문 + 라벨</button><button class="sm" onclick="printOne(\'letters\')">안내문만</button></div></div>';
+  el.innerHTML=h;
+}
+function openDetail(id){ CUR=id; drawDetail(); $('detail').classList.add('open'); var rows=$('rows').children; for(var i=0;i<rows.length;i++) rows[i].classList.toggle('cur', rows[i].getAttribute('data-id')===id); }
+function closeDetail(){ $('detail').classList.remove('open'); }
+
+/* ═══ 표시 저장 — 건수를 묻고 한 번에 저장한다 ═══ */
+function saveMark(id, patch){
+  var ref=fbDb.ref('rehab_ad/marks/'+id), now=Date.now();
+  return gate.save(ref, function(prev){
+    prev=prev||{};
+    return Object.assign({}, prev, { id:id, entityType:'Task', taskKind:'rehabOutreach', sourceKind:'rehabNotice', sourceId:id }, patch(prev,now));
+  }, { entityType:'Task' });
+}
+async function loadMarks(){ MARKS=(await fbDb.ref('rehab_ad/marks').once('value')).val()||{}; }
+async function loadInfo(){ INFO=(await fbDb.ref('rehab_ad/info').once('value')).val()||{}; }
+async function setStatus(id, st){
+  try{ await saveMark(id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); await loadMarks(); draw(); toast('「'+STATUS[st]+'」(으)로 표시했습니다'); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
 async function bulk(st){
-  var list=selected(); if(!list.length) return;
-  if(!confirm(list.length+'건을 「'+ST_NAME[st]+'」(으)로 표시할까요?')) return;
-  var now=Date.now();
-  var jobs=list.map(function(n){
-    var ref=fbDb.ref('rehab_ad/marks/'+n.id);
-    return gate.save(ref, function(prev){
-      prev=prev||{};
-      return Object.assign({}, prev, { id:n.id, entityType:'Task', taskKind:'rehabOutreach',
-        sourceKind:'rehabNotice', sourceId:n.id, status:st, statusAt:now,
-        sentAt: st==='sent' ? now : (prev.sentAt||null) });
-    }, { entityType:'Task' }).then(function(r){ MARKS[n.id]=r.snapshot ? r.snapshot.val() : MARKS[n.id]; return true; });
-  });
-  var res=await Promise.allSettled(jobs);
+  var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
+  if(!confirm(list.length+'곳을 「'+STATUS[st]+'」(으)로 표시할까요?')) return;
+  var res=await Promise.allSettled(list.map(function(n){ return saveMark(n.id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); }));
   var fail=res.filter(function(r){ return r.status==='rejected'; });
-  await loadMarks();
-  SEL={}; draw();
-  toast(fail.length ? ((list.length-fail.length)+'건 저장 · '+fail.length+'건 실패: '+String(fail[0].reason&&fail[0].reason.message||fail[0].reason)) : list.length+'건을 「'+ST_NAME[st]+'」(으)로 표시했습니다');
+  await loadMarks(); SEL={}; draw();
+  toast(fail.length ? ((list.length-fail.length)+'곳 저장 · '+fail.length+'곳 실패: '+String(fail[0].reason&&fail[0].reason.message||fail[0].reason)) : list.length+'곳을 「'+STATUS[st]+'」(으)로 표시했습니다');
+}
+async function saveManual(){
+  if(!CUR) return;
+  var c={ phone:$('mcPhone').value.trim(), fax:$('mcFax').value.trim(), email:$('mcEmail').value.trim(), homepage:$('mcHome').value.trim() };
+  if(c.homepage && !safeHref(c.homepage)){ toast('홈페이지는 https:// 로 시작해야 합니다'); return; }
+  var memo=$('mcMemo').value.trim().slice(0,500);
+  try{ await saveMark(CUR, function(){ return { contact:c, memo:memo }; }); await loadMarks(); draw(); toast('저장했습니다'); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
 }
 
-/* ═══ 우편 라벨 — A4 한 장에 2열 × 8줄(가로 99.1 × 세로 34mm 계열 라벨지) ═══
-   ⚠ 인쇄만 한다. «발송 완료» 표시는 실제로 부친 뒤 사람이 누른다. */
-function printLabels(){
-  var list=selected(); if(!list.length) return;
-  var cells=list.map(function(n){
-    return '<div class="lb"><div class="zip">(우) '+esc(n.zip||'')+'</div><div class="ad">'+esc(n.address||'')+'</div>'+
-      '<div class="to">'+esc(n.debtorName||'')+' 귀중</div><div class="ceo">대표이사님 앞</div></div>';
-  }).join('');
+/* ═══ 연락처 찾기 — 서버(rehabEnrich)가 홈페이지·업체 정보에서 찾는다 ═══ */
+function setProg(t){ var p=$('prog'); p.style.display=t?'block':'none'; p.textContent=t||''; }
+async function enrich(ids, hints){
+  if(!ids.length){ toast('찾을 회사가 없습니다'); return; }
+  var tok; try{ tok=await firebase.auth().currentUser.getIdToken(); }catch(e){ toast('로그인이 필요합니다'); return; }
+  var done=0, found=0, refused=0, failed=0, errMsg='';
+  setProg('연락처 찾는 중 0/'+ids.length+' …');
+  for(var i=0;i<ids.length;i+=4){
+    var batch=ids.slice(i,i+4);
+    try{
+      var r=await fetch(ENRICH_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:JSON.stringify({ ids:batch, hints:hints||{} }) });
+      var j={}; try{ j=await r.json(); }catch(e){}
+      if(r.status===404 || r.status===0) throw new Error('서버 함수(rehabEnrich)가 아직 올라가지 않았습니다');
+      if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+      (j.results||[]).forEach(function(x){ if(x.refused) refused++; else if(x.status==='found') found++; });
+      done+=batch.length;
+      if(j.providers==='없음'){ errMsg='서버에 검색 열쇠(KAKAO_REST_KEY)가 없습니다'; break; }
+    }catch(e){ failed+=batch.length; errMsg=String(e&&e.message||e); if(/올라가지/.test(errMsg)) break; }
+    setProg('연락처 찾는 중 '+Math.min(i+4,ids.length)+'/'+ids.length+' … 찾음 '+found+'곳');
+  }
+  try{ await loadInfo(); }catch(e){}
+  setProg(''); draw();
+  var msg='연락처 찾기 끝 — '+found+'곳에서 찾음';
+  if(refused) msg+=' · 검색 서비스가 거절한 '+refused+'곳은 다음에 다시';
+  if(failed) msg+=' · 실패 '+failed+'곳'+(errMsg?'('+errMsg+')':'');
+  else if(errMsg) msg+=' · '+errMsg;
+  toast(msg);
+}
+function findContacts(onlySel, oneId){
+  if(oneId){ enrich([oneId]); return; }
+  var ids = (onlySel || Object.keys(SEL).length) ? Object.keys(SEL)
+    : VIEW.filter(function(n){ return !INFO[n.id]; }).map(function(n){ return n.id; });
+  if(ids.length>12 && !confirm(ids.length+'곳의 연락처를 찾습니다. 한 곳에 몇 초씩 걸립니다. 계속할까요?')) return;
+  enrich(ids);
+}
+function readHome(){
+  var hp=$('mcHome').value.trim();
+  if(!safeHref(hp)){ toast('홈페이지 주소를 https:// 로 먼저 입력하세요'); return; }
+  var h={}; h[CUR]={ homepage:hp }; enrich([CUR], h);
+}
+
+/* ═══ 인쇄·CSV ═══ */
+function printList(list, what){
+  if(!list.length) return;
   var w=window.open('', '_blank');
   if(!w){ toast('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요'); return; }
-  w.document.write('<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>우편 라벨 '+list.length+'장</title><style>'+
-    '@page{size:A4;margin:12mm 4.5mm}body{margin:0;font-family:"Malgun Gothic",sans-serif}'+
-    '.sheet{display:grid;grid-template-columns:99.1mm 99.1mm;grid-auto-rows:34mm;column-gap:3mm}'+
-    '.lb{padding:4mm 6mm;overflow:hidden;break-inside:avoid}.zip{font-size:10pt}.ad{font-size:10pt;margin:1mm 0 2mm;line-height:1.35}'+
-    '.to{font-size:12pt;font-weight:700}.ceo{font-size:10pt}</style></head><body><div class="sheet">'+cells+'</div>'+
-    '<script>window.onload=function(){window.print();}<\/script></body></html>');
-  w.document.close();
+  w.document.write(RehabLetter.buildDocument(list, what, { draft: $('draftCk') ? $('draftCk').checked : true })); w.document.close();
 }
-
-/* ═══ CSV — 우체국 대량 발송·라벨 프로그램에 넣을 때 ═══ */
+function printDocs(what){ printList(VIEW.filter(function(n){ return SEL[n.id]; }), what); }
+function printOne(what){ var n=NOTICES[CUR]; if(n) printList([n], what); }
 function downloadCsv(){
-  var list=selected(); if(!list.length) return;
-  var head=['공고일','법원','사건번호','사건종류','회사명','우편번호','주소','상태'];
+  var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
+  var head=['공고일','법원','사건번호','종류','단계','회사명','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','홈페이지','상태','메모'];
   var q=function(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  var body=list.map(function(n){ return [n.noticeDate,n.courtName,n.caseNo,n.caseType,n.debtorName,n.zip,n.address,ST_NAME[statusOf(n.id)]].map(q).join(','); });
+  var body=list.map(function(n){ var c=contactOf(n.id), m=MARKS[n.id]||{};
+    return [n.noticeDate,n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),c.homepage,STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
   var blob=new Blob(['﻿'+[head.join(',')].concat(body).join('\r\n')],{type:'text/csv;charset=utf-8'});
-  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_'+seoulToday()+'_'+list.length+'건.csv';
+  var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_'+seoulToday()+'_'+list.length+'곳.csv';
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
 }
 
 /* ═══ 불러오기 ═══ */
-async function loadMarks(){ MARKS=(await fbDb.ref('rehab_ad/marks').once('value')).val()||{}; }
-async function loadAll(){
-  var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(),
-    fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
-  NOTICES=r[0].val()||{};
-  var runs=r[2].val()||{}, last=Object.keys(runs).pop();
-  $('runNote').textContent = last
-    ? '마지막 수집 '+last+' · 새로 담음 '+(runs[last].added||0)+'건'+((runs[last].errors||[]).length?' · ⚠ 못 읽은 법원 '+runs[last].errors.length+'곳':'')
-    : '아직 서버 수집 기록이 없습니다(매일 07:40).';
-  fillCourts(); draw();
+async function reload(){
+  try{
+    var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(), loadInfo(), fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
+    NOTICES=r[0].val()||{};
+    var runs=r[3].val()||{}, k=Object.keys(runs).pop(); LASTRUN=k?Object.assign({date:k},runs[k]):null;
+    fillFilters(); draw();
+  }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
 }
+function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fSort').value='date'; $('fText').value=''; TAB='all'; draw(); }
+function clearSel(){ SEL={}; draw(); }
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
 async function isAdmin(u){
   try{ var v=(await fbDb.ref('uid_roles/'+u.uid).once('value')).val()||{}; return v.isAdmin===true; }catch(e){ return false; }
 }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+function copyText(t){
+  function fb(){ var a=document.createElement('textarea'); a.value=t; a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); try{ document.execCommand('copy'); }catch(e){} a.remove(); }
+  if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).catch(fb); else fb();
+  toast('복사했습니다');
+}
 function boot(){
-  ['fDays','fStatus','fCourt','fType'].forEach(function(id){ $(id).addEventListener('change',draw); });
+  ['fDays','fCourt','fSido','fType','fStage','fContact','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
   $('fText').addEventListener('input',draw);
-  $('rows').addEventListener('change',function(e){
-    var id=e.target && e.target.getAttribute('data-id'); if(!id) return;
-    if(e.target.checked) SEL[id]=1; else delete SEL[id]; drawSel();
+  $('tabs').addEventListener('click',function(e){ var t=e.target.closest('.tab'); if(!t) return; TAB=t.getAttribute('data-tab'); draw(); });
+  $('rows').addEventListener('click',function(e){
+    if(e.target.matches('input[data-ck]')){ var id=e.target.getAttribute('data-ck'); if(e.target.checked) SEL[id]=1; else delete SEL[id]; drawSel(); return; }
+    var tr=e.target.closest('tr[data-id]'); if(tr) openDetail(tr.getAttribute('data-id'));
   });
-  $('ckAll').addEventListener('change',function(){
-    SEL={}; if(this.checked) VIEW.forEach(function(n){ SEL[n.id]=1; }); draw();
-  });
+  $('ckAll').addEventListener('change',function(){ SEL={}; if(this.checked) VIEW.forEach(function(n){ SEL[n.id]=1; }); draw(); });
+  $('detail').addEventListener('click',function(e){ var b=e.target.closest('button[data-copy]'); if(b) copyText(b.getAttribute('data-copy')); });
   window.addEventListener('pagehide',function(){ SEL={}; });
+  ['fDays','fSort'].forEach(function(id){ var v=lsGet(id); if(v) $(id).value=v; });
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
   fbDb=firebase.database();
   try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
   firebase.auth().onAuthStateChanged(async function(u){
-    fbUid=u?u.uid:null;
     $('outBtn').style.display=u?'':'none';
     if(!u){ $('who').textContent=''; PuGate.show(); return; }
     PuGate.hide();
     if(!(await isAdmin(u))){ lock('접속: '+(u.email||'-')); return; }
     gate=PuOntologyWrite.createGateway({ mode:'enforce', actor:u.uid });
     $('lock').style.display='none'; $('app').style.display='';
-    try{ await loadAll(); }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
+    await reload();
   });
 }
 boot();
