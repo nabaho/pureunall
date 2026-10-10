@@ -69,7 +69,7 @@ function run(fetchImpl) {
   const sent = [];
   const fetch = async (url, opt) => { sent.push({ url, opt }); return fetchImpl(url, opt); };
   const R = P({ functions: { region: () => ({ runWith: () => ({ database: { ref: () => ({ onWrite: (f) => f }) } }) }) },
-    getDatabase: () => db, fetch, secretOf: () => 'GOCSPX-xxxxxxxxxxxxxxxxxxxx' });
+    getDatabase: () => db, fetch, secretOf: () => 'GOCSPX-xxxxxxxxxxxxxxxxxxxx', clientId: 'CID' });
   return { db, sent, R };
 }
 const ok = (j) => ({ ok: true, status: 200, json: async () => j });

@@ -21,7 +21,8 @@
  * ⚠ 갱신 열쇠는 로그·기록 어디에도 안 남긴다. */
 'use strict';
 
-const LINK = require('./gcal-link')._test;
+/* gcal-link 은 firebase-functions 를 싣는다 — 쓸 때 부른다(검사 기계에는 함수 묶음 꾸러미가 없다) */
+const LINK = () => require('./gcal-link')._test;
 const GARCH = require('./gcal-archive');
 
 const REGION = 'asia-northeast3';
@@ -90,11 +91,11 @@ function make(deps) {
     if (!uid) throw new Error('대표 계정을 찾지 못했습니다');
     const rec = (await db.ref('gcal_tokens/' + uid).once('value')).val();
     if (!rec || !rec.rt) throw new Error('대표 구글 연결이 없습니다 — 푸른 캘린더에서 대표님이 구글 연결을 다시 해 주세요');
-    const secret = (deps.secretOf || LINK.secretOf)();
+    const secret = (deps.secretOf || LINK().secretOf)();
     if (!secret) throw new Error('구글 연결용 서버 비밀값이 없습니다');
     const r = await doFetch(TOKEN_URL, {
       method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: rec.rt, client_id: LINK.CLIENT_ID, client_secret: secret }).toString(),
+      body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: rec.rt, client_id: deps.clientId || LINK().CLIENT_ID, client_secret: secret }).toString(),
     });
     const j = await r.json().catch(() => null);
     if (!r.ok || !j || !j.access_token) throw new Error('대표 구글 표를 못 받았습니다(' + ((j && j.error) || r.status) + ')');
