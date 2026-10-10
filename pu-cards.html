@@ -15427,25 +15427,60 @@ function parseVcf(text){
      「TTT_김원미」(회사 칸 빔) · 「동원정윤성인」(회사 칸 ㈜동원정) · 「EVOLVE soft전석정」(회사 칸은 «다른» 회사)
    그래서 ① 회사 칸이 비거나 같은 회사면 이름과 회사를 가르고, ② 회사 칸이 «다른» 회사면 가르지 않고
    메모에 「[가져오기 확인]」을 단다 — 한 칸에 두 사람이 섞인 줄이다(사람이 본다, 기계가 고르지 않는다).
-   ⚠ 「_」로만 가른다 — 「/」는 두 회사를 잇는 데도 쓴다(「제이원인스트루먼트/지앤지」).
-   ⚠ 「3호_소망상사」(번호 꼬리표 + 가게) · 「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
+   ⚠ 「_」·「-」로 가른다 — 「/」는 두 회사를 잇는 데도 쓴다(「제이원인스트루먼트/지앤지」). 「-」는 한쪽이 사람 이름 모양일 때만.
+   ⚠ 「3호_소망상사」(번호 꼬리표 + 가게)는 회사 칸으로 옮기고 꼬리표는 메모에(2026-10-10 「추천대로」).
+     「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
 const IMP_ROLE_TAIL = /(담당|사무실|소개|대표|사장|팀장|과장|부장|이사|실장|센터|본부|경리|총무|회계|직원|원장|상사|푸드|누리|산업|건설|물산|상회|식품|기업|테크|전자|공업|상점|마트|약국|병원|의원)$/;
 const IMP_FLAG = '[가져오기 확인] 이름 앞의 회사와 회사 칸이 다릅니다 — 한 칸에 두 사람이 섞였을 수 있습니다';
 /* 회사 이름 견주기는 «맞출 때» 쓰는 다듬개(ErpMatch._norm) 하나로 — 새 다듬개를 만들지 않는다(tests/cards-norm-align) */
 const impCo = x => ErpMatch._norm(x);
+/* 사람 이름 모양인가 — 성씨 + 세 글자(직함이 붙어 있으면 두·네 글자도). 직함은 떼어 돌려준다.
+   (대표 「추천대로」 2026-10-10 — 「회사-사람차장」·「사람-회사」·「김철수노무사」도 가져올 때 가른다)
+   ⚠ 「-」 는 회사 이름 안에도 쓰여(「가나-다라」) «사람 이름 모양»일 때만 가른다. 애매하면 그대로 둔다. */
+const IMP_SUR = '김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민진나지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예봉경';
+const IMP_TITLE = /^(.+?)\s*(대표이사|대표|회장|부사장|사장|전무|상무|이사장|이사|본부장|센터장|관리소장|실장|부장|차장|과장|대리|주임|사원|팀장|원장|소장|국장|관장|노무사|세무사|변호사|회계사|교수|매니저|총무|사무국장|사무장|지점장|점장|계장|주무관|사무관|조사관|감독관|시설장|책임|선임|수석|연구원|담당자)님?$/;
+function impPerson(t){
+  t = String(t || '').trim();
+  let title = '';
+  const m = t.match(IMP_TITLE);
+  if(m){ t = m[1].trim(); title = m[2]; }
+  if(!/^[가-힣]{2,4}$/.test(t) || IMP_SUR.indexOf(t[0]) < 0 || IMP_ROLE_TAIL.test(t)) return null;
+  if(t.length !== 3 && !title) return null;
+  return { name: t, title: title };
+}
 function importTidyRow(r){
   if(!r) return r;
   const name = String(r.name || '').trim(), co = String(r.company || '').trim();
   const nc = impCo(co);
   const same = pc => { const a = impCo(pc); return !nc || a === nc || a.indexOf(nc) === 0 || nc.indexOf(a) === 0; };
   const flag = () => Object.assign({}, r, { memo: (String(r.memo || '') + '\n' + IMP_FLAG).trim() });
+  /* 직함은 직함 칸이 비었을 때만 넣는다 — 사람이 적어 둔 값을 덮지 않는다 */
+  const put = (p, pc) => {
+    if(!same(pc)) return flag();
+    const o = Object.assign({}, r, { name: p.name, company: co || pc });
+    if(p.title && !String(r.title || '').trim()) o.title = p.title;
+    return o;
+  };
+  /* ⓪ 「2호_회사」 — 번호 꼬리표 + 회사(사람 없음). 회사 칸이 빌 때만 회사 칸으로, 꼬리표는 메모 맨 앞에 */
+  let m = name.match(/^(\d+호)\s*_\s*(.+)$/);
+  if(m && !co) return Object.assign({}, r, { name: '', company: m[2].trim(), memo: (m[1] + '\n' + String(r.memo || '')).trim() });
   /* ① 「회사_이름」 */
-  let m = name.match(/^(.+?)\s*_\s*([가-힣]{2,5})$/);
+  m = name.match(/^(.+?)\s*_\s*([가-힣]{2,5})$/);
   if(m && !/_/.test(m[1]) && !/^[0-9０-９]/.test(m[1].trim()) && !IMP_ROLE_TAIL.test(m[2])){
     const pc = m[1].trim();
     if(!same(pc)) return flag();
     return Object.assign({}, r, { name: m[2], company: co || pc });
   }
+  /* ①′ 「회사-사람차장」 · 「사람-회사」 · 「회사_사람주무관」 — 한쪽만 사람 이름 모양일 때 */
+  m = name.match(/^([^-_]+?)\s*[-_]\s*([^-_]+)$/);
+  if(m){
+    const L = m[1].trim(), R = m[2].trim(), pl = impPerson(L), pr = impPerson(R);
+    if(pr && !pl && !/^[0-9０-９]/.test(L)) return put(pr, L);
+    if(pl && !pr && R.length >= 3 && !/(담당|사무실|소개|직원)$/.test(R)) return put(pl, R);
+  }
+  /* ①″ 「김철수노무사」 — 이름에 직함만 붙은 것 */
+  const pt = impPerson(name);
+  if(pt && pt.title) return Object.assign({}, r, String(r.title || '').trim() ? { name: pt.name } : { name: pt.name, title: pt.title });
   /* ② 영문 회사가 붙은 「EVOLVE soft전석정」 */
   m = name.match(/^([A-Za-z][A-Za-z0-9 .&-]{1,30}?)\s*([가-힣]{2,4})$/);
   if(m && !IMP_ROLE_TAIL.test(m[2])){
