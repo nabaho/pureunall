@@ -76,6 +76,9 @@ test('★ 이벤트 — 놓을 곳이 없어도 브라우저가 파일을 열지
   assert.ok(init.includes('setTimeout(_dndEnd,1500)'), '끌기를 그만둬도 켜진 채 남는다');
   assert.ok(fnSrc('_dndCands').includes("document.getElementById('modalbg')||document"), '창 뒤의 단추가 켜진다');
   assert.ok(fnSrc('_dndRun').includes('okc.length===1') && fnSrc('_dndRun').includes('cands.length===1'), '여러 곳일 때 아무 데나 놓으면 엉뚱한 곳으로 간다');
+  /* 덮어쓰는 일(원본·틀 교체, 사업장 백업)은 화면 아무 데나가 아니라 단추 «위»에서만 */
+  for (const k of ['pickTpl', 'pickHwp', 'hwpTplUpload', 'importSites']) assert.equal(box.rules[k].exact, true, k + ' 이 아무 데나 놓아도 덮어쓴다');
+  assert.ok(fnSrc('_dndRun').includes('DND_RULES[c.fn].exact'), 'exact 를 안 본다');
   assert.ok(fnSrc('dzOver').includes('e.stopPropagation()'), '기존 끌어놓기 칸이 이중으로 받는다');
   assert.ok(SRC.includes('.dnd-ok{outline:2px dashed #fbbf24!important'));
   assert.ok(/\.dnd-ok\{[^}]*color:var\(--ink\)!important/.test(SRC), '켜진 단추 글씨가 배경에 묻힌다');
