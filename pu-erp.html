@@ -26688,7 +26688,7 @@ function loaReconcileStatus(todayS){
   return changed;
 }
 function setLoaList(list){ dbSet('leave_of_absence', list); }
-/* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 김석우 퇴사 뒤에도 질병휴직이 열려 있어
+/* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 퇴사한 직원의 질병휴직이 열려 있어
    명부·급여·휴가 화면이 모두 «휴직»으로 보였다).
    · 마지막 근무일 전에 시작한 휴직 → 종료(endedDate = 마지막 근무일, 종료일이 더 이르면 그 날)
    · 마지막 근무일 뒤에 시작할 휴직 → 취소
@@ -27126,7 +27126,7 @@ function calcOrdinaryDailyWage(sid){
   var ordinaryMonthly = +c.ordinaryMonthly || ((latest.baseSalary||0) + (latest.fixedAllowance||0));
   var u = (dbGet('user_accounts', USERS_SEED) || []).find(function(x){ return x && x.sid === sid; }) || {};
   var hrs = (+u.scheduledHours > 0 && +u.scheduledHours < 8) ? +u.scheduledHours : 8;
-  return Math.round(ordinaryMonthly / 209 * hrs);
+  return Math.round(ordinaryMonthly / erpMonthStdHours(hrs) * hrs);
 }
 
 // 법정 퇴직금 계산 — 근로자퇴직급여 보장법 제8조①: 계속근로기간 1년에 대하여 30일분 이상의 평균임금
@@ -73915,6 +73915,15 @@ var PENSION_BOUNDS = [
   { from:'2026-07', min:410000, max:6590000 }   // [확인 필요] 공단 고시 원문 대조 전
 ];
 var MIN_WAGE_HOURLY = { '2024':9860, '2025':10030, '2026':10320 };   // 최저임금위원회 고시 (시간급)
+/* 월 소정근로시간(주휴 포함) — 1일 소정근로시간에서 셈한다 (2026-10-10 인사관리: 1일 7시간 근로자가 209시간으로 나뉘어
+   시급 9,676원으로 보였다. 급여대장은 183시간 · 11,050원).
+   급여대장과 같은 셈: 209 × 1일 시간 ÷ 8 (반올림) → 8시간 209 · 7시간 183 · 4시간 105.
+   주 15시간 미만이면 주휴가 없다(근로기준법 제18조③) → 1일 시간 × 5 × 365 ÷ 7 ÷ 12. ⚠ 주 5일 근무 전제 — 다르면 명부에서 고친다. */
+function erpMonthStdHours(dailyH){
+  var h = (+dailyH > 0 && +dailyH < 8) ? +dailyH : 8;
+  if(h * 5 < 15) return Math.round(h * 5 * 365 / 7 / 12);
+  return Math.round(209 * h / 8);
+}
 function erpPayRates(ym){
   var s = String(ym || '');
   var y = /^\d{4}/.test(s) ? s.slice(0,4) : String(new Date().getFullYear());
@@ -74146,7 +74155,8 @@ function calcPayrollFresh(rec){
   // ★ 통상임금 (월): 기본급 + 고정수당(레거시) + isOrdinary 임금항목
   var ordinaryMonthly = (rec.baseSalary||0) + (rec.fixedAllowance||0) + ordinaryFromAllow;
   // 법정수당: 통상시급 기반 (ordinaryMonthly 전달)
-  var legal = calcLegalAllowances(rec, ordinaryMonthly);
+  var _empH = ((dbGet('user_accounts', USERS_SEED) || []).find(function(u){ return u && u.sid === rec.empSid; }) || {}).scheduledHours;
+  var legal = calcLegalAllowances(rec, ordinaryMonthly, erpMonthStdHours(_empH));   // 단시간 근로자는 그 사람의 월 소정근로시간으로 나눈다
   // 성과금 자동 합산 (finance_income.perfShares)
   var perf = calcPerfBonus(rec.empSid, rec.ym);
   // ★ Fix#2: 이중계산 방지 — perf.total(입금연동 성과)와 rec.bonus(수동 입력 상여)는 별개
@@ -74228,7 +74238,7 @@ function calcPayrollFresh(rec){
        연장·야간·휴일수당, 그 달만 나간 상여·성과는 넣지 않는다. 월 소정 209시간(주 40시간) 기준.
        ⚠ 단시간 근로자는 명부의 소정근로시간(scheduledHours)이 8 미만이면 비례로 본다. */
   var _schedH = (_emp && +_emp.scheduledHours > 0 && +_emp.scheduledHours < 8) ? +_emp.scheduledHours : 8;
-  var minWageMonthlyFor = Math.round(rates.minWageHourly * 209 * _schedH / 8);
+  var minWageMonthlyFor = Math.round(rates.minWageHourly * erpMonthStdHours(_schedH));
   var minWageBase = (rec.baseSalary||0) + (rec.fixedAllowance||0) + Math.max(0, allowSum) + legacyPay;
   var minWageWarning = !prorated && (rec.baseSalary||0) > 0 && minWageBase < minWageMonthlyFor;
 
@@ -74376,11 +74386,12 @@ function payslipMethods(rec){
 // 통상시급 = 월 통상임금 / 209시간 (주40시간 + 주휴8시간 = 209시간/월)
 // ★ ordinaryMonthly 외부 전달 시 사용 (pay_items isOrdinary 자동 반영). 미전달 시 baseSalary+fixedAllowance.
 function calcLegalAllowances(rec, ordinaryMonthly){
+  var stdHours = arguments[2];   // 월 소정근로시간 (calcPayroll 이 넘긴다 — 없으면 209)
   var la = rec.legalAllowances || {};
   var monthly = (ordinaryMonthly != null) ? ordinaryMonthly : ((rec.baseSalary||0) + (rec.fixedAllowance||0));
   /* ★ 통상시급을 «먼저» 반올림하지 않는다 — 반올림한 시급에 시간을 곱하면 오차가 시간만큼 커진다.
        보이는 시급(ordinaryWage)만 반올림하고, 셈은 날 시급(hourly)으로 한 뒤 마지막에 원 미만 절사. */
-  var hourly = monthly / 209;
+  var hourly = monthly / (+stdHours > 0 ? +stdHours : 209);   // 월 소정근로시간 (erpMonthStdHours — 8시간이면 209)
   var ordinaryWage = Math.round(hourly);
   var otHrs = parseFloat(la.overtimeHours)||0;
   var nightHrs = parseFloat(la.nightHours)||0;
