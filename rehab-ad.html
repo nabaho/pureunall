@@ -51,6 +51,20 @@ a{color:var(--blue)}
 main{max-width:1560px;margin:0 auto;padding:12px 16px 60px}
 .note{display:flex;gap:10px;align-items:flex-start;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.55;margin-bottom:10px}
 .note b{font-weight:700}
+.funnel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
+.funnel h4{margin:0 0 8px;font-size:12.5px;color:var(--ink2)}
+.fstep{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer}
+.fstep .fl{flex:0 0 118px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
+.fstep .fb{flex:1;background:var(--bg);border-radius:6px;height:22px;position:relative;overflow:hidden}
+.fstep .fb i{display:block;height:100%;background:var(--blue-line);border-radius:6px;min-width:2px}
+.fstep .fb b{position:absolute;left:8px;top:2px;font-size:12.5px;font-variant-numeric:tabular-nums}
+.fstep .fp{flex:0 0 120px;font-size:12px;color:var(--mute);text-align:right;white-space:nowrap}
+.fstep:hover .fl{color:var(--blue-d)}
+.fgrp{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.fgrp>em{font-style:normal;font-size:12px;color:var(--mute);flex:0 0 52px}
+.fchip{border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:2px 9px;font-size:12px;cursor:pointer;white-space:nowrap}
+.fchip b{font-variant-numeric:tabular-nums;margin-left:3px}
+.fchip.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-d);font-weight:700}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
 .tab{display:flex;align-items:baseline;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 13px;cursor:pointer}
 .tab b{font-size:19px;font-variant-numeric:tabular-nums}
@@ -169,6 +183,7 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
     안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
   </div>
 
+  <div class="funnel" id="funnel"></div>
   <div class="tabs" id="tabs"></div>
 
   <div class="tools">
@@ -314,14 +329,17 @@ function contactOf(id){
 }
 
 /* ═══ 거르기·정렬 ═══ */
-function baseList(){
+var DATE='';
+function baseList(skip){
+  skip=skip||'';
   var days=Number($('fDays').value), court=$('fCourt').value, sido=$('fSido').value, type=$('fType').value, stage=$('fStage').value,
       ct=$('fContact').value, tr=$('fTrade').value, q=$('fText').value.trim().toLowerCase(), since=days?daysAgo(days):'';
   return Object.keys(NOTICES).map(function(k){ return NOTICES[k]; }).filter(function(n){
     if(!n || n._deleted) return false;
     if(since && (n.noticeDate||'')<since) return false;
     if(court && n.courtCode!==court) return false;
-    if(sido && n.sido!==sido) return false;
+    if(sido && skip!=='sido' && (n.sido||'기타')!==sido) return false;
+    if(DATE && skip!=='date' && n.noticeDate!==DATE) return false;
     if(type && n.caseType!==type) return false;
     if(stage && n.stage!==stage) return false;
     if(ct){ var c=contactOf(n.id); if(ct==='has' && !c.any) return false; if(ct==='none' && c.any) return false; if(ct==='check' && !c.check) return false; }
@@ -350,13 +368,39 @@ function drawTabs(base){
     return '<div class="tab'+(TAB===k?' on':'')+'" data-tab="'+k+'"><b>'+c[k]+'</b><span>'+names[k]+'</span></div>';
   }).join('');
 }
+function drawFunnel(base){
+  var tot=base.length, has=0, link=0, send=0, sent=0;
+  base.forEach(function(n){ if(contactOf(n.id).any) has++; var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(b) link++; var st=statusOf(n.id); if(st==='send') send++; if(st==='sent') sent++; });
+  var steps=[['all','공고 수집',tot,tot],['has','연락처 확보',has,tot],['link','거래·연결 있음',link,tot],['send','발송 예정',send,tot],['sent','발송 완료',sent,tot]];
+  var h='<h4>걸러 보기 — 단계마다 눌러서 볼 수 있습니다</h4>'+steps.map(function(x){
+    var pct=x[3]?Math.round(x[2]*100/x[3]):0;
+    return '<div class="fstep" data-step="'+x[0]+'"><span class="fl">'+x[1]+'</span><span class="fb"><i style="width:'+pct+'%"></i><b>'+x[2]+'곳</b></span><span class="fp">'+(x[0]==='all'?'':'전체의 '+pct+'%')+'</span></div>';
+  }).join('');
+  var reg={}, dat={};
+  baseList('sido').forEach(function(n){ var k=n.sido||'기타'; reg[k]=(reg[k]||0)+1; });
+  baseList('date').forEach(function(n){ var k=n.noticeDate||''; if(k) dat[k]=(dat[k]||0)+1; });
+  var cur=$('fSido').value;
+  h+='<div class="fgrp"><em>지역</em><button class="fchip'+(cur?'':' on')+'" data-sido="">전체</button>'+
+    Object.keys(reg).sort(function(a,b){ return reg[b]-reg[a]; }).map(function(k){ return '<button class="fchip'+(cur===k?' on':'')+'" data-sido="'+esc(k)+'">'+esc(k)+'<b>'+reg[k]+'</b></button>'; }).join('')+'</div>';
+  h+='<div class="fgrp"><em>공고일</em><button class="fchip'+(DATE?'':' on')+'" data-date="">전체</button>'+
+    Object.keys(dat).sort().reverse().map(function(k){ return '<button class="fchip'+(DATE===k?' on':'')+'" data-date="'+k+'">'+k.slice(5)+'<b>'+dat[k]+'</b></button>'; }).join('')+'</div>';
+  $('funnel').innerHTML=h;
+}
+function funnelClick(step){
+  if(step==='all'){ $('fContact').value=''; $('fTrade').value=''; TAB='all'; }
+  if(step==='has'){ $('fContact').value=($('fContact').value==='has'?'':'has'); }
+  if(step==='link'){ $('fTrade').value=($('fTrade').value==='any'?'':'any'); }
+  if(step==='send'){ TAB=(TAB==='send'?'all':'send'); }
+  if(step==='sent'){ TAB=(TAB==='sent'?'all':'sent'); }
+  draw();
+}
 function iconsOf(c){
   function ic(on,ch,t){ return '<span class="ico'+(on?'':' off')+'" title="'+esc(t)+'">'+ch+'</span>'; }
   return ic(c.phones.length,'☎',c.phones[0]||'전화 없음')+ic(c.faxes.length,'📠',c.faxes[0]||'팩스 없음')+
     ic(c.emails.length,'✉',c.emails[0]||'메일 없음')+ic(!!c.homepage,'🌐',c.homepage||'홈페이지 없음');
 }
 function draw(){
-  var base=baseList(); drawTabs(base);
+  var base=baseList(); drawTabs(base); drawFunnel(base);
   VIEW=sortList(base.filter(function(n){ return TAB==='all' || statusOf(n.id)===TAB; }));
   var html=VIEW.map(function(n,i){
     var st=statusOf(n.id), c=contactOf(n.id);
@@ -639,7 +683,7 @@ async function reload(){
     loadLinks();
   }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
 }
-function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fSort').value='date'; $('fText').value=''; TAB='all'; draw(); }
+function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; draw(); }
 function clearSel(){ SEL={}; draw(); }
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
@@ -655,6 +699,13 @@ function copyText(t){
 function boot(){
   ['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
   $('fText').addEventListener('input',draw);
+  $('funnel').addEventListener('click',function(e){
+    var st=e.target.closest('[data-step]'); if(st){ funnelClick(st.getAttribute('data-step')); return; }
+    var c=e.target.closest('.fchip'); if(!c) return;
+    if(c.hasAttribute('data-sido')){ $('fSido').value=c.getAttribute('data-sido'); lsSet('fSido',$('fSido').value); }
+    if(c.hasAttribute('data-date')){ DATE=c.getAttribute('data-date'); }
+    draw();
+  });
   $('tabs').addEventListener('click',function(e){ var t=e.target.closest('.tab'); if(!t) return; TAB=t.getAttribute('data-tab'); draw(); });
   $('rows').addEventListener('click',function(e){
     if(e.target.matches('input[data-ck]')){ var id=e.target.getAttribute('data-ck'); if(e.target.checked) SEL[id]=1; else delete SEL[id]; drawSel(); return; }
