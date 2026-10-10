@@ -19240,6 +19240,9 @@ function firmTabSave(quiet){
   l.savedAt=Date.now();
   try{ LS.set(NS+FIRM_LOCAL, JSON.stringify(l)); }
   catch(e){ toast('⚠ 저장하지 못했습니다 — '+String(e&&e.message||e)); return; }
+  /* ⚠ LS.set 은 클라우드로 «올릴 것» 표시를 안 한다 — 안 부르면 다른 고침이 생길 때까지 이 기기에만 남는다
+       (2026-10-10 실측: 설립일·자본금을 고쳤는데 클라우드는 옛 값). set() 이 하는 일을 여기서 한다. */
+  if(typeof fbScheduleAuto==='function') fbScheduleAuto(FIRM_LOCAL);
   renderFirmTab();
   if(!quiet) toast(n ? '💾 법인정보를 저장했습니다 — 기관 서식 채우기에 씁니다' : '바뀐 칸이 없습니다');
   return n;
@@ -19340,6 +19343,7 @@ function firmOcrApply(p, keys){
   if(채움.length){
     l.savedAt=Date.now();
     try{ LS.set(NS+FIRM_LOCAL, JSON.stringify(l)); }catch(err){ return { filled:[], differ:다름, fail:true }; }
+    if(typeof fbScheduleAuto==='function') fbScheduleAuto(FIRM_LOCAL);   /* 클라우드로도 — 위 firmTabSave 와 같은 까닭 */
   }
   return { filled:채움, differ:다름 };
 }
