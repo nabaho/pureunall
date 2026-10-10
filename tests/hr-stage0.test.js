@@ -173,3 +173,19 @@ test('⑤ 근로계약서(임금 칸)·증명서 발급대장은 읽기도 좁�
   for (const k of ['leave_of_absence', 'locked_attend_months', 'leave_grants', 'company_info'])
     assert.equal(rulesData[k]['.read'], rulesData.$other['.read'], 'data/' + k + ' 읽기를 좁히면 다른 앱 화면이 빕니다');
 });
+
+test('⑤ 규칙 만들개의 data 칸에 같은 열쇠가 두 번 적히지 않는다 — 뒤의 것이 «조용히» 이긴다', () => {
+  /* 2026-10-10 실제로 겪었다: 다른 방이 leave_of_absence 를 «권한 그대로» 적은 사이에
+     이 방이 같은 열쇠를 좁혀 적었다. JS 객체는 오류 없이 뒤의 줄을 쓴다 — 어느 쪽이 살았는지 아무도 모른다. */
+  const src = fs.readFileSync(path.join(R, 'scripts', 'make-firebase-rules.js'), 'utf8').replace(/\r\n/g, '\n');
+  const i = src.indexOf('rules.data = {');
+  assert.ok(i >= 0, 'rules.data 를 못 찾았습니다');
+  const body = src.slice(i, src.indexOf('\n};', i)).replace(/\/\*[\s\S]*?\*\//g, '');
+  const seen = {}, dup = [];
+  for (const l of body.split('\n')){
+    const k = (l.match(/^  ([A-Za-z_$][\w$]*)\s*:/) || [])[1];
+    if (!k) continue;
+    if (seen[k]) dup.push(k); seen[k] = 1;
+  }
+  assert.deepEqual(dup, [], '두 번 적힌 열쇠 — 한 곳으로 합치십시오: ' + dup.join(', '));
+});

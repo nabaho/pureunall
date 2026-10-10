@@ -199,7 +199,8 @@ rules.data = {
   /* 이알피 환경설정 «사건 유형» — 계약서등관리 사건계약 갈래가 읽는다(2026-10-09). 권한은 «그대로»(여태 $other: 재직 직원 읽기·쓰기 — 이알피가 고친다) — 이름만 적는다 */
   biz_case_types: { '.read': LOGIN, '.write': LOGIN },
   /* 이알피 휴가관리 «휴직» — 계약서등관리 위임장 노무사 명단이 휴직자를 빼려고 읽는다(2026-10-10). 권한은 «그대로»(여태 $other) — 이름만 */
-  leave_of_absence: { '.read': LOGIN, '.write': LOGIN },
+  /* ⚠ 권한은 아래 «푸른 자기 직원 인사 자료» 묶음에 있다(2026-10-10 쓰기를 HRW 로 좁힘, 읽기는 그대로) —
+       같은 열쇠를 두 번 적으면 JS 객체는 «뒤의 것»이 조용히 이긴다. 한 곳에만 적는다. */
 
   /* 그 밖의 업무 칸 — 이름이 안 붙은 것은 전부 여기로 온다.
      ⚠ 이름 붙은 칸이 «먼저» 잡히므로 위의 재무 칸들은 여기에 안 걸린다. */
@@ -453,7 +454,7 @@ rules.data = {
   locked_attend_months:    { '.read': LOGIN, '.write': HRW },   /* 근태 마감 — 캘린더가 읽는다 */
   overtime_records:        { '.read': LOGIN, '.write': HRW },   /* 연장·야간·휴일 시간 → 급여 법정수당 */
   comp_leave_records:      { '.read': LOGIN, '.write': HRW },   /* 보상휴가 사용 */
-  leave_of_absence:        { '.read': LOGIN, '.write': HRW },   /* 휴직·출산·병가 — 캘린더·업무관리가 읽는다 */
+  leave_of_absence:        { '.read': LOGIN, '.write': HRW },   /* 휴직·출산·병가 — 캘린더·업무관리·위임장 노무사 명단이 읽는다 */
   leave_grants:            { '.read': LOGIN, '.write': HRW },   /* 연차 부여일수 수기 조정 — 대시보드가 읽는다 */
   employment_contracts:    { '.read': HRW,   '.write': HRW },   /* 근로계약서 — 임금 칸 */
   cert_log:                { '.read': HRW,   '.write': HRW },   /* 증명서 발급대장 */
