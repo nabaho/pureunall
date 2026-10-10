@@ -76525,33 +76525,67 @@ function _lvAddMonths(d, n){
 }
 function _lvDayBefore(d){ var x = new Date(d.getTime()); x.setDate(x.getDate() - 1); return x; }
 /* u 하나의 발생 사건들 — untilYmd(포함)까지. 퇴직자는 마지막 근무일(lastWorkDate, 없으면 retireDate)까지 */
-function erpLeaveGrants(u, untilYmd, policy){
+/* 기산일 eff 부터의 발생 사건 — okUnit(단위기간 시작일)이 거짓이면 그 단위기간 몫은 생기지 않는다 */
+function _lvGrantsFrom(eff, until, P, okUnit){
   var out = [];
-  if(!u || !u.hireDate) return out;
-  var P = policy || dbGet('policy_leave', {}) || {};
   var base = +P.baseAfterOneYear >= 15 ? +P.baseAfterOneYear : 15;      // 법정 15일보다 적게는 못 정한다
   var cap = +P.maxDays >= 25 ? +P.maxDays : 25;
   var bs = +P.bonusStart || 3, be = +P.bonusEvery || 2;
-  var eff = _lvParse(getLeaveStartDate(u.hireDate));
-  if(!eff) return out;
-  var lastDay = u.lastWorkDate || u.retireDate || '';
-  var until = String(untilYmd || '9999-12-31');
-  if(lastDay && lastDay < until) until = lastDay;
+  var ok = okUnit || function(){ return true; };
   var firstAnn = _lvAddMonths(eff, 12);
   var under1Expiry = _lvYmd(_lvDayBefore(firstAnn));
   for(var m = 1; m <= 11; m++){
     var dm = _lvYmd(_lvAddMonths(eff, m));
     if(dm > until) break;
+    if(!ok(_lvYmd(_lvAddMonths(eff, m - 1)))) continue;
     out.push({ date:dm, days:1, kind:'under1', expiry:under1Expiry, label:'1년 미만 ' + m + '개월 개근' });
   }
   for(var k = 1; k < 80; k++){
     var dk = _lvYmd(_lvAddMonths(eff, 12 * k));
     if(dk > until) break;
+    if(!ok(_lvYmd(_lvAddMonths(eff, 12 * (k - 1))))) continue;
     var bonus = k < bs ? 0 : Math.floor((k - bs) / be) + 1;
     out.push({ date:dk, days:Math.min(base + bonus, cap), kind:'year', years:k,
       expiry:_lvYmd(_lvDayBefore(_lvAddMonths(eff, 12 * (k + 1)))), label:k + '년 근속 (기본 ' + base + ' + 가산 ' + bonus + ')' });
   }
   return out;
+}
+/* ★★ 2021-06-01(5인 이상 전환) 전 입사자 — 대법원 2024. 12. 12. 선고 2023도5476 판결로 바꾼다 (2026-10-10 대표 「모두 다해라」)
+     판결: 「1년간 계속근로는 … 원칙적으로 그 근로자가 근로를 개시한 날로부터 기산한다」 ·
+           5인 이상 여부는 «근로 개시일부터 센» 연차 산정 단위기간별로 본다
+           (시행령 제7조의2④ — 그 1년 «계속하여» 5명 이상이어야 한다 [조문 원문 대조 필요]).
+     ★ 전환 날(LEAVE_RULING_FROM)까지 이미 생긴 연차는 «그대로» 둔다 — 법정보다 많이 준 해를 거두지 않는다.
+       그 뒤부터는 판결식(실제 입사일 기산 · 단위기간 시작이 전환일 이후인 것만 · 가산도 실제 입사일부터).
+     ★ 전환 날에 «판결식으로 받았어야 할 이번 주기 몫»이 실제로 받은 것보다 많으면 그 차이를 전환 날짜로 «보정» 부여한다
+       — 누구도 법정보다 적게 받지 않게. 되돌리려면 LEAVE_RULING_FROM 을 '9999-12-31' 로. */
+var LEAVE_RULING_FROM = '2026-10-10';
+function erpLeaveGrants(u, untilYmd, policy){
+  var out = [];
+  if(!u || !u.hireDate) return out;
+  var P = policy || dbGet('policy_leave', {}) || {};
+  var lastDay = u.lastWorkDate || u.retireDate || '';
+  var until = String(untilYmd || '9999-12-31');
+  if(lastDay && lastDay < until) until = lastDay;
+  var actual = _lvParse(u.hireDate);
+  if(!actual) return out;
+  var oldStaff = typeof PUREUN_5IN_DATE !== 'undefined' && String(u.hireDate) < PUREUN_5IN_DATE;
+  if(!oldStaff) return _lvGrantsFrom(actual, until, P);
+  var cut = LEAVE_RULING_FROM;
+  /* ① 전환 날까지 — 예전 규칙(2021-06-01 기산) 그대로 */
+  var before = _lvGrantsFrom(_lvParse(PUREUN_5IN_DATE), until < cut ? until : cut, P);
+  if(until <= cut) return before;
+  /* ② 판결식 — 실제 입사일 기산, 단위기간이 «통째로» 5인 이상 전환일 뒤인 것만 */
+  var ruling = _lvGrantsFrom(actual, until, P, function(unitStart){ return unitStart >= PUREUN_5IN_DATE; });
+  var after = ruling.filter(function(g){ return g.date > cut; });
+  /* ③ 전환 보정 — 전환 날 기준 «살아 있는» 마지막 1년분을 견준다 */
+  var lastOf = function(list){ var y = list.filter(function(g){ return g.kind === 'year' && g.date <= cut && g.expiry >= cut; }); return y[y.length - 1] || null; };
+  var o = lastOf(before), r = lastOf(ruling);
+  var fix = [];
+  if(r && (r.days - (o ? o.days : 0)) > 0){
+    fix.push({ date:cut, days:r.days - (o ? o.days : 0), kind:'year', years:r.years, expiry:r.expiry,
+      label:'판결식 전환 보정 (대법원 2023도5476 — ' + r.years + '년 근속 ' + r.days + '일 중 모자란 몫)' });
+  }
+  return before.concat(fix, after);
 }
 /* 그해(달력 1~12월)에 «생긴» 연차 — 오늘·퇴직일 뒤의 것은 아직 없다 */
 function erpLeaveGrantedInYear(u, year, asOfYmd){
@@ -77343,7 +77377,8 @@ function calcLeavePromoStage(hireDate, year){
     return cand;
   }
   /* ★ 부여(erpLeaveGrants)와 «같은» 기산일 — 예전에는 부여는 2021-06-01, 촉진은 실제 입사일로 따로 셌다 (2026-10-10) */
-  if(hireDate && typeof getLeaveStartDate === 'function') hireDate = getLeaveStartDate(hireDate);
+  /* 전환 날(LEAVE_RULING_FROM, 대법원 2023도5476) 뒤로는 실제 입사일 기념일이 만료일이다 */
+  if(hireDate && typeof getLeaveStartDate === 'function' && !(typeof LEAVE_RULING_FROM !== 'undefined' && todayYMD() > LEAVE_RULING_FROM)) hireDate = getLeaveStartDate(hireDate);
   var today = new Date(); today.setHours(0,0,0,0);
   // 1년 미만(입사 후 첫 1년 이내) 여부 — 근로기준법 §61 제2항 별도 시기
   var isFirstYear = false, firstYearEnd = null;
