@@ -10,7 +10,7 @@ const vm = require('node:vm');
 const source = fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8');
 const marker = 'auth.onAuthStateChanged(function(user){';
 const start = source.indexOf(marker);
-const end = source.indexOf('\n    });', start);
+const end = source.indexOf('\n  });', start);
 assert.ok(start > 0 && end > start, '포털 인증 관찰자를 찾지 못했습니다');
 const callback = source.slice(start + 'auth.onAuthStateChanged('.length, end) + '\n    }';
 
