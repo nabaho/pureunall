@@ -141,6 +141,7 @@
      기금 머리(#fundhead) 바로 아래에 붙인다 — 그 높이를 --fundhead-h, 회계 머리 높이를 --closehead-h 로 잰다(_syncTopbarH).
      ⚠ 넓은 화면만 — 폰에서는 세 겹이 화면을 다 차지한다. 표는 넓은 화면에서 가로 스크롤 상자를 풀어야 제목 줄이 붙는다. */
   .ledgerwrap{overflow-x:auto}
+  .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
   .ledbulk{position:sticky;bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin-top:10px;z-index:6;font-size:12.5px}
   @media(min-width:1000px){
     .closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px));z-index:11}
@@ -10909,7 +10910,7 @@ function renderSetupDash(){
     +(list.length
       ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+'</div>'
         +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0 0">'+chips+'</div></div><div class="panel">'
-        +(vis.length?'<div class="sdwrap" style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
+        +(vis.length?'<div class="sdwrap"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
           :'<div class="msg ok" style="font-size:13px">이 거르기에 해당하는 기금이 없습니다.</div>')
       :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div></div><div class="panel" style="display:none">')
     +'</div>'
