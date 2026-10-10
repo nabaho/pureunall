@@ -254,6 +254,25 @@
     out.years = Object.keys(ys).sort();
     return out;
   }
+  /* 담당자별·연도별 묶기 (사업관리 › 수행 실적 탭 — 대표 승인 2026-10-10 목업).
+     by='main' 담당자 · by='year' 연도. 같은 거름(지운 줄 제외)·같은 연도 잣대(perfYear)·같은 금액 셈을 쓴다.
+     담당이 비면 「(담당 없음)」 · 연도를 못 읽으면 「모름」(지어내지 않음). 많은 것부터(연도는 최근부터, 모름은 맨 끝). */
+  function perfBy(recs, by) {
+    var map = {};
+    (recs || []).forEach(function (r) {
+      if (!r || r.excluded) return;
+      var y = perfYear(r);
+      var k = by === 'main' ? (String(r.main || '').trim() || '(담당 없음)') : (y || '모름');
+      var g = map[k] = map[k] || { key: k, total: 0, amt: 0, unknown: 0, byYear: {}, type: {} };
+      g.total++; g.amt += _won(r.amt);
+      if (y) g.byYear[y] = (g.byYear[y] || 0) + 1; else g.unknown++;
+      var t = String(r.type || '').trim() || '(유형 없음)'; g.type[t] = (g.type[t] || 0) + 1;
+    });
+    var rows = Object.keys(map).map(function (k) { return map[k]; });
+    if (by === 'main') rows.sort(function (a, b) { return b.total - a.total || a.key.localeCompare(b.key); });
+    else rows.sort(function (a, b) { return a.key === '모름' ? 1 : b.key === '모름' ? -1 : b.key.localeCompare(a.key); });
+    return rows;
+  }
   /* 많은 것부터 [이름, 수] — 칩·수행기관 칸에 쓴다 */
   function topCounts(obj, n) {
     return Object.keys(obj || {}).map(function (k) { return [k, obj[k]]; })
@@ -337,7 +356,7 @@
 
   var api = {
     ownerGuess: ownerGuess, reportAtt: reportAtt,
-    perfYear: perfYear, perfTable: perfTable, topCounts: topCounts, flatName: flatName, mailReports: mailReports, REPORT_RE: REPORT_RE,
+    perfYear: perfYear, perfTable: perfTable, perfBy: perfBy, topCounts: topCounts, flatName: flatName, mailReports: mailReports, REPORT_RE: REPORT_RE,
     xlsxLines: xlsxLines, perfFields: perfFields,
     KINDS: KINDS, STAGES: STAGES, DOC_KINDS: DOC_KINDS,
     isOpen: function (st) { return !!OPEN[st]; }, isWin: function (st) { return !!WIN[st]; },
