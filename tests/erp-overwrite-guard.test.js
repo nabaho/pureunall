@@ -82,7 +82,7 @@ test('★ 업무 자료 배열은 모든 항목에 id 가 있어야 한다', () 
   ];
   // 연차대장은 2026-08-15 에 id 를 붙였다 — 예외에서 빠져 있어야 한다
   assert.ok(예외.indexOf('leave_ledger') < 0);
-  assert.match(app, /function leaveLedgerWithIds\(rows\)\{/);
+  assert.match(app, /function leaveLedgerWithIds\(rows(, *users)?\)\{/);   // 2026-10-10: 사번을 붙이려고 명부(users)도 받는다
   assert.match(app, /'ll-' \+ String\(r\.name==null\?'':r\.name\) \+ '\|' \+ String\(r\.year==null\?'':r\.year\)/);
 });
 
