@@ -28,13 +28,17 @@
     { name: '세종지사', tel: '', addr: '세종 한누리대로 312, 노불비즈니스타운 502호' },
     { name: '대전지사', tel: '', addr: '대전 서구 둔산서로 79, 2층' }
   ];
+  /* 대지급금 한도 — 근로복지공단·고용노동부 안내 기준. 해마다 고시·법이 바뀔 수 있어 한 곳에서만 고친다.
+     도산대지급금: 2026.8.20 시행 개정(최종 6개월분, 상한 2,100→3,150만원). 회생절차개시결정이 2026.8.20 이후인 사건에 적용.
+     간이대지급금: 임금 등 700만원 + 퇴직급여 700만원, 합계 1,000만원(재직자는 퇴직급여 제외). */
+  var LIMIT = { simple: '1,000만원', insolvency: '3,150만원', asOf: '2026.8.20 시행 개정 기준' };
   /* 재기컨설팅 바우처 비용 — 기업이 내는 몫 */
   var COST = {
     basis: '2024년 혁신바우처 지원계획 공고',
     share: 10,          // 기업 자부담 %
     support: 90,        // 정부 지원 %
     exampleFee: 120,    // 예시: 사업정리 노무 컨설팅 120만원
-    stamp: '[초안 — 담당 노무사 최종 검토 필요: 대지급금 처리 기간·비용 문구]'
+    stamp: '[초안 — 담당 노무사 최종 검토 필요: 대지급금 처리 기간·한도·비용 문구]'
   };
   function shareWon() { return Math.round(COST.exampleFee * COST.share) / 100; }
   function officeLines() {
@@ -60,7 +64,8 @@
       '<p class="to">' + esc(coName(c)) + (c && c.ceoName ? ' ' + esc(c.ceoName) : '') + ' 대표이사님 귀하</p>' +
       '<p>안녕하십니까. ' + esc(FIRM.name) + '입니다. 법원 공고를 보고 회생절차 중 꼭 필요한 두 가지를 간단히 안내드립니다.</p>' +
       '<div class="big"><span class="no">1</span><div><b>임금을 받지 못한 근로자는 «간이대지급금·대지급금»을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다.</b>' +
-      '<div class="sub">체불임금·퇴직금 등 받을 수 있는 한도를 꼼꼼히 따져 근로복지공단 신청을 처음부터 끝까지 지원합니다. 근거: 임금채권보장법 제7조·제7조의2</div></div></div>' +
+      '<div class="max">간이대지급금 최대 <b>' + LIMIT.simple + '</b> · 도산대지급금 최대 <b>' + LIMIT.insolvency + '</b></div>' +
+      '<div class="sub">체불임금·퇴직금 등 받을 수 있는 한도를 꼼꼼히 따져 근로복지공단 신청을 처음부터 끝까지 지원합니다. 실제 지급액은 연령·체불액·퇴직 시기에 따라 달라집니다(' + LIMIT.asOf + '). 근거: 임금채권보장법 제7조·제7조의2</div></div></div>' +
       '<div class="big"><span class="no">2</span><div><b>회사는 ' + share + '만원(+부가가치세)만 부담하시면 노무 상담·컨설팅을 받으실 수 있습니다.</b>' +
       '<div class="sub">정부 재기컨설팅 바우처가 ' + COST.support + '%를 지원합니다. ' + esc(FIRM.name) + '은 2026년 재기컨설팅(사업정리) 공급기업입니다.</div></div></div>' +
       '<h2>문의·상담 — 공인노무사가 직접 답해 드립니다</h2>' +
@@ -91,6 +96,7 @@
       '법원 공고를 보고 회생절차 중 꼭 필요한 두 가지를 간단히 안내드립니다.',
       '',
       '1. 임금을 받지 못한 근로자는 「간이대지급금·대지급금」을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다.',
+      '   간이대지급금 최대 ' + LIMIT.simple + ' · 도산대지급금 최대 ' + LIMIT.insolvency + '까지 받을 수 있습니다(실제 지급액은 연령·체불액·퇴직 시기에 따라 달라집니다, ' + LIMIT.asOf + ').',
       '   체불임금·퇴직금 등 받을 수 있는 한도를 꼼꼼히 따져 근로복지공단 신청을 처음부터 끝까지 지원합니다. (임금채권보장법 제7조·제7조의2)',
       '',
       '2. 회사는 ' + share + '만원(+부가가치세)만 부담하시면 노무 상담·컨설팅을 받으실 수 있습니다.',
@@ -115,7 +121,7 @@
       '',
       '안녕하십니까. ' + FIRM.name + '입니다.' + (opts.existing ? ' 평소 거래해 주셔서 감사드립니다.' : ''),
       '법원 공고를 보고 두 가지를 안내드립니다.',
-      '1. 임금을 받지 못한 근로자는 간이대지급금·대지급금을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다(임금채권보장법 제7조·제7조의2).',
+      '1. 임금을 받지 못한 근로자는 간이대지급금·대지급금을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다(간이대지급금 최대 ' + LIMIT.simple + ', 도산대지급금 최대 ' + LIMIT.insolvency + '; 임금채권보장법 제7조·제7조의2).',
       '2. 회사는 ' + share + '만원(+부가가치세)만 부담하시면 노무 상담·컨설팅을 받으실 수 있습니다(정부 바우처 ' + COST.support + '% 지원, 해당 연도 공고에 따름).',
       '',
       '상담: ' + telLine() + ' / ' + FIRM.email,
@@ -147,6 +153,7 @@
     '.letter .big{display:flex;gap:10pt;align-items:flex-start;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6pt;padding:10pt 12pt;margin:9pt 0;font-size:13pt;line-height:1.5}' +
     '.letter .big .no{flex:0 0 22pt;height:22pt;border-radius:50%;background:#1e40af;color:#ffffff;text-align:center;font-weight:bold;line-height:22pt;font-size:12pt}' +
     '.letter .big .sub{font-size:10pt;color:#475569;margin-top:3pt;font-weight:normal}' +
+    '.letter .max{margin-top:4pt;font-size:12pt;font-weight:bold;color:#1e40af}' +
     '.letter .tel{font-size:13pt;font-weight:bold;margin:2pt 0 6pt}' +
     '.letter table.off{border-collapse:collapse;width:100%}.letter table.off th{width:62pt;text-align:left;font-size:10.5pt;padding:2pt 0;color:#1e40af}.letter table.off td{font-size:10.5pt;padding:2pt 0}' +
     '.letter .foot{margin-top:6pt;font-size:8.3pt;color:#64748b;border-top:1px solid #e2e8f0;padding-top:4pt}' +
@@ -176,6 +183,6 @@
       (opts && opts.noPrint ? '' : '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>') + '</body></html>';
   }
 
-  return { FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
+  return { LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
     buildLabelSheets: buildLabelSheets, buildDocument: buildDocument, CSS: CSS };
 });
