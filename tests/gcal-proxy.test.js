@@ -57,10 +57,11 @@ function fakeDb(seed) {
   const get = (p) => p.split('/').reduce((o, k) => (o == null ? undefined : o[k]), data);
   const set = (p, v) => { const ks = p.split('/'); let o = data; ks.slice(0, -1).forEach((k) => { o[k] = o[k] || {}; o = o[k]; }); o[ks[ks.length - 1]] = v; };
   return { data, ref: (p) => ({
-    once: async () => ({ val: () => get(p) ?? null }),
+    once: async () => ({ val: () => get(p) ?? null, forEach: (fn) => Object.keys(get(p) || {}).forEach((k) => fn({ key: k })) }),
     update: async (u) => { Object.keys(u).forEach((k) => set(p + '/' + k, u[k])); },
     set: async (v) => set(p, v),
     transaction: async (fn) => { set(p, fn(get(p))); },
+    remove: async () => { const ks = p.split('/'); const o = get(ks.slice(0, -1).join('/')); if (o) delete o[ks[ks.length - 1]]; },
   }) };
 }
 function run(fetchImpl) {
@@ -250,4 +251,54 @@ test('⑫ 화면 — 상세 ✏️·🗑, 고치는 창은 서버로', () => {
   assert.match(캘린더, /gStart: ev\.start\.dateTime/);
   const idx = fs.readFileSync(path.join(ROOT, 'functions', 'index.js'), 'utf8');
   assert.match(idx, /exports\.gcalEdit\s*=/);
+});
+
+/* ══ 여러 날 일정 · 연결 끊김 알림 (2026-10-10 「추천대로」) ══════════════════ */
+
+test('⑬ 여러 날 — 화면과 서버가 같은 셈, 끝나는 날 검사', () => {
+  const 경우 = [
+    { date: '2026-10-12', endDate: '2026-10-14', time: '', endTime: '', summary: '종일 사흘' },
+    { date: '2026-10-12', endDate: '2026-10-14', time: '14:00', endTime: '10:00', summary: '시각 여러 날(끝이 더 이른 시각)' },
+    { date: '2026-10-12', endDate: '2026-10-13', time: '09:00', endTime: '', summary: '끝 시각 없음' },
+    { date: '2026-10-12', endDate: '2026-10-12', time: '09:00', endTime: '10:00', summary: '같은 날' },
+  ];
+  for (const e of 경우) assert.deepStrictEqual(P.bodyOf(e), AUTH.bodyOf(e), e.summary);
+  assert.deepStrictEqual(P.bodyOf(경우[0]).end, { date: '2026-10-15' }, '종일은 다음 날(끝 안 듦)');
+  assert.strictEqual(P.bodyOf(경우[1]).end.dateTime, '2026-10-14T10:00:00');
+  assert.strictEqual(P.cleanFields({ date: '2026-10-12', endDate: '2026-10-14', title: 't' }).endDate, '2026-10-14');
+  assert.strictEqual(P.cleanFields({ date: '2026-10-12', endDate: '2026-10-12', title: 't' }).endDate, '', '같은 날은 하루짜리');
+  assert.throws(() => P.cleanFields({ date: '2026-10-12', endDate: '2026-10-11', title: 't' }), /끝나는 날이 시작보다 앞/);
+  assert.match(캘린더, /data-m=\\"endDate\\"/);
+  assert.match(캘린더, /\["kind","date","endDate",/);
+  assert.match(캘린더, /끝나는 날이 시작보다 앞입니다/);
+});
+
+test('⑭ 대표 구글 연결이 끊기면 대표 폰으로 — 12시간에 한 번, 버린 열쇠는 지운다', async () => {
+  const pushes = [];
+  function rig(tokens, tokenReply) {
+    const db = fakeDb({ uid_roles: { U1: { sid: 'P-001', status: 'active', isAdmin: true } }, gcal_tokens: tokens,
+      fcm_tokens: { U1: { PHONE: true } }, data: { user_dir: { v: {} }, my_schedules: { v: { sch_1: 줄() } } } });
+    const R = P({ functions: { region: () => ({ runWith: () => ({ database: { ref: () => ({ onWrite: (f) => f }) }, https: { onRequest: (f) => f } }) }) },
+      getDatabase: () => db, secretOf: () => 'GOCSPX-xxxxxxxxxxxxxxxxxxxx', clientId: 'CID',
+      fetch: async (url) => /oauth2/.test(url) ? tokenReply() : ok({ id: 'G' }),
+      getMessaging: () => ({ sendEachForMulticast: async (m) => { pushes.push(m); return { successCount: 1, failureCount: 0, responses: [{}] }; } }) });
+    return { db, R };
+  }
+  const 버림 = () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_grant' }) });
+  const a = rig({ U1: { rt: 'RT' } }, 버림);
+  const r = await a.R.proxyOne('sch_1', 줄());
+  assert.strictEqual(r.done, false);
+  assert.match(a.db.data.data.my_schedules.v.sch_1.gcalProxyErr, /구글 연결을 다시/);
+  assert.ok(!a.db.data.gcal_tokens.U1, '버린 열쇠를 안 지웠다');
+  assert.strictEqual(pushes.length, 1);
+  assert.match(pushes[0].data.title, /구글 연결이 끊겼습니다/);
+  await a.R.proxyOne('sch_1', 줄());
+  assert.strictEqual(pushes.length, 1, '12시간 안에 또 울렸다');
+  const b = rig({}, 버림);                       /* 처음부터 연결 없음 */
+  await b.R.proxyOne('sch_1', 줄());
+  assert.strictEqual(pushes.length, 2);
+  const c = rig({ U1: { rt: 'RT' } }, () => ({ ok: false, status: 503, json: async () => ({ error: 'backend' }) }));
+  await c.R.proxyOne('sch_1', 줄());
+  assert.strictEqual(pushes.length, 2, '잠깐 고장(503)에 끊김 알림을 보냈다');
+  assert.ok(c.db.data.gcal_tokens.U1, '잠깐 고장에 열쇠를 지웠다');
 });

@@ -24,6 +24,7 @@
 /* gcal-link 은 firebase-functions 를 싣는다 — 쓸 때 부른다(검사 기계에는 함수 묶음 꾸러미가 없다) */
 const LINK = () => require('./gcal-link')._test;
 const GARCH = require('./gcal-archive');
+const PUSH = require('./push-admins');
 
 const REGION = 'asia-northeast3';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -42,16 +43,19 @@ function bodyOf(ev) {
   const 몸 = { summary: s(ev.summary).trim() };
   if (ev.location) 몸.location = s(ev.location);
   if (ev.description) 몸.description = s(ev.description);
+  /* 여러 날 일정 — 화면(몸만들기)과 같은 셈 */
+  const 끝날짜 = /^\d{4}-\d{2}-\d{2}$/.test(s(ev.endDate)) && ev.endDate > ev.date ? ev.endDate : '';
   if (/^\d{2}:\d{2}$/.test(s(ev.time))) {
     const h = +ev.time.slice(0, 2), mi = ev.time.slice(3, 5);
     let 끝, 끝날;
-    if (/^\d{2}:\d{2}$/.test(s(ev.endTime))) { 끝 = ev.endTime; 끝날 = 끝 <= ev.time ? addDays(ev.date, 1) : ev.date; }
+    if (끝날짜) { 끝 = /^\d{2}:\d{2}$/.test(s(ev.endTime)) ? ev.endTime : ev.time; 끝날 = 끝날짜; }
+    else if (/^\d{2}:\d{2}$/.test(s(ev.endTime))) { 끝 = ev.endTime; 끝날 = 끝 <= ev.time ? addDays(ev.date, 1) : ev.date; }
     else { 끝 = ('0' + ((h + 1) % 24)).slice(-2) + ':' + mi; 끝날 = h >= 23 ? addDays(ev.date, 1) : ev.date; }
     몸.start = { dateTime: ev.date + 'T' + ev.time + ':00', timeZone: 'Asia/Seoul' };
     몸.end = { dateTime: 끝날 + 'T' + 끝 + ':00', timeZone: 'Asia/Seoul' };
   } else {
     몸.start = { date: ev.date };
-    몸.end = { date: addDays(ev.date, 1) };
+    몸.end = { date: addDays(끝날짜 || ev.date, 1) };
   }
   if (ev.source && ev.source.kind && ev.source.id) {
     몸.extendedProperties = { private: { puSourceKind: s(ev.source.kind), puSourceId: s(ev.source.id) } };
@@ -113,7 +117,7 @@ function ownerOf(ev, mailSid) {
 }
 /* 고친 칸 → 구글에 «통째로» 다시 넣을 일정(참석자·알림·반복 등 나머지는 그대로) */
 function mergedEvent(cur, f, nameOf) {
-  const 몸 = bodyOf({ date: f.date, time: f.time, endTime: f.endTime, summary: f.title, location: f.place,
+  const 몸 = bodyOf({ date: f.date, endDate: f.endDate, time: f.time, endTime: f.endTime, summary: f.title, location: f.place,
     description: descOf(f.contact, f.note, f.sid, nameOf), puSid: f.sid });
   const out = Object.assign({}, cur, { summary: 몸.summary, start: 몸.start, end: 몸.end });
   if (몸.location) out.location = 몸.location; else delete out.location;
@@ -131,11 +135,18 @@ function 내용바뀜(a, b) { return 내용칸.some((k) => s((a || {})[k]) !== s
 function cleanFields(f) {
   const o = f || {};
   const hm = (v) => (/^\d{2}:\d{2}$/.test(s(v)) ? s(v) : '');
-  const out = { date: s(o.date), time: hm(o.time), endTime: hm(o.time) ? hm(o.endTime) : '',
+  const out = { date: s(o.date), endDate: '', time: hm(o.time), endTime: hm(o.time) ? hm(o.endTime) : '',
     title: s(o.title).trim().slice(0, 300), place: s(o.place).trim().slice(0, 300),
     contact: s(o.contact).trim().slice(0, 200), note: s(o.note).slice(0, 4000), sid: SID_RE.test(s(o.sid)) ? s(o.sid) : '' };
   if (!/^\d{4}-\d{2}-\d{2}$/.test(out.date)) throw new Error('날짜가 올바르지 않습니다');
   if (!out.title) throw new Error('무슨 일인지 적어 주세요');
+  /* 끝나는 날 — 시작보다 뒤일 때만(같거나 비면 하루짜리). 앞이면 막는다 */
+  const ed = s(o.endDate);
+  if (ed && /^\d{4}-\d{2}-\d{2}$/.test(ed)) {
+    if (ed < out.date) throw new Error('끝나는 날이 시작보다 앞입니다');
+    if (ed > out.date) out.endDate = ed;
+  }
+  if (out.endDate && out.time && out.endTime && out.endDate === out.date && out.endTime <= out.time) out.endTime = '';
   return out;
 }
 
@@ -143,12 +154,30 @@ function make(deps) {
   const { functions, getDatabase } = deps;
   const doFetch = deps.fetch || ((...a) => fetch(...a));
 
+  /* ⚠ 대표 구글 연결이 끊기면 대표 폰으로 알린다 — 직원 일정·고치기·지우기가 모두 이 연결에 기댄다.
+     조용히 실패하면 「구글에 안 들어갔다」를 아무도 모른다. 12시간에 한 번만(gcal_proxy/alertAt, 서버만 쓰는 자리). */
+  async function 끊김알림(db, uid) {
+    try {
+      const ref = db.ref('gcal_proxy/alertAt');
+      const last = Number((await ref.once('value')).val()) || 0;
+      if (Date.now() - last < 12 * 3600e3) return;
+      await ref.set(Date.now());
+      const messaging = (deps.getMessaging || (() => require('firebase-admin/messaging').getMessaging()))();
+      await PUSH.pushOne(db, messaging, uid, {
+        title: '⚠ 구글 연결이 끊겼습니다',
+        body: '직원 일정이 구글 공용 달력으로 못 갑니다 — 푸른 캘린더에서 「구글 연결」을 다시 눌러 주세요',
+        tag: 'pu-gcal-broken', url: '/pureunall/pu-cal.html?sso=1',
+      });
+    } catch (e) { console.warn('[직원 일정 → 구글] 끊김 알림 실패', s((e && e.message) || e)); }
+  }
+
   async function ownerAccess(db) {
     const roles = (await db.ref('uid_roles').once('value')).val() || {};
     const uid = Object.keys(roles).find((u) => roles[u] && s(roles[u].sid) === OWNER_SID && s(roles[u].status) === 'active');
     if (!uid) throw new Error('대표 계정을 찾지 못했습니다');
+    const 끊김 = '대표 구글 연결이 없습니다 — 푸른 캘린더에서 대표님이 구글 연결을 다시 해 주세요';
     const rec = (await db.ref('gcal_tokens/' + uid).once('value')).val();
-    if (!rec || !rec.rt) throw new Error('대표 구글 연결이 없습니다 — 푸른 캘린더에서 대표님이 구글 연결을 다시 해 주세요');
+    if (!rec || !rec.rt) { await 끊김알림(db, uid); throw new Error(끊김); }
     const secret = (deps.secretOf || LINK().secretOf)();
     if (!secret) throw new Error('구글 연결용 서버 비밀값이 없습니다');
     const r = await doFetch(TOKEN_URL, {
@@ -156,7 +185,15 @@ function make(deps) {
       body: new URLSearchParams({ grant_type: 'refresh_token', refresh_token: rec.rt, client_id: deps.clientId || LINK().CLIENT_ID, client_secret: secret }).toString(),
     });
     const j = await r.json().catch(() => null);
-    if (!r.ok || !j || !j.access_token) throw new Error('대표 구글 표를 못 받았습니다(' + ((j && j.error) || r.status) + ')');
+    if (!r.ok || !j || !j.access_token) {
+      /* 구글이 그 열쇠를 버렸다(invalid_grant) — gcal-link ⑤ 와 같이 지우고 «다시 연결»이 뜨게, 대표 폰에도 알린다 */
+      if (j && j.error === 'invalid_grant') {
+        await db.ref('gcal_tokens/' + uid).remove().catch(() => {});
+        await 끊김알림(db, uid);
+        throw new Error(끊김);
+      }
+      throw new Error('대표 구글 표를 못 받았습니다(' + ((j && j.error) || r.status) + ')');
+    }
     db.ref('gcal_tokens/' + uid).update({ usedAt: Date.now() }).catch(() => {});
     return j.access_token;
   }
