@@ -3030,19 +3030,23 @@ function _rvTxnSafe(x,close){
 function rvApprovePicked(){
   var D=RV.data||{}, its=Object.keys(RV.picked).map(function(k){ return RV.items[+k]; }).filter(function(it){ return it&&it.t==='txn'; });
   if(!its.length){ toast('고른 분개 묶음이 없습니다','warn'); return; }
-  var rd=function(p){ return fbDb.ref(NS+'/closing/'+p).once('value').then(function(s){ return s.val(); }); };
+  /* 장부도 «지금» 서버 것으로 다시 읽어 잣대를 댄다 — 확인함을 연 뒤 다른 사람이 계정을 바꿨을 수 있다(점검 2026-10-10).
+     마감 여부나 장부를 못 읽은 묶음은 통째로 건드리지 않는다. */
+  var rd=function(p){ return fbDb.ref(NS+'/'+p).once('value').then(function(s){ return s.val(); }); };
   Promise.all(its.map(function(it){ var p=it.fid+'/'+it.yr;
-    return Promise.all([rd(p+'/locked'),rd(p+'/months')]).then(function(r){ return {locked:!!r[0], months:r[1]||{}}; },function(){ return null; }); }))
+    return Promise.all([rd('closing/'+p+'/locked'),rd('closing/'+p+'/months'),rd('txns/'+p)]).then(function(r){ return {locked:!!r[0], months:r[1]||{}, T:r[2]||{}}; },function(){ return null; }); }))
   .then(function(closes){
     var up={}, who=(S.user||''), at=_nowStamp(), sk={lock:0,undone:0,risky:0}, plan=[], n=0;
-    its.forEach(function(it,i){ var T=((D.txns||{})[it.fid]||{})[it.yr]||{}, ok=[];
+    its.forEach(function(it,i){ if(!closes[i]) return;
+      var T=closes[i].T, ok=[]; D.txns=D.txns||{}; D.txns[it.fid]=D.txns[it.fid]||{}; D.txns[it.fid][it.yr]=T;   // 확인함 목록도 지금 것으로
       Object.keys(T).forEach(function(id){ var x=T[id]||{}, w=_rvTxnSafe(x,closes[i]);
         if(w){ if(sk[w]!=null) sk[w]++; return; }
         var b='txns/'+it.fid+'/'+it.yr+'/'+id+'/'; up[b+'approved']=true; up[b+'approved_by']=who; up[b+'approved_at']=at; up[b+'ok_via']='bulk';
         ok.push(Object.assign({_id:id},x)); });
       if(ok.length){ plan.push({it:it, ok:ok}); n+=ok.length; }
     });
-    var why=(sk.risky?'\n· 100만 원 넘는 출금·임금성·차입 의심 '+sk.risky+'건 — 장부에서 하나씩 보세요':'')+(sk.undone?'\n· 차·대가 안 정해진 줄 '+sk.undone+'건':'')+(sk.lock?'\n· 마감한 달·확정한 해 '+sk.lock+'건':'');
+    var nFail=closes.filter(function(c){ return !c; }).length;
+    var why=(nFail?'\n· 서버에서 못 읽은 묶음 '+nFail+'개 — 통째로 뺌':'')+(sk.risky?'\n· 100만 원 넘는 출금·임금성·차입 의심 '+sk.risky+'건 — 장부에서 하나씩 보세요':'')+(sk.undone?'\n· 차·대가 안 정해진 줄 '+sk.undone+'건':'')+(sk.lock?'\n· 마감한 달·확정한 해 '+sk.lock+'건':'');
     if(!n){ toast('승인할 줄이 없습니다'+why.replace(/\n· /g,' · '),'warn'); return; }
     var list=plan.map(function(p){ var f=funds[p.it.fid]||{}; return '· '+(f.short_name||f.name||p.it.fid)+' '+p.it.yr+'년 '+p.ok.length+'건'; }).join('\n');
     confirmM(n+'건을 승인할까요?\n\n'+list+(why?'\n\n빼는 것:'+why:''),{ok:n+'건 승인'}).then(function(y){ if(!y) return;
