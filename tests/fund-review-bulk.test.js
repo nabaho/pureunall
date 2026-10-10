@@ -52,6 +52,8 @@ test('★ 배선 — 모든 줄 □, 갈래마다 단추, 승인은 누가·언�
   assert.ok(a.includes("up[b+'approved_by']=who; up[b+'approved_at']=at; up[b+'ok_via']='bulk'"));
   assert.ok(a.indexOf('_trTxnEv(x,p.it.fid,names)') < a.indexOf('learnAcct('), '배운 뒤에 세면 늘 «맞음»이 된다');
   assert.ok(a.includes("_audit(p.it.fid,'분개 한꺼번에 승인'"));
-  assert.ok(a.includes("rd(p+'/locked'),rd(p+'/months')"), '마감 여부를 안 읽는다');
+  assert.ok(a.includes("rd('closing/'+p+'/locked'),rd('closing/'+p+'/months'),rd('txns/'+p)"), '마감 여부·지금 장부를 안 읽는다');
+  assert.ok(a.includes('var T=closes[i].T') && !a.includes('var T=((D.txns||{})[it.fid]'), '확인함을 연 때의 장부로 판단한다');
+  assert.ok(a.includes('if(!closes[i]) return;'), '못 읽은 묶음을 건드린다');
   assert.ok(a.indexOf('confirmM(') < a.indexOf('fbDb.ref(NS).update(up)'), '묻지 않고 쓴다');
 });

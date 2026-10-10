@@ -102,3 +102,28 @@ test('ⓔ 위임장 함께', () => {
   ['openFill(withPower([fm]), host)', 'printBlank(withPower([fm]))', 'openFill(withPower(checkedForms())', 'printBlank(withPower(checkedForms()))', 'openFill(withPower(list)']
     .forEach((s) => assert.ok(SRC.indexOf(s) >= 0, s));
 });
+
+/* ⓕ 원본 모양 미리보기에도 재직 노무사 명단 (대표 지시 2026-10-10 「위임장에 … 공인노무사 모든 사람의 이름이 자동으로」) */
+test('ⓕ 미리보기 명단', async () => {
+  const W = global.window, keep = { CF: W.PuFormCardFill, T: W.EsignHwpTpl, H: W.PureunHwp };
+  const L = '대표 공인노무사 권형하, 공인노무사 박한별';
+  const seen = [];
+  const doc = { replaceAll: (a, b) => { seen.push([a, b]); return '{"count":1}'; }, exportHwpx: () => [7, 8], free: () => seen.push('free') };
+  try {
+    W.PuFormCardFill = { lawyersNow: () => L };
+    W.EsignHwpTpl = { applyLawyerLine: (d, line) => { seen.push(['line', line]); return 1; } };
+    W.PureunHwp = { openDoc: async () => doc };
+    const u8 = new Uint8Array([1]);
+    const r = await C.withLawyerNames(u8, '위임장.hwp');
+    assert.equal(r.name, '위임장.hwpx', '바꾼 사본은 hwpx 로 그린다');
+    assert.deepStrictEqual(Array.from(r.bytes), [7, 8]);
+    assert.deepStrictEqual(seen, [['line', L], ['{{공인노무사명단}}', L], 'free'], '이름 줄·표지 둘 다 · 다 쓰면 놓는다');
+    W.PuFormCardFill = { lawyersNow: () => '' };
+    assert.equal((await C.withLawyerNames(u8, '위임장.hwp')).bytes, u8, '명단이 없으면 원본 그대로');
+    W.PuFormCardFill = { lawyersNow: () => L };
+    assert.equal((await C.withLawyerNames(u8, '양식.xlsx')).bytes, u8, '엑셀은 건드리지 않는다');
+    W.PureunHwp = { openDoc: async () => { throw new Error('x'); } };
+    assert.equal((await C.withLawyerNames(u8, '위임장.hwp')).bytes, u8, '엔진이 못 열면 원본 그대로');
+  } finally { W.PuFormCardFill = keep.CF; W.EsignHwpTpl = keep.T; W.PureunHwp = keep.H; }
+  assert.match(SRC, /srcBytes\(src\)\.then\(function \(u8\) \{ return withLawyerNames\(u8, src\.name\); \}\)/, '원본 모양이 명단을 넣어 그린다');
+});

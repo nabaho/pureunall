@@ -53,6 +53,7 @@ const TypeSafeEvaluate = require("./typesafe-evaluate");
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
+const RehabWatch = require("./rehab-watch");
 
 if (!getApps().length) initializeApp();
 
@@ -1174,6 +1175,38 @@ exports.recruitWatch = functions
       }
     } catch (e) { console.warn("[컨설턴트 모집 감시] 회원 공지 첫 훑기 실패", String(e && e.message || e)); }
     console.log("[컨설턴트 모집 감시]", { checked: result.checked, added: result.hits.length, errors: result.errors });
+    return null;
+  });
+
+/* 회생광고 — 전국 회생 관할 법원 공고에서 «법인회생 포괄적 금지명령» 기업을 모은다 (2026-10-10).
+   대표 지시 「포괄금지명령 나온 기업들만 모아서 … 푸른통합시스템에 앱 만든다. 회생광고로」.
+   ⚠ 법원 공고는 «읽기만» 한다(로그인 없음 · 요청 사이 0.8초). 남기는 것은 회사명·주소·사건 정보뿐.
+   ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › rehab_ad). 화면은 rehab-ad.html.
+   ⚠ 발송은 하지 않는다 — 사람이 고른 건만 화면에서 우편 라벨로 뽑는다(정보통신망법 제50조).
+   07:40 — 다른 아침 일들(07:20 모집 감시)과 겹치지 않게. 최근 10일을 다시 훑어 늦게 뜬 공고도 줍는다. */
+exports.rehabWatch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("every day 07:40")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const root = getDatabase().ref("rehab_ad");
+    const existing = (await root.child("notices").once("value")).val() || {};
+    const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
+    const today = new Date(nowMs + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
+    const since = new Date(nowMs + 9 * 3600e3 - 10 * 864e5).toISOString().slice(0, 10);
+    const post = async (u, body) => {
+      const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+        headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return r.json();
+    };
+    const result = await RehabWatch.run({ post, existing, sinceYmd: since, nowMs,
+      wait: () => new Promise((ok) => setTimeout(ok, 800)) });
+    /* 온톨로지 판 표시 — 서버는 관리자 SDK 라 규칙을 건너뛰므로 레코드 모양을 여기서 갖춘다 */
+    result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
+    await root.update(RehabWatch.updatesOf(result, today, nowIso));
+    console.log("[회생광고 수집]", { checked: result.checked, found: result.found, added: result.added.length, errors: result.errors });
     return null;
   });
 

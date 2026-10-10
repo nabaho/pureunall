@@ -132,6 +132,22 @@ details.recban[open]>summary::before{content:'▾ '}
   background:var(--card);padding:6px 0;margin-top:-6px;border-bottom:1px solid var(--border)}
 /* ⚠ 폰(좁은 화면)에서는 단추 줄까지 붙이면 세 층이 화면의 3분의 1(375px 실측 278px)을 먹는다 → 하위 탭까지만 */
 @media (max-width:640px){ #recPaneHist>.bar{position:static;margin-top:0;border-bottom:0} }
+/* 공인노무사회·공공기관 탭 — 갈래·모두 봤음·서버 시각을 «한 줄»(.rec-stick)로, 하위 탭 밑에 붙인다(대표 「a」 2026-10-10).
+   ⚠ 표 머리는 그 밑에 붙는다 — 높이(--rbarH)는 재서 넣는다. 표를 감싼 .scroll 이 넘침 상자면 머리가 안 붙어 넓은 화면에선 풀어 준다. */
+.rec-stick{position:sticky;top:calc(var(--headH,94px) + var(--rsubH,44px));z-index:13;background:var(--card);
+  padding:6px 0;margin-bottom:6px;border-bottom:1px solid var(--border)}
+.rec-line{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rec-line .mchips{margin:0}
+.rec-line .mchip{padding:4px 10px}
+.rec-line .rec-sep{width:1px;height:18px;background:var(--border)}
+.rec-line .rec-at{font-size:11.5px;color:var(--text-mute);white-space:nowrap;cursor:help}
+.rec-stick .sel-bar{margin:6px 0 0}
+@media (min-width:1100px){
+  #recPaneKc .scroll,#recPanePub .scroll{overflow:visible}
+  #recPaneKc .rec-hits thead th,#recPanePub .rec-hits thead th{position:sticky;z-index:12;background:var(--card);
+    top:calc(var(--headH,94px) + var(--rsubH,44px) + var(--rbarH,44px))}
+}
+@media (max-width:640px){ .rec-stick{position:static;border-bottom:0} }
 .rsubs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin:-4px 0 12px;flex-wrap:wrap}
 .rsub{padding:9px 16px;border:0;background:none;font-family:inherit;font-size:13.5px;cursor:pointer;color:var(--text-mute);border-bottom:3px solid transparent;margin-bottom:-1px}
 .rsub.on{color:var(--navy);font-weight:700;border-bottom-color:var(--navy)}
@@ -165,8 +181,6 @@ a.tlink:hover{color:var(--navy);text-decoration:underline}
 tr.rec-past td{opacity:.62}
 @media (max-width:640px){ .rec-hits td.chk,.rec-hits td.rn{display:inline-block!important;width:auto} }
 .rec-fixed thead th{font-size:11.5px;color:var(--text-mute);font-weight:600;text-align:left}
-.rec-head{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:12.5px;margin:2px 0 8px}
-.rec-head b{color:var(--navy)}
 .recban.calm{background:var(--bg);border-color:var(--border);color:var(--text-mute)}
 tr.rec-now td{background:#fffbeb}
 td.og{width:15%;max-width:0;overflow:hidden;text-overflow:ellipsis}
@@ -341,7 +355,7 @@ table.cmp td{white-space:nowrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=56"></script>
+<script src="js/pu-ontology.js?v=57"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -349,7 +363,7 @@ table.cmp td{white-space:nowrap}
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=22"></script>
+<script src="js/pu-appbar.js?v=23"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
@@ -1205,6 +1219,7 @@ function recDraw(){
   /* ⚠ 폴더를 안 읽었어도 새 모집 글은 보인다 */
   if($('recWatchKc')) $('recWatchKc').innerHTML=recWatchHtml('kc');
   if($('recWatch')) $('recWatch').innerHTML=recWatchHtml('pub');
+  recStickySync();   /* 한 줄 높이가 바뀌었을 수 있다(갈래 수·선택 줄) */
   recSubDraw();
   matchEnsure();
   var mnr=$('matchNoteR'); if(mnr) mnr.innerHTML=matchNoteHtml();
@@ -1567,15 +1582,16 @@ function recWatchHtml(grp){
       +' <span class="sml" title="'+esc(e.why||f.why||'')+'">(까닭: '+esc(String(e.why||f.why||'').slice(0,60))+')</span></div>';
   }).join('');
   var fresh=all.filter(function(x){ return !seen[x.key]; });
-  var info='<span class="sml">— 서버가 매일 아침 7시 20분에 '+(last.checked?last.checked+'곳':'기관')+' 게시판을 읽습니다'
-    +(last.at?' · 마지막 '+esc(new Date(last.at).toLocaleString('ko-KR')):' · 아직 한 번도 안 돌았습니다')
-    +(errs.length?' · <span style="color:var(--red)">못 읽은 곳 '+errs.length+'('+esc(errs.map(errName).join(', '))+')'+(stuck.length<errs.length?' — 다음 날 다시 읽습니다':'')+'</span>':'')+'</span>';
-  var head=stuckHtml+'<div class="rec-head"><b>'+nm+'</b>'+(fresh.length?' <span class="tag red">새 글 '+fresh.length+'</span>':' <span class="sml">('+all.length+'건)</span>')+' '+info+'</div>';
-  if(!all.length) return head+'<div class="recban calm">'+(last.at?'아직 걸린 모집 글이 없습니다.':'첫 실행(아침 7시 20분) 뒤에 채워집니다.')+'</div>';
+  /* 서버 안내는 «작은 시각»으로 — 전체 문장은 마우스를 올리면(title). 못 읽은 곳만 빨갛게 드러낸다 */
+  var atTxt=last.at?(function(d){ return (d.getMonth()+1)+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(last.at)):'아직 안 돎';
+  var atTitle='서버가 매일 아침 7시 20분에 '+(last.checked?last.checked+'곳':'기관')+' 게시판을 읽습니다'+(last.at?' · 마지막 '+new Date(last.at).toLocaleString('ko-KR'):' · 아직 한 번도 안 돌았습니다');
+  var atHtml='<span class="rec-at" title="'+esc(atTitle)+'">🕒 '+esc(atTxt)+'</span>'
+    +(errs.length?' <span class="rec-at" style="color:var(--red)" title="'+esc(errs.map(function(e){ return errName(e)+': '+(e.why||''); }).join(' / '))+'">못 읽은 곳 '+errs.length+'('+esc(errs.map(errName).join(', '))+')'+(stuck.length<errs.length?' — 다음 날 다시 읽습니다':'')+'</span>':'');
+  if(!all.length) return stuckHtml+'<div class="rec-stick"><div class="rec-line"><span class="sml">'+(last.at?'아직 걸린 모집 글이 없습니다.':'첫 실행(아침 7시 20분) 뒤에 채워집니다.')+'</span><span class="sp"></span>'+atHtml+'</div></div>';
   /* 갈래 단추 — 제목 내용으로 가른 것(GovRecruit.kindOf) */
   var cnt={}; all.forEach(function(x){ var k=GovRecruit.kindOf(x.title); cnt[k]=(cnt[k]||0)+1; });
   var cur=_recKind[grp]||''; if(cur && !cnt[cur]) cur=_recKind[grp]='';
-  var chips='<div class="mchips" style="margin-bottom:8px"><button class="mchip'+(cur?'':' on')+'" onclick="recKindSet(\''+grp+'\',\'\')">전체 <span class="n">'+all.length+'</span></button>'
+  var chips='<div class="mchips"><button class="mchip'+(cur?'':' on')+'" onclick="recKindSet(\''+grp+'\',\'\')">전체 <span class="n">'+all.length+'</span></button>'
     + GovRecruit.KINDS.filter(function(k){ return cnt[k.k]; }).map(function(k){
       return '<button class="mchip'+(cur===k.k?' on':'')+'" onclick="recKindSet(\''+grp+'\',\''+k.k+'\')">'+k.icon+' '+esc(k.name)+' <span class="n">'+cnt[k.k]+'</span></button>'; }).join('')+'</div>';
   var today=recYmd(recToday());
@@ -1601,9 +1617,11 @@ function recWatchHtml(grp){
       +'<button class="btn sm" onclick="recWatchCal(\''+esc(x.key)+'\')">📅 마감일</button>'
       +(nw?'<button class="btn sm" onclick="recSeen(\''+esc(x.key)+'\')">✓ 봤음</button>':'')+'</td></tr>'; };
   recSelShown(grp, shown.map(function(x){ return x.key; }));
-  return head+chips
-    +(fr.length>1?'<div class="bar" style="margin:0 0 6px"><button class="btn sm" onclick="recSeenAll(\''+grp+'\')">✓ 새 글 '+fr.length+'건 모두 봤음</button></div>':'')
-    +recSelBar(grp, '<button class="btn sm" onclick="recSelSeen(\''+grp+'\',true)">✓ 고른 것 봤음</button> <button class="btn sm" onclick="recSelSeen(\''+grp+'\',false)">↩ 안 본 것으로</button>')
+  /* 한 줄: 갈래 단추 · 마감 지난 것 빼기 | (오른쪽) 새 글 모두 봤음 · 🕒 서버 시각. 고르면 선택 줄도 이 고정 칸 안에 */
+  return stuckHtml+'<div class="rec-stick"><div class="rec-line">'+chips+'<span class="sp"></span>'
+    +(fr.length>1?'<button class="btn sm" onclick="recSeenAll(\''+grp+'\')">✓ 새 글 '+fr.length+'건 모두 봤음</button>':'')
+    +atHtml+'</div>'
+    +recSelBar(grp, '<button class="btn sm" onclick="recSelSeen(\''+grp+'\',true)">✓ 고른 것 봤음</button> <button class="btn sm" onclick="recSelSeen(\''+grp+'\',false)">↩ 안 본 것으로</button>')+'</div>'
     +'<div class="scroll"><table class="rec-hits rec-fixed"><colgroup><col style="width:32px"><col style="width:40px"><col style="width:88px"><col style="width:140px"><col style="width:124px"><col><col style="width:132px"><col style="width:86px"><col style="width:150px"><col style="width:168px"></colgroup>'
     +'<thead><tr>'+recChkHead(grp)+'<th>날짜</th><th>'+(grp==='kc'?'게시판':'기관')+'</th><th>갈래</th><th>제목</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th title="공고 본문의 제출서류 — 갖고 있는 것/필요한 것">서류</th><th>기간</th><th style="text-align:right">할 일</th></tr></thead><tbody>'
     +shown.map(row).join('')+'</tbody></table></div>'
@@ -2132,6 +2150,9 @@ function recStickySync(){
   if(!root || !root.style || typeof root.style.setProperty!=='function') return;
   if(h && h.offsetHeight) root.style.setProperty('--headH', h.offsetHeight+'px');
   if(r && r.offsetHeight) root.style.setProperty('--rsubH', r.offsetHeight+'px');
+  /* 공인노무사회·공공기관 탭의 한 줄 — 숨은 탭은 0 이라 «보이는 것»만 잰다 */
+  if(document.querySelectorAll){ var bh=0; Array.prototype.forEach.call(document.querySelectorAll('.rec-stick'), function(el){ if(el.offsetHeight>bh) bh=el.offsetHeight; });
+    if(bh) root.style.setProperty('--rbarH', bh+'px'); }
 }
 function recStickyWatch(){
   recStickySync();

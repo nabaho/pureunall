@@ -204,7 +204,8 @@ test('ⓕ 원본 모양 — 한글은 rhwp, 엑셀은 미리보기 PDF(보관함
   assert.match(p, /drawOrig\(ob, fm\)/);
   const d = cutFn(s, 'function drawOrig(');
   assert.match(d, /renderPdfPages\(box, u8\)/, '엑셀 미리보기 PDF 를 그리지 않습니다');
-  assert.match(d, /w\.PureunHwp\.renderPreview\(box, u8, src\.name\)/, '한글 원본을 rhwp 로 그리지 않습니다');
+  assert.match(d, /w\.PureunHwp\.renderPreview\(box, d\.bytes, d\.name\)/, '한글 원본을 rhwp 로 그리지 않습니다');
+  assert.match(d, /withLawyerNames\(u8, src\.name\)/, '재직 노무사 명단을 넣어 그린다(2026-10-10)');
   assert.match(d, /S\.sel !== want/, '다른 양식으로 넘어간 뒤 늦게 온 그림을 덮어쓰면 안 된다');
   const pv = cutFn(s, 'function previewPdfOf(');
   assert.match(pv, /a\.role === 'preview'/); assert.match(pv, /a\.fileId/, '미리보기 PDF 는 보관함(fileId)에서도 받아야 한다(양식 목록에 박으면 무겁다)');

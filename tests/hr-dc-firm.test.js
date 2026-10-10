@@ -22,7 +22,7 @@ function env(store){
     getStaffPension: sid => ({ type: sid === 'P-1' ? 'NONE' : 'DC' }),
     calcPayroll: p => ({ grossPay: p.grossPay }) };
   vm.createContext(ctx);
-  vm.runInContext(fnSrc('dcFirmCheck') + '\nthis.f = dcFirmCheck;', ctx);
+  vm.runInContext('var DC_BANK_MEMO = /퇴직연금부담금/;\n' + fnSrc('dcBankOutflows') + '\n' + fnSrc('dcFirmCheck') + '\nthis.f = dcFirmCheck;', ctx);
   return ctx;
 }
 
@@ -47,4 +47,33 @@ test('그달 «근로자» 몫만 견준다 — 대표 몫·DC 아닌 사람 임
 test('퇴직연금 화면 월별 누계 탭에 법인 대조 표가 붙는다', () => {
   assert.match(SRC, /var firm = dcFirmCheck\(selYear\);/);
   assert.match(SRC, /firmBox,\s*\n\s*\/\/ 연도 선택 \+ 안내/);
+});
+
+test('★ DC 는 자동이체 — 올린 통장 거래내역의 «퇴직연금부담금» 출금을 센다 (출금관리에 안 적은 달도)', () => {
+  const pay = ym => [{ ym, empSid: 'A-1', status: 'paid', grossPay: 3000000 }];
+  const store = {
+    user_accounts: [{ sid: 'A-1' }],
+    payroll_monthly: [...pay('2026-05'), ...pay('2026-06'), ...pay('2026-07'), ...pay('2026-08')],
+    ledger_batches: [
+      { id: 'b1', src: 'bank', rows: [
+        { _k: 'k1', type: 'expense', date: '2026-05-25', memo: '퇴직연금부담금', amount: 250000 },
+        { _k: 'k2', type: 'expense', date: '2026-05-26', memo: '퇴직연금부담금', amount: 100000 },
+        { _k: 'k3', type: 'expense', date: '2026-05-06', memo: '교보', amount: 636000 },
+        { _k: 'k9', type: 'expense', date: '2026-07-15', memo: '점심', amount: 9000 }] },
+      { id: 'b2', src: 'bank', rows: [{ _k: 'k1', type: 'expense', date: '2026-05-25', memo: '퇴직연금부담금', amount: 250000 }] },
+      { id: 'b3', src: 'bank', _deleted: true, rows: [{ _k: 'kx', type: 'expense', date: '2026-08-25', memo: '퇴직연금부담금', amount: 1 }] },
+      { id: 'c1', src: 'hana-sms', rows: [{ _k: 'ks', type: 'expense', date: '2026-09-30', memo: '카드', amount: 1 }] }]
+  };
+  const rows = env(store).f('2026');
+  const by = ym => rows.find(r => r.ym === ym);
+  assert.equal(by('2026-05').paid, 350000, '겹친 줄은 한 번만 · 대표 몫(교보)은 빼고 · 한 달 두 번 이체는 더한다');
+  assert.equal(by('2026-05').src, 'bank');
+  assert.equal(by('2026-06').noOutflow, true, '통장이 덮는 달에 출금이 없으면 «출금 없음»');
+  assert.equal(by('2026-08').noBank, true, '통장이 7/15 까지면 8월은 «통장 내역 없음» — 안 본 것을 «안 냈다»로 말하지 않는다');
+  assert.equal(by('2026-08').noOutflow, false);
+  assert.equal(by('2026-07').noBank, true, '★ 통장이 7/15 에서 끝나면 7월 25일 무렵 이체는 «못 본 것» — 「출금 없음」이라 하면 안 된다 (실제 화면에서 찾음)');
+});
+
+test('화면에 «통장 내역 없음» 이 따로 보인다', () => {
+  assert.match(SRC, /r\.noBank \? '통장 내역 없음'/);
 });
