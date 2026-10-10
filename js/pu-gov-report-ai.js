@@ -82,8 +82,134 @@
     return t;
   }
 
-  var api = { fieldsFor: fieldsFor, mask: mask, unmask: unmask,
-    ROUND_KEYS: ROUND_KEYS, SUMMARY_KEYS: SUMMARY_KEYS, USES: USES, LIMITS: LIMITS, GARIM: GARIM, NO_RECORD: NO_RECORD };
+  var BODY_MAX = 1500;
+  var LABEL = { inquiry: '문의', diagnosis: '진단', advice: '자문', result: '성과', next: '향후',
+    inquiryDiag: '문의·진단 종합', review: '검토사항(기존)', action: '조치결과', etc: '기타사항',
+    adviceAll: '자문 결과', overall: '총평' };
+  var LABEL_FORM = {
+    'cci-seosan': { inquiryDiag: '요청 진단', adviceAll: '자문 결과' },
+    techguard: { diagnosis: '문제점', adviceAll: '자문 내용' },
+  };
+  function labelsFor(formKey) {
+    var o = {}, x = LABEL_FORM[formKey] || {};
+    Object.keys(LABEL).forEach(function (k) { o[k] = x[k] || LABEL[k]; });
+    return o;
+  }
+  /* 기관 작성기준 — FORMS 에는 기준 문구가 없다. 기관 원문 대조 전의 출발 문구(노무사 확인 필요) */
+  var COMMON_GUIDE = '회차마다 상담 요청(문의)·현황 진단·자문 내용·성과·향후 계획을 사실 위주로 1~3문장씩 쓴다. '
+    + '보고서 문체(~함, ~임)로 쓰고, 법 조문은 입력에 나온 것만 쓴다.';
+  var GUIDE = {
+    'cci-north': '충남북부상공회의소 인사노무 컨설팅 결과보고서. 회차별 수행내역은 문의·진단·자문·성과·향후가 한 칸에 이어 들어간다. '
+      + '문의·진단 종합은 기업의 요청과 진단 결과를 묶고, 결과종합은 검토사항(기존 제도)과 조치결과를 나눠 쓴다. 기타사항이 없으면 「없음」.',
+    'cci-seosan': '서산상공회의소 인사노무 경영컨설팅. 업체 방문 확인서는 회차마다 문의·진단·자문을 쓰고, '
+      + '상담 및 자문 결과 보고서는 요청 진단과 자문 결과를 전체 회차를 묶어 쓴다.',
+    techguard: '통합 기술보호지원반 법률 자문 완료보고서(별지 11). 회차별 법률 자문 일지에 문제점·자문·성과·향후를 쓰고, '
+      + '종합에 자문 내용과 총평을 쓴다. 기술 자료의 내용은 쓰지 않는다.',
+  };
+  function systemText(formKey, fields, lim) {
+    var lab = labelsFor(formKey);
+    var one = function (k) { return k + '=' + lab[k] + ' ' + lim[k] + '자'; };
+    var r0 = fields.rounds[0] || 'inquiry', s0 = fields.summary[0] || 'overall';
+    return [
+      '당신은 공인노무사가 쓰는 정부 지원 인사노무 컨설팅 보고서의 초안을 쓴다. 노무사가 읽고 고친 뒤 확정한다.',
+      '작성기준: ' + (GUIDE[formKey] ? GUIDE[formKey] + ' ' : '') + COMMON_GUIDE,
+      '규칙',
+      '- 입력에 없는 사실·날짜·숫자·법 조문 번호를 만들지 않는다. 모르면 쓰지 않는다.',
+      '- 메모도 자료도 없는 회차의 칸에는 정확히 「' + NO_RECORD + '」 만 쓴다.',
+      '- [해당 기업] [대표자] [담당자] 같은 대괄호 표시는 그대로 옮겨 쓴다. ' + GARIM + ' 의 원래 값을 짐작하지 않는다.',
+      '- 입력의 「채울_칸」에 있는 칸만 쓴다. 「이미_쓴_칸」·「이미_쓴_종합」은 맥락으로만 읽는다.',
+      '- 칸 이름과 글자 수 한도 — 회차: ' + (fields.rounds.map(one).join(', ') || '없음')
+        + ' / 종합: ' + (fields.summary.map(one).join(', ') || '없음'),
+      '- JSON 만 답한다. 앞뒤에 다른 글을 붙이지 않는다. 꼴: {"rounds":[{"i":0,"' + r0 + '":"…"}],"summary":{"' + s0 + '":"…"}}'
+        + ' — i 는 입력 회차의 i 그대로.',
+    ].join('\n');
+  }
+  function baseNames(report) {
+    var c = (report && report.company) || {};
+    return [{ v: c.name, as: '[해당 기업]' }, { v: c.ceo, as: '[대표자]' }, { v: c.contact, as: '[담당자]' }];
+  }
+
+  /* 보낼 글 — 입력을 JSON 으로 묶은 뒤 «통째로» 가린다(빠지는 글이 없게) */
+  function buildRequest(report, feed, formKey, opts) {
+    opts = opts || {};
+    var form = (G && G.FORMS && G.FORMS[formKey]) || {};
+    var fields = fieldsFor(formKey, opts.fileKeys);
+    var lim = {};
+    Object.keys(LIMITS).forEach(function (k) { lim[k] = LIMITS[k]; });
+    Object.keys(opts.limits || {}).forEach(function (k) { if (+opts.limits[k] > 0) lim[k] = +opts.limits[k]; });
+    var src = opts.src || {}, tg = !!opts.techguard, memos = opts.memos || [], want = [];
+    var rs = (report && Array.isArray(report.rounds)) ? report.rounds : [], sm = (report && report.summary) || {};
+    var rounds = rs.map(function (r, i) {
+      r = r || {};
+      var o = { i: i, 날짜: str(r.date) };
+      if (!tg) o.방식 = r.visit === true ? '방문' : r.visit === false ? '사무' : '모름';
+      o.메모 = str(memos[i]);
+      var had = {};
+      fields.rounds.forEach(function (k) {
+        var v = str(r[k]), p = 'rounds.' + i + '.' + k;
+        if (!v || src[p] === 'ai') want.push(p);
+        else if (!tg) had[k] = v;
+      });
+      if (!tg && Object.keys(had).length) o.이미_쓴_칸 = had;
+      return o;
+    });
+    var hadS = {};
+    fields.summary.forEach(function (k) {
+      var v = str(sm[k]), p = 'summary.' + k;
+      if (!v || src[p] === 'ai') want.push(p);
+      else if (!tg) hadS[k] = v;
+    });
+    var data = [];
+    if (!tg) (feed || []).forEach(function (x) {
+      if (!x || x.priv || x.kind === '일정') return;          // 일정은 회차 메모로 이미 간다
+      var o = { 날짜: str(x.d), 종류: str(x.kind) };
+      if (x.kind === '보낸 서류') o.서류 = str(x.text);
+      else {
+        o.제목 = str(x.text);
+        if (str(x.body)) o.본문 = str(x.body).slice(0, BODY_MAX);
+      }
+      data.push(o);
+    });
+    var input = { 양식: str(form.name), 회차: rounds, 자료: data };
+    if (!tg && Object.keys(hadS).length) input.이미_쓴_종합 = hadS;
+    input.채울_칸 = want;
+    var m = mask(JSON.stringify(input, null, 1), baseNames(report).concat(opts.names || []));
+    return { system: systemText(formKey, fields, lim), messages: [{ role: 'user', content: m.text }],
+      sent: m.text, back: m.back, fields: fields, want: want, limits: lim };
+  }
+
+  /* 받은 글 — 첫 { ~ 마지막 } 를 JSON 으로. 아는 칸의 글자만 옮긴다(모르는 열쇠·__proto__ 는 버린다) */
+  function parseDraft(text, back) {
+    var bad = function (why) { var e = new Error('AI 답을 읽지 못했습니다 — ' + why); e.parse = true; return e; };
+    var s = String(text == null ? '' : text), a = s.indexOf('{'), b = s.lastIndexOf('}');
+    if (a < 0 || b < a) throw bad('JSON 이 없습니다');
+    var o;
+    try { o = JSON.parse(s.slice(a, b + 1)); } catch (e) { throw bad('JSON 이 깨졌습니다'); }
+    if (!o || typeof o !== 'object' || Array.isArray(o)) throw bad('꼴이 다릅니다');
+    var un = function (v) {
+      if (typeof v !== 'string') return '';
+      v = v.replace(/\r\n?/g, '\n').trim();
+      return back ? unmask(v, back) : v;
+    };
+    var rounds = [];
+    (Array.isArray(o.rounds) ? o.rounds : []).forEach(function (r) {
+      if (!r || typeof r !== 'object') return;
+      var i = Number(r.i);
+      if (!Number.isInteger(i) || i < 0 || typeof r.i === 'string' && !/^\d+$/.test(r.i)) return;
+      var x = { i: i };
+      ROUND_KEYS.forEach(function (k) { var v = un(r[k]); if (v) x[k] = v; });
+      rounds.push(x);
+    });
+    var so = (o.summary && typeof o.summary === 'object' && !Array.isArray(o.summary)) ? o.summary : {}, summary = {};
+    SUMMARY_KEYS.forEach(function (k) { var v = un(so[k]); if (v) summary[k] = v; });
+    rounds = rounds.filter(function (x) { return Object.keys(x).length > 1; });
+    if (!rounds.length && !Object.keys(summary).length) throw bad('채운 칸이 없습니다');
+    return { rounds: rounds, summary: summary };
+  }
+
+  var api = { fieldsFor: fieldsFor, mask: mask, unmask: unmask, buildRequest: buildRequest, parseDraft: parseDraft,
+    ROUND_KEYS: ROUND_KEYS, SUMMARY_KEYS: SUMMARY_KEYS, USES: USES, LIMITS: LIMITS, GARIM: GARIM, NO_RECORD: NO_RECORD,
+    BODY_MAX: BODY_MAX, GUIDE: GUIDE, COMMON_GUIDE: COMMON_GUIDE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuGovReportAi = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
