@@ -184,7 +184,8 @@ const RPT_NAMES = ['grpRptRef', 'grpRid', 'grpYearOf', 'grpDay', 'grpShift', 'gr
   'grpReadMail', 'grpReadSent', 'grpReadSaved', 'grpStaffName', 'grpCollect', 'grpHintInput', 'grpSetup',
   'grpReadForm', 'grpCanConfirm', 'grpWho', 'grpCleanReport', 'grpRecord', 'grpWriteFail', 'grpNote',
   'grpSaveDraft', 'grpConfirm', 'grpNewVersion', 'grpAddRound', 'grpDelRound', 'grpAsk', 'grpFieldsFor',
-  'grpBlankList', 'grpGet', 'grpSetPath', 'grpParseRoundText', 'grpRoundText', 'grpFileName'];
+  'grpBlankList', 'grpGet', 'grpSetPath', 'grpParseRoundText', 'grpRoundText', 'grpFileName',
+  'grpAiSync', 'grpAiFields', 'grpAiDropRound'];
 
 const BIZ = '123-45-67891';   // 검산만 맞춘 가짜 번호
 function rptWorld(opts) {
@@ -234,7 +235,7 @@ function rptWorld(opts) {
     grpRender: () => {}, grpRenderTop: () => {}, grpRenderWarn: () => {},
   };
   vm.createContext(ctx);
-  const consts = (SRC.match(/^const GRP_(?:DENIED|HINT|RLAB|FILE_KO)=.*;$/gm) || []).join('\n');
+  const consts = (SRC.match(/^const GRP_(?:DENIED|HINT|RLAB|FILE_KO|AI_MODELS|AI_WAIT_MS|AI_OK|AI_MSG|AI_PATH)=.*;$/gm) || []).join('\n');
   vm.runInContext('var _grp=null;\n' + consts + '\n' + grab('getCoAtts') + '\n' + RPT_NAMES.map(grab).join('\n'), ctx);
   return { ctx, db, els, calls };
 }
@@ -476,4 +477,314 @@ test('보고서 ①-3 열쇠는 있는데 클라우드 연결 전이면 조용�
   const input = await w.ctx.grpCollect('c1', 'bxeyzrxm');
   assert.strictEqual(input.mail.length, 0);
   assert.ok(input.notes.some((n) => /클라우드 연결 전/.test(n)));
+});
+
+/* ══ ✨ AI 초안 (3단계) ══════════════════════════════════════════════════════
+ * ★ 지키는 것
+ *   ① 밖으로 나가는 글(프록시로 가는 body 전부)에 업체·사람 이름·전화·메일·사업자번호가 없다.
+ *   ② 사람이 쓴 칸은 덮지 않는다 — 처음부터 쓴 칸도, AI 칸을 사람이 고친 것도.
+ *   ③ 기술보호는 켜기 전엔 아무것도 안 보내고, 켜도 메일·보낸 서류는 안 보낸다.
+ *   ④ 확정된 판은 부르지 않는다.
+ *   ⑤ 오류 문구는 설계서 §5 그대로, 칸은 그대로.
+ * 가짜 프록시(fetch 바꿔치기) — 실제로 밖에 나가지 않는다. 합성 자료만. */
+const Ai = require('../js/pu-gov-report-ai.js');
+const AI_NAMES = ['grpAiProxyUrl', 'grpAiConsent', 'grpAiFetch', 'grpAiCall', 'grpAiNames', 'grpAiMemos', 'grpAiCan',
+  'grpAiDraft', 'grpAiUndo', 'grpAiAllow', 'grpAddRound', 'grpDelRound'];
+const SCREEN_NAMES = ['grpRenderTop', 'grpFileLabel', 'grpFieldHtml', 'grpSrcLabel', 'grpWarnings', 'grpAiButtons', 'grpAiFoot'];
+const aiBtn = (h) => (h.match(/<button[^>]*data-grp-act="ai"[^>]*>/) || [''])[0];
+const aiText = (text) => ({ content: [{ type: 'text', text }] });
+const aiReply = (o) => aiText(JSON.stringify(o));
+const okReply = () => aiReply({
+  rounds: [{ i: 0, inquiry: '[해당 기업] [담당자] 취업규칙 문의', diagnosis: '연장근로 규정 미비', advice: '덮으면 안 됨' }],
+  summary: { inquiryDiag: '[해당 기업] 종합', review: '검토 초안', action: 'AI 조치', etc: '없음', overall: '양식이 안 씀' },
+});
+function aiWorld(opts) {
+  const o = opts || {};
+  const seed = mailSeed();
+  seed.pucards.coMail['1234567891'].rows.push(
+    { d: '2025-09-03', at: 3, io: 'in', s: '가나상사 홍길동 대리 연락처 041-000-0000 hong@example.com', w: '홍길동' });
+  const w = rptWorld(Object.assign({}, o, { seed }));
+  const fetched = [];
+  const replies = (o.replies || [okReply()]).slice();
+  const store = Object.assign({}, o.ls || { gov_ai_ok: '1' });
+  Object.assign(w.ctx, {
+    PuGovReportAi: Ai, clearTimeout, AbortController: o.noAbort ? undefined : AbortController,
+    setTimeout: o.fastTimeout ? (fn, ms) => setTimeout(fn, ms >= 90000 ? 5 : ms) : setTimeout,
+    window: { PU_CFG: { aiProxyUrl: o.noProxy ? '' : 'https://proxy.example.com/ai' } },
+    localStorage: { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+    fetch: async (url, init) => {
+      fetched.push({ url, body: JSON.parse(init.body) });
+      const r = replies.shift();
+      if (r instanceof Error) throw r;
+      if (r && r.hang) return { json: () => new Promise(() => {}) };
+      return { json: async () => r };
+    },
+  });
+  vm.runInContext(AI_NAMES.map(grab).join('\n'), w.ctx);
+  if (o.screen) vm.runInContext(SCREEN_NAMES.map(grab).join('\n'), w.ctx);
+  return Object.assign(w, { fetched, store });
+}
+
+test('AI ① 밖으로 나가는 글 전부에 가림 — 업체·사람 이름·전화·메일·사업자번호가 안 나간다', async () => {
+  const w = aiWorld();
+  w.ctx.getScheds()[1].memo = '홍길동 대리 면담(010-0000-0000) — 취업규칙 개정 요청';
+  const st = await opened(w);
+  const r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, true, JSON.stringify(r));
+  assert.strictEqual(w.fetched.length, 1);
+  assert.strictEqual(w.fetched[0].url, 'https://proxy.example.com/ai');
+  const out = JSON.stringify(w.fetched[0].body);
+  for (const bad of ['가나상사', '홍길동', '김가나', '041-000-0000', '010-0000-0000', 'hong@example.com', BIZ, '1234567891']) {
+    assert.ok(!out.includes(bad), bad + ' 이(가) 나갔다');
+  }
+  assert.ok(out.includes('[가림]'), '전화·메일 자리는 [가림]');
+  assert.strictEqual(w.fetched[0].body.model, 'claude-opus-5');
+  assert.strictEqual(w.fetched[0].body.max_tokens, 8000);
+  assert.strictEqual(st.report.rounds[0].inquiry, '가나상사 홍길동 취업규칙 문의', '받은 글에서 이름을 되돌린다');
+  assert.strictEqual(st.aiSrc['rounds.0.inquiry'], 'ai');
+});
+
+test('AI ② 사람이 쓴 칸은 덮지 않는다 — 처음부터 쓴 칸도, AI 칸을 사람이 고친 것도', async () => {
+  const w = aiWorld({ replies: [okReply(),
+    aiReply({ rounds: [{ i: 0, diagnosis: '두 번째 진단' }], summary: { review: '두 번째 검토', etc: '두 번째 기타' } })] });
+  const st = await opened(w);
+  st.report.summary.action = '사람이 쓴 조치';
+  const memo = st.report.rounds[0].advice;
+  assert.ok(memo, '일정 메모가 자문 칸에 들어 있다(2단계)');
+  assert.strictEqual((await w.ctx.grpAiDraft()).ok, true);
+  assert.strictEqual(st.report.rounds[0].advice, memo, '메모에서 온 자문(사람 기록)을 덮었다');
+  assert.strictEqual(st.report.summary.action, '사람이 쓴 조치');
+  assert.strictEqual(st.report.summary.review, '검토 초안');
+  assert.strictEqual(st.report.summary.overall, '', '충남북부 양식이 안 쓰는 칸');
+  st.report.summary.review = '사람이 고친 검토';          // 화면에서 고친 것과 같다
+  assert.strictEqual((await w.ctx.grpAiDraft()).ok, true);
+  assert.strictEqual(st.report.summary.review, '사람이 고친 검토');
+  assert.ok(!st.aiSrc['summary.review'], '사람이 고친 칸은 AI 표시가 빠진다');
+  assert.strictEqual(st.report.summary.etc, '두 번째 기타', '사람이 안 고친 AI 칸은 새 초안으로');
+  assert.strictEqual(st.report.rounds[0].diagnosis, '두 번째 진단');
+});
+
+test('AI ③ 기술보호 — 켜기 전엔 아무것도 안 보내고, 켜도 메일·보낸 서류는 안 보낸다', async () => {
+  const w = aiWorld();
+  const input = await w.ctx.grpCollect('c1', 'bxeyzrxm');
+  const st = w.ctx.grpSetup(input, 'techguard');
+  assert.strictEqual(st.techguard, true);
+  assert.strictEqual(st.aiAllow, false, '기본은 끔');
+  const r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.fetched.length, 0);
+  assert.ok(w.ctx.__toasts.some((t) => /이번 건 AI 사용/.test(t.m)));
+  assert.strictEqual(w.ctx.grpAiAllow(), true);
+  assert.strictEqual(st.aiAllow, true);
+  assert.strictEqual((await w.ctx.grpAiDraft()).ok, true);
+  const sent = JSON.stringify(w.fetched[0].body);
+  for (const bad of ['취업규칙 검토 요청', '임금체계 검토 의견서', '취업규칙 개정안', '연락처']) {
+    assert.ok(!sent.includes(bad), bad + ' 이(가) 나갔다');
+  }
+  assert.ok(sent.includes('2025-09-04') && sent.includes('취업규칙 개정 요청'), '회차 날짜·메모는 보낸다');
+});
+
+test('AI ④ 확정된 판은 부르지 않는다', async () => {
+  const w = aiWorld();
+  await opened(w);
+  assert.strictEqual((await w.ctx.grpConfirm()).ok, true);
+  const r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.fetched.length, 0);
+  assert.strictEqual(w.ctx.grpAiCan(w.ctx._grp).ok, false);
+});
+
+test('AI ⑤ 오류 — 프록시 없음·동의 안 함·응답 없음·JSON 못 읽음(한 번 더 물은 뒤), 칸은 그대로', async () => {
+  let w = aiWorld({ noProxy: true });
+  await opened(w);
+  let r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.fetched.length, 0);
+  assert.ok(w.ctx.__toasts.some((t) => t.m === 'AI 프록시가 설정되지 않았습니다 — 포털 ⚙ 설정'));
+
+  w = aiWorld({ ls: {} });
+  w.ctx.confirm = () => false;
+  await opened(w);
+  r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.fetched.length, 0, '동의 안 하면 보내지 않는다');
+  assert.ok(!('gov_ai_ok' in w.store));
+
+  w = aiWorld({ ls: {} });
+  await opened(w);
+  assert.strictEqual((await w.ctx.grpAiDraft()).ok, true);
+  assert.strictEqual(w.store.gov_ai_ok, '1', '동의는 브라우저에 기억한다');
+
+  w = aiWorld({ replies: [new TypeError('Failed to fetch'), new TypeError('Failed to fetch')] });
+  let st = await opened(w);
+  let before = JSON.stringify(st.report);
+  r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.ok(w.ctx.__toasts.some((t) => t.m === 'AI 응답이 없습니다 — 잠시 뒤 다시'));
+  assert.strictEqual(JSON.stringify(st.report), before, '칸은 그대로');
+
+  w = aiWorld({ replies: [aiText('죄송합니다'), aiText('여전히 JSON 아님')] });
+  st = await opened(w);
+  before = JSON.stringify(st.report);
+  r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.fetched.length, 2, '못 읽으면 한 번 더 묻는다');
+  assert.ok(w.ctx.__toasts.some((t) => t.m === 'AI 답을 읽지 못했습니다'));
+  assert.strictEqual(JSON.stringify(st.report), before);
+
+  w = aiWorld({ replies: [aiText('잠시만요'), okReply()] });
+  await opened(w);
+  assert.strictEqual((await w.ctx.grpAiDraft()).ok, true, '두 번째 답을 읽으면 된다');
+  assert.strictEqual(w.fetched.length, 2);
+});
+
+test('AI ⑥ 임시 저장에 AI 칸 목록(aiFields)을 남기고, 다시 열면 「AI 초안」으로 이어 받는다', async () => {
+  const w = aiWorld();
+  await opened(w);
+  await w.ctx.grpAiDraft();
+  assert.strictEqual((await w.ctx.grpSaveDraft()).ok, true);
+  const rec = w.db.읽기('scal_reports/c1/bxeyzrxm_2025');
+  assert.ok(Array.from(rec.aiFields).includes('summary.review'));
+  assert.ok(Array.from(rec.aiFields).every((p) => !/\.\./.test(p)));
+  const again = await w.ctx.grpCollect('c1', 'bxeyzrxm');
+  const st2 = w.ctx.grpSetup(again, 'cci-north');
+  assert.strictEqual(st2.aiSrc['summary.review'], 'ai');
+  assert.strictEqual(st2.aiVal['summary.review'], '검토 초안');
+  assert.strictEqual(st2.aiUndo, null, '되돌리기는 창 안에서만');
+});
+
+test('AI ⑦ 되돌리기 — 직전 AI 넣기만 되돌리고, 그 뒤 사람이 고친 칸은 그대로', async () => {
+  const w = aiWorld();
+  const st = await opened(w);
+  await w.ctx.grpAiDraft();
+  st.report.summary.etc = '사람이 고친 기타';
+  const u = w.ctx.grpAiUndo();
+  assert.strictEqual(u.ok, true);
+  assert.strictEqual(st.report.summary.review, '');
+  assert.strictEqual(st.report.rounds[0].inquiry, '');
+  assert.strictEqual(st.report.summary.etc, '사람이 고친 기타');
+  assert.strictEqual(st.aiUndo, null);
+  assert.ok(!st.aiSrc['summary.review']);
+});
+
+test('AI ⑦-2 보고서에서 더한 회차를 빼면 AI 칸 표시도 한 칸씩 당겨진다', async () => {
+  const w = aiWorld();
+  const st = await opened(w);
+  w.ctx.grpAddRound(); w.ctx.grpAddRound();             // 2회·3회(0부터 2·3) 추가
+  st.aiSrc = { 'rounds.2.inquiry': 'ai', 'rounds.3.inquiry': 'ai', 'summary.etc': 'ai' };
+  st.aiVal = { 'rounds.2.inquiry': 'a', 'rounds.3.inquiry': 'b', 'summary.etc': 'c' };
+  w.ctx.grpDelRound(2);
+  assert.deepStrictEqual(Object.keys(st.aiSrc).sort(), ['rounds.2.inquiry', 'summary.etc']);
+  assert.strictEqual(st.aiVal['rounds.2.inquiry'], 'b');
+});
+
+test('AI — 스크립트 줄: pu-gov-report-ai.js 는 pu-gov-report.js 뒤에', () => {
+  const g = HTML.indexOf('<script src="js/pu-gov-report.js?v=');
+  const a = HTML.indexOf('<script src="js/pu-gov-report-ai.js?v=');
+  assert.ok(g >= 0 && a > g, 'pu-gov-report-ai.js 줄이 없거나 차례가 틀렸다');
+});
+
+test('AI ⑧ 화면 — ✨ 단추·되돌리기 단추·「AI 초안」 딱지와 경고, 사람이 고치면 딱지가 빠진다, 확정하면 잠긴다', async () => {
+  const w = aiWorld({ screen: true });
+  const st = await opened(w);
+  w.ctx.grpRenderTop();
+  let top = w.els['#grpTop'].innerHTML;
+  assert.ok(aiBtn(top) && !/disabled/.test(aiBtn(top)), '열린 초안에서는 눌린다');
+  assert.ok(!/data-grp-act="aiAllow"/.test(top), '기술보호가 아니면 켜기 단추가 없다');
+  assert.ok(!/data-grp-act="aiUndo"/.test(top));
+  assert.ok(!/3단계에서 붙습니다/.test(top), '자리만 잡던 단추가 남았다');
+  await w.ctx.grpAiDraft();
+  w.ctx.grpRenderTop();
+  top = w.els['#grpTop'].innerHTML;
+  assert.match(top, /data-grp-act="aiUndo"/);
+  const f = w.ctx.grpFieldsFor('cci-north').find((x) => x.path === 'summary.review');
+  assert.match(w.ctx.grpFieldHtml(st, f), /data-grp-ai="summary\.review"><span class="grp-tag ai">AI 초안/);
+  st.aiWarn['summary.review'] = ['확인 필요 — 입력에 없던 날짜·숫자: 2026'];
+  assert.match(w.ctx.grpFieldHtml(st, f), /확인 필요 — 입력에 없던 날짜·숫자: 2026/);
+  assert.ok(w.ctx.grpWarnings(st).some((x) => /✨ AI 초안 \d+칸/.test(x.t)));
+  st.report.summary.review = '사람이 고침';
+  w.ctx.grpAiSync(st);
+  assert.ok(!/AI 초안/.test(w.ctx.grpFieldHtml(st, f)), '사람이 고치면 딱지가 없어진다');
+  assert.strictEqual((await w.ctx.grpConfirm()).ok, true);
+  w.ctx.grpRenderTop();
+  top = w.els['#grpTop'].innerHTML;
+  assert.match(aiBtn(top), /disabled/, '확정된 판은 잠긴다');
+  assert.ok(!/data-grp-act="aiUndo"/.test(top));
+});
+
+test('AI ⑨ 화면 — 기술보호는 켜기 전 ✨ 가 잠기고 「이번 건 AI 사용」 단추가 있다', async () => {
+  const w = aiWorld({ screen: true });
+  const input = await w.ctx.grpCollect('c1', 'bxeyzrxm');
+  const st = w.ctx.grpSetup(input, 'techguard');
+  w.ctx.grpRenderTop();
+  let top = w.els['#grpTop'].innerHTML;
+  assert.match(aiBtn(top), /disabled/);
+  assert.match(top, /data-grp-act="aiAllow"[^>]*>☐ 이번 건 AI 사용/);
+  w.ctx.grpAiAllow();                                   // 다시 그린다
+  top = w.els['#grpTop'].innerHTML;
+  assert.ok(!/disabled/.test(aiBtn(top)));
+  assert.match(top, /☑ 이번 건 AI 사용/);
+  assert.ok(w.ctx.grpWarnings(st).some((x) => /이번 건 AI 사용 켬/.test(x.t)));
+});
+
+test('AI ⑩ 화면 — 칸을 고치면(change) AI 표시를 맞추고 그 딱지만 다시 그린다', () => {
+  const b = grab('grpBind');
+  assert.match(b, /grpReadForm\(\);[\s\S]*grpAiSync\(_grp\)[\s\S]*data-grp-ai/);
+  assert.match(SRC, /\.grp-tag\.ai\{/);
+});
+test('AI ⑪ 쓰는 중에는 회차 추가·빼기가 막히고, 단추도 잠긴다', async () => {
+  const w = aiWorld({ screen: true });
+  const st = await opened(w);
+  w.ctx.grpAddRound();
+  const n = st.report.rounds.length;
+  st.aiBusy = true;
+  assert.strictEqual(w.ctx.grpAddRound(), 0);
+  assert.strictEqual(w.ctx.grpDelRound(n - 1), false);
+  assert.strictEqual(st.report.rounds.length, n, '쓰는 중에는 회차가 그대로');
+  assert.ok(w.ctx.__toasts.some((x) => x.m === 'AI 초안을 쓰는 중입니다 — 끝난 뒤 다시'));
+  st.aiBusy = false;
+  assert.strictEqual(w.ctx.grpDelRound(n - 1), true);
+  const html = SRC.replace(/\r/g, '');
+  assert.ok(html.includes('data-grp-act="addRound"${st.aiBusy'), '추가 단추가 쓰는 중이면 disabled');
+  assert.ok(html.includes('data-arg="${i}"${st.aiBusy'), '빼기 단추가 쓰는 중이면 disabled');
+});
+
+test('AI ⑫ 기다리는 동안 회차가 바뀌었으면 아무것도 넣지 않는다', async () => {
+  const w = aiWorld();
+  const st = await opened(w);
+  const orig = w.ctx.fetch;
+  w.ctx.fetch = async (u, i) => { st.report.rounds[0].date = '2099-01-01'; return orig(u, i); };
+  const before = JSON.stringify(st.report.rounds.map((r) => r.inquiry));
+  const r = await w.ctx.grpAiDraft();
+  assert.strictEqual(r.ok, false);
+  assert.ok(w.ctx.__toasts.some((x) => x.m === '회차가 바뀌어 AI 초안을 넣지 않았습니다 — 다시 눌러 주세요'));
+  assert.strictEqual(JSON.stringify(st.report.rounds.map((x) => x.inquiry)), before);
+  assert.deepStrictEqual(Object.keys(st.aiSrc), []);
+  assert.strictEqual(st.aiBusy, false);
+});
+
+test('AI ⑬ 확정된 판에는 「노무사가 읽고 고친 뒤」 경고를 띄우지 않는다(딱지만)', async () => {
+  const w = aiWorld({ screen: true });
+  const st = await opened(w);
+  await w.ctx.grpAiDraft();
+  st.aiWarn['summary.review'] = ['확인 필요 — 테스트'];
+  const f = w.ctx.grpFieldsFor('cci-north').find((x) => x.path === 'summary.review');
+  assert.ok(w.ctx.grpWarnings(st).some((x) => /노무사가 읽고 고친 뒤/.test(x.t)));
+  assert.strictEqual((await w.ctx.grpConfirm()).ok, true);
+  assert.ok(!w.ctx.grpWarnings(st).some((x) => /노무사가 읽고 고친 뒤/.test(x.t)), '확정본에 검토 요청 경고');
+  const foot = w.ctx.grpFieldHtml(st, f);
+  assert.match(foot, /grp-tag ai">AI 초안/);
+  assert.ok(!/확인 필요/.test(foot));
+});
+
+test('AI ⑭ 응답 본문이 멈춰도 시간 제한으로 끊기고 aiBusy 가 풀린다', async () => {
+  for (const noAbort of [false, true]) {
+    const w = aiWorld({ replies: [{ hang: 1 }], fastTimeout: true, noAbort });
+    const st = await opened(w);
+    const r = await w.ctx.grpAiDraft();
+    assert.strictEqual(r.ok, false);
+    assert.ok(w.ctx.__toasts.some((x) => x.m === 'AI 응답이 없습니다 — 잠시 뒤 다시'));
+    assert.strictEqual(st.aiBusy, false);
+    assert.strictEqual(w.fetched.length, 1, '끊긴 것은 다음 모델로 넘기지 않는다');
+  }
 });
