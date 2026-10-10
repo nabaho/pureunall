@@ -643,6 +643,26 @@
       return { bytes: r.preview || r.bytes, name: String(src.name).replace(/\.[^.]+$/, '') + (r.preview ? '.hwpx' : '.hwp'), markers: r.markers || [] };
     });
   }
+  /* 원본 모양에도 «지금 재직 중인» 공인노무사 명단을 넣어 그린다 (대표 2026-10-10 「위임장에 푸른이알피에 연결되어 있는
+     공인노무사 모든 사람의 이름이 자동으로 … 계약서 관리에는 rhwp 사용」).
+     채우기·빈 양식 인쇄는 이미 넣고 있었고(formHwpFill → applyLawyerLine), 미리보기만 원본 그대로라 옛 이름 한 명만 보였다.
+     rhwp 로 열어 ① 이름표 없는 위임장의 「성 명 : 공인노무사 ○○○」 줄 ② {{공인노무사명단}} 표지를 명단으로 바꾼다.
+     명단은 이알피 직원 명부(data/user_dir)·휴직(data/leave_of_absence)에서 — 퇴사·휴직하면 빠진다(PuFormCardFill.lawyersNow).
+     ⚠ 원본 파일은 고치지 않는다 — 그릴 사본만. 바꿀 것이 없거나 엔진이 없으면 원본 그대로 그린다. */
+  function withLawyerNames(u8, name) {
+    var CF = w.PuFormCardFill, T = w.EsignHwpTpl, H = w.PureunHwp;
+    var line = CF && CF.lawyersNow ? CF.lawyersNow() : '';
+    var same = { bytes: u8, name: name };
+    if (!line || !H || !H.openDoc || isXlsxName(name)) return Promise.resolve(same);
+    return H.openDoc(u8, name).then(function (doc) {
+      try {
+        var n = T && T.applyLawyerLine ? T.applyLawyerLine(doc, line) : 0;
+        try { n += (JSON.parse(doc.replaceAll('{{공인노무사명단}}', line, true)) || {}).count || 0; } catch (_) {}
+        if (!n) return same;
+        return { bytes: new Uint8Array(doc.exportHwpx()), name: String(name).replace(/\.[^.]+$/, '') + '.hwpx' };
+      } finally { try { doc.free(); } catch (_) {} }
+    }, function () { return same; });
+  }
   /* 문서 하나 → 쪽 그림들 [{url, land}] — 화면 밖 틀에 그려 캔버스를 그림으로 */
   function pagesOf(doc, host, opt) {
     opt = opt || {};
@@ -2810,7 +2830,8 @@
       box.innerHTML = ''; box.appendChild(el('div', { 'class': 'pcf-muted', text: '원본 모양을 그리는 중…' }));
       var go = pdf ? srcBytes({ name: pdf.name, data: pdf.data || pdf.dataUrl, fileId: pdf.fileId })
           .then(function (u8) { if (S.sel !== want) return; box.innerHTML = ''; return renderPdfPages(box, u8); })
-        : srcBytes(src).then(function (u8) { if (S.sel !== want) return; box.innerHTML = ''; return w.PureunHwp.renderPreview(box, u8, src.name); });
+        : srcBytes(src).then(function (u8) { return withLawyerNames(u8, src.name); })
+          .then(function (d) { if (S.sel !== want) return; box.innerHTML = ''; return w.PureunHwp.renderPreview(box, d.bytes, d.name); });
       go.catch(function (e) {
         if (S.sel !== want) return;
         box.innerHTML = '';
@@ -3171,7 +3192,7 @@
     facetCounts: facetCounts,
     setsOf: setsOf,
     changeSets: changeSets,
-    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder, contractsForCo: contractsForCo, powerFor: powerFor,
+    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder, contractsForCo: contractsForCo, powerFor: powerFor, withLawyerNames: withLawyerNames,
     bundleMarkers: bundleMarkers,
     bundleFileNames: bundleFileNames,
     zipName: zipName,
