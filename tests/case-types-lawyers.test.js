@@ -186,3 +186,38 @@ test('ⓗ 이름 줄이기 — 「 - 푸른 표준」·끝의 (근로자)/(사�
   assert.equal(fn({ name: '' }), '');
   assert.match(SRC, /title: f\.name, text: shownName\(f\)/, '전체 이름은 마우스를 올리면');
 });
+
+/* ⓘ 종료 서식 · 내용 고치기 (대표 지시 2026-10-10) */
+test('ⓘ 종료 서식 — 종료한 양식은 목록·세기·계약서 출력에서 빠지고 종료 서식 보기에만 나온다', () => {
+  const F = [{ id: 'a', kind: 'company', name: '자문계약서', body: '' },
+    { id: 'b', kind: 'company', name: '옛 계약서', body: '', closed: true, closedAt: '2026-10-10', enabled: false },
+    { id: 'c', kind: 'case', name: '위임장', body: '', closed: true, closedAt: '2026-10-11', enabled: false },
+    { id: 'd', kind: 'case', name: '산재 위임약정서(사용자)', groupName: '산재등', body: '' }];
+  assert.deepStrictEqual(C.filterForms(F, { kind: 'company' }).map((f) => f.id), ['a'], '종료한 것은 목록에서 빠진다');
+  assert.deepStrictEqual(C.filterForms(F, { kind: 'case' }).map((f) => f.id), ['d']);
+  assert.deepStrictEqual(C.filterForms(F, { closed: true }).map((f) => f.id), ['c', 'b'], '종료 서식은 종류 상관없이 · 최근 종료가 먼저');
+  assert.deepStrictEqual(C.filterForms(F, { closed: true, kind: 'case' }).map((f) => f.id), ['c']);
+  assert.equal(C.isClosed(F[1]), true); assert.equal(C.isClosed(F[0]), false);
+  assert.equal(C.facetCounts(F, 'case').sides.all, 1, '칩 개수에서도 뺀다');
+  assert.deepStrictEqual(C.contractPick(F, { kinds: ['company'] }), ['a'], '이알피 계약서 출력에서도 빠진다');
+  const tm = C.treeModel(F);
+  assert.equal(tm.filter((t) => t.kind === 'company')[0].count, 1);
+});
+test('ⓘ 종료 서식 — 옮기기·되살리기 배선(한 건만 거래로, 쓰던 사용 여부를 되돌림)', () => {
+  assert.match(SRC, /c\.closed = true; c\.closedAt = at; c\.enabledBefore = c\.enabled !== false; c\.enabled = false;/, '종료 때 사용 안 함도 함께(이알피가 enabled 만 본다)');
+  assert.match(SRC, /c\.enabled = c\.enabledBefore !== false;\s*delete c\.closed; delete c\.closedAt; delete c\.enabledBefore;/, '되살리면 옛 사용 여부로');
+  assert.match(SRC, /pickKind\('_closed'\)/, '왼쪽 메뉴 「🗄 종료 서식」');
+  assert.match(SRC, /t: '🗄 종료 서식으로 옮기기'/, '⋯ 메뉴에서 옮긴다');
+  assert.match(SRC, /text: '↩ 되살리기'/);
+});
+test('ⓘ 내용 고치기 — 한글 원본을 저장소 안 편집기로 고쳐 새 원본으로(이전 원본은 보관함에)', () => {
+  assert.match(SRC, /host\.hwpEdit && hwpOrigOf\(fm\)\) \? el\('button'[^\n]*text: '✏ 내용 고치기'/, '도구줄에 단추');
+  const i = SRC.indexOf('function editOriginal(fm) {'), j = SRC.indexOf('function del(fm) {', i);
+  const f = SRC.slice(i, j);
+  assert.match(f, /host\.hwpEdit\(u8, src\.name\)/, '저장소 안 편집기만(외부로 안 나간다)');
+  assert.match(f, /reflowBytes\(out, src\.name\)/, '고친 뒤 줄을 다시 나눈다');
+  assert.match(f, /storeNewOriginal\(fm, bytes, src\.name/);
+  const g = SRC.slice(SRC.indexOf('function storeNewOriginal('), i);
+  assert.match(g, /keep\.originals = \(Array\.isArray\(keep\.originals\)/, '이전 원본 이력을 남긴다');
+  assert.match(g, /withNewOriginal\(keep, nu\)/);
+});

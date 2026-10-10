@@ -280,7 +280,7 @@
   function treeModel(forms) {
     function leaf(f) { return { id: f.id, name: f.name || '(이름 없음)', enabled: f.enabled !== false }; }
     return KINDS.map(function (k) {
-      var list = (forms || []).filter(function (f) { return f.kind === k.v; });
+      var list = (forms || []).filter(function (f) { return f.kind === k.v && !isClosed(f); });
       var groups;
       if (k.v === 'case') {
         var by = {};
@@ -348,7 +348,7 @@
     info = info || {};
     var out = [];
     (info.kinds || []).forEach(function (kv) {
-      var list = (forms || []).filter(function (f) { return f && f.enabled !== false && f.kind === kv && groupOf(f) !== PROPOSAL_GROUP; });
+      var list = (forms || []).filter(function (f) { return f && f.enabled !== false && !isClosed(f) && f.kind === kv && groupOf(f) !== PROPOSAL_GROUP; });
       var ids = list.map(function (f) { return f.id; }), pick = ids;
       var set = setIdsFor(info.sets, kv, info.typeCode)
         || (kv === 'company' ? (info.typeCode === '자문' ? CONTRACT_SETS.advisory : info.typeCode === '급여' ? CONTRACT_SETS.payroll : null) : null);
@@ -400,7 +400,7 @@
     var deals = fms.filter(function (f) { return f.kind === 'case' && CONTRACT_RE.test(String(f.name || '')); });
     if (!deals.length || fms.some(hasPower)) return null;
     var g = groupOf(deals[0]), sd = sideOf(deals[0]) === 'employer' ? 'employer' : 'worker';
-    var pool = (all || []).filter(function (f) { return f && f.kind === 'case' && f.enabled !== false && isPowerOnly(f) && fms.indexOf(f) < 0; });
+    var pool = (all || []).filter(function (f) { return f && f.kind === 'case' && f.enabled !== false && !isClosed(f) && isPowerOnly(f) && fms.indexOf(f) < 0; });
     return pool.filter(function (f) { return groupOf(f) === g && sideOf(f) === sd; })[0]
       || pool.filter(function (f) { return /공통/.test(f.name || '') && sideOf(f) === sd; })[0]
       || pool.filter(function (f) { return sideOf(f) === sd; })[0] || null;
@@ -446,18 +446,24 @@
     var list = twoGroups(kind) ? FUND_GROUPS : caseTypeList(), i = list.indexOf(g);
     return i >= 0 ? i : (g === NO_GROUP ? 1000 : 500);
   }
-  /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어 } */
+  /* ══ 🗄 종료 서식 (대표 지시 2026-10-10 「더 이상 사용 안 하거나 불필요한 계약서는 종료서식으로 별도 보관함에」) ══
+     지우지 않고 «옮긴다» — 양식에 closed:true · closedAt 만 적는다(새 저장 칸이 없다 → 규칙 배포 없음).
+     ★ 옮길 때 enabled:false 도 함께 둔다 — 이알피 「계약서 출력」(enabled 만 본다)에서도 빠진다. 되살리면 옛 값으로 돌린다. */
+  function isClosed(f) { return !!(f && f.closed === true); }
+  /* o = { kind, side?:'all'|'worker'|'employer'|'both', grp?:'all'|이름, q?:검색어, closed?:true(종료 서식만 · kind 무관) } */
   function filterForms(forms, o) {
     o = o || {};
     var q = String(o.q || '').trim().toLowerCase();
-    var isCase = o.kind === 'case', grouped = hasGroups(o.kind);
+    var isCase = o.kind === 'case', grouped = hasGroups(o.kind), closedView = !!o.closed;
     return (forms || []).filter(function (f) {
-      if (f.kind !== o.kind) return false;
+      if (isClosed(f) !== closedView) return false;
+      if (closedView ? (o.kind && f.kind !== o.kind) : f.kind !== o.kind) return false;
       if (isCase && o.side && o.side !== 'all' && sideOf(f) !== o.side) return false;
       if (grouped && o.grp && o.grp !== 'all' && groupOf(f) !== o.grp) return false;
       if (q && String(f.name || '').toLowerCase().indexOf(q) < 0) return false;
       return true;
     }).sort(function (a, b) {
+      if (closedView) return String(b.closedAt || '').localeCompare(String(a.closedAt || '')) || String(a.name || '').localeCompare(String(b.name || ''));
       if (grouped) {
         var ga = groupOf(a), gb = groupOf(b), d = groupRank(ga, o.kind) - groupRank(gb, o.kind);
         if (d) return d;
@@ -517,7 +523,7 @@
   }
   /* 칩 개수 — 측 칩은 사건계약 전체에서, 사건유형 칩은 «고른 측 안에서» 센다 */
   function facetCounts(forms, kind, side) {
-    var list = (forms || []).filter(function (f) { return f.kind === kind; });
+    var list = (forms || []).filter(function (f) { return f.kind === kind && !isClosed(f); });
     var sides = { all: list.length, worker: 0, employer: 0, both: 0 };
     var by = {};
     if (twoGroups(kind)) FUND_GROUPS.forEach(function (g) { by[g] = 0; });   // 0개 묶음도 칩으로 보인다
@@ -956,7 +962,7 @@
     + '.pcf-act{border:none;color:#fff;padding:3px 10px;border-radius:4px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit}'
     /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
     + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
-    + '.pcf-tsub{padding-left:26px!important;font-size:12px}'
+    + '.pcf-tsub{padding-left:26px!important;font-size:12px}.pcf-tclosed{margin-top:4px;border-top:1px dashed #e2e8f0;color:#64748b}'
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
     + '.pcf-printb:hover{background:#f1f5f9}'
@@ -2441,7 +2447,7 @@
     }
     function cur() { return S.sel ? S.forms.filter(function (x) { return x.id === S.sel; })[0] || null : null; }
     function curKind() { return S.kind; }
-    function shown() { return moreFilter(filterForms(S.forms, { kind: S.kind, side: S.side, grp: S.grp, q: S.q }), S.src, S.use); }
+    function shown() { var cv = S.kind === '_closed'; return moreFilter(filterForms(S.forms, { kind: cv ? '' : S.kind, closed: cv, side: S.side, grp: S.grp, q: S.q }), S.src, S.use); }
     function resetFilters() { S.side = 'all'; S.grp = 'all'; S.q = ''; S.src = ''; S.use = ''; }
 
     function load() {
@@ -2458,7 +2464,7 @@
         S.loaded = true;
         var fm = cur();
         if (S.sel && !fm) { S.sel = null; if (host.onSelect) host.onSelect(null); }
-        if (fm) S.kind = fm.kind;
+        if (fm) S.kind = isClosed(fm) ? '_closed' : fm.kind;
         /* 고른 것이 없으면 첫 양식을 «보여만» 준다 — host 에 알리지 않는다(다른 칸을 보는 중이면 끌려온다) */
         else { var f0 = shown()[0]; S.sel = f0 ? f0.id : null; }
         drawTree(); drawMain();
@@ -2484,7 +2490,8 @@
     function select(id) {
       S.sel = id || null;
       var fm = cur();
-      if (fm && fm.kind !== S.kind) { S.kind = fm.kind; resetFilters(); }
+      if (fm && isClosed(fm)) { if (S.kind !== '_closed') { S.kind = '_closed'; resetFilters(); } }
+      else if (fm && fm.kind !== S.kind) { S.kind = fm.kind; resetFilters(); }
       /* 칩(측·사건유형)에 가려진 양식을 골랐으면 칩을 푼다 — 종이에는 뜨는데 목록에는 없는 일이 없게.
          (이름 찾기로 가려진 것은 그대로 둔다 — 글자를 칠 때마다 선택이 바뀌면 안 된다) */
       if (fm && (S.side !== 'all' || S.grp !== 'all') && shown().indexOf(fm) < 0) { S.side = 'all'; S.grp = 'all'; }
@@ -2522,6 +2529,87 @@
     function copy(fm) {
       var c = JSON.parse(JSON.stringify(fm)); c.id = 'fm-copy-' + Date.now(); c.name = fm.name + ' (복사)';
       change(function (list) { return list.concat([c]); }, '복제했습니다').then(function () { select(c.id); }, function () {});
+    }
+    /* 🗄 종료 서식으로 옮기기 · ↩ 되살리기 — 양식 «한 건»만 거래로 고친다 */
+    function closeForm(fm) {
+      if (!w.confirm('"' + fm.name + '" 서식을 종료 서식으로 옮길까요?\n(목록과 계약서 출력에서 빠지고 🗄 종료 서식 보관함에 남습니다 — 언제든 되살릴 수 있습니다)')) return;
+      var at = todayYMD();
+      change(function (list) {
+        return list.map(function (x) {
+          if (x.id !== fm.id) return x;
+          var c = JSON.parse(JSON.stringify(x));
+          c.closed = true; c.closedAt = at; c.enabledBefore = c.enabled !== false; c.enabled = false;
+          return c;
+        });
+      }, '🗄 종료 서식으로 옮겼습니다 — 왼쪽 「🗄 종료 서식」에서 되살릴 수 있습니다').then(function () {
+        if (S.sel === fm.id) { var f0 = shown()[0]; select(f0 ? f0.id : null); }
+      }, function () {});
+    }
+    function reopenForm(fm) {
+      change(function (list) {
+        return list.map(function (x) {
+          if (x.id !== fm.id) return x;
+          var c = JSON.parse(JSON.stringify(x));
+          c.enabled = c.enabledBefore !== false;
+          delete c.closed; delete c.closedAt; delete c.enabledBefore;
+          return c;
+        });
+      }, '↩ 되살렸습니다 — 「' + kindInfo(fm.kind).label + '」 양식 목록에 다시 있습니다').then(function () { pickKind(fm.kind); select(fm.id); }, function () {});
+    }
+    /* ✏ 내용 고치기 (대표 「한글 내용을 수정해야 하는 경우가 많다」 2026-10-10) — 원본 한글을 저장소 안 편집기(host.hwpEdit)로 열어 고치고,
+       저장하면 «새 원본»이 된다(이전 원본은 보관함에 남는다). 엑셀은 한글 편집기가 못 열어 ⬇ 받아 엑셀에서 고친다 */
+    function reflowBytes(bytes, name) {
+      if (!w.PureunHwp || !w.PureunHwp.openDoc) return Promise.resolve(bytes);
+      return w.PureunHwp.openDoc(bytes, name).then(function (doc) {
+        try { doc.reflowLinesegs(); return new Uint8Array(/\.hwpx$/i.test(name) ? doc.exportHwpx() : doc.exportHwp()); }
+        finally { try { doc.free(); } catch (_) {} }
+      }, function () { return bytes; });
+    }
+    function storeNewOriginal(fm, bytes, name, okMsg) {
+      var from = { kind: 'form', formId: fm.id, formName: fm.name || '', formKind: fm.kind };
+      return Promise.all(orphanInline(fm).map(function (a) {
+        var b = bytesOfDataUrl(a.data || a.dataUrl);
+        return host.archive({ name: a.name, size: b.length, type: '', bytes: b }, from).then(function (r) {
+          if (!r || !r.fileId) throw new Error('옛 원본을 보관함에 올리지 못했습니다');
+          return { fileId: r.fileId, name: a.name, size: b.length, attId: a.id };
+        });
+      })).then(function (oldEntries) {
+        return host.archive({ name: name, size: bytes.length, type: '', bytes: bytes }, from).then(function (r) {
+          if (!r || !r.fileId) throw new Error('새 원본을 보관함에 올리지 못했습니다');
+          var small = bytes.length <= ATTACH_MAX;
+          var nu = { fileId: r.fileId, name: name, size: bytes.length, attId: small ? newId('at-') : '', data: small ? dataUrlOf(bytes) : '' };
+          return new Promise(function (res) {   // 글자 본문도 새 원본에서 다시 뽑는다(못 뽑으면 그대로)
+            var done = false, fin = function (t) { if (!done) { done = true; res(t); } };
+            try { extractTemplateText(new Blob([bytes]), function (t, err) { fin(err ? '' : (t || '')); }); } catch (_) { fin(''); }
+            setTimeout(function () { fin(''); }, 4000);
+          }).then(function (text) {
+            return change(function (list) {
+              return list.map(function (x) {
+                if (x.id !== fm.id) return x;
+                var keep = JSON.parse(JSON.stringify(x));
+                keep.originals = (Array.isArray(keep.originals) ? keep.originals : []).concat(oldEntries);
+                var nf = withNewOriginal(keep, nu);
+                if (text && String(text).trim().length > 20) nf.body = text;
+                return nf;
+              });
+            }, okMsg);
+          });
+        });
+      });
+    }
+    function editOriginal(fm) {
+      var src = hwpOrigOf(fm);
+      if (!src || !host.hwpEdit) return;
+      if (!host.archive) { toast('원본 보관함이 연결되지 않았습니다'); return; }
+      toast('원본을 여는 중…');
+      srcBytes(src).then(function (u8) { return host.hwpEdit(u8, src.name); }).then(function (out) {
+        if (!out) return null;   // 취소
+        toast('저장하는 중…');
+        return reflowBytes(out, src.name);
+      }).then(function (bytes) {
+        if (!bytes) return;
+        return storeNewOriginal(fm, bytes, src.name, '✔ 내용을 고쳐 새 원본으로 저장했습니다 — 이전 원본은 🗄 원본 보관함에 남아 있습니다');
+      }).catch(function (e) { toast('⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e) + ' (양식은 그대로입니다)'); });
     }
     function del(fm) {
       if (!w.confirm('"' + fm.name + '" 양식을 지울까요?\n(올린 원본은 원본 보관함에 그대로 남습니다)')) return;
@@ -2732,11 +2820,15 @@
       t.innerHTML = '';
       if (!S.loaded) return;
       KINDS.forEach(function (k) {
-        var n = S.forms.filter(function (f) { return f.kind === k.v; }).length;
+        var n = S.forms.filter(function (f) { return f.kind === k.v && !isClosed(f); }).length;
         var on = S.kind === k.v;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
       });
+      /* 🗄 종료 서식 — 더 쓰지 않는 서식을 옮겨 두는 보관함(지우지 않는다) */
+      var nClosed = S.forms.filter(isClosed).length;
+      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (S.kind === '_closed' ? ' on' : ''), 'aria-current': S.kind === '_closed' ? 'true' : null,
+        title: '더 쓰지 않는 서식을 옮겨 둔 곳 — 언제든 되살릴 수 있습니다', onclick: function () { pickKind('_closed'); } }, [el('span', { text: '🗄 종료 서식' }), el('i', { text: String(nClosed) })]));
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
       var setRows = S.sets.map(function (st) {
@@ -2764,9 +2856,9 @@
     /* ── 오른쪽 ── */
     function mobileSelects() {
       var kSel = el('select', { 'aria-label': '계약 종류', onchange: function () { pickKind(kSel.value); } }, KINDS.map(function (k) {
-        var n = S.forms.filter(function (x) { return x.kind === k.v; }).length;
+        var n = S.forms.filter(function (x) { return x.kind === k.v && !isClosed(x); }).length;
         return el('option', { value: k.v, text: k.icon + ' ' + k.label + ' (' + n + ')', selected: k.v === S.kind });
-      }));
+      }).concat([el('option', { value: '_closed', text: '🗄 종료 서식 (' + S.forms.filter(isClosed).length + ')', selected: S.kind === '_closed' })]));
       return el('div', { 'class': 'pcf-msel' }, [kSel, setPicker()]);
     }
     function uploadBtn(kind) {
@@ -2793,7 +2885,19 @@
     }
     function toolbar(fm) {
       var kind = curKind(), k = kindInfo(kind);
+      if (kind === '_closed' && !fm) return el('div', { 'class': 'pcf-top' }, [el('b', { text: '🗄 종료 서식' }), el('span', { 'class': 'pcf-strip', text: '종료한 서식이 여기에 모입니다' })]);
       if (!fm) return el('div', { 'class': 'pcf-top' }, [el('b', { text: k.icon + ' ' + k.label + ' 양식' }), el('span', { 'class': 'pcf-strip', text: '목록에서 양식을 고르세요' })]);
+      if (isClosed(fm)) {
+        var hasO = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp)), vw = hasO && S.paperView !== 'text' ? 'orig' : 'text';
+        return el('div', { 'class': 'pcf-top' }, [
+          el('b', { title: fm.name }, [el('span', { text: '🗄 ' }), fm.name]),
+          el('div', { 'class': 'pcf-strip' }, [el('span', { text: kindInfo(fm.kind).label + ' · ' + (fm.closedAt || '날짜 없음') + ' 종료' })]),
+          hasO ? el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
+            chip('📄 원본 모양', vw === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
+            chip('🔤 글자 본문', vw === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
+          el('button', { type: 'button', 'class': 'pcf-fillbig', title: '다시 쓰는 서식으로 되돌립니다(옛 종류·갈래 그대로)', text: '↩ 되살리기', onclick: function () { reopenForm(fm); } }),
+          moreMenu([{ t: '🗑 완전히 지우기', title: '양식을 지웁니다(올린 원본은 원본 보관함에 남습니다)', fn: function () { del(fm); } }])]);
+      }
       var strip = el('div', { 'class': 'pcf-strip' });
       var arcd = {};
       (fm.originals || []).forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
@@ -2812,6 +2916,7 @@
         hasOrig ? el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
           chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
           chip('🔤 글자 본문', view === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
+        (host.hwpEdit && hwpOrigOf(fm)) ? el('button', { type: 'button', 'class': 'pcf-printb', title: '한글 원본의 글자를 한글처럼 직접 고칩니다. 저장하면 새 원본이 되고 이전 원본은 🗄 원본 보관함에 남습니다.', text: '✏ 내용 고치기', onclick: function () { editOriginal(fm); } }) : null,
         host.hwpShow && hwpSources(fm).some(function (x) { return !isXlsxName(x.name); })
           ? el('button', { type: 'button', 'class': 'pcf-printb', title: '당사자 칸을 비운 채(＿＿＿ 밑줄) 바로 인쇄합니다 — 손으로 적을 때', text: '🖨 빈 양식 인쇄', onclick: function () { printBlank(withPower([fm])); } }) : null,
         host.cards ? el('button', { type: 'button', 'class': 'pcf-fillbig', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다. 채운 뒤 내려받거나 보냅니다.', text: '📝 찾아서 채우기', onclick: function () { openFill(withPower([fm]), host); } }) : null,
@@ -2821,6 +2926,7 @@
           (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
             ? { t: '✏ 바꿀 자리 만들기', title: '원본 글자를 찾아 표시나 고친 글자로 바꿉니다. 이전 원본은 보관함에 남습니다.', fn: function () { openMark(fm); } } : null,
           hwpAtt ? { t: '🔍 한글 원본 크게 보기', fn: function () { openHwpPreview(hwpAtt, null); } } : null,
+          { t: '🗄 종료 서식으로 옮기기', title: '더 쓰지 않는 서식 — 지우지 않고 종료 서식 보관함으로 옮깁니다(되살릴 수 있습니다)', fn: function () { closeForm(fm); } },
           { t: '🗑 삭제', fn: function () { del(fm); } }
         ].concat(toolItems(kind)))
       ]);
@@ -2899,7 +3005,7 @@
       var hasOrig = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp));
       var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
       var sheet = el('div', { 'class': 'pcf-sheet' + (view === 'orig' ? ' orig' : '') });
-      if (fm.enabled === false) sheet.appendChild(el('div', { 'class': 'pcf-offband', text: '사용 안 함 — 계약서 출력 때 고를 수 없습니다' }));
+      if (fm.enabled === false && !isClosed(fm)) sheet.appendChild(el('div', { 'class': 'pcf-offband', text: '사용 안 함 — 계약서 출력 때 고를 수 없습니다' }));
       if (view === 'orig') {
         var ob = el('div', { 'class': 'pcf-orig' });
         sheet.appendChild(ob);
@@ -2951,6 +3057,7 @@
               [it.label, el('small', { text: String(it.n) })]);
           }))]);
       }
+      if (kind === '_closed') row.push(el('div', { 'class': 'pcf-muted', style: 'font-size:11.5px', text: '종료한 서식 — 목록과 계약서 출력에서 빠져 있습니다. 되살리거나 완전히 지울 수 있습니다.' }));
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
         var sideItems = [{ v: 'all', label: '전체', n: fc.sides.all, title: '근로자측·사용자측 모두' },
@@ -3158,7 +3265,7 @@
       all.checked = list.length > 0 && list.every(function (f) { return S.checked.indexOf(f.id) >= 0; });
       all.addEventListener('change', function () { list.forEach(function (f) { toggleCheck(f.id, all.checked); }); drawList(); });
       var tb = el('tbody');
-      if (!list.length) tb.appendChild(el('tr', null, [el('td', { colspan: '4', 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: '맞는 양식이 없습니다' })]));
+      if (!list.length) tb.appendChild(el('tr', null, [el('td', { colspan: '4', 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: S.kind === '_closed' ? '종료한 서식이 없습니다 — 양식의 ⋯ 메뉴에서 「🗄 종료 서식으로 옮기기」' : '맞는 양식이 없습니다' })]));
       var prev = null, n = 0, rows = [];
       list.forEach(function (f) {
         if (S.kind === 'case') {
@@ -3177,14 +3284,14 @@
           el('td', { 'class': 'pcf-lc' }, [ck]),
           el('td', { 'class': 'pcf-ln2' }, [el('span', { 'class': 'pcf-grip', 'aria-hidden': 'true', text: '⠿' }), String(n)]),
           el('td', { 'class': 'pcf-lnm' }, [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }),
-            sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null]),
+            S.kind === '_closed' ? el('span', { 'class': 'pcf-sd both', title: (f.closedAt || '') + ' 종료', text: kindInfo(f.kind).label }) : (sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null)]),
           el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]);
         tb.appendChild(tr); rows.push({ id: f.id, node: tr });
       });
       dragSort(rows, moveForm);
       col.appendChild(el('table', { 'class': 'pcf-lt' }, [el('thead', null, [el('tr', null, [el('th', { 'class': 'pcf-lc' }, [all]),
         el('th', { 'class': 'pcf-ln2', text: '#' }), el('th', { text: '양식 (' + list.length + ')' }), el('th', { 'class': 'pcf-lsrc', text: '원본' })])]), tb]));
-      col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
+      if (S.kind !== '_closed') col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
       return col;
     }
     function cardGrid(list) {
@@ -3270,7 +3377,7 @@
     CASE_TYPES: CASE_TYPES, setCaseTypes: setCaseTypes, caseTypeList: caseTypeList, caseShortOf: caseShortOf, CASE_ALIAS: CASE_ALIAS, FUND_GROUPS: FUND_GROUPS, TYPE_SET: TYPE_SET, TWO_GROUP_KINDS: TWO_GROUP_KINDS, MAKE_KINDS: MAKE_KINDS, makePlan: makePlan, contractFolder: contractFolder, contractValues: contractValues, fillFormOnce: fillFormOnce, contractPick: contractPick, CONTRACT_SETS: CONTRACT_SETS, CASE_CODES: CASE_CODES, CONTRACT_WINS: CONTRACT_WINS, PROPOSAL_GROUP: PROPOSAL_GROUP,
     SIDES: SIDES,
     sideOf: sideOf, srcType: srcType, moreFilter: moreFilter,
-    filterForms: filterForms,
+    filterForms: filterForms, isClosed: isClosed,
     facetCounts: facetCounts,
     setsOf: setsOf,
     changeSets: changeSets,
