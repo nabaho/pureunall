@@ -385,6 +385,20 @@
     var first = checked.map(function (id) { return all.filter(function (f) { return f.id === id; })[0]; }).filter(Boolean);
     return { list: first.concat(rest), checked: checked.slice() };
   }
+  /* ══ 채우기 창 «이 회사 이알피 계약» (대표 「이알피 또는 기업정보함에서 찾아야 할 것 같은데」 2026-10-10) ══
+     고른 회사(사업자번호·이름)에 맞는 이알피 계약 — 최근 계약일 먼저. 이름은 (주)·㈜·주식회사·빈칸을 떼고 견준다 */
+  function contractsForCo(list, co) {
+    co = co || {};
+    var nb = function (s) { return String(s || '').replace(/\D/g, '').slice(0, 10); };
+    var nn = function (s) { return String(s || '').replace(/\(주\)|㈜|주식회사|\(유\)|유한회사|\s/g, '').toLowerCase(); };
+    var bz = nb(co.bz), name = nn(co.c);
+    if (!bz && !name) return [];
+    return (list || []).filter(function (c) {
+      if (!c) return false;
+      if (bz && nb(c.bizNo) && nb(c.bizNo) === bz) return true;
+      return !!name && nn(c.companyName) === name;
+    }).sort(function (a, b) { return String(b.signDate || '').localeCompare(String(a.signDate || '')); });
+  }
   /* 계약 값이 «이기는» 칸 — 계약에서만 아는 값. 회사·담당자·근로자 칸은 채우기 창에서 고른 것이 먼저(비면 계약 값) */
   var CONTRACT_WINS = /^(계약|성공보수$|주담당$|부담당$|부가세처리$|납부일$|국민연금관리번호$|건강보험번호$|고용보험번호$|산재관리번호$)/;
   /* 「계약서 / 제안서·견적서」 두 묶음을 쓰는 종류 (대표 「추천대로」 2026-10-06 — 견적서·제안 공문을 기금 밖에서도).
@@ -1337,6 +1351,40 @@
     var coQ = el('input', { type: 'search', placeholder: '회사 이름·사업자번호·대표자', 'aria-label': '회사 찾기' });
     var coList = el('div', { 'class': 'pcf-fl' });
     var coPicked = el('div');
+    /* 📄 이 회사 이알피 계약 — 회사를 고르면 그 회사 계약을 보여 주고, 누르면 계약번호·금액·기간 등이 채워진다(읽기만) */
+    var ctPickBox = el('div', { 'class': 'pcf-ctpick' });
+    function ctxOf() { return st.ct || host.contractCtx || null; }
+    function drawCtPick(r, list) {
+      ctPickBox.innerHTML = '';
+      if (host.contractCtx || !r) return;
+      if (st.ct) {
+        ctPickBox.appendChild(el('div', { 'class': 'pcf-fpick' }, [el('b', { text: '📄 ' + st.ct.label }), el('span', { text: '이알피 계약 자료로 채웠습니다' }),
+          el('button', { type: 'button', 'class': 'pcf-b', text: '풀기', onclick: function () { st.ct = null; drawCtPick(r, list); drawVals(); } })]));
+        return;
+      }
+      if (list == null) { ctPickBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '이알피 계약 찾는 중…' })); return; }
+      if (!list.length) { ctPickBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '이 회사의 이알피 계약이 없습니다 — 계약번호·금액·기간은 오른쪽 칸에 직접 적으세요' })); return; }
+      ctPickBox.appendChild(el('div', { 'class': 'pcf-fh', text: '📄 이 회사 이알피 계약 (' + list.length + ') — 누르면 계약번호·금액·기간이 들어갑니다' }));
+      list.slice(0, 6).forEach(function (c) {
+        ctPickBox.appendChild(el('button', { type: 'button', 'class': 'pcf-fi', title: '이 계약 자료로 채웁니다',
+          onclick: function () {
+            ctPickBox.innerHTML = ''; ctPickBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '계약 자료 읽는 중…' }));
+            host.contractLoad(c.id).then(function (info) {
+              if (st.co !== r) return;
+              st.ct = { vals: info.vals, label: '계약 ' + (info.contractNo || info.id) };
+              drawCtPick(r, list); drawVals();
+            }, function (e) { drawCtPick(r, list); toast('⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
+          } }, [el('b', { text: c.contractNo || '(번호 없음)' }),
+          el('span', { text: [(c.kinds || []).join('·'), c.signDate, c.status].filter(Boolean).join(' · ') })]));
+      });
+    }
+    function loadCtPick(r) {
+      st.ct = null;
+      if (host.contractCtx || !host.contractList || !host.contractLoad) { ctPickBox.innerHTML = ''; return; }
+      drawCtPick(r, null);
+      (st.ctList ? Promise.resolve(st.ctList) : host.contractList().then(function (l) { st.ctList = l || []; return st.ctList; }))
+        .then(function (l) { if (st.co === r) drawCtPick(r, contractsForCo(l, r)); }, function () { if (st.co === r) ctPickBox.innerHTML = ''; });
+    }
     var ctQ = el('input', { type: 'search', placeholder: '담당자 이름·회사·직급·전화·이메일', 'aria-label': '담당자 찾기' });
     var ctBox = el('div', { 'class': 'pcf-fl' });
     var wkQ = el('input', { type: 'search', placeholder: '근로자 이름·휴대폰', 'aria-label': '근로자 찾기' });
@@ -1351,8 +1399,8 @@
       CF.coConflicts(st.co).forEach(function (c) { if (st.srcPick[c.f] === 'biz') co[c.f] = c.biz; });
       var V = CF.valuesFrom({ co: co, contact: st.contact, worker: st.worker });
       /* 이알피 계약 → 서류 묶음 (설계 2026-10-03 §4) — 계약 칸은 계약 값이, 나머지는 비었을 때만 */
-      if (host.contractCtx && host.contractCtx.vals) {
-        var cv = host.contractCtx.vals;
+      if (ctxOf() && ctxOf().vals) {
+        var cv = ctxOf().vals;
         Object.keys(cv).forEach(function (k) {
           var x = cv[k];
           if (x == null || x === '') return;
@@ -1502,7 +1550,7 @@
     }
     /* 출처 이름표 — 계약 칸이 이기는지는 values() 와 같은 규칙 */
     function srcOf(k) {
-      var cv = host.contractCtx && host.contractCtx.vals;
+      var cv = ctxOf() && ctxOf().vals;
       return CF.fieldSource(k, { co: st.co, coX: st.coX, contact: st.contact, worker: st.worker, edits: st.edits,
         contract: cv, contractWins: CONTRACT_WINS.test(k), picks: st.srcPick, conflicts: CF.coConflicts(st.co) });
     }
@@ -1583,9 +1631,9 @@
       coPicked.innerHTML = '';
       coPicked.appendChild(el('div', { 'class': 'pcf-fpick' }, [
         el('b', { text: r.c || '(이름 없음)' }), el('span', { text: coSub(r) }),
-        el('button', { type: 'button', 'class': 'pcf-b', text: '바꾸기', onclick: function () { st.co = null; st.contact = null; coPicked.innerHTML = ''; drawContacts(); drawVals(); coQ.focus(); } })
+        el('button', { type: 'button', 'class': 'pcf-b', text: '바꾸기', onclick: function () { st.co = null; st.ct = null; st.contact = null; coPicked.innerHTML = ''; ctPickBox.innerHTML = ''; drawContacts(); drawVals(); coQ.focus(); } })
       ]));
-      drawContacts(); drawVals();
+      drawContacts(); drawVals(); loadCtPick(r);
       var keys = CF.coInfoKeys(r);
       if (keys.length) host.cards.coInfo(keys).then(function (vals) {
         if (st.co !== r) return;
@@ -1873,7 +1921,7 @@
         srcSel ? el('div', { style: 'margin-bottom:8px' }, [el('span', { 'class': 'pcf-fh', text: '채울 원본 ' }), srcSel]) : null,
         el('div', { 'class': 'pcf-fcols' }, [
           el('div', null, [
-            el('div', { 'class': 'pcf-fh', text: '① 회사 — ERP 업체관리에서 찾기' }), coQ, coList, coPicked,
+            el('div', { 'class': 'pcf-fh', text: '① 회사 — 이알피 업체관리·기업정보함(명함·사업자등록증)에서 찾기' }), coQ, coList, coPicked, ctPickBox,
             el('div', { 'class': 'pcf-fh', text: '② 담당자 — 기업정보함에서 찾아오기' }), ctQ, ctBox,
             el('div', { 'class': 'pcf-fh', text: '③ 근로자 본인 — 명함에서 찾기 또는 직접 적기' }), wkQ, wkList
           ]),
@@ -2302,10 +2350,10 @@
       S.err = null;
       /* 이알피 사건 유형 · 직원 명부(재직 공인노무사) — 못 읽어도 양식은 뜬다(옛 기본 유형 · 기본 명단) */
       var soft = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
-      return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir')]).then(function (r) {
+      return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
         var cf = r[0].val(), rm = r[1].val();
         if (r[2]) setCaseTypes(r[2].v || r[2]);
-        if (r[3] && w.PuFormCardFill && w.PuFormCardFill.setLawyers) w.PuFormCardFill.setLawyers(r[3].v || r[3]);
+        if (r[3] && w.PuFormCardFill && w.PuFormCardFill.setLawyers) w.PuFormCardFill.setLawyers(r[3].v || r[3], r[4] && (r[4].v || r[4]));   // 퇴사·휴직은 빠진다
         S.removed = listOf(rm && rm.v);
         S.forms = mergeSeeds(listOf(cf && cf.v), S.removed).list;
         S.loaded = true;
@@ -3100,7 +3148,7 @@
     facetCounts: facetCounts,
     setsOf: setsOf,
     changeSets: changeSets,
-    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder,
+    orderOf: orderOf, moveIn: moveIn, applyOrder: applyOrder, contractsForCo: contractsForCo,
     bundleMarkers: bundleMarkers,
     bundleFileNames: bundleFileNames,
     zipName: zipName,
