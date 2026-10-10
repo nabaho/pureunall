@@ -133,3 +133,15 @@ test('★★ 사전규격의 자세한 칸 — 등록일·납품기한·납품�
   const s = P.parse(env([it]), 'spec').rows[0];
   assert.deepEqual([s.rgstDt, s.dlvrDt, s.dlvrDays, s.sw, s.items, s.bizDiv], ['2026-10-07 08:50:00', '2026-12-31', '90', 'Y', '컨설팅 1식', '용역']);
 });
+
+test('★★★ stale — 예정월이 «3달 전 이전»이고 공고·사전규격이 아닐 때만 지난 계획', () => {
+  const t = '2026-10-10';
+  assert.equal(P.STALE_MONTHS, 3);
+  assert.equal(P.stale({ kind: 'plan', ym: '2026-07', bids: [] }, t), true, '3달 전');
+  assert.equal(P.stale({ kind: 'plan', ym: '2026-08', bids: [] }, t), false, '2달 전은 곧 나올 수 있다');
+  assert.equal(P.stale({ kind: 'plan', ym: '2025-01', bids: [] }, t), true, '해를 건너도');
+  assert.equal(P.stale({ kind: 'plan', ym: '2026-01', bids: ['R1'] }, t), false, '공고 나온 것은 아니다');
+  assert.equal(P.stale({ kind: 'spec', ym: '2026-01', bids: [] }, t), false, '사전규격은 아니다');
+  assert.equal(P.stale({ kind: 'plan', ym: '', bids: [] }, t), false, '예정월을 모르면 아니다');
+  assert.equal(P.stale(null, t), false);
+});

@@ -294,7 +294,7 @@ table.cmp td{white-space:nowrap}
   <div class="card">
     <div class="bar">
       <input id="pq" placeholder="사업명·기관 검색" style="min-width:190px" oninput="_planPage=0;planDraw()">
-      <select id="pView" onchange="_planPage=0;planDraw()"><option value="ahead">공고 전 (앞으로)</option><option value="posted">✅ 공고 나옴</option>
+      <select id="pView" onchange="_planPage=0;planDraw()"><option value="ahead">공고 전 · 앞으로</option><option value="past">⌛ 지난 계획</option><option value="posted">✅ 공고 나옴</option>
         <option value="star">★ 관심</option><option value="all">모두</option><option value="hidden">🙈 숨긴 것</option></select>
       <select id="pMthd" onchange="planMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
         <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
@@ -380,7 +380,7 @@ table.cmp td{white-space:nowrap}
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=2"></script>
 <script src="js/gov-g2b.js?v=6"></script>
-<script src="js/gov-plan.js?v=3"></script>
+<script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=1"></script>
 <script src="js/gov-recruit.js?v=6"></script>
@@ -632,18 +632,24 @@ async function planFetchNow(quiet){
   } finally { _fetching=false; planDraw(); }
 }
 function planMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('fMthd')) $('fMthd').value=lsGet('feed_mthd'); _planPage=0; planDraw(); draw(); }
+/* 보기 하나에 이 줄이 드는가 — 목록과 보기 고르개의 건수가 «같은 잣대»를 쓴다(다르면 「(29)」인데 29줄이 안 나온다).
+   ahead 공고 전(앞으로) · past ⌛ 지난 계획(예정월 지난 지 2달 넘음) · posted ✅ 공고 나옴 · star ★ · hidden 🙈 · all 모두 */
+function planInView(r, v, today){
+  var st=GovPlan.state(r,today).k;
+  if(v==='hidden') return !!r.hidden;
+  if(r.hidden) return false;
+  if(v==='ahead') return st!=='posted' && !GovPlan.stale(r,today);
+  if(v==='past') return GovPlan.stale(r,today);
+  if(v==='posted') return st==='posted';
+  if(v==='star') return !!r.star;
+  return true;
+}
+var PLAN_VIEWS=[['ahead','공고 전 · 앞으로'],['past','⌛ 지난 계획'],['posted','✅ 공고 나옴'],['star','★ 관심'],['all','모두'],['hidden','🙈 숨긴 것']];
 function planRows(){
   var q=(($('pq')&&$('pq').value)||'').toLowerCase(), v=($('pView')&&$('pView').value)||'ahead', fm=($('pMthd')&&$('pMthd').value)||'';
   var today=GovPlan.ymd(new Date()), every=get('plan').filter(Boolean), soleOut=0;
   var rows=every.filter(function(r){
-    var st=GovPlan.state(r,today).k;
-    if(v==='hidden'){ if(!r.hidden) return false; }
-    else {
-      if(r.hidden) return false;
-      if(v==='ahead' && st==='posted') return false;
-      if(v==='posted' && st!=='posted') return false;
-      if(v==='star' && !r.star) return false;
-    }
+    if(!planInView(r,v,today)) return false;
     if(q && [r.nm,r.org,r.kw,r.dept].join(' ').toLowerCase().indexOf(q)<0) return false;
     if(fm==='nosole' && isSole(r)){ soleOut++; return false; }
     if(fm==='sole' && !isSole(r)) return false;
@@ -653,19 +659,37 @@ function planRows(){
   rows.sort(function(a,b){ var sa=GovPlan.state(a,today).k, sb=GovPlan.state(b,today).k;
     if(ord[sa]!==ord[sb]) return ord[sa]-ord[sb];
     if(sa==='spec') return String(b.rcptDt||'').localeCompare(String(a.rcptDt||''));
+    if(sa==='late') return String(b.ym||'').localeCompare(String(a.ym||''));   /* 지난 것은 «최근 것이 위» — 막 지난 것이 곧 공고로 나올 가능성이 크다 */
     return String(a.ym||'9999').localeCompare(String(b.ym||'9999')); });
   return {every:every, rows:rows, soleOut:soleOut, today:today, view:v};
+}
+/* 보기 고르개 — 「공고 전 (29)」처럼 건수를 붙인다. 계약방법 고르개는 따르고 검색어는 안 따른다(열기 전에 크기를 알 수 있게).
+   ⚠ 고르개를 다시 그려도 고른 보기는 그대로 둔다. */
+function planViewCounts(every, today){
+  var fm=($('pMthd')&&$('pMthd').value)||'', c={};
+  PLAN_VIEWS.forEach(function(x){ c[x[0]]=0; });
+  every.forEach(function(r){
+    if(fm==='nosole' && isSole(r)) return; if(fm==='sole' && !isSole(r)) return;
+    PLAN_VIEWS.forEach(function(x){ if(planInView(r,x[0],today)) c[x[0]]++; }); });
+  return c;
+}
+function planViewSel(every, today, cur){
+  var c=planViewCounts(every, today), el=$('pView'); if(!el) return c;
+  el.innerHTML=PLAN_VIEWS.map(function(x){ return '<option value="'+x[0]+'">'+x[1]+' ('+c[x[0]].toLocaleString()+')</option>'; }).join('');
+  el.value=cur; return c;
 }
 function planDraw(){
   if(!$('ptb')) return;
   var o=planRows(), today=o.today, feed=get('feed'), pg=_planPaged(o.rows), rows=pg.page;
+  var vc=planViewSel(o.every, today, o.view);
   var soon=o.every.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;
   if($('tbPlan')) $('tbPlan').innerHTML='📅 발주 예정'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
   var vis={}; o.rows.forEach(function(r){ vis[r.no]=1; });
   Object.keys(_planSel).forEach(function(k){ if(!vis[k]) delete _planSel[k]; });
   var sn=Object.keys(_planSel).length, hid=o.every.filter(function(r){ return r.hidden; }).length;
-  $('pCnt').textContent='전체 '+o.every.filter(function(r){ return !r.hidden; }).length+'건 · 지금 '+o.rows.length+'건'
-    +(hid?' · 숨김 '+hid+'건':'')+(o.soleOut?' · 수의계약 '+o.soleOut+'건 뺌':'');
+  $('pCnt').innerHTML='전체 '+o.every.filter(function(r){ return !r.hidden; }).length+'건 · 지금 '+o.rows.length+'건'
+    +(hid?' · 숨김 '+hid+'건':'')+(o.soleOut?' · 수의계약 '+o.soleOut+'건 뺌':'')
+    +(o.view==='ahead' && vc.past ? ' · <a href="#" onclick="planView(\'past\');return false" title="예정월이 지난 지 2달 넘었는데 공고가 없는 계획 — 지우지 않고 따로 둡니다">⌛ 지난 계획 '+vc.past+'건은 따로</a>' : '');
   var at=lsGet('plan_at'), err=lsGet('plan_err');
   $('planNote').innerHTML='나라장터 <b>발주계획</b>(기관이 연초·분기마다 올리는 «언제 발주할지») · <b>사전규격</b>(입찰공고 직전 미리 공개)을 공고 모아보기와 «같은 찾는 말»로 거른 것입니다. '
     +'계획에 없던 공고가 나올 수도 있어 공고 모아보기를 대신하지 않습니다.'
@@ -693,7 +717,7 @@ function planDraw(){
       +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
       +'<td class="og" title="'+esc((r.top&&r.top!==r.org?r.top+' · ':'')+(r.org||''))+'">'+esc(r.org||'-')+'</td>'
       +'<td style="text-align:right">'+(r.prc?Math.round(r.prc/10000).toLocaleString()+'만원':'-')+'</td>'
-      +'<td class="sml">'+esc(r.mthd||'-')+'</td>'
+      +'<td class="sml"'+(isSole(r)?' style="color:var(--amber);font-weight:700"':'')+'>'+esc(r.mthd||'-')+'</td>'   /* 수의계약은 두되 눈에 띄게(대표 2026-10-10) */
       +'<td class="sml" title="'+esc([r.dept,r.ofcl,r.tel].filter(Boolean).join(' · '))+'">'+esc(r.dept||r.ofcl||'-')+(r.tel?'<div>'+esc(r.tel)+'</div>':'')+'</td>'
       +'<td>'+stHtml+'</td>'
       +'<td class="act">'
@@ -701,9 +725,10 @@ function planDraw(){
         +(r.files&&r.files.length&&/^https:\/\//.test(r.files[0])?'<a class="btn sm" href="'+esc(r.files[0])+'" target="_blank" rel="noopener" title="사전규격서 (나라장터)">📎</a> ':'')
         +(r.hidden?'<button class="btn sm" title="되살리기" onclick="planHide(\''+no+'\',false)">↩</button>'
                   :'<button class="btn sm" onclick="planHide(\''+no+'\',true)">🚫</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요')+'</td></tr>';
+  }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요'+(o.view==='ahead'&&vc.past?' (⌛ 지난 계획 '+vc.past+'건은 보기에서)':''))+'</td></tr>';
   if($('planPager')) $('planPager').innerHTML=_pager(pg.p, pg.pages, pg.from, rows.length, pg.n, 'planPageTo');
 }
+function planView(v){ if($('pView')) $('pView').value=v; _planPage=0; planDraw(); }
 function planTog(no,on){ if(on) _planSel[no]=1; else delete _planSel[no]; planDraw(); }
 function planSelAll(on){ if(!on){ _planSel={}; planDraw(); return; }
   _planPaged(planRows().rows).page.forEach(function(r){ _planSel[r.no]=1; }); planDraw(); }
