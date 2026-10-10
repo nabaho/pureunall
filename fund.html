@@ -155,6 +155,7 @@
   .tblwrap.scrollx thead th{position:static;box-shadow:none}
   tbody tr{cursor:pointer}tbody tr:hover{background:var(--bg)}
   td.no{color:var(--faint);width:34px;font-variant-numeric:tabular-nums}
+  .ckcol{width:30px;text-align:center}tr.ticked td{background:var(--ok-bg)}
   .chip{font-size:11px;font-weight:600;padding:1px 8px;border-radius:999px}
   .chip.ok{background:var(--ok-bg);color:var(--ok)}.chip.warn{background:var(--warn-bg);color:var(--warn)}.chip.dg{background:var(--danger-bg);color:var(--danger)}
   /* 칸 출처 표시(목업 4) — 🤖 기계·미확인 · ✓ 확인됨 · ✎ 사람이 씀 */
@@ -13707,8 +13708,8 @@ function openAudit(){
       .sort(function(a,b){ return String(b.at||'').localeCompare(String(a.at||'')); });
     var b=$('auditBody'); if(!b) return;
     b.innerHTML=arr.length
-      ? '<table><thead><tr><th style="width:150px">언제</th><th style="width:100px">누가</th><th>무엇을</th></tr></thead><tbody>'
-        +arr.map(function(x){ return '<tr><td style="white-space:nowrap">'+esc(x.at||'')+'</td>'
+      ? '<table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th style="width:150px">언제</th><th style="width:100px">누가</th><th>무엇을</th></tr></thead><tbody>'
+        +arr.map(function(x,i){ return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap">'+esc(x.at||'')+'</td>'
           +'<td style="white-space:nowrap">'+esc(x.by||'')+'</td>'
           +'<td><b>'+esc(x.what||'')+'</b>'+(x.detail?' <span class="muted">'+esc(x.detail)+'</span>':'')+'</td></tr>'; }).join('')
         +'</tbody></table>'
@@ -15854,14 +15855,14 @@ function subsidyDocsPanel(f){
   var dd=S.subDocs||{}, ids=Object.keys(dd);
   /* 서류함에는 두 갈래가 섞여 있다 — 사진첩에서 담은 것(ref)과 앱 창고에 올린 것(url).
      사진첩 원본은 내려받기 주소가 오래 살지 않아 링크로 걸지 않고 창으로 연다. */
-  var urows=ids.map(function(id){ var x=dd[id];
+  var urows=ids.map(function(id,i){ var x=dd[id];
     var nm=esc(x.name||'(이름 없음)');
     var cell=x.ref
       ? '<button onclick="openShelfScan(\''+id+'\')" style="padding:2px 7px;font-size:12px">'+nm+'</button>'
       : '<a href="'+esc(x.url||'#')+'" target="_blank" rel="noopener">'+nm+'</a>';
     var where=x.ref?'<span class="chip" style="font-size:10px">🖼 사진첩</span>'
                    :'<span class="chip" style="font-size:10px">📎 앱 보관</span>';
-    return '<tr><td>'+esc(x.kind||'기타')+'</td><td>'+cell+'</td><td>'+where+'</td>'
+    return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td>'+esc(x.kind||'기타')+'</td><td>'+cell+'</td><td>'+where+'</td>'
       +'<td class="muted">'+esc(x.uploaded||'')+'</td><td><button onclick="delSubDoc(\''+id+'\')" style="padding:2px 7px">×</button></td></tr>';
   }).join('');
   var opts=SUBDOC_KINDS.map(function(k){return '<option>'+k+'</option>';}).join('');
@@ -15896,7 +15897,7 @@ function subsidyDocsPanel(f){
       +(fbStore?'<button onclick="uploadSubDoc()" title="이 앱 창고에 파일을 올립니다 — 사진첩에 없는 한글·PDF 같은 문서에 씁니다">📎 파일 올리기</button>'
                :'<span class="muted" style="font-size:11px">파일 올리기는 Firebase Storage가 필요합니다</span>')
     +'</div>'
-    +(ids.length?'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr><th>종류</th><th>서류</th><th>어디에</th><th>담은날</th><th></th></tr></thead><tbody>'+urows+'</tbody></table></div>':'<div class="muted" style="padding:12px 2px">담아 둔 서류가 없습니다.</div>')
+    +(ids.length?'<div style="overflow-x:auto;margin-top:10px"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>종류</th><th>서류</th><th>어디에</th><th>담은날</th><th></th></tr></thead><tbody>'+urows+'</tbody></table></div>':'<div class="muted" style="padding:12px 2px">담아 둔 서류가 없습니다.</div>')
     +'</div>'
     +'</div>'                                   /* 왼쪽 끝 */
     +'<div style="flex:1;min-width:320px;position:sticky;top:calc(var(--topbar-h,48px) + 8px);align-self:flex-start" class="panel" id="formSide">'
@@ -16023,15 +16024,15 @@ function welfareTab(f){
     return '<div class="panel">'+loadingHTML()+'</div>'; }
   var w=S.welf||{}, arr=Object.keys(w).map(function(k){var o=Object.assign({},w[k]);o._id=k;return o;});
   var bud=arr.reduce(function(s,x){return s+(num(x.budget)||0);},0), sp=arr.reduce(function(s,x){return s+(num(x.spent)||0);},0), ben=arr.reduce(function(s,x){return s+(num(x.beneficiaries)||0);},0);
-  var rows=arr.map(function(p){
-    return '<tr onclick="editProg(\''+p._id+'\')"><td><span class="chip" style="background:var(--acc-soft);color:var(--acc2)">'+esc(p.category||'-')+'</span></td>'
+  var rows=arr.map(function(p,i){
+    return '<tr onclick="editProg(\''+p._id+'\')">'+_ckTd()+'<td class="no">'+(i+1)+'</td><td><span class="chip" style="background:var(--acc-soft);color:var(--acc2)">'+esc(p.category||'-')+'</span></td>'
       +'<td style="font-weight:700">'+esc(p.name||'—')+'</td><td style="text-align:right">'+(num(p.budget)||0).toLocaleString()+'</td>'
       +'<td style="text-align:right">'+(num(p.spent)||0).toLocaleString()+'</td><td style="text-align:right">'+(num(p.beneficiaries)||'—')+'</td></tr>';
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap"><h2>목적사업·대부</h2>'+welfSubBar()+yearSel()
     +'<span class="stat">예산 '+bud.toLocaleString()+'원</span><span class="stat">집행 '+sp.toLocaleString()+'원</span><span class="stat">수혜 '+ben.toLocaleString()+'명</span>'
     +'<span style="flex:1"></span><button class="primary" onclick="editProg(\'\')">+ 사업 추가</button></div>'
-    +'<div style="margin-top:12px">'+(arr.length?'<table><thead><tr><th>분류</th><th>사업명</th><th style="text-align:right">예산</th><th style="text-align:right">집행</th><th style="text-align:right">수혜자</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="muted" style="padding:16px 4px">'+S.year+'년 등록된 목적사업이 없습니다.</div>')+'</div></div>';
+    +'<div style="margin-top:12px">'+(arr.length?'<table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>분류</th><th>사업명</th><th style="text-align:right">예산</th><th style="text-align:right">집행</th><th style="text-align:right">수혜자</th></tr></thead><tbody>'+rows+'</tbody></table>':'<div class="muted" style="padding:16px 4px">'+S.year+'년 등록된 목적사업이 없습니다.</div>')+'</div></div>';
 }
 function editProg(id){
   var p=(S.welf&&S.welf[id])||{category:'생활안정자금'};
@@ -16707,13 +16708,13 @@ function journalView(arr){
   var rows='', prevDate=null, dayN=0, daySum=0, no=0;
   function dayLine(){
     if(prevDate===null||dayN<2) return '';
-    return '<tr style="background:var(--bg);font-size:11.5px;color:var(--sub)"><td colspan="2">'+esc(prevDate)+' 소계 ('+dayN+'건)</td>'
+    return '<tr style="background:var(--bg);font-size:11.5px;color:var(--sub)"><td class="ckcol"></td><td colspan="2">'+esc(prevDate)+' 소계 ('+dayN+'건)</td>'
       +'<td></td><td style="text-align:right">'+_n(daySum)+'</td><td></td><td style="text-align:right">'+_n(daySum)+'</td></tr>';
   }
   jr.forEach(function(e){
     if(e.date!==prevDate){ rows+=dayLine(); prevDate=e.date; dayN=0; daySum=0; }
     dayN++; daySum+=e.amount; no++;
-    rows+='<tr><td class="no">'+no+'</td><td style="white-space:nowrap">'+esc(e.date)+'</td>'
+    rows+='<tr>'+_ckTd()+'<td class="no">'+no+'</td><td style="white-space:nowrap">'+esc(e.date)+'</td>'
       +'<td>'+esc(e.debit)+'</td><td style="text-align:right">'+_n(e.amount)+'</td>'
       +'<td>'+esc(e.credit)+'</td><td style="text-align:right">'+_n(e.amount)+'</td>'
       +'<td class="muted mo" style="max-width:240px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="'+esc(e.memo)+'">'+esc(e.memo)+'</td></tr>';
@@ -16722,13 +16723,19 @@ function journalView(arr){
   return '<div class="panel"><div class="row"><h2 style="font-size:15px">분개장</h2>'+hlp('close.journal')
     +'<span class="stat">'+jr.length+'건</span><span class="stat">차·대 각 '+_n(tot)+'원</span>'
     +'<span style="flex:1"></span><button onclick="printLedger(\'journal\')">🖨 인쇄</button></div>'
-    +'<div class="ledgerwrap" style="margin-top:8px"><table><thead><tr><th>번호</th><th>일자</th>'
+    +'<div class="ledgerwrap" style="margin-top:8px"><table><thead><tr>'+_ckTh()+'<th>#</th><th>일자</th>'
     +'<th>차변 계정</th><th style="text-align:right">차변</th><th>대변 계정</th><th style="text-align:right">대변</th>'
     +'<th class="mo">적요</th></tr></thead><tbody>'+rows
-    +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="3">합계</td>'
+    +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td class="ckcol"></td><td colspan="3">합계</td>'
     +'<td style="text-align:right">'+_n(tot)+'</td><td></td><td style="text-align:right">'+_n(tot)+'</td><td class="mo"></td></tr>'
     +'</tbody></table></div></div>';
 }
+/* 목록 맨 왼쪽 □·# (2026-10-10 「확인할 때 맨 왼쪽에 □·번호」) — □ 는 눈으로 짚어 가는 표시라 저장하지 않고,
+   인쇄(printLedger)에는 나가지 않는다(.ckcol). 머리 □ 는 그 표의 줄을 모두 짚는다. */
+function _ckTh(){ return '<th class="ckcol"><input type="checkbox" title="모두 짚기" onclick="_ckAll(this)"></th>'; }
+function _ckTd(){ return '<td class="ckcol" onclick="event.stopPropagation()"><input type="checkbox" onchange="_ckRow(this)"></td>'; }
+function _ckRow(el){ var tr=el.closest('tr'); if(tr) tr.classList.toggle('ticked',el.checked); }
+function _ckAll(el){ var t=el.closest('table'); if(!t) return; Array.prototype.forEach.call(t.querySelectorAll('tbody td.ckcol input'),function(c){ c.checked=el.checked; _ckRow(c); }); }
 // ── 계정별원장 ──
 function ledgerView(arr){
   var jr=journalOf(arr), op=_openingOf(S.fundId,S.year);
@@ -16743,16 +16750,16 @@ function ledgerView(arr){
         return '<option value="'+esc(n)+'"'+(n===acct?' selected':'')+'>'+(c?c+' ':'')+esc(n)+' ('+acctType(n)+')</option>';}).join('')+'</select>';
   var om=openingMoves(op)[acct]||{d:0,c:0};
   var bal=om.d-om.c, sumD=om.d, sumC=om.c;
-  var rows='';
-  if(om.d||om.c) rows+='<tr style="color:var(--faint)"><td>—</td><td>전기이월</td>'
+  var rows='', no=0;
+  if(om.d||om.c) rows+='<tr style="color:var(--faint)"><td class="ckcol"></td><td></td><td>—</td><td>전기이월</td>'
     +'<td style="text-align:right">'+_nz(om.d)+'</td><td style="text-align:right">'+_nz(om.c)+'</td>'
     +'<td style="text-align:right">'+_n(dr?bal:-bal)+'</td></tr>';
   jr.forEach(function(e){
     if(e.debit!==acct&&e.credit!==acct) return;
     var d=(e.debit===acct)?e.amount:0, c=(e.credit===acct)?e.amount:0;
-    sumD+=d; sumC+=c; bal+=d-c;
+    sumD+=d; sumC+=c; bal+=d-c; no++;
     var other=(e.debit===acct)?e.credit:e.debit;
-    rows+='<tr><td style="white-space:nowrap">'+esc(e.date)+'</td>'
+    rows+='<tr>'+_ckTd()+'<td class="no">'+no+'</td><td style="white-space:nowrap">'+esc(e.date)+'</td>'
       +'<td>'+esc(e.memo||other)+' <span class="muted mo" style="font-size:11px">('+esc(other)+')</span></td>'
       +'<td style="text-align:right">'+_nz(d)+'</td><td style="text-align:right">'+_nz(c)+'</td>'
       +'<td style="text-align:right;font-variant-numeric:tabular-nums">'+_n(dr?bal:-bal)+'</td></tr>';
@@ -16762,9 +16769,9 @@ function ledgerView(arr){
     +'<span class="chip" style="font-size:10px">'+(dr?'차변 잔액 계정':'대변 잔액 계정')+'</span>'
     +'<span style="flex:1"></span><span class="stat">기말잔액 '+_n(endBal)+'원</span>'
     +'<button onclick="printLedger(\'ledger\')">🖨 인쇄</button></div>'
-    +'<div class="ledgerwrap" style="margin-top:8px"><table><thead><tr><th>일자</th><th>적요(상대계정)</th>'
+    +'<div class="ledgerwrap" style="margin-top:8px"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>일자</th><th>적요(상대계정)</th>'
     +'<th style="text-align:right">차변</th><th style="text-align:right">대변</th><th style="text-align:right">잔액</th></tr></thead><tbody>'+rows
-    +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td colspan="2">합계 / 기말잔액</td>'
+    +'<tr style="font-weight:700;border-top:2px solid var(--ink)"><td class="ckcol"></td><td colspan="3">합계 / 기말잔액</td>'
     +'<td style="text-align:right">'+_n(sumD)+'</td><td style="text-align:right">'+_n(sumC)+'</td>'
     +'<td style="text-align:right">'+_n(endBal)+'</td></tr></tbody></table></div></div>';
 }
@@ -17927,13 +17934,13 @@ function f15View(arr){
   if(!f15Load()) return '<div class="panel">'+loadingHTML()+'</div>';
   var R=buildF15(arr,S.fundId,S.year,S.f15Rep,S.f15Sites,S.f15Welf);
   function ip(k,lbl,ph){ return '<div class="fld"><label>'+lbl+'</label><input id="f15-'+k+'" value="'+esc((S.f15Rep||{})[k]||'')+'" placeholder="'+(ph||'0')+'"></div>'; }
-  var bfRows=R.bfList.length?R.bfList.map(function(b){
+  var bfRows=R.bfList.length?R.bfList.map(function(b,i){
     var sel='<select onchange="f15SetBf(\''+b.id+'\',this.value)" style="padding:2px 5px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">'
       +BF_KINDS.map(function(x){return '<option value="'+x[0]+'"'+(b.kind===x[0]?' selected':'')+'>'+x[1]+'</option>';}).join('')+'</select>';
-    return '<tr><td style="white-space:nowrap">'+esc(b.date)+'</td><td class="mo muted">'+esc(b.memo)+'</td>'
+    return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td style="white-space:nowrap">'+esc(b.date)+'</td><td class="mo muted">'+esc(b.memo)+'</td>'
       +'<td><span class="chip '+(b.dir==='증가'?'ok':'dg')+'" style="font-size:10px">'+b.dir+'</span></td>'
       +'<td style="text-align:right">'+_n(b.amount)+'</td><td>'+sel+'</td></tr>';
-  }).join(''):'<tr><td colspan="5" class="muted">기본재산 변동 분개가 없습니다.</td></tr>';
+  }).join(''):'<tr><td colspan="7" class="muted">기본재산 변동 분개가 없습니다.</td></tr>';
   var itemRows=R.items.map(function(x){
     return '<tr><td>'+_f15n(x.no)+' '+esc(x.label)+'</td><td style="text-align:right">'+_nz(_k1000(x.amt))+'</td>'
       +'<td style="text-align:right">'+_nz(x.cnt)+'</td></tr>';
@@ -18030,7 +18037,7 @@ function f15View(arr){
       +'</tbody></table></div></div>'
     +'<details style="margin-top:14px"><summary style="cursor:pointer;font-weight:700">기본재산 변동 내역 — 구분 확인 ('+R.bfList.length+'건)</summary>'
       +'<p class="muted" style="font-size:11.5px;margin:6px 0">적요로 자동 추정했습니다. 틀린 것만 바꿔 주세요.</p>'
-      +'<div style="overflow-x:auto"><table><thead><tr><th>일자</th><th class="mo">적요</th><th>증감</th><th style="text-align:right">금액(원)</th><th>별지15호 구분</th></tr></thead><tbody>'+bfRows+'</tbody></table></div></details>'
+      +'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>일자</th><th class="mo">적요</th><th>증감</th><th style="text-align:right">금액(원)</th><th>별지15호 구분</th></tr></thead><tbody>'+bfRows+'</tbody></table></div></details>'
     +'<details style="margin-top:10px" open><summary style="cursor:pointer;font-weight:700">회계로 알 수 없는 칸 — 직접 입력</summary>'
       +'<div class="grid" style="margin-top:10px">'
       +ip('biz_type','⑧ 업종','예: 제조업')+ip('capital','⑪ 납입자본금(천원)')
@@ -20148,7 +20155,7 @@ function printLedger(kind){
     +'<style>@page{size:A4 landscape;margin:12mm}body{font-family:Malgun Gothic,sans-serif;color:#1e293b}'
     +'h1{font-size:16px;margin:0 0 2px}p.sub{font-size:11px;color:#475569;margin:0 0 10px}'
     +'table{border-collapse:collapse;width:100%;margin-bottom:14px}th,td{border:1px solid #94a3b8;padding:3px 6px;font-size:10.5px}'
-    +'th{background:#e2e8f0}.mo{display:table-cell}@media print{button{display:none}}</style>'
+    +'th{background:#e2e8f0}.mo{display:table-cell}.ckcol{display:none}@media print{button{display:none}}</style>'
     +'<h1>'+esc(LBL[kind]||'장부')+'</h1>'
     +'<p class="sub">'+esc(fd.name||'')+' · '+S.year+'년도 · 출력 '+ymd()+'</p>'+body
     +'<button onclick="print()" style="padding:8px 16px">인쇄 / PDF 저장</button>');
