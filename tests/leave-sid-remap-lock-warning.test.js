@@ -52,11 +52,12 @@ function makeSandbox(store, lockedYms) {
 function baseStore() {
   return {
     user_accounts: [
-      { sid: 'T-777', name: '퇴사자', status: 'retired', hireDate: '2020-01-01' },
+      /* 2026-10-10: 이미 T- 번호를 받은 퇴직자는 다시 매기지 않는다(사번은 영구 번호) — 재매핑 대상은 «아직 T- 가 없는» 퇴직자다 */
+      { sid: 'P-777', name: '퇴사자', status: 'retired', hireDate: '2020-01-01' },
       { sid: 'A-001', name: '재직자', status: 'active', hireDate: '2019-01-01' },
     ],
     finance_income: [],
-    payroll_monthly: [{ id: 'p1', empSid: 'T-777', ym: '2026-03' }],
+    payroll_monthly: [{ id: 'p1', empSid: 'P-777', ym: '2026-03' }],
     overtime_records: [],
     attendance_records: [],
     companies: [], cases: [], consultings: [], funds: [], other_projects: [],
@@ -83,6 +84,6 @@ test('★★ 재매핑 대상이 아닌 사번의 마감 기록은 경고에 안
   store.payroll_monthly.push({ id: 'p2', empSid: 'A-001', ym: '2026-04' });
   const { confirms, api } = makeSandbox(store, ['2026-03', '2026-04']);
   api();
-  assert.ok(confirms[0].indexOf('2026-03') >= 0, '재매핑 대상(T-777)의 잠긴 달은 있어야 한다');
+  assert.ok(confirms[0].indexOf('2026-03') >= 0, '재매핑 대상(P-777)의 잠긴 달은 있어야 한다');
   assert.ok(confirms[0].indexOf('2026-04') < 0, '재직자(A-001, 재매핑 대상 아님)의 잠긴 달까지 섞였다: ' + confirms[0]);
 });
