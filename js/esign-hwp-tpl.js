@@ -141,11 +141,16 @@
        「모든 위임장은 푸른노무법인 담당노무사들 자동으로 … 퇴사하거나 휴직시 이름이 자동으로 빠지게」) ══
      「성 명 : (대표 /) 공인노무사 권 형 하」 줄 → 「성 명 : 〈재직 명단〉」, 그 밑에 이어진 「공인노무사 ○ ○ ○」 줄은 비운다.
      ⚠ 「공인노무사법」 문장이 든 문서(위임장)에서만 · 같은 칸(또는 본문) 안 차례로만 본다. 직접 올린 원본은 고치지 않는다(채울 때만) */
+  /* ★ 표 칸 하나에 이름만 든 꼴(「공인노무사명 | 권형하노무사」 — 한국공인노무사회 승인서식 사건위임계약서)도 바꾼다
+       (2026-10-10 대표 「위임장에 … 공인노무사 모든 사람의 이름이 자동으로」). 칸 안에서만 — 본문의 「… 대표 권형하노무사」 서명 줄은 그대로.
+     ⚠ 「공인노무사」·「대표노무사」 같은 이름표 글자만 든 칸은 사람 이름이 아니라 건너뛴다. */
+  var NAME_CELL = /^\s*(?!공인|대표)[가-힣](?:\s*[가-힣]){1,3}\s*(?:공인\s*)?노무사\s*$/;
   var NAMES_LINE = /^(\s*성\s*명\s*[:：]\s*)(?:대표\s*\/?\s*)?공인노무사\s*[가-힣](?:\s*[가-힣]){1,3}\s*$/;
   var NAME_ONLY = /^\s*공인노무사\s*[가-힣](?:\s*[가-힣]){1,3}\s*$/;
-  function lawyerLineEdits(paras, line) {
+  function lawyerLineEdits(paras, line, inCell) {
     var out = [];
     for (var i = 0; i < (paras || []).length; i++) {
+      if (inCell && NAME_CELL.test(String(paras[i].text || ''))) { out.push({ key: paras[i].key, text: line }); continue; }
       var m = NAMES_LINE.exec(String(paras[i].text || '')); if (!m) continue;
       out.push({ key: paras[i].key, text: m[1] + line });
       for (var j = i + 1; j < paras.length && NAME_ONLY.test(String(paras[j].text || '')); j++) out.push({ key: paras[j].key, text: '' });
@@ -157,7 +162,7 @@
     var js = function (q) { try { return JSON.parse(doc.searchAllText(q, false, true)) || []; } catch (e) { return []; } };
     if (!js('공인노무사법').length) return 0;
     var groups = {};
-    js('공인노무사').forEach(function (h) {
+    js('노무사').forEach(function (h) {
       var c = h.cellContext, g = c ? [h.sec, c.parentPara, c.ctrlIdx, c.cellIdx].join('.') : 'b' + h.sec;
       (groups[g] = groups[g] || { sec: h.sec, c: c, idx: [] }).idx.push(c ? c.cellPara : h.para);
     });
@@ -168,7 +173,7 @@
       var get = function (k) { try { var L = len(k); return c ? doc.getTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, k, 0, L) : doc.getTextRange(G.sec, k, 0, L); } catch (e) { return null; } };
       var paras = [];
       for (var k = lo; k <= hi + 4; k++) { var t = get(k); if (t == null) break; paras.push({ key: k, text: t }); }
-      lawyerLineEdits(paras, line).forEach(function (e) {
+      lawyerLineEdits(paras, line, !!c).forEach(function (e) {
         try {
           var L = len(e.key);
           if (c) { if (L) doc.deleteTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, e.key, 0, L); if (e.text) doc.insertTextInCell(G.sec, c.parentPara, c.ctrlIdx, c.cellIdx, e.key, 0, e.text); }
