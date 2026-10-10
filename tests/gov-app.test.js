@@ -138,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,'
+    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -647,7 +647,7 @@ test('★★★ 공고 전(기본) — 임박·이번 달·예정월 지남·몇
   assert.match(h, /경영지원팀<div>02-000-0000<\/div>/, '담당 부서·전화');
   assert.match(h, /href="https:\/\/www\.g2b\.go\.kr:8082\/ep\/co\/fileDownload\.do\?fileTask=PS&amp;fileSeq=9::1"/, '사전규격서 링크');
   assert.match(r.el('tbPlan').innerHTML, /📅 발주 예정 <span class="tag red"[^>]*>2<\/span>/, '임박 1 + 이번 달 1');
-  assert.match(r.el('pCnt').textContent, /전체 5건 · 지금 4건 · 숨김 1건/);
+  assert.match(r.el('pCnt').innerHTML, /전체 5건 · 지금 4건 · 숨김 1건/);
 });
 test('★★★ 「공고 나옴」 보기 — 공고 모아보기에 그 공고가 있으면 「공고 보기」로 바로 연다', () => {
   const r = runApp({ plan: PLANS(), feed: [{ id: 'G0001', src: '나라장터', type: '새 공고', no: 'R26BK00000001-000', nm: '임금체계 개편 용역', org: '무원' }] });
@@ -664,7 +664,7 @@ test('★★ 수의계약 고르개는 두 탭이 «한 값» — 발주 예정�
   const r = runApp({ plan: PLANS() });
   r.el('pView').value = 'ahead'; r.el('pMthd').value = 'nosole'; r.api.planMthd('nosole');
   assert.doesNotMatch(r.el('ptb').innerHTML, /노무 자문 용역/);
-  assert.match(r.el('pCnt').textContent, /수의계약 1건 뺌/);
+  assert.match(r.el('pCnt').innerHTML, /수의계약 1건 뺌/);
   assert.equal(r.store.gov3_feed_mthd, 'nosole'); assert.equal(r.el('fMthd').value, 'nosole');
   r.api.feedMthd(''); assert.equal(r.el('pMthd').value, '', '반대쪽도 따라온다');
 });
@@ -909,7 +909,7 @@ test('★★★ 기본 50건씩 · 고르개 20·50·100·전체 · 쪽 넘기�
   const r = runApp({ plan: MANY(120) }); r.el('pView').value = 'ahead'; r.api.planDraw();
   assert.equal(planRowsOf(r.el('ptb').innerHTML), 50);
   assert.match(r.el('pPerBox').innerHTML, /<select onchange="planPer\(this\.value\)">[\s\S]*value="20"[\s\S]*value="50" selected[\s\S]*value="100"[\s\S]*value="0"[^>]*>전체/);
-  assert.match(r.el('pCnt').textContent, /지금 120건/, '건수는 쪽이 아니라 걸린 것 전부');
+  assert.match(r.el('pCnt').innerHTML, /지금 120건/, '건수는 쪽이 아니라 걸린 것 전부');
   assert.match(r.el('planPager').innerHTML, /onclick="planPageTo\(2\)">3<\/button>[\s\S]*1–50 \/ 120건/);
   r.api.planPageTo(2);
   assert.equal(planRowsOf(r.el('ptb').innerHTML), 20); assert.match(r.el('ptb').innerHTML, /<td class="rn">101<\/td>/);
@@ -930,4 +930,76 @@ test('★ 거르는 조건을 바꾸면 첫 쪽으로(빈 쪽에 남지 않게)'
   const r = runApp({ plan: MANY(120) }); r.el('pView').value = 'ahead'; r.api.planDraw(); r.api.planPageTo(2);
   r.el('pq').value = '노무 용역 1'; r.api.planDraw();
   assert.ok(planRowsOf(r.el('ptb').innerHTML) > 0, '걸린 것이 있는데 빈 쪽');
+});
+
+/* ═══ 발주 예정 — 「⌛ 지난 계획」 갈래 + 보기에 건수 (대표 2026-10-10 「12번」) · 수의계약은 두되 표시 ═══ */
+const PASTS = () => [
+  { kind: 'plan', no: 'A1', nm: '이번 달 노무 용역', org: '가', ym: ymAdd(0), bids: [], mthd: '수의계약', kw: '노무' },
+  { kind: 'plan', no: 'A2', nm: '두 달 전 노무 용역', org: '나', ym: ymAdd(-2), bids: [], kw: '노무' },
+  { kind: 'plan', no: 'P3', nm: '석 달 전 노무 용역', org: '다', ym: ymAdd(-3), bids: [], mthd: '수의계약', kw: '노무' },
+  { kind: 'plan', no: 'P4', nm: '반 년 전 노무 용역', org: '라', ym: ymAdd(-6), bids: [], kw: '노무' },
+  { kind: 'plan', no: 'P5', nm: '옛날에 공고 나온 용역', org: '마', ym: ymAdd(-6), bids: ['R1'], kw: '노무' },
+  { kind: 'plan', no: 'P6', nm: '숨긴 지난 용역', org: '바', ym: ymAdd(-6), bids: [], hidden: true, kw: '노무' },
+  { kind: 'spec', no: 'S1', nm: '사전규격 노무', org: '사', rcptDt: '2026-10-07 09:00:00', closeDt: '2099-01-01 18:00:00', bids: [], kw: '노무' }
+];
+test('★★★ 기본 보기(공고 전)는 «예정월이 3달 전 이전»인 지난 계획을 빼고 ⌛ 지난 계획에 따로 둔다 — 지우지 않는다', () => {
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  let h = r.el('ptb').innerHTML;
+  assert.equal(planRowsOf(h), 3, '이번 달·두 달 전·사전규격');
+  assert.match(h, /이번 달 노무/); assert.match(h, /두 달 전 노무/, '1~2달 지난 것은 곧 나올 수 있어 앞으로에 둔다'); assert.match(h, /사전규격 노무/);
+  assert.doesNotMatch(h, /석 달 전|반 년 전/);
+  r.api.planView('past'); h = r.el('ptb').innerHTML;
+  assert.equal(planRowsOf(h), 2); assert.match(h, /석 달 전[\s\S]*반 년 전/, '오래된 것은 아래');
+  assert.doesNotMatch(h, /옛날에 공고|숨긴 지난|이번 달/, '공고 나온 것·숨긴 것·앞으로는 이 갈래가 아니다');
+  assert.equal(JSON.parse(r.store.gov3_plan).length, 7, '지운 것이 없다');
+  r.api.planView('all'); assert.equal(planRowsOf(r.el('ptb').innerHTML), 6, '모두 = 숨긴 것 빼고 전부');
+});
+test('★★★ 보기 고르개에 건수 — 목록과 «같은 잣대» · 계약방법 고르개는 따르고 검색어는 안 따른다 · 고른 보기는 그대로', () => {
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'past'; r.api.planDraw();
+  const o = r.el('pView').innerHTML;
+  for (const [v, n, t] of [['ahead', 3, '공고 전 · 앞으로'], ['past', 2, '⌛ 지난 계획'], ['posted', 1, '✅ 공고 나옴'], ['all', 6, '모두'], ['hidden', 1, '🙈 숨긴 것']])
+    assert.match(o, new RegExp('<option value="' + v + '">' + t + ' \\(' + n + '\\)</option>'), v + ' 건수');
+  assert.equal(r.el('pView').value, 'past', '다시 그려도 고른 보기가 남는다');
+  r.el('pq').value = '반 년'; r.api.planDraw();
+  assert.match(r.el('pView').innerHTML, /⌛ 지난 계획 \(2\)/, '검색어는 건수에 안 든다');
+  r.el('pMthd').value = 'nosole'; r.api.planDraw();
+  assert.match(r.el('pView').innerHTML, /⌛ 지난 계획 \(1\)/, '수의계약 빼기를 따른다');
+  for (const v of ['ahead', 'past', 'posted', 'all', 'hidden', 'star']) {
+    r.el('pq').value = ''; r.el('pMthd').value = ''; r.api.planView(v);
+    const n = Number(new RegExp('<option value="' + v + '">[^<]*\\((\\d+)\\)').exec(r.el('pView').innerHTML)[1]);
+    assert.equal(planRowsOf(r.el('ptb').innerHTML), Math.min(n, 50), v + ': 건수와 줄 수가 다르다');
+  }
+});
+test('★★ 앞으로 보기에서는 «⌛ 지난 계획 N건은 따로» 링크로 알리고 누르면 그 보기로 · 지난 계획 보기에서는 안 띄운다', () => {
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.match(r.el('pCnt').innerHTML, /onclick="planView\('past'\);return false"[^>]*>⌛ 지난 계획 2건은 따로<\/a>/);
+  r.api.planView('past'); assert.equal(r.el('pView').value, 'past');
+  assert.doesNotMatch(r.el('pCnt').innerHTML, /따로/);
+  const e = runApp({ plan: PASTS().filter((x) => x.no === 'P4') }); e.el('pView').value = 'ahead'; e.api.planDraw();
+  assert.match(e.el('ptb').innerHTML, /걸리는 것이 없습니다[^<]*\(⌛ 지난 계획 1건은 보기에서\)/, '빈 표에서도 어디 있는지 알려 준다');
+});
+test('★★ 수의계약은 «두되 표시» — 기본으로 빼지 않고 이름 앞 딱지 + 계약방법 칸 강조', () => {
+  const r = runApp({ plan: PASTS() }); r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.equal(r.el('pMthd').value || '', '', '기본은 전체 계약');
+  const h = r.el('ptb').innerHTML;
+  assert.match(h, /<span class="tag amber"[^>]*>수의계약<\/span> <b>이번 달 노무 용역<\/b>/);
+  assert.match(h, /<td class="sml" style="color:var\(--amber\);font-weight:700">수의계약<\/td>/, '계약방법 칸도 강조');
+  assert.doesNotMatch(h, /<td class="sml" style="[^"]*">-<\/td>/, '수의계약 아닌 칸은 강조하지 않는다');
+});
+
+test('★★ 진짜 select 처럼 — 옵션을 다시 그리면 값이 비워지는 환경에서도 고른 보기가 남는다', () => {
+  const r = runApp({ plan: PASTS() });
+  const sel = r.el('pView'); let v = 'past';
+  Object.defineProperty(sel, 'value', { get: () => v, set: (x) => { v = x; }, configurable: true });
+  Object.defineProperty(sel, 'innerHTML', { get: () => sel._h || '', set: (h) => { sel._h = h; v = ''; }, configurable: true });   // 브라우저는 옵션을 갈아 끼우면 고른 값을 잃는다
+  r.api.planDraw();
+  assert.equal(sel.value, 'past', '다시 그리고 나서 고른 보기가 비었다');
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 2);
+});
+test('★ 보기를 바꾸면 첫 쪽으로(링크로 가든 고르개로 가든) — 뒤쪽 쪽에 남아 빈 표가 되지 않게', () => {
+  const OLD = MANY(120).map((x) => Object.assign({}, x, { no: 'O' + x.no, ym: '2024-01' }));
+  const r = runApp({ plan: MANY(120).concat(OLD) });
+  r.el('pView').value = 'ahead'; r.api.planDraw(); r.api.planPageTo(2);
+  r.api.planView('past');
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 50); assert.match(r.el('ptb').innerHTML, /<td class="rn">1<\/td>/, '쪽 번호가 따라오면 101번부터 보인다');
 });

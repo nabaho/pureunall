@@ -219,6 +219,16 @@
     return { k: 'later', label: d + '개월 뒤 발주 예정' };
   }
 
+  /* 지난 계획 — 예정월이 끝난 지 «2달 넘게» 지났는데 입찰공고가 없는 발주계획(예정월 3달 전 이전).
+     ⚠ 지우지 않는다 — 「공고 전(앞으로)」 기본 보기에서만 빠지고 「⌛ 지난 계획」에서 본다. 1~2달 지난 것은 «곧 나올 수 있어» 앞으로에 둔다.
+     ⚠ 사전규격(공고 임박)·예정월 모름·공고 나옴은 아니다. */
+  var STALE_MONTHS = 3;
+  function stale(r, today) {
+    if (!r || r.kind === 'spec' || (r.bids && r.bids.length) || !r.ym) return false;
+    var cur = s(today).slice(0, 7) || ymd(new Date()).slice(0, 7);
+    return monthsBetween(cur, r.ym) <= -STALE_MONTHS;
+  }
+
   /* 공고 모아보기에 이미 받은 그 입찰공고 — 번호(차수 뗀 것)로 잇는다 */
   function linked(r, feed) {
     var want = (r && r.bids) || [];
@@ -246,7 +256,7 @@
   var api = { PLAN_BASE: PLAN_BASE, SPEC_BASE: SPEC_BASE, PLAN_PAGE: PLAN_PAGE, SPEC_PAGE: SPEC_PAGE,
               encKey: encKey, planUrl: planUrl, specUrl: specUrl, windows: windows, bidsOf: bidsOf, ymOf: ymOf,
               normPlan: normPlan, normSpec: normSpec, parse: parse, errSay: errSay, merge: merge,
-              state: state, linked: linked, prune: prune, ymd: ymd, PLAN_MORE: PLAN_MORE, SPEC_MORE: SPEC_MORE };
+              state: state, stale: stale, STALE_MONTHS: STALE_MONTHS, linked: linked, prune: prune, ymd: ymd, PLAN_MORE: PLAN_MORE, SPEC_MORE: SPEC_MORE };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovPlan = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
