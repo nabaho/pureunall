@@ -144,7 +144,7 @@
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
-<script src="js/pu-kakao.js?v=7"></script>
+<script src="js/pu-kakao.js?v=8"></script>
 <script src="js/pu-billing.js?v=11"></script>
 <style>
 :root{
@@ -1995,6 +1995,7 @@ body.portal-mode #moreFab{display:flex;}
        유지 방식은 복귀 뒤 인증표로 실제 로그인하기 직전에 적용한다. */
     var used = false;
     try { used = localStorage.getItem(KK_USED_KEY) === '1'; } catch(e){}
+    try { sessionStorage.setItem('pu_kakao_login_tap_at', String(Date.now())); } catch(_t){}
     PuKakao.goLogin({ ask: !used }).catch(function(err){
       showErr((err && err.message) || '카카오 연결에 실패했습니다');
       if(btn) btn.disabled = false;
@@ -2020,7 +2021,7 @@ body.portal-mode #moreFab{display:flex;}
          로그인 유지 켠 경우에는 부팅 때 이미 시작한 LOCAL 작업을 재사용한다. */
       var keep = false;
       try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
-      var kkStarted = Date.now(), kkServerMs = 0, kkStoreMs = 0;
+      var kkStarted = Date.now(), kkServerMs = 0, kkStoreMs = 0, kkProfile = null;
       var persist = _persistenceReady.then(function(){
         if(_persistenceBootError) throw _persistenceBootError;
         if(!keep) return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION);
@@ -2028,23 +2029,29 @@ body.portal-mode #moreFab{display:flex;}
         if(err && typeof err === 'object') err.puPersistence = true;
         throw err;
       });
-      var server = PuKakao.loginFinish(p.code).then(function(token){ kkServerMs = Date.now() - kkStarted; return token; });
+      var server = PuKakao.loginFinish(p.code).then(function(result){
+        kkServerMs = Date.now() - kkStarted;
+        kkProfile = result && result.profile ? result.profile : null;
+        return result && result.token ? result.token : result;
+      });
       Promise.all([server, persist]).then(function(ready){
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         /* 공개 명부도 LOGIN 권한이 필요하다. 로그인 전 미리 읽으면 권한 거부를
            «명부 없음»으로 삼아 관리자 전용 명부까지 다시 읽느라 수 초를 낭비했다. */
-        try {
-          window.__puRosterPrefetch = Promise.resolve(db.ref('data/user_dir').once('value'))
-            .catch(function(){ return null; });
-        } catch(_r){ window.__puRosterPrefetch = null; }
+        if(!kkProfile){
+          try {
+            window.__puRosterPrefetch = Promise.resolve(db.ref('data/user_dir').once('value'))
+              .catch(function(){ return null; });
+          } catch(_r){ window.__puRosterPrefetch = null; }
+        }
         // 개인 식별값 없이 이 탭에만 단계별 소요를 남겨 다음 지연 제보를 구별한다.
-        try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({serverMs:kkServerMs, storeMs:kkStoreMs, totalMs:Date.now()-kkStarted})); } catch(_t){}
+        try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({at:kkStarted, serverMs:kkServerMs, storeMs:kkStoreMs, totalMs:Date.now()-kkStarted})); } catch(_t){}
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
         /* signIn 성공 결과를 이미 받았다. 인증 상태 알림이 한 번 더 올 때까지 기다리지 않고
            곧바로 포털을 연다(알림이 먼저 왔으면 _handled가 중복 진입을 막는다). */
-        if(!_handled){ _handled = true; enterPortal(cred.user); }
+        if(!_handled){ _handled = true; enterPortal(cred.user, kkProfile); }
         try {
           cred.user.getIdToken().then(function(tok){ reportLogin(cred.user.email || '', true, '', tok); }).catch(function(){});
         } catch(e){}
@@ -2528,7 +2535,7 @@ body.portal-mode #moreFab{display:flex;}
   }
 
   // ── 포털 진입: 로그인된 사용자의 계정 정보 조회 후 타일 렌더 ──
-  function enterPortal(user){
+  function enterPortal(user, verifiedProfile){
     if(_returnToApp(user)) return;     // 로그아웃으로 밀려났던 앱 탭 — 하던 앱으로 돌아간다
     _portalUid = user.uid || '';
     _portalReady = false;
@@ -2546,7 +2553,25 @@ body.portal-mode #moreFab{display:flex;}
       renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
       $('portalView').style.display = 'block';
       _portalReady = true;
+      try {
+        var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
+        if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
+          timing.portalMs = timing.at ? Date.now() - timing.at : timing.totalMs;
+          timing.fastProfile = !!(verifiedProfile && verifiedProfile.acct && m === verifiedProfile);
+          var tapAt = Number(sessionStorage.getItem('pu_kakao_login_tap_at') || 0);
+          if(tapAt && Date.now() - tapAt < 600000) timing.fromTapMs = Date.now() - tapAt;
+          sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify(timing));
+          sessionStorage.removeItem('pu_kakao_login_tap_at');
+        }
+      } catch(_t){}
       _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
+    }
+    /* 이 정보는 카카오 인가코드·재직 확인을 마친 서버가 같은 응답으로 보낸 것만 쓴다.
+       Firebase가 실제로 연 계정 이메일과 사번이 다르면 기존 명부 조회로 돌아간다. */
+    if(verifiedProfile && verifiedProfile.acct && verifiedProfile.acct.status === 'active'
+        && sidToEmail(verifiedProfile.acct.sid) === String(user.email || '').toLowerCase()){
+      _show(verifiedProfile);
+      return;
     }
     // 명부 읽기 공통: {v:...} 래핑·객체 형태 모두 배열로 정규화
     function _readRoster(path){

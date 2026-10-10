@@ -500,6 +500,22 @@ test('⑨ ★★★ 직원명부는 Firebase 인증이 끝난 뒤 읽는다', as
   assert.deepEqual(읽기, ['인증 뒤'], '인증 전 명부 읽기는 권한 거부와 불필요한 재시도를 부른다');
 });
 
+test('⑨ ★★★ 카카오 인증 응답에 본인 정보가 있으면 화면에서 직원명부를 다시 읽지 않는다', async () => {
+  const w = 복귀세상(true);
+  const profile = { acct: { sid: 'P-001', name: '근로자', role: 'member', status: 'active' }, all: [] };
+  w.ctx.PuKakao.loginFinish = () => Promise.resolve({ token: 'CT', profile });
+  const 읽기 = [];
+  w.ctx.db.ref = (path) => ({ once: () => { 읽기.push(path); return Promise.resolve(null); } });
+  let 받은정보;
+  w.ctx.enterPortal = (_user, info) => { 받은정보 = info; };
+  w.ctx.kkHandleReturn();
+  for (let i = 0; i < 5; i++) await 틈();
+  assert.equal(받은정보, profile, '인증 서버가 확인한 본인 정보를 포털에 넘기지 않았다');
+  assert.ok(!읽기.includes('data/user_dir'), '로그인 직후 직원명부 전체를 또 읽었다');
+  assert.match(화면, /sidToEmail\(verifiedProfile\.acct\.sid\) === String\(user\.email \|\| ''\)\.toLowerCase\(\)/,
+    '실제로 로그인한 이메일과 서버 정보가 다르면 빠른 진입을 막아야 한다');
+});
+
 test('⑪ ★★★ 저장소가 실제로 실패하면 로그인하지 않고 이유와 다른 로그인 길을 보인다', async () => {
   const w = 복귀세상(true);
   w.ctx.auth.setPersistence = () => Promise.reject(new Error('IndexedDB unavailable'));

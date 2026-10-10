@@ -38,7 +38,7 @@ test('미로그인이 확정된 뒤에만 가림막을 걷고 로그인 폼을 �
   assert.match(authArea, /else\s*\{[\s\S]*if\(!window\.__kkReturning\)\s*_rmBootSplash\(\)/,
     '미로그인 확정 뒤 로그인 폼을 여는 길이 없습니다');
 
-  const portalAt = source.indexOf('function enterPortal(user)');
+  const portalAt = source.indexOf('function enterPortal(user');
   const portalArea = source.slice(portalAt, source.indexOf('\n  }', portalAt) + 4);
   assert.match(portalArea, /renderPortal\([\s\S]*portalView['"]?\)\.style\.display\s*=\s*'block'[\s\S]*_rmBootSplash\(\)/,
     '로그인 상태에서는 포털을 다 그리기 전에 가림막을 걷고 있습니다');
