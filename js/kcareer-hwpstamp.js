@@ -162,7 +162,10 @@
     var a = at;
     for (var k = 0; k < 4; k++) { var p = s.lastIndexOf('<hp:p ', a - 1); if (p < 0) break; a = p; }
     var b = s.indexOf('</hp:p>', at); if (b < 0) b = s.length;
-    return /<hp:pic\b/.test(s.slice(a, b));
+    /* ⚠ 쪽 머리말·꼬리말에 든 그림(기관 로고)은 도장이 아니다 — 강사카드는 로고가 «서명 줄 문단»에 매달려
+       있어 늘 「이미 도장 있음」으로 읽혔다(2026-10-10). 머리말·꼬리말은 걷고 본다. */
+    var 본문 = s.slice(a, b).replace(/<hp:(footer|header)\b[\s\S]*?<\/hp:\1>/g, '');
+    return /<hp:pic\b/.test(본문);
   }
 
   function insertPic(sectionXml, pic, at) {
@@ -219,7 +222,30 @@
     return /^((대표[가-힣]{0,4}|공인노무사|노무사|사원)?[가-힣]{0,4})?$/.test(뒤);
   }
 
-  var api = { isFirmSpot: isFirmSpot,
+  /* ★ 서명 줄 정돈 (대표 지적 2026-10-10 「줄이 제대로 안 맞다」)
+     강사카드처럼 「성명: ________ (서명)」 밑줄이 «밑줄 글자 모양의 공백 조각»으로 된 서식에
+     이름이 들어가면 이름은 밑줄 «앞»에 얹히고 밑줄은 빈 채로 남았다 —
+         성명: 권형하 ________ (서명)       ← 이름이 줄 밖, 줄은 비어 있음
+     이름을 밑줄 «안»으로 옮기고, 이름이 차지한 만큼 공백을 줄여 줄 전체 길이를 그대로 둔다.
+         성명: 권형하______ (서명)          ← 이름이 줄 위에 앉는다(서명·도장 자리는 그대로)
+     ⚠ 확실한 꼴만 고친다 — 「라벨: 이름」 조각 + «공백만 든» 조각 + 「(서명|인)」 조각이 이어질 때.
+       아니면 문서를 그대로 둔다(되돌려 줄 수 없는 손질을 만들지 않는다). */
+  var SIGN_NAME_LABEL = '(?:성\\s*명|이\\s*름|신\\s*청\\s*인|작\\s*성\\s*자|지\\s*원\\s*자|서\\s*약\\s*자|강\\s*사\\s*명)';
+  var SIGN_LINE_RE = new RegExp(
+    '(<hp:t>)([^<]*?' + SIGN_NAME_LABEL + '\\s*[:：]\\s*)([가-힣](?:[ \\u3000]?[가-힣]){1,3})(</hp:t></hp:run><hp:run charPrIDRef="\\d+">)'
+    + '<hp:t>([ \\u00a0\\u3000]{4,})</hp:t>(</hp:run><hp:run charPrIDRef="\\d+"><hp:t>\\s*[（(]\\s*(?:서명|인|날인)\\s*[)）])', 'g');
+  function tidySignLine(sectionXml) {
+    var s = String(sectionXml || ''), n = 0;
+    var out = s.replace(SIGN_LINE_RE, function (all, a, head, name, mid, blank, tail) {
+      var 이름 = name.replace(/[ \u3000]/g, '');
+      var 칸 = Math.max(4, blank.length - 이름.length * 2);
+      n++;
+      return a + head + mid.replace(/^<\/hp:t><\/hp:run>/, '</hp:t></hp:run>') + '<hp:t>' + 이름 + new Array(칸 + 1).join(' ') + '</hp:t>' + tail;
+    });
+    return { xml: out, n: n };
+  }
+
+  var api = { isFirmSpot: isFirmSpot, tidySignLine: tidySignLine,
               PX_TO_HU: PX_TO_HU, picXml: picXml, findSpot: findSpot, findSpots: findSpots, whoOf: whoOf,
               insertPic: insertPic, addToManifest: addToManifest, nextImageId: nextImageId };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
