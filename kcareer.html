@@ -293,6 +293,7 @@ body.kc-staff [data-act="new"],
    직원 화면에서 빼지 않으면 보기 전용이라는 약속이 깨진다. */
 body.kc-staff [data-act="paste"],
 body.kc-staff [data-act="csv"],
+body.kc-staff [data-act-amt],
 body.kc-staff .row-chk,
 body.kc-staff .dt th:first-child,
 body.kc-staff .dt td:first-child,
@@ -2312,6 +2313,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn" type="button" onclick="loadPuPerf('cases',true)">🔗 pu-erp 사건 불러오기</button>
           <button class="btn" type="button" onclick="puSyncNow()">🔄 실적 동기화</button>
           <button class="btn" type="button" onclick="puUndoLastSync()">↩ 동기화 되돌리기</button>
+          <button class="btn" type="button" onclick="openAmtPaste()" data-act-amt="1" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다 — 넣기 전에 표로 보여 줍니다">💰 금액 붙여넣어 채우기</button>
           <button class="btn" data-act="csv">📤 CSV</button>
           <button class="btn primary" data-act="new">+ 새 사건</button>
         </div>
@@ -2329,6 +2331,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn" type="button" onclick="loadPuConsulting(true)">🔗 pu-erp 컨설팅 불러오기</button>
           <button class="btn" type="button" onclick="puSyncNow()">🔄 실적 동기화</button>
           <button class="btn" type="button" onclick="puUndoLastSync()">↩ 동기화 되돌리기</button>
+          <button class="btn" type="button" onclick="openAmtPaste()" data-act-amt="1" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다 — 넣기 전에 표로 보여 줍니다">💰 금액 붙여넣어 채우기</button>
           <button class="btn" data-act="csv">📤 CSV</button>
           <button class="btn primary" data-act="new">+ 새 컨설팅</button>
         </div>
@@ -2345,6 +2348,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn" type="button" onclick="loadPuPerf('funds',true)">🔗 pu-erp 기금 불러오기</button>
           <button class="btn" type="button" onclick="puSyncNow()">🔄 실적 동기화</button>
           <button class="btn" type="button" onclick="puUndoLastSync()">↩ 동기화 되돌리기</button>
+          <button class="btn" type="button" onclick="openAmtPaste()" data-act-amt="1" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다 — 넣기 전에 표로 보여 줍니다">💰 금액 붙여넣어 채우기</button>
           <button class="btn" data-act="csv">📤 CSV</button>
           <button class="btn primary" data-act="new">+ 새 기금</button>
         </div>
@@ -2373,6 +2377,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn" type="button" onclick="loadPuPerf('other_projects',true)">🔗 pu-erp 기타사업 불러오기</button>
           <button class="btn" type="button" onclick="puSyncNow()">🔄 실적 동기화</button>
           <button class="btn" type="button" onclick="puUndoLastSync()">↩ 동기화 되돌리기</button>
+          <button class="btn" type="button" onclick="openAmtPaste()" data-act-amt="1" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다 — 넣기 전에 표로 보여 줍니다">💰 금액 붙여넣어 채우기</button>
           <button class="btn" data-act="csv">📤 CSV</button>
           <button class="btn primary" data-act="new">+ 새 기타</button>
         </div>
@@ -2419,6 +2424,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <span class="cnt" id="puagCnt" style="font-size:11px;color:var(--text-mute)"></span>
           <button class="btn" type="button" onclick="puSyncNow()">🔄 푸른이알피에서 가져오기</button>
           <button class="btn" type="button" onclick="puUndoLastSync()">↩ 되돌리기</button>
+          <button class="btn" type="button" onclick="openAmtPaste()" data-act-amt="1" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다 — 넣기 전에 표로 보여 줍니다">💰 금액 붙여넣어 채우기</button>
         </div>
         <div id="puagBody"></div>
       </div></section>
@@ -3058,6 +3064,28 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   </div>
 </div>
 <!-- 📋 붙여넣어 여러 건 넣기 (대표 승인 2026-09-06) -->
+<div class="modal-ov" id="modalAmtPaste">
+  <div class="modal" style="width:820px">
+    <div class="modal-h">💰 금액 붙여넣어 채우기</div>
+    <div class="modal-b">
+      <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:7px;line-height:1.7">엑셀에서 <b>업체명 · 금액</b> 두 칸(과제명이 있으면 업체명 · 과제 · 금액)을 복사해 붙이세요. 컨설팅·사건·기금·기타 <b>모두</b>에서 업체 이름이 같은 실적을 찾아, <b>넣기 전에</b> 표로 보여 드립니다.</div>
+      <textarea id="amtSrc" spellcheck="false" placeholder="가나상사&#9;3,300,000&#10;다라테크&#9;2,200,000"
+        style="width:100%;height:96px;border:1px solid var(--border);border-radius:8px;padding:9px 10px;font-family:Consolas,'D2Coding',monospace;font-size:16px;line-height:1.7;resize:vertical"></textarea>
+      <div style="display:flex;gap:10px;align-items:center;margin:10px 0 6px;flex-wrap:wrap">
+        <button class="btn primary" type="button" onclick="amtPreview()">🔍 미리보기</button>
+        <label style="font-size:12px;display:inline-flex;gap:5px;align-items:center"><input type="checkbox" id="amtVat" onchange="amtVat(this.checked)"> 부가세 포함 금액을 붙였음 (÷1.1 해서 공급가액으로)</label>
+        <span style="margin-left:auto;font-size:11px;color:var(--text-mute)">이미 금액이 있는 건은 꺼 둡니다 · 이알피에서 받은 금액은 대상이 아닙니다</span>
+      </div>
+      <div id="amtPrev"></div>
+    </div>
+    <div class="modal-foot">
+      <span style="font-size:11.5px;color:var(--text-mute);margin-right:auto" id="amtFoot"></span>
+      <button class="btn" type="button" id="amtUndoBtn" style="display:none" onclick="amtUndoRun()">↩ 방금 한 것 되돌리기</button>
+      <button class="btn" type="button" onclick="closeAmtPaste()">닫기</button>
+      <button class="btn primary" type="button" id="amtOk" style="display:none" onclick="amtApply()">채우기</button>
+    </div>
+  </div>
+</div>
 <div class="modal-ov" id="modalPaste">
   <div class="modal" style="width:720px">
     <div class="modal-h" id="pasteHead">📋 붙여넣어 여러 건 넣기</div>
@@ -11718,6 +11746,140 @@ function pasteSave(){
   kcUndoBar('📋 '+ids.length+'건을 넣었습니다'
     +(빈줄?(' · '+필수.map(function(c){ return c.label; }).join('·')+'이 빈 '+빈줄+'줄은 뺐습니다'):''), null, pasteUndoRun);
   toast('✅ '+(def.title||page)+' '+ids.length+'건 등록');
+}
+/* ═══ 💰 금액 붙여넣어 채우기 (대표 지시 2026-10-10 「만들어라」 — 목업 승인) ═══
+   외부기관 실적(이알피 밖에서 온 일)은 금액이 비어 있다(실측 173건 중 69건).
+   엑셀에서 「업체명 ⇥ 금액」(과제명이 있으면 「업체명 ⇥ 과제 ⇥ 금액」)을 붙이면, 컨설팅·사건·기금·기타 «네 통 모두»에서
+   업체 이름이 같은 건을 찾아 «넣기 전에» 표로 보여 준다.
+   ⚠ 이름이 같다고 저절로 정하지 않는다 — 한 건이면 켜 두고, 둘 이상이면 «고르게» 한다(온톨로지 규칙: 이름으로 잇지 않는다).
+   ⚠ 이미 금액이 있는 건은 기본으로 꺼 둔다(켜면 덮어씀) · 이알피에서 받은 금액(amtFrom:'erp')은 대상이 아니다 — 이알피에서 고치는 값이다.
+   ⚠ 넣은 금액에는 amtFrom 을 달지 않는다 = «직접 적은 금액» — 이후 이알피 동기화가 덮지 않는다.
+   ⚠ 금액은 공급가액(부가세 뺀 값)으로 적는다 — 부가세 든 금액을 붙였으면 «부가세 포함»을 켜 ÷1.1. */
+var AMT_STORES=[['consult','컨설팅'],['case','사건'],['fund','기금'],['etc','기타']];
+var _amtCtx=null, _amtUndo=null;
+function _amtFlat(s){ return (window.KcareerBiz&&KcareerBiz.flatName)?KcareerBiz.flatName(s):String(s||'').replace(/\s+/g,'').toLowerCase(); }
+function _amtNum(s){ var d=String(s==null?'':s).replace(/[^\d]/g,''); return d?Number(d):0; }
+/* 한 줄 → { org, project, amt } · 못 읽으면 null. 탭·두 칸 이상 띄우기로 가르고, 숫자 칸은 «맨 끝»에서 찾는다 */
+function amtParseLine(line){
+  var t=String(line||'').replace(/\r/g,'').trim(); if(!t) return null;
+  var cells=t.indexOf('\t')>=0 ? t.split('\t') : t.split(/\s{2,}/);
+  cells=cells.map(function(c){ return c.trim(); }).filter(function(c,i){ return c!=='' || i===0; });
+  if(cells.length<2){
+    var m=/^(.*?)\s+([\d][\d,\.]*)\s*원?$/.exec(t); if(!m) return null; cells=[m[1].trim(), m[2]];
+  }
+  var amt=_amtNum(cells[cells.length-1]); if(!amt) return null;
+  var org=cells[0]; if(!org) return null;
+  return { org:org, project:cells.length>=3?cells.slice(1,-1).join(' '):'', amt:amt, raw:t };
+}
+function amtMatch(row, recs){
+  var f=_amtFlat(row.org); if(f.length<2) return [];
+  var 같음=recs.filter(function(r){ return _amtFlat(r.org)===f; });
+  var 후보=같음.length?같음:recs.filter(function(r){ var g=_amtFlat(r.org); return f.length>=3 && g.length>=3 && (g.indexOf(f)>=0 || f.indexOf(g)>=0); });
+  if(row.project && 후보.length>1){
+    var p=_amtFlat(row.project), 좁힘=후보.filter(function(r){ var g=_amtFlat((r.project||'')+(r.type||'')); return g.indexOf(p)>=0 || p.indexOf(g)>=0; });
+    if(좁힘.length) 후보=좁힘;
+  }
+  return 후보;
+}
+function openAmtPaste(){
+  _amtCtx={ rows:[], vat:false }; _amtUndo=null;
+  var t=document.getElementById('amtSrc'); if(t) t.value='';
+  var v=document.getElementById('amtVat'); if(v) v.checked=false;
+  amtRender();
+  document.getElementById('modalAmtPaste').classList.add('open');
+}
+function closeAmtPaste(){ var m=document.getElementById('modalAmtPaste'); if(m) m.classList.remove('open'); _amtCtx=null; }
+function amtPreview(){
+  if(!_amtCtx) return;
+  var recs=[]; AMT_STORES.forEach(function(sc){ (get(sc[0])||[]).forEach(function(r){ if(r && !r.excluded) recs.push(Object.assign({}, r, { _st:sc[0], _stLabel:sc[1] })); }); });
+  var lines=String((document.getElementById('amtSrc')||{}).value||'').split('\n'), rows=[], 못=0;
+  lines.forEach(function(ln){
+    if(!String(ln).trim()) return;
+    var p=amtParseLine(ln); if(!p){ 못++; return; }
+    var 후보=amtMatch(p, recs), 고칠수=후보.filter(function(r){ return r.amtFrom!=='erp'; });
+    var row={ org:p.org, amt:p.amt, 후보:후보, 이알피만:(후보.length>0 && !고칠수.length) };
+    row.cands=고칠수;
+    row.pick=(고칠수.length===1)?0:-1;
+    row.on=(row.pick===0 && !_amtNum(고칠수[0].amt));     /* 이미 금액이 있으면 꺼 둔다 */
+    rows.push(row);
+  });
+  _amtCtx.rows=rows; _amtCtx.못=못; _amtCtx.done=false;
+  amtRender();
+}
+function _amtFinal(n){ return (_amtCtx&&_amtCtx.vat)?Math.round(n/1.1):n; }
+function amtRender(){
+  var box=document.getElementById('amtPrev'), foot=document.getElementById('amtFoot'), ok=document.getElementById('amtOk'), un=document.getElementById('amtUndoBtn');
+  if(!box||!_amtCtx) return;
+  var rows=_amtCtx.rows;
+  if(!rows.length){ box.innerHTML='<div style="font-size:12px;color:var(--text-mute);padding:10px 0">붙인 뒤 「🔍 미리보기」를 누르세요'+(_amtCtx.못?' <span style="color:var(--amber)">· 읽지 못한 줄 '+_amtCtx.못+'개(금액이 없거나 업체명이 빈 줄)</span>':'')+'</div>'; foot.textContent=''; ok.style.display='none'; if(un) un.style.display=_amtUndo?'':'none'; return; }
+  var n=0, 확인=0, 없음=0;
+  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--text-mute);font-size:11px;text-align:left"><th></th><th>붙인 업체</th><th>맞춘 실적</th><th>사업·연도</th><th style="text-align:right">전 금액</th><th style="text-align:right">새 금액(공급가)</th><th>상태</th></tr></thead><tbody>';
+  rows.forEach(function(r,i){
+    var c=r.pick>=0?r.cands[r.pick]:null, 상태='', 칸='', 끔=false;
+    if(!r.후보.length){ 상태='<span style="color:var(--text-mute)">실적에 없음 — 건너뜀</span>'; 끔=true; 없음++; 칸='<span style="color:var(--text-mute)">—</span>'; }
+    else if(r.이알피만){ 상태='<span style="color:var(--text-mute)">이알피 금액 — 이알피에서 고칩니다</span>'; 끔=true; 칸='<span style="color:var(--text-mute)">'+escapeHtml(r.후보[0].org||'')+'</span>'; }
+    else{
+      if(r.cands.length>1) 칸='<select data-amt-i="'+i+'" onchange="amtPick('+i+',this.value)" style="font-size:12px;max-width:230px"><option value="-1">— 고르기 —</option>'
+        +r.cands.map(function(x,k){ return '<option value="'+k+'"'+(r.pick===k?' selected':'')+'>'+escapeHtml((x.org||'')+' · '+x._stLabel+' '+(KcareerBiz.perfYear(x)||'모름')+(x.type?' '+x.type:''))+'</option>'; }).join('')+'</select>';
+      else 칸=escapeHtml(c?c.org:'');
+      if(!c){ 상태='<span style="color:var(--amber);font-weight:700">⚠ 어느 건인지 골라 주세요</span>'; 확인++; 끔=true; }
+      else if(_amtNum(c.amt)){ 상태='<span style="color:var(--amber);font-weight:700">⚠ 이미 금액 있음'+(r.on?' — 덮어씀':' — 켜면 덮어씀')+'</span>'; 확인++; }
+      else 상태='<span style="color:var(--teal);font-weight:700">✔ 채움</span>';
+    }
+    if(r.on && c) n++;
+    html+='<tr style="border-top:1px solid var(--border)"><td><input type="checkbox" '+(r.on?'checked ':'')+(끔?'disabled ':'')+'onchange="amtToggle('+i+',this.checked)"></td>'
+      +'<td>'+escapeHtml(r.org)+'</td><td>'+칸+'</td>'
+      +'<td style="color:var(--text-mute)">'+(c?escapeHtml(c._stLabel+' · '+(c.type||'')+' · '+(KcareerBiz.perfYear(c)||'모름')):'')+'</td>'
+      +'<td style="text-align:right">'+(c&&_amtNum(c.amt)?Number(c.amt).toLocaleString('ko-KR'):'—')+'</td>'
+      +'<td style="text-align:right;font-weight:700">'+_amtFinal(r.amt).toLocaleString('ko-KR')+'</td><td>'+상태+'</td></tr>';
+  });
+  html+='</tbody></table></div>';
+  box.innerHTML=html;
+  foot.textContent=n+'건 채움 · '+확인+'건 확인 필요 · '+없음+'건 건너뜀'+(_amtCtx.못?' · 못 읽은 줄 '+_amtCtx.못:'');
+  ok.style.display=''; ok.textContent='채우기 ('+n+'건)'; ok.disabled=!n;
+  if(un) un.style.display=_amtUndo?'':'none';
+}
+function amtPick(i,v){ var r=_amtCtx&&_amtCtx.rows[i]; if(!r) return; r.pick=Number(v); var c=r.pick>=0?r.cands[r.pick]:null; r.on=!!c && !_amtNum(c.amt); amtRender(); }
+function amtToggle(i,on){ var r=_amtCtx&&_amtCtx.rows[i]; if(!r) return; r.on=!!on; amtRender(); }
+function amtVat(on){ if(_amtCtx){ _amtCtx.vat=!!on; amtRender(); } }
+function amtApply(){
+  if(!_amtCtx) return;
+  var 바꿈={}, 되돌림=[], n=0;
+  _amtCtx.rows.forEach(function(r){
+    var c=r.pick>=0?r.cands[r.pick]:null; if(!r.on || !c) return;
+    (바꿈[c._st]=바꿈[c._st]||{})[c.id]=_amtFinal(r.amt);
+  });
+  var 저장실패=false;
+  Object.keys(바꿈).forEach(function(st){
+    var arr=get(st)||[], 바뀜=false;
+    arr.forEach(function(r){
+      if(!r || !Object.prototype.hasOwnProperty.call(바꿈[st], r.id)) return;
+      if(r.amtFrom==='erp') return;                      /* 그사이 이알피 금액이 됐으면 건드리지 않는다 */
+      되돌림.push({ st:st, id:r.id, amt:r.amt==null?'':r.amt });
+      r.amt=String(바꿈[st][r.id]); delete r.amtFrom; 바뀜=true; n++;
+    });
+    if(바뀜 && set(st,arr)===false) 저장실패=true;
+  });
+  if(저장실패){ toast('⚠ 저장공간이 부족해 일부를 넣지 못했습니다'); }
+  _amtUndo=되돌림.length?{ items:되돌림 }:null;
+  AMT_STORES.forEach(function(sc){ try{ if(CAREER_CFG[sc[0]]) renderCareer(sc[0]); }catch(e){} });
+  _safe(renderPuAgency); _safe(renderBizDash);
+  toast('💰 금액 '+n+'건을 채웠습니다 — 「방금 한 것 되돌리기」로 되돌릴 수 있습니다', 6000);
+  _amtCtx.rows=[]; _amtCtx.done=true; amtRender();
+}
+function amtUndoRun(){
+  if(!_amtUndo) return;
+  var by={}; _amtUndo.items.forEach(function(x){ (by[x.st]=by[x.st]||{})[x.id]=x.amt; });
+  var n=0;
+  Object.keys(by).forEach(function(st){
+    var arr=get(st)||[], 바뀜=false;
+    arr.forEach(function(r){ if(r && Object.prototype.hasOwnProperty.call(by[st], r.id)){ r.amt=by[st][r.id]; if(!_amtNum(r.amt)) r.amt=''; 바뀜=true; n++; } });
+    if(바뀜) set(st,arr);
+  });
+  _amtUndo=null;
+  AMT_STORES.forEach(function(sc){ try{ if(CAREER_CFG[sc[0]]) renderCareer(sc[0]); }catch(e){} });
+  _safe(renderPuAgency); _safe(renderBizDash);
+  toast('↩ 금액 '+n+'건을 되돌렸습니다'); amtRender();
 }
 /* 방금 넣은 «그것만» 뺀다 — 사람이 그 사이에 고친 다른 기록은 건드리지 않는다 */
 function pasteUndoRun(){
