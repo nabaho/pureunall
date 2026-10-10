@@ -46,6 +46,18 @@ function classifyLink(u) {
   return "site";
 }
 
+/* 게시판·글·검색결과 같은 «쪽»은 회사 홈페이지가 아니다 — 첫 화면(뿌리 주소) 꼴만 홈페이지 후보로 본다.
+   예) weseb.com/SJB/m.php?board=facto&no=160347 · cafe/게시판 글 · 순위 게시판 */
+function looksLikePost(u) {
+  const x = safeUrl(u);
+  if (!x) return true;
+  if (x.search) return true;
+  const segs = x.pathname.split("/").filter(Boolean);
+  if (segs.length > 2) return true;
+  if (/\.(php|asp|aspx|jsp|do|cgi)$/i.test(x.pathname) && !/^\/(index|main|home)\./i.test(x.pathname)) return true;
+  return /(board|bbs|article|view|notice|post|read|rank)/i.test(x.pathname);
+}
+
 /* ─── 전화·팩스 ─── */
 const SERVICE_PREFIX = ["1544", "1566", "1577", "1588", "1599", "1600", "1644", "1661", "1666", "1688", "1800", "1899"];
 
@@ -249,7 +261,8 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
   const addUniq = (list, v) => { if (v && list.indexOf(v) < 0) list.push(v); };
   const addRef = (type, title, url) => { if (url && !refs.some((r) => r.url === url) && refs.length < 5) refs.push({ type, title: clean(title).slice(0, 60), url }); };
   const nameOk = (text) => M.nameIn(text, name);
-  let home = "", conf = "";
+  let home = "", conf = "", fromWeb = false;
+  const webPhones = [], webFaxes = [];   // 웹검색 조각글에서 얻은 번호 — 홈페이지가 확인되지 않으면 함께 버린다
 
   if (hint.homepage && classifyLink(hint.homepage) === "site") { home = hint.homepage; conf = "low"; out.sources.push("알려 준 홈페이지"); }
 
@@ -275,16 +288,16 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
     let list = [];
     try { list = await providers.web("\"" + core + "\" " + (key ? key + " " : "") + "홈페이지"); } catch (e) { note.push("웹검색 실패" + (e && e.status ? "(" + e.status + ")" : "")); }
     await wait();
-    (list || []).forEach((c) => { const k = classifyLink(c.link); if (k === "dir" || k === "sns") addRef(k, c.title, c.link); });
-    const hit = (list || []).find((c) => classifyLink(c.link) === "site" && nameOk(c.title + " " + c.snippet) && (!key || addrHas(c.title + " " + c.snippet, address)));
+    (list || []).forEach((c) => { const k = classifyLink(c.link); if ((k === "dir" || k === "sns") && nameOk(c.title)) addRef(k, c.title, c.link); });
+    const hit = (list || []).find((c) => classifyLink(c.link) === "site" && !looksLikePost(c.link) && nameOk(c.title + " " + c.snippet) && (!key || addrHas(c.title + " " + c.snippet, address)));
     if (hit) {
-      home = hit.link; conf = "high"; out.sources.push("웹검색");
+      home = hit.link; conf = "high"; fromWeb = true; out.sources.push("웹검색");
       const sp = findPhones(hit.snippet);
-      sp.phones.concat(sp.loose).slice(0, 1).forEach((p) => addUniq(phones, p));
-      sp.faxes.forEach((p) => addUniq(faxes, p));
+      sp.phones.concat(sp.loose).slice(0, 1).forEach((p) => { webPhones.push(p); addUniq(phones, p); });
+      sp.faxes.forEach((p) => { webFaxes.push(p); addUniq(faxes, p); });
     } else {
       /* 주소는 안 맞아도 «사이트 제목에 회사명이 있는» 첫 후보는 홈페이지 «후보»로 읽어 본다 — 읽고 나서 쪽 안에 회사명이 있어야 확정한다 */
-      const soft = (list || []).find((c) => classifyLink(c.link) === "site" && nameOk(c.title));
+      const soft = (list || []).find((c) => classifyLink(c.link) === "site" && !looksLikePost(c.link) && nameOk(c.title));
       if (soft) { home = soft.link; conf = "low"; }
     }
   }
@@ -299,7 +312,11 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
         try { await wait(); const p = await getPage(link); pages.push(p); seen.push(p.url); } catch (e) { /* 한 쪽이 안 열려도 계속 */ }
       }
       const text = pages.map((p) => htmlToText(p.html)).join("\n");
-      if (conf === "low" && !nameOk(text)) { home = ""; note.push("홈페이지 후보에 회사명이 없어 버림"); }
+      if ((conf === "low" || fromWeb) && !nameOk(text)) {
+        home = ""; note.push("홈페이지 후보에 회사명이 없어 버림");
+        webPhones.forEach((p) => { const i = phones.indexOf(p); if (i >= 0) phones.splice(i, 1); });
+        webFaxes.forEach((p) => { const i = faxes.indexOf(p); if (i >= 0) faxes.splice(i, 1); });
+      }
       else {
         /* 후보(웹검색 소프트·알려 준 홈페이지)는 «회사명 + 소재지»가 쪽에 함께 있어야 medium 이다.
            회사명만 있고 시·군·구가 없으면 이사했거나 동명 회사일 수 있다 — 남기되 low 로 표시해 사람이 확인하게 한다. */
@@ -315,7 +332,10 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
         out.ceo = findCeo(text);
         out.sources.push("홈페이지 읽음 " + pages.length + "쪽");
       }
-    } catch (e) { note.push("홈페이지 열기 실패(" + clean(e && e.message).slice(0, 40) + ")"); }
+    } catch (e) {
+      note.push("홈페이지 열기 실패(" + clean(e && e.message).slice(0, 40) + ")");
+      if (fromWeb) conf = "low";   // 열어 보지 못했으면 «확인된» 홈페이지가 아니다
+    }
   }
 
   out.homepage = home && safeUrl(home) ? safeUrl(home).toString() : "";
@@ -328,5 +348,5 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
   return out;
 }
 
-module.exports = { safeUrl, hostOf, classifyLink, normPhone, findPhones, findEmails, rankEmails, htmlToText, contactLinks,
+module.exports = { safeUrl, hostOf, classifyLink, looksLikePost, normPhone, findPhones, findEmails, rankEmails, htmlToText, contactLinks,
   decodeBody, fetchPage, coreName, findCeo, addrKey, addrHas, kakaoProviders, naverProviders, lookup, PAGE_TIMEOUT_MS };

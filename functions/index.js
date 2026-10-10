@@ -1251,7 +1251,8 @@ exports.rehabWatch = functions
       const week = 7 * 864e5;
       const all = Object.keys(existing).map((k) => existing[k]).concat(result.added).filter((n) => n && n.id && !n._deleted);
       const todo = all.filter((n) => { const x = info[n.id]; return !x || (x.status === "none" && nowMs - (x.checkedAt || 0) > week)
-          || (rehabSearchRefused(x) && nowMs - (x.checkedAt || 0) > 864e5); })   // 한쪽이 거절해 일부만 남은 곳은 하루 뒤 다시
+          || (rehabSearchRefused(x) && nowMs - (x.checkedAt || 0) > 864e5)
+          || (x.homepage && RehabContact.looksLikePost(x.homepage)); })   // 게시판 글을 홈페이지로 잘못 담은 곳은 다시   // 한쪽이 거절해 일부만 남은 곳은 하루 뒤 다시
         .sort((a, b) => String(b.noticeDate).localeCompare(String(a.noticeDate)));
       await rehabPool(todo, 3, t0 + 470 * 1000, async (n) => {
         if (refused >= 3 && !found) return;   // 검색 서비스가 계속 거절하면 그만 둔다
