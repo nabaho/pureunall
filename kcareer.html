@@ -1374,7 +1374,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=8"></script>
+<script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=4"></script>
@@ -2339,6 +2339,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
           <button class="btn" type="button" onclick="loadPuConsulting(true)">🔗 pu-erp 컨설팅 불러오기</button>
           <button class="btn" type="button" onclick="puSyncNow()">🔄 실적 동기화</button>
           <button class="btn" type="button" onclick="puUndoLastSync()">↩ 동기화 되돌리기</button>
+          <button class="btn" type="button" onclick="openCardsImport()" data-act-amt="1" title="기업정보함 회사 메모의 현장클리닉·기술보호 수행 기록을 실적으로 가져옵니다 — 넣기 전에 표로 보여 줍니다">🏷 기업정보함에서 가져오기</button>
           <button class="btn" type="button" onclick="openAmtPaste()" data-act-amt="1" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다 — 넣기 전에 표로 보여 줍니다">💰 금액 붙여넣어 채우기</button>
           <button class="btn" data-act="csv">📤 CSV</button>
           <button class="btn primary" data-act="new">+ 새 컨설팅</button>
@@ -3072,6 +3073,23 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   </div>
 </div>
 <!-- 📋 붙여넣어 여러 건 넣기 (대표 승인 2026-09-06) -->
+<div class="modal-ov" id="modalCardsImp">
+  <div class="modal" style="width:1000px;max-width:96vw">
+    <div class="modal-h">🏷 기업정보함에서 수행 실적 가져오기</div>
+    <div class="modal-b">
+      <div style="font-size:11.5px;color:var(--text-mute);margin-bottom:8px;line-height:1.7">기업정보함 회사 메모의 <b>[현장클리닉]</b>·<b>[기술보호울타리]</b> 줄 중 <b>우리 노무사가 위원</b>인 건을 컨설팅 실적으로 넣습니다.
+        같은 회사 실적이 이미 있으면 <b>내용을 보고</b> 새로 넣을지·그 실적에 연결할지·건너뛸지 고르세요(노란 줄). 일수는 기록에 있는 것만 채워져 있고, 비어 있으면 직접 적으세요.</div>
+      <div id="ciTabs" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px"></div>
+      <div id="ciBody"></div>
+    </div>
+    <div class="modal-foot">
+      <span style="font-size:11.5px;color:var(--text-mute);margin-right:auto" id="ciFoot"></span>
+      <button class="btn" type="button" id="ciUndoBtn" style="display:none" onclick="ciUndoRun()">↩ 방금 한 것 되돌리기</button>
+      <button class="btn" type="button" onclick="closeCardsImport()">닫기</button>
+      <button class="btn primary" type="button" id="ciOk" style="display:none" onclick="ciApply()">넣기</button>
+    </div>
+  </div>
+</div>
 <div class="modal-ov" id="modalAmtPaste">
   <div class="modal" style="width:820px">
     <div class="modal-h">💰 금액 붙여넣어 채우기</div>
@@ -9179,7 +9197,7 @@ const FORM_DEFS={
     {key:'org',label:'고객사',required:true},{key:'project',label:'과제',full:true},
     {key:'agency',label:'수행기관/발주처'},{key:'main',label:'담당',default:'권형하'},
     {key:'year',label:'연도'},{key:'status',label:'상태',type:'select',options:['진행','완료'],default:'진행'},
-    {key:'amt',label:'금액',type:'number'},{key:'note',label:'비고',full:true}]},
+    {key:'amt',label:'금액',type:'number'},{key:'days',label:'수행일수',type:'number'},{key:'note',label:'비고',full:true}]},
   lecture:{title:'강의실적',store:'lecture',prefix:'L',fields:[
     {key:'topic',label:'주제',required:true},{key:'org',label:'주관기관'},
     {key:'date',label:'일자',date:true},{key:'duration',label:'시간',type:'number'},
@@ -11754,6 +11772,152 @@ function pasteSave(){
   kcUndoBar('📋 '+ids.length+'건을 넣었습니다'
     +(빈줄?(' · '+필수.map(function(c){ return c.label; }).join('·')+'이 빈 '+빈줄+'줄은 뺐습니다'):''), null, pasteUndoRun);
   toast('✅ '+(def.title||page)+' '+ids.length+'건 등록');
+}
+/* ═══ 🏷 기업정보함에서 수행 실적 가져오기 (대표 지시 2026-10-10 「1 넣어라 · 현장클리닉 일수도 · 4(겹침)는 내용을 봐야」) ═══
+   기업정보함(pucards/coInfo) 회사 메모에 [현장클리닉]·[기술보호울타리] 줄이 한 건씩 적혀 있다(실측 현장클리닉 160·기술보호 38).
+   경력관리 실적에는 현장클리닉 27·기술보호 16 뿐이었다 — 같은 회사가 이미 있는 것은 21곳, 나머지 172건은 새 실적.
+   ⚠ 줄 읽기는 KcareerBiz.parseCardsLine 한 곳 · 회사 이름은 «사업자번호»로 찾는다(이알피 업체 + 기업정보함 사업자등록증).
+   ⚠ 우리 노무사가 위원인 건만 — 외부 위원은 건너뛴다. 담당은 그 위원.
+   ⚠ 일수: 기술보호는 자문 기간에서 센다 · 현장클리닉은 기록에 없다 → 이알피 계약의 «확정 일수»(consultDays)가 사업자번호·연도로 이어질 때만,
+     아니면 비워 두고 사람이 적는다(「일수는 사람이 확정」 규칙 — 지어내지 않는다).
+   ⚠ 이미 있는 실적과 겹치면 «내용을 보고» 사람이 고른다 — 새로 넣기 · 이 실적에 연결(비어 있는 연도·기간·일수·담당만 보탬) · 건너뜀.
+     같은 해이면 연결을 미리 골라 두고, 다른 해이면 새로 넣기를 미리 골라 둔다(둘 다 바꿀 수 있다).
+   ⚠ 같은 줄을 두 번 넣지 않게 cardsRef(회사번호+줄 내용)를 단다 · 방금 한 것 되돌리기. */
+var _ciCtx=null, _ciUndo=null;
+function _ciAgency(kind){ return kind==='clinic' ? '비즈니스지원단(중기청)' : '중소기업기술보호울타리'; }
+function _ciType(kind){ return kind==='clinic' ? '현장클리닉' : '통합기술보호지원단'; }
+function _ciDigits(v){ return String(v==null?'':v).replace(/\D/g,''); }
+async function openCardsImport(){
+  if(typeof fbDb==='undefined' || !fbDb){ toast('로그인 뒤에 기업정보함을 읽을 수 있습니다'); return; }
+  _ciCtx={ rows:[], tab:'clinic', busy:true, msg:'기업정보함을 읽는 중… (몇 초 걸립니다)', skipped:0, already:0 };
+  _ciUndo=null;
+  document.getElementById('modalCardsImp').classList.add('open'); ciRender();
+  try{
+    var 읽기=function(p){ return fbDb.ref(p).once('value').then(function(s){ return s.val(); }); };
+    var got=await Promise.all([읽기('pucards/coInfo'), 읽기('pucards/items'), 읽기('data/companies'), 읽기('data/consultings')]);
+    var coInfo=got[0]||{}, items=got[1]||{};
+    var 업체=_puUnwrap(got[2])||[], 계약=_puUnwrap(got[3])||[];
+    업체=Array.isArray(업체)?업체:Object.keys(업체).map(function(k){ return 업체[k]; });
+    계약=Array.isArray(계약)?계약:Object.keys(계약).map(function(k){ return 계약[k]; });
+    var 이름={};
+    업체.forEach(function(c){ if(!c) return; var d=_ciDigits(c.bizNo||c.bizno), n=c.name||c.companyName; if(d.length===10 && n) 이름[d]=n; });
+    Object.keys(items).forEach(function(k){ var it=items[k]; if(!it) return; var d=_ciDigits(it.bizno), n=it.name||it.company||it.title; if(d.length===10 && n && !이름[d]) 이름[d]=n; });
+    var staff={}; _bizOwnerNames().forEach(function(n){ n=String(n||'').trim(); if(n) staff[n]=1; });
+    var cons=(get('consult')||[]).filter(function(r){ return r && !r.excluded; }), have={};
+    cons.forEach(function(r){ if(r.cardsRef) have[r.cardsRef]=1; });
+    var rows=[], skipped=0, already=0;
+    Object.keys(coInfo).forEach(function(k){
+      if(!/^\d{10}$/.test(k)) return;
+      String((coInfo[k]||{}).memo||'').split(/\r?\n/).forEach(function(ln){
+        var p=KcareerBiz.parseCardsLine(ln); if(!p) return;
+        if(!p.member || !staff[p.member]){ skipped++; return; }
+        var ref='cards:'+k+'|'+p.key; if(have[ref]){ already++; return; }
+        var nm=이름[k]||'', f=KcareerBiz.flatName(nm);
+        var 후보=nm?cons.filter(function(r){ return (p.kind==='clinic'?/현장클리닉/:/기술보호/).test(r.type||'') && KcareerBiz.flatName(r.org)===f; }):[];
+        /* 현장클리닉 일수 — 이알피 계약(같은 사업자번호 · 같은 해 · 현장클리닉 번호)에 «확정»된 것만 */
+        var days=p.days||0, 일수출처=p.days?'자문 기간':'';
+        if(!days && p.kind==='clinic'){
+          var ys=[String(p.apply).slice(0,4), String(p.done).slice(0,4)];
+          var c=계약.filter(function(x){ return x && _ciDigits(x.bizNo||x.bizno)===k && /현장클리/.test(String(x.no||'')) && ys.indexOf(String(x.startDate||'').slice(0,4))>=0 && Number(x.consultDays)>0; })[0];
+          if(c){ days=Number(c.consultDays); 일수출처='이알피 계약'; }
+        }
+        var 같은해=후보.filter(function(r){ return String(r.year||'')===p.year; })[0];
+        rows.push({ k:k, name:nm||('(이름 없음 '+k+')'), p:p, days:days||'', 출처:일수출처,
+          후보:후보.map(function(r){ return { id:r.id, year:String(r.year||''), desc:[r.year||'연도 모름', r.type, r.main, (Number(r.amt)?Number(r.amt).toLocaleString('ko-KR')+'원':'')].filter(Boolean).join(' · ') }; }),
+          act: 같은해 ? 'link:'+같은해.id : 'new', on:true });
+      });
+    });
+    rows.sort(function(a,b){ return (b.후보.length>0)-(a.후보.length>0) || String(b.p.year).localeCompare(String(a.p.year)) || a.name.localeCompare(b.name); });
+    _ciCtx.rows=rows; _ciCtx.skipped=skipped; _ciCtx.already=already; _ciCtx.busy=false; _ciCtx.msg='';
+  }catch(e){ _ciCtx.busy=false; _ciCtx.msg='⚠ 기업정보함을 읽지 못했습니다 — '+String(e&&e.message||e); }
+  ciRender();
+}
+function closeCardsImport(){ var m=document.getElementById('modalCardsImp'); if(m) m.classList.remove('open'); _ciCtx=null; }
+function ciTab(t){ if(_ciCtx){ _ciCtx.tab=t; ciRender(); } }
+function ciOn(i,on){ var r=_ciCtx&&_ciCtx.rows[i]; if(r){ r.on=!!on; ciSum(); } }
+function ciAct(i,v){ var r=_ciCtx&&_ciCtx.rows[i]; if(r){ r.act=v; r.on=(v!=='skip'); ciRender(); } }
+function ciDays(i,v){ var r=_ciCtx&&_ciCtx.rows[i]; if(!r) return; var n=Number(String(v||'').replace(/[^\d.]/g,'')); r.days=(isFinite(n)&&n>0)?n:''; r.출처=r.days?'직접 적음':''; ciSum(); }
+function ciBulkDays(){
+  if(!_ciCtx) return; var n=Number(String((document.getElementById('ciBulk')||{}).value||'').replace(/[^\d.]/g,''));
+  if(!(n>0)){ toast('채울 일수를 먼저 적어 주세요'); return; }
+  var c=0; _ciCtx.rows.forEach(function(r){ if(r.p.kind==='clinic' && !r.days){ r.days=n; r.출처='직접 적음(일괄)'; c++; } });
+  toast('현장클리닉 일수가 비어 있던 '+c+'건에 '+n+'일을 적었습니다 — 넣기 전에 표에서 고칠 수 있습니다', 6000); ciRender();
+}
+function ciSum(){
+  var f=document.getElementById('ciFoot'), ok=document.getElementById('ciOk'); if(!_ciCtx||!f) return;
+  var rs=_ciCtx.rows, n=0, ln=0, sk=0, 일=0;
+  rs.forEach(function(r){ if(!r.on || r.act==='skip'){ sk++; return; } if(r.act==='new') n++; else ln++; 일+=Number(r.days)||0; });
+  f.textContent='새로 '+n+'건 · 연결 '+ln+'건 · 건너뜀 '+sk+'건 · 일수 합계 '+일+'일';
+  if(ok){ ok.style.display=''; ok.textContent='넣기 ('+(n+ln)+'건)'; ok.disabled=!(n+ln); }
+}
+function ciRender(){
+  var box=document.getElementById('ciBody'), foot=document.getElementById('ciFoot'), ok=document.getElementById('ciOk'), un=document.getElementById('ciUndoBtn'), tb=document.getElementById('ciTabs');
+  if(!box||!_ciCtx) return;
+  if(un) un.style.display=_ciUndo?'':'none';
+  if(_ciCtx.busy || _ciCtx.msg){ box.innerHTML='<div style="padding:18px;font-size:12.5px;color:var(--text-mute)">'+escapeHtml(_ciCtx.msg||'')+'</div>'; if(ok) ok.style.display='none'; if(foot) foot.textContent=''; if(tb) tb.innerHTML=''; return; }
+  var rs=_ciCtx.rows, cl=rs.filter(function(r){ return r.p.kind==='clinic'; }), te=rs.filter(function(r){ return r.p.kind==='tech'; });
+  var 겹침=rs.filter(function(r){ return r.후보.length; }).length;
+  if(tb) tb.innerHTML='<span class="btn sm'+(_ciCtx.tab==='clinic'?' primary':'')+'" onclick="ciTab(\'clinic\')" style="cursor:pointer">🏥 현장클리닉 '+cl.length+'</span> '
+    +'<span class="btn sm'+(_ciCtx.tab==='tech'?' primary':'')+'" onclick="ciTab(\'tech\')" style="cursor:pointer">🛡 기술보호울타리 '+te.length+'</span>'
+    +'<span style="margin-left:10px;font-size:11.5px;color:var(--text-mute)">같은 회사 실적이 이미 있어 <b style="color:var(--amber)">내용을 봐야 하는 건 '+겹침+'</b> · 우리 노무사가 아니라 건너뜀 '+_ciCtx.skipped+' · 이미 가져옴 '+_ciCtx.already+'</span>'
+    +'<span style="margin-left:auto;display:inline-flex;gap:5px;align-items:center;font-size:11.5px">일수 빈 현장클리닉을 모두 <input id="ciBulk" inputmode="numeric" style="width:44px;font-size:16px;padding:1px 4px"> 일로 <button class="btn sm" type="button" onclick="ciBulkDays()">채우기</button></span>';
+  var 목록=(_ciCtx.tab==='clinic'?cl:te);
+  var h='<div style="max-height:46vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--text-mute);font-size:11px;text-align:left;position:sticky;top:0;background:var(--card,#fff)"><th></th><th>회사</th><th>'+(_ciCtx.tab==='clinic'?'신청 → 완료':'자문 기간')+'</th><th>위원</th><th>일수</th><th>같은 회사 실적 · 처리</th></tr></thead><tbody>';
+  목록.forEach(function(r){
+    var i=_ciCtx.rows.indexOf(r), p=r.p;
+    var 기간=_ciCtx.tab==='clinic' ? (escapeHtml(String(p.apply).replace(/-/g,'.'))+' → '+escapeHtml(String(p.done).slice(5).replace(/-/g,'.')||'—')) : (escapeHtml(String(p.from).replace(/-/g,'.'))+' ~ '+escapeHtml(String(p.to).slice(5).replace(/-/g,'.')));
+    var 처리='<select onchange="ciAct('+i+',this.value)" style="font-size:12px;max-width:300px"><option value="new"'+(r.act==='new'?' selected':'')+'>새로 넣기</option>'
+      +r.후보.map(function(c){ return '<option value="link:'+escapeHtml(c.id)+'"'+(r.act==='link:'+c.id?' selected':'')+'>연결: '+escapeHtml(c.desc)+'</option>'; }).join('')
+      +'<option value="skip"'+(r.act==='skip'?' selected':'')+'>건너뜀</option></select>';
+    h+='<tr style="border-top:1px solid var(--border)'+(r.후보.length?';background:#fffbeb':'')+'"><td><input type="checkbox" '+(r.on&&r.act!=='skip'?'checked ':'')+'onchange="ciOn('+i+',this.checked)"></td>'
+      +'<td style="white-space:nowrap" title="'+escapeHtml(r.k)+'"><b>'+escapeHtml(r.name)+'</b></td><td style="white-space:nowrap">'+기간+'</td>'
+      +'<td style="white-space:nowrap">'+escapeHtml(p.member)+(p.counselor&&p.kind==='clinic'?' <span style="color:var(--text-mute)">· 상담 '+escapeHtml(p.counselor)+'</span>':'')+'</td>'
+      +'<td><input value="'+escapeHtml(String(r.days||''))+'" inputmode="numeric" onchange="ciDays('+i+',this.value)" style="width:46px;font-size:16px;padding:1px 4px;text-align:right" title="'+escapeHtml(r.출처||'기록에 일수가 없습니다 — 아는 만큼 적어 주세요')+'"></td>'
+      +'<td>'+(r.후보.length?'<span style="color:var(--amber);font-weight:700">⚠ 이미 있음</span> ':'')+처리+'</td></tr>';
+  });
+  h+='</tbody></table></div>';
+  if(!목록.length) h='<div style="padding:14px;font-size:12px;color:var(--text-mute)">가져올 것이 없습니다</div>';
+  box.innerHTML=h; ciSum();
+}
+function ciApply(){
+  if(!_ciCtx) return;
+  var arr=get('consult')||[], 추가=[], 바뀐=[], n=0, m=0;
+  _ciCtx.rows.forEach(function(r){
+    if(!r.on || r.act==='skip') return;
+    var p=r.p, ref='cards:'+r.k+'|'+p.key, 일=Number(r.days)||0;
+    if(r.act.indexOf('link:')===0){
+      var rec=arr.filter(function(x){ return x && x.id===r.act.slice(5); })[0]; if(!rec) return;
+      var 전={ id:rec.id, vals:{} };
+      var fill=function(f,v){ if(v===''||v==null||v===0) return; if(!String(rec[f]==null?'':rec[f]).trim()){ 전.vals[f]=(f in rec)?rec[f]:undefined; rec[f]=String(v); } };
+      fill('year',p.year); fill('period',p.period); fill('days',일||''); fill('main',p.member); fill('agency',_ciAgency(p.kind));
+      전.vals.cardsRef=('cardsRef' in rec)?rec.cardsRef:undefined; rec.cardsRef=ref; 바뀐.push(전); m++;
+    }else{
+      var id=kcNextNo('CN',4,'consult',추가);
+      var rec2={ id:id, type:_ciType(p.kind), org:r.name, project:'', agency:_ciAgency(p.kind), main:p.member, year:p.year, status:'완료',
+        period:p.period, note:'기업정보함에서 가져옴'+(p.counselor&&p.kind==='clinic'?' · 지방청 상담위원 '+p.counselor:'')+(p.where?' ('+p.where+')':'')+(p.status?' · '+p.status:''),
+        cardsRef:ref, src:'cards', savedAt:new Date().toISOString() };
+      if(일>0) rec2.days=String(일);
+      추가.push(rec2); n++;
+    }
+  });
+  추가.slice().reverse().forEach(function(x){ arr.unshift(x); });
+  if(set('consult',arr)===false){ toast('⚠ 저장공간이 부족해 넣지 못했습니다'); return; }
+  _ciUndo={ added:추가.map(function(x){ return x.id; }), changed:바뀐 };
+  try{ if(CAREER_CFG.consult) renderCareer('consult'); }catch(e){}
+  _safe(renderPuAgency); _safe(renderBizDash);
+  toast('🏷 새 실적 '+n+'건 · 기존 실적에 연결 '+m+'건을 넣었습니다 — 「방금 한 것 되돌리기」로 되돌릴 수 있습니다', 7000);
+  _ciCtx.rows=_ciCtx.rows.filter(function(r){ return !(r.on && r.act!=='skip'); }); ciRender();
+}
+function ciUndoRun(){
+  if(!_ciUndo) return;
+  var arr=get('consult')||[], ids={}; _ciUndo.added.forEach(function(id){ ids[id]=1; });
+  arr=arr.filter(function(r){ return !(r && ids[r.id]); });
+  _ciUndo.changed.forEach(function(c){ var rec=arr.filter(function(x){ return x && x.id===c.id; })[0]; if(!rec) return;
+    Object.keys(c.vals).forEach(function(f){ if(c.vals[f]===undefined) delete rec[f]; else rec[f]=c.vals[f]; }); });
+  set('consult',arr); var n=_ciUndo.added.length+_ciUndo.changed.length; _ciUndo=null;
+  try{ if(CAREER_CFG.consult) renderCareer('consult'); }catch(e){}
+  _safe(renderPuAgency); _safe(renderBizDash);
+  toast('↩ '+n+'건을 되돌렸습니다 — 목록을 다시 불러오려면 창을 닫고 다시 여세요'); ciRender();
 }
 /* ═══ 💰 금액 붙여넣어 채우기 (대표 지시 2026-10-10 「만들어라」 — 목업 승인) ═══
    외부기관 실적(이알피 밖에서 온 일)은 금액이 비어 있다(실측 173건 중 69건).
@@ -15652,7 +15816,7 @@ function _bizPerfHtml(){
   var t=KcareerBiz.perfTable(_bizPerfRecs());
   if(!t.total) return '<div class="fd-box"><h4>📊 사업별 수행 건수</h4><div style="font-size:12px;color:var(--text-mute)">컨설팅 실적이 아직 없습니다 — 이알피에서 받아 오면 여기 사업별로 셉니다</div></div>';
   var ys=t.years.slice(-6), 앞=t.years.slice(0, Math.max(0, t.years.length-6));
-  var 금액=t.amt>0, mx=t.rows[0].total||1, Y=String(new Date().getFullYear());
+  var 금액=t.amt>0, 일수=t.days>0, mx=t.rows[0].total||1, Y=String(new Date().getFullYear());
   var 칸=function(n){ return '<td style="text-align:right;font-variant-numeric:tabular-nums'+(n?'':';color:var(--text-mute)')+'">'+(n||'·')+'</td>'; };
   var h='<div class="fd-box"><h4 style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">📊 사업별 수행 건수'
     +'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">전체 '+t.total+'건 · '+t.rows.length+'개 사업'
@@ -15662,7 +15826,7 @@ function _bizPerfHtml(){
     +'<th class="rownum-h">№</th><th style="text-align:left">사업</th><th style="text-align:left">수행기관</th>'
     +(앞.length?'<th style="text-align:right" title="'+escapeHtml(앞.join('·'))+'">이전</th>':'')
     +ys.map(function(y){ return '<th style="text-align:right">'+y+'</th>'; }).join('')
-    +'<th style="text-align:right">모름</th><th style="text-align:right">합계</th>'+(금액?'<th style="text-align:right">금액</th>':'')+'<th style="text-align:left">담당</th></tr></thead><tbody>';
+    +'<th style="text-align:right">모름</th><th style="text-align:right">합계</th>'+(일수?'<th style="text-align:right" title="수행일수 합계(적힌 건만)">일수</th>':'')+(금액?'<th style="text-align:right">금액</th>':'')+'<th style="text-align:left">담당</th></tr></thead><tbody>';
   t.rows.forEach(function(g,i){
     var 이전=앞.reduce(function(s,y){ return s+(g.byYear[y]||0); },0);
     var 기관=KcareerBiz.topCounts(g.agency,2), 열림=(_bizPerfOpen===g.type);
@@ -15672,12 +15836,13 @@ function _bizPerfHtml(){
       +'<td style="white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="'+escapeHtml(Object.keys(g.agency).join(' · '))+'">'+escapeHtml(기관.map(function(a){ return a[0]; }).join(' · ')||'-')+'</td>'
       +(앞.length?칸(이전):'')+ys.map(function(y){ return 칸(g.byYear[y]||0); }).join('')
       +칸(g.unknown)+'<td style="text-align:right;font-weight:800">'+g.total+'</td>'
+      +(일수?'<td style="text-align:right">'+(g.days?g.days:'·')+'</td>':'')
       +(금액?'<td style="text-align:right;white-space:nowrap">'+(g.amt?g.amt.toLocaleString('ko-KR'):'·')+'</td>':'')
       +'<td style="white-space:nowrap">'+KcareerBiz.topCounts(g.main,3).map(function(m){ return '<span class="tag" style="margin-right:3px">'+escapeHtml(m[0])+' '+m[1]+'</span>'; }).join('')+'</td></tr>';
     if(열림){
       var 줄=_bizPerfRecs().filter(function(r){ return (String(r.type||'').trim()||'(유형 없음)')===g.type; })
         .sort(function(a,b){ return String(KcareerBiz.perfYear(b)).localeCompare(String(KcareerBiz.perfYear(a))) || String(a.org||'').localeCompare(String(b.org||'')); });
-      h+='<tr><td></td><td colspan="'+(5+ys.length+(앞.length?1:0)+(금액?1:0))+'" style="padding:4px 0 10px">'
+      h+='<tr><td></td><td colspan="'+(5+ys.length+(앞.length?1:0)+(금액?1:0)+(일수?1:0))+'" style="padding:4px 0 10px">'
         +줄.map(function(r){ return '<div style="display:flex;gap:10px;font-size:11.5px;padding:2px 0;white-space:nowrap">'
           +'<span style="width:44px;color:var(--text-mute)">'+escapeHtml(KcareerBiz.perfYear(r)||'모름')+'</span>'
           +'<span style="min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis" title="'+escapeHtml((r.org||'')+' '+(r.project||''))+'"><b>'+escapeHtml(r.org||'-')+'</b> '+escapeHtml(r.project||'')+'</span>'
@@ -15765,7 +15930,7 @@ function _bizPerfSummary(){
   var t=KcareerBiz.perfTable(get('consult')||[]), Y=String(new Date().getFullYear());
   return '<div class="fd-box" style="background:#f0fdf4;border-color:#bbf7d0"><h4 style="margin:0 0 6px">🏆 수행 실적 요약</h4>'
     +(t.total?'<div style="font-size:12.5px">전체 <b>'+t.total+'건</b> · '+t.rows.length+'개 사업'+(t.byYear[Y]?' · 올해 <b>'+t.byYear[Y]+'건</b>':'')
-      +(t.amt>0?' · 금액 합계(공급가액) <b>'+t.amt.toLocaleString('ko-KR')+'원</b>':'')+(t.unknown?' · 연도 모름 '+t.unknown+'건':'')
+      +(t.days>0?' · 수행일수 <b>'+t.days+'일</b>':'')+(t.amt>0?' · 금액 합계(공급가액) <b>'+t.amt.toLocaleString('ko-KR')+'원</b>':'')+(t.unknown?' · 연도 모름 '+t.unknown+'건':'')
       :'<div style="font-size:12.5px;color:var(--text-mute)">컨설팅 실적이 아직 없습니다 — 이알피에서 받아 오면 여기 사업별로 셉니다')
     +' &nbsp; <button class="btn sm" type="button" onclick="navTile(\'page-bizperf\')">🏆 자세히 보기 →</button></div></div>';
 }
@@ -15785,6 +15950,7 @@ function renderBizPerf(){
     +'<select class="tb-select" onchange="bizPerfYear(this.value)"><option value="">전체 연도</option>'+연도들.map(function(y){ return '<option value="'+escapeHtml(y)+'"'+(_bizPerfYear===y?' selected':'')+'>'+escapeHtml(y)+'</option>'; }).join('')+'</select>'
     +'<input class="tb-input" id="bizPerfQ" placeholder="사업·업체·담당 검색" style="min-width:170px" value="'+escapeHtml(_bizPerfQ)+'" oninput="bizPerfQ(this.value)">'
     +'<div class="tb-spacer"></div>'
+    +'<button class="btn" type="button" onclick="openCardsImport()" title="기업정보함 회사 메모의 현장클리닉·기술보호 수행 기록을 실적으로 가져옵니다">🏷 기업정보함에서 가져오기</button> '
     +'<button class="btn" type="button" onclick="openAmtPaste()" title="엑셀의 업체명·금액을 붙여 빈 금액을 채웁니다">💰 금액 붙여넣어 채우기</button></div>'
     +'<div id="bizPerfBody">'+_bizPerfBody()+'</div>';
 }
@@ -15798,18 +15964,18 @@ function _bizPerfGroupHtml(by){
   var rows=KcareerBiz.perfBy(_bizPerfRecs(), by);
   if(!rows.length) return '<div class="fd-box"><div style="font-size:12px;color:var(--text-mute)">조건에 맞는 실적이 없습니다</div></div>';
   var 연도=Object.keys(rows.reduce(function(m,g){ Object.keys(g.byYear).forEach(function(y){ m[y]=1; }); return m; },{})).sort(), ys=연도.slice(-6);
-  var 합={ n:0, amt:0 }; rows.forEach(function(g){ 합.n+=g.total; 합.amt+=g.amt; });
+  var 합={ n:0, amt:0, d:0 }; rows.forEach(function(g){ 합.n+=g.total; 합.amt+=g.amt; 합.d+=g.days; });
   var 칩=function(g){ return KcareerBiz.topCounts(g.type,3).map(function(m){ return '<span class="tag" style="margin-right:3px">'+escapeHtml(m[0])+' '+m[1]+'</span>'; }).join(''); };
   var h='<div class="fd-box"><h4 style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">'+(by==='main'?'👤 담당자별 수행 건수':'📅 연도별 수행 건수')
-    +'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">전체 '+합.n+'건'+(합.amt?' · 금액 합계 '+합.amt.toLocaleString('ko-KR')+'원':'')+'</span></h4><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
+    +'<span style="font-size:11px;font-weight:400;color:var(--text-mute)">전체 '+합.n+'건'+(합.d?' · 수행일수 '+합.d+'일':'')+(합.amt?' · 금액 합계 '+합.amt.toLocaleString('ko-KR')+'원':'')+'</span></h4><div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr>'
     +'<th class="rownum-h">№</th><th style="text-align:left">'+(by==='main'?'담당자':'연도')+'</th>'
     +(by==='main'?ys.map(function(y){ return '<th style="text-align:right">'+y+'</th>'; }).join('')+'<th style="text-align:right">모름</th>':'<th style="text-align:right">사업 수</th>')
-    +'<th style="text-align:right">합계</th><th style="text-align:right">금액(공급가)</th><th style="text-align:left">많이 한 사업</th></tr></thead><tbody>';
+    +'<th style="text-align:right">합계</th>'+(합.d?'<th style="text-align:right">일수</th>':'')+'<th style="text-align:right">금액(공급가)</th><th style="text-align:left">많이 한 사업</th></tr></thead><tbody>';
   rows.forEach(function(g,i){
     h+='<tr'+(by==='year'?' style="cursor:pointer" title="누르면 그 해의 사업별 표" onclick="bizPerfDrill(\''+_jsAttr(g.key==='모름'?'모름':g.key)+'\')"':'')+'><td class="rownum">'+(i+1)+'</td><td style="white-space:nowrap"><b>'+escapeHtml(g.key)+'</b></td>'
       +(by==='main'?ys.map(function(y){ var n=g.byYear[y]||0; return '<td style="text-align:right'+(n?'':';color:var(--text-mute)')+'">'+(n||'·')+'</td>'; }).join('')+'<td style="text-align:right'+(g.unknown?'':';color:var(--text-mute)')+'">'+(g.unknown||'·')+'</td>'
         :'<td style="text-align:right">'+Object.keys(g.type).length+'</td>')
-      +'<td style="text-align:right;font-weight:800">'+g.total+'</td><td style="text-align:right;white-space:nowrap">'+(g.amt?g.amt.toLocaleString('ko-KR'):'·')+'</td><td style="white-space:nowrap">'+칩(g)+'</td></tr>';
+      +'<td style="text-align:right;font-weight:800">'+g.total+'</td>'+(합.d?'<td style="text-align:right">'+(g.days?g.days:'·')+'</td>':'')+'<td style="text-align:right;white-space:nowrap">'+(g.amt?g.amt.toLocaleString('ko-KR'):'·')+'</td><td style="white-space:nowrap">'+칩(g)+'</td></tr>';
   });
   return h+'</tbody></table></div></div>';
 }
