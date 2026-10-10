@@ -164,6 +164,36 @@ async function roleOf(uid) {
   return (await db().ref("uid_roles/" + pathSafe(uid)).once("value")).val() || {};
 }
 
+/* 카카오 인증이 끝난 사람의 포털 이름표만 같은 응답에 싣는다.
+   휴대전화가 인증 뒤 명부 전체를 다시 내려받느라 멈추지 않도록 하되,
+   사번·역할이 인증 기록과 어긋나면 빠른 길을 쓰지 않는다. */
+function loginProfileOf(raw, sid, role) {
+  const norm = (v) => String(v || "").replace(/-/g, "").toLowerCase();
+  const wanted = norm(sid);
+  if (!wanted || !raw) return null;
+  let list = raw.v !== undefined ? raw.v : raw;
+  if (!Array.isArray(list)) list = list && typeof list === "object" ? Object.values(list) : [];
+  const all = list.filter((row) => row && norm(row.sid) === wanted).map((row) => ({
+    sid: String(row.sid || ""), name: String(row.name || ""),
+    title: String(row.title || ""), role: String(row.role || "member"),
+    status: String(row.status || "active"),
+  }));
+  const acct = all.find((row) => row.status === "active") || all[0];
+  if (!acct || acct.status !== "active" || (role.role && acct.role !== role.role)) return null;
+  return { acct, all };
+}
+
+async function loginProfileWithin(sid, role) {
+  let timer;
+  try {
+    return await Promise.race([
+      Promise.resolve().then(() => db().ref("data/user_dir").once("value"))
+        .then((snap) => loginProfileOf(snap.val(), sid, role)).catch(() => null),
+      new Promise((resolve) => { timer = setTimeout(() => resolve(null), 700); }),
+    ]);
+  } finally { clearTimeout(timer); }
+}
+
 /* 서버 비밀값(카카오 앱 키)을 꺼낸다 — 앞뒤 빈칸·줄바꿈은 걷는다.
    ⚠ 2026-09-27 실제로 세 값 모두 「???_????」+줄바꿈(한글 안내문이 PowerShell 에서
      깨진 것)으로 들어가 있었고, 직원은 카카오 쪽 「KOE101 앱 관리자 설정 오류」 화면으로
@@ -426,9 +456,14 @@ exports.kakaoLoginFinish = functions
     }
 
     const t3 = Date.now();
-    const token = await getAuth().createCustomToken(link.uid, { kakao: true, sid: link.sid || "" });
+    const roleSid = String(role.sid || "");
+    const linkSid = String(link.sid || "");
+    const sameSid = !roleSid || !linkSid || roleSid.replace(/-/g, "").toLowerCase() === linkSid.replace(/-/g, "").toLowerCase();
+    const profilePromise = sameSid && roleSid ? loginProfileWithin(roleSid, role) : Promise.resolve(null);
+    const tokenPromise = getAuth().createCustomToken(link.uid, { kakao: true, sid: link.sid || "" });
+    const [token, profile] = await Promise.all([tokenPromise, profilePromise]);
     /* 단계별 시간 — 다음에 느리다는 말이 나오면 «어디서»를 기록에서 바로 본다. 사람 정보는 안 적는다. */
     console.log("[kakaoLoginFinish] 카카오 " + (t1 - t0) + "ms · 연결기록 " + (t2 - t1) + "ms · 재직 "
-      + (t3 - t2) + "ms · 표 " + (Date.now() - t3) + "ms");
-    res.json({ ok: true, token });
+      + (t3 - t2) + "ms · 표·내정보 " + (Date.now() - t3) + "ms · 빠른진입 " + !!profile);
+    res.json({ ok: true, token, profile });
   });

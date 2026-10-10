@@ -127,7 +127,7 @@ test('★★ ③ 단계별 시간을 남기되 회원번호·사번은 안 적�
   try { await call(K.kakaoLoginFinish, 'POST', {}, { code: 'cA' }); } finally { console.log = orig; }
   const line = seen.find(s => s.startsWith('[kakaoLoginFinish]'));
   assert.ok(line, '★ 단계별 시간이 기록에 안 남는다 — 다음에 또 어디서 느린지 모른다');
-  assert.match(line, /카카오 \d+ms · 연결기록 \d+ms · 재직 \d+ms · 표 \d+ms/);
+  assert.match(line, /카카오 \d+ms · 연결기록 \d+ms · 재직 \d+ms · 표(?:·내정보)? \d+ms/);
   assert.ok(!/111|P-101|staff1/.test(line), '★★ 기록에 사람을 가리키는 값이 들어갔다');
 });
 
@@ -245,5 +245,5 @@ test('★★ 카카오 인증 성공 결과로 포털을 바로 열고 인증상
   const start = enter.indexOf('Promise.all([server, persist])');
   const end = enter.indexOf("}).catch(function(err){", start);
   assert.ok(start > 0 && end > start);
-  assert.match(enter.slice(start, end), /if\(!_handled\)\{ _handled = true; enterPortal\(cred\.user\); \}/);
+  assert.match(enter.slice(start, end), /if\(!_handled\)\{ _handled = true; enterPortal\(cred\.user(?:, kkProfile)?\); \}/);
 });

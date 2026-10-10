@@ -112,10 +112,11 @@
   }
   /* targetUid 를 주면 «남의» 연결을 끊는다 — 서버가 관리자인지 다시 확인한다(관리자 설정 화면용) */
   function unlink(idToken, targetUid) { return call('kakaoUnlink', {}, { uid: targetUid || '' }, idToken).then(function () { return true; }); }
-  /* 카카오로 로그인 — 통과하면 서버가 「그 사람 계정」 표(custom token)를 준다 */
+  /* 카카오로 로그인 — 인증표와 그 사람의 최소 포털 정보를 함께 받는다. */
   function loginFinish(code) {
     var state = _returnState; _returnState = '';
-    return call('kakaoLoginFinish', {}, { code: code, state: state }).then(function (j) { return j.token; });
+    return call('kakaoLoginFinish', {}, { code: code, state: state })
+      .then(function (j) { return { token: j.token, profile: j.profile || null }; });
   }
 
   global.PuKakao = {

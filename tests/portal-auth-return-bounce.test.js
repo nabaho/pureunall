@@ -79,6 +79,6 @@ test('포털이 다 그려지기 전 인증 알림은 가림막을 걷지 않는
   b.ctx._portalReady = false;
   b.fire(b.user);
   assert.ok(!b.events.includes('uncover'));
-  const enter = source.slice(source.indexOf('function enterPortal(user){'), source.indexOf('  // ── 프로그램 창 관리자'));
+  const enter = source.slice(source.indexOf('function enterPortal(user'), source.indexOf('  // ── 프로그램 창 관리자'));
   assert.match(enter, /renderPortal\([\s\S]*_portalReady = true;[\s\S]*_rmBootSplash\(\)/);
 });

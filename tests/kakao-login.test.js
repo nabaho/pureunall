@@ -165,6 +165,43 @@ test('★ 연결하면 카카오로 그 직원 계정에 들어온다 (사번은
   assert.deepEqual(issued[0], { uid: 'staff1', claims: { kakao: true, sid: 'P-101' } });
 });
 
+test('★★★ 카카오 인증 응답에는 자기 포털 정보만 함께 실어 휴대전화 명부 재조회 없이 진입한다', async () => {
+  const K = fresh({ data: { user_dir: { v: [
+    { sid: 'P-101', name: '이전 이름', role: 'member', status: 'retired', privateMemo: '싣지 말 것' },
+    { sid: 'P-101', name: '현 근로자', title: '노무사', role: 'member', status: 'active', privateMemo: '싣지 말 것' },
+    { sid: 'P-102', name: '다른 근로자', role: 'member', status: 'active' },
+  ] } } });
+  await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA' } });
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+  assert.equal(r.body.token, 'CT:staff1');
+  assert.equal(r.body.profile.acct.name, '현 근로자');
+  assert.equal(r.body.profile.all.length, 2, '겹친 사번 경고를 잃지 않아야 한다');
+  assert.ok(!JSON.stringify(r.body.profile).includes('다른 근로자'), '남의 명부를 응답에 실었다');
+  assert.ok(!JSON.stringify(r.body.profile).includes('privateMemo'), '포털에 불필요한 개인 필드를 실었다');
+});
+
+test('★★★ 명부가 없거나 인증 사번·역할과 어긋나면 빠른 진입 정보 없이 기존 경로를 쓴다', async () => {
+  const K = fresh({ data: { user_dir: { v: [ { sid: 'P-102', name: '다른 근로자', role: 'member' } ] } } });
+  await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA' } });
+  assert.equal((await call(K.kakaoLoginFinish, { body: { code: 'cA' } })).body.profile, null);
+  world.data.data.user_dir.v = [{ sid: 'P-101', name: '근로자', role: 'admin' }];
+  world.data.uid_roles.staff1.role = 'member';
+  assert.equal((await call(K.kakaoLoginFinish, { body: { code: 'cA' } })).body.profile, null);
+});
+
+test('★★★ 본인 이름표 읽기가 실패해도 카카오 인증표는 정상 발급한다', async () => {
+  const K = fresh();
+  await call(K.kakaoLink, { token: 'staff1', body: { code: 'cA' } });
+  const originalRef = world.database.ref;
+  world.database.ref = (p) => {
+    if (p === 'data/user_dir') throw new Error('명부 연결 실패');
+    return originalRef(p);
+  };
+  const r = await call(K.kakaoLoginFinish, { body: { code: 'cA' } });
+  assert.equal(r.body.token, 'CT:staff1');
+  assert.equal(r.body.profile, null);
+});
+
 test('★ 로그인 안 한 사람은 연결 못 한다', async () => {
   const K = fresh();
   const r = await call(K.kakaoLink, { body: { code: 'cA' } });

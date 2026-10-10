@@ -158,7 +158,7 @@ test('④★ 숨은 탭은 보일 때 간다 · 그새 나갔으면 포털을 �
 });
 
 test('⑤ 포털 진입이 맨 먼저 이것을 본다 · 두 파일의 열쇠 이름이 같다', () => {
-  assert.match(enter, /function enterPortal\(user\)\{\n\s*if\(_returnToApp\(user\)\) return;/);
+  assert.match(enter, /function enterPortal\(user(?:, verifiedProfile)?\)\{\n\s*if\(_returnToApp\(user\)\) return;/);
   assert.match(SYNC, /var RETURN_KEY = 'pu_return_app';/);
   assert.match(enter, /var RETURN_KEY = 'pu_return_app'/);
 });
