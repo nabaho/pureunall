@@ -747,6 +747,7 @@ test('★★ 받은 적이 있으면 탭을 열어도 다시 안 받는다(하�
   const r2 = runApp({ feed: [] }); r2.api.setPull(async () => { n++; return PLAN_ENV([]); });
   r2.api.setTab('plan'); await tickP(20);
   assert.equal(n, 0); assert.match(r2.el('ptb').innerHTML, /인증키를 먼저/);
+  assert.doesNotMatch(r2.el('toast').textContent || '', /인증키/, '열쇠가 없는데 탭을 열 때마다 알림이 뜬다');
 });
 test('★★ 「아직 받은 적이 없습니다」 옆과 빈 표에 «누르는» 단추 — 글자만 있으면 막다른 길', () => {
   const r = runApp({ feed: [], key_data: 'K' }); r.api.planDraw();
@@ -761,4 +762,7 @@ test('★★ 지금 받기를 두 번 눌러도 한 번만 · 받는 중엔 새�
   const one = runApp({ feed: [], key_data: 'K', plan_at: 'x' }); let c1 = 0;
   one.api.setPull(async () => { c1++; return PLAN_ENV([]); }); await one.api.planFetchNow();
   assert.equal(calls, c1, '겹쳐 받았다');
+  /* 다 받은 뒤에는 다시 받을 수 있어야 한다 — 문(_fetching)을 안 닫으면 그 뒤로 영영 안 받는다 */
+  const before = calls; await r.api.planFetchNow(); assert.ok(calls > before, '받기가 끝났는데 다시 안 받는다');
+  const before2 = calls; await r.api.fetchAll(); assert.ok(calls > before2, '새로 받기(전부)가 막혔다');
 });
