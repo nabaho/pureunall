@@ -52,3 +52,13 @@ test('④ 화면 — 동기화가 금액을 받아 쓰고, 자동 동기화도 �
   assert.match(SRC, /\(ctx\.amtUps\|\|\[\]\)\.length/, '금액만 바뀐 날에도 자동 동기화가 돈다');
   assert.match(SRC, /<script src="js\/kcareer-pusync\.js\?v=\d+"><\/script>/);
 });
+
+test('⑤ 2026-10-10 검토 — 사람이 고친 금액은 지켜지고, 이알피에서 지운 금액은 비운다', () => {
+  const save = SRC.slice(SRC.indexOf('function saveForm('), SRC.indexOf('function saveForm(') + 3000);
+  assert.match(save, /'amt' in data && String\(data\.amt\|\|''\)!==String\(_amt0\|\|''\)\) delete db\[i\]\.amtFrom;/, '고치면 이알피 표시를 뗀다');
+  assert.match(SRC, /if\(지금 && r\.amtFrom !== 'erp'\) return;/, '쓰는 순간에도 사람이 적은 금액이면 그대로');
+  const coll = { consultings: [{ id: 'c1', companyName: '가나상사' }] };
+  const ref = P.refOf('consultings', 0, coll.consultings[0]);
+  assert.deepEqual(P.buildAmtUpdates(coll, [{ puRef: ref, amt: '900000', amtFrom: 'erp' }]), [{ puRef: ref, amt: '' }], '이알피에서 지워지면 비운다');
+  assert.deepEqual(P.buildAmtUpdates(coll, [{ puRef: ref, amt: '900000' }]), [], '사람이 적은 것은 그대로');
+});

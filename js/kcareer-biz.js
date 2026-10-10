@@ -229,9 +229,9 @@
      ⚠ 연도는 year → 없으면 period·date 속 20xx → 그래도 없으면 «모름»(지어내지 않는다).
      ⚠ 지운(excluded) 줄은 세지 않는다 — 실적 화면과 같은 잣대. */
   function perfYear(r) {
-    var y = String((r && r.year) || '').match(/20\d{2}/);
+    var y = String((r && r.year) || '').match(/(19|20)\d{2}/);   /* 이알피 연도 셈(KcareerPuSync.yearOf)과 같은 잣대 */
     if (y) return y[0];
-    var p = String((r && (r.period || r.date)) || '').match(/20\d{2}/);
+    var p = String((r && (r.period || r.date)) || '').match(/(19|20)\d{2}/);
     return p ? p[0] : '';
   }
   function _won(v) { return Number(String(v == null ? '' : v).replace(/[^\d]/g, '')) || 0; }

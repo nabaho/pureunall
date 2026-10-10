@@ -125,3 +125,12 @@ test('⑤ 법인 도장 — 보관함 한 줄에 표시만 · 저절로 정하�
   const up = strip(떼기('async function firmSealUpload('));
   assert.ok(/addStamps\(/.test(up) && /setFirmSeal\(/.test(up), '새로 올린 것은 보관함으로 가고 법인 도장으로 정해진다');
 });
+
+test('① 2026-10-10 검토 — 합친 도장에도 기본·법인 도장은 하나씩', () => {
+  const { ctx, store } = 받기틀({ stamps: JSON.stringify([{ id: 'S1', def: true, firm: true }]) });
+  ctx.kcApplyRestore({ stamps: JSON.stringify([{ id: 'S2', def: true, firm: true }]) }, 'pull');
+  const a = JSON.parse(store.cm3_stamps);
+  assert.equal(a.filter((s) => s.def).length, 1, '기본 도장 하나');
+  assert.equal(a.filter((s) => s.firm).length, 1, '법인 도장 하나');
+  assert.equal(a.find((s) => s.def).id, 'S2', '받은 쪽이 남는다');
+});

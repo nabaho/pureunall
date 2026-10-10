@@ -1366,12 +1366,12 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-scan.js?v=2"></script>
 <script src="js/kcareer-cases.js?v=3"></script>
 <!-- 🏢 사업관리 판정(구분·단계·갈래 짐작·한눈에 셈·두 서류 줄 비교) — 2026-10-05 -->
-<script src="js/kcareer-biz.js?v=6"></script>
+<script src="js/kcareer-biz.js?v=7"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
 <script src="js/kcareer-profile1.js?v=4"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
-<script src="js/kcareer-pusync.js?v=8"></script>
+<script src="js/kcareer-pusync.js?v=9"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
 <!-- ★ 주민번호 지우개 — 판독 층보다 «먼저» 실어야 한다.
      판독 층은 지우개가 없으면 글자 판독을 아예 막는다(그대로 보내면 주민번호가 AI 로 나간다).
@@ -3643,7 +3643,10 @@ function _tombDiff(key, oldArr, newArr){
 function set(key,arr){
   if(key===TOMB_KEY){ tombSave(arr); return; }                  /* 자리표 자체는 견주지 않는다 */
   if(key===TOMB_REV_KEY){ tombRevSave(arr); return; }
-  if(key==='id_docs' && hasIDPin()){ if(_idUnlocked && _idKey){ _idDocs=Array.isArray(arr)?arr.slice():[]; _persistIdDocs(); } return; }
+  if(key==='id_docs' && hasIDPin()){ if(_idUnlocked && _idKey){ _idDocs=Array.isArray(arr)?arr.slice():[]; _persistIdDocs(); return; }
+    /* ⚠ 잠긴 채로 쓰려 했다 — 예전엔 조용히 버렸다(「등록 완료」가 떴는데 없음). 2026-10-10 검토 */
+    try{ toast('🔒 신분증 보관함이 잠겨 있어 저장하지 못했습니다 — PIN 으로 잠금을 푼 뒤 다시 해 주세요', 8000); }catch(e){}
+    return false; }
   /* ★ 삭제를 «여기 한 곳»에서 잡는다 — 삭제 경로가 늘어도 빠지지 않는다 */
   try{ if(Array.isArray(arr)) _tombDiff(key, get(key), arr); }catch(e){}
   /* ★ 옆줄 숫자도 여기서 함께 고친다 — 삭제·등록·합치기·스캔이 다 이 길로 지난다.
@@ -5572,7 +5575,15 @@ function puSyncCommit(){
   var amtMap = {}, amtN = 0;
   (_puSyncCtx.amtUps || []).forEach(function(u){ amtMap[u.puRef] = u.amt; });
   PU_SYNC_STORES.forEach(function(k){
-    buf[k].forEach(function(r){ if(r.puRef && amtMap[r.puRef] && !r.puRefCheck){ r.amt = amtMap[r.puRef]; r.amtFrom = 'erp'; amtN++; } });
+    buf[k].forEach(function(r){
+      if(!r.puRef || r.puRefCheck || !Object.prototype.hasOwnProperty.call(amtMap, r.puRef)) return;
+      /* ⚠ 미리보기를 연 사이 사람이 금액을 고쳤으면 그대로 — 판정 때와 같은 잣대를 «쓰는 순간» 다시 본다 */
+      var 지금 = Number(String(r.amt == null ? '' : r.amt).replace(/[^\d]/g, '')) || 0;
+      if(지금 && r.amtFrom !== 'erp') return;
+      if(amtMap[r.puRef]){ r.amt = amtMap[r.puRef]; r.amtFrom = 'erp'; }
+      else { r.amt = ''; delete r.amtFrom; }          /* 이알피에서 금액이 지워졌다 */
+      amtN++;
+    });
   });
 
   PU_SYNC_STORES.forEach(function(k){ set(k, buf[k]); });
@@ -9411,10 +9422,13 @@ function saveForm(){ if(!_formCtx) return; const {page,editId}=_formCtx; const d
     else data[f.key]=v('ff-'+f.key); });
   for(const f of def.fields){ if(f.required&&!data[f.key]){ toast('필수: '+f.label); return; } }
   const db=get(def.store);
-  if(editId){ const i=db.findIndex(r=>r.id===editId); if(i>=0){ db[i]={...db[i],...data,savedAt:new Date().toISOString()}; set(def.store,db); _flashId=editId; toast('수정 완료'); } }
+  if(editId){ const i=db.findIndex(r=>r.id===editId); if(i>=0){ var _amt0=db[i].amt; db[i]={...db[i],...data,savedAt:new Date().toISOString()};
+    /* 💰 사람이 금액을 고쳤으면 «이알피 금액» 표시를 뗀다 — 남기면 다음 동기화가 이알피 값으로 되돌린다(2026-10-10 검토) */
+    if('amt' in data && String(data.amt||'')!==String(_amt0||'')) delete db[i].amtFrom;
+    if(set(def.store,db)===false) return; _flashId=editId; toast('수정 완료'); } }
   else { let id; if(page==='wiccok'||page==='award'){ const yr=data.year||(data.issueDate||'').slice(0,4)||String(new Date().getFullYear()); data.year=yr; id=wiccokId(data.type,yr); }
     else id=nextId(def.prefix||page.slice(0,2).toUpperCase(), def.store);
-    db.unshift({id,...data,savedAt:new Date().toISOString()}); set(def.store,db); _flashId=id; if(page==='personal_doc') renderPersonalDocs(); if(page==='account') renderAccounts(); if(page==='id_doc') renderIDDocs(); toast('등록 완료: '+id); }
+    db.unshift({id,...data,savedAt:new Date().toISOString()}); if(set(def.store,db)===false) return; _flashId=id; if(page==='personal_doc') renderPersonalDocs(); if(page==='account') renderAccounts(); if(page==='id_doc') renderIDDocs(); toast('등록 완료: '+id); }
   closeForm(); if(typeof CAREER_CFG!=='undefined'&&CAREER_CFG[page]) renderCareer(page);
   /* ⚠ 환경설정의 학력 카드는 «학력 목록을 비추는 것»이다 — 목록이 바뀌면 같이 바뀌어야
      「넣었는데 안 보인다」가 없다 */
@@ -15432,6 +15446,8 @@ var BIZ_MAILREP='biz_mailrep', _bizMailBusy=false, _bizMailOnlyNew=false, _bizMa
 function _bizMailCache(){ try{ var o=JSON.parse(LS.get(NS+BIZ_MAILREP)||'null'); return (o&&Array.isArray(o.list))?o:null; }catch(e){ return null; } }
 async function bizMailScan(){
   if(_bizMailBusy) return;
+  /* ⚠ 담당자를 읽는 중에 다시 찾으면 그사이 읽은 것을 덮는다 — 끝나거나 멈춘 뒤에 */
+  if(typeof _bizOwnBusy!=='undefined' && _bizOwnBusy){ toast('👤 담당자를 읽는 중입니다 — 끝나거나 「⏹ 멈추기」 뒤에 다시 찾아 주세요'); return; }
   if(typeof fbDb==='undefined' || !fbDb){ toast('로그인 뒤에 메일함을 읽을 수 있습니다'); return; }
   _bizMailBusy=true; _safe(renderBizDash);
   try{
@@ -15561,7 +15577,9 @@ async function bizMailOwner(i, quiet){
       if(!결과.names.length && 후보.length){ 결과.names=후보.slice(0,3); 결과.src='본문(담당 표시 없음)'; }
     }
   }catch(e){ 결과.err=String(e&&e.message||e).slice(0,80); }
-  var c2=_bizMailCache(); if(c2 && c2.list[i] && c2.list[i].s===x.s){ c2.list[i].owner=결과; try{ LS.set(NS+BIZ_MAILREP, JSON.stringify(c2)); }catch(e){} }
+  /* ⚠ 차례(i)가 아니라 «그 메일»(칸+번호)로 찾아 적는다 — 그사이 다시 찾기로 줄 차례가 바뀌었을 수 있다(2026-10-10 검토) */
+  var c2=_bizMailCache(), 그줄=c2?c2.list.filter(function(y){ return y && y.k===x.k && y.box===x.box; })[0]:null;
+  if(그줄){ 그줄.owner=결과; try{ LS.set(NS+BIZ_MAILREP, JSON.stringify(c2)); }catch(e){} }
   if(!quiet){ _safe(renderBizDash); toast(결과.err?('⚠ '+결과.err):(결과.names.length?('👤 '+결과.names.map(function(h){ return h.name; }).join(' · ')+' — '+결과.src):'이름을 찾지 못했습니다')); }
   return 결과;
 }
@@ -19238,7 +19256,8 @@ function firmTabSave(quiet){
     if(v) l[k]=v; else delete l[k];
   });
   l.savedAt=Date.now();
-  try{ LS.set(NS+FIRM_LOCAL, JSON.stringify(l)); }
+  /* ⚠ LS.set 은 꽉 차면 던지지 않고 false 를 돌려준다 — 그것도 실패다(2026-10-10 검토) */
+  try{ if(LS.set(NS+FIRM_LOCAL, JSON.stringify(l))===false) throw new Error('저장공간이 부족합니다'); }
   catch(e){ toast('⚠ 저장하지 못했습니다 — '+String(e&&e.message||e)); return; }
   /* ⚠ LS.set 은 클라우드로 «올릴 것» 표시를 안 한다 — 안 부르면 다른 고침이 생길 때까지 이 기기에만 남는다
        (2026-10-10 실측: 설립일·자본금을 고쳤는데 클라우드는 옛 값). set() 이 하는 일을 여기서 한다. */
@@ -19342,7 +19361,7 @@ function firmOcrApply(p, keys){
   });
   if(채움.length){
     l.savedAt=Date.now();
-    try{ LS.set(NS+FIRM_LOCAL, JSON.stringify(l)); }catch(err){ return { filled:[], differ:다름, fail:true }; }
+    try{ if(LS.set(NS+FIRM_LOCAL, JSON.stringify(l))===false) return { filled:[], differ:다름, fail:true }; }catch(err){ return { filled:[], differ:다름, fail:true }; }
     if(typeof fbScheduleAuto==='function') fbScheduleAuto(FIRM_LOCAL);   /* 클라우드로도 — 위 firmTabSave 와 같은 까닭 */
   }
   return { filled:채움, differ:다름 };
@@ -19861,11 +19880,15 @@ function _idCryptoOK(){ return !!(window.crypto && window.crypto.subtle); }
 async function _deriveIdKey(pin, salt){
   var base=await crypto.subtle.importKey('raw', new TextEncoder().encode(pin), 'PBKDF2', false, ['deriveKey']);
   return crypto.subtle.deriveKey({name:'PBKDF2', salt:salt, iterations:150000, hash:'SHA-256'}, base, {name:'AES-GCM', length:256}, false, ['encrypt','decrypt']); }
-async function _persistIdDocs(){ if(!_idKey) return;
+/* ⚠ 담았는지를 «돌려준다» (2026-10-10 검토) — LS.set 은 꽉 차면 false 를 돌려줄 뿐 던지지 않는다.
+     PIN 정하기가 이것을 안 보고 평문 사본을 지우면, 암호문도 평문도 없는 채로 «PIN 만» 남아
+     환경설정 잠금이 아무 PIN 에나 열렸다(_decryptIdDocs 는 암호문이 없으면 «빈 것»으로 본다). */
+async function _persistIdDocs(){ if(!_idKey) return false;
   try{ var iv=crypto.getRandomValues(new Uint8Array(12));
     var ct=await crypto.subtle.encrypt({name:'AES-GCM',iv:iv}, _idKey, new TextEncoder().encode(JSON.stringify(_idDocs||[])));
-    LS.set(NS+'id_docs_enc', JSON.stringify({iv:abToB64(iv.buffer), ct:abToB64(ct)}));
-  }catch(e){ console.error('id enc',e); toast('신분증 암호화 저장 오류'); } }
+    if(LS.set(NS+'id_docs_enc', JSON.stringify({iv:abToB64(iv.buffer), ct:abToB64(ct)}))===false){ toast('⚠ 신분증을 담지 못했습니다(저장공간 부족) — 환경설정 › 저장공간에서 비운 뒤 다시', 8000); return false; }
+    return true;
+  }catch(e){ console.error('id enc',e); toast('신분증 암호화 저장 오류'); return false; } }
 async function _decryptIdDocs(){ var blob=LS.get(NS+'id_docs_enc'); if(!blob){ _idDocs=[]; return true; }
   try{ var o=JSON.parse(blob);
     var pt=await crypto.subtle.decrypt({name:'AES-GCM', iv:new Uint8Array(b64ToAb(o.iv))}, _idKey, b64ToAb(o.ct));
@@ -19946,11 +19969,20 @@ function kcCfgApply(){
   else _cfgArm();
   return !잠금;
 }
-function kcCfgLock(byHand){
+/* why: 'hidden'(창을 가림) · 'idle'(5분) · 없음(다른 화면으로·지금 잠그기)
+   ⚠ 'hidden' 때는 «화면만» 가린다 — 폰에서 신분증을 찍으려고 카메라·파일 고르기를 열면 창이 가려지는데,
+     그때 신분증 보관함까지 잠그면 돌아와서 담는 순간 버려졌다(2026-10-10 검토). 다시 풀 때 PIN 을 묻는 것은 같다.
+   ⚠ 열려 있던 창(신분증 크게 보기·계좌 입력 창 등)은 환경설정 «밖»에 떠 있어 CSS 로 안 가려진다 —
+     5분 잠금·지금 잠그기 때는 닫는다. 다른 화면으로 갈 때는 닫지 않는다(그 화면이 띄운 창일 수 있다). */
+function kcCfgLock(byHand, why){
   if(_cfgTimer){ clearInterval(_cfgTimer); _cfgTimer=null; }
   if(!hasIDPin()){ if(byHand) toast('🔐 PIN 이 없어 잠글 수 없습니다 — 먼저 PIN 을 정해 주세요', 5000); return; }
   var 열려있었다=_cfgOpen; _cfgOpen=false;
-  if(_idUnlocked) _safe(lockIDDocs);
+  if(why!=='hidden' && _idUnlocked) _safe(lockIDDocs);
+  if(열려있었다 && (byHand || why==='idle')) _safe(function(){
+    document.querySelectorAll('.modal-ov.open').forEach(function(m){
+      if(m.id==='modalForm' && typeof closeForm==='function') closeForm(); else m.classList.remove('open'); });
+  });
   document.body.classList.add('cfg-locked');
   var i=document.getElementById('cfgPinInput'); if(i) i.value='';
   if(byHand) toast('🔒 환경설정을 잠갔습니다');
@@ -19960,6 +19992,9 @@ async function kcCfgUnlock(){
   var inp=document.getElementById('cfgPinInput'), pin=String((inp&&inp.value)||'').trim();
   if(!pin){ toast('PIN 을 넣어 주세요'); return; }
   if(!_idCryptoOK()){ toast('이 브라우저에서는 PIN 을 확인할 수 없습니다(https 주소에서 열어 주세요)'); return; }
+  /* ⚠ 맞춰 볼 암호문이 없으면 «아무 PIN 이나» 맞는 것이 된다 — 열지 않는다(2026-10-10 검토).
+       PIN 정하기가 이제 암호문을 못 담으면 멈추므로, 여기 오는 것은 옛 기기에 남은 깨진 상태뿐이다. */
+  if(!LS.get(NS+'id_docs_enc')){ toast('⚠ 이 기기의 PIN 확인 자료가 없습니다 — 잠금을 풀 수 없습니다. 담당자에게 알려 주세요', 9000); return; }
   try{
     var salt=new Uint8Array(b64ToAb(LS.get(NS+'id_salt')));
     _idKey=await _deriveIdKey(pin, salt);
@@ -19975,7 +20010,7 @@ function _cfgArm(){
   if(_cfgTimer) clearInterval(_cfgTimer);
   _cfgTimer=setInterval(function(){
     if(!_cfgOpen){ clearInterval(_cfgTimer); _cfgTimer=null; return; }
-    if(Date.now()-_cfgLastAct>=KC_CFG_IDLE_MS){ kcCfgLock(); if(_cfgActive()) toast('🔒 5분 동안 손대지 않아 환경설정을 잠갔습니다', 5000); }
+    if(Date.now()-_cfgLastAct>=KC_CFG_IDLE_MS){ kcCfgLock(false,'idle'); if(_cfgActive()) toast('🔒 5분 동안 손대지 않아 환경설정을 잠갔습니다', 5000); }
   }, 15000);
 }
 function _cfgBind(){
@@ -19983,7 +20018,7 @@ function _cfgBind(){
   var 손=function(){ if(_cfgOpen) _cfgLastAct=Date.now(); };
   ['pointerdown','keydown','wheel','touchstart'].forEach(function(ev){ document.addEventListener(ev, 손, {passive:true, capture:true}); });
   /* 창을 가리거나 다른 창으로 가면 잠근다 — 폰은 화면을 끄면 여기로 온다 */
-  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') kcCfgLock(); });
+  document.addEventListener('visibilitychange', function(){ if(document.visibilityState==='hidden') kcCfgLock(false,'hidden'); });
 }
 /* PIN 이 없을 때 — 신분증·계좌 탭의 「보안 설정」으로 데려간다 */
 function kcCfgGoSetPin(){
@@ -20004,7 +20039,7 @@ function initIDSecurity(){
       LS.set(NS+'id_salt', abToB64(salt.buffer));
       _idKey=await _deriveIdKey(pin, salt);
       _idDocs=Array.isArray(plain)?plain.slice():[];
-      await _persistIdDocs();
+      if(!(await _persistIdDocs())) throw new Error('신분증 암호문을 담지 못함');   /* ⚠ 평문을 지우기 «전»에 멈춘다 */
       LS.remove(NS+'id_docs');
       _idUnlocked=true; document.getElementById('idPinInput').value='';
       document.getElementById('idRemovePin').style.display=''; showIDOverlay(false); toast('PIN 설정 + 신분증 암호화 완료 — 이제 환경설정도 이 PIN 으로 잠깁니다', 6000);
@@ -21488,7 +21523,15 @@ function kcApplyRestore(ls, mode){
       /* ★ 합쳐 받는 목록(FB_UNION) — 받은 것이 «빈 목록»이어도 이 기기 것을 지우지 않는다 */
       if(FB_UNION.indexOf(bare)>=0 && mode!=='rollback'){
         var 받은=(Array.isArray(a)?a:[]).filter(function(r){ return !(r&&r.id!=null&&tombDead(tb, rv, String(r.id))); });
-        raw=JSON.stringify(_kcUnionRows(받은, LS.get(NS+bare), tb, rv));
+        var 합친=_kcUnionRows(받은, LS.get(NS+bare), tb, rv);
+        /* ⚠ 도장: 기본(def)·법인 도장(firm)은 «하나씩»이다 — 두 기기에서 따로 정했으면 합친 뒤 둘이 된다.
+             받은 쪽(먼저 놓임)을 남기고 나머지는 뗀다(2026-10-10 검토). */
+        if(bare==='stamps'){ var 기본=false, 법인=false;
+          합친=합친.map(function(r){ var c=Object.assign({}, r);
+            if(c.def){ if(기본) c.def=false; else 기본=true; }
+            if(c.firm){ if(법인) delete c.firm; else 법인=true; }
+            return c; }); }
+        raw=JSON.stringify(합친);
       }
       else if(Array.isArray(a) && a.length && a[0] && a[0].id!=null){
         if(mode==='rollback'){

@@ -421,8 +421,10 @@
     (existingRecords || []).forEach(function (r) {
       if (!r || !isIdRef(r.puRef) || r.puRefCheck) return;
       var hit = byRef[r.puRef]; if (!hit) return;
-      var amt = amountOf(hit.coll, hit.c); if (!amt) return;
+      var amt = amountOf(hit.coll, hit.c);
       var 지금 = _n(r.amt);
+      /* 이알피에서 금액이 지워졌는데(0) 예전에 받은 금액이 남아 있으면 비운다 — 안 비우면 영영 셈에 남는다 */
+      if (!amt) { if (지금 && r.amtFrom === 'erp') out.push({ puRef: r.puRef, amt: '' }); return; }
       if (지금 && r.amtFrom !== 'erp') return;                 /* 사람이 적은 금액 */
       if (지금 === amt && r.amtFrom === 'erp') return;          /* 이미 같다 */
       out.push({ puRef: r.puRef, amt: String(amt) });

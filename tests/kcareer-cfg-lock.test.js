@@ -75,11 +75,17 @@ test('② 5분 손대지 않으면 · 창을 가리면 · 「지금 잠그기」
   await 넣고풀기(w, '4826');
   w.ctx.document.visibilityState = 'hidden'; (w.듣기.visibilitychange || []).forEach((f) => f());
   assert.equal(w.잠김(), true, '창을 가리면 잠김');
-  assert.equal(vm.runInContext('_idUnlocked', w.ctx), false, '신분증도 함께 잠김');
+  /* 2026-10-10 검토: 가릴 때는 «화면만» — 폰에서 신분증을 찍으려고 카메라를 열면 창이 가려진다.
+     그때 신분증 보관함까지 잠그면 돌아와 담는 순간 버려졌다 */
+  assert.equal(vm.runInContext('_idUnlocked', w.ctx), true, '가릴 때는 신분증 보관함을 잠그지 않는다');
   w.ctx.document.visibilityState = 'visible';
+  await 넣고풀기(w, '4826');
+  vm.runInContext("kcCfgLock(false,'idle')", w.ctx);
+  assert.equal(vm.runInContext('_idUnlocked', w.ctx), false, '5분 잠금은 신분증도 함께 잠근다');
   await 넣고풀기(w, '4826');
   vm.runInContext('kcCfgLock(true)', w.ctx);
   assert.equal(w.잠김(), true, '지금 잠그기');
+  assert.equal(vm.runInContext('_idUnlocked', w.ctx), false, '지금 잠그기도 신분증까지');
   assert.equal(KC_IDLE(), 5 * 60 * 1000);
   function KC_IDLE() { return vm.runInContext('KC_CFG_IDLE_MS', w.ctx); }
 });
@@ -106,4 +112,22 @@ test('⑤ 잠겨 있으면 잠금 칸 말고는 아무것도 안 보인다 · PI
   assert.ok(/<div id="cfgLock"[^>]*>/.test(SRC) && /id="cfgPinInput"[^>]*font-size:16px/.test(SRC));
   const page = SRC.slice(SRC.indexOf('id="page-settings"'), SRC.indexOf('<div class="tabrow">', SRC.indexOf('id="page-settings"')));
   assert.ok(/id="cfgLock"/.test(page), '잠금 칸은 환경설정 .page 바로 아래(CSS 가 그 자리를 본다)');
+});
+
+test('⑥ 2026-10-10 검토 — 맞춰 볼 암호문이 없으면 열지 않는다 · 창을 닫는다 · 잠긴 칸에 쓰면 말한다', async () => {
+  const w = 세상(); await PIN정하기(w, '4826');
+  delete w.ctx.store['cm3_id_docs_enc'];
+  vm.runInContext('kcCfgApply()', w.ctx);
+  await 넣고풀기(w, '0000');
+  assert.equal(w.잠김(), true, '암호문이 없으면 아무 PIN 도 맞지 않는다');
+  const lock = strip(떼기('function kcCfgLock('));
+  assert.ok(/\.modal-ov\.open/.test(lock) && /closeForm\(\)/.test(lock), '환경설정 밖에 뜬 창(신분증 크게 보기·계좌 입력)도 닫는다');
+  assert.ok(/why!=='hidden'/.test(lock), '가릴 때는 신분증 보관함을 잠그지 않는다');
+  const setFn = strip(떼기('function set(key,arr)'));
+  assert.ok(/key==='id_docs'[\s\S]*?return false;/.test(setFn), '잠긴 신분증 칸에 쓰면 false — 조용히 버리지 않는다');
+  const save = strip(떼기('function saveForm('));
+  assert.ok((save.match(/set\(def\.store,db\)===false\) return;/g) || []).length >= 2, '못 담았으면 「등록 완료」를 띄우지 않는다');
+  const per = strip(떼기('async function _persistIdDocs('));
+  assert.ok(/===false/.test(per) && /return true;/.test(per), '담았는지 돌려준다');
+  assert.ok(/if\(!\(await _persistIdDocs\(\)\)\) throw/.test(SRC), 'PIN 정하기는 암호문을 못 담으면 평문을 지우기 전에 멈춘다');
 });
