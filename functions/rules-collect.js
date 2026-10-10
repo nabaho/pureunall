@@ -28,7 +28,7 @@ const PDF_HOLD = {
   LOST: '메일에서 PDF 를 다시 못 찾음',
   STUCK: 'PDF 다시 읽기 — 멈춤(메일에서 직접)',
 };
-function isPdfName(n) { return /.pdf$/i.test(String(n || '')); }
+function isPdfName(n) { return /\.pdf$/i.test(String(n || '')); }
 
 const val = async (db, p) => (await db.ref(p).once('value')).val();
 function isRetry(e) {
@@ -167,6 +167,7 @@ async function runOnce(o) {
   if (Object.keys(skip).length) await db.ref().update(skip);
   const healed = await heal(o, db, bucket, docs || {});
   const have = Object.assign({}, docs || {});
+  const roundBody = new Set();   // 이번 회차에 «담긴 것으로 확정된» 한글·워드 규칙본문 id — 뒤 메일의 겹침이 알아보게
   const coIndex = MR.buildCompanyIndex(companies || {});
   const domIndex = P.buildDomainIndex(companies || {});
   /* 남은 것 «모두»를 한 번 세고(메모리 안 셈이라 싸다) 이번 몫만 자른다 — left 가 이어 달리기의 잣대다 */
@@ -238,6 +239,7 @@ async function runOnce(o) {
     /* PDF 는 맨 뒤 (설계 §11-3) — 같은 메일의 한글·워드 본문이 먼저 담겨야 PDF 사본을 알아본다 */
     const ordered = (atts || []).slice().sort((x, y) => (isPdfName(x && x.name) ? 1 : 0) - (isPdfName(y && y.name) ? 1 : 0));
     let bodyStored = false;
+    const bodyIds = new Set();   // 이 메일에서 담은 한글·워드 규칙본문 — DB 쓰기가 성공해야 roundBody 로 올린다
     try {
       for (const a of ordered) {
         const ext = P.wantAtt(a.name);
@@ -258,7 +260,14 @@ async function runOnce(o) {
         }
         const sha = crypto.createHash('sha256').update(a.data).digest('hex');
         const id = P.docIdOf(sha);
-        if (has(id)) { c.dup++; ids.push(id); continue; }
+        if (has(id)) {
+          /* 겹침이어도 «한글 본문 있음» 이다 — 앞 메일·옛 회차에 이미 담긴 한글·워드 규칙본문을 이 메일이 다시 붙여 왔다면
+             같은 메일의 PDF 는 그 사본이다 (R1). 담김 상태인 비-PDF 규칙본문만 센다. */
+          const ex = have[id];
+          if (ext !== 'pdf' && (bodyIds.has(id) || roundBody.has(id)
+            || (ex && typeof ex === 'object' && ex.kind === '규칙본문' && ex.status === '담김' && !isPdfName(ex.name)))) bodyStored = true;
+          c.dup++; ids.push(id); continue;
+        }
         if (o.trace) o.trace('가리기 ' + m.mailKey + ' ' + ext + ' ' + a.data.length + 'B');
         const r = await (o.redact || X.redactOne)(a.data, ext);   // o.redact 는 검사 전용 이음매(가짜 PDF 글 주입) — index.js 는 안 넘긴다
         if (!r.ok) {
@@ -297,7 +306,7 @@ async function runOnce(o) {
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
           { kind, sha, file, textLen: r.text.length,
             pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' }) });
-        if (ext !== 'pdf' && kind === '규칙본문') bodyStored = true;
+        if (ext !== 'pdf' && kind === '규칙본문') { bodyStored = true; bodyIds.add(id); }
         staged[id] = 1; c.stored++; ids.push(id);
       }
       up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: ids, why: ids.length ? '' : '첨부 없음' };
@@ -311,6 +320,7 @@ async function runOnce(o) {
       continue;
     }
     Object.assign(have, staged);
+    bodyIds.forEach((x) => roundBody.add(x));
     sum.stored += c.stored; sum.held += c.held; sum.dup += c.dup;
   }
   sum.errors = sum.errors.slice(0, 10);

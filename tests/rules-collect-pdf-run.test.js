@@ -42,8 +42,9 @@ const docsOf = (db) => Object.values(((db.store.rules_mgmt || {}).library || {})
 
 test('한글 본문과 PDF 가 한 메일 — PDF 가 앞에 와도 PDF 는 사본 보류, 한글은 담김', async () => {
   const db = fakeDb(MAIL({ 10: { s: '가나상사 취업규칙 송부', d: 3000, e: 'hr@gana.co.kr', a: 2 } })), bucket = fakeBucket();
-  const hw = H.build(H.para(RULE_TEXT.split('\n')[0]) + H.para('제2조(정의) 사원이란 …'));
+  const hw = H.build(H.para(RULE_TEXT.split('\n')[0]) + H.para('제2조(정의) 사원이란 …') + H.para('담당 ' + RRN));
   await C.run(base(db, bucket, { 'i_INBOX-4a1e411c_10': [{ name: '가나상사_취업규칙.pdf', data: fakePdf('a') }, { name: '가나상사_취업규칙.hwpx', data: hw }] }));
+  assert.ok(!JSON.stringify(db.store.rules_mgmt).includes(RRN), '★ 원래 주민번호가 DB 어딘가에 남았다');
   const ds = docsOf(db);
   const pdf = ds.find((d) => /\.pdf$/.test(d.name)), hwp = ds.find((d) => /\.hwpx$/.test(d.name));
   assert.equal(hwp.status, '담김');
@@ -73,4 +74,40 @@ test('스캔 PDF — 보류(스캔), 글 없음', async () => {
 test('isPdfName', () => {
   assert.equal(C.isPdfName('a.PDF'), true);
   assert.equal(C.isPdfName('a.hwp'), false);
+  assert.equal(C.isPdfName('xpdf'), false);
+  assert.equal(C.isPdfName('a_pdf'), false);
+});
+
+/* R1 — 한글 본문이 «겹침»(앞 메일·옛 회차에 이미 있음)이어도 같은 메일의 PDF 는 사본 보류 */
+const hwBody = () => H.build(H.para(RULE_TEXT.split('\n')[0]) + H.para('제2조(정의) 사원이란 …'));
+
+test('뒤 메일이 같은 한글 본문을 다시 붙여 오고 새 PDF 도 — PDF 는 사본 보류 (같은 회차)', async () => {
+  const db = fakeDb(MAIL({
+    /* 회차는 «새 메일부터» 돈다(날짜 내림차순) — 한글 본문을 먼저 담는 쪽(21)이 더 새 것, 다시 붙여 온 쪽(20)이 더 옛것 */
+    21: { s: '가나상사 취업규칙', d: 4100, e: 'hr@gana.co.kr', a: 1 },
+    20: { s: 'RE: 가나상사 취업규칙', d: 4000, e: 'hr@gana.co.kr', a: 2 } })), bucket = fakeBucket();
+  const hw = hwBody();
+  await C.run(base(db, bucket, {
+    'i_INBOX-4a1e411c_21': [{ name: '가나상사_취업규칙.hwpx', data: hw }],
+    'i_INBOX-4a1e411c_20': [{ name: '가나상사_취업규칙.hwpx', data: hw }, { name: '가나상사_취업규칙_최종.pdf', data: fakePdf('c') }] }));
+  const ds = docsOf(db);
+  const pdf = ds.find((d) => /\.pdf$/.test(d.name));
+  assert.equal(ds.filter((d) => /\.hwpx$/.test(d.name)).length, 1);
+  assert.equal(pdf.status, '보류');
+  assert.equal(pdf.holdWhy, C.PDF_HOLD.COPY);
+  assert.equal(db.store.rules_mgmt.library.text[pdf.id], undefined, '★ 사본인데 글을 담았다');
+});
+
+test('한글 본문이 회차 전에 이미 담겨 있다 — 새 메일의 PDF 는 사본 보류', async () => {
+  const P = require('../functions/rules-collect-pick.js');
+  const hw = hwBody();
+  const hid = P.docIdOf(crypto.createHash('sha256').update(hw).digest('hex'));
+  const seed = MAIL({ 30: { s: '가나상사 취업규칙', d: 5000, e: 'hr@gana.co.kr', a: 2 } });
+  seed.rules_mgmt = { library: { docs: { [hid]: { id: hid, name: '가나상사_취업규칙.hwpx', kind: '규칙본문', status: '담김' } } } };
+  const db = fakeDb(seed), bucket = fakeBucket();
+  await C.run(base(db, bucket, { 'i_INBOX-4a1e411c_30': [{ name: '가나상사_취업규칙.hwpx', data: hw }, { name: '가나상사_취업규칙.pdf', data: fakePdf('d') }] }));
+  const pdf = docsOf(db).find((d) => /\.pdf$/.test(d.name));
+  assert.equal(pdf.status, '보류');
+  assert.equal(pdf.holdWhy, C.PDF_HOLD.COPY);
+  assert.equal(((db.store.rules_mgmt.library || {}).text || {})[pdf.id], undefined, '★ 사본인데 글을 담았다');
 });
