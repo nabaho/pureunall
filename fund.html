@@ -146,6 +146,11 @@
     .closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px));z-index:11}
     .ledgerwrap{overflow:visible}
     .ledgerwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px) + var(--closehead-h,156px));z-index:5;background:#f8fafc}
+    /* 🏗 설립중 기금 틀 고정(대표 2026-10-10): 제목·숫자·칩 → 목록 표 머리 → 진행판 제목·지금 할 일 띠. 높이 --sdhead-h 는 _syncTopbarH 가 잰다 */
+    .sdhead{position:sticky;top:var(--topbar-h,48px);z-index:12;margin-bottom:0}
+    .sdwrap{overflow:visible}
+    .sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:5;background:#f8fafc}
+    .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
   }
   /* 묶음마다 표가 따로라, 폭을 안 정하면 충남과 경기의 열이 어긋난다 */
   table.fixcol{table-layout:fixed}
@@ -10638,6 +10643,7 @@ function _syncTopbarH(again){
   var fh=$('fundhead'), ch=document.querySelector('.closehead');
   if(fh){ var h2=Math.round(fh.getBoundingClientRect().height); if(h2>0) _setCssVar('--fundhead-h',h2+'px'); }
   if(ch){ var h3=Math.round(ch.getBoundingClientRect().height); if(h3>0) _setCssVar('--closehead-h',h3+'px'); }
+  var sd=document.querySelector('.sdhead'); if(sd){ var h4=Math.round(sd.getBoundingClientRect().height); if(h4>0) _setCssVar('--sdhead-h',h4+'px'); }
   if(!_topbarRO && window.ResizeObserver){
     _topbarRO=new ResizeObserver(function(){ _syncTopbarH(); });
     _topbarRO.observe(t);
@@ -10898,16 +10904,17 @@ function renderSetupDash(){
       +'<td style="white-space:nowrap">'+esc(mgrMainName(f)||'—')+'</td></tr>';
   }).join('');
   var sel=rows.filter(function(r){ return r.f._id===SD.sel; })[0];
-  $('app').innerHTML='<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
+  $('app').innerHTML='<div class="panel sdhead"><div class="row" style="flex-wrap:wrap;gap:8px"><h1 style="margin:0">🏗 설립중 기금</h1>'+hlp('setup.dash')
     +'<span style="flex:1"></span><button onclick="sdReload()" title="참여사업장을 다시 읽어 빈 자료를 새로 셉니다">↻ 다시 읽기</button><button class="primary" onclick="newFund()">＋ 새 기금 등록</button></div>'
     +(list.length
       ?'<div class="row" style="gap:8px;flex-wrap:wrap;margin:8px 0 0">'+kpi('설립중',list.length)+kpi('기한 임박(7일 안)',cnt.due,cnt.due?'var(--danger)':'')+kpi('인가 기다림',cnt.wait)+kpi('빈 자료 있는 곳',cnt.gap,cnt.gap?'var(--warn)':'')+'</div>'
-        +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0">'+chips+'</div>'
-        +(vis.length?'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
+        +'<div class="row" style="flex-wrap:wrap;gap:6px;margin:10px 0 0">'+chips+'</div></div><div class="panel">'
+        +(vis.length?'<div class="sdwrap" style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table><thead><tr>'+_ckTh()+'<th style="width:36px">#</th><th>기금</th><th>유형</th><th>진행</th><th>단계</th><th>다음 할 일</th><th>기한</th><th>빈 자료</th><th>담당</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
           :'<div class="msg ok" style="font-size:13px">이 거르기에 해당하는 기금이 없습니다.</div>')
-      :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div>')
+      :'<div class="msg" style="font-size:13px;margin-top:8px">설립 중인 기금이 없습니다. [＋ 새 기금 등록]에서 «신규 설립»으로 만들면 여기에 나옵니다.</div></div><div class="panel" style="display:none">')
     +'</div>'
     +(sel?_sdBoard(sel.f,sel.st):'');
+  if(typeof _syncTopbarH==='function') _syncTopbarH();   // 틀 고정 높이를 다시 잰다
 }
 /* 진행판 — 고른 기금 하나 */
 function _sdBoard(f,st){
@@ -10946,14 +10953,14 @@ function _sdBoard(f,st){
       return '<tr'+(cur?' style="background:var(--warn-bg)"':'')+'>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td>'+(cur?'<b>'+esc(p[1])+'</b>':esc(p[1]))+'</td><td>'+stt+'</td>'
         +'<td><button'+(cur?' class="primary"':'')+' onclick="event.stopPropagation();sdBundle(\''+fid+'\',\''+p[0]+'\')" style="padding:2px 9px">📑 열기</button></td></tr>'; }).join('')
     +'</tbody></table></div>';
-  return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
+  return '<div class="panel"><div class="sdbhead"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="margin:0;font-size:16px">'+esc(f.short_name||f.name||fid)+' — 진행판</h2>'
     +'<span class="chip" style="font-size:10.5px">'+esc(f.fund_type||'—')+'</span><span class="chip warn" style="font-size:10.5px">'+st.nD+'/'+st.steps.length+'</span>'
     +'<span style="flex:1"></span><button onclick="sdOpen(\''+fid+'\',\'setup\')">📂 기금 열기</button>'
     +'<button onclick="trashFund(\''+fid+'\')" style="color:var(--danger)">🗑 설립 취소(보관)</button></div>'
     +(nx?'<div class="row" style="gap:10px;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:10px 14px;margin:10px 0">'
       +'<span>지금 할 일</span><b style="font-size:14px">'+_sdNo(nx[0])+' '+esc(nx[1])+due+'</b><span style="flex:1"></span>'+act+'</div>'
       :'<div class="msg ok" style="margin:10px 0">12단계를 모두 마쳤습니다 — [📂 기금 열기]에서 [✅ 운영 전환]을 누르면 기금 현황으로 옮겨 갑니다.</div>')
-    +'<div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px">'+groups+'</div>'
+    +'</div><div class="sdflow" style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:0 0 12px">'+groups+'</div>'
     +'<div class="sdgrid" style="display:grid;grid-template-columns:1.25fr 1fr;gap:12px">'
     +'<div><div class="row" style="margin-bottom:6px"><b>📝 빈 자료'+(st.nGap?' '+st.nGap+'가지':'')+'</b>'+hlp('setup.gaps')+'</div>'+gaps+'</div>'
     +'<div><div class="row" style="margin-bottom:6px"><b>📑 서류 묶음</b>'+hlp('estab.bundle')+'</div>'+bundles+'</div></div></div>';

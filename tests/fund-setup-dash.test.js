@@ -68,3 +68,18 @@ test('★ 배선 — 새 기금 등록 바로 아래 칸, 화면 이동, 옛 길
   assert.ok(fnSrc('toggleSetup').includes("'/setup/'+code).set({done:on,date:on?ymd():''})"));
   assert.match(SRC, /'setup\.dash':\{t:'설립중 기금'/);
 });
+
+test('★ 틀 고정 — 제목·숫자·칩 → 표 머리 → 진행판 띠, 높이를 재고, 넓은 화면(1000px~)만', () => {
+  const css = SRC.slice(SRC.indexOf('.ledgerwrap{overflow-x:auto}'), SRC.indexOf('table.fixcol{table-layout:fixed}'));
+  assert.ok(css.includes('.sdhead{position:sticky;top:var(--topbar-h,48px)'), '머리가 안 붙는다');
+  assert.ok(css.includes('.sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px))'), '표 머리가 안 붙는다');
+  assert.ok(css.includes('.sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px))'), '진행판 띠가 안 붙는다');
+  assert.ok(css.indexOf('@media(min-width:1000px)') < css.indexOf('.sdhead{'), '폰에서도 붙는다(화면이 좁아 가려진다)');
+  assert.ok(fnSrc('_syncTopbarH').includes("_setCssVar('--sdhead-h'"), '머리 높이를 안 잰다');
+  const r = fnSrc('renderSetupDash');
+  assert.ok(r.includes('class="panel sdhead"') && r.includes('class="sdwrap"') && r.includes('_syncTopbarH()'));
+  assert.ok(fnSrc('_sdBoard').includes('<div class="sdbhead">'));
+  /* 짝이 맞는가 — 판(panel) 여닫음이 어긋나면 아래 판이 안으로 말려 들어간다 */
+  const cnt = (s, re) => (s.match(re) || []).length;
+  for (const fn of ['renderSetupDash', '_sdBoard']) { const t = fnSrc(fn); assert.equal(cnt(t, /<div/g) - cnt(t, /<\/div>/g), 0, fn + ' div 가 안 맞는다'); }
+});
