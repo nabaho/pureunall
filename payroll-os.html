@@ -15,6 +15,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=60"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-dnd.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -742,7 +743,7 @@ function relockFor(index, locked){
   return {locked:out, moved:moved, lost:lost};
 }
 
-function importPayroll(){var i=document.createElement('input');i.type='file';i.accept='.json';
+function importPayroll(dropped){var i=document.createElement('input');i.type='file';i.accept='.json';
   i.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
    r.onload=function(){
     var raw; try{ raw=JSON.parse(r.result); }catch(err){ alert('JSON 오류: '+err.message); return; }
@@ -812,7 +813,7 @@ function importPayroll(){var i=document.createElement('input');i.type='file';i.a
       setSaveState('failed','저장 실패');
       alert('올리다 멈췄습니다 — '+(err&&(err.code||err.message))+'\n\n목록은 아직 안 바뀌었으니 화면은 그대로입니다. 다시 시도해 주세요.');
     });
-   };r.readAsText(f);};i.click();}
+   };r.readAsText(f);};if(dropped&&dropped.length&&window.PuDnd)PuDnd.pick(i,dropped);else i.click();}
 window.importPayroll=importPayroll;window.toggleLock=toggleLock;
 window.lockAllGreen=lockAllGreen;window.toggleOnlyReview=toggleOnlyReview;
 
@@ -2602,7 +2603,7 @@ function rrnUploadMap(json, key){
     return {up:up, n:pairs.length, bad:bad, dup:skipped};
   });
 }
-function uploadRrn(){
+function uploadRrn(dropped){
   var i=document.createElement('input'); i.type='file'; i.accept='.json';
   i.onchange=function(e){ var f=e.target.files[0]; if(!f) return; var r=new FileReader();
     r.onload=function(){
@@ -2616,7 +2617,7 @@ function uploadRrn(){
         });
       }).catch(function(err){ alert('주민번호 올리기 실패: '+((err&&err.code)||err.message||err)); });
     }; r.readAsText(f); };
-  i.click();
+  if(dropped&&dropped.length&&window.PuDnd) PuDnd.pick(i,dropped); else i.click();
 }
 function revealRrn(site, name){
   var rec=rrnRec(site, name); if(!rec){ alert('등록된 주민번호가 없습니다.'); return; }
@@ -3467,7 +3468,7 @@ function render(){
 }
 /* 간이세액표 올리기 — 모양을 먼저 본다. 잘못된 파일이 들어가면 세금이
    조용히 0 이 되거나 엉뚱해진다(가장 찾기 어려운 종류의 고장). */
-function importTaxTable(){var i=document.createElement('input');i.type='file';i.accept='.json';
+function importTaxTable(dropped){var i=document.createElement('input');i.type='file';i.accept='.json';
   i.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
    r.onload=function(){try{
      var t=JSON.parse(r.result);
@@ -3477,11 +3478,11 @@ function importTaxTable(){var i=document.createElement('input');i.type='file';i.
      if(t.rows[t.rows.length-1].max!=null) throw new Error('마지막 구간에 상한이 있습니다 — 높은 급여가 「표없음」이 됩니다');
      dbSet('tax_table',t);
      alert('간이세액표 저장 완료 — '+(t.연도||'')+'년 · 구간 '+t.rows.length+'개 · 가족 칸 '+t.rows[0].tax.length+'개');
-   }catch(err){alert('간이세액표 오류: '+err.message);}};r.readAsText(f);};i.click();}
+   }catch(err){alert('간이세액표 오류: '+err.message);}};r.readAsText(f);};if(dropped&&dropped.length&&window.PuDnd)PuDnd.pick(i,dropped);else i.click();}
 window.importTaxTable=importTaxTable;
-function importCards(){var i=document.createElement('input');i.type='file';i.accept='.json';
+function importCards(dropped){var i=document.createElement('input');i.type='file';i.accept='.json';
   i.onchange=function(e){var f=e.target.files[0];if(!f)return;var r=new FileReader();
-   r.onload=function(){try{var raw=JSON.parse(r.result);var a=Array.isArray(raw)?raw:Object.values(raw);dbSet('site_cards',a);alert('카드 '+a.length+'개 서버 저장 완료');}catch(err){alert('JSON 오류: '+err.message);}};r.readAsText(f);};i.click();}
+   r.onload=function(){try{var raw=JSON.parse(r.result);var a=Array.isArray(raw)?raw:Object.values(raw);dbSet('site_cards',a);alert('카드 '+a.length+'개 서버 저장 완료');}catch(err){alert('JSON 오류: '+err.message);}};r.readAsText(f);};if(dropped&&dropped.length&&window.PuDnd)PuDnd.pick(i,dropped);else i.click();}
 window.importCards=importCards;window.doLogin=doLogin;window.doLogout=doLogout;window.goBack=goBack;
 </script>
 <script>
@@ -3503,6 +3504,8 @@ window.importCards=importCards;window.doLogin=doLogin;window.doLogout=doLogout;w
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
 <script src="js/pu-back.js?v=2"></script>
+<!-- 파일 끌어다 놓기(2026-10-10) — JSON 을 받는 네 곳. 모두 서버를 덮어쓰는 일이라 exact: 단추 «위»에서만 받는다(화면 아무 데나 놓아 덮어쓰지 않게) -->
+<script>try{ PuDnd.init({ rules:{ importPayroll:{ext:['json'],argc:0,exact:true}, importCards:{ext:['json'],argc:0,exact:true}, importTaxTable:{ext:['json'],argc:0,exact:true}, uploadRrn:{ext:['json'],argc:0,exact:true} } }); }catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

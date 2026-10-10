@@ -3858,8 +3858,9 @@ function dropZoneSlim(id,label,hint,accept){
    ⚠ 놓을 곳이 없어도 브라우저가 파일을 «열어 버리지» 않게 늘 preventDefault 한다.
    ⚠ 받는 함수는 마지막 인자로 파일 배열(dropped)을 받는다 — 없으면 예전처럼 폴더 찾기를 연다(_pickGo). */
 var DND_RULES={
-  importBank:{ext:['xls','xlsx'],argc:0}, importFundsInfo:{ext:['json'],argc:0}, importSubsidy:{ext:['json'],argc:0}, importSites:{ext:['json'],argc:0},
-  pickTpl:{ext:['xlsx'],argc:1}, pickHwp:{ext:['hwp','hwpx'],argc:1}, hwpTplUpload:{ext:['hwpx','hwp'],argc:1},
+  importBank:{ext:['xls','xlsx'],argc:0}, importFundsInfo:{ext:['json'],argc:0}, importSubsidy:{ext:['json'],argc:0}, importSites:{ext:['json'],argc:0,exact:true},
+  /* exact — «덮어쓰는» 일(원본·틀 교체, 사업장 백업)은 단추 «위»에서만 받는다. 화면 아무 데나 놓아 원본을 갈아 끼우지 않게 */
+  pickTpl:{ext:['xlsx'],argc:1,exact:true}, pickHwp:{ext:['hwp','hwpx'],argc:1,exact:true}, hwpTplUpload:{ext:['hwpx','hwp'],argc:1,exact:true},
   pickHwpBulk:{ext:['hwp','hwpx'],argc:0,multi:true}, wrepBulkPick:{ext:['pdf','jpg','jpeg','png'],argc:0,multi:true},
   cmImportPick:{ext:['hwp','hwpx','pdf','jpg','jpeg','png'],argc:0,multi:true}, uploadSubDoc:{ext:null,argc:0}
 };
@@ -3897,7 +3898,7 @@ function _dndStart(){
   _dnd.cands.forEach(function(c){ c.el.classList.add('dnd-ok'); });
   var n=_dnd.cands.length;
   _dndBar(n===0?'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요'
-    :n===1?'📥 여기 아무 데나 놓으면 «'+String(_dnd.cands[0].el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»'
+    :(n===1&&!DND_RULES[_dnd.cands[0].fn].exact)?'📥 여기 아무 데나 놓으면 «'+String(_dnd.cands[0].el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»'
     :'📥 노란 점선 단추 위에 놓으세요 ('+n+'곳)');
 }
 function _dndEnd(){
@@ -3911,10 +3912,10 @@ function _dndRun(files,hot,cands){
   var info=null, fit=null;
   if(hot){ info=_dndParse(hot); }
   else {
-    var okc=cands.filter(function(c){ return _dndFit(c,files).ok; });
+    var free=cands.filter(function(c){ return !DND_RULES[c.fn].exact; }), okc=free.filter(function(c){ return _dndFit(c,files).ok; });
     if(okc.length===1) info=okc[0];
-    else if(cands.length===1) info=cands[0];
-    else { toast(cands.length?'받는 곳이 여러 곳입니다 — 노란 점선 단추 위에 놓으세요':'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요','warn'); return; }
+    else if(free.length===1&&cands.length===1) info=free[0];
+    else { toast(cands.length?(free.length?'받는 곳이 여러 곳입니다 — 노란 점선 단추 위에 놓으세요':'이 일은 실수로 덮어쓰지 않게 단추 «위»에 놓아야 합니다'):'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요','warn'); return; }
     if(!hot&&info) toast('«'+String(info.el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»(으)로 받습니다');
   }
   if(!info){ toast('이 자리는 파일을 받지 않습니다','warn'); return; }
