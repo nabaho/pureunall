@@ -79,8 +79,8 @@ test('ⓓ 휴직 · 이름표 없는 위임장 · 회사 계약', () => {
   ['공인노무사', '대표노무사', '공인노무사명', '푸른노무법인 대표 권형하노무사'].forEach((t) =>
     assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLineEdits([{ key: 0, text: t }], L, true))), [], '이름표·서명 줄은 그대로: ' + t));
   const H = fs.readFileSync(path.join(__dirname, '..', 'docs-esign.html'), 'utf8');
-  assert.match(H, /EsignHwpTpl\.applyLawyerLine\(doc, lawLine\); r = EsignHwpTpl\.fillDoc\(doc, V\);/, '계약서 양식 채우기에서');
-  assert.match(H, /EsignHwpTpl\.applyLawyerLine\(doc, V\.공인노무사명단\);/, '집단체불 서류에서');
+  assert.match(H, /EsignHwpTpl\.applyLawyerLine\(doc, lawLine, lawLines\); EsignHwpTpl\.expandLawyerMarker\(doc, lawLines\); r = EsignHwpTpl\.fillDoc\(doc, V\);/, '계약서 양식 채우기에서(한 줄에 한 명)');
+  assert.match(H, /EsignHwpTpl\.applyLawyerLine\(doc, V\.공인노무사명단, lawLines\);[^\n]*\n\s*EsignHwpTpl\.expandLawyerMarker\(doc, lawLines\);/, '집단체불 서류에서');
   assert.match(H, /softGet\('data\/user_dir'\), softGet\('data\/leave_of_absence'\)/);
   assert.match(SRC, /soft\('data\/user_dir'\), soft\('data\/leave_of_absence'\)/);
   const list = [{ id: 'c1', contractNo: 'C-1', companyName: '(주)가나상사', signDate: '2025-01-01' }, { id: 'c2', contractNo: 'C-2', bizNo: '123-45-67890', companyName: '다른이름', signDate: '2026-01-01' },
@@ -132,4 +132,37 @@ test('ⓕ 미리보기 명단', async () => {
     assert.equal((await C.withLawyerNames(u8, '위임장.hwp')).bytes, u8, '엔진이 못 열면 원본 그대로');
   } finally { W.PuFormCardFill = keep.CF; W.EsignHwpTpl = keep.T; W.PureunHwp = keep.H; }
   assert.match(SRC, /srcBytes\(src\)\.then\(function \(u8\) \{ return withLawyerNames\(u8, src\.name\); \}\)/, '원본 모양이 명단을 넣어 그린다');
+});
+
+/* ⓖ 노무사 이름은 한 줄에 한 명씩 세로로 (대표 지시 2026-10-10 「세로로 열을 맞추어 … 한 줄에 1명씩 공인노무사로 … 모든 위임장은 똑같이」) */
+test('ⓖ 세로 명단', () => {
+  const dir = [{ sid: 'P-001', name: '권형하', title: '대표노무사', status: 'active' }, { sid: 'P-003', name: '박한별', status: 'active' },
+    { sid: 'P-004', name: '김혜민', status: 'active' }, { sid: 'P-009', name: '퇴사자', status: 'resigned' }, { sid: 'P-010', name: '휴직자', status: 'active' }, { sid: 'A-001', name: '직원', status: 'active' }];
+  const loa = [{ sid: 'P-010', status: 'active', startDate: '2026-10-01' }];
+  const ppl = CF.lawyerPeople(dir, loa, '2026-10-10');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(CF.lawyerLines(ppl))), ['공인노무사 권형하', '공인노무사 박한별', '공인노무사 김혜민'], '대표 먼저 · 한 줄에 한 명 · 퇴사·휴직·직원 제외');
+  const ros = CF.lawyersRoster(dir, loa, '2026-10-10');
+  assert.deepStrictEqual(ros.map((r) => r.name + ':' + (r.on ? 'on' : r.why)), ['권형하:on', '박한별:on', '김혜민:on', '퇴사자:퇴사', '휴직자:휴직 중'], '관리 화면은 빠진 사람과 까닭도 보인다');
+  const dl = '대표 공인노무사 권형하, 공인노무사 박한별·김혜민';
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLinesOf(dl, dl, ['X', 'Y']))), ['X', 'Y'], '고치지 않았으면 기본 줄들');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLinesOf('대표 공인노무사 권형하, 공인노무사 박한별·김혜민', 'z', []))), ['공인노무사 권형하', '공인노무사 박한별', '공인노무사 김혜민'], '고친 값은 쪼개 「공인노무사 ○○○」 꼴로');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(T.lawyerLinesOf('', dl, ['X']))), []);
+  assert.equal(T.spacesFor('  성        명 : ') > 12 && T.spacesFor('  성        명 : ') < 24, true, '앞 너비만큼 빈칸');
+  assert.equal(T.spacesFor(''), 0);
+  /* 가짜 문서로 — 표지 줄이 「성 명 : 」 뒤에 홀로 서면 세로로, 아니면 그대로 */
+  const paras = ['  성        명 : {{공인노무사명단}}', '신고서 담당: {{공인노무사명단}} 외', '끝'];
+  const log = [];
+  const doc = {
+    searchAllText: () => JSON.stringify(paras.map((p, i) => ({ sec: 0, para: i, charOffset: 0, length: 9, cellContext: null })).filter((h) => paras[h.para].includes('{{공인노무사명단}}'))),
+    getParagraphLength: (s, k) => paras[k].length, getTextRange: (s, k, o, n) => paras[k].slice(o, o + n),
+    deleteText: (s, k, o, n) => { paras[k] = paras[k].slice(0, o) + paras[k].slice(o + n); }, insertText: (s, k, o, t) => { paras[k] = paras[k].slice(0, o) + t + paras[k].slice(o); },
+    getParaPropertiesAt: () => '{"paraShapeId":7}', setParaShapeId: (s, k, id) => log.push(['shape', k, id]),
+    splitParagraph: (s, k, off, meta) => { log.push(['split', k, JSON.parse(meta).para_shape_id]); paras.splice(k + 1, 0, ''); }
+  };
+  assert.equal(T.expandLawyerMarker(doc, ['공인노무사 권형하', '공인노무사 박한별', '공인노무사 김혜민']), 1);
+  assert.equal(paras[0], '  성        명 : 공인노무사 권형하');
+  assert.ok(/^ +공인노무사 박한별$/.test(paras[1]) && /^ +공인노무사 김혜민$/.test(paras[2]), '이어지는 줄은 앞을 띄어 맞춘다');
+  assert.equal(paras[1].indexOf('공'), paras[2].indexOf('공'), '첫 글자가 한 줄로 선다');
+  assert.equal(paras[3], '신고서 담당: {{공인노무사명단}} 외', '「성 명 :」 줄이 아닌 칸은 그대로 두어 한 줄로 채운다');
+  assert.deepStrictEqual(log.filter((x) => x[0] === 'split').map((x) => x[2]), [7, 7], '새 문단은 원래 문단 모양을 따른다');
 });
