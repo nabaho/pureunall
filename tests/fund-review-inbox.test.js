@@ -90,7 +90,7 @@ test('★ 배선 — 메뉴 맨 위 · 길 · □·# · ⓘ · 키(한글 입력
   assert.match(SRC, /id="nav-review" onclick="go\(\\'review\\'\)"/);
   assert.ok(SRC.indexOf('id="nav-review"') < SRC.indexOf('id="nav-home-wrap"'), '확인함이 맨 위가 아니다');
   assert.match(fnSrc('route'), /else if\(S\.view==='review'\) renderReview\(\);/);
-  assert.match(fnSrc('route'), /\['home','billing','forms','review'\]/);
+  assert.match(fnSrc('route'), /\['home','billing','forms','review'(,'setup')?\]/);
   assert.match(fnSrc('renderReview'), /<th style="width:34px">□<\/th><th style="width:40px">#<\/th>/);
   assert.match(SRC, /'review\.inbox':\{t:'확인함 — 기계가 넣은 것을 사람 눈으로'/);
   const k = fnSrc('_rvBindKeys');

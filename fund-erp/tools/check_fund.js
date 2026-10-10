@@ -408,8 +408,11 @@ ok('실수로 지운 기금을 되살리는 길을 알려 준다', src.includes(
 ok('머리줄은 고른 묶음만 말한다', /var curInc=[^;]*_curList\.filter\(/.test(src)
   && !src.includes("'<h1>기금 현황</h1><span class=\"stat\">운영 '"));
 // 빈 묶음을 사이드바에 남기면 누를 것도 없는 줄이 자리만 차지한다(묶음이 늘어도 뜻은 같다)
-ok('빈 설립중·종료·삭제는 사이드바에서 숨긴다',
-  /if\(!n && \(g\[0\]==='setup'\|\|g\[0\]==='trash'\|\|g\[0\]==='past'[^)]*\)\) return '';/.test(src));
+/* 2026-10-10: 설립중은 기금 현황 하위에서 빼고 새 기금 등록 아래 🏗 칸(설립중 기금 대시보드)으로 옮겼다 */
+ok('빈 종료·삭제는 사이드바에서 숨긴다',
+  /if\(!n && \(g\[0\]==='trash'\|\|g\[0\]==='past'[^)]*\)\) return '';/.test(src));
+ok('설립중은 기금 현황 하위에 두지 않고 새 기금 등록 아래 따로',
+  src.includes("if(g[0]==='setup') return '';") && src.includes('id="nav-setup" onclick="go(\\\'setup\\\')"'));
 ok('[기금 현황]을 누르면 첫 하위로 (대표 선택 ②-나)',
   /function goHome\(\)\{[\s\S]{0,240}?S\.homeTab='지역공동';[\s\S]{0,240}?go\('home'\);/.test(src));
 /* ── 하위 묶음 접기·펴기 ── (대표 지시)
