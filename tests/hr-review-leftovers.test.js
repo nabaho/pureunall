@@ -32,18 +32,9 @@ const bare = (s) => s.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm,
 
 /* ── 퇴직금 계산을 실제로 돌린다 ── */
 function severanceOf(rows, hire, retire){
-  const c = {
-    dbGet: (k, d) => (k === 'payroll_monthly' ? rows : d),
-    Date, Math, parseInt, parseFloat, isFinite,
-  };
-  vm.createContext(c);
-  vm.runInContext(
-    cutFn(src, 'function calcLegalAllowances(') + '\n'
-    + cutFn(src, 'function calcAverageWage(') + '\n'
-    + cutFn(src, 'function calcOrdinaryDailyWage(') + '\n'
-    + cutFn(src, 'function calcLegalSeverance(') + '\n'
-    + 'this.run = calcLegalSeverance;', c);
-  return c.run('A-001', hire, retire);
+  /* 2026-10-10 인사관리 3단계: 퇴직금은 급여 계산(calcPayroll)을 거친다 — 급여·퇴직 계산 한 벌을 싣는 공용 도우미 */
+  const c = require('./lib-hr-env.js').hrEnv({ payroll_monthly: rows });
+  return c.calcLegalSeverance('A-001', hire, retire);
 }
 const PAY = (ym) => ({ empSid: 'A-001', ym: ym, status: 'confirmed', baseSalary: 3000000 });
 
