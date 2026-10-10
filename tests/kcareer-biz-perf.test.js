@@ -135,3 +135,10 @@ test('⑥ 실측 고침 — html 만 오는 본문 · 스캔 PDF 는 AI 에게 �
   assert.ok(/KcareerBiz\.ownerGuess\(읽음\.text, 이름\)/.test(own), 'AI 답도 명부로 다시 거른다 — 지어낸 이름은 못 들어온다');
   assert.ok(/AI 판독/.test(own), 'AI 가 읽었으면 그렇다고 적는다');
 });
+
+test('⑦ 2026-10-10 검토 — 담당자는 «그 메일»(칸+번호)에 적고, 읽는 중엔 다시 찾기를 막는다', () => {
+  const own = strip(떼기('async function bizMailOwner('));
+  assert.ok(/y\.k===x\.k && y\.box===x\.box/.test(own), '차례·제목이 아니라 칸+번호로 찾는다');
+  assert.ok(/_bizOwnBusy/.test(strip(떼기('async function bizMailScan('))), '읽는 중 다시 찾으면 덮는다 — 막는다');
+  assert.equal(B.perfYear({ year: '1999' }), '1999', '이알피 연도 셈과 같은 잣대(19xx)');
+});
