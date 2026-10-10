@@ -124,20 +124,49 @@ test('⑧ 칸 용량은 «그려진 줄 수»로 잰다 — 폰(5줄)에서 6으
   assert.match(몸, /querySelectorAll\("\.day"\)\.length \/ 7/, '그려진 줄 수를 안 셉니다');
 });
 
-/* ── 폰 ㉮ «칸은 막대 · 그날 목록 · 밀어 넘기기» (대표 지시 2026-09-27 「폰화면 ui도 구글처럼 사용이
-   같아야한다」 — 다른 방에서 짓던 것을 이어 마무리) ── */
-test('⑨ 폰 달 보기 아래에 «고른 날 목록»이 붙는다 — 칸에서 못 읽는 제목을 여기서 읽는다', () => {
+/* ── 폰 ㉮ → ㉯ «날을 누르면 그날 목록 · 밀어 넘기기» ──
+   ㉮ (2026-09-27 「폰화면 ui도 구글처럼 사용이 같아야한다」): 칸은 막대, 아래에 늘 그날 목록.
+   ㉯ (2026-10-10 「구글캘린더 폰에서 사용하는 것과 완벽하게 똑같이」 + 폰 홈 화면 구글 월 위젯 캡처):
+      칸은 «제목 칩», 달력이 화면을 가득 채우고, 그날 목록은 날을 눌렀을 때 «아래에서 올라온다». */
+test('⑨ 폰 달 보기 — 날을 누르면 «그날 목록»이 올라온다(달력은 화면을 가득 채운다)', () => {
   const 몸 = 함수몸(캘린더, 'function calendarHtml(eumOnly){');
-  assert.match(몸, /폰목록Html\(eumOnly\)/, '폰에 그날 목록이 없습니다');
-  const 목록 = 함수몸(캘린더, 'function 폰목록Html(eumOnly){');
+  assert.match(몸, /폰시트Html\(eumOnly\)/, '폰에 그날 목록 창이 없습니다');
+  assert.ok(!/\+ 폰목록Html\(eumOnly\)/.test(몸), '달력 아래에 목록이 늘 붙어 있습니다 — ㉯ 는 화면을 가득 채웁니다');
+  const 시트 = 함수몸(캘린더, 'function 폰시트Html(eumOnly){');
+  assert.match(시트, /S\.sheet/, '올라온 창이 S.sheet 를 안 봅니다');
+  assert.match(시트, /data-sheetclose/, '올라온 창을 닫는 길이 없습니다');
+  const 목록 = 함수몸(캘린더, 'function 폰목록Html(eumOnly, 날){');
   assert.match(목록, /data-ev=/, '목록 줄을 눌러 여는 길이 칩과 다릅니다');
   assert.match(목록, /data-mnew/, '빈 날에 넣는 길이 없습니다');
+  assert.match(목록, /var ds = 날 \|\| 고른날\(\)/, '달 밖 날짜(9/30 등)를 눌러도 그 날 것이 나와야 합니다');
+});
+test('⑨㉯ 폰 칸은 «제목 칩» — 가는 줄(글자 0)로 되돌아가지 않는다', () => {
+  assert.ok(!/body\.mob \.ev\{[^}]*font-size:0/.test(캘린더), '폰 칩이 다시 글자 없는 줄이 됐습니다');
+  assert.ok(!/body\.mob \.ev > \*\{display:none\}/.test(캘린더), '폰 칩의 글자를 숨깁니다');
+  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px/, '폰 칩 글자 크기(위젯 캡처 실측)가 없습니다');
+  assert.match(캘린더, /body\.mob #app\.fit \.cal\{flex:1 1 0/, '달력이 화면을 가득 채우지 않습니다');
+});
+test('⑨㉯ 폰 칩은 위젯처럼 — 지난 날도 같은 색, 밝은 칩은 어두운 글자', () => {
+  const e = { text: '1000 가나상사', date: '2026-09-20', end: '2026-09-20', time: '', color: '#2563eb', store: 'my_schedules', id: 'a' };
+  const 지난 = 칩(true, e);          /* 오늘 9/27 — 9/20 은 지난 날 */
+  assert.ok(/background:#2563eb/i.test(지난), '폰에서 지난 일정을 옅게 칠했습니다(위젯은 안 그렇다): ' + 지난);
+  const 넓은 = 칩(false, e);
+  assert.ok(!/background:#2563eb/i.test(넓은), '넓은 화면의 «지난 일정 옅게»가 사라졌습니다');
+  const 노랑 = 칩(true, Object.assign({}, e, { color: '#f6bf26' }));
+  assert.ok(/color:#1f1f1f/.test(노랑), '밝은 칩에 흰 글자를 씁니다: ' + 노랑);
+  assert.ok(/color:#ffffff/.test(지난), '어두운 칩인데 흰 글자가 아닙니다: ' + 지난);
+});
+test('⑨㉯ 올라온 창 — 달을 넘기면 닫히고, 「최신」 표시는 평소 점 하나로 줄어든다', () => {
+  assert.match(캘린더, /if\(t\.hasAttribute\('data-mv'\)\)\{\s+S\.sheet = false;/, '‹ › 로 달을 넘겨도 올라온 창이 안 닫힙니다');
+  assert.match(캘린더, /S\.pick = null; S\.sheet = false;/, '밀어서 달을 넘겨도 올라온 창이 안 닫힙니다');
+  assert.match(캘린더, /if\(S\.sheet\)\{ e\.preventDefault\(\); S\.sheet = false; render\(\); \}/, 'ESC 로 안 닫힙니다');
+  assert.match(캘린더, /#pu-version-fab\[style\*="255, 255, 255"\]/, '「최신」 표시가 칸을 가립니다');
 });
 test('⑨ 폰에서 날을 누르면 «그 날을 본다» — 새로 넣기 창을 바로 띄우지 않는다(넓은 화면은 그대로)', () => {
   const i = 캘린더.indexOf("if(t.hasAttribute('data-day')){");
   assert.ok(i >= 0);
   const 길 = 캘린더.slice(i, i + 300);
-  assert.match(길, /폰\(\) && S\.view === 'month'\)\{ S\.pick = 날짜;/, '폰에서 날을 누르면 바로 쓰는 창이 뜹니다');
+  assert.match(길, /폰\(\) && S\.view === 'month'\)\{ S\.pick = 날짜; S\.sheet = true;/, '폰에서 날을 누르면 바로 쓰는 창이 뜹니다');
   assert.match(길, /openNew\(날짜\)/, '넓은 화면의 새로 넣기가 사라졌습니다');
 });
 test('⑨ 좌우로 밀어 달을 넘기되, 칩(끌어 옮기기) 위에서 시작한 손짓은 안 받는다', () => {

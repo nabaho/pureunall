@@ -627,18 +627,20 @@
     font-size:12px;padding:0 10px;height:30px;cursor:pointer;font-family:inherit;white-space:nowrap}
   body.mob .mnav{border:none;background:transparent;font-size:24px;color:var(--gtext);width:40px;height:40px;
     border-radius:50%;cursor:pointer;font-family:inherit}
-  body.mob .mplus{border:none;background:var(--gtoday);color:#ffffff;font-size:22px;font-weight:700;width:62px;height:40px;
+  body.mob .mplus{border:none;background:#2563eb;color:#ffffff;font-size:22px;font-weight:700;width:62px;height:40px;
     border-radius:20px;margin-left:6px;cursor:pointer;font-family:inherit}
   body.mob .mmenu{border:none;background:transparent;color:var(--gsub);font-size:16px;width:30px;height:40px;cursor:pointer}
   body.mob .cal{border:none;border-radius:0}
   body.mob .mhd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex:none;border-bottom:1px solid var(--gline)}
-  body.mob .mhd div{text-align:center;font-size:14px;font-weight:500;color:var(--gtext);padding:4px 0;
+  body.mob .mhd div{text-align:center;font-size:13px;font-weight:500;color:var(--gtext);padding:4px 0;
     border-right:1px solid var(--gline)}
   body.mob .mhd div:last-child{border-right:none}
-  body.mob .day{padding:3px 2px 1px}
+  body.mob .day{padding:2px 2px 1px}
   body.mob .dline{margin-bottom:2px}
-  body.mob .dnum{min-width:20px;height:20px;font-size:11.5px;padding:0 3px;font-weight:400}
-  body.mob .lun{font-size:11px}
+  /* 날짜는 작고 «흐리게» — 위젯 캡처가 그렇다(오늘만 파란 동그라미) */
+  body.mob .dnum{min-width:20px;height:20px;font-size:10.5px;padding:0 3px;font-weight:400}
+  body.mob .dnum:not(.today){color:var(--gsub)}
+  body.mob .lun{font-size:10.5px}
   body.mob .ev{font-size:11px;line-height:16px;padding:1px 3px;border-radius:3px;font-weight:500;text-overflow:clip}
   body.mob .evph{height:18px}
   body.mob .evs{gap:2px}
@@ -647,6 +649,12 @@
   /* ⚠ 어두운판의 :root[data-theme=dark] .day.today 테두리보다 «세게» 써야 이긴다 */
   html body.mob .cal .day.today{outline:none}
   body.mob .day.today .lun{color:var(--gtoday)}
+  /* 오늘 동그라미 — 위젯은 «진한 파랑에 흰 글자»다(어두운판 규칙이 연한 하늘색+검정 글자라 !important 로 이긴다, 2026-10-10) */
+  html body.mob .dnum.today{background:#2563eb !important;color:#ffffff !important}
+  /* 「최신」 새로보기 표시(js/pu-version.js, 모든 앱 공용) — 평소(흰 바탕 = 최신·확인 중)엔 점 하나로 줄여 칸을 안 가린다.
+     「새 버전 있음」(파란 바탕)은 그대로 둔다 — 이것은 눈에 띄어야 한다. 흰 바탕을 못 알아보면 «줄지 않을 뿐»이다(안전한 쪽). */
+  body.mob #pu-version-fab[style*="255, 255, 255"]{padding:7px !important;gap:0 !important;opacity:.7}
+  body.mob #pu-version-fab[style*="255, 255, 255"] > span:last-child{display:none}
   /* ── 폰 ㉮ — 칸은 «막대»만, 읽는 것은 아래 «그날 목록»에서 (대표 지시 2026-09-27
        「폰화면 ui도 구글처럼 사용이 같아야한다」) ──
      왜: 배포본을 폰 크기(375×812)로 재 보니 날짜 칸이 53px, 칩이 49px 이라
@@ -657,17 +665,30 @@
   body.mob .mhead{flex:none}
   /* ⚠ #app.fit .cal 이 아이디라 더 세다 — 그것을 이기려면 여기도 #app.fit 을 짚어야 한다.
      안 짚으면 달력이 flex:1 로 남아 목록이 화면의 3분의 2를 먹는다(2026-09-27 실제로 그랬다). */
-  body.mob #app.fit .cal{flex:3 1 0;min-height:180px}
-  body.mob .ev{font-size:0;line-height:0;height:5px;padding:0;border-radius:3px;overflow:hidden}
-  body.mob .ev > *{display:none}
-  body.mob .evph{height:5px}
+  /* ★ 폰 ㉯ (2026-10-10) — 위 ㉮ 를 «되돌렸다». 대표 지시 「구글캘린더 폰에서 사용하는 것과 완벽하게 똑같이」 +
+       폰 홈 화면의 «구글 캘린더 월 위젯» 캡처:
+       ① 칸마다 «제목이 적힌 색 칩»(한 칸 다섯 개 안팎, 글자는 칸 끝에서 그냥 잘린다 — 위젯도 같다)
+       ② 달력이 화면을 «가득» 채운다 — 아래 목록 없음
+       ③ 날을 누르면 아래에서 «그날 목록»이 올라온다(위젯은 구글 앱의 그날로 간다 — 우리는 이 목록)
+     ㉮ 의 까닭(글자 잘림)은 위젯도 똑같아 «감수»한다. 읽는 길은 칩을 눌러 상세 · 날을 눌러 목록이다.
+     ⚠ 칩 높이·글자는 위젯 캡처를 쟀다(칩 12px · 글자 9.5px · 간격 2px). 한 칸에 몇 개 드는지는
+       용량재기() 가 «그려 놓고 재서» 정한다 — 여기서 숫자를 박지 않는다. */
+  body.mob #app.fit .cal{flex:1 1 0;min-height:240px}
+  body.mob .ev{font-size:9.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px;font-weight:500;
+    overflow:hidden;text-overflow:clip;white-space:nowrap}
+  body.mob .evph{height:12px}
   body.mob .evs{gap:2px}
-  body.mob .more{font-size:9px;line-height:7px;letter-spacing:0;padding:0;text-align:center}
+  body.mob .more{font-size:11px;line-height:8px;letter-spacing:1px;padding:0;text-align:center;color:var(--gsub)}
   /* 고른 날 — 구글처럼 옅은 칠 한 겹(테두리를 두르면 칸이 들쭉날쭉해 보인다) */
-  html body.mob .cal .day.pick{background:var(--acc-soft) !important}
+  /* (㉯ — 고른 날 칠은 없다. 구글 위젯에도 없고, 목록 창이 «어느 날인지» 말한다) */
   /* 그날 목록 — 제목이 안 잘리는 크기(12.5px)로 */
-  body.mob .mlist{flex:2 1 0;min-height:110px;overflow-y:auto;border-top:8px solid var(--bg);
-    padding:9px 12px 16px;background:var(--panel)}
+  /* 그날 목록 — 아래에서 올라오는 창(㉯). 구글 폰 달력의 «그날 일정 창»과 같은 쓰임 */
+  body.mob .msheet{position:fixed;left:0;right:0;bottom:0;z-index:39;max-height:62vh;overflow-y:auto;
+    background:var(--panel);border-radius:16px 16px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.28);
+    padding:8px 0 calc(14px + env(safe-area-inset-bottom))}
+  body.mob .msheet .mgrip{display:block;width:36px;height:4px;border-radius:2px;background:var(--gline);margin:0 auto 4px}
+  body.mob .sheetveil{z-index:38;opacity:.32}
+  body.mob .mlist{padding:4px 16px 10px;background:var(--panel)}
   body.mob .mlday{font-size:12.5px;font-weight:700;color:var(--gtext);margin-bottom:6px}
   body.mob .mlday .n{font-weight:400;color:var(--gsub);margin-left:5px}
   body.mob .mrow{display:flex;gap:8px;align-items:flex-start;padding:7px 0;
@@ -753,6 +774,8 @@ var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toa
           map:null, route:null,
           /* trip — 🚗 출장 카드 { key:'gcal:…', date } — 출장 알림을 누르고 들어왔을 때(2026-10-09) */
           trip:null,
+          /* sheet — 폰 월 보기에서 날을 눌렀을 때 올라오는 «그날 목록»(S.pick 이 어느 날인지) (2026-10-10) */
+          sheet:false,
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'',
           /* pick — 폰에서 «고른 날»(그날 목록이 보여 주는 날). 주·일 보기의 date 와 따로 둔다:
@@ -2155,6 +2178,16 @@ function chipHtml(e, ymd){
   var 판 = 어둠 ? "#1b1b1d" : "#ffffff";
   /* 지났나 — 시각이 있으면 «끝난 시각»으로, 없으면 «마지막 날»로 (구글과 같다) */
   var 지남 = e.endAt ? (e.endAt < Date.now()) : ((e.end || ymd) < todayYMD());
+  /* ★ 폰은 구글 «위젯»을 따른다(2026-10-10 ㉯) — 위젯은 지난 일정도 같은 색이다(옅게 하는 것은 구글 «앱»).
+       글자색은 바탕 밝기로: 노랑 같은 밝은 칩은 어두운 글자, 나머지는 흰 글자(위젯 캡처가 그렇다) */
+  var 위젯 = typeof 폰 === "function" && 폰();
+  if(위젯) 지남 = false;
+  function 칩글자(바탕){
+    var m = /^#([0-9a-f]{6})$/i.exec(String(바탕 || ""));
+    if(!m) return "#ffffff";
+    var n = parseInt(m[1], 16), r = n >> 16, g = (n >> 8) & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 170 ? "#1f1f1f" : "#ffffff";
+  }
   var 공휴 = e.kind === "hol";
   var 지운것 = e.kind === "gone";
   var 막대 = (e._span || 1) > 1 || (e.end && e.end > e.date);
@@ -2183,7 +2216,7 @@ function chipHtml(e, ymd){
       + '<span class="gtm">' + esc(e.time) + '</span>' + esc(제목);
   } else {
     var 칩바탕 = 지남 ? mixHex(사람색, 판, 옅게) : (눅임 ? mixHex(사람색, 판, 눅임) : 사람색);
-    꼴 = "background:" + esc(칩바탕) + ";color:" + (지남 ? 지난글자(칩바탕) : "#ffffff");
+    꼴 = "background:" + esc(칩바탕) + ";color:" + (지남 ? 지난글자(칩바탕) : (위젯 ? 칩글자(칩바탕) : "#ffffff"));
     var n = e._span || 1;
     /* 막대 — 칸 n 개를 건너간다. 100% 는 한 칸의 속 너비, 칸 사이 틈(여백·테두리)을 더한다.
        position+z-index 로 «옆 칸 위에» 그린다(옆 칸 바탕이 막대를 덮지 않게). */
@@ -2364,8 +2397,10 @@ function 폰머리Html(){
   var 음력 = lunarRange(S.ym);
   return '<div class="mhead">'
     + '<div class="mtt"><b>' + 달 + '월</b>' + (음력 ? '<span>' + esc(음력) + '</span>' : '') + '</div>'
-    + '<button class="mfilt" data-mf="1" title="누르면 전체 → 공용 → 개인">'
-    +   (S.filter === "priv" ? "🔒 개인" : S.filter === "shared" ? "👥 공용" : "전체") + '</button>'
+    /* 거르개가 «꺼져» 있으면 칩을 안 둔다 — 구글 위젯 머리에는 없다(2026-10-10). 켜져 있으면 «걸러 보는 중»을 알려야 하므로 둔다.
+       거르개 켜고 끄기는 ☰ 메뉴의 사람 칩에서 한다 */
+    + (S.filter ? '<button class="mfilt" data-mf="1" title="누르면 전체 → 공용 → 개인">'
+    +   (S.filter === "priv" ? "🔒 개인" : S.filter === "shared" ? "👥 공용" : "👤 걸러 봄") + '</button>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mplus" data-mnew="1" title="새로 넣기">＋</button>'
@@ -2394,8 +2429,10 @@ function 목록순(e, ds){
    ⚠ 여기서는 그림글자(⚖️·🏛️·🔒)를 «안 걷는다». 칩에서는 걷는다(구글 화면에 없으므로) —
      그러나 폰에서 칩은 글자 없는 막대라, 이 목록이 글자가 나오는 «유일한 자리»다.
    ⚠ 누르는 길은 칩과 같게 둔다(data-ev·data-holday) — 두 벌로 나뉘면 한쪽만 고쳐진다. */
-function 폰목록Html(eumOnly){
-  var ds = 고른날();
+function 폰목록Html(eumOnly, 날){
+  /* 날 — 올라온 창이 «누른 날»을 그대로 넘긴다. 달력 첫·끝 줄의 지난달·다음달 날짜(9/30 등)도 그 날 것이 나와야 한다
+     (고른날() 은 보는 달 안만 믿어, 예전에는 엉뚱한 날 목록이 떴다) */
+  var ds = 날 || 고른날();
   var evs = eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch);
   var h = 공휴칩(ds);
   var 것들 = (h ? [h] : []).concat(evs);
@@ -2426,6 +2463,13 @@ function 폰목록Html(eumOnly){
     +   '<span class="n">· ' + 것들.length + '건</span></div>'
     + (줄 || '<div class="mnone">일정이 없습니다 · <b data-mnew="1">＋ 로 넣기</b></div>')
     + '</div>';
+}
+/* ★ 폰 «그날 목록 창» (2026-10-10 ㉯) — 날(또는 「•••」)을 누르면 아래에서 올라온다.
+   ⚠ 달을 넘기면(‹ › · 밀기) 닫는다 — S.sheet=false (data-mv · 밀기 처리). */
+function 폰시트Html(eumOnly){
+  if(!S.sheet || !/^\d{4}-\d{2}-\d{2}$/.test(String(S.pick || ""))) return "";
+  return '<div class="veil sheetveil" data-sheetclose="1"></div>'
+    + '<div class="msheet"><span class="mgrip"></span>' + 폰목록Html(eumOnly, S.pick) + '</div>';
 }
 function calendarHtml(eumOnly){
   /* 🗄 스위치가 켜져 있거나 구글을 못 받았으면 보관함도 그 달 것을 받는다(같은 달이면 안 받는다) */
@@ -2500,8 +2544,8 @@ function calendarHtml(eumOnly){
     return 폰머리Html() + '<div class="cal">'
       + '<div class="mhd">' + 요일.map(function(w){ return '<div>' + w + '</div>'; }).join("") + '</div>'
       + '<div class="calgrid" style="grid-template-rows:repeat(' + (grid.length / 7) + ',1fr)">' + cells + '</div></div>'
-      /* 칸에서 못 읽는 것을 여기서 읽는다 — 구글 폰 달력과 같은 쓰임 */
-      + 폰목록Html(eumOnly);
+      /* 날을 누르면 올라오는 그날 목록(㉯) — 달력은 화면을 가득 채운다 */
+      + 폰시트Html(eumOnly);
   }
   return '<div class="cal">'
     + '<div class="calgrid">' + cells + '</div></div>';
@@ -4189,7 +4233,7 @@ document.addEventListener('touchend', function(e){
   if(Date.now() - s.t > 800) return;
   var d = new Date(S.ym + '-01');
   d.setMonth(d.getMonth() + (dx < 0 ? 1 : -1));
-  S.ym = ymOf(d); S.pick = null; _민때 = Date.now();
+  S.ym = ymOf(d); S.pick = null; S.sheet = false; _민때 = Date.now();
   render();
 }, { passive:true });
 
@@ -4227,7 +4271,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4278,7 +4322,9 @@ document.addEventListener('click', function(e){
     return;
   }
   if(t.hasAttribute('data-t')){ S.tab = t.getAttribute('data-t'); if(S.tab==='eumcal') S.filter=null; S.open = null; render(); return; }
+  if(t.hasAttribute('data-sheetclose')){ S.sheet = false; render(); return; }
   if(t.hasAttribute('data-mv')){
+    S.sheet = false;
     var mv = +t.getAttribute('data-mv');
     if(mv===0){ S.ym = ymOf(new Date()); S.date = todayYMD(); }
     else if(S.tab==='eumppl' && S.scope==='year'){
@@ -4298,7 +4344,7 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
   /* ＋ — 폰에서 넣는 «유일한» 길이다. 보고 있는(고른) 날에 넣는다 — 구글과 같다.
      ⚠ 예전엔 언제나 «오늘»이었다. 다음 달을 펴 놓고 ＋ 를 누르면 오늘 것이 생겼다. */
-  if(t.hasAttribute('data-mnew')){ openNew(폰() && S.view === 'month' ? 고른날() : todayYMD()); return; }
+  if(t.hasAttribute('data-mnew')){ openNew(폰() && S.view === 'month' ? (S.sheet && S.pick ? S.pick : 고른날()) : todayYMD()); return; }
   if(t.hasAttribute('data-gone')){
     S.showGone = !S.showGone;
     try{ localStorage.setItem("pu_cal_gone", S.showGone ? "1" : ""); }catch(_){}
@@ -4403,7 +4449,7 @@ document.addEventListener('click', function(e){
     var 날 = t.getAttribute('data-more');
     /* 폰은 「•••」도 «그 날을 고르는» 것이다 — 읽는 자리가 아래 목록 하나여야 한다.
        작은 화면에서 펼침 창까지 겹쳐 띄우면 달력이 통째로 가려진다. */
-    if(폰() && S.view === 'month'){ S.pick = 날; render(); return; }
+    if(폰() && S.view === 'month'){ S.pick = 날; S.sheet = true; render(); return; }
     S.open = (S.open === 날) ? null : 날;
     render(); return;
   }
@@ -4433,7 +4479,7 @@ document.addEventListener('click', function(e){
        폰에서 넣는 길은 ＋ 하나다 — 고른 날에 넣는다. */
   if(t.hasAttribute('data-day')){
     var 날짜 = t.getAttribute('data-day');
-    if(폰() && S.view === 'month'){ S.pick = 날짜; render(); return; }
+    if(폰() && S.view === 'month'){ S.pick = 날짜; S.sheet = true; render(); return; }
     openNew(날짜); return;
   }
 });
@@ -4515,7 +4561,8 @@ document.addEventListener('keydown', function(e){
   if(S.mycolor){ e.preventDefault(); if(S.mycolor.겹침){ S.mycolor.겹침 = null; render(); } else closeMyColor(); return; }
   if(S.note){ e.preventDefault(); closeNote(); return; }
   if(S.mailmap){ e.preventDefault(); closeMailMap(); return; }
-  if(S.modal){ e.preventDefault(); closeModal(); }
+  if(S.modal){ e.preventDefault(); closeModal(); return; }
+  if(S.sheet){ e.preventDefault(); S.sheet = false; render(); }
 });
 
 $('goErp').onclick = function(){ goErp(''); };
