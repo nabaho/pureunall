@@ -1639,8 +1639,15 @@ body.portal-mode #moreFab{display:flex;}
     return rowExists(r) ? r : (APP_ROWS[0] ? APP_ROWS[0].id : 'client');
   }
   /* 사람이 옮겨 둔 자리 — 지금 없는 줄 이름이면 «없던 일»로 친다. */
+  /* ★ 대표가 줄을 옮긴 앱 — 옮기기 «전» 줄이 저장돼 있으면 없던 일로 친다(제자리로 간다).
+     자리 저장은 타일을 끌 때 «모든» 타일의 그때 줄을 함께 적는다(persistOrderFromDom). 그래서
+     옮기기 전에 한 번이라도 끌었던 사람은 옛 줄이 남아, 앱의 row 를 바꿔도 화면이 그대로였다
+     (대표 보고 2026-10-10 「계약서등관리 자료함으로 옮겨줘」 — 10-05 에 row 를 바꿨는데 의뢰인 업무 줄에 남음).
+     ⚠ 줄 사이 옮기기는 원래 막혀 있어(관리자가 풀어야 한다) 옛 줄 값은 «일부러 둔 자리»가 아니다. */
+  var ROW_MOVED_FROM = { docs:'client' };
   function savedRowOf(key, dflt){
     var r = tilePrefs && tilePrefs.rows && tilePrefs.rows[key];
+    if(ROW_MOVED_FROM[key] && r === ROW_MOVED_FROM[key]) return dflt;
     return rowExists(r) ? r : dflt;
   }
 
