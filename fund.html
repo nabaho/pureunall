@@ -141,7 +141,6 @@
      기금 머리(#fundhead) 바로 아래에 붙인다 — 그 높이를 --fundhead-h, 회계 머리 높이를 --closehead-h 로 잰다(_syncTopbarH).
      ⚠ 넓은 화면만 — 폰에서는 세 겹이 화면을 다 차지한다. 표는 넓은 화면에서 가로 스크롤 상자를 풀어야 제목 줄이 붙는다. */
   .ledgerwrap{overflow-x:auto}
-  .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
   .ledbulk{position:sticky;bottom:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;background:var(--ink);color:#fff;border-radius:10px;padding:8px 12px;margin-top:10px;z-index:6;font-size:12.5px}
   @media(min-width:1000px){
     .closehead{position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px));z-index:11}
@@ -153,6 +152,7 @@
     .sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:5;background:#f8fafc}
     .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
   }
+  .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
   /* 묶음마다 표가 따로라, 폭을 안 정하면 충남과 경기의 열이 어긋난다 */
   table.fixcol{table-layout:fixed}
   table.fixcol td{overflow:hidden;text-overflow:ellipsis}

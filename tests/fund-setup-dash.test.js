@@ -71,6 +71,7 @@ test('★ 배선 — 새 기금 등록 바로 아래 칸, 화면 이동, 옛 길
 
 test('★ 틀 고정 — 제목·숫자·칩 → 표 머리 → 진행판 띠, 높이를 재고, 넓은 화면(1000px~)만', () => {
   const css = SRC.slice(SRC.indexOf('.ledgerwrap{overflow-x:auto}'), SRC.indexOf('table.fixcol{table-layout:fixed}'));
+  assert.ok(css.includes('.sdwrap{overflow-x:auto;border:1px solid var(--line)'), '표 감싸는 칸 기본 모양이 없다');
   assert.ok(css.includes('.sdhead{position:sticky;top:var(--topbar-h,48px)'), '머리가 안 붙는다');
   assert.ok(css.includes('.sdwrap thead th{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px))'), '표 머리가 안 붙는다');
   assert.ok(css.includes('.sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px))'), '진행판 띠가 안 붙는다');
