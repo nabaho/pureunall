@@ -78834,9 +78834,33 @@ function parseDCWide(file, allUsers, cb){
    (분류 exp-pension, 내역 details = [대표(…) · 근로자(…)]). 그 «근로자» 몫을 그달 DC 가입자 임금총액(세전 지급총액)의
    1/12(근로자퇴직급여 보장법 제20조① — 연 임금총액의 1/12 이상)과 견준다.
    ⚠ 출금 날짜가 «그달 임금분»인지 «전달 임금분»인지 기록이 없다 — 둘 다 보여 주고 판단은 사람이 한다.
-   ⚠ 사람별로 나눈 금액이 없으므로 개인 부족분은 여기서 알 수 없다(퇴직연금 사업자 내역 필요). */
+   ⚠ 사람별로 나눈 금액이 없으므로 개인 부족분은 여기서 알 수 없다(퇴직연금 사업자 내역 필요).
+   ★ DC 는 «자동이체»다 (2026-10-10 대표) — 출금관리에 손으로 적지 않은 달이 많다. 그래서 올린 «통장 거래내역»
+     (ledger_batches · src 'bank')에서 적요 «퇴직연금부담금» 출금을 직접 센다. 통장이 그 달을 «덮지 못하면»
+     (마지막 통장 날짜 뒤) 「출금 없음」이 아니라 「통장 내역 없음」이라고 적는다 — 안 본 것을 «안 냈다»로 말하지 않는다. */
+var DC_BANK_MEMO = /퇴직연금부담금/;
+function dcBankOutflows(){
+  var by = {}, seen = {}, last = '';
+  (dbGet('ledger_batches', []) || []).forEach(function(b){
+    if(!b || b._deleted || (b.src && b.src !== 'bank')) return;
+    (b.rows || []).forEach(function(r){
+      if(!r) return;
+      var d = String(r.date || '').slice(0, 10);
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) return;
+      if(d > last) last = d;
+      if(r.type === 'income' || !DC_BANK_MEMO.test(String(r.memo || '') + ' ' + String(r.note || ''))) return;
+      var k = r._k ? String(r._k) : d + '|' + r.amount + '|' + r.memo;   // 두 묶음에 겹친 줄은 한 번만
+      if(seen[k]) return; seen[k] = 1;
+      var ym = d.slice(0, 7);
+      by[ym] = (by[ym] || 0) + Math.abs(parseInt(r.amount, 10) || 0);
+    });
+  });
+  return { byYm: by, lastDate: last };
+}
 function dcFirmCheck(year){
   var y = String(year);
+  var bank = dcBankOutflows();
+  var bankLastYm = bank.lastDate.slice(0, 7);
   var exp = (dbGet('finance_expense', []) || []).filter(function(e){ return e && e.category === 'exp-pension' && String(e.date || '').slice(0, 4) === y; });
   var pays = dbGet('payroll_monthly', []) || [];
   var dcSet = {};
@@ -78854,8 +78878,15 @@ function dcFirmCheck(year){
       return s + (d.length ? d.reduce(function(t, x){ return t + (+x.amount || 0); }, 0) : 0);
     }, 0);
     var hasPay = pays.some(function(p){ return p && p.ym === ym && dcSet[p.empSid]; });
+    // 통장(자동이체)이 있으면 그것을 쓴다 — 출금관리 기록과 같은 돈이라 더하면 두 번 센다
+    var src = paid ? 'expense' : '';
+    if(bank.byYm[ym]){ paid = bank.byYm[ym]; src = 'bank'; }
+    // 통장도 출금관리도 이 달까지 오지 않았으면 «본 적 없는 달» — 출금관리에 적힌 마지막 달까지는 본 것으로 친다
+    var seenYm = exp.reduce(function(m, e){ var v = String(e.date || '').slice(0, 7); return v > m ? v : m; }, bankLastYm);
+    var noBank = !paid && (!seenYm || ym > seenYm);
     if(!paid && !hasPay) continue;
-    rows.push({ ym:ym, paid:Math.round(paid), need:Math.round(need(ym)), needPrev:Math.round(need(prevYm(ym))), noOutflow:!paid && hasPay });
+    rows.push({ ym:ym, paid:Math.round(paid), src:src, need:Math.round(need(ym)), needPrev:Math.round(need(prevYm(ym))),
+      noOutflow:!paid && hasPay && !noBank, noBank:!paid && hasPay && noBank, bankLast:bank.lastDate });
   }
   return rows;
 }
@@ -79252,7 +79283,9 @@ function RetirementSettlement(){
             var low = r.paid > 0 && r.need > 0 && r.paid < r.need * 0.95 && r.paid < r.needPrev * 0.95;
             return h('tr', { key:r.ym },
               h('td', { style:Object.assign({}, cS, { textAlign:'left', fontFamily:'inherit' }) }, r.ym),
-              h('td', { style:Object.assign({}, cS, { color: r.noOutflow ? '#d97706' : '#1e293b', fontWeight:700, fontFamily: r.noOutflow ? 'inherit' : 'monospace' }) }, r.noOutflow ? '출금 기록 없음' : r.paid.toLocaleString()),
+              h('td', { title: r.noBank ? '올린 통장 거래내역이 ' + (r.bankLast || '-') + ' 까지라 이 달 자동이체를 볼 수 없습니다' : (r.src === 'bank' ? '통장 거래내역 «퇴직연금부담금» 출금' : (r.src === 'expense' ? '출금관리 기록' : '')),
+                style:Object.assign({}, cS, { color: r.noBank ? '#64748b' : (r.noOutflow ? '#d97706' : '#1e293b'), fontWeight:700, fontFamily: (r.noOutflow || r.noBank) ? 'inherit' : 'monospace' }) },
+                r.noBank ? '통장 내역 없음' : (r.noOutflow ? '출금 기록 없음' : (r.paid.toLocaleString() + (r.src === 'bank' ? ' 🏦' : '')))),
               h('td', { style:cS }, r.need.toLocaleString()),
               h('td', { style:Object.assign({}, cS, { color: low ? '#dc2626' : '#475569' }) }, pct(r.paid, r.need)),
               h('td', { style:cS }, r.needPrev.toLocaleString()),
