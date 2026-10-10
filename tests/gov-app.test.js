@@ -899,3 +899,6 @@ test('★ 받지 못했으면 판도 남기지 않는다(승인 전) — 다음�
   await r.api.planFetchNow(true);
   assert.equal(r.store.gov3_plan_ver || '', '');
 });
+test('★ 폰에서는 상세 팝업의 칸 이름도 접힌다 — 「사전규격 등록번호」가 375px 에서 6px 삐져나갔다', () => {
+  assert.match(src, /@media \(max-width:640px\)\{ table\.kv th\{width:84px;white-space:normal;word-break:keep-all\} \}/);
+});
