@@ -48,41 +48,54 @@ a{color:var(--blue)}
 .top .sub{font-size:12px;color:var(--mute)}
 .top .sp{flex:1}
 #who{font-size:13px;color:var(--mute)}
-main{max-width:1560px;margin:0 auto;padding:12px 16px 60px}
+main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .note{display:flex;gap:10px;align-items:flex-start;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.55;margin-bottom:10px}
 .note b{font-weight:700}
-.funnel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:10px}
-.funnel h4{margin:0 0 8px;font-size:12.5px;color:var(--ink2)}
-.fstep{display:flex;align-items:center;gap:8px;padding:3px 0;cursor:pointer}
-.fstep .fl{flex:0 0 118px;font-size:12.5px;color:var(--ink2);white-space:nowrap}
-.fstep .fb{flex:1;background:var(--bg);border-radius:6px;height:22px;position:relative;overflow:hidden}
-.fstep .fb i{display:block;height:100%;background:var(--blue-line);border-radius:6px;min-width:2px}
-.fstep .fb b{position:absolute;left:8px;top:2px;font-size:12.5px;font-variant-numeric:tabular-nums}
-.fstep .fp{flex:0 0 120px;font-size:12px;color:var(--mute);text-align:right;white-space:nowrap}
-.fstep:hover .fl{color:var(--blue-d)}
+.funnel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-bottom:6px}
+.fsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:stretch}
+.fsteps>button{font-size:12px;padding:3px 10px;white-space:nowrap}
+.fs{border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
+.fs:hover{border-color:var(--blue)}
+.fs.on{background:var(--blue-bg);border-color:var(--blue)}
+.fs span{font-size:12px;color:var(--ink2);margin-right:8px}
+.fs b{font-size:16px;font-variant-numeric:tabular-nums}
+.fs em{font-style:normal;font-size:12px;color:var(--mute);margin-left:6px}
+.fs i{position:absolute;left:0;bottom:0;height:3px;background:var(--blue)}
+.infoRow{display:flex;flex-wrap:wrap;gap:4px 18px;align-items:center;justify-content:space-between}
+.infoRow .runline,.infoRow .pager{margin:0}
+.pager{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--ink2);margin:0 0 8px;flex-wrap:wrap}
+.pager select{padding:3px 6px}
+#fixbar{background:var(--bg)}
+@media (min-width:1101px){
+  #fixbar{position:sticky;top:var(--hh,50px);z-index:15;padding-bottom:4px}
+  .tbl{max-height:calc(100vh - var(--topY,300px) - 10px)}
+  .tbl thead th{position:sticky;top:0;z-index:2}
+  .detail{top:var(--topY,300px) !important;max-height:calc(100vh - var(--topY,300px) - 10px) !important}
+}
+@media (max-width:1100px){ .fsteps{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .fgrp{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .fgrp>em{font-style:normal;font-size:12px;color:var(--mute);flex:0 0 52px}
 .fchip{border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:2px 9px;font-size:12px;cursor:pointer;white-space:nowrap}
 .fchip b{font-variant-numeric:tabular-nums;margin-left:3px}
 .fchip.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-d);font-weight:700}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
-.tab{display:flex;align-items:baseline;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 13px;cursor:pointer}
-.tab b{font-size:19px;font-variant-numeric:tabular-nums}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px}
+.tab{display:flex;align-items:baseline;gap:6px;background:var(--card);border:1px solid var(--line);border-radius:8px;padding:3px 11px;cursor:pointer}
+.tab b{font-size:15px;font-variant-numeric:tabular-nums}
 .tab span{font-size:12.5px;color:var(--ink2)}
 .tab.on{background:var(--blue-bg);border-color:var(--blue);}
 .tab.on span{color:var(--blue-d);font-weight:700}
-.tools{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.tools{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:4px}
 .tools select,.tools input{font:inherit;border:1px solid var(--line2);border-radius:8px;padding:6px 8px;background:var(--card);color:var(--ink)}
 .tools input{min-width:190px}
 .tools .sp{flex:1}
 .runline{font-size:12px;color:var(--mute);margin:0 0 8px;display:flex;gap:14px;flex-wrap:wrap}
 #prog{display:none;background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d);border-radius:8px;padding:6px 10px;margin-bottom:8px;font-size:13px}
-#selbar{display:none;position:sticky;top:50px;z-index:10;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px;padding:7px 10px;margin-bottom:8px;gap:6px;flex-wrap:wrap;align-items:center}
+#selbar{display:none;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:10px;padding:7px 10px;margin-bottom:8px;gap:6px;flex-wrap:wrap;align-items:center}
 #selbar.on{display:flex}
 #selbar .grp{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 #selbar .div{width:1px;height:22px;background:var(--blue-line)}
 #selbar label{font-size:12px;color:var(--ink2);display:flex;gap:4px;align-items:center}
-.layout{display:grid;grid-template-columns:minmax(0,1fr) 410px;gap:12px;align-items:start}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,28vw,540px);gap:12px;align-items:start}
 .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
 table{border-collapse:collapse;width:100%}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
@@ -183,6 +196,7 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
     안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
   </div>
 
+  <div id="fixbar">
   <div class="funnel" id="funnel"></div>
   <div class="tabs" id="tabs"></div>
 
@@ -209,7 +223,7 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
     <span class="sp"></span>
     <button class="pri" id="findBtn" onclick="findContacts()">🔎 연락처 찾기</button>
   </div>
-  <div class="runline" id="runline"></div>
+  <div class="infoRow"><div class="runline" id="runline"></div><div class="pager" id="pager"></div></div>
   <div id="prog"></div>
 
   <div id="selbar">
@@ -237,11 +251,14 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
     </span>
   </div>
 
+
+  </div>
+
   <div class="layout">
-    <div class="tbl">
+    <div class="tbl" id="tblbox">
       <table>
         <thead><tr>
-          <th class="ck"><input type="checkbox" id="ckAll" aria-label="보이는 줄 전체 선택"></th>
+          <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
           <th class="no">번호</th><th>포괄금지명령</th><th>회사명</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
@@ -329,7 +346,7 @@ function contactOf(id){
 }
 
 /* ═══ 거르기·정렬 ═══ */
-var DATE='';
+var DATE='', PG=0, PSIZE=Number(lsGet('pgSize'))||50, SIG='';
 function baseList(skip){
   skip=skip||'';
   var days=Number($('fDays').value), court=$('fCourt').value, sido=$('fSido').value, type=$('fType').value, stage=$('fStage').value,
@@ -368,22 +385,25 @@ function drawTabs(base){
     return '<div class="tab'+(TAB===k?' on':'')+'" data-tab="'+k+'"><b>'+c[k]+'</b><span>'+names[k]+'</span></div>';
   }).join('');
 }
+var FUN_OPEN=false;
 function drawFunnel(base){
   var tot=base.length, has=0, link=0, send=0, sent=0;
   base.forEach(function(n){ if(contactOf(n.id).any) has++; var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(b) link++; var st=statusOf(n.id); if(st==='send') send++; if(st==='sent') sent++; });
-  var steps=[['all','공고 수집',tot,tot],['has','연락처 확보',has,tot],['link','거래·연결 있음',link,tot],['send','발송 예정',send,tot],['sent','발송 완료',sent,tot]];
-  var h='<h4>걸러 보기 — 단계마다 눌러서 볼 수 있습니다</h4>'+steps.map(function(x){
-    var pct=x[3]?Math.round(x[2]*100/x[3]):0;
-    return '<div class="fstep" data-step="'+x[0]+'"><span class="fl">'+x[1]+'</span><span class="fb"><i style="width:'+pct+'%"></i><b>'+x[2]+'곳</b></span><span class="fp">'+(x[0]==='all'?'':'전체의 '+pct+'%')+'</span></div>';
-  }).join('');
-  var reg={}, dat={};
-  baseList('sido').forEach(function(n){ var k=n.sido||'기타'; reg[k]=(reg[k]||0)+1; });
-  baseList('date').forEach(function(n){ var k=n.noticeDate||''; if(k) dat[k]=(dat[k]||0)+1; });
+  var steps=[['all','공고 수집',tot,TAB==='all'&&!$('fContact').value&&!$('fTrade').value],['has','연락처 확보',has,$('fContact').value==='has'],['link','거래·연결 있음',link,$('fTrade').value==='any'],['send','발송 예정',send,TAB==='send'],['sent','발송 완료',sent,TAB==='sent']];
+  var h='<div class="fsteps">'+steps.map(function(x){
+    var pct=tot?Math.round(x[2]*100/tot):0;
+    return '<div class="fs'+(x[3]?' on':'')+'" data-step="'+x[0]+'" title="누르면 그 조건으로 걸러집니다"><span>'+x[1]+'</span><b>'+x[2]+'곳</b>'+(x[0]==='all'?'':'<em>'+pct+'%</em>')+'<i style="width:'+pct+'%"></i></div>';
+  }).join('')+'<button data-more="1" title="지역별·공고일별 건수">'+(FUN_OPEN?'▲ 지역·공고일':'▼ 지역·공고일')+((cur||DATE)?' ('+(cur?esc(cur):'')+(cur&&DATE?' · ':'')+(DATE?esc(DATE.slice(5)):'')+')':'')+'</button></div>';
   var cur=$('fSido').value;
-  h+='<div class="fgrp"><em>지역</em><button class="fchip'+(cur?'':' on')+'" data-sido="">전체</button>'+
-    Object.keys(reg).sort(function(a,b){ return reg[b]-reg[a]; }).map(function(k){ return '<button class="fchip'+(cur===k?' on':'')+'" data-sido="'+esc(k)+'">'+esc(k)+'<b>'+reg[k]+'</b></button>'; }).join('')+'</div>';
-  h+='<div class="fgrp"><em>공고일</em><button class="fchip'+(DATE?'':' on')+'" data-date="">전체</button>'+
-    Object.keys(dat).sort().reverse().map(function(k){ return '<button class="fchip'+(DATE===k?' on':'')+'" data-date="'+k+'">'+k.slice(5)+'<b>'+dat[k]+'</b></button>'; }).join('')+'</div>';
+  if(FUN_OPEN){
+    var reg={}, dat={};
+    baseList('sido').forEach(function(n){ var k=n.sido||'기타'; reg[k]=(reg[k]||0)+1; });
+    baseList('date').forEach(function(n){ var k=n.noticeDate||''; if(k) dat[k]=(dat[k]||0)+1; });
+    h+='<div class="fgrp"><em>지역</em><button class="fchip'+(cur?'':' on')+'" data-sido="">전체</button>'+
+      Object.keys(reg).sort(function(a,b){ return reg[b]-reg[a]; }).map(function(k){ return '<button class="fchip'+(cur===k?' on':'')+'" data-sido="'+esc(k)+'">'+esc(k)+'<b>'+reg[k]+'</b></button>'; }).join('')+'</div>';
+    h+='<div class="fgrp"><em>공고일</em><button class="fchip'+(DATE?'':' on')+'" data-date="">전체</button>'+
+      Object.keys(dat).sort().reverse().map(function(k){ return '<button class="fchip'+(DATE===k?' on':'')+'" data-date="'+k+'">'+k.slice(5)+'<b>'+dat[k]+'</b></button>'; }).join('')+'</div>';
+  }
   $('funnel').innerHTML=h;
 }
 function funnelClick(step){
@@ -402,7 +422,12 @@ function iconsOf(c){
 function draw(){
   var base=baseList(); drawTabs(base); drawFunnel(base);
   VIEW=sortList(base.filter(function(n){ return TAB==='all' || statusOf(n.id)===TAB; }));
-  var html=VIEW.map(function(n,i){
+  var sig=['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fSort','fText'].map(function(id){ return $(id).value; }).join('|')+'|'+TAB+'|'+DATE;
+  if(sig!==SIG){ SIG=sig; PG=0; }
+  var pages=Math.max(1,Math.ceil(VIEW.length/PSIZE)); if(PG>=pages) PG=pages-1; if(PG<0) PG=0;
+  var from=PG*PSIZE, shown=VIEW.slice(from,from+PSIZE);
+  drawPager(from,shown.length,pages);
+  var html=shown.map(function(n,i0){ var i=from+i0;
     var st=statusOf(n.id), c=contactOf(n.id);
     var ce=ceoOf(n.id);
     return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
@@ -426,7 +451,18 @@ function draw(){
   }
   var vis={}; VIEW.forEach(function(n){ vis[n.id]=1; });
   Object.keys(SEL).forEach(function(k){ if(!vis[k]) delete SEL[k]; });   /* 안 보이는 줄이 골라져 있으면 안 된다 */
-  drawSel(); drawDetail(); drawRunline();
+  drawSel(); drawDetail(); drawRunline(); fitLayout();
+}
+function drawPager(from,cnt,pages){
+  var tot=VIEW.length;
+  $('pager').innerHTML='<span>조건에 맞는 <b>'+tot+'곳</b>'+(tot?' 중 '+(from+1)+'–'+(from+cnt)+'번':'')+'</span>'+
+    '<button class="sm" data-pg="-1"'+(PG<=0?' disabled':'')+'>‹ 이전</button><span>'+(PG+1)+' / '+pages+'쪽</span><button class="sm" data-pg="1"'+(PG>=pages-1?' disabled':'')+'>다음 ›</button>'+
+    '<span>한 쪽에 </span><select id="pgSize" aria-label="몇 곳씩 볼지">'+[20,50,100,200].map(function(v){ return '<option value="'+v+'"'+(v===PSIZE?' selected':'')+'>'+v+'곳</option>'; }).join('')+'</select>'+
+    '<span style="color:var(--mute)">· 모두 선택은 쪽과 상관없이 조건에 맞는 전체를 고릅니다</span>';
+}
+function fitLayout(){
+  var h=$('head').offsetHeight, f=$('fixbar').offsetHeight, r=document.documentElement.style;
+  r.setProperty('--hh',h+'px'); r.setProperty('--topY',(h+f+4)+'px');
 }
 function drawSel(){
   var n=Object.keys(SEL).length;
@@ -699,7 +735,11 @@ function copyText(t){
 function boot(){
   ['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
   $('fText').addEventListener('input',draw);
+  $('pager').addEventListener('click',function(e){ var b=e.target.closest('[data-pg]'); if(!b) return; PG+=Number(b.getAttribute('data-pg')); draw(); $('tblbox').scrollTop=0; });
+  $('pager').addEventListener('change',function(e){ if(e.target.id==='pgSize'){ PSIZE=Number(e.target.value)||50; lsSet('pgSize',String(PSIZE)); PG=0; draw(); } });
+  window.addEventListener('resize',fitLayout);
   $('funnel').addEventListener('click',function(e){
+    if(e.target.closest('[data-more]')){ FUN_OPEN=!FUN_OPEN; draw(); return; }
     var st=e.target.closest('[data-step]'); if(st){ funnelClick(st.getAttribute('data-step')); return; }
     var c=e.target.closest('.fchip'); if(!c) return;
     if(c.hasAttribute('data-sido')){ $('fSido').value=c.getAttribute('data-sido'); lsSet('fSido',$('fSido').value); }
