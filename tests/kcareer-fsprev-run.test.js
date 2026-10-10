@@ -60,6 +60,8 @@ function 무대(opts) {
     showPDFInline: function (id, cid, alt) { pdf호출.push({ id: id, cid: cid, alt: alt }); },
     openLocalOriginal: function () {},
     getFileAsync: async function (id) { return opts.attach && opts.attach[id] ? opts.attach[id] : null; },
+    /* ☁ 클라우드 사본(2026-10-10) — 이 검사 안에서는 «사본 없음» */
+    _fsCloudFile: async function () { return null; },
   };
   vm.createContext(ctx);
   const 코드 = [

@@ -3875,6 +3875,61 @@ async function kcOwnFilesUp(){
   }finally{ _kcOwnUpBusy=false; }
   return n;
 }
+/* ═══ ☁ 서류 폴더 원본의 클라우드 사본 (대표 지시 2026-10-10 「2」 — 검토 권고 2번) ═══
+   위촉장·자격증 등 «서류 폴더 연결»(src:'fs')로 붙인 원본은 그 PC 폴더에만 있었다(실측 194건·68MB).
+   그 PC 가 고장 나거나 다른 PC 에서 열면 원본을 못 봤다.
+   → 폴더가 이어진 기기에서 열 때 «조용히» 한 번씩 읽어 본인만 읽는 창고(kcareer_forms/{uid})에 사본을 둔다.
+     레코드에는 자리(fsCloud)와 그때의 파일 표(경로|크기|수정일 = fsCloudKey)만 적는다 — 파일이 바뀌면 다시 올린다.
+   ⚠ 원본은 여전히 폴더의 파일이다 — 폴더가 있으면 늘 폴더에서 연다. 사본은 폴더가 없을 때만 쓴다.
+   ⚠ 권한을 «묻지 않는다»(queryPermission 만) — 열 때마다 권한 창이 뜨면 안 된다. 허락돼 있을 때만 돈다.
+   ⚠ 25MB 넘는 파일은 안 올린다(창고 규칙). 직원 보기 전용에서는 안 돈다. */
+var KC_FS_STORES=['wiccok','cert','license','complete','award','edu','work','lecture','certdoc','case','consult','fund','etc','advisory'];
+var _kcFsUpBusy=false;
+function _fsKeyOf(r){ return String(r.relPath||'')+'|'+String(r.fileSize||'')+'|'+String(r.fileMtime||''); }
+async function _fsRootQuiet(){
+  try{ var h=_fsRoot||await fsLoadRoot(); if(!h) return null;
+    if(await h.queryPermission({mode:'read'})==='granted'){ _fsRoot=h; return h; } }catch(e){}
+  return null;
+}
+async function kcFsBackupUp(quiet){
+  if(_kcFsUpBusy) return 0;
+  if(typeof kcIsStaff==='function' && kcIsStaff()) return 0;
+  if(!kcFormStorage() || !kcFormPath('x')) return 0;
+  if(!(await _fsRootQuiet())) return 0;
+  var 할=[];
+  KC_FS_STORES.forEach(function(st){ (get(st)||[]).forEach(function(r){
+    if(r && r.src==='fs' && r.relPath && r.fsCloudKey!==_fsKeyOf(r) && !(Number(r.fileSize)>=25*1024*1024)) 할.push({ st:st, id:r.id, key:_fsKeyOf(r), rel:r.relPath }); }); });
+  if(!할.length) return 0;
+  _kcFsUpBusy=true; var n=0, 못=0, 모은={};
+  var 적기=function(){ Object.keys(모은).forEach(function(st){ var arr=get(st)||[], 바뀜=false;
+      arr.forEach(function(r){ var u=모은[st][r.id]; if(u && r.src==='fs' && _fsKeyOf(r)===u.key){ r.fsCloud=u.path; r.fsCloudKey=u.key; 바뀜=true; } });
+      if(바뀜) set(st, arr); }); 모은={}; };
+  try{
+    if(!quiet) toast('☁ 서류 폴더 원본 '+할.length+'건을 클라우드에도 보관합니다…', 4000);
+    for(var i=0;i<할.length;i++){
+      var t=할[i], f=null;
+      try{ f=await _fsFileOf(t.rel); }catch(e){ f=null; }
+      if(!f || f.size>=25*1024*1024){ 못++; continue; }
+      var ext=(String(f.name||t.rel).split('.').pop()||'').toLowerCase();
+      var 자리=await kcFormUpload('FS_'+t.st+'_'+t.id, abToB64(await f.arrayBuffer()), ext);
+      if(!자리){ 못++; continue; }
+      (모은[t.st]=모은[t.st]||{})[t.id]={ path:자리, key:t.key }; n++;
+      if(n%10===0) 적기();            /* 열 건마다 적어 둔다 — 중간에 끊겨도 다음에 이어서 */
+    }
+    적기();
+  }finally{ _kcFsUpBusy=false; }
+  if(n || !quiet) toast('☁ 서류 폴더 원본 '+n+'건을 클라우드에도 보관했습니다'+(못?' · 못 올린 것 '+못+'건(파일이 옮겨졌거나 너무 큼)':''), 6000);
+  return n;
+}
+/* 폴더에 없을 때 — 그 경로를 가진 기록의 클라우드 사본을 받아 온다. 없으면 null */
+async function _fsCloudFile(relPath){
+  var 자리='';
+  KC_FS_STORES.some(function(st){ return (get(st)||[]).some(function(r){ if(r && r.relPath===relPath && r.fsCloud){ 자리=r.fsCloud; return true; } return false; }); });
+  var s=kcFormStorage(); if(!자리 || !s) return null;
+  try{ var url=await s.ref(자리).getDownloadURL(); var buf=await (await kcFetch(url)).arrayBuffer();
+    var nm=String(relPath).split('/').pop(); return { name:nm, buf:buf }; }
+  catch(e){ console.warn('원본 사본 받기', e); return null; }
+}
 function _kcOwnUpSoon(){ if(_kcOwnUpT) clearTimeout(_kcOwnUpT); _kcOwnUpT=setTimeout(function(){ _kcOwnUpT=null; kcOwnFilesUp().catch(function(e){ console.warn('내 파일 창고 올리기', e); }); }, 1500); }
 async function getFileAsync(id){
   if(_cache[id]) return _cache[id];
@@ -4177,6 +4232,8 @@ async function fsConnectFolder(){
     var h = await window.showDirectoryPicker({id:'kcareer-docs', mode:'read'});
     _fsRoot = h; await fsSaveRoot(h);
     toast('✅ 서류 폴더 연결됨: ' + h.name);
+    /* ☁ 이어진 김에 원본 사본을 클라우드에 — 이미 올린 것은 건너뛴다 */
+    setTimeout(function(){ kcFsBackupUp(false).catch(function(e){ console.warn('원본 사본', e); }); }, 3000);
     return h;
   }catch(e){
     if(e && e.name === 'AbortError') return null;      /* 사용자가 취소 */
@@ -4505,8 +4562,13 @@ async function _fsFileOf(relPath){
      원본이 «있는데» 없다고 하는 것이라 대표가 잃은 줄로 아신다. */
 async function recFileAsync(rec, id){
   if(rec && rec.src === 'fs' && rec.relPath){
-    var lf = await _fsFileOf(rec.relPath);
-    if(!lf) return null;
+    var lf = null; try{ lf = await _fsFileOf(rec.relPath); }catch(e){ lf = null; }
+    if(!lf){
+      /* ☁ 폴더가 없거나 파일이 옮겨졌으면 클라우드 사본 (2026-10-10) */
+      var cf = await _fsCloudFile(rec.relPath);
+      if(!cf) return null;
+      return { name: cf.name, ext: (cf.name.split('.').pop() || '').toLowerCase(), base64: abToB64(cf.buf), file: null };
+    }
     var nm = lf.name || String(rec.relPath).split('/').pop();
     return { name: nm, ext: (nm.split('.').pop() || '').toLowerCase(),
              base64: abToB64(await lf.arrayBuffer()), file: lf };
@@ -4516,8 +4578,20 @@ async function recFileAsync(rec, id){
 
 async function openLocalOriginal(relPath){
   try{
-    var f = await _fsFileOf(relPath);
-    if(!f){ toast('이 기기에는 서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'); return; }
+    var f = null; try{ f = await _fsFileOf(relPath); }catch(e0){ f = null; }
+    if(!f){
+      /* ☁ 이 기기에 폴더가 없거나 파일이 옮겨졌으면 클라우드 사본으로 연다 (2026-10-10) */
+      var cf = await _fsCloudFile(relPath);
+      if(cf){
+        if(_isHwpName(cf.name)){ try{ openHwpViewer(cf.buf, cf.name); return; }catch(e3){ console.warn('한글 뷰어', e3); } }
+        var cu = URL.createObjectURL(new Blob([cf.buf], { type:/\.pdf$/i.test(cf.name)?'application/pdf':(/\.(jpe?g)$/i.test(cf.name)?'image/jpeg':(/\.png$/i.test(cf.name)?'image/png':'application/octet-stream')) }));
+        window.open(cu, '_blank'); setTimeout(function(){ URL.revokeObjectURL(cu); }, 60000);
+        toast('☁ 클라우드에 보관한 사본으로 열었습니다', 3000);
+        return;
+      }
+      toast(_fsRoot ? '원본을 못 찾았습니다 — 파일이 이동·삭제되었을 수 있습니다. 다시 스캔하세요'
+                    : '이 기기에는 서류 폴더가 연결돼 있지 않습니다 — 위촉장 › ⋯ 더보기 › 서류 폴더 연결'); return;
+    }
     /* ★★ 한글 문서는 브라우저가 못 연다 — 새 탭에 «날것»(PK…mimetypeapplication/hwp+zip)으로
        뜬다(대표 제보 2026-09-12). 앱 안의 한글 뷰어로 보낸다.
        ⚠ 여태 openOriginal 의 «앱 안 첨부» 갈래에만 이 판정이 있었다. 폴더 경로 갈래는
@@ -21740,6 +21814,8 @@ function fbAutoPush(){ if(KC_SAFE) return; if(kcNoPush()) return; if(!fbUid||!fb
    ⚠ 이 구간 안에 전역 선언(function·var)을 넣지 말 것 — 감싼 함수 안이라 바깥에서 안 보인다. */
 (KV ? KV.boot() : Promise.resolve(null)).then(function(_kvr){
 if(_kvr) console.log('[경력관리 저장소]', _kvr);
+/* ☁ 서류 폴더가 «허락된 채» 이어진 기기면, 열고 30초 뒤 원본 사본을 조용히 올린다(이미 올린 것은 건너뜀) */
+_safe(function(){ setTimeout(function(){ if(typeof kcFsBackupUp==='function') kcFsBackupUp(true).catch(function(e){ console.warn('원본 사본', e); }); }, 30000); });
 if(KV && KV.state==='broken') _safe(function(){ toast('⚠️ 경력관리 저장소를 열지 못했습니다 — 저장·동기화를 멈춥니다. 새로고침해 주세요(계속되면 다른 탭을 닫고 다시)', 15000); });
 _safe(function(){ var o=get('profile_info'); if(Array.isArray(o)) set('profile_info',{}); });
 /* ⚠ 「표창장」·「임명장」으로 담겨 탭이 어긋난 기록을 부팅 때 한 번 다듬는다(멱등).
