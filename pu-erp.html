@@ -78821,6 +78821,37 @@ function parseDCWide(file, allUsers, cb){
 // - 매월 자동 적립 (월별급여 확정 시)
 // - 법정 퇴직금 자동 계산 (DC 미가입자)
 // ============================================================
+/* ══ 법인 단위 DC 납입 대조 (2026-10-10 인사관리) ═════════════════════════════════
+   사람별 적립 기록(dc_contributions)은 비어 있지만, 출금관리에는 실제 퇴직연금 «출금»이 있다
+   (분류 exp-pension, 내역 details = [대표(…) · 근로자(…)]). 그 «근로자» 몫을 그달 DC 가입자 임금총액(세전 지급총액)의
+   1/12(근로자퇴직급여 보장법 제20조① — 연 임금총액의 1/12 이상)과 견준다.
+   ⚠ 출금 날짜가 «그달 임금분»인지 «전달 임금분»인지 기록이 없다 — 둘 다 보여 주고 판단은 사람이 한다.
+   ⚠ 사람별로 나눈 금액이 없으므로 개인 부족분은 여기서 알 수 없다(퇴직연금 사업자 내역 필요). */
+function dcFirmCheck(year){
+  var y = String(year);
+  var exp = (dbGet('finance_expense', []) || []).filter(function(e){ return e && e.category === 'exp-pension' && String(e.date || '').slice(0, 4) === y; });
+  var pays = dbGet('payroll_monthly', []) || [];
+  var dcSet = {};
+  (dbGet('user_accounts', USERS_SEED) || []).forEach(function(u){ if(u && u.sid && getStaffPension(u.sid).type === 'DC') dcSet[u.sid] = 1; });
+  var need = function(ym){
+    return pays.filter(function(p){ return p && p.ym === ym && dcSet[p.empSid] && (p.status === 'confirmed' || p.status === 'paid'); })
+      .reduce(function(s, p){ var c = {}; try { c = calcPayroll(p) || {}; } catch(e){ c = {}; } return s + (+c.grossPay || 0); }, 0) / 12;
+  };
+  var prevYm = function(ym){ var d = new Date(+ym.slice(0,4), +ym.slice(5,7) - 2, 1); return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0'); };
+  var rows = [];
+  for(var m = 1; m <= 12; m++){
+    var ym = y + '-' + String(m).padStart(2, '0');
+    var paid = exp.filter(function(e){ return String(e.date).slice(0, 7) === ym; }).reduce(function(s, e){
+      var d = Array.isArray(e.details) ? e.details.filter(function(x){ return x && /근로자/.test(String(x.name || '')); }) : [];
+      return s + (d.length ? d.reduce(function(t, x){ return t + (+x.amount || 0); }, 0) : 0);
+    }, 0);
+    var hasPay = pays.some(function(p){ return p && p.ym === ym && dcSet[p.empSid]; });
+    if(!paid && !hasPay) continue;
+    rows.push({ ym:ym, paid:Math.round(paid), need:Math.round(need(ym)), needPrev:Math.round(need(prevYm(ym))), noOutflow:!paid && hasPay });
+  }
+  return rows;
+}
+
 function RetirementSettlement(){
   var users = getActiveUsers();
   var allUsers = dbGet('user_accounts', USERS_SEED);  // 퇴사자 포함 전체
@@ -79200,7 +79231,26 @@ function RetirementSettlement(){
         setSelYear(String(y));
       }
 
+      var firm = dcFirmCheck(selYear);
+      var cS = { padding:'4px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'11px', textAlign:'right', fontFamily:'monospace' };
+      var firmBox = firm.length ? h('div', { style:{ background:'#fff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'10px 12px', marginBottom:'10px' } },
+        h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', marginBottom:'6px' } }, '🏦 법인 DC 납입 대조 — 출금관리의 퇴직연금 «근로자» 몫 vs DC 가입자 임금총액 ÷ 12',
+          h('span', { style:{ fontWeight:400, color:'#64748b', marginLeft:'8px', fontSize:'10.5px' } }, '근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요')),
+        h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+          h('thead', null, h('tr', { style:{ background:'#f8fafc' } }, ['달', '낸 근로자 몫', '그달 임금총액÷12', '비율', '전달 임금총액÷12', '비율'].map(function(t){ return h('th', { key:t, style:Object.assign({}, cS, { fontFamily:'inherit', color:'#475569', fontWeight:700 }) }, t); }))),
+          h('tbody', null, firm.map(function(r){
+            var pct = function(a, b){ return b > 0 ? Math.round(a / b * 1000) / 10 + '%' : '-'; };
+            var low = r.paid > 0 && r.need > 0 && r.paid < r.need * 0.95 && r.paid < r.needPrev * 0.95;
+            return h('tr', { key:r.ym },
+              h('td', { style:Object.assign({}, cS, { textAlign:'left', fontFamily:'inherit' }) }, r.ym),
+              h('td', { style:Object.assign({}, cS, { color: r.noOutflow ? '#d97706' : '#1e293b', fontWeight:700 }) }, r.noOutflow ? '출금 기록 없음' : r.paid.toLocaleString()),
+              h('td', { style:cS }, r.need.toLocaleString()),
+              h('td', { style:Object.assign({}, cS, { color: low ? '#dc2626' : '#475569' }) }, pct(r.paid, r.need)),
+              h('td', { style:cS }, r.needPrev.toLocaleString()),
+              h('td', { style:Object.assign({}, cS, { color: low ? '#dc2626' : '#475569' }) }, pct(r.paid, r.needPrev)));
+          })))) : null;
       return h('div', null,
+        firmBox,
         // 연도 선택 + 안내
         h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px 14px', marginBottom:'10px',
           display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' } },
