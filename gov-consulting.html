@@ -495,7 +495,8 @@ html,body{height:100%;font-family:'Noto Sans KR',sans-serif;background:var(--bg)
 .grp-sp{flex:1;}
 .grp-b{font-size:11.5px;padding:6px 11px;white-space:nowrap;}
 .grp-b[disabled]{opacity:.45;cursor:not-allowed;}
-.grp-ai{background:#f8fafc;color:#64748b;border-color:#cbd5e1;}
+.grp-ai{background:#eff6ff;color:#1e40af;border-color:#bfdbfe;}
+.grp-ai[disabled]{background:#f8fafc;color:#64748b;border-color:#cbd5e1;}
 .grp-x{background:none;border:none;font-size:20px;cursor:pointer;color:var(--t2);padding:0 4px;}
 .grp-miss{font-size:11px;font-weight:700;color:var(--danger);}
 .grp-warn{display:flex;flex-direction:column;gap:5px;padding:10px 16px 0;}
@@ -528,6 +529,9 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 .grp-rno{font-weight:800;white-space:nowrap;}
 .grp-tag{font-size:10.5px;font-weight:700;padding:1px 6px;border-radius:6px;background:#e2e8f0;color:#475569;white-space:nowrap;}
 .grp-tag.add{background:#fffbeb;color:#854d0e;}
+.grp-tag.ai{background:#eff6ff;color:#1e40af;}
+.grp-aiw{margin-top:3px;font-size:11px;line-height:1.45;color:#854d0e;}
+.grp-aiw-w{margin-top:2px;}
 .grp-tag.mail{background:var(--sf2);color:var(--accent);}
 .grp-tag.doc{background:rgba(42,157,143,.12);color:#166534;}
 .grp-tag.priv{background:rgba(233,69,96,.1);color:var(--danger);}
@@ -8090,6 +8094,12 @@ function grpBind(){
     if(!el||!el.getAttribute||!el.getAttribute('data-grp')||!_grp||_grp.locked) return;
     grpReadForm();
     if(el.type!=='checkbox') el.classList.toggle('grp-blank',!String(el.value||'').trim());
+    /* 사람이 고친 AI 칸 — 표시를 떼고 그 칸(회차는 그 회차) 딱지만 다시 그린다 */
+    grpAiSync(_grp).forEach(function(p){
+      const m=/^rounds\.(\d+)\./.exec(p), key=m?'rounds.'+m[1]:p;
+      const box=q('[data-grp-ai="'+key+'"]');
+      if(box) box.outerHTML=grpAiFoot(_grp,m?GRP_RLAB.map(function(k){ return key+'.'+k[0]; }):[p],key);
+    });
     grpRenderWarn();
   });
 }
@@ -8289,6 +8299,29 @@ function grpAiUndo(){
   return {ok:true,restored:u.restored,kept:u.kept};
 }
 /* ── 그리기 ── */
+/* 「AI 초안」 딱지 + 그 칸 경고. paths 가 여럿이면(회차 한 칸) 경고 앞에 이름표를 붙인다 */
+function grpAiFoot(st,paths,key){
+  const on=(paths||[]).filter(function(p){ return st&&st.aiSrc&&st.aiSrc[p]==='ai'; });
+  if(!on.length) return '';
+  const ws=[];
+  on.forEach(function(p){
+    const last=p.slice(p.lastIndexOf('.')+1);
+    const lab=(GRP_RLAB.find(function(k){ return k[0]===last; })||[])[1];
+    ((st.aiWarn||{})[p]||[]).forEach(function(w){ ws.push((paths.length>1&&lab?lab+' — ':'')+w); });
+  });
+  return `<div class="grp-aiw" data-grp-ai="${escAttr(key)}"><span class="grp-tag ai">AI 초안</span>${ws.map(function(w){ return `<div class="grp-aiw-w">⚠ ${escAttr(w)}</div>`; }).join('')}</div>`;
+}
+/* 머리줄 AI 단추들 — 기술보호 켜기 · ✨ · ↶ 되돌리기 */
+function grpAiButtons(st){
+  if(st.aiBusy) return '<button type="button" class="btn btn-s grp-b grp-ai" disabled>✨ AI 초안 쓰는 중…</button>';
+  const can=grpAiCan(st);
+  const tip=can.ok?'빈 칸과 전에 AI 가 쓴 칸에만 초안을 넣습니다 — 사람이 쓴 칸은 덮지 않습니다. 저장은 직접 누릅니다':can.why;
+  let h='';
+  if(st.techguard&&!st.locked) h+=`<button type="button" class="btn btn-s grp-b" data-grp-act="aiAllow" title="기술보호 사업장 — 켜도 회차 날짜·메모만 보냅니다">${st.aiAllow?'☑':'☐'} 이번 건 AI 사용</button>`;
+  h+=`<button type="button" class="btn btn-s grp-b grp-ai" data-grp-act="ai"${can.ok?'':' disabled'} title="${escAttr(tip)}">✨ AI 초안</button>`;
+  if(st.aiUndo&&!st.locked) h+=`<button type="button" class="btn btn-s grp-b" data-grp-act="aiUndo" title="직전 AI 넣기를 되돌립니다 — 그 뒤 사람이 고친 칸은 그대로">↶ AI 되돌리기</button>`;
+  return h;
+}
 function grpSrcLabel(st,f){
   if(f.kind==='check') return '';
   const now=grpGet(st.report,f.path), was=grpGet(st.base,f.path);
@@ -8317,7 +8350,7 @@ function grpFieldHtml(st,f){
   const src=grpSrcLabel(st,f);
   const foot=src?`<div class="grp-src">출처 <b>${escAttr(src)}</b></div>`
     :(blank?`<div class="grp-blankmsg">${f.path==='company.workers'?'이알피에 상시근로자수가 없습니다 — 직접 넣어 주세요':'비어 있음 — 이대로 내려받으면 「＿＿＿」로 찍힙니다'}</div>`:'');
-  return `<label class="grp-lbl">${escAttr(f.label)}</label><div>${ctl}${foot}</div>`;
+  return `<label class="grp-lbl">${escAttr(f.label)}</label><div>${ctl}${grpAiFoot(st,[f.path],f.path)}${foot}</div>`;
 }
 function grpWarnings(st){
   const W=[];
@@ -8326,6 +8359,12 @@ function grpWarnings(st){
   const f=FORMS[st.formKey]||{}, lim=f.rounds||{}, n=(st.report.rounds||[]).length;
   if(st.locked) W.push({k:'ok',t:'✔ 확정본 v'+st.ver+((st.saved&&st.saved.confirmedBy)?' — '+st.saved.confirmedBy:'')+'. 칸이 잠겼습니다. 고치려면 [새 판으로 고치기]'});
   if(st.techguard) W.push({k:'lock',t:'🔒 기술보호 자료 — 이 사업장의 자료·보고서는 기술보호 자료로 다룹니다'});
+  if(st.techguard&&st.aiAllow&&!st.locked) W.push({k:'lock',t:'🔒 이번 건 AI 사용 켬 — 회차 날짜·메모만 보냅니다(메일·보낸 서류는 보내지 않습니다)'});
+  const aiOn=Object.keys(st.aiSrc||{}).filter(function(p){ return st.aiSrc[p]==='ai'; });
+  if(aiOn.length){
+    const wn=aiOn.filter(function(p){ return (st.aiWarn||{})[p]&&st.aiWarn[p].length; }).length;
+    W.push({k:wn?'warn':'',t:'✨ AI 초안 '+aiOn.length+'칸 — 노무사가 읽고 고친 뒤 저장·확정하세요'+(wn?' · 확인 필요 '+wn+'칸':'')});
+  }
   if(lim.min&&n<lim.min) W.push({k:'warn',t:'⚠ 회차가 기관 기준 '+lim.min+'회보다 적습니다 — 지금 '+n+'회. [+ 회차 추가]로 일정에 없는 방문을 넣으세요(정부사업일정에는 쓰지 않습니다)'});
   if(lim.max&&n>lim.max) W.push({k:'warn',t:'⚠ 회차가 기관 기준 최대 '+lim.max+'회를 넘습니다 — 지금 '+n+'회(넘는 회차는 양식에 안 들어갑니다)'});
   const usesWorkers=grpFieldsFor(st.formKey).some(function(x){ return x.path==='company.workers'; });
@@ -8368,7 +8407,7 @@ function grpRenderTop(){
     <span class="grp-pill gray">상태: ${st.locked?'확정 v'+st.ver:(st.ver?'초안(새 판 · 확정본 v'+st.ver+' 있음)':'초안')}</span>
     ${st.techguard?'<span class="grp-pill priv">기술보호 자료</span>':''}
     <span class="grp-sp"></span>
-    <button type="button" class="btn btn-s grp-b grp-ai" disabled title="3단계에서 붙습니다">✨ AI 초안 (3단계)</button>
+    ${grpAiButtons(st)}
     ${st.locked?`<button type="button" class="btn btn-s grp-b" data-grp-act="newVer" title="확정본은 그대로 두고 새 판을 고칩니다">✎ 새 판으로 고치기</button>`
       :`<button type="button" class="btn btn-s grp-b" data-grp-act="save">💾 임시 저장</button>`}
     ${dls}
@@ -8403,6 +8442,7 @@ function grpRender(){
       ${showVisit?`<td><select class="fsel grp-in" data-grp="rounds.${i}.visit" data-kind="visit"${dis}>
         <option value=""${vis===''?' selected':''}>모름</option><option value="1"${vis==='1'?' selected':''}>■방문</option><option value="0"${vis==='0'?' selected':''}>■사무활동</option></select></td>`:''}
       <td><textarea class="fi grp-in${txt?'':' grp-blank'}" rows="3" data-grp="${i}" data-kind="round" placeholder="${escAttr(use)}"${dis}>${escAttr(txt)}</textarea>
+        ${grpAiFoot(st,GRP_RLAB.map(function(k){ return 'rounds.'+i+'.'+k[0]; }),'rounds.'+i)}
         ${added?'<div class="grp-blankmsg">일정에 기록이 없는 회차입니다 — 이 보고서에만 남습니다</div>':'<div class="grp-src">재료 <b>정부사업일정 메모</b></div>'}</td>
     </tr>`;
   }).join('');

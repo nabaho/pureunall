@@ -490,6 +490,8 @@ test('보고서 ①-3 열쇠는 있는데 클라우드 연결 전이면 조용�
 const Ai = require('../js/pu-gov-report-ai.js');
 const AI_NAMES = ['grpAiProxyUrl', 'grpAiConsent', 'grpAiFetch', 'grpAiCall', 'grpAiNames', 'grpAiMemos', 'grpAiCan',
   'grpAiDraft', 'grpAiUndo', 'grpAiAllow'];
+const SCREEN_NAMES = ['grpRenderTop', 'grpFileLabel', 'grpFieldHtml', 'grpSrcLabel', 'grpWarnings', 'grpAiButtons', 'grpAiFoot'];
+const aiBtn = (h) => (h.match(/<button[^>]*data-grp-act="ai"[^>]*>/) || [''])[0];
 const aiText = (text) => ({ content: [{ type: 'text', text }] });
 const aiReply = (o) => aiText(JSON.stringify(o));
 const okReply = () => aiReply({
@@ -517,6 +519,7 @@ function aiWorld(opts) {
     },
   });
   vm.runInContext(AI_NAMES.map(grab).join('\n'), w.ctx);
+  if (o.screen) vm.runInContext(SCREEN_NAMES.map(grab).join('\n'), w.ctx);
   return Object.assign(w, { fetched, store });
 }
 
@@ -677,4 +680,53 @@ test('AI — 스크립트 줄: pu-gov-report-ai.js 는 pu-gov-report.js 뒤에',
   const g = HTML.indexOf('<script src="js/pu-gov-report.js?v=');
   const a = HTML.indexOf('<script src="js/pu-gov-report-ai.js?v=');
   assert.ok(g >= 0 && a > g, 'pu-gov-report-ai.js 줄이 없거나 차례가 틀렸다');
+});
+
+test('AI ⑧ 화면 — ✨ 단추·되돌리기 단추·「AI 초안」 딱지와 경고, 사람이 고치면 딱지가 빠진다, 확정하면 잠긴다', async () => {
+  const w = aiWorld({ screen: true });
+  const st = await opened(w);
+  w.ctx.grpRenderTop();
+  let top = w.els['#grpTop'].innerHTML;
+  assert.ok(aiBtn(top) && !/disabled/.test(aiBtn(top)), '열린 초안에서는 눌린다');
+  assert.ok(!/data-grp-act="aiAllow"/.test(top), '기술보호가 아니면 켜기 단추가 없다');
+  assert.ok(!/data-grp-act="aiUndo"/.test(top));
+  assert.ok(!/3단계에서 붙습니다/.test(top), '자리만 잡던 단추가 남았다');
+  await w.ctx.grpAiDraft();
+  w.ctx.grpRenderTop();
+  top = w.els['#grpTop'].innerHTML;
+  assert.match(top, /data-grp-act="aiUndo"/);
+  const f = w.ctx.grpFieldsFor('cci-north').find((x) => x.path === 'summary.review');
+  assert.match(w.ctx.grpFieldHtml(st, f), /data-grp-ai="summary\.review"><span class="grp-tag ai">AI 초안/);
+  st.aiWarn['summary.review'] = ['확인 필요 — 입력에 없던 날짜·숫자: 2026'];
+  assert.match(w.ctx.grpFieldHtml(st, f), /확인 필요 — 입력에 없던 날짜·숫자: 2026/);
+  assert.ok(w.ctx.grpWarnings(st).some((x) => /✨ AI 초안 \d+칸/.test(x.t)));
+  st.report.summary.review = '사람이 고침';
+  w.ctx.grpAiSync(st);
+  assert.ok(!/AI 초안/.test(w.ctx.grpFieldHtml(st, f)), '사람이 고치면 딱지가 없어진다');
+  assert.strictEqual((await w.ctx.grpConfirm()).ok, true);
+  w.ctx.grpRenderTop();
+  top = w.els['#grpTop'].innerHTML;
+  assert.match(aiBtn(top), /disabled/, '확정된 판은 잠긴다');
+  assert.ok(!/data-grp-act="aiUndo"/.test(top));
+});
+
+test('AI ⑨ 화면 — 기술보호는 켜기 전 ✨ 가 잠기고 「이번 건 AI 사용」 단추가 있다', async () => {
+  const w = aiWorld({ screen: true });
+  const input = await w.ctx.grpCollect('c1', 'bxeyzrxm');
+  const st = w.ctx.grpSetup(input, 'techguard');
+  w.ctx.grpRenderTop();
+  let top = w.els['#grpTop'].innerHTML;
+  assert.match(aiBtn(top), /disabled/);
+  assert.match(top, /data-grp-act="aiAllow"[^>]*>☐ 이번 건 AI 사용/);
+  w.ctx.grpAiAllow();                                   // 다시 그린다
+  top = w.els['#grpTop'].innerHTML;
+  assert.ok(!/disabled/.test(aiBtn(top)));
+  assert.match(top, /☑ 이번 건 AI 사용/);
+  assert.ok(w.ctx.grpWarnings(st).some((x) => /이번 건 AI 사용 켬/.test(x.t)));
+});
+
+test('AI ⑩ 화면 — 칸을 고치면(change) AI 표시를 맞추고 그 딱지만 다시 그린다', () => {
+  const b = grab('grpBind');
+  assert.match(b, /grpReadForm\(\);[\s\S]*grpAiSync\(_grp\)[\s\S]*data-grp-ai/);
+  assert.match(SRC, /\.grp-tag\.ai\{/);
 });
