@@ -29,12 +29,12 @@ function leaveEnv(opt){
   opt = opt || {};
   const store = Object.assign({ policy_leave: {}, attendance_records: [], user_accounts: [] }, opt.store || {});
   const ctx = { Math, Number, String, parseInt, parseFloat, isNaN, isFinite, Object, Array, JSON,
-    Date: opt.today ? fixedDate(...opt.today) : Date, dbGet: (k, d) => (k in store ? store[k] : d), USERS_SEED: [] };
+    Date: opt.today ? fixedDate(...opt.today) : Date, todayYMD: () => (opt.todayS || '2026-10-10'), dbGet: (k, d) => (k in store ? store[k] : d), USERS_SEED: [] };
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(R, 'js', 'pu-work-core.js'), 'utf8'), ctx);
   const LOCAL_YMD = (fs.readFileSync(path.join(R, 'js', 'utils.js'), 'utf8').match(/function localYMD\([^\n]*/) || [''])[0];
   vm.runInContext(LOCAL_YMD + '\nvar PUREUN_5IN_DATE = "2021-06-01";\n' +
-    ['getLeaveStartDate', '_lvYmd', '_lvParse', '_lvAddMonths', '_lvDayBefore', 'erpLeaveGrants', 'erpLeaveGrantedInYear',
+    ['getLeaveStartDate', '_lvYmd', '_lvParse', '_lvAddMonths', '_lvDayBefore', '_lvGrantsFrom', 'erpLeaveGrants', 'erpLeaveGrantedInYear',
      'erpLeaveBalanceAt', 'getLeaveRemain', 'calcRetirementLeaveJoinBasis', 'calcLeavePromoStage', 'leaveLedgerWithIds'].map(fnSrc).join('\n') +
     '\nthis.G = erpLeaveGrants; this.Y = erpLeaveGrantedInYear; this.B = erpLeaveBalanceAt; this.remain = getLeaveRemain;' +
     ' this.retire = calcRetirementLeaveJoinBasis; this.promo = calcLeavePromoStage; this.ll = leaveLedgerWithIds;', ctx);

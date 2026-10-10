@@ -122,7 +122,7 @@ test('④ 연차 잔여는 퇴직일(retireDate)에서 멈춘다 — 퇴직자 �
   /* 2단계(2026-10-10)부터 getLeaveRemain 은 발생 장부(erpLeaveGrants)를 거친다 — 장부 도우미를 함께 싣는다.
      localYMD 는 js/utils.js 에 있다 */
   const LOCAL_YMD = (fs.readFileSync(path.join(R, 'js', 'utils.js'), 'utf8').match(/function localYMD\([^\n]*/) || [''])[0];
-  vm.runInContext(LOCAL_YMD + '\n' + ['_lvYmd', '_lvParse', '_lvAddMonths', '_lvDayBefore', 'erpLeaveGrants', 'erpLeaveGrantedInYear'].map(fnSrc).join('\n')
+  vm.runInContext(LOCAL_YMD + '\n' + ['_lvYmd', '_lvParse', '_lvAddMonths', '_lvDayBefore', '_lvGrantsFrom', 'erpLeaveGrants', 'erpLeaveGrantedInYear'].map(fnSrc).join('\n')
     + '\n' + fnSrc('getLeaveStartDate') + '\n' + fnSrc('getLeaveRemain')
     + '\nvar PUREUN_5IN_DATE = "2021-06-01";\nthis.f = getLeaveRemain;', ctx);
   const r = ctx.f('X-1', 2026);
