@@ -1037,6 +1037,8 @@
     retirementIncomeTax: retirementIncomeTax, basicTax: basicTax,
     // 급여
     insuranceEmployee: insuranceEmployee, localIncomeTax: localIncomeTax,
+    /* 그해 근로자 부담 요율 묶음 — 이알피 자기 직원 급여(pu-erp.html calcPayroll)가 같은 연도표를 쓴다 (2026-10-10) */
+    insuranceRatesOf: function (year) { var y = String(year); return { pensionEE: rateOfYear(INS_RATES.pensionEE, y), healthEE: rateOfYear(INS_RATES.healthEE, y), longtermRate: rateOfYear(INS_RATES.longtermRate, y), empInsEE: rateOfYear(INS_RATES.empInsEE, y) }; },
     // 간이세액표
     CHILD_CREDIT: CHILD_CREDIT, childCredit: childCredit, pickSimpleTaxTable: pickSimpleTaxTable,
     lookupSimpleTax: lookupSimpleTax, withholdingTax: withholdingTax,
