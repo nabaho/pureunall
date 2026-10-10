@@ -11,7 +11,7 @@ const F = (ls) => S.field(ls);
 test('★★ 칸 목록이 화면이 쓰는 클라우드 칸을 «모두» 덮는다 — 빠지면 그 칸은 기기 사이로 안 간다', () => {
   const want = ['feed', 'kw', 'key_data', 'key_biz', 'last', 'last_at', 'recruit_scan', 'recruit_at', 'recruit_log', 'recruit_url',
     'recruit_custom', 'recruit_seen', 'recruit_mailitems', 'recruit_mail_at', 'recruit_mailfolders', 'recruit_mailmap',
-    'recruit_mailskip', 'recruit_need', 'recruit_due', 'recruit_match', 'plan', 'plan_since', 'spec_since', 'plan_at'];
+    'recruit_mailskip', 'recruit_need', 'recruit_due', 'recruit_match', 'plan', 'plan_since', 'spec_since', 'plan_at', 'plan_err'];
   want.forEach((k) => assert.ok(F(k), k + ' 가 빠졌다'));
   assert.equal(S.FIELDS.length, want.length);
   /* 푸른 캘린더(pu-cal-recruit.js)가 읽는 자리 — 모양을 바꾸면 달력이 빈다 */
