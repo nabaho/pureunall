@@ -10,6 +10,7 @@
 const crypto = require('crypto');
 const P = require('./rules-collect-pick');
 const X = require('./rules-collect-redact');
+const PDF = require('./rules-collect-pdf');   // 다시 보기 전에 pdf.js 를 실을 수 있는지 한 번 본다(받기 전에)
 const MR = require('./mail-receive');
 const LIB = 'rules_mgmt/library';
 const FILE_KINDS = ['규칙본문', '신구대조표'];
@@ -289,6 +290,14 @@ async function runOnce(o) {
             || (ex && typeof ex === 'object' && ex.kind === '규칙본문' && ex.status === '담김' && !isPdfName(ex.name)))) bodyStored = true;
           c.dup++; ids.push(id); continue;
         }
+        /* ★ PDF 글 뽑기는 CPU 일이라 withTimeout 으로 못 끊는다 — 받다가 예산이 다 됐으면 읽지 않고 옛 까닭으로 보류한다(다시 보기가 나중에 읽는다) */
+        if (ext === 'pdf' && o.now() - t0 > o.budgetMs) {
+          up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
+            { kind: P.kindOf(a.name, ''), sha, file: null, textLen: 0, pii: { count: {}, residual: 0 },
+              status: '보류', holdWhy: PDF_HOLD.OLD }) });
+          staged[id] = 1; c.held++; ids.push(id);
+          continue;
+        }
         if (o.trace) o.trace('가리기 ' + m.mailKey + ' ' + ext + ' ' + a.data.length + 'B');
         const r = await (o.redact || X.redactOne)(a.data, ext);   // o.redact 는 검사 전용 이음매(가짜 PDF 글 주입) — index.js 는 안 넘긴다
         if (!r.ok) {
@@ -326,7 +335,8 @@ async function runOnce(o) {
         up[LIB + '/text/' + id] = r.text;
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
           { kind, sha, file, textLen: r.text.length,
-            pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' }) });
+            pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' },
+          r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}) });   // 쪽 한도(300)에 잘린 PDF 는 표시 — 뒤쪽은 담기지 않았다
         if (ext !== 'pdf' && kind === '규칙본문') { bodyStored = true; bodyIds.add(id); }
         staged[id] = 1; c.stored++; ids.push(id);
       }
@@ -348,7 +358,15 @@ async function runOnce(o) {
   /* ── PDF 다시 보기 — 남은 예산 안에서 메일 한 통씩 ── */
   const pdfQ = pdfTargets(docs || {});   // 처음 읽은 문서만 — 이번 회차에 새로 담은 것은 이미 새 규칙으로 읽혔다
   const pdfSum = { done: 0, stored: 0, held: 0, left: pdfQ.length };
-  for (const g of pdfQ) {
+  /* ★ 받기 «전에» pdf.js 를 실을 수 있는지 한 번 본다 — 못 실으면 메일을 받아 봐야 아무것도 못 읽고, 큰 메일 표시만 쌓인다.
+     o.redact 가 있으면(검사 전용 이음매) 실제 pdf.js 를 안 쓰므로 보지 않는다. o.pdfLoad 로 바꿔 끼울 수 있다. */
+  const probe = o.pdfLoad || (o.redact ? null : PDF.load);
+  let pdfReady = true;
+  if (pdfQ.length && probe) {
+    try { await probe(); }
+    catch (e) { pdfReady = false; sum.retry++; sum.errors.push(e && e.code === 'PDFJS_MISSING' ? 'PDFJS_MISSING' : errTag(e)); }
+  }
+  for (const g of (pdfReady ? pdfQ : [])) {
     const tk = TRY + '/pdf_' + g.mailKey;
     const mk = ((tries0 || {})['pdf_' + g.mailKey]) || {};
     const slow = !!mk.slow;                       // 큰 메일(앞 회차에 받다 멈춘 메일)은 길게 기다리되 «한 번»만
@@ -415,7 +433,8 @@ async function runOnce(o) {
         const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
         if (why) { close(up, id, { kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
         up[LIB + '/text/' + id] = r.text;
-        close(up, id, { kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null });
+        close(up, id, Object.assign({ kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null },
+          r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}));
         pdfSum.stored++;
       }
       if (noPdfJs) {
@@ -435,18 +454,21 @@ async function runOnce(o) {
   }
   sum.pdf = pdfSum;
   sum.errors = sum.errors.slice(0, 10);
-  sum.left = Math.max(0, allLeft.length - (newMails - newRetry)) + pdfSum.left;
-  if (!sum.left && !requeued) {   // 다 본 뒤 줄이 비었다 — 이제 세운다(다음 회차가 길게 기다리며 본다)
+  /* 새 메일 몫(newLeft)과 PDF 다시 보기 몫(pdfSum.left)을 나눠 센다 — 줄 비움 판단은 새 메일 몫만으로 한다.
+     PDF 가 막혀(연결·pdf.js) 남아 있다고 «멈춘 메일 다시 세우기» 까지 막으면 안 된다. */
+  const newLeft = Math.max(0, allLeft.length - (newMails - newRetry));
+  sum.left = newLeft + pdfSum.left;
+  if (!newLeft && !requeued) {   // 다 본 뒤 새 메일 줄이 비었다 — 이제 세운다(다음 회차가 길게 기다리며 본다)
     const n2 = await requeueStuck();
     sum.requeued += n2; sum.left += n2;
   }
   sum.healed = healed;   // 다시 시도할 것은 남은 것으로 센다
   /* 설계 §4-5 — 「담음 0, 오류 있음」이 사흘 이어지면 관리자에게 알린다(부르는 쪽이 systemAlerts 에 쓴다) */
-  const bad = sum.stored === 0 && (sum.retry > 0 || sum.errors.length > 0);
+  const bad = (sum.stored + pdfSum.stored) === 0 && (sum.retry > 0 || sum.errors.length > 0);   // 다시 보기로 살린 PDF 도 «담음»이다
   sum.zeroStreak = bad ? Number((prevRun && prevRun.zeroStreak) || 0) + 1 : 0;
   sum.alert = sum.zeroStreak >= 3;
   await db.ref(LIB + '/run').set(Object.assign({}, sum, { took: o.now() - t0 }));
-  if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
+  if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry, pdf: sum.pdf }));
   return sum;
 }
 module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS, PDF_HOLD, isPdfName, pdfTargets };

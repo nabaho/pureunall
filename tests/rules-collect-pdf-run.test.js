@@ -274,3 +274,95 @@ test('다시 보기 — 대상이 없으면 셈은 옛 그대로(pdf 0, left 0)'
   assert.deepEqual(sum.pdf, { done: 0, stored: 0, held: 0, left: 0 });
   assert.equal(sum.mails, 1); assert.equal(sum.retry, 0); assert.equal(sum.left, 0);
 });
+
+/* ── 최종 검토 보강 ── */
+const ECONN = () => Object.assign(new Error('끊김'), { code: 'ECONNRESET' });
+
+test('다시 보기로 PDF 를 살렸으면 「담음 0」 이 아니다 — 가짜 사흘 경보를 세우지 않는다', async () => {
+  const idA = 'rd_a', idB = 'rd_b';
+  const db = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' }), heldDoc(idB, { name: '규칙.pdf', sha: sha(PB), uid: '21' })],
+    seenOf(KEY20, KEY21), ROWS2));
+  db.store.rules_mgmt.library.run = { at: 1, left: 2, zeroStreak: 2 };
+  const sum = await C.run(base(db, fakeBucket(), {}, {
+    fetchAtts: async (m) => { if (m.mailKey === KEY21) throw ECONN(); return [{ name: '취업규칙.pdf', data: PA }]; } }));
+  assert.equal(db.store.rules_mgmt.library.docs[idA].status, '담김');
+  assert.equal(sum.stored, 0); assert.equal(sum.pdf.stored, 1); assert.equal(sum.retry, 1);
+  assert.equal(sum.zeroStreak, 0, '★ 살린 PDF 를 안 세고 「담음 0」 으로 셌다');
+  assert.equal(sum.alert, false);
+});
+
+test('멈춘 메일 다시 세우기는 PDF 다시 보기를 기다리지 않는다 — 새 메일 몫만 비면 세운다', async () => {
+  const idA = 'rd_a';
+  const rows = Object.assign({}, ROWS2, { 22: { s: '가나상사 취업규칙 셋', d: 3002, e: 'hr@gana.co.kr', a: 0 } });
+  const seen = Object.assign(seenOf(KEY20, KEY21), { 'i_INBOX-4a1e411c_21': { at: 1, docs: [], why: '멈춤 2번 — 건너뜀(메일에서 직접 확인)' } });
+  const db = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seen, rows));
+  const sum = await C.run(base(db, fakeBucket(), {}, { fetchAtts: async (m) => { if (m.mailKey === KEY20) throw ECONN(); return []; } }));
+  assert.equal(sum.mails, 2, '새 메일 한 통 + PDF 다시 보기 한 통');
+  assert.equal(sum.pdf.left, 1);
+  assert.ok(sum.requeued >= 1, '★ 막힌 PDF 가 멈춘 메일 다시 세우기까지 막았다');
+  assert.ok(sum.left >= 2, '다시 세운 것과 PDF 몫이 남은 것으로 센다');
+});
+
+test('다시 보기 — pdf.js 를 못 싣는지 «받기 전에» 한 번 본다(못 싣으면 아무것도 받지 않는다)', async () => {
+  const idA = 'rd_a';
+  const db = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seenOf(KEY20)));
+  let fetched = 0, probed = 0;
+  const sum = await C.run(base(db, fakeBucket(), {}, {
+    pdfLoad: async () => { probed++; throw Object.assign(new Error('없음'), { code: 'PDFJS_MISSING' }); },
+    fetchAtts: async () => { fetched++; return [{ name: '취업규칙.pdf', data: PA }]; } }));
+  assert.equal(probed, 1);
+  assert.equal(fetched, 0, '★ 못 읽을 줄 알면서 메일을 받았다');
+  assert.equal(db.store.rules_mgmt.library.docs[idA].holdWhy, C.PDF_HOLD.OLD);
+  assert.equal(db.store.rules_mgmt.library.docs[idA].revision, 1);
+  assert.equal(sum.pdf.left, 1); assert.equal(sum.mails, 0);
+  assert.ok(sum.errors.indexOf('PDFJS_MISSING') >= 0);
+  assert.equal(sum.retry, 1);
+  assert.equal(Object.keys(tryOf(db)).filter((k) => k.indexOf('pdf_') === 0).length, 0, '표시를 남겼다');
+  /* 실을 수 있으면 평소대로 */
+  const db2 = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seenOf(KEY20)));
+  const s2 = await C.run(base(db2, fakeBucket(), {}, { pdfLoad: async () => ({}), fetchAtts: async () => [{ name: '취업규칙.pdf', data: PA }] }));
+  assert.equal(s2.pdf.stored, 1);
+});
+
+test('새 메일 — 예산이 받다가 다 됐으면 PDF 는 읽지 않고 옛 까닭으로 보류(다시 보기가 나중에 읽는다)', async () => {
+  const db = fakeDb(MAIL({ 40: { s: '가나상사 취업규칙', d: 6000, e: 'hr@gana.co.kr', a: 2 } })), bucket = fakeBucket();
+  let t = 1e12, pdfReads = 0;
+  const hw = hwBody();
+  const redact = fakeRedact(X.redactOne);
+  await C.run(base(db, bucket, {}, {
+    now: () => t, budgetMs: 1e6,
+    fetchAtts: async () => { t += 2e6; return [{ name: '가나상사_취업규칙.pdf', data: fakePdf('big') }, { name: '가나상사_취업규칙_최종.hwpx', data: hw }]; },
+    redact: async (b, ext) => { if (ext === 'pdf') pdfReads++; return redact(b, ext); } }));
+  const pdf = docsOf(db).find((d) => /\.pdf$/.test(d.name));
+  assert.equal(pdfReads, 0, '★ 예산이 끝났는데 PDF 를 읽었다(CPU 는 시간 한도로 못 끊는다)');
+  assert.deepEqual([pdf.status, pdf.holdWhy], ['보류', C.PDF_HOLD.OLD]);
+  assert.equal(pdf.file, null);
+  assert.equal(db.store.rules_mgmt.library.text[pdf.id], undefined);
+  assert.equal(C.pdfTargets({ [pdf.id]: pdf }).length, 1, '다시 보기 대상으로 남는다');
+});
+
+test('쪽 한도에 잘린 PDF — 문서 줄에 pdfTruncated·pdfPages (새 메일·다시 보기 둘 다)', async () => {
+  const cut = (n) => async (b, ext) => ({ ok: true, format: 'pdf', text: RULE_TEXT + '\n' + n, data: null, count: {}, total: 0, truncated: true, pages: 301 });
+  const db = fakeDb(MAIL({ 41: { s: '가나상사 취업규칙', d: 6100, e: 'hr@gana.co.kr', a: 1 } }));
+  await C.run(base(db, fakeBucket(), { 'i_INBOX-4a1e411c_41': [{ name: '가나상사_취업규칙.pdf', data: fakePdf('t1') }] }, { redact: cut('t1') }));
+  const d1 = docsOf(db)[0];
+  assert.equal(d1.status, '담김'); assert.equal(d1.pdfTruncated, true); assert.equal(d1.pdfPages, 301);
+  /* 잘리지 않은 것은 표시가 없다 */
+  const db0 = fakeDb(MAIL({ 42: { s: '가나상사 취업규칙', d: 6200, e: 'hr@gana.co.kr', a: 1 } }));
+  await C.run(base(db0, fakeBucket(), { 'i_INBOX-4a1e411c_42': [{ name: '가나상사_취업규칙.pdf', data: fakePdf('t0') }] }));
+  assert.equal(docsOf(db0)[0].pdfTruncated, undefined);
+  /* 다시 보기 */
+  const idA = 'rd_a';
+  const db2 = fakeDb(seeded([heldDoc(idA, { name: '취업규칙.pdf', sha: sha(PA), uid: '20' })], seenOf(KEY20)));
+  await C.run(base(db2, fakeBucket(), { [KEY20]: [{ name: '취업규칙.pdf', data: PA }] }, { redact: cut('t2') }));
+  const d2 = db2.store.rules_mgmt.library.docs[idA];
+  assert.equal(d2.status, '담김'); assert.equal(d2.pdfTruncated, true); assert.equal(d2.pdfPages, 301);
+});
+
+test('마지막 로그 줄에 pdf 셈이 들어 있다', async () => {
+  const db = fakeDb(MAIL({ 43: { s: '가나상사 취업규칙', d: 6300, e: 'hr@gana.co.kr', a: 0 } }));
+  const lines = [];
+  await C.run(base(db, fakeBucket(), {}, { log: (l) => lines.push(l) }));
+  const last = JSON.parse(lines[lines.length - 1]);
+  assert.deepEqual(last.pdf, { done: 0, stored: 0, held: 0, left: 0 });
+});
