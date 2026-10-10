@@ -1200,6 +1200,8 @@ async function rehabFindContact(n, hint, providers) {
 }
 /* 검색 서비스 자체가 거절(401·403·429)한 결과는 «못 찾음»이 아니다 — 저장하면 7일 동안 다시 안 본다 */
 function rehabSearchRefused(found) { return /실패\((401|403|429)\)/.test(String((found && found.note) || "")); }
+/* 한쪽(카카오맵)만 거절하고 웹검색에서 무언가 찾았으면 «찾은 것»은 남긴다 — 통째로 버리지 않는다 */
+function rehabHasFind(found) { return !!(found && (found.homepage || found.phone || found.fax || found.email)); }
 function rehabInfoRecord(n, found, nowMs) {
   return Object.assign({ id: n.id, entityType: "Document", docKind: "rehabContact", sourceKind: "rehabNotice", sourceId: n.id,
     schemaVersion: 3, contractVersion: OntologyServerWrite.CONTRACT_VERSION, createdAt: nowMs, updatedAt: nowMs, revision: 1 }, found);
@@ -1248,14 +1250,15 @@ exports.rehabWatch = functions
       const info = (await root.child("info").once("value")).val() || {};
       const week = 7 * 864e5;
       const all = Object.keys(existing).map((k) => existing[k]).concat(result.added).filter((n) => n && n.id && !n._deleted);
-      const todo = all.filter((n) => { const x = info[n.id]; return !x || (x.status === "none" && nowMs - (x.checkedAt || 0) > week); })
+      const todo = all.filter((n) => { const x = info[n.id]; return !x || (x.status === "none" && nowMs - (x.checkedAt || 0) > week)
+          || (rehabSearchRefused(x) && nowMs - (x.checkedAt || 0) > 864e5); })   // 한쪽이 거절해 일부만 남은 곳은 하루 뒤 다시
         .sort((a, b) => String(b.noticeDate).localeCompare(String(a.noticeDate)));
       await rehabPool(todo, 3, t0 + 470 * 1000, async (n) => {
         if (refused >= 3 && !found) return;   // 검색 서비스가 계속 거절하면 그만 둔다
         tried++;
         const r = await rehabFindContact(n, {}, providers);
-        if (rehabSearchRefused(r)) { refused++; return; }
-        if (r.status !== "none" || r.note) found += r.status === "found" ? 1 : 0;
+        if (rehabSearchRefused(r)) { refused++; if (!rehabHasFind(r)) return; }
+        if (r.status !== "none" || r.note) found += (r.status === "found" || rehabHasFind(r)) ? 1 : 0;
         upd["info/" + n.id] = rehabInfoRecord(n, r, Date.now());
       });
       upd["runs/" + today].contact = { tried, found, refused, left: Math.max(0, todo.length - tried) };
@@ -1297,7 +1300,7 @@ exports.rehabEnrich = functions
         const hint = hints[id] && typeof hints[id].homepage === "string" ? { homepage: hints[id].homepage.slice(0, 300) } : {};
         const r = await rehabFindContact(notices[id], hint, providers);
         const refusedNow = rehabSearchRefused(r);
-        if (!refusedNow) upd["info/" + id] = rehabInfoRecord(notices[id], r, Date.now());
+        if (!refusedNow || rehabHasFind(r)) upd["info/" + id] = rehabInfoRecord(notices[id], r, Date.now());
         out.push({ id, status: r.status, homepage: r.homepage, phone: r.phone, fax: r.fax, email: r.email, note: r.note, refused: refusedNow });
       });
       if (Object.keys(upd).length) await root.update(upd);
