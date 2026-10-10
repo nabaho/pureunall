@@ -42,7 +42,8 @@ test('② 일수 — 기술보호는 자문 기간(양끝 포함) · 현장클�
 
 test('③ 화면 규칙', () => {
   const op = strip(떼기('async function openCardsImport('));
-  assert.ok(/staff\[p\.member\]/.test(op), '우리 노무사만');
+  assert.ok(/members\[r\.p\.member\]=members\[r\.p\.member\]\|\|\{ n:0, on:!!staff\[r\.p\.member\] \}/.test(op), '위원으로 인정할 사람을 화면에서 고른다 — 직원 명부·실적 담당에 있는 사람만 미리 켠다');
+  assert.ok(/function _ciVis\(/.test(SRC) && /_ciVis\(\)\.forEach\(function\(r\)\{\r?\n    if\(!r\.on \|\| r\.act==='skip'\) return;/.test(SRC), '넣기는 인정한 위원의 줄만');
   assert.ok(/have\[ref\]\)\{ already\+\+; return; \}/.test(op), '이미 가져온 줄은 건너뛴다');
   assert.ok(/Number\(x\.consultDays\)>0/.test(op) && /현장클리/.test(op) && /_ciDigits\(x\.bizNo\|\|x\.bizno\)===k/.test(op), '현장클리닉 일수는 이알피 «확정» 일수만 — 사업자번호로 잇는다');
   assert.ok(/같은해 \? 'link:'\+같은해\.id : 'new'/.test(op), '같은 해면 연결을 미리 골라 두고 아니면 새로');

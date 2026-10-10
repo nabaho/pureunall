@@ -11810,7 +11810,7 @@ async function openCardsImport(){
       if(!/^\d{10}$/.test(k)) return;
       String((coInfo[k]||{}).memo||'').split(/\r?\n/).forEach(function(ln){
         var p=KcareerBiz.parseCardsLine(ln); if(!p) return;
-        if(!p.member || !staff[p.member]){ skipped++; return; }
+        if(!p.member){ skipped++; return; }
         var ref='cards:'+k+'|'+p.key; if(have[ref]){ already++; return; }
         var nm=이름[k]||'', f=KcareerBiz.flatName(nm);
         var 후보=nm?cons.filter(function(r){ return (p.kind==='clinic'?/현장클리닉/:/기술보호/).test(r.type||'') && KcareerBiz.flatName(r.org)===f; }):[];
@@ -11828,11 +11828,17 @@ async function openCardsImport(){
       });
     });
     rows.sort(function(a,b){ return (b.후보.length>0)-(a.후보.length>0) || String(b.p.year).localeCompare(String(a.p.year)) || a.name.localeCompare(b.name); });
+    /* ★ 「위원으로 인정할 사람」 — 줄에 적힌 클리닉위원·노무사 이름마다 건수를 세어 보이고, 직원 명부·실적 담당에 있는 사람만 미리 켠다.
+         명부에 없는 사람(예전 사원 등)은 건수를 보고 사람이 켠다 — 남의 실적이 우리 실적으로 새는 것을 막는다(2026-10-10). */
+    var members={}; rows.forEach(function(r){ var m=members[r.p.member]=members[r.p.member]||{ n:0, on:!!staff[r.p.member] }; m.n++; });
+    _ciCtx.members=members;
     _ciCtx.rows=rows; _ciCtx.skipped=skipped; _ciCtx.already=already; _ciCtx.busy=false; _ciCtx.msg='';
   }catch(e){ _ciCtx.busy=false; _ciCtx.msg='⚠ 기업정보함을 읽지 못했습니다 — '+String(e&&e.message||e); }
   ciRender();
 }
 function closeCardsImport(){ var m=document.getElementById('modalCardsImp'); if(m) m.classList.remove('open'); _ciCtx=null; }
+function _ciVis(){ var m=(_ciCtx&&_ciCtx.members)||{}; return ((_ciCtx&&_ciCtx.rows)||[]).filter(function(r){ return m[r.p.member] && m[r.p.member].on; }); }
+function ciMember(name,on){ var m=_ciCtx&&_ciCtx.members&&_ciCtx.members[name]; if(m){ m.on=!!on; ciRender(); } }
 function ciTab(t){ if(_ciCtx){ _ciCtx.tab=t; ciRender(); } }
 function ciOn(i,on){ var r=_ciCtx&&_ciCtx.rows[i]; if(r){ r.on=!!on; ciSum(); } }
 function ciAct(i,v){ var r=_ciCtx&&_ciCtx.rows[i]; if(r){ r.act=v; r.on=(v!=='skip'); ciRender(); } }
@@ -11840,12 +11846,12 @@ function ciDays(i,v){ var r=_ciCtx&&_ciCtx.rows[i]; if(!r) return; var n=Number(
 function ciBulkDays(){
   if(!_ciCtx) return; var n=Number(String((document.getElementById('ciBulk')||{}).value||'').replace(/[^\d.]/g,''));
   if(!(n>0)){ toast('채울 일수를 먼저 적어 주세요'); return; }
-  var c=0; _ciCtx.rows.forEach(function(r){ if(r.p.kind==='clinic' && !r.days){ r.days=n; r.출처='직접 적음(일괄)'; c++; } });
+  var c=0; _ciVis().forEach(function(r){ if(r.p.kind==='clinic' && !r.days){ r.days=n; r.출처='직접 적음(일괄)'; c++; } });
   toast('현장클리닉 일수가 비어 있던 '+c+'건에 '+n+'일을 적었습니다 — 넣기 전에 표에서 고칠 수 있습니다', 6000); ciRender();
 }
 function ciSum(){
   var f=document.getElementById('ciFoot'), ok=document.getElementById('ciOk'); if(!_ciCtx||!f) return;
-  var rs=_ciCtx.rows, n=0, ln=0, sk=0, 일=0;
+  var rs=_ciVis(), n=0, ln=0, sk=0, 일=0;
   rs.forEach(function(r){ if(!r.on || r.act==='skip'){ sk++; return; } if(r.act==='new') n++; else ln++; 일+=Number(r.days)||0; });
   f.textContent='새로 '+n+'건 · 연결 '+ln+'건 · 건너뜀 '+sk+'건 · 일수 합계 '+일+'일';
   if(ok){ ok.style.display=''; ok.textContent='넣기 ('+(n+ln)+'건)'; ok.disabled=!(n+ln); }
@@ -11855,11 +11861,15 @@ function ciRender(){
   if(!box||!_ciCtx) return;
   if(un) un.style.display=_ciUndo?'':'none';
   if(_ciCtx.busy || _ciCtx.msg){ box.innerHTML='<div style="padding:18px;font-size:12.5px;color:var(--text-mute)">'+escapeHtml(_ciCtx.msg||'')+'</div>'; if(ok) ok.style.display='none'; if(foot) foot.textContent=''; if(tb) tb.innerHTML=''; return; }
-  var rs=_ciCtx.rows, cl=rs.filter(function(r){ return r.p.kind==='clinic'; }), te=rs.filter(function(r){ return r.p.kind==='tech'; });
+  var rs=_ciVis(), cl=rs.filter(function(r){ return r.p.kind==='clinic'; }), te=rs.filter(function(r){ return r.p.kind==='tech'; });
   var 겹침=rs.filter(function(r){ return r.후보.length; }).length;
   if(tb) tb.innerHTML='<span class="btn sm'+(_ciCtx.tab==='clinic'?' primary':'')+'" onclick="ciTab(\'clinic\')" style="cursor:pointer">🏥 현장클리닉 '+cl.length+'</span> '
     +'<span class="btn sm'+(_ciCtx.tab==='tech'?' primary':'')+'" onclick="ciTab(\'tech\')" style="cursor:pointer">🛡 기술보호울타리 '+te.length+'</span>'
-    +'<span style="margin-left:10px;font-size:11.5px;color:var(--text-mute)">같은 회사 실적이 이미 있어 <b style="color:var(--amber)">내용을 봐야 하는 건 '+겹침+'</b> · 우리 노무사가 아니라 건너뜀 '+_ciCtx.skipped+' · 이미 가져옴 '+_ciCtx.already+'</span>'
+    +'<span style="margin-left:10px;font-size:11.5px;color:var(--text-mute)">같은 회사 실적이 이미 있어 <b style="color:var(--amber)">내용을 봐야 하는 건 '+겹침+'</b> · 위원 인정 안 한 건 '+(_ciCtx.rows.length-rs.length)+' · 이미 가져옴 '+_ciCtx.already+'</span>'
+    +'<div style="flex-basis:100%;font-size:11.5px;margin-top:2px">👥 <b>위원으로 인정할 사람</b> (건수) — '
+      +Object.keys(_ciCtx.members).sort(function(a,b){ return _ciCtx.members[b].n-_ciCtx.members[a].n; }).map(function(nm){ var m=_ciCtx.members[nm];
+        return '<label style="margin-right:10px;white-space:nowrap"><input type="checkbox" '+(m.on?'checked ':'')+'data-n="'+escapeHtml(nm)+'" onchange="ciMember(this.dataset.n,this.checked)"> '+escapeHtml(nm)+' '+m.n+'</label>'; }).join('')
+      +'<span style="color:var(--text-mute)"> · 직원 명부·실적 담당에 있는 사람만 미리 켜 둡니다</span></div>'
     +'<span style="margin-left:auto;display:inline-flex;gap:5px;align-items:center;font-size:11.5px">일수 빈 현장클리닉을 모두 <input id="ciBulk" inputmode="numeric" style="width:44px;font-size:16px;padding:1px 4px"> 일로 <button class="btn sm" type="button" onclick="ciBulkDays()">채우기</button></span>';
   var 목록=(_ciCtx.tab==='clinic'?cl:te);
   var h='<div style="max-height:46vh;overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12px"><thead><tr style="color:var(--text-mute);font-size:11px;text-align:left;position:sticky;top:0;background:var(--card,#fff)"><th></th><th>회사</th><th>'+(_ciCtx.tab==='clinic'?'신청 → 완료':'자문 기간')+'</th><th>위원</th><th>일수</th><th>같은 회사 실적 · 처리</th></tr></thead><tbody>';
@@ -11882,7 +11892,7 @@ function ciRender(){
 function ciApply(){
   if(!_ciCtx) return;
   var arr=get('consult')||[], 추가=[], 바뀐=[], n=0, m=0;
-  _ciCtx.rows.forEach(function(r){
+  _ciVis().forEach(function(r){
     if(!r.on || r.act==='skip') return;
     var p=r.p, ref='cards:'+r.k+'|'+p.key, 일=Number(r.days)||0;
     if(r.act.indexOf('link:')===0){
