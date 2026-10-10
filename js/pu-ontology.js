@@ -152,6 +152,18 @@
                       {path:'data/attendance_records/v/{id}',entityType:'ScheduleEvent'}] },
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting','scal_rptForms','scal_rptFormsIndex','scal_reports'],
       sharedRoots:['data/consultings','puphotos','pucards/coMail','pucards/sentDocs'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
+    /* 컨설팅보고서 — 모든 사업장·사업의 보고서 상태를 한눈에(대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱」).
+       ★ 읽기만 한다 — 보고서(scal_reports)·양식 서고(scal_rptForms*)·일정(scal_*)의 주인은 정부사업일정(consult)이다.
+         쓰는 일(초안·AI·HWPX·확정)은 정부사업일정의 보고서 창으로 건너가서 한다(gov-consulting.html#rpt=).
+       ⚠ 소유 자리 data/gov_report_view 는 «보던 자리»(거르개) 예약이다 — 등록부 계약(소유 자리·쓰기 선언 필수,
+         tests/ontology-contract·ontology-write-gate)을 맞추려고 둔다. 이번 판은 쓰지 않는다(설계 §2 「아무것도 쓰지 않는다」).
+         쓰게 되면 규칙(cal_view 꼴 — uid 로 가름)을 먼저 낸다.
+       ⚠ scal_cos·scal_types·scal_scheds·scal_staff 는 정부사업일정이 FB_NODES 로 부르는 자리라 등록부에 주인이 아직 안 적혀 있다.
+         이 화면도 같은 꼴(GR_NODES)로 부른다 — 주인 정리는 정부사업일정 몫이다(이번 범위 밖). */
+    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['data/gov_report_view'],
+      sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir'],
+      writeContracts:[{path:'data/gov_report_view/{uid}',entityType:'ViewState'}],
+      entityTypes:['Organization','Project','Document','ViewState'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
        이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
     work:{ name:'업무관리', file:'work.html', primaryRoots:['work_erp','kakaoWork'], sharedRoots:['data','pucards/idx'],
@@ -440,6 +452,9 @@
   var READ_ADAPTERS = {
     erp_core:{program:'erp',strategy:'local',path:'data',parser:'erp'},
     consult_core:{program:'consult',strategy:'local',path:'data/consultings',parser:'erp'},
+    /* 컨설팅보고서 — 제 업무 자료가 없다(보고서는 consult 의 자리). 소유 자리는 «보던 자리» 예약뿐이라 in_app */
+    govreport_view:{program:'govreport',strategy:'in_app',path:'data/gov_report_view',parser:'coverage',
+      gives:'보던 거르개 자리(예약 — 이번 판은 쓰지 않는다). 보고서 상태는 정부사업일정(consult)의 자리다'},
     /* 푸른 캘린더 — 업무 자료를 «따로 담지 않는다». 일정·근태의 주인은 이알피이고
        그것은 erp_core 가 이미 읽는다. 여기서 또 읽으면 같은 일정이 두 번 세어진다.
        제 자리(data/cal_view)에 있는 것은 «어느 탭을 보고 있었나»뿐이라 업무 개체가 아니다.

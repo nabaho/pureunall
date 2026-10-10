@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>푸른노무법인 컨설팅보고서</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>📑</text></svg>">
+<!-- ══════════════════════════════════════════════════════════════
+     푸른노무법인 컨설팅보고서 (gov-report.html) — 2026-10-10
+     대표 지시 「포털 의뢰인 업무에 별도 앱을 만들어 진행」 · 시안 확인 후 「진행」.
+     설계 docs/superpowers/specs/2026-10-10-gov-report-app-design.md · 계획 docs/superpowers/plans/2026-10-10-gov-report-app.md
+
+     ★ 이 화면은 «읽기만» 한다 — 모든 사업장·사업의 보고서 상태를 보고, 쓰는 일은
+       정부사업일정의 보고서 창(gov-consulting.html#rpt=업체|사업)으로 건너가서 한다.
+     ★ 계산은 js/pu-gov-report-list.js(순수 함수)가 한다. 이 파일은 읽고 그린다.
+     ⚠ 목록에는 업체·사업·담당 이름과 상태만 — 보고서 본문을 그리지 않는다(기술보호도 같다).
+     ⚠ scal_cos 등은 GR_NODES 로 부른다(정부사업일정 FB_NODES 꼴) — 등록부 js/pu-ontology.js govreport 주석.
+     ══════════════════════════════════════════════════════════════ -->
+<style>
+:root{
+  --navy:#1e293b; --mute:#64748b; --line:#e2e8f0; --bg:#f8fafc; --card:#ffffff;
+  --blue:#2563eb; --blue-bg:#eff6ff; --blue-line:#bfdbfe; --blue-ink:#1e40af;
+  --green:#166534; --green-bg:#f0fdf4; --amber:#854d0e; --amber-bg:#fffbeb; --red:#991b1b; --red-bg:#fef2f2;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-serif;background:var(--bg);color:var(--navy);font-size:14px}
+#head{position:sticky;top:0;z-index:20;background:var(--card);box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.top{display:flex;align-items:center;gap:10px;padding:10px 16px;flex-wrap:wrap}
+.top h1{font-size:17px;margin:0}
+.top .sp{flex:1}
+#who{font-size:13px;color:var(--mute)}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--navy);border-radius:8px;padding:6px 12px}
+button:disabled{opacity:.5;cursor:default}
+main{max-width:1280px;margin:0 auto;padding:14px 16px 60px}
+#lock{display:none;max-width:460px;margin:60px auto;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:24px;text-align:center}
+#lock p{color:var(--mute);font-size:13px}
+.loading{padding:30px;text-align:center;color:var(--mute)}
+/* 폰에서 입력칸을 누를 때 화면이 확대되지 않게(tests/phone-input-zoom) */
+@media (max-width:768px){ input,select,textarea{font-size:16px} }
+</style>
+</head>
+<body>
+<div id="head">
+  <div class="top">
+    <h1>📑 컨설팅보고서</h1>
+    <span id="who"></span>
+    <span class="sp"></span>
+    <button id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
+  </div>
+</div>
+
+<div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p></div>
+
+<main id="app" style="display:none">
+  <div class="loading" id="loading">불러오는 중…</div>
+</main>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script src="js/pu-ontology.js?v=58"></script>
+<script src="js/pu-ls-guard.js?v=4"></script>
+<!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
+     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면은 아무것도 쓰지 않는다. -->
+<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
+<script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-appbar.js?v=24"></script>
+<script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
+<script src="js/pu-whoami.js?v=3"></script>
+<script>
+(function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
+  try{ if(!go()){ var n=0, iv=setInterval(function(){ if(go()||++n>40) clearInterval(iv); }, 250); } }catch(e){} })();
+</script>
+<script src="js/pu-back.js?v=2"></script>
+<script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
+<script>
+var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+var fbDb=null;
+function $(id){ return document.getElementById(id); }
+function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
+function grBoot(){
+  if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
+  if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
+  if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
+  fbDb=firebase.database();
+  try{ firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL); }catch(e){}
+  firebase.auth().onAuthStateChanged(function(u){
+    $('outBtn').style.display=u?'':'none';
+    if(!u||u.isAnonymous){ PuGate.show(); return; }
+    PuGate.hide();
+    $('lock').style.display='none'; $('app').style.display='';
+  });
+}
+grBoot();
+</script>
+</body>
+</html>
