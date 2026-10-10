@@ -131,6 +131,8 @@ function 구글칩(ev, 자료) {
     함수몸(캘린더원문, 'function gcalMailColor(mail){'),
     /* 새벽 구글 시각 대신 제목 앞 시각을 믿는 셈(2026-10-04) — gcalToEvent 가 부른다 */
     함수몸(캘린더원문, 'function 제목시각(title, 구글시각){'),
+    /* 담당 번호(서버 대신 넣기, 2026-10-10) — gcalToEvent 가 부른다 */
+    함수몸(캘린더원문, 'function 일정담당(ev){'),
     함수몸(캘린더원문, 'function gcalToEvent(ev){'),
     'var __r = gcalToEvent(' + JSON.stringify(ev) + ');'
   ].join('\n'), 상자);
