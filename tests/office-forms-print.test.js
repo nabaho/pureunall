@@ -18,8 +18,8 @@ const cutIn = (start) => { const a = CF.indexOf(start); assert.ok(a >= 0, start)
 test('ⓐ 빈 양식 인쇄 — 값 없이, 두 자리', () => {
   const pb = cutIn('    function printBlank(');
   assert.match(pb, /printForms\(fms, \{\}, host,/, '빈 값으로 채운다(오늘 날짜도 넣지 않는다)');
-  assert.match(cut('    function toolbar('), /printBlank\(\[fm\]\)/);
-  assert.match(cut('    function drawBar('), /printBlank\(checkedForms\(\)\)/);
+  assert.match(cut('    function toolbar('), /printBlank\((?:withPower\()?\[fm\]\)/);
+  assert.match(cut('    function drawBar('), /printBlank\((?:withPower\()?checkedForms\(\)\)/);
 });
 
 test('ⓑ 채운 본 이름 — .hwp / 미리보기 사본 .hwpx', () => {

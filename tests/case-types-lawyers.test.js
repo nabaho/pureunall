@@ -84,3 +84,21 @@ test('ⓓ 휴직 · 이름표 없는 위임장 · 회사 계약', () => {
   assert.match(SRC, /drawContacts\(\); drawVals\(\); loadCtPick\(r\);/, '회사를 고르면 그 회사 이알피 계약을 보여 준다');
   assert.match(SRC, /function ctxOf\(\) \{ return st\.ct \|\| host\.contractCtx \|\| null; \}/);
 });
+
+/* ⓔ 사건계약에는 위임장이 늘 함께 (대표 지시 2026-10-10) */
+test('ⓔ 위임장 함께', () => {
+  const F = (id, name, groupName, side) => ({ id, kind: 'case', name, groupName, side });
+  const all = [F('a', '산재 위임약정서(사용자) - 푸른 표준', '산재등', 'employer'), F('b', '산재 위임장(사용자) - 푸른 표준', '산재등', 'employer'),
+    F('c', '행정심판 위임약정서(사용자)', '기타행심', 'employer'), F('d', '위임장(사용자 공통) - 푸른 표준', '', 'employer'),
+    F('e', '위임약정서 (근로자측)', '', 'worker'), F('f', '위임장(근로자 공통) - 푸른 표준', '', 'worker'),
+    F('g', '노동위원회 위임약정서·위임장(사용자)', '부해등', 'employer'), F('h', '노동위원회 대리인선임신고서', '부해등', 'both')];
+  assert.equal(C.powerFor([all[0]], all).id, 'b', '같은 갈래·같은 측 위임장');
+  assert.equal(C.powerFor([all[2]], all).id, 'd', '없으면 그 측 공통 위임장');
+  assert.equal(C.powerFor([all[4]], all).id, 'f');
+  assert.equal(C.powerFor([all[6]], all), null, '이미 위임장이 들어 있는 양식');
+  assert.equal(C.powerFor([all[0], all[1]], all), null);
+  assert.equal(C.powerFor([all[7]], all), null, '신고서만 고르면 넣지 않는다');
+  assert.equal(C.powerFor([{ id: 'x', kind: 'company', name: '자문계약서' }], all), null, '사건계약이 아니면');
+  ['openFill(withPower([fm]), host)', 'printBlank(withPower([fm]))', 'openFill(withPower(checkedForms())', 'printBlank(withPower(checkedForms()))', 'openFill(withPower(list)']
+    .forEach((s) => assert.ok(SRC.indexOf(s) >= 0, s));
+});
