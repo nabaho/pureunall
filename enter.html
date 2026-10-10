@@ -137,7 +137,7 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
 <script src="js/pu-logout-why.js?v=1"></script>
-<script type="module" src="js/pu-mfa.js?v=2"></script>
+<!-- 2단계 인증 모듈은 필요한 순간에만 불러온다. 카카오 복귀 시 두 번째 Auth 인스턴스를 만들지 않는다. -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -1490,6 +1490,23 @@ body.portal-mode #moreFab{display:flex;}
   firebase.initializeApp(FB_CONFIG);
   var auth = firebase.auth();
   var db = firebase.database();
+  var _puMfaLoad = null;
+  function puLoadMFA(){
+    if(window.PuMFA) return Promise.resolve(window.PuMFA);
+    if(_puMfaLoad) return _puMfaLoad;
+    _puMfaLoad = new Promise(function(resolve, reject){
+      var script = document.createElement('script');
+      script.type = 'module';
+      script.src = 'js/pu-mfa.js?v=3';
+      script.onload = function(){
+        if(window.PuMFA) resolve(window.PuMFA);
+        else reject(new Error('2단계 인증 모듈을 시작하지 못했습니다.'));
+      };
+      script.onerror = function(){ reject(new Error('2단계 인증 모듈을 불러오지 못했습니다.')); };
+      document.head.appendChild(script);
+    }).catch(function(err){ _puMfaLoad = null; throw err; });
+    return _puMfaLoad;
+  }
   /* ── 뉴스레터 칸 경고 (대표 지시 2026-10-04 「문제가 발생하면 푸른 통합로그인에 들어갔을때 뉴스레터 앱에
        문제 발생등에 대한 경고 표시를 해서 검토 할 수 있게 해라」) ──
      서버 감시꾼이 newsletter/watch/현재 에 «지금 사람이 볼 것»을 세어 둔다. 여기는 그 한 칸만 읽는다(한 번).
@@ -1921,6 +1938,7 @@ body.portal-mode #moreFab{display:flex;}
     return { shown: shown, userSeen: userSeen, cover: cover, _hide: hide, _show: show };
   })();
   auth.onAuthStateChanged(function(user){
+      if(!window.__puAuthObservedAt) window.__puAuthObservedAt = Date.now();
       if(user && user.email){
         if(_authRecheckTimer){ clearTimeout(_authRecheckTimer); _authRecheckTimer = null; }
         if(_handled && _portalUid && user.uid !== _portalUid){
@@ -2035,7 +2053,9 @@ body.portal-mode #moreFab{display:flex;}
       var keep = false;
       try { keep = localStorage.getItem('pu_portal_auto') === '1'; } catch(e){}
       var kkStarted = Date.now(), kkServerMs = 0, kkStoreMs = 0, kkProfile = null;
-      var kkFirebaseStarted = 0, kkFirebaseMs = 0;
+      var kkFirebaseStarted = 0, kkFirebaseMs = 0, kkFirebasePerfAt = 0;
+      var kkFirebaseNetworkMs = 0, kkFirebaseNetworkCount = 0, kkFirebaseHidden = false;
+      var kkAuthReadyBeforeSignIn = false;
       var persist = Promise.resolve().then(function(){
         if(!keep) return auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(function(){
           try { localStorage.setItem('pu_portal_persistence_applied', 'session'); } catch(_e){}
@@ -2062,9 +2082,25 @@ body.portal-mode #moreFab{display:flex;}
       });
       Promise.all([server, persist]).then(function(ready){
         kkFirebaseStarted = Date.now();
+        kkAuthReadyBeforeSignIn = !!window.__puAuthObservedAt;
+        try {
+          kkFirebasePerfAt = window.performance.now();
+          kkFirebaseHidden = !!document.hidden;
+        } catch(_t){}
         return auth.signInWithCustomToken(ready[0]);
       }).then(function(cred){
         kkFirebaseMs = Date.now() - kkFirebaseStarted;
+        try {
+          kkFirebaseHidden = kkFirebaseHidden || !!document.hidden;
+          var resources = window.performance.getEntriesByType('resource');
+          resources.forEach(function(entry){
+            if(entry.startTime < kkFirebasePerfAt || entry.startTime > window.performance.now()) return;
+            // 주소·토큰은 기록하지 않는다. Firebase 인증 호스트의 소요 시간만 합산한다.
+            if(!/^https:\/\/(identitytoolkit|securetoken)\.googleapis\.com\//.test(entry.name)) return;
+            kkFirebaseNetworkCount++;
+            kkFirebaseNetworkMs += Math.max(0, Math.round(entry.duration || 0));
+          });
+        } catch(_t){}
         /* 공개 명부도 LOGIN 권한이 필요하다. 로그인 전 미리 읽으면 권한 거부를
            «명부 없음»으로 삼아 관리자 전용 명부까지 다시 읽느라 수 초를 낭비했다. */
         if(!kkProfile){
@@ -2077,7 +2113,10 @@ body.portal-mode #moreFab{display:flex;}
         try { sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify({
           at:kkStarted, serverMs:kkServerMs, storeMs:kkStoreMs,
           callbackBootMs:Math.max(0, kkStarted - (window.__puLoginNavAt || kkStarted)),
-          firebaseMs:kkFirebaseMs, totalMs:Date.now()-kkStarted
+          firebaseMs:kkFirebaseMs, firebaseNetworkMs:kkFirebaseNetworkMs,
+          firebaseNetworkCount:kkFirebaseNetworkCount, firebaseHidden:kkFirebaseHidden,
+          authReadyBeforeSignIn:kkAuthReadyBeforeSignIn,
+          totalMs:Date.now()-kkStarted
         })); } catch(_t){}
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
         kkMarkUsed();
@@ -2215,15 +2254,14 @@ body.portal-mode #moreFab{display:flex;}
   function mfaRefreshProfile(){
     var btn=$('mfaEnrollBtn'), st=$('mfaProfileState');
     if(!btn || !st) return;
-    if(!window.PuMFA){ st.textContent='2단계 인증 모듈을 불러오지 못했습니다'; btn.textContent='새로고침'; btn.disabled=false; btn.onclick=function(){ location.reload(); }; return; }
-    PuMFA.status().then(function(s){
+    puLoadMFA().then(function(mfa){ return mfa.status(); }).then(function(s){
       if(s.enrolled){ st.textContent='등록됨 — 다음 비밀번호 로그인부터 숫자 6자리를 확인합니다'; btn.textContent='등록 완료'; btn.disabled=true; }
       else { st.textContent='미등록 — 등록해도 다른 직원 로그인에는 영향이 없습니다'; btn.textContent='인증 앱 등록'; btn.disabled=false; btn.onclick=mfaBeginEnrollment; }
     }).catch(function(e){ st.textContent=(e&&e.message)||'확인하지 못했습니다'; btn.textContent='다시 확인'; btn.disabled=false; btn.onclick=mfaRefreshProfile; });
   }
   function mfaBeginEnrollment(){
     var btn=$('mfaEnrollBtn'); if(btn) btn.disabled=true;
-    PuMFA.beginEnrollment().then(function(v){
+    puLoadMFA().then(function(mfa){ return mfa.beginEnrollment(); }).then(function(v){
       $('mfaSecret').textContent=v.secretKey; $('mfaOpenApp').href=v.uri;
       $('mfaEnrollCode').value=''; $('mfaEnrollErr').style.display='none';
       $('mfaEnrollModal').style.display='flex'; $('mfaEnrollCode').focus();
@@ -2231,10 +2269,10 @@ body.portal-mode #moreFab{display:flex;}
       .finally(function(){ if(btn) btn.disabled=false; });
   }
   function mfaOfferAfterLogin(role, via){
-    if(via !== 'login' || role === 'admin' || !window.PuMFA || !auth.currentUser) return;
+    if(via !== 'login' || role === 'admin' || !auth.currentUser) return;
     var u=auth.currentUser, key='pu_mfa_offer:'+u.uid;
     try { if(sessionStorage.getItem(key)==='1') return; sessionStorage.setItem(key,'1'); } catch(_e){}
-    Promise.all([PuMFA.status(), u.getIdTokenResult()]).then(function(all){
+    puLoadMFA().then(function(mfa){ return Promise.all([mfa.status(), u.getIdTokenResult()]); }).then(function(all){
       if(all[0] && all[0].enrolled) return;
       var kakao=!!(all[1] && all[1].claims && all[1].claims.kakao===true);
       $('mfaOfferText').textContent = kakao
@@ -2397,7 +2435,7 @@ body.portal-mode #moreFab{display:flex;}
       _settled = true; clearTimeout(_watchdog);
       $('loginBtn').disabled = false;
       var code = (err && err.code) || '';
-      if(code === 'auth/multi-factor-auth-required' && window.PuMFA){
+      if(code === 'auth/multi-factor-auth-required'){
         mfaOpenLogin(email, pw, wantsAutoLogin);
         return;
       }
@@ -2432,7 +2470,7 @@ body.portal-mode #moreFab{display:flex;}
   function mfaOpenLogin(email, pw, keep){
     $('mfaLoginErr').style.display='none'; $('mfaLoginCode').value='';
     $('mfaLoginModal').style.display='flex'; $('mfaLoginOk').disabled=true;
-    PuMFA.beginLogin(email, pw, keep).then(function(v){
+    puLoadMFA().then(function(mfa){ return mfa.beginLogin(email, pw, keep); }).then(function(v){
       if(v.credential){ location.reload(); return; }
       $('mfaLoginOk').disabled=false; $('mfaLoginCode').focus();
     }).catch(function(e){ $('mfaLoginErr').textContent=(e&&e.message)||'2단계 인증을 시작하지 못했습니다'; $('mfaLoginErr').style.display='block'; });
@@ -2595,6 +2633,8 @@ body.portal-mode #moreFab{display:flex;}
           sessionStorage.setItem('pu_kakao_last_timing', JSON.stringify(timing));
           puLoginTimingSave({mode:'kakao', savedAt:Date.now(), callbackBootMs:timing.callbackBootMs,
             serverMs:timing.serverMs, storeMs:timing.storeMs, firebaseMs:timing.firebaseMs,
+            firebaseNetworkMs:timing.firebaseNetworkMs, firebaseNetworkCount:timing.firebaseNetworkCount,
+            firebaseHidden:timing.firebaseHidden, authReadyBeforeSignIn:timing.authReadyBeforeSignIn,
             portalMs:Math.max(0, timing.portalMs - timing.totalMs), callbackToPortalMs:timing.portalMs,
             fromTapMs:timing.fromTapMs});
           sessionStorage.removeItem('pu_kakao_login_tap_at');
@@ -5284,6 +5324,12 @@ body.portal-mode #moreFab{display:flex;}
       lines.push('복귀 화면 준비 ' + ms(k.callbackBootMs) + ' · 서버 ' + ms(k.serverMs)
         + ' · 저장소 ' + ms(k.storeMs) + ' (서버와 병렬)');
       lines.push('Firebase 로그인 ' + ms(k.firebaseMs) + ' · 타일 표시 ' + ms(k.portalMs));
+      if(k.firebaseNetworkCount > 0) lines.push('Firebase 인증 통신 ' + ms(k.firebaseNetworkMs)
+        + ' (' + k.firebaseNetworkCount + '건)' + (k.firebaseHidden ? ' · 도중 화면 숨김' : ''));
+      else if(k.firebaseNetworkCount === 0) lines.push('Firebase 인증 통신 기록 없음'
+        + (k.firebaseHidden ? ' · 도중 화면 숨김' : ''));
+      if(typeof k.authReadyBeforeSignIn === 'boolean') lines.push('인증 초기화: Firebase 로그인 시작 전 '
+        + (k.authReadyBeforeSignIn ? '완료' : '대기 중'));
       lines.push('카카오 복귀→포털 ' + ms(k.callbackToPortalMs));
     }
     if(s){
