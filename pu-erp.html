@@ -63782,24 +63782,10 @@ function MyDeskV2(props){
     var policy = dbGet('policy_leave', { basis:'joinDate', baseAfterOneYear:15, bonusEvery:2, bonusStart:3, maxDays:25, carryOverLimit:5, monthlyForFirstYear:true });
     var grants = dbGet('leave_grants', {});
     var year = String((new Date()).getFullYear());
-    // 자동 부여 계산
-    var hire = new Date(me.hireDate);
-    if(isNaN(hire.getTime())) return null;
-    var yearEnd = new Date(parseInt(year), 11, 31);
-    if(hire > yearEnd) return null;
-    var yearsAtEnd = (yearEnd-hire)/(365.25*86400000);
-    var autoDays = 0;
-    if(yearsAtEnd < 1){
-      if(policy.monthlyForFirstYear){
-        var mo = Math.floor((yearEnd-hire)/(30.44*86400000));
-        autoDays = Math.min(mo, 11);
-      }
-    } else {
-      var fullYears = Math.floor(yearsAtEnd);
-      var bonusStart = policy.bonusStart||3, bonusEvery = policy.bonusEvery||2;
-      var bonus = fullYears < bonusStart ? 0 : Math.floor((fullYears-bonusStart)/bonusEvery)+1;
-      autoDays = Math.min((policy.baseAfterOneYear||15)+bonus, policy.maxDays||25);
-    }
+    /* ★ 휴가관리·근태관리와 «같은» 장부(erpLeaveGrants)에서 — 예전에는 여기만 따로 세어 기산일(2021-06-01)·
+         소정근로시간을 무시했고, 같은 사람이 대시보드 18일·휴가관리 17일로 보였다 (2026-10-10) */
+    if(String(getLeaveStartDate(me.hireDate)) > year + '-12-31') return null;
+    var autoDays = erpLeaveGrantedInYear(me, year).days;
     // 오버라이드
     var ov = grants[sid] && grants[sid][year] ? grants[sid][year] : null;
     var total = ov && ov.total!=null ? ov.total : autoDays;
@@ -63810,7 +63796,7 @@ function MyDeskV2(props){
     var leaveCnt = rec.filter(function(r){return r.type==='leave';}).length;
     var halfCnt = rec.filter(function(r){return r.type==='halfday-am'||r.type==='halfday-pm';}).length;
     var hourTotal = rec.filter(function(r){return r.type==='leave-hour';}).reduce(function(s,r){return s+(parseFloat(r.hours)||0);},0);
-    var used = PuWork.leaveUsed(rec);
+    var used = PuWork.leaveUsed(rec, me.scheduledHours || 8);   // 단시간 근로자는 소정근로시간으로 나눈다
     return { year:year, grant:grant, total:total, carryOver:carryOver, used:used, remain:grant-used,
       leaveCnt:leaveCnt, halfCnt:halfCnt, hourTotal:hourTotal };
   })();
@@ -71554,38 +71540,21 @@ var LEAVE_REASONS = ['자발적 퇴사','권고사직','계약만료','해고','
 var DOC_LABELS = { settlement:'퇴직정산서', career:'경력증명서', employment:'이직확인서 (고용보험)', withholding:'근로소득 원천징수영수증', dismissal:'해고예고수당 정산서' };
 
 // ★ 퇴직자 입사일 기준 연차 재산정 헬퍼 (근기법 §60)
-// 회계년도 기준 정책이라도 퇴직자는 입사일 기준 비례 계산이 원칙
-function calcRetirementLeaveJoinBasis(hireDate, retireDateStr, policy){
+// 회계년도 기준 정책이라도 퇴직자는 입사일 기준 비례 계산이 원칙
+function calcRetirementLeaveJoinBasis(hireDate, retireDateStr, policy, u){
+  /* ★★ 퇴직 때 남은 연차 = 발생 장부(erpLeaveGrants)에서 «기한이 남은 것» − 그동안 쓴 것 (2026-10-10 인사관리 2단계)
+       예전 식은 ① 365.25 로 나눠 정확히 1년 다닌 사람을 «1년 미만»으로 보고 ② 마지막 기념일 «뒤» 구간을
+       근무비율로 «비례» 부여했다(1년을 마쳐야 생긴다 — 법정 아님) ③ 정작 그 기념일에 생긴 연차와 이미 쓴 날은 빼지 않았다.
+     ★ 생긴 순서대로(먼저 생긴 것부터) 쓴 것으로 본다. 마지막 근무일(lastWorkDate, 없으면 퇴직일)까지만 센다.
+     ⚠ 휴가관리 «부여일수 수정»(해 단위 수기 조정)은 날짜가 없어 여기에 섞지 않는다 — 있으면 사람이 대조한다. */
   if(!hireDate || !retireDateStr) return null;
-  var hire = new Date(hireDate);
-  var retire = new Date(retireDateStr);
-  if(isNaN(hire.getTime()) || isNaN(retire.getTime())) return null;
-  var p = policy || dbGet('policy_leave', { baseAfterOneYear:15, bonusEvery:2, bonusStart:3, maxDays:25, monthlyForFirstYear:true });
-  var yearsWorked = (retire - hire) / (365.25 * 86400000);
-  if(yearsWorked < 0) return null;
-  // 1년 미만: 월 1일 (최대 11일)
-  if(yearsWorked < 1){
-    var months = Math.floor((retire - hire) / (30.44 * 86400000));
-    var days = Math.min(months, 11);
-    return { days:days, basis:'joinDate', fullEntitlement:days,
-      reason:'1년 미만 · 입사일 기준 '+months+'개월 → '+days+'일 (근기법 §60①)' };
-  }
-  // 1년 이상: 마지막 기념일 기준 비례 계산
-  var fullYears = Math.floor(yearsWorked);
-  var lastAnn = new Date(hire); lastAnn.setFullYear(lastAnn.getFullYear() + fullYears);
-  var nextAnn = new Date(hire); nextAnn.setFullYear(nextAnn.getFullYear() + fullYears + 1);
-  var nextFY = fullYears + 1;
-  var bs = p.bonusStart||3; var be = p.bonusEvery||2;
-  var bonus = nextFY < bs ? 0 : Math.floor((nextFY - bs) / be) + 1;
-  var entitlement = Math.min((p.baseAfterOneYear||15) + bonus, p.maxDays||25);
-  var periodDays = Math.round((nextAnn - lastAnn) / 86400000);
-  var workedInPeriod = Math.max(0, Math.round((retire - lastAnn) / 86400000));
-  var proRated = Math.round(entitlement * workedInPeriod / periodDays * 10) / 10;
-  return { days:proRated, basis:'joinDate', fullEntitlement:entitlement,
-    workedInPeriod:workedInPeriod, periodDays:periodDays,
-    lastAnn:localYMD(lastAnn), nextAnn:localYMD(nextAnn),
-    fullYears:fullYears, nextFullYears:nextFY,
-    reason:fullYears+'→'+nextFY+'년차 구간 ('+workedInPeriod+'/'+periodDays+'일 × '+entitlement+'일 = '+proRated+'일)' };
+  var uu = Object.assign({}, u || {}, { hireDate:hireDate, retireDate:retireDateStr });
+  var lastDay = (u && u.lastWorkDate) || retireDateStr;
+  var b = erpLeaveBalanceAt(uu, lastDay);
+  var liveDays = (b.live || []).reduce(function(t, g){ return t + g.days; }, 0);
+  var remain = Math.max(0, b.remain);
+  return { days:remain, basis:'joinDate', fullEntitlement:liveDays, used:b.used, expired:b.expired,
+    reason:'기한이 남은 연차 ' + liveDays + '일 − 그중 쓴 날 = 남은 ' + remain + '일 (생긴 순서대로 사용 · ' + lastDay + ' 기준, 근기법 §60)' };
 }
 
 // ── 퇴사자가 들고 있는 것 찾아 넘기기 ─────────────────────────
@@ -71870,7 +71839,7 @@ function RetireModal(props){
       (function(){
         var policy = dbGet('policy_leave', { basis:'joinDate', baseAfterOneYear:15, bonusEvery:2, bonusStart:3, maxDays:25 });
         var curBasis = policy.basis || 'joinDate';
-        var recalc = calcRetirementLeaveJoinBasis(u.hireDate, f1.retireDate, policy);
+        var recalc = calcRetirementLeaveJoinBasis(u.hireDate, f1.retireDate, policy, Object.assign({}, u, { lastWorkDate:f1.lastWorkDate || f1.retireDate }));
         // 회계년도 기준이거나, 입사일 기준이더라도 비례 재산정이 다를 수 있음
         var policyLabel = curBasis === 'fiscal' ? '회계년도 기준' : '입사일 기준(정책)';
         return h('div', { style:{ marginTop:'8px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 14px' } },
@@ -76331,6 +76300,94 @@ function getLeaveStartDate(hireDate){
   return hireDate < PUREUN_5IN_DATE ? PUREUN_5IN_DATE : hireDate;
 }
 
+/* ══ 연차 발생 장부 — 입사일 기준 «한 벌» (2026-10-10 인사관리 2단계, 대표 확정 「연차는 입사일 기준」) ══
+   ★★ 왜: 연차를 세는 곳이 네 벌이었다(getLeaveRemain · 휴가관리 calcGrantDays · 대시보드 myLeave · 퇴직 재산정).
+       모두 «그해 12월 31일까지 찬 햇수»로 셌다 —
+       ① 입사 다음 해의 1년 미만 월차가 어느 해에도 안 잡혔다(2025-12-01 입사 → 2026년 월차 11일 누락)
+       ② 아직 오지 않은 달까지 미리 셌다(올해 3월 입사자가 10월에 9일 — 실제 6일)
+       ③ 화면마다 기산일·나누는 수가 달라 같은 사람이 17일·18일로 보였다.
+   ★ 이제 발생은 «날짜가 있는 사건»이다 (근로기준법 제60조):
+       · 1년 미만: 입사 후 매 1개월 개근마다 1일 (최대 11일) — 그 달 같은 날(없으면 말일)에 생긴다.
+                   쓸 수 있는 기한 = 입사 1년이 되기 전날 (제60조②, 2020.3.31 개정 이후 입사 1년에 소멸)
+       · 1년 이상: 입사 기념일마다 15일 + (3년 이상이면 최초 1년 초과 매 2년 1일), 최대 25일
+                   쓸 수 있는 기한 = 다음 기념일 전날
+       · 퇴직하면 그 뒤 날짜의 발생은 없다 — 기념일 «당일»에 근로관계가 있어야 생긴다.
+   ⚠ 기산일: 2021-06-01 전 입사자는 2021-06-01부터 센다(getLeaveStartDate — 5인 이상 전환일).
+     대법원 2024.12.12. 2023도5476 은 «입사일부터 기산하고 단위기간마다 5인 이상 여부를 따로 판단»하는 틀이라
+     이 규칙은 담당 노무사 확정 전이다 [확인 필요]. 바꿀 때는 getLeaveStartDate 한 곳만 고친다.
+   ⚠ 출근율 80%·결근에 따른 감액은 세지 않는다(늘 개근으로 본다 — 근로자에게 불리하지 않은 쪽).
+     약정 휴직자에게 감액할지는 사내 규정에 따라 사람이 «부여일수 수정»으로 정한다. */
+function _lvYmd(d){ return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function _lvParse(s){ var m = String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? new Date(+m[1], +m[2]-1, +m[3]) : null; }
+function _lvAddMonths(d, n){
+  var y = d.getFullYear(), mo = d.getMonth() + n, day = d.getDate();
+  var last = new Date(y, mo + 1, 0).getDate();
+  return new Date(y, mo, Math.min(day, last));
+}
+function _lvDayBefore(d){ var x = new Date(d.getTime()); x.setDate(x.getDate() - 1); return x; }
+/* u 하나의 발생 사건들 — untilYmd(포함)까지. 퇴직자는 마지막 근무일(lastWorkDate, 없으면 retireDate)까지 */
+function erpLeaveGrants(u, untilYmd, policy){
+  var out = [];
+  if(!u || !u.hireDate) return out;
+  var P = policy || dbGet('policy_leave', {}) || {};
+  var base = +P.baseAfterOneYear >= 15 ? +P.baseAfterOneYear : 15;      // 법정 15일보다 적게는 못 정한다
+  var cap = +P.maxDays >= 25 ? +P.maxDays : 25;
+  var bs = +P.bonusStart || 3, be = +P.bonusEvery || 2;
+  var eff = _lvParse(getLeaveStartDate(u.hireDate));
+  if(!eff) return out;
+  var lastDay = u.lastWorkDate || u.retireDate || '';
+  var until = String(untilYmd || '9999-12-31');
+  if(lastDay && lastDay < until) until = lastDay;
+  var firstAnn = _lvAddMonths(eff, 12);
+  var under1Expiry = _lvYmd(_lvDayBefore(firstAnn));
+  for(var m = 1; m <= 11; m++){
+    var dm = _lvYmd(_lvAddMonths(eff, m));
+    if(dm > until) break;
+    out.push({ date:dm, days:1, kind:'under1', expiry:under1Expiry, label:'1년 미만 ' + m + '개월 개근' });
+  }
+  for(var k = 1; k < 80; k++){
+    var dk = _lvYmd(_lvAddMonths(eff, 12 * k));
+    if(dk > until) break;
+    var bonus = k < bs ? 0 : Math.floor((k - bs) / be) + 1;
+    out.push({ date:dk, days:Math.min(base + bonus, cap), kind:'year', years:k,
+      expiry:_lvYmd(_lvDayBefore(_lvAddMonths(eff, 12 * (k + 1)))), label:k + '년 근속 (기본 ' + base + ' + 가산 ' + bonus + ')' });
+  }
+  return out;
+}
+/* 그해(달력 1~12월)에 «생긴» 연차 — 오늘·퇴직일 뒤의 것은 아직 없다 */
+function erpLeaveGrantedInYear(u, year, asOfYmd){
+  var y = String(year), asOf = asOfYmd || localYMD(new Date());
+  var until = (y + '-12-31') < asOf ? (y + '-12-31') : asOf;
+  var list = erpLeaveGrants(u, until).filter(function(g){ return g.date.slice(0,4) === y; });
+  var days = list.reduce(function(s, g){ return s + g.days; }, 0);
+  return { days:days, list:list };
+}
+/* 어느 날 «쓸 수 있는» 연차 잔여 — 생긴 순서대로(먼저 생긴 것부터) 쓴 것으로 보고, 기한이 지난 것은 뺀다.
+   퇴직 정산(미사용 연차수당)의 기초다. 수기 부여 조정(leave_grants)은 여기에 섞지 않는다 — 해 단위라 날짜가 없다. */
+function erpLeaveBalanceAt(u, atYmd, atts){
+  if(!u || !u.hireDate) return { remain:0, grants:[], used:0, expired:0 };
+  var at = atYmd || localYMD(new Date());
+  var grants = erpLeaveGrants(u, at).map(function(g){ return Object.assign({ left:g.days }, g); });
+  var dayHours = u.scheduledHours || 8;
+  var uses = (atts || dbGet('attendance_records', []) || []).filter(function(r){ return r && r.sid === u.sid && r.date && r.date <= at; })
+    .sort(function(a, b){ return String(a.date).localeCompare(String(b.date)); });
+  var usedTotal = 0, unplaced = 0;
+  uses.forEach(function(r){
+    var d = PuWork.leaveUsed([r], dayHours);
+    if(!(d > 0)) return;
+    usedTotal += d;
+    for(var i = 0; i < grants.length && d > 1e-9; i++){
+      var g = grants[i];
+      if(g.date <= r.date && g.expiry >= r.date && g.left > 0){ var t = Math.min(g.left, d); g.left -= t; d -= t; }
+    }
+    unplaced += d;   // 쓸 연차가 없을 때 쓴 것(미리 쓰기) — 잔여에서 뺀다
+  });
+  var live = grants.filter(function(g){ return g.expiry >= at; });
+  var expired = grants.filter(function(g){ return g.expiry < at; }).reduce(function(s, g){ return s + g.left; }, 0);
+  var remain = live.reduce(function(s, g){ return s + g.left; }, 0) - unplaced;
+  return { remain:Math.round(remain * 10) / 10, grants:grants, used:Math.round(usedTotal * 10) / 10, expired:Math.round(expired * 10) / 10, live:live };
+}
+
 function getLeaveRemain(sid, year){
   var policy = dbGet('policy_leave', { baseAfterOneYear:15, bonusEvery:2, bonusStart:3, maxDays:25, carryOverLimit:5, monthlyForFirstYear:true });
   var grants = dbGet('leave_grants', {});
@@ -76347,18 +76404,8 @@ function getLeaveRemain(sid, year){
      명부에 그 칸을 쓰는 곳이 하나도 없어(서버 실측 0건) 퇴직자 연차가 연말까지 붙었다 (2026-10-10). */
   var _retD = u.retireDate || u.leaveDate;
   if(_retD){ var ld=new Date(_retD); if(!isNaN(ld.getTime())&&ld<yearEnd) yearEnd=ld; }
-  var autoDays = 0;
-  if(hire <= yearEnd){
-    var yrs = (yearEnd-hire)/(365.25*86400000);
-    if(yrs < 1){
-      if(policy.monthlyForFirstYear){ autoDays = Math.min(Math.floor((yearEnd-hire)/(30.44*86400000)), 11); }
-    } else {
-      var fy = Math.floor(yrs);
-      var bs = policy.bonusStart||3, be = policy.bonusEvery||2;
-      var bn = fy < bs ? 0 : Math.floor((fy-bs)/be)+1;
-      autoDays = Math.min((policy.baseAfterOneYear||15)+bn, policy.maxDays||25);
-    }
-  }
+  /* ★ 그해에 «실제로 생긴» 날짜의 합 — 발생 장부(erpLeaveGrants) 한 벌에서 (2026-10-10) */
+  var autoDays = (hire <= yearEnd) ? erpLeaveGrantedInYear(u, y).days : 0;
   var ov = grants[sid] && grants[sid][y] ? grants[sid][y] : null;
   var total = ov && ov.total!=null ? ov.total : autoDays;
   var carry = ov ? (ov.carryOver||0) : 0;
@@ -76927,8 +76974,15 @@ function LeaveOfAbsenceTab(){
    ⚠ 그런데 같은 사람·같은 해 행이 둘일 수도 있다(옛 자료·이관 중복). 그때 같은 id 를
      주면 dbSet 의 중복제거가 «한 줄을 지운다» — 자료가 사라진다.
      그래서 나온 순서대로 #2, #3 을 붙인다. 순서는 저장된 배열 그대로라 기기마다 같다. */
-function leaveLedgerWithIds(rows){
+function leaveLedgerWithIds(rows, users){
   if(!Array.isArray(rows)) return { rows:[], changed:0, dup:0 };
+  /* ★ 사번을 붙인다 — 대장은 «이름+연도»로만 담겨 있어 동명이인이 생기면 남의 연차가 명세서에 실린다 (2026-10-10).
+       명부에 그 이름이 «하나뿐»일 때만 붙인다(퇴직자 포함). 둘 이상이면 붙이지 않고 그대로 둔다 — 짐작하지 않는다.
+       ⚠ id 는 바꾸지 않는다(이름|연도 꼴 그대로) — 병합 열쇠가 바뀌면 남이 고친 줄과 엇갈린다. */
+  var byName = {};
+  (users || (typeof dbGet === 'function' ? dbGet('user_accounts', []) : []) || []).forEach(function(u){
+    if(u && u.name && u.sid){ var k = String(u.name).trim(); (byName[k] = byName[k] || []).push(u.sid); }
+  });
   var seen = {}, changed = 0, dup = 0;
   var out = rows.map(function(r){
     if(!r || typeof r !== 'object') return r;
@@ -76936,9 +76990,13 @@ function leaveLedgerWithIds(rows){
     var n = seen[base] || 0; seen[base] = n + 1;
     if(n) dup++;                                   // 같은 사람·같은 해가 또 나왔다
     var id = n ? (base + '#' + (n+1)) : base;
-    if(r.id === id) return r;
+    var c = byName[String(r.name == null ? '' : r.name).trim()] || [];
+    var sid = r.sid || (c.length === 1 ? c[0] : null);
+    if(r.id === id && (r.sid || !sid)) return r;
     changed++;
-    return Object.assign({}, r, { id:id });
+    var o = Object.assign({}, r, { id:id });
+    if(sid && !r.sid) o.sid = sid;
+    return o;
   });
   return { rows:out, changed:changed, dup:dup };
 }
@@ -77003,7 +77061,8 @@ function LeaveLedgerTab(){
       // 치는 동안에는 서버 변경으로 화면을 갈아끼우지 않는다 — 치던 숫자가 사라지면 더 나쁘다
       onFocus:function(e){ _editing.current = true; try{ e.target.select(); }catch(_){} },
       onBlur:function(){ _editing.current = false; },
-      onChange:function(e){ var v=(e.target.value||'').trim(); updField(r.id, field, v===''?null:(isNaN(Number(v))?v:Number(v))); },
+      /* «1.» 처럼 치는 중인 글자는 글자 그대로 둔다 — 예전에는 바로 숫자 1 로 바뀌어 0.5 를 칠 수 없었다 */
+      onChange:function(e){ var v=(e.target.value||'').trim(); updField(r.id, field, v===''?null:(/^-?\d+(\.\d+)?$/.test(v)?Number(v):v)); },
       style:inS});
   }
   return h('div',null,
@@ -77069,6 +77128,8 @@ function calcLeavePromoStage(hireDate, year){
     if(cand.getTime() <= ref.getTime()) cand = new Date(ref.getFullYear()+1, hd.getMonth(), hd.getDate());
     return cand;
   }
+  /* ★ 부여(erpLeaveGrants)와 «같은» 기산일 — 예전에는 부여는 2021-06-01, 촉진은 실제 입사일로 따로 셌다 (2026-10-10) */
+  if(hireDate && typeof getLeaveStartDate === 'function') hireDate = getLeaveStartDate(hireDate);
   var today = new Date(); today.setHours(0,0,0,0);
   // 1년 미만(입사 후 첫 1년 이내) 여부 — 근로기준법 §61 제2항 별도 시기
   var isFirstYear = false, firstYearEnd = null;
@@ -77397,20 +77458,15 @@ function LeaveManagement(){
     var isOldEmp = effectiveHire !== hireDate;
     var hire = new Date(effectiveHire);
     if(isNaN(hire.getTime())) return {days:0, reason:'입사일 형식 오류'};
-    var yearEnd = new Date(parseInt(year), 11, 31);
-    if(leaveDate){ var ld=new Date(leaveDate); if(!isNaN(ld.getTime())&&ld<yearEnd) yearEnd=ld; }
-    if(hire > yearEnd) return {days:0, reason: isOldEmp ? '기산일 이전 (기산일: '+PUREUN_5IN_DATE+')' : '입사 전'};
-    var yearsAtEnd = (yearEnd-hire)/(365.25*86400000);
     var prefix = isOldEmp ? '[기산일:'+PUREUN_5IN_DATE+'] ' : '';
-    if(yearsAtEnd < 1){
-      if(!policy.monthlyForFirstYear) return {days:0, reason:prefix+'1년 미만(정책 미적용)'};
-      var mo = Math.floor((yearEnd-hire)/(30.44*86400000));
-      return {days:Math.min(mo,11), reason:prefix+'1년 미만('+mo+'개월)'+(leaveDate?' [퇴직일 기준]':''), isOldEmp:isOldEmp, effectiveHire:effectiveHire};
-    }
-    var fullYears = Math.floor(yearsAtEnd);
-    var bonus = calcBonus(fullYears);
-    var total = Math.min((policy.baseAfterOneYear||15)+bonus, policy.maxDays||25);
-    return {days:total, reason:prefix+fullYears+'년차 (기본'+(policy.baseAfterOneYear||15)+'+가산'+bonus+')'+(leaveDate?' [퇴직일 기준]':''), isOldEmp:isOldEmp, effectiveHire:effectiveHire};
+    if(String(effectiveHire) > String(year)+'-12-31') return {days:0, reason: isOldEmp ? '기산일 이전 (기산일: '+PUREUN_5IN_DATE+')' : '입사 전'};
+    /* ★ 그해에 «실제로 생긴» 연차 — 발생 장부 한 벌(erpLeaveGrants)에서 (2026-10-10 인사관리 2단계).
+         예전에는 12월 31일까지 찬 햇수로 셌다 — 입사 다음 해 월차가 빠지고 아직 안 온 달을 미리 셌다.
+         ⚠ «1년 미만 매월 부여» 정책을 꺼도 월차는 생긴다 — 근로기준법 제60조②는 끌 수 없다. */
+    var gy = erpLeaveGrantedInYear({ hireDate:hireDate, retireDate:leaveDate || '' }, year);
+    var parts = gy.list.reduce(function(acc, g){ var k = g.kind === 'under1' ? '1년 미만 월차' : (g.years + '년 근속'); acc[k] = (acc[k] || 0) + g.days; return acc; }, {});
+    var why = Object.keys(parts).map(function(k){ return k + ' ' + parts[k] + '일'; }).join(' + ') || '그해 생긴 연차 없음';
+    return {days:gy.days, reason:prefix + why + (leaveDate?' [퇴직일 기준]':''), isOldEmp:isOldEmp, effectiveHire:effectiveHire, list:gy.list};
   }
 
   /* ⚠★ 시간연차를 «하루」로 바꿀 때 8시간 고정으로 나누면 안 된다 (2026-09-02).
@@ -77463,7 +77519,13 @@ function LeaveManagement(){
          안 남았다(2026-09-23 찾음). 그 열쇠 그대로 지도로 펴서 쓴다. */
     var g = _erpNameMap(dbGet('leave_grants',{}));
     if(!g[modalSid]) g[modalSid]={};
-    g[modalSid][selYear]={total:parseInt(mForm.total)||0, carryOver:parseInt(mForm.carryOver)||0};
+    /* ★ 반일(0.5)도 적을 수 있게 parseFloat — 예전 parseInt 는 14.5일을 14일로 잘랐다.
+         이월은 정책의 «이월 한도»를 넘지 못한다 — 예전에는 한도를 화면에 쓰기만 하고 지키지 않았다 (2026-10-10) */
+    var _pol = dbGet('policy_leave', {}) || {};
+    var _lim = (_pol.carryOverLimit != null && _pol.carryOverLimit !== '') ? (+_pol.carryOverLimit || 0) : 5;
+    var _carry = Math.max(0, parseFloat(mForm.carryOver) || 0);
+    if(_carry > _lim){ showToast('이월은 최대 ' + _lim + '일입니다 (휴가 정책 «이월 한도»)'); _carry = _lim; }
+    g[modalSid][selYear]={total:Math.max(0, parseFloat(mForm.total)||0), carryOver:_carry};
     dbSet('leave_grants',g);
     setModalSid(null);
     showToast('부여일수 수정됨');
@@ -78348,7 +78410,7 @@ function LeaveManagement(){
             h('input',{type:'number',min:0,max:99,value:mForm.total,onChange:function(e){setMForm(Object.assign({},mForm,{total:parseInt(e.target.value)||0}));},style:{fontFamily:'monospace',textAlign:'right'}})),
           h('div',{className:'fld'},h('label',null,'전년도 이월'),
             h('input',{type:'number',min:0,max:10,value:mForm.carryOver,onChange:function(e){setMForm(Object.assign({},mForm,{carryOver:parseInt(e.target.value)||0}));},style:{fontFamily:'monospace',textAlign:'right'}}),
-            h('div',{style:{fontSize:'10.5px',color:'#94a3b8',marginTop:'3px'}},'최대 '+(policy.carryOverLimit||5)+'일까지 이월'))
+            h('div',{style:{fontSize:'10.5px',color:'#94a3b8',marginTop:'3px'}},'최대 '+((policy.carryOverLimit!=null && policy.carryOverLimit!=='') ? policy.carryOverLimit : 5)+'일까지 이월'))
         ),
         h('div',{className:'modal-f'},
           h('button',{className:'btn-secondary',onClick:resetOverride},'자동으로 복원'),
@@ -80377,7 +80439,7 @@ function PayrollLedger(props){
       try {
         var _ly = (ym||'').slice(0,4);
         var _lf = function(v){ return (v==null||v==='')?'-':v; };
-        var _llRows = (dbGet('leave_ledger',[])||[]).filter(function(x){ return x.name===u.name && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3).map(function(x){
+        var _llRows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로 — 동명이인이면 남의 연차가 명세서에 실린다 (2026-10-10) */ return (x.sid ? x.sid===u.sid : x.name===u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3).map(function(x){
           var _mo = (x.monthly||'-'); if(x.note) _mo += ' <span style="color:#94a3b8">('+x.note+')</span>';
           var _hi = (String(x.year)===_ly) ? ' style="background:#f0fdf4;font-weight:700"' : '';
           return '<tr'+_hi+'><td style="padding:3px 6px;text-align:center">'+x.year+'년</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.granted)+'</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.used)+'</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.remain)+'</td><td style="padding:3px 6px;font-size:10px;color:#475569">'+_mo+'</td></tr>';
@@ -81922,7 +81984,12 @@ function getLeavePromoNotice(empName){
     var _same = _all.filter(function(u){ return u && u.name === empName && !u.retireDate; });
     if(_same.length > 1) return null;
     var lr = null;
-    for(var i=0;i<ledger.length;i++){ if(ledger[i].name===empName && Number(ledger[i].year)===year){ lr=ledger[i]; break; } }
+    var _me = _same.length === 1 ? _same[0] : null;
+    for(var i=0;i<ledger.length;i++){
+      var _L = ledger[i]; if(!_L || Number(_L.year)!==year) continue;
+      /* 사번이 붙은 줄은 사번으로, 아니면 이름으로 (사번이 다른 사람 줄은 이름이 같아도 쓰지 않는다) */
+      if(_L.sid ? (_me && _L.sid === _me.sid) : (_L.name === empName)){ lr = _L; break; }
+    }
     if(!lr) return null;
     var remain = (lr.remain!=null && !isNaN(Number(lr.remain))) ? Number(lr.remain) : null;
     if(remain==null || remain<=0) return null;
@@ -82509,7 +82576,7 @@ function PayrollPayslip(props){
       // 연차 현황 (연도별, 연차대장 기준)
       (function(){
         var _ly = (props.selYM||'').slice(0,4);
-        var _rows = (dbGet('leave_ledger',[])||[]).filter(function(x){ return x.name===u.name && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3);
+        var _rows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로 — 동명이인이면 남의 연차가 명세서에 실린다 (2026-10-10) */ return (x.sid ? x.sid===u.sid : x.name===u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3);
         if(!_rows.length) return null;
         var _lf = function(v){ return (v==null||v==='')?'-':v; };
         var _thx = {padding:'4px 6px',color:'#1e40af',fontWeight:700,fontSize:'11px'};
