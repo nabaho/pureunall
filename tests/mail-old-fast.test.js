@@ -86,8 +86,39 @@ test('★★ readOldMail 이 붙어 둔 연결을 쓴다 — 통마다 popOpen·
   assert.doesNotMatch(rd, /finally\s*\{[^}]*pop\.close\(\)/, '통마다 연결을 닫는다 — 다음 통이 또 로그인한다');
 });
 
-test('★★ 그릇은 하나 — 둘이 따로 로그인하면 둘째가 잠금에 걸려 기다린다', () => {
-  assert.match(rd, /maxInstances:\s*1\b/, 'readOldMail 그릇 수를 묶지 않았다');
+test('★★ 그릇 수를 묶지 않는다 — 1 로 묶었더니 큰 메일 한 통 도는 동안 다른 요청이 «그냥 끊겼다»', () => {
+  /* 2026-10-10 06:55~06:57 「사용 가능한 인스턴스 없음」 10건. 경력관리 화면도 이 함수를 쓴다. */
+  assert.doesNotMatch(rd, /maxInstances/, 'readOldMail 그릇 수를 묶었다 — 큰 메일이 도는 동안 나머지가 끊긴다');
+});
+
+test('★★ 큰 지난 메일은 «앞부분(TOP)만» 먼저 받는다 — POP3 는 1초에 60KB 쯤이다(12MB 가 195초)', () => {
+  assert.match(rd, /const partial = size > OLD_FULL_MAX && !b\.full && wantAtt < 0;/, '큰 메일도 통째로 받는다');
+  assert.match(rd, /partial \? 'TOP ' \+ hit\.n/, '앞부분만 받는 길이 없다');
+  assert.match(rd, /full: !partial, partial: partial/, '화면이 앞부분인 줄 모른다');
+});
+
+test('★ 화면은 앞부분만 온 메일에 말을 하고 「전체 받기」를 둔다 — 첨부 목록도 반쪽이다', () => {
+  assert.match(HTML, /큰 메일이라 글 앞부분만 보입니다/);
+  assert.match(HTML, /body: JSON\.stringify\(\{ key:uid, full:1 \}\)/, '전체 받기가 full 을 안 보낸다');
+});
+
+test('★★ 로그인이 잠겨 거절되면(-ERR) 기다렸다 다시 — 연결 문제는 그대로 올린다', async () => {
+  const MS = fresh();
+  let tries = 0;
+  const realSet = global.setTimeout;
+  global.setTimeout = (fn) => realSet(fn, 0);
+  try {
+    const ok = await MS.oldPopOpen(async () => {
+      tries++;
+      if (tries < 3) throw Object.assign(new Error('-ERR [IN-USE]'), { pop: true });
+      return 'connected';
+    });
+    assert.equal(ok, 'connected');
+    assert.equal(tries, 3);
+    let n = 0;
+    await assert.rejects(MS.oldPopOpen(async () => { n++; throw new Error('소켓이 끊겼다'); }));
+    assert.equal(n, 1, '연결 문제인데 되풀이했다');
+  } finally { global.setTimeout = realSet; }
 });
 
 test('★ 「지난 메일」 칸을 열면 미리 붙여 둔다(warm) — 메일은 안 읽는다', () => {
