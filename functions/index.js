@@ -1072,7 +1072,8 @@ exports.rulesLawWatch = functions
 /* 컨설턴트 모집 감시 — fetch(undici) 가 못 열 때 쓰는 «다른 길»(node https · IPv4 · 넘김 셋까지) */
 function 모집다른길(u, raw, 넘김) {
   return new Promise((ok, no) => {
-    const req = require("https").get(u, { family: 4, timeout: 30000,
+    /* ca — 중간 인증서를 빠뜨리는 서버(지방공기업평가원)를 위해 «더해서» 검증한다(recruit-watch.js EXTRA_CA) */
+    const req = require("https").get(u, { family: 4, timeout: 30000, ca: RecruitWatch.caList(),
       headers: { "User-Agent": RecruitWatch.UA, "Accept": "text/html,application/xhtml+xml,*/*", "Accept-Language": "ko-KR,ko;q=0.9" } }, (res) => {
       const s = res.statusCode || 0;
       if (s >= 300 && s < 400 && res.headers.location && 넘김 < 3) {

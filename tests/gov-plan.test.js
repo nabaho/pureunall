@@ -73,6 +73,7 @@ test('★★★ 활용신청 승인 전 — 「서비스 접근거부」를 «�
   /* 글자 없이 코드만 와도 — 20 접근거부 · 30 등록되지 않은 열쇠 */
   assert.match(P.errSay('발주계획', { err: 'X', code: '20' }), /활용신청 승인/);
   assert.match(P.errSay('발주계획', { err: 'X', code: '30' }), /활용신청 승인/);
+  assert.match(P.errSay('발주계획', o), /\[코드 20 · 서비스 접근거부\]$/, '원래 말·코드를 붙인다');
   assert.equal(P.errSay('발주계획', { err: 'X', code: '22' }), '발주계획: X');
 });
 const judge = (r) => G.judge(r, G.KEYWORDS_DEFAULT);
