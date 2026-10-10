@@ -11,6 +11,7 @@
 <script src="js/pu-ontology.js?v=60"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
+<script src="js/pu-dnd.js?v=1"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -153,10 +154,6 @@
     .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
   }
   .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
-  /* 파일 끌어다 놓기 — 받는 단추가 노란 점선으로 켜진다 (팔레트 노랑) */
-  .dnd-ok{outline:2px dashed #fbbf24!important;outline-offset:2px;background-color:#fffbeb!important;color:var(--ink)!important}   /* 글자색도 — 파란 단추의 흰 글씨가 노랑 위에서 묻혔다 */
-  .dnd-hot{outline-style:solid!important;background-color:#fde68a!important}
-  #dndbar{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:200;background:var(--ink);color:#fff;padding:10px 18px;border-radius:999px;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,.25);pointer-events:none;max-width:92vw}
   /* 묶음마다 표가 따로라, 폭을 안 정하면 충남과 경기의 열이 어긋난다 */
   table.fixcol{table-layout:fixed}
   table.fixcol td{overflow:hidden;text-overflow:ellipsis}
@@ -3849,14 +3846,11 @@ function dropZoneSlim(id,label,hint,accept){
     +'<span class="muted" style="font-size:11px;white-space:nowrap">끌어다 놓기 · 클릭해 선택</span>'
     +'<span id="'+id+'-stat" style="font-size:11px"></span></div>';
 }
-/* ══ 파일은 «끌어다 놓기»가 먼저 (대표 지시 2026-10-10 「데이터 가지고 올 경우 마우스로 드래그하면 되게 … 팝업창으로 폴더 찾기보다 우선」) ══
-   파일을 받는 단추는 예전 그대로 누르면 «폴더 찾기» 창이 뜬다. 그 위에 «끌어다 놓기»를 얹는다 — 새 단추를 만들지 않는다.
-   · 파일을 끌어 오면 이 화면에서 파일을 받는 단추가 노란 점선으로 켜진다(DND_RULES 에 있는 것만 — 단추의 onclick 글자를 읽어 알아본다).
-   · 켜진 단추 «위에» 놓으면 그 단추가 하는 일을 그 파일로 바로 한다. 받는 단추가 «한 곳»뿐이면 화면 아무 데나 놓아도 된다.
-   · 형식이 안 맞으면(예: 통장 자리에 PDF) 무엇을 받는지 알리고 아무것도 안 한다.
-   · 창(모달)이 떠 있으면 그 안의 단추만 본다. 기존 끌어놓기 칸(.dropz)은 그쪽이 먼저 받는다(dzOver 가 멈춰 세운다).
-   ⚠ 놓을 곳이 없어도 브라우저가 파일을 «열어 버리지» 않게 늘 preventDefault 한다.
-   ⚠ 받는 함수는 마지막 인자로 파일 배열(dropped)을 받는다 — 없으면 예전처럼 폴더 찾기를 연다(_pickGo). */
+/* ══ 파일은 «끌어다 놓기»가 먼저 (대표 지시 2026-10-10 「데이터 가지고 올 경우 마우스로 드래그 … 폴더 찾기보다 우선」) ══
+   틀은 «공용 모듈» js/pu-dnd.js 가 한다(급여 프로그램과 같은 것 — 2026-10-10 에 인라인 두 벌을 한 벌로 합쳤다). 여기에는 «무엇을 받는가»(규칙)만 둔다.
+   · 단추의 onclick 글자 «이름('글자')» 를 읽어 규칙에 있는 것만 받는 곳으로 안다. 받는 함수는 마지막 인자로 파일 배열(dropped)을 받고 _pickGo 로 끝난다.
+   · exact — 덮어쓰는 일(원본·틀 교체, 사업장 백업)은 단추 «위»에서만. 새 받는 곳을 만들면 여기에 한 줄 + 함수 끝 inp.click() → _pickGo(inp,dropped).
+   · 기존 끌어놓기 칸(.dropz)은 dzOver 가 이벤트를 멈춰 세워 그쪽이 먼저 받는다. */
 var DND_RULES={
   importBank:{ext:['xls','xlsx'],argc:0}, importFundsInfo:{ext:['json'],argc:0}, importSubsidy:{ext:['json'],argc:0}, importSites:{ext:['json'],argc:0,exact:true},
   /* exact — «덮어쓰는» 일(원본·틀 교체, 사업장 백업)은 단추 «위»에서만 받는다. 화면 아무 데나 놓아 원본을 갈아 끼우지 않게 */
@@ -3864,84 +3858,9 @@ var DND_RULES={
   pickHwpBulk:{ext:['hwp','hwpx'],argc:0,multi:true}, wrepBulkPick:{ext:['pdf','jpg','jpeg','png'],argc:0,multi:true},
   cmImportPick:{ext:['hwp','hwpx','pdf','jpg','jpeg','png'],argc:0,multi:true}, uploadSubDoc:{ext:null,argc:0}
 };
-var _dnd={on:false, cands:[], hot:null, t:0};
-/* 파일 입력 상자에 끌어온 파일을 «골라 준 것처럼» 넣는다 — 받는 쪽 코드(ev.target.files / inp.files)가 그대로 돈다 */
-function _pickGo(inp,dropped){
-  if(dropped&&dropped.length){ Object.defineProperty(inp,'files',{value:dropped,configurable:true}); if(inp.onchange) inp.onchange({target:inp}); return; }
-  inp.click();
-}
-function _dndExt(f){ var m=/\.([^.\\/]+)$/.exec(String(f&&f.name||'')); return m?m[1].toLowerCase():''; }
-/* 단추의 onclick 글자 «이름('글자')» 를 읽는다 — 규칙에 있고 인자 수가 맞을 때만 */
-function _dndParse(el){
-  var m=/^\s*([A-Za-z_]\w*)\(((?:\s*'[^'\\]*'\s*,?)*)\s*\)\s*;?\s*$/.exec((el&&el.getAttribute&&el.getAttribute('onclick'))||'');
-  if(!m||!Object.prototype.hasOwnProperty.call(DND_RULES,m[1])) return null;
-  var args=[]; String(m[2]||'').replace(/'([^'\\]*)'/g,function(_,a){ args.push(a); return ''; });
-  if(args.length!==DND_RULES[m[1]].argc) return null;
-  return {fn:m[1], args:args, el:el};
-}
-/* 놓은 파일이 이 단추에 맞는가 → {ok, files, note} */
-function _dndFit(info,files){
-  var R=DND_RULES[info.fn], bad=R.ext?files.filter(function(f){ return R.ext.indexOf(_dndExt(f))<0; }):[];
-  if(bad.length) return {ok:false, note:'이 단추는 .'+R.ext.join(' .')+' 파일만 받습니다 — '+bad[0].name+(bad.length>1?' 외 '+(bad.length-1)+'개':'')};
-  if(!R.multi&&files.length>1) return {ok:true, files:[files[0]], note:'여러 개를 놓았습니다 — 첫 파일 «'+files[0].name+'»만 받습니다'};
-  return {ok:true, files:files, note:''};
-}
-function _dndCands(){
-  var sel=Object.keys(DND_RULES).map(function(k){ return '[onclick^="'+k+'("]'; }).join(',');
-  var root=document.getElementById('modalbg')||document;   // 창이 떠 있으면 그 안만
-  return Array.prototype.slice.call(root.querySelectorAll(sel)).filter(function(el){ return el.offsetParent!==null||getComputedStyle(el).position==='fixed'; })
-    .map(_dndParse).filter(Boolean);
-}
-function _dndBar(txt){ var b=document.getElementById('dndbar'); if(!b){ b=document.createElement('div'); b.id='dndbar'; document.body.appendChild(b); } b.textContent=txt; }
-function _dndStart(){
-  if(_dnd.on) return; _dnd.on=true; _dnd.cands=_dndCands();
-  _dnd.cands.forEach(function(c){ c.el.classList.add('dnd-ok'); });
-  var n=_dnd.cands.length;
-  _dndBar(n===0?'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요'
-    :(n===1&&!DND_RULES[_dnd.cands[0].fn].exact)?'📥 여기 아무 데나 놓으면 «'+String(_dnd.cands[0].el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»'
-    :'📥 노란 점선 단추 위에 놓으세요 ('+n+'곳)');
-}
-function _dndEnd(){
-  if(!_dnd.on) return; _dnd.on=false; clearTimeout(_dnd.t);
-  Array.prototype.forEach.call(document.querySelectorAll('.dnd-ok,.dnd-hot'),function(el){ el.classList.remove('dnd-ok','dnd-hot'); });
-  var b=document.getElementById('dndbar'); if(b) b.remove(); _dnd.hot=null;
-}
-/* 놓았다 — 단추 위면 그 단추, 아니면 «받는 곳이 한 곳»일 때만 그 한 곳 */
-function _dndRun(files,hot,cands){
-  files=Array.prototype.slice.call(files||[]); if(!files.length) return;
-  var info=null, fit=null;
-  if(hot){ info=_dndParse(hot); }
-  else {
-    var free=cands.filter(function(c){ return !DND_RULES[c.fn].exact; }), okc=free.filter(function(c){ return _dndFit(c,files).ok; });
-    if(okc.length===1) info=okc[0];
-    else if(free.length===1&&cands.length===1) info=free[0];
-    else { toast(cands.length?(free.length?'받는 곳이 여러 곳입니다 — 노란 점선 단추 위에 놓으세요':'이 일은 실수로 덮어쓰지 않게 단추 «위»에 놓아야 합니다'):'이 화면에는 끌어서 받는 곳이 없습니다 — 단추를 눌러 파일을 고르세요','warn'); return; }
-    if(!hot&&info) toast('«'+String(info.el.textContent||'').replace(/\s+/g,' ').trim().slice(0,24)+'»(으)로 받습니다');
-  }
-  if(!info){ toast('이 자리는 파일을 받지 않습니다','warn'); return; }
-  fit=_dndFit(info,files);
-  if(!fit.ok){ toast(fit.note,'warn'); return; }
-  if(fit.note) toast(fit.note,'warn');
-  window[info.fn].apply(null,info.args.concat([fit.files]));
-}
-(function _dndInit(){
-  var has=function(e){ var t=e.dataTransfer&&e.dataTransfer.types; return !!t&&Array.prototype.indexOf.call(t,'Files')>=0; };
-  document.addEventListener('dragenter',function(e){ if(has(e)) _dndStart(); });
-  document.addEventListener('dragover',function(e){
-    if(!has(e)) return; e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect='copy';
-    if(!_dnd.on) _dndStart();
-    var hot=(e.target&&e.target.closest)?e.target.closest('.dnd-ok'):null;
-    if(hot!==_dnd.hot){ if(_dnd.hot) _dnd.hot.classList.remove('dnd-hot'); _dnd.hot=hot; if(hot) hot.classList.add('dnd-hot'); }
-    clearTimeout(_dnd.t); _dnd.t=setTimeout(_dndEnd,1500);   // 끌기를 그만두면(Esc·창 밖) 알아서 꺼진다
-  });
-  document.addEventListener('dragleave',function(e){ if(_dnd.on&&e.relatedTarget===null) _dndEnd(); });
-  document.addEventListener('dragend',_dndEnd);
-  document.addEventListener('drop',function(e){
-    if(!has(e)) return; e.preventDefault();
-    var hot=(e.target&&e.target.closest)?e.target.closest('.dnd-ok'):null, cands=_dnd.cands.slice(), files=(e.dataTransfer&&e.dataTransfer.files)||[];
-    _dndEnd(); _dndRun(files,hot,cands);
-  });
-})();
+/* 끌어온 파일이 있으면 폴더 찾기 없이 그 파일을, 없으면 예전처럼 폴더 찾기를 연다(모듈이 못 실렸으면 예전 그대로) */
+function _pickGo(inp,dropped){ if(dropped&&dropped.length&&window.PuDnd) PuDnd.pick(inp,dropped); else inp.click(); }
+try{ PuDnd.init({ rules:DND_RULES, toast:function(m,t){ toast(m,t); } }); }catch(e){}
 function dzOver(e,on){ e.preventDefault(); e.stopPropagation();
   var d=e.currentTarget; d.style.borderColor=on?'var(--acc)':'var(--line)'; d.style.background=on?'#f8fafc':'var(--bg)'; }
 function dzDrop(e,id){ dzOver(e,0);
