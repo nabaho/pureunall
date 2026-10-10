@@ -79,3 +79,65 @@ test("⑥ 저장 묶음은 새 공고와 회차 기록을 한 번에 담는다",
   assert.ok(upd["notices/c1_2"]);
   assert.equal(upd["runs/2026-10-10"].added, 1);
 });
+
+test("⑦ 공고 제목 → 사건 단계: 사무 공고는 단계를 올리지 않고, 끝난 일이 이긴다", () => {
+  assert.equal(W.stageOfTitle("포괄적 금지명령 공고"), "금지명령");
+  assert.equal(W.stageOfTitle("회생절차 개시결정 공고"), "개시");
+  assert.equal(W.stageOfTitle("회생계획 인가결정 공고"), "인가");
+  assert.equal(W.stageOfTitle("회생절차종결결정 공고"), "종결");
+  assert.equal(W.stageOfTitle("회생절차 폐지결정 공고"), "폐지·기각");
+  assert.equal(W.stageOfTitle("회생계획 불인가결정 공고"), "폐지·기각");
+  assert.equal(W.stageOfTitle("관계인집회기일 변경공고"), null, "기일 변경은 단계가 아니다");
+  assert.equal(W.stageOfTitle("회생계획안 제출기간 연장결정 공고"), null);
+  const ev = (t) => ({ d: "2026-10-01", t });
+  assert.equal(W.stageOfEvents([ev("포괄적 금지명령 공고"), ev("회생절차 개시결정 공고")]), "개시");
+  assert.equal(W.stageOfEvents([ev("회생절차 개시결정 공고"), ev("회생절차 폐지결정 공고")]), "폐지·기각");
+  assert.equal(W.stageOfEvents([]), "");
+});
+
+test("⑧ 같은 사건의 개시결정 공고는 «이력»과 «단계»로 붙고, 다른 사건 것은 안 섞인다", async () => {
+  const lists = { "000221": [[
+    row({ pbancBgngYmd: "20261010", pbancTitlNm: "회생절차 개시결정 공고", inetPbancSeq: 9 }),
+    row({ pbancBgngYmd: "20261008" }),
+    row({ csNo: "20260130009999", csNoNm: "2026회합 9999", pbancBgngYmd: "20261009", pbancTitlNm: "회생절차 개시결정 공고" }),
+  ]] };
+  const r = await W.run({ post: fakePost(lists, []), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  assert.equal(r.added.length, 1, "금지명령이 없는 사건(9999)은 담지 않는다");
+  assert.equal(r.added[0].stage, "개시");
+  assert.deepEqual(r.added[0].events.map((e) => e.t), ["포괄적 금지명령 공고", "회생절차 개시결정 공고"]);
+});
+
+test("⑨ 이미 담긴 사건에 새 공고가 생기면 상세를 부르지 않고 이력·단계만 고친다", async () => {
+  const calls = [], key = W.noticeKey(row());
+  const existing = { [key]: { id: key, stage: "금지명령", events: [{ d: "2026-10-08", t: "포괄적 금지명령 공고" }] } };
+  const lists = { "000221": [[row({ pbancBgngYmd: "20261012", pbancTitlNm: "회생절차 개시결정 공고", inetPbancSeq: 9 }), row()]] };
+  const r = await W.run({ post: fakePost(lists, calls), existing, sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  assert.equal(r.added.length, 0);
+  assert.equal(calls.filter((u) => u === W.VIEW).length, 0);
+  assert.equal(r.eventUpdates[key].stage, "개시");
+  assert.equal(r.eventUpdates[key].events.length, 2);
+  const upd = W.updatesOf(r, "2026-10-12", "t", 5);
+  assert.equal(upd["notices/" + key + "/stage"], "개시");
+});
+
+test("⑩ 주소에서 시·도와 시·군·구를 뽑는다", () => {
+  assert.deepEqual(W.regionOf("서울 서초구 매헌로 16, 1312호"), { sido: "서울", sigungu: "서초구" });
+  assert.deepEqual(W.regionOf("김포시 통진읍 애기봉로571번길"), { sido: "경기", sigungu: "김포시" });
+  assert.deepEqual(W.regionOf("경기도 수원시 영통구 광교로 1"), { sido: "경기", sigungu: "수원시" });
+  assert.deepEqual(W.regionOf("충청남도 천안시 서북구 원두정8길 6"), { sido: "충남", sigungu: "천안시" });
+});
+
+test("⑪ 본점 주소를 쓰고, 송달주소가 대리인 법률사무소면 따로 남긴다", async () => {
+  const detail = { data: { rtnMap: { csBasInf: { csNm: "회생" }, btprtDebtrInf: {
+    btprtZpcd: "54654", btprtAddr: "전북특별자치도 익산시 배산로 183, 5층 (모현동2가, 한사랑빌딩)",
+    btprtDlvrZpcd: "54868", btprtDlvrAddr: "전주시 덕진구 만성동로 60, 503호 법률사무소 경청 (만성동, 리드타워)" } } } };
+  const d = W.pickDetail(detail.data);
+  assert.equal(d.zip, "54654");
+  assert.match(d.address, /^전북특별자치도 익산시 배산로 183/);
+  assert.match(d.dlvAddress, /법률사무소 경청/);
+  assert.equal(d.counsel, "법률사무소 경청");
+  assert.equal(d.dlvZip, "54868");
+  /* 송달주소가 본점과 같으면 따로 남기지 않는다 */
+  const same = W.pickDetail({ rtnMap: { btprtDebtrInf: { btprtZpcd: "06771", btprtAddr: "서울 서초구 매헌로 16", btprtDlvrZpcd: "06771", btprtDlvrAddr: "서울 서초구 매헌로 16" } } });
+  assert.deepEqual([same.dlvAddress, same.counsel], ["", ""]);
+});

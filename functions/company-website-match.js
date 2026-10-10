@@ -127,4 +127,5 @@ function uniqueByLink(candidates) {
 module.exports = {
   addressToken, stripTags, normName, findMatch, findLocalMatch,
   naverLocalToCandidates, naverWebToCandidates, uniqueByLink,
+  nameIn, addrIn,   // 2026-10-10 회생광고 연락처 찾기(rehab-contact.js)도 같은 비교를 쓴다
 };
