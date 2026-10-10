@@ -104,4 +104,7 @@ test('⑩ 회계·결산 틀 고정 — 회계 머리·표 제목 줄이 기금 
   assert.ok(css.includes('var(--closehead-h,156px)'));
   const t = fnSrc('_syncTopbarH');
   assert.ok(t.includes("_setCssVar('--fundhead-h'") && t.includes("_setCssVar('--closehead-h'"), '머리 높이를 안 잰다');
+  /* 분개장·계정별원장·월계표 표도 같은 틀 고정(2026-10-10 「계속」) */
+  for (const fn of ['journalView', 'ledgerView', 'monthlyView'])
+    assert.ok(fnSrc(fn).includes('<div class="ledgerwrap" style="margin-top:8px">'), fn + ' 표 제목 줄이 안 붙는다');
 });
