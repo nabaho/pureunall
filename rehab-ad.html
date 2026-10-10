@@ -89,6 +89,16 @@ td.ct{letter-spacing:2px}
 .c-amber{background:var(--amber-bg);color:var(--amber)}
 .c-red{background:var(--red-bg);color:var(--red)}
 .ico{display:inline-block;width:20px;text-align:center;font-size:13px}
+.pgm{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);font-weight:700}
+td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
+.prev{margin-top:6px}.prev summary{cursor:pointer;font-weight:600;font-size:13px}
+.prev iframe{width:100%;height:560px;border:1px solid var(--line2);border-radius:8px;margin-top:6px;background:#ffffff}
+.mails .m{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--line);font-size:13px}
+.mails .m:last-child{border-bottom:0}.mails .m .em{font-weight:600;word-break:break-all}
+.route{font-size:12.5px;line-height:1.55;border-radius:8px;padding:6px 9px;margin:6px 0}
+.route.mail{background:var(--green-bg);border:1px solid var(--green-line);color:var(--green)}
+.route.ask{background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber)}
+.route.post{background:var(--blue-bg);border:1px solid var(--blue-line);color:var(--blue-d)}
 .ico.off{opacity:.25}
 .empty{padding:34px;text-align:center;color:var(--mute);line-height:1.7}
 /* 상세 패널 */
@@ -173,8 +183,11 @@ td.ct{letter-spacing:2px}
     <select id="fContact" aria-label="연락처">
       <option value="">연락처 전체</option><option value="has">연락처 있음</option><option value="none">연락처 없음</option><option value="check">확인 필요</option>
     </select>
+    <select id="fTrade" aria-label="거래·연결">
+      <option value="">거래·연결 전체</option><option value="client">계약·거래중</option><option value="cards">기업정보함 있음</option><option value="any">우리 자료에 있음(전체)</option><option value="none">연결 없음</option>
+    </select>
     <select id="fSort" aria-label="정렬">
-      <option value="date">공고일 최신순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
+      <option value="date">공고일 최신순</option><option value="trade">거래·연결 있는 순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
     </select>
     <input id="fText" type="search" placeholder="회사명·주소·대리인 찾기">
     <button class="sm" onclick="resetFilters()">거르개 풀기</button>
@@ -214,7 +227,7 @@ td.ct{letter-spacing:2px}
       <table>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="보이는 줄 전체 선택"></th>
-          <th class="no">번호</th><th>공고일</th><th>회사명</th><th>지역</th><th>법원</th><th>사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
+          <th class="no">번호</th><th>포괄금지명령</th><th>회사명</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -228,7 +241,7 @@ td.ct{letter-spacing:2px}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=57"></script>
+<script src="js/pu-ontology.js?v=58"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
      없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -243,12 +256,13 @@ td.ct{letter-spacing:2px}
 </script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
-<script src="js/rehab-letter.js?v=1"></script>
+<script src="js/rehab-letter.js?v=3"></script>
+<script src="js/rehab-match.js?v=1"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var ENRICH_URL='https://asia-northeast3-pureun-erp.cloudfunctions.net/rehabEnrich';
 var fbDb=null, gate=null;
-var NOTICES={}, MARKS={}, INFO={}, LASTRUN=null;
+var NOTICES={}, MARKS={}, INFO={}, LASTRUN=null, IDX=null, MATCH={}, LINKNOTE='';
 var VIEW=[], SEL={}, CUR='', TAB='all';
 var STATUS={new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
 var ST_CHIP={new:'c-gray',send:'c-blue',hold:'c-amber',skip:'c-red',sent:'c-green'};
@@ -268,6 +282,24 @@ function lsSet(k,v){ try{ localStorage.setItem('rehabad_'+k,v); }catch(e){} }
 function statusOf(id){ var m=MARKS[id]; return (m && !m._deleted && STATUS[m.status]) ? m.status : 'new'; }
 
 /* ── 연락처 합치기: 사람이 손으로 적은 것(marks.contact)이 서버가 찾은 것(info)보다 앞선다 ── */
+/* 포괄금지명령 공고일 — 이력(events)에서 찾고, 없으면 처음 공고일 */
+function pgmDate(n){
+  var e=(n.events||[]).filter(function(x){ return /포괄적\s*금지명령/.test(x.t); })[0];
+  return (e&&e.d)||n.noticeDate||'';
+}
+/* 대표자 — 직접 적은 것 → 홈페이지에서 읽은 것 → 기업정보함·이알피. 법원 공고에는 대표자가 없다 */
+function ceoOf(id){
+  var m=(MARKS[id]&&MARKS[id].contact)||{}, i=INFO[id]||{}, k=MATCH[id]||{};
+  if(m.ceo) return {name:m.ceo, src:'직접 입력'};
+  if(i.ceo) return {name:i.ceo, src:'홈페이지'};
+  if(k.ceo) return {name:k.ceo, src:'기업정보함·이알피'+(k.level==='weak'?' (후보)':'')};
+  return {name:'', src:''};
+}
+function tradeBadge(id){
+  var b=MATCH[id]?RehabMatch.badge(MATCH[id]):null; if(!b) return '';
+  var cls={client:'c-green',past:'c-gray',cards:'c-blue',weak:'c-amber'}[b.kind]||'c-gray';
+  return '<span class="chip '+cls+'" style="margin-left:0" title="'+(b.strong?'이름과 지역이 같습니다':'이름만 같은 후보입니다 — 확인하세요')+'">'+(b.kind==='client'?'🤝 ':b.kind==='cards'?'📇 ':'')+esc(b.text)+'</span>';
+}
 function contactOf(id){
   var i=INFO[id]||{}, m=(MARKS[id]&&MARKS[id].contact)||{};
   var phones=uniq([m.phone].concat(i.phones||[]));
@@ -284,7 +316,7 @@ function contactOf(id){
 /* ═══ 거르기·정렬 ═══ */
 function baseList(){
   var days=Number($('fDays').value), court=$('fCourt').value, sido=$('fSido').value, type=$('fType').value, stage=$('fStage').value,
-      ct=$('fContact').value, q=$('fText').value.trim().toLowerCase(), since=days?daysAgo(days):'';
+      ct=$('fContact').value, tr=$('fTrade').value, q=$('fText').value.trim().toLowerCase(), since=days?daysAgo(days):'';
   return Object.keys(NOTICES).map(function(k){ return NOTICES[k]; }).filter(function(n){
     if(!n || n._deleted) return false;
     if(since && (n.noticeDate||'')<since) return false;
@@ -293,7 +325,8 @@ function baseList(){
     if(type && n.caseType!==type) return false;
     if(stage && n.stage!==stage) return false;
     if(ct){ var c=contactOf(n.id); if(ct==='has' && !c.any) return false; if(ct==='none' && c.any) return false; if(ct==='check' && !c.check) return false; }
-    if(q && ((n.debtorName||'')+' '+(n.address||'')+' '+(n.counsel||'')+' '+(n.dlvAddress||'')).toLowerCase().indexOf(q)<0) return false;
+    if(tr){ var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(tr==='client' && !(b&&b.kind==='client')) return false; if(tr==='cards' && !(b&&b.kind==='cards')) return false; if(tr==='any' && !b) return false; if(tr==='none' && b) return false; }
+    if(q && ((n.debtorName||'')+' '+(n.address||'')+' '+(n.counsel||'')+' '+(n.dlvAddress||'')+' '+ceoOf(n.id).name).toLowerCase().indexOf(q)<0) return false;
     return true;
   });
 }
@@ -303,6 +336,7 @@ function sortList(list){
     if(s==='name') return (a.debtorName||'').localeCompare(b.debtorName||'','ko');
     if(s==='region') return ((a.sido||'')+(a.sigungu||'')).localeCompare((b.sido||'')+(b.sigungu||''),'ko') || (b.noticeDate||'').localeCompare(a.noticeDate||'');
     if(s==='contact'){ var d=(contactOf(b.id).any?1:0)-(contactOf(a.id).any?1:0); if(d) return d; }
+    if(s==='trade'){ var t=(MATCH[b.id]&&RehabMatch.badge(MATCH[b.id])?1:0)-(MATCH[a.id]&&RehabMatch.badge(MATCH[a.id])?1:0); if(t) return t; }
     return (b.noticeDate||'').localeCompare(a.noticeDate||'') || (a.courtName||'').localeCompare(b.courtName||'');
   });
 }
@@ -326,11 +360,14 @@ function draw(){
   VIEW=sortList(base.filter(function(n){ return TAB==='all' || statusOf(n.id)===TAB; }));
   var html=VIEW.map(function(n,i){
     var st=statusOf(n.id), c=contactOf(n.id);
+    var ce=ceoOf(n.id);
     return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
       '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
-      '<td class="no">'+(i+1)+'</td><td>'+esc((n.noticeDate||'').slice(5))+'</td>'+
+      '<td class="no">'+(i+1)+'</td><td><span class="chip pgm" style="margin-left:0" title="포괄적 금지명령 공고일">포괄금지명령 '+esc(pgmDate(n).slice(5))+'</span></td>'+
       '<td class="co" title="'+esc(n.debtorName)+'">'+esc(n.debtorName)+'<span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></td>'+
-      '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc((n.courtName||'').replace('지방법원','지법'))+'</td><td>'+esc(n.caseNo)+'</td>'+
+      '<td class="ceo" title="'+esc(ce.src)+'">'+(ce.name?esc(ce.name):'<span style="color:var(--line2)">—</span>')+'</td>'+
+      '<td>'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
+      '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc(courtShort(n)+' '+n.caseNo)+'</td>'+
       '<td><span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span></td>'+
       '<td class="ct">'+iconsOf(c)+(c.check?'<span class="chip c-amber" title="확인 필요">⚠</span>':'')+'</td>'+
       '<td><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td></tr>';
@@ -386,8 +423,9 @@ function drawDetail(){
   var addrQ=encodeURIComponent(n.address||''), nameQ=encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim()+' '+(n.sigungu||''));
   var h='<button class="sm close dclose" onclick="closeDetail()">닫기</button>';
   h+='<h2>'+esc(n.debtorName)+'</h2>';
-  h+='<div class="meta"><span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div>';
-  h+='<dl class="kv"><dt>법원</dt><dd>'+esc(n.courtName)+(n.division?' · '+esc(n.division):'')+'</dd><dt>사건번호</dt><dd>'+esc(n.caseNo)+'</dd><dt>공고일</dt><dd>'+esc(n.noticeDate)+' · '+esc(n.noticeTitle)+'</dd></dl>';
+  h+='<div class="meta"><span class="chip pgm" style="margin-left:0">포괄금지명령 '+esc(pgmDate(n))+'</span> <span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'">현재 '+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div>';
+  var ce=ceoOf(n.id);
+  h+='<dl class="kv"><dt>대표자</dt><dd>'+(ce.name?'<b>'+esc(ce.name)+'</b> <span style="color:var(--mute);font-size:11.5px">'+esc(ce.src)+'</span>':'<span style="color:var(--mute)">확인 전 — 법원 공고에는 대표자가 없습니다. 아래 「사업자번호 조회」·인터넷등기소에서 확인해 입력하세요.</span>')+'</dd><dt>법원</dt><dd>'+esc(n.courtName)+(n.division?' · '+esc(n.division):'')+'</dd><dt>사건번호</dt><dd>'+esc(n.caseNo)+'</dd><dt>공고일</dt><dd>'+esc(n.noticeDate)+' · '+esc(n.noticeTitle)+'</dd></dl>';
 
   h+='<div class="sec"><h3>본점 주소 <span class="sp"></span>'+copyBtn((n.zip?'('+n.zip+') ':'')+(n.address||''))+'</h3>';
   h+='<div style="font-size:13px;line-height:1.5">'+(n.zip?'('+esc(n.zip)+') ':'')+esc(n.address)+'</div>';
@@ -396,6 +434,7 @@ function drawDetail(){
   }
   h+='</div>';
 
+  h+=tradeSection(n);
   h+='<div class="sec"><h3>연락처 <span class="sp"></span><button class="sm" onclick="findContacts(false,\''+esc(n.id)+'\')">🔎 '+(c.searched?'다시 찾기':'찾기')+'</button></h3>';
   function line(lab,list,link){
     var v=list.length ? list.map(function(x){ return link? '<a href="'+esc(safeHref(x))+'" target="_blank" rel="noopener noreferrer">'+esc(x.replace(/^https?:\/\//,'').replace(/\/$/,''))+'</a>' : esc(x); }).join(' / ') : '<span class="none">찾지 못함</span>';
@@ -412,6 +451,7 @@ function drawDetail(){
   h+='</div>';
 
   h+='<div class="sec"><h3>직접 확인하고 고치기</h3><div class="f">'+
+    '<span>대표자</span><input id="mcCeo" value="'+esc(mc.ceo||'')+'" placeholder="홍길동">'+
     '<span>전화</span><input id="mcPhone" value="'+esc(mc.phone||'')+'" placeholder="02-000-0000">'+
     '<span>팩스</span><input id="mcFax" value="'+esc(mc.fax||'')+'" placeholder="02-000-0000">'+
     '<span>이메일</span><input id="mcEmail" value="'+esc(mc.email||'')+'" placeholder="name@company.co.kr">'+
@@ -432,11 +472,67 @@ function drawDetail(){
   var ev=n.events||[];
   if(ev.length){ h+='<div class="sec"><h3>사건 진행 이력</h3><ul class="tl">'+ev.map(function(e){ return '<li><span class="d">'+esc(e.d.slice(5))+'</span><span>'+esc(e.t)+'</span></li>'; }).join('')+'</ul></div>'; }
 
+  h+='<div class="sec"><h3>홍보양식 (안내문) <span class="sp"></span><button class="sm" onclick="printOne(\'letters\')">🖨 인쇄·PDF</button></h3>'+
+    '<details class="prev"'+(PREV_OPEN?' open':'')+' ontoggle="previewToggle(this)"><summary>'+esc(n.debtorName)+' 앞 안내문 미리보기</summary>'+
+    (PREV_OPEN?'<iframe sandbox="" srcdoc="'+esc(RehabLetter.buildDocument([withCeo(n)],'letters',{noPrint:true,draft:true}))+'"></iframe>':'')+'</details>'+
+    '<div style="font-size:11.5px;color:var(--mute);margin-top:4px">우편으로 보낼 때는 이 안내문을 인쇄하고, 메일로 보낼 때는 인쇄창에서 PDF로 저장해 푸른 메일에 첨부하세요.</div></div>';
   h+='<div class="sec"><h3>상태</h3><div class="st-btns">'+['new','send','hold','skip','sent'].map(function(k){
     return '<button class="sm'+(st===k?' on':'')+'" onclick="setStatus(\''+esc(n.id)+'\',\''+k+'\')">'+STATUS[k]+'</button>'; }).join('')+'</div>'+
     '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="sm" onclick="printOne(\'both\')">🖨 이 회사 안내문 + 라벨</button><button class="sm" onclick="printOne(\'letters\')">안내문만</button></div></div>';
   el.innerHTML=h;
 }
+var PREV_OPEN=false;
+/* 미리보기를 펼칠 때 그 자리에서 문서를 만든다 — 패널을 다시 그리면 적던 칸이 지워진다 */
+function previewToggle(d){ PREV_OPEN=d.open; if(d.open && !d.querySelector('iframe') && NOTICES[CUR]){ var f=document.createElement('iframe'); f.setAttribute('sandbox',''); f.srcdoc=RehabLetter.buildDocument([withCeo(NOTICES[CUR])],'letters',{noPrint:true,draft:true}); d.appendChild(f); } }
+function courtShort(n){ return String(n.courtName||'').replace('지방법원','지법').replace(/법원$/,''); }
+function withCeo(n){ return Object.assign({}, n, { ceoName: ceoOf(n.id).name }); }
+var SRC_NAME={erp:'이알피 업체관리',contract:'이알피 계약',biz:'기업정보함 사업자등록증',card:'기업정보함 명함'};
+/* 우리 자료에 이 회사가 있나 — 계약·거래, 기업정보함, 그리고 «메일을 어떻게 보낼지» */
+function tradeSection(n){
+  var m=MATCH[n.id], h='<div class="sec"><h3>푸른노무법인 거래·기업정보함</h3>';
+  if(!IDX){ return h+'<div style="font-size:12px;color:var(--mute)">'+(LINKNOTE||'불러오는 중…')+'</div></div>'; }
+  if(!m || m.level==='none'){
+    return h+'<div style="font-size:12.5px;color:var(--ink2)">이알피 업체·계약, 기업정보함에서 같은 이름의 회사를 찾지 못했습니다.</div>'+
+      '<div class="route post">📮 우편으로 안내합니다. (이메일은 사전 동의가 없어 보내지 않습니다)</div>'+(LINKNOTE?'<div style="font-size:11.5px;color:var(--mute)">'+esc(LINKNOTE)+'</div>':'')+'</div>';
+  }
+  var b=RehabMatch.badge(m);
+  h+='<div class="meta" style="margin-bottom:4px">'+tradeBadge(n.id)+' <span style="font-size:12px;color:var(--mute)">'+(m.level==='strong'?'이름과 지역이 같아 같은 회사로 봅니다':'이름만 같습니다 — 같은 회사인지 확인하세요')+'</span></div>';
+  h+='<ul class="tl" style="margin-bottom:4px">'+m.hits.slice(0,6).map(function(x){
+    var st=x.src==='erp'?(x.closed?'닫힘':'업체관리중'):x.src==='contract'?(x.active?'진행 계약':'끝난 계약'):'';
+    return '<li><span style="width:130px;flex:none;color:var(--mute)">'+esc(SRC_NAME[x.src]||x.src)+'</span><span>'+esc(x.name)+(st?' · '+st:'')+(x.person?' · '+esc(x.person)+(x.title?' '+esc(x.title):''):'')+(x.ceo?' · 대표 '+esc(x.ceo):'')+(x.address?'<br><span style="color:var(--mute);font-size:11.5px">'+esc(x.address)+(x.strong?' ✔ 같은 지역':'')+'</span>':'')+'</span></li>';
+  }).join('')+(m.hits.length>6?'<li><span></span><span>… 외 '+(m.hits.length-6)+'건</span></li>':'')+'</ul>';
+  var trade=m.emails.filter(function(e){ return e.trade; }), other=m.emails.filter(function(e){ return !e.trade; });
+  if(m.emails.length){
+    h+='<div class="mails">'+m.emails.map(function(e){
+      return '<div class="m"><span class="em">'+esc(e.email)+'</span><span class="chip '+(e.trade?'c-green':'c-gray')+'" style="margin-left:0">'+(e.trade?'거래':SRC_NAME[e.src]||'')+'</span>'+(e.who?'<span style="color:var(--mute);font-size:12px">'+esc(e.who)+'</span>':'')+
+        '<button class="sm" data-copy="'+esc(e.email)+'">복사</button><button class="sm pri" onclick="mailTo(\''+esc(n.id)+'\',\''+esc(e.email)+'\')">푸른 메일로 쓰기</button></div>';
+    }).join('')+'</div>';
+    if(trade.length && m.level==='strong') h+='<div class="route mail">✉ <b>이미 거래·연결된 곳</b>입니다 — 푸른 메일로 안내문을 보냅니다. 「푸른 메일로 쓰기」를 누르면 받는 사람·제목·본문이 채워진 쓰기 창이 열리고, <b>보내기는 직접</b> 누릅니다.</div>';
+    else if(trade.length) h+='<div class="route ask">같은 이름의 거래처가 있습니다(이름만 같음). 같은 회사인지 확인한 뒤 메일을 쓰세요. 아니면 우편으로 안내합니다.</div>';
+    else h+='<div class="route ask">명함·사업자등록증에만 있는 주소입니다. 영리 목적 광고성 메일은 <b>받는 사람의 사전 동의</b>가 있어야 하므로(정보통신망법 제50조) 동의 여부를 확인한 뒤 보내고, 모르면 우편으로 안내합니다.</div>';
+  }else{
+    h+='<div class="route post">📮 기업정보함·이알피에 이메일이 없습니다 — 우편으로 안내합니다.</div>';
+  }
+  return h+'</div>';
+}
+/* 푸른 메일 쓰기 창을 «채워서» 연다 — 보내기는 사람이 누른다. 주소줄이 길면 서버가 거절하므로 본문은 짧은 판을 쓴다 */
+function mailTo(id, email){
+  var n=NOTICES[id], m=MATCH[id]||{};
+  var body=RehabLetter.buildMailBody(withCeo(n), { ceo:ceoOf(id).name, existing:!!(m.client||m.contract) });
+  var url='pu-cards.html?view=mail&to='+encodeURIComponent(email)+'&name='+encodeURIComponent(n.debtorName)+'&subject='+encodeURIComponent(RehabLetter.MAIL_SUBJECT)+'&body='+encodeURIComponent(body);
+  if(url.length>7000){ toast('본문이 길어 메일에 다 못 담습니다 — 안내문을 PDF로 저장해 첨부하세요'); }
+  window.open(url,'puMailWrite');
+}
+/* 이알피 업체·계약, 기업정보함 색인을 «읽기만» 한다 — 하나가 막혀도 나머지로 이어 간다 */
+async function loadLinks(){
+  var names=['이알피 업체','이알피 계약','기업정보함'], fail=[];
+  var res=await Promise.allSettled([fbDb.ref('data/companies/v').once('value'), fbDb.ref('data/contracts/v').once('value'), fbDb.ref('pucards/idx').once('value')]);
+  var v=res.map(function(r,i){ if(r.status==='fulfilled') return r.value.val(); fail.push(names[i]); return null; });
+  IDX=RehabMatch.buildIndex({ erpCompanies:v[0], erpContracts:v[1], cardsIdx:v[2] });
+  LINKNOTE=fail.length?('읽지 못한 자료: '+fail.join('·')):'';
+  recomputeMatch(); draw();
+}
+function recomputeMatch(){ MATCH={}; if(!IDX) return; Object.keys(NOTICES).forEach(function(id){ MATCH[id]=RehabMatch.matchNotice(NOTICES[id], IDX); }); }
 function openDetail(id){ CUR=id; drawDetail(); $('detail').classList.add('open'); var rows=$('rows').children; for(var i=0;i<rows.length;i++) rows[i].classList.toggle('cur', rows[i].getAttribute('data-id')===id); }
 function closeDetail(){ $('detail').classList.remove('open'); }
 
@@ -464,7 +560,7 @@ async function bulk(st){
 }
 async function saveManual(){
   if(!CUR) return;
-  var c={ phone:$('mcPhone').value.trim(), fax:$('mcFax').value.trim(), email:$('mcEmail').value.trim(), homepage:$('mcHome').value.trim() };
+  var c={ ceo:$('mcCeo').value.trim(), phone:$('mcPhone').value.trim(), fax:$('mcFax').value.trim(), email:$('mcEmail').value.trim(), homepage:$('mcHome').value.trim() };
   if(c.homepage && !safeHref(c.homepage)){ toast('홈페이지는 https:// 로 시작해야 합니다'); return; }
   var memo=$('mcMemo').value.trim().slice(0,500);
   try{ await saveMark(CUR, function(){ return { contact:c, memo:memo }; }); await loadMarks(); draw(); toast('저장했습니다'); }
@@ -517,16 +613,17 @@ function printList(list, what){
   if(!list.length) return;
   var w=window.open('', '_blank');
   if(!w){ toast('팝업이 막혀 있습니다 — 이 사이트의 팝업을 허용해 주세요'); return; }
-  w.document.write(RehabLetter.buildDocument(list, what, { draft: $('draftCk') ? $('draftCk').checked : true })); w.document.close();
+  w.document.write(RehabLetter.buildDocument(list.map(withCeo), what, { draft: $('draftCk') ? $('draftCk').checked : true })); w.document.close();
 }
 function printDocs(what){ printList(VIEW.filter(function(n){ return SEL[n.id]; }), what); }
 function printOne(what){ var n=NOTICES[CUR]; if(n) printList([n], what); }
 function downloadCsv(){
   var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
-  var head=['공고일','법원','사건번호','종류','단계','회사명','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','홈페이지','상태','메모'];
+  var head=['포괄금지명령일','법원','사건번호','종류','단계','회사명','대표자','거래·연결','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','우리 자료의 메일','홈페이지','상태','메모'];
   var q=function(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   var body=list.map(function(n){ var c=contactOf(n.id), m=MARKS[n.id]||{};
-    return [n.noticeDate,n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),c.homepage,STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
+    var bd=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null, own=((MATCH[n.id]||{}).emails||[]).map(function(e){ return e.email; });
+    return [pgmDate(n),n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,ceoOf(n.id).name,bd?bd.text:'',n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),own.join(' / '),c.homepage,STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
   var blob=new Blob(['﻿'+[head.join(',')].concat(body).join('\r\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_'+seoulToday()+'_'+list.length+'곳.csv';
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
@@ -538,10 +635,11 @@ async function reload(){
     var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(), loadInfo(), fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
     NOTICES=r[0].val()||{};
     var runs=r[3].val()||{}, k=Object.keys(runs).pop(); LASTRUN=k?Object.assign({date:k},runs[k]):null;
-    fillFilters(); draw();
+    fillFilters(); recomputeMatch(); draw();
+    loadLinks();
   }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
 }
-function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fSort').value='date'; $('fText').value=''; TAB='all'; draw(); }
+function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fSort').value='date'; $('fText').value=''; TAB='all'; draw(); }
 function clearSel(){ SEL={}; draw(); }
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
@@ -555,7 +653,7 @@ function copyText(t){
   toast('복사했습니다');
 }
 function boot(){
-  ['fDays','fCourt','fSido','fType','fStage','fContact','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
+  ['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
   $('fText').addEventListener('input',draw);
   $('tabs').addEventListener('click',function(e){ var t=e.target.closest('.tab'); if(!t) return; TAB=t.getAttribute('data-tab'); draw(); });
   $('rows').addEventListener('click',function(e){

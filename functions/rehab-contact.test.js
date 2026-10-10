@@ -182,3 +182,18 @@ test("⑰ 카카오 공급자 — 열쇠는 머리글에만, 응답을 같은 �
   const bad = C.kakaoProviders({ key: "SECRET", fetchFn: async () => ({ ok: false, status: 403, json: async () => ({}) }) });
   await assert.rejects(() => bad.local("가나"), (e) => e.status === 403 && e.message.indexOf("SECRET") < 0);
 });
+test("⑱ 대표자 — 「대표이사 홍길동」꼴만 읽고, 인사말·전화 같은 낱말은 이름이 아니다", () => {
+  assert.equal(C.findCeo("회사명 (주)가나 대표이사 : 홍길동 사업자등록번호 123"), "홍길동");
+  assert.equal(C.findCeo("대표자명 김철수 | TEL 02-111-2222"), "김철수");
+  assert.equal(C.findCeo("CEO 박영희"), "박영희");
+  assert.equal(C.findCeo("대표이사 인사말 안녕하십니까"), "", "인사말은 이름이 아니다");
+  assert.equal(C.findCeo("대표 전화 02-123-4567"), "");
+  assert.equal(C.findCeo("대표이사 꿈꾸는"), "", "성씨로 시작하지 않으면 버린다");
+  assert.equal(C.findCeo(""), "");
+});
+
+test("⑲ 홈페이지를 읽으면 대표자도 함께 담는다", async () => {
+  const r = await C.lookup({ name: "주식회사 가나", address: "서울 서초구", hint: { homepage: "https://www.gana.co.kr" },
+    getPage: async (u) => ({ url: new URL(u).toString(), html: "<p>(주)가나 서울 서초구 대표이사 홍길동 TEL 02-1234-5678</p>" }) });
+  assert.equal(r.ceo, "홍길동");
+});

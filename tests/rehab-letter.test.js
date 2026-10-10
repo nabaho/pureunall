@@ -51,3 +51,35 @@ test('⑥ 문서 한 통 — 안내문은 회사마다 한 쪽, 인쇄 창을 �
   assert.match(d, /<title>안내문과 라벨 2곳<\/title>/);
   assert.ok(!/class="sheet"/.test(L.buildDocument([co('가')], 'letters')));
 });
+
+test('⑦ 메일 본문(글자 판) — 회사명·대표자·비용·수신거부, 거래 관계면 첫 인사가 다르다', () => {
+  const p = L.buildPlainText(co('주식회사 가나'), { ceo: '홍길동' });
+  assert.match(p, /^주식회사 가나 홍길동 대표이사님께/);
+  assert.match(p, /기업 자부담 10% \+ 부가가치세/);
+  assert.match(p, /120만원 → 기업 자부담 12만원 \+ 부가가치세 12만원/);
+  assert.match(p, /원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다/);
+  assert.ok(!/평소 .*거래해 주셔서/.test(p));
+  assert.match(L.buildPlainText(co('주식회사 가나'), { existing: true }), /평소 푸른노무법인과 거래해 주셔서 감사드립니다/);
+  assert.ok(!/<[a-z]+/.test(p), '글자 판에 태그가 섞이면 안 된다');
+  assert.match(L.MAIL_SUBJECT, /회생절차 중 근로자 임금·고용 및 재기컨설팅 안내/);
+});
+
+test('⑧ 화면 안 미리보기는 인쇄 창을 부르지 않는다(noPrint)', () => {
+  const d = L.buildDocument([co('가')], 'letters', { noPrint: true });
+  assert.ok(!/window\.print/.test(d));
+  assert.match(d, /class="letter"/);
+});
+test('⑨ 대표자 이름을 알면 안내문·라벨에 넣는다', () => {
+  assert.match(L.buildLetter(co('주식회사 가나', { ceoName: '홍길동' })), /주식회사 가나 홍길동 대표이사님 귀하/);
+  assert.match(L.buildLabel(co('주식회사 가나', { ceoName: '홍길동' })), /대표이사 홍길동 님 앞/);
+  assert.match(L.buildLabel(co('주식회사 가나')), /대표이사님 앞/);
+});
+
+test('⑩ 메일 쓰기 창에 주소줄로 넣는 본문은 짧다 — 인코딩해도 7000자 안', () => {
+  const body = L.buildMailBody(co('주식회사 아주아주긴회사이름이름이름 가나다'), { ceo: '홍길동', existing: true });
+  const url = 'pu-cards.html?view=mail&to=' + encodeURIComponent('someone@company.co.kr') + '&name=' + encodeURIComponent('주식회사 아주아주긴회사이름이름이름 가나다') +
+    '&subject=' + encodeURIComponent(L.MAIL_SUBJECT) + '&body=' + encodeURIComponent(body);
+  assert.ok(url.length < 7000, '주소줄이 너무 길다: ' + url.length);
+  assert.match(body, /평소 거래해 주셔서/);
+  assert.match(body, /원하지 않으시면 알려 주십시오/);
+});

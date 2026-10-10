@@ -163,6 +163,22 @@ async function fetchPage(url, { fetchFn = fetch, timeoutMs = PAGE_TIMEOUT_MS } =
   throw new Error("주소를 읽을 수 없음");
 }
 
+/* ─── 대표자 ─── 홈페이지 글에서 「대표이사 홍길동」「대표자 : 홍길동」꼴만 읽는다.
+   ⚠ 법원 공고에는 대표자가 없다(금지명령·개시결정 공고 본문이 비어 있다 — 2026-10-10 확인). 홈페이지 표기가 «있을 때만» 적는다.
+   ⚠ 「대표이사 인사말」「대표 전화」 같은 말이 이름으로 읽히지 않게 — 성씨로 시작하는 2~4글자만 받고, 흔한 낱말은 뺀다. */
+const SURNAMES = "김이박최정강조윤장임한오서신권황안송류전홍고문양손배백허유남심노하곽성차주우구민나진지엄채원천방공현함변염여추도소석선설마길연위표명기반왕금옥육인맹제모탁국어은편용예경봉사부가갈감견계골공곡궁";
+const CEO_STOP = /^(인사말|소개|메시지|이사|전화|번호|연락처|주소|이름|성명|대표|사장|회장|님|명의|직인|취급|관리|사업|등록|소재|본점|업무|보유|제품|서비스|이메일|팩스|사무|모집|채용|문의|안내|환영|말씀|이력|약력)/;
+function findCeo(text) {
+  const t = String(text || "");
+  const re = /(?:대표\s*이사|대표\s*자명?|대표\s*원장|대표\s*[:：]|CEO|C\.E\.O|대\s*표)\s*[:：]?\s*([가-힣]{2,4})(?![가-힣])/g;
+  let m;
+  while ((m = re.exec(t))) {
+    const n = m[1];
+    if (SURNAMES.indexOf(n[0]) < 0 || CEO_STOP.test(n)) continue;
+    return n;
+  }
+  return "";
+}
 /* ─── 이름 맞추기 ─── */
 function coreName(name) {
   return clean(String(name || "").replace(/\((주|유|사|재|합)\)|㈜|주식회사|유한회사|유한책임회사|합자회사|합명회사/g, " "));
@@ -225,7 +241,7 @@ function naverProviders({ id, secret, fetchFn = fetch, timeoutMs = 10000 }) {
    확신: high = 업체·웹검색에서 «이름과 주소가 함께» 맞음 · medium = 홈페이지 안에 회사명이 있음 · low 는 버린다 */
 async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs = Date.now(), wait = () => Promise.resolve() }) {
   const out = { status: "none", confidence: "", homepage: "", phone: "", fax: "", email: "", phones: [], faxes: [], emails: [],
-    refs: [], sources: [], note: "", checkedAt: nowMs };
+    refs: [], sources: [], note: "", ceo: "", checkedAt: nowMs };
   const core = coreName(name);
   if (M.normName(name).length < 2) { out.note = "회사명이 짧아 찾지 않음"; return out; }
   const key = addrKey(address);
@@ -296,6 +312,7 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
         ph.faxes.forEach((p) => addUniq(faxes, p));
         if (!ph.phones.length && !phones.length) ph.loose.slice(0, 2).forEach((p) => addUniq(phones, p));
         rankEmails(findEmails(pages.map((p) => p.html).join("\n") + "\n" + text), hostOf(home)).slice(0, 4).forEach((e) => addUniq(mails, e));
+        out.ceo = findCeo(text);
         out.sources.push("홈페이지 읽음 " + pages.length + "쪽");
       }
     } catch (e) { note.push("홈페이지 열기 실패(" + clean(e && e.message).slice(0, 40) + ")"); }
@@ -312,4 +329,4 @@ async function lookup({ name, address, providers = {}, hint = {}, getPage, nowMs
 }
 
 module.exports = { safeUrl, hostOf, classifyLink, normPhone, findPhones, findEmails, rankEmails, htmlToText, contactLinks,
-  decodeBody, fetchPage, coreName, addrKey, addrHas, kakaoProviders, naverProviders, lookup, PAGE_TIMEOUT_MS };
+  decodeBody, fetchPage, coreName, findCeo, addrKey, addrHas, kakaoProviders, naverProviders, lookup, PAGE_TIMEOUT_MS };

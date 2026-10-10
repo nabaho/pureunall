@@ -43,7 +43,7 @@
     var share = Math.round(COST.exampleFee * COST.share) / 100;
     return '<section class="letter">' +
       '<h1>회생절차를 진행하는 기업을 위한 노무·재기 지원 안내</h1>' +
-      '<p class="to">' + esc(coName(c)) + ' 대표이사님 귀하</p>' +
+      '<p class="to">' + esc(coName(c)) + (c && c.ceoName ? ' ' + esc(c.ceoName) : '') + ' 대표이사님 귀하</p>' +
       '<p>안녕하십니까. ' + esc(FIRM.name) + '입니다.<br>' +
       '법원 공고를 통해 귀사가 회생절차를 신청하신 것을 알게 되어, 이 시기에 꼭 챙기셔야 할 <b>근로자 임금·고용 문제</b>와 <b>정부 재기 지원</b>을 안내드립니다.</p>' +
       '<h2>1. 회생 중 꼭 챙겨야 할 노무 사항</h2>' +
@@ -73,11 +73,68 @@
       '</section>';
   }
 
+  /* 메일 본문(글자 판) — 푸른 메일 쓰기 창에 «본문»으로 넣는다. 같은 내용을 글자로만.
+     ⚠ 첨부는 URL 로 넘길 수 없다 — 본문에 안내문 내용이 그대로 들어가므로 첨부 없이도 읽힌다.
+     opts.existing — 이미 거래·연결된 곳이면 첫 인사를 달리한다. opts.ceo — 대표자 이름을 알면 「○○○ 대표이사님」 */
+  var MAIL_SUBJECT = '[' + FIRM.name + '] 회생절차 중 근로자 임금·고용 및 재기컨설팅 안내';
+  function buildPlainText(c, opts) {
+    opts = opts || {};
+    var share = Math.round(COST.exampleFee * COST.share) / 100;
+    var to = coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께';
+    return [
+      to, '',
+      '안녕하십니까. ' + FIRM.name + '입니다.',
+      opts.existing ? '평소 ' + FIRM.name + '과 거래해 주셔서 감사드립니다.' : '',
+      '법원 공고를 통해 귀사가 회생절차를 신청하신 것을 알게 되어, 이 시기에 꼭 챙기셔야 할 근로자 임금·고용 문제와 정부 재기 지원을 안내드립니다.',
+      '',
+      '1. 회생 중 꼭 챙겨야 할 노무 사항',
+      '- 임금·퇴직금은 «공익채권»입니다. 회생절차에 의하지 않고 수시로 갚아야 하므로 지급 계획을 회생계획과 함께 세워야 합니다. (채무자회생법 제179조 제1항 제10호·제180조)',
+      '- 체불 근로자는 「대지급금」을 신청할 수 있습니다. 회생절차개시결정이 지급 사유입니다. (임금채권보장법 제7조 제1항)',
+      '- 인력 조정은 법정 절차를 지켜야 합니다. 경영상 해고는 해고 회피 노력·공정한 대상자 선정·50일 전 근로자대표 통보·협의가 필요하고, 근로조건 불이익 변경은 동의 절차가 필요합니다. (근로기준법 제24조·제94조)',
+      '',
+      '2. 정부 지원 — 중소벤처기업진흥공단 「재기컨설팅」',
+      '위기에 놓인 중소기업에 진로제시(회생조기진입 등)·사업정리·재창업·회생 컨설팅을 정부가 바우처로 지원합니다. ' + FIRM.name + '은 2026년 재기컨설팅(사업정리) 공급기업으로 선정되었습니다(사업정리의 노무 분야 — 임금·고용관계 정리, 근로자 대지급금 안내).',
+      '- 진로제시·사업정리·재창업 컨설팅: 정부 지원 ' + COST.support + '% / 기업 자부담 ' + COST.share + '% + 부가가치세',
+      '- 회생컨설팅(자산 50억원 이하·간이회생): 정부 지원 ' + COST.support + '% / 기업 자부담 ' + COST.share + '% + 부가가치세',
+      '- 회생컨설팅(자산 50억원 초과): 자산 규모에 따라 차등',
+      '예) 사업정리 노무 컨설팅 ' + COST.exampleFee + '만원 → 기업 자부담 ' + share + '만원 + 부가가치세 ' + share + '만원. 비율·한도·신청 자격은 해당 연도 공고에 따라 달라질 수 있어 신청 가능 여부와 함께 확인해 드립니다. (' + COST.basis + ' 기준)',
+      '',
+      '3. ' + FIRM.name + '이 도와드리는 일',
+      '- 임금·퇴직금 지급 계획과 체불 정리 자문 · 근로자 대지급금 신청 지원(도산등사실인정·대지급금 수행 경험)',
+      '- 회생계획에 맞춘 고용조정 절차 설계 · 사업정리·재창업 단계 노무 정리와 재기컨설팅 연계',
+      '',
+      '상담을 원하시면 연락 주십시오. 공인노무사가 직접 상담합니다.',
+      FIRM.name + ' · 전화 ' + FIRM.tel + ' · 이메일 ' + FIRM.email,
+      FIRM.addr,
+      FIRM.name + ' ' + FIRM.rep,
+      '',
+      '※ 법원 회생 공고를 보고 드리는 안내입니다. 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'
+    ].filter(function (x, i, a) { return x !== '' || (a[i - 1] !== '' && i > 0); }).join('\n');
+  }
+  /* 푸른 메일 쓰기 창을 «주소줄로» 채울 때 쓰는 짧은 본문 — 주소줄이 길면(약 8KB) 서버가 거절한다.
+     한글은 글자마다 9글자로 늘어나므로 본문을 600자 안팎으로 줄였다. 자세한 안내문은 PDF 로 저장해 첨부한다. */
+  function buildMailBody(c, opts) {
+    opts = opts || {};
+    return [
+      coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께',
+      '',
+      '안녕하십니까. ' + FIRM.name + '입니다.' + (opts.existing ? ' 평소 거래해 주셔서 감사드립니다.' : ''),
+      '법원 공고를 보고 회생절차 중 꼭 챙기실 근로자 임금·고용 사항과 정부 재기컨설팅 지원을 안내드립니다.',
+      '- 임금·퇴직금은 공익채권입니다(채무자회생법 제179조·제180조).',
+      '- 체불 근로자는 대지급금을 신청할 수 있습니다(임금채권보장법 제7조).',
+      '- 인력 조정은 법정 절차를 지켜야 합니다(근로기준법 제24조·제94조).',
+      '- 재기컨설팅(진로제시·사업정리): 정부 ' + COST.support + '% 지원, 기업 자부담 ' + COST.share + '% + 부가가치세(해당 연도 공고에 따름).',
+      '',
+      '상세 안내문은 첨부와 같습니다. 상담: ' + FIRM.tel + ' / ' + FIRM.email,
+      FIRM.name + ' ' + FIRM.rep,
+      '※ 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'
+    ].join('\n');
+  }
   /* 라벨 한 칸 — 본점 주소로 보낸다(송달주소는 대리인 사무실일 수 있다) */
   function buildLabel(c) {
     return '<div class="lb"><div class="zip">(우) ' + esc((c && c.zip) || '') + '</div>' +
       '<div class="ad">' + esc((c && c.address) || '') + '</div>' +
-      '<div class="to">' + esc(coName(c)) + ' 귀중</div><div class="ceo">대표이사님 앞</div></div>';
+      '<div class="to">' + esc(coName(c)) + ' 귀중</div><div class="ceo">' + (c && c.ceoName ? '대표이사 ' + esc(c.ceoName) + ' 님 앞' : '대표이사님 앞') + '</div></div>';
   }
 
   var CSS =
@@ -117,9 +174,9 @@
     var title = {letters: '안내문', labels: '우편 라벨', both: '안내문과 라벨'}[what] || '인쇄';
     return '<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><title>' + title + ' ' + (list || []).length + '곳</title>' +
       '<style>' + CSS + '</style></head><body>' + body +
-      '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script></body></html>';
+      (opts && opts.noPrint ? '' : '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>') + '</body></html>';
   }
 
-  return { FIRM: FIRM, COST: COST, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
+  return { FIRM: FIRM, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
     buildLabelSheets: buildLabelSheets, buildDocument: buildDocument, CSS: CSS };
 });

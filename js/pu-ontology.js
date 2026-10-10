@@ -172,7 +172,8 @@
        ⚠ 회사명(debtorName)은 «보이는 이름»일 뿐 관계 열쇠가 아니다 — 기업정보함과 이름으로 잇지 않는다(사업자번호가 없다).
        빌려 읽는 곳: uid_roles(관리자인지 확인). */
     rehabad:{ name:'회생광고', file:'rehab-ad.html', primaryRoots:['rehab_ad'],
-      sharedRoots:['uid_roles'],
+      /* 읽기만 — 법원 공고의 회사가 이미 거래·연결된 곳인지 알아본다(js/rehab-match.js). 이름으로 추정한 관계는 저장하지 않는다. */
+      sharedRoots:['uid_roles','data/companies','data/contracts','pucards/idx'],
       writeContracts:[{path:'rehab_ad/marks/{id}',entityType:'Task'}],
       entityTypes:['Document','Task'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
