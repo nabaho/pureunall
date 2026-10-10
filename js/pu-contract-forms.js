@@ -1107,7 +1107,7 @@
     + '.pcf-tsel{width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-family:inherit;background:#fff;color:#334155;font-weight:600}'
     + '.pcf-lp{width:330px;flex:none;display:flex;flex-direction:column;border:1px solid #e2e8f0;border-right:none;border-radius:8px 0 0 8px;background:#fff;min-height:0}'
     + '.pcf-cols.card .pcf-lp{width:auto;flex:1;border-right:1px solid #e2e8f0;border-radius:8px}'
-    + '.pcf-setnote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border-radius:6px;font-size:12px;color:#334155}.pcf-setnote .pcf-b{margin-left:auto}'
+    + '.pcf-setnote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:12px;color:#334155}.pcf-setnote .pcf-b{margin-left:auto}'
     + '.pcf-lh{padding:6px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;flex-direction:column;gap:5px}'
     + '.pcf-lhr{display:flex;gap:4px;align-items:center}.pcf-lhr .pcf-q{flex:1;min-width:0;max-width:none}'
     + '.pcf-lbody{flex:1;min-height:0;overflow-y:auto}.pcf-lbody .pcf-list{width:auto;border:none;height:auto;overflow:visible}'
@@ -3088,12 +3088,11 @@
       }
       var setNow = S.setView ? setById(S.setView) : null;
       if (setNow) {
-        var scol = setColor(setNow.id);
         return el('div', { 'class': 'pcf-lh' }, [
           el('div', { 'class': 'pcf-lhr' }, [q, el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
             chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
             chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
-          el('div', { 'class': 'pcf-setnote', style: 'border-left:4px solid ' + scol + ';background:' + scol + '14' }, [
+          el('div', { 'class': 'pcf-setnote' }, [
             el('b', { text: '📦 ' + setNow.name }), el('span', { text: ' — 이 세트의 서류 ' + (setViewList() || []).length + '개가 체크되어 있습니다' }),
             el('button', { type: 'button', 'class': 'pcf-b', text: '종류별로 보기', onclick: function () { pickKind(S.kind === '_closed' ? 'company' : S.kind); } })])]);
       }
