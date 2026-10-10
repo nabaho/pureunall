@@ -741,7 +741,7 @@ test('★★★ 인증키가 있고 한 번도 안 받았으면 탭을 여는 �
 });
 test('★★ 받은 적이 있으면 탭을 열어도 다시 안 받는다(하루 한 번 자동에 맡긴다) · 열쇠가 없으면 안 받는다', async () => {
   let n = 0;
-  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z' }); r.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-09T10:00:00Z', plan_since: '2026-10-09' }); r.api.setPull(async () => { n++; return PLAN_ENV([]); });
   r.api.setTab('plan'); await tickP(20);
   assert.equal(n, 0);
   const r2 = runApp({ feed: [] }); r2.api.setPull(async () => { n++; return PLAN_ENV([]); });
@@ -765,4 +765,23 @@ test('★★ 지금 받기를 두 번 눌러도 한 번만 · 받는 중엔 새�
   /* 다 받은 뒤에는 다시 받을 수 있어야 한다 — 문(_fetching)을 안 닫으면 그 뒤로 영영 안 받는다 */
   const before = calls; await r.api.planFetchNow(); assert.ok(calls > before, '받기가 끝났는데 다시 안 받는다');
   const before2 = calls; await r.api.fetchAll(); assert.ok(calls > before2, '새로 받기(전부)가 막혔다');
+});
+
+test('★★★ 승인 전에 한 번 실패했어도(받은 때는 있음) 한 번도 «다 받지» 못했으면 탭을 열 때 다시 받는다', async () => {
+  let n = 0;
+  const r = runApp({ feed: [], key_data: 'K', plan_at: '2026-10-10T01:18:04Z' });
+  r.api.setPull(async () => { n++; return PLAN_ENV([]); });
+  r.api.setTab('plan');
+  for (let i = 0; i < 100 && !r.store.gov3_plan_since; i++) await tickP(5);
+  assert.ok(n >= 1, '승인이 났는데 탭을 열어도 다시 안 받는다');
+  assert.match(r.store.gov3_plan_since || '', /^\d{4}-\d{2}-\d{2}$/);
+});
+test('★★ 실패 안내(plan_err)는 클라우드로 간다 — 열쇠는 안 들어 있다', async () => {
+  const S = require('../js/gov-sync.js');
+  assert.ok(S.field('plan_err'), 'plan_err 가 동기화 칸이 아니다');
+  const r = runApp({ feed: [], key_data: 'SECRET-KEY-123' });
+  r.api.setPull(async (u) => (/\/ao\//.test(u) ? { OpenAPI_ServiceResponse: { cmmMsgHeader: { errMsg: 'SERVICE_ACCESS_DENIED_ERROR', returnAuthMsg: '서비스 접근거부', returnReasonCode: '20' } } } : PLAN_ENV([])));
+  await r.api.fetchAll();
+  assert.match(r.store.gov3_plan_err, /\[코드 20 · 서비스 접근거부\]/);
+  assert.doesNotMatch(r.store.gov3_plan_err, /SECRET-KEY-123/);
 });

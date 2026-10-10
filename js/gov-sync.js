@@ -45,7 +45,9 @@
     { ls: 'plan',               path: 'plan',               kind: 'rows', idf: 'no' },
     { ls: 'plan_since',         path: 'plan_since',         kind: 'scalar' },
     { ls: 'spec_since',         path: 'spec_since',         kind: 'scalar' },
-    { ls: 'plan_at',            path: 'plan_at',            kind: 'scalar' }
+    { ls: 'plan_at',            path: 'plan_at',            kind: 'scalar' },
+    /* 받기 실패 안내(「발주계획: 아직 못 받습니다 … [코드 20 · 서비스 접근거부]」) — 원격으로 갈라 보려고. ⚠ 열쇠는 들어 있지 않다 */
+    { ls: 'plan_err',           path: 'plan_err',           kind: 'scalar' }
   ];
   var SV = 2;   /* 이 판의 쓰기 표 — 보안규칙이 이 값 이상만 받는다 */
   var byLs = {};
