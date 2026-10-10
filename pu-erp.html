@@ -65883,11 +65883,15 @@ function Certificate(){
     return function(){ window.clearTimeout(t); window.removeEventListener('resize', fit); };
   });
 
-  var users = getActiveUsers();
+  /* ★ 휴직자도 «재직» 중이다 — 근로관계가 이어진다. 예전에는 getActiveUsers(재직 'active' 만)만 보아
+       휴직자는 재직·퇴직 어느 목록에도 없어 재직증명서를 뗄 수 없었다 (2026-10-10 전수검토). */
+  var users = getActiveUsers().concat(sortUsers((dbGet('user_accounts', USERS_SEED)||[]).filter(function(x){
+    return x && x.status === 'leave';
+  })));
   var company = dbGet('company_info', { name:'푸른노무법인', ceo:'권형하', bizNum:'312-81-52792',
     addr:'충청남도 천안시 서북구 원두정8길 6', phone:'041-XXX-XXXX' });
 
-  var ks = useState('employment'); var kind = ks[0]; var setKind = ks[1];
+  var ks = useState('employment'); var kindPicked = ks[0]; var setKind = ks[1];
   var ss = useState(users[0] ? users[0].sid : ''); var sid = ss[0]; var setSid = ss[1];
   var ps = useState(''); var purpose = ps[0]; var setPurpose = ps[1];
   var ds = useState(todayYMD()); var issueDate = ds[0]; var setIssueDate = ds[1];
@@ -65907,6 +65911,12 @@ function Certificate(){
 
   var retiredUsers = sortUsers(dbGet('user_accounts', USERS_SEED).filter(function(x){return x.status==='retired';}));
   var u = users.concat(retiredUsers).find(function(x){return x.sid===sid;}) || users[0];
+  /* ★★ 퇴직자에게는 «재직증명서»를 내지 않는다 (2026-10-10 전수검토).
+       예전에는 퇴직자를 고르면 경력증명서로 바뀌기만 하고 다시 재직증명서로 돌릴 수 있었다 —
+       그러면 「재직기간 ~ 현재」가 찍힌 문서가 법인 직인과 함께 나갔다(허위 증명).
+       고르개만 막으면 다른 길(상태 바뀜·저장된 선택)로 샌다 — 그래서 «뽑는 값» 자체를 바꾼다. */
+  var isRetiredSel = !!(u && (u.status === 'retired' || (u.retireDate && u.retireDate <= todayYMD())));
+  var kind = (isRetiredSel && kindPicked === 'employment') ? 'career' : kindPicked;
   var kindLabel = (KINDS.find(function(k){return k.v===kind;})||{}).label;
 
   // 연봉 계산 (전년도 12개월 합계)
@@ -66116,7 +66126,8 @@ function Certificate(){
     // 증명 문구
     var statementText;
     if(kind === 'employment'){
-      statementText = '상기 자는 위와 같이 당 법인에 재직하였음을 증명함.';
+      /* 재직증명서는 «지금» 재직 중임을 증명한다 — 과거형(「재직하였음」)이 아니다 */
+      statementText = '상기 자는 위와 같이 당 법인에 재직하고 있음을 증명함.';
     } else if(kind === 'career'){
       statementText = u.retireDate
         ? '상기 자는 위와 같이 당 법인에 근무하였음을 증명함.'
@@ -66246,7 +66257,8 @@ function Certificate(){
               h('label', { style:{ fontSize:'10.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'2px' } }, '증명서 종류'),
               h('select', { value:kind, onChange:function(e){setKind(e.target.value);},
                 style:{ width:'100%', padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px' } },
-                KINDS.map(function(k){return h('option', { key:k.v, value:k.v }, k.label);})
+                KINDS.map(function(k){return h('option', { key:k.v, value:k.v,
+                  disabled: isRetiredSel && k.v === 'employment' }, k.label + (isRetiredSel && k.v === 'employment' ? ' (퇴직자 불가)' : ''));})
               )
             ),
             h('div', null,
@@ -71681,6 +71693,11 @@ function rtMove(fromSid, picks){
   return done;
 }
 
+/* 콘솔 백업용 명부 — 주민번호·계좌·비밀번호·연락처를 뺀다 (사번을 되돌리는 데 필요 없는 칸) */
+function erpNoPiiUsers(list){
+  var DROP = ['rrn','rrnSeal','accountNo','accountHolder','loginPw','pwHash','phone','homePhone','emergencyPhone','emergencyContact','address','addressDetail','zipCode','email','birthDate'];
+  return (list||[]).map(function(u){ if(!u||typeof u!=='object') return u; var o={}; Object.keys(u).forEach(function(k){ if(DROP.indexOf(k)<0) o[k]=u[k]; }); return o; });
+}
 function RetireModal(props){
   useEscClose(props.onClose);
   var u = props.user;
@@ -71717,14 +71734,27 @@ function RetireModal(props){
   }
 
   // 자동계산
+  /* ⚠ 365.25 가 아니라 365 로 나눈다 (2026-10-10 인사관리 전수검토).
+       365.25 로 나누면 «정확히 1년» 다닌 사람이 0.9993년이 되어 「1년 미만 — 퇴직금 0원」으로
+       나왔다. calcLegalSeverance 와 같은 잣대다. */
   function calcYears(from, to){
     if(!from||!to) return 0;
-    return (new Date(to)-new Date(from))/(365.25*24*3600*1000);
+    return (new Date(to)-new Date(from))/(365*24*3600*1000);
   }
   var years = calcYears(u.hireDate, f1.retireDate);
   var isSev = years >= 1;
   var base = u.baseSalary || 0;
-  var daily = Math.round(base/30);
+  /* ★ 연차수당은 «통상임금 1일분» × 남은 일수다 (근로기준법 제60조 — 미사용 연차수당).
+       예전에는 일급(기본급÷30)에 다시 ×8 을 곱해 시급처럼 썼다 — 기본급 300만원이면
+       하루치가 80만원(맞는 값 약 11만원)으로 «약 7배» 부풀었다.
+       통상일급은 급여 기록(calcOrdinaryDailyWage)에서 먼저 찾고, 없으면 명부 기본급÷209×8. */
+  var ordDaily = calcOrdinaryDailyWage(u.sid) || Math.round(base / 209 * 8);
+  /* ★ 퇴직금은 평균임금으로 센다 — 예전 식(기본급÷30×30×근속)은 수당·상여를 다 빠뜨렸다.
+       DC형 가입자는 회사가 퇴직금을 따로 주지 않는다(퇴직연금사업자 계좌에 이미 적립) —
+       법정 퇴직금을 «또» 잡으면 이중 지급이 된다. 그래서 금액 대신 안내를 보인다. */
+  var pensionTypeOf = getStaffPension(u.sid).type;
+  var isDC = pensionTypeOf === 'DC';
+  var legalSev = (!isDC && isSev) ? calcLegalSeverance(u.sid, u.hireDate, f1.retireDate) : null;
 
   function calcProrated(){
     if(!f1.retireDate || !base) return 0;
@@ -71733,8 +71763,12 @@ function RetireModal(props){
     return Math.round(base * d.getDate() / dim);
   }
   var prorated = calcProrated();
-  var annualPay = Math.round(daily * 8 * (f2.annualLeaveRemain||0));
-  var severance = isSev ? Math.round(daily*30*years) : 0;
+  var annualPay = Math.round(ordDaily * (f2.annualLeaveRemain||0));
+  var severance = (legalSev && legalSev.eligible) ? legalSev.severance : 0;
+  var sevNote = isDC ? 'DC형 — 퇴직연금 계좌에서 지급(회사 지급 없음)'
+    : !isSev ? null
+    : (legalSev && legalSev.cannotCalc) ? '급여 기록이 없어 셈할 수 없음 — 퇴직정산에서 확인'
+    : null;
   var total = prorated + annualPay + severance;
 
   var tenureText = (function(){
@@ -71865,7 +71899,9 @@ function RetireModal(props){
           ) : h('div', { style:{ fontSize:'11px', color:'#94a3b8' } }, '퇴직일을 입력하면 자동 계산됩니다.')
         );
       })(),
-      row('퇴직금'+(isSev?'':' (1년 미만)'), h('span', { style:{ fontFamily:'monospace', fontWeight:700, color:isSev?'#1e40af':'#94a3b8' } }, isSev?severance.toLocaleString()+'원':'-')),
+      row('퇴직금'+(isSev?'':' (1년 미만)'), sevNote
+        ? h('span', { style:{ fontSize:'11.5px', fontWeight:700, color:isDC?'#1e40af':'#d97706' } }, sevNote)
+        : h('span', { style:{ fontFamily:'monospace', fontWeight:700, color:isSev?'#1e40af':'#94a3b8' } }, isSev?severance.toLocaleString()+'원':'-')),
       h('div', { style:{ display:'flex', justifyContent:'space-between', padding:'10px 0 4px', borderTop:'2px solid #e2e8f0', marginTop:'4px' } },
         h('span', { style:{ fontSize:'12.5px', fontWeight:700 } }, '예상 합계'),
         h('span', { style:{ fontFamily:'monospace', fontSize:'16px', fontWeight:800, color:'#1e40af' } }, total.toLocaleString()+'원')
@@ -76045,7 +76081,10 @@ function getLeaveRemain(sid, year){
   if(isNaN(hire.getTime())) return { total:0, used:0, remain:0 };
   var y = String(year);
   var yearEnd = new Date(parseInt(y), 11, 31);
-  if(u.leaveDate){ var ld=new Date(u.leaveDate); if(!isNaN(ld.getTime())&&ld<yearEnd) yearEnd=ld; }
+  /* ★ 퇴직일 칸은 retireDate 다 — 퇴사 처리(RetireModal)가 거기에 쓴다. 예전에는 leaveDate 만 읽었는데
+     명부에 그 칸을 쓰는 곳이 하나도 없어(서버 실측 0건) 퇴직자 연차가 연말까지 붙었다 (2026-10-10). */
+  var _retD = u.retireDate || u.leaveDate;
+  if(_retD){ var ld=new Date(_retD); if(!isNaN(ld.getTime())&&ld<yearEnd) yearEnd=ld; }
   var autoDays = 0;
   if(hire <= yearEnd){
     var yrs = (yearEnd-hire)/(365.25*86400000);
@@ -76772,24 +76811,35 @@ function calcLeavePromoStage(hireDate, year){
   // 1년 미만(입사 후 첫 1년 이내) 여부 — 근로기준법 §61 제2항 별도 시기
   var isFirstYear = false, firstYearEnd = null;
   if(hireDate){ var _hd = new Date(hireDate); if(!isNaN(_hd.getTime())){ firstYearEnd = new Date(_hd.getFullYear()+1, _hd.getMonth(), _hd.getDate()); isFirstYear = today < firstYearEnd; } }
-  var expiry, p1=null, p2=null;
+  /* ★★ 근로기준법 제61조의 «시기»를 그대로 옮긴다 (2026-10-10 인사관리 전수검토).
+       ① 1차 = 만료 6개월 전(1년 미만은 3개월 전)을 «기준으로 10일 이내»에 서면 촉구 — 10일짜리 창이다.
+       ② 2차 = 만료 2개월 전(1년 미만은 1개월 전)«까지» 사용시기 지정 통보 — 마감일이다.
+       예전에는 6개월 전~2개월 전 전체를 「1차 시기」로, 2개월 전~만료를 「2차 시기」로 보였다 —
+       2차 칸이 뜨는 순간이 이미 기한이 지난 때였다. 화면대로 하면 촉진 효력이 없어 미사용수당이 남는다.
+     ★ 만료일은 «사용할 수 있는 마지막 날»이다 — 입사 기념일 «전날». 기념일 당일에는 새 연차가 생긴다.
+     ⚠ 1년 미만자에게 1차 촉구 «뒤에» 생긴 휴가의 단서(1개월 전 기준 5일 이내 / 10일 전까지)는
+       아직 따로 셈하지 않는다 — 2단계(연차 장부)에서 발생일별로 다룬다. */
+  function dayBefore(d){ var x=new Date(d.getTime()); x.setDate(x.getDate()-1); return x; }
+  function addDays(d, n){ var x=new Date(d.getTime()); x.setDate(x.getDate()+n); return x; }
+  var expiry, p1=null, p1End=null, p2=null;
   if(isFirstYear){
-    // §61②: 만료=입사 1년, 1차=만료 3개월 전, 2차=만료 1개월 전
-    expiry = firstYearEnd; p1 = addMonths(expiry, -3); p2 = addMonths(expiry, -1);
+    expiry = dayBefore(firstYearEnd); p1 = addMonths(expiry, -3); p2 = addMonths(expiry, -1);
   } else {
-    expiry = (basis==='fiscalYear') ? fiscalEnd(Number(year)) : joinExpiry(hireDate, today);
+    expiry = (basis==='fiscalYear') ? fiscalEnd(Number(year)) : (function(){ var a = joinExpiry(hireDate, today); return a ? dayBefore(a) : null; })();
     if(expiry){ p1 = addMonths(expiry, -6); p2 = addMonths(expiry, -2); }
   }
+  if(p1) p1End = addDays(p1, 9);   // 기준일 포함 10일
   var stage, sc;
   if(!expiry){ stage='입사일 없음'; sc='#94a3b8'; }
   else if(today < p1){ stage='대기'; sc='#94a3b8'; }
-  else if(today < p2){ stage='1차 통보 시기'; sc='#d97706'; }
-  else if(today < expiry){ stage='2차 통보 시기'; sc='#dc2626'; }
+  else if(today <= p1End){ stage='1차 통보 시기'; sc='#d97706'; }
+  else if(today <= p2){ stage='2차 통보 시기'; sc='#dc2626'; }
+  else if(today <= expiry){ stage='촉진 기한 지남'; sc='#991b1b'; }
   else { stage='만료'; sc='#991b1b'; }
   var dday = expiry ? Math.ceil((expiry.getTime()-today.getTime())/86400000) : null;
   var promoteOn = (pol.promoteEnabled !== false);
   if(!promoteOn){ stage='미실시'; sc='#94a3b8'; }
-  return { expiry:expiry, expiryStr:fmt(expiry), p1:p1, p2:p2, stage:stage, sc:sc, dday:dday, enabled:promoteOn, isFirstYear:isFirstYear };
+  return { expiry:expiry, expiryStr:fmt(expiry), p1:p1, p1End:p1End, p2:p2, stage:stage, sc:sc, dday:dday, enabled:promoteOn, isFirstYear:isFirstYear };
 }
 
 // 사용촉진 통보서 인쇄창 (연차/반차 우측 상세 + 사용촉진 탭 공용)
@@ -77122,7 +77172,7 @@ function LeaveManagement(){
   var selUser = users.find(function(u){return u.sid===selSid;});
 
   // 선택 직원 연차 정보
-  var auto = selUser ? calcGrantDays(selUser.hireDate, selYear, selUser.leaveDate||null) : {days:0,reason:''};
+  var auto = selUser ? calcGrantDays(selUser.hireDate, selYear, selUser.retireDate||selUser.leaveDate||null) : {days:0,reason:''};
   var override = selSid && grants[selSid] && grants[selSid][selYear] ? grants[selSid][selYear] : null;
   var total = override && override.total!=null ? override.total : auto.days;
   var carryOver = override ? (override.carryOver||0) : 0;
@@ -77212,7 +77262,7 @@ function LeaveManagement(){
   function downloadCSV(){
     var rows = [['직원','직위','입사일','부여(자동)','이월','총부여','사용','잔여','비고']];
     leaveUsers.forEach(function(u){
-      var a=calcGrantDays(u.hireDate,selYear,u.leaveDate||null);
+      var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
       var ov=grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
       var t=ov&&ov.total!=null?ov.total:a.days;
       var co=ov?(ov.carryOver||0):0;
@@ -77328,7 +77378,7 @@ function LeaveManagement(){
             ),
             h('tbody',null,
               leaveUsers.map(function(u,i){
-                var a  = calcGrantDays(u.hireDate,selYear,u.leaveDate||null);
+                var a  = calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
                 var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
                 var t  = ov&&ov.total!=null?ov.total:a.days;
                 var co = ov?(ov.carryOver||0):0;
@@ -77378,8 +77428,8 @@ function LeaveManagement(){
                       var planOv = prec ? (round===1 ? prec.n1Plan : prec.n2Plan) : null;
                       var plannedStr = planOv || (planned ? lmFmt(planned) : null);
                       var reached = hasRemain && (round===1
-                        ? (pstage.stage==='1차 통보 시기' || pstage.stage==='2차 통보 시기' || pstage.stage==='만료')
-                        : (pstage.stage==='2차 통보 시기' || pstage.stage==='만료'));
+                        ? (pstage.stage==='1차 통보 시기' || pstage.stage==='2차 통보 시기' || pstage.stage==='촉진 기한 지남' || pstage.stage==='만료')
+                        : (pstage.stage==='2차 통보 시기' || pstage.stage==='촉진 기한 지남' || pstage.stage==='만료'));
                       if(dateVal){
                         return h('span',{title:(byVal?('기록자: '+byVal):'')+(sentAt?(' · 메일발송 '+sentAt):'')+' · 클릭하여 날짜 수정',
                             onClick:function(e){ e.stopPropagation();
@@ -77395,7 +77445,7 @@ function LeaveManagement(){
                       }
                       if(reached){
                         return h('span',{style:{display:'inline-flex',flexDirection:'column',gap:'2px',alignItems:'center'}},
-                          plannedStr ? h('span',{style:{fontSize:'9px',color:'#d97706',fontFamily:'monospace',fontWeight:700}}, plannedStr.slice(5)+' 예정') : null,
+                          plannedStr ? h('span',{style:{fontSize:'9px',color:'#d97706',fontFamily:'monospace',fontWeight:700}}, plannedStr.slice(5)+(round===2?' 까지':' 예정')) : null,
                           h('span',{style:{display:'flex',gap:'3px'}},
                             h('button',{title:'통보서 메일 발송 + 통보일 기록',
                               onClick:function(e){ e.stopPropagation(); sendPromoFromList(u, round, Math.round(re*10)/10, pstage.expiryStr); },
@@ -77414,7 +77464,7 @@ function LeaveManagement(){
                       }
                       // 아직 시기 전 — 예정일 흐리게
                       return plannedStr && hasRemain
-                        ? h('span',{style:{fontSize:'9.5px',color:'#cbd5e1',fontFamily:'monospace'}}, plannedStr.slice(5)+' 예정')
+                        ? h('span',{style:{fontSize:'9.5px',color:'#cbd5e1',fontFamily:'monospace'}}, plannedStr.slice(5)+(round===2?' 까지':' 예정'))
                         : h('span',{style:{fontSize:'10px',color:'#cbd5e1'}},'—');
                     }
                     return [
@@ -77435,11 +77485,11 @@ function LeaveManagement(){
                     (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
                 h('td',{colSpan:2,style:{padding:'7px',textAlign:'right',fontFamily:'monospace'}},''),
                 h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total:a.days;var co=ov?(ov.carryOver||0):0;return s+t+co;},0)),
+                  leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total:a.days;var co=ov?(ov.carryOver||0):0;return s+t+co;},0)),
                 h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
                   Math.round(leaveUsers.reduce(function(s,u){return s+calcUsed(u.sid,selYear).used;},0)*10)/10),
                 h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  Math.round(leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total:a.days;var co=ov?(ov.carryOver||0):0;return s+(t+co-calcUsed(u.sid,selYear).used);},0)*10)/10),
+                  Math.round(leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total:a.days;var co=ov?(ov.carryOver||0):0;return s+(t+co-calcUsed(u.sid,selYear).used);},0)*10)/10),
                 h('td',null),
                 h('td',null),
                 h('td',null)
@@ -77505,15 +77555,15 @@ function LeaveManagement(){
             var planOv = prec ? (round===1 ? prec.n1Plan : prec.n2Plan) : null;
             var plannedStr = planOv || (planned ? lmFmt(planned) : null);
             var reached = !noP && (round===1
-              ? (pst.stage==='1차 통보 시기'||pst.stage==='2차 통보 시기'||pst.stage==='만료')
-              : (pst.stage==='2차 통보 시기'||pst.stage==='만료'));
+              ? (pst.stage==='1차 통보 시기'||pst.stage==='2차 통보 시기'||pst.stage==='촉진 기한 지남'||pst.stage==='만료')
+              : (pst.stage==='2차 통보 시기'||pst.stage==='촉진 기한 지남'||pst.stage==='만료'));
             var left;
             if(dateVal){
               left = h('span',{style:{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'11px',fontWeight:700,color:'#166534'}},
                 '✓ '+dateVal, sentAt ? h('span',{style:{fontSize:'10px',color:'#2563eb',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'1px 6px',fontWeight:700}},'📧 '+sentAt) : null);
             } else if(reached){
               left = h('span',{style:{display:'inline-flex',gap:'6px',alignItems:'center'}},
-                plannedStr ? h('span',{style:{fontSize:'11px',color:'#d97706',fontFamily:'monospace',fontWeight:700}}, plannedStr+' 예정') : null,
+                plannedStr ? h('span',{style:{fontSize:'11px',color:'#d97706',fontFamily:'monospace',fontWeight:700}}, plannedStr+(round===2?' 까지':' 예정')) : null,
                 h('button',{style:btnO,onClick:function(){ sendPromoFromList(selUser, round, remainNum, pst.expiryStr); }},'📧 발송'));
             } else {
               left = h('span',{style:{fontSize:'11px',color:'#cbd5e1'}}, plannedStr && !noP ? (plannedStr+' 예정') : '—');
@@ -77578,7 +77628,7 @@ function LeaveManagement(){
           });
           function calcYearStat(y){
             var ystr = String(y);
-            var grantInfo = calcGrantDays(selUser.hireDate, y, selUser.leaveDate);
+            var grantInfo = calcGrantDays(selUser.hireDate, y, selUser.retireDate||selUser.leaveDate||null);
             var override = (grants[selUser.sid]||{})[ystr];
             var grantDays = override && typeof override.total==='number' ? override.total : grantInfo.days;
             var carry = override && typeof override.carryOver==='number' ? override.carryOver : 0;
@@ -81651,10 +81701,12 @@ function getLeavePromoNotice(empName){
       var hd=new Date(u.hireDate); if(isNaN(hd.getTime())) return null;
       var cand=new Date(year, hd.getMonth(), hd.getDate());
       if(cand.getTime()<=today.getTime()) cand=new Date(year+1, hd.getMonth(), hd.getDate());
+      /* 만료일 = 쓸 수 있는 마지막 날 = 입사 기념일 «전날» (calcLeavePromoStage 와 같은 잣대) */
+      cand.setDate(cand.getDate()-1);
       expiry=cand;
     }
     var p1=new Date(expiry.getTime()); var _d=p1.getDate(); p1.setMonth(p1.getMonth()-6); if(p1.getDate()<_d) p1.setDate(0);
-    if(today < p1 || today >= expiry) return null;
+    if(today < p1 || today > expiry) return null;
     return { remain:remain, expiryStr:fmt(expiry) };
   }catch(_e){ return null; }
 }
@@ -83721,7 +83773,9 @@ function StaffRoster(){
       { title:'퇴사자 사번 정리', confirmText:'일괄 변환', danger:true }).then(function(ok){
       if(!ok) return;
       try {
-        console.log('[사번정리 백업] user_accounts', JSON.stringify(curUsers));
+        /* ⚠ 콘솔 백업에 주민번호·계좌·비밀번호를 찍지 않는다 (2026-10-10 전수검토) — 콘솔은 화면 녹화·확장프로그램·
+             옆사람에게 그대로 보인다. 사번을 되돌리는 데 필요한 것은 사번·이름·입사일뿐이다. */
+        console.log('[사번정리 백업] user_accounts', JSON.stringify(erpNoPiiUsers(curUsers)));
         console.log('[사번정리 백업] finance_income', JSON.stringify(fi));
         console.log('[사번정리 백업] payroll_monthly', JSON.stringify(pay));
         console.log('[사번정리 백업] overtime_records', JSON.stringify(ot));
@@ -83788,7 +83842,7 @@ function StaffRoster(){
         function digits(x){ return String(x||'').replace(/[^0-9]/g,''); }
         function fmtDate(x){ var s=String(x||'').trim().replace(' 00:00:00',''); return s ? s.slice(0,10) : ''; }
         // 백업 (콘솔에 1회 출력 — 만약 문제 시 복구용)
-        try { console.log('[근로자명부 가져오기 백업]', JSON.stringify(users)); } catch(_){}
+        try { console.log('[근로자명부 가져오기 백업]', JSON.stringify(erpNoPiiUsers(users))); } catch(_){}
         var arr = users.map(function(u){ return Object.assign({}, u); });
         var byRrn = {}, byName = {};
         arr.forEach(function(u){ var d=digits(u.rrn); if(d) byRrn[d]=u; if(u.name) byName[u.name.trim()]=u; });
