@@ -234,7 +234,15 @@
   var SIGN_LINE_RE = new RegExp(
     '(<hp:t>)([^<]*?' + SIGN_NAME_LABEL + '\\s*[:：]\\s*)([가-힣](?:[ \\u3000]?[가-힣]){1,3})(</hp:t></hp:run><hp:run charPrIDRef="\\d+">)'
     + '<hp:t>([ \\u00a0\\u3000]{4,})</hp:t>(</hp:run><hp:run charPrIDRef="\\d+"><hp:t>\\s*[（(]\\s*(?:서명|인|날인)\\s*[)）])', 'g');
-  function tidySignLine(sectionXml) {
+  /* 서명 줄이 있는 구역의 «빈 작성일» — 「2026년　　월　　일」 → 오늘 (대표 지시 2026-10-10 「작성일 오늘」).
+     ⚠ 비어 있을 때만 적는다 — 이미 적힌 날짜(월·일 숫자가 있는 것)는 손대지 않는다. 서명 줄이 없는 서식은 건드리지 않는다. */
+  function fillBlankDate(xml, today) {
+    var d = today || new Date(), y = d.getFullYear(), m = d.getMonth() + 1, dd = d.getDate();
+    return xml.replace(/<hp:t>(\s*)(\d{4})?(\s*)년[ 　]*월[ 　]*일(\s*)<\/hp:t>/, function (all, a, Y, b, c) {
+      return '<hp:t>' + a + (Y || y) + b + '년 ' + m + '월 ' + dd + '일' + c + '</hp:t>';
+    });
+  }
+  function tidySignLine(sectionXml, today) {
     var s = String(sectionXml || ''), n = 0;
     var out = s.replace(SIGN_LINE_RE, function (all, a, head, name, mid, blank, tail) {
       var 이름 = name.replace(/[ \u3000]/g, '');
@@ -242,6 +250,7 @@
       n++;
       return a + head + mid.replace(/^<\/hp:t><\/hp:run>/, '</hp:t></hp:run>') + '<hp:t>' + 이름 + new Array(칸 + 1).join(' ') + '</hp:t>' + tail;
     });
+    if (n) out = fillBlankDate(out, today);
     return { xml: out, n: n };
   }
 
