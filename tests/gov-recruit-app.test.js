@@ -331,7 +331,7 @@ test('★★ 서버가 찾은 새 모집 글을 날짜 내림차순으로 보여
   await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
   assert.ok(w.indexOf('외부연구진') < w.indexOf('현장코칭'), '최근 글이 위');
-  assert.match(w, /새 글 2</);
+  assert.match(w, /✓ 새 글 2건 모두 봤음/); assert.equal((w.match(/<span class="tag red">새 글<\/span>/g) || []).length, 2, '새 글 딱지 둘');
   assert.match(w, /11곳/); assert.match(w, /못 읽은 곳 1\(LH 한국토지주택공사\)/, '고장 난 게시판을 숨기지 않는다(기관 이름으로)');
   assert.match(r.el('recTb').innerHTML, /🆕 새 글/);
   assert.equal(r.api.recNewFor('erc'), true);
@@ -367,7 +367,7 @@ test('★★ ✓ 봤음 — 대표 자리에만 적고 🆕 가 사라진다, �
   assert.ok(ercRow, '지방공기업평가원 줄이 있어야 한다');
   assert.doesNotMatch(ercRow, /🆕 새 글/);
   assert.equal((tb.match(/🆕 새 글/g) || []).length, 1);
-  assert.match(r.el('recWatch').innerHTML, /새 글 1</);
+  assert.equal((r.el('recWatch').innerHTML.match(/<span class="tag red">새 글<\/span>/g) || []).length, 1, '봤음 뒤 새 글 딱지 하나');
   await new Promise((res) => setTimeout(res, 2800));
   assert.ok(pushed && pushed['recruit/seen'].k1, '다른 기기에서도 봤음이 보여야 한다');
 });
@@ -1201,7 +1201,7 @@ test('★★★ 여러 날 못 읽는 게시판은 크게 — 언제부터·며�
   assert.ok(w.indexOf('<a href="' + ERC_URL.replace(/&/g, '&amp;') + '" target="_blank" rel="noopener">🔗 게시판 직접 열기</a>') > 0, '직접 열 링크가 없다');
   assert.match(w, /까닭: fetch failed \[UND_ERR_CONNECT_TIMEOUT\]/);
   assert.doesNotMatch(w, /다음 날 다시 읽습니다/, '닷새째인데 「다음 날 다시」라고 한다');
-  assert.ok(w.indexOf('5일째') < w.indexOf('rec-head'), '띠는 머리줄 위에');
+  assert.ok(w.indexOf('5일째') < w.indexOf('rec-stick'), '띠는 고정 줄 위에');
 });
 test('★★ 하루 실패는 예전처럼 작게 — 「다음 날 다시 읽습니다」, 큰 띠 없음', async () => {
   const r = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
@@ -1220,4 +1220,44 @@ test('★ 직접 열기 링크는 https 만 — 이상한 주소는 링크로 �
   await r.api.recWatchPull();
   const w = r.el('recWatch').innerHTML;
   assert.match(w, /3일째/); assert.doesNotMatch(w, /javascript:/); assert.doesNotMatch(w, /직접 열기<\/a>/);
+});
+
+/* ═══ 공인노무사회·공공기관 탭 머리 — 한 줄 + 틀고정 (대표 「a」 2026-10-10 목업 안 A) ═══ */
+function stickOf(h) { const i = h.indexOf('<div class="rec-stick">'); const j = h.indexOf('<div class="scroll">', i); return i < 0 ? '' : h.slice(i, j < 0 ? h.length : j); }
+test('★★★ 머리는 «한 줄» — 탭과 같은 말(제목줄)은 없고, 갈래 → 모두 봤음 → 🕒 서버 시각 차례로 한 고정 칸에', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML, st = stickOf(w);
+  assert.ok(st, '고정 칸(.rec-stick)이 없다');
+  assert.doesNotMatch(w, /공공기관 게시판 새 모집 글/, '탭과 같은 말(제목줄)이 남았다');
+  assert.equal((w.match(/class="rec-stick"/g) || []).length, 1, '고정 칸은 하나');
+  const a = st.indexOf('class="mchips"'), b = st.indexOf('✓ 새 글 2건 모두 봤음'), c = st.indexOf('class="rec-at"');
+  assert.ok(a >= 0 && b > a && c > b, '차례: 갈래 → 모두 봤음 → 시각 ' + [a, b, c]);
+  assert.match(st, /<span class="rec-at" title="서버가 매일 아침 7시 20분에 11곳 게시판을 읽습니다 · 마지막 [^"]+">🕒 10\.05 \d\d:\d\d<\/span>/);
+  assert.match(st, /못 읽은 곳 1\(LH 한국토지주택공사\)/, '못 읽은 곳은 고정 칸에 빨갛게');
+  assert.ok(w.indexOf('<thead>') > w.indexOf('rec-stick'), '표는 고정 칸 아래');
+});
+test('★★ 고른 줄이 있으면 선택 줄(sel-bar)도 고정 칸 «안»에 — 내려 보다 고른 것을 처리할 수 있게', async () => {
+  const r = runApp({ recruit_scan: SCAN }, { Date: FixedDate('2026-12-05T09:00:00') });
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchPull();
+  r.api.recSelTog('pub', 'k1', true);
+  const st = stickOf(r.el('recWatch').innerHTML);
+  assert.match(st, /class="sel-bar"/, '선택 줄이 고정 칸 밖에 있다');
+});
+test('★★ 걸린 글이 없을 때도 한 줄(안내 + 🕒 시각) — 빈 제목줄을 따로 그리지 않는다', async () => {
+  const empty = { last: { at: '2026-10-09T22:20:00Z', checked: 19, added: 0, errors: [], counts: {} }, hits: {} };
+  const r = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
+  r.api.setFb(fbWith(empty), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatchKc').innerHTML;
+  assert.match(w, /<div class="rec-stick"><div class="rec-line"><span class="sml">아직 걸린 모집 글이 없습니다\.<\/span><span class="sp"><\/span><span class="rec-at"[^>]*>🕒 /);
+  assert.doesNotMatch(w, /공인노무사회 공지·회원 공지·채용 정보/);
+});
+test('★★ 틀고정 CSS — 한 줄은 하위 탭 밑, 표 머리는 그 밑(넓은 화면), 폰은 풀어 준다', () => {
+  assert.match(src, /\.rec-stick\{position:sticky;top:calc\(var\(--headH,94px\) \+ var\(--rsubH,44px\)\);z-index:13;background:var\(--card\);/);
+  assert.match(src, /@media \(min-width:1100px\)\{\s*#recPaneKc \.scroll,#recPanePub \.scroll\{overflow:visible\}\s*#recPaneKc \.rec-hits thead th,#recPanePub \.rec-hits thead th\{position:sticky;z-index:12;background:var\(--card\);\s*top:calc\(var\(--headH,94px\) \+ var\(--rsubH,44px\) \+ var\(--rbarH,44px\)\)\}/);
+  assert.match(src, /@media \(max-width:640px\)\{ \.rec-stick\{position:static;border-bottom:0\} \}/);
+  assert.match(src, /\$\('recWatch'\)\.innerHTML=recWatchHtml\('pub'\);\s*recStickySync\(\);/, '그린 뒤 높이를 다시 잰다');
 });

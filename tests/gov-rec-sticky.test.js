@@ -74,3 +74,16 @@ test('★ 부팅 때 지켜보기 시작하고, 모집 탭을 열 때도 잰다(
   assert.match(fnSrc('boot'), /^function boot\(\)\{\s*recStickyWatch\(\);/);
   assert.match(fnSrc('setTab'), /if\(t==='rec'\)\{[^}]*recStickySync\(\);/);
 });
+
+test('★★ 공인노무사회·공공기관 탭의 한 줄(.rec-stick) 높이를 --rbarH 로 — 숨은 탭(0)은 빼고 보이는 것만', () => {
+  const props = {};
+  const mk = (list) => ({
+    document: { documentElement: { style: { setProperty: (k, v) => { props[k] = v; } } }, querySelectorAll: (q) => (q === '.rec-stick' ? list : []) },
+    $: () => null, window: { addEventListener() {} }
+  });
+  vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 0 }, { offsetHeight: 46 }]));
+  assert.equal(props['--rbarH'], '46px');
+  delete props['--rbarH'];
+  vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 0 }]));
+  assert.ok(!('--rbarH' in props), '다 숨었는데 0px 을 박으면 표 머리가 고정 줄을 덮는다');
+});
