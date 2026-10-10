@@ -1511,19 +1511,25 @@ async function 일요일보충한번(누가) {
   const 거리 = NCore.거리고르기({ 자료모음, 판례모음, 노무사회, 회차들: 지난것, 지금열쇠: 열쇠, 뺄안: 회차.안 });
   const 후보안 = NCore.자동으로담기({}, { 법령: [], 자료: 거리.자료, 판례: 거리.판례 }, 회차.회차 || {});
   const r = NWatch.보충하기({ 안: 회차.안, 후보안, 지난표: NCore.지난것들(지난것, 열쇠) });
-  if (!r.바꾼.length && !r.채운.length) {
-    await 기록자리.set({ 때: now, 바꾼: [], 채운: [] });
-    console.log("[일요일 보충] 바꿀 것 없음");
-    return;
+  const 바꿈 = r.바꾼.length > 0 || r.채운.length > 0;
+  if (바꿈) {
+    const 회차자리 = db.ref("newsletter/issues/" + 열쇠);
+    await 회차자리.child("판").transaction((v) => (Number(v) || 0) + 1);
+    await 회차자리.update({ 안: r.안, 고친이: NWatch.일요일보충이름, 고친때: now });
   }
-  const 회차자리 = db.ref("newsletter/issues/" + 열쇠);
-  await 회차자리.child("판").transaction((v) => (Number(v) || 0) + 1);
-  await 회차자리.update({ 안: r.안, 고친이: NWatch.일요일보충이름, 고친때: now });
-  /* 자동 확정본이면 «지금 내용»으로 다시 봉인 — 월요일이 하는 것을 미리 한다(전문도 함께 새로 짓는다) */
+  /* 자동 확정본이면 «지금 내용»으로 다시 봉인 — 월요일이 하는 것을 미리 한다(전문도 함께 새로 짓는다)
+     ★ 바꿀 기사가 «없어도» 봉인한다 (2026-10-10). 금요일 봉인 뒤에 편지 디자인이 바뀌면
+       (머리 색 B안이 그랬다) 월요일은 내용이 같다며 «금요일의 옛 서식»을 그대로 보낸다.
+       내용은 그대로, 서식만 최신으로 — AI·담기는 안 한다. */
   if (확정본 && 확정본.회차열쇠 === 열쇠 && 확정본.자동 === true && 확정본.상태 === "준비") {
     const 새 = await NF.확정본다시짓기({ db, 회차열쇠: 열쇠, 보낼날: 확정본.보낼날, now });
     if (새.ok) await db.ref("newsletter/weeklyReady").set(새.확정본);
     else console.warn("[일요일 보충] 다시 봉인 못 함 — " + (새.까닭 || ""));
+  }
+  if (!바꿈) {
+    await 기록자리.set({ 때: now, 바꾼: [], 채운: [] });
+    console.log("[일요일 보충] 바꿀 것 없음 — 서식만 새로 봉인");
+    return;
   }
   await 기록자리.set({ 때: now, 바꾼: r.바꾼, 채운: r.채운 });
   console.log("[일요일 보충]", JSON.stringify({ 바꾼: r.바꾼.length, 채운: r.채운.length }));

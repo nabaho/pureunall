@@ -95,6 +95,13 @@ test('⑥ 서버 — 일요일 17시, 가져오기 셋 → 보충 → 자동 확
   assert.ok(b.indexOf('NWatch.보충할까(') < b.indexOf('NWatch.보충하기('), '할까를 먼저 본다');
   assert.match(b, /뺄안: 회차\.안/);
   assert.match(b, /확정본\.자동 === true[^)]*\)[\s\S]*?NF\.확정본다시짓기/, '자동 확정본일 때만 다시 봉인');
+  /* ★ 바꿀 기사가 없어도 봉인한다 (2026-10-10) — 금요일 뒤에 디자인이 바뀌면 옛 서식이 나간다.
+       «바꿀 것 없음»으로 돌아가는 자리가 봉인보다 «뒤»에 있어야 한다. */
+  const 봉인 = b.indexOf('NF.확정본다시짓기');
+  const 없음 = b.indexOf('바꿀 것 없음');
+  assert.ok(없음 > 봉인, '바꿀 것이 없으면 봉인 전에 돌아간다 — 금요일의 옛 서식이 그대로 나간다');
+  assert.ok(!/return;[\s\S]*NF\.확정본다시짓기/.test(b.slice(b.indexOf('NWatch.보충하기('))),
+    '보충 뒤 봉인 전에 돌아가는 길이 있다');
   assert.ok(!/scheduled|buildQueue|validateBulk/.test(b), '보충이 발송 대기열을 건드린다');
   assert.match(b, /\/보충"\)/, '무엇을 바꿨는지 남기지 않는다 — 점검표가 못 적는다');
   /* 오늘만 23시는 날짜 문지기가 있다 — 크론이 해마다 10/4 에 다시 부른다 */
