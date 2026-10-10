@@ -234,17 +234,20 @@
     var p = String((r && (r.period || r.date)) || '').match(/(19|20)\d{2}/);
     return p ? p[0] : '';
   }
+  /* 수행일수 — 숫자만, 없으면 0(«모름»을 0일로 세지 않고 합에서만 빠진다) */
+  function _days(v) { var n = Number(String(v == null ? '' : v).replace(/[^\d.]/g, '')); return isFinite(n) && n > 0 ? n : 0; }
   function _won(v) { return Number(String(v == null ? '' : v).replace(/[^\d]/g, '')) || 0; }
   function perfTable(recs) {
-    var by = {}, ys = {}, out = { rows: [], years: [], total: 0, unknown: 0, amt: 0, byYear: {} };
+    var by = {}, ys = {}, out = { rows: [], years: [], total: 0, unknown: 0, amt: 0, days: 0, byYear: {} };
     (recs || []).forEach(function (r) {
       if (!r || r.excluded) return;
       var t = String(r.type || '').trim() || '(유형 없음)';
-      var g = by[t] = by[t] || { type: t, total: 0, unknown: 0, amt: 0, byYear: {}, agency: {}, main: {}, ids: [] };
+      var g = by[t] = by[t] || { type: t, total: 0, unknown: 0, amt: 0, days: 0, byYear: {}, agency: {}, main: {}, ids: [] };
       var y = perfYear(r);
       if (y) { g.byYear[y] = (g.byYear[y] || 0) + 1; ys[y] = 1; out.byYear[y] = (out.byYear[y] || 0) + 1; }
       else { g.unknown++; out.unknown++; }
       g.total++; out.total++; g.ids.push(r.id);
+      var dd = _days(r.days); g.days += dd; out.days += dd;
       var a = _won(r.amt); g.amt += a; out.amt += a;
       var ag = String(r.agency || '').trim(); if (ag) g.agency[ag] = (g.agency[ag] || 0) + 1;
       var m = String(r.main || '').trim(); if (m) g.main[m] = (g.main[m] || 0) + 1;
@@ -263,8 +266,8 @@
       if (!r || r.excluded) return;
       var y = perfYear(r);
       var k = by === 'main' ? (String(r.main || '').trim() || '(담당 없음)') : (y || '모름');
-      var g = map[k] = map[k] || { key: k, total: 0, amt: 0, unknown: 0, byYear: {}, type: {} };
-      g.total++; g.amt += _won(r.amt);
+      var g = map[k] = map[k] || { key: k, total: 0, amt: 0, days: 0, unknown: 0, byYear: {}, type: {} };
+      g.total++; g.amt += _won(r.amt); g.days += _days(r.days);
       if (y) g.byYear[y] = (g.byYear[y] || 0) + 1; else g.unknown++;
       var t = String(r.type || '').trim() || '(유형 없음)'; g.type[t] = (g.type[t] || 0) + 1;
     });
@@ -354,7 +357,37 @@
     return (보고[0] || null);
   }
 
+  /* ── 🏷 기업정보함 메모 줄 읽기 (대표 지시 2026-10-10 「1 넣어라」) ──
+     기업정보함 회사 메모에 `[현장클리닉] 신청일 신청 · 완료일 완료 · 클리닉위원 ○ · 지방청 상담위원 ○ (기관, 지역)` 와
+     `[기술보호울타리] 신청일 신청 · 사전예방 · 자문 시작~끝 · 최종완료 · 노무사 ○ (통합기술보호지원반)` 이 한 줄에 한 건씩 적혀 있다.
+     ⚠ 일수는 «적혀 있을 때만» — 기술보호는 자문 기간(시작~끝, 양끝 포함)에서 셀 수 있고, 현장클리닉은 기록에 없다(지어내지 않는다).
+     ⚠ 연도는 현장클리닉 = 완료한 해(없으면 신청한 해), 기술보호 = 자문 시작한 해. */
+  function cardsDays(a, b) {
+    var x = Date.parse(a), y = Date.parse(b);
+    if (isNaN(x) || isNaN(y) || y < x) return 0;
+    return Math.round((y - x) / 86400000) + 1;
+  }
+  function parseCardsLine(line) {
+    var t = String(line || '').trim(), m = /^\[(현장클리닉|기술보호울타리)\]/.exec(t);
+    if (!m) return null;
+    var kind = m[1] === '현장클리닉' ? 'clinic' : 'tech';
+    var d = function (re) { var x = re.exec(t); return x ? x[1] : ''; };
+    var apply = d(/(20\d\d-\d\d-\d\d)\s*신청/), done = d(/(20\d\d-\d\d-\d\d)\s*완료/);
+    var rg = /자문\s*(20\d\d-\d\d-\d\d)\s*~\s*(20\d\d-\d\d-\d\d)/.exec(t), paren = /\(([^()]*)\)\s*$/.exec(t);
+    var out = { kind: kind, apply: apply, done: done, from: rg ? rg[1] : '', to: rg ? rg[2] : '',
+      member: kind === 'clinic' ? d(/클리닉위원\s*([가-힣]{2,4})/) : d(/노무사\s*([가-힣]{2,4})/),
+      counselor: d(/상담위원\s*([가-힣]{2,4})/), where: paren ? paren[1].trim() : '', days: rg ? cardsDays(rg[1], rg[2]) : 0, status: '', year: '' };
+    var st = /(최종완료|만족도조사\s*제출완료)/.exec(t); out.status = st ? st[1] : '';
+    out.year = kind === 'clinic' ? String(done || apply).slice(0, 4) : String(out.from || apply).slice(0, 4);
+    var p = function (s) { return String(s || '').replace(/-/g, '.'); };
+    out.period = kind === 'clinic' ? (apply && done ? p(apply) + '~' + p(done) : '') : (out.from ? p(out.from) + '~' + p(out.to) : '');
+    /* 같은 줄을 두 번 넣지 않는 열쇠 — 줄 «내용»에서 만든다(줄 번호가 아니라) */
+    out.key = kind + '|' + apply + '|' + (out.from || done);
+    return out;
+  }
+
   var api = {
+    parseCardsLine: parseCardsLine, cardsDays: cardsDays,
     ownerGuess: ownerGuess, reportAtt: reportAtt,
     perfYear: perfYear, perfTable: perfTable, perfBy: perfBy, topCounts: topCounts, flatName: flatName, mailReports: mailReports, REPORT_RE: REPORT_RE,
     xlsxLines: xlsxLines, perfFields: perfFields,
