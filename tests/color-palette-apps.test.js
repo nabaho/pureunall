@@ -47,6 +47,7 @@ const DONE = [
   ['sign.html', '서명'],
   ['ieum-view.html', '이음보기'],
   ['install.html', '설치안내'],
+  ['rehab-ad.html', '회생광고'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */
