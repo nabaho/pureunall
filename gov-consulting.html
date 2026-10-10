@@ -1323,11 +1323,13 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-whoami.js?v=3"></script>
   <!-- 정부컨설팅 보고서 — 기관 빈 양식(HWPX)을 채운다 (2026-10-09). 차례가 중요하다:
-       hwpx-fill → gov-report(그것을 쓴다) → build → pack(gov-report 를 쓴다). hwpx-fill 판은 fund.html 과 같게. -->
+       hwpx-fill → gov-report(그것을 쓴다) → build → pack(gov-report 를 쓴다). hwpx-fill 판은 fund.html 과 같게.
+       ai(3단계 AI 초안, 2026-10-10)도 gov-report 를 쓴다 — 그 뒤에. -->
   <script src="js/pu-hwpx-fill.js?v=6"></script>
   <script src="js/pu-gov-report.js?v=1"></script>
   <script src="js/pu-gov-report-build.js?v=3"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
+  <script src="js/pu-gov-report-ai.js?v=1"></script>
   <!-- 회사 열쇠(사업자번호) — 보고서 창이 기업정보함 메일·보낸 자료를 그 열쇠로만 찾는다 -->
   <script src="js/pu-cokey.js?v=1"></script>
   <script>
@@ -7601,7 +7603,13 @@ const GRP_RLAB=[['inquiry','문의'],['diagnosis','진단'],['advice','자문'],
 /* 양식마다 회차 칸에 들어가는 이름표 — 안내 글(placeholder)에만 쓴다 */
 const GRP_RUSE={'cci-north':['문의','진단','자문','성과','향후'],'cci-seosan':['문의','진단','자문'],techguard:['진단','자문','성과','향후']};
 const GRP_ACTS={save:'grpSaveDraft',dl:'grpDownload',confirm:'grpConfirm',addRound:'grpAddRound',delRound:'grpDelRound',
-  newVer:'grpNewVersion',choose:'grpChooseForm',close:'grpClose'};
+  newVer:'grpNewVersion',choose:'grpChooseForm',close:'grpClose',ai:'grpAiDraft',aiUndo:'grpAiUndo',aiAllow:'grpAiAllow'};
+/* ✨ AI 초안(3단계, 2026-10-10) — 업무관리 aiCall 과 같은 프록시·모델 순서. 시간 제한 90초 */
+const GRP_AI_MODELS=['claude-opus-5','claude-sonnet-4-20250514'];
+const GRP_AI_WAIT_MS=90000;
+const GRP_AI_OK='gov_ai_ok';
+const GRP_AI_MSG={noProxy:'AI 프록시가 설정되지 않았습니다 — 포털 ⚙ 설정',net:'AI 응답이 없습니다 — 잠시 뒤 다시',parse:'AI 답을 읽지 못했습니다',locked:'확정된 판입니다 — AI 초안은 [새 판으로 고치기] 뒤에 씁니다',tg:'기술보호 사업장입니다 — 「이번 건 AI 사용」을 켜야 AI 초안을 씁니다(켜도 회차 날짜·메모만 보냅니다)',none:'AI 가 채울 빈 칸이 없습니다 — 사람이 쓴 칸은 덮지 않습니다'};
+const GRP_AI_PATH=/^(?:rounds\.\d+\.(?:inquiry|diagnosis|advice|result|next)|summary\.(?:inquiryDiag|review|action|etc|adviceAll|overall))$/;
 function grpRptRef(coId,rid){ return _fbDB.ref('scal_reports/'+coId+'/'+rid); }
 function grpRid(typeId,year){ return String(typeId)+'_'+String(year); }
 /* 보고서의 해 — 첫 회차(사전진단 뺀) 날짜의 해. 일정이 없으면 오늘의 해 */
@@ -7734,11 +7742,19 @@ function grpSetup(input,fk){
   if(!rep.summary) rep.summary={};
   if(!Array.isArray(rep.summary.outputs)) rep.summary.outputs=[];
   if(!rep.techField) rep.techField={};
+  /* 전에 AI 가 넣고 사람이 손대지 않은 채 저장된 칸(aiFields) — 다시 열어도 「AI 초안」으로 이어 받는다 */
+  const ai={src:{},val:{}};
+  ((saved&&Array.isArray(saved.aiFields))?saved.aiFields:[]).forEach(function(p){
+    if(!GRP_AI_PATH.test(String(p))) return;
+    const v=grpGet(rep,p);
+    if(typeof v==='string'&&v.trim()){ ai.src[p]='ai'; ai.val[p]=v; }
+  });
   _grp={coId:input.co.id,typeId:input.type.id,coName:input.co.name,input:input,formKey:fk,year:input.year,rid:input.rid,
     report:rep,base:base.report,src:built.src||{},feed:built.feed||[],techguard:fk==='techguard',
     meta:rep.rounds.map(function(r,i){ return {added:!!(sm[i]&&sm[i].added)}; }),
     saved:saved,state:(saved&&saved.state)||'초안',ver:Number((saved&&saved.ver)||0)||0,
-    locked:!!(saved&&saved.state==='검토완료'),newVer:false,tpl:{},notes:(input.notes||[]).slice()};
+    locked:!!(saved&&saved.state==='검토완료'),newVer:false,tpl:{},notes:(input.notes||[]).slice(),
+    aiSrc:ai.src,aiVal:ai.val,aiWarn:{},aiUndo:null,aiAllow:false,aiBusy:false};
   return _grp;
 }
 /* 점 경로로 읽고 쓴다('company.name', 'rounds.0.date') */
@@ -7847,6 +7863,7 @@ function grpRecord(state){
   const st=_grp;
   return {formKey:st.formKey,typeId:st.typeId,state:state,report:grpCleanReport(st.report),
     rounds:st.meta.map(function(m){ return {added:!!(m&&m.added)}; }),ver:st.ver||0,
+    aiFields:grpAiFields(st),
     updatedAt:Date.now(),updatedBy:grpWho()};
 }
 function grpNote(html){
@@ -7948,7 +7965,7 @@ function grpDelRound(i){
   const st=_grp; i=Number(i);
   if(!st||!st.report||st.locked||!(st.meta[i]&&st.meta[i].added)) return false;
   grpReadForm();
-  st.report.rounds.splice(i,1); st.meta.splice(i,1);
+  st.report.rounds.splice(i,1); st.meta.splice(i,1); grpAiDropRound(st,i);
   grpRender();
   return true;
 }
@@ -8075,6 +8092,201 @@ function grpBind(){
     if(el.type!=='checkbox') el.classList.toggle('grp-blank',!String(el.value||'').trim());
     grpRenderWarn();
   });
+}
+/* ── ✨ AI 초안 (3단계, 2026-10-10 대표 「추천대로」) ──
+   설계 docs/superpowers/specs/2026-10-10-gov-report-step3-ai-draft-design.md
+   ★ 보내기 전에 모두 가린다(PuGovReportAi.buildRequest) — 이름은 자리 표시, 전화·메일·주민·계좌·사업자번호는 [가림].
+   ★ 비었거나 전에 AI 가 넣고 사람이 손대지 않은 칸만 채운다. 사람이 고쳤는지는 «지금 값 ≠ AI 가 넣은 값(aiVal)» 으로 본다.
+   ★ 저장하지 않는다 — 💾·✔ 를 사람이 누를 때만. 기술보호는 「이번 건 AI 사용」을 켤 때만, 켜도 회차 날짜·메모만.
+   ⚠ 바깥으로 나가는 부름은 grpAiCall 하나뿐이다(업무관리 aiCall 과 같은 꼴 — 공용 모듈 정리는 범위 밖). */
+function grpAiProxyUrl(){
+  try{
+    const raw=localStorage.getItem('pureun_v6_setting_ai_proxy_url')||localStorage.getItem('pureun_v6_ai_proxy_url')
+      ||(window.PU_CFG&&window.PU_CFG.aiProxyUrl)||'';
+    if(!raw) return '';
+    if(raw.charAt(0)==='"'){ try{ return JSON.parse(raw); }catch(e){ return raw.replace(/^"|"$/g,''); } }
+    return raw;
+  }catch(e){ return ''; }
+}
+function grpAiConsent(){
+  try{ if(localStorage.getItem(GRP_AI_OK)==='1') return true; }catch(e){}
+  const ok=grpAsk('✨ AI 초안\n\n업체 자료가 외부 AI(Anthropic)로 전송됩니다 — 가림 처리 후\n'
+    +'(업체·대표자·담당자 이름은 자리 표시로 바꾸고, 전화·메일·주민번호·계좌·사업자번호는 [가림]으로 지웁니다. '
+    +'급여·명부 같은 개인 자료와 첨부 원본은 보내지 않습니다.)\n\n계속할까요? (이 브라우저에서 한 번만 묻습니다)');
+  if(ok){ try{ localStorage.setItem(GRP_AI_OK,'1'); }catch(e){} }
+  return !!ok;
+}
+function grpAiFetch(url,opts){
+  if(typeof AbortController==='undefined') return fetch(url,opts);
+  const ac=new AbortController();
+  const timer=setTimeout(function(){ ac.abort(); },GRP_AI_WAIT_MS);
+  return fetch(url,Object.assign({},opts,{signal:ac.signal})).then(function(r){ clearTimeout(timer); return r; },
+    function(e){
+      clearTimeout(timer);
+      if(e&&e.name==='AbortError'){ const t=new Error(GRP_AI_MSG.net+' ('+Math.round(GRP_AI_WAIT_MS/1000)+'초)'); t.timeout=true; throw t; }
+      throw e;
+    });
+}
+function grpAiCall(system,messages){
+  const url=grpAiProxyUrl();
+  if(!url){ const e=new Error(GRP_AI_MSG.noProxy); e.noProxy=true; return Promise.reject(e); }
+  let i=0;
+  function attempt(){
+    return grpAiFetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:GRP_AI_MODELS[i],max_tokens:8000,system:system,messages:messages})})
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if(d&&d.error) throw new Error(d.error.message||'AI 오류');
+        const t=d&&(d.reply||d.text||((d.content||[]).filter(function(b){ return b&&b.type==='text'; }).map(function(b){ return b.text; }).join('')));
+        if(!t) throw new Error('AI 응답이 비어 있습니다');
+        return t;
+      })
+      .catch(function(e){
+        if(e&&e.timeout) throw e;                                    // 끊긴 것은 모델 탓이 아니다
+        if(i<GRP_AI_MODELS.length-1){ i++; return attempt(); }       // 프록시가 모델을 막으면 다음 모델로
+        throw e;
+      });
+  }
+  return attempt();
+}
+/* 자리 표시로 바꿀 이름 — 보고서 company(이름·대표자·담당자)는 모듈이 넣는다. 여기서는 사업장 이름·계약 업체명·다른 담당자 */
+function grpAiNames(st){
+  const out=[{v:st.coName,as:'[해당 기업]'}];
+  const cc=(st.input&&st.input.cons&&st.input.cons.company)||{};
+  if(cc.name) out.push({v:cc.name,as:'[해당 기업]'});
+  if(cc.ceo) out.push({v:cc.ceo,as:'[대표자]'});
+  const prim=String(((st.report&&st.report.company)||{}).contact||'').trim();
+  let n=1;
+  (cc.contacts||[]).forEach(function(c){
+    const nm=String((c&&c.name)||'').trim();
+    if(!nm||nm===prim) return;
+    n++; out.push({v:nm,as:'[담당자'+n+']'});
+  });
+  return out;
+}
+/* 회차마다 그날 일정 메모(사전진단 뺌) — 날짜로 잇는다. 보고서에서 더한 회차는 '' */
+function grpAiMemos(st){
+  const sc=((st.input&&st.input.scheds)||[]).filter(function(s){ return s&&s.phase!=='pre'; });
+  return ((st.report&&st.report.rounds)||[]).map(function(r){
+    const d=String((r&&r.date)||'');
+    if(!d) return '';
+    return sc.filter(function(s){ return String(s.date||'')===d; })
+      .map(function(s){ return String(s.memo||'').trim(); }).filter(Boolean).join(' / ');
+  });
+}
+function grpAiCan(st){
+  if(!st||!st.formKey||!st.report) return {ok:false,why:''};
+  if(st.locked) return {ok:false,why:GRP_AI_MSG.locked};
+  if(st.techguard&&!st.aiAllow) return {ok:false,why:GRP_AI_MSG.tg};
+  return {ok:true,why:''};
+}
+/* 사람이 고친 AI 칸을 찾아 표시를 뗀다 — 뗀 경로 목록 */
+function grpAiSync(st){
+  st=st||_grp;
+  const gone=[];
+  if(!st||!st.aiSrc||!st.report) return gone;
+  st.aiVal=st.aiVal||{}; st.aiWarn=st.aiWarn||{};
+  Object.keys(st.aiSrc).forEach(function(p){
+    if(st.aiSrc[p]!=='ai') return;
+    const v=grpGet(st.report,p);
+    if(String(v==null?'':v)!==String(st.aiVal[p]==null?'':st.aiVal[p])){
+      delete st.aiSrc[p]; delete st.aiVal[p]; delete st.aiWarn[p]; gone.push(p);
+    }
+  });
+  return gone;
+}
+/* 저장할 AI 칸 목록 — 사람이 고친 것은 빼고 */
+function grpAiFields(st){
+  st=st||_grp;
+  if(!st||!st.aiSrc) return [];
+  grpAiSync(st);
+  return Object.keys(st.aiSrc).filter(function(p){ return st.aiSrc[p]==='ai'&&GRP_AI_PATH.test(p); }).sort();
+}
+/* 보고서에서 더한 회차를 빼면 그 뒤 회차의 AI 표시를 한 칸씩 당긴다. 되돌리기는 번호가 어긋나므로 버린다 */
+function grpAiDropRound(st,i){
+  if(!st||!st.aiSrc) return;
+  const move=function(m){
+    const o={};
+    Object.keys(m||{}).forEach(function(p){
+      const x=/^rounds\.(\d+)\.(.+)$/.exec(p);
+      if(!x){ o[p]=m[p]; return; }
+      const n=+x[1];
+      if(n===i) return;
+      o[n>i?'rounds.'+(n-1)+'.'+x[2]:p]=m[p];
+    });
+    return o;
+  };
+  st.aiSrc=move(st.aiSrc); st.aiVal=move(st.aiVal); st.aiWarn=move(st.aiWarn); st.aiUndo=null;
+}
+/* 기술보호 — 「이번 건 AI 사용」 켜기/끄기(이 창에서만, 저장하지 않는다) */
+function grpAiAllow(){
+  const st=_grp;
+  if(!st||!st.techguard||st.locked) return false;
+  if(st.aiAllow){ st.aiAllow=false; grpRenderTop(); grpRenderWarn(); return false; }
+  if(!grpAsk('🔒 기술보호 사업장입니다.\n이번 건에 AI 초안을 쓸까요?\n\n켜도 회차 날짜·메모만 보냅니다(메일·보낸 서류·기술 자료는 보내지 않습니다).')) return false;
+  st.aiAllow=true; grpRenderTop(); grpRenderWarn();
+  return true;
+}
+/* ✨ AI 초안 */
+async function grpAiDraft(){
+  const st=_grp;
+  if(!st||!st.formKey||!st.report||st.ask||st.loading) return {ok:false};
+  if(st.aiBusy) return {ok:false,error:'AI 초안을 쓰는 중입니다'};
+  const can=grpAiCan(st);
+  if(!can.ok){ toast(can.why,'err'); return {ok:false,error:can.why}; }
+  grpReadForm(); grpAiSync(st);
+  const A=PuGovReportAi;
+  const req=A.buildRequest(st.report,st.feed,st.formKey,
+    {techguard:!!st.techguard,src:st.aiSrc,names:grpAiNames(st),memos:grpAiMemos(st)});
+  if(!req.want.length){ toast(GRP_AI_MSG.none); return {ok:false,error:GRP_AI_MSG.none}; }
+  if(!grpAiProxyUrl()){ toast(GRP_AI_MSG.noProxy,'err'); grpNote(escAttr(GRP_AI_MSG.noProxy)); return {ok:false,error:GRP_AI_MSG.noProxy}; }
+  if(!grpAiConsent()) return {ok:false,cancelled:true};                 // 동의 안 하면 아무것도 보내지 않는다
+  st.aiBusy=true; grpRenderTop();
+  let draft=null, err=null;
+  try{
+    for(let k=0;k<2&&!draft;k++){                                      // 못 읽으면 한 번 더 묻는다
+      const text=await grpAiCall(req.system,req.messages);
+      try{ draft=A.parseDraft(text,req.back); }catch(e){ if(!e.parse) throw e; err=e; }
+    }
+  }catch(e){ err=e; }
+  st.aiBusy=false;
+  if(_grp!==st) return {ok:false,error:'창이 바뀌었습니다'};
+  if(!draft){
+    const m=(err&&err.noProxy)?GRP_AI_MSG.noProxy:(err&&err.parse)?GRP_AI_MSG.parse:GRP_AI_MSG.net;
+    console.warn('[보고서] AI 초안 실패',err);
+    toast(m,'err'); grpNote(escAttr(m)); grpRenderTop();
+    return {ok:false,error:m};
+  }
+  if(st.locked){ toast(GRP_AI_MSG.locked,'err'); grpRenderTop(); return {ok:false,error:GRP_AI_MSG.locked}; }
+  grpReadForm(); grpAiSync(st);                                        // 기다리는 동안 사람이 고친 칸
+  const res=A.applyDraft(st.report,st.aiSrc,draft,req.fields);
+  st.report=res.report; st.aiSrc=res.src;
+  Object.keys(res.undo.put).forEach(function(p){ st.aiVal[p]=res.undo.put[p]; });
+  if(res.filled.length) st.aiUndo=res.undo;
+  const warn=A.checkDraft(draft,req.sent,req.limits);
+  res.filled.forEach(function(p){ if(warn[p]) st.aiWarn[p]=warn[p]; else delete st.aiWarn[p]; });
+  grpNote(''); grpRender();
+  const nw=res.filled.filter(function(p){ return warn[p]; }).length;
+  toast(res.filled.length
+    ?'AI 초안을 '+res.filled.length+'칸에 넣었습니다'+(nw?' — 확인 필요 '+nw+'칸':'')+'. 읽고 고친 뒤 저장하세요'
+    :'AI 초안에 새로 넣을 칸이 없었습니다');
+  return {ok:true,filled:res.filled};
+}
+/* ↶ 직전 AI 넣기 되돌리기 — 그 뒤 사람이 고친 칸은 그대로 */
+function grpAiUndo(){
+  const st=_grp;
+  if(!st||!st.report||st.locked||!st.aiUndo) return {ok:false};
+  grpReadForm(); grpAiSync(st);
+  const u=PuGovReportAi.undoDraft(st.report,st.aiSrc,st.aiUndo);
+  st.report=u.report; st.aiSrc=u.src;
+  u.restored.forEach(function(p){
+    if(st.aiSrc[p]==='ai') st.aiVal[p]=grpGet(st.report,p); else delete st.aiVal[p];
+    delete st.aiWarn[p];
+  });
+  st.aiUndo=null;
+  grpRender();
+  toast('AI 초안 '+u.restored.length+'칸을 되돌렸습니다'+(u.kept.length?' — 그 뒤 고친 '+u.kept.length+'칸은 그대로 둡니다':''));
+  return {ok:true,restored:u.restored,kept:u.kept};
 }
 /* ── 그리기 ── */
 function grpSrcLabel(st,f){
