@@ -199,6 +199,8 @@ tr.gone td{opacity:.62}
 .pop-head{display:flex;align-items:center;gap:8px;margin-bottom:10px;font-size:15px;color:var(--navy)}
 table.kv th{width:120px;background:none;white-space:nowrap;vertical-align:top}
 table.kv td{white-space:normal;word-break:break-all}
+/* 폰 — 「사전규격 등록번호」 같은 긴 칸 이름이 6px 삐져나갔다(2026-10-10 실측 375px). 칸 이름도 접게 한다 */
+@media (max-width:640px){ table.kv th{width:84px;white-space:normal;word-break:keep-all} }
 .pop-sub{font-weight:700;color:var(--navy);margin:12px 0 6px}
 table.cmp td{white-space:nowrap}
 #lock{position:fixed;inset:0;z-index:9999;background:var(--bg);display:none;
