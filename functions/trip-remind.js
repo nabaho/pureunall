@@ -49,6 +49,17 @@ function 서울ms(ymd, hm) {
 function 서울hm(ms) { return new Date(ms + 9 * 3600e3).toISOString().slice(11, 16); }
 function 서울날(ms) { return new Date(ms + 9 * 3600e3).toISOString().slice(0, 10); }
 
+/* 제목 앞 시각 — 「1000 가나상사」「0930-1500 …」「10:30 …」 → 「HH:MM」, 없으면 "".
+     pu-cal.html 제목시각 과 «같은 꼴»만 시각으로 본다(연도 「2026년」·날짜 「2026-10」은 시각이 아니다).
+     ⚠ 화면(js/pu-cal-map.js titleTime) ↔ 서버(functions/trip-remind.js titleTime) 같은 셈 — 검사가 맞대 본다. */
+function titleTime(title) {
+  const m = /^\s*([01]\d|2[0-3]):?([0-5]\d)(?![\d년.\/]|-\d{1,2}(?!\d))/.exec(s(title));
+  return m ? m[1] + ':' + m[2] : '';
+}
+/* 종일 일정의 제목 시각 — 「2026 일터혁신 …」 같은 연도(2020~2039, 쌍점 없음)는 빼고 (js/pu-cal-map.js allDayTime 과 같다) */
+function allDayTime(title) { return /^\s*20[23]\d(?![:\d])/.test(s(title)) ? '' : titleTime(title); }
+function 하루뒤(ymd) { return new Date(Date.parse(ymd + 'T00:00:00Z') + 86400e3).toISOString().slice(0, 10); }
+
 function 설정(v) {
   const c = Object.assign({}, 기본, v && typeof v === 'object' ? v : {});
   c.leadMin = Math.min(240, Math.max(15, Number(c.leadMin) || 기본.leadMin));
@@ -87,16 +98,31 @@ function pickTrips(input) {
       startMs: t, title: 자름(title, 80) || '일정', place: p });
   }
   (o.gcal || []).forEach((ev) => {
-    if (!ev || ev.status === 'cancelled' || !ev.start || !ev.start.dateTime) return;  /* 종일 일정은 출발 시각이 없다 */
+    if (!ev || ev.status === 'cancelled' || !ev.start || !(ev.start.dateTime || ev.start.date)) return;
     const 만든이 = (ev.creator && ev.creator.email) || (ev.organizer && ev.organizer.email) || '';
     /* 서버가 직원 대신 넣은 일정(gcal-proxy)은 만든이가 대표 계정이다 — 담당 번호(puSid)가 이긴다 */
     const 담당 = 담당번호(ev);
     const 참석 = (ev.attendees || []).some((a) => a && a.responseStatus !== 'declined' && 대표메일(a.email));
     const 내것 = 담당 ? 담당 === cfg.ownerSid : 대표메일(만든이);
     if (!(내것 || 참석 || 표식있음(ev.summary, cfg.titleMarks))) return;
+    /* ★ 제목 앞 시각(2026-10-10) — 직원들은 시각을 제목 앞에 적는다(「1000 가나상사」).
+         ① 종일 일정(하루짜리) + 제목 시각 → 그 시각. 제목 시각이 없으면 출발 시각을 몰라 뺀다.
+         ② 구글 시각이 새벽(00:00~05:59) + 제목 시각 → 제목 시각(화면 제목시각 과 같은 결정).
+            안 그러면 「00:30 · 0930 방문」 알림이 전날 밤 11시에 울린다. */
+    if (ev.start.date) {
+      const 끝 = ev.end && ev.end.date;
+      if (끝 && 끝 > 하루뒤(ev.start.date)) return;                  /* 여러 날 종일 */
+      const t = allDayTime(ev.summary);
+      if (!t) return;
+      넣기('gcal', ev.id, ev.start.date, t, ev.summary, ev.location);
+      return;
+    }
     const ms = Date.parse(ev.start.dateTime);
     if (!isFinite(ms)) return;
-    넣기('gcal', ev.id, 서울날(ms), 서울hm(ms), ev.summary, ev.location);
+    let 시 = 서울hm(ms);
+    const t = titleTime(ev.summary);
+    if (t && 시 < '06:00') 시 = t;
+    넣기('gcal', ev.id, 서울날(ms), 시, ev.summary, ev.location);
   });
   Object.keys(o.schedules || {}).forEach((id) => {
     const x = o.schedules[id];
@@ -138,7 +164,8 @@ function make(deps) {
     const uid = Object.keys(roles).find((u) => roles[u] && s(roles[u].sid) === cfg.ownerSid
       && s(roles[u].status) !== 'resigned') || '';
 
-    const timeMin = new Date(now).toISOString(), timeMax = new Date(now + cfg.leadMin * 60e3).toISOString();
+    /* 오늘 0시(서울)부터 받는다 — 새벽 구글 시각·종일 일정은 «이미 지난» 것으로 보여 now 부터 받으면 빠진다 */
+    const timeMin = new Date(Date.parse(서울날(now) + 'T00:00:00+09:00')).toISOString(), timeMax = new Date(now + cfg.leadMin * 60e3).toISOString();
     const url = 'https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(GARCH.CAL_ID)
       + '/events?key=' + (deps.apiKey || API_KEY) + '&singleEvents=true&orderBy=startTime&maxResults=250'
       + '&timeMin=' + encodeURIComponent(timeMin) + '&timeMax=' + encodeURIComponent(timeMax);
@@ -191,3 +218,5 @@ module.exports.pickTrips = pickTrips;
 module.exports.알림글 = 알림글;
 module.exports.설정 = 설정;
 module.exports.표식있음 = 표식있음;
+module.exports.titleTime = titleTime;
+module.exports.allDayTime = allDayTime;
