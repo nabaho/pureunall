@@ -52,6 +52,36 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .note{display:flex;gap:10px;align-items:flex-start;background:var(--amber-bg);border:1px solid var(--amber-line);color:var(--amber);border-radius:10px;padding:8px 12px;font-size:12.5px;line-height:1.55;margin-bottom:10px}
 .note b{font-weight:700}
 .funnel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:6px 8px;margin-bottom:6px}
+.guide{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;gap:8px;margin-bottom:8px;align-items:stretch}
+.guide .gs{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 11px;font-size:12.5px;line-height:1.5;color:var(--ink2)}
+.guide .gs b{color:var(--blue-d)}
+.guide .gs button{margin-top:3px}
+.law{margin-bottom:8px;font-size:12.5px}
+.law summary{cursor:pointer;color:var(--mute)}
+.law .note{margin-top:6px}
+.modal{display:none;position:fixed;inset:0;z-index:60;background:rgba(15,23,42,.5);align-items:center;justify-content:center;padding:18px}
+.modal.on{display:flex}
+.mbox{background:var(--card);border-radius:12px;width:min(900px,100%);height:min(92vh,900px);display:flex;flex-direction:column;overflow:hidden;box-shadow:0 10px 30px rgba(15,23,42,.3)}
+.mhead{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid var(--line)}
+.mhead h3{margin:0;font-size:15px}
+.mhead .sp{flex:1}
+.mtabs{display:flex;gap:4px}
+.mtabs button.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-d);font-weight:700}
+.mwho{padding:6px 14px;font-size:12.5px;color:var(--ink2);background:var(--bg);border-bottom:1px solid var(--line)}
+.mbody{flex:1;min-height:0;display:flex}
+.mbody iframe{flex:1;border:0;background:#ffffff}
+.mbody pre{flex:1;margin:0;padding:14px 18px;overflow:auto;white-space:pre-wrap;word-break:keep-all;font:13.5px/1.7 -apple-system,'Malgun Gothic',sans-serif}
+.mfoot{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:9px 14px;border-top:1px solid var(--line)}
+.mfoot .hint{flex:1;font-size:12px;color:var(--mute)}
+@media (min-width:1101px){
+  th.ck,td.ck{position:sticky;left:0;z-index:1;background:var(--card)}
+  th.no,td.no{position:sticky;left:34px;z-index:1;background:var(--card);min-width:38px}
+  th.co,td.co{position:sticky;left:72px;z-index:1;background:var(--card);box-shadow:1px 0 0 var(--line2)}
+  .tbl thead th.ck,.tbl thead th.no,.tbl thead th.co{z-index:4;background:var(--bg)}
+  tbody tr:hover td.ck,tbody tr:hover td.no,tbody tr:hover td.co{background:var(--bg)}
+  tbody tr.cur td.ck,tbody tr.cur td.no,tbody tr.cur td.co{background:var(--blue-bg)}
+}
+@media (max-width:1100px){ .guide{grid-template-columns:1fr} }
 .fsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:stretch}
 .fsteps>button{font-size:12px;padding:3px 10px;white-space:nowrap}
 .fs{border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
@@ -118,8 +148,6 @@ td.ct{letter-spacing:2px}
 .ico{display:inline-block;width:20px;text-align:center;font-size:13px}
 .pgm{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);font-weight:700}
 td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
-.prev{margin-top:6px}.prev summary{cursor:pointer;font-weight:600;font-size:13px}
-.prev iframe{width:100%;height:560px;border:1px solid var(--line2);border-radius:8px;margin-top:6px;background:#ffffff}
 .mails .m{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--line);font-size:13px}
 .mails .m:last-child{border-bottom:0}.mails .m .em{font-weight:600;word-break:break-all}
 .route{font-size:12.5px;line-height:1.55;border-radius:8px;padding:6px 9px;margin:6px 0}
@@ -182,6 +210,7 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
     <span class="sub">법인회생 · 포괄적 금지명령 기업 → 우편 안내</span>
     <span id="who"></span>
     <span class="sp"></span>
+    <button class="sm pri" onclick="openForm()">📄 홍보양식 보기</button>
     <button class="sm" id="refreshBtn" onclick="reload()">새로고침</button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
@@ -190,11 +219,17 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
 <div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>회생광고는 대표 전용입니다.</p></div>
 
 <main id="app" style="display:none">
-  <div class="note">
+  <div class="guide" id="guide">
+    <div class="gs"><b>① 대상을 좁힙니다</b><br>아래 <b>깔때기</b>의 「연락처 확보」「거래·연결 있음」, 지역·공고일, 거르개로 보낼 곳만 남깁니다.</div>
+    <div class="gs"><b>② 홍보양식을 확인합니다</b><br>보낼 안내문과 메일 본문이 어떻게 나가는지 팝업으로 봅니다.<br><button class="sm pri" onclick="openForm()">📄 홍보양식 보기</button></div>
+    <div class="gs"><b>③ 골라서 보냅니다</b><br>맨 앞 ☐로 고르고 <b>📮 발송 예정</b> → <b>🖨 안내문 + 라벨</b> 인쇄 → 우편 발송 뒤 <b>✅ 발송 완료로</b>.</div>
+    <button class="sm" onclick="$('guide').style.display='none';lsSet('guideOff','1')" title="안내 닫기" style="align-self:start">닫기 ✕</button>
+  </div>
+  <details class="law"><summary>⚖️ 왜 우편으로 보내나요? (법적 유의)</summary><div class="note">
     <span>⚖️</span>
     <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조) 기업을 매일 아침 모읍니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
     안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
-  </div>
+  </div></details>
 
   <div id="fixbar">
   <div class="funnel" id="funnel"></div>
@@ -259,7 +294,7 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
       <table>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
-          <th class="no">번호</th><th>포괄금지명령</th><th>회사명</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
+          <th class="no">번호</th><th class="co">회사명</th><th>포괄금지명령</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -268,6 +303,23 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
     <aside class="detail" id="detail"></aside>
   </div>
 </main>
+<div class="modal" id="formModal" onclick="if(event.target===this) closeForm()">
+  <div class="mbox" role="dialog" aria-modal="true" aria-label="홍보양식 보기">
+    <div class="mhead">
+      <h3>📄 홍보양식</h3>
+      <span class="mtabs"><button class="sm" id="mtLetter" onclick="formTab('letter')">우편 안내문</button><button class="sm" id="mtMail" onclick="formTab('mail')">메일 본문</button></span>
+      <span class="sp"></span>
+      <button class="sm" onclick="closeForm()">닫기 ✕</button>
+    </div>
+    <div class="mwho" id="mwho"></div>
+    <div class="mbody" id="mbody"></div>
+    <div class="mfoot">
+      <button class="pri" onclick="formPrint()">🖨 인쇄·PDF</button>
+      <button id="mCopy" onclick="formCopy()">📋 메일 본문 복사</button>
+      <span class="hint">우편은 안내문을 인쇄해 발송합니다. 메일은 거래 관계가 확인된 곳에만 보냅니다.</span>
+    </div>
+  </div>
+</div>
 <div id="toast"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -432,8 +484,9 @@ function draw(){
     var ce=ceoOf(n.id);
     return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
       '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
-      '<td class="no">'+(i+1)+'</td><td><span class="chip pgm" style="margin-left:0" title="포괄적 금지명령 공고일">포괄금지명령 '+esc(pgmDate(n).slice(5))+'</span></td>'+
+      '<td class="no">'+(i+1)+'</td>'+
       '<td class="co" title="'+esc(n.debtorName)+'">'+esc(n.debtorName)+'<span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></td>'+
+      '<td><span class="chip pgm" style="margin-left:0" title="포괄적 금지명령 공고일">포괄금지명령 '+esc(pgmDate(n).slice(5))+'</span></td>'+
       '<td class="ceo" title="'+esc(ce.src)+'">'+(ce.name?esc(ce.name):'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td>'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc(courtShort(n)+' '+n.caseNo)+'</td>'+
@@ -553,17 +606,39 @@ function drawDetail(){
   if(ev.length){ h+='<div class="sec"><h3>사건 진행 이력</h3><ul class="tl">'+ev.map(function(e){ return '<li><span class="d">'+esc(e.d.slice(5))+'</span><span>'+esc(e.t)+'</span></li>'; }).join('')+'</ul></div>'; }
 
   h+='<div class="sec"><h3>홍보양식 (안내문) <span class="sp"></span><button class="sm" onclick="printOne(\'letters\')">🖨 인쇄·PDF</button></h3>'+
-    '<details class="prev"'+(PREV_OPEN?' open':'')+' ontoggle="previewToggle(this)"><summary>'+esc(n.debtorName)+' 앞 안내문 미리보기</summary>'+
-    (PREV_OPEN?'<iframe sandbox="" srcdoc="'+esc(RehabLetter.buildDocument([withCeo(n)],'letters',{noPrint:true,draft:true}))+'"></iframe>':'')+'</details>'+
+    '<button class="sm pri" onclick="openForm()">📄 '+esc(n.debtorName)+' 앞 안내문·메일 본문 크게 보기</button>'+
     '<div style="font-size:11.5px;color:var(--mute);margin-top:4px">우편으로 보낼 때는 이 안내문을 인쇄하고, 메일로 보낼 때는 인쇄창에서 PDF로 저장해 푸른 메일에 첨부하세요.</div></div>';
   h+='<div class="sec"><h3>상태</h3><div class="st-btns">'+['new','send','hold','skip','sent'].map(function(k){
     return '<button class="sm'+(st===k?' on':'')+'" onclick="setStatus(\''+esc(n.id)+'\',\''+k+'\')">'+STATUS[k]+'</button>'; }).join('')+'</div>'+
     '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="sm" onclick="printOne(\'both\')">🖨 이 회사 안내문 + 라벨</button><button class="sm" onclick="printOne(\'letters\')">안내문만</button></div></div>';
   el.innerHTML=h;
 }
-var PREV_OPEN=false;
-/* 미리보기를 펼칠 때 그 자리에서 문서를 만든다 — 패널을 다시 그리면 적던 칸이 지워진다 */
-function previewToggle(d){ PREV_OPEN=d.open; if(d.open && !d.querySelector('iframe') && NOTICES[CUR]){ var f=document.createElement('iframe'); f.setAttribute('sandbox',''); f.srcdoc=RehabLetter.buildDocument([withCeo(NOTICES[CUR])],'letters',{noPrint:true,draft:true}); d.appendChild(f); } }
+var FORM={tab:'letter'};
+function formTarget(){
+  var n=NOTICES[CUR];
+  if(n) return { n:withCeo(n), real:true, existing:!!(MATCH[n.id]&&(MATCH[n.id].client||MATCH[n.id].contract)) };
+  return { n:{ debtorName:'○○○ 주식회사', zip:'', address:'(본점 주소)', dlvAddress:'', ceoName:'' }, real:false, existing:false };
+}
+function openForm(){ FORM.tab='letter'; $('formModal').classList.add('on'); drawForm(); }
+function closeForm(){ $('formModal').classList.remove('on'); $('mbody').innerHTML=''; }
+function formTab(t){ FORM.tab=t; drawForm(); }
+function drawForm(){
+  var t=formTarget(), n=t.n;
+  $('mtLetter').classList.toggle('on',FORM.tab==='letter'); $('mtMail').classList.toggle('on',FORM.tab==='mail');
+  $('mwho').innerHTML = t.real ? '보는 회사: <b>'+esc(n.debtorName)+'</b>'+(n.ceoName?' · 대표 '+esc(n.ceoName):'')+' — 목록에서 다른 회사를 누르면 그 회사 이름으로 바뀝니다.'
+                               : '예시 화면입니다 — 목록에서 회사를 누른 뒤 다시 열면 그 회사 이름이 들어갑니다.';
+  if(FORM.tab==='letter'){
+    $('mbody').innerHTML='<iframe sandbox="" title="안내문"></iframe>';
+    $('mbody').firstChild.srcdoc=RehabLetter.buildDocument([n],'letters',{noPrint:true,draft:true});
+  } else {
+    $('mbody').innerHTML='<pre></pre>';
+    $('mbody').firstChild.textContent='제목: '+RehabLetter.MAIL_SUBJECT+'\n\n'+RehabLetter.buildPlainText(n,{ceo:n.ceoName,existing:t.existing});
+  }
+  $('mCopy').style.display = FORM.tab==='mail' ? '' : 'none';
+}
+function formPrint(){ var t=formTarget(); printList([NOTICES[CUR]||t.n],'letters'); }
+function formCopy(){ var t=formTarget(); copyText(RehabLetter.MAIL_SUBJECT+'\n\n'+RehabLetter.buildPlainText(t.n,{ceo:t.n.ceoName,existing:t.existing})); }
+document.addEventListener('keydown',function(e){ if(e.key==='Escape' && $('formModal').classList.contains('on')) closeForm(); });
 function courtShort(n){ return String(n.courtName||'').replace('지방법원','지법').replace(/법원$/,''); }
 function withCeo(n){ return Object.assign({}, n, { ceoName: ceoOf(n.id).name }); }
 var SRC_NAME={erp:'이알피 업체관리',contract:'이알피 계약',biz:'기업정보함 사업자등록증',card:'기업정보함 명함'};
@@ -738,6 +813,7 @@ function boot(){
   $('pager').addEventListener('click',function(e){ var b=e.target.closest('[data-pg]'); if(!b) return; PG+=Number(b.getAttribute('data-pg')); draw(); $('tblbox').scrollTop=0; });
   $('pager').addEventListener('change',function(e){ if(e.target.id==='pgSize'){ PSIZE=Number(e.target.value)||50; lsSet('pgSize',String(PSIZE)); PG=0; draw(); } });
   window.addEventListener('resize',fitLayout);
+  if(lsGet('guideOff')==='1') $('guide').style.display='none';
   $('funnel').addEventListener('click',function(e){
     if(e.target.closest('[data-more]')){ FUN_OPEN=!FUN_OPEN; draw(); return; }
     var st=e.target.closest('[data-step]'); if(st){ funnelClick(st.getAttribute('data-step')); return; }
