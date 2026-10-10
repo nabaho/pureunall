@@ -21,10 +21,8 @@ const vm = require('node:vm');
 const R = path.join(__dirname, '..');
 const SRC = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n');
 
-/* 주석을 걷는다 — 주석 속 옛 식(「×8」 등)에 검사가 속지 않게 */
-function stripComments(s){
-  return s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"\\])\/\/[^\n]*/g, '$1');
-}
+/* 주석을 걷는다 — 주석 속 옛 식(「×8」 등)에 검사가 속지 않게. 함수 «조각»이라 stripJs(공용 걷개) */
+const { stripJs } = require('./strip-comments.js');
 /* 맨 앞 칸의 function 하나를 잘라 온다 — 다음 맨 앞 칸 function 앞까지 */
 function fnSrc(name){
   const i = SRC.indexOf('\nfunction ' + name + '(');
@@ -44,7 +42,7 @@ const ymd = d => d ? (d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(
 
 /* ── ① 퇴사 처리 화면 ── */
 test('① 퇴사 화면의 연차수당은 «통상임금 1일분 × 남은 일수» — 일급에 ×8 을 또 곱하지 않는다', () => {
-  const body = stripComments(fnSrc('RetireModal'));
+  const body = stripJs(fnSrc('RetireModal'));
   const m = body.match(/var\s+annualPay\s*=\s*([^;]+);/);
   assert.ok(m, 'annualPay 를 셈하는 줄이 없습니다');
   assert.doesNotMatch(m[1], /\*\s*8\b/, '연차수당 식에 «×8» 이 다시 들어왔습니다 — 하루치를 시급처럼 쓰면 약 7배가 됩니다');
@@ -53,7 +51,7 @@ test('① 퇴사 화면의 연차수당은 «통상임금 1일분 × 남은 일�
 });
 
 test('① 퇴사 화면의 퇴직금은 법정 계산(calcLegalSeverance)을 쓰고, DC 가입자는 금액 대신 안내한다', () => {
-  const body = stripComments(fnSrc('RetireModal'));
+  const body = stripJs(fnSrc('RetireModal'));
   assert.match(body, /calcLegalSeverance\s*\(/, '퇴직금은 평균임금으로 세는 calcLegalSeverance 를 불러야 합니다');
   assert.doesNotMatch(body, /daily\s*\*\s*30\s*\*\s*years/, '옛 식(기본급÷30×30×근속)이 남아 있습니다');
   assert.match(body, /getStaffPension\s*\(/, 'DC 가입 여부를 보지 않습니다 — DC 가입자에게 법정 퇴직금을 또 잡으면 이중 지급입니다');
@@ -62,7 +60,7 @@ test('① 퇴사 화면의 퇴직금은 법정 계산(calcLegalSeverance)을 쓰
 
 /* ── ② 증명서 ── */
 test('② 퇴직자에게는 재직증명서를 «뽑는 값» 자체가 경력증명서로 바뀐다 (고르개만 막지 않는다)', () => {
-  const body = stripComments(fnSrc('Certificate'));
+  const body = stripJs(fnSrc('Certificate'));
   assert.match(body, /var\s+kind\s*=\s*\(\s*isRetiredSel\s*&&[^;]*'employment'[^;]*\)\s*\?\s*'career'/,
     '퇴직자 + 재직증명서 조합이 그대로 통과합니다 — 「~ 현재」 문서가 직인과 함께 나갑니다');
   assert.match(body, /disabled\s*:\s*isRetiredSel\s*&&\s*k\.v\s*===\s*'employment'/, '고르개에서도 퇴직자 재직증명서를 막아야 합니다');
@@ -129,7 +127,7 @@ test('④ 연차 잔여는 퇴직일(retireDate)에서 멈춘다 — 퇴직자 �
 });
 
 test('④ 휴가관리 화면의 부여 계산도 모두 retireDate 를 넘긴다', () => {
-  const body = stripComments(fnSrc('LeaveManagement'));
+  const body = stripJs(fnSrc('LeaveManagement'));
   const calls = body.match(/calcGrantDays\([^)]*\)/g) || [];
   assert.ok(calls.length >= 2, 'calcGrantDays 부르는 곳을 못 찾았습니다');
   const bad = calls.filter(c => !/retireDate/.test(c) && !/^calcGrantDays\(hireDate/.test(c));
@@ -144,7 +142,7 @@ test('사번정리·명부 가져오기의 콘솔 백업은 주민번호·계좌
   const out = ctx.f([{ sid: 'X-1', name: '가', rrn: '000000-0000000', accountNo: '1', loginPw: 'p', hireDate: '2020-01-01' }])[0];
   for (const k of ['rrn', 'accountNo', 'loginPw']) assert.equal(k in out, false, k + ' 가 콘솔에 찍힙니다');
   assert.equal(out.sid, 'X-1', '사번은 되돌리기에 필요합니다');
-  const code = stripComments(SRC);
+  const code = stripJs(SRC);
   assert.doesNotMatch(code, /console\.log\('\[사번정리 백업\] user_accounts',\s*JSON\.stringify\(curUsers\)\)/);
   assert.doesNotMatch(code, /console\.log\('\[근로자명부 가져오기 백업\]',\s*JSON\.stringify\(users\)\)/);
 });
