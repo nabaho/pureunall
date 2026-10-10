@@ -81,4 +81,5 @@ test('★ 다른 업무 목록도 맨 왼쪽 □·# (분개장·계정별원장�
   assert.ok(fnSrc('ledgerView').includes('<td class="ckcol"></td><td colspan="3">합계 / 기말잔액</td>'), '합계 줄 칸이 밀린다');
   assert.ok(fnSrc('f15View').includes('<td colspan="7" class="muted">기본재산 변동'), '빈 줄 칸이 모자란다');
   assert.ok(fnSrc('printLedger').includes('.ckcol{display:none}'), '인쇄에 □ 가 나간다');
+  assert.ok(fnSrc('journalView').includes("_n(daySum)+'</td><td class=\"mo\"></td></tr>'"), '분개장 소계 줄이 한 칸 모자란다');
 });

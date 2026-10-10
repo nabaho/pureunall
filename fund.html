@@ -16709,7 +16709,7 @@ function journalView(arr){
   function dayLine(){
     if(prevDate===null||dayN<2) return '';
     return '<tr style="background:var(--bg);font-size:11.5px;color:var(--sub)"><td class="ckcol"></td><td colspan="2">'+esc(prevDate)+' 소계 ('+dayN+'건)</td>'
-      +'<td></td><td style="text-align:right">'+_n(daySum)+'</td><td></td><td style="text-align:right">'+_n(daySum)+'</td></tr>';
+      +'<td></td><td style="text-align:right">'+_n(daySum)+'</td><td></td><td style="text-align:right">'+_n(daySum)+'</td><td class="mo"></td></tr>';
   }
   jr.forEach(function(e){
     if(e.date!==prevDate){ rows+=dayLine(); prevDate=e.date; dayN=0; daySum=0; }
