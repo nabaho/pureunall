@@ -157,12 +157,13 @@ test('★★ 화면에 적힌 주기가 «코드와 같다»', () => {
   const sync = scheduleOf(FSYNC, 'syncMailbox');
   assert.strictEqual(send.every, 15, '메일 보내기 주기가 바뀌었다');
   assert.strictEqual(pay.every, 30, '급여자료 주기가 바뀌었다');
-  assert.deepStrictEqual(sync, { every:10, hours:15, first:7, last:21 },
-    '메일 받기가 밤에도 돌거나 업무 중 10분 주기가 바뀌었다');
+  /* 검사고정-허용 — 3분은 대표 지시(2026-10-10 「실시간 연동」)로 정한 값이다. 바꾸면 화면의 하루 횟수·요금 말이 함께 바뀌어야 한다 */
+  assert.deepStrictEqual(sync, { every:3, hours:15, first:7, last:21 },
+    '메일 받기가 밤에도 돌거나 업무 중 3분 주기가 바뀌었다');
 
-  assert.ok(ENTER.indexOf('메일 받기 07~21시 10분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번') >= 0,
+  assert.ok(ENTER.indexOf('메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번') >= 0,
     '뜻풀이의 주기가 코드와 다르다');
-  assert.ok(ENTER.indexOf('메일 받기 07~21시 10분마다 · 메일 보내기 15분마다 · 급여자료 30분마다') >= 0,
+  assert.ok(ENTER.indexOf('메일 받기 07~21시 3분마다 · 메일 보내기 15분마다 · 급여자료 30분마다') >= 0,
     '줄 설명의 주기가 코드와 다르다');
   assert.ok(ENTER.indexOf('홈페이지 뉴스 모으기 하루 한 번') >= 0,
     '줄 설명의 주기가 코드와 다르다');

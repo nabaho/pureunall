@@ -687,6 +687,29 @@ function goneKeys(haveKeys, uids) {
   });
 }
 
+/* ── 칸마다 «지난 회차에 살아 있던 번호 목록»을 짧게 적어 둔다 (대표 지시 2026-10-10) ──
+   「다음 메일에서 삭제하면 자동으로 삭제하고 실시간 연동되게」
+   지난 목록과 이번 목록을 견주면 지운 것을 «폴더 전체를 안 읽고» 안다(goneKeys 에 그대로 넣는다).
+   번호는 계정 전체에서 매겨져 17만번대까지 가므로 «차이»로 줄여 36진수로 적는다 —
+   400통이 1~2KB 다. ⚠ 순서를 정렬해서 적는다(차이가 늘 양수여야 풀 수 있다). */
+function aliveEncode(uids) {
+  const list = (uids || []).map(Number).filter((n) => n > 0).sort((a, b) => a - b);
+  let prev = 0;
+  return list.map((n) => { const d = n - prev; prev = n; return d.toString(36); }).join('.');
+}
+function aliveDecode(s) {
+  const out = [];
+  let prev = 0;
+  String(s || '').split('.').forEach((t) => {
+    if (!t) return;
+    const d = parseInt(t, 36);
+    if (!Number.isFinite(d) || d <= 0) return;
+    prev += d;
+    out.push(prev);
+  });
+  return out;
+}
+
 /* 새로 매겨졌으면 지난 목록은 버려야 한다 — 같은 번호가 다른 메일을 가리킨다. */
 function uidReset(sync, uidValidity) {
   const old = Number((sync || {}).uv || 0);
@@ -702,6 +725,6 @@ module.exports = {
   folderNameBad, childPath, renamedPath,
   textPartOf, decodePart, toText, looksUtf8, previewFrom, unentity, isHeadLine, PREVIEW_MAX,
   ROW_VER, needsRefetch, folderDone,
-  pickToFetch, uidSet, nextSync, uidReset, goneKeys,
+  pickToFetch, uidSet, nextSync, uidReset, goneKeys, aliveEncode, aliveDecode,
   sweepNeeded, sweepUnread,
 };
