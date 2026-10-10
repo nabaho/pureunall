@@ -63878,10 +63878,11 @@ function MyDeskV2(props){
     /* ★ 휴가관리·근태관리와 «같은» 장부(erpLeaveGrants)에서 — 예전에는 여기만 따로 세어 기산일(2021-06-01)·
          소정근로시간을 무시했고, 같은 사람이 대시보드 18일·휴가관리 17일로 보였다 (2026-10-10) */
     if(String(getLeaveStartDate(me.hireDate)) > year + '-12-31') return null;
-    var autoDays = erpLeaveGrantedInYear(me, year).days;
+    var _gyMe = erpLeaveGrantedInYear(me, year);
+    var autoDays = _gyMe.days;
     // 오버라이드
     var ov = grants[sid] && grants[sid][year] ? grants[sid][year] : null;
-    var total = ov && ov.total!=null ? ov.total : autoDays;
+    var total = ov && ov.total!=null ? ov.total + erpRulingFixDays(_gyMe.list) : autoDays;
     var carryOver = ov ? (ov.carryOver||0) : 0;
     var grant = total + carryOver;
     // 사용량
@@ -76559,6 +76560,9 @@ function _lvGrantsFrom(eff, until, P, okUnit){
      ★ 전환 날에 «판결식으로 받았어야 할 이번 주기 몫»이 실제로 받은 것보다 많으면 그 차이를 전환 날짜로 «보정» 부여한다
        — 누구도 법정보다 적게 받지 않게. 되돌리려면 LEAVE_RULING_FROM 을 '9999-12-31' 로. */
 var LEAVE_RULING_FROM = '2026-10-10';
+/* 판결식 전환 «보정» 몫 — 손으로 고친 부여일수(leave_grants)는 판결 전환 «전»에 정한 값이라 보정분을 덮으면 안 된다.
+   그래서 수기 부여가 있는 해에도 이 몫은 «위에 더한다» (2026-10-10 실제 화면에서 찾음 — 사무장 17일이 18일이 아니었다) */
+function erpRulingFixDays(list){ return (list || []).filter(function(g){ return g && /전환 보정/.test(String(g.label || '')); }).reduce(function(s, g){ return s + (+g.days || 0); }, 0); }
 function erpLeaveGrants(u, untilYmd, policy){
   var out = [];
   if(!u || !u.hireDate) return out;
@@ -76573,7 +76577,7 @@ function erpLeaveGrants(u, untilYmd, policy){
   var cut = LEAVE_RULING_FROM;
   /* ① 전환 날까지 — 예전 규칙(2021-06-01 기산) 그대로 */
   var before = _lvGrantsFrom(_lvParse(PUREUN_5IN_DATE), until < cut ? until : cut, P);
-  if(until <= cut) return before;
+  if(until < cut) return before;   // 전환 날 «당일»까지 세면 보정분(전환 날짜)이 들어가야 한다 — 2026-10-10 실제 화면에서 찾음
   /* ② 판결식 — 실제 입사일 기산, 단위기간이 «통째로» 5인 이상 전환일 뒤인 것만 */
   var ruling = _lvGrantsFrom(actual, until, P, function(unitStart){ return unitStart >= PUREUN_5IN_DATE; });
   var after = ruling.filter(function(g){ return g.date > cut; });
@@ -76638,9 +76642,10 @@ function getLeaveRemain(sid, year){
   var _retD = u.retireDate || u.leaveDate;
   if(_retD){ var ld=new Date(_retD); if(!isNaN(ld.getTime())&&ld<yearEnd) yearEnd=ld; }
   /* ★ 그해에 «실제로 생긴» 날짜의 합 — 발생 장부(erpLeaveGrants) 한 벌에서 (2026-10-10) */
-  var autoDays = (hire <= yearEnd) ? erpLeaveGrantedInYear(u, y).days : 0;
+  var _gyU = (hire <= yearEnd) ? erpLeaveGrantedInYear(u, y) : { days:0, list:[] };
+  var autoDays = _gyU.days;
   var ov = grants[sid] && grants[sid][y] ? grants[sid][y] : null;
-  var total = ov && ov.total!=null ? ov.total : autoDays;
+  var total = ov && ov.total!=null ? ov.total + erpRulingFixDays(_gyU.list) : autoDays;
   var carry = ov ? (ov.carryOver||0) : 0;
   var grant = total + carry;
   var atts = dbGet('attendance_records', []).filter(function(r){
@@ -77941,7 +77946,7 @@ function LeaveManagement(){
     leaveUsers.forEach(function(u){
       var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
       var ov=grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-      var t=ov&&ov.total!=null?ov.total:a.days;
+      var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
       var co=ov?(ov.carryOver||0):0;
       var us=calcUsed(u.sid,selYear);
       rows.push([u.name,u.title,u.hireDate||'',a.days,co,t+co,Math.round(us.used*10)/10,Math.round((t+co-us.used)*10)/10,ov?'수동':'자동']);
@@ -78057,7 +78062,7 @@ function LeaveManagement(){
               leaveUsers.map(function(u,i){
                 var a  = calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
                 var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-                var t  = ov&&ov.total!=null?ov.total:a.days;
+                var t  = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
                 var co = ov?(ov.carryOver||0):0;
                 var gr = t+co;
                 var us = calcUsed(u.sid,selYear);
@@ -78162,11 +78167,11 @@ function LeaveManagement(){
                     (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
                 h('td',{colSpan:2,style:{padding:'7px',textAlign:'right',fontFamily:'monospace'}},''),
                 h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total:a.days;var co=ov?(ov.carryOver||0):0;return s+t+co;},0)),
+                  leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;var co=ov?(ov.carryOver||0):0;return s+t+co;},0)),
                 h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
                   Math.round(leaveUsers.reduce(function(s,u){return s+calcUsed(u.sid,selYear).used;},0)*10)/10),
                 h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  Math.round(leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total:a.days;var co=ov?(ov.carryOver||0):0;return s+(t+co-calcUsed(u.sid,selYear).used);},0)*10)/10),
+                  Math.round(leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;var co=ov?(ov.carryOver||0):0;return s+(t+co-calcUsed(u.sid,selYear).used);},0)*10)/10),
                 h('td',null),
                 h('td',null),
                 h('td',null)
@@ -78203,7 +78208,10 @@ function LeaveManagement(){
             '푸른노무법인은 ',h('strong',null,'2021년 06월 01일'),' 5인이상 사업장으로 전환되어 근로기준법상 연차가 적용되었습니다.',
             h('br',null),
             '이전 입사자의 연차는 ',h('strong',null,'2021-06-01'),
-            '부터 기산하며, 실제 입사일('+selUser.hireDate+')로부터 2021-05-31까지는 연차 미발생 기간입니다.'
+            '부터 기산하며, 실제 입사일('+selUser.hireDate+')로부터 2021-05-31까지는 연차 미발생 기간입니다.',
+            h('br',null),
+            /* 2026-10-10 대법원 2023도5476 판결식 전환 — 지난 부여분은 그대로, 다음부터 실제 입사일 기산·가산 */
+            h('strong',null,LEAVE_RULING_FROM+'부터'),' 대법원 2024. 12. 12. 선고 2023도5476 판결에 따라 실제 입사일 기준으로 셉니다(지난 부여분은 그대로 · 모자란 몫은 보정 부여).'
           ),
           // 잔여 프로그레스 바
           h('div',{style:{background:'#e2e8f0',borderRadius:'4px',height:'8px',overflow:'hidden'}},

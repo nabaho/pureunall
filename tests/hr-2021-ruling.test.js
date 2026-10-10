@@ -31,7 +31,7 @@ const yearOnly = l => l.filter(g => g.kind === 'year').map(g => [g.date, g.days]
 
 test('① 전환 날까지는 예전 규칙(2021-06-01 기산) 그대로 — 이미 준 연차를 거두지 않는다', () => {
   const E = env();
-  const before = yearOnly(E.G({ hireDate: '2019-07-18' }, E.CUT));
+  const before = yearOnly(E.G({ hireDate: '2019-07-18' }, '2026-10-09'));   // 전환 날 «전날»까지
   assert.equal(JSON.stringify(before), JSON.stringify([['2022-06-01', 15], ['2023-06-01', 15], ['2024-06-01', 16], ['2025-06-01', 16], ['2026-06-01', 17]]));
 });
 
@@ -49,6 +49,18 @@ test('② 전환 뒤는 실제 입사일 기념일 · 가산도 실제 입사일
   const E = env();
   const after = yearOnly(E.G({ hireDate: '2019-07-18' }, '2028-12-31')).filter(([d]) => d > E.CUT && !/-10-10$/.test(d));
   assert.equal(JSON.stringify(after), JSON.stringify([['2027-07-18', 18], ['2028-07-18', 19]]));
+});
+
+test('★ 전환 날 «당일»까지 세면 보정분이 들어간다 (2026-10-10 실제 화면에서 찾음 — 오늘이 전환 날이라 빠졌다)', () => {
+  const E = env();
+  const fix = E.G({ hireDate: '2019-07-18' }, E.CUT).filter(g => /전환 보정/.test(g.label));
+  assert.equal(fix.length, 1);
+});
+
+test('★ 손으로 고친 부여일수가 있어도 보정분은 «위에 더한다» — 수기 값은 전환 전에 정한 것', () => {
+  const S = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8');
+  assert.ok((S.match(/ov\.total ?\+ ?erpRulingFixDays\(/g) || []).length >= 6, '수기 부여가 보정분을 덮는 자리가 남았습니다');
+  assert.doesNotMatch(S, /ov ?&& ?ov\.total ?!= ?null ?\? ?ov\.total ?: ?(a\.days|autoDays)/, '보정분 없이 수기 값만 쓰는 자리가 남았습니다');
 });
 
 test('2021-06-01 이후 입사자는 아무것도 안 바뀐다', () => {
