@@ -963,6 +963,7 @@
     /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
     + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
     + '.pcf-tsub{padding-left:26px!important;font-size:12px}.pcf-tclosed{margin-top:4px;border-top:1px dashed #e2e8f0;color:#64748b}'
+    + '.pcf-tk.pcf-tset{padding-left:12px;border-left:4px solid #cbd5e1;border-radius:4px 6px 6px 4px;margin:2px 0;font-weight:600}.pcf-tk.pcf-tset:hover{filter:brightness(.96)}.pcf-tk.pcf-tset.on{font-weight:700}.pcf-tk.pcf-tset.on i{background:rgba(255,255,255,.25);color:#fff}'
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
     + '.pcf-printb:hover{background:#f1f5f9}'
@@ -1102,6 +1103,7 @@
     + '.pcf-tsel{width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-family:inherit;background:#fff;color:#334155;font-weight:600}'
     + '.pcf-lp{width:330px;flex:none;display:flex;flex-direction:column;border:1px solid #e2e8f0;border-right:none;border-radius:8px 0 0 8px;background:#fff;min-height:0}'
     + '.pcf-cols.card .pcf-lp{width:auto;flex:1;border-right:1px solid #e2e8f0;border-radius:8px}'
+    + '.pcf-setnote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border-radius:6px;font-size:12px;color:#334155}.pcf-setnote .pcf-b{margin-left:auto}'
     + '.pcf-lh{padding:6px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;flex-direction:column;gap:5px}'
     + '.pcf-lhr{display:flex;gap:4px;align-items:center}.pcf-lhr .pcf-q{flex:1;min-width:0;max-width:none}'
     + '.pcf-lbody{flex:1;min-height:0;overflow-y:auto}.pcf-lbody .pcf-list{width:auto;border:none;height:auto;overflow:visible}'
@@ -2447,7 +2449,19 @@
     }
     function cur() { return S.sel ? S.forms.filter(function (x) { return x.id === S.sel; })[0] || null : null; }
     function curKind() { return S.kind; }
-    function shown() { var cv = S.kind === '_closed'; return moreFilter(filterForms(S.forms, { kind: cv ? '' : S.kind, closed: cv, side: S.side, grp: S.grp, q: S.q }), S.src, S.use); }
+    /* ★ 세트 보기 (대표 2026-10-10 「대시보드가 서로 다른 내용으로 동시에 눌리고 내용이 연결이 안 된다」)
+       왼쪽에서 눌린 곳은 «하나»다 — 계약 종류 · 🗄 종료 서식 · 세트 중 하나. 세트를 누르면 목록 칸에 «그 세트의 서류만» 보이고(체크된 채),
+       다른 종류를 누르면 세트 보기는 풀린다. 전에는 종류와 세트가 함께 눌린 채 목록은 종류 전체를 보여 줬다. */
+    function setViewList() {
+      var st = S.setView ? setById(S.setView) : null;
+      if (!st) return null;
+      var by = {}; S.forms.forEach(function (f) { by[f.id] = f; });
+      var q = String(S.q || '').trim().toLowerCase();
+      return (st.formIds || []).map(function (id) { return by[id]; }).filter(function (f) {
+        return f && !isClosed(f) && (!q || String(f.name || '').toLowerCase().indexOf(q) >= 0);
+      });
+    }
+    function shown() { var sv = setViewList(); if (sv) return moreFilter(sv, S.src, S.use); var cv = S.kind === '_closed'; return moreFilter(filterForms(S.forms, { kind: cv ? '' : S.kind, closed: cv, side: S.side, grp: S.grp, q: S.q }), S.src, S.use); }
     function resetFilters() { S.side = 'all'; S.grp = 'all'; S.q = ''; S.src = ''; S.use = ''; }
 
     function load() {
@@ -2490,16 +2504,17 @@
     function select(id) {
       S.sel = id || null;
       var fm = cur();
-      if (fm && isClosed(fm)) { if (S.kind !== '_closed') { S.kind = '_closed'; resetFilters(); } }
+      if (S.setView) { if (fm && !isClosed(fm)) S.kind = fm.kind; }   // 세트 보기에서는 종류·칩을 건드리지 않는다
+      else if (fm && isClosed(fm)) { if (S.kind !== '_closed') { S.kind = '_closed'; resetFilters(); } }
       else if (fm && fm.kind !== S.kind) { S.kind = fm.kind; resetFilters(); }
       /* 칩(측·사건유형)에 가려진 양식을 골랐으면 칩을 푼다 — 종이에는 뜨는데 목록에는 없는 일이 없게.
          (이름 찾기로 가려진 것은 그대로 둔다 — 글자를 칠 때마다 선택이 바뀌면 안 된다) */
-      if (fm && (S.side !== 'all' || S.grp !== 'all') && shown().indexOf(fm) < 0) { S.side = 'all'; S.grp = 'all'; }
+      if (!S.setView && fm && (S.side !== 'all' || S.grp !== 'all') && shown().indexOf(fm) < 0) { S.side = 'all'; S.grp = 'all'; }
       drawTree(); drawMain();
       if (host.onSelect) host.onSelect(S.sel);
     }
     function pickKind(v) {
-      S.kind = v; resetFilters();
+      S.kind = v; S.setView = null; resetFilters();
       var f0 = shown()[0];
       select(f0 ? f0.id : null);
     }
@@ -2815,25 +2830,35 @@
     function modal(o) { o.archiveFile = archiveFile; openModal(o); }
 
     /* ── 왼쪽 메뉴 — 계약유형만(양식 이름은 본문 목록) ── */
+    /* 세트마다 다른 색 — 위아래가 한눈에 갈리게(대표 지시 2026-10-10). 세트 열쇠를 글자 차례로 줄 세워 색을 돌려 쓴다 → 차례를 끌어 바꿔도 색은 그대로 */
+    var SET_COLORS = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#dc2626', '#4f46e5', '#0d9488'];
+    function setColor(id) {
+      var ids = S.sets.map(function (s) { return s.id; }).sort();
+      var i = ids.indexOf(id);
+      return SET_COLORS[(i < 0 ? 0 : i) % SET_COLORS.length];
+    }
     function drawTree() {
       var t = host.tree; if (!t) return;
       t.innerHTML = '';
       if (!S.loaded) return;
+      t.appendChild(el('div', { 'class': 'pcf-th', text: '📂 서식 종류' }));
       KINDS.forEach(function (k) {
         var n = S.forms.filter(function (f) { return f.kind === k.v && !isClosed(f); }).length;
-        var on = S.kind === k.v;
+        var on = !S.setView && S.kind === k.v;
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
       });
       /* 🗄 종료 서식 — 더 쓰지 않는 서식을 옮겨 두는 보관함(지우지 않는다) */
       var nClosed = S.forms.filter(isClosed).length;
-      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (S.kind === '_closed' ? ' on' : ''), 'aria-current': S.kind === '_closed' ? 'true' : null,
+      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (!S.setView && S.kind === '_closed' ? ' on' : ''), 'aria-current': !S.setView && S.kind === '_closed' ? 'true' : null,
         title: '더 쓰지 않는 서식을 옮겨 둔 곳 — 언제든 되살릴 수 있습니다', onclick: function () { pickKind('_closed'); } }, [el('span', { text: '🗄 종료 서식' }), el('i', { text: String(nClosed) })]));
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
       var setRows = S.sets.map(function (st) {
-        var on = S.setId === st.id;
-        var b = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), title: st.name + ' — 누르면 목록에 체크됩니다 · 끌어서 차례를 바꿉니다',
+        var on = S.setView === st.id, col = setColor(st.id);
+        var b = el('button', { type: 'button', 'class': 'pcf-tk pcf-tset' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
+          style: on ? 'background:' + col + ';border-left-color:' + col + ';color:#fff' : 'border-left-color:' + col + ';background:' + col + '14',
+          title: st.name + ' — 누르면 이 세트의 서류만 목록에 체크되어 나옵니다 · 끌어서 차례를 바꿉니다',
           onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]);
         t.appendChild(b);
         if (st.id === CHEDANG_SET_ID) esignTk();   // 👥 집단체불 세트는 체당금 접수 세트 바로 밑
@@ -3057,6 +3082,17 @@
               [it.label, el('small', { text: String(it.n) })]);
           }))]);
       }
+      var setNow = S.setView ? setById(S.setView) : null;
+      if (setNow) {
+        var scol = setColor(setNow.id);
+        return el('div', { 'class': 'pcf-lh' }, [
+          el('div', { 'class': 'pcf-lhr' }, [q, el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
+            chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
+            chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
+          el('div', { 'class': 'pcf-setnote', style: 'border-left:4px solid ' + scol + ';background:' + scol + '14' }, [
+            el('b', { text: '📦 ' + setNow.name }), el('span', { text: ' — 이 세트의 서류 ' + (setViewList() || []).length + '개가 체크되어 있습니다' }),
+            el('button', { type: 'button', 'class': 'pcf-b', text: '종류별로 보기', onclick: function () { pickKind(S.kind === '_closed' ? 'company' : S.kind); } })])]);
+      }
       if (kind === '_closed') row.push(el('div', { 'class': 'pcf-muted', style: 'font-size:11.5px', text: '종료한 서식 — 목록과 계약서 출력에서 빠져 있습니다. 되살리거나 완전히 지울 수 있습니다.' }));
       if (kind === 'case') {
         var fc = facetCounts(S.forms, 'case', S.side);
@@ -3169,8 +3205,9 @@
       S.setId = st.id;
       if (!S.checked.length) { toast('이 세트의 양식이 모두 지워졌습니다'); drawMain(); return; }
       if (S.checked.length < (st.formIds || []).length) toast('세트 양식 ' + ((st.formIds || []).length - S.checked.length) + '개는 지워져 뺐습니다');
+      S.setView = st.id;
       var first = S.forms.filter(function (f) { return f.id === S.checked[0]; })[0];
-      if (first && (first.kind !== S.kind || shown().indexOf(first) < 0)) select(first.id); else drawMain();
+      if (first) select(first.id); else drawMain();
     }
     function saveAsSet() {
       var ids = checkedForms().map(function (f) { return f.id; }); if (!ids.length) return;   // 그사이 지워진 양식은 넣지 않는다
@@ -3181,7 +3218,7 @@
       var fs0 = S.forms.filter(function (f) { return f.id === ids[0]; })[0] || {};
       var ns = { id: newId('fs-'), name: name, formIds: ids, kind: fs0.kind || S.kind, at: Date.now() };
       track(changeSets(db, function (doc) { doc.v.push(ns); return doc; })).then(function (list) {
-        S.sets = list; S.setId = ns.id; drawMain(); toast('세트를 저장했습니다 — ' + name);
+        S.sets = list; S.setId = ns.id; S.setView = ns.id; drawTree(); drawMain(); toast('세트를 저장했습니다 — ' + name);
       }, function (e) { toast('⚠ 세트를 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
     }
     /* 이름 바꾸기·지우기. 기본 세트를 지우면 rm 에 남긴다(안 남기면 다음에 도로 생긴다) */
@@ -3210,7 +3247,7 @@
         }
         return doc;
       })).then(function (list) {
-        S.sets = list; if (!rename && S.setId === id) S.setId = null; drawMain();
+        S.sets = list; if (!rename && S.setId === id) S.setId = null; if (!rename && S.setView === id) S.setView = null; drawTree(); drawMain();
         toast(gone ? '이미 지워진 세트입니다' : rename ? '이름을 바꿨습니다' : '세트를 지웠습니다');
       }, function (e) { toast('⚠ 저장하지 못했습니다 — ' + ((e && e.message) || e)); });
     }
@@ -3268,7 +3305,7 @@
       if (!list.length) tb.appendChild(el('tr', null, [el('td', { colspan: '4', 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: S.kind === '_closed' ? '종료한 서식이 없습니다 — 양식의 ⋯ 메뉴에서 「🗄 종료 서식으로 옮기기」' : '맞는 양식이 없습니다' })]));
       var prev = null, n = 0, rows = [];
       list.forEach(function (f) {
-        if (S.kind === 'case') {
+        if (S.kind === 'case' && !S.setView) {
           var g = groupOf(f);
           if (g !== prev) { prev = g; tb.appendChild(el('tr', { 'class': 'pcf-lgr' }, [el('td', { colspan: '4', 'class': 'pcf-lg', text: g })])); }
         }
@@ -3284,14 +3321,14 @@
           el('td', { 'class': 'pcf-lc' }, [ck]),
           el('td', { 'class': 'pcf-ln2' }, [el('span', { 'class': 'pcf-grip', 'aria-hidden': 'true', text: '⠿' }), String(n)]),
           el('td', { 'class': 'pcf-lnm' }, [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }),
-            S.kind === '_closed' ? el('span', { 'class': 'pcf-sd both', title: (f.closedAt || '') + ' 종료', text: kindInfo(f.kind).label }) : (sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null)]),
+            S.setView ? el('span', { 'class': 'pcf-sd both', text: kindInfo(f.kind).label }) : S.kind === '_closed' ? el('span', { 'class': 'pcf-sd both', title: (f.closedAt || '') + ' 종료', text: kindInfo(f.kind).label }) : (sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null)]),
           el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]);
         tb.appendChild(tr); rows.push({ id: f.id, node: tr });
       });
-      dragSort(rows, moveForm);
+      if (!S.setView) dragSort(rows, moveForm);   // 세트 보기의 차례는 아래 막대에서(세트 안 차례)
       col.appendChild(el('table', { 'class': 'pcf-lt' }, [el('thead', null, [el('tr', null, [el('th', { 'class': 'pcf-lc' }, [all]),
         el('th', { 'class': 'pcf-ln2', text: '#' }), el('th', { text: '양식 (' + list.length + ')' }), el('th', { 'class': 'pcf-lsrc', text: '원본' })])]), tb]));
-      if (S.kind !== '_closed') col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
+      if (S.kind !== '_closed' && !S.setView) col.appendChild(el('button', { type: 'button', 'class': 'pcf-li add', text: '+ 새 양식', onclick: function () { modal({ kind: S.kind, onSave: save }); } }));
       return col;
     }
     function cardGrid(list) {
