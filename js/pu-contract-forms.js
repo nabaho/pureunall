@@ -2369,12 +2369,15 @@
       function onKey(e) { if (e.key === 'Escape') close(); }
       document.addEventListener('keydown', onKey);
       var listBox = el('div', { style: 'display:flex;flex-direction:column;gap:4px' }), prevBox = el('div', { style: 'border:1px solid #cbd5e1;background:#fff;border-radius:6px;padding:10px 14px;font-family:serif;font-size:13.5px;line-height:1.9;white-space:pre' });
-      var note = el('div', { 'class': 'pcf-fnote' });
+      var note = el('div', { 'class': 'pcf-fnote' }), showGone = false;
       function draw() {
         var ros = CF.lawyersRoster(S.lawDir, S.lawLoa);
         listBox.innerHTML = ''; var on = ros.filter(function (r) { return r.on; });
         if (!ros.length) listBox.appendChild(el('div', { 'class': 'pcf-muted', text: '직원 명부를 읽지 못했습니다 — 기본 명단(' + CF.lawyersNow() + ')을 씁니다' }));
-        ros.forEach(function (r, i) {
+        /* 퇴사한 사람은 접어 둔다 — 옛 명부가 길다(스물 남짓). 들어가는 사람·휴직 중인 사람만 먼저 */
+        var gone = ros.filter(function (r) { return r.why === '퇴사'; });
+        if (gone.length) listBox.appendChild(el('button', { type: 'button', 'class': 'pcf-b', style: 'align-self:flex-start;margin-bottom:2px', text: (showGone ? '▾ 퇴사 ' : '▸ 퇴사 ') + gone.length + '명 ' + (showGone ? '접기' : '보기'), onclick: function () { showGone = !showGone; draw(); } }));
+        ros.filter(function (r) { return showGone || r.why !== '퇴사'; }).forEach(function (r, i) {
           listBox.appendChild(el('div', { style: 'display:flex;gap:10px;align-items:center;padding:5px 8px;border:1px solid ' + (r.on ? '#bbf7d0' : '#e2e8f0') + ';border-radius:6px;background:' + (r.on ? '#f0fdf4' : '#f8fafc') + ';' + (r.on ? '' : 'color:#94a3b8') }, [
             el('span', { style: 'width:20px;text-align:right', text: r.on ? String(on.indexOf(r) + 1) : '–' }),
             el('b', { text: r.name }), el('span', { style: 'font-size:12px', text: r.title || r.sid }),
