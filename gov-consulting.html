@@ -5945,6 +5945,8 @@ function applySession(){
   setTimeout(()=>{ checkNewAssignments(); },3200);
   /* 업무관리에서 건너왔으면 그 일정을 연다 — 자료가 올 때까지 기다린다 */
   setTimeout(openFromLink,300);
+  setTimeout(openFromReportLink,300);
+  setTimeout(openFormsFromLink,300);
 }
 
 /* 업무관리에서 「줄을 눌러」 건너온 자리 — 주소 끝에 #sc=<일정번호> 가 붙는다
@@ -5969,6 +5971,48 @@ function openFromLink(){
     if(++tries>LINK_TRIES){
       linkClear();
       toast('그 일정을 찾지 못했습니다 — 지워졌거나 볼 수 없는 일정입니다','err');
+      return;
+    }
+    setTimeout(look,LINK_WAIT);
+  })();
+}
+
+/* 컨설팅보고서 앱(gov-report.html)에서 건너온 자리 — #rpt=<업체>|<사업> 이면 그 보고서 창, #forms 면 ⚙ 양식 서고
+   (대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱」 · 설계 docs/superpowers/specs/2026-10-10-gov-report-app-design.md §1·§5).
+   ★ #sc= 와 같은 기다리기 — 자료가 늦게 오므로 나타날 때까지 15초 기다린다.
+   ⚠ 클라우드가 붙기(FB_READY) 전에는 열지 않는다 — 저장본을 못 읽은 채 열면 빈 초안이 보이고, 그대로 저장하면 덮는다.
+   ⚠ 권한(확정은 담당·부담당·관리자, 서고는 관리자)은 열린 창의 규칙 그대로다. */
+function linkRpt(){
+  const m=/[#&]rpt=([^&]+)/.exec(location.hash||'');
+  if(!m)return null;
+  let raw=m[1];
+  try{ raw=decodeURIComponent(m[1]); }catch(e){}
+  const p=raw.split('|');
+  return (p.length===2&&p[0]&&p[1])?{coId:p[0],typeId:p[1]}:null;
+}
+function openFromReportLink(){
+  const t=linkRpt();
+  if(!t)return;
+  let tries=0;
+  (function look(){
+    const ok=FB_READY&&getCos().some(c=>c&&c.id===t.coId)&&getTypes().some(x=>x&&x.id===t.typeId);
+    if(ok){ linkClear(); grpOpenReport(t.coId,t.typeId); return; }
+    if(++tries>LINK_TRIES){
+      linkClear();
+      toast('그 보고서를 찾지 못했습니다 — 지워졌거나 볼 수 없는 사업장입니다','err');
+      return;
+    }
+    setTimeout(look,LINK_WAIT);
+  })();
+}
+function openFormsFromLink(){
+  if(!/[#&]forms(?:&|$)/.test(location.hash||''))return;
+  let tries=0;
+  (function look(){
+    if(getSession()){ linkClear(); grpOpenForms(); return; }
+    if(++tries>LINK_TRIES){
+      linkClear();
+      toast('로그인한 뒤 ⚙ 양식 서고를 다시 열어 주세요','err');
       return;
     }
     setTimeout(look,LINK_WAIT);
