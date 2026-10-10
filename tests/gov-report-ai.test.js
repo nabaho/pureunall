@@ -136,3 +136,31 @@ test('parseDraft — 못 읽으면 parse 표시가 있는 오류', () => {
     assert.throws(() => A.parseDraft(t), (e) => e.parse === true && /AI 답을 읽지 못했습니다/.test(e.message), JSON.stringify(t));
   }
 });
+
+test('parseDraft — 회차 번호 i 는 0 이상 정수 또는 숫자 글자만(null·true·[]·"" 은 버린다)', () => {
+  const mk = (i) => JSON.stringify({ rounds: [{ i, inquiry: '글' }, { i: 0, advice: '정상' }] });
+  for (const bad of [null, true, [], '']) {
+    assert.deepEqual(A.parseDraft(mk(bad)).rounds, [{ i: 0, advice: '정상' }], JSON.stringify(bad));
+  }
+  assert.deepEqual(A.parseDraft(mk('1')).rounds.map((r) => r.i), [1, 0]);
+});
+
+test('buildRequest — techguard 양식은 opts 없이도 날짜·메모만(닫힌 쪽으로 실패)', () => {
+  const q = A.buildRequest(rep(), feed(), 'techguard', {});
+  const body = JSON.parse(q.sent);
+  assert.deepEqual(body.자료, []);
+  assert.ok(!('이미_쓴_종합' in body) && !('이미_쓴_칸' in body.회차[0]) && !('방식' in body.회차[0]));
+  assert.ok(!q.sent.includes('의견서') && !q.sent.includes('취업규칙 검토 요청') && !q.sent.includes('사람이 쓴 검토'));
+});
+
+test('buildRequest — 본문은 가린 뒤 자른다(경계에 걸친 전화번호·메일이 새지 않는다)', () => {
+  for (const tail of ['041-000-0000', 'hong@example.com']) {
+    for (let pad = 1490; pad <= 1500; pad++) {
+      const f = [{ d: '2025-09-02', kind: '받은 메일', text: '제목', att: [], priv: false, body: 'x'.repeat(pad) + ' ' + tail + ' 끝' }];
+      const q = A.buildRequest(rep(), f, 'cci-north', {});
+      assert.ok(!/041-|hong@|@example|example\.com|000-0000/.test(q.sent), tail + ' pad ' + pad);
+    }
+  }
+  const emoji = [{ d: '2025-09-02', kind: '받은 메일', text: '제목', att: [], priv: false, body: 'x'.repeat(1499) + '😀😀' }];
+  assert.ok(!/[\ud800-\udbff](?![\udc00-\udfff])/.test(A.buildRequest(rep(), emoji, 'cci-north', {}).sent), '서로게이트 쌍이 갈라졌다');
+});

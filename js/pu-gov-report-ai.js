@@ -137,7 +137,8 @@
     var lim = {};
     Object.keys(LIMITS).forEach(function (k) { lim[k] = LIMITS[k]; });
     Object.keys(opts.limits || {}).forEach(function (k) { if (+opts.limits[k] > 0) lim[k] = +opts.limits[k]; });
-    var src = opts.src || {}, tg = !!opts.techguard, memos = opts.memos || [], want = [];
+    var src = opts.src || {}, tg = !!opts.techguard || formKey === 'techguard', memos = opts.memos || [], want = [];
+    var nm = baseNames(report).concat(opts.names || []);
     var rs = (report && Array.isArray(report.rounds)) ? report.rounds : [], sm = (report && report.summary) || {};
     var rounds = rs.map(function (r, i) {
       r = r || {};
@@ -166,14 +167,14 @@
       if (x.kind === '보낸 서류') o.서류 = str(x.text);
       else {
         o.제목 = str(x.text);
-        if (str(x.body)) o.본문 = str(x.body).slice(0, BODY_MAX);
+        if (str(x.body)) o.본문 = Array.from(mask(str(x.body), nm).text).slice(0, BODY_MAX).join('');   // 가린 뒤에 자른다(잘린 번호가 새지 않게)
       }
       data.push(o);
     });
     var input = { 양식: str(form.name), 회차: rounds, 자료: data };
     if (!tg && Object.keys(hadS).length) input.이미_쓴_종합 = hadS;
     input.채울_칸 = want;
-    var m = mask(JSON.stringify(input, null, 1), baseNames(report).concat(opts.names || []));
+    var m = mask(JSON.stringify(input, null, 1), nm);
     return { system: systemText(formKey, fields, lim), messages: [{ role: 'user', content: m.text }],
       sent: m.text, back: m.back, fields: fields, want: want, limits: lim };
   }
@@ -194,8 +195,9 @@
     var rounds = [];
     (Array.isArray(o.rounds) ? o.rounds : []).forEach(function (r) {
       if (!r || typeof r !== 'object') return;
+      var ok = (typeof r.i === 'number' && Number.isInteger(r.i) && r.i >= 0) || (typeof r.i === 'string' && /^\d+$/.test(r.i));
+      if (!ok) return;
       var i = Number(r.i);
-      if (!Number.isInteger(i) || i < 0 || typeof r.i === 'string' && !/^\d+$/.test(r.i)) return;
       var x = { i: i };
       ROUND_KEYS.forEach(function (k) { var v = un(r[k]); if (v) x[k] = v; });
       rounds.push(x);
