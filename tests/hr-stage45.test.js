@@ -92,7 +92,7 @@ test('다음 달 시작하는 휴직은 등록 즉시 «휴직»이 되지 않�
 
 test('지난 날짜의 휴직 표시 — 끝난 휴직도 그 날짜면 보인다', () => {
   const store = { leave_of_absence: [{ sid: 'A', status: 'ended', startDate: '2026-03-01', endDate: '2026-12-31', endedDate: '2026-06-30' }] };
-  const c = load(['getLoaList', 'getLoaStatus'], { dbGet: (k, d) => (k in store ? store[k] : d), todayYMD: () => '2026-10-10' });
+  const c = load(['getLoaList', 'erpLastWorkDay', 'getLoaStatus'], { USERS_SEED: [], dbGet: (k, d) => (k in store ? store[k] : d), todayYMD: () => '2026-10-10' });
   assert.ok(c.getLoaStatus('A', '2026-04-15'), '지난 달 급여표에서 휴직 표시가 사라집니다');
   assert.equal(c.getLoaStatus('A', '2026-08-01'), null, '일찍 끝난 뒤의 날짜까지 휴직으로 보입니다');
 });

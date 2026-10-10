@@ -26673,6 +26673,7 @@ function loaReconcileStatus(todayS){
     if(!x || !x.sid || x._deleted || x.status === 'cancelled' || !x.startDate) return;
     var end = x.endedDate || x.endDate || '9999-12-31';
     if(x.status === 'ended' && !x.endedDate && !x.endDate) return;
+    if(x.status === 'pending' || x.status === 'rejected') return;   // 아직 승인 안 된 휴직은 휴직이 아니다
     if(x.startDate <= t && t <= end) covering[x.sid] = x;
   });
   var changed = 0;
@@ -26687,6 +26688,35 @@ function loaReconcileStatus(todayS){
   return changed;
 }
 function setLoaList(list){ dbSet('leave_of_absence', list); }
+/* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 김석우 퇴사 뒤에도 질병휴직이 열려 있어
+   명부·급여·휴가 화면이 모두 «휴직»으로 보였다).
+   · 마지막 근무일 전에 시작한 휴직 → 종료(endedDate = 마지막 근무일, 종료일이 더 이르면 그 날)
+   · 마지막 근무일 뒤에 시작할 휴직 → 취소
+   ⚠ 지우지 않는다 — 휴직 이력(연차 출근율·급여 일할)은 남아야 한다. 이미 끝난·취소된 기록은 손대지 않는다.
+   ⚠ 한 건씩 올린다(dbUpsert) — 목록 통째 쓰기는 그 사이 남이 넣은 휴직을 지운다. */
+function erpCloseLoaForRetire(sid, lastDay){
+  if(!sid || !lastDay) return 0;
+  var n = 0, list = getLoaList() || [], all = list.slice();
+  list.forEach(function(x, i){
+    if(!x || x.sid !== sid || x._deleted) return;
+    if(x.status !== 'active' && x.status !== 'pending') return;
+    var upd;
+    if(x.startDate && x.startDate > lastDay) upd = Object.assign({}, x, { status:'cancelled', cancelledReason:'퇴직(' + lastDay + ') — 시작 전 취소', updatedAt:new Date().toISOString() });
+    else {
+      var end = (x.endDate && x.endDate < lastDay) ? x.endDate : lastDay;
+      upd = Object.assign({}, x, { status:'ended', endedDate:end, endedReason:'퇴직(' + lastDay + ')으로 종료', updatedAt:new Date().toISOString() });
+    }
+    all[i] = upd; n++;
+    if(!dbUpsert('leave_of_absence', upd)) setLoaList(all);
+  });
+  return n;
+}
+/* 퇴직자는 마지막 근무일 «뒤로는» 휴직자가 아니다 — 휴직 판정이 명부 상태를 함께 본다 */
+function erpLastWorkDay(sid){
+  var u = (dbGet('user_accounts', USERS_SEED) || []).find(function(x){ return x && x.sid === sid; });
+  if(!u || u.status !== 'retired') return '';
+  return String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+}
 
 // 두 날짜 사이 개월 수 (소수점 1자리)
 function monthsBetween(start, end){
@@ -26744,8 +26774,10 @@ function loaUsageText(startDate, endDate, unit){
 // 직원의 휴직 상태 (특정 날짜 기준)
 function getLoaStatus(sid, refDate){
   var date = refDate || todayYMD();
+  var _last = erpLastWorkDay(sid);
+  if(_last && date > _last) return null;   // 퇴직 뒤로는 휴직이 아니다 (2026-10-10)
   /* ★ 지난 날짜를 물으면 «끝난» 휴직도 본다 — 예전에는 종료 처리하는 순간 과거 달 급여표의 휴직 표시가 모두 사라졌다 (2026-10-10) */
-  var list = getLoaList().filter(function(x){ return x && x.sid===sid && x.status!=='cancelled' && !x._deleted && (x.status==='active' || date < todayYMD()); })
+  var list = getLoaList().filter(function(x){ return x && x.sid===sid && (x.status==='active' || x.status==='ended') && !x._deleted && (x.status==='active' || date < todayYMD()); })
     .map(function(x){ return (x.status === 'ended' && x.endedDate) ? Object.assign({}, x, { endDate:x.endedDate }) : x; });
   return list.find(function(x){
     return x.startDate <= date && (!x.endDate || x.endDate >= date);
@@ -36821,11 +36853,13 @@ function UserWithRateSection(){
                             });
                             dbSet('leave_of_absence', allLoa);
                           }
+                        } else if(newStatus === 'retired'){
+                          erpCloseLoaForRetire(x.sid, todayYMD());   // 퇴직: 진행 중·대기 휴직을 닫는다 (2026-10-10)
                         } else if(prevStatus === 'leave' && newStatus !== 'leave'){
                           // status='leave' → 다른 상태로 변경: 활성 LoA 자동 종료
                           var changed = false;
                           allLoa = allLoa.map(function(l){
-                            if(l.sid===x.sid && l.status!=='ended'){
+                            if(l.sid===x.sid && l.status==='active'){
                               changed = true;
                               return Object.assign({}, l, { status:'ended', endedDate:today });
                             }
@@ -73942,8 +73976,9 @@ function payrollLoaDays(sid, ym){
   out.days = dim;
   var list = (typeof getLoaList === 'function') ? getLoaList() : dbGet('leave_of_absence', []);
   (Array.isArray(list) ? list : []).forEach(function(x){
-    if(!x || x.sid !== sid || !x.startDate || x.status === 'cancelled' || x._deleted) return;
+    if(!x || x.sid !== sid || !x.startDate || x._deleted || (x.status !== 'active' && x.status !== 'ended')) return;
     var end = x.endedDate || x.endDate || last;
+    var _lw = erpLastWorkDay(sid); if(_lw && end > _lw) end = _lw;   // 퇴직 뒤 날짜를 무급일로 세지 않는다
     var a = x.startDate > first ? x.startDate : first, b = end < last ? end : last;
     if(a > b) return;
     var n = Math.round((Date.UTC(+b.slice(0,4), +b.slice(5,7)-1, +b.slice(8,10)) - Date.UTC(+a.slice(0,4), +a.slice(5,7)-1, +a.slice(8,10))) / 86400000) + 1;
@@ -76721,6 +76756,7 @@ function LeaveOfAbsenceTab(){
     var users0 = dbGet('user_accounts', USERS_SEED);
     var me0 = (users0 || []).find(function(u){ return u && u.sid === sid; });
     if(!me0) return;
+    if(me0.status === 'retired' || me0.status === 'scheduled') return;   // 퇴직자를 휴직으로 되살리지 않는다 (2026-10-10)
     if(!on && me0.status !== 'leave') return;   // 바꿀 것이 없으면 명부를 다시 쓰지 않는다
     var updated = users0.map(function(u){
       if(u.sid !== sid) return u;
@@ -76766,7 +76802,7 @@ function LeaveOfAbsenceTab(){
     setLeaves(next);
     if(!dbUpsert('leave_of_absence', it)) setLoaList(next);
     // ★ user_accounts status 자동 동기화 (status='active' 진행중일 때만)
-    if(it.status !== 'ended'){
+    if(it.status === 'active'){   // 대기·반려·취소 기록을 저장했다고 휴직이 되지 않는다
       syncUserStatus(it.sid, true, { startDate:it.startDate, endDate:it.endDate, reason:it.reason });
     } else {
       syncUserStatus(it.sid, false);
@@ -76794,9 +76830,13 @@ function LeaveOfAbsenceTab(){
   async function endLeave(it){
     if(!(await popConfirm('"' + (users.find(function(u){return u.sid===it.sid;})||{}).name + '" 휴직을 종료(복귀) 처리하시겠습니까?\n\n→ 휴직 상태: 종료\n→ 직원 상태: 재직'))) return;
     var today = todayYMD();
-    persist(leaves.map(function(x){
-      return x.id===it.id ? Object.assign({}, x, { status:'ended', endDate: x.endDate || today }) : x;
-    }));
+    /* ★ 끝난 날(endedDate)을 남긴다 — 예전에는 종료일이 미래(예: 12-31)로 남아 다음에 열면 다시 휴직이 되고
+         급여 무급일도 연말까지 셌다. 그 한 건만 올린다. (2026-10-10) */
+    var _endD = (it.endDate && it.endDate < today) ? it.endDate : today;
+    var _ended = Object.assign({}, it, { status:'ended', endDate: it.endDate || today, endedDate:_endD, updatedAt:new Date().toISOString() });
+    var _nextL = leaves.map(function(x){ return x.id===it.id ? _ended : x; });
+    setLeaves(_nextL);
+    if(!dbUpsert('leave_of_absence', _ended)) persist(_nextL);
     syncUserStatus(it.sid, false);
     showToast('휴직 종료 → 재직 복귀');
   }
@@ -77929,6 +77969,7 @@ function LeaveManagement(){
     return true;
   });
   var leaveLiveN = leaveBase.filter(function(u){ return !isGoneUser(u); }).length;
+  var leaveOnN = leaveBase.filter(function(u){ return !isGoneUser(u) && (u.status === 'leave' || !!getLoaStatus(u.sid)); }).length;
   var leaveGoneN = leaveBase.filter(isGoneUser).length;
   /* ★ 탭이 목록도 합계도 함께 가른다 — 재직 탭 합계에 퇴사자가 섞이지 않는다.
      검색해도 탭 밖 사람은 안 나온다(찾으려면 퇴사자 탭으로). */
@@ -78000,7 +78041,7 @@ function LeaveManagement(){
                   marginLeft: o.v==='retired' ? '4px' : 0,
                   background: on ? o.bg : '#fff', color: on ? o.c : '#94a3b8',
                   border:'1px solid '+(on ? o.bd : '#e2e8f0') } },
-                o.label + ' ' + o.n);
+                o.label + ' ' + o.n + (o.v === 'active' && leaveOnN ? ' (휴직 ' + leaveOnN + ' 포함)' : ''));
             })),
         // ★ 퇴직자 연차 재산정 미완료 경고
         (function(){
@@ -84636,7 +84677,10 @@ function StaffRoster(){
 
   function openRetire(u){ setDetailModal(null); setRetireModal(u); }
   function saveRetire(data){
+    data = Object.assign({}, data, { leaveStartDate:'', leaveEndDate:'' });
     persist(users.map(function(u){ return u.sid === data.sid ? data : u; }));
+    var _nl = erpCloseLoaForRetire(data.sid, data.lastWorkDate || data.retireDate || todayYMD());
+    if(_nl) showToast('🏠 진행 중이던 휴직 ' + _nl + '건을 퇴직일에 맞춰 닫았습니다');
     setRetireModal(null);
     setStatusTab('retired');
     showToast(data.name + ' 퇴사 처리 완료');
@@ -84861,7 +84905,7 @@ function StaffRoster(){
         arr.forEach(function(u){ var d=digits(u.rrn); if(d) byRrn[d]=u; if(u.name) byName[u.name.trim()]=u; });
         var maxA = 0;
         arr.forEach(function(u){ var m=/^A-(\d+)$/.exec(u.sid||''); if(m){ var n=parseInt(m[1],10); if(n>maxA) maxA=n; } });
-        var filled=0, added=0, skipped=0, noTitle=0;
+        var filled=0, added=0, skipped=0, noTitle=0; var _retiredNow=[];
         for(var r=hi+1;r<data.length;r++){
           var row=data[r]; if(!row||!row.length) continue;
           var nm=cName>=0?String(row[cName]||'').trim():'';
@@ -84883,7 +84927,7 @@ function StaffRoster(){
             /* 직위도 «비어 있을 때만» 채운다 — 여기 있는 값이 명부보다 최신일 수 있다 */
             if(titleTxt && !String(hit.title||'').trim()){ hit.title=titleTxt; did=true; }
             if(isRetired){
-              if(hit.status!=='retired'){ hit.status='retired'; did=true; }
+              if(hit.status!=='retired'){ hit.status='retired'; hit.leaveStartDate=''; hit.leaveEndDate=''; _retiredNow.push(hit); did=true; }
               if(retire && !hit.retireDate){ hit.retireDate=retire; did=true; }
             }
             if(did) filled++; else skipped++;
@@ -84913,6 +84957,8 @@ function StaffRoster(){
           }
         }
         persist(arr);
+        /* 명단에서 «퇴직»으로 바뀐 사람의 진행 중 휴직을 닫는다 (2026-10-10) */
+        _retiredNow.forEach(function(x){ erpCloseLoaForRetire(x.sid, x.lastWorkDate || x.retireDate || todayYMD()); });
         /* ★ 직위 없이 들어온 사람은 «세어서 말한다» — 조용히 넘어가면
              경력증명서를 뽑을 때에야 「직명 및 직위: -」를 보고 알게 된다. */
         showToast('📥 근로자명부: 빈칸 채움 '+filled+'명 / 퇴사자 신규 '+added+'명 / 변경없음 '+skipped+'명'

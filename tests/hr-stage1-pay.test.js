@@ -48,7 +48,7 @@ function payEnv(opt){
     vm.runInContext(fs.readFileSync(path.join(R, 'js', 'pu-simpletax.js'), 'utf8'), ctx);
   }
   vm.runInContext(between('var PAYROLL_RATES_2026 = {', '// ============ 보상휴가제') + '\n' + fnSrc('getLoaList').replace(/^function getLoaList[\s\S]*?\n/, '') +
-    '\nfunction getLoaList(){ return dbGet("leave_of_absence", []); }' +
+    '\nfunction getLoaList(){ return dbGet("leave_of_absence", []); }\n' + fnSrc('erpLastWorkDay') +
     '\nthis.calcPayroll = calcPayroll; this.calcPayrollFresh = calcPayrollFresh; this.payslipLines = payslipLines;' +
     ' this.erpPayRates = erpPayRates; this.erpIncomeTax = erpIncomeTax; this.payrollSnapshotOf = payrollSnapshotOf;' +
     ' this.calcIncomeTax2026 = calcIncomeTax2026; this.payslipMethods = payslipMethods;', ctx);
