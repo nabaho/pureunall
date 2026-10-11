@@ -311,8 +311,8 @@ test('폰 머리 — 구글 앱처럼 ☰ 가 왼쪽 맨 앞, 그다음 제목',
 test('폰 왼쪽 서랍 — ☰ 가 서랍을 연다(일정·일·주·월 + 새로고침), 옛 메뉴는 「더 보기」로 잇는다', () => {
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /if\(t\.hasAttribute\('data-mmenu'\)\)\{ S\.drawer = !S\.drawer;/);
-  assert.match(캘, /\[\["sched","일정"\],\["day","일"\],\["3day","3일"\],\["week","주"\],\["month","월"\]\]/);
-  assert.match(캘, /data-dreload="1">새로고침/);
+  assert.match(캘, /\[\["sched","일정","v_agenda"\],\["day","일","v_day"\],\["3day","3일","v_3day"\],\["week","주","v_week"\],\["month","월","v_month"\]\]/);
+  assert.match(캘, /data-dreload="1">' \+ 선아이콘\("refresh"\) \+ '새로고침/);
   assert.match(캘, /data-dmore="1">더 보기/);
   assert.match(캘, /if\(t\.hasAttribute\('data-dmore'\)\)\{ S\.drawer = false; S\.mobMenu = !S\.mobMenu;/);
 });
@@ -344,4 +344,11 @@ test('서랍 캘린더 체크 줄 — 공용 일정·나만 보기, 둘 다 켜�
   assert.match(캘, /\[\["shared","공용 일정","var\(--acc\)"\],\["priv","나만 보기","var\(--gsub\)"\]\]/);
   assert.match(캘, /if\(켜짐2\)\{ if\(지금 === null\) S\.filter = 다른; \}/);
   assert.match(캘, /else S\.filter = 지금 === 다른 \? null : 어느;/);
+});
+
+test('서랍 아이콘 + 주·3일 머리 음력 — 구글 앱 캡처', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /선아이콘\("refresh"\) \+ '새로고침/);
+  assert.match(캘, /<span class="gln">' \+ lunarDay\(ds\)/);
+  assert.match(캘, /v_month:"M3 3v8h8V3H3z/);
 });
