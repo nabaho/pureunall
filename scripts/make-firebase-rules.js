@@ -698,7 +698,9 @@ rules.scal_rptFormsIndex = { '.read': LOGIN, '.write': ADMIN };
      (scal_reports 와 같은 까닭: 규칙은 위에서 아래로 내려가며 한 군데라도 허락하면 통과한다).
    ★ 줄 모양은 화면 모듈(js/pu-gov-report-track.js)과 같은 값 — 상태 다섯 · 방식 넷 · 메모 200자 · 이름 40자 · 키 꼴
      (tests/gov-report-rules.test.js 가 둘을 맞춰 본다). rid 아래에는 items 말고 아무것도 못 쓴다.
-   ⚠ 게시는 대표 승인 뒤에만(scripts/rules-deploy.js). 게시 전에는 읽기·쓰기가 거절되고 화면은 읽기 전용으로 돈다. */
+   ★ 2026-10-11 — 줄에 선택 칸 link(받은 서류 연결) 하나를 더했다(아래 link 가지). 게시 대기.
+   ⚠ scal_docs 자체는 2026-10-11 부터 게시되어 돈다. 게시를 기다리는 것은 link 가지뿐 — 게시 전에는 link 가 든 저장만 거절된다.
+     게시는 대표 승인 뒤에만(scripts/rules-deploy.js). */
 const SCAL_DOCS_DAY = "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)";
 rules.scal_docs = {
   '.read': LOGIN,
@@ -720,6 +722,20 @@ rules.scal_docs = {
           note:   { '.validate': 'newData.isString() && newData.val().length <= 200' },
           how:    { '.validate': "newData.isString() && newData.val().matches(/^(mail|platform|post|other)$/)" },
           ack:    { '.validate': 'newData.isBoolean()' },
+          /* 받은 서류 연결 (2026-10-11, 설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md §3)
+             메일 첨부 하나를 가리키는 열쇠 — 'i:<폴더>:<uid>'(일반) · 'o:<popKey>'(지난 메일). 바이트는 담지 않는다.
+             ★ 따로 쓰기 문을 열지 않는다 — 줄($key) 쓰기 규칙을 그대로 따른다(줄 하나 .set 안에 실린다).
+             ★ 화면 모듈 LINK_SRC·LINK_KEY_MAX·LINK_NAME_MAX(js/pu-gov-report-track.js)와 같은 값 — tests/gov-report-rules.test.js.
+             ⚠ 게시는 대표 승인 뒤에만. 게시 전에는 줄의 $other:false 때문에 link 가 든 저장이 통째로 거절된다
+               (컨설팅보고서 앱 「저장하지 못했습니다 — 규칙 게시 또는 권한 확인」, link 없는 저장은 그대로 된다). */
+          link: {
+            '.validate': "newData.hasChildren(['src','key'])",
+            src:    { '.validate': "newData.isString() && newData.val() === 'mail'" },
+            key:    { '.validate': 'newData.isString() && newData.val().length >= 1 && newData.val().length <= 80' },
+            name:   { '.validate': 'newData.isString() && newData.val().length <= 100' },
+            date:   { '.validate': SCAL_DOCS_DAY },
+            $other: { '.validate': false }
+          },
           $other: { '.validate': false }
         }
       },
@@ -775,8 +791,12 @@ rules.pucards = {
   '.read': MAIL, '.write': ADMIN,
   items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': MAIL } },
   tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
+  /* 예약 발송과 회차별 결과는 필요한 줄만 읽는다. 이름 붙인 칸이라 $k 쓰기 권한을 그대로 옮긴다. */
+  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': MAIL } },
   $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
 };
+/* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
+rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
 /* 푸른 캘린더 «나만 보기» 일정 (대표 지시 2026-09-27 「본인만 확인가능하고 다른사람은 확인안되게」,
    추천대로 «관리자도 못 본다»). ⚠ data 아래가 아니다 — data 는 재무 권한자가 통째로 읽는다.
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */
@@ -1116,6 +1136,21 @@ rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'a
    ⚠ 읽기 = 관리자만(대표가 isAdmin). 직원 화면엔 안 보인다 — 무엇을 지켜보는지가 곧 대표의 관심이다.
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 고쳐 쓸 일이 없다. */
 rules.gov_watch = { '.read': 'auth != null && ' + ADMIN, '.write': false };
+
+/* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
+   공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
+   ⚠ 읽기 = 기업정보함(pucards)과 «같은» MAIL — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 MAIL 이 읽는다.
+     자리만 옮기는 것이라 보는 사람이 늘지 않는다. 담긴 것: 근로자 수·사업장 이름/주소·사업 상태·공휴일.
+     돈(보험료)은 서버가 애초에 담지 않는다(functions/nps-monthly.js nowOf).
+   ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 숫자를 고치면 원본과 어긋난다.
+   ⚠ pubdata_req = 화면의 «받아 달라». 번호 10자리 열쇠에 {at, k, nm} 만 받는다. 읽기는 아무도 —
+     누가 무엇을 열었는지가 남는 자리가 아니다(서버가 받자마자 지운다). */
+rules.pubdata = { '.read': MAIL, '.write': false };
+rules.pubdata_req = { $no: { '.write': MAIL,
+  '.validate': "$no.matches(/^[0-9]{10}$/) && (!newData.exists() || (newData.child('at').isNumber()"
+    + " && (!newData.child('k').exists() || newData.child('k').val() === 'ei' || newData.child('k').val() === 'nps')"
+    + " && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
+  $other: { '.validate': "$other === 'at' || $other === 'k' || $other === 'nm'" } } };
 
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).

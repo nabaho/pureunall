@@ -285,3 +285,13 @@ test('ⓜ 견적서 보기 배선 — 세트 보기와 같은 길(눌린 곳 하
   assert.match(SRC, /S\.kind !== '_closed' && !S\.setView && !S\.quote\) col\.appendChild/);
   assert.match(SRC, /if \(kSel\.value === '_quote'\) pickQuote\(\);/, '폰 선택 칸에서도');
 });
+
+test('ⓝ EDI 위임장 3종 글자 본문 — 네모 칸(┌│└)을 쓰지 않는다: 비례 글꼴에서 오른쪽 줄이 어긋난다 (대표 2026-10-11 「건강보험 위임장은 왜 이런가」)', () => {
+  for (const id of ['fm-pr-pension', 'fm-pr-health', 'fm-pr-employment']) {
+    const i = SRC.indexOf("id:'" + id + "'"), j = SRC.indexOf('\n', SRC.indexOf('body:', i));
+    const line = SRC.slice(i, j);
+    assert.ok(line.length > 200, id);
+    assert.doesNotMatch(line, /[┌┐└┘│]/, id + ' 본문에 네모 칸 글자가 없다');
+  }
+  assert.match(SRC, /원두정8길 6, 두정빌딩 3층 301호/, '시드 본문 주소도 3층 301호');
+});

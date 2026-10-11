@@ -1043,6 +1043,24 @@
               "ack": {
                 ".validate": "newData.isBoolean()"
               },
+              "link": {
+                ".validate": "newData.hasChildren(['src','key'])",
+                "src": {
+                  ".validate": "newData.isString() && newData.val() === 'mail'"
+                },
+                "key": {
+                  ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80"
+                },
+                "name": {
+                  ".validate": "newData.isString() && newData.val().length <= 100"
+                },
+                "date": {
+                  ".validate": "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              },
               "$other": {
                 ".validate": false
               }
@@ -1116,11 +1134,28 @@
           ".write": "auth != null && auth.token.email != null"
         }
       },
+      "scheduled": {
+        ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".indexOn": [
+          "at",
+          "bulk"
+        ],
+        "$k2": {
+          ".write": "auth != null && auth.token.email != null"
+        }
+      },
       "$k": {
         ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
           ".write": "auth != null && auth.token.email != null"
         }
+      }
+    },
+    "hanaSmsBridge": {
+      "adminAlerts": {
+        ".indexOn": [
+          "receivedAt"
+        ]
       }
     },
     "cal_private": {
@@ -1467,6 +1502,19 @@
     "gov_watch": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       ".write": false
+    },
+    "pubdata": {
+      ".read": "auth != null && auth.token.email != null",
+      ".write": false
+    },
+    "pubdata_req": {
+      "$no": {
+        ".write": "auth != null && auth.token.email != null",
+        ".validate": "$no.matches(/^[0-9]{10}$/) && (!newData.exists() || (newData.child('at').isNumber() && (!newData.child('k').exists() || newData.child('k').val() === 'ei' || newData.child('k').val() === 'nps') && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
+        "$other": {
+          ".validate": "$other === 'at' || $other === 'k' || $other === 'nm'"
+        }
+      }
     },
     "rehab_ad": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",

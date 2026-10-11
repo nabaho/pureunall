@@ -20,7 +20,7 @@
 const 멈춤문턱 = 5;
 /* 정찰 기록의 판 — 정찰에 무엇을 더 보게 하면 올린다. 화면(pu-home.html 자동정찰판)이 판이 다르면
    저절로 다시 정찰한다 — 대표께 단추를 찾게 하지 않는다. ⚠ 화면의 값과 «같아야» 한다(검사가 본다). */
-const 정찰판 = 2;
+const 정찰판 = 4;   // 3 = 레이아웃 화면까지 · 4 = 게시판·쪽 설정까지 + «이름이 든 칸 이름»(일반직원 5명 자동화, 2026-10-11)
 const 게시판 = { 구성원: "people_board", 자문사: "partner_board" };
 
 /* RTDB 날값을 배열로 — {u, v:[…]} 꼴·객체 꼴·배열 꼴을 모두 받는다 */
@@ -73,6 +73,9 @@ function 고르기(자료) {
     const m = members[k] || {};
     const srl = 번호(m.srl);
     if (!srl || m.takenDown) return;
+    /* ★ 남기기(사유 있음)는 «먼저» 본다 (2026-10-11). 남기기는 어차피 안 내리므로 직원과 이을 까닭이 없다 —
+         고용관계가 아닌 지사장처럼 명부에 없는 분이 매달 「연결 확인」으로 떠 소음이 됐다. */
+    if (남기기있나(m.keepOnSite)) return;
     if (!m.sid) { 연결확인.push({ 종류: "구성원", key: k, srl: srl, 까닭: "직원과 이어지지 않음" }); return; }
     const p = 사람[String(m.sid)];
     if (!p) { 연결확인.push({ 종류: "구성원", key: k, srl: srl, 까닭: "명부에서 찾지 못함" }); return; }
@@ -111,6 +114,9 @@ function 고르기(자료) {
     if (p.posted !== true || 번호(p.boardSrl) || p.takenDown || p.uploadedAt) return;
     if (!(p.consent && typeof p.consent === "object" && String(p.consent.date || "").trim())) return;
     if (!(p.logo && Number(p.logo.bytes) > 0)) return;
+    /* ★ 「지금 홈페이지에 이 회사 로고가 없다」를 사람이 확인해야 올린다 (2026-10-11).
+         손으로 이미 올려 두고 잇지만 않은 회사면 두 번째 로고가 걸린다 — 그림끼리는 견줄 수 없다. */
+    if (!(p.notOnSite && typeof p.notOnSite === "object" && String(p.notOnSite.at || "").trim())) return;
     const c = 회사[String(id)];
     if (!c || String(c.status || "") !== "active") return;
     올릴것.push({ 종류: "새거래처", 게시판: 게시판.자문사, companyId: String(id) });
@@ -166,6 +172,18 @@ async function 돌기(방식, 받은지문, 도구) {
   const 결과 = Object.assign({ 방식: 방식, 달: 달, 내림: [], 못내림: [], 이미: [], 올림: [], 못올림: [] }, 고른것);
   if (방식 === "보기") return 결과;
 
+  /* ★ 잠근다 (2026-10-11) — 매달 08:00 실행과 「지금 돌리기」(또는 관리자 둘)가 겹치면 둘 다
+       «아직 안 올림»을 읽고 둘 다 올려 홈페이지에 같은 글이 두 장 걸린다. 쓰는 일은 한 번에 하나만.
+     ⚠ 보기는 잠그지 않는다 — 아무것도 안 쓴다. */
+  const 풀기 = await 도구.잠그기("homepage/auto/lock", 지금);
+  if (!풀기) {
+    결과.ok = false; 결과.바쁨 = true;
+    결과.실패 = "다른 자동 실행이 지금 도는 중입니다 — 몇 분 뒤 다시 눌러 주십시오";
+    return 결과;
+  }
+  try { return await 쓰는일(); } finally { await 풀기(); }
+
+  async function 쓰는일() {
   let 보낼것 = 고른것.보낼것;
   if (방식 === "승인") {
     /* ★ 사람이 본 목록과 지금 목록이 «같을 때만» 내린다. 그사이 누가 퇴사 처리를
@@ -244,6 +262,16 @@ async function 돌기(방식, 받은지문, 도구) {
     올림: 결과.올림, 못올림: 결과.못올림, 올리기안됨: 결과.올리기안됨 || ""
   });
   return 결과;
+  }
 }
 
-module.exports = { 멈춤문턱, 정찰판, 게시판, 고르기, 지문, 남기기있나, 돌기 };
+/* 잠금 한 칸의 규칙 — 서버(index.js)가 트랜잭션 몸통으로 쓴다. 검사가 서버 없이 돌려 본다.
+   ★ 15분이 지난 잠금은 «죽은 것»으로 보고 넘겨받는다 — 함수가 도중에 죽으면 풀지 못하고 남는다.
+     한 번 도는 데 길어야 몇 분이다(내릴 것 5건 + 올릴 것 몇 건). */
+const 잠금유효ms = 15 * 60 * 1000;
+function 잠금몸통(cur, 지금, 누가) {
+  if (cur && typeof cur.at === "number" && 지금 - cur.at < 잠금유효ms) return undefined;   // 누가 쥐고 있다
+  return { at: 지금, by: 누가 || "" };
+}
+
+module.exports = { 멈춤문턱, 정찰판, 게시판, 고르기, 지문, 남기기있나, 돌기, 잠금몸통, 잠금유효ms };

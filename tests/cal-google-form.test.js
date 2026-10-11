@@ -189,7 +189,7 @@ test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 
   assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
   assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
   assert.match(함수몸('function 개인에넣기(m){'), /repeat:\(m\.mode === "new" && m\.repeat\)/);
-  assert.match(캘린더, /"vis","repeat","remind"(?:,"guests")?\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
+  assert.match(캘린더, /"vis","repeat","remind"(?:,"guests")?(?:,"attach")?\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
 });
 
 /* ── 「참석자 추가」·「Google Meet 화상 회의 추가」 줄 (구글 입력 화면, 2026-10-11) ── */
@@ -240,4 +240,79 @@ test('글꼴 — Roboto 가 한글보다 앞(숫자·영문은 구글 앱과 같
   assert.ok(차례.indexOf('Malgun Gothic') > 차례.indexOf('Noto Sans KR'), '맑은 고딕이 Noto Sans KR 앞에 있습니다');
   assert.strictEqual(차례.indexOf('Pretendard'), -1, '불러오지 않는 Pretendard 가 다시 들어왔습니다');
   assert.strictEqual(차례[차례.length - 1], 'sans-serif');
+});
+
+/* ── 일정 칩은 구글 공식 화면 실측 크기 (2026-10-11) ── */
+test('칩 크기 — 구글 실측(글자 12px · 굵기 500 · 줄 20px · 모서리 6px), 칩 사이 틈 2px(= 24px 간격)', () => {
+  const 칩 = 캘린더.match(/\n\s*\.ev\{padding:([^;]+);border-radius:(\d+)px;font-size:(\d+)px;font-weight:(\d+);line-height:(\d+)px;/);
+  assert.ok(칩, '.ev 규칙을 못 찾았습니다');
+  assert.deepStrictEqual([칩[2], 칩[3], 칩[4], 칩[5]], ['6', '12', '500', '20'], '구글 실측(6px·12px·500·20px)과 다릅니다: ' + 칩.slice(1).join(' / '));
+  assert.match(캘린더, /\.evs\{display:flex;flex-direction:column;gap:2px\}/, '칩 사이 틈이 2px 이 아닙니다');
+  /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
+  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
+});
+
+/* ── 상세 팝업·시각 일정 글자는 구글 공식 화면 실측 (2026-10-11) ── */
+test('상세 팝업 — 구글 실측: 상자 448px · 모서리 28px · 배경 #f0f4f9 · 날짜 「10월 12일 (월요일)」 진한 글자', () => {
+  const 팝업 = 캘린더.match(/\n\s*\.modal\.det\{[^}]*\}/);
+  assert.ok(팝업, '.modal.det 규칙을 못 찾았습니다');
+  assert.match(팝업[0], /border-radius:28px/); assert.match(팝업[0], /max-width:min\(448px/); assert.match(팝업[0], /background:#f0f4f9/);
+  assert.match(캘린더, /:root\[data-theme="dark"\] \.modal\.det\{background:var\(--panel\)\}/, '어두운 화면은 판색을 따른다');
+  assert.match(캘린더, /\.dwhen\{font-size:14px;line-height:20px;color:var\(--gtext\)/, '날짜 줄이 구글처럼 진한 글자가 아닙니다');
+  const b = 상자();
+  vm.runInContext(함수몸('function 상세날짜글(ymd){'), b);
+  const 글 = (v) => vm.runInContext('상세날짜글("' + v + '")', b);
+  assert.strictEqual(글(new Date().getFullYear() + '-10-12'), '10월 12일 (' + ['일','월','화','수','목','금','토'][new Date(new Date().getFullYear(), 9, 12).getDay()] + '요일)');
+  assert.match(글('2025-12-31'), /^2025년 12월 31일 \(수요일\)$/);
+});
+
+test('시각 일정 칩 — 구글 실측: 시각 12px/400 · 제목 12px/500', () => {
+  assert.match(캘린더, /\.ev\[data-g="t"\]\{padding:1px 4px;font-weight:500;background:transparent\}/);
+  assert.match(캘린더, /\.ev \.gtm\{margin-right:4px;font-weight:400\}/);
+});
+
+test('PC 이전·다음 달 단추 — 구글 공식 실측 32×32 원(2026-10-11)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\.mv\{border:none;background:transparent;border-radius:50%;width:32px;height:32px;/);
+});
+
+test('PC 「오늘」 단추·월 제목 — 구글 실측(78×36, 1px #747775, 모서리 18px, 14px/500, 제목 18px)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\.todaybtn\{padding:0 24px;height:36px;border:1px solid #747775;[^}]*border-radius:18px;\s*cursor:pointer;font-size:14px;font-weight:500/);
+  assert.match(캘, /\.monthbar \.ym\{font-size:18px;font-weight:400/);
+});
+
+test('첨부파일 줄 — 새 일정에 드라이브 링크 입력, 다른 주소는 막는다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /data-m="attach"[^>]*placeholder="첨부파일 추가/);
+  assert.match(캘, /attachments: 첨부목록\(m\.attach\)\.링크/);
+  assert.match(캘, /첨부는 구글 드라이브 링크/);
+});
+
+test('「N개 더보기」 — 구글 실측(12px/500, 줄 20px, 상자 22px)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\.more\{font-size:12px;color:var\(--gtext\);padding:1px 6px;cursor:pointer;line-height:20px;\s*font-weight:500;border-radius:6px;/);
+});
+
+test('폰 새 일정 단추 — 구글 앱처럼 오른쪽 아래에 뜬 둥근 네모, 머리에는 «오늘» 단추', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /body\.mob \.mplus\{position:fixed;right:16px;bottom:88px;[^}]*width:56px;\s*height:56px;border-radius:16px/);
+  assert.match(캘, /data-theme="dark"\] body\.mob \.mplus\{background:#304678;color:#d9e2ff\}/);
+  assert.match(캘, /<button class="mtoday" data-mv="0" title="오늘">/);
+});
+
+test('폰 머리 — 구글 앱처럼 ☰ 가 왼쪽 맨 앞, 그다음 제목', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  const i = 캘.indexOf('function 폰머리Html(){');
+  const 몸 = 캘.slice(i, i + 3500);
+  assert.ok(몸.indexOf('class="mmenu"') > 0 && 몸.indexOf('class="mmenu"') < 몸.indexOf('class="mtt"'), '☰ 가 제목보다 앞이어야 합니다');
+});
+
+test('폰 왼쪽 서랍 — ☰ 가 서랍을 연다(일정·일·주·월 + 새로고침), 옛 메뉴는 「더 보기」로 잇는다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /if\(t\.hasAttribute\('data-mmenu'\)\)\{ S\.drawer = !S\.drawer;/);
+  assert.match(캘, /\[\["sched","일정"\],\["day","일"\],\["week","주"\],\["month","월"\]\]/);
+  assert.match(캘, /data-dreload="1">새로고침/);
+  assert.match(캘, /data-dmore="1">더 보기/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-dmore'\)\)\{ S\.drawer = false; S\.mobMenu = !S\.mobMenu;/);
 });

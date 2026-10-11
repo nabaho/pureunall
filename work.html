@@ -18,11 +18,11 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=62"></script>
+<script src="js/pu-ontology.js?v=66"></script>
 <script src="js/pu-kakao-work.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
-<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -1255,7 +1255,7 @@
 }
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=24"></script>
+  <script src="js/pu-appbar.js?v=26"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -1411,6 +1411,19 @@ var mailaddr={};
      업체에 걸린 주소는 여기 못 넣는다(mlkCanNo). 넣으면 진짜 업체 메일이
      «조용히» 사라지는데, 안 오는 메일은 아무도 못 찾는다. */
 var mailno={};
+/* ══ 메일함(푸른메일)에서 사람이 이어 둔 것 — «읽기만» (대표 지시 2026-10-11 「항상 서로 동기화」) ══
+   pucards/config/mailCo   {주소열쇠: {n:자문사이름, id:업체번호}}  — 「이 주소는 이 자문사」
+   pucards/config/mailWork {주소열쇠: {kind, id}}                    — 「이 주소는 이 사건·컨설팅」
+   ★ 같은 일을 두 앱이 따로 들고 있으면 한쪽에서 이은 것이 다른 쪽엔 안 보인다.
+     «베끼지 않고» 메일함의 표를 그대로 읽는다 — 메일함에서 이으면 업무관리에도 저절로 붙는다.
+   ⚠ 업체 번호·건 번호로만 잇는다. 이름 글자만 든 옛 칸은 안 쓴다(이름은 관계 열쇠가 아니다).
+   ⚠ 읽기만 한다. 고치는 곳은 메일함이다.
+   ⚠ 못 읽으면(규칙 밖 로그인 등) 조용히 빈 표 — 업무관리 자신의 잇기는 그대로 돈다. */
+var mbCoLink={}, mbWorkLink={};
+/* 메일함 열쇠 → 주소. 메일함 mbWhoKey 는 점(.)을 쉼표로 바꿔 담는다 — 그 거꾸로.
+   '@도메인' 꼴은 «도메인째» 이은 것이다(메일함 mbCoOf 와 같은 뜻). */
+function mbKeyAddr(k){ return _mailAddr(String(k||'').replace(/,/g,'.')); }
+function mbKeyDom(k){ var s=String(k||''); return s.charAt(0)==='@'?s.slice(1).replace(/,/g,'.').toLowerCase():''; }
 /* ppchk/{업무|사번} = {by,byName,at,txt} — 푸른이알피 진행 메모를 기록으로 담은 표시.
    ⚠ 담은 «글»을 함께 둔다. 「담았다」만 두면 그 뒤에 메모를 고쳐도 담을 수 없다. */
 var ppchk={};
@@ -1560,6 +1573,13 @@ function start(){
     watchMapChildren(NS+'/mailno',function(value){ mailno=value||{}; },function(){
       if(appHasFocus()){ S._pend=true; return; }
       route(); if(S.drawerId) renderDrawer(); },function(){ mailno={}; });
+    /* 메일함에서 이은 것(읽기만) — 메일함에서 이으면 이 화면의 메일도 저절로 따라 붙는다 */
+    watchMapChildren('pucards/config/mailCo',function(value){ mbCoLink=value||{}; },function(){
+      if(appHasFocus()){ S._pend=true; return; }
+      route(); if(S.drawerId) renderDrawer(); },function(){ mbCoLink={}; });
+    watchMapChildren('pucards/config/mailWork',function(value){ mbWorkLink=value||{}; },function(){
+      if(appHasFocus()){ S._pend=true; return; }
+      route(); if(S.drawerId) renderDrawer(); },function(){ mbWorkLink={}; });
     peWatch();                                   // 푸른이알피 등록 → 자동 연동
     succAutoSoon();                              // 승계표 → 퇴사자 업무 자동 승계
     /* 받은 메일은 «업체 이름표»가 있어야 이어 붙는다 — 업체 목록을 먼저 받고 읽는다.
@@ -3679,9 +3699,33 @@ function mailKeysOf(it){
      ⚠ 이것이 없으면 「7월 급여 확정자료 송부의 건」처럼 제목에 회사가 안 나오는
        메일은 영영 못 찾는다 — 짐작으로는 걸릴 글자가 없다. */
   var coid=''; try{ coid=String((co&&co.id)||''); }catch(e){}
+  /* ★ 업체·건에 «겉으로» 적힌 주소 — 업체 메일(email)·대표담당 메일(primaryContactEmail).
+       메일함·서버는 주소를 세 군데(이 둘 + 담당자 줄)에서 보는데 여기는 담당자 줄만 봤다.
+     ⚠ 이 둘은 «주소째»만 담는다(도메인은 안 넓힌다) — 업체 메일 칸에 세무사무소 주소가
+       적힌 곳이 있다. 도메인으로 넓히면 그 사무소가 맡은 다른 회사 메일까지 끌려온다. */
+  var rr=null; try{ rr=peRec(it); }catch(e){}
+  [co, rr, rr&&rr.company].forEach(function(o){
+    if(!o) return;
+    [o.email, o.primaryContactEmail].forEach(function(e){ var a=_mailAddr(e); if(a) mails[a]=1; });
+  });
+  /* ★ 메일함에서 사람이 이은 것 (2026-10-11) — 업체 번호·건 번호가 «이 업무와 같을 때만» */
+  var refT=it&&it.ref?String(it.ref.type||''):'', refI=it&&it.ref?String(it.ref.id||''):'';
+  var mbPut=function(k){
+    var d=mbKeyDom(k);
+    if(d){ if(!MAIL_PUBLIC[d]) doms[d]=1; return; }       // 공용 도메인째로는 안 잇는다
+    var a=mbKeyAddr(k); if(a) mails[a]=1;
+  };
+  Object.keys(mbCoLink||{}).forEach(function(k){
+    var v=mbCoLink[k];
+    if(v&&typeof v==='object'&&v.id&&coid&&String(v.id)===coid) mbPut(k);
+  });
+  Object.keys(mbWorkLink||{}).forEach(function(k){
+    var v=mbWorkLink[k];
+    if(v&&v.kind&&v.id&&refT&&String(v.kind)===refT&&String(v.id)===refI) mbPut(k);
+  });
+  var nm=_normCo((it&&it.company)||'');
   /* 「이 주소는 앞으로도 이 사업장」으로 고정해 둔 것 — 사람이 정한 것이라 그대로 믿는다.
      ⚠ 고정할 때 「여러 사업장에 걸린 주소인가」를 이미 걸렀다(mlkAddrCos). */
-  var nm=_normCo((it&&it.company)||'');
   Object.keys(mailaddr||{}).forEach(function(ak){
     var p=mailaddr[ak]; if(!p) return;
     var same=(coid&&String(p.coid||'')===coid)||(nm&&_normCo(String(p.co||''))===nm);

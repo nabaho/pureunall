@@ -104,8 +104,10 @@ test('★★★ 한 바퀴 — 번호로 맞춰 적고, 잠긴 폴더·지운 �
   assert.equal(all['pucards/coInfo/' + B2 + '/ntsEndDt'], '2024-01-31');
   assert.equal(all['pucards/coInfo/' + B1 + '/ntsMatch'], 'ok');
   assert.ok(all['pucards/config/ntsMonthly'] && all['pucards/config/ntsMonthly'].status.gone === 1, '★ 한 일을 남겨야 화면이 말할 수 있다');
-  assert.ok(Object.keys(all).every((k) => k.indexOf('pucards/coInfo/') === 0 || k === 'pucards/config/ntsMonthly'),
+  /* 2026-10-11 공공데이터 공용 자리(pubdata/co/{번호}/nts)에도 상태를 쓴다 — 그 자리도 «표시용»이다 */
+  assert.ok(Object.keys(all).every((k) => k.indexOf('pucards/coInfo/') === 0 || k === 'pucards/config/ntsMonthly' || /^pubdata\/co\/\d{10}\/nts$/.test(k)),
     '★★★ 기업 상세 밖(명함·업체)을 고쳤다 — 결과는 «표시만» 한다');
+  assert.equal(all['pubdata/co/' + B2 + '/nts'].state, '폐업자', '★★ 공용 자리에 국세청 상태가 없다');
   assert.equal(r.status.gone, 1);
 });
 

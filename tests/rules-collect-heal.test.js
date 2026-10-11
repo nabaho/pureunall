@@ -15,14 +15,15 @@ const C = require('../functions/rules-collect.js');
 
 function fakeDb(init) {
   const store = JSON.parse(JSON.stringify(init || {}));
+  const reads = [];
   const get = (p) => p.split('/').filter(Boolean).reduce((o, k) => (o == null ? undefined : o[k]), store);
   const set = (p, v) => {
     const ks = p.split('/').filter(Boolean); let o = store;
     ks.slice(0, -1).forEach((k) => { o[k] = o[k] || {}; o = o[k]; });
     if (v === null) delete o[ks[ks.length - 1]]; else o[ks[ks.length - 1]] = JSON.parse(JSON.stringify(v));
   };
-  return { store, ref: (p) => ({
-    once: async () => ({ val: () => (p ? get(p) : store) ?? null }),
+  return { store, reads, ref: (p) => ({
+    once: async () => { reads.push(p); return { val: () => (p ? get(p) : store) ?? null }; },
     update: async (obj) => { Object.keys(obj).forEach((k) => set((p ? p + '/' : '') + k, obj[k])); },
     set: async (v) => set(p, v),
   }) };
@@ -59,6 +60,10 @@ test('★★★ 담긴 글에서 번호가 걸리면 가려 다시 쓰고, 파�
   assert.equal(L.docs.rd_a.pii.count.phone, 2, '가린 셈에 더해져야 화면에 보인다');
   assert.equal(L.docs.rd_a.revision, 2);
   assert.equal(L.docs.rd_a.status, '담김');
+  assert.ok(!db.reads.includes('rules_mgmt/library/text'), '★★★ 본문 전체를 읽으면 매 회차 큰 비용이 든다');
+  assert.ok(db.reads.includes('rules_mgmt/library/text/rd_a'));
+  assert.ok(db.reads.includes('rules_mgmt/library/text/rd_b'));
+  assert.ok(!db.reads.includes('rules_mgmt/library/text/rd_c'), '보류 문서 본문은 읽지 않는다');
 });
 
 test('④ 걸리지 않은 것은 판 표시만 — 글·파일 그대로 · 보류는 안 본다', async () => {

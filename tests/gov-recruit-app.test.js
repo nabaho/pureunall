@@ -30,7 +30,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovSync: require('../js/gov-sync.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
@@ -48,6 +48,7 @@ function runApp(seed, opt) {
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
+    + 'orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setOpen = (fn) => { opt._open = fn; };
@@ -1398,4 +1399,110 @@ test('★★ 참고용 표의 선택 줄 단추는 «참고용 묶음»을 가�
   assert.match(r.el('recMail').innerHTML, /recSelSkip\('pick_ref'\)">고른 것 무시/);
   r.api.recSelTog('nt_ref', 'n|3', true);
   assert.match(r.el('recMail').innerHTML, /recSelSeen\('nt_ref',true\)">✓ 고른 것 봤음/);
+});
+
+/* ═══ 🧑‍💼 같은 기관의 모집 글 딱지 + ★ 별표만 (대표 지시 2026-10-11 「딱지 진행」·「별표 표시 … 별표만 확인」) ═══ */
+const TODAY = '2026-12-05T09:00:00';
+const FEED = [
+  { id: 'F1', src: '기업마당', no: 'PBLN_1', nm: '2026년 콘텐츠 기업 노무 컨설팅 참가기업 모집', org: '지방공기업평가원', type: '새 공고', savedAt: '2026-12-01T00:00:00Z' },
+  { id: 'F2', src: '기업마당', no: 'PBLN_2', nm: '2026년 일터혁신 상생컨설팅 지원', org: '어느 모르는 기관', type: '새 공고', savedAt: '2026-12-01T00:00:00Z' },
+  { id: 'F3', src: '나라장터', no: 'R1', nm: '직원 근무평정 대행 용역', org: '충남경제진흥원', type: '관심', savedAt: '2026-12-01T00:00:00Z' }
+];
+test('★★★ 공고 줄에 «같은 기관의 모집 글» 딱지 — 서버 모집 글(gov_watch)의 기관과 짝지으면 줄 앞에 🧑‍💼', async () => {
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r.api.setFb(fbWith(WATCH), 'U1');
+  await r.api.recWatchLoad(); r.api.draw();
+  const tb = r.el('tb').innerHTML;
+  const f1 = tb.split('<tr class="fr')[1];
+  assert.match(f1, /class="orgrec"[^>]*onclick="event\.stopPropagation\(\);orgRecOpen\('F1'\)">🧑‍💼 모집 글 1<\/button>/, '지방공기업평가원 글이 짝지어지지 않았다');
+  assert.ok(f1.indexOf('orgrec') < f1.indexOf('<b>'), '딱지는 공고명 «앞» — 뒤에 두면 긴 이름 줄임표에 잘려 안 보인다');
+  assert.doesNotMatch(tb.split('<tr class="fr')[2], /orgrec/, '모르는 기관에 딱지가 붙었다');
+});
+test('★★ 서버 글은 «한 번만» 받으러 간다 — 그리다가 저절로 받고, 실패해도 다시 그리며 또 받지 않는다(끝없이 도는 것 방지)', async () => {
+  let calls = 0;
+  const db = { ref: (p) => ({ once: () => { if (p === 'gov_watch') calls++; return Promise.resolve({ val: () => (p === 'gov_watch' ? WATCH : null) }); }, update: () => Promise.resolve() }) };
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r.api.setFb(db, 'U1');
+  r.api.draw(); r.api.draw(); r.api.draw();
+  await tick(); await tick();
+  assert.equal(calls, 1, '그릴 때마다 서버 글을 받으러 갔다: ' + calls);
+  assert.match(r.el('tb').innerHTML, /orgrec/, '받은 뒤 다시 그려 딱지가 떠야 한다');
+  let bad = 0;
+  const r2 = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r2.api.setFb({ ref: (p) => ({ once: () => { if (p === 'gov_watch') bad++; return Promise.reject(Object.assign(new Error('x'), { code: 'PERMISSION_DENIED' })); } }) }, 'U1');
+  r2.api.draw(); await tick(); await tick(); r2.api.draw(); await tick();
+  assert.equal(bad, 1, '실패한 뒤 또 받으러 갔다'); assert.doesNotMatch(r2.el('tb').innerHTML, /orgrec/);
+});
+test('★ 공고 탭을 그릴 때 모집 탭이 따라 그려지지 않는다 — 읽기(recWatchLoad)와 그리기(recWatchPull)가 갈라져 있다', () => {
+  assert.match(src, /async function recWatchLoad\(\)\{[\s\S]*?\n\}\s*async function recWatchPull\(\)\{[\s\S]*?await recWatchLoad\(\);\s*recDraw\(\);/);
+  assert.match(src, /function orgRecEnsure\(\)\{[\s\S]*?recWatchLoad\(\)\.then/);
+  assert.doesNotMatch(src.slice(src.indexOf('function orgRecEnsure'), src.indexOf('function orgRecFind')), /recWatchPull|recDraw/);
+});
+test('★ 접수가 끝난 모집 글만 있으면 회색 「지난 N」 딱지 — 접수 중이면 개수', async () => {
+  const W = { hits: { p1: { key: 'p1', board: 'erc', org: 'erc', boardName: '지방공기업평가원 공지', title: '외부연구진 풀 공개 모집 (접수기간 2026.10.01 ~ 2026.10.15)', date: '2026-10-01', href: 'https://a.kr/1', per: { from: '2026-10-01', to: '2026-10-15' } } } };
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r.api.setFb(fbWith(W), 'U1'); await r.api.recWatchLoad(); r.api.draw();
+  assert.match(r.el('tb').innerHTML, /class="orgrec off"[^>]*>🧑‍💼 모집 글 지난 1<\/button>/);
+  const pop = r.api.orgRecBlock(FEED[0]);
+  assert.match(pop, /접수 중 0 · 지난 것 1/);
+});
+test('★★ 제목에 기관 이름(4글자↑)이 든 글도 짝짓는다 — 공인노무사회 공지에 실린 「[한국콘텐츠진흥원] … 컨설턴트 모집」', async () => {
+  const W = { hits: { c1: { key: 'c1', board: 'kcplaa', org: '', boardName: '공인노무사회 공지(기관 모집 공문)', title: '[한국콘텐츠진흥원] 콘텐츠 기업 노무 컨설턴트 모집 안내', date: '2026-12-02', href: 'https://a.kr/c1' } } };
+  const feed = [{ id: 'K1', src: '기업마당', no: 'PBLN_9', nm: '2026년 콘텐츠 기업 노무 컨설팅 참가기업 모집', org: '한국콘텐츠진흥원', type: '새 공고' }];
+  const r = runApp({ feed }, { Date: FixedDate(TODAY) });
+  r.api.setFb(fbWith(W), 'U1'); await r.api.recWatchLoad(); r.api.draw();
+  assert.match(r.el('tb').innerHTML, /🧑‍💼 모집 글 1/);
+  assert.match(r.api.orgRecBlock(feed[0]), /\[한국콘텐츠진흥원\] 콘텐츠 기업 노무 컨설턴트 모집 안내/);
+});
+test('★ 못 찾으면 «없다»고 말하되 감시 목록에 없을 수 있다고 밝힌다 · 서버 글을 못 읽었으면 그렇게 말한다', async () => {
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  assert.match(r.api.orgRecBlock(FEED[1]), /불러오지 못했습니다/);
+  r.api.setFb(fbWith(WATCH), 'U1'); await r.api.recWatchLoad();
+  assert.match(r.api.orgRecBlock(FEED[1]), /찾지 못했습니다 — 이 기관 게시판은 감시 목록에 없을 수 있습니다/);
+});
+test('★ 공고 상세 팝업에도 같은 기관 모집 글 칸이 있다', async () => {
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r.api.setFb(fbWith(WATCH), 'U1'); await r.api.recWatchLoad(); r.api.draw();
+  r.api.feedPop('F1');
+  assert.match(r.el('popBody').innerHTML, /같은 기관의 컨설턴트·전문가 모집 글/);
+  assert.match(r.el('popBody').innerHTML, /2027년 외부연구진 풀 공개 모집/);
+});
+test('★★ 별표 — 줄 맨 왼쪽(ㅁ 왼쪽)에 별 단추가 있고, 눌러도 줄 팝업이 안 열린다', () => {
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r.api.draw();
+  const rows = r.el('tb').innerHTML.split('<tr class="fr').slice(1);
+  assert.equal(rows.length, 3);
+  rows.forEach((x) => assert.match(x, /onclick="feedRowClick[^>]*><td class="stc"><button class="starbtn[^>]*>[★☆]<\/button><\/td><td class="chk">/, '별 단추가 ㅁ 왼쪽에 없다'));
+  assert.match(rows[2], /class="starbtn on"[^>]*onclick="event\.stopPropagation\(\);star\('F3'\)">★<\/button>/);
+  assert.match(rows[0], />☆<\/button><\/td>/);
+  assert.match(rows[2], /starred/, '별표 친 줄 배경');
+});
+test('★★ 「별표만」 — 누르면 별표 친 공고만, 한 번 더 누르면 전체 · 단추에 건수', () => {
+  const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
+  r.api.draw();
+  assert.equal(r.el('fStarBtn').textContent, '☆ 별표만 1건');
+  r.api.feedStarOnly();
+  assert.equal(r.el('fSt').value, '관심');
+  assert.equal(r.el('tb').innerHTML.split('<tr class="fr').length - 1, 1);
+  assert.match(r.el('tb').innerHTML, /근무평정/);
+  assert.equal(r.el('fStarBtn').textContent, '★ 별표만 1건'); assert.match(r.el('fStarBtn').className, /\bon\b/);
+  r.api.feedStarOnly();
+  assert.equal(r.el('fSt').value, ''); assert.equal(r.el('tb').innerHTML.split('<tr class="fr').length - 1, 3);
+  assert.doesNotMatch(r.el('fStarBtn').className, /\bon\b/);
+});
+test('★ 별표를 치면 단추 건수가 곧 바뀌고, 끄면 예전 상태로 돌아간다', () => {
+  const r = runApp({ feed: FEED.map((x) => Object.assign({}, x, x.id === 'F1' ? { type: '지원함' } : {})) }, { Date: FixedDate(TODAY) });
+  r.api.draw(); r.api.star('F1');
+  assert.equal(r.el('fStarBtn').textContent, '☆ 별표만 2건');
+  r.api.star('F1');
+  assert.equal(r.el('fStarBtn').textContent, '☆ 별표만 1건');
+  assert.equal(r.api.get('feed').filter((x) => x.id === 'F1')[0].type, '지원함', '별표를 끄면 지원함으로 돌아가야 한다');
+});
+
+test('★ 빈 목록 줄의 칸 수(colspan)가 머리 칸 수와 같다 — 별 칸을 더하고 안 맞추면 안내 줄이 삐뚤어진다', () => {
+  const at = src.indexOf('id="fSelAll"'), head = src.slice(src.lastIndexOf('<thead>', at));
+  const ths = (head.slice(0, head.indexOf('</tr></thead>')).match(/<th[ >]/g) || []).length;
+  const r = runApp({}, { Date: FixedDate(TODAY) });
+  r.api.draw();
+  assert.match(r.el('tb').innerHTML, new RegExp('colspan="' + ths + '"'), '머리 칸 ' + ths + '개인데 빈 줄 colspan 이 다르다');
 });

@@ -192,6 +192,26 @@
     return '';
   }
 
+  /* ── 기업마당(지원사업) 전용 넓히기 (대표 지시 2026-10-11 「걸러진건 넓혀라」) ──
+     지원사업 공고는 공고명이 「ESG경영 진단 및 컨설팅 지원」처럼 뭉뚱그려도 «해시태그·소분류·요약»에 노무 말이 적혀 있다.
+     ① 공고명에 센 말이 있으면 그대로 건다(원래 규칙).
+     ② 공고명에 약한 말(컨설팅·인사·고용)만 있어도 «해시태그·소분류·요약»에 업무 분야 말(FIELD)이 있으면 건다.
+     ③ 공고명에 낱말이 아예 없어도 «해시태그»에 센 말(노무·노사·일터혁신·직장내괴롭힘 …)이 있으면 건다.
+     ⚠ 빼는 말(DROP)·기관 이름(ORG)은 «공고명»에서만 본다 — 해시태그까지 보면 「홍보」 한 태그에 다 빠진다.
+     ⚠ 해시태그의 약한 말(컨설팅·경영)만으로는 걸지 않는다 — 그러면 창업·박람회가 다 걸린다. */
+  function judgeBiz(title, hits, row, kws) {
+    if (hits.some(function (k) { return WEAK.indexOf(k) < 0; })) return hits;
+    var list = (kws && kws.length) ? kws : KEYWORDS_DEFAULT;
+    var strong = list.filter(function (k) { return WEAK.indexOf(k) < 0; });
+    function clean(x) { ORG.forEach(function (o) { x = x.split(o).join(' '); }); return ' ' + x + ' '; }
+    if (hits.length) {                       /* 공고명에 약한 말만 — 분야 말이 곁에 있어야 */
+      var f = FIELD.filter(function (w) { return hits.indexOf(w) < 0; });
+      var extra = clean(s(row.tags).replace(/,/g, ' ') + ' ' + s(row.mid) + ' ' + s(row.body || row.memo));
+      return (matched({ nm: title }, f).length || matched({ nm: extra }, f).length) ? hits : [];
+    }
+    return matched({ nm: clean(s(row.tags).replace(/,/g, ' ')) }, strong);
+  }
+
   /* 공고 하나를 거를지 정한다 — merge 가 이것만 쓴다. 걸리면 걸린 낱말 목록, 아니면 []. */
   function judge(row, kws) {
     row = row || {};
@@ -203,6 +223,7 @@
     ORG.forEach(function (o) { t = t.split(o).join(' '); });
     if (DROP.some(function (d) { return t.indexOf(d) >= 0; })) return [];
     var hits = matched({ nm: t }, kws);
+    if (row.src === '기업마당') return judgeBiz(t, hits, row, kws);
     if (!hits.length) return [];
     if (hits.some(function (k) { return WEAK.indexOf(k) < 0; })) return hits;
     var field = FIELD.filter(function (f) { return hits.indexOf(f) < 0; });

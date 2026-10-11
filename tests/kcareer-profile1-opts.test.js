@@ -38,7 +38,7 @@ test('화면 — 칸 상세는 미리보기·출력이 같은 모델을 쓰고, 
   const m = strip(SRC.slice(SRC.indexOf('function _p1Model('), SRC.indexOf('function renderProfile1(')));
   assert.ok(/lim:o\.lim/.test(m) && /titles:o\.titles/.test(m) && /notes:o\.notes/.test(m), '모델에 칸 상세를 넘긴다');
   assert.ok(/function p1Jump\(/.test(SRC) && /function p1Panel\(/.test(SRC));
-  assert.ok(/_p1ZoomMode='width'/.test(SRC), '기본은 폭 맞춤(B안)');
+  assert.ok(/_p1ZoomMode='fit'/.test(SRC) && /var _p1View='a4'/.test(SRC), '기본은 A4 세로 한 장 · 한 화면(아래로 안 내려가게)');
   assert.ok(/id="p1Side" style="position:sticky/.test(SRC), '왼쪽 칸 목록이 따라온다');
 });
 
@@ -85,4 +85,11 @@ test('화면 — 오른쪽은 이력서만, 보기·바로 가기 단추는 왼�
   assert.ok(/id="p1Zoom"/.test(r), '왼쪽 목록 맨 위에 단추 자리');
   assert.ok(/_p1View==='screen'/.test(r) && /toScreenHtml/.test(r), '기본은 화면용');
   assert.ok(/function p1View\(/.test(SRC));
+});
+
+test('넣을 칸은 «두 줄(2열)»로 넓게 — 왼쪽 칸이 넓고, 칸 상세는 두 열을 가로지른다', () => {
+  assert.ok(/class="p1-wrap" style="display:grid;grid-template-columns:\d{3}px/.test(SRC), '왼쪽 폭이 세 자리 px');
+  const r = strip(SRC.slice(SRC.indexOf('function renderProfile1('), SRC.indexOf('function _p1Scale(')));
+  assert.ok(/grid-template-columns:1fr 1fr/.test(r), '넣을 칸 2열');
+  assert.ok(/grid-column:1\/-1/.test(strip(SRC.slice(SRC.indexOf('function p1Panel('), SRC.indexOf('function p1Lim(')))), '칸 상세는 두 열 전체');
 });

@@ -51,6 +51,8 @@ test('★ 메일함을 «통째로» 읽지 않는다 — 요금이 는다', () 
 test('★ 대기열에서 «이 회차 것»만 고른다 — 자료 발송이 섞여 있다', () => {
   assert.ok(/bulk[\s\S]{0,40}batchId/.test(읽기),
     '★ batchId 로 안 거른다 — 남의 메일이 이 회차 결과에 섞인다');
+  assert.ok(/orderByChild\('bulk'\)\.equalTo\(String\(d\.batchId\)\)/.test(읽기),
+    '★★★ 대기열 전체를 받은 뒤 걸러서는 반복 비용을 줄이지 못한다');
 });
 
 test('★ 화면이 Core 의 판단을 쓴다 — 제 셈을 따로 하지 않는다', () => {

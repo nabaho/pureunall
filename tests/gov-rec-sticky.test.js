@@ -72,7 +72,9 @@ test('★★ CSS — 하위 탭은 머리 밑에, 단추 줄은 그 밑에 «재
 
 test('★ 부팅 때 지켜보기 시작하고, 모집 탭을 열 때도 잰다(숨어 있던 동안은 못 쟀다)', () => {
   assert.match(fnSrc('boot'), /^function boot\(\)\{\s*recStickyWatch\(\);/);
-  assert.match(fnSrc('setTab'), /if\(t==='rec'\)\{[^}]*recStickySync\(\);/);
+  /* 2026-10-11 — 모든 탭에서 잰다(공고·발주의 .tab-stick 높이도 같이). 모집 탭 «조건 안»에만 있으면 다른 탭이 옛 높이를 쓴다 */
+  assert.match(fnSrc('setTab'), /\n  recStickySync\(\);/);
+  assert.doesNotMatch(fnSrc('setTab'), /if\(t==='rec'\)[^\n]*recStickySync/);
 });
 
 test('★★ 공인노무사회·공공기관 탭의 한 줄(.rec-stick) 높이를 --rbarH 로 — 숨은 탭(0)은 빼고 보이는 것만', () => {
@@ -89,4 +91,26 @@ test('★★ 공인노무사회·공공기관 탭의 한 줄(.rec-stick) 높이�
   delete props['--rbarH'];
   vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 0 }]));
   assert.ok(!('--rbarH' in props), '다 숨었는데 0px 을 박으면 표 머리가 고정 줄을 덮는다');
+});
+
+/* ═══ 지원 이력·메일 표 머리줄 틀고정 (대표 지시 2026-10-11 「지원이력도 틀고정」) ═══
+   실측(1600×800): 머리 0–96 · 하위 탭 96–139 · 단추 줄 139–(재 값) · 표 머리줄이 그 밑에 붙는다. */
+test('★★ CSS — 지원 이력·메일의 표 머리줄이 단추 줄 밑에 붙는다(1100px 이상) · 넘침 상자는 풀어 준다', () => {
+  const m = src.match(/@media \(min-width:1100px\)\{[\s\S]*?#recPaneHist \.scroll\{overflow:visible\}[\s\S]*?\n\}/);
+  assert.ok(m, '1100px 이상 지원 이력 틀고정 규칙이 없다');
+  assert.match(m[0], /#recPaneHist thead th\{position:sticky;z-index:12;background:var\(--card\);\s*top:calc\(var\(--headH,94px\) \+ var\(--rsubH,44px\) \+ var\(--rbarH,44px\)\)\}/);
+});
+
+test('★★ 지원 이력의 단추 줄 높이를 --rbarH 로 재서 알린다 — 숨은 탭(0)은 값을 지우지 않는다', () => {
+  const props = {};
+  const mk = (list) => ({
+    document: { documentElement: { style: { setProperty: (k, v) => { props[k] = v; } } },
+      querySelectorAll: (q) => (q === '#recPaneHist>.bar' ? list : []) },
+    $: () => null, window: { addEventListener() {} }
+  });
+  vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 44 }]));
+  assert.equal(props['--rbarH'], '44px');
+  delete props['--rbarH'];
+  vm.runInNewContext(fnSrc('recStickySync') + ';recStickySync();', mk([{ offsetHeight: 0 }]));
+  assert.equal(props['--rbarH'], undefined, '숨은 탭이 옛 값을 0 으로 덮으면 다른 탭 머리줄이 겹친다');
 });

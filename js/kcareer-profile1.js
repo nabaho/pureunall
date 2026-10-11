@@ -32,7 +32,7 @@
   /* 한 장에 들어가는 «줄» — 10.5px 표 줄 기준(머리·숫자 칸 포함).
      실측(2026-10-07 브라우저, A4 794×1123 · 여백 14mm): 46줄이 655px 로 쓸 자리(1017px)의 2/3 — 64줄이면 약 910px.
      인쇄 글꼴 차이를 두고 남긴다. */
-  var BUDGET = 64;
+  var BUDGET = 54;
   /* 줄일 차례와 «더는 안 줄이는 바닥» */
   var SHRINK = [['perf', 3], ['wic', 4], ['lec', 2], ['work', 3], ['award', 1], ['cert', 3], ['edu', 2]];
 
@@ -284,15 +284,15 @@
     + '.p1s td{white-space:normal;font-size:13.5px;padding:2px 4px;vertical-align:top}.p1s td.y{width:62px}.p1s .t-work td.y,.p1s .t-role td.y{width:104px}'
     + '.p1s td.more{font-size:12.5px}';
 
-  var CSS = '.p1{font-family:"Malgun Gothic",sans-serif;color:#1e293b;font-size:10.5px;line-height:1.45}'
-    + '.p1 h2{font-size:17px;border-bottom:2px solid #1e293b;padding-bottom:4px;margin:0 0 8px;display:flex;align-items:baseline;gap:10px}'
-    + '.p1 h2 small,.p1 h4 small{font-size:11px;color:#64748b;font-weight:400}'
+  var CSS = '.p1{font-family:"Malgun Gothic",sans-serif;color:#1e293b;font-size:12.5px;line-height:1.45}'
+    + '.p1 h2{font-size:20px;border-bottom:2px solid #1e293b;padding-bottom:4px;margin:0 0 8px;display:flex;align-items:baseline;gap:10px}'
+    + '.p1 h2 small,.p1 h4 small{font-size:12.5px;color:#64748b;font-weight:400}'
     + '.p1 .top{display:flex;gap:12px;margin-bottom:6px}.p1 .ph{width:70px;height:90px;object-fit:cover;border-radius:4px}'
-    + '.p1 h4{font-size:11px;background:#f8fafc;border-left:3px solid #166534;padding:2px 6px;margin:8px 0 3px}'
+    + '.p1 h4{font-size:13px;background:#f8fafc;border-left:3px solid #166534;padding:2px 6px;margin:8px 0 3px}'
     + '.p1 table{width:100%;border-collapse:collapse;table-layout:fixed}.p1 td{padding:1px 4px;border-bottom:1px solid #f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
-    + '.p1 td.y{width:52px;color:#64748b}.p1 td.more{color:#64748b}'
+    + '.p1 td.y{width:60px;color:#64748b}.p1 td.more{color:#64748b}'
     /* 기간 칸(「2019.03~2021.02」)은 해 하나보다 길다 — 「2017.10 …」으로 잘리던 것 */
-    + '.p1 .t-work td.y,.p1 .t-role td.y{width:96px}'
+    + '.p1 .t-work td.y,.p1 .t-role td.y{width:112px}'
     + '.p1 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
 
   var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass,

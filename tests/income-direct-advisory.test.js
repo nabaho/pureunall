@@ -55,6 +55,8 @@ function runSave(d) {
   /* 확정은 «성과급 마감 막이» 문을 지나 저장한다 — 흉내 내지 않고 진짜 문을 함께 싣는다 */
   ['function erpNextOpenYM(', 'function erpPerfYMFor(', 'function erpUpsertIncome(']
     .forEach((head) => vm.runInContext(sliceFn(erp, head), ctx));
+  // 입금 문이 부르는 공용 판정(입금 마감 등)도 진짜를 싣는다
+  vm.runInContext(require('./fin-one-rule-src').finRuleSrc(erp), ctx);
   vm.runInContext(sliceFn(erp, 'function saveDirectIncome(d){'), ctx);
   ctx.saveDirectIncome(Object.assign({
     row: { amount: 165000, date: '2026-08-10', memo: '최건(마루베이커리', _k: 'k1' },
@@ -93,10 +95,16 @@ test('★ 미입금 대기가 이 기록을 «찾을 수 있는» 모양이어�
      (그냥 indexOf 로 잡았다가 엉뚱한 데를 재고 있었다) */
   const at = erp.indexOf('(function addAdvisoryPending(){');
   assert.ok(at > 0, 'addAdvisoryPending 함수를 찾지 못했습니다');
-  const blk = erp.slice(at, at + 1200);
-  assert.match(blk, /kind === '자문료'/, '모으는 조건이 바뀌었으면 이 검사도 함께 봐야 합니다.');
-  assert.match(blk, /advisoryYm \|\| String\(i\.date\)\.slice\(0, ?7\)/,
-    '★ 받을 달을 안 보면 밀려 들어온 자문료가 엉뚱한 달에 잡힙니다.');
+  const blk = erp.slice(at, at + 1600);
+  /* 모으는 잣대는 공용 판정 하나(erpAdvisoryPaidFor — 2026-10-11). 그 판정에 이 기록을 실제로 넣어 본다 */
+  assert.match(blk, /erpAdvisoryPaidFor\(/, '모으는 조건이 바뀌었으면 이 검사도 함께 봐야 합니다.');
+  const ctx = { String, Array };
+  vm.createContext(ctx);
+  vm.runInContext(require('./fin-one-rule-src').finRuleSrc(erp), ctx);
+  assert.equal(ctx.erpAdvisoryPaidFor({ name: '마루베이커리' }, '2026-07', [r]).length, 1,
+    '★ 미입금 대기가 이 기록을 못 찾습니다 — 그 달 미입금이 그대로 남아 같은 돈이 두 번 보입니다.');
+  assert.equal(ctx.erpAdvisoryPaidFor({ name: '마루베이커리' }, '2026-08', [r]).length, 0,
+    '★ 받을 달을 안 보면 밀려 들어온 자문료가 엉뚱한 달(입금월)에 잡힙니다.');
 });
 
 test('★ 자문료에는 성과급이 안 붙는다 — 확정창을 거친 자문료와 같은 규칙', () => {

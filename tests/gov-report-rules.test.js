@@ -80,7 +80,7 @@ test('scal_docs 줄 모양 — 키 꼴 · 상태 다섯 · 시각 숫자 · 날�
   assert.ok(k.how['.validate'].includes('(mail|platform|post|other)'));
   assert.equal(k.ack['.validate'], 'newData.isBoolean()');
   assert.equal(k.$other['.validate'], false);
-  assert.deepEqual(Object.keys(k).sort(), ['$other', '.validate', '.write', 'ack', 'at', 'by', 'gotAt', 'how', 'note', 'sentAt', 'st']);
+  assert.deepEqual(Object.keys(k).sort(), ['$other', '.validate', '.write', 'ack', 'at', 'by', 'gotAt', 'how', 'link', 'note', 'sentAt', 'st']);
 });
 
 test('규칙과 화면 모듈(js/pu-gov-report-track.js)이 같은 값을 쓴다', () => {
@@ -90,4 +90,27 @@ test('규칙과 화면 모듈(js/pu-gov-report-track.js)이 같은 값을 쓴다
   assert.ok(k.note['.validate'].endsWith('<= ' + Tr.NOTE_MAX), '메모 길이');
   assert.ok(k.by['.validate'].endsWith('<= ' + Tr.BY_MAX), '이름 길이');
   assert.ok(k['.validate'].includes(Tr.KEY_RE.source), '줄 키 꼴');
+});
+
+/* ═══ 받은 서류 연결 (2026-10-11, 설계 2026-10-11-gov-report-inbox-design.md §3) ═══ */
+
+test('scal_docs 줄의 link — src·key 필수 · src 는 mail 만 · key 1~80자 · name ≤100자 · date 꼴 · 다른 칸 거절 · 따로 쓰기 문 없음', () => {
+  const k = rules.scal_docs.$co.$rid.items.$key;
+  const l = k.link;
+  assert.ok(l, 'link 가지가 없습니다');
+  assert.equal(l['.validate'], "newData.hasChildren(['src','key'])");
+  assert.equal(l.src['.validate'], "newData.isString() && newData.val() === 'mail'");
+  assert.equal(l.key['.validate'], 'newData.isString() && newData.val().length >= 1 && newData.val().length <= 80');
+  assert.equal(l.name['.validate'], 'newData.isString() && newData.val().length <= 100');
+  assert.equal(l.date['.validate'], k.sentAt['.validate'], '날짜 꼴은 sentAt·gotAt 과 같은 식');
+  assert.equal(l.$other['.validate'], false);
+  assert.deepEqual(Object.keys(l).sort(), ['$other', '.validate', 'date', 'key', 'name', 'src']);
+  assert.equal(l['.write'], undefined, 'link 에 따로 쓰기 문을 열지 않는다(줄 쓰기 규칙을 따른다)');
+});
+
+test('link 한계 — 규칙과 화면 모듈(js/pu-gov-report-track.js)이 같은 값', () => {
+  const l = rules.scal_docs.$co.$rid.items.$key.link;
+  assert.ok(l.src['.validate'].includes("'" + Tr.LINK_SRC + "'"), '연결 갈래');
+  assert.ok(l.key['.validate'].endsWith('<= ' + Tr.LINK_KEY_MAX), '열쇠 길이');
+  assert.ok(l.name['.validate'].endsWith('<= ' + Tr.LINK_NAME_MAX), '이름 길이');
 });

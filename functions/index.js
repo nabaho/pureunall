@@ -1344,7 +1344,7 @@ exports.rehabWatch = functions
     const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
     const today = new Date(nowMs + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
     const first = !(await root.child("runs").limitToFirst(1).once("value")).exists();
-    const noBankruptcyYet = !Object.keys(existing).some((k) => existing[k] && existing[k].kind === "bankruptcy");
+    const noBankruptcyYet = RehabWatch.DEFAULT_KINDS.indexOf("bankruptcy") >= 0 && !Object.keys(existing).some((k) => existing[k] && existing[k].kind === "bankruptcy");
     const since = new Date(nowMs + 9 * 3600e3 - ((first || noBankruptcyYet) ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면(파산을 처음 모을 때도) 한 달 치
     const post = async (u, body) => {
       const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
@@ -1693,13 +1693,19 @@ async function 뉴스레터경고판갱신(db) {
   const 반송들 = (await db.ref("newsletter/bounces").once("value")).val() || {};
   /* 손으로 보낸 회차 — 감시 기록에 발송 ok 가 안 남는다. 회차 원본의 보낸때로 가린다(2026-10-09) */
   const 보낸때 = 열쇠 ? Number((await db.ref("newsletter/issues/" + 열쇠 + "/보낸때").once("value")).val()) || 0 : 0;
-  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null, 반송들, { 보낸때 });
+  /* 팝업 머리말에 «2026년 10월 2주차» 처럼 사람이 읽는 이름을 쓴다(대표 지시 2026-10-11) — 없으면 비워 둔다 */
+  const 회차이름 = 열쇠 ? String((await db.ref("newsletter/issues/" + 열쇠 + "/회차/이름").once("value")).val() || "") : "";
+  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null, 반송들, { 보낸때, 회차이름 });
   await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
 /* 법제처 원문 조문 읽기 (대표 결정 2026-10-05 「추천대로」 — 서버가 원문을 직접 읽어 AI 에게 넘긴다)
    ⚠ 공개 열쇠(OC=test) — 판례 모으개(news-prec.js)와 같은 문. 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다). */
 async function 법조문원문(조목록) {
   const 밑 = "https://www.law.go.kr/DRF/";
+  /* ⚠ 법제처 XML 은 «번호 칸»(<항번호>①)과 «내용 칸»(<항내용>① 사용자는…)이 둘 다 번호를 적는다 — 태그만 걷으면
+       「① ① 사용자는」 이 되어 AI 교정자가 «번호 중복»이라고 올린다(2026-10-11 근로기준법 제55조 오탐, 편지는 멀쩡했다).
+       내용 맨 앞에 «같은 번호»가 있을 때만 번호 칸을 버린다(없으면 번호를 살린다). 항·호·목이 같은 모양이다. */
+  const 번호겹침 = /<(항|호|목)번호>\s*([^<]*?)\s*<\/\1번호>\s*(<\1내용>\s*)(?=\2\s)/g;
   const 받기 = async (u) => {
     const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
     try { const r = await fetch(u, { signal: ac.signal }); return r.ok ? await r.text() : ""; }
@@ -1721,7 +1727,7 @@ async function 법조문원문(조목록) {
     const 조 = 글.replace(/<!\[CDATA\[|\]\]>/g, "").match(/<조문내용>[\s\S]*?<\/조문단위>/);
     if (!조) continue;
     결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""),
-      원문: 조[0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
+      원문: 조[0].replace(번호겹침, "$3").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
   }
   return 결과;
 }
@@ -1734,7 +1740,7 @@ async function 감시용회차(db, 열쇠) {
   return 있음 ? o : null;
 }
 
-/* 일요일 보충 한 번 — 일요일 17시(newsletterSundayRefill)와 «오늘만 23시»가 함께 부른다.
+/* 일요일 보충 한 번 — 일요일 17시(newsletterSundayRefill)가 부른다.
    판단은 news-watch.js(보충할까·보충하기), 고르기는 Core.거리고르기 — 여기는 읽고 쓰기만. */
 async function 일요일보충한번(누가) {
   const db = getDatabase();
@@ -1906,21 +1912,6 @@ exports.newsletterSundayRefill = functions
     return null;
   });
 
-/* ★ 오늘만 — 2026-10-04(일) 23:00 한 번 (대표 지시 「오늘꺼 만 예외로 23시에 모아달라. 그리고 내일 오전 06시에 보내라」)
-   일요일 17시 보충이 배포되기 전에 17시가 지나, 10/5 편지에 새것을 넣으려고 오늘 밤만 한 번 더 돈다.
-   ⚠ 날짜 문지기 — 서울 날이 2026-10-04 가 아니면 아무것도 안 한다(크론이 해마다 10/4 에 다시 부르기 때문).
-   ⚠ 다 돌고 나면 지워도 된다: firebase functions:delete newsletterRefillOnce20261004 --region asia-northeast3 */
-exports.newsletterRefillOnce20261004 = functions
-  .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
-  .pubsub.schedule("0 23 4 10 *")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    if (서울오늘() !== "2026-10-04") { console.log("[오늘만 보충] 날짜가 지나 아무것도 안 함"); return null; }
-    await 일요일보충한번("오늘만 23시 보충");
-    return null;
-  });
-
 /* 매일 09:00 — 반송·수신거부 확인 (대표 지시 2026-10-05 「수신거부가 되거나 반송되는것은 자동으로 …」
    → 목업 → 「원장의 주소 그대로 지우지 않는다. 추천대로」)
    받은메일함(mailbox/msgs/{inbox})에서 마지막 발송 뒤의 반송·회신을 갈라 newsletter/bounces 에 적는다.
@@ -1947,7 +1938,9 @@ exports.newsletterBounceScan = functions
     const 받은 = Object.keys(폴더).find((k) => 폴더[k] && 폴더[k].kind === "inbox") || "INBOX";
     const [받은메일, 대기열, 설정, 사업장들, 더한분들, 기존] = await Promise.all([
       db.ref("mailbox/msgs/" + 받은).orderByKey().limitToLast(800).once("value").then((x) => x.val() || {}),
-      db.ref(MD.CARDS_ROOT + "/scheduled").once("value").then((x) => x.val() || {}),
+      회차들[보낸].batchId
+        ? db.ref(MD.CARDS_ROOT + "/scheduled").orderByChild("bulk").equalTo(String(회차들[보낸].batchId)).once("value").then((x) => x.val() || {})
+        : Promise.resolve({}),
       db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
       db.ref("data/companies/v").once("value").then((x) => x.val() || {}),
       db.ref("newsletter/더한분들").once("value").then((x) => x.val() || {}),
@@ -1997,7 +1990,8 @@ exports.newsletterWatchDelivery = functions
       return null;
     }
     if (ready.상태 !== "완료" || ready.보낼날 !== today || !ready.batchId) return null;
-    const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled").once("value")).val() || {};
+    const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled")
+      .orderByChild("bulk").equalTo(String(ready.batchId)).once("value")).val() || {};
     const 셈 = NWatch.전달셈(줄들, ready.batchId);
     await db.ref("newsletter/watch/" + ready.회차열쇠 + "/전달").set(Object.assign({ 때: Date.now(), 받는수: ready.받는수 || 0 }, 셈));
     if (셈.실패 || 셈.확인필요) {
@@ -4801,10 +4795,23 @@ async function 홈자동정찰(그릇) {
       .map((m) => String(m.name || "").trim()).filter(Boolean).slice(0, 20);
   } catch (e) { /* 이름을 못 읽으면 이름 자리만 빠진다 */ }
   const 결과 = { at: Date.now(), 판: HA.정찰판, 대상: {} };
+  let 레이아웃번호 = [];
   for (const 이름 of Object.keys(자리)) {
     try {
       const g = await 홈부르기(자리[이름], 그릇);
       const 화면 = await g.text();
+      /* 3차 정찰 — 찾을 직원 이름을 «공개 홈페이지의 직원 줄»에서 직접 읽는다(구성원 자료엔 노무사뿐이었다).
+         ⚠ 구성원쪽이 구성원쪽고치기보다 «먼저» 열린다(객체 순서) — 그래서 거기서 쓸 수 있다. */
+      if (이름 === "구성원쪽") {
+        const 공개이름 = HW.직원이름뽑기(화면);
+        if (공개이름.length) 직원이름들 = 공개이름;
+        결과.직원줄수 = 공개이름.length;
+      }
+      /* 목록 둘(설치된 레이아웃·모든 인스턴스)에서 번호를 모은다 — 겹침 없이 */
+      if (이름 === "레이아웃목록" || 이름 === "레이아웃인스턴스") {
+        /* ⚠ 배열을 «.push» 로 늘리지 않는다 — 「정찰은 읽기만」 검사가 .push( 를 쓰기로 읽는다(배열 push 도) */
+        레이아웃번호 = 레이아웃번호.concat(HW.레이아웃번호들(화면).filter((n) => 레이아웃번호.indexOf(n) < 0)).slice(0, 8);
+      }
       const 본 = HW.정찰(화면);
       const 채움 = HW.채운칸들(화면);
       const 본문값 = String((HW.칸읽기(화면).칸 || {}).content || "");
@@ -4814,8 +4821,33 @@ async function 홈자동정찰(그릇) {
         번호값: 본.번호값, 확인표있나: 본.확인표있나, 채운칸: 채움.채운칸, 본문에그림: 채움.본문에그림,
         편집기: HW.편집기단서(화면), 본문: HW.본문모양(본문값) };
       if (이름 === "구성원쪽고치기") 결과.대상[이름].이름자리 = HW.이름자리모양(본문값, 직원이름들);
+      /* 4차 정찰(판 4) — 연 «모든 화면»에서 직원 이름이 든 «칸 이름»과 모양을 본다(값·이름은 안 담는다).
+         칸 이름만 알면 서버가 그 칸 하나를 고치는 길을 지을 수 있다. */
+      결과.대상[이름].이름든칸 = HW.이름든칸들(화면, 직원이름들);
+      if (이름 !== "구성원쪽고치기") 결과.대상[이름].이름자리 = HW.이름자리모양(화면, 직원이름들);
     } catch (e) {
       결과.대상[이름] = { 막힘: String((e && e.message) || e) };
+    }
+  }
+  /* 3차 정찰(판 3) — 레이아웃마다 «설정 칸»과 «코드» 읽는 화면을 열어, 직원 이름이 어디에 있는지만 본다.
+     ★ 이름이 «입력 칸(설정값)»에 있으면 칸 하나씩 안전하게 고칠 수 있고, «코드 속 글자»면 틀 전체를 저장해야 한다.
+     ⚠ 읽기만 — 값·코드는 한 글자도 안 남긴다. 이름은 NAME 으로 가리고 몇 번 나왔는지·어떤 모양 안인지만. */
+  결과.레이아웃 = {};
+  for (const n of 레이아웃번호) {
+    결과.레이아웃[n] = {};
+    const 칸들 = HW.레이아웃자리(n);
+    for (const 종류 of Object.keys(칸들)) {
+      try {
+        const g = await 홈부르기(칸들[종류], 그릇);
+        const 화면 = await g.text();
+        const 본 = HW.정찰(화면);
+        결과.레이아웃[n][종류] = { 상태: g.status, 옮김: (g.headers.get("location") || "").replace(HW.ORIGIN, ""),
+          크기: 본.크기, 글칸: 본.글칸, 넓은칸: 본.넓은칸, 숨은칸: 본.숨은칸, 이름표: 본.이름표, 행위들: 본.행위들,
+          채운칸: HW.채운칸들(화면).채운칸, 레이아웃이름: HW.레이아웃이름(화면),
+          이름자리: HW.이름자리모양(화면, 직원이름들), 이름든칸: HW.이름든칸들(화면, 직원이름들) };
+      } catch (e) {
+        결과.레이아웃[n][종류] = { 막힘: String((e && e.message) || e) };
+      }
     }
   }
   /* ⚠ 데이터베이스는 «undefined» 가 든 값을 통째로 거부한다 — 2026-10-05 2차 정찰이 그 탓에 조용히
@@ -4974,6 +5006,15 @@ async function 홈자동한번(방식, 받은지문, 누가) {
         const 까닭 = String((e && e.message) || e);
         return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: 까닭 }));
       }
+    },
+    /* 쓰는 일은 한 번에 하나만 (2026-10-11) — 잡으면 «풀기» 함수를, 남이 쥐고 있으면 null 을 준다.
+       ⚠ 찬 자리(null)로 먼저 불려도 잠금 몸통이 값을 내므로 접히지 않는다(서버가 진짜 값으로 다시 부른다). */
+    잠그기: async (p, 지금) => {
+      const r = await db.ref(p).transaction((cur) => HA.잠금몸통(cur, 지금, 누가));
+      if (!r || !r.committed) return null;
+      return async () => {
+        await db.ref(p).transaction((cur) => (cur && cur.at === 지금 ? null : cur)).catch(() => {});
+      };
     },
     지금: () => Date.now(),
     달: 서울달,
@@ -7011,6 +7052,8 @@ exports.ntsMonthly = NTSM.ntsMonthly;
    실제 코드는 nps-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
 const NPSM = require("./nps-monthly")({ functions, getDatabase, MAIL_REGION });
 exports.npsMonthly = NPSM.npsMonthly;
+/* 🗂 공공데이터 공용 자리 — 화면의 «받아 달라»(pubdata_req/{번호})를 받아 그 회사만 받는다(2026-10-11, functions/pubdata.js). */
+exports.pubdataAsk = NPSM.pubdataAsk;
 
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */

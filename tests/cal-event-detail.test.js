@@ -64,7 +64,7 @@ function 상자(옵션) {
   });
   ['function 구글상세(id){', 'function 층상세(ymd, id){', 'function 공휴일상세(ymd){',
    'function detailHtml(){', 'function 긴날짜(ymd){', 'function 시분(ms){',
-   'function 날짜글(ymd){', 'function 시각글(hm){', 'function 선아이콘(이름){', 'function 행아이콘(그림){',
+   'function 날짜글(ymd){', 'function 상세날짜글(ymd){', 'function 시각글(hm){', 'function 선아이콘(이름){', 'function 행아이콘(그림){',
    'function 도구단추(속성, 이름, 뜻){',
    'function holidayOf(ymd){', 'function 언제적(iso){'].forEach((h) => vm.runInContext(함수몸(h), box));
   return box;
@@ -190,7 +190,7 @@ test('★ 상세 창이 그려진다 — 제목·언제·줄·안내·닫기', (
     rows: [{ i: '📁', t: '가나상사' }], hint: ['사건 ▸ 심급·단계에서 고칩니다.'], url: '' } });
   const html = vm.runInContext('detailHtml()', b);
   assert.match(html, /지노위 기한/, '제목이 없습니다');
-  assert.match(html, /9월 15일 \(화\)/, '★ 언제인지 안 적습니다');
+  assert.match(html, /9월 15일 \(화요일\)/, '★ 언제인지 안 적습니다(구글 팝업 꼴 「9월 15일 (화요일)」)');
   assert.match(html, /가나상사/, '줄이 안 보입니다');
   assert.match(html, /사건 ▸ 심급·단계/, '안내가 안 보입니다');
   /* ⚠ 가림막(veil)에도 data-close 가 붙어 있다 — 그것만 보면 단추를 빼도 안 걸린다

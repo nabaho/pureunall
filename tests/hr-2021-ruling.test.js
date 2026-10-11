@@ -60,7 +60,13 @@ test('★ 전환 날 «당일»까지 세면 보정분이 들어간다 (2026-10-
 test('★ 손으로 고친 부여일수가 있어도 보정분은 «위에 더한다» — 수기 값은 전환 전에 정한 것', () => {
   const S = fs.readFileSync(path.join(R, 'pu-erp.html'), 'utf8');
   /* 휴가관리 표·합계는 lvRow 한 곳으로 모였다(2026-10-11) — 자리 수보다 «덮는 자리가 없는가»(아래 줄)가 본뜻이다 */
-  assert.ok((S.match(/ov\.total ?\+ ?erpRulingFixDays\(/g) || []).length >= 3, '수기 부여에 보정분을 더하는 자리가 사라졌습니다');
+  /* 2026-10-11 A1: 화면마다 따로 더하던 것을 erpLeaveYearGrant 하나로 모았다 — 그 함수가 보정분을 더하고,
+     화면은 그 함수를 부른다(자리 수를 세면 «빠진 자리»를 못 잡았다: 변수 이름이 override 인 곳 둘이 셈 밖이었다) */
+  const fnAt = S.indexOf('function erpLeaveYearGrant(');
+  assert.ok(fnAt >= 0, '부여 합 함수(erpLeaveYearGrant)가 사라졌습니다');
+  assert.match(S.slice(fnAt, S.indexOf('\n}', fnAt)), /ov\.total[^;]*\+ ?erpRulingFixDays\(/, '수기 부여에 보정분을 더하는 자리가 사라졌습니다');
+  assert.ok((S.match(/erpLeaveYearGrant\(/g) || []).length >= 4, '화면들이 부여 합 함수를 부르지 않습니다');
+  assert.doesNotMatch(S, /override ?&& ?(override\.total ?!= ?null|typeof override\.total ?=== ?'number') ?\? ?override\.total ?:/, '보정분 없이 수기 값만 쓰는 자리가 남았습니다(override)');
   assert.match(S, /ov\.total != null \? \(\+ov\.total \|\| 0\) \+ fix/, '«이번 연차 기간» 셈도 보정분을 더해야 합니다');
   assert.doesNotMatch(S, /ov ?&& ?ov\.total ?!= ?null ?\? ?ov\.total ?: ?(a\.days|autoDays)/, '보정분 없이 수기 값만 쓰는 자리가 남았습니다');
 });

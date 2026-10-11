@@ -67,7 +67,7 @@ test('명부 맞추기: 대기 중 휴직으로 재직자를 휴직으로 바꾸
 });
 
 test('퇴사 처리·환경설정·명단 가져오기 세 길이 모두 휴직 기록을 닫는다', () => {
-  assert.match(SRC, /function saveRetire\(data\)\{[\s\S]{0,400}erpCloseLoaForRetire\(data\.sid/);
+  assert.match(SRC, /function saveRetire\(data\)\{[\s\S]{0,1200}erpCloseLoaForRetire\(data\.sid/);   // 앞에 «퇴직 예정» 갈래가 있다(2026-10-11)
   assert.match(SRC, /newStatus === 'retired'\)\{\s*\n\s*erpCloseLoaForRetire\(x\.sid/);
   assert.match(SRC, /_retiredNow\.forEach\(function\(x\)\{ erpCloseLoaForRetire\(/);
 });

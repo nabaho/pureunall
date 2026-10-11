@@ -67,6 +67,7 @@ test('담고, 겹침은 한 번만, PDF 는 보류 줄만 — 원래 번호는 �
   assert.deepEqual(kept.companyCand, [{ companyId: 'co_gana', why: '주소' }]);
   assert.equal(kept.companyLinkStatus, 'pending');
   assert.equal(kept.companyId, null, '★ 후보를 사업장으로 확정했다 — 확정은 사람');
+  assert.equal(kept.recheckV, C.RECHECK_V, '새로 가린 글을 다음 회차에 또 읽지 않는다');
   assert.ok(kept.file && /^rules_lib\/rd_\w+\.hwpx$/.test(kept.file.path));
   const held = docs.find((d) => d.status === '보류');
   assert.match(held.holdWhy, /PDF/);

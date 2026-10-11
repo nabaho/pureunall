@@ -68,8 +68,8 @@ test('★ 배선 — 단계 순서·완료 막기·한글 감사별 한 장·제
   assert.ok(set.includes("step==='audit'&&state==='done'") && set.includes('_as.got<_as.n'), '감사가 덜 받았는데 완료가 된다');
   /* 사업계획서: 제목·예산은 다음 해, 추정재무상태표의 바탕은 결산한 해(확정 스냅샷이 아니라 그 해 장부) */
   const pf = fnSrc('_flowPlanFill');
-  assert.ok(pf.includes('S.year=yr+1') && pf.includes('S.f15Close={fin:computeFin(arrC,fid,yr)}'), '연도·바탕이 어긋난다');
-  assert.ok(pf.includes('S.year=keep.y') && pf.includes('S.f15Close=keep.c'), 'S 를 되돌리지 않는다(실패 길 포함)');
+  assert.ok(pf.includes('S.year=yr+1') && pf.includes('S._bizBase={fid:fid,yr:yr,fin:journalOf(arrC).length?computeFin(arrC,fid,yr):null}'), '연도·바탕이 어긋난다');
+  assert.ok(pf.includes('S.year=keep.y') && pf.includes('S._bizBase=keep.b'), 'S 를 되돌리지 않는다(실패 길 포함)');
   assert.ok((pf.match(/back\(\)/g) || []).length >= 2, '실패해도 되돌린다');
   /* 감사보고서: 한 사람마다 한 장 + 의견이 한글에 간다 */
   assert.ok(SRC.includes("감사의견:AUDIT_OP[f._audOp==='지적'?'지적':'적정']"), '한글이 늘 적정이다');

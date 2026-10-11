@@ -117,7 +117,7 @@ test('② 담을 값 — 기본은 «동의 받기 전», 동의를 적으면 �
   const 줄 = { 이름: '홍길동', 소속: '가나상사', 직책: '대표', 주소: 'hong@example.com', 전화: '010-0000-0001', 명함번호: '100' };
   const 기본 = C.지인담을값(줄, { 담은이: 'admin@example.com', 담은날: '2026-10-11' });
   assert.deepStrictEqual(기본, { 이름: '홍길동', 소속: '가나상사', 직책: '대표', 주소: 'hong@example.com',
-    전화: '010-0000-0001', 출처: '명함', 명함번호: '100', 담은날: '2026-10-11', 담은이: 'admin@example.com', 동의: false });
+    전화: '010-0000-0001', 사업장주소: '', 출처: '명함', 명함번호: '100', 담은날: '2026-10-11', 담은이: 'admin@example.com', 동의: false });
   assert.ok(!('동의날' in 기본) && !('동의방법' in 기본), '동의 전인데 동의 날짜가 적혔다');
   const 동의 = C.지인담을값(줄, { 담은날: '2026-10-11', 동의: true, 동의날: '2026-10-01', 동의방법: '  구두  ' });
   assert.strictEqual(동의.동의, true);
@@ -454,7 +454,10 @@ test('표의 한 칸은 «한 줄» — 칸마다 …로 줄이고 전문은 tit
   assert.match(표, /<th class="ck"><\/th><th class="n">#<\/th>/);
   assert.match(표, /<td class="ck"><input type="checkbox" class="chk5"[^>]*><\/td><td class="n">1<\/td>/);
   /* 폰 — 16px 미만 입력칸은 아이폰이 화면을 키운다 */
-  assert.match(화면, /@media\(max-width:700px\)\{#friendbox input,#friendbox select\{font-size:16px !important\}\}/);
+  /* 2026-10-11 — 지역 고르개(select)가 지인 탭 필터 줄에도 생겨 선택자가 늘었다. 뜻은 같다: 폰에서 입력칸·select 는 16px. */
+  assert.match(화면, /@media\(max-width:700px\)\{#friendbox input,#friendbox select,[^{}]*\{font-size:16px !important\}\}/);
+  const 폰 = /@media\(max-width:700px\)\{([^{}]*)\{font-size:16px !important\}\}/.exec(화면);
+  assert.ok(폰 && /#friendbox select/.test(폰[1]) && /\.chips\.filt select/.test(폰[1]), '폰 규칙이 지역 select 를 빠뜨렸다');
 });
 
 /* ═══ 지인·잠재 표 — 고르기 · 찾기 · 한꺼번에 동의/빼기 ═════════════════════ */

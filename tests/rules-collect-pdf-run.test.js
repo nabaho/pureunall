@@ -138,6 +138,7 @@ test('다시 보기 — 옛 PDF 보류 규칙본문만, 지문이 같은 첨부�
     { fetchAtts: async (m) => { fetched++; return m.mailKey === 'i_INBOX-4a1e411c_20' ? [{ name: '다른.pdf', data: PB }, { name: '취업규칙.pdf', data: PA }] : []; } }));
   const lib = db.store.rules_mgmt.library;
   assert.equal(lib.docs[idA].status, '담김');
+  assert.equal(lib.docs[idA].recheckV, C.RECHECK_V, '되살린 PDF 글을 다음 회차에 또 읽지 않는다');
   assert.equal(lib.docs[idA].revision, 2);
   assert.ok(lib.text[idA].startsWith('제1조'));
   assert.equal(lib.docs[idC].holdWhy, C.PDF_HOLD.OLD, '★ 동의서 PDF 를 다시 읽었다(범위 밖)');

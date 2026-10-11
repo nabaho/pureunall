@@ -115,13 +115,13 @@
       body:'                급여관리업무 위임계약서\n\n                                                     계약번호: {{계약번호}}\n\n   {{회사명}} (이하 "갑"이라 한다)과 푸른노무법인 (이하 "을"이라 한다)은\n   민법 제680조에 의해 아래와 같이 위임계약을 체결하고 성실히 이행할 것을\n   약정한다.\n\n                          - 아 래 -\n\n제1조 【위임사무】\n   ① 갑은 을에게 갑의 회사 내 근로자의 급여관리업무를 위임한다.\n   ② 제1항의 급여관리업무란 갑의 급여대장 관리업무이다.\n   ③ 제1항의 급여관리업무에는 4대보험업무를 포함한다. 단, 을이 보험사무\n      대행기관 자격으로 수행할 수 없는 업무는 위임사무에서 제외한다.\n   ④ 제3항의 급여관리업무에는 {{회사명}}을(를) 포함한 부속사업장의 업무도\n      포함한다.\n\n제2조 【보수】\n   ① 갑은 을에게 제1조에서 정한 위임사무에 대한 보수로 매월 금 {{계약금액}}원\n      (부가세 포함)을 지불한다.\n   ② 갑은 을의 계좌로 제1항에 따른 비용을 지급하되, 지급일은 매월 ____일로\n      한다.\n   ③ 제1항의 월 보수액은 갑의 상시 근로자 수 및 사업장의 상황 등에 따라\n      계약기간 도중 혹은 연장시점에 인상될 수 있다. 인상 보수액은 갑과 을이\n      상호 합의하여 결정한다.\n\n제3조 【비용】\n   제1항의 위임사무를 처리하는데 있어서 특별히 소요되는 기타경비는 을이\n   부담한다.\n\n제4조 【자료제출 및 편의제공】\n   ① 갑은 위임사무를 원활히 수행하는데 필요한 각종 자료의 제출요구에 적극\n      조력하여야 하며 을은 갑이 제시한 자료에 따라 위임사무를 처리한다.\n   ② 갑은 위임사무의 원활한 수행에 필요한 시설물의 이용, 사무기기의 사용\n      등에 협조하여야 한다.\n\n제5조 【자료의 보관】\n   갑이 사무 처리를 위하여 제공한 서류와 자료는 위임사무가 종료된 때 갑의\n   요청에 의해 반환하는 것을 원칙으로 하고 반환요청이 없는 경우 을은 3년이\n   경과한 때 이를 폐기할 수 있다.\n\n제6조 【계약기간】\n   ① 위임사무를 수행하는 계약기간은 {{계약시작일}} 부터 {{계약종료일}} 까지로 한다.\n   ② 갑과 을 중 어느 일방이 계약기간 만료 전 1개월 이내에 본 계약과 관련하여\n      이의를 제기하지 아니하는 경우에는 동일 조건으로 1년간 계약을 연장하는\n      것으로 간주한다.\n\n제7조 【계약의 해지】\n   갑과 을이 본 약정서에 정한 의무를 이행하지 않을 때와 갑이 제공한 자료나\n   진술한 사항이 허위인 경우 또는 을이 위임사무를 고의로 지연시킨 경우에는\n   일방이 본 계약을 해지할 수 있다.\n\n제8조 【비밀 준수】\n   을은 위임사무를 통하여 지득한 갑의 비밀을 준수하여야 한다.\n\n제9조 【특약사항】\n   제2조 제2항에 명시한 업무 외의 노무관리업무로서 노동위원회 사건, 노동부\n   진정사건, 업무상 재해 등의 사건처리와 별도의 방문상담이 필요한 업무처리의\n   경우에는 갑은 을에게 별도의 비용을 지불한다.\n\n   본 약정의 성립을 증명하기 위하여 약정서 2부를 작성하여 서명 날인하여\n   계약당사자가 각각 1부씩 보관한다.\n\n                              {{계약일}}\n\n   갑   대 표 자: {{대표자}}        을   대 표 자: 권 형 하\n        주    소: {{주소}}              주    소: 충남 천안시 서북구\n                                                  원두정8길 6, 301호\n        업 체 명: {{회사명}} (인)        업 체 명: 푸른노무법인 (인)\n',
       attachments:[], enabled:true, createdAt:'2026-05-08' },
     { id:'fm-pr-pension', kind:'company', name:'국민연금 EDI 업무대행 신청서 (푸른 표준)',
-      body:'              국민연금 웹 EDI 업무대행 신청서\n\n                                                     계약번호: {{계약번호}}\n\n   접수번호: ______________   접수일: ______________   처리기간: 즉시\n\n┌─────────────────────────────────────────────┐\n│ [업무대행기관]                                              │\n│  사업장관리번호: 312-81-52792-0                            │\n│  사업장 명칭   : 푸른노무법인                              │\n│  소 재 지      : 충청남도 천안시 서북구 원두정8길 6, 3층  │\n│  사업자등록번호: 312-81-52792                              │\n│  법인등록번호  : 161571-0000304                            │\n│  사    용    자: 권 형 하  (생년월일: 1975.01.07)         │\n└─────────────────────────────────────────────┘\n\n┌─────────────────────────────────────────────┐\n│ [위탁사업장]                                                │\n│  사업장관리번호: {{사업자번호}}                            │\n│  사업장 명칭   : {{회사명}}                                │\n│  소 재 지      : {{주소}}                                  │\n│  사업자등록번호: {{사업자번호}}                            │\n│  법인등록번호  : ____________________                      │\n│  사    용    자: {{대표자}}  (생년월일: ______________)   │\n└─────────────────────────────────────────────┘\n\n[업무위탁 범위]\n   ▪ 자격의 취득 및 상실 신고\n   ▪ 내용변경 신고\n   ▪ 기준소득월액 변경 등 신고\n   ▪ 신고서 처리결과 및 보험료결정내역 확인\n\n   ※ 증명서 발급에 관한 사항은 업무대행 범위에 포함되지 않음\n\n   위탁사업장은 민법 제114조 규정에 따라 국민연금 웹 EDI 업무대행을 위탁하고,\n   업무대행기관은 대행기관으로서 제반 업무처리에 따른 법적 책임을 부담하며,\n   각 신청인은 개인정보의 부적정사용을 방지하기 위한 조치를 취하고 불법 유출\n   등으로 발생하는 손해배상 등에 대하여 연대하여 책임질 것을 서약하며 업무대행을\n   신청합니다.\n\n                              {{계약일}}\n\n   신청인 (업무대행기관 사용자):\n     푸른노무법인                                       (서명 또는 인)\n\n   신청인 (업무대행 위탁사업장 사용자):\n     {{대표자}}                                         (서명 또는 인)\n\n              국민연금공단  ○○○○ 지사장  귀하\n',
+      body:'              국민연금 웹 EDI 업무대행 신청서\n\n                                                     계약번호: {{계약번호}}\n\n   접수번호: ______________   접수일: ______________   처리기간: 즉시\n\n────────────────────────────────────────\n [업무대행기관]\n  사업장관리번호: 312-81-52792-0\n  사업장 명칭 : 푸른노무법인\n  소 재 지 : 충청남도 천안시 서북구 원두정8길 6, 두정빌딩 3층 301호\n  사업자등록번호: 312-81-52792\n  법인등록번호 : 161571-0000304\n  사    용    자: 권 형 하  (생년월일: 1975.01.07)\n────────────────────────────────────────\n\n────────────────────────────────────────\n [위탁사업장]\n  사업장관리번호: {{사업자번호}}\n  사업장 명칭 : {{회사명}}\n  소 재 지 : {{주소}}\n  사업자등록번호: {{사업자번호}}\n  법인등록번호 : ____________________\n  사    용    자: {{대표자}}  (생년월일: ______________)\n────────────────────────────────────────\n\n[업무위탁 범위]\n   ▪ 자격의 취득 및 상실 신고\n   ▪ 내용변경 신고\n   ▪ 기준소득월액 변경 등 신고\n   ▪ 신고서 처리결과 및 보험료결정내역 확인\n\n   ※ 증명서 발급에 관한 사항은 업무대행 범위에 포함되지 않음\n\n   위탁사업장은 민법 제114조 규정에 따라 국민연금 웹 EDI 업무대행을 위탁하고,\n   업무대행기관은 대행기관으로서 제반 업무처리에 따른 법적 책임을 부담하며,\n   각 신청인은 개인정보의 부적정사용을 방지하기 위한 조치를 취하고 불법 유출\n   등으로 발생하는 손해배상 등에 대하여 연대하여 책임질 것을 서약하며 업무대행을\n   신청합니다.\n\n                              {{계약일}}\n\n   신청인 (업무대행기관 사용자):\n     푸른노무법인                                       (서명 또는 인)\n\n   신청인 (업무대행 위탁사업장 사용자):\n     {{대표자}}                                         (서명 또는 인)\n\n              국민연금공단  ○○○○ 지사장  귀하\n',
       attachments:[], enabled:true, createdAt:'2026-05-08' },
     { id:'fm-pr-health', kind:'company', name:'건강보험 EDI 업무대행 위임장 (푸른 표준)',
-      body:'              건강보험 EDI 업무대행 위임장\n\n                                                     계약번호: {{계약번호}}\n\n┌─────────────────────────────────────────────┐\n│ [업무대행기관]                                              │\n│  사업장관리번호: 312-81-52792-0                            │\n│  기 관 명      : 푸른노무법인                              │\n│  소 재 지      : 충청남도 천안시 서북구 원두정8길 6,      │\n│                  두정빌딩 3층 301호 (전화: 041-556-0034~6)       │\n│  대 표 자      : 권 형 하                                  │\n│  주 민 번 호   : 750107-1******                            │\n└─────────────────────────────────────────────┘\n\n┌─────────────────────────────────────────────┐\n│ [위탁사업장]                                                │\n│  사업장관리번호 (단위사업장기호): {{사업자번호}}-0         │\n│  사 업 장 명   : {{회사명}}                                │\n│  소 재 지      : {{주소}}                                  │\n│  대 표 자      : {{대표자}}                                │\n│  주 민 번 호   : ______________                            │\n│  사업자등록번호: {{사업자번호}}                            │\n└─────────────────────────────────────────────┘\n\n[위임 업무 범위]\n   공단 웹 EDI 서비스 업무\n\n[작성 방법]\n   - 주민번호: 생년월일 + 성별까지 기재\n\n   민법 제114조(대리행위의 효력)의 규정에 의하여 위와 같이 건강보험 EDI\n   업무대행 대리인 위임을 신청합니다.\n\n                              {{계약일}}\n\n                  위임자: {{대표자}}                (서명 또는 인)\n\n              국민건강보험공단  ○○○○ 지사장  귀하\n',
+      body:'              건강보험 EDI 업무대행 위임장\n\n                                                     계약번호: {{계약번호}}\n\n────────────────────────────────────────\n [업무대행기관]\n  사업장관리번호: 312-81-52792-0\n  기 관 명 : 푸른노무법인\n  소 재 지 : 충청남도 천안시 서북구 원두정8길 6,\n                  두정빌딩 301호 (전화: 041-556-0034~6)\n  대 표 자 : 권 형 하\n  주 민 번 호 : 750107-1******\n────────────────────────────────────────\n\n────────────────────────────────────────\n [위탁사업장]\n  사업장관리번호 (단위사업장기호): {{사업자번호}}-0\n  사 업 장 명 : {{회사명}}\n  소 재 지 : {{주소}}\n  대 표 자 : {{대표자}}\n  주 민 번 호 : ______________\n  사업자등록번호: {{사업자번호}}\n────────────────────────────────────────\n\n[위임 업무 범위]\n   공단 웹 EDI 서비스 업무\n\n[작성 방법]\n   - 주민번호: 생년월일 + 성별까지 기재\n\n   민법 제114조(대리행위의 효력)의 규정에 의하여 위와 같이 건강보험 EDI\n   업무대행 대리인 위임을 신청합니다.\n\n                              {{계약일}}\n\n                  위임자: {{대표자}}                (서명 또는 인)\n\n              국민건강보험공단  ○○○○ 지사장  귀하\n',
       attachments:[], enabled:true, createdAt:'2026-05-08' },
     { id:'fm-pr-employment', kind:'company', name:'고용·산재 보험사무대행기관 사무위탁서 (푸른 표준)',
-      body:'              보험사무대행기관 사무위탁서\n\n                                                     계약번호: {{계약번호}}\n\n┌─────────────────────────────────────────────┐\n│ 사업장관리번호: {{사업자번호}}-0                           │\n│ 사업장명      : {{회사명}}                                 │\n│ 상시사용근로자수:           명                             │\n│ 소 재 지      : {{주소}}                                   │\n│ 전 화 번 호   : ________________                           │\n│ 대 표 자      : {{대표자}}                                 │\n│ 사업의 종류   : ________________                           │\n└─────────────────────────────────────────────┘\n\n[위탁사항]\n   □ 고용보험 및 산업재해보상보험 (임금채권 및 석면피해구제 포함) 관련 사무\n     1. 보수총액 및 근로자 고용정보 신고에 관한 사무\n     2. 보험료 신고에 관한 사무\n     3. 보험관계 성립, 변경, 소멸 등의 신고에 관한 사무\n     4. 기타 관계 법령 및 규칙 등에 의하여 사업주가 근로복지공단이나\n        지방고용노동관서에 신고 또는 보고하여야 할 보험사무\n     5. 피보험자격의 취득·상실 및 근로내역확인 신고 등 피보험자관리에\n        관한 사무 (고용보험에 한함)\n\n   ※ 보험사무대행기관이 상기 위탁사항의 처리에 필요한 정보를 근로복지공단\n     에서 제공받는 것에 동의함\n\n   사무처리 시작 연월일 (예정): {{계약일}}\n\n   위와 같이 귀 보험사무대행기관에 [√]고용보험 [√]산업재해보상보험\n   (임금채권 및 석면피해구제 포함) 사무의 처리를 위탁합니다.\n\n                              {{계약일}}\n\n   위탁사업주 주소: {{주소}}\n   위탁사업주 성명: {{대표자}}                          (서명 또는 인)\n\n              보험사무대행기관 대표  귀하\n\n   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n   [√]고용보험 [√]산업재해보상보험 관련 사무 수탁을 [√]승낙 [ ]불승낙 합니다.\n\n   불승낙 사유: ________________________________________\n\n   보험가입자 사업장관리번호: 2009-0049-00\n\n                              {{계약일}}\n\n   보험사무대행기관 명칭: 푸른노무법인\n   소 재 지            : 충청남도 천안시 서북구 원두정8길 6\n   대 표 자            : 권 형 하                       (서명 또는 인)\n\n              {{회사명}} 귀하\n',
+      body:'              보험사무대행기관 사무위탁서\n\n                                                     계약번호: {{계약번호}}\n\n────────────────────────────────────────\n 사업장관리번호: {{사업자번호}}-0\n 사업장명 : {{회사명}}\n 상시사용근로자수:           명\n 소 재 지 : {{주소}}\n 전 화 번 호 : ________________\n 대 표 자 : {{대표자}}\n 사업의 종류 : ________________\n────────────────────────────────────────\n\n[위탁사항]\n   □ 고용보험 및 산업재해보상보험 (임금채권 및 석면피해구제 포함) 관련 사무\n     1. 보수총액 및 근로자 고용정보 신고에 관한 사무\n     2. 보험료 신고에 관한 사무\n     3. 보험관계 성립, 변경, 소멸 등의 신고에 관한 사무\n     4. 기타 관계 법령 및 규칙 등에 의하여 사업주가 근로복지공단이나\n        지방고용노동관서에 신고 또는 보고하여야 할 보험사무\n     5. 피보험자격의 취득·상실 및 근로내역확인 신고 등 피보험자관리에\n        관한 사무 (고용보험에 한함)\n\n   ※ 보험사무대행기관이 상기 위탁사항의 처리에 필요한 정보를 근로복지공단\n     에서 제공받는 것에 동의함\n\n   사무처리 시작 연월일 (예정): {{계약일}}\n\n   위와 같이 귀 보험사무대행기관에 [√]고용보험 [√]산업재해보상보험\n   (임금채권 및 석면피해구제 포함) 사무의 처리를 위탁합니다.\n\n                              {{계약일}}\n\n   위탁사업주 주소: {{주소}}\n   위탁사업주 성명: {{대표자}}                          (서명 또는 인)\n\n              보험사무대행기관 대표  귀하\n\n   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n   [√]고용보험 [√]산업재해보상보험 관련 사무 수탁을 [√]승낙 [ ]불승낙 합니다.\n\n   불승낙 사유: ________________________________________\n\n   보험가입자 사업장관리번호: 2009-0049-00\n\n                              {{계약일}}\n\n   보험사무대행기관 명칭: 푸른노무법인\n   소 재 지            : 충청남도 천안시 서북구 원두정8길 6\n   대 표 자            : 권 형 하                       (서명 또는 인)\n\n              {{회사명}} 귀하\n',
       attachments:[], enabled:true, createdAt:'2026-05-08' },
     { id:'fm-pr-cms', kind:'company', name:'CMS 자동이체 이용신청서 (푸른 표준)',
       body:'         계좌/신용카드 자동출금 이용신청서 (■신규 □변경 □해지)\n\n                                                     계약번호: {{계약번호}}\n\n※ 전자금융거래법 관련 규정(시행령 10조)에 의거, 자동이체 신청시에는 반드시\n   서면/공동인증서/녹취를 통한 예금주/카드주/휴대폰명의자 본인의 동의가\n   필요합니다.\n※ 신용카드 이용시 카드이용내역서상 카드사에 따라 결제대행기관인 나이스\n   또는 나이스(올더게이트)의 이름으로 청구될 수 있으며, 계좌출금 시에는\n   통장 내역에 수납기관이 지정한 통장기재내역으로 6자 이내 표시됩니다.\n\n◈ 수납기관 및 요금정보 (수납기관 기재란)\n   수납기관명    : 푸른노무법인\n   자동이체사유  : 월 자문료\n   금     액     : {{계약금액}}원\n   비     고     : 통장기재내역: 푸른노무법인\n\n◈ 납부자 정보 (수납기관 기재란)\n   납부자 번호 (고객번호): __________________\n   이체개시 년월         : {{계약시작일}}\n   지정 출금일           : 매월 ___일\n\n◈ 신청인 정보 입력\n   신청인 성명           : {{회사명}}\n   이 메 일             : {{대표이메일}}\n   주     소             : {{주소}}\n   연 락 처              : {{대표전화}}\n   휴대폰번호            : __________________\n\n   결제수단 선택         : ■ 계좌(CMS)  □ 신용카드\n                          *계좌이용시 휴대폰번호 등으로 개설된 평생계좌번호는\n                           이용 불가\n\n   은행명/카드사         : __________________\n   사업자번호            : {{사업자번호}}\n   예금주/카드주 본인명  : __________________\n   계좌/카드번호         : __________________\n   예금주/카드주 본인 주민번호 앞6자리: ______ - *******\n   카드유효기간          : ___/___ (월/년)  *카드 선택시\n\n※ 법인공용카드, 선불카드, 해외발행카드 등 일부 카드는 이용이 불가능할 수\n   있습니다.\n※ 연체, 잔액부족 등의 사유로 납부가 지연되는 경우가 발생하지 않도록 유의\n   하여 주십시오.\n\n[자동이체 서비스 이용 약관 / 개인정보 수집·이용동의 / 개인정보 취급위탁 /\n 문자(SMS) 발송 동의]\n   상기 자동이체 신청과 관련하여 계좌예금주/카드주로서 자동이체서비스\n   이용약관과 개인정보 수집 및 이용동의, 개인정보 취급 위탁에 동의,\n   문자(SMS) 발송에 동의하며, 자동출금이체서비스를 신청합니다.\n\n                              {{계약일}}\n\n   신청인               : {{대표자}}                  (인 또는 서명)\n   예금주/카드주 동의란 :                              (인 또는 서명)\n\n   * 신청인과 예금주/카드주가 상이한 경우에는 예금주/카드주의 동의가 필요\n     하며, 날인 또는 서명은 출금통장의 거래날인, 서명 사용\n',
@@ -244,13 +244,80 @@
       db.ref(PATH).transaction(function (cur) {
         var base = mergeSeeds(listOf(cur && cur.v), removed).list;
         out = fn(base.slice());
+        /* 고친·새 양식만 첨부 사본을 뺀다(slimForm) — 손대지 않은 양식은 그대로 둔다(옛 사본 걷어내기는 따로, 대표 확인 뒤) */
+        out = (out || []).map(function (f) { return base.indexOf(f) >= 0 ? f : slimForm(f); });
         return { v: out, u: nextU(cur) };
-      }, function (err, committed) {
+      }, function (err, committed, snap) {
         if (err) { rej(err); return; }
         if (!committed) { rej(new Error('저장이 끝나지 않았습니다')); return; }
+        try { rememberForms(snap && snap.val()); } catch (_) {}   // 방금 올린 판 — 다음 열기 때 다시 안 받는다
         res(out);
       });
     });
+  }
+  /* ══ 양식 묶음은 «바뀌었을 때만» 받는다 (2026-10-11 대표 「비용이 너무 많이 증가하는데 해결 방법 없나」) ══
+     ■ 왜 — 양식 62개가 3.4MB 이고 그중 96% 가 첨부 원본(base64)이다. 화면을 열 때마다·서류를 채울 때마다
+       once() 로 통째 받았다 — 실측 3분에 8번 · 29.6MB(그 3분 내려받기의 93%). 실시간DB 는 내려받은 양만큼 돈이 든다.
+     ■ 어떻게 — 모든 저장 길(여기 changeForms · 이알피 dbSet/트랜잭션)이 data/contract_forms/u 를 올린다.
+       그 13바이트만 먼저 읽어, 지난번 받은 판(이 창 메모리 → 이 기기 IndexedDB)과 같으면 그것을 쓴다.
+       다르거나·없거나·u 를 못 읽으면 예전처럼 통째 받는다(→ 받은 판을 다시 적어 둔다).
+     ⚠ 받은 판은 «사본»으로 돌려준다 — 부른 쪽이 고쳐도 보관본이 안 더러워진다.
+     ⚠ 보관은 양식(우리 서식)뿐이다 — 사람·업체 자료가 아니다. IndexedDB 를 못 쓰는 창은 메모리만 쓴다. */
+  var FORMS_IDB = 'pu-contract-forms-cache', FORMS_STORE = 'kv', FORMS_KEY = 'contract_forms';
+  var memForms = null;   // { u, val }
+  function cloneVal(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+  function idbOpen() {
+    return new Promise(function (res) {
+      try {
+        var idb = w.indexedDB; if (!idb) { res(null); return; }
+        var rq = idb.open(FORMS_IDB, 1);
+        rq.onupgradeneeded = function () { try { rq.result.createObjectStore(FORMS_STORE); } catch (_) {} };
+        rq.onsuccess = function () { res(rq.result); };
+        rq.onerror = function () { res(null); };
+        rq.onblocked = function () { res(null); };
+      } catch (_) { res(null); }
+    });
+  }
+  function idbGetForms() {
+    return idbOpen().then(function (idb) {
+      if (!idb) return null;
+      return new Promise(function (res) {
+        try {
+          var rq = idb.transaction(FORMS_STORE, 'readonly').objectStore(FORMS_STORE).get(FORMS_KEY);
+          rq.onsuccess = function () { res(rq.result || null); idb.close(); };
+          rq.onerror = function () { res(null); idb.close(); };
+        } catch (_) { res(null); }
+      });
+    });
+  }
+  function idbPutForms(rec) {
+    return idbOpen().then(function (idb) {
+      if (!idb) return;
+      try {
+        var tx = idb.transaction(FORMS_STORE, 'readwrite');
+        tx.objectStore(FORMS_STORE).put(rec, FORMS_KEY);
+        tx.oncomplete = tx.onerror = tx.onabort = function () { try { idb.close(); } catch (_) {} };
+      } catch (_) {}
+    });
+  }
+  function rememberForms(v) {
+    if (v && typeof v.u === 'number') { memForms = { u: v.u, val: cloneVal(v) }; idbPutForms(memForms); }
+    else memForms = null;
+  }
+  /* 서버 본문({v,u}) — once('value').val() 과 같은 것을 돌려준다 */
+  function formsValue(db) {
+    function full() {
+      return db.ref(PATH).once('value').then(function (s) { var v = s.val(); rememberForms(v); return cloneVal(v); });
+    }
+    return db.ref(PATH + '/u').once('value').then(function (s) {
+      var u = s.val();
+      if (typeof u !== 'number') return full();
+      if (memForms && memForms.u === u) return cloneVal(memForms.val);
+      return idbGetForms().then(function (rec) {
+        if (rec && rec.u === u && rec.val && rec.val.u === u) { memForms = rec; return cloneVal(rec.val); }
+        return full();
+      }, full);
+    }, full);
   }
   function changeRemoved(db, fn) {
     return new Promise(function (res, rej) {
@@ -875,8 +942,8 @@
   }
   function attKey(a) { return (a && a.id) || ('n:' + (a && a.name) + '|' + (a && a.size)); }
   function loadForms(db) {
-    return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value')]).then(function (r) {
-      var cf = r[0].val(), rm = r[1].val();
+    return Promise.all([formsValue(db), db.ref(PATH_RM).once('value')]).then(function (r) {
+      var cf = r[0], rm = r[1].val();
       return mergeSeeds(listOf(cf && cf.v), listOf(rm && rm.v)).list;
     });
   }
@@ -1156,16 +1223,23 @@
 
   /* 한글 원본 미리보기 — 공용 한글 엔진(js/pu-hwp-engine.js)으로 그린다.
      「본문 교체」는 올릴 때와 «같은 읽개»로 뽑는다(두 벌이 되면 또 갈린다). */
-  function openHwpPreview(att, onApplyText) {
+  function openHwpPreview(att, onApplyText, getBytes) {
+    /* getBytes — 보관함에서 받는 길(첨부 사본이 없을 때). 없으면 목록 안 사본 */
+    var bytesP = null;
+    function bytes() {
+      if (!bytesP) bytesP = getBytes ? getBytes() : ((att && (att.data || att.dataUrl)) ? Promise.resolve(bytesOfDataUrl(att.data || att.dataUrl)) : Promise.reject(new Error('원본 파일이 없습니다')));
+      return bytesP;
+    }
     var ov = el('div', { 'class': 'pcf-hv' });
     var body = el('div', { style: 'flex:1;overflow:auto;background:#e2e8f0;min-height:300px' },
       [el('div', { style: 'color:#475569;padding:40px;text-align:center', text: '📥 한글 엔진을 불러오는 중…' })]);
     var apply = onApplyText ? el('button', { type: 'button', 'class': 'pcf-b b', text: '📝 이 파일 글자로 본문 교체', onclick: function () {
-      var u8 = bytesOfDataUrl(att.data || att.dataUrl);
-      extractTemplateText(new Blob([u8]), function (text, err) {
-        if (err || !text) { toast('❌ 글자를 뽑지 못했습니다: ' + (err || '빈 본문')); return; }
-        onApplyText(text); toast('✅ 본문을 바꿨습니다'); ov.remove();
-      });
+      bytes().then(function (u8) {
+        extractTemplateText(new Blob([u8]), function (text, err) {
+          if (err || !text) { toast('❌ 글자를 뽑지 못했습니다: ' + (err || '빈 본문')); return; }
+          onApplyText(text); toast('✅ 본문을 바꿨습니다'); ov.remove();
+        });
+      }, function (e) { toast('❌ 원본을 받지 못했습니다: ' + ((e && e.message) || e)); });
     } }) : null;
     var box = el('div', { 'class': 'pcf-hvb' }, [
       el('div', { 'class': 'pcf-hvh' }, [el('b', { text: '🔍 원본 미리보기 — ' + (att.name || '') }), apply,
@@ -1175,10 +1249,8 @@
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
     document.body.appendChild(ov);
     if (!w.PureunHwp) { body.firstChild.textContent = '한글 엔진을 불러오지 못했습니다.'; return; }
-    try {
-      w.PureunHwp.renderPreview(body, bytesOfDataUrl(att.data || att.dataUrl), att.name)
-        .catch(function (e) { body.textContent = '❌ 미리보기 실패: ' + ((e && e.message) || e); });
-    } catch (e) { body.textContent = '❌ 미리보기 실패: ' + ((e && e.message) || e); }
+    bytes().then(function (u8) { return w.PureunHwp.renderPreview(body, u8, att.name); })
+      .catch(function (e) { body.textContent = '❌ 미리보기 실패: ' + ((e && e.message) || e); });
   }
 
   /* rhwp 판 올리기 — 이알피 「계약서 출력」과 같은 브라우저 자리(pureun_v6_rhwp_ver)에 적는다.
@@ -1260,7 +1332,7 @@
           arcd[attKey(a)] ? el('span', { 'class': 'pcf-ok', text: '보관함' }) : null,
           el('span', { style: 'color:#94a3b8;font-family:monospace;font-size:10.5px', text: ((a.size || 0) / 1024).toFixed(1) + 'KB' }),
           /\.(hwp|hwpx)$/i.test(a.name || '') ? el('button', { type: 'button', 'class': 'pcf-b g', title: '원본 미리보기', text: '🔍',
-            onclick: function () { openHwpPreview(a, function (t) { bodyIn.value = t; }); } }) : null,
+            onclick: function () { openHwpPreview(a, function (t) { bodyIn.value = t; }, opts.attBytes ? function () { return opts.attBytes(f, a); } : null); } }) : null,
           el('button', { type: 'button', 'class': 'pcf-b', style: 'color:#dc2626', text: '×', title: '첨부 빼기 (보관함 사본은 남습니다)',
             onclick: function () { f.attachments = f.attachments.filter(function (x) { return x.id !== a.id; }); drawAtts(); } })
         ]));
@@ -1380,6 +1452,41 @@
       if (use === 'off' && f.enabled !== false) return false;
       return true;
     });
+  }
+  /* ══ 첨부 원본은 «원본 보관함»에서 (2026-10-11 대표 「비용이 너무 많이 증가」 → 「순서대로」) ══
+     ■ 왜 — 양식 목록(data/contract_forms) 3.4MB 중 3.27MB 가 첨부 사본(base64)이었고, 그 62개는 «모두»
+       원본 보관함(pu_docs/originals, 창고 — 지울 수 없음)에 같은 파일이 있었다. 사본 때문에 양식 한 장만 고쳐도
+       목록 통째(3.4MB)가 오갔다.
+     ■ 그래서 — 읽을 때: 목록 안 사본(data)이 있으면 그것, 없으면 보관함 번호(a.fileId 또는 originals[attId].fileId).
+       저장할 때(slimForm): «보관함 번호가 확인된» 첨부만 사본을 뺀다. 번호가 없으면 그 사본이 유일본이라 절대 안 뺀다. */
+  function attSrc(fm, a) {
+    if (!a) return null;
+    if (a.data || a.dataUrl) return { name: a.name, data: a.data || a.dataUrl };
+    var fid = a.fileId || ((((fm && fm.originals) || []).filter(function (o) { return o && o.attId && o.attId === a.id && o.fileId; })[0]) || {}).fileId;
+    return fid ? { name: a.name, fileId: fid } : null;
+  }
+  function attBytes(fm, a, host) {
+    var s = attSrc(fm, a);
+    if (!s) return Promise.reject(new Error('원본 파일이 없습니다'));
+    if (s.data) return Promise.resolve(bytesOfDataUrl(s.data));
+    return (host && host.hwpBytes) ? host.hwpBytes(s) : Promise.reject(new Error('원본을 불러올 길이 없습니다'));
+  }
+  function slimForm(f) {
+    if (!f || !Array.isArray(f.attachments) || !f.attachments.length) return f;
+    var o = Array.isArray(f.originals) ? f.originals : [];
+    var changed = false;
+    var atts = f.attachments.map(function (a) {
+      if (!a || !(a.data || a.dataUrl)) return a;
+      var hit = o.filter(function (x) { return x && x.attId && x.attId === a.id && x.fileId; })[0];
+      if (!hit) return a;   // 보관함에 없다 — 이 사본이 유일본이다
+      var c = {}; Object.keys(a).forEach(function (k) { if (k !== 'data' && k !== 'dataUrl') c[k] = a[k]; });
+      c.fileId = hit.fileId; changed = true;
+      return c;
+    });
+    if (!changed) return f;
+    var nf = {}; Object.keys(f).forEach(function (k) { nf[k] = f[k]; });
+    nf.attachments = atts;
+    return nf;
   }
   function hwpSources(fm) {
     var out = [];
@@ -2481,8 +2588,8 @@
       S.err = null;
       /* 이알피 사건 유형 · 직원 명부(재직 공인노무사) — 못 읽어도 양식은 뜬다(옛 기본 유형 · 기본 명단) */
       var soft = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
-      return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
-        var cf = r[0].val(), rm = r[1].val();
+      return Promise.all([formsValue(db), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
+        var cf = r[0], rm = r[1].val();
         if (r[2]) setCaseTypes(r[2].v || r[2]);
         if (r[3]) { S.lawDir = r[3].v || r[3]; S.lawLoa = r[4] && (r[4].v || r[4]); }
         if (r[3] && w.PuFormCardFill && w.PuFormCardFill.setLawyers) w.PuFormCardFill.setLawyers(r[3].v || r[3], r[4] && (r[4].v || r[4]));   // 퇴사·휴직은 빠진다
@@ -2845,7 +2952,7 @@
       });
     }
     function filesOf(e) { return e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length ? e.dataTransfer.files : null; }
-    function modal(o) { o.archiveFile = archiveFile; openModal(o); }
+    function modal(o) { o.archiveFile = archiveFile; o.attBytes = function (form, a) { return attBytes(form, a, host); }; openModal(o); }
 
     /* ── 왼쪽 메뉴 — 계약유형만(양식 이름은 본문 목록) ── */
     /* 왼쪽 메뉴 «상위 머리글»(서식 종류 · 세트) 접기·펴기, 서식 종류 차례 끌어 바꾸기 (대표 2026-10-11) — 보는 사람 브라우저에만 기억한다(새 저장 칸·규칙 배포 없음).
@@ -2972,13 +3079,23 @@
       (fm.originals || []).forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
       (fm.attachments || []).forEach(function (a) {
         if (a.role === 'preview') return;   // 미리보기 PDF 는 보기 칸이 쓴다 — 받을 원본 줄에는 안 띄운다
-        strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl || '#', download: a.name || '첨부', title: (a.name || '첨부') + ' 받기',
-          text: '📥 ' + (/\.xlsx$/i.test(a.name || '') ? '엑셀' : /\.(hwp|hwpx)$/i.test(a.name || '') ? '한글' : '파일') + (arcd[attKey(a)] ? ' ✓' : '') }));
+        var lbl = '📥 ' + (/\.xlsx$/i.test(a.name || '') ? '엑셀' : /\.(hwp|hwpx)$/i.test(a.name || '') ? '한글' : '파일') + (arcd[attKey(a)] ? ' ✓' : '');
+        if (a.data || a.dataUrl) strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl, download: a.name || '첨부', title: (a.name || '첨부') + ' 받기', text: lbl }));
+        /* 사본이 없는 첨부(보관함에만 있음) — 누를 때 보관함에서 받아 이름 그대로 내려준다 */
+        else if (attSrc(fm, a)) strip.appendChild(el('a', { 'class': 'pcf-att', href: '#', title: (a.name || '첨부') + ' 받기 (원본 보관함)', text: lbl,
+          onclick: function (e) {
+            e.preventDefault();
+            attBytes(fm, a, host).then(function (u8) {
+              var url = w.URL.createObjectURL(new Blob([u8])), x = document.createElement('a');
+              x.href = url; x.download = a.name || '첨부'; document.body.appendChild(x); x.click(); x.remove();
+              setTimeout(function () { w.URL.revokeObjectURL(url); }, 5000);
+            }, function (er) { toast('❌ 원본을 받지 못했습니다: ' + ((er && er.message) || er)); });
+          } }));
       });
       if (!strip.childNodes.length) strip.appendChild(el('span', { text: '원본 파일 없음' }));
       var hasOrig = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp));
       var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
-      var hwpAtt = (fm.attachments || []).filter(function (a) { return /\.(hwp|hwpx)$/i.test(a.name || '') && (a.data || a.dataUrl); })[0];
+      var hwpAtt = (fm.attachments || []).filter(function (a) { return /\.(hwp|hwpx)$/i.test(a.name || '') && attSrc(fm, a); })[0];
       return el('div', { 'class': 'pcf-top' }, [
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' }), fm.name]),
         strip,
@@ -2994,7 +3111,7 @@
           { t: '⧉ 복제', fn: function () { copy(fm); } },
           (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
             ? { t: '✏ 바꿀 자리 만들기', title: '원본 글자를 찾아 표시나 고친 글자로 바꿉니다. 이전 원본은 보관함에 남습니다.', fn: function () { openMark(fm); } } : null,
-          hwpAtt ? { t: '🔍 한글 원본 크게 보기', fn: function () { openHwpPreview(hwpAtt, null); } } : null,
+          hwpAtt ? { t: '🔍 한글 원본 크게 보기', fn: function () { openHwpPreview(hwpAtt, null, function () { return attBytes(fm, hwpAtt, host); }); } } : null,
           { t: '🗄 종료 서식으로 옮기기', title: '더 쓰지 않는 서식 — 지우지 않고 종료 서식 보관함으로 옮깁니다(되살릴 수 있습니다)', fn: function () { closeForm(fm); } },
           { t: '🗑 삭제', fn: function () { del(fm); } }
         ].concat(toolItems(kind)))
@@ -3476,7 +3593,9 @@
     zipName: zipName,
     splitVars: splitVars,
     attKey: attKey, withNewOriginal: withNewOriginal, orphanInline: orphanInline,
+    attSrc: attSrc, attBytes: attBytes, slimForm: slimForm,
     loadForms: loadForms,
+    formsValue: formsValue,
     linkOriginal: linkOriginal,
     ATTACH_MAX: ATTACH_MAX,
     hwpSources: hwpSources,

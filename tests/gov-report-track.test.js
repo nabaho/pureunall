@@ -198,3 +198,66 @@ test('patchFor — 모르는 상태는 null', () => {
   assert.equal(Tr.patchFor({ st: 'weird' }, '홍길동', 1), null);
   assert.equal(Tr.patchFor(null, '', 1), null);
 });
+
+/* ═══ 받은 서류 연결(link) — 설계 2026-10-11-gov-report-inbox-design.md §3 ═══ */
+
+test('link 상수 — 규칙과 같은 값(src mail · 열쇠 80자 · 이름 100자)', () => {
+  assert.equal(Tr.LINK_SRC, 'mail');
+  assert.equal(Tr.LINK_KEY_MAX, 80);
+  assert.equal(Tr.LINK_NAME_MAX, 100);
+  assert.equal(Tr.LINK_BAD, '연결 값이 올바르지 않습니다');
+});
+
+test('normLink · normalize — 틀린 link 는 버리고(줄은 남긴다) 이름은 100자로 자른다', () => {
+  const L = { src: 'mail', key: 'i:INBOX-0a1b2c3d:101', name: '서명본.hwpx', date: '2026-09-25' };
+  assert.deepEqual(Tr.normLink(L), L);
+  assert.deepEqual(Tr.normLink({ src: 'mail', key: 'o:AB', name: '', date: '2026/09/25', extra: 1 }), { src: 'mail', key: 'o:AB' });
+  [null, 'x', { src: 'file', key: 'k' }, { src: 'mail' }, { src: 'mail', key: '' }, { src: 'mail', key: 7 },
+    { src: 'mail', key: 'k'.repeat(81) }].forEach((bad) => assert.equal(Tr.normLink(bad), null, JSON.stringify(bad)));
+  assert.equal(Tr.normLink({ src: 'mail', key: 'k', name: '가'.repeat(150) }).name.length, 100);
+  const raw = { c2: { t3_2026: { items: {
+    sign: { st: 'doing', at: 1, link: L },
+    submit: { st: 'done', at: 2, link: { src: 'file', key: 'x' } },
+  } } } };
+  assert.deepEqual(Tr.normalize(raw), { c2: { t3_2026: { sign: { st: 'doing', at: 1, link: L }, submit: { st: 'done', at: 2 } } } });
+});
+
+test('patchFor · validate — link 를 실어 쓰고, 틀린 link 는 저장 전에 막는다', () => {
+  const L = { src: 'mail', key: 'i:INBOX-0a1b2c3d:101', name: '서명본.hwpx', date: '2026-09-25' };
+  const p = Tr.patchFor({ st: 'doing', sentAt: '2026-09-20', link: L }, '홍길동', 5);
+  assert.deepEqual(p, { st: 'doing', at: 5, by: '홍길동', sentAt: '2026-09-20', link: L });
+  assert.deepEqual(Tr.normalize({ c: { r: { items: { k: p } } } }).c.r.k, p);
+  assert.deepEqual(Tr.patchFor({ st: 'doing', link: null }, '', 5), { st: 'doing', at: 5 });
+  assert.equal(Tr.validate({ st: 'doing', link: L }, 'sign'), '');
+  assert.equal(Tr.validate({ st: 'doing', link: null }, 'sign'), '');
+  assert.equal(Tr.validate({ st: 'doing', link: { src: 'mail', key: '' } }, 'sign'), '연결 값이 올바르지 않습니다');
+});
+
+test('nextLink — 상태만 고치는 저장은 옛 link 를 이어 받고, 요청(op.link)이 있으면 그것(null 이면 지움)', () => {
+  const L = { src: 'mail', key: 'i:X:1', name: 'a.pdf' };
+  const M = { src: 'mail', key: 'i:X:2', name: 'b.pdf' };
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, undefined), L);
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, {}), L);
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: M }), M);
+  assert.equal(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: null }), null);
+  assert.equal(Tr.nextLink(null, undefined), null);
+  assert.equal(Tr.nextLink({ st: 'doing', at: 1 }, undefined), null);
+  const carried = Tr.patchFor({ st: 'done', gotAt: '2026-10-08', link: Tr.nextLink({ st: 'doing', at: 1, link: L }, undefined) }, '홍길동', 9);
+  assert.deepEqual(carried.link, L, '상태만 고쳐도 link 가 남는다');
+});
+
+test('nextLink — 지우는 것은 op.link 가 «null» 일 때만 · 칸만 있고 undefined 이거나 꼴이 틀린 요청은 옛 link 를 지우지 않는다', () => {
+  const L = { src: 'mail', key: 'i:X:1', name: 'a.pdf' };
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: undefined }), L);
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: { src: 'web', key: 'x' } }), L);
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: '' }), L);
+  assert.equal(Tr.nextLink({ st: 'doing', at: 1 }, { link: undefined }), null);
+  assert.equal(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: null }), null);
+});
+
+test('put — link 가 든 줄을 로컬 표에 그대로 · 저장 관문은 link 가 든 줄 .set 도 통과', () => {
+  const L = { src: 'mail', key: 'i:X:1', name: 'a.pdf' };
+  assert.deepEqual(Tr.put({}, 'c2', 't3_2026', 'sign', { st: 'doing', at: 1, link: L }).c2.t3_2026.sign.link, L);
+  const p = Tr.patchFor({ st: 'doing', link: L }, '홍길동', 1);
+  assert.equal(W.inspectWrite({ kind: 'set', path: 'scal_docs/c2/t3_2026/items/sign', value: p, mode: 'enforce' }).ok, true);
+});

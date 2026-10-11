@@ -46,11 +46,12 @@ function box(o) {
     mbCoOf: (e) => (o.coOf || {})[e] || '',
     mbCoRec: (nm) => ({ '가나상사': GANA, '사아무역': SAA })[nm] || null,
     mbWhoIndex: () => ({ byAddr: o.byAddr || {}, byDom: {}, coAddr: o.coAddr || {} }),
+    _mbWkAddr: o.wkAddr || {},   /* 업무관리에서 고정한 주소 → 업체 번호 (2026-10-11) */
   };
   vm.createContext(ctx);
   ['mbWhoLive', 'mbWhoWhy','mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkHandOf',
     'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbWorkMgrs', 'mbWorkTag', 'mbSubsOfRow', 'mbCoNameOf',
-    'mbWorkLinkedKeys', 'mbWorkTodo',
+    'mbWorkLinkedKeys', 'mbWorkTodo', 'mbCoRecOfAddr',
     'mbNoWhoBox', 'mbBoxWhoList', 'mbBoxWhoOfRow']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   /* ⚠ 갈래 목록을 여기 «베껴 두지 않는다». 베껴 두면 앱이 갈래를 늘려도 검사만 옛 목록을

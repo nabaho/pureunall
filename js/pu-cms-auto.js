@@ -64,20 +64,39 @@
     return out;
   }
 
+  /* 이알피 erpAdvisoryYmOf 와 같은 결과 — tests/erp-fin-one-rule.test.js 가 견준다 */
   function ymOf(rec) { return str(rec.advisoryYm) || str(rec.date).slice(0, 7); }
+  /* 살아 있는 입금인가 — 이알피 erpIncomeLive 와 같은 규칙(이 파일은 이알피 전역을 못 본다, 노드에서도 돈다).
+     지운 것(_deleted)·거래내역에서 되돌린 것(undoneDate)은 «없는 돈» 이다(2026-10-11 fin.md 1). */
+  function live(x) { return !!x && !x._deleted && !x.undoneDate; }
   function addMonth(ym, n) {
     var y = parseInt(ym.slice(0, 4), 10), m = parseInt(ym.slice(5, 7), 10) - 1 + n;
     y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
     return y + '-' + ('0' + (m + 1)).slice(-2);
   }
-  /* 받을 달 = 그 업체 자문료의 가장 늦은 받을 달 + 1 (10/2 더빌 대조 규칙 — 말일 출금이 한 달 밀리지 않게) */
-  function nextAdvisoryYm(companyId, incomes, wdate) {
+  /* 받을 달 = 그 업체 자문료의 가장 늦은 받을 달 + 1 (10/2 더빌 대조 규칙 — 말일 출금이 한 달 밀리지 않게)
+     ★ 업체 맞추기는 findRecorded 와 같은 sameCo(번호, 번호 없는 옛 줄만 이름) — 전에는 번호 없는 줄을 여기서만 빼서
+       «다음 받을 달» 이 한 달 앞으로 잡히고, 그 달 줄을 findRecorded 가 이름으로 찾아 새 달 자문료가 조용히 빠졌다(fin.md 4).
+     co 는 업체 기록. 옛 호출처럼 업체 번호 글자만 와도 된다(그때는 번호로만 본다). */
+  function nextAdvisoryYm(co, incomes, wdate, norm) {
+    var c = (co && typeof co === 'object') ? co : { id: co, name: '' };
+    var nm = norm || defaultNorm;
     var last = '';
     (incomes || []).forEach(function (x) {
-      if (!x || x._deleted || x.companyId !== companyId || x.kind !== '자문료') return;
+      if (!live(x) || x.kind !== '자문료' || !sameCo(x, c, nm)) return;
       var ym = ymOf(x); if (ym > last) last = ym;
     });
     return last ? addMonth(last, 1) : str(wdate).slice(0, 7);
+  }
+  /* 업체가 「몇 월분」 기준(cmsYmBase)을 정해 두었으면 그 달 — 이알피 erpCmsYmOf(row, erpCmsYmBase(co)) 와 같은 결과.
+     정해 두지 않았으면 '' (그때만 «직전 + 1» 로 물러난다). 대표 결정 2026-10-11: 자동 처리도 업체 설정을 따른다(fin.md 5). */
+  function cmsYmOf(co, r) {
+    var base = co && co.cmsYmBase;
+    if (base !== 'wdate' && base !== 'setdate') return '';
+    var w = str(r && r.wdate).slice(0, 7), s = str(r && r.setdate).slice(0, 7);
+    var first = base === 'wdate' ? w : s, back = base === 'wdate' ? s : w;
+    var ym = first.length === 7 ? first : back;
+    return ym.length === 7 ? ym : '';
   }
   function feeFits(co, amt) {
     var fee = parseInt(co.monthlyAdvisoryFee, 10) || 0;
@@ -99,23 +118,26 @@
   function hasPaidInWdateMonth(co, incomes, wdate, norm) {
     var wm = str(wdate).slice(0, 7);
     return (incomes || []).some(function (x) {
-      return x && !x._deleted && x.kind === '자문료' && sameCo(x, co, norm) && str(x.date).slice(0, 7) === wm;
+      return live(x) && x.kind === '자문료' && sameCo(x, co, norm) && str(x.date).slice(0, 7) === wm;
     });
   }
   /* 이미 입금관리에 있나 — 같은 업체·같은 금액·출금일(또는 정산일) 앞뒤 5일, 또는 같은 받을 달.
-     옛 은행 입금·손으로 넣은 입금(cmsKey 없음)과 겹치지 않게 한다. */
+     옛 은행 입금·손으로 넣은 입금(cmsKey 없음)과 겹치지 않게 한다.
+     돌려주는 것: { rec, by } — by 'amount'(금액·날짜까지 맞음) 이 'ym'(받을 달만 맞음) 보다 앞선다.
+     ★ 'ym' 만으로 맞은 것은 «이 줄이 들어갔다» 는 근거가 못 된다 — 더빌 합계 줄을 처리됨으로 찍지 않고 사람이 본다(fin.md 4). */
   function findRecorded(co, r, ym, incomes, norm) {
     var amt = parseInt(r.amount, 10) || 0, tw = dayMs(r.wdate), ts = dayMs(r.setdate);
     var near = function (a, b) { return !isNaN(a) && !isNaN(b) && Math.abs(a - b) <= 5 * 864e5; };
-    var hit = null;
+    var byYm = null, hit = null;
     (incomes || []).some(function (x) {
-      if (!x || x._deleted || x.kind !== '자문료' || !sameCo(x, co, norm)) return false;
+      if (!live(x) || x.kind !== '자문료' || !sameCo(x, co, norm)) return false;
       var xt = dayMs(x.date);
-      var byAmt = (parseInt(x.amount, 10) || 0) === amt && (near(xt, tw) || near(xt, ts));
-      if (byAmt || (ym && ymOf(x) === ym)) { hit = x; return true; }
+      if ((parseInt(x.amount, 10) || 0) === amt && (near(xt, tw) || near(xt, ts))) { hit = x; return true; }
+      if (!byYm && ym && ymOf(x) === ym) byYm = x;
       return false;
     });
-    return hit;
+    if (hit) return { rec: hit, by: 'amount' };
+    return byYm ? { rec: byYm, by: 'ym' } : null;
   }
 
   /* 줄마다 판정 — 순서가 곧 우선순위다
@@ -133,8 +155,12 @@
         if (!byCode[code]) byCode[code] = c;
       });
     });
-    var done = {};
-    (ctx.incomes || []).forEach(function (x) { if (x && !x._deleted && x.cmsKey) done[x.cmsKey] = true; });
+    var done = {}, undone = {};
+    (ctx.incomes || []).forEach(function (x) {
+      if (!x || x._deleted || !x.cmsKey) return;
+      /* 거래내역에서 되돌린 입금(undoneDate)의 줄은 «넣음» 도 «새로 넣을 것» 도 아니다 — 사람이 무른 돈을 저절로 되살리지 않는다 */
+      if (x.undoneDate) undone[x.cmsKey] = true; else done[x.cmsKey] = true;
+    });
     var seen = (ctx.incomes || []).slice();         // 이번 실행에서 «자동»으로 정한 것도 다음 줄의 판정에 넣는다
     var locked = ctx.isLocked || function () { return false; };
     var skip = ctx.skip || {};
@@ -148,24 +174,34 @@
       if (!str(r.wdate)) { it.verdict = 'skip'; it.why = '출금일 없음'; return it; }
       if (skip[r._k]) { it.verdict = 'skip'; it.why = '되돌린 줄'; return it; }
       if (done[r._k]) { it.verdict = 'done'; return it; }
+      if (undone[r._k]) { it.verdict = 'skip'; it.why = '되돌린 입금의 줄'; return it; }
       if (ambiguous[r.code]) { it.verdict = 'new_member'; it.why = '회원코드가 두 업체에 이어져 있음'; return it; }
       var co = byCode[r.code] || null;
       it.company = co;
       if (!co) { it.verdict = 'new_member'; it.why = '회원코드가 어느 업체에도 이어져 있지 않음'; return it; }
-      it.ym = nextAdvisoryYm(co.id, seen, r.wdate);
+      /* 몇 월분 — 업체가 정해 둔 기준(cmsYmBase)이 먼저, 없을 때만 «직전 + 1» */
+      it.ym = cmsYmOf(co, r) || nextAdvisoryYm(co, seen, r.wdate, norm);
       if (!feeFits(co, r.amount)) { it.verdict = 'amount'; it.why = '월 자문료 ' + (co.monthlyAdvisoryFee || 0) + '원과 다름'; return it; }
       /* 마감 — 받을 달뿐 아니라 입금 날짜(출금일)의 달도 본다(입금은 그 날짜의 달 장부에 앉는다) */
       var wym = str(r.wdate).slice(0, 7);
       if (locked(it.ym)) { it.verdict = 'locked'; it.why = it.ym + ' 마감됨'; return it; }
       if (locked(wym)) { it.verdict = 'locked'; it.why = wym + ' 마감됨 (입금일의 달)'; return it; }
-      var rec = findRecorded(co, r, it.ym, real, norm);
-      if (rec) { it.verdict = 'recorded'; it.why = '이미 입금관리에 있음 — ' + str(rec.date) + ' ' + (parseInt(rec.amount, 10) || 0) + '원'; return it; }
+      var found = findRecorded(co, r, it.ym, real, norm);
+      if (found && found.by === 'amount') {
+        var rec = found.rec;
+        it.verdict = 'recorded'; it.why = '이미 입금관리에 있음 — ' + str(rec.date) + ' ' + (parseInt(rec.amount, 10) || 0) + '원'; return it;
+      }
+      if (found) {
+        it.verdict = 'ym_taken';
+        it.why = it.ym + ' 분 자문료가 이미 있음(' + str(found.rec.date) + ' ' + (parseInt(found.rec.amount, 10) || 0) + '원) — 금액·날짜가 달라 사람 확인';
+        return it;
+      }
       if (hasPaidInWdateMonth(co, seen, r.wdate, norm)) { it.verdict = 'dup_month'; it.why = wym + ' 에 이미 받은 자문료가 있음'; return it; }
       if ((since && str(r.wdate) < since) || (!since && !preview)) {
         it.verdict = 'old'; it.why = since ? '자동 시작일(' + since + ') 이전 줄 — 미리보기만' : '자동 시작일이 없음 — 미리보기만'; return it;
       }
       it.verdict = 'auto';
-      seen.push({ companyId: co.id, kind: '자문료', advisoryYm: it.ym, date: r.wdate });
+      seen.push({ companyId: co.id, companyName: co.name, kind: '자문료', advisoryYm: it.ym, date: r.wdate });
       return it;
     });
   }
@@ -230,7 +266,7 @@
       var m = norm(b.memo), t = dayMs(d);
       if (isNaN(t)) return;
       var hits = (opts.incomes || []).filter(function (x) {
-        if (!x || x._deleted || used[x.id] || inSet(taken, x.id) || (parseInt(x.amount, 10) || 0) !== amt) return false;
+        if (!live(x) || used[x.id] || inSet(taken, x.id) || (parseInt(x.amount, 10) || 0) !== amt) return false;
         /* CMS 로 들어간 입금은 더빌 합계 줄로 들어온다 — 업체 이름 줄과 짝짓지 않는다 */
         if (x.cmsKey) return false;
         var xt = dayMs(x.date);
@@ -244,7 +280,7 @@
   }
 
   var API = { statusOf: statusOf, rowKey: rowKey, parsePayTable: parsePayTable,
-    nextAdvisoryYm: nextAdvisoryYm, judgeRows: judgeRows, buildIncome: buildIncome,
+    nextAdvisoryYm: nextAdvisoryYm, cmsYmOf: cmsYmOf, ymOf: ymOf, isLive: live, judgeRows: judgeRows, buildIncome: buildIncome,
     bankLinesToMark: bankLinesToMark, safeKey: safeKey };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   root.PuCmsAuto = API;

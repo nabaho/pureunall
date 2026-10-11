@@ -35,7 +35,11 @@ test('★ 1일 7시간 근로자의 통상시급은 월급 ÷ 183 — 209 로 �
 });
 
 test('급여 계산이 그 사람의 1일 소정근로시간을 넘긴다 · 최저임금 비교도 같은 시간', () => {
-  assert.match(SRC, /calcLegalAllowances\(rec, ordinaryMonthly, erpMonthStdHours\(_empH\)\)/);
+  /* 규칙: 그 사람의 시간(erpMonthStdHours(_empH))이 calcLegalAllowances 셋째 인자로 간다 —
+     바로 넘기든 변수(명세서 글에도 쓰는 _stdHours)를 거치든 (2026-10-11 A4) */
+  const direct = /calcLegalAllowances\(rec, ordinaryMonthly, erpMonthStdHours\(_empH\)\)/.test(SRC);
+  const viaVar = SRC.match(/var ([A-Za-z_$][\w$]*) = erpMonthStdHours\(_empH\);[\s\S]{0,300}?calcLegalAllowances\(rec, ordinaryMonthly, ([A-Za-z_$][\w$]*)\)/);
+  assert.ok(direct || (viaVar && viaVar[1] === viaVar[2]), '급여 계산이 그 사람의 월 소정근로시간으로 나누지 않는다');
   assert.match(SRC, /minWageHourly \* erpMonthStdHours\(_schedH\)/);
   assert.match(SRC, /ordinaryMonthly \/ erpMonthStdHours\(hrs\) \* hrs/);
 });

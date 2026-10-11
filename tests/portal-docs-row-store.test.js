@@ -16,7 +16,7 @@ test('계약서등관리 앱의 제자리는 자료함(store)', () => {
 test('저장된 옛 줄(client)은 무시하고 제자리로, 다른 앱·다른 줄은 그대로', () => {
   const src = en.match(/var ROW_MOVED_FROM = [^\n]+\n\s*function savedRowOf[\s\S]*?\n  \}/);
   assert.ok(src, 'ROW_MOVED_FROM · savedRowOf 를 찾지 못함');
-  const ctx = { tilePrefs: null, rowExists: (id) => ['client', 'store', 'inout'].includes(id) };
+  const ctx = { tilePrefs: null, rowExists: (id) => ['client', 'store', 'sales', 'inside'].includes(id) };
   vm.createContext(ctx);
   vm.runInContext(src[0], ctx);
   ctx.tilePrefs = { rows: { docs: 'client', erp: 'client', cards: 'store', photos: 'gone' } };
@@ -24,6 +24,6 @@ test('저장된 옛 줄(client)은 무시하고 제자리로, 다른 앱·다른
   assert.strictEqual(ctx.savedRowOf('erp', 'client'), 'client');
   assert.strictEqual(ctx.savedRowOf('cards', 'store'), 'store');
   assert.strictEqual(ctx.savedRowOf('photos', 'store'), 'store');
-  ctx.tilePrefs = { rows: { docs: 'inout' } };
-  assert.strictEqual(ctx.savedRowOf('docs', 'store'), 'inout');
+  ctx.tilePrefs = { rows: { docs: 'inside' } };
+  assert.strictEqual(ctx.savedRowOf('docs', 'store'), 'inside');
 });

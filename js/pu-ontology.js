@@ -122,7 +122,7 @@
       writeContracts:[{path:dataRoots(['payroll_monthly'], '/v/{id}')[0],entityType:'PayrollRecord'},
                       {path:dataRoots(['attendance_records'], '/v/{id}')[0],entityType:'ScheduleEvent'},
                       {path:dataRoots(['user_accounts'])[0],entityType:'Person'}] },
-    fin:{ name:'재무', file:'pu-erp.html?app=fin',
+    fin:{ name:'재무관리', file:'pu-erp.html?app=fin',
       primaryRoots:dataRoots(FIN_DATA_KEYS).concat(['hanaSmsBridge']),
       sharedRoots:dataRoots(['companies','contracts','cases','consultings','funds','other_projects','payroll_monthly',
         'user_accounts','mgr_rates','policy_perf','locked_payroll_months','locked_attend_months','locked_irregular_months',
@@ -163,11 +163,15 @@
          컨설팅(data/consultings, 목차 머리말만)·ERP 연결(scal_erpTypeMap)을 빌려 읽는다. 쓰지 않는다(주인은 erp·consult).
        ★ 서류 진행 기록(2026-10-10, 설계 2026-10-10-gov-report-track-design.md) — 이 앱이 처음으로 «쓴다»:
          scal_docs/{업체}/{rid}/items/{줄 키}(③서명본·④별첨·⑤제출의 상태·날짜·메모, 줄 하나씩 .set). 주인은 이 앱이다.
-         이름 표 GR_TRACK_NODES 로 부른다. 규칙 scal_docs(scripts/make-firebase-rules.js)는 대표 승인 뒤 게시 —
-         게시 전에는 읽기·쓰기가 거절되고 화면은 읽기 전용으로 돈다. */
+         이름 표 GR_TRACK_NODES 로 부른다. 규칙 scal_docs(scripts/make-firebase-rules.js)는 2026-10-11 부터 게시되어 돈다 —
+         게시를 기다리는 것은 줄 안의 link 가지뿐(게시 전에는 link 가 든 저장만 거절된다).
+       ★ 받은 서류함(2026-10-11, 설계 2026-10-11-gov-report-inbox-design.md) — 칸 창 「📥 받은 서류 후보」가 메일함 거울
+         (mailbox/folders · mailbox/msgs 머리글, 주인은 푸른 메일 mail)과 업체관리(data/companies, 주소 세 칸)를 빌려 읽는다
+         (이름 표 GR_INBOX_NODES, 칸 창을 처음 열 때 한 번). 첨부는 서버 함수로 한 건씩 받아 화면에서만 보고 버린다.
+         연결은 scal_docs 줄 안의 link 한 칸 — 쓰기 계약은 그대로다. */
     govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report','scal_docs'],
       sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir',
-                   'data/biz_cons_types','data/consultings','scal_erpTypeMap'],
+                   'data/biz_cons_types','data/consultings','scal_erpTypeMap','mailbox','data/companies'],
       writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'},{path:'scal_docs/{co}/{rid}/items/{key}',entityType:'Document'}],
       entityTypes:['Organization','Project','Document'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
@@ -383,6 +387,12 @@
        열쇠 하나를 사진첩·기업정보함·경력관리·급여가 나눠 쓰는데, 어디가 하루 몫을
        태우는지 모르면 어디를 손볼지도 모른다(대표 물음 2026-09-08). */
     ai_read_tally:'판독 호출 셈 — 앱별 하루 몫 살피기(숫자만)',
+    /* 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11) — 공단·국세청·천문연이 «공개»하는 자료를
+       서버가 한 번 받아 두는 곳이다. 업무 개체가 아니라 «참고 자료»라 관계로 엮지 않는다.
+       열쇠는 사업자번호(회사를 잇는 열쇠와 같다)·연도. 쓰기는 서버만, 읽기는 기업정보함과 같은 범위(로그인 직원).
+       ⚠ 돈(보험료)은 담지 않는다. 사람이 정한 것(국민연금 사업장 고르기)은 기업정보함 coInfo 에 남는다. */
+    pubdata:'공공데이터 공용 자리 — 회사별 근로자 수·사업 상태, 공휴일(서버만 씀)',
+    pubdata_req:'공공데이터 «받아 달라» 요청 — 서버가 받고 지운다',
     /* 이번 달 판독 요금 한도·경고선·단가 (대표 결정 2026-09-10 · ₩30,000 / ₩25,000).
        ⚠ 업무 자료가 아니라 «정책 숫자»다 — 담긴 것은 숫자 셋뿐이라 직원 누구나
          읽는다(사진첩 판독 띠가 「한도를 다 썼습니다」라고 말하려면 읽어야 한다).

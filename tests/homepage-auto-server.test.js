@@ -7,6 +7,7 @@ const test = require('node:test');
 const assert = require('node:assert');
 const fs = require('fs');
 const path = require('path');
+const HA = require('../functions/homepage-auto.js');
 
 const 원문 = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
 const 주석뺌 = 원문.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
@@ -95,6 +96,37 @@ test('자동 정찰은 «읽기만» 한다 — 보내기(POST)가 없고, 적�
   assert.deepStrictEqual(쓰는자리, ['homepage/auto/recon']);
   assert.ok(!/\.(update|push|remove|transaction)\(/.test(b), '정찰에서 다른 쓰기를 합니다');
   assert.match(b, /HW\.자동정찰자리\(/, '정해 둔 자리 말고 다른 곳을 엽니다');
+});
+
+test('3차 정찰 — 레이아웃 화면은 «정해 둔 도우미»로만 열고, 직원 이름은 공개 쪽에서 읽는다', () => {
+  const b = 함수몸('홈자동정찰');
+  /* 주소를 손으로 짓지 않는다 — 번호는 숫자만 받는 HW.레이아웃자리 로만 */
+  assert.match(b, /HW\.레이아웃번호들\(/);
+  assert.match(b, /HW\.레이아웃자리\(/);
+  assert.ok(!/dispLayoutAdmin/.test(b), '정찰 함수에 레이아웃 주소가 직접 적혀 있습니다 — 숫자 검사를 거치지 않습니다');
+  assert.ok(!/proc[A-Z]/.test(b.replace(/\/\*[\s\S]*?\*\//g, ' ')), '정찰에서 «하는»(proc…) 길을 부릅니다');
+  /* 이름은 «공개 홈페이지의 직원 줄»에서 — 구성원 자료엔 노무사뿐이라 2차 정찰은 이름을 못 찾았다 */
+  assert.match(b, /HW\.직원이름뽑기\(/);
+  /* 값·코드는 기록에 안 담는다 — 담는 칸은 모양 도우미(정찰·채운칸들·이름자리모양)가 낸 것뿐이다 */
+  assert.match(b, /HW\.이름자리모양\(화면, 직원이름들\)/);
+});
+
+test('3차 정찰 — 레이아웃 번호를 «두 목록 모두»에서 모은다(한쪽이 비어도 다른 쪽에서)', () => {
+  const b = 함수몸('홈자동정찰');
+  assert.match(b, /이름 === "레이아웃목록"\s*\|\|\s*이름 === "레이아웃인스턴스"/,
+    '레이아웃 번호를 한쪽 목록에서만 읽습니다 — 그 목록이 비면 레이아웃 정찰이 통째로 빕니다');
+});
+
+test('정찰 판 번호 — 서버(homepage-auto)가 기록에 쓰는 판과 같다', () => {
+  assert.match(함수몸('홈자동정찰'), /판:\s*HA\.정찰판/);
+  assert.ok(HA.정찰판 >= 3, '레이아웃 정찰을 넣었는데 판 번호를 안 올렸습니다 — 화면이 다시 정찰하지 않습니다');
+});
+
+test('4차 정찰 — 열린 «모든 화면»에서 이름이 든 칸 이름을 본다(공통 기록에도, 레이아웃 기록에도)', () => {
+  const b = 함수몸('홈자동정찰');
+  const 수 = (b.match(/HW\.이름든칸들\(화면, 직원이름들\)/g) || []).length;
+  assert.ok(수 >= 2, '이름든칸들 를 쓰는 기록이 ' + 수 + '곳뿐입니다 — 일반 화면과 레이아웃 화면 둘 다 필요합니다');
+  assert.ok(HA.정찰판 >= 4, '4차 정찰을 넣었는데 판 번호를 안 올렸습니다 — 화면이 다시 정찰하지 않습니다');
 });
 
 test('정찰은 «미리 보기» 때만 돈다 — 매달 돌기·승인에는 안 끼어든다', () => {

@@ -206,7 +206,9 @@ test('★★ 온톨로지 관문(강제 모드)을 «실제로» 지난다 — 2
   assert.equal(새것.ok, true, '관문이 넣기를 거절합니다: ' + 새것.message);
   const r2 = 속.서버[자리('att-2')];
   assert.equal(r2.entityType, 'ScheduleEvent', '개체 종류를 안 붙였습니다');
-  assert.ok(r2.revision >= 1 && r2.createdAt > 0, '수정차수·생성 시각이 없습니다');
+  /* 이알피 근태의 createdAt 은 글자(ISO) — 숫자든 글자든 «시각이 찍혔는가»만 본다(모양 규칙은 ontology-write-createdat-format.test.js) */
+  assert.ok(r2.revision >= 1 && r2.createdAt != null && r2.createdAt !== '', '수정차수·생성 시각이 없습니다');
+  assert.equal(typeof r2.createdAt, 'string', '근태 createdAt 은 ISO 글자여야 합니다 — 숫자면 이알피 정렬이 죽습니다');
 });
 
 // ── 곁들여 지켜야 할 것 ───────────────────────────────────────────────
