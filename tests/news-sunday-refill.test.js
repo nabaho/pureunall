@@ -88,7 +88,7 @@ test('⑥ 서버 — 일요일 17시, 가져오기 셋 → 보충 → 자동 확
   const 일정 = 몸('newsletterSundayRefill');
   assert.match(일정, /\.pubsub\.schedule\("every sunday 17:00"\)/, '18시 점검보다 먼저여야 한다');
   assert.match(일정, /일요일보충한번\(/);
-  /* 몸통은 한 곳(일요일보충한번) — 일요일 17시와 «오늘만 23시»가 같이 부른다 */
+  /* 몸통은 한 곳(일요일보충한번) — 일요일 17시(newsletterSundayRefill)가 부른다 */
   const i = 서버.indexOf('async function 일요일보충한번');
   const b = 서버.slice(i, 서버.indexOf('\n}\n', i));
   ['뉴스모으기한번()', '자료판례모아담기(', '노무사회모으기('].forEach((x) => assert.ok(b.indexOf(x) >= 0, x + ' 를 안 부른다'));
@@ -104,12 +104,6 @@ test('⑥ 서버 — 일요일 17시, 가져오기 셋 → 보충 → 자동 확
     '보충 뒤 봉인 전에 돌아가는 길이 있다');
   assert.ok(!/scheduled|buildQueue|validateBulk/.test(b), '보충이 발송 대기열을 건드린다');
   assert.match(b, /\/보충"\)/, '무엇을 바꿨는지 남기지 않는다 — 점검표가 못 적는다');
-  /* 오늘만 23시는 날짜 문지기가 있다 — 크론이 해마다 10/4 에 다시 부른다 */
-  const 오늘만 = 몸('newsletterRefillOnce20261004');
-  if (오늘만) {
-    assert.match(오늘만, /서울오늘\(\) !== "2026-10-04"/, '날짜 문지기가 없다 — 내년 10/4 에 또 돈다');
-    assert.match(오늘만, /일요일보충한번\(/);
-  }
   /* 18시 점검이 그 기록을 읽는다 */
   assert.match(몸('newsletterWatchSunday'), /\/보충"\)\.once\("value"\)[\s\S]*보충 \}\)/);
   /* 매일 가져오기는 그대로 */
