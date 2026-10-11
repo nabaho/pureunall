@@ -586,11 +586,15 @@ function _officersOf(f){ return (Array.isArray(f&&f.officers)?f.officers:[]).fil
 /* 감사보고서는 감사가 **각자** 쓴다 — 노·사 감사가 한 장씩이다.
    명부에 측이 안 적힌 감사가 있으면 «측 없음»으로 한 장 낸다(빈 서류보다 낫다). */
 function _auditorsOf(f){
-  return _officersOf(f).filter(function(o){ return /감사/.test(o.role||''); })
+  var all=_officersOf(f).filter(function(o){ return /감사/.test(o.role||''); })
     .map(function(o){
-      var r=String(o.role||'');
-      return { side:/사용자/.test(r)?'사용자측':/근로자/.test(r)?'근로자측':'', name:String(o.name||'').trim() };
+      var r=String(o.role||''), side=/사용자/.test(r)?'사용자측':/근로자/.test(r)?'근로자측':'', name=String(o.name||'').trim();
+      /* key — 결산 후 진행에서 «감사 한 사람»의 보냄·받음·의견을 적는 열쇠(측+이름이 같으면 같은 사람). 이메일은 감사에게 보내는 메일의 받는 사람 */
+      return { side:side, name:name, email:String(o.email||'').trim(), key:(typeof hkey==='function')?hkey(side+'|'+name):(side+'|'+name) };
     });
+  /* _audOnly — 한 사람 몫의 한글 한 장을 만들 때 그 사람만 남긴다(복사본 f 에만 적는다) */
+  if(f&&f._audOnly) all=all.filter(function(a){ return a.key===f._audOnly; });
+  return all;
 }
 var TABS=[['info','기금 정보',1],['sites','참여사업장',1],['annual','연간 일정',1],['subsidy','근복지원금',1],
   ['closing','회계·결산',1],['welfare','목적사업·대부',1],['events','변경 이벤트',1]];
@@ -5434,7 +5438,7 @@ function _hwpAuditValues(f){
   f=f||{};
   var auds=_auditorsOf(f), fy=_fyRange(f);
   return {기금명:String(f.name||''), 본인:auds.length===1?'본인은':'본인 등은', 시작일:fy.start, 종료일:fy.end,
-    감사의견:AUDIT_OP['적정'], 작성일:_hwpKoDate(_hwpTodayIso(),['       ','       ']),
+    감사의견:AUDIT_OP[f._audOp==='지적'?'지적':'적정'], 작성일:_hwpKoDate(_hwpTodayIso(),['       ','       ']),
     대표자:String(f.chairman||'').trim()||String(_boss(f).name||''),
     감사:auds.length?auds.map(function(a){ return {감사명:a.name}; }):2,     // 명부에 감사가 없으면 원본처럼 빈 서명 줄 둘
     _note:auds.length?'':'임원 명부에 감사가 없어 서명 줄을 비웠습니다 — [기금 정보] › 임원 명부에 노·사 감사를 넣으세요'};
@@ -11320,6 +11324,7 @@ function officerPanel(f){
     +'<th style="width:120px">생년월일</th>'
     +'<th style="width:130px">소속 회사<span class="muted" style="font-weight:400;font-size:10px">(참여사업장)</span></th>'
     +'<th style="width:110px">직책<span class="muted" style="font-weight:400;font-size:10px">(부장·과장)</span></th>'
++'<th style="width:150px">이메일<span class="muted" style="font-weight:400;font-size:10px">(감사 메일용)</span></th>'
     /* 주민등록번호 — 설립등기신청서·인감신고서·인감대지·인감카드·사업자등록신청서가 «전체 번호»를 묻는다.
        생년월일만으로는 그 다섯 서식이 늘 손으로 남았다(대표 결정 2026-09-07: 저장한다). */
     +'<th>주민등록번호<span class="muted" style="font-weight:400;font-size:10px">(등기·세무 서식)</span></th>'
@@ -11346,6 +11351,7 @@ function _offRow(o){
          여러 회사에서 나오는 공동기금에서는 그것이 곧 위원 명부의 알맹이다. */
     +'<td><input class="off-company" type="text" placeholder="소속 회사" value="'+esc(o.company||'')+'" oninput="markDirty()"></td>'
     +'<td><input class="off-title" type="text" placeholder="부장·과장" value="'+esc(o.title||'')+'" oninput="markDirty()"></td>'
++'<td><input class="off-email" type="text" placeholder="name@회사.com" value="'+esc(o.email||'')+'" oninput="markDirty()" autocomplete="off"></td>'
     +'<td><input class="off-rrn" type="text" placeholder="000000-0000000" value="'+esc(o.rrn||'')+'" oninput="markDirty()" autocomplete="off"></td>'
     +'<td><input class="off-addr" type="text" value="'+esc(o.addr||'')+'" oninput="markDirty()"></td>'
     +'<td><button onclick="this.closest(\'tr\').remove();markDirty()" title="이 줄 지우기">✕</button></td></tr>';
@@ -11441,7 +11447,7 @@ function _readOfficers(){
     /* 빈 칸은 «키를 두지 않는다» — 빈 문자열을 넣으면 실시간DB 에 쓸모없는 칸이 쌓이고,
        나중에 «있는데 비었다»와 «아예 없다»가 구별되지 않는다. */
     var o={ role:(tr.querySelector('.off-role')||{}).value||'', name:g('.off-name') };
-    ['birth','company','title','rrn','addr'].forEach(function(k){ var v=g('.off-'+k); if(v) o[k]=v; });
+    ['birth','company','title','email','rrn','addr'].forEach(function(k){ var v=g('.off-'+k); if(v) o[k]=v; });
     return o;
   }).filter(function(o){ return o.name; });
 }
@@ -19049,6 +19055,8 @@ var FLOW_STEPS=[
   ['req','자료 요청 메일',['','sent']],
   ['recv','자료 수령',['','part','done']],
   ['lock','결산 확정',null],                       // 🔒 결산 확정(closing.locked) 그대로 — 따로 적지 않는다
+  ['plan','사업계획서 준비',['','part','done']],   // 다음 해(결산해+1) 예산 → 한글 사업계획서(2026-10-11)
+  ['audit','감사',['','part','done']],             // 근로자측·사용자측 감사 «각각» — 보냄·받음·의견(flow/audit/auds/{키})
   ['review','검토 요청 메일',['','sent']],
   ['reply','검토 회신',['','fix','ok']],
   ['seal','날인본 받기',['','part','done']],
@@ -19122,7 +19130,8 @@ function flowReadme(f,yr,notes,who){
     '■ 제출처: '+lab+' (운영상황보고 — 근로복지기본법 시행령 제63조①)',
     '■ 기한: '+(yr+1)+'. 3. 31.(휴일이면 다음 날)',
     '■ 제출: '+(who==='사업장'?'사업장이 직접':'푸른노무법인'),
-    '■ 제출 서류: 운영상황보고서(별지 제15호) + 해당 연도 결산서 + 다음 연도 사업계획서(추정재무상태표·추정손익계산서 포함)','',
+    '■ 제출 서류: 운영상황보고서(별지 제15호) + 해당 연도 결산서 + 다음 연도 사업계획서(추정재무상태표·추정손익계산서 포함)',
+'■ 묶음 파일: 01 결산서·사업계획서(엑셀) · 02 운영상황보고서 · 03 감사보고서(감사 한 사람마다 한 장) · 04 결산 승인 회의록 · 05 기본재산 변경 보고서 · 06 세무 준비표 · 07 다음 연도 사업계획서(한글)','',
     '■ 날인']
     .concat(FLOW_SEAL.map(function(s){ return '  - '+s[0]+': '+s[1]; }))
     .concat(notes&&notes.length?['','■ 참고']:[]).concat((notes||[]).map(function(n){ return '  - '+n; }))
@@ -19153,7 +19162,11 @@ function _flowZipInto(z,dir,fid,yr,d,has){
     var R=buildF15(arrC,fid,yr,d.rep,d.sites,d.welf), P=f15Pages(R);
     z.file(dir+'02. 운영상황보고서(별지 제15호) '+yr+'.html','<!doctype html><meta charset=utf-8><title>운영상황보고서 '+yr+'</title><style>'
       +f15CSS('',true)+'</style>'+P.p1+P.p2+'<button onclick="print()" style="position:fixed;right:16px;top:16px;padding:9px 16px">인쇄 / PDF 저장</button>');
-    var kinds=[['ops_audit','03. 감사보고서'],['ops_minutes_close','04. 협의회 회의록(결산 승인)'],['ops_asset_change','05. 기본재산 총액 변경 보고서']];
+    /* 감사보고서는 «감사 한 사람마다 한 장» — 근로자측·사용자측에게 따로 보낸다. 명부에 감사가 없으면 예전처럼 빈 서명 줄 한 벌 */
+var _audOps=((((d.close||{}).flow||{}).audit||{}).auds)||{};
+var audJobs=_auditorsOf(f).map(function(a){ return ['ops_audit','03. 감사보고서('+(a.side?a.side+' ':'')+a.name+')',a]; });
+if(!audJobs.length) audJobs=[['ops_audit','03. 감사보고서',null]];
+var kinds=audJobs.concat([['ops_minutes_close','04. 협의회 회의록(결산 승인)'],['ops_asset_change','05. 기본재산 총액 변경 보고서']]);
     var keep={y:S.year,ff:S.formFund}; S.year=yr; S.formFund=fid;
     var back=function(){ S.year=keep.y; S.formFund=keep.ff; };
     return kinds.reduce(function(p,k){ return p.then(function(){
@@ -19161,11 +19174,12 @@ function _flowZipInto(z,dir,fid,yr,d,has){
       if(!has[_hwpTplKey(k[0],f)]){ notes.push(nm+' — 한글 틀이 없어 넣지 못했습니다(서식 탭에서 인쇄)'); return; }
       if(k[0]==='ops_asset_change'&&!(R.bf.employer+R.bf.other)){ notes.push(nm+' — 그해 출연이 없어 뺐습니다'); return; }
       var pre=DOC_NEEDS_LEDGER[k[0]]?_docExtra(k[0],f).catch(function(){ return null; }):Promise.resolve();
-      return pre.then(function(){ return hwpTplFill(k[0],f,d.sites); })
+      return pre.then(function(){ return hwpTplFill(k[0],k[2]?Object.assign({},f,{_audOnly:k[2].key,_audOp:(_audOps[k[2].key]||{}).op||''}):f,d.sites); })
         .then(function(res){ z.file(dir+k[1]+'.hwpx',res.bytes); })
         .catch(function(){ notes.push(nm+' — 채우지 못했습니다'); });
     }); },Promise.resolve()).then(function(){ back(); }, function(e){ back(); throw e; })
-    .then(function(){ z.file(dir+'00. 제출 안내.txt',flowReadme(f,yr,notes,who)); return notes; });
+    .then(function(){ return _flowZipPlan(z,dir,f,fid,yr,d,has,notes); })
+.then(function(){ z.file(dir+'00. 제출 안내.txt',flowReadme(f,yr,notes,who)); return notes; });
   });
 }
 function _flowTplIdx(){ return _hwpTplIdxRef().once('value').then(function(s){ return s.val()||{}; }).catch(function(){ return {}; }); }
@@ -19212,6 +19226,9 @@ function flowPackageMany(yr){
 }
 /* 상태 바꾸기 — 노동부 제출·세무 완료는 연간 일정(RPT-03, TAX-02·03)에도 같이 체크한다 */
 function flowSet(step,state){
+  /* ④는 다음 해 예산이 있어야, ⑤는 감사 모두 «받음»이어야 «완료»로 바꾼다 — 껍데기 사업계획서·빠진 감사보고서가 제출 묶음에 들어가지 않게 */
+  if(step==='plan'&&state==='done'&&!flowPlanReady(S.fundId,S.year)){ toast((S.year+1)+'년 예산이 비어 있어 완료로 바꿀 수 없습니다 — 예산·집행에서 먼저 넣으세요','warn'); renderFund(); return; }
+  if(step==='audit'&&state==='done'){ var _as=flowAuditStat(S.f15Close,_auditorsOf(funds[S.fundId]||{})); if(!_as.n||_as.got<_as.n){ toast('감사 모두의 «받음»이 체크돼야 완료로 바꿀 수 있습니다','warn'); renderFund(); return; } }
   var fid=S.fundId, yr=S.year, at=state?ymd():null, up={}, base='closing/'+fid+'/'+yr+'/flow/'+step+'/';
   up[base+'state']=state||null; up[base+'at']=at; up[base+'by']=state?(S.user||''):null;
   var ann=[];
@@ -19274,8 +19291,153 @@ function flowMailOpen(){
   if(!(m.to||[]).length){ toast('받는 사람(사업장 담당자 이메일)이 없습니다 — 메일함에서 직접 적으세요','warn'); }
   var u=flowMailUrl(m.to,f.short_name||f.name||'',s?s.value:m.subject,b?b.value:m.body);
   if(!window.open(u,'puMailWrite')) toast('팝업이 막혔습니다 — 브라우저에서 팝업을 허용하세요','warn');
-  else toast('푸른메일함에 받는 사람·제목·본문을 채웠습니다 — '+(m.kind==='review'?'제출 묶음 파일을 붙여 ':'')+'보내세요');
+  else toast('푸른메일함에 받는 사람·제목·본문을 채웠습니다 — '+(m.kind==='review'?'제출 묶음 파일을 붙여 ':m.kind==='audit'?'감사보고서 한글·결산서를 붙여 ':'')+'보내세요');
 }
+/* ══ ④ 사업계획서 준비 · ⑤ 감사 (대표 지시 2026-10-11 「추천대로 진행」 — 목업 docs/목업-기금관리-결산후진행-사업계획서·감사) ══
+   결산 후 진행이 8단계라 «사업계획서를 어디서 어떻게 만드나»·«감사보고서를 누구에게 보냈나»가 화면에 없었다.
+   · ④ 사업계획서 — 다음 해(결산해+1) 예산이 있어야 한글 사업계획서를 받는다(없으면 완료로 못 바꾼다 — 예산 없는 껍데기 서류 방지).
+     추정재무상태표의 바탕은 «결산한 해»의 기말이다. 확정 스냅샷(S.f15Close.fin)이 아니라 그 해 장부(computeFin)로 셈한다 —
+     결산 확정 전에도 만들 수 있고, 제출 묶음의 엑셀 시트(buildClosingWb)와 같은 셈이다.
+   · ⑤ 감사 — 노·사 감사 «각각» 한 장씩(한글), 보냄·받음·의견을 감사마다 적는다. 둘 다 받아야 «완료».
+     저장: closing/{기금}/{연도}/flow/plan/{hwp_at,council}, flow/audit/auds/{감사 키}/{sent_at,got_at,op}.
+   ⚠ 감사 의견은 감사가 정한다 — 앱은 «적정» 초안만 깔고, 「지적사항 있음」을 고르면 한글에도 그대로 넘긴다. */
+function flowPlanReady(fid,yr){ return typeof _hasBudget==='function'&&_hasBudget(fid,yr+1); }
+/* 감사별 보냄·받음 셈 — 순수 함수. c = closing/{기금}/{연도} 마디, auds = _auditorsOf(f) */
+function flowAuditStat(c,auds){
+  var A=(((((c||{}).flow||{}).audit)||{}).auds)||{}, n=(auds||[]).length, sent=0, got=0;
+  (auds||[]).forEach(function(a){ var r=A[a.key]||{}; if(r.sent_at||r.got_at) sent++; if(r.got_at) got++; });
+  return {n:n, sent:sent, got:got, state:!n?'':(got===n?'done':(sent||got)?'part':'')};
+}
+/* 감사 한 사람에게 보내는 메일 문안 — 순수 함수(검사 대상). 앱은 보내지 않는다(문안과 받는 사람만) */
+function flowAuditMailText(f,yr,a){
+  f=f||{}; var nm=String(f.name||f.short_name||'기금'), side=(a&&a.side)?(a.side+' '):'';
+  return {
+    subject:'[푸른노무법인] '+nm+' '+yr+'년 감사보고서 작성 요청의 건',
+    body:['안녕하세요. 푸른노무법인입니다.','',
+      nm+'의 '+yr+'년 결산서를 첨부와 같이 보내드립니다.',
+      '근로복지기금법인의 '+side+'감사로서 업무집행 내용과 회계에 속하는 수입·지출의 증빙서류와 장부를 살펴보시고, 첨부한 감사보고서에 의견을 적어 서명 또는 날인하신 뒤 스캔본(PDF)을 '+(yr+1)+'년 2월 20일까지 회신해 주시기 바랍니다.','',
+      '1. 첨부: 감사보고서('+side+'감사용) 1장, '+yr+'년 결산서',
+      '2. 감사 의견은 감사님께서 정하시는 것입니다. 양식의 «적정» 문구는 초안이니, 지적사항이 있으면 고쳐 주십시오.',
+      '3. 감사보고서는 협의회에서 결산서와 함께 승인을 받습니다.','','감사합니다.'].join('\n')};
+}
+function flowOpen(step){ S._flowOpen=(S._flowOpen===step?'':step); renderFund(); }
+/* 사업계획서 한글 한 벌 — 제목·예산은 다음 해, 추정재무상태표의 바탕은 결산한 해(위 머리말). S 를 잠깐 바꿨다가 되돌린다(_flowZipInto 와 같은 방식) */
+function _flowPlanFill(fid,yr,d){
+  var f=Object.assign({_id:fid},funds[fid]||{}), arrC=closeArr(d.arr,fid,yr);
+  var keep={y:S.year,ff:S.formFund,c:S.f15Close};
+  S.year=yr+1; S.formFund=fid; S.f15Close={fin:computeFin(arrC,fid,yr)};
+  var back=function(){ S.year=keep.y; S.formFund=keep.ff; S.f15Close=keep.c; };
+  return hwpTplFill('bizplan',f,d.sites).then(function(res){ back(); return res; },function(e){ back(); throw e; });
+}
+/* 제출 묶음 안의 «07. 다음 해 사업계획서(한글)» — 예산이 있을 때만 */
+function _flowZipPlan(z,dir,f,fid,yr,d,has,notes){
+  var nm='사업계획서';
+  if(!flowPlanReady(fid,yr)){ notes.push(nm+' — '+(yr+1)+'년 예산이 비어 뺐습니다(예산·집행에서 먼저 넣으세요)'); return; }
+  if(!has[_hwpTplKey('bizplan',f)]){ notes.push(nm+' — 한글 틀이 없어 넣지 못했습니다(서식 탭에서 인쇄)'); return; }
+  return _flowPlanFill(fid,yr,d).then(function(res){ z.file(dir+'07. '+(yr+1)+'년도 사업계획서.hwpx',res.bytes); })
+    .catch(function(){ notes.push(nm+' — 채우지 못했습니다'); });
+}
+function flowPlanHwp(){
+  var fid=S.fundId, yr=S.year, f=funds[fid]||{};
+  if(!flowPlanReady(fid,yr)){ toast((yr+1)+'년 예산이 비어 있습니다 — 예산·집행에서 먼저 넣으세요','warn'); return; }
+  toast('사업계획서를 만드는 중…');
+  _flowLoad(fid,yr).then(function(d){
+    if(!journalOf(d.arr).length) throw new Error(yr+'년 승인된 분개가 없어 추정재무상태표의 바탕이 없습니다');
+    return _flowPlanFill(fid,yr,d);
+  }).then(function(res){
+    _dlBlob(new Blob([res.bytes],{type:'application/octet-stream'}),String(f.short_name||f.name||fid).replace(/\s+/g,'')+' '+(yr+1)+'년도 사업계획서.hwpx');
+    if(S.fundId!==fid||S.year!==yr) return;
+    var at=ymd(), base='closing/'+fid+'/'+yr+'/flow/plan/', up={};
+    up[base+'hwp_at']=at; up[base+'state']='done'; up[base+'at']=at; up[base+'by']=S.user||'';
+    return fbDb.ref(NS).update(up).then(function(){
+      var c=S.f15Close=S.f15Close||{}; c.flow=c.flow||{}; var r=c.flow.plan=c.flow.plan||{};
+      r.hwp_at=at; r.state='done'; r.at=at; _cbDirty(); renderFund();
+      toast('한글 사업계획서를 받았습니다 — '+(c.locked?'':'결산 확정 전 장부로 셈했습니다(확정 뒤 다시 받으면 최신)'));
+    });
+  }).catch(function(e){ toast('사업계획서를 만들지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+function flowPlanCouncil(v){
+  var fid=S.fundId, yr=S.year;
+  fbDb.ref(NS+'/closing/'+fid+'/'+yr+'/flow/plan/council').set(v||null).then(function(){
+    var c=S.f15Close=S.f15Close||{}; c.flow=c.flow||{}; (c.flow.plan=c.flow.plan||{}).council=v||''; _cbDirty(); renderFund();
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function flowGoBudget(){
+  var yr=S.year;
+  _leaveGuard().then(function(ok){ if(!ok) return; S.year=yr+1; S.closeSub='budget'; S.annualFor=null; renderFund(); });
+}
+/* 감사 한 사람의 칸을 적고, 그 결과로 ⑤ 단계 상태(대기·일부·완료)를 다시 셈해 함께 적는다 */
+function flowAudSet(key,patch){
+  var fid=S.fundId, yr=S.year, f=funds[fid]||{}, c=S.f15Close=S.f15Close||{}, fl=c.flow=c.flow||{}, au=fl.audit=fl.audit||{}, A=au.auds=au.auds||{};
+  var next=Object.assign({},A[key]||{}), up={}, base='closing/'+fid+'/'+yr+'/flow/audit/', at=ymd();
+  Object.keys(patch).forEach(function(k){ up[base+'auds/'+key+'/'+k]=(patch[k]==null||patch[k]==='')?null:patch[k];
+    if(patch[k]==null||patch[k]==='') delete next[k]; else next[k]=patch[k]; });
+  var A2=Object.assign({},A); A2[key]=next;
+  var st=flowAuditStat({flow:{audit:{auds:A2}}},_auditorsOf(f));
+  up[base+'state']=st.state||null; up[base+'at']=st.state?at:null; up[base+'by']=st.state?(S.user||''):null;
+  fbDb.ref(NS).update(up).then(function(){
+    A[key]=next; au.state=st.state; au.at=st.state?at:''; _cbDirty(); renderFund(); toast('저장됨');
+  }).catch(function(e){ toast('저장 실패: '+((e&&e.message)||e),'err'); });
+}
+function flowAudSent(key,on){ flowAudSet(key,{sent_at:on?ymd():null}); }
+function flowAudGot(key,on){ flowAudSet(key,{got_at:on?ymd():null}); }
+function flowAudOp(key,v){ flowAudSet(key,{op:v==='지적'?'지적':null}); }
+function flowAudHwp(key){
+  var fid=S.fundId, yr=S.year, f=Object.assign({_id:fid},funds[fid]||{}), a=_auditorsOf(f).filter(function(x){ return x.key===key; })[0];
+  if(!a) return;
+  var rec=((((S.f15Close||{}).flow||{}).audit||{}).auds||{})[key]||{};
+  _loadSites(fid).then(function(sites){ return hwpTplFill('ops_audit',Object.assign({},f,{_audOnly:key,_audOp:rec.op||''}),sites); }).then(function(res){
+    _dlBlob(new Blob([res.bytes],{type:'application/octet-stream'}),'감사보고서('+(a.side?a.side+' ':'')+a.name+') '+yr+'.hwpx');
+    toast('감사보고서를 받았습니다 — '+a.name+' 한 장'+(rec.op==='지적'?' (지적사항 있음: 밑줄 칸을 감사가 적습니다)':''));
+  }).catch(function(e){ toast('감사보고서를 만들지 못했습니다: '+((e&&e.message)||e),'err'); });
+}
+function flowAudMail(key){
+  var fid=S.fundId, yr=S.year, f=Object.assign({_id:fid},funds[fid]||{}), a=_auditorsOf(f).filter(function(x){ return x.key===key; })[0];
+  if(!a) return;
+  var T=flowAuditMailText(f,yr,a), to=a.email?[a.email]:[];
+  S._flowMail={to:to, subject:T.subject, body:T.body, kind:'audit'};
+  showModal('<h2 style="margin-bottom:6px">감사보고서 작성 요청 메일 — '+esc((a.side?a.side+' ':'')+a.name)+'</h2>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:6px">받는 사람: '+(to.length?esc(to.join(', ')):'<b style="color:var(--danger)">감사 이메일이 없습니다 — 기금 정보 › 등기임원 명부에 적어 주세요</b>')+'</div>'
+    +'<input id="flowSubj" value="'+esc(T.subject)+'" style="width:100%;margin-bottom:6px">'
+    +'<textarea id="flowBody" rows="14" style="width:100%;font-size:12.5px">'+esc(T.body)+'</textarea>'
+    +'<div class="muted" style="font-size:11.5px;margin-top:4px">첨부는 [⬇ 한글]로 받은 이 감사의 감사보고서와 결산서를 메일함에서 붙이세요. 앱은 메일을 대신 보내지 않습니다.</div>'
+    +'<div class="row" style="justify-content:flex-end;gap:6px;margin-top:10px">'
+    +'<button onclick="flowMailCopy()">📋 제목·본문 복사</button>'
+    +'<button onclick="flowMailOpen()">✉ 푸른메일함 열기</button>'
+    +'<button class="primary" onclick="closeM();flowAudSent(\''+key+'\',true)">보냄으로 표시</button></div>');
+}
+/* 단계를 펼친 줄 — 사업계획서 준비·감사 */
+function _flowDetail(step,c,f,yr){
+  var fid=S.fundId, rec=((c.flow||{})[step])||{}, ck=function(ok){ return '<input type="checkbox" disabled'+(ok?' checked':'')+'>'; };
+  var bt='padding:3px 9px;font-size:11.5px', inner='';
+  if(step==='plan'){
+    var py=yr+1, ready=flowPlanReady(fid,yr), nt=(rec.council&&typeof _sdAdd==='function')?_sdAdd(rec.council,-7):'', dd=nt?dueDays(ymd(),nt):null;
+    var line=function(ok,lbl,note,right){ return '<div style="display:flex;gap:8px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)">'+ck(ok)
+      +'<span style="flex:1"><b>'+lbl+'</b> <span class="muted" style="font-size:11.5px">'+note+'</span></span><span>'+right+'</span></div>'; };
+    inner='<div style="font-weight:700;margin-bottom:4px">'+py+'년도 사업계획서</div>'
+      +line(!!c.locked,'① '+yr+'년 결산이 확정돼 있다','— 추정재무상태표의 바탕은 '+yr+'년 기말',c.locked?'<span class="chip ok" style="font-size:10.5px">확정 '+esc(String(c.locked_at||'').slice(5))+'</span>':'<span class="chip warn" style="font-size:10.5px">확정 전</span> <button onclick="closeSub(\'f15\')" style="'+bt+'">운영상황보고서 탭에서 확정</button>')
+      +line(ready,'② '+py+'년 예산을 넣었다','— 출연금에서 세우거나 직접 입력',ready?'<span class="chip ok" style="font-size:10.5px">입력됨</span> <button onclick="flowGoBudget()" style="'+bt+'">예산·집행 '+py+' 열기 →</button>':'<span class="chip warn" style="font-size:10.5px">비어 있음</span> <button class="primary" onclick="flowGoBudget()" style="'+bt+'">예산·집행 '+py+' 열기 →</button>')
+      +line(!!rec.hwp_at,'③ 한글 사업계획서를 받았다','— 제목 「'+py+'년도」 · 추정재무상태표 포함',(rec.hwp_at?'<span class="chip ok" style="font-size:10.5px">받음 '+esc(String(rec.hwp_at).slice(5))+'</span> ':'')+'<button'+(ready?' class="primary"':' disabled style="opacity:.5"')+' onclick="flowPlanHwp()" style="'+bt+'">⬇ 한글 받기</button>'+(ready?'':' <span class="muted" style="font-size:11px">②가 끝나야 켜짐</span>'))
+      +line(!!rec.council,'④ 협의회 승인 날짜','— 회의 7일 전까지 통지(시행령 제42조③)','<input type="date" value="'+esc(rec.council||'')+'" onchange="flowPlanCouncil(this.value)" style="padding:2px 5px;font-size:11.5px;border:1px solid var(--line);border-radius:6px"> '+(nt?'<span class="chip '+(dd!=null&&dd<0?'dg':dd!=null&&dd<=7?'warn':'')+'" style="font-size:10.5px">통지 '+nt.slice(5).replace('-','/')+'까지'+(dd==null?'':(dd<0?' · '+(-dd)+'일 지남':' · D-'+dd))+'</span>':''));
+    inner+='<div class="muted" style="font-size:11px;margin-top:6px">②가 비어 있으면 상태를 «완료»로 바꿀 수 없습니다. 제출 묶음에는 예산이 있을 때만 「07. 사업계획서」가 들어갑니다.</div>';
+  } else {
+    var auds=_auditorsOf(f), st=flowAuditStat(c,auds), A=(rec.auds||{});
+    var rows=auds.map(function(a,i){ var r=A[a.key]||{}, k=a.key;
+      return '<tr>'+_ckTd()+'<td class="no">'+(i+1)+'</td><td><span class="chip" style="font-size:10.5px">'+esc(a.side||'측 없음')+'</span></td><td>'+esc(a.name)+'</td>'
+        +'<td style="white-space:nowrap"><button onclick="flowAudMail(\''+k+'\')" style="'+bt+'">✉ 메일 쓰기</button>'+(a.email?'':' <span class="chip warn" style="font-size:10px">메일 주소 없음</span>')+'</td>'
+        +'<td><select onchange="flowAudOp(\''+k+'\',this.value)" style="padding:2px 5px;font-size:11.5px;border:1px solid var(--line);border-radius:6px"><option value="적정"'+(r.op==='지적'?'':' selected')+'>적정</option><option value="지적"'+(r.op==='지적'?' selected':'')+'>지적사항 있음</option></select></td>'
+        +'<td><button onclick="flowAudHwp(\''+k+'\')" style="'+bt+'" title="이 감사 한 사람 몫의 감사보고서(한글)">⬇ 한글 한 장</button></td>'
+        +'<td style="white-space:nowrap"><input type="checkbox" onchange="flowAudSent(\''+k+'\',this.checked)"'+(r.sent_at||r.got_at?' checked':'')+'> <span class="muted" style="font-size:11px">'+esc(String(r.sent_at||'').slice(5))+'</span></td>'
+        +'<td style="white-space:nowrap"><input type="checkbox" onchange="flowAudGot(\''+k+'\',this.checked)"'+(r.got_at?' checked':'')+'> <span class="muted" style="font-size:11px">'+esc(String(r.got_at||'').slice(5))+'</span></td></tr>'; }).join('');
+    inner='<div style="font-weight:700;margin-bottom:4px">감사 — 근로자측·사용자측 각각 <span class="muted" style="font-weight:400;font-size:11.5px">(임원 명부의 감사를 읽습니다)</span></div>'
+      +(auds.length?'<div style="overflow-x:auto;border:1px solid var(--line);border-radius:9px"><table style="font-size:12px"><thead><tr>'+_ckTh()+'<th>#</th><th>측</th><th>이름</th><th>메일</th><th>감사 의견</th><th>한글</th><th>보냄</th><th>받음</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+        :'<div class="msg warn" style="font-size:12px">임원 명부에 감사가 없습니다 — <button onclick="goTab(\'info\')" style="'+bt+'">기금 정보 › 등기임원 명부 →</button></div>')
+      +(auds.length&&auds.length!==2?'<div class="row" style="margin-top:6px"><span class="chip warn" style="font-size:10.5px">감사가 '+auds.length+'명입니다 — 정관은 노·사 각 1인(명부를 확인하세요)</span></div>':'')
+      +'<div class="muted" style="font-size:11px;margin-top:6px">감사 의견은 감사가 정합니다 — 「적정」은 초안이고, 고르면 한글에 그대로 들어갑니다. 감사 모두 «받음»이 체크돼야 완료로 바뀝니다.</div>';
+  }
+  return '<tr class="flowdetail"><td></td><td></td><td colspan="5" style="background:var(--acc-soft);padding:10px 12px">'+inner+'</td></tr>';
+}
+
 /* 날인본 — 서류마다 사진첩 원본을 잇는다(원본은 사진첩이 보관, 기금은 참조만 — 서류함과 같은 방식) */
 function flowSealInfo(){
   var c=S.f15Close||{}, st=flowSealStat(c), yr=S.year;
@@ -19339,7 +19501,12 @@ function flowView(){
     recv:'<span class="muted" style="font-size:11.5px">통장 거래내역·원천징수영수증·잔액증명·증빙</span>',
     lock:c.locked?'<span class="muted" style="font-size:11.5px">🔒 '+esc(_lockInfo())+'</span>'
       :'<button onclick="closeSub(\'f15\')" style="padding:2px 9px;font-size:11.5px">운영상황보고서 탭에서 확정</button>',
-    review:'<button onclick="flowMail(\'review\')" style="padding:2px 9px;font-size:11.5px">✉ 메일 쓰기</button> '
+    plan:'<button onclick="flowOpen(\'plan\')" style="padding:2px 9px;font-size:11.5px">📋 열기 '+(S._flowOpen==='plan'?'▴':'▾')+'</button> '
++(flowPlanReady(fid,yr)?'<span class="chip ok" style="font-size:10.5px">'+(yr+1)+' 예산 있음</span>':'<span class="chip warn" style="font-size:10.5px">'+(yr+1)+' 예산 비어 있음</span>'),
+audit:(function(){ var as=flowAuditStat(c,_auditorsOf(f));
+return '<button onclick="flowOpen(\'audit\')" style="padding:2px 9px;font-size:11.5px">🔎 열기 '+(S._flowOpen==='audit'?'▴':'▾')+'</button> '
++(as.n?'<span class="chip" style="font-size:10.5px">보냄 '+as.sent+'/'+as.n+' · 받음 '+as.got+'/'+as.n+'</span>':'<span class="chip warn" style="font-size:10.5px">감사 명부 없음</span>'); })(),
+review:'<button onclick="flowMail(\'review\')" style="padding:2px 9px;font-size:11.5px">✉ 메일 쓰기</button> '
       +'<button onclick="flowPackage()" style="padding:2px 9px;font-size:11.5px">📦 제출 묶음</button>',
     reply:'<span class="muted" style="font-size:11.5px">수정 요청이면 메모에 적고, 고친 뒤 다시 보내기</span>',
     seal:(function(){ var st=flowSealStat(c);
@@ -19351,7 +19518,7 @@ function flowView(){
       +'<span class="muted" style="font-size:11.5px">법인세 3/31 · 지방소득세 4/30</span>'
   };
   var rows=FLOW_STEPS.map(function(s,i){
-    var st=flowState(c,s[0]), rec=fl[s[0]]||{}, tone=flowTone(st);
+    var st=flowState(c,s[0]), rec=fl[s[0]]||{}, tone=flowTone(st), _dt=(S._flowOpen===s[0]&&(s[0]==='plan'||s[0]==='audit'))?_flowDetail(s[0],c,f,yr):'';
     var stCell=s[2]
       ? '<select onchange="flowSet(\''+s[0]+'\',this.value)" class="chip '+tone+'" style="font-size:11px;padding:2px 4px;border:1px solid var(--line)">'
         +s[2].map(function(o){ return '<option value="'+o+'"'+(st===o?' selected':'')+'>'+FLOW_LBL[o]+'</option>'; }).join('')+'</select>'
@@ -19360,7 +19527,7 @@ function flowView(){
     return '<tr><td><input type="checkbox"></td><td class="no">'+(i+1)+'</td><td style="white-space:nowrap;font-weight:600">'+esc(s[1])+'</td>'
       +'<td>'+stCell+'</td><td class="mo" style="white-space:nowrap">'+esc(at.slice(5))+'</td>'
       +'<td>'+act[s[0]]+'</td>'
-      +'<td>'+(s[2]?'<input value="'+esc(rec.memo||'')+'" placeholder="메모" onchange="flowMemo(\''+s[0]+'\',this.value)" style="width:100%;min-width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">':'')+'</td></tr>';
+      +'<td>'+(s[2]?'<input value="'+esc(rec.memo||'')+'" placeholder="메모" onchange="flowMemo(\''+s[0]+'\',this.value)" style="width:100%;min-width:110px;padding:3px 6px;border:1px solid var(--line);border-radius:6px;font-size:11.5px">':'')+'</td></tr>'+_dt;
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="font-size:15px">'+yr+'년 결산 후 진행</h2>'+hlp('close.flow')+dchip
     +'<span style="flex:1"></span><button onclick="flowPackage()" title="결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글)를 한 zip 으로">📦 제출 묶음 받기(ZIP)</button></div>'
@@ -19380,7 +19547,7 @@ function flowHomeHTML(list,cb,yr){
       +'<td class="mo" style="white-space:nowrap">'+(sub?'<span class="chip ok" style="font-size:10px">제출</span>':(dd==null?'':(dd<0?(-dd)+'일 지남':'D-'+dd)))+'</td></tr>';
   }).join('');
   return '<div class="panel"><div class="row" style="flex-wrap:wrap;gap:8px"><h2 style="font-size:15px">'+yr+'년 결산 후 진행</h2>'+hlp('close.flow')
-    +'<span class="muted" style="font-size:11.5px">1 자료 요청 · 2 자료 수령 · 3 결산 확정 · 4 검토 요청 · 5 회신 · 6 날인본 · 7 노동부 제출 · 8 세무</span>'
+    +'<span class="muted" style="font-size:11.5px">1 자료 요청 · 2 자료 수령 · 3 결산 확정 · 4 사업계획서 · 5 감사 · 6 검토 요청 · 7 회신 · 8 날인본 · 9 노동부 제출 · 10 세무</span>'
     +'<span style="flex:1"></span><button onclick="flowPackageMany('+yr+')">📦 고른 기금 제출 묶음</button>'
     +'<button onclick="taxPrepMany('+yr+')" title="고른 기금의 법인세·지방소득세 신고 값을 한 장(기금마다 한 줄)으로 — 세무사에게 넘길 때">🧾 고른 기금 신고 준비표</button></div>'
     +'<div style="overflow-x:auto;margin-top:8px"><table><thead><tr><th style="width:24px"><input type="checkbox" onclick="[].forEach.call(document.querySelectorAll(\'.flowpick\'),function(x){x.checked=this.checked;},this)"></th>'
@@ -22097,7 +22264,8 @@ var HELP={
  'close.flow':{t:'결산 후 진행 — 검토·날인·노동부 제출까지',h:'<p>결산이 끝나면 <b>사업장 검토 → 날인 → 관할 고용노동관서 제출</b>까지가 한 묶음입니다. 운영상황보고는 회계연도가 끝난 뒤 <b>3개월 이내</b>(12월 결산이면 3/31)에 운영상황·결산서·<b>다음 연도 사업계획서</b>(추정재무상태표·손익계산서)를 붙여 냅니다(근로복지기본법 시행령 제63조①).</p>'
    +'<p><b>✉ 메일 쓰기</b>는 문안과 받는 사람(참여사업장 담당자 이메일)을 보여 주고 <b>푸른메일함</b>을 엽니다. 보내기와 첨부는 메일함에서 직접 합니다.</p>'
    +'<p><b>📦 제출 묶음</b>은 결산서·사업계획서 워크북, 운영상황보고서, 감사보고서·결산 승인 회의록·기본재산 변경 보고서(한글 틀이 있을 때)와 제출 안내문을 한 zip 으로 받습니다.</p>'
-   +'<p>협의회 회의록은 <b>출석위원 전원이 서명 또는 날인</b>해야 합니다(법 제57조). 협의회는 <b>7일 전까지</b> 알려야 합니다(시행령 제42조③).</p>'
+   +'<p><b>④ 사업계획서 준비</b> — 다음 해 예산이 있어야 한글 사업계획서를 받습니다(없으면 완료로 못 바꿉니다). 추정재무상태표의 바탕은 결산한 해 기말입니다. <b>⑤ 감사</b> — 근로자측·사용자측 감사에게 <b>각각</b> 한 장씩 보내고, 둘 다 «받음»이어야 완료입니다. 감사 의견은 감사가 정합니다(앱은 «적정» 초안).</p>'
+    +'<p>협의회 회의록은 <b>출석위원 전원이 서명 또는 날인</b>해야 합니다(법 제57조). 협의회는 <b>7일 전까지</b> 알려야 합니다(시행령 제42조③).</p>'
    +'<p>노동부 전자신고는 공동인증서 로그인이 필요해 앱이 대신 낼 수 없습니다 — 제출 뒤 <b>노동부 제출 → 완료</b>로 바꾸면 연간 일정(별지15호 제출)도 함께 체크됩니다.</p>'},
  'close.donation':{t:'기부금영수증 — 누가 낸 돈인가',h:'<p><b>회사(사업주) 출연</b>은 기부금이 아니라 회사의 손비입니다 — 법인세법 시행령 제19조제22호(해당 법인이 설립한 사내근로복지기금, 다른 법인과 공동으로 설립한 공동근로복지기금, 협력중소기업의 기금에 출연하는 금품). 그래서 회사에는 <b>기부금영수증이 필요 없습니다</b>. (옛 실무서는 지정기부금으로 보고 영수증을 발급했습니다.)</p>'
    +'<p><b>개인·제휴사 등 사업주 외</b>가 낸 돈을 상대가 기부금으로 공제받으려면 기금이 기부금영수증을 발급합니다. 이때 기금은 기부자별 발급명세를 <b>5년</b> 보관하고, 한 해 발급합계표를 사업연도 끝 달 말일부터 <b>6개월 안</b>(12월 결산이면 6월 30일)에 관할 세무서에 냅니다 — 법인세법 제112조의2. 전자기부금영수증으로 발급했으면 둘 다 하지 않아도 됩니다.</p>'
