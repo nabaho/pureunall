@@ -246,6 +246,15 @@ test('nextLink — 상태만 고치는 저장은 옛 link 를 이어 받고, 요
   assert.deepEqual(carried.link, L, '상태만 고쳐도 link 가 남는다');
 });
 
+test('nextLink — 지우는 것은 op.link 가 «null» 일 때만 · 칸만 있고 undefined 이거나 꼴이 틀린 요청은 옛 link 를 지우지 않는다', () => {
+  const L = { src: 'mail', key: 'i:X:1', name: 'a.pdf' };
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: undefined }), L);
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: { src: 'web', key: 'x' } }), L);
+  assert.deepEqual(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: '' }), L);
+  assert.equal(Tr.nextLink({ st: 'doing', at: 1 }, { link: undefined }), null);
+  assert.equal(Tr.nextLink({ st: 'doing', at: 1, link: L }, { link: null }), null);
+});
+
 test('put — link 가 든 줄을 로컬 표에 그대로 · 저장 관문은 link 가 든 줄 .set 도 통과', () => {
   const L = { src: 'mail', key: 'i:X:1', name: 'a.pdf' };
   assert.deepEqual(Tr.put({}, 'c2', 't3_2026', 'sign', { st: 'doing', at: 1, link: L }).c2.t3_2026.sign.link, L);

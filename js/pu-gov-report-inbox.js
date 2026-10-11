@@ -177,9 +177,10 @@
     if (c && c.tech) b.push({ txt: MSG.TECH, key: 'draft' });
     return b;
   }
+  /* 개인 자료(priv) 후보는 연결 꼴을 만들지 않는다 — 화면이 단추를 빼먹어도 여기서 막는다 */
   function linkFrom(c, name) {
     var nm = str(name);
-    if (!c || !c.key || !nm) return null;
+    if (!c || c.priv || !c.key || !nm) return null;
     var o = { src: 'mail', key: c.key, name: nm.slice(0, 100) };
     if (/^\d{4}-\d{2}-\d{2}$/.test(str(c.day))) o.date = c.day;
     return o;

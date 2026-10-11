@@ -2,6 +2,7 @@
 /* 컨설팅보고서 앱(gov-report.html) — 화면 검사 (2026-10-10)
  * ★ 지키는 것: 쓰기는 서류 진행 기록 줄 하나(scal_docs/{업체}/{rid}/items/{키} .set)뿐 · 숫자 칸을 누르면 거르고 다시 누르면 풀린다 · 내 담당만 · 서고는 읽기만 ·
  *   오류·빈 상태 문구(설계서 §5) · 본문은 그리지 않는다
+ *   받은 서류함(2026-10-11): 메일함은 읽기만 · 「연결」은 같은 줄 하나 .set 안의 link · 「열어 보기」는 한 번에 하나, 받은 것은 담지 않는다
  * 공개 저장소다 — 합성 자료만(tests/helpers/gov-report-fixture.js). */
 const fs = require('fs');
 const path = require('path');
@@ -14,6 +15,10 @@ const L = require('../js/pu-gov-report-list.js');
 const Rpt = require('../js/pu-gov-report.js');
 const D = require('../js/pu-gov-report-docs.js');
 const Tr = require('../js/pu-gov-report-track.js');
+const I = require('../js/pu-gov-report-inbox.js');
+const MO = require('../js/rules-v2/mail-orig.js');
+require('../js/pu-co-thread.js');
+const CT = globalThis.PuCoThread;
 const O = require('../js/pu-ontology.js');
 const { fakeDoc } = require('./helpers/fake-preview-dom.js');
 
@@ -39,7 +44,9 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grRenderForms', 'grRenderAlerts', 'grRender', 'grReset', 'grLoad',
   'grBizType', 'grErp', 'grSetBiz', 'grLoadDocs', 'grRetryDocs', 'grRenderBiz',
   'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
-  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp'];
+  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp',
+  'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink', 'grMailFetch', 'grMailCall',
+  'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -47,18 +54,28 @@ function world(o) {
   const db = FakeDb.만들기(o.seed || F.seed());
   const els = {};
   ['cwKey', 'cwSt', 'cwSent', 'cwGot', 'cwHow', 'cwAck', 'cwNote', 'cwHwpMsg'].forEach((id) => { els[id] = fakeEl(); }); // 칸 창 입력 — 진짜 DOM 에서는 innerHTML 이 만든다
+  const urls = { made: [], revoked: [] };   // 보기 창이 만든·버린 blob 주소
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
     encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportTrack: Tr,
+    PuGovReportInbox: I, PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout,
+    /* 받은 서류함 — 가짜 서버(mailServer)·로그인·blob 주소. 서버를 안 주면 부르는 순간 실패한다 */
+    fetch: (o.mail && o.mail.fetch) || (async () => { throw new Error('이 검사는 서버를 부르면 안 된다'); }),
+    firebase: { auth: () => ({ currentUser: o.noUser ? null : { getIdToken: async () => 'tok' } }) },
+    URL: { createObjectURL: (b) => { urls.made.push(b); return 'blob:' + urls.made.length; }, revokeObjectURL: (u) => { urls.revoked.push(u); } },
+    Blob: function (parts, opt) { this.parts = parts; this.type = opt && opt.type; },
     $: (id) => (els[id] = els[id] || fakeEl()),
     fbDb: o.db ? o.db(db) : db };
   if (o.preview) ctx.PuHwpPreview = o.preview;
+  if (o.pdfjs) ctx.pdfjsLib = o.pdfjs;
+  if (o.xlsx) ctx.XLSX = o.xlsx;
   ctx.window = ctx;
   ctx.navigator = o.nav || { clipboard: { writeText: async (t) => { ctx.copied = t; } } };
   vm.createContext(ctx);
-  vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR_TRACK_NODES'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
+  vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR_TRACK_NODES'), varLine('GR_INBOX_NODES'),
+    varLine('GR_MAIL'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
     + "\ngrToday=function(){ return '2026-10-10'; };", ctx);
   if (o.email) vm.runInContext('GR.email=' + JSON.stringify(o.email) + ';', ctx);
-  return { ctx, db, els };
+  return { ctx, db, els, urls };
 }
 
 /* 쓰기는 서류 진행 기록 줄 하나뿐 — 자리 꼴 scal_docs/{업체}/{rid}/items/{키}, set 만 */
@@ -821,4 +838,296 @@ test('㊱ 불러오는 사이 창을 닫고 같은 파일을 다시 골라도 �
   const r2 = await p2;
   assert.equal(r2.ok, true);
   assert.equal(w.els.cwHwpMsg.textContent, '열었습니다 — 서명본.hwpx');
+});
+
+/* ══ 받은 서류함(📥 받은 서류 후보 · 연결 · 열어 보기) — 설계 2026-10-11-gov-report-inbox-design.md ══ */
+
+/* 가짜 서버 함수 — readMailMessage(peek)·readOldMail(목록)은 첨부 목록을, readMailAttachment·readOldMail(index)은 그 첨부를 준다 */
+const ATTS = [{ i: 0, part: '2', name: '서명본.hwpx', size: 4 }, { i: 1, part: '3', name: '확인서.pdf', size: 4 },
+  { i: 2, part: '4', name: '현장.jpg', size: 4 }, { i: 3, part: '5', name: '보고서 초안.pdf', size: 4 },
+  { i: 4, part: '6', name: '점검표.xlsx', size: 4 }, { i: 5, part: '', name: '자료.pdf', size: 4 }];
+function mailServer(o) {
+  o = o || {};
+  const calls = [];
+  const atts = o.atts || ATTS;
+  const reply = (status, j) => ({ status, json: async () => j });
+  const fetch = async (url, init) => {
+    const fn = url.slice(url.lastIndexOf('/') + 1), body = JSON.parse(init.body);
+    calls.push({ url, fn, body, auth: init.headers.Authorization, method: init.method });
+    if (o.hold) await o.hold;
+    if (o.never) return new Promise(() => {});
+    if (o.status) return reply(o.status, { ok: false, error: '거절' });
+    if (fn === 'readMailMessage' || (fn === 'readOldMail' && body.index == null)) return reply(200, { ok: true, html: '<p>본문</p>', text: '본문', atts });
+    if (fn !== 'readMailAttachment' && fn !== 'readOldMail') return reply(400, { ok: false, error: '?' });
+    const a = atts.filter((x) => x.i === body.index)[0];
+    return a ? reply(200, { ok: true, name: a.name, mime: 'text/html', b64: 'UEsDBA==' }) : reply(404, { ok: false, error: '그 첨부가 없습니다' });
+  };
+  return { fetch, calls };
+}
+/* 가짜 pdf.js — 받은 인자와 닫기(destroy)를 센다 */
+function fakePdf() {
+  const st = { got: null, destroyed: 0 };
+  const lib = { GlobalWorkerOptions: {}, getDocument: (o) => { st.got = o; return { promise: Promise.resolve({ numPages: 3,
+    getPage: async () => ({ getViewport: () => ({ width: 600, height: 800 }), render: () => ({ promise: Promise.resolve() }) }),
+    destroy: () => { st.destroyed++; } }) }; } };
+  return { lib, st };
+}
+/* 불러오고 → 사업 고르고 → 칸 창 열고 → 메일함 읽기가 끝날 때까지 */
+async function cellOf(w, biz, co, ty, step) {
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz(biz);
+  w.ctx.grOpenCell(co, ty, step);
+  await w.ctx.grLoadInbox();
+}
+
+test('㊲ 칸 창 「📥 받은 서류 후보」 — 그 업체 주소로 오간 첨부 메일만, 날짜 내림차순 · 받음/보냄 · 첨부 이름 · 개인 자료는 목록에만', async () => {
+  const w = world();
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  assert.ok(w.els.cellw.innerHTML.includes('<div id="cwInbox"></div>'));
+  const h = w.els.cwInbox.innerHTML;
+  ['📥 받은 서류 후보', '보냄 → 외부 · 2026-10-01', '받음 ← 다라정밀 담당 · 2026-09-25', '서명본 보내드립니다', '📎 서명본.hwpx', '📎 확인서.pdf',
+    '<span class="st st-todo">개인 자료 · 목록에만</span>', I.MSG.NAME_NOTE].forEach((s) => assert.ok(h.includes(s), s));
+  const at = (s) => h.indexOf(s);
+  assert.ok(at('보고서 초안') < at('현장 사진') && at('현장 사진') < at('자료 보냅니다') && at('자료 보냅니다') < at('서명본 보내드립니다'), '날짜 내림차순');
+  ['첨부 없음', '기간 밖', '다른 업체 주소', '스팸'].forEach((s) => assert.ok(!h.includes(s), s + ' 가 후보에 나왔다'));
+  const priv = h.split('<li>').filter((x) => x.includes('9월 급여대장.xlsx'))[0];
+  assert.ok(priv && !priv.includes('grOpenCand') && !priv.includes('grLinkCand'), '개인 자료는 연결·열어 보기를 막는다');
+  assert.match(h, /onclick="grOpenCand\(3,0\)">열어 보기/);
+  assert.match(h, /onclick="grLinkCand\(3,0\)">연결/);
+  assert.equal(w.db.쓴것.length, 0, '목록은 읽기만');
+});
+
+test('㊳ 주소가 없는 업체는 안내 · 기술보호 사업은 딱지(열기는 된다) · 메일함은 한 번만 읽는다', async () => {
+  let n = 0;
+  const w = world({ db: (db) => ({ ref: (p) => { if (p === 'mailbox/folders') n++; return db.ref(p); } }) });
+  await cellOf(w, 'consulting-05', 'c3', 't4', 'sign');
+  assert.ok(w.els.cwInbox.innerHTML.includes(I.MSG.NO_ADDR));
+  w.ctx.grCloseCell();
+  w.ctx.grSetBiz('consulting-03');
+  w.ctx.grOpenCell('c1', 't1', 'attach');
+  await w.ctx.grLoadInbox();
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes('자문 일지 회신') && h.includes('<span class="st st-draft">기술보호 자료</span>'));
+  assert.match(h, /onclick="grOpenCand\(0,0\)">열어 보기/, '기술보호 자료도 열어 볼 수 있다');
+  assert.equal(n, 1, '메일함 폴더 표는 한 번만 읽는다');
+});
+
+test('㊴ 메일함을 못 읽으면 「메일함을 불러오지 못했습니다」 + 다시 시도 — 칸 창의 다른 기능은 그대로', async () => {
+  let deny = true;
+  const w = world({ db: (db) => ({ ref: (p) => (deny && p.indexOf('mailbox') === 0
+    ? { once: async () => { throw new Error('permission_denied'); } } : db.ref(p)) }) });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes('메일함을 불러오지 못했습니다') && h.includes('onclick="grRetryInbox()"'));
+  assert.ok(w.els.cellw.innerHTML.includes('onclick="grSaveCell()"'), '저장은 그대로');
+  deny = false;
+  await w.ctx.grRetryInbox();
+  assert.ok(w.els.cwInbox.innerHTML.includes('서명본 보내드립니다'));
+});
+
+test('㊵ 「연결」 — 그 서류 줄 하나만 .set, link 는 줄 안에 · 상태만 고친 저장도 link 를 이어 받는다 · 「연결 지우기」는 link 만 뺀다', async () => {
+  const w = world({ email: 'p009@pureun.kr' });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  w.els.cwSt.value = 'doing'; w.els.cwSent.value = '2026-09-20';   // 칸 창에 보이는 값(진짜 DOM 에서는 그려진 값)
+  await w.ctx.grLinkCand(3, 0);
+  onlyTrackWrites(w.db);
+  assert.equal(w.db.쓴것.length, 1);
+  const v = w.db.쓴것[0];
+  assert.equal(v.자리, 'scal_docs/c2/t3_2026/items/sign');
+  assert.deepEqual(v.값.link, { src: 'mail', key: 'i:INBOX-0a1b2c3d:101', name: '서명본.hwpx', date: '2026-09-25' });
+  assert.deepEqual([v.값.st, v.값.sentAt, v.값.by], ['doing', '2026-09-20', '홍길동'], '칸 창 값과 함께 쓴다');
+  assert.ok(w.els.cellw.innerHTML.includes('연결했습니다'));
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes('연결된 서류') && h.includes('서명본.hwpx · 2026-09-25') && h.includes('onclick="grOpenLinked()"') && h.includes('onclick="grUnlink()"'));
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-08';
+  await w.ctx.grSaveCell();
+  assert.deepEqual(w.db.쓴것[1].값.link, v.값.link, '상태만 고쳐도 link 가 남는다');
+  assert.equal(w.db.쓴것[1].값.st, 'done');
+  await w.ctx.grUnlink();
+  onlyTrackWrites(w.db);
+  const u = w.db.쓴것[2].값;
+  assert.equal(u.link, undefined);
+  assert.deepEqual([u.st, u.gotAt], ['done', '2026-10-08'], '서류 줄 상태는 그대로');
+  assert.ok(w.els.cellw.innerHTML.includes('연결을 지웠습니다'));
+  assert.ok(!w.els.cwInbox.innerHTML.includes('연결된 서류'));
+});
+
+test('㊶ 규칙 게시 전 — link 가 든 저장이 거절되면 「저장하지 못했습니다 — 규칙 게시 또는 권한 확인」, 표·값은 그대로 · link 없는 저장은 된다', async () => {
+  const w = world({ db: (db) => ({ ref: (p) => (p.indexOf('scal_docs/') === 0
+    ? { set: async (v) => { if (v && v.link) throw new Error('PERMISSION_DENIED'); return db.ref(p).set(v); } } : db.ref(p)) }) });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  w.els.cwSt.value = 'doing'; w.els.cwSent.value = '2026-09-20';
+  await w.ctx.grLinkCand(3, 0);
+  assert.ok(w.els.cellw.innerHTML.includes('저장하지 못했습니다 — 규칙 게시 또는 권한 확인'));
+  assert.equal(w.ctx.GR.track.c2.t3_2026.sign.link, undefined);
+  assert.equal(w.db.쓴것.length, 0);
+  assert.ok(!w.els.cwInbox.innerHTML.includes('연결된 서류'));
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-08';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 1, 'link 가 없는 저장은 게시 전에도 된다');
+  assert.equal(w.db.쓴것[0].값.link, undefined);
+});
+
+test('㊷ 「열어 보기」(한글) — 서버에서 그 한 건만(peek) 받아 한글 미리보기로 · 로그인 증표 · 아무것도 쓰지·담지 않는다', async () => {
+  const mail = mailServer();
+  const pv = pvPreview();
+  const w = world({ mail, preview: pv });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  const r = await w.ctx.grOpenCand(3, 0);
+  assert.equal(r.ok, true);
+  assert.deepEqual(mail.calls.map((c) => c.fn), ['readMailMessage', 'readMailAttachment']);
+  assert.deepEqual(mail.calls[0].body, { slug: 'INBOX-0a1b2c3d', uid: '101', peek: true }, '읽음 표시를 건드리지 않는다(peek)');
+  assert.deepEqual(mail.calls[1].body, { slug: 'INBOX-0a1b2c3d', uid: '101', index: 0, part: '2' });
+  mail.calls.forEach((c) => {
+    assert.equal(c.auth, 'Bearer tok');
+    assert.equal(c.method, 'POST');
+    assert.ok(c.url.startsWith(w.ctx.GR_MAIL.fn), c.url);
+  });
+  assert.equal(pv.calls.length, 1);
+  assert.equal(pv.calls[0].name, '서명본.hwpx');
+  assert.deepEqual([...new Uint8Array(pv.calls[0].buf)], [80, 75, 3, 4]);
+  assert.ok(w.els.cwInbox.innerHTML.includes('열었습니다 — 서명본.hwpx'));
+  assert.equal(w.db.쓴것.length, 0, '받은 것을 어디에도 쓰지 않는다');
+});
+
+test('㊸ 한 번에 하나 — 받는 동안 다른 「열어 보기」는 잠기고 눌러도 서버를 부르지 않는다 · 지난 메일은 1분 안내', async () => {
+  const g = gate();
+  const mail = mailServer({ hold: g.p });
+  const w = world({ mail, preview: pvPreview() });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  const first = w.ctx.grOpenCand(3, 0);
+  await tick();
+  assert.equal(w.ctx.GR.avBusy, true);
+  assert.match(w.els.cwInbox.innerHTML, /onclick="grOpenCand\(3,1\)" disabled/, '다른 단추가 잠긴다');
+  assert.ok(w.els.cwInbox.innerHTML.includes(I.MSG.WAIT));
+  const second = await w.ctx.grOpenCand(3, 1);
+  assert.equal(second.ok, false);
+  assert.equal(second.busy, true);
+  assert.equal(mail.calls.length, 1, '두 번째는 서버를 부르지 않았다');
+  g.go(); await first;
+  assert.equal(w.ctx.GR.avBusy, false);
+  assert.doesNotMatch(w.els.cwInbox.innerHTML, /onclick="grOpenCand\(3,1\)" disabled/);
+  /* 지난 메일(POP3) 연결 — 안내가 다르고 readOldMail 로 간다 */
+  const s = F.seed();
+  s.scal_docs.c2.t3_2026.items.sign.link = { src: 'mail', key: 'o:AB12_x', name: '자료.pdf' };
+  const g2 = gate();
+  const m2 = mailServer({ hold: g2.p });
+  const v = world({ seed: s, mail: m2, pdfjs: fakePdf().lib });
+  await cellOf(v, 'consulting-04', 'c2', 't3', 'sign');
+  const p = v.ctx.grOpenLinked();
+  await tick();
+  assert.ok(v.els.cwInbox.innerHTML.includes('불러오는 중… (지난 메일은 1분쯤 걸립니다)'));
+  g2.go(); await p;
+  assert.deepEqual(m2.calls.map((c) => [c.fn, c.body]), [['readOldMail', { key: 'AB12_x' }], ['readOldMail', { key: 'AB12_x', index: 5 }]]);
+});
+
+test('㊹ PDF·그림·표는 앱 안 보기 창 — 판독기는 저장소 vendor 에서, 닫으면 blob 주소·PDF 를 버린다', async () => {
+  const mail = mailServer();
+  const pdf = fakePdf();
+  const xs = { read: (b, o) => { xs.got = [b, o]; return { SheetNames: ['점검', '둘째'], Sheets: { 점검: {} } }; },
+    utils: { sheet_to_json: () => { const rows = [['<b>칸</b>', '둘']]; for (let i = 0; i < 250; i++) rows.push([i, '값']); return rows; } } };
+  const w = world({ mail, pdfjs: pdf.lib, xlsx: xs });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  /* PDF — 그림처럼 그린다(PDF 속 스크립트가 돌지 않게) */
+  await w.ctx.grOpenCand(3, 1);
+  assert.equal(pdf.st.got.isEvalSupported, false);
+  assert.ok(pdf.st.got.data instanceof Uint8Array);
+  assert.match(pdf.lib.GlobalWorkerOptions.workerSrc, /^vendor\/pdf\.worker\.min\.js\?v=\d+$/);
+  let h = w.els.attv.innerHTML;
+  assert.equal(w.els.attv.style.display, '');
+  assert.ok(h.includes('<canvas id="avCanvas" class="av-pdf"></canvas>') && h.includes('<b>1</b> / 3') && h.includes('data-close'));
+  w.ctx.grPdfPage(1);
+  assert.equal(w.ctx.GR.av.page, 2);
+  w.ctx.grCloseAv();
+  assert.equal(pdf.st.destroyed, 1);
+  assert.equal(w.els.attv.style.display, 'none');
+  /* 그림 — 종류는 확장자로 우리가 정한다 */
+  await w.ctx.grOpenCand(1, 0);
+  assert.equal(w.urls.made[0].type, 'image/jpeg');
+  assert.ok(w.els.attv.innerHTML.includes('<img class="av-img" src="blob:1" alt="현장.jpg">'));
+  w.ctx.grCloseAv();
+  assert.deepEqual(w.urls.revoked, ['blob:1'], '닫으면 그 파일은 사라진다');
+  assert.equal(w.ctx.GR.av, null);
+  /* 표 — 첫 시트 앞 200행, 칸은 이스케이프 */
+  await w.ctx.grOpenCand(0, 1);
+  h = w.els.attv.innerHTML;
+  assert.equal((h.match(/<tr>/g) || []).length, 200);
+  assert.ok(h.includes('<th>&#60;b&#62;칸&#60;/b&#62;</th>') && !h.includes('<b>칸'));
+  assert.ok(h.includes('「점검」 등 2장 중 첫 장'));
+  assert.equal(xs.got[1].type, 'array');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('㊺ 실패 문구 — 첨부 없음 · 로그인 · 응답 없음 · 너무 큼 · 열 수 없는 형식 — 칸 창은 그대로, 잠금은 풀린다', async () => {
+  const cases = [
+    [{ atts: [{ i: 0, part: '2', name: '다른.pdf', size: 4 }] }, {}, I.MSG.GONE],
+    [{ status: 401 }, {}, I.MSG.LOGIN],
+    [{}, { noUser: true }, I.MSG.LOGIN],
+    [{ never: true }, { wait: 5 }, I.MSG.NO_REPLY],
+    [{ atts: [{ i: 0, part: '2', name: '서명본.hwpx', size: 21 * 1024 * 1024 }] }, {}, I.MSG.TOO_BIG],
+  ];
+  for (const [srv, opt, want] of cases) {
+    const mail = mailServer(srv);
+    const w = world(Object.assign({ mail, preview: pvPreview() }, opt));
+    if (opt.wait) vm.runInContext('GR_MAIL.wait=' + opt.wait + ';', w.ctx);
+    await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+    const cw = w.ctx.GR.cw, msg = cw.msg, cell = w.els.cellw.innerHTML;
+    const r = await w.ctx.grOpenCand(3, 0);
+    assert.equal(r.ok, false, want);
+    assert.ok(w.els.cwInbox.innerHTML.includes(want), want);
+    assert.match(w.els.cwInbox.innerHTML, /class="err-s"/);
+    assert.strictEqual(w.ctx.GR.cw, cw);
+    assert.equal(cw.msg, msg);
+    assert.equal(w.els.cellw.innerHTML, cell, '칸 창을 다시 그리지 않는다');
+    assert.equal(w.ctx.GR.avBusy, false, '실패해도 잠금은 풀린다');
+    assert.equal(w.db.쓴것.length, 0);
+  }
+  const mail = mailServer();
+  const w = world({ mail });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  await w.ctx.grOpenCand(1, 1);
+  assert.ok(w.els.cwInbox.innerHTML.includes(I.MSG.CANT));
+  assert.equal(mail.calls.length, 0, '열 수 없는 형식은 서버를 부르지 않는다');
+});
+
+test('㊻ 연결된 서류 「열어 보기」 — 연결 열쇠로 그 메일·그 이름 · 후보 줄의 바깥 값은 이스케이프', async () => {
+  const s = F.seed();
+  s.scal_docs.c2.t3_2026.items.sign.link = { src: 'mail', key: 'i:INBOX-0a1b2c3d:101', name: '확인서.pdf', date: '2026-09-25' };
+  const m = s.mailbox.msgs['INBOX-0a1b2c3d']['101'];
+  m.s = '<img src=x>'; m.f = '<b>보낸이</b>'; m.an = ['<i>.pdf'];
+  const mail = mailServer();
+  const w = world({ seed: s, mail, pdfjs: fakePdf().lib });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes('연결된 서류') && h.includes('확인서.pdf · 2026-09-25'));
+  assert.ok(!h.includes('<img') && !h.includes('<b>보낸이') && !h.includes('<i>.pdf'), '이스케이프 안 됨');
+  assert.ok(h.includes('&#60;img src=x&#62;') && h.includes('&#60;b&#62;보낸이'));
+  await w.ctx.grOpenLinked();
+  assert.deepEqual(mail.calls.map((c) => c.fn + ':' + (c.body.part || '')), ['readMailMessage:', 'readMailAttachment:3']);
+});
+
+test('㊼ 정적 — 메일함은 GR_INBOX_NODES 로만 · 받은 바이트는 저장·업로드·내려받기 없음 · 외부 주소 없음 · 판독기는 누를 때 vendor 에서', () => {
+  assert.match(SRC, /var GR_INBOX_NODES=\{folders:'mailbox\/folders',msgs:'mailbox\/msgs',cos:'data\/companies'\};/);
+  assert.doesNotMatch(INLINE, /ref\(\s*['"](mailbox|data\/companies)/, 'GR_INBOX_NODES 를 거치지 않았다');
+  const RULES = fs.readFileSync(path.join(__dirname, '..', 'rules.html'), 'utf8');
+  const base = (RULES.match(/const MAIL_FN_BASE="([^"]+)"/) || [])[1];
+  assert.ok(base && SRC.includes("fn:'" + base + "'"), '서버 함수 주소는 취업규칙 화면과 같은 곳');
+  const body = ['grOpenAtt', 'grShowAtt', 'grRenderAv', 'grCloseAv', 'grOpenCand', 'grOpenLinked', 'grLib'].map(grab).join('\n');
+  assert.doesNotMatch(body, /localStorage|sessionStorage|indexedDB|caches\.|FormData|download|\.set\(|\.update\(|\.push\(|\.put\(|window\.open|https?:\/\//);
+  const libs = [...INLINE.matchAll(/grLib\('([^']+)'/g)].map((x) => x[1]);
+  assert.ok(libs.length >= 2 && libs.every((x) => /^vendor\/[\w.-]+\.js\?v=\d+$/.test(x)), '판독기는 저장소 vendor 에서만: ' + libs.join(', '));
+  assert.match(grab('grShowAtt'), /workerSrc='vendor\/pdf\.worker\.min\.js\?v=\d+'/);
+  assert.match(grab('grShowAtt'), /isEvalSupported:false/);
+  assert.match(SRC, /<div id="attv" class="toc" style="display:none"><\/div>/);
+  assert.doesNotMatch(SRC.slice(0, SRC.indexOf('</head>')), /vendor\/(pdf|xlsx)/, '판독기는 누를 때 싣는다');
+});
+
+test('㊽ 폴더마다 최근 메일만 읽는다(GR_MAIL.per) — 넘치면 안내', async () => {
+  const w = world();
+  vm.runInContext('GR_MAIL.per=2;', w.ctx);
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  assert.equal(w.ctx.GR.inbox.clipped, true);
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes(I.MSG.CLIPPED));
+  assert.ok(h.includes('현장 사진') && !h.includes('서명본 보내드립니다'), '열쇠 순 뒤에서 둘(106·107)만 읽었다');
 });

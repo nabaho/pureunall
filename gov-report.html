@@ -15,6 +15,9 @@
      ★ 이 화면이 쓰는 곳은 «하나»다 — 서류 진행 기록(③서명본·④별첨·⑤제출) 줄 하나씩:
        scal_docs/{업체}/{rid}/items/{줄 키} 를 .set (grSaveCell). 설계 docs/superpowers/specs/2026-10-10-gov-report-track-design.md
        규칙 게시 전에는 읽기·쓰기가 거절되어 읽기 전용으로 돈다(「기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인」).
+     ★ 받은 서류함(2026-10-11, 설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md) — 칸 창에 그 업체 «주소»로 오간
+       첨부 메일 후보(메일함 거울 mailbox/* 머리글만 읽음). 「연결」은 위 줄 하나 .set 안의 link 한 칸 — 쓰는 곳은 여전히 하나.
+       「열어 보기」는 서버 함수로 한 번에 한 건씩 받아 이 화면에서만 보고 버린다(저장·업로드·내려받기 없음).
      ★ 계산은 현황판 계산 모듈(순수 함수, 아래 script 로 싣는다)이 한다. 이 파일은 읽고 그린다.
      ⚠ 목록에는 업체·사업·담당 이름과 상태만 — 보고서 본문을 그리지 않는다(기술보호도 같다).
      ⚠ scal_cos 등은 GR_NODES 로 부른다(정부사업일정 FB_NODES 꼴) — 등록부 js/pu-ontology.js govreport 주석.
@@ -101,6 +104,18 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 .cw-f input,.cw-f select,.cw-f textarea{font-family:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card)}
 .cw-c{display:flex;align-items:center;gap:6px;font-size:13px;margin:8px 0}
 .cw-b{display:flex;justify-content:flex-end;margin-top:10px}
+.ib{list-style:none;margin:6px 0 0;padding:0;max-height:320px;overflow:auto}
+.ib>li{padding:6px 0;border-bottom:1px solid var(--line)}
+.ib-h{font-size:12px;color:var(--mute)}
+.ib-s{font-size:13px;margin:2px 0}
+.ib-a{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;margin-top:3px}
+.ib-a>span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ib-l{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:13px;background:var(--blue-bg);border:1px solid var(--blue-line);border-radius:8px;padding:6px 8px;margin:4px 0}
+.av-box{max-width:980px}
+.av-stage{max-height:75vh;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px;margin-top:8px}
+.av-img,.av-pdf{display:block;max-width:100%;margin:0 auto;background:var(--card)}
+.av-stage table{font-size:12px}
+.av-stage td,.av-stage th{max-width:220px;overflow:hidden;text-overflow:ellipsis}
 .fm{padding:6px 0;border-bottom:1px solid var(--line)}
 .fm-n{font-size:13px;font-weight:600}
 .fm-f{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0}
@@ -166,6 +181,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 </main>
 <div id="toc" class="toc" style="display:none"></div>
 <div id="cellw" class="toc" style="display:none"></div>
+<div id="attv" class="toc" style="display:none"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -190,13 +206,13 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/pu-gov-report-list.js?v=2"></script>
 <!-- 서류 관리(왼쪽 패널)·목차 — 이알피 컨설팅 사업 · 서류 틀 · 체크표 · 목차(순수 함수)
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
-<script src="js/pu-gov-report-track.js?v=3"></script>
+<script src="js/pu-gov-report-track.js?v=4"></script>
 <script src="js/pu-gov-report-docs.js?v=3"></script>
 <!-- 받은 서류함 — 주소 맞추기(pu-co-thread) · 서버 부르기(rules-v2/mail-orig 의 makeCall) · 후보·연결 열쇠·첨부 받기 순서(순수 함수)
      설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md. 판독기(pdf·xlsx)는 누를 때 vendor/ 에서 싣는다 -->
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
-<script src="js/pu-gov-report-inbox.js?v=1"></script>
+<script src="js/pu-gov-report-inbox.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-preview.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
@@ -213,7 +229,12 @@ var GR_DOC_NODES={biz:'data/biz_cons_types',cons:'data/consultings',tmap:'scal_e
 /* 서류 진행 기록(③서명본·④별첨·⑤제출) — 이 앱의 자리. 읽기는 통째 한 번, 쓰기는 줄 하나(grSaveCell)
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_docs…') 를 쓰지 않는다(화면 검사가 막는다) */
 var GR_TRACK_NODES={docs:'scal_docs'};
-var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
+/* 받은 서류함 — 메일함 거울(주인 푸른 메일)·업체관리를 빌려 읽는 자리. 칸 창을 처음 열 때 한 번(grLoadInbox)
+   ⚠ 이름 표로 부른다 — 글자 그대로 ref('mailbox…')·ref('data/companies') 를 쓰지 않는다(화면 검사가 막는다) */
+var GR_INBOX_NODES={folders:'mailbox/folders',msgs:'mailbox/msgs',cos:'data/companies'};
+/* 서버 함수 자리(취업규칙 화면 MAIL_FN_BASE 와 같은 곳) · 폴더마다 읽을 최근 통 수 · 응답 기다림(ms, 지난 메일은 1분쯤) */
+var GR_MAIL={fn:'https://asia-northeast3-pureun-erp.cloudfunctions.net/',per:3000,wait:180000};
+var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,av:null,avBusy:false,avMsg:'',avErr:false,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -379,15 +400,19 @@ function grCloseToc(){ GR.toc=null; GR.tocMsg=''; GR.tocFail=false; grRenderToc(
 /* 칸 창 — 체크표 ③④⑤ 칸 하나. 그 칸의 서류가 여럿이면(기술보호 ④ = 자문 일지 회차 + 서약서·여비·만족도) 서류를 고른다.
    저장은 고른 줄 키 하나만. 기록을 못 읽었으면 열지 않는다 */
 function grOpenCell(coId,typeId,step){
-  var D=PuGovReportDocs, T=PuGovReportTrack;
+  var D=PuGovReportDocs, T=PuGovReportTrack, d=GR.docs||{};
   if(!GR.track||GR.trackErr) return;
   var p=D.pairs(GR.input,typeId,GR.f.year).filter(function(x){ return x.coId===coId; })[0];
   var erp=grErp(GR.f.biz);
   if(!p||!erp) return;
   var keys=T.keysFor(D.planFor(erp.name),step,Math.max(+p.rounds||0,+p.planned||0));
   if(!keys.length) return;
-  GR.cw={coId:coId,coName:p.coName,typeId:typeId,rid:p.rid,step:step,keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false};
+  var cons=D.consFor({consultings:d.cons,co:p.co,code:erp.code,typeId:typeId,tmap:d.tmap,biz:d.biz});
+  GR.cw={coId:coId,coName:p.coName,typeId:typeId,rid:p.rid,step:step,keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
+    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,tech:D.planFor(erp.name).key==='techguard',cands:[]};
+  GR.avMsg=''; GR.avErr=false;
   grRenderCell();
+  grLoadInbox();
 }
 function grPickCell(key){
   if(!GR.cw||!GR.cw.keys.some(function(k){ return k.key===key; })) return;
@@ -423,12 +448,14 @@ function grRenderCell(){
     +'<div class="days">메모에 연락처·주민번호 같은 개인정보를 적지 마세요</div>'
     +(rec&&rec.at?'<div class="days">고친 사람 '+grEsc(rec.by||'—')+' · '+grEsc(L.dayOf(rec.at))+'</div>':'')
     +(c.msg?'<div class="'+(c.err?'err-s':'days')+'">'+grEsc(c.msg)+'</div>':'')
-    +'<div class="cw-b"><button type="button" onclick="grSaveCell()"'+(c.busy?' disabled':'')+'>저장</button></div></div>';
+    +'<div class="cw-b"><button type="button" onclick="grSaveCell()"'+(c.busy?' disabled':'')+'>저장</button></div><div id="cwInbox"></div></div>';
   el.innerHTML=h; el.style.display='';
+  grRenderInbox();
 }
 /* 저장 — 그 줄 키 하나만 .set(scal_docs/{업체}/{rid}/items/{키}). update 는 저장 관문이 «부분 update» 로 막는다.
+   op 없음(「저장」) = 옛 link 를 이어 받는다 · op.link 가 있으면 그것(「연결」) · op.link 가 null 이면 뺀다(「연결 지우기」) — 받은 서류함 2026-10-11.
    거절되면(규칙 게시 전·권한 없음) 창에 알리고 값은 그대로 둔다. 되면 다시 읽지 않고 로컬 값으로 다시 그린다 */
-async function grSaveCell(){
+async function grSaveCell(op){
   var T=PuGovReportTrack, c=GR.cw;
   if(!c||c.busy) return;
   var pk=c.coId+'/'+c.rid+'/'+c.key;
@@ -437,6 +464,7 @@ async function grSaveCell(){
   var entry={st:$('cwSt').value,note:$('cwNote').value,
     sentAt:c.step==='sign'?$('cwSent').value:'',gotAt:c.step==='attach'?'':$('cwGot').value,
     how:c.step==='submit'?$('cwHow').value:'',ack:c.step==='submit'&&!!$('cwAck').checked};
+  entry.link=T.nextLink(T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null,op);
   c.draft=entry;
   var bad=T.validate(entry,c.step);
   if(bad){ c.msg=bad; c.err=true; grRenderCell(); return; }
@@ -455,7 +483,7 @@ async function grSaveCell(){
   /* 저장하는 사이 다시 읽기가 시작·끝났거나 못 읽은 상태면(옛 기록 위에 덮지 않게) 로컬 표는 건드리지 않는다 */
   if(base&&GR.track===base&&!GR.trackErr){
     GR.track=T.put(GR.track,c.coId,c.rid,c.key,rec);
-    c.busy=false; c.draft=null; c.msg='저장했습니다'; c.err=false;
+    c.busy=false; c.draft=null; c.msg=!op?'저장했습니다':(op.link?'연결했습니다':'연결을 지웠습니다'); c.err=false;
     grApplyTrack(); grRender();
   }else{
     c.busy=false; c.msg='저장했습니다 — 목록을 다시 불러온 뒤 확인해 주세요'; c.err=false;
@@ -484,6 +512,208 @@ async function grOpenHwp(input){
     console.warn('[컨설팅보고서] 한글 미리보기 실패',e);
     return say((e&&e.message)||'미리보기를 열지 못했습니다',true);
   }
+}
+/* ═══ 받은 서류함 — 칸 창 「📥 받은 서류 후보」·「연결」·「열어 보기」 (설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md) ═══
+   ★ 칸 창을 다시 그리지 않는다 — #cwInbox 만 고친다(적던 값 보존). 쓰기는 grSaveCell 한 곳뿐(link 를 실어 보낸다).
+   ★ 열어 보기는 한 번에 하나(GR.avBusy) — 지난 메일 POP3 가 동시 호출에 막힌다. 받은 바이트는 지역 변수로만, 저장·업로드 없음. */
+
+/* 메일함 거울(폴더 표 + 폴더마다 최근 GR_MAIL.per 통의 머리글)과 업체관리를 «한 번» 읽는다. 본문·첨부는 읽지 않는다.
+   업체관리를 못 읽은 것은 실패로 치지 않는다(이알피 계약 연락처로만 찾는다). 폴더를 못 읽으면 칸 창 안에 다시 시도 */
+function grLoadInbox(force){
+  if(!force&&GR.inboxP) return GR.inboxP;
+  var seq=++GR.iseq;
+  GR.inbox={st:'loading',rows:[],cos:null,clipped:false}; grRenderInbox();
+  GR.inboxP=grReadInbox(seq);
+  return GR.inboxP;
+}
+async function grReadInbox(seq){
+  var I=PuGovReportInbox, N=GR_INBOX_NODES;
+  try{
+    var got=await Promise.all([fbDb.ref(N.folders).once('value').then(function(s){ return s.val(); }),
+      fbDb.ref(N.cos).once('value').then(function(s){ return s.val(); },function(e){ console.warn('[컨설팅보고서] 못 읽음 '+N.cos,e); return null; })]);
+    var folders=got[0]||{}, slugs=I.boxesOf(folders);
+    var boxes=await Promise.all(slugs.map(function(s){
+      return fbDb.ref(N.msgs+'/'+s).orderByKey().limitToLast(GR_MAIL.per).once('value').then(function(x){ return x.val()||{}; });
+    }));
+    if(seq!==GR.iseq) return;
+    var msgs={}, clipped=false;
+    slugs.forEach(function(s,i){ msgs[s]=boxes[i]; if(Object.keys(boxes[i]).length>=GR_MAIL.per) clipped=true; });
+    GR.inbox={st:'ok',rows:I.mailRows(folders,msgs),cos:got[1],clipped:clipped};
+  }catch(e){
+    if(seq!==GR.iseq) return;
+    console.warn('[컨설팅보고서] 메일함 못 읽음',e);
+    GR.inbox={st:'err',rows:[],cos:null,clipped:false}; GR.inboxP=null;
+  }
+  grRenderInbox();
+}
+function grRetryInbox(){ return grLoadInbox(true); }
+/* 칸 창 안 후보 자리 — 연결된 서류 · 후보 줄(받음/보냄·날짜·제목·딱지·첨부마다 열어 보기/연결) · 안내 */
+function grRenderInbox(){
+  var I=PuGovReportInbox, T=PuGovReportTrack, c=GR.cw, el=$('cwInbox'), ib=GR.inbox||{};
+  if(!el) return;
+  if(!c){ el.innerHTML=''; return; }
+  var rec=T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null, lk=rec&&rec.link, busy=!!GR.avBusy;
+  var h='<div class="cw-f"><span>📥 받은 서류 후보</span><div class="days">'+grEsc(I.MSG.NAME_NOTE)+'</div>';
+  if(lk) h+='<div class="ib-l"><b>연결된 서류</b><span>'+grEsc(lk.name||'(이름 없음)')+(lk.date?' · '+grEsc(lk.date):'')+'</span>'
+    +'<button type="button" class="act" onclick="grOpenLinked()"'+(busy?' disabled':'')+'>열어 보기</button>'
+    +'<button type="button" class="act" onclick="grUnlink()"'+(c.busy?' disabled':'')+'>연결 지우기</button></div>';
+  if(ib.st==='err') h+='<div class="err-s">'+grEsc(I.MSG.LOAD_FAIL)+'</div><button type="button" onclick="grRetryInbox()">다시 시도</button>';
+  else if(ib.st!=='ok') h+='<div class="days">메일함을 불러오는 중…</div>';
+  else{
+    var r=I.candidates(ib.rows,{addrs:I.addrsFor({companies:ib.cos,cons:c.cons,name:c.coName}),win:c.win,tech:c.tech});
+    c.cands=r.list;
+    if(r.noAddr) h+='<div class="days">'+grEsc(I.MSG.NO_ADDR)+'</div>';
+    else if(!r.list.length) h+='<div class="days">'+grEsc(I.MSG.NONE)+'</div>';
+    else h+='<ul class="ib">'+r.list.map(function(m,i){
+      var tags=I.badges(m).map(function(b){ return ' <span class="st st-'+b.key+'">'+grEsc(b.txt)+'</span>'; }).join('');
+      var atts=m.atts.length?m.atts.map(function(a,j){
+        return '<div class="ib-a"><span>📎 '+grEsc(a.name)+'</span>'+(m.priv?'':
+          '<button type="button" class="act" onclick="grOpenCand('+i+','+j+')"'+(busy?' disabled':'')+(a.kind?'':' title="'+grEsc(I.MSG.CANT)+'"')+'>열어 보기</button>'
+          +'<button type="button" class="act" onclick="grLinkCand('+i+','+j+')"'+(c.busy||!m.key?' disabled':'')+'>연결</button>')+'</div>';
+      }).join(''):'<div class="days">첨부 '+grEsc(m.a)+'개 — 이름이 없어 메일함에서 받아 주세요</div>';
+      return '<li><div class="ib-h">'+(m.out?'보냄 → ':'받음 ← ')+grEsc(m.who)+' · '+grEsc(m.day)+tags+'</div>'
+        +'<div class="ib-s">'+grEsc(m.s||'(제목 없음)')+'</div>'+atts+'</li>';
+    }).join('')+'</ul>'+(r.more?'<div class="days">'+grEsc(I.MSG.MORE)+'</div>':'');
+    if(ib.clipped) h+='<div class="days">'+grEsc(I.MSG.CLIPPED)+'</div>';
+  }
+  if(GR.avMsg) h+='<div class="'+(GR.avErr?'err-s':'days')+'">'+grEsc(GR.avMsg)+'</div>';
+  el.innerHTML=h+'</div>';
+}
+/* 「연결」 — 고른 후보의 첨부 하나를 지금 칸 창의 서류 줄에. 저장은 기존 한 곳(grSaveCell)이 칸 창 값과 함께 줄 하나 .set.
+   규칙 게시 전에는 거절되어 「저장하지 못했습니다 — 규칙 게시 또는 권한 확인」(값은 그대로) */
+function grLinkCand(i,j){
+  var c=GR.cw, m=c&&c.cands?c.cands[i]:null, a=m?m.atts[j]:null;
+  if(!m||!a||m.priv) return Promise.resolve();
+  var lk=PuGovReportInbox.linkFrom(m,a.name);
+  return lk?grSaveCell({link:lk}):Promise.resolve();
+}
+/* 「연결 지우기」 — link 만 뺀 줄을 같은 길로 다시 쓴다(서류 줄 상태는 칸 창 값 그대로) */
+function grUnlink(){ return GR.cw?grSaveCell({link:null}):Promise.resolve(); }
+/* 서버 부르기 — 취업규칙 화면과 같은 손(PuRulesMailOrig.makeCall: POST · Bearer 로그인 증표 · ok 가 아니면 status 를 단 오류).
+   GR_MAIL.wait 안에 답이 없으면 TimeoutError(「메일 서버 응답이 없습니다」) */
+function grMailFetch(url,init){
+  return new Promise(function(ok,no){
+    var t=setTimeout(function(){ var e=new Error('응답이 없습니다'); e.name='TimeoutError'; no(e); },GR_MAIL.wait);
+    fetch(url,init).then(function(r){ clearTimeout(t); ok(r); },function(e){ clearTimeout(t); no(e); });
+  });
+}
+function grMailCall(){
+  return PuRulesMailOrig.makeCall({base:GR_MAIL.fn,fetch:grMailFetch,getToken:function(){
+    var u=firebase.auth().currentUser;
+    if(!u){ var e=new Error('로그인이 필요합니다'); e.status=401; throw e; }
+    return u.getIdToken();
+  }});
+}
+/* 「열어 보기」 — 후보 줄의 첨부 / 연결된 서류. 개인 자료는 열지 않는다 */
+function grOpenCand(i,j){
+  var c=GR.cw, m=c&&c.cands?c.cands[i]:null, a=m?m.atts[j]:null;
+  if(!m||!a||m.priv) return Promise.resolve({ok:false});
+  return grOpenAtt({kind:'imap',slug:m.slug,uid:m.uid},a.name);
+}
+function grOpenLinked(){
+  var c=GR.cw, rec=c?PuGovReportTrack.recOf(GR.track||{},c.coId,c.rid)[c.key]:null, lk=rec&&rec.link;
+  if(!lk) return Promise.resolve({ok:false});
+  return grOpenAtt(PuGovReportInbox.linkKey.parse(lk.key),lk.name||'');
+}
+/* 한 건 받아 연다 — 한 번에 하나(GR.avBusy). 실패해도 칸 창은 그대로, 안내는 #cwInbox 에만.
+   창이 닫혀 취소된 것(e.cancelled — 한글 미리보기)은 실패가 아니다 */
+async function grOpenAtt(ref,name){
+  var I=PuGovReportInbox, kind=I.kindOf(name);
+  var say=function(m,bad){ GR.avMsg=m; GR.avErr=!!bad; grRenderInbox(); };
+  if(GR.avBusy) return {ok:false,busy:true};
+  if(!ref||!name){ say(I.MSG.GONE,true); return {ok:false}; }
+  if(!kind){ say(I.MSG.CANT,true); return {ok:false}; }
+  if(kind==='hwp'&&!window.PuHwpPreview){ say('한글 미리보기를 불러오지 못했습니다 — 새로 고친 뒤 다시 눌러 주세요',true); return {ok:false}; }
+  GR.avBusy=true; say(ref.kind==='pop'?I.MSG.WAIT_OLD:I.MSG.WAIT);
+  try{
+    var got=await I.fetchAtt({call:grMailCall(),ref:ref,name:name});
+    await grShowAtt(kind,PuRulesMailOrig.b64ToBytes(got.b64),name);
+    GR.avBusy=false; say('열었습니다 — '+name);
+    return {ok:true};
+  }catch(e){
+    GR.avBusy=false;
+    if(e&&e.cancelled){ say(''); return {ok:false,cancelled:true}; }
+    console.warn('[컨설팅보고서] 받은 서류 열기 실패',e);
+    say(I.errText(e),true);
+    return {ok:false};
+  }
+}
+/* 판독기를 «그때» 저장소 vendor/ 에서 싣는다 — 화면을 열 때 싣지 않는다 */
+function grLib(src,ready){
+  if(ready()) return Promise.resolve();
+  return new Promise(function(ok,no){
+    var s=document.createElement('script'); s.src=src;
+    s.onload=function(){ if(ready()) ok(); else no(new Error('판독기를 쓸 수 없습니다')); };
+    s.onerror=function(){ no(new Error('판독기를 불러오지 못했습니다')); };
+    document.head.appendChild(s);
+  });
+}
+/* 받은 바이트를 보여 준다 — 한글은 한글 미리보기 창, PDF 는 캔버스 그림(스크립트가 돌지 않게), 그림은 확장자로 정한 종류의 blob, 표는 첫 시트 앞 줄 */
+async function grShowAtt(kind,bytes,name){
+  var I=PuGovReportInbox;
+  if(kind==='hwp'){ await window.PuHwpPreview.open(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),name); return; }
+  grCloseAv();
+  var a={kind:kind,name:name,url:'',pdf:null,page:1,pages:0,grid:null,sheet:'',sheets:0};
+  if(kind==='img') a.url=URL.createObjectURL(new Blob([bytes],{type:I.imgType(name)}));
+  else if(kind==='pdf'){
+    await grLib('vendor/pdf.min.js?v=1',function(){ return !!window.pdfjsLib; });
+    try{ window.pdfjsLib.GlobalWorkerOptions.workerSrc='vendor/pdf.worker.min.js?v=1'; }catch(e){}
+    a.pdf=await window.pdfjsLib.getDocument({data:bytes,isEvalSupported:false}).promise;
+    a.pages=Number(a.pdf.numPages||1);
+  }else{
+    await grLib('vendor/xlsx.full.min.js?v=1',function(){ return !!window.XLSX; });
+    var wb=window.XLSX.read(bytes,{type:'array'}), sh=wb.Sheets[wb.SheetNames[0]];
+    a.grid=window.XLSX.utils.sheet_to_json(sh,{header:1,defval:''}).slice(0,I.SHEET_ROWS);
+    a.sheet=String(wb.SheetNames[0]||''); a.sheets=wb.SheetNames.length;
+  }
+  GR.av=a; grRenderAv();
+}
+function grRenderAv(){
+  var a=GR.av, el=$('attv');
+  if(!a){ el.style.display='none'; el.innerHTML=''; return; }
+  var stage;
+  if(a.kind==='img') stage='<img class="av-img" src="'+grEsc(a.url)+'" alt="'+grEsc(a.name)+'">';
+  else if(a.kind==='pdf') stage='<canvas id="avCanvas" class="av-pdf"></canvas>';
+  else stage='<table>'+(a.grid||[]).map(function(r,ri){
+    return '<tr>'+(r||[]).slice(0,40).map(function(x){ var t=ri?'td':'th'; return '<'+t+'>'+grEsc(String(x==null?'':x).slice(0,120))+'</'+t+'>'; }).join('')+'</tr>';
+  }).join('')+'</table>';
+  var pager=(a.kind==='pdf'&&a.pages>1)?'<button type="button" onclick="grPdfPage(-1)"'+(a.page<=1?' disabled':'')+'>◀</button> <b>'+a.page+'</b> / '+a.pages
+    +' <button type="button" onclick="grPdfPage(1)"'+(a.page>=a.pages?' disabled':'')+'>▶</button>':'';
+  var sub=(a.kind==='xls'&&a.sheets>1)?' · 「'+grEsc(a.sheet)+'」 등 '+a.sheets+'장 중 첫 장':'';
+  el.innerHTML='<div class="toc-box av-box" role="dialog" aria-label="받은 서류 보기">'
+    +'<div class="toc-top"><b>👁 '+grEsc(a.name)+'</b><span class="days">'+sub+'</span><span class="sp"></span>'+pager
+    +'<button type="button" data-close onclick="grCloseAv()">닫기</button></div>'
+    +'<div class="av-stage">'+stage+'</div>'
+    +'<div class="days">받은 파일은 이 화면에서만 봅니다 — 저장·올리기를 하지 않고, 닫으면 버립니다</div></div>';
+  el.style.display='';
+  if(a.kind==='pdf') setTimeout(grPdfDraw,0);
+}
+/* PDF 한 쪽을 캔버스에 — 그린 «뒤»에 부른다. 그사이 창이 바뀌었으면 그리지 않는다 */
+function grPdfDraw(){
+  var a=GR.av, cv=$('avCanvas');
+  if(!a||a.kind!=='pdf'||!a.pdf||!cv||!cv.getContext) return Promise.resolve();
+  var want=a.page;
+  return a.pdf.getPage(want).then(function(pg){
+    if(GR.av!==a||a.page!==want) return;
+    var box=((cv.parentNode&&cv.parentNode.clientWidth)||900)-28, v0=pg.getViewport({scale:1});
+    var vp=pg.getViewport({scale:Math.min(2.2,Math.max(0.5,box/(v0.width||600)))});
+    cv.width=Math.floor(vp.width); cv.height=Math.floor(vp.height);
+    return pg.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+  }).catch(function(e){ console.warn('[컨설팅보고서] PDF 쪽 그리기 실패',e); });
+}
+function grPdfPage(step){
+  var a=GR.av;
+  if(!a||!a.pages) return;
+  var n=Math.min(a.pages,Math.max(1,a.page+step));
+  if(n===a.page) return;
+  a.page=n; grRenderAv();
+}
+/* 닫으면 그 파일은 사라진다 — blob 주소를 버리고 PDF 를 닫는다 */
+function grCloseAv(){
+  var a=GR.av; GR.av=null;
+  if(a&&a.url){ try{ URL.revokeObjectURL(a.url); }catch(e){} }
+  if(a&&a.pdf&&a.pdf.destroy){ try{ a.pdf.destroy(); }catch(e){} }
+  grRenderAv();
 }
 /* 양식 서고 — 읽기만. 등록·바꾸기는 정부사업일정의 ⚙ 양식 서고(#forms, 관리자) */
 function grRenderForms(){
@@ -619,6 +849,7 @@ function grBoot(){
   }); });
   $('toc').addEventListener('click',function(e){ if(e.target===this) grCloseToc(); });
   $('cellw').addEventListener('click',function(e){ if(e.target===this) grCloseCell(); });
+  $('attv').addEventListener('click',function(e){ if(e.target===this) grCloseAv(); });
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);

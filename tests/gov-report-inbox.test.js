@@ -142,6 +142,14 @@ test('linkFrom — 연결 꼴(src·key·name·date) · 열쇠를 못 만들었�
   assert.deepEqual(Tr.normLink(I.linkFrom(r.list[3], '서명본.hwpx')), I.linkFrom(r.list[3], '서명본.hwpx'), '기록 모듈이 그대로 받는다');
 });
 
+test('linkFrom — 개인 자료 후보는 모듈에서도 연결 꼴을 만들지 않는다(화면이 단추를 빼먹어도)', () => {
+  const r = I.candidates(ROWS, { addrs: DARA, win: WIN });
+  const priv = r.list.filter((c) => c.priv)[0];
+  assert.ok(priv && priv.key, '개인 자료 후보가 합성 자료에 있어야 한다');
+  assert.equal(I.linkFrom(priv, priv.atts[0].name), null);
+  assert.equal(I.linkFrom(Object.assign({}, r.list[3], { priv: true }), '서명본.hwpx'), null);
+});
+
 test('errText — 시간 초과·끊김 / 로그인 / 없음 / 너무 큼 / 그 밖', () => {
   const e = (status, name, message) => Object.assign(new Error(message || ''), { status, name: name || 'Error' });
   assert.equal(I.errText(e(0, 'TimeoutError')), I.MSG.NO_REPLY);

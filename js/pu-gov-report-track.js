@@ -64,9 +64,14 @@
     if (isDay(l.date)) o.date = l.date;
     return o;
   }
-  /* 저장할 때 실을 연결 — 요청(op)에 link 칸이 있으면 그것(null 이면 지움), 없으면 옛 줄의 것을 이어 받는다 */
+  /* 저장할 때 실을 연결 — op.link 가 null 이면 지운다(「연결 지우기」), 올바른 link 면 그것(「연결」),
+     그 밖(op 없음·칸 없음·undefined·꼴이 틀림)은 옛 줄의 것을 이어 받는다 — 지우는 것은 명시한 null 뿐 */
   function nextLink(prev, op) {
-    if (obj(op) && has(op, 'link')) return normLink(op.link);
+    if (obj(op) && has(op, 'link')) {
+      if (op.link === null) return null;
+      var lk = normLink(op.link);
+      if (lk) return lk;
+    }
     return obj(prev) ? normLink(prev.link) : null;
   }
   function normRec(r) {
