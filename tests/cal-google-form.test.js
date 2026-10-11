@@ -270,3 +270,14 @@ test('시각 일정 칩 — 구글 실측: 시각 12px/400 · 제목 12px/500', 
   assert.match(캘린더, /\.ev\[data-g="t"\]\{padding:1px 4px;font-weight:500;background:transparent\}/);
   assert.match(캘린더, /\.ev \.gtm\{margin-right:4px;font-weight:400\}/);
 });
+
+test('PC 이전·다음 달 단추 — 구글 공식 실측 32×32 원(2026-10-11)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\.mv\{border:none;background:transparent;border-radius:50%;width:32px;height:32px;/);
+});
+
+test('PC 「오늘」 단추·월 제목 — 구글 실측(78×36, 1px #747775, 모서리 18px, 14px/500, 제목 18px)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\.todaybtn\{padding:0 24px;height:36px;border:1px solid #747775;[^}]*border-radius:18px;\s*cursor:pointer;font-size:14px;font-weight:500/);
+  assert.match(캘, /\.monthbar \.ym\{font-size:18px;font-weight:400/);
+});
