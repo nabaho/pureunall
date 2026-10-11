@@ -87,11 +87,10 @@ async function heal(o, db, bucket, docs) {
   const ids = Object.keys(docs || {}).filter((id) => docs[id] && docs[id].status === '담김'
     && Number(docs[id].recheckV || 0) < RECHECK_V);
   if (!ids.length) return 0;
-  const texts = (await val(db, LIB + '/text')) || {};
   const recheck = o.recheck || X.recheck;
   let n = 0;
   for (const id of ids) {
-    const d = docs[id], t = texts[id];
+    const d = docs[id], t = await val(db, LIB + '/text/' + id);
     const P0 = LIB + '/docs/' + id + '/';
     const up = { [P0 + 'recheckV']: RECHECK_V };
     const r = t ? await recheck(t) : { leak: 0 };
@@ -335,7 +334,7 @@ async function runOnce(o) {
         up[LIB + '/text/' + id] = r.text;
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
           { kind, sha, file, textLen: r.text.length,
-            pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' },
+            pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '', recheckV: RECHECK_V },
           r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}) });   // 쪽 한도(300)에 잘린 PDF 는 표시 — 뒤쪽은 담기지 않았다
         if (ext !== 'pdf' && kind === '규칙본문') { bodyStored = true; bodyIds.add(id); }
         staged[id] = 1; c.stored++; ids.push(id);
@@ -436,7 +435,7 @@ async function runOnce(o) {
         const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
         if (why) { close(up, id, { kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
         up[LIB + '/text/' + id] = r.text;
-        close(up, id, Object.assign({ kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null },
+        close(up, id, Object.assign({ kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null, recheckV: RECHECK_V },
           r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}));
         pdfSum.stored++;
       }

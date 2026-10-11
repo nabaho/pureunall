@@ -791,8 +791,12 @@ rules.pucards = {
   '.read': MAIL, '.write': ADMIN,
   items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': MAIL } },
   tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
+  /* 예약 발송과 회차별 결과는 필요한 줄만 읽는다. 이름 붙인 칸이라 $k 쓰기 권한을 그대로 옮긴다. */
+  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': MAIL } },
   $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
 };
+/* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
+rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
 /* 푸른 캘린더 «나만 보기» 일정 (대표 지시 2026-09-27 「본인만 확인가능하고 다른사람은 확인안되게」,
    추천대로 «관리자도 못 본다»). ⚠ data 아래가 아니다 — data 는 재무 권한자가 통째로 읽는다.
    본인 로그인만 읽고 쓴다(기업정보함 개인 폴더 pucards_private 와 같은 꼴). */

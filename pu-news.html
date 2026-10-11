@@ -4313,12 +4313,8 @@ async function 결과읽기(열쇠){
     /* ㉡ 아직 대기열에 남은 것 — 나간 것은 서버가 지운다.
        ⚠ 대기열에는 자료 발송도 섞여 있다. 이 회차 것(bulk=batchId)만 고른다. */
     if(d.batchId){
-      const v = (await db.ref('pucards/scheduled').once('value')).val() || {};
-      const 내것 = {};
-      Object.keys(v).forEach(function(k){
-        const r = v[k]||{}; if(String(r.bulk||'') === String(d.batchId)) 내것[k] = r;
-      });
-      나온것.예약줄 = 내것;
+      나온것.예약줄 = (await db.ref('pucards/scheduled')
+        .orderByChild('bulk').equalTo(String(d.batchId)).once('value')).val() || {};
     }
     /* ㉢ 푸른메일함 — 보낸 뒤에 들어온 것만 본다.
        ⚠ 통째로 읽지 않는다. 뒤에서 400통만 가져와 보낸 때로 다시 거른다. */

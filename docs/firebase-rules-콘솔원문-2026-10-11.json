@@ -1134,11 +1134,28 @@
           ".write": "auth != null && auth.token.email != null"
         }
       },
+      "scheduled": {
+        ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".indexOn": [
+          "at",
+          "bulk"
+        ],
+        "$k2": {
+          ".write": "auth != null && auth.token.email != null"
+        }
+      },
       "$k": {
         ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
           ".write": "auth != null && auth.token.email != null"
         }
+      }
+    },
+    "hanaSmsBridge": {
+      "adminAlerts": {
+        ".indexOn": [
+          "receivedAt"
+        ]
       }
     },
     "cal_private": {
