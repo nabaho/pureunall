@@ -89,7 +89,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
        설명엔 안 든다(반출 기록 정리와 같다). 주기는 tests/homepage-auto-server.test.js 가 지킨다. */
   /* 2026-10-10 회생광고 수집(아침 7:40, rehabWatch)이 늘어 스물셋(그때는 «오늘만» 보충이 아직 있었다) — 법원 공고를 읽기만 한다. 하루 셈 +1 */
   /* 2026-10-11 «오늘만» 보충(newsletterRefillOnce20261004)을 지워 스물둘로 줄었다 — 하루 셈(아래 perDay)엔 처음부터 안 들어 있어 그대로다 */
-  assert.strictEqual(all.length, 22, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
+  /* 2026-10-11 안내문 발송 대장 정리(새벽 3:40, newsletterNoticeLogBuild)가 늘어 스물셋 — 다음메일 거울을 읽기만 한다. 하루 셈 +1 */
+  assert.strictEqual(all.length, 23, '스케줄 함수 수가 바뀌었다 — 화면 문구도 같이 고쳐야 한다');  // 검사고정-허용: 화면 문구와 짝인 «개수» 자체가 규칙이다(이 검사가 처음부터 그렇게 지킨다)
   /* 🤖 금요일 준비 — 화면에 있고, «AI 를 쓴다»는 것까지 말한다(사용액 창은 비용을 보는 곳이다) */
   assert.ok(FIDX.indexOf('exports.weeklyNewsletterPrepare') >= 0
     && ENTER.indexOf('거래처 뉴스레터 금요일 준비 한 번(AI 정리)') >= 0,
@@ -120,6 +121,8 @@ test('★★ 자동으로 도는 것이 «몇 개»인지 — 화면과 코드�
     '컨설턴트 모집 감시 일정이 화면 설명에 없습니다');
   assert.ok(FIDX.indexOf('exports.rehabWatch ') >= 0 && ENTER.indexOf('회생광고 수집 하루 한 번') >= 0,
     '회생광고 수집 일정이 화면 설명에 없습니다');
+  assert.ok(FIDX.indexOf('exports.newsletterNoticeLogBuild') >= 0 && ENTER.indexOf('안내문 대장 정리 하루 한 번') >= 0,
+    '안내문 대장 정리 일정이 화면 설명에 없습니다');
 });
 
 test('★★ 주간 브리핑은 «하루 셈에 안 든다» — 월요일에만 돈다', () => {
@@ -181,7 +184,7 @@ test('★★ 하루 몇 번인지도 코드와 맞는다', () => {
   const perDay = Math.round(60 / send.every) * send.hours
     + Math.round(60 / pay.every) * pay.hours
     + Math.round(60 / sync.every) * sync.hours
-    + 8    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·컨설턴트 모집 감시·회생광고 수집·공인노무사회 자료·뉴스레터 반송 확인 — 각 하루 한 번
+    + 9    // 홈페이지 뉴스·발간자료/판례·지역뉴스 후보·취업규칙 법 개정 확인·컨설턴트 모집 감시·회생광고 수집·공인노무사회 자료·뉴스레터 반송 확인·안내문 대장 정리 — 각 하루 한 번
     + Math.round(60 / rules.every) * rules.hours   // 취업규칙 모으기 — 30분마다 깨움(2026-10-05)
     + Math.round(24 / every3h());   // 뉴스레터 감시꾼 — 코드에서 읽은 «몇 시간마다»
          //   (주간 브리핑은 월요일뿐, 반출 정리는 달마다라 안 센다)
