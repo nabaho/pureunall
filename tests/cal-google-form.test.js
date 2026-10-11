@@ -136,3 +136,19 @@ test('날짜·시간을 고르면 다시 그려 글자를 맞춘다 · 저장 �
   assert.match(캘린더, /f !== 'date' && f !== 'endDate' && f !== 'time' && f !== 'endTime'\) return;\s+modalRead\(\); render\(\);/);
   assert.match(캘린더, /\.gform \.gsave\{[^}]*background:var\(--gtoday\)/, '저장 단추가 구글 파랑이 아닙니다');
 });
+
+/* ── 일정 상세 창도 구글 «일정 팝업» 꼴 (2026-10-10) ── */
+test('상세 창 — 위 아이콘 줄 · 선 아이콘 줄 · 「오후 2:00~오후 3:00」 · 아래 단추 줄 없음', () => {
+  const 상세 = 함수몸('function detailHtml(){');
+  assert.match(상세, /class="dtool"/, '위 아이콘 줄이 없습니다');
+  for (const 속성 of ['data-gedit="1"', 'data-gdel="1"', 'data-dgo="1"', 'data-close="1"']) {
+    assert.ok(상세.includes(속성), '아이콘 줄에 빠진 단추: ' + 속성);
+  }
+  assert.match(상세, /도구단추\('data-route="'/, '이날 동선 단추가 없습니다');
+  assert.ok(!/class="mbtns"/.test(상세), '구글 팝업에는 아래 단추 줄이 없습니다');
+  assert.match(상세, /시각글\(d\.time\)/, '시간이 구글 꼴(오후 2:00)이 아닙니다');
+  assert.match(함수몸('function 행아이콘(그림){'), /선아이콘\(행그림\[그림\]\)/, '줄 앞 이모지를 선 아이콘으로 바꾸지 않습니다');
+  for (const 이모지 of ['👤', '📍', '≡', '✉', '🕒', '⏱', '👥', '🔔', '🔁', '🎥', '📎']) {
+    assert.ok(캘린더.includes('"' + 이모지 + '":"'), '행그림에 없는 이모지: ' + 이모지);
+  }
+});

@@ -56,8 +56,16 @@ function 상자(옵션) {
     render: () => {}, toast: () => {}
   };
   vm.createContext(box);
+  /* 2026-10-10 상세 창이 구글 팝업 꼴로 바뀌어 «선 아이콘 사전(GIC)·행그림»과 날짜글·시각글을 함께 싣는다 */
+  ['GIC', '행그림'].forEach((이름) => {
+    const i = 캘린더.indexOf('\nvar ' + 이름 + ' = {');
+    assert.ok(i >= 0, '못 찾음: var ' + 이름);
+    vm.runInContext(캘린더.slice(i + 1, 캘린더.indexOf('\n};', i) + 3), box);
+  });
   ['function 구글상세(id){', 'function 층상세(ymd, id){', 'function 공휴일상세(ymd){',
    'function detailHtml(){', 'function 긴날짜(ymd){', 'function 시분(ms){',
+   'function 날짜글(ymd){', 'function 시각글(hm){', 'function 선아이콘(이름){', 'function 행아이콘(그림){',
+   'function 도구단추(속성, 이름, 뜻){',
    'function holidayOf(ymd){', 'function 언제적(iso){'].forEach((h) => vm.runInContext(함수몸(h), box));
   return box;
 }
@@ -195,7 +203,7 @@ test('★ 시각이 있으면 «몇 시부터 몇 시까지»를 적는다', () 
   const b = 상자({ 상세: { kind: 'gcal', title: '방문', color: '#039be5', date: '2026-09-16',
     end: '', time: '14:00', endAt: Date.parse('2026-09-16T16:00:00+09:00'), rows: [], hint: [], url: 'https://x' } });
   const html = vm.runInContext('detailHtml()', b);
-  assert.match(html, /14:00 – 16:00/, '★ 끝 시각을 안 적습니다');
+  assert.match(html, /오후 2:00~오후 4:00/, '★ 끝 시각을 안 적습니다(구글 꼴 「오후 2:00~오후 4:00」)');
   assert.match(html, /data-dgo="1"/, '★ 구글 일정인데 「구글에서 열기」가 없습니다');
 });
 

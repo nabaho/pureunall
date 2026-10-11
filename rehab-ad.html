@@ -75,8 +75,8 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .mfoot .hint{flex:1;font-size:12px;color:var(--mute)}
 @media (min-width:1101px){
   th.ck,td.ck{position:sticky;left:0;z-index:1;background:var(--card)}
-  th.no,td.no{position:sticky;left:34px;z-index:1;background:var(--card);min-width:38px}
-  th.co,td.co{position:sticky;left:72px;z-index:1;background:var(--card);box-shadow:1px 0 0 var(--line2)}
+  th.no,td.no{position:sticky;left:36px;z-index:1;background:var(--card)}
+  th.co,td.co{position:sticky;left:80px;z-index:1;background:var(--card);box-shadow:1px 0 0 var(--line2)}
   .tbl thead th.ck,.tbl thead th.no,.tbl thead th.co{z-index:4;background:var(--bg)}
   tbody tr:hover td.ck,tbody tr:hover td.no,tbody tr:hover td.co{background:var(--bg)}
   tbody tr.cur td.ck,tbody tr.cur td.no,tbody tr.cur td.co{background:var(--blue-bg)}
@@ -136,17 +136,21 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 #selbar label{font-size:12px;color:var(--ink2);display:flex;gap:4px;align-items:center}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,28vw,540px);gap:12px;align-items:start}
 .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
-table{border-collapse:collapse;width:100%}
-th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle}
+table{border-collapse:collapse;width:100%;min-width:1260px;table-layout:fixed}
+col.c-ck{width:36px}col.c-no{width:44px}col.c-co{width:270px}col.c-pgm{width:128px}col.c-ceo{width:84px}col.c-tr{width:120px}col.c-rg{width:112px}col.c-ct2{width:196px}col.c-st{width:72px}col.c-ico{width:112px}col.c-stat{width:84px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
 th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600}
 tbody tr{cursor:pointer}
 tbody tr:hover{background:var(--bg)}
 tbody tr.cur{background:var(--blue-bg)}
-td.ck,th.ck{width:34px;text-align:center;padding:0}
-td.no,th.no{width:38px;text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
+td.ck,th.ck{text-align:center;padding:0}
+td.no,th.no{text-align:right;color:var(--mute);font-variant-numeric:tabular-nums}
 td.ck input,th.ck input{width:18px;height:18px;cursor:pointer}
-td.co{font-weight:600;max-width:250px;overflow:hidden;text-overflow:ellipsis}
-td.rg{max-width:130px;overflow:hidden;text-overflow:ellipsis}
+td.co{font-weight:600}
+td.co .cn{display:flex;align-items:center;gap:6px;min-width:0}
+td.co .nm{overflow:hidden;text-overflow:ellipsis;min-width:0}
+td.co .chip{margin-left:0;flex:0 0 auto}
+td.rg{}
 td.ct{letter-spacing:2px}
 .chip{display:inline-block;border-radius:999px;padding:1px 8px;font-size:11.5px;margin-left:5px;font-weight:500}
 .c-gray{background:var(--gray-bg);color:var(--ink2)}
@@ -156,7 +160,7 @@ td.ct{letter-spacing:2px}
 .c-red{background:var(--red-bg);color:var(--red)}
 .ico{display:inline-block;width:20px;text-align:center;font-size:13px}
 .pgm{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);font-weight:700}
-td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
+td.ceo{}
 .mails .m{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px dashed var(--line);font-size:13px}
 .mails .m:last-child{border-bottom:0}.mails .m .em{font-weight:600;word-break:break-all}
 .route{font-size:12.5px;line-height:1.55;border-radius:8px;padding:6px 9px;margin:6px 0}
@@ -302,6 +306,7 @@ td.ceo{max-width:90px;overflow:hidden;text-overflow:ellipsis}
   <div class="layout">
     <div class="tbl" id="tblbox">
       <table>
+        <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ct2"><col class="c-st"><col class="c-ico"><col class="c-stat"></colgroup>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
           <th class="no">번호</th><th class="co">회사명</th><th>포괄금지명령</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
@@ -553,7 +558,7 @@ function draw(){
     return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
       '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
       '<td class="no">'+(i+1)+'</td>'+
-      '<td class="co" title="'+esc(n.debtorName)+'">'+esc(n.debtorName)+'<span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></td>'+
+      '<td class="co" title="'+esc(n.debtorName)+'"><div class="cn"><span class="nm">'+esc(n.debtorName)+'</span><span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></div></td>'+
       '<td><span class="chip pgm" style="margin-left:0" title="포괄적 금지명령 공고일">포괄금지명령 '+esc(pgmDate(n).slice(5))+'</span></td>'+
       '<td class="ceo" title="'+esc(ce.src)+'">'+(ce.name?esc(ce.name):'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td>'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
