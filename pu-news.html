@@ -49,7 +49,7 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
-<script src="js/pu-news-core.js?v=55"></script>
+<script src="js/pu-news-core.js?v=56"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
 <script src="js/pu-news-tpl.js?v=46"></script>
@@ -94,15 +94,16 @@ input,select,textarea{font-family:inherit;font-size:14px}
      어느 것이 «화면을 바꾸는 탭»이고 어느 것이 «거르개»인지 눈이 못 갈랐다.
      ★ 탭은 밑줄, 갈색으로 칠하는 것은 «고른 거르개»뿐이다. */
 .subtabs{display:flex;gap:2px;margin:12px 0 0;flex-wrap:wrap;border-bottom:1px solid var(--line)}
-.subtabs button{font-size:13.5px;font-weight:700;padding:10px 12px 8px;border:0;border-radius:0;
+.subtabs button:not(.mini):not(.btn){font-size:13.5px;font-weight:700;padding:10px 12px 8px;border:0;border-radius:0;
   border-bottom:2px solid transparent;margin-bottom:-1px;background:none;color:var(--sub);white-space:nowrap}
-.subtabs button:hover{color:var(--ink)}
-.subtabs button.on{color:var(--ink);border-bottom-color:var(--brown)}
-.subtabs button .n{color:var(--faint);font-weight:700}
+.subtabs button:not(.mini):not(.btn):hover{color:var(--ink)}
+.subtabs button:not(.mini):not(.btn).on{color:var(--ink);border-bottom-color:var(--brown)}
+.subtabs button:not(.mini):not(.btn) .n{color:var(--faint);font-weight:700}
 /* 설명·단추를 함께 실은 작은 탭 줄 — 흰 상자 한 줄. 좁으면 설명이 … 로 줄고, 더 좁으면 내려간다 */
 .subtabs.bar{align-items:stretch;background:#fff;border:1px solid var(--line);border-radius:12px;
   padding:0 12px;flex-wrap:nowrap;min-width:0}
-.subtabs.bar>:not(button){align-self:center}
+/* 탭 단추만 줄 높이를 다 쓰고(밑줄이 바닥에 닿게), 오른쪽의 작은 단추들은 가운데에 둔다 — 안 그러면 갈색 단추가 줄 높이만큼 늘어난다 */
+.subtabs.bar>:not(button),.subtabs.bar>button.mini,.subtabs.bar>button.btn{align-self:center}
 .subtabs.bar:has(+ .filt){border-radius:12px 12px 0 0}
 .subtabs.bar .cut{width:1px;height:18px;background:var(--line);flex:0 0 auto;margin:0 4px}
 .subtabs.bar .stat{font-size:12px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:0 1 auto}
@@ -420,6 +421,27 @@ table.list .chk,table.list #chkAll{width:15px;height:15px;cursor:pointer;accent-
   background:var(--brown-soft);border:1px solid var(--brown);border-radius:10px;
   padding:8px 13px;font-size:13px;color:var(--ink)}
 .picked .sp{flex:1}
+table.list .chk4,table.list .chk5,table.list .chkh{width:15px;height:15px;cursor:pointer;accent-color:var(--brown)}
+/* 📇 기업정보함에서 «여러 명» 들여오기 창 (2026-10-11) — 같은 옷에 찾는 줄·표·동의 줄만 더한다 */
+#friendbox h4 .sub{font-size:12px;font-weight:600;color:var(--sub)}
+#friendbox .qrow{display:flex;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line);
+  background:#fff;flex-wrap:wrap}
+#friendbox .qrow input[type=text]{flex:1 1 220px;max-width:320px;width:auto;padding:7px 10px;line-height:1.4}
+#friendbox .qrow .chips{margin:0}
+#friendbox .qrow .all{margin-left:auto;display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--sub);cursor:pointer}
+#friendbox input[type=checkbox]{width:15px;height:15px;padding:0;accent-color:var(--brown);flex:0 0 auto;cursor:pointer}
+/* 표의 한 칸은 «한 줄» — 넘치면 … 로 줄이고 전문은 title 에 (CLAUDE.md) */
+#friendbox table.fr{table-layout:fixed;width:100%;min-width:720px}
+#friendbox table.fr th,#friendbox table.fr td{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:7px 10px}
+#friendbox table.fr th.ck,#friendbox table.fr td.ck{padding-left:10px;padding-right:0}
+#friendbox tr.dim td{color:var(--faint);background:#faf9f7}
+#friendbox .cons{padding:10px 16px;border-top:1px solid var(--line);background:var(--paper);display:grid;gap:6px;font-size:13px}
+#friendbox .cons label{display:inline-flex;align-items:center;gap:7px;cursor:pointer}
+#friendbox .cons .f{display:none;align-items:center;gap:8px;flex-wrap:wrap;margin-left:8px}
+#friendbox .cons input[type=date],#friendbox .cons select{width:auto;padding:4px 8px;border:1px solid var(--line);border-radius:7px}
+#friendbox .cons .hint{font-size:12px;color:var(--sub)}
+/* 폰 — 16px 미만 입력칸은 아이폰이 화면을 키운다 */
+@media(max-width:700px){#friendbox input,#friendbox select{font-size:16px !important}}
 /* ══ 표 머리 틀고정 (대표 지시 2026-09-27 「캡쳐2 틀고정」) ══
    「🏢 사업장 114 …」 제목줄과 「☐ # 유형 회사 대표자 담당자」 머리줄을 «한 덩이(thead)»로
    묶어 붙인다. 114줄을 내려가면 어느 열이 대표자고 어느 열이 담당자인지 잃는다.
@@ -703,18 +725,18 @@ table.list tr:hover td{background:#fcfcfd}
 /* 📇 명함에서 담는 창 — 줄창(#rowbox)과 «같은 옷»을 입힌다. 두 창이 다르게 생기면
    같은 앱에서 온 것으로 안 보인다. 안쪽은 표라서 흰 바탕으로 둔다. */
 /* 🔍 비슷한 명함 창(#simbox, 2026-09-27)도 «같은 옷»이다 — 규칙을 둘로 베끼지 않고 함께 건다 */
-#cardbox,#simbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
-#cardbox.on,#simbox.on{display:flex;align-items:center;justify-content:center}
-#cardbox .in,#simbox .in{background:#fff;border-radius:14px;width:min(1000px,96vw);max-height:92vh;
+#cardbox,#simbox,#friendbox{position:fixed;inset:0;background:rgba(15,23,42,.6);display:none;z-index:82;padding:22px}
+#cardbox.on,#simbox.on,#friendbox.on{display:flex;align-items:center;justify-content:center}
+#cardbox .in,#simbox .in,#friendbox .in{background:#fff;border-radius:14px;width:min(1000px,96vw);max-height:92vh;
   display:flex;flex-direction:column;overflow:hidden}
-#cardbox .in h4,#simbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
+#cardbox .in h4,#simbox .in h4,#friendbox .in h4{font-size:15px;font-weight:800;padding:13px 16px;border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:8px;margin:0;background:var(--brown-soft);color:#4a3c2e}
-#cardbox .in h4 .sp,#simbox .in h4 .sp{flex:1}
-#cardbox .bd,#simbox .bd{overflow:auto;flex:1;min-height:0;padding:0}
-#cardbox .ft,#simbox .ft{display:flex;align-items:center;gap:8px;padding:11px 16px;
+#cardbox .in h4 .sp,#simbox .in h4 .sp,#friendbox .in h4 .sp{flex:1}
+#cardbox .bd,#simbox .bd,#friendbox .bd{overflow:auto;flex:1;min-height:0;padding:0}
+#cardbox .ft,#simbox .ft,#friendbox .ft{display:flex;align-items:center;gap:8px;padding:11px 16px;
   border-top:1px solid var(--line);background:var(--paper);flex-wrap:wrap}
-#cardbox .ft .sp,#simbox .ft .sp{flex:1}
-#cardbox .ft .hint,#simbox .ft .hint{font-size:12px;color:var(--sub)}
+#cardbox .ft .sp,#simbox .ft .sp,#friendbox .ft .sp{flex:1}
+#cardbox .ft .hint,#simbox .ft .hint,#friendbox .ft .hint{font-size:12px;color:var(--sub)}
 /* 찾는 말 줄 · 직접 넣기 줄 — 칸과 단추가 한 줄에 선다 */
 #simbox .qrow{display:flex;gap:8px;align-items:center;padding:11px 16px;
   border-bottom:1px solid var(--line);background:#fff;flex-wrap:wrap}
@@ -1099,6 +1121,33 @@ table.list tr:hover td{background:#fcfcfd}
   </div>
 </div></div>
 
+<!-- 📇 기업정보함에서 «여러 명» 들여오기 — 지인·잠재 (대표 지시 2026-10-11).
+     ⚠ 담기 직전에 서버를 다시 읽어 이미 있는 분은 덮지 않는다. 동의는 «받기 전»이 기본이다. -->
+<div id="friendbox"><div class="in">
+  <h4><span>기업정보함에서 가져오기</span><span class="sub" id="frSub"></span><span class="sp"></span>
+    <button class="mini" onclick="들여오기닫기()">닫기</button></h4>
+  <div class="qrow">
+    <input type="text" id="frQ" placeholder="⌕ 이름·회사·메일 주소로 찾기" oninput="들여오기찾기(this.value)" autocomplete="off">
+    <span class="chips"><span class="seg" id="frSeg"></span></span>
+    <label class="all" id="frAllWrap"></label>
+  </div>
+  <div class="bd" id="frB"></div>
+  <div class="cons">
+    <div><label><input type="checkbox" id="frCk" onchange="들여오기동의바뀜(this)"> 이 분들께 이미 수신 동의를 받았습니다</label>
+      <span class="f" id="frConsF">동의 받은 날 <input type="date" id="frDate" onchange="App.들여오기.동의날=this.value">
+        방법 <select id="frHow" onchange="App.들여오기.동의방법=this.value">
+          <option value="구두">구두</option><option value="메일">메일</option><option value="서면">서면</option>
+          <option value="문자·카톡">문자·카톡</option><option value="기타">기타</option></select></span></div>
+    <div class="hint">체크하지 않으면 「동의 받기 전」으로 담기고, 동의를 받으실 때까지 보내지 않습니다.</div>
+  </div>
+  <div class="ft">
+   <span class="hint" id="frHint"></span>
+   <span class="sp"></span>
+   <button class="btn" onclick="들여오기닫기()">그만두기</button>
+   <button class="btn pri" id="frGo" onclick="들여오기담기()">담기</button>
+  </div>
+</div></div>
+
 <div id="ilbox"><div class="in">
   <h4><span id="ilT">📥 공인노무사회 자료</span><span class="sp"></span>
     <button class="mini" onclick="노무사회읽기()">⟳ 다시 읽기</button>
@@ -1136,6 +1185,8 @@ var App = {
   더한분들: {},
   /* 「해지한 곳」 수신 동의 — newsletter/해지동의/{업체 id} (2026-10-11) */
   해지동의: {},
+  /* 지인·잠재 탭 (2026-10-11) — 상태 칩 · 찾는 말 · 고른 분(더한분 열쇠) · 기업정보함에서 들여오는 창 */
+  지인거르기: '', 지인찾기: '', 지인고름: {}, 들여오기: null,
   /* 기업정보함(pucards/idx) — 「받는 명단」 탭을 열 때 한 번만 읽는다(1.3MB).
      ⚠ null 은 «아직 안 읽었다»이고 {} 는 «읽었는데 비었다»다. 둘을 섞으면 영영 읽는다. */
   명함들: null, 명함읽는중: false, 명함후보캐시: null,
@@ -4582,46 +4633,59 @@ function 내보내기단추(){
    ★ 업체관리에 계약을 등록해 같은 주소가 «고객사»로 들어오면 「고객이 됨」만 표시한다 —
      명단다듬기가 앞의 줄(고객사)을 남기므로 두 통이 안 간다. 옮기는 손이 필요 없다.
    ★ 동의 받은 날부터 2년마다 다시 확인 (시행령 제62조의3) — 기한 30일 전부터 알린다. */
-function 지인화면(){
+/* 지인·잠재 줄들 — 상태를 «한 번» 셈한다. 표 · 거르개 · 일괄 처리가 같은 셈을 본다 (2026-10-11).
+   ⚠ 일괄 처리가 «다른 셈»을 보면 화면에 안 보이는 줄이 바뀐다 — 그래서 한 곳이다. */
+function 지인줄들(){
   const r = 명단셈();
   const 고객주소 = {};
   고객사줄들(r).forEach(function(x){ 고객주소[String(x.email||'').trim().toLowerCase()] = 1; });
   ((r.해지 || {}).줄들 || []).forEach(function(x){ 고객주소[String(x.email||'').trim().toLowerCase()] = 1; });
   const 막 = App.막은주소 || {};
-  const 오늘날 = 오늘();
-  const 열쇠들 = Object.keys(App.더한분들 || {}).filter(function(k){ return (App.더한분들[k]||{}).뺌 !== true; });
-  const 줄 = 열쇠들.map(function(k){
-    const x = App.더한분들[k] || {};
+  const 오늘날 = Core.서울오늘();
+  const 곧날 = Core.서울오늘(Date.now() + 30*864e5);
+  return Object.keys(App.더한분들 || {}).filter(function(k){
+    const x = App.더한분들[k];
+    return x && typeof x === 'object' && x.뺌 !== true;
+  }).map(function(k){
+    const x = App.더한분들[k];
     const e = String(x.주소||'').trim().toLowerCase();
     let 상태, 판;
     if(고객주소[e]){ 상태 = '고객'; 판 = '<span style="color:var(--brown);font-weight:700">고객이 됨</span> <span class="tg">고객사 줄로 갑니다</span>'; }
     else if(Core.막은주소인가(e, 막)){ 상태 = '거부'; 판 = '<span style="color:var(--bad);font-weight:700">수신거부</span>'; }
     else if(x.동의 === true){
-      const 기한 = x.동의날 ? (/^\d{4}-/.test(x.동의날) ? (+x.동의날.slice(0,4) + 2) + x.동의날.slice(4) : '') : '';
-      const 곧 = 기한 && 기한 <= new Date(Date.now() + 30*864e5).toISOString().slice(0,10);
+      /* 동의 받은 날부터 2년마다 다시 확인 — 시행령 제62조의3. 30일 전부터 알린다. */
+      const 기한 = Core.동의재확인일(x.동의날);
+      const 곧 = 기한 && 기한 <= 곧날;
       상태 = '동의';
       판 = '<span style="color:var(--ok);font-weight:700">✓ 동의</span> <span class="tg">'
         + esc(x.동의날 || '') + (x.동의방법 ? ' · ' + esc(x.동의방법) : '') + '</span>'
         + (곧 ? ' <span class="tg" style="color:var(--bad)" title="동의 받은 날부터 2년마다 다시 확인해야 합니다(시행령 제62조의3)">'
                + (기한 < 오늘날 ? '재확인 지남' : '재확인 ' + esc(기한)) + '</span>' : '');
     } else { 상태 = '대기'; 판 = '<span style="color:var(--warn,#b45309);font-weight:700">동의 받기 전</span> <span class="tg">안 보냅니다</span>'; }
-    return { k: k, x: x, 상태: 상태, 판: 판 };
+    return { k: k, x: x, 상태: 상태, 판: 판,
+             찾는글: [x.이름, x.소속, x.직책, x.주소].join(' ').toLowerCase() };
   });
-  const 셈 = { 동의: 0, 대기: 0, 고객: 0, 거부: 0 };
-  줄.forEach(function(v){ 셈[v.상태]++; });
-  const 고름 = App.지인거르기 || '';
-  const 보일 = 줄.filter(function(v){ return !고름 || v.상태 === 고름; })
-    .sort(function(a,b){ return String(b.x.담은날||'').localeCompare(String(a.x.담은날||'')); });
-  const 칩 = function(k, 이름){
-    return '<button class="chip' + (고름 === k ? ' on' : '') + '" onclick="App.지인거르기=\'' + k + '\';render()">'
-      + 이름 + (k ? ' ' + 셈[k] : '') + '</button>';
-  };
-  const 표 = 보일.map(function(v, i){
+}
+/* 칩(상태)과 찾는 말로 거른다 — 최근에 담은 분이 위로 */
+function 지인거른것(줄){
+  const 상태 = App.지인거르기 || '';
+  const 조각 = String(App.지인찾기 || '').trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return 줄.filter(function(v){
+    if(상태 && v.상태 !== 상태) return false;
+    for(let i = 0; i < 조각.length; i++){ if(v.찾는글.indexOf(조각[i]) < 0) return false; }
+    return true;
+  }).sort(function(a, b){ return String(b.x.담은날||'').localeCompare(String(a.x.담은날||'')); });
+}
+/* 표의 한 줄은 «한 줄» — 칸마다 줄바꿈 없이 (CLAUDE.md 표의 한 칸은 한 줄) */
+function 지인표줄(보일){
+  return 보일.map(function(v, i){
     const x = v.x;
-    return '<tr><td class="n">' + (i+1) + '</td>'
-      + '<td><b>' + esc(x.이름 || '—') + '</b>' + (x.직책 ? ' <span class="tg">' + esc(x.직책) + '</span>' : '') + '</td>'
-      + '<td>' + esc(x.소속 || '—') + '</td>'
-      + '<td><span class="mail" title="' + esc(x.주소||'') + '">' + esc(x.주소||'') + '</span></td>'
+    return '<tr><td class="ck"><input type="checkbox" class="chk4" value="' + esc(v.k) + '"'
+      + (App.지인고름[v.k] ? ' checked' : '') + ' onchange="지인고름바뀜(this)"></td>'
+      + '<td class="n">' + (i+1) + '</td>'
+      + '<td style="white-space:nowrap"><b>' + esc(x.이름 || '—') + '</b>' + (x.직책 ? ' <span class="tg">' + esc(x.직책) + '</span>' : '') + '</td>'
+      + '<td style="white-space:nowrap">' + esc(x.소속 || '—') + '</td>'
+      + '<td style="white-space:nowrap"><span class="mail" title="' + esc(x.주소||'') + '">' + esc(x.주소||'') + '</span></td>'
       + '<td class="tel">' + esc(x.담은날 || '') + '</td>'
       + '<td style="white-space:nowrap">' + v.판 + '</td>'
       + '<td style="text-align:right;white-space:nowrap">'
@@ -4629,20 +4693,377 @@ function 지인화면(){
           + (x.동의 === true ? '동의 취소' : '동의 받음') + '</button> ')
       + '<button class="mini" onclick="더한분빼기(\'' + esc(v.k) + '\')" title="명단에서 뺍니다">✕</button></td></tr>';
   }).join('');
-  const 머리도움 = 오른도움('사업장에 딸리지 않은 분(지인·잠재 고객)을 손으로 담는 자리입니다.<br>'
+}
+function 지인화면(){
+  const 줄 = 지인줄들();
+  const 셈 = { 동의: 0, 대기: 0, 고객: 0, 거부: 0 };
+  줄.forEach(function(v){ 셈[v.상태]++; });
+  const 거 = App.지인거르기 || '';
+  const 보일 = 지인거른것(줄);
+  const 골랐수 = 보일.filter(function(v){ return App.지인고름[v.k]; }).length;
+  const 칩 = function(k, 이름){
+    return '<button class="chip' + (거 === k ? ' on' : '') + '" onclick="App.지인거르기=\'' + k + '\';render()">'
+      + 이름 + (k ? ' ' + 셈[k] : '') + '</button>';
+  };
+  const 머리도움 = 오른도움('사업장에 딸리지 않은 분(지인·잠재 고객)을 담는 자리입니다 — <b>기업정보함에서 여러 명을 한꺼번에</b> 가져오거나 한 사람씩 적어 넣습니다.<br>'
     + '<b>동의를 받은 분에게만</b> 갑니다 — 거래관계 밖이라 명시적 사전 동의가 필요합니다(정보통신망법 제50조 제1항).<br>'
     + '동의 받은 날부터 <b>2년마다</b> 다시 확인해야 합니다(시행령 제62조의3) — 30일 전부터 빨갛게 알립니다.<br>'
+    + '표 왼쪽 칸으로 여러 명을 골라 <b>한꺼번에 동의 받음·빼기</b>를 할 수 있습니다(보이는 줄만 바뀝니다).<br>'
     + '업체관리에 계약을 등록하시면 같은 주소가 고객사 명단으로 들어가고, 여기엔 <b>고객이 됨</b>만 남습니다.<br>'
     + '여기만 «사본»입니다 — 손으로 빼야 빠집니다. 기업정보함 ⋯ 메뉴의 「뉴스레터 명단에 넣기」도 이리로 옵니다.');
   return `
   ${작은탭('동의 ' + 셈.동의 + '명에게 갑니다 · 대기 ' + 셈.대기 + ' · 고객이 됨 ' + 셈.고객,
-    머리도움 + '<button class="mini" onclick="더한분넣기()">＋ 한 사람 넣기</button>')}
-  <div class="chips tight filt"><span class="seg">${칩('', '전체')}${칩('동의', '동의함')}${칩('대기', '동의 받기 전')}${칩('고객', '고객이 됨')}${셈.거부 ? 칩('거부', '수신거부') : ''}</span></div>
+    머리도움 + '<button class="mini on" onclick="들여오기열기()" title="기업정보함 명함에서 여러 명을 골라 담습니다">기업정보함에서 가져오기</button>'
+    + '<button class="mini" onclick="더한분넣기()">＋ 한 사람 넣기</button>')}
+  <div class="chips tight filt"><span class="seg">${칩('', '전체')}${칩('동의', '동의함')}${칩('대기', '동의 받기 전')}${칩('고객', '고객이 됨')}${셈.거부 ? 칩('거부', '수신거부') : ''}</span>
+    <input type="text" class="nafind" id="jnFind" value="${esc(App.지인찾기 || '')}" placeholder="⌕ 이름·소속·주소 찾기" oninput="지인찾기(this.value)" autocomplete="off">
+    <span class="sp1"></span><span class="k" id="jnFindCnt">${String(App.지인찾기 || '').trim() ? '검색 결과 ' + 보일.length + '명' : ''}</span></div>
+  <div class="picked" id="jnBar" style="display:${골랐수 ? 'flex' : 'none'}">
+    <b id="jnBarN">${골랐수}명</b> 골랐습니다
+    <span class="sp"></span>
+    <button class="mini" onclick="지인동의일괄()">고른 분 동의 받음</button>
+    <button class="mini" onclick="지인빼기일괄()">고른 분 빼기</button>
+    <button class="mini" onclick="지인고름지우기()">✕ 선택 풀기</button>
+  </div>
   <div class="whorest">
-  ${줄.length ? `<div class="box"><table class="list"><tr><th class="n">#</th><th>이름</th><th>소속</th><th>보낼 주소</th><th class="tel">담은 날</th><th>동의</th><th></th></tr>${표}</table></div>`
-    : `<div class="note"><b>아직 담은 분이 없습니다.</b> 오른쪽 위 <b>＋ 한 사람 넣기</b>로 담으시고, 동의를 받으시면 <b>동의 받음</b>을 눌러 주세요.</div>`}
+  ${줄.length ? `<div class="box"><table class="list"><thead><tr><th class="ck"><input type="checkbox" class="chkh" onchange="지인전체선택(this)" title="이 표에 보이는 것 모두"></th><th class="n">#</th><th>이름</th><th>소속</th><th>보낼 주소</th><th class="tel">담은 날</th><th>동의</th><th></th></tr></thead><tbody id="jnBody">${지인표줄(보일)}</tbody></table></div>`
+    : `<div class="note"><b>아직 담은 분이 없습니다.</b> 오른쪽 위 <b>기업정보함에서 가져오기</b>로 여러 명을 한꺼번에 담으시거나 <b>＋ 한 사람 넣기</b>로 직접 적으세요.
+       담은 뒤 동의를 받으시면 <b>동의 받음</b>을 눌러 주세요 — 동의를 받은 분에게만 갑니다.</div>`}
   </div>`;
 }
+/* 찾는 말 — 표 몸통만 바꾼다(render 를 부르면 입력칸이 포커스를 잃는다) */
+function 지인찾기(v){
+  App.지인찾기 = String(v || '');
+  const 보일 = 지인거른것(지인줄들());
+  const b = $('jnBody'); if(b) b.innerHTML = 지인표줄(보일);
+  const c = $('jnFindCnt'); if(c) c.textContent = App.지인찾기.trim() ? '검색 결과 ' + 보일.length + '명' : '';
+  const h = document.querySelector('.chkh'); if(h) h.checked = false;
+  지인띠고치기();
+}
+function 지인고름바뀜(el){
+  const k = String(el && el.value || '');
+  if(!k) return;
+  if(el.checked) App.지인고름[k] = 1; else delete App.지인고름[k];
+  지인띠고치기();
+}
+/* 이 표에 «보이는 줄» 모두 — 찾는 말·칩으로 걸러진 것만이다 */
+function 지인전체선택(el){
+  const 안 = (el && el.closest) ? (el.closest('table') || document) : document;
+  안.querySelectorAll('.chk4').forEach(function(c){
+    c.checked = !!el.checked;
+    const k = String(c.value || '');
+    if(!k) return;
+    if(el.checked) App.지인고름[k] = 1; else delete App.지인고름[k];
+  });
+  지인띠고치기();
+}
+function 지인고름지우기(){ App.지인고름 = {}; render(); }
+/* 골라 둔 것 가운데 «지금 보이는 줄»만 — 걸러져 안 보이는 줄은 일괄 처리에서 빠진다.
+   ⚠ 안 보이는데 바뀌면 「왜 저 사람이 빠졌지」가 된다. */
+function 지인보이는고름(){
+  return 지인거른것(지인줄들()).filter(function(v){ return App.지인고름[v.k]; });
+}
+/* 띠만 고친다 — 띠를 늘 그려 두고 «보이고 숨기기»만 한다(다시 그리면 찾는 칸이 포커스를 잃는다) */
+function 지인띠고치기(){
+  const n = 지인보이는고름().length;
+  const 띠 = $('jnBar'); if(!띠) return;
+  띠.style.display = n ? 'flex' : 'none';
+  const b = $('jnBarN'); if(b) b.textContent = n + '명';
+}
+/* 고른 분 «한꺼번에» 동의 받음 — 건수를 묻고 한 번에 저장한다 (CLAUDE.md 일괄 처리) */
+async function 지인동의일괄(){
+  const 골 = 지인보이는고름();
+  if(!골.length) return toast('고른 분이 없습니다');
+  const 대상 = 골.filter(function(v){ return v.상태 === '대기'; });
+  const 건너뜀 = 골.length - 대상.length;
+  if(!대상.length) return toast('고른 분은 이미 동의를 받았거나 고객사로 받는 분이라 바꿀 것이 없습니다');
+  const 방법글 = window.prompt('어떻게 동의를 받으셨나요? (구두·메일·서면 등)', '구두');
+  if(방법글 == null) return;
+  const 방법 = String(방법글).trim().slice(0, 40);
+  const 날 = Core.서울오늘();
+  const 틀 = Core.동의기록점검(날, 방법);
+  if(틀) return toast(틀, 6000);
+  if(!window.confirm(대상.length + '명께 ' + 날 + ' 「' + 방법 + '」으로 수신 동의를 받았다고 기록합니다.'
+      + (건너뜀 ? '\n(이미 동의했거나 고객사로 받는 ' + 건너뜀 + '명은 그대로 둡니다)' : '') + '\n\n맞습니까?')) return;
+  const 갱신 = {};
+  대상.forEach(function(v){
+    갱신[v.k + '/동의'] = true; 갱신[v.k + '/동의날'] = 날; 갱신[v.k + '/동의방법'] = 방법;
+  });
+  try{
+    await db.ref('newsletter/더한분들').update(갱신);
+    대상.forEach(function(v){ Object.assign(App.더한분들[v.k], { 동의: true, 동의날: 날, 동의방법: 방법 }); });
+    App.지인고름 = {};
+    render();
+    toast(대상.length + '명의 동의를 기록했습니다 — 다음 회차부터 갑니다', 6000);
+  }catch(e){ toast('기록하지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+/* 고른 분 «한꺼번에» 빼기 — 되돌릴 수 없어 건수를 묻는다 */
+async function 지인빼기일괄(){
+  const 대상 = 지인보이는고름();
+  if(!대상.length) return toast('고른 분이 없습니다');
+  if(!window.confirm(대상.length + '명을 지인·잠재 명단에서 뺍니다.\n뺀 분은 되돌릴 수 없고, 다시 담으셔야 합니다.\n\n빼실까요?')) return;
+  const 갱신 = {};
+  대상.forEach(function(v){ 갱신[v.k] = null; });
+  try{
+    await db.ref('newsletter/더한분들').update(갱신);
+    대상.forEach(function(v){ delete App.더한분들[v.k]; });
+    App.지인고름 = {};
+    render();
+    toast(대상.length + '명을 뺐습니다', 5000);
+  }catch(e){ toast('빼지 못했습니다: ' + ((e&&e.message)||''), 7000); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   📇 기업정보함에서 «여러 명» 들여오기 — 지인·잠재 (대표 지시 2026-10-11
+   「지인잠재을 가지고 오려고 하면 기업정보함에서 가지고 올수 있게 해라 그리고 한번에
+    여러명 가지고 올수 있게 해야한다」 → 목업 → 「추천대로」)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 4천 명 넘게 있는 목록이라 «찾아서 고르는» 창이다 — 찾는 말을 바꿔도 고른 분은 남고,
+     「고른 분」 칩으로 모아 볼 수 있다.
+   ★ 이미 고객사로 받는 분 · 이미 담은 분 · 수신거부는 흐리게 두고 못 고른다.
+   ★ 한 번에 300명까지(Core.지인한번에한도) — 실수로 수천 명을 담으면 빼는 일이 한 명씩이다.
+   ★ 담기 직전에 서버를 «다시» 읽어 이미 있는 열쇠·주소는 건드리지 않는다 — 덮으면 받아 둔
+     동의 표시가 「받기 전」으로 되돌아간다.
+   ★ 기본은 「동의 받기 전」(안 보냄). 이미 동의를 받은 분들이면 날짜·방법을 함께 기록한다. */
+function 들여오기새것(){
+  return { 열림: false, 말: '', 거르개: '새', 고름: {}, 보일수: 100, 동의함: false,
+           동의날: Core.서울오늘(), 동의방법: '구두', 후보: null, 카드수: 0, 쓰는중: false };
+}
+function 들여오기열기(){
+  if(!App.들여오기) App.들여오기 = 들여오기새것();
+  const g = App.들여오기;
+  g.열림 = true;
+  명함읽기();
+  들여오기후보다시셈();
+  $('friendbox').classList.add('on');
+  $('frQ').value = g.말;
+  들여오기그리기();
+  setTimeout(function(){ const q = $('frQ'); if(q && q.focus) q.focus(); }, 0);
+}
+/* 닫아도 고른 분은 남는다 — 실수로 닫아도 처음부터 다시 고르지 않게 */
+function 들여오기닫기(){
+  const g = App.들여오기; if(!g || g.쓰는중) return;
+  g.열림 = false;
+  $('friendbox').classList.remove('on');
+}
+function 들여오기후보다시셈(){
+  const g = App.들여오기; if(!g) return;
+  if(!App.명함들){ g.후보 = null; g.카드수 = 0; return; }
+  const r = 명단셈();
+  const 받는 = {};
+  (r.전체 || []).forEach(function(x){
+    if(x.누구 !== '더한분') 받는[String(x.email || '').trim().toLowerCase()] = 1;
+  });
+  g.후보 = Core.지인후보(App.명함들, { 받는주소: 받는, 담은: App.더한분들, 막은주소: App.막은주소 });
+  g.카드수 = Object.keys(App.명함들).filter(function(k){ const x = App.명함들[k]; return x && x.k === 'card'; }).length;
+  /* 그사이 다른 길로 담겼거나 수신거부가 된 분은 고른 것에서 뺀다 */
+  const 맵 = {};
+  g.후보.줄들.forEach(function(줄){ 맵[줄.열쇠] = 줄; });
+  Object.keys(g.고름).forEach(function(k){ if(!맵[k] || 맵[k].상태 !== '새') delete g.고름[k]; });
+}
+function 들여오기거른것(){
+  const g = App.들여오기;
+  return (g && g.후보) ? Core.지인후보거르기(g.후보.줄들, { 거르개: g.거르개, 말: g.말, 고름: g.고름 }) : [];
+}
+function 들여오기그리기(){
+  const g = App.들여오기; if(!g || !g.열림) return;
+  들여오기표그리기();
+  들여오기곁그리기();
+}
+function 들여오기표그리기(){
+  const g = App.들여오기; const b = $('frB'); if(!b) return;
+  if(!g.후보){
+    b.innerHTML = '<div class="note" style="margin:14px 16px">기업정보함 명함을 읽는 중입니다…</div>';
+    return;
+  }
+  const 거름 = 들여오기거른것();
+  if(!거름.length){
+    b.innerHTML = '<div class="note" style="margin:14px 16px">'
+      + (g.거르개 === '고름' ? '아직 고른 분이 없습니다.'
+        : g.후보.줄들.length ? '찾는 분이 없습니다 — 이름·회사·주소의 일부만 넣어 보세요. 이미 담겼거나 보낼 수 없는 분은 위 「이미 있음」에서 보입니다.'
+        : '메일 주소가 적힌 명함이 없습니다.') + '</div>';
+    return;
+  }
+  const 빈 = '<span style="color:var(--faint)">—</span>';
+  const 칸 = function(v){ const t = String(v == null ? '' : v); return t ? esc(t) : 빈; };
+  const 사유 = { 고객: '고객사로 받는 중', 담음: '이미 담음', 거부: '수신거부' };
+  const 보임 = 거름.slice(0, g.보일수);
+  const 줄들 = 보임.map(function(줄, i){
+    const 못 = 줄.상태 !== '새';
+    return '<tr' + (못 ? ' class="dim"' : '') + '><td class="ck"><input type="checkbox" class="chk5" value="' + esc(줄.열쇠) + '"'
+      + (g.고름[줄.열쇠] ? ' checked' : '') + (못 ? ' disabled' : '') + ' onchange="들여오기고름(this)"></td>'
+      + '<td class="n">' + (i + 1) + '</td>'
+      + '<td title="' + esc(줄.이름) + '"><b>' + 칸(줄.이름) + '</b></td>'
+      + '<td title="' + esc(줄.소속) + '">' + 칸(줄.소속) + '</td>'
+      + '<td title="' + esc(줄.직책) + '">' + 칸(줄.직책) + '</td>'
+      + '<td title="' + esc(줄.주소) + '">' + esc(줄.주소) + '</td>'
+      + '<td>' + (사유[줄.상태] ? '<span class="tg">' + 사유[줄.상태] + '</span>'
+          : (줄.같은주소수 > 1 ? '<span class="tg" title="같은 주소가 적힌 명함이 여러 장입니다 — 한 줄로 모았습니다">같은 주소 ' + 줄.같은주소수 + '장</span>' : '')) + '</td></tr>';
+  }).join('');
+  const 더 = 거름.length > 보임.length
+    ? '<div style="text-align:center;padding:10px"><button class="mini" onclick="들여오기더보기()">더 보기 (남은 '
+      + (거름.length - 보임.length).toLocaleString() + '명)</button></div>' : '';
+  b.innerHTML = '<table class="list fz fr"><colgroup><col style="width:34px"><col style="width:46px"><col style="width:100px">'
+    + '<col style="width:180px"><col style="width:90px"><col><col style="width:140px"></colgroup>'
+    + '<thead><tr><th class="ck"></th><th class="n">#</th><th>이름</th><th>회사</th><th>직책</th><th>메일 주소</th><th>상태</th></tr></thead>'
+    + '<tbody>' + 줄들 + '</tbody></table>' + 더;
+}
+/* 표 밖의 것들 — 칩 숫자 · 모두 고르기 · 아래 줄. 표를 다시 그리지 않고 고친다. */
+function 들여오기곁그리기(){
+  const g = App.들여오기; if(!g) return;
+  const 후 = g.후보;
+  const 고른수 = Object.keys(g.고름).length;
+  const sub = $('frSub');
+  if(sub) sub.textContent = 후 ? '명함 ' + g.카드수.toLocaleString() + '장 중 메일 주소가 있는 분 ' + 후.셈.전체.toLocaleString() + '명' : '';
+  const seg = $('frSeg');
+  if(seg){
+    const 셈 = 후 ? 후.셈 : { 새: 0, 고객: 0, 담음: 0, 거부: 0 };
+    const 칩 = function(k, 글){
+      return '<button class="chip' + (g.거르개 === k ? ' on' : '') + '" onclick="들여오기거르개(\'' + k + '\')">' + 글 + '</button>';
+    };
+    seg.innerHTML = 칩('새', '새 분 ' + 셈.새.toLocaleString())
+      + 칩('이미', '이미 있음 ' + (셈.고객 + 셈.담음 + 셈.거부).toLocaleString())
+      + 칩('고름', '고른 분 ' + 고른수.toLocaleString());
+  }
+  const all = $('frAllWrap');
+  if(all){
+    const 선택 = 들여오기거른것().filter(function(x){ return x.상태 === '새'; });
+    const 이름 = g.말.trim() ? '검색 결과 ' : '목록 ';
+    if(!후 || !선택.length) all.innerHTML = '';
+    else if(선택.length > Core.지인한번에한도){
+      all.innerHTML = '<input type="checkbox" disabled><span>' + 이름 + 선택.length.toLocaleString() + '명 — '
+        + Core.지인한번에한도 + '명 이하로 좁히면 모두 고를 수 있습니다</span>';
+    } else {
+      all.innerHTML = '<input type="checkbox" onchange="들여오기모두(this)"'
+        + (선택.every(function(x){ return g.고름[x.열쇠]; }) ? ' checked' : '') + '><span>' + 이름 + 선택.length.toLocaleString() + '명 모두 고르기</span>';
+    }
+  }
+  const 힌트 = $('frHint'); if(힌트) 힌트.textContent = 고른수 + '명 골랐습니다 · 한 번에 ' + Core.지인한번에한도 + '명까지';
+  const go = $('frGo');
+  if(go) go.textContent = g.쓰는중 ? '담는 중…' : (고른수 ? 고른수 + '명 담기' : '담기') + (고른수 && g.동의함 ? ' (동의 기록)' : '');
+  const ck = $('frCk'); if(ck) ck.checked = !!g.동의함;
+  const f = $('frConsF'); if(f) f.style.display = g.동의함 ? 'inline-flex' : 'none';
+  const d = $('frDate'); if(d){ d.value = g.동의날; d.max = Core.서울오늘(); }
+  const h = $('frHow'); if(h) h.value = g.동의방법;
+}
+let 들여오기시계 = 0;
+function 들여오기찾기(v){
+  const g = App.들여오기; if(!g) return;
+  g.말 = String(v || '');
+  g.보일수 = 100;
+  clearTimeout(들여오기시계);
+  들여오기시계 = setTimeout(들여오기그리기, 120);
+}
+function 들여오기거르개(k){
+  const g = App.들여오기; if(!g) return;
+  g.거르개 = (g.거르개 === k && k !== '새') ? '새' : k;
+  g.보일수 = 100;
+  들여오기그리기();
+}
+function 들여오기더보기(){
+  const g = App.들여오기; if(!g) return;
+  g.보일수 += 100;
+  들여오기표그리기();
+}
+function 들여오기고름(el){
+  const g = App.들여오기; if(!g) return;
+  const k = String(el && el.value || '');
+  if(!k) return;
+  if(el.checked){
+    if(Object.keys(g.고름).length >= Core.지인한번에한도){
+      el.checked = false;
+      return toast('한 번에 ' + Core.지인한번에한도 + '명까지 담을 수 있습니다 — 이번에 담고 다시 가져오세요');
+    }
+    g.고름[k] = 1;
+  } else delete g.고름[k];
+  들여오기곁그리기();
+}
+/* 걸러진 «담을 수 있는 분» 모두 — 한도를 넘으면 못 고른다(검색으로 좁히게) */
+function 들여오기모두(el){
+  const g = App.들여오기; if(!g || !g.후보) return;
+  const 선택 = 들여오기거른것().filter(function(x){ return x.상태 === '새'; });
+  if(el.checked){
+    const 새로 = 선택.filter(function(x){ return !g.고름[x.열쇠]; });
+    if(Object.keys(g.고름).length + 새로.length > Core.지인한번에한도){
+      el.checked = false;
+      return toast('한 번에 ' + Core.지인한번에한도 + '명까지 담을 수 있습니다 — 검색으로 좁혀 주십시오');
+    }
+    선택.forEach(function(x){ g.고름[x.열쇠] = 1; });
+  } else 선택.forEach(function(x){ delete g.고름[x.열쇠]; });
+  들여오기그리기();
+}
+function 들여오기동의바뀜(el){
+  const g = App.들여오기; if(!g) return;
+  g.동의함 = !!el.checked;
+  들여오기곁그리기();
+}
+async function 들여오기담기(){
+  const g = App.들여오기; if(!g || g.쓰는중) return;
+  const 열쇠들 = Object.keys(g.고름);
+  if(!열쇠들.length) return toast('담을 분을 먼저 고르십시오');
+  if(열쇠들.length > Core.지인한번에한도) return toast('한 번에 ' + Core.지인한번에한도 + '명까지 담을 수 있습니다');
+  if(g.동의함){
+    const 틀 = Core.동의기록점검(g.동의날, g.동의방법);
+    if(틀) return toast(틀, 6000);
+  }
+  const 맵 = {};
+  ((g.후보 && g.후보.줄들) || []).forEach(function(줄){ 맵[줄.열쇠] = 줄; });
+  const 고른줄 = 열쇠들.map(function(k){ return 맵[k]; }).filter(function(x){ return x && x.상태 === '새'; });
+  if(!고른줄.length) return toast('고른 분이 이미 담겼거나 보낼 수 없는 분입니다');
+  /* 건수를 묻는다 — 동의를 «받았다고 적는» 일이거나 많이 담을 때 (CLAUDE.md 일괄 처리) */
+  if(g.동의함 || 고른줄.length > 30){
+    const 말 = 고른줄.length + '명을 지인·잠재에 담습니다.\n\n'
+      + (g.동의함 ? g.동의날 + ' 「' + g.동의방법 + '」으로 수신 동의를 «받았다고 기록»합니다. 맞습니까?'
+                  : '동의를 받기 전이라, 동의를 받으실 때까지 보내지 않습니다.');
+    if(!window.confirm(말)) return;
+  }
+  g.쓰는중 = true;
+  들여오기곁그리기();
+  try{
+    /* ★ 담기 직전에 서버를 «다시» 읽는다 — 다른 창·기업정보함에서 그사이 담았거나 동의를 받아 둔 분을 덮지 않는다 */
+    const 서버 = (await db.ref('newsletter/더한분들').once('value')).val() || {};
+    const 이미열쇠 = {}, 이미주소 = {};
+    Object.keys(서버).forEach(function(k){
+      const v = 서버[k];
+      if(!v || typeof v !== 'object' || v.뺌 === true) return;
+      이미열쇠[k] = 1;
+      const e = String(v.주소 || '').trim().toLowerCase();
+      if(e) 이미주소[e] = 1;
+    });
+    const 묶음 = {};
+    let 건너뜀 = 0;
+    고른줄.forEach(function(줄){
+      if(이미열쇠[줄.열쇠] || 이미주소[줄.주소]){ 건너뜀++; return; }
+      묶음[줄.열쇠] = Core.지인담을값(줄, { 담은이: (App.me && App.me.email) || '', 동의: g.동의함,
+        동의날: g.동의날, 동의방법: g.동의방법 });
+    });
+    const 담은수 = Object.keys(묶음).length;
+    if(담은수) await db.ref('newsletter/더한분들').update(묶음);
+    App.더한분들 = Object.assign({}, 서버, 묶음);
+    g.쓰는중 = false;
+    if(!담은수){
+      g.고름 = {};
+      들여오기후보다시셈();
+      들여오기그리기();
+      return toast('고른 분이 모두 이미 담겨 있어 그대로 두었습니다');
+    }
+    const 동의했나 = g.동의함;
+    const 날 = g.동의날, 방법 = g.동의방법;
+    App.들여오기 = 들여오기새것();          /* 다 담았으니 처음 상태로 */
+    $('friendbox').classList.remove('on');
+    render();
+    toast(담은수 + '명을 지인·잠재에 담았습니다 — '
+      + (동의했나 ? 날 + ' ' + 방법 + ' 동의로 기록했습니다' : '동의 받기 전이라 동의를 받으시면 갑니다')
+      + (건너뜀 ? ' · 이미 있던 ' + 건너뜀 + '명은 그대로 두었습니다' : ''), 8000);
+  }catch(e){
+    g.쓰는중 = false;
+    들여오기곁그리기();
+    toast('담지 못했습니다: ' + ((e&&e.message)||''), 8000);
+  }
+}
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && App.들여오기 && App.들여오기.열림) 들여오기닫기();
+});
 
 /* ══════════════════════════════════════════════════════════════════════════
    해지한 곳 — 업체관리 status=closed (대표 지시 2026-10-11 「계약해지하면 별도로 관리」)
@@ -4706,7 +5127,7 @@ async function 해지동의바꾸기(id){
     } else {
       const 방법 = window.prompt('어떻게 동의를 받으셨나요? (구두·메일·서면 등)', '구두');
       if(방법 == null) return;
-      const 값 = { 동의: true, 동의날: 오늘(), 방법: String(방법).trim().slice(0, 40),
+      const 값 = { 동의: true, 동의날: Core.서울오늘(), 방법: String(방법).trim().slice(0, 40),
                    누가: (App.me && App.me.email) || '' };
       await db.ref('newsletter/해지동의/' + id).set(값);
       App.해지동의[id] = 값;
@@ -5405,7 +5826,12 @@ function 명함읽기(){
     App.명함읽는중 = false;
     App.명함후보캐시 = null;
     if(App.tab === 'who' || App.tab === 'noaddr') render();
-  }).catch(function(){ App.명함들 = {}; App.명함읽는중 = false; });
+    /* 지인·잠재 «들여오기» 창이 열려 있으면 읽자마자 보여 준다 (2026-10-11) */
+    if(App.들여오기 && App.들여오기.열림){ 들여오기후보다시셈(); 들여오기그리기(); }
+  }).catch(function(){
+    App.명함들 = {}; App.명함읽는중 = false;
+    if(App.들여오기 && App.들여오기.열림){ 들여오기후보다시셈(); 들여오기그리기(); }
+  });
 }
 /* 후보를 한 번만 셈해 둔다 — 표를 다시 그릴 때마다 명함 6,669장을 훑지 않게 */
 function 명함후보(){
@@ -5605,8 +6031,8 @@ async function 더한분동의(열쇠){
     방법 = String(방법).trim().slice(0, 40);
   }
   try{
-    await db.ref('newsletter/더한분들/' + 열쇠).update({ 동의: 새것, 동의날: 새것 ? 오늘() : '', 동의방법: 방법 });
-    x.동의 = 새것; x.동의날 = 새것 ? 오늘() : ''; x.동의방법 = 방법;
+    await db.ref('newsletter/더한분들/' + 열쇠).update({ 동의: 새것, 동의날: 새것 ? Core.서울오늘() : '', 동의방법: 방법 });
+    x.동의 = 새것; x.동의날 = 새것 ? Core.서울오늘() : ''; x.동의방법 = 방법;
     render();
   }catch(e){ toast('고치지 못했습니다: ' + ((e&&e.message)||''), 7000); }
 }
