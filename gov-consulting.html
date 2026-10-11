@@ -1332,10 +1332,10 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <script src="js/pu-hwpx-fill.js?v=6"></script>
   <script src="js/pu-hwp-engine.js?v=21"></script>
   <script src="js/pu-hwp-preview.js?v=2"></script>
-  <script src="js/pu-gov-report.js?v=4"></script>
+  <script src="js/pu-gov-report.js?v=5"></script>
   <script src="js/pu-gov-report-build.js?v=5"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
-  <script src="js/pu-gov-report-ai.js?v=3"></script>
+  <script src="js/pu-gov-report-ai.js?v=4"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
   <!-- 회사 열쇠(사업자번호) — 보고서 창이 기업정보함 메일·보낸 자료를 그 열쇠로만 찾는다 -->
   <script src="js/pu-cokey.js?v=1"></script>
@@ -7602,7 +7602,7 @@ function grpRenderForms(){
             const ys=Object.keys(got).filter(function(y){ return got[y]; }).sort().reverse();
             const id=fk+'__'+fl;
             return `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:4px 0;font-size:12px;">
-              <span style="min-width:110px;font-weight:700;">${escAttr(GRP_FILE_KO[fl]||fl)}</span>
+              <span style="min-width:110px;font-weight:700;">${escAttr((f.files[fl]||{}).label||GRP_FILE_KO[fl]||fl)}</span>
               <span style="flex:1;min-width:120px;">${ys.length?ys.map(function(y){ return `<span class="att-label" style="background:var(--ok);" title="${escAttr((got[y].name||'')+' · '+(got[y].size||0)+'바이트')}">${escAttr(y)}</span>`; }).join(' '):'<span style="color:var(--t2);">등록된 양식 없음</span>'}</span>
               <input type="number" id="rfYr_${escAttr(id)}" value="${escAttr(yNow)}" min="2020" max="2100" style="width:70px;font-size:12px;padding:3px 5px;">
               <button type="button" class="btn btn-s" style="font-size:11px;padding:3px 10px;" onclick="grpPickForm('${escAttr(fk)}','${escAttr(fl)}')">등록</button>
@@ -8040,6 +8040,8 @@ function grpFileName(agency,formName,coName,state){
 }
 function grpFileLabel(fk,fileKey){
   const f=((typeof PuGovReport!=='undefined'&&PuGovReport.FORMS)||{})[fk]||{};
+  const own=String(((f.files||{})[fileKey]||{}).label||'');      // 양식이 파일 이름을 따로 정해 둔 것(현장클리닉: 별지14·별지11)
+  if(own) return own;
   return fileKey==='main'?String(f.name||fk):String(GRP_FILE_KO[fileKey]||fileKey);
 }
 /* 서고에 그 해(또는 그 이전) 양식이 있는가 — 색인만 읽는다(본문 b64 는 크다) */
@@ -8491,10 +8493,10 @@ function grpRenderTop(){
   const f=FORMS[st.formKey]||{};
   const can=grpCanConfirm(getCos().find(function(c){ return c.id===st.coId; }));
   const dls=Object.keys(f.files||{}).map(function(k){
-    const lb=grpFileLabel(st.formKey,k), short=k==='main'?'HWPX':lb;
+    const lb=grpFileLabel(st.formKey,k), solo=k==='main'&&Object.keys(f.files||{}).length===1, short=solo?'HWPX':lb;
     if(st.tpl[k]===null) return `<span class="grp-miss">양식 서고에 ${escAttr(lb)} 양식이 없습니다</span>`;
     return `<button type="button" class="btn btn-s grp-b" data-grp-act="dl" data-arg="${escAttr(k)}" title="${escAttr(lb)} — 양식 서고 빈 양식에 지금 화면 값을 채워 내려받습니다">⬇ ${escAttr(short)}</button>
-      <button type="button" class="btn btn-s grp-b" data-grp-act="preview" data-arg="${escAttr(k)}"${st.pvBusy?' disabled':''} title="${escAttr(lb)} — 같은 양식에 지금 화면 값을 채워 한글 그대로 미리 봅니다(내려받지·저장하지 않습니다)">👁 ${st.pvBusy?'미리보기 준비 중…':(k==='main'?'한글 미리보기':escAttr(short)+' 미리보기')}</button>`;
+      <button type="button" class="btn btn-s grp-b" data-grp-act="preview" data-arg="${escAttr(k)}"${st.pvBusy?' disabled':''} title="${escAttr(lb)} — 같은 양식에 지금 화면 값을 채워 한글 그대로 미리 봅니다(내려받지·저장하지 않습니다)">👁 ${st.pvBusy?'미리보기 준비 중…':(solo?'한글 미리보기':escAttr(short)+' 미리보기')}</button>`;
   }).join('');
   el.innerHTML=`<div class="grp-h1">📄 보고서 작성 — ${escAttr(st.coName||'')}</div>
     <span class="grp-pill">${escAttr(f.agency||'')} · ${escAttr(st.year)}</span>

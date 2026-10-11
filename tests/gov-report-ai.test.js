@@ -239,7 +239,11 @@ const CLINIC_SUMMARY = ['theme', 'inquiryDiag', 'status', 'diag', 'remedy', 'eff
 
 test('clinic — USES: 회차 5칸 전부 + 종합 7칸(양식 지도와 같다), 간단형 세 양식은 그대로', () => {
   assert.deepEqual(A.fieldsFor('clinic'), { rounds: RK, summary: CLINIC_SUMMARY });
-  assert.deepEqual(A.USES.clinic, { main: { rounds: RK, summary: CLINIC_SUMMARY } });
+  assert.deepEqual(A.USES.clinic, {
+    main: { rounds: RK, summary: CLINIC_SUMMARY },
+    plan: { rounds: ['inquiry', 'diagnosis', 'advice'], summary: ['theme', 'inquiryDiag'] },
+  });
+  assert.deepEqual(A.fieldsFor('clinic', ['plan']), { rounds: ['inquiry', 'diagnosis', 'advice'], summary: ['theme', 'inquiryDiag'] });
   assert.deepEqual(A.fieldsFor('cci-north'), { rounds: RK, summary: ['inquiryDiag', 'review', 'action', 'etc'] });
   assert.deepEqual(A.fieldsFor('cci-seosan'), { rounds: ['inquiry', 'diagnosis', 'advice'], summary: ['inquiryDiag', 'adviceAll'] });
   assert.deepEqual(A.fieldsFor('techguard'), { rounds: ['diagnosis', 'advice', 'result', 'next'], summary: ['adviceAll', 'overall'] });
@@ -253,6 +257,25 @@ test('clinic — buildValues 가 실제로 쓰는 새 종합 칸과 USES 가 같
     const out = JSON.stringify(R.buildValues(report, fk));
     const f = A.fieldsFor(fk);
     NEW.forEach((k) => assert.equal(out.includes('N' + k), f.summary.includes(k), fk + ' 새 종합 ' + k));
+  }
+});
+
+test('clinic — 지도 대조는 파일마다: 수행계획서(plan)·현장지도결과서(main)가 각자의 표지 값에서 실제로 읽는 칸이 USES 와 같다', () => {
+  const RKS = ['inquiry', 'diagnosis', 'advice', 'result', 'next'], SKS = ['theme', 'inquiryDiag', 'status', 'diag', 'remedy', 'effects', 'followUp'];
+  for (const file of Object.keys(R.FORMS.clinic.files)) {
+    const toks = R.FORMS.clinic.files[file].set.map((x) => x.tok);
+    const used = (report) => { const V = R.buildValues(report, 'clinic'); return JSON.stringify(toks.map((t) => V[t])); };
+    const u = A.USES.clinic[file];
+    assert.ok(u, file + ' 파일의 USES 가 없다 — 지도 대조가 이 파일을 건너뛴다');
+    /* 칸 하나만 채운 보고서로 한 칸씩 — 한 칸이 다른 칸을 가리지(자문이 있으면 진단은 안 찍힘) 않게 */
+    for (const k of RKS) {
+      const rp = { company: {}, rounds: [{ date: '2025-09-04' }], summary: {} }; rp.rounds[0][k] = 'R_' + k;
+      assert.equal(used(rp).includes('R_' + k), u.rounds.includes(k), file + ' 회차 ' + k);
+    }
+    for (const k of SKS) {
+      const rp = { company: {}, rounds: [{ date: '2025-09-04' }], summary: {} }; rp.summary[k] = 'S_' + k;
+      assert.equal(used(rp).includes('S_' + k), u.summary.includes(k), file + ' 종합 ' + k);
+    }
   }
 });
 

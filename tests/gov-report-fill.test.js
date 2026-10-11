@@ -496,7 +496,7 @@ test('현장클리닉 — FORMS.clinic 모양 · 표지 목록이 지도와 같�
   assert.equal(f.name, '비즈니스지원단 현장클리닉 현장지도결과서(별지 14)');
   assert.equal(f.agency, '중소벤처기업부 비즈니스지원단');
   assert.deepEqual(f.rounds, { min: 1, max: 3 });
-  assert.deepEqual(Object.keys(f.files), ['main']);
+  assert.deepEqual(Object.keys(f.files), ['main', 'plan']);
   const toks = f.files.main.set.map((r) => r.tok);
   assert.deepEqual(toks, CLINIC_TOKS);
   assert.equal(new Set(toks).size, toks.length, '같은 표지를 두 칸에 쓰면 한 값이 두 번 들어간다');
@@ -747,6 +747,154 @@ test('현장클리닉 — 비어 있는 값은 밑줄(모르는 값), 시간 칸
   assert.equal(textAt(r.xml, 'T2.C6.P0'), X.BLANK, '담당자 이름을 모르면 밑줄');
   assert.equal(textAt(r.xml, 'T2.C8.P0'), ' ');
   assert.equal(textAt(r.xml, 'T4.C5.P0'), ' ');
+});
+
+/* ── 현장클리닉 수행계획서(별지 11) (2026-10-12) ──
+ * 합성 XML — 별지11 을 한글로 변환한 단독 양식의 «주소 꼴»(T0 한 표, 칸 C0~C76)만 흉내 낸다. 애로사항 칸(C21)은 « ①»·« ②»·« ③» 세 문단,
+ * 일정 칸 날짜는 «월   일»(공백 셋), 체크 칸(C64·C71·C74)·서명줄(C76)은 원문 그대로 남아야 하는 자리다. 값은 다라정밀·홍길동(합성). */
+function planXml() {
+  const 일정 = () => ['월   일', null, null, null, null, null, null, null];
+  const cells = ['지원기업명', null, '추천 분야', '세분류', '세세분류', '지원 분야', '세분류', '세세분류', '업종(업태)', null, '주 생산품', null,
+    '지원기업 담당자명', null, '직 위', null, '회사전화번호', null, '휴대폰', null, '애로사항', [' ①', ' ②', ' ③'],
+    ['테마', '(진단결과 해결과제)'], null, '계약금액', null, ['추천', 'MD'], null, '지원일수', null, '지원단 소속', null, '지원단 명', null,
+    '자문내용', '일정', ['유형', '(현장/자료조사)'], '내용', '예상산출물', ...일정(), ...일정(), ...일정(),
+    ['추천 MD ', '준수 여부'], '  □Yes     □No', ['추천 MD ', '초과사유'], null, '지원기업사업자등록증 사본', null, ['3일 초과', '지원대상 확인'],
+    '수출기업', ' □Yes     □No', '(Yes-첨부파일 필수)', '창업기업', ' □Yes     □No', '(Yes-첨부파일 필수)',
+    ['  상기와 같이 20  년도 중소기업지원 비즈니스지원단 현장클리닉사업 수행계획서를 제출합니다. ', null, '년    월    일 ',
+      '지원단 명 :         (서명 또는 인)지원기업명 :         (서명 또는 인)', null, '중소벤처기업부장관 귀하']];
+  return SEC(P(EMPTY), P(RUN('【별지 11】')), P(RUN('현장클리닉 수행 계획서')), P(EMPTY), tbl(...cells));
+}
+const PLAN_ALL = [{ at: 'T0.C1.P0', tok: '업체명' }, { at: 'T0.C9.P0', tok: '업종' }, { at: 'T0.C13.P0', tok: '담당자' }, { at: 'T0.C15.P0', tok: '직위' },
+  { at: 'T0.C17.P0', tok: '전화' }, { at: 'T0.C21.P0', tok: '애로1' }, { at: 'T0.C21.P1', tok: '애로2' }, { at: 'T0.C21.P2', tok: '애로3' },
+  { at: 'T0.C23.P0', tok: '테마' }, { at: 'T0.C29.P0', tok: '지원일수' }, { at: 'T0.C31.P0', tok: '소속' }, { at: 'T0.C33.P0', tok: '지원단명' }];
+for (let k = 0; k < 3; k++) {
+  const b = 39 + 8 * k, n = k + 1;
+  PLAN_ALL.push({ at: 'T0.C' + b + '.P0', tok: '계획일' + n }, { at: 'T0.C' + (b + 1) + '.P0', tok: '계획유형' + n });
+  ['a', 'b', 'c'].forEach((x, i) => PLAN_ALL.push({ at: 'T0.C' + (b + 2 + 2 * i) + '.P0', tok: '계획내용' + n + x }, { at: 'T0.C' + (b + 3 + 2 * i) + '.P0', tok: '계획산출' + n + x }));
+}
+const planReport = (n, over) => {
+  const r = clinicReport(n, over);
+  r.company = Object.assign({}, r.company, { bizType: '금속가공', contactTitle: '총무팀 대리', tel: '041-000-0000' });
+  r.summary.inquiryDiag = '애로 첫 줄\n애로 둘째 줄\n애로 셋째 줄';
+  return r;
+};
+const planFill = (rp, xml) => G.fillForm(xml || planXml(), 'clinic', 'plan', rp);
+const planClean = (r) => { assert.deepEqual(r.missing, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.left, []); assert.doesNotMatch(r.xml, /{{|}}/); };
+
+test('수행계획서 — FORMS.clinic.files.plan 지도가 위 계획과 같고 별지14 와는 공통 표지 이름뿐', () => {
+  const f = G.FORMS.clinic;
+  assert.deepEqual(f.files.plan.set, PLAN_ALL);
+  const pt = f.files.plan.set.map((r) => r.tok);
+  assert.equal(new Set(pt).size, pt.length, '같은 표지를 두 칸에 쓰면 한 값이 두 번 들어간다');
+  assert.deepEqual(pt.filter((t) => CLINIC_TOKS.includes(t)).sort(), ['담당자', '소속', '업체명', '지원단명', '테마']);
+  assert.deepEqual(f.rounds, { min: 1, max: 3 }, '회차 한도는 그대로');
+  assert.deepEqual(f.files.main.set.map((r) => r.tok), CLINIC_TOKS, '별지14 지도는 그대로');
+  /* 지도 주소가 합성 양식에 있고 표지가 칸마다 한 번씩 박힌다 */
+  const xml = planXml(), addrs = clAddrs(xml);
+  f.files.plan.set.forEach((r) => assert.ok(clHas(addrs, clRuleAddr(r)), '양식에 없는 주소: ' + clRuleAddr(r)));
+  assert.equal(textAt(xml, 'T0.C39.P0'), '월   일'); assert.equal(textAt(xml, 'T0.C21.P1'), ' ②');
+  const tk = G.tokenize(xml, 'clinic', 'plan');
+  pt.forEach((t) => assert.equal(tk.split('{{' + t + '}}').length - 1, 1, '표지 {{' + t + '}} 가 한 번씩 박혀야 한다'));
+  /* 헛돌지 않는다 — 일정 묶음 하나가 빠진 양식이면 검사가 실제로 알린다 */
+  const noTbl = SEC(P(EMPTY), P(RUN('【별지 11】')));
+  assert.ok(planFill(planReport(3), noTbl).missing.length > 0, '칸이 빠진 양식인데 missing 이 비면 검사가 헛도는 것이다');
+});
+
+test('수행계획서 — 회차 3개: 값이 제 칸에 들어가고 «월   일»·애로 «①»·원문 이름표는 그대로/채워진다', () => {
+  const rp = planReport(3);
+  rp.rounds.forEach((r, i) => { r.visit = [true, false, undefined][i]; });          // 입력 차례 06-11(현장) · 04-16(자료조사) · 05-07(모름)
+  rp.rounds[0].advice = ''; rp.rounds[0].diagnosis = '진단만';                      // 06-11 — 자문 없으면 진단으로
+  rp.rounds[2].advice = ''; rp.rounds[2].diagnosis = ''; rp.rounds[2].inquiry = '문의만'; // 05-07 — 진단도 없으면 문의
+  const xml = planXml(), r = planFill(rp, xml);
+  planClean(r); assert.equal(r.short, null); assert.equal(r.over, null);
+  assert.equal(textAt(r.xml, 'T0.C1.P0'), '다라정밀');
+  assert.equal(textAt(r.xml, 'T0.C9.P0'), '금속가공');
+  assert.equal(textAt(r.xml, 'T0.C13.P0'), '홍길동');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '총무팀 대리');
+  assert.equal(textAt(r.xml, 'T0.C17.P0'), '041-000-0000');
+  assert.equal(textAt(r.xml, 'T0.C21.P0'), ' ① 애로 첫 줄');
+  assert.equal(textAt(r.xml, 'T0.C21.P1'), ' ② 애로 둘째 줄');
+  assert.equal(textAt(r.xml, 'T0.C21.P2'), ' ③ 애로 셋째 줄');
+  assert.equal(textAt(r.xml, 'T0.C23.P0'), '취업규칙 정비');
+  assert.equal(textAt(r.xml, 'T0.C29.P0'), '3일');
+  assert.equal(textAt(r.xml, 'T0.C31.P0'), '푸른노무법인');
+  assert.equal(textAt(r.xml, 'T0.C33.P0'), '이푸른');
+  /* 일정 3묶음 — 날짜 순(04-16 → 05-07 → 06-11), «월   일» 원문은 남지 않는다 */
+  assert.equal(textAt(r.xml, 'T0.C39.P0'), '4월 16일'); assert.equal(textAt(r.xml, 'T0.C47.P0'), '5월 7일'); assert.equal(textAt(r.xml, 'T0.C55.P0'), '6월 11일');
+  assert.equal(count(r.xml, '월   일'), 0, '«월   일» 자리표시가 남았다');
+  assert.deepEqual(['C40', 'C48', 'C56'].map((c) => textAt(r.xml, 'T0.' + c + '.P0')), ['자료조사', ' ', '현장'], '방문 여부를 모르면 빈칸');
+  assert.equal(textAt(r.xml, 'T0.C41.P0'), '자문2025-04-16', '내용 첫 줄은 자문');
+  assert.equal(textAt(r.xml, 'T0.C49.P0'), '문의만', '자문·진단이 없으면 문의');
+  assert.equal(textAt(r.xml, 'T0.C57.P0'), '진단만', '자문이 없으면 진단');
+  /* 나머지 내용·산출물 줄은 빈칸 한 칸(밑줄 아님) */
+  for (let k = 0; k < 3; k++) {
+    const b = 39 + 8 * k;
+    [b + 3, b + 4, b + 5, b + 6, b + 7].forEach((c) => assert.equal(textAt(r.xml, 'T0.C' + c + '.P0'), ' ', 'T0.C' + c));
+  }
+  /* 보고서에 없는 값·체크 칸·서명 줄은 원문 그대로 */
+  ['T0.C11.P0', 'T0.C19.P0', 'T0.C25.P0', 'T0.C27.P0', 'T0.C66.P0', 'T0.C68.P0'].forEach((a) => assert.equal(textAt(r.xml, a), textAt(xml, a), a + ' — 안 건드린다'));
+  ['T0.C64.P0', 'T0.C71.P0', 'T0.C74.P0', 'T0.C76.P0', 'T0.C76.P2', 'T0.C76.P3', 'T0.C76.P5', 'T0.C0.P0', 'T0.C20.P0', 'T0.C34.P0', 'T0.C63.P1']
+    .forEach((a) => assert.equal(textAt(r.xml, a), textAt(xml, a), a + ' — 원문 그대로'));
+  assert.equal(X.scan(r.xml).length, X.scan(xml).length, '문단 수가 바뀌면 안 된다');
+});
+
+test('수행계획서 — 일정 묶음 한 칸에 내용은 첫 줄(a)에만, 같은 묶음의 b·c 와 산출물 줄은 빈칸', () => {
+  const V = G.buildValues(planReport(1), 'clinic');
+  assert.equal(V['계획내용1a'], '자문2025-06-11'); assert.equal(V['계획내용1b'], ' '); assert.equal(V['계획내용1c'], ' ');
+  ['a', 'b', 'c'].forEach((x) => assert.equal(V['계획산출1' + x], ' ', '예상산출물은 보고서에 없다 — 빈칸'));
+  assert.equal(V['계획일1'], '6월 11일'); assert.equal(V['계획유형1'], '현장');
+  assert.equal(V['업종'], '금속가공'); assert.equal(V['직위'], '총무팀 대리'); assert.equal(V['전화'], '041-000-0000');
+  assert.equal(V['지원일수'], '1일');
+});
+
+test('수행계획서 — 회차 0·1·2개: 안 쓴 묶음은 빈칸 한 칸, 모자람 알림, 지원일수는 회차 수', () => {
+  const emptyFrom = (xml, n) => {
+    for (let k = n; k < 3; k++) for (let o = 0; o < 8; o++) assert.equal(textAt(xml, 'T0.C' + (39 + 8 * k + o) + '.P0'), ' ', '묶음 ' + (k + 1) + ' 칸 ' + o);
+  };
+  const r0 = planFill(planReport(0)); planClean(r0); emptyFrom(r0.xml, 0);
+  assert.deepEqual(r0.short, { need: 1, have: 0 });
+  assert.equal(textAt(r0.xml, 'T0.C29.P0'), X.BLANK, '회차가 없으면 지원일수는 모르는 값 — 밑줄');
+  assert.equal(count(r0.xml, '월   일'), 0);
+  const r1 = planFill(planReport(1)); planClean(r1); emptyFrom(r1.xml, 1);
+  assert.equal(r1.short, null); assert.equal(textAt(r1.xml, 'T0.C29.P0'), '1일'); assert.equal(textAt(r1.xml, 'T0.C39.P0'), '6월 11일');
+  const r2 = planFill(planReport(2)); planClean(r2); emptyFrom(r2.xml, 2);
+  assert.equal(textAt(r2.xml, 'T0.C29.P0'), '2일'); assert.equal(textAt(r2.xml, 'T0.C39.P0'), '4월 16일'); assert.equal(textAt(r2.xml, 'T0.C47.P0'), '6월 11일');
+});
+
+test('수행계획서 — 회차 4개는 셋째까지만 쓰고 넘침을 알린다, 있을 수 없는 날짜는 밑줄', () => {
+  const rp = planReport(3);
+  rp.rounds.push({ date: '2025-08-14', visit: true, inquiry: '넷째 문의', diagnosis: '', advice: '넷째 자문', result: '', next: '' });
+  const r = planFill(rp);
+  assert.deepEqual(r.over, { max: 3, have: 4 }); planClean(r);
+  assert.ok(!textAll(r.xml).includes('넷째'), '양식 한도(3)까지만 쓴다');
+  assert.ok(!textAll(r.xml).includes('8월 14일'));
+  assert.equal(textAt(r.xml, 'T0.C29.P0'), '3일');
+  const bad = planReport(1); bad.rounds = [{ date: '2025-02-30', visit: true, advice: '자문' }];
+  assert.equal(textAt(planFill(bad).xml, 'T0.C39.P0'), X.BLANK, '있을 수 없는 날짜는 지어내지 않고 밑줄');
+});
+
+test('수행계획서 — 애로사항 줄 1·2·3·4개(빈 줄 제외, CRLF·공백 정리), 줄이 없으면 번호만', () => {
+  const lines = (s) => { const rp = planReport(3); rp.summary.inquiryDiag = s; const r = planFill(rp); planClean(r);
+    return ['P0', 'P1', 'P2'].map((p) => textAt(r.xml, 'T0.C21.' + p)); };
+  assert.deepEqual(lines('가'), [' ① 가', ' ②', ' ③']);
+  assert.deepEqual(lines('가\r\n\r\n  나  \r\n'), [' ① 가', ' ② 나', ' ③']);
+  assert.deepEqual(lines('가\n나\n다'), [' ① 가', ' ② 나', ' ③ 다']);
+  assert.deepEqual(lines('가\n나\n다\n라'), [' ① 가', ' ② 나', ' ③ 다'], '넷째 줄부터는 양식에 칸이 없다 — 별지14 애로사항 칸에는 전부 들어간다');
+  assert.deepEqual(lines(''), [' ①', ' ②', ' ③']);
+  assert.deepEqual(lines(undefined), [' ①', ' ②', ' ③']);
+});
+
+test('수행계획서 — 비어 있는 값은 밑줄(모르는 값), 별지14(main) 채우기는 그대로', () => {
+  const rp = planReport(3); rp.summary = {}; rp.company = {}; rp.consultantOrg = ''; delete rp.consultant;
+  const r = planFill(rp); planClean(r);
+  ['T0.C1.P0', 'T0.C9.P0', 'T0.C13.P0', 'T0.C15.P0', 'T0.C17.P0', 'T0.C23.P0', 'T0.C31.P0', 'T0.C33.P0'].forEach((a) =>
+    assert.equal(textAt(r.xml, a), X.BLANK, a + ' — 모르는 값은 밑줄'));
+  assert.deepEqual(['P0', 'P1', 'P2'].map((p) => textAt(r.xml, 'T0.C21.' + p)), [' ①', ' ②', ' ③']);
+  /* 별지14 쪽 — plan 값을 새로 만들어도 main 이 찍는 값·결과는 같다 */
+  const m = G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3));
+  assert.deepEqual(m.missing, []); assert.deepEqual(m.left, []); assert.deepEqual(m.unknown, []);
+  assert.equal(textAt(m.xml, 'T2.C4.P0'), '2025.04.16');
+  assert.match(rawAt(m.xml, 'T1.C0.P0'), /애로 첫줄<hp:lineBreak\/>애로 둘째줄/, '별지14 애로사항 칸은 줄 전체 그대로');
 });
 
 test('현장클리닉 — 간단형 세 양식의 buildValues 는 그대로(clinic 분기가 새지 않는다)', () => {
