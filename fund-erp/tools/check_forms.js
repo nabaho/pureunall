@@ -103,22 +103,31 @@ console.log('■ 지원신청서 — 금액·신청일이 정말 들어가나 (�
   chk('기금마다 다른 체크는 비었다', !/■체육/.test(t.replace(/\s/g,'')));
 }
 
-console.log('\n■ 추정재무상태표 — 확정 스냅샷의 «실제 모양»으로 (코덱스 #4)');
+console.log('\n■ 추정재무상태표 — «앞 해 기말»이 바탕 (2026-10-11: 확정 스냅샷이 아니라 앞 해 장부로 셈한 S._bizBase)');
 {
   const f = { name:'가나공동', fund_type:'공동', officers:[],
     years:{2026:{budget:{rev_contrib:8000000, rev_interest:56000,
       exp_purpose:5000000, exp_admin:500000, exp_etc:275000}}} };
-  global.funds.X = f;
-  /* closeSnapshot 이 실제로 담는 모양 그대로 — 자산총계는 assets 다 */
-  global.S.f15Close = { fin: { cash:4984897, savings:0, loan:0, otherAsset:0, secu:0,
-    res1:0, res2:2308897, assets:4984897, liab:2308897, basic:2676000, retained:0 } };
+  global.funds.X = f; global.S.formFund = 'X'; global.S.f15Close = null;
+  /* 바탕 = 서식 해(2026)의 «앞 해(2025) 기말» — 자산총계는 assets 든 totalAssets 든 읽는다 */
+  const base = { cash:4984897, savings:0, loan:0, otherAsset:0, secu:0,
+    res1:0, res2:2308897, assets:4984897, liab:2308897, basic:2676000, retained:0 };
+  global.S._bizBase = { fid:'X', yr:global.S.year-1, fin:base };
   const t = draw('bizplan', f);
-  chk('추정 현금 7,266 천원', t.includes('7,266'), '스냅샷 모양(assets)으로 안 채워짐');
+  chk('추정 현금 7,266 천원', t.includes('7,266'), '앞 해 기말 바탕으로 안 채워짐');
   chk('추정 준비금2 3,790 천원', t.includes('3,790'));
   chk('추정 기본재산 3,476 천원', t.includes('3,476'));
   /* 옛 스냅샷에는 준비금이 없다 — 0 으로 메우면 «준비금 0 인 기금»으로 셈해 틀린 표가 나온다 */
-  global.S.f15Close = { fin: { cash:4984897, assets:4984897, liab:0, basic:2676000, retained:0 } };
+  global.S._bizBase = { fid:'X', yr:global.S.year-1, fin:{ cash:4984897, assets:4984897, liab:0, basic:2676000, retained:0 } };
   chk('옛 스냅샷이면 추정표를 안 채운다', !draw('bizplan', f).includes('7,266'));
+  /* 바탕의 «해·기금»이 맞아야 쓴다 — 같은 해 것(한 해 어긋남)·다른 기금 것이면 비운다(남의 숫자·틀린 해를 찍지 않는다) */
+  global.S._bizBase = { fid:'X', yr:global.S.year, fin:base };
+  chk('같은 해 기말은 바탕이 아니다(한 해 어긋남)', !draw('bizplan', f).includes('7,266'));
+  global.S._bizBase = { fid:'다른기금', yr:global.S.year-1, fin:base };
+  chk('다른 기금 바탕이면 안 채운다', !draw('bizplan', f).includes('7,266'));
+  global.S._bizBase = { fid:'X', yr:global.S.year-1, fin:null };
+  chk('앞 해 장부가 없으면 안 채운다(0 을 바탕으로 삼지 않는다)', !draw('bizplan', f).includes('7,266'));
+  global.S._bizBase = null;
 }
 
 console.log('\n■ 사업계획서 손익예산은 그대로인가 (제출본 대조)');
