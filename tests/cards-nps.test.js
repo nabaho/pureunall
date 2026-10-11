@@ -19,14 +19,11 @@ const { sliceFn } = require('./fnslice');
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'pu-cards.html'), 'utf8').split('\r\n').join('\n');
 const NPSM = require('../functions/nps-monthly.js');
 
+/* ⚠ 2026-10-11 공용 자리(pubdata)로 옮긴 뒤 — 공단에 묻고 후보를 줄 세우는 일은 서버만 한다. 화면은 셈 둘(문턱·추이)과 얹기(coWithPub)만 */
 function client(extra) {
-  const nm = SRC.match(/\n  _norm\(s\)\{([\s\S]*?)\},\n/);
   const ctx = Object.assign({ String, Number, Object, Array, Date, JSON, console }, extra || {});
   vm.createContext(ctx);
-  vm.runInContext('var ErpMatch = { _norm(s){' + nm[1] + '} };\n' + SRC.match(/const NPS_URL = [^\n]*/)[0] + '\n'
-    + SRC.match(/const NPS_CAND_MAX = [^\n]*/)[0] + '\n'
-    + ['function npsCands(', 'function npsCues(', 'function npsTrend(', 'async function npsNow(', 'async function npsGet(', 'function npsKey(']
-      .map(n => sliceFn(SRC, n)).join('\n'), ctx);
+  vm.runInContext(['function npsCues(', 'function npsTrend(', 'function coWithPub('].map(n => sliceFn(SRC, n)).join('\n'), ctx);
   return ctx;
 }
 const ITEMS = [
@@ -36,32 +33,41 @@ const ITEMS = [
 ];
 
 test('★★★ ① 후보 — 이름이 같은 곳·가입 중인 곳이 먼저, 그러나 «고른 것»은 없다', () => {
-  const c = client();
-  const out = JSON.parse(JSON.stringify(c.npsCands(ITEMS, '㈜가나상사')));
+  const out = NPSM.cands(ITEMS, '㈜가나상사');
   assert.equal(out.map(x => x.seq).join(','), '13,12,11', '이름 같음·가입 중 차례가 아닙니다: ' + out.map(x => x.seq));
   assert.ok(out.every(x => !('pick' in x)), '후보에 «고름» 표시가 붙었습니다');
-  /* 서버도 같은 차례 */
-  assert.equal(NPSM.cands(ITEMS, '㈜가나상사').map(x => x.seq).join(','), '13,12,11', '서버 후보 차례가 화면과 다릅니다');
 });
 
 test('★★★ ② 고지금액(보험료)은 화면도 서버도 «안 적는다»', () => {
   const now = NPSM.nowOf({ jnngpCnt: 23, crrmmNtcAmt: '8080808', dataCrtYm: '202608', wkplJnngStcd: '1' }, { nwAcqzrCnt: 3, lssJnngpCnt: 1 }, 1);
   assert.ok(!JSON.stringify(now).includes('8080808'), '★★★ 서버가 보험료를 적습니다');
-  const fn = sliceFn(SRC, 'async function npsNow(');
-  assert.ok(!/crrmmNtcAmt/.test(fn), '★★★ 화면이 보험료를 적습니다');
+  assert.ok(!/crrmmNtcAmt/.test(SRC), '★★★ 화면이 보험료 칸을 읽습니다');
   assert.ok(!/crrmmNtcAmt/.test(fs.readFileSync(path.join(__dirname, '..', 'functions', 'nps-monthly.js'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '')),
     '★★★ 서버 코드가 보험료 칸을 읽습니다');
 });
 
-test('★★ ④ 화면과 서버의 now 가 같은 모양이다', async () => {
-  const resp = (item) => ({ ok: true, json: async () => ({ response: { body: { items: { item } } } }) });
-  const c = client({ PU_CFG: { ntsKey: 'k' }, encodeURIComponent,
-    fetch: async (u) => /getDetail/.test(u) ? resp({ jnngpCnt: 23, dataCrtYm: '202608', vldtVlKrnNm: '제조업', wkplJnngStcd: '1', crrmmNtcAmt: '9' })
-      : resp({ nwAcqzrCnt: 3, lssJnngpCnt: 1 }) });
-  const a = JSON.parse(JSON.stringify(await c.npsNow('13', '202608')));
-  const b = NPSM.nowOf({ jnngpCnt: 23, dataCrtYm: '202608', vldtVlKrnNm: '제조업', wkplJnngStcd: '1' }, { nwAcqzrCnt: 3, lssJnngpCnt: 1 }, a.at);
-  assert.deepEqual(Object.keys(a).sort(), Object.keys(b).sort(), '칸 이름이 다릅니다');
-  assert.equal(a.cnt, 23); assert.equal(a.nw, 3); assert.equal(a.lss, 1); assert.equal(a.ym, '202608');
+test('★★★ ④ 화면은 공단에 직접 묻지 않는다 — 숫자는 서버가 공용 자리에, 화면은 «받아 달라»', () => {
+  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, '');
+  assert.ok(!/NpsBplcInfoInqireService/.test(code), '★★★ 화면이 국민연금 공단에 직접 묻습니다 — 쓰는 곳이 둘이 됩니다');
+  const pick = sliceFn(SRC, 'async function coNpsPick(');
+  assert.match(pick, /coPubAsk\(o, 'nps'\)/, '고른 뒤 서버에 숫자를 청하지 않습니다');
+  assert.ok(!/now:|hist/.test(pick), '★★ 화면이 숫자를 적습니다');
+  assert.match(sliceFn(SRC, 'function npsWrite('), /'coInfo\/' \+ key \+ '\/nps\/'/, '사람이 정한 것은 기업정보함 coInfo 에 적습니다');
+});
+
+test('★★★ 얹기 — 지금 숫자는 «지금 고른 사업장»의 것만, 고른 것·없음은 coInfo 것만', () => {
+  const c = client();
+  const pb = { nps: { now: { cnt: 9 }, nowSeq: '13', cand: [{ seq: '13' }], hist: { '202609': 9 }, pick: { seq: 'X' } } };
+  let ex = JSON.parse(JSON.stringify(c.coWithPub({ nps: { pick: { seq: '13' }, hist: { '202608': 8 } } }, pb)));
+  assert.equal(ex.nps.now.cnt, 9); assert.equal(ex.nps.pick.seq, '13', '★★★ 공용 자리의 pick 이 사람이 고른 것을 덮었습니다');
+  assert.deepEqual(Object.keys(ex.nps.hist).sort(), ['202608', '202609']);
+  ex = JSON.parse(JSON.stringify(c.coWithPub({ nps: { pick: { seq: '99' } } }, pb)));
+  assert.equal(ex.nps.now, null, '★★★ 사업장을 바꿨는데 옛 사업장 숫자가 보입니다');
+  ex = JSON.parse(JSON.stringify(c.coWithPub({ nps: {} }, pb)));
+  assert.equal(ex.nps.now, null, '★★ 연결을 풀었는데 숫자가 보입니다'); assert.ok(!ex.nps.pick);
+  ex = JSON.parse(JSON.stringify(c.coWithPub({ nps: { none: { at: 1 } } }, pb)));
+  assert.ok(!ex.nps.cand, '「없음」인데 후보가 보입니다');
+  assert.equal(c.coWithPub(null, null), null);
 });
 
 test('★★★ ③ 서버 — 고른 곳만 숫자·hist, 안 고른 곳은 후보만, 「없음」은 그대로', async () => {
