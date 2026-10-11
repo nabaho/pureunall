@@ -28,7 +28,7 @@ function run(opt){
     getComputedStyle: function(el){ return { position: el.position || 'static' }; }
   };
   vm.createContext(ctx);
-  vm.runInContext(src.slice(src.indexOf('function erpFillHeight(el, min){'),
+  vm.runInContext(src.slice(src.indexOf('function erpFillHeight('),
                             src.indexOf('function useFillHeight(')), ctx);
   // 형제들을 사슬로 엮는다 (nextElementSibling)
   const sibs = (opt.below || []).map(function(b){
@@ -72,7 +72,7 @@ t('화면마다 최소값을 달리 줄 수 있다', run({ innerHeight:500, top:
 t('상자가 아직 없으면 0 (그때는 지금까지 쓰던 값이 쓰인다)', (function(){
   const ctx = { Math:Math, console:console }; ctx.window = { innerHeight:1080 };
   vm.createContext(ctx);
-  vm.runInContext(src.slice(src.indexOf('function erpFillHeight(el, min){'),
+  vm.runInContext(src.slice(src.indexOf('function erpFillHeight('),
                             src.indexOf('function useFillHeight(')), ctx);
   return ctx.erpFillHeight(null);
 })(), 0);
