@@ -233,9 +233,7 @@
 
   function esc(v) { return s(v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   /* A4 미리보기·인쇄(PDF)용 글 — 화면과 인쇄가 «같은 글»이다 */
-  function toHtml(model, photoUrl) {
-    var h = model.head;
-    var sec = function (x) {
+  function secHtml(model, x) {
       var 머리말 = !x.more ? '' : (x.pin ? '(주요 ' + x.pin + (x.show > x.pin ? ' · 최근 ' + (x.show - x.pin) : '') + ' · 전체 ' + x.n + ')' : '(최근 ' + x.show + ' · 전체 ' + x.n + ')');
       return '<h4>' + esc(x.title) + (머리말 ? ' <small>' + 머리말 + '</small>' : '') + '</h4><table class="t-' + x.key + '">'
         + x.rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td' + (i === 0 ? ' class="y"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('')
@@ -243,7 +241,11 @@
         + (x.note ? '<tr><td class="y"></td><td colspan="2" class="more">' + esc(x.note) + '</td></tr>' : '')
         + (x.key === 'perf' && model.perfByYear ? '<tr><td class="y"></td><td colspan="2" class="more">연도별: ' + esc(model.perfByYear) + '</td></tr>' : '')
         + '</table>';
-    };
+    }
+
+  function toHtml(model, photoUrl) {
+    var h = model.head;
+    var sec = function (x) { return secHtml(model, x); };
     var by = {}; model.sections.forEach(function (x) { by[x.key] = x; });
     var 짝 = function (a, b) { return (by[a] || by[b]) ? '<div class="two"><div>' + (by[a] ? sec(by[a]) : '') + '</div><div>' + (by[b] ? sec(by[b]) : '') + '</div></div>' : ''; };
     return '<div class="p1">'
@@ -258,6 +260,30 @@
       + '</div>';
   }
 
+  /* ★ 화면용(2026-10-11 목업 3) — A4 모양이 아니라 «화면 너비»에 맞춰 펼친다(머리띠 + 3단).
+     같은 모델·같은 칸 글(secHtml)이다 — 인쇄(PDF)·한글 파일은 그대로 A4 한 장(toHtml). */
+  function toScreenHtml(model, photoUrl) {
+    var h = model.head, by = {}; model.sections.forEach(function (x) { by[x.key] = x; });
+    var col = function (keys) { return '<div>' + keys.map(function (k) { return by[k] ? secHtml(model, by[k]) : ''; }).join('') + '</div>'; };
+    var 칩 = String(h.field || '').split(/[·,\/]/).map(s).filter(Boolean).map(function (t) { return '<span>' + esc(t) + '</span>'; }).join('');
+    return '<div class="p1 p1s">'
+      + '<div class="hd">' + (photoUrl ? '<img class="ph" src="' + esc(photoUrl) + '" alt="">' : '<span></span>')
+      + '<div><h2>' + esc(h.name) + ' <small>' + esc([h.license, h.org, h.title].filter(Boolean).join(' · ')) + '</small></h2>'
+      + (h.intro ? '<div class="intro">' + esc(h.intro) + '</div>' : '') + (칩 ? '<div class="chips">' + 칩 + '</div>' : '') + '</div>'
+      + '<div class="ct">' + [h.phone, h.email].filter(Boolean).map(esc).join('<br>') + '</div></div>'
+      + '<div class="cols3">' + col(['edu', 'cert', 'work', 'biz']) + col(['role', 'wic']) + col(['lec', 'perf', 'award', 'pub']) + '</div></div>';
+  }
+  var SCREEN_CSS = '.p1s{font-size:14px;line-height:1.55;padding:6px 4px}'
+    + '.p1s .hd{display:grid;grid-template-columns:auto 1fr auto;gap:20px;align-items:center;border-bottom:3px solid #1e3a5f;padding-bottom:14px;margin-bottom:18px}'
+    + '.p1s .hd .ph{width:96px;height:124px;object-fit:cover;border-radius:6px}'
+    + '.p1s .hd h2{margin:0;font-size:24px;border:0;padding:0;display:block}.p1s .hd h2 small{font-size:14px;color:#64748b;font-weight:400;margin-left:8px}'
+    + '.p1s .intro{margin:4px 0 6px;color:#334155;font-size:15px}.p1s .chips span{display:inline-block;border:1px solid #d9e0ea;border-radius:14px;padding:1px 10px;margin:2px 4px 0 0;font-size:12.5px;background:#f8fafc}'
+    + '.p1s .ct{font-size:13px;color:#475569;text-align:right;line-height:1.7}'
+    + '.p1s .cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:22px;align-items:start}'
+    + '.p1s h4{font-size:14px;margin:0 0 4px;padding:3px 8px}.p1s h4+table{margin-bottom:16px}'
+    + '.p1s td{white-space:normal;font-size:13.5px;padding:2px 4px;vertical-align:top}.p1s td.y{width:62px}.p1s .t-work td.y,.p1s .t-role td.y{width:104px}'
+    + '.p1s td.more{font-size:12.5px}';
+
   var CSS = '.p1{font-family:"Malgun Gothic",sans-serif;color:#1e293b;font-size:10.5px;line-height:1.45}'
     + '.p1 h2{font-size:17px;border-bottom:2px solid #1e293b;padding-bottom:4px;margin:0 0 8px;display:flex;align-items:baseline;gap:10px}'
     + '.p1 h2 small,.p1 h4 small{font-size:11px;color:#64748b;font-weight:400}'
@@ -269,7 +295,7 @@
     + '.p1 .t-work td.y,.p1 .t-role td.y{width:96px}'
     + '.p1 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
 
-  var api = { USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass,
+  var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass,
     build: build, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerProfile1 = api;

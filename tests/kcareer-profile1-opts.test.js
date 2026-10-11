@@ -68,3 +68,21 @@ test('화면 — 새 칸 입력과 hwpx 가 같은 값을 쓴다', () => {
   const b = strip(SRC.slice(SRC.indexOf('function _p1Bytes('), SRC.indexOf('function p1Hwpx(')));
   assert.ok(/h\.intro/.test(b) && /x\.note/.test(b), '한글 문서에도 소개·한 줄 더');
 });
+
+/* ── 화면용 프로필(목업 3, 2026-10-11) ── */
+test('화면용은 «같은 칸 글»을 3단으로 펼친다 — 칸 이름 표지(.t-키)가 인쇄용과 같아 바로 가기가 둘 다 듣는다', () => {
+  const m = P.build(src, { use: 'general', field: '인사노무 · 일터혁신', intro: '소개' });
+  const h = P.toScreenHtml(m, '');
+  assert.ok(/class="cols3"/.test(h) && /class="chips"/.test(h) && /t-lec/.test(h));
+  assert.ok(/t-lec/.test(P.toHtml(m, '')), '인쇄용에도 같은 표지');
+  assert.ok(typeof P.SCREEN_CSS === 'string' && P.SCREEN_CSS.length > 50);
+});
+test('화면 — 오른쪽은 이력서만, 보기·바로 가기 단추는 왼쪽 칸 목록 맨 위에', () => {
+  const html = SRC.slice(SRC.indexOf('id="page-profile1"'), SRC.indexOf('id="page-bizdash"'));
+  assert.ok(!/id="p1Zoom"/.test(html), '오른쪽 위 단추 줄이 없어야 한다');
+  assert.ok(/id="p1Paper"/.test(html));
+  const r = strip(SRC.slice(SRC.indexOf('function renderProfile1('), SRC.indexOf('function _p1Scale(')));
+  assert.ok(/id="p1Zoom"/.test(r), '왼쪽 목록 맨 위에 단추 자리');
+  assert.ok(/_p1View==='screen'/.test(r) && /toScreenHtml/.test(r), '기본은 화면용');
+  assert.ok(/function p1View\(/.test(SRC));
+});
