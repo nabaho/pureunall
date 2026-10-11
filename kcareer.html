@@ -2034,6 +2034,15 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <!-- 👤 프로필 1장 (대표 지시 2026-10-07 → 목업 승인) — 경력·실적·이력을 A4 한 장으로. 셈은 js/kcareer-profile1.js -->
       <section class="page-view" id="page-profile1"><div class="page">
         <div class="page-head"><div class="page-title">👤 프로필 1장</div><div class="page-desc">경력관리에 든 학력·자격·경력·위촉·실적·강의를 A4 한 장으로 — 넘치면 «최근 N»을 저절로 줄입니다 · 금액·주민번호·계좌는 넣지 않습니다</div></div>
+        <!-- 👁 크기 조절 줄 (대표 지시 2026-10-11 「화면 더 커지게 조절가능하게해서 글자 볼수 있게」) — ➖/➕ 로 10%씩, 설정 칸을 접으면 그림이 넓어진다.
+             ⚠ 이 줄은 «설정 칸 밖»이다 — 설정을 접어도 크기 단추가 남아야 한다. -->
+        <div id="p1Row" style="display:flex;gap:6px;align-items:center;justify-content:flex-end;margin:-2px 0 8px">
+          <span id="p1StepBox" style="display:inline-flex;gap:4px;align-items:center"><span style="font-size:12px;color:var(--text-mute)">크기</span>
+            <button class="btn sm" type="button" onclick="p1Step(-1)" title="10% 작게">➖</button>
+            <button class="btn sm" type="button" id="p1Pct" onclick="p1Step(0)" title="누르면 100% 로">100%</button>
+            <button class="btn sm" type="button" onclick="p1Step(1)" title="10% 크게">➕</button></span>
+          <button class="btn sm" type="button" id="p1SideBtn" onclick="p1SideToggle()" title="왼쪽 «넣을 칸» 설정을 접어 그림을 넓게 봅니다">◀ 설정 접기</button>
+        </div>
         <div class="p1-wrap" style="display:grid;grid-template-columns:500px minmax(0,1fr);gap:14px;align-items:start">
           <div id="p1Side" style="position:sticky;top:8px;max-height:calc(100vh - 90px);overflow:auto;padding-right:2px"></div>
           <div id="p1Paper" style="min-width:0;background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;overflow:hidden"></div>
@@ -7649,7 +7658,7 @@ function renderProfile1(){
     +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
   _p1JumpList=m.sections.map(function(x){ return [x.key, x.title]; });
   if(_p1OpenKey){ var 켠=paper.querySelector('.t-'+_p1OpenKey); if(켠){ 켠.style.outline='2px solid var(--teal)'; 켠.style.outlineOffset='2px'; var 켠h=켠.previousElementSibling; if(켠h&&켠h.tagName==='H4'){ 켠h.style.outline='2px solid var(--teal)'; 켠h.style.outlineOffset='1px'; } } }
-  _p1ZoomBar(); _p1Scale();
+  p1SideApply(); _p1ZoomBar(); _p1Scale();
   /* 사진은 «나중에» 붙인다 — 보관함에서 꺼내는 데 시간이 걸린다.
      ⚠ 예전엔 fileURLAsync 로 꺼냈는데, 사진이 «data: 머리»를 단 채 담겨 있으면 풀다가 조용히 실패해 사진이 영영 안 나왔다
        (대표 물음 2026-10-07 「증명사진 넣기에 왜 사진은 없나?」). 이력서 «사진 넣기»와 같은 길(_rhPhotoPng)로 꺼내
@@ -7670,7 +7679,10 @@ function renderProfile1(){
    · 전체 화면 — 모니터 전체를 써서 한 장을 가장 크게 (Esc 로 나옴)
    ⚠ 크기만 바꾼다 — 서류 내용·인쇄·저장은 그대로(A4 794×1123). */
 var _p1ZoomMode='fit', _p1JumpList=[];   /* 기본은 «한 화면» — A4 세로 한 장이 아래로 안 내려가도 다 보인다(대표 지시 2026-10-11 「A4 세로 한 장 · 아래로 안 내려가도」) */
-try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom2')||'fit'; }catch(e){}
+var _p1Pct=100, _p1Cur=1, _p1Side=true;   /* 직접 정한 크기(%) · 지금 보이는 배율 · 설정 칸 펼침 */
+try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom2')||'fit'; if(_p1ZoomMode!=='width'&&_p1ZoomMode!=='custom') _p1ZoomMode='fit';
+  var _pp=parseInt(localStorage.getItem('kc_p1_pct'),10); if(_pp>=40&&_pp<=250) _p1Pct=_pp;
+  _p1Side=localStorage.getItem('kc_p1_side')!=='0'; }catch(e){}
 function _p1Scale(){
   var paper=document.getElementById('p1Paper'); if(!paper) return;
   if(_p1View==='screen'){ paper.style.width='100%'; paper.style.margin='0'; paper.style.height='auto'; paper.style.overflow='visible'; paper.style.background='#fff'; return; }
@@ -7684,18 +7696,42 @@ function _p1Scale(){
   }
   paper.style.background='#fff'; paper.style.overflow='hidden'; a4.style.marginLeft='0';
   var box=paper.parentNode, availW=(box&&box.clientWidth)||794;
+  var extra=0;
   if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; paper.style.margin='0'; }
+  else if(_p1ZoomMode==='custom'){
+    /* 직접 정한 크기 — 칸보다 크면 «옆으로 밀어» 본다(확대 상한 250%). 칸에 들어가면 가운데에 둔다 */
+    s=Math.max(.4, Math.min(2.5, _p1Pct/100)); var fitsW=(794*s+2)<=availW;
+    paper.style.width=fitsW?(Math.round(794*s)+2+'px'):'100%'; paper.style.margin=fitsW?'0 auto':'0';
+    if(!fitsW){ paper.style.overflowX='auto'; extra=18; }
+  }
   else{
     var top=paper.getBoundingClientRect().top;
     var availH=Math.max(300, window.innerHeight-Math.max(0,top)-62);   /* 아래 작업 띠(약 56px) 만큼 비운다 */
     s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
   }
   a4.style.transform='scale('+s+')';
-  paper.style.height=Math.round(1123*s)+'px';
+  paper.style.height=(Math.round(1123*s)+extra)+'px';
+  _p1Cur=s; _p1PctLabel();
 }
+function _p1PctLabel(){ var b=document.getElementById('p1Pct'); if(b) b.textContent=Math.round(_p1Cur*100)+'%'; }
+/* ➖/➕ — 지금 보이는 크기에서 10% 씩(상한 250%·하한 40%). 0 이면 100%. 직접 정하면 「한 화면·폭 맞춤」은 꺼진다 */
+function p1Step(d){
+  var pct=d?Math.max(40, Math.min(250, Math.round(_p1Cur*10)*10+d*10)):100;
+  _p1Pct=pct; _p1ZoomMode='custom';
+  try{ localStorage.setItem('kc_p1_zoom2','custom'); localStorage.setItem('kc_p1_pct',String(pct)); }catch(e){}
+  _p1ZoomBar(); _p1Scale();
+}
+/* 설정 칸 접기/펴기 — 접으면 그림이 칸 전체를 쓴다 */
+function p1SideApply(){
+  var w=document.querySelector('.p1-wrap'), s=document.getElementById('p1Side'), b=document.getElementById('p1SideBtn'); if(!w||!s) return;
+  w.style.gridTemplateColumns=_p1Side?'500px minmax(0,1fr)':'minmax(0,1fr)'; s.style.display=_p1Side?'':'none';
+  if(b) b.textContent=_p1Side?'◀ 설정 접기':'▶ 설정 펴기';
+}
+function p1SideToggle(){ _p1Side=!_p1Side; try{ localStorage.setItem('kc_p1_side',_p1Side?'1':'0'); }catch(e){} p1SideApply(); _p1Scale(); }
 var _p1View='a4';   /* 기본은 A4 세로 한 장 — 「화면용(넓게)」는 고르면 */
 try{ _p1View=(localStorage.getItem('kc_p1_view')==='screen')?'screen':'a4'; }catch(e){}
 function _p1ZoomBar(){
+  var sb=document.getElementById('p1StepBox'); if(sb) sb.style.display=(_p1View==='a4')?'inline-flex':'none';   /* 화면용(넓게)는 칸 너비에 늘 맞는다 */
   var bar=document.getElementById('p1Zoom'); if(!bar) return;
   var v=function(m,t,ti){ return '<button class="btn sm'+(_p1View===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1View(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };
   var z=function(m,t,ti){ return '<button class="btn sm'+(_p1ZoomMode===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1Zoom(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };
