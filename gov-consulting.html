@@ -1335,7 +1335,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <script src="js/pu-gov-report.js?v=3"></script>
   <script src="js/pu-gov-report-build.js?v=4"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
-  <script src="js/pu-gov-report-ai.js?v=1"></script>
+  <script src="js/pu-gov-report-ai.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
   <!-- 회사 열쇠(사업자번호) — 보고서 창이 기업정보함 메일·보낸 자료를 그 열쇠로만 찾는다 -->
   <script src="js/pu-cokey.js?v=1"></script>
@@ -7649,17 +7649,17 @@ function grpPickedForm(inp){
 let _grp=null;            // 지금 열린 보고서 상태
 let _grpBound=false;
 const GRP_DENIED='아직 저장 자리가 열리지 않았습니다(관리자 규칙 게시 필요) — 내려받기는 됩니다';
-const GRP_HINT={'cci-north':'충남북부','cci-seosan':'서산','techguard':'기술보호'};
+const GRP_HINT={'cci-north':'충남북부','cci-seosan':'서산','techguard':'기술보호','clinic':'현장클리닉'};
 const GRP_RLAB=[['inquiry','문의'],['diagnosis','진단'],['advice','자문'],['result','성과'],['next','향후']];
 /* 양식마다 회차 칸에 들어가는 이름표 — 안내 글(placeholder)에만 쓴다 */
-const GRP_RUSE={'cci-north':['문의','진단','자문','성과','향후'],'cci-seosan':['문의','진단','자문'],techguard:['진단','자문','성과','향후']};
+const GRP_RUSE={'cci-north':['문의','진단','자문','성과','향후'],'cci-seosan':['문의','진단','자문'],techguard:['진단','자문','성과','향후'],clinic:['문의','진단','자문','성과','향후']};
 const GRP_ACTS={save:'grpSaveDraft',dl:'grpDownload',preview:'grpPreview',confirm:'grpConfirm',addRound:'grpAddRound',delRound:'grpDelRound',
   newVer:'grpNewVersion',choose:'grpChooseForm',close:'grpClose',ai:'grpAiDraft',aiUndo:'grpAiUndo',aiAllow:'grpAiAllow'};
 /* ✨ AI 초안(3단계, 2026-10-10) — 서버 readDoc(Gemini)를 PuAiCall 로 부른다(로그인·월 한도 적용). 시간 제한 90초 */
 const GRP_AI_WAIT_MS=90000;
 const GRP_AI_OK='gov_ai_ok';
 const GRP_AI_MSG={login:'로그인을 확인해 주세요',budget:'이번 달 AI 사용 한도를 넘었습니다 — 대표에게 문의',net:'AI 응답이 없습니다 — 잠시 뒤 다시',parse:'AI 답을 읽지 못했습니다',locked:'확정된 판입니다 — AI 초안은 [새 판으로 고치기] 뒤에 씁니다',tg:'기술보호 사업장입니다 — 「이번 건 AI 사용」을 켜야 AI 초안을 씁니다(켜도 회차 날짜·메모만 보냅니다)',busyRound:'AI 초안을 쓰는 중입니다 — 끝난 뒤 다시',moved:'회차가 바뀌어 AI 초안을 넣지 않았습니다 — 다시 눌러 주세요',none:'AI 가 채울 빈 칸이 없습니다 — 사람이 쓴 칸은 덮지 않습니다'};
-const GRP_AI_PATH=/^(?:rounds\.\d+\.(?:inquiry|diagnosis|advice|result|next)|summary\.(?:inquiryDiag|review|action|etc|adviceAll|overall))$/;
+const GRP_AI_PATH=/^(?:rounds\.\d+\.(?:inquiry|diagnosis|advice|result|next)|summary\.(?:theme|inquiryDiag|review|action|etc|adviceAll|overall|status|diag|remedy|effects|followUp))$/;
 function grpRptRef(coId,rid){ return _fbDB.ref('scal_reports/'+coId+'/'+rid); }
 function grpRid(typeId,year){ return String(typeId)+'_'+String(year); }
 /* 보고서의 해 — 첫 회차(사전진단 뺀) 날짜의 해. 일정이 없으면 오늘의 해 */
@@ -7851,7 +7851,7 @@ function grpReadForm(){
 }
 /* 양식마다 화면에 내는 칸 — [경로, 이름표, 출처 열쇠(build src), 꼴, 안내] */
 function grpFieldsFor(fk){
-  const N=fk==='cci-north', S=fk==='cci-seosan', T=fk==='techguard';
+  const N=fk==='cci-north', S=fk==='cci-seosan', T=fk==='techguard', C=fk==='clinic';
   const L=[];
   const add=function(sec,on,path,label,srcKey,kind,ph){ if(on) L.push({sec:sec,path:path,label:label,srcKey:srcKey||'',kind:kind||'',ph:ph||''}); };
   add(1,true,'company.name','업체명','업체명');
@@ -7864,21 +7864,30 @@ function grpFieldsFor(fk){
   add(1,true,'company.contact','담당자','담당자');
   add(1,S,'company.contactDept','담당부서','');
   add(1,N||S,'company.contactTitle',N?'부서·직위':'직위','담당부서직위');
+  add(4,C,'consultantOrg','지원단 소속','');
+  add(4,C,'consultant','지원단 명','');
   add(1,S,'company.tel','연락처','');
   add(1,S,'company.fax','팩스','');
   add(1,S,'company.email','이메일','');
-  add(3,S,'field','상담분야','');
+  add(3,S||C,'field',C?'분야':'상담분야','');
   add(3,T,'techField.prevent','지원분야 — 사전예방','','check');
   add(3,T,'techField.startup','지원분야 — 스타트업','','check');
-  add(3,N||S,'summary.inquiryDiag',N?'문의·진단 종합':'요청 진단','','multi');
+  add(3,C,'summary.theme','테마','');
+  add(3,N||S||C,'summary.inquiryDiag',N?'문의·진단 종합':C?'애로사항 및 문제점':'요청 진단','','multi');
   add(3,N,'summary.review','검토사항(기존)','','multi');
   add(3,N,'summary.action','조치결과','','multi');
   add(3,N,'summary.outputs','산출물(별첨)','산출물목록','lines','한 줄에 하나 — 번호는 저절로 붙습니다');
   add(3,N,'summary.etc','기타사항','','multi','없으면 「없음」');
   add(3,S||T,'summary.adviceAll',T?'자문 내용':'자문 결과','','multi');
   add(3,T,'summary.overall','총평','','multi');
-  add(4,N||S,'writtenAt','작성일','','date');
-  add(4,true,'consultant',T?'자문위원(상담역)':'경영상담역','');
+  add(3,C,'summary.status','기업 현황','','multi');
+  add(3,C,'summary.diag','문제 진단','','multi');
+  add(3,C,'summary.remedy','처방 내용','','multi');
+  /* 전후 비교 — 줄마다 «개선 전 → 개선 후»(buildValues 가 줄로 나눈다). 글자 칸이어야 한다: lines 꼴이면 배열이 되어 쉼표로 붙는다 */
+  add(3,C,'summary.effects','전후 비교','','multi','한 줄에 하나 — 「개선 전 → 개선 후」, 최대 4줄');
+  add(3,C,'summary.followUp','향후 추진사항','','multi');
+  add(4,N||S,'writtenAt','작성일','','date');      // 현장클리닉 별지 14 에는 작성일 칸이 없다
+  add(4,!C,'consultant',T?'자문위원(상담역)':'경영상담역','');
   return L;
 }
 /* 비어 있는 칸 이름표 목록(체크칸 제외) — 회차는 일자·글이 빈 것 */
@@ -8545,7 +8554,7 @@ function grpRender(){
         <div class="grp-tblw"><table class="grp-tbl"><thead><tr><th>회차</th><th style="width:140px">일자</th>${showVisit?'<th style="width:110px">방식</th>':''}<th>수행 내역(${escAttr((GRP_RUSE[fk]||[]).join('·'))})</th></tr></thead>
         <tbody>${rows||`<tr><td colspan="${showVisit?4:3}" class="grp-src">일정에 회차가 없습니다 — [+ 회차 추가]</td></tr>`}</tbody></table></div></div>
       <div class="grp-card"><h3>③ 종합</h3><div class="grp-grid">${sec(3)}</div></div>
-      <div class="grp-card"><h3>④ 서명 · 작성일 <span class="grp-src">서명은 날인 스캔 회신(대표 결정 10/7)</span></h3><div class="grp-grid">${sec(4)}</div></div>
+      <div class="grp-card"><h3>${fk==='clinic'?'④ 지원단':'④ 서명 · 작성일 <span class="grp-src">서명은 날인 스캔 회신(대표 결정 10/7)</span>'}</h3><div class="grp-grid">${sec(4)}</div></div>
     </div>
     <div class="grp-side"><div class="grp-card"><h3>📎 출처 · 받은 자료</h3><div class="grp-feed">${feed}</div></div></div>
   </div>`;

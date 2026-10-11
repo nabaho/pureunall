@@ -1075,3 +1075,103 @@ test('미리보기 ⑬ 보고서 창 위 미리보기 — Esc·뒤로가기 한 
   doc.key('Escape', btn);
   assert.deepStrictEqual(closed, ['mbGovRpt']);
 });
+/* ── 현장클리닉(clinic, 별지 14) 보고서 창 칸 — 2026-10-12 ── */
+const CLINIC_PATHS = ['company.name', 'company.contact', 'consultantOrg', 'consultant', 'field', 'summary.theme', 'summary.inquiryDiag',
+  'summary.status', 'summary.diag', 'summary.remedy', 'summary.effects', 'summary.followUp'];
+
+test('clinic ① grpFieldsFor — 칸 경로·꼴·이름표(별지 14), writtenAt·사업자번호 등 안 쓰는 칸은 없다', () => {
+  const w = rptWorld();
+  const L = Array.from(w.ctx.grpFieldsFor('clinic'));
+  assert.deepStrictEqual(L.map((x) => x.path), CLINIC_PATHS);
+  const by = (p) => L.find((x) => x.path === p);
+  assert.strictEqual(by('company.name').label, '업체명');
+  assert.strictEqual(by('company.contact').label, '담당자');
+  assert.strictEqual(by('consultantOrg').label, '지원단 소속');
+  assert.strictEqual(by('consultant').label, '지원단 명');
+  assert.strictEqual(by('field').label, '분야');
+  assert.strictEqual(by('summary.theme').label, '테마');
+  assert.strictEqual(by('summary.inquiryDiag').label, '애로사항 및 문제점');
+  assert.strictEqual(by('summary.status').label, '기업 현황');
+  assert.strictEqual(by('summary.diag').label, '문제 진단');
+  assert.strictEqual(by('summary.remedy').label, '처방 내용');
+  assert.strictEqual(by('summary.effects').label, '전후 비교');
+  assert.strictEqual(by('summary.followUp').label, '향후 추진사항');
+  ['summary.inquiryDiag', 'summary.status', 'summary.diag', 'summary.remedy', 'summary.followUp'].forEach((p) => assert.strictEqual(by(p).kind, 'multi', p));
+  /* 전후 비교는 «글자» 칸이다 — buildValues 가 줄로 나눈다(lines 꼴이면 배열이 되어 쉼표로 붙는다) */
+  assert.strictEqual(by('summary.effects').kind, 'multi');
+  assert.match(by('summary.effects').ph, /한 줄에 하나/);
+  assert.match(by('summary.effects').ph, /개선 전 → 개선 후/);
+  assert.match(by('summary.effects').ph, /최대 4줄/);
+  ['writtenAt', 'company.bizNo', 'company.ceo', 'company.bizType', 'company.address', 'company.workers', 'summary.outputs'].forEach((p) =>
+    assert.ok(!L.some((x) => x.path === p), p + ' 는 현장클리닉 칸이 아니다'));
+  assert.ok(!L.some((x) => x.sec === 4 && x.kind === 'date'), '작성일 칸 없음(별지 14 에 작성일이 없다)');
+});
+
+test('clinic ② 간단형 세 양식의 칸 목록은 그대로다', () => {
+  const w = rptWorld();
+  const P = (fk) => Array.from(w.ctx.grpFieldsFor(fk), (x) => x.path);
+  assert.deepStrictEqual(P('cci-north'), ['company.name', 'company.bizNo', 'company.ceo', 'company.bizType', 'company.address', 'company.workers',
+    'company.contact', 'company.contactTitle', 'summary.inquiryDiag', 'summary.review', 'summary.action', 'summary.outputs', 'summary.etc', 'writtenAt', 'consultant']);
+  assert.deepStrictEqual(P('cci-seosan'), ['company.name', 'company.bizNo', 'company.bizType', 'company.address', 'company.workers', 'company.workType',
+    'company.contact', 'company.contactDept', 'company.contactTitle', 'company.tel', 'company.fax', 'company.email', 'field', 'summary.inquiryDiag',
+    'summary.adviceAll', 'writtenAt', 'consultant']);
+  assert.deepStrictEqual(P('techguard'), ['company.name', 'company.ceo', 'company.contact', 'techField.prevent', 'techField.startup', 'summary.adviceAll',
+    'summary.overall', 'consultant']);
+  const lab = (fk, p) => w.ctx.grpFieldsFor(fk).find((x) => x.path === p).label;
+  assert.strictEqual(lab('cci-north', 'consultant'), '경영상담역');
+  assert.strictEqual(lab('cci-seosan', 'consultant'), '경영상담역');
+  assert.strictEqual(lab('techguard', 'consultant'), '자문위원(상담역)');
+  assert.strictEqual(lab('cci-north', 'summary.inquiryDiag'), '문의·진단 종합');
+  assert.strictEqual(lab('cci-seosan', 'summary.inquiryDiag'), '요청 진단');
+});
+
+test('clinic ③ GRP_HINT·GRP_RUSE — 양식 고르기 힌트와 회차 칸 이름표, 간단형 값은 그대로', () => {
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(SRC.match(/^const GRP_HINT=.*;/m)[0] + '\n' + SRC.match(/^const GRP_RUSE=.*;/m)[0] + '\nthis.H=GRP_HINT; this.U=GRP_RUSE;', ctx);
+  assert.strictEqual(ctx.H.clinic, '현장클리닉');
+  assert.deepStrictEqual(Array.from(ctx.U.clinic), ['문의', '진단', '자문', '성과', '향후']);
+  assert.strictEqual(ctx.H['cci-north'], '충남북부');
+  assert.strictEqual(ctx.H['cci-seosan'], '서산');
+  assert.strictEqual(ctx.H.techguard, '기술보호');
+  assert.deepStrictEqual(Array.from(ctx.U['cci-seosan']), ['문의', '진단', '자문']);
+  assert.deepStrictEqual(Array.from(ctx.U.techguard), ['진단', '자문', '성과', '향후']);
+});
+
+test('clinic ④ grpHintInput — 현장클리닉을 고르면 사업 이름 끝에 «현장클리닉» 이 붙어 build 가 clinic 양식을 고른다', () => {
+  const w = rptWorld();
+  const input = { type: { id: 't', name: '컨설팅', fullName: '비즈니스 지원' }, cons: {} };
+  const hinted = w.ctx.grpHintInput(input, 'clinic');
+  assert.strictEqual(Build.resolveFormKey(hinted.type, '').formKey, 'clinic');
+});
+
+test('clinic ⑤ grpBlankList — 비어 있는 새 칸 이름표가 나온다(지원단 소속 포함), 채우면 빠진다', () => {
+  const w = rptWorld();
+  const st = { formKey: 'clinic', report: { company: { name: '가나상사', contact: '홍길동' }, consultantOrg: '', consultant: '이푸른', field: '인사노무',
+    summary: { theme: '규정 정비', inquiryDiag: '', status: '', diag: '', remedy: '', effects: '', followUp: '' }, rounds: [] } };
+  const bl = Array.from(w.ctx.grpBlankList(st));
+  assert.deepStrictEqual(bl, ['지원단 소속', '애로사항 및 문제점', '기업 현황', '문제 진단', '처방 내용', '전후 비교', '향후 추진사항']);
+  st.report.consultantOrg = '푸른노무법인';
+  assert.ok(!Array.from(w.ctx.grpBlankList(st)).includes('지원단 소속'));
+});
+
+test('clinic ⑥ GRP_AI_PATH — 새 종합 칸도 AI 칸으로 저장·복원된다, 양식 밖 경로는 여전히 거절', () => {
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(SRC.match(/^const GRP_AI_PATH=.*;/m)[0] + '\nthis.R=GRP_AI_PATH;', ctx);
+  ['theme', 'status', 'diag', 'remedy', 'effects', 'followUp', 'inquiryDiag', 'review', 'adviceAll', 'overall'].forEach((k) =>
+    assert.ok(ctx.R.test('summary.' + k), k));
+  assert.ok(ctx.R.test('rounds.2.next'));
+  ['summary.outputs', 'summary.themeX', 'consultantOrg', 'company.name', 'summary.__proto__'].forEach((p) => assert.ok(!ctx.R.test(p), p));
+});
+
+test('clinic ⑦ 칸 경로와 AI 모듈 USES 가 같은 종합 칸을 가리킨다(화면 ↔ AI ↔ buildValues)', () => {
+  const Ai = require('../js/pu-gov-report-ai.js');
+  const w = rptWorld();
+  const screen = Array.from(w.ctx.grpFieldsFor('clinic'), (x) => x.path).filter((p) => /^summary\./.test(p)).map((p) => p.slice(8)).sort();
+  assert.deepStrictEqual(Ai.fieldsFor('clinic').summary.slice().sort(), screen);
+});
+
+test('clinic ⑧ 화면 — 방식(방문/사무) 열은 충남북부만(현장클리닉에는 없다)', () => {
+  assert.match(SRC, /const showVisit=fk==='cci-north';/);
+});

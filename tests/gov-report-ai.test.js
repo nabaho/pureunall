@@ -233,3 +233,85 @@ test('checkDraft — 입력에 없던 날짜·숫자, 한도 초과, [가림] �
   assert.match(w['summary.overall'].join(' '), /\[가림\] 이 남았습니다/);
   assert.equal(A.checkDraft({ rounds: [], summary: { etc: 'x'.repeat(301) } }, sent, { etc: 400 })['summary.etc'], undefined);
 });
+
+/* ── 현장클리닉(clinic, 별지 14) — 2026-10-12 ── */
+const CLINIC_SUMMARY = ['theme', 'inquiryDiag', 'status', 'diag', 'remedy', 'effects', 'followUp'];
+
+test('clinic — USES: 회차 5칸 전부 + 종합 7칸(양식 지도와 같다), 간단형 세 양식은 그대로', () => {
+  assert.deepEqual(A.fieldsFor('clinic'), { rounds: RK, summary: CLINIC_SUMMARY });
+  assert.deepEqual(A.USES.clinic, { main: { rounds: RK, summary: CLINIC_SUMMARY } });
+  assert.deepEqual(A.fieldsFor('cci-north'), { rounds: RK, summary: ['inquiryDiag', 'review', 'action', 'etc'] });
+  assert.deepEqual(A.fieldsFor('cci-seosan'), { rounds: ['inquiry', 'diagnosis', 'advice'], summary: ['inquiryDiag', 'adviceAll'] });
+  assert.deepEqual(A.fieldsFor('techguard'), { rounds: ['diagnosis', 'advice', 'result', 'next'], summary: ['adviceAll', 'overall'] });
+});
+
+test('clinic — buildValues 가 실제로 쓰는 새 종합 칸과 USES 가 같다(지도 대조, 새 칸 포함)', () => {
+  const NEW = ['theme', 'status', 'diag', 'remedy', 'effects', 'followUp'];
+  for (const fk of Object.keys(R.FORMS)) {
+    const report = { company: {}, rounds: [{ date: '2025-09-04' }], summary: {} };
+    NEW.forEach((k) => { report.summary[k] = 'N' + k + ' → N' + k + '후'; });
+    const out = JSON.stringify(R.buildValues(report, fk));
+    const f = A.fieldsFor(fk);
+    NEW.forEach((k) => assert.equal(out.includes('N' + k), f.summary.includes(k), fk + ' 새 종합 ' + k));
+  }
+});
+
+test('clinic — LIMITS·LABEL·LABEL_FORM: 새 칸 한도와 이름표, 애로사항 이름, 다른 양식 이름표 불변', () => {
+  const L = A.LIMITS;
+  assert.deepEqual([L.theme, L.status, L.diag, L.remedy, L.effects, L.followUp], [100, 600, 600, 800, 600, 600]);
+  const lab = A.labelsFor('clinic');
+  assert.equal(lab.inquiryDiag, '애로사항 및 문제점');
+  assert.equal(lab.theme, '테마');
+  assert.equal(lab.status, '기업 현황');
+  assert.equal(lab.diag, '문제 진단');
+  assert.equal(lab.remedy, '처방 내용');
+  assert.equal(lab.effects, '전후 비교(줄마다 «개선 전 → 개선 후»)');
+  assert.equal(lab.followUp, '향후 추진사항');
+  assert.equal(A.labelsFor('cci-north').inquiryDiag, '문의·진단 종합');
+  assert.equal(A.labelsFor('cci-seosan').inquiryDiag, '요청 진단');
+  assert.equal(A.labelsFor('techguard').adviceAll, '자문 내용');
+});
+
+test('clinic — GUIDE: 별지 14 작성기준, 노무사 확인 전 초안이라는 주석, 다른 양식 문구 불변', () => {
+  assert.match(A.GUIDE.clinic, /별지 14/);
+  assert.match(A.GUIDE.clinic, /개선 전 → 개선 후/);
+  assert.match(A.GUIDE.clinic, /40%/);
+  assert.ok(A.GUIDE['cci-north'].startsWith('충남북부상공회의소 인사노무 컨설팅 결과보고서.'));
+  assert.ok(A.GUIDE['cci-seosan'].startsWith('서산상공회의소 인사노무 경영컨설팅.'));
+  assert.ok(A.GUIDE.techguard.startsWith('통합 기술보호지원반 법률 자문 완료보고서(별지 11).'));
+  const src = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'js', 'pu-gov-report-ai.js'), 'utf8');
+  assert.match(src, /노무사 확인 필요[^\n]*\n\s*clinic:/, 'GUIDE.clinic 바로 위에 «노무사 확인 필요» 주석');
+});
+
+test('clinic — buildRequest: 새 종합 칸이 채울 칸·시스템 글에 들어가고 업체·담당자 이름은 가려 나간다', () => {
+  const r = rep();
+  r.summary = { theme: '', inquiryDiag: '', status: '', diag: '', remedy: '', effects: '', followUp: '', outputs: [] };
+  const q = A.buildRequest(r, [], 'clinic', {});
+  assert.deepEqual(q.want.filter((p) => p.startsWith('summary.')), CLINIC_SUMMARY.map((k) => 'summary.' + k));
+  assert.match(q.system, /effects=전후 비교\(줄마다 «개선 전 → 개선 후»\) 600자/);
+  assert.match(q.system, /inquiryDiag=애로사항 및 문제점 600자/);
+  assert.match(q.system, /별지 14/);
+  assert.ok(!/review=|adviceAll=|overall=/.test(q.system), '현장클리닉이 안 쓰는 칸은 묻지 않는다');
+  assert.ok(!q.sent.includes('가나상사') && !q.sent.includes('홍길동'));
+  assert.ok(q.sent.includes('현장클리닉 현장지도결과서(별지 14)'));
+});
+
+test('clinic — parseDraft·applyDraft·checkDraft: 새 종합 칸이 AI 초안에서 보고서 칸까지 흐른다(여러 줄 유지)', () => {
+  const text = JSON.stringify({ rounds: [], summary: {
+    theme: '인사규정 정비', inquiryDiag: '임금체계 문의', status: '상시 12명 제조업', diag: '규정 미비', remedy: '취업규칙 신설',
+    effects: '규정 없음 → 규정 신설\r\n수당 혼재 → 수당 구분', followUp: '6개월 뒤 점검', review: '양식 밖', overall: '양식 밖',
+  } });
+  const d = A.parseDraft(text, []);
+  assert.deepEqual(Object.keys(d.summary).sort(), CLINIC_SUMMARY.concat(['review', 'overall']).sort());
+  assert.equal(d.summary.effects, '규정 없음 → 규정 신설\n수당 혼재 → 수당 구분');
+  const r = rep(); r.summary = { outputs: [] };
+  const res = A.applyDraft(r, {}, d, A.fieldsFor('clinic'));
+  assert.deepEqual(res.filled.slice().sort(), CLINIC_SUMMARY.map((k) => 'summary.' + k).sort());
+  assert.equal(res.report.summary.review, undefined, '양식이 안 쓰는 칸은 받지 않는다');
+  const V = R.buildValues(res.report, 'clinic');
+  assert.equal(V['전1'], '규정 없음');
+  assert.equal(V['후2'], '수당 구분');
+  const w = A.checkDraft({ rounds: [], summary: { effects: 'x'.repeat(601), theme: 'y'.repeat(101) } }, '{}', {});
+  assert.match(w['summary.effects'].join(' '), /한도 600자 초과/);
+  assert.match(w['summary.theme'].join(' '), /한도 100자 초과/);
+});

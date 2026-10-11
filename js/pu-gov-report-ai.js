@@ -16,7 +16,9 @@
   var GARIM = '[가림]';
   var NO_RECORD = '기록 없음 — 입력 필요';
   var ROUND_KEYS = ['inquiry', 'diagnosis', 'advice', 'result', 'next'];
-  var SUMMARY_KEYS = ['inquiryDiag', 'review', 'action', 'etc', 'adviceAll', 'overall'];
+  /* 종합 칸 이름 전부 — parseDraft·applyDraft·checkDraft 는 여기 있는 것만 받는다(현장클리닉 새 칸: theme·status·diag·remedy·effects·followUp) */
+  var SUMMARY_KEYS = ['theme', 'inquiryDiag', 'review', 'action', 'etc', 'adviceAll', 'overall',
+    'status', 'diag', 'remedy', 'effects', 'followUp'];
   /* 양식 파일마다 쓰는 칸 — buildValues 가 실제로 찍는 칸 */
   var USES = {
     'cci-north': { main: { rounds: ROUND_KEYS, summary: ['inquiryDiag', 'review', 'action', 'etc'] } },
@@ -25,10 +27,13 @@
       report: { rounds: [], summary: ['inquiryDiag', 'adviceAll'] },
     },
     techguard: { main: { rounds: ['diagnosis', 'advice', 'result', 'next'], summary: ['adviceAll', 'overall'] } },
+    /* 현장클리닉(별지 14) — 일정 칸 «수행내용» 에 회차 5칸이 이어 들어가고, 종합은 테마·애로사항·현황·진단·처방·전후 비교·향후 */
+    clinic: { main: { rounds: ROUND_KEYS, summary: ['theme', 'inquiryDiag', 'status', 'diag', 'remedy', 'effects', 'followUp'] } },
   };
   /* 칸별 글자 수 한도 — 기관 공식 한도가 아니라 양식 칸 크기에 맞춘 출발값(노무사 확인 필요) */
   var LIMITS = { inquiry: 300, diagnosis: 300, advice: 300, result: 300, next: 300,
-    inquiryDiag: 600, review: 600, action: 600, etc: 300, adviceAll: 1000, overall: 600 };
+    inquiryDiag: 600, review: 600, action: 600, etc: 300, adviceAll: 1000, overall: 600,
+    theme: 100, status: 600, diag: 600, remedy: 800, effects: 600, followUp: 600 };
 
   function str(v) { return v == null ? '' : String(v).trim(); }
 
@@ -85,8 +90,11 @@
   var BODY_MAX = 1500;
   var LABEL = { inquiry: '문의', diagnosis: '진단', advice: '자문', result: '성과', next: '향후',
     inquiryDiag: '문의·진단 종합', review: '검토사항(기존)', action: '조치결과', etc: '기타사항',
-    adviceAll: '자문 결과', overall: '총평' };
+    adviceAll: '자문 결과', overall: '총평',
+    theme: '테마', status: '기업 현황', diag: '문제 진단', remedy: '처방 내용',
+    effects: '전후 비교(줄마다 «개선 전 → 개선 후»)', followUp: '향후 추진사항' };
   var LABEL_FORM = {
+    clinic: { inquiryDiag: '애로사항 및 문제점' },
     'cci-seosan': { inquiryDiag: '요청 진단', adviceAll: '자문 결과' },
     techguard: { diagnosis: '문제점', adviceAll: '자문 내용' },
   };
@@ -105,6 +113,10 @@
       + '상담 및 자문 결과 보고서는 요청 진단과 자문 결과를 전체 회차를 묶어 쓴다.',
     techguard: '통합 기술보호지원반 법률 자문 완료보고서(별지 11). 회차별 법률 자문 일지에 문제점·자문·성과·향후를 쓰고, '
       + '종합에 자문 내용과 총평을 쓴다. 기술 자료의 내용은 쓰지 않는다.',
+    /* ⚠ 노무사 확인 필요 — 운영지침 별지 14 에서 옮긴 출발 문구(초안). 기관 원문·실무 기준과 대조해 고친 뒤 확정한다 */
+    clinic: '비즈니스지원단 현장클리닉 현장지도결과서(별지 14). 수행계획서 내용을 충실히 반영하고 기업 애로 해결 과정을 논리적으로 기록한다. '
+      + '기업 현황·문제 진단·처방 내용을 나눠 쓰고, 전후 비교는 «개선 전 → 개선 후» 한 줄씩, 향후 추진사항은 성과추적관리 방안을 함께 쓴다. '
+      + '산출물은 계획 대비 40% 이하면 취소될 수 있으니 실제 산출물과 맞춰 쓴다.',
   };
   function systemText(formKey, fields, lim) {
     var lab = labelsFor(formKey);
@@ -283,7 +295,7 @@
   var api = { fieldsFor: fieldsFor, mask: mask, unmask: unmask, buildRequest: buildRequest, parseDraft: parseDraft,
     applyDraft: applyDraft, undoDraft: undoDraft, checkDraft: checkDraft,
     ROUND_KEYS: ROUND_KEYS, SUMMARY_KEYS: SUMMARY_KEYS, USES: USES, LIMITS: LIMITS, GARIM: GARIM, NO_RECORD: NO_RECORD,
-    BODY_MAX: BODY_MAX, GUIDE: GUIDE, COMMON_GUIDE: COMMON_GUIDE };
+    BODY_MAX: BODY_MAX, GUIDE: GUIDE, COMMON_GUIDE: COMMON_GUIDE, labelsFor: labelsFor, LABEL: LABEL, LABEL_FORM: LABEL_FORM };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuGovReportAi = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
