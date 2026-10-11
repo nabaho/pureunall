@@ -77895,6 +77895,24 @@ function LeaveOfAbsenceTab(){
    ⚠ 그런데 같은 사람·같은 해 행이 둘일 수도 있다(옛 자료·이관 중복). 그때 같은 id 를
      주면 dbSet 의 중복제거가 «한 줄을 지운다» — 자료가 사라진다.
      그래서 나온 순서대로 #2, #3 을 붙인다. 순서는 저장된 배열 그대로라 기기마다 같다. */
+/* ★ 연차대장 한 줄이 «이 사람 것인가» (2026-10-11 검토 A7)
+     leaveLedgerWithIds 는 «이름이 하나뿐일 때만» 사번을 붙인다 → 사번 없는 줄 = 동명이인이라 못 붙인 줄일 수 있다.
+     그런데 명세서는 사번 없는 줄을 이름으로 맞춰, 동명이인이면 «둘 모두»에게 남의 연차가 실렸다.
+     규칙(erpPerfShareIsMine 과 같은 잣대): ① 사번이 있는 줄은 사번만 본다
+       ② 사번 없는 줄은 명부(재직·퇴직 전부 + user_dir)에 그 이름이 «하나뿐»이고 그 사람이 나일 때만 이름으로 맞춘다
+       ③ 그 밖(동명이인의 사번 없는 줄)은 누구의 명세서에도 싣지 않는다 — 틀린 것을 적느니 비운다. */
+function erpLeaveLedgerRowIsMine(row, empSid, empName){
+  if(!row || !empSid) return false;
+  if(row.sid) return row.sid === empSid;
+  var nm = String(empName || '').trim();
+  if(!nm || String(row.name == null ? '' : row.name).trim() !== nm) return false;
+  var all = [];
+  try { all = (dbGet('user_accounts', []) || []).concat(dbGet('user_dir', []) || []); } catch(_e){ all = []; }
+  var holders = {};
+  all.forEach(function(u){ if(u && u.sid && u.name && String(u.name).trim() === nm) holders[u.sid] = 1; });
+  var ks = Object.keys(holders);
+  return ks.length === 1 && ks[0] === empSid;
+}
 function leaveLedgerWithIds(rows, users){
   if(!Array.isArray(rows)) return { rows:[], changed:0, dup:0 };
   /* ★ 사번을 붙인다 — 대장은 «이름+연도»로만 담겨 있어 동명이인이 생기면 남의 연차가 명세서에 실린다 (2026-10-10).
@@ -81621,7 +81639,7 @@ function PayrollLedger(props){
       try {
         var _ly = (ym||'').slice(0,4);
         var _lf = function(v){ return (v==null||v==='')?'-':v; };
-        var _llRows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로 — 동명이인이면 남의 연차가 명세서에 실린다 (2026-10-10) */ return (x.sid ? x.sid===u.sid : x.name===u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3).map(function(x){
+        var _llRows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로, 사번 없는 줄은 이름이 명부에 하나뿐일 때만 (2026-10-11 A7) */ return erpLeaveLedgerRowIsMine(x, u.sid, u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3).map(function(x){
           var _mo = (x.monthly||'-'); if(x.note) _mo += ' <span style="color:#94a3b8">('+x.note+')</span>';
           var _hi = (String(x.year)===_ly) ? ' style="background:#f0fdf4;font-weight:700"' : '';
           return '<tr'+_hi+'><td style="padding:3px 6px;text-align:center">'+x.year+'년</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.granted)+'</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.used)+'</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.remain)+'</td><td style="padding:3px 6px;font-size:10px;color:#475569">'+_mo+'</td></tr>';
@@ -81636,7 +81654,7 @@ function PayrollLedger(props){
       if((rec.bonus||0)>0) _payBasis += '· 기타상여: '+num(rec.bonus)+'원<br>';
       var _dedBasis = _pbt.ded.map(function(t){ return '· '+_escH(t); }).join('<br>');
       var basisHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px"><tr><td style="width:50%;vertical-align:top;padding-right:7px"><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:8px 12px;font-size:10px;color:#166534;line-height:1.7"><div style="font-weight:700;color:#166534;margin-bottom:3px">📋 지급 근거</div>'+_payBasis+'</div></td><td style="width:50%;vertical-align:top;padding-left:7px"><div style="background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:8px 12px;font-size:10px;color:#854d0e;line-height:1.7"><div style="font-weight:700;color:#854d0e;margin-bottom:3px">📋 공제 근거</div>'+_dedBasis+'</div></td></tr></table>'+(calc.minWageWarning?('<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:5px;padding:6px 12px;font-size:10px;color:#dc2626;font-weight:700">⚠️ '+_escH(_pbt.minWage)+'</div>'):'');
-      var _pn2 = getLeavePromoNotice(u.name);
+      var _pn2 = getLeavePromoNotice(u.name, u.sid);
       var promoHtml = _pn2 ? ('<div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:4px">📣 연차 사용촉진 안내</div><div style="font-size:11.5px;color:#1e40af;line-height:1.6">미사용 연차 <b>'+_pn2.remain+'일</b> · 사용기간 ~'+_pn2.expiryStr+' 까지 · 사용시기를 지정해 주세요.</div></div>') : '';
       var el = document.createElement('div');
       el.style.cssText = "position:absolute;left:-9999px;top:0;width:700px;box-sizing:border-box;background:#fff;padding:30px;font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#1e293b";
@@ -83149,7 +83167,7 @@ function PayrollBulkModal(props){
 }
 
 // ── 급여명세서 (1직원 상세) ──
-function getLeavePromoNotice(empName){
+function getLeavePromoNotice(empName, empSid){
   try{
     var pol = dbGet('policy_leave', {}) || {};
     var basis = pol.basis || 'joinDate';
@@ -83164,14 +83182,21 @@ function getLeavePromoNotice(empName){
          «헷갈릴 수 있으면 아예 안 적는다» — 틀린 것을 적느니 비우는 것이 낫다.
          2026-09-03 확인: 지금 같은 이름은 없다. 생기는 날 조용히 틀리지 않게 막아 둔다. */
     var _all = dbGet('user_accounts', USERS_SEED) || [];
-    var _same = _all.filter(function(u){ return u && u.name === empName && !u.retireDate; });
-    if(_same.length > 1) return null;
+    /* ★ 사번을 받으면 사번으로 그 사람을 찾는다 (2026-10-11 A7). 사번이 없을 때만 예전처럼 이름 —
+         재직자 가운데 그 이름이 둘 이상이면 아예 안 적는다(퇴직한 동명이인은 여기서 세지 않는다). */
+    var _me = null;
+    if(empSid){ for(var _k = 0; _k < _all.length; _k++){ if(_all[_k] && _all[_k].sid === empSid){ _me = _all[_k]; break; } } }
+    else {
+      var _same = _all.filter(function(u){ return u && u.name === empName && !u.retireDate; });
+      if(_same.length > 1) return null;
+      _me = _same.length === 1 ? _same[0] : null;
+    }
+    if(!_me) return null;
     var lr = null;
-    var _me = _same.length === 1 ? _same[0] : null;
     for(var i=0;i<ledger.length;i++){
       var _L = ledger[i]; if(!_L || Number(_L.year)!==year) continue;
-      /* 사번이 붙은 줄은 사번으로, 아니면 이름으로 (사번이 다른 사람 줄은 이름이 같아도 쓰지 않는다) */
-      if(_L.sid ? (_me && _L.sid === _me.sid) : (_L.name === empName)){ lr = _L; break; }
+      /* 사번이 붙은 줄은 사번으로, 사번 없는 줄은 이름이 명부(퇴직자 포함)에 하나뿐일 때만 — 명세서 연차표와 같은 잣대 */
+      if(erpLeaveLedgerRowIsMine(_L, _me.sid, _me.name)){ lr = _L; break; }
     }
     if(!lr) return null;
     var remain = (lr.remain!=null && !isNaN(Number(lr.remain))) ? Number(lr.remain) : null;
@@ -83183,8 +83208,8 @@ function getLeavePromoNotice(empName){
     if(basis==='fiscalYear'){
       expiry = (fiscalMonth===1) ? new Date(year,11,31) : lastDayOfMonth(year+1, fiscalMonth-2);
     } else {
-      var users = dbGet('user_accounts', USERS_SEED) || [];
-      var u=null; for(var j=0;j<users.length;j++){ if(users[j].name===empName){ u=users[j]; break; } }
+      /* 위에서 찾은 «그 사람»(_me) — 예전에는 여기서 이름으로 다시 찾아 첫 건(퇴직한 동명이인일 수 있다)의 입사일을 썼다 */
+      var u = _me;
       if(!u || !u.hireDate) return null;
       var hd=new Date(u.hireDate); if(isNaN(hd.getTime())) return null;
       var cand=new Date(year, hd.getMonth(), hd.getDate());
@@ -83263,7 +83288,7 @@ function PayrollPayslip(props){
              fromLedger:m.fromLedger,
              paidDate:r.paidDate || '',
              methods:payslipMethods(r),
-             promo:getLeavePromoNotice(emp.name) };
+             promo:getLeavePromoNotice(emp.name, emp.sid) };
   }
   function buildSlipBody(empSid, ym){
     var d = slipData(empSid, ym), won = function(v){ return v.toLocaleString()+'원'; };
@@ -83592,7 +83617,7 @@ function PayrollPayslip(props){
             h('td', {style:{padding:'5px 8px'}}, rec.paidDate||(props.selYM+'-25')))
         )
       ),
-      (function(){ var _pn=getLeavePromoNotice(u.name); return _pn ? h('div',{style:{margin:'0 0 16px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'10px 14px'}}, h('div',{style:{fontSize:'12px',fontWeight:700,color:'#1e40af',marginBottom:'4px'}},'📣 연차 사용촉진 안내'), h('div',{style:{fontSize:'11.5px',color:'#1e40af',lineHeight:1.6}}, '미사용 연차 '+_pn.remain+'일 · 사용기간 ~'+_pn.expiryStr+' 까지 · 사용시기를 지정해 주세요.')) : null; })(),
+      (function(){ var _pn=getLeavePromoNotice(u.name, u.sid); return _pn ? h('div',{style:{margin:'0 0 16px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'10px 14px'}}, h('div',{style:{fontSize:'12px',fontWeight:700,color:'#1e40af',marginBottom:'4px'}},'📣 연차 사용촉진 안내'), h('div',{style:{fontSize:'11.5px',color:'#1e40af',lineHeight:1.6}}, '미사용 연차 '+_pn.remain+'일 · 사용기간 ~'+_pn.expiryStr+' 까지 · 사용시기를 지정해 주세요.')) : null; })(),
       // 지급/공제 2단
       h('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'16px'}},
         // 지급
@@ -83754,7 +83779,7 @@ function PayrollPayslip(props){
       // 연차 현황 (연도별, 연차대장 기준)
       (function(){
         var _ly = (props.selYM||'').slice(0,4);
-        var _rows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로 — 동명이인이면 남의 연차가 명세서에 실린다 (2026-10-10) */ return (x.sid ? x.sid===u.sid : x.name===u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3);
+        var _rows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로, 사번 없는 줄은 이름이 명부에 하나뿐일 때만 (2026-10-11 A7) */ return erpLeaveLedgerRowIsMine(x, u.sid, u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3);
         if(!_rows.length) return null;
         var _lf = function(v){ return (v==null||v==='')?'-':v; };
         var _thx = {padding:'4px 6px',color:'#1e40af',fontWeight:700,fontSize:'11px'};

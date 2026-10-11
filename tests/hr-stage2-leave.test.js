@@ -143,5 +143,10 @@ test('연차대장 — 이름이 하나뿐일 때만 사번을 붙이고, 동명
 
 test('명세서의 연차 현황은 사번이 붙은 줄을 사번으로 찾는다', () => {
   const code = stripJs(SRC);
-  assert.ok((code.match(/x\.sid \? x\.sid===u\.sid : x\.name===u\.name/g) || []).length >= 2);
+  /* 2026-10-11 A7: 줄 맞추기는 erpLeaveLedgerRowIsMine 한 곳(사번 우선, 사번 없는 줄은 이름이 명부에 하나뿐일 때만).
+     규칙: 명세서 두 곳이 그 함수를 부르고, 그 함수가 «사번이 있으면 사번만» 본다 — 자세한 동작은 payslip-leave-ledger-homonym.test.js */
+  assert.ok((code.match(/erpLeaveLedgerRowIsMine\(x, u\.sid, u\.name\)/g) || []).length >= 2);
+  const at = code.indexOf('function erpLeaveLedgerRowIsMine(');
+  assert.ok(at >= 0);
+  assert.match(code.slice(at, code.indexOf('\n}', at)), /if\(row\.sid\) return row\.sid === empSid;/);
 });
