@@ -224,9 +224,9 @@ test('ⓘ 내용 고치기 — 한글 원본을 저장소 안 편집기로 고�
 
 /* ⓙ 왼쪽 메뉴 — 한 곳만 눌림 · 세트 보기 · 세트마다 색 (대표 지시 2026-10-10) */
 test('ⓙ 왼쪽 메뉴 — 종류·종료 서식·세트 중 한 곳만 눌리고, 세트를 누르면 목록이 그 세트의 서류만 보인다', () => {
-  assert.match(SRC, /S\.kind = v; S\.setView = null; resetFilters\(\);/, '종류를 누르면 세트 보기가 풀린다');
-  assert.match(SRC, /var on = !S\.setView && S\.kind === k\.v;/, '종류는 세트 보기 중엔 눌림 표시를 하지 않는다');
-  assert.match(SRC, /!S\.setView && S\.kind === '_closed' \? ' on'/, '종료 서식도 마찬가지');
+  assert.match(SRC, /S\.kind = v; S\.setView = null; S\.quote = false; resetFilters\(\);/, '종류를 누르면 세트 보기가 풀린다');
+  assert.match(SRC, /var on = !S\.setView && !S\.quote && S\.kind === k\.v;/, '종류는 세트·견적서 보기 중엔 눌림 표시를 하지 않는다');
+  assert.match(SRC, /!S\.setView && !S\.quote && S\.kind === '_closed' \? ' on'/, '종료 서식도 마찬가지');
   assert.match(SRC, /var on = S\.setView === st\.id;/, '세트는 세트 보기일 때만 눌림');
   assert.match(SRC, /S\.setView = st\.id;/, '세트를 누르면 세트 보기로');
   const i = SRC.indexOf('function setViewList() {'), j = SRC.indexOf('function shown() {', i);
@@ -258,4 +258,30 @@ test('ⓛ 「📄 계약서 양식」 = 상위 탭 — 눌러서 아래 메뉴�
   const i = H.indexOf('function setFormsFold('), g = H.slice(i, H.indexOf('setFormsFold(formsFolded());', i));
   assert.match(g, /localStorage\.setItem\('pcf-fold-forms'/); assert.match(g, /\$\('formsTree'\)[\s\S]*t\.hidden = !!f/);
   assert.match(g, /catch \(e\) \{\}/, '저장소가 막혀도 동작');
+});
+
+test('ⓜ 🧾 견적서·제안서 — 종류를 가로질러 모아 따로 본다 (대표 2026-10-11)', () => {
+  const G = C.PROPOSAL_GROUP;
+  const F = [
+    { id: 'a', kind: 'company', name: '자문계약서', body: '' },
+    { id: 'b', kind: 'company', name: '자문 견적서', groupName: G, body: '' },
+    { id: 'c', kind: 'consulting', name: '컨설팅 견적서', groupName: G, body: '' },
+    { id: 'd', kind: 'fund', name: '기금 견적서', groupName: G, body: '' },
+    { id: 'e', kind: 'other', name: '종료한 견적서', groupName: G, closed: true, closedAt: '2026-10-01', body: '' },
+    { id: 'f', kind: 'case', name: '사건 견적서', groupName: G, body: '' },
+    { id: 'g', kind: 'fund', name: '기금 위임계약서', body: '' }];
+  const ids = (o) => C.filterForms(F, Object.assign({ quote: true }, o)).map((f) => f.id);
+  assert.deepStrictEqual(ids(), ['b', 'c', 'd'], '견적·제안 묶음만 · 종료·사건계약·계약서는 뺀다 · 종류 차례');
+  assert.deepStrictEqual(ids({ q: '컨설팅' }), ['c'], '이름 찾기');
+  assert.deepStrictEqual(C.filterForms(F, { kind: 'company' }).map((f) => f.id), ['a', 'b'], '원래 종류에서도 그대로 보인다');
+});
+test('ⓜ 견적서 보기 배선 — 세트 보기와 같은 길(눌린 곳 하나, 끌기·새 양식 없음)', () => {
+  assert.match(SRC, /function pickQuote\(\) \{\s*S\.quote = true; S\.setView = null;/);
+  assert.match(SRC, /S\.kind = v; S\.setView = null; S\.quote = false;/, '종류를 누르면 견적서 보기가 풀린다');
+  assert.match(SRC, /S\.setView = st\.id; S\.quote = false;/, '세트를 누르면 견적서 보기가 풀린다');
+  assert.match(SRC, /var on = !S\.setView && !S\.quote && S\.kind === k\.v;/);
+  assert.match(SRC, /onclick: pickQuote \}, \[el\('span', \{ text: '🧾 견적서·제안서' \}\)/);
+  assert.match(SRC, /if \(!S\.setView && !S\.quote\) dragSort\(rows, moveForm\);/);
+  assert.match(SRC, /S\.kind !== '_closed' && !S\.setView && !S\.quote\) col\.appendChild/);
+  assert.match(SRC, /if \(kSel\.value === '_quote'\) pickQuote\(\);/, '폰 선택 칸에서도');
 });
