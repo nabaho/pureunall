@@ -402,3 +402,10 @@ test('폰 일정 상세 — 구글 앱 캡처: 시트로 덮기 · 「내일 •
   assert.match(캘, /body\.mob \.dttl\{font-size:28px;line-height:36px\}/);
   assert.match(캘, /body\.mob \.dtool \.dtb\[data-close\]\{order:-1;margin-right:auto\}/);
 });
+
+test('폰 새 일정 입력 — 캘린더 칩 줄(푸른노무법인 · 공용 / 나만 보기), 아래 선택 줄은 폰에서 뺀다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /<div class="gtabs gcalchips">/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-mvis'\)\)\{ modalRead\(\); S\.modal\.vis = t\.getAttribute\('data-mvis'\); render\(\); return; \}/);
+  assert.match(캘, /\? 달력힌트 : 줄\("calendar", 달력, "누가 보나"\) \+ 달력힌트/);
+});

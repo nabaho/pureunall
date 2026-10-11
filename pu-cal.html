@@ -492,6 +492,9 @@
   .gform .gfrom{margin:-6px 0 8px 56px}
   .gform .gtabs{display:flex;gap:8px;margin:0 0 8px 56px}
   .gform .gtabs button{border:1px solid var(--gline);background:transparent;color:var(--gtext);font-size:14px;padding:0 16px;height:32px;border-radius:8px;cursor:pointer;font-family:inherit}
+  .gform .gcalchips{overflow-x:auto;margin-top:2px}
+  .gform .gcalchips button{display:inline-flex;align-items:center;gap:10px;white-space:nowrap;flex:none}
+  .gform .gcalchips .cdot{width:16px;height:16px;border-radius:50%;display:inline-block}
   .gform .gtabs button.on{background:#d3e3fd;border-color:#d3e3fd;color:#0b57d0;font-weight:500}
   :root[data-theme="dark"] .gform .gtabs button.on{background:#0842a0;border-color:#0842a0;color:#d3e3fd}
   .gform .grow{display:flex;align-items:center;gap:0;padding:0;min-height:48px}
@@ -4145,6 +4148,10 @@ function modalHtml(){
                 + esc(t.icon + " " + PuWork.labelFor(t.code, "calendar")) + '</option>'; }).join("") + '</select>')
     + (새것 ? '<div class="gtabs"><button data-mk="sch"' + (일정 ? ' class="on"' : '') + '>일정</button>'
         + '<button data-mk="att"' + (일정 ? '' : ' class="on"') + '>연차·근태</button></div>' : '')
+    /* ★ 폰 — 구글 앱 입력 화면의 «캘린더 칩 줄»(내 캘린더 / 가족 / 업무처리 — 캡처 2026-10-11). 우리는 「푸른노무법인 · 공용」과 「나만 보기」 둘 */
+    + ((typeof 폰 === "function" && 폰() && 일정 && m.store !== "gcal")
+        ? '<div class="gtabs gcalchips">' + [["shared","푸른노무법인 · 공용","var(--gtoday)"],["private","나만 보기","var(--gsub)"]].map(function(c){
+            return '<button data-mvis="' + c[0] + '"' + ((m.vis === "private" ? "private" : "shared") === c[0] ? ' class="on"' : '') + '><i class="cdot" style="background:' + c[2] + '"></i>' + c[1] + '</button>'; }).join("") + '</div>' : '')
     + '<div class="gcols"><div class="gmain">'
     +   시각줄
     +   (일정 && 새것 ? 반복알림줄(m) + 참석자줄(m) : '')
@@ -4156,7 +4163,7 @@ function modalHtml(){
     +   줄("notes", '<textarea data-m="note" rows="1" placeholder="설명 추가">' + esc(m.note||"") + '</textarea>', "설명", true)
     + '</div><div class="gside">'
     +   줄("badge", 누가, "담당 직원")
-    +   (일정 && m.store !== "gcal" ? 줄("calendar", 달력, "누가 보나") + 달력힌트 : '')
+    +   (일정 && m.store !== "gcal" ? ((typeof 폰 === "function" && 폰()) ? 달력힌트 : 줄("calendar", 달력, "누가 보나") + 달력힌트) : '')
     +   (m.store === "gcal" ? '<div class="ghint" style="padding-left:56px">구글 공용 달력의 일정입니다 — 저장하면 구글이 바로 바뀝니다'
           + (m.recur ? ' (반복 일정은 «이 날 것만» 바뀝니다)' : '') + '.</div>' : '')
     + '</div></div>'
@@ -4883,7 +4890,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4971,6 +4978,7 @@ document.addEventListener('click', function(e){
     render(); return;
   }
   if(t.hasAttribute('data-mk')){ modalRead(); S.modal.kind = t.getAttribute('data-mk'); render(); return; }
+  if(t.hasAttribute('data-mvis')){ modalRead(); S.modal.vis = t.getAttribute('data-mvis'); render(); return; }
   if(t.hasAttribute('data-mtime')){
     modalRead(); S.modal.timed = t.getAttribute('data-mtime') === "1";
     if(S.modal.timed && !S.modal.time){ S.modal.time = "09:00"; S.modal.endTime = "10:00"; }
