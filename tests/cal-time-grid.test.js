@@ -123,3 +123,9 @@ test('PC 머리 크기 — 구글 공식 주 보기 실측(요일 11px·줄 32px
   assert.match(캘린더, /@media \(min-width:701px\)\{ \.tga \.ev\{padding-left:8px\} \}/);
   assert.match(캘린더, /\.tgh \.gdn\{font-size:22px;line-height:36px;min-width:36px/, '폰의 작은 값이 사라졌습니다');
 });
+
+test('폰 한 시간 높이 62px(구글 폰 앱 캡처) · PC 48px — 눈금선도 같이 따라간다', () => {
+  assert.match(캘린더, /격자높이 = \(typeof 폰 === "function" && 폰\(\)\) \? 62 : 48;/);
+  assert.match(캘린더, /background-size:100% var\(--hh,48px\)/);
+  assert.match(캘린더, /;--hh:' \+ 격자높이 \+ 'px;height:'/);
+});

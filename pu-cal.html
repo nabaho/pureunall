@@ -767,7 +767,7 @@
   .tgtime{position:relative;font-size:10px;color:var(--gsub);min-width:0}
   .tgbody .tgtime span{position:absolute;right:6px;transform:translateY(-50%);white-space:nowrap}
   .tgcol{position:relative;border-left:1px solid var(--gline);min-width:0;
-    background-image:linear-gradient(to bottom,var(--gline) 1px,transparent 1px);background-size:100% 48px}
+    background-image:linear-gradient(to bottom,var(--gline) 1px,transparent 1px);background-size:100% var(--hh,48px)}
   .tev{position:absolute;box-sizing:border-box;border:1px solid var(--panel);border-radius:6px;padding:2px 4px;overflow:hidden;cursor:pointer;
     display:flex;flex-direction:column;gap:0;z-index:2}
   .tev b{font-size:11px;font-weight:500;line-height:14px;word-break:keep-all;overflow-wrap:break-word}
@@ -2898,6 +2898,8 @@ function 시간블록Html(x){
     + '<b>' + esc(제목) + '</b>' + (높이 >= 40 ? '<span>' + esc(시각) + '</span>' : '') + '</div>';
 }
 function 격자Html(days, eumOnly){
+  /* ★ 한 시간의 높이 — PC 48px(구글 웹 실측) · 폰 62px(구글 폰 앱 일 보기 캡처 2026-10-11: 시간 눈금 간격 139/923×412 ≈ 62px) */
+  격자높이 = (typeof 폰 === "function" && 폰()) ? 62 : 48;
   var 오늘 = todayYMD(), n = days.length;
   var 열 = days.map(function(ds){ return 격자일정(ds, eumOnly); });
   var 칸틀 = 'grid-template-columns:var(--tgw,48px) repeat(' + n + ',minmax(0,1fr))';
@@ -2925,7 +2927,7 @@ function 격자Html(days, eumOnly){
   return '<div class="cal"><div class="tgrid">'
     + '<div class="tghead" style="' + 칸틀 + '"><div class="tgtime"></div>' + 머리 + '</div>'
     + '<div class="tgallday" style="' + 칸틀 + '"><div class="tgtime"><span>종일</span></div>' + 종일줄 + '</div>'
-    + '<div class="tgscroll"><div class="tgbody" style="' + 칸틀 + ';height:' + (24 * 격자높이) + 'px">'
+    + '<div class="tgscroll"><div class="tgbody" style="' + 칸틀 + ';--hh:' + 격자높이 + 'px;height:' + (24 * 격자높이) + 'px">'
     +   '<div class="tgtime">' + 눈금 + '</div>' + 몸 + '</div></div>'
     + '</div></div>';
 }
