@@ -56,7 +56,7 @@
 <!-- ⚠ 편지 짓개(tpl) «다음»에 싣는다 — 안내문이 그 빛깔(Tpl.색)을 빌린다 -->
 <script src="js/pu-news-notice.js?v=3"></script>
 <!-- ★ 지난 안내문(다음메일 기록) 대장의 «순수 도우미» — 파일별 모으기·연도 칩·대장(CSV) (대표 지시 2026-10-11) -->
-<script src="js/pu-news-noticelog.js?v=2"></script>
+<script src="js/pu-news-noticelog.js?v=3"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -4176,7 +4176,7 @@ function 기록구역(){
     + 몸
     + '<div class="pad hint nlg-note">다음메일(예약·보낸·내게쓴편지함)에서 자동으로 정리한 <b>읽기 전용</b> 기록입니다. 새로 보낸 안내문도 매일 새벽에 더해집니다.'
     + (정리때 ? ' 마지막 정리 ' + esc(정리때) + '.' : '')
-    + (줄.length ? ' 원문(본문·파일) 보관 <b>' + 보관.보관 + '/' + 줄.length + '건</b>' + (보관.실패 ? ' · 못 한 것 ' + 보관.실패 + '건(자동으로 다시 시도)' : '') + '.' : '')
+    + (줄.length ? ' 원문(본문·파일) 보관 <b>' + 보관.보관 + '/' + 줄.length + '건</b>' + (보관.실패 ? ' · 못 한 것 ' + 보관.실패 + '건(' + (보관.영구 ? (보관.영구 === 보관.실패 ? '다시 가져올 수 없음' : '그중 ' + 보관.영구 + '건은 다시 가져올 수 없음 · 나머지는 자동으로 다시 시도') : '자동으로 다시 시도') + ')' : '') + '.' : '')
     + '</div></div>';
 }
 /* 상세로 들어가면 «상세의 맨 위»가 보이게 한다.
@@ -4291,6 +4291,7 @@ function 기록상세(n){
   /* ── 받은 곳 — 원문 머리글로 확인했으면 그것, 아니면 거울(한 통 8명까지) ── */
   const 업체 = NL.배열로(받은곳 ? 받은곳.업체 : n.업체), 명함 = NL.배열로(받은곳 ? 받은곳.명함업체 : n.명함업체);
   const 칩들 = 업체.map(function(x){ return { 글: String(x), 칸: '' }; }).concat(명함.map(function(x){ return { 글: String(x) + '(명함)', 칸: 'card' }; }));
+  const 찾은수 = NL.찾은곳수(받은곳, 칩들.length);                    /* 이름 목록은 서버가 400곳에서 자른다 — 진짜 수가 있으면 그것 */
   const 한도 = App.기록펼침 === n.id ? 9999 : 18;
   const 칩HTML = 칩들.slice(0, 한도).map(function(c){ return '<span class="' + c.칸 + '">' + esc(c.글) + '</span>'; }).join('')
     + (칩들.length > 한도 ? '<button onclick="기록펼치기(\'' + esc(n.id) + '\')">+' + (칩들.length - 한도) + '곳 ▾</button>' : '');
@@ -4315,7 +4316,8 @@ function 기록상세(n){
     내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="lim" style="margin-top:6px">⚠ 보관된 원문을 읽지 못했습니다 — 이 안내문을 다시 열어 보십시오.</div>';
   } else if(상태 === '실패'){
     const 실 = 표.실패 || {};
-    내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="lim" style="margin-top:6px">⚠ 원문을 보관하지 못했습니다 — ' + esc(실.까닭 || '까닭을 모릅니다') + ' (' + (Number(실.횟수) || 1) + '번 시도 · 매일 새벽 다시 시도합니다)</div>';
+    내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="lim" style="margin-top:6px">⚠ 원문을 보관하지 못했습니다 — ' + esc(실.까닭 || '까닭을 모릅니다')
+      + (실.영구 ? ' (다시 시도하지 않습니다 · 원문이 필요하면 다음메일 웹 «보낸편지함»에서 이 메일을 직접 저장해 두십시오)' : ' (' + (Number(실.횟수) || 1) + '번 시도 · 매일 새벽 다시 시도합니다)') + '</div>';
   } else {
     내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="hint" style="margin:6px 0 0">📦 아직 원문 보관 전입니다 — 새벽(매일)에 메일 한 통을 받아 본문·파일을 보관합니다.</div>';
   }
@@ -4330,7 +4332,7 @@ function 기록상세(n){
     + '<span>받은 주소 ' + 주소수 + '개' + (받은곳 ? ' (원문 기준)' : '') + '</span></div></div>'
     + '<div class="sx">' + 내용 + '</div>'
     + (파일HTML ? '<div class="sx"><div class="l">첨부 파일 ' + 첨부수 + '개 — 언제 어떤 안내문에 붙여 보냈나</div>' + 파일HTML + '</div>' : '')
-    + '<div class="sx"><div class="l">받은 곳 — 업체 이름을 찾은 ' + 칩들.length + '곳</div>'
+    + '<div class="sx"><div class="l">받은 곳 — 업체 이름을 찾은 ' + 찾은수 + '곳' + (찾은수 > 칩들.length ? ' <span class="sz">(이름은 앞 ' + 칩들.length + '곳까지만 적어 둡니다)</span>' : '') + '</div>'
     + (칩HTML ? '<div class="nco">' + 칩HTML + '</div>' : '<div class="hint" style="margin:0">업체 이름을 찾은 곳이 없습니다.</div>')
     + '<div class="hint" style="margin-top:8px">' + 받은곳말 + '</div></div>'
     + (NL.한계말(n, 읽음 ? 본 : null).length ? '<div class="sx">' + NL.한계말(n, 읽음 ? 본 : null).map(function(t){ return '<div class="lim">⚠ ' + esc(t) + '</div>'; }).join('') + '</div>' : '')
