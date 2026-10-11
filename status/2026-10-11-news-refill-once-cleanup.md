@@ -44,9 +44,9 @@
 - 확인: `firebase functions:list` 삭제 전 97개 → 후 96개. 사라진 것은 `newsletterRefillOnce20261004` 하나뿐이고,
   이웃 뉴스레터 함수 7개(`newsletterSundayRefill` · `newsletterBounceScan` · `newsletterWatchRetry` · `newsletterWatchSunday` ·
   `newsletterWatchDelivery` · `weeklyNewsletterPrepare` · `weeklyNewsletterSend`)는 그대로다.
-- ⚠ **못 본 것**: Cloud Scheduler 의 같은 이름 작업(보통 `firebase-schedule-newsletterRefillOnce20261004-asia-northeast3`)이
-  같이 지워졌는지는 이 PC 에 gcloud 가 없어 확인하지 못했다. 콘솔(Cloud Scheduler · asia-northeast3)에서 남아 있으면 지운다.
-  남아 있어도 받을 함수가 없어 해롭지 않다(다음 발화 2027-10-04).
+- ✅ **Cloud Scheduler 도 확인함**(2026-10-11 18:50, 읽기만): 같은 이름 작업(`firebase-schedule-newsletterRefillOnce20261004-asia-northeast3`)이
+  같이 지워졌다. gcloud 가 없어 firebase-tools 모듈로 읽었다 — 34개 위치를 모두 훑어 작업은 **us-central1 에만 30개**(= 예약 함수 30개)이고 그 가운데 `RefillOnce` 는 없으며, Pub/Sub 주제도 404.
+  ⚠ 서울(asia-northeast3) 목록은 0개다 — 예약 작업은 프로젝트 기본 위치(us-central1)에 만들어지므로, 서울만 보고 «없다» 하지 말 것(이웃 작업이 보이는지부터).
 
 ## 남은 일
-- 위 ⚠ 한 가지(Cloud Scheduler 에 같은 이름 작업이 남았는지 콘솔에서 한 번 보기)뿐이다.
+- 없다. 일회용 함수는 코드 · 서버 함수 · 예약 작업 · Pub/Sub 주제까지 모두 정리됐다.
