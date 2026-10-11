@@ -220,7 +220,7 @@ td.ceo{}
 <div id="head">
   <div class="top">
     <h1>⚖️ 회생광고</h1>
-    <span class="sub">법인회생 · 포괄적 금지명령 기업 → 우편 안내</span>
+    <span class="sub">법인회생(포괄적 금지명령) · 법인파산(파산선고) → 우편 안내</span>
     <span id="who"></span>
     <span class="sp"></span>
     <button class="sm pri" onclick="openForm()">📄 홍보양식 보기</button>
@@ -241,7 +241,7 @@ td.ceo{}
   <details class="auto" id="autoBox"><summary id="autoSum">✉ 자동 발송 — 불러오는 중…</summary><div class="abody" id="autoBody"></div></details>
   <details class="law"><summary>⚖️ 왜 우편으로 보내나요? (법적 유의)</summary><div class="note">
     <span>⚖️</span>
-    <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조) 기업을 매일 아침 모읍니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
+    <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조)과 <b>법인파산 · 파산선고</b> 기업을 매일 아침 모읍니다. 파산선고는 도산대지급금의 지급 사유라 안내문이 다릅니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
     안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
   </div></details>
 
@@ -256,7 +256,7 @@ td.ceo{}
     </select>
     <select id="fCourt" aria-label="법원"><option value="">모든 법원</option></select>
     <select id="fSido" aria-label="지역"><option value="">모든 지역</option></select>
-    <select id="fType" aria-label="사건종류"><option value="">회생·간이회생</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
+    <select id="fType" aria-label="사건종류"><option value="">모든 종류</option><option value="reh">법인회생 전체</option><option value="bk">법인파산 전체</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
     <select id="fStage" aria-label="단계"><option value="">모든 단계</option></select>
     <select id="fContact" aria-label="연락처">
       <option value="">연락처 전체</option><option value="has">연락처 있음</option><option value="none">연락처 없음</option><option value="check">확인 필요</option>
@@ -309,7 +309,7 @@ td.ceo{}
         <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ct2"><col class="c-st"><col class="c-ico"><col class="c-stat"></colgroup>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
-          <th class="no">번호</th><th class="co">회사명</th><th>포괄금지명령</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
+          <th class="no">번호</th><th class="co">회사명</th><th>공고(금지명령·파산선고)</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -355,7 +355,7 @@ td.ceo{}
 </script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
-<script src="js/rehab-letter.js?v=6"></script>
+<script src="js/rehab-letter.js?v=7"></script>
 <script src="js/rehab-match.js?v=1"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
@@ -423,8 +423,8 @@ var NOTICES={}, MARKS={}, INFO={}, LASTRUN=null, IDX=null, MATCH={}, LINKNOTE=''
 var VIEW=[], SEL={}, CUR='', TAB='all';
 var STATUS={new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
 var ST_CHIP={new:'c-gray',send:'c-blue',hold:'c-amber',skip:'c-red',sent:'c-green'};
-var STAGE_CHIP={'금지명령':'c-amber','개시':'c-blue','인가':'c-green','종결':'c-gray','폐지·기각':'c-red'};
-var STAGES=['금지명령','개시','인가','종결','폐지·기각'];
+var STAGE_CHIP={'파산선고':'c-red','금지명령':'c-amber','개시':'c-blue','인가':'c-green','종결':'c-gray','폐지·기각':'c-red'};
+var STAGES=['금지명령','파산선고','개시','인가','종결','폐지·기각'];
 
 function $(id){ return document.getElementById(id); }
 function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
@@ -440,10 +440,13 @@ function statusOf(id){ var m=MARKS[id]; return (m && !m._deleted && STATUS[m.sta
 
 /* ── 연락처 합치기: 사람이 손으로 적은 것(marks.contact)이 서버가 찾은 것(info)보다 앞선다 ── */
 /* 포괄금지명령 공고일 — 이력(events)에서 찾고, 없으면 처음 공고일 */
+function isBk(n){ return n && n.kind==='bankruptcy'; }
 function pgmDate(n){
-  var e=(n.events||[]).filter(function(x){ return /포괄적\s*금지명령/.test(x.t); })[0];
+  var re=isBk(n)?/파산선고/:/포괄적\s*금지명령/;
+  var e=(n.events||[]).filter(function(x){ return re.test(x.t); })[0];
   return (e&&e.d)||n.noticeDate||'';
 }
+function pgmLabel(n){ return isBk(n)?'파산선고':'포괄금지명령'; }
 /* 대표자 — 직접 적은 것 → 홈페이지에서 읽은 것 → 기업정보함·이알피. 법원 공고에는 대표자가 없다 */
 function ceoOf(id){
   var m=(MARKS[id]&&MARKS[id].contact)||{}, i=INFO[id]||{}, k=MATCH[id]||{};
@@ -482,7 +485,7 @@ function baseList(skip){
     if(court && n.courtCode!==court) return false;
     if(sido && skip!=='sido' && (n.sido||'기타')!==sido) return false;
     if(DATE && skip!=='date' && n.noticeDate!==DATE) return false;
-    if(type && n.caseType!==type) return false;
+    if(type==='reh'){ if(isBk(n)) return false; } else if(type==='bk'){ if(!isBk(n)) return false; } else if(type && n.caseType!==type) return false;
     if(stage && n.stage!==stage) return false;
     if(ct){ var c=contactOf(n.id); if(ct==='has' && !c.any) return false; if(ct==='none' && c.any) return false; if(ct==='check' && !c.check) return false; }
     if(tr){ var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(tr==='client' && !(b&&b.kind==='client')) return false; if(tr==='cards' && !(b&&b.kind==='cards')) return false; if(tr==='any' && !b) return false; if(tr==='none' && b) return false; }
@@ -559,7 +562,7 @@ function draw(){
       '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
       '<td class="no">'+(i+1)+'</td>'+
       '<td class="co" title="'+esc(n.debtorName)+'"><div class="cn"><span class="nm">'+esc(n.debtorName)+'</span><span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></div></td>'+
-      '<td><span class="chip pgm" style="margin-left:0" title="포괄적 금지명령 공고일">포괄금지명령 '+esc(pgmDate(n).slice(5))+'</span></td>'+
+      '<td><span class="chip pgm" style="margin-left:0" title="'+(isBk(n)?'파산선고 공고일':'포괄적 금지명령 공고일')+'">'+pgmLabel(n)+' '+esc(pgmDate(n).slice(5))+'</span></td>'+
       '<td class="ceo" title="'+esc(ce.src)+'">'+(ce.name?esc(ce.name):'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td>'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc(courtShort(n)+' '+n.caseNo)+'</td>'+
@@ -629,7 +632,7 @@ function drawDetail(){
   var addrQ=encodeURIComponent(n.address||''), nameQ=encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim()+' '+(n.sigungu||''));
   var h='<button class="sm close dclose" onclick="closeDetail()">닫기</button>';
   h+='<h2>'+esc(n.debtorName)+'</h2>';
-  h+='<div class="meta"><span class="chip pgm" style="margin-left:0">포괄금지명령 '+esc(pgmDate(n))+'</span> <span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'">현재 '+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div>';
+  h+='<div class="meta"><span class="chip pgm" style="margin-left:0">'+pgmLabel(n)+' '+esc(pgmDate(n))+'</span> <span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'">현재 '+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div>';
   var ce=ceoOf(n.id);
   h+='<dl class="kv"><dt>대표자</dt><dd>'+(ce.name?'<b>'+esc(ce.name)+'</b> <span style="color:var(--mute);font-size:11.5px">'+esc(ce.src)+'</span>':'<span style="color:var(--mute)">확인 전 — 법원 공고에는 대표자가 없습니다. 아래 「사업자번호 조회」·인터넷등기소에서 확인해 입력하세요.</span>')+'</dd><dt>법원</dt><dd>'+esc(n.courtName)+(n.division?' · '+esc(n.division):'')+'</dd><dt>사건번호</dt><dd>'+esc(n.caseNo)+'</dd><dt>공고일</dt><dd>'+esc(n.noticeDate)+' · '+esc(n.noticeTitle)+'</dd></dl>';
 

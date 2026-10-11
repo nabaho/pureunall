@@ -93,3 +93,10 @@ test("⑨ functions 의 사본이 js 원본과 같다(두 곳에서 따로 고�
     assert.equal(a, b, f + " 사본이 원본과 다르다 — js/" + f + " 를 functions/ 로 복사하세요");
   });
 });
+
+test("⑩ 파산 공고(kind: bankruptcy)는 자동 메일 대상이 아니다 — 우편 안내만", () => {
+  const p = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: Object.assign(notice("a", GA, "서울 서초구 1"), { kind: "bankruptcy" }) },
+    index: idx([erp(GA, "서울 서초구 1", "a@a.kr")]) });
+  assert.equal(p.candidates.length, 0);
+});
