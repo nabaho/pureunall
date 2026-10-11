@@ -81524,7 +81524,8 @@ function PayrollLedger(props){
   function recountDup(){
     try{ setDupCount(payrollDupGroups(dbGet('payroll_monthly', [])).length); }catch(e){}
   }
-  var sc = useState(true); var showDeduct = sc[0]; var setShowDeduct = sc[1]; // 공제 컬럼 접기 (기본 펼침)
+  var sc = useState(false); var showDeduct = sc[0]; var setShowDeduct = sc[1]; // 공제 6칸 — 기본은 «공제계» 한 칸 (2026-10-11 시안: 한 화면에)
+  var hzS = useState(true); var hideZeroCols = hzS[0]; var setHideZeroCols = hzS[1]; // 그달 모두 0원인 칸 접기 (2026-10-11 시안)
   // 전월복사 확인 모달 { prevYM, count, newRecs, backup }
   var cm = useState(null); var copyModal = cm[0]; var setCopyModal = cm[1];
   // 복사 취소(되돌리기)용 백업 { ym, recs }
@@ -82177,9 +82178,36 @@ function PayrollLedger(props){
   var thStyle = {padding:'3px 3px',background:'#f8fafc',borderBottom:'2px solid #e2e8f0',fontSize:'10px',fontWeight:700,color:'#475569',whiteSpace:'nowrap',position:'sticky',top:0};
   var tdNum = {padding:'2px 4px',textAlign:'right',fontFamily:'monospace',fontSize:'10.5px',whiteSpace:'nowrap'};
   var IS_M = window.innerWidth <= 768;
+  /* 그달 «모두 0원»인 칸은 접는다 (2026-10-11 대표 「창 늘어나지 않고 한번에 볼수 있게」 — 시안)
+     · 기본급은 늘 · 한 명이라도 값(또는 연장·야간·휴일 «시간»)이 있으면 그 칸은 저절로 나온다 · 위의 «보이기»로 다 펼친다 */
+  var _payRowsZ = users.filter(function(u){
+    if(u.status!=='resigned' && u.status!=='retired') return true;
+    return recs.some(function(r){ return r.empSid===u.sid && r.ym===props.selYM; });
+  }).map(function(u){ var r = getRec(u.sid); var c = {}; try { c = calcPayroll(r) || {}; } catch(e){ c = {}; } return { r:r, c:c }; });
+  function _payColHas(cs){
+    if(cs.key === 'base') return true;
+    return _payRowsZ.some(function(x){
+      var r = x.r || {}, c = x.c || {}, L = c.legal || {}, LA = r.legalAllowances || {}, al = r.allowances || [];
+      switch(cs.key){
+        case 'meal':       return +r.nonTaxableMeal > 0;
+        case 'car':        return +r.nonTaxableCar > 0;
+        case 'overtime':   return +L.overtime > 0 || +LA.overtimeHours > 0;
+        case 'night':      return +L.night > 0 || +LA.nightHours > 0;
+        case 'holiday':    return +L.holiday > 0 || +LA.holidayHours > 0;
+        case 'etc':        return al.some(function(a){ return a && +a.amount && !colSpec.some(function(k){ return k.type === 'custom' && k.item.code === a.code; }); });
+        case 'bonus_lump': return +r.bonus > 0;
+        case 'perf':       return +((c.perfBonus || {}).total || 0) !== 0 || ((c.perfBonus || {}).details || []).length > 0 || +r.bonus > 0;
+      }
+      if(cs.type === 'custom') return al.some(function(a){ return a && a.code === cs.item.code && +a.amount; });
+      return true;
+    });
+  }
+  var colShow = hideZeroCols ? colSpec.filter(_payColHas) : colSpec;
+  var colZero = colSpec.filter(function(c){ return colShow.indexOf(c) < 0; });
+  var _colLabel = { meal:'식대', car:'차량유지', overtime:'연장', night:'야간', holiday:'휴일', etc:'기타', bonus_lump:'상여', perf:'성과급' };
   var inputNum = {width:'65px',padding:'1px 3px',border:'1px solid #e2e8f0',borderRadius:'5px',fontSize:'10px',fontFamily:'monospace',textAlign:'right'};
   // ── 왼쪽 열 고정 (엑셀 틀고정: 고른 열까지 가로 스크롤 시 왼쪽 유지). 이 기기에만 저장, 데이터/서버 무관 ──
-  var _fzInit = (function(){ try{ return localStorage.getItem('pureun_v6_payroll_freeze_col') || 'none'; }catch(e){ return 'none'; } })();
+  var _fzInit = (function(){ try{ return localStorage.getItem('pureun_v6_payroll_freeze_col') || 'name'; }catch(e){ return 'name'; } })();   // 기본: 이름 칸 고정 (2026-10-11 시안)
   var _fzS = useState(_fzInit); var freezeCol = _fzS[0]; var _setFreezeCol = _fzS[1];
   function setFreezeCol(v){ _setFreezeCol(v); try{ localStorage.setItem('pureun_v6_payroll_freeze_col', v); }catch(e){} }
   var _fzRef = useRef(null);
@@ -82471,6 +82499,15 @@ function PayrollLedger(props){
         })
       )
     : h('div', { ref:_fill15.ref, ref:_fzRef, style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'6px', overflow:'auto', maxHeight:(_fill15.max || 'calc(100vh - 280px)') } },
+      (colZero.length > 0 || !hideZeroCols) && h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', padding:'4px 8px', borderBottom:'1px solid #e2e8f0', background:'#f8fafc', fontSize:'11px', whiteSpace:'nowrap', position:'sticky', left:0 } },
+        hideZeroCols
+          ? h('button', { type:'button', onClick:function(){ setHideZeroCols(false); }, title:'이번 달 모두 0원이라 접어 둔 칸을 펼칩니다 — 새로 입력할 때',
+              style:{ border:'1px solid #bfdbfe', background:'#eff6ff', color:'#1e40af', borderRadius:'10px', padding:'1px 9px', cursor:'pointer', fontSize:'11px', fontWeight:700 } },
+              '빈 칸 ' + colZero.length + '개 숨김 (' + colZero.map(function(c){ return _colLabel[c.key] || (c.item && c.item.name) || c.key; }).join('·') + ') · 보이기')
+          : h('button', { type:'button', onClick:function(){ setHideZeroCols(true); },
+              style:{ border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', borderRadius:'10px', padding:'1px 9px', cursor:'pointer', fontSize:'11px' } }, '0원 칸 다시 접기'),
+        h('button', { type:'button', onClick:function(){ setShowDeduct(!showDeduct); },
+          style:{ border:'1px solid #fde68a', background:'#fffbeb', color:'#854d0e', borderRadius:'10px', padding:'1px 9px', cursor:'pointer', fontSize:'11px' } }, showDeduct ? '공제 6칸 접기' : '공제 6칸 펼치기')),
       h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px' } },
         h('thead', null, h('tr', null,
           h('th', { style:Object.assign({},thStyle, fzStyle('num','#f8fafc',6)) }, '#'),
@@ -82483,12 +82520,12 @@ function PayrollLedger(props){
             title: IS_M?null:(freezeCol==='title'?'클릭: 왼쪽 고정 해제':'클릭: 직책까지 왼쪽 고정') },
             '직책', !IS_M && h('span', { style:{marginLeft:'3px',fontSize:'9px',opacity:freezeCol==='title'?0.9:0.3} }, '📌')),
           // 지급 항목
-          h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'62px',color:'#1e40af'}) }, '시급'),
-          // 동적 임금항목 컬럼 (환경설정 sortOrder 순 + hidden 제외 + 신규 항목 자동 추가)
-          colSpec.map(function(c){
+          h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'52px',color:'#1e40af'}) }, '시급'),
+          // 동적 임금항목 컬럼 (환경설정 sortOrder 순 + hidden 제외 + 신규 항목 자동 추가) — 그달 0원 칸은 접는다(colShow)
+          colShow.map(function(c){
             if(c.type === 'mapped'){
               switch(c.key){
-                case 'base':       return h('th', { key:c.key, style:Object.assign({},thStyle,{textAlign:'right',minWidth:'80px'}) }, '기본급');
+                case 'base':       return h('th', { key:c.key, style:Object.assign({},thStyle,{textAlign:'right',minWidth:'68px'}) }, '기본급');
                 case 'meal':       return h('th', { key:c.key, style:Object.assign({},thStyle,{textAlign:'right',minWidth:'68px',color:'#166534'}) }, '식대');
                 case 'car':        return h('th', { key:c.key, style:Object.assign({},thStyle,{textAlign:'right',minWidth:'72px',color:'#166534'}) }, '차량유지');
                 case 'overtime':   return h('th', { key:c.key, style:Object.assign({},thStyle,{textAlign:'right',minWidth:'68px',color:'#854d0e'}) }, '연장수당');
@@ -82508,7 +82545,7 @@ function PayrollLedger(props){
               title:'신규 임금항목 ('+(isDed ? '공제 - 지급액 차감' : (c.item.taxable?'과세':'비과세'))+')' },
               isDed ? '− ' + c.item.name : c.item.name);
           }),
-          h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'80px',background:'#f0fdf4'}) }, '지급액'),
+          h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'68px',background:'#f0fdf4'}) }, '지급액'),
           // 공제 헤더 (접기/펼치기 — 펼침 시 각 항목별 컬럼명)
           showDeduct
             ? [
@@ -82522,9 +82559,9 @@ function PayrollLedger(props){
               ]
             : h('th', { style:Object.assign({},thStyle,{textAlign:'center',background:'#fffbeb',cursor:'pointer',userSelect:'none',minWidth:'72px'}),
                 onClick:function(){setShowDeduct(true);} },
-                h('span',null,'공제 ▸ 펼치기')),
+                h('span',null,'공제계 ▸')),
           showDeduct && h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'72px',background:'#fffbeb'}) }, '공제계'),
-          h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'80px',background:'#bfdbfe'}) }, '실지급'),
+          h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'68px',background:'#bfdbfe'}) }, '실지급'),
           h('th', { style:Object.assign({},thStyle,{textAlign:'right',minWidth:'78px',background:'#fffbeb',color:'#d97706',borderLeft:'2px solid #fbbf24'}), title:'비과세 실비변상 — 임금·4대보험·소득세와 무관 (별도 송금)' }, h('div',{style:{display:'flex',alignItems:'baseline',gap:'5px',justifyContent:'flex-end',whiteSpace:'nowrap'}}, h('span',null,'🧾 실비'), h('span',{style:{fontSize:'8.5px',fontWeight:600,color:'#d97706'}},'비과세'))),
           h('th', { style:thStyle }, '상태'),
           h('th', { style:thStyle }, '명세'),
@@ -82556,20 +82593,22 @@ function PayrollLedger(props){
             return h('tr', { key:u.sid, style:{borderBottom:'1px solid #f8fafc', background: effectivePause ? '#fffbeb' : 'transparent'} },
               h('td', {style:Object.assign({padding:'4px',textAlign:'center',color:'#94a3b8',fontSize:'10.5px'}, fzStyle('num', effectivePause?'#fffbeb':'#fff', 2))}, idx+1),
               h('td', {style:Object.assign({padding:'4px 6px',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}, IS_M?{position:'sticky',left:0,zIndex:1,background:effectivePause?'#fffbeb':'#fff'}:{}, fzStyle('name', effectivePause?'#fffbeb':'#fff', 2))},
-                u.name,
+                /* 휴직·퇴직은 한 글자 동그라미 — 글자표 둘이 붙으면 이름 칸이 세 배로 늘어 표가 옆으로 밀렸다 (2026-10-11 시안) */
                 loaActive && h('span', {
-                  title:'휴직: '+(loaPolicy?loaPolicy.name:loaActive.code)+(loaActive.plannedEndDate?' (~'+loaActive.plannedEndDate+')':''),
-                  style:{marginLeft:'5px',padding:'1px 5px',borderRadius:'5px',background:effectivePause?'#dc2626':'#2563eb',color:'#fff',fontSize:'8.5px',fontWeight:700}
-                }, '🏠 '+(loaPolicy?loaPolicy.name.slice(0,4):'휴직')),
-                // LoA 없이 status='leave'만 설정된 경우에도 배지 표시
+                  title:'휴직: '+(loaPolicy?loaPolicy.name:(loaActive.typeLabel||loaActive.code))+' '+(loaActive.startDate||'')+' ~ '+(loaActive.endedDate||loaActive.endDate||loaActive.plannedEndDate||'')+(effectivePause?' · 급여 정지':''),
+                  style:{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'16px',height:'16px',borderRadius:'50%',marginRight:'4px',verticalAlign:'-2px',
+                    background:'#fffbeb',color:effectivePause?'#dc2626':'#854d0e',border:'1px solid '+(effectivePause?'#dc2626':'#d97706'),fontSize:'9.5px',fontWeight:800}
+                }, '휴'),
+                // LoA 없이 status='leave'만 설정된 경우에도 표시
                 !loaActive && u.status==='leave' && h('span', {
-                  title:'휴직 (환경설정 상태)',
-                  style:{marginLeft:'5px',padding:'1px 5px',borderRadius:'5px',background:'#2563eb',color:'#fff',fontSize:'8.5px',fontWeight:700}
-                }, '🏠 휴직'),
+                  title:'휴직 (명부 상태)',
+                  style:{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'16px',height:'16px',borderRadius:'50%',marginRight:'4px',verticalAlign:'-2px',background:'#fffbeb',color:'#854d0e',border:'1px solid #d97706',fontSize:'9.5px',fontWeight:800}
+                }, '휴'),
                 (u.status==='resigned'||u.status==='retired') && h('span', {
-                  title:'퇴직: '+(u.resignDate||''),
-                  style:{marginLeft:'5px',padding:'1px 5px',borderRadius:'5px',background:'#dc2626',color:'#fff',fontSize:'8.5px',fontWeight:700}
-                }, '📤 퇴직')
+                  title:'퇴직: '+(u.lastWorkDate||u.retireDate||u.resignDate||'')+' (마지막 근무일)'+(u.leaveReason?' · '+u.leaveReason:''),
+                  style:{display:'inline-flex',alignItems:'center',justifyContent:'center',width:'16px',height:'16px',borderRadius:'50%',marginRight:'4px',verticalAlign:'-2px',background:'#fef2f2',color:'#991b1b',border:'1px solid #dc2626',fontSize:'9.5px',fontWeight:800}
+                }, '퇴'),
+                h('span', { style:{ color:(u.status==='resigned'||u.status==='retired')?'#94a3b8':undefined } }, u.name)
               ),
               h('td', {style:Object.assign({padding:'4px 6px',fontSize:'10.5px',color:'#64748b',whiteSpace:'nowrap'}, fzStyle('title', effectivePause?'#fffbeb':'#fff', 2))}, u.title),
               // 시급 (통상시급, 자동계산: (기본급+고정수당)/209)
@@ -82668,7 +82707,7 @@ function PayrollLedger(props){
                         : '-');
                   })()
                 };
-                return colSpec.map(function(c){
+                return colShow.map(function(c){
                   if(c.type === 'mapped'){
                     return React.cloneElement(cells[c.key], { key:c.key });
                   }
