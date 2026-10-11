@@ -7047,6 +7047,38 @@ exports.backfillMailbox = MSYNC.backfillMailbox;
 /* 📦 지난 메일 한 통 열기 — 그 자리에서 POP3 로 (직원 누구나, 메일함과 같은 문) */
 exports.readOldMail = MSYNC.readOldMail;
 
+/* 📦 안내문 원문 보관 (대표 지시 2026-10-12 「1」 — 본문·파일 보관)
+   대장(newsletterNoticeLogBuild, 03:40)에 오른 안내문마다 «메일 한 통»을 받아 본문 글·첨부 파일·원본(.eml)을 지킨다.
+   다음메일 IMAP 은 폴더당 400통까지만 열어 줘서 보낸편지함 안내문은 열흘쯤 뒤면 앱에서 못 연다 — 열리는 동안 받아 둔다.
+   창 밖이면 POP3 로 찾는다(느림 — 시간 예산을 재고 시작).
+   ⚠ 실제 코드는 news-notice-archive.js(순수) — 여기는 메일함·창고를 «끼워 넣는» 자리다. 읽기만 한다(DELE·읽음 표시·이동 없음).
+   ⚠ 03:40 짓개 «뒤»에 돈다 — 그날 새 안내문이 그날 밤에 보관된다. 창고 = 뉴스레터 그림 창고(기본)의 newsletter_archive/ 한 줄기.
+   ⚠ 배포는 «이름 찍어서» — functions:newsletterNoticeArchive (index.js 를 고치고 합쳐도 저절로 안 올라간다). */
+const NoticeArchive = require("./news-notice-archive");
+exports.newsletterNoticeArchive = functions
+  .region(MAIL_REGION)
+  .runWith({ secrets: ["DAUM_MAIL_PASSWORD"], timeoutSeconds: 540, memory: "1GB" })
+  .pubsub.schedule("every day 03:55")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const MS = require("./mail-sync");
+    const t0 = Date.now();
+    await NoticeArchive.돌리기({
+      db: getDatabase(), 통: getStorage().bucket(NEWS_IMG_BUCKET), 통이름: NEWS_IMG_BUCKET,
+      열기: {
+        imap: (slug, fn) => MS.withFolder(MAIL_DEPS, slug, fn),
+        pop: async (fn) => {
+          const user = await mailUserAsync(), pass = mailPass();
+          if (!user || !pass) throw new Error("메일 계정이 설정되지 않았습니다");
+          const pop = await MS.oldPopOpen(() => MS.popOpen(user, pass, 240000));
+          try { return await fn(pop); } finally { try { await pop.close(); } catch (_) { /* 이미 끊겼다 */ } }
+        }
+      },
+      now: t0, 끝나는때: t0 + 500 * 1000, 로그: (m) => console.log(m)
+    });
+    return null;
+  });
+
 /* 🗑 다음메일에서 «지운» 메일은 업무관리 목록에서도 뺀다 (대표 지시 2026-09-27)
    ⚠ 실제 코드는 mail-gone.js 에 있다 — index.js 를 더 키우지 않기 위해서다.
    ⚠ 여기 한 줄을 안 적으면 밖에서 안 보인다(배포가 안 된다). mail-sync 와 같은 까닭. */
