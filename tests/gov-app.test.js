@@ -138,7 +138,7 @@ function runApp(seed) {
   vm.runInNewContext(code + '\n;globalThis.__api={draw,drawKw,dchip,star,find,readyNote,ageOut,'
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
-    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,'
+    + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,planStarOnly,planStarBtn,'
     + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
@@ -408,7 +408,7 @@ test('★★ 공고 줄마다 ㅁ 와 № 가 있다', () => {
   assert.match(h, /<td class="rn">1<\/td>/);
   assert.match(h, /<td class="rn">3<\/td>/);
   assert.match(src, /<th class="chk"><input type="checkbox" id="fSelAll"/, '머리에 전체 고르기');
-  assert.match(src, /<th class="rn">№<\/th><th class="stc"[^>]*>★<\/th><th>출처<\/th>/);
+  assert.match(src, /<th class="stc"[^>]*>★<\/th><th class="chk"><input[^>]*id="fSelAll"[^>]*><\/th><th class="rn">№<\/th><th>출처<\/th>/);
 });
 
 test('★★ 고른 공고를 한꺼번에 관심으로 — 이미 관심인 것은 그대로', () => {
@@ -1022,4 +1022,35 @@ test('★ 공고 모아보기 머리는 넓은 화면에서 «딱 두 줄» — 
   assert.match(css, /#q\{flex:1 1 150px/, '검색창이 줄어들 수 있어야 한 줄에 들어간다');
   assert.match(css, /#kwBox\{flex-wrap:nowrap;overflow-x:auto/, '찾는 말이 줄바꿈하면 세 줄이 된다');
   assert.match(css, /#kwBox>\*\{flex:none\}/, '알약이 찌그러지면 안 된다');
+});
+
+/* ═══ ★ 발주 예정에도 «별 칸을 ㅁ 왼쪽에» + 「별표만」 (대표 지시 2026-10-11 「별표 왜 없나 ㅁ 왼쪽에 넣어라」) ═══ */
+test('★★ 발주 예정 — 별 단추가 줄 맨 왼쪽(ㅁ 왼쪽)에 있고, 오른쪽 관리 칸에는 중복으로 없다', () => {
+  const r = runApp({ plan: PLANS() });
+  r.el('pView').value = 'ahead'; r.api.planDraw();
+  const rows = r.el('ptb').innerHTML.split('<tr class="fr').slice(1);
+  assert.ok(rows.length >= 2);
+  rows.forEach((x) => assert.match(x, /onclick="planRowClick[^>]*><td class="stc"><button class="starbtn[^>]*onclick="event\.stopPropagation\(\);planStar\('[^']+'\)">[★☆]<\/button><\/td><td class="chk">/, '별 단추가 ㅁ 왼쪽에 없다'));
+  rows.forEach((x) => assert.equal((x.match(/planStar\(/g) || []).length, 1, '별 단추가 두 곳에 있다'));
+  const head = src.slice(src.lastIndexOf('<thead>', src.indexOf('id="pSelAll"')));
+  assert.match(head, /^<thead><tr><th class="stc"[^>]*>★<\/th><th class="chk">/);
+});
+test('★★ 발주 예정 「별표만」 — 누르면 별표 친 것만, 한 번 더 누르면 처음 보기 · 단추에 건수', () => {
+  const r = runApp({ plan: PLANS() });
+  r.el('pView').value = 'ahead'; r.api.planDraw();
+  r.api.planStar('P2');
+  assert.equal(r.el('pStarBtn').textContent, '☆ 별표만 1건');
+  r.api.planStarOnly();
+  assert.equal(r.el('pView').value, 'star');
+  assert.equal(planRowsOf(r.el('ptb').innerHTML), 1);
+  assert.equal(r.el('pStarBtn').textContent, '★ 별표만 1건'); assert.match(r.el('pStarBtn').className, /\bon\b/);
+  r.api.planStarOnly();
+  assert.equal(r.el('pView').value, 'ahead'); assert.doesNotMatch(r.el('pStarBtn').className, /\bon\b/);
+});
+test('★ 발주 예정 빈 줄의 colspan 이 머리 칸 수와 같다', () => {
+  const head = src.slice(src.lastIndexOf('<thead>', src.indexOf('id="pSelAll"')));
+  const ths = (head.slice(0, head.indexOf('</tr></thead>')).match(/<th[ >]/g) || []).length;
+  const r = runApp({});
+  r.el('pView').value = 'ahead'; r.api.planDraw();
+  assert.match(r.el('ptb').innerHTML, new RegExp('colspan="' + ths + '"'));
 });

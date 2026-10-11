@@ -38,11 +38,11 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-
 .orgrec{border:1px solid var(--amber);background:var(--bg);color:var(--amber);border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px;line-height:18px}
 /* ★ 별표 — 줄 왼쪽(№ 옆)에 늘 보인다. 예전엔 맨 오른쪽 「관리」 칸에 있어 넓지 않은 화면에선 아예 안 보였다(대표 지시 2026-10-11 「별표표시 하게」) */
 .stc{width:30px;text-align:center}
-.starbtn{border:0;background:none;cursor:pointer;font-size:17px;line-height:1;color:var(--text-mute);padding:2px 4px}
+.starbtn{border:0;background:none;cursor:pointer;font-size:17px;line-height:1;vertical-align:middle;color:var(--text-mute);padding:2px 4px}
 .starbtn.on{color:var(--amber)}
 .starbtn:hover{color:var(--amber)}
-#fStarBtn{white-space:nowrap}
-#fStarBtn.on{background:var(--amber);color:#fff;border-color:var(--amber)}
+#fStarBtn,#pStarBtn{white-space:nowrap}
+#fStarBtn.on,#pStarBtn.on{background:var(--amber);color:#fff;border-color:var(--amber)}
 tr.fr.starred{background:rgba(217,119,6,.07)}
 .orgrec.off{border-color:var(--border);color:var(--text-mute);font-weight:500}
 .btn{padding:6px 11px;border:1px solid var(--border);border-radius:7px;background:var(--card);
@@ -313,7 +313,7 @@ table.cmp td{white-space:nowrap}
     <div id="note" style="font-size:12.5px;margin-bottom:9px"></div>
     <div id="feedSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th class="stc" title="별표(관심)">★</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th>받은 날</th><th>마감</th>
+      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th>받은 날</th><th>마감</th>
         <th style="text-align:right">남음</th><th style="text-align:right">추정가격</th><th>관리</th></tr></thead>
       <tbody id="tb"></tbody>
     </table></div>
@@ -331,6 +331,7 @@ table.cmp td{white-space:nowrap}
         <option value="star">★ 관심</option><option value="all">모두</option><option value="hidden">🙈 숨긴 것</option></select>
       <select id="pMthd" onchange="planMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
         <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
+      <button class="btn" id="pStarBtn" onclick="planStarOnly()" title="별표(관심) 친 것만 모아 봅니다 — 한 번 더 누르면 「공고 전 · 앞으로」로 돌아옵니다">☆ 별표만</button>
       <div class="sp"></div>
       <span id="pCnt" class="sub"></span>
       <span id="pPerBox"></span>
@@ -339,7 +340,7 @@ table.cmp td{white-space:nowrap}
     <div class="sml" id="planNote" style="margin:0 0 8px"></div>
     <div id="planSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="chk"><input type="checkbox" id="pSelAll" title="보이는 것 모두" onchange="planSelAll(this.checked)"></th><th class="rn">№</th><th>구분</th><th>예정</th><th>사업명</th><th>기관</th>
+      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="pSelAll" title="보이는 것 모두" onchange="planSelAll(this.checked)"></th><th class="rn">№</th><th>구분</th><th>예정</th><th>사업명</th><th>기관</th>
         <th style="text-align:right">금액</th><th>계약방법</th><th>담당</th><th>상태</th><th>관리</th></tr></thead>
       <tbody id="ptb"></tbody>
     </table></div>
@@ -725,6 +726,7 @@ function planDraw(){
   if(!$('ptb')) return;
   var o=planRows(), today=o.today, feed=get('feed'), pg=_planPaged(o.rows), rows=pg.page;
   var vc=planViewSel(o.every, today, o.view);
+  planStarBtn(vc, o.view);
   var soon=o.every.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;
   if($('tbPlan')) $('tbPlan').innerHTML='📅 발주 예정'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
   var vis={}; o.rows.forEach(function(r){ vis[r.no]=1; });
@@ -753,6 +755,7 @@ function planDraw(){
     var stHtml='<span class="tag '+stc+'"'+(r.bids&&r.bids.length?' title="입찰공고번호 '+esc(r.bids.join(', '))+'"':'')+'>'+esc(st.label)+'</span>'
       +(lk.length?' <button class="btn sm" onclick="planGoFeed(\''+esc(lk[0].id)+'\')" title="공고 모아보기에서 엽니다">공고 보기</button>':'');
     return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+'" onclick="planRowClick(event,\''+no+'\')">'
+      +'<td class="stc"><button class="starbtn'+(r.star?' on':'')+'" title="'+(r.star?'별표 끄기':'별표 치기')+'" onclick="event.stopPropagation();planStar(\''+no+'\')">'+(r.star?'★':'☆')+'</button></td>'
       +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="planTog(\''+no+'\',this.checked)"></td>'
       +'<td class="rn">'+(pg.from+i+1)+'</td>'
       +'<td><span class="tag '+(r.kind==='spec'?'red':'navy')+'">'+(r.kind==='spec'?'사전규격':'발주계획')+'</span></td>'
@@ -764,12 +767,17 @@ function planDraw(){
       +'<td class="sml" title="'+esc([r.dept,r.ofcl,r.tel].filter(Boolean).join(' · '))+'">'+esc(r.dept||r.ofcl||'-')+(r.tel?'<div>'+esc(r.tel)+'</div>':'')+'</td>'
       +'<td>'+stHtml+'</td>'
       +'<td class="act">'
-        +'<button class="btn sm" onclick="planStar(\''+no+'\')">'+(r.star?'★':'☆')+'</button> '
         +(r.files&&r.files.length&&/^https:\/\//.test(r.files[0])?'<a class="btn sm" href="'+esc(r.files[0])+'" target="_blank" rel="noopener" title="사전규격서 (나라장터)">📎</a> ':'')
         +(r.hidden?'<button class="btn sm" title="되살리기" onclick="planHide(\''+no+'\',false)">↩</button>'
                   :'<button class="btn sm" onclick="planHide(\''+no+'\',true)">🚫</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요'+(o.view==='ahead'&&vc.past?' (⌛ 지난 계획 '+vc.past+'건은 보기에서)':''))+'</td></tr>';
+  }).join('') : '<tr><td colspan="12" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요'+(o.view==='ahead'&&vc.past?' (⌛ 지난 계획 '+vc.past+'건은 보기에서)':''))+'</td></tr>';
   if($('planPager')) $('planPager').innerHTML=_pager(pg.p, pg.pages, pg.from, rows.length, pg.n, 'planPageTo');
+}
+/* 별표만 보기 — 보기 고르개(pView)의 「★ 관심」을 켜고 끈다(한 값). 끄면 처음 보기(공고 전 · 앞으로)로 */
+function planStarOnly(){ var el=$('pView'); el.value = (el.value==='star') ? 'ahead' : 'star'; _planPage=0; planDraw(); }
+function planStarBtn(vc, view){
+  var b=$('pStarBtn'); if(!b) return; var on=view==='star';
+  b.className='btn'+(on?' on':''); b.textContent=(on?'★ 별표만 ':'☆ 별표만 ')+((vc&&vc.star)||0)+'건';
 }
 function planView(v){ if($('pView')) $('pView').value=v; _planPage=0; planDraw(); }
 function planTog(no,on){ if(on) _planSel[no]=1; else delete _planSel[no]; planDraw(); }
@@ -977,9 +985,9 @@ function draw(){
     var st=r.hidden ? '<span class="tag red">'+(r.ruleOut?'숨김·규칙':'숨김')+'</span>'
       : '<span class="tag '+(r.type==='관심'?'teal':(r.type==='지나감'?'':'navy'))+'">'+esc(r.type||'-')+'</span>';
     return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+(r.type==='관심'?' starred':'')+'" onclick="feedRowClick(event,\''+id+'\')">'
+      +'<td class="stc"><button class="starbtn'+(r.type==='관심'?' on':'')+'" title="'+(r.type==='관심'?'별표 끄기':'별표 치기')+'" onclick="event.stopPropagation();star(\''+id+'\')">'+(r.type==='관심'?'★':'☆')+'</button></td>'
       +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="feedTog(\''+id+'\',this.checked)"></td>'
       +'<td class="rn">'+(from+i+1)+'</td>'
-      +'<td class="stc"><button class="starbtn'+(r.type==='관심'?' on':'')+'" title="'+(r.type==='관심'?'별표 끄기':'별표 치기')+'" onclick="event.stopPropagation();star(\''+id+'\')">'+(r.type==='관심'?'★':'☆')+'</button></td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
       +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'

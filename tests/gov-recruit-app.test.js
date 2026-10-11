@@ -1467,12 +1467,12 @@ test('★ 공고 상세 팝업에도 같은 기관 모집 글 칸이 있다', as
   assert.match(r.el('popBody').innerHTML, /같은 기관의 컨설턴트·전문가 모집 글/);
   assert.match(r.el('popBody').innerHTML, /2027년 외부연구진 풀 공개 모집/);
 });
-test('★★ 별표 — 줄 왼쪽 №옆에 별 단추가 있고, 눌러도 줄 팝업이 안 열린다', () => {
+test('★★ 별표 — 줄 맨 왼쪽(ㅁ 왼쪽)에 별 단추가 있고, 눌러도 줄 팝업이 안 열린다', () => {
   const r = runApp({ feed: FEED }, { Date: FixedDate(TODAY) });
   r.api.draw();
   const rows = r.el('tb').innerHTML.split('<tr class="fr').slice(1);
   assert.equal(rows.length, 3);
-  rows.forEach((x) => assert.match(x, /<td class="rn">\d+<\/td><td class="stc"><button class="starbtn/, '별 단추가 №옆에 없다'));
+  rows.forEach((x) => assert.match(x, /onclick="feedRowClick[^>]*><td class="stc"><button class="starbtn[^>]*>[★☆]<\/button><\/td><td class="chk">/, '별 단추가 ㅁ 왼쪽에 없다'));
   assert.match(rows[2], /class="starbtn on"[^>]*onclick="event\.stopPropagation\(\);star\('F3'\)">★<\/button>/);
   assert.match(rows[0], />☆<\/button><\/td>/);
   assert.match(rows[2], /starred/, '별표 친 줄 배경');
@@ -1500,7 +1500,7 @@ test('★ 별표를 치면 단추 건수가 곧 바뀌고, 끄면 예전 상태�
 });
 
 test('★ 빈 목록 줄의 칸 수(colspan)가 머리 칸 수와 같다 — 별 칸을 더하고 안 맞추면 안내 줄이 삐뚤어진다', () => {
-  const head = src.slice(src.indexOf('<thead><tr><th class="chk"><input type="checkbox" id="fSelAll"'));
+  const at = src.indexOf('id="fSelAll"'), head = src.slice(src.lastIndexOf('<thead>', at));
   const ths = (head.slice(0, head.indexOf('</tr></thead>')).match(/<th[ >]/g) || []).length;
   const r = runApp({}, { Date: FixedDate(TODAY) });
   r.api.draw();
