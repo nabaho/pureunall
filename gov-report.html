@@ -635,7 +635,7 @@ function grRenderSend(){
         else if(!fs&&(!x.rec||!x.rec.gotAt)) h+=' <button type="button" class="act" onclick="grMarkSent(\'\')">제출 보냄 기록(오늘)</button>';
       }
       h+='<div class="days">'+grEsc(S.MSG.ATTACH)+'</div><div class="days">'+grEsc(S.MSG.DL_NOTE)+'</div>';
-    }else if(x.plan.how==='platform'&&x.plan.steps){
+    }else if(x.plan.how==='platform'&&Array.isArray(x.plan.steps)){
       h+='<ol class="days">'+x.plan.steps.map(function(t){ return '<li>'+grEsc(t)+'</li>'; }).join('')+'</ol>'
         +'<div class="days">로그인과 «제출» 단추는 사람이 합니다 — 접수 화면을 캡처해 두고 «접수 확인»에 표시하세요</div>';
     }else h+='<div class="days">제출 방식 확인 필요 — 운영지침 도착 뒤 정합니다</div>';
