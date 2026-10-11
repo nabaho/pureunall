@@ -82175,8 +82175,9 @@ function PayrollLedger(props){
     };
   }, {gross:0,deduct:0,net:0,count:0,perf:0,reimb:0});
 
-  var thStyle = {padding:'3px 3px',background:'#f8fafc',borderBottom:'2px solid #e2e8f0',fontSize:'10px',fontWeight:700,color:'#475569',whiteSpace:'nowrap',position:'sticky',top:0};
-  var tdNum = {padding:'2px 4px',textAlign:'right',fontFamily:'monospace',fontSize:'10.5px',whiteSpace:'nowrap'};
+  /* 글자 — 대표 「급여관리도 글자 더크게」(2026-10-11): 머리 10→12.5 · 숫자 10.5→13 · 입력 10→12.5 */
+  var thStyle = {padding:'5px 5px',background:'#f8fafc',borderBottom:'2px solid #e2e8f0',fontSize:'12.5px',fontWeight:700,color:'#475569',whiteSpace:'nowrap',position:'sticky',top:0};
+  var tdNum = {padding:'4px 5px',textAlign:'right',fontFamily:'monospace',fontSize:'13px',whiteSpace:'nowrap'};
   var IS_M = window.innerWidth <= 768;
   /* 그달 «모두 0원»인 칸은 접는다 (2026-10-11 대표 「창 늘어나지 않고 한번에 볼수 있게」 — 시안)
      · 기본급은 늘 · 한 명이라도 값(또는 연장·야간·휴일 «시간»)이 있으면 그 칸은 저절로 나온다 · 위의 «보이기»로 다 펼친다 */
@@ -82205,7 +82206,7 @@ function PayrollLedger(props){
   var colShow = hideZeroCols ? colSpec.filter(_payColHas) : colSpec;
   var colZero = colSpec.filter(function(c){ return colShow.indexOf(c) < 0; });
   var _colLabel = { meal:'식대', car:'차량유지', overtime:'연장', night:'야간', holiday:'휴일', etc:'기타', bonus_lump:'상여', perf:'성과급' };
-  var inputNum = {width:'65px',padding:'1px 3px',border:'1px solid #e2e8f0',borderRadius:'5px',fontSize:'10px',fontFamily:'monospace',textAlign:'right'};
+  var inputNum = {width:'84px',padding:'2px 4px',border:'1px solid #e2e8f0',borderRadius:'5px',fontSize:'12.5px',fontFamily:'monospace',textAlign:'right'};
   // ── 왼쪽 열 고정 (엑셀 틀고정: 고른 열까지 가로 스크롤 시 왼쪽 유지). 이 기기에만 저장, 데이터/서버 무관 ──
   var _fzInit = (function(){ try{ return localStorage.getItem('pureun_v6_payroll_freeze_col') || 'name'; }catch(e){ return 'name'; } })();   // 기본: 이름 칸 고정 (2026-10-11 시안)
   var _fzS = useState(_fzInit); var freezeCol = _fzS[0]; var _setFreezeCol = _fzS[1];
@@ -82508,7 +82509,7 @@ function PayrollLedger(props){
               style:{ border:'1px solid #e2e8f0', background:'#fff', color:'#64748b', borderRadius:'10px', padding:'1px 9px', cursor:'pointer', fontSize:'11px' } }, '0원 칸 다시 접기'),
         h('button', { type:'button', onClick:function(){ setShowDeduct(!showDeduct); },
           style:{ border:'1px solid #fde68a', background:'#fffbeb', color:'#854d0e', borderRadius:'10px', padding:'1px 9px', cursor:'pointer', fontSize:'11px' } }, showDeduct ? '공제 6칸 접기' : '공제 6칸 펼치기')),
-      h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px' } },
+      h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'13px' } },
         h('thead', null, h('tr', null,
           h('th', { style:Object.assign({},thStyle, fzStyle('num','#f8fafc',6)) }, '#'),
           h('th', { style:Object.assign({},thStyle,{textAlign:'left',minWidth:'52px'}, IS_M?{position:'sticky',left:0,zIndex:3}:{}, fzStyle('name','#f8fafc',6), IS_M?{}:{cursor:'pointer',userSelect:'none'}),
@@ -82591,8 +82592,8 @@ function PayrollLedger(props){
               return base;
             })();
             return h('tr', { key:u.sid, style:{borderBottom:'1px solid #f8fafc', background: effectivePause ? '#fffbeb' : 'transparent'} },
-              h('td', {style:Object.assign({padding:'4px',textAlign:'center',color:'#94a3b8',fontSize:'10.5px'}, fzStyle('num', effectivePause?'#fffbeb':'#fff', 2))}, idx+1),
-              h('td', {style:Object.assign({padding:'4px 6px',fontWeight:600,fontSize:'11px',whiteSpace:'nowrap'}, IS_M?{position:'sticky',left:0,zIndex:1,background:effectivePause?'#fffbeb':'#fff'}:{}, fzStyle('name', effectivePause?'#fffbeb':'#fff', 2))},
+              h('td', {style:Object.assign({padding:'4px',textAlign:'center',color:'#94a3b8',fontSize:'12px'}, fzStyle('num', effectivePause?'#fffbeb':'#fff', 2))}, idx+1),
+              h('td', {style:Object.assign({padding:'4px 6px',fontWeight:600,fontSize:'14px',whiteSpace:'nowrap'}, IS_M?{position:'sticky',left:0,zIndex:1,background:effectivePause?'#fffbeb':'#fff'}:{}, fzStyle('name', effectivePause?'#fffbeb':'#fff', 2))},
                 /* 휴직·퇴직은 한 글자 동그라미 — 글자표 둘이 붙으면 이름 칸이 세 배로 늘어 표가 옆으로 밀렸다 (2026-10-11 시안) */
                 loaActive && h('span', {
                   title:'휴직: '+(loaPolicy?loaPolicy.name:(loaActive.typeLabel||loaActive.code))+' '+(loaActive.startDate||'')+' ~ '+(loaActive.endedDate||loaActive.endDate||loaActive.plannedEndDate||'')+(effectivePause?' · 급여 정지':''),
@@ -82610,7 +82611,7 @@ function PayrollLedger(props){
                 }, '퇴'),
                 h('span', { style:{ color:(u.status==='resigned'||u.status==='retired')?'#94a3b8':undefined } }, u.name)
               ),
-              h('td', {style:Object.assign({padding:'4px 6px',fontSize:'10.5px',color:'#64748b',whiteSpace:'nowrap'}, fzStyle('title', effectivePause?'#fffbeb':'#fff', 2))}, u.title),
+              h('td', {style:Object.assign({padding:'4px 6px',fontSize:'12.5px',color:'#64748b',whiteSpace:'nowrap'}, fzStyle('title', effectivePause?'#fffbeb':'#fff', 2))}, u.title),
               // 시급 (통상시급, 자동계산: (기본급+고정수당)/209)
               h('td', {style:Object.assign({},tdNum,{color:'#1e40af',fontWeight:600,background:'#eff6ff'})},
                 calc.legal.ordinaryWage>0 ? calc.legal.ordinaryWage.toLocaleString() : '-'),
@@ -82761,7 +82762,7 @@ function PayrollLedger(props){
                         updateRec(u.sid, patch);
                       },
                       style:{width:'100%',padding:'2px 4px',border:'1px solid '+(manual?'#fbbf24':'transparent'),borderRadius:'5px',background:'transparent',
-                        textAlign:'right',fontSize:'11px',fontFamily:'monospace',color:manual?'#d97706':'inherit',fontWeight:manual?700:400}}));
+                        textAlign:'right',fontSize:'12.5px',fontFamily:'monospace',color:manual?'#d97706':'inherit',fontWeight:manual?700:400}}));
                 }
                 return [
                   dedCell('pensionOverride',   calc.pension),
