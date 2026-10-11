@@ -28140,6 +28140,22 @@ function erpCoAlive(co){
   return !!(co && !co._deleted && co.status !== 'closed');
 }
 
+/* ── 업체 종료 때 정리할 미입금 자문료 고르기 (2026-10-11 검토 §5) ──
+   잣대는 fi.companyId === co.id. companyId 가 없는 줄만 «정규화한 이름이 같고, 그 이름의 살아 있는
+   업체가 정확히 이 한 곳»일 때 고른다 — 같은 이름의 지점·동명 법인 돈을 함께 지우지 않는다.
+   휴지통(_deleted)·되돌린(undoneDate) 줄은 고르지 않는다. 쓰기는 하지 않는다. */
+function erpCloseCoPendingIncomes(co, incomes, companies){
+  if(!co || !co.id) return [];
+  var nm = erpNormName(co.name);
+  var sameName = nm ? (companies || []).filter(function(c){ return erpCoAlive(c) && erpNormName(c.name) === nm; }) : [];
+  var nameIsMine = sameName.length === 1 && sameName[0].id === co.id;
+  return (incomes || []).filter(function(fi){
+    if(!fi || !fi.id || fi._deleted || fi.undoneDate || fi.paid || fi.kind !== '자문료') return false;
+    if(fi.companyId) return fi.companyId === co.id;
+    return nameIsMine && erpNormName(fi.companyName) === nm;
+  });
+}
+
 function CompanyManagement(){
   /* 표를 «한 화면 안에서» 최대로 — 대표 지시 2026-10-11 「사업장정보가 2개정도 더 보이게」 → 「한화면안에서 쪽 번호가 나오게」.
      두 줄을 그냥 늘리면 쪽 번호가 화면 밖으로 밀렸다. 그래서 디자인은 그대로 두고 «빈 자리»만 걷는다:
@@ -29113,22 +29129,21 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     if(!closeModal) return;
     if(!closeModal.closedReason){ showToast('종료 사유 선택'); return; }
     if(!closeModal.closedDate){ showToast('종료일 입력'); return; }
-    // 미입금 자문료 확인
-    var allIncomes = dbGet('finance_income', []);
-    var pendingForCo = allIncomes.filter(function(fi){
-      return !fi.paid && fi.kind === '자문료' && fi.companyName === closeModal.name;
-    });
+    // 미입금 자문료 확인 — companyId 로 고른다(이름이 같은 다른 업체 돈을 섞지 않는다, 검토 §5)
+    var _closeCo = (dbGet('companies', []) || []).find(function(c){ return c && c.id === closeModal.id; }) || { id: closeModal.id, name: closeModal.name };
+    var pendingForCo = erpCloseCoPendingIncomes(_closeCo, dbGet('finance_income', []) || [], dbGet('companies', []) || []);
     var doCleanup = false;
     if(pendingForCo.length > 0){
       doCleanup = await popConfirm('"' + closeModal.name + '" 업체의 미입금 자문료 ' + pendingForCo.length + '건이 있습니다.\n\n함께 정리(휴지통 이동)하시겠습니까?\n\n→ 확인: 종료 + 미입금 자동 정리\n→ 취소: 종료만 진행 (미입금은 입금관리에 남음)');
     }
-    coPatch(closeModal.id, {
+    /* 업체 종료가 저장되지 않았으면 입금은 손대지 않는다 */
+    if(!coPatch(closeModal.id, {
       status:'closed',
       closedAt:(new Date()).toISOString(),
       closedDate: closeModal.closedDate,
       closedReason: closeModal.closedReason,
       closedReasonDetail: closeModal.closedReasonDetail
-    });
+    })) return;
     // closed_archive에도 기록 (종료관리 표시용)
     var arch = dbGet('closed_archive', []);
     arch.unshift({
@@ -29142,32 +29157,20 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
       closedAt:(new Date()).toISOString()
     });
     dbSet('closed_archive', arch);
-    // 미입금 자문료 정리 (휴지통 이동)
-    var cleanupCount = 0;
+    /* 미입금 자문료 정리 — 휴지통에 «먼저» 담고, 담은 뒤에 그 줄들만 뺀다(erpMoveIncomesToTrash).
+       ⚠ 예전에는 입금표를 통째 저장(dbSet)해 원본을 먼저 지우고 휴지통을 나중에 썼다 —
+         두 번째가 실패하면 돈 기록이 어디에도 없었다. 마감된 달 줄은 건너뛰고 몇 건인지 알린다. */
+    var cleanupMsg = '';
     if(doCleanup && pendingForCo.length > 0){
-      var trash = dbGet(TRASH_FIN_KEY, []) || [];   // 돈 기록 → 재무 전용 휴지통
-      var pendingIds = {};
-      pendingForCo.forEach(function(fi){ pendingIds[fi.id] = 1; });
-      var remaining = allIncomes.filter(function(fi){
-        if(pendingIds[fi.id]){
-          trash.unshift({
-            id: 'trash-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)+'-'+Math.random().toString(36).slice(2,5),
-            storeKey: 'finance_income',
-            item: fi,
-            deletedAt: (new Date()).toISOString(),
-            deletedBy: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.sid : '',
-            reason: '업체 종료에 따른 자동 정리: ' + closeModal.name
-          });
-          cleanupCount++;
-          return false;
-        }
-        return true;
-      });
-      dbSet('finance_income', remaining);
-      dbSet(TRASH_FIN_KEY, trash);
+      var _mv = erpMoveIncomesToTrash(pendingForCo.map(function(fi){ return fi.id; }), '업체 종료에 따른 자동 정리: ' + closeModal.name);
+      if(!_mv.ok) cleanupMsg = ' / ⚠ 미입금 정리 실패 — 입금관리에 그대로 남았습니다';
+      else {
+        if(_mv.moved) cleanupMsg += ' / 미입금 ' + _mv.moved + '건 정리';
+        if(_mv.locked) cleanupMsg += ' / 🔒 마감된 달 ' + _mv.locked + '건은 건너뜀(입금관리에 남음)';
+      }
     }
     setCloseModal(null);
-    showToast('종료 처리'+(cleanupCount>0 ? ' / 미입금 '+cleanupCount+'건 정리' : ''));
+    showToast('종료 처리' + cleanupMsg, cleanupMsg ? 7000 : undefined);
   }
   // 복원 (closed → 원래 status로, 또는 active)
   async function restoreCompany(id){
@@ -48349,6 +48352,40 @@ function erpMoveIncomeToTrash(incomeId, reason){
   return true;
 }
 window.erpMoveIncomeToTrash = erpMoveIncomeToTrash;
+/* 여러 건을 같은 방식으로 — 휴지통 «한 번» 쓰고 → 그 줄들만 «한 번» 뺀다 (업체 종료 정리, 검토 §5).
+   마감된 달 줄은 건너뛰고 locked 로 센다. 휴지통에 못 담으면 하나도 지우지 않고,
+   지우기가 실패하면 방금 담은 휴지통 줄을 거둔다. 돌려주는 값: { ok, moved, locked } */
+function erpMoveIncomesToTrash(ids, reason){
+  var res = { ok: true, moved: 0, locked: 0 };
+  if(!Array.isArray(ids) || !ids.length) return res;
+  var want = {}; ids.forEach(function(id){ if(id) want[id] = 1; });
+  var list = dbGet('finance_income', []) || [];
+  var items = [];
+  list.forEach(function(x){
+    if(!x || !want[x.id]) return;
+    var ym = String(x.advisoryYm || x.date || '').slice(0, 7), dm = String(x.date || '').slice(0, 7);
+    if((ym && isIncomeLocked(ym)) || (dm && isIncomeLocked(dm))){ res.locked++; return; }
+    items.push(x);
+  });
+  if(!items.length) return res;
+  var tk = trashKeyFor('finance_income');
+  var now = (new Date()).toISOString();
+  var by = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.sid || '') : '';
+  var entries = items.map(function(it){
+    return { id: 'trash-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 5),
+      storeKey: 'finance_income', item: it, deletedAt: now, deletedBy: by, reason: reason || '' };
+  });
+  var tids = {}; entries.forEach(function(e){ tids[e.id] = 1; });
+  var trash = dbGet(tk, []) || [];
+  if(dbSet(tk, entries.concat(trash)) === false){ res.ok = false; return res; }
+  if(dbRemoveMany('finance_income', items.map(function(it){ return it.id; })) === false){
+    dbSet(tk, (dbGet(tk, []) || []).filter(function(x){ return !(x && tids[x.id]); }));
+    res.ok = false; return res;
+  }
+  res.moved = items.length;
+  return res;
+}
+window.erpMoveIncomesToTrash = erpMoveIncomesToTrash;
 
 function erpCmsUndo(incomeId, key){
   if(!incomeId || !key) return Promise.resolve(false);
