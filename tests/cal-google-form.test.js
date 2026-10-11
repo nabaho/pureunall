@@ -307,3 +307,12 @@ test('폰 머리 — 구글 앱처럼 ☰ 가 왼쪽 맨 앞, 그다음 제목',
   const 몸 = 캘.slice(i, i + 3500);
   assert.ok(몸.indexOf('class="mmenu"') > 0 && 몸.indexOf('class="mmenu"') < 몸.indexOf('class="mtt"'), '☰ 가 제목보다 앞이어야 합니다');
 });
+
+test('폰 왼쪽 서랍 — ☰ 가 서랍을 연다(일정·일·주·월 + 새로고침), 옛 메뉴는 「더 보기」로 잇는다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /if\(t\.hasAttribute\('data-mmenu'\)\)\{ S\.drawer = !S\.drawer;/);
+  assert.match(캘, /\[\["sched","일정"\],\["day","일"\],\["week","주"\],\["month","월"\]\]/);
+  assert.match(캘, /data-dreload="1">새로고침/);
+  assert.match(캘, /data-dmore="1">더 보기/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-dmore'\)\)\{ S\.drawer = false; S\.mobMenu = !S\.mobMenu;/);
+});

@@ -782,6 +782,17 @@
   body.mob .mhead{position:relative}
   body.mob .mttb{display:flex;align-items:center;gap:6px;border:none;background:transparent;padding:0;cursor:pointer;font-family:inherit;color:var(--gtext)}
   body.mob .mcar{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--gtext);margin-top:4px}
+  /* ★ 폰 왼쪽 서랍 — 구글 앱 캡처(2026-10-11): ☰ 를 누르면 왼쪽에서 밀려 나오고, 「일정·일·주·월」 + 「새로고침」.
+       고른 보기는 알약 칠(어두운 판 #3f4659 → 우리 팔레트의 #0842a0, 밝은 판 #d3e3fd). 옛 ☰ 메뉴(탭·사람 칩…)는 「더 보기」 줄로 잇는다 */
+  .dscrim{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.5)}
+  .drawer{position:fixed;left:0;top:0;bottom:0;width:min(84vw,320px);z-index:41;background:var(--panel);overflow-y:auto;
+    padding:18px 12px;box-shadow:0 8px 28px rgba(0,0,0,.4)}
+  .drawer h3{margin:4px 12px 14px;font-size:22px;font-weight:400;color:var(--gtext)}
+  .drawer button{display:block;width:100%;text-align:left;border:none;background:transparent;border-radius:28px;padding:0 20px;height:56px;
+    font-size:15px;font-weight:500;color:var(--gtext);cursor:pointer;font-family:inherit}
+  .drawer button.on{background:#d3e3fd;color:#0842a0}
+  :root[data-theme="dark"] .drawer button.on{background:#0842a0;color:#d3e3fd}
+  .drawer hr{border:none;border-top:1px solid var(--gline);margin:8px 0}
   .vveil{position:fixed;inset:0;z-index:30;background:transparent}
   .vmenu{position:absolute;left:12px;top:52px;z-index:31;background:var(--panel);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.3);padding:6px 0;min-width:150px}
   .vmenu button{display:block;width:100%;text-align:left;border:none;background:transparent;padding:12px 20px;font-size:15px;color:var(--gtext);cursor:pointer;font-family:inherit}
@@ -2556,6 +2567,10 @@ function 폰머리Html(){
        거르개 켜고 끄기는 ☰ 메뉴의 사람 칩에서 한다 */
     + (S.filter ? '<button class="mfilt" data-mf="1" title="누르면 전체 → 공용 → 개인">'
     +   (S.filter === "priv" ? "🔒 개인" : S.filter === "shared" ? "👥 공용" : "👤 걸러 봄") + '</button>' : '')
+    + (S.drawer ? '<div class="dscrim" data-dclose="1"></div><div class="drawer"><h3>푸른 캘린더</h3>'
+        + [["sched","일정"],["day","일"],["week","주"],["month","월"]].map(function(v){
+            return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>'; }).join("")
+        + '<hr><button data-dreload="1">새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mtoday" data-mv="0" title="오늘"><i>' + parseInt(todayYMD().slice(8,10), 10) + '</i></button>'
@@ -4732,7 +4747,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-gotoday],[data-meet]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4826,7 +4841,10 @@ document.addEventListener('click', function(e){
     render(); return;
   }
   if(t.hasAttribute('data-mfull')){ modalRead(); S.modal.full = true; render(); return; }
-  if(t.hasAttribute('data-mmenu')){ S.mobMenu = !S.mobMenu; render(); return; }
+  if(t.hasAttribute('data-mmenu')){ S.drawer = !S.drawer; render(); return; }
+  if(t.hasAttribute('data-dclose')){ S.drawer = false; render(); return; }
+  if(t.hasAttribute('data-dreload')){ S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return; }
+  if(t.hasAttribute('data-dmore')){ S.drawer = false; S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
   if(t.hasAttribute('data-gotoday')){ S.date = t.getAttribute('data-gotoday'); S.ym = S.date.slice(0,7); S.view = 'day'; S.gridScroll = true; render(); return; }
@@ -4836,7 +4854,7 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-view')){
     var 이전보기 = S.view;
     S.view = t.getAttribute('data-view');
-    S.vmenu = false; S.sheet = false;
+    S.vmenu = false; S.sheet = false; S.drawer = false;
     if(S.view === 'sched' && 이전보기 !== 'sched') S.schedScroll = true;
     if(S.view === 'week' || S.view === 'day') S.gridScroll = true;        /* 시간 축은 지금(또는 오전 7시) 근처에서 시작 */
     if(!S.date) S.date = todayYMD();
