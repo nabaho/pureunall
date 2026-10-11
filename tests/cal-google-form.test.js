@@ -293,3 +293,10 @@ test('「N개 더보기」 — 구글 실측(12px/500, 줄 20px, 상자 22px)', 
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /\.more\{font-size:12px;color:var\(--gtext\);padding:1px 6px;cursor:pointer;line-height:20px;\s*font-weight:500;border-radius:6px;/);
 });
+
+test('폰 새 일정 단추 — 구글 앱처럼 오른쪽 아래에 뜬 둥근 네모, 머리에는 «오늘» 단추', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /body\.mob \.mplus\{position:fixed;right:16px;bottom:88px;[^}]*width:56px;\s*height:56px;border-radius:16px/);
+  assert.match(캘, /data-theme="dark"\] body\.mob \.mplus\{background:#304678;color:#d9e2ff\}/);
+  assert.match(캘, /<button class="mtoday" data-mv="0" title="오늘">/);
+});
