@@ -38370,6 +38370,7 @@ function npsWrite(key, patch){
   return Store.db.ref(DB_ROOT).update(upd).then(() => {
     coListBust(); renderCoSoon();
     if(state.coPick === key) openCoDetailPanel(key, true);
+    if(_coWork && _coWork.key === key) coWorkMount();
     return true;
   }).catch(e => { console.warn('[국민연금 적기]', e); toast('저장하지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); return false; });
 }
@@ -38414,13 +38415,6 @@ function coNpsUnpick(key){
   if(!confirm('국민연금 사업장 연결을 풀까요?\n지금까지 받은 숫자 기록은 남겨 둡니다.')) return;
   npsWrite(key, { pick: null, now: null }).then(ok => ok && toast('연결을 풀었습니다', 5000));
 }
-function coNpsSummary(o){
-  const p = (o.extra && o.extra.nps) || {};
-  if(p.pick && p.now) return '가입자 ' + (Number(p.now.cnt) || 0) + '명';
-  if(p.none) return '없음';
-  if(p.cand && p.cand.length) return '후보 ' + p.cand.length + '곳 — 골라 주세요';
-  return '아직 안 찾음';
-}
 function coNpsHtml(o){
   const k = esc(String(o.key).replace(/'/g, "\\'"));
   const p = (o.extra && o.extra.nps) || {};
@@ -38452,6 +38446,122 @@ function coNpsHtml(o){
       <div class="coerppin" style="margin-top:6px"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
   }
   return `<div class="dim" style="margin-bottom:6px">국민연금 가입 사업장에서 가입자 수(≈ 근로자 수)를 받아 옵니다. 처음 한 번은 사업장을 골라 주세요.</div>${find}`;
+}
+/* ══════ 👥 근로자 수 — 한 줄 + 사업장 팝업 (대표 「진행」 2026-10-11, 목업 ㉯ 「칸이 늘어나는 것보다 팝업」) ══════
+   기업 상세에는 «한 줄»만 둔다. 누르면 사업장 창이 뜨고, 위 갈래는 🏢 고용·산재보험 · 💳 국민연금 둘이다.
+   ★ 고용·산재: 근로복지공단 「고용/산재보험 현황정보」 — 사업자번호 «10자리 그대로» 물어 정확히 맞는다.
+     그래서 사람이 고르지 않고, 기업 상세를 열면 저절로 받아 둔다(30일에 한 번). 매달 2일 서버도 받는다.
+     자리: coInfo/{번호}/ei = { at, rows:[{nm,fg(gy|sj),cnt,ind,since,addr}], gy, sj, n } · eiHist/{년월} = 고용 상시인원
+   ★ 국민연금은 앞 6자리만 공개라 그대로 «사람이 고른다»(coNpsHtml) — 그 화면을 이 창 안으로 옮겼다.
+   ⚠ 공단 신고 기준 숫자다 — 상시근로자 «판단»은 법 기준으로 따로 본다고 화면에 적는다. */
+const EI_URL = 'https://apis.data.go.kr/B490001/gySjbPstateInfoService/getGySjBoheomBsshItem';
+const EI_EVERY_DAYS = 30;
+/* 공단 답 → 사업장 줄 (순수 로직). opaBoheomFg 1 = 산재, 2 = 고용 */
+function eiRows(items){
+  return [].concat(items || []).filter(Boolean).map(it => {
+    const fg = String(it.opaBoheomFg || '') === '2' ? 'gy' : 'sj';
+    const d = String(it.seongripDt || '');
+    return { nm: String(it.saeopjangNm || '').trim(), fg: fg, cnt: Number(it.sangsiInwonCnt) || 0,
+      ind: String((fg === 'gy' ? it.gyEopjongNm : it.sjEopjongNm) || it.gyEopjongNm || it.sjEopjongNm || '').trim(),
+      since: d.length >= 6 ? d.slice(0,4) + '.' + d.slice(4,6) : '', addr: String(it.addr || '').trim() };
+  }).sort((a,b) => (b.cnt - a.cnt) || a.nm.localeCompare(b.nm, 'ko'));
+}
+/* 합계 — 고용·산재 상시인원과 사업장 수(이름+주소로 센다) */
+function eiSum(rows){
+  const gy = (rows || []).filter(r => r.fg === 'gy').reduce((n, r) => n + r.cnt, 0);
+  const sj = (rows || []).filter(r => r.fg === 'sj').reduce((n, r) => n + r.cnt, 0);
+  const sites = new Set((rows || []).map(r => r.nm + '|' + r.addr)).size;
+  return { gy: gy, sj: sj, n: sites };
+}
+let _eiAsked = {};          /* 이 화면에서 한 번 물어본 회사 — 실패해도 되풀이하지 않는다 */
+async function coEiFetch(key, quiet){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const no = digits(o.bizno || '');
+  if(no.length !== 10){ if(!quiet) toast('사업자번호가 있어야 고용·산재보험에서 찾을 수 있습니다', 7000); return; }
+  const svc = npsKey();
+  if(!svc){ if(!quiet) toast('공공데이터 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」', 9000); return; }
+  _eiAsked[key] = 1;
+  let rows;
+  try{
+    const r = await fetch(EI_URL + '?serviceKey=' + encodeURIComponent(svc) + '&_type=json&numOfRows=100&pageNo=1&v_saeopjaDrno=' + no);
+    if(!r.ok) throw new Error('공단 답 ' + r.status);
+    const j = await r.json();
+    const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
+    rows = eiRows(it);
+  }catch(e){ if(!quiet) toast('고용·산재보험에 못 물어봤습니다 — ' + ((e && e.message) || ''), 8000); return; }
+  const s = eiSum(rows), now = Date.now();
+  const ym = new Date(now + 9 * 3600000).toISOString().slice(0,7).replace('-', '');
+  const upd = {};
+  upd['coInfo/' + key + '/ei'] = { at: now, rows: rows.length ? rows : null, gy: s.gy, sj: s.sj, n: s.n };
+  if(rows.length) upd['coInfo/' + key + '/eiHist/' + ym] = s.gy;
+  if(Store.mode !== 'firebase') return;
+  try{ await Store.db.ref(DB_ROOT).update(upd); }catch(e){ console.warn('[고용·산재 적기]', e); return; }
+  coListBust(); renderCoSoon();
+  if(state.coPick === key) openCoDetailPanel(key, true);
+  if(_coWork && _coWork.key === key) coWorkMount();
+}
+/* 기업 상세를 열 때 — 아직 없거나 30일 지났으면 조용히 받는다(국세청 coNtsAutoOnOpen 과 같은 결) */
+function coEiAutoOnOpen(o){
+  if(!o || _eiAsked[o.key] || Store.mode !== 'firebase') return;
+  if(digits(o.bizno || '').length !== 10 || !npsKey()) return;
+  const ei = o.extra && o.extra.ei;
+  if(ei && ei.at && Date.now() - Number(ei.at) < EI_EVERY_DAYS * 86400000) return;
+  _eiAsked[o.key] = 1;        /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
+  coEiFetch(o.key, true);
+}
+/* 기업 상세의 «한 줄» */
+function coWorkRowHtml(o){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const ei = (o.extra && o.extra.ei) || null, np = (o.extra && o.extra.nps) || {};
+  const npTxt = np.pick && np.now ? '국민연금 ' + (Number(np.now.cnt) || 0) + '명' : '';
+  let big, small;
+  if(ei && ei.rows){ big = '상시 ' + (Number(ei.gy) || Number(ei.sj) || 0) + '명';
+    small = [(Number(ei.gy) ? '고용보험' : '산재보험'), '사업장 ' + (Number(ei.n) || 0) + '곳', npTxt].filter(Boolean).join(' · '); }
+  else if(npTxt){ big = npTxt; small = '고용·산재보험은 아직 못 받음'; }
+  else { big = '근로자 수'; small = ei ? '고용·산재보험에 이 번호의 사업장이 없습니다' : '열면 고용·산재보험에서 받아 옵니다'; }
+  return `<div class="coerppin" style="cursor:pointer;white-space:nowrap;margin-top:10px" onclick="openCoWork('${k}')"
+      title="눌러서 사업장 창 열기">👥 <b>${esc(big)}</b>
+      <span class="dim" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(small)}</span>
+      <span style="color:#2563eb">사업장 ›</span></div>`;
+}
+/* ── 사업장 팝업 ── */
+let _coWork = null;          /* { key, tab:'ei'|'nps' } */
+function openCoWork(key, tab){ _coWork = { key: String(key), tab: tab || 'ei' }; coWorkMount(); }
+function coWorkClose(){ _coWork = null; coWorkMount(); }
+function coWorkTab(t){ if(_coWork){ _coWork.tab = t; coWorkMount(); } }
+function coWorkMount(){
+  let box = document.getElementById('coWorkBox');
+  if(!box){ if(!_coWork) return; box = document.createElement('div'); box.id = 'coWorkBox'; document.body.appendChild(box); }
+  const o = _coWork && (coList() || []).find(x => x.key === _coWork.key);
+  box.innerHTML = o ? coWorkHtml(o, _coWork.tab) : '';
+  if(!o) _coWork = null;
+}
+function coWorkHtml(o, tab){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const tb = (t, label) => `<button onclick="coWorkTab('${t}')" style="height:30px;padding:0 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid ${tab === t ? '#bfdbfe;background:#eff6ff;color:#1e40af;font-weight:700' : '#e2e8f0;background:#ffffff;color:#475569'}">${label}</button>`;
+  return `<div class="mck-dim" onclick="if(event.target===this)coWorkClose()"><div class="mck" style="width:min(760px,100%)">
+    <header><span>🏢</span><h2>${esc(o.name || o.key)} — 사업장</h2><span class="x" onclick="coWorkClose()" title="닫기">✕</span></header>
+    <div style="display:flex;gap:6px;padding:10px 18px 0">${tb('ei', '🏢 고용·산재보험')}${tb('nps', '💳 국민연금')}</div>
+    <div class="body">${tab === 'nps' ? coNpsHtml(o) : coEiHtml(o)}</div></div></div>`;
+}
+function coEiHtml(o){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const ei = (o.extra && o.extra.ei) || null;
+  const again = `<div class="coerppin" style="margin-top:10px;display:inline-flex"><button onclick="coEiFetch('${k}')">↻ 지금 다시 받기</button></div>`;
+  if(digits(o.bizno || '').length !== 10) return '<p class="em">사업자번호가 있어야 고용·산재보험에서 찾을 수 있습니다.</p>';
+  if(!ei) return '<p class="em">아직 받아 오지 않았습니다.</p>' + again;
+  if(!ei.rows) return '<p class="em">고용·산재보험에 이 사업자번호의 사업장이 없습니다(' + esc(fmtDate(ei.at)) + ' 확인).</p>' + again;
+  const tile = (big, small) => `<div style="flex:1;min-width:0;white-space:nowrap;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px"><b style="font-size:17px">${big}</b> <span style="color:#64748b;font-size:12px">${small}</span></div>`;
+  const cues = npsCues(Number(ei.gy) || Number(ei.sj) || 0);
+  return `<div style="display:flex;gap:8px;margin-bottom:10px">${tile((Number(ei.gy)||0) + '명', '상시 (고용)')}${tile((Number(ei.sj)||0) + '명', '상시 (산재)')}${tile((Number(ei.n)||0) + '곳', '사업장')}</div>
+    <table style="table-layout:fixed"><colgroup><col style="width:24%"><col style="width:48px"><col style="width:52px"><col><col style="width:64px"><col style="width:26%"></colgroup>
+      <tr><th>사업장</th><th>보험</th><th>상시</th><th>업종</th><th>성립</th><th>주소</th></tr>
+      ${ei.rows.map(r => `<tr><td title="${esc(r.nm)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.nm)}</td><td>${r.fg === 'gy' ? '고용' : '산재'}</td>
+        <td style="text-align:right">${Number(r.cnt) || 0}</td><td title="${esc(r.ind)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.ind)}</td>
+        <td>${esc(r.since)}</td><td title="${esc(r.addr)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.addr)}</td></tr>`).join('')}
+    </table>
+    ${cues.length ? `<div style="margin-top:8px">${cues.map(c => `<span style="display:inline-block;font-size:11.5px;border-radius:6px;padding:1px 7px;margin:0 4px 4px 0;background:#fffbeb;color:#854d0e;border:1px solid #fde68a">${esc(c)}</span>`).join('')}</div>` : ''}
+    <div class="em" style="margin-top:6px">사업자번호로 바로 맞춤 · ${esc(fmtDate(ei.at))} 확인 · 공단 신고 기준(상시근로자 판단은 법 기준으로 따로 확인)</div>${again}`;
 }
 function coDetailPanelHtml(o){
   const folder = o.folder ? _coFolders[o.folder] : null;
@@ -38501,6 +38611,9 @@ function coDetailPanelHtml(o){
     <div id="coTiles">${coTilesHtml(o)}</div>
     ${/* 부족한 것 — 하나도 없으면 빈 글자라 칸 자체가 안 뜬다 */''}
     <div id="coNeedBox">${coNeedHtml(o)}</div>
+    ${/* 👥 근로자 수 — 기업 상세에는 «한 줄», 누르면 사업장 팝업(대표 「칸이 늘어나는 것보다 팝업」 2026-10-11 목업 ㉯) */''}
+    ${/* ⚠ typeof — 기업 상세를 «떼어서» 그려 보는 검사(상자 안에 함수 몇 개만 싣는다)가 이 줄 때문에 멎지 않게 */''}
+    ${typeof coWorkRowHtml === 'function' ? coWorkRowHtml(o) : ''}
     ${/* 🔗 여기로 합쳐 둔 줄 — 합쳐진 쪽은 목록에서 사라지므로, 되돌릴 수 있는 자리가
          여기뿐이다. 없으면 빈 글자라 아무 자리도 안 먹는다. */''}
     ${coMergeRowHtml(o)}
@@ -38513,9 +38626,6 @@ function coDetailPanelHtml(o){
     <div id="coInfoBox" style="margin-top:12px">${coInfoBoxHtml(o)}</div>
     ${/* 📝 메모 — 기업정보 «바로 아래». 서류에서 읽어온 값 다음에 사람이 적은 값이 온다. */''}
     ${coMemoHtml(o)}
-    ${/* 👥 국민연금 가입자 — 메모 아래 접힌 카드(2026-10-11). 숫자 카드라 펴 보기 전에도 줄 머리에 가입자 수가 보인다 */''}
-    ${/* ⚠ typeof — 기업 상세를 «떼어서» 그려 보는 검사(상자 안에 함수 몇 개만 싣는다)가 이 줄 때문에 멎지 않게 */''}
-    ${typeof coNpsHtml === 'function' ? coCardHtml('nps', '👥 국민연금 가입자', coNpsSummary(o), `<div id="coNpsBox">${coNpsHtml(o)}</div>`) : ''}
     ${/* 서류 — 「읽어 온 것·안 붙은 것·보낸 것·붙이기」를 한 카드에 담는다.
          ⚠ 안쪽 자리(#coDocsBox·#coSentBox)는 그대로다. 늦게 오는 값이 그 자리를
            찾아 채우므로, 카드가 접혀 있어도(감춰져 있을 뿐) 그대로 들어간다. */''}
@@ -38578,6 +38688,8 @@ function openCoDetailPanel(key, keep){
   /* 🏛 아직 국세청에 안 물어본 회사면 그 자리에서 한 번 묻는다(상태 + 등록증 대조) —
      어느 길로 들어온 등록증이든(수정창·사진첩·일괄) 여기서 빠짐없이 걸린다 */
   coNtsAutoOnOpen(o);
+  /* 👥 고용·산재 상시인원 — 30일에 한 번 저절로(사업자번호 10자리로 정확히 맞으므로 사람이 안 고른다) */
+  if(typeof coEiAutoOnOpen === 'function') coEiAutoOnOpen(o);
 }
 
 /* ══════════════ 👷 근로자 정보함 (대표 지시 2026-09-01 · 2026-09-02 다시 정리) ══════════════
