@@ -206,7 +206,7 @@ var GR_DOC_NODES={biz:'data/biz_cons_types',cons:'data/consultings',tmap:'scal_e
 /* 서류 진행 기록(③서명본·④별첨·⑤제출) — 이 앱의 자리. 읽기는 통째 한 번, 쓰기는 줄 하나(grSaveCell)
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_docs…') 를 쓰지 않는다(화면 검사가 막는다) */
 var GR_TRACK_NODES={docs:'scal_docs'};
-var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,cw:null,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
+var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -236,6 +236,7 @@ function grRenderKpis(){
   var view=L.filterRows(GR.rows,base), k=L.kpis(view), x=T.kpiExtra(view);
   var cells=[['','전체',k.all],['todo','미작성',k.todo],['draft','초안',k.draft],['done','검토완료',k.done],['signed','서명',x.signed],['submitted','제출',x.submitted]];
   var tip={signed:' title="③ 업체 서명본이 진행(발송)·완료인 줄"',submitted:' title="⑤ 기관 제출을 마친 줄"'};
+  if(GR.trackErr){ tip.signed=tip.submitted=' title="기록을 못 불러왔습니다"'; cells[4][2]=cells[5][2]='?'; }
   $('kpis').innerHTML=cells.map(function(c){
     return '<button type="button" class="kpi'+(c[0]&&GR.f.status===c[0]?' on':'')+'" data-st="'+c[0]+'"'+(tip[c[0]]||'')+'><b>'+c[2]+'</b><span>'+c[1]+'</span></button>';
   }).join('');
@@ -372,7 +373,7 @@ function grCloseToc(){ GR.toc=null; GR.tocMsg=''; GR.tocFail=false; grRenderToc(
    저장은 고른 줄 키 하나만. 기록을 못 읽었으면 열지 않는다 */
 function grOpenCell(coId,typeId,step){
   var D=PuGovReportDocs, T=PuGovReportTrack;
-  if(!GR.track) return;
+  if(!GR.track||GR.trackErr) return;
   var p=D.pairs(GR.input,typeId,GR.f.year).filter(function(x){ return x.coId===coId; })[0];
   var erp=grErp(GR.f.biz);
   if(!p||!erp) return;
@@ -382,15 +383,17 @@ function grOpenCell(coId,typeId,step){
   grRenderCell();
 }
 function grPickCell(key){
-  if(!GR.cw) return;
+  if(!GR.cw||!GR.cw.keys.some(function(k){ return k.key===key; })) return;
   GR.cw.key=key; GR.cw.draft=null; GR.cw.msg=''; GR.cw.err=false;
   grRenderCell();
 }
+/* 쓰기 자리에 들어갈 이름 점검 — 경로 글자·프로토타입 이름을 막는다(줄 키는 모듈 KEY_RE) */
+function grOkId(k){ return typeof k==='string'&&!!k&&k.length<=100&&!/[\/.#$\[\]\s]/.test(k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'; }
 function grCloseCell(){ GR.cw=null; grRenderCell(); }
 function grRenderCell(){
   var T=PuGovReportTrack, L=PuGovReportList, c=GR.cw, el=$('cellw');
   if(!c){ el.style.display='none'; el.innerHTML=''; return; }
-  var rec=T.recOf(GR.track,c.coId,c.rid)[c.key]||null, v=c.draft||rec||{st:'none'};
+  var rec=T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null, v=c.draft||rec||{st:'none'};
   var item=c.keys.filter(function(k){ return k.key===c.key; })[0]||c.keys[0];
   var opt=function(val,txt,cur){ return '<option value="'+grEsc(val)+'"'+(val===cur?' selected':'')+'>'+grEsc(txt)+'</option>'; };
   var field=function(name,inner){ return '<label class="cw-f"><span>'+name+'</span>'+inner+'</label>'; };
@@ -417,6 +420,9 @@ function grRenderCell(){
 async function grSaveCell(){
   var T=PuGovReportTrack, c=GR.cw;
   if(!c||c.busy) return;
+  var pk=c.coId+'/'+c.rid+'/'+c.key;
+  if(!grOkId(c.coId)||!grOkId(c.rid)||!T.KEY_RE.test(c.key)||c.key.length>20||!c.keys.some(function(k){ return k.key===c.key; })){ c.msg=T.SAVE_FAIL; c.err=true; grRenderCell(); return; }
+  if(GR.saving[pk]){ c.msg='같은 칸을 저장하는 중입니다 — 잠시 뒤에 다시 눌러 주세요'; c.err=true; grRenderCell(); return; }
   var entry={st:$('cwSt').value,note:$('cwNote').value,
     sentAt:c.step==='sign'?$('cwSent').value:'',gotAt:c.step==='attach'?'':$('cwGot').value,
     how:c.step==='submit'?$('cwHow').value:'',ack:c.step==='submit'&&!!$('cwAck').checked};
@@ -424,17 +430,25 @@ async function grSaveCell(){
   var bad=T.validate(entry,c.step);
   if(bad){ c.msg=bad; c.err=true; grRenderCell(); return; }
   var rec=T.patchFor(entry,GR.staffMap[GR.me]||'',Date.now());
-  c.busy=true; c.msg='저장하는 중…'; c.err=false; grRenderCell();
+  var base=GR.track;
+  c.busy=true; GR.saving[pk]=true; c.msg='저장하는 중…'; c.err=false; grRenderCell();
   try{ await fbDb.ref(GR_TRACK_NODES.docs+'/'+c.coId+'/'+c.rid+'/items/'+c.key).set(rec); }
   catch(e){
     console.warn('[컨설팅보고서] 저장 못 함',e);
+    delete GR.saving[pk];
     c.busy=false; c.msg=T.SAVE_FAIL; c.err=true;
     if(GR.cw===c) grRenderCell();
     return;
   }
-  GR.track=T.put(GR.track,c.coId,c.rid,c.key,rec);
-  c.busy=false; c.draft=null; c.msg='저장했습니다'; c.err=false;
-  grApplyTrack(); grRender();
+  delete GR.saving[pk];
+  /* 저장하는 사이 다시 읽기가 시작·끝났거나 못 읽은 상태면(옛 기록 위에 덮지 않게) 로컬 표는 건드리지 않는다 */
+  if(base&&GR.track===base&&!GR.trackErr){
+    GR.track=T.put(GR.track,c.coId,c.rid,c.key,rec);
+    c.busy=false; c.draft=null; c.msg='저장했습니다'; c.err=false;
+    grApplyTrack(); grRender();
+  }else{
+    c.busy=false; c.msg='저장했습니다 — 목록을 다시 불러온 뒤 확인해 주세요'; c.err=false;
+  }
   if(GR.cw===c) grRenderCell();
 }
 /* 양식 서고 — 읽기만. 등록·바꾸기는 정부사업일정의 ⚙ 양식 서고(#forms, 관리자) */
@@ -538,8 +552,9 @@ async function grRetryDocs(){
 }
 /* 서류 진행 기록 — 통째로 한 번(once). 못 읽으면(규칙 게시 전·권한 없음) 체크표 ③④⑤ 만 읽기 전용 「—」, 나머지는 그대로 돈다 */
 async function grLoadTrack(){
-  try{ GR.track=PuGovReportTrack.normalize((await fbDb.ref(GR_TRACK_NODES.docs).once('value')).val()); GR.trackErr=false; }
-  catch(e){ console.warn('[컨설팅보고서] 못 읽음 '+GR_TRACK_NODES.docs,e); GR.track=null; GR.trackErr=true; }
+  var seq=++GR.tseq;
+  try{ var t=PuGovReportTrack.normalize((await fbDb.ref(GR_TRACK_NODES.docs).once('value')).val()); if(seq!==GR.tseq) return; GR.track=t; GR.trackErr=false; }
+  catch(e){ if(seq!==GR.tseq) return; console.warn('[컨설팅보고서] 못 읽음 '+GR_TRACK_NODES.docs,e); GR.track=null; GR.trackErr=true; }
 }
 /* 현황판 줄에 기록을 붙인다(r.trk · ③④ 막대) — 읽은 뒤 · 저장한 뒤 · 왼쪽 자료를 다시 읽은 뒤 */
 function grApplyTrack(){

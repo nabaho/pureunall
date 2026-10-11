@@ -38,7 +38,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grRenderForms', 'grRenderAlerts', 'grRender', 'grReset', 'grLoad',
   'grBizType', 'grErp', 'grSetBiz', 'grLoadDocs', 'grRetryDocs', 'grRenderBiz',
   'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
-  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell'];
+  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -456,7 +456,8 @@ test('㉒ 규칙 게시 전 — 읽기 거절: 칸은 「—」·누를 수 없�
   assert.ok(r.els.docs.innerHTML.includes('기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인'));
   assert.ok(!r.els.docs.innerHTML.includes('data-cell'), '못 읽었으면 누를 수 없다(남의 기록을 모르고 덮지 않게)');
   assert.ok(r.els.rows.innerHTML.includes('다라정밀'), '목록은 그대로');
-  assert.match(r.els.kpis.innerHTML, /data-st="signed"[^>]*><b>0<\/b>/);
+  assert.match(r.els.kpis.innerHTML, /data-st="signed" title="기록을 못 불러왔습니다"><b>\?<\/b>/, '못 읽었으면 0 이 아니라 ?');
+  assert.match(r.els.kpis.innerHTML, /data-st="submitted" title="기록을 못 불러왔습니다"><b>\?<\/b>/);
   assert.ok(r.els.alerts.innerHTML.includes('기록을 못 불러왔습니다'));
   r.ctx.grOpenCell('c2', 't3', 'sign');
   assert.equal(r.ctx.GR.cw, null);
@@ -522,4 +523,95 @@ test('㉕ 진행 막대 ③④ · 목차 딱지도 기록을 따른다 · 칸 �
   const c = v.els.cellw.innerHTML;
   assert.ok(!c.includes('<img') && !c.includes('<b>홍') && !c.includes('<정밀>'), '이스케이프 안 됨');
   assert.ok(c.includes('&#60;img src=x&#62;') && c.includes('다라&#60;정밀&#62;'));
+});
+
+/* ═══ 고침 1 — 저장·다시 읽기 겹침 · 키 점검 · 겹친 저장 ═══ */
+
+function gate() { let go; const p = new Promise((r) => { go = r; }); return { p, go }; }
+const snap = (v) => ({ val: () => v });
+
+test('㉖ 저장하는 사이 다시 읽기가 실패해도 저장이 끝난 뒤 칸은 잠긴 채 — 일부만 든 기록이 되살아나지 않는다', async () => {
+  const g = gate(); let mode = 'pass'; const sets = [];
+  const w = world({ db: (db) => ({ ref: (p) => {
+    if (p === 'scal_docs' && mode === 'fail') return { once: async () => { throw new Error('permission_denied'); } };
+    if (p.indexOf('scal_docs/') === 0) return { set: async (v) => { await g.p; sets.push([p, v]); return db.ref(p).set(v); } };
+    return db.ref(p);
+  } }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-08';
+  const saving = w.ctx.grSaveCell();
+  mode = 'fail';
+  await w.ctx.grLoadTrack();
+  assert.equal(w.ctx.GR.track, null);
+  assert.equal(w.ctx.GR.trackErr, true);
+  g.go();
+  await saving;
+  assert.equal(sets.length, 1, '저장 자체는 한 줄');
+  assert.equal(w.ctx.GR.track, null, '일부만 든 기록이 생기면 안 된다');
+  assert.equal(w.ctx.GR.trackErr, true);
+  assert.ok(w.els.cellw.innerHTML.includes('목록을 다시 불러온 뒤 확인해 주세요'));
+  w.ctx.grRender();
+  assert.ok(!w.els.docs.innerHTML.includes('data-cell'), '칸은 다시 잠겨 있다');
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  assert.equal(w.ctx.GR.cw, null, '못 읽은 동안은 열리지 않는다');
+});
+
+test('㉖-2 먼저 시작한 다시 읽기가 늦게 끝나도 나중 것을 덮지 못한다', async () => {
+  const q = []; let mode = 'pass';
+  const w = world({ db: (db) => ({ ref: (p) => (p === 'scal_docs' && mode === 'gated'
+    ? { once: () => new Promise((r) => q.push(r)) } : db.ref(p)) }) });
+  await w.ctx.grLoad();
+  mode = 'gated';
+  const a = w.ctx.grLoadTrack(), b = w.ctx.grLoadTrack();
+  const val = (st) => snap({ c2: { t3_2026: { items: { sign: { st, at: 1 } } } } });
+  q[1](val('done')); await b;
+  q[0](val('doing')); await a;
+  assert.equal(w.ctx.GR.track.c2.t3_2026.sign.st, 'done', '옛 읽기가 나중 읽기를 덮었다');
+});
+
+test('㉗ 줄 키·업체·rid 점검 — 고른 서류가 목록에 없으면 안 바뀌고, 이상한 이름은 쓰지 않는다', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  w.ctx.grOpenCell('c1', 't1', 'attach');
+  const k0 = w.ctx.GR.cw.key;
+  w.ctx.grPickCell('nope/x');
+  assert.equal(w.ctx.GR.cw.key, k0, '목록에 없는 키는 고를 수 없다');
+  w.ctx.GR.cw.key = 'a/b';
+  w.els.cwSt.value = 'done';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 0);
+  assert.ok(w.els.cellw.innerHTML.includes('저장하지 못했습니다'));
+  w.ctx.GR.cw.key = k0; w.ctx.GR.cw.rid = 'x/../y';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 0);
+  w.ctx.GR.cw.rid = 't1_2026'; w.ctx.GR.cw.coId = '__proto__';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('㉘ 겹친 저장 — 같은 칸 저장이 끝나기 전에 다시 열어 저장해도 .set 은 한 번', async () => {
+  const g = gate(); let n = 0;
+  const w = world({ db: (db) => ({ ref: (p) => (p.indexOf('scal_docs/') === 0
+    ? { set: async (v) => { n++; await g.p; return db.ref(p).set(v); } } : db.ref(p)) }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-08';
+  const first = w.ctx.grSaveCell();
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'blocked';
+  await w.ctx.grSaveCell();
+  assert.equal(n, 1, '두 번째 .set 이 나갔다');
+  assert.ok(w.els.cellw.innerHTML.includes('저장하는 중'));
+  g.go(); await first;
+  assert.equal(n, 1);
+  w.ctx.grCloseCell(); w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'blocked';
+  await w.ctx.grSaveCell();
+  assert.equal(n, 2, '끝난 뒤에는 다시 저장할 수 있다');
 });
