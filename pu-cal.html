@@ -499,6 +499,9 @@
   .gform .gsave{border:none;background:var(--gtoday);color:#ffffff;border-radius:20px;padding:0 24px;height:40px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
   :root[data-theme="dark"] .gform .gsave{color:#131314}
   .gform .gvis{font-weight:400}
+  .gform .gmeet{border:none;background:var(--gtoday);color:#ffffff;border-radius:20px;padding:0 18px;height:36px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+  :root[data-theme="dark"] .gform .gmeet{color:#131314}
+  .gform .gmeet.on{background:transparent;color:var(--gtoday);border:1px solid var(--gline)}
   .gform .ghint{flex-basis:100%;font-size:12px;color:var(--gsub);padding:0 0 8px}
   .gform .cpull{flex:1;margin-bottom:0;border:none;background:transparent;padding:0}
   .gform .gbody > #cardres{flex-basis:100%}
@@ -3295,7 +3298,7 @@ function recOf(store, id){
 function openNew(ymd){
   /* 구글처럼 «시간 일정»이 기본 — 시작은 다음 정각, 끝은 비워 둔다(저장 때 한 시간 뒤). 종일은 스위치로 */
   S.modal = { mode:"new", kind:"sch", date:ymd, endDate:"", sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1,
-    vis:"shared", timed:true, time:새시각(ymd), endTime:"", repeat:"", remind:"" };
+    vis:"shared", timed:true, time:새시각(ymd), endTime:"", repeat:"", remind:"", guests:"", meet:false };
   /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
   if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
@@ -3788,6 +3791,7 @@ var GIC = {
   history:"M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
   notifications:"M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z",
   repeat:"M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z",
+  badge:"M20 7h-5V4c0-1.1-.9-2-2-2h-2c-1.1 0-2 .9-2 2v3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V9c0-1.1-.9-2-2-2zM9 12c.83 0 1.5.67 1.5 1.5S9.83 15 9 15s-1.5-.67-1.5-1.5S8.17 12 9 12zm3 6H6v-.43c0-.6.36-1.15.92-1.4.47-.21 1.14-.37 2.08-.37s1.61.16 2.08.37c.56.25.92.8.92 1.4V18zm1-9h-2V4h2v5zm5 7.5h-4V15h4v1.5zm0-3h-4V12h4v1.5z",
   videocam:"M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM15 16H5V8h10v8z",
   attach:"M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"
 };
@@ -3814,6 +3818,22 @@ function 반복알림줄(m){
     + '</select>';
   return '<div class="grow"><span class="gi" title="반복">' + 선아이콘("repeat") + '</span><div class="gbody">' + 반복 + '</div></div>'
     + (m.timed ? '<div class="grow"><span class="gi" title="알림">' + 선아이콘("notifications") + '</span><div class="gbody">' + 알림 + '</div></div>' : '');
+}
+/* ★ 「참석자 추가」·「Google Meet 화상 회의 추가」 줄 (구글 입력 화면, 2026-10-11) — 새 일정에만.
+   ⚠ 초대 «메일»은 보내지 않는다(sendUpdates=none) — 참석자는 구글 일정에만 붙는다. 줄 아래에 그렇게 적어 둔다.
+   ⚠ Meet 은 구글이 거절하면 «일정만» 넣는다(createEvent·서버 모두) — 일정이 통째로 사라지지 않게.
+   ⚠ 나만 보기는 참석자·Meet 없이 넣는다(내 달력 한 칸이다). */
+function 참석자목록(글){
+  var 나눔 = String(글 || "").split(/[\s,;]+/).filter(function(x){ return x; });
+  var 나쁨 = 나눔.filter(function(x){ return !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(x); });
+  return { 메일:나눔.filter(function(x){ return 나쁨.indexOf(x) < 0; }).slice(0, 20), 나쁨:나쁨, 넘침:나눔.length > 20 };
+}
+function 참석자줄(m){
+  return '<div class="grow"><span class="gi" title="참석자">' + 선아이콘("group") + '</span><div class="gbody">'
+    + '<input data-m="guests" value="' + esc(m.guests || "") + '" placeholder="참석자 추가 (메일 — 여러 명은 쉼표로)" inputmode="email" autocomplete="off"></div></div>'
+    + (String(m.guests || "").trim() ? '<div class="ghint" style="padding-left:56px">초대 메일은 보내지 않습니다 — 구글 일정에만 참석자로 붙습니다.</div>' : '')
+    + '<div class="grow"><span class="gi" title="Google Meet">' + 선아이콘("videocam") + '</span><div class="gbody">'
+    + '<button class="gmeet' + (m.meet ? ' on' : '') + '" data-meet="1">' + (m.meet ? '✓ Google Meet 화상 회의가 추가됩니다' : 'Google Meet 화상 회의 추가') + '</button></div></div>';
 }
 /* 「10월 10일 (토)」 — 올해가 아니면 「2025년 10월 10일 (금)」. 구글 앱 입력 화면의 날짜 글자 */
 function 날짜글(ymd){
@@ -3907,7 +3927,7 @@ function modalHtml(){
         + '<button data-mk="att"' + (일정 ? '' : ' class="on"') + '>연차·근태</button></div>' : '')
     + '<div class="gcols"><div class="gmain">'
     +   시각줄
-    +   (일정 && 새것 ? 반복알림줄(m) : '')
+    +   (일정 && 새것 ? 반복알림줄(m) + 참석자줄(m) : '')
     +   (일정 && 새것 ? 줄("business", 명함칸Html(m), "기업정보함에서 불러오기") : '')
     +   (일정 ? 줄("place", '<input data-m="place" value="' + esc(m.place||"") + '" placeholder="위치 추가">'
           /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
@@ -3915,7 +3935,7 @@ function modalHtml(){
     +   (일정 ? 줄("person", '<input data-m="contact" value="' + esc(m.contact||"") + '" placeholder="담당자 추가 (이름 · 전화)">', "담당자") : '')
     +   줄("notes", '<textarea data-m="note" rows="1" placeholder="설명 추가">' + esc(m.note||"") + '</textarea>', "설명", true)
     + '</div><div class="gside">'
-    +   줄("group", 누가, "누구")
+    +   줄("badge", 누가, "담당 직원")
     +   (일정 && m.store !== "gcal" ? 줄("calendar", 달력, "누가 보나") + 달력힌트 : '')
     +   (m.store === "gcal" ? '<div class="ghint" style="padding-left:56px">구글 공용 달력의 일정입니다 — 저장하면 구글이 바로 바뀝니다'
           + (m.recur ? ' (반복 일정은 «이 날 것만» 바뀝니다)' : '') + '.</div>' : '')
@@ -4122,6 +4142,7 @@ function 구글에넣기(m){
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
     repeat: String(m.repeat||""), remindMin: m.timed ? (+m.remind || 0) : 0,
+    attendees: 참석자목록(m.guests).메일, meet: !!m.meet, meetId: m.meet ? "pu-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) : "",
     date: m.date, endDate: String(m.endDate||""), time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
     location: String(m.place||"").trim(), description: 설명.join("\n"), puSid: String(m.sid||""),
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
@@ -4142,7 +4163,7 @@ function 구글에넣기(m){
 function modalRead(){
   var m = S.modal; if(!m) return;
   var 옛시작 = m.date, 옛끝 = m.endDate || m.date, 옛시각 = m.time, 옛끝시각 = m.endTime;
-  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis","repeat","remind"].forEach(function(f){
+  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis","repeat","remind","guests"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -4173,6 +4194,12 @@ function doSave(){
   if(!m.date){ m.err = "날짜를 골라 주세요"; render(); return; }
   if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
   /* 시작 ~ 끝: 끝만 적고 시작이 없으면 묻는다, 끝이 비면 한 시간 뒤, 끝이 시작보다 이르면 막는다 */
+  /* 참석자 메일 검사(새 일정) — 틀린 것이 있으면 «어느 것이» 틀렸는지 말하고 막는다 */
+  if(일정 && m.mode === "new" && String(m.guests || "").trim()){
+    var 손님 = 참석자목록(m.guests);
+    if(손님.나쁨.length){ m.err = "참석자 메일이 올바르지 않습니다: " + 손님.나쁨.slice(0, 3).join(", "); render(); return; }
+    if(손님.넘침){ m.err = "참석자는 스무 명까지 넣을 수 있습니다"; render(); return; }
+  }
   /* 구글 일정의 끝나는 날 — 시작보다 앞이면 막는다. 뒤면 «여러 날»: 끝 시각이 시작보다 일러도 된다(다른 날이다) */
   var 여러날 = 일정 && /^\d{4}-\d{2}-\d{2}$/.test(String(m.endDate||"")) && m.endDate !== m.date;
   if(여러날 && m.endDate < m.date){ m.err = "끝나는 날이 시작보다 앞입니다"; render(); return; }
@@ -4207,6 +4234,8 @@ function doSave(){
     /* 반복·알림은 «새 일정»에서만(고치기 창에는 줄이 없다) — 서버 대신 넣기(gcal-proxy)가 구글로 보낸다 */
     if(m.mode === "new" && m.repeat) item.repeat = String(m.repeat);
     if(m.mode === "new" && m.timed && +m.remind > 0) item.remindMin = +m.remind;
+    if(m.mode === "new" && String(m.guests || "").trim()) item.guests = 참석자목록(m.guests).메일;
+    if(m.mode === "new" && m.meet) item.meet = true;
     item.time = String(m.time||"");
     item.endTime = String(m.endTime||"");
     item.place = String(m.place||"").trim();
@@ -4630,7 +4659,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-gotoday]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-gotoday],[data-meet]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4728,6 +4757,7 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
   if(t.hasAttribute('data-gotoday')){ S.date = t.getAttribute('data-gotoday'); S.ym = S.date.slice(0,7); S.view = 'day'; S.gridScroll = true; render(); return; }
+  if(t.hasAttribute('data-meet')){ modalRead(); if(S.modal){ S.modal.meet = !S.modal.meet; render(); } return; }
   if(t.hasAttribute('data-vmenu')){ S.vmenu = !S.vmenu; render(); return; }
   if(t.hasAttribute('data-vclose')){ S.vmenu = false; render(); return; }
   if(t.hasAttribute('data-view')){

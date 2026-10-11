@@ -189,5 +189,44 @@ test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 
   assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
   assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
   assert.match(함수몸('function 개인에넣기(m){'), /repeat:\(m\.mode === "new" && m\.repeat\)/);
-  assert.match(캘린더, /"vis","repeat","remind"\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
+  assert.match(캘린더, /"vis","repeat","remind"(?:,"guests")?\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
+});
+
+/* ── 「참석자 추가」·「Google Meet 화상 회의 추가」 줄 (구글 입력 화면, 2026-10-11) ── */
+test('참석자·Meet — 구글 몸이 화면과 서버에서 같고, 허용 밖 값은 안 섞인다', () => {
+  const 기본 = { date: '2026-10-14', time: '14:00', endTime: '15:00', summary: '회의' };
+  const 경우 = [
+    Object.assign({}, 기본, { attendees: ['A@B.com', 'c@d.co.kr'], meet: true, meetId: 'pu-abc' }),
+    Object.assign({}, 기본, { attendees: [], meet: true, meetId: '' }),
+    Object.assign({}, 기본, { attendees: ['not-an-email', 'a b@c.d', 'x@y', 'ok@ok.com', 7, null], meet: false, meetId: 'pu-x' }),
+  ];
+  for (const e of 경우) assert.deepStrictEqual(P.bodyOf(e), AUTH.bodyOf(e));
+  const 첫 = P.bodyOf(경우[0]);
+  assert.deepStrictEqual(첫.attendees, [{ email: 'a@b.com' }, { email: 'c@d.co.kr' }], '메일은 소문자로');
+  assert.deepStrictEqual(첫.conferenceData, { createRequest: { requestId: 'pu-abc', conferenceSolutionKey: { type: 'hangoutsMeet' } } });
+  assert.ok(!('conferenceData' in P.bodyOf(경우[1])), '번호(meetId) 없는 Meet 은 보내지 않는다');
+  assert.deepStrictEqual(P.bodyOf(경우[2]).attendees, [{ email: 'ok@ok.com' }], '메일 꼴이 아닌 것이 섞였다');
+  const 많음 = P.bodyOf(Object.assign({}, 기본, { attendees: Array.from({ length: 30 }, (_, i) => 'u' + i + '@x.com') }));
+  assert.strictEqual(많음.attendees.length, 20, '스무 명까지');
+});
+
+test('참석자·Meet — 서버 대신 넣기: 우리 표의 값을 넘기고, Meet 을 구글이 거절하면 일정만', async () => {
+  const ev = P.eventOf({ id: 's1', sid: 'P-005', date: '2026-10-14', time: '10:00', title: '회의', guests: ['a@b.com'], meet: true }, 's1', () => '박한별');
+  assert.deepStrictEqual(ev.attendees, ['a@b.com']); assert.strictEqual(ev.meet, true); assert.strictEqual(ev.meetId, 'pu-s1');
+  assert.deepStrictEqual(P.eventOf({ id: 's2', date: '2026-10-14', title: 't', guests: 'x', meet: 'yes' }, 's2').attendees, []);
+  assert.strictEqual(P.eventOf({ id: 's2', date: '2026-10-14', title: 't', meet: 'yes' }, 's2').meet, false);
+  /* 구글이 Meet 을 거절하는 경우는 tests/gcal-proxy.test.js «Meet 거절 대비» 가 서버를 돌려 본다 */
+});
+
+test('참석자·Meet — 화면: 줄은 새 일정에만 · 메일 검사 · 초대 메일 안 보냄을 말한다 · 클라이언트 Meet 실패 대비', () => {
+  assert.match(함수몸('function modalHtml(){'), /반복알림줄\(m\) \+ 참석자줄\(m\)/);
+  assert.match(함수몸('function 참석자줄(m){'), /초대 메일은 보내지 않습니다/, '초대 메일이 안 간다는 말이 없습니다');
+  assert.match(함수몸('function doSave(){'), /참석자 메일이 올바르지 않습니다/, '틀린 메일을 막지 않습니다');
+  assert.match(함수몸('function 구글에넣기(m){'), /attendees: 참석자목록\(m\.guests\)\.메일, meet: !!m\.meet, meetId:/);
+  assert.match(함수몸('function doSave(){'), /item\.guests = 참석자목록\(m\.guests\)\.메일/);
+  assert.match(함수몸('function doSave(){'), /item\.meet = true/);
+  const 가 = fs.readFileSync(path.join(ROOT, 'js', 'pu-gcal-auth.js'), 'utf8');
+  assert.match(가, /conferenceDataVersion=1/, 'Meet 을 만들려면 conferenceDataVersion 이 필요합니다');
+  assert.match(가, /meet: false \}\), opt\)\.then\(function \(r\) \{ r\.meetFailed = true/, 'Meet 을 거절당했을 때 일정만 다시 넣지 않습니다');
+  assert.match(fs.readFileSync(path.join(ROOT, 'functions', 'gcal-proxy.js'), 'utf8'), /Google Meet 을 구글이 거절해 일정만 넣었습니다/);
 });

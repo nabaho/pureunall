@@ -302,3 +302,34 @@ test('⑭ 대표 구글 연결이 끊기면 대표 폰으로 — 12시간에 한
   assert.strictEqual(pushes.length, 2, '잠깐 고장(503)에 끊김 알림을 보냈다');
   assert.ok(c.db.data.gcal_tokens.U1, '잠깐 고장에 열쇠를 지웠다');
 });
+
+/* ══ 참석자·Meet (2026-10-11) — 구글이 Meet 을 거절해도 «일정은 들어간다» ══ */
+test('Meet 거절 대비 — 첫 요청(Meet 포함)이 거절되면 Meet 없이 일정만 다시 넣고, 까닭을 기록에 남긴다', async () => {
+  const bodies = [];
+  const { db, sent, R } = run((url, opt) => {
+    if (/oauth2/.test(url)) return ok({ access_token: 'AT' });
+    bodies.push({ url, body: JSON.parse(opt.body) });
+    return /conferenceDataVersion=1/.test(url)
+      ? { ok: false, status: 400, json: async () => ({ error: { message: 'Invalid conference type value' } }) }
+      : ok({ id: 'GEV7' });
+  });
+  const rec = 줄({ guests: ['a@b.com'], meet: true });
+  const r = await R.proxyOne('sch_1', rec);
+  assert.strictEqual(r.done, true, '일정이 통째로 사라졌습니다');
+  assert.strictEqual(bodies.length, 2);
+  assert.match(bodies[0].url, /conferenceDataVersion=1/); assert.ok(bodies[0].body.conferenceData, '첫 요청에 Meet 이 없습니다');
+  assert.ok(!/conferenceDataVersion/.test(bodies[1].url) && !bodies[1].body.conferenceData, '두 번째 요청에 Meet 이 남았습니다');
+  assert.deepStrictEqual(bodies[1].body.attendees, [{ email: 'a@b.com' }], '참석자는 두 번째 요청에도 있어야 합니다');
+  const saved = db.data.data.my_schedules.v.sch_1;
+  assert.strictEqual(saved.gcalEventId, 'GEV7');
+  assert.match(saved.gcalProxyErr, /Google Meet 을 구글이 거절해 일정만 넣었습니다/);
+});
+
+test('Meet 이 되면 — 요청 한 번, conferenceDataVersion 이 붙고 기록은 깨끗하다', async () => {
+  const urls = [];
+  const { db, R } = run((url, opt) => { if (/oauth2/.test(url)) return ok({ access_token: 'AT' }); urls.push(url); return ok({ id: 'GEV8' }); });
+  const r = await R.proxyOne('sch_1', 줄({ meet: true }));
+  assert.strictEqual(r.done, true); assert.strictEqual(urls.length, 1);
+  assert.match(urls[0], /sendUpdates=none&conferenceDataVersion=1$/);
+  assert.strictEqual(db.data.data.my_schedules.v.sch_1.gcalProxyErr, null);
+});
