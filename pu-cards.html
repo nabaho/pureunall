@@ -38089,6 +38089,146 @@ function coHeadRepaint(){
   const n = $('coNeedBox'); if(n) n.innerHTML = coNeedHtml(o);
 }
 
+/* ══════ 👥 국민연금 가입자 — 기업 상세 (대표 「진행」 2026-10-11, 목업 승인) ══════
+   공공데이터포털 「국민연금공단_국민연금 가입 사업장 내역」(V2). 열쇠는 국세청과 같은 PU_CFG.ntsKey.
+   ★ 국민연금 자료는 사업자번호를 «앞 6자리»만 공개한다 — 그래서 번호 6자리로 후보를 받고,
+     이 회사가 맞는지는 «사람이 고른다». 이름이 같다고 저절로 고르지 않는다(이름으로 회사 맞추기 금지).
+   ★ 적는 자리: coInfo/{번호}/nps — pick(고른 사업장) · cand(후보) · now(이번 숫자) · hist/{년월}(가입자 수).
+     새 최상위 자리를 내지 않는다. 매달 2일 서버(functions/nps-monthly.js)가 고른 곳의 숫자를 새로 받는다.
+   ⚠ 당월 고지금액(보험료)은 «안 적는다» — 돈은 대표만 보는 자리인데 coInfo 는 직원도 읽는다.
+   ⚠ 가입자 수는 «국민연금 신고 기준»이다 — 상시근로자 수와 다를 수 있어 화면에 «추정»이라 적는다. */
+const NPS_URL = 'https://apis.data.go.kr/B552015/NpsBplcInfoInqireServiceV2/';
+const NPS_CAND_MAX = 8;
+/* 후보 줄 세우기 — 이름이 같은 곳·가입 중인 곳 먼저 (순수 로직). 이름 다듬개는 ErpMatch._norm 하나 */
+function npsCands(items, coName){
+  const n = (typeof ErpMatch !== 'undefined' && ErpMatch._norm) ? ErpMatch._norm : (s=>String(s||'').replace(/\s+/g,''));
+  const me = n(coName || '');
+  return [].concat(items || []).filter(it => it && it.seq).map(it => {
+    const nm = String(it.wkplNm || '').trim();
+    const nn = n(nm);
+    return { seq: String(it.seq), nm: nm, addr: String(it.wkplRoadNmDtlAddr || '').trim(),
+      on: String(it.wkplJnngStcd || '') === '1', ym: String(it.dataCrtYm || ''),
+      same: !!me && !!nn && (nn === me || nn.indexOf(me) === 0 || me.indexOf(nn) === 0) };
+  }).sort((a,b) => (b.same - a.same) || (b.on - a.on) || a.nm.localeCompare(b.nm, 'ko')).slice(0, NPS_CAND_MAX);
+}
+/* 노무 안내 — 가입자 수로 본 «넘은 문턱». 법 조문은 사람이 아는 대로 짧게, 추정이라고 붙인다 */
+function npsCues(cnt){
+  const c = Number(cnt) || 0, out = [];
+  if(c >= 50) out.push('50명 이상 — 장애인 고용의무(장애인고용촉진법 제28조)');
+  if(c >= 30) out.push('30명 이상 — 노사협의회 설치(근로자참여법 제4조)');
+  if(c >= 10) out.push('10명 이상 — 취업규칙 작성·신고(근로기준법 제93조)');
+  if(c >= 5)  out.push('5명 이상 — 근로기준법 대부분 적용(제11조)');
+  return out;
+}
+/* 지난 기록과 견주기 — 12달 전(없으면 가장 오래된 달)과 직전 달 (순수 로직) */
+function npsTrend(hist, ym){
+  const ks = Object.keys(hist || {}).filter(k => /^\d{6}$/.test(k) && k < String(ym || '999999')).sort();
+  if(!ks.length) return null;
+  const y = Number(String(ym).slice(0,4)), m = Number(String(ym).slice(4,6));
+  const yearAgo = String(y - 1) + String(m).padStart(2, '0');
+  const base = ks.filter(k => k <= yearAgo).pop() || ks[0];
+  return { prevYm: ks[ks.length-1], prev: Number(hist[ks[ks.length-1]]) || 0, baseYm: base, base: Number(hist[base]) || 0 };
+}
+function npsKey(){ return String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim(); }
+async function npsGet(op, q){
+  const svc = npsKey();
+  if(!svc) throw new Error('공공데이터 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」');
+  const r = await fetch(NPS_URL + op + '?serviceKey=' + encodeURIComponent(svc) + '&dataType=json&' + q);
+  if(!r.ok) throw new Error('국민연금 답 ' + r.status);
+  const j = await r.json();
+  const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
+  return [].concat(it || []);
+}
+function npsWrite(key, patch){
+  if(Store.mode !== 'firebase'){ toast('실시간DB 연결 상태에서만 적을 수 있습니다'); return Promise.resolve(false); }
+  const upd = {};
+  Object.keys(patch).forEach(f => { upd['coInfo/' + key + '/nps/' + f] = patch[f]; });
+  return Store.db.ref(DB_ROOT).update(upd).then(() => {
+    coListBust(); renderCoSoon();
+    if(state.coPick === key) openCoDetailPanel(key, true);
+    return true;
+  }).catch(e => { console.warn('[국민연금 적기]', e); toast('저장하지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); return false; });
+}
+/* 🔍 후보 찾기 — 사업자번호 앞 6자리로 */
+async function coNpsFind(key){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const no = digits(o.bizno || '');
+  if(no.length !== 10) return toast('사업자번호가 있어야 국민연금에서 찾을 수 있습니다', 7000);
+  toast('국민연금 사업장을 찾는 중…', 3000);
+  let items;
+  try{ items = await npsGet('getBassInfoSearchV2', 'bzowrRgstNo=' + no.slice(0,6) + '&numOfRows=100&pageNo=1'); }
+  catch(e){ return toast('국민연금에 못 물어봤습니다 — ' + ((e && e.message) || ''), 9000); }
+  const cand = npsCands(items, o.name);
+  await npsWrite(key, { cand: cand.length ? cand : null, candAt: Date.now(), candN: items.length });
+  if(!cand.length) toast('앞 6자리가 같은 국민연금 사업장이 없습니다 — 가입자 3인 미만 법인·10인 미만 개인사업장은 공개되지 않습니다', 10000);
+}
+/* ✓ 이 사업장이 맞음 — 그 자리에서 숫자를 받아 적는다 */
+async function coNpsPick(key, seq){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const c = ((o.extra && o.extra.nps && o.extra.nps.cand) || []).find(x => x && String(x.seq) === String(seq));
+  if(!c) return toast('그 후보를 찾지 못했습니다 — 다시 찾아 주세요', 6000);
+  toast('가입자 수를 받는 중…', 3000);
+  let now;
+  try{ now = await npsNow(seq, c.ym); }
+  catch(e){ return toast('국민연금에 못 물어봤습니다 — ' + ((e && e.message) || ''), 9000); }
+  const patch = { pick: { seq: String(seq), nm: c.nm, addr: c.addr, by: myEmail || '', at: Date.now() }, now: now, none: null };
+  if(now && now.ym) patch['hist/' + now.ym] = now.cnt;
+  if(await npsWrite(key, patch)) toast('👥 국민연금 사업장을 이었습니다 — 매달 2일 서버가 새 숫자를 받습니다', 6000);
+}
+/* 상세 + 그 달 신규·상실 → now (돈은 빼고) */
+async function npsNow(seq, ym0){
+  const d = (await npsGet('getDetailInfoSearchV2', 'seq=' + encodeURIComponent(seq)))[0] || {};
+  const ym = String(d.dataCrtYm || ym0 || '');
+  let p = {};
+  if(ym){ try{ p = (await npsGet('getPdAcctoSttusInfoSearchV2', 'seq=' + encodeURIComponent(seq) + '&dataCrtYm=' + ym))[0] || {}; }catch(_){ } }
+  return { ym: ym, cnt: Number(d.jnngpCnt) || 0, nw: Number(p.nwAcqzrCnt) || 0, lss: Number(p.lssJnngpCnt) || 0,
+    ind: String(d.vldtVlKrnNm || ''), on: String(d.wkplJnngStcd || '') === '1',
+    adpt: String(d.adptDt || ''), scsn: String(d.scsnDt || ''), at: Date.now() };
+}
+function coNpsNone(key){ npsWrite(key, { none: { by: myEmail || '', at: Date.now() }, cand: null }).then(ok => ok && toast('「국민연금 사업장 없음」으로 적었습니다 — 다시 찾으면 풀립니다', 6000)); }
+function coNpsUnpick(key){
+  if(!confirm('국민연금 사업장 연결을 풀까요?\n지금까지 받은 숫자 기록은 남겨 둡니다.')) return;
+  npsWrite(key, { pick: null, now: null }).then(ok => ok && toast('연결을 풀었습니다', 5000));
+}
+function coNpsSummary(o){
+  const p = (o.extra && o.extra.nps) || {};
+  if(p.pick && p.now) return '가입자 ' + (Number(p.now.cnt) || 0) + '명';
+  if(p.none) return '없음';
+  if(p.cand && p.cand.length) return '후보 ' + p.cand.length + '곳 — 골라 주세요';
+  return '아직 안 찾음';
+}
+function coNpsHtml(o){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const p = (o.extra && o.extra.nps) || {};
+  const no = digits(o.bizno || '');
+  if(p.pick && p.now){
+    const n = p.now, t = npsTrend(p.hist, n.ym);
+    const ym = n.ym ? n.ym.slice(0,4) + '.' + n.ym.slice(4,6) : '';
+    const d = t ? (Number(n.cnt) || 0) - t.base : null;
+    const tile = (big, small, cls) => `<div style="flex:1;min-width:0;white-space:nowrap;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px"><b style="font-size:17px${cls==='up'?';color:#166534':cls==='dn'?';color:#dc2626':''}">${big}</b> <span style="color:#64748b;font-size:12px">${small}</span></div>`;
+    const cues = npsCues(n.cnt);
+    return `<div style="display:flex;gap:8px">${tile((Number(n.cnt)||0) + '명', '가입자')}${
+        d == null ? tile('—', '지난 기록 없음') : tile((d > 0 ? '+' : '') + d, (t.baseYm.slice(0,4) + '.' + t.baseYm.slice(4)) + '보다', d > 0 ? 'up' : d < 0 ? 'dn' : '')}${
+        tile((Number(n.nw)||0) + ' / ' + (Number(n.lss)||0), '신규 / 상실')}</div>
+      ${cues.length ? `<div style="margin-top:6px">${cues.map(c => `<span class="t" style="background:#fffbeb;color:#854d0e;border:1px solid #fde68a;margin:0 4px 4px 0;display:inline-block">${esc(c)}</span>`).join('')}</div>` : ''}
+      <div class="dim" style="font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+        title="${esc(n.ind || '')}">${esc(ym)} 기준 · ${esc(n.ind || '업종 모름')}${n.on ? '' : ' · ⚠ 국민연금 «탈퇴» 사업장'} · 가입자 수는 신고 기준(상시근로자 추정)</div>
+      <div class="dim" style="font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">이은 사업장: ${esc(p.pick.nm || '')}
+        </div>
+      <div class="coerppin" style="margin-top:6px"><button onclick="coNpsUnpick('${k}')">연결 풀기</button></div>`;
+  }
+  if(no.length !== 10) return `<div class="dim">사업자번호가 있어야 국민연금에서 찾을 수 있습니다.</div>`;
+  const find = `<span class="coerppin" style="display:inline-flex"><button onclick="coNpsFind('${k}')">🔍 국민연금에서 찾기</button></span>`;
+  if(p.none) return `<div class="dim">「국민연금 사업장 없음」으로 적어 두었습니다. ${find}</div>`;
+  if(p.cand && p.cand.length){
+    return `<div class="dim" style="font-size:12px;margin-bottom:6px">사업자번호 앞 6자리가 같은 곳입니다 — 이 회사가 맞는 줄을 골라 주세요(이름이 같아도 저절로 고르지 않습니다).</div>
+      ${p.cand.map(c => `<div class="coerppin" style="white-space:nowrap">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${esc(c.nm + ' · ' + c.addr)}">${c.same ? '★ ' : ''}<b>${esc(c.nm)}</b> <span class="dim">${esc(c.addr)}${c.on ? '' : ' · 탈퇴'}</span></span>
+        <button onclick="coNpsPick('${k}','${esc(c.seq)}')">이 사업장 맞음</button></div>`).join('')}
+      <div class="coerppin" style="margin-top:6px"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
+  }
+  return `<div class="dim" style="margin-bottom:6px">국민연금 가입 사업장에서 가입자 수(≈ 근로자 수)를 받아 옵니다. 처음 한 번은 사업장을 골라 주세요.</div>${find}`;
+}
 function coDetailPanelHtml(o){
   const folder = o.folder ? _coFolders[o.folder] : null;
   /* ── 머리 한 줄 — 계약·폴더를 «한 줄»에 모은다 (넉 줄이 두 줄로) ──
@@ -38149,6 +38289,9 @@ function coDetailPanelHtml(o){
     <div id="coInfoBox" style="margin-top:12px">${coInfoBoxHtml(o)}</div>
     ${/* 📝 메모 — 기업정보 «바로 아래». 서류에서 읽어온 값 다음에 사람이 적은 값이 온다. */''}
     ${coMemoHtml(o)}
+    ${/* 👥 국민연금 가입자 — 메모 아래 접힌 카드(2026-10-11). 숫자 카드라 펴 보기 전에도 줄 머리에 가입자 수가 보인다 */''}
+    ${/* ⚠ typeof — 기업 상세를 «떼어서» 그려 보는 검사(상자 안에 함수 몇 개만 싣는다)가 이 줄 때문에 멎지 않게 */''}
+    ${typeof coNpsHtml === 'function' ? coCardHtml('nps', '👥 국민연금 가입자', coNpsSummary(o), `<div id="coNpsBox">${coNpsHtml(o)}</div>`) : ''}
     ${/* 서류 — 「읽어 온 것·안 붙은 것·보낸 것·붙이기」를 한 카드에 담는다.
          ⚠ 안쪽 자리(#coDocsBox·#coSentBox)는 그대로다. 늦게 오는 값이 그 자리를
            찾아 채우므로, 카드가 접혀 있어도(감춰져 있을 뿐) 그대로 들어간다. */''}
