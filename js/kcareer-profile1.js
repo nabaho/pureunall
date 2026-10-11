@@ -25,7 +25,9 @@
   var SECTIONS = [
     { key: 'edu', title: '학력' }, { key: 'cert', title: '자격' }, { key: 'work', title: '주요 경력' },
     { key: 'lec', title: '강의' }, { key: 'role', title: '주요 직책 (전·현)' }, { key: 'wic', title: '위촉·위원' }, { key: 'perf', title: '컨설팅 실적' },
-    { key: 'award', title: '수상·표창' }
+    /* 2026-10-11 새 칸(목업 B안 2단계) — 사업별 수행 요약(기록에서 셈) · 연구·저서·기고(사람이 적음) */
+    { key: 'biz', title: '사업별 수행 요약' },
+    { key: 'award', title: '수상·표창' }, { key: 'pub', title: '연구·저서·기고' }
   ];
   /* 한 장에 들어가는 «줄» — 10.5px 표 줄 기준(머리·숫자 칸 포함).
      실측(2026-10-07 브라우저, A4 794×1123 · 여백 14mm): 46줄이 655px 로 쓸 자리(1017px)의 2/3 — 64줄이면 약 910px.
@@ -60,7 +62,11 @@
     return [per, what];
   }
   /* 칸을 넣나 — 실적은 «켰을 때만»(컨설턴트 모집용은 저절로), 나머지는 «끄지 않았으면». 화면 고르기 칸도 이 한 곳을 본다 */
-  function isOn(k, on, use) { on = on || {}; return k === 'perf' ? (on.perf === true || (on.perf == null && (use === 'consultant' || use === 'bid'))) : on[k] !== false; }
+  function isOn(k, on, use) {
+    on = on || {};
+    /* 실적 칸과 «사업별 요약»은 용도가 실적 위주일 때만 저절로 켠다 — 나머지는 사람이 켠다 */
+    return (k === 'perf' || k === 'biz') ? (on[k] === true || (on[k] == null && (use === 'consultant' || use === 'bid'))) : on[k] !== false;
+  }
   function isAward(r) { return /표창|상장|감사|공로|포상|수상/.test(s(r && r.type)); }
   function isCourse(r) { return /수료|이수|과정|양성|교육/.test(s(r && r.title)); }
   var 국가 = /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|지도사/;
@@ -82,6 +88,27 @@
   /* src = { fields:{name,org,title,phone,email,license}, edu, cert, work, wiccok, consult, advisory, lecture }
      opts = { use:'general'|…, on:{ edu:true,… }, roles:'2019~2021 ○○노무사회 회장\n…', now:Date,
               amtOf:function(실적)→원|null, minAmt:5000000, pins:{ wic:[id…], perf:[id…] } } */
+  /* 사업별 수행 요약 — 실적 기록을 «사업 종류»로 묶어 건수·일수(적힌 건만)를 센다. 모르는 것을 지어내지 않는다. */
+  function bizRows(recs) {
+    var g = {};
+    (recs || []).forEach(function (r) {
+      var t = s(r && r.type) || '기타';
+      var x = g[t] || (g[t] = { n: 0, d: 0 });
+      x.n++; var d = Number(r && r.days); if (d > 0) x.d += d;
+    });
+    return Object.keys(g).sort(function (a, b) { return g[b].n - g[a].n || a.localeCompare(b); })
+      .map(function (t) { return [g[t].n + '건', t, g[t].d ? '일수 ' + g[t].d + '일' : '']; });
+  }
+  /* 연구·저서·기고 — 사람이 한 줄에 하나 적는다. 앞이 연도(4자리)면 연도 칸에, 아니면 빈 칸 */
+  function pubRows(v) {
+    var lines = Array.isArray(v) ? v : String(v || '').split('\n');
+    return lines.map(function (l) {
+      var t = s(l); if (!t) return null;
+      var m = /^(\d{4})\s*[.\-년]?\s*(.*)$/.exec(t);
+      return m && m[2] ? [m[1], m[2]] : ['', t];
+    }).filter(Boolean);
+  }
+
   function build(src, opts) {
     src = src || {}; opts = opts || {};
     var use = USES[opts.use] ? opts.use : 'general', L = USES[use].lim;
@@ -124,17 +151,19 @@
         .map(function (r) { return [yearOf(r.issueDate || r.year), s(r.titleVal || r.type), s(r.org)]; }),
       /* 사람이 적은 차례 그대로 — 무엇을 앞세울지는 사람이 고른다 */
       role: (Array.isArray(opts.roles) ? opts.roles : String(opts.roles || '').split(/\r?\n/))
-        .map(function (l) { return roleRow(l, 올해); }).filter(Boolean)
+        .map(function (l) { return roleRow(l, 올해); }).filter(Boolean),
+      biz: bizRows(실적전부),
+      pub: pubRows(opts.pubs)
     };
     /* 연도별 실적 수 — 줄인 뒤에도 «전체»를 한 줄로 보여 준다(실적 칸을 넣을 때만) */
     var 해별 = {};
     실적.forEach(function (r) { var y = s(r.year) || yearOf(r.date); if (y) 해별[y] = (해별[y] || 0) + 1; });
     var 해줄 = !살('perf') ? '' : Object.keys(해별).sort().reverse().slice(0, 6).map(function (y) { return y + ' ' + 해별[y]; }).join(' · ');
-    var limit = { edu: 99, cert: 99, role: 99, work: L.work, lec: L.lec, wic: L.wic, perf: L.perf, award: L.award };
+    var limit = { edu: 99, cert: 99, role: 99, work: L.work, lec: L.lec, wic: L.wic, perf: L.perf, award: L.award, biz: 8, pub: 99 };
     var model = {
       use: use, useLabel: USES[use].label,
       head: { name: s(f.name), license: s(f.license) || '공인노무사', org: s(f.org), title: s(f.title),
-              phone: s(f.phone), email: s(f.email), field: s(opts.field || '') },
+              phone: s(f.phone), email: s(f.email), field: s(opts.field || ''), intro: s(opts.intro || '') },
       kpis: [
         { label: '컨설팅 실적', n: 실적.length }, { label: '위촉·위원', n: 위촉.length },
         { label: '강의', n: (src.lecture || []).length }, { label: '자격', n: 자격.length }
@@ -221,10 +250,11 @@
       + '<h2>프로필 <small>' + esc([h.license, h.name].filter(Boolean).join(' ')) + (h.org || h.title ? ' · ' + esc([h.org, h.title].filter(Boolean).join(' ')) : '') + '</small></h2>'
       + '<div class="top">' + (photoUrl ? '<img class="ph" src="' + esc(photoUrl) + '" alt="">' : '')
       + '<table>' + (h.phone || h.email ? '<tr><td class="y">연락처</td><td>' + esc([h.phone, h.email].filter(Boolean).join(' · ')) + '</td></tr>' : '')
-      + (h.field ? '<tr><td class="y">주 분야</td><td>' + esc(h.field) + '</td></tr>' : '') + '</table></div>'
+      + (h.field ? '<tr><td class="y">주 분야</td><td>' + esc(h.field) + '</td></tr>' : '')
+      + (h.intro ? '<tr><td class="y">소개</td><td>' + esc(h.intro) + '</td></tr>' : '') + '</table></div>'
       /* 숫자 칸(KPI)은 그리지 않는다 — 대표 2026-10-07 「kpi 필요없다」 */
       + 짝('edu', 'cert') + 짝('work', 'lec')
-      + (by.role ? sec(by.role) : '') + (by.wic ? sec(by.wic) : '') + (by.perf ? sec(by.perf) : '') + (by.award ? sec(by.award) : '')
+      + (by.role ? sec(by.role) : '') + (by.wic ? sec(by.wic) : '') + (by.perf ? sec(by.perf) : '') + (by.biz ? sec(by.biz) : '') + (by.award ? sec(by.award) : '') + (by.pub ? sec(by.pub) : '')
       + '</div>';
   }
 

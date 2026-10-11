@@ -41,3 +41,30 @@ test('화면 — 칸 상세는 미리보기·출력이 같은 모델을 쓰고, 
   assert.ok(/_p1ZoomMode='width'/.test(SRC), '기본은 폭 맞춤(B안)');
   assert.ok(/id="p1Side" style="position:sticky/.test(SRC), '왼쪽 칸 목록이 따라온다');
 });
+
+/* ── 2단계 새 칸 (2026-10-11) ── */
+test('사업별 수행 요약 — 기록에서 건수·일수(적힌 건만)를 센다 · 일수를 지어내지 않는다 · 용도가 실적 위주일 때만 저절로 켠다', () => {
+  const s2 = Object.assign({}, src, { consult: [{ type: '현장클리닉', days: 3, year: '2025' }, { type: '현장클리닉', year: '2024' }, { type: '기술', days: 1, year: '2026' }] });
+  const m = P.build(s2, { use: 'general', on: { biz: true } });
+  const biz = sec(m, 'biz');
+  assert.deepEqual(biz.rows[0], ['2건', '현장클리닉', '일수 3일']);
+  assert.equal(biz.rows[1][2], '일수 1일');
+  const 무일수 = P.build({ consult: [{ type: '현장클리닉' }] }, { use: 'general', on: { biz: true } });
+  assert.equal(sec(무일수, 'biz').rows[0][2], '', '일수 기록이 없으면 비운다(0일로 적지 않는다)');
+  assert.ok(!sec(P.build(s2, { use: 'general' }), 'biz'), '일반 용도는 사람이 켜야 한다');
+  assert.ok(sec(P.build(s2, { use: 'bid' }), 'biz'), '입찰용은 저절로 켜진다');
+});
+test('연구·저서·기고 — 한 줄에 하나, 앞의 4자리 연도는 연도 칸 · 빈 줄은 버린다 · 한 줄 소개는 머리에', () => {
+  const m = P.build(src, { use: 'general', pubs: '2024 노동법 칼럼\n책 한 권\n\n', intro: '사람 중심' });
+  assert.deepEqual(sec(m, 'pub').rows, [['2024', '노동법 칼럼'], ['', '책 한 권']]);
+  const h = P.toHtml(m, '');
+  assert.ok(h.includes('연구·저서·기고') && /소개<\/td><td>사람 중심/.test(h));
+  assert.ok(!sec(P.build(src, { use: 'general' }), 'pub'), '적지 않으면 칸이 안 나온다');
+});
+test('화면 — 새 칸 입력과 hwpx 가 같은 값을 쓴다', () => {
+  assert.ok(/function p1Intro\(/.test(SRC) && /function p1Pubs\(/.test(SRC));
+  const m = strip(SRC.slice(SRC.indexOf('function _p1Model('), SRC.indexOf('function renderProfile1(')));
+  assert.ok(/intro:o\.intro/.test(m) && /pubs:o\.pubs/.test(m));
+  const b = strip(SRC.slice(SRC.indexOf('function _p1Bytes('), SRC.indexOf('function p1Hwpx(')));
+  assert.ok(/h\.intro/.test(b) && /x\.note/.test(b), '한글 문서에도 소개·한 줄 더');
+});
