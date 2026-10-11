@@ -52,6 +52,7 @@ function 화면올리기(App덧) {
     PuNewsCore: require('../../js/pu-news-core.js')
   };
   짐.window = 짐; 짐.self = 짐; 짐.globalThis = 짐;
+  짐.요소들 = 요소들;   /* 검사가 창 안의 글(innerHTML)을 읽을 수 있게 */
   vm.createContext(짐);
   try { vm.runInContext(본, 짐, { filename: 'pu-news.html#main' }); } catch (e) { 짐.올림오류 = e; }
   if (짐.App && App덧) Object.assign(짐.App, App덧);

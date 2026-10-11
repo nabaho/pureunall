@@ -117,20 +117,23 @@ test('⑥ 화면 — 탭 둘이 서고, render 가 그린다', () => {
   assert.match(화면, /if\(App\.tab==='friend'\) m\.innerHTML = 지인화면\(\)/);
   assert.match(화면, /if\(App\.tab==='closed'\) m\.innerHTML = 해지화면\(\)/);
   /* 두 표 모두 머리와 줄의 칸 수가 같다 */
-  [['지인화면', '표'], ['해지화면', '표']].forEach(([f]) => {
-    const b = 함(f);
-    const 머 = /<table class="list"><tr>([\s\S]*?)<\/tr>\$\{표\}/.exec(b);
-    assert.ok(머, f + ' 표 머리를 못 찾았다');
-    const th = (머[1].match(/<th/g) || []).length;
-    const 줄 = b.slice(b.indexOf('const 표 ='), b.indexOf("}).join('')", b.indexOf('const 표 =')));
-    assert.strictEqual((줄.match(/<td/g) || []).length, th, f + ' — 머리와 줄의 칸 수가 다르다');
-  });
+  const 해 = 함('해지화면');
+  const 해머 = /<table class="list"><tr>([\s\S]*?)<\/tr>\$\{표\}/.exec(해);
+  assert.ok(해머, '해지화면 표 머리를 못 찾았다');
+  const 해줄 = 해.slice(해.indexOf('const 표 ='), 해.indexOf("}).join('')", 해.indexOf('const 표 =')));
+  assert.strictEqual((해줄.match(/<td/g) || []).length, (해머[1].match(/<th/g) || []).length, '해지화면 — 머리와 줄의 칸 수가 다르다');
+  /* 지인·잠재 — 머리는 지인화면(thead), 줄은 지인표줄 (2026-10-11 줄을 따로 뽑아 찾는 말에도 쓴다) */
+  const 지머 = /<thead><tr>([\s\S]*?)<\/tr><\/thead><tbody id="jnBody">/.exec(함('지인화면'));
+  assert.ok(지머, '지인화면 표 머리를 못 찾았다');
+  assert.strictEqual((함('지인표줄').match(/<td/g) || []).length, (지머[1].match(/<th/g) || []).length,
+    '지인화면 — 머리와 줄의 칸 수가 다르다');
   /* 받는 명단 사업장 표에는 고객사만 */
   assert.match(함('명단화면'), /사업장으로묶기\(고객사줄들\(r, true\)\)/, '해지·지인이 사업장 표에 섞인다');
 });
 
 test('⑥ 디자인 — 작은 탭은 밑줄, 거르개에 그림문자 없음, 내보내기 하나', () => {
-  const css = /\.subtabs button\{([^}]*)\}/.exec(화면);
+  /* 2026-10-11 — 탭 모양은 «탭 단추에만» 입힌다(.mini·.btn 은 제 모양을 지킨다) */
+  const css = /\.subtabs button(?::not\(\.mini\):not\(\.btn\))?\{([^}]*)\}/.exec(화면);
   assert.ok(css && /border-bottom:2px solid/.test(css[1]) && !/border-radius:99px/.test(css[1]),
     '작은 탭이 다시 알약이다 — 거르개와 헷갈린다');
   const 명 = 함('명단화면');

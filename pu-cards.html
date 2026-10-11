@@ -6899,18 +6899,38 @@ function selToNewsletter(){
   }).then(async yes=>{
     if(!yes) return;
     const 오늘 = new Date().toISOString().slice(0,10);
-    const 묶음 = {};
-    쓸것.forEach(function(it){
-      const 열쇠 = 'c' + String(it.id||'').replace(/[.#$/[\]]/g,'_').slice(0,40);
-      묶음[열쇠] = { 이름: it.name||'', 소속: it.company||'', 직책: it.title||'',
-                     주소: normEmail(it.email), 전화: it.mobile||it.phone||'',
-                     출처: '명함', 명함번호: String(it.id||''),
-                     담은날: 오늘, 담은이: myEmail||'', 동의: false };
-    });
     try{
-      await db.ref('newsletter/더한분들').update(묶음);
+      /* ★ 이미 담긴 분은 «덮지 않는다» (2026-10-11). 같은 명함을 다시 넣으면 update 가 그 칸을 통째로
+           갈아 끼워, 받아 둔 동의 표시가 「받기 전」으로 되돌아갔다 — 그분은 조용히 발송에서 빠졌다.
+           담기 직전에 서버를 읽어 같은 열쇠·같은 주소는 건너뛴다(뉴스레터 화면의 「기업정보함에서
+           가져오기」와 같은 규칙). */
+      const 이미 = (await db.ref('newsletter/더한분들').once('value')).val() || {};
+      const 이미열쇠 = {}, 이미주소 = {};
+      Object.keys(이미).forEach(function(k){
+        const v = 이미[k];
+        if(!v || typeof v !== 'object' || v.뺌 === true) return;
+        이미열쇠[k] = 1;
+        const e = String(v.주소||'').trim().toLowerCase();
+        if(e) 이미주소[e] = 1;
+      });
+      const 묶음 = {};
+      let 건너뜀 = 0;
+      쓸것.forEach(function(it){
+        const 열쇠 = 'c' + String(it.id||'').replace(/[.#$/[\]]/g,'_').slice(0,40);
+        const 주소 = normEmail(it.email);
+        if(이미열쇠[열쇠] || 이미주소[주소]){ 건너뜀++; return; }
+        묶음[열쇠] = { 이름: it.name||'', 소속: it.company||'', 직책: it.title||'',
+                       주소: 주소, 전화: it.mobile||it.phone||'',
+                       출처: '명함', 명함번호: String(it.id||''),
+                       담은날: 오늘, 담은이: myEmail||'', 동의: false };
+      });
+      const 담은수 = Object.keys(묶음).length;
+      if(담은수) await db.ref('newsletter/더한분들').update(묶음);
       state.sel={}; render();
-      toast('📰 ' + Object.keys(묶음).length + '명을 뉴스레터 지인·잠재에 넣었습니다 — 동의를 받으시면 갑니다', 7000);
+      toast(담은수
+        ? '📰 ' + 담은수 + '명을 뉴스레터 지인·잠재에 넣었습니다 — 동의를 받으시면 갑니다'
+          + (건너뜀 ? ' · 이미 있던 ' + 건너뜀 + '명은 그대로 두었습니다' : '')
+        : '고른 분이 모두 이미 담겨 있어 그대로 두었습니다', 7000);
     }catch(e){ toast('넣지 못했습니다: '+((e&&e.message)||''), 8000); }
   });
 }
