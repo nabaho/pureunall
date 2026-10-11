@@ -840,6 +840,8 @@
   .scard{border-radius:16px;padding:8px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
   .scard b{font-size:14px;font-weight:500;line-height:20px;word-break:break-word}
   .scard span{font-size:12px;opacity:.9}
+  .swk{display:none}
+  body.mob .swk{display:block;font-size:14px;color:var(--gtext);padding:14px 16px 2px 73px}
   .snone{font-size:13px;color:var(--gsub);padding:10px 0}
   .sdot{display:none}
   /* ★ PC 「일정」 보기 — 구글 웹 일정 보기 실측(2026-10-11 calendar.google.com/calendar/embed?mode=AGENDA):
@@ -847,7 +849,7 @@
        폰은 색 카드 그대로(폰 앱은 카드다) */
   @media (min-width:701px){
     .sday{border-top:1px solid var(--gline);padding:6px 16px}
-    .sday:first-child{border-top:none}
+    .sday:first-child,.swk:first-child + .sday{border-top:none}
     .sdn{width:60px}
     .sdn b{font-size:18px;line-height:36px;width:36px;margin:0 auto}
     .scards{gap:0}
@@ -2711,7 +2713,7 @@ function 폰일정Html(eumOnly){
     var n = parseInt(m[1], 16);
     return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 170 ? "#1f1f1f" : "#ffffff";
   }
-  var 날들 = [];
+  var 날들 = [], 이전주글 = "";
   for(var n = 1; n <= 끝일; n++){
     var ds = ym + "-" + ("0" + n).slice(-2);
     var h = 공휴칩(ds);
@@ -2741,6 +2743,10 @@ function 폰일정Html(eumOnly){
         + '<i class="sdot" style="background:' + esc(색) + '"></i><b>' + esc(제목) + '</b>' + (언제 ? '<span>' + esc(언제) + '</span>' : '') + '</div>';
     }).join("");
     var d = new Date(ds + "T00:00:00");
+    /* ★ 폰 — 구글 앱 일정 보기는 «한 주»마다 「10월 4일~10일」 머리를 둔다(2026-10-11 캡처). 일요일 시작 */
+    var 주시작 = new Date(d.getTime() - d.getDay() * 86400000), 주끝 = new Date(주시작.getTime() + 6 * 86400000);
+    var 주글 = (주시작.getMonth() + 1) + "월 " + 주시작.getDate() + "일~" + (주끝.getMonth() === 주시작.getMonth() ? "" : (주끝.getMonth() + 1) + "월 ") + 주끝.getDate() + "일";
+    if(주글 !== 이전주글){ 이전주글 = 주글; 날들.push('<div class="swk">' + 주글 + '</div>'); }
     날들.push('<div class="sday' + (ds === 오늘 ? ' today' : '') + '" data-day="' + ds + '">'
       + '<div class="sdn"><b>' + n + '</b><span class="sw">' + ["일","월","화","수","목","금","토"][d.getDay()] + '</span>'
       /* 폰 — 요일 · 날짜 · 음력 세 줄(구글 앱 일정 보기 캡처 2026-10-11) */

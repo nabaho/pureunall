@@ -378,3 +378,9 @@ test('「구글 앱 색」 — 서랍에서 켜면 구글 색 없는 일정이 �
   assert.match(캘, /data-dmono="1">/);
   assert.match(캘, /localStorage\.setItem\("pucal_gmono", _모노\(\) \? "0" : "1"\)/);
 });
+
+test('폰 일정 보기 — 주마다 「10월 4일~10일」 머리(일요일 시작)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /날들\.push\('<div class="swk">' \+ 주글 \+ '<\/div>'\)/);
+  assert.match(캘, /body\.mob \.swk\{display:block;font-size:14px;color:var\(--gtext\);padding:14px 16px 2px 73px\}/);
+});
