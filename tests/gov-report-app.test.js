@@ -46,7 +46,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
   'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp',
   'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink',
-  'grSendCtx', 'grSay', 'grRenderSend', 'grApplyFields', 'grMarkSent', 'grLinkReply', 'grCopy', 'grOpenMail', 'grWriteMail',
+  'grSendCtx', 'grSay', 'grRenderSend', 'grApplyFields', 'grMarkSent', 'grLinkReply', 'grCopy', 'grOpenMail', 'grWriteMail', 'grWriteSubmit',
   'grMailFetch', 'grMailCall',
   'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv'];
 
@@ -1566,4 +1566,211 @@ test('62 쓰기 거절(규칙 게시 전·권한 없음) — 「보냈음 기록
   assert.ok(w.els.cellw.innerHTML.includes('저장하지 못했습니다 — 규칙 게시 또는 권한 확인'));
   assert.strictEqual(w.ctx.GR.track, before);
   assert.equal(w.db.쓴것.length, 0);
+});
+
+/* ══ 기관 제출 칸(⑤) — 제출 메일 쓰기 · 제출 보냄 기록 · 플랫폼 체크 글 ══ */
+
+/* 합성 씨앗 — 다라정밀 제출 줄(submit) 을 마음대로, 보낸편지함에 메일을 더한다(공용 씨앗은 건드리지 않는다)
+   rows: [{ u, at: Date.UTC(...), s: 제목, t: 받는이(쉼표) }] */
+function submitSeed(rec, o) {
+  o = o || {};
+  const s = signSeed(undefined, o);
+  if (rec) s.scal_docs.c2.t3_2026.items.submit = Object.assign({ by: '홍길동', at: Date.UTC(2026, 8, 20, 3) }, rec);
+  (o.rows || []).forEach((r) => {
+    s.mailbox.msgs[SENT_SLUG][r.u] = { u: r.u, f: '푸른노무법인', e: 'office@pureun.kr', t: r.t, tn: '', s: r.s, d: r.at, a: 1, an: ['제출본.pdf'] };
+  });
+  return s;
+}
+const submitCell = (w) => cellOf(w, 'consulting-04', 'c2', 't3', 'submit');
+const submitPlanOf = (w) => D.planFor(w.ctx.GR.cw.biz).items.filter((i) => i.step === 'submit')[0];
+/* 쓰기 창 가짜 — 받는이가 비면 진짜처럼 거절(false) */
+function mailWin(ret, calls) {
+  const win = { puMailComposeTo(o) { calls.push(o); return o.to ? ret : false; }, focus() {}, location: { href: '' } };
+  return win;
+}
+const AGENCY_ROWS = [
+  { u: 210, at: Date.UTC(2026, 7, 1, 1), s: '충남북부 인사노무 중간보고 제출', t: 'old@example.org' },
+  { u: 211, at: Date.UTC(2026, 8, 29, 1), s: '충남북부 인사노무 결과보고서 제출', t: 'agency@example.org,agency2@example.org,dara@example.com,office@pureun.kr' },
+  { u: 212, at: Date.UTC(2026, 9, 2, 1), s: '다른 사업 안내', t: 'other@example.org' }
+];
+
+test('63 grRenderSend — 제출 칸: 메일 사업은 「제출 메일 쓰기」 · 플랫폼은 순서 글(<ol>)만 · 방식 모르면 안내 한 줄 · 아무것도 쓰지 않는다', async () => {
+  /* 충남북부(mail) */
+  let w = world({ seed: submitSeed(null) });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-04'); w.ctx.grOpenCell('c2', 't3', 'submit');
+  assert.match(w.els.cwSend.innerHTML, /<button type="button" onclick="grWriteSubmit\(\)" disabled>✉ 제출 메일 쓰기/, '메일함을 읽는 동안은 잠긴다');
+  await w.ctx.grLoadInbox();
+  let h = w.els.cwSend.innerHTML;
+  assert.match(h, /<button type="button" onclick="grWriteSubmit\(\)">✉ 제출 메일 쓰기<\/button>/);
+  assert.ok(!h.includes('서명 요청 메일 쓰기') && !h.includes('<ol'));
+  assert.ok(h.includes("onclick=\"grMarkSent('')\">제출 보냄 기록(오늘)"), '보낸 메일을 못 찾으면 오늘로 기록');
+  assert.ok(h.includes(S.MSG.ATTACH) && h.includes(S.MSG.DL_NOTE));
+  assert.equal(w.db.쓴것.length, 0, '그리기는 읽기만');
+  /* 완료면 단추 없음 */
+  w = world({ seed: submitSeed({ st: 'done', gotAt: '2026-09-30', how: 'mail' }) });
+  await submitCell(w);
+  h = w.els.cwSend.innerHTML;
+  assert.ok(!h.includes('제출 메일 쓰기') && !h.includes('제출 보냄 기록') && !h.includes('보낸 메일을 찾았습니다'), '완료면 단추 숨김');
+  assert.ok(h.includes(S.MSG.ATTACH), '안내 글은 그대로');
+
+  /* 기술보호(platform) — 순서 글 li 수 = steps 수, 메일 단추 없음, 저장 없음 */
+  w = world({ seed: submitSeed(null) });
+  await cellOf(w, 'consulting-03', 'c1', 't1', 'submit');
+  const plan = submitPlanOf(w);
+  assert.equal(plan.how, 'platform');
+  h = w.els.cwSend.innerHTML;
+  assert.equal(h.split('<li>').length - 1, plan.steps.length, 'li 개수');
+  assert.ok(h.includes('<ol class="days">') && h.includes('로그인과 «제출» 단추는 사람이 합니다 — 접수 화면을 캡처해 두고 «접수 확인»에 표시하세요'));
+  assert.ok(!h.includes('제출 메일 쓰기') && !h.includes('grWriteSubmit') && !h.includes('grMarkSent') && !h.includes('<button'), '메일 단추 없음');
+  assert.equal(w.db.쓴것.length, 0, '체크는 저장하지 않는다');
+  assert.equal(await w.ctx.grWriteSubmit(), false, '플랫폼 사업은 메일 길이 없다');
+
+  /* 제출 방식을 모르는 사업(현장클리닉 꼴) — 안내 한 줄만 */
+  w = world({ seed: submitSeed(null) });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-04');
+  const noHow = (n) => { const p = D.planFor(n); return Object.assign({}, p, { items: p.items.map((i) => (i.step === 'submit' ? { id: i.id, name: i.name, per: i.per, step: i.step } : i)) }); };
+  w.ctx.PuGovReportDocs = Object.assign({}, D, { planFor: noHow });
+  w.ctx.grOpenCell('c2', 't3', 'submit'); await w.ctx.grLoadInbox();
+  h = w.els.cwSend.innerHTML;
+  assert.ok(h.includes('<div class="days">제출 방식 확인 필요 — 운영지침 도착 뒤 정합니다</div>'));
+  assert.ok(!h.includes('<button') && !h.includes('<ol') && !h.includes('grWriteSubmit'));
+  assert.equal(await w.ctx.grWriteSubmit(), false);
+  assert.equal(D.planFor('현장클리닉').items.filter((i) => i.step === 'submit')[0].how, undefined, '진짜 현장클리닉 줄도 방식이 없다');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('64 제출 보낸 메일 찾기 — 꼬리표는 [제출:rid] · 서명 요청 메일은 안 섞인다 · 단추는 날짜 모양이 맞을 때만(서명 칸도)', async () => {
+  assert.equal(S.tagOf('submit', 't3_2026'), '[제출:t3_2026]');
+  const sent = { u: 220, at: Date.UTC(2026, 8, 30, 1), s: '[제출:t3_2026] 인사노무 충남북부 결과보고서 제출 (다라정밀)', t: 'agency@example.org' };
+  const sent2 = { u: 221, at: Date.UTC(2026, 9, 2, 1), s: '[제출:t3_2026] 재제출', t: 'agency@example.org' };
+  let w = world({ email: 'p009@pureun.kr', seed: submitSeed(null, { rows: [sent2, sent] }) });
+  await submitCell(w);
+  assert.equal(w.ctx.grSendCtx().tag, '[제출:t3_2026]', '제출 칸의 꼬리표');
+  let h = w.els.cwSend.innerHTML;
+  assert.ok(h.includes('보낸 메일을 찾았습니다 — 2026-09-30') && h.includes('(2건 중 가장 이른 것)') && h.includes('제출일로 기록'), h);
+  assert.ok(h.includes("onclick=\"grMarkSent('2026-09-30')\"") && !h.includes('제출 보냄 기록(오늘)'));
+  /* 같은 날로 이미 기록돼 있으면 단추 없음 */
+  w = world({ seed: submitSeed({ st: 'doing', gotAt: '2026-09-30' }, { rows: [sent] }) });
+  await submitCell(w);
+  assert.ok(!w.els.cwSend.innerHTML.includes('보낸 메일을 찾았습니다') && !w.els.cwSend.innerHTML.includes('제출 보냄 기록(오늘)'));
+  /* 서명 요청 꼬리표 메일은 제출 칸에서 «찾았습니다» 가 되지 않는다 */
+  w = world({ seed: submitSeed(null, { sentDays: [18] }) });
+  await submitCell(w);
+  assert.ok(!w.els.cwSend.innerHTML.includes('보낸 메일을 찾았습니다') && w.els.cwSend.innerHTML.includes('제출 보냄 기록(오늘)'));
+
+  /* 날짜 모양이 어긋난 줄 — 단추를 만들지 않는다(제출 칸·서명 칸 모두) */
+  const odd = (tag) => ({ out: true, day: "2026-09-30');alert(1);('", slug: SENT_SLUG, uid: 999, d: 1, s: tag + ' 이상한 날짜', to: ['agency@example.org'], atts: [] });
+  w = world({ seed: submitSeed(null) });
+  await submitCell(w);
+  w.ctx.GR.inbox.rows = w.ctx.GR.inbox.rows.concat([odd('[제출:t3_2026]')]);
+  w.ctx.grRenderSend();
+  h = w.els.cwSend.innerHTML;
+  assert.ok(!h.includes('alert(1)') && !h.includes('제출일로 기록') && !h.includes('제출 보냄 기록(오늘)') && !h.includes('grMarkSent'), '제출 칸: ' + h);
+  w = world({ seed: signSeed(null) });
+  await signCell(w);
+  w.ctx.GR.inbox.rows = w.ctx.GR.inbox.rows.concat([odd('[서명요청:t3_2026]')]);
+  w.ctx.grRenderSend();
+  h = w.els.cwSend.innerHTML;
+  assert.ok(!h.includes('alert(1)') && !h.includes('보낸 날로 기록') && !h.includes('보냈음 기록(오늘)') && !h.includes('grMarkSent'), '서명 칸: ' + h);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('65 grMarkSent(제출 칸) — 한 줄 .set {done · 제출일 · how:mail} · 기존 ack·note·link 보존 · 서명 칸 값은 건드리지 않는다', async () => {
+  const rec = { st: 'doing', how: '', ack: true, note: '접수 메일 기다림', link: SIGN_LINK };
+  const w = world({ email: 'p009@pureun.kr', seed: submitSeed(rec) });
+  await submitCell(w);
+  showRec(w, rec); w.els.cwAck.checked = true; w.els.cwHow.value = '';
+  await w.ctx.grMarkSent('2026-09-30');
+  onlyTrackWrites(w.db);
+  assert.equal(w.db.쓴것.length, 1);
+  const v = w.db.쓴것[0];
+  assert.equal(v.자리, 'scal_docs/c2/t3_2026/items/submit');
+  assert.deepEqual([v.값.st, v.값.gotAt, v.값.how, v.값.by], ['done', '2026-09-30', 'mail', '홍길동']);
+  assert.equal(v.값.ack, true, 'ack 보존'); assert.equal(v.값.note, '접수 메일 기다림', 'note 보존');
+  assert.deepEqual(v.값.link, SIGN_LINK, 'link 보존');
+  assert.ok(w.els.cellw.innerHTML.includes('저장했습니다'));
+  assert.ok(!w.els.cwSend.innerHTML.includes('제출 메일 쓰기'), '완료가 되면 메일 단추가 사라진다');
+  /* 오늘 날짜(빈 값) */
+  const w2 = world({ email: 'p009@pureun.kr', seed: submitSeed(null) });
+  await submitCell(w2);
+  await w2.ctx.grMarkSent('');
+  assert.deepEqual([w2.db.쓴것[0].값.st, w2.db.쓴것[0].값.gotAt, w2.db.쓴것[0].값.how], ['done', '2026-10-10', 'mail']);
+  onlyTrackWrites(w2.db);
+});
+
+test('66 grWriteSubmit — 지난 제출 메일에서 받는이를 따라 쓰기 창에 한 번 · 안내는 열린 뒤에도 남는다 · 못 찾으면 빈 창 + 제목·본문 복사', async () => {
+  const calls = [];
+  /* 찾음 — 가장 최근 «사업 낱말» 보낸 메일 · 우리·업체 주소는 뺀다 */
+  let w = world({ seed: submitSeed(null, { rows: AGENCY_ROWS }) });
+  await submitCell(w);
+  w.ctx.open = (u, n) => { assert.equal(n, 'puMailWrite'); return mailWin(true, calls); };
+  assert.equal(await w.ctx.grWriteSubmit(), true);
+  assert.equal(calls.length, 1, '한 번만 부른다');
+  const o = calls[0];
+  assert.deepEqual(Object.keys(o).sort(), ['body', 'card', 'cc', 'subject', 'to']);
+  assert.equal(o.to, 'agency@example.org'); assert.equal(o.cc, 'agency2@example.org');
+  assert.ok(o.subject.startsWith('[제출:t3_2026] ') && o.subject.includes('다라정밀'), o.subject);
+  assert.ok(o.body.includes('제출합니다') && !o.body.includes('@'));
+  const msg = w.els.cwSendMsg;
+  assert.ok(msg.textContent.includes('지난 제출 메일(2026-09-29)에서 받는 사람을 따라 왔습니다 — 확인하세요'), 'grOpenMail 이 덮은 뒤 다시 쓴다: ' + msg.textContent);
+  assert.ok(msg.textContent.includes('쓰기 창을 열었습니다') && msg.className === 'days');
+  assert.equal(w.db.쓴것.length, 0);
+  assert.equal(w.ctx.copied, undefined);
+
+  /* 쓰기 창이 값 채우기를 거절 — 받는이·참조·제목만 주소로, 본문은 클립보드 · 안내는 그대로 */
+  calls.length = 0;
+  w = world({ seed: submitSeed(null, { rows: AGENCY_ROWS }) }); await submitCell(w);
+  let fake = mailWin(false, calls); w.ctx.open = () => fake;
+  assert.equal(await w.ctx.grWriteSubmit(), true);
+  const d = S.draft('submit', { rid: 't3_2026', co: '다라정밀', biz: w.ctx.GR.cw.biz, reportName: w.ctx.GR.cw.keys[0].name });
+  assert.equal(fake.location.href, S.composeUrl('pu-cards.html', { to: 'agency@example.org', cc: 'agency2@example.org', subject: d.subject }));
+  assert.equal(w.ctx.copied, d.body);
+  assert.ok(w.els.cwSendMsg.textContent.includes('지난 제출 메일(2026-09-29)') && w.els.cwSendMsg.textContent.includes(S.MSG.BODY_COPIED));
+
+  /* 못 찾음(우리·업체 주소뿐이거나 보낸 메일 없음) — 빈 쓰기 창 + 제목·본문 복사 */
+  for (const rows of [[], [{ u: 230, at: Date.UTC(2026, 8, 29, 1), s: '충남북부 제출', t: 'dara@example.com,office@pureun.kr' }]]) {
+    calls.length = 0;
+    w = world({ seed: submitSeed(null, { rows }) }); await submitCell(w);
+    fake = mailWin(true, calls); w.ctx.open = () => fake;
+    assert.equal(await w.ctx.grWriteSubmit(), true);
+    assert.equal(calls.length, 1); assert.equal(calls[0].to, '', '받는이 없이');
+    assert.equal(fake.location.href, 'pu-cards.html?view=mail', '빈 쓰기 창');
+    const dd = S.draft('submit', { rid: 't3_2026', co: '다라정밀', biz: w.ctx.GR.cw.biz, reportName: w.ctx.GR.cw.keys[0].name });
+    assert.equal(w.ctx.copied, dd.subject + '\n\n' + dd.body, '제목\\n\\n본문');
+    const m = w.els.cwSendMsg;
+    assert.ok(m.textContent.includes(S.MSG.NO_SUBMIT_TO) && m.textContent.includes(S.MSG.COPIED_ALL), m.textContent);
+    assert.equal(m.className, 'err-s');
+    assert.equal(w.db.쓴것.length, 0);
+  }
+
+  /* 팝업이 막혔다 — 안내를 덮어쓰지 않고 막힘을 알린다 */
+  w = world({ seed: submitSeed(null, { rows: AGENCY_ROWS }) }); await submitCell(w);
+  w.ctx.open = () => null;
+  assert.equal(await w.ctx.grWriteSubmit(), false);
+  assert.ok(w.els.cwSendMsg.textContent.includes('쓰기 창이 막혔습니다') && w.els.cwSendMsg.className === 'err-s');
+  /* 서명 칸에서는 아무 일도 하지 않는다 */
+  w = world({ seed: submitSeed(null, { rows: AGENCY_ROWS }) }); await signCell(w);
+  w.ctx.open = () => { throw new Error('열면 안 된다'); };
+  assert.equal(await w.ctx.grWriteSubmit(), false);
+});
+
+test('67 플랫폼 체크 글 — 값은 글자로만(이스케이프) · 상수 배열을 바꾸지 않는다', async () => {
+  const evil = Object.freeze(['<script>alert(1)</script>', 'x" onerror="alert(2)', '<img src=x onerror=alert(3)>']);
+  const w = world({ seed: submitSeed(null) });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-04');
+  w.ctx.PuGovReportDocs = Object.assign({}, D, { planFor: (n) => { const p = D.planFor(n); return Object.assign({}, p, { items: p.items.map((i) => (i.step === 'submit' ? { id: i.id, name: i.name, per: i.per, step: i.step, how: 'platform', steps: evil } : i)) }); } });
+  w.ctx.grOpenCell('c2', 't3', 'submit'); await w.ctx.grLoadInbox();
+  const h = w.els.cwSend.innerHTML;
+  assert.equal(h.split('<li>').length - 1, 3);
+  assert.ok(!/<script|<img/i.test(h), '태그가 그대로 들어갔다');
+  assert.ok(h.includes('&#60;script&#62;alert(1)&#60;/script&#62;') && h.includes('x&#34; onerror=&#34;alert(2)'), h);
+  assert.equal(evil.length, 3, '상수 배열은 그대로(읽기만)');
+  assert.doesNotMatch(grab('grRenderSend'), /\.(push|pop|shift|unshift|splice|sort|reverse)\(/, 'steps 를 바꾸는 호출이 없다');
+});
+
+test('68 정적 — 제출 메일도 쓰기 길은 grSaveCell 한 곳 · 자동 발송 호출 없음', () => {
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  ['grWriteSubmit', 'grRenderSend', 'grMarkSent'].forEach((n) => assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|mailto:|\.send\s*\(|sendMail|httpsCallable/, n));
+  assert.match(grab('grWriteSubmit'), /grOpenMail\(S\.composeParts\(d,to,cc\)\)/);
+  assert.match(grab('grWriteSubmit'), /\.then\(function\(r\)/, '안내는 grOpenMail 이 끝난 뒤 다시 쓴다');
 });
