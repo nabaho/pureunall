@@ -154,9 +154,14 @@
     .sdbhead{position:sticky;top:calc(var(--topbar-h,48px) + var(--sdhead-h,150px));z-index:11;background:var(--panel,#fff);padding-bottom:2px}
   }
   .sdwrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}   /* 직접 style 로 적으면 아래 넓은 화면의 overflow:visible 을 이긴다 — 표 머리가 안 붙었다 */
-  /* 거래·분개입력 — 아주 넓은 화면(1700px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
-  @media(min-width:1700px){
-    .closesplit.hasside{display:grid;grid-template-columns:minmax(0,1fr) 470px;gap:12px;align-items:start}
+  /* 거래·분개입력 — 아주 넓은 화면(1850px~)에서는 오른쪽에 결산·재무제표를 «붙박이»로 둔다(대표 2026-10-11 안 B). 좁으면 예전처럼 거래표 아래에 쌓인다 — 13칸 거래표가 좁아지면 □·승인·증빙이 뭉개지므로 */
+  @media(min-width:1850px){
+    .closesplit.hasside{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:12px;align-items:start}
+    /* 거래표를 ~1170px 안에 앉힌다(13칸) — 계정 선택·적요·손볼 것 칸을 줄이고, 손볼 것은 줄바꿈. 안 그러면 표가 오른쪽 결산 판 밑으로 삐져나간다(실사이트 1,912px 에서 1,343px → 1,167px 로 실측) */
+    .closesplit.hasside>.closemain select{width:130px}
+    .closesplit.hasside>.closemain tbody td:nth-child(4){max-width:170px!important}
+    .closesplit.hasside>.closemain tbody td:last-child{white-space:normal!important;max-width:150px}
+    .closesplit.hasside>.closeside td{padding:4px 8px;font-size:12px}   /* 결산 판은 좁게 — 한 화면에 더 들어가게 */
     .closesplit.hasside>.closemain{grid-column:1;grid-row:1;margin-bottom:0;min-width:0}
     .closesplit.hasside>.closeside{grid-column:2;grid-row:1;margin-bottom:0;position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px) + var(--closehead-h,156px) + 8px);max-height:calc(100vh - var(--topbar-h,48px) - var(--fundhead-h,73px) - var(--closehead-h,156px) - 20px);overflow:auto}
     .closesplit.hasside>.closerest{grid-column:1 / -1;margin-bottom:0}
