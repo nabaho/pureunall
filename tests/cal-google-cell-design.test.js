@@ -46,10 +46,13 @@ test('① 월 보기 — 「오늘」·「공휴일」 칸 배경에 더 이상 
 });
 
 test('② 주 보기 — 같은 규칙(칸 배경은 흰색)', () => {
-  const fn = 함수몸(캘린더, 'function weekHtml(eumOnly){');
-  const m = fn.match(/var wbg = [^;]+;/);
-  assert.ok(m, '주 보기 칸 배경 셈을 못 찾았습니다');
-  assert.strictEqual(/fffbeb|fef2f2/.test(m[0]), false, '주 보기에 아직 칠이 남아 있습니다: ' + m[0]);
+  /* 2026-10-11 주·일 보기가 «시간 축 격자»(격자Html)가 되어 칸 배경 셈(wbg)은 없어졌다 —
+     오늘·공휴일 칸을 칠하지 않는다는 규칙은 그대로: 격자 칸(.tgcol) 어디에도 옅은 노랑·빨강 칠이 없어야 한다 */
+  const fn = 함수몸(캘린더, 'function 격자Html(days, eumOnly){');
+  assert.strictEqual(/fffbeb|fef2f2/.test(fn), false, '주·일 보기 격자에 칠이 남아 있습니다');
+  const 칸규칙 = 캘린더.match(/\.tgcol[^{]*\{[^}]*\}/g) || [];
+  assert.ok(칸규칙.length >= 1, '격자 칸 규칙을 못 찾았습니다');
+  assert.strictEqual(칸규칙.some((r) => /fffbeb|fef2f2/.test(r)), false, '격자 칸에 칠이 남아 있습니다');
 });
 
 /* ③ 은 2026-09-27 에 뒤집혔다 (대표 지시 「구글캘린더 화면과 … 공휴일 처리 등 완벽하게 같이」).
