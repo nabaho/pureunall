@@ -155,7 +155,7 @@ function fakePost2(byTask, calls) {
 test("⑫ 회생과 파산을 함께 읽고, 종류(kind)와 첫 단계를 붙인다 — 상세는 각자의 업무구분으로 부른다", async () => {
   const calls = [];
   const byTask = { "4": [[row()]], "5": [[bk(), bk({ csNo: "20262090001769", pbancTitlNm: "채권자집회소집 공고" })]] };
-  const r = await W.run({ post: fakePost2(byTask, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab", "bankruptcy"], post: fakePost2(byTask, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.added.length, 2, "회생 1 + 파산선고 1 (집회소집 공고는 대상이 아니다)");
   const reh = r.added.find((x) => x.kind === "rehab"), bnk = r.added.find((x) => x.kind === "bankruptcy");
   assert.equal(reh.stage, "금지명령");
@@ -170,13 +170,23 @@ test("⑬ 간이파산·기타공고 안의 파산선고도 잡고, 이시폐지
   assert.equal(W.isTarget(bk({ pbancTitlNm: "배당공고" }), "bankruptcy"), false);
   const existing = { c000221_20262090001768: { id: "c000221_20262090001768", kind: "bankruptcy", stage: "파산선고", events: [{ d: "2026-10-01", t: "파산선고결정 공고" }] } };
   const byTask = { "4": [[]], "5": [[bk({ pbancTitlNm: "이시폐지 공고", pbancBgngYmd: "20261009" })]] };
-  const r = await W.run({ post: fakePost2(byTask, []), existing, sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab", "bankruptcy"], post: fakePost2(byTask, []), existing, sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.eventUpdates.c000221_20262090001768.stage, "폐지·기각");
 });
 
 test("⑭ 한 번에 상세를 부르는 새 사건 수에 상한이 있다 — 나머지는 다음 회차", async () => {
   const rows = Array.from({ length: 5 }, (_, i) => bk({ csNo: "2026209000" + (2000 + i), csNoNm: "2026하합 " + (2000 + i) }));
-  const r = await W.run({ post: fakePost2({ "4": [[]], "5": [rows] }, []), sinceYmd: "2026-10-01", courts: ["000221"], maxNew: 3, nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab", "bankruptcy"], post: fakePost2({ "4": [[]], "5": [rows] }, []), sinceYmd: "2026-10-01", courts: ["000221"], maxNew: 3, nowMs: 1 });
   assert.equal(r.found, 5);
   assert.equal(r.added.length, 3);
+});
+
+test("⑮ 기본으로는 회생만 모은다 — 파산은 잠시 멈춤(DEFAULT_KINDS)", async () => {
+  assert.deepEqual(W.DEFAULT_KINDS, ["rehab"]);
+  const calls = [];
+  const byTask = { "4": [[row()]], "5": [[bk()]] };
+  const r = await W.run({ post: fakePost2(byTask, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  assert.equal(r.added.length, 1);
+  assert.equal(r.added[0].kind, "rehab");
+  assert.ok(!calls.some((c) => c[1] === "5"), "파산 업무구분(5)은 부르지 않는다");
 });
