@@ -382,7 +382,7 @@
       호칭: org ? '귀 기관' : '귀사',
       송부일자: sendDate(o.today),
       담당노무사: String(o.staffName || ''),
-      노무사연락처: String(o.staffTel || '041-556-0035'),
+      노무사연락처: String(o.staffTel || '041-556-0034~6'),
       견적금액: amt == null ? '' : won(amt),
       부가세: amt == null ? '' : (o.vat === 'excl' ? '10% 별도' : '포함'),
       비용합계: total == null ? '' : won(total)
