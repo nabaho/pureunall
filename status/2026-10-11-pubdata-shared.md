@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 완료
 이어하기시도: 0
 작업폴더: C:\Users\fair0\Documents\pu-wt-pubdata
 가지: pubdata-shared
@@ -22,5 +22,5 @@
 - 3단계: pu-cards 가 pubdata/co 구독(loadPubCo)·coWithPub 로 얹기, 공단 직접 호출 걷어냄(coPubAsk 받아 달라). 사람이 정한 pick·none 만 coInfo.
 - 있는 자료 옮기기: 0건(배포 뒤 기업 상세를 연 곳이 시험한 1곳뿐, 이미 새 자리). 국민연금 고른 곳 0.
 - 4단계: pubdata/common/holidays 2025·2026·2027(20·22·24건) 첫 채움(서버와 같은 holiRows). 캘린더·이알피는 손입력 우선으로 자동 합침(저장 안 함), 급여관리는 「🛰 공휴일 불러오기」로 칸만 채움(임금 계산이라 저장은 사람).
-- ⚠ 합친 뒤 npsMonthly 다시 배포(임시공휴일 종류).
-- 남은 일: 5단계 — 11월 중순, OLD_TOO=false(functions/pubdata.js)로 옛 자리 쓰기 멈춤 + 이알피 업체관리 근로자 수 한 줄.
+- npsMonthly 다시 배포함(10/11, 임시공휴일 종류).
+- 1~4단계 끝(#2514·#2518·#2522·#2526). 남은 일: 5단계 — 11월 중순, OLD_TOO=false(functions/pubdata.js)로 옛 자리 쓰기 멈춤 + 이알피 업체관리 근로자 수 한 줄.
