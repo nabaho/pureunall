@@ -828,8 +828,16 @@
   .sdn b{display:block;font-size:22px;font-weight:400;line-height:36px;color:var(--gtext)}
   .sdn span{font-size:12px;color:var(--gsub)}
   .sday.today .sdn b{background:#2563eb;color:#ffffff;border-radius:50%;width:36px;margin:0 auto}
-  .scards{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
-  .scard{border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+  /* 폰 일정 보기 카드 — 구글 앱 캡처 실측: 한 줄 카드 높이 36px · 두 줄 59px · 모서리 ≈16px · 카드 사이 ≈12px · 제목 15px / 시각 14px */
+  .scards{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
+  body.mob .sdn{display:flex;flex-direction:column;width:50px;padding-top:0}
+  body.mob .sdn .sw{order:-1;font-size:14px;font-weight:700;color:var(--gtext);line-height:20px}
+  body.mob .sdn b{font-size:20px;line-height:26px}
+  body.mob .sdn .sl{font-size:14px;color:var(--gsub);line-height:18px}
+  body.mob .sday.today .sdn b{width:32px;line-height:32px}
+  body.mob .scard b{font-size:15px}
+  body.mob .scard span{font-size:14px}
+  .scard{border-radius:16px;padding:8px 14px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
   .scard b{font-size:14px;font-weight:500;line-height:20px;word-break:break-word}
   .scard span{font-size:12px;opacity:.9}
   .snone{font-size:13px;color:var(--gsub);padding:10px 0}
@@ -2711,16 +2719,26 @@ function 폰일정Html(eumOnly){
     var 카드 = evs.map(function(e){
       var 언제 = e.time ? 시각글(e.time) + (e.endAt ? " – " + 시각글(시분(e.endAt)) : "")
         : "종일" + (e.end && e.end > ds ? " (~" + parseInt(e.end.slice(5,7), 10) + "/" + parseInt(e.end.slice(8,10), 10) + ")" : "");
+      /* ★ 폰 — 구글 앱 일정 보기 캡처(2026-10-11): 종일은 제목 «한 줄»만(「종일」 글자 없음), 시각은 「오전 4:00~4:30」(끝이 같은 오전/오후면 끝은 시각만) */
+      if(typeof 폰 === "function" && 폰()){
+        if(!e.time) 언제 = (e.end && e.end > ds) ? "~" + parseInt(e.end.slice(5,7), 10) + "/" + parseInt(e.end.slice(8,10), 10) : "";
+        else if(e.endAt){
+          var 시작 = 시각글(e.time), 끝 = 시각글(시분(e.endAt));
+          언제 = 시작 + "~" + (시작.slice(0, 2) === 끝.slice(0, 2) ? 끝.slice(3) : 끝);
+        }
+      }
       var 제목 = String(e.text || "");
       if(e.kind === "priv") 제목 = "🔒 " + 제목;
       var 색 = e.color || "#70757a";
       return '<div class="scard" style="background:' + esc(색) + ';color:' + 글자색(색) + '"'
         + (e.kind === "hol" ? ' data-holday="' + esc(ds) + '"' : ' data-ev="' + esc(e.store) + ':' + esc(e.id) + '"') + '>'
-        + '<i class="sdot" style="background:' + esc(색) + '"></i><b>' + esc(제목) + '</b><span>' + esc(언제) + '</span></div>';
+        + '<i class="sdot" style="background:' + esc(색) + '"></i><b>' + esc(제목) + '</b>' + (언제 ? '<span>' + esc(언제) + '</span>' : '') + '</div>';
     }).join("");
     var d = new Date(ds + "T00:00:00");
     날들.push('<div class="sday' + (ds === 오늘 ? ' today' : '') + '" data-day="' + ds + '">'
-      + '<div class="sdn"><b>' + n + '</b><span>' + ["일","월","화","수","목","금","토"][d.getDay()] + '</span></div>'
+      + '<div class="sdn"><b>' + n + '</b><span class="sw">' + ["일","월","화","수","목","금","토"][d.getDay()] + '</span>'
+      /* 폰 — 요일 · 날짜 · 음력 세 줄(구글 앱 일정 보기 캡처 2026-10-11) */
+      + ((typeof 폰 === "function" && 폰() && typeof lunarDay === "function") ? '<span class="sl">' + lunarDay(ds) + '</span>' : '') + '</div>'
       + '<div class="scards">' + (카드 || '<div class="snone">일정 없음</div>') + '</div></div>');
   }
   return '<div class="cal"><div class="slist">'
