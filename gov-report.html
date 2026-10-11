@@ -216,6 +216,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-gov-report-inbox.js?v=4"></script>
 <script src="js/pu-gov-report-send.js?v=1"></script>
+<script src="js/pu-gov-report-criteria.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-preview.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
@@ -426,8 +427,10 @@ function grOpenCell(coId,typeId,step,itemId){
   /* 대형 — 항목(itemId) 하나의 줄 키들(월별은 계약 기간의 달) · 간단형은 그 단계의 모든 서류 */
   var keys=itemId?T.keysForItem(plan,itemId,n,D.monthsFor(cons,p)):T.keysFor(plan,step,n);
   if(!keys.length) return;
+  var it=itemId?(plan.items||[]).filter(function(x){ return x.id===itemId; })[0]:null, isRd=!!(it&&it.rd);
   GR.cw={coId:coId,coName:p.coName,bizNo:String((p.co&&p.co.bizNo)||''),typeId:typeId,rid:p.rid,step:step,item:itemId||'',keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
-    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:plan.key==='techguard',cands:[]};
+    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:plan.key==='techguard',cands:[],
+    rd:isRd,crit:isRd?String(plan.criteria||''):''};
   GR.avMsg=''; GR.avErr=false;
   grRenderCell();
   grLoadInbox();
@@ -464,6 +467,7 @@ function grRenderCell(){
     +'<input type="file" id="cwHwp" accept=".hwp,.hwpx" style="display:none" onchange="grOpenHwp(this)">'
     +'<div class="days" id="cwHwpMsg">고른 파일은 이 화면에서만 읽습니다 — 올리지도 저장하지도 않습니다</div></div>';
   if(c.step==='sign'||c.step==='submit'||c.step==='plat'||c.step==='report') h+='<div id="cwSend"></div>';
+  if(c.rd) h+=grRdHtml(c,v);
   h+=field('메모(200자)','<textarea id="cwNote" maxlength="200" rows="3">'+grEsc(v.note||'')+'</textarea>')
     +'<div class="days">메모에 연락처·주민번호 같은 개인정보를 적지 마세요</div>'
     +(rec&&rec.at?'<div class="days">고친 사람 '+grEsc(rec.by||'—')+' · '+grEsc(L.dayOf(rec.at))+'</div>':'')
@@ -471,7 +475,61 @@ function grRenderCell(){
     +'<div class="cw-b"><button type="button" onclick="grSaveCell()"'+(c.busy?' disabled':'')+'>저장</button></div><div id="cwInbox"></div></div>';
   el.innerHTML=h; el.style.display='';
   grRenderSend();
+  grRenderCrit();
   grRenderInbox();
+}
+/* 칸 창 «회차 기록» — rd 항목에만(c.rd). 값은 그 회차 줄의 저장된 rd(입력 중 값은 c.draft). 바뀌면 «기준» 구역만 다시 그린다(칸 창 전체는 아님) */
+function grRdHtml(c,v){
+  var rd=(v&&v.rd)||{}, num=function(x){ return (typeof x==='number'&&isFinite(x))?String(x):''; };
+  var opt=function(val,txt,cur){ return '<option value="'+grEsc(val)+'"'+(val===cur?' selected':'')+'>'+grEsc(txt)+'</option>'; };
+  var f=function(name,inner){ return '<label class="cw-f"><span>'+name+'</span>'+inner+'</label>'; };
+  var nin=function(id,val,max,step){ return '<input type="number" id="'+id+'" min="0" max="'+max+'" step="'+step+'" value="'+grEsc(num(val))+'" oninput="grRenderCrit()">'; };
+  var ck=function(id,on,txt){ return '<label class="cw-c"><input type="checkbox" id="'+id+'"'+(on?' checked':'')+' onchange="grRenderCrit()"> '+txt+'</label>'; };
+  var h='<div class="toc-h">회차 기록 — 이 회차의 회의 형태·시간·인원 (파일·이름은 저장하지 않습니다)</div>'
+    +f('형태','<select id="cwRdMode" onchange="grRenderCrit()">'+opt('','고르기',rd.mode||'')+opt('face','대면',rd.mode||'')+opt('remote','비대면',rd.mode||'')+'</select>')
+    +f('시간(분)',nin('cwRdMins',rd.mins,PuGovReportTrack.RD_MINS_MAX,1))
+    +f('참석 인원(명)',nin('cwRdPeople',rd.people,PuGovReportTrack.RD_PEOPLE_MAX,1))
+    +ck('cwRdPhoto',rd.photo===true,'시작·종료 사진 확보 ✓')+ck('cwRdSign',rd.sign===true,'서명지 확보 ✓');
+  if(c.crit==='industry') h+=f('MD(0.5 단위)',nin('cwRdMd',rd.md,PuGovReportTrack.RD_MD_MAX,0.5))
+    +f('종류','<select id="cwRdKind">'+opt('','고르기',rd.kind||'')+opt('visit','방문',rd.kind||'')+opt('report','보고서',rd.kind||'')+opt('research','자료조사',rd.kind||'')+'</select>');
+  return h+'<div id="cwCrit"></div>';
+}
+/* 입력칸에서 회차 기록 읽기 — 형태가 비었으면 null(그 칸은 «기록 없음»). 숫자 칸이 비면 그 키를 뺀다 · 체크는 true/false.
+   loose=true 면 형태가 비어도 적어 둔 값을 모아 준다(저장 전 안내·입력 보존용) */
+function grReadRd(loose){
+  var c=GR.cw, g=function(id){ var e=$(id); return e&&e.value!=null?String(e.value).trim():''; };
+  var mode=g('cwRdMode');
+  if(mode!=='face'&&mode!=='remote'){ if(!loose) return null; mode=''; }
+  var rd={mode:mode}, put=function(k,id){ var t=g(id); if(t==='') return; var x=Number(t); if(isFinite(x)) rd[k]=x; };
+  put('mins','cwRdMins'); put('people','cwRdPeople');
+  var p=!!$('cwRdPhoto').checked, sg=!!$('cwRdSign').checked;
+  if(mode||p) rd.photo=p;
+  if(mode||sg) rd.sign=sg;
+  if(c&&c.crit==='industry'){ put('md','cwRdMd'); var kd=g('cwRdKind'); if(kd) rd.kind=kd; }
+  return rd;
+}
+/* 「기준」 — 알림일 뿐(저장·제출을 막지 않는다). 그 업체·rid 의 이 항목 모든 회차 줄의 저장된 rd 를 모으고, 지금 입력 중인 회차는 입력값으로 바꿔 센다.
+   rd 가 없는 줄은 건너뛴다(기록한 회차만 센다). 모든 글은 grEsc */
+function grRenderCrit(){
+  var T=PuGovReportTrack, C=PuGovReportCriteria, c=GR.cw, el=$('cwCrit');
+  if(!c||!c.rd||!c.crit||!el) return;
+  var recs=T.recOf(GR.track||{},c.coId,c.rid), cur=grReadRd(), list=[], here=null;
+  c.keys.forEach(function(k){
+    var r=k.key===c.key?(cur||(recs[k.key]&&recs[k.key].rd)||null):((recs[k.key]&&recs[k.key].rd)||null);
+    if(r) list.push(r);
+    if(k.key===c.key) here=r;
+  });
+  var S=C.summary(c.crit,list,c.keys.length), line=function(t,bad){ return '<div class="'+(bad?'err-s':'days')+'">'+grEsc(t)+'</div>'; };
+  var h='<div class="toc-h">기준 점검 — 알림일 뿐입니다</div>';
+  if(!S||!S.recorded){ el.innerHTML=h+line('점검할 기록이 없습니다'); return; }
+  var rc=C.roundCheck(c.crit,here);
+  h+=rc.state==='ok'?line('이 회차: 인정'):rc.state==='miss'?line('이 회차: 미달 — '+rc.miss.join(' · '),true):line('이 회차: 아직 기록 없음');
+  if(S.key==='workplace') h+=line('기록 '+S.recorded+'회차 · 인정 '+S.qualified+' · 계획 '+S.planned+'회차')
+    +line('대면 '+S.face+'/'+S.recorded+' ('+S.facePct+'%, 기준 '+C.WP_FACE_PCT+'% 이상)',S.faceOk===false);
+  else h+=line('기록 '+S.recorded+'회차 · MD 합계 '+S.md+' · 계획 '+S.planned+'회차')
+    +line('비대면 보고서 '+S.remoteReportMd+' MD(한도 '+C.IND_REMOTE_REPORT_MD+')',!S.reportOk)
+    +line('비대면 자료조사 '+S.remoteResearchMd+' MD(한도 '+C.IND_REMOTE_RESEARCH_MD+')',!S.researchOk);
+  el.innerHTML=h;
 }
 /* 저장 — 그 줄 키 하나만 .set(scal_docs/{업체}/{rid}/items/{키}). update 는 저장 관문이 «부분 update» 로 막는다.
    op 없음(「저장」) = 옛 link 를 이어 받는다 · op.link 가 있으면 그것(「연결」) · op.link 가 null 이면 뺀다(「연결 지우기」) — 받은 서류함 2026-10-11.
@@ -486,8 +544,16 @@ async function grSaveCell(op){
     sentAt:c.step==='sign'?$('cwSent').value:'',gotAt:c.step==='attach'?'':$('cwGot').value,
     how:c.step==='submit'?$('cwHow').value:'',ack:c.step==='submit'&&!!$('cwAck').checked};
   entry.link=T.nextLink(T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null,op);
+  /* 회차 기록 — rd 항목만 입력칸을 읽는다. 입력이 비면 옛 rd 를 이어 받는다(지우는 길 없음). rd 가 아닌 항목은 키를 만들지 않는다(옛 rd 가 있을 때만 이어 받음) */
+  var loose=c.rd?grReadRd(true):null, rdRaw=loose&&loose.mode?loose:null, stray=!!loose&&!loose.mode&&Object.keys(loose).length>1;
+  var rdNext=T.nextRd(T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null,rdRaw?{rd:rdRaw}:undefined);
+  if(rdNext) entry.rd=rdNext;
   c.draft=entry;
   var bad=T.validate(entry,c.step);
+  if(!bad&&stray) bad='회차 기록의 형태(대면·비대면)를 먼저 골라 주세요';
+  /* nextRd 는 범위 밖 값을 조용히 버린다 — 저장 전에 입력 그대로 점검해 알린다 */
+  if(!bad&&rdRaw){ var nr=T.normRd(rdRaw); if(!nr||Object.keys(nr).length!==Object.keys(rdRaw).length) bad=T.RD_BAD; }
+  if(bad&&(rdRaw||stray)) entry.rd=loose;
   if(bad){ c.msg=bad; c.err=true; grRenderCell(); return; }
   var rec=T.patchFor(entry,GR.staffMap[GR.me]||'',Date.now());
   var base=GR.track;
