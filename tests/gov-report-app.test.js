@@ -1,6 +1,6 @@
 'use strict';
 /* 컨설팅보고서 앱(gov-report.html) — 화면 검사 (2026-10-10)
- * ★ 지키는 것: 읽기만 한다 · 숫자 칸을 누르면 거르고 다시 누르면 풀린다 · 내 담당만 · 서고는 읽기만 ·
+ * ★ 지키는 것: 쓰기는 서류 진행 기록 줄 하나(scal_docs/{업체}/{rid}/items/{키} .set)뿐 · 숫자 칸을 누르면 거르고 다시 누르면 풀린다 · 내 담당만 · 서고는 읽기만 ·
  *   오류·빈 상태 문구(설계서 §5) · 본문은 그리지 않는다
  * 공개 저장소다 — 합성 자료만(tests/helpers/gov-report-fixture.js). */
 const fs = require('fs');
@@ -13,6 +13,7 @@ const F = require('./helpers/gov-report-fixture.js');
 const L = require('../js/pu-gov-report-list.js');
 const Rpt = require('../js/pu-gov-report.js');
 const D = require('../js/pu-gov-report-docs.js');
+const Tr = require('../js/pu-gov-report-track.js');
 const O = require('../js/pu-ontology.js');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'gov-report.html'), 'utf8');
@@ -36,24 +37,32 @@ function varLine(n) {
 const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis', 'grSetStatus', 'grRenderRows',
   'grRenderForms', 'grRenderAlerts', 'grRender', 'grReset', 'grLoad',
   'grBizType', 'grErp', 'grSetBiz', 'grLoadDocs', 'grRetryDocs', 'grRenderBiz',
-  'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc'];
+  'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
+  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
   o = o || {};
   const db = FakeDb.만들기(o.seed || F.seed());
   const els = {};
+  ['cwKey', 'cwSt', 'cwSent', 'cwGot', 'cwHow', 'cwAck', 'cwNote'].forEach((id) => { els[id] = fakeEl(); }); // 칸 창 입력 — 진짜 DOM 에서는 innerHTML 이 만든다
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
-    encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D,
+    encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportTrack: Tr,
     $: (id) => (els[id] = els[id] || fakeEl()),
     fbDb: o.db ? o.db(db) : db };
   ctx.window = ctx;
   ctx.navigator = o.nav || { clipboard: { writeText: async (t) => { ctx.copied = t; } } };
   vm.createContext(ctx);
-  vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
+  vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR_TRACK_NODES'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
     + "\ngrToday=function(){ return '2026-10-10'; };", ctx);
   if (o.email) vm.runInContext('GR.email=' + JSON.stringify(o.email) + ';', ctx);
   return { ctx, db, els };
+}
+
+/* 쓰기는 서류 진행 기록 줄 하나뿐 — 자리 꼴 scal_docs/{업체}/{rid}/items/{키}, set 만 */
+const TRACK_PATH = /^scal_docs\/[^/]+\/[^/]+\/items\/[a-z]+(:[0-9]+)?$/;
+function onlyTrackWrites(db) {
+  db.쓴것.forEach((x) => assert.ok(TRACK_PATH.test(x.자리) && !x.update && !x.transaction, '허락 밖 쓰기: ' + x.자리));
 }
 
 test('정적 — 공통 머리와 새 모듈을 차례대로 싣는다', () => {
@@ -69,12 +78,17 @@ test('정적 — 공통 머리와 새 모듈을 차례대로 싣는다', () => {
   assert.match(SRC, /PuWhoami\.mount\('#who'\)/);
 });
 
-test('정적 — 아무것도 쓰지 않는다 · 일정 자리는 GR_NODES 로만 부른다', () => {
-  assert.doesNotMatch(INLINE, /\.(set|update|remove|transaction)\s*\(/, '쓰기 명령이 있다');
+test('정적 — 쓰기는 한 곳뿐(서류 진행 기록 줄 하나 .set) · 일정 자리는 GR_NODES 로만 부른다', () => {
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/, '쓰기 명령이 있다');
+  assert.match(grab('grSaveCell'), /fbDb\.ref\(GR_TRACK_NODES\.docs\+'\/'\+c\.coId\+'\/'\+c\.rid\+'\/items\/'\+c\.key\)\.set\(rec\)/);
+  assert.match(SRC, /var GR_TRACK_NODES=\{docs:'scal_docs'\};/);
+  assert.doesNotMatch(INLINE, /ref\(\s*['"]scal_docs/, 'GR_TRACK_NODES 를 거치지 않았다');
   assert.doesNotMatch(INLINE, /ref\(\s*['"]scal_(cos|types|scheds|staff)/, 'GR_NODES 를 거치지 않았다');
   assert.match(SRC, /불러오지 못했습니다 — 연결을 확인해 주세요/);
   assert.match(SRC, /올해 걸린 보고서가 없습니다 — 사업 걸기는 정부사업일정에서/);
+  assert.match(SRC, /<div id="cellw" class="toc" style="display:none"><\/div>/);
+  assert.match(SRC, /<option value="signed">서명 진행<\/option><option value="submitted">제출 완료<\/option>/);
 });
 
 test('① 불러오면 올해 줄 셋 — 단추는 정부사업일정 보고서 창으로, 작성 전은 비활성', async () => {
@@ -93,13 +107,15 @@ test('① 불러오면 올해 줄 셋 — 단추는 정부사업일정 보고서
   assert.equal(w.els.empty.style.display, 'none');
 });
 
-test('② 숫자 칸 — 올해 기준, 누르면 거르고 다시 누르면 풀린다 · 서명·제출은 비활성', async () => {
+test('② 숫자 칸 — 올해 기준, 누르면 거르고 다시 누르면 풀린다 · 서명·제출은 서류 진행 기록으로 센다', async () => {
   const w = world();
   await w.ctx.grLoad();
   const k = w.els.kpis.innerHTML;
   assert.match(k, /data-st=""[^>]*><b>3<\/b><span>전체/);
   assert.match(k, /data-st="todo"[^>]*><b>1<\/b><span>미작성/);
-  assert.match(k, /data-st="signed" disabled/);
+  assert.match(k, /data-st="signed"[^>]*><b>2<\/b><span>서명/);
+  assert.match(k, /data-st="submitted"[^>]*><b>1<\/b><span>제출/);
+  assert.ok(!k.includes('disabled'), '서명·제출 칸도 누를 수 있다');
   w.ctx.grSetStatus('todo');
   assert.ok(w.els.rows.innerHTML.includes('마바산업'));
   assert.ok(!w.els.rows.innerHTML.includes('가나상사'));
@@ -108,7 +124,14 @@ test('② 숫자 칸 — 올해 기준, 누르면 거르고 다시 누르면 풀
   w.ctx.grSetStatus('todo');
   assert.ok(w.els.rows.innerHTML.includes('가나상사'), '다시 누르면 풀린다');
   w.ctx.grSetStatus('signed');
-  assert.equal(w.ctx.GR.f.status, '', '서명 칸은 누를 수 없다');
+  let h = w.els.rows.innerHTML;
+  assert.ok(h.includes('다라정밀') && h.includes('마바산업') && !h.includes('가나상사'), '서명 = ③ 진행·완료');
+  assert.match(w.els.kpis.innerHTML, /class="kpi on" data-st="signed"/);
+  w.ctx.grSetStatus('submitted');
+  h = w.els.rows.innerHTML;
+  assert.ok(h.includes('마바산업') && !h.includes('다라정밀'), '제출 = ⑤ 완료');
+  w.ctx.grSetStatus('submitted');
+  assert.equal(w.ctx.GR.f.status, '', '다시 누르면 풀린다');
 });
 
 test('③ 내 담당만 — 로그인 메일 → 담당자 번호, 주담당·부담당 줄만', async () => {
@@ -136,7 +159,7 @@ test('④ 양식 서고 현황 — 읽기만, 등록·바꾸기는 정부사업�
   assert.ok(h.includes('href="gov-consulting.html#forms"'));
 });
 
-test('⑤ 챙길 것 — 14일 넘은 미작성 · 7일 넘은 초안 · 서명 기다림 0', async () => {
+test('⑤ 챙길 것 — 14일 넘은 미작성 · 7일 넘은 초안 · 서명 회신 7일 넘게 기다림 · 제출 기한 지남', async () => {
   const w = world();
   await w.ctx.grLoad();
   const h = w.els.alerts.innerHTML;
@@ -144,7 +167,11 @@ test('⑤ 챙길 것 — 14일 넘은 미작성 · 7일 넘은 초안 · 서명 
   assert.ok(h.includes('마바산업') && h.includes('종료 151일'));
   assert.match(h, /초안 7일 넘음 <b>1<\/b>/);
   assert.ok(h.includes('20일 전 고침'));
-  assert.match(h, /서명 기다림 <b>0<\/b>/);
+  assert.match(h, /서명 회신 기다림 \(7일 넘음\) <b>1<\/b>/);
+  assert.ok(h.includes('다라정밀') && h.includes('회신 20일째'));
+  assert.match(h, /제출 기한 지남 <b>1<\/b>/);
+  assert.ok(h.includes('기한 2026-09-30'));
+  assert.ok(!h.includes('서명 단계가 생기면 셉니다'));
 });
 
 test('⑥ 못 읽으면 문구와 다시 시도 단추 — 목록은 숨긴다', async () => {
@@ -282,7 +309,7 @@ test('정적 — 목록·체크표의 「목차」 단추와 창 닫기 · 창�
   assert.match(SRC, /data-close onclick="grCloseToc\(\)">닫기<\/button>/);
 });
 
-test('⑭ 서류 체크표 — 간단형은 ①~⑤ 열(①② 자동, ③④⑤ 「—」)·기한·목차 단추', async () => {
+test('⑭ 서류 체크표 — 간단형은 ①~⑤ 열(①② 자동, ③④⑤ 기록 칸)·기한·목차 단추', async () => {
   const w = world();
   await w.ctx.grLoad();
   assert.equal(w.els.docs.style.display, 'none', '사업을 안 고르면 체크표가 없다');
@@ -291,7 +318,9 @@ test('⑭ 서류 체크표 — 간단형은 ①~⑤ 열(①② 자동, ③④⑤
   assert.equal(w.els.docs.style.display, '');
   ['①초안', '②확정', '③서명본', '④별첨', '⑤제출', '기한', '통합기술보호지원단', '간단형', '가나상사', '2026-09-30'].forEach((s) => assert.ok(h.includes(s), s));
   assert.ok(h.includes('<span class="st st-draft">초안</span>'));
-  assert.equal((h.match(/<td>—<\/td>/g) || []).length, 4, '② ③ ④ ⑤ 는 「—」');
+  assert.equal((h.match(/<td>—<\/td>/g) || []).length, 2, '② 와 ③ 은 「—」 — 기술보호에는 ③ 서명본 줄이 없다');
+  assert.ok(h.includes('data-cell="1" data-co="c1" data-ty="t1" data-step="attach"'));
+  assert.ok(h.includes('<span class="st st-wait">○ 없음 0/6</span>'));
   assert.ok(h.includes('data-toc="1" data-co="c1" data-ty="t1"'));
   w.ctx.grSetBiz('consulting-05');
   assert.ok(w.els.docs.innerHTML.includes('<span class="st st-todo">미작성</span>'));
@@ -362,4 +391,135 @@ test('⑲ 목차 창의 바깥 값은 이스케이프', async () => {
   w.ctx.grOpenToc('c1', 't1');
   assert.ok(!w.els.toc.innerHTML.includes('<상사>'));
   assert.ok(w.els.toc.innerHTML.includes('가나&#60;상사&#62;'));
+});
+
+/* ═══ 서류 진행 기록(③서명본·④별첨·⑤제출) — 설계 2026-10-10-gov-report-track-design.md ═══ */
+
+test('⑳ 체크표 ③④⑤ — 기록을 읽어 칸으로, 누르면 칸 창 · 기술보호는 ③ 이 없다 · 여는 것만으로는 안 쓴다', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  const h = w.els.docs.innerHTML;
+  assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t3" data-step="sign"'));
+  assert.ok(h.includes('<span class="st st-draft">◐ 발송함 · 회신 20일째</span>'));
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  const c = w.els.cellw.innerHTML;
+  assert.equal(w.els.cellw.style.display, '');
+  ['③ 업체 서명본 — 다라정밀', '서류: 업체 서명본', '발송일', '회신(스캔 받음)일', 'value="2026-09-20"',
+    '개인정보를 적지 마세요', '고친 사람 홍길동 · 2026-09-20', 'data-close', 'onclick="grSaveCell()"'].forEach((s) => assert.ok(c.includes(s), s));
+  assert.match(c, /<option value="doing" selected>◐ 발송함<\/option>/);
+  assert.ok(!c.includes('value="na"'), '서명본에는 해당없음이 없다');
+  w.ctx.grCloseCell();
+  assert.equal(w.els.cellw.style.display, 'none');
+  w.ctx.grSetBiz('consulting-03');
+  const g = w.els.docs.innerHTML;
+  assert.ok(!g.includes('data-step="sign"'));
+  assert.ok(g.includes('data-step="attach"') && g.includes('data-step="submit"'));
+  assert.equal(w.db.쓴것.length, 0, '여는 것만으로는 쓰지 않는다');
+});
+
+test('㉑ 저장 — 줄 키 하나만 .set · 다시 읽지 않고 표·숫자 칸·챙길 것·목차가 바뀐다', async () => {
+  const w = world({ email: 'p009@pureun.kr' });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'done'; w.els.cwSent.value = '2026-09-20'; w.els.cwGot.value = '2026-10-08'; w.els.cwNote.value = ' 스캔 회신 ';
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t3_2026/items/sign']);
+  const v = w.db.쓴것[0].값;
+  assert.deepEqual([v.st, v.sentAt, v.gotAt, v.note, v.by, typeof v.at], ['done', '2026-09-20', '2026-10-08', '스캔 회신', '홍길동', 'number']);
+  assert.equal(w.db.읽기('scal_docs/c2/t3_2026/items/sign').st, 'done');
+  assert.ok(w.els.cellw.innerHTML.includes('저장했습니다'));
+  assert.ok(w.els.docs.innerHTML.includes('<span class="st st-done">● 회신 받음</span>'));
+  assert.match(w.els.alerts.innerHTML, /서명 회신 기다림 \(7일 넘음\) <b>0<\/b>/);
+  assert.match(w.els.kpis.innerHTML, /data-st="submitted"[^>]*><b>0<\/b>/);
+  w.ctx.grOpenCell('c2', 't3', 'submit');
+  const c = w.els.cellw.innerHTML;
+  ['제출일', '제출 방식', '접수 확인', '<option value="platform">플랫폼</option>'].forEach((s) => assert.ok(c.includes(s), s));
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-09'; w.els.cwHow.value = 'platform'; w.els.cwAck.checked = true; w.els.cwNote.value = '';
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  const s = w.db.쓴것[1];
+  assert.equal(s.자리, 'scal_docs/c2/t3_2026/items/submit');
+  assert.deepEqual(s.값, { st: 'done', at: s.값.at, by: '홍길동', gotAt: '2026-10-09', how: 'platform', ack: true });
+  assert.match(w.els.kpis.innerHTML, /data-st="submitted"[^>]*><b>1<\/b>/, '사업 거르개 안(다라정밀 하나)에서 제출 1');
+  w.ctx.grOpenToc('c2', 't3');
+  assert.ok(w.els.toc.innerHTML.includes('<span class="st st-done">● 제출함</span>'));
+});
+
+test('㉒ 규칙 게시 전 — 읽기 거절: 칸은 「—」·누를 수 없고 안내 · 쓰기 거절: 창에 「저장하지 못했습니다 — 규칙 게시 또는 권한 확인」, 값은 그대로', async () => {
+  const denied = { once: async () => { throw new Error('permission_denied'); }, set: async () => { throw new Error('PERMISSION_DENIED'); } };
+  const r = world({ db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  await r.ctx.grLoad();
+  r.ctx.grSetBiz('consulting-04');
+  assert.ok(r.els.docs.innerHTML.includes('기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인'));
+  assert.ok(!r.els.docs.innerHTML.includes('data-cell'), '못 읽었으면 누를 수 없다(남의 기록을 모르고 덮지 않게)');
+  assert.ok(r.els.rows.innerHTML.includes('다라정밀'), '목록은 그대로');
+  assert.match(r.els.kpis.innerHTML, /data-st="signed"[^>]*><b>0<\/b>/);
+  assert.ok(r.els.alerts.innerHTML.includes('기록을 못 불러왔습니다'));
+  r.ctx.grOpenCell('c2', 't3', 'sign');
+  assert.equal(r.ctx.GR.cw, null);
+  const w = world({ db: (db) => ({ ref: (p) => (p.indexOf('scal_docs/') === 0 ? denied : db.ref(p)) }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'done';
+  await w.ctx.grSaveCell();
+  const c = w.els.cellw.innerHTML;
+  assert.ok(c.includes('저장하지 못했습니다 — 규칙 게시 또는 권한 확인'));
+  assert.match(c, /<option value="done" selected>● 회신 받음<\/option>/, '고르던 값은 창에 남는다');
+  assert.ok(w.els.docs.innerHTML.includes('◐ 발송함'), '표 값은 그대로');
+  assert.equal(w.ctx.GR.track.c2.t3_2026.sign.st, 'doing');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('㉓ 잘못 적으면 쓰지 않는다 — 회신일 < 발송일 · 적던 값은 창에 남는다', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'done'; w.els.cwSent.value = '2026-09-20'; w.els.cwGot.value = '2026-09-01'; w.els.cwNote.value = '메모';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 0);
+  assert.ok(w.els.cellw.innerHTML.includes('회신일이 발송일보다 앞섭니다'));
+  assert.ok(w.els.cellw.innerHTML.includes('value="2026-09-01"'), '적던 값이 남는다');
+});
+
+test('㉔ 여러 서류가 한 칸이면(기술보호 ④) 서류를 골라 그 줄만 저장 · 해당없음은 세지 않는다', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  w.ctx.grOpenCell('c1', 't1', 'attach');
+  const c = w.els.cellw.innerHTML;
+  assert.ok(c.includes('<select id="cwKey" onchange="grPickCell(this.value)">'));
+  ['법률 자문 일지 1회차', '법률 자문 일지 3회차', '보안서약서', '별지8 여비지급신청서', '만족도조사', 'value="na"'].forEach((s) => assert.ok(c.includes(s), s));
+  w.ctx.grPickCell('pledge');
+  assert.equal(w.ctx.GR.cw.key, 'pledge');
+  w.els.cwSt.value = 'na';
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c1/t1_2026/items/pledge']);
+  assert.ok(w.els.docs.innerHTML.includes('<span class="st st-wait">○ 없음 0/5</span>'));
+});
+
+test('㉕ 진행 막대 ③④ · 목차 딱지도 기록을 따른다 · 칸 창의 바깥 값은 이스케이프', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  const row = w.els.rows.innerHTML.split('<tr>').filter((x) => x.includes('마바산업'))[0];
+  assert.ok(row.includes('<span class="stp on" title="③ 서명"></span>') && row.includes('<span class="stp on" title="④ 제출"></span>'));
+  w.ctx.grOpenToc('c3', 't4');
+  assert.ok(w.els.toc.innerHTML.includes('<span class="st st-done">● 제출함</span>'));
+  assert.ok(w.els.toc.innerHTML.includes('<span class="days">— 해당없음</span>'));
+  const s = F.seed();
+  s.scal_docs.c2.t3_2026.items.sign.note = '<img src=x>';
+  s.scal_docs.c2.t3_2026.items.sign.by = '<b>홍</b>';
+  s.scal_cos[1].name = '다라<정밀>';
+  const v = world({ seed: s });
+  await v.ctx.grLoad();
+  v.ctx.grSetBiz('consulting-04');
+  v.ctx.grOpenCell('c2', 't3', 'sign');
+  const c = v.els.cellw.innerHTML;
+  assert.ok(!c.includes('<img') && !c.includes('<b>홍') && !c.includes('<정밀>'), '이스케이프 안 됨');
+  assert.ok(c.includes('&#60;img src=x&#62;') && c.includes('다라&#60;정밀&#62;'));
 });

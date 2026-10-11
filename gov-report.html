@@ -10,8 +10,11 @@
      대표 지시 「포털 의뢰인 업무에 별도 앱을 만들어 진행」 · 시안 확인 후 「진행」.
      설계 docs/superpowers/specs/2026-10-10-gov-report-app-design.md · 계획 docs/superpowers/plans/2026-10-10-gov-report-app.md
 
-     ★ 이 화면은 «읽기만» 한다 — 모든 사업장·사업의 보고서 상태를 보고, 쓰는 일은
+     ★ 보고서는 «읽기만» 한다 — 모든 사업장·사업의 보고서 상태를 보고, 쓰는 일은
        정부사업일정의 보고서 창(gov-consulting.html#rpt=업체|사업)으로 건너가서 한다.
+     ★ 이 화면이 쓰는 곳은 «하나»다 — 서류 진행 기록(③서명본·④별첨·⑤제출) 줄 하나씩:
+       scal_docs/{업체}/{rid}/items/{줄 키} 를 .set (grSaveCell). 설계 docs/superpowers/specs/2026-10-10-gov-report-track-design.md
+       규칙 게시 전에는 읽기·쓰기가 거절되어 읽기 전용으로 돈다(「기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인」).
      ★ 계산은 현황판 계산 모듈(순수 함수, 아래 script 로 싣는다)이 한다. 이 파일은 읽고 그린다.
      ⚠ 목록에는 업체·사업·담당 이름과 상태만 — 보고서 본문을 그리지 않는다(기술보호도 같다).
      ⚠ scal_cos 등은 GR_NODES 로 부른다(정부사업일정 FB_NODES 꼴) — 등록부 js/pu-ontology.js govreport 주석.
@@ -93,6 +96,11 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 .toc-l>li{padding:4px 0;border-bottom:1px solid var(--line)}
 .toc-l ul{margin:2px 0 0;padding-left:16px;font-size:12px;color:var(--mute)}
 .toc-t{width:100%;min-height:160px;margin-top:8px;font:inherit;font-size:12px}
+.cellb{border:0;background:none;padding:0;cursor:pointer}
+.cw-f{display:flex;flex-direction:column;gap:4px;margin:8px 0;font-size:13px}
+.cw-f input,.cw-f select,.cw-f textarea{font-family:inherit;border:1px solid var(--line);border-radius:8px;padding:6px 8px;background:var(--card)}
+.cw-c{display:flex;align-items:center;gap:6px;font-size:13px;margin:8px 0}
+.cw-b{display:flex;justify-content:flex-end;margin-top:10px}
 .fm{padding:6px 0;border-bottom:1px solid var(--line)}
 .fm-n{font-size:13px;font-weight:600}
 .fm-f{display:flex;justify-content:space-between;gap:8px;font-size:12px;padding:2px 0}
@@ -135,6 +143,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
         <select id="fStatus" aria-label="상태">
           <option value="">모든 상태</option><option value="todo">미작성</option><option value="wait">작성 전</option>
           <option value="draft">초안</option><option value="done">검토완료</option>
+          <option value="signed">서명 진행</option><option value="submitted">제출 완료</option>
         </select>
         <input id="fCo" type="search" placeholder="업체 찾기">
         <label id="mineWrap" style="display:none"><input type="checkbox" id="fMine"> 내 담당만</label>
@@ -156,6 +165,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
   </div>
 </main>
 <div id="toc" class="toc" style="display:none"></div>
+<div id="cellw" class="toc" style="display:none"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -163,7 +173,8 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/pu-ontology.js?v=62"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
-     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면은 아무것도 쓰지 않는다. -->
+     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면의 쓰기는 서류 진행 기록 줄 하나 .set 뿐이다
+     (레코드 모양이 아니라 관문을 지난다 — 부분 update 는 관문이 막으므로 쓰지 않는다). -->
 <script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-appbar.js?v=24"></script>
@@ -192,7 +203,10 @@ var GR_FIELDS={fYear:'year',fType:'type',fAtt:'att',fStatus:'status'};
 /* 서류 관리(왼쪽 패널)가 빌려 읽는 자리 — 이알피 컨설팅 사업 · 이알피 컨설팅 · ERP 연결(정부사업일정이 FB_NODES 로 부르는 그 자리) · 명부
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_…') 를 쓰면 등록부 검사가 주인 없는 자리로 잡는다. 읽기만, 한 번씩 */
 var GR_DOC_NODES={biz:'data/biz_cons_types',cons:'data/consultings',tmap:'scal_erpTypeMap',dir:'data/user_dir'};
-var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
+/* 서류 진행 기록(③서명본·④별첨·⑤제출) — 이 앱의 자리. 읽기는 통째 한 번, 쓰기는 줄 하나(grSaveCell)
+   ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_docs…') 를 쓰지 않는다(화면 검사가 막는다) */
+var GR_TRACK_NODES={docs:'scal_docs'};
+var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,cw:null,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -218,23 +232,28 @@ function grRenderFilters(){
   $('mineWrap').style.display=GR.me?'':'none';
 }
 function grRenderKpis(){
-  var L=PuGovReportList, base=grFilter(); base.status='';
-  var k=L.kpis(L.filterRows(GR.rows,base));
-  var cells=[['','전체',k.all],['todo','미작성',k.todo],['draft','초안',k.draft],['done','검토완료',k.done],['signed','서명',k.signed],['submitted','제출',k.submitted]];
+  var L=PuGovReportList, T=PuGovReportTrack, base=grFilter(); base.status='';
+  var view=L.filterRows(GR.rows,base), k=L.kpis(view), x=T.kpiExtra(view);
+  var cells=[['','전체',k.all],['todo','미작성',k.todo],['draft','초안',k.draft],['done','검토완료',k.done],['signed','서명',x.signed],['submitted','제출',x.submitted]];
+  var tip={signed:' title="③ 업체 서명본이 진행(발송)·완료인 줄"',submitted:' title="⑤ 기관 제출을 마친 줄"'};
   $('kpis').innerHTML=cells.map(function(c){
-    var off=c[0]==='signed'||c[0]==='submitted';
-    return '<button type="button" class="kpi'+(c[0]&&GR.f.status===c[0]?' on':'')+'" data-st="'+c[0]+'"'
-      +(off?' disabled title="서명·제출은 다음 단계에서 셉니다"':'')+'><b>'+c[2]+'</b><span>'+c[1]+'</span></button>';
+    return '<button type="button" class="kpi'+(c[0]&&GR.f.status===c[0]?' on':'')+'" data-st="'+c[0]+'"'+(tip[c[0]]||'')+'><b>'+c[2]+'</b><span>'+c[1]+'</span></button>';
   }).join('');
 }
-/* 숫자 칸 — 누르면 그 상태로, 같은 칸을 다시 누르면 풀린다. 「전체」는 풀기 */
+/* 숫자 칸 — 누르면 그 상태로, 같은 칸을 다시 누르면 풀린다. 「전체」는 풀기. 「서명」「제출」은 서류 진행 기록으로 거른다(grView) */
 function grSetStatus(st){
-  if(st==='signed'||st==='submitted') return;
   GR.f.status=(st&&GR.f.status!==st)?st:'';
   grRender();
 }
+/* 목록에 보일 줄 — 「서명」「제출」은 현황판 상태가 아니라 기록(r.trk)으로 거른다 */
+function grView(){
+  var L=PuGovReportList, f=grFilter(), k=f.status;
+  if(k!=='signed'&&k!=='submitted') return L.filterRows(GR.rows,f);
+  f.status='';
+  return L.filterRows(GR.rows,f).filter(function(r){ return PuGovReportTrack.kpiHit(r,k); });
+}
 function grRenderRows(){
-  var L=PuGovReportList, view=L.filterRows(GR.rows,grFilter());
+  var L=PuGovReportList, view=grView();
   var STEP=['① 초안','② 검토완료','③ 서명','④ 제출'];
   $('rows').innerHTML=view.map(function(r){
     var s=r.st;
@@ -278,24 +297,30 @@ function grSetBiz(code){
   GR.f.type='';
   grRender();
 }
-/* 서류 체크표 — 고른 사업의 업체들. 간단형 셋(충남북부·서산·기술보호)만 ①② 를 현황판 상태로 채우고 ③④⑤ 는 「—」.
-   다른 틀은 근거 자료가 아직 없어 «서류 목차 보기» 줄만 둔다(설계서 §4) */
+/* 서류 체크표 — 고른 사업의 업체들. 간단형 셋(충남북부·서산·기술보호)만 ①② 를 현황판 상태로 채우고
+   ③④⑤ 는 서류 진행 기록(scal_docs) — 칸을 누르면 칸 창(grOpenCell). 기록을 못 읽었으면 「—」이고 누를 수 없다
+   (남의 기록을 모른 채 덮지 않게). 다른 틀은 근거 자료가 아직 없어 «서류 목차 보기» 줄만 둔다(설계서 §4) */
 function grRenderDocs(){
-  var D=PuGovReportDocs, el=$('docs');
+  var D=PuGovReportDocs, T=PuGovReportTrack, el=$('docs');
   if(!GR.f.biz||!GR.docs.loaded||GR.docs.err){ el.style.display='none'; el.innerHTML=''; return; }
   var erp=grErp(GR.f.biz), tid=grBizType();
-  var t=D.docsTable({erp:erp,typeId:tid,input:GR.input,rows:GR.rows,year:GR.f.year,consultings:GR.docs.cons,tmap:GR.docs.tmap,biz:GR.docs.biz});
+  var t=D.docsTable({erp:erp,typeId:tid,input:GR.input,rows:GR.rows,year:GR.f.year,consultings:GR.docs.cons,tmap:GR.docs.tmap,biz:GR.docs.biz,
+    track:GR.track||undefined,today:GR.today});
   var btn=function(x,label){ return '<button type="button" class="act tocb" data-toc="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'">'+label+'</button>'; };
+  var chip=function(c){ return c.key?'<span class="st st-'+c.key+'">'+grEsc(c.txt)+'</span>':grEsc(c.txt); };
+  var cell=function(x,c){
+    return c.step?'<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" title="눌러서 기록">'+chip(c)+'</button>':chip(c);
+  };
   var head='<div class="dc-h"><b>📋 서류 — '+grEsc(erp?erp.name:'')+'</b><span class="tag">'+grEsc(D.KIND_KO[t.plan.kind])+'</span>'
-    +(t.plan.check?'<span class="tag-chk">[확인 필요: '+grEsc(t.plan.check)+']</span>':'')+'</div>';
+    +(t.plan.check?'<span class="tag-chk">[확인 필요: '+grEsc(t.plan.check)+']</span>':'')
+    +(t.auto&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')+'</div>';
   var body;
   if(!tid) body='<div class="empty">'+grEsc(D.UNLINKED)+' — 사업 잇기는 정부사업일정의 ERP 연결에서</div>';
   else if(!t.lines.length) body='<div class="empty">'+grEsc(GR.f.year)+'년에 이 사업 업체가 없습니다</div>';
   else if(t.auto) body='<table><thead><tr><th>업체</th>'+t.cols.map(function(c){ return '<th>'+grEsc(c)+'</th>'; }).join('')+'<th>기한</th><th></th></tr></thead><tbody>'
     +t.lines.map(function(x){
-      return '<tr><td class="co" title="'+grEsc(x.coName)+'">'+grEsc(x.coName)+'</td>'+x.cells.map(function(c){
-        return '<td>'+(c.key?'<span class="st st-'+c.key+'">'+grEsc(c.txt)+'</span>':grEsc(c.txt))+'</td>';
-      }).join('')+'<td>'+grEsc(x.due||'—')+'</td><td>'+btn(x,'목차')+'</td></tr>';
+      return '<tr><td class="co" title="'+grEsc(x.coName)+'">'+grEsc(x.coName)+'</td>'+x.cells.map(function(c){ return '<td>'+cell(x,c)+'</td>'; }).join('')
+        +'<td>'+grEsc(x.due||'—')+'</td><td>'+btn(x,'목차')+'</td></tr>';
     }).join('')+'</tbody></table>';
   else body=t.lines.map(function(x){ return '<div class="dc-l"><span>'+grEsc(x.coName)+'</span>'+btn(x,'서류 목차 보기')+'</div>'; }).join('');
   el.innerHTML=head+body; el.style.display='';
@@ -308,7 +333,8 @@ function grOpenToc(coId,typeId){
   var erp=(GR.f.biz&&grBizType()===typeId)?grErp(GR.f.biz):D.erpTypeFor(typeId,d.biz,d.tmap);
   var row=GR.rows.filter(function(r){ return r.coId===coId&&r.typeId===typeId&&r.year===p.year; })[0]||null;
   var cons=D.consFor({consultings:d.cons,co:p.co,code:erp?erp.code:'',typeId:typeId,tmap:d.tmap,biz:d.biz});
-  GR.toc=D.tocFor({pair:p,row:row,erp:erp,cons:cons,dir:d.dir}); GR.tocMsg=''; GR.tocFail=false;
+  GR.toc=D.tocFor({pair:p,row:row,erp:erp,cons:cons,dir:d.dir,rec:GR.track?PuGovReportTrack.recOf(GR.track,coId,p.rid):undefined,today:GR.today});
+  GR.tocMsg=''; GR.tocFail=false;
   grRenderToc();
 }
 function grRenderToc(){
@@ -317,7 +343,7 @@ function grRenderToc(){
   var h=t.head;
   var list=t.items.length?'<ol class="toc-l">'+t.items.map(function(x){
       return '<li><span>'+grEsc(x.name)+'</span> '
-        +(x.chip.key?'<span class="st st-'+x.chip.key+'">'+grEsc(x.chip.txt)+'</span>':'<span class="days">—</span>')
+        +(x.chip.key?'<span class="st st-'+x.chip.key+'">'+grEsc(x.chip.txt)+'</span>':'<span class="days">'+grEsc(x.chip.txt)+'</span>')
         +(x.check?' <span class="tag-chk">'+grEsc(x.check)+'</span>':'')
         +(x.subs.length?'<ul>'+x.subs.map(function(s){ return '<li>'+grEsc(s)+'</li>'; }).join('')+'</ul>':'')+'</li>';
     }).join('')+'</ol>':'<div class="empty">'+grEsc(D.NO_PLAN)+' — 목차는 머리말만</div>';
@@ -342,6 +368,75 @@ function grCopyToc(){
   catch(e){ done(false); return Promise.resolve(); }
 }
 function grCloseToc(){ GR.toc=null; GR.tocMsg=''; GR.tocFail=false; grRenderToc(); }
+/* 칸 창 — 체크표 ③④⑤ 칸 하나. 그 칸의 서류가 여럿이면(기술보호 ④ = 자문 일지 회차 + 서약서·여비·만족도) 서류를 고른다.
+   저장은 고른 줄 키 하나만. 기록을 못 읽었으면 열지 않는다 */
+function grOpenCell(coId,typeId,step){
+  var D=PuGovReportDocs, T=PuGovReportTrack;
+  if(!GR.track) return;
+  var p=D.pairs(GR.input,typeId,GR.f.year).filter(function(x){ return x.coId===coId; })[0];
+  var erp=grErp(GR.f.biz);
+  if(!p||!erp) return;
+  var keys=T.keysFor(D.planFor(erp.name),step,Math.max(+p.rounds||0,+p.planned||0));
+  if(!keys.length) return;
+  GR.cw={coId:coId,coName:p.coName,typeId:typeId,rid:p.rid,step:step,keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false};
+  grRenderCell();
+}
+function grPickCell(key){
+  if(!GR.cw) return;
+  GR.cw.key=key; GR.cw.draft=null; GR.cw.msg=''; GR.cw.err=false;
+  grRenderCell();
+}
+function grCloseCell(){ GR.cw=null; grRenderCell(); }
+function grRenderCell(){
+  var T=PuGovReportTrack, L=PuGovReportList, c=GR.cw, el=$('cellw');
+  if(!c){ el.style.display='none'; el.innerHTML=''; return; }
+  var rec=T.recOf(GR.track,c.coId,c.rid)[c.key]||null, v=c.draft||rec||{st:'none'};
+  var item=c.keys.filter(function(k){ return k.key===c.key; })[0]||c.keys[0];
+  var opt=function(val,txt,cur){ return '<option value="'+grEsc(val)+'"'+(val===cur?' selected':'')+'>'+grEsc(txt)+'</option>'; };
+  var field=function(name,inner){ return '<label class="cw-f"><span>'+name+'</span>'+inner+'</label>'; };
+  var date=function(id,val){ return '<input type="date" id="'+id+'" value="'+grEsc(val||'')+'">'; };
+  var h='<div class="toc-box" role="dialog" aria-label="서류 진행 기록">'
+    +'<div class="toc-top"><b>'+grEsc(T.COL_KO[c.step])+' — '+grEsc(c.coName)+'</b><span class="sp"></span>'
+    +'<button type="button" data-close onclick="grCloseCell()">닫기</button></div>';
+  if(c.keys.length>1) h+=field('서류','<select id="cwKey" onchange="grPickCell(this.value)">'+c.keys.map(function(k){ return opt(k.key,k.name,c.key); }).join('')+'</select>');
+  else h+='<div class="toc-h">서류: '+grEsc(item.name)+'</div>';
+  h+=field('상태','<select id="cwSt">'+T.ALLOWED[c.step].map(function(s){ return opt(s,T.label(c.step,s),v.st); }).join('')+'</select>');
+  if(c.step==='sign') h+=field('발송일',date('cwSent',v.sentAt))+field('회신(스캔 받음)일',date('cwGot',v.gotAt));
+  if(c.step==='submit') h+=field('제출일',date('cwGot',v.gotAt))
+    +field('제출 방식','<select id="cwHow">'+opt('','고르기',v.how||'')+Object.keys(T.HOW).map(function(k){ return opt(k,T.HOW[k],v.how||''); }).join('')+'</select>')
+    +'<label class="cw-c"><input type="checkbox" id="cwAck"'+(v.ack?' checked':'')+'> 접수 확인</label>';
+  h+=field('메모(200자)','<textarea id="cwNote" maxlength="200" rows="3">'+grEsc(v.note||'')+'</textarea>')
+    +'<div class="days">메모에 연락처·주민번호 같은 개인정보를 적지 마세요</div>'
+    +(rec&&rec.at?'<div class="days">고친 사람 '+grEsc(rec.by||'—')+' · '+grEsc(L.dayOf(rec.at))+'</div>':'')
+    +(c.msg?'<div class="'+(c.err?'err-s':'days')+'">'+grEsc(c.msg)+'</div>':'')
+    +'<div class="cw-b"><button type="button" onclick="grSaveCell()"'+(c.busy?' disabled':'')+'>저장</button></div></div>';
+  el.innerHTML=h; el.style.display='';
+}
+/* 저장 — 그 줄 키 하나만 .set(scal_docs/{업체}/{rid}/items/{키}). update 는 저장 관문이 «부분 update» 로 막는다.
+   거절되면(규칙 게시 전·권한 없음) 창에 알리고 값은 그대로 둔다. 되면 다시 읽지 않고 로컬 값으로 다시 그린다 */
+async function grSaveCell(){
+  var T=PuGovReportTrack, c=GR.cw;
+  if(!c||c.busy) return;
+  var entry={st:$('cwSt').value,note:$('cwNote').value,
+    sentAt:c.step==='sign'?$('cwSent').value:'',gotAt:c.step==='attach'?'':$('cwGot').value,
+    how:c.step==='submit'?$('cwHow').value:'',ack:c.step==='submit'&&!!$('cwAck').checked};
+  c.draft=entry;
+  var bad=T.validate(entry,c.step);
+  if(bad){ c.msg=bad; c.err=true; grRenderCell(); return; }
+  var rec=T.patchFor(entry,GR.staffMap[GR.me]||'',Date.now());
+  c.busy=true; c.msg='저장하는 중…'; c.err=false; grRenderCell();
+  try{ await fbDb.ref(GR_TRACK_NODES.docs+'/'+c.coId+'/'+c.rid+'/items/'+c.key).set(rec); }
+  catch(e){
+    console.warn('[컨설팅보고서] 저장 못 함',e);
+    c.busy=false; c.msg=T.SAVE_FAIL; c.err=true;
+    if(GR.cw===c) grRenderCell();
+    return;
+  }
+  GR.track=T.put(GR.track,c.coId,c.rid,c.key,rec);
+  c.busy=false; c.draft=null; c.msg='저장했습니다'; c.err=false;
+  grApplyTrack(); grRender();
+  if(GR.cw===c) grRenderCell();
+}
 /* 양식 서고 — 읽기만. 등록·바꾸기는 정부사업일정의 ⚙ 양식 서고(#forms, 관리자) */
 function grRenderForms(){
   var L=PuGovReportList, FORMS=(window.PuGovReport&&window.PuGovReport.FORMS)||{};
@@ -353,13 +448,18 @@ function grRenderForms(){
   }).join('')+'<a class="more" href="'+L.FORMS_HREF+'">⚙ 등록·바꾸기 — 정부사업일정 양식 서고</a>';
 }
 function grRenderAlerts(){
-  var L=PuGovReportList, a=L.alerts(L.filterRows(GR.rows,{year:GR.f.year}),GR.today);
-  var line=function(r,txt){ return '<li><a href="'+grEsc(L.reportHref(r.coId,r.typeId))+'">'+grEsc(r.coName)+' · '+grEsc(r.typeName)+'</a> <span class="days">'+txt+'</span></li>'; };
+  var L=PuGovReportList, T=PuGovReportTrack, rows=L.filterRows(GR.rows,{year:GR.f.year});
+  var a=L.alerts(rows,GR.today), x=T.alertsExtra(rows,GR.today);
+  var line=function(r,txt){ return '<li><a href="'+grEsc(L.reportHref(r.coId,r.typeId))+'">'+grEsc(r.coName)+' · '+grEsc(r.typeName)+'</a> <span class="days">'+grEsc(txt)+'</span></li>'; };
   $('alerts').innerHTML='<div class="al-h">종료 후 '+L.UNWRITTEN_DAYS+'일 넘은 미작성 <b>'+a.unwritten.length+'</b></div><ul>'
     +a.unwritten.map(function(r){ return line(r,'종료 '+r.st.days+'일'); }).join('')+'</ul>'
     +'<div class="al-h">초안 '+L.DRAFT_DAYS+'일 넘음 <b>'+a.staleDraft.length+'</b></div><ul>'
     +a.staleDraft.map(function(r){ return line(r,r.st.days+'일 전 고침'); }).join('')+'</ul>'
-    +'<div class="al-h">서명 기다림 <b>0</b> <span class="days">서명 단계가 생기면 셉니다</span></div>';
+    +'<div class="al-h">서명 회신 기다림 ('+T.WAIT_SIGN_DAYS+'일 넘음) <b>'+x.waitSign.length+'</b></div><ul>'
+    +x.waitSign.map(function(e){ return line(e.row,'회신 '+e.days+'일째'); }).join('')+'</ul>'
+    +'<div class="al-h">제출 기한 지남 <b>'+x.overdue.length+'</b></div><ul>'
+    +x.overdue.map(function(e){ return line(e.row,'기한 '+e.due); }).join('')+'</ul>'
+    +(GR.trackErr?'<div class="err-s">'+grEsc(T.LOAD_FAIL)+'</div>':'');
 }
 function grRender(){
   $('loading').style.display=GR.loaded?'none':'';
@@ -412,6 +512,9 @@ async function grLoad(){
   }
   await grLoadDocs();
   if(seq!==GR.seq) return;
+  await grLoadTrack();
+  if(seq!==GR.seq) return;
+  grApplyTrack();
   GR.loaded=true;
   grRender();
 }
@@ -430,7 +533,18 @@ async function grLoadDocs(){
 async function grRetryDocs(){
   GR.docs={loaded:false,err:false}; grRenderBiz();
   await grLoadDocs();
+  grApplyTrack();
   grRender();
+}
+/* 서류 진행 기록 — 통째로 한 번(once). 못 읽으면(규칙 게시 전·권한 없음) 체크표 ③④⑤ 만 읽기 전용 「—」, 나머지는 그대로 돈다 */
+async function grLoadTrack(){
+  try{ GR.track=PuGovReportTrack.normalize((await fbDb.ref(GR_TRACK_NODES.docs).once('value')).val()); GR.trackErr=false; }
+  catch(e){ console.warn('[컨설팅보고서] 못 읽음 '+GR_TRACK_NODES.docs,e); GR.track=null; GR.trackErr=true; }
+}
+/* 현황판 줄에 기록을 붙인다(r.trk · ③④ 막대) — 읽은 뒤 · 저장한 뒤 · 왼쪽 자료를 다시 읽은 뒤 */
+function grApplyTrack(){
+  var d=GR.docs||{};
+  PuGovReportDocs.trackRows(GR.rows,{track:GR.track,input:GR.input,biz:d.biz,tmap:d.tmap,consultings:d.cons,today:GR.today});
 }
 
 /* ═══ 로그인 — 포털 앱과 같은 문 ═══ */
@@ -449,10 +563,13 @@ function grBoot(){
     if(b) grSetBiz(b.getAttribute('data-biz'));
   });
   ['rows','docs'].forEach(function(id){ $(id).addEventListener('click',function(e){
+    var c=e.target&&e.target.closest?e.target.closest('[data-cell]'):null;
+    if(c){ grOpenCell(c.getAttribute('data-co'),c.getAttribute('data-ty'),c.getAttribute('data-step')); return; }
     var b=e.target&&e.target.closest?e.target.closest('[data-toc]'):null;
     if(b) grOpenToc(b.getAttribute('data-co'),b.getAttribute('data-ty'));
   }); });
   $('toc').addEventListener('click',function(e){ if(e.target===this) grCloseToc(); });
+  $('cellw').addEventListener('click',function(e){ if(e.target===this) grCloseCell(); });
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
