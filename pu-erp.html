@@ -10660,8 +10660,26 @@ function useEscClose(onClose){
      어느 화면에 무엇이 붙어 있는지 일일이 적지 않아도 되게 DOM 에서 직접 잰다.
    ⚠ 뜬 것(모달·툴팁 position:fixed/absolute)은 자리를 차지하지 않는다 — 빼면 안 된다.
      이걸 안 걸러내면 모달이 열린 화면에서 표가 240px 로 쪼그라든다. */
-function erpFillHeight(el, min){
+/* exact — 표 아래 줄(쪽 번호 등)과 «실제» 바닥 여백(.page·.main 의 아래 안쪽 여백)까지 빼서
+   표·쪽 번호가 한 화면 안에 들어오게 한다(업체관리 2026-10-11). 안 주면 예전 셈 그대로. */
+function erpFillHeight(el, min, exact){
   if(!el || typeof window === 'undefined') return 0;
+  if(exact){
+    var _top = el.getBoundingClientRect().top, _below = 0, _sib = el.nextElementSibling;
+    while(_sib){
+      var _pos = ''; try { _pos = window.getComputedStyle(_sib).position; } catch(e){ _pos = ''; }
+      if(_pos !== 'fixed' && _pos !== 'absolute'){
+        var _cs = window.getComputedStyle(_sib);
+        _below += _sib.getBoundingClientRect().height + (parseFloat(_cs.marginTop) || 0) + (parseFloat(_cs.marginBottom) || 0);
+      }
+      _sib = _sib.nextElementSibling;
+    }
+    var _pads = 0;
+    [el.parentElement, (typeof document !== 'undefined' ? document.getElementById('main-scroll-area') : null)].forEach(function(p){
+      if(p){ try { _pads += parseFloat(window.getComputedStyle(p).paddingBottom) || 0; } catch(e){} }
+    });
+    return Math.max(min || 240, Math.round(window.innerHeight - _top - _below - _pads - 2));
+  }
   var top = el.getBoundingClientRect().top;
   var below = 0;
   var sib = el.nextElementSibling;
@@ -10688,11 +10706,11 @@ function erpFillExtra(el, rows){
   return (rh > 0 ? rh : 34) * rows;
 }
 /* extraRows — 창 바닥보다 «몇 줄 더» 길게(그만큼 아래 줄은 스크롤로 본다). 안 주면 예전과 같다 */
-function useFillHeight(min, extraRows){
+function useFillHeight(min, extraRows, exact){
   var ref = useRef(null);
   var st = useState(0); var h = st[0]; var setH = st[1];
   function fit(){
-    var want = erpFillHeight(ref.current, min);
+    var want = erpFillHeight(ref.current, min, exact);
     if(!want) return;
     want += erpFillExtra(ref.current, extraRows);
     // 8px 안쪽 차이는 그대로 둔다 — 안 그러면 「재고 → 다시 그리고 → 또 재고」 가 끝나지 않는다
@@ -27952,9 +27970,15 @@ function coMgrPendTag(co){
 }
 
 function CompanyManagement(){
-  /* 표가 창 바닥보다 «두 줄 더» — 대표 지시 2026-10-11 「디자인은 그대로하고 아래 사업장정보가 2개정도 더 보이게」.
-     그만큼 쪽 번호 줄은 화면 아래로 내려가 살짝 내리면 보인다(업체관리 화면은 위아래로 스크롤된다). */
-  var _fill1 = useFillHeight(null, 2);
+  /* 표를 «한 화면 안에서» 최대로 — 대표 지시 2026-10-11 「사업장정보가 2개정도 더 보이게」 → 「한화면안에서 쪽 번호가 나오게」.
+     두 줄을 그냥 늘리면 쪽 번호가 화면 밖으로 밀렸다. 그래서 디자인은 그대로 두고 «빈 자리»만 걷는다:
+     ① 안내 두 줄을 쪽 번호와 같은 줄 양옆으로 ② 쪽 번호 줄 위아래 여백을 줄임 ③ 업체관리일 때만 바닥 빈 여백을 걷음
+     ④ 표 높이는 실제 바닥 여백까지 빼서 잰다(exact) — 쪽 번호가 늘 화면 안에 든다. */
+  var _fill1 = useFillHeight(null, 0, true);
+  useEffect(function(){
+    try { document.body.classList.add('co-screen'); } catch(_e){}
+    return function(){ try { document.body.classList.remove('co-screen'); } catch(_e){} };
+  }, []);
   var existing = dbGet('companies', null);
   // 로컬 캐시가 비어 있어도 서버에 쓰지 않는다(빈 값 덮어쓰기로 업체가 사라지는 사고 방지).
   // Firebase 동기화가 끝나면 목록이 채워진다.
@@ -29257,6 +29281,8 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   }
 
   return h('div', { className:'page' },
+    /* 업체관리일 때만 바닥 빈 여백을 걷는다 — 표·쪽 번호가 한 화면에 들어오게 (2026-10-11) */
+    h('style', null, 'body.co-screen main.main{padding-bottom:0 !important} body.co-screen .page{padding-bottom:4px !important}'),
     // 통일 헤더: 월 네비 + KPI 4개
     h(MonthKpiHeader, {
       selYM: selYM,
@@ -29381,7 +29407,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             '▽ 필터 ' + activeFilterCount + ' 풀기')
         )
       )
-    : h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'14px', flexWrap:'wrap' } },
+    : h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'8px', flexWrap:'wrap' } },
       /* ★ 검색을 맨 왼쪽으로 (대표 지시 2026-08-27)
          전에는 맨 오른쪽에서 남는 자리를 다 차지해(flex:1) 화면마다 폭이 달랐다.
          사건관리·컨설팅관리가 이미 «왼쪽 260px» 이라 거기에 맞춘다 —
@@ -30004,14 +30030,14 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
         )
       )
     ),
-    // 페이지네이션
-    h(PaginationBar, { page:pg.page, total:pg.total, setPage:pg.setPage, count:pg.count, pageSize:coPageSize, setPageSize:setCoPageSize }),
-    // 하단 안내
-    h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px', marginTop:'10px', fontSize:'11px', color:'#94a3b8' } },
-      h('div', { style:{ display:'flex', justifyContent:'space-between' } },
-        h('div', null, h('span', { style:{ color:'#fbbf24', fontWeight:700 } }, '주황 테두리'), ' = 계약 만료 30일 이내'),
-        h('div', null, '셀 더블클릭 → 인라인 편집 · Enter/클릭밖 → 저장 · ESC → 취소')
-      )
+    // 페이지네이션 + 하단 안내 — 한 줄에 (왼쪽 안내 · 가운데 쪽 번호 · 오른쪽 안내) — 2026-10-11 한 화면에 넣으려고
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' } },
+      h('div', { style:{ flex:'1 1 0', minWidth:0, overflow:'hidden', textOverflow:'ellipsis' } },
+        h('span', { style:{ color:'#fbbf24', fontWeight:700 } }, '주황 테두리'), ' = 계약 만료 30일 이내'),
+      h('div', { style:{ flex:'none' } },
+        h(PaginationBar, { page:pg.page, total:pg.total, setPage:pg.setPage, count:pg.count, pageSize:coPageSize, setPageSize:setCoPageSize, compact:true })),
+      h('div', { style:{ flex:'1 1 0', minWidth:0, overflow:'hidden', textOverflow:'ellipsis', textAlign:'right' }, title:'셀 더블클릭 → 인라인 편집 · Enter/클릭밖 → 저장 · ESC → 취소' },
+        '셀 더블클릭 → 인라인 편집 · Enter/클릭밖 → 저장 · ESC → 취소')
     ),
     // 수정 모달
     editModal && h(CompanyEditModal, {
@@ -36245,7 +36271,7 @@ function PaginationBar(props){
   var s = Math.max(1, page-3), e = Math.min(total, s+6);
   s = Math.max(1, e-6);
   for(var i=s; i<=e; i++) pages.push(i);
-  return h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', padding:'10px 0', flexWrap:'wrap' } },
+  return h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', padding:(props.compact ? '4px 0' : '10px 0'), flexWrap:'wrap' } },
     sizeSelector,
     h('button', { onClick:function(){ setPage(1); }, disabled:page===1, style:btnS(false, page===1) }, '«'),
     h('button', { onClick:function(){ setPage(page-1); }, disabled:page===1, style:btnS(false, page===1) }, '‹'),
