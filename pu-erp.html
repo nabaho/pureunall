@@ -8867,29 +8867,36 @@ window.erpResetComboWhitelist = erpResetComboWhitelist;
 
 // ============ ERP 안정화 헬퍼 (요율 스냅샷·담당자·검증·자동입력) ============
 
-// #4 요율 스냅샷: 급여 확정 시 현재 환경설정 요율을 복사 → 과거 명세서 보호
-//    사용: var snap = RatesSnapshot.capture(); 후 payroll 항목에 ratesSnapshot:snap 저장
+// #4 요율 스냅샷: 급여 확정 때 «그 달 계산이 실제로 쓴» 요율을 남긴다 (2026-10-11 검토 A5)
+//    사용: var snap = RatesSnapshot.capture(ym); 후 payroll 항목에 ratesSnapshot:snap 저장
+//    ⚠ 예전에는 환경설정의 insurance_rates·min_wage·withholding_tax 를 찍었다 — 셋 다 «계산에 안 쓰이는» 칸이었다
+//      (계산은 erpPayRates 의 엔진 연도표 · erpIncomeTax 의 공식 간이세액표를 본다). 게다가 간이세액표 화면은
+//      withholding_brackets 에 쓰는데 사진은 withholding_tax(아무도 안 쓰는 칸)를 찍었다.
+//      이제는 erpPayRates(ym) 그대로 + 출처 표시(source) 를 남긴다. 금액을 지키는 것은 여전히 calcSnapshot 이다.
 var RatesSnapshot = {
-  // 현재 시점의 모든 요율을 1개 객체로 캡처 (급여 확정 시 호출)
-  capture: function(){
+  capture: function(ym){
+    var r = (typeof erpPayRates === 'function') ? erpPayRates(ym) : {};
+    var T = (typeof PuSimpleTax !== 'undefined' && PuSimpleTax.tables) || [];
+    var LC = (typeof PuLaborCore !== 'undefined') ? PuLaborCore : null;
+    var tt = (LC && LC.pickSimpleTaxTable && T.length) ? LC.pickSimpleTaxTable(T, String(ym || '')) : null;
     return {
       capturedAt: new Date().toISOString(),
-      insurance: dbGet('insurance_rates', {}),
-      minWage:   dbGet('min_wage', {}),
-      withholdingTax: dbGet('withholding_tax', {}),
+      source: r.ratesFrom === 'engine' ? 'engine-year-table' : 'fallback-constants',
+      ym: String(ym || ''), year: String(r.year || ''),
+      insurance: { pension:r.pension, healthIns:r.healthIns, longCare:r.longCare, empIns:r.empIns,
+        empEmpInsExtra:r.empEmpInsExtra, empWorkers:r.empWorkers,
+        pensionWageMin:r.pensionWageMin, pensionWageMax:r.pensionWageMax },
+      minWage: { year:String(r.minWageYear || ''), hourly:r.minWageHourly },
+      withholdingTax: { source: tt ? 'simple-tax-table' : 'not-loaded', effectiveFrom: tt ? String(tt.시행 || '') : '' },
       payItems: dbGet('pay_items', [])
     };
   },
-  // 저장된 스냅샷 우선, 없으면 현재 요율 사용 (명세서 표시 시 호출)
+  // 저장된 스냅샷 우선, 없으면 «그 달 계산 기준»으로 다시 만든다 (환경설정 칸을 읽지 않는다)
   read: function(payrollRecord, key){
     if(payrollRecord && payrollRecord.ratesSnapshot && payrollRecord.ratesSnapshot[key] !== undefined){
       return payrollRecord.ratesSnapshot[key];
     }
-    return dbGet(key === 'insurance' ? 'insurance_rates' :
-                 key === 'minWage'   ? 'min_wage' :
-                 key === 'withholdingTax' ? 'withholding_tax' :
-                 key === 'payItems'  ? 'pay_items' : key,
-                 key === 'payItems' ? [] : {});
+    return RatesSnapshot.capture(payrollRecord && payrollRecord.ym)[key];
   }
 };
 
@@ -36173,6 +36180,15 @@ function PayItemSection(){
   );
 }
 
+/* ★ 환경설정의 최저임금·4대보험 요율·간이세액표 «세 화면»은 급여 계산에 쓰이지 않는다 (2026-10-11 검토 A5)
+     계산은 erpPayRates(그 달)의 엔진 연도표(js/pu-labor-core.js)와 공식 간이세액표(js/pu-simpletax.js)만 본다.
+     화면에 아무 말이 없어 관리자가 요율을 고치면 급여가 바뀐 줄 알았다 — 자료는 지우지 않고 띠로 알린다. */
+var ERP_NOT_USED_BY_CALC_TEXT = '⚠ 계산에는 쓰이지 않습니다 — 엔진 연도표 기준(읽기 전용 참고)';
+function ErpNotUsedByCalcNote(props){
+  return h('div', { 'data-not-used-by-calc':'1', title:(props && props.detail) || '',
+    style:{ background:'#fffbeb', border:'1px solid #fde68a', color:'#854d0e', borderRadius:'6px', padding:'6px 10px', fontSize:'11.5px', fontWeight:700, marginBottom:'8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+    ERP_NOT_USED_BY_CALC_TEXT);
+}
 function MinWageSection(){
   var DEFAULT = { id:'min-wage-2026', year:2026, hourlyMin:10320, weeklyMin:495360, monthlyMin209:2156880, monthlyMin226:2332320, effectiveFrom:'2026-01-01' };
   var existing = dbGet('min_wage', null);
@@ -36200,6 +36216,7 @@ function MinWageSection(){
   }
 
   return h('div', { style:{ marginBottom:'12px' } },
+    h(ErpNotUsedByCalcNote, { detail:'급여의 최저임금 비교는 그 달 연도의 시급(MIN_WAGE_HOURLY)과 단시간 비례 시간으로 셈합니다 — 이 칸은 참고용입니다.' }),
     _alert && h('div', { style:{ background:_alert.bg, border:'1px solid '+_alert.bd, color:_alert.fg, borderRadius:'6px', padding:'8px 12px', fontSize:'11.5px', fontWeight:700, marginBottom:'10px' } }, _alert.msg),
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '최저임금'),
@@ -36671,13 +36688,14 @@ function InsuranceSection(){
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '4대보험 요율')
     ),
+    h(ErpNotUsedByCalcNote, { detail:'급여 공제는 그 달 연도의 엔진 요율표(js/pu-labor-core.js)로 셈합니다 — 이 칸을 고쳐도 급여는 바뀌지 않습니다.' }),
     h('div', null,
     h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'7px 10px', marginBottom:'8px' } },
       h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#1e40af', display:'flex', alignItems:'center', gap:'6px' } }, '🛡️ 4대보험 요율',
         h(InfoPop, { title:'🛡️ 4대보험 요율 안내' },
-          '• 연도별 요율을 관리하여 급여대장·퇴직정산에서 정확한 계산에 씁니다.\n',
-          '• 국민연금·건강보험은 보건복지부, 고용·산재는 고용노동부 고시 기준입니다.\n',
-          '• 월별급여 모듈이 이 설정을 저절로 참조합니다.'))
+          '• 이 칸은 참고용 기록입니다 — 급여 계산은 이 칸을 읽지 않습니다.\n',
+          '• 실제 공제 요율은 그 달 연도의 엔진 요율표(js/pu-labor-core.js)에서 꺼냅니다.\n',
+          '• 국민연금·건강보험은 보건복지부, 고용·산재는 고용노동부 고시 기준입니다.'))
     ),
     h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'8px' } },
       h('label', { style:{ fontSize:'11px', fontWeight:600, color:'#475569' } }, '연도:'),
@@ -36705,7 +36723,7 @@ function InsuranceSection(){
       ),
       rowDouble('국민연금',     null,                   'pension', 'ee', 'er'),
       rowDouble('건강보험',     null,                   'health',  'ee', 'er'),
-      rowSingle('장기요양',     '건강보험 대비',        'longterm','rate', '(건강보험료 × 12.81%)'),
+      rowSingle('장기요양',     '건강보험 대비',        'longterm','rate', '(건강보험료 × ' + ((cur.longterm || {}).rate) + '%)'),   /* 이 칸의 값을 그대로 — 숫자를 박아 두면 칸을 고쳐도 글이 옛 값을 말한다 */
       rowDouble('고용보험',     null,                   'employment','ee','er'),
       rowSingle('산재보험',     '업종 평균',            'injury',  'rate', '(사업주 전액)')
     )
@@ -36749,6 +36767,7 @@ function WithholdingTaxSection(){
       h('button', { onClick:function(e){ e.stopPropagation(); reset(); },
         style:{ background:'#fef2f2', color:'#dc2626', padding:'3px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', border:'1px solid #fecaca' } }, '기본값 복원')
     ),
+    h(ErpNotUsedByCalcNote, { detail:'소득세는 공식 간이세액표(js/pu-simpletax.js, 그 달 시행 판)로 셈합니다 — 이 구간표는 참고용입니다.' }),
     h('div', null,
     h('div', { style:{ marginBottom:'5px' } }, h(InfoPop, { title:'간이세액', text:'과세급여 기준 · 국세청 간이세액표 · 지방소득세 = 소득세 × 10%' })),
     h('table', { className:'dt' },
@@ -64383,9 +64402,10 @@ function MyDeskV2(props){
     var autoDays = _gyMe.days;
     // 오버라이드
     var ov = grants[sid] && grants[sid][year] ? grants[sid][year] : null;
-    var total = ov && ov.total!=null ? ov.total + erpRulingFixDays(_gyMe.list) : autoDays;
-    var carryOver = ov ? (ov.carryOver||0) : 0;
-    var grant = total + carryOver;
+    var _yg = erpLeaveYearGrant(ov, _gyMe);   // 부여 합은 한 함수에서 (2026-10-11 A1)
+    var total = _yg.total;
+    var carryOver = _yg.carry;
+    var grant = _yg.granted;
     // 사용량
     var rec = attendance.filter(function(r){ return r.sid===sid && (r.date||'').slice(0,4)===year; });
     var leaveCnt = rec.filter(function(r){return r.type==='leave';}).length;
@@ -74408,6 +74428,59 @@ function erpPayRates(ym){
   r.year = y;
   return r;
 }
+/* ══ 명세서·화면의 «계산 근거» 글 — 계산이 «실제로 쓴» 값에서 만든다 (2026-10-11 검토 A4) ══════
+   ★ 왜: 명세서·계약서 글에 2025년 요율(연금 4.5%·건보 3.545%·장기 12.95%)과 «÷209h» 가 박혀 있었다.
+     실제 셈은 erpPayRates(그 달)의 엔진 연도표와 erpMonthStdHours(단시간 비례)를 쓴다 —
+     근로자에게 나가는 문서(근로기준법 제48조②)에 계산과 다른 숫자가 함께 찍혔다.
+   ★ 규칙: 숫자는 «계산이 쓴 것과 같다고 확인될 때만» 찍는다. 확인이 안 되면 숫자 없는 말로 쓴다
+     (틀린 숫자보다 숫자 없는 글이 낫다). 금액은 여기서 셈하지 않는다 — 글만 만든다. */
+function erpPctText(v){ return String(Math.round((+v || 0) * 1e6) / 1e4) + '%'; }
+/* 통상시급을 나눈 «월 소정근로시간» — 계산 결과의 시간이 그 결과의 통상시급과 맞을 때만 돌려준다 */
+function erpPayStdHoursOf(calc){
+  var c = calc || {}, H = +c.stdHours;
+  if(!(H > 0)) return null;
+  var lg = c.legal || {};
+  /* 확정 사진의 통상시급이 이 시간으로 나눈 값과 다르면(그 뒤 명부 시간이 바뀜) 시간을 모른다고 본다 */
+  if(+lg.ordinaryWage > 0 && +c.ordinaryMonthly > 0 && Math.round(+c.ordinaryMonthly / H) !== +lg.ordinaryWage) return null;
+  return H;
+}
+/* 통상시급 산식 글 — «월 통상임금 ÷ 183시간» 처럼 실제 나눈 시간을 쓴다 */
+function erpOrdinaryWageFormula(calc){
+  var H = erpPayStdHoursOf(calc);
+  return '월 통상임금 ÷ ' + (H ? H + '시간' : '월 소정근로시간');
+}
+function erpPayBasisText(calc, rec){
+  var c = calc || {}, r = rec || {};
+  var num = function(v){ return (Math.round(+v || 0)).toLocaleString(); };
+  var H = erpPayStdHoursOf(c);
+  /* 그 달 요율 — 급여대장에서 가져온 달(ledger)은 실제 공제액이 기준이라 요율을 찍지 않는다 */
+  var rates = null;
+  if(c.frozen !== 'ledger' && r.ym){ try { rates = erpPayRates(r.ym); } catch(e){ rates = null; } }
+  if(rates && c.ratesYear && String(c.ratesYear) !== String(rates.year)) rates = null;
+  if(rates && c.ratesFrom && rates.ratesFrom && c.ratesFrom !== rates.ratesFrom) rates = null;
+  var neutral = c.frozen === 'ledger' ? '급여대장의 실제 공제액' : '그 해 고시 요율 적용';
+  var line = function(label, ovKey, amt, formula){
+    if(r[ovKey] != null) return label + ': 직접 입력';
+    if(+c.insurableBase > 0 && amt != null && +amt === 0 && c.frozen !== 'ledger') return label + ': 0원 (이번 달 공제 없음)';
+    return label + ': ' + (rates ? formula : neutral);
+  };
+  var ded = ['과세표준: ' + num(c.insurableBase) + '원'];
+  ded.push(line('국민연금', 'pensionOverride', c.pension, rates ? ('과세표준 × ' + erpPctText(rates.pension) + ' (기준소득월액 하한 ' + num(rates.pensionWageMin) + '원·상한 ' + num(rates.pensionWageMax) + '원)') : ''));
+  ded.push(line('건강보험', 'healthInsOverride', c.healthIns, rates ? ('과세표준 × ' + erpPctText(rates.healthIns)) : ''));
+  ded.push(line('장기요양', 'longCareOverride', c.longCare, rates ? ('건강보험료 × ' + erpPctText(rates.longCare)) : ''));
+  ded.push(line('고용보험', 'empInsOverride', c.empIns, rates ? ('과세표준 × ' + erpPctText(rates.empIns)) : ''));
+  ded.push('소득세: ' + (r.incomeTaxOverride != null ? '직접 입력' : (c.incomeTaxBasis || '근로소득 간이세액표')) + ' (부양가족 ' + (r.dependents || 1) + '명)');
+  ded.push('지방소득세: ' + (r.localTaxOverride != null ? '직접 입력' : '소득세 × 10%'));
+  var minWage = '';
+  if(c.minWageWarning){
+    var mh = rates ? +rates.minWageHourly : 0;
+    var exact = mh > 0 && H && Math.round(mh * H) === +c.minWageMonthly;
+    minWage = '최저임금 미달 우려: ' + (+c.minWageBase > 0 ? '매월 정기 지급 임금 ' + num(c.minWageBase) + '원이 ' : '')
+      + (rates ? rates.minWageYear + '년 ' : '') + '최저임금 월 ' + num(c.minWageMonthly) + '원'
+      + (exact ? '(시급 ' + num(mh) + '원 × 월 ' + H + '시간)' : '') + ' 미달';
+  }
+  return { stdHours:H, ordinary:erpOrdinaryWageFormula(c), ded:ded, minWage:minWage, ratesYear: rates ? rates.year : '' };
+}
 /* 원 미만 절사 — 보험료. 0.1 같은 소수 오차(3,000,000×0.009=26999.999…)로 1원이 빠지지 않게 먼저 다듬는다 */
 function erpFloorWon(v){ v = Math.round((+v || 0) * 1e6) / 1e6; return Math.floor(v); }
 /* 10원 미만 절사 — 소득세·지방소득세 */
@@ -74565,7 +74638,7 @@ function payrollSnapshotOf(c){
   if(!c) return null;
   var pick = function(o, ks){ var r = {}; ks.forEach(function(k){ if(o && o[k] != null && isFinite(+o[k])) r[k] = +o[k]; }); return r; };
   var s = pick(c, ['grossPay','allowSum','totalBonus','insurableBase','ordinaryMonthly','averageBase','workDays','prorate',
-    'baseSalaryProrated','pension','healthIns','longCare','empIns','incomeTax','localTax','totalDeduct','netPay','minWageMonthly']);
+    'baseSalaryProrated','pension','healthIns','longCare','empIns','incomeTax','localTax','totalDeduct','netPay','minWageMonthly','stdHours']);
   s.legal = pick(c.legal, ['ordinaryWage','overtimeHours','overtime','nightHours','night','holidayHours','holidayOver8Hours','holiday','weekly','total']);
   s.employer = pick(c.employer, ['pension','healthIns','longCare','empIns','workers','total']);
   s.nonTaxable = pick(c.nonTaxable, ['meal','car','childcare','fromAllow','total']);
@@ -74620,7 +74693,8 @@ function calcPayrollFresh(rec){
   var ordinaryMonthly = (rec.baseSalary||0) + (rec.fixedAllowance||0) + ordinaryFromAllow;
   // 법정수당: 통상시급 기반 (ordinaryMonthly 전달)
   var _empH = ((dbGet('user_accounts', USERS_SEED) || []).find(function(u){ return u && u.sid === rec.empSid; }) || {}).scheduledHours;
-  var legal = calcLegalAllowances(rec, ordinaryMonthly, erpMonthStdHours(_empH));   // 단시간 근로자는 그 사람의 월 소정근로시간으로 나눈다
+  var _stdHours = erpMonthStdHours(_empH);   // 명세서 «계산 근거» 글도 이 시간을 쓴다 (erpPayBasisText)
+  var legal = calcLegalAllowances(rec, ordinaryMonthly, _stdHours);   // 단시간 근로자는 그 사람의 월 소정근로시간으로 나눈다
   // 성과금 자동 합산 (finance_income.perfShares)
   var perf = calcPerfBonus(rec.empSid, rec.ym);
   // ★ Fix#2: 이중계산 방지 — perf.total(입금연동 성과)와 rec.bonus(수동 입력 상여)는 별개
@@ -74720,7 +74794,7 @@ function calcPayrollFresh(rec){
     totalDeduct:totalDeduct, netPay:grossPay-totalDeduct,
     employer:{pension:empPension, healthIns:empHealthIns, longCare:empLongCare, empIns:empEmpIns, workers:empWorkers, total:employerTotal},
     minWageWarning:minWageWarning, minWageMonthly:minWageMonthlyFor, minWageBase:minWageBase,
-    incomeTaxBasis:incomeTaxBasis, ratesYear:rates.year, ratesFrom:rates.ratesFrom,
+    incomeTaxBasis:incomeTaxBasis, ratesYear:rates.year, ratesFrom:rates.ratesFrom, stdHours:_stdHours,
     loa:loa, fullLoa:fullLoa, legacyPay:legacyPay };
 }
 
@@ -74835,7 +74909,7 @@ function payslipMethods(rec){
   else if(c.prorated && c.workDays) out.push('기본급 = ' + won(rec.baseSalary) + ' × ' + c.workDays + '/' + dim + '일');
   else out.push('근무일수 ' + (dim ? dim + '일 (만근)' : '만근'));
   var lg = c.legal || {};
-  if(lg.ordinaryWage) out.push('통상시급 ' + won(lg.ordinaryWage) + ' (월 통상임금 ÷ 209시간)');
+  if(lg.ordinaryWage) out.push('통상시급 ' + won(lg.ordinaryWage) + ' (' + erpOrdinaryWageFormula(c) + ')');
   if(+lg.overtimeHours) out.push('연장 ' + lg.overtimeHours + '시간 × 통상시급 × 1.5');
   if(+lg.nightHours) out.push('야간 ' + lg.nightHours + '시간 × 통상시급 × 0.5');
   if(+lg.holidayHours){
@@ -77098,6 +77172,18 @@ var LEAVE_RULING_FROM = '2026-10-10';
 /* 판결식 전환 «보정» 몫 — 손으로 고친 부여일수(leave_grants)는 판결 전환 «전»에 정한 값이라 보정분을 덮으면 안 된다.
    그래서 수기 부여가 있는 해에도 이 몫은 «위에 더한다» (2026-10-10 실제 화면에서 찾음 — 사무장 17일이 18일이 아니었다) */
 function erpRulingFixDays(list){ return (list || []).filter(function(g){ return g && /전환 보정/.test(String(g.label || '')); }).reduce(function(s, g){ return s + (+g.days || 0); }, 0); }
+/* ★ 그해 연차 «부여 합» 은 이 함수 «하나»로 낸다 (2026-10-11 검토 A1)
+     자동(발생 장부) / 수기 부여(leave_grants.total) / 판결식 전환 보정분 / 이월 — 이 넷의 합.
+     예전에는 화면마다 이 한 줄을 다시 짰고, 휴가관리 «선택 직원 상세»·«연도별 이력» 두 곳이 보정분을 빼먹어
+     같은 사람이 목록 18일 · 상세 17일로 보였다. 이력은 이월·수기가 «숫자형» 일 때만 읽어 또 달랐다.
+     gy = 그해 발생 장부 결과 { days, list } (erpLeaveGrantedInYear · calcGrantDays 가 같은 꼴로 돌려준다). */
+function erpLeaveYearGrant(ov, gy){
+  var autoDays = (gy && +gy.days) || 0;
+  var manual = !!(ov && ov.total != null);
+  var total = manual ? (+ov.total || 0) + erpRulingFixDays(gy && gy.list) : autoDays;
+  var carry = ov ? (+ov.carryOver || 0) : 0;
+  return { auto:autoDays, total:total, carry:carry, granted:total + carry, manual:manual };
+}
 function erpLeaveGrants(u, untilYmd, policy){
   var out = [];
   if(!u || !u.hireDate) return out;
@@ -77221,9 +77307,10 @@ function getLeaveRemain(sid, year){
   var _gyU = (hire <= yearEnd) ? erpLeaveGrantedInYear(u, y) : { days:0, list:[] };
   var autoDays = _gyU.days;
   var ov = grants[sid] && grants[sid][y] ? grants[sid][y] : null;
-  var total = ov && ov.total!=null ? ov.total + erpRulingFixDays(_gyU.list) : autoDays;
-  var carry = ov ? (ov.carryOver||0) : 0;
-  var grant = total + carry;
+  var _yg = erpLeaveYearGrant(ov, _gyU);   // 부여 합은 한 함수에서 (2026-10-11 A1)
+  var total = _yg.total;
+  var carry = _yg.carry;
+  var grant = _yg.granted;
   var atts = dbGet('attendance_records', []).filter(function(r){
     return r.sid===sid && (r.date||'').slice(0,4)===y;
   });
@@ -77808,6 +77895,24 @@ function LeaveOfAbsenceTab(){
    ⚠ 그런데 같은 사람·같은 해 행이 둘일 수도 있다(옛 자료·이관 중복). 그때 같은 id 를
      주면 dbSet 의 중복제거가 «한 줄을 지운다» — 자료가 사라진다.
      그래서 나온 순서대로 #2, #3 을 붙인다. 순서는 저장된 배열 그대로라 기기마다 같다. */
+/* ★ 연차대장 한 줄이 «이 사람 것인가» (2026-10-11 검토 A7)
+     leaveLedgerWithIds 는 «이름이 하나뿐일 때만» 사번을 붙인다 → 사번 없는 줄 = 동명이인이라 못 붙인 줄일 수 있다.
+     그런데 명세서는 사번 없는 줄을 이름으로 맞춰, 동명이인이면 «둘 모두»에게 남의 연차가 실렸다.
+     규칙(erpPerfShareIsMine 과 같은 잣대): ① 사번이 있는 줄은 사번만 본다
+       ② 사번 없는 줄은 명부(재직·퇴직 전부 + user_dir)에 그 이름이 «하나뿐»이고 그 사람이 나일 때만 이름으로 맞춘다
+       ③ 그 밖(동명이인의 사번 없는 줄)은 누구의 명세서에도 싣지 않는다 — 틀린 것을 적느니 비운다. */
+function erpLeaveLedgerRowIsMine(row, empSid, empName){
+  if(!row || !empSid) return false;
+  if(row.sid) return row.sid === empSid;
+  var nm = String(empName || '').trim();
+  if(!nm || String(row.name == null ? '' : row.name).trim() !== nm) return false;
+  var all = [];
+  try { all = (dbGet('user_accounts', []) || []).concat(dbGet('user_dir', []) || []); } catch(_e){ all = []; }
+  var holders = {};
+  all.forEach(function(u){ if(u && u.sid && u.name && String(u.name).trim() === nm) holders[u.sid] = 1; });
+  var ks = Object.keys(holders);
+  return ks.length === 1 && ks[0] === empSid;
+}
 function leaveLedgerWithIds(rows, users){
   if(!Array.isArray(rows)) return { rows:[], changed:0, dup:0 };
   /* ★ 사번을 붙인다 — 대장은 «이름+연도»로만 담겨 있어 동명이인이 생기면 남의 연차가 명세서에 실린다 (2026-10-10).
@@ -78447,8 +78552,9 @@ function LeaveManagement(){
     }
     var a = calcGrantDays(u.hireDate, selYear, u.retireDate||u.leaveDate||null);
     var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-    var t = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
-    var co = ov?(ov.carryOver||0):0;
+    var _yg = erpLeaveYearGrant(ov, a);   // 목록·상세·이력·CSV 가 같은 함수 (2026-10-11 A1)
+    var t = _yg.total;
+    var co = _yg.carry;
     var us = calcUsed(u.sid, selYear);
     return { mode:'year', t:t, co:co, granted:t+co, used:us.used, remain:Math.round((t+co-us.used)*10)/10, ov:ov, auto:a.days,
       usedTitle:'연'+us.fullDays+'·반'+us.halfDays+'·시'+us.hourTotal+'h', promoYear:selYear };
@@ -78459,9 +78565,11 @@ function LeaveManagement(){
   // 선택 직원 연차 정보
   var auto = selUser ? calcGrantDays(selUser.hireDate, selYear, selUser.retireDate||selUser.leaveDate||null) : {days:0,reason:''};
   var override = selSid && grants[selSid] && grants[selSid][selYear] ? grants[selSid][selYear] : null;
-  var total = override && override.total!=null ? override.total : auto.days;
-  var carryOver = override ? (override.carryOver||0) : 0;
-  var grant = total + carryOver;
+  /* ★ 목록과 같은 함수 — 예전에는 여기만 판결식 보정분을 안 더해 목록 18일·상세 17일로 보였다 (2026-10-11 A1) */
+  var _selYg = erpLeaveYearGrant(override, auto);
+  var total = _selYg.total;
+  var carryOver = _selYg.carry;
+  var grant = _selYg.granted;
   var used  = selUser ? calcUsed(selSid, selYear) : {used:0,fullDays:0,halfDays:0,hourTotal:0};
   var remain = grant - used.used;
   var selCycle = (lvView === 'now' && selUser) ? erpLeaveCycleNow(selUser, todayYMD(), attendance, grants) : null;
@@ -78559,8 +78667,9 @@ function LeaveManagement(){
     leaveUsers.forEach(function(u){
       var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
       var ov=grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-      var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
-      var co=ov?(ov.carryOver||0):0;
+      var _yg=erpLeaveYearGrant(ov,a);
+      var t=_yg.total;
+      var co=_yg.carry;
       var us=calcUsed(u.sid,selYear);
       rows.push([u.name,u.title,u.hireDate||'',a.days,co,t+co,Math.round(us.used*10)/10,Math.round((t+co-us.used)*10)/10,ov?'수동':'자동']);
     });
@@ -78943,11 +79052,14 @@ function LeaveManagement(){
             var ystr = String(y);
             var grantInfo = calcGrantDays(selUser.hireDate, y, selUser.retireDate||selUser.leaveDate||null);
             var override = (grants[selUser.sid]||{})[ystr];
-            var grantDays = override && typeof override.total==='number' ? override.total : grantInfo.days;
-            var carry = override && typeof override.carryOver==='number' ? override.carryOver : 0;
-            var totalGrant = grantDays + carry;
+            /* ★ 목록·상세와 같은 함수·같은 잣대 (2026-10-11 A1·A2) — 예전에는 판결식 보정분이 빠지고,
+                 시간연차를 8시간으로 나눠 1일 4시간 근로자의 4시간이 이력에서만 0.5일이었다 */
+            var _yg = erpLeaveYearGrant(override, grantInfo);
+            var grantDays = _yg.total;
+            var carry = _yg.carry;
+            var totalGrant = _yg.granted;
             var recs = allRecs.filter(function(r){return r.date.startsWith(ystr+'-');});
-            var used = PuWork.leaveUsed(recs);
+            var used = PuWork.leaveUsed(recs, selUser.scheduledHours || 8);
             return { y:y, totalGrant:totalGrant, grantDays:grantDays, carry:carry, used:used, remain:Math.max(0,totalGrant-used), recs:recs };
           }
           var years = [];
@@ -81527,7 +81639,7 @@ function PayrollLedger(props){
       try {
         var _ly = (ym||'').slice(0,4);
         var _lf = function(v){ return (v==null||v==='')?'-':v; };
-        var _llRows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로 — 동명이인이면 남의 연차가 명세서에 실린다 (2026-10-10) */ return (x.sid ? x.sid===u.sid : x.name===u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3).map(function(x){
+        var _llRows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로, 사번 없는 줄은 이름이 명부에 하나뿐일 때만 (2026-10-11 A7) */ return erpLeaveLedgerRowIsMine(x, u.sid, u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3).map(function(x){
           var _mo = (x.monthly||'-'); if(x.note) _mo += ' <span style="color:#94a3b8">('+x.note+')</span>';
           var _hi = (String(x.year)===_ly) ? ' style="background:#f0fdf4;font-weight:700"' : '';
           return '<tr'+_hi+'><td style="padding:3px 6px;text-align:center">'+x.year+'년</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.granted)+'</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.used)+'</td><td style="padding:3px 6px;text-align:right;font-family:monospace">'+_lf(x.remain)+'</td><td style="padding:3px 6px;font-size:10px;color:#475569">'+_mo+'</td></tr>';
@@ -81536,12 +81648,13 @@ function PayrollLedger(props){
       } catch(_e){}
       var _payBasis = (calc.prorated ? ('· 기본급(일할): 기본급 × '+calc.workDays+'/'+(calc.workDays && calc.prorate ? Math.round(calc.workDays / calc.prorate) : 30)+'일 = '+num(calc.baseSalaryProrated)+'원<br>') : ('· 기본급: '+num(rec.baseSalary)+'원<br>'));
       if((rec.allowances||[]).length>0) _payBasis += '· 수당(고정): '+(rec.allowances||[]).map(function(a){return a.name+' '+num(a.amount);}).join(', ')+'원<br>';
-      if(calc.legal.total>0) _payBasis += '· 통상시급: (기본급 + 고정수당) ÷ 209h = '+num(calc.legal.ordinaryWage)+'원<br>· 법정수당: 연장 ×1.5 / 야간 추가 ×0.5 / 휴일 8h이내 ×1.5, 초과 ×2.0 / 주휴(주 15h↑)<br>';
+      var _pbt = erpPayBasisText(calc, rec); var _escH = function(t){ return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };   // 요율·시간 글은 계산이 쓴 값에서 (2026-10-11 A4)
+      if(calc.legal.total>0) _payBasis += '· 통상시급: '+_pbt.ordinary+' = '+num(calc.legal.ordinaryWage)+'원<br>· 법정수당: 연장 ×1.5 / 야간 추가 ×0.5 / 휴일 8h이내 ×1.5, 초과 ×2.0 / 주휴(주 15h↑)<br>';
       if(calc.perfBonus.total>0){ _payBasis += '· 성과금(성과관리): 발생 입금액 × 담당요율<br>'; calc.perfBonus.details.forEach(function(d){ _payBasis += '&nbsp;&nbsp;- '+d.source+': '+num(d.baseAmount)+' × '+d.pct+'% = '+num(d.amount)+'원 ('+d.role+')<br>'; }); }
       if((rec.bonus||0)>0) _payBasis += '· 기타상여: '+num(rec.bonus)+'원<br>';
-      var _dedBasis = '· 과세표준: '+num(calc.insurableBase)+'원<br>· 국민연금: 과세표준 × 4.5% (상한월 6,170,000원)<br>· 건강보험: 과세표준 × 3.545%<br>· 장기요양: 건강보험 × 12.95%<br>· 고용보험: 과세표준 × 0.9%<br>· 소득세: 근로소득 간이세액표 (부양가족 '+(rec.dependents||1)+'명)<br>· 지방세: 소득세 × 10%';
-      var basisHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px"><tr><td style="width:50%;vertical-align:top;padding-right:7px"><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:8px 12px;font-size:10px;color:#166534;line-height:1.7"><div style="font-weight:700;color:#166534;margin-bottom:3px">📋 지급 근거</div>'+_payBasis+'</div></td><td style="width:50%;vertical-align:top;padding-left:7px"><div style="background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:8px 12px;font-size:10px;color:#854d0e;line-height:1.7"><div style="font-weight:700;color:#854d0e;margin-bottom:3px">📋 공제 근거</div>'+_dedBasis+'</div></td></tr></table>'+(calc.minWageWarning?('<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:5px;padding:6px 12px;font-size:10px;color:#dc2626;font-weight:700">⚠️ 최저임금 위반: 2026년 시급 10,320원 / 월 209h '+num(calc.minWageMonthly)+'원 미달</div>'):'');
-      var _pn2 = getLeavePromoNotice(u.name);
+      var _dedBasis = _pbt.ded.map(function(t){ return '· '+_escH(t); }).join('<br>');
+      var basisHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px"><tr><td style="width:50%;vertical-align:top;padding-right:7px"><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:8px 12px;font-size:10px;color:#166534;line-height:1.7"><div style="font-weight:700;color:#166534;margin-bottom:3px">📋 지급 근거</div>'+_payBasis+'</div></td><td style="width:50%;vertical-align:top;padding-left:7px"><div style="background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:8px 12px;font-size:10px;color:#854d0e;line-height:1.7"><div style="font-weight:700;color:#854d0e;margin-bottom:3px">📋 공제 근거</div>'+_dedBasis+'</div></td></tr></table>'+(calc.minWageWarning?('<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:5px;padding:6px 12px;font-size:10px;color:#dc2626;font-weight:700">⚠️ '+_escH(_pbt.minWage)+'</div>'):'');
+      var _pn2 = getLeavePromoNotice(u.name, u.sid);
       var promoHtml = _pn2 ? ('<div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:4px">📣 연차 사용촉진 안내</div><div style="font-size:11.5px;color:#1e40af;line-height:1.6">미사용 연차 <b>'+_pn2.remain+'일</b> · 사용기간 ~'+_pn2.expiryStr+' 까지 · 사용시기를 지정해 주세요.</div></div>') : '';
       var el = document.createElement('div');
       el.style.cssText = "position:absolute;left:-9999px;top:0;width:700px;box-sizing:border-box;background:#fff;padding:30px;font-family:'Malgun Gothic','맑은 고딕',sans-serif;color:#1e293b";
@@ -81937,8 +82050,8 @@ function PayrollLedger(props){
     var __pm = parseInt(props.selYM.slice(5,7),10) + 1;
     if(__pm > 12){ __pm = 1; __py++; }
     var autoPaidDate = __py + '-' + String(__pm).padStart(2,'0') + '-05';
-    // #4 요율 스냅샷: 확정 시점의 4대보험·최저임금·세액표를 함께 저장 → 추후 환경설정 변경되어도 과거 명세서 보호
-    var ratesSnap = RatesSnapshot.capture();
+    // #4 요율 스냅샷: 확정 달의 계산이 쓴 엔진 요율·간이세액표 판을 함께 남긴다(기록용) — 금액 보호는 calcSnapshot
+    var ratesSnap = RatesSnapshot.capture(props.selYM);   // 그 달 계산이 쓴 엔진 요율 (2026-10-11 A5)
     var newRecs = users.map(function(u){
       var rec = getRec(u.sid);
       var calc = calcPayroll(rec);
@@ -83054,7 +83167,7 @@ function PayrollBulkModal(props){
 }
 
 // ── 급여명세서 (1직원 상세) ──
-function getLeavePromoNotice(empName){
+function getLeavePromoNotice(empName, empSid){
   try{
     var pol = dbGet('policy_leave', {}) || {};
     var basis = pol.basis || 'joinDate';
@@ -83069,14 +83182,21 @@ function getLeavePromoNotice(empName){
          «헷갈릴 수 있으면 아예 안 적는다» — 틀린 것을 적느니 비우는 것이 낫다.
          2026-09-03 확인: 지금 같은 이름은 없다. 생기는 날 조용히 틀리지 않게 막아 둔다. */
     var _all = dbGet('user_accounts', USERS_SEED) || [];
-    var _same = _all.filter(function(u){ return u && u.name === empName && !u.retireDate; });
-    if(_same.length > 1) return null;
+    /* ★ 사번을 받으면 사번으로 그 사람을 찾는다 (2026-10-11 A7). 사번이 없을 때만 예전처럼 이름 —
+         재직자 가운데 그 이름이 둘 이상이면 아예 안 적는다(퇴직한 동명이인은 여기서 세지 않는다). */
+    var _me = null;
+    if(empSid){ for(var _k = 0; _k < _all.length; _k++){ if(_all[_k] && _all[_k].sid === empSid){ _me = _all[_k]; break; } } }
+    else {
+      var _same = _all.filter(function(u){ return u && u.name === empName && !u.retireDate; });
+      if(_same.length > 1) return null;
+      _me = _same.length === 1 ? _same[0] : null;
+    }
+    if(!_me) return null;
     var lr = null;
-    var _me = _same.length === 1 ? _same[0] : null;
     for(var i=0;i<ledger.length;i++){
       var _L = ledger[i]; if(!_L || Number(_L.year)!==year) continue;
-      /* 사번이 붙은 줄은 사번으로, 아니면 이름으로 (사번이 다른 사람 줄은 이름이 같아도 쓰지 않는다) */
-      if(_L.sid ? (_me && _L.sid === _me.sid) : (_L.name === empName)){ lr = _L; break; }
+      /* 사번이 붙은 줄은 사번으로, 사번 없는 줄은 이름이 명부(퇴직자 포함)에 하나뿐일 때만 — 명세서 연차표와 같은 잣대 */
+      if(erpLeaveLedgerRowIsMine(_L, _me.sid, _me.name)){ lr = _L; break; }
     }
     if(!lr) return null;
     var remain = (lr.remain!=null && !isNaN(Number(lr.remain))) ? Number(lr.remain) : null;
@@ -83088,8 +83208,8 @@ function getLeavePromoNotice(empName){
     if(basis==='fiscalYear'){
       expiry = (fiscalMonth===1) ? new Date(year,11,31) : lastDayOfMonth(year+1, fiscalMonth-2);
     } else {
-      var users = dbGet('user_accounts', USERS_SEED) || [];
-      var u=null; for(var j=0;j<users.length;j++){ if(users[j].name===empName){ u=users[j]; break; } }
+      /* 위에서 찾은 «그 사람»(_me) — 예전에는 여기서 이름으로 다시 찾아 첫 건(퇴직한 동명이인일 수 있다)의 입사일을 썼다 */
+      var u = _me;
       if(!u || !u.hireDate) return null;
       var hd=new Date(u.hireDate); if(isNaN(hd.getTime())) return null;
       var cand=new Date(year, hd.getMonth(), hd.getDate());
@@ -83168,7 +83288,7 @@ function PayrollPayslip(props){
              fromLedger:m.fromLedger,
              paidDate:r.paidDate || '',
              methods:payslipMethods(r),
-             promo:getLeavePromoNotice(emp.name) };
+             promo:getLeavePromoNotice(emp.name, emp.sid) };
   }
   function buildSlipBody(empSid, ym){
     var d = slipData(empSid, ym), won = function(v){ return v.toLocaleString()+'원'; };
@@ -83280,7 +83400,7 @@ function PayrollPayslip(props){
     ),
     // 최저임금 경고
     calc.minWageWarning && h('div', {className:'no-print', style:{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',padding:'8px 14px',marginBottom:'10px',maxWidth:'700px',margin:'0 auto 10px',fontSize:'11.5px',color:'#991b1b',fontWeight:700}},
-      '⚠️ 최저임금 위반 우려: 기본급 ' + (rec.baseSalary||0).toLocaleString() + '원이 2026 최저임금 월 ' + calc.minWageMonthly.toLocaleString() + '원(시급 10,320원 × 209h) 미달'
+      '⚠️ ' + erpPayBasisText(calc, rec).minWage   /* 그 달 연도 시급·단시간 비례·정기 지급 임금 — 계산과 같은 값 (2026-10-11 A4) */
     ),
     // ── 좌우 분할: [좌: 입력 폼 + 잠금 + 추이 + 변경이력] / [우: 명세서 본문] ──
     h('div', { className:'pay-grid', style:{display:'grid', gridTemplateColumns: window.innerWidth<=768?'1fr':'minmax(0,1fr) minmax(0,1fr)', gap: window.innerWidth<=768?'10px':'14px', alignItems:'flex-start'} },
@@ -83290,7 +83410,7 @@ function PayrollPayslip(props){
     h('div', {className:'no-print', style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:_mob?'10px 10px':'12px 14px',marginBottom:'8px'}},
       // ① 기본 입력 (부양가족 / 일할계산)
       h('div', {style:{fontSize:_mob?'10.5px':'11.5px',fontWeight:700,color:'#854d0e',marginBottom:_mob?'4px':'6px'}},
-        '⚙️ 급여 입력항목 · 통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (기본급÷209h)'),
+        '⚙️ 급여 입력항목 · 통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (' + erpOrdinaryWageFormula(calc) + ')'),
       h('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:_mob?'5px':'8px', marginBottom:_mob?'5px':'8px'}}),
         h('label', null,
           h('div',{style:labelStyle},'부양가족 수'),
@@ -83497,7 +83617,7 @@ function PayrollPayslip(props){
             h('td', {style:{padding:'5px 8px'}}, rec.paidDate||(props.selYM+'-25')))
         )
       ),
-      (function(){ var _pn=getLeavePromoNotice(u.name); return _pn ? h('div',{style:{margin:'0 0 16px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'10px 14px'}}, h('div',{style:{fontSize:'12px',fontWeight:700,color:'#1e40af',marginBottom:'4px'}},'📣 연차 사용촉진 안내'), h('div',{style:{fontSize:'11.5px',color:'#1e40af',lineHeight:1.6}}, '미사용 연차 '+_pn.remain+'일 · 사용기간 ~'+_pn.expiryStr+' 까지 · 사용시기를 지정해 주세요.')) : null; })(),
+      (function(){ var _pn=getLeavePromoNotice(u.name, u.sid); return _pn ? h('div',{style:{margin:'0 0 16px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',padding:'10px 14px'}}, h('div',{style:{fontSize:'12px',fontWeight:700,color:'#1e40af',marginBottom:'4px'}},'📣 연차 사용촉진 안내'), h('div',{style:{fontSize:'11.5px',color:'#1e40af',lineHeight:1.6}}, '미사용 연차 '+_pn.remain+'일 · 사용기간 ~'+_pn.expiryStr+' 까지 · 사용시기를 지정해 주세요.')) : null; })(),
       // 지급/공제 2단
       h('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'14px',marginBottom:'16px'}},
         // 지급
@@ -83642,7 +83762,7 @@ function PayrollPayslip(props){
             : h('span',null,'· 기본급: ' + (rec.baseSalary||0).toLocaleString() + '원', h('br')),
           (rec.allowances||[]).length>0 ? h('span',null,'· 수당(고정): ' + (rec.allowances||[]).map(function(a){return a.name+' '+(a.amount||0).toLocaleString();}).join(', ') + '원', h('br')) : null,
           calc.legal.total>0 ? h('span',null,
-            '· 통상시급: (기본급 + 고정수당) ÷ 209h = ' + calc.legal.ordinaryWage.toLocaleString() + '원', h('br'),
+            '· 통상시급: ' + erpOrdinaryWageFormula(calc) + ' = ' + calc.legal.ordinaryWage.toLocaleString() + '원', h('br'),
             '· 법정수당: 연장 ×1.5 / 야간 추가 ×0.5 / 휴일 8h이내 ×1.5, 초과 ×2.0 / 주휴(주 15h↑)', h('br')) : null,
           calc.perfBonus.total>0 ? h('span',null,
             '· 성과금(성과관리): 발생 입금액 × 담당요율', h('br'),
@@ -83651,20 +83771,15 @@ function PayrollPayslip(props){
         ),
         h('div', {style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'5px',padding:'8px 12px',fontSize:'10px',color:'#854d0e',lineHeight:'1.7'}},
           h('div',{style:{fontWeight:700,color:'#854d0e',marginBottom:'3px'}},'📋 공제 근거'),
-          '· 과세표준: ' + calc.insurableBase.toLocaleString() + '원', h('br'),
-          '· 국민연금: 과세표준 × 4.5% (상한월 6,170,000원)', h('br'),
-          '· 건강보험: 과세표준 × 3.545%', h('br'),
-          '· 장기요양: 건강보험 × 12.95%', h('br'),
-          '· 고용보험: 과세표준 × 0.9%', h('br'),
-          '· 소득세: 근로소득 간이세액표 (부양가족 ' + (rec.dependents||1) + '명)', h('br'),
-          '· 지방세: 소득세 × 10%'
+          /* 요율은 그 달 계산이 쓴 엔진 연도표에서 — 확인 안 되면 숫자 없는 말 (2026-10-11 A4) */
+          erpPayBasisText(calc, rec).ded.map(function(t, i, a){ return h('span', { key:'d'+i }, '· ' + t, i < a.length - 1 ? h('br') : null); })
         )
       ),
-      calc.minWageWarning ? h('div',{style:{marginTop:'8px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'6px 12px',fontSize:'10px',color:'#dc2626',fontWeight:700}},'⚠️ 최저임금 위반: 2026년 시급 10,320원 / 월 209h ' + calc.minWageMonthly.toLocaleString() + '원 미달') : null,
+      calc.minWageWarning ? h('div',{style:{marginTop:'8px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'6px 12px',fontSize:'10px',color:'#dc2626',fontWeight:700}},'⚠️ ' + erpPayBasisText(calc, rec).minWage) : null,
       // 연차 현황 (연도별, 연차대장 기준)
       (function(){
         var _ly = (props.selYM||'').slice(0,4);
-        var _rows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로 — 동명이인이면 남의 연차가 명세서에 실린다 (2026-10-10) */ return (x.sid ? x.sid===u.sid : x.name===u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3);
+        var _rows = (dbGet('leave_ledger',[])||[]).filter(function(x){ /* 사번이 붙은 줄은 사번으로, 사번 없는 줄은 이름이 명부에 하나뿐일 때만 (2026-10-11 A7) */ return erpLeaveLedgerRowIsMine(x, u.sid, u.name) && Number(x.year)<=Number(_ly); }).sort(function(a,b){ return a.year-b.year; }).slice(-3);
         if(!_rows.length) return null;
         var _lf = function(v){ return (v==null||v==='')?'-':v; };
         var _thx = {padding:'4px 6px',color:'#1e40af',fontWeight:700,fontSize:'11px'};
@@ -84697,7 +84812,8 @@ function EmploymentContractModal(props){
       workPlace: u.branch || '',
       jobDuty: u.jobDuty || '',
       payComposition: '',
-      payMethod: '월급제 · 통상시급 = 월 통상임금 ÷ 209시간 · 근로자 명의 계좌 입금',
+      /* 월 소정근로시간은 급여 계산과 같은 erpMonthStdHours(명부 1일 시간) — 단시간 근로자에게 «÷209» 가 적히지 않게 (2026-10-11 A4) */
+      payMethod: '월급제 · 통상시급 = 월 통상임금 ÷ ' + erpMonthStdHours(u.scheduledHours) + '시간(월 소정근로시간) · 근로자 명의 계좌 입금',
       payDay: '',
       holidays: '주휴일(일요일), 근로자의 날, 관공서 공휴일',
       annualLeave: '근로기준법 제60조에 따름 (입사일 기준)',
