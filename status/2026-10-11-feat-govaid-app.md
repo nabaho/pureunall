@@ -1,4 +1,4 @@
-상태: 사람 확인 필요
+상태: 이어하기 대기
 이어하기시도: 0
 작업폴더: C:\Users\fair0\Documents\pu-wt-subsidy
 가지: feat/subsidy-app
@@ -14,9 +14,9 @@
 - 이름을 `subsidy` → `govaid` 로 — 기금관리가 `fund_erp/subsidy*` 를 이미 쓴다
 
 ## 남은 일
-1. **대표 설계서 검토** ← 지금 여기. 승인 전에는 코드를 쓰지 않는다(감시도 이어 하지 말 것)
-2. 구현 계획(writing-plans) → 실행 방식 선택
-3. 엔진·씨앗(47개)·화면·규칙·온톨로지·검사
+설계서·계획 승인됨(대표 「직접 끝까지 해라」). 계획: docs/superpowers/plans/2026-10-11-govaid.md — Task 1~10.
+진행 기록: .superpowers/sdd/2026-10-11-govaid/progress.md (Task N: complete 줄) + git log.
+⚠ 감시가 이어 할 때: 푸시·규칙 올리기(Task 5 Step 7·8)·PR 은 하지 말 것 — 사람이 본다.
 
 ## 바로잡은 것
 - 시안에 「사업 67개」라 적었으나 틀림 — 67은 자리표시 4줄만 뺀 줄 수이고, 분야만 다른 짝 20쌍을 합치면 **47개**.
