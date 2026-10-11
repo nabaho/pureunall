@@ -72,7 +72,9 @@ test('★★ CSS — 하위 탭은 머리 밑에, 단추 줄은 그 밑에 «재
 
 test('★ 부팅 때 지켜보기 시작하고, 모집 탭을 열 때도 잰다(숨어 있던 동안은 못 쟀다)', () => {
   assert.match(fnSrc('boot'), /^function boot\(\)\{\s*recStickyWatch\(\);/);
-  assert.match(fnSrc('setTab'), /if\(t==='rec'\)\{[^}]*recStickySync\(\);/);
+  /* 2026-10-11 — 모든 탭에서 잰다(공고·발주의 .tab-stick 높이도 같이). 모집 탭 «조건 안»에만 있으면 다른 탭이 옛 높이를 쓴다 */
+  assert.match(fnSrc('setTab'), /\n  recStickySync\(\);/);
+  assert.doesNotMatch(fnSrc('setTab'), /if\(t==='rec'\)[^\n]*recStickySync/);
 });
 
 test('★★ 공인노무사회·공공기관 탭의 한 줄(.rec-stick) 높이를 --rbarH 로 — 숨은 탭(0)은 빼고 보이는 것만', () => {

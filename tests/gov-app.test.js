@@ -1018,7 +1018,7 @@ test('★ 공고 모아보기 머리는 넓은 화면에서 «딱 두 줄» — 
   const m = src.match(/@media \(min-width:1400px\)\{[\s\S]*?\n\}/);
   assert.ok(m, '1400px 이상 두 줄 규칙이 없다');
   const css = m[0];
-  assert.match(css, /#pgFeed \.card>\.bar:first-child\{flex-wrap:nowrap/, '첫 줄이 줄바꿈을 허용한다');
+  assert.match(css, /\.tab-stick>\.bar:first-child\{flex-wrap:nowrap/, '첫 줄이 줄바꿈을 허용한다');
   assert.match(css, /#q\{flex:1 1 150px/, '검색창이 줄어들 수 있어야 한 줄에 들어간다');
   assert.match(css, /#kwBox\{flex-wrap:nowrap;overflow-x:auto/, '찾는 말이 줄바꿈하면 세 줄이 된다');
   assert.match(css, /#kwBox>\*\{flex:none\}/, '알약이 찌그러지면 안 된다');
@@ -1053,4 +1053,34 @@ test('★ 발주 예정 빈 줄의 colspan 이 머리 칸 수와 같다', () => 
   const r = runApp({});
   r.el('pView').value = 'ahead'; r.api.planDraw();
   assert.match(r.el('ptb').innerHTML, new RegExp('colspan="' + ths + '"'));
+});
+
+/* ═══ ★ 틀고정 — 공고 모아보기·발주 예정 (대표 지시 2026-10-11 「이부분들 모두 틀고정」) ═══
+   실제 붙는지는 브라우저에서 쟀다(1600×800: 머리 0–96 · 덩어리 96–175 · 표 머리줄 175–211, 겹침 0 · 발주 96–142 · 142–178 ·
+   컨설턴트 모집 96–139 · 139–179 · 179–215). 여기서는 «짜임»이 무너지지 않게 못박는다. */
+test('★★ 틀고정 — 검색·거르개 줄(공고는 찾는 말 줄까지)이 한 덩어리(.tab-stick)다 — 따로 붙이면 높이를 재야 한다', () => {
+  const feed = src.slice(src.indexOf('<div class="wrap" id="pgFeed">'), src.indexOf('<div class="wrap" id="pgPlan"'));
+  const a = feed.indexOf('<div class="tab-stick">'), q = feed.indexOf('id="q"'), kw = feed.indexOf('id="kwBox"'), per = feed.indexOf('id="period"');
+  assert.ok(a > 0 && a < q && q < kw && kw < per, '공고: 덩어리가 검색줄·찾는 말 줄을 감싸야 한다');
+  assert.match(feed.slice(kw, per), /<\/div>\s*<\/div>\s*<div\s*$/, '찾는 말 줄 뒤에서 덩어리를 닫아야 한다');
+  const plan = src.slice(src.indexOf('<div class="wrap" id="pgPlan"'), src.indexOf('id="planNote"'));
+  assert.ok(plan.indexOf('<div class="tab-stick">') > 0 && plan.indexOf('<div class="tab-stick">') < plan.indexOf('id="pq"'), '발주 예정 검색줄이 덩어리 안에 없다');
+});
+test('★★ 틀고정 CSS — 1100px 이상에서만 붙고, 덩어리는 머리 밑(--headH), 표 머리줄은 덩어리 밑(--tstickH) · 가로 상자(.scroll)는 풀어 준다', () => {
+  const m = src.match(/@media \(min-width:1100px\)\{\s*\.tab-stick\{[^}]*\}[\s\S]*?\n\}/);
+  assert.ok(m, '1100px 이상 틀고정 규칙이 없다');
+  assert.match(m[0], /\.tab-stick\{position:sticky;top:var\(--headH,94px\)/);
+  assert.match(m[0], /#pgFeed \.scroll,#pgPlan \.scroll\{overflow:visible\}/, '넘침 상자가 남으면 표 머리줄이 안 붙는다');
+  assert.match(m[0], /#pgFeed thead th,#pgPlan thead th\{position:sticky;[^}]*top:calc\(var\(--headH,94px\) \+ var\(--tstickH,60px\)\)/);
+  assert.doesNotMatch(src.slice(0, src.indexOf('@media (min-width:1100px){\n  .tab-stick')).split('.tab-stick{background')[1].split('}')[0], /position:sticky/, '좁은 화면에서도 붙으면 화면의 3분의 1을 먹는다');
+});
+test('★ 덩어리 높이는 «재서» 알린다 — 보이는 덩어리만 · 탭을 바꿀 때마다 다시 · 크기가 바뀌면 다시(ResizeObserver)', () => {
+  const sync = src.slice(src.indexOf('function recStickySync'), src.indexOf('function recStickyWatch'));
+  assert.match(sync, /querySelectorAll\('\.tab-stick'\)[\s\S]*?setProperty\('--tstickH'/);
+  assert.match(sync, /if\(th\) root\.style\.setProperty/, '숨은 탭(높이 0)이 값을 0 으로 덮으면 안 된다');
+  const watch = src.slice(src.indexOf('function recStickyWatch'), src.indexOf('function boot'));
+  assert.match(watch, /querySelectorAll\('\.tab-stick'\)[\s\S]*?ro\.observe\(el\)/);
+  const st = src.slice(src.indexOf('function setTab'), src.indexOf("lsSet('tab', t)"));
+  assert.match(st, /\n  recStickySync\(\);/, '탭마다 다시 재야 한다(공고 79px ↔ 발주 46px)');
+  assert.doesNotMatch(st, /if\(t==='rec'\)\{[^}]*recStickySync/, '컨설턴트 모집 탭에서만 재면 다른 탭이 옛 높이를 쓴다');
 });
