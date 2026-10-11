@@ -1719,6 +1719,8 @@ body.portal-mode #moreFab{display:flex;}
     /* 회생광고 — 법원 회생 공고(포괄적 금지명령)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
        ⚠ 대표 전용(adminOnly) — 누구에게 영업 안내를 보낼지는 대표가 정한다. 자료 규칙(rehab_ad)도 관리자만 읽는다. */
     { key:'rehabad', name:'회생광고',     desc:'회생기업 안내 발송', icon:'⚖️', url:'rehab-ad.html',       roles:null, adminOnly:true, row:'sales' },
+    /* 정부지원금 — 지원사업 사전 + 기존·예비 고객사 후보 + 노무사 검토(대표 지시 2026-10-11). 재직 직원 전원(규칙 govaid). */
+    { key:'govaid',  name:'정부지원금',   desc:'지원사업 찾기·검토', icon:'🎯', url:'pu-govaid.html',      roles:null, row:'sales' },
     /* 이름·설명은 **지금 그 앱이 무엇을 하는가**를 적는다(대표 지시 2026-08-10).
        기업정보함은 메일 보내기까지 하고, 사진첩은 현장 사진보다 서류가 더 많다 —
        처음 지을 때의 이름이 하는 일보다 좁아지면 사람이 엉뚱한 타일을 찾는다. */
