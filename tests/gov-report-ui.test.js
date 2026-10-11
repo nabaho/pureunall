@@ -1222,6 +1222,16 @@ test('clinic ⑩ 화면 — 다른 양식의 파일 단추·이름표는 그대�
   assert.strictEqual(s.w.ctx.grpFileLabel('cci-seosan', 'report'), '결과보고서');
 });
 
+test('clinic ⑫ 내려받는 파일 이름 — 별지14(main)는 이제 «현장지도결과서(별지14)» 이름표로 만든다(양식 이름 «…(별지 14)» 이던 전 이름에서 일부러 바뀜), 수행계획서·다른 양식 이름', async () => {
+  const w = aiWorld({ screen: true });
+  const f = Rpt.FORMS.clinic, nm = (fk, file) => w.ctx.grpFileName(Rpt.FORMS[fk].agency, w.ctx.grpFileLabel(fk, file), '다라정밀', '초안');
+  assert.strictEqual(nm('clinic', 'main'), '중소벤처기업부 비즈니스지원단_현장지도결과서(별지14)_다라정밀_초안.hwpx');
+  assert.strictEqual(nm('clinic', 'plan'), '중소벤처기업부 비즈니스지원단_수행계획서(별지11)_다라정밀_초안.hwpx');
+  assert.notStrictEqual(nm('clinic', 'main'), w.ctx.grpFileName(f.agency, f.name, '다라정밀', '초안'), '전 이름(양식 이름)과 다르다 — 의도한 변경');
+  assert.strictEqual(nm('cci-north', 'main'), w.ctx.grpFileName(Rpt.FORMS['cci-north'].agency, Rpt.FORMS['cci-north'].name, '다라정밀', '초안'), '다른 양식 main 이름은 그대로');
+  assert.strictEqual(nm('techguard', 'main'), w.ctx.grpFileName(Rpt.FORMS.techguard.agency, Rpt.FORMS.techguard.name, '다라정밀', '초안'));
+});
+
 test('clinic ⑪ 화면 — 양식 서고 창·서고 현황도 파일 이름표를 같게(plan 이 그냥 «plan» 으로 보이지 않는다)', () => {
   const L = require('../js/pu-gov-report-list.js');
   const fs = L.formsStatus({}, Rpt.FORMS);

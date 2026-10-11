@@ -847,7 +847,7 @@ test('수행계획서 — 일정 묶음 한 칸에 내용은 첫 줄(a)에만, �
   assert.equal(V['지원일수'], '1일');
 });
 
-test('수행계획서 — 회차 0·1·2개: 안 쓴 묶음은 빈칸 한 칸, 모자람 알림, 지원일수는 회차 수', () => {
+test('수행계획서 — 회차 0·1·2개: 안 쓴 묶음은 빈칸 한 칸, 모자람 알림, 지원일수는 서로 다른 날짜 수', () => {
   const emptyFrom = (xml, n) => {
     for (let k = n; k < 3; k++) for (let o = 0; o < 8; o++) assert.equal(textAt(xml, 'T0.C' + (39 + 8 * k + o) + '.P0'), ' ', '묶음 ' + (k + 1) + ' 칸 ' + o);
   };
@@ -859,6 +859,23 @@ test('수행계획서 — 회차 0·1·2개: 안 쓴 묶음은 빈칸 한 칸, �
   assert.equal(r1.short, null); assert.equal(textAt(r1.xml, 'T0.C29.P0'), '1일'); assert.equal(textAt(r1.xml, 'T0.C39.P0'), '6월 11일');
   const r2 = planFill(planReport(2)); planClean(r2); emptyFrom(r2.xml, 2);
   assert.equal(textAt(r2.xml, 'T0.C29.P0'), '2일'); assert.equal(textAt(r2.xml, 'T0.C39.P0'), '4월 16일'); assert.equal(textAt(r2.xml, 'T0.C47.P0'), '6월 11일');
+});
+
+test('수행계획서 — 같은 날 두 회차는 1일(별지14 총수행일수와 같은 값), 일정 묶음은 회차마다 한 칸', () => {
+  const rp = planReport(3);
+  rp.rounds = [{ date: '2025-04-16', visit: true, advice: '오전' }, { date: '2025-04-16', visit: true, advice: '오후' }];
+  const p = planFill(rp); planClean(p);
+  assert.equal(textAt(p.xml, 'T0.C29.P0'), '1일', '1일 1개 지원기업 — 같은 날은 하루');
+  assert.equal(textAt(p.xml, 'T0.C39.P0'), '4월 16일'); assert.equal(textAt(p.xml, 'T0.C47.P0'), '4월 16일', '묶음은 회차마다');
+  assert.equal(textAt(p.xml, 'T0.C41.P0'), '오전'); assert.equal(textAt(p.xml, 'T0.C49.P0'), '오후');
+  assert.equal(textAt(p.xml, 'T0.C55.P0'), ' ');
+  const m = G.fillForm(clinicXml(), 'clinic', 'main', Object.assign(clinicReport(3), { rounds: rp.rounds }));
+  assert.equal(textAt(m.xml, 'T0.C11.P0'), '1일', '별지14 총수행일수도 같다');
+  rp.rounds = [{ date: '2025-06-11' }, { date: '2025-04-16' }, { date: '2025-04-16' }];
+  assert.equal(G.buildValues(rp, 'clinic')['지원일수'], '2일');
+  assert.equal(G.buildValues(rp, 'clinic')['지원일수'], G.buildValues(rp, 'clinic')['총수행일수']);
+  rp.rounds = [{ date: '2025-02-30' }];
+  assert.equal(G.buildValues(rp, 'clinic')['지원일수'], '', '있을 수 없는 날짜만 있으면 모르는 값');
 });
 
 test('수행계획서 — 회차 4개는 셋째까지만 쓰고 넘침을 알린다, 있을 수 없는 날짜는 밑줄', () => {
