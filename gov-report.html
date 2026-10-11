@@ -87,6 +87,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 .bz b{font-size:12px;font-variant-numeric:tabular-nums}
 .docs{background:var(--card);border:1px solid var(--blue-line);border-radius:10px;padding:10px;margin-bottom:10px;overflow:auto}
 .dc-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.dc-wide{overflow-x:auto}
 .dc-l{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 .tag-chk{display:inline-block;border-radius:6px;padding:1px 6px;font-size:11px;background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a}
 .tocb{margin-left:4px}
@@ -207,8 +208,8 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/pu-gov-report-list.js?v=2"></script>
 <!-- 서류 관리(왼쪽 패널)·목차 — 이알피 컨설팅 사업 · 서류 틀 · 체크표 · 목차(순수 함수)
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
-<script src="js/pu-gov-report-track.js?v=4"></script>
-<script src="js/pu-gov-report-docs.js?v=4"></script>
+<script src="js/pu-gov-report-track.js?v=7"></script>
+<script src="js/pu-gov-report-docs.js?v=6"></script>
 <!-- 받은 서류함 — 주소 맞추기(pu-co-thread) · 서버 부르기(rules-v2/mail-orig 의 makeCall) · 후보·연결 열쇠·첨부 받기 순서(순수 함수)
      설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md. 판독기(pdf·xlsx)는 누를 때 vendor/ 에서 싣는다 -->
 <script src="js/pu-co-thread.js?v=3"></script>
@@ -344,10 +345,23 @@ function grRenderDocs(){
   };
   var head='<div class="dc-h"><b>📋 서류 — '+grEsc(erp?erp.name:'')+'</b><span class="tag">'+grEsc(D.KIND_KO[t.plan.kind])+'</span>'
     +(t.plan.check?'<span class="tag-chk">[확인 필요: '+grEsc(t.plan.check)+']</span>':'')
-    +(t.auto&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')+'</div>';
+    +((t.auto||t.big)&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')+'</div>';
   var body;
   if(!tid) body='<div class="empty">'+grEsc(D.UNLINKED)+' — 사업 잇기는 정부사업일정의 ERP 연결에서</div>';
   else if(!t.lines.length) body='<div class="empty">'+grEsc(GR.f.year)+'년에 이 사업 업체가 없습니다</div>';
+  else if(t.big){
+    /* 대형 — 단계(항목)마다 한 열. 단계 칸은 칩이 있을 때만 단추(칸 창) · 키가 없으면 「—」 · 기록을 못 읽었으면 「?」 */
+    var bcell=function(x,c){
+      if(GR.trackErr) return '?';
+      if(!c.chip) return '—';
+      return '<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" data-item="'+grEsc(c.id)+'" title="눌러서 기록">'+chip(c.chip)+'</button>';
+    };
+    body='<div class="dc-wide"><table><thead><tr><th>업체</th>'+t.cols.map(function(c){ return '<th>'+grEsc(c)+'</th>'; }).join('')+'<th>다음 단계</th><th>기한</th><th></th></tr></thead><tbody>'
+      +t.lines.map(function(x){
+        return '<tr><td class="co" title="'+grEsc(x.coName)+'">'+grEsc(x.coName)+'</td>'+x.cells.map(function(c){ return '<td>'+bcell(x,c)+'</td>'; }).join('')
+          +'<td>'+(GR.trackErr?'?':(x.next===undefined?'—':(x.next?grEsc(x.next.name):'모두 끝')))+'</td><td>'+grEsc(x.due||'—')+'</td><td>'+btn(x,'목차')+'</td></tr>';
+      }).join('')+'</tbody></table></div>';
+  }
   else if(t.auto) body='<table><thead><tr><th>업체</th>'+t.cols.map(function(c){ return '<th>'+grEsc(c)+'</th>'; }).join('')+'<th>기한</th><th></th></tr></thead><tbody>'
     +t.lines.map(function(x){
       return '<tr><td class="co" title="'+grEsc(x.coName)+'">'+grEsc(x.coName)+'</td>'+x.cells.map(function(c){ return '<td>'+cell(x,c)+'</td>'; }).join('')
@@ -401,17 +415,19 @@ function grCopyToc(){
 function grCloseToc(){ GR.toc=null; GR.tocMsg=''; GR.tocFail=false; grRenderToc(); }
 /* 칸 창 — 체크표 ③④⑤ 칸 하나. 그 칸의 서류가 여럿이면(기술보호 ④ = 자문 일지 회차 + 서약서·여비·만족도) 서류를 고른다.
    저장은 고른 줄 키 하나만. 기록을 못 읽었으면 열지 않는다 */
-function grOpenCell(coId,typeId,step){
+function grOpenCell(coId,typeId,step,itemId){
   var D=PuGovReportDocs, T=PuGovReportTrack, d=GR.docs||{};
   if(!GR.track||GR.trackErr) return;
   var p=D.pairs(GR.input,typeId,GR.f.year).filter(function(x){ return x.coId===coId; })[0];
   var erp=grErp(GR.f.biz);
   if(!p||!erp) return;
-  var keys=T.keysFor(D.planFor(erp.name),step,Math.max(+p.rounds||0,+p.planned||0));
-  if(!keys.length) return;
   var cons=D.consFor({consultings:d.cons,co:p.co,code:erp.code,typeId:typeId,tmap:d.tmap,biz:d.biz});
-  GR.cw={coId:coId,coName:p.coName,bizNo:String((p.co&&p.co.bizNo)||''),typeId:typeId,rid:p.rid,step:step,keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
-    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:D.planFor(erp.name).key==='techguard',cands:[]};
+  var plan=D.planFor(erp.name), n=Math.max(+p.rounds||0,+p.planned||0);
+  /* 대형 — 항목(itemId) 하나의 줄 키들(월별은 계약 기간의 달) · 간단형은 그 단계의 모든 서류 */
+  var keys=itemId?T.keysForItem(plan,itemId,n,D.monthsFor(cons,p)):T.keysFor(plan,step,n);
+  if(!keys.length) return;
+  GR.cw={coId:coId,coName:p.coName,bizNo:String((p.co&&p.co.bizNo)||''),typeId:typeId,rid:p.rid,step:step,item:itemId||'',keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
+    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:plan.key==='techguard',cands:[]};
   GR.avMsg=''; GR.avErr=false;
   grRenderCell();
   grLoadInbox();
@@ -433,12 +449,13 @@ function grRenderCell(){
   var field=function(name,inner){ return '<label class="cw-f"><span>'+name+'</span>'+inner+'</label>'; };
   var date=function(id,val){ return '<input type="date" id="'+id+'" value="'+grEsc(val||'')+'">'; };
   var h='<div class="toc-box" role="dialog" aria-label="서류 진행 기록">'
-    +'<div class="toc-top"><b>'+grEsc(T.COL_KO[c.step])+' — '+grEsc(c.coName)+'</b><span class="sp"></span>'
+    +'<div class="toc-top"><b>'+grEsc(T.COL_KO[c.step])+(c.item?' · '+grEsc(item.name):'')+' — '+grEsc(c.coName)+'</b><span class="sp"></span>'
     +'<button type="button" data-close onclick="grCloseCell()">닫기</button></div>';
   if(c.keys.length>1) h+=field('서류','<select id="cwKey" onchange="grPickCell(this.value)">'+c.keys.map(function(k){ return opt(k.key,k.name,c.key); }).join('')+'</select>');
   else h+='<div class="toc-h">서류: '+grEsc(item.name)+'</div>';
   h+=field('상태','<select id="cwSt">'+T.ALLOWED[c.step].map(function(s){ return opt(s,T.label(c.step,s),v.st); }).join('')+'</select>');
   if(c.step==='sign') h+=field('발송일',date('cwSent',v.sentAt))+field('회신(스캔 받음)일',date('cwGot',v.gotAt));
+  if(c.step==='plat'||c.step==='report') h+=field('완료일',date('cwGot',v.gotAt));
   if(c.step==='submit') h+=field('제출일',date('cwGot',v.gotAt))
     +field('제출 방식','<select id="cwHow">'+opt('','고르기',v.how||'')+Object.keys(T.HOW).map(function(k){ return opt(k,T.HOW[k],v.how||''); }).join('')+'</select>')
     +'<label class="cw-c"><input type="checkbox" id="cwAck"'+(v.ack?' checked':'')+'> 접수 확인</label>';
@@ -446,7 +463,7 @@ function grRenderCell(){
   if(c.step==='sign') h+='<div class="cw-f"><span>받은 한글 파일</span><button type="button" onclick="grPickHwp()">📂 받은 한글 파일 열어 보기</button>'
     +'<input type="file" id="cwHwp" accept=".hwp,.hwpx" style="display:none" onchange="grOpenHwp(this)">'
     +'<div class="days" id="cwHwpMsg">고른 파일은 이 화면에서만 읽습니다 — 올리지도 저장하지도 않습니다</div></div>';
-  if(c.step==='sign'||c.step==='submit') h+='<div id="cwSend"></div>';
+  if(c.step==='sign'||c.step==='submit'||c.step==='plat'||c.step==='report') h+='<div id="cwSend"></div>';
   h+=field('메모(200자)','<textarea id="cwNote" maxlength="200" rows="3">'+grEsc(v.note||'')+'</textarea>')
     +'<div class="days">메모에 연락처·주민번호 같은 개인정보를 적지 마세요</div>'
     +(rec&&rec.at?'<div class="days">고친 사람 '+grEsc(rec.by||'—')+' · '+grEsc(L.dayOf(rec.at))+'</div>':'')
@@ -611,9 +628,9 @@ function grSay(m,bad){ var e=$('cwSendMsg'); if(e){ e.textContent=m; e.className
 function grRenderSend(){
   var x=grSendCtx(), el=$('cwSend');
   if(!el) return;
-  if(!x||(x.c.step!=='sign'&&x.c.step!=='submit')){ el.innerHTML=''; return; }
+  if(!x||(x.c.step!=='sign'&&x.c.step!=='submit'&&x.c.step!=='plat'&&x.c.step!=='report')){ el.innerHTML=''; return; }
   var S=PuGovReportSend, c=x.c, v=c.draft||x.rec||{st:'none'}, done=v.st==='done', dayOk=function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(d); };
-  var h='<div class="cw-f"><span>✉ '+(c.step==='sign'?'서명 요청':'제출 메일')+'</span>';
+  var h='<div class="cw-f"><span>'+(c.step==='sign'?'✉ 서명 요청':(c.step==='submit'?'✉ 제출 메일':'📝 단계 안내'))+'</span>';
   if(c.step==='sign'){
     if(x.ib.st==='ok'&&x.addrs&&!Object.keys(x.addrs).length) h+='<div class="days">'+grEsc(S.MSG.NO_ADDR)+'</div>';
     else if(!done) h+='<button type="button" onclick="grWriteMail()"'+(x.ib.st==='ok'?'':' disabled')+'>✉ 서명 요청 메일 쓰기</button>';
@@ -640,6 +657,15 @@ function grRenderSend(){
         +'<div class="days">로그인과 «제출» 단추는 사람이 합니다 — 접수 화면을 캡처해 두고 «접수 확인»에 표시하세요</div>';
     }else h+='<div class="days">제출 방식 확인 필요 — 운영지침 도착 뒤 정합니다</div>';
   }
+  /* 대형 단계 안내 — 입력 순서(plat)와 안내 글(plat·report·sign). 값은 항목 틀(DOC_PLANS)의 글자 — 모두 grEsc, 배열은 읽기만 */
+  var guide=false;
+  if(c.step==='plat'&&Array.isArray(x.plan.steps)&&x.plan.steps.length){
+    guide=true;
+    h+='<div class="days">입력 순서</div><ol class="days">'+x.plan.steps.map(function(s){ return '<li>'+grEsc(s)+'</li>'; }).join('')+'</ol>'
+      +'<div class="days">로그인과 최종 제출은 사람이 합니다 — 접수 화면을 캡처해 두세요</div>';
+  }
+  if((c.step==='plat'||c.step==='report'||c.step==='sign')&&typeof x.plan.note==='string'&&x.plan.note){ guide=true; h+='<div class="days">안내: '+grEsc(x.plan.note)+'</div>'; }
+  if((c.step==='plat'||c.step==='report')&&!guide){ el.innerHTML=''; return; }
   h+='<div class="days" id="cwSendMsg"></div></div>';
   el.innerHTML=h;
 }
@@ -860,6 +886,9 @@ function grRenderForms(){
 function grRenderAlerts(){
   var L=PuGovReportList, T=PuGovReportTrack, rows=L.filterRows(GR.rows,{year:GR.f.year});
   var a=L.alerts(rows,GR.today), x=T.alertsExtra(rows,GR.today);
+  /* 막힌 단계 — 현황판 줄이 아니라 기록에서 직접(대형 사업은 줄이 없는 일이 많다). 기록을 못 읽었으면 개수 「?」·목록 없음 */
+  var d=GR.docs||{}, blocked=(d.loaded&&!d.err&&!GR.trackErr)?PuGovReportDocs.blockedAlerts({input:GR.input,year:GR.f.year,track:GR.track,biz:d.biz,tmap:d.tmap,consultings:d.cons}):[];
+  var bline=function(e){ return '<li><a href="'+grEsc(L.reportHref(e.coId,e.typeId))+'">'+grEsc(e.coName)+' · '+grEsc(e.typeName)+'</a> <span class="days">'+grEsc(e.items.map(function(b){ return b.name+(b.note?' ('+b.note+')':''); }).join(' · '))+'</span></li>'; };
   var line=function(r,txt){ return '<li><a href="'+grEsc(L.reportHref(r.coId,r.typeId))+'">'+grEsc(r.coName)+' · '+grEsc(r.typeName)+'</a> <span class="days">'+grEsc(txt)+'</span></li>'; };
   $('alerts').innerHTML='<div class="al-h">종료 후 '+L.UNWRITTEN_DAYS+'일 넘은 미작성 <b>'+a.unwritten.length+'</b></div><ul>'
     +a.unwritten.map(function(r){ return line(r,'종료 '+r.st.days+'일'); }).join('')+'</ul>'
@@ -869,6 +898,8 @@ function grRenderAlerts(){
     +x.waitSign.map(function(e){ return line(e.row,'회신 '+e.days+'일째'); }).join('')+'</ul>'
     +'<div class="al-h">제출 기한 지남 <b>'+x.overdue.length+'</b></div><ul>'
     +x.overdue.map(function(e){ return line(e.row,'기한 '+e.due); }).join('')+'</ul>'
+    +'<div class="al-h">막힌 단계 <b>'+(GR.trackErr?'?':blocked.length)+'</b></div><ul>'
+    +blocked.map(bline).join('')+'</ul>'
     +(GR.trackErr?'<div class="err-s">'+grEsc(T.LOAD_FAIL)+'</div>':'');
 }
 function grRender(){
@@ -975,7 +1006,7 @@ function grBoot(){
   });
   ['rows','docs'].forEach(function(id){ $(id).addEventListener('click',function(e){
     var c=e.target&&e.target.closest?e.target.closest('[data-cell]'):null;
-    if(c){ grOpenCell(c.getAttribute('data-co'),c.getAttribute('data-ty'),c.getAttribute('data-step')); return; }
+    if(c){ grOpenCell(c.getAttribute('data-co'),c.getAttribute('data-ty'),c.getAttribute('data-step'),c.getAttribute('data-item')||''); return; }
     var b=e.target&&e.target.closest?e.target.closest('[data-toc]'):null;
     if(b) grOpenToc(b.getAttribute('data-co'),b.getAttribute('data-ty'));
   }); });
