@@ -633,12 +633,61 @@ function 자동정찰자리(로고글번호) {
     자문사새글: ORIGIN + "/index.php?mid=partner_board&act=dispBoardWrite",
     구성원새글: ORIGIN + "/index.php?mid=people_board&act=dispBoardWrite",
     구성원쪽: ORIGIN + "/people",
-    구성원쪽고치기: ORIGIN + "/index.php?mid=people&act=dispPageAdminContentModify"
+    구성원쪽고치기: ORIGIN + "/index.php?mid=people&act=dispPageAdminContentModify",
+    /* 3차 정찰 — 레이아웃 목록 둘. 목록에서 번호를 읽어 레이아웃마다 설정 칸·코드 화면을 연다(레이아웃자리).
+       ⚠ 화면 이름은 라이믹스 공개 소스(modules/layout/layout.admin.view.php)에서 «확인한» 것이다.
+         처음엔 dispLayoutAdminContent 라고 썼는데 그런 화면은 없다 — 검사는 통과했지만 실제로는 번호를 못 읽었을 것이다. */
+    레이아웃목록: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminInstalledList",
+    레이아웃인스턴스: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminAllInstanceList"
   };
   if (Number.isInteger(n) && n > 0) {
     자리.자문사옛글 = ORIGIN + "/index.php?mid=partner_board&act=dispBoardWrite&document_srl=" + n;
   }
   return 자리;
+}
+
+/* ══════ 3차 정찰(2026-10-11) — 일반직원 5명의 이름이 «입력 칸»인지 «코드 속 글자»인지 ══════
+   대표 지시 「일반직원 5명 자동화」. 직원 이름은 게시판 글도 쪽 본문도 아니다(2차 정찰). 레이아웃 쪽에
+   있다는 것까지만 알고, 그것이 «레이아웃 설정 입력 칸»(칸 하나씩 안전하게 고칠 수 있음)인지
+   «레이아웃 코드 속 글자»(사이트 전체 틀을 저장해야 함 — 위험)인지는 아무도 안 봤다. 쓰기를 짓기 전에 «본다».
+   ★ 2차 정찰에서 이름 자리가 비었던 까닭 — 찾을 이름을 «우리 구성원 자료»에서 가져왔는데 거기엔 노무사만 있었다.
+     이번에는 공개 홈페이지의 직원 줄에서 이름을 «직접» 읽어 찾는다.
+   ⚠ 읽기만. 이름은 기록에 안 남는다(이름자리모양 이 «NAME» 으로 가린다). 레이아웃 번호는 숫자만 받는다. */
+const 직원줄 = /<div class="people_box">\s*<div class="text1">([^<]{1,40})<\/div>/g;
+function 직원이름뽑기(공개쪽html) {
+  const 이름들 = [];
+  for (const m of String(공개쪽html || "").matchAll(직원줄)) {
+    const n = 이름다듬기(글자되돌리기(m[1]));
+    if (n && 이름들.indexOf(n) < 0) 이름들.push(n);
+  }
+  return 이름들.slice(0, 12);
+}
+/* 레이아웃 목록 화면에서 레이아웃 번호만 — 숫자만, 여덟 개까지 */
+function 레이아웃번호들(목록html) {
+  const 번호들 = [];
+  for (const m of String(목록html || "").matchAll(/layout_srl=(\d{1,9})/g)) {
+    const n = Number(m[1]);
+    if (Number.isInteger(n) && n > 0 && 번호들.indexOf(n) < 0) 번호들.push(n);
+  }
+  return 번호들.slice(0, 8);
+}
+/* 레이아웃 하나의 «읽는 화면» 둘 — 설정 칸(Modify)과 코드 편집(Edit). 숫자가 아니면 빈 손. */
+function 레이아웃자리(번호) {
+  const n = Number(번호);
+  if (!Number.isInteger(n) || n <= 0) return {};
+  return {
+    설정칸: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminModify&layout_srl=" + n,
+    코드: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminEdit&layout_srl=" + n
+  };
+}
+/* 레이아웃의 «기술 이름»(예: 제작사 레이아웃 폴더 이름) — 영문·숫자·밑줄만 받는다. 다른 글자는 안 담는다. */
+function 레이아웃이름(html) {
+  for (const m of String(html || "").matchAll(/<input\b[^>]*>/gi)) {
+    if (속성(m[0], "name") !== "layout") continue;
+    const v = 속성(m[0], "value");
+    if (/^[A-Za-z0-9_]{2,40}$/.test(v)) return v;
+  }
+  return "";
 }
 
 /* 숨은 칸 가운데 «번호»만 — 이름이 srl 로 끝나고 값이 숫자인 것.
@@ -876,7 +925,8 @@ module.exports = {
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
   내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리, 새구성원몸통, 새글번호,
-  편집기단서, 본문모양, 이름자리모양, 편집기번호, 로고올리기몸통, 올리기답풀기, 로고새글몸통,
+  편집기단서, 본문모양, 이름자리모양, 직원이름뽑기, 레이아웃번호들, 레이아웃자리, 레이아웃이름,
+  편집기번호, 로고올리기몸통, 올리기답풀기, 로고새글몸통,
   파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
 };

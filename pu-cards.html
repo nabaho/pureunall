@@ -41,7 +41,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=64"></script>
+<script src="js/pu-ontology.js?v=65"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
@@ -3565,7 +3565,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=24"></script>
+  <script src="js/pu-appbar.js?v=26"></script>
   <script src="js/pu-handoff.js?v=1"></script>
   <script src="js/pu-doc-pick.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -6921,6 +6921,9 @@ function selToNewsletter(){
         if(이미열쇠[열쇠] || 이미주소[주소]){ 건너뜀++; return; }
         묶음[열쇠] = { 이름: it.name||'', 소속: it.company||'', 직책: it.title||'',
                        주소: 주소, 전화: it.mobile||it.phone||'',
+                       /* 회사 주소 (2026-10-11) — 뉴스레터가 그분의 «지역 소식»을 고르는 데 쓴다.
+                          ⚠ 「주소」 는 메일 주소다. 색인(idxRecord)과 같은 칸을 읽는다. */
+                       사업장주소: (it.kind==='biz' ? it.address : it.companyAddr)||'',
                        출처: '명함', 명함번호: String(it.id||''),
                        담은날: 오늘, 담은이: myEmail||'', 동의: false };
       });

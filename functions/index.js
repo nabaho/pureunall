@@ -4786,10 +4786,23 @@ async function 홈자동정찰(그릇) {
       .map((m) => String(m.name || "").trim()).filter(Boolean).slice(0, 20);
   } catch (e) { /* 이름을 못 읽으면 이름 자리만 빠진다 */ }
   const 결과 = { at: Date.now(), 판: HA.정찰판, 대상: {} };
+  let 레이아웃번호 = [];
   for (const 이름 of Object.keys(자리)) {
     try {
       const g = await 홈부르기(자리[이름], 그릇);
       const 화면 = await g.text();
+      /* 3차 정찰 — 찾을 직원 이름을 «공개 홈페이지의 직원 줄»에서 직접 읽는다(구성원 자료엔 노무사뿐이었다).
+         ⚠ 구성원쪽이 구성원쪽고치기보다 «먼저» 열린다(객체 순서) — 그래서 거기서 쓸 수 있다. */
+      if (이름 === "구성원쪽") {
+        const 공개이름 = HW.직원이름뽑기(화면);
+        if (공개이름.length) 직원이름들 = 공개이름;
+        결과.직원줄수 = 공개이름.length;
+      }
+      /* 목록 둘(설치된 레이아웃·모든 인스턴스)에서 번호를 모은다 — 겹침 없이 */
+      if (이름 === "레이아웃목록" || 이름 === "레이아웃인스턴스") {
+        /* ⚠ 배열을 «.push» 로 늘리지 않는다 — 「정찰은 읽기만」 검사가 .push( 를 쓰기로 읽는다(배열 push 도) */
+        레이아웃번호 = 레이아웃번호.concat(HW.레이아웃번호들(화면).filter((n) => 레이아웃번호.indexOf(n) < 0)).slice(0, 8);
+      }
       const 본 = HW.정찰(화면);
       const 채움 = HW.채운칸들(화면);
       const 본문값 = String((HW.칸읽기(화면).칸 || {}).content || "");
@@ -4801,6 +4814,27 @@ async function 홈자동정찰(그릇) {
       if (이름 === "구성원쪽고치기") 결과.대상[이름].이름자리 = HW.이름자리모양(본문값, 직원이름들);
     } catch (e) {
       결과.대상[이름] = { 막힘: String((e && e.message) || e) };
+    }
+  }
+  /* 3차 정찰(판 3) — 레이아웃마다 «설정 칸»과 «코드» 읽는 화면을 열어, 직원 이름이 어디에 있는지만 본다.
+     ★ 이름이 «입력 칸(설정값)»에 있으면 칸 하나씩 안전하게 고칠 수 있고, «코드 속 글자»면 틀 전체를 저장해야 한다.
+     ⚠ 읽기만 — 값·코드는 한 글자도 안 남긴다. 이름은 NAME 으로 가리고 몇 번 나왔는지·어떤 모양 안인지만. */
+  결과.레이아웃 = {};
+  for (const n of 레이아웃번호) {
+    결과.레이아웃[n] = {};
+    const 칸들 = HW.레이아웃자리(n);
+    for (const 종류 of Object.keys(칸들)) {
+      try {
+        const g = await 홈부르기(칸들[종류], 그릇);
+        const 화면 = await g.text();
+        const 본 = HW.정찰(화면);
+        결과.레이아웃[n][종류] = { 상태: g.status, 옮김: (g.headers.get("location") || "").replace(HW.ORIGIN, ""),
+          크기: 본.크기, 글칸: 본.글칸, 넓은칸: 본.넓은칸, 숨은칸: 본.숨은칸, 이름표: 본.이름표, 행위들: 본.행위들,
+          채운칸: HW.채운칸들(화면).채운칸, 레이아웃이름: HW.레이아웃이름(화면),
+          이름자리: HW.이름자리모양(화면, 직원이름들) };
+      } catch (e) {
+        결과.레이아웃[n][종류] = { 막힘: String((e && e.message) || e) };
+      }
     }
   }
   /* ⚠ 데이터베이스는 «undefined» 가 든 값을 통째로 거부한다 — 2026-10-05 2차 정찰이 그 탓에 조용히
@@ -4959,6 +4993,15 @@ async function 홈자동한번(방식, 받은지문, 누가) {
         const 까닭 = String((e && e.message) || e);
         return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: 까닭 }));
       }
+    },
+    /* 쓰는 일은 한 번에 하나만 (2026-10-11) — 잡으면 «풀기» 함수를, 남이 쥐고 있으면 null 을 준다.
+       ⚠ 찬 자리(null)로 먼저 불려도 잠금 몸통이 값을 내므로 접히지 않는다(서버가 진짜 값으로 다시 부른다). */
+    잠그기: async (p, 지금) => {
+      const r = await db.ref(p).transaction((cur) => HA.잠금몸통(cur, 지금, 누가));
+      if (!r || !r.committed) return null;
+      return async () => {
+        await db.ref(p).transaction((cur) => (cur && cur.at === 지금 ? null : cur)).catch(() => {});
+      };
     },
     지금: () => Date.now(),
     달: 서울달,

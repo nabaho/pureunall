@@ -333,3 +333,11 @@ test('Meet 이 되면 — 요청 한 번, conferenceDataVersion 이 붙고 기�
   assert.match(urls[0], /sendUpdates=none&conferenceDataVersion=1$/);
   assert.strictEqual(db.data.data.my_schedules.v.sch_1.gcalProxyErr, null);
 });
+
+test('첨부파일 — 구글 드라이브 링크만, 화면·서버 몸이 같다', () => {
+  const ev = { summary: '자료', date: '2026-10-20', time: '', attachments: ['https://drive.google.com/file/d/abc/view', 'https://evil.example/x', 'http://drive.google.com/a'] };
+  const 서버 = P.bodyOf(ev);
+  assert.deepStrictEqual(서버.attachments, [{ fileUrl: 'https://drive.google.com/file/d/abc/view', title: '첨부파일' }]);
+  assert.deepStrictEqual(서버, AUTH.bodyOf(ev));
+  assert.strictEqual(P.bodyOf({ summary: 'a', date: '2026-10-20' }).attachments, undefined);
+});

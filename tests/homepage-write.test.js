@@ -619,6 +619,81 @@ test('이름자리모양 — 이름은 안 남기고 «몇 번째 이름이 몇 
   ['홍길동', '사무장', '없는사람'].forEach(v => assert.ok(!글.includes(v), '값이 새었다: ' + v));
   assert.ok(r[0].모양[0].includes('<span class="nm">'), '이름을 둘러싼 태그 모양이 안 보입니다: ' + r[0].모양[0]);
 });
+
+/* ══════ 3차 정찰 — 일반직원 이름이 «입력 칸»인지 «코드 속 글자»인지 (2026-10-11) ══════
+   2차 정찰에서 이름 자리가 비었던 까닭 — 찾을 이름을 구성원 자료(노무사뿐)에서 가져왔다.
+   이제 공개 홈페이지의 직원 줄에서 «직접» 읽는다. ★ 이름은 예시(홍길동·김가나)만. */
+const 공개쪽 = (이름들) => '<div class="bh_row">' + 이름들.map(n =>
+  '<div class="lg:col-2_5 col-6"><div class="people_box"><div class="text1">' + n + '</div><div class="text2">사무장</div></div></div>').join('')
+  + '</div><div class="bh_row"><div class="person"><div class="text1">노무사글</div></div></div>';
+
+test('직원이름뽑기 — 공개 쪽의 직원 줄(people_box)에서만 이름을 읽는다', () => {
+  assert.deepEqual(W.직원이름뽑기(공개쪽(['홍길동', '김가나', '이다라'])), ['홍길동', '김가나', '이다라']);
+  assert.deepEqual(W.직원이름뽑기('<div class="person"><div class="text1">노무사글</div></div>'), [],
+    '직원 줄이 아닌 text1 까지 이름으로 읽었습니다');
+  assert.deepEqual(W.직원이름뽑기(공개쪽(['홍길동', '홍길동'])), ['홍길동'], '같은 이름이 두 번 들어갑니다');
+  assert.deepEqual(W.직원이름뽑기(''), []);
+  assert.deepEqual(W.직원이름뽑기(null), []);
+});
+
+test('직원이름뽑기 — 열두 명까지만, 글자가 지나치게 긴 줄은 안 읽는다', () => {
+  const 많이 = Array.from({ length: 20 }, (_, i) => '직원' + String.fromCharCode(0xAC00 + i));
+  assert.equal(W.직원이름뽑기(공개쪽(많이)).length, 12);
+  assert.deepEqual(W.직원이름뽑기(공개쪽(['가'.repeat(60)])), [], '40자를 넘는 줄을 이름으로 읽었습니다');
+});
+
+test('레이아웃번호들 — 숫자만, 겹침 없이, 여덟 개까지', () => {
+  const 목록 = '<a href="?act=dispLayoutAdminModify&layout_srl=12">a</a><a href="?layout_srl=12">b</a>'
+    + '<a href="?layout_srl=7">c</a><a href="?layout_srl=abc">d</a><a href="?layout_srl=0">e</a>';
+  assert.deepEqual(W.레이아웃번호들(목록), [12, 7]);
+  const 열 = Array.from({ length: 12 }, (_, i) => 'layout_srl=' + (i + 1)).join(' ');
+  assert.equal(W.레이아웃번호들(열).length, 8);
+  assert.deepEqual(W.레이아웃번호들(''), []);
+});
+
+test('레이아웃자리 — 읽는 화면 둘(disp…)뿐이고, 숫자가 아니면 아무것도 안 준다', () => {
+  const 칸 = W.레이아웃자리(12);
+  assert.deepEqual(Object.keys(칸).sort(), ['설정칸', '코드']);
+  Object.keys(칸).forEach(k => {
+    assert.ok(칸[k].startsWith('https://xn--o80bs5mdnbm0bf80anms.kr/'), k + ' 가 우리 홈페이지가 아닙니다');
+    assert.match(칸[k], /act=dispLayoutAdmin(Modify|Edit)&layout_srl=12$/);
+    assert.ok(!/act=proc/i.test(칸[k]), k + ' 가 «하는» 주소(proc)입니다');
+  });
+  ['1;x', '../1', '', null, undefined, -3, 0, '12 or 1'].forEach(v =>
+    assert.deepEqual(W.레이아웃자리(v), {}, JSON.stringify(v) + ' 로 주소를 지었습니다'));
+});
+
+test('레이아웃이름 — 영문·숫자·밑줄만 받고, 한글·기호가 든 값은 안 담는다', () => {
+  assert.equal(W.레이아웃이름('<input type="hidden" name="layout" value="abc_layout">'), 'abc_layout');
+  assert.equal(W.레이아웃이름('<input value="abc_layout" name="layout" type="hidden">'), 'abc_layout');
+  assert.equal(W.레이아웃이름('<input type="hidden" name="layout" value="홍길동">'), '', '한글 값을 담았습니다');
+  assert.equal(W.레이아웃이름('<input type="hidden" name="layout" value="a b;c">'), '');
+  assert.equal(W.레이아웃이름('<input type="hidden" name="other" value="abc">'), '');
+});
+
+test('★ 3차 정찰 기록에 이름·코드가 새지 않는다 — 입력 칸 안과 코드 속 모두', () => {
+  /* 이름이 «설정 칸 값»에도, «코드 글자»에도 있는 가짜 레이아웃 화면 */
+  const 화면 = '<form><input type="hidden" name="layout" value="abc_layout">'
+    + '<input type="text" name="staff1" value="홍길동"><textarea name="code_layout">'
+    + '&lt;div class="text1"&gt;홍길동&lt;/div&gt;&lt;div class="text1"&gt;김가나&lt;/div&gt;</textarea></form>';
+  const 이름들 = ['홍길동', '김가나', '이다라'];
+  const 기록 = { 정찰: W.정찰(화면), 채운칸: W.채운칸들(화면).채운칸, 이름: W.레이아웃이름(화면),
+    이름자리: W.이름자리모양(화면, 이름들) };
+  const 글 = JSON.stringify(기록);
+  이름들.forEach(v => assert.ok(!글.includes(v), '이름이 기록에 새었습니다: ' + v));
+  assert.equal(기록.이름자리[0].수, 2, '입력 칸 값과 코드 속 두 곳을 다 세야 합니다');
+  assert.equal(기록.이름자리[2].수, 0);
+  assert.ok(기록.채운칸.includes('staff1'), '값이 든 입력 칸의 «이름»은 보여야 어디에 있는지 압니다');
+});
+
+test('자동 정찰 자리에 레이아웃 목록 둘이 있다 — 라이믹스에 «실제로 있는» 읽는 화면이다', () => {
+  const 자리 = W.자동정찰자리(185);
+  /* ⚠ 2026-10-11 — 처음엔 dispLayoutAdminContent 라고 썼다. 라이믹스 공개 소스
+     (modules/layout/layout.admin.view.php)의 화면 이름은 아래 둘이다. 없는 이름이면 번호를 못 읽어
+     레이아웃 정찰이 통째로 비는데, 검사는 «우리가 쓴 이름»만 보니 통과했다. 이름을 «고정»해 둔다. */
+  assert.ok(/act=dispLayoutAdminInstalledList$/.test(자리.레이아웃목록 || ''), String(자리.레이아웃목록));
+  assert.ok(/act=dispLayoutAdminAllInstanceList$/.test(자리.레이아웃인스턴스 || ''), String(자리.레이아웃인스턴스));
+});
 /* ══════ 2단계 — 새 거래처 로고 글 짓기 (2026-10-05) ══════
    절차는 라이믹스 공개 파일(common/js/plugins/jquery.fileupload/js/main.js)이 하는 그대로다:
    ① 새 글 화면의 편집기 번호(data-editor-sequence) ② procFileUpload 로 그림 올리기

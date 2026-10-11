@@ -72,6 +72,8 @@ function boot(over) {
    'erpLearnPayerAlias', 'erpAutoMarkCompanyIncome'].forEach((n) => {
     vm.runInContext(cutFn(SRC, 'function ' + n + '('), ctx);
   });
+  // «이미 냈나» 는 공용 판정(erpAdvisoryPaidFor)이 정한다 — 그 묶음도 진짜를 싣는다
+  vm.runInContext(require('./fin-one-rule-src').finRuleSrc(SRC), ctx);
   return ctx;
 }
 

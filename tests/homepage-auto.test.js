@@ -148,9 +148,17 @@ test('명부·업체관리를 못 읽었거나 비었으면 실패이고 아무�
 /* ══════ 한 번 돌기 — 도구(읽기·쓰기·내리기)를 가짜로 넣어 실제로 돌린다 ══════ */
 function 가짜(자료, 내리기답) {
   const 쓴것 = [], 붙인것 = [], 내린것 = [];
+  /* 잠금 한 칸 — 진짜 규칙(HA.잠금몸통)으로 잡고 푼다 */
+  const 잠금 = { 값: 자료['homepage/auto/lock'] || null, 푼횟수: 0 };
   return {
-    쓴것, 붙인것, 내린것,
+    쓴것, 붙인것, 내린것, 잠금,
     도구: {
+      잠그기: async (p, 지금) => {
+        const 새 = HA.잠금몸통(잠금.값, 지금, 'auto');
+        if (새 === undefined) return null;
+        잠금.값 = 새;
+        return async () => { 잠금.푼횟수++; if (잠금.값 && 잠금.값.at === 지금) 잠금.값 = null; };
+      },
       읽기: async (p) => 자료[p],
       쓰기: async (p, v) => { 쓴것.push([p, v]); },
       덧붙이기: async (p, v) => { 붙인것.push([p, v]); },
@@ -175,6 +183,50 @@ function 멈춤자료() {
   자료['data/user_dir'] = 여럿.roster; 자료['homepage/members'] = 여럿.members;
   return 자료;
 }
+
+/* ══════ 2026-10-11 — 동시 실행 잠금 ══════
+   매달 08:00 실행과 「지금 돌리기」가 겹치면 둘 다 «아직 안 올림»을 읽고 둘 다 올렸다. */
+test('★★ 다른 실행이 잠금을 쥐고 있으면 «아무것도» 안 하고 바쁘다고 한다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/auto/lock'] = { at: 1000 - 60 * 1000, by: 'monthly' };   // 1분 전에 잡힘
+  const g = 가짜(자료);
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(r.ok, false);
+  assert.ok(r.바쁨, '★ 바쁘다고 안 알린다');
+  assert.strictEqual(g.내린것.length + g.쓴것.length + g.붙인것.length, 0,
+    '★★ 남이 도는 중인데 내리거나 썼다 — 같은 글이 두 번 올라간다');
+});
+
+test('★ 오래된(15분 넘은) 잠금은 죽은 것으로 보고 넘겨받는다 — 함수가 죽으면 영영 못 돈다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/auto/lock'] = { at: 1000 - HA.잠금유효ms - 1, by: 'dead' };
+  const g = 가짜(자료);
+  const r = await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.내린것.length, 2, '★ 죽은 잠금 때문에 영영 안 돈다');
+  assert.ok(!r.바쁨);
+});
+
+test('★★ 다 돌면 잠금을 푼다 — 실패해도 푼다', async () => {
+  const g = 가짜(퇴사자료());
+  await HA.돌기('돌리기', '', g.도구);
+  assert.strictEqual(g.잠금.값, null, '★★ 다 돌았는데 잠금이 남았다 — 15분 동안 아무도 못 돌린다');
+  const 터짐 = 가짜(퇴사자료());
+  터짐.도구.내리기 = async () => { throw new Error('그물 끊김'); };
+  await assert.rejects(HA.돌기('돌리기', '', 터짐.도구));
+  assert.strictEqual(터짐.잠금.값, null, '★★ 도중에 터지자 잠금이 남았다');
+});
+
+test('보기는 잠그지 않는다 — 아무것도 안 쓴다', async () => {
+  const 자료 = 퇴사자료(); 자료['homepage/auto/lock'] = { at: 1000 - 1000, by: 'monthly' };
+  const r = await HA.돌기('보기', '', 가짜(자료).도구);
+  assert.strictEqual(r.내릴것.length, 2, '★ 남이 돌리는 중이라고 미리 보기까지 막혔다');
+});
+
+test('★ 「남기기」(사유 있음)는 직원과 안 이어져 있어도 «연결 확인»에 안 뜬다 — 매달 소음', () => {
+  const r = HA.고르기(기본({ members: { m1: { srl: 322, keepOnSite: { why: '지사장 — 고용관계 아님' } } } }));
+  assert.strictEqual(r.연결확인.length, 0, '★ 남기기로 정한 분을 매달 「연결 확인」으로 띄운다');
+  /* 사유 없는 남기기는 남기기가 아니다 — 그대로 알린다 */
+  const r2 = HA.고르기(기본({ members: { m1: { srl: 322, keepOnSite: {} } } }));
+  assert.strictEqual(r2.연결확인.length, 1);
+});
 
 test('보기는 아무것도 쓰지도 내리지도 않는다', async () => {
   const g = 가짜(퇴사자료());
@@ -263,7 +315,15 @@ test('기록에는 이름을 담지 않는다', async () => {
 
 /* ══════ 2단계 — 새 거래처 로고 «올리기» 고르기 ══════ */
 const 올릴회사 = (더) => Object.assign({ posted: true, consent: { date: '2026-10-05', by: '관리자', at: 1 },
-  logo: { bytes: 9000, w: 300, h: 80, at: 1 } }, 더 || {});
+  logo: { bytes: 9000, w: 300, h: 80, at: 1 }, notOnSite: { at: '2026-10-11', by: '관리자' } }, 더 || {});
+
+test('★★ 「지금 홈페이지에 없음」 확인이 없으면 로고를 올리지 않는다 — 손으로 올린 것과 두 장이 걸린다', () => {
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사() } })).올릴것.length, 1);
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ notOnSite: null }) } })).올릴것.length, 0,
+    '★★ 홈페이지에 이미 있는지 아무도 안 봤는데 올린다');
+  assert.strictEqual(HA.고르기(기본({ partners: { C1: 올릴회사({ notOnSite: {} }) } })).올릴것.length, 0,
+    '★ 빈 확인을 확인으로 쳤다');
+});
 
 test('올림 표시·공개 동의·로고가 다 있고 아직 안 이은 거래 중 회사는 올릴 것에 든다', () => {
   const r = HA.고르기(기본({ partners: { C1: 올릴회사() } }));

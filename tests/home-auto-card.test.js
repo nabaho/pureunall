@@ -46,7 +46,14 @@ function 상자(더) {
     toast() {}, say: async () => {}, askYes: async () => true,
     openModal() {}, closeModal() {}, modalHead: (t) => '<h2>' + t + '</h2>', modalFoot: () => '',
     firebase: { auth: () => ({ currentUser: { getIdToken: async () => 'tok' } }) },
-    fetch: async (url, opt) => { 부른것.push([url, JSON.parse(opt.body)]); return { ok: true, status: 200, json: async () => ({ ok: true, 내림: [], 못내림: [], 내릴것: [] }) }; },
+    /* 가짜 서버 — «보기»에는 보기답(내릴 것·올릴 것)을, 쓰는 부름에는 결과를 준다 */
+    fetch: async (url, opt) => {
+      const 몸 = JSON.parse(opt.body);
+      부른것.push([url, 몸]);
+      const 답 = 몸.mode === '보기' ? (ctx.보기답 || { ok: true, 내릴것: [], 올릴것: [] })
+                                     : (ctx.돌린답 || { ok: true, 내림: [], 못내림: [], 내릴것: [] });
+      return { ok: true, status: 200, json: async () => 답 };
+    },
     db: { ref: () => ({ once: async () => ({ val: () => null }) }) },
     window: {}
   }, 더 || {});
@@ -55,9 +62,32 @@ function 상자(더) {
   vm.runInContext([constLine('HOME_AUTO_URL'), fnSource('다음자동날'), fnSource('마지막자동'),
     fnSource('자동카드Html'), fnSource('자동부르기'), fnSource('자동지금돌리기'), fnSource('자동승인'),
     fnSource('자동대상이름'), fnSource('자동기록다시읽기'), fnSource('자동줄목록'),
-    fnSource('자동결과알리기')].join('\n'), ctx);
+    fnSource('자동결과알리기'), fnSource('자동멈춘목록보기')].join('\n'), ctx);
   return ctx;
 }
+
+/* ══════ 2026-10-11 화면 ══════ */
+test('★★ 멈춤의 「하나씩 보기」는 멈춘 «그 목록»을 보인다 — 서버에 다시 묻지 않는다', () => {
+  let 창 = '';
+  const ctx = 상자({ openModal: (h) => { 창 = String(h); } });
+  ctx.App.members = { m1: { name: '홍길동' }, m2: { name: '김가나' } };
+  ctx.App.autoRuns = 기록({ 멈춤: '6건', 지문: 'x', 후보: [{ 종류: '퇴사', key: 'm1' }, { 종류: '퇴사', key: 'm2' }] });
+  ctx.자동멈춘목록보기();
+  assert.ok(창.includes('홍길동') && 창.includes('김가나'), '★★ 멈춘 목록이 안 보입니다');
+  assert.strictEqual(ctx.부른것.length, 0, '★★ 서버에 다시 물었습니다 — 승인할 목록과 다를 수 있습니다');
+  const 할일 = fnSource('jobsOf');
+  assert.match(할일, /onclick="자동멈춘목록보기\(\)"/, '★ 멈춤 할 일의 「하나씩 보기」가 멈춘 목록으로 안 갑니다');
+});
+
+test('★ 자동 연결 카드는 「미리 보기」라 부르지 않는다 — 위 띠 「👁 미리보기」와 헷갈린다', () => {
+  const h = 상자().자동카드Html();
+  assert.ok(!/>\s*미리 ?보기\s*</.test(h), '★ 이름이 겹칩니다: ' + h);
+});
+
+test('★ 구성원 편집칸 — 내린 표시가 있으면 «내린 표시 지우기»를 보인다', () => {
+  const 몸 = fnSource('memberBandHtml');
+  assert.match(몸, /rec\.takenDown[\s\S]{0,120}내린표시줄Html\('member'/, '★ 재입사해도 내린 표시를 지울 길이 없습니다');
+});
 const 기록 = (r) => ({ '2026-10': { a: Object.assign({ at: 5, 방식: '돌리기', ok: true, 내림: [], 못내림: [], 멈춤: '', 후보: [] }, r) } });
 
 test('다음 돌 때는 «다음 달 1일» — 해가 바뀌는 달도', () => {
@@ -101,18 +131,50 @@ test('카드 — 미리 보기·지금 돌리기·기록 단추가 있다', () =
   for (const f of ['자동미리보기()', '자동지금돌리기()', '자동기록창()']) assert.ok(h.includes(f), f + ' 가 없습니다');
 });
 
-test('지금 돌리기 — «예»를 안 누르면 서버를 안 부른다', async () => {
-  const ctx = 상자({ askYes: async () => false });
+/* ⚠ 2026-10-11 — 「지금 돌리기」는 먼저 «보기»로 물어 목록을 보여 준 뒤 «예»를 받는다.
+     그래서 «서버를 한 번도 안 부른다»가 아니라 «홈페이지를 바꾸는 부름(돌리기)이 없다»가 규칙이다. */
+const 한건 = { ok: true, 내릴것: [{ 종류: '퇴사', srl: 1, key: 'm1' }], 올릴것: [] };
+const 모드들 = (ctx) => ctx.부른것.map(x => x[1].mode);
+
+test('지금 돌리기 — «예»를 안 누르면 홈페이지를 바꾸는 부름이 없다', async () => {
+  const ctx = 상자({ askYes: async () => false, 보기답: 한건 });
   await ctx.자동지금돌리기();
-  assert.strictEqual(ctx.부른것.length, 0);
+  assert.ok(!모드들(ctx).includes('돌리기'), '★★ 묻기 전에 돌렸습니다: ' + 모드들(ctx).join(','));
 });
 
-test('지금 돌리기 — «예»를 누르면 «돌리기»로 부른다', async () => {
-  const ctx = 상자();
+test('지금 돌리기 — «보기»로 먼저 묻고, «예»를 누르면 «돌리기»로 부른다', async () => {
+  const ctx = 상자({ 보기답: 한건 });
   await ctx.자동지금돌리기();
-  assert.strictEqual(ctx.부른것.length, 1);
-  assert.strictEqual(ctx.부른것[0][1].mode, '돌리기');
-  assert.strictEqual(ctx.부른것[0][0], ctx.HOME_AUTO_URL);
+  assert.deepStrictEqual(모드들(ctx), ['보기', '돌리기']);
+  assert.strictEqual(ctx.부른것[1][0], ctx.HOME_AUTO_URL);
+});
+
+test('★★ 지금 돌리기 — 확인 창에 «올릴 것»과 «바로 공개»를 보인다', async () => {
+  let 몸말 = '';
+  const ctx = 상자({ askYes: async (t, b) => { 몸말 = String(b); return false; },
+    보기답: { ok: true, 내릴것: [], 올릴것: [{ 종류: '새구성원', key: 'm9' }] } });
+  ctx.App.members = { m9: { name: '홍길동' } };
+  await ctx.자동지금돌리기();
+  assert.match(몸말, /올릴 것 1건/, '★★ 올릴 것을 안 보여 줍니다 — 누르면 무엇이 공개되는지 모릅니다');
+  assert.match(몸말, /바로 홈페이지에 공개/);
+  assert.match(몸말, /홍길동/, '★ 누가 올라가는지 이름이 없습니다');
+});
+
+test('지금 돌리기 — 할 것이 없으면 묻지도 돌리지도 않는다', async () => {
+  let 물음 = 0;
+  const ctx = 상자({ askYes: async () => { 물음++; return true; } });
+  await ctx.자동지금돌리기();
+  assert.strictEqual(물음, 0);
+  assert.ok(!모드들(ctx).includes('돌리기'));
+});
+
+test('★ 결과 창이 «올림»도 알린다 — 무엇이 공개됐는지', async () => {
+  let 몸말 = '';
+  const ctx = 상자({ say: async (t, b) => { 몸말 = String(b); } });
+  ctx.App.members = { m9: { name: '홍길동' } };
+  await ctx.자동결과알리기({ ok: true, 내림: [], 못내림: [], 올림: [{ key: 'm9', srl: 777 }], 못올림: [] });
+  assert.match(몸말, /올림 1건/);
+  assert.match(몸말, /홍길동/);
 });
 
 test('승인 — 멈춘 기록의 «지문»을 그대로 들고 «승인»으로 부른다', async () => {

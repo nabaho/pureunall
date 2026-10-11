@@ -34,6 +34,17 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-
 #top .ttl{font-size:16px;font-weight:700;color:var(--navy)}
 #top .sub{font-size:11px;color:var(--text-mute)}
 .sp{flex:1}
+/* 같은 기관의 모집 글 딱지 — 공고명 «앞»에 둔다(뒤에 두면 긴 이름 줄임표에 잘려 안 보인다) */
+.orgrec{border:1px solid var(--amber);background:var(--bg);color:var(--amber);border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px;line-height:18px}
+/* ★ 별표 — 줄 왼쪽(№ 옆)에 늘 보인다. 예전엔 맨 오른쪽 「관리」 칸에 있어 넓지 않은 화면에선 아예 안 보였다(대표 지시 2026-10-11 「별표표시 하게」) */
+.stc{width:30px;text-align:center}
+.starbtn{border:0;background:none;cursor:pointer;font-size:17px;line-height:1;vertical-align:middle;color:var(--text-mute);padding:2px 4px}
+.starbtn.on{color:var(--amber)}
+.starbtn:hover{color:var(--amber)}
+#fStarBtn,#pStarBtn{white-space:nowrap}
+#fStarBtn.on,#pStarBtn.on{background:var(--amber);color:#fff;border-color:var(--amber)}
+tr.fr.starred{background:rgba(217,119,6,.07)}
+.orgrec.off{border-color:var(--border);color:var(--text-mute);font-weight:500}
 .btn{padding:6px 11px;border:1px solid var(--border);border-radius:7px;background:var(--card);
   color:var(--text);font-size:12.5px;cursor:pointer;font-family:inherit}
 .btn:hover{background:var(--bg)}
@@ -289,6 +300,7 @@ table.cmp td{white-space:nowrap}
         <option value="__hidden">🙈 숨긴 것</option><option value="__all">모두 (숨긴 것 포함)</option></select>
       <select id="fMthd" onchange="feedMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
         <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
+      <button class="btn" id="fStarBtn" onclick="feedStarOnly()" title="별표(관심) 친 공고만 모아 봅니다 — 한 번 더 누르면 전체로 돌아옵니다">☆ 별표만</button>
       <div class="sp"></div>
       <span id="cnt" class="sub"></span>
       <span id="perBox"></span>
@@ -301,7 +313,7 @@ table.cmp td{white-space:nowrap}
     <div id="note" style="font-size:12.5px;margin-bottom:9px"></div>
     <div id="feedSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th>받은 날</th><th>마감</th>
+      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="fSelAll" title="보이는 것 모두" onchange="feedSelAll(this.checked)"></th><th class="rn">№</th><th>출처</th><th>상태</th><th>공고명</th><th>기관</th><th title="경력관리의 지난 위촉·실적과 견준 것">이력</th><th>받은 날</th><th>마감</th>
         <th style="text-align:right">남음</th><th style="text-align:right">추정가격</th><th>관리</th></tr></thead>
       <tbody id="tb"></tbody>
     </table></div>
@@ -319,6 +331,7 @@ table.cmp td{white-space:nowrap}
         <option value="star">★ 관심</option><option value="all">모두</option><option value="hidden">🙈 숨긴 것</option></select>
       <select id="pMthd" onchange="planMthd(this.value)" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다"><option value="">전체 계약</option>
         <option value="nosole">수의계약 빼기</option><option value="sole">수의계약만</option></select>
+      <button class="btn" id="pStarBtn" onclick="planStarOnly()" title="별표(관심) 친 것만 모아 봅니다 — 한 번 더 누르면 「공고 전 · 앞으로」로 돌아옵니다">☆ 별표만</button>
       <div class="sp"></div>
       <span id="pCnt" class="sub"></span>
       <span id="pPerBox"></span>
@@ -327,7 +340,7 @@ table.cmp td{white-space:nowrap}
     <div class="sml" id="planNote" style="margin:0 0 8px"></div>
     <div id="planSel"></div>
     <div class="scroll"><table>
-      <thead><tr><th class="chk"><input type="checkbox" id="pSelAll" title="보이는 것 모두" onchange="planSelAll(this.checked)"></th><th class="rn">№</th><th>구분</th><th>예정</th><th>사업명</th><th>기관</th>
+      <thead><tr><th class="stc" title="별표(관심)">★</th><th class="chk"><input type="checkbox" id="pSelAll" title="보이는 것 모두" onchange="planSelAll(this.checked)"></th><th class="rn">№</th><th>구분</th><th>예정</th><th>사업명</th><th>기관</th>
         <th style="text-align:right">금액</th><th>계약방법</th><th>담당</th><th>상태</th><th>관리</th></tr></thead>
       <tbody id="ptb"></tbody>
     </table></div>
@@ -382,7 +395,7 @@ table.cmp td{white-space:nowrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=64"></script>
+<script src="js/pu-ontology.js?v=65"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -390,7 +403,7 @@ table.cmp td{white-space:nowrap}
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=24"></script>
+<script src="js/pu-appbar.js?v=26"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
@@ -410,6 +423,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-submit.js?v=3"></script>
 <script src="js/gov-sync.js?v=7"></script>
 <script src="js/gov-match.js?v=2"></script>
+<script src="js/gov-orgrec.js?v=1"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script>
@@ -712,6 +726,7 @@ function planDraw(){
   if(!$('ptb')) return;
   var o=planRows(), today=o.today, feed=get('feed'), pg=_planPaged(o.rows), rows=pg.page;
   var vc=planViewSel(o.every, today, o.view);
+  planStarBtn(vc, o.view);
   var soon=o.every.filter(function(r){ if(r.hidden) return false; var k=GovPlan.state(r,today).k; return k==='spec'||k==='soon'; }).length;
   if($('tbPlan')) $('tbPlan').innerHTML='📅 발주 예정'+(soon?' <span class="tag red" title="공고 임박·이번 달·다음 달">'+soon+'</span>':'');
   var vis={}; o.rows.forEach(function(r){ vis[r.no]=1; });
@@ -740,6 +755,7 @@ function planDraw(){
     var stHtml='<span class="tag '+stc+'"'+(r.bids&&r.bids.length?' title="입찰공고번호 '+esc(r.bids.join(', '))+'"':'')+'>'+esc(st.label)+'</span>'
       +(lk.length?' <button class="btn sm" onclick="planGoFeed(\''+esc(lk[0].id)+'\')" title="공고 모아보기에서 엽니다">공고 보기</button>':'');
     return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+'" onclick="planRowClick(event,\''+no+'\')">'
+      +'<td class="stc"><button class="starbtn'+(r.star?' on':'')+'" title="'+(r.star?'별표 끄기':'별표 치기')+'" onclick="event.stopPropagation();planStar(\''+no+'\')">'+(r.star?'★':'☆')+'</button></td>'
       +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="planTog(\''+no+'\',this.checked)"></td>'
       +'<td class="rn">'+(pg.from+i+1)+'</td>'
       +'<td><span class="tag '+(r.kind==='spec'?'red':'navy')+'">'+(r.kind==='spec'?'사전규격':'발주계획')+'</span></td>'
@@ -751,12 +767,17 @@ function planDraw(){
       +'<td class="sml" title="'+esc([r.dept,r.ofcl,r.tel].filter(Boolean).join(' · '))+'">'+esc(r.dept||r.ofcl||'-')+(r.tel?'<div>'+esc(r.tel)+'</div>':'')+'</td>'
       +'<td>'+stHtml+'</td>'
       +'<td class="act">'
-        +'<button class="btn sm" onclick="planStar(\''+no+'\')">'+(r.star?'★':'☆')+'</button> '
         +(r.files&&r.files.length&&/^https:\/\//.test(r.files[0])?'<a class="btn sm" href="'+esc(r.files[0])+'" target="_blank" rel="noopener" title="사전규격서 (나라장터)">📎</a> ':'')
         +(r.hidden?'<button class="btn sm" title="되살리기" onclick="planHide(\''+no+'\',false)">↩</button>'
                   :'<button class="btn sm" onclick="planHide(\''+no+'\',true)">🚫</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="11" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요'+(o.view==='ahead'&&vc.past?' (⌛ 지난 계획 '+vc.past+'건은 보기에서)':''))+'</td></tr>';
+  }).join('') : '<tr><td colspan="12" class="empty">'+(!o.every.length?(keyData()?'아직 받은 발주 예정이 없습니다 <button class="btn sm" onclick="planFetchNow()">🔄 지금 받기</button>':'🔑 인증키를 먼저 넣어 주세요'):'걸리는 것이 없습니다 — 보기·조건을 넓혀 보세요'+(o.view==='ahead'&&vc.past?' (⌛ 지난 계획 '+vc.past+'건은 보기에서)':''))+'</td></tr>';
   if($('planPager')) $('planPager').innerHTML=_pager(pg.p, pg.pages, pg.from, rows.length, pg.n, 'planPageTo');
+}
+/* 별표만 보기 — 보기 고르개(pView)의 「★ 관심」을 켜고 끈다(한 값). 끄면 처음 보기(공고 전 · 앞으로)로 */
+function planStarOnly(){ var el=$('pView'); el.value = (el.value==='star') ? 'ahead' : 'star'; _planPage=0; planDraw(); }
+function planStarBtn(vc, view){
+  var b=$('pStarBtn'); if(!b) return; var on=view==='star';
+  b.className='btn'+(on?' on':''); b.textContent=(on?'★ 별표만 ':'☆ 별표만 ')+((vc&&vc.star)||0)+'건';
 }
 function planView(v){ if($('pView')) $('pView').value=v; _planPage=0; planDraw(); }
 function planTog(no,on){ if(on) _planSel[no]=1; else delete _planSel[no]; planDraw(); }
@@ -937,6 +958,7 @@ function periodHtml(){
   return h;
 }
 function draw(){
+  _orgRecCache=null; orgRecEnsure();
   matchEnsure();
   var mnf=$('matchNoteF'); if(mnf) mnf.innerHTML=matchNoteHtml();
   var v=feedVisible(), all=v.all, rows=v.rows;
@@ -947,6 +969,7 @@ function draw(){
   $('cnt').textContent='전체 '+all.length+'건'+(rows.length!==all.length?' · 지금 '+rows.length+'건':'')
     +(hiddenN?' · 숨김 '+hiddenN+'건':'')+(v.soleOut?' · 수의계약 '+v.soleOut+'건 뺌':'')+(v.fm==='sole'?' · 수의계약만':'');
   var pb=$('perBox'); if(pb) pb.innerHTML=perSel('per','feedPer');
+  feedStarBtn(all);
   var per=perOf('per'), n=rows.length;
   var pages=per?Math.max(1,Math.ceil(n/per)):1, p=Math.min(_feedPage,pages-1); _feedPage=p;
   var from=per?p*per:0, page=per?rows.slice(from,from+per):rows;
@@ -961,12 +984,13 @@ function draw(){
   $('tb').innerHTML = page.length ? page.map(function(r,i){ var on=!!_feedSel[r.id], id=esc(r.id);
     var st=r.hidden ? '<span class="tag red">'+(r.ruleOut?'숨김·규칙':'숨김')+'</span>'
       : '<span class="tag '+(r.type==='관심'?'teal':(r.type==='지나감'?'':'navy'))+'">'+esc(r.type||'-')+'</span>';
-    return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+'" onclick="feedRowClick(event,\''+id+'\')">'
+    return '<tr class="fr'+(on?' sel-on':'')+(r.hidden?' gone':'')+(r.type==='관심'?' starred':'')+'" onclick="feedRowClick(event,\''+id+'\')">'
+      +'<td class="stc"><button class="starbtn'+(r.type==='관심'?' on':'')+'" title="'+(r.type==='관심'?'별표 끄기':'별표 치기')+'" onclick="event.stopPropagation();star(\''+id+'\')">'+(r.type==='관심'?'★':'☆')+'</button></td>'
       +'<td class="chk"><input type="checkbox" class="row-chk" '+(on?'checked':'')+' onchange="feedTog(\''+id+'\',this.checked)"></td>'
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+'</td>'
       +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
       +matchCell(function(){ return matchTargetFeed(r); })
       +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
@@ -979,7 +1003,7 @@ function draw(){
         +'<button class="btn sm" title="서식 채우기 — 경력관리에서 열립니다" onclick="toForm(\''+id+'\')">📝</button> '
         +(r.hidden ? '<button class="btn sm" title="되살리기" onclick="unhide(\''+id+'\')">↩</button>'
                    : '<button class="btn sm" onclick="hide(\''+id+'\')">🚫</button>')+'</td></tr>';
-  }).join('') : '<tr><td colspan="12" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
+  }).join('') : '<tr><td colspan="13" class="empty">'+(!v.every.length?'아직 받은 공고가 없습니다':(!all.length&&$('fSt').value.charAt(0)!=='_'?'보이는 공고가 없습니다 — 숨긴 '+hiddenN+'건은 상태 「🙈 숨긴 것」에서 봅니다':'걸리는 공고가 없습니다 — 조건을 넓혀 보세요'))+'</td></tr>';
   var pg=$('feedPager'); if(pg) pg.innerHTML=_pager(p, pages, from, page.length, n, 'feedPageTo');
 }
 function feedTog(id,on){ if(on) _feedSel[id]=1; else delete _feedSel[id]; draw(); }
@@ -1051,6 +1075,7 @@ function feedPop(id){
     +(r.hidden?'<button class="btn sm" onclick="unhide(\''+esc(r.id)+'\')">↩ 되살리기</button>'
               :'<button class="btn sm" onclick="hide(\''+esc(r.id)+'\');popClose()">🚫 숨기기</button>')
     +'</div>'
+    +orgRecBlock(r)
     +cmp(same,'같은 공고의 다른 차수 (재공고·정정)')
     +cmp(org,'같은 기관의 다른 공고 (지난 것·숨긴 것 포함)');
   popOpen('📋 공고 상세', body);
@@ -1064,6 +1089,14 @@ function popOpen(title, html){
 function popClose(){ var p=$('pop'); if(p) p.className='pop'; _recPopId=null; }
 try{ document.addEventListener('keydown', function(e){ if(e.key==='Escape') popClose(); }); }catch(e){}
 function find(id){ var a=get('feed'); for(var i=0;i<a.length;i++) if(a[i].id===id) return {a:a,i:i}; return null; }
+/* 별표만 보기 — 상태 거르개(fSt)의 「관심」을 켜고 끈다. 거르개와 «한 값»이라 둘이 어긋나지 않는다.
+   ⚠ 별표 = 상태 「관심」(star() 가 type 을 바꾼다) — 별표를 끄면 예전 상태(prevType)로 돌아간다. */
+function feedStarOnly(){ var sel=$('fSt'); sel.value = (sel.value==='관심') ? '' : '관심'; _feedPage=0; draw(); }
+function feedStarBtn(all){
+  var b=$('fStarBtn'); if(!b) return;
+  var n=(all||[]).filter(function(r){ return r.type==='관심'; }).length, on=$('fSt').value==='관심';
+  b.className='btn'+(on?' on':''); b.textContent=(on?'★ 별표만 ':'☆ 별표만 ')+n+'건';
+}
 function star(id){ var h=find(id); if(!h) return; var r=h.a[h.i];
   if(r.type==='관심'){ r.type=r.prevType||'새 공고'; delete r.prevType; }
   else { if(r.type && r.type!=='새 공고') r.prevType=r.type; r.type='관심'; }
@@ -1418,10 +1451,15 @@ function recDraw(){
    ⚠ 서버 결과 gov_watch 는 «관리자만» 읽힌다. 못 읽으면 조용히 비우지 않고 까닭을 말한다.
    ⚠ 「봤음」은 대표 개인 자리(recruit_seen)에만 — 서버 결과를 고치지 않는다(쓰기 권한도 없다). */
 var _recWatch=null, _recWatchErr='';
+/* 읽기만 — 그리지 않는다(공고 모아보기의 모집 글 딱지도 이것만 쓴다. 안 그러면 공고 탭을 그릴 때마다 모집 탭 전체가 따라 그려진다) */
+async function recWatchLoad(){
+  if(!fbDb||!fbUid) return;
+  try{ var s=await fbDb.ref('gov_watch').once('value'); _recWatch=s.val()||{}; _recWatchErr=''; _orgRecCache=null; }
+  catch(e){ _recWatch=null; _recWatchErr=/permission/i.test(String(e&&(e.code||e.message)||e)) ? '읽을 권한이 없습니다(관리자만 봅니다)' : '불러오지 못했습니다 — 인터넷을 확인해 주세요'; }
+}
 async function recWatchPull(){
   if(!fbDb||!fbUid) return;
-  try{ var s=await fbDb.ref('gov_watch').once('value'); _recWatch=s.val()||{}; _recWatchErr=''; }
-  catch(e){ _recWatch=null; _recWatchErr=/permission/i.test(String(e&&(e.code||e.message)||e)) ? '읽을 권한이 없습니다(관리자만 봅니다)' : '불러오지 못했습니다 — 인터넷을 확인해 주세요'; }
+  await recWatchLoad();
   recDraw();
 }
 function recWatchHits(){
@@ -1482,6 +1520,47 @@ function matchTargetHit(x){
   if(!kc) names.push(String(x.boardName||'').replace(/\s*(공지사항|공지|게시판|알림).*$/,''));
   return { key:'h|'+x.key, orgId:orgId, orgNames:names.filter(Boolean), title:x.title||'' };
 }
+/* ═══ 🧑‍💼 같은 기관의 컨설턴트·전문가 모집 글 (대표 지시 2026-10-11 「노무컨설팅 공고가 나면 그 기관에 공인노무사 모집공고가 있는지 자동으로」)
+   공고 줄의 «기관»으로 서버가 매일 남기는 모집 글(gov_watch/hits)을 찾아 딱지로 알린다. 짝짓기는 js/gov-orgrec.js(규칙).
+   ⚠ 읽기만 한다. ⚠ gov_watch 는 관리자만 읽힌다 — 못 읽으면 딱지를 그리지 않는다(조용히). ⚠ 서버 글은 «한 번만» 받으러 간다(_orgRecTried — 실패 뒤 다시 그리며 또 받으면 끝없이 돈다). */
+var _orgRecTried=false, _orgRecCache=null, _orgRecHits=null;
+function orgRecEnsure(){
+  if(_recWatch || _orgRecTried || !fbDb || !fbUid) return;
+  _orgRecTried=true;
+  recWatchLoad().then(function(){ _orgRecCache=null; try{ draw(); }catch(e){} });
+}
+function orgRecFind(r){
+  if(!_recWatch) return null;
+  if(!_orgRecCache){ _orgRecCache={}; _orgRecHits=recWatchHits(); }
+  var k=(r.org||'')+'|'+(r.ntce||'');
+  return _orgRecCache[k] || (_orgRecCache[k]=GovOrgRec.find(r, _orgRecHits, {
+    matches:function(n){ return GovRecruit.matches(n, get('recruit_custom')); },
+    orgKey:GovMatch.orgKey, kindOf:GovRecruit.kindOf, dueState:GovRecruit.dueState,
+    per:function(h){ return recPer(h.key, h.per, h.title, h.date); },
+    today:recYmd(recToday()) }));
+}
+function orgRecTag(r){
+  var f=orgRecFind(r); if(!f || (!f.live.length && !f.past.length)) return '';
+  var n=f.live.length;
+  return '<button class="orgrec'+(n?'':' off')+'" title="'+(n?'같은 기관에서 지금 접수 중인 컨설턴트·전문가 모집 글이 있습니다':'같은 기관의 모집 글이 있었으나 접수가 끝났습니다')+' — 눌러서 보기" onclick="event.stopPropagation();orgRecOpen(\''+esc(r.id)+'\')">🧑‍💼 모집 글 '+(n?n:'지난 '+f.past.length)+'</button>';
+}
+function orgRecBlock(r){
+  var f=orgRecFind(r), nm=GovOrgRec.namesOf(r).join(' / ');
+  var head='<div class="pop-sub">🧑‍💼 같은 기관의 컨설턴트·전문가 모집 글 <span class="sml">'+esc(nm)+'</span></div>';
+  if(!f) return head+'<div class="sml" style="margin:6px 0 12px">'+(_recWatch?'':'서버가 모은 모집 글을 아직 불러오지 못했습니다(관리자만 봅니다).')+'</div>';
+  if(!f.live.length && !f.past.length)
+    return head+'<div class="sml" style="margin:6px 0 12px">감시 중인 게시판에서 이 기관의 모집 글을 찾지 못했습니다 — 이 기관 게시판은 감시 목록에 없을 수 있습니다. 기관 홈페이지에서 «공지·채용» 게시판을 직접 확인해 보세요.</div>';
+  var row=function(it, gone){ var h=it.hit, ki=GovRecruit.kindInfo(it.kind);
+    var ttl=/^https:\/\//.test(h.href||'') ? '<a class="tlink" href="'+esc(h.href)+'" onclick="return recOpenPost(\''+esc(h.key)+'\')">'+esc(h.title)+'</a>' : esc(h.title);
+    return '<tr'+(gone?' class="rec-past"':'')+'><td class="sml">'+esc(h.date||'')+'</td><td class="sml">'+ki.icon+' '+esc(ki.name)+'</td>'
+      +'<td style="white-space:normal">'+ttl+'</td><td><span class="due '+it.due.k+'">'+esc(it.due.text)+'</span></td>'
+      +'<td class="sml">'+esc(h.boardName||'')+(it.how==='title'?' <span class="sml" title="게시판이 아니라 글 제목에 기관 이름이 있어 짝지었습니다">(제목)</span>':'')+'</td></tr>'; };
+  return head+'<div class="scroll"><table class="cmp"><thead><tr><th>글 날짜</th><th>갈래</th><th>모집 글</th><th>접수</th><th>게시판</th></tr></thead><tbody>'
+    +f.live.map(function(it){ return row(it,false); }).join('')+f.past.map(function(it){ return row(it,true); }).join('')+'</tbody></table></div>'
+    +'<div class="sml" style="margin:4px 0 12px">접수 중 '+f.live.length+' · 지난 것 '+f.past.length+' — 서버가 매일 아침 게시판을 읽어 모은 글입니다. 기관 이름으로만 짝짓습니다(공고 내용은 보지 않습니다).</div>';
+}
+function orgRecOpen(id){ var h=find(id); if(!h) return; var r=h.a[h.i];
+  popOpen('🧑‍💼 같은 기관의 모집 글', '<div class="note" style="margin-bottom:6px">「'+esc(r.nm||'')+'」</div>'+orgRecBlock(r)); }
 function matchMarkKey(tk, rid){ return GovSync.safeKey(tk+'|'+rid); }
 function matchFind(t){
   var recs=matchRecs(); if(!recs) return null;

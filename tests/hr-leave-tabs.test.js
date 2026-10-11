@@ -27,3 +27,9 @@ test('연차대장: 한 번에 한 해 — ◀ ▶ 로 넘긴다', () => {
   assert.match(SRC, /: \[curY\]\.map\(function\(y\)\{/);
   assert.doesNotMatch(SRC, /: years\.map\(function\(y\)\{\s*var rows = ledger\.filter/, '여러 해를 한꺼번에 쌓는 자리가 남았습니다');
 });
+
+test('연차/반차: 왼쪽 표가 오른쪽 상세보다 넓다 (대표 「넓게 해달라 · 오른쪽 화면 줄여달라」 2026-10-11)', () => {
+  const m = SRC.match(/tab==='annual' && h\('div',\{style:_isAdminView\?\{display:'grid',gridTemplateColumns:'minmax\(0,([\d.]+)fr\) minmax\(0,([\d.]+)fr\)'/);
+  assert.ok(m, '연차/반차 두 칸 배치를 못 찾았습니다');
+  assert.ok(px(m[1]) > px(m[2]) * 1.4, '왼쪽 표가 충분히 넓지 않습니다: ' + m[1] + ' : ' + m[2]);
+});

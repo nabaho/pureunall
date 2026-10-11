@@ -211,6 +211,9 @@
     var 손님 = (Array.isArray(ev.attendees) ? ev.attendees : []).filter(function (x) { return /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(String(x)); }).slice(0, 20);
     if (손님.length) 몸.attendees = 손님.map(function (x) { return { email: String(x).toLowerCase() }; });
     if (ev.meet && ev.meetId) 몸.conferenceData = { createRequest: { requestId: String(ev.meetId), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
+    /* 첨부파일 — 구글 드라이브 링크만(구글 입력 화면의 「첨부파일 추가」). functions/gcal-proxy.js bodyOf 와 같은 셈 */
+    var 첨 = (Array.isArray(ev.attachments) ? ev.attachments : []).filter(function (x) { return /^https:\/\/(drive|docs)\.google\.com\/[^\s]+$/.test(String(x)); }).slice(0, 10);
+    if (첨.length) 몸.attachments = 첨.map(function (u) { return { fileUrl: String(u), title: '첨부파일' }; });
     if (Number(ev.remindMin) > 0) 몸.reminders = { useDefault: false, overrides: [{ method: 'popup', minutes: Math.round(Number(ev.remindMin)) }] };
     /* 여러 날 일정 — 끝나는 날(endDate)이 시작보다 뒤면 그 날까지(2026-10-10). 없으면 예전 그대로 */
     var 끝날짜 = /^\d{4}-\d{2}-\d{2}$/.test(String(ev.endDate || '')) && ev.endDate > ev.date ? ev.endDate : '';
@@ -256,7 +259,7 @@
     if (틀림) return Promise.reject(new Error(틀림));
     var 몸 = 몸만들기(ev);
     var 회의 = !!몸.conferenceData;
-    return apiCall('POST', '/calendars/' + encodeURIComponent(calId) + '/events?sendUpdates=none' + (회의 ? '&conferenceDataVersion=1' : ''), 몸, opt)
+    return apiCall('POST', '/calendars/' + encodeURIComponent(calId) + '/events?sendUpdates=none' + (회의 ? '&conferenceDataVersion=1' : '') + (몸.attachments ? '&supportsAttachments=true' : ''), 몸, opt)
       .then(function (r) {
         if (!r || !r.id) throw new Error('구글이 만들었다고 대답하지 않았습니다');
         return { created: true, id: r.id };
