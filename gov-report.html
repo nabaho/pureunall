@@ -192,6 +192,8 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
 <script src="js/pu-gov-report-track.js?v=2"></script>
 <script src="js/pu-gov-report-docs.js?v=3"></script>
+<script src="js/pu-hwp-engine.js?v=21"></script>
+<script src="js/pu-hwp-preview.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script>
@@ -408,6 +410,10 @@ function grRenderCell(){
   if(c.step==='submit') h+=field('제출일',date('cwGot',v.gotAt))
     +field('제출 방식','<select id="cwHow">'+opt('','고르기',v.how||'')+Object.keys(T.HOW).map(function(k){ return opt(k,T.HOW[k],v.how||''); }).join('')+'</select>')
     +'<label class="cw-c"><input type="checkbox" id="cwAck"'+(v.ack?' checked':'')+'> 접수 확인</label>';
+  /* ③ 서명본 칸만 — 받은 한글 파일(.hwp·.hwpx)을 «이 브라우저 안에서만» 열어 본다. 올리지도 저장하지도 않는다(grOpenHwp) */
+  if(c.step==='sign') h+='<div class="cw-f"><span>받은 한글 파일</span><button type="button" onclick="grPickHwp()">📂 받은 한글 파일 열어 보기</button>'
+    +'<input type="file" id="cwHwp" accept=".hwp,.hwpx" style="display:none" onchange="grOpenHwp(this)">'
+    +'<div class="days" id="cwHwpMsg">고른 파일은 이 화면에서만 읽습니다 — 올리지도 저장하지도 않습니다</div></div>';
   h+=field('메모(200자)','<textarea id="cwNote" maxlength="200" rows="3">'+grEsc(v.note||'')+'</textarea>')
     +'<div class="days">메모에 연락처·주민번호 같은 개인정보를 적지 마세요</div>'
     +(rec&&rec.at?'<div class="days">고친 사람 '+grEsc(rec.by||'—')+' · '+grEsc(L.dayOf(rec.at))+'</div>':'')
@@ -450,6 +456,29 @@ async function grSaveCell(){
     c.busy=false; c.msg='저장했습니다 — 목록을 다시 불러온 뒤 확인해 주세요'; c.err=false;
   }
   if(GR.cw===c) grRenderCell();
+}
+/* 📂 받은 한글 파일 열어 보기 — 고른 파일은 브라우저 안에서만 읽어 미리보기 창(PuHwpPreview)에 넘긴다. 어디에도 올리지·쓰지 않는다.
+   안내는 글자(textContent)로만 — 파일 이름은 사람이 정한 데이터. 칸 창은 다시 그리지 않는다(적던 값 보존)
+   ★ 파일을 잡자마자(await 전에) 고르기 칸을 비운다 — 불러오는 사이 창을 닫고 같은 파일을 다시 골라도 change 가 뜬다.
+     잡아 둔 File 은 칸을 비워도 그대로 읽힌다.
+   ★ 창을 닫았거나 다른 파일에 밀려 취소된 것(e.cancelled)은 실패가 아니다 — 안내 줄을 건드리지 않는다. */
+function grPickHwp(){ var el=$('cwHwp'); if(el&&el.click) el.click(); }
+async function grOpenHwp(input){
+  var say=function(m,bad){ var e=$('cwHwpMsg'); if(e){ e.textContent=m; e.className=bad?'err-s':'days'; } return {ok:!bad,msg:m}; };
+  var f=input&&input.files&&input.files[0];
+  try{ if(input) input.value=''; }catch(e){}
+  if(!f) return {ok:false};
+  if(!/\.hwpx?$/i.test(String(f.name||''))) return say('한글(.hwp·.hwpx) 파일만 열 수 있습니다',true);
+  if(!window.PuHwpPreview) return say('한글 미리보기를 불러오지 못했습니다 — 새로 고친 뒤 다시 눌러 주세요',true);
+  try{
+    var buf=await f.arrayBuffer();
+    await window.PuHwpPreview.open(buf,f.name);
+    return say('열었습니다 — '+f.name);
+  }catch(e){
+    if(e&&e.cancelled) return {ok:false,cancelled:true};
+    console.warn('[컨설팅보고서] 한글 미리보기 실패',e);
+    return say((e&&e.message)||'미리보기를 열지 못했습니다',true);
+  }
 }
 /* 양식 서고 — 읽기만. 등록·바꾸기는 정부사업일정의 ⚙ 양식 서고(#forms, 관리자) */
 function grRenderForms(){
