@@ -1,6 +1,6 @@
 "use strict";
 
-/* 👥 국민연금 가입자 — 한 달에 한 번 서버가 (대표 「진행」 2026-10-11, 목업 승인)
+/* 👥 근로자 수 — 국민연금 가입자 + 🏢 고용·산재 상시인원(아래 EI_*), 한 달에 한 번 서버가 (대표 「진행」 2026-10-11, 목업 승인)
    ═══════════════════════════════════════════════════════════════════════════
    기업 상세에서 사람이 「이 사업장 맞음」을 고른 회사(coInfo/{번호}/nps/pick)는
    매달 2일 아침 서버가 새 숫자를 받아 now 를 바꾸고 hist/{년월} 에 가입자 수를 쌓는다.
@@ -45,6 +45,38 @@ function nowOf(d, p, at) {
     adpt: String(d.adptDt || ""), scsn: String(d.scsnDt || ""), at: at || Date.now() };
 }
 
+/* ── 🏢 고용·산재보험 상시인원 (2026-10-11 「진행」 — 사업장 팝업 목업 ㉯) ──
+   근로복지공단 「고용/산재보험 현황정보」 — 사업자번호 10자리로 정확히 맞으므로 사람이 고르지 않는다.
+   셈은 화면(pu-cards.html eiRows·eiSum)과 같다 — tests/cards-workers-pop.test.js 가 견준다.
+   ⚠ 25일 안에 받은 곳은 건너뛴다(화면이 열면서 받은 것). 한 번에 EI_CAP 곳까지. */
+const EI_URL = "https://apis.data.go.kr/B490001/gySjbPstateInfoService/getGySjBoheomBsshItem";
+const EI_CAP = 500;
+const EI_SKIP_DAYS = 25;
+function eiRows(items) {
+  return [].concat(items || []).filter(Boolean).map((it) => {
+    const fg = String(it.opaBoheomFg || "") === "2" ? "gy" : "sj";
+    const d = String(it.seongripDt || "");
+    return { nm: String(it.saeopjangNm || "").trim(), fg, cnt: Number(it.sangsiInwonCnt) || 0,
+      ind: String((fg === "gy" ? it.gyEopjongNm : it.sjEopjongNm) || it.gyEopjongNm || it.sjEopjongNm || "").trim(),
+      since: d.length >= 6 ? d.slice(0, 4) + "." + d.slice(4, 6) : "", addr: String(it.addr || "").trim() };
+  }).sort((a, b) => (b.cnt - a.cnt) || a.nm.localeCompare(b.nm, "ko"));
+}
+function eiSum(rows) {
+  const gy = (rows || []).filter((r) => r.fg === "gy").reduce((n, r) => n + r.cnt, 0);
+  const sj = (rows || []).filter((r) => r.fg === "sj").reduce((n, r) => n + r.cnt, 0);
+  const sites = new Set((rows || []).map((r) => r.nm + "|" + r.addr)).size;
+  return { gy, sj, n: sites };
+}
+function eiPlan(list, now) {
+  const t = now || Date.now();
+  return (list || []).filter((o) => {
+    if (digits(o.bizno).length !== 10) return false;
+    const ei = o.extra && o.extra.ei;
+    return !(ei && ei.at && t - Number(ei.at) < EI_SKIP_DAYS * 86400000);
+  }).slice(0, EI_CAP);
+}
+function ymKst(t) { return new Date(t + 9 * 3600000).toISOString().slice(0, 7).replace("-", ""); }
+
 async function readKey(db) {
   const s = String(process.env.NTS_KEY || "").trim();
   if (s) return s;
@@ -79,7 +111,8 @@ async function runOnce(deps, opts) {
   const o = opts || {};
   const db = deps.getDatabase();
   const fetchFn = deps.fetch || fetch;
-  const out = { ran: false, companies: 0, pick: { asked: 0, got: 0, failed: 0 }, cand: { asked: 0, got: 0, failed: 0 } };
+  const out = { ran: false, companies: 0, pick: { asked: 0, got: 0, failed: 0 }, cand: { asked: 0, got: 0, failed: 0 },
+    ei: { asked: 0, got: 0, none: 0, failed: 0 } };
   const svc = o.key != null ? o.key : await readKey(db);
   if (!svc) { out.why = "열쇠 없음"; return out; }
   const [itemsS, groupsS, infoS] = await Promise.all([
@@ -127,7 +160,27 @@ async function runOnce(deps, opts) {
       console.warn("nps-monthly 후보 실패:", c.key, String((e && e.message) || e).slice(0, 120));
     }
   }
-  await db.ref(ROOT + "/config/npsMonthly").set({ at, companies: out.companies, pick: out.pick, cand: out.cand });
+  /* 🏢 고용·산재 상시인원 — 번호로 정확히 맞는다(사람이 안 고른다) */
+  for (const c of eiPlan(list, at)) {
+    out.ei.asked++;
+    try {
+      const res = await fetchFn(EI_URL + "?serviceKey=" + enc + "&_type=json&numOfRows=100&pageNo=1&v_saeopjaDrno=" + digits(c.bizno));
+      if (!res.ok) throw new Error("공단 답 " + res.status);
+      const j = await res.json();
+      const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
+      const rows = eiRows(it);
+      const sm = eiSum(rows);
+      const u = {};
+      u[ROOT + "/coInfo/" + c.key + "/ei"] = { at, rows: rows.length ? rows : null, gy: sm.gy, sj: sm.sj, n: sm.n };
+      if (rows.length) u[ROOT + "/coInfo/" + c.key + "/eiHist/" + ymKst(at)] = sm.gy; else out.ei.none++;
+      await db.ref().update(u);
+      out.ei.got++;
+    } catch (e) {
+      out.ei.failed++;
+      console.warn("nps-monthly 고용·산재 실패:", c.key, String((e && e.message) || e).slice(0, 120));
+    }
+  }
+  await db.ref(ROOT + "/config/npsMonthly").set({ at, companies: out.companies, pick: out.pick, cand: out.cand, ei: out.ei });
   return out;
 }
 
@@ -146,4 +199,4 @@ function make(deps) {
 }
 
 module.exports = make;
-Object.assign(module.exports, { cands, nowOf, plan, runOnce, norm });
+Object.assign(module.exports, { cands, nowOf, plan, runOnce, norm, eiRows, eiSum, eiPlan });

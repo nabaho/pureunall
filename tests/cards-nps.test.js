@@ -86,7 +86,8 @@ test('★★★ ③ 서버 — 고른 곳만 숫자·hist, 안 고른 곳은 후
   assert.equal(writes['pucards/coInfo/1234567890/nps/now'].cnt, 23);
   assert.ok(Array.isArray(writes['pucards/coInfo/2223334445/nps/cand']), '안 고른 곳에 후보가 없습니다');
   assert.ok(!('pucards/coInfo/2223334445/nps/pick' in writes), '★★★ 서버가 저절로 골랐습니다');
-  assert.ok(!Object.keys(writes).some(k => k.includes('3334445556')), '★★ 「없음」으로 적은 곳을 건드렸습니다');
+  /* 고용·산재(ei)는 번호로 정확히 맞으므로 「없음」과 상관없이 받는다 — 국민연금 칸(nps)만 본다 */
+  assert.ok(!Object.keys(writes).some(k => k.includes('3334445556/nps')), '★★ 「없음」으로 적은 곳의 국민연금을 건드렸습니다');
   assert.ok(!JSON.stringify(writes).includes('8080808'), '★★★ 보험료가 적혔습니다');
   assert.ok(asked.some(x => x === 'getBassInfoSearchV2:222333'), '후보는 사업자번호 앞 6자리로 물어야 합니다: ' + asked);
 });
@@ -113,8 +114,10 @@ test('★ 추이 — 12달 전(없으면 가장 오래된 달)과 견준다', ()
   assert.equal(c.npsTrend({}, '202608'), null, '기록이 없으면 비교하지 않는다');
 });
 
-test('★ 기업 상세에 카드가 있고, 서버 함수가 등록돼 있다', () => {
-  assert.match(sliceFn(SRC, 'function coDetailPanelHtml('), /coCardHtml\('nps'/);
+/* ⚠ 2026-10-11 카드 → «한 줄 + 사업장 팝업»으로 바뀌었다(대표 「칸이 늘어나는 것보다 팝업」). 국민연금 화면은 팝업의 💳 갈래다. */
+test('★ 기업 상세에 근로자 수 한 줄이 있고, 팝업 💳 갈래가 국민연금을 그리고, 서버 함수가 등록돼 있다', () => {
+  assert.match(sliceFn(SRC, 'function coDetailPanelHtml('), /coWorkRowHtml\(o\)/);
+  assert.match(SRC.slice(SRC.indexOf('\nfunction coWorkHtml('), SRC.indexOf('\nfunction coEiHtml(')), /coNpsHtml\(o\)/);
   const idx = fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8');
   assert.match(idx, /exports\.npsMonthly\s*=/);
 });
