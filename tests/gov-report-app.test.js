@@ -3,6 +3,7 @@
  * ★ 지키는 것: 쓰기는 서류 진행 기록 줄 하나(scal_docs/{업체}/{rid}/items/{키} .set)뿐 · 숫자 칸을 누르면 거르고 다시 누르면 풀린다 · 내 담당만 · 서고는 읽기만 ·
  *   오류·빈 상태 문구(설계서 §5) · 본문은 그리지 않는다
  *   받은 서류함(2026-10-11): 메일함은 읽기만 · 「연결」은 같은 줄 하나 .set 안의 link · 「열어 보기」는 한 번에 하나, 받은 것은 담지 않는다
+ *   대형 사업 단계 열 표(2026-10-11, 설계 2-A): 69~80번 — 칸 창이 항목(data-item)을 받고, 체크 글·안내·「막힌 단계」 알림
  * 공개 저장소다 — 합성 자료만(tests/helpers/gov-report-fixture.js). */
 const fs = require('fs');
 const path = require('path');
@@ -366,8 +367,8 @@ test('⑮ 대형·틀 없음은 «서류 목차 보기» 줄만 · 연결 없는
   await w.ctx.grLoad();
   w.ctx.grSetBiz('consulting-02');
   let h = w.els.docs.innerHTML;
-  assert.ok(h.includes('대형') && h.includes('서류 목차 보기') && h.includes('가나상사'));
-  assert.ok(!h.includes('①초안'), '대형은 체크표를 그리지 않는다');
+  assert.ok(h.includes('대형') && h.includes('가나상사') && h.includes('data-toc="1"'));
+  assert.ok(!h.includes('①초안') && !h.includes('서류 목차 보기'), '대형은 간단형 열이 아니라 단계 열 표(설계 2-A) — 「목차」 단추는 남는다');
   w.ctx.grSetBiz('consulting-01');
   h = w.els.docs.innerHTML;
   assert.ok(h.includes('정부사업일정에 사업 없음'));
@@ -879,10 +880,10 @@ function fakePdf() {
   return { lib, st };
 }
 /* 불러오고 → 사업 고르고 → 칸 창 열고 → 메일함 읽기가 끝날 때까지 */
-async function cellOf(w, biz, co, ty, step) {
+async function cellOf(w, biz, co, ty, step, item) {
   await w.ctx.grLoad();
   w.ctx.grSetBiz(biz);
-  w.ctx.grOpenCell(co, ty, step);
+  w.ctx.grOpenCell(co, ty, step, item);
   await w.ctx.grLoadInbox();
 }
 /* 발송일이 없는 다라정밀 서명 줄 — 서명 칸은 «저장된 발송일»이 있으면 회신 후보를 앞으로 올린다(2026-10-11 서명 요청).
@@ -1772,4 +1773,333 @@ test('68 정적 — 제출 메일도 쓰기 길은 grSaveCell 한 곳 · 자동 
   ['grWriteSubmit', 'grRenderSend', 'grMarkSent'].forEach((n) => assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|mailto:|\.send\s*\(|sendMail|httpsCallable/, n));
   assert.match(grab('grWriteSubmit'), /grOpenMail\(S\.composeParts\(d,to,cc\)\)/);
   assert.match(grab('grWriteSubmit'), /\.then\(function\(r\)/, '안내는 grOpenMail 이 끝난 뒤 다시 쓴다');
+});
+
+/* ══ 대형 사업 단계 열 표·칸 창·체크 글·막힌 단계 알림 — 설계 docs/superpowers/specs/2026-10-11-gov-report-big-stages-design.md §4 ══
+   합성 씨앗(bigSeed)은 이 검사 안에서만 쓴다 — 공용 씨앗은 건드리지 않는다.
+   다라정밀(c2)에 대형 둘을 더 건다: 일터상생혁신컨설팅(consulting-02 → t2, 회차 2) · 산업일자리전환컨설팅충남(consulting-06 → t5, 회차 2, 계약 2026-08~10).
+   이음: 이알피 사업 코드 → scal_erpTypeMap → 일정 사업(t2·t5), 업체 → scal_cos(c2 types), 이알피 계약(k3, 다라정밀 이름) */
+const BIG_LINK = { src: 'mail', key: 'i:INBOX-0a1b2c3d:107', name: '현장.jpg', date: '2026-09-29' };
+function bigSeed(o) {
+  o = o || {};
+  const s = F.seed();
+  s.scal_types.push({ id: 't5', name: '산업일자리충남', fullName: '산업일자리전환 컨설팅(충남)', agency: '', rounds: 2 });
+  const c2 = s.scal_cos.filter((c) => c.id === 'c2')[0];
+  c2.types.push('t2', 't5');
+  c2.customRounds = { t2: 2, t5: 2 };
+  s.scal_scheds.push(
+    { id: 'b1', coId: 'c2', typeId: 't2', date: '2026-08-20', round: 1, isField: true },
+    { id: 'b2', coId: 'c2', typeId: 't2', date: '2026-09-17', round: 2, isField: true },
+    { id: 'b3', coId: 'c2', typeId: 't5', date: '2026-08-25', round: 1, isField: true },
+    { id: 'b4', coId: 'c2', typeId: 't5', date: '2026-09-22', round: 2, isField: true });
+  s.scal_erpTypeMap['consulting-06'] = 't5';
+  s.data.consultings.v.k3 = { id: 'k3', companyName: '다라정밀', typeCodes: { consulting: 'consulting-06' },
+    startDate: o.start || '2026-08-01', endDate: o.end || '2026-10-31', status: 'active', managerMain: 'P-009' };
+  /* 기록: { t2: { plan: {...} }, t5: { log: {...} } } — 줄 하나씩 */
+  Object.keys(o.track || {}).forEach((tid) => {
+    s.scal_docs.c2[tid + '_2026'] = { items: {} };
+    Object.keys(o.track[tid]).forEach((k) => {
+      s.scal_docs.c2[tid + '_2026'].items[k] = Object.assign({ by: '홍길동', at: Date.UTC(2026, 8, 20, 3) }, o.track[tid][k]);
+    });
+  });
+  /* 대형 사업은 저장본(formKey)이 있어야 현황판 줄이 생긴다 — 알림 검사용 */
+  if (o.row) s.scal_reports.c2 = { t2_2026: { formKey: 'techguard', typeId: 't2', state: '초안', ver: 0, updatedAt: Date.UTC(2026, 8, 20, 3), updatedBy: '홍길동', report: {} } };
+  return s;
+}
+const planItem = (biz, id) => D.planFor(biz).items.filter((i) => i.id === id)[0];
+const WP = '일터상생혁신컨설팅';
+const countOf = (h, re) => (h.match(re) || []).length;
+
+test('69 정적 — 단계 칸의 data-item 이 칸 창 네 번째 인자로 간다 · 쓰기는 여전히 .set 한 곳 · 새 쓰기 길이 없다', () => {
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
+  assert.match(SRC, /grOpenCell\(c\.getAttribute\('data-co'\),c\.getAttribute\('data-ty'\),c\.getAttribute\('data-step'\),c\.getAttribute\('data-item'\)\|\|''\)/);
+  assert.match(grab('grOpenCell'), /^function grOpenCell\(coId,typeId,step,itemId\)/);
+  assert.match(grab('grOpenCell'), /itemId\?T\.keysForItem\(plan,itemId,n,D\.monthsFor\(cons,p\)\):T\.keysFor\(plan,step,n\)/);
+  assert.match(grab('grOpenCell'), /item:itemId\|\|''/);
+  assert.match(grab('grRenderDocs'), /data-item="'\+grEsc\(c\.id\)/);
+  ['grRenderDocs', 'grOpenCell', 'grRenderCell', 'grRenderSend', 'grRenderAlerts'].forEach((n) =>
+    assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|mailto:|\.send\s*\(/, n + ' 이 직접 쓰거나 부른다'));
+  assert.match(SRC, /\.dc-wide\{overflow-x:auto\}/);
+});
+
+test('70 대형 사업 체크표 — 단계 열 머리·「다음 단계」·기한·목차 · 칩 단추는 data-item · 간단형은 그대로 5열(data-item 없음)', async () => {
+  const w = world({ seed: bigSeed() });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  let h = w.els.docs.innerHTML;
+  assert.equal(w.els.docs.style.display, '');
+  assert.ok(h.includes('<div class="dc-wide"><table>'));
+  ['<th>업체</th>', '<th>참여 안내서(서명)</th>', '<th>수행계획서</th>', '<th>회차별 수행보고서+사진2장+서명지</th>', '<th>이행결과표</th>', '<th>다음 단계</th>', '<th>기한</th>',
+    '가나상사', '다라정밀', '대형', 'data-toc="1" data-co="c2" data-ty="t2"'].forEach((s) => assert.ok(h.includes(s), s));
+  assert.ok(!h.includes('①초안') && !h.includes('서류 목차 보기'), '대형은 간단형 열이 아니다');
+  assert.equal(countOf(h, /data-item="/g), 16, '두 줄 × 단계 8칸 모두 칩 단추');
+  assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t2" data-step="sign" data-item="guide"'));
+  assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t2" data-step="plat" data-item="plan"'));
+  assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t2" data-step="report" data-item="kickoff"'));
+  assert.ok(h.includes('<span class="st st-wait">○ 없음 0/2</span>'), '회차 서류는 0/2 (회차 둘)');
+  const line = h.split('<tr>').filter((x) => x.includes('다라정밀'))[0];
+  assert.ok(line.includes('<td>참여 안내서(서명)</td>'), '기록이 없으면 다음 단계는 첫 단계');
+  assert.equal(w.db.쓴것.length, 0);
+  /* 간단형 — 지금과 같은 5열 */
+  w.ctx.grSetBiz('consulting-04');
+  h = w.els.docs.innerHTML;
+  ['①초안', '②확정', '③서명본', '④별첨', '⑤제출', '기한'].forEach((s) => assert.ok(h.includes(s), s));
+  assert.ok(!h.includes('data-item') && !h.includes('dc-wide') && !h.includes('다음 단계'));
+  assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t3" data-step="sign"'));
+});
+
+test('71 대형 표 — 충남: 수행일지·월별 열 · 다 끝나면 「모두 끝」 · 달이 없으면(계약 기간이 거꾸로) 그 칸만 「—」이고 눌러도 안 열린다', async () => {
+  let w = world({ seed: bigSeed() });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-06');
+  let h = w.els.docs.innerHTML;
+  ['<th>수행일지</th>', '<th>월별 수행실적보고서</th>', '<th>결과보고서</th>', '<th>사후관리 결과보고서</th>', '2026-10-31'].forEach((s) => assert.ok(h.includes(s), s));
+  assert.ok(h.includes('data-step="report" data-item="monthly"') && h.includes('○ 없음 0/3'), '계약 2026-08~10 → 달 셋');
+  assert.ok(h.includes('<td>수행일지</td>'));
+  w = world({ seed: bigSeed({ track: { t5: { log: { st: 'done' }, 'monthly:1': { st: 'done' }, 'monthly:2': { st: 'done' }, 'monthly:3': { st: 'na' }, result: { st: 'done' }, after: { st: 'na' } } } }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-06');
+  h = w.els.docs.innerHTML;
+  assert.ok(h.includes('<td>모두 끝</td>'), h);
+  /* 달이 없는 월별 — 칩이 없다 */
+  w = world({ seed: bigSeed({ start: '2026-12-01', end: '2026-08-31' }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-06');
+  h = w.els.docs.innerHTML;
+  assert.equal(countOf(h, /<td>—<\/td>/g), 1, '월별 한 칸만 「—」');
+  assert.ok(!h.includes('data-item="monthly"') && h.includes('data-item="log"') && h.includes('data-item="result"'));
+  w.ctx.grOpenCell('c2', 't5', 'report', 'monthly');
+  assert.equal(w.ctx.GR.cw, null, '키가 없으면 열리지 않는다');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('72 기록을 못 읽으면(GR.trackErr) 대형 단계 칸은 단추 없이 「?」 · 다음 단계도 「?」 · 안내 · 칸 창은 안 열린다', async () => {
+  const denied = { once: async () => { throw new Error('permission_denied'); } };
+  const w = world({ seed: bigSeed(), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  const h = w.els.docs.innerHTML;
+  assert.equal(w.ctx.GR.trackErr, true);
+  assert.ok(h.includes('기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인'));
+  assert.ok(!h.includes('data-cell') && !h.includes('data-item'), '누를 수 없다');
+  assert.equal(countOf(h, /<td>\?<\/td>/g), 2 * (8 + 1), '두 줄 × (단계 8칸 + 다음 단계)');
+  assert.ok(h.includes('data-toc="1"'), '목차 단추는 남는다');
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'plan');
+  assert.equal(w.ctx.GR.cw, null);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('73 칸 창 — 플랫폼 단계(plan): 키 [plan]·item · 「완료일」 한 칸(발송일·제출 방식 없음) · 입력 순서 <li> = steps 수 · 사람이 하는 일 안내 · 열기만으로는 안 쓴다', async () => {
+  const w = world({ seed: bigSeed() });
+  await cellOf(w, 'consulting-02', 'c2', 't2', 'plat', 'plan');
+  const cw = w.ctx.GR.cw;
+  assert.ok(cw, '열렸다');
+  assert.deepEqual(cw.keys.map((k) => k.key), ['plan']);
+  assert.equal(cw.keys[0].id, 'plan');
+  assert.equal(cw.item, 'plan');
+  assert.equal(cw.step, 'plat');
+  const c = w.els.cellw.innerHTML;
+  assert.ok(c.includes('플랫폼 입력 · 수행계획서 — 다라정밀'), '제목에 단계 이름·항목 이름');
+  assert.ok(c.includes('id="cwGot"') && c.includes('<span>완료일</span>'));
+  assert.ok(!c.includes('id="cwSent"') && !c.includes('발송일') && !c.includes('id="cwHow"') && !c.includes('제출 방식') && !c.includes('id="cwAck"'));
+  assert.ok(!c.includes('cwHwp'), '한글 파일 열기는 서명 칸만');
+  assert.ok(c.includes('<div id="cwSend"></div>'));
+  ['value="none"', 'value="doing"', 'value="done"', 'value="blocked"', 'value="na"'].forEach((s) => assert.ok(c.includes(s), s));
+  const steps = planItem(w.ctx.GR.cw.biz, 'plan').steps;
+  assert.ok(steps.length >= 4);
+  const h = w.els.cwSend.innerHTML;
+  assert.equal(countOf(h, /<li>/g), steps.length);
+  assert.ok(h.includes('<div class="days">입력 순서</div><ol class="days">'));
+  steps.forEach((t) => assert.ok(h.includes(t.replace(/&/g, '&#38;').replace(/</g, '&#60;').replace(/>/g, '&#62;').replace(/"/g, '&#34;').replace(/'/g, '&#39;')), t));
+  assert.ok(h.includes('로그인과 최종 제출은 사람이 합니다 — 접수 화면을 캡처해 두세요'));
+  assert.ok(!h.includes('<button') && !h.includes('grWriteMail'), '메일 단추 없음');
+  assert.ok(h.includes('📝 단계 안내'));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('74 회차 서류(round) — 키 round:1..n(회차 수) · 서류 고르기 <select> · 안내 글 · 고르면 그 줄 키로', async () => {
+  const w = world({ seed: bigSeed() });
+  await cellOf(w, 'consulting-02', 'c2', 't2', 'plat', 'round');
+  assert.deepEqual(w.ctx.GR.cw.keys.map((k) => k.key), ['round:1', 'round:2'], '합성 회차 둘');
+  assert.equal(w.ctx.GR.cw.key, 'round:1');
+  const c = w.els.cellw.innerHTML;
+  assert.ok(c.includes('<select id="cwKey" onchange="grPickCell(this.value)">'));
+  assert.ok(c.includes('회차별 수행보고서+사진2장+서명지 1회차') && c.includes('회차별 수행보고서+사진2장+서명지 2회차'));
+  const h = w.els.cwSend.innerHTML;
+  assert.ok(h.includes('안내: ') && h.includes('회의 2시간 이상'));
+  assert.equal(countOf(h, /<li>/g), planItem(w.ctx.GR.cw.biz, 'round').steps.length);
+  w.ctx.grPickCell('round:2');
+  assert.equal(w.ctx.GR.cw.key, 'round:2');
+  assert.ok(w.els.cwSend.innerHTML.includes('입력 순서'), '고르면 다시 그린다 — 같은 항목 안내');
+  /* 다른 항목의 키로는 못 바꾼다 */
+  w.ctx.grPickCell('plan');
+  assert.equal(w.ctx.GR.cw.key, 'round:2');
+});
+
+test('75 월별(monthly) — 키 monthly:1..m · 이름에 YYYY-MM · 보고서 단계는 완료일 한 칸 · 안내 글만(입력 순서 없음)', async () => {
+  const w = world({ seed: bigSeed() });
+  await cellOf(w, 'consulting-06', 'c2', 't5', 'report', 'monthly');
+  const cw = w.ctx.GR.cw;
+  assert.deepEqual(cw.keys.map((k) => k.key), ['monthly:1', 'monthly:2', 'monthly:3']);
+  assert.deepEqual(cw.keys.map((k) => k.name), ['2026-08 월별 수행실적보고서', '2026-09 월별 수행실적보고서', '2026-10 월별 수행실적보고서']);
+  const c = w.els.cellw.innerHTML;
+  assert.ok(c.includes('보고서 · 2026-08 월별 수행실적보고서 — 다라정밀'));
+  assert.ok(c.includes('2026-09 월별 수행실적보고서') && c.includes('id="cwGot"') && !c.includes('id="cwSent"'));
+  const h = w.els.cwSend.innerHTML;
+  assert.ok(h.includes('안내: 달마다 한 부'));
+  assert.ok(!h.includes('입력 순서') && !h.includes('<ol'));
+  assert.ok(h.includes('📝 단계 안내'));
+  /* 안내가 없는 보고서 항목 — 안내 칸이 비어 있다(헛 머리글을 그리지 않는다) */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't5', 'report', 'after');
+  assert.deepEqual(w.ctx.GR.cw.keys.map((k) => k.key), ['after']);
+  assert.equal(w.els.cwSend.innerHTML, '');
+});
+
+test('76 저장 — 대형 단계 칸: scal_docs/<co>/<rid>/items/plan 한 줄만 · {st:done, gotAt, note, by, at} · 옛 link 를 지킨다 · 표·다음 단계가 바뀐다', async () => {
+  const w = world({ email: 'p009@pureun.kr', seed: bigSeed({ track: { t2: { plan: { st: 'doing', link: BIG_LINK } } } }) });
+  await cellOf(w, 'consulting-02', 'c2', 't2', 'plat', 'plan');
+  assert.ok(w.ctx.GR.cw.keys.length === 1);
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-09'; w.els.cwNote.value = ' 플랫폼 입력 마침 ';
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/plan'], '한 줄만');
+  const v = w.db.쓴것[0].값;
+  assert.deepEqual(Object.keys(v).sort(), ['at', 'by', 'gotAt', 'link', 'note', 'st'], '규칙 밖 필드 없음');
+  assert.deepEqual([v.st, v.gotAt, v.note, v.by, typeof v.at, v.link], ['done', '2026-10-09', '플랫폼 입력 마침', '홍길동', 'number', BIG_LINK]);
+  assert.ok(w.els.cellw.innerHTML.includes('저장했습니다'));
+  const row = w.els.docs.innerHTML.split('<tr>').filter((x) => x.includes('다라정밀'))[0];
+  assert.ok(row.includes('<span class="st st-done">● 등록함</span>'), row);
+  assert.ok(row.includes('<td>참여 안내서(서명)</td>'), '다음 단계는 아직 첫 단계');
+  /* 회차 칸 — 고른 줄 키 하나만 */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'round');
+  w.ctx.grPickCell('round:2');
+  w.els.cwSt.value = 'blocked'; w.els.cwGot.value = ''; w.els.cwNote.value = '서명지 못 받음';
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/plan', 'scal_docs/c2/t2_2026/items/round:2']);
+  assert.deepEqual(w.db.쓴것[1].값, { st: 'blocked', note: '서명지 못 받음', by: '홍길동', at: w.db.쓴것[1].값.at });
+  assert.match(w.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/, '현황판 줄이 없는 사업은 알림에 안 나온다(줄은 저장본이 있을 때만)');
+  /* 잘못 적으면 쓰지 않는다 — 대형 단계에도 같은 점검 */
+  const n = w.db.쓴것.length;
+  w.els.cwSt.value = 'doing'; w.els.cwGot.value = '10/09';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, n);
+  assert.ok(w.els.cellw.innerHTML.includes('날짜는 YYYY-MM-DD 꼴로 적어 주세요'));
+});
+
+test('77 서명 단계(guide) — 설계 1 의 「서명 요청 메일 쓰기」가 나오고 grWriteMail 이 [서명요청:rid] 꼬리표로 쓰기 창을 연다 · 안내 글', async () => {
+  const calls = [];
+  const w = world({ seed: bigSeed() });
+  await cellOf(w, 'consulting-02', 'c2', 't2', 'sign', 'guide');
+  assert.deepEqual(w.ctx.GR.cw.keys.map((k) => k.key), ['guide']);
+  let h = w.els.cwSend.innerHTML;
+  assert.ok(w.els.cellw.innerHTML.includes('<div id="cwSend"></div>'));
+  assert.ok(w.els.cellw.innerHTML.includes('③ 업체 서명본 · 참여 안내서(서명) — 다라정밀'));
+  assert.match(h, /<button type="button" onclick="grWriteMail\(\)">✉ 서명 요청 메일 쓰기<\/button>/);
+  assert.ok(h.includes('✉ 서명 요청') && h.includes('안내: 담당자 서명 후 플랫폼에 업로드'));
+  assert.ok(w.els.cellw.innerHTML.includes('id="cwSent"') && w.els.cellw.innerHTML.includes('id="cwGot"'), '서명 칸은 발송일·회신일 둘');
+  w.ctx.open = () => ({ puMailComposeTo(o) { calls.push(o); return true; }, focus() {}, location: { href: '' } });
+  assert.equal(await w.ctx.grWriteMail(), true);
+  assert.equal(calls.length, 1);
+  assert.ok(calls[0].subject.startsWith('[서명요청:t2_2026] ') && calls[0].subject.includes('다라정밀'), calls[0].subject);
+  assert.equal(calls[0].to, 'dara@example.com');
+  assert.equal(w.db.쓴것.length, 0, '메일을 열기만 한다');
+  /* 보냈음 기록 — 같은 한 줄 .set, 키는 guide */
+  w.ctx.GR.cw.draft = null;
+  showRec(w, { st: 'none' });
+  await w.ctx.grMarkSent('');
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/guide']);
+  assert.equal(w.db.쓴것[0].값.st, 'doing');
+});
+
+test('78 대형 칸의 바깥 값은 이스케이프 — 체크 글·안내 글(DOC_PLANS 사본)·메모·알림', async () => {
+  const bad = '<script>alert(1)</script>"\'';
+  const esc = '&#60;script&#62;alert(1)&#60;/script&#62;&#34;&#39;';
+  const evil = Object.freeze([bad, 'x" onerror="alert(2)', '<img src=x onerror=alert(3)>']);
+  const w = world({ seed: bigSeed({ row: true, track: { t2: { plan: { st: 'blocked', note: bad } } } }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  const hostile = (n) => { const p = D.planFor(n); return Object.assign({}, p, { items: p.items.map((i) => (i.id === 'plan' || i.id === 'round' || i.id === 'guide' || i.id === 'kickoff'
+    ? Object.assign({}, i, { steps: i.step === 'plat' ? evil : i.steps, note: bad }) : i)) }); };
+  w.ctx.PuGovReportDocs = Object.assign({}, D, { planFor: hostile });
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'plan');
+  await w.ctx.grLoadInbox();
+  let h = w.els.cwSend.innerHTML;
+  assert.equal(countOf(h, /<li>/g), 3);
+  assert.ok(!/<script|<img/i.test(h), '태그가 그대로 들어갔다: ' + h);
+  assert.ok(h.includes('<li>' + esc + '</li>') && h.includes('x&#34; onerror=&#34;alert(2)'), h);
+  assert.ok(h.includes('안내: ' + esc), h);
+  assert.equal(evil.length, 3, '상수 배열은 그대로(읽기만)');
+  assert.ok(w.els.cellw.innerHTML.includes('<textarea id="cwNote" maxlength="200" rows="3">' + esc + '</textarea>'), '메모 칸도 글자로');
+  assert.ok(!/<script/i.test(w.els.cellw.innerHTML));
+  /* 서명·보고서 단계의 안내 글 */
+  w.ctx.grCloseCell(); w.ctx.grOpenCell('c2', 't2', 'sign', 'guide'); await w.ctx.grLoadInbox();
+  assert.ok(w.els.cwSend.innerHTML.includes('안내: ' + esc) && !/<script/i.test(w.els.cwSend.innerHTML));
+  w.ctx.grCloseCell(); w.ctx.grOpenCell('c2', 't2', 'report', 'kickoff');
+  assert.ok(w.els.cwSend.innerHTML.includes('안내: ' + esc) && !/<script/i.test(w.els.cwSend.innerHTML));
+  /* 알림의 메모 */
+  w.ctx.grRender();
+  const a = w.els.alerts.innerHTML;
+  assert.ok(a.includes('수행계획서 (' + esc + ')'), a);
+  assert.ok(!/<script/i.test(a));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('79 알림 「막힌 단계」 — 막힘 기록이 있는 대형 줄이 있으면 N · 업체·사업·단계 이름·메모 · 없으면 0 · 막힘이 풀리면 사라진다', async () => {
+  const w = world({ email: 'p009@pureun.kr', seed: bigSeed({ row: true, track: { t2: { plan: { st: 'blocked', note: '인증서 만료' }, 'round:2': { st: 'blocked' }, kickoff: { st: 'doing' } } } }) });
+  await w.ctx.grLoad();
+  let a = w.els.alerts.innerHTML;
+  assert.match(a, /막힌 단계 <b>1<\/b>/);
+  const li = liOf(a.slice(a.indexOf('막힌 단계')), '다라정밀');
+  assert.ok(li.includes('다라정밀 · 일터혁신 컨설팅') || li.includes('다라정밀 · 일터혁신'), li);
+  assert.ok(li.includes('수행계획서 (인증서 만료)') && li.includes('회차별 수행보고서+사진2장+서명지 2회차'), li);
+  assert.ok(li.includes(' · '), '여럿이면 가운뎃점으로');
+  assert.ok(li.includes('href="gov-consulting.html#rpt=c2|t2"'));
+  assert.ok(a.indexOf('제출 기한 지남') < a.indexOf('막힌 단계'), '제출 기한 지남 뒤에');
+  /* 칸 창에서 풀면 알림이 줄어든다(다시 읽지 않고) */
+  w.ctx.grSetBiz('consulting-02');
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'plan');
+  w.els.cwSt.value = 'done'; w.els.cwGot.value = '2026-10-10'; w.els.cwNote.value = '';
+  await w.ctx.grSaveCell();
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'round');
+  w.ctx.grPickCell('round:2');
+  w.els.cwSt.value = 'doing'; w.els.cwGot.value = ''; w.els.cwNote.value = '';
+  await w.ctx.grSaveCell();
+  assert.match(w.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/);
+  /* 막힘 기록이 없다 */
+  const n = world({ seed: bigSeed({ row: true, track: { t2: { plan: { st: 'doing' } } } }) });
+  await n.ctx.grLoad();
+  assert.match(n.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/);
+  const base = world();
+  await base.ctx.grLoad();
+  assert.match(base.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/, '간단형만 있는 공용 씨앗도 0');
+  /* 기록을 못 읽으면 0 이 아니라 기존 안내만 — 알림 묶음은 0 으로 그려진다(못 읽음 문구가 함께 나온다) */
+  const denied = { once: async () => { throw new Error('permission_denied'); } };
+  const r = world({ seed: bigSeed({ row: true }), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  await r.ctx.grLoad();
+  assert.ok(r.els.alerts.innerHTML.includes('기록을 못 불러왔습니다'));
+});
+
+test('80 회귀 — 첨부(attach) 칸 창에는 #cwSend 가 없다 · 간단형 ⑤ 제출·③ 서명 칸 동작은 그대로(기존 57·63 검사) · 간단형 칸 창에는 항목 이름이 안 붙는다', async () => {
+  const w = world({ seed: bigSeed() });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  w.ctx.grOpenCell('c1', 't1', 'attach');
+  assert.ok(!w.els.cellw.innerHTML.includes('id="cwSend"'));
+  assert.equal(w.ctx.GR.cw.item, '', '간단형은 item 이 빈 글자');
+  assert.ok(w.els.cellw.innerHTML.includes('④ 산출물 별첨 — 가나상사'));
+  assert.ok(!w.els.cellw.innerHTML.includes('완료일'));
+  w.ctx.grCloseCell();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  assert.ok(w.els.cellw.innerHTML.includes('③ 업체 서명본 — 다라정밀') && w.els.cellw.innerHTML.includes('발송일') && w.els.cellw.innerHTML.includes('id="cwHwp"'));
+  assert.ok(w.els.cwSend.innerHTML.includes('✉ 서명 요청') && !w.els.cwSend.innerHTML.includes('📝'));
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't3', 'submit');
+  assert.ok(w.els.cwSend.innerHTML.includes('✉ 제출 메일') && w.els.cellw.innerHTML.includes('제출 방식'));
+  assert.equal(w.db.쓴것.length, 0);
 });
