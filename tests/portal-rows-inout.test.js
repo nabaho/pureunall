@@ -26,11 +26,14 @@ const rowOf = (key) => {
   return m ? m[1] : null;
 };
 
-test('★★ 줄은 셋이고, 넷째는 «내외관리» 하나로 합쳤다', () => {
+test('★★ 줄은 넷이다 — 내외관리를 «영업관리(위)·내부관리(아래)» 둘로 갈랐다 (대표 지시 2026-10-11)', () => {
   const ids = (ROWS.match(/id:'([a-z]+)'/g) || []).map((s) => s.slice(4, -1));
-  assert.deepStrictEqual(ids, ['client', 'store', 'inout'],
+  assert.deepStrictEqual(ids, ['client', 'store', 'sales', 'inside'],
     '★ 줄 구성이 다르다: ' + ids.join(','));
-  assert.ok(/label:'내외관리'/.test(ROWS), '★ 이름이 「내외관리」가 아니다');
+  assert.ok(/id:'sales',\s*label:'영업관리'/.test(ROWS), '★ 윗줄 이름이 「영업관리」가 아니다');
+  assert.ok(/id:'inside',\s*label:'내부관리'/.test(ROWS), '★ 아랫줄 이름이 「내부관리」가 아니다');
+  assert.ok(ids.indexOf('sales') < ids.indexOf('inside'), '★ 내부관리가 영업관리 «아랫줄»이어야 한다');
+  assert.ok(!/id:'inout'/.test(ROWS), '★ 옛 「내외관리」 줄이 남아 있다');
   assert.ok(!/id:'office'|id:'outside'/.test(ROWS),
     '★ 「우리 사무실」·「대외」가 아직 따로 남아 있다');
 });
@@ -45,9 +48,11 @@ test('★★ 업무관리는 «자료함»이다 (대표 지시)', () => {
   assert.strictEqual(rowOf('work'), 'store');
 });
 
-test('★★ 경력관리·홈페이지 관리가 «한 줄»에 모였다', () => {
-  assert.strictEqual(rowOf('career'), 'inout');
-  assert.strictEqual(rowOf('home'), 'inout');
+test('★★ 영업관리 = 홈페이지·뉴스레터·정부사업신청·회생광고 / 내부관리 = 경력·재무·인사', () => {
+  ['home', 'news', 'govbid', 'rehabad'].forEach((k) =>
+    assert.strictEqual(rowOf(k), 'sales', k + ' 이 영업관리에 없다'));
+  ['career', 'fin', 'hr'].forEach((k) =>
+    assert.strictEqual(rowOf(k), 'inside', k + ' 이 내부관리에 없다'));
 });
 
 test('★ 모든 타일이 «실제로 있는 줄»에 있다 (없는 줄이면 화면에서 사라진다)', () => {
@@ -67,9 +72,7 @@ test('★★ ⚙ 설정·백업·복구를 «타일로 되돌리지 않는다» 
       '★ ' + k + ' 이 다시 타일로 들어왔다 — 왼쪽 아래 떠 있는 단추와 중복이다.'
       + ' 타일로 두려면 떠 있는 단추를 먼저 없애야 한다');
   });
-  /* 내외관리 줄은 이 둘뿐이다 */
-  ['career', 'home'].forEach((k) =>
-    assert.strictEqual(rowOf(k), 'inout', k + ' 이 내외관리에 없다'));
+  /* 두 줄 모두 설정·백업 타일은 없다 — 위 단언이 그 증거다 */
 });
 
 test('★★ 떠 있는 단추는 남아 있다 — 타일을 걷어내며 같이 지우면 길이 사라진다', () => {
