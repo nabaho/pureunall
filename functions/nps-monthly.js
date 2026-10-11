@@ -230,11 +230,16 @@ async function askOnce(deps, no, req, opts) {
     /* 고른 사업장이 바뀌었으면(nowSeq ≠ pick) 하루 안이라도 다시 받는다 */
     const cur = Object.assign({}, c.extra);
     if (nps.pick && nps.pick.seq && String(nps.nowSeq || "") !== String(nps.pick.seq)) cur.nps = Object.assign({}, nps, { now: null, candAt: null });
+    /* 한 갈래가 실패해도 다른 갈래는 간다 — 실패는 적어서 돌려준다(로그) */
     for (const k of PUBD.reqKinds(req, cur, at)) {
-      if (k === "ei") { await oneEi(db, fetchFn, enc, c, at); out.did.push("ei"); continue; }
-      if (nps.none) { out.skip.push("nps:없음"); continue; }
-      if (nps.pick && nps.pick.seq) { await oneNps(db, fetchFn, enc, c, at); out.did.push("nps"); }
-      else { await oneCand(db, fetchFn, enc, c, at); out.did.push("cand"); }
+      try {
+        if (k === "ei") { await oneEi(db, fetchFn, enc, c, at); out.did.push("ei"); continue; }
+        if (nps.none) { out.skip.push("nps:없음"); continue; }
+        if (nps.pick && nps.pick.seq) { await oneNps(db, fetchFn, enc, c, at); out.did.push("nps"); }
+        else { await oneCand(db, fetchFn, enc, c, at); out.did.push("cand"); }
+      } catch (e) {
+        out.failed = (out.failed || []).concat(k + ":" + String((e && e.message) || e).slice(0, 80));
+      }
     }
   } finally {
     if (n.length === 10) await db.ref("pubdata_req/" + n).remove();
@@ -254,7 +259,11 @@ function make(deps) {
       return null;
     });
   /* 🗂 화면의 «받아 달라» — pubdata_req/{번호} 가 생기면 그 회사만 받는다(쓰기는 서버만) */
+  /* ⚠★ 서울(asia-northeast3) — 공공데이터포털은 바깥 지역 아이피를 막는다. 2026-10-11 첫 배포가
+     us-central1 에 만들어져 「fetch failed」로 실패했다(뉴스레터 모으개 2026-09-07 과 같은 병).
+     매달 도는 npsMonthly 와 «같은 지역»이어야 한다 — tests/pubdata.test.js 가 견준다. */
   const pubdataAsk = deps.functions
+    .region(deps.MAIL_REGION)
     .runWith({ timeoutSeconds: 60, memory: "256MB" })
     .database.ref("/pubdata_req/{no}")
     .onCreate(async (snap, context) => {

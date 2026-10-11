@@ -133,3 +133,21 @@ test('★ 화면 읽기 도구는 쓰지 않는다 — 요청 자리 말고는 s
   const writes = code.match(/\.ref\(([^)]*)\)\.(set|update|push|remove)\(/g) || [];
   assert.ok(writes.length >= 1 && writes.every(w => /pubdata_req/.test(w)), '★★ 화면이 공용 자리에 씁니다: ' + writes.join(' | '));
 });
+
+test('★★★ 요청 함수는 서울 — 매달 함수와 같은 지역(공공데이터포털은 바깥 아이피를 막는다)', () => {
+  const regions = [];
+  const chain = { region: (r) => { regions.push(r); return chain; }, runWith: () => chain,
+    pubsub: { schedule: () => ({ timeZone: () => ({ onRun: () => 'sched' }) }) },
+    database: { ref: () => ({ onCreate: () => 'ask' }) } };
+  const made = NPSM({ functions: chain, getDatabase: () => null, MAIL_REGION: 'asia-northeast3' });
+  assert.equal(made.pubdataAsk, 'ask');
+  assert.equal(regions.length, 2, '★★★ 지역을 안 적은 함수가 있습니다 — 기본(us-central1)에서는 「fetch failed」');
+  assert.ok(regions.every(r => r === 'asia-northeast3'), '★★★ 서울이 아닙니다: ' + regions);
+});
+
+test('★★ 요청 — 한 갈래가 실패해도 오류로 끝나지 않고, 요청은 지운다', async () => {
+  const f = fakeDb({ 'pucards/coInfo/1234567890': {}, 'pubdata/co/1234567890': null });
+  const r = await NPSM.askOnce({ getDatabase: () => f.db, fetch: async () => { throw new Error('fetch failed'); } }, '1234567890', {}, { key: 'k', now: 1 });
+  assert.ok(r.failed && r.failed.length >= 1, '실패를 적지 않았습니다');
+  assert.deepEqual(f.removed, ['pubdata_req/1234567890']);
+});
