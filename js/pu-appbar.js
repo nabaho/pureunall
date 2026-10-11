@@ -34,37 +34,37 @@
        손잡이가 붙어도 그 앱이 목록에 안 보이고, script 를 안 실으면 손잡이 자체가
        없다 — 이번엔 둘 다였다. 이름도 포털 개명(2026-08-11)을 따라잡았다. */
   var APPS = [
-    { key: 'erp',     name: '푸른이알피',   icon: '🏢', url: 'pu-erp.html',         desc: '계약·업체·사건' },
+    { key: 'erp',     row: 'client', name: '푸른이알피',   icon: '🏢', url: 'pu-erp.html',         desc: '계약·업체·사건' },
     /* 직원 인사 · 재무 — 이알피와 같은 파일이고 주소 꼬리(?app=hr·fin)만 다르다(대표 지시 2026-10-09, 메일과 같은 방식).
        perm — 관리자이거나 그 권한이 있을 때만 보인다. 잣대는 포털과 같은 서버 권한표(uid_roles)이고,
        포털이 마지막으로 읽은 값(pu_app_perm_<uid>)을 빌려 본다. */
-    { key: 'hr',      name: '인사관리',    icon: '👥', url: 'pu-erp.html?app=hr',  desc: '명부·급여·근태', perm: 'hr' },
-    { key: 'fin',     name: '재무관리',     icon: '📒', url: 'pu-erp.html?app=fin', desc: '입출금·마감', perm: 'fin' },
-    { key: 'cal',     name: '푸른 캘린더',  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
-    { key: 'consult', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
+    { key: 'hr',      row: 'inside', name: '인사관리',    icon: '👥', url: 'pu-erp.html?app=hr',  desc: '명부·급여·근태', perm: 'hr' },
+    { key: 'fin',     row: 'inside', name: '재무관리',     icon: '📒', url: 'pu-erp.html?app=fin', desc: '입출금·마감', perm: 'fin' },
+    { key: 'cal',     row: 'client', name: '푸른 캘린더',  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><rect x="15" y="24" width="70" height="62" rx="9" fill="#ffffff" stroke="#cbd5e1" stroke-width="3"/><path d="M15 33a9 9 0 0 1 9-9h52a9 9 0 0 1 9 9v11H15z" fill="#dc2626"/><circle cx="31" cy="58" r="5" fill="#bfdbfe"/><circle cx="50" cy="58" r="5" fill="#bfdbfe"/><circle cx="69" cy="58" r="5" fill="#bfdbfe"/><circle cx="31" cy="72" r="5" fill="#bfdbfe"/><circle cx="50" cy="72" r="5" fill="#bfdbfe"/></svg>', url: 'pu-cal.html',         desc: '일정·근태·이음센터' },
+    { key: 'consult', row: 'client', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
     /* 컨설팅보고서(2026-10-10) — 포털 타일과 짝. 쓰는 일은 정부사업일정의 보고서 창이 한다 */
-    { key: 'govreport', name: '컨설팅보고서', icon: '📑', url: 'gov-report.html',     desc: '보고서 현황·작성' },
-    { key: 'work',    name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
-    { key: 'career',  name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
-    { key: 'govbid',  name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기', adminOnly: true },
-    { key: 'rehabad', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송', adminOnly: true },
-    { key: 'cards',   name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
+    { key: 'govreport', row: 'client', name: '컨설팅보고서', icon: '📑', url: 'gov-report.html',     desc: '보고서 현황·작성' },
+    { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
+    { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
+    { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기', adminOnly: true },
+    { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송', adminOnly: true },
+    { key: 'cards',   row: 'store', name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
     /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
        whoAmI() 는 주소 꼬리까지 보고 메일을 먼저 가른다 · go() 는 «&» 로 잇는다(2026-10-04).
        tests/appbar-every-link.test.js 가 모든 줄이 «제 앱»으로 가는지 돌려 본다. */
-    { key: 'mail',    name: '메일',        icon: '✉️', url: 'pu-cards.html?view=mail', desc: '자료 붙여 보내기·예약' },
-    { key: 'photos',  name: '사진첩',       icon: '🖼️', url: 'pu-photos.html',      desc: '사진·서류' },
-    { key: 'paydata', name: '급여데이터함',  icon: '💼', url: 'pu-paydata.html',     desc: '급여자료 사업장별' },
-    { key: 'fund',    name: '기금관리',     icon: '🏦', url: 'fund.html',           desc: '근로복지기금 운영' },
+    { key: 'mail',    row: 'store', name: '메일',        icon: '✉️', url: 'pu-cards.html?view=mail', desc: '자료 붙여 보내기·예약' },
+    { key: 'photos',  row: 'store', name: '사진첩',       icon: '🖼️', url: 'pu-photos.html',      desc: '사진·서류' },
+    { key: 'paydata', row: 'store', name: '급여데이터함',  icon: '💼', url: 'pu-paydata.html',     desc: '급여자료 사업장별' },
+    { key: 'fund',    row: 'client', name: '기금관리',     icon: '🏦', url: 'fund.html',           desc: '근로복지기금 운영' },
     /* 취업규칙은 한 줄 — 조별 문안·모은 자료(rules-v2.html)는 앱 머리줄의 세 갈래 단추로 간다
        (두 앱 합치기 2026-10-04). 포털 타일과 짝이다. 첫 화면은 🏢 사업장(2026-10-04 대표 「추천」). */
-    { key: 'rules',   name: '취업규칙',      icon: '📋', url: 'rules-v2.html',       desc: '작성·검토·개정·신고' },
-    { key: 'docs',    name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
-    { key: 'payroll', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱' },
-    { key: 'home',    name: '홈페이지', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },
+    { key: 'rules',   row: 'client', name: '취업규칙',      icon: '📋', url: 'rules-v2.html',       desc: '작성·검토·개정·신고' },
+    { key: 'docs',    row: 'store', name: '계약서등관리',  icon: '📄', url: 'docs-esign.html',  /* 옛 이름 문서관리 — 대표 2026-10-05 «업무계약 발생 시 진행하는 서류» */     desc: '사건 위임장 · 계약서 양식' },
+    { key: 'payroll', row: 'client', name: '급여관리',     icon: '💰', url: 'payroll-os.html',     desc: '급여 아웃소싱' },
+    { key: 'home',    row: 'sales', name: '홈페이지', icon: '🌐', url: 'pu-home.html',        desc: '구성원·주요업무 글', adminOnly: true },
     /* 뉴스레터 — 경력관리·홈페이지 관리와 «같이» 총괄관리자 전용이다.
        포털 타일(enter.html)과 잣대를 맞춘다 — 한쪽만 보이면 눌러도 막히는 문이 된다. */
-    { key: 'news',    name: '뉴스레터', icon: '📰', url: 'pu-news.html',        desc: '주간뉴스레터 짓기·보내기', adminOnly: true }
+    { key: 'news',    row: 'sales', name: '뉴스레터', icon: '📰', url: 'pu-news.html',        desc: '주간뉴스레터 짓기·보내기', adminOnly: true }
   ];
 
   /* 단추에 적는 말 — 한 곳에서만 정한다. 바꾸려면 여기 한 줄. */
@@ -80,9 +80,20 @@
     catch (e) { return dflt; }
   }
   function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
-  function favs() { var a = lsGet(FAV_KEY, []); return Array.isArray(a) ? a : []; }
+  /* ══ 목록에는 «의뢰인 업무·자료함»만 (대표 지시 2026-10-11) ══
+     「즐겨찾기에 의뢰인 업무와 자료함만 즐겨찾기가 되게 해라 … 중간에 구분해서」 → 「영업 내부관리 빼는 것으로 진행」.
+     줄 이름·차례는 포털(enter.html)의 줄(row)과 같다 — tests/appbar-fav-rows.test.js 가 포털과 견준다.
+     ⚠ 영업관리·내부관리 앱도 APPS 에서 «지우지 않는다» — 그 앱 안에서 «지금 어느 앱인지»(whoAmI)·보던 화면 기억에 쓴다.
+       목록에서만 거른다. */
+  var ROWS = [{ id: 'client', label: '의뢰인 업무' }, { id: 'store', label: '자료함' }];
+  function rowShown(row) { return ROWS.some(function (r) { return r.id === row; }); }
+  function appOf(key) { for (var i = 0; i < APPS.length; i++) if (APPS[i].key === key) return APPS[i]; return null; }
+  function favable(key) { var a = appOf(key); return !!(a && rowShown(a.row)); }
+  /* 저장된 별표 중 «목록에 있는 줄»의 것만 즐겨찾기로 친다 — 예전에 단 영업·내부관리 별표는 저절로 빠진다(지우지는 않는다) */
+  function favs() { var a = lsGet(FAV_KEY, []); return (Array.isArray(a) ? a : []).filter(favable); }
   function isFav(key) { return favs().indexOf(key) >= 0; }
   function toggleFav(key) {
+    if (!favable(key)) return favs();
     var a = favs(), i = a.indexOf(key);
     if (i >= 0) a.splice(i, 1); else a.push(key);
     lsSet(FAV_KEY, a);
@@ -116,10 +127,16 @@
   function ordered() {
     var f = favs();
     var admin = isAdminNow();
-    return APPS.filter(function (a) { return (!a.adminOnly || admin) && (!a.perm || admin || permOk(a.perm)); }).sort(function (a, b) {
-      var fa = f.indexOf(a.key) >= 0 ? 0 : 1, fb = f.indexOf(b.key) >= 0 ? 0 : 1;
-      return fa - fb;   // 같으면 원래 차례 (안정 정렬)
-    });
+    var rowIx = function (a) { for (var i = 0; i < ROWS.length; i++) if (ROWS[i].id === a.row) return i; return ROWS.length; };
+    return APPS.filter(function (a) { return rowShown(a.row) && (!a.adminOnly || admin) && (!a.perm || admin || permOk(a.perm)); })
+      .map(function (a, i) { return { a: a, i: i }; })
+      .sort(function (x, y) {
+        var fx = f.indexOf(x.a.key) >= 0 ? 0 : 1, fy = f.indexOf(y.a.key) >= 0 ? 0 : 1;
+        if (fx !== fy) return fx - fy;                       // 즐겨찾기가 맨 위
+        if (!fx) return x.i - y.i;                           // 즐겨찾기끼리는 원래 차례
+        return (rowIx(x.a) - rowIx(y.a)) || (x.i - y.i);     // 그다음 의뢰인 업무 → 자료함, 줄 안에서는 원래 차례
+      })
+      .map(function (x) { return x.a; });
   }
 
   /* ── 보던 화면 기억 ──
@@ -246,7 +263,7 @@
 
     var head = document.createElement('div');
     head.style.cssText = 'padding:6px 11px;font-size:10.5px;color:#94a3b8;background:#f8fafc;border-bottom:1px solid #eef2f6';
-    head.textContent = '프로그램 이동 · ☆ 를 누르면 위로 올라갑니다';
+    head.textContent = '프로그램 이동 · ☆ 를 누르면 즐겨찾기로 올라갑니다';
     pop.appendChild(head);
 
     var list = document.createElement('div');
@@ -255,17 +272,28 @@
 
     function draw() {
       list.innerHTML = '';
-      var arr = ordered(), lastFav = -1;
-      arr.forEach(function (a, i) { if (isFav(a.key)) lastFav = i; });
+      var arr = ordered(), sec = '';
+      /* 칸 머리 — ⭐ 즐겨찾기 · 의뢰인 업무 · 자료함 (대표 지시 2026-10-11 「중간에 구분해서」). 빈 칸은 머리도 안 그린다 */
+      function secHead(id, text) {
+        if (sec === id) return;
+        sec = id;
+        var h = document.createElement('div');
+        h.setAttribute('data-pu-sec', id);
+        h.style.cssText = 'padding:5px 11px 3px;font-size:10.5px;font-weight:700;color:#64748b;background:#f8fafc;' +
+          'border-top:1px solid #e2e8f0;border-bottom:1px solid #eef2f6';
+        h.textContent = text;
+        list.appendChild(h);
+      }
 
       arr.forEach(function (a, i) {
+        if (isFav(a.key)) secHead('fav', '⭐ 즐겨찾기');
+        else ROWS.forEach(function (r) { if (r.id === a.row) secHead(r.id, r.label); });
         var now = (a.key === _me);
         var row = document.createElement('div');
         row.setAttribute('data-pu-app', a.key);   // 자동 시험·자동화가 줄을 정확히 집을 수 있게
         row.style.cssText =
           'display:flex;align-items:center;gap:8px;padding:7px 10px;font-size:12.5px;' +
-          'border-bottom:1px solid #f8fafc;' + (now ? 'background:#eff6ff;' : 'cursor:pointer;') +
-          (i === lastFav && lastFav < arr.length - 1 ? 'border-bottom:1px solid #cbd5e1;' : '');
+          'border-bottom:1px solid #f8fafc;' + (now ? 'background:#eff6ff;' : 'cursor:pointer;');
 
         var star = document.createElement('span');
         star.textContent = isFav(a.key) ? '★' : '☆';
@@ -492,6 +520,7 @@
     lastScreen: lastScreen,
     backTarget: backTarget,
     favs: favs,
+    ROWS: ROWS,
     toggleFav: toggleFav,
     ordered: ordered,
     _close: closePop
