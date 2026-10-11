@@ -3295,7 +3295,7 @@ function recOf(store, id){
 function openNew(ymd){
   /* 구글처럼 «시간 일정»이 기본 — 시작은 다음 정각, 끝은 비워 둔다(저장 때 한 시간 뒤). 종일은 스위치로 */
   S.modal = { mode:"new", kind:"sch", date:ymd, endDate:"", sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1,
-    vis:"shared", timed:true, time:새시각(ymd), endTime:"" };
+    vis:"shared", timed:true, time:새시각(ymd), endTime:"", repeat:"", remind:"" };
   /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
   if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
@@ -3791,6 +3791,30 @@ var GIC = {
   videocam:"M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM15 16H5V8h10v8z",
   attach:"M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"
 };
+/* ★ 「반복 안 함」·「알림 추가」 줄 (구글 입력 화면, 2026-10-11) — 구글 일정의 recurrence·reminders 로 그대로 간다.
+   ⚠ «새 일정»에만 둔다. 이미 있는 일정에서 바꾸면 반복 일정의 «이 날 것만» 고치는 것과 부딪히고,
+     이알피에서 고친 줄이 구글로 따라갈 때(syncEdit) 반복 규칙을 잘못 덮을 수 있다 — 고치기는 구글에서.
+   ⚠ 알림은 시간 일정에만(종일의 「몇 분 전」은 뜻이 없다). 「매주 (수요일)」처럼 고른 날을 글자에 보여 준다. */
+function 반복글(ymd){
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
+  if(!m) return { D:"매일", W:"매주", M:"매월", Y:"매년" };
+  var 요 = ["일","월","화","수","목","금","토"][new Date(+m[1], +m[2] - 1, +m[3]).getDay()];
+  return { D:"매일", W:"매주 (" + 요 + "요일)", M:"매월 " + (+m[3]) + "일", Y:"매년 " + (+m[2]) + "월 " + (+m[3]) + "일" };
+}
+var 알림들 = [["", "알림 추가"], ["10", "10분 전"], ["30", "30분 전"], ["60", "1시간 전"], ["120", "2시간 전"], ["1440", "1일 전"]];
+function 반복알림줄(m){
+  var 글 = 반복글(m.date);
+  var 반복 = '<select data-m="repeat" title="반복">'
+    + [["", "반복 안 함"], ["DAILY", 글.D], ["WEEKLY", 글.W], ["MONTHLY", 글.M], ["YEARLY", 글.Y]].map(function(o){
+        return '<option value="' + o[0] + '"' + (String(m.repeat || "") === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join("")
+    + '</select>';
+  var 알림 = '<select data-m="remind" title="알림">'
+    + 알림들.map(function(o){
+        return '<option value="' + o[0] + '"' + (String(m.remind || "") === o[0] ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join("")
+    + '</select>';
+  return '<div class="grow"><span class="gi" title="반복">' + 선아이콘("repeat") + '</span><div class="gbody">' + 반복 + '</div></div>'
+    + (m.timed ? '<div class="grow"><span class="gi" title="알림">' + 선아이콘("notifications") + '</span><div class="gbody">' + 알림 + '</div></div>' : '');
+}
 /* 「10월 10일 (토)」 — 올해가 아니면 「2025년 10월 10일 (금)」. 구글 앱 입력 화면의 날짜 글자 */
 function 날짜글(ymd){
   var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
@@ -3883,6 +3907,7 @@ function modalHtml(){
         + '<button data-mk="att"' + (일정 ? '' : ' class="on"') + '>연차·근태</button></div>' : '')
     + '<div class="gcols"><div class="gmain">'
     +   시각줄
+    +   (일정 && 새것 ? 반복알림줄(m) : '')
     +   (일정 && 새것 ? 줄("business", 명함칸Html(m), "기업정보함에서 불러오기") : '')
     +   (일정 ? 줄("place", '<input data-m="place" value="' + esc(m.place||"") + '" placeholder="위치 추가">'
           /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
@@ -4009,6 +4034,7 @@ function 개인에넣기(m){
   var id = 고침 ? m.id : PuCalWrite.newId("prv");
   var item = { id:id, date:m.date, title:String(m.title).trim(), time:String(m.time||""), endTime:String(m.endTime||""),
     endDate:(m.endDate && m.endDate > m.date) ? m.endDate : "",
+    repeat:(m.mode === "new" && m.repeat) ? String(m.repeat) : "", remindMin:(m.mode === "new" && m.timed && +m.remind > 0) ? +m.remind : 0,
     place:String(m.place||"").trim(), contact:String(m.contact||"").trim(), note:String(m.note||"") };
   if(m.card && m.card.k){ item.sourceKind = "card"; item.sourceId = m.card.k; }
   var prev = 고침 ? 개인하나(id) : null;
@@ -4037,7 +4063,8 @@ function 개인지우기조용히(id){
      ⚠ 구글 로그인이 안 돼 있으면 우리 쪽에만 둔다(그렇다고 말한다). 구글이 실패해도 우리 기록은 남는다.
      돌려주는 것: 구글로 보냈나(참/거짓) */
 function 내구글몸(item){
-  return { date:item.date, endDate:item.endDate || "", time:item.time || "", endTime:item.endTime || "", summary:item.title,
+  return { repeat:item.repeat || "", remindMin:item.remindMin || 0,
+    date:item.date, endDate:item.endDate || "", time:item.time || "", endTime:item.endTime || "", summary:item.title,
     location:item.place || "", description:[item.contact ? "담당자: " + item.contact : "", item.note || ""].filter(Boolean).join("\n"),
     visibility:"private", source:{ kind:"cal_private", id:item.id } };
 }
@@ -4094,6 +4121,7 @@ function 구글에넣기(m){
   if(사람) 설명.push("푸른 담당: " + 사람 + (/^[A-Z]-\d{3}$/.test(String(m.sid||"")) ? " (" + m.sid + ")" : ""));
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
+    repeat: String(m.repeat||""), remindMin: m.timed ? (+m.remind || 0) : 0,
     date: m.date, endDate: String(m.endDate||""), time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
     location: String(m.place||"").trim(), description: 설명.join("\n"), puSid: String(m.sid||""),
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
@@ -4114,7 +4142,7 @@ function 구글에넣기(m){
 function modalRead(){
   var m = S.modal; if(!m) return;
   var 옛시작 = m.date, 옛끝 = m.endDate || m.date, 옛시각 = m.time, 옛끝시각 = m.endTime;
-  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis"].forEach(function(f){
+  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis","repeat","remind"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -4176,6 +4204,9 @@ function doSave(){
   if(일정){
     item.title = String(m.title).trim();
     if(여러날 || (prev && prev.endDate)) item.endDate = 여러날 ? m.endDate : "";
+    /* 반복·알림은 «새 일정»에서만(고치기 창에는 줄이 없다) — 서버 대신 넣기(gcal-proxy)가 구글로 보낸다 */
+    if(m.mode === "new" && m.repeat) item.repeat = String(m.repeat);
+    if(m.mode === "new" && m.timed && +m.remind > 0) item.remindMin = +m.remind;
     item.time = String(m.time||"");
     item.endTime = String(m.endTime||"");
     item.place = String(m.place||"").trim();

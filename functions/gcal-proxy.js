@@ -43,6 +43,9 @@ function bodyOf(ev) {
   const 몸 = { summary: s(ev.summary).trim() };
   if (ev.location) 몸.location = s(ev.location);
   if (ev.description) 몸.description = s(ev.description);
+  /* 반복·알림 — js/pu-gcal-auth.js 몸만들기 와 같은 셈 */
+  if (/^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(s(ev.repeat))) 몸.recurrence = ['RRULE:FREQ=' + ev.repeat];
+  if (Number(ev.remindMin) > 0) 몸.reminders = { useDefault: false, overrides: [{ method: 'popup', minutes: Math.round(Number(ev.remindMin)) }] };
   /* 여러 날 일정 — 화면(몸만들기)과 같은 셈 */
   const 끝날짜 = /^\d{4}-\d{2}-\d{2}$/.test(s(ev.endDate)) && ev.endDate > ev.date ? ev.endDate : '';
   if (/^\d{2}:\d{2}$/.test(s(ev.time))) {
@@ -78,7 +81,9 @@ function eventOf(rec, id, nameOf) {
   const sid = SID_RE.test(s(rec.sid)) ? s(rec.sid) : '';
   if (sid) 설명.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid) + ' (' + sid + ')');
   return {
-    date: s(rec.date), endDate: /^\d{4}-\d{2}-\d{2}$/.test(s(rec.endDate)) ? s(rec.endDate) : '', time: 시각, endTime: 시각 && /^\d{2}:\d{2}/.test(s(rec.endTime)) ? s(rec.endTime).slice(0, 5) : '',
+    date: s(rec.date), endDate: /^\d{4}-\d{2}-\d{2}$/.test(s(rec.endDate)) ? s(rec.endDate) : '', time: 시각,
+    repeat: /^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(s(rec.repeat)) ? s(rec.repeat) : '',
+    remindMin: Number(rec.remindMin) > 0 ? Math.round(Number(rec.remindMin)) : 0, endTime: 시각 && /^\d{2}:\d{2}/.test(s(rec.endTime)) ? s(rec.endTime).slice(0, 5) : '',
     summary: s(rec.title).trim(), location: s(rec.place).trim(), description: 설명.join('\n'), puSid: sid,
     source: (rec.sourceKind === 'card' && rec.sourceId) ? { kind: 'card', id: s(rec.sourceId) } : null,
     recId: s(rec.id || id),

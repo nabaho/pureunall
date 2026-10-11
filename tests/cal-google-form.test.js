@@ -21,6 +21,7 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 const 캘린더 = fs.readFileSync(path.join(ROOT, 'pu-cal.html'), 'utf8');
 const P = require(path.join(ROOT, 'functions', 'gcal-proxy.js'));
+const AUTH = require(path.join(ROOT, 'js', 'pu-gcal-auth.js'));
 
 function 함수몸(head) {
   const i = 캘린더.indexOf(head);
@@ -151,4 +152,42 @@ test('상세 창 — 위 아이콘 줄 · 선 아이콘 줄 · 「오후 2:00~�
   for (const 이모지 of ['👤', '📍', '≡', '✉', '🕒', '⏱', '👥', '🔔', '🔁', '🎥', '📎']) {
     assert.ok(캘린더.includes('"' + 이모지 + '":"'), '행그림에 없는 이모지: ' + 이모지);
   }
+});
+
+/* ── 「반복 안 함」·「알림 추가」 줄 (구글 입력 화면, 2026-10-11) ── */
+test('반복·알림 — 구글 몸(recurrence·reminders)이 화면과 서버에서 같다', () => {
+  const 경우 = [
+    { date: '2026-10-14', time: '14:00', endTime: '15:00', summary: '매주 회의', repeat: 'WEEKLY', remindMin: 30 },
+    { date: '2026-10-14', time: '', summary: '종일 매년', repeat: 'YEARLY', remindMin: 0 },
+    { date: '2026-10-14', time: '09:00', summary: '알림만', repeat: '', remindMin: 1440 },
+    { date: '2026-10-14', time: '09:00', summary: '이상한 값', repeat: 'HOURLY; BYDAY=MO', remindMin: -5 },
+  ];
+  for (const e of 경우) assert.deepStrictEqual(P.bodyOf(e), AUTH.bodyOf(e), e.summary);
+  const 첫 = P.bodyOf(경우[0]);
+  assert.deepStrictEqual(첫.recurrence, ['RRULE:FREQ=WEEKLY']);
+  assert.deepStrictEqual(첫.reminders, { useDefault: false, overrides: [{ method: 'popup', minutes: 30 }] });
+  assert.ok(!('reminders' in P.bodyOf(경우[1])), '알림 0 은 보내지 않는다(구글 기본 알림을 따른다)');
+  const 이상 = P.bodyOf(경우[3]);
+  assert.ok(!('recurrence' in 이상) && !('reminders' in 이상), '허용 밖 값이 구글 규칙에 섞였다(주입)');
+});
+
+test('반복·알림 — 서버 대신 넣기가 우리 표의 값을 구글로 넘긴다', () => {
+  const ev = P.eventOf({ id: 's1', sid: 'P-005', date: '2026-10-14', time: '10:00', title: '회의', repeat: 'MONTHLY', remindMin: 60 }, 's1', () => '박한별');
+  assert.strictEqual(ev.repeat, 'MONTHLY'); assert.strictEqual(ev.remindMin, 60);
+  assert.deepStrictEqual(P.bodyOf(ev).recurrence, ['RRULE:FREQ=MONTHLY']);
+  const 없음 = P.eventOf({ id: 's2', date: '2026-10-14', title: 't', repeat: 'x', remindMin: 'a' }, 's2');
+  assert.strictEqual(없음.repeat, ''); assert.strictEqual(없음.remindMin, 0);
+});
+
+test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 보여 준다 · 저장 길마다 넘긴다', () => {
+  const b = 상자();
+  vm.runInContext(함수몸('function 반복글(ymd){'), b);
+  const 글 = vm.runInContext('반복글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(글)), { D: '매일', W: '매주 (수요일)', M: '매월 14일', Y: '매년 10월 14일' });
+  assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? 반복알림줄\(m\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
+  assert.match(함수몸('function 반복알림줄(m){'), /m\.timed \? '<div class="grow">/, '알림은 시간 일정에만');
+  assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
+  assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
+  assert.match(함수몸('function 개인에넣기(m){'), /repeat:\(m\.mode === "new" && m\.repeat\)/);
+  assert.match(캘린더, /"vis","repeat","remind"\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
 });
