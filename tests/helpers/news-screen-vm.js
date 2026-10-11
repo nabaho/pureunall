@@ -49,7 +49,16 @@ function 화면올리기(App덧) {
     encodeURIComponent, decodeURIComponent, isNaN, parseInt, parseFloat, Intl,
     firebase: { apps: [], initializeApp: () => ({}), auth: () => ({ onAuthStateChanged() {} }),
       database: () => ({ ref: 빈참조 }), app: () => ({}) },
-    PuNewsCore: require('../../js/pu-news-core.js')
+    PuNewsCore: require('../../js/pu-news-core.js'),
+    /* 화면은 이 모듈들을 <script src> 로 싣는데 vm 은 src 를 안 읽는다 — 같은 모듈을 손으로 건넨다.
+       (빠뜨리면 안내문 탭 같은 «진짜 render()» 가 Notice·Tpl 이 없다며 멈춘다) */
+    PuNewsTpl: require('../../js/pu-news-tpl.js'),
+    PuNewsShow: require('../../js/pu-news-show.js'),
+    PuNewsNotice: require('../../js/pu-news-notice.js'),
+    PuNewsReview: require('../../js/pu-news-review.js'),
+    PuNewsRegionalSources: require('../../js/pu-news-regional-sources.js'),
+    /* 지난 안내문 대장 도우미 */
+    PuNewsNoticeLog: require('../../js/pu-news-noticelog.js')
   };
   짐.window = 짐; 짐.self = 짐; 짐.globalThis = 짐;
   짐.요소들 = 요소들;   /* 검사가 창 안의 글(innerHTML)을 읽을 수 있게 */
