@@ -691,7 +691,7 @@
     font-family:inherit;font-size:12px;font-weight:500;padding:0;position:relative}
   body.mob .mtoday i{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:2px solid currentColor;
     border-radius:6px;font-style:normal;line-height:1}
-  body.mob .mmenu{border:none;background:transparent;color:var(--gsub);font-size:16px;width:30px;height:40px;cursor:pointer}
+  body.mob .mmenu{border:none;background:transparent;color:var(--gtext);font-size:20px;width:40px;height:40px;cursor:pointer;margin-left:-8px}
   body.mob .cal{border:none;border-radius:0}
   body.mob .mhd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex:none;border-bottom:1px solid var(--gline)}
   body.mob .mhd div{text-align:center;font-size:13px;font-weight:500;color:var(--gtext);padding:4px 0;
@@ -2542,7 +2542,11 @@ function 폰머리Html(){
     : S.view === "day" ? 일글(S.date) + " (" + ["일","월","화","수","목","금","토"][new Date(S.date + "T00:00:00").getDay()] + ")"
     : lunarRange(S.ym);
   var 보기들 = [["month","월"],["sched","일정"],["week","주"],["day","일"]];
+  /* ★ 구글 폰 앱 머리 순서(2026-10-11 캡처): ☰ 가 «왼쪽 맨 앞», 그다음 「10월 ▾ / 음력」 */
   return '<div class="mhead">'
+    + '<button class="mmenu" data-mmenu="1" title="메뉴">☰'
+    +   ((GLINK.st === "need" && GLINK.why !== "inactive") || GLINK.st === "err" ? '<i class="gd" title="구글 연결 안 됨"></i>' : '')
+    + '</button>'
     + '<div class="mtt"><button class="mttb" data-vmenu="1" title="보기 고르기"><b>' + 달 + '월</b><i class="mcar"></i></button>'
     +   (부제 ? '<span>' + esc(부제) + '</span>' : '') + '</div>'
     + (S.vmenu ? '<div class="vveil" data-vclose="1"></div><div class="vmenu">' + 보기들.map(function(v){
@@ -2556,9 +2560,6 @@ function 폰머리Html(){
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mtoday" data-mv="0" title="오늘"><i>' + parseInt(todayYMD().slice(8,10), 10) + '</i></button>'
     + '<button class="mplus" data-mnew="1" title="새로 넣기">＋</button>'
-    + '<button class="mmenu" data-mmenu="1" title="메뉴">☰'
-    +   ((GLINK.st === "need" && GLINK.why !== "inactive") || GLINK.st === "err" ? '<i class="gd" title="구글 연결 안 됨"></i>' : '')
-    + '</button>'
     + '</div>';
 }
 /* ★ 폰에서 «고른 날» — 구글 폰 달력처럼 «날을 하나 골라 놓고» 그 날을 아래에서 읽는다.
