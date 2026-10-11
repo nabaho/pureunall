@@ -800,6 +800,12 @@
   body.mob .tgrid.wide .tghead,body.mob .tgrid.wide .tgallday{border:none}
   body.mob .tgrid.wide .tgh,body.mob .tgrid.wide .tga,body.mob .tgrid.wide .tgcol{border-left:none;background-image:none}
   body.mob .tgrid.wide .tgcol{padding:0}
+  /* ★ 폰 월 보기 — 구글 앱(Material 3 Expressive)은 날짜 칸이 «둥근 칸»이다(9to5Google·PhoneArena 보도 + 구글 앱 주·일 보기 캡처의 둥근 시간 칸과 같은 꼴). 월 보기 캡처는 없어 둥근 칸 모양만 따른다(확인 필요) */
+  body.mob.gm #app.fit,body.mob.gm .mhead,body.mob.gm .cal{background:var(--gsurf)}
+  body.mob.gm .mhd{border-bottom:none;background:var(--gsurf)}
+  body.mob.gm .mhd div{border-right:none}
+  body.mob.gm .calgrid{gap:3px;padding:3px}
+  body.mob.gm .calgrid .day{background:var(--gslot);border:none !important;border-radius:12px}
   .hs{position:absolute;left:4px;right:4px;margin-top:1.5px;border-radius:12px;background:var(--gslot);pointer-events:none}
   .tgbody .tgtime span{position:absolute;right:6px;transform:translateY(-50%);white-space:nowrap}
   .tgcol{position:relative;border-left:1px solid var(--gline);min-width:0;
@@ -4790,6 +4796,7 @@ function render(){
     document.body.classList.toggle("mob", 폰달력);
     document.body.classList.toggle("mobmenu", 폰달력 && !!S.mobMenu);
     document.body.classList.toggle("gv", 폰달력 && (S.view === "day" || S.view === "3day" || S.view === "week"));
+    document.body.classList.toggle("gm", 폰달력 && S.view === "month");
   }catch(_){}
   if(달력){
     펼침자리();
