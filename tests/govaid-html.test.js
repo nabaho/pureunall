@@ -54,3 +54,16 @@ test('예비 고객 → 업체 잇기는 사업자번호 10자리가 같아야 �
   assert.match(fn, /length!==10/);
   assert.match(fn, /validateCompanyLink\(/);
 });
+
+test('검토 저장은 «그때의 판정»을 함께 남기고, 업체면 companyId · 예비 고객이면 원본 짝(sourceKind·sourceId)', () => {
+  const fn = NOC.slice(NOC.indexOf('function saveReview('), NOC.indexOf('function saveReview(') + 1200);
+  assert.match(fn, /snapshot:GovaidView\.snapshot\(/);
+  assert.match(fn, /companyId=/);
+  assert.match(fn, /sourceKind=/);
+  assert.match(fn, /sourceId=/);
+});
+
+test('한 번에 고친 검토는 사유를 지우지 않는다(사유를 안 넘기면 앞 사유를 둔다)', () => {
+  const fn = NOC.slice(NOC.indexOf('function saveReview('), NOC.indexOf('function saveReview(') + 1200);
+  assert.match(fn, /reason==null\s*\?\s*\(prev\.reason\|\|''\)/);
+});
