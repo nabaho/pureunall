@@ -57,11 +57,12 @@ function world(o) {
 }
 
 test('정적 — 공통 머리와 새 모듈을 차례대로 싣는다', () => {
-  ['js/pu-gov-report.js', 'js/pu-gov-report-build.js', 'js/pu-gov-report-list.js', 'js/pu-gov-report-docs.js', 'js/pu-appbar.js', 'js/pu-back.js',
+  ['js/pu-gov-report.js', 'js/pu-gov-report-build.js', 'js/pu-gov-report-list.js', 'js/pu-gov-report-track.js', 'js/pu-gov-report-docs.js', 'js/pu-appbar.js', 'js/pu-back.js',
     'js/pu-gate.js', 'js/pu-whoami.js', 'js/pu-ls-guard.js', 'js/pu-logout-why.js', 'js/pu-ontology.js']
     .forEach((f) => assert.match(SRC, new RegExp('src="' + f.replace(/\./g, '\\.') + '\\?v=\\d+"'), f));
   assert.ok(SRC.indexOf('pu-gov-report-build.js') < SRC.indexOf('pu-gov-report-list.js'), 'build 를 먼저 싣는다');
   assert.ok(SRC.indexOf('pu-gov-report-list.js') < SRC.indexOf('pu-gov-report-docs.js'), '목록 모듈 다음에 싣는다');
+  assert.ok(SRC.indexOf('pu-gov-report-track.js') < SRC.indexOf('pu-gov-report-docs.js'), '기록 모듈을 서류 모듈보다 먼저 싣는다');
   assert.match(SRC, /pu-ontology-write\.js\?v=\d+" data-mode="observe"/);
   assert.match(SRC, /PuGate\.show\(/);
   assert.match(SRC, /PuBack\.guard\(/);

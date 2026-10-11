@@ -8,6 +8,7 @@ const assert = require('node:assert/strict');
 const D = require('../js/pu-gov-report-docs.js');
 const L = require('../js/pu-gov-report-list.js');
 const F = require('./helpers/gov-report-fixture.js');
+const Tr = require('../js/pu-gov-report-track.js');
 
 const T = '2026-10-10';
 const X = F.docs();
@@ -287,4 +288,57 @@ test('erpTypeFor 는 숨긴·합친 사업을 건너뛴다 · sidName 은 id·em
   assert.equal(D.sidName(X.dir, 'nope'), '');
   assert.equal(D.sidName(X.dir, ''), '');
   assert.equal(D.months('2020-01-01', '2030-12-01').length, 36);
+});
+
+/* ═══ 서류 진행 기록(③④⑤) — 설계 2026-10-10-gov-report-track-design.md ═══ */
+
+test('docsTable — 기록(track)을 주면 ③④⑤ 를 칸으로 · 안 주면 「—」 그대로 · 줄에 rid·planned', () => {
+  const track = Tr.normalize(F.track());
+  const o = (c, ty, tr) => ({ erp: code(c), typeId: ty, input: F.input(T), rows: rows(), year: '2026',
+    consultings: X.cons, tmap: X.tmap, biz: X.biz, track: tr, today: T });
+  const n = D.docsTable(o('consulting-04', 't3', track));
+  assert.deepEqual(n.lines[0].cells.slice(2).map((c) => c.txt + '/' + c.key + '/' + c.step),
+    ['◐ 발송함 · 회신 20일째/draft/sign', '○ 없음/wait/attach', '○ 없음/wait/submit']);
+  assert.deepEqual([n.lines[0].rid, n.lines[0].planned], ['t3_2026', 3]);
+  const s = D.docsTable(o('consulting-05', 't4', track));
+  assert.deepEqual(s.lines[0].cells.slice(2).map((c) => c.txt + '/' + c.key), ['● 회신 받음/done', '— 해당없음/', '● 제출함/done']);
+  const g = D.docsTable(o('consulting-03', 't1', track));
+  assert.deepEqual(g.lines[0].cells.slice(1).map((c) => c.txt + '/' + c.key), ['—/', '—/', '○ 없음 0/6/wait', '○ 없음/wait'],
+    '기술보호는 ③ 이 없고 ④ 는 여섯 줄(자문 일지 3회차 + 셋)');
+  const none = D.docsTable(o('consulting-04', 't3', undefined));
+  assert.deepEqual(none.lines[0].cells.slice(2).map((c) => c.txt + '/' + c.key), ['—/', '—/', '—/'], '못 읽었으면 지금처럼');
+  const big = D.docsTable(o('consulting-02', 't2', track));
+  assert.equal(big.lines[0].cells, null, '대형은 칸이 없다');
+});
+
+test('tocFor — rec(그 업체·rid 기록)를 주면 ③④⑤ 줄 딱지 · ①② 는 그대로 · 안 주면 「—」', () => {
+  const track = Tr.normalize(F.track());
+  const r3 = rows().filter((x) => x.coId === 'c3')[0];
+  const t = D.tocFor({ pair: pairOf('t4', 'c3'), row: r3, erp: code('consulting-05'), cons: null, dir: X.dir,
+    rec: Tr.recOf(track, 'c3', 't4_2026'), today: T });
+  assert.deepEqual(t.items.map((x) => x.name + ':' + x.chip.txt), ['방문확인서:미작성', '상담·자문 결과보고서:미작성',
+    '업체 서명본:● 회신 받음', '산출물 별첨:— 해당없음', '기관 제출:● 제출함']);
+  assert.ok(D.tocText(t).includes('5. 기관 제출 (● 제출함)'));
+  const r1 = rows().filter((x) => x.coId === 'c1' && x.typeId === 't1')[0];
+  const g = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir, rec: {}, today: T });
+  assert.deepEqual(g.items.map((x) => x.chip.txt), ['초안', '○ 없음 0/3', '○ 없음', '○ 없음', '○ 없음', '○ 없음']);
+  const plain = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir });
+  assert.deepEqual(plain.items[1].chip, { txt: '—', key: '' });
+});
+
+test('trackRows — 현황판 줄에 r.trk(③④⑤·기한·회신 날수)와 ③④ 막대 · 기록이 없으면 null', () => {
+  const rs = rows();
+  D.trackRows(rs, { track: Tr.normalize(F.track()), input: F.input(T), biz: X.biz, tmap: X.tmap, consultings: X.cons, today: T });
+  const by = (id) => rs.filter((x) => x.coId === id && x.year === '2026')[0];
+  assert.equal(by('c1').trk.sign, null, '기술보호는 서명본 줄이 없다');
+  assert.equal(by('c1').trk.submit.st, 'none');
+  assert.equal(by('c1').trk.due, '2026-09-30');
+  assert.deepEqual(by('c1').st.steps, [true, false, false, false]);
+  assert.deepEqual([by('c2').trk.sign.st, by('c2').trk.waitDays, by('c2').trk.due], ['doing', 20, '2026-12-31']);
+  assert.deepEqual(by('c3').st.steps, [false, false, true, true]);
+  assert.equal(by('c3').trk.due, '', '계약을 못 찾으면 기한 없음');
+  D.trackRows(rs, { track: null });
+  assert.equal(by('c3').trk, null);
+  assert.deepEqual(by('c3').st.steps, [false, false, false, false], '기록을 못 읽으면 막대는 ①② 만');
+  assert.deepEqual(D.TRACK_COLS, ['sign', 'attach', 'submit']);
 });

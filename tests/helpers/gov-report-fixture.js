@@ -11,7 +11,10 @@
  *   이알피 사업: 01 현장클리닉(→t9, 정부사업일정에 없는 번호) · 02 일터상생혁신컨설팅(→t2) · 03 통합기술보호지원단(→t1)
  *     · 04 인사노무컨설팅충남북부상의(→t3) · 05 인사노무컨설팅서산(→t4) · 06·07 산업일자리 · 09 농촌융복합 · 10 기초컨설팅푸른법인(sortOrder 없음)
  *     · 08 일터혁신상생컨설팅(hidden, 02 로 합침) · 11 혁신바우처컨설팅(mergedInto 만) — 둘은 목록에 안 나온다
- *   이알피 계약: k1 (주)가나상사 03 (2026-05-01~09-30, 담당 P-009) · k2 다라정밀 04 (담당 P-404 = 명부에 없음) — 마바산업은 계약 없음 */
+ *   이알피 계약: k1 (주)가나상사 03 (2026-05-01~09-30, 담당 P-009) · k2 다라정밀 04 (담당 P-404 = 명부에 없음) — 마바산업은 계약 없음
+ * 서류 진행 기록(2026-10-10, 설계 2026-10-10-gov-report-track-design.md) — scal_docs
+ *   c2 다라정밀 t3_2026 sign 진행(발송 09-20, 회신 없음 → 20일째) · c3 마바산업 t4_2026 sign 완료 · attach 해당없음 · submit 완료
+ *   c1 가나상사 t1_2026 은 기록 없음(기한 09-30 지남) */
 function seed() {
   return {
     scal_staff: [{ id: 'a1', name: '홍길동' }, { id: 'a2', name: '김가나' }],
@@ -83,6 +86,14 @@ function seed() {
       } },
     },
     scal_erpTypeMap: { 'consulting-01': 't9', 'consulting-02': 't2', 'consulting-03': 't1', 'consulting-04': 't3', 'consulting-05': 't4' },
+    scal_docs: {
+      c2: { t3_2026: { items: { sign: { st: 'doing', sentAt: '2026-09-20', by: '홍길동', at: Date.UTC(2026, 8, 20, 3) } } } },
+      c3: { t4_2026: { items: {
+        sign: { st: 'done', sentAt: '2026-05-20', gotAt: '2026-05-25', by: '김가나', at: Date.UTC(2026, 4, 25, 3) },
+        attach: { st: 'na', by: '김가나', at: Date.UTC(2026, 4, 25, 3) },
+        submit: { st: 'done', gotAt: '2026-05-28', how: 'mail', ack: true, by: '김가나', at: Date.UTC(2026, 4, 28, 3), note: '접수 메일 받음' },
+      } } },
+    },
   };
 }
 /* 모듈 입력 꼴로 */
@@ -96,4 +107,6 @@ function docs() {
   const s = seed();
   return { biz: s.data.biz_cons_types, cons: s.data.consultings, tmap: s.scal_erpTypeMap, dir: s.data.user_dir };
 }
-module.exports = { seed, input, docs };
+/* 서류 진행 기록(DB 모양 그대로) */
+function track() { return seed().scal_docs; }
+module.exports = { seed, input, docs, track };
