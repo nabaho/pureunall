@@ -34,6 +34,7 @@ function wbox(o) {
   const b = {
     String, Object, Array, JSON,
     mbCoLink: o.mbCo || {}, mbWorkLink: o.mbWork || {}, mailaddr: {},
+    coSrc: o.cos || [], _subIdx: null, _subIdxFor: null, _subIdxLen: -1,
     coFind: (it) => (o.co && it && it.co_id === o.co.id) ? o.co : null,
     peRec: () => o.pe || null,
     _cList: (x) => (x && x.contacts) || [],
@@ -41,7 +42,7 @@ function wbox(o) {
   };
   vm.createContext(b);
   vm.runInContext(W.match(/var MAIL_PUBLIC=\{[^}]*\};/)[0] + '\n'
-    + ['_mailAddr', 'mbKeyAddr', 'mbKeyDom', 'mailKeysOf', 'mailHit'].map((n) => sliceFn(W, 'function ' + n + '(')).join('\n'), b);
+    + ['_mailAddr', 'mbKeyAddr', 'mbKeyDom', '_coDigits', '_coBizParts', 'subIndex', 'coSubIdsOf', 'mailKeysOf', 'mailHit'].map((n) => sliceFn(W, 'function ' + n + '(')).join('\n'), b);
   return b;
 }
 const GANA = { id: 'co-gana', name: '가나상사', contacts: [] };
@@ -263,4 +264,72 @@ test('★★★ 서버도 같은 답 — 알림과 메일함 칸이 어긋나지
   const idx = screenIdx();
   ['t1@semu.kr', 'ceo@gana.kr', 'bill@gana.kr', 'shared@semu.kr', 'gil@sa.kr'].forEach((e) =>
     assert.equal(SRV.whoOf(e, T).who, idx.byAddr[e] || '', e + ' 에서 서버와 화면이 어긋났다'));
+});
+
+/* ══════════════════════════════════════════════
+   ⑤ 지사(사무대행) 메일 → 본사 업무 (대표 지시 2026-10-11 「지사메일 본사로」)
+   ══════════════════════════════════════════════
+   회사를 합치는 것이 아니다(합치지 않기로 한 결정 그대로). 메일을 «어느 서랍에 보여 줄까»만 잇는다.
+   열쇠는 사업자번호 — 열 자리가 같고 종사업장이 본사업장인 지사를, 그 번호의 본사 «한 곳»에만. */
+const HQ = { id: 'co-hq', name: '가나식당세종점', status: 'active', bizNo: '123-45-67890', contacts: [] };
+const SUB = { id: 'co-sub', name: '가나식당', status: 'suboffice', bizNo: '123-45-67890-0', contacts: [] };
+const HQ_ITEM = { company: '가나식당세종점', co_id: 'co-hq', ref: { type: 'companies', id: 'co-hq' } };
+const labeled = (id) => ({ from: 'someone@naver.com', subject: '자료 송부의 건', companyId: id, companyName: '' });
+function sbox(cos, co) { return wbox({ co: co || cos[0], cos: cos }); }
+const subHit = (b, it, id) => b.mailHit(b.mailKeysOf(it), labeled(id));
+
+test('★★★ 지사로 표시된 메일이 같은 사업자번호의 본사 업무에 붙는다', () => {
+  const b = sbox([HQ, SUB]);
+  assert.equal(subHit(b, HQ_ITEM, 'co-sub'), true, '지사 메일이 본사 업무에 안 붙는다');
+  assert.equal(subHit(b, HQ_ITEM, 'co-hq'), true, '본사 자기 메일은 그대로 붙어야 한다');
+});
+
+test('★★★ 종사업장이 다른 지사(-6)는 안 잇는다 — 다른 사업장이다', () => {
+  const OTHER = { id: 'co-sub6', name: '가나식당', status: 'suboffice', bizNo: '123-45-67890-6' };
+  const b = sbox([HQ, OTHER]);
+  assert.equal(subHit(b, HQ_ITEM, 'co-sub6'), false, '다른 종사업장 지사를 본사에 붙였다');
+});
+
+test('★★★ 같은 번호의 본사가 둘이면 아무 데도 안 잇는다 — 고를 수 없다', () => {
+  const HQ2 = { id: 'co-hq2', name: '가나식당본점', status: 'active', bizNo: '123-45-67890' };
+  const b = sbox([HQ, HQ2, SUB]);
+  assert.equal(subHit(b, HQ_ITEM, 'co-sub'), false, '본사가 둘인데 한쪽을 골랐다');
+});
+
+test('★★ 번호가 달라서 이름만 같으면 안 잇는다 — 이름은 관계 열쇠가 아니다', () => {
+  const NAMESAKE = { id: 'co-sub2', name: '가나식당세종점', status: 'suboffice', bizNo: '123-99-99999-0' };
+  const b = sbox([HQ, NAMESAKE]);
+  assert.equal(subHit(b, HQ_ITEM, 'co-sub2'), false, '이름만 같은 지사를 붙였다');
+  const NOBIZ = { id: 'co-sub3', name: '가나식당', status: 'suboffice', bizNo: '' };
+  assert.equal(subHit(sbox([HQ, NOBIZ]), HQ_ITEM, 'co-sub3'), false, '번호 없는 지사를 붙였다');
+});
+
+test('★★ 방향은 하나뿐 — 지사 → 본사. 본사 메일이 지사 업무로 가지는 않는다', () => {
+  const b = sbox([HQ, SUB], SUB);
+  const SUB_ITEM = { company: '가나식당', co_id: 'co-sub', ref: { type: 'companies', id: 'co-sub' } };
+  assert.equal(subHit(b, SUB_ITEM, 'co-hq'), false);
+});
+
+test('★★ 다른 회사의 지사는 안 붙는다', () => {
+  const OTHER_HQ = { id: 'co-x', name: '다라상사', status: 'active', bizNo: '123-81-11111' };
+  const OTHER_SUB = { id: 'co-xs', name: '다라상사', status: 'suboffice', bizNo: '123-81-11111-0' };
+  const b = sbox([HQ, SUB, OTHER_HQ, OTHER_SUB]);
+  assert.equal(subHit(b, HQ_ITEM, 'co-xs'), false, '남의 회사 지사가 붙었다');
+});
+
+test('★ 업체 목록을 아직 못 받았으면 조용히 비어 있다 — 아무것도 안 잇는다', () => {
+  const b = sbox([], HQ);
+  assert.equal(subHit(b, HQ_ITEM, 'co-sub'), false);
+  assert.deepEqual(Object.keys(b.coSubIdsOf(HQ)), []);
+});
+
+test('★ 이어진 메일이 «왜 여기 있나» 서랍 줄에 적힌다 — 따라갈 수 있어야 한다', () => {
+  const row = code(sliceFn(W, 'function dMailRowHTML('));
+  assert.match(row, /coSubIdsOf\(_co\)\[String\(m\.companyId\)\]/);
+  assert.match(row, /지사\(사무대행\)로 온 메일/);
+  assert.match(row, /meta:[^\n]*\+via,/, '이유가 meta 에 안 실린다');
+});
+
+test('★ 자동으로 적는 쪽(alMailSure)도 같은 열쇠 — 서랍에 보이는 것과 기록에 담기는 것이 갈리지 않는다', () => {
+  assert.match(code(sliceFn(W, 'function alMailSure(')), /mailHit\(\{coid:k\.coid,subs:k\.subs,/);
 });

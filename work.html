@@ -3679,6 +3679,46 @@ function _mailAddr(s){
    naver.com 하나로 묶으면 서로 다른 업체 메일이 한 업무에 다 붙는다. */
 var MAIL_PUBLIC={'naver.com':1,'gmail.com':1,'daum.net':1,'hanmail.net':1,'nate.com':1,
   'kakao.com':1,'outlook.com':1,'hotmail.com':1,'yahoo.com':1,'icloud.com':1};
+/* ══ 지사(사무대행) 메일은 «본사» 업무로 (대표 지시 2026-10-11 「지사메일 본사로」) ══
+   업체관리 본사(active)와 사무대행 지사(suboffice)는 «다른 기록»이다(합치지 않기로 한 결정 —
+   tests/co-dup-suboffice-apart). 합치는 것이 아니라, 메일을 «어느 업무 서랍에 보여 줄까»만 잇는다.
+   ★ 열쇠는 사업자번호다(이름이 아니다). 열 자리가 같고 종사업장이 «본사업장(비었거나 0)»인
+     지사 기록을, 그 번호의 «본사 한 곳»에만 잇는다.
+   ⚠ 종사업장이 다른 지사(-6 같은 것)는 안 잇는다 — 다른 사업장이다(실측 지사 66곳 중 22곳).
+   ⚠ 같은 번호의 본사가 «둘 이상»이면 아무 데도 안 잇는다 — 고를 수 없다.
+   ⚠ 업무관리가 업체 목록(coSrc)을 받은 뒤에만 안다 — 못 받았으면 조용히 비어 있다.
+   ⚠ 담당자는 따로다. 메일은 본사 업무로 보이지만 지사 담당과 본사 담당이 다른 곳이 많다
+     (실측 쌍 24곳 중 16곳) — 메일함의 담당 칸은 이 때문에 바꾸지 않는다. */
+var _subIdx=null, _subIdxFor=null, _subIdxLen=-1;
+function _coBizParts(c){
+  var d=_coDigits(c&&c.bizNo);
+  if(d.length<10) return null;
+  return { base:d.slice(0,10), main:/^0*$/.test(d.slice(10)) };
+}
+/* {본사 업체 번호: [지사 업체 번호…]} — 업체 목록이 바뀔 때만 다시 만든다 */
+function subIndex(){
+  if(!coSrc||!coSrc.length) return {};
+  if(_subIdx&&_subIdxFor===coSrc&&_subIdxLen===coSrc.length) return _subIdx;
+  var by={};
+  coSrc.forEach(function(c){
+    if(!c||!c.id) return;
+    var p=_coBizParts(c); if(!p||!p.main) return;
+    var g=by[p.base]=by[p.base]||{hq:[],sub:[]};
+    (String(c.status||'')==='suboffice'?g.sub:g.hq).push(String(c.id));
+  });
+  var out={};
+  Object.keys(by).forEach(function(b){
+    if(by[b].hq.length===1&&by[b].sub.length) out[by[b].hq[0]]=by[b].sub;
+  });
+  _subIdx=out; _subIdxFor=coSrc; _subIdxLen=coSrc.length;
+  return out;
+}
+/* 이 업체(본사)에 잇는 지사 업체 번호들 {번호:1} */
+function coSubIdsOf(co){
+  var r={}; if(!co||!co.id) return r;
+  ((subIndex()[String(co.id)])||[]).forEach(function(id){ r[id]=1; });
+  return r;
+}
 /* 그 업무의 업체를 가리키는 표식들 — 정확한 주소, 회사 도메인, 정규화한 회사 이름 */
 function mailKeysOf(it){
   var mails={}, doms={}, co=null;
@@ -3733,7 +3773,7 @@ function mailKeysOf(it){
     var a=_mailAddr(p.addr||ak.replace(/_at_/,'@'));
     if(a) mails[a]=1;
   });
-  return { mails:mails, doms:doms, name:nm, coid:coid };
+  return { mails:mails, doms:doms, name:nm, coid:coid, subs:coSubIdsOf(co) };
 }
 /* 메일 한 통이 이 업무에 붙는가 — «한 쌍»만 본다.
    ⚠ 이것을 따로 뗀 까닭: 「어느 업무에도 안 붙는 메일」을 찾으려면 업무마다
@@ -3742,6 +3782,8 @@ function mailKeysOf(it){
 function mailHit(k,m){
   if(!k||!m) return false;
   if(k.coid&&String(m.companyId||'')===k.coid) return true;
+  /* 지사(사무대행)로 표시된 메일 — 같은 사업자번호의 본사 업무에도 붙는다(위 「지사 메일은 본사 업무로」) */
+  if(k.subs&&m.companyId&&k.subs[String(m.companyId)]) return true;
   var byName=k.name&&k.name.length>=2;
   if(byName&&m.companyName&&_normCo(String(m.companyName))===k.name) return true;
   var a=_mailAddr(m.from);
@@ -4684,13 +4726,18 @@ function dMailRowHTML(m,id,up){
      짐작 딱지와 같은 까닭이다. */
   var L=maillink&&maillink[k];
   var hand=!!(L&&L.item);
+  /* 지사(사무대행) 쪽으로 온 메일이 본사 업무에 붙은 것이면 «왜 여기 있나»를 meta 에 적는다 */
+  var via='';
+  try{ var _it=items[id], _co=_it&&coFind(_it);
+    if(_co&&m.companyId&&String(m.companyId)!==String(_co.id)&&coSubIdsOf(_co)[String(m.companyId)])
+      via=' · 지사(사무대행)로 온 메일 — 같은 사업자번호'; }catch(e){}
   return mlRowHTML({ seen:!!c, up:up, date:_mlDay(m.at), text:mailBrief(m),
     hand:hand, handTip:hand?(L.auto
       ?('자동으로 이었습니다 — '+String(L.why||'제목의 회사 이름')+' · 아니면 「이어 줄 메일」 › 이은 것에서 되돌리세요')
       :('손으로 이었습니다 — '+String(L.byName||'')+' '+String(L.at||'').slice(0,10))):'',
     full:String(m.subject||'')||mailBrief(m),
     att:nn, attTip:att,
-    meta:_mailWhen(m.at)+' 받음 · '+String(m.from||'(보낸이 모름)')+(att?' · '+att:''),
+    meta:_mailWhen(m.at)+' 받음 · '+String(m.from||'(보낸이 모름)')+(att?' · '+att:'')+via,
     body:String(m.preview||'').slice(0,240),
     ck:(c?'mailUnsee(\''+escJ(k)+'\')':'mailSee(\''+escJ(id)+'\',\''+escJ(k)+'\',0)'),
     ckTip:(c?'확인 표시를 지웁니다 (기록은 그대로 남습니다)':'기록할 것은 없지만 봤다고 표시합니다'),
@@ -5591,7 +5638,7 @@ function alMailSure(k,m){
   if(!mailHit(k,m)) return false;
   if(k.name&&k.name.length>=MLK_MIN_MATCH) return true;
   if(k.name&&m.companyName&&_normCo(String(m.companyName))===k.name) return true;
-  return mailHit({coid:k.coid,name:'',mails:k.mails,doms:k.doms},m);
+  return mailHit({coid:k.coid,subs:k.subs,name:'',mails:k.mails,doms:k.doms},m);
 }
 /* 후보가 여럿이면 담당자로 가른다 — 사번이 맞는 것 하나, 아니면 글에 이름이 나오는 것 하나.
    ⚠ 하나로 안 좁혀지면 그대로 돌려준다(→ 고를 것). 아무거나 고르지 않는다. */
