@@ -11,7 +11,7 @@
 1. [x] 규칙: pubdata 직원 읽기·쓰기 막음(서버만) · pubdata_req 받아 달라 요청 · 읽기 도구 js/pu-pubdata.js · 온톨로지 INFRA_ROOTS
 2. [x] 서버(nps-monthly.js): pubdata/co/{번호}/nps·ei 씀 + 한 달은 옛 자리(pucards/coInfo)도 · 요청 처리 · 공휴일 pubdata/common/holidays/{연도}
 3. [x] 기업정보함이 pubdata 읽기 + 있는 자료 한 번 옮김
-4. [ ] 공휴일: 캘린더·이알피·급여관리 · 손입력 약정휴일 그대로
+4. [x] 공휴일: 캘린더·이알피·급여관리 · 손입력 약정휴일 그대로
 5. [ ] 옛 자리 쓰기 멈춤(11월 중순 이후) · 업체관리 한 줄
 
 ## 끝낸 것 / 남은 일
@@ -20,4 +20,7 @@
 - ⚠ 합친 뒤 함수 배포: npsMonthly · ntsMonthly · pubdataAsk(새).
 - #2514 합침·함수 셋 배포. pubdataAsk 첫 배포가 us-central1 → fetch failed → #2518 로 서울 옮김·재배포, 실요청 시험 OK(새·옛 자리 둘 다 적힘, 요청 지워짐).
 - 3단계: pu-cards 가 pubdata/co 구독(loadPubCo)·coWithPub 로 얹기, 공단 직접 호출 걷어냄(coPubAsk 받아 달라). 사람이 정한 pick·none 만 coInfo.
-- 남은 일: 있는 자료 한 번 옮기기(살아 있는 자료) → 4단계(공휴일 화면들) → 5단계(11월 중순 옛 자리 쓰기 멈춤).
+- 있는 자료 옮기기: 0건(배포 뒤 기업 상세를 연 곳이 시험한 1곳뿐, 이미 새 자리). 국민연금 고른 곳 0.
+- 4단계: pubdata/common/holidays 2025·2026·2027(20·22·24건) 첫 채움(서버와 같은 holiRows). 캘린더·이알피는 손입력 우선으로 자동 합침(저장 안 함), 급여관리는 「🛰 공휴일 불러오기」로 칸만 채움(임금 계산이라 저장은 사람).
+- ⚠ 합친 뒤 npsMonthly 다시 배포(임시공휴일 종류).
+- 남은 일: 5단계 — 11월 중순, OLD_TOO=false(functions/pubdata.js)로 옛 자리 쓰기 멈춤 + 이알피 업체관리 근로자 수 한 줄.

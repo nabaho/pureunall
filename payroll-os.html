@@ -14,6 +14,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=66"></script>
+<script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -3145,6 +3146,7 @@ function screenDayCalendar() {
     hs.join(', ') + '</textarea>' +
     '<div style="margin-top:8px;display:flex;gap:8px;align-items:center">' +
     '<button class="btn" onclick="setHolidays(\'' + year + '\', document.getElementById(\'holiText\').value)">공휴일 저장</button>' +
+    '<button class="btn" style="background:#fff;color:#1e40af;border:1px solid #bfdbfe" onclick="pullHolidays(\'' + year + '\')" title="한국천문연구원 공휴일을 칸에 채웁니다 — 저장은 직접">🛰 공휴일 불러오기</button>' +
     '<span style="font-size:12px;color:var(--sub)">' + (hs.length ? hs.length + '일 등록됨' : '아직 없음 — 일요일만 휴일로 봅니다') + '</span></div></div>';
   if (!hs.length) h += '<div class="note" style="border-left:3px solid var(--warn)">' +
     '<b>공휴일을 넣지 않으면</b> 설날·추석·공휴일 근로가 평일 연장(×1.5)으로 계산되어 ' +
@@ -3153,6 +3155,23 @@ function screenDayCalendar() {
 }
 window.saveDay = saveDay; window.delDay = delDay; window.clearDays = clearDays;
 window.setHolidays = setHolidays;
+/* 🛰 공휴일 불러오기 (2026-10-11) — 공공데이터 공용 자리(한국천문연구원)의 그 해 공휴일을 «칸에 채운다».
+   ⚠ 저장은 사람이 「공휴일 저장」을 눌러야 한다 — 공휴일은 휴일근로 수당 계산에 바로 들어가고,
+     5인 미만 사업장·약정휴일처럼 사업장마다 다르다. 저절로 섞으면 확인 없이 임금이 바뀐다.
+   이미 적힌 날(약정휴일 등)은 그대로 두고, 없는 날만 더한다. */
+function pullHolidays(year) {
+  var box = document.getElementById('holiText');
+  if (!box || typeof PuPubdata === 'undefined') return;
+  PuPubdata.holidays(year).then(function (list) {
+    if (!list.length) { alert(year + '년 공휴일 자료가 아직 없습니다 — 서버가 매달 2일에 받습니다.'); return; }
+    var have = String(box.value || '').split(/[,\s]+/).filter(function (x) { return /^\d{4}-\d{1,2}-\d{1,2}$/.test(x); });
+    var seen = {}; have.forEach(function (d) { seen[d] = 1; });
+    var add = list.map(function (x) { return x.date; }).filter(function (d) { return !seen[d]; });
+    box.value = have.concat(add).sort().join(', ');
+    alert('천문연 공휴일 ' + add.length + '일을 칸에 더했습니다. 확인한 뒤 「공휴일 저장」을 눌러 주세요.');
+  });
+}
+window.pullHolidays = pullHolidays;
 
 /* ══════════════ ① 근태 ══════════════ */
 function screenAttend() {

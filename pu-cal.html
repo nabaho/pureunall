@@ -17,6 +17,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="js/pu-ontology.js?v=66"></script>
+<script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
@@ -1147,10 +1148,23 @@ function holidayOf(ymd){
   var hs = D.holidays;
   if(Array.isArray(hs)){
     for(var i=0;i<hs.length;i++){ if(hs[i] && hs[i].date===ymd) return hs[i].name||'공휴일'; }
-    return '';
-  }
-  if(hs && typeof hs==='object' && hs[ymd]) return (hs[ymd].name||hs[ymd]) || '공휴일';
-  return '';
+  } else if(hs && typeof hs==='object' && hs[ymd]) return (hs[ymd].name||hs[ymd]) || '공휴일';
+  /* 손으로 넣은 날에 없으면 공공데이터 공용 자리(한국천문연구원) — 2026-10-11. 손입력이 이긴다. */
+  return (typeof PUB_HOLI !== 'undefined' && PUB_HOLI[ymd]) || '';
+}
+/* 🗂 공용 자리의 공휴일(pubdata/common/holidays) — 지난해·올해·내년. 매달 2일 서버가 받아 둔다.
+   ⚠ 이 앱은 읽기만 한다 — 이알피 공휴일 표(data/holidays)에 옮겨 적지 않는다. */
+var PUB_HOLI = {};
+function 공휴일받기(){
+  if(typeof PuPubdata === 'undefined') return;
+  var y = (new Date()).getFullYear();
+  [y - 1, y, y + 1].forEach(function(yy){
+    PuPubdata.holidays(yy).then(function(list){
+      if(!list.length) return;
+      list.forEach(function(x){ if(x && x.date) PUB_HOLI[x.date] = x.name || '공휴일'; });
+      render();
+    });
+  });
 }
 
 /* ── 그 날의 일들 ──────────────────────────────────────────────────── */
@@ -5147,6 +5161,7 @@ function start(user){
     /* 구글 달력도 받는다 — 이 달력을 채우는 것이 그쪽이다(9월 126건).
        ⚠ 우리 자료를 먼저 그리고 그 다음 받는다 — 구글이 늦어도 화면은 먼저 뜬다. */
     gcalLoad();
+    공휴일받기();
     /* 바뀐 한 건만 받아 다시 그린다 — 큰 표를 통째로 다시 받지 않는다 */
     ['attendance_records','my_schedules'].forEach(function(k){
       S.unwatch.push(PuCalRead.watch(k, function(){

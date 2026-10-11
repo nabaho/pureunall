@@ -207,6 +207,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=66"></script>
+<script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -36418,6 +36419,33 @@ function HolidayModal(props){
   );
 }
 
+/* ══ 📅 공휴일 = 손입력(data/holidays) + 공공데이터 공용 자리(pubdata/common/holidays) (대표 「진행」 2026-10-11) ══
+   공용 자리는 매달 2일 서버가 한국천문연구원 특일 정보에서 올해·내년을 받아 둔다.
+   ★ 손으로 넣은 날(약정휴일·고친 이름)이 이긴다 — 받은 것은 «없는 날만» 더해 보여 준다(PuPubdata.mergeHolidays).
+   ⚠ 합친 것을 data/holidays 에 «저장하지 않는다» — 저장하면 천문연이 고친 날(대체공휴일 등)이 옛것으로 굳는다. */
+var _erpPubHoli = {};           /* { 연도: [{date,name,kind}] } */
+var _erpPubHoliAt = 0;
+function erpPubHolidaysLoad(){
+  if(typeof PuPubdata === 'undefined' || Date.now() - _erpPubHoliAt < 60000) return;
+  _erpPubHoliAt = Date.now();
+  var y = (new Date()).getFullYear();
+  [y - 1, y, y + 1].forEach(function(yy){
+    PuPubdata.holidays(yy).then(function(list){
+      if(!list.length) return;
+      _erpPubHoli[yy] = list;
+      try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail:'holidays' })); } catch(_){}
+    });
+  });
+}
+if(typeof window !== 'undefined') window.addEventListener('fb_initial_done', erpPubHolidaysLoad);
+function erpHolidays(){
+  var man = dbGet('holidays', []) || [];
+  if(typeof PuPubdata === 'undefined') return man;
+  var pub = [];
+  Object.keys(_erpPubHoli).forEach(function(k){ pub = pub.concat(_erpPubHoli[k]); });
+  return PuPubdata.mergeHolidays(man, pub);
+}
+
 function HolidaySection(){
   var existing = dbGet('holidays', null);
   if(!existing){ dbSet('holidays', HOLIDAY_SEED); existing = HOLIDAY_SEED; }
@@ -36443,8 +36471,16 @@ function HolidaySection(){
   function del(d, n){ (function(){var _ud=list.slice(); persist(list.filter(function(x){ return !(x.date === d && x.name === n); })); showToastUndo('🗑️ 삭제됨', function(){persist(_ud);});})(); }
   function reseed(){ persist(HOLIDAY_SEED.slice()); showToast('시드 복원됨'); }
 
-  var filtered = list.filter(function(x){ return x.date.indexOf(year + '-') === 0; });
-  var years = Array.from(new Set(list.map(function(x){ return parseInt(x.date.slice(0,4),10); }))).sort();
+  /* 🛰 천문연 자료(공용 자리)를 «없는 날만» 얹어 보여 준다 — 그 줄은 고치거나 지울 수 없다(저장된 것이 아니다) */
+  useEffect(function(){ erpPubHolidaysLoad(); }, []);
+  var tk = useState(0); var bump = tk[1];
+  useDbReread(['holidays'], function(){ bump(function(n){ return n + 1; }); });
+  var pubAll = [];
+  Object.keys(_erpPubHoli).forEach(function(k){ pubAll = pubAll.concat(_erpPubHoli[k]); });
+  var shown = typeof PuPubdata !== 'undefined' ? PuPubdata.mergeHolidays(list, pubAll) : list;
+  var filtered = shown.filter(function(x){ return x.date.indexOf(year + '-') === 0; });
+  var nKasi = filtered.filter(function(x){ return x.src === 'kasi'; }).length;
+  var years = Array.from(new Set(shown.map(function(x){ return parseInt(x.date.slice(0,4),10); }))).sort();
   if(years.indexOf(year) < 0) years.push(year);
 
   function dow(dateStr){
@@ -36463,6 +36499,8 @@ function HolidaySection(){
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'10px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '공휴일'),
       h('span', { style:{ background:'#e2e8f0', color:'#475569', fontSize:'11px', padding:'2px 8px', borderRadius:'10px', fontWeight:600 } }, filtered.length + '개'),
+      nKasi > 0 && h('span', { title:'한국천문연구원 특일 정보 — 매달 2일 서버가 받아 둡니다. 손으로 넣은 날이 이깁니다.',
+        style:{ color:'#64748b', fontSize:'11px', fontWeight:600, whiteSpace:'nowrap' } }, '🛰 천문연 ' + nKasi + '개 자동'),
       h('select', { value:year, onClick:function(e){ e.stopPropagation(); }, onChange:function(e){ setYear(parseInt(e.target.value,10)); }, style:{ marginLeft:'8px', padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } },
         years.sort().map(function(yy){ return h('option', { key:yy, value:yy }, yy + '년'); })),
       h('div', { style:{ flex:1 } }),
@@ -36489,7 +36527,9 @@ function HolidaySection(){
                 h('td', { className:'ac', style:{ color: weekend ? '#dc2626' : '#475569', fontWeight:600 } }, d),
                 h('td', null, x.name),
                 h('td', null, kindTag(x.kind)),
-                h('td', { className:'ac' },
+                x.src === 'kasi'
+                  ? h('td', { className:'ac', style:{ color:'#64748b', fontSize:'11px', whiteSpace:'nowrap' }, title:'천문연 자료 — 바꾸려면 같은 날짜로 「+ 추가」하면 그것이 이깁니다' }, '🛰 천문연')
+                  : h('td', { className:'ac' },
                   h('button', { className:'dt-row-btn edit', onClick:function(){ openEdit(x); } }, '수정'),
                   h('button', { className:'dt-row-btn del',  onClick:function(){ del(x.date, x.name); } }, '삭제')
                 )
@@ -63760,7 +63800,7 @@ function PersonalCalendar(props){
   var mySchedules = (dbGet('my_schedules', [])||[]).filter(function(s){return s.sid===sid;});
   var myAttendance = (dbGet('attendance_records', [])||[]).filter(function(r){return r.sid===sid;});
   // 공휴일 맵
-  var myHolidays = dbGet('holidays', [])||[];
+  var myHolidays = erpHolidays();
   var myHMap = {}; myHolidays.forEach(function(h){ myHMap[h.date] = h.name; });
   var byDate = {};
   function addEv(date, ev){
@@ -76507,7 +76547,7 @@ function AttendanceManagement(){
     var month = parseInt(selYM.split('-')[1]);
     var firstDay = new Date(year, month-1, 1).getDay();
     var lastDay  = new Date(year, month, 0).getDate();
-    var holidays = dbGet('holidays',[]) || [];
+    var holidays = erpHolidays();
     var hMap = {}; holidays.forEach(function(h){ hMap[h.date]=h.name; });
 
     var dayMap = {};

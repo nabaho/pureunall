@@ -109,8 +109,10 @@ test('★★ ④ 고른 사업장이 바뀌면 하루 안이라도 다시 받는
 test('★★ ⑤ 공휴일 — 쉬는 날만, 종류 가르기', () => {
   const rows = PUBD.holiRows([{ locdate: 20270209, dateName: '대체공휴일(설날)', isHoliday: 'Y' },
     { locdate: 20270501, dateName: '노동절', isHoliday: 'Y' }, { locdate: 20270405, dateName: '식목일', isHoliday: 'N' },
-    { locdate: 20280412, dateName: '국회의원선거일', isHoliday: 'Y' }]);
-  assert.equal(rows.length, 3, '쉬지 않는 날(N)이 섞였습니다');
+    { locdate: 20280412, dateName: '국회의원선거일', isHoliday: 'Y' }, { locdate: 20250127, dateName: '임시공휴일', isHoliday: 'Y' }]);
+  assert.equal(rows.length, 4, '쉬지 않는 날(N)이 섞였습니다');
+  assert.equal(rows[0].kind, '임시공휴일', '이알피 종류 낱말(임시공휴일)과 다릅니다');
+  rows.shift();
   assert.equal(rows[0].kind, '대체공휴일'); assert.equal(rows[1].kind, '법정공휴일'); assert.equal(rows[2].kind, '선거일');
   assert.equal(rows[1].date, '2027-05-01');
 });
