@@ -595,6 +595,8 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .ds-ic{display:inline-flex;gap:2px}
 .ds-ic .btn.sm{padding:1px 6px;font-size:12px;white-space:nowrap}
 .ds-ic .btn.ds-dl{border-color:var(--navy);color:var(--navy);font-weight:700}
+/* 프로필 1장 — 머리를 줄여 A4 가 위로 바짝 올라온다(아래로 안 내려가게) */
+#page-profile1 .page-head{margin-bottom:4px}#page-profile1 .page-desc{display:none}#page-profile1 .page{padding-top:8px}
 .ds-prev{position:sticky;top:10px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:10px}
 .ds-pv-empty{color:var(--text-mute);font-size:12px;text-align:center;padding:28px 8px;line-height:1.7}
 .ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:max(320px,calc(100vh - 400px));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:6px;margin-bottom:8px;cursor:grab;position:relative}
@@ -1378,7 +1380,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=8"></script>
+<script src="js/kcareer-profile1.js?v=9"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=9"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -7664,11 +7666,11 @@ function renderProfile1(){
    · 한 화면 — 한 장 전체가 «스크롤 없이» 보이게 (기본)   · 폭 맞춤 — 칸 너비에 꽉 차게(글자가 큼, 아래로 내림)
    · 전체 화면 — 모니터 전체를 써서 한 장을 가장 크게 (Esc 로 나옴)
    ⚠ 크기만 바꾼다 — 서류 내용·인쇄·저장은 그대로(A4 794×1123). */
-var _p1ZoomMode='width', _p1JumpList=[];   /* 기본은 «폭 맞춤» — 글자가 크게 읽힌다(대표 선택 2026-10-11 목업 B안) */
-try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom')||'width'; }catch(e){}
+var _p1ZoomMode='fit', _p1JumpList=[];   /* 기본은 «한 화면» — A4 세로 한 장이 아래로 안 내려가도 다 보인다(대표 지시 2026-10-11 「A4 세로 한 장 · 아래로 안 내려가도」) */
+try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom')||'fit'; }catch(e){}
 function _p1Scale(){
   var paper=document.getElementById('p1Paper'); if(!paper) return;
-  if(_p1View==='screen'){ paper.style.width='100%'; paper.style.height='auto'; paper.style.overflow='visible'; paper.style.background='#fff'; return; }
+  if(_p1View==='screen'){ paper.style.width='100%'; paper.style.margin='0'; paper.style.height='auto'; paper.style.overflow='visible'; paper.style.background='#fff'; return; }
   var a4=paper.querySelector('.p1-a4'); if(!a4) return;
   var full=(document.fullscreenElement===paper), s, W, H;
   if(full){
@@ -7679,17 +7681,17 @@ function _p1Scale(){
   }
   paper.style.background='#fff'; paper.style.overflow='hidden'; a4.style.marginLeft='0';
   var box=paper.parentNode, availW=(box&&box.clientWidth)||794;
-  if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; }
+  if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; paper.style.margin='0'; }
   else{
     var top=paper.getBoundingClientRect().top;
-    var availH=Math.max(300, window.innerHeight-Math.max(0,top)-70);   /* 아래 작업 띠(약 60px) 만큼 비운다 */
-    s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px';
+    var availH=Math.max(300, window.innerHeight-Math.max(0,top)-62);   /* 아래 작업 띠(약 56px) 만큼 비운다 */
+    s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
   }
   a4.style.transform='scale('+s+')';
   paper.style.height=Math.round(1123*s)+'px';
 }
-var _p1View='screen';
-try{ _p1View=(localStorage.getItem('kc_p1_view')==='a4')?'a4':'screen'; }catch(e){}
+var _p1View='a4';   /* 기본은 A4 세로 한 장 — 「화면용(넓게)」는 고르면 */
+try{ _p1View=(localStorage.getItem('kc_p1_view')==='screen')?'screen':'a4'; }catch(e){}
 function _p1ZoomBar(){
   var bar=document.getElementById('p1Zoom'); if(!bar) return;
   var v=function(m,t,ti){ return '<button class="btn sm'+(_p1View===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1View(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };

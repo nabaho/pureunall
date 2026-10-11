@@ -38,7 +38,7 @@ test('화면 — 칸 상세는 미리보기·출력이 같은 모델을 쓰고, 
   const m = strip(SRC.slice(SRC.indexOf('function _p1Model('), SRC.indexOf('function renderProfile1(')));
   assert.ok(/lim:o\.lim/.test(m) && /titles:o\.titles/.test(m) && /notes:o\.notes/.test(m), '모델에 칸 상세를 넘긴다');
   assert.ok(/function p1Jump\(/.test(SRC) && /function p1Panel\(/.test(SRC));
-  assert.ok(/_p1ZoomMode='width'/.test(SRC), '기본은 폭 맞춤(B안)');
+  assert.ok(/_p1ZoomMode='fit'/.test(SRC) && /var _p1View='a4'/.test(SRC), '기본은 A4 세로 한 장 · 한 화면(아래로 안 내려가게)');
   assert.ok(/id="p1Side" style="position:sticky/.test(SRC), '왼쪽 칸 목록이 따라온다');
 });
 
