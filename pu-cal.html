@@ -1997,6 +1997,8 @@ function gcalToEvent(ev){
   var color = gColor || (mailSid ? (colorOf(mailSid) || "") : "")
     || gcalMailColor(mail) || (ev.summary ? "#2563eb" : "#94a3b8");
   var sid = mailSid || "GCAL";
+  /* 「구글 앱 색」 — 켜면 구글 색이 없는 일정(= 캘린더 색)은 전부 캘린더 초록(구글 앱 캡처 #87ac5c). 끄면 사람별 색 그대로 */
+  try{ if(!gColor && localStorage.getItem("pucal_gmono") === "1") color = "#87ac5c"; }catch(_){}
   var us = users();
   for(var ui = 0; ui < us.length; ui++){
     var u = us[ui];
@@ -2586,6 +2588,7 @@ function 폰(){
     && window.matchMedia("(max-width:700px), (max-height:500px) and (pointer:coarse)").matches; }
   catch(e){ return false; }
 }
+function _모노(){ try{ return localStorage.getItem("pucal_gmono") === "1"; }catch(_){ return false; } }
 function 폰머리Html(){
   /* 보기마다 제목이 다르다(구글): 월·일정은 「10월 / 병오년8월 – 9월」, 주는 「10월 / 11일 – 17일」, 일은 「10월 / 14일 (수)」.
      제목을 누르면 «보기 고르기» 메뉴가 열린다(월·일정·주·일) — 구글 폰 앱의 제목 옆 ▾ 와 같다(2026-10-11) */
@@ -2622,7 +2625,8 @@ function 폰머리Html(){
         + '<hr>' + [["shared","공용 일정","var(--acc)"],["priv","나만 보기","var(--gsub)"]].map(function(c){
             var 켜짐 = S.filter === null || S.filter === undefined || S.filter === c[0];
             return '<button class="dcal" data-dcal="' + c[0] + '"><i class="dck' + (켜짐 ? ' on' : '') + '" style="--ck:' + c[2] + '">' + (켜짐 ? '✓' : '') + '</i>' + c[1] + '</button>'; }).join("")
-        + '<hr><button data-dreload="1">' + 선아이콘("refresh") + '새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
+        + '<hr><button class="dcal" data-dmono="1"><i class="dck' + (_모노() ? ' on' : '') + '" style="--ck:#87ac5c">' + (_모노() ? '✓' : '') + '</i>구글 앱 색(모두 초록)</button>'
+        + '<button data-dreload="1">' + 선아이콘("refresh") + '새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mtoday" data-srch="1" title="일정 검색">' + 선아이콘("search") + '</button>'
@@ -4839,7 +4843,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4946,6 +4950,10 @@ document.addEventListener('click', function(e){
     if(켜짐2){ if(지금 === null) S.filter = 다른; }          /* 둘 다 켜졌으면 이것을 끈다 · 이것만 켜졌으면 못 끈다 */
     else S.filter = 지금 === 다른 ? null : 어느;               /* 꺼져 있으면 켠다(다른 것이 켜져 있었으면 둘 다 = 전체) */
     render(); return;
+  }
+  if(t.hasAttribute('data-dmono')){
+    try{ localStorage.setItem("pucal_gmono", _모노() ? "0" : "1"); }catch(_){}
+    S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return;
   }
   if(t.hasAttribute('data-sback')){ S.srch = false; S.q = ''; render(); return; }
   if(t.hasAttribute('data-dclose')){ S.drawer = false; render(); return; }
