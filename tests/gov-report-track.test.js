@@ -171,3 +171,30 @@ test('저장 관문(강제 모드) — 줄 하나 .set 은 통과, 부분 update
   assert.equal(W.inspectWrite({ kind: 'set', path: 'scal_docs/c2/t3_2026/items/sign', value: p, mode: 'enforce' }).ok, true);
   assert.equal(W.inspectWrite({ kind: 'update', path: 'scal_docs/c2/t3_2026', value: { 'items/sign': p }, mode: 'enforce' }).ok, false);
 });
+
+test('프로토타입 오염 — __proto__·constructor·prototype 업체·rid 는 버리고 읽기도 자기 것만', () => {
+  const rec = { st: 'done', at: 1 };
+  ['__proto__', 'constructor', 'prototype'].forEach((bad) => {
+    const rawCo = JSON.parse('{"' + bad + '":{"pol":{"items":{"submit":{"st":"done","at":1}}}}}');
+    assert.deepEqual(Tr.normalize(rawCo), {});
+    const rawRid = JSON.parse('{"c1":{"' + bad + '":{"items":{"submit":{"st":"done","at":1}}}}}');
+    assert.deepEqual(Tr.normalize(rawRid), {});
+    assert.equal(({}).pol, undefined);
+    assert.deepEqual(Tr.put({}, bad, 'x', 'submit', rec), {});
+    assert.deepEqual(Tr.put({}, 'c1', bad, 'submit', rec), {});
+    assert.equal(({}).x, undefined);
+    assert.equal(({}).submit, undefined);
+    assert.deepEqual(Tr.recOf({ c1: { r: { submit: rec } } }, bad, 'r'), {});
+    assert.deepEqual(Tr.recOf({ c1: { r: { submit: rec } } }, 'c1', bad), {});
+  });
+  assert.deepEqual(Tr.recOf({}, 'toString', 'valueOf'), {});
+  const n = Tr.normalize(JSON.parse('{"toString":{"hasOwnProperty":{"items":{"submit":{"st":"done","at":1}}}}}'));
+  assert.deepEqual(Object.keys(n.toString), ['hasOwnProperty']);
+  assert.equal(Tr.cellFor(NORTH, {}, 'submit', 1, T0).st, 'none');
+  assert.equal(Tr.cellFor(TG, { constructor: { st: 'done', at: 1 } }, 'attach', 1, T0).st, 'none');
+});
+
+test('patchFor — 모르는 상태는 null', () => {
+  assert.equal(Tr.patchFor({ st: 'weird' }, '홍길동', 1), null);
+  assert.equal(Tr.patchFor(null, '', 1), null);
+});

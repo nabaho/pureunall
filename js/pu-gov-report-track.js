@@ -35,6 +35,8 @@
   function isDay(d) { return typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d); }
   function dayNum(d) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str(d)); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) / 864e5 : NaN; }
   function daysBetween(a, b) { var n = dayNum(b) - dayNum(a); return isFinite(n) ? n : null; }
+  /* 업체·rid 는 DB 가 지은 이름 — 프로토타입을 건드리는 이름은 버린다(오염 방지) */
+  function okId(k) { return typeof k === 'string' && !!k && k !== '__proto__' && k !== 'constructor' && k !== 'prototype'; }
   function okKey(k) { return typeof k === 'string' && k.length <= KEY_MAX && KEY_RE.test(k); }
 
   function keyOf(item, round) { var id = str(item && item.id); return round ? id + ':' + round : id; }
@@ -64,16 +66,17 @@
     var out = {};
     if (!obj(raw)) return out;
     Object.keys(raw).forEach(function (co) {
-      if (!obj(raw[co])) return;
+      if (!okId(co) || !obj(raw[co])) return;
       Object.keys(raw[co]).forEach(function (rid) {
+        if (!okId(rid)) return;
         var items = obj(raw[co][rid]) ? raw[co][rid].items : null;
         if (!obj(items)) return;
         Object.keys(items).forEach(function (k) {
           if (!okKey(k)) return;
           var r = normRec(items[k]);
           if (!r) return;
-          out[co] = out[co] || {};
-          out[co][rid] = out[co][rid] || {};
+          if (!has(out, co)) out[co] = {};
+          if (!has(out[co], rid)) out[co][rid] = {};
           out[co][rid][k] = r;
         });
       });
@@ -81,15 +84,15 @@
     return out;
   }
   function recOf(track, coId, rid) {
-    return (obj(track) && obj(track[coId]) && obj(track[coId][rid])) ? track[coId][rid] : {};
+    return (obj(track) && has(track, coId) && obj(track[coId]) && has(track[coId], rid) && obj(track[coId][rid])) ? track[coId][rid] : {};
   }
   /* 저장이 된 뒤 로컬 값 갱신 — 다시 읽지 않는다. 원본은 그대로 */
   function put(track, coId, rid, key, rec) {
     var out = JSON.parse(JSON.stringify(obj(track) ? track : {}));
     var r = normRec(rec);
-    if (!r || !okKey(key) || !str(coId) || !str(rid)) return out;
-    out[coId] = out[coId] || {};
-    out[coId][rid] = out[coId][rid] || {};
+    if (!r || !okKey(key) || !okId(coId) || !okId(rid)) return out;
+    if (!has(out, coId)) out[coId] = {};
+    if (!has(out[coId], rid)) out[coId][rid] = {};
     out[coId][rid][key] = r;
     return out;
   }
@@ -105,11 +108,11 @@
     return 'none';
   }
   function label(step, st) { var s = STEP_KO[step] || {}; return MARK[st] + ' ' + (s[st] || ST_KO[st]); }
-  /* 발송했는데 회신이 없는 줄 가운데 가장 이른 발송일부터 오늘까지 */
+  /* 발송했는데 회신이 없는 줄(sentAt 이 있고 gotAt 이 없으면 waitDays 가 생긴다 — 상태와 무관하게 설계 글자 그대로. done·na 는 뺀다) 가운데 가장 이른 발송일부터 오늘까지 */
   function waitOf(keys, rec, today) {
     var first = '';
     keys.forEach(function (k) {
-      var r = rec[k.key];
+      var r = has(rec, k.key) ? rec[k.key] : null;
       if (!r || !r.sentAt || r.gotAt || r.st === 'done' || r.st === 'na') return;
       if (!first || r.sentAt < first) first = r.sentAt;
     });
@@ -118,7 +121,7 @@
   function chipOf(step, keys, rec, today) {
     rec = obj(rec) ? rec : {};
     keys = keys || [];
-    var sts = keys.map(function (k) { return rec[k.key] ? rec[k.key].st : 'none'; });
+    var sts = keys.map(function (k) { return has(rec, k.key) && rec[k.key] ? rec[k.key].st : 'none'; });
     var st = stateOf(sts);
     var live = sts.filter(function (s) { return s !== 'na'; });
     var done = live.filter(function (s) { return s === 'done'; }).length;
@@ -190,6 +193,7 @@
   /* 저장할 줄 하나 — 빈 값은 뺀다(DB 도 빈 값을 저장하지 않는다) */
   function patchFor(entry, who, now) {
     var e = entry || {}, o = { st: e.st, at: Number(now) || 0 };
+    if (STATES.indexOf(e.st) < 0) return null;   // 모르는 상태는 저장 꼴을 만들지 않는다(호출쪽이 validate 를 먼저 부른다)
     if (str(who)) o.by = str(who).slice(0, BY_MAX);
     if (isDay(str(e.sentAt))) o.sentAt = str(e.sentAt);
     if (isDay(str(e.gotAt))) o.gotAt = str(e.gotAt);
