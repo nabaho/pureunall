@@ -10660,6 +10660,15 @@ function useEscClose(onClose){
      어느 화면에 무엇이 붙어 있는지 일일이 적지 않아도 되게 DOM 에서 직접 잰다.
    ⚠ 뜬 것(모달·툴팁 position:fixed/absolute)은 자리를 차지하지 않는다 — 빼면 안 된다.
      이걸 안 걸러내면 모달이 열린 화면에서 표가 240px 로 쪼그라든다. */
+/* 날짜 칸을 글자로 — createdAt 이 숫자(밀리초)로 든 레코드가 있다(공용 저장 관문, 2026-10-10).
+   .slice·.localeCompare 를 바로 부르면 화면이 통째로 멎는다(업체관리 2026-10-10). 숫자면 ISO 글자로, 없으면 빈 글자. */
+function erpDateStr(v){
+  if(v == null || v === '') return '';
+  if(typeof v === 'number'){ var d = new Date(v); return isNaN(d) ? '' : d.toISOString(); }
+  return String(v);
+}
+window.erpDateStr = erpDateStr;
+
 /* exact — 표 아래 줄(쪽 번호 등)과 «실제» 바닥 여백(.page·.main 의 아래 안쪽 여백)까지 빼서
    표·쪽 번호가 한 화면 안에 들어오게 한다(업체관리 2026-10-11). 안 주면 예전 셈 그대로. */
 function erpFillHeight(el, min, exact){
@@ -21348,7 +21357,7 @@ function ContractModal(props){
               var _stLbl = c.status==='transferred' ? '이관완료 → 종료관리'
                 : (c.permanentArchived||c.closedDate) ? '보관됨 → 종료관리'
                 : '진행중 → 계약관리';
-              var _cd = (c.signDate || c.startDate || c.createdAt || '').slice(0,10);
+              var _cd = erpDateStr(c.signDate || c.startDate || c.createdAt).slice(0,10);
               var sv = contractDupVStyle(r.v ? r.v.verdict : 'diff');
               wrap.appendChild(_card(_kindLbl(c, cKinds), _subText(c, cKinds), c.contractAmount,
                 (c.contractNo||'-'), (u?u.name:'-') + ' · ' + (_cd||'계약일 없음') + ' · ' + _stLbl, sv));
@@ -25693,7 +25702,7 @@ function ContractManagement(props){
     var kindsArr = c.kinds || (c.kind ? [c.kind] : []);
     if(kindFilter !== 'all' && kindsArr.indexOf(kindFilter) < 0) return false;
     if(monthOnly){
-      var d = (c.contractDate||c.signDate||c.createdAt||'').slice(0,7);
+      var d = erpDateStr(c.contractDate||c.signDate||c.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     // 담당자 필터
@@ -25749,7 +25758,7 @@ function ContractManagement(props){
   // 종류별 카운트 (탭 표시용 - 전체 contracts 기준)
   // 선택된 월(selYM)에 등록된 계약만 필터링 (계약일 또는 서명일 또는 생성일 기준)
   var monthContracts = contracts.filter(function(c){
-    var d = (c.contractDate || c.signDate || c.createdAt || '').slice(0,7);
+    var d = erpDateStr(c.contractDate || c.signDate || c.createdAt).slice(0,7);
     return d === selYM;
   });
   function kindCount(kindV){
@@ -29109,7 +29118,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     }
     // monthOnly는 담당 깔때기/검색어가 없을 때만 적용
     if(monthOnly && !fMgr.length && !fSub.length && !query){
-      var d = (co.contractStartDate||co.firstContractDate||co.createdAt||'').slice(0,7);
+      var d = erpDateStr(co.contractStartDate||co.firstContractDate||co.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     if(query){
@@ -29320,7 +29329,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
         { label:'🏛️ 사무대행', value:companies.filter(function(c){return c.status==='suboffice' || c.isSuboffice;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'💰 월 자문료', value:totalAdvisoryFee.toLocaleString()+'원', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a',
           sub: suspendedFee > 0 ? '중단 ' + suspendedFee.toLocaleString() + '원 제외' : null },
-        { label:'✨ 이번 달 신규', value:companies.filter(function(c){return (c.contractStartDate||c.firstContractDate||c.createdAt||'').slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
+        { label:'✨ 이번 달 신규', value:companies.filter(function(c){return erpDateStr(c.contractStartDate||c.firstContractDate||c.createdAt).slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
         { label:'⏸ 계약 중단', value:companies.filter(function(c){return !!c.suspended;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
       ],
       extra: h('button', { onClick:function(){setMonthOnly(!monthOnly);},
@@ -33152,7 +33161,7 @@ function CaseManagement(props){
     if(typeFilter !== 'all' && c.typeCode !== typeFilter) return false;
     if(stageFilter !== 'all' && (c.stageCode||'') !== stageFilter) return false;
     if(monthOnly){
-      var d = (c.contractDate||c.receiveDate||c.createdAt||'').slice(0,7);
+      var d = erpDateStr(c.contractDate||c.receiveDate||c.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     if(mgrFilter !== 'all' && c.managerMain !== mgrFilter && (c.managerSubs||[]).indexOf(mgrFilter) < 0) return false;
@@ -42085,7 +42094,7 @@ function DataDiagnostics(){
         if(!c.contractNo) return false;
         var m = (c.contractNo||'').match(/계약-(\d{4})-/);
         if(!m) return false;
-        var cYear = (c.contractDate||c.createdAt||'').slice(0,4);
+        var cYear = erpDateStr(c.contractDate||c.createdAt).slice(0,4);
         return cYear && cYear !== m[1] && cYear !== thisYear;
       });
       if(wrongYear.length) warns.push({ key:'contractno_year', label:'계약번호 연도 불일치', count:wrongYear.length,
@@ -46839,7 +46848,7 @@ function CoNumberPanel(){
             h('td', { key:'s', style:{ padding:'5px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', color:'#854d0e' } },
               (c.status === 'suboffice' || c.isSuboffice) ? '대행' : ''),
             h('td', { key:'d', style:{ padding:'5px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', color:'#64748b' } },
-              (c.createdAt || c.contractStartDate || '').slice(0, 10) || '—')
+              erpDateStr(c.createdAt || c.contractStartDate).slice(0, 10) || '—')
           ]);
         }))));
 }
@@ -68779,7 +68788,7 @@ function ProjectManagementShared(props){
       else if(it.contractPaidDate) d = it.contractPaidDate.slice(0,7);
       else if(it.retainerPaidDate) d = it.retainerPaidDate.slice(0,7);
       else if(it.successPaidDate)  d = it.successPaidDate.slice(0,7);
-      else d = (it.contractDate||it.startDate||it.createdAt||'').slice(0,7);
+      else d = erpDateStr(it.contractDate||it.startDate||it.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     if(mgrFilter !== 'all' && it.managerMain !== mgrFilter && (it.managerSubs||[]).indexOf(mgrFilter) < 0) return false;
