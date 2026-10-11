@@ -12,9 +12,9 @@ test('erpReloadUrl — app 꼬리는 남기고 v 만 바꾼다', () => {
   const m = SRC.match(/function erpReloadUrl\(\)\{[\s\S]*?\n\}/);
   assert.ok(m, 'erpReloadUrl 을 못 찾았습니다');
   const run = (search) => new Function('location', 'Date', m[0] + '; return erpReloadUrl();')({ pathname: '/p/pu-erp.html', search }, { now: () => 7 });
-  assert.equal(run('?app=hr&sso=1&v=1'), '/p/pu-erp.html?app=hr&v=7');
-  assert.equal(run('?app=fin'), '/p/pu-erp.html?app=fin&v=7');
-  assert.equal(run('?v=3'), '/p/pu-erp.html?v=7');
+  assert.equal(run('?app=hr&sso=1&v=1'), '/p/pu-erp.html?app=hr&v=7');   // 검사고정-허용: 꾸민 입력·시계(7)로 만든 주소 — 캐시 번호가 아니다
+  assert.equal(run('?app=fin'), '/p/pu-erp.html?app=fin&v=7');   // 검사고정-허용: 꾸민 입력
+  assert.equal(run('?v=3'), '/p/pu-erp.html?v=7');   // 검사고정-허용: 꾸민 입력
 });
 
 test('★ app 꼬리를 버리는 새로고침(location.pathname + ?v=)이 남지 않았다', () => {
