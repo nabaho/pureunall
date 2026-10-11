@@ -15,6 +15,7 @@ const Rpt = require('../js/pu-gov-report.js');
 const D = require('../js/pu-gov-report-docs.js');
 const Tr = require('../js/pu-gov-report-track.js');
 const O = require('../js/pu-ontology.js');
+const { fakeDoc } = require('./helpers/fake-preview-dom.js');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'gov-report.html'), 'utf8');
 const INLINE = [...SRC.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).join('\n')
@@ -619,10 +620,31 @@ test('㉘ 겹친 저장 — 같은 칸 저장이 끝나기 전에 다시 열어 
 
 /* ══ 「📂 받은 한글 파일 열어 보기」 (2026-10-11) — ③ 서명본 칸 창에서만, 브라우저 안에서만 읽는다 ══ */
 function pvFile(name, bytes) { return { name, size: bytes.length, arrayBuffer: async () => new Uint8Array(bytes).buffer }; }
+/* 가짜 PuHwpPreview — hold: 끝나기를 붙잡아 둔다 · cancel: 진짜 창이 닫힘·밀림 때 내는 «취소»(cancelled·AbortError) · fail: 진짜 실패 */
+function pvCancel(msg) { const e = new Error(msg); e.name = 'AbortError'; e.cancelled = true; return e; }
 function pvPreview(o) {
+  o = o || {};
   const calls = [];
-  return { calls, open: async (buf, name) => { calls.push({ buf, name }); if (o && o.fail) throw new Error(o.fail); return { pageCount: 2 }; } };
+  return { calls, open: (buf, name) => {
+    const c = { buf, name };
+    calls.push(c);
+    if (o.hold) return new Promise((res, rej) => { c.resolve = () => res({ pageCount: 2 }); c.reject = rej; });
+    if (o.cancel) return Promise.reject(pvCancel(o.cancel));
+    if (o.fail) return Promise.reject(new Error(o.fail));
+    return Promise.resolve({ pageCount: 2 });
+  } };
 }
+/* 진짜 미리보기 창(js/pu-hwp-preview.js)을 그 화면 안에 싣는다 — 엔진은 끝나기를 붙잡아 둔다(≈10MB 코어를 불러오는 사이) */
+const PV_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-hwp-preview.js'), 'utf8');
+function realPreview(ctx) {
+  const doc = fakeDoc();
+  const held = [];
+  ctx.document = doc;
+  ctx.PureunHwp = { renderPreview: () => new Promise((res, rej) => { held.push({ res, rej }); }) };
+  vm.runInContext(PV_SRC, ctx);
+  return { doc, held };
+}
+const tick = async (n) => { for (let i = 0; i < (n || 5); i++) await new Promise((r) => setImmediate(r)); };
 
 test('㉙ 파일 열기 단추 — ③ 서명본 칸 창에만, 숨은 파일 고르기(.hwp·.hwpx)와 안내 줄', async () => {
   const w = world();
@@ -644,9 +666,12 @@ test('㉙ 파일 열기 단추 — ③ 서명본 칸 창에만, 숨은 파일 �
 test('㉚ 한글 파일을 고르면 PuHwpPreview.open(바이트, 이름) — 아무것도 쓰지 않는다', async () => {
   const pv = pvPreview();
   const w = world({ preview: pv });
-  const inp = { files: [pvFile('서명본.HWPX', [80, 75, 3, 4])], value: 'C:\\fakepath\\서명본.HWPX' };
-  const r = await w.ctx.grOpenHwp(inp);
+  const inp = { files: [pvFile('서명본.HWPX', [80, 75, 3, 4])], value: '서명본.HWPX' };
+  const p = w.ctx.grOpenHwp(inp);
+  assert.equal(inp.value, '', '파일을 잡자마자(읽기·열기 전에) 비워야 같은 파일을 다시 고를 수 있다');
+  const r = await p;
   assert.equal(r.ok, true);
+  assert.equal(w.els.cwHwpMsg.textContent, '열었습니다 — 서명본.HWPX');
   assert.equal(pv.calls.length, 1);
   assert.equal(pv.calls[0].name, '서명본.HWPX');
   assert.ok(pv.calls[0].buf instanceof ArrayBuffer || Object.prototype.toString.call(pv.calls[0].buf) === '[object ArrayBuffer]');
@@ -659,8 +684,10 @@ test('㉛ 한글이 아니면 「한글(.hwp·.hwpx) 파일만 열 수 있습니
   const w = world({ preview: pv });
   let read = 0;
   const f = { name: '서명본.pdf', size: 3, arrayBuffer: async () => { read++; return new ArrayBuffer(3); } };
-  const r = await w.ctx.grOpenHwp({ files: [f], value: 'x' });
+  const inp = { files: [f], value: 'x' };
+  const r = await w.ctx.grOpenHwp(inp);
   assert.equal(r.ok, false);
+  assert.equal(inp.value, '', '한글이 아니어도 고르기 칸은 비운다');
   assert.equal(pv.calls.length, 0);
   assert.equal(read, 0, '한글이 아닌 파일을 읽었다');
   assert.equal(w.els.cwHwpMsg.textContent, '한글(.hwp·.hwpx) 파일만 열 수 있습니다');
@@ -668,27 +695,118 @@ test('㉛ 한글이 아니면 「한글(.hwp·.hwpx) 파일만 열 수 있습니
   assert.equal(r2.ok, false);
   assert.equal(pv.calls.length, 0);
 });
-test('㉜ 미리보기 실패·창 없음 — 안내만, 칸 창의 적던 값은 그대로(다시 그리지 않는다)', async () => {
-  const w1 = world({ preview: pvPreview({ fail: '미리보기를 열지 못했습니다 — 깨진 파일' }) });
-  const r1 = await w1.ctx.grOpenHwp({ files: [pvFile('a.hwp', [1])], value: '' });
-  assert.equal(r1.ok, false);
-  assert.match(w1.els.cwHwpMsg.textContent, /깨진 파일/);
-  assert.ok(!w1.els.cellw || w1.els.cellw.innerHTML === '', '칸 창을 다시 그렸다');
-  const w2 = world();
-  const r2 = await w2.ctx.grOpenHwp({ files: [pvFile('a.hwp', [1])], value: '' });
-  assert.equal(r2.ok, false);
-  assert.ok(w2.els.cwHwpMsg.textContent.length > 0);
-  const r3 = await w2.ctx.grOpenHwp({ files: [], value: '' });
-  assert.equal(r3.ok, false);
+test('㉜ 파일을 열어도(성공·실패·취소·창 없음·한글 아님) 열린 칸 창은 그대로 — 다시 그리지·저장하지·닫지 않는다', async () => {
+  const kinds = [
+    ['성공', pvPreview()],
+    ['실패', pvPreview({ fail: '미리보기를 열지 못했습니다 — 깨진 파일' })],
+    ['취소', pvPreview({ cancel: '미리보기가 닫혀 취소되었습니다' })],
+    ['창 없음', null]
+  ];
+  for (const [kind, pv] of kinds) {
+    const w = world(pv ? { preview: pv } : {});
+    await w.ctx.grLoad();
+    w.ctx.grSetBiz('consulting-04');
+    w.ctx.grOpenCell('c2', 't3', 'sign');
+    const cw = w.ctx.GR.cw;
+    assert.ok(cw && w.els.cellw.innerHTML.includes('id="cwHwp"'), kind + ': ③ 서명본 칸 창이 안 열렸다');
+    /* 사람이 칸 창에 적던 자리 — 다시 그리면(grRenderCell) 이 표가 사라진다 */
+    const SENT = '<!--적던 칸 창-->';
+    w.els.cellw.innerHTML = SENT;
+    w.els.cwNote.value = '적던 메모';
+    w.els.cwSent.value = '2026-10-01';
+    const msgBefore = cw.msg;
+    for (const busy of [false, true]) {
+      cw.busy = busy;
+      w.ctx.GR.saving = busy ? { x: true } : {};
+      const savingBefore = JSON.stringify(w.ctx.GR.saving);
+      for (const f of [pvFile('서명본.hwpx', [1]), pvFile('서명본.pdf', [1])]) {
+        await w.ctx.grOpenHwp({ files: [f], value: f.name });
+        const at = kind + ' · ' + f.name + (busy ? ' · 저장 중' : '');
+        assert.equal(w.els.cellw.innerHTML, SENT, at + ': 칸 창을 다시 그렸다 — 적던 값이 날아간다');
+        assert.equal(w.els.cwNote.value, '적던 메모', at);
+        assert.equal(w.els.cwSent.value, '2026-10-01', at);
+        assert.strictEqual(w.ctx.GR.cw, cw, at + ': 칸 창이 바뀌거나 닫혔다');
+        assert.equal(cw.busy, busy, at + ': 저장 중 표시를 건드렸다');
+        assert.equal(cw.msg, msgBefore, at + ': 칸 창 안내를 바꿨다');
+        assert.equal(JSON.stringify(w.ctx.GR.saving), savingBefore, at + ': GR.saving 을 건드렸다');
+      }
+    }
+    assert.equal(w.db.쓴것.length, 0, kind + ': 무언가 썼다');
+  }
 });
 test('㉝ 정적 — 스크립트 줄, 파일은 글자로만 안내하고 올리지·저장하지 않는다', () => {
   const FUND = fs.readFileSync(path.join(__dirname, '..', 'fund.html'), 'utf8');
+  const GC = fs.readFileSync(path.join(__dirname, '..', 'gov-consulting.html'), 'utf8');
   const ev = (s) => (s.match(/js\/pu-hwp-engine\.js\?v=(\d+)/) || [])[1];
   assert.ok(ev(SRC) && ev(SRC) === ev(FUND), '엔진 ?v 가 다른 앱과 같아야 한다');
-  const e = SRC.indexOf('<script src="js/pu-hwp-engine.js?v='), p = SRC.indexOf('<script src="js/pu-hwp-preview.js?v=1">');
+  const pvv = (s) => (s.match(/js\/pu-hwp-preview\.js\?v=(\d+)/) || [])[1];
+  assert.ok(pvv(SRC) && pvv(SRC) === pvv(GC), '미리보기 창 ?v 가 두 화면(컨설팅보고서·정부사업일정)에서 같아야 한다');
+  const e = SRC.indexOf('<script src="js/pu-hwp-engine.js?v='), p = SRC.search(/<script src="js\/pu-hwp-preview\.js\?v=\d+"><\/script>/);
   assert.ok(e >= 0 && p > e && p < SRC.indexOf('<script>', p), '엔진 → 미리보기 순서');
   const fn = grab('grOpenHwp');
   assert.doesNotMatch(fn, /innerHTML/, '파일 이름을 innerHTML 로 넣었다');
   assert.doesNotMatch(fn, /fetch\(|XMLHttpRequest|FormData|localStorage|\.set\(|\.update\(|\.push\(|\.put\(/);
   assert.doesNotMatch(INLINE, /esm\.sh|edwardkim\.github\.io|createEditor|window\.open/);
+});
+test('㉞ 미리보기 실패·창 없음·파일 없음 — 안내 줄에 글자로 알린다(빨간 줄)', async () => {
+  const w1 = world({ preview: pvPreview({ fail: '미리보기를 열지 못했습니다 — 깨진 파일' }) });
+  const r1 = await w1.ctx.grOpenHwp({ files: [pvFile('a.hwp', [1])], value: '' });
+  assert.equal(r1.ok, false);
+  assert.match(w1.els.cwHwpMsg.textContent, /깨진 파일/);
+  assert.equal(w1.els.cwHwpMsg.className, 'err-s');
+  const w2 = world();
+  const r2 = await w2.ctx.grOpenHwp({ files: [pvFile('a.hwp', [1])], value: '' });
+  assert.equal(r2.ok, false);
+  assert.match(w2.els.cwHwpMsg.textContent, /한글 미리보기를 불러오지 못했습니다/);
+  const r3 = await w2.ctx.grOpenHwp({ files: [], value: '' });
+  assert.equal(r3.ok, false);
+});
+test('㉟ 취소는 실패가 아니다 — 불러오는 사이 미리보기를 닫으면(진짜 창·Esc) 안내 줄을 건드리지 않는다', async () => {
+  /* ① 가짜 창이 «취소»를 내면 */
+  const w0 = world({ preview: pvPreview({ cancel: '다른 파일을 열어 이 미리보기는 취소되었습니다' }) });
+  w0.els.cwHwpMsg.textContent = '고른 파일은 이 화면에서만 읽습니다'; w0.els.cwHwpMsg.className = 'days';
+  const r0 = await w0.ctx.grOpenHwp({ files: [pvFile('a.hwpx', [1])], value: '' });
+  assert.equal(r0.ok, false);
+  assert.equal(r0.cancelled, true);
+  assert.equal(w0.els.cwHwpMsg.textContent, '고른 파일은 이 화면에서만 읽습니다', '취소를 안내 줄에 적었다');
+  assert.equal(w0.els.cwHwpMsg.className, 'days', '취소를 빨간 실패로 보였다');
+  /* ② 진짜 미리보기 창 — 엔진 코어를 불러오는 사이 사람이 Esc 로 닫는다 */
+  const w = world();
+  const real = realPreview(w.ctx);
+  w.els.cwHwpMsg.textContent = '고른 파일은 이 화면에서만 읽습니다'; w.els.cwHwpMsg.className = 'days';
+  const p = w.ctx.grOpenHwp({ files: [pvFile('서명본.hwpx', [80, 75])], value: '' });
+  await tick();
+  assert.equal(real.held.length, 1, '진짜 창이 엔진을 부르지 않았다');
+  assert.equal(w.ctx.PuHwpPreview.isOpen(), true);
+  real.doc.key('Escape');
+  assert.equal(w.ctx.PuHwpPreview.isOpen(), false);
+  real.held[0].res({ pageCount: 1 });
+  const r = await p;
+  assert.equal(r.ok, false);
+  assert.equal(r.cancelled, true, '진짜 창의 취소 표시를 못 알아봤다');
+  assert.equal(w.els.cwHwpMsg.textContent, '고른 파일은 이 화면에서만 읽습니다', '「다른 파일을 열어 …」 같은 엉뚱한 말이 떴다');
+  assert.equal(w.els.cwHwpMsg.className, 'days');
+});
+test('㊱ 불러오는 사이 창을 닫고 같은 파일을 다시 골라도 다시 열린다 — 고르기 칸은 이미 비어 있다', async () => {
+  const pv = pvPreview({ hold: true });
+  const w = world({ preview: pv });
+  const inp = { files: [pvFile('서명본.hwpx', [1])], value: '서명본.hwpx' };
+  const p1 = w.ctx.grOpenHwp(inp);
+  assert.equal(inp.value, '', '불러오기가 끝나야 비운다 — 그사이 같은 파일을 고르면 브라우저가 change 를 안 띄운다');
+  await tick();
+  assert.equal(pv.calls.length, 1);
+  /* 사람이 창을 닫고 📂 를 다시 눌러 같은 파일을 고른다 — 칸이 비어 있으니 change 가 뜬다 */
+  inp.value = '서명본.hwpx';
+  const p2 = w.ctx.grOpenHwp(inp);
+  assert.equal(inp.value, '');
+  await tick();
+  assert.equal(pv.calls.length, 2, '다시 고른 파일을 열지 않았다');
+  pv.calls[0].reject(pvCancel('미리보기가 닫혀 취소되었습니다'));   /* 옛 요청은 진짜 창에서 «취소»로 끝난다 */
+  const r1 = await p1;
+  assert.equal(r1.cancelled, true);
+  assert.notEqual(w.els.cwHwpMsg.className, 'err-s', '옛 요청의 취소가 빨간 줄로 떴다');
+  pv.calls[1].resolve();
+  const r2 = await p2;
+  assert.equal(r2.ok, true);
+  assert.equal(w.els.cwHwpMsg.textContent, '열었습니다 — 서명본.hwpx');
 });

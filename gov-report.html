@@ -193,7 +193,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/pu-gov-report-track.js?v=2"></script>
 <script src="js/pu-gov-report-docs.js?v=3"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
-<script src="js/pu-hwp-preview.js?v=1"></script>
+<script src="js/pu-hwp-preview.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script>
@@ -458,22 +458,26 @@ async function grSaveCell(){
   if(GR.cw===c) grRenderCell();
 }
 /* 📂 받은 한글 파일 열어 보기 — 고른 파일은 브라우저 안에서만 읽어 미리보기 창(PuHwpPreview)에 넘긴다. 어디에도 올리지·쓰지 않는다.
-   안내는 글자(textContent)로만 — 파일 이름은 사람이 정한 데이터. 칸 창은 다시 그리지 않는다(적던 값 보존) */
+   안내는 글자(textContent)로만 — 파일 이름은 사람이 정한 데이터. 칸 창은 다시 그리지 않는다(적던 값 보존)
+   ★ 파일을 잡자마자(await 전에) 고르기 칸을 비운다 — 불러오는 사이 창을 닫고 같은 파일을 다시 골라도 change 가 뜬다.
+     잡아 둔 File 은 칸을 비워도 그대로 읽힌다.
+   ★ 창을 닫았거나 다른 파일에 밀려 취소된 것(e.cancelled)은 실패가 아니다 — 안내 줄을 건드리지 않는다. */
 function grPickHwp(){ var el=$('cwHwp'); if(el&&el.click) el.click(); }
 async function grOpenHwp(input){
   var say=function(m,bad){ var e=$('cwHwpMsg'); if(e){ e.textContent=m; e.className=bad?'err-s':'days'; } return {ok:!bad,msg:m}; };
   var f=input&&input.files&&input.files[0];
+  try{ if(input) input.value=''; }catch(e){}
   if(!f) return {ok:false};
-  var done=function(r){ try{ input.value=''; }catch(e){} return r; };
-  if(!/\.hwpx?$/i.test(String(f.name||''))) return done(say('한글(.hwp·.hwpx) 파일만 열 수 있습니다',true));
-  if(!window.PuHwpPreview) return done(say('한글 미리보기를 불러오지 못했습니다 — 새로 고친 뒤 다시 눌러 주세요',true));
+  if(!/\.hwpx?$/i.test(String(f.name||''))) return say('한글(.hwp·.hwpx) 파일만 열 수 있습니다',true);
+  if(!window.PuHwpPreview) return say('한글 미리보기를 불러오지 못했습니다 — 새로 고친 뒤 다시 눌러 주세요',true);
   try{
     var buf=await f.arrayBuffer();
     await window.PuHwpPreview.open(buf,f.name);
-    return done(say('열었습니다 — '+f.name));
+    return say('열었습니다 — '+f.name);
   }catch(e){
+    if(e&&e.cancelled) return {ok:false,cancelled:true};
     console.warn('[컨설팅보고서] 한글 미리보기 실패',e);
-    return done(say((e&&e.message)||'미리보기를 열지 못했습니다',true));
+    return say((e&&e.message)||'미리보기를 열지 못했습니다',true);
   }
 }
 /* 양식 서고 — 읽기만. 등록·바꾸기는 정부사업일정의 ⚙ 양식 서고(#forms, 관리자) */

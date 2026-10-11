@@ -29,12 +29,14 @@
 2. 창을 연다(제목 = 파일 이름, 「불러오는 중…」).
 3. `PureunHwp.renderPreview(host, input, name)` 성공 → 「N쪽」 표시. 실패 → 창 안에 「미리보기를 열지 못했습니다 — <이유>」 + (opts.onFail 있으면 호출).
 4. 닫기(단추·바깥 클릭·Esc·뒤로가기) → 정리.
+5. 끝나기 전에 창이 닫혔거나 새 `open()` 에 밀린 요청은 실패가 아니라 «취소» — `err.cancelled=true`·`name='AbortError'`(「미리보기가 닫혀 취소되었습니다」 / 「다른 파일을 열어 이 미리보기는 취소되었습니다」)로 거절하고 `onFail` 은 부르지 않는다. 쓰는 쪽은 조용히 넘긴다.
+- Esc 는 미리보기 창이 문서의 잡기(capture) 단계에서 먼저 받아 멈춘다 — 페이지의 「Esc 한 번 = 창 하나」 듣개가 밑의 창까지 닫지 않게(2026-10-11 검토 반영).
 - `PuHwpPreview.close()` · `PuHwpPreview.isOpen()` 도 내놓는다(검사·뒤로가기용).
 
 ## 4. 만들 것
 
 - `js/pu-hwp-preview.js`(새) + `tests/pu-hwp-preview.test.js`: 가짜 `PureunHwp` 로 열기·실패·닫기·한 번에 하나·Esc·외부 주소 없음·편집기 호출 없음 검사. `hwp-engine-local-editor.test.js` 를 본보기로 «새 파일에 `esm.sh`·`edwardkim.github.io`·`createEditor` 없음» 도 지킨다.
-- `gov-consulting.html`: 스크립트(`pu-hwp-engine.js?v=…` 뒤에 `pu-hwp-preview.js?v=1`; 이미 같은 `?v` 로 다른 앱이 쓰는 엔진 버전과 똑같이) + 「👁 한글 미리보기」 단추(`GRP_ACTS`) + `grpPreview(fileKey)`(내려받기 코드와 채우기 부분을 같이 쓴다 — 복사하지 말고 공통 함수로 뽑는다).
+- `gov-consulting.html`: 스크립트(`pu-hwp-engine.js?v=…` 뒤에 `pu-hwp-preview.js?v=…`(두 화면 같은 값); 이미 같은 `?v` 로 다른 앱이 쓰는 엔진 버전과 똑같이) + 「👁 한글 미리보기」 단추(`GRP_ACTS`) + `grpPreview(fileKey)`(내려받기 코드와 채우기 부분을 같이 쓴다 — 복사하지 말고 공통 함수로 뽑는다).
 - `gov-report.html`: 스크립트 + 칸 창의 「📂 받은 한글 파일 열어 보기」.
 - 검사: 기존 `tests/gov-report-ui.test.js`·`tests/gov-report-app.test.js` 에 단추·흐름 검사(가짜 `PuHwpPreview`). 페이지가 «쓰기는 `scal_docs` 한 줄뿐»인 기존 검사는 그대로 통과해야 한다.
 - 기록: STATUS.md · `status/2026-10-11-gov-report-hwp-preview.md`.

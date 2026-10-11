@@ -7,7 +7,8 @@
 - 새 공용 창 `js/pu-hwp-preview.js` → `PuHwpPreview.open(바이트, 이름, {onFail})`·`close()`·`isOpen()`. 전체 화면 창(닫기 `data-close`·Esc·바깥 클릭·PuBack 층), 한 번에 하나, 닫을 때 DOM·키 듣개 정리. 그리는 일은 공용 엔진 `PureunHwp.renderPreview` 만 부른다.
 - 정부사업일정 보고서 창: 「⬇ HWPX」 옆 「👁 한글 미리보기」. 채우는 부분을 `grpFillReport` 로 뽑아 `grpDownload`·`grpPreview` 가 같이 쓴다(복사 아님). 안내(못 찾은 칸 등)는 그대로.
 - 컨설팅보고서 앱: ③ 서명본 칸 창에만 「📂 받은 한글 파일 열어 보기」(`grPickHwp`·`grOpenHwp`). .hwp·.hwpx 가 아니면 「한글(.hwp·.hwpx) 파일만 열 수 있습니다」.
-- 두 화면 모두 `js/pu-hwp-engine.js?v=21`(다른 앱과 같은 판) + `js/pu-hwp-preview.js?v=1` 를 싣는다.
+- 두 화면 모두 `js/pu-hwp-engine.js?v=21`(다른 앱과 같은 판) + `js/pu-hwp-preview.js`(두 화면 같은 `?v` — 검사가 지킨다) 를 싣는다.
+- 검토 반영(2026-10-11, 확인된 15건): Esc 는 미리보기가 잡기 단계에서 먼저 받아 멈춘다 · 닫힘·밀림은 «취소»(`err.cancelled`)로 내고 두 화면이 조용히 넘긴다 · 보고서 창 「👁」 은 채우는 동안 「미리보기 준비 중…」으로 잠근다 · 파일 고르기 칸은 파일을 잡자마자 비운다 · 검사: 가짜 문서가 진짜처럼 이벤트를 흘리고(`tests/helpers/fake-preview-dom.js`), 진짜 `initShortcuts`·`PuBack`·미리보기 창을 같이 돌리며, 정적 검사는 저장소 걷개(`stripJs`·`stripComments`)를 쓴다. 고친 내용마다 돌연변이(고장 넣기) 18개로 검사가 실제로 깨지는 것을 확인했다.
 
 ## 왜
 
@@ -17,6 +18,11 @@
 ## 남긴 함정
 
 - 엔진 코어(≈10MB)는 처음 미리볼 때 불러온다 — 느린 망에서는 「불러오는 중…」이 길 수 있다.
+- Esc 는 미리보기 창이 문서의 잡기(capture) 단계에서 먼저 받아 멈춘다(`stopImmediatePropagation`·`preventDefault`). 안 그러면 정부사업일정의 「Esc 한 번 = 창 하나」(`initShortcuts`→`closeTopOverlay`)가 밑의 보고서 창까지 닫아 적던 값이 날아간다. 창이 닫혀 있을 때·Esc 가 아닌 키는 건드리지 않는다. ⚠ 미리보기 «위에» 다른 창을 띄우는 기능을 붙이면 그 창의 Esc 가 먼저 오도록 손봐야 한다.
+- 뒤로가기는 `PuBack` 층이라 미리보기를 먼저 닫고, 다음 한 번이 보고서 창 차례다(파수꾼 `closeTopOverlay`).
+- 그리기가 끝나기 전에 창을 닫거나(「미리보기가 닫혀 취소되었습니다」) 새 `open()` 에 밀린(「다른 파일을 열어 이 미리보기는 취소되었습니다」) 요청은 `err.cancelled=true`·`name='AbortError'` 로 거절한다(`onFail` 없음). `grpPreview`·`grOpenHwp` 는 그때 `{ok:false,cancelled:true}` 만 돌려주고 알림·안내 줄을 건드리지 않는다 — 새로 쓰는 쪽도 `e.cancelled` 를 먼저 거른다. 엔진 그리기는 멈출 수 없어 취소된 요청도 떼어 낸 칸에 끝까지 그린 뒤 버려진다(처음 한 번 CPU 낭비).
+- 보고서 창 「👁」 은 채우는 동안(양식 읽기·JSZip·채우기, `_grp.pvBusy`)만 잠긴다. 창이 뜬 뒤(엔진 불러오는 중)에는 창이 화면을 덮고, 닫고 다시 누르면 새 요청이 옛 요청을 취소한다.
+- 칸 창의 파일 고르기 칸은 파일을 잡자마자(읽기 전) 비운다 — 불러오는 사이 창을 닫고 같은 파일을 다시 골라도 `change` 가 뜬다.
 - 미리보기는 «읽기 전용»이다. 고쳐 쓰려면 편집기(`createEditor`)가 필요한데 이번엔 일부러 붙이지 않았다.
 - 칸 창의 파일 안내 줄은 칸 창을 다시 그리면(칸 고르기·저장) 사라진다 — 적던 값을 지키려고 일부러 다시 그리지 않는다.
 - 엔진 `?v` 는 다른 앱과 같게 유지한다(엔진을 고치면 모든 화면 ?v 를 함께 올린다; `scripts/check-cache-version.js`).

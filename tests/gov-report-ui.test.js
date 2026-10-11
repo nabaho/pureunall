@@ -18,6 +18,8 @@ const assert = require('node:assert');
 const FakeDb = require('./helpers/fake-rtdb.js');
 const Pack = require('../js/pu-gov-report-pack.js');
 const Rpt = require('../js/pu-gov-report.js');
+const { stripComments } = require('./strip-comments.js');
+const { fakeDoc } = require('./helpers/fake-preview-dom.js');
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'gov-consulting.html'), 'utf8');
 const HTML = SRC.replace(/<!--[\s\S]*?-->/g, ' ');
@@ -835,9 +837,21 @@ test('AI ⑯ 동의 문구는 Google Gemini', () => {
 
 /* ══ 「👁 한글 미리보기」 (2026-10-11) — 내려받기와 같은 채우기, 저장·내려받기 없이 미리 보여 준다 ══ */
 const PV_NAMES = ['grpFileName', 'grpFileLabel', 'grpNote', 'grpFillReport', 'grpFillFail', 'grpFillSay', 'grpDownload', 'grpPreview'];
+const PV_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-hwp-preview.js'), 'utf8');
+const BACK_SRC = fs.readFileSync(path.join(__dirname, '..', 'js', 'pu-back.js'), 'utf8');
+const pvTick = async (n) => { for (let i = 0; i < (n || 5); i++) await new Promise((r) => setImmediate(r)); };
+/* 진짜 미리보기 창(js/pu-hwp-preview.js)을 그 화면 안에 싣는다 — 엔진은 끝나기를 붙잡아 둔다(≈10MB 코어를 불러오는 사이) */
+function pvReal(ctx) {
+  const doc = fakeDoc();
+  const held = [];
+  ctx.document = doc;
+  ctx.PureunHwp = { renderPreview: () => new Promise((res, rej) => { held.push({ res, rej }); }) };
+  vm.runInContext(PV_SRC, ctx);
+  return { doc, held };
+}
 function pvWorld(o) {
   o = o || {};
-  const calls = { saved: 0, fill: 0, opened: [], notes: [], tplFor: [] };
+  const calls = { saved: 0, fill: 0, opened: [], notes: [], tplFor: [], top: [] };
   const ctx = {
     console: { warn() {} }, Promise, Uint8Array, Date, String, Object, Array, JSON, Math, RegExp, Error,
     escAttr: (v) => String(v == null ? '' : v),
@@ -845,13 +859,24 @@ function pvWorld(o) {
     q: () => null,
     PuGovReport: { FORMS: Rpt.FORMS },
     PuGovReportPack: { fillHwpx: async () => { calls.fill++; return { bytes: new Uint8Array([7, 7]), result: o.result || { missing: [], short: false, over: false } }; } },
-    grpReadForm: () => {}, grpRenderTop: () => {}, grpRenderWarn: () => {},
-    grpLoadTemplate: async (fk, k, y) => { calls.tplFor.push([fk, k, y]); return o.noTpl ? null : new Uint8Array([1, 2]); },
+    grpReadForm: () => {}, grpRenderWarn: () => {},
+    /* 단추 줄을 그릴 때마다 «준비 중» 이었는지 적어 둔다 — 👁 잠금·풀림을 본다 */
+    grpRenderTop: () => { calls.top.push(!!(ctx._grp && ctx._grp.pvBusy)); },
+    grpLoadTemplate: async (fk, k, y) => {
+      calls.tplFor.push([fk, k, y]);
+      if (o.holdTpl && calls.tplFor.length === 1) await new Promise((r) => { calls.releaseTpl = r; });
+      return o.noTpl ? null : new Uint8Array([1, 2]);
+    },
     grpLoadJsZip: async () => ({}),
     grpSaveBlob: () => { calls.saved++; },
     Blob: function () {},
   };
-  if (!o.noPreview) ctx.PuHwpPreview = { open: async (b, n) => { calls.opened.push({ b, n }); if (o.openFail) throw new Error(o.openFail); return { pageCount: 2 }; } };
+  if (!o.noPreview) ctx.PuHwpPreview = { open: async (b, n) => {
+    calls.opened.push({ b, n });
+    if (o.openCancel) { const e = new Error(o.openCancel); e.name = 'AbortError'; e.cancelled = true; throw e; }
+    if (o.openFail) throw new Error(o.openFail);
+    return { pageCount: 2 };
+  } };
   vm.createContext(ctx);
   const consts = (SRC.match(/^const GRP_(?:FILE_KO|VERB)=.*;\r?$/gm) || []).join('\n');
   vm.runInContext('var _grp=null;\n' + consts + '\n' + PV_NAMES.map(grab).join('\n'), ctx);
@@ -911,7 +936,7 @@ test('미리보기 ⑤ 모르는 양식 파일·화면 상태가 없으면 아�
   assert.strictEqual((await w.ctx.grpPreview('main')).ok, false);
 });
 test('미리보기 ⑥ 정적 — 채우기는 공통 한 곳(복사 아님), 미리보기는 내려받지 않고 쓰지 않는다', () => {
-  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  const code = stripComments(SRC);   /* 통째 HTML — 손으로 쓴 걷개는 accept="image/*" 부터 삼킨다 */
   assert.strictEqual((code.match(/PuGovReportPack\.fillHwpx\(/g) || []).length, 1, '채우기가 두 곳이다 — 공통 함수로 뽑아야 한다');
   const fill = grab('grpFillReport');
   assert.match(fill, /PuGovReportPack\.fillHwpx\(/);
@@ -935,7 +960,118 @@ test('미리보기 ⑧ 스크립트 — 엔진은 다른 앱과 같은 ?v, 미�
   assert.ok(ev(HTML), 'pu-hwp-engine.js 줄이 없다');
   assert.strictEqual(ev(HTML), ev(FUND));
   const e = HTML.indexOf('<script src="js/pu-hwp-engine.js?v=');
-  const p = HTML.indexOf('<script src="js/pu-hwp-preview.js?v=1">');
+  const p = HTML.search(/<script src="js\/pu-hwp-preview\.js\?v=\d+"><\/script>/);
   assert.ok(e >= 0 && p > e, '미리보기 창은 엔진 다음에');
   assert.ok(p < HTML.indexOf('async function grpPreview('), '쓰는 코드보다 먼저 싣는다');
+});
+test('미리보기 ⑨ 준비하는 동안 또 눌러도 무시한다 — 채우기는 한 번, 빨간 알림 없음, 끝나면 다시 누를 수 있다', async () => {
+  const w = pvWorld({ holdTpl: true });
+  const p1 = w.ctx.grpPreview('main');
+  assert.strictEqual(w.calls.top[w.calls.top.length - 1], true, '준비 중 표시(👁 잠금)를 그리지 않았다');
+  const r2 = await w.ctx.grpPreview('main');   /* 두 번째 누름 — 첫 채우기가 아직 끝나지 않았다 */
+  assert.strictEqual(r2.ok, false);
+  assert.strictEqual(r2.busy, true);
+  assert.strictEqual(w.calls.tplFor.length, 1, '두 번째 누름이 채우기를 또 시작했다');
+  w.calls.releaseTpl();
+  const r1 = await p1;
+  assert.strictEqual(r1.ok, true);
+  assert.strictEqual(w.calls.opened.length, 1, '미리보기를 두 번 열었다');
+  assert.strictEqual(w.calls.top[w.calls.top.length - 1], false, '끝난 뒤 👁 를 풀지 않았다');
+  assert.strictEqual(w.ctx.__toasts.filter((t) => t.k === 'err').length, 0, '빨간 알림이 떴다');
+  assert.strictEqual((await w.ctx.grpPreview('main')).ok, true, '끝난 뒤 다시 누를 수 없다');
+  /* 채우다 실패해도 잠금은 풀린다 */
+  const w2 = pvWorld({ noTpl: true });
+  assert.strictEqual((await w2.ctx.grpPreview('main')).ok, false);
+  assert.strictEqual(vm.runInContext('_grp.pvBusy', w2.ctx), false, '실패 뒤에도 잠겨 있다');
+  assert.strictEqual(w2.calls.top[w2.calls.top.length - 1], false);
+});
+test('미리보기 ⑩ 창이 «취소»로 끝나면(닫힘·밀림) 실패가 아니다 — 빨간 알림·안내 줄 덮어쓰기 없음', async () => {
+  const w = pvWorld({ openCancel: '다른 파일을 열어 이 미리보기는 취소되었습니다', result: { missing: ['a'], short: false, over: false } });
+  const r = await w.ctx.grpPreview('main');
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.cancelled, true);
+  assert.strictEqual(w.ctx.__toasts.filter((t) => t.k === 'err').length, 0, '취소를 빨간 알림으로 띄웠다');
+  assert.match(w.calls.notes[w.calls.notes.length - 1], /^미리 봅니다 — 양식에서 못 찾은 칸 1곳$/, '안내 줄을 취소 문구로 덮었다');
+  /* 진짜 실패는 그대로 알린다 */
+  const w2 = pvWorld({ openFail: '미리보기를 열지 못했습니다 — 깨진 파일' });
+  await w2.ctx.grpPreview('main');
+  assert.strictEqual(w2.ctx.__toasts.filter((t) => t.k === 'err').length, 1);
+});
+test('미리보기 ⑪ 진짜 창 — 엔진을 불러오는 사이 닫으면 조용히 취소, 닫고 다시 누르면 새로 열린다', async () => {
+  const w = pvWorld({ noPreview: true, result: { missing: ['a'], short: false, over: false } });
+  const real = pvReal(w.ctx);
+  const p = w.ctx.grpPreview('main');
+  await pvTick();
+  assert.strictEqual(real.held.length, 1, '진짜 창이 엔진을 부르지 않았다');
+  const notes = w.calls.notes.slice();
+  w.ctx.PuHwpPreview.close();                     /* 사람이 「닫기」 — 엔진 코어는 아직 오는 중 */
+  real.held[0].res({ pageCount: 2 });
+  const r = await p;
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(r.cancelled, true, '진짜 창의 취소 표시를 못 알아봤다');
+  assert.strictEqual(w.ctx.__toasts.filter((t) => t.k === 'err').length, 0, '닫았을 뿐인데 빨간 알림이 떴다');
+  assert.deepStrictEqual(w.calls.notes, notes, '안내 줄을 덮어썼다');
+  /* 닫고 곧바로 다시 누른다 — 옛 요청은 아직 엔진을 기다린다 */
+  const pA = w.ctx.grpPreview('main');
+  await pvTick();
+  real.doc.key('Escape');
+  const pB = w.ctx.grpPreview('main');
+  await pvTick();
+  assert.strictEqual(real.held.length, 3);
+  real.held[1].res({ pageCount: 2 });
+  real.held[2].res({ pageCount: 2 });
+  assert.strictEqual((await pA).cancelled, true);
+  assert.strictEqual((await pB).ok, true);
+  assert.strictEqual(w.ctx.PuHwpPreview.isOpen(), true);
+  assert.strictEqual(w.ctx.__toasts.filter((t) => t.k === 'err').length, 0);
+});
+test('미리보기 ⑫ 준비 중에는 👁 단추가 잠기고 「미리보기 준비 중…」 — 위임은 잠긴 단추를 안 부른다', () => {
+  const el = { innerHTML: '' };
+  const w = pvWorld();
+  Object.assign(w.ctx, { q: (s) => (s === '#grpTop' ? el : null), grpCanConfirm: () => true, getCos: () => [], grpAiButtons: () => '' });
+  vm.runInContext(grab('grpRenderTop'), w.ctx);
+  const pvBtns = () => el.innerHTML.match(/<button[^>]*data-grp-act="preview"[^>]*>[^<]*<\/button>/g) || [];
+  vm.runInContext('_grp.pvBusy=true; grpRenderTop();', w.ctx);
+  assert.ok(pvBtns().length >= 1, '👁 단추를 못 그렸다');
+  pvBtns().forEach((b) => { assert.match(b, /\sdisabled[\s>]/); assert.match(b, /준비 중/); });
+  vm.runInContext('_grp.pvBusy=false; grpRenderTop();', w.ctx);
+  pvBtns().forEach((b) => { assert.doesNotMatch(b, /\sdisabled[\s>]/); assert.match(b, /미리보기/); assert.doesNotMatch(b, /준비 중/); });
+  assert.match(grab('grpBind'), /b\.disabled\)\s*return/, '위임이 잠긴 단추를 거르지 않는다');
+});
+test('미리보기 ⑬ 보고서 창 위 미리보기 — Esc·뒤로가기 한 번 = 미리보기 하나 (진짜 initShortcuts·closeTopOverlay·PuBack)', async () => {
+  const doc = fakeDoc();
+  const report = { id: 'mbGovRpt', open: true };
+  doc.querySelectorAll = (sel) => (sel === '.mb.open' && report.open ? [report] : []);
+  doc.querySelector = (sel) => (sel === '.mb.open' && report.open ? report : null);
+  const closed = [];
+  const ctx = { document: doc, console: { warn() {} }, Promise, Error, String, Array, parseInt, Uint8Array,
+    getComputedStyle: () => ({ zIndex: '500' }),
+    q: () => null,
+    closeModal: (id) => { closed.push(id); if (id === 'mbGovRpt') report.open = false; },
+    pkTryClose: () => {},
+    PureunHwp: { renderPreview: (host) => { host.appendChild(doc.createElement('canvas')); return Promise.resolve({ pageCount: 1 }); } } };
+  ctx.window = ctx;
+  vm.createContext(ctx);
+  vm.runInContext(['topOverlay', 'openOverlayList', 'closePanels', 'closeTopOverlay', 'initShortcuts'].map(grab).join('\n'), ctx);
+  vm.runInContext('initShortcuts();', ctx);        /* 페이지를 열 때 — 미리보기보다 먼저 문서에 붙는다 */
+  vm.runInContext(BACK_SRC, ctx);
+  const guard = SRC.match(/<script>(try\{ ?PuBack\.guard\([\s\S]*?)<\/script>/);
+  assert.ok(guard, '정부사업일정의 뒤로가기 파수꾼 줄을 못 찾았다');
+  vm.runInContext(guard[1], ctx);
+  vm.runInContext(PV_SRC, ctx);
+  const btn = doc.createElement('button');         /* 보고서 창의 👁 단추에 초점이 남아 있다 */
+  doc.body.appendChild(btn);
+  /* Esc */
+  await ctx.PuHwpPreview.open(new Uint8Array(1), '보고서.hwpx');
+  doc.key('Escape', btn);
+  assert.strictEqual(ctx.PuHwpPreview.isOpen(), false, 'Esc 가 미리보기를 안 닫았다');
+  assert.deepStrictEqual(closed, [], 'Esc 한 번에 보고서 창까지 닫혔다 — 적던 값이 날아간다');
+  /* 뒤로가기 */
+  await ctx.PuHwpPreview.open(new Uint8Array(1), '보고서.hwpx');
+  ctx.PuBack._pop();
+  assert.strictEqual(ctx.PuHwpPreview.isOpen(), false, '뒤로가기가 미리보기를 안 닫았다');
+  assert.deepStrictEqual(closed, [], '뒤로가기 한 번에 보고서 창까지 닫혔다');
+  /* 그다음 한 번이 보고서 창 차례 */
+  doc.key('Escape', btn);
+  assert.deepStrictEqual(closed, ['mbGovRpt']);
 });

@@ -1331,7 +1331,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
        ai(3단계 AI 초안, 2026-10-10)도 gov-report 를 쓴다 — 그 뒤에. -->
   <script src="js/pu-hwpx-fill.js?v=6"></script>
   <script src="js/pu-hwp-engine.js?v=21"></script>
-  <script src="js/pu-hwp-preview.js?v=1"></script>
+  <script src="js/pu-hwp-preview.js?v=2"></script>
   <script src="js/pu-gov-report.js?v=1"></script>
   <script src="js/pu-gov-report-build.js?v=3"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
@@ -8110,9 +8110,19 @@ async function grpDownload(fileKey){
   }catch(e){ return grpFillFail(e,GRP_VERB.dl); }
 }
 /* 👁 한글 미리보기 — 같은 채우기로 만든 HWPX 를 «내려받지·저장하지 않고» 미리 보여 준다(읽기 전용 창, js/pu-hwp-preview.js).
-   안내 줄(못 찾은 칸 등)은 미리보기 뒤 보고서 창 아래에 그대로 남는다. */
+   안내 줄(못 찾은 칸 등)은 미리보기 뒤 보고서 창 아래에 그대로 남는다.
+   ★ 채우는 동안(양식 읽기·JSZip·채우기)은 st.pvBusy — 👁 단추가 「미리보기 준비 중…」으로 잠기고, 또 불려도 무시한다.
+     두 번 눌러 겹치면 먼저 것이 «취소»로 끝나 멀쩡한 미리보기 위에 빨간 알림이 떴다(2026-10-11 검토).
+     창이 뜬 뒤(엔진 불러오는 중)에는 창이 화면을 덮는다 — 닫고 다시 누르면 새 요청이 옛 요청을 취소한다.
+   ★ 창을 닫았거나 새 미리보기에 밀려 취소된 것(e.cancelled)은 실패가 아니다 — 알림·안내 줄을 건드리지 않는다. */
 async function grpPreview(fileKey){
-  const r=await grpFillReport(fileKey,GRP_VERB.pv);
+  const st=_grp;
+  if(!st||!st.formKey) return {ok:false};
+  if(st.pvBusy) return {ok:false,busy:true};
+  st.pvBusy=true; grpRenderTop();
+  let r;
+  try{ r=await grpFillReport(fileKey,GRP_VERB.pv); }
+  finally{ st.pvBusy=false; if(_grp===st) grpRenderTop(); }
   if(!r.ok) return r;
   const say=grpFillSay(r.result);
   grpNote(say.length?escAttr('미리 봅니다 — '+say.join(' · ')):'');
@@ -8122,7 +8132,10 @@ async function grpPreview(fileKey){
   try{
     await PuHwpPreview.open(r.bytes,r.name);
     return {ok:true,name:r.name,result:r.result};
-  }catch(e){ return grpFillFail(e,GRP_VERB.pv); }
+  }catch(e){
+    if(e&&e.cancelled) return {ok:false,cancelled:true};
+    return grpFillFail(e,GRP_VERB.pv);
+  }
 }
 /* 창 열기 — 양식이 애매하면(상공회의소·인사노무만) 먼저 고르게 한다 */
 async function grpOpenReport(coId,typeId,forced){
@@ -8471,7 +8484,7 @@ function grpRenderTop(){
     const lb=grpFileLabel(st.formKey,k), short=k==='main'?'HWPX':lb;
     if(st.tpl[k]===null) return `<span class="grp-miss">양식 서고에 ${escAttr(lb)} 양식이 없습니다</span>`;
     return `<button type="button" class="btn btn-s grp-b" data-grp-act="dl" data-arg="${escAttr(k)}" title="${escAttr(lb)} — 양식 서고 빈 양식에 지금 화면 값을 채워 내려받습니다">⬇ ${escAttr(short)}</button>
-      <button type="button" class="btn btn-s grp-b" data-grp-act="preview" data-arg="${escAttr(k)}" title="${escAttr(lb)} — 같은 양식에 지금 화면 값을 채워 한글 그대로 미리 봅니다(내려받지·저장하지 않습니다)">👁 ${k==='main'?'한글 미리보기':escAttr(short)+' 미리보기'}</button>`;
+      <button type="button" class="btn btn-s grp-b" data-grp-act="preview" data-arg="${escAttr(k)}"${st.pvBusy?' disabled':''} title="${escAttr(lb)} — 같은 양식에 지금 화면 값을 채워 한글 그대로 미리 봅니다(내려받지·저장하지 않습니다)">👁 ${st.pvBusy?'미리보기 준비 중…':(k==='main'?'한글 미리보기':escAttr(short)+' 미리보기')}</button>`;
   }).join('');
   el.innerHTML=`<div class="grp-h1">📄 보고서 작성 — ${escAttr(st.coName||'')}</div>
     <span class="grp-pill">${escAttr(f.agency||'')} · ${escAttr(st.year)}</span>

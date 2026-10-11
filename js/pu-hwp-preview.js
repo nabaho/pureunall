@@ -7,6 +7,15 @@
      그리는 일은 공용 엔진(js/pu-hwp-engine.js)의 PureunHwp.renderPreview 만 부른다(엔진 코어는 엔진이 알아서 지연 불러오기).
    ★ 파일 이름은 사람이 정한 «데이터» — 글자(textContent)로만 넣는다.
    ★ 한 번에 창은 하나. 이미 열려 있으면 같은 창의 제목·내용만 바꾼다(옛 요청이 늦게 끝나도 새 창을 건드리지 않는다).
+   ★ 취소는 실패가 아니다 — 그리기가 끝나기 전에 창이 닫혔거나(「미리보기가 닫혀 취소되었습니다」)
+     새 open() 에 밀린(「다른 파일을 열어 이 미리보기는 취소되었습니다」) 요청은
+     err.cancelled = true · err.name = 'AbortError' 로 거절하고 onFail 은 부르지 않는다.
+     쓰는 쪽은 e.cancelled 면 조용히 넘긴다(빨간 알림·안내 줄 덮어쓰기 없음).
+     ⚠ 엔진 그리기는 멈출 수 없어서, 취소된 요청도 떼어 낸 옛 칸에 끝까지 그린 뒤 버려진다.
+   ★ Esc 는 이 창이 «먼저» 받는다 — 문서의 잡기(capture) 단계에서 받아 멈춘다(stopImmediatePropagation·preventDefault).
+     정부사업일정은 문서에 「Esc 한 번 = 창 하나」 듣개(initShortcuts)가 있어서, 그냥 두면 Esc 한 번에
+     밑의 보고서 창까지 같이 닫혀 적던 값이 날아갔다(2026-10-11 검토). 뗄 때도 같은 capture 값(true)으로 뗀다.
+     창이 닫혀 있을 때·Esc 가 아닌 키는 건드리지 않는다.
    ★ 뒤로가기: PuBack 이 있으면 층으로 올려 «닫기»를 먼저 한다(js/pu-back.js 관례). 닫기 단추엔 data-close.
    ------------------------------------------------------------------ */
 (function (global) {
@@ -15,6 +24,8 @@
   var MSG_NO_ENGINE = '한글 엔진을 불러오지 못했습니다';
   var MSG_FAIL = '미리보기를 열지 못했습니다 — ';
   var MSG_LOADING = '불러오는 중…';
+  var MSG_CLOSED = '미리보기가 닫혀 취소되었습니다';
+  var MSG_SUPERSEDED = '다른 파일을 열어 이 미리보기는 취소되었습니다';
 
   var S = null;      /* 열려 있는 창 { root, title, status, host, token, onKey, backId } */
   var seq = 0;
@@ -47,8 +58,14 @@
     root.addEventListener('click', function (e) { if (e && e.target === root) close_(); });
     doc().body.appendChild(root);
     var s = { root: root, box: box, title: title, status: status, host: null, token: 0, backId: null, onKey: null };
-    s.onKey = function (e) { if (e && (e.key === 'Escape' || e.key === 'Esc')) close_(); };
-    doc().addEventListener('keydown', s.onKey);
+    s.onKey = function (e) {
+      if (!e || (e.key !== 'Escape' && e.key !== 'Esc') || S !== s) return;
+      if (typeof e.stopImmediatePropagation === 'function') e.stopImmediatePropagation();
+      if (typeof e.stopPropagation === 'function') e.stopPropagation();
+      if (typeof e.preventDefault === 'function') e.preventDefault();
+      close_();
+    };
+    doc().addEventListener('keydown', s.onKey, true);
     if (global.PuBack && typeof global.PuBack.open === 'function') {
       try { s.backId = global.PuBack.open('한글 미리보기', close_); } catch (_) { s.backId = null; }
     }
@@ -67,7 +84,7 @@
     var s = S;
     if (!s) return false;
     S = null;
-    try { doc().removeEventListener('keydown', s.onKey); } catch (_) {}
+    try { doc().removeEventListener('keydown', s.onKey, true); } catch (_) {}
     if (s.backId != null && global.PuBack && typeof global.PuBack.close === 'function') {
       try { global.PuBack.close(s.backId); } catch (_) {}
     }
@@ -80,6 +97,14 @@
     var err = new Error(msg);
     if (opts && typeof opts.onFail === 'function') { try { opts.onFail(err); } catch (_) {} }
     return Promise.reject(err);
+  }
+
+  /* 끝나기 전에 밀려난 요청 — 실패가 아니라 «취소». 까닭에 맞는 말을 쓴다 */
+  function cancelled(s) {
+    var err = new Error(S === s ? MSG_SUPERSEDED : MSG_CLOSED);
+    err.name = 'AbortError';
+    err.cancelled = true;
+    return err;
   }
 
   function open(input, name, opts) {
@@ -95,12 +120,12 @@
     try { p = Promise.resolve(eng.renderPreview(host, input, name)); }
     catch (e) { p = Promise.reject(e); }
     return p.then(function (r) {
-      if (S !== s || s.token !== mine) throw new Error('다른 파일을 열어 이 미리보기는 취소되었습니다');
+      if (S !== s || s.token !== mine) throw cancelled(s);
       var n = r && r.pageCount != null ? r.pageCount : 0;
       s.status.textContent = n + '쪽';
       return { pageCount: n };
     }, function (e) {
-      if (S !== s || s.token !== mine) throw new Error('다른 파일을 열어 이 미리보기는 취소되었습니다');
+      if (S !== s || s.token !== mine) throw cancelled(s);
       var msg = MSG_FAIL + reasonOf(e);
       s.status.textContent = '';
       var note = make('div', 'padding:24px;color:#991b1b;text-align:center', msg);
