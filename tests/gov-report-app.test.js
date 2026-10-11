@@ -2226,6 +2226,11 @@ test('83 칸 창 — rd 항목(일터혁신 round·산업일자리 mdlog)에만 
   await mdCell(w);
   h = w.els.cellw.innerHTML;
   RD_IDS.concat(['cwCrit']).forEach((id) => assert.ok(hasId(h, id), id));
+  /* 입력이 바뀌면 «기준» 구역이 바로 따라간다 — 산업일자리 한도는 종류(방문·보고서·자료조사)에 달렸다 */
+  RD_IDS.forEach((id) => {
+    const tag = (h.match(new RegExp('<(?:input|select)[^>]*id="' + id + '"[^>]*>')) || [''])[0];
+    assert.ok(/on(?:input|change)="grRenderCrit\(\)"/.test(tag), id + ' 에 grRenderCrit 연결이 있다: ' + tag);
+  });
   assert.ok(h.includes('<option value="visit">방문</option>') && h.includes('<option value="report">보고서</option>') && h.includes('<option value="research">자료조사</option>'));
   /* rd 가 아닌 항목 — 같은 사업의 plan·kickoff·guide · 산업일자리 plan/final · 간단형 */
   const none = (html) => RD_IDS.concat(['cwCrit']).forEach((id) => assert.ok(!hasId(html, id) && !html.includes('회차 기록'), id));

@@ -491,7 +491,7 @@ function grRdHtml(c,v){
     +f('참석 인원(명)',nin('cwRdPeople',rd.people,PuGovReportTrack.RD_PEOPLE_MAX,1))
     +ck('cwRdPhoto',rd.photo===true,'시작·종료 사진 확보 ✓')+ck('cwRdSign',rd.sign===true,'서명지 확보 ✓');
   if(c.crit==='industry') h+=f('MD(0.5 단위)',nin('cwRdMd',rd.md,PuGovReportTrack.RD_MD_MAX,0.5))
-    +f('종류','<select id="cwRdKind">'+opt('','고르기',rd.kind||'')+opt('visit','방문',rd.kind||'')+opt('report','보고서',rd.kind||'')+opt('research','자료조사',rd.kind||'')+'</select>');
+    +f('종류','<select id="cwRdKind" onchange="grRenderCrit()">'+opt('','고르기',rd.kind||'')+opt('visit','방문',rd.kind||'')+opt('report','보고서',rd.kind||'')+opt('research','자료조사',rd.kind||'')+'</select>');
   return h+'<div id="cwCrit"></div>';
 }
 /* 입력칸에서 회차 기록 읽기 — 형태가 비었으면 null(그 칸은 «기록 없음»). 숫자 칸이 비면 그 키를 뺀다 · 체크는 true/false.
