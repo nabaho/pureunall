@@ -303,6 +303,18 @@ test('keysForItem — once · round · month · 이상한 id 거부 · 상한', 
   assert.deepEqual(Tr.keysForItem(null, 'plan', 3, []), []);
 });
 
+test('keysForItem — 꼬리표(:N)가 붙어 20자를 넘는 키는 만들지 않는다 · 보통 id 는 그대로', () => {
+  const long18 = 'abcdefghijklmnopqr';   // 18자 — once 키는 18자, round 키는 :1~:9 까지 20자, :10 부터 21자
+  const lp = { items: [{ id: long18, name: 'x', per: 'round', step: 'plat' }] };
+  const ks = Tr.keysForItem(lp, long18, 12, []).map((k) => k.key);
+  assert.deepEqual(ks, [1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => long18 + ':' + i), '열 번째부터는 21자라 빠진다');
+  assert.ok(ks.every((k) => k.length <= 20 && Tr.KEY_RE.test(k)));
+  const lm = { items: [{ id: long18, name: 'x', per: 'month', step: 'report' }] };
+  assert.equal(Tr.keysForItem(lm, long18, 0, Array.from({ length: 12 }, (_, i) => '2026-' + String(i + 1).padStart(2, '0'))).length, 9);
+  assert.equal(Tr.keysForItem(BIGPLAN, 'round', 12, []).length, 12, '보통 id 는 그대로');
+  assert.equal(Tr.keysForItem(BIGPLAN, 'monthly', 0, Array.from({ length: 24 }, () => '2026-03')).length, 24);
+});
+
 test('bigCells · nextStage · blockedOf — 합성 기록', () => {
   const rec = {
     guide: { st: 'done', at: 1 }, plan: { st: 'done', at: 1 },

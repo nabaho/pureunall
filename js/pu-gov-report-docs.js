@@ -10,6 +10,9 @@
      · [확인 필요] 는 지어내지 않고 딱지로 보인다(현장클리닉 운영지침 · 농촌융복합 양식 글자 · 연결·계약 못 찾음).
      · 제출 줄(step 'submit')에만 선택 필드 how('mail'|'platform')·steps(플랫폼 제출 순서 글)를 둘 수 있다(2026-10-11).
        how 가 없으면(현장클리닉 — 운영지침 확인 전) 정하지 않은 것이다. 화면이 서명·제출 메일 초안/체크 글에 쓴다.
+     · 대형 틀(2026-10-11, 설계 2-A)은 항목마다 선택 글 steps(플랫폼 입력 순서 · plat 줄)·note(증빙·기준 안내)를 둘 수 있다.
+       docsTable 은 대형이면 단계 열(cols = 항목 이름)·칸(cells)·다음 단계(next)를, trackRows 는 막힌 단계(blocked)를 돌려준다.
+       간단형 출력은 그대로다(big·next 속성이 없다). 월별 서류의 달은 monthsFor(계약 기간 → 회차 날짜).
      · 목차에는 업체 이름·담당 이름·날짜·서류 이름·상태만 — 연락처·금액·보고서 본문은 담지 않는다.
      · ③④⑤ 칸·목차 딱지·현황판 줄 기록(trackRows)은 서류 진행 기록(scal_docs, pu-gov-report-track.js)을
        «받았을 때만» 계산한다 — 못 읽었으면(규칙 게시 전·권한 없음) 지금처럼 「—」. 이 모듈은 여전히 쓰지 않는다.
@@ -35,7 +38,7 @@
   function digits(v) { return str(v).replace(/\D/g, ''); }
   function it(id, name, per, step, extra) {
     var o = { id: id, name: name, per: per, step: step };
-    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; }
+    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; if (extra.note) o.note = extra.note; }
     return o;
   }
   /* 기술보호울타리 제출 순서 — 2024 «시스템 사용 매뉴얼(전문가용)» 기준 초안. [노무사 확인] — 화면이 바뀌면 고친다.
@@ -50,11 +53,15 @@
     '접수 화면을 캡처해 두고, 이 칸의 «접수 확인»에 표시'
   ];
 
+  /* 대형 사업 플랫폼 입력 순서 글 — 정리본 기준 초안 [노무사 확인]. 로그인(공동인증서·OTP)과 저장·제출 단추는 사람이 한다 */
+  var PLAT_LOGIN = '플랫폼에 로그인 — 사람이 합니다(공동인증서·OTP 는 자동으로 다루지 않습니다)';
+  var PLAT_SUBMIT = '저장·제출 단추 — 사람이 누릅니다';
+
   var DOC_PLANS = [
     { key: 'industry-cn', words: ['산업일자리전환컨설팅충남'], kind: '대형', source: SOURCE, items: [
-      it('log', '수행일지', 'once', 'plat'),
-      it('monthly', '월별 수행실적보고서', 'month', 'report'),
-      it('result', '결과보고서', 'once', 'report'),
+      it('log', '수행일지', 'once', 'plat', { note: '컨설팅 수행일지 — 기본정보(사업명·수행기관·컨설턴트·기업)와 회차별 수행 내용' }),
+      it('monthly', '월별 수행실적보고서', 'month', 'report', { note: '달마다 한 부' }),
+      it('result', '결과보고서', 'once', 'report', { note: '컨설팅 개요 · 진단 결과·전환 과제 · 핵심 과제·KPI · 로드맵 · 기대효과 · 이행 계획 · 사후관리 방안' }),
       it('after', '사후관리 결과보고서', 'once', 'report')] },
     { key: 'cci-north', words: ['충남북부'], kind: '간단', source: SOURCE, items: [
       it('report', '결과보고서', 'once', 'report'),
@@ -85,22 +92,29 @@
       it('photo', '현장 사진', 'once', 'attach')] },
     /* 이알피 이름이 「일터상생혁신컨설팅」이다(옛 「일터혁신상생컨설팅」은 숨김·합침) — 낱말 둘 다 본다 */
     { key: 'workplace', words: ['일터혁신', '일터상생혁신'], kind: '대형', source: SOURCE, items: [
-      it('guide', '참여 안내서(서명)', 'once', 'sign'),
-      it('plan', '수행계획서', 'once', 'plat'),
-      it('round', '회차별 수행보고서+사진2장+서명지', 'round', 'plat'),
-      it('kickoff', '착수보고', 'once', 'report'),
-      it('mid', '중간보고', 'once', 'report'),
-      it('final', '최종보고', 'once', 'report'),
-      it('follow', '이행관리 등록', 'once', 'plat'),
+      it('guide', '참여 안내서(서명)', 'once', 'sign', { note: '담당자 서명 후 플랫폼에 업로드' }),
+      it('plan', '수행계획서', 'once', 'plat', { steps: [PLAT_LOGIN, '진단 결과 문제점·개선 필요사항 입력',
+        '개선과제 최대 5개와 우선순위(공식 «개선과제명» 사용) · 선택 과제 2개(특화는 3개)',
+        '과제별 수행목표·적용대상·수행내용·기대효과 · 노사참여(디자인팀 성명·부서·직급) · 연계 정부지원사업', PLAT_SUBMIT] }),
+      it('round', '회차별 수행보고서+사진2장+서명지', 'round', 'plat', { steps: [PLAT_LOGIN,
+        '회차 수행보고서 입력: 진단기간·참여인력·수행일시·회차·회의형태·참석자(성명·부서·직급)',
+        '회의안건·주요 논의사항·기타(다음 안건 등) — «○회차 디자인팀 회의» 같은 형식적 문구는 쓰지 않습니다',
+        '시작·종료 사진(타임스탬프 앱) 2장과 참석자 전원 서명지 스캔 첨부', PLAT_SUBMIT],
+        note: '회의 2시간 이상 · 기업 참여 3명 이상 · 대면 70% 이상(비대면은 ZOOM 등 공식 프로그램만 — 전화·메일은 인정 안 됨)' }),
+      it('kickoff', '착수보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
+      it('mid', '중간보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
+      it('final', '최종보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
+      it('follow', '이행관리 등록', 'once', 'plat', { steps: [PLAT_LOGIN, '이행관리 수행내용 등록', PLAT_SUBMIT] }),
       it('outcome', '이행결과표', 'once', 'report')] },
     { key: 'industry', words: ['산업일자리'], kind: '대형', source: SOURCE, items: [
-      it('kickoff', '착수보고서(PPT)', 'once', 'report'),
-      it('plan', '수행계획서', 'once', 'report'),
-      it('mdlog', 'MD별 수행일지', 'round', 'report'),
-      it('final', '최종결과보고서', 'once', 'report'),
-      it('meeting', '최종보고회', 'once', 'report'),
-      it('link', '연계지원사업 등록', 'once', 'plat'),
-      it('done', '완료보고서(요약)', 'once', 'report')] },
+      it('kickoff', '착수보고서(PPT)', 'once', 'report', { note: '표준 PPT — 사업개요·컨설팅 추진 계획·운영 체계. 업로드하면 1MD 로 인정' }),
+      it('plan', '수행계획서', 'once', 'report', { note: '운영기관 승인이 나야 수행을 시작합니다' }),
+      it('mdlog', 'MD별 수행일지', 'round', 'report', { note: '비대면은 보고서 4MD·자료조사 2MD 까지(연속 불가)' }),
+      it('final', '최종결과보고서', 'once', 'report', { note: '표준 HWP + 체크리스트: KPI 4개 이상(필수 2·선택 2) · 정부지원사업 2개 이상 연계(산업일자리전환지원금 필수) · 기업 현황 최신 연도 · 다른 보고서와 중복 금지' }),
+      it('meeting', '최종보고회', 'once', 'report', { note: '최종 MD 대면 결과보고회' }),
+      it('link', '연계지원사업 등록', 'once', 'plat', { steps: [PLAT_LOGIN, '수행일지·최종결과보고서 등록 확인',
+        '연계지원사업 등록(산업일자리전환지원금 포함 2개 이상 — 적합·부적합 사유)', PLAT_SUBMIT] }),
+      it('done', '완료보고서(요약)', 'once', 'report', { note: '운영기관·중진공 승인으로 완료' })] },
   ];
   var NONE = { key: 'none', words: [], kind: '없음', source: '', items: [] };
 
@@ -249,6 +263,12 @@
     }
     return out;
   }
+  /* 월별 서류의 달 — 계약 기간(startDate~endDate) → 없으면 회차 날짜(첫~마지막) → 없으면 [] */
+  function monthsFor(cons, pair) {
+    var s = str(cons && cons.startDate).slice(0, 10), e = str(cons && cons.endDate).slice(0, 10);
+    var p = pair || {};
+    return months(s || p.firstDate, e || p.lastDate);
+  }
   function range(n) { var a = []; for (var i = 1; i <= n; i++) a.push(i + '회차'); return a; }
 
   var DASH = { txt: '—', key: '' };
@@ -261,22 +281,36 @@
   }
   function docsTable(o) {
     o = o || {};
-    var erp = o.erp || null, plan = planFor(erp ? erp.name : ''), auto = !!AUTO[plan.key];
+    var erp = o.erp || null, plan = planFor(erp ? erp.name : ''), auto = !!AUTO[plan.key], isBig = plan.kind === '대형';
     var byCo = {};
     (o.rows || []).forEach(function (r) { if (r && r.typeId === o.typeId) byCo[r.coId + '|' + r.year] = r; });
     var lines = o.typeId ? pairs(o.input, o.typeId, o.year).map(function (p) {
       var r = byCo[p.coId + '|' + p.year] || null;
       var cons = consFor({ consultings: o.consultings, co: p.co, code: erp ? erp.code : '', typeId: o.typeId, tmap: o.tmap, biz: o.biz });
       var cells = auto ? chips(r) : null;
+      var bigRec = null, bn = 0, bms = [];
+      if (isBig) {
+        /* 대형 — 단계(항목)마다 칸. 기록을 못 받았으면(track 없음) 칩은 「—」, 다음 단계는 모른다 */
+        bigRec = o.track ? Track.recOf(o.track, p.coId, p.rid) : null;
+        bn = Math.max(+p.rounds || 0, +p.planned || 0);
+        bms = monthsFor(cons, p);
+        cells = Track.bigCells(plan, bigRec || {}, bn, bms, o.today).map(function (c) {
+          return (bigRec || !c.chip) ? c : { id: c.id, name: c.name, step: c.step, chip: { txt: DASH.txt, key: DASH.key }, st: 'none' };
+        });
+      }
       /* 기록을 받았을 때만 ③④⑤ — 틀에 그 step 이 없으면 「—」(기술보호의 ③) */
-      if (cells && o.track) {
+      if (auto && cells && o.track) {
         var rec = Track.recOf(o.track, p.coId, p.rid), n = Math.max(+p.rounds || 0, +p.planned || 0);
         TRACK_COLS.forEach(function (s, i) { cells[2 + i] = Track.cellFor(plan, rec, s, n, o.today) || DASH; });
       }
-      return { coId: p.coId, coName: p.coName, typeId: p.typeId, year: p.year, rid: p.rid, rounds: p.rounds, planned: p.planned,
+      var line = { coId: p.coId, coName: p.coName, typeId: p.typeId, year: p.year, rid: p.rid, rounds: p.rounds, planned: p.planned,
         cells: cells, due: cons ? str(cons.endDate).slice(0, 10) : '' };
+      if (isBig) line.next = bigRec ? Track.nextStage(plan, bigRec, bn, bms) : undefined;   // 간단형 줄에는 next 속성 자체가 없다
+      return line;
     }) : [];
-    return { plan: plan, auto: auto, cols: COLS.slice(), lines: lines };
+    var table = { plan: plan, auto: auto, cols: isBig ? plan.items.map(function (x) { return x.name; }) : COLS.slice(), lines: lines };
+    if (isBig) table.big = true;   // 간단형·틀 없음 출력에는 big 속성이 없다
+    return table;
   }
 
   function tocFor(o) {
@@ -303,11 +337,17 @@
       items: items };
   }
   /* 현황판 줄(buildRows)에 서류 진행 기록을 붙인다 — r.trk(③④⑤ 칸·기한·회신 날수)와 r.st.steps 의 ③④ 막대.
-     간단형 셋(AUTO)만. 기록이 없으면(못 읽음) r.trk = null, 막대 ③④ 는 끈다. 여러 번 불러도 같다 */
+     간단형 셋(AUTO)과 대형 틀(r.trk.big — 막힌 단계·다음 단계, 막대 ③④ 는 끔). 기록이 없으면(못 읽음) r.trk = null, 막대 ③④ 는 끈다. 여러 번 불러도 같다 */
   function trackRows(rows, o) {
     o = o || {};
-    var cos = {};
+    var cos = {}, pairMemo = {};
     list((o.input || {}).cos).forEach(function (c) { cos[c.id] = c; });
+    /* 현황판 줄(buildRows)에는 첫 회차 날짜가 없다 — 월별 서류의 달은 pairs(같은 조건)의 첫·마지막 회차 날짜에서 읽는다 */
+    function pairOf(r) {
+      var k = r.typeId + '|' + r.year;
+      if (!pairMemo[k]) pairMemo[k] = pairs(o.input, r.typeId, r.year);
+      return pairMemo[k].filter(function (p) { return p.coId === r.coId && p.rid === r.rid; })[0] || null;
+    }
     (rows || []).forEach(function (r) {
       if (!r) return;
       var s = (r.st && r.st.steps) || [false, false, false, false];
@@ -315,6 +355,14 @@
       if (r.st) r.st.steps = [!!s[0], !!s[1], false, false];
       if (!o.track || !r.st) return;
       var erp = erpTypeFor(r.typeId, o.biz, o.tmap), plan = planFor(erp ? erp.name : r.typeName);
+      if (plan.kind === '대형') {
+        var bcons = consFor({ consultings: o.consultings, co: cos[r.coId] || { id: r.coId, name: r.coName }, code: erp ? erp.code : '', typeId: r.typeId, tmap: o.tmap, biz: o.biz });
+        var bn = Math.max(+r.rounds || 0, +r.maxRounds || 0), bms = monthsFor(bcons, pairOf(r)), brec = Track.recOf(o.track, r.coId, r.rid);
+        r.trk = { due: bcons ? str(bcons.endDate).slice(0, 10) : '', sign: null, submit: null, waitDays: null, bar3: false, bar4: false, big: true,
+          next: Track.nextStage(plan, brec, bn, bms), blocked: Track.blockedOf(plan, brec, bn, bms) };
+        r.st.steps = [!!s[0], !!s[1], false, false];
+        return;
+      }
       if (!AUTO[plan.key]) return;
       var cons = consFor({ consultings: o.consultings, co: cos[r.coId] || { id: r.coId, name: r.coName }, code: erp ? erp.code : '',
         typeId: r.typeId, tmap: o.tmap, biz: o.biz });
@@ -341,7 +389,7 @@
 
   var api = { rowsOf: rowsOf, visibleTypes: visibleTypes, groupByAgency: groupByAgency, planFor: planFor, linkOf: linkOf,
     pairs: pairs, sidebarGroups: sidebarGroups, erpTypeFor: erpTypeFor, coKey: coKey, consCode: consCode, consFor: consFor,
-    sidName: sidName, months: months, docsTable: docsTable, tocFor: tocFor, tocText: tocText, trackRows: trackRows,
+    sidName: sidName, months: months, monthsFor: monthsFor, docsTable: docsTable, tocFor: tocFor, tocText: tocText, trackRows: trackRows,
     DOC_PLANS: DOC_PLANS, NONE: NONE, AUTO: AUTO, KIND_KO: KIND_KO, COLS: COLS,
     NO_AGENCY: NO_AGENCY, UNLINKED: UNLINKED, NO_PLAN: NO_PLAN, TRACK_COLS: TRACK_COLS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

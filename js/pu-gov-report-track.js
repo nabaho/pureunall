@@ -71,7 +71,8 @@
         out.push({ key: keyOf(x, i + 1), id: x.id, name: str(m) + ' ' + x.name, round: i + 1, month: str(m) });
       });
     }
-    return out;
+    /* 회차·달 꼬리표(:N)가 붙은 키도 규칙(20자·KEY_RE)을 넘지 않는 것만 — 긴 id 는 뒤 회차 키가 잘린다 */
+    return out.filter(function (k) { return okKey(k.key); });
   }
 
   /* 연결 하나 — 틀리면 null(그 줄은 남긴다). 이름은 자르고 날짜 꼴이 아니면 뺀다 */

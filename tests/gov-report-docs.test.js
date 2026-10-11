@@ -170,12 +170,14 @@ test('docsTable — 간단형은 ①② 를 buildRows 상태로, ③④⑤ 는 �
   assert.deepEqual(d.lines[0].cells.slice(0, 2), [{ txt: '✓', key: 'done' }, { txt: '검토완료 v2', key: 'done' }]);
 });
 
-test('docsTable — 대형·틀 없음은 체크표 없이 줄만 · 연결 없으면 줄도 없다', () => {
+test('docsTable — 대형은 ①② 자동 없이 단계 칸(기록 없으면 「—」) · 틀 없음은 줄만 · 연결 없으면 줄도 없다', () => {
   const w = D.docsTable({ erp: code('consulting-02'), typeId: 't2', input: F.input(T), rows: rows(), year: '2026',
     consultings: X.cons, tmap: X.tmap, biz: X.biz });
   assert.equal(w.plan.key, 'workplace');
   assert.equal(w.auto, false);
-  assert.deepEqual(w.lines.map((x) => [x.coName, x.cells]), [['가나상사', null]]);
+  assert.equal(w.big, true);
+  assert.deepEqual(w.lines.map((x) => [x.coName, x.cells.length, x.next]), [['가나상사', 8, undefined]], '기록을 못 받았으면 다음 단계는 모른다(undefined)');
+  assert.ok(w.lines[0].cells.every((c) => !c.chip || c.chip.txt === '—'), '기록 없이 칩을 지어내지 않는다');
   const u = D.docsTable({ erp: code('consulting-06'), typeId: '', input: F.input(T), rows: rows(), year: '2026' });
   assert.deepEqual(u.lines, []);
   assert.equal(D.docsTable({}).plan.key, 'none');
@@ -308,7 +310,10 @@ test('docsTable — 기록(track)을 주면 ③④⑤ 를 칸으로 · 안 주�
   const none = D.docsTable(o('consulting-04', 't3', undefined));
   assert.deepEqual(none.lines[0].cells.slice(2).map((c) => c.txt + '/' + c.key), ['—/', '—/', '—/'], '못 읽었으면 지금처럼');
   const big = D.docsTable(o('consulting-02', 't2', track));
-  assert.equal(big.lines[0].cells, null, '대형은 칸이 없다');
+  assert.equal(big.big, true);
+  assert.deepEqual(big.lines[0].cells.map((c) => c.id), D.planFor('일터상생혁신컨설팅').items.map((x) => x.id), '대형은 ③④⑤ 대신 단계 칸(틀 항목 순서)');
+  assert.equal(n.big, undefined, '간단형 출력에는 big 이 없다');
+  assert.ok(!('next' in n.lines[0]), '간단형 줄에는 next 가 없다');
 });
 
 test('tocFor — rec(그 업체·rid 기록)를 주면 ③④⑤ 줄 딱지 · ①② 는 그대로 · 안 주면 「—」', () => {
@@ -353,10 +358,155 @@ test('제출 방식 · 체크 글 — 충남북부·서산은 메일, 기술보�
   assert.equal(sub('clinic').how, undefined, '운영지침 확인 전 — 정하지 않는다');
   D.DOC_PLANS.forEach((p) => p.items.forEach((x) => {
     if (x.how !== undefined) assert.ok(['mail', 'platform'].includes(x.how), p.key + '.' + x.id);
-    if (x.how !== undefined || x.steps !== undefined) assert.equal(x.step, 'submit', '제출 줄에만 둔다');
-    if (x.steps !== undefined) assert.equal(x.how, 'platform', 'steps 는 플랫폼 제출 줄에만');
+    if (x.how !== undefined) assert.equal(x.step, 'submit', 'how 는 제출 줄에만 둔다');
+    /* steps: 간단형은 플랫폼 제출 줄에만, 대형(2026-10-11 설계 2-A)은 플랫폼 입력 줄(plat)에 */
+    if (x.steps !== undefined && p.kind !== '대형') { assert.equal(x.step, 'submit'); assert.equal(x.how, 'platform', 'steps 는 플랫폼 제출 줄에만'); }
+    if (x.steps !== undefined && p.kind === '대형') { assert.equal(x.step, 'plat', p.key + '.' + x.id + ' 대형 steps 는 plat 줄에'); assert.equal(x.how, undefined); }
   }));
   /* 공개 저장소 — 주소·전화·실제 이름 꼴 없음 */
   const all = JSON.stringify(D.DOC_PLANS);
   assert.ok(!/@[a-z0-9-]+\.[a-z]{2,}|\d{2,3}-\d{3,4}-\d{4}/i.test(all));
+});
+
+/* ═══ 대형 사업 단계 체크표(설계 2-A, 2026-10-11) ═══ */
+
+test('대형 항목 체크 글 — steps 는 배열·note 는 글, 주소·전화 꼴 없음, 간단형에는 없다', () => {
+  const bigs = D.DOC_PLANS.filter((p) => p.kind === '대형');
+  assert.ok(bigs.length >= 3);
+  let withText = 0;
+  bigs.forEach((p) => p.items.forEach((x) => {
+    if (x.steps !== undefined) { assert.ok(Array.isArray(x.steps) && x.steps.length >= 3 && x.steps.every((s) => typeof s === 'string' && s.trim()), p.key + '.' + x.id); withText++; }
+    if (x.note !== undefined) { assert.ok(typeof x.note === 'string' && x.note.trim(), p.key + '.' + x.id); withText++; }
+  }));
+  assert.ok(withText >= 8, '대형 항목에 체크 글·안내가 충분히 있다');
+  D.DOC_PLANS.filter((p) => p.kind !== '대형').forEach((p) => p.items.forEach((x) => {
+    assert.equal(x.note, undefined, p.key + '.' + x.id + ' 간단형에는 note 가 없다');
+  }));
+  const all = JSON.stringify(D.DOC_PLANS);
+  assert.ok(!/@[a-z0-9-]+\.[a-z]{2,}|\d{2,3}-\d{3,4}-\d{4}/i.test(all));
+  /* 글만 더했다 — id·이름·per·step·순서는 그대로 */
+  const shape = (k) => D.DOC_PLANS.find((p) => p.key === k).items.map((x) => x.id + ':' + x.name + ':' + x.per + ':' + x.step).join('|');
+  assert.equal(shape('industry-cn'), 'log:수행일지:once:plat|monthly:월별 수행실적보고서:month:report|result:결과보고서:once:report|after:사후관리 결과보고서:once:report');
+  assert.equal(shape('workplace'), 'guide:참여 안내서(서명):once:sign|plan:수행계획서:once:plat|round:회차별 수행보고서+사진2장+서명지:round:plat|kickoff:착수보고:once:report|mid:중간보고:once:report|final:최종보고:once:report|follow:이행관리 등록:once:plat|outcome:이행결과표:once:report');
+  assert.equal(shape('industry'), 'kickoff:착수보고서(PPT):once:report|plan:수행계획서:once:report|mdlog:MD별 수행일지:round:report|final:최종결과보고서:once:report|meeting:최종보고회:once:report|link:연계지원사업 등록:once:plat|done:완료보고서(요약):once:report');
+  /* 플랫폼 입력(plat) 줄에는 체크 글 — 로그인·제출은 사람이 한다고 적는다 */
+  const plan = D.DOC_PLANS.find((p) => p.key === 'workplace').items.find((x) => x.id === 'plan');
+  assert.ok(plan.steps[0].includes('사람이 합니다') && plan.steps[plan.steps.length - 1].includes('사람이 누릅니다'));
+});
+
+test('monthsFor — 계약 기간 → 회차 날짜 → 없음', () => {
+  assert.deepEqual(D.monthsFor({ startDate: '2026-03-02', endDate: '2026-05-30' }, { firstDate: '2026-01-01', lastDate: '2026-01-31' }), ['2026-03', '2026-04', '2026-05']);
+  assert.deepEqual(D.monthsFor(null, { firstDate: '2026-06-10', lastDate: '2026-07-20' }), ['2026-06', '2026-07']);
+  assert.deepEqual(D.monthsFor({ startDate: '2026-03-02' }, { firstDate: '2026-01-01', lastDate: '2026-04-20' }), ['2026-03', '2026-04'], '계약 시작만 있으면 끝은 회차 날짜로 채운다');
+  assert.deepEqual(D.monthsFor({}, {}), []);
+  assert.deepEqual(D.monthsFor(null, null), []);
+});
+
+/* 합성 자료 — 사업 이름이 대형 틀(산업일자리전환컨설팅충남 = industry-cn)에 걸리고, 업체·회차가 pairs 에 실제로 잡힌다 */
+const BIGX = (() => {
+  const biz = [{ code: 'E1', name: '산업일자리전환컨설팅충남', agency: '충남경제진흥원', sortOrder: 1 },
+    { code: 'E2', name: '인사노무컨설팅충남북부상의', agency: '충남북부상공회의소', sortOrder: 2 }];
+  const input = {
+    types: [{ id: 'tb', name: '산업일자리(충남)', rounds: 2 }, { id: 'tc', name: '인사노무(충남북부)', rounds: 2 }],
+    cos: [{ id: 'cb', name: '다라정밀', types: ['tb', 'tc'] }],
+    scheds: [{ id: 's1', coId: 'cb', typeId: 'tb', date: '2026-03-05', round: 1, isField: true },
+      { id: 's2', coId: 'cb', typeId: 'tb', date: '2026-04-09', round: 2, isField: true },
+      { id: 's3', coId: 'cb', typeId: 'tc', date: '2026-05-05', round: 1, isField: true },
+      { id: 's4', coId: 'cb', typeId: 'tc', date: '2026-06-09', round: 2, isField: true }],
+    staff: [],
+  };
+  return { biz, input, tmap: { E1: 'tb', E2: 'tc' } };
+})();
+const bigErp = () => D.erpTypeFor('tb', BIGX.biz.slice(0, 1), BIGX.tmap);
+const bigTrack = (items, rid) => Tr.normalize({ cb: { [rid || 'tb_2026']: { items } } });
+
+test('대형 합성 입력이 실제로 연결된다(검사가 조용히 건너뛰지 않게)', () => {
+  assert.equal(D.pairs(BIGX.input, 'tb', '2026').length, 1);
+  assert.equal(D.pairs(BIGX.input, 'tb', '2026')[0].rid, 'tb_2026');
+  assert.equal(bigErp().code, 'E1');
+  assert.equal(D.planFor(bigErp().name).key, 'industry-cn');
+  assert.equal(D.pairs(BIGX.input, 'tc', '2026')[0].rid, 'tc_2026');
+  assert.equal(D.erpTypeFor('tc', BIGX.biz, BIGX.tmap).code, 'E2');
+  assert.equal(D.planFor(BIGX.biz[1].name).key, 'cci-north');
+});
+
+test('docsTable — 대형 틀이면 단계 열·칩·다음 단계, 간단형은 big 없이 그대로', () => {
+  const o = (extra) => Object.assign({ erp: bigErp(), typeId: 'tb', input: BIGX.input, rows: [], year: '2026', consultings: [], tmap: BIGX.tmap, biz: BIGX.biz, today: '2026-10-11' }, extra);
+  const t = D.docsTable(o({ track: bigTrack({ log: { st: 'done', at: 1 } }) }));
+  assert.equal(t.lines.length, 1, '합성 자료가 줄로 이어진다');
+  assert.equal(t.big, true);
+  assert.equal(t.auto, false);
+  assert.deepEqual(t.cols, ['수행일지', '월별 수행실적보고서', '결과보고서', '사후관리 결과보고서']);
+  const line = t.lines[0];
+  assert.equal(line.coName, '다라정밀');
+  assert.equal(line.cells.length, 4);
+  assert.deepEqual(line.cells.map((c) => c.id), ['log', 'monthly', 'result', 'after']);
+  assert.deepEqual(line.cells.map((c) => c.step), ['plat', 'report', 'report', 'report']);
+  assert.equal(line.cells[0].chip.key, 'done');
+  assert.equal(line.cells[0].chip.txt, '● 등록함');
+  assert.equal(line.cells[1].chip.txt, '○ 없음 0/2', '월별 — 회차 날짜 3~4월 두 달(계약이 없어서)');
+  assert.equal(line.next.id, 'monthly', '첫 미완 단계(수행일지는 완료)');
+  assert.equal(line.rid, 'tb_2026');
+  /* 월별: 계약 기간이 있으면 그 달들 */
+  const cons = [{ id: 'k', companyName: '다라정밀', typeCodes: { consulting: 'E1' }, programName: '산업일자리전환컨설팅충남', startDate: '2026-03-01', endDate: '2026-06-30' }];
+  const c = D.docsTable(o({ consultings: cons, track: bigTrack({ log: { st: 'done', at: 1 }, 'monthly:1': { st: 'done', at: 1 } }) }));
+  assert.equal(c.lines[0].due, '2026-06-30');
+  assert.equal(c.lines[0].cells[1].chip.txt, '◐ 작성 중 1/4');
+  assert.equal(c.lines[0].next.id, 'monthly', '달 하나만 끝났으면 아직 미완');
+  /* 전부 끝 → next null */
+  const all = bigTrack({ log: { st: 'done', at: 1 }, 'monthly:1': { st: 'done', at: 1 }, 'monthly:2': { st: 'na', at: 1 }, result: { st: 'done', at: 1 }, after: { st: 'na', at: 1 } });
+  assert.equal(D.docsTable(o({ track: all })).lines[0].next, null);
+  /* 기록을 못 받았으면 칩은 「—」·다음 단계는 모른다 */
+  const nt = D.docsTable(o({ track: undefined })).lines[0];
+  assert.deepEqual(nt.cells.map((x) => x.chip), [{ txt: '—', key: '' }, { txt: '—', key: '' }, { txt: '—', key: '' }, { txt: '—', key: '' }]);
+  assert.equal(nt.next, undefined);
+  /* 간단형 — 같은 합성 입력에 간단형 사업 이름 */
+  const simple = D.docsTable(o({ erp: D.erpTypeFor('tc', BIGX.biz, BIGX.tmap), typeId: 'tc' }));
+  assert.equal(simple.lines.length, 1);
+  assert.equal(simple.plan.key, 'cci-north');
+  assert.equal(simple.big, undefined, '간단형 출력에는 big 이 없다');
+  assert.ok(!('big' in simple));
+  assert.deepEqual(simple.cols, D.COLS);
+  assert.deepEqual(Object.keys(simple.lines[0]), ['coId', 'coName', 'typeId', 'year', 'rid', 'rounds', 'planned', 'cells', 'due'], '간단형 줄에는 next 가 없다');
+  assert.deepEqual(Object.keys(simple), ['plan', 'auto', 'cols', 'lines']);
+});
+
+test('trackRows — 대형 틀 줄에 막힌 단계·다음 단계가 실리고 간단형 줄은 그대로', () => {
+  const mk = (typeName, tid) => [{ coId: 'cb', typeId: tid || 'tb', typeName, year: '2026', rid: (tid || 'tb') + '_2026', rounds: 2, maxRounds: 0, coName: '다라정밀', st: { steps: [true, true, true, true] } }];
+  const base = { input: BIGX.input, biz: BIGX.biz, tmap: BIGX.tmap, consultings: [], today: '2026-10-11' };
+  const rows = mk('산업일자리전환컨설팅충남');
+  const track = bigTrack({ log: { st: 'blocked', note: '메모', at: 1 }, 'monthly:2': { st: 'blocked', note: '', at: 1 } });
+  const ret = D.trackRows(rows, Object.assign({ track }, base));
+  assert.equal(ret, rows);
+  const r = rows[0];
+  assert.ok(r.trk, '대형 틀 줄에 기록이 실린다');
+  assert.equal(r.trk.big, true);
+  assert.deepEqual(r.st.steps, [true, true, false, false], '③④ 막대는 대형에서 끈다');
+  assert.equal(r.trk.sign, null);
+  assert.equal(r.trk.submit, null);
+  assert.equal(r.trk.waitDays, null);
+  assert.equal(r.trk.bar3, false);
+  assert.equal(r.trk.bar4, false);
+  assert.equal(r.trk.due, '', '계약이 없으면 기한 없음');
+  assert.deepEqual(r.trk.blocked, [{ id: 'log', key: 'log', name: '수행일지', note: '메모' },
+    { id: 'monthly', key: 'monthly:2', name: '2026-04 월별 수행실적보고서', note: '' }], '달은 회차 날짜(3~4월)에서 — 현황판 줄에 날짜가 없어 pairs 에서 읽는다');
+  assert.equal(r.trk.next.id, 'log');
+  /* 계약 기간이 있으면 기한·달 수가 그것을 따른다 */
+  const cons = [{ id: 'k', companyName: '다라정밀', typeCodes: { consulting: 'E1' }, startDate: '2026-03-01', endDate: '2026-06-30' }];
+  const rc = mk('산업일자리전환컨설팅충남');
+  D.trackRows(rc, Object.assign({}, base, { consultings: cons, track: bigTrack({ 'monthly:4': { st: 'blocked', note: 'x', at: 1 } }) }));
+  assert.equal(rc[0].trk.due, '2026-06-30');
+  assert.deepEqual(rc[0].trk.blocked.map((b) => b.name), ['2026-06 월별 수행실적보고서']);
+  /* 여러 번 불러도 같고, 기록이 없으면 null·막대는 ①② 만 */
+  D.trackRows(rows, Object.assign({ track }, base));
+  assert.deepEqual(r.trk.blocked.length, 2);
+  D.trackRows(rows, { track: null });
+  assert.equal(r.trk, null);
+  assert.deepEqual(r.st.steps, [true, true, false, false]);
+  /* 간단형 줄 — 기존과 같은 모양(big·next·blocked 가 없다) */
+  const sr = mk('인사노무컨설팅충남북부상의', 'tc');
+  D.trackRows(sr, Object.assign({ track: bigTrack({ sign: { st: 'done', at: 1 } }, 'tc_2026') }, base));
+  assert.ok(sr[0].trk && !('big' in sr[0].trk) && !('next' in sr[0].trk) && !('blocked' in sr[0].trk));
+  assert.equal(sr[0].trk.sign.st, 'done');
+  assert.deepEqual(sr[0].st.steps, [true, true, true, false]);
 });
