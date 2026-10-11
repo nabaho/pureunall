@@ -163,8 +163,8 @@
          컨설팅(data/consultings, 목차 머리말만)·ERP 연결(scal_erpTypeMap)을 빌려 읽는다. 쓰지 않는다(주인은 erp·consult).
        ★ 서류 진행 기록(2026-10-10, 설계 2026-10-10-gov-report-track-design.md) — 이 앱이 처음으로 «쓴다»:
          scal_docs/{업체}/{rid}/items/{줄 키}(③서명본·④별첨·⑤제출의 상태·날짜·메모, 줄 하나씩 .set). 주인은 이 앱이다.
-         이름 표 GR_TRACK_NODES 로 부른다. 규칙 scal_docs(scripts/make-firebase-rules.js)는 대표 승인 뒤 게시 —
-         게시 전에는 읽기·쓰기가 거절되고 화면은 읽기 전용으로 돈다.
+         이름 표 GR_TRACK_NODES 로 부른다. 규칙 scal_docs(scripts/make-firebase-rules.js)는 2026-10-11 부터 게시되어 돈다 —
+         게시를 기다리는 것은 줄 안의 link 가지뿐(게시 전에는 link 가 든 저장만 거절된다).
        ★ 받은 서류함(2026-10-11, 설계 2026-10-11-gov-report-inbox-design.md) — 칸 창 「📥 받은 서류 후보」가 메일함 거울
          (mailbox/folders · mailbox/msgs 머리글, 주인은 푸른 메일 mail)과 업체관리(data/companies, 주소 세 칸)를 빌려 읽는다
          (이름 표 GR_INBOX_NODES, 칸 창을 처음 열 때 한 번). 첨부는 서버 함수로 한 건씩 받아 화면에서만 보고 버린다.

@@ -9,7 +9,8 @@
        한 주소가 여러 업체에 적혀 있으면 업체관리에 먼저 적힌 쪽 것(functions/mail-owner.js 와 같은 규칙). 우리 주소(@pureun.kr)는 안 본다.
      · 개인 자료(PuGovReportBuild.PRIV_RE — 복제하지 않고 가져다 쓴다)는 목록에만: 딱지를 달고 연결·열어 보기를 막는다(화면 몫).
      · 연결 열쇠: 일반 폴더 'i:<폴더 slug>:<uid>' · 지난 메일 'o:<popKey>' — 80자 이내(규칙·기록 모듈 LINK_KEY_MAX 와 같다).
-       거울에 조각 번호가 없어 첨부는 «이름»으로 집는다(fetchAtt: 목록 peek → 같은 이름의 i·part 로 받기).
+       거울에 조각 번호가 없어 첨부는 «이름»으로 집는다(findAtt: 목록 peek → 같은 이름 · readAtt: 그 i·part 로 받기).
+       거울 이름은 60자로 잘려 있을 수 있다 — 똑같은 이름이 없으면 서버 이름을 거울 꼴로 줄여 맞추고, 형식은 서버 이름으로 정한다.
      · 첨부 받기는 «부르는 함수(call)»를 받아서만 한다 — 화면이 js/rules-v2/mail-orig.js 의 makeCall 로 만든다.
        받은 것(b64)은 돌려주기만 하고 어디에도 담지 않는다. 20MB(서버 ATT_MAX) 넘으면 받지 않는다.
    ⚠ 저장소는 공개다 — 검사는 합성 자료만 쓴다. */
@@ -41,8 +42,16 @@
     LOGIN: '로그인을 확인해 주세요',
     GONE: '메일에서 그 첨부를 찾지 못했습니다(지워졌을 수 있습니다)',
     TOO_BIG: '20MB 가 넘어 앱에서 열 수 없습니다 — 메일함에서 받아 주세요',
+    AMBIG: '이름 앞부분이 같은 첨부가 여럿이라 어느 것인지 알 수 없습니다 — 메일함에서 받아 주세요',
+    PRIV_OPEN: '첨부 이름에 개인 자료로 보이는 말이 있어 앱에서 열지 않습니다 — 메일함에서 확인해 주세요',
     FAIL: '열지 못했습니다 — '
   };
+  /* 거울(functions/mail-box.js attList·attNames)이 첨부 이름을 줄여 담는 꼴 — 탭·줄바꿈을 빈칸으로, 앞뒤 빈칸을 떼고 80자 → 다시 떼고 60자.
+     서버(functions/mail-sync.js pickParts)는 온 이름을 준다. 60자로 잘린 이름은 이 꼴로 서버 이름과 맞춘다(findAtt) */
+  var NAME_CUT = 60;
+  function mirrorName(n) { return str(String(n == null ? '' : n).replace(/[\r\n\t]+/g, ' ').trim().slice(0, 80).trim().slice(0, NAME_CUT)); }
+  /* 거울 이름이 잘렸을 수 있다 — 확장자가 잘려 나갔을 수 있으니 형식을 이 이름으로 판단하지 않는다(서버 이름을 받은 뒤에 정한다) */
+  function mayBeCut(name) { return str(name).length >= NAME_CUT; }
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function obj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -165,7 +174,7 @@
       if (!hit) return;
       out.push({ slug: m.slug, uid: m.uid, out: m.out, who: m.who, s: m.s, d: m.d, day: m.day, a: m.a,
         key: linkKey.make({ slug: m.slug, uid: m.uid }), priv: privOf(m), tech: !!o.tech,
-        atts: m.an.map(function (n) { return { name: n, kind: kindOf(n) }; }) });
+        atts: m.an.map(function (n) { var a = { name: n, kind: kindOf(n) }; if (mayBeCut(n)) a.cut = true; return a; }) });
     });
     out.sort(function (a, b) { return (b.d - a.d) || (a.key < b.key ? -1 : (a.key > b.key ? 1 : 0)); });
     return { list: out.slice(0, MAX), total: out.length, more: out.length > MAX, noAddr: false };
@@ -187,38 +196,67 @@
   }
 
   /* ── 열기 ── */
-  function fail(status, msg) { var e = new Error(msg || ''); e.status = status; return e; }
+  /* code 가 있는 오류는 이 모듈이 낸 것(gone·cant·ambig·priv) — 서버 글을 보여 주지 않고 정한 문구로 */
+  function fail(status, msg, code) { var e = new Error(msg || ''); e.status = status; e.code = code || ''; return e; }
+  var CODE_MSG = { gone: 'GONE', cant: 'CANT', ambig: 'AMBIG', priv: 'PRIV_OPEN' };
+  var DEFAULT_REFUSAL = '서버가 거절했습니다';   // js/rules-v2/mail-orig.js makeCall 이 서버 글이 없을 때 다는 말
   function errText(e) {
-    var st = Number(e && e.status) || 0, nm = str(e && e.name), msg = str(e && e.message);
+    var st = Number(e && e.status) || 0, nm = str(e && e.name), msg = str(e && e.message), code = str(e && e.code);
+    if (has(CODE_MSG, code)) return MSG[CODE_MSG[code]];
     if (nm === 'TimeoutError' || st === 408 || st === 503 || st === 504 || /Failed to fetch|NetworkError|network/i.test(msg)) return MSG.NO_REPLY;
     if (st === 401 || st === 403) return MSG.LOGIN;
-    if (st === 404) return MSG.GONE;
+    /* 404 — 서버가 까닭을 적어 보냈으면 그 글(예: 폴더의 최근 400통 밖 메일 · functions/mail-sync.js below). 화면이 이스케이프한다 */
+    if (st === 404) return (msg && msg !== DEFAULT_REFUSAL) ? msg.slice(0, 200) : MSG.GONE;
     if (st === 413) return MSG.TOO_BIG;
     return MSG.FAIL + (msg || '알 수 없는 오류');
   }
-  /* 첨부 하나 — 목록(peek: 읽음 표시를 건드리지 않는다)에서 같은 이름을 찾아 그 번호·조각 이름으로 받는다.
+  /* 첨부 찾기 — 목록(peek: 읽음 표시를 건드리지 않는다)에서 이름으로. 바이트는 받지 않는다.
+     ① 이름이 똑같은 것 ② 없으면 서버 이름을 거울 꼴(mirrorName)로 줄여 같은 것 — 60자로 잘린 거울 이름.
+        그런 것이 이름이 다른 둘 이상이면 어느 것인지 모르므로 거절한다(엉뚱한 파일을 열지 않는다).
+     돌려주는 name 은 «서버의 온 이름» — 형식(kindOf)은 이 이름으로 정한다. 온 이름에 개인 자료 말(PRIV_RE)이 있으면 거절.
      ⚠ readMailMessage 는 본문도 함께 돌려준다 — 여기서 버린다(돌려주지 않는다). */
-  async function fetchAtt(o) {
+  async function findAtt(o) {
     o = o || {};
     var ref = o.ref, call = o.call, name = str(o.name);
-    if (!ref || !name || typeof call !== 'function') throw fail(404, '그 첨부가 없습니다');
-    var imap = ref.kind === 'imap';
-    var head = imap ? await call('readMailMessage', { slug: ref.slug, uid: ref.uid, peek: true })
-                    : await call('readOldMail', { key: ref.key });
-    var atts = (head && Array.isArray(head.atts)) ? head.atts : [], a = null, idx = -1;
-    for (var i = 0; i < atts.length; i++) {
-      if (atts[i] && atts[i].name === name) { a = atts[i]; idx = a.i == null ? i : a.i; break; }
+    if (!ref || !name || typeof call !== 'function') throw fail(404, '그 첨부가 없습니다', 'gone');
+    var head = ref.kind === 'imap' ? await call('readMailMessage', { slug: ref.slug, uid: ref.uid, peek: true })
+                                   : await call('readOldMail', { key: ref.key });
+    var atts = ((head && Array.isArray(head.atts)) ? head.atts : []).map(function (a, i) {
+      return (a && typeof a === 'object') ? { a: a, idx: a.i == null ? i : a.i, name: String(a.name == null ? '' : a.name) } : null;
+    }).filter(Boolean);
+    var hit = atts.filter(function (x) { return x.name === name; })[0] || null;
+    if (!hit) {
+      var near = atts.filter(function (x) { return mirrorName(x.name) === name; });
+      var names = near.map(function (x) { return x.name; }).filter(function (n, i, all) { return all.indexOf(n) === i; });
+      if (names.length > 1) throw fail(409, '이름 앞부분이 같은 첨부가 여럿입니다', 'ambig');
+      hit = near[0] || null;
     }
-    if (!a) throw fail(404, '그 첨부가 없습니다');
-    if (Number(a.size || 0) > ATT_MAX) throw fail(413, '너무 큽니다');
-    var got = imap ? await call('readMailAttachment', { slug: ref.slug, uid: ref.uid, index: idx, part: String(a.part || '') })
-                   : await call('readOldMail', { key: ref.key, index: idx });
-    if (!got || !got.b64) throw fail(404, '그 첨부가 없습니다');
-    return { name: name, b64: got.b64 };
+    if (!hit) throw fail(404, '그 첨부가 없습니다', 'gone');
+    if (PRIV_RE.test(hit.name)) throw fail(403, '개인 자료', 'priv');
+    if (Number(hit.a.size || 0) > ATT_MAX) throw fail(413, '너무 큽니다');
+    return { name: hit.name, idx: hit.idx, part: String(hit.a.part || ''), size: Number(hit.a.size || 0) };
+  }
+  /* 찾은 첨부 하나의 바이트 — 받은 것(b64)은 돌려주기만 한다 */
+  async function readAtt(o) {
+    o = o || {};
+    var ref = o.ref, call = o.call, f = o.att;
+    if (!ref || !f || typeof call !== 'function') throw fail(404, '그 첨부가 없습니다', 'gone');
+    var got = ref.kind === 'imap' ? await call('readMailAttachment', { slug: ref.slug, uid: ref.uid, index: f.idx, part: f.part })
+                                  : await call('readOldMail', { key: ref.key, index: f.idx });
+    if (!got || !got.b64) throw fail(404, '그 첨부가 없습니다', 'gone');
+    return { name: f.name, b64: got.b64 };
+  }
+  /* 찾기 + 받기 한 번에 — 형식을 서버 이름으로 정하고, 열 수 없는 형식이면 바이트를 받지 않는다 */
+  async function fetchAtt(o) {
+    o = o || {};
+    var f = await findAtt(o);
+    if (!kindOf(f.name)) throw fail(415, '열 수 없는 형식', 'cant');
+    return readAtt({ ref: o.ref, call: o.call, att: f });
   }
 
   var api = { windowOf: windowOf, addrsFor: addrsFor, boxesOf: boxesOf, mailRows: mailRows, candidates: candidates, badges: badges,
-    kindOf: kindOf, imgType: imgType, linkKey: linkKey, linkFrom: linkFrom, errText: errText, fetchAtt: fetchAtt,
+    kindOf: kindOf, imgType: imgType, linkKey: linkKey, linkFrom: linkFrom, errText: errText,
+    findAtt: findAtt, readAtt: readAtt, fetchAtt: fetchAtt, mirrorName: mirrorName, mayBeCut: mayBeCut, NAME_CUT: NAME_CUT,
     MAX: MAX, KEY_MAX: KEY_MAX, ATT_MAX: ATT_MAX, BEFORE: BEFORE, AFTER: AFTER, SHEET_ROWS: SHEET_ROWS,
     BOX_KINDS: BOX_KINDS, PRIV_RE: PRIV_RE, MSG: MSG };
   if (isNode) module.exports = api;

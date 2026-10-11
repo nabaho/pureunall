@@ -699,7 +699,8 @@ rules.scal_rptFormsIndex = { '.read': LOGIN, '.write': ADMIN };
    ★ 줄 모양은 화면 모듈(js/pu-gov-report-track.js)과 같은 값 — 상태 다섯 · 방식 넷 · 메모 200자 · 이름 40자 · 키 꼴
      (tests/gov-report-rules.test.js 가 둘을 맞춰 본다). rid 아래에는 items 말고 아무것도 못 쓴다.
    ★ 2026-10-11 — 줄에 선택 칸 link(받은 서류 연결) 하나를 더했다(아래 link 가지). 게시 대기.
-   ⚠ 게시는 대표 승인 뒤에만(scripts/rules-deploy.js). 게시 전에는 읽기·쓰기가 거절되고 화면은 읽기 전용으로 돈다. */
+   ⚠ scal_docs 자체는 2026-10-11 부터 게시되어 돈다. 게시를 기다리는 것은 link 가지뿐 — 게시 전에는 link 가 든 저장만 거절된다.
+     게시는 대표 승인 뒤에만(scripts/rules-deploy.js). */
 const SCAL_DOCS_DAY = "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)";
 rules.scal_docs = {
   '.read': LOGIN,

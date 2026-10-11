@@ -207,3 +207,76 @@ test('fetchAtt — 이름이 없으면 404(받기는 안 부름) · 20MB 넘으�
   const empty = fakeCall([{ i: 0, part: '2', name: 'a.pdf', size: 1 }], { noB64: true });
   await assert.rejects(I.fetchAtt({ call: empty.call, ref, name: 'a.pdf' }), (e) => e.status === 404);
 });
+
+/* ── 최종 검토 고침 (2026-10-11) ── 거울 이름은 60자로 잘린다(functions/mail-box.js attNames) · 서버는 온 이름(pickParts) */
+const STEM = '가'.repeat(66);
+const LONG_PDF = STEM + '.pdf', LONG_HWP = STEM + '.hwpx';   // 70·71자 — 앞 60자가 같다
+const REF = { kind: 'imap', slug: 'INBOX-0a1b2c3d', uid: '101' };
+
+test('mirrorName · mayBeCut — 거울 꼴(탭·줄바꿈 → 빈칸, 앞뒤 빈칸 떼고 60자) · 60자 이름은 잘렸을 수 있다', () => {
+  assert.equal(I.NAME_CUT, 60);
+  const cut = I.mirrorName(LONG_PDF);
+  assert.equal(cut, '가'.repeat(60));
+  assert.equal(I.kindOf(cut), '', '잘린 이름에는 확장자가 없다');
+  assert.equal(I.mirrorName('  서명본\t최종\r\n.pdf '), '서명본 최종 .pdf');
+  assert.equal(I.mirrorName('a.pdf'), 'a.pdf');
+  assert.equal(I.mayBeCut(cut), true);
+  assert.equal(I.mayBeCut('a.pdf'), false);
+  const r = I.candidates([{ slug: 'B', uid: '1', out: false, from: 'dara@example.com', to: [], who: '', s: '긴 이름', d: 1,
+    day: '2026-09-01', a: 2, an: [cut, 'a.pdf'] }], { addrs: DARA, win: WIN });
+  assert.deepEqual(r.list[0].atts, [{ name: cut, kind: '', cut: true }, { name: 'a.pdf', kind: 'pdf' }], '잘린 이름은 cut 표시(형식을 아직 모른다)');
+});
+
+test('긴 이름 — 거울의 60자 이름으로 서버의 70자 이름을 찾아 받는다 · 돌려주는 이름은 서버의 온 이름', async () => {
+  const f = fakeCall([{ i: 0, part: '2', name: '확인서.pdf', size: 10 }, { i: 1, part: '3', name: LONG_PDF, size: 10 }]);
+  const found = await I.findAtt({ call: f.call, ref: REF, name: I.mirrorName(LONG_PDF) });
+  assert.deepEqual(found, { name: LONG_PDF, idx: 1, part: '3', size: 10 });
+  assert.equal(I.kindOf(found.name), 'pdf', '형식은 온 이름으로 정한다');
+  assert.equal(f.calls.length, 1, '찾기는 목록만 부른다(바이트 안 받음)');
+  const g = fakeCall([{ i: 0, part: '2', name: '확인서.pdf', size: 10 }, { i: 1, part: '3', name: LONG_PDF, size: 10 }]);
+  const got = await I.fetchAtt({ call: g.call, ref: REF, name: I.mirrorName(LONG_PDF) });
+  assert.deepEqual(got, { name: LONG_PDF, b64: 'UEsDBA==' });
+  assert.deepEqual(g.calls[1], ['readMailAttachment', { slug: 'INBOX-0a1b2c3d', uid: '101', index: 1, part: '3' }]);
+  const tab = fakeCall([{ i: 0, part: '2', name: '서명본\t최종.pdf', size: 10 }]);
+  assert.equal((await I.findAtt({ call: tab.call, ref: REF, name: '서명본 최종.pdf' })).name, '서명본\t최종.pdf', '탭을 빈칸으로 바꾼 거울 이름도 맞춘다');
+});
+
+test('긴 이름 — 똑같은 이름이 먼저 · 앞 60자가 같은 것이 둘이면 잘린 이름으로는 고르지 않고 거절(엉뚱한 파일 금지)', async () => {
+  const atts = [{ i: 0, part: '2', name: LONG_HWP, size: 10 }, { i: 1, part: '3', name: LONG_PDF, size: 10 }];
+  const ex = fakeCall(atts);
+  assert.deepEqual(await I.findAtt({ call: ex.call, ref: REF, name: LONG_PDF }), { name: LONG_PDF, idx: 1, part: '3', size: 10 },
+    '온 이름을 알면 그 이름으로');
+  const amb = fakeCall(atts);
+  await assert.rejects(I.fetchAtt({ call: amb.call, ref: REF, name: I.mirrorName(LONG_PDF) }), (e) => e.code === 'ambig');
+  assert.equal(amb.calls.length, 1, '바이트를 받지 않는다');
+  assert.equal(I.errText(Object.assign(new Error('x'), { code: 'ambig', status: 409 })), I.MSG.AMBIG);
+  assert.match(I.MSG.AMBIG, /여럿/);
+  const dup = fakeCall([{ i: 0, part: '2', name: LONG_PDF, size: 10 }, { i: 1, part: '3', name: LONG_PDF, size: 10 }]);
+  assert.equal((await I.findAtt({ call: dup.call, ref: REF, name: I.mirrorName(LONG_PDF) })).idx, 0, '이름까지 같은 둘은 똑같은 이름 규칙처럼 첫 것');
+});
+
+test('긴 이름 — 개인 자료 말이 60자 뒤에 있으면(거울 딱지는 못 봄) 온 이름으로 다시 보고 받지 않는다', async () => {
+  const name = '가'.repeat(62) + ' 9월 급여대장.xlsx';
+  const cut = I.mirrorName(name);
+  assert.ok(!I.PRIV_RE.test(cut), '거울 이름에는 그 말이 없다');
+  const f = fakeCall([{ i: 0, part: '2', name, size: 10 }]);
+  await assert.rejects(I.fetchAtt({ call: f.call, ref: REF, name: cut }), (e) => e.code === 'priv');
+  assert.equal(f.calls.length, 1, '바이트를 받지 않는다');
+  assert.equal(I.errText(Object.assign(new Error(''), { code: 'priv', status: 403 })), I.MSG.PRIV_OPEN);
+});
+
+test('긴 이름 — 온 이름도 열 수 없는 형식이면 받지 않는다(cant)', async () => {
+  const f = fakeCall([{ i: 0, part: '2', name: STEM + '.zip', size: 10 }]);
+  await assert.rejects(I.fetchAtt({ call: f.call, ref: REF, name: I.mirrorName(STEM + '.zip') }), (e) => e.code === 'cant');
+  assert.equal(f.calls.length, 1);
+  assert.equal(I.errText(Object.assign(new Error(''), { code: 'cant' })), I.MSG.CANT);
+});
+
+test('errText — 404 에 서버가 적어 보낸 까닭이 있으면 그 글(최근 400통 밖 등) · 없으면 「지워졌을 수 있습니다」 · 모듈이 낸 없음은 GONE', () => {
+  const below = '메일 서버가 이 칸에서는 최근 400통만 열어 줍니다 — 이 메일은 그 밖입니다';
+  assert.equal(I.errText(Object.assign(new Error(below), { status: 404 })), below);
+  assert.equal(I.errText(Object.assign(new Error('서버가 거절했습니다'), { status: 404 })), I.MSG.GONE, 'makeCall 기본 문구는 까닭이 아니다');
+  assert.equal(I.errText(Object.assign(new Error(''), { status: 404 })), I.MSG.GONE);
+  assert.equal(I.errText(Object.assign(new Error('그 첨부가 없습니다'), { status: 404, code: 'gone' })), I.MSG.GONE);
+  assert.equal(I.errText(Object.assign(new Error('가'.repeat(500)), { status: 404 })).length, 200, '너무 긴 글은 자른다');
+});
