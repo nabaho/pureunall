@@ -771,6 +771,14 @@
   .tgscroll{flex:1;min-height:0;overflow-y:auto}
   .tgtime{position:relative;font-size:10px;color:var(--gsub);min-width:0}
   body.mob .tgrid.wide .tgtime{font-size:12px}
+  /* ★ 폰 주·3일·일 보기 — 구글 앱 캡처: 바깥 «면»(어두운 #3a3a3c / 밝은 #f0f4f9) 위에 시간마다 둥근 칸(#171719 / 흰). 밝은 모드 값은 캡처가 없어 구글 M3 기본값을 썼다(확인 필요) */
+  :root{--gsurf:#f0f4f9;--gslot:#ffffff}
+  :root[data-theme="dark"]{--gsurf:#3a3a3c;--gslot:#171719}
+  body.mob .tgrid.wide,body.mob.gv #app.fit,body.mob.gv .mhead{background:var(--gsurf)}
+  body.mob .tgrid.wide .tghead,body.mob .tgrid.wide .tgallday{border:none}
+  body.mob .tgrid.wide .tgh,body.mob .tgrid.wide .tga,body.mob .tgrid.wide .tgcol{border-left:none;background-image:none}
+  body.mob .tgrid.wide .tgcol{padding:0}
+  .hs{position:absolute;left:4px;right:4px;margin-top:1.5px;border-radius:12px;background:var(--gslot);pointer-events:none}
   .tgbody .tgtime span{position:absolute;right:6px;transform:translateY(-50%);white-space:nowrap}
   .tgcol{position:relative;border-left:1px solid var(--gline);min-width:0;
     background-image:linear-gradient(to bottom,var(--gline) 1px,transparent 1px);background-size:100% var(--hh,48px)}
@@ -2924,7 +2932,7 @@ function 격자Html(days, eumOnly){
   var 오늘 = todayYMD(), n = days.length;
   var 열 = days.map(function(ds){ return 격자일정(ds, eumOnly); });
   /* 폰 일·3일 보기는 시간 글자 칸을 넓힌다 — 구글 폰 앱 일 보기 캡처: 칸 폭 ≈73px · 글자 ≈12.5px (주 보기는 7열이라 그대로) */
-  var 눈금폭 = (typeof 폰 === "function" && 폰() && n <= 3) ? "72px" : "var(--tgw,48px)";
+  var 눈금폭 = (typeof 폰 === "function" && 폰()) ? "72px" : "var(--tgw,48px)";
   var 칸틀 = 'grid-template-columns:' + 눈금폭 + ' repeat(' + n + ',minmax(0,1fr))';
   var 배치 = 줄배치(days, 열.map(function(c){ return c.종일; }), n === 1 ? 6 : 3, 7);
   var 머리 = days.map(function(ds){
@@ -2944,6 +2952,8 @@ function 격자Html(days, eumOnly){
   var 지금 = new Date(), 지금분 = 지금.getHours() * 60 + 지금.getMinutes();
   var 몸 = days.map(function(ds, i){
     var 블록 = 겹침배치(열[i].시간.slice()).map(시간블록Html).join("");
+    /* 폰 — 한 시간마다 «둥근 칸»(구글 앱 주·3일·일 보기 캡처 2026-10-11). 바깥 판은 연한 면, 칸은 그 위의 어두운(밝은 모드는 흰) 둥근 네모 */
+    if(눈금폭 === "72px"){ var 칸들 = ""; for(var hh = 0; hh < 24; hh++) 칸들 += '<i class="hs" style="top:' + (hh * 격자높이) + 'px;height:' + (격자높이 - 3) + 'px"></i>'; 블록 = 칸들 + 블록; }
     return '<div class="tgcol' + (ds === 오늘 ? ' today' : '') + '" data-day="' + ds + '">' + 블록
       + (ds === 오늘 ? '<div class="tnow" style="top:' + (지금분 / 60 * 격자높이) + 'px"></div>' : '') + '</div>';
   }).join("");
@@ -4697,6 +4707,7 @@ function render(){
     var 폰달력 = 달력 && 폰();                       /* 2026-10-11 — 월만이 아니라 일정·주·일 도 폰 머리 */
     document.body.classList.toggle("mob", 폰달력);
     document.body.classList.toggle("mobmenu", 폰달력 && !!S.mobMenu);
+    document.body.classList.toggle("gv", 폰달력 && (S.view === "day" || S.view === "3day" || S.view === "week"));
   }catch(_){}
   if(달력){
     펼침자리();
