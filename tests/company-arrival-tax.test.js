@@ -48,7 +48,8 @@ ok('기존 업체에 이어 붙일 때도 찍는다',
 console.log('\n[② 맨 위로 올라온다]');
 ok('업체 목록이 arvSort 로 정렬된다', /fresh\.sort\(function\(a,b\)\{ return arvSort\(a, b, function\(x,y\)\{/.test(co),
    '맨 위로 안 오면 206곳 중에서 찾아야 한다');
-ok('나머지는 등록일 최신순 그대로', /return \(y\.createdAt\|\|''\)\.localeCompare\(x\.createdAt\|\|''\);/.test(co),
+/* 규칙은 «y(뒤) 의 createdAt 을 x(앞) 와 견준다 = 최신순» — 글자·숫자 둘 다 받게 감싼 꼴(2026-10-11)도 같은 규칙 */
+ok('나머지는 등록일 최신순 그대로', /return [^;]*y\.createdAt[^;]*\.localeCompare\([^;]*x\.createdAt[^;]*\);/.test(co),
    '기존 차례를 흔들면 안 된다 — 새 것만 위로 얹는다');
 
 console.log('\n[③ 딱지가 보인다 — 컴퓨터·폰 둘 다]');
