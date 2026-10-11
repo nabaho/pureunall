@@ -8867,29 +8867,36 @@ window.erpResetComboWhitelist = erpResetComboWhitelist;
 
 // ============ ERP 안정화 헬퍼 (요율 스냅샷·담당자·검증·자동입력) ============
 
-// #4 요율 스냅샷: 급여 확정 시 현재 환경설정 요율을 복사 → 과거 명세서 보호
-//    사용: var snap = RatesSnapshot.capture(); 후 payroll 항목에 ratesSnapshot:snap 저장
+// #4 요율 스냅샷: 급여 확정 때 «그 달 계산이 실제로 쓴» 요율을 남긴다 (2026-10-11 검토 A5)
+//    사용: var snap = RatesSnapshot.capture(ym); 후 payroll 항목에 ratesSnapshot:snap 저장
+//    ⚠ 예전에는 환경설정의 insurance_rates·min_wage·withholding_tax 를 찍었다 — 셋 다 «계산에 안 쓰이는» 칸이었다
+//      (계산은 erpPayRates 의 엔진 연도표 · erpIncomeTax 의 공식 간이세액표를 본다). 게다가 간이세액표 화면은
+//      withholding_brackets 에 쓰는데 사진은 withholding_tax(아무도 안 쓰는 칸)를 찍었다.
+//      이제는 erpPayRates(ym) 그대로 + 출처 표시(source) 를 남긴다. 금액을 지키는 것은 여전히 calcSnapshot 이다.
 var RatesSnapshot = {
-  // 현재 시점의 모든 요율을 1개 객체로 캡처 (급여 확정 시 호출)
-  capture: function(){
+  capture: function(ym){
+    var r = (typeof erpPayRates === 'function') ? erpPayRates(ym) : {};
+    var T = (typeof PuSimpleTax !== 'undefined' && PuSimpleTax.tables) || [];
+    var LC = (typeof PuLaborCore !== 'undefined') ? PuLaborCore : null;
+    var tt = (LC && LC.pickSimpleTaxTable && T.length) ? LC.pickSimpleTaxTable(T, String(ym || '')) : null;
     return {
       capturedAt: new Date().toISOString(),
-      insurance: dbGet('insurance_rates', {}),
-      minWage:   dbGet('min_wage', {}),
-      withholdingTax: dbGet('withholding_tax', {}),
+      source: r.ratesFrom === 'engine' ? 'engine-year-table' : 'fallback-constants',
+      ym: String(ym || ''), year: String(r.year || ''),
+      insurance: { pension:r.pension, healthIns:r.healthIns, longCare:r.longCare, empIns:r.empIns,
+        empEmpInsExtra:r.empEmpInsExtra, empWorkers:r.empWorkers,
+        pensionWageMin:r.pensionWageMin, pensionWageMax:r.pensionWageMax },
+      minWage: { year:String(r.minWageYear || ''), hourly:r.minWageHourly },
+      withholdingTax: { source: tt ? 'simple-tax-table' : 'not-loaded', effectiveFrom: tt ? String(tt.시행 || '') : '' },
       payItems: dbGet('pay_items', [])
     };
   },
-  // 저장된 스냅샷 우선, 없으면 현재 요율 사용 (명세서 표시 시 호출)
+  // 저장된 스냅샷 우선, 없으면 «그 달 계산 기준»으로 다시 만든다 (환경설정 칸을 읽지 않는다)
   read: function(payrollRecord, key){
     if(payrollRecord && payrollRecord.ratesSnapshot && payrollRecord.ratesSnapshot[key] !== undefined){
       return payrollRecord.ratesSnapshot[key];
     }
-    return dbGet(key === 'insurance' ? 'insurance_rates' :
-                 key === 'minWage'   ? 'min_wage' :
-                 key === 'withholdingTax' ? 'withholding_tax' :
-                 key === 'payItems'  ? 'pay_items' : key,
-                 key === 'payItems' ? [] : {});
+    return RatesSnapshot.capture(payrollRecord && payrollRecord.ym)[key];
   }
 };
 
@@ -36173,6 +36180,15 @@ function PayItemSection(){
   );
 }
 
+/* ★ 환경설정의 최저임금·4대보험 요율·간이세액표 «세 화면»은 급여 계산에 쓰이지 않는다 (2026-10-11 검토 A5)
+     계산은 erpPayRates(그 달)의 엔진 연도표(js/pu-labor-core.js)와 공식 간이세액표(js/pu-simpletax.js)만 본다.
+     화면에 아무 말이 없어 관리자가 요율을 고치면 급여가 바뀐 줄 알았다 — 자료는 지우지 않고 띠로 알린다. */
+var ERP_NOT_USED_BY_CALC_TEXT = '⚠ 계산에는 쓰이지 않습니다 — 엔진 연도표 기준(읽기 전용 참고)';
+function ErpNotUsedByCalcNote(props){
+  return h('div', { 'data-not-used-by-calc':'1', title:(props && props.detail) || '',
+    style:{ background:'#fffbeb', border:'1px solid #fde68a', color:'#854d0e', borderRadius:'6px', padding:'6px 10px', fontSize:'11.5px', fontWeight:700, marginBottom:'8px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } },
+    ERP_NOT_USED_BY_CALC_TEXT);
+}
 function MinWageSection(){
   var DEFAULT = { id:'min-wage-2026', year:2026, hourlyMin:10320, weeklyMin:495360, monthlyMin209:2156880, monthlyMin226:2332320, effectiveFrom:'2026-01-01' };
   var existing = dbGet('min_wage', null);
@@ -36200,6 +36216,7 @@ function MinWageSection(){
   }
 
   return h('div', { style:{ marginBottom:'12px' } },
+    h(ErpNotUsedByCalcNote, { detail:'급여의 최저임금 비교는 그 달 연도의 시급(MIN_WAGE_HOURLY)과 단시간 비례 시간으로 셈합니다 — 이 칸은 참고용입니다.' }),
     _alert && h('div', { style:{ background:_alert.bg, border:'1px solid '+_alert.bd, color:_alert.fg, borderRadius:'6px', padding:'8px 12px', fontSize:'11.5px', fontWeight:700, marginBottom:'10px' } }, _alert.msg),
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '최저임금'),
@@ -36671,13 +36688,14 @@ function InsuranceSection(){
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'12px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '4대보험 요율')
     ),
+    h(ErpNotUsedByCalcNote, { detail:'급여 공제는 그 달 연도의 엔진 요율표(js/pu-labor-core.js)로 셈합니다 — 이 칸을 고쳐도 급여는 바뀌지 않습니다.' }),
     h('div', null,
     h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'7px 10px', marginBottom:'8px' } },
       h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#1e40af', display:'flex', alignItems:'center', gap:'6px' } }, '🛡️ 4대보험 요율',
         h(InfoPop, { title:'🛡️ 4대보험 요율 안내' },
-          '• 연도별 요율을 관리하여 급여대장·퇴직정산에서 정확한 계산에 씁니다.\n',
-          '• 국민연금·건강보험은 보건복지부, 고용·산재는 고용노동부 고시 기준입니다.\n',
-          '• 월별급여 모듈이 이 설정을 저절로 참조합니다.'))
+          '• 이 칸은 참고용 기록입니다 — 급여 계산은 이 칸을 읽지 않습니다.\n',
+          '• 실제 공제 요율은 그 달 연도의 엔진 요율표(js/pu-labor-core.js)에서 꺼냅니다.\n',
+          '• 국민연금·건강보험은 보건복지부, 고용·산재는 고용노동부 고시 기준입니다.'))
     ),
     h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'8px' } },
       h('label', { style:{ fontSize:'11px', fontWeight:600, color:'#475569' } }, '연도:'),
@@ -36749,6 +36767,7 @@ function WithholdingTaxSection(){
       h('button', { onClick:function(e){ e.stopPropagation(); reset(); },
         style:{ background:'#fef2f2', color:'#dc2626', padding:'3px 8px', borderRadius:'4px', fontSize:'11px', fontWeight:600, cursor:'pointer', border:'1px solid #fecaca' } }, '기본값 복원')
     ),
+    h(ErpNotUsedByCalcNote, { detail:'소득세는 공식 간이세액표(js/pu-simpletax.js, 그 달 시행 판)로 셈합니다 — 이 구간표는 참고용입니다.' }),
     h('div', null,
     h('div', { style:{ marginBottom:'5px' } }, h(InfoPop, { title:'간이세액', text:'과세급여 기준 · 국세청 간이세액표 · 지방소득세 = 소득세 × 10%' })),
     h('table', { className:'dt' },
@@ -81992,8 +82011,8 @@ function PayrollLedger(props){
     var __pm = parseInt(props.selYM.slice(5,7),10) + 1;
     if(__pm > 12){ __pm = 1; __py++; }
     var autoPaidDate = __py + '-' + String(__pm).padStart(2,'0') + '-05';
-    // #4 요율 스냅샷: 확정 시점의 4대보험·최저임금·세액표를 함께 저장 → 추후 환경설정 변경되어도 과거 명세서 보호
-    var ratesSnap = RatesSnapshot.capture();
+    // #4 요율 스냅샷: 확정 달의 계산이 쓴 엔진 요율·간이세액표 판을 함께 남긴다(기록용) — 금액 보호는 calcSnapshot
+    var ratesSnap = RatesSnapshot.capture(props.selYM);   // 그 달 계산이 쓴 엔진 요율 (2026-10-11 A5)
     var newRecs = users.map(function(u){
       var rec = getRec(u.sid);
       var calc = calcPayroll(rec);
