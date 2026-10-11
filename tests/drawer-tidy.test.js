@@ -128,16 +128,17 @@ test('★★ 담당(주담당·부담당)은 접지 않는다 — 늘 봐야 하
   assert.ok(P.slice(i - 200, i).indexOf('dFold(') < 0);
 });
 
-test('다음 할 일도 접지 않는다', () => {
-  const i = RD.indexOf('☐ 다음 할 일');
-  assert.ok(i > 0 && RD.slice(i - 200, i).indexOf('dFold(') < 0);
+test('다음 할 일도 접지 않는다 — 맨 아래 쓰는 칸에 늘 있다 (2026-10-11 6차 ❸안)', () => {
+  const C = code(grab('dComposeHTML'));
+  assert.ok(C.indexOf('☐ 다음 할 일') > 0, '쓰는 칸에 다음 할 일이 없다');
+  assert.ok(C.indexOf('dFold(') < 0, '쓰는 칸 안에서 접는다');
 });
 
 /* ══════════════════════════════════════════════
    ③ 편 것은 그 업무를 보는 동안만
    ══════════════════════════════════════════════ */
 test('★★ 업무를 바꾸면 펴 둔 것이 되돌아간다', () => {
-  assert.match(code(grab('openDrawer')), /if\(S\.drawerId!==id\) _dFold=\{\};/);
+  assert.match(code(grab('openDrawer')), /if\(S\.drawerId!==id\)\{?\s*_dFold=\{\};/);
 });
 
 test('같은 업무를 다시 그릴 때는 안 되돌린다 — 펴 놓고 기록 한 줄 적으면 도로 접힌다', () => {
@@ -157,16 +158,40 @@ test('★★ 기록 칸이 상자들보다 «먼저» 그려진다', () => {
   assert.ok(iLog < iVo && iLog < iPeople, '기록 칸이 아직 상자 아래에 있다');
 });
 
-test('★ 다음 할 일보다는 뒤다 — 오늘 할 일이 맨 위여야 한다', () => {
-  assert.ok(RD.indexOf('☐ 다음 할 일') < RD.indexOf('dLogBoxHTML(id,logs)'));
+/* ── 2026-10-11 대표 결정(6차 목업 ❸안) — 「위는 보기, 맨 아래는 쓰기 고정」 ──
+   예전 규칙(적는 칸과 적힌 것이 한 덩이로 맨 위)은 본문을 내려 메일·자료를 보다 보면
+   적는 칸이 화면 밖으로 사라졌다. 이제 적힌 것은 «본문 맨 위», 적는 칸은 «바닥 고정»이다. */
+test('★★ 적는 칸(다음 할 일·기록)은 본문 «밖» 바닥에 고정된다 — 본문을 내려도 사라지지 않는다', () => {
+  const C = grab('dComposeHTML');
+  assert.match(C, /id="dlog"/);
+  assert.match(C, /drawerAdd\(/);
+  assert.match(C, /id="dx-text"/);
+  /* 본문(.dbody) 다음에 쓰는 칸, 그다음 단추 줄 */
+  assert.match(RD, /'<div class="dbody">'\+h\+'<\/div>'\+dComposeHTML\(id,it,cases\)\+foot/);
+  const CSS = W.slice(W.indexOf('<style>'), W.indexOf('</style>'));
+  assert.match(CSS, /#drawer \.dbody\{[^}]*overflow-y:auto/, '본문이 스크롤되지 않는다');
+  assert.match(CSS, /#drawer \.dh,#drawer \.dcomp,#drawer \.dfoot\{flex:none\}/, '머리·쓰는 칸·단추 줄이 눌린다');
 });
 
-test('★★ 적는 칸과 적힌 것이 한 덩이로 움직였다 — 둘이 갈리면 헛갈린다', () => {
+test('★★ 적힌 기록 목록은 본문 맨 위다 — 주 구분선도 그대로', () => {
   const B = grab('dLogBoxHTML');
-  assert.match(B, /id="dlog"/);
   assert.match(B, /id="feed"/);
-  assert.match(B, /drawerAdd\(/);
   assert.match(B, /wksep/, '주 구분선이 빠졌다');
+  assert.ok(B.indexOf('id="dlog"') < 0, '적는 칸이 목록 안에 또 있다');
+});
+
+test('★ 스크롤은 본문 «한 곳»에서만 — 목록이 따로 스크롤되면 상자들 사이에서 몇 픽셀로 눌린다', () => {
+  const CSS = W.slice(W.indexOf('<style>'), W.indexOf('</style>'));
+  const r = (CSS.match(/#feed\{[^}]*\}/) || [''])[0];
+  assert.ok(r, '#feed 규칙이 없다');
+  assert.ok(!/overflow/.test(r) && !/flex:\s*1/.test(r), '#feed 가 따로 늘고 줄며 스크롤된다: ' + r);
+});
+
+test('★ 많이 쌓인 기록은 앞부분만 — 「이전 기록 더 보기」로 다 편다', () => {
+  const B = code(grab('dLogBoxHTML'));
+  assert.match(B, /S\.feedAll!==id&&nAll>DFEED_MAX/);
+  assert.match(B, /이전 기록 '\+\(nAll-arr\.length\)\+'건 더 보기/);
+  assert.match(code(grab('openDrawer')), /S\.feedAll=null/, '다른 업무를 열어도 펴진 채다');
 });
 
 test('★ 옛 자리에는 남아 있지 않다 — 두 번 그리면 Enter 가 어느 칸으로 갈지 모른다', () => {
@@ -177,6 +202,115 @@ test('★ 옛 자리에는 남아 있지 않다 — 두 번 그리면 Enter 가 
 test('맨 아래 단추 줄(수정·담당 변경·종료)은 그대로 맨 아래다', () => {
   assert.ok(RD.indexOf('dLogBoxHTML(id,logs)') < RD.indexOf('class="dfoot"'));
   assert.match(RD, /✓ 업무 종료/);
+});
+
+test('★ 자주 안 쓰는 것(푸른이알피·담당 변경·삭제)은 ⋯ 안에 — 없어지지는 않는다', () => {
+  const i = RD.indexOf('class="dmore"');
+  assert.ok(i > 0, '⋯ 메뉴가 없다');
+  const M = RD.slice(i);
+  assert.match(M, /handoverModal\(/, '담당 변경이 사라졌다');
+  assert.match(M, /deleteItem\(/, '삭제가 사라졌다');
+  assert.match(M, /openPuerp\(/, '푸른이알피로 가는 길이 사라졌다');
+  assert.match(code(grab('openDrawer')), /S\.dMore=false/, '다른 업무를 열어도 ⋯ 이 펴진 채다');
+});
+
+/* ══════════════════════════════════════════════
+   ④-2 비어 있는 칸은 «한 줄»로 (2026-10-11)
+   ══════════════════════════════════════════════ */
+function gbox(){
+  const b = box();
+  vm.runInContext('var _dSink=null;\n' + grab('dFoldGroupHTML') + '\n' + grab('dFold'), b);
+  return b;
+}
+test('★★ 서랍이 그리는 동안 접힌 칸들은 따로 안 깔리고 한 줄로 모인다', () => {
+  const b = gbox();
+  vm.runInContext('_dSink=[]', b);
+  assert.equal(b.dFold('st', b.dFoldHead('✅', '진행 단계', '아직 없음'), FULL, true), '');
+  assert.equal(b.dFold('org', b.dFoldHead('🏛', '상대기관', '등록 없음'), FULL, true), '');
+  const h = b.dFoldGroupHTML(vm.runInContext('_dSink', b));
+  assert.match(h, /진행 단계/); assert.match(h, /상대기관/);
+  assert.match(h, /비어 있음/);
+  assert.equal((h.match(/dFoldToggle\(/g) || []).length, 2, '이름마다 펴는 길이 있어야 한다');
+  assert.ok(h.indexOf('단계 깔기') < 0, '접혔는데 속이 보인다');
+  assert.ok(h.indexOf('아직 없음') < 0 && h.indexOf('등록 없음') < 0, '칸마다 「없음」을 되풀이한다');
+});
+
+test('★★ 내용이 있거나 편 칸은 모으지 않는다 — 그대로 그린다', () => {
+  const b = gbox();
+  vm.runInContext('_dSink=[]', b);
+  assert.equal(b.dFold('st', b.dFoldHead('✅', '진행 단계', '2 / 5'), FULL, false), FULL);
+  b.dFoldToggle('org');
+  assert.match(b.dFold('org', b.dFoldHead('🏛', '상대기관', '등록 없음'), FULL, true), /접기/);
+  assert.equal(vm.runInContext('_dSink.length', b), 0);
+});
+
+test('★ 접힌 줄에 얹혀 있던 단추(지식 적기)는 한 줄에도 그대로 얹힌다', () => {
+  const b = gbox();
+  const chip = '<span class="chipbtn" onclick="event.stopPropagation();kbPromote(1)">＋ 지식 적기</span>';
+  const h = b.dFoldGroupHTML([{ k:'kb', head:b.dFoldHead('📚', '관련 지식', '', chip) }]);
+  assert.ok(h.indexOf(chip) > 0, '단추가 빠졌다 — 두 번 눌러야 지식을 적는다');
+});
+
+test('모으는 것은 서랍을 그리는 동안뿐 — 끝나면 풀고, 시작할 때도 비운다', () => {
+  assert.match(RD, /_dSink=null;/);
+  assert.match(RD, /_dSink=\[\];/);
+  assert.match(RD, /var sunk=_dSink; _dSink=null;/);
+  assert.match(RD, /h\+=dFoldGroupHTML\(sunk\);/);
+});
+
+/* ══════════════════════════════════════════════
+   ④-3 이 회사 사건 · 회사 담당자 한 줄 (대표 지시 2026-10-11)
+   ══════════════════════════════════════════════ */
+function cbox(items){
+  const b = { String, items, hasResult: it => !!it && String(it.cat||'') === '사건' };
+  b.allItems = () => Object.keys(items).map(k => { items[k]._id = k; return items[k]; });
+  b.openItems = () => b.allItems().filter(it => it.state !== 'done');
+  vm.createContext(b);
+  vm.runInContext(grab('_dCaseDue') + '\n' + grab('dCasesOf'), b);
+  return b;
+}
+test('★★ 사건은 같은 «업체 번호»로만 붙는다 — 이름이 같아도 번호가 다르면 안 붙는다', () => {
+  const b = cbox({
+    A:  { cat:'자문', company:'가나정밀', co_id:'C1' },
+    K1: { cat:'사건', company:'가나정밀', co_id:'C1', title:'부당해고' },
+    K2: { cat:'사건', company:'가나정밀', co_id:'C9', title:'남의 회사 사건' },
+    K3: { cat:'사건', company:'가나정밀', co_id:'', title:'번호 없는 사건' },
+    K4: { cat:'사건', company:'다른이름', co_id:'C1', title:'번호 같은 사건', state:'done' },
+    N1: { cat:'컨설팅', company:'가나정밀', co_id:'C1' }
+  });
+  const r = b.dCasesOf(b.items.A, 'A').map(x => x._id);
+  assert.deepEqual(Array.from(r), ['K1'], '번호가 다른·번호 없는·끝난·사건 아닌 것이 섞였다: ' + r.join(','));
+});
+
+test('★ 업체 번호가 없는 업무는 사건 칸을 안 만든다 — 이름으로 짐작하지 않는다', () => {
+  const b = cbox({ A:{ cat:'자문', company:'가나정밀', co_id:'' }, K1:{ cat:'사건', company:'가나정밀', co_id:'' } });
+  assert.equal(b.dCasesOf(b.items.A, 'A').length, 0);
+  assert.ok(code(grab('dCasesOf')).indexOf('company') < 0, '회사 이름을 들여다본다');
+});
+
+test('★ 사건 서랍에서는 «자기 자신»을 빼고 다른 사건만', () => {
+  const b = cbox({ K1:{ cat:'사건', co_id:'C1' }, K2:{ cat:'사건', co_id:'C1' } });
+  assert.deepEqual(Array.from(b.dCasesOf(b.items.K1, 'K1').map(x => x._id)), ['K2']);
+});
+
+test('★ 사건이 있으면 «기록할 곳»을 고를 수 있고, 고른 사건에 남는다', () => {
+  assert.match(code(grab('dComposeHTML')), /if\(cases&&cases\.length\)/, '사건이 없을 때도 고르는 칸이 나온다');
+  const A = code(grab('drawerAdd'));
+  assert.match(A, /sel&&sel\.value&&items\[sel\.value\]/, '없는 업무로 기록을 보낼 수 있다');
+  assert.match(A, /addLog\(to,v,todayStr\(\)\)/);
+});
+
+test('★ 머리에 회사 담당자 한 줄 — 이 건 담당자가 먼저, 없으면 ＋ 추가', () => {
+  const P = code(grab('dPplHTML'));
+  assert.match(P, /\[\]\.concat\(itemContacts\(it\)\|\|\[\],coContacts\(it\)\|\|\[\]\)/);
+  assert.match(P, /contactAdd\(/, '담당자가 없을 때 적는 길이 없다');
+  assert.match(RD, /\+dPplHTML\(id,it\)/);
+});
+
+test('★ 다시 그려도 보던 자리·쓰던 글을 잃지 않는다 (같은 업무일 때만)', () => {
+  assert.match(RD, /if\(dr\._id===id\)\{/);
+  assert.match(RD, /nb\.scrollTop=keep\.top/);
+  assert.match(RD, /ni\.value=keep\.v/);
 });
 
 test('아직 안 읽었으면 「불러오는 중」이 그대로 나온다', () => {
