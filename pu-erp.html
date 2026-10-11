@@ -28140,6 +28140,78 @@ function erpCoAlive(co){
   return !!(co && !co._deleted && co.status !== 'closed');
 }
 
+/* ── 업체 → 계약 회사 사본 맞추기 (2026-10-11 검토 §1) ──
+   oldCo = 고치기 전 업체, newCo = 고친 뒤 업체.
+   · 잣대는 companyId — 사업자번호가 같은 다른 업체(본점·지점)의 계약을 건드리지 않는다.
+   · 진행 중 계약만 — 종료·취소·이관완료·만료·휴지통 계약은 «그때 값»을 남긴다(옛 계약서 재출력).
+   · 실제로 «바뀐 칸»만 쓴다 — 값이 undefined 인 칸은 건너뛴다.
+   · companyId 가 없는 계약은 «고치기 전 사업자번호를 가진 살아 있는 업체가 정확히 이 한 곳»일 때만 맞춘다.
+     여럿이거나 이 업체가 아니면 건드리지 않고 held 로 센다(사람이 보게).
+   돌려주는 값: { records:[바뀐 계약 전체], held:N, fields:[바뀐 칸] } — 쓰기는 하지 않는다. */
+var ERP_CO_CT_FIELDS = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
+  'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
+  'contacts','primaryContactName','primaryContactPhone','primaryContactEmail'];
+var ERP_CT_ENDED = { closed:1, cancelled:1, transferred:1, expired:1 };
+function erpCoSyncContractsPlan(oldCo, newCo, contracts, companies, onlyFields){
+  var out = { records:[], held:0, fields:[] };
+  if(!newCo || !newCo.id) return out;
+  oldCo = oldCo || {};
+  var same = function(a, b){
+    if(a === b) return true;
+    if((a === undefined || a === null || a === '') && (b === undefined || b === null || b === '')) return true;
+    if(typeof a === 'object' || typeof b === 'object'){ try { return JSON.stringify(a) === JSON.stringify(b); } catch(_e){ return false; } }
+    return String(a) === String(b);
+  };
+  var list = Array.isArray(onlyFields) ? ERP_CO_CT_FIELDS.filter(function(f){ return onlyFields.indexOf(f) >= 0; }) : ERP_CO_CT_FIELDS;
+  var delta = {};
+  list.forEach(function(f){
+    if(newCo[f] === undefined) return;
+    if(same(oldCo[f], newCo[f])) return;
+    delta[f] = newCo[f]; out.fields.push(f);
+  });
+  if(!out.fields.length) return out;
+  var dg = function(x){ return String(x || '').replace(/[^0-9]/g, ''); };
+  var oldBiz = dg(oldCo.bizNo !== undefined ? oldCo.bizNo : newCo.bizNo);
+  /* companyId 없는 계약용 — 고치기 전 번호를 가진 살아 있는 업체가 이 한 곳뿐인가
+     ⚠ 업체표에는 이미 «고친 뒤» 값이 들어 있을 수 있다 — 이 업체 자신은 빼고 «다른» 살아 있는 업체만 센다. */
+  var bizOthers = oldBiz ? (companies || []).filter(function(c){ return c && c.id !== newCo.id && erpCoAlive(c) && dg(c.bizNo) === oldBiz; }) : [];
+  var bizIsMine = !!oldBiz && bizOthers.length === 0;
+  (contracts || []).forEach(function(ct){
+    if(!ct || !ct.id || ct._deleted || ERP_CT_ENDED[ct.status]) return;
+    var mine = false;
+    if(ct.companyId){ mine = ct.companyId === newCo.id; }
+    else {
+      var ctBiz = dg(ct.bizNo || (ct.company && ct.company.bizNo));
+      if(!ctBiz || ctBiz !== oldBiz) return;
+      if(bizIsMine) mine = true; else { out.held++; return; }
+    }
+    if(!mine) return;
+    var comp = Object.assign({}, ct.company || {});
+    var touched = false;
+    out.fields.forEach(function(f){ if(!same(comp[f], delta[f])){ comp[f] = delta[f]; touched = true; } });
+    var nextCt = Object.assign({}, ct, { company: comp });
+    if(delta.name !== undefined && !same(ct.companyName, delta.name)){ nextCt.companyName = delta.name; touched = true; }
+    if(delta.bizNo !== undefined && !same(ct.bizNo, delta.bizNo)){ nextCt.bizNo = delta.bizNo; touched = true; }
+    if(touched) out.records.push(nextCt);
+  });
+  return out;
+}
+/* 계획대로 «한 번에» 쓴다 — 계약표 통째 저장(dbSet)도, 칸마다 저장도 하지 않는다. */
+function erpCoSyncContracts(oldCo, newCo, onlyFields){
+  var plan = erpCoSyncContractsPlan(oldCo, newCo, dbGet('contracts', []) || [], dbGet('companies', []) || [], onlyFields);
+  var heldMsg = plan.held ? ' · 연결 보류 ' + plan.held + '건은 건드리지 않았습니다' : '';
+  if(!plan.records.length){
+    if(plan.held) showToast('업체 변경 → 계약 동기화 없음' + heldMsg, 6000);
+    return true;
+  }
+  if(dbUpsertMany('contracts', plan.records) === false){
+    showToast('⚠ 계약 ' + plan.records.length + '건에 업체 변경을 못 옮겼습니다 — 계약관리에서 확인해 주세요', 7000);
+    return false;
+  }
+  showToast('업체 변경 → 계약 ' + plan.records.length + '건 동기화됨' + heldMsg, plan.held ? 6000 : undefined);
+  return true;
+}
+
 /* ── 업체 종료 때 정리할 미입금 자문료 고르기 (2026-10-11 검토 §5) ──
    잣대는 fi.companyId === co.id. companyId 가 없는 줄만 «정규화한 이름이 같고, 그 이름의 살아 있는
    업체가 정확히 이 한 곳»일 때 고른다 — 같은 이름의 지점·동명 법인 돈을 함께 지우지 않는다.
@@ -29019,38 +29091,12 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     var _p = {}; _p[editing.field] = nextVal;
     if(!coPatch(editing.id, _p)){ cancelEdit(); return; }
     var changedCo = Object.assign({}, _coF, _p);
-    // 계약관리 동기화 (업체 정보 변경 시 같은 사업자번호의 계약 데이터에도 반영)
-    syncToContracts(changedCo, editing.field, nextVal);
+    // 계약관리 동기화 — companyId 로 이어진 진행 중 계약에만, 바뀐 칸만 (검토 §1)
+    erpCoSyncContracts(_coF, changedCo, [editing.field]);
     cancelEdit();
   }
-  // 계약관리 동기화 - companies의 변경 사항을 contracts.company에 반영
-  function syncToContracts(co, field, val){
-    if(!co || !co.bizNo) return;
-    // 회사 정보 필드만 동기화 (계약 자체 필드는 제외)
-    var COMPANY_FIELDS = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
-      'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
-      'contacts','primaryContactName','primaryContactPhone','primaryContactEmail'];
-    if(COMPANY_FIELDS.indexOf(field) < 0) return;
-    var contracts = dbGet('contracts', []);
-    var coBiz = (co.bizNo || '').replace(/[^0-9]/g,'');
-    if(!coBiz) return;
-    var changed = 0;
-    var nextContracts = contracts.map(function(ct){
-      var ctBiz = ((ct.bizNo || (ct.company && ct.company.bizNo)) || '').replace(/[^0-9]/g,'');
-      if(ctBiz !== coBiz) return ct;
-      changed++;
-      var nextCompany = Object.assign({}, ct.company || {}, (function(){var x={}; x[field]=val; return x;})());
-      // companyName/bizNo는 root 레벨에도 있음
-      var nextCt = Object.assign({}, ct, { company: nextCompany });
-      if(field === 'name')  nextCt.companyName = val;
-      if(field === 'bizNo') nextCt.bizNo = val;
-      return nextCt;
-    });
-    if(changed > 0){
-      dbSet('contracts', nextContracts);
-      showToast('업체 변경 → 계약 ' + changed + '건 동기화됨');
-    }
-  }
+  /* 계약관리 동기화는 바깥 erpCoSyncContracts 가 한다 — 사업자번호로 묶어 계약표를 통째 저장하던
+     syncToContracts 는 2026-10-11 검토 §1 로 걷어냈다. 되살리지 말 것. */
   function onEditKey(e){
     if(e.key === 'Enter'){
       e.preventDefault();
@@ -30239,15 +30285,13 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
             form.mgrHistory = coMgrHistAdd(editModal, form.managerMain);
           }
         }
-        coUpsert(form);
+        var _coSaved = coUpsert(form);
         setEditModal(null);
         if(_mgrAsked) setTimeout(function(){ showToast('⏳ 담당 변경을 요청했습니다 — 관리자가 승인하면 바뀝니다', 6000); }, 400);
-        // 계약관리 일괄 동기화 (회사정보 필드 모두)
-        var fields = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
-          'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
-          'primaryContactName','primaryContactPhone','primaryContactEmail'];
-        fields.forEach(function(f){ syncToContracts(form, f, form[f]); });
+        if(!_coSaved) return;
         showToast('수정됨');
+        // 계약관리 동기화 — 연 때 값(editModal)과 견줘 «바뀐 칸만», 계약표에 한 번만 쓴다 (검토 §1)
+        erpCoSyncContracts(editModal, form);
       },
       onClose: function(){ setEditModal(null); }
     }),
