@@ -384,3 +384,13 @@ test('폰 일정 보기 — 주마다 「10월 4일~10일」 머리(일요일 �
   assert.match(캘, /날들\.push\('<div class="swk">' \+ 주글 \+ '<\/div>'\)/);
   assert.match(캘, /body\.mob \.swk\{display:block;font-size:14px;color:var\(--gtext\);padding:14px 16px 2px 73px\}/);
 });
+
+test('폰 새 일정 입력 — 구글 앱 캡처: 연도 포함 날짜 · 한국 표준시 줄 · 「반복 안함」 · 「사용자 추가」 · 「화상 회의 추가」 · 저장 #377aff', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /function 입력날짜글\(ymd\)/);
+  assert.match(캘, /줄\("public", '<span class="gtxt">한국 표준시<\/span>', "시간대"\)/);
+  assert.match(캘, /"반복 안함" : "반복 안 함"/);
+  assert.match(캘, /'사용자 추가 \(메일 — 여러 명은 쉼표로\)'/);
+  assert.match(캘, /'화상 회의 추가' : 'Google Meet 화상 회의 추가'/);
+  assert.match(캘, /data-theme="dark"\] body\.mob \.gform \.gsave\{background:#377aff;color:#ffffff/);
+});
