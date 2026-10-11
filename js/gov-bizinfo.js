@@ -88,14 +88,21 @@
       startDt: p.start,
       field: s(it.pldirSportRealmLclasCodeNm) || s(it.lcategory),
       target: s(it.trgetNm),
+      mid: s(it.pldirSportRealmMlsfcCodeNm),          /* 소분류(컨설팅·교육 …) — 걸러내기가 본다 */
+      tags: s(it.hashtags),                           /* 해시태그 — 공고명에 없는 「노무」 같은 말이 여기 있다 */
       prc: 0,                                      /* 지원사업에는 추정가격이 없다 */
       mthd: '',
       url: /^https:\/\//.test(s(it.pblancUrl)) ? s(it.pblancUrl) : s(it.link),
-      memo: plain(it.bsnsSumryCn || it.description).slice(0, 200)
+      memo: plain(it.bsnsSumryCn || it.description).slice(0, 200),
+      body: plain(it.bsnsSumryCn || it.description).slice(0, 600)   /* 걸러내기 전용 — 저장하지 않는다 */
     };
   }
 
-  var api = { BASE: BASE, FIELDS: FIELDS, FIELDS_DEFAULT: FIELDS_DEFAULT,
+  /* 전국 둘째 길에서 받을 건수 — 지역 거르기를 풀면 전국 건수라 지역 길(200)보다 넉넉히.
+     ⚠ 상한은 «실호출로 확인하지 못했다» — 거절되면 둘째 길만 조용히 건너뛴다(gov.html). */
+  var NATION_COUNT = 500;
+
+  var api = { BASE: BASE, FIELDS: FIELDS, FIELDS_DEFAULT: FIELDS_DEFAULT, NATION_COUNT: NATION_COUNT,
               REGIONS_DEFAULT: REGIONS_DEFAULT,
               buildUrl: buildUrl, parse: parse, period: period };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

@@ -184,3 +184,51 @@ test('★ 수행기관 칸이 비면 소관기관을 대신 보여 준다 — �
   const x = B.parse({ jsonArray: [Object.assign({}, REAL, { excInsttNm: '' })] }).rows[0];
   assert.equal(x.inst, '충청북도'); assert.equal(x.ntce, '충청북도');
 });
+
+/* ═══ ★★★ 기업마당 걸러내기 넓히기 (대표 지시 2026-10-11 「걸러진건 넓혀라」) ═══
+   224건이 «하나도» 안 걸렸다 — 공고명이 뭉뚱그려도 해시태그·소분류·요약에 노무 말이 있는 것을 놓쳤다. */
+const G2 = require('../js/gov-g2b.js');
+function biz(over) { return B.parse({ jsonArray: [Object.assign({}, REAL, over)] }).rows[0]; }
+test('norm 이 소분류·해시태그·요약 본문을 걸러내기용으로 데려간다', () => {
+  const x = biz({});
+  assert.equal(x.mid, '컨설팅');
+  assert.match(x.tags, /ESG경영/);
+  assert.match(x.body, /ESG경영 역량강화/);
+});
+test('★ 공고명에 컨설팅뿐이어도 해시태그에 노무 말이 있으면 건다 — 「콘텐츠 기업 컨설팅 지원」 + #노무', () => {
+  const r = biz({ pblancId: 'P1', pblancNm: '2026년 콘텐츠 기업 컨설팅 지원사업 참여기업 모집', hashtags: '경영,컨설팅,노무,콘텐츠', bsnsSumryCn: '<p>노무 종합컨설팅을 지원합니다</p>' });
+  assert.ok(G2.judge(r).length > 0, '노무 태그가 있는데 안 걸렸다');
+});
+test('★ 공고명에 컨설팅뿐이고 요약에 노무·임금 같은 분야 말이 있으면 건다', () => {
+  const r = biz({ pblancId: 'P2', pblancNm: '중소기업 맞춤형 컨설팅 지원', hashtags: '경영,컨설팅', bsnsSumryCn: '<p>임금체계·취업규칙 정비 등 인사노무 분야를 컨설팅합니다</p>' });
+  assert.ok(G2.judge(r).length > 0, '요약에 분야 말이 있는데 안 걸렸다');
+});
+test('★ 공고명이 컨설팅뿐이고 태그·요약에도 분야 말이 없으면 안 건다 — 마케팅·특허 컨설팅이 쏟아지면 안 된다', () => {
+  const r = biz({ pblancId: 'P3', pblancNm: '수출기업 해외마케팅 컨설팅 지원', hashtags: '수출,마케팅,컨설팅', bsnsSumryCn: '<p>해외 판로 개척 컨설팅</p>' });
+  assert.deepEqual(G2.judge(r), []);
+});
+test('★ 해시태그의 약한 말(컨설팅·경영)만으로는 안 건다 — 공고명에 낱말이 없을 때', () => {
+  const r = biz({ pblancId: 'P4', pblancNm: '2026년 청년 창업 사관학교 입교생 모집', hashtags: '창업,청년,컨설팅,경영', mid: '컨설팅', bsnsSumryCn: '<p>창업 교육</p>' });
+  assert.deepEqual(G2.judge(r), []);
+});
+test('★ 공고명에 낱말이 없어도 해시태그에 센 말(노무·일터혁신)이 있으면 건다', () => {
+  const r = biz({ pblancId: 'P5', pblancNm: '2026년 중소기업 근로환경 개선 지원사업 모집', hashtags: '근로환경,일터혁신,노무', bsnsSumryCn: '<p>근로환경</p>' });
+  assert.ok(G2.judge(r).length > 0);
+});
+test('★ 빼는 말(DROP)은 공고명에서만 본다 — 태그의 「홍보」 한 단어에 노무 공고가 빠지면 안 된다', () => {
+  const tagDrop = biz({ pblancId: 'P6', pblancNm: '중소기업 노무관리 컨설팅 지원', hashtags: '노무,홍보,컨설팅' });
+  assert.ok(G2.judge(tagDrop).length > 0, '태그의 홍보 때문에 빠졌다');
+  const titleDrop = biz({ pblancId: 'P7', pblancNm: '노무 홍보 영상 제작 지원', hashtags: '노무' });
+  assert.deepEqual(G2.judge(titleDrop), [], '공고명에 홍보가 있는데 걸렸다');
+});
+test('★ 기관 이름(노사발전재단)에 든 낱말로는 안 건다 — 태그에 기관 이름만 있을 때', () => {
+  const r = biz({ pblancId: 'P8', pblancNm: '2026년 성과공유 지원사업 모집', hashtags: '노사발전재단,성과공유', bsnsSumryCn: '<p>노사발전재단 운영</p>' });
+  assert.deepEqual(G2.judge(r), []);
+});
+test('★ 다른 출처(나라장터)의 걸러내기는 그대로다 — 태그·요약이 있어도 보지 않는다', () => {
+  assert.deepEqual(G2.judge({ src: '나라장터', nm: '수출기업 해외마케팅 컨설팅', tags: '노무', body: '노무 임금' }), []);
+  assert.ok(G2.judge({ src: '나라장터', nm: '노무 컨설팅 용역' }).length > 0);
+});
+test('전국 둘째 길의 건수 상한이 모듈에 있고 지역 길(200)보다 크다', () => {
+  assert.ok(B.NATION_COUNT > 200);
+});
