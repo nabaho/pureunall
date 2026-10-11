@@ -593,7 +593,8 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .ds-ok{font-size:11px;color:var(--green,#16a34a);min-width:74px}
 .ds-nosub{font-size:11px;color:var(--text-mute);min-width:74px}
 .ds-ic{display:inline-flex;gap:2px}
-.ds-ic .btn.sm{padding:1px 6px;font-size:12px}
+.ds-ic .btn.sm{padding:1px 6px;font-size:12px;white-space:nowrap}
+.ds-ic .btn.ds-dl{border-color:var(--navy);color:var(--navy);font-weight:700}
 .ds-prev{position:sticky;top:10px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:10px}
 .ds-pv-empty{color:var(--text-mute);font-size:12px;text-align:center;padding:28px 8px;line-height:1.7}
 .ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:max(320px,calc(100vh - 400px));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:6px;margin-bottom:8px;cursor:grab;position:relative}
@@ -8233,8 +8234,8 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
           <span class="ds-kind">${escapeHtml(r.kind||'-')}</span><span class="ds-day">${escapeHtml(_dsDay(r.savedAt))}</span>${제출}
           <span class="ds-ic">${_cdSrc(r)==='received'
             ? `<button class="btn sm" title="원본 보기" onclick='openOriginal(${JSON.stringify({id:r.id,src:r.src||"",relPath:r.relPath||"",genFileId:r.genFileId||""}).replace(/'/g,"&#39;")})'>📄</button>`
-            : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','gen')" title="내려받기 — 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇</button>`
-              + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="원본 양식 내려받기 — 기록이 남습니다">⬇</button>`:'')}
+            : `<button class="btn sm" title="${D.label} 보기" onclick="showBig('${r.genFileId}')">📄 보기</button><button class="btn sm ds-dl" onclick="docDl('${domain}','${r.id}','gen')" title="내 컴퓨터로 내려받습니다 — 브라우저의 다운로드 폴더(보통 내 PC › 다운로드)에 저장됩니다. 무엇을·언제 내려받았는지 이 서류에 남습니다">⬇ 받기</button>`
+              + (r.origFileId?`<button class="btn sm" title="원본 양식 보기" onclick="showBig('${r.origFileId}')">📎 원본</button><button class="btn sm" onclick="docDl('${domain}','${r.id}','orig')" title="받은 그대로의 빈 원본 양식을 내려받습니다(채운 서류가 아닙니다) — 다운로드 폴더에 저장됩니다">⬇ 원본</button>`:'')}
           <button class="btn sm" title="제출기록${n?' '+n+'건':''}" onclick="openSubmitLog('${domain}','${r.id}')">🧾${n?n:''}</button></span>
         </div>`+이전; }).join('');
   }).join('');
@@ -8486,7 +8487,7 @@ async function docDl(domain,id,which,quiet){
     set(D.store,db);
   }
   _safe(function(){ _logCv(D.label||'서류','내려받기'); });
-  if(!quiet){ renderDocStore(domain); toast('⬇ 「'+이름+'」 — 내려받은 기록을 남겼습니다'); }
+  if(!quiet){ renderDocStore(domain); toast('⬇ 「'+이름+'」 — 내 컴퓨터의 «다운로드» 폴더에 저장했습니다 (브라우저 오른쪽 위 ⬇ 를 누르면 바로 열 수 있습니다)', 7000); }
   return true;
 }
 function openDocDlLog(domain,id){
