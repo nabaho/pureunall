@@ -809,7 +809,47 @@
 
   /* 드로어 */
   #drawerbg{position:fixed;inset:0;background:rgba(20,30,50,.25);z-index:90}
-  #drawer{position:fixed;top:0;right:0;width:430px;max-width:96vw;height:100vh;background:#fff;border-left:1px solid #e2e8f0;box-shadow:-14px 0 30px rgba(15,23,42,.12);z-index:95;display:flex;flex-direction:column}
+  /* ⚠ 100dvh — 폰에서 100vh 는 주소창 몫까지 잡아, 맨 아래 «쓰는 칸»이 화면 밖으로 밀린다 */
+  #drawer{position:fixed;top:0;right:0;width:430px;max-width:96vw;height:100vh;height:100dvh;background:#fff;border-left:1px solid #e2e8f0;box-shadow:-14px 0 30px rgba(15,23,42,.12);z-index:95;display:flex;flex-direction:column}
+  /* 서랍 = 머리(고정) · 본문(이것만 스크롤) · 쓰는 칸(고정) · 단추 줄(고정) — 대표 결정 2026-10-11 6차 ❸안
+     ⚠ 예전에는 #feed 가 flex:1 로 늘고 줄며 상자들과 자리를 다퉈, 상자가 많은 업무에서는
+       기록 목록이 몇 픽셀로 눌려 «기록이 안 보였다». 스크롤은 본문 한 곳에서만 한다. */
+  #drawer .dbody{flex:1;min-height:0;overflow-y:auto;padding-bottom:14px}
+  #drawer .dh,#drawer .dcomp,#drawer .dfoot{flex:none}
+  /* 머리의 회사 담당자 한 줄 — 이름·직함·번호. 넘치면 … (두 줄로 안 쌓는다) */
+  #drawer .dppl{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:12px;white-space:nowrap;overflow:hidden}
+  #drawer .dppl .lb{font-size:10.5px;font-weight:800;color:var(--faint);flex-shrink:0}
+  #drawer .dppl .nm{font-weight:800;color:var(--ink);flex-shrink:0}
+  #drawer .dppl .rk{color:var(--sub);font-size:11px;flex-shrink:0}
+  #drawer .dppl a{color:var(--acc);font-weight:700;text-decoration:none;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis}
+  #drawer .dppl .more{margin-left:auto;color:var(--acc);cursor:pointer;font-size:11.5px;font-weight:700;flex-shrink:0}
+  /* ⚖ 이 회사 사건 — 자문 업무 안에서 «따로» 보이는 칸 */
+  .dcase{margin:10px 18px 0;background:#fef2f2;border:1px solid #fecaca;border-radius:9px;padding:8px 10px}
+  .dcase .hd{display:flex;align-items:center;font-size:12px;font-weight:800;color:#991b1b;margin-bottom:6px}
+  .dcase .c1{display:flex;align-items:center;gap:8px;background:#fff;border-radius:7px;padding:6px 9px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+  .dcase .c1+.c1{margin-top:5px}
+  .dcase .c1:hover{box-shadow:0 0 0 1px #f87171}
+  .dcase .c1 .t{font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .dcase .c1 .s{font-size:11px;color:#64748b;flex-shrink:0}
+  .dcase .c1 .dd{font-size:11px;font-weight:800;color:#dc2626;flex-shrink:0}
+  .dcase .more{font-size:11px;color:#991b1b;margin-top:5px}
+  /* 본문 칸 이름 줄 — 상자 없이 글자 한 줄 */
+  .dsec{display:flex;align-items:center;gap:6px;margin:12px 18px 0;font-size:11px;font-weight:800;color:var(--faint)}
+  .dsec .r{margin-left:auto;font-weight:600}
+  .dfmore{margin:2px 18px 0;font-size:11.5px;color:var(--acc);cursor:pointer;font-weight:700}
+  .dfmore:hover{text-decoration:underline}
+  /* 비어 있는 칸들을 «한 줄»로 — 칸마다 한 줄씩 깔면 빈 것이 더 많아 보인다 */
+  .dfgrp .bh{white-space:normal;flex-wrap:wrap;row-gap:3px;cursor:default}
+  .dfgrp .fg{cursor:pointer;font-weight:700;color:var(--sub)}
+  .dfgrp .fg:hover{color:var(--acc2);text-decoration:underline}
+  .dfgrp .dfsep{color:var(--faint);font-weight:400}
+  /* 맨 아래 «쓰는 칸» — 본문을 아무리 내려도 늘 여기 있다 */
+  #drawer .dcomp{border-top:1px solid var(--line);padding:8px 18px;background:#fff;display:flex;flex-direction:column;gap:6px}
+  #drawer .dcomp .nextbox{margin:0}
+  #drawer .dcomp .crow{display:flex;gap:6px;align-items:center}
+  #drawer .dcomp .dinput{margin:0;width:auto;flex:1;min-width:0}
+  #drawer .dcomp select{flex-shrink:1;min-width:0;max-width:112px;border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:8px;padding:6px 6px;font-size:12px;font-weight:700}
+  #drawer .dcomp .vo{flex-shrink:0;font-size:12px;padding:6px 9px}
   #drawer .dh{padding:14px 18px 11px;border-bottom:1px solid var(--line)}
   #drawer .dh .row1{display:flex;align-items:center;gap:8px}
   #drawer .dh .ttl{font-size:14px;font-weight:800;flex:1}
@@ -825,7 +865,7 @@
   .nextbox input[type=date]{flex-shrink:0;border:1px solid #fde68a;background:#fff;border-radius:5px;font-size:11px;padding:2px 4px;color:#854d0e}
   .dinput{margin:10px 18px;border:1.6px solid var(--acc);border-radius:8px;padding:8px 11px;font-size:12.5px;width:calc(100% - 36px)}
   .dinput:focus{outline:none;box-shadow:0 0 0 2px rgba(37,99,235,.12)}
-  #feed{flex:1;overflow-y:auto;padding:2px 18px 16px}
+  #feed{padding:2px 18px 4px}
   .wksep{font-size:10.5px;font-weight:800;color:var(--faint);letter-spacing:.06em;margin:13px 0 5px;display:flex;align-items:center;gap:8px}
   .wksep::after{content:"";flex:1;height:1px;background:#e2e8f0}
   .fe{display:flex;gap:10px;padding:5px 0;font-size:12.5px;align-items:baseline}
@@ -937,8 +977,15 @@
   .fe .del{color:#fecaca;cursor:pointer;font-size:11px;visibility:hidden}
   .fe:hover .del{visibility:visible}
   .fe.hov .tx{background:#ffffff;border:1px dashed #fbbf24;border-radius:7px;padding:4px 9px;color:#854d0e;font-size:11.5px}
-  #drawer .dfoot{border-top:1px solid var(--line);padding:10px 18px;display:flex;gap:8px;flex-wrap:wrap}
+  #drawer .dfoot{position:relative;border-top:1px solid var(--line);padding:8px 18px;padding-bottom:calc(8px + env(safe-area-inset-bottom));display:flex;gap:8px;flex-wrap:wrap;align-items:center}
   #drawer .dfoot button{font-size:12px;padding:6px 10px}
+  #drawer .dfoot .pri{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:800}
+  /* ⋯ — 자주 안 쓰는 것(푸른이알피·담당 변경·삭제)은 여기 안에 */
+  #drawer .dmore{position:absolute;right:18px;bottom:calc(100% + 4px);background:#fff;border:1px solid var(--line);border-radius:9px;
+    box-shadow:0 12px 30px rgba(15,32,60,.18);padding:4px;display:flex;flex-direction:column;min-width:170px;z-index:3}
+  #drawer .dmore button{border:none;background:none;text-align:left;padding:8px 10px;font-size:12.5px;border-radius:6px;cursor:pointer}
+  #drawer .dmore button:hover{background:var(--bg)}
+  #drawer .dmore .del{color:var(--danger)}
 
   /* 인수인계 */
   .honote{margin:0 18px 4px;border:1px solid var(--line);border-radius:9px;overflow:hidden}
@@ -7875,24 +7922,60 @@ function dFoldHead(icon,title,right,raw){
 function dFold(k,head,full,empty){
   if(!empty||!full) return full;
   var j='dFoldToggle(\''+escJ(k)+'\')';
-  if(!_dFold[k])
+  if(!_dFold[k]){
+    /* 서랍이 «모으는 중»이면 접힌 줄을 따로 깔지 않고 한 줄로 모은다(dFoldGroupHTML) */
+    /* typeof — dFold 만 오려 쓰는 곳(검사 등)에서는 _dSink 가 없다. 없으면 옛 모양 */
+    if(typeof _dSink!=='undefined'&&_dSink){ _dSink.push({k:k,head:head}); return ''; }
     return '<div class="dbox dfold" onclick="'+j+'" title="눌러서 폅니다">'+head+'</div>';
+  }
   return full+'<div class="dfoldx" onclick="'+j+'">접기 ▴</div>';
+}
+/* ── 비어 있는 칸을 «한 줄»로 (대표 결정 2026-10-11 6차 ❸안) ──
+   진행 단계·받은 자료·상대기관·지식이 다 비면 예전에는 접힌 줄이 넷 깔렸다.
+   이제 「▸ 진행 단계 · 받은 자료 · 상대기관 · 지식 — 비어 있음」 한 줄이고,
+   이름을 누르면 그 칸만 펴진다(펴는 길은 dFoldToggle 그대로).
+   ⚠ 없애지 않는다 — 「단계 깔기」처럼 처음 시작하는 단추가 그 안에 있다.
+   ⚠ 접힌 줄에 얹혀 있던 단추(지식 적기)는 이 한 줄에도 그대로 얹는다 — 두 번 누르게 하지 않는다.
+   ⚠ 모으는 것은 renderDrawer 가 그리는 동안뿐이다(_dSink). 다른 화면의 dFold 는 옛 모양 그대로다. */
+var _dSink=null;
+function dFoldGroupHTML(list){
+  if(!list||!list.length) return '';
+  var names=[], raws='';
+  list.forEach(function(x){
+    var head=String(x.head||'');
+    var body=head.replace(/^[\s\S]*?<span class="fa">▸<\/span>/,'');
+    var cut=body.indexOf('<span class="r">');
+    var nm=cut>=0?body.slice(0,cut):body;
+    var r=cut>=0?body.slice(cut+16).replace(/<\/span><\/div>\s*$/,''):'';
+    names.push('<span class="fg" onclick="dFoldToggle(\''+escJ(x.k)+'\')" title="눌러서 폅니다">'+nm+'</span>');
+    if(r.indexOf('<')>=0) raws+=r;          // 글이 아니라 단추가 얹혀 있던 줄
+  });
+  return '<div class="dbox dfgrp"><div class="bh"><span class="fa">▸</span>'
+    +names.join('<span class="dfsep"> · </span>')
+    +'<span class="r">비어 있음'+(raws?' '+raws:'')+'</span></div></div>';
 }
 /* ── 기록 적는 칸과 적힌 것 ──
    ★ 서랍 «맨 위»로 올렸다 (대표 지시 2026-09-05 「찾는데 헤깔린다」).
      업무를 여는 까닭은 열에 아홉 «오늘 한 일을 적으려고»인데, 예전에는 상자 일곱을
      지나 맨 아래까지 내려가야 이 칸이 나왔다.
    ⚠ 그리는 내용은 옛것 그대로다 — 자리만 옮겼다. */
+/* ★ 2026-10-11 (대표 결정 6차 ❸안) — 적는 칸은 서랍 «맨 아래 고정»(dComposeHTML),
+     적힌 것은 «본문 맨 위»다. 메신저처럼 위는 보기, 아래는 쓰기.
+     예전에는 둘이 한 덩이로 위에 있었는데, 본문을 내려 메일·자료를 보다 보면 적는 칸이
+     화면 밖으로 사라져 다시 올라가야 했다. 바닥에 붙여 두면 어디서든 바로 적는다.
+   ⚠ 많이 쌓인 업무는 앞의 DFEED_MAX 줄만 보이고 「이전 기록 더 보기」로 편다 —
+     기록 수백 줄이 메일·자료 칸을 화면 저 아래로 밀어내지 않게. */
+var DFEED_MAX=10;
 function dLogBoxHTML(id,logs){
   var h='';
-  h+='<input class="dinput" id="dlog" placeholder="기록 추가… (Enter로 저장, 오늘 날짜)" onkeydown="if(event.key===\'Enter\'&&!_ime(event)){event.preventDefault();drawerAdd(\''+id+'\',this)}">';
   h+='<div id="feed">';
   if(!logs){ h+=loadingHTML('이력 불러오는 중…'); }
   else{
     var arr=Object.keys(logs).map(function(k){var l=logs[k];l._id=k;return l;})
       .sort(function(a,b){return (b.d||'').localeCompare(a.d||'')||(b.at||'').localeCompare(a.at||'');});
-    if(!arr.length) h+='<div class="muted" style="padding:20px 4px;font-size:12.5px">아직 기록이 없습니다. 위 칸에 첫 기록을 남겨보세요.</div>';
+    if(!arr.length) h+='<div class="muted" style="padding:12px 4px;font-size:12.5px">아직 기록이 없습니다. 맨 아래 칸에 첫 기록을 남겨보세요.</div>';
+    var nAll=arr.length;
+    if(S.feedAll!==id&&nAll>DFEED_MAX) arr=arr.slice(0,DFEED_MAX);
     var lastWk=null;
     var curWk=weekKeyOf(curMonday());
     arr.forEach(function(l){
@@ -7912,13 +7995,97 @@ function dLogBoxHTML(id,logs){
         +'</span>'
         +(canDel?'<span class="del" onclick="delLog(\''+escJ(id)+'\',\''+escJ(l._id)+'\')">✕</span>':'')+'</div>';
     });
+    if(nAll>arr.length)
+      h+='<div class="dfmore" onclick="S.feedAll=\''+escJ(id)+'\';renderDrawer()">이전 기록 '+(nAll-arr.length)+'건 더 보기 ▾</div>';
   }
   h+='</div>';
   return h;
 }
+/* ── 맨 아래 쓰는 칸 — 다음 할 일 · (사건이 있으면) 기록할 곳 · 기록 · 말로 ──
+   ⚠ 다음 할 일은 접지 않는다 — 오늘 할 일은 늘 보여야 한다(2026-09-05 원칙 그대로, 자리만 바닥).
+   ⚠ 기록할 곳 고르기는 «이 회사 사건이 있을 때만» 나온다. 자문 서랍에서 사건 일을 적고
+     싶을 때 사건 서랍을 따로 열지 않게 — 고르지 않으면 늘 «이 업무»다. */
+function dComposeHTML(id,it,cases){
+  var h='<div class="dcomp">';
+  h+='<div class="nextbox"><span class="lb">☐ 다음 할 일</span>'
+    +'<input type="text" id="dx-text" value="'+esc(it.next&&it.next.text||'')+'" placeholder="예: 이유서 제출" onchange="saveNext(\''+id+'\')">'
+    +'<input type="date" id="dx-date" value="'+esc(it.next&&it.next.date||'')+'" onchange="saveNext(\''+id+'\')"></div>';
+  h+='<div class="crow">';
+  if(cases&&cases.length){
+    h+='<select id="dlog-to" title="이 기록을 어느 업무에 남길지 고릅니다 — 고르지 않으면 이 업무입니다">'
+      +'<option value="">'+esc(catNorm(it.cat)||'이 업무')+'에</option>'
+      +cases.map(function(c){ return '<option value="'+esc(c._id)+'">⚖ '+esc(itemName(c)||c.title||'사건')+'</option>'; }).join('')
+      +'</select>';
+  }
+  h+='<input class="dinput" id="dlog" placeholder="기록 추가… (Enter로 저장, 오늘 날짜)" onkeydown="if(event.key===\'Enter\'&&!_ime(event)){event.preventDefault();drawerAdd(\''+id+'\',this)}">';
+  h+='<button class="vo" onclick="dVoiceOpen()" title="말하면 AI 가 정리해 기록 초안을 만듭니다">🎤 말로</button>';
+  h+='</div></div>';
+  return h;
+}
+/* 🎤 말로 — 본문의 「말로 기록」 칸을 펴고 그 자리로 내려 준다 */
+function dVoiceOpen(){
+  _dFold.vo=true; renderDrawer();
+  setTimeout(function(){ var e=$('dvoice'); if(e&&e.scrollIntoView) e.scrollIntoView({block:'nearest',behavior:'smooth'}); },30);
+}
+/* ── 머리의 회사 담당자 한 줄 ──
+   이 건 담당자(손으로 적은 것)가 먼저, 그다음 업체 담당자(푸른이알피·기업정보함).
+   «외 n명»을 누르면 본문의 사업장 담당자 칸으로 내려간다 — 거기서 적고 고친다. */
+function dPplHTML(id,it){
+  var seen={}, list=[];
+  [].concat(itemContacts(it)||[],coContacts(it)||[]).forEach(function(c){
+    if(!c||!String(c.name||'').trim()) return;
+    var k=String(c.name).trim()+'|'+String(c.phone||c.bizPhone||'').replace(/\D/g,'');
+    if(seen[k]) return; seen[k]=1; list.push(c);
+  });
+  var go='dGoPeople()';
+  if(!list.length)
+    return '<div class="dppl"><span class="lb">회사 담당자</span><span class="muted">없음</span>'
+      +'<span class="more" onclick="contactAdd(\''+escJ(id)+'\');setTimeout(dGoPeople,30)" title="이 건 담당자를 적습니다">＋ 추가</span></div>';
+  var c=list[0], tel=c.phone||c.bizPhone||'';
+  return '<div class="dppl"><span class="lb">회사</span>'
+    +'<span class="nm">'+esc(c.name)+'</span>'
+    +(contactRole(c)?'<span class="rk">'+esc(contactRole(c))+'</span>':'')
+    +(tel?'<a href="tel:'+esc(telHref(tel))+'">'+esc(tel)+'</a>':'')
+    +'<span class="more" onclick="'+go+'" title="사업장 담당자 칸으로 내려갑니다">'
+    +(list.length>1?'외 '+(list.length-1)+'명 ▾':'▾')+'</span></div>';
+}
+function dGoPeople(){
+  var e=$('dpeople'); if(e&&e.scrollIntoView) e.scrollIntoView({block:'start',behavior:'smooth'});
+}
+/* ── ⚖ 이 회사 사건 (대표 지시 2026-10-11 「기본 자문도 있지만 필요시 사건도 발생한다 … 칸분리」) ──
+   ★ 같은 «업체 번호»(co_id = 푸른이알피 companyId)를 가진 «진행 중» 사건만 붙인다.
+   ⚠⚠ 회사 이름으로 묶지 않는다(온톨로지 규칙 — 업체명은 관계 열쇠가 아니다).
+     이름이 같은 다른 지점·다른 법인의 사건이 붙으면 남의 사건을 내 고객 것으로 읽는다.
+     업체 번호가 비어 있는 사건은 여기 안 나온다 — 푸른이알피에서 업체를 이어 주면 저절로 나온다.
+   ⚠ 읽기만 한다. 누르면 그 사건의 서랍이 열린다(고치는 곳은 그 서랍). */
+function dCasesOf(it,id){
+  var cid=String((it&&it.co_id)||''); if(!cid) return [];
+  return openItems().filter(function(x){
+    return x._id!==id&&hasResult(x)&&String(x.co_id||'')===cid;
+  }).sort(function(a,b){ return String(_dCaseDue(a)||'9').localeCompare(String(_dCaseDue(b)||'9')); });
+}
+function _dCaseDue(x){ return (x.pe_due&&x.pe_due.date)||(x.next&&x.next.date)||''; }
+function dCaseBoxHTML(it,cases){
+  if(!cases||!cases.length) return '';
+  var MAX=3;
+  return '<div class="dcase"><div class="hd">⚖ '+(hasResult(it)?'이 회사 다른 사건':'이 회사 사건')+' '+cases.length+'</div>'
+    +cases.slice(0,MAX).map(function(c){
+      var due=_dCaseDue(c), n=due?dday(due):null;
+      var dtx=n===null?'':(n<0?'D+'+(-n):n===0?'D-Day':'D-'+n);
+      return '<div class="c1" onclick="openDrawer(\''+escJ(c._id)+'\')" title="이 사건의 서랍을 엽니다">'
+        +'<span class="t">'+esc(itemName(c)||c.title||'사건')+'</span>'
+        +'<span class="s">'+esc(c.status||'진행중')+'</span>'
+        +(due?'<span class="'+(n!==null&&n<=7?'dd':'s')+'">'+esc(md(due))+(dtx?' '+dtx:'')+'</span>':'')
+        +'</div>';
+    }).join('')
+    +(cases.length>MAX?'<div class="more">외 '+(cases.length-MAX)+'건 — 내 업무에서 「사건」으로 봅니다</div>':'')
+    +'</div>';
+}
+/* ⋯ 안의 단추 — 자주 안 쓰는 것 */
+function dMoreToggle(){ S.dMore=!S.dMore; renderDrawer(); }
 function openDrawer(id){
   /* 업무를 바꾸면 펴 둔 것을 되돌린다 — 앞 업무에서 편 것이 따라오면 안 된다 */
-  if(S.drawerId!==id) _dFold={};
+  if(S.drawerId!==id){ _dFold={}; S.dMore=false; S.feedAll=null; }
   S.drawerId=id;
   if(!$('drawerbg')){ var bg=document.createElement('div'); bg.id='drawerbg'; bg.onclick=closeDrawer; document.body.appendChild(bg);
     var dr=document.createElement('div'); dr.id='drawer'; document.body.appendChild(dr); }
@@ -7934,6 +8101,7 @@ function loadItemLogs(id){
 }
 function renderDrawer(){
   var dr=$('drawer'); if(!dr||!S.drawerId)return;
+  _dSink=null;                   // 앞 회차가 도중에 멈췄어도 «모으기»가 남아 다른 접기를 삼키지 않게
   /* 업체 목록이 아직이면 받아 온 뒤 한 번 더 그린다 — 사업자번호로 이어야
      상호가 조금 달라도 같은 회사의 취업규칙 이력이 붙는다 */
   if(!coSrc && typeof coLoad==='function'){ coLoad().then(function(){ if(S.drawerId) renderDrawer(); }); }
@@ -7963,18 +8131,29 @@ function renderDrawer(){
     +' · 담당 '+esc((it.mgr_main&&it.mgr_main.name)||'—')+(subs?' <span style="color:#60a5fa">(공동 '+esc(subs)+')</span>':'')
     +peFlag(it)+'</div>'
     +(briefTrim(it.brief)?'<div class="meta2" style="color:#1e40af;font-weight:700">✏️ '+esc(briefTrim(it.brief))+'</div>':'')
+    +dPplHTML(id,it)               // 회사 담당자 한 줄 (대표 지시 2026-10-11 「간략하게 이름등을 확인」)
     +'<div class="chips">'
     +STATUSES.map(function(s){ return '<span class="status" style="background:'+s[1]+';color:'+s[2]+';'+((it.status||'진행중')===s[0]?'':'opacity:.35;')
       /* ⚠ 여기서 patchItem 을 바로 부르면 기록이 안 남는다 — 표·보드와 같은 길(setStatus)로 간다 */
       +'" onclick="setStatus(\''+escJ(id)+'\',\''+escJ(s[0])+'\')">'+s[0]+'</span>'; }).join('')
     +'</div></div>';
-  h+='<div class="nextbox"><span class="lb">☐ 다음 할 일</span>'
-    +'<input type="text" id="dx-text" value="'+esc(it.next&&it.next.text||'')+'" placeholder="예: 이유서 제출" onchange="saveNext(\''+id+'\')">'
-    +'<input type="date" id="dx-date" value="'+esc(it.next&&it.next.date||'')+'" onchange="saveNext(\''+id+'\')"></div>';
-  // 사건 단계 기한 — 계산된 값이라 입력칸으로 두지 않는다. 위 "다음 할 일"과 별개다.
+  /* ══ 여기부터 «본문» — 이것만 스크롤된다. 맨 아래 쓰는 칸·단추 줄은 고정(6차 ❸안) ══ */
+  var head=h; h='';
+  var cases=dCasesOf(it,id);
+  _dSink=[];                     // 비어 있는 칸은 그리는 동안 모았다가 맨 끝에 «한 줄»로
+  h+=dCaseBoxHTML(it,cases);     // ⚖ 이 회사 사건 — 자문 안에서 따로 보이는 칸
+  // 사건 단계 기한 — 계산된 값이라 입력칸으로 두지 않는다. 아래 "다음 할 일"과 별개다.
   if(it.pe_due&&it.pe_due.date) h+='<div class="nextbox" style="border-color:#fecaca">'
     +'<span class="lb">⚖ 단계 기한</span>'+sdueHTML(it)+'</div>';
-  h+=dLogBoxHTML(id,logs);       // ★ 기록이 맨 위 — 적으러 왔는데 맨 아래에 있었다
+  // 인수 확인 대기 — 후임(나)에게 확인 버튼. 놓치면 안 되는 것이라 본문 «위»에 둔다
+  if(it.ho&&!it.ho.confirmed){
+    var toMe=it.ho.to&&((S.me.sid&&it.ho.to.sid===S.me.sid)||it.ho.to.name===S.me.name);
+    if(toMe) h+='<button class="recvbtn" onclick="confirmHo(\''+id+'\')">📥 인수 확인 — 노트와 타임라인을 확인했습니다</button>';
+    else h+='<div class="nextbox" style="background:#fffbeb">📥 인수 확인 대기 중 — 후임 '+esc(it.ho.to&&it.ho.to.name||'—')
+      +' ('+esc((it.ho.at||'').slice(0,10))+' 지정'+(it.ho.from?', 전임 '+esc(it.ho.from.name||''):'')+')</div>';
+  }
+  h+='<div class="dsec">기록</div>';
+  h+=dLogBoxHTML(id,logs);       // ★ 적힌 기록이 본문 맨 위 — 적는 칸은 맨 아래 고정(dComposeHTML)
   /* ★ 오간 메일은 «기록 바로 아래» (대표 지시 2026-09-06).
      여태 사람·푸른이알피 메모 다음이라 한참 내려야 보였다. 그런데 기록을 적으러
      서랍을 여는 사람이 가장 먼저 확인할 것이 「그동안 무슨 메일이 왔나」다. */
@@ -7986,11 +8165,11 @@ function renderDrawer(){
   h+=dVisitsHTML(it);
   /* 🏦 기금 진행 — 기금 업무에서만 뜬다 */
   h+=dFundHTML(it);
-  h+=dFold('vo',dFoldHead('🎤','말로 기록','말하면 AI 가 정리합니다'),
-           dVoiceHTML(id,it), VO.id!==id);
+  h+='<div id="dvoice">'+dFold('vo',dFoldHead('🎤','말로 기록','말하면 AI 가 정리합니다'),
+           dVoiceHTML(id,it), VO.id!==id)+'</div>';
   h+=dFold('st',dFoldHead('✅','진행 단계','아직 없음'),
            dStepsHTML(id,it), !stepsOf(id).length);
-  h+=dPeopleHTML(id,it);
+  h+='<div id="dpeople">'+dPeopleHTML(id,it)+'</div>';
   h+=dPpHTML(it,id);
   h+=dRulesHTML(it);
   /* ── 취업규칙 이력 (대표 지시 2026-08-29: 「보여주기만」) ──
@@ -8041,13 +8220,9 @@ function wkOpenRuleRev(url){ try{ window.open(url,'_blank'); }catch(e){} }
       :'<div class="kbempty">아직 없습니다. 기록 한 줄에서 <b>↗</b>를 누르거나 아래 <b>＋ 지식 적기</b>로 남깁니다.</div>')
     +'<div class="row" style="gap:6px;margin-top:6px">'+kbAddChip(id)+'</div>'
     +'</div></div>', !rel.length);
-  // 인수 확인 대기 — 후임(나)에게 확인 버튼
-  if(it.ho&&!it.ho.confirmed){
-    var toMe=it.ho.to&&((S.me.sid&&it.ho.to.sid===S.me.sid)||it.ho.to.name===S.me.name);
-    if(toMe) h+='<button class="recvbtn" onclick="confirmHo(\''+id+'\')">📥 인수 확인 — 노트와 타임라인을 확인했습니다</button>';
-    else h+='<div class="nextbox" style="background:#fffbeb">📥 인수 확인 대기 중 — 후임 '+esc(it.ho.to&&it.ho.to.name||'—')
-      +' ('+esc((it.ho.at||'').slice(0,10))+' 지정'+(it.ho.from?', 전임 '+esc(it.ho.from.name||''):'')+')</div>';
-  }
+  // 비어 있는 칸들 — 위에서 모은 것을 «한 줄»로
+  var sunk=_dSink; _dSink=null;
+  h+=dFoldGroupHTML(sunk);
   // 인수인계 노트 (평상시에도 작성 — 정책②)
   var nd=noteDone(it), n3=it.ho_note||{};
   h+='<div class="honote"><div class="hh" onclick="S.noteOpen=!S.noteOpen;renderDrawer()">'
@@ -8096,21 +8271,45 @@ function wkOpenRuleRev(url){ try{ window.open(url,'_blank'); }catch(e){} }
       +(n3.byName?' · 마지막 작성 '+esc(n3.byName):'')+(n3.ai?' · AI 초안 사용':'')+'</div></div>';
   }
   h+='</div>';
-  h+='<div class="dfoot">'
-    +'<button onclick="itemModal(\''+id+'\')">✏️ 수정</button>'
-    +(it.src==='puerp'&&it.ref?'<button onclick="openPuerp(\''+escJ(it.ref.type)+'\')" title="푸른이알피 해당 메뉴로 이동">🔗 푸른이알피</button>':'')
-    +'<button onclick="handoverModal(\''+id+'\')">🔄 담당 변경</button>'
+  /* 바닥 단추 줄 — 늘 쓰는 둘(종료·수정)만 밖에, 나머지는 ⋯ 안에(6차 ❸안).
+     ⚠ 삭제는 ⋯ 안에서도 deleteItem 의 확인 창을 그대로 거친다. */
+  var foot='<div class="dfoot">'
     +(it.state==='done'
       ?'<button onclick="restoreItem(\''+id+'\')">↩ 진행으로 복구</button>'
-      :'<button onclick="completeItem(\''+escJ(id)+'\')">✓ 업무 종료'+(peLinked(it)?' 🔗':'')+'</button>')
+      :'<button class="pri" onclick="completeItem(\''+escJ(id)+'\')">✓ 업무 종료'+(peLinked(it)?' 🔗':'')+'</button>')
+    +'<button onclick="itemModal(\''+id+'\')">✏️ 수정</button>'
     +'<span style="flex:1"></span>'
-    +'<button style="color:var(--danger);border-color:#f87171" onclick="deleteItem(\''+id+'\')">🗑 삭제</button>'
+    +'<button onclick="dMoreToggle()" title="푸른이알피 · 담당 변경 · 삭제">⋯</button>'
+    +(S.dMore?'<div class="dmore">'
+      +(it.src==='puerp'&&it.ref?'<button onclick="S.dMore=false;openPuerp(\''+escJ(it.ref.type)+'\')" title="푸른이알피 해당 메뉴로 이동">🔗 푸른이알피에서 열기</button>':'')
+      +'<button onclick="S.dMore=false;handoverModal(\''+id+'\')">🔄 담당 변경</button>'
+      +'<button class="del" onclick="S.dMore=false;deleteItem(\''+id+'\')">🗑 삭제</button>'
+      +'</div>':'')
     +'</div>';
-  dr.innerHTML=h;
+  /* 다시 그려도 «보던 자리»와 «쓰던 글»을 잃지 않는다 — 메일·자료가 늦게 와서 다시 그릴 때마다
+     본문이 맨 위로 튀거나 적던 기록이 지워지면 안 된다(같은 업무일 때만). */
+  var keep=null;
+  if(dr._id===id){
+    var ob=dr.querySelector('.dbody'), oi=$('dlog'), ot=$('dlog-to');
+    keep={ top:ob?ob.scrollTop:0, v:oi?oi.value:'', f:!!(oi&&document.activeElement===oi), to:ot?ot.value:'' };
+  }
+  dr.innerHTML=head+'<div class="dbody">'+h+'</div>'+dComposeHTML(id,it,cases)+foot;
+  dr._id=id;
+  if(keep){
+    var nb=dr.querySelector('.dbody'), ni=$('dlog'), nt=$('dlog-to');
+    if(nb&&keep.top) nb.scrollTop=keep.top;
+    if(nt&&keep.to) nt.value=keep.to;
+    if(ni&&keep.v){ ni.value=keep.v; }
+    if(ni&&keep.f){ ni.focus(); }
+  }
 }
 function drawerAdd(id,inp){
   var v=inp.value; if(!v.trim())return; inp.value='';
-  addLog(id,v,todayStr()).then(function(ok){ if(!ok){inp.value=v;return;} renderDrawer(); route();
+  /* 기록할 곳 — 이 회사 사건을 골랐으면 그 사건에 남긴다(고르지 않으면 이 업무) */
+  var sel=$('dlog-to'), to=(sel&&sel.value&&items[sel.value])?sel.value:id;
+  addLog(to,v,todayStr()).then(function(ok){ if(!ok){inp.value=v;return;}
+    if(to!==id) toast('⚖ '+(itemName(items[to])||'사건')+' 에 기록했습니다');
+    renderDrawer(); route();
     setTimeout(function(){var d2=$('dlog');if(d2)d2.focus();},50); });
 }
 function saveNext(id){
