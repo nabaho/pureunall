@@ -153,18 +153,22 @@
     consult:{ name:'정부사업일정', file:'gov-consulting.html', primaryRoots:['scal_roundlog','activeWriter/gov_consulting','scal_rptForms','scal_rptFormsIndex','scal_reports'],
       sharedRoots:['data/consultings','puphotos','pucards/coMail','pucards/sentDocs'], entityTypes:['Organization','Person','Project','ScheduleEvent','MediaAsset'] },
     /* 컨설팅보고서 — 모든 사업장·사업의 보고서 상태를 한눈에(대표 지시 2026-10-10 「포털 의뢰인 업무에 별도 앱」).
-       ★ 읽기만 한다 — 보고서(scal_reports)·양식 서고(scal_rptForms*)·일정(scal_*)의 주인은 정부사업일정(consult)이다.
+       ★ 보고서(scal_reports)·양식 서고(scal_rptForms*)·일정(scal_*)은 읽기만 한다 — 주인은 정부사업일정(consult)이다.
          쓰는 일(초안·AI·HWPX·확정)은 정부사업일정의 보고서 창으로 건너가서 한다(gov-consulting.html#rpt=).
        ⚠ 소유 자리 activeWriter/gov_report 는 등록부 계약(소유 자리 필수)을 맞추는 이름 자리다 — 이번 판은 쓰지 않는다.
          규칙은 activeWriter 통째(로그인)로 이미 열려 있다(scripts/make-firebase-rules.js).
        ⚠ scal_cos·scal_types·scal_scheds·scal_staff 는 정부사업일정이 FB_NODES 로 부르는 자리라 등록부에 주인이 아직 안 적혀 있다.
          이 화면도 같은 꼴(GR_NODES)로 부른다 — 주인 정리는 정부사업일정 몫이다(이번 범위 밖).
        ★ 서류 관리(2026-10-10, 설계 2026-10-10-gov-report-docs-design.md) — 왼쪽 패널·목차가 이알피 컨설팅 사업(data/biz_cons_types)·
-         컨설팅(data/consultings, 목차 머리말만)·ERP 연결(scal_erpTypeMap)을 빌려 읽는다. 쓰지 않는다(주인은 erp·consult). */
-    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report'],
+         컨설팅(data/consultings, 목차 머리말만)·ERP 연결(scal_erpTypeMap)을 빌려 읽는다. 쓰지 않는다(주인은 erp·consult).
+       ★ 서류 진행 기록(2026-10-10, 설계 2026-10-10-gov-report-track-design.md) — 이 앱이 처음으로 «쓴다»:
+         scal_docs/{업체}/{rid}/items/{줄 키}(③서명본·④별첨·⑤제출의 상태·날짜·메모, 줄 하나씩 .set). 주인은 이 앱이다.
+         이름 표 GR_TRACK_NODES 로 부른다. 규칙 scal_docs(scripts/make-firebase-rules.js)는 대표 승인 뒤 게시 —
+         게시 전에는 읽기·쓰기가 거절되고 화면은 읽기 전용으로 돈다. */
+    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report','scal_docs'],
       sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir',
                    'data/biz_cons_types','data/consultings','scal_erpTypeMap'],
-      writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'}],
+      writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'},{path:'scal_docs/{co}/{rid}/items/{key}',entityType:'Document'}],
       entityTypes:['Organization','Project','Document'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
        이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
@@ -457,7 +461,7 @@
     consult_core:{program:'consult',strategy:'local',path:'data/consultings',parser:'erp'},
     /* 컨설팅보고서 — 제 업무 자료가 없다(보고서는 consult 의 자리). 소유 자리는 «보던 자리» 예약뿐이라 in_app */
     govreport_view:{program:'govreport',strategy:'in_app',path:'activeWriter/gov_report',parser:'coverage',
-      gives:'이름 자리(예약 — 이번 판은 쓰지 않는다). 보고서 상태는 정부사업일정(consult)의 자리다'},
+      gives:'이름 자리(예약) · 서류 진행 기록(scal_docs, 앱 안에서만 본다). 보고서 상태는 정부사업일정(consult)의 자리다'},
     /* 푸른 캘린더 — 업무 자료를 «따로 담지 않는다». 일정·근태의 주인은 이알피이고
        그것은 erp_core 가 이미 읽는다. 여기서 또 읽으면 같은 일정이 두 번 세어진다.
        제 자리(data/cal_view)에 있는 것은 «어느 탭을 보고 있었나»뿐이라 업무 개체가 아니다.

@@ -691,6 +691,42 @@ rules.scal_reports = {
 /* 보고서 양식 서고 — 읽기는 로그인, 양식 등록·고침은 관리자만. */
 rules.scal_rptForms      = { '.read': LOGIN, '.write': ADMIN };
 rules.scal_rptFormsIndex = { '.read': LOGIN, '.write': ADMIN };
+/* 서류 진행 기록 (2026-10-10, 설계 docs/superpowers/specs/2026-10-10-gov-report-track-design.md §2-1)
+   scal_docs/{업체}/{rid}/items/{줄 키} — 컨설팅보고서 앱(gov-report.html)이 ③서명본·④별첨·⑤제출을 «줄 하나씩» 남긴다.
+   ★ 직원은 줄 하나를 만들고 고친다(상태를 「없음」으로 되돌리는 것도 «고침»이다). 진짜 지우기는 관리자만.
+   ★ 위쪽 칸(루트·$co·$rid·items)은 관리자 전용 — 위에서 열면 아래 «줄 단위» 잠금과 모양 검사를 위에서 뚫는다
+     (scal_reports 와 같은 까닭: 규칙은 위에서 아래로 내려가며 한 군데라도 허락하면 통과한다).
+   ★ 줄 모양은 화면 모듈(js/pu-gov-report-track.js)과 같은 값 — 상태 다섯 · 방식 넷 · 메모 200자 · 이름 40자 · 키 꼴
+     (tests/gov-report-rules.test.js 가 둘을 맞춰 본다). rid 아래에는 items 말고 아무것도 못 쓴다.
+   ⚠ 게시는 대표 승인 뒤에만(scripts/rules-deploy.js). 게시 전에는 읽기·쓰기가 거절되고 화면은 읽기 전용으로 돈다. */
+const SCAL_DOCS_DAY = "newData.isString() && newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)";
+rules.scal_docs = {
+  '.read': LOGIN,
+  '.write': ADMIN,
+  $co: {
+    '.write': ADMIN,
+    $rid: {
+      '.write': ADMIN,
+      items: {
+        '.write': ADMIN,
+        $key: {
+          '.write': `(${LOGIN}) && (newData.exists() || ${ADMIN})`,
+          '.validate': "$key.matches(/^[a-z]+(:[0-9]+)?$/) && $key.length <= 20 && newData.hasChildren(['st','at'])",
+          st:     { '.validate': "newData.isString() && newData.val().matches(/^(none|doing|done|blocked|na)$/)" },
+          at:     { '.validate': 'newData.isNumber()' },
+          sentAt: { '.validate': SCAL_DOCS_DAY },
+          gotAt:  { '.validate': SCAL_DOCS_DAY },
+          by:     { '.validate': 'newData.isString() && newData.val().length <= 40' },
+          note:   { '.validate': 'newData.isString() && newData.val().length <= 200' },
+          how:    { '.validate': "newData.isString() && newData.val().matches(/^(mail|platform|post|other)$/)" },
+          ack:    { '.validate': 'newData.isBoolean()' },
+          $other: { '.validate': false }
+        }
+      },
+      $other: { '.validate': false }
+    }
+  }
+};
 
 /* ══ 백업 ══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).

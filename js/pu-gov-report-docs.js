@@ -9,10 +9,14 @@
      · ①② 자동은 정부사업일정 보고서 창이 채우는 간단형 셋(AUTO)만 — 현황판 줄(buildRows)의 상태를 그대로 쓴다.
      · [확인 필요] 는 지어내지 않고 딱지로 보인다(현장클리닉 운영지침 · 농촌융복합 양식 글자 · 연결·계약 못 찾음).
      · 목차에는 업체 이름·담당 이름·날짜·서류 이름·상태만 — 연락처·금액·보고서 본문은 담지 않는다.
+     · ③④⑤ 칸·목차 딱지·현황판 줄 기록(trackRows)은 서류 진행 기록(scal_docs, pu-gov-report-track.js)을
+       «받았을 때만» 계산한다 — 못 읽었으면(규칙 게시 전·권한 없음) 지금처럼 「—」. 이 모듈은 여전히 쓰지 않는다.
+       (설계 docs/superpowers/specs/2026-10-10-gov-report-track-design.md)
    ⚠ 업체×사업 쌍(pairs)은 pu-gov-report-list.js candidates 와 같은 조건이다(지운 업체 뺌 · 사전진단 뺀 회차 · 해 = 첫 회차).
      한쪽만 바꾸면 체크표와 목록이 다른 업체를 센다.
    ⚠ 저장소는 공개다 — 검사는 합성 자료만 쓴다. */
 (function (root) {
+  var Track = (typeof module !== 'undefined' && module.exports) ? require('./pu-gov-report-track.js') : root.PuGovReportTrack;
   var NO_AGENCY = '기관 미지정';
   var UNLINKED = '정부사업일정에 사업 없음';
   var NO_PLAN = '서류 틀 없음';
@@ -20,6 +24,7 @@
   var AUTO = { 'cci-north': true, 'cci-seosan': true, techguard: true };
   var KIND_KO = { '간단': '간단형', '대형': '대형', '없음': NO_PLAN };
   var COLS = ['①초안', '②확정', '③서명본', '④별첨', '⑤제출'];
+  var TRACK_COLS = ['sign', 'attach', 'submit'];   // 체크표 ③④⑤ 칸 = 서류 틀 줄의 step
   /* gov-consulting.html CO_CORP_RE 의 줄인 꼴 — 이름 견주기에서 법인 표기를 뗀다 */
   var CORP_RE = /(주식회사|유한회사|유한책임회사|합자회사|합명회사|사단법인|재단법인|농업회사법인|영농조합법인|㈜|\(주\)|\(유\)|\(사\)|\(재\))/g;
 
@@ -245,8 +250,14 @@
     var lines = o.typeId ? pairs(o.input, o.typeId, o.year).map(function (p) {
       var r = byCo[p.coId + '|' + p.year] || null;
       var cons = consFor({ consultings: o.consultings, co: p.co, code: erp ? erp.code : '', typeId: o.typeId, tmap: o.tmap, biz: o.biz });
-      return { coId: p.coId, coName: p.coName, typeId: p.typeId, year: p.year, rounds: p.rounds,
-        cells: auto ? chips(r) : null, due: cons ? str(cons.endDate).slice(0, 10) : '' };
+      var cells = auto ? chips(r) : null;
+      /* 기록을 받았을 때만 ③④⑤ — 틀에 그 step 이 없으면 「—」(기술보호의 ③) */
+      if (cells && o.track) {
+        var rec = Track.recOf(o.track, p.coId, p.rid), n = Math.max(+p.rounds || 0, +p.planned || 0);
+        TRACK_COLS.forEach(function (s, i) { cells[2 + i] = Track.cellFor(plan, rec, s, n, o.today) || DASH; });
+      }
+      return { coId: p.coId, coName: p.coName, typeId: p.typeId, year: p.year, rid: p.rid, rounds: p.rounds, planned: p.planned,
+        cells: cells, due: cons ? str(cons.endDate).slice(0, 10) : '' };
     }) : [];
     return { plan: plan, auto: auto, cols: COLS.slice(), lines: lines };
   }
@@ -266,12 +277,35 @@
     var items = plan.items.map(function (x, i) {
       var subs = x.per === 'round' ? range(n) : (x.per === 'month' ? months(s || p.firstDate, e || p.lastDate) : []);
       var chip = (auto && x.step === 'report' && r && r.st) ? { txt: r.st.label, key: r.st.key } : { txt: '—', key: '' };
+      if (auto && o.rec && x.step !== 'report' && x.step !== 'plat') chip = Track.itemChip(x, o.rec, n, o.today) || chip;
       return { no: i + 1, id: x.id, name: x.name, per: x.per, step: x.step, subs: subs, chip: chip, check: check };
     });
     return { head: { coName: str(p.coName), bizName: erp ? erp.name : str(p.typeName), agency: erp ? (erp.agency || NO_AGENCY) : '',
         period: period, manager: sidName(o.dir, cons && cons.managerMain) || (p.attNames || []).join('·'), rounds: n,
         plan: plan.key, kind: plan.kind, warn: warn },
       items: items };
+  }
+  /* 현황판 줄(buildRows)에 서류 진행 기록을 붙인다 — r.trk(③④⑤ 칸·기한·회신 날수)와 r.st.steps 의 ③④ 막대.
+     간단형 셋(AUTO)만. 기록이 없으면(못 읽음) r.trk = null, 막대 ③④ 는 끈다. 여러 번 불러도 같다 */
+  function trackRows(rows, o) {
+    o = o || {};
+    var cos = {};
+    list((o.input || {}).cos).forEach(function (c) { cos[c.id] = c; });
+    (rows || []).forEach(function (r) {
+      if (!r) return;
+      var s = (r.st && r.st.steps) || [false, false, false, false];
+      r.trk = null;
+      if (r.st) r.st.steps = [!!s[0], !!s[1], false, false];
+      if (!o.track || !r.st) return;
+      var erp = erpTypeFor(r.typeId, o.biz, o.tmap), plan = planFor(erp ? erp.name : r.typeName);
+      if (!AUTO[plan.key]) return;
+      var cons = consFor({ consultings: o.consultings, co: cos[r.coId] || { id: r.coId, name: r.coName }, code: erp ? erp.code : '',
+        typeId: r.typeId, tmap: o.tmap, biz: o.biz });
+      r.trk = Track.rowTrack(plan, Track.recOf(o.track, r.coId, r.rid), Math.max(+r.rounds || 0, +r.maxRounds || 0),
+        cons ? str(cons.endDate).slice(0, 10) : '', o.today);
+      r.st.steps = [!!s[0], !!s[1], r.trk.bar3, r.trk.bar4];
+    });
+    return rows;
   }
   function tocText(toc) {
     toc = toc || {};
@@ -290,9 +324,9 @@
 
   var api = { rowsOf: rowsOf, visibleTypes: visibleTypes, groupByAgency: groupByAgency, planFor: planFor, linkOf: linkOf,
     pairs: pairs, sidebarGroups: sidebarGroups, erpTypeFor: erpTypeFor, coKey: coKey, consCode: consCode, consFor: consFor,
-    sidName: sidName, months: months, docsTable: docsTable, tocFor: tocFor, tocText: tocText,
+    sidName: sidName, months: months, docsTable: docsTable, tocFor: tocFor, tocText: tocText, trackRows: trackRows,
     DOC_PLANS: DOC_PLANS, NONE: NONE, AUTO: AUTO, KIND_KO: KIND_KO, COLS: COLS,
-    NO_AGENCY: NO_AGENCY, UNLINKED: UNLINKED, NO_PLAN: NO_PLAN };
+    NO_AGENCY: NO_AGENCY, UNLINKED: UNLINKED, NO_PLAN: NO_PLAN, TRACK_COLS: TRACK_COLS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuGovReportDocs = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
