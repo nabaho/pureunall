@@ -165,7 +165,7 @@ test('⑨㉯ 올라온 창 — 달을 넘기면 닫히고, 「최신」 표시�
 test('⑨ 폰에서 날을 누르면 «그 날을 본다» — 새로 넣기 창을 바로 띄우지 않는다(넓은 화면은 그대로)', () => {
   const i = 캘린더.indexOf("if(t.hasAttribute('data-day')){");
   assert.ok(i >= 0);
-  const 길 = 캘린더.slice(i, i + 300);
+  const 길 = 캘린더.slice(i, i + 1100);          /* 2026-10-11 시간 축 빈 칸 누르기가 끼어 «새로 넣기»가 더 아래로 밀렸다 */
   assert.match(길, /폰\(\) && S\.view === 'month'\)\{ S\.pick = 날짜; S\.sheet = true;/, '폰에서 날을 누르면 바로 쓰는 창이 뜹니다');
   assert.match(길, /openNew\(날짜\)/, '넓은 화면의 새로 넣기가 사라졌습니다');
 });
