@@ -21,25 +21,29 @@ const ROOT = path.join(__dirname, '..');
 const 원본 = fs.readFileSync(path.join(ROOT, 'pu-news.html'), 'utf8').replace(/\r\n/g, '\n');
 const news = stripComments(원본);
 
-/* 폰 규칙 덩이만 떼어 본다 — 다른 미디어쿼리의 규칙이 섞여 통과하면 안 된다 */
+/* 폰 규칙 덩이들만 떼어 본다 — 다른 미디어쿼리(넓은 화면·태블릿)의 규칙이 섞여 통과하면 안 된다 */
 function 폰규칙() {
-  /* ⚠ 「@media(max-width:560px)」 는 «여럿»이다(설정 칸·접는 줄 …).
-       첫 것을 잡으면 엉뚱한 덩이를 보게 된다 — 폰 손질을 모아 둔 «마지막» 덩이다. */
-  const i = news.lastIndexOf('@media(max-width:560px){');
-  assert.ok(i >= 0, '폰 규칙 덩이가 없다');
-  /* 중괄호를 세어 그 덩이만 */
-  let d = 0, k = news.indexOf('{', i);
-  for (; k < news.length; k++) {
-    if (news[k] === '{') d++;
-    else if (news[k] === '}') { d--; if (!d) break; }
+  /* ⚠ 「@media(max-width:560px)」 는 «여럿»이다(설정 칸·접는 줄·폰 정리 2026-09-12·폰 콤팩트 2026-10-12 …).
+       예전에는 «마지막» 덩이만 봤다(첫 것은 설정 칸 같은 작은 덩이라서). 그런데 2026-10-12 에 콤팩트 덩이가 «마지막»이 되어
+       이 검사가 일제히 엉뚱한 덩이를 보고 깨졌다 — 규칙은 «어느 덩이에 있나»가 아니라 «폰 규칙 어디엔가 있나»다. 그래서 전부 이어 붙여 본다. */
+  let 모음 = '', i = -1;
+  while ((i = news.indexOf('@media(max-width:560px){', i + 1)) >= 0) {
+    /* 중괄호를 세어 그 덩이만 */
+    let d = 0, k = news.indexOf('{', i);
+    for (; k < news.length; k++) {
+      if (news[k] === '{') d++;
+      else if (news[k] === '}') { d--; if (!d) break; }
+    }
+    모음 += news.slice(i, k + 1) + '\n';
   }
-  return news.slice(i, k + 1);
+  assert.ok(모음, '폰 규칙 덩이가 없다');
+  return 모음;
 }
 const 폰 = 폰규칙();
 
 /* ══════ ① 탭이 다 보인다 ══════ */
 
-test('★★ 폰에서 탭 다섯이 «다 보인다» — 굴려서 찾게 두지 않는다', () => {
+test('★★ 폰에서 탭이 «다 보인다» — 굴려서 찾게 두지 않는다', () => {
   /* 폰에서는 가로로 굴릴 수 있다는 것이 눈에 안 띈다 — 없는 탭으로 여기게 된다. */
   assert.match(폰, /#tabs button\{[^}]*flex:1/,
     '탭이 남는 자리를 나눠 갖지 않는다 — 다섯째가 화면 밖으로 나간다');
@@ -97,20 +101,25 @@ test('★★ 바둑판 칸이 «줄어들 수 있다» — 안 줄면 화면 밖
 
 /* ══════ ④ 표 ══════ */
 
-test('★★ 폰에서 표는 «옆으로 굴려» 본다 — 한 글자씩 세로로 쏟아지지 않게', () => {
-  assert.match(폰, /table\.list th,table\.list td\{white-space:nowrap\}/,
-    '표 칸이 접힌다 — 회사 이름이 한 글자씩 세로로 쏟아진다');
-  assert.match(폰, /table\.list\{min-width:\d+px\}/, '표가 제 폭을 못 가진다');
-  assert.match(폰, /\.box\{overflow-x:auto\}/, '표를 굴릴 자리가 없다');
+test('★★ 폰에서 표는 «카드»로 바뀐다 — 옆으로 굴려 보게 두지 않는다(2026-10-12 콤팩트)', () => {
+  /* 2026-09-12 에는 표를 «옆으로 굴려» 보게 했다(table.list{min-width:620px} + 칸 nowrap). 그랬더니 「실린 것」·담당자·나갔나·열람이
+     화면 밖에 있었다(대표 폰 캡처 2026-10-11). 이제는 열을 «카드 한 장의 칸»으로 바꾼다 — 칸이 폭을 다 쓰니 한 글자씩 쏟아지지도 않는다.
+     (카드 규칙의 세부는 tests/news-phone-compact.test.js) */
+  assert.ok(!/table\.list\s*\{[^}]*min-width:\s*\d+px/.test(폰), '표에 폭 바닥이 남았다 — 옆으로 굴려야만 보인다(열이 잘리던 까닭)');
+  assert.match(폰, /#main table\.list\{[^}]*display:\s*block/, '표가 카드로 안 바뀐다');
+  assert.match(폰, /#main table\.list td,#main table\.list th\{[^}]*white-space:\s*normal/, '카드 칸이 안 접힌다 — 회사 이름이 한 줄에 못 들어가면 잘린다');
+  /* 그물 — 못 줄이는 것이 하나 남아도 쪽 전체가 옆으로 밀리지 않는다 */
+  assert.match(폰, /\.box\{overflow-x:auto\}/, '상자 안전판이 없다');
 });
 
 /* ══════ ⑤ 단추 ══════ */
 
-test('★ 회차 단추는 두 칸으로, «보내기»만 제 줄을 온전히 쓴다', () => {
-  /* 되돌릴 수 없는 일이라 옆 단추와 나란히 두면 엄지로 잘못 누르기 쉽다. */
-  assert.match(폰, /\.hdbar>\.btn\{[^}]*flex:1 1 calc\(50% - \d+px\)/,
-    '단추가 두 칸으로 안 선다 — 넷이 세 줄을 먹는다');
-  assert.match(폰, /\.hdbar>\.btn\.pri\{flex:1 1 100%\}/,
+test('★ 회차 단추는 한 줄에 나란히, «보내기»만 제 줄을 온전히 쓴다', () => {
+  /* 되돌릴 수 없는 일이라 옆 단추와 나란히 두면 엄지로 잘못 누르기 쉽다.
+     (2026-10-12 콤팩트: 예전 «두 칸 바둑판»(넷이 세 줄)을 «한 줄에 셋 + 보내기 한 줄»로 줄였다 — 단추는 그대로 다 있다) */
+  assert.match(폰, /\.nowtop \.hdbar \.btn\.test[^{]*\{[^}]*flex:1 1 0/,
+    '다시 담기·시험 발송·예약 단추가 한 줄에 나란히 서지 않는다 — 넷이 세 줄을 먹는다');
+  assert.match(폰, /\.nowtop \.hdbar \.btn\.pri\{[^}]*flex:1 1 100%/,
     '보내기가 제 줄을 안 쓴다 — 잘못 눌리기 쉬운 자리다');
 });
 
@@ -118,7 +127,9 @@ test('★ 회차 단추는 두 칸으로, «보내기»만 제 줄을 온전히 
 
 test('★★ 위를 얼리는 규칙은 «넓은 화면에만» 있다 — 폰에서 새면 아무것도 못 본다', () => {
   /* 이미 다른 검사가 보는 규칙이지만, 폰 규칙을 만지다 새기 쉬운 자리라 여기서도 본다. */
-  assert.ok(!/overflow:hidden/.test(폰.slice(0, 폰.indexOf('.item'))),
+  /* 쪽 «자체»(html·body·#shell·.wrap·#main)를 안 구르게 하는 overflow:hidden 이 폰 규칙에 들어가면 안 된다.
+     ⚠ 이름·기간 같은 «칸 하나»를 말줄임하려고 건 overflow:hidden 은 다르다(2026-10-12 콤팩트) — 쪽을 안 구르게 하지 않는다. */
+  assert.ok(!/(?:^|[}\s,])(?:html|body|#shell|\.wrap|#main)(?:\[[^\]]*\])?\s*\{[^}]*overflow(?:-y)?:\s*hidden/.test(폰),
     '폰 규칙 안에 쪽을 안 구르게 하는 것이 들어갔다');
   assert.match(news, /@media\(min-width:981px\)\{[\s\S]{0,200}?html,body\{height:100%;overflow:hidden\}/,
     '얼리기가 넓은 화면 조건 밖으로 나갔다');
