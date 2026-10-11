@@ -251,3 +251,22 @@ test('칩 크기 — 구글 실측(글자 12px · 굵기 500 · 줄 20px · 모�
   /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
   assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
 });
+
+/* ── 상세 팝업·시각 일정 글자는 구글 공식 화면 실측 (2026-10-11) ── */
+test('상세 팝업 — 구글 실측: 상자 448px · 모서리 28px · 배경 #f0f4f9 · 날짜 「10월 12일 (월요일)」 진한 글자', () => {
+  const 팝업 = 캘린더.match(/\n\s*\.modal\.det\{[^}]*\}/);
+  assert.ok(팝업, '.modal.det 규칙을 못 찾았습니다');
+  assert.match(팝업[0], /border-radius:28px/); assert.match(팝업[0], /max-width:min\(448px/); assert.match(팝업[0], /background:#f0f4f9/);
+  assert.match(캘린더, /:root\[data-theme="dark"\] \.modal\.det\{background:var\(--panel\)\}/, '어두운 화면은 판색을 따른다');
+  assert.match(캘린더, /\.dwhen\{font-size:14px;line-height:20px;color:var\(--gtext\)/, '날짜 줄이 구글처럼 진한 글자가 아닙니다');
+  const b = 상자();
+  vm.runInContext(함수몸('function 상세날짜글(ymd){'), b);
+  const 글 = (v) => vm.runInContext('상세날짜글("' + v + '")', b);
+  assert.strictEqual(글(new Date().getFullYear() + '-10-12'), '10월 12일 (' + ['일','월','화','수','목','금','토'][new Date(new Date().getFullYear(), 9, 12).getDay()] + '요일)');
+  assert.match(글('2025-12-31'), /^2025년 12월 31일 \(수요일\)$/);
+});
+
+test('시각 일정 칩 — 구글 실측: 시각 12px/400 · 제목 12px/500', () => {
+  assert.match(캘린더, /\.ev\[data-g="t"\]\{padding:1px 4px;font-weight:500;background:transparent\}/);
+  assert.match(캘린더, /\.ev \.gtm\{margin-right:4px;font-weight:400\}/);
+});
