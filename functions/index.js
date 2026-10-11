@@ -1189,6 +1189,8 @@ exports.recruitWatch = functions
    ★ 검색은 서버에 «이미 있는» 열쇠(KAKAO_REST_KEY — 카카오 로그인용)로 다음 웹검색·카카오맵 업체검색을 부른다.
      새로 신청할 것이 없다. 네이버 열쇠는 서버에 없다(대표 결정 「가입 안 하고 진행 안 한다」). */
 const RehabContact = require("./rehab-contact");
+const RehabMatch = require("./rehab-match");
+const RehabAutoMail = require("./rehab-automail");
 
 function rehabProviders() {
   const key = process.env.KAKAO_REST_KEY;
@@ -1217,6 +1219,87 @@ async function rehabPool(list, limit, deadline, worker) {
   };
   await Promise.all(Array.from({ length: limit }, loop));
 }
+
+/* ── 회생광고 자동 메일 — 거래 관계가 있는 곳에만 (functions/rehab-automail.js 머리말) ──
+   rehab_ad/auto/settings  { enabled, dailyCap }   ← rehabAuto 가 적는다(관리자). 기본값은 꺼짐.
+   rehab_ad/auto/optout    { <메일열쇠>: {at, by} } ← 수신거부 명단
+   rehab_ad/auto/sent      { <공고번호>: {email, at, queueId} } ← 걸었다는 기록(두 번 안 보내려고)
+   rehab_ad/auto/preview   { at, enabled, cap, sentToday, items:[…], skipped:[…] } ← 화면이 보여 주는 «보낼 곳»
+   걸린 메일은 pucards/scheduled 에 들어가 sendScheduledMail 이 15분 안에 보낸다. */
+async function rehabAutoRun(db, nowMs, opts) {
+  const root = db.ref("rehab_ad");
+  const [setSnap, optSnap, sentSnap, noticeSnap, markSnap, comp, cont, idxSnap] = await Promise.all([
+    root.child("auto/settings").once("value"), root.child("auto/optout").once("value"), root.child("auto/sent").once("value"),
+    root.child("notices").once("value"), root.child("marks").once("value"),
+    db.ref("data/companies/v").once("value"), db.ref("data/contracts/v").once("value"), db.ref("pucards/idx").once("value"),
+  ]);
+  const settings = RehabAutoMail.cleanSettings(setSnap.val());
+  const index = RehabMatch.buildIndex({ erpCompanies: comp.val(), erpContracts: cont.val(), cardsIdx: idxSnap.val() });
+  const p = RehabAutoMail.plan({ nowMs, settings, notices: noticeSnap.val() || {}, marks: markSnap.val() || {}, index,
+    sent: sentSnap.val() || {}, optout: optSnap.val() || {} });
+  const queueNow = !!(opts && opts.queue) && settings.enabled;
+  const sendAt = RehabAutoMail.nextSendAt(nowMs);
+  const queued = [];
+  const upd = {};
+  if (queueNow) {
+    p.toSend.forEach((c) => {
+      const qid = "rehab-" + c.id + "-" + nowMs.toString(36);
+      upd["pucards/scheduled/" + qid] = RehabAutoMail.queueRow(c, nowMs, sendAt);
+      upd["rehab_ad/auto/sent/" + c.id] = { email: c.email, at: nowMs, queueId: qid, sendAt, name: c.name };
+      queued.push(c.id);
+    });
+  }
+  upd["rehab_ad/auto/preview"] = {
+    at: nowMs, enabled: settings.enabled, cap: p.cap, sentToday: p.sentToday + queued.length, queued: queued.length,
+    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
+    skipped: p.skipped.slice(0, 40),
+  };
+  await db.ref().update(upd);
+  return { enabled: settings.enabled, candidates: p.candidates.length, queued: queued.length, skipped: p.skipped.length };
+}
+
+exports.rehabAuto = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(m[1], true);
+      const db = getDatabase();
+      const role = (await db.ref("uid_roles/" + decoded.uid).once("value")).val() || {};
+      if (role.isAdmin !== true) { res.status(403).json({ error: "총괄관리자만 부를 수 있습니다." }); return; }
+      const body = req.body || {};
+      const action = String(body.action || "get");
+      const root = db.ref("rehab_ad");
+      if (action === "set") {
+        const next = RehabAutoMail.cleanSettings({ enabled: body.enabled === true, dailyCap: body.dailyCap });
+        await root.child("auto/settings").set(Object.assign({}, next, { by: decoded.email || decoded.uid, at: Date.now() }));
+      } else if (action === "optout") {
+        const email = String(body.email || "").trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email)) { res.status(400).json({ error: "메일 주소 모양이 아닙니다." }); return; }
+        await root.child("auto/optout/" + RehabAutoMail.emailKey(email)).set({ email, at: Date.now(), by: decoded.email || decoded.uid });
+      } else if (action === "optout-remove") {
+        const email = String(body.email || "").trim().toLowerCase();
+        await root.child("auto/optout/" + RehabAutoMail.emailKey(email)).remove();
+      }
+      /* 어떤 일을 했든 «미리보기»는 새로 계산한다 — 걸지는 않는다(queue 없음) */
+      const sum = await rehabAutoRun(db, Date.now(), { queue: false });
+      const [setSnap, optSnap, prevSnap, sentSnap] = await Promise.all([
+        root.child("auto/settings").once("value"), root.child("auto/optout").once("value"),
+        root.child("auto/preview").once("value"), root.child("auto/sent").limitToLast(30).once("value"),
+      ]);
+      res.json({ ok: true, settings: RehabAutoMail.cleanSettings(setSnap.val()), optout: Object.keys(optSnap.val() || {}).map((k) => (optSnap.val()[k] || {}).email || k),
+        preview: prevSnap.val() || null, recent: sentSnap.val() || {}, summary: sum });
+    } catch (err) {
+      console.error("[rehabAuto]", err);
+      res.status(500).json({ error: String((err && err.message) || "처리하지 못했습니다.").slice(0, 160) });
+    }
+  });
 
 exports.rehabWatch = functions
   .region(MAIL_REGION)
@@ -1268,6 +1351,9 @@ exports.rehabWatch = functions
       upd["runs/" + today].contactNote = "검색 열쇠(KAKAO_REST_KEY)가 서버에 없어 연락처를 찾지 않았습니다";
     }
     await root.update(upd);
+    /* 자동 메일 — 꺼져 있으면(기본) 미리보기만 남긴다. 실패해도 수집은 이미 끝났다. */
+    try { const au = await rehabAutoRun(getDatabase(), Date.now(), { queue: true }); console.log("[회생광고 자동메일]", au); }
+    catch (e) { console.warn("[회생광고 자동메일]", String((e && e.message) || e).slice(0, 160)); }
     console.log("[회생광고 수집]", { checked: result.checked, found: result.found, added: result.added.length,
       updated: Object.keys(result.eventUpdates).length, contact: upd["runs/" + today].contact, errors: result.errors });
     return null;
