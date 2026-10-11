@@ -1734,7 +1734,7 @@ async function 감시용회차(db, 열쇠) {
   return 있음 ? o : null;
 }
 
-/* 일요일 보충 한 번 — 일요일 17시(newsletterSundayRefill)와 «오늘만 23시»가 함께 부른다.
+/* 일요일 보충 한 번 — 일요일 17시(newsletterSundayRefill)가 부른다.
    판단은 news-watch.js(보충할까·보충하기), 고르기는 Core.거리고르기 — 여기는 읽고 쓰기만. */
 async function 일요일보충한번(누가) {
   const db = getDatabase();
@@ -1903,21 +1903,6 @@ exports.newsletterSundayRefill = functions
   .timeZone("Asia/Seoul")
   .onRun(async () => {
     await 일요일보충한번("일요일 보충");
-    return null;
-  });
-
-/* ★ 오늘만 — 2026-10-04(일) 23:00 한 번 (대표 지시 「오늘꺼 만 예외로 23시에 모아달라. 그리고 내일 오전 06시에 보내라」)
-   일요일 17시 보충이 배포되기 전에 17시가 지나, 10/5 편지에 새것을 넣으려고 오늘 밤만 한 번 더 돈다.
-   ⚠ 날짜 문지기 — 서울 날이 2026-10-04 가 아니면 아무것도 안 한다(크론이 해마다 10/4 에 다시 부르기 때문).
-   ⚠ 다 돌고 나면 지워도 된다: firebase functions:delete newsletterRefillOnce20261004 --region asia-northeast3 */
-exports.newsletterRefillOnce20261004 = functions
-  .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 540, memory: "1GB", secrets: ["ILABOR_ID", "ILABOR_PW"] })
-  .pubsub.schedule("0 23 4 10 *")
-  .timeZone("Asia/Seoul")
-  .onRun(async () => {
-    if (서울오늘() !== "2026-10-04") { console.log("[오늘만 보충] 날짜가 지나 아무것도 안 함"); return null; }
-    await 일요일보충한번("오늘만 23시 보충");
     return null;
   });
 
