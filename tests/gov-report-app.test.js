@@ -1385,7 +1385,7 @@ test('58 grWriteMail — 쓰기 창(puMailComposeTo)에 {받는이·참조·꼬�
   assert.ok(o.body.includes('서명') && !o.body.includes('@'), '본문에 주소·연락처를 넣지 않는다');
   assert.ok(w.els.cwSendMsg.textContent.includes('쓰기 창을 열었습니다'));
   assert.equal(w.db.쓴것.length, 0, '메일을 열기만 한다 — 아무것도 쓰지 않는다');
-  assert.equal(w.ctx.copied, undefined, '값을 채웠으면 클립보드는 쓰지 않는다');
+  assert.ok(/서명\(날인\)하여 스캔본/.test(w.ctx.copied), '복사는 창을 열기 전에 해 둔다 — 열면 초점을 잃어 크롬이 거절한다(값 채우기가 되어도 본문이 복사돼 있다)');
 
   /* 주소 하나뿐 — 참조 없음 */
   calls.length = 0;
@@ -1715,7 +1715,7 @@ test('66 grWriteSubmit — 지난 제출 메일에서 받는이를 따라 쓰기
   assert.ok(msg.textContent.includes('지난 제출 메일(2026-09-29)에서 받는 사람을 따라 왔습니다 — 확인하세요'), 'grOpenMail 이 덮은 뒤 다시 쓴다: ' + msg.textContent);
   assert.ok(msg.textContent.includes('쓰기 창을 열었습니다') && msg.className === 'days');
   assert.equal(w.db.쓴것.length, 0);
-  assert.equal(w.ctx.copied, undefined);
+  assert.ok(/제출합니다/.test(w.ctx.copied), '복사는 창을 열기 전에 해 둔다');
 
   /* 쓰기 창이 값 채우기를 거절 — 받는이·참조·제목만 주소로, 본문은 클립보드 · 안내는 그대로 */
   calls.length = 0;

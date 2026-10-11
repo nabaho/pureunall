@@ -660,24 +660,25 @@ function grMarkSent(day){
 /* 「서명본으로 연결」 — 회신 후보 첨부 하나: 연결 + 회신일(그 메일 날짜) + 완료, 한 번의 저장 */
 function grLinkReply(i,j){
   var S=PuGovReportSend, c=GR.cw, m=c&&c.cands?c.cands[i]:null, a=m?m.atts[j]:null;
-  if(!c||c.step!=='sign'||!m||!a||m.priv||!m.reply) return Promise.resolve();
+  if(!c||c.busy||c.step!=='sign'||!m||!a||m.priv||!m.reply) return Promise.resolve();
   var lk=PuGovReportInbox.linkFrom(m,a.name);
   if(!lk||!grApplyFields(S.gotFields('sign',m.day))) return Promise.resolve();
   return grSaveCell({link:lk});
 }
-/* 「메일 쓰기」 — 푸른메일함 쓰기 창(puMailComposeTo)에 값을 채워 연다. 안 되면 주소(받는이·참조·제목만)로, 본문은 클립보드로 */
+/* 「메일 쓰기」 — 푸른메일함 쓰기 창(puMailComposeTo)에 값을 채워 연다. 안 되면 주소(받는이·참조·제목만)로, 본문은 클립보드로.
+   ★ 복사는 창을 열기 «전에» 시작한다 — 열고 나면 이 쪽이 초점을 잃어 크롬이 복사를 거절한다(처음 누를 때는 늘 «안 되는» 길). 값 채우기가 되어도 복사는 해 둔다 */
 function grCopy(txt){ try{ return navigator.clipboard.writeText(txt).then(function(){ return true; },function(){ return false; }); }catch(e){ return Promise.resolve(false); } }
 function grOpenMail(p){
-  var S=PuGovReportSend, w=null, ok=false;
+  var S=PuGovReportSend, w=null, ok=false, c0=GR.cw, url=S.composeUrl('pu-cards.html',p);
+  var copyP=grCopy(url?p.body:(p.subject+'\n\n'+p.body));
   try{ w=window.open('','puMailWrite'); }catch(e){ w=null; }
   if(!w){ grSay('쓰기 창이 막혔습니다 — 팝업을 허용해 주세요',true); return Promise.resolve(false); }
   try{ if(w!==window&&typeof w.puMailComposeTo==='function') ok=!!w.puMailComposeTo({card:'',to:p.to,cc:p.cc,subject:p.subject,body:p.body}); }catch(e){ ok=false; }
   if(!ok){
-    var url=S.composeUrl('pu-cards.html',p);
     try{ w.location.href=url||'pu-cards.html?view=mail'; }catch(e){ try{ w=window.open(url||'pu-cards.html?view=mail','puMailWrite')||w; }catch(x){} }
     try{ w.focus(); }catch(e){}
-    return grCopy(url?p.body:(p.subject+'\n\n'+p.body)).then(function(copied){
-      grSay(copied?(url?S.MSG.BODY_COPIED:S.MSG.COPIED_ALL):'쓰기 창을 열었습니다 — 본문은 복사하지 못했습니다',!copied);
+    return copyP.then(function(copied){
+      if(GR.cw===c0) grSay(copied?(url?S.MSG.BODY_COPIED:S.MSG.COPIED_ALL):'쓰기 창을 열었습니다 — 본문은 복사하지 못했습니다',!copied);
       return true;
     });
   }
@@ -706,7 +707,7 @@ function grWriteSubmit(){
   grSay(note,!f);
   return grOpenMail(S.composeParts(d,to,cc)).then(function(r){
     var e=$('cwSendMsg'), cur=e?e.textContent:'', bad=!!e&&e.className==='err-s';
-    if(r) grSay(note+(cur?' / '+cur:''),bad||!f);
+    if(r&&GR.cw===x.c) grSay(note+(cur?' / '+cur:''),bad||!f);
     return r;
   });
 }
