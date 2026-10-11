@@ -31,3 +31,11 @@ test('③ 공제는 기본 접힘 · ④ 이름 칸 기본 고정', () => {
   assert.match(SRC, /var sc = useState\(false\); var showDeduct = sc\[0\];/);
   assert.match(SRC, /getItem\('pureun_v6_payroll_freeze_col'\) \|\| 'name'/);
 });
+
+test('글자 크기 — 머리 12px 이상 · 숫자 13px 이상 (대표 「급여관리도 글자 더크게」 2026-10-11)', () => {
+  const th = SRC.match(/var thStyle = \{[^}]*fontSize:'([\d.]+)px'/);
+  const td = SRC.match(/var tdNum = \{[^}]*fontSize:'([\d.]+)px'/);
+  assert.ok(th && td, '급여대장 thStyle/tdNum 을 못 찾았습니다');
+  assert.ok(parseFloat(th[1]) >= 12, '머리 글자가 작습니다: ' + th[1]);
+  assert.ok(parseFloat(td[1]) >= 13, '숫자 글자가 작습니다: ' + td[1]);
+});
