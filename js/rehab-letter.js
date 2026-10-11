@@ -111,6 +111,21 @@
       '※ 법원 회생 공고를 보고 드리는 1회 안내입니다. 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'
     ].filter(function (x, i, a) { return x !== '' || (a[i - 1] !== '' && i > 0); }).join('\n');
   }
+  /* 광고성 메일 — 거래 관계가 있는 곳에만 자동으로 나간다(정보통신망법 제50조: 제목 앞 「(광고)」, 보내는 이, 수신거부 방법).
+     opts.ceo — 대표자 이름을 알면 「○○○ 대표이사님」 */
+  var AD_SUBJECT = '(광고) ' + MAIL_SUBJECT;
+  function buildAdMail(c, opts) {
+    opts = opts || {};
+    var text = buildPlainText(c, { ceo: opts.ceo, existing: true });
+    var foot = [
+      '',
+      '──────────',
+      '이 메일은 귀사와 ' + FIRM.name + '의 거래 관계에 따라 보내드리는 광고성 정보입니다.',
+      '수신을 원하지 않으시면 이 메일에 회신하여 「수신거부」라고 적어 주시거나 ' + OFFICES[0].tel + '(천안)로 연락 주십시오. 바로 중단하겠습니다.',
+      '발신: ' + FIRM.name + ' · ' + FIRM.addr + ' · ' + FIRM.email
+    ].join('\n');
+    return { subject: AD_SUBJECT, text: '(광고)\n\n' + text + foot };
+  }
   /* 푸른 메일 쓰기 창을 «주소줄로» 채울 때 쓰는 짧은 본문 — 주소줄이 길면(약 8KB) 서버가 거절한다.
      한글은 글자마다 9글자로 늘어나므로 본문을 600자 안팎으로 줄였다. 자세한 안내문은 PDF 로 저장해 첨부한다. */
   function buildMailBody(c, opts) {
@@ -183,6 +198,6 @@
       (opts && opts.noPrint ? '' : '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>') + '</body></html>';
   }
 
-  return { LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
+  return { buildAdMail: buildAdMail, AD_SUBJECT: AD_SUBJECT, LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
     buildLabelSheets: buildLabelSheets, buildDocument: buildDocument, CSS: CSS };
 });

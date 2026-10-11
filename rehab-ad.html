@@ -82,6 +82,15 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
   tbody tr.cur td.ck,tbody tr.cur td.no,tbody tr.cur td.co{background:var(--blue-bg)}
 }
 @media (max-width:1100px){ .guide{grid-template-columns:1fr} }
+.auto{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:12.5px}
+.auto>summary{cursor:pointer;padding:7px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;list-style:none}
+.auto>summary::-webkit-details-marker{display:none}
+.auto .abody{padding:4px 12px 12px;border-top:1px solid var(--line)}
+.auto .arow{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:8px 0}
+.auto table{width:100%;min-width:0;table-layout:auto;border-collapse:collapse;margin:4px 0}
+.auto th,.auto td{padding:4px 8px;font-size:12px;border-bottom:1px solid var(--line);text-align:left;overflow:visible;white-space:normal}
+.auto .legal{color:var(--mute);font-size:11.5px;line-height:1.5;margin-top:6px}
+.auto input[type=text],.auto input[type=email]{padding:4px 8px;border:1px solid var(--line2);border-radius:8px;min-width:220px}
 .fsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:stretch}
 .fsteps>button{font-size:12px;padding:3px 10px;white-space:nowrap}
 .fs{border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
@@ -229,6 +238,7 @@ td.ceo{}
     <div class="gs"><b>③ 골라서 보냅니다</b><br>맨 앞 ☐로 고르고 <b>📮 발송 예정</b> → <b>🖨 안내문 + 라벨</b> 인쇄 → 우편 발송 뒤 <b>✅ 발송 완료로</b>.</div>
     <button class="sm" onclick="$('guide').style.display='none';lsSet('guideOff','1')" title="안내 닫기" style="align-self:start">닫기 ✕</button>
   </div>
+  <details class="auto" id="autoBox"><summary id="autoSum">✉ 자동 발송 — 불러오는 중…</summary><div class="abody" id="autoBody"></div></details>
   <details class="law"><summary>⚖️ 왜 우편으로 보내나요? (법적 유의)</summary><div class="note">
     <span>⚖️</span>
     <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조) 기업을 매일 아침 모읍니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
@@ -349,6 +359,64 @@ td.ceo{}
 <script src="js/rehab-match.js?v=1"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
+var AUTO_URL='https://asia-northeast3-pureun-erp.cloudfunctions.net/rehabAuto';
+var AUTO={ settings:{enabled:false,dailyCap:5}, preview:null, optout:[], recent:{} };
+async function loadAuto(){
+  try{
+    var v=(await fbDb.ref('rehab_ad/auto').once('value')).val()||{};
+    AUTO.settings=Object.assign({enabled:false,dailyCap:5}, v.settings||{});
+    AUTO.preview=v.preview||null;
+    AUTO.optout=Object.keys(v.optout||{}).map(function(k){ return (v.optout[k]||{}).email||k; });
+    AUTO.recent=v.sent||{};
+  }catch(e){}
+  drawAuto();
+}
+async function autoCall(body, okMsg){
+  var tok; try{ tok=await firebase.auth().currentUser.getIdToken(); }catch(e){ toast('로그인이 필요합니다'); return; }
+  try{
+    var r=await fetch(AUTO_URL,{ method:'POST', headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok }, body:JSON.stringify(body) });
+    var j={}; try{ j=await r.json(); }catch(e){}
+    if(r.status===404) throw new Error('서버 함수(rehabAuto)가 아직 올라가지 않았습니다');
+    if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
+    AUTO.settings=j.settings||AUTO.settings; AUTO.preview=j.preview||null; AUTO.optout=j.optout||[]; AUTO.recent=j.recent||{};
+    drawAuto(); if(okMsg) toast(okMsg);
+  }catch(e){ toast('처리하지 못했습니다: '+(e&&e.message||e)); }
+}
+function drawAuto(){
+  var s=AUTO.settings, p=AUTO.preview||{}, items=p.items||[], skipped=p.skipped||[];
+  $('autoSum').innerHTML='✉ <b>자동 발송</b> (거래처만) '+
+    '<span class="chip '+(s.enabled?'c-green':'c-gray')+'" style="margin-left:0">'+(s.enabled?'켜짐':'꺼짐')+'</span>'+
+    '<span style="color:var(--mute)">보낼 곳 '+items.length+'곳 · 오늘 건 '+(p.sentToday||0)+'/'+s.dailyCap+'통</span>';
+  var rows=items.map(function(x){
+    return '<tr><td>'+esc(x.name)+'</td><td>'+esc(x.email)+'</td><td>'+esc(x.ceo||'')+'</td><td>'+(x.willSend?'<span class="chip c-green" style="margin-left:0">걸었음</span>':'<span class="chip c-gray" style="margin-left:0">'+(s.enabled?'다음 실행 때':'꺼져 있어 안 보냄')+'</span>')+'</td></tr>';
+  }).join('');
+  var skip=skipped.map(function(x){ return '<tr><td>'+esc(x.name)+'</td><td colspan="3">'+esc(x.reason)+'</td></tr>'; }).join('');
+  var rec=Object.keys(AUTO.recent||{}).map(function(k){ return AUTO.recent[k]; }).sort(function(a,b){ return (b.at||0)-(a.at||0); }).slice(0,10).map(function(x){
+    return '<tr><td>'+esc(x.name||'')+'</td><td>'+esc(x.email||'')+'</td><td colspan="2">'+new Date(x.at||0).toLocaleString('ko-KR')+'</td></tr>'; }).join('');
+  $('autoBody').innerHTML=
+    '<div class="arow"><button class="'+(s.enabled?'':'pri')+'" onclick="autoToggle()">'+(s.enabled?'⏸ 끄기':'▶ 켜기')+'</button>'+
+    '<label>하루 <select id="autoCap" onchange="autoCap()">'+[3,5,10,20].map(function(n){ return '<option value="'+n+'"'+(n===s.dailyCap?' selected':'')+'>'+n+'통</option>'; }).join('')+'</select> 까지</label>'+
+    '<button class="sm" onclick="autoCall({action:\'get\'},\'새로 계산했습니다\')">↻ 새로 계산</button>'+
+    '<span style="color:var(--mute)">'+(p.at?'계산: '+new Date(p.at).toLocaleString('ko-KR'):'아직 계산 전')+'</span></div>'+
+    '<b>보낼 곳</b> <span style="color:var(--mute)">(계약·거래중이고 우리 이알피 자료에 메일이 있는 곳만 · 매일 아침 수집 뒤 자동으로 건다)</span>'+
+    '<table><tr><th>회사</th><th>메일(우리 자료)</th><th>대표자</th><th>상태</th></tr>'+(rows||'<tr><td colspan="4" style="color:var(--mute)">지금 보낼 곳이 없습니다</td></tr>')+'</table>'+
+    (skip?'<details><summary style="cursor:pointer;color:var(--mute)">건너뛴 곳 '+skipped.length+'곳 — 이유 보기</summary><table>'+skip+'</table></details>':'')+
+    (rec?'<b>최근 건 곳</b><table>'+rec+'</table>':'')+
+    '<div class="arow"><b>수신거부 명단</b><input type="email" id="autoOptIn" placeholder="메일 주소를 적고 추가">'+
+    '<button class="sm" onclick="autoOptout()">추가</button></div>'+
+    '<div>'+(AUTO.optout.length?AUTO.optout.map(function(e){ return '<span class="chip c-gray" style="margin-left:0;margin-right:4px">'+esc(e)+' <a href="#" onclick="autoOptRemove(\''+esc(e)+'\');return false" title="명단에서 빼기">✕</a></span>'; }).join(''):'<span style="color:var(--mute)">비어 있음</span>')+'</div>'+
+    '<div class="legal">· 제목 앞 「(광고)」, 보내는 이, 수신거부 방법이 자동으로 들어갑니다. 오전 8시~오후 9시에만 나가고 밤에 걸리면 다음 날 아침입니다. 같은 공고·같은 주소로는 다시 안 보냅니다.<br>'+
+    '· 홈페이지·검색에서 읽어 온 메일·팩스는 <b>절대 쓰지 않습니다</b>(정보통신망법 제50조·제50조의2). 꺼져 있으면 아무것도 보내지 않습니다.</div>';
+}
+function autoToggle(){
+  var on=!AUTO.settings.enabled;
+  var msg=on?'자동 발송을 켭니다.\n\n매일 아침 수집 뒤, 계약·거래중인 곳(우리 이알피 메일)에 하루 '+AUTO.settings.dailyCap+'통까지 (광고) 메일이 자동으로 나갑니다.\n되돌릴 수 없으니 안내문 문구를 노무사가 확인한 뒤에 켜세요. 켤까요?':'자동 발송을 끕니다. 이미 건 메일은 15분 안에 나갈 수 있습니다. 끌까요?';
+  if(!confirm(msg)) return;
+  autoCall({action:'set', enabled:on, dailyCap:AUTO.settings.dailyCap}, on?'켰습니다':'껐습니다');
+}
+function autoCap(){ autoCall({action:'set', enabled:AUTO.settings.enabled, dailyCap:Number($('autoCap').value)}, '하루 상한을 바꿨습니다'); }
+function autoOptout(){ var e=$('autoOptIn').value.trim(); if(!e){ toast('메일 주소를 적어 주세요'); return; } autoCall({action:'optout', email:e}, '수신거부 명단에 넣었습니다'); }
+function autoOptRemove(e){ if(!confirm(e+' 을(를) 수신거부 명단에서 뺄까요?')) return; autoCall({action:'optout-remove', email:e}, '명단에서 뺐습니다'); }
 var ENRICH_URL='https://asia-northeast3-pureun-erp.cloudfunctions.net/rehabEnrich';
 var fbDb=null, gate=null;
 var NOTICES={}, MARKS={}, INFO={}, LASTRUN=null, IDX=null, MATCH={}, LINKNOTE='';
@@ -796,7 +864,7 @@ async function reload(){
     NOTICES=r[0].val()||{};
     var runs=r[3].val()||{}, k=Object.keys(runs).pop(); LASTRUN=k?Object.assign({date:k},runs[k]):null;
     fillFilters(); recomputeMatch(); draw();
-    loadLinks();
+    loadLinks(); loadAuto();
   }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
 }
 function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; draw(); }
