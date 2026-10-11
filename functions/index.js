@@ -1700,6 +1700,10 @@ async function 뉴스레터경고판갱신(db) {
    ⚠ 공개 열쇠(OC=test) — 판례 모으개(news-prec.js)와 같은 문. 못 읽으면 그 조문만 빠진다(AI 는 원문 없는 조문을 판단하지 않는다). */
 async function 법조문원문(조목록) {
   const 밑 = "https://www.law.go.kr/DRF/";
+  /* ⚠ 법제처 XML 은 «번호 칸»(<항번호>①)과 «내용 칸»(<항내용>① 사용자는…)이 둘 다 번호를 적는다 — 태그만 걷으면
+       「① ① 사용자는」 이 되어 AI 교정자가 «번호 중복»이라고 올린다(2026-10-11 근로기준법 제55조 오탐, 편지는 멀쩡했다).
+       내용 맨 앞에 «같은 번호»가 있을 때만 번호 칸을 버린다(없으면 번호를 살린다). 항·호·목이 같은 모양이다. */
+  const 번호겹침 = /<(항|호|목)번호>\s*([^<]*?)\s*<\/\1번호>\s*(<\1내용>\s*)(?=\2\s)/g;
   const 받기 = async (u) => {
     const ac = new AbortController(); const t = setTimeout(() => ac.abort(), 8000);
     try { const r = await fetch(u, { signal: ac.signal }); return r.ok ? await r.text() : ""; }
@@ -1721,7 +1725,7 @@ async function 법조문원문(조목록) {
     const 조 = 글.replace(/<!\[CDATA\[|\]\]>/g, "").match(/<조문내용>[\s\S]*?<\/조문단위>/);
     if (!조) continue;
     결과.push({ 이름: c.법 + " 제" + c.조 + "조" + (c.의 ? "의" + c.의 : ""),
-      원문: 조[0].replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
+      원문: 조[0].replace(번호겹침, "$3").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 1500) });
   }
   return 결과;
 }
