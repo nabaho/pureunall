@@ -189,7 +189,7 @@ test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 
   assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
   assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
   assert.match(함수몸('function 개인에넣기(m){'), /repeat:\(m\.mode === "new" && m\.repeat\)/);
-  assert.match(캘린더, /"vis","repeat","remind"(?:,"guests")?\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
+  assert.match(캘린더, /"vis","repeat","remind"(?:,"guests")?(?:,"attach")?\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
 });
 
 /* ── 「참석자 추가」·「Google Meet 화상 회의 추가」 줄 (구글 입력 화면, 2026-10-11) ── */
@@ -280,4 +280,11 @@ test('PC 「오늘」 단추·월 제목 — 구글 실측(78×36, 1px #747775, 
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /\.todaybtn\{padding:0 24px;height:36px;border:1px solid #747775;[^}]*border-radius:18px;\s*cursor:pointer;font-size:14px;font-weight:500/);
   assert.match(캘, /\.monthbar \.ym\{font-size:18px;font-weight:400/);
+});
+
+test('첨부파일 줄 — 새 일정에 드라이브 링크 입력, 다른 주소는 막는다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /data-m="attach"[^>]*placeholder="첨부파일 추가/);
+  assert.match(캘, /attachments: 첨부목록\(m\.attach\)\.링크/);
+  assert.match(캘, /첨부는 구글 드라이브 링크/);
 });
