@@ -11,7 +11,7 @@
        ① IMAP (창 안)  — fetchOne source. 읽음 표시를 안 건드린다(messageFlagsAdd 를 아예 안 부른다).
        ② POP3 (창 밖)  — 날짜 이진 탐색 + 이웃 훑기로 찾아 RETR. 느리다(약 60KB/초) — 시간 예산을 재고 시작한다.
    ★ 보관하는 것
-       · 본문 글(2만 자까지) — 실시간DB newsletter/noticeArchive/<id>
+       · 본문 글(2만 자까지) — 실시간DB newsletter/noticeArchive/<id>. HTML 만 있는 메일은 «우리가» HTML 을 글로 바꾼다(아래 html글)
        · 첨부 파일 — 창고 newsletter_archive/files/<내용 해시>/<이름>. «내용 해시»로 두는 까닭: 같은 파일을 여러 번
          보내도 한 벌만 담고, «이름만 같고 내용이 다른 판»을 가른다(휴일대체합의서.hwp 처럼 해마다 고치는 서식).
        · 원본 .eml — 창고 newsletter_archive/eml/<id>.eml (그림·서식까지 그대로. 메일 프로그램에서 열린다)
@@ -30,7 +30,7 @@ const crypto = require('crypto');
 const NL = require('./news-notice-log.js');
 
 /* ── 규칙 ── */
-const 판 = 1;                                   /* 보관 모양을 바꾸면 올린다 — 올리면 다시 받는다 */
+const 판 = 2;                                   /* 보관 모양을 바꾸면 올린다 — 올리면 다시 받는다(2: HTML 만 있는 메일의 본문을 글로 바꾸고, 받은 곳 «수»를 따로 적는다) */
 const 표지자리 = 'newsletter/noticeLog/archiveIndex';   /* 가벼운 표지 — 대장과 함께 읽힌다 */
 const 본자리 = 'newsletter/noticeArchive';              /* 무거운 본문·주소 — 상세를 열 때만 읽는다 */
 const 창고자리 = 'newsletter_archive';          /* 기본 창고 안의 한 줄기 — 규칙이 없어 사람 손(클라이언트)은 못 닿고 토큰 주소로만 열린다 */
@@ -44,6 +44,8 @@ const POP속도 = 55 * 1024;                      /* 바이트/초 — 실측 �
 const POP여유초 = 20;
 const 날짜이웃 = 3 * 60e3;                      /* POP3 에서 «같은 메일»로 볼 날짜 오차 */
 const 형제창 = 2 * 3600e3;                      /* 같은 안내문의 다른 통(받는 사람만 다른 것)을 찾는 시간 폭 */
+const 늦은연속한도 = 40;                        /* POP3 번호는 «거의» 시간 차례라(실측 1%가 뒤바뀐다) 늦은 통을 한 번 봤다고 훑기를 끝내지 않는다 — 연달아 이만큼 늦어야 끝 */
+const 이름한도 = 400;                           /* 받은 곳 업체 이름을 적는 수 — 수(업체수·명함수)는 따로 «진짜 수»를 적는다 */
 const 하루 = 24 * 3600e3;
 
 /* ── 작은 도구 ── */
@@ -74,6 +76,89 @@ function 토큰주소(통이름, 자리, 토큰) {
 }
 function 파일자리(해시값, 이름) { return 창고자리 + '/files/' + String(해시값).slice(0, 32) + '/' + 파일이름다듬기(이름); }
 function 원본자리(id) { return 창고자리 + '/eml/' + String(id).replace(/[^A-Za-z0-9_-]/g, '_') + '.eml'; }
+
+/* ── HTML → 글 ─────────────────────────────────────────────────────────────────
+   ⚠ 다음메일 편집기·아웃룩이 만든 안내문은 «HTML 만» 있는 때가 많다. 그런데 mailparser(3.9)는 그런 메일의 text 를
+     — 첨부가 붙은 multipart/mixed 에서는 «빈 글»로, 그림이 박힌 단일 HTML 에서는 «[data:image/png;base64,…]» 수십만 자로 돌려준다
+     (2026-10-12 운영 첫 실행: 보관 20건 중 14건이 본문 0자 · 4건이 그림 글자). 그래서 HTML 이 있으면 «우리가» 글로 바꾼다.
+   보여 줄 글이지 HTML 로 되돌릴 글이 아니다 — 줄바꿈·목록 점·표 칸 나눔·링크 주소만 살리고, 그림은 «[그림]» 한 마디로 둔다.
+   브라우저가 보여 주는 줄 모양을 따른다: <p> 와 <div> 는 «줄 끝»일 뿐 빈 줄이 아니고, <p><br></p> 가 «빈 줄 하나»다(다음메일 편집기의 꼴).
+   의존 없는 순수 함수 — CI 에도 돈다. 그림 태그에 수 MB 가 들어도 한 번 훑어 끝난다(태그 토막 하나일 뿐). */
+const 이름엔티티 = { nbsp: ' ', amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", middot: '·', bull: '•', hellip: '…', ldquo: '“', rdquo: '”', lsquo: '‘', rsquo: '’',
+  ndash: '–', mdash: '—', laquo: '«', raquo: '»', copy: '©', reg: '®', trade: '™', times: '×', rarr: '→', larr: '←' };
+function 엔티티풀기(글) {
+  return String(글 == null ? '' : 글).replace(/&(#x[0-9a-f]{1,6}|#[0-9]{1,7}|[a-z]{2,8});/gi, (그대로, 키) => {
+    if (키[0] === '#') {
+      const n = (키[1] === 'x' || 키[1] === 'X') ? parseInt(키.slice(2), 16) : parseInt(키.slice(1), 10);
+      return (n > 0 && n <= 0x10ffff && !(n >= 0xd800 && n <= 0xdfff)) ? String.fromCodePoint(n) : '';
+    }
+    const 값 = 이름엔티티[키.toLowerCase()];
+    return 값 === undefined ? 그대로 : 값;
+  });
+}
+const 숨김태그 = new Set(['script', 'style', 'head', 'title', 'noscript', 'template', 'svg', 'iframe', 'object']);   /* 안의 글을 «안 보여 주는» 태그(닫는 태그가 있는 것만) */
+const 줄태그 = new Set(['p', 'div', 'tr', 'table', 'thead', 'tbody', 'tfoot', 'ul', 'ol', 'li', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'pre', 'section', 'article',
+  'header', 'footer', 'dl', 'dt', 'dd', 'center', 'form', 'fieldset', 'address', 'figure', 'figcaption', 'main', 'nav', 'aside', 'hr', 'body', 'html']);
+function html글(html) {
+  let s = String(html == null ? '' : html);
+  if (s.length > 8e6) s = s.slice(0, 8e6);                                    /* 안내문 글은 이보다 훨씬 앞에 있다 — 끝없는 입력을 막는 상한 */
+  s = s.replace(/<!--[\s\S]*?-->/g, '');                                        /* 주석·조건부 주석(<!--[if mso]> …) */
+  const 토막 = s.split(/(<\/?[A-Za-z][^>]*>)/);                                /* 홀수 칸 = 태그, 짝수 칸 = 글 */
+  const 줄들 = []; let 지금 = '', 숨김 = '';
+  const 끝 = (강제) => {
+    const t = 지금.replace(/[ \t\u00a0]+$/g, '').replace(/^[ \t\u00a0]+/g, '').replace(/ {2,}/g, ' ');   /* 인라인 태그 사이에 낀 겹공백은 한 칸으로 */
+    if ((t && t !== '•') || 강제 || (!t && /\u00a0/.test(지금))) 줄들.push(t);   /* &nbsp; 만 든 줄은 «빈 줄 하나»(브라우저도 한 줄 높이로 그린다) — 공백만 든 줄은 높이가 없다 */
+    지금 = '';
+  };
+  const 링크들 = [];
+  for (let i = 0; i < 토막.length; i++) {
+    const 조각 = 토막[i];
+    if (i % 2 === 0) { if (!숨김 && 조각) 지금 += 엔티티풀기(조각.replace(/[ \t\r\n\f]+/g, ' ')); continue; }
+    const m = /^<(\/?)([A-Za-z][A-Za-z0-9]*)/.exec(조각.slice(0, 40));
+    if (!m) continue;
+    const 닫음 = m[1] === '/', 이름 = m[2].toLowerCase();
+    if (숨김) { if (닫음 && 이름 === 숨김) 숨김 = ''; continue; }
+    if (!닫음 && 숨김태그.has(이름)) {
+      let 닫힘 = false;                                                          /* 닫는 태그가 «있을 때만» 숨긴다 — 안 닫힌 <script> 가 뒤 글을 통째로 삼키면 안 된다 */
+      for (let j = i + 2; j < 토막.length; j += 2) { if (/^<\/[A-Za-z]/.test(토막[j].slice(0, 4)) && 토막[j].slice(2, 2 + 이름.length).toLowerCase() === 이름) { 닫힘 = true; break; } }
+      if (닫힘) 숨김 = 이름;
+      continue;
+    }
+    if (이름 === 'br') { 끝(true); continue; }                                    /* <br> 는 «빈 줄까지» 만든다 — 줄 끝의 <br> 는 앞 줄에 이미 닿아 있어 더 안 만든다 */
+    if (이름 === 'img') {
+      if (!닫음 && !/\b(?:width|height)\s*=\s*["']?1(?:px)?["']?(?=[\s/>"'])/i.test(조각.slice(0, 600))) 지금 += ' [그림] ';   /* 1×1 추적 점은 안 센다 */
+      continue;
+    }
+    if (이름 === 'a') {
+      if (!닫음) {
+        const h = /\bhref\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i.exec(조각.slice(0, 700));
+        링크들.push({ 주소: h ? 엔티티풀기(h[1] || h[2] || h[3] || '').trim() : '', 시작: 지금.length });
+      } else {
+        const L = 링크들.pop();                                                  /* 보이는 글에 주소가 없으면 «글 (주소)» — 안내문의 신청 링크가 사라지면 안 된다 */
+        if (L && /^https?:\/\//i.test(L.주소) && L.주소.length <= 300 && L.시작 <= 지금.length) {
+          const 보임 = 지금.slice(L.시작).trim(), 짧게 = L.주소.replace(/^https?:\/\//i, '').replace(/\/$/, '');
+          if (보임 && !/^https?:\/\//i.test(보임) && 보임.indexOf(짧게) < 0) 지금 += ' (' + L.주소 + ')';
+        }
+      }
+      continue;
+    }
+    if (이름 === 'li') { 끝(false); if (!닫음) 지금 = '• '; continue; }
+    if (이름 === 'td' || 이름 === 'th') { if (닫음) 지금 += '\t'; continue; }          /* 표 칸은 탭으로 — 줄 끝의 탭은 위에서 걷힌다 */
+    if (줄태그.has(이름)) 끝(false);
+  }
+  끝(false);
+  return 줄들.join('\n').replace(/\u00a0/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+}
+/* HTML 이 없을 때의 보루 — mailparser 가 그림을 «[data:image/png;base64,…]» 로 바꿔 준 글에서 그 덩어리를 «[그림]» 으로 */
+function 평문글(글) {
+  return String(글 == null ? '' : 글).replace(/\[?data:[a-z]+\/[a-z0-9.+-]+;base64,[A-Za-z0-9+\/=\s]*\]?/gi, '[그림]');
+}
+/* 본문으로 쓸 글 고르기 — HTML 이 있으면 그것(받는 사람이 본 모양), 글이 안 나오면(그림뿐) 평문 */
+function 본문고르기(p) {
+  const html = p && typeof p.html === 'string' ? p.html : '';
+  if (html.trim()) { const 글 = html글(html); if (글.trim()) return 글; }
+  return 평문글(p && p.text);
+}
 
 /* 본문 글 다듬기 — 줄바꿈 하나로, 보이지 않는 글자 걷기, 빈 줄 둘까지, 한도에서 자르기 */
 function 본문다듬기(글) {
@@ -116,8 +201,8 @@ function 받은곳만들기(묶음들, 지수) {
     else if (지.명함.has(a)) 지.명함.get(a).forEach((n) => 명함.add(n));
     else 미확인++;
   });
-  return { 받는주소수: 전체.size, 한통최대, 메일수: (묶음들 || []).length,
-    업체: Array.from(업체).sort().slice(0, 80), 명함업체: Array.from(명함).sort().slice(0, 80), 업체미확인: 미확인 };
+  return { 받는주소수: 전체.size, 한통최대, 메일수: (묶음들 || []).length, 업체수: 업체.size, 명함수: 명함.size,     /* 이름 목록은 한도에서 잘려도 «진짜 수»는 따로 */
+    업체: Array.from(업체).sort().slice(0, 이름한도), 명함업체: Array.from(명함).sort().slice(0, 이름한도), 업체미확인: 미확인 };
 }
 
 /* ── 원문 풀기 — 메일 원본(Buffer) → 글·첨부·받는 주소 ── */
@@ -129,7 +214,7 @@ async function 원문풀기(원본, parse) {
     첨부.push({ 이름: String(a.filename || '').trim() || '첨부', 형식: String(a.contentType || ''), 내용: a.content });
   });
   const t = p.date ? new Date(p.date).getTime() : 0;
-  return { 제목: String(p.subject || ''), 날짜: Number.isFinite(t) ? t : 0, 본문: 본문다듬기(p.text || ''),
+  return { 제목: String(p.subject || ''), 날짜: Number.isFinite(t) ? t : 0, 본문: 본문다듬기(본문고르기(p)),
     첨부, 받는주소들: 봉투주소들(p) };
 }
 
@@ -219,19 +304,26 @@ async function pop찾기(pop, 목표, 부품) {
   로그('NOTICE_ARCHIVE_POP', JSON.stringify({ N, 이진탐색: 본, 도착: lo, 표본: 표본.slice(0, 12) }));   /* 날짜·번호만 — 제목·주소는 안 남긴다 */
   const 한도 = Number(부품.훑기한도 || 700);
   let 첫통 = null; const 형제들 = [];
-  for (let n = Math.max(1, lo - 40), 훑음 = 0; n <= N && 훑음 < 한도; n++, 훑음++) {
-    const raw = await 머리(n); 본++;
+  const 통계 = { 훑음: 0, 처음날: 0, 끝날: 0, 우리가보낸: 0, 제목일치: 0 };
+  for (let n = Math.max(1, lo - 40), 늦음 = 0; n <= N && 통계.훑음 < 한도; n++) {
+    const raw = await 머리(n); 본++; 통계.훑음++;
     const d = 머리날짜(raw);
-    if (d && d > 목표.날짜 + 형제창) break;
+    if (d) { if (!통계.처음날) 통계.처음날 = d; 통계.끝날 = d; }
+    if (NL.우리주소.test((/^From:[^\r\n]*/im.exec(raw) || [''])[0])) 통계.우리가보낸++;
+    if (d && d > 목표.날짜 + 형제창) { if (++늦음 >= 늦은연속한도) break; continue; }     /* 한 통이 늦다고 끝내지 않는다 — 번호는 «거의» 시간 차례일 뿐이다 */
+    늦음 = 0;
     if (!d || d < 목표.날짜 - 날짜이웃) continue;
     let p;
     try { p = await parse(Buffer.from(raw, 'binary')); } catch (_) { continue; }
     if (NL.제목다듬기(p.subject) !== 목표.제목) continue;
+    통계.제목일치++;
     const 보낸 = ((p.from && p.from.value && p.from.value[0]) || {}).address || '';
     if (!NL.우리주소.test(String(보낸))) continue;
     if (!첫통 && Math.abs(d - 목표.날짜) <= 날짜이웃) 첫통 = { n, 날짜: d };
     형제들.push({ n, 주소들: 봉투주소들(p) });
   }
+  /* 날짜·수만 남긴다(제목·주소는 안 남김) — 운영에서만 시험되는 길이라 «어디를 얼마나 봤나»가 유일한 단서다 */
+  로그('NOTICE_ARCHIVE_POP_SCAN', JSON.stringify({ 훑음: 통계.훑음, 첫: 통계.처음날 ? NL.서울날(통계.처음날) : '', 끝: 통계.끝날 ? NL.서울날(통계.끝날) : '', 우리가보낸: 통계.우리가보낸, 제목일치: 통계.제목일치 }));
   if (!첫통) return { 못찾음: 'POP3 에서 그 메일을 찾지 못했습니다', N, 본것: 본 };
   return { 첫통, 형제들, 본것: 본, N };
 }
@@ -248,6 +340,7 @@ async function 하나보관(o, 항목) {
   const 폴더읽기 = async (slug) => { if (!(slug in 폴더)) 폴더[slug] = (await (await db.ref('mailbox/folders/' + slug).once('value')).val()) || {}; return 폴더[slug]; };
   for (const r of refs) await 폴더읽기(r.칸);
   const 정렬 = refs.slice().sort((a, b) => 칸순서((폴더[a.칸] || {}).kind) - 칸순서((폴더[b.칸] || {}).kind));
+  const 모두보낸 = 정렬.length > 0 && 정렬.every((r) => (폴더[r.칸] || {}).kind === 'sent');   /* 보낸편지함에만 있는 안내문 — POP3 에는 보낸편지함이 없는 듯하다(실측: 6년치 목록에 «밖으로 나간» 우리 메일 2통) */
 
   /* ① IMAP — 창 안의 통을 차례로. 봉투(받는 사람)는 «열리는 모든 통»에서 모으고, 원본은 처음 열린 한 통만 받는다. */
   let 원본 = null, 원본메일 = null, 방법 = '', 연속오류 = 0, 오류수 = 0, 마지막오류 = '';
@@ -302,7 +395,15 @@ async function 하나보관(o, 항목) {
       return { 실패: 'POP3 실패 — ' + String((e && e.message) || e).slice(0, 160) };
     }
     if (풀이.미룸) return { 미룸: 풀이.미룸 };
-    if (풀이.실패 || 풀이.못찾음) return { 실패: 풀이.실패 || 풀이.못찾음 };
+    if (풀이.실패) return { 실패: 풀이.실패 };
+    if (풀이.못찾음) {
+      /* 보낸편지함에만 있는 메일이 IMAP 창 밖이고 POP3 에도 없다 — 오늘 안 되는 것이 아니라 «앞으로도» 안 된다. 날마다 다시 해 봐야 헛수고라 «확정»한다(영구).
+         ⚠ 모든 참조가 «없다»는 답을 받았을 때만(창밖 = 참조 수) — 연결이 흔들려 «답을 못 받은» 참조가 있는 날의 «못 찾음»을 확정하면 안 된다. */
+      const 확정 = 모두보낸 && 창밖 === 정렬.length;
+      return 확정
+        ? { 실패: '보낸편지함 메일이 다음메일의 열람 창(폴더당 400통) 밖으로 밀려났고 POP3 에서도 찾지 못했습니다 — POP3 는 보낸편지함을 주지 않는 것으로 보입니다', 영구: true }
+        : { 실패: 풀이.못찾음 };
+    }
     원본 = 풀이.원본; 방법 = 'pop3'; 원본메일 = { 칸: '다음메일(POP3)', 번호: String(풀이.n) };
     풀이.형제들.forEach((x) => 봉투들.push(x.주소들));
   }
@@ -328,11 +429,11 @@ async function 돌리기(o) {
     .filter((x) => x && typeof x === 'object')
     .filter((x) => {
       const 표 = 표지들[x.id];
-      if (표 && !표.실패 && Number(표.판) >= 판) return false;                       /* 이미 보관했다 */
-      if (표 && 표.실패) {
-        if (Number(표.실패.횟수) >= 포기횟수) return false;                          /* 포기한 것 */
-        if (now - Number(표.실패.때 || 0) < 다시해보기틈) return false;               /* 아직 이르다 */
-      }
+      if (!표 || !(Number(표.판) >= 판)) return true;                                /* 처음이거나 옛 판 — 새 규칙으로 «바로» 다시(옛 판의 실패도 기다리지 않는다) */
+      if (!표.실패) return false;                                                    /* 이미 보관했다 */
+      if (표.실패.영구) return false;                                                 /* 다시 해 봐야 소용없다고 «확인한» 것 */
+      if (Number(표.실패.횟수) >= 포기횟수) return false;                            /* 포기한 것 */
+      if (now - Number(표.실패.때 || 0) < 다시해보기틈) return false;                 /* 아직 이르다 */
       return true;
     })
     .sort((a, b) => (Number(b.시각) || 0) - (Number(a.시각) || 0));                  /* 새것이 먼저 — 창에서 먼저 밀려난다 */
@@ -360,8 +461,9 @@ async function 돌리기(o) {
 
     if (r.미룸) { 결과.미룸++; 로그('[안내문 보관] 미룸 ' + 항목.id + ' — ' + r.미룸); continue; }
     if (r.실패) {
-      const 옛 = (표지들[항목.id] && 표지들[항목.id].실패) || {};
+      const 옛표 = 표지들[항목.id], 옛 = (옛표 && Number(옛표.판) >= 판 && 옛표.실패) || {};      /* 옛 판의 횟수는 이어 세지 않는다 */
       const 실패 = { 때: now, 까닭: String(r.실패).slice(0, 200), 횟수: (Number(옛.횟수) || 0) + 1 };
+      if (r.영구) 실패.영구 = true;
       await db.ref(표지자리 + '/' + 항목.id).update({ 판, 실패 });
       결과.실패++; 로그('[안내문 보관] 실패 ' + 항목.id + ' — ' + 실패.까닭);
       continue;
@@ -380,5 +482,6 @@ async function 돌리기(o) {
 module.exports = {
   판, 표지자리, 본자리, 창고자리, 본문한도, 메일한도, 첨부하나한도, 포기횟수, 다시해보기틈, POP속도,
   해시, 파일이름다듬기, 내려받기머리, 토큰주소, 파일자리, 원본자리, 본문다듬기, 주소목록, 봉투주소들, 받은곳만들기,
-  원문풀기, 올리기, 보관하기, 머리날짜, pop원본, pop찾기, 하나보관, 돌리기
+  원문풀기, 올리기, 보관하기, 머리날짜, pop원본, pop찾기, 하나보관, 돌리기,
+  엔티티풀기, html글, 평문글, 본문고르기, 이름한도, 늦은연속한도
 };

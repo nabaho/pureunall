@@ -7074,7 +7074,7 @@ exports.newsletterNoticeArchive = functions
           try { return await fn(pop); } finally { try { await pop.close(); } catch (_) { /* 이미 끊겼다 */ } }
         }
       },
-      now: t0, 끝나는때: t0 + 500 * 1000, 로그: (m) => console.log(m)
+      now: t0, 끝나는때: t0 + 500 * 1000, 로그: (...a) => console.log(...a)   /* 모든 인자 — 첫 인자만 넘기면 NOTICE_ARCHIVE_POP 의 JSON 이 사라진다(2026-10-12) */
     });
     return null;
   });

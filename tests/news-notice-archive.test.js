@@ -12,6 +12,8 @@
      ⑧ 시간이 모자라면 «미룬다» — 실패로 적지 않는다(느린 POP3 로 19MB 를 받는 데 5분이 든다)
      ⑨ 쓰는 곳은 실시간DB 두 자리(표지·본)와 창고 한 줄기 — 대장 줄(items)·meta 는 안 건드린다(짓개가 쓰는 곳)
      ⑩ 두 번째 실행은 아무것도 안 받고 안 쓴다(멱등)
+     ⑪ HTML 만 있는 메일도 본문이 나온다 — mailparser 는 text 를 비우거나 그림 글자로 채운다(운영 첫 실행 20건 중 18건). 받은 곳 수는 이름이 잘려도 진짜 수
+     ⑫ 보낸편지함에만 있고 IMAP 창 밖인 안내문은 POP3 를 «한 번 찾아본 뒤» 영구 실패로 확정 · 판이 오르면 옛 판의 실패도 바로 다시
    ⚠ CI 에는 mailparser 가 없다 — 가짜 풀이기(parse)를 끼워 돌리고, 진짜 mailparser 는 «있을 때만» 한 번 더 본다.
    ⚠ 이름·주소·업체는 전부 가짜. */
 
@@ -34,7 +36,7 @@ const 줄글 = (s) => Buffer.from(String(s), 'utf8').toString('binary');        
 function 가짜원본(m) {
   const 머리 = ['Date: ' + new Date(m.날짜).toUTCString(), 'From: ' + (m.보낸 || 우리), 'Subject: ' + 줄글(m.제목),
     'To: ' + (m.받는 || []).join(', ')].concat(m.참조 && m.참조.length ? ['Cc: ' + m.참조.join(', ')] : []).join('\r\n');
-  const 몸 = Buffer.from(JSON.stringify({ text: m.본문 || '', attachments: (m.첨부 || []).map((a) => ({ filename: a.이름, type: a.형식 || 'application/octet-stream',
+  const 몸 = Buffer.from(JSON.stringify({ text: m.본문 || '', html: m.html || '', attachments: (m.첨부 || []).map((a) => ({ filename: a.이름, type: a.형식 || 'application/octet-stream',
     b64: Buffer.from(a.내용).toString('base64'), related: !!a.그림 })) }), 'utf8').toString('base64');
   return Buffer.from(머리 + '\r\n\r\n' + 몸, 'binary');
 }
@@ -46,7 +48,7 @@ const 가짜parse = async (buf) => {
   const 목록 = (v) => ({ value: String(v || '').split(',').map((x) => 주소꼴(x)).filter(Boolean).map((address) => ({ address })) });
   const 덧 = 몸 ? JSON.parse(Buffer.from(몸, 'base64').toString('utf8')) : {};
   return { subject: Buffer.from(H.subject || '', 'binary').toString('utf8'), date: H.date ? new Date(H.date) : undefined,
-    from: { value: [{ address: 주소꼴(H.from) }] }, to: 목록(H.to), cc: 목록(H.cc), text: 덧.text || '',
+    from: { value: [{ address: 주소꼴(H.from) }] }, to: 목록(H.to), cc: 목록(H.cc), text: 덧.text || '', html: 덧.html ? 덧.html : false, /* 진짜 mailparser 도 HTML 이 없으면 false */
     attachments: (덧.attachments || []).map((a) => ({ filename: a.filename, contentType: a.type, content: Buffer.from(a.b64, 'base64'), related: !!a.related })) };
 };
 
@@ -73,6 +75,7 @@ function 가짜imap(칸들, 옵션) {
     if (옵션 && 옵션.연결실패) throw new Error('imap 연결 실패');
     const 칸 = 칸들[slug] || {};
     return fn({ fetchOne: async (uid, q) => {
+      if (옵션 && 옵션.던질번호 && 옵션.던질번호.includes(String(uid))) throw new Error('imap 일시 오류');      /* 한 통만 흔들리는 날 */
       호출.fetch.push({ slug, uid: String(uid), 원본: !!q.source });
       const m = 칸[String(uid)]; if (!m) return false;
       if (q.source) return { uid, source: m.원본 };
@@ -119,7 +122,7 @@ async function 돌려(db, 부품, 덧) {
   const 로그 = []; let t = 0;
   const r = await A.돌리기(Object.assign({ db, 통, 통이름: 'bucket-x', 열기: { imap: (부품.imap || 가짜imap({}).열기), pop: (부품.pop || 가짜pop([]).열기) },
     parse: 가짜parse, now: 부품.now || 날(2026, 10, 12, 3, 55), 끝나는때: 부품.끝나는때 || (Date.now() + 480 * 1000),
-    로그: (m) => 로그.push(m), 토큰만들기: () => 'tok' + (++t) }, 덧 || {}));
+    로그: (...a) => 로그.push(a.join(' ')), 토큰만들기: () => 'tok' + (++t) }, 덧 || {}));
   return { r, 통, 로그 };
 }
 const 쓴자리 = (db) => db.쓴것.map((x) => x.자리 + (x.update ? ' ⟵' + Object.keys(x.값).join(',') : ''));
@@ -442,6 +445,208 @@ test('③ 받는 사람이 하나도 안 보이는 안내문(사본뿐)은 «받
   assert.strictEqual(db.읽기('newsletter/noticeLog/archiveIndex/n20260905_h1').받은곳, false);
 });
 
+/* ───────────────────────── ⑪ 본문 — HTML 만 있는 메일 ─────────────────────────
+   운영 첫 실행(2026-10-12)에서 보관 20건 중 14건이 «본문 0자», 4건이 «[data:image/png;base64,…] 수십만 자»였다.
+   mailparser(3.9)는 HTML 만 있는 메일의 text 를 — 첨부가 붙은 multipart/mixed 에서는 빈 글로, 그림이 박힌 단일 HTML 에서는
+   그림 글자로 돌려준다. 가짜 풀이기가 «항상 text 를 준다»고 가정한 탓에 이 구멍이 검사를 빠져나갔다 — 이제 가짜도 html 만 줄 수 있고,
+   진짜 mailparser 로도(있을 때만) 같은 모양을 본다. */
+
+test('⑪ HTML → 글 — 다음메일 편집기 꼴: <p> 는 줄 끝일 뿐 · <p><br></p> 가 빈 줄 하나 · 엔티티·nbsp · 스타일·머리는 안 보인다', () => {
+  const html = '<html><head><style>p{margin:0}</style><title>제목줄</title></head><body><div style="color:#111"><p>안녕하세요. 푸른노무법인입니다.</p><p><br></p>'
+    + '<p>귀사의&nbsp;무궁한 발전을 기원합니다.</p><p>둘째 &amp; 셋째 &lt;줄&gt;</p><p><br></p><p><br></p><p>감사합니다.<br></p></div></body></html>';
+  assert.strictEqual(A.html글(html), '안녕하세요. 푸른노무법인입니다.\n\n귀사의 무궁한 발전을 기원합니다.\n둘째 & 셋째 <줄>\n\n감사합니다.',
+    '줄 모양이 브라우저와 다르다 — <p> 마다 빈 줄을 넣었거나 <p><br></p> 의 빈 줄을 잃었다');
+  assert.ok(!/margin|제목줄/.test(A.html글(html)), '스타일·제목 태그의 글이 본문에 들었다');
+  assert.strictEqual(A.html글('<p>가</p><p>&nbsp;</p><p>나</p><p> </p><p>다</p>'), '가\n\n나\n다', '&nbsp; 만 든 줄은 빈 줄 하나, 공백만 든 줄은 높이가 없다');
+});
+
+test('⑪ HTML → 글 — 목록은 점 · 표 칸은 탭 · 링크는 «글 (주소)» · 이미 주소가 보이면 겹치지 않는다 · mailto 는 글만', () => {
+  assert.strictEqual(A.html글('<ul><li>하나</li><li><b>둘</b></li><li></li></ul>'), '• 하나\n• 둘', '목록 점이 없거나 빈 항목이 점만 남겼다');
+  assert.strictEqual(A.html글('<table><tr><td>구분</td><td>금액</td></tr><tr><td>가</td><td>10</td></tr></table>'), '구분\t금액\n가\t10');
+  assert.strictEqual(A.html글('<table><tr><td><p>왼쪽 칸</p></td><td><p>오른쪽 칸</p></td></tr></table>'), '왼쪽 칸\n오른쪽 칸', '배치용 표의 칸 글이 한 줄로 붙었다');
+  assert.strictEqual(A.html글('<a href="https://x.test/apply?a=1&amp;b=2">신청하기</a>'), '신청하기 (https://x.test/apply?a=1&b=2)', '링크 주소가 사라졌다 — 안내문의 신청 링크를 잃는다');
+  assert.strictEqual(A.html글('<a href="https://x.test/">https://x.test/</a>'), 'https://x.test/', '보이는 글이 주소인데 또 붙였다');
+  assert.strictEqual(A.html글('<a href="https://x.test/a">x.test/a 에서 신청</a>'), 'x.test/a 에서 신청', '보이는 글에 주소가 들었는데 또 붙였다');
+  assert.strictEqual(A.html글('<a href="mailto:a@b.test">메일 보내기</a>'), '메일 보내기', 'mailto 주소를 본문에 붙였다(받는 «주소»는 남기지 않는 것이 규칙이다)');
+  assert.strictEqual(A.html글('<a href="javascript:alert(1)">누르기</a>'), '누르기');
+});
+
+test('⑪ HTML → 글 — 그림은 «[그림]» 한 마디 · base64 가 새지 않는다 · 1×1 추적 점은 안 센다', () => {
+  const 큰그림 = '<img src="data:image/png;base64,' + 'iVBORw0KGgo'.repeat(50000) + '" width="640">';
+  const 글 = A.html글('<div>' + 큰그림 + '</div><p>새해 인사</p>');
+  assert.strictEqual(글, '[그림]\n새해 인사', '그림 글자가 본문에 샜다: ' + 글.slice(0, 60));
+  assert.strictEqual(A.html글('<p>글<img src="https://t.test/p.gif" width="1" height="1"></p>'), '글', '1×1 추적 점을 그림으로 셌다');
+  assert.strictEqual(A.html글('<p>글 <img src="cid:logo1"> 끝</p>'), '글 [그림] 끝');
+});
+
+test('⑪ HTML → 글 — 못된 입력: 스크립트·주석·조건부 주석은 안 보이고, 안 닫힌 <script> 가 뒤 글을 삼키지 않고, 숫자 엔티티는 안전하게', () => {
+  assert.strictEqual(A.html글('<script>alert(1)</script>본문<style>.a{}</style>'), '본문');
+  assert.strictEqual(A.html글('앞<!-- 숨김 -->뒤<!--[if mso]><p>mso글</p><![endif]-->끝'), '앞뒤끝', '주석·조건부 주석이 본문에 들었다');
+  assert.strictEqual(A.html글('<p>앞</p><script>아직 안 닫힘<p>뒤 글</p>'), '앞\n아직 안 닫힘\n뒤 글', '안 닫힌 <script> 가 뒤의 글을 통째로 삼켰다');
+  assert.strictEqual(A.html글('&#44032;&#x1F600;&#xD800;&#0;&#9999999;&unknownentity;'), '가😀&unknownentity;', '숫자 엔티티를 못 풀거나, 잘못된 것을 글자로 만들었거나, 모르는 이름을 지웠다');
+  assert.strictEqual(A.html글('&amp;lt;'), '&lt;', '엔티티를 두 번 풀었다');
+  assert.strictEqual(A.html글(null), ''); assert.strictEqual(A.html글(''), ''); assert.strictEqual(A.html글('태그 없는 글'), '태그 없는 글');
+  assert.strictEqual(A.html글('a < b'), 'a < b', '태그가 아닌 « < » 를 태그로 먹었다');
+});
+
+test('⑪ HTML → 글 — 수 MB 짜리(그림 base64)도 순식간에 끝난다', () => {
+  const html = '<p>앞 글</p><img src="data:image/png;base64,' + 'A'.repeat(4e6) + '"><p>' + '뒤 글 '.repeat(20000) + '</p>';
+  const t0 = Date.now(), 글 = A.html글(html);
+  assert.ok(Date.now() - t0 < 2500, '4MB 그림이 든 HTML 을 글로 바꾸는 데 ' + (Date.now() - t0) + 'ms — 선형이어야 한다');
+  assert.match(글, /^앞 글\n\[그림\]\n뒤 글 뒤 글/);
+});
+
+test('⑪ 본문 고르기 — HTML 이 있으면 그것(받는 사람이 본 모양) · HTML 이 글을 못 내면 평문 · mailparser 의 그림 글자는 걷는다', () => {
+  assert.strictEqual(A.본문고르기({ html: '<p>HTML 글</p>', text: '' }), 'HTML 글', 'HTML 만 있는 메일(text 가 빈 mailparser 결과)의 본문을 못 얻었다');
+  assert.strictEqual(A.본문고르기({ html: '<p>HTML 글</p>', text: '[data:image/png;base64,AAAA]' }), 'HTML 글', 'mailparser 의 «그림 글자 text» 를 HTML 보다 앞세웠다');
+  assert.strictEqual(A.본문고르기({ html: '<img src="cid:a">', text: '평문 글' }), '[그림]', 'HTML 에 그림만 있어도 글로 쳐 준다(그림이 곧 내용일 수 있다)');
+  assert.strictEqual(A.본문고르기({ html: '<div> </div>', text: '평문 글' }), '평문 글', 'HTML 이 빈 글이면 평문으로 물러서야 한다');
+  assert.strictEqual(A.본문고르기({ html: false, text: '평문만' }), '평문만');
+  assert.strictEqual(A.본문고르기({ text: 'x [data:image/png;base64,AAAA/+=\nBBBB] y' }), 'x [그림] y', '평문에 낀 그림 글자를 안 걷었다');
+  assert.strictEqual(A.본문고르기(null), ''); assert.strictEqual(A.본문고르기({}), '');
+});
+
+test('⑪ 원문 풀기·보관하기 — HTML 만 있는 메일도 본문이 «있다»고 적고, 받은 곳 수는 이름 목록이 잘려도 진짜 수를 적는다', async () => {
+  const 시각 = 날(2026, 10, 24, 17);
+  const 원본 = 가짜원본({ 제목: '[푸른노무법인] 광고성 환급금 주의 안내', 날짜: 시각, 본문: '', html: '<div><p>안녕하세요.</p><p><br></p><p>주의하시길 바랍니다.</p></div>', 받는: ['a@none.test'], 첨부: [첨2] });
+  const 풀 = await A.원문풀기(원본, 가짜parse);
+  assert.strictEqual(풀.본문.글, '안녕하세요.\n\n주의하시길 바랍니다.'); assert.strictEqual(풀.본문.길이, 풀.본문.글.length);
+  const 통 = 가짜창고();
+  const r = await A.보관하기({ id: 'n20261024_k1', 원본, 방법: 'imap', 원본메일: { 칸: '예약편지함' }, 받은곳: null, 통, 통이름: 'bucket-x', now: 1, parse: 가짜parse, 토큰만들기: () => 'tok' });
+  assert.match(r.본.본문, /주의하시길 바랍니다/); assert.strictEqual(r.표지.본문, true, '본문이 있는데 표지가 «본문 없음»이라 한다');
+  /* 받은 곳 — 이름 목록은 한도에서 자르되, 수는 진짜로 */
+  const 업체 = {}; for (let i = 0; i < A.이름한도 + 100; i++) 업체['c' + i] = { name: '업체' + String(i).padStart(4, '0'), email: 'u' + i + '@fake-many.test' };
+  const 지수 = NL.지수만들기(업체, 명함들());
+  const 주소들 = Object.keys(업체).map((k) => 업체[k].email).concat(['park@fake-c.test', 'x@none.test']);
+  const 받 = A.받은곳만들기([주소들], 지수);
+  assert.strictEqual(받.업체수, A.이름한도 + 100, '업체 이름이 한도에서 잘리면 «업체 N곳»이 틀린다 — 진짜 수를 따로 적어야 한다');
+  assert.strictEqual(받.업체.length, A.이름한도); assert.strictEqual(받.명함수, 1); assert.strictEqual(받.명함업체.length, 1); assert.strictEqual(받.업체미확인, 1);
+  assert.ok(!/@/.test(JSON.stringify(받)), '받는 주소가 결과에 남았다');
+});
+
+/* ───────────────────────── ⑫ 보낸편지함에만 있는 안내문 — 창 밖이고 POP3 에도 없으면 «확정» ─────────────────────────
+   운영 첫 실행: 가장 최근 안내문 3건(보낸편지함에만 있고 IMAP 창 밖)을 POP3 가 못 찾았다. 지난 메일 목록 23,155줄을 세어 보니
+   «밖으로 나간» 우리 메일이 6년에 2통뿐 — POP3 는 보낸편지함을 안 준다. 그래서 날마다 새벽에 다시 해 봐야 헛수고다. */
+
+test('⑫ 보낸편지함뿐 — IMAP 창 밖이고 POP3 에도 없으면 «영구»로 적고 다시는 안 한다 · POP3 는 «한 번은» 찾아본다', async () => {
+  const 시각 = 날(2026, 10, 2, 17, 22), 제목 = '아무도 없는 안내', 지금 = 날(2026, 10, 12, 3, 55);
+  const 상자 = 큰상자(400, 날(2026, 9, 1, 9), '다른 안내');
+  const pop = 가짜pop(상자);
+  const db = 세우기(항목('n20261002_p1', 제목, 시각, [{ 칸: 'sentS', 번호: '1' }, { 칸: 'sentS', 번호: '2' }]));
+  let { r } = await 돌려(db, { imap: 가짜imap({ sentS: {} }).열기, pop: pop.열기, now: 지금 });
+  assert.deepStrictEqual(r, { 대상: 1, 보관: 0, 실패: 1, 미룸: 0 });
+  assert.ok(pop.호출.TOP > 0, 'POP3 를 한 번도 안 찾아보고 «없다»고 확정했다 — 추측으로 포기하면 안 된다');
+  const 실패 = db.읽기('newsletter/noticeLog/archiveIndex/n20261002_p1').실패;
+  assert.strictEqual(실패.영구, true, '확인한 뒤에도 «영구»가 아니라 날마다 다시 한다'); assert.match(실패.까닭, /POP3/); assert.ok(실패.까닭.length <= 200);
+  ({ r } = await 돌려(db, { imap: 가짜imap({ sentS: {} }).열기, pop: pop.열기, now: 지금 + 30 * 24 * 3600e3 }));
+  assert.deepStrictEqual(r, { 대상: 0, 보관: 0, 실패: 0, 미룸: 0 }, '영구로 확정한 것을 한 달 뒤에 또 해 봤다');
+});
+
+test('⑫ «영구»는 확인했을 때만 — 예약·내게쓴편지함 참조가 섞였거나, IMAP 이 흔들렸거나, 참조가 없으면 보통 실패(6시간 뒤 다시)', async () => {
+  const 시각 = 날(2026, 10, 2, 17, 22), 제목 = '아무도 없는 안내', 지금 = 날(2026, 10, 12, 3, 55);
+  const 상자 = 큰상자(400, 날(2026, 9, 1, 9), '다른 안내');
+  const 영구인가 = (db, id) => db.읽기('newsletter/noticeLog/archiveIndex/' + id).실패.영구;
+  /* ① 예약편지함 참조 — POP3 에는 올 수 있는 칸이다 */
+  let db = 세우기(항목('n20261002_p2', 제목, 시각, [{ 칸: 'schedS', 번호: '1' }]));
+  await 돌려(db, { imap: 가짜imap({ schedS: {} }).열기, pop: 가짜pop(상자).열기, now: 지금 });
+  assert.strictEqual(영구인가(db, 'n20261002_p2'), undefined, '예약편지함 메일을 «영구»로 확정했다');
+  let { r } = await 돌려(db, { imap: 가짜imap({ schedS: {} }).열기, pop: 가짜pop(상자).열기, now: 지금 + A.다시해보기틈 + 1000 });
+  assert.strictEqual(r.대상, 1, '영구가 아닌 실패는 6시간 뒤 다시 해 봐야 한다');
+  /* ② 보낸편지함 + 내게쓴편지함 */
+  db = 세우기(항목('n20261002_p3', 제목, 시각, [{ 칸: 'sentS', 번호: '1' }, { 칸: 'tomeS', 번호: '2' }]));
+  await 돌려(db, { imap: 가짜imap({ sentS: {}, tomeS: {} }).열기, pop: 가짜pop(상자).열기, now: 지금 });
+  assert.strictEqual(영구인가(db, 'n20261002_p3'), undefined, '내게쓴편지함 참조가 섞였는데 «영구»로 확정했다');
+  /* ③ 보낸편지함이지만 IMAP 연결이 죽었다 — «창 밖»이라는 답을 받은 적이 없다 */
+  db = 세우기(항목('n20261002_p4', 제목, 시각, [{ 칸: 'sentS', 번호: '1' }]));
+  await 돌려(db, { imap: 가짜imap({}, { 연결실패: true }).열기, pop: 가짜pop(상자).열기, now: 지금 });
+  assert.strictEqual(영구인가(db, 'n20261002_p4'), undefined, 'IMAP 이 죽었던 날의 «못 찾음»을 영구로 확정했다');
+  assert.match(db.읽기('newsletter/noticeLog/archiveIndex/n20261002_p4').실패.까닭, /IMAP 연결 실패/);
+});
+
+test('⑫ 판이 오르면 옛 판의 실패도 «기다리지 않고» 바로 다시 — 횟수는 새로 센다 · 영구도 옛 판 것이면 다시 본다', async () => {
+  const f = 여럿(3), 지금 = 날(2026, 10, 12, 3, 55), db = 세우기(f.항목들);
+  await db.ref('newsletter/noticeLog/archiveIndex').update({
+    'n20260101_g1': { 판: A.판 - 1, 실패: { 때: 지금 - 60e3, 횟수: 5, 까닭: '옛 판 실패(방금)' } },
+    'n20260102_g2': { 판: A.판 - 1, 실패: { 때: 지금 - 60e3, 횟수: 1, 까닭: '옛 판 영구', 영구: true } },
+    'n20260103_g3': { 판: A.판, 실패: { 때: 지금 - 60e3, 횟수: 1, 까닭: '이 판 영구', 영구: true } }
+  });
+  const { r } = await 돌려(db, { imap: f.imap.열기, now: 지금 });
+  assert.deepStrictEqual(r, { 대상: 2, 보관: 2, 실패: 0, 미룸: 0 }, '옛 판의 실패(영구 포함)는 새 규칙으로 바로 다시, 이 판의 영구는 건드리지 않는다');
+  assert.strictEqual(db.읽기('newsletter/noticeLog/archiveIndex/n20260103_g3').실패.영구, true, '이 판의 영구를 다시 했다');
+  assert.strictEqual(db.읽기('newsletter/noticeLog/archiveIndex/n20260101_g1').판, A.판, '다시 보관했는데 표지의 판이 안 올랐다');
+  /* 옛 판의 횟수는 이어 세지 않는다 */
+  const db2 = 세우기(Object.assign({}, 항목('n20260101_g1', '안내 1', 날(2026, 1, 1, 9), [])));
+  await db2.ref('newsletter/noticeLog/archiveIndex').update({ 'n20260101_g1': { 판: A.판 - 1, 실패: { 때: 1, 횟수: 5, 까닭: '옛' } } });
+  await 돌려(db2, { imap: f.imap.열기, now: 지금 });
+  assert.strictEqual(db2.읽기('newsletter/noticeLog/archiveIndex/n20260101_g1').실패.횟수, 1, '옛 판의 횟수(5)를 이어 세어 포기에 가까워졌다');
+});
+
+test('② POP3 훑기 — 번호가 «거의» 시간 차례라(실측 1%가 뒤바뀐다) 늦은 통 한 통을 봤다고 끝내지 않는다 · 연달아 늦어야 끝', async () => {
+  const 시각 = 날(2026, 10, 2, 17, 22), 제목 = '[푸른노무법인] 늦은 통이 앞서는 안내';
+  const 상자 = 큰상자(3000, 시각, 제목);
+  const 첫 = 상자.findIndex((m) => m.제목 === 제목 && m.날짜 === 시각);
+  assert.ok(첫 > 0, '시험 상자에 목표가 없다');
+  for (let k = 0; k < 5; k++) 상자.splice(첫, 0, { 날짜: 시각 + 5 * 3600e3 + k * 1000, 제목: '번호가 앞서 온 늦은 광고 ' + k, 보낸: 'late@fake-ad.test', 받는: [우리], 원본: Buffer.from('x') });
+  const db = 세우기(항목('n20261002_q1', 제목, 시각, [{ 칸: 'schedS', 번호: '1' }]));
+  const { r } = await 돌려(db, { imap: 가짜imap({ schedS: {} }).열기, pop: 가짜pop(상자).열기 });
+  assert.deepStrictEqual(r, { 대상: 1, 보관: 1, 실패: 0, 미룸: 0 }, '번호가 앞선 늦은 통 몇 개 때문에 목표 앞에서 훑기를 접었다');
+  assert.strictEqual(db.읽기('newsletter/noticeArchive/n20261002_q1').방법, 'pop3');
+  /* 반대로 «연달아» 늦은 통이 한도를 넘으면 접는다 — 한도(700통)까지 끝없이 훑으면 느리고 헛되다 */
+  const 늦은많이 = 큰상자(600, 날(2026, 7, 1, 9), '다른 안내');
+  for (let i = 0; i < 600; i++) 늦은많이.push({ 날짜: 시각 + 5 * 3600e3 + i * 60e3, 제목: '늦은 광고 ' + i, 보낸: 'late@fake-ad.test', 받는: [우리], 원본: Buffer.from('x') });
+  const 부름 = 가짜pop(늦은많이);
+  const db2 = 세우기(항목('n20261002_q2', '찾을 수 없는 안내', 시각, [{ 칸: 'schedS', 번호: '1' }]));
+  await 돌려(db2, { imap: 가짜imap({ schedS: {} }).열기, pop: 부름.열기 });
+  assert.ok(부름.호출.TOP < 300, '늦은 통이 연달아 이어지는데도 접지 않고 계속 훑었다: TOP ' + 부름.호출.TOP);
+});
+
+test('② POP3 훑은 모양을 로그로 남긴다 — 날짜·수만(제목·주소 없음)', async () => {
+  const 시각 = 날(2026, 10, 2, 17, 22), 제목 = '아무도 없는 안내';
+  const db = 세우기(항목('n20261002_r1', 제목, 시각, [{ 칸: 'sentS', 번호: '1' }]));
+  const { 로그 } = await 돌려(db, { imap: 가짜imap({ sentS: {} }).열기, pop: 가짜pop(큰상자(400, 날(2026, 9, 1, 9), '다른 안내')).열기 });
+  const 줄 = 로그.find((l) => /NOTICE_ARCHIVE_POP_SCAN/.test(l));
+  assert.ok(줄, '훑은 모양(몇 통·어느 날짜·우리가 보낸 것 몇 통)을 로그로 안 남긴다 — 운영에서만 시험되는 길이다');
+  assert.match(줄, /"훑음":\d+/); assert.match(줄, /"우리가보낸":\d+/); assert.ok(!/@|아무도/.test(줄), '로그에 주소·제목이 남았다');
+});
+
+test('⑫ «영구»는 «모든 참조가 없다고 답했을 때만» — 한 통은 IMAP 이 흔들려 답을 못 받았다면 확정하지 않는다', async () => {
+  const 시각 = 날(2026, 10, 2, 17, 22), 제목 = '아무도 없는 안내', 지금 = 날(2026, 10, 12, 3, 55);
+  const db = 세우기(항목('n20261002_p5', 제목, 시각, [{ 칸: 'sentS', 번호: '1' }, { 칸: 'sentS', 번호: '2' }]));
+  await 돌려(db, { imap: 가짜imap({ sentS: {} }, { 던질번호: ['1'] }).열기, pop: 가짜pop(큰상자(400, 날(2026, 9, 1, 9), '다른 안내')).열기, now: 지금 });
+  const 표 = db.읽기('newsletter/noticeLog/archiveIndex/n20261002_p5');
+  assert.ok(표.실패, '실패로 적혀야 한다');
+  assert.strictEqual(표.실패.영구, undefined, '한 통은 «없다»는 답을 못 받았는데(흔들렸다) 영구로 확정했다 — 내일 멀쩡히 열릴 수도 있다');
+});
+
+test('② POP3 훑기 — «늦은 통»이 듬성듬성 섞여 있어도(연달아가 아니면) 끝내지 않는다 — 늦음은 «연속»으로 센다', async () => {
+  const 시각 = 날(2026, 10, 2, 17, 22), 제목 = '[푸른노무법인] 늦은 통이 듬성듬성 섞인 안내';
+  const 상자 = 큰상자(400, 시각, 제목);
+  const 첫 = 상자.findIndex((m) => m.제목 === 제목 && m.날짜 === 시각);
+  assert.ok(첫 > 0, '시험 상자에 목표가 없다');
+  const 구간 = [];
+  for (let k = 0; k < A.늦은연속한도 + 20; k++) {                         /* 중간 통 · 늦은 통 · 중간 통 · 늦은 통 … — 늦은 통은 모두 합치면 한도를 넘지만 «연달아»는 아니다 */
+    구간.push({ 날짜: 시각 - 10 * 60e3 + k * 1000, 제목: '중간 광고 ' + k, 보낸: 'mid@fake-ad.test', 받는: [우리], 원본: Buffer.from('x') });
+    구간.push({ 날짜: 시각 + 5 * 3600e3 + k * 1000, 제목: '늦은 광고 ' + k, 보낸: 'late@fake-ad.test', 받는: [우리], 원본: Buffer.from('x') });
+  }
+  상자.splice(첫, 0, ...구간);
+  const db = 세우기(항목('n20261002_q3', 제목, 시각, [{ 칸: 'schedS', 번호: '1' }]));
+  const { r } = await 돌려(db, { imap: 가짜imap({ schedS: {} }).열기, pop: 가짜pop(상자).열기 });
+  assert.deepStrictEqual(r, { 대상: 1, 보관: 1, 실패: 0, 미룸: 0 }, '늦은 통을 «연달아»가 아니라 «합쳐서» 세어 목표 앞에서 훑기를 접었다');
+});
+
+test('⑪ 받은 곳 이름 한도 — 업체 수십 곳이 이름 없이 사라지지 않게 넉넉히(운영 실측: 한 안내문에 업체 80+ · 명함 65+ 가 한도에 걸려 있었다)', () => {
+  assert.ok(A.이름한도 >= 300, '이름 한도가 ' + A.이름한도 + ' — 한 안내문에 업체 이름이 이보다 많이 잘린다');   /* 검사고정-허용: 값 자체가 규칙이다(80 에서 잘려 «업체 80곳»으로 보이던 사고) */
+});
+
+test('⑫ 판 — 운영에 판 1 로 보관된 20건은 본문이 비어 있다: 판이 1 에 머물면 고친 코드가 그것들을 다시 받지 않는다', () => {
+  assert.ok(A.판 >= 2, '판이 ' + A.판 + ' — 판 1 로 보관된 안내문(본문 0자·그림 글자)이 새 코드로 다시 보관되지 않는다');   /* 검사고정-허용: 이미 운영에 판 1 이 쌓였다는 «사실»이 규칙이다 */
+});
+
+test('⑫ 함수 연결 — 로그 함수가 «모든 인자»를 넘긴다(둘째 인자를 버리면 POP3 진단 JSON 이 로그에서 사라진다)', () => {
+  const i = 색인글.indexOf('exports.newsletterNoticeArchive'), 몸 = 색인글.slice(i, 색인글.indexOf('\n  });', i) + 8);
+  assert.match(몸, /로그:\s*\(\.\.\.(\w+)\)\s*=>\s*console\.log\(\.\.\.\1\)/, '로그가 첫 인자만 넘긴다 — 운영 첫 실행에서 NOTICE_ARCHIVE_POP 의 내용이 통째로 사라졌다');
+});
+
 /* ───────────────────────── ⑨ ⑩ 쓰는 곳·멱등 ───────────────────────── */
 
 test('⑨ 쓰는 곳은 표지·본(한 번에) 뿐 — 대장 줄·meta 는 안 건드린다 · undefined 없음 · 열쇠에 못 쓰는 글자 없음', async () => {
@@ -519,4 +724,32 @@ test('진짜 mailparser 로 실제 .eml 을 풀어도 같다 — 한글 제목·
   assert.strictEqual(p.첨부[0].내용.toString(), 'HWPDATA');
   assert.deepStrictEqual(p.받는주소들.sort(), ['kim@fake-a.test', 'lee@fake-b.test', 'park@fake-c.test']);
   assert.strictEqual(p.날짜, Date.UTC(2026, 9, 2, 8, 22));
+});
+
+test('진짜 mailparser — HTML 만 있는 메일(운영의 «본문 0자» 사고 그대로): 첨부 붙은 multipart/mixed · 그림 박힌 단일 HTML · text+html 겹 구성 모두 본문이 나온다', { skip: !진짜 }, async () => {
+  const b64 = (b) => Buffer.from(b).toString('base64').replace(/(.{76})/g, '$1\r\n');
+  const 머리 = (덧) => ['Date: Fri, 24 Oct 2025 17:22:00 +0900', 'From: 370-6@daum.net', 'To: kim@fake-a.test',
+    'Subject: =?UTF-8?B?' + Buffer.from('[푸른노무법인] 안내').toString('base64') + '?=', 'MIME-Version: 1.0'].concat(덧);
+  const html = '<html><head><style>p{margin:0}</style></head><body><div><p>안녕하세요. 푸른노무법인입니다.</p><p><br></p><p>환급금 광고성 영업을 주의하시길 바랍니다.</p></div></body></html>';
+  /* ① multipart/mixed — HTML + 첨부. 운영에서 mailparser 가 text 를 «빈 글»로 돌려준 모양 */
+  const 혼합 = 머리(['Content-Type: multipart/mixed; boundary="B1"', '', '--B1', 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64(html),
+    '--B1', 'Content-Type: application/pdf; name="x.pdf"', 'Content-Disposition: attachment; filename="x.pdf"', 'Content-Transfer-Encoding: base64', '', b64('%PDF-1.4 x'), '--B1--', '']).join('\r\n');
+  let p = await A.원문풀기(Buffer.from(혼합), 진짜.simpleParser);
+  assert.strictEqual(p.본문.글, '안녕하세요. 푸른노무법인입니다.\n\n환급금 광고성 영업을 주의하시길 바랍니다.', 'HTML 만 있는 메일의 본문이 비었거나 모양이 다르다: ' + JSON.stringify(p.본문.글.slice(0, 60)));
+  assert.strictEqual(p.첨부.length, 1);
+  /* ② 그림이 박힌 단일 HTML — 운영에서 mailparser 가 text 를 «[data:image/png;base64,…]» 수십만 자로 돌려준 모양 */
+  const 그림 = '<html><body><div><img src="data:image/png;base64,' + 'iVBORw0KGgo'.repeat(2000) + '"></div><p>새해 인사</p></body></html>';
+  const 단일 = 머리(['Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64(그림)]).join('\r\n');
+  p = await A.원문풀기(Buffer.from(단일), 진짜.simpleParser);
+  assert.strictEqual(p.본문.글, '[그림]\n새해 인사', '그림 글자가 본문에 샜다: ' + JSON.stringify(p.본문.글.slice(0, 60)));
+  assert.ok(p.본문.길이 < 50 && !p.본문.잘림, '본문 길이가 그림 글자 때문에 부풀었다: ' + p.본문.길이);
+  /* ③ text + html 겹 구성(multipart/alternative) — 받는 사람이 본 모양(HTML)을 따른다 */
+  const 겹 = 머리(['Content-Type: multipart/alternative; boundary="B2"', '', '--B2', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64('평문 글'),
+    '--B2', 'Content-Type: text/html; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64('<p>HTML 글</p>'), '--B2--', '']).join('\r\n');
+  p = await A.원문풀기(Buffer.from(겹), 진짜.simpleParser);
+  assert.strictEqual(p.본문.글, 'HTML 글');
+  /* ④ 평문만 — 그대로 */
+  const 평문 = 머리(['Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: base64', '', b64('평문만 있는 안내\n둘째 줄')]).join('\r\n');
+  p = await A.원문풀기(Buffer.from(평문), 진짜.simpleParser);
+  assert.strictEqual(p.본문.글, '평문만 있는 안내\n둘째 줄');
 });
