@@ -50,7 +50,7 @@ const B = (() => {
     grabFn('_reserveAcct'), grabFn('reserveAdjust'), grabFn('_reserveEntry'), grabFn('_reserveEntries'),
     grabFn('_rsvIsAuto'), grabFn('_rsvWhtOf'), grabFn('whtItemsOf'), grabFn('whtItemsSum'), grabFn('_whtEntry'), grabFn('accruedOf'), grabFn('_accEntry'), grabFn('closeArr'), grabFn('annexRows'), grabFn('splitPL'), grabFn('rsv1Ledger'), grabFn('rsv1UseOf'),
     grabFn('carryOpening'), grabFn('f15PrevCheck'),
-    'this.carry=carryOpening; this.prevCheck=f15PrevCheck;',
+    'this.carry=carryOpening; this.prevCheck=f15PrevCheck; this.ACCT=ACCT_CHART;',
     'this.funds=funds; this.useRate=useRate; this.computeFin=computeFin; this.closeArr=closeArr;',
     'this.reserveAdjust=reserveAdjust; this.isAuto=_rsvIsAuto; this.accruedOf=accruedOf; this.annex=annexRows; this.split=splitPL; this.ledger=rsv1Ledger; this.useOf=rsv1UseOf;',
   ].join('\n')).call(box);
@@ -190,9 +190,21 @@ test('★★ 전년 기말에서 전기이월 가져오기 — 준비금2 잔액
 
 test('이월할 칸이 없는 계정에 잔액이 남으면 알린다(조용히 버리지 않는다)', () => {
   fresh({ fund_type: '사내', years: {} });
+  /* 내장 계정은 이제 모두 이월 칸이 있다(예수금·미지급금도 2026-10-11 에 생겼다) — 칸이 없는 계정을 임시로 만들어 «알린다»만 본다 */
+  B.ACCT['기타부채'] = '부채';
+  try {
+    const arr = TX.concat([{ _id: 'm1', date: '2025-12-30', memo: '기타', amount: 50000, nocash: 1, debit: '지급수수료', credit: '기타부채', approved: true }]);
+    const pc = B.closeArr(arr, 'F1', 2025);
+    assert.deepEqual(B.carry(pc, {}, B.computeFin(pc, 'F1', 2025)).missing, ['기타부채']);
+  } finally { delete B.ACCT['기타부채']; }
+});
+
+test('예수금·미지급금은 이월 칸이 있다 — 해를 넘긴 환급·미지급이 막히지 않는다(2026-10-11)', () => {
+  fresh({ fund_type: '사내', years: {} });
   const arr = TX.concat([{ _id: 'm1', date: '2025-12-30', memo: '미지급', amount: 50000, nocash: 1, debit: '지급수수료', credit: '미지급금', approved: true }]);
   const pc = B.closeArr(arr, 'F1', 2025);
-  assert.deepEqual(B.carry(pc, {}, B.computeFin(pc, 'F1', 2025)).missing, ['미지급금']);
+  const r = B.carry(pc, {}, B.computeFin(pc, 'F1', 2025));
+  assert.deepEqual(r.missing, []); assert.equal(r.op.apay, 50000, '작년 기말 미지급금이 다음 해로 안 넘어간다');
 });
 
 test('★ ⑫(올해 기초 기본재산)와 작년에 보고한 ⑳을 천원 단위로 견준다', () => {

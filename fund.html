@@ -16596,6 +16596,8 @@ var OPEN_ACCT={cash:'현금성자산',savings:'정기예금',loan:'근로자대�
                accrued:'미수수익',recv:'미수금',stfund:'단기금융상품',spcash:'특정현금과예금',
                /* 회계법인 결산본(U사내 2019)에 있던 계정 — 이월할 자리가 없어 연말에 사라졌다 */
                prepaid:'선납세금',payable:'미지급비용',
+               /* 입금 오류·환급처럼 «맡아 둔 돈»이 해를 넘기면 이월할 칸이 없어 다음 해 환급이 막혔다(2026-10-10 대표 질문) — 예수금·미지급금 */
+               held:'예수금',apay:'미지급금',
                spresv:'손실대비특별적립금',
                basic:'기본재산',retained:'이월잉여금',
                /* 준비금은 1·2를 갈라 이월한다. **번호는 공식 서식이 정해 둔 것**이다 —
@@ -20646,10 +20648,10 @@ function _bankLastBal(arr){
    · 고른 줄 한꺼번에: ✓ 승인(차·대가 정해지고 100만↑·임금성·차입이 아닌 줄만 — 나머지는 빼고 몇 줄인지 알림) · 차변/대변 한꺼번에(승인한 줄·쪼갠 거래·이체는 뺌,
      바꾸기 전 값은 _track 묶음으로 남아 📜 작업 일지에서 되돌림). 마감한 달·결산 확정한 해 줄은 고를 수 없다. */
 var LED_KINDS=[['all','전체'],['issues','⚠ 문제만'],['unclass','미분류'],['unappr','미승인'],['noev','📎 증빙 없음'],['sug','🤖 기계 제안'],
-  ['wage','임금성 의심'],['borrow','차입 의심'],['big','100만 원 넘는 출금'],['xfer','🔁 이체 짝']];
+  ['wage','임금성 의심'],['borrow','차입 의심'],['big','100만 원 넘는 출금'],['xfer','🔁 이체 짝'],['refund','↔ 입금 오류·환급']];
 var LED_ISSUE=['unclass','unappr','same','wage','borrow'];
 var LED_BIG=1000000;
-var LED_TAG={unclass:['미분류','dg'],unappr:['미승인','warn'],same:['차·대 같음','dg'],wage:['임금성 의심','dg'],borrow:['차입 의심','dg'],big:['100만↑',''],noev:['증빙 없음',''],xfer:['이체 짝',''],sug:['🤖','']};
+var LED_TAG={unclass:['미분류','dg'],unappr:['미승인','warn'],same:['차·대 같음','dg'],wage:['임금성 의심','dg'],borrow:['차입 의심','dg'],big:['100만↑',''],noev:['증빙 없음',''],xfer:['이체 짝',''],refund:['↔ 환급',''],sug:['🤖','']};
 function _ledIssues(x,xferIds){
   var o=[], sp=_splitsOf(x), wd=num(x.withdraw)||0, dep=num(x.deposit)||0;
   if(!_txnDone(x)) o.push('unclass');
@@ -20661,6 +20663,7 @@ function _ledIssues(x,xferIds){
   if(wd>0&&!x.scan) o.push('noev');
   if(xferIds&&xferIds[x._id]) o.push('xfer');
   if(x.sug&&!x.approved) o.push('sug');
+  if(x.refund) o.push('refund');   // 입금 오류·환급으로 묶은 줄(예수금으로 서로 지운 것)
   return o;
 }
 function _ledMatch(iss,k){ if(!k||k==='all') return true; if(k==='issues') return LED_ISSUE.some(function(c){ return iss.indexOf(c)>=0; }); return iss.indexOf(k)>=0; }
@@ -20685,6 +20688,7 @@ function _ledBulkHTML(){
   var opt=function(lab){ return '<option value="">'+lab+'</option>'+ACCTS.map(function(a){ return '<option>'+esc(a)+'</option>'; }).join(''); };
   return '<div class="ledbulk"><span>'+ids.length+'건 선택'+(dep?' · 입금 '+dep.toLocaleString()+'원':'')+(wd?' · 출금 '+wd.toLocaleString()+'원':'')+'</span>'
     +'<button class="primary" onclick="ledBulkApprove()" style="padding:4px 11px">✓ 고른 것 승인</button>'
+    +(ids.length===2?'<button onclick="ledRefundPair()" style="padding:4px 11px" title="잘못 들어온 입금과 그 환급(출금) 두 줄을 예수금으로 서로 지웁니다 — 수익·비용에 안 남습니다">↔ 입금 오류·환급으로 묶기</button>'+hlp('led.refund'):'')
     +'<select onchange="ledBulkAcct(\'debit\',this.value);this.value=\'\'" style="padding:3px 6px">'+opt('차변 한꺼번에 ▾')+'</select>'
     +'<select onchange="ledBulkAcct(\'credit\',this.value);this.value=\'\'" style="padding:3px 6px">'+opt('대변 한꺼번에 ▾')+'</select>'
     +'<span style="flex:1"></span><button onclick="ledPickAll(false)" style="padding:3px 9px">✕ 선택 풀기</button></div>';
@@ -20715,6 +20719,53 @@ function ledBulkApprove(){
       S.ledSel={}; renderFund(); toast(ok.length+'건을 승인했습니다');
       if(typeof RV!=='undefined') RV.at=0;
     }).catch(function(e){ toast('승인 실패: '+((e&&e.message)||e),'err'); });
+  });
+}
+/* ══ ↔ 입금 오류·환급 묶기 (대표 질문 2026-10-10 「입금이 잘못되어 환급되는 경우는 어떻게 정리하나」 — 목업 docs/목업-기금관리-결산확인정리 «덧붙임») ══
+   잘못 들어온 돈을 돌려준 것은 수익도 비용도 아니다 — 맡아 둔 돈이다. 그래서 입금 때 (대)예수금, 환급 때 (차)예수금으로 서로 지운다.
+     입금: (차) 현금성자산 / (대) 예수금      환급: (차) 예수금 / (대) 현금성자산      → 수익·비용 0, 기말 예수금 0
+   · 같은 통장의 «같은 날·같은 금액» 입·출은 이체 짝(findTransfers)에서 일부러 빠져 있어 자동으로 못 찾는다 — 사람이 두 줄을 골라 묶는다.
+   · 금액이 다르면 묶지 않는다(수수료를 떼거나 이자가 붙은 경우는 ✂ 로 같은 금액만큼 쪼갠 뒤) — 차액을 지어내지 않는다.
+   · 이미 승인한 줄·쪼갠 거래·이체 상계 줄·마감한 달·확정한 해는 묶지 않는다. 사람이 눌렀으므로 승인 표시(ok_via:'refund')까지 한다.
+   · 거래처 학습(learnAcct)과 🛡 신뢰 셈에는 넣지 않는다 — 환급은 거래처의 «계정 습관»이 아니다.
+   · 되돌리기: 장부 계정 한꺼번에(ledBulkAcct)와 같은 방식으로 batches/{bid} 를 같은 저장에 쓴다 → 📜 작업 일지에서 묶음째 되돌린다.
+   · 출연금이 «과하게» 들어와 돌려주는 경우(이미 기본재산으로 잡았다면 정정)는 앱이 정하지 않는다 — 기본재산이 줄어드는 일이라 노무사가 본다. */
+function _refundPair(a,b){
+  a=a||{}; b=b||{};
+  var isD=function(x){ return (num(x.deposit)||0)>0&&!(num(x.withdraw)||0); }, isW=function(x){ return (num(x.withdraw)||0)>0&&!(num(x.deposit)||0); };
+  var dep=isD(a)?a:(isD(b)?b:null), wd=isW(a)?a:(isW(b)?b:null);
+  if(!dep||!wd||dep===wd) return {ok:false, why:'dir', msg:'입금 한 줄과 출금 한 줄을 고르세요'};
+  var two=[dep,wd];
+  if(two.some(function(x){ return _splitsOf(x).length; })) return {ok:false, why:'split', msg:'쪼갠 거래는 묶을 수 없습니다'};
+  if(two.some(function(x){ return x.xfer; })) return {ok:false, why:'xfer', msg:'이미 계좌 간 이체로 상계된 줄입니다'};
+  if(two.some(function(x){ return x.approved; })) return {ok:false, why:'appr', msg:'이미 승인한 줄은 묶지 않습니다 — 승인을 풀고 다시 고르세요'};
+  if(dep.acct&&wd.acct&&String(dep.acct)!==String(wd.acct)) return {ok:false, why:'acct', msg:'통장(계좌)이 다릅니다 — 계좌 간 이체라면 [이체 자동매칭]을 쓰세요'};
+  var din=num(dep.deposit)||0, wout=num(wd.withdraw)||0;
+  if(din!==wout) return {ok:false, why:'diff', msg:'금액이 다릅니다(입금 '+din.toLocaleString()+' / 출금 '+wout.toLocaleString()+') — 먼저 ✂ 로 같은 금액으로 쪼갠 뒤 묶으세요'};
+  if(String(wd.date||'')<String(dep.date||'')) return {ok:false, why:'order', msg:'환급(출금)이 입금보다 앞섭니다 — 날짜를 확인하세요'};
+  return {ok:true, dep:dep, wd:wd, amt:din};
+}
+function ledRefundPair(){
+  var fid=S.fundId, yr=S.year, key=fid+'/'+yr; if(S.txnsFor!==key) return;
+  var ids=_ledSelIds(); if(ids.length!==2){ toast('입금 한 줄과 출금 한 줄, 두 줄만 고르세요','warn'); return; }
+  var r=_refundPair(S.txns[ids[0]],S.txns[ids[1]]); if(!r.ok){ toast(r.msg,'warn'); return; }
+  var dId=(S.txns[ids[0]]===r.dep)?ids[0]:ids[1], wId=(dId===ids[0])?ids[1]:ids[0];
+  if(txnLocked(dId)||txnLocked(wId)){ toast('마감한 달·확정한 해의 줄은 묶을 수 없습니다','warn'); return; }
+  var who=(S.user||''), at=_nowStamp(), bid=(typeof _provBid==='function')?_provBid():('b'+Date.now().toString(36)), up={}, bc={}, n=0;
+  var put=function(id,field,val){ var p='txns/'+key+'/'+id+'/'+field, prev=(S.txns[id]||{})[field];
+    up[p]=val; var c={a:val}; if(!_provEmpty(prev)) c.b=prev; bc[fid+'|t|'+yr+'|'+id+'|'+field]=c; n++; };
+  [[dId,'현금성자산','예수금',wId],[wId,'예수금','현금성자산',dId]].forEach(function(t){
+    put(t[0],'debit',t[1]); put(t[0],'credit',t[2]); put(t[0],'approved',true); put(t[0],'approved_by',who); put(t[0],'approved_at',at); put(t[0],'ok_via','refund'); put(t[0],'refund',t[3]);
+    up['txns/'+key+'/'+t[0]+'/sug']=null; });
+  up['batches/'+bid]={meta:{at:at, by:who, what:'입금 오류·환급 묶기 — '+r.amt.toLocaleString()+'원', src:'', n:n}, cells:bc};
+  up['audit/'+fid+'/'+fbDb.ref(NS+'/audit/'+fid).push().key]={at:at, by:(who||'?'), what:'입금 오류·환급 묶기', bid:bid, detail:yr+'년 '+String(r.dep.date||'')+' 입금 ↔ '+String(r.wd.date||'')+' 출금 · '+r.amt.toLocaleString()+'원 · 예수금'};
+  confirmM('입금 오류·환급으로 묶을까요?\n\n· '+String(r.dep.date||'')+' 입금 '+r.amt.toLocaleString()+'원 → (차) 현금성자산 / (대) 예수금\n· '+String(r.wd.date||'')+' 출금 '+r.amt.toLocaleString()+'원 → (차) 예수금 / (대) 현금성자산\n\n수익·비용에는 남지 않고 기말 예수금은 0이 됩니다. 두 줄은 승인 표시까지 하며, 📜 작업 일지에서 묶음째 되돌릴 수 있습니다.',{ok:'두 줄 묶기'}).then(function(y){ if(!y) return;
+    fbDb.ref(NS).update(up).then(function(){
+      [[dId,'현금성자산','예수금',wId],[wId,'예수금','현금성자산',dId]].forEach(function(t){ var x=S.txns[t[0]]; if(!x) return;
+        x.debit=t[1]; x.credit=t[2]; x.approved=true; x.approved_by=who; x.approved_at=at; x.ok_via='refund'; x.refund=t[3]; delete x.sug; });
+      S.ledSel={}; if(typeof JL!=='undefined') JL.data=null;
+      renderFund(); toast('입금 오류·환급으로 묶었습니다 — 예수금으로 서로 지웠습니다');
+    }).catch(function(e){ toast('묶기 실패: '+((e&&e.message)||e),'err'); });
   });
 }
 function ledBulkAcct(side,acct){
@@ -22345,6 +22396,10 @@ var HELP={
  'imp.undo':{t:'통장 가져온 기록',h:'<p>가져온 통장 파일마다 한 줄입니다. 잘못 가져온 파일은 <b>↶ 되돌리기</b>로 통째로 걷어냅니다.</p>'
    +'<p><b>남기는 줄</b> — 사람이 승인한 줄 · 증빙을 붙인 줄 · 쪼갠 거래 · 마감한 달·확정한 해. 🛡 자동 확정으로 승인된 줄은 기계 일이라 걷어냅니다.</p>'
    +'<p>이 기능을 넣기 «전»에 가져온 줄은 어느 파일인지 기록이 없어 여기 안 나옵니다 — 장부에서 고르고 지웁니다. 되돌리기는 대표·관리자만.</p>'},
+ 'led.refund':{t:'입금 오류·환급 묶기',h:'<p>잘못 들어온 돈을 <b>그대로 돌려준 것</b>은 수익도 비용도 아닙니다 — 맡아 둔 돈입니다. 입금 줄과 환급(출금) 줄을 □로 고른 뒤 누르면 <b>입금 (대)예수금 · 환급 (차)예수금</b>으로 서로 지워 결산서에 남지 않습니다.</p>'
+   +'<p><b>금액이 다르면</b>(수수료를 떼거나 이자가 붙은 경우) 묶지 않습니다 — ✂ 로 같은 금액만큼 쪼갠 뒤 묶고, 남는 금액은 지급수수료·이자수익으로 따로 잡으세요.</p>'
+   +'<p>이미 승인한 줄·마감한 달·확정한 해·쪼갠 거래·이체 상계 줄은 묶지 않습니다. 두 줄에는 <b>↔ 환급</b> 표시가 붙고 📜 작업 일지에서 되돌릴 수 있습니다. <b>해를 넘겨 환급</b>하면 작년 기말 예수금은 전기이월의 «예수금» 칸으로 넘어갑니다.</p>'
+   +'<p>출연금이 <b>과하게</b> 들어와 돌려주는 경우는 기본재산이 줄어드는 일이라 앱이 정하지 않습니다 — 노무사가 확인하세요.</p>'},
  'led.filter':{t:'장부 거르기 · 한꺼번에 정리',h:'<p>줄마다 맨 오른쪽 «손볼 것»에 그 줄이 왜 걸렸는지 딱지가 붙습니다 — 미분류·미승인·차·대 같음·임금성 의심·차입 의심·100만 원 넘는 출금·증빙 없음·이체 짝·🤖 기계 제안.</p>'
    +'<p>위 칩을 누르면 그 줄만 보입니다(다시 누르면 전체). <b>⚠ 문제만</b>은 결산을 막는 줄(미분류·미승인·차·대 같음)과 법 위반 의심(임금성·차입)만 모읍니다.</p>'
    +'<p>맨 왼쪽 □로 줄을 고르면 아래에 띠가 뜹니다. <b>✓ 고른 것 승인</b>은 차·대가 정해진 줄만 승인하고, 100만 원 넘는 출금·임금성·차입 의심은 빼서 하나씩 보게 합니다. <b>차변/대변 한꺼번에</b>는 승인한 줄·쪼갠 거래·이체를 빼고 바꾸며, 바꾸기 전 값은 📜 작업 일지에서 묶음째 되돌릴 수 있습니다.</p>'
