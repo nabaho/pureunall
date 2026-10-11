@@ -5215,6 +5215,10 @@ function _hwpBizplanValues(f,sites){
   }
   var fin=null; try{ fin=_bizFinOf()||(isSetupFund(f)?_bizFinZero():null); }catch(e){}
   var P=null; try{ if(fin) P=bizplanBS(f,yr,fin,sites); }catch(e){}
+  /* 왜 비었는지 — 바탕(앞 해 기말)이 없어서인지, 예산이 없어서인지 갈라 알린다(실사이트 확인: 바탕은 있는데 예산이 비어 «분개가 없다»고 잘못 말했다) */
+  if(!P) V._note=(V._note?V._note+' · ':'')+(fin
+    ?'추정재무상태표는 '+yr+'년 예산이 비어 있어 비웠습니다 — 예산·집행에서 '+yr+'년 예산을 먼저 넣으세요'
+    :'추정재무상태표는 «'+(yr-1)+'년 기말»이 바탕인데 그 해 승인된 분개가 없어 비웠습니다 — 회계·결산에서 '+(yr-1)+'년을 승인하면 채워집니다');
   if(P){
     BIZ_BS_ROWS.forEach(function(x){ var k=BIZ_TPL_BS[x[0]]; if(k) V[k]=W(x[1](P)); });
     V.대_현금=W(P.cash); V.대_단기=W(P.savings); V.대_준비금1=W(P.res1); V.대_준비금2=W(P.res2);
@@ -7735,8 +7739,12 @@ function planBudget(f,sites,yr){
      없는 것을 0 으로 메우면 «준비금이 0인 기금»으로 셈해 표가 통째로 틀린다.
      그래서 하나라도 없으면 «안 채운다». 빈 칸이 틀린 숫자보다 낫다. */
 function _bizFinOf(){
-  var c=(typeof S!=='undefined'&&S.f15Close)||null;
-  var f=c&&c.fin; if(!f) return null;
+  /* ★ 2026-10-11 — 바탕은 «이 서식 해의 앞 해 기말»이다(사업계획서는 다음 해 것이므로). 예전에는 지금 보는 해의 확정 스냅샷(S.f15Close.fin)을 읽어
+     ① 한 해 어긋났고 ② 결산을 확정한 기금이 없어(43곳 모두 스냅샷 0) 어디서나 비었다. 이제 앞 해 장부로 셈한 것(_bizBaseLoad)을 읽는다.
+     읽어 둔 것이 «이 기금·앞 해» 것이 아니면 쓰지 않는다 — 남의 기금 숫자가 찍히면 안 된다. */
+  var b=(typeof S!=='undefined'&&S._bizBase)||null;
+  if(!b||b.fid!==(S.formFund||S.fundId)||b.yr!==S.year-1) return null;
+  var f=b.fin; if(!f) return null;
   var assets=(f.assets!=null)?f.assets:f.totalAssets;
   if(assets==null) return null;
   if(f.res1==null||f.res2==null||f.secu==null) return null;   // 옛 스냅샷
@@ -9564,7 +9572,19 @@ function _setDocLayer(layer,ftype){ S._docLayer=layer;
      siteContribNow 가 늘 약정액으로 내려간다 — 금액을 다 적어 두고도 밑줄로 나갔다. */
 var DOC_NEEDS_LEDGER={ops_asset_change:1,sub_assets:1,sub_contrib:1,sub_welfare_plan:1,
                       sub_payment:1,sub_checklist:1,subsidy:1,contrib:1};
+/* 사업계획서의 «바탕» — 이 서식 해(S.year)의 «앞 해 기말». 앞 해 장부(승인 분개)로 셈한다. 앞 해 장부가 없으면 fin 을 비운다 —
+   0 을 바탕으로 삼으면 «재산이 0»이라 적는 셈이다(빈 칸이 틀린 숫자보다 낫다). */
+function _bizBaseLoad(f){
+  var fid=S.formFund, yr=S.year-1;
+  if(!fid||!f||f._sample||typeof fbDb==='undefined'||!fbDb){ S._bizBase=null; return Promise.resolve(null); }
+  return fbDb.ref(NS+'/txns/'+fid+'/'+yr).once('value').then(function(sn){ var v=sn.val()||{};
+    var arr=closeArr(Object.keys(v).map(function(k){ var o=Object.assign({},v[k]); o._id=k; return o; }),fid,yr);
+    S._bizBase={fid:fid,yr:yr,fin:journalOf(arr).length?computeFin(arr,fid,yr):null};
+    return S._bizBase;
+  }).catch(function(){ S._bizBase={fid:fid,yr:yr,fin:null}; return null; });
+}
 function _docExtra(kind,f){
+  if(kind==='bizplan') return _bizBaseLoad(f);   // 장부 서식이 아니라 «앞 해 기말»만 — S._docR 는 그대로 둔다(묶음에서 다른 서식이 읽은 것을 지우지 않게)
   S._docBf=null; S._docR=null;
   if(!DOC_NEEDS_LEDGER[kind]||!f||f._sample) return Promise.resolve(null);
   var fid=S.formFund, yr=S.year;
@@ -9899,6 +9919,8 @@ function estabBundle(phase){
   var _need=docsFor(ph[2](),f.fund_type||'공동').some(function(d){ return DOC_NEEDS_LEDGER[d[0]]; });
   var _pre=_need ? _docExtra(docsFor(ph[2](),f.fund_type||'공동').filter(function(d){ return DOC_NEEDS_LEDGER[d[0]]; })[0][0], f)
                  : Promise.resolve(null);
+  /* 사업계획서(① 인가·⑤ 지원금 묶음에 있다)의 추정재무상태표는 «앞 해 기말»이 바탕 — 묶음도 먼저 읽어 둔다 */
+  if(docsFor(ph[2](),f.fund_type||'공동').some(function(d){ return d[0]==='bizplan'; })) _pre=_pre.catch(function(){ return null; }).then(function(){ return _bizBaseLoad(f); });
   _pre.catch(function(){ return null; }).then(function(){
   return (f._sample?Promise.resolve([]):_loadSites(S.formFund,{withClosed:true}));
   }).then(function(sites){
@@ -9957,7 +9979,7 @@ function _estabBundleHwpGo(phase,draftN){
     return plan.use.reduce(function(p,u,k){ return p.then(function(){
       say('⏳ '+(k+1)+'/'+plan.use.length+' 채우는 중…');
       /* 장부를 읽어야 채워지는 서식(재산목록·출연확인서…)은 한 서식 열 때처럼 그 서식 몫을 먼저 읽는다 */
-      var pre=DOC_NEEDS_LEDGER[u.d[0]]?_docExtra(u.d[0],f).catch(function(){ return null; }):Promise.resolve();
+      var pre=DOC_NEEDS_LEDGER[u.d[0]]?_docExtra(u.d[0],f).catch(function(){ return null; }):(u.d[0]==='bizplan'?_bizBaseLoad(f).catch(function(){ return null; }):Promise.resolve());
       return pre.then(function(){ return hwpTplFill(u.d[0],f,sites); }).then(function(res){
         return mk(res.bytes).then(function(b){ res.bytes=b; return res; });
       }).then(function(res){
@@ -19324,9 +19346,9 @@ function flowOpen(step){ S._flowOpen=(S._flowOpen===step?'':step); renderFund();
 /* 사업계획서 한글 한 벌 — 제목·예산은 다음 해, 추정재무상태표의 바탕은 결산한 해(위 머리말). S 를 잠깐 바꿨다가 되돌린다(_flowZipInto 와 같은 방식) */
 function _flowPlanFill(fid,yr,d){
   var f=Object.assign({_id:fid},funds[fid]||{}), arrC=closeArr(d.arr,fid,yr);
-  var keep={y:S.year,ff:S.formFund,c:S.f15Close};
-  S.year=yr+1; S.formFund=fid; S.f15Close={fin:computeFin(arrC,fid,yr)};
-  var back=function(){ S.year=keep.y; S.formFund=keep.ff; S.f15Close=keep.c; };
+  var keep={y:S.year,ff:S.formFund,b:S._bizBase};
+  S.year=yr+1; S.formFund=fid; S._bizBase={fid:fid,yr:yr,fin:journalOf(arrC).length?computeFin(arrC,fid,yr):null};
+  var back=function(){ S.year=keep.y; S.formFund=keep.ff; S._bizBase=keep.b; };
   return hwpTplFill('bizplan',f,d.sites).then(function(res){ back(); return res; },function(e){ back(); throw e; });
 }
 /* 제출 묶음 안의 «07. 다음 해 사업계획서(한글)» — 예산이 있을 때만 */
