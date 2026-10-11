@@ -16,6 +16,7 @@
 - 게시 전 화면 동작: 읽기가 거절되면 ③④⑤ 칸은 「—」(누를 수 없음)+「기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인」, 나머지 화면은 그대로.
   쓰기가 거절되면 칸 창에 「저장하지 못했습니다 — 규칙 게시 또는 권한 확인」, 값은 그대로.
 - 게시는 `scripts/rules-deploy.js` 로, 대표 승인 뒤에만.
+- 게시 뒤 할 일: 콘솔 원문 스냅숏 갱신 + `tests/photos-staff-share.test.js` 의 `PENDING`(`/scal_docs`) 비우기. (`tests/perf-rules.test.js` 의 `allowTop` 에 있는 `scal_docs` 는 영구 목록이라 그대로 둔다.)
 
 ## 다음 (확인 필요)
 
