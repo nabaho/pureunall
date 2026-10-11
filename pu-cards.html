@@ -1406,6 +1406,17 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-inq button{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:12px;
   padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 .dm-inq button:hover{background:#eff6ff}
+/* 🤖 받은메일함 위 「AI가 업무 칸으로 옮겼습니다」 띠 (대표 승인 목업 2026-10-11) — 한 줄, 넘치면 … */
+.dm-ai2{display:flex;align-items:center;gap:8px;padding:6px 12px;white-space:nowrap;overflow:hidden;
+  background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1e40af}
+.dm-ai2 b{font-weight:800}
+.dm-ai2 .chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+.dm-ai2 .chip{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:999px;
+  padding:1px 9px;font-size:12px;cursor:pointer;font-family:inherit}
+.dm-ai2 .chip:hover{background:#eff6ff}
+.dm-ai2 .chip.ad{color:#64748b;border-color:#e2e8f0;cursor:default}
+.dm-ai2 .go{flex:none;border:1px solid #1e40af;background:#fff;color:#1e40af;border-radius:5px;
+  padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 /* ── 📤 보낸 메일을 사람마다 갈라 보는 칩 줄 (대표 지시 2026-09-16) ── */
 .dm-sentwho{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 12px;
   background:#f8fafc;border-top:1px solid #cbd5e1;border-bottom:1px solid #e2e8f0}
@@ -19559,6 +19570,59 @@ function mbInqRows(now0){
                    return !row || !Number(row.r||0); })
     .sort((a,b)=> Number(b.d||0) - Number(a.d||0));
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   🤖 받은메일함 위 「AI가 새 메일 N통을 업무 칸으로 옮겼습니다」 띠 (대표 승인 목업 2026-10-11)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 왜 — 2026-10-04 AI 자동분류를 켠 뒤 새 메일은 «업무 칸»으로 옮겨져 받은메일함에서 빠진다.
+     실측 2026-10-11: 받은메일함 576통 가운데 10/05~10/11 새 메일 30통이 전부 옮겨졌고, 받은메일함
+     맨 위는 10/04 였다. 사람은 「새 메일이 안 온다 · 받은메일함이 이상하다」로 읽었다.
+     옮기는 동작은 그대로 두고, 「어디로 갔는지」만 받은메일함 맨 위에 알린다.
+   ⚠ 받은메일함 «에서만», 최근 7일 안에 AI 가 옮긴 메일이 있을 때만 뜬다(0통이면 띠 자체가 없다).
+   ⚠ 「AI 가 짚은 것」만 센다(_mbPutBy === 'ai') — 사람이 손으로 옮긴 것은 본인이 아니까 안 센다.
+   ⚠ 숨긴 칸(광고)으로 간 것은 칩이 아니라 «수만» — 눌러도 볼 곳이 없다(전체메일에도 안 나온다).
+   ⚠ 셈은 그리는 동안 한 번만(mbMemoOf) — 줄마다 판정하지 않는다. */
+const MB_AI_DAYS = 7;
+function mbAiMoved(){
+  const m = mbMemoOf();
+  if(m.aiMoved) return m.aiMoved;
+  const out = { n:0, hidden:0, by:{}, order:[] };
+  m.aiMoved = out;
+  const inbox = mbFolderOf('inbox')[0];
+  if(!inbox) return out;
+  const cut = Date.now() - MB_AI_DAYS * 86400000;
+  const box = _mbMsgs[inbox.slug] || {};
+  const by = _mbPutBy || {}, put = _mbPut || {};
+  Object.keys(box).forEach(uid=>{
+    const v = box[uid]; if(!v || Number(v.d||0) < cut) return;
+    const key = inbox.slug + ':' + uid;
+    if(by[key] !== 'ai') return;
+    const bid = String(put[key] || ''); if(!bid) return;
+    if(mbHidden(bid)){ out.hidden++; return; }
+    out.n++;
+    if(!out.by[bid]){ out.by[bid] = 0; out.order.push(bid); }
+    out.by[bid]++;
+  });
+  out.order.sort((a,b)=> out.by[b] - out.by[a]);
+  return out;
+}
+function mbAiStripHtml(){
+  if(mbSentBox()) return '';
+  const inbox = mbFolderOf('inbox')[0];
+  if(!inbox || mbNow() !== inbox.slug) return '';           /* 받은메일함에서만 */
+  const a = mbAiMoved();
+  if(!a.n && !a.hidden) return '';
+  const chip = bid=>{
+    const b = mbBinBy(bid);
+    const name = (b && b.name) || mbBoxName(bid);
+    return `<button type="button" class="chip" onclick="mbGo('${MB_BIN_P}${esc(bid)}')"
+      title="${esc(name)} 칸을 엽니다">${esc(name)} ${a.by[bid]}</button>`;
+  };
+  const ad = a.hidden ? `<span class="chip ad" title="숨긴 칸으로 간 것 — 전체메일에도 안 나옵니다">광고 ${a.hidden} (숨김)</span>` : '';
+  return `<div class="dm-ai2">🤖 <span>최근 ${MB_AI_DAYS}일, AI가 새 메일 <b>${a.n + a.hidden}통</b>을 업무 칸으로 옮겼습니다</span>
+    <span class="chips">${a.order.map(chip).join('')}${ad}</span>
+    <button type="button" class="go" onclick="openMailBox('*all')"
+      title="옮겨진 것까지 날짜순으로 봅니다">전체메일에서 보기</button></div>`;
+}
 function mbInqLineHtml(){
   if(mbSentBox()) return '';               /* 우리가 낸 칸에서는 안 보인다 */
   const rows = mbInqRows();
@@ -25640,6 +25704,7 @@ function mbListHtml(){
            [새로고침 ↻] 을 누르면 그때 알려 준다.
          ⚠ 되살리려면 이 자리에 dm-hint 한 줄을 도로 넣으면 된다(git 에 있다). */''}
     </div>
+    ${mbAiStripHtml()}
     ${mbInqLineHtml()}
     ${mbMineLineHtml()}
     ${mbSpamLineHtml()}
