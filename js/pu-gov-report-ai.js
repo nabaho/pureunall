@@ -28,7 +28,11 @@
     },
     techguard: { main: { rounds: ['diagnosis', 'advice', 'result', 'next'], summary: ['adviceAll', 'overall'] } },
     /* 현장클리닉(별지 14) — 일정 칸 «수행내용» 에 회차 5칸이 이어 들어가고, 종합은 테마·애로사항·현황·진단·처방·전후 비교·향후 */
-    clinic: { main: { rounds: ROUND_KEYS, summary: ['theme', 'inquiryDiag', 'status', 'diag', 'remedy', 'effects', 'followUp'] } },
+    clinic: {
+      main: { rounds: ROUND_KEYS, summary: ['theme', 'inquiryDiag', 'status', 'diag', 'remedy', 'effects', 'followUp'] },
+      /* 수행계획서(별지 11) — 일정 칸 내용 첫 줄에 자문 → 진단 → 문의 중 있는 것, 종합은 테마·애로사항(줄마다 ①②③) */
+      plan: { rounds: ['inquiry', 'diagnosis', 'advice'], summary: ['theme', 'inquiryDiag'] },
+    },
   };
   /* 칸별 글자 수 한도 — 기관 공식 한도가 아니라 양식 칸 크기에 맞춘 출발값(노무사 확인 필요) */
   var LIMITS = { inquiry: 300, diagnosis: 300, advice: 300, result: 300, next: 300,

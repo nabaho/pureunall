@@ -175,7 +175,7 @@
       var files = Object.keys(f.files || {}).map(function (fl) {
         var got = (idx[fk] || {})[fl] || {};
         var years = Object.keys(got).filter(function (y) { return got[y] && /^\d{4}$/.test(y); }).sort().reverse();
-        return { fileKey: fl, label: FILE_KO[fl] || fl, years: years, latest: years[0] || '' };
+        return { fileKey: fl, label: str((f.files[fl] || {}).label) || FILE_KO[fl] || fl, years: years, latest: years[0] || '' };
       });
       return { formKey: fk, name: str(f.name), agency: str(f.agency), files: files,
         ready: files.length > 0 && files.every(function (x) { return x.years.length > 0; }) };
