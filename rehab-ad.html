@@ -96,6 +96,21 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .lgform{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .lgform input[type=text]{flex:1 1 140px;min-width:100px}
 td.lg{font-size:12px;color:var(--ink2)}
+.bar1,.bar2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.bar1 .tabs{margin:0}
+.bar1 input[type=search]{min-width:240px}
+.bar2 select,.moreF select{font-size:12.5px;padding:4px 6px}
+.moreF{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+.funnel{background:none;border:0;padding:0;margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.funnel .qp{border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:3px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.funnel .qp b{font-variant-numeric:tabular-nums;margin-left:4px}
+.funnel .qp.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-d);font-weight:700}
+.funnel .fgrp{flex:0 0 100%;margin-top:2px}
+.tab{border-color:transparent;background:transparent;padding:3px 10px}
+.tab.on{background:var(--blue-bg);border-color:var(--blue)}
+.dhead{position:sticky;top:-14px;z-index:5;margin:-14px -15px 8px;padding:12px 15px 6px;background:var(--card);border-bottom:1px solid var(--line)}
+.dhead h2{margin-top:0}
+.dhead .meta{margin-bottom:2px}
 .fsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:stretch}
 .fsteps>button{font-size:12px;padding:3px 10px;white-space:nowrap}
 .fs{border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
@@ -141,8 +156,8 @@ td.lg{font-size:12px;color:var(--ink2)}
 #selbar label{font-size:12px;color:var(--ink2);display:flex;gap:4px;align-items:center}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,28vw,540px);gap:12px;align-items:start}
 .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
-table{border-collapse:collapse;width:100%;min-width:1410px;table-layout:fixed}
-col.c-ck{width:36px}col.c-no{width:44px}col.c-co{width:270px}col.c-pgm{width:128px}col.c-ceo{width:84px}col.c-tr{width:120px}col.c-rg{width:112px}col.c-ct2{width:196px}col.c-st{width:72px}col.c-ico{width:112px}col.c-stat{width:84px}col.c-log{width:150px}
+table{border-collapse:collapse;width:100%;min-width:1240px;table-layout:fixed}
+col.c-ck{width:36px}col.c-no{width:44px}col.c-co{width:240px}col.c-kind{width:84px}col.c-pgm{width:158px}col.c-ceo{width:84px}col.c-tr{width:116px}col.c-rg{width:116px}col.c-ico{width:116px}col.c-stat{width:84px}col.c-log{width:150px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
 th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600}
 tbody tr{cursor:pointer}
@@ -251,34 +266,32 @@ td.ceo{}
   </div></details>
 
   <div id="fixbar">
-  <div class="funnel" id="funnel"></div>
-  <div class="tabs" id="tabs"></div>
-
-  <div class="tools">
-    <select id="fDays" aria-label="기간">
+  <div class="bar1"><div class="tabs" id="tabs"></div><span class="sp"></span><input id="fText" type="search" placeholder="회사명·주소·사건번호 찾기">
+    <button class="pri" id="findBtn" onclick="findContacts()">🔎 연락처 찾기</button></div>
+  <div class="bar2"><div class="funnel" id="funnel"></div><span class="sp"></span>
+<select id="fDays" aria-label="기간">
       <option value="7">최근 7일</option><option value="14">최근 14일</option>
       <option value="31" selected>최근 1개월</option><option value="0">전체 기간</option>
     </select>
-    <select id="fCourt" aria-label="법원"><option value="">모든 법원</option></select>
-    <select id="fSido" aria-label="지역"><option value="">모든 지역</option></select>
-    <select id="fType" aria-label="사건종류"><option value="">모든 종류</option><option value="reh">법인회생 전체</option><option value="bk">법인파산 전체</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
-    <select id="fStage" aria-label="단계"><option value="">모든 단계</option></select>
-    <select id="fContact" aria-label="연락처">
-      <option value="">연락처 전체</option><option value="has">연락처 있음</option><option value="none">연락처 없음</option><option value="check">확인 필요</option>
-    </select>
-    <select id="fTrade" aria-label="거래·연결">
-      <option value="">거래·연결 전체</option><option value="client">계약·거래중</option><option value="cards">기업정보함 있음</option><option value="any">우리 자료에 있음(전체)</option><option value="none">연결 없음</option>
-    </select>
-    <select id="fLog" aria-label="발송 기록">
-      <option value="">발송 기록 전체</option><option value="none">발송 기록 없음</option><option value="sent">발송 기록 있음</option><option value="resp">반응 있음(문의·상담·계약)</option><option value="bad">반송·수신거부</option>
-    </select>
-    <select id="fSort" aria-label="정렬">
+<select id="fType" aria-label="사건종류"><option value="">모든 종류</option><option value="reh">법인회생 전체</option><option value="bk">법인파산 전체</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
+<select id="fSort" aria-label="정렬">
       <option value="date">공고일 최신순</option><option value="trade">거래·연결 있는 순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
     </select>
-    <input id="fText" type="search" placeholder="회사명·주소·대리인 찾기">
-    <button class="sm" onclick="resetFilters()">거르개 풀기</button>
-    <span class="sp"></span>
-    <button class="pri" id="findBtn" onclick="findContacts()">🔎 연락처 찾기</button>
+    <button class="sm" id="moreBtn" onclick="toggleMore()">필터 더 보기 ▾</button></div>
+  <div class="moreF" id="moreF" style="display:none">
+<select id="fCourt" aria-label="법원"><option value="">모든 법원</option></select>
+<select id="fSido" aria-label="지역"><option value="">모든 지역</option></select>
+<select id="fStage" aria-label="단계"><option value="">모든 단계</option></select>
+<select id="fContact" aria-label="연락처">
+      <option value="">연락처 전체</option><option value="has">연락처 있음</option><option value="none">연락처 없음</option><option value="check">확인 필요</option>
+    </select>
+<select id="fTrade" aria-label="거래·연결">
+      <option value="">거래·연결 전체</option><option value="client">계약·거래중</option><option value="cards">기업정보함 있음</option><option value="any">우리 자료에 있음(전체)</option><option value="none">연결 없음</option>
+    </select>
+<select id="fLog" aria-label="발송 기록">
+      <option value="">발송 기록 전체</option><option value="none">발송 기록 없음</option><option value="sent">발송 기록 있음</option><option value="resp">반응 있음(문의·상담·계약)</option><option value="bad">반송·수신거부</option>
+    </select>
+    <button class="sm" onclick="resetFilters()">모든 거르개 풀기</button>
   </div>
   <div class="infoRow"><div class="runline" id="runline"></div><div class="pager" id="pager"></div></div>
   <div id="prog"></div>
@@ -314,10 +327,10 @@ td.ceo{}
   <div class="layout">
     <div class="tbl" id="tblbox">
       <table>
-        <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ct2"><col class="c-st"><col class="c-ico"><col class="c-log"><col class="c-stat"></colgroup>
+        <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-kind"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ico"><col class="c-log"><col class="c-stat"></colgroup>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
-          <th class="no">번호</th><th class="co">회사명</th><th>공고(금지명령·파산선고)</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>발송·반응</th><th>상태</th>
+          <th class="no">번호</th><th class="co">회사명</th><th>구분</th><th>공고·단계</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>연락처</th><th>발송·반응</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -515,6 +528,15 @@ function offerOptout(id){
   mails.forEach(function(m){ autoCall({ action:'optout', email:m }, ''); });
   toast('수신거부 명단에 넣었습니다');
 }
+function kindLabel(n){ return isBk(n) ? (n.caseType==='간이파산'?'간이파산':'파산') : (n.caseType||'회생'); }
+function kindChip(n){ return isBk(n) ? 'c-red' : (n.caseType==='간이회생' ? 'c-gray' : 'c-blue'); }
+/* 공고·단계 칸 — 첫 단계(금지명령·파산선고)는 붉은 표시로 공고일과 함께, 앞선 단계는 그 단계 이름과 처음 공고일 */
+function stageCell(n){
+  var first = (n.stage==='금지명령' || n.stage==='파산선고');
+  var d = esc(pgmDate(n).slice(5));
+  if(first) return '<span class="chip pgm" style="margin-left:0">'+(isBk(n)?'파산선고':'포괄금지명령')+' '+d+'</span>';
+  return '<span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span> <span style="color:var(--mute);font-size:11.5px">'+d+'</span>';
+}
 function isBk(n){ return n && n.kind==='bankruptcy'; }
 function pgmDate(n){
   var re=isBk(n)?/파산선고/:/포괄적\s*금지명령/;
@@ -570,7 +592,7 @@ function baseList(skip){
       if(lgf==='sent' && !LG.length) return false;
       if(lgf==='resp' && !LG.some(function(x){ return /문의|상담|계약/.test(x.r||''); })) return false;
       if(lgf==='bad' && !LG.some(function(x){ return /반송|수신거부/.test(x.r||''); })) return false; }
-    if(q && ((n.debtorName||'')+' '+(n.address||'')+' '+(n.counsel||'')+' '+(n.dlvAddress||'')+' '+ceoOf(n.id).name).toLowerCase().indexOf(q)<0) return false;
+    if(q && ((n.debtorName||'')+' '+(n.address||'')+' '+(n.counsel||'')+' '+(n.dlvAddress||'')+' '+ceoOf(n.id).name+' '+(n.caseNo||'')+' '+(n.courtName||'')).toLowerCase().indexOf(q)<0) return false;
     return true;
   });
 }
@@ -596,14 +618,12 @@ function drawTabs(base){
 }
 var FUN_OPEN=false;
 function drawFunnel(base){
-  var tot=base.length, has=0, link=0, send=0, sent=0;
-  base.forEach(function(n){ if(contactOf(n.id).any) has++; var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(b) link++; var st=statusOf(n.id); if(st==='send') send++; if(st==='sent') sent++; });
-  var steps=[['all','공고 수집',tot,TAB==='all'&&!$('fContact').value&&!$('fTrade').value],['has','연락처 확보',has,$('fContact').value==='has'],['link','거래·연결 있음',link,$('fTrade').value==='any'],['send','발송 예정',send,TAB==='send'],['sent','발송 완료',sent,TAB==='sent']];
-  var h='<div class="fsteps">'+steps.map(function(x){
-    var pct=tot?Math.round(x[2]*100/tot):0;
-    return '<div class="fs'+(x[3]?' on':'')+'" data-step="'+x[0]+'" title="누르면 그 조건으로 걸러집니다"><span>'+x[1]+'</span><b>'+x[2]+'곳</b>'+(x[0]==='all'?'':'<em>'+pct+'%</em>')+'<i style="width:'+pct+'%"></i></div>';
-  }).join('')+'<button data-more="1" title="지역별·공고일별 건수">'+(FUN_OPEN?'▲ 지역·공고일':'▼ 지역·공고일')+((cur||DATE)?' ('+(cur?esc(cur):'')+(cur&&DATE?' · ':'')+(DATE?esc(DATE.slice(5)):'')+')':'')+'</button></div>';
+  var has=0, link=0;
+  base.forEach(function(n){ if(contactOf(n.id).any) has++; var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(b) link++; });
   var cur=$('fSido').value;
+  var h='<button class="qp'+($('fContact').value==='has'?' on':'')+'" data-step="has" title="연락처를 찾은 곳만">연락처 있음<b>'+has+'</b></button>'+
+        '<button class="qp'+($('fTrade').value==='any'?' on':'')+'" data-step="link" title="우리 이알피·기업정보함에 있는 곳만">거래·연결<b>'+link+'</b></button>'+
+        '<button class="qp'+((FUN_OPEN||cur||DATE)?' on':'')+'" data-more="1" title="지역별·공고일별로 보기">지역·공고일'+((cur||DATE)?' ('+(cur?esc(cur):'')+(cur&&DATE?' · ':'')+(DATE?esc(DATE.slice(5)):'')+')':'')+(FUN_OPEN?' ▲':' ▼')+'</button>';
   if(FUN_OPEN){
     var reg={}, dat={};
     baseList('sido').forEach(function(n){ var k=n.sido||'기타'; reg[k]=(reg[k]||0)+1; });
@@ -614,7 +634,10 @@ function drawFunnel(base){
       Object.keys(dat).sort().reverse().map(function(k){ return '<button class="fchip'+(DATE===k?' on':'')+'" data-date="'+k+'">'+k.slice(5)+'<b>'+dat[k]+'</b></button>'; }).join('')+'</div>';
   }
   $('funnel').innerHTML=h;
+  var more=['fCourt','fSido','fStage','fContact','fTrade','fLog'].filter(function(id){ return $(id).value; }).length;
+  $('moreBtn').textContent='필터 더 보기 '+($('moreF').style.display==='none'?'▾':'▴')+(more?' ('+more+')':'');
 }
+function toggleMore(){ var m=$('moreF'); m.style.display = m.style.display==='none' ? '' : 'none'; fitLayout(); drawFunnel(baseList()); }
 function funnelClick(step){
   if(step==='all'){ $('fContact').value=''; $('fTrade').value=''; TAB='all'; }
   if(step==='has'){ $('fContact').value=($('fContact').value==='has'?'':'has'); }
@@ -642,12 +665,12 @@ function draw(){
     return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
       '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
       '<td class="no">'+(i+1)+'</td>'+
-      '<td class="co" title="'+esc(n.debtorName)+'"><div class="cn"><span class="nm">'+esc(n.debtorName)+'</span><span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span></div></td>'+
-      '<td><span class="chip pgm" style="margin-left:0" title="'+(isBk(n)?'파산선고 공고일':'포괄적 금지명령 공고일')+'">'+pgmLabel(n)+' '+esc(pgmDate(n).slice(5))+'</span></td>'+
+      '<td class="co" title="'+esc(n.debtorName+' · '+n.courtName+' '+n.caseNo)+'"><div class="cn"><span class="nm">'+esc(n.debtorName)+'</span></div></td>'+
+      '<td><span class="chip '+kindChip(n)+'" style="margin-left:0">'+esc(kindLabel(n))+'</span></td>'+
+      '<td title="'+esc(courtShort(n)+' '+n.caseNo)+'">'+stageCell(n)+'</td>'+
       '<td class="ceo" title="'+esc(ce.src)+'">'+(ce.name?esc(ce.name):'<span style="color:var(--line2)">—</span>')+'</td>'+
       '<td>'+(tradeBadge(n.id)||'<span style="color:var(--line2)">—</span>')+'</td>'+
-      '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc(courtShort(n)+' '+n.caseNo)+'</td>'+
-      '<td><span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span></td>'+
+      '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td>'+
       '<td class="ct">'+iconsOf(c)+(c.check?'<span class="chip c-amber" title="확인 필요">⚠</span>':'')+'</td>'+
       '<td class="lg">'+logCell(n.id)+'</td><td><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td></tr>';
   }).join('');
@@ -711,9 +734,9 @@ function drawDetail(){
   if(!n){ el.innerHTML='<div class="ph">왼쪽 목록에서 회사를 누르면<br>주소·연락처·사건 이력이 여기에 나옵니다.</div>'; return; }
   var c=contactOf(n.id), st=statusOf(n.id), mk=MARKS[n.id]||{}, mc=mk.contact||{};
   var addrQ=encodeURIComponent(n.address||''), nameQ=encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim()+' '+(n.sigungu||''));
-  var h='<button class="sm close dclose" onclick="closeDetail()">닫기</button>';
+  var h='<div class="dhead"><button class="sm close dclose" onclick="closeDetail()">닫기</button>';
   h+='<h2>'+esc(n.debtorName)+'</h2>';
-  h+='<div class="meta"><span class="chip pgm" style="margin-left:0">'+pgmLabel(n)+' '+esc(pgmDate(n))+'</span> <span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'">현재 '+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div>';
+  h+='<div class="meta"><span class="chip pgm" style="margin-left:0">'+pgmLabel(n)+' '+esc(pgmDate(n))+'</span> <span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'">현재 '+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div></div>';
   var ce=ceoOf(n.id);
   h+='<dl class="kv"><dt>대표자</dt><dd>'+(ce.name?'<b>'+esc(ce.name)+'</b> <span style="color:var(--mute);font-size:11.5px">'+esc(ce.src)+'</span>':'<span style="color:var(--mute)">확인 전 — 법원 공고에는 대표자가 없습니다. 아래 「사업자번호 조회」·인터넷등기소에서 확인해 입력하세요.</span>')+'</dd><dt>법원</dt><dd>'+esc(n.courtName)+(n.division?' · '+esc(n.division):'')+'</dd><dt>사건번호</dt><dd>'+esc(n.caseNo)+'</dd><dt>공고일</dt><dd>'+esc(n.noticeDate)+' · '+esc(n.noticeTitle)+'</dd></dl>';
 
