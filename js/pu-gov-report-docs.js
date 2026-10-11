@@ -8,6 +8,8 @@
        DOC_PLANS 차례가 뜻이다: 좁은 낱말이 먼저(산업일자리전환컨설팅충남 → 산업일자리).
      · ①② 자동은 정부사업일정 보고서 창이 채우는 간단형 셋(AUTO)만 — 현황판 줄(buildRows)의 상태를 그대로 쓴다.
      · [확인 필요] 는 지어내지 않고 딱지로 보인다(현장클리닉 운영지침 · 농촌융복합 양식 글자 · 연결·계약 못 찾음).
+     · 제출 줄(step 'submit')에만 선택 필드 how('mail'|'platform')·steps(플랫폼 제출 순서 글)를 둘 수 있다(2026-10-11).
+       how 가 없으면(현장클리닉 — 운영지침 확인 전) 정하지 않은 것이다. 화면이 서명·제출 메일 초안/체크 글에 쓴다.
      · 목차에는 업체 이름·담당 이름·날짜·서류 이름·상태만 — 연락처·금액·보고서 본문은 담지 않는다.
      · ③④⑤ 칸·목차 딱지·현황판 줄 기록(trackRows)은 서류 진행 기록(scal_docs, pu-gov-report-track.js)을
        «받았을 때만» 계산한다 — 못 읽었으면(규칙 게시 전·권한 없음) 지금처럼 「—」. 이 모듈은 여전히 쓰지 않는다.
@@ -31,7 +33,22 @@
   function str(v) { return v == null ? '' : String(v).trim(); }
   function squash(v) { return str(v).replace(/\s+/g, ''); }
   function digits(v) { return str(v).replace(/\D/g, ''); }
-  function it(id, name, per, step) { return { id: id, name: name, per: per, step: step }; }
+  function it(id, name, per, step, extra) {
+    var o = { id: id, name: name, per: per, step: step };
+    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; }
+    return o;
+  }
+  /* 기술보호울타리 제출 순서 — 2024 «시스템 사용 매뉴얼(전문가용)» 기준 초안. [노무사 확인] — 화면이 바뀌면 고친다.
+     로그인(공동인증서·통합로그인)과 «제출» 단추는 사람이 한다. 비밀번호·인증서는 다루지 않는다. */
+  var TECHGUARD_STEPS = [
+    '기술보호울타리에 로그인(공동인증서·통합로그인) — 사람이 합니다',
+    '마이페이지 → 상담현황에서 그 기업 건을 열어 상태가 «상담중» 이후인지 확인',
+    '완료보고서 작성: 지원일자(차수)·자문내용·총평(점수) 입력',
+    '완료보고서(PDF) 업로드 — 신청기업에게 공개되는 문서입니다(개인 증빙은 넣지 않습니다)',
+    '여비 여부 선택 → 기타 증빙서류(비공개)에 여비지급신청서 등 업로드',
+    '«제출» 단추 — 사람이 누릅니다 → 상태가 «제출완료»로 바뀌었는지 확인',
+    '접수 화면을 캡처해 두고, 이 칸의 «접수 확인»에 표시'
+  ];
 
   var DOC_PLANS = [
     { key: 'industry-cn', words: ['산업일자리전환컨설팅충남'], kind: '대형', source: SOURCE, items: [
@@ -43,20 +60,20 @@
       it('report', '결과보고서', 'once', 'report'),
       it('sign', '업체 서명본', 'once', 'sign'),
       it('attach', '산출물 별첨', 'once', 'attach'),
-      it('submit', '기관 제출', 'once', 'submit')] },
+      it('submit', '기관 제출', 'once', 'submit', { how: 'mail' })] },
     { key: 'cci-seosan', words: ['서산'], kind: '간단', source: SOURCE, items: [
       it('visit', '방문확인서', 'round', 'report'),
       it('report', '상담·자문 결과보고서', 'once', 'report'),
       it('sign', '업체 서명본', 'once', 'sign'),
       it('attach', '산출물 별첨', 'once', 'attach'),
-      it('submit', '기관 제출', 'once', 'submit')] },
+      it('submit', '기관 제출', 'once', 'submit', { how: 'mail' })] },
     { key: 'techguard', words: ['기술보호'], kind: '간단', source: SOURCE, items: [
       it('report', '별지11 완료보고서', 'once', 'report'),
       it('advice', '법률 자문 일지', 'round', 'attach'),
       it('pledge', '보안서약서', 'once', 'attach'),
       it('travel', '별지8 여비지급신청서', 'once', 'attach'),
       it('survey', '만족도조사', 'once', 'attach'),
-      it('submit', '기관 제출(기술보호울타리)', 'once', 'submit')] },
+      it('submit', '기관 제출(기술보호울타리)', 'once', 'submit', { how: 'platform', steps: TECHGUARD_STEPS })] },
     { key: 'clinic', words: ['현장클리닉'], kind: '간단', check: '운영지침', source: SOURCE, items: [
       it('log', '상담일지', 'round', 'report'),
       it('track', '별지24 성과추적관리결과서', 'once', 'report'),

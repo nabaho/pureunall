@@ -208,12 +208,13 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <!-- 서류 관리(왼쪽 패널)·목차 — 이알피 컨설팅 사업 · 서류 틀 · 체크표 · 목차(순수 함수)
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
 <script src="js/pu-gov-report-track.js?v=4"></script>
-<script src="js/pu-gov-report-docs.js?v=3"></script>
+<script src="js/pu-gov-report-docs.js?v=4"></script>
 <!-- 받은 서류함 — 주소 맞추기(pu-co-thread) · 서버 부르기(rules-v2/mail-orig 의 makeCall) · 후보·연결 열쇠·첨부 받기 순서(순수 함수)
      설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md. 판독기(pdf·xlsx)는 누를 때 vendor/ 에서 싣는다 -->
 <script src="js/pu-co-thread.js?v=3"></script>
 <script src="js/rules-v2/mail-orig.js?v=2"></script>
 <script src="js/pu-gov-report-inbox.js?v=4"></script>
+<script src="js/pu-gov-report-send.js?v=1"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-preview.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
@@ -410,7 +411,7 @@ function grOpenCell(coId,typeId,step){
   if(!keys.length) return;
   var cons=D.consFor({consultings:d.cons,co:p.co,code:erp.code,typeId:typeId,tmap:d.tmap,biz:d.biz});
   GR.cw={coId:coId,coName:p.coName,bizNo:String((p.co&&p.co.bizNo)||''),typeId:typeId,rid:p.rid,step:step,keys:keys,key:keys[0].key,draft:null,msg:'',err:false,busy:false,
-    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,tech:D.planFor(erp.name).key==='techguard',cands:[]};
+    win:PuGovReportInbox.windowOf(p.firstDate,p.lastDate),cons:cons,biz:erp.name,tech:D.planFor(erp.name).key==='techguard',cands:[]};
   GR.avMsg=''; GR.avErr=false;
   grRenderCell();
   grLoadInbox();
@@ -445,12 +446,14 @@ function grRenderCell(){
   if(c.step==='sign') h+='<div class="cw-f"><span>받은 한글 파일</span><button type="button" onclick="grPickHwp()">📂 받은 한글 파일 열어 보기</button>'
     +'<input type="file" id="cwHwp" accept=".hwp,.hwpx" style="display:none" onchange="grOpenHwp(this)">'
     +'<div class="days" id="cwHwpMsg">고른 파일은 이 화면에서만 읽습니다 — 올리지도 저장하지도 않습니다</div></div>';
+  if(c.step==='sign'||c.step==='submit') h+='<div id="cwSend"></div>';
   h+=field('메모(200자)','<textarea id="cwNote" maxlength="200" rows="3">'+grEsc(v.note||'')+'</textarea>')
     +'<div class="days">메모에 연락처·주민번호 같은 개인정보를 적지 마세요</div>'
     +(rec&&rec.at?'<div class="days">고친 사람 '+grEsc(rec.by||'—')+' · '+grEsc(L.dayOf(rec.at))+'</div>':'')
     +(c.msg?'<div class="'+(c.err?'err-s':'days')+'">'+grEsc(c.msg)+'</div>':'')
     +'<div class="cw-b"><button type="button" onclick="grSaveCell()"'+(c.busy?' disabled':'')+'>저장</button></div><div id="cwInbox"></div></div>';
   el.innerHTML=h; el.style.display='';
+  grRenderSend();
   grRenderInbox();
 }
 /* 저장 — 그 줄 키 하나만 .set(scal_docs/{업체}/{rid}/items/{키}). update 는 저장 관문이 «부분 update» 로 막는다.
@@ -524,7 +527,7 @@ async function grOpenHwp(input){
 function grLoadInbox(force){
   if(!force&&GR.inboxP) return GR.inboxP;
   var seq=++GR.iseq;
-  GR.inbox={st:'loading',rows:[],cos:null,clipped:false}; grRenderInbox();
+  GR.inbox={st:'loading',rows:[],cos:null,clipped:false}; grRenderSend(); grRenderInbox();
   GR.inboxP=grReadInbox(seq);
   return GR.inboxP;
 }
@@ -546,7 +549,7 @@ async function grReadInbox(seq){
     console.warn('[컨설팅보고서] 메일함 못 읽음',e);
     GR.inbox={st:'err',rows:[],cos:null,clipped:false}; GR.inboxP=null;
   }
-  grRenderInbox();
+  grRenderSend(); grRenderInbox();
 }
 function grRetryInbox(){ return grLoadInbox(true); }
 /* 칸 창 안 후보 자리 — 연결된 서류 · 후보 줄(받음/보냄·날짜·제목·딱지·첨부마다 열어 보기/연결) · 안내 */
@@ -563,15 +566,17 @@ function grRenderInbox(){
   else if(ib.st!=='ok') h+='<div class="days">메일함을 불러오는 중…</div>';
   else{
     var r=I.candidates(ib.rows,{addrs:I.addrsFor({companies:ib.cos,cons:c.cons,name:c.coName,bizNo:c.bizNo}),win:c.win,tech:c.tech});
-    c.cands=r.list;
+    var list=(c.step==='sign'&&rec&&rec.sentAt)?PuGovReportSend.rankReplies(r.list,rec.sentAt):r.list;
+    c.cands=list;
     if(r.noAddr) h+='<div class="days">'+grEsc(I.MSG.NO_ADDR)+'</div>';
-    else if(!r.list.length) h+='<div class="days">'+grEsc(I.MSG.NONE)+'</div>';
-    else h+='<ul class="ib">'+r.list.map(function(m,i){
-      var tags=I.badges(m).map(function(b){ return ' <span class="st st-'+b.key+'">'+grEsc(b.txt)+'</span>'; }).join('');
+    else if(!list.length) h+='<div class="days">'+grEsc(I.MSG.NONE)+'</div>';
+    else h+='<ul class="ib">'+list.map(function(m,i){
+      var tags=I.badges(m).map(function(b){ return ' <span class="st st-'+b.key+'">'+grEsc(b.txt)+'</span>'; }).join('')+(m.reply?' <span class="st st-draft">'+grEsc(PuGovReportSend.MSG.REPLY)+'</span>':'');
       var atts=m.atts.length?m.atts.map(function(a,j){
         return '<div class="ib-a"><span>📎 '+grEsc(a.name)+'</span>'+(m.priv?'':
           '<button type="button" class="act" onclick="grOpenCand('+i+','+j+')"'+(busy?' disabled':'')+(a.kind||a.cut?'':' title="'+grEsc(I.MSG.CANT)+'"')+'>열어 보기</button>'
-          +'<button type="button" class="act" onclick="grLinkCand('+i+','+j+')"'+(c.busy||!m.key?' disabled':'')+'>연결</button>')+'</div>';
+          +'<button type="button" class="act" onclick="grLinkCand('+i+','+j+')"'+(c.busy||!m.key?' disabled':'')+'>연결</button>'
+          +(m.reply&&c.step==='sign'?'<button type="button" class="act" onclick="grLinkReply('+i+','+j+')"'+(c.busy||!m.key?' disabled':'')+'>서명본으로 연결</button>':''))+'</div>';
       }).join(''):'<div class="days">첨부 '+grEsc(m.a)+'개 — 이름이 없어 메일함에서 받아 주세요</div>';
       return '<li><div class="ib-h">'+(m.out?'보냄 → ':'받음 ← ')+grEsc(m.who)+' · '+grEsc(m.day)+tags+'</div>'
         +'<div class="ib-s">'+grEsc(m.s||'(제목 없음)')+'</div>'+atts+'</li>';
@@ -591,6 +596,121 @@ function grLinkCand(i,j){
 }
 /* 「연결 지우기」 — link 만 뺀 줄을 같은 길로 다시 쓴다(서류 줄 상태는 칸 창 값 그대로) */
 function grUnlink(){ return GR.cw?grSaveCell({link:null}):Promise.resolve(); }
+/* ═══ 서명 요청·제출 메일 — 칸 창 #cwSend (설계 docs/superpowers/specs/2026-10-11-gov-report-sign-submit-design.md)
+   ★ 쓰기는 grSaveCell 한 곳뿐 — 여기서는 칸 창 입력값을 채우고 그 길을 부른다. 메일은 «쓰기 창에 값을 채워 열기»까지(보내기는 사람). ═══ */
+function grSendCtx(){
+  var c=GR.cw; if(!c) return null;
+  var D=PuGovReportDocs, T=PuGovReportTrack, S=PuGovReportSend, I=PuGovReportInbox, ib=GR.inbox||{};
+  var item=c.keys.filter(function(k){ return k.key===c.key; })[0]||c.keys[0]||{};
+  var plan=(D.planFor(c.biz).items||[]).filter(function(x){ return x.id===item.id; })[0]||{};
+  var rec=T.recOf(GR.track||{},c.coId,c.rid)[c.key]||null;
+  var addrs=(ib.st==='ok')?I.addrsFor({companies:ib.cos,cons:c.cons,name:c.coName,bizNo:c.bizNo}):null;
+  return {c:c,item:item,plan:plan,rec:rec,ib:ib,addrs:addrs,tag:S.tagOf(c.step,c.rid)};
+}
+function grSay(m,bad){ var e=$('cwSendMsg'); if(e){ e.textContent=m; e.className=bad?'err-s':'days'; } }
+function grRenderSend(){
+  var x=grSendCtx(), el=$('cwSend');
+  if(!el) return;
+  if(!x||(x.c.step!=='sign'&&x.c.step!=='submit')){ el.innerHTML=''; return; }
+  var S=PuGovReportSend, c=x.c, v=c.draft||x.rec||{st:'none'}, done=v.st==='done', dayOk=function(d){ return /^\d{4}-\d{2}-\d{2}$/.test(d); };
+  var h='<div class="cw-f"><span>✉ '+(c.step==='sign'?'서명 요청':'제출 메일')+'</span>';
+  if(c.step==='sign'){
+    if(x.ib.st==='ok'&&x.addrs&&!Object.keys(x.addrs).length) h+='<div class="days">'+grEsc(S.MSG.NO_ADDR)+'</div>';
+    else if(!done) h+='<button type="button" onclick="grWriteMail()"'+(x.ib.st==='ok'?'':' disabled')+'>✉ 서명 요청 메일 쓰기</button>';
+    var f=x.ib.st==='ok'?S.findSent(x.ib.rows,x.tag):null;
+    if(!done&&x.ib.st==='ok'){
+      if(f&&dayOk(f.day)&&(!x.rec||x.rec.sentAt!==f.day)) h+=' <button type="button" class="act" onclick="grMarkSent(\''+grEsc(f.day)+'\')">보낸 메일을 찾았습니다 — '+grEsc(f.day)+(f.count>1?' ('+f.count+'건 중 가장 이른 것)':'')+' · 보낸 날로 기록</button>';
+      else if(!f&&(!x.rec||!x.rec.sentAt)) h+=' <button type="button" class="act" onclick="grMarkSent(\'\')">보냈음 기록(오늘)</button>';
+    }
+    h+='<div class="days">'+grEsc(S.MSG.ATTACH)+'</div><div class="days">'+grEsc(S.MSG.DL_NOTE)+'</div>'
+      +'<div class="days"><a href="'+grEsc(PuGovReportList.reportHref(c.coId,c.typeId))+'" target="_blank" rel="noopener">보고서 창 열기(확정본 내려받기)</a></div>';
+  }
+  if(c.step==='submit'){
+    if(x.plan.how==='mail'){
+      var okIb=x.ib.st==='ok';
+      if(!done) h+='<button type="button" onclick="grWriteSubmit()"'+(okIb?'':' disabled')+'>✉ 제출 메일 쓰기</button>';
+      var fs=okIb?S.findSent(x.ib.rows,x.tag):null;
+      if(!done&&okIb){
+        if(fs&&dayOk(fs.day)&&(!x.rec||x.rec.gotAt!==fs.day)) h+=' <button type="button" class="act" onclick="grMarkSent(\''+grEsc(fs.day)+'\')">보낸 메일을 찾았습니다 — '+grEsc(fs.day)+(fs.count>1?' ('+fs.count+'건 중 가장 이른 것)':'')+' · 제출일로 기록</button>';
+        else if(!fs&&(!x.rec||!x.rec.gotAt)) h+=' <button type="button" class="act" onclick="grMarkSent(\'\')">제출 보냄 기록(오늘)</button>';
+      }
+      h+='<div class="days">'+grEsc(S.MSG.ATTACH)+'</div><div class="days">'+grEsc(S.MSG.DL_NOTE)+'</div>';
+    }else if(x.plan.how==='platform'&&Array.isArray(x.plan.steps)){
+      h+='<ol class="days">'+x.plan.steps.map(function(t){ return '<li>'+grEsc(t)+'</li>'; }).join('')+'</ol>'
+        +'<div class="days">로그인과 «제출» 단추는 사람이 합니다 — 접수 화면을 캡처해 두고 «접수 확인»에 표시하세요</div>';
+    }else h+='<div class="days">제출 방식 확인 필요 — 운영지침 도착 뒤 정합니다</div>';
+  }
+  h+='<div class="days" id="cwSendMsg"></div></div>';
+  el.innerHTML=h;
+}
+/* 칸 창 입력값(상태·발송일·회신일·제출 방식)을 채운 뒤 저장 — 새 쓰기 길을 만들지 않는다 */
+function grApplyFields(f){
+  var set=function(id,val){ var e=$(id); if(e&&val!==undefined) e.value=val; };
+  if(!f) return false;
+  set('cwSt',f.st); set('cwSent',f.sentAt); set('cwGot',f.gotAt); set('cwHow',f.how);
+  return true;
+}
+/* 「보낸 날로 기록」 — day 가 비면 오늘. 상태·발송일만 채운다(메모·회신일·연결은 칸 창 값 그대로) */
+function grMarkSent(day){
+  var S=PuGovReportSend, c=GR.cw;
+  if(!c||c.busy) return Promise.resolve();
+  if(!grApplyFields(S.sentFields(c.step,day||GR.today))) return Promise.resolve();
+  return grSaveCell();
+}
+/* 「서명본으로 연결」 — 회신 후보 첨부 하나: 연결 + 회신일(그 메일 날짜) + 완료, 한 번의 저장 */
+function grLinkReply(i,j){
+  var S=PuGovReportSend, c=GR.cw, m=c&&c.cands?c.cands[i]:null, a=m?m.atts[j]:null;
+  if(!c||c.busy||c.step!=='sign'||!m||!a||m.priv||!m.reply) return Promise.resolve();
+  var lk=PuGovReportInbox.linkFrom(m,a.name);
+  if(!lk||!grApplyFields(S.gotFields('sign',m.day))) return Promise.resolve();
+  return grSaveCell({link:lk});
+}
+/* 「메일 쓰기」 — 푸른메일함 쓰기 창(puMailComposeTo)에 값을 채워 연다. 안 되면 주소(받는이·참조·제목만)로, 본문은 클립보드로.
+   ★ 복사는 창을 열기 «전에» 시작한다 — 열고 나면 이 쪽이 초점을 잃어 크롬이 복사를 거절한다(처음 누를 때는 늘 «안 되는» 길). 값 채우기가 되어도 복사는 해 둔다 */
+function grCopy(txt){ try{ return navigator.clipboard.writeText(txt).then(function(){ return true; },function(){ return false; }); }catch(e){ return Promise.resolve(false); } }
+function grOpenMail(p){
+  var S=PuGovReportSend, w=null, ok=false, c0=GR.cw, url=S.composeUrl('pu-cards.html',p);
+  var copyP=grCopy(url?p.body:(p.subject+'\n\n'+p.body));
+  try{ w=window.open('','puMailWrite'); }catch(e){ w=null; }
+  if(!w){ grSay('쓰기 창이 막혔습니다 — 팝업을 허용해 주세요',true); return Promise.resolve(false); }
+  try{ if(w!==window&&typeof w.puMailComposeTo==='function') ok=!!w.puMailComposeTo({card:'',to:p.to,cc:p.cc,subject:p.subject,body:p.body}); }catch(e){ ok=false; }
+  if(!ok){
+    try{ w.location.href=url||'pu-cards.html?view=mail'; }catch(e){ try{ w=window.open(url||'pu-cards.html?view=mail','puMailWrite')||w; }catch(x){} }
+    try{ w.focus(); }catch(e){}
+    return copyP.then(function(copied){
+      if(GR.cw===c0) grSay(copied?(url?S.MSG.BODY_COPIED:S.MSG.COPIED_ALL):'쓰기 창을 열었습니다 — 본문은 복사하지 못했습니다',!copied);
+      return true;
+    });
+  }
+  try{ w.focus(); }catch(e){}
+  grSay('쓰기 창을 열었습니다 — 첨부를 붙이고 보내 주세요');
+  return Promise.resolve(true);
+}
+function grWriteMail(){
+  var x=grSendCtx(), S=PuGovReportSend;
+  if(!x||x.c.step!=='sign') return Promise.resolve(false);
+  var d=S.draft('sign',{rid:x.c.rid,co:x.c.coName,biz:x.c.biz,reportName:x.item.name});
+  if(!d){ grSay(S.MSG.NO_TAG,true); return Promise.resolve(false); }
+  var a=S.toCc(x.addrs);
+  if(!a.to){ grSay(S.MSG.NO_ADDR,true); return Promise.resolve(false); }
+  return grOpenMail(S.composeParts(d,a.to,a.cc));
+}
+/* 「제출 메일 쓰기」 — 지난 제출 메일에서 받는이를 따라 오고, 못 찾으면 빈 쓰기 창 + 제목·본문 복사. 안내 문구는 grOpenMail 이 끝난 뒤 다시 쓴다 */
+function grWriteSubmit(){
+  var x=grSendCtx(), S=PuGovReportSend, D=PuGovReportDocs;
+  if(!x||x.c.step!=='submit'||x.plan.how!=='mail') return Promise.resolve(false);
+  var d=S.draft('submit',{rid:x.c.rid,co:x.c.coName,biz:x.c.biz,reportName:x.item.name});
+  if(!d){ grSay(S.MSG.NO_TAG,true); return Promise.resolve(false); }
+  var f=S.submitTo(x.ib.rows||[],{words:D.planFor(x.c.biz).words,addrs:x.addrs||{}});
+  var to=f?f.to[0]:'', cc=f?f.to.slice(1):[];
+  var note=f?'지난 제출 메일('+f.day+')에서 받는 사람을 따라 왔습니다 — 확인하세요':S.MSG.NO_SUBMIT_TO;
+  grSay(note,!f);
+  return grOpenMail(S.composeParts(d,to,cc)).then(function(r){
+    var e=$('cwSendMsg'), cur=e?e.textContent:'', bad=!!e&&e.className==='err-s';
+    if(r&&GR.cw===x.c) grSay(note+(cur?' / '+cur:''),bad||!f);
+    return r;
+  });
+}
 /* 서버 부르기 — 취업규칙 화면과 같은 손(PuRulesMailOrig.makeCall: POST · Bearer 로그인 증표 · ok 가 아니면 status 를 단 오류).
    GR_MAIL.wait 안에 답이 없으면 TimeoutError(「메일 서버 응답이 없습니다」) — 그때 보낸 요청은 AbortController 로 끊는다(뒤에서 계속 받지 않게) */
 function grMailFetch(url,init){
