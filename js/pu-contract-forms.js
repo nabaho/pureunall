@@ -244,6 +244,8 @@
       db.ref(PATH).transaction(function (cur) {
         var base = mergeSeeds(listOf(cur && cur.v), removed).list;
         out = fn(base.slice());
+        /* 고친·새 양식만 첨부 사본을 뺀다(slimForm) — 손대지 않은 양식은 그대로 둔다(옛 사본 걷어내기는 따로, 대표 확인 뒤) */
+        out = (out || []).map(function (f) { return base.indexOf(f) >= 0 ? f : slimForm(f); });
         return { v: out, u: nextU(cur) };
       }, function (err, committed, snap) {
         if (err) { rej(err); return; }
@@ -1221,16 +1223,23 @@
 
   /* 한글 원본 미리보기 — 공용 한글 엔진(js/pu-hwp-engine.js)으로 그린다.
      「본문 교체」는 올릴 때와 «같은 읽개»로 뽑는다(두 벌이 되면 또 갈린다). */
-  function openHwpPreview(att, onApplyText) {
+  function openHwpPreview(att, onApplyText, getBytes) {
+    /* getBytes — 보관함에서 받는 길(첨부 사본이 없을 때). 없으면 목록 안 사본 */
+    var bytesP = null;
+    function bytes() {
+      if (!bytesP) bytesP = getBytes ? getBytes() : ((att && (att.data || att.dataUrl)) ? Promise.resolve(bytesOfDataUrl(att.data || att.dataUrl)) : Promise.reject(new Error('원본 파일이 없습니다')));
+      return bytesP;
+    }
     var ov = el('div', { 'class': 'pcf-hv' });
     var body = el('div', { style: 'flex:1;overflow:auto;background:#e2e8f0;min-height:300px' },
       [el('div', { style: 'color:#475569;padding:40px;text-align:center', text: '📥 한글 엔진을 불러오는 중…' })]);
     var apply = onApplyText ? el('button', { type: 'button', 'class': 'pcf-b b', text: '📝 이 파일 글자로 본문 교체', onclick: function () {
-      var u8 = bytesOfDataUrl(att.data || att.dataUrl);
-      extractTemplateText(new Blob([u8]), function (text, err) {
-        if (err || !text) { toast('❌ 글자를 뽑지 못했습니다: ' + (err || '빈 본문')); return; }
-        onApplyText(text); toast('✅ 본문을 바꿨습니다'); ov.remove();
-      });
+      bytes().then(function (u8) {
+        extractTemplateText(new Blob([u8]), function (text, err) {
+          if (err || !text) { toast('❌ 글자를 뽑지 못했습니다: ' + (err || '빈 본문')); return; }
+          onApplyText(text); toast('✅ 본문을 바꿨습니다'); ov.remove();
+        });
+      }, function (e) { toast('❌ 원본을 받지 못했습니다: ' + ((e && e.message) || e)); });
     } }) : null;
     var box = el('div', { 'class': 'pcf-hvb' }, [
       el('div', { 'class': 'pcf-hvh' }, [el('b', { text: '🔍 원본 미리보기 — ' + (att.name || '') }), apply,
@@ -1240,10 +1249,8 @@
     ov.addEventListener('click', function (e) { if (e.target === ov) ov.remove(); });
     document.body.appendChild(ov);
     if (!w.PureunHwp) { body.firstChild.textContent = '한글 엔진을 불러오지 못했습니다.'; return; }
-    try {
-      w.PureunHwp.renderPreview(body, bytesOfDataUrl(att.data || att.dataUrl), att.name)
-        .catch(function (e) { body.textContent = '❌ 미리보기 실패: ' + ((e && e.message) || e); });
-    } catch (e) { body.textContent = '❌ 미리보기 실패: ' + ((e && e.message) || e); }
+    bytes().then(function (u8) { return w.PureunHwp.renderPreview(body, u8, att.name); })
+      .catch(function (e) { body.textContent = '❌ 미리보기 실패: ' + ((e && e.message) || e); });
   }
 
   /* rhwp 판 올리기 — 이알피 「계약서 출력」과 같은 브라우저 자리(pureun_v6_rhwp_ver)에 적는다.
@@ -1325,7 +1332,7 @@
           arcd[attKey(a)] ? el('span', { 'class': 'pcf-ok', text: '보관함' }) : null,
           el('span', { style: 'color:#94a3b8;font-family:monospace;font-size:10.5px', text: ((a.size || 0) / 1024).toFixed(1) + 'KB' }),
           /\.(hwp|hwpx)$/i.test(a.name || '') ? el('button', { type: 'button', 'class': 'pcf-b g', title: '원본 미리보기', text: '🔍',
-            onclick: function () { openHwpPreview(a, function (t) { bodyIn.value = t; }); } }) : null,
+            onclick: function () { openHwpPreview(a, function (t) { bodyIn.value = t; }, opts.attBytes ? function () { return opts.attBytes(f, a); } : null); } }) : null,
           el('button', { type: 'button', 'class': 'pcf-b', style: 'color:#dc2626', text: '×', title: '첨부 빼기 (보관함 사본은 남습니다)',
             onclick: function () { f.attachments = f.attachments.filter(function (x) { return x.id !== a.id; }); drawAtts(); } })
         ]));
@@ -1445,6 +1452,41 @@
       if (use === 'off' && f.enabled !== false) return false;
       return true;
     });
+  }
+  /* ══ 첨부 원본은 «원본 보관함»에서 (2026-10-11 대표 「비용이 너무 많이 증가」 → 「순서대로」) ══
+     ■ 왜 — 양식 목록(data/contract_forms) 3.4MB 중 3.27MB 가 첨부 사본(base64)이었고, 그 62개는 «모두»
+       원본 보관함(pu_docs/originals, 창고 — 지울 수 없음)에 같은 파일이 있었다. 사본 때문에 양식 한 장만 고쳐도
+       목록 통째(3.4MB)가 오갔다.
+     ■ 그래서 — 읽을 때: 목록 안 사본(data)이 있으면 그것, 없으면 보관함 번호(a.fileId 또는 originals[attId].fileId).
+       저장할 때(slimForm): «보관함 번호가 확인된» 첨부만 사본을 뺀다. 번호가 없으면 그 사본이 유일본이라 절대 안 뺀다. */
+  function attSrc(fm, a) {
+    if (!a) return null;
+    if (a.data || a.dataUrl) return { name: a.name, data: a.data || a.dataUrl };
+    var fid = a.fileId || ((((fm && fm.originals) || []).filter(function (o) { return o && o.attId && o.attId === a.id && o.fileId; })[0]) || {}).fileId;
+    return fid ? { name: a.name, fileId: fid } : null;
+  }
+  function attBytes(fm, a, host) {
+    var s = attSrc(fm, a);
+    if (!s) return Promise.reject(new Error('원본 파일이 없습니다'));
+    if (s.data) return Promise.resolve(bytesOfDataUrl(s.data));
+    return (host && host.hwpBytes) ? host.hwpBytes(s) : Promise.reject(new Error('원본을 불러올 길이 없습니다'));
+  }
+  function slimForm(f) {
+    if (!f || !Array.isArray(f.attachments) || !f.attachments.length) return f;
+    var o = Array.isArray(f.originals) ? f.originals : [];
+    var changed = false;
+    var atts = f.attachments.map(function (a) {
+      if (!a || !(a.data || a.dataUrl)) return a;
+      var hit = o.filter(function (x) { return x && x.attId && x.attId === a.id && x.fileId; })[0];
+      if (!hit) return a;   // 보관함에 없다 — 이 사본이 유일본이다
+      var c = {}; Object.keys(a).forEach(function (k) { if (k !== 'data' && k !== 'dataUrl') c[k] = a[k]; });
+      c.fileId = hit.fileId; changed = true;
+      return c;
+    });
+    if (!changed) return f;
+    var nf = {}; Object.keys(f).forEach(function (k) { nf[k] = f[k]; });
+    nf.attachments = atts;
+    return nf;
   }
   function hwpSources(fm) {
     var out = [];
@@ -2910,7 +2952,7 @@
       });
     }
     function filesOf(e) { return e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length ? e.dataTransfer.files : null; }
-    function modal(o) { o.archiveFile = archiveFile; openModal(o); }
+    function modal(o) { o.archiveFile = archiveFile; o.attBytes = function (form, a) { return attBytes(form, a, host); }; openModal(o); }
 
     /* ── 왼쪽 메뉴 — 계약유형만(양식 이름은 본문 목록) ── */
     /* 왼쪽 메뉴 «상위 머리글»(서식 종류 · 세트) 접기·펴기, 서식 종류 차례 끌어 바꾸기 (대표 2026-10-11) — 보는 사람 브라우저에만 기억한다(새 저장 칸·규칙 배포 없음).
@@ -3037,13 +3079,23 @@
       (fm.originals || []).forEach(function (o) { if (o.attId) arcd[o.attId] = 1; });
       (fm.attachments || []).forEach(function (a) {
         if (a.role === 'preview') return;   // 미리보기 PDF 는 보기 칸이 쓴다 — 받을 원본 줄에는 안 띄운다
-        strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl || '#', download: a.name || '첨부', title: (a.name || '첨부') + ' 받기',
-          text: '📥 ' + (/\.xlsx$/i.test(a.name || '') ? '엑셀' : /\.(hwp|hwpx)$/i.test(a.name || '') ? '한글' : '파일') + (arcd[attKey(a)] ? ' ✓' : '') }));
+        var lbl = '📥 ' + (/\.xlsx$/i.test(a.name || '') ? '엑셀' : /\.(hwp|hwpx)$/i.test(a.name || '') ? '한글' : '파일') + (arcd[attKey(a)] ? ' ✓' : '');
+        if (a.data || a.dataUrl) strip.appendChild(el('a', { 'class': 'pcf-att', href: a.data || a.dataUrl, download: a.name || '첨부', title: (a.name || '첨부') + ' 받기', text: lbl }));
+        /* 사본이 없는 첨부(보관함에만 있음) — 누를 때 보관함에서 받아 이름 그대로 내려준다 */
+        else if (attSrc(fm, a)) strip.appendChild(el('a', { 'class': 'pcf-att', href: '#', title: (a.name || '첨부') + ' 받기 (원본 보관함)', text: lbl,
+          onclick: function (e) {
+            e.preventDefault();
+            attBytes(fm, a, host).then(function (u8) {
+              var url = w.URL.createObjectURL(new Blob([u8])), x = document.createElement('a');
+              x.href = url; x.download = a.name || '첨부'; document.body.appendChild(x); x.click(); x.remove();
+              setTimeout(function () { w.URL.revokeObjectURL(url); }, 5000);
+            }, function (er) { toast('❌ 원본을 받지 못했습니다: ' + ((er && er.message) || er)); });
+          } }));
       });
       if (!strip.childNodes.length) strip.appendChild(el('span', { text: '원본 파일 없음' }));
       var hasOrig = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp));
       var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
-      var hwpAtt = (fm.attachments || []).filter(function (a) { return /\.(hwp|hwpx)$/i.test(a.name || '') && (a.data || a.dataUrl); })[0];
+      var hwpAtt = (fm.attachments || []).filter(function (a) { return /\.(hwp|hwpx)$/i.test(a.name || '') && attSrc(fm, a); })[0];
       return el('div', { 'class': 'pcf-top' }, [
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' }), fm.name]),
         strip,
@@ -3059,7 +3111,7 @@
           { t: '⧉ 복제', fn: function () { copy(fm); } },
           (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
             ? { t: '✏ 바꿀 자리 만들기', title: '원본 글자를 찾아 표시나 고친 글자로 바꿉니다. 이전 원본은 보관함에 남습니다.', fn: function () { openMark(fm); } } : null,
-          hwpAtt ? { t: '🔍 한글 원본 크게 보기', fn: function () { openHwpPreview(hwpAtt, null); } } : null,
+          hwpAtt ? { t: '🔍 한글 원본 크게 보기', fn: function () { openHwpPreview(hwpAtt, null, function () { return attBytes(fm, hwpAtt, host); }); } } : null,
           { t: '🗄 종료 서식으로 옮기기', title: '더 쓰지 않는 서식 — 지우지 않고 종료 서식 보관함으로 옮깁니다(되살릴 수 있습니다)', fn: function () { closeForm(fm); } },
           { t: '🗑 삭제', fn: function () { del(fm); } }
         ].concat(toolItems(kind)))
@@ -3541,6 +3593,7 @@
     zipName: zipName,
     splitVars: splitVars,
     attKey: attKey, withNewOriginal: withNewOriginal, orphanInline: orphanInline,
+    attSrc: attSrc, attBytes: attBytes, slimForm: slimForm,
     loadForms: loadForms,
     formsValue: formsValue,
     linkOriginal: linkOriginal,
