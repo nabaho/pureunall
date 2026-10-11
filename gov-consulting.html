@@ -1330,6 +1330,8 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
        hwpx-fill → gov-report(그것을 쓴다) → build → pack(gov-report 를 쓴다). hwpx-fill 판은 fund.html 과 같게.
        ai(3단계 AI 초안, 2026-10-10)도 gov-report 를 쓴다 — 그 뒤에. -->
   <script src="js/pu-hwpx-fill.js?v=6"></script>
+  <script src="js/pu-hwp-engine.js?v=21"></script>
+  <script src="js/pu-hwp-preview.js?v=1"></script>
   <script src="js/pu-gov-report.js?v=1"></script>
   <script src="js/pu-gov-report-build.js?v=3"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
@@ -7651,7 +7653,7 @@ const GRP_HINT={'cci-north':'충남북부','cci-seosan':'서산','techguard':'�
 const GRP_RLAB=[['inquiry','문의'],['diagnosis','진단'],['advice','자문'],['result','성과'],['next','향후']];
 /* 양식마다 회차 칸에 들어가는 이름표 — 안내 글(placeholder)에만 쓴다 */
 const GRP_RUSE={'cci-north':['문의','진단','자문','성과','향후'],'cci-seosan':['문의','진단','자문'],techguard:['진단','자문','성과','향후']};
-const GRP_ACTS={save:'grpSaveDraft',dl:'grpDownload',confirm:'grpConfirm',addRound:'grpAddRound',delRound:'grpDelRound',
+const GRP_ACTS={save:'grpSaveDraft',dl:'grpDownload',preview:'grpPreview',confirm:'grpConfirm',addRound:'grpAddRound',delRound:'grpDelRound',
   newVer:'grpNewVersion',choose:'grpChooseForm',close:'grpClose',ai:'grpAiDraft',aiUndo:'grpAiUndo',aiAllow:'grpAiAllow'};
 /* ✨ AI 초안(3단계, 2026-10-10) — 서버 readDoc(Gemini)를 PuAiCall 로 부른다(로그인·월 한도 적용). 시간 제한 90초 */
 const GRP_AI_WAIT_MS=90000;
@@ -8055,8 +8057,11 @@ function grpSaveBlob(bytes,name){
   document.body.appendChild(a); a.click();
   setTimeout(function(){ URL.revokeObjectURL(url); a.remove(); },2000);
 }
-/* ⬇ HWPX — 서고 양식(그 해 또는 그 이전 최근 해)에 지금 화면 값을 채운다 */
-async function grpDownload(fileKey){
+/* 양식 서고 양식 + 지금 화면 값 → 채운 HWPX. ⬇ HWPX 와 👁 한글 미리보기가 «같이» 쓴다(복사하지 않는다).
+   성공 {ok:true,bytes,name,result,label} · 실패 {ok:false,error} — 실패 안내(알림·안내 줄)는 여기서 한다.
+   v 는 안내 문구만 갈린다: {fail:'내려받지 못했습니다', need:'내려받을 수 있습니다'} */
+const GRP_VERB={dl:{fail:'내려받지 못했습니다',need:'내려받을 수 있습니다'},pv:{fail:'미리 보지 못했습니다',need:'미리 볼 수 있습니다'}};
+async function grpFillReport(fileKey,v){
   const st=_grp;
   if(!st||!st.formKey) return {ok:false};
   const FORMS=(typeof PuGovReport!=='undefined'&&PuGovReport.FORMS)||{};
@@ -8068,27 +8073,56 @@ async function grpDownload(fileKey){
     const bytes=await grpLoadTemplate(st.formKey,fileKey,st.year);
     if(!bytes){
       const m='양식 서고에 '+label+' 양식이 없습니다';
-      st.tpl[fileKey]=null; toast(m,'err'); grpNote(escAttr(m)+' — 관리자가 「⚙ 양식 서고」에서 등록해야 내려받을 수 있습니다');
+      st.tpl[fileKey]=null; toast(m,'err'); grpNote(escAttr(m)+' — 관리자가 「⚙ 양식 서고」에서 등록해야 '+v.need);
       grpRenderTop(); grpRenderWarn();
       return {ok:false,error:m};
     }
     const JSZ=await grpLoadJsZip();
     const out=await PuGovReportPack.fillHwpx(bytes,st.formKey,fileKey,JSON.parse(JSON.stringify(st.report)),JSZ);
     const name=grpFileName(f.agency,label,st.coName||st.report.company.name,st.state);
-    grpSaveBlob(out.bytes,name);
-    const res=out.result||{}, say=[];
-    if(res.missing&&res.missing.length) say.push('양식에서 못 찾은 칸 '+res.missing.length+'곳');
-    if(res.short) say.push('회차가 모자랍니다');
-    if(res.over) say.push('기관 기준을 넘는 회차는 양식에 안 들어갔습니다');
+    return {ok:true,bytes:out.bytes,name:name,result:out.result||{},label:label};
+  }catch(e){ return grpFillFail(e,v); }
+}
+function grpFillFail(e,v){
+  console.warn('[보고서] '+v.fail,e);
+  const m=v.fail+' — '+((e&&e.message)||e);
+  toast(m,'err'); grpNote(escAttr(m));
+  return {ok:false,error:m};
+}
+/* 채운 결과의 «못 찾은 칸·회차 모자람» 안내 조각 — 내려받기·미리보기 같은 말 */
+function grpFillSay(res){
+  const say=[];
+  if(res.missing&&res.missing.length) say.push('양식에서 못 찾은 칸 '+res.missing.length+'곳');
+  if(res.short) say.push('회차가 모자랍니다');
+  if(res.over) say.push('기관 기준을 넘는 회차는 양식에 안 들어갔습니다');
+  return say;
+}
+/* ⬇ HWPX — 서고 양식(그 해 또는 그 이전 최근 해)에 지금 화면 값을 채운다 */
+async function grpDownload(fileKey){
+  const r=await grpFillReport(fileKey,GRP_VERB.dl);
+  if(!r.ok) return r;
+  try{
+    grpSaveBlob(r.bytes,r.name);
+    const say=grpFillSay(r.result);
     grpNote(say.length?escAttr('내려받았습니다 — '+say.join(' · ')):'');
-    toast('내려받았습니다 — '+name);
-    return {ok:true,name:name,result:res};
-  }catch(e){
-    console.warn('[보고서] 내려받기 실패',e);
-    const m='내려받지 못했습니다 — '+((e&&e.message)||e);
-    toast(m,'err'); grpNote(escAttr(m));
-    return {ok:false,error:m};
+    toast('내려받았습니다 — '+r.name);
+    return {ok:true,name:r.name,result:r.result};
+  }catch(e){ return grpFillFail(e,GRP_VERB.dl); }
+}
+/* 👁 한글 미리보기 — 같은 채우기로 만든 HWPX 를 «내려받지·저장하지 않고» 미리 보여 준다(읽기 전용 창, js/pu-hwp-preview.js).
+   안내 줄(못 찾은 칸 등)은 미리보기 뒤 보고서 창 아래에 그대로 남는다. */
+async function grpPreview(fileKey){
+  const r=await grpFillReport(fileKey,GRP_VERB.pv);
+  if(!r.ok) return r;
+  const say=grpFillSay(r.result);
+  grpNote(say.length?escAttr('미리 봅니다 — '+say.join(' · ')):'');
+  if(typeof PuHwpPreview==='undefined'||!PuHwpPreview){
+    return grpFillFail(new Error('한글 미리보기를 불러오지 못했습니다'),GRP_VERB.pv);
   }
+  try{
+    await PuHwpPreview.open(r.bytes,r.name);
+    return {ok:true,name:r.name,result:r.result};
+  }catch(e){ return grpFillFail(e,GRP_VERB.pv); }
 }
 /* 창 열기 — 양식이 애매하면(상공회의소·인사노무만) 먼저 고르게 한다 */
 async function grpOpenReport(coId,typeId,forced){
@@ -8436,7 +8470,8 @@ function grpRenderTop(){
   const dls=Object.keys(f.files||{}).map(function(k){
     const lb=grpFileLabel(st.formKey,k), short=k==='main'?'HWPX':lb;
     if(st.tpl[k]===null) return `<span class="grp-miss">양식 서고에 ${escAttr(lb)} 양식이 없습니다</span>`;
-    return `<button type="button" class="btn btn-s grp-b" data-grp-act="dl" data-arg="${escAttr(k)}" title="${escAttr(lb)} — 양식 서고 빈 양식에 지금 화면 값을 채워 내려받습니다">⬇ ${escAttr(short)}</button>`;
+    return `<button type="button" class="btn btn-s grp-b" data-grp-act="dl" data-arg="${escAttr(k)}" title="${escAttr(lb)} — 양식 서고 빈 양식에 지금 화면 값을 채워 내려받습니다">⬇ ${escAttr(short)}</button>
+      <button type="button" class="btn btn-s grp-b" data-grp-act="preview" data-arg="${escAttr(k)}" title="${escAttr(lb)} — 같은 양식에 지금 화면 값을 채워 한글 그대로 미리 봅니다(내려받지·저장하지 않습니다)">👁 ${k==='main'?'한글 미리보기':escAttr(short)+' 미리보기'}</button>`;
   }).join('');
   el.innerHTML=`<div class="grp-h1">📄 보고서 작성 — ${escAttr(st.coName||'')}</div>
     <span class="grp-pill">${escAttr(f.agency||'')} · ${escAttr(st.year)}</span>

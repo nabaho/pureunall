@@ -832,3 +832,110 @@ test('AI ⑯ 동의 문구는 Google Gemini', () => {
   assert.ok(h.includes('외부 AI(Google Gemini)') && !h.includes('Anthropic') && !h.includes('aiProxyUrl'));
   assert.match(HTML, /<script src="js\/pu-ai-call\.js\?v=\d+"><\/script>/);
 });
+
+/* ══ 「👁 한글 미리보기」 (2026-10-11) — 내려받기와 같은 채우기, 저장·내려받기 없이 미리 보여 준다 ══ */
+const PV_NAMES = ['grpFileName', 'grpFileLabel', 'grpNote', 'grpFillReport', 'grpFillFail', 'grpFillSay', 'grpDownload', 'grpPreview'];
+function pvWorld(o) {
+  o = o || {};
+  const calls = { saved: 0, fill: 0, opened: [], notes: [], tplFor: [] };
+  const ctx = {
+    console: { warn() {} }, Promise, Uint8Array, Date, String, Object, Array, JSON, Math, RegExp, Error,
+    escAttr: (v) => String(v == null ? '' : v),
+    toast: (m, k) => { ctx.__toasts.push({ m: String(m), k: k || '' }); }, __toasts: [],
+    q: () => null,
+    PuGovReport: { FORMS: Rpt.FORMS },
+    PuGovReportPack: { fillHwpx: async () => { calls.fill++; return { bytes: new Uint8Array([7, 7]), result: o.result || { missing: [], short: false, over: false } }; } },
+    grpReadForm: () => {}, grpRenderTop: () => {}, grpRenderWarn: () => {},
+    grpLoadTemplate: async (fk, k, y) => { calls.tplFor.push([fk, k, y]); return o.noTpl ? null : new Uint8Array([1, 2]); },
+    grpLoadJsZip: async () => ({}),
+    grpSaveBlob: () => { calls.saved++; },
+    Blob: function () {},
+  };
+  if (!o.noPreview) ctx.PuHwpPreview = { open: async (b, n) => { calls.opened.push({ b, n }); if (o.openFail) throw new Error(o.openFail); return { pageCount: 2 }; } };
+  vm.createContext(ctx);
+  const consts = (SRC.match(/^const GRP_(?:FILE_KO|VERB)=.*;\r?$/gm) || []).join('\n');
+  vm.runInContext('var _grp=null;\n' + consts + '\n' + PV_NAMES.map(grab).join('\n'), ctx);
+  vm.runInContext('grpNote=function(h){ __notes.push(String(h)); };', Object.assign(ctx, { __notes: calls.notes }));
+  vm.runInContext("_grp={formKey:'cci-north',year:'2025',coName:'가나상사',state:'초안',tpl:{},report:{company:{name:'가나상사'}}};", ctx);
+  return { ctx, calls };
+}
+
+test('미리보기 ① 같은 채우기로 만든 바이트를 PuHwpPreview 에 넘긴다 — 내려받기·저장·쓰기 없음', async () => {
+  const w = pvWorld({ result: { missing: ['a', 'b'], short: true, over: false } });
+  const r = await w.ctx.grpPreview('main');
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(w.calls.fill, 1);
+  assert.strictEqual(w.calls.saved, 0, '미리보기가 내려받았다');
+  assert.strictEqual(w.calls.opened.length, 1);
+  assert.deepStrictEqual(Array.from(w.calls.opened[0].b), [7, 7]);
+  assert.match(w.calls.opened[0].n, /^충남북부상공회의소_.*가나상사_초안\.hwpx$/);
+  const note = w.calls.notes[w.calls.notes.length - 1];
+  assert.match(note, /양식에서 못 찾은 칸 2곳/);
+  assert.match(note, /회차가 모자랍니다/);
+});
+test('미리보기 ② 내려받기는 그대로 — 같은 채우기 뒤 grpSaveBlob, 안내·알림 문구도 같다', async () => {
+  const w = pvWorld({ result: { missing: ['a'], short: false, over: true } });
+  const r = await w.ctx.grpDownload('main');
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(w.calls.saved, 1);
+  assert.strictEqual(w.calls.opened.length, 0);
+  assert.match(w.calls.notes[w.calls.notes.length - 1], /내려받았습니다 — 양식에서 못 찾은 칸 1곳 · 기관 기준을 넘는 회차는 양식에 안 들어갔습니다/);
+  assert.match(w.ctx.__toasts[w.ctx.__toasts.length - 1].m, /^내려받았습니다 — /);
+});
+test('미리보기 ③ 서고에 양식이 없으면 열지 않고 안내 — 내려받기와 같은 자리', async () => {
+  const w = pvWorld({ noTpl: true });
+  const r = await w.ctx.grpPreview('main');
+  assert.strictEqual(r.ok, false);
+  assert.strictEqual(w.calls.opened.length, 0);
+  assert.strictEqual(w.ctx.__toasts[0].k, 'err');
+  assert.match(w.calls.notes[0], /양식 서고에 .* 양식이 없습니다/);
+  const d = await w.ctx.grpDownload('main');
+  assert.strictEqual(d.ok, false);
+  assert.match(w.calls.notes[w.calls.notes.length - 1], /등록해야 내려받을 수 있습니다/);
+});
+test('미리보기 ④ 엔진·창이 없거나 못 열면 알리고 칸은 그대로', async () => {
+  const w1 = pvWorld({ noPreview: true });
+  const r1 = await w1.ctx.grpPreview('main');
+  assert.strictEqual(r1.ok, false);
+  assert.strictEqual(w1.ctx.__toasts[w1.ctx.__toasts.length - 1].k, 'err');
+  const w2 = pvWorld({ openFail: '미리보기를 열지 못했습니다 — 깨진 파일' });
+  const r2 = await w2.ctx.grpPreview('main');
+  assert.strictEqual(r2.ok, false);
+  assert.match(w2.ctx.__toasts[w2.ctx.__toasts.length - 1].m, /깨진 파일/);
+});
+test('미리보기 ⑤ 모르는 양식 파일·화면 상태가 없으면 아무것도 안 한다', async () => {
+  const w = pvWorld();
+  assert.strictEqual((await w.ctx.grpPreview('nope')).ok, false);
+  assert.strictEqual(w.calls.fill, 0);
+  vm.runInContext('_grp=null;', w.ctx);
+  assert.strictEqual((await w.ctx.grpPreview('main')).ok, false);
+});
+test('미리보기 ⑥ 정적 — 채우기는 공통 한 곳(복사 아님), 미리보기는 내려받지 않고 쓰지 않는다', () => {
+  const code = SRC.replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.strictEqual((code.match(/PuGovReportPack\.fillHwpx\(/g) || []).length, 1, '채우기가 두 곳이다 — 공통 함수로 뽑아야 한다');
+  const fill = grab('grpFillReport');
+  assert.match(fill, /PuGovReportPack\.fillHwpx\(/);
+  assert.match(grab('grpDownload'), /grpFillReport\(/);
+  assert.match(grab('grpPreview'), /grpFillReport\(/);
+  const pv = grab('grpPreview');
+  assert.doesNotMatch(pv, /grpSaveBlob|createObjectURL|localStorage|lsSet|fbPush|\.set\(|\.update\(|\.push\(/);
+  assert.match(pv, /PuHwpPreview\.open\(/);
+});
+test('미리보기 ⑦ 화면 — 「⬇ HWPX」 옆 「👁 한글 미리보기」, 위임 표(GRP_ACTS)에 grpPreview', () => {
+  const top = grab('grpRenderTop');
+  assert.match(top, /data-grp-act="dl"[\s\S]*?data-grp-act="preview"/);
+  assert.match(top, /👁/);
+  assert.match(top, /한글 미리보기/);
+  assert.match(SRC.match(/const GRP_ACTS=\{[^}]*\}/)[0], /preview:'grpPreview'/);
+  assert.match(top, /data-grp-act="preview" data-arg="\$\{escAttr\(k\)\}"/, '자료는 escAttr 를 거친다');
+});
+test('미리보기 ⑧ 스크립트 — 엔진은 다른 앱과 같은 ?v, 미리보기 창은 엔진 뒤·쓰는 코드 앞', () => {
+  const FUND = fs.readFileSync(path.join(__dirname, '..', 'fund.html'), 'utf8');
+  const ev = (s) => (s.match(/js\/pu-hwp-engine\.js\?v=(\d+)/) || [])[1];
+  assert.ok(ev(HTML), 'pu-hwp-engine.js 줄이 없다');
+  assert.strictEqual(ev(HTML), ev(FUND));
+  const e = HTML.indexOf('<script src="js/pu-hwp-engine.js?v=');
+  const p = HTML.indexOf('<script src="js/pu-hwp-preview.js?v=1">');
+  assert.ok(e >= 0 && p > e, '미리보기 창은 엔진 다음에');
+  assert.ok(p < HTML.indexOf('async function grpPreview('), '쓰는 코드보다 먼저 싣는다');
+});

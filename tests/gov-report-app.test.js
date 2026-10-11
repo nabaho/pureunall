@@ -38,18 +38,19 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grRenderForms', 'grRenderAlerts', 'grRender', 'grReset', 'grLoad',
   'grBizType', 'grErp', 'grSetBiz', 'grLoadDocs', 'grRetryDocs', 'grRenderBiz',
   'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
-  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId'];
+  'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
   o = o || {};
   const db = FakeDb.만들기(o.seed || F.seed());
   const els = {};
-  ['cwKey', 'cwSt', 'cwSent', 'cwGot', 'cwHow', 'cwAck', 'cwNote'].forEach((id) => { els[id] = fakeEl(); }); // 칸 창 입력 — 진짜 DOM 에서는 innerHTML 이 만든다
+  ['cwKey', 'cwSt', 'cwSent', 'cwGot', 'cwHow', 'cwAck', 'cwNote', 'cwHwpMsg'].forEach((id) => { els[id] = fakeEl(); }); // 칸 창 입력 — 진짜 DOM 에서는 innerHTML 이 만든다
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
     encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportTrack: Tr,
     $: (id) => (els[id] = els[id] || fakeEl()),
     fbDb: o.db ? o.db(db) : db };
+  if (o.preview) ctx.PuHwpPreview = o.preview;
   ctx.window = ctx;
   ctx.navigator = o.nav || { clipboard: { writeText: async (t) => { ctx.copied = t; } } };
   vm.createContext(ctx);
@@ -614,4 +615,80 @@ test('㉘ 겹친 저장 — 같은 칸 저장이 끝나기 전에 다시 열어 
   w.els.cwSt.value = 'blocked';
   await w.ctx.grSaveCell();
   assert.equal(n, 2, '끝난 뒤에는 다시 저장할 수 있다');
+});
+
+/* ══ 「📂 받은 한글 파일 열어 보기」 (2026-10-11) — ③ 서명본 칸 창에서만, 브라우저 안에서만 읽는다 ══ */
+function pvFile(name, bytes) { return { name, size: bytes.length, arrayBuffer: async () => new Uint8Array(bytes).buffer }; }
+function pvPreview(o) {
+  const calls = [];
+  return { calls, open: async (buf, name) => { calls.push({ buf, name }); if (o && o.fail) throw new Error(o.fail); return { pageCount: 2 }; } };
+}
+
+test('㉙ 파일 열기 단추 — ③ 서명본 칸 창에만, 숨은 파일 고르기(.hwp·.hwpx)와 안내 줄', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  const c = w.els.cellw.innerHTML;
+  assert.ok(c.includes('📂 받은 한글 파일 열어 보기'));
+  assert.match(c, /<input type="file" id="cwHwp" accept="\.hwp,\.hwpx" style="display:none" onchange="grOpenHwp\(this\)">/);
+  assert.ok(c.includes('onclick="grPickHwp()"'));
+  assert.ok(c.includes('id="cwHwpMsg"'));
+  assert.ok(c.includes('올리지'), '올리지·저장하지 않는다는 안내');
+  w.ctx.grCloseCell();
+  w.ctx.grSetBiz('consulting-03');
+  w.ctx.grOpenCell('c2', 't3', 'attach');   // ④ 칸에는 없다 (기술보호 ③ 은 칸 자체가 없다)
+  assert.ok(!w.els.cellw.innerHTML.includes('📂'), '③ 이 아닌 칸에 단추가 있다');
+  assert.equal(w.db.쓴것.length, 0);
+});
+test('㉚ 한글 파일을 고르면 PuHwpPreview.open(바이트, 이름) — 아무것도 쓰지 않는다', async () => {
+  const pv = pvPreview();
+  const w = world({ preview: pv });
+  const inp = { files: [pvFile('서명본.HWPX', [80, 75, 3, 4])], value: 'C:\\fakepath\\서명본.HWPX' };
+  const r = await w.ctx.grOpenHwp(inp);
+  assert.equal(r.ok, true);
+  assert.equal(pv.calls.length, 1);
+  assert.equal(pv.calls[0].name, '서명본.HWPX');
+  assert.ok(pv.calls[0].buf instanceof ArrayBuffer || Object.prototype.toString.call(pv.calls[0].buf) === '[object ArrayBuffer]');
+  assert.equal(inp.value, '', '같은 파일을 다시 고를 수 있게 비운다');
+  assert.equal(w.db.쓴것.length, 0, '파일을 어디에도 쓰지 않는다');
+  onlyTrackWrites(w.db);
+});
+test('㉛ 한글이 아니면 「한글(.hwp·.hwpx) 파일만 열 수 있습니다」 — 열지도 읽지도 않는다', async () => {
+  const pv = pvPreview();
+  const w = world({ preview: pv });
+  let read = 0;
+  const f = { name: '서명본.pdf', size: 3, arrayBuffer: async () => { read++; return new ArrayBuffer(3); } };
+  const r = await w.ctx.grOpenHwp({ files: [f], value: 'x' });
+  assert.equal(r.ok, false);
+  assert.equal(pv.calls.length, 0);
+  assert.equal(read, 0, '한글이 아닌 파일을 읽었다');
+  assert.equal(w.els.cwHwpMsg.textContent, '한글(.hwp·.hwpx) 파일만 열 수 있습니다');
+  const r2 = await w.ctx.grOpenHwp({ files: [pvFile('이름만.hwp.exe', [1])], value: '' });
+  assert.equal(r2.ok, false);
+  assert.equal(pv.calls.length, 0);
+});
+test('㉜ 미리보기 실패·창 없음 — 안내만, 칸 창의 적던 값은 그대로(다시 그리지 않는다)', async () => {
+  const w1 = world({ preview: pvPreview({ fail: '미리보기를 열지 못했습니다 — 깨진 파일' }) });
+  const r1 = await w1.ctx.grOpenHwp({ files: [pvFile('a.hwp', [1])], value: '' });
+  assert.equal(r1.ok, false);
+  assert.match(w1.els.cwHwpMsg.textContent, /깨진 파일/);
+  assert.ok(!w1.els.cellw || w1.els.cellw.innerHTML === '', '칸 창을 다시 그렸다');
+  const w2 = world();
+  const r2 = await w2.ctx.grOpenHwp({ files: [pvFile('a.hwp', [1])], value: '' });
+  assert.equal(r2.ok, false);
+  assert.ok(w2.els.cwHwpMsg.textContent.length > 0);
+  const r3 = await w2.ctx.grOpenHwp({ files: [], value: '' });
+  assert.equal(r3.ok, false);
+});
+test('㉝ 정적 — 스크립트 줄, 파일은 글자로만 안내하고 올리지·저장하지 않는다', () => {
+  const FUND = fs.readFileSync(path.join(__dirname, '..', 'fund.html'), 'utf8');
+  const ev = (s) => (s.match(/js\/pu-hwp-engine\.js\?v=(\d+)/) || [])[1];
+  assert.ok(ev(SRC) && ev(SRC) === ev(FUND), '엔진 ?v 가 다른 앱과 같아야 한다');
+  const e = SRC.indexOf('<script src="js/pu-hwp-engine.js?v='), p = SRC.indexOf('<script src="js/pu-hwp-preview.js?v=1">');
+  assert.ok(e >= 0 && p > e && p < SRC.indexOf('<script>', p), '엔진 → 미리보기 순서');
+  const fn = grab('grOpenHwp');
+  assert.doesNotMatch(fn, /innerHTML/, '파일 이름을 innerHTML 로 넣었다');
+  assert.doesNotMatch(fn, /fetch\(|XMLHttpRequest|FormData|localStorage|\.set\(|\.update\(|\.push\(|\.put\(/);
+  assert.doesNotMatch(INLINE, /esm\.sh|edwardkim\.github\.io|createEditor|window\.open/);
 });
