@@ -204,6 +204,9 @@
     if (ev.visibility === 'private') 몸.visibility = 'private';
     if (ev.location) 몸.location = String(ev.location);
     if (ev.description) 몸.description = String(ev.description);
+    /* 반복·알림(구글 입력 화면의 「반복 안 함」·「알림 추가」, 2026-10-11) — functions/gcal-proxy.js bodyOf 와 같은 셈 */
+    if (/^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(String(ev.repeat || ''))) 몸.recurrence = ['RRULE:FREQ=' + ev.repeat];
+    if (Number(ev.remindMin) > 0) 몸.reminders = { useDefault: false, overrides: [{ method: 'popup', minutes: Math.round(Number(ev.remindMin)) }] };
     /* 여러 날 일정 — 끝나는 날(endDate)이 시작보다 뒤면 그 날까지(2026-10-10). 없으면 예전 그대로 */
     var 끝날짜 = /^\d{4}-\d{2}-\d{2}$/.test(String(ev.endDate || '')) && ev.endDate > ev.date ? ev.endDate : '';
     if (/^\d{2}:\d{2}$/.test(String(ev.time || ''))) {
