@@ -45,6 +45,10 @@ function bodyOf(ev) {
   if (ev.description) 몸.description = s(ev.description);
   /* 반복·알림 — js/pu-gcal-auth.js 몸만들기 와 같은 셈 */
   if (/^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(s(ev.repeat))) 몸.recurrence = ['RRULE:FREQ=' + ev.repeat];
+  /* 참석자·Google Meet — js/pu-gcal-auth.js 몸만들기 와 같은 셈 */
+  const 손님 = (Array.isArray(ev.attendees) ? ev.attendees : []).filter((x) => /^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(s(x))).slice(0, 20);
+  if (손님.length) 몸.attendees = 손님.map((x) => ({ email: s(x).toLowerCase() }));
+  if (ev.meet && ev.meetId) 몸.conferenceData = { createRequest: { requestId: s(ev.meetId), conferenceSolutionKey: { type: 'hangoutsMeet' } } };
   if (Number(ev.remindMin) > 0) 몸.reminders = { useDefault: false, overrides: [{ method: 'popup', minutes: Math.round(Number(ev.remindMin)) }] };
   /* 여러 날 일정 — 화면(몸만들기)과 같은 셈 */
   const 끝날짜 = /^\d{4}-\d{2}-\d{2}$/.test(s(ev.endDate)) && ev.endDate > ev.date ? ev.endDate : '';
@@ -83,7 +87,9 @@ function eventOf(rec, id, nameOf) {
   return {
     date: s(rec.date), endDate: /^\d{4}-\d{2}-\d{2}$/.test(s(rec.endDate)) ? s(rec.endDate) : '', time: 시각,
     repeat: /^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(s(rec.repeat)) ? s(rec.repeat) : '',
-    remindMin: Number(rec.remindMin) > 0 ? Math.round(Number(rec.remindMin)) : 0, endTime: 시각 && /^\d{2}:\d{2}/.test(s(rec.endTime)) ? s(rec.endTime).slice(0, 5) : '',
+    remindMin: Number(rec.remindMin) > 0 ? Math.round(Number(rec.remindMin)) : 0,
+    attendees: Array.isArray(rec.guests) ? rec.guests.filter((x) => typeof x === 'string').slice(0, 20) : [],
+    meet: rec.meet === true, meetId: rec.meet === true ? 'pu-' + s(rec.id || id).slice(0, 60) : '', endTime: 시각 && /^\d{2}:\d{2}/.test(s(rec.endTime)) ? s(rec.endTime).slice(0, 5) : '',
     summary: s(rec.title).trim(), location: s(rec.place).trim(), description: 설명.join('\n'), puSid: sid,
     source: (rec.sourceKind === 'card' && rec.sourceId) ? { kind: 'card', id: s(rec.sourceId) } : null,
     recId: s(rec.id || id),
@@ -218,18 +224,25 @@ function make(deps) {
     const ref = db.ref('data/my_schedules/v/' + id);
     try {
       const at = await ownerAccess(db);
-      const r = await doFetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(GARCH.CAL_ID)
-        + '/events?sendUpdates=none', {
-        method: 'POST', headers: { Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
-        body: JSON.stringify(bodyOf(ev)),
-      });
-      const j = await r.json().catch(() => null);
+      const 넣기 = async (e) => {
+        const 몸 = bodyOf(e);
+        const 응 = await doFetch('https://www.googleapis.com/calendar/v3/calendars/' + encodeURIComponent(GARCH.CAL_ID)
+          + '/events?sendUpdates=none' + (몸.conferenceData ? '&conferenceDataVersion=1' : ''), {
+          method: 'POST', headers: { Authorization: 'Bearer ' + at, 'Content-Type': 'application/json' },
+          body: JSON.stringify(몸),
+        });
+        return { r: 응, j: await 응.json().catch(() => null) };
+      };
+      let { r, j } = await 넣기(ev);
+      let 회의실패 = false;
+      /* Meet 을 구글이 거절하면 «일정이 통째로 사라지는» 것이 가장 나쁘다 — Meet 없이 일정만 다시 넣고 기록에 남긴다 */
+      if ((!r.ok || !j || !j.id) && ev.meet) { 회의실패 = true; ({ r, j } = await 넣기(Object.assign({}, ev, { meet: false }))); }
       if (!r.ok || !j || !j.id) throw new Error('구글이 만들지 않았습니다(' + ((j && j.error && j.error.message) || r.status) + ')');
       const now = Date.now();
       await ref.transaction((cur) => {
         if (!cur || cur._deleted) return cur;                 /* 그 사이 지워졌으면 손대지 않는다 */
         return Object.assign({}, cur, {
-          gcalEventId: j.id, gcalProxyAt: now, gcalProxyErr: null, movedToGcal: true,
+          gcalEventId: j.id, gcalProxyAt: now, gcalProxyErr: 회의실패 ? 'Google Meet 을 구글이 거절해 일정만 넣었습니다' : null, movedToGcal: true,
           updatedAt: now, revision: (Number(cur.revision) || 0) + 1,
         });
       });
