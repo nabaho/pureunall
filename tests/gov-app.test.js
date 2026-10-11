@@ -122,7 +122,7 @@ function runApp(seed) {
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }) },
     location: { protocol: 'https:' },
     GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'),
-    GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'),
+    GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'),
     Promise, navigator: {},
     GovAlio: require('../js/gov-alio.js'),
@@ -408,7 +408,7 @@ test('★★ 공고 줄마다 ㅁ 와 № 가 있다', () => {
   assert.match(h, /<td class="rn">1<\/td>/);
   assert.match(h, /<td class="rn">3<\/td>/);
   assert.match(src, /<th class="chk"><input type="checkbox" id="fSelAll"/, '머리에 전체 고르기');
-  assert.match(src, /<th class="rn">№<\/th><th>출처<\/th>/);
+  assert.match(src, /<th class="rn">№<\/th><th class="stc"[^>]*>★<\/th><th>출처<\/th>/);
 });
 
 test('★★ 고른 공고를 한꺼번에 관심으로 — 이미 관심인 것은 그대로', () => {
