@@ -28131,6 +28131,103 @@ function coMgrPendTag(co){
     style:{ flexShrink:0, fontSize:'10.5px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'3px', padding:'0 4px' } }, '⏳');
 }
 
+/* ── «살아 있는 업체» 판정 하나 (2026-10-11 검토 §6) ──
+   종료(closed)·휴지통(_deleted) 업체는 사무대행·계약 중단 탭과 건수, 세무사 메일 명단,
+   보수총액 엑셀 맞추기에 들어가지 않는다 — 끝난 업체 자료를 세무사에게 요청하는 메일이 나갈 뻔했다.
+   ⚠ 종료할 때 isSuboffice·suspended 는 지우지 않는다(복원 때 원래 자리로 돌아가야 한다) —
+     그래서 «표시하는 쪽»이 이 판정을 먼저 거친다. */
+function erpCoAlive(co){
+  return !!(co && !co._deleted && co.status !== 'closed');
+}
+
+/* ── 업체 → 계약 회사 사본 맞추기 (2026-10-11 검토 §1) ──
+   oldCo = 고치기 전 업체, newCo = 고친 뒤 업체.
+   · 잣대는 companyId — 사업자번호가 같은 다른 업체(본점·지점)의 계약을 건드리지 않는다.
+   · 진행 중 계약만 — 종료·취소·이관완료·만료·휴지통 계약은 «그때 값»을 남긴다(옛 계약서 재출력).
+   · 실제로 «바뀐 칸»만 쓴다 — 값이 undefined 인 칸은 건너뛴다.
+   · companyId 가 없는 계약은 «고치기 전 사업자번호를 가진 살아 있는 업체가 정확히 이 한 곳»일 때만 맞춘다.
+     여럿이거나 이 업체가 아니면 건드리지 않고 held 로 센다(사람이 보게).
+   돌려주는 값: { records:[바뀐 계약 전체], held:N, fields:[바뀐 칸] } — 쓰기는 하지 않는다. */
+var ERP_CO_CT_FIELDS = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
+  'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
+  'contacts','primaryContactName','primaryContactPhone','primaryContactEmail'];
+var ERP_CT_ENDED = { closed:1, cancelled:1, transferred:1, expired:1 };
+function erpCoSyncContractsPlan(oldCo, newCo, contracts, companies, onlyFields){
+  var out = { records:[], held:0, fields:[] };
+  if(!newCo || !newCo.id) return out;
+  oldCo = oldCo || {};
+  var same = function(a, b){
+    if(a === b) return true;
+    if((a === undefined || a === null || a === '') && (b === undefined || b === null || b === '')) return true;
+    if(typeof a === 'object' || typeof b === 'object'){ try { return JSON.stringify(a) === JSON.stringify(b); } catch(_e){ return false; } }
+    return String(a) === String(b);
+  };
+  var list = Array.isArray(onlyFields) ? ERP_CO_CT_FIELDS.filter(function(f){ return onlyFields.indexOf(f) >= 0; }) : ERP_CO_CT_FIELDS;
+  var delta = {};
+  list.forEach(function(f){
+    if(newCo[f] === undefined) return;
+    if(same(oldCo[f], newCo[f])) return;
+    delta[f] = newCo[f]; out.fields.push(f);
+  });
+  if(!out.fields.length) return out;
+  var dg = function(x){ return String(x || '').replace(/[^0-9]/g, ''); };
+  var oldBiz = dg(oldCo.bizNo !== undefined ? oldCo.bizNo : newCo.bizNo);
+  /* companyId 없는 계약용 — 고치기 전 번호를 가진 살아 있는 업체가 이 한 곳뿐인가
+     ⚠ 업체표에는 이미 «고친 뒤» 값이 들어 있을 수 있다 — 이 업체 자신은 빼고 «다른» 살아 있는 업체만 센다. */
+  var bizOthers = oldBiz ? (companies || []).filter(function(c){ return c && c.id !== newCo.id && erpCoAlive(c) && dg(c.bizNo) === oldBiz; }) : [];
+  var bizIsMine = !!oldBiz && bizOthers.length === 0;
+  (contracts || []).forEach(function(ct){
+    if(!ct || !ct.id || ct._deleted || ERP_CT_ENDED[ct.status]) return;
+    var mine = false;
+    if(ct.companyId){ mine = ct.companyId === newCo.id; }
+    else {
+      var ctBiz = dg(ct.bizNo || (ct.company && ct.company.bizNo));
+      if(!ctBiz || ctBiz !== oldBiz) return;
+      if(bizIsMine) mine = true; else { out.held++; return; }
+    }
+    if(!mine) return;
+    var comp = Object.assign({}, ct.company || {});
+    var touched = false;
+    out.fields.forEach(function(f){ if(!same(comp[f], delta[f])){ comp[f] = delta[f]; touched = true; } });
+    var nextCt = Object.assign({}, ct, { company: comp });
+    if(delta.name !== undefined && !same(ct.companyName, delta.name)){ nextCt.companyName = delta.name; touched = true; }
+    if(delta.bizNo !== undefined && !same(ct.bizNo, delta.bizNo)){ nextCt.bizNo = delta.bizNo; touched = true; }
+    if(touched) out.records.push(nextCt);
+  });
+  return out;
+}
+/* 계획대로 «한 번에» 쓴다 — 계약표 통째 저장(dbSet)도, 칸마다 저장도 하지 않는다. */
+function erpCoSyncContracts(oldCo, newCo, onlyFields){
+  var plan = erpCoSyncContractsPlan(oldCo, newCo, dbGet('contracts', []) || [], dbGet('companies', []) || [], onlyFields);
+  var heldMsg = plan.held ? ' · 연결 보류 ' + plan.held + '건은 건드리지 않았습니다' : '';
+  if(!plan.records.length){
+    if(plan.held) showToast('업체 변경 → 계약 동기화 없음' + heldMsg, 6000);
+    return true;
+  }
+  if(dbUpsertMany('contracts', plan.records) === false){
+    showToast('⚠ 계약 ' + plan.records.length + '건에 업체 변경을 못 옮겼습니다 — 계약관리에서 확인해 주세요', 7000);
+    return false;
+  }
+  showToast('업체 변경 → 계약 ' + plan.records.length + '건 동기화됨' + heldMsg, plan.held ? 6000 : undefined);
+  return true;
+}
+
+/* ── 업체 종료 때 정리할 미입금 자문료 고르기 (2026-10-11 검토 §5) ──
+   잣대는 fi.companyId === co.id. companyId 가 없는 줄만 «정규화한 이름이 같고, 그 이름의 살아 있는
+   업체가 정확히 이 한 곳»일 때 고른다 — 같은 이름의 지점·동명 법인 돈을 함께 지우지 않는다.
+   휴지통(_deleted)·되돌린(undoneDate) 줄은 고르지 않는다. 쓰기는 하지 않는다. */
+function erpCloseCoPendingIncomes(co, incomes, companies){
+  if(!co || !co.id) return [];
+  var nm = erpNormName(co.name);
+  var sameName = nm ? (companies || []).filter(function(c){ return erpCoAlive(c) && erpNormName(c.name) === nm; }) : [];
+  var nameIsMine = sameName.length === 1 && sameName[0].id === co.id;
+  return (incomes || []).filter(function(fi){
+    if(!fi || !fi.id || fi._deleted || fi.undoneDate || fi.paid || fi.kind !== '자문료') return false;
+    if(fi.companyId) return fi.companyId === co.id;
+    return nameIsMine && erpNormName(fi.companyName) === nm;
+  });
+}
+
 function CompanyManagement(){
   /* 표를 «한 화면 안에서» 최대로 — 대표 지시 2026-10-11 「사업장정보가 2개정도 더 보이게」 → 「한화면안에서 쪽 번호가 나오게」.
      두 줄을 그냥 늘리면 쪽 번호가 화면 밖으로 밀렸다. 그래서 디자인은 그대로 두고 «빈 자리»만 걷는다:
@@ -28181,7 +28278,7 @@ function CompanyManagement(){
   function importWageXlsx(e){
     var file = e.target.files && e.target.files[0]; if(!file) return;
     if(typeof XLSX === 'undefined'){ showToast('엑셀 모듈 로딩중'); return; }
-    var agents = companies.filter(function(co){ return co.status==='suboffice' || co.isSuboffice; });
+    var agents = companies.filter(function(co){ return erpCoAlive(co) && (co.status==='suboffice' || co.isSuboffice); });   // 종료·휴지통 업체는 맞추지 않는다(검토 §6)
     var reader = new FileReader();
     reader.onload = function(ev){
       try {
@@ -28433,6 +28530,8 @@ function CompanyManagement(){
   function buildTaxGroups(){
     var byEmail = {};
     companies.forEach(function(co){
+      // ⚠ 종료·휴지통 업체는 세무사에게 자료를 요청하지 않는다 — 외부로 나가는 메일이다(검토 §6)
+      if(!erpCoAlive(co)) return;
       if(!(co.status==='suboffice' || co.isSuboffice)) return;
       var em = (co.taxEmail||'').trim().toLowerCase();
       if(!em) return;
@@ -28992,38 +29091,12 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     var _p = {}; _p[editing.field] = nextVal;
     if(!coPatch(editing.id, _p)){ cancelEdit(); return; }
     var changedCo = Object.assign({}, _coF, _p);
-    // 계약관리 동기화 (업체 정보 변경 시 같은 사업자번호의 계약 데이터에도 반영)
-    syncToContracts(changedCo, editing.field, nextVal);
+    // 계약관리 동기화 — companyId 로 이어진 진행 중 계약에만, 바뀐 칸만 (검토 §1)
+    erpCoSyncContracts(_coF, changedCo, [editing.field]);
     cancelEdit();
   }
-  // 계약관리 동기화 - companies의 변경 사항을 contracts.company에 반영
-  function syncToContracts(co, field, val){
-    if(!co || !co.bizNo) return;
-    // 회사 정보 필드만 동기화 (계약 자체 필드는 제외)
-    var COMPANY_FIELDS = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
-      'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
-      'contacts','primaryContactName','primaryContactPhone','primaryContactEmail'];
-    if(COMPANY_FIELDS.indexOf(field) < 0) return;
-    var contracts = dbGet('contracts', []);
-    var coBiz = (co.bizNo || '').replace(/[^0-9]/g,'');
-    if(!coBiz) return;
-    var changed = 0;
-    var nextContracts = contracts.map(function(ct){
-      var ctBiz = ((ct.bizNo || (ct.company && ct.company.bizNo)) || '').replace(/[^0-9]/g,'');
-      if(ctBiz !== coBiz) return ct;
-      changed++;
-      var nextCompany = Object.assign({}, ct.company || {}, (function(){var x={}; x[field]=val; return x;})());
-      // companyName/bizNo는 root 레벨에도 있음
-      var nextCt = Object.assign({}, ct, { company: nextCompany });
-      if(field === 'name')  nextCt.companyName = val;
-      if(field === 'bizNo') nextCt.bizNo = val;
-      return nextCt;
-    });
-    if(changed > 0){
-      dbSet('contracts', nextContracts);
-      showToast('업체 변경 → 계약 ' + changed + '건 동기화됨');
-    }
-  }
+  /* 계약관리 동기화는 바깥 erpCoSyncContracts 가 한다 — 사업자번호로 묶어 계약표를 통째 저장하던
+     syncToContracts 는 2026-10-11 검토 §1 로 걷어냈다. 되살리지 말 것. */
   function onEditKey(e){
     if(e.key === 'Enter'){
       e.preventDefault();
@@ -29102,22 +29175,21 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     if(!closeModal) return;
     if(!closeModal.closedReason){ showToast('종료 사유 선택'); return; }
     if(!closeModal.closedDate){ showToast('종료일 입력'); return; }
-    // 미입금 자문료 확인
-    var allIncomes = dbGet('finance_income', []);
-    var pendingForCo = allIncomes.filter(function(fi){
-      return !fi.paid && fi.kind === '자문료' && fi.companyName === closeModal.name;
-    });
+    // 미입금 자문료 확인 — companyId 로 고른다(이름이 같은 다른 업체 돈을 섞지 않는다, 검토 §5)
+    var _closeCo = (dbGet('companies', []) || []).find(function(c){ return c && c.id === closeModal.id; }) || { id: closeModal.id, name: closeModal.name };
+    var pendingForCo = erpCloseCoPendingIncomes(_closeCo, dbGet('finance_income', []) || [], dbGet('companies', []) || []);
     var doCleanup = false;
     if(pendingForCo.length > 0){
       doCleanup = await popConfirm('"' + closeModal.name + '" 업체의 미입금 자문료 ' + pendingForCo.length + '건이 있습니다.\n\n함께 정리(휴지통 이동)하시겠습니까?\n\n→ 확인: 종료 + 미입금 자동 정리\n→ 취소: 종료만 진행 (미입금은 입금관리에 남음)');
     }
-    coPatch(closeModal.id, {
+    /* 업체 종료가 저장되지 않았으면 입금은 손대지 않는다 */
+    if(!coPatch(closeModal.id, {
       status:'closed',
       closedAt:(new Date()).toISOString(),
       closedDate: closeModal.closedDate,
       closedReason: closeModal.closedReason,
       closedReasonDetail: closeModal.closedReasonDetail
-    });
+    })) return;
     // closed_archive에도 기록 (종료관리 표시용)
     var arch = dbGet('closed_archive', []);
     arch.unshift({
@@ -29131,32 +29203,20 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
       closedAt:(new Date()).toISOString()
     });
     dbSet('closed_archive', arch);
-    // 미입금 자문료 정리 (휴지통 이동)
-    var cleanupCount = 0;
+    /* 미입금 자문료 정리 — 휴지통에 «먼저» 담고, 담은 뒤에 그 줄들만 뺀다(erpMoveIncomesToTrash).
+       ⚠ 예전에는 입금표를 통째 저장(dbSet)해 원본을 먼저 지우고 휴지통을 나중에 썼다 —
+         두 번째가 실패하면 돈 기록이 어디에도 없었다. 마감된 달 줄은 건너뛰고 몇 건인지 알린다. */
+    var cleanupMsg = '';
     if(doCleanup && pendingForCo.length > 0){
-      var trash = dbGet(TRASH_FIN_KEY, []) || [];   // 돈 기록 → 재무 전용 휴지통
-      var pendingIds = {};
-      pendingForCo.forEach(function(fi){ pendingIds[fi.id] = 1; });
-      var remaining = allIncomes.filter(function(fi){
-        if(pendingIds[fi.id]){
-          trash.unshift({
-            id: 'trash-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)+'-'+Math.random().toString(36).slice(2,5),
-            storeKey: 'finance_income',
-            item: fi,
-            deletedAt: (new Date()).toISOString(),
-            deletedBy: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? CURRENT_USER.sid : '',
-            reason: '업체 종료에 따른 자동 정리: ' + closeModal.name
-          });
-          cleanupCount++;
-          return false;
-        }
-        return true;
-      });
-      dbSet('finance_income', remaining);
-      dbSet(TRASH_FIN_KEY, trash);
+      var _mv = erpMoveIncomesToTrash(pendingForCo.map(function(fi){ return fi.id; }), '업체 종료에 따른 자동 정리: ' + closeModal.name);
+      if(!_mv.ok) cleanupMsg = ' / ⚠ 미입금 정리 실패 — 입금관리에 그대로 남았습니다';
+      else {
+        if(_mv.moved) cleanupMsg += ' / 미입금 ' + _mv.moved + '건 정리';
+        if(_mv.locked) cleanupMsg += ' / 🔒 마감된 달 ' + _mv.locked + '건은 건너뜀(입금관리에 남음)';
+      }
     }
     setCloseModal(null);
-    showToast('종료 처리'+(cleanupCount>0 ? ' / 미입금 '+cleanupCount+'건 정리' : ''));
+    showToast('종료 처리' + cleanupMsg, cleanupMsg ? 7000 : undefined);
   }
   // 복원 (closed → 원래 status로, 또는 active)
   async function restoreCompany(id){
@@ -29211,9 +29271,10 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   // 상태 탭 범위 — 목록 거르기와 유형별 건수가 같은 기준을 쓰도록 따로 뺐다
   function coInTab(co){
     // ★ 계약 중단 탭
-    if(statusTab === 'suspended') return !!co.suspended;
+    // ⚠ 계약 중단·사무대행 탭은 «살아 있는 업체»만 — 종료해도 표시는 남겨 둬(복원용) 여기서 거른다(검토 §6)
+    if(statusTab === 'suspended') return erpCoAlive(co) && !!co.suspended;
     // 사무대행 탭: status='suboffice' OR active+isSuboffice 모두 표시 (자문과 중복인 경우)
-    if(statusTab === 'suboffice') return co.status === 'suboffice' || !!co.isSuboffice;
+    if(statusTab === 'suboffice') return erpCoAlive(co) && (co.status === 'suboffice' || !!co.isSuboffice);
     /* ⚠ 폐업 탭을 없앴다(대표 지시 2026-09-06 「폐업은 필요없다. 삭제해라」).
        2026-08-17 에 「폐업 정산 신고가 남으니 목록에 남겨 두자」며 만들었으나
        373곳 어디에도 한 번도 켜진 적이 없다(실측 0곳). 폐업한 곳은 이제
@@ -29328,7 +29389,8 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
 
   // 카운트
   var activeCount = companies.filter(function(c){return c.status==='active';}).length;
-  var subofficeCount = companies.filter(function(c){return c.status==='suboffice' || c.isSuboffice;}).length;
+  var subofficeCount = companies.filter(function(c){return erpCoAlive(c) && (c.status==='suboffice' || c.isSuboffice);}).length;
+  var suspendedCount = companies.filter(function(c){return erpCoAlive(c) && !!c.suspended;}).length;
   /* ★ 계약 중단한 업체는 그 달 자문료에서 뺀다 (대표 지시 2026-09-08).
      빼기만 하고 말없이 넘어가면 「어제보다 금액이 줄었는데?」가 된다 —
      얼마를 왜 뺐는지 칸 아래에 함께 적는다. */
@@ -29452,13 +29514,13 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
       selYM: selYM,
       onMonthChange: function(ym){ setSelYM(ym); },  // monthOnly 자동 활성화 제거 (다른 달 계약 사라지는 버그 수정)
       kpis: [
-        { label:'🏢 운영 업체', value:companies.filter(function(c){return c.status!=='closed';}).length+'개', bg:'#f8fafc', fg:'#1e293b', color:'#1e293b', border:'#e2e8f0' },
+        { label:'🏢 운영 업체', value:companies.filter(erpCoAlive).length+'개', bg:'#f8fafc', fg:'#1e293b', color:'#1e293b', border:'#e2e8f0' },
         { label:'💼 활성 자문', value:companies.filter(function(c){return c.status==='active';}).length+'개', bg:'#eff6ff', fg:'#1e40af', color:'#1e40af', border:'#bfdbfe' },
-        { label:'🏛️ 사무대행', value:companies.filter(function(c){return c.status==='suboffice' || c.isSuboffice;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
+        { label:'🏛️ 사무대행', value:subofficeCount+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'💰 월 자문료', value:totalAdvisoryFee.toLocaleString()+'원', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a',
           sub: suspendedFee > 0 ? '중단 ' + suspendedFee.toLocaleString() + '원 제외' : null },
         { label:'✨ 이번 달 신규', value:companies.filter(function(c){return erpDateStr(c.contractStartDate||c.firstContractDate||c.createdAt).slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
-        { label:'⏸ 계약 중단', value:companies.filter(function(c){return !!c.suspended;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
+        { label:'⏸ 계약 중단', value:suspendedCount+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
       ],
       extra: h('button', { onClick:function(){setMonthOnly(!monthOnly);},
         title:MONTH_ONLY_TIP,
@@ -29624,7 +29686,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           color: statusTab==='suspended' ? '#fff' : '#854d0e',
           border: '1px solid '+(statusTab==='suspended' ? '#fbbf24' : '#fde68a'),
           fontSize:'12px', fontWeight:700, cursor:'pointer' } },
-        '⏸ 계약 중단 (' + companies.filter(function(c){return !!c.suspended;}).length + ')'),
+        '⏸ 계약 중단 (' + suspendedCount + ')'),
       // (종료 탭 제거: 종료 업체는 종료관리에서 조회)
       // (폐업 탭 제거 2026-09-06: 폐업한 곳은 「종료 처리」에서 사유 「업체 폐업」으로 넘긴다)
       // (담당·부담당·급여일 필터는 표 머리 깔때기로 옮겼다 — 도구줄에는 두지 않는다)
@@ -30223,15 +30285,13 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
             form.mgrHistory = coMgrHistAdd(editModal, form.managerMain);
           }
         }
-        coUpsert(form);
+        var _coSaved = coUpsert(form);
         setEditModal(null);
         if(_mgrAsked) setTimeout(function(){ showToast('⏳ 담당 변경을 요청했습니다 — 관리자가 승인하면 바뀝니다', 6000); }, 400);
-        // 계약관리 일괄 동기화 (회사정보 필드 모두)
-        var fields = ['name','bizNo','ceo','ceo2','zipcode','address','phone','fax','email',
-          'bizType','bizCategory','companySize','employmentInsuredCount','injuryInsuredCount',
-          'primaryContactName','primaryContactPhone','primaryContactEmail'];
-        fields.forEach(function(f){ syncToContracts(form, f, form[f]); });
+        if(!_coSaved) return;
         showToast('수정됨');
+        // 계약관리 동기화 — 연 때 값(editModal)과 견줘 «바뀐 칸만», 계약표에 한 번만 쓴다 (검토 §1)
+        erpCoSyncContracts(editModal, form);
       },
       onClose: function(){ setEditModal(null); }
     }),
@@ -30499,7 +30559,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
     // ★ 세무사무실 보수총액 신고자료 일괄요청 모달
     taxMailModal && (function(){
       var groups = buildTaxGroups();
-      var noEmail = companies.filter(function(c){ return (c.status==='suboffice'||c.isSuboffice) && !((c.taxEmail||'').trim()); });
+      var noEmail = companies.filter(function(c){ return erpCoAlive(c) && (c.status==='suboffice'||c.isSuboffice) && !((c.taxEmail||'').trim()); });
       return h('div', { onClick:function(){ if(!taxSending) setTaxMailModal(false); },
         style:{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' } },
         h('div', { onClick:function(e){ e.stopPropagation(); },
@@ -48336,6 +48396,40 @@ function erpMoveIncomeToTrash(incomeId, reason){
   return true;
 }
 window.erpMoveIncomeToTrash = erpMoveIncomeToTrash;
+/* 여러 건을 같은 방식으로 — 휴지통 «한 번» 쓰고 → 그 줄들만 «한 번» 뺀다 (업체 종료 정리, 검토 §5).
+   마감된 달 줄은 건너뛰고 locked 로 센다. 휴지통에 못 담으면 하나도 지우지 않고,
+   지우기가 실패하면 방금 담은 휴지통 줄을 거둔다. 돌려주는 값: { ok, moved, locked } */
+function erpMoveIncomesToTrash(ids, reason){
+  var res = { ok: true, moved: 0, locked: 0 };
+  if(!Array.isArray(ids) || !ids.length) return res;
+  var want = {}; ids.forEach(function(id){ if(id) want[id] = 1; });
+  var list = dbGet('finance_income', []) || [];
+  var items = [];
+  list.forEach(function(x){
+    if(!x || !want[x.id]) return;
+    var ym = String(x.advisoryYm || x.date || '').slice(0, 7), dm = String(x.date || '').slice(0, 7);
+    if((ym && isIncomeLocked(ym)) || (dm && isIncomeLocked(dm))){ res.locked++; return; }
+    items.push(x);
+  });
+  if(!items.length) return res;
+  var tk = trashKeyFor('finance_income');
+  var now = (new Date()).toISOString();
+  var by = (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.sid || '') : '';
+  var entries = items.map(function(it){
+    return { id: 'trash-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7) + Math.random().toString(36).slice(2, 5),
+      storeKey: 'finance_income', item: it, deletedAt: now, deletedBy: by, reason: reason || '' };
+  });
+  var tids = {}; entries.forEach(function(e){ tids[e.id] = 1; });
+  var trash = dbGet(tk, []) || [];
+  if(dbSet(tk, entries.concat(trash)) === false){ res.ok = false; return res; }
+  if(dbRemoveMany('finance_income', items.map(function(it){ return it.id; })) === false){
+    dbSet(tk, (dbGet(tk, []) || []).filter(function(x){ return !(x && tids[x.id]); }));
+    res.ok = false; return res;
+  }
+  res.moved = items.length;
+  return res;
+}
+window.erpMoveIncomesToTrash = erpMoveIncomesToTrash;
 
 function erpCmsUndo(incomeId, key){
   if(!incomeId || !key) return Promise.resolve(false);
@@ -75113,7 +75207,7 @@ function erpPerfBreakdown(empSid, period){
     (item.perfShares || []).forEach(function(p){
       if(!p) return;
       // 옛 자료는 사번 자리에 이름이 들어 있다 — 급여 쪽과 같은 방식으로 찾는다
-      var match = p.sid === empSid || (empName && p.sid === empName) || (p.name && p.name === empName);
+      var match = erpPerfShareIsMine(p, empSid, empName);
       if(!match || (p.amount || 0) === 0) return;    // 0원(수습·퇴사·요율0)은 세지 않는다
       var got = p.amount || 0;
       /* 「몫」은 그 사람 앞으로 잡힌 성과 기준액이다 — 분할%가 이미 반영돼 있다.
@@ -75290,7 +75384,7 @@ function calcPerfBonus(empSid, ym){
     if(!erpPerfCounts(item, true)) return;
     (item.perfShares||[]).forEach(function(p){
       // sid 직접 일치 또는 (옛 데이터) 이름 일치
-      var match = p.sid === empSid || (empName && p.sid === empName) || (p.name && p.name === empName);
+      var match = erpPerfShareIsMine(p, empSid, empName);
       if(match && (p.amount||0) !== 0){   // 음수(수기 차감 조정)도 산입
         var amt = p.amount||0;
         total += amt;
@@ -75319,8 +75413,27 @@ function calcPerfBonus(empSid, ym){
 }
 
 // ===== 성과급 건별 수동조정 (원천 finance_income.perfShares 직접 수정 → 성과관리·급여 자동 동기화) =====
+/* ★ 성과 몫이 «이 사람 것인가» — 사번으로 먼저, 이름은 «옛 자료 호환»으로만 (2026-10-11 검토 A6).
+   예전에는 이름이 같으면 사번이 달라도 맞췄다 — 동명이인이면 한 사람의 성과급이 다른 사람 급여에 붙거나 두 번 나갈 수 있었다.
+   이름으로 맞추는 조건(셋 모두): ① 명부(재직·퇴직 전부)에 그 이름이 «하나뿐» ② 적힌 값이 «누구의 사번도 아님»(옛 자료는 사번 자리에 이름)
+   ③ 몫에 사번이 없거나, 사번 자리에 이름이 든 경우. 사번이 있는 몫은 사번만 본다. */
+function erpPerfShareIsMine(p, empSid, empName){
+  if(!p || !empSid) return false;
+  if(p.sid === empSid) return true;
+  var nm = String(empName || '').trim();
+  if(!nm) return false;
+  var all = [];
+  try { all = (dbGet('user_accounts', []) || []).concat(dbGet('user_dir', []) || []); } catch(_e){ all = []; }
+  var sids = {}, byName = {};
+  all.forEach(function(u){ if(u && u.sid){ sids[u.sid] = 1; if(u.name){ var k = String(u.name).trim(); (byName[k] = byName[k] || {})[u.sid] = 1; } } });
+  if(Object.keys(byName[nm] || {}).length !== 1) return false;     // 동명이인이면 이름으로 맞추지 않는다
+  if(p.sid){ return !sids[p.sid] && String(p.sid).trim() === nm; } // 사번 자리에 «이름»이 든 옛 자료만
+  return String(p.name || '').trim() === nm;                       // 사번이 없는 옛 몫
+}
+window.erpPerfShareIsMine = erpPerfShareIsMine;
+
 function _perfShareMatch(p, empSid, empName){
-  return p.sid === empSid || (empName && p.sid === empName) || (p.name && p.name === empName);
+  return erpPerfShareIsMine(p, empSid, empName);
 }
 // 그 입금에서 이 사람 앞으로 잡힌 성과금액 — 이력에 「얼마에서 얼마로」를 적으려면 필요하다
 function _perfAmountOf(fiArr, incomeId, empSid, empName){

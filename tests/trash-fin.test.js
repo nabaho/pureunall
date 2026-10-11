@@ -64,7 +64,10 @@ test('③ ★★ 돈 기록을 버리는 길은 재무 전용, 읽는 곳은 두
   assert.match(tab, /trashAllRows\(\)\.filter\(_trashIsFin\)/, '입금관리 휴지통 목록이 옛 자리에 남은 것을 못 봅니다');
   assert.doesNotMatch(tab, /dbSet\('trash_bin'/, '★★ 입금관리가 일반 휴지통에 씁니다');
   const co = fn('CompanyManagement');
-  assert.match(co, /dbSet\(TRASH_FIN_KEY, trash\)/, '★★ 업체 종료 때 미입금 자문료를 일반 휴지통에 버립니다');
+  /* 업체 종료의 미입금 정리는 erpMoveIncomesToTrash 를 거친다(2026-10-11 검토 §5) — 그 길이 재무 휴지통을 써야 한다 */
+  assert.match(co, /erpMoveIncomesToTrash\(/, '★★ 업체 종료가 입금 휴지통 길(erpMoveIncomesToTrash)을 안 거칩니다');
+  assert.doesNotMatch(co, /dbSet\('trash_bin'/, '★★ 업체관리가 일반 휴지통에 씁니다');
+  assert.match(fn('erpMoveIncomesToTrash'), /trashKeyFor\('finance_income'\)/, '★★ 업체 종료 때 미입금 자문료를 일반 휴지통에 버립니다');
   assert.match(fn('_lostSnapTs') + B.slice(B.indexOf('function _fxRows(')), /trashAllRows\(\)/, '유실 검사·찾기가 재무 휴지통을 안 봅니다');
 });
 

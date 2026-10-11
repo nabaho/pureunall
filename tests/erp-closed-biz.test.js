@@ -53,6 +53,8 @@ function tabFn(){
   assert.ok(j > i, 'coInTab 끝을 못찾음');
   const ctx = { console };
   vm.createContext(ctx);
+  /* coInTab 이 먼저 거치는 «살아 있는 업체» 판정도 함께 싣는다(검토 §6) */
+  vm.runInContext(require('./cut-fn').cutFn(src, 'function erpCoAlive('), ctx);
   vm.runInContext('var statusTab = "active";\n' + src.slice(i, j + 4)
     + '\nthis.coInTab = coInTab; this.setTab = function(t){ statusTab = t; };', ctx);
   return ctx;

@@ -61,7 +61,7 @@ function realm(opts) {
   const need = [
     'function isPayrollLocked(', 'function erpPerfMonthOf(', 'function erpNextOpenYM(',
     'function erpPerfLockInfo(', 'function erpIncomeLog(', 'function erpIncomeLogText(',
-    'function _perfShareMatch(', 'function _perfAmountOf(', 'function _perfEditAllowed(',
+    'function erpPerfShareIsMine(', 'function _perfShareMatch(', 'function _perfAmountOf(', 'function _perfEditAllowed(',
     'function applyPerfOverride(', 'function revertPerfOverride(',
   ];
   vm.runInContext(need.map((d) => cutFn(src, d)).join('\n'), ctx);

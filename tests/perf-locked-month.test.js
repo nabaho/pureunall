@@ -61,7 +61,7 @@ function realm(opts) {
     'function erpNextOpenYM(', 'function erpPerfYMFor(', 'function erpPerfLockInfo(',
     'function erpLockNoticeFor(', 'function erpUpsertIncome(', 'function erpRoutePerfDelta(',
     'function _perfAdjustRec(', 'function calcPerfBonus(', 'function erpPerfBreakdown(',
-    'function erpUndoIncome(',
+    'function erpUndoIncome(', 'function erpPerfShareIsMine(',
   ];
   vm.runInContext(need.map((d) => cutFn(src, d)).join('\n'), ctx);
   // 입금 문(erpUpsertIncome·erpUndoIncome)이 부르는 공용 판정(입금 마감 등)도 진짜를 싣는다
