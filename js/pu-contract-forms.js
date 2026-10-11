@@ -2864,10 +2864,9 @@
       var t = host.tree; if (!t) return;
       t.innerHTML = '';
       if (!S.loaded) return;
-      var nKinds = S.forms.filter(function (f) { return !isClosed(f); }).length;
-      t.appendChild(foldHead('kinds', '📂 서식 종류', '', nKinds));
-      var foldKinds = isFolded('kinds'), kindRows = [];
-      if (!foldKinds) orderedKinds().forEach(function (k) {
+      /* 「📂 서식 종류」 머리글은 뺐다(대표 2026-10-11) — 접고 펴기는 상위 「📄 계약서 양식」 단추가 한다(docs-esign.html) */
+      var kindRows = [];
+      orderedKinds().forEach(function (k) {
         var n = S.forms.filter(function (f) { return f.kind === k.v && !isClosed(f); }).length;
         var on = !S.setView && S.kind === k.v;
         var kb = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
@@ -2878,7 +2877,7 @@
       dragSort(kindRows, moveKind);
       /* 🗄 종료 서식 — 더 쓰지 않는 서식을 옮겨 두는 보관함(지우지 않는다) */
       var nClosed = S.forms.filter(isClosed).length;
-      if (!foldKinds) t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (!S.setView && S.kind === '_closed' ? ' on' : ''), 'aria-current': !S.setView && S.kind === '_closed' ? 'true' : null,
+      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (!S.setView && S.kind === '_closed' ? ' on' : ''), 'aria-current': !S.setView && S.kind === '_closed' ? 'true' : null,
         title: '더 쓰지 않는 서식을 옮겨 둔 곳 — 언제든 되살릴 수 있습니다', onclick: function () { pickKind('_closed'); } }, [el('span', { text: '🗄 종료 서식' }), el('i', { text: String(nClosed) })]));
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
       t.appendChild(foldHead('sets', '📦 세트', 'pcf-thset', S.sets.length));   // 색은 이 머리글에만(대표 2026-10-11) — 세트 이름 줄은 무색
