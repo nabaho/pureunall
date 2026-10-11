@@ -731,11 +731,18 @@
   .tgh{display:flex;flex-direction:column;align-items:center;padding:6px 0 4px;cursor:pointer;border-left:1px solid var(--gline)}
   .tgh .gwd{font-size:11px;color:var(--gsub);line-height:14px}
   .tgh .gdn{font-size:22px;line-height:36px;min-width:36px;text-align:center;border-radius:50%;color:var(--gtext)}
+  /* PC — 구글 공식 주 보기 실측(2026-10-11): 요일 11px/500 줄 32px · 날짜 26px/400 줄 46px · 오늘 46px 원(폰은 위 작은 값 그대로) */
+  @media (min-width:701px){
+    .tgh{padding:0}
+    .tgh .gwd{font-weight:500;line-height:32px}
+    .tgh .gdn{font-size:26px;line-height:46px;min-width:46px;width:46px}
+  }
   .tgh.today .gwd{color:var(--gtoday)}
   .tgh.today .gdn{background:var(--gtoday);color:#ffffff}
   :root[data-theme="dark"] .tgh.today .gdn{color:#131314}
   .tgallday{flex:none;border-bottom:1px solid var(--gline);max-height:34vh;overflow-y:auto}
   .tga{border-left:1px solid var(--gline);padding:2px 2px 3px;min-width:0}
+  @media (min-width:701px){ .tga .ev{padding-left:8px} }          /* 구글 실측: 주 보기 종일 칩 왼쪽 여백 8px(월 보기는 6px) */
   .tgallday .tgtime span{position:static;display:block;padding:6px 6px 0 0;text-align:right;font-size:10px;color:var(--gsub)}
   .tgscroll{flex:1;min-height:0;overflow-y:auto}
   .tgtime{position:relative;font-size:10px;color:var(--gsub);min-width:0}
@@ -775,6 +782,23 @@
   .scard b{font-size:14px;font-weight:500;line-height:20px;word-break:break-word}
   .scard span{font-size:12px;opacity:.9}
   .snone{font-size:13px;color:var(--gsub);padding:10px 0}
+  .sdot{display:none}
+  /* ★ PC 「일정」 보기 — 구글 웹 일정 보기 실측(2026-10-11 calendar.google.com/calendar/embed?mode=AGENDA):
+       날짜 숫자 18px/400 (36×36 칸) · 줄 간격 32px · 시각 14px/400 · 제목 14px/500 · 점은 일정 색 · 날 사이는 가는 선.
+       폰은 색 카드 그대로(폰 앱은 카드다) */
+  @media (min-width:701px){
+    .sday{border-top:1px solid var(--gline);padding:6px 16px}
+    .sday:first-child{border-top:none}
+    .sdn{width:60px}
+    .sdn b{font-size:18px;line-height:36px;width:36px;margin:0 auto}
+    .scards{gap:0}
+    .scard{display:grid;grid-template-columns:16px 160px minmax(0,1fr);align-items:center;min-height:32px;padding:0 8px;border-radius:0;gap:0 12px;
+      background:transparent !important;color:var(--gtext) !important}
+    .scard:hover{background:var(--bg) !important}
+    .scard .sdot{display:block;width:10px;height:10px;border-radius:50%;grid-column:1;grid-row:1}
+    .scard span{grid-column:2;grid-row:1;font-size:14px;font-weight:400;line-height:20px;opacity:1;white-space:nowrap}
+    .scard b{grid-column:3;grid-row:1;font-size:14px;font-weight:500;line-height:20px}
+  }
   /* (㉯ — 고른 날 칠은 없다. 구글 위젯에도 없고, 목록 창이 «어느 날인지» 말한다) */
   /* 그날 목록 — 제목이 안 잘리는 크기(12.5px)로 */
   /* 그날 목록 — 아래에서 올라오는 창(㉯). 구글 폰 달력의 «그날 일정 창»과 같은 쓰임 */
@@ -2610,7 +2634,7 @@ function 폰일정Html(eumOnly){
       var 색 = e.color || "#70757a";
       return '<div class="scard" style="background:' + esc(색) + ';color:' + 글자색(색) + '"'
         + (e.kind === "hol" ? ' data-holday="' + esc(ds) + '"' : ' data-ev="' + esc(e.store) + ':' + esc(e.id) + '"') + '>'
-        + '<b>' + esc(제목) + '</b><span>' + esc(언제) + '</span></div>';
+        + '<i class="sdot" style="background:' + esc(색) + '"></i><b>' + esc(제목) + '</b><span>' + esc(언제) + '</span></div>';
     }).join("");
     var d = new Date(ds + "T00:00:00");
     날들.push('<div class="sday' + (ds === 오늘 ? ' today' : '') + '" data-day="' + ds + '">'
@@ -2752,6 +2776,11 @@ function weekDays(ymd){
      그것은 격자의 «그 시각»에 놓는다(제목시간범위 — 월 보기 칩 · 출장 알림과 같은 규칙, 연도 「2026 …」는 시각이 아니다).
    ⚠ 여러 날 일정 · 공휴일 · 시각 없는 종일은 종일 줄이다. 칸을 비어 있는 곳을 누르면 «그 시각»으로 새 일정 창이 뜬다. */
 var 격자높이 = 48;     /* 한 시간의 높이(px) — 구글 앱을 쟀다 */
+/* ★ 제목 앞 시각(「1000 …」)으로 종일 일정을 시간 칸에 놓을까 — 끈다(2026-10-11).
+     구글 공식 주 보기를 열어 재 보니(calendar.google.com/calendar/embed?mode=WEEK) 이 공용 달력의 일정은 거의 다 «종일»이라
+     시간 칸은 비어 있고 «종일 줄에 칩»으로 늘어서며 칸마다 「N개 더보기」가 붙는다. 「똑같이」가 지시라 그대로 따른다.
+     true 로 바꾸면 제목 앞 시각 칸에 놓는다(월 보기 칩·출장 알림의 제목 시각 규칙과 같은 제목시간범위). */
+var 격자제목시각 = false;
 function 제목시간범위(title){
   var 글 = String(title || "");
   if(/^\s*20[23]\d(?![:\d])/.test(글)) return null;                       /* 「2026 일터혁신…」 연도 */
@@ -2777,7 +2806,7 @@ function 격자일정(ds, eumOnly){
         t0 = 끝.slice(0, 10) === ds ? 격자분(끝.slice(11, 16)) : 1440;
       } else if(e.endTime) t0 = 격자분(e.endTime);
     } else {
-      var 범위 = 제목시간범위(e.text);
+      var 범위 = 격자제목시각 ? 제목시간범위(e.text) : null;
       if(!범위){ 종일.push(e); return; }
       s0 = 범위.s; t0 = 범위.t;
     }
