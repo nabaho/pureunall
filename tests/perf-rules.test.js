@@ -69,7 +69,7 @@ const baseTop = ['uid_roles','sid_roles','data','payroll_os','fund_erp','work_er
 /* ② 있어도 되는 것 — 다른 작업에서 일부러 늘린 노드.
    ★ 최상위를 일부러 늘렸다면 여기에 적어라. 적지 않으면 아래 검사가 막는다
      (실수로 늘어난 것을 잡는 덫이라 자동으로 넘기지 않는다) */
-const allowTop = ['pubdata' /* 공공데이터 공용 자리(서버만 씀, 읽기 MAIL) — 2026-10-11 */,'pubdata_req' /* «받아 달라» 요청(서버가 지움) — 2026-10-11 */,'pu_sign' /* 계약서 서명 요청(직원 req · 열쇠 칸 open) — 2026-10-09 */,'gov' /* 정부사업신청 대표 개인 자리 — 2026-10-03 */,'gov_watch' /* 컨설턴트 모집 감시(서버) — 관리자만 읽기 2026-10-04 */,'rehab_ad' /* 회생광고 — 법원 공고 기업(서버 담음)·발송 표시, 관리자만 2026-10-10 */,'systemAlerts','systemBackups','systemBackupsIndex','systemRestoreLog',
+const allowTop = ['govaid' /* 정부지원금 — 재직 직원 읽기·쓰기(지우기 금지) 2026-10-11 */,'pubdata' /* 공공데이터 공용 자리(서버만 씀, 읽기 MAIL) — 2026-10-11 */,'pubdata_req' /* «받아 달라» 요청(서버가 지움) — 2026-10-11 */,'pu_sign' /* 계약서 서명 요청(직원 req · 열쇠 칸 open) — 2026-10-09 */,'gov' /* 정부사업신청 대표 개인 자리 — 2026-10-03 */,'gov_watch' /* 컨설턴트 모집 감시(서버) — 관리자만 읽기 2026-10-04 */,'rehab_ad' /* 회생광고 — 법원 공고 기업(서버 담음)·발송 표시, 관리자만 2026-10-10 */,'systemAlerts','systemBackups','systemBackupsIndex','systemRestoreLog',
   /* 2026-10-11 입금 알림: 서버 전용 노드에 시각 색인만 추가한다. 읽기·쓰기 허용은 없다. */
   'hanaSmsBridge',
   /* 2026-10-05 홈택스 세금계산서 아카이브 — PC 마다 IndexedDB 에만 있던 것을 모든 PC 가 같게(대표 지시

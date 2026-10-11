@@ -22,6 +22,8 @@
       /* 취업규칙 검토의 두 끝 (2026-09-26) — 우리 검토 기준 92개와, 그것이 기대는 법 조문.
          둘 다 업무 기록이 아니라 «참고표» 다(js/pu-rules-lawlink.js). 저장 자리가 없다. */
       ReviewCriterion:'검토 기준', LegalProvision:'법령 조문',
+      /* 정부지원금(2026-10-11) — 지원사업 사전 한 건 · (회사, 사업) 한 쌍에 대한 노무사의 검토 결정 */
+      SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -50,7 +52,9 @@
       attachedTo:['Document|MediaAsset|Message','Organization|Contract|Case|Project|Person'],
       ownedBy:['Document|MediaAsset|Message','Person'],
       transferredTo:['Task|Case|Project','Person'],
-      forOrganization:['Task|Document|MediaAsset|Message|PayrollRecord|Policy|Submission','Organization'],
+      forOrganization:['Task|Document|MediaAsset|Message|PayrollRecord|Policy|Submission|EligibilityReview','Organization'],
+      /* 정부지원금 검토 → 그 검토가 다룬 지원사업(2026-10-11) */
+      assessesProgram:['EligibilityReview','SupportProgram'],
       fulfills:['Submission','Contract|Case|Project'],
       supersedes:['Policy|Document','Policy|Document'],
       groundedIn:['ReviewCriterion','LegalProvision'],
@@ -198,6 +202,19 @@
       sharedRoots:['uid_roles','data/companies','data/contracts','pucards/idx'],
       writeContracts:[{path:'rehab_ad/marks/{id}',entityType:'Task'}],
       entityTypes:['Document','Task'] },
+    /* 정부지원금 — 지원사업 사전의 조건으로 기존·예비 고객사마다 후보를 계산하고 노무사가 검토한다(대표 지시 2026-10-11).
+       설계 docs/superpowers/specs/2026-10-11-govaid-design.md.
+       ★ 쓰는 것: programs(SupportProgram) · prospects(예비 고객 Organization — 업체관리 원장에 넣지 않는다) ·
+         extras(원장에 없는 보충값, Organization) · reviews(EligibilityReview — 판정이 아니라 사람의 결정만).
+       ★ 빌려 읽는 곳: data/companies(원장) · pubdata/co(국민연금·고용보험 인원, 사업자번호 열쇠) · uid_roles(사번·재직).
+       ⚠ 예비 고객 → 업체 연결은 사업자번호가 같을 때만(validateCompanyLink) — 이름으로 잇지 않는다. */
+    govaid:{ name:'정부지원금', file:'pu-govaid.html', primaryRoots:['govaid'],
+      sharedRoots:['data/companies','pubdata/co','uid_roles'],
+      writeContracts:[{path:'govaid/programs/{id}',entityType:'SupportProgram'},
+                      {path:'govaid/prospects/{id}',entityType:'Organization'},
+                      {path:'govaid/extras/{key}',entityType:'Organization'},
+                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'}],
+      entityTypes:['Organization','SupportProgram','EligibilityReview'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
@@ -435,6 +452,7 @@
        (tests/ontology-registry.test.js). 사전에 말만 늘어나는 것을 막는다. */
   var PREDICATES_PLANNED = {
     belongsToOrganization:'사람→사업장 재직 — 사업장 근로자에게 영구 번호가 없어 미룸(2026-09-03 대표 ①: 일·기록을 사업장에만 붙인다)',
+    assessesProgram:'정부지원금 검토→지원사업 — 1판은 앱 안에서만 본다(govaid_core in_app). 관계 색인은 2판에서 ID 관계만 넣는다(설계서 11절)',
     evidencedBy:'업무→증빙 — 사진첩 서류를 업무에 붙이는 일은 다음 단계',
     transferredTo:'업무 인계 — 인계 기록에 영구 ID가 아직 없다',
     fulfills:'계약 이행 — 어떤 일이 계약을 채웠는지 기준이 없다',
@@ -491,6 +509,9 @@
     /* 회생광고 — 관리자만 읽는 영업 대상 목록이다. 통합 진단에 섞지 않는다(그 앱 안에서만 본다). */
     rehab_core:{program:'rehabad',strategy:'in_app',path:'rehab_ad',parser:'coverage',
       gives:'회생 공고 기업·발송 표시 (관리자 전용 — 통합 진단에서 읽지 않는다)'},
+    /* 정부지원금 — 고객사 이름·인원·검토가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
+    govaid_core:{program:'govaid',strategy:'in_app',path:'govaid',parser:'coverage',
+      gives:'지원사업 사전·예비 고객·보충값·검토 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.

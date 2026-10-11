@@ -384,3 +384,28 @@ test('폰 일정 보기 — 주마다 「10월 4일~10일」 머리(일요일 �
   assert.match(캘, /날들\.push\('<div class="swk">' \+ 주글 \+ '<\/div>'\)/);
   assert.match(캘, /body\.mob \.swk\{display:block;font-size:14px;color:var\(--gtext\);padding:14px 16px 2px 73px\}/);
 });
+
+test('폰 새 일정 입력 — 구글 앱 캡처: 연도 포함 날짜 · 한국 표준시 줄 · 「반복 안함」 · 「사용자 추가」 · 「화상 회의 추가」 · 저장 #377aff', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /function 입력날짜글\(ymd\)/);
+  assert.match(캘, /줄\("public", '<span class="gtxt">한국 표준시<\/span>', "시간대"\)/);
+  assert.match(캘, /"반복 안함" : "반복 안 함"/);
+  assert.match(캘, /'사용자 추가 \(메일 — 여러 명은 쉼표로\)'/);
+  assert.match(캘, /'화상 회의 추가' : 'Google Meet 화상 회의 추가'/);
+  assert.match(캘, /data-theme="dark"\] body\.mob \.gform \.gsave\{background:#377aff;color:#ffffff/);
+});
+
+test('폰 일정 상세 — 구글 앱 캡처: 시트로 덮기 · 「내일 • 오전 12:15~1:15」 · 제목 28px', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /body\.mob \.modal\.det\{left:0;top:36px;transform:none;width:100%;max-width:none;height:calc\(100% - 36px\);max-height:none;border-radius:28px 28px 0 0/);
+  assert.match(캘, /언제 = 날말 \+ \(시 \? " • " \+ 시 : ""\)/);
+  assert.match(캘, /body\.mob \.dttl\{font-size:28px;line-height:36px\}/);
+  assert.match(캘, /body\.mob \.dtool \.dtb\[data-close\]\{order:-1;margin-right:auto\}/);
+});
+
+test('폰 새 일정 입력 — 캘린더 칩 줄(푸른노무법인 · 공용 / 나만 보기), 아래 선택 줄은 폰에서 뺀다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /<div class="gtabs gcalchips">/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-mvis'\)\)\{ modalRead\(\); S\.modal\.vis = t\.getAttribute\('data-mvis'\); render\(\); return; \}/);
+  assert.match(캘, /\? 달력힌트 : 줄\("calendar", 달력, "누가 보나"\) \+ 달력힌트/);
+});

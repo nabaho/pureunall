@@ -1167,6 +1167,18 @@ rules.pubdata_req = { $no: { '.write': MAIL,
     + " && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
   $other: { '.validate': "$other === 'at' || $other === 'k' || $other === 'nm'" } } };
 
+/* ══ 🎯 정부지원금(pu-govaid.html) — 지원사업 사전·예비 고객·보충값·검토 (2026-10-11) ══
+   설계 docs/superpowers/specs/2026-10-11-govaid-design.md 8·11절 · 대표 「노무사 전원 모두 가능」.
+   ⚠ 읽기·쓰기 = 재직 직원(LOGIN) — 업체관리 원장(data/companies)과 «같은 잣대»다. 원장보다 넓히지 않는다.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식(공용 관문 tombstone)으로만.
+   ⚠ 열쇠와 레코드 id 가 어긋나면 막는다 — 다른 자리에 남의 레코드를 덮어쓰지 못하게. */
+const GOVAID_W = `(${LOGIN}) && newData.exists()`;
+rules.govaid = { '.read': LOGIN,
+  programs:  { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
+  prospects: { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
+  extras:    { $k:  { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k" } },
+  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } } };
+
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
    ⚠ 읽기 = 관리자만. 누구에게 무엇을 보낼지는 대표가 정한다 — 직원 화면엔 안 보인다.
