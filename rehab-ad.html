@@ -91,6 +91,11 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .auto th,.auto td{padding:4px 8px;font-size:12px;border-bottom:1px solid var(--line);text-align:left;overflow:visible;white-space:normal}
 .auto .legal{color:var(--mute);font-size:11.5px;line-height:1.5;margin-top:6px}
 .auto input[type=text],.auto input[type=email]{padding:4px 8px;border:1px solid var(--line2);border-radius:8px;min-width:220px}
+.lgrow{display:flex;gap:6px;align-items:center;flex-wrap:wrap;padding:4px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.lgrow .d{font-variant-numeric:tabular-nums;color:var(--ink2);min-width:74px}
+.lgform{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
+.lgform input[type=text]{flex:1 1 140px;min-width:100px}
+td.lg{font-size:12px;color:var(--ink2)}
 .fsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:stretch}
 .fsteps>button{font-size:12px;padding:3px 10px;white-space:nowrap}
 .fs{border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
@@ -136,8 +141,8 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 #selbar label{font-size:12px;color:var(--ink2);display:flex;gap:4px;align-items:center}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,28vw,540px);gap:12px;align-items:start}
 .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
-table{border-collapse:collapse;width:100%;min-width:1260px;table-layout:fixed}
-col.c-ck{width:36px}col.c-no{width:44px}col.c-co{width:270px}col.c-pgm{width:128px}col.c-ceo{width:84px}col.c-tr{width:120px}col.c-rg{width:112px}col.c-ct2{width:196px}col.c-st{width:72px}col.c-ico{width:112px}col.c-stat{width:84px}
+table{border-collapse:collapse;width:100%;min-width:1410px;table-layout:fixed}
+col.c-ck{width:36px}col.c-no{width:44px}col.c-co{width:270px}col.c-pgm{width:128px}col.c-ceo{width:84px}col.c-tr{width:120px}col.c-rg{width:112px}col.c-ct2{width:196px}col.c-st{width:72px}col.c-ico{width:112px}col.c-stat{width:84px}col.c-log{width:150px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
 th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600}
 tbody tr{cursor:pointer}
@@ -264,6 +269,9 @@ td.ceo{}
     <select id="fTrade" aria-label="거래·연결">
       <option value="">거래·연결 전체</option><option value="client">계약·거래중</option><option value="cards">기업정보함 있음</option><option value="any">우리 자료에 있음(전체)</option><option value="none">연결 없음</option>
     </select>
+    <select id="fLog" aria-label="발송 기록">
+      <option value="">발송 기록 전체</option><option value="none">발송 기록 없음</option><option value="sent">발송 기록 있음</option><option value="resp">반응 있음(문의·상담·계약)</option><option value="bad">반송·수신거부</option>
+    </select>
     <select id="fSort" aria-label="정렬">
       <option value="date">공고일 최신순</option><option value="trade">거래·연결 있는 순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
     </select>
@@ -306,10 +314,10 @@ td.ceo{}
   <div class="layout">
     <div class="tbl" id="tblbox">
       <table>
-        <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ct2"><col class="c-st"><col class="c-ico"><col class="c-stat"></colgroup>
+        <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ct2"><col class="c-st"><col class="c-ico"><col class="c-log"><col class="c-stat"></colgroup>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
-          <th class="no">번호</th><th class="co">회사명</th><th>공고(금지명령·파산선고)</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>상태</th>
+          <th class="no">번호</th><th class="co">회사명</th><th>공고(금지명령·파산선고)</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>법원·사건번호</th><th>단계</th><th>연락처</th><th>발송·반응</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -440,6 +448,73 @@ function statusOf(id){ var m=MARKS[id]; return (m && !m._deleted && STATUS[m.sta
 
 /* ── 연락처 합치기: 사람이 손으로 적은 것(marks.contact)이 서버가 찾은 것(info)보다 앞선다 ── */
 /* 포괄금지명령 공고일 — 이력(events)에서 찾고, 없으면 처음 공고일 */
+/* ═══ 발송 기록 — 언제·어떻게 보냈고 어떤 반응이 있었나 (marks/<id>/sendLog) ═══
+   한 회사에 여러 번 적을 수 있다(우편 → 전화 → 방문). 지우지 않고 쌓는다(최근 30건). */
+var SEND_METHODS=['우편','메일','팩스','전화','기타'];
+var REACTIONS=['','무응답','문의','상담','계약','반송','수신거부'];
+function logOf(id){ var m=MARKS[id]; var l=m&&m.sendLog; return Array.isArray(l)?l.filter(Boolean):(l&&typeof l==='object'?Object.keys(l).map(function(k){ return l[k]; }):[]); }
+function lastLog(id){ var l=logOf(id).slice().sort(function(a,b){ return String(b.d||'').localeCompare(String(a.d||'')); }); return l[0]||null; }
+function reactChip(r){ if(!r) return ''; var c=/문의|상담|계약/.test(r)?'c-green':/반송|수신거부/.test(r)?'c-red':'c-gray'; return '<span class="chip '+c+'" style="margin-left:0">'+esc(r)+'</span>'; }
+function logCell(id){
+  var x=lastLog(id), n=logOf(id).length;
+  if(!x) return '<span style="color:var(--line2)">—</span>';
+  return esc(String(x.d||'').slice(5)+' '+(x.m||''))+(x.r?' '+reactChip(x.r):'')+(n>1?' <span style="color:var(--mute)">외 '+(n-1)+'</span>':'');
+}
+function logSection(n){
+  var id=n.id, all=logOf(id).map(function(x,i){ return { x:x, i:i }; }).sort(function(a,b){ return String(b.x.d||'').localeCompare(String(a.x.d||'')); });
+  var rows=all.map(function(o){
+    return '<div class="lgrow"><span class="d">'+esc(o.x.d||'')+'</span><b>'+esc(o.x.m||'')+'</b>'+
+      '<select onchange="setLogReaction('+o.i+',this.value)" aria-label="반응">'+REACTIONS.map(function(r){ return '<option value="'+esc(r)+'"'+(r===(o.x.r||'')?' selected':'')+'>'+(r||'반응 없음 표시')+'</option>'; }).join('')+'</select>'+
+      '<span style="flex:1;color:var(--ink2)">'+esc(o.x.n||'')+'</span>'+
+      '<button class="sm" onclick="delLog('+o.i+')" title="이 기록 지우기">✕</button></div>';
+  }).join('');
+  return '<div class="sec"><h3>발송 기록</h3>'+(rows||'<div style="color:var(--mute);font-size:12.5px">아직 기록이 없습니다 — 보낸 뒤 아래에 적어 두세요</div>')+
+    '<div class="lgform"><input type="date" id="lgDate" value="'+seoulToday()+'" aria-label="발송일">'+
+    '<select id="lgMethod" aria-label="방법">'+SEND_METHODS.map(function(m){ return '<option>'+m+'</option>'; }).join('')+'</select>'+
+    '<select id="lgReact" aria-label="반응">'+REACTIONS.map(function(r){ return '<option value="'+esc(r)+'">'+(r||'반응 아직 없음')+'</option>'; }).join('')+'</select>'+
+    '<input type="text" id="lgMemo" maxlength="200" placeholder="메모(누구와 통화, 반송 사유 등)">'+
+    '<label style="font-size:12px"><input type="checkbox" id="lgSent" checked> 「발송 완료」로도 표시</label>'+
+    '<button class="pri sm" onclick="addLog()">기록 추가</button></div></div>';
+}
+async function addLog(){
+  if(!CUR) return;
+  var d=$('lgDate').value, e={ d:d, m:$('lgMethod').value, r:$('lgReact').value, n:$('lgMemo').value.trim().slice(0,200) };
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ toast('발송일을 골라 주세요'); return; }
+  var markSent=$('lgSent').checked, id=CUR;
+  try{
+    await saveMark(id, function(prev,now){
+      var l=Array.isArray(prev.sendLog)?prev.sendLog.slice():[];
+      l.push(e); var out={ sendLog:l.slice(-30) };
+      if(markSent && prev.status!=='sent'){ out.status='sent'; out.statusAt=now; out.sentAt=now; }
+      return out;
+    });
+    await loadMarks(); draw(); toast('발송 기록을 남겼습니다');
+    if(e.r==='수신거부') offerOptout(id);
+  }catch(err){ toast('저장하지 못했습니다: '+(err&&err.message||err)); }
+}
+async function setLogReaction(i, r){
+  var id=CUR; if(!id) return;
+  try{
+    await saveMark(id, function(prev){ var l=Array.isArray(prev.sendLog)?prev.sendLog.slice():[]; if(l[i]) l[i]=Object.assign({}, l[i], { r:r }); return { sendLog:l }; });
+    await loadMarks(); draw(); toast('반응을 바꿨습니다');
+    if(r==='수신거부') offerOptout(id);
+  }catch(err){ toast('저장하지 못했습니다: '+(err&&err.message||err)); }
+}
+async function delLog(i){
+  var id=CUR; if(!id || !confirm('이 발송 기록을 지울까요?')) return;
+  try{
+    await saveMark(id, function(prev){ var l=Array.isArray(prev.sendLog)?prev.sendLog.slice():[]; l.splice(i,1); return { sendLog:l }; });
+    await loadMarks(); draw(); toast('지웠습니다');
+  }catch(err){ toast('저장하지 못했습니다: '+(err&&err.message||err)); }
+}
+/* 「수신거부」 반응이면 그 회사의 메일을 자동 발송 수신거부 명단에도 올릴지 묻는다 */
+function offerOptout(id){
+  var mails=uniq(contactOf(id).emails.concat(((MATCH[id]||{}).emails||[]).map(function(e){ return e.email; })));
+  if(!mails.length){ toast('수신거부로 기록했습니다 — 이 회사의 메일 주소는 알려진 것이 없습니다'); return; }
+  if(!confirm('수신거부 반응입니다. 자동 발송 수신거부 명단에도 넣을까요?\n\n'+mails.join('\n'))) return;
+  mails.forEach(function(m){ autoCall({ action:'optout', email:m }, ''); });
+  toast('수신거부 명단에 넣었습니다');
+}
 function isBk(n){ return n && n.kind==='bankruptcy'; }
 function pgmDate(n){
   var re=isBk(n)?/파산선고/:/포괄적\s*금지명령/;
@@ -489,6 +564,12 @@ function baseList(skip){
     if(stage && n.stage!==stage) return false;
     if(ct){ var c=contactOf(n.id); if(ct==='has' && !c.any) return false; if(ct==='none' && c.any) return false; if(ct==='check' && !c.check) return false; }
     if(tr){ var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(tr==='client' && !(b&&b.kind==='client')) return false; if(tr==='cards' && !(b&&b.kind==='cards')) return false; if(tr==='any' && !b) return false; if(tr==='none' && b) return false; }
+    var lgf=$('fLog').value;
+    if(lgf){ var LG=logOf(n.id);
+      if(lgf==='none' && LG.length) return false;
+      if(lgf==='sent' && !LG.length) return false;
+      if(lgf==='resp' && !LG.some(function(x){ return /문의|상담|계약/.test(x.r||''); })) return false;
+      if(lgf==='bad' && !LG.some(function(x){ return /반송|수신거부/.test(x.r||''); })) return false; }
     if(q && ((n.debtorName||'')+' '+(n.address||'')+' '+(n.counsel||'')+' '+(n.dlvAddress||'')+' '+ceoOf(n.id).name).toLowerCase().indexOf(q)<0) return false;
     return true;
   });
@@ -550,7 +631,7 @@ function iconsOf(c){
 function draw(){
   var base=baseList(); drawTabs(base); drawFunnel(base);
   VIEW=sortList(base.filter(function(n){ return TAB==='all' || statusOf(n.id)===TAB; }));
-  var sig=['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fSort','fText'].map(function(id){ return $(id).value; }).join('|')+'|'+TAB+'|'+DATE;
+  var sig=['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fLog','fSort','fText'].map(function(id){ return $(id).value; }).join('|')+'|'+TAB+'|'+DATE;
   if(sig!==SIG){ SIG=sig; PG=0; }
   var pages=Math.max(1,Math.ceil(VIEW.length/PSIZE)); if(PG>=pages) PG=pages-1; if(PG<0) PG=0;
   var from=PG*PSIZE, shown=VIEW.slice(from,from+PSIZE);
@@ -568,7 +649,7 @@ function draw(){
       '<td class="rg">'+esc((n.sido||'')+(n.sigungu?' '+n.sigungu:''))+'</td><td>'+esc(courtShort(n)+' '+n.caseNo)+'</td>'+
       '<td><span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span></td>'+
       '<td class="ct">'+iconsOf(c)+(c.check?'<span class="chip c-amber" title="확인 필요">⚠</span>':'')+'</td>'+
-      '<td><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td></tr>';
+      '<td class="lg">'+logCell(n.id)+'</td><td><span class="chip '+ST_CHIP[st]+'" style="margin-left:0">'+STATUS[st]+'</span></td></tr>';
   }).join('');
   $('rows').innerHTML=html;
   var e=$('empty');
@@ -684,6 +765,7 @@ function drawDetail(){
   h+='<div class="sec"><h3>홍보양식 (안내문) <span class="sp"></span><button class="sm" onclick="printOne(\'letters\')">🖨 인쇄·PDF</button></h3>'+
     '<button class="sm pri" onclick="openForm()">📄 '+esc(n.debtorName)+' 앞 안내문·메일 본문 크게 보기</button>'+
     '<div style="font-size:11.5px;color:var(--mute);margin-top:4px">우편으로 보낼 때는 이 안내문을 인쇄하고, 메일로 보낼 때는 인쇄창에서 PDF로 저장해 푸른 메일에 첨부하세요.</div></div>';
+  h+=logSection(n);
   h+='<div class="sec"><h3>상태</h3><div class="st-btns">'+['new','send','hold','skip','sent'].map(function(k){
     return '<button class="sm'+(st===k?' on':'')+'" onclick="setStatus(\''+esc(n.id)+'\',\''+k+'\')">'+STATUS[k]+'</button>'; }).join('')+'</div>'+
     '<div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap"><button class="sm" onclick="printOne(\'both\')">🖨 이 회사 안내문 + 라벨</button><button class="sm" onclick="printOne(\'letters\')">안내문만</button></div></div>';
@@ -850,11 +932,11 @@ function printDocs(what){ printList(VIEW.filter(function(n){ return SEL[n.id]; }
 function printOne(what){ var n=NOTICES[CUR]; if(n) printList([n], what); }
 function downloadCsv(){
   var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
-  var head=['포괄금지명령일','법원','사건번호','종류','단계','회사명','대표자','거래·연결','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','우리 자료의 메일','홈페이지','상태','메모'];
+  var head=['포괄금지명령일','법원','사건번호','종류','단계','회사명','대표자','거래·연결','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','우리 자료의 메일','홈페이지','최근 발송일','발송 방법','반응','상태','메모'];
   var q=function(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
-  var body=list.map(function(n){ var c=contactOf(n.id), m=MARKS[n.id]||{};
+  var body=list.map(function(n){ var c=contactOf(n.id), m=MARKS[n.id]||{}, lg=lastLog(n.id)||{};
     var bd=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null, own=((MATCH[n.id]||{}).emails||[]).map(function(e){ return e.email; });
-    return [pgmDate(n),n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,ceoOf(n.id).name,bd?bd.text:'',n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),own.join(' / '),c.homepage,STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
+    return [pgmDate(n),n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,ceoOf(n.id).name,bd?bd.text:'',n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),own.join(' / '),c.homepage,lg.d||'',lg.m||'',lg.r||'',STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
   var blob=new Blob(['﻿'+[head.join(',')].concat(body).join('\r\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_'+seoulToday()+'_'+list.length+'곳.csv';
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
@@ -870,7 +952,7 @@ async function reload(){
     loadLinks(); loadAuto();
   }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
 }
-function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; draw(); }
+function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fLog').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; draw(); }
 function clearSel(){ SEL={}; draw(); }
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
@@ -884,7 +966,7 @@ function copyText(t){
   toast('복사했습니다');
 }
 function boot(){
-  ['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
+  ['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fLog','fSort'].forEach(function(id){ $(id).addEventListener('change',function(){ lsSet(id,$(id).value); draw(); }); });
   $('fText').addEventListener('input',draw);
   $('pager').addEventListener('click',function(e){ var b=e.target.closest('[data-pg]'); if(!b) return; PG+=Number(b.getAttribute('data-pg')); draw(); $('tblbox').scrollTop=0; });
   $('pager').addEventListener('change',function(e){ if(e.target.id==='pgSize'){ PSIZE=Number(e.target.value)||50; lsSet('pgSize',String(PSIZE)); PG=0; draw(); } });
