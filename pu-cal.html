@@ -2726,6 +2726,8 @@ function 폰일정Html(eumOnly){
           var 시작 = 시각글(e.time), 끝 = 시각글(시분(e.endAt));
           언제 = 시작 + "~" + (시작.slice(0, 2) === 끝.slice(0, 2) ? 끝.slice(3) : 끝);
         }
+        /* 장소가 있으면 시각 앞에 «장소, 시각» — 구글 앱 일정 보기 캡처(「세종 전의면 미래산단4로 105, 오전 1:30~2:30」) */
+        if(e.place) 언제 = String(e.place).trim() + (언제 ? ", " + 언제 : "");
       }
       var 제목 = String(e.text || "");
       if(e.kind === "priv") 제목 = "🔒 " + 제목;

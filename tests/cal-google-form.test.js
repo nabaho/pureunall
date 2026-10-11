@@ -366,3 +366,8 @@ test('폰 일정 보기 카드 — 종일은 제목 한 줄, 시각은 「오전
   assert.match(캘, /언제 = 시작 \+ "~" \+ \(시작\.slice\(0, 2\) === 끝\.slice\(0, 2\) \? 끝\.slice\(3\) : 끝\);/);
   assert.match(캘, /\(언제 \? '<span>' \+ esc\(언제\) \+ '<\/span>' : ''\)/);
 });
+
+test('폰 일정 보기 카드 — 장소가 있으면 「장소, 시각」', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /if\(e\.place\) 언제 = String\(e\.place\)\.trim\(\) \+ \(언제 \? ", " \+ 언제 : ""\);/);
+});
