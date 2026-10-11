@@ -1079,7 +1079,7 @@ test('★ 덩어리 높이는 «재서» 알린다 — 보이는 덩어리만 ·
   assert.match(sync, /querySelectorAll\('\.tab-stick'\)[\s\S]*?setProperty\('--tstickH'/);
   assert.match(sync, /if\(th\) root\.style\.setProperty/, '숨은 탭(높이 0)이 값을 0 으로 덮으면 안 된다');
   const watch = src.slice(src.indexOf('function recStickyWatch'), src.indexOf('function boot'));
-  assert.match(watch, /querySelectorAll\('\.tab-stick'\)[\s\S]*?ro\.observe\(el\)/);
+  assert.match(watch, /querySelectorAll\('\.tab-stick,#recPaneHist>\.bar'\)[\s\S]*?ro\.observe\(el\)/, '공고·발주 덩어리와 지원 이력 단추 줄 모두 크기 변화를 지켜본다');
   const st = src.slice(src.indexOf('function setTab'), src.indexOf("lsSet('tab', t)"));
   assert.match(st, /\n  recStickySync\(\);/, '탭마다 다시 재야 한다(공고 79px ↔ 발주 46px)');
   assert.doesNotMatch(st, /if\(t==='rec'\)\{[^}]*recStickySync/, '컨설턴트 모집 탭에서만 재면 다른 탭이 옛 높이를 쓴다');
