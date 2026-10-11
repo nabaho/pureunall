@@ -113,7 +113,7 @@ test('④⑤ 처리 — 머리 날짜는 일 보기로 · 빈 칸은 «누른 �
   assert.ok(잼 > 0 && 열기 > 잼, '★ 누른 위치를 창을 띄운 «뒤»에 잽니다 — 판이 다시 그려져 엉뚱한 시각이 들어갑니다');
   assert.match(길, /Math\.min\(1439, \(e\.clientY/, '밤 11시 30분 칸까지 눌려야 합니다');
   assert.match(캘린더, /var 옛격자 = document\.querySelector\('\.tgscroll'\)/, '다시 그릴 때 보던 높이를 안 지킵니다');
-  assert.match(캘린더, /if\(S\.view === 'week' \|\| S\.view === 'day'\) S\.gridScroll = true;/, '들어올 때 지금 근처로 안 내려갑니다');
+  assert.match(캘린더, /if\(S\.view === 'week' \|\| S\.view === 'day' \|\| S\.view === '3day'\) S\.gridScroll = true;/, '들어올 때 지금 근처로 안 내려갑니다');
   assert.match(함수몸('function weekHtml(eumOnly){'), /격자Html\(weekDays\(S\.date\), eumOnly\)/);
   assert.match(함수몸('function dayHtml(eumOnly){'), /격자Html\(\[S\.date\], eumOnly\)/);
 });
