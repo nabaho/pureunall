@@ -54,6 +54,7 @@ function plan(a) {
   Object.keys(a.notices || {}).forEach((id) => {
     const n = a.notices[id];
     if (!n || n._deleted || !n.debtorName) return;
+    if (n.kind === "bankruptcy") return;   // 파산 안내는 광고 메일로 자동 발송하지 않는다 — 우편만
     if (String(n.noticeDate || "") < since) return;                               // 오래된 공고는 대상이 아니다(조용히)
     const skip = (reason) => skipped.push({ id: id, name: n.debtorName, reason: reason });
     const mk = marks[id] || {};

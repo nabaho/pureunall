@@ -1344,7 +1344,8 @@ exports.rehabWatch = functions
     const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
     const today = new Date(nowMs + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
     const first = !(await root.child("runs").limitToFirst(1).once("value")).exists();
-    const since = new Date(nowMs + 9 * 3600e3 - (first ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면 한 달 치
+    const noBankruptcyYet = !Object.keys(existing).some((k) => existing[k] && existing[k].kind === "bankruptcy");
+    const since = new Date(nowMs + 9 * 3600e3 - ((first || noBankruptcyYet) ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면(파산을 처음 모을 때도) 한 달 치
     const post = async (u, body) => {
       const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
         headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });

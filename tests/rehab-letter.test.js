@@ -104,3 +104,17 @@ test('⑪ 광고성 메일 — 제목 앞 (광고), 본문 첫 줄 (광고), 보
   assert.match(m.text, /평소 푸른노무법인과 거래해 주셔서/);
   assert.match(m.text, /홍길동 대표이사님께/);
 });
+
+test('⑫ 파산 공고(kind: bankruptcy)는 대지급금 한 가지만 — 회생 문구·바우처 비용이 없다', () => {
+  const c = co('주식회사 가나', { kind: 'bankruptcy' });
+  const h = L.buildLetter(c, { draft: true });
+  assert.match(h, /파산절차 중 근로자 임금/);
+  assert.match(h, /파산관재인 · 대표이사님 귀하/);
+  assert.match(h, /도산대지급금/); assert.match(h, /3,150만원/);
+  assert.ok(!/회생절차/.test(h) && !/12만원/.test(h) && !/재기컨설팅/.test(h), '회생·바우처 문구가 섞이면 안 된다');
+  assert.match(h, /원하지 않으시면 알려 주십시오/);
+  const p = L.buildPlainText(c, { ceo: '홍길동' });
+  assert.match(p, /파산관재인 · 홍길동 대표이사님께/); assert.ok(!/12만원/.test(p));
+  assert.ok(L.buildMailBody(c, {}).length > 50);
+  assert.match(L.buildLetter(co('주식회사 가나')), /회생절차 중 근로자 임금/, '회생 안내문은 그대로');
+});
