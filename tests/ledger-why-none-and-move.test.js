@@ -111,7 +111,8 @@ console.log('\n[⑦ 업체 바꾸기 — 되돌리기와 다르다]');
    이것은 앞 업체를 물리고 새 업체로 «한 번에» 다시 붙인다. */
 const MOVE = grab('movePop && (function(){', '// ── 4-3 비교 수정 팝업');
 t('업체 바꾸기 구역을 잘라냈다', MOVE.length > 2000, true);
-t('★ 앞 확정을 먼저 무른다', /if\(!erpUndoIncome\(fi\)\)\{ showToast\('❌ 앞 확정을 되돌리지 못했습니다'\); return; \}/.test(MOVE), true);
+/* 무르기가 실패하면 그 자리에서 멈춘다 — 안내 글(마감이면 마감 안내가 먼저 뜬다)은 규칙이 아니다 */
+t('★ 앞 확정을 먼저 무른다', /if\(!erpUndoIncome\(fi\)\)\{[^}]*showToast\('❌ 앞 확정을 되돌리지 못했습니다'\); return; \}/.test(MOVE), true);
 t('되돌리기가 실패하면 옮기지 않는다 (둘 다 살아 있으면 돈이 두 번 잡힌다)',
   /erpUndoIncome\(fi\)\)\{[\s\S]{0,80}?return; \}[\s\S]{0,400}?saveIncome/.test(MOVE), true);
 t('★ 성과급을 새 업체 담당자로 다시 나눈다 (대표 선택)', /saveIncome\([\s\S]{0,90}?withPerf:true/.test(MOVE), true);

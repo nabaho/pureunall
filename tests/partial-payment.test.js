@@ -133,7 +133,8 @@ has('미입금 판단이 erpPaidSoFar 를 쓴다',
 has('거래내역 후보가 그 판단을 쓴다', /erpUnpaidParts\(it\)\.forEach\(function\(u\)\{[\s\S]{0,400}?paidAmount:u\.paid/);
 has('미수금관리가 받은 돈을 뺀다', /function _remain\(item, fee, kindLabel, legacyField\)/);
 has('미수금 배지도 같은 셈', /function _left\(item, fee, kindLabel, legacyField\)/);
-has('자문료를 금액으로 센다', /paidAmt\[_k\] = \(paidAmt\[_k\] \|\| 0\) \+ \(parseInt\(i\.amount, 10\) \|\| 0\)/);
+/* 받았는지(있다/없다)가 아니라 «금액을 더해» 센다 — 잣대는 공용 판정 erpAdvisoryPaidFor (2026-10-11) */
+has('자문료를 금액으로 센다', /erpAdvisoryPaidFor\(co, ym, _advIdx\)\.reduce\(function\(s, i\)\{ return s \+ \(parseInt\(i\.amount, 10\) \|\| 0\); \}, 0\)/);
 has('자문료 잔금은 받을 달로 기록', /advisoryYm: isAdv \? \(pItem\.ym \|\| String\(paidDate\)\.slice\(0,7\)\)/);
 has('업체 월 표가 부분입금을 가려낸다', /function paidInfo\(\w+, month, fee\)/);   // 첫 칸은 업체 기록 또는 이름(2026-10-04)
 has('부분입금 달은 ◐ 로 보인다', /pInf\.partial[\s\S]{0,400}?'◐'/);
