@@ -48,6 +48,18 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-
 .tag.red{background:var(--bg);color:var(--red);border:1px solid var(--red)}
 .tag.amber{background:var(--bg);color:var(--amber);border:1px solid var(--amber)}
 .bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+/* 공고 모아보기 머리 — «딱 두 줄»(대표 지시 2026-10-11 「셀 너무 많다 정렬해달라 2줄로」).
+   첫 줄 = 검색·거르개 셋·건수·표시·단추 / 둘째 줄 = 찾는 말 알약(넘치면 옆으로 민다 — 줄을 늘리지 않는다).
+   ⚠ 1400px 아래(폰·좁은 창)는 예전처럼 줄바꿈을 허용한다 — 못 줄이는 칸을 억지로 밀면 단추가 잘린다. */
+@media (min-width:1400px){
+  #pgFeed .card>.bar:first-child{flex-wrap:nowrap;white-space:nowrap}
+  #pgFeed .card>.bar:first-child #q{flex:1 1 150px;min-width:110px;max-width:260px}
+  #pgFeed .card>.bar:first-child>*{flex-shrink:0}
+  #pgFeed .card>.bar:first-child #q{flex-shrink:1}
+  #pgFeed #cnt{font-size:12px}
+  #kwBox{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding-bottom:3px;margin-bottom:6px}
+  #kwBox>*{flex:none}
+}
 input,select{padding:6px 9px;border:1px solid var(--border);border-radius:7px;
   font-family:inherit;font-size:12.5px;background:var(--card);color:var(--text)}
 table{width:100%;border-collapse:collapse;font-size:12.5px}
@@ -390,10 +402,10 @@ table.cmp td{white-space:nowrap}
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=2"></script>
-<script src="js/gov-g2b.js?v=6"></script>
+<script src="js/gov-g2b.js?v=7"></script>
 <script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
-<script src="js/gov-bizinfo.js?v=2"></script>
+<script src="js/gov-bizinfo.js?v=3"></script>
 <script src="js/gov-recruit.js?v=6"></script>
 <script src="js/gov-submit.js?v=3"></script>
 <script src="js/gov-sync.js?v=7"></script>
@@ -547,6 +559,13 @@ async function _fetchAll(){
              field:GovBizinfo.FIELDS_DEFAULT[i], regions:GovBizinfo.REGIONS_DEFAULT, count:200})));
         if(b.ok) got=got.concat(b.rows); else { errs.push('기업마당: '+b.err); break; } }
       catch(e){ errs.push('기업마당: 받지 못했습니다'); break; }
+    }
+    /* 전국 공고도 한 번 더 — 「한국콘텐츠진흥원 노무 컨설팅」처럼 지역 태그가 없는 전국 공고가 위 지역 거르기에 빠졌다(대표 지시 2026-10-11).
+       ⚠ 이 둘째 길은 «덤»이다 — 실패해도 위 결과·오류 표시에 영향 없이 조용히 넘어간다. 걸러내기(judgeBiz)가 노무 말을 가린다. */
+    for(var j=0;j<GovBizinfo.FIELDS_DEFAULT.length;j++){
+      try{ var nb=GovBizinfo.parse(await pull(GovBizinfo.buildUrl({key:kb, field:GovBizinfo.FIELDS_DEFAULT[j], count:GovBizinfo.NATION_COUNT})));
+        if(nb.ok) got=got.concat(nb.rows); }
+      catch(e){}
     }
   }
   var buf=get('feed');   /* ⚠ 다 받은 «뒤»에 읽는다(검토 2026-10-04) */

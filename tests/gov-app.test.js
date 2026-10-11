@@ -1003,3 +1003,23 @@ test('★ 보기를 바꾸면 첫 쪽으로(링크로 가든 고르개로 가든
   r.api.planView('past');
   assert.equal(planRowsOf(r.el('ptb').innerHTML), 50); assert.match(r.el('ptb').innerHTML, /<td class="rn">1<\/td>/, '쪽 번호가 따라오면 101번부터 보인다');
 });
+
+test('★★ 기업마당 전국 둘째 길 — 지역 태그 없는 전국 공고(한국콘텐츠진흥원 노무 컨설팅)를 받되, 실패해도 첫째 길 결과·오류를 건드리지 않는다', () => {
+  const a = src.indexOf('regions:GovBizinfo.REGIONS_DEFAULT');
+  const b = src.indexOf('NATION_COUNT', a);
+  assert.ok(a > 0 && b > a, '지역 길 뒤에 전국 길이 없다');
+  const seg = src.slice(b - 260, b + 320);
+  assert.ok(seg.indexOf('regions') < 0, '전국 길에 지역 거르기가 남아 있다');
+  assert.match(seg, /catch\(e\)\{\}/, '전국 길은 실패를 조용히 넘겨야 한다(첫째 길 오류 표시를 안 건드림)');
+  assert.ok(seg.indexOf('errs.push') < 0, '전국 길이 오류 표시를 만들면 안 된다');
+});
+
+test('★ 공고 모아보기 머리는 넓은 화면에서 «딱 두 줄» — 첫 줄은 줄바꿈 없이, 찾는 말 알약은 옆으로 민다(줄을 늘리지 않는다)', () => {
+  const m = src.match(/@media \(min-width:1400px\)\{[\s\S]*?\n\}/);
+  assert.ok(m, '1400px 이상 두 줄 규칙이 없다');
+  const css = m[0];
+  assert.match(css, /#pgFeed \.card>\.bar:first-child\{flex-wrap:nowrap/, '첫 줄이 줄바꿈을 허용한다');
+  assert.match(css, /#q\{flex:1 1 150px/, '검색창이 줄어들 수 있어야 한 줄에 들어간다');
+  assert.match(css, /#kwBox\{flex-wrap:nowrap;overflow-x:auto/, '찾는 말이 줄바꿈하면 세 줄이 된다');
+  assert.match(css, /#kwBox>\*\{flex:none\}/, '알약이 찌그러지면 안 된다');
+});
