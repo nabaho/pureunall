@@ -3951,6 +3951,9 @@ function detailHtml(){
               + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
         : "")
+    /* ★ 폰 — 구글 앱 일정 상세의 맨 아래 「캘린더」 줄(캡처: 달력 아이콘 + 「내 캘린더 / 메일」). 우리는 공용 구글 달력 이름 */
+    + ((typeof 폰 === "function" && 폰() && d.kind === "gcal")
+        ? '<div class="drows"><div class="drow"><span class="di">' + 선아이콘("calendar") + '</span><span class="dt">푸른노무법인</span></div></div>' : "")
     + (d.hint || []).map(function(h){ return '<div class="dhint">' + esc(h) + '</div>'; }).join("")
     /* 구글에서 나머지(참석자·첨부·회의·알림·반복)를 받는 중·못 받음·연결 안 됨 — 숨기지 않고 말한다 */
     + (d.kind === "gcal" && d.loading ? '<div class="dhint">⏳ 참석자·첨부·알림을 구글에서 받는 중…</div>' : "")

@@ -409,3 +409,8 @@ test('폰 새 일정 입력 — 캘린더 칩 줄(푸른노무법인 · 공용 /
   assert.match(캘, /if\(t\.hasAttribute\('data-mvis'\)\)\{ modalRead\(\); S\.modal\.vis = t\.getAttribute\('data-mvis'\); render\(\); return; \}/);
   assert.match(캘, /\? 달력힌트 : 줄\("calendar", 달력, "누가 보나"\) \+ 달력힌트/);
 });
+
+test('폰 일정 상세 — 구글 일정에는 맨 아래 「캘린더」 줄(푸른노무법인)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /d\.kind === "gcal"\)\s*\? '<div class="drows"><div class="drow"><span class="di">' \+ 선아이콘\("calendar"\) \+ '<\/span><span class="dt">푸른노무법인<\/span>/);
+});
