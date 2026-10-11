@@ -300,3 +300,10 @@ test('폰 새 일정 단추 — 구글 앱처럼 오른쪽 아래에 뜬 둥근 
   assert.match(캘, /data-theme="dark"\] body\.mob \.mplus\{background:#304678;color:#d9e2ff\}/);
   assert.match(캘, /<button class="mtoday" data-mv="0" title="오늘">/);
 });
+
+test('폰 머리 — 구글 앱처럼 ☰ 가 왼쪽 맨 앞, 그다음 제목', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  const i = 캘.indexOf('function 폰머리Html(){');
+  const 몸 = 캘.slice(i, i + 3500);
+  assert.ok(몸.indexOf('class="mmenu"') > 0 && 몸.indexOf('class="mmenu"') < 몸.indexOf('class="mtt"'), '☰ 가 제목보다 앞이어야 합니다');
+});
