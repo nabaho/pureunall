@@ -14,7 +14,10 @@
  *   이알피 계약: k1 (주)가나상사 03 (2026-05-01~09-30, 담당 P-009) · k2 다라정밀 04 (담당 P-404 = 명부에 없음) — 마바산업은 계약 없음
  * 서류 진행 기록(2026-10-10, 설계 2026-10-10-gov-report-track-design.md) — scal_docs
  *   c2 다라정밀 t3_2026 sign 진행(발송 09-20, 회신 없음 → 20일째) · c3 마바산업 t4_2026 sign 완료 · attach 해당없음 · submit 완료
- *   c1 가나상사 t1_2026 은 기록 없음(기한 09-30 지남) */
+ *   c1 가나상사 t1_2026 은 기록 없음(기한 09-30 지남)
+ * 받은 서류함(2026-10-11, 설계 2026-10-11-gov-report-inbox-design.md) — 업체관리 data/companies · 메일함 거울 mailbox
+ *   m1 (주)가나상사(gana@·gana.hong@) · m9 먼저상사(shared@) · m2 다라정밀(dara@ · shared@ 는 먼저상사 것 · office@pureun.kr 은 우리 주소)
+ *   다라정밀 후보 = 201 보낸(10-01) · 107(09-29) · 102(09-26 급여대장 → 개인 자료) · 101(09-25 서명본) — 103 첨부 0 · 104 기간 밖 · 105 남의 주소 · 301 스팸 */
 function seed() {
   return {
     scal_staff: [{ id: 'a1', name: '홍길동' }, { id: 'a2', name: '김가나' }],
@@ -64,6 +67,12 @@ function seed() {
     },
     data: {
       user_dir: [{ sid: 'P-009', name: '홍길동', status: 'active' }, { sid: 'P-010', name: '김가나', status: 'retired' }],
+      companies: { u: 1, v: [
+        { id: 'm1', name: '(주)가나상사', bizNo: '000-00-00001', email: 'gana@example.com', contacts: [{ name: '홍길동', email: 'gana.hong@example.com' }] },
+        { id: 'm9', name: '먼저상사', email: 'shared@example.com' },
+        { id: 'm2', name: '다라정밀', primaryContactEmail: 'dara@example.com',
+          contacts: [{ name: '김가나', email: 'shared@example.com' }, { name: '우리 담당', email: 'office@pureun.kr' }] },
+      ] },
       biz_cons_types: { u: 1, v: [
         { code: 'consulting-01', name: '현장클리닉', short: '클리닉', agency: '비즈니스지원단(중기청)', sortOrder: 1 },
         { code: 'consulting-02', name: '일터상생혁신컨설팅', short: '일터', agency: '', sortOrder: 2 },
@@ -93,6 +102,31 @@ function seed() {
         attach: { st: 'na', by: '김가나', at: Date.UTC(2026, 4, 25, 3) },
         submit: { st: 'done', gotAt: '2026-05-28', how: 'mail', ack: true, by: '김가나', at: Date.UTC(2026, 4, 28, 3), note: '접수 메일 받음' },
       } } },
+    },
+    mailbox: {
+      folders: {
+        'INBOX-0a1b2c3d': { path: 'INBOX', name: '받은메일함', kind: 'inbox' },
+        'Sent-1b2c3d4e': { path: 'Sent', name: '보낸메일함', kind: 'sent' },
+        'Spam-2c3d4e5f': { path: 'Spam', name: '스팸편지함', kind: 'spam' },
+        'Trash-3d4e5f6a': { path: 'Trash', name: '휴지통', kind: 'trash', nomsg: 1 },
+      },
+      msgs: {
+        'INBOX-0a1b2c3d': {
+          101: { u: 101, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '서명본 보내드립니다', d: Date.UTC(2026, 8, 25, 1), a: 2, an: ['서명본.hwpx', '확인서.pdf'] },
+          102: { u: 102, f: '다라정밀 담당', e: 'DARA@example.com', t: 'office@pureun.kr', s: '자료 보냅니다', d: Date.UTC(2026, 8, 26, 1), a: 1, an: ['9월 급여대장.xlsx'] },
+          103: { u: 103, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '첨부 없음', d: Date.UTC(2026, 8, 27, 1), a: 0 },
+          104: { u: 104, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '기간 밖', d: Date.UTC(2026, 5, 1, 1), a: 1, an: ['옛것.pdf'] },
+          105: { u: 105, f: '먼저상사', e: 'shared@example.com', t: 'office@pureun.kr', s: '다른 업체 주소', d: Date.UTC(2026, 8, 28, 1), a: 1, an: ['남의것.pdf'] },
+          106: { u: 106, f: '가나상사 홍길동', e: 'gana.hong@example.com', t: 'office@pureun.kr', s: '자문 일지 회신', d: Date.UTC(2026, 6, 20, 1), a: 1, an: ['자문일지.pdf'] },
+          107: { u: 107, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '현장 사진', d: Date.UTC(2026, 8, 29, 1), a: 2, an: ['현장.jpg', '압축.zip'] },
+        },
+        'Sent-1b2c3d4e': {
+          201: { u: 201, f: '푸른노무법인', e: 'office@pureun.kr', t: 'x@example.org,dara@example.com', tn: '외부', s: '보고서 초안 보내드립니다', d: Date.UTC(2026, 9, 1, 1), a: 2, an: ['보고서 초안.pdf', '점검표.xlsx'] },
+        },
+        'Spam-2c3d4e5f': {
+          301: { u: 301, f: '스팸', e: 'dara@example.com', t: 'office@pureun.kr', s: '스팸', d: Date.UTC(2026, 8, 30, 1), a: 1, an: ['스팸.pdf'] },
+        },
+      },
     },
   };
 }

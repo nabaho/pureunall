@@ -11,6 +11,9 @@
        줄 하나 .set 을 통과시킨다. update 는 관문이 «부분 update» 로 막는다(그래서 쓰지 않는다).
    ⚠ 규칙(scripts/make-firebase-rules.js scal_docs)과 같은 값을 쓴다 — 상태 다섯 · 방식 넷 · 메모 200자 · 이름 40자 · 키 꼴.
      한쪽만 바꾸면 화면이 «된다»고 보인 것을 서버가 거절한다(tests/gov-report-rules.test.js 가 맞춰 본다).
+   ★ 받은 서류 연결(2026-10-11, 설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md §3) — 줄에 선택 칸 link 하나:
+     { src:'mail', key:1~80자, name?:≤100자, date?:'YYYY-MM-DD' }. 읽을 때 틀린 link 는 버리고(줄은 남긴다) 이름은 자른다.
+     화면 grSaveCell 은 줄 전체를 .set 하므로, 상태만 고치는 저장이 link 를 지우지 않게 nextLink(옛 줄, 요청)로 이어 받는다.
    ⚠ 저장소는 공개다 — 검사는 합성 자료만 쓴다. */
 (function (root) {
   var STATES = ['none', 'doing', 'done', 'blocked', 'na'];
@@ -28,6 +31,9 @@
   var KEY_RE = /^[a-z]+(:[0-9]+)?$/;
   var SAVE_FAIL = '저장하지 못했습니다 — 규칙 게시 또는 권한 확인';
   var LOAD_FAIL = '기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인';
+  /* 받은 서류 연결 — 규칙(scal_docs …/$key/link)과 같은 값 */
+  var LINK_SRC = 'mail', LINK_KEY_MAX = 80, LINK_NAME_MAX = 100;
+  var LINK_BAD = '연결 값이 올바르지 않습니다';
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function obj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -50,6 +56,24 @@
     return out;
   }
 
+  /* 연결 하나 — 틀리면 null(그 줄은 남긴다). 이름은 자르고 날짜 꼴이 아니면 뺀다 */
+  function normLink(l) {
+    if (!obj(l) || l.src !== LINK_SRC || typeof l.key !== 'string' || !l.key || l.key.length > LINK_KEY_MAX) return null;
+    var o = { src: LINK_SRC, key: l.key };
+    if (str(l.name)) o.name = str(l.name).slice(0, LINK_NAME_MAX);
+    if (isDay(l.date)) o.date = l.date;
+    return o;
+  }
+  /* 저장할 때 실을 연결 — op.link 가 null 이면 지운다(「연결 지우기」), 올바른 link 면 그것(「연결」),
+     그 밖(op 없음·칸 없음·undefined·꼴이 틀림)은 옛 줄의 것을 이어 받는다 — 지우는 것은 명시한 null 뿐 */
+  function nextLink(prev, op) {
+    if (obj(op) && has(op, 'link')) {
+      if (op.link === null) return null;
+      var lk = normLink(op.link);
+      if (lk) return lk;
+    }
+    return obj(prev) ? normLink(prev.link) : null;
+  }
   function normRec(r) {
     if (!obj(r) || STATES.indexOf(r.st) < 0) return null;
     var o = { st: r.st, at: Number(r.at) || 0 };
@@ -59,6 +83,8 @@
     if (str(r.note)) o.note = str(r.note).slice(0, NOTE_MAX);
     if (typeof r.how === 'string' && has(HOW, r.how)) o.how = r.how;
     if (r.ack === true) o.ack = true;
+    var lk = normLink(r.link);
+    if (lk) o.link = lk;
     return o;
   }
   /* DB 의 scal_docs 통째 → { 업체: { rid: { 키: 줄 } } } (items 한 층을 걷는다) */
@@ -188,6 +214,7 @@
     if (sent && got && got < sent) return '회신일이 발송일보다 앞섭니다';
     if (str(e.how) && !has(HOW, str(e.how))) return '제출 방식을 다시 골라 주세요';
     if (str(e.note).length > NOTE_MAX) return '메모는 ' + NOTE_MAX + '자까지입니다';
+    if (e.link != null && !normLink(e.link)) return LINK_BAD;
     return '';
   }
   /* 저장할 줄 하나 — 빈 값은 뺀다(DB 도 빈 값을 저장하지 않는다) */
@@ -200,14 +227,17 @@
     if (has(HOW, str(e.how))) o.how = str(e.how);
     if (e.ack === true) o.ack = true;
     if (str(e.note)) o.note = str(e.note);
+    var lk = normLink(e.link);
+    if (lk) o.link = lk;
     return o;
   }
 
   var api = { keyOf: keyOf, keysFor: keysFor, normalize: normalize, recOf: recOf, put: put, stateOf: stateOf, label: label,
     chipOf: chipOf, cellFor: cellFor, itemChip: itemChip, rowTrack: rowTrack, kpiHit: kpiHit, kpiExtra: kpiExtra,
-    alertsExtra: alertsExtra, validate: validate, patchFor: patchFor,
+    alertsExtra: alertsExtra, validate: validate, patchFor: patchFor, normLink: normLink, nextLink: nextLink,
     STATES: STATES, ST_KO: ST_KO, MARK: MARK, ALLOWED: ALLOWED, COL_KO: COL_KO, STEPS: STEPS, HOW: HOW, CHIP: CHIP,
-    NOTE_MAX: NOTE_MAX, BY_MAX: BY_MAX, WAIT_SIGN_DAYS: WAIT_SIGN_DAYS, KEY_RE: KEY_RE, SAVE_FAIL: SAVE_FAIL, LOAD_FAIL: LOAD_FAIL };
+    NOTE_MAX: NOTE_MAX, BY_MAX: BY_MAX, WAIT_SIGN_DAYS: WAIT_SIGN_DAYS, KEY_RE: KEY_RE, SAVE_FAIL: SAVE_FAIL, LOAD_FAIL: LOAD_FAIL,
+    LINK_SRC: LINK_SRC, LINK_KEY_MAX: LINK_KEY_MAX, LINK_NAME_MAX: LINK_NAME_MAX, LINK_BAD: LINK_BAD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuGovReportTrack = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
