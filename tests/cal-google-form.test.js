@@ -329,6 +329,6 @@ test('폰 머리 검색 — 🔍 로 «← 검색» 머리가 열리고, 폰에�
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /if\(S\.srch \|\| S\.q\) return '<div class="mhead msrch"><button class="mnav" data-sback="1"/);
   assert.match(캘, /<button class="mtoday" data-srch="1" title="일정 검색">/);
-  assert.match(캘, /if\(폰\(\)\) return 잇기단추Html\(\);/);
+  assert.match(캘, /if\(typeof 폰 === "function" && 폰\(\)\) return 잇기단추Html\(\);/);
   assert.match(캘, /if\(t\.hasAttribute\('data-sback'\)\)\{ S\.srch = false; S\.q = ''; render\(\); return; \}/);
 });

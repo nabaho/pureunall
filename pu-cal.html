@@ -2990,7 +2990,7 @@ function srchHtml(){
   /* ★ 구글 로그인·사람 색 단추는 «내 동그라미» 창으로 옮겼다(창도구Html) — 겹치던 것을 합쳤다.
      계정 잇기는 «할 일이 있을 때만» 뜨는 알림이라 여기 그대로 둔다. */
   /* 폰은 머리(폰머리Html)에 검색칸이 있다 — 같은 번호(calq)가 둘이 되면 안 되므로 여기서는 뺀다 */
-  if(폰()) return 잇기단추Html();
+  if(typeof 폰 === "function" && 폰()) return 잇기단추Html();
   var 열림 = !!(S.srch || S.q);
   return 잇기단추Html()
     + (열림
