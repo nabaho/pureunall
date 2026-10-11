@@ -394,3 +394,11 @@ test('폰 새 일정 입력 — 구글 앱 캡처: 연도 포함 날짜 · 한�
   assert.match(캘, /'화상 회의 추가' : 'Google Meet 화상 회의 추가'/);
   assert.match(캘, /data-theme="dark"\] body\.mob \.gform \.gsave\{background:#377aff;color:#ffffff/);
 });
+
+test('폰 일정 상세 — 구글 앱 캡처: 시트로 덮기 · 「내일 • 오전 12:15~1:15」 · 제목 28px', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /body\.mob \.modal\.det\{left:0;top:36px;transform:none;width:100%;max-width:none;height:calc\(100% - 36px\);max-height:none;border-radius:28px 28px 0 0/);
+  assert.match(캘, /언제 = 날말 \+ \(시 \? " • " \+ 시 : ""\)/);
+  assert.match(캘, /body\.mob \.dttl\{font-size:28px;line-height:36px\}/);
+  assert.match(캘, /body\.mob \.dtool \.dtb\[data-close\]\{order:-1;margin-right:auto\}/);
+});

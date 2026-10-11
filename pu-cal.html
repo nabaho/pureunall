@@ -371,6 +371,18 @@
   .drow .di .gic{width:20px;height:20px}
   .drow .dt{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
   .drow .dt a{color:var(--gtoday)}
+  /* ★ 폰 일정 상세 — 구글 앱 캡처: 화면을 «거의 가득» 덮는 시트(위 둥근 모서리 28px) · ✕ 왼쪽 / 도구 오른쪽 · 제목 28px · 줄 글자 17px */
+  body.mob .modal.det{left:0;top:36px;transform:none;width:100%;max-width:none;height:calc(100% - 36px);max-height:none;border-radius:28px 28px 0 0;box-shadow:none;overflow-y:auto}
+  body.mob .dtool{padding:14px 10px 0}
+  body.mob .dtool .dtb[data-close]{order:-1;margin-right:auto}
+  body.mob .dtop{padding:18px 20px 12px;gap:20px}
+  body.mob .ddot{width:18px;height:18px;border-radius:5px;margin-top:11px}
+  body.mob .dttl{font-size:28px;line-height:36px}
+  body.mob .dwhen{font-size:17px;line-height:24px;margin-top:8px}
+  body.mob .drows{padding:8px 20px 14px}
+  body.mob .drow{font-size:17px;line-height:24px;padding:14px 0;gap:20px}
+  body.mob .drow .di{width:24px}
+  body.mob .drow .di .gic{width:24px;height:24px}
   .dhint{font-size:12px;color:var(--gsub);background:var(--bg);border-radius:8px;padding:8px 12px;margin:0 20px 10px;line-height:1.5}
   .modal.det .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0}
   /* ── 주소 지도 · 하루 동선 (2026-10-09) ── 상세 창 «위»에 겹쳐 뜬다 */
@@ -3895,6 +3907,14 @@ function detailHtml(){
   var 언제 = 상세날짜글(d.date) + (d.time ? " ⋅ " + 시각글(d.time) + (d.endAt ? "~" + 시각글(시분(d.endAt)) : "") : "")
     + (d.end && d.end !== d.date ? " ~ " + 상세날짜글(d.end) : "")
     + (d.kind === "hol" ? " ⋅ 공휴일" : "");
+  /* ★ 폰 — 구글 앱 일정 상세 캡처(2026-10-11): 「내일 • 오전 12:15~1:15」(오늘·내일·어제는 말로, 끝이 같은 오전/오후면 끝은 시각만) */
+  if(typeof 폰 === "function" && 폰() && d.kind !== "hol"){
+    var 오늘s = todayYMD(), 내일s = shiftDay(오늘s, 1), 어제s = shiftDay(오늘s, -1);
+    var 날말 = d.date === 오늘s ? "오늘" : d.date === 내일s ? "내일" : d.date === 어제s ? "어제" : 상세날짜글(d.date);
+    var 시 = d.time ? 시각글(d.time) : "", 끝s = (d.time && d.endAt) ? 시각글(시분(d.endAt)) : "";
+    if(끝s) 시 += "~" + (시.slice(0, 2) === 끝s.slice(0, 2) ? 끝s.slice(3) : 끝s);
+    언제 = 날말 + (시 ? " • " + 시 : "") + (d.end && d.end !== d.date ? " ~ " + 상세날짜글(d.end) : "");
+  }
   var 동선있음 = typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length;
   return '<div class="veil" data-close="1"></div>'
     + '<div class="modal det">'
