@@ -352,3 +352,17 @@ test('서랍 아이콘 + 주·3일 머리 음력 — 구글 앱 캡처', () => {
   assert.match(캘, /<span class="gln">' \+ lunarDay\(ds\)/);
   assert.match(캘, /v_month:"M3 3v8h8V3H3z/);
 });
+
+test('폰 일정 보기 — 구글 앱 캡처: 날짜 열 요일·날짜·음력 세 줄, 둥근 카드(16px), 카드 사이 12px', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /<span class="sl">' \+ lunarDay\(ds\)/);
+  assert.match(캘, /\.scards\{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px\}/);
+  assert.match(캘, /\.scard\{border-radius:16px;padding:8px 14px;/);
+  assert.match(캘, /body\.mob \.sdn \.sw\{order:-1;font-size:14px;font-weight:700/);
+});
+
+test('폰 일정 보기 카드 — 종일은 제목 한 줄, 시각은 「오전 4:00~4:30」', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /언제 = 시작 \+ "~" \+ \(시작\.slice\(0, 2\) === 끝\.slice\(0, 2\) \? 끝\.slice\(3\) : 끝\);/);
+  assert.match(캘, /\(언제 \? '<span>' \+ esc\(언제\) \+ '<\/span>' : ''\)/);
+});
