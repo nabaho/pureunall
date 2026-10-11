@@ -97,17 +97,25 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .lgform{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px}
 .lgform input[type=text]{flex:1 1 140px;min-width:100px}
 td.lg{font-size:12px;color:var(--ink2)}
-.bar1,.bar2{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
-.bar1 .tabs{margin:0}
-.bar1 input[type=search]{min-width:240px}
-.bar2 select,.moreF select{font-size:12.5px;padding:4px 6px}
+.bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:6px}
+.bar .sep{width:1px;height:20px;background:var(--line2);flex:0 0 auto}
+.bar .sp{flex:1}
+.bar .tabs{margin:0;flex-wrap:nowrap}
+.funnelMore{margin-bottom:6px}
+.funnelMore:empty{display:none}
+.infoPanel{max-height:55vh;overflow:auto;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+.left{min-width:0;display:flex;flex-direction:column}
+.left .infoRow{padding:6px 4px 0}
+.bar input[type=search]{width:150px}
+#fDays{width:96px}#fType{width:104px}#fSort{width:118px}
+.bar select,.moreF select{font-size:12.5px;padding:4px 6px}
 .moreF{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px}
 .funnel{background:none;border:0;padding:0;margin:0;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
 .funnel .qp{border:1px solid var(--line2);background:var(--card);border-radius:999px;padding:3px 11px;font-size:12.5px;cursor:pointer;white-space:nowrap}
 .funnel .qp b{font-variant-numeric:tabular-nums;margin-left:4px}
 .funnel .qp.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-d);font-weight:700}
 .funnel .fgrp{flex:0 0 100%;margin-top:2px}
-.tab{border-color:transparent;background:transparent;padding:3px 10px}
+.tab{border-color:transparent;background:transparent;padding:3px 7px;gap:4px}
 .tab.on{background:var(--blue-bg);border-color:var(--blue)}
 .dhead{position:sticky;top:-14px;z-index:5;margin:-14px -15px 8px;padding:12px 15px 6px;background:var(--card);border-bottom:1px solid var(--line)}
 .dhead h2{margin-top:0}
@@ -133,7 +141,7 @@ td.sr:hover{color:var(--amber)}
 #fixbar{background:var(--bg)}
 @media (min-width:1101px){
   #fixbar{position:sticky;top:var(--hh,50px);z-index:15;padding-bottom:4px}
-  .tbl{max-height:calc(100vh - var(--topY,300px) - 10px)}
+  .tbl{max-height:calc(100vh - var(--topY,300px) - 52px)}
   .tbl thead th{position:sticky;top:0;z-index:2}
   .detail{top:var(--topY,300px) !important;max-height:calc(100vh - var(--topY,300px) - 10px) !important}
 }
@@ -258,23 +266,10 @@ td.ceo{}
 <div id="lock"><h3>열 수 없습니다</h3><p id="lockWhy"></p><p>회생광고는 대표 전용입니다.</p></div>
 
 <main id="app" style="display:none">
-  <div class="guide" id="guide">
-    <div class="gs"><b>① 대상을 좁힙니다</b><br>아래 <b>깔때기</b>의 「연락처 확보」「거래·연결 있음」, 지역·공고일, 거르개로 보낼 곳만 남깁니다.</div>
-    <div class="gs"><b>② 홍보양식을 확인합니다</b><br>보낼 안내문과 메일 본문이 어떻게 나가는지 팝업으로 봅니다.<br><button class="sm pri" onclick="openForm()">📄 홍보양식 보기</button></div>
-    <div class="gs"><b>③ 골라서 보냅니다</b><br>맨 앞 ☐로 고르고 <b>📮 발송 예정</b> → <b>🖨 안내문 + 라벨</b> 인쇄 → 우편 발송 뒤 <b>✅ 발송 완료로</b>.</div>
-    <button class="sm" onclick="$('guide').style.display='none';lsSet('guideOff','1')" title="안내 닫기" style="align-self:start">닫기 ✕</button>
-  </div>
-  <details class="auto" id="autoBox"><summary id="autoSum">✉ 자동 발송 — 불러오는 중…</summary><div class="abody" id="autoBody"></div></details>
-  <details class="law"><summary>⚖️ 왜 우편으로 보내나요? (법적 유의)</summary><div class="note">
-    <span>⚖️</span>
-    <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조)과 <b>법인파산 · 파산선고</b> 기업을 매일 아침 모읍니다. 파산선고는 도산대지급금의 지급 사유라 안내문이 다릅니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
-    안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
-  </div></details>
-
   <div id="fixbar">
-  <div class="bar1"><div class="tabs" id="tabs"></div><span class="sp"></span><input id="fText" type="search" placeholder="회사명·주소·사건번호 찾기">
-    <button class="pri" id="findBtn" onclick="findContacts()">🔎 연락처 찾기</button></div>
-  <div class="bar2"><div class="funnel" id="funnel"></div><span class="sp"></span>
+  <div class="bar">
+    <div class="tabs" id="tabs"></div><span class="sep"></span>
+    <div class="funnel" id="funnel"></div><span class="sep"></span>
 <select id="fDays" aria-label="기간">
       <option value="7">최근 7일</option><option value="14">최근 14일</option>
       <option value="31" selected>최근 1개월</option><option value="0">전체 기간</option>
@@ -283,7 +278,13 @@ td.ceo{}
 <select id="fSort" aria-label="정렬">
       <option value="date">공고일 최신순</option><option value="star">별표 먼저</option><option value="trade">거래·연결 있는 순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
     </select>
-    <button class="sm" id="moreBtn" onclick="toggleMore()">필터 더 보기 ▾</button></div>
+    <button class="sm" id="moreBtn" onclick="toggleMore()">필터 ▾</button>
+    <span class="sp"></span>
+    <input id="fText" type="search" placeholder="회사명·주소·사건번호 찾기">
+    <button class="pri" id="findBtn" onclick="findContacts()">🔎 연락처 찾기</button>
+    <button class="sm" id="infoBtn" onclick="toggleInfo()">설정·안내 ▾ <span class="chip c-gray" id="autoChip" style="margin-left:2px">자동 꺼짐</span></button>
+  </div>
+  <div class="funnelMore" id="funnelMore"></div>
   <div class="moreF" id="moreF" style="display:none">
 <select id="fCourt" aria-label="법원"><option value="">모든 법원</option></select>
 <select id="fSido" aria-label="지역"><option value="">모든 지역</option></select>
@@ -299,7 +300,21 @@ td.ceo{}
     </select>
     <button class="sm" onclick="resetFilters()">모든 거르개 풀기</button>
   </div>
-  <div class="infoRow"><div class="runline" id="runline"></div><div class="pager" id="pager"></div></div>
+  <div class="infoPanel" id="infoPanel" style="display:none">
+  <div class="guide" id="guide">
+    <div class="gs"><b>① 대상을 좁힙니다</b><br>아래 <b>깔때기</b>의 「연락처 확보」「거래·연결 있음」, 지역·공고일, 거르개로 보낼 곳만 남깁니다.</div>
+    <div class="gs"><b>② 홍보양식을 확인합니다</b><br>보낼 안내문과 메일 본문이 어떻게 나가는지 팝업으로 봅니다.<br><button class="sm pri" onclick="openForm()">📄 홍보양식 보기</button></div>
+    <div class="gs"><b>③ 골라서 보냅니다</b><br>맨 앞 ☐로 고르고 <b>📮 발송 예정</b> → <b>🖨 안내문 + 라벨</b> 인쇄 → 우편 발송 뒤 <b>✅ 발송 완료로</b>.</div>
+    <button class="sm" onclick="$('guide').style.display='none';lsSet('guideOff','1')" title="안내 닫기" style="align-self:start">닫기 ✕</button>
+  </div>
+  <details class="auto" id="autoBox"><summary id="autoSum">✉ 자동 발송 — 불러오는 중…</summary><div class="abody" id="autoBody"></div></details>
+  <details class="law"><summary>⚖️ 왜 우편으로 보내나요? (법적 유의)</summary><div class="note">
+    <span>⚖️</span>
+    <div>전국 회생 관할 법원 공고에서 <b>법인회생 · 포괄적 금지명령</b>(채무자회생법 제45조)과 <b>법인파산 · 파산선고</b> 기업을 매일 아침 모읍니다. 파산선고는 도산대지급금의 지급 사유라 안내문이 다릅니다. 이 단계는 <b>회생 신청 직후(개시결정 전)</b>라 안내 시기가 가장 좋습니다.
+    안내는 <b>우편</b>으로 보냅니다 — 이메일·문자 광고는 받는 사람의 사전 동의가 있어야 합니다(정보통신망법 제50조). 찾은 이메일·팩스는 상담 때 쓰도록 모아 둔 것입니다.</div>
+  </div></details>
+
+  </div>
   <div id="prog"></div>
 
   <div id="selbar">
@@ -333,6 +348,7 @@ td.ceo{}
   </div>
 
   <div class="layout">
+    <div class="left">
     <div class="tbl" id="tblbox">
       <table>
         <colgroup><col class="c-ck"><col class="c-sr"><col class="c-no"><col class="c-co"><col class="c-kind"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ico"><col class="c-log"><col class="c-stat"></colgroup>
@@ -343,6 +359,8 @@ td.ceo{}
         <tbody id="rows"></tbody>
       </table>
       <div class="empty" id="empty" style="display:none"></div>
+    </div>
+    <div class="infoRow"><div class="runline" id="runline"></div><div class="pager" id="pager"></div></div>
     </div>
     <aside class="detail" id="detail"></aside>
   </div>
@@ -413,6 +431,7 @@ async function autoCall(body, okMsg){
 }
 function drawAuto(){
   var s=AUTO.settings, p=AUTO.preview||{}, items=p.items||[], skipped=p.skipped||[];
+  var ac=$('autoChip'); if(ac){ ac.textContent='자동 '+(s.enabled?'켜짐':'꺼짐'); ac.className='chip '+(s.enabled?'c-green':'c-gray'); }
   $('autoSum').innerHTML='✉ <b>자동 발송</b> (거래처만) '+
     '<span class="chip '+(s.enabled?'c-green':'c-gray')+'" style="margin-left:0">'+(s.enabled?'켜짐':'꺼짐')+'</span>'+
     '<span style="color:var(--mute)">보낼 곳 '+items.length+'곳 · 오늘 건 '+(p.sentToday||0)+'/'+s.dailyCap+'통</span>';
@@ -637,7 +656,7 @@ function sortList(list){
 function drawTabs(base){
   var c={all:base.length,new:0,send:0,hold:0,skip:0,sent:0};
   base.forEach(function(n){ c[statusOf(n.id)]++; });
-  var names={all:'전체',new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
+  var names={all:'전체',new:'미검토',send:'예정',hold:'보류',skip:'제외',sent:'완료'};
   $('tabs').innerHTML=['all','new','send','hold','skip','sent'].map(function(k){
     return '<div class="tab'+(TAB===k?' on':'')+'" data-tab="'+k+'"><b>'+c[k]+'</b><span>'+names[k]+'</span></div>';
   }).join('');
@@ -661,9 +680,16 @@ function drawFunnel(base){
     h+='<div class="fgrp"><em>공고일</em><button class="fchip'+(DATE?'':' on')+'" data-date="">전체</button>'+
       Object.keys(dat).sort().reverse().map(function(k){ return '<button class="fchip'+(DATE===k?' on':'')+'" data-date="'+k+'">'+k.slice(5)+'<b>'+dat[k]+'</b></button>'; }).join('')+'</div>';
   }
-  $('funnel').innerHTML=h;
+  $('funnel').innerHTML=h.split('<div class="fgrp">')[0];
+  $('funnelMore').innerHTML=h.indexOf('<div class="fgrp">')>=0 ? '<div class="fgrp">'+h.split('<div class="fgrp">').slice(1).join('<div class="fgrp">') : '';
   var more=['fCourt','fSido','fStage','fContact','fTrade','fLog'].filter(function(id){ return $(id).value; }).length;
-  $('moreBtn').textContent='필터 더 보기 '+($('moreF').style.display==='none'?'▾':'▴')+(more?' ('+more+')':'');
+  $('moreBtn').textContent='필터 '+($('moreF').style.display==='none'?'▾':'▴')+(more?' ('+more+')':'');
+}
+function toggleInfo(){
+  var el=$('infoPanel'), on=el.style.display==='none';
+  el.style.display=on?'':'none';
+  $('infoBtn').firstChild.nodeValue='설정·안내 '+(on?'▴ ':'▾ ');
+  fitLayout();
 }
 function toggleMore(){ var m=$('moreF'); m.style.display = m.style.display==='none' ? '' : 'none'; fitLayout(); drawFunnel(baseList()); }
 function funnelClick(step){
@@ -736,7 +762,7 @@ function drawSel(){
   $('ckAll').checked = VIEW.length>0 && n===VIEW.length;
   $('ckAll').indeterminate = n>0 && n<VIEW.length;
   var left=Object.keys(NOTICES).filter(function(k){ return !INFO[k]; }).length;
-  $('findBtn').textContent = n ? '🔎 선택 '+n+'곳 연락처 찾기' : '🔎 연락처 찾기'+(left?' (미확인 '+left+'곳)':'');
+  $('findBtn').textContent = n ? '🔎 선택 '+n+'곳 찾기' : '🔎 연락처 찾기'+(left?' '+left:''); $('findBtn').title = n ? '고른 회사의 연락처를 찾습니다' : (left ? '아직 찾아보지 않은 '+left+'곳의 연락처를 찾습니다' : '연락처를 다시 찾습니다');
 }
 function drawRunline(){
   var all=Object.keys(NOTICES).length, got=Object.keys(NOTICES).filter(function(k){ return contactOf(k).any; }).length;
