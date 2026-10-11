@@ -25,7 +25,7 @@
 <script src="js/pu-version.js?v=8"></script>
 <script src="js/pu-back.js?v=2"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=12"></script>
+<script src="js/pu-gcal-auth.js?v=13"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
@@ -3341,7 +3341,7 @@ function recOf(store, id){
 function openNew(ymd){
   /* 구글처럼 «시간 일정»이 기본 — 시작은 다음 정각, 끝은 비워 둔다(저장 때 한 시간 뒤). 종일은 스위치로 */
   S.modal = { mode:"new", kind:"sch", date:ymd, endDate:"", sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1,
-    vis:"shared", timed:true, time:새시각(ymd), endTime:"", repeat:"", remind:"", guests:"", meet:false };
+    vis:"shared", timed:true, time:새시각(ymd), endTime:"", repeat:"", remind:"", guests:"", attach:"", meet:false };
   /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
   if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
@@ -3878,10 +3878,18 @@ function 참석자목록(글){
   var 나쁨 = 나눔.filter(function(x){ return !/^[^\s@,;]+@[^\s@,;]+\.[^\s@,;]+$/.test(x); });
   return { 메일:나눔.filter(function(x){ return 나쁨.indexOf(x) < 0; }).slice(0, 20), 나쁨:나쁨, 넘침:나눔.length > 20 };
 }
+/* 「첨부파일 추가」 줄 — 구글 드라이브 «링크»를 붙이면 구글 일정에 첨부로 붙는다(파일 올리기는 아직 없다: 구글 쪽 드라이브 권한이 따로 필요하다) */
+function 첨부목록(글){
+  var 나눔 = String(글 || "").split(/[\s,;]+/).filter(function(x){ return x; });
+  var 좋음 = function(x){ return /^https:\/\/(drive|docs)\.google\.com\/[^\s]+$/.test(x); };
+  return { 링크:나눔.filter(좋음).slice(0, 10), 나쁨:나눔.filter(function(x){ return !좋음(x); }) };
+}
 function 참석자줄(m){
   return '<div class="grow"><span class="gi" title="참석자">' + 선아이콘("group") + '</span><div class="gbody">'
     + '<input data-m="guests" value="' + esc(m.guests || "") + '" placeholder="참석자 추가 (메일 — 여러 명은 쉼표로)" inputmode="email" autocomplete="off"></div></div>'
     + (String(m.guests || "").trim() ? '<div class="ghint" style="padding-left:56px">초대 메일은 보내지 않습니다 — 구글 일정에만 참석자로 붙습니다.</div>' : '')
+    + '<div class="grow"><span class="gi" title="첨부파일">' + 선아이콘("attach") + '</span><div class="gbody">'
+    + '<input data-m="attach" value="' + esc(m.attach || "") + '" placeholder="첨부파일 추가 (구글 드라이브 링크)" autocomplete="off"></div></div>'
     + '<div class="grow"><span class="gi" title="Google Meet">' + 선아이콘("videocam") + '</span><div class="gbody">'
     + '<button class="gmeet' + (m.meet ? ' on' : '') + '" data-meet="1">' + (m.meet ? '✓ Google Meet 화상 회의가 추가됩니다' : 'Google Meet 화상 회의 추가') + '</button></div></div>';
 }
@@ -4192,7 +4200,7 @@ function 구글에넣기(m){
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
     repeat: String(m.repeat||""), remindMin: m.timed ? (+m.remind || 0) : 0,
-    attendees: 참석자목록(m.guests).메일, meet: !!m.meet, meetId: m.meet ? "pu-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) : "",
+    attachments: 첨부목록(m.attach).링크, attendees: 참석자목록(m.guests).메일, meet: !!m.meet, meetId: m.meet ? "pu-" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8) : "",
     date: m.date, endDate: String(m.endDate||""), time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
     location: String(m.place||"").trim(), description: 설명.join("\n"), puSid: String(m.sid||""),
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
@@ -4213,7 +4221,7 @@ function 구글에넣기(m){
 function modalRead(){
   var m = S.modal; if(!m) return;
   var 옛시작 = m.date, 옛끝 = m.endDate || m.date, 옛시각 = m.time, 옛끝시각 = m.endTime;
-  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis","repeat","remind","guests"].forEach(function(f){
+  ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis","repeat","remind","guests","attach"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
@@ -4249,6 +4257,8 @@ function doSave(){
     var 손님 = 참석자목록(m.guests);
     if(손님.나쁨.length){ m.err = "참석자 메일이 올바르지 않습니다: " + 손님.나쁨.slice(0, 3).join(", "); render(); return; }
     if(손님.넘침){ m.err = "참석자는 스무 명까지 넣을 수 있습니다"; render(); return; }
+    var 첨부 = 첨부목록(m.attach);
+    if(첨부.나쁨.length){ m.err = "첨부는 구글 드라이브 링크(https://drive.google.com/…)만 넣을 수 있습니다"; render(); return; }
   }
   /* 구글 일정의 끝나는 날 — 시작보다 앞이면 막는다. 뒤면 «여러 날»: 끝 시각이 시작보다 일러도 된다(다른 날이다) */
   var 여러날 = 일정 && /^\d{4}-\d{2}-\d{2}$/.test(String(m.endDate||"")) && m.endDate !== m.date;
@@ -4285,6 +4295,7 @@ function doSave(){
     if(m.mode === "new" && m.repeat) item.repeat = String(m.repeat);
     if(m.mode === "new" && m.timed && +m.remind > 0) item.remindMin = +m.remind;
     if(m.mode === "new" && String(m.guests || "").trim()) item.guests = 참석자목록(m.guests).메일;
+    if(m.mode === "new" && String(m.attach || "").trim()) item.attach = 첨부목록(m.attach).링크;
     if(m.mode === "new" && m.meet) item.meet = true;
     item.time = String(m.time||"");
     item.endTime = String(m.endTime||"");
