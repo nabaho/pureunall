@@ -7007,6 +7007,11 @@ exports.mgrWatch = MGRW.mgrWatch;
 const NTSM = require("./nts-monthly")({ functions, getDatabase, MAIL_REGION });
 exports.ntsMonthly = NTSM.ntsMonthly;
 
+/* 👥 국민연금 가입자 — 매달 2일 07시, 기업 상세에서 «고른» 사업장의 숫자를 새로 받는다(대표 「진행」 2026-10-11).
+   실제 코드는 nps-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
+const NPSM = require("./nps-monthly")({ functions, getDatabase, MAIL_REGION });
+exports.npsMonthly = NPSM.npsMonthly;
+
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */
 const GONE = require("./gone-watch")({ functions, getDatabase, MAIL_REGION });
