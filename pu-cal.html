@@ -800,6 +800,12 @@
   body.mob .tgrid.wide .tghead,body.mob .tgrid.wide .tgallday{border:none}
   body.mob .tgrid.wide .tgh,body.mob .tgrid.wide .tga,body.mob .tgrid.wide .tgcol{border-left:none;background-image:none}
   body.mob .tgrid.wide .tgcol{padding:0}
+  /* ★ 폰 월 보기 — 구글 앱(Material 3 Expressive)은 날짜 칸이 «둥근 칸»이다(9to5Google·PhoneArena 보도 + 구글 앱 주·일 보기 캡처의 둥근 시간 칸과 같은 꼴). 월 보기 캡처는 없어 둥근 칸 모양만 따른다(확인 필요) */
+  body.mob.gm #app.fit,body.mob.gm .mhead,body.mob.gm .cal{background:var(--gsurf)}
+  body.mob.gm .mhd{border-bottom:none;background:var(--gsurf)}
+  body.mob.gm .mhd div{border-right:none}
+  body.mob.gm .calgrid{gap:3px;padding:3px}
+  body.mob.gm .calgrid .day{background:var(--gslot);border:none !important;border-radius:12px}
   .hs{position:absolute;left:4px;right:4px;margin-top:1.5px;border-radius:12px;background:var(--gslot);pointer-events:none}
   .tgbody .tgtime span{position:absolute;right:6px;transform:translateY(-50%);white-space:nowrap}
   .tgcol{position:relative;border-left:1px solid var(--gline);min-width:0;
@@ -3945,6 +3951,9 @@ function detailHtml(){
               + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
         : "")
+    /* ★ 폰 — 구글 앱 일정 상세의 맨 아래 「캘린더」 줄(캡처: 달력 아이콘 + 「내 캘린더 / 메일」). 우리는 공용 구글 달력 이름 */
+    + ((typeof 폰 === "function" && 폰() && d.kind === "gcal")
+        ? '<div class="drows"><div class="drow"><span class="di">' + 선아이콘("calendar") + '</span><span class="dt">푸른노무법인</span></div></div>' : "")
     + (d.hint || []).map(function(h){ return '<div class="dhint">' + esc(h) + '</div>'; }).join("")
     /* 구글에서 나머지(참석자·첨부·회의·알림·반복)를 받는 중·못 받음·연결 안 됨 — 숨기지 않고 말한다 */
     + (d.kind === "gcal" && d.loading ? '<div class="dhint">⏳ 참석자·첨부·알림을 구글에서 받는 중…</div>' : "")
@@ -4790,6 +4799,7 @@ function render(){
     document.body.classList.toggle("mob", 폰달력);
     document.body.classList.toggle("mobmenu", 폰달력 && !!S.mobMenu);
     document.body.classList.toggle("gv", 폰달력 && (S.view === "day" || S.view === "3day" || S.view === "week"));
+    document.body.classList.toggle("gm", 폰달력 && S.view === "month");
   }catch(_){}
   if(달력){
     펼침자리();
