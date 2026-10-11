@@ -114,10 +114,28 @@ async function loadTables(db) {
      ⚠ 먼저 넣은 것이 이긴다 — 화면과 같은 규칙이다. */
   const coById = {}, coByName = {}, coByBiz = {}, erpAddr = {};
   const okMail = (e) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(e || "").trim());
+  /* 지사(사무대행)의 담당은 «본사» 푸른이알피 주담당 기준 (대표 결정 2026-10-11) — 화면 mbHqRec 와 같은 잣대.
+     열쇠는 사업자번호: 열 자리가 같고 종사업장이 본사업장인 지사 → 그 번호의 본사 «한 곳».
+     본사가 둘 이상이거나 종사업장이 다르면 안 잇는다(지사 기록 그대로). 지사 기록은 건드리지 않는다. */
+  const hqOfSub = {};
+  {
+    const by = {};
+    arr(cos.val()).forEach((c) => {
+      if (!c || !c.id) return;
+      const d = digits(c.bizNo);
+      if (d.length < 10 || !/^0*$/.test(d.slice(10))) return;
+      const g = by[d.slice(0, 10)] = by[d.slice(0, 10)] || { hq: [], sub: [] };
+      (String(c.status || "") === "suboffice" ? g.sub : g.hq).push(c);
+    });
+    Object.keys(by).forEach((b) => {
+      if (by[b].hq.length === 1) by[b].sub.forEach((s) => { hqOfSub[String(s.id)] = by[b].hq[0]; });
+    });
+  }
   arr(cos.val()).forEach((c) => {
     if (!c) return;
-    const rec = { main: c.managerMain ? (nameBySid[c.managerMain] || c.managerMain) : "",
-      left: coLeft(c) };
+    const eff = (String(c.status || "") === "suboffice" && hqOfSub[String(c.id)]) || c;
+    const rec = { main: eff.managerMain ? (nameBySid[eff.managerMain] || eff.managerMain) : "",
+      left: coLeft(eff) };
     if (c.id) coById[String(c.id)] = rec;
     const n = normName(c.name);
     if (n && !coByName[n]) coByName[n] = rec;
@@ -149,8 +167,11 @@ async function loadTables(db) {
       });
   });
   coArr.forEach((c) => {
-    if (!c || coLeft(c) || !c.managerMain) return;
-    const main = nameBySid[c.managerMain] || c.managerMain;
+    if (!c) return;
+    /* 지사면 담당·종료는 본사 기록 기준 — 위 hqOfSub 와 같은 잣대 */
+    const eff = (String(c.status || "") === "suboffice" && hqOfSub[String(c.id)]) || c;
+    if (coLeft(eff) || !eff.managerMain) return;
+    const main = nameBySid[eff.managerMain] || eff.managerMain;
     CO_EXTRA.forEach((f) => {
       const e = String(c[f] || "").trim().toLowerCase();
       if (!okMail(e) || /@pureun\.kr$/.test(e) || (extraCos[e] || []).length !== 1) return;

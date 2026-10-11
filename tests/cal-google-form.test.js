@@ -324,3 +324,24 @@ test('3일 보기 — 보고 있는 날부터 사흘을 시간 축 격자로, �
   assert.match(캘, /S\.view==='3day' \? mv\*3 : mv/);
   assert.match(캘, /if\(S\.view === "3day"\) return \{ from:S\.date, to:shiftDay\(S\.date, 2\) \};/);
 });
+
+test('폰 머리 검색 — 🔍 로 «← 검색» 머리가 열리고, 폰에서는 윗줄 검색칸(같은 번호)을 뺀다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /if\(S\.srch \|\| S\.q\) return '<div class="mhead msrch"><button class="mnav" data-sback="1"/);
+  assert.match(캘, /<button class="mtoday" data-srch="1" title="일정 검색">/);
+  assert.match(캘, /if\(typeof 폰 === "function" && 폰\(\)\) return 잇기단추Html\(\);/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-sback'\)\)\{ S\.srch = false; S\.q = ''; render\(\); return; \}/);
+});
+
+test('폰 머리 — 구글 앱처럼 오른쪽에 내 동그라미(이니셜), 누르면 내 계정 창', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /<button class="mavatar" data-mavatar="1" title="내 계정">/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-mavatar'\)\)\{[^}]*S\.mobMenu = true; render\(\);/);
+});
+
+test('서랍 캘린더 체크 줄 — 공용 일정·나만 보기, 둘 다 켜면 전체, 마지막 하나는 못 끈다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\[\["shared","공용 일정","var\(--acc\)"\],\["priv","나만 보기","var\(--gsub\)"\]\]/);
+  assert.match(캘, /if\(켜짐2\)\{ if\(지금 === null\) S\.filter = 다른; \}/);
+  assert.match(캘, /else S\.filter = 지금 === 다른 \? null : 어느;/);
+});
