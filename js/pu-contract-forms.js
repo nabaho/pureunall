@@ -245,12 +245,77 @@
         var base = mergeSeeds(listOf(cur && cur.v), removed).list;
         out = fn(base.slice());
         return { v: out, u: nextU(cur) };
-      }, function (err, committed) {
+      }, function (err, committed, snap) {
         if (err) { rej(err); return; }
         if (!committed) { rej(new Error('저장이 끝나지 않았습니다')); return; }
+        try { rememberForms(snap && snap.val()); } catch (_) {}   // 방금 올린 판 — 다음 열기 때 다시 안 받는다
         res(out);
       });
     });
+  }
+  /* ══ 양식 묶음은 «바뀌었을 때만» 받는다 (2026-10-11 대표 「비용이 너무 많이 증가하는데 해결 방법 없나」) ══
+     ■ 왜 — 양식 62개가 3.4MB 이고 그중 96% 가 첨부 원본(base64)이다. 화면을 열 때마다·서류를 채울 때마다
+       once() 로 통째 받았다 — 실측 3분에 8번 · 29.6MB(그 3분 내려받기의 93%). 실시간DB 는 내려받은 양만큼 돈이 든다.
+     ■ 어떻게 — 모든 저장 길(여기 changeForms · 이알피 dbSet/트랜잭션)이 data/contract_forms/u 를 올린다.
+       그 13바이트만 먼저 읽어, 지난번 받은 판(이 창 메모리 → 이 기기 IndexedDB)과 같으면 그것을 쓴다.
+       다르거나·없거나·u 를 못 읽으면 예전처럼 통째 받는다(→ 받은 판을 다시 적어 둔다).
+     ⚠ 받은 판은 «사본»으로 돌려준다 — 부른 쪽이 고쳐도 보관본이 안 더러워진다.
+     ⚠ 보관은 양식(우리 서식)뿐이다 — 사람·업체 자료가 아니다. IndexedDB 를 못 쓰는 창은 메모리만 쓴다. */
+  var FORMS_IDB = 'pu-contract-forms-cache', FORMS_STORE = 'kv', FORMS_KEY = 'contract_forms';
+  var memForms = null;   // { u, val }
+  function cloneVal(v) { return v == null ? v : JSON.parse(JSON.stringify(v)); }
+  function idbOpen() {
+    return new Promise(function (res) {
+      try {
+        var idb = w.indexedDB; if (!idb) { res(null); return; }
+        var rq = idb.open(FORMS_IDB, 1);
+        rq.onupgradeneeded = function () { try { rq.result.createObjectStore(FORMS_STORE); } catch (_) {} };
+        rq.onsuccess = function () { res(rq.result); };
+        rq.onerror = function () { res(null); };
+        rq.onblocked = function () { res(null); };
+      } catch (_) { res(null); }
+    });
+  }
+  function idbGetForms() {
+    return idbOpen().then(function (idb) {
+      if (!idb) return null;
+      return new Promise(function (res) {
+        try {
+          var rq = idb.transaction(FORMS_STORE, 'readonly').objectStore(FORMS_STORE).get(FORMS_KEY);
+          rq.onsuccess = function () { res(rq.result || null); idb.close(); };
+          rq.onerror = function () { res(null); idb.close(); };
+        } catch (_) { res(null); }
+      });
+    });
+  }
+  function idbPutForms(rec) {
+    return idbOpen().then(function (idb) {
+      if (!idb) return;
+      try {
+        var tx = idb.transaction(FORMS_STORE, 'readwrite');
+        tx.objectStore(FORMS_STORE).put(rec, FORMS_KEY);
+        tx.oncomplete = tx.onerror = tx.onabort = function () { try { idb.close(); } catch (_) {} };
+      } catch (_) {}
+    });
+  }
+  function rememberForms(v) {
+    if (v && typeof v.u === 'number') { memForms = { u: v.u, val: cloneVal(v) }; idbPutForms(memForms); }
+    else memForms = null;
+  }
+  /* 서버 본문({v,u}) — once('value').val() 과 같은 것을 돌려준다 */
+  function formsValue(db) {
+    function full() {
+      return db.ref(PATH).once('value').then(function (s) { var v = s.val(); rememberForms(v); return cloneVal(v); });
+    }
+    return db.ref(PATH + '/u').once('value').then(function (s) {
+      var u = s.val();
+      if (typeof u !== 'number') return full();
+      if (memForms && memForms.u === u) return cloneVal(memForms.val);
+      return idbGetForms().then(function (rec) {
+        if (rec && rec.u === u && rec.val && rec.val.u === u) { memForms = rec; return cloneVal(rec.val); }
+        return full();
+      }, full);
+    }, full);
   }
   function changeRemoved(db, fn) {
     return new Promise(function (res, rej) {
@@ -875,8 +940,8 @@
   }
   function attKey(a) { return (a && a.id) || ('n:' + (a && a.name) + '|' + (a && a.size)); }
   function loadForms(db) {
-    return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value')]).then(function (r) {
-      var cf = r[0].val(), rm = r[1].val();
+    return Promise.all([formsValue(db), db.ref(PATH_RM).once('value')]).then(function (r) {
+      var cf = r[0], rm = r[1].val();
       return mergeSeeds(listOf(cf && cf.v), listOf(rm && rm.v)).list;
     });
   }
@@ -2481,8 +2546,8 @@
       S.err = null;
       /* 이알피 사건 유형 · 직원 명부(재직 공인노무사) — 못 읽어도 양식은 뜬다(옛 기본 유형 · 기본 명단) */
       var soft = function (p) { return db.ref(p).once('value').then(function (s) { return s.val(); }, function () { return null; }); };
-      return Promise.all([db.ref(PATH).once('value'), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
-        var cf = r[0].val(), rm = r[1].val();
+      return Promise.all([formsValue(db), db.ref(PATH_RM).once('value'), soft('data/biz_case_types'), soft('data/user_dir'), soft('data/leave_of_absence')]).then(function (r) {
+        var cf = r[0], rm = r[1].val();
         if (r[2]) setCaseTypes(r[2].v || r[2]);
         if (r[3]) { S.lawDir = r[3].v || r[3]; S.lawLoa = r[4] && (r[4].v || r[4]); }
         if (r[3] && w.PuFormCardFill && w.PuFormCardFill.setLawyers) w.PuFormCardFill.setLawyers(r[3].v || r[3], r[4] && (r[4].v || r[4]));   // 퇴사·휴직은 빠진다
@@ -3477,6 +3542,7 @@
     splitVars: splitVars,
     attKey: attKey, withNewOriginal: withNewOriginal, orphanInline: orphanInline,
     loadForms: loadForms,
+    formsValue: formsValue,
     linkOriginal: linkOriginal,
     ATTACH_MAX: ATTACH_MAX,
     hwpSources: hwpSources,
