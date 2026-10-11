@@ -1137,6 +1137,21 @@ rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'a
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 고쳐 쓸 일이 없다. */
 rules.gov_watch = { '.read': 'auth != null && ' + ADMIN, '.write': false };
 
+/* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
+   공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
+   ⚠ 읽기 = 기업정보함(pucards)과 «같은» MAIL — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 MAIL 이 읽는다.
+     자리만 옮기는 것이라 보는 사람이 늘지 않는다. 담긴 것: 근로자 수·사업장 이름/주소·사업 상태·공휴일.
+     돈(보험료)은 서버가 애초에 담지 않는다(functions/nps-monthly.js nowOf).
+   ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 숫자를 고치면 원본과 어긋난다.
+   ⚠ pubdata_req = 화면의 «받아 달라». 번호 10자리 열쇠에 {at, k, nm} 만 받는다. 읽기는 아무도 —
+     누가 무엇을 열었는지가 남는 자리가 아니다(서버가 받자마자 지운다). */
+rules.pubdata = { '.read': MAIL, '.write': false };
+rules.pubdata_req = { $no: { '.write': MAIL,
+  '.validate': "$no.matches(/^[0-9]{10}$/) && (!newData.exists() || (newData.child('at').isNumber()"
+    + " && (!newData.child('k').exists() || newData.child('k').val() === 'ei' || newData.child('k').val() === 'nps')"
+    + " && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
+  $other: { '.validate': "$other === 'at' || $other === 'k' || $other === 'nm'" } } };
+
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
    ⚠ 읽기 = 관리자만. 누구에게 무엇을 보낼지는 대표가 정한다 — 직원 화면엔 안 보인다.

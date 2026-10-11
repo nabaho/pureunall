@@ -7050,6 +7050,8 @@ exports.ntsMonthly = NTSM.ntsMonthly;
    실제 코드는 nps-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
 const NPSM = require("./nps-monthly")({ functions, getDatabase, MAIL_REGION });
 exports.npsMonthly = NPSM.npsMonthly;
+/* 🗂 공공데이터 공용 자리 — 화면의 «받아 달라»(pubdata_req/{번호})를 받아 그 회사만 받는다(2026-10-11, functions/pubdata.js). */
+exports.pubdataAsk = NPSM.pubdataAsk;
 
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */
