@@ -98,10 +98,14 @@ test('① 화면 코드는 대장에 쓰는 길이 없다 — set·update·remov
   const 끝 = 화면글.indexOf('function 안내끌기(', 시작);
   assert.ok(시작 > 0 && 끝 > 시작, '대장 블록을 못 찾았다');
   const 블록 = 화면글.slice(시작, 끝);
-  /* db 를 «여는» 곳은 한 군데뿐이고, 그 뒤는 once 다 — set·update·remove·push·transaction·on 이 이어지면 안 된다 */
-  const 연곳 = [...블록.matchAll(/\bdb\s*\.\s*ref\s*\(/g)].length;
-  assert.strictEqual(연곳, 1, '대장 블록이 db 를 여러 곳에서 연다(' + 연곳 + ') — 읽는 곳은 안내기록읽기 하나여야 한다');
-  assert.ok(/\bdb\s*\.\s*ref\s*\([^)]*\)\s*\.once\s*\(\s*['"]value['"]\s*\)/.test(블록), '한 번 읽기(once)여야 한다 — 실시간 듣기(on)는 읽는 값만큼 요금이 든다');
+  /* db 를 «여는» 곳은 읽는 길뿐 — 대장(안내기록읽기)과 보관본(보관읽기). 열 때마다 «그 뒤는 once» 여야 하고,
+     자리는 newsletter/noticeLog · newsletter/noticeArchive/<id> 둘뿐이다 — set·update·remove·push·transaction·on 이 이어지면 안 된다 */
+  const 열림 = [...블록.matchAll(/\bdb\s*\.\s*ref\s*\(([^)]*)\)\s*(\.\s*\w+\s*\([^)]*\))?/g)];
+  assert.ok(열림.length >= 1 && 열림.length <= 2, '대장 블록이 db 를 ' + 열림.length + '곳에서 연다 — 읽는 길은 둘(대장·보관본)이어야 한다');
+  열림.forEach((m) => {
+    assert.ok(/^\.\s*once\s*\(\s*['"]value['"]\s*\)$/.test((m[2] || '').trim()), '한 번 읽기(once)여야 한다 — 실시간 듣기(on)는 읽는 값만큼 요금이 든다: ' + m[0]);
+    assert.ok(/^\s*['"]newsletter\/notice(Log|Archive\/)['"]?/.test(m[1]) || /^\s*['"]newsletter\/notice(Log['"]|Archive\/['"])/.test(m[1]), '읽는 자리가 대장·보관본 말고 다른 곳이다: ' + m[1]);
+  });
   assert.ok(!/\.(set|update|push|transaction)\s*\(/.test(블록), '대장 블록에 쓰기 호출이 있다 — 대장은 서버(newsletterNoticeLogBuild)만 쓴다');
   assert.ok(!/\bdb\b[^;]*\.remove\s*\(/.test(블록), '대장 블록에서 db 를 지우는 호출이 있다');
 });
@@ -266,9 +270,9 @@ test('⑤ 상세 → «파일별로 보기» → 그 파일 한 개의 보낸 �
   assert.match(글, /2번 보냈습니다/); assert.match(글, /처음 2026-09-28.*마지막 2026-10-02/);
   assert.ok(글.indexOf('2026-10-02(금)') < 글.indexOf('2026-09-28(월)'), '보낸 기록은 최근 것이 위여야 한다');
   assert.match(글, /함께 보낸 파일.*판결요약\.hwp/, '같이 붙어 간 다른 파일이 안 보인다');
-  assert.match(글, /파일 «내용» 자체는 이 기록에 없습니다/, '내용이 없다는 한계를 숨겼다');
+  assert.match(글, /파일 «내용»은 아직 보관 전이라 이 기록에 없습니다/, '보관 전인데 내용이 없다는 한계를 숨겼다');
   /* 아래 큰 단추는 «가장 최근에 보낸» 안내문으로 간다 (보낸 기록은 최근 것이 맨 앞) */
-  assert.match(화면(짐), /class="btn pri" onclick="기록고르기\('n20261002_a1b2c3d4'\)">가장 최근 안내문 열기/, '파일 상세의 큰 단추가 가장 최근 안내문으로 안 간다');
+  assert.match(화면(짐), /class="btn pri" onclick="기록고르기\('n20261002_a1b2c3d4'\)">최근 안내문 열기/, '파일 상세의 큰 단추가 가장 최근 안내문으로 안 간다');
   /* 이 안내문 열기 */
   실행(짐, "기록고르기('n20260928_b2c3d4e5')");
   assert.strictEqual(실행(짐, 'App.지금기록'), 'n20260928_b2c3d4e5'); assert.strictEqual(실행(짐, 'App.지금파일'), '');

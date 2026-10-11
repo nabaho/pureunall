@@ -56,7 +56,7 @@
 <!-- ⚠ 편지 짓개(tpl) «다음»에 싣는다 — 안내문이 그 빛깔(Tpl.색)을 빌린다 -->
 <script src="js/pu-news-notice.js?v=3"></script>
 <!-- ★ 지난 안내문(다음메일 기록) 대장의 «순수 도우미» — 파일별 모으기·연도 칩·대장(CSV) (대표 지시 2026-10-11) -->
-<script src="js/pu-news-noticelog.js?v=1"></script>
+<script src="js/pu-news-noticelog.js?v=2"></script>
 <script src="js/pu-news-regional-sources.js?v=5"></script>
 <script src="js/pu-news-review.js?v=5"></script>
 <style>
@@ -215,6 +215,19 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .nlg-detail .nfile .hs{font-size:11.5px;color:var(--sub);margin-top:2px;overflow-wrap:anywhere}
 .nlg-detail .nfile .hs b{color:var(--ink)}
 .nlg-detail .nfile .go{margin-left:auto;flex:none}
+/* 원문 보관(2026-10-12) — 보관 칩 · 본문 전체 상자 · 내려받기 줄 · «판» 딱지 */
+.nlg-detail .ro.ok{color:#166534;background:#f0fdf4;border-color:#bbf7d0}
+.nlg-detail .nbody.full{white-space:pre-wrap;max-height:340px;overflow:auto}
+.nlg-detail .nfile .nb{min-width:0;flex:1 1 150px}   /* 기본 폭을 줘야 «내려받기» 줄이 모자라면 아래로 내려간다(0 이면 글 칸이 한 글자 폭으로 짜부라진다) */
+.nlg-detail .nfile .dl{margin-left:auto;flex:none;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.nlg-detail a.mini{text-decoration:none;display:inline-block;white-space:nowrap}
+.nlg-detail .nfile .sz{font-size:11px;font-weight:600;color:var(--faint)}
+.nlg-detail .nfile .hs.warn{color:#854d0e}
+.nlg-detail .ver,.nlg-detail .tl .ver{font-size:10.5px;font-weight:800;color:#854d0e;background:#fffbeb;border:1px solid #fde68a;border-radius:99px;padding:1px 7px;margin-left:6px;white-space:nowrap}
+.nlg-detail .vers{display:flex;flex-direction:column;gap:6px}
+.nlg-detail .vers .v{font-size:12.5px}
+.nlg-detail .vers .v .ver{margin-left:0}
+.nlg-ar{font-size:11px}
 .nlg-detail .nco{display:flex;flex-wrap:wrap;gap:6px}
 .nlg-detail .nco span,.nlg-detail .nco button{font-size:12px;border:1px solid var(--line);border-radius:8px;padding:3px 9px;background:#fff;color:var(--ink)}
 .nlg-detail .nco span.card,.nlg-detail .nco button{background:var(--paper);color:var(--sub)}
@@ -244,6 +257,9 @@ input,select,textarea{font-family:inherit;font-size:14px}
   .nlg-detail .sx{padding:10px 14px}
   .nlg-detail .nact{padding:12px 14px}
   .nlg-detail .nact .btn{flex:1 1 calc(50% - 4px);text-align:center}
+  .nlg-detail .nfile{flex-wrap:wrap}
+  .nlg-detail .nfile .nb{flex:1 1 calc(100% - 46px)}
+  .nlg-detail .nfile .dl{margin-left:32px;justify-content:flex-start}
 }
 
 /* ★ 담는 법 — 카드 셋을 «한 줄 띠»로 (대표 지시 2026-09-05 「크기 좀 줄여라,
@@ -4072,7 +4088,10 @@ function 안내빈화면(){
    목록·파일별·칩·대장(CSV)은 순수 도우미 PuNewsNoticeLog(js/pu-news-noticelog.js)가 만들고 화면은 그것을 그린다.
    ⚠ 제목·파일 이름·업체 이름은 사람이 보낸 메일에서 온 글이다 — 전부 esc() 로 거른다.
    ⚠ onclick 글자 안에 제목·파일 이름을 넣지 않는다(따옴표가 있으면 깨진다) — 서버가 만든 열쇠나 줄 «번호»만 쓴다.
-   ⚠ 받는 «주소»는 대장에 없다(업체 이름·수만). 파일 «내용»·본문 전체도 여기엔 없다 — 다음메일에서 연다.
+   ⚠ 받는 «주소»는 어디에도 없다(업체 이름·수만).
+   ★ 원문(본문 전체·첨부 파일·원본 .eml)은 서버(newsletterNoticeArchive, 매일 03:55)가 «메일 한 통»을 받아 지켜 둔 것이다(대표 지시 2026-10-12 「1」).
+     표지(newsletter/noticeLog/archiveIndex)는 대장과 함께 읽히고, 무거운 본(newsletter/noticeArchive/<id>)은 상세를 열 때만 읽는다.
+     보관 전이면 거울의 앞부분(140자)·파일 이름만 보인다. 내려받기 주소는 서버가 만든 토큰 주소뿐(그 밖의 글은 링크로 안 만든다).
    ⚠ 폰에서는 상세가 열리면(.det) 목록을 접고 화면을 채운다(‹ 목록). */
 function 안내기록읽기(){
   if(App.안내기록 !== undefined) return Promise.resolve();
@@ -4081,21 +4100,35 @@ function 안내기록읽기(){
   return db.ref('newsletter/noticeLog').once('value').then(function(s){
     const v = s.val() || {};
     App.안내기록 = v.items || {}; App.안내기록메타 = v.meta || {}; App.안내기록오류 = '';
+    App.안내표지 = v.archiveIndex || {};                  /* 원문 보관 표지 — 없으면 «아직 보관 전» */
   }, function(e){
     App.안내기록 = {}; App.안내기록오류 = (e && e.message) || '읽지 못했습니다';
   }).then(function(){ render(); });
 }
+/* 보관본(noticeArchive/<id>) — 상세를 열 때만, 열 때마다 «한 번». 읽는 중 = null · 읽지 못함 = false(다시 열면 다시 읽는다) */
+function 보관읽기(id){
+  App.안내보관 = App.안내보관 || {};
+  if(App.안내보관[id] === false) delete App.안내보관[id];
+  if(App.안내보관[id] !== undefined) return Promise.resolve();
+  App.안내보관[id] = null;
+  return db.ref('newsletter/noticeArchive/' + id).once('value').then(function(s){
+    App.안내보관[id] = s.val() || false;
+  }, function(){ App.안내보관[id] = false; }).then(function(){ render(); });
+}
+function 기록보관상태(id){ return window.PuNewsNoticeLog.표지상태((App.안내표지 || {})[id]); }
+function 기록보관본(id){ return (App.안내보관 || {})[id]; }
 function 기록다시읽기(){ App.안내기록 = undefined; App.안내기록오류 = ''; render(); }
 function 기록한줄(n){
   const NL = window.PuNewsNoticeLog, 구 = NL.짧은구분(n.구분);
   const 고름 = !App.지금안내 && App.지금기록 === n.id;
-  const 첨 = NL.배열로(n.첨부).length + (Number(n.이름없는첨부) || 0);
+  const 첨 = NL.첨부수(n, App.안내표지 || {});
   /* 제목은 두 줄까지(넘치면 …) · title 에 전문 · 날짜·첨부는 그 밑에 작게 — 좁은 목록 칸에서 한 건이 석 줄이 되던 것을 막는다 */
   return '<div class="item nlg-row' + (고름 ? ' sel' : '') + '" onclick="기록고르기(\'' + esc(n.id) + '\')">'
     + '<span class="pill nlg-' + 구.색 + '">' + esc(구.이름) + '</span>'
     + '<span class="t"><span class="nlg-tt" title="' + esc(n.제목) + '">' + esc(NL.짧은제목(n.제목)) + '</span>'
     + '<span class="nlg-sub">' + esc(n.날짜)
     + (첨 ? ' · <span class="nlg-clip">📎 ' + 첨 + '</span>' : '')
+    + (기록보관상태(n.id) === '보관' ? ' · <span class="nlg-ar" title="원문(본문·파일)이 보관돼 있습니다">📦</span>' : '')
     + (Number(n.사라짐) > 0 ? ' <span class="nlg-gone">메일함에서 사라짐</span>' : '') + '</span></span></div>';
 }
 function 기록파일한줄(f, i){
@@ -4108,7 +4141,7 @@ function 기록파일한줄(f, i){
 function 기록구역(){
   const NL = window.PuNewsNoticeLog; if(!NL) return '';
   const 읽는중 = App.안내기록 === undefined || App.안내기록 === null;
-  const 줄 = NL.목록(App.안내기록 || {}), 파일줄 = NL.파일들(줄);
+  const 줄 = NL.목록(App.안내기록 || {}), 파일줄 = NL.파일들(줄, App.안내표지 || {}), 보관 = NL.보관수(줄, App.안내표지 || {});
   const 보기 = App.기록보기 === 'file' ? 'file' : 'note';
   const 메타 = App.안내기록메타 || {};
   let 칩들 = '', 몸 = '';
@@ -4142,7 +4175,9 @@ function 기록구역(){
         + '<div class="chips">' + 칩들 + '</div>' : '')
     + 몸
     + '<div class="pad hint nlg-note">다음메일(예약·보낸·내게쓴편지함)에서 자동으로 정리한 <b>읽기 전용</b> 기록입니다. 새로 보낸 안내문도 매일 새벽에 더해집니다.'
-    + (정리때 ? ' 마지막 정리 ' + esc(정리때) + '.' : '') + '</div></div>';
+    + (정리때 ? ' 마지막 정리 ' + esc(정리때) + '.' : '')
+    + (줄.length ? ' 원문(본문·파일) 보관 <b>' + 보관.보관 + '/' + 줄.length + '건</b>' + (보관.실패 ? ' · 못 한 것 ' + 보관.실패 + '건(자동으로 다시 시도)' : '') + '.' : '')
+    + '</div></div>';
 }
 /* 상세로 들어가면 «상세의 맨 위»가 보이게 한다.
    · 폰(한 칸 화면): 목록이 접히니 맨 위로.
@@ -4164,7 +4199,7 @@ function 기록위로(){
 /* 누르는 쪽도 그리는 쪽과 «같은 줄»을 본다 — 그릴 때 남긴 값에 기대지 않는다(칩·더 보기가 바뀐 뒤에도 번호가 맞는다) */
 function 기록현재파일줄(){
   const NL = window.PuNewsNoticeLog;
-  return NL.파일거르기(NL.파일들(NL.목록(App.안내기록 || {})), App.기록종 || '');
+  return NL.파일거르기(NL.파일들(NL.목록(App.안내기록 || {}), App.안내표지 || {}), App.기록종 || '');
 }
 /* 폰에서 상세는 목록 위에 얹힌 «한 층»이다 — 폰의 뒤로가기가 앱을 나가지 않고 목록으로 돌아오게 층을 심는다
    (대표 지시 2026-08-30 「스마트폰 가장 아래 뒤로가기 버튼을 누르면 … 직전에 눌렀던 화면으로」, js/pu-back.js).
@@ -4188,17 +4223,28 @@ function 기록접기(){
   const y = App._기록스크롤 || 0; App._기록스크롤 = 0;                /* 폰: 목록이 다시 펴졌으니 보던 자리로 */
   if(y){ try{ window.scrollTo(0, y); }catch(_){} }
 }
-function 기록고르기(id){ App.지금기록 = id; App.지금파일 = ''; App.지금안내 = ''; 기록층열기(); render(); 기록위로(); }
+function 기록고르기(id){
+  App.지금기록 = id; App.지금파일 = ''; App.지금안내 = '';
+  if(기록보관상태(id) === '보관') 보관읽기(id);            /* 보관본(본문·파일 주소)은 «열 때» 읽는다 — 읽는 동안은 「불러오는 중」 */
+  기록층열기(); render(); 기록위로();
+}
 function 파일고르기(i){
   const f = 기록현재파일줄()[i]; if(!f) return;
   App.지금파일 = f.이름; App.지금기록 = ''; App.지금안내 = ''; 기록층열기(); render(); 기록위로();
 }
-/* 안내문 상세의 «파일별로 보기 ›» — i 는 그 안내문의 첨부 번호 */
+/* 안내문 상세의 «파일별로 보기 ›» — i 는 그 안내문의 «첨부 줄 번호»(보관본이 있으면 보관본의 줄, 없으면 거울의 이름 줄 — 그리는 쪽과 같은 줄) */
+function 기록첨부줄(n){
+  const NL = window.PuNewsNoticeLog;
+  const 본 = 기록보관상태(n.id) === '보관' ? 기록보관본(n.id) : null;
+  if(본 && typeof 본 === 'object' && NL.배열로(본.첨부).length)
+    return NL.배열로(본.첨부).map(function(a){ return { 이름: String(a.이름 || ''), 해시: String(a.해시 || ''), 크기: Number(a.크기) || 0, 주소: NL.안전주소(a.주소), 형식: String(a.형식 || '') }; }).filter(function(a){ return a.이름; });
+  return NL.배열로(n.첨부).map(function(x){ return { 이름: String(x), 해시: '', 크기: 0, 주소: '', 형식: '' }; }).filter(function(a){ return a.이름; });
+}
 function 기록파일열기(i){
   const NL = window.PuNewsNoticeLog;
   const n = NL.목록(App.안내기록 || {}).filter(function(r){ return r.id === App.지금기록; })[0];
-  const 이름 = n && NL.배열로(n.첨부).map(String).filter(Boolean)[i]; if(!이름) return;
-  App.기록보기 = 'file'; App.기록종 = ''; App.지금파일 = 이름; App.지금기록 = ''; App.지금안내 = ''; 기록층열기(); render(); 기록위로();
+  const a = n && 기록첨부줄(n)[i]; if(!a) return;
+  App.기록보기 = 'file'; App.기록종 = ''; App.지금파일 = a.이름; App.지금기록 = ''; App.지금안내 = ''; 기록층열기(); render(); 기록위로();
 }
 /* ‹ 목록 단추 — 사람이 직접 닫았으니 층도 «목록에서 뺀다»(뒤로가기 걸음은 PuBack 이 알아서 한다) */
 function 기록닫기(){ 기록층닫기(); 기록접기(); }
@@ -4209,60 +4255,121 @@ function 기록펼치기(id){ App.기록펼침 = id; render(); }
 
 function 기록상세(n){
   const NL = window.PuNewsNoticeLog;
-  const 지도 = {}; NL.파일들(NL.목록(App.안내기록 || {})).forEach(function(f){ 지도[f.이름] = f; });
-  const 이름들 = NL.배열로(n.첨부).map(String).filter(Boolean);
-  const 파일HTML = 이름들.map(function(nm, i){
-    const f = 지도[nm], 여럿 = !!(f && f.횟수 > 1);
-    const 날들 = f ? f.보냄.map(function(b){ return b.날짜; }).slice().sort() : [];
-    return '<div class="nfile"><span class="ic">' + NL.아이콘(NL.확장자(nm)) + '</span><div><div class="nm">' + esc(nm) + '</div>'
-      + '<div class="hs">' + (여럿 ? '<b>' + f.횟수 + '번</b> 보냈습니다 — ' + esc(날들.join(' · '))
-        : '이 파일은 <b>이번 한 번</b> 보냈습니다 — ' + esc(n.날짜)) + '</div></div>'
-      + (여럿 ? '<div class="go"><button class="mini" onclick="기록파일열기(' + i + ')">파일별로 보기 ›</button></div>' : '') + '</div>';
-  }).join('') + (Number(n.이름없는첨부) > 0
-    ? '<div class="nfile"><span class="ic">📎</span><div class="hs">이름이 기록에 없는 첨부 ' + Number(n.이름없는첨부) + '개</div></div>' : '');
-  const 칩들 = NL.배열로(n.업체).map(function(x){ return { 글: String(x), 칸: '' }; })
-    .concat(NL.배열로(n.명함업체).map(function(x){ return { 글: String(x) + '(명함)', 칸: 'card' }; }));
+  const 상태 = 기록보관상태(n.id), 표 = (App.안내표지 || {})[n.id] || {};
+  const 본 = 상태 === '보관' ? 기록보관본(n.id) : undefined;             /* undefined = 아직 안 읽음 · null = 읽는 중 · false = 읽지 못함 */
+  const 읽음 = !!(본 && typeof 본 === 'object');
+  const 줄들 = NL.목록(App.안내기록 || {}), 판 = NL.판정보(줄들, App.안내표지 || {});
+  const 지도 = {}; NL.파일들(줄들, App.안내표지 || {}).forEach(function(f){ 지도[f.이름] = f; });
+  const 받은곳 = (읽음 && 본.받은곳 && typeof 본.받은곳 === 'object') ? 본.받은곳 : null;   /* 원문 머리글로 «확인»한 받은 곳 */
+
+  /* ── 첨부 파일 — 보관본이 있으면 «전부(크기·내려받기)», 없으면 거울의 이름(최대 5개) ── */
+  const 첨부들 = 기록첨부줄(n);
+  const 파일HTML = 첨부들.map(function(a, i){
+    const nm = a.이름, f = 지도[nm], 여럿 = !!(f && f.횟수 > 1);
+    const 이판 = a.해시 ? NL.판찾기(판, nm, a.해시) : null, 판수 = (판[nm] && 판[nm].판들.length) || 0;
+    const 날들 = (이판 ? 이판.보냄.map(function(b){ return b.날짜; }) : (f ? f.보냄.map(function(b){ return b.날짜; }) : [])).slice().sort();
+    const 횟수 = 이판 ? 이판.횟수 : (f ? f.횟수 : 0);
+    const 설명 = 횟수 > 1
+      ? '<b>' + 횟수 + '번</b> ' + (이판 ? '같은 내용으로 ' : '') + '보냈습니다 — ' + esc(날들.join(' · '))
+      : '이 파일은 <b>이번 한 번</b> 보냈습니다 — ' + esc(n.날짜);
+    const 판말 = (이판 && 판수 > 1) ? '<div class="hs warn">같은 이름의 파일이 <b>내용이 달라진 적</b>이 있습니다(판 ' + 판수 + '개) — 이 파일은 «판 ' + NL.판글자(이판.번호) + '»입니다.</div>' : '';
+    return '<div class="nfile"><span class="ic">' + NL.아이콘(NL.확장자(nm)) + '</span><div class="nb"><div class="nm">' + esc(nm)
+      + (이판 && 판수 > 1 ? '<span class="ver">판 ' + esc(NL.판글자(이판.번호)) + '</span>' : '')
+      + (a.크기 ? ' <span class="sz">' + esc(NL.크기글(a.크기)) + '</span>' : '') + '</div>'
+      + '<div class="hs">' + 설명 + '</div>' + 판말 + '</div>'
+      + ((여럿 || a.주소) ? '<div class="dl">'
+        + (a.주소 ? '<a class="mini" href="' + esc(a.주소) + '" target="_blank" rel="noopener noreferrer">📥 내려받기</a>' : '')
+        + (여럿 ? '<button class="mini" onclick="기록파일열기(' + i + ')">파일별로 보기 ›</button>' : '') + '</div>' : '') + '</div>';
+  }).join('')
+    + (읽음 ? NL.배열로(본.건너뜀).map(function(k){ return '<div class="nfile"><span class="ic">⚠</span><div class="nb"><div class="nm">' + esc(k && k.이름) + '</div><div class="hs warn">보관하지 않았습니다 — ' + esc(k && k.까닭) + '</div></div></div>'; }).join('') : '')
+    + (!읽음 && Number(n.이름없는첨부) > 0 ? '<div class="nfile"><span class="ic">📎</span><div class="hs">이름이 기록에 없는 첨부 ' + Number(n.이름없는첨부) + '개</div></div>' : '')
+    + (읽음 && 본.원본 && NL.안전주소(본.원본.주소) ? '<div class="nfile"><span class="ic">✉</span><div class="nb"><div class="nm">원본 메일(.eml) <span class="sz">' + esc(NL.크기글(본.원본.크기)) + '</span></div>'
+      + '<div class="hs">그림·서식까지 그대로 — 메일 프로그램(아웃룩 등)에서 열립니다.</div></div>'
+      + '<div class="dl"><a class="mini" href="' + esc(NL.안전주소(본.원본.주소)) + '" target="_blank" rel="noopener noreferrer">📥 내려받기</a></div></div>' : '');
+  const 첨부수 = 읽음 ? 첨부들.length : 첨부들.length + (Number(n.이름없는첨부) || 0);
+
+  /* ── 받은 곳 — 원문 머리글로 확인했으면 그것, 아니면 거울(한 통 8명까지) ── */
+  const 업체 = NL.배열로(받은곳 ? 받은곳.업체 : n.업체), 명함 = NL.배열로(받은곳 ? 받은곳.명함업체 : n.명함업체);
+  const 칩들 = 업체.map(function(x){ return { 글: String(x), 칸: '' }; }).concat(명함.map(function(x){ return { 글: String(x) + '(명함)', 칸: 'card' }; }));
   const 한도 = App.기록펼침 === n.id ? 9999 : 18;
   const 칩HTML = 칩들.slice(0, 한도).map(function(c){ return '<span class="' + c.칸 + '">' + esc(c.글) + '</span>'; }).join('')
     + (칩들.length > 한도 ? '<button onclick="기록펼치기(\'' + esc(n.id) + '\')">+' + (칩들.length - 한도) + '곳 ▾</button>' : '');
+  const 주소수 = 받은곳 ? (Number(받은곳.받는주소수) || 0) : (Number(n.받는주소수) || 0);
+  const 받은곳말 = 받은곳
+    ? '<b>원문 머리글 기준</b> — 받은 주소 ' + 주소수 + '개(메일 ' + (Number(받은곳.메일수) || 0) + '통 · 한 통 최대 ' + (Number(받은곳.한통최대) || 0) + '명). 업체 이름은 «같은 이메일 주소»로 찾았습니다(업체관리 → 기업정보함 명함 순). 어느 쪽에도 없는 주소 '
+      + (Number(받은곳.업체미확인) || 0) + '개는 수만 적습니다. 숨은참조는 원문에도 없어 알 수 없습니다.'
+    : '업체 이름은 «같은 이메일 주소»로 찾았습니다(업체관리 → 기업정보함 명함 순). 어느 쪽에도 없는 주소 ' + (Number(n.업체미확인) || 0) + '개는 수만 적습니다.';
+
+  /* ── 내용 — 보관본이 있으면 본문 전체, 읽는 중·읽지 못함·보관 전·보관 실패는 각각 다른 말 ── */
+  const 앞부분 = '<div class="nbody">' + esc(n.미리보기 || '(앞부분이 기록에 없습니다)')
+    + '<div class="cut">※ 메일 앞부분만 기록에 남아 있습니다 — 전체 글은 「메일함에서 찾기」로 봅니다.</div></div>';
+  let 내용;
+  if(읽음){
+    const 글 = String(본.본문 || '');
+    내용 = '<div class="l">내용 (메일 본문 전체)</div><div class="nbody full">' + (글 ? esc(글) : '(본문이 비어 있습니다)')
+      + (본.본문잘림 ? '<div class="cut">※ 긴 글이라 앞 ' + 글.length.toLocaleString() + '자만 보관했습니다(전체 ' + (Number(본.본문길이) || 0).toLocaleString() + '자) — 나머지는 원본 메일(.eml)에 있습니다.</div>' : '')
+      + '</div><div class="hint" style="margin:6px 0 0">보관 ' + esc(NL.날짜글(표.때)) + ' · ' + (본.방법 === 'pop3' ? '다음메일(POP3 — 창 밖이라 이 길로 받았습니다)' : '다음메일(IMAP)' + (본.메일 && 본.메일.칸 ? ' ' + esc(본.메일.칸) : '')) + ' · 메일 ' + esc(NL.크기글(본.메일 && 본.메일.크기)) + '</div>';
+  } else if(상태 === '보관' && 본 === null){
+    내용 = '<div class="l">내용 (메일 본문 전체)</div><div class="nbody">불러오는 중…</div>';
+  } else if(상태 === '보관' && 본 === false){
+    내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="lim" style="margin-top:6px">⚠ 보관된 원문을 읽지 못했습니다 — 이 안내문을 다시 열어 보십시오.</div>';
+  } else if(상태 === '실패'){
+    const 실 = 표.실패 || {};
+    내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="lim" style="margin-top:6px">⚠ 원문을 보관하지 못했습니다 — ' + esc(실.까닭 || '까닭을 모릅니다') + ' (' + (Number(실.횟수) || 1) + '번 시도 · 매일 새벽 다시 시도합니다)</div>';
+  } else {
+    내용 = '<div class="l">내용 (메일 첫머리)</div>' + 앞부분 + '<div class="hint" style="margin:6px 0 0">📦 아직 원문 보관 전입니다 — 새벽(매일)에 메일 한 통을 받아 본문·파일을 보관합니다.</div>';
+  }
+
   const 구 = NL.짧은구분(n.구분);
+  const 보관칩 = 상태 === '보관' ? '<span class="ro ok">📦 원문 보관됨 ' + esc(NL.날짜글(표.때)) + '</span>'
+    : 상태 === '실패' ? '<span class="ro">⚠ 원문 보관 못 함</span>' : '<span class="ro">📦 보관 전</span>';
   return '<div class="box nlg-detail">'
     + '<div class="nlg-sheetbar"><button class="mini" onclick="기록닫기()">‹ 목록</button><b>' + esc(NL.요일말(n.날짜) + ' ' + 구.이름) + '</b></div>'
-    + '<div class="dh"><h2>' + esc(n.제목) + '</h2><div class="meta"><span class="ro">다음메일 기록 · 읽기 전용</span>'
+    + '<div class="dh"><h2>' + esc(n.제목) + '</h2><div class="meta"><span class="ro">다음메일 기록 · 읽기 전용</span>' + 보관칩
     + '<span>📅 ' + esc(NL.요일말(n.날짜, true)) + '</span><span>' + esc(n.구분) + '</span><span>' + esc(NL.기록위치(n)) + '</span>'
-    + '<span>받은 주소 ' + (Number(n.받는주소수) || 0) + '개</span></div></div>'
-    + '<div class="sx"><div class="l">내용 (메일 첫머리)</div><div class="nbody">' + esc(n.미리보기 || '(앞부분이 기록에 없습니다)')
-    + '<div class="cut">※ 메일 앞부분만 기록에 남아 있습니다 — 전체 글은 「메일함에서 찾기」로 봅니다.</div></div></div>'
-    + (파일HTML ? '<div class="sx"><div class="l">첨부 파일 ' + (이름들.length + (Number(n.이름없는첨부) || 0)) + '개 — 언제 어떤 안내문에 붙여 보냈나</div>' + 파일HTML + '</div>' : '')
-    + '<div class="sx"><div class="l">받은 곳 — 업체 이름을 찾은 ' + NL.받은곳수(n) + '곳</div>'
+    + '<span>받은 주소 ' + 주소수 + '개' + (받은곳 ? ' (원문 기준)' : '') + '</span></div></div>'
+    + '<div class="sx">' + 내용 + '</div>'
+    + (파일HTML ? '<div class="sx"><div class="l">첨부 파일 ' + 첨부수 + '개 — 언제 어떤 안내문에 붙여 보냈나</div>' + 파일HTML + '</div>' : '')
+    + '<div class="sx"><div class="l">받은 곳 — 업체 이름을 찾은 ' + 칩들.length + '곳</div>'
     + (칩HTML ? '<div class="nco">' + 칩HTML + '</div>' : '<div class="hint" style="margin:0">업체 이름을 찾은 곳이 없습니다.</div>')
-    + '<div class="hint" style="margin-top:8px">업체 이름은 «같은 이메일 주소»로 찾았습니다(업체관리 → 기업정보함 명함 순). 어느 쪽에도 없는 주소 '
-    + (Number(n.업체미확인) || 0) + '개는 수만 적습니다.</div></div>'
-    + (NL.한계말(n).length ? '<div class="sx">' + NL.한계말(n).map(function(t){ return '<div class="lim">⚠ ' + esc(t) + '</div>'; }).join('') + '</div>' : '')
+    + '<div class="hint" style="margin-top:8px">' + 받은곳말 + '</div></div>'
+    + (NL.한계말(n, 읽음 ? 본 : null).length ? '<div class="sx">' + NL.한계말(n, 읽음 ? 본 : null).map(function(t){ return '<div class="lim">⚠ ' + esc(t) + '</div>'; }).join('') + '</div>' : '')
     + (App.기록찾기 === n.id ? '<div class="sx"><div class="info">📨 ' + esc(NL.찾기말(n).안내) + '</div></div>' : '')
     + '<div class="nact"><button class="btn pri" onclick="기록메일함찾기(\'' + esc(n.id) + '\')">📨 메일함에서 찾기</button>'
     + '<button class="btn" onclick="기록내려받기()">⬇ 대장 내려받기</button></div></div>';
 }
 function 파일상세(이름){
   const NL = window.PuNewsNoticeLog;
-  const f = NL.파일들(NL.목록(App.안내기록 || {})).filter(function(x){ return x.이름 === 이름; })[0];
+  const 줄들 = NL.목록(App.안내기록 || {});
+  const f = NL.파일들(줄들, App.안내표지 || {}).filter(function(x){ return x.이름 === 이름; })[0];
   if(!f) return null;
+  const 표들 = App.안내표지 || {}, 판 = NL.판정보(줄들, 표들), g = 판[이름], 판수 = g ? g.판들.length : 0;
   const 타임라인 = f.보냄.map(function(b){
-    return '<div class="e"><div class="dt">' + esc(NL.요일말(b.날짜, true)) + ' · 받은 주소 ' + b.받는주소수 + '개</div>'
+    const 표 = 표들[b.id], 해 = NL.배열로(표 && 표.해시들).filter(function(h){ return h && h.이름 === 이름; })[0];
+    const v = (해 && NL.표지상태(표) === '보관') ? NL.판찾기(판, 이름, 해.해시) : null;
+    return '<div class="e"><div class="dt">' + esc(NL.요일말(b.날짜, true)) + ' · 받은 주소 ' + b.받는주소수 + '개'
+      + (v && 판수 > 1 ? ' <span class="ver">판 ' + esc(NL.판글자(v.번호)) + '</span>' : '') + (v ? ' <span class="nlg-ar" title="원문 보관됨">📦</span>' : '') + '</div>'
       + '<div class="tt">' + esc(b.제목) + '</div>'
       + (b.미리보기 ? '<div class="cv">「' + esc(b.미리보기.slice(0, 90)) + (b.미리보기.length > 90 ? ' …' : '') + '」</div>' : '')
       + (b.함께.length ? '<div class="wf"><span>함께 보낸 파일</span>'
         + b.함께.map(function(n){ return '<span>' + NL.아이콘(NL.확장자(n)) + ' ' + esc(n) + '</span>'; }).join('') + '</div>' : '')
       + '<div style="margin-top:6px"><button class="mini" onclick="기록고르기(\'' + esc(b.id) + '\')">이 안내문 열기 ›</button></div></div>';
   }).join('');
+  const 판말 = 판수 > 1
+    ? '<div class="sx"><div class="l">같은 이름 · 내용이 다른 판 ' + 판수 + '개 <span style="font-weight:600">(보관된 안내문 기준)</span></div><div class="vers">'
+      + g.판들.map(function(v){ return '<div class="v"><span class="ver">판 ' + esc(NL.판글자(v.번호)) + '</span> ' + esc(v.처음 === v.마지막 ? v.처음 : v.처음 + ' ~ ' + v.마지막) + ' · ' + v.횟수 + '번' + (v.크기 ? ' · ' + esc(NL.크기글(v.크기)) : '') + '</div>'; }).join('') + '</div></div>'
+    : '';
   return '<div class="box nlg-detail">'
     + '<div class="nlg-sheetbar"><button class="mini" onclick="기록닫기()">‹ 목록</button><b>' + f.아이콘 + ' ' + esc(f.이름) + '</b></div>'
     + '<div class="dh"><h2>' + f.아이콘 + ' ' + esc(f.이름) + '</h2><div class="meta"><span class="ro">다음메일 기록 · 읽기 전용</span>'
     + '<span>' + esc(f.종류) + (f.확장 ? ' (.' + esc(f.확장) + ')' : '') + '</span><span><b>' + f.횟수 + '번</b> 보냈습니다</span>'
-    + '<span>처음 ' + esc(f.처음) + '</span><span>마지막 ' + esc(f.마지막) + '</span></div></div>'
+    + '<span>처음 ' + esc(f.처음) + '</span><span>마지막 ' + esc(f.마지막) + '</span>' + (판수 > 1 ? '<span class="ro">내용이 다른 판 ' + 판수 + '개</span>' : '') + '</div></div>'
+    + 판말
     + '<div class="sx"><div class="l">이 파일을 언제 · 어떤 안내문에 붙여 · 어떤 말과 함께 보냈나</div><div class="tl">' + 타임라인 + '</div></div>'
-    + '<div class="sx"><div class="info">ℹ 파일 «이름» · 보낸 때 · 안내문 제목과 말머리는 기록돼 있습니다. 파일 «내용» 자체는 이 기록에 없습니다 — 다음메일에서 열어 확인합니다.</div></div>'
-    + '<div class="nact"><button class="btn pri" onclick="기록고르기(\'' + esc(f.보냄[0].id) + '\')">가장 최근 안내문 열기</button>'
+    + '<div class="sx"><div class="info">' + (g
+      ? 'ℹ 보관된 안내문(📦)에서는 파일 «내용»까지 내려받을 수 있습니다 — 아래 «이 안내문 열기»에서 «📥 내려받기». 아직 보관 전인 안내문은 이름·보낸 때·제목·말머리만 기록돼 있습니다.'
+      : 'ℹ 파일 «이름» · 보낸 때 · 안내문 제목과 말머리는 기록돼 있습니다. 파일 «내용»은 아직 보관 전이라 이 기록에 없습니다 — 보관되면(매일 새벽) 안내문 상세에서 내려받을 수 있습니다.') + '</div></div>'
+    + '<div class="nact"><button class="btn pri" onclick="기록고르기(\'' + esc(f.보냄[0].id) + '\')">최근 안내문 열기</button>'
     + '<button class="btn" onclick="기록내려받기()">⬇ 대장 내려받기</button></div></div>';
 }
 /* 「메일함에서 찾기」 — 푸른 메일함에 «폴더·번호로 여는 길»이 아직 없어 1차는 제목을 복사하고 메일함을 열어 안내한다.
@@ -4286,7 +4393,7 @@ function 기록내려받기(){
   const NL = window.PuNewsNoticeLog, 줄 = NL.목록(App.안내기록 || {});
   if(!줄.length) return toast('내려받을 기록이 없습니다');
   const 오늘 = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-  const blob = new Blob([NL.대장글(줄)], { type:'text/csv;charset=utf-8' });
+  const blob = new Blob([NL.대장글(줄, App.안내표지 || {})], { type:'text/csv;charset=utf-8' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = '안내문_발송대장_' + 오늘 + '.csv';
   document.body.appendChild(a); a.click(); a.remove();

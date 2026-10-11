@@ -32,7 +32,7 @@
 ## 진행
 1. [x] 순수 모듈 `functions/news-notice-archive.js` + 검사 `tests/news-notice-archive.test.js`(23 — 가짜 IMAP·POP3(3천 통 상자)·창고·DB, 진짜 mailparser 는 «있을 때만») · 망가뜨린 **42가지 모두 걸림**
 2. [x] `functions/index.js` 연결(`newsletterNoticeArchive`, 매일 03:55) · 포털 요금 글(하루 509→510번 · 「안내문 원문 보관 하루 한 번」)·`billing-auto-truth`(스케줄 23→24) · `require('./index.js')` 2.3초에 읽힘 · 관련 검사 279개 파일 종료코드 0
-3. [ ] 화면(상세·파일별·읽기 경로) + 검사
+3. [x] 화면(상세·파일별·읽기 경로) + 검사 — `pu-news.html`·`js/pu-news-noticelog.js`(캐시 1→2). 보관본은 상세를 열 때만 읽고(`newsletter/noticeArchive/<id>`, 쓰지 않음) 가벼운 표지(`archiveIndex`)는 대장과 함께 읽는다. 검사: 보관본 화면 11 · 도우미 21 · 망가뜨린 **41가지 모두 걸림**. 규칙 변경 없음 — `newsletter` 칸이 이미 «관리자만 읽기/쓰기»라 새 자리도 그 안에 있다
 4. [ ] PR → 합침 → **이름 찍어 배포**(`functions:newsletterNoticeArchive`, 최신 origin/main 에서) → 예약 작업 «지금 실행»(us-central1) → 로그·결과 확인
 5. [ ] 운영 확인(읽기만): 23건 중 몇 건 보관됐나 · 창 밖 3건은 POP3 로 찾았나 · 받은 곳 수 바로잡힘 여부
 
