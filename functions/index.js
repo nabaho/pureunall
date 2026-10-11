@@ -1693,7 +1693,9 @@ async function 뉴스레터경고판갱신(db) {
   const 반송들 = (await db.ref("newsletter/bounces").once("value")).val() || {};
   /* 손으로 보낸 회차 — 감시 기록에 발송 ok 가 안 남는다. 회차 원본의 보낸때로 가린다(2026-10-09) */
   const 보낸때 = 열쇠 ? Number((await db.ref("newsletter/issues/" + 열쇠 + "/보낸때").once("value")).val()) || 0 : 0;
-  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null, 반송들, { 보낸때 });
+  /* 팝업 머리말에 «2026년 10월 2주차» 처럼 사람이 읽는 이름을 쓴다(대표 지시 2026-10-11) — 없으면 비워 둔다 */
+  const 회차이름 = 열쇠 ? String((await db.ref("newsletter/issues/" + 열쇠 + "/회차/이름").once("value")).val() || "") : "";
+  const 판 = NWatch.경고판짓기(열쇠 ? Object.assign({ 열쇠 }, v[열쇠]) : null, 반송들, { 보낸때, 회차이름 });
   await db.ref("newsletter/watch/현재").set(Object.assign({ 때: Date.now() }, 판));
 }
 /* 법제처 원문 조문 읽기 (대표 결정 2026-10-05 「추천대로」 — 서버가 원문을 직접 읽어 AI 에게 넘긴다)

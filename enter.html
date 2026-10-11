@@ -308,6 +308,34 @@ input:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(30,64,175,.12);
 .tile .nl-warn{position:absolute;top:6px;right:12px;min-width:20px;height:20px;padding:0 6px;border-radius:10px;
   background:#dc2626;color:#fff;font-size:.66rem;font-weight:800;line-height:20px;display:flex;align-items:center;
   justify-content:center;box-shadow:0 1px 4px rgba(0,0,0,.2);white-space:nowrap}
+/* 뉴스레터 ⚠ 를 누르면 «왜 떴는지» 팝업 (대표 지시 2026-10-11 「클릭하면 왜 경고가 나왔는지 팝업 나오게 해달라」)
+   — kkModal 과 같은 짜임. 색은 5색군(gray·blue·amber·red)만: amber=확인 필요 · red=안 나감·막힘 · gray=조용한 안내 */
+.tile .nl-warn{cursor:pointer}
+.tile .nl-warn:focus-visible{outline:2px solid #1e40af;outline-offset:2px}
+#nlWarnModal{display:none;position:fixed;inset:0;background:rgba(15,23,42,.5);z-index:75;align-items:center;justify-content:center;padding:16px;}
+#nlWarnModal .box{background:#fff;border-radius:16px;width:480px;max-width:100%;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 50px rgba(15,23,42,.3);}
+#nlWarnModal .hd{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px;flex-shrink:0;}
+#nlWarnModal .hi{width:34px;height:34px;border-radius:50%;background:#fef2f2;border:1px solid #fecaca;color:#dc2626;display:flex;align-items:center;justify-content:center;font-size:1rem;flex:none;}
+#nlWarnModal .hd b{display:block;font-size:1rem;font-weight:800;letter-spacing:-.3px;}
+#nlWarnModal .sub{font-size:.74rem;color:#64748b;margin-top:3px;}
+#nlWarnModal .hd .x{margin-left:auto;cursor:pointer;color:#94a3b8;font-size:1.2rem;background:none;border:none;line-height:1;padding:2px 4px;}
+#nlWarnModal .bd{padding:0 18px 4px;overflow-y:auto;}
+#nlWarnModal .it{border:1px solid #fde68a;border-left:4px solid #d97706;background:#fffbeb;border-radius:10px;padding:11px 13px;margin-bottom:9px;}
+#nlWarnModal .it.red{border-color:#fecaca;border-left-color:#dc2626;background:#fef2f2;}
+#nlWarnModal .it.gray{border-color:#e2e8f0;border-left-color:#94a3b8;background:#f8fafc;}
+#nlWarnModal .top{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:5px;}
+#nlWarnModal .chip{display:inline-block;font-size:.7rem;font-weight:800;border-radius:99px;padding:2px 9px;background:#fffbeb;color:#854d0e;border:1px solid #fde68a;}
+#nlWarnModal .it.red .chip{background:#fef2f2;color:#991b1b;border-color:#fecaca;}
+#nlWarnModal .it.gray .chip{background:#f8fafc;color:#475569;border-color:#cbd5e1;}
+#nlWarnModal .when{font-size:.7rem;color:#64748b;white-space:nowrap;}
+#nlWarnModal .t{font-size:.92rem;font-weight:800;margin-bottom:6px;letter-spacing:-.2px;word-break:keep-all;overflow-wrap:anywhere;}
+#nlWarnModal .l{font-size:.72rem;font-weight:800;color:#64748b;margin-top:6px;}
+#nlWarnModal .p{font-size:.83rem;line-height:1.55;color:#1e293b;margin-top:1px;word-break:keep-all;overflow-wrap:anywhere;}
+#nlWarnModal .tip{font-size:.75rem;color:#64748b;line-height:1.5;padding:2px 18px 12px;flex-shrink:0;}
+#nlWarnModal .ft{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid #f8fafc;background:#f8fafc;flex-shrink:0;}
+#nlWarnModal .nlw-btn{font-size:.85rem;font-weight:700;border-radius:9px;padding:9px 16px;border:1px solid #cbd5e1;background:#fff;color:#475569;cursor:pointer;font-family:inherit;}
+#nlWarnModal .nlw-btn.pri{background:#1e40af;border-color:#1e40af;color:#fff;}
+#nlWarnModal .nlw-btn:focus-visible,#nlWarnModal .hd .x:focus-visible{outline:2px solid #1e40af;outline-offset:2px;}
 /* 준비중 — 관리자 화면의 딱지 · 줄 오른쪽 끝으로 미는 자리 (대표 지시 2026-10-09) */
 .tile .tile-soon-pill{position:absolute;top:4px;left:50%;transform:translateX(2px);display:inline-block;
   background:#d97706;color:#fff;font-size:.6rem;font-weight:800;line-height:1;padding:3px 7px;
@@ -1426,6 +1454,24 @@ body.portal-mode #moreFab{display:flex;}
   </div>
 </div>
 
+<!-- ── 뉴스레터 ⚠ 경고 — 왜 떴는지 (대표 지시 2026-10-11 「클릭하면 왜 경고가 나왔는지 팝업 나오게 해달라」)
+     관리자만 읽는 경고판(newsletter/watch/현재)으로 채운다. 포털 뉴스레터 타일의 ⚠ 를 누르면 열린다. -->
+<div id="nlWarnModal" role="dialog" aria-modal="true" aria-labelledby="nlwTitle">
+  <div class="box">
+    <div class="hd">
+      <span class="hi" aria-hidden="true">⚠</span>
+      <div><b id="nlwTitle">뉴스레터 — 확인할 것</b><div class="sub" id="nlwSub"></div></div>
+      <button class="x" id="nlwClose" type="button" aria-label="닫기">✕</button>
+    </div>
+    <div class="bd" id="nlwBody"></div>
+    <div class="tip">💡 문제가 없어지면 이 표시는 저절로 사라집니다. 월요일 발송이 끝나면 「보내기 전 점검」 항목은 더 세지 않습니다.</div>
+    <div class="ft">
+      <button class="nlw-btn" id="nlwOk" type="button">닫기</button>
+      <button class="nlw-btn pri" id="nlwGo" type="button">자동화 점검 열기 ›</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── (관리자) 카카오 로그인 현황 ── -->
 <div id="kkAdminModal" role="dialog" aria-modal="true" aria-labelledby="kkAdminTitle">
   <div class="box" style="width:560px">
@@ -1511,7 +1557,98 @@ body.portal-mode #moreFab{display:flex;}
        문제 발생등에 대한 경고 표시를 해서 검토 할 수 있게 해라」) ──
      서버 감시꾼이 newsletter/watch/현재 에 «지금 사람이 볼 것»을 세어 둔다. 여기는 그 한 칸만 읽는다(한 번).
      ⚠ 문제가 없으면 아무것도 안 그린다 — 늘 떠 있는 표시는 곧 아무도 안 본다.
-     ⚠ 관리자만 읽을 수 있는 자리다. 읽기가 막히면(직원) 조용히 넘어간다 — 칸도 관리자에게만 보인다. */
+     ⚠ 관리자만 읽을 수 있는 자리다. 읽기가 막히면(직원) 조용히 넘어간다 — 칸도 관리자에게만 보인다.
+     ★ 2026-10-11 대표 지시 「경고표시 뭐냐 … 클릭하면 왜 경고가 나왔는지 팝업 나오게 해달라」
+       — ⚠ 를 누르면 «왜 떴는지»가 팝업으로 보인다(서버가 줄마다 적어 둔 까닭 = 경고판 줄들).
+         타일의 다른 곳을 누르면 예전처럼 앱이 열린다. 옛 경고판(줄들 없음)이면 말들만으로 그린다.
+       ⚠ 까닭 글은 AI 가 쓴 것이다 — 화면에는 textContent 로만 넣는다(innerHTML 금지 — 검사가 막는다). */
+  var 뉴스레터종류 = {
+    ai:       { 칩:'🤖 AI 교정이 올림', 톤:'amber', 안내:'AI 가 편지를 법제처 원문·판례 원문과 견주어 올린 «확인할 것»입니다. 틀릴 수도 있어 사람이 보고 판단하며, 발송은 막지 않습니다.' },
+    you:      { 칩:'⚠ 확인 필요', 톤:'amber', 안내:'발송은 되지만 사람이 한 번 보면 좋은 것입니다. 자세한 내용은 자동화 점검에 있습니다.' },
+    block:    { 칩:'⛔ 안 나감', 톤:'red', 안내:'이대로는 월요일에 편지가 나가지 않습니다. 까닭을 보고 자동화 점검에서 다시 하거나 설정을 고쳐 주십시오.' },
+    send:     { 칩:'⛔ 발송 막힘', 톤:'red', 안내:'자동 발송이 나가지 못했습니다. 두 번 나가는 것을 막으려고 서버는 스스로 다시 보내지 않습니다 — 까닭을 보고 뉴스레터 화면에서 손으로 보내 주십시오.' },
+    giveup:   { 칩:'⚠ AI 초안 못 채움', 톤:'red', 안내:'금요일 준비가 AI 초안을 끝내 못 채웠습니다. 뉴스레터 화면에서 비어 있는 꼭지를 확인해 직접 채워 주십시오.' },
+    delivery: { 칩:'⚠ 전달 실패', 톤:'red', 안내:'받는 분 가운데 전달이 안 됐거나 확인이 필요한 통이 있습니다. 뉴스레터 › 보낸 결과에서 주소를 확인해 주십시오.' },
+    bounce:   { 칩:'반송', 톤:'gray', 안내:'주소가 없거나 받는 쪽이 거부한 것 가운데 사람이 처리할 것이 있습니다. 받는 곳 › 반송·거부에서 처리해 주십시오.' }
+  };
+  var 뉴스레터경고칸 = null, 뉴스레터경고단추 = null, 뉴스레터경고묶음 = false;
+  /* 실시간DB 는 배열을 «번호 열쇠 객체»로 줄 때도 있다 — 둘 다 배열로 */
+  function 뉴스레터경고목록(x){
+    if(!x || typeof x !== 'object') return [];
+    if(Array.isArray(x)) return x;
+    return Object.keys(x).sort(function(a, b){ return Number(a) - Number(b); }).map(function(k){ return x[k]; });
+  }
+  /* 서울 시각 «10/11(일) 18:00» */
+  function 뉴스레터경고때말(ms){
+    ms = Number(ms) || 0;
+    if(!ms) return '';
+    var d = new Date(ms + 9 * 3600 * 1000), p = function(n){ return (n < 10 ? '0' : '') + n; };
+    return (d.getUTCMonth() + 1) + '/' + d.getUTCDate() + '(' + '일월화수목금토'.charAt(d.getUTCDay()) + ') ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes());
+  }
+  /* 경고판 → 팝업에 그릴 줄들. 줄들 이 없으면(옛 경고판) 말들 만으로 «확인 필요» 줄을 만든다 */
+  function 뉴스레터경고줄들(v){
+    var 줄들 = 뉴스레터경고목록(v.줄들);
+    if(!줄들.length) 줄들 = 뉴스레터경고목록(v.말들).map(function(m){ return { 종류:'you', 말:m, 까닭:'', 때:0 }; });
+    return 줄들.filter(function(x){ return x && x.말; }).map(function(x){
+      var k = Object.prototype.hasOwnProperty.call(뉴스레터종류, x.종류) ? 뉴스레터종류[x.종류] : 뉴스레터종류.you;
+      return { 칩:k.칩, 톤:k.톤, 안내:k.안내, 말:String(x.말), 까닭:String(x.까닭 || ''), 때:뉴스레터경고때말(x.때), 수:Number(x.수) || 1 };
+    });
+  }
+  function 뉴스레터경고만들기(태그, 클래스, 글){
+    var e = document.createElement(태그);
+    if(클래스) e.className = 클래스;
+    if(글 != null) e.textContent = 글;
+    return e;
+  }
+  function 뉴스레터경고열기(v, 칸, 단추){
+    var 줄들 = 뉴스레터경고줄들(v), n = Number(v.경고수) || 줄들.length, 본 = 0;
+    줄들.forEach(function(r){ 본 += r.수; });
+    var 머리 = String(v.회차이름 || v.열쇠 || '');
+    if(n > 본) 머리 += (머리 ? ' · ' : '') + '외 ' + (n - 본) + '건은 자동화 점검에서 볼 수 있습니다';
+    $('nlwTitle').textContent = '뉴스레터 — 확인할 것 ' + n + '건';
+    $('nlwSub').textContent = 머리;
+    var bd = $('nlwBody'); bd.textContent = '';
+    줄들.forEach(function(r){
+      var it = 뉴스레터경고만들기('div', 'it ' + r.톤), top = 뉴스레터경고만들기('div', 'top');
+      top.appendChild(뉴스레터경고만들기('span', 'chip', r.칩));
+      if(r.때) top.appendChild(뉴스레터경고만들기('span', 'when', r.때));
+      it.appendChild(top);
+      it.appendChild(뉴스레터경고만들기('div', 't', r.말));
+      if(r.까닭){ it.appendChild(뉴스레터경고만들기('div', 'l', '왜 떴나요')); it.appendChild(뉴스레터경고만들기('div', 'p', r.까닭)); }
+      it.appendChild(뉴스레터경고만들기('div', 'l', '어떻게 하나요'));
+      it.appendChild(뉴스레터경고만들기('div', 'p', r.안내));
+      bd.appendChild(it);
+    });
+    $('nlwGo').textContent = (v.탭 === 'bounce' ? '반송·거부 열기' : '자동화 점검 열기') + ' ›';
+    뉴스레터경고칸 = 칸 || null; 뉴스레터경고단추 = 단추 || null;
+    뉴스레터경고묶기();
+    $('nlWarnModal').style.display = 'flex';
+    $('nlwOk').focus();
+  }
+  function 뉴스레터경고닫기(포커스){
+    $('nlWarnModal').style.display = 'none';
+    if(포커스 && 뉴스레터경고단추 && 뉴스레터경고단추.focus) 뉴스레터경고단추.focus();
+  }
+  /* 창의 단추·바깥 누르기·Tab 은 한 번만 묶는다(ESC 는 아래 공용 keydown 처리기가 닫는다) */
+  function 뉴스레터경고묶기(){
+    if(뉴스레터경고묶음) return;
+    뉴스레터경고묶음 = true;
+    var 닫기 = function(){ 뉴스레터경고닫기(true); };
+    $('nlwClose').addEventListener('click', 닫기);
+    $('nlwOk').addEventListener('click', 닫기);
+    $('nlWarnModal').addEventListener('click', function(e){ if(e.target === $('nlWarnModal')) 닫기(); });
+    $('nlwGo').addEventListener('click', function(){
+      var 칸 = 뉴스레터경고칸;
+      뉴스레터경고닫기(false);
+      if(칸 && 칸.click) 칸.click();   /* 타일을 누른 것과 «똑같이» — 한 앱 한 창 규칙(openPortalApp)을 그대로 탄다 */
+    });
+    $('nlWarnModal').addEventListener('keydown', function(e){   /* 포커스가 창 밖으로 새지 않게 — Tab 이 처음·끝에서 돈다 */
+      if(e.key !== 'Tab') return;
+      var 처음 = $('nlwClose'), 끝 = $('nlwGo');
+      if(e.shiftKey && document.activeElement === 처음){ e.preventDefault(); 끝.focus(); }
+      else if(!e.shiftKey && document.activeElement === 끝){ e.preventDefault(); 처음.focus(); }
+    });
+  }
   function 뉴스레터경고달기(){
     var t = document.querySelector('a.tile[data-key="news"]');
     if(!t) return;
@@ -1523,9 +1660,17 @@ body.portal-mode #moreFab{display:flex;}
       var b = document.createElement('span');
       b.className = 'nl-warn';
       b.textContent = '⚠ ' + n;
+      /* ⚠ 를 누르면 «왜 떴는지» 팝업 — 타일 전체를 누르는 것(앱 열기)과 갈라 둔다(대표 지시 2026-10-11).
+         stopPropagation: 데스크톱 타일의 클릭 처리(앱 열기)가 같이 돌지 않게 · preventDefault: 폰에서 링크로 가지 않게 */
+      b.setAttribute('role', 'button');
+      b.setAttribute('tabindex', '0');
+      b.setAttribute('aria-label', '뉴스레터 경고 ' + n + '건 — 눌러서 까닭 보기');
+      var 열기 = function(e){ e.preventDefault(); e.stopPropagation(); 뉴스레터경고열기(v, t, b); };
+      b.addEventListener('click', 열기);
+      b.addEventListener('keydown', function(e){ if(e.key === 'Enter' || e.key === ' ') 열기(e); });
       t.appendChild(b);
       t.dataset.warnTab = v.탭 === 'bounce' ? 'bounce' : 'watch';   /* 반송만 있으면 받는 곳 › 반송·거부로 */
-      t.title = '⚠ 뉴스레터 — 확인할 것 ' + n + '건\n· ' + (v.말들 || []).join('\n· ') + '\n\n누르면 ' + (v.탭 === 'bounce' ? '「반송·거부」' : '「자동화 점검」') + '으로 갑니다';
+      t.title = '⚠ 뉴스레터 — 확인할 것 ' + n + '건\n· ' + 뉴스레터경고목록(v.말들).join('\n· ') + '\n\n⚠ 를 누르면 까닭이 보입니다 · 타일을 누르면 ' + (v.탭 === 'bounce' ? '「반송·거부」' : '「자동화 점검」') + '으로 갑니다';
       if(t.href && t.href.indexOf('tab=') < 0 && t.href.slice(-1) !== '#') t.href += '&tab=' + t.dataset.warnTab;
     }).catch(function(){});
   }
@@ -5493,6 +5638,8 @@ body.portal-mode #moreFab{display:flex;}
     } else if($('sgModal').style.display === 'flex'){
       sgCloseModal();
       $('sgFab').focus();
+    } else if($('nlWarnModal').style.display === 'flex'){
+      뉴스레터경고닫기(true);
     }
   });
 
