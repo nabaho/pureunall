@@ -36705,7 +36705,7 @@ function InsuranceSection(){
       ),
       rowDouble('국민연금',     null,                   'pension', 'ee', 'er'),
       rowDouble('건강보험',     null,                   'health',  'ee', 'er'),
-      rowSingle('장기요양',     '건강보험 대비',        'longterm','rate', '(건강보험료 × 12.81%)'),
+      rowSingle('장기요양',     '건강보험 대비',        'longterm','rate', '(건강보험료 × ' + ((cur.longterm || {}).rate) + '%)'),   /* 이 칸의 값을 그대로 — 숫자를 박아 두면 칸을 고쳐도 글이 옛 값을 말한다 */
       rowDouble('고용보험',     null,                   'employment','ee','er'),
       rowSingle('산재보험',     '업종 평균',            'injury',  'rate', '(사업주 전액)')
     )
@@ -74408,6 +74408,59 @@ function erpPayRates(ym){
   r.year = y;
   return r;
 }
+/* ══ 명세서·화면의 «계산 근거» 글 — 계산이 «실제로 쓴» 값에서 만든다 (2026-10-11 검토 A4) ══════
+   ★ 왜: 명세서·계약서 글에 2025년 요율(연금 4.5%·건보 3.545%·장기 12.95%)과 «÷209h» 가 박혀 있었다.
+     실제 셈은 erpPayRates(그 달)의 엔진 연도표와 erpMonthStdHours(단시간 비례)를 쓴다 —
+     근로자에게 나가는 문서(근로기준법 제48조②)에 계산과 다른 숫자가 함께 찍혔다.
+   ★ 규칙: 숫자는 «계산이 쓴 것과 같다고 확인될 때만» 찍는다. 확인이 안 되면 숫자 없는 말로 쓴다
+     (틀린 숫자보다 숫자 없는 글이 낫다). 금액은 여기서 셈하지 않는다 — 글만 만든다. */
+function erpPctText(v){ return String(Math.round((+v || 0) * 1e6) / 1e4) + '%'; }
+/* 통상시급을 나눈 «월 소정근로시간» — 계산 결과의 시간이 그 결과의 통상시급과 맞을 때만 돌려준다 */
+function erpPayStdHoursOf(calc){
+  var c = calc || {}, H = +c.stdHours;
+  if(!(H > 0)) return null;
+  var lg = c.legal || {};
+  /* 확정 사진의 통상시급이 이 시간으로 나눈 값과 다르면(그 뒤 명부 시간이 바뀜) 시간을 모른다고 본다 */
+  if(+lg.ordinaryWage > 0 && +c.ordinaryMonthly > 0 && Math.round(+c.ordinaryMonthly / H) !== +lg.ordinaryWage) return null;
+  return H;
+}
+/* 통상시급 산식 글 — «월 통상임금 ÷ 183시간» 처럼 실제 나눈 시간을 쓴다 */
+function erpOrdinaryWageFormula(calc){
+  var H = erpPayStdHoursOf(calc);
+  return '월 통상임금 ÷ ' + (H ? H + '시간' : '월 소정근로시간');
+}
+function erpPayBasisText(calc, rec){
+  var c = calc || {}, r = rec || {};
+  var num = function(v){ return (Math.round(+v || 0)).toLocaleString(); };
+  var H = erpPayStdHoursOf(c);
+  /* 그 달 요율 — 급여대장에서 가져온 달(ledger)은 실제 공제액이 기준이라 요율을 찍지 않는다 */
+  var rates = null;
+  if(c.frozen !== 'ledger' && r.ym){ try { rates = erpPayRates(r.ym); } catch(e){ rates = null; } }
+  if(rates && c.ratesYear && String(c.ratesYear) !== String(rates.year)) rates = null;
+  if(rates && c.ratesFrom && rates.ratesFrom && c.ratesFrom !== rates.ratesFrom) rates = null;
+  var neutral = c.frozen === 'ledger' ? '급여대장의 실제 공제액' : '그 해 고시 요율 적용';
+  var line = function(label, ovKey, amt, formula){
+    if(r[ovKey] != null) return label + ': 직접 입력';
+    if(+c.insurableBase > 0 && amt != null && +amt === 0 && c.frozen !== 'ledger') return label + ': 0원 (이번 달 공제 없음)';
+    return label + ': ' + (rates ? formula : neutral);
+  };
+  var ded = ['과세표준: ' + num(c.insurableBase) + '원'];
+  ded.push(line('국민연금', 'pensionOverride', c.pension, rates ? ('과세표준 × ' + erpPctText(rates.pension) + ' (기준소득월액 하한 ' + num(rates.pensionWageMin) + '원·상한 ' + num(rates.pensionWageMax) + '원)') : ''));
+  ded.push(line('건강보험', 'healthInsOverride', c.healthIns, rates ? ('과세표준 × ' + erpPctText(rates.healthIns)) : ''));
+  ded.push(line('장기요양', 'longCareOverride', c.longCare, rates ? ('건강보험료 × ' + erpPctText(rates.longCare)) : ''));
+  ded.push(line('고용보험', 'empInsOverride', c.empIns, rates ? ('과세표준 × ' + erpPctText(rates.empIns)) : ''));
+  ded.push('소득세: ' + (r.incomeTaxOverride != null ? '직접 입력' : (c.incomeTaxBasis || '근로소득 간이세액표')) + ' (부양가족 ' + (r.dependents || 1) + '명)');
+  ded.push('지방소득세: ' + (r.localTaxOverride != null ? '직접 입력' : '소득세 × 10%'));
+  var minWage = '';
+  if(c.minWageWarning){
+    var mh = rates ? +rates.minWageHourly : 0;
+    var exact = mh > 0 && H && Math.round(mh * H) === +c.minWageMonthly;
+    minWage = '최저임금 미달 우려: ' + (+c.minWageBase > 0 ? '매월 정기 지급 임금 ' + num(c.minWageBase) + '원이 ' : '')
+      + (rates ? rates.minWageYear + '년 ' : '') + '최저임금 월 ' + num(c.minWageMonthly) + '원'
+      + (exact ? '(시급 ' + num(mh) + '원 × 월 ' + H + '시간)' : '') + ' 미달';
+  }
+  return { stdHours:H, ordinary:erpOrdinaryWageFormula(c), ded:ded, minWage:minWage, ratesYear: rates ? rates.year : '' };
+}
 /* 원 미만 절사 — 보험료. 0.1 같은 소수 오차(3,000,000×0.009=26999.999…)로 1원이 빠지지 않게 먼저 다듬는다 */
 function erpFloorWon(v){ v = Math.round((+v || 0) * 1e6) / 1e6; return Math.floor(v); }
 /* 10원 미만 절사 — 소득세·지방소득세 */
@@ -74565,7 +74618,7 @@ function payrollSnapshotOf(c){
   if(!c) return null;
   var pick = function(o, ks){ var r = {}; ks.forEach(function(k){ if(o && o[k] != null && isFinite(+o[k])) r[k] = +o[k]; }); return r; };
   var s = pick(c, ['grossPay','allowSum','totalBonus','insurableBase','ordinaryMonthly','averageBase','workDays','prorate',
-    'baseSalaryProrated','pension','healthIns','longCare','empIns','incomeTax','localTax','totalDeduct','netPay','minWageMonthly']);
+    'baseSalaryProrated','pension','healthIns','longCare','empIns','incomeTax','localTax','totalDeduct','netPay','minWageMonthly','stdHours']);
   s.legal = pick(c.legal, ['ordinaryWage','overtimeHours','overtime','nightHours','night','holidayHours','holidayOver8Hours','holiday','weekly','total']);
   s.employer = pick(c.employer, ['pension','healthIns','longCare','empIns','workers','total']);
   s.nonTaxable = pick(c.nonTaxable, ['meal','car','childcare','fromAllow','total']);
@@ -74620,7 +74673,8 @@ function calcPayrollFresh(rec){
   var ordinaryMonthly = (rec.baseSalary||0) + (rec.fixedAllowance||0) + ordinaryFromAllow;
   // 법정수당: 통상시급 기반 (ordinaryMonthly 전달)
   var _empH = ((dbGet('user_accounts', USERS_SEED) || []).find(function(u){ return u && u.sid === rec.empSid; }) || {}).scheduledHours;
-  var legal = calcLegalAllowances(rec, ordinaryMonthly, erpMonthStdHours(_empH));   // 단시간 근로자는 그 사람의 월 소정근로시간으로 나눈다
+  var _stdHours = erpMonthStdHours(_empH);   // 명세서 «계산 근거» 글도 이 시간을 쓴다 (erpPayBasisText)
+  var legal = calcLegalAllowances(rec, ordinaryMonthly, _stdHours);   // 단시간 근로자는 그 사람의 월 소정근로시간으로 나눈다
   // 성과금 자동 합산 (finance_income.perfShares)
   var perf = calcPerfBonus(rec.empSid, rec.ym);
   // ★ Fix#2: 이중계산 방지 — perf.total(입금연동 성과)와 rec.bonus(수동 입력 상여)는 별개
@@ -74720,7 +74774,7 @@ function calcPayrollFresh(rec){
     totalDeduct:totalDeduct, netPay:grossPay-totalDeduct,
     employer:{pension:empPension, healthIns:empHealthIns, longCare:empLongCare, empIns:empEmpIns, workers:empWorkers, total:employerTotal},
     minWageWarning:minWageWarning, minWageMonthly:minWageMonthlyFor, minWageBase:minWageBase,
-    incomeTaxBasis:incomeTaxBasis, ratesYear:rates.year, ratesFrom:rates.ratesFrom,
+    incomeTaxBasis:incomeTaxBasis, ratesYear:rates.year, ratesFrom:rates.ratesFrom, stdHours:_stdHours,
     loa:loa, fullLoa:fullLoa, legacyPay:legacyPay };
 }
 
@@ -74835,7 +74889,7 @@ function payslipMethods(rec){
   else if(c.prorated && c.workDays) out.push('기본급 = ' + won(rec.baseSalary) + ' × ' + c.workDays + '/' + dim + '일');
   else out.push('근무일수 ' + (dim ? dim + '일 (만근)' : '만근'));
   var lg = c.legal || {};
-  if(lg.ordinaryWage) out.push('통상시급 ' + won(lg.ordinaryWage) + ' (월 통상임금 ÷ 209시간)');
+  if(lg.ordinaryWage) out.push('통상시급 ' + won(lg.ordinaryWage) + ' (' + erpOrdinaryWageFormula(c) + ')');
   if(+lg.overtimeHours) out.push('연장 ' + lg.overtimeHours + '시간 × 통상시급 × 1.5');
   if(+lg.nightHours) out.push('야간 ' + lg.nightHours + '시간 × 통상시급 × 0.5');
   if(+lg.holidayHours){
@@ -81536,11 +81590,12 @@ function PayrollLedger(props){
       } catch(_e){}
       var _payBasis = (calc.prorated ? ('· 기본급(일할): 기본급 × '+calc.workDays+'/'+(calc.workDays && calc.prorate ? Math.round(calc.workDays / calc.prorate) : 30)+'일 = '+num(calc.baseSalaryProrated)+'원<br>') : ('· 기본급: '+num(rec.baseSalary)+'원<br>'));
       if((rec.allowances||[]).length>0) _payBasis += '· 수당(고정): '+(rec.allowances||[]).map(function(a){return a.name+' '+num(a.amount);}).join(', ')+'원<br>';
-      if(calc.legal.total>0) _payBasis += '· 통상시급: (기본급 + 고정수당) ÷ 209h = '+num(calc.legal.ordinaryWage)+'원<br>· 법정수당: 연장 ×1.5 / 야간 추가 ×0.5 / 휴일 8h이내 ×1.5, 초과 ×2.0 / 주휴(주 15h↑)<br>';
+      var _pbt = erpPayBasisText(calc, rec); var _escH = function(t){ return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); };   // 요율·시간 글은 계산이 쓴 값에서 (2026-10-11 A4)
+      if(calc.legal.total>0) _payBasis += '· 통상시급: '+_pbt.ordinary+' = '+num(calc.legal.ordinaryWage)+'원<br>· 법정수당: 연장 ×1.5 / 야간 추가 ×0.5 / 휴일 8h이내 ×1.5, 초과 ×2.0 / 주휴(주 15h↑)<br>';
       if(calc.perfBonus.total>0){ _payBasis += '· 성과금(성과관리): 발생 입금액 × 담당요율<br>'; calc.perfBonus.details.forEach(function(d){ _payBasis += '&nbsp;&nbsp;- '+d.source+': '+num(d.baseAmount)+' × '+d.pct+'% = '+num(d.amount)+'원 ('+d.role+')<br>'; }); }
       if((rec.bonus||0)>0) _payBasis += '· 기타상여: '+num(rec.bonus)+'원<br>';
-      var _dedBasis = '· 과세표준: '+num(calc.insurableBase)+'원<br>· 국민연금: 과세표준 × 4.5% (상한월 6,170,000원)<br>· 건강보험: 과세표준 × 3.545%<br>· 장기요양: 건강보험 × 12.95%<br>· 고용보험: 과세표준 × 0.9%<br>· 소득세: 근로소득 간이세액표 (부양가족 '+(rec.dependents||1)+'명)<br>· 지방세: 소득세 × 10%';
-      var basisHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px"><tr><td style="width:50%;vertical-align:top;padding-right:7px"><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:8px 12px;font-size:10px;color:#166534;line-height:1.7"><div style="font-weight:700;color:#166534;margin-bottom:3px">📋 지급 근거</div>'+_payBasis+'</div></td><td style="width:50%;vertical-align:top;padding-left:7px"><div style="background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:8px 12px;font-size:10px;color:#854d0e;line-height:1.7"><div style="font-weight:700;color:#854d0e;margin-bottom:3px">📋 공제 근거</div>'+_dedBasis+'</div></td></tr></table>'+(calc.minWageWarning?('<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:5px;padding:6px 12px;font-size:10px;color:#dc2626;font-weight:700">⚠️ 최저임금 위반: 2026년 시급 10,320원 / 월 209h '+num(calc.minWageMonthly)+'원 미달</div>'):'');
+      var _dedBasis = _pbt.ded.map(function(t){ return '· '+_escH(t); }).join('<br>');
+      var basisHtml = '<table style="width:100%;border-collapse:collapse;margin-top:12px"><tr><td style="width:50%;vertical-align:top;padding-right:7px"><div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:5px;padding:8px 12px;font-size:10px;color:#166534;line-height:1.7"><div style="font-weight:700;color:#166534;margin-bottom:3px">📋 지급 근거</div>'+_payBasis+'</div></td><td style="width:50%;vertical-align:top;padding-left:7px"><div style="background:#fffbeb;border:1px solid #fde68a;border-radius:5px;padding:8px 12px;font-size:10px;color:#854d0e;line-height:1.7"><div style="font-weight:700;color:#854d0e;margin-bottom:3px">📋 공제 근거</div>'+_dedBasis+'</div></td></tr></table>'+(calc.minWageWarning?('<div style="margin-top:8px;background:#fef2f2;border:1px solid #fecaca;border-radius:5px;padding:6px 12px;font-size:10px;color:#dc2626;font-weight:700">⚠️ '+_escH(_pbt.minWage)+'</div>'):'');
       var _pn2 = getLeavePromoNotice(u.name);
       var promoHtml = _pn2 ? ('<div style="margin-top:12px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:10px 14px"><div style="font-size:12px;font-weight:700;color:#1e40af;margin-bottom:4px">📣 연차 사용촉진 안내</div><div style="font-size:11.5px;color:#1e40af;line-height:1.6">미사용 연차 <b>'+_pn2.remain+'일</b> · 사용기간 ~'+_pn2.expiryStr+' 까지 · 사용시기를 지정해 주세요.</div></div>') : '';
       var el = document.createElement('div');
@@ -83280,7 +83335,7 @@ function PayrollPayslip(props){
     ),
     // 최저임금 경고
     calc.minWageWarning && h('div', {className:'no-print', style:{background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'6px',padding:'8px 14px',marginBottom:'10px',maxWidth:'700px',margin:'0 auto 10px',fontSize:'11.5px',color:'#991b1b',fontWeight:700}},
-      '⚠️ 최저임금 위반 우려: 기본급 ' + (rec.baseSalary||0).toLocaleString() + '원이 2026 최저임금 월 ' + calc.minWageMonthly.toLocaleString() + '원(시급 10,320원 × 209h) 미달'
+      '⚠️ ' + erpPayBasisText(calc, rec).minWage   /* 그 달 연도 시급·단시간 비례·정기 지급 임금 — 계산과 같은 값 (2026-10-11 A4) */
     ),
     // ── 좌우 분할: [좌: 입력 폼 + 잠금 + 추이 + 변경이력] / [우: 명세서 본문] ──
     h('div', { className:'pay-grid', style:{display:'grid', gridTemplateColumns: window.innerWidth<=768?'1fr':'minmax(0,1fr) minmax(0,1fr)', gap: window.innerWidth<=768?'10px':'14px', alignItems:'flex-start'} },
@@ -83290,7 +83345,7 @@ function PayrollPayslip(props){
     h('div', {className:'no-print', style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:_mob?'10px 10px':'12px 14px',marginBottom:'8px'}},
       // ① 기본 입력 (부양가족 / 일할계산)
       h('div', {style:{fontSize:_mob?'10.5px':'11.5px',fontWeight:700,color:'#854d0e',marginBottom:_mob?'4px':'6px'}},
-        '⚙️ 급여 입력항목 · 통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (기본급÷209h)'),
+        '⚙️ 급여 입력항목 · 통상시급 ' + calc.legal.ordinaryWage.toLocaleString() + '원/h (' + erpOrdinaryWageFormula(calc) + ')'),
       h('div', {style:{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:_mob?'5px':'8px', marginBottom:_mob?'5px':'8px'}}),
         h('label', null,
           h('div',{style:labelStyle},'부양가족 수'),
@@ -83642,7 +83697,7 @@ function PayrollPayslip(props){
             : h('span',null,'· 기본급: ' + (rec.baseSalary||0).toLocaleString() + '원', h('br')),
           (rec.allowances||[]).length>0 ? h('span',null,'· 수당(고정): ' + (rec.allowances||[]).map(function(a){return a.name+' '+(a.amount||0).toLocaleString();}).join(', ') + '원', h('br')) : null,
           calc.legal.total>0 ? h('span',null,
-            '· 통상시급: (기본급 + 고정수당) ÷ 209h = ' + calc.legal.ordinaryWage.toLocaleString() + '원', h('br'),
+            '· 통상시급: ' + erpOrdinaryWageFormula(calc) + ' = ' + calc.legal.ordinaryWage.toLocaleString() + '원', h('br'),
             '· 법정수당: 연장 ×1.5 / 야간 추가 ×0.5 / 휴일 8h이내 ×1.5, 초과 ×2.0 / 주휴(주 15h↑)', h('br')) : null,
           calc.perfBonus.total>0 ? h('span',null,
             '· 성과금(성과관리): 발생 입금액 × 담당요율', h('br'),
@@ -83651,16 +83706,11 @@ function PayrollPayslip(props){
         ),
         h('div', {style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'5px',padding:'8px 12px',fontSize:'10px',color:'#854d0e',lineHeight:'1.7'}},
           h('div',{style:{fontWeight:700,color:'#854d0e',marginBottom:'3px'}},'📋 공제 근거'),
-          '· 과세표준: ' + calc.insurableBase.toLocaleString() + '원', h('br'),
-          '· 국민연금: 과세표준 × 4.5% (상한월 6,170,000원)', h('br'),
-          '· 건강보험: 과세표준 × 3.545%', h('br'),
-          '· 장기요양: 건강보험 × 12.95%', h('br'),
-          '· 고용보험: 과세표준 × 0.9%', h('br'),
-          '· 소득세: 근로소득 간이세액표 (부양가족 ' + (rec.dependents||1) + '명)', h('br'),
-          '· 지방세: 소득세 × 10%'
+          /* 요율은 그 달 계산이 쓴 엔진 연도표에서 — 확인 안 되면 숫자 없는 말 (2026-10-11 A4) */
+          erpPayBasisText(calc, rec).ded.map(function(t, i, a){ return h('span', { key:'d'+i }, '· ' + t, i < a.length - 1 ? h('br') : null); })
         )
       ),
-      calc.minWageWarning ? h('div',{style:{marginTop:'8px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'6px 12px',fontSize:'10px',color:'#dc2626',fontWeight:700}},'⚠️ 최저임금 위반: 2026년 시급 10,320원 / 월 209h ' + calc.minWageMonthly.toLocaleString() + '원 미달') : null,
+      calc.minWageWarning ? h('div',{style:{marginTop:'8px',background:'#fef2f2',border:'1px solid #fecaca',borderRadius:'5px',padding:'6px 12px',fontSize:'10px',color:'#dc2626',fontWeight:700}},'⚠️ ' + erpPayBasisText(calc, rec).minWage) : null,
       // 연차 현황 (연도별, 연차대장 기준)
       (function(){
         var _ly = (props.selYM||'').slice(0,4);
@@ -84697,7 +84747,8 @@ function EmploymentContractModal(props){
       workPlace: u.branch || '',
       jobDuty: u.jobDuty || '',
       payComposition: '',
-      payMethod: '월급제 · 통상시급 = 월 통상임금 ÷ 209시간 · 근로자 명의 계좌 입금',
+      /* 월 소정근로시간은 급여 계산과 같은 erpMonthStdHours(명부 1일 시간) — 단시간 근로자에게 «÷209» 가 적히지 않게 (2026-10-11 A4) */
+      payMethod: '월급제 · 통상시급 = 월 통상임금 ÷ ' + erpMonthStdHours(u.scheduledHours) + '시간(월 소정근로시간) · 근로자 명의 계좌 입금',
       payDay: '',
       holidays: '주휴일(일요일), 근로자의 날, 관공서 공휴일',
       annualLeave: '근로기준법 제60조에 따름 (입사일 기준)',
