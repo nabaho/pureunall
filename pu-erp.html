@@ -77563,9 +77563,14 @@ function LeaveLedgerTab(){
     }));
   }
   var years = ledger.reduce(function(acc,r){ if(acc.indexOf(r.year)<0) acc.push(r.year); return acc; }, []).sort(function(a,b){ return b-a; });
-  var th = {padding:'5px 8px',background:'#f8fafc',color:'#475569',fontWeight:700,fontSize:'11px',textAlign:'left',borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'};
-  var td = {padding:'3px 6px',borderBottom:'1px solid #f8fafc',fontSize:'11.5px',verticalAlign:'top'};
-  var inS = {width:'100%',padding:'2px 4px',border:'1px solid transparent',borderRadius:'4px',fontSize:'11.5px',textAlign:'right',fontFamily:'monospace',background:'transparent',boxSizing:'border-box'};
+  /* 한 번에 «한 해»만 — ◀ ▶ 로 넘긴다 (2026-10-11 대표 「년도별로 창넘기기 형태」). 기본은 가장 최근 해 */
+  var lyS = usePersistedState('leave_ledger_year', ''); var lyPick = lyS[0]; var setLyPick = lyS[1];
+  var curY = years.filter(function(y){ return String(y) === String(lyPick); })[0] || years[0];
+  var curI = years.indexOf(curY);
+  var th = {padding:'6px 8px',background:'#f8fafc',color:'#475569',fontWeight:700,fontSize:'12.5px',textAlign:'left',borderBottom:'2px solid #e2e8f0',whiteSpace:'nowrap'};
+  var td = {padding:'4px 7px',borderBottom:'1px solid #f8fafc',fontSize:'13px',verticalAlign:'middle'};
+  var inS = {width:'100%',padding:'2px 4px',border:'1px solid transparent',borderRadius:'4px',fontSize:'13px',textAlign:'right',fontFamily:'monospace',background:'transparent',boxSizing:'border-box'};
+  var navB = function(on){ return {border:'1px solid #cbd5e1',background:on?'#fff':'#f8fafc',color:on?'#1e293b':'#cbd5e1',borderRadius:'5px',padding:'3px 10px',cursor:on?'pointer':'default',fontSize:'13px'}; };
   function numInput(r, field){
     return h('input',{type:'text', value:(r[field]==null?'':r[field]),
       // 치는 동안에는 서버 변경으로 화면을 갈아끼우지 않는다 — 치던 숫자가 사라지면 더 나쁘다
@@ -77578,12 +77583,18 @@ function LeaveLedgerTab(){
   return h('div',null,
     h('div',{style:{display:'flex',alignItems:'center',gap:'10px',marginBottom:'8px',flexWrap:'wrap'}},
       h('div',{style:{fontWeight:700,fontSize:'14px',color:'#1e293b'}},'📋 연차대장 (연도별 요약)'),
-      h('span',{style:{fontSize:'11px',color:'#94a3b8'}}, ledger.length ? ('총 '+ledger.length+'건') : '아직 비어 있음')
+      h('span',{style:{fontSize:'11px',color:'#94a3b8'}}, ledger.length ? ('총 '+ledger.length+'건') : '아직 비어 있음'),
+      years.length > 0 && h('div',{style:{display:'inline-flex',alignItems:'center',gap:'6px',marginLeft:'auto'}},
+        /* 왼쪽 ◀ = 지난해, 오른쪽 ▶ = 다음 해 (years 는 최근 해가 앞) */
+        h('button',{type:'button',disabled:curI>=years.length-1,onClick:function(){ if(curI<years.length-1) setLyPick(String(years[curI+1])); },style:navB(curI<years.length-1),title:'지난해'},'◀'),
+        h('span',{style:{fontWeight:800,fontSize:'15px',color:'#1e40af',minWidth:'64px',textAlign:'center'}}, curY+'년'),
+        h('button',{type:'button',disabled:curI<=0,onClick:function(){ if(curI>0) setLyPick(String(years[curI-1])); },style:navB(curI>0),title:'다음 해'},'▶'),
+        h('span',{style:{fontSize:'11px',color:'#94a3b8'}}, (curI+1)+' / '+years.length))
     ),
     h('div',{style:{fontSize:'11px',color:'#64748b',marginBottom:'12px'}}, '※ 부여·사용·잔여·비고 칸을 클릭하면 바로 수정됩니다. 월별 내역은 참고용(읽기 전용).'),
     years.length===0
       ? h('div',{style:{padding:'24px',textAlign:'center',color:'#94a3b8',background:'#fff',border:'1px dashed #cbd5e1',borderRadius:'8px'}}, '연차대장이 비어 있습니다. 클라우드에서 불러오는 중이거나, 아직 등록된 것이 없습니다.')
-      : years.map(function(y){
+      : [curY].map(function(y){
           var rows = ledger.filter(function(r){ return r.year===y; });
           var usedSum = rows.reduce(function(a,r){ return a+(typeof r.used==='number'?r.used:0); }, 0);
           return h('div',{key:y,style:{marginBottom:'18px'}},
@@ -77604,7 +77615,7 @@ function LeaveLedgerTab(){
                     h('td',{style:Object.assign({},td,{padding:'2px 4px'})}, numInput(r,'granted')),
                     h('td',{style:Object.assign({},td,{padding:'2px 4px',background:'#fffbeb'})}, numInput(r,'used')),
                     h('td',{style:Object.assign({},td,{padding:'2px 4px',background:'#eff6ff'})}, numInput(r,'remain')),
-                    h('td',{style:Object.assign({},td,{fontSize:'10.5px',color:'#64748b',whiteSpace:'normal'})}, r.monthly||'-'),
+                    h('td',{title:r.monthly||'',style:Object.assign({},td,{fontSize:'12px',color:'#64748b',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',maxWidth:'520px'})}, r.monthly||'-'),
                     h('td',{style:Object.assign({},td,{padding:'2px 4px'})},
                       h('input',{type:'text',value:(r.note||''),
                         onFocus:function(e){ _editing.current = true; try{ e.target.select(); }catch(_){} },
@@ -78237,8 +78248,9 @@ function LeaveManagement(){
     showToast('CSV 다운로드');
   }
 
-  var thS={padding:'4px 6px',fontWeight:700,color:'#475569',fontSize:'10.5px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'};
-  var tdS={padding:'3px 6px',borderBottom:'1px solid #f8fafc',fontSize:'11px'};
+  /* 글자 크기 — 대표 「글자화면 다시 더 크게 해달라」(2026-10-11): 머리 10.5→12.5 · 칸 11→13 */
+  var thS={padding:'6px 8px',fontWeight:700,color:'#475569',fontSize:'12.5px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'};
+  var tdS={padding:'5px 8px',borderBottom:'1px solid #f8fafc',fontSize:'13px'};
 
   return h('div',{className:'page',style:{overflowX:'hidden'}},
     // 헤더
@@ -78324,10 +78336,10 @@ function LeaveManagement(){
 
       // ─ 좌: 직원별 연차 현황 테이블
       _isAdminView && h('div',null,
-        h('div',{style:{fontWeight:700,fontSize:'11px',color:'#1e293b',marginBottom:'3px'}},'👥 직원별 연차 현황'),
+        h('div',{style:{fontWeight:700,fontSize:'13px',color:'#1e293b',marginBottom:'4px'}},'👥 직원별 연차 현황'),
         h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'11.5px',marginBottom:'5px',boxSizing:'border-box'}}),
         h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
-          h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11.5px'}},
+          h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px'}},
             h('thead',null,
               h('tr',null,
                 (lvView === 'now'
@@ -78349,24 +78361,24 @@ function LeaveManagement(){
                   style:{background:isSel?'#eff6ff':i%2===0?'#fff':'#f8fafc',
                     cursor:'pointer',borderLeft:'3px solid '+(isSel?'#1e40af':'transparent'),
                     borderBottom:'1px solid #f8fafc'}},
-                  h('td',{style:Object.assign({},tdS,{textAlign:'center',color:'#94a3b8',fontFamily:'monospace',fontSize:'11px'})},i+1),
+                  h('td',{style:Object.assign({},tdS,{textAlign:'center',color:'#94a3b8',fontFamily:'monospace',fontSize:'12px'})},i+1),
                   /* 이름 칸은 한 줄 — 직책은 옆에 작게 (CLAUDE.md 한 칸 한 줄) */
                   h('td',{style:Object.assign({},tdS,{fontWeight:700,whiteSpace:'nowrap'})},
                     u.name,
-                    h('span',{style:{fontSize:'10.5px',color:'#94a3b8',fontWeight:400,marginLeft:'5px'}},u.title||''),
+                    h('span',{style:{fontSize:'11.5px',color:'#94a3b8',fontWeight:400,marginLeft:'5px'}},u.title||''),
                     onLoa && !(u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '휴직'),
                     (u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '퇴사'),
                     u.leaveRecalcApplied && h('span', { title:'퇴직 시 입사일 기준 연차 재산정 적용됨',
                       style:{ marginLeft:'4px', fontSize:'10px', background:'#eff6ff', color:'#2563eb', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '🔄재산정')),
                   R.mode === 'now'
                     ? [
-                        h('td',{key:'per',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'}),title:R.cycle.firstYear?'입사 1년 미만 — 매달 1일씩 생긴다':''},
+                        h('td',{key:'per',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'12.5px',color:'#64748b',whiteSpace:'nowrap'}),title:R.cycle.firstYear?'입사 1년 미만 — 매달 1일씩 생긴다':''},
                           R.cycle.start ? (R.cycle.start + ' ~ ' + R.cycle.end) : '-'),
                         h('td',{key:'g',style:Object.assign({},tdS,mono)},
                           ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+R.auto+'일)'},gr+'⚙'):gr),
                         h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color}),title:R.usedTitle},Math.round(R.used*10)/10),
-                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re),
-                        h('td',{key:'nx',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'})},
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'15px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re),
+                        h('td',{key:'nx',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'12.5px',color:'#64748b',whiteSpace:'nowrap'})},
                           R.cycle.next ? (R.cycle.next.date + ' · ' + R.cycle.next.days + '일') : '—')
                       ]
                     : [
@@ -78375,7 +78387,7 @@ function LeaveManagement(){
                         h('td',{key:'co',style:Object.assign({},tdS,mono,{color:R.co>0?'#2563eb':'#cbd5e1'})},R.co>0?R.co:'-'),
                         h('td',{key:'gr',style:Object.assign({},tdS,mono,{fontWeight:700,background:'#eff6ff'})},gr),
                         h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color,background:'#fffbeb'}),title:R.usedTitle},Math.round(R.used*10)/10),
-                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re)
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'15px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re)
                       ],
                   // ── 촉진: «한 칸» — 지금 차례인 통보만 보인다 (1차를 했으면 2차) ──
                   (function(){
@@ -78444,7 +78456,7 @@ function LeaveManagement(){
                   h('td',{style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})},
                     h('button',{onClick:function(e){e.stopPropagation();setSelSid(u.sid);openOverride();},
                       title:'부여일수 수정',
-                      style:{padding:'2px 7px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'10.5px',whiteSpace:'nowrap'}},'⚙ 수정'))
+                      style:{padding:'3px 9px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'12px',whiteSpace:'nowrap'}},'⚙ 수정'))
                 );
               }),
               // 합계 — 표와 같은 셈(lvRow)
@@ -78872,7 +78884,13 @@ function LeaveManagement(){
       var ots = dbGet('overtime_records', []);
       var uses = dbGet('comp_leave_records', []);
       // 직원별 잔여 + 발생/사용 통계
-      var rows = users.map(function(u){
+      /* ★ 재직 칸에는 재직자만 — 예전에는 명부 전원(퇴사자 22명 포함)이 0.0h 로 줄줄이 나왔다 (2026-10-11 대표).
+           퇴사자는 «퇴사자» 칸에서, 보상휴가 기록이 있는 사람만 본다(남은 시간은 퇴직 때 수당으로 정산할 몫). */
+      var rows = users.filter(function(u){
+        if(!showRetired) return !isGoneUser(u);
+        if(!isGoneUser(u)) return false;
+        return ots.some(function(r){ return r.sid===u.sid && r.convertedToComp; }) || uses.some(function(r){ return r.sid===u.sid; });
+      }).map(function(u){
         var gen = ots.filter(function(r){return r.sid===u.sid && r.convertedToComp;});
         var generated = gen.reduce(function(s,r){return s+(parseFloat(r.compHours)||0);},0);
         var use = uses.filter(function(r){return r.sid===u.sid;});
