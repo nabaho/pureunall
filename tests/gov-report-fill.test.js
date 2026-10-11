@@ -448,18 +448,20 @@ test('missing — 해마다 바뀐 양식에서 지도 칸이 없으면 조용�
  * 값은 다라정밀·홍길동·이푸른(합성)이다 — 실제 양식 파일·고객사 이름은 저장소에 두지 않는다. */
 const CL_LABEL = ['수행일자', '지원기업담당자', '수행시간', '현장수행시간'];
 function clinicXml() {
-  const 일정 = (n, 일자라벨) => [String(n), 일자라벨, '(수정 불가)', '지원기업담당자', '(수정 불가)', '수행시간', '(수정 불가)',
-    '현장수행시간', '(수정 불가)', ['수행내용', '(수정 불가)'], '특이사항', '(작성란)'];
+  /* «(수정 불가)»·«(작성란)» 안내 칸은 실제 양식처럼 회색·가운데 맞춤 모양(문단 136 · 글자 152), 합계 칸은 글자 188 */
+  const NB = { t: '(수정 불가)', pp: 136, cp: 152 }, WR = { t: '(작성란)', pp: 136, cp: 152 };
+  const 일정 = (n, 일자라벨) => [String(n), 일자라벨, NB, '지원기업담당자', NB, '수행시간', NB,
+    '현장수행시간', NB, ['수행내용', NB], '특이사항', WR];
   const 전후 = (n) => [String(n), null, null, '(파일첨부)'];
   return SEC(
     P(EMPTY), P(RUN('【별지 14】')), P(EMPTY), P(RUN('현장클리닉 현장지도결과서')), P(EMPTY), P(RUN('1. 현장클리닉 개요')), P(EMPTY),
-    tbl('지원기업명', null, ['지원기업 ', '담당자명'], null, '지원단 소속', null, '지원단 명', null, '분야', null,
+    tbl('지원기업명', { t: null, pp: 140, cp: 65 }, ['지원기업 ', '담당자명'], null, '지원단 소속', null, '지원단 명', null, '분야', null,
       '총 수행일수', null, '테마', null, '수행 일자', null),
     P(EMPTY), P(RUN('2. 지원기업 애로사항 및 문제점')), P(EMPTY),
     tbl({ t: null, pp: 9, cp: 9 }),                                              // T1.C0 — 큰 칸(기준과 다른 모양)
     P(EMPTY), P(EMPTY), P(RUN('3. 현장클리닉 일정별 수행 내역(수행계획서 작성내용) 및 특이사항')), P(EMPTY),
     tbl('번호', '수행내역', ...일정(1, CL_LABEL[0]), ...일정(2, CL_LABEL[0]), ...일정(3, '수행 일자'),
-      '총 수행시간', '00시간 00분', '현장 수행시간', '00시간 00분(  %)'),
+      '총 수행시간', { t: '00시간 00분', pp: 136, cp: 188 }, '현장 수행시간', { t: '00시간 00분(  %)', pp: 136, cp: 188 }),
     P(EMPTY), P(RUN('4. 현장클리닉 수행 내용(상세입력)')), P(EMPTY),
     tbl('구분', '수행내용', ['기업', '현황'], { t: null, pp: 23, cp: 7 }, ['문제', '진단'], { t: null, pp: 11, cp: 11 },
       ['처방', '내용'], { t: null, pp: 11, cp: 11 }),                              // T3.C3 = 기준 칸(23·7)
@@ -513,6 +515,10 @@ test('현장클리닉 — 지도의 주소가 합성 양식에 실제로 있고,
   const rules = G.FORMS.clinic.files.main.set;
   rules.forEach((r) => assert.ok(clHas(addrs, clRuleAddr(r)), '양식에 없는 주소: ' + clRuleAddr(r)));
   rules.forEach((r) => { if (r.like) assert.ok(addrs.includes(r.like), '양식에 없는 기준 칸: ' + r.like); });
+  /* 기준 칸은 지도 자신의 값 칸이어야 한다(안내 글자 칸·이름표 칸을 기준 삼으면 회색·가운데 맞춤이 번진다) */
+  const own = rules.map((r) => (r.cell ? r.cell + 'P0' : r.at));
+  [...new Set(rules.filter((r) => r.like).map((r) => r.like))].forEach((a) => assert.ok(own.includes(a), '기준 칸이 지도의 값 칸이 아니다: ' + a));
+  assert.deepEqual([...new Set(rules.filter((r) => r.like).map((r) => r.like))].sort(), ['T0.C1.P0', 'T3.C3.P0']);
   const tk = G.tokenize(xml, 'clinic', 'main');
   CLINIC_TOKS.forEach((t) => assert.equal(tk.split('{{' + t + '}}').length - 1, 1, '표지 {{' + t + '}} 가 한 번씩 박혀야 한다'));
   /* 헛돌지 않는다 — 칸이 없는 양식으로 바꾸면 검사가 실제로 알린다 */
@@ -574,6 +580,30 @@ test('현장클리닉 — 모양 빌리기: 큰 칸(애로사항·문제진단·
   const noRef = clinicXml().replace(/<hp:p [^>]*paraPrIDRef="23">(?:(?!<\/hp:p>)[\s\S])*<\/hp:p>/, '');
   const r2 = G.fillForm(noRef, 'clinic', 'main', clinicReport(3));
   assert.ok(r2.missing.includes('like T3.C3.P0'), JSON.stringify(r2.missing));
+});
+
+test('현장클리닉 — 일정 칸 값은 «(수정 불가)» 안내 글자 모양(회색·가운데)을 버리고 개요 값 칸(140·65)·큰 칸(23·7) 모양', () => {
+  const xml = clinicXml();
+  assert.equal(ppAt(xml, 'T2.C4.P0'), '136'); assert.deepEqual(cpsAt(xml, 'T2.C4.P0'), ['152'], '검사 준비: 원본 칸이 안내 모양이어야 한다');
+  for (const n of [0, 1, 3]) {
+    const r = G.fillForm(xml, 'clinic', 'main', clinicReport(n));
+    assert.deepEqual(r.missing, [], '회차 ' + n);
+    for (let k = 0; k < 3; k++) {
+      [4, 6, 8, 10].forEach((c) => { const a = 'T2.C' + (12 * k + c) + '.P0'; assert.equal(ppAt(r.xml, a), '140', a); assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['65'], a); });
+      ['T2.C' + (12 * k + 11) + '.P1', 'T2.C' + (12 * k + 13) + '.P0'].forEach((a) => {
+        assert.equal(ppAt(r.xml, a), '23', a); assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['7'], a);
+      });
+    }
+    ['T2.C39.P0', 'T2.C41.P0'].forEach((a) => { assert.equal(ppAt(r.xml, a), '140', a); assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['65'], a); });
+    assert.doesNotMatch(r.xml, /paraPrIDRef="136"|charPrIDRef="(152|188)"/, '안내·자리표시 글자 모양이 값에 남았다');
+    /* 이름표 칸은 그대로 */
+    assert.equal(ppAt(r.xml, 'T2.C3.P0'), '0'); assert.equal(textAt(r.xml, 'T2.C3.P0'), '수행일자');
+    assert.equal(textAt(r.xml, 'T2.C11.P0'), '수행내용');
+  }
+  /* 기준 칸(개요 값 칸 T0.C1.P0)이 없으면 지어내지 않고 missing 으로 알린다 */
+  const noRef = xml.replace(/<hp:p [^>]*paraPrIDRef="140">(?:(?!<\/hp:p>)[\s\S])*<\/hp:p>/, '');
+  assert.notEqual(noRef, xml);
+  assert.ok(G.fillForm(noRef, 'clinic', 'main', clinicReport(3)).missing.includes('like T0.C1.P0'));
 });
 
 test('현장클리닉 — 회차 0·1·2개: 안 쓴 일정 칸은 빈칸 한 칸(밑줄·옛 글자 아님), 모자람 알림', () => {
