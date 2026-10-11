@@ -125,7 +125,7 @@ function appBox(cfg) {
   };
   vm.createContext(ctx);
   ['mbWhoLive', 'mbWhoWhy', 'mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkHandOf',
-    'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbCoRecOfAddr'].forEach((n) =>
+    'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbCoRecOfAddr', 'mbHqRec'].forEach((n) =>
     vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   const m = app.match(/const MB_WORK_KIND = \{[^}]*\};/);
   vm.runInContext('var ' + m[0].slice('const '.length), ctx);

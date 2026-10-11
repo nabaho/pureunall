@@ -29,7 +29,7 @@ function 상자(S, 일정들) {
   const b = { console, String, Object, Array, Number, Math, Date, parseInt, RegExp, JSON, S,
     todayYMD: () => '2026-10-11', 공휴칩: (ds) => (ds === '2026-10-09' ? { kind: 'hol', text: '한글날', color: '#d81b60', store: '', id: 'h' } : null),
     eventsOn: (ds) => (일정들[ds] || []), passFilter: () => true, matchSearch: () => true,
-    esc: (v) => String(v == null ? '' : v), 목록순: () => 0,
+    esc: (v) => String(v == null ? '' : v), 선아이콘: (n) => '<svg data-ic="' + n + '"></svg>', 목록순: () => 0,
     lunarRange: () => '병오년8월 – 9월', weekDays: (d) => ['2026-10-11', '2026-10-12', '2026-10-13', '2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17'] };
   vm.createContext(b);
   ['function 날짜글(ymd){', 'function 시각글(hm){', 'function 시분(ms){', 'function 폰일정Html(eumOnly){', 'function 폰머리Html(){']
