@@ -78573,8 +78573,8 @@ function LeaveManagement(){
   }
 
   /* 글자 크기 — 대표 「글자화면 다시 더 크게 해달라」(2026-10-11): 머리 10.5→12.5 · 칸 11→13 */
-  var thS={padding:'6px 8px',fontWeight:700,color:'#475569',fontSize:'12.5px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'};
-  var tdS={padding:'5px 8px',borderBottom:'1px solid #f8fafc',fontSize:'13px'};
+  var thS={padding:'8px 10px',fontWeight:700,color:'#475569',fontSize:'14px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'};
+  var tdS={padding:'7px 10px',borderBottom:'1px solid #f8fafc',fontSize:'15px'};
 
   return h('div',{className:'page',style:{overflowX:'hidden'}},
     // 헤더
@@ -78656,14 +78656,14 @@ function LeaveManagement(){
       })
     ),
     tab==='aledger' && _erpCanFin() && h(LeaveLedgerTab, null),
-    tab==='annual' && h('div',{style:_isAdminView?{display:'grid',gridTemplateColumns:'1fr 1.6fr',gap:'10px',alignItems:'start'}:{}},
+    tab==='annual' && h('div',{style:_isAdminView?{display:'grid',gridTemplateColumns:'minmax(0,1.9fr) minmax(0,1fr)',gap:'10px',alignItems:'start'}:{}},
 
       // ─ 좌: 직원별 연차 현황 테이블
       _isAdminView && h('div',null,
-        h('div',{style:{fontWeight:700,fontSize:'13px',color:'#1e293b',marginBottom:'4px'}},'👥 직원별 연차 현황'),
+        h('div',{style:{fontWeight:700,fontSize:'15px',color:'#1e293b',marginBottom:'6px'}},'👥 직원별 연차 현황'),
         h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'11.5px',marginBottom:'5px',boxSizing:'border-box'}}),
         h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
-          h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'13px'}},
+          h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'15px'}},
             h('thead',null,
               h('tr',null,
                 (lvView === 'now'
@@ -78689,20 +78689,20 @@ function LeaveManagement(){
                   /* 이름 칸은 한 줄 — 직책은 옆에 작게 (CLAUDE.md 한 칸 한 줄) */
                   h('td',{style:Object.assign({},tdS,{fontWeight:700,whiteSpace:'nowrap'})},
                     u.name,
-                    h('span',{style:{fontSize:'11.5px',color:'#94a3b8',fontWeight:400,marginLeft:'5px'}},u.title||''),
+                    h('span',{style:{fontSize:'13px',color:'#94a3b8',fontWeight:400,marginLeft:'6px'}},u.title||''),
                     onLoa && !(u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '휴직'),
                     (u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '퇴사'),
                     u.leaveRecalcApplied && h('span', { title:'퇴직 시 입사일 기준 연차 재산정 적용됨',
                       style:{ marginLeft:'4px', fontSize:'10px', background:'#eff6ff', color:'#2563eb', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '🔄재산정')),
                   R.mode === 'now'
                     ? [
-                        h('td',{key:'per',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'12.5px',color:'#64748b',whiteSpace:'nowrap'}),title:R.cycle.firstYear?'입사 1년 미만 — 매달 1일씩 생긴다':''},
+                        h('td',{key:'per',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'14px',color:'#64748b',whiteSpace:'nowrap'}),title:R.cycle.firstYear?'입사 1년 미만 — 매달 1일씩 생긴다':''},
                           R.cycle.start ? (R.cycle.start + ' ~ ' + R.cycle.end) : '-'),
                         h('td',{key:'g',style:Object.assign({},tdS,mono)},
                           ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+R.auto+'일)'},gr+'⚙'):gr),
                         h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color}),title:R.usedTitle},Math.round(R.used*10)/10),
-                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'15px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re),
-                        h('td',{key:'nx',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'12.5px',color:'#64748b',whiteSpace:'nowrap'})},
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'17px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re),
+                        h('td',{key:'nx',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'14px',color:'#64748b',whiteSpace:'nowrap'})},
                           R.cycle.next ? (R.cycle.next.date + ' · ' + R.cycle.next.days + '일') : '—')
                       ]
                     : [
@@ -78711,7 +78711,7 @@ function LeaveManagement(){
                         h('td',{key:'co',style:Object.assign({},tdS,mono,{color:R.co>0?'#2563eb':'#cbd5e1'})},R.co>0?R.co:'-'),
                         h('td',{key:'gr',style:Object.assign({},tdS,mono,{fontWeight:700,background:'#eff6ff'})},gr),
                         h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color,background:'#fffbeb'}),title:R.usedTitle},Math.round(R.used*10)/10),
-                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'15px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re)
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'17px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re)
                       ],
                   // ── 촉진: «한 칸» — 지금 차례인 통보만 보인다 (1차를 했으면 2차) ──
                   (function(){
@@ -78780,7 +78780,7 @@ function LeaveManagement(){
                   h('td',{style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})},
                     h('button',{onClick:function(e){e.stopPropagation();setSelSid(u.sid);openOverride();},
                       title:'부여일수 수정',
-                      style:{padding:'3px 9px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'12px',whiteSpace:'nowrap'}},'⚙ 수정'))
+                      style:{padding:'3px 9px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'13px',whiteSpace:'nowrap'}},'⚙ 수정'))
                 );
               }),
               // 합계 — 표와 같은 셈(lvRow)
