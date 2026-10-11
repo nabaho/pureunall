@@ -334,7 +334,179 @@ async function seed(){
 function drawCo(){ $('coList').innerHTML='<div class="empty">준비 중</div>'; }
 function drawGrid(){ $('gBox').innerHTML='<div class="empty">준비 중</div>'; }
 function drawProg(){ $('pList').innerHTML='<div class="empty">준비 중</div>'; }
-function drawCheck(){ $('cList').innerHTML='<div class="empty">준비 중</div>'; }
+
+/* ═══ ⏳ 확인할 조건 — 초안·지난해 확정 사업을 한 건씩 맞춰 보고 확정 ═══ */
+function drawCheck(){
+  var view=PROGS.filter(function(p){ return GovaidView.needsCheck(p,YEAR); });
+  $('cList').innerHTML = view.length ? view.map(function(p,i){ var k='check|'+p.id;
+    return '<div class="li'+(p.id===CUR_CHECK?' cur':'')+'" data-cp="'+esc(p.id)+'"><input type="checkbox" data-ck="'+esc(k)+'"'+(SEL[k]?' checked':'')+'><span class="n">'+(i+1)+'</span><div class="body"><span class="nm">'+esc(nm(p))+'</span>'+statusChip(p)+'</div></div>'; }).join('')
+    : '<div class="empty">확인할 사업이 없습니다 — 모두 '+YEAR+' 기준으로 확정됐습니다</div>';
+  drawEditor();
+}
+function ckGroup(name, opts, on){ return opts.map(function(o){ return '<label class="ck"><input type="checkbox" name="'+name+'" value="'+esc(o[0])+'"'+(on.indexOf(o[0])>=0?' checked':'')+'>'+esc(o[1])+'</label>'; }).join(''); }
+function drawEditor(){
+  var box=$('cDetail'), p = CUR_CHECK==='__new' ? { id:'', name:'', fields:[], cond:{}, status:'draft' } : progById(CUR_CHECK);
+  if(!p){ box.innerHTML='<div class="empty">왼쪽에서 사업을 고르세요</div>'; return; }
+  var L=GovaidMatch.list, c=p.cond||{}, hc=c.headcount||{}, yr=c.yearsInBiz||{}, sd=c.salesDropPct||{}, ind=c.industries||{}, src=p.source||{}, facts={};
+  L(c.facts).forEach(function(f){ if(f&&f.key) facts[f.key]= f.want===false?'no':'yes'; });
+  function v(x){ return x==null?'':esc(x); }
+  function pair(a,b){ return [a,b]; }
+  box.innerHTML='<div class="bar"><b style="font-size:15px">'+(p.id?esc(nm(p)):'새 사업')+'</b>'+(p.id?statusChip(p):'')
+    +(L(p.seedRow).length?'<span class="hint">캡처 번호 '+esc(L(p.seedRow).join('·'))+'</span>':'')+'<span class="sp"></span>'
+    +(src.url&&/^https?:\/\//.test(src.url)?'<a href="'+esc(src.url)+'" target="_blank" rel="noopener">🔗 공고 원문</a>':'')+'</div>'
+    +'<div class="ed">'
+    +'<label class="k" for="eName">사업명</label><input id="eName" value="'+v(p.name)+'">'
+    +'<label class="k" for="eAgency">담당기관</label><input id="eAgency" value="'+v(p.agency)+'" placeholder="모르면 비워 두세요">'
+    +'<label class="k" for="eFields">분야</label><input id="eFields" value="'+v(L(p.fields).join(', '))+'" placeholder="쉼표로 가름">'
+    +'<label class="k" for="eSummary">지원내용</label><input id="eSummary" value="'+v(p.summary)+'">'
+    +'<label class="k">상시 근로자</label><div class="row"><input id="eHcMin" type="number" min="0" style="width:90px" value="'+v(hc.min)+'"> 명 이상 ~ <input id="eHcMax" type="number" min="0" style="width:90px" value="'+v(hc.max)+'"> 명 이하</div>'
+    +'<label class="k">업력</label><div class="row"><input id="eYrMin" type="number" min="0" style="width:90px" value="'+v(yr.min)+'"> 년 이상 ~ <input id="eYrMax" type="number" min="0" style="width:90px" value="'+v(yr.max)+'"> 년 이하</div>'
+    +'<label class="k">매출 감소</label><div class="row"><input id="eSdMin" type="number" min="0" style="width:90px" value="'+v(sd.min)+'"> % 이상</div>'
+    +'<label class="k">규모</label><div>'+ckGroup('eSize', GovaidMatch.SIZES.map(function(s){ return pair(s,s); }), L(c.sizes))+'<span class="hint">비우면 제한 없음</span></div>'
+    +'<label class="k">지역</label><div>'+ckGroup('eReg', GovaidMatch.REGIONS.map(function(s){ return pair(s,s); }), L(c.regions))+'<span class="hint">비우면 전국</span></div>'
+    +'<label class="k">업종 (해당)</label><div>'+ckGroup('eIndInc', indOpts(), L(ind.include))+'</div>'
+    +'<label class="k">업종 (제외)</label><div>'+ckGroup('eIndExc', indOpts(), L(ind.exclude))+'</div>'
+    +Object.keys(GovaidMatch.FACTS).map(function(k){ return '<label class="k" for="eF_'+k+'">'+esc(GovaidMatch.FACTS[k])+'</label><select id="eF_'+k+'"><option value="">따지지 않음</option><option value="yes"'+(facts[k]==='yes'?' selected':'')+'>그래야 한다</option><option value="no"'+(facts[k]==='no'?' selected':'')+'>아니어야 한다</option></select>'; }).join('')
+    +'<label class="k" for="eManual">사람이 볼 조건</label><textarea id="eManual" rows="3" placeholder="한 줄에 하나 — 숫자로 못 재는 조건">'+esc(L(c.manual).join('\n'))+'</textarea>'
+    +'<label class="k">근거(공고)</label><div class="row"><input id="eSrcTitle" placeholder="공고명" value="'+v(src.title)+'" style="flex:1;min-width:160px"><input id="eSrcNo" placeholder="공고번호" value="'+v(src.no)+'" style="width:130px"><input id="eSrcPage" placeholder="쪽" value="'+v(src.page)+'" style="width:60px"></div>'
+    +'<label class="k" for="eSrcUrl">원문 주소</label><input id="eSrcUrl" placeholder="https://" value="'+v(src.url)+'">'
+    +'</div><div class="mfoot">'+(p.id?'<button data-pdrop="'+esc(p.id)+'">사전에서 빼기</button><span class="sp"></span>':'')
+    +'<button data-psave="draft">초안으로 저장</button><button class="pri" data-psave="confirm">✓ 확정 ('+YEAR+' 기준)</button></div>';
+}
+function numIn(id){ var s=$(id).value.trim(); if(s==='') return null; var n=Number(s); return isFinite(n)&&n>=0 ? Math.round(n) : NaN; }
+function checked(name){ return Array.prototype.map.call(document.querySelectorAll('input[name="'+name+'"]:checked'), function(x){ return x.value; }); }
+function readEditor(cur){
+  var hcMin=numIn('eHcMin'), hcMax=numIn('eHcMax'), yrMin=numIn('eYrMin'), yrMax=numIn('eYrMax'), sdMin=numIn('eSdMin');
+  if([hcMin,hcMax,yrMin,yrMax,sdMin].some(function(x){ return x!==null && isNaN(x); })) throw new Error('숫자 칸에는 0 이상의 숫자만 넣으세요');
+  if(hcMin!=null && hcMax!=null && hcMin>hcMax) throw new Error('근로자 수 아래·위가 뒤바뀌었습니다');
+  if(yrMin!=null && yrMax!=null && yrMin>yrMax) throw new Error('업력 아래·위가 뒤바뀌었습니다');
+  var url=$('eSrcUrl').value.trim(); if(url && !/^https?:\/\//.test(url)) throw new Error('원문 주소는 http:// 또는 https:// 로 시작해야 합니다');
+  var name=$('eName').value.trim(); if(!name) throw new Error('사업명을 넣으세요');
+  var summary=$('eSummary').value.trim();
+  var facts=Object.keys(GovaidMatch.FACTS).map(function(k){ var s=$('eF_'+k).value; return s ? {key:k, want:s==='yes'} : null; }).filter(Boolean);
+  return { name:name, nameCut: !!(cur && name===cur.name && cur.nameCut), agency:$('eAgency').value.trim(),
+    fields:$('eFields').value.split(',').map(function(s){ return s.trim(); }).filter(Boolean),
+    summary:summary, summaryCut: !!(cur && summary===cur.summary && cur.summaryCut),
+    cond:{ headcount:{min:hcMin,max:hcMax}, yearsInBiz:{min:yrMin,max:yrMax}, salesDropPct:{min:sdMin},
+      sizes:checked('eSize'), regions:checked('eReg'), industries:{include:checked('eIndInc'), exclude:checked('eIndExc')},
+      facts:facts, manual:$('eManual').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean) },
+    source:{ title:$('eSrcTitle').value.trim(), no:$('eSrcNo').value.trim(), page:$('eSrcPage').value.trim(), url:url } };
+}
+/* 조건이 하나라도 있는가 — 엔진과 같은 잣대(빈 사업장으로 판정해 조건 글자가 나오는지) */
+function hasCond(p){ return GovaidMatch.judge({vals:{},facts:{}}, Object.assign({}, p, {status:'confirmed', baseYear:YEAR}), YEAR).items.length>0; }
+async function saveProgram(mode){
+  var cur=CUR_CHECK==='__new'?null:progById(CUR_CHECK), patch;
+  try{ patch=readEditor(cur); }catch(e){ toast(e.message); return; }
+  var id = cur ? cur.id : 'gp-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+  if(mode==='confirm'){
+    if(!hasCond(patch)){ toast('조건이 하나도 없어 확정할 수 없습니다 — 조건을 넣거나 «사람이 볼 조건»을 적으세요'); return; }
+    if(!patch.agency && !confirm('담당기관이 비어 있습니다. 그래도 확정할까요?')) return;
+    Object.assign(patch, { status:'confirmed', baseYear:YEAR, confirmedAt:Date.now(), confirmedBy:ME.sid });
+  } else patch.status='draft';
+  try{
+    await gate.save(fbDb.ref('govaid/programs/'+id), function(prev){ return Object.assign({}, prev||{}, patch, { id:id, entityType:'SupportProgram' }); },
+      cur ? { entityType:'SupportProgram' } : { entityType:'SupportProgram', expectedRevision:-1 });
+    CUR_CHECK=id; await reload(); toast(mode==='confirm' ? '확정했습니다 — 이제 후보 계산에 들어갑니다' : '초안으로 저장했습니다');
+  }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+function confirmOne(id){
+  var p=progById(id); if(!p) return Promise.reject(new Error('사업을 찾지 못했습니다'));
+  var probe=GovaidMatch.judge({vals:{},facts:{}}, Object.assign({}, p, {status:'confirmed', baseYear:YEAR}), YEAR);
+  if(!probe.items.length) return Promise.reject(new Error('「'+nm(p)+'」은 조건이 비어 확정하지 않았습니다'));
+  return gate.save(fbDb.ref('govaid/programs/'+id), function(prev){ return Object.assign({}, prev||{}, { status:'confirmed', baseYear:YEAR, confirmedAt:Date.now(), confirmedBy:ME.sid }); }, { entityType:'SupportProgram' });
+}
+async function dropProgram(id){
+  var p=D.programs[id]; if(!p) return;
+  if(!confirm('「'+nm(p)+'」을(를) 사전에서 뺍니다. 지난 검토 기록은 남습니다. 뺄까요?')) return;
+  try{ await gate.remove(fbDb.ref('govaid/programs/'+id), p, { entityType:'SupportProgram' }); CUR_CHECK=''; await reload(); toast('사전에서 뺐습니다'); }
+  catch(e){ toast('빼지 못했습니다: '+(e&&e.message||e)); }
+}
+
+/* ═══ 사업장 정보 창 — 예비 고객은 기본값까지, 기존 고객사는 원장에 없는 «보충값»만 ═══ */
+function autoHcText(pf){ var a=GovaidMatch.headcountAuto((D.pub||{})[pf.bizno]); return a.v==null ? '모름' : a.v+'명('+a.src+')'; }
+function selHtml(id, opts, cur, blankTxt){ return '<select id="'+id+'"><option value="">'+esc(blankTxt)+'</option>'+opts.map(function(o){ return '<option value="'+esc(o[0])+'"'+(o[0]===cur?' selected':'')+'>'+esc(o[1])+'</option>'; }).join('')+'</select>'; }
+function openSubject(key){
+  var pf=key?profileByKey(key):null, isNew=!pf, isPr=isNew||pf.kind==='pr';
+  var pr=(isPr&&!isNew) ? (D.prospects[pf.id]||{}) : {}, ex=pf ? (D.extras[pf.key]||{}) : {}, ev=ex.vals||{}, ef=ex.facts||{};
+  SUBJ={ key:key, isNew:isNew, isPr:isPr };
+  function v(x){ return x==null?'':esc(x); }
+  var sizes=GovaidMatch.SIZES.map(function(s){ return [s,s]; }), regs=GovaidMatch.REGIONS.map(function(s){ return [s,s]; }), inds=indOpts();
+  var h='<div class="mhead"><h3>'+(isNew?'새 예비 고객':esc(pf.name))+'</h3>'+(pf?kindChip(pf):'')+'<span class="sp"></span><button class="sm" data-close="1">닫기</button></div><div class="ed">';
+  if(isPr){
+    h+='<label class="k" for="sName">회사 이름</label><input id="sName" value="'+v(pr.name)+'">'
+      +'<label class="k" for="sBiz">사업자번호</label><input id="sBiz" inputmode="numeric" placeholder="000-00-00000" value="'+v(pr.bizno)+'">'
+      +'<label class="k" for="sReg">지역</label>'+selHtml('sReg',regs,pr.region,'모름')
+      +'<label class="k" for="sInd">업종</label>'+selHtml('sInd',inds,pr.industry,'모름')
+      +'<label class="k" for="sSize">규모</label>'+selHtml('sSize',sizes,pr.size,'모름')
+      +'<label class="k" for="sHc">상시 근로자</label><div class="row"><input id="sHc" type="number" min="0" style="width:100px" value="'+v(pr.headcount)+'"> 명 <span class="hint">모르면 비워 두세요(0 과 다릅니다)</span></div>'
+      +'<label class="k" for="sFy">개업 연도</label><input id="sFy" type="number" min="1900" max="'+YEAR+'" style="width:100px" value="'+v(pr.foundedYear)+'">'
+      +'<label class="k" for="sMemo">메모</label><input id="sMemo" maxlength="300" value="'+v(pr.memo)+'">';
+  } else {
+    var co=companyById(pf.id)||{};
+    h+='<label class="k">업체관리 값</label><div class="hint">'+esc([co.name, co.bizNo||'사업자번호 없음', co.companySize||'규모 없음', co.address||'주소 없음'].join(' · '))+' — 고치려면 푸른이알피 업체관리에서</div>'
+      +'<label class="k" for="xHc">근로자 (직접)</label><div class="row"><input id="xHc" type="number" min="0" style="width:100px" value="'+v(ev.headcount)+'"> 명 <span class="hint">비우면 '+esc(autoHcText(pf))+'</span></div>'
+      +'<label class="k" for="xFy">개업 연도</label><input id="xFy" type="number" min="1900" max="'+YEAR+'" style="width:100px" value="'+v(ev.foundedYear)+'">'
+      +'<label class="k" for="xReg">지역 (직접)</label>'+selHtml('xReg',regs,ev.region,'업체관리 주소대로')
+      +'<label class="k" for="xInd">업종</label>'+selHtml('xInd',inds,ev.industry,'모름')
+      +'<label class="k" for="xSize">규모 (직접)</label>'+selHtml('xSize',sizes,ev.size,'업체관리대로');
+  }
+  h+='<label class="k" for="xSd">매출 감소율</label><div class="row"><input id="xSd" type="number" min="0" style="width:100px" value="'+v(ev.salesDropPct)+'"> % <span class="hint">작년 대비 — 모르면 비워 두세요</span></div>';
+  h+=Object.keys(GovaidMatch.FACTS).map(function(k){ var cur= ef[k]===true?'yes':(ef[k]===false?'no':'');
+    return '<label class="k" for="xF_'+k+'">'+esc(GovaidMatch.FACTS[k])+'</label><select id="xF_'+k+'"><option value="">모름</option><option value="yes"'+(cur==='yes'?' selected':'')+'>예</option><option value="no"'+(cur==='no'?' selected':'')+'>아니오</option></select>'; }).join('');
+  if(isPr && !isNew) h+=linkBlock(pr);
+  h+='</div><div class="mfoot"><button data-close="1">취소</button><button class="pri" data-ssave="1">저장</button></div>';
+  openModal(h);
+}
+function linkBlock(pr){
+  if(pr.companyLinkStatus==='linked') return '<label class="k">업체 연결</label><div class="hint">업체관리 업체와 이어졌습니다 — 목록에서는 그 업체로 보입니다</div>';
+  var cands=PuOntology.companyLinkCandidates({ companyName:pr.name, bizNo:pr.bizno }, GovaidView.companies(D.companies), '');
+  return '<label class="k" for="sLink">업체관리와 잇기</label><div class="row">'
+    +(cands.length ? '<select id="sLink"><option value="">잇지 않음</option>'+cands.map(function(c){ return '<option value="'+esc(c.id)+'">'+esc(c.name+' · '+(c.bizNo||'번호 없음'))+'</option>'; }).join('')+'</select><span class="hint">계약해 업체관리에 생겼을 때만 — 사업자번호가 같아야 이어집니다</span>'
+      : '<span class="hint">이을 후보가 없습니다</span>')+'</div>';
+}
+/* 업체 잇기 — 사업자번호 10자리가 같아야 하고, 공용 검사(validateCompanyLink)도 통과해야 한다. 이름만으로는 잇지 않는다 */
+function checkLink(rec, companyId){
+  var co=companyById(companyId);
+  if(!co) return {ok:false, message:'고른 업체를 찾지 못했습니다'};
+  var a=GovaidMatch.digits(rec.bizno), b=GovaidMatch.digits(co.bizNo);
+  if(a.length!==10 || a!==b) return {ok:false, message:'사업자번호가 같은 업체만 이을 수 있습니다 — 이름이 같아도 잇지 않습니다'};
+  var r=PuOntology.validateCompanyLink({ companyId:companyId, companyName:rec.name, bizNo:rec.bizno }, GovaidView.companies(D.companies));
+  return r.ok ? {ok:true} : {ok:false, message:r.message};
+}
+function saveExtras(key, vals, facts){
+  var isCo=/^co_/.test(key), id=key.slice(3);
+  return gate.save(fbDb.ref('govaid/extras/'+key), function(prev){
+    var rec=Object.assign({}, prev||{}, { id:key, entityType:'Organization', subjectKey:key, vals:vals, facts:facts });
+    if(isCo) rec.companyId=id; else { rec.sourceKind='govaidProspect'; rec.sourceId=id; }
+    return rec;
+  }, { entityType:'Organization' });
+}
+async function saveSubject(){
+  var S=SUBJ; if(!S) return;
+  function n(id){ var s=$(id)?$(id).value.trim():''; if(s==='') return null; var x=Number(s); if(!isFinite(x)||x<0) throw new Error('숫자 칸에는 0 이상의 숫자만 넣으세요'); return Math.round(x); }
+  function year(id){ var y=n(id); if(y!=null && (y<1900||y>YEAR)) throw new Error('개업 연도가 맞지 않습니다'); return y; }
+  try{
+    var facts={}; Object.keys(GovaidMatch.FACTS).forEach(function(k){ var s=$('xF_'+k).value; if(s) facts[k]=(s==='yes'); });
+    var vals={ salesDropPct:n('xSd') }, key=S.key;
+    if(S.isPr){
+      var name=$('sName').value.trim(); if(!name) throw new Error('회사 이름을 넣으세요');
+      var biz=GovaidMatch.digits($('sBiz').value); if(biz && biz.length!==10) throw new Error('사업자번호는 숫자 10자리입니다');
+      var id = S.isNew ? 'pr'+Date.now().toString(36)+Math.random().toString(36).slice(2,6) : key.slice(3);
+      var rec={ id:id, entityType:'Organization', name:name, bizno:biz, region:$('sReg').value, industry:$('sInd').value, size:$('sSize').value,
+        headcount:n('sHc'), foundedYear:year('sFy'), memo:$('sMemo').value.trim().slice(0,300) };
+      var link=$('sLink')?$('sLink').value:'';
+      if(link){ var chk=checkLink(rec, link); if(!chk.ok) throw new Error(chk.message); rec.companyId=link; rec.companyLinkStatus='linked'; }
+      await gate.save(fbDb.ref('govaid/prospects/'+id), function(prev){ var base=Object.assign({}, prev||{}, rec); if(!base.companyLinkStatus) base.companyLinkStatus='pending'; return base; },
+        S.isNew ? { entityType:'Organization', expectedRevision:-1 } : { entityType:'Organization' });
+      key = rec.companyLinkStatus==='linked' ? 'co_'+link : 'pr_'+id;
+      if(rec.companyLinkStatus!=='linked') await saveExtras('pr_'+id, vals, facts);
+    } else {
+      Object.assign(vals, { headcount:n('xHc'), foundedYear:year('xFy'), region:$('xReg').value, industry:$('xInd').value, size:$('xSize').value });
+      await saveExtras(key, vals, facts);
+    }
+    closeModal(); CUR_CO=key; await reload(); toast('저장했습니다');
+  }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
 
 /* ═══ 누르기·고르기 — 한 곳에서 받는다(인라인 onclick 에 열쇠를 넣지 않는다 — 따옴표가 깨진다) ═══ */
 document.addEventListener('change', function(e){
@@ -353,10 +525,43 @@ document.addEventListener('click', function(e){
   if(clickMore(t)) return;   /* 단추가 줄 누르기보다 먼저 — 줄 안의 «해당» 단추가 검토 창으로 새지 않게 */
   if((b=t.closest('table[data-name] tr[data-row]'))){ rowClick(b.closest('table').getAttribute('data-name'), b.getAttribute('data-row')); return; }
 });
-/* Task 7·8 이 늘린다 — 처리했으면 true */
-function clickMore(t){ return false; }
-function rowClick(name,id){ if(name==='dict'){ CUR_CHECK=id; TAB='check'; draw(); } }
-async function bulkDo(name){ toast('준비 중'); }
+/* 처리했으면 true — 못 받은 누르기만 줄 누르기(rowClick)로 넘어간다 */
+function clickMore(t){
+  var b;
+  if((b=t.closest('[data-subj]'))){ openSubject(b.getAttribute('data-subj')); return true; }
+  if((b=t.closest('[data-ssave]'))){ saveSubject(); return true; }
+  if((b=t.closest('[data-psave]'))){ saveProgram(b.getAttribute('data-psave')); return true; }
+  if((b=t.closest('[data-pdrop]'))){ dropProgram(b.getAttribute('data-pdrop')); return true; }
+  if((b=t.closest('[data-cp]'))){ CUR_CHECK=b.getAttribute('data-cp'); TAB='check'; lsSet('tab',TAB); draw(); return true; }
+  return clickReview(t);
+}
+/* Task 8 이 채운다 */
+function clickReview(t){ return false; }
+function rowClick(name,id){
+  if(name==='dict'){ CUR_CHECK=id; TAB='check'; draw(); return; }
+  rowReview(name,id);
+}
+function rowReview(name,id){}
+async function bulkDo(name, d){
+  var ids=picked(name); if(!ids.length) return;
+  var kind=BULK[name], jobs=[], label='';
+  if(kind==='review'){ var r=reviewJobs(name, ids, d); jobs=r.jobs; label=r.label; }
+  else if(kind==='dropProgram'){ label='사전에서 빼기'; jobs=ids.map(function(id){ return function(){ return gate.remove(fbDb.ref('govaid/programs/'+id), D.programs[id], {entityType:'SupportProgram'}); }; }); }
+  else if(kind==='dropProspect'){
+    label='예비 고객 빼기(기존 고객사는 건너뜀)';
+    jobs=ids.filter(function(k){ return /^pr_/.test(k); }).map(function(k){ var id=k.slice(3); return function(){ return gate.remove(fbDb.ref('govaid/prospects/'+id), D.prospects[id], {entityType:'Organization'}); }; });
+  }
+  else { label='확정('+YEAR+' 기준)'; jobs=ids.map(function(id){ return function(){ return confirmOne(id); }; }); }
+  if(!jobs.length){ toast('할 수 있는 것이 없습니다'); return; }
+  if(!confirm(jobs.length+'건을 '+label+'할까요?')) return;
+  var res=await Promise.allSettled(jobs.map(function(f){ return f(); }));
+  var fail=res.filter(function(x){ return x.status==='rejected'; });
+  picked(name).forEach(function(id){ delete SEL[name+'|'+id]; });
+  await reload();
+  toast(fail.length ? (jobs.length-fail.length)+'건 완료 · '+fail.length+'건 실패: '+String(fail[0].reason&&fail[0].reason.message||fail[0].reason) : jobs.length+'건 완료');
+}
+/* Task 8 이 채운다 */
+function reviewJobs(name, ids, d){ return { jobs:[], label:'' }; }
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }

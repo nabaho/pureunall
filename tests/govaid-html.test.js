@@ -42,3 +42,15 @@ test('자료 표는 맨 왼쪽 ☐ + 번호 — 보기 전용 표만 예외(data
 test('예비 고객은 업체관리 원장(data/companies)에 쓰지 않는다 — 읽기만', () => {
   assert.doesNotMatch(NOC, /gate\.(?:save|remove)\(fbDb\.ref\('data\//);
 });
+
+test('조건이 하나도 없으면 확정하지 않는다 — 화면도 엔진과 같은 잣대(judge 의 items)로 막는다', () => {
+  const fn = NOC.slice(NOC.indexOf('function confirmOne('), NOC.indexOf('function confirmOne(') + 600);
+  assert.match(fn, /GovaidMatch\.judge\(/);
+  assert.match(fn, /items\.length/);
+});
+
+test('예비 고객 → 업체 잇기는 사업자번호 10자리가 같아야 한다(이름만으로 잇지 않는다)', () => {
+  const fn = NOC.slice(NOC.indexOf('function checkLink('), NOC.indexOf('function checkLink(') + 700);
+  assert.match(fn, /length!==10/);
+  assert.match(fn, /validateCompanyLink\(/);
+});
