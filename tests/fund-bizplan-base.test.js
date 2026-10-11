@@ -62,4 +62,5 @@ test('★ 배선 — 서식 한 장·한글 한 장·한글 묶음·HTML 묶음�
   assert.ok(fnSrc('_bizFinOf').includes('b.yr!==S.year-1'), '바탕의 해를 안 맞춰 본다');
   /* 바탕이 없을 때 왜 비는지 알린다 */
   assert.ok(SRC.includes("그 해 승인된 분개가 없어 비웠습니다"), '왜 비었는지 안 알린다');
+  assert.ok(SRC.includes("년 예산이 비어 있어 비웠습니다") && SRC.includes('(fin\n'), '바탕은 있는데 예산이 없을 때를 «분개가 없다»고 잘못 말한다');
 });

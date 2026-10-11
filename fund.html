@@ -5215,7 +5215,10 @@ function _hwpBizplanValues(f,sites){
   }
   var fin=null; try{ fin=_bizFinOf()||(isSetupFund(f)?_bizFinZero():null); }catch(e){}
   var P=null; try{ if(fin) P=bizplanBS(f,yr,fin,sites); }catch(e){}
-  if(!P) V._note=(V._note?V._note+' · ':'')+'추정재무상태표는 «'+(yr-1)+'년 기말»이 바탕인데 그 해 승인된 분개가 없어 비웠습니다 — 회계·결산에서 '+(yr-1)+'년을 승인하면 채워집니다';
+  /* 왜 비었는지 — 바탕(앞 해 기말)이 없어서인지, 예산이 없어서인지 갈라 알린다(실사이트 확인: 바탕은 있는데 예산이 비어 «분개가 없다»고 잘못 말했다) */
+  if(!P) V._note=(V._note?V._note+' · ':'')+(fin
+    ?'추정재무상태표는 '+yr+'년 예산이 비어 있어 비웠습니다 — 예산·집행에서 '+yr+'년 예산을 먼저 넣으세요'
+    :'추정재무상태표는 «'+(yr-1)+'년 기말»이 바탕인데 그 해 승인된 분개가 없어 비웠습니다 — 회계·결산에서 '+(yr-1)+'년을 승인하면 채워집니다');
   if(P){
     BIZ_BS_ROWS.forEach(function(x){ var k=BIZ_TPL_BS[x[0]]; if(k) V[k]=W(x[1](P)); });
     V.대_현금=W(P.cash); V.대_단기=W(P.savings); V.대_준비금1=W(P.res1); V.대_준비금2=W(P.res2);
