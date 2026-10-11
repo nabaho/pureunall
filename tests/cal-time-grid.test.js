@@ -129,3 +129,9 @@ test('폰 한 시간 높이 62px(구글 폰 앱 캡처) · PC 48px — 눈금선
   assert.match(캘린더, /background-size:100% var\(--hh,48px\)/);
   assert.match(캘린더, /;--hh:' \+ 격자높이 \+ 'px;height:'/);
 });
+
+test('폰 일·3일 보기 — 시간 글자 칸 72px · 글자 12px (구글 폰 앱 캡처), 주 보기는 그대로', () => {
+  assert.match(캘린더, /var 눈금폭 = \(typeof 폰 === "function" && 폰\(\) && n <= 3\) \? "72px" : "var\(--tgw,48px\)";/);
+  assert.match(캘린더, /body\.mob \.tgrid\.wide \.tgtime\{font-size:12px\}/);
+  assert.match(캘린더, /<div class="tgrid' \+ \(눈금폭 === "72px" \? ' wide' : ''\) \+ '">/);
+});
