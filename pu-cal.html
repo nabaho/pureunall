@@ -799,6 +799,10 @@
     font-size:15px;font-weight:500;color:var(--gtext);cursor:pointer;font-family:inherit}
   .drawer button.on{background:#d3e3fd;color:#0842a0}
   :root[data-theme="dark"] .drawer button.on{background:#0842a0;color:#d3e3fd}
+  .drawer .dcal{display:flex;align-items:center;gap:16px;height:48px}
+  .drawer .dck{width:20px;height:20px;border-radius:4px;border:2px solid var(--ck);display:inline-flex;align-items:center;justify-content:center;
+    font-style:normal;font-size:14px;line-height:1;color:#ffffff;flex:none}
+  .drawer .dck.on{background:var(--ck)}
   .drawer hr{border:none;border-top:1px solid var(--gline);margin:8px 0}
   .vveil{position:fixed;inset:0;z-index:30;background:transparent}
   .vmenu{position:absolute;left:12px;top:52px;z-index:31;background:var(--panel);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.3);padding:6px 0;min-width:150px}
@@ -2594,6 +2598,11 @@ function 폰머리Html(){
     + (S.drawer ? '<div class="dscrim" data-dclose="1"></div><div class="drawer"><h3>푸른 캘린더</h3>'
         + [["sched","일정"],["day","일"],["3day","3일"],["week","주"],["month","월"]].map(function(v){
             return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>'; }).join("")
+        /* 구글 서랍의 «내 캘린더» 체크 줄 — 우리 쪽은 「공용 일정」·「나만 보기」 둘. 둘 다 켜면 전체, 하나만 켜면 그것만(마지막 하나는 못 끈다).
+           사람별 거르개는 「더 보기」의 탭줄에 그대로 있다 */
+        + '<hr>' + [["shared","공용 일정","var(--acc)"],["priv","나만 보기","var(--gsub)"]].map(function(c){
+            var 켜짐 = S.filter === null || S.filter === undefined || S.filter === c[0];
+            return '<button class="dcal" data-dcal="' + c[0] + '"><i class="dck' + (켜짐 ? ' on' : '') + '" style="--ck:' + c[2] + '">' + (켜짐 ? '✓' : '') + '</i>' + c[1] + '</button>'; }).join("")
         + '<hr><button data-dreload="1">새로고침</button><button data-dmore="1">더 보기 (탭·사람·거르개)</button></div>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
@@ -4788,7 +4797,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4888,6 +4897,13 @@ document.addEventListener('click', function(e){
     S.mobMenu = true; render();
     setTimeout(function(){ var m = document.getElementById('me'); if(m) m.click(); }, 0);
     return;
+  }
+  if(t.hasAttribute('data-dcal')){
+    var 어느 = t.getAttribute('data-dcal'), 다른 = 어느 === "shared" ? "priv" : "shared", 지금 = S.filter === undefined ? null : S.filter;
+    var 켜짐2 = 지금 === null || 지금 === 어느;
+    if(켜짐2){ if(지금 === null) S.filter = 다른; }          /* 둘 다 켜졌으면 이것을 끈다 · 이것만 켜졌으면 못 끈다 */
+    else S.filter = 지금 === 다른 ? null : 어느;               /* 꺼져 있으면 켠다(다른 것이 켜져 있었으면 둘 다 = 전체) */
+    render(); return;
   }
   if(t.hasAttribute('data-sback')){ S.srch = false; S.q = ''; render(); return; }
   if(t.hasAttribute('data-dclose')){ S.drawer = false; render(); return; }
