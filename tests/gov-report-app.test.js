@@ -80,6 +80,18 @@ test('정적 — 공통 머리와 새 모듈을 차례대로 싣는다', () => {
   assert.match(SRC, /PuWhoami\.mount\('#who'\)/);
 });
 
+test('정적 — 받은 서류함 모듈을 차례대로 싣는다(주소 맞추기·서버 부르기 → 후보 모듈) · 서버 부르기 번호는 취업규칙 화면과 같다', () => {
+  ['js/pu-co-thread.js', 'js/rules-v2/mail-orig.js', 'js/pu-gov-report-inbox.js'].forEach((f) =>
+    assert.match(SRC, new RegExp('<script src="' + f.replace(/\./g, '\\.') + '\\?v=\\d+"></script>'), f));
+  const at = (f) => SRC.indexOf(f);
+  assert.ok(at('pu-co-thread.js') < at('pu-gov-report-inbox.js'));
+  assert.ok(at('rules-v2/mail-orig.js') < at('pu-gov-report-inbox.js'));
+  assert.ok(at('pu-gov-report-build.js') < at('pu-gov-report-inbox.js'), 'PRIV_RE 를 build 에서 가져온다');
+  const RULES = fs.readFileSync(path.join(__dirname, '..', 'rules.html'), 'utf8');
+  const v = (s) => (s.match(/js\/rules-v2\/mail-orig\.js\?v=(\d+)/) || [])[1];
+  assert.ok(v(SRC) && v(SRC) === v(RULES), '서버 부르기 모듈 ?v 가 취업규칙 화면과 같아야 한다');
+});
+
 test('정적 — 쓰기는 한 곳뿐(서류 진행 기록 줄 하나 .set) · 일정 자리는 GR_NODES 로만 부른다', () => {
   assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/, '쓰기 명령이 있다');
