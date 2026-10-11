@@ -76719,6 +76719,47 @@ function erpLeaveGrants(u, untilYmd, policy){
   }
   return before.concat(fix, after);
 }
+/* «이번 연차 기간» — 오늘(퇴직자는 마지막 근무일) 쓸 수 있는 연차가 생긴 날부터 만료일까지 (2026-10-11 대표 「휴가관리 시안대로 진행」)
+   까닭: 입사일 기준인데 표가 달력 연도로 잘라 세어, 작년 11월에 생긴 15일을 올해 쓰면 «부여 0 · 사용 5 · 잔여 −5» 로 보였다.
+   · 생긴 = 그 날 «살아 있는»(생긴 날 ≤ 그 날 ≤ 만료일) 발생분 합 — 판결식 전환 보정분도 함께
+   · 쓴   = 그 기간(첫 발생일 ~ 마지막 만료일) 안의 연차·반차·시간연차 (소정근로시간으로 나눈다)
+   · 수기 부여(leave_grants[sid][그 해]) 가 있으면 «생긴»을 그 값 + 전환 보정 + 이월 로 본다 (해 = 이번 기간 주 발생분의 해)
+   · 다음 = 그 날 뒤에 처음 생길 발생분 (퇴직자는 없음) */
+function erpLeaveCycleNow(u, atYmd, atts, ovMap){
+  var out = { start:'', end:'', granted:0, used:0, remain:0, next:null, firstYear:false, ovYear:'', ov:null, autoDays:0 };
+  if(!u || !u.hireDate) return out;
+  var at = atYmd || localYMD(new Date());
+  var lastDay = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+  if(lastDay && lastDay < at) at = lastDay;
+  var all = erpLeaveGrants(Object.assign({}, u, { lastWorkDate:'', retireDate:'' }), '9999-12-31');
+  var live = all.filter(function(g){ return g.date <= at && g.expiry >= at; });
+  var nx = lastDay ? null : (all.filter(function(g){ return g.date > at; })[0] || null);
+  out.next = nx ? { date:nx.date, days:nx.days } : null;
+  if(!live.length){
+    // 아직 하나도 안 생겼다(입사 첫 달) — 기간은 입사일부터 첫 기념일 전날까지
+    var h0 = _lvParse(u.hireDate);
+    if(h0){ out.start = _lvYmd(h0); out.end = _lvYmd(_lvDayBefore(_lvAddMonths(h0, 12))); out.firstYear = true; }
+    return out;
+  }
+  var main = live.filter(function(g){ return g.kind === 'year' && !/전환 보정/.test(String(g.label || '')); }).pop() || live[0];
+  out.firstYear = main.kind === 'under1';
+  out.start = out.firstYear ? String(u.hireDate).slice(0, 10) : live.reduce(function(m, g){ return g.date < m ? g.date : m; }, live[0].date);
+  out.end = live.reduce(function(m, g){ return g.expiry > m ? g.expiry : m; }, live[0].expiry);
+  out.autoDays = live.reduce(function(t, g){ return t + g.days; }, 0);
+  out.granted = out.autoDays;
+  out.ovYear = main.date.slice(0, 4);
+  var ov = ovMap && ovMap[u.sid] && ovMap[u.sid][out.ovYear] ? ovMap[u.sid][out.ovYear] : null;
+  if(ov && !out.firstYear){
+    out.ov = ov;
+    var fix = live.filter(function(g){ return /전환 보정/.test(String(g.label || '')); }).reduce(function(t, g){ return t + g.days; }, 0);
+    out.granted = (ov.total != null ? (+ov.total || 0) + fix : out.autoDays) + (+ov.carryOver || 0);
+  }
+  var dayHours = u.scheduledHours || 8;
+  var recs = (atts || []).filter(function(r){ return r && r.sid === u.sid && r.date && r.date >= out.start && r.date <= out.end; });
+  out.used = (typeof PuWork !== 'undefined' && PuWork.leaveUsed) ? PuWork.leaveUsed(recs, dayHours) : 0;
+  out.remain = Math.round((out.granted - out.used) * 10) / 10;
+  return out;
+}
 /* 그해(달력 1~12월)에 «생긴» 연차 — 오늘·퇴직일 뒤의 것은 아직 없다 */
 function erpLeaveGrantedInYear(u, year, asOfYmd){
   var y = String(year), asOf = asOfYmd || localYMD(new Date());
@@ -77978,6 +78019,23 @@ function LeaveManagement(){
     return {used:PuWork.leaveUsed(rec, dayHours), fullDays:leaveCnt, halfDays:halfCnt, hourTotal:hourTotal};
   }
 
+  /* 보는 기준 — «지금»(이번 연차 기간) / «연도별»(달력 1~12월, 대장·정산용) (2026-10-11 시안) */
+  var lvvS = usePersistedState('leave_view', 'now'); var lvView = lvvS[0]; var setLvView = lvvS[1];
+  function lvRow(u){
+    if(lvView === 'now'){
+      var c = erpLeaveCycleNow(u, todayYMD(), attendance, grants);
+      return { mode:'now', granted:c.granted, used:c.used, remain:c.remain, ov:c.ov, auto:c.autoDays, cycle:c,
+        usedTitle:'이번 연차 기간 ' + c.start + ' ~ ' + c.end + ' 안에 쓴 연차', promoYear:String(new Date().getFullYear()) };
+    }
+    var a = calcGrantDays(u.hireDate, selYear, u.retireDate||u.leaveDate||null);
+    var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
+    var t = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
+    var co = ov?(ov.carryOver||0):0;
+    var us = calcUsed(u.sid, selYear);
+    return { mode:'year', t:t, co:co, granted:t+co, used:us.used, remain:Math.round((t+co-us.used)*10)/10, ov:ov, auto:a.days,
+      usedTitle:'연'+us.fullDays+'·반'+us.halfDays+'·시'+us.hourTotal+'h', promoYear:selYear };
+  }
+
   var selUser = users.find(function(u){return u.sid===selSid;});
 
   // 선택 직원 연차 정보
@@ -77988,6 +78046,9 @@ function LeaveManagement(){
   var grant = total + carryOver;
   var used  = selUser ? calcUsed(selSid, selYear) : {used:0,fullDays:0,halfDays:0,hourTotal:0};
   var remain = grant - used.used;
+  var selCycle = (lvView === 'now' && selUser) ? erpLeaveCycleNow(selUser, todayYMD(), attendance, grants) : null;
+  if(selCycle){ grant = selCycle.granted; used = Object.assign({}, used, { used:selCycle.used }); remain = selCycle.remain; }
+  var lbOpenS = usePersistedState('leave_basis_open', false); var lbOpen = lbOpenS[0]; var setLbOpen = lbOpenS[1];
 
   // 오버라이드 저장
   function openOverride(){
@@ -78118,6 +78179,15 @@ function LeaveManagement(){
         h('button',{onClick:function(){setSelYear(String(parseInt(selYear)+1));},style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'4px',padding:'2px 7px',cursor:'pointer',fontSize:'13px'}},'▶')
       ),
       h('div',{style:{display:'flex',gap:'3px',alignItems:'center',flexShrink:0}},
+        // 보는 기준 — 지금(이번 연차 기간) / 연도별(달력 1~12월)
+        _isAdminView && h('div',{style:{display:'inline-flex',border:'1px solid #cbd5e1',borderRadius:'7px',overflow:'hidden',marginRight:'6px'}},
+          [{v:'now',l:'지금 기준'},{v:'year',l:'연도별'}].map(function(o){
+            var on = lvView === o.v;
+            return h('button',{key:o.v,type:'button',onClick:function(){ setLvView(o.v); },
+              title: o.v==='now' ? '오늘 쓸 수 있는 연차가 생긴 날부터 만료일까지로 셉니다' : '선택한 해(1~12월)에 생기고 쓴 것으로 셉니다 — 대장·정산용',
+              style:{border:'none',padding:'3px 10px',fontSize:'11px',cursor:'pointer',whiteSpace:'nowrap',
+                background: on ? '#1e40af' : '#fff', color: on ? '#fff' : '#64748b', fontWeight: on ? 700 : 500}}, o.l);
+          })),
         // 재직 / 퇴사자 탭 — 목록도 합계도 함께 갈린다
         _isAdminView && h('div',{style:{display:'inline-flex',gap:'3px',alignItems:'center'}},
           [{ v:'active',  label:'재직',      n:leaveLiveN, c:'#1e40af', bg:'#eff6ff', bd:'#bfdbfe' },
@@ -78177,61 +78247,60 @@ function LeaveManagement(){
           h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11.5px'}},
             h('thead',null,
               h('tr',null,
-                h('th',{rowSpan:2,style:Object.assign({},thS,{width:'40px',textAlign:'center',verticalAlign:'middle'})},'#'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{verticalAlign:'middle'})},'직원'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',verticalAlign:'middle'})},'부여'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',verticalAlign:'middle'})},'이월'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',background:'#eff6ff',verticalAlign:'middle'})},'총'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',background:'#fffbeb',verticalAlign:'middle'})},'사용'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',background:'#eff6ff',verticalAlign:'middle'})},'잔여'),
-                h('th',{colSpan:2,style:Object.assign({},thS,{textAlign:'center',background:'#fffbeb',color:'#854d0e',borderBottom:'1px solid #fde68a'})},'\uD83D\uDCE2 \uC0AC\uC6A9\uCD09\uC9C4\uC2DC\uD589'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'center',width:'36px',verticalAlign:'middle'})},'⚙️')
-              ),
-              h('tr',null,
-                h('th',{style:Object.assign({},thS,{textAlign:'center',background:'#fffbeb',color:'#854d0e',width:'88px'})},'1차 통보'),
-                h('th',{style:Object.assign({},thS,{textAlign:'center',background:'#fffbeb',color:'#854d0e',width:'88px'})},'2차 통보')
+                (lvView === 'now'
+                  ? [['#','center'],['이름','left'],['이번 연차 기간','left'],['생긴','right'],['쓴','right'],['남은','right'],['다음 연차','left'],['촉진','left'],['','center']]
+                  : [['#','center'],['이름','left'],['부여','right'],['이월','right'],['총','right'],['사용','right'],['잔여','right'],['촉진','left'],['','center']])
+                  .map(function(c, k){ return h('th',{key:k,style:Object.assign({},thS,{textAlign:c[1],whiteSpace:'nowrap'})},c[0]); })
               )
             ),
             h('tbody',null,
               leaveUsers.map(function(u,i){
-                var a  = calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
-                var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-                var t  = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
-                var co = ov?(ov.carryOver||0):0;
-                var gr = t+co;
-                var us = calcUsed(u.sid,selYear);
-                var re = gr-us.used;
-                var ratio = gr>0?us.used/gr:0;
+                var R = lvRow(u);
+                var ov = R.ov, gr = R.granted, re = R.remain;
+                var ratio = gr>0?R.used/gr:0;
                 var color = ratio>=0.8?'#dc2626':ratio>=0.5?'#d97706':'#16a34a';
                 var isSel = u.sid===selSid;
+                var mono = {textAlign:'right',fontFamily:'monospace',whiteSpace:'nowrap'};
+                var onLoa = u.status==='leave' || !!getLoaStatus(u.sid);
                 return h('tr',{key:u.sid,onClick:function(){setSelSid(u.sid);},
                   style:{background:isSel?'#eff6ff':i%2===0?'#fff':'#f8fafc',
                     cursor:'pointer',borderLeft:'3px solid '+(isSel?'#1e40af':'transparent'),
                     borderBottom:'1px solid #f8fafc'}},
                   h('td',{style:Object.assign({},tdS,{textAlign:'center',color:'#94a3b8',fontFamily:'monospace',fontSize:'11px'})},i+1),
-                  h('td',{style:Object.assign({},tdS,{fontWeight:700})},
+                  /* 이름 칸은 한 줄 — 직책은 옆에 작게 (CLAUDE.md 한 칸 한 줄) */
+                  h('td',{style:Object.assign({},tdS,{fontWeight:700,whiteSpace:'nowrap'})},
                     u.name,
-                    (u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'6px', fontWeight:700, verticalAlign:'middle' } }, '퇴사'),
+                    h('span',{style:{fontSize:'10.5px',color:'#94a3b8',fontWeight:400,marginLeft:'5px'}},u.title||''),
+                    onLoa && !(u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '휴직'),
+                    (u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '퇴사'),
                     u.leaveRecalcApplied && h('span', { title:'퇴직 시 입사일 기준 연차 재산정 적용됨',
-                      style:{ marginLeft:'4px', fontSize:'10px', background:'#eff6ff', color:'#2563eb',
-                        padding:'1px 5px', borderRadius:'6px', fontWeight:700, verticalAlign:'middle' } }, '🔄재산정'),
-                    h('div',{style:{fontSize:'10.5px',color:'#94a3b8',fontWeight:400}},u.title)),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace'})},
-                    ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+a.days+'일)'},t+'⚙'):t),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',color:co>0?'#2563eb':'#cbd5e1'})},co>0?co:'-'),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,background:'#eff6ff'})},gr),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,color:color,background:'#fffbeb'}),title:'연'+us.fullDays+'·반'+us.halfDays+'·시'+us.hourTotal+'h'},
-                    Math.round(us.used*10)/10),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},
-                    Math.round(re*10)/10),
-                  // ── 1차/2차 통보 (사용촉진 데이터 인라인) ──
+                      style:{ marginLeft:'4px', fontSize:'10px', background:'#eff6ff', color:'#2563eb', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '🔄재산정')),
+                  R.mode === 'now'
+                    ? [
+                        h('td',{key:'per',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'}),title:R.cycle.firstYear?'입사 1년 미만 — 매달 1일씩 생긴다':''},
+                          R.cycle.start ? (R.cycle.start + ' ~ ' + R.cycle.end) : '-'),
+                        h('td',{key:'g',style:Object.assign({},tdS,mono)},
+                          ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+R.auto+'일)'},gr+'⚙'):gr),
+                        h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color}),title:R.usedTitle},Math.round(R.used*10)/10),
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re),
+                        h('td',{key:'nx',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'})},
+                          R.cycle.next ? (R.cycle.next.date + ' · ' + R.cycle.next.days + '일') : '—')
+                      ]
+                    : [
+                        h('td',{key:'g',style:Object.assign({},tdS,mono)},
+                          ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+R.auto+'일)'},R.t+'⚙'):R.t),
+                        h('td',{key:'co',style:Object.assign({},tdS,mono,{color:R.co>0?'#2563eb':'#cbd5e1'})},R.co>0?R.co:'-'),
+                        h('td',{key:'gr',style:Object.assign({},tdS,mono,{fontWeight:700,background:'#eff6ff'})},gr),
+                        h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color,background:'#fffbeb'}),title:R.usedTitle},Math.round(R.used*10)/10),
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re)
+                      ],
+                  // ── 촉진: «한 칸» — 지금 차례인 통보만 보인다 (1차를 했으면 2차) ──
                   (function(){
-                    var pstage = calcLeavePromoStage(u.hireDate, selYear);
+                    var pstage = calcLeavePromoStage(u.hireDate, R.promoYear);
                     var prec = promoRecOf(u.sid);
                     var hasRemain = re > 0;   // 잔여 있을 때만 촉진 대상
                     var isRetiredU = (u.status==='retired' || u.status==='resigned');  // 퇴사자는 촉진 불필요
                     if(isRetiredU) hasRemain = false;
-                    // 통보 셀 렌더: 완료(날짜+✎) / 시기도래(＋기록) / 아직(—)
                     function noticeCell(round){
                       if(isRetiredU) return h('span',{style:{fontSize:'10px',color:'#cbd5e1'}, title:'퇴사자 — 사용촉진 불필요'},'—');
                       if(!pstage.enabled) return h('span',{style:{fontSize:'10px',color:'#cbd5e1'}, title:'사용촉진 미실시 (연차수당 지급 방침)'},'미실시');
@@ -78260,7 +78329,7 @@ function LeaveManagement(){
                           '✓ '+dateVal.slice(5), sentAt ? h('span',{style:{color:'#2563eb',fontSize:'9px'}},'📧') : h('span',{style:{color:'#94a3b8',fontSize:'9px'}},'✎'));
                       }
                       if(reached){
-                        return h('span',{style:{display:'inline-flex',flexDirection:'column',gap:'2px',alignItems:'center'}},
+                        return h('span',{style:{display:'inline-flex',flexDirection:'row',gap:'4px',alignItems:'center',whiteSpace:'nowrap'}},
                           plannedStr ? h('span',{style:{fontSize:'9px',color:'#d97706',fontFamily:'monospace',fontWeight:700}}, plannedStr.slice(5)+(round===2?' 까지':' 예정')) : null,
                           h('span',{style:{display:'flex',gap:'3px'}},
                             h('button',{title:'통보서 메일 발송 + 통보일 기록',
@@ -78283,33 +78352,32 @@ function LeaveManagement(){
                         ? h('span',{style:{fontSize:'9.5px',color:'#cbd5e1',fontFamily:'monospace'}}, plannedStr.slice(5)+(round===2?' 까지':' 예정'))
                         : h('span',{style:{fontSize:'10px',color:'#cbd5e1'}},'—');
                     }
-                    return [
-                      h('td',{key:'n1',style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})}, noticeCell(1)),
-                      h('td',{key:'n2',style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})}, noticeCell(2))
-                    ];
+                    var round = (prec && prec.n1Date) ? 2 : 1;
+                    var body = (!pstage.enabled || isRetiredU || (prec && prec.excluded)) ? h('span',{style:{fontSize:'10px',color:'#cbd5e1'}},'—') : noticeCell(round);
+                    return h('td',{key:'promo',style:Object.assign({},tdS,{padding:'3px 6px',whiteSpace:'nowrap'})},
+                      (pstage.enabled && !isRetiredU && !(prec && prec.excluded)) && h('span',{style:{fontSize:'9.5px',color:'#94a3b8',marginRight:'4px'}}, round+'차'),
+                      body);
                   })(),
                   h('td',{style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})},
                     h('button',{onClick:function(e){e.stopPropagation();setSelSid(u.sid);openOverride();},
-                      style:{padding:'2px 6px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'10px'}},'수정'))
+                      title:'부여일수 수정',
+                      style:{padding:'2px 7px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'10.5px',whiteSpace:'nowrap'}},'⚙ 수정'))
                 );
               }),
-              // 합계
-              h('tr',{style:{background:'#1e40af',color:'#fff'}},
-                // 어느 무리의 합인지 밝힌다 — 탭에 따라 숫자가 달라지므로
-                h('td',{style:{padding:'7px 10px',fontWeight:800,whiteSpace:'nowrap'}},
-                  '합계', h('span',{style:{fontWeight:600,fontSize:'10px',opacity:.85,marginLeft:'5px'}},
-                    (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
-                h('td',{colSpan:2,style:{padding:'7px',textAlign:'right',fontFamily:'monospace'}},''),
-                h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;var co=ov?(ov.carryOver||0):0;return s+t+co;},0)),
-                h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  Math.round(leaveUsers.reduce(function(s,u){return s+calcUsed(u.sid,selYear).used;},0)*10)/10),
-                h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  Math.round(leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;var co=ov?(ov.carryOver||0):0;return s+(t+co-calcUsed(u.sid,selYear).used);},0)*10)/10),
-                h('td',null),
-                h('td',null),
-                h('td',null)
-              )
+              // 합계 — 표와 같은 셈(lvRow)
+              (function(){
+                var rows = leaveUsers.map(lvRow);
+                var sum = function(k){ return Math.round(rows.reduce(function(t, r){ return t + (+r[k] || 0); }, 0) * 10) / 10; };
+                var cS = {padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800};
+                return h('tr',{style:{background:'#1e40af',color:'#fff'}},
+                  h('td',{colSpan: lvView==='now' ? 3 : 4,style:{padding:'7px 10px',fontWeight:800,whiteSpace:'nowrap'}},
+                    '합계', h('span',{style:{fontWeight:600,fontSize:'10px',opacity:.85,marginLeft:'5px'}},
+                      (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
+                  h('td',{style:cS},sum('granted')),
+                  h('td',{style:cS},sum('used')),
+                  h('td',{style:cS},sum('remain')),
+                  h('td',{colSpan: lvView==='now' ? 3 : 2}));
+              })()
             )
           )
         ),
@@ -78328,24 +78396,28 @@ function LeaveManagement(){
               h('span',{style:{fontSize:'11px',color:'#94a3b8',marginLeft:'6px'}},'입사 '+(selUser.hireDate||'-'))
             ),
             h('div',{style:{display:'flex',gap:'8px',fontSize:'12px'}},
-              h('span',{style:{background:'#eff6ff',color:'#1e40af',padding:'3px 10px',borderRadius:'6px',fontWeight:700}},'총 '+grant+'일'),
+              h('span',{style:{background:'#eff6ff',color:'#1e40af',padding:'3px 10px',borderRadius:'6px',fontWeight:700,whiteSpace:'nowrap'},
+                title: selCycle ? ('이번 연차 기간 ' + selCycle.start + ' ~ ' + selCycle.end) : (selYear + '년 기준')}, (selCycle ? '생긴 ' : '총 ')+grant+'일'),
               h('span',{style:{background:'#fffbeb',color:'#854d0e',padding:'3px 10px',borderRadius:'6px',fontWeight:700}},'사용 '+Math.round(used.used*10)/10+'일'),
-              h('span',{style:{background:'#eff6ff',color:'#2563eb',padding:'3px 10px',borderRadius:'6px',fontWeight:800,fontSize:'13px'}},'잔여 '+Math.round(remain*10)/10+'일'),
+              h('span',{style:{background:'#eff6ff',color:'#2563eb',padding:'3px 10px',borderRadius:'6px',fontWeight:800,fontSize:'13px',whiteSpace:'nowrap'}},'잔여 '+Math.round(remain*10)/10+'일'+(selCycle && selCycle.end ? ' · 만료 '+selCycle.end : '')),
               h('button',{onClick:openOverride,style:{padding:'3px 8px',background:'#f8fafc',border:'1px solid #cbd5e1',borderRadius:'4px',cursor:'pointer',fontSize:'11px',color:'#475569'}},'부여일수 수정')
             )
           ),
           // 5인이상 전환 안내 (2021-06-01 이전 입사자만)
-          auto.isOldEmp && h('div',{style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:'8px 12px',marginBottom:'10px',fontSize:'11.5px',color:'#854d0e'}},
-            h('span',{style:{fontWeight:700,marginRight:'4px'}},'📋 연차 기산일 안내'),
-            '실제 입사일('+selUser.hireDate+')과 연차 기산일이 다릅니다.',
-            h('br',null),
+          auto.isOldEmp && h('div',{style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:'5px 10px',marginBottom:'8px',fontSize:'11.5px',color:'#854d0e'}},
+            h('div',{style:{display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap',overflow:'hidden'}},
+              h('span',{style:{fontWeight:700}},'📋 연차 기산일 안내'),
+              h('span',{style:{overflow:'hidden',textOverflow:'ellipsis'}},'실제 입사일('+selUser.hireDate+')과 연차 기산일이 다릅니다.'),
+              h('button',{type:'button',onClick:function(){ setLbOpen(!lbOpen); },
+                style:{marginLeft:'auto',border:'1px solid #fde68a',background:'#fff',color:'#854d0e',borderRadius:'5px',padding:'1px 8px',fontSize:'10.5px',cursor:'pointer',flexShrink:0}}, lbOpen ? '접기' : '펼치기')),
+            lbOpen && h('div',{style:{marginTop:'4px'}},
             '푸른노무법인은 ',h('strong',null,'2021년 06월 01일'),' 5인이상 사업장으로 전환되어 근로기준법상 연차가 적용되었습니다.',
             h('br',null),
             '이전 입사자의 연차는 ',h('strong',null,'2021-06-01'),
             '부터 기산하며, 실제 입사일('+selUser.hireDate+')로부터 2021-05-31까지는 연차 미발생 기간입니다.',
             h('br',null),
             /* 2026-10-10 대법원 2023도5476 판결식 전환 — 지난 부여분은 그대로, 다음부터 실제 입사일 기산·가산 */
-            h('strong',null,LEAVE_RULING_FROM+'부터'),' 대법원 2024. 12. 12. 선고 2023도5476 판결에 따라 실제 입사일 기준으로 셉니다(지난 부여분은 그대로 · 모자란 몫은 보정 부여).'
+            h('strong',null,LEAVE_RULING_FROM+'부터'),' 대법원 2024. 12. 12. 선고 2023도5476 판결에 따라 실제 입사일 기준으로 셉니다(지난 부여분은 그대로 · 모자란 몫은 보정 부여).')
           ),
           // 잔여 프로그레스 바
           h('div',{style:{background:'#e2e8f0',borderRadius:'4px',height:'8px',overflow:'hidden'}},
