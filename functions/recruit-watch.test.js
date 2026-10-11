@@ -706,7 +706,8 @@ test('★★ 읽는 손은 바이트(raw)도 넘긴다 — 로그인 게시판�
 test('★★ 서버 — AI 는 readDoc 과 같은 문(달 한도·열쇠·셈), 비밀값 GEMINI_KEY · 그림은 바이트로', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
   const i = src.indexOf('exports.recruitWatch'); const body = src.slice(i, src.indexOf('\nexports.', i + 30));
-  assert.match(body, /secrets: \["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY"\]/);
+  /* 앞 셋은 처음부터 — 뒤 둘(메일 비밀값)은 2026-10-11 아침 요약 메일을 보내려고 더했다(functions/recruit-digest.test.js 가 따로 못박는다) */
+  assert.match(body, /secrets: \["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"\]/);
   assert.match(body, /aiMonthSpend\(\)[\s\S]*몫\.over[\s\S]*readGeminiKey\(\)[\s\S]*DR\.callGemini[\s\S]*bumpReadTally\("gov"/);
   assert.match(body, /if \(raw\) return new Uint8Array\(await res\.arrayBuffer\(\)\)/);
   assert.match(body, /if \(raw\) return new Uint8Array\(await r\.arrayBuffer\(\)\)/);
@@ -769,4 +770,73 @@ test('★★ 서버 — 다른 길이 그 목록(ca)으로 검증한다 · 검�
   const i = src.indexOf('function 모집다른길'); const body = src.slice(i, src.indexOf('\nexports.', src.indexOf('exports.recruitWatch') + 30));
   assert.match(body, /require\("https"\)\.get\(u, \{ family: 4, timeout: 30000, ca: RecruitWatch\.caList\(\),/);
   assert.doesNotMatch(body, /rejectUnauthorized/, '검증을 끄면 가짜 서버도 통과한다');
+});
+
+/* ═══ 1단계 — 지자체·공공기관 14곳 + 용역 «평가위원» 거르기 (대표 「1단계」 2026-10-11) ═══ */
+const NEW_IDS = ['chungnam', 'daejeon', 'chungbuk', 'chungbuk2', 'cheonan', 'dangjin', 'cri_job', 'cri', 'gbsa', 'djmoel', 'kpc', 'djtp', 'djbea', 'kli'];
+test('★★ 새 게시판 14곳 — 들어 있고, 모두 https · org 비움 · gate:eval · 기존 17곳은 gate 가 없다', () => {
+  NEW_IDS.forEach((id) => {
+    const b = W.BOARDS.find((x) => x.id === id);
+    assert.ok(b, id + ' 가 없다');
+    assert.match(b.url, /^https:\/\//); assert.equal(b.org, '', id + ': 화면 사전에 없는 기관은 org 를 비운다'); assert.equal(b.gate, 'eval', id);
+  });
+  const old = W.BOARDS.filter((b) => NEW_IDS.indexOf(b.id) < 0);
+  assert.ok(old.length >= 17, '기존 게시판이 줄었다: ' + old.length);
+  old.forEach((b) => assert.equal(b.gate, undefined, b.id + ' 에 gate 가 붙었다 — 기존 게시판의 평가위원 글이 사라진다'));
+});
+test('★★★ 용역 평가위원 거르기 — 공학·IT 용역은 빼고, 분야 말이 있거나 풀(Pool)·추가 모집은 통과', () => {
+  const gate = { id: 'x', gate: 'eval' };
+  [
+    '2026년 대전 동구 중소기업 MRO 플랫폼 조성 용역 제안서 평가위원(후보자) 모집',
+    '「천안시 중계펌프장 관리대행 용역」기술제안서 평가위원(후보자) 모집 공고',
+    '[평가위원모집] GIS/통계 기반 재난안전데이터 분석·관리 시스템 운영 용역',
+    '[평가위원모집] 2026 시험인증 재직자 보수교육 - 제안서 평가위원(후보자)',
+    '청사 시설관리 용역 심사위원 모집'
+  ].forEach((t) => assert.equal(W.pass(gate, t), false, '들어왔다: ' + t));
+  [
+    'GBSA 제안서 평가위원(후보자) Pool 모집',
+    '경기도경제과학진흥원 제안서 평가위원(후보자) 추가 모집(공무원·공공기관·',
+    '충북연구원 노사관계 진단 용역 제안서 평가위원 모집',
+    '2026 공공기관 인사제도 개선 컨설팅 평가위원 후보자 모집',
+    '[충북연구원 임원추천위원회 공고 2026-01호] 충북연구원 비상임 임원 모집',
+    '지방공기업 현장코칭 전문위원 모집 공고',
+    '충남 노동권익 자문위원 공개모집',
+    '2026 평가위원 후보자 상시 모집'
+  ].forEach((t) => assert.equal(W.pass(gate, t), true, '놓친다: ' + t));
+});
+test('★★ 평가위원 말고 다른 «누구»가 함께 있으면 거르지 않는다 · 평가위원 글이 아닌 것은 건드리지 않는다', () => {
+  assert.equal(W.evalOut('○○ 용역 평가위원 및 컨설턴트 모집'), false, '컨설턴트가 함께');
+  assert.equal(W.evalOut('○○ 용역 평가위원 및 외부전문가 모집'), false, '전문가가 함께');
+  assert.equal(W.evalOut('2026 지방공기업 컨설턴트 모집'), false, '평가위원 글이 아니다');
+  assert.equal(W.evalOut(''), false); assert.equal(W.evalOut(null), false);
+  assert.equal(W.evalOut('설비 공사 심사위원 모집'), true);
+});
+test('★★★ 기존 게시판(gate 없음)은 예전 그대로 — 평가위원 글이 사라지지 않는다', () => {
+  const erc = W.BOARDS.find((b) => b.id === 'erc');
+  [ '지방공기업평가원 평가위원 모집 공고', '2026년 상반기 용역 심사위원 모집' ].forEach((t) => assert.equal(W.pass(erc, t), W.isRecruit(t), t));
+  assert.equal(W.pass(erc, '2026년 상반기 용역 심사위원 모집'), true);
+});
+test('★★ 이미 들어온 공학 평가위원 글은 gate 게시판에서 나간다(drops) — gate 없는 게시판의 글은 안 나간다', async () => {
+  const html = '<table><tr><td>1</td><td><a href="/v/1">GBSA 제안서 평가위원(후보자) Pool 모집</a></td><td>2026-10-05</td></tr></table>';
+  const eng = { board: 'g', title: '설비 공사 기술제안서 평가위원(후보자) 모집', date: '2026-10-01', href: 'https://g.example/v/9' };
+  const ok = { board: 'g', title: 'GBSA 제안서 평가위원(후보자) Pool 모집', date: '2026-10-05', href: 'https://g.example/v/1' };
+  const old = { board: 'o', title: '설비 공사 기술제안서 평가위원(후보자) 모집', date: '2026-10-01', href: 'https://g.example/v/8' };
+  const boards = [{ id: 'g', org: '', gate: 'eval', name: 'g', url: 'https://g.example/list' }, { id: 'o', org: '', name: 'o', url: 'https://o.example/list' }];
+  const r = await W.run({ boards, fetchText: () => Promise.resolve(html), today: '2026-10-11', nowIso: 'T', existing: { k1: eng, k2: ok, k3: old } });
+  assert.equal(r.drops.k1, true, '공학 평가위원 글이 안 나갔다'); assert.equal(r.drops.k2, undefined, '풀 모집이 나갔다'); assert.equal(r.drops.k3, undefined, 'gate 없는 게시판의 글이 나갔다');
+});
+test('★★★ 한 번 돈다 — gate 게시판은 공학 평가위원 글을 빼고 풀 모집·분야 글만 남긴다', async () => {
+  const html = '<table>' + [
+    ['설비 공사 기술제안서 평가위원(후보자) 모집 공고', '2026-10-08'],
+    ['GBSA 제안서 평가위원(후보자) Pool 모집', '2026-10-05'],
+    ['공공기관 인사제도 개선 컨설팅 평가위원 모집', '2026-10-04'],
+    ['2026년 청사 청소 용역 입찰 공고', '2026-10-03']
+  ].map(([t, d], i) => '<tr><td>' + (4 - i) + '</td><td><a href="/v/' + i + '">' + t + '</a></td><td>' + d + '</td></tr>').join('') + '</table>';
+  const b = { id: 'gbsa', org: '', gate: 'eval', name: '경기도경제과학진흥원 공지', url: 'https://g.example/list' };
+  const r = await W.run({ boards: [b], fetchText: () => Promise.resolve(html), today: '2026-10-11', nowIso: 'T' });
+  assert.deepEqual(Array.from(r.hits.map((h) => h.title)).sort(), ['GBSA 제안서 평가위원(후보자) Pool 모집', '공공기관 인사제도 개선 컨설팅 평가위원 모집']);
+  assert.equal(r.hits[0].org, '', '화면 사전에 없는 기관은 org 가 빈다'); assert.equal(r.hits[0].boardName, '경기도경제과학진흥원 공지');
+  /* 같은 게시판에 gate 가 없으면 공학 글도 들어온다 — 새 규칙이 gate 에만 걸린다는 증거 */
+  const r2 = await W.run({ boards: [{ id: 'old', org: '', name: 'x', url: 'https://g.example/list' }], fetchText: () => Promise.resolve(html), today: '2026-10-11', nowIso: 'T' });
+  assert.equal(r2.hits.length, 3);
 });

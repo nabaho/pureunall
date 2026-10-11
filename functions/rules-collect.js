@@ -3,13 +3,14 @@
    ⚠ 원본 바이트는 이 함수 안에서만 산다. 담는 것은 redactOne 이 돌려준 가린 것뿐.
    ⚠ 다시 시도할 실패(연결·시간)는 seen 에 안 적는다 — 적으면 영영 다시 안 본다.
    ⚠ 겹침은 원본 지문(sha256)으로 — 답장마다 같은 파일이 붙어 온다.
-   ⚠ 담는 것은 규칙 본문·신구대조표뿐(글 + 한글이면 파일). 동의서·신고서·의견청취·기타는
+   ⚠ 담는 것은 규칙 본문·신구대조표뿐(글 + 한글이면 파일, PDF 는 글만 — 설계 §11). 동의서·신고서·의견청취·기타는
      근로자 이름·서명이 들거나 취업규칙 서류가 아니라 글도 파일도 안 담는다 — 보류 줄만(NO_TEXT_KINDS).
    ⚠ 사업장은 후보 목록을 «그대로» 담는다. 첫 후보를 사업장으로 고르지 않는다(확정은 사람). */
 'use strict';
 const crypto = require('crypto');
 const P = require('./rules-collect-pick');
 const X = require('./rules-collect-redact');
+const PDF = require('./rules-collect-pdf');   // 다시 보기 전에 pdf.js 를 실을 수 있는지 한 번 본다(받기 전에)
 const MR = require('./mail-receive');
 const LIB = 'rules_mgmt/library';
 const FILE_KINDS = ['규칙본문', '신구대조표'];
@@ -21,6 +22,14 @@ const NO_TEXT_KINDS = {
   '신고서': NAMES + '(신고서) — 담지 않음',
   '의견청취': NAMES + '(의견청취) — 담지 않음',
 };
+/* PDF (설계 §11) — 보류 까닭 글은 화면·검사가 본다. OLD 는 옛 까닭이자 «다시 보기» 대상 표시다. */
+const PDF_HOLD = {
+  OLD: 'PDF — 아직 못 읽음',
+  COPY: '같은 메일에 한글 본문 있음 — PDF 사본',
+  LOST: '메일에서 PDF 를 다시 못 찾음',
+  STUCK: 'PDF 다시 읽기 — 멈춤(메일에서 직접)',
+};
+function isPdfName(n) { return /\.pdf$/i.test(String(n || '')); }
 
 const val = async (db, p) => (await db.ref(p).once('value')).val();
 function isRetry(e) {
@@ -107,6 +116,26 @@ async function heal(o, db, bucket, docs) {
   }
   return n;
 }
+/* ══════ PDF 다시 보기 (설계 §11-4 · 2026-10-10 대표 「추천대로」) ══════
+   옛 회차가 「PDF — 아직 못 읽음」으로 보류한 규칙본문·신구대조표 PDF 를 살린다. 그 메일만 다시 받아
+   «지문(sha)이 같은 첨부»만 읽는다 — 다른 첨부는 건드리지 않는다(겹침·범위). 동의서·신고서 PDF 는 읽지 않는다. */
+function pdfTargets(docs) {
+  const by = {};
+  Object.keys(docs || {}).forEach((id) => {
+    const d = docs[id];
+    if (!d || d.status !== '보류' || d.holdWhy !== PDF_HOLD.OLD) return;
+    if (FILE_KINDS.indexOf(d.kind) < 0 || !isPdfName(d.name) || !d.sha || !d.mail) return;
+    const k = d.mail.src === 'imap' ? 'i_' + d.mail.box + '_' + d.mail.key : 'p_' + d.mail.key;
+    (by[k] = by[k] || { mailKey: k, mail: d.mail, dir: d.dir, ids: [] }).ids.push(id);
+  });
+  return Object.keys(by).sort().map((k) => by[k]);
+}
+function sameMailBody(seenRec, docs, exceptId) {
+  return ((seenRec && seenRec.docs) || []).some((id) => {
+    const d = (docs || {})[id];
+    return id !== exceptId && d && d.kind === '규칙본문' && d.status === '담김' && !isPdfName(d.name);
+  });
+}
 const MAX_CHAIN = 150;
 /* 정해진 회차(30분마다 깨움)가 «돌지» 가른다 (2026-10-05 대표 「2020년 부터 찾아라」) — 작은 기록(run) 하나만 보고.
    밀린 것이 있거나 모르면 돈다(이어 달리기가 이어받는다) · 없으면 하루 한 번(새 메일) · 사흘째 0(고장)이면 하루 한 번.
@@ -144,6 +173,7 @@ async function runOnce(o) {
   /* ② 두 번 회차를 죽인 메일은 건너뛴다 — seen 에 까닭을 적어 «다 본 것»으로 센다. 이미 seen 인 표시는 치운다 */
   const tries = tries0 || {}, seen = Object.assign({}, seen0 || {}), skip = {};
   Object.keys(tries).forEach((k) => {
+    if (k.indexOf('pdf_') === 0) return;   // PDF 다시 보기 표시 — 다시 보기가 스스로 센다
     const n = Number((tries[k] || {}).n || 0);
     if (seen[k]) { skip[TRY + '/' + k] = null; return; }
     /* 큰 메일(slow)은 «한 번»만 — 4분을 기다리고도 회차가 죽었으면 다시 해도 같다(2026-10-09 실측: 06:30 회차가
@@ -159,6 +189,7 @@ async function runOnce(o) {
   if (Object.keys(skip).length) await db.ref().update(skip);
   const healed = await heal(o, db, bucket, docs || {});
   const have = Object.assign({}, docs || {});
+  const roundBody = new Set();   // 이번 회차에 «담긴 것으로 확정된» 한글·워드 규칙본문 id — 뒤 메일의 겹침이 알아보게
   const coIndex = MR.buildCompanyIndex(companies || {});
   const domIndex = P.buildDomainIndex(companies || {});
   /* 남은 것 «모두»를 한 번 세고(메모리 안 셈이라 싸다) 이번 몫만 자른다 — left 가 이어 달리기의 잣대다 */
@@ -227,8 +258,12 @@ async function runOnce(o) {
     const mail = { src: m.src, box: m.slug || '', key: m.src === 'imap' ? m.uid : m.key,
       date: Number(m.row.d || 0), from: String(m.row.e || ''), to: String(m.row.t || ''),
       subject: String(m.row.s || '').slice(0, 200) };
+    /* PDF 는 맨 뒤 (설계 §11-3) — 같은 메일의 한글·워드 본문이 먼저 담겨야 PDF 사본을 알아본다 */
+    const ordered = (atts || []).slice().sort((x, y) => (isPdfName(x && x.name) ? 1 : 0) - (isPdfName(y && y.name) ? 1 : 0));
+    let bodyStored = false;
+    const bodyIds = new Set();   // 이 메일에서 담은 한글·워드 규칙본문 — DB 쓰기가 성공해야 roundBody 로 올린다
     try {
-      for (const a of atts || []) {
+      for (const a of ordered) {
         const ext = P.wantAtt(a.name);
         if (!ext) continue;
         const now = o.now();
@@ -247,9 +282,24 @@ async function runOnce(o) {
         }
         const sha = crypto.createHash('sha256').update(a.data).digest('hex');
         const id = P.docIdOf(sha);
-        if (has(id)) { c.dup++; ids.push(id); continue; }
+        if (has(id)) {
+          /* 겹침이어도 «한글 본문 있음» 이다 — 앞 메일·옛 회차에 이미 담긴 한글·워드 규칙본문을 이 메일이 다시 붙여 왔다면
+             같은 메일의 PDF 는 그 사본이다 (R1). 담김 상태인 비-PDF 규칙본문만 센다. */
+          const ex = have[id];
+          if (ext !== 'pdf' && (bodyIds.has(id) || roundBody.has(id)
+            || (ex && typeof ex === 'object' && ex.kind === '규칙본문' && ex.status === '담김' && !isPdfName(ex.name)))) bodyStored = true;
+          c.dup++; ids.push(id); continue;
+        }
+        /* ★ PDF 글 뽑기는 CPU 일이라 withTimeout 으로 못 끊는다 — 받다가 예산이 다 됐으면 읽지 않고 옛 까닭으로 보류한다(다시 보기가 나중에 읽는다) */
+        if (ext === 'pdf' && o.now() - t0 > o.budgetMs) {
+          up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
+            { kind: P.kindOf(a.name, ''), sha, file: null, textLen: 0, pii: { count: {}, residual: 0 },
+              status: '보류', holdWhy: PDF_HOLD.OLD }) });
+          staged[id] = 1; c.held++; ids.push(id);
+          continue;
+        }
         if (o.trace) o.trace('가리기 ' + m.mailKey + ' ' + ext + ' ' + a.data.length + 'B');
-        const r = await X.redactOne(a.data, ext);   // impl(셋째 칸)은 검사 전용 — 여기서는 안 넘긴다
+        const r = await (o.redact || X.redactOne)(a.data, ext);   // o.redact 는 검사 전용 이음매(가짜 PDF 글 주입) — index.js 는 안 넘긴다
         if (!r.ok) {
           /* 무슨 까닭이든 ok:false 는 똑같이 보류 — 글·파일 아무것도 안 담는다 */
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
@@ -267,7 +317,8 @@ async function runOnce(o) {
            ★★★ 동의서·신고서·의견청취도 같다 (2026-10-04 대표 결정 「둘다 26 지움」).
            근로자 이름·서명이 든 서류다. 결정은 첫 회차 것을 «손으로» 지우는 데만 쓰였고 여기엔 안 들어와,
            10-04 새벽 회차가 신고서 1건을 또 담았다. 결정은 손이 아니라 이 자리에 둔다. */
-        const HOLD = NO_TEXT_KINDS[kind];
+        /* 같은 메일에 한글·워드 규칙본문이 이미 담겼으면 PDF 규칙본문은 사본 — 담으면 회차에 가짜 판이 생긴다 */
+        const HOLD = NO_TEXT_KINDS[kind] || (ext === 'pdf' && kind === '규칙본문' && bodyStored ? PDF_HOLD.COPY : '');
         if (HOLD) {
           up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
             { kind, sha, file: null, textLen: 0, pii: { count: r.count || {}, residual: 0 },
@@ -284,7 +335,9 @@ async function runOnce(o) {
         up[LIB + '/text/' + id] = r.text;
         up[LIB + '/docs/' + id] = docRecord({ id, now, cv: o.contractVersion, body: Object.assign({}, common,
           { kind, sha, file, textLen: r.text.length,
-            pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' }) });
+            pii: { count: r.count || {}, residual: 0 }, status: '담김', holdWhy: '' },
+          r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}) });   // 쪽 한도(300)에 잘린 PDF 는 표시 — 뒤쪽은 담기지 않았다
+        if (ext !== 'pdf' && kind === '규칙본문') { bodyStored = true; bodyIds.add(id); }
         staged[id] = 1; c.stored++; ids.push(id);
       }
       up[LIB + '/seen/' + m.mailKey] = { at: o.now(), docs: ids, why: ids.length ? '' : '첨부 없음' };
@@ -298,21 +351,133 @@ async function runOnce(o) {
       continue;
     }
     Object.assign(have, staged);
+    bodyIds.forEach((x) => roundBody.add(x));
     sum.stored += c.stored; sum.held += c.held; sum.dup += c.dup;
   }
+  const newMails = sum.mails, newRetry = sum.retry;   // 새 메일 몫 — 다시 보기 메일은 따로 센다
+  /* ── PDF 다시 보기 — 남은 예산 안에서 메일 한 통씩 ── */
+  const pdfQ = pdfTargets(docs || {});   // 처음 읽은 문서만 — 이번 회차에 새로 담은 것은 이미 새 규칙으로 읽혔다
+  const pdfSum = { done: 0, stored: 0, held: 0, left: pdfQ.length };
+  /* ★ 받기 «전에» pdf.js 를 실을 수 있는지 한 번 본다 — 못 실으면 메일을 받아 봐야 아무것도 못 읽고, 큰 메일 표시만 쌓인다.
+     o.redact 가 있으면(검사 전용 이음매) 실제 pdf.js 를 안 쓰므로 보지 않는다. o.pdfLoad 로 바꿔 끼울 수 있다. */
+  const probe = o.pdfLoad || (o.redact ? null : PDF.load);
+  let pdfReady = true;
+  if (pdfQ.length && probe) {
+    try { await probe(); }
+    catch (e) { pdfReady = false; sum.retry++; sum.errors.push(e && e.code === 'PDFJS_MISSING' ? 'PDFJS_MISSING' : errTag(e)); }
+  }
+  for (const g of (pdfReady ? pdfQ : [])) {
+    const tk = TRY + '/pdf_' + g.mailKey;
+    const mk = ((tries0 || {})['pdf_' + g.mailKey]) || {};
+    const slow = !!mk.slow;                       // 큰 메일(앞 회차에 받다 멈춘 메일)은 길게 기다리되 «한 번»만
+    const n0 = Number(mk.n || 0);
+    const waitMs = slow ? (o.slowMs || SLOW_MS) : (o.fetchMs || FETCH_MS);
+    const P0 = (id) => LIB + '/docs/' + id + '/';
+    const now = o.now();
+    const close = (up, id, fields) => {
+      const d = docs[id];
+      Object.keys(fields).forEach((f) => { up[P0(id) + f] = fields[f]; });
+      up[P0(id) + 'revision'] = Number(d.revision || 1) + 1;
+      up[P0(id) + 'updatedAt'] = now;
+      up[P0(id) + 'pdfAt'] = now;
+    };
+    const up = {};
+    if (slow ? n0 >= 1 : n0 >= STUCK_MAX) {
+      g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.STUCK }));
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
+      continue;
+    }
+    if (o.now() - t0 > Math.max(0, o.budgetMs - waitMs)) { if (slow) continue; break; }   // 끝에서 시작하지 않는다 — 큰 메일은 건너뛰고 작은 것을 본다
+    const src = g.mail.src === 'imap' ? 'imap' : 'pop3';
+    const row = src === 'imap' ? (((msgs || {})[g.mail.box] || {})[g.mail.key]) : ((old || {})[g.mail.key]);
+    if (!row) {
+      g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.LOST }));
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
+      continue;
+    }
+    const m = { src, slug: src === 'imap' ? g.mail.box : '', uid: src === 'imap' ? String(g.mail.key) : '',
+      key: src === 'pop3' ? String(g.mail.key) : '', row, mailKey: g.mailKey, dir: g.dir };
+    sum.mails++;
+    try { await db.ref(tk).set(Object.assign({ at: now, n: n0 + 1 }, slow ? { slow: true } : {})); } catch (_) { /* 표시 못 해도 받기는 한다 */ }
+    let atts;
+    try { atts = await withTimeout(o.fetchAtts(m), waitMs); }
+    catch (e) {
+      if (isRetry(e)) {
+        sum.retry++; sum.errors.push(errTag(e));
+        if (!e.hang) { try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ } }   // 끊김 같은 보통 실패는 지운다
+        else if (!slow) { try { await db.ref(tk).set({ at: now, n: 0, slow: true }); } catch (_) { /* 다음 회차가 치운다 */ } }   // 처음 멈춤 — 큰 메일로 올려 한 번 더
+        continue;   // 큰 메일이 또 멈췄으면 표시(n+1, slow)를 남겨 다음 회차가 멈춤으로 닫는다
+      }
+      g.ids.forEach((id) => close(up, id, { holdWhy: PDF_HOLD.LOST }));
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.held += g.ids.length; pdfSum.left--;
+      continue;
+    }
+    try {
+      const bySha = {};
+      (atts || []).forEach((a) => { if (a && a.data && isPdfName(a.name)) bySha[crypto.createHash('sha256').update(a.data).digest('hex')] = a; });
+      let noPdfJs = false, unknownOld = false;
+      const snap = { stored: pdfSum.stored, held: pdfSum.held };   // 묶음을 버릴 때 이 묶음에서 센 것도 되돌린다
+      for (const id of g.ids) {
+        const d = docs[id], a = bySha[d.sha];
+        if (!a) { close(up, id, { holdWhy: PDF_HOLD.LOST }); pdfSum.held++; continue; }
+        const r = await (o.redact || X.redactOne)(a.data, 'pdf');
+        /* ★ env:true 는 «pdf.js 를 못 실은» 환경 문제다 — 문서가 아니라 서버 탓이므로 아무것도 안 쓴다.
+           env 없는 옛 까닭(모르는 실패)은 이 문서 탓일 수 있다 — 이 묶음은 쓰지 않고 표시(n)를 남기되 다음 묶음은 계속 읽는다(STUCK_MAX 에 닿게) */
+        if (!r.ok && r.holdWhy === PDF_HOLD.OLD && r.env) { noPdfJs = true; break; }
+        if (!r.ok && r.holdWhy === PDF_HOLD.OLD) { unknownOld = true; break; }
+        if (!r.ok) { close(up, id, { holdWhy: r.holdWhy, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
+        const kind = P.kindOf(d.name, r.text);
+        const why = NO_TEXT_KINDS[kind] || (kind === '규칙본문' && sameMailBody(seen[g.mailKey], docs, id) ? PDF_HOLD.COPY : '');
+        if (why) { close(up, id, { kind, holdWhy: why, 'pii/count': r.count || {} }); pdfSum.held++; continue; }
+        up[LIB + '/text/' + id] = r.text;
+        close(up, id, Object.assign({ kind, status: '담김', holdWhy: '', textLen: r.text.length, 'pii/count': r.count || {}, file: null },
+          r.truncated ? { pdfTruncated: true, pdfPages: r.pages } : {}));
+        pdfSum.stored++;
+      }
+      if (noPdfJs || unknownOld) { pdfSum.stored = snap.stored; pdfSum.held = snap.held; }
+      if (noPdfJs) {
+        /* 이 묶음은 아무것도 안 쓰고(up 버림) 표시를 치우며, 이번 회차 다시 보기는 여기서 멈춘다 — 남은 것은 그대로 센다.
+           안 멈추면 같은 앞머리를 계속 다시 받는다. 이 메일은 retry 로 세어 이어 달리기가 이것만으로 이어지지 않게 한다. */
+        sum.retry++; sum.errors.push('PDFJS_MISSING');
+        try { await db.ref(tk).set(null); } catch (_) { /* 다음 회차가 치운다 */ }
+        break;
+      }
+      if (unknownOld) {
+        /* 아무것도 안 쓰고(up 버림) 표시는 «남긴다»(받을 때 이미 n+1) — 계속 터지면 STUCK_MAX 번째에 멈춤으로 닫힌다. 다음 묶음은 계속 본다 */
+        sum.retry++; sum.errors.push('PDF_UNKNOWN');
+        continue;
+      }
+      up[tk] = null;
+      await db.ref().update(up);
+      pdfSum.done++; pdfSum.left--;
+    } catch (e) {
+      /* 표시는 «남긴다» — 같은 메일에서 읽다 계속 터지면 STUCK_MAX 번째에 멈춤으로 닫는다 */
+      sum.retry++; sum.errors.push(errTag(e));
+    }
+  }
+  sum.pdf = pdfSum;
   sum.errors = sum.errors.slice(0, 10);
-  sum.left = Math.max(0, allLeft.length - (sum.mails - sum.retry));
-  if (!sum.left && !requeued) {   // 다 본 뒤 줄이 비었다 — 이제 세운다(다음 회차가 길게 기다리며 본다)
+  /* 새 메일 몫(newLeft)과 PDF 다시 보기 몫(pdfSum.left)을 나눠 센다 — 줄 비움 판단은 새 메일 몫만으로 한다.
+     PDF 가 막혀(연결·pdf.js) 남아 있다고 «멈춘 메일 다시 세우기» 까지 막으면 안 된다. */
+  const newLeft = Math.max(0, allLeft.length - (newMails - newRetry));
+  sum.left = newLeft + pdfSum.left;
+  if (!newLeft && !requeued) {   // 다 본 뒤 새 메일 줄이 비었다 — 이제 세운다(다음 회차가 길게 기다리며 본다)
     const n2 = await requeueStuck();
     sum.requeued += n2; sum.left += n2;
   }
   sum.healed = healed;   // 다시 시도할 것은 남은 것으로 센다
   /* 설계 §4-5 — 「담음 0, 오류 있음」이 사흘 이어지면 관리자에게 알린다(부르는 쪽이 systemAlerts 에 쓴다) */
-  const bad = sum.stored === 0 && (sum.retry > 0 || sum.errors.length > 0);
+  const bad = (sum.stored + pdfSum.stored) === 0 && (sum.retry > 0 || sum.errors.length > 0);   // 다시 보기로 살린 PDF 도 «담음»이다
   sum.zeroStreak = bad ? Number((prevRun && prevRun.zeroStreak) || 0) + 1 : 0;
   sum.alert = sum.zeroStreak >= 3;
   await db.ref(LIB + '/run').set(Object.assign({}, sum, { took: o.now() - t0 }));
-  if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry }));
+  if (o.log) o.log(JSON.stringify({ mails: sum.mails, stored: sum.stored, held: sum.held, dup: sum.dup, retry: sum.retry, pdf: sum.pdf }));
   return sum;
 }
-module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS };
+module.exports = { run, shouldChain, shouldRunScheduled, withTimeout, STUCK_MAX, FETCH_MS, SLOW_MS, MAX_CHAIN, LOCK_MS, RECHECK_V, isRetry, errTag, LIB, FILE_KINDS, NO_TEXT_KINDS, PDF_HOLD, isPdfName, pdfTargets };

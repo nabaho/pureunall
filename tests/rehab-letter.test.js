@@ -94,3 +94,13 @@ test('⑩ 메일 쓰기 창에 주소줄로 넣는 본문은 짧다 — 인코�
   assert.match(body, /평소 거래해 주셔서/);
   assert.match(body, /원하지 않으시면 알려 주십시오/);
 });
+test('⑪ 광고성 메일 — 제목 앞 (광고), 본문 첫 줄 (광고), 보내는 이·수신거부 방법이 있다', () => {
+  const m = L.buildAdMail(co('주식회사 가나'), { ceo: '홍길동' });
+  assert.match(m.subject, /^\(광고\) \[푸른노무법인\]/);
+  assert.match(m.text, /^\(광고\)\n/);
+  assert.match(m.text, /거래 관계에 따라 보내드리는 광고성 정보/);
+  assert.match(m.text, /「수신거부」라고 적어 주시거나 041-556-0035/);
+  assert.match(m.text, /발신: 푸른노무법인 · 충청남도 천안시/);
+  assert.match(m.text, /평소 푸른노무법인과 거래해 주셔서/);
+  assert.match(m.text, /홍길동 대표이사님께/);
+});

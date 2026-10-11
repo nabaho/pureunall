@@ -29,7 +29,7 @@ function run(opt){
   };
   vm.createContext(ctx);
   vm.runInContext(src.slice(src.indexOf('function erpFillHeight(el, min){'),
-                            src.indexOf('function useFillHeight(min){')), ctx);
+                            src.indexOf('function useFillHeight(')), ctx);
   // 형제들을 사슬로 엮는다 (nextElementSibling)
   const sibs = (opt.below || []).map(function(b){
     return { position:b.position || 'static', getBoundingClientRect: function(){ return { height:b.height }; } };
@@ -73,12 +73,12 @@ t('상자가 아직 없으면 0 (그때는 지금까지 쓰던 값이 쓰인다)
   const ctx = { Math:Math, console:console }; ctx.window = { innerHeight:1080 };
   vm.createContext(ctx);
   vm.runInContext(src.slice(src.indexOf('function erpFillHeight(el, min){'),
-                            src.indexOf('function useFillHeight(min){')), ctx);
+                            src.indexOf('function useFillHeight(')), ctx);
   return ctx.erpFillHeight(null);
 })(), 0);
 
 console.log('\n[⑤ 「재고 → 다시 그리고 → 또 재고」 가 끝나지 않는 일이 없게]');
-const HOOK = src.slice(src.indexOf('function useFillHeight(min){'), src.indexOf('function useEnterSave(onSave){'));
+const HOOK = src.slice(src.indexOf('function useFillHeight('), src.indexOf('function useEnterSave(onSave){'));
 t('★ 8px 안쪽 차이는 무시한다', /Math\.abs\(prev - want\) < 8 \? prev : want/.test(HOOK), true);
 t('그릴 때마다 다시 잰다', /useEffect\(function\(\)\{ fit\(\); \}\);/.test(HOOK), true);
 t('창 크기가 바뀌면 다시 잰다', /window\.addEventListener\('resize', fit\);/.test(HOOK), true);
@@ -93,7 +93,8 @@ console.log('\n[⑥ 모든 화면이 이 도우미 하나만 쓴다]');
 t('★ 화면마다 따로 만든 셈이 남아 있지 않다', /_ldFit|_pbFit|_ldBoxRef|_pbRef/.test(src), false);
 t('★ 못 박은 높이가 폴백 밖에 남아 있지 않다',
   (src.match(/maxHeight:\s*'calc\(100vh - \d+px\)'[,}]/g) || []).length, 0);
-const uses = (src.match(/useFillHeight\(\)/g) || []).length;
+/* 「몇 줄 더」 인자를 받는 화면도 센다(업체관리 2026-10-11) — 정의 줄은 빼고 «쓰는 자리»만 */
+const uses = (src.match(/=\s*useFillHeight\(/g) || []).length;
 t('★ 17곳이 이 도우미를 쓴다 (표를 새로 만들면 여기도 늘어야 한다)', uses, 17);
 /* 폴백은 그대로 남긴다 — 재기가 실패해도 오늘보다 나빠지지 않게 */
 t('폴백(지금까지 쓰던 값)이 살아 있다',

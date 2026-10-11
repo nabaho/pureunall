@@ -107,7 +107,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=49"></script>
+<script src="js/pu-contract-forms.js?v=53"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -2886,7 +2886,9 @@ function fbSeedAllowed(){ return !fbDb || _fbSynced; }  // 오프라인이거나
    받는다 — 새 이름이 생기면 저절로 포함되게 만들어 두었다. 전달함은 표가 아니라 사람별 쪽지함이라
    그 길로 들어오면 온 직원이 남의 쪽지까지 매번 내려받는다. 여기 넣으면 fbShouldSync 가 걸러 준다.
    전달함은 자기 몫만 따로 구독한다(_handoffWatch). */
-var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours','audit_log'];
+/* gcal_archive(메타 포함)는 달력·업무관리에서 날짜 범위로 직접 읽는다.
+   ERP 표가 아닌 원자료를 부팅 계획에 넣으면 매번 보관함 전체를 받고도 적용하지 못한다. */
+var FB_EXCLUDE = ['_meta_','session','current_menu','open_groups','dark_mode','corp_dash_tab','sidebar_collapsed','login_','bank_ledger_draft','co_merge_log','co_link_log','co_vat_log','backup_history','handoff_notes','presence_hours','audit_log','gcal_archive'];
 /* ⚠ audit_log(수정 기록) — 2026-10-04 부터 «한 줄씩 따로» 적는다(AuditLog.write → data/audit_log/v/{id}).
    통째로 받고 통째로 올리는 동기화에 태우면, 재무 권한 기기가 옛 사본을 한 번 올리는 순간 그 사이 다른 직원이 적은 줄이 지워진다.
    그래서 받지도 올리지도 않는다 — 보는 화면(AuditLogSection)이 열 때 서버에서 바로 읽는다. */
@@ -3930,17 +3932,47 @@ function erpBackupKey(){
 
 /* 백업으로 나가기 직전에 잠근다. 원본(snap.data)은 안 건드린다 —
    같은 덩어리로 요약·id명부를 만들기 때문이다. */
+/* ★ 실시간DB 는 칸 이름에 . # $ / [ ] 를 받지 않는다 — 한 칸이라도 있으면 백업 «전체»가 거절된다.
+     2026-10-11: 거래내역 임시 저장(bank_ledger_draft.expCat)의 열쇠 「…14:10#1」(같은 날 같은 금액 둘째 줄)
+     하나 때문에 매일 백업이 통째로 실패했다. 이 PC 의 작업 자료라 열쇠 모양을 바꿀 수 없으니(바꾸면 짝이 끊긴다)
+     «백업에 실을 때만» 이름을 바꾸고 되살릴 때 원래대로 푼다. 바꾼 이름은 ~k~ 로 시작한다 — 옛 백업은 그대로 지나간다. */
+var ERP_FB_BAD_KEY = /[.#$\/\[\]]/;
+function erpFbSafeKeys(v){
+  if(!v || typeof v !== 'object') return v;
+  if(Array.isArray(v)) return v.map(erpFbSafeKeys);
+  var o = {};
+  Object.keys(v).forEach(function(k){
+    var nk = (ERP_FB_BAD_KEY.test(k) || k.indexOf('~k~') === 0)
+      ? '~k~' + encodeURIComponent(k).replace(/\./g, '%2E') : k;
+    o[nk] = erpFbSafeKeys(v[k]);
+  });
+  return o;
+}
+function erpFbUnsafeKeys(v){
+  if(!v || typeof v !== 'object') return v;
+  if(Array.isArray(v)) return v.map(erpFbUnsafeKeys);
+  var o = {};
+  Object.keys(v).forEach(function(k){
+    var nk = k;
+    if(k.indexOf('~k~') === 0){ try { nk = decodeURIComponent(k.slice(3)); } catch(_e){ nk = k; } }
+    o[nk] = erpFbUnsafeKeys(v[k]);
+  });
+  return o;
+}
+window.erpFbSafeKeys = erpFbSafeKeys; window.erpFbUnsafeKeys = erpFbUnsafeKeys;
+
 function erpSealSnap(snap){
   return erpBackupKey().then(function(key){
     return PuRrnSeal.seal(snap.data || {}, key);
   }).then(function(sealed){
-    return { savedAt: snap.savedAt, version: snap.version, data: sealed };
+    return { savedAt: snap.savedAt, version: snap.version, data: erpFbSafeKeys(sealed) };
   });
 }
 
 /* 되돌릴 때 푼다. 이 잠금이 생기기 «전» 백업은 잠긴 자리가 없어 그대로 지나간다 —
    옛 백업을 손볼 필요가 없다. */
 function erpUnsealSnap(snap){
+  if(snap && snap.data) snap.data = erpFbUnsafeKeys(snap.data);
   if(!snap || !snap.data || !window.PuRrnSeal) return Promise.resolve(snap);
   if(!PuRrnSeal.countSealed(snap.data)) return Promise.resolve(snap);
   return erpBackupKey().then(function(key){
@@ -3953,8 +3985,17 @@ function erpUnsealSnap(snap){
 
 function serverBackupWrite(id, snap){
   /* ⚠ 요약·id명부는 «원본» 으로 만든다(아래). 잠근 사본으로 만들면 요약이 달라진다. */
-  return erpSealSnap(snap).then(function(locked){ return _serverBackupWriteRaw(id, snap, locked); })
+  var _sealed = false;
+  return erpSealSnap(snap).then(function(locked){ _sealed = true; return _serverBackupWriteRaw(id, snap, locked); })
     .catch(function(e){
+      /* 잠그기는 됐는데 서버가 저장을 거절한 것 — 「주민번호 잠금 실패」로 적으면 엉뚱한 곳을 찾게 된다(2026-10-11) */
+      if(_sealed){
+        console.error('[백업] 서버에 저장하지 못했습니다:', e && e.message);
+        window.erpAlert && erpAlert('danger', '백업을 저장하지 못했습니다',
+          '서버가 백업 저장을 거절했습니다 — ' + ((e && e.message) || '알 수 없음'),
+          '자료는 그대로입니다. 이 화면을 캡처해 알려 주세요.');
+        throw e;
+      }
       /* 잠글 수 없으면 안 쓴다 — 잠기지 않은 백업을 쓰는 것이 더 나쁘다.
          조용히 넘기면 「백업이 도는 줄 알았다」가 된다. */
       console.error('[백업] 주민번호를 잠그지 못해 백업을 건너뜁니다:', e && e.message);
@@ -10639,12 +10680,21 @@ function erpFillHeight(el, min){
    fill.ref 를 상자에 달고, maxHeight 에 (fill.max || 지금까지 쓰던 값) 을 준다.
    ★ 아직 못 쟀으면 fill.max 가 없다 — 그때는 «지금까지 쓰던 값» 이 그대로 쓰인다.
      재는 데 실패해도 오늘보다 나빠지지 않는다. */
-function useFillHeight(min){
+/* 표 한 줄의 높이로 «몇 줄 더» 를 픽셀로 — 줄이 아직 없으면 34px(업체관리 한 줄)로 어림한다 */
+function erpFillExtra(el, rows){
+  if(!rows || rows <= 0) return 0;
+  var tr = el && el.querySelector ? el.querySelector('tbody tr') : null;
+  var rh = tr ? Math.round(tr.getBoundingClientRect().height) : 0;
+  return (rh > 0 ? rh : 34) * rows;
+}
+/* extraRows — 창 바닥보다 «몇 줄 더» 길게(그만큼 아래 줄은 스크롤로 본다). 안 주면 예전과 같다 */
+function useFillHeight(min, extraRows){
   var ref = useRef(null);
   var st = useState(0); var h = st[0]; var setH = st[1];
   function fit(){
     var want = erpFillHeight(ref.current, min);
     if(!want) return;
+    want += erpFillExtra(ref.current, extraRows);
     // 8px 안쪽 차이는 그대로 둔다 — 안 그러면 「재고 → 다시 그리고 → 또 재고」 가 끝나지 않는다
     setH(function(prev){ return Math.abs(prev - want) < 8 ? prev : want; });
   }
@@ -26688,7 +26738,7 @@ function loaReconcileStatus(todayS){
   return changed;
 }
 function setLoaList(list){ dbSet('leave_of_absence', list); }
-/* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 김석우 퇴사 뒤에도 질병휴직이 열려 있어
+/* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 퇴사한 직원의 질병휴직이 열려 있어
    명부·급여·휴가 화면이 모두 «휴직»으로 보였다).
    · 마지막 근무일 전에 시작한 휴직 → 종료(endedDate = 마지막 근무일, 종료일이 더 이르면 그 날)
    · 마지막 근무일 뒤에 시작할 휴직 → 취소
@@ -27126,7 +27176,7 @@ function calcOrdinaryDailyWage(sid){
   var ordinaryMonthly = +c.ordinaryMonthly || ((latest.baseSalary||0) + (latest.fixedAllowance||0));
   var u = (dbGet('user_accounts', USERS_SEED) || []).find(function(x){ return x && x.sid === sid; }) || {};
   var hrs = (+u.scheduledHours > 0 && +u.scheduledHours < 8) ? +u.scheduledHours : 8;
-  return Math.round(ordinaryMonthly / 209 * hrs);
+  return Math.round(ordinaryMonthly / erpMonthStdHours(hrs) * hrs);
 }
 
 // 법정 퇴직금 계산 — 근로자퇴직급여 보장법 제8조①: 계속근로기간 1년에 대하여 30일분 이상의 평균임금
@@ -27902,7 +27952,9 @@ function coMgrPendTag(co){
 }
 
 function CompanyManagement(){
-  var _fill1 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 240px)
+  /* 표가 창 바닥보다 «두 줄 더» — 대표 지시 2026-10-11 「디자인은 그대로하고 아래 사업장정보가 2개정도 더 보이게」.
+     그만큼 쪽 번호 줄은 화면 아래로 내려가 살짝 내리면 보인다(업체관리 화면은 위아래로 스크롤된다). */
+  var _fill1 = useFillHeight(null, 2);
   var existing = dbGet('companies', null);
   // 로컬 캐시가 비어 있어도 서버에 쓰지 않는다(빈 값 덮어쓰기로 업체가 사라지는 사고 방지).
   // Firebase 동기화가 끝나면 목록이 채워진다.
@@ -73915,6 +73967,15 @@ var PENSION_BOUNDS = [
   { from:'2026-07', min:410000, max:6590000 }   // [확인 필요] 공단 고시 원문 대조 전
 ];
 var MIN_WAGE_HOURLY = { '2024':9860, '2025':10030, '2026':10320 };   // 최저임금위원회 고시 (시간급)
+/* 월 소정근로시간(주휴 포함) — 1일 소정근로시간에서 셈한다 (2026-10-10 인사관리: 1일 7시간 근로자가 209시간으로 나뉘어
+   시급 9,676원으로 보였다. 급여대장은 183시간 · 11,050원).
+   급여대장과 같은 셈: 209 × 1일 시간 ÷ 8 (반올림) → 8시간 209 · 7시간 183 · 4시간 105.
+   주 15시간 미만이면 주휴가 없다(근로기준법 제18조③) → 1일 시간 × 5 × 365 ÷ 7 ÷ 12. ⚠ 주 5일 근무 전제 — 다르면 명부에서 고친다. */
+function erpMonthStdHours(dailyH){
+  var h = (+dailyH > 0 && +dailyH < 8) ? +dailyH : 8;
+  if(h * 5 < 15) return Math.round(h * 5 * 365 / 7 / 12);
+  return Math.round(209 * h / 8);
+}
 function erpPayRates(ym){
   var s = String(ym || '');
   var y = /^\d{4}/.test(s) ? s.slice(0,4) : String(new Date().getFullYear());
@@ -74146,7 +74207,8 @@ function calcPayrollFresh(rec){
   // ★ 통상임금 (월): 기본급 + 고정수당(레거시) + isOrdinary 임금항목
   var ordinaryMonthly = (rec.baseSalary||0) + (rec.fixedAllowance||0) + ordinaryFromAllow;
   // 법정수당: 통상시급 기반 (ordinaryMonthly 전달)
-  var legal = calcLegalAllowances(rec, ordinaryMonthly);
+  var _empH = ((dbGet('user_accounts', USERS_SEED) || []).find(function(u){ return u && u.sid === rec.empSid; }) || {}).scheduledHours;
+  var legal = calcLegalAllowances(rec, ordinaryMonthly, erpMonthStdHours(_empH));   // 단시간 근로자는 그 사람의 월 소정근로시간으로 나눈다
   // 성과금 자동 합산 (finance_income.perfShares)
   var perf = calcPerfBonus(rec.empSid, rec.ym);
   // ★ Fix#2: 이중계산 방지 — perf.total(입금연동 성과)와 rec.bonus(수동 입력 상여)는 별개
@@ -74228,7 +74290,7 @@ function calcPayrollFresh(rec){
        연장·야간·휴일수당, 그 달만 나간 상여·성과는 넣지 않는다. 월 소정 209시간(주 40시간) 기준.
        ⚠ 단시간 근로자는 명부의 소정근로시간(scheduledHours)이 8 미만이면 비례로 본다. */
   var _schedH = (_emp && +_emp.scheduledHours > 0 && +_emp.scheduledHours < 8) ? +_emp.scheduledHours : 8;
-  var minWageMonthlyFor = Math.round(rates.minWageHourly * 209 * _schedH / 8);
+  var minWageMonthlyFor = Math.round(rates.minWageHourly * erpMonthStdHours(_schedH));
   var minWageBase = (rec.baseSalary||0) + (rec.fixedAllowance||0) + Math.max(0, allowSum) + legacyPay;
   var minWageWarning = !prorated && (rec.baseSalary||0) > 0 && minWageBase < minWageMonthlyFor;
 
@@ -74376,11 +74438,12 @@ function payslipMethods(rec){
 // 통상시급 = 월 통상임금 / 209시간 (주40시간 + 주휴8시간 = 209시간/월)
 // ★ ordinaryMonthly 외부 전달 시 사용 (pay_items isOrdinary 자동 반영). 미전달 시 baseSalary+fixedAllowance.
 function calcLegalAllowances(rec, ordinaryMonthly){
+  var stdHours = arguments[2];   // 월 소정근로시간 (calcPayroll 이 넘긴다 — 없으면 209)
   var la = rec.legalAllowances || {};
   var monthly = (ordinaryMonthly != null) ? ordinaryMonthly : ((rec.baseSalary||0) + (rec.fixedAllowance||0));
   /* ★ 통상시급을 «먼저» 반올림하지 않는다 — 반올림한 시급에 시간을 곱하면 오차가 시간만큼 커진다.
        보이는 시급(ordinaryWage)만 반올림하고, 셈은 날 시급(hourly)으로 한 뒤 마지막에 원 미만 절사. */
-  var hourly = monthly / 209;
+  var hourly = monthly / (+stdHours > 0 ? +stdHours : 209);   // 월 소정근로시간 (erpMonthStdHours — 8시간이면 209)
   var ordinaryWage = Math.round(hourly);
   var otHrs = parseFloat(la.overtimeHours)||0;
   var nightHrs = parseFloat(la.nightHours)||0;

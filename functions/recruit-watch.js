@@ -116,7 +116,26 @@ const BOARDS = [
      ⚠ 대부분은 노무법인의 직원·수습 채용이라 일반 잣대(isRecruit)를 쓰면 「노무사 모집」이 다 걸린다 —
        그래서 전용 잣대(rule:'kcplaa' → isKcplaa)를 쓴다. 실측: 「직장 내 괴롭힘 사건 외부 조사자 선임 공고」를 잡고
        노무법인 채용 10여 건을 거른다. */
-  { id: 'kcplaa_job', org: 'kcplaa', name: '공인노무사회 채용 정보', url: 'https://www.kcplaa.or.kr/worker/list?scd=1', rule: 'kcplaa' }
+  { id: 'kcplaa_job', org: 'kcplaa', name: '공인노무사회 채용 정보', url: 'https://www.kcplaa.or.kr/worker/list?scd=1', rule: 'kcplaa' },
+
+  /* ★ 1단계 — 지자체·공공기관 14곳 (대표 「다른 지자체나 공공기관에 모집공고 … 충남 충북 대전 전국단위」 → 「1단계」, 2026-10-11).
+     2026-10-11 실측: 기관 누리집에서 고시·공고·공지 게시판을 찾아 우리 읽개(parseRows)로 읽어 «줄이 뽑히는» 곳만 더했다.
+     ⚠ org 는 비운다 — 화면 사전(js/gov-recruit.js)에 없는 기관이다(제목으로 정하고, 못 정하면 게시판 이름을 보인다).
+     ⚠ gate:'eval' — 「제안서 평가위원」은 공학 분야가 많아 분야 말(노무·인사·경영…)이 있거나 풀 모집일 때만 통과(evalOut). */
+  { id: 'chungnam',  org: '', gate: 'eval', name: '충청남도 도정공고',          url: 'https://www.chungnam.go.kr/cnportal/province/province/list.do?menuNo=500487' },
+  { id: 'daejeon',   org: '', gate: 'eval', name: '대전광역시 고시공고',        url: 'https://www.daejeon.go.kr/drh/MediaList.do?notiType=NOTI_06&menuSeq=2564' },
+  { id: 'chungbuk',  org: '', gate: 'eval', name: '충청북도 고시/공고',         url: 'https://www.chungbuk.go.kr/www/selectGosiPblancList.do?key=422' },
+  { id: 'chungbuk2', org: '', gate: 'eval', name: '충청북도 타기관 고시/공고',  url: 'https://www.chungbuk.go.kr/www/selectBbsNttList.do?bbsNo=61&key=423' },
+  { id: 'cheonan',   org: '', gate: 'eval', name: '천안시 공고알림',            url: 'https://www.cheonan.go.kr/prog/saeolGosi/GOSI/kor/sub02_02_01/list.do' },
+  { id: 'dangjin',   org: '', gate: 'eval', name: '당진시 고시/공고',           url: 'https://www.dangjin.go.kr/prog/publicNotice/kor/sub03_02_01_01/list.do' },
+  { id: 'cri_job',   org: '', gate: 'eval', name: '충북연구원 채용공고',        url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0404' },
+  { id: 'cri',       org: '', gate: 'eval', name: '충북연구원 공지사항',        url: 'https://www.cri.re.kr/bbs/board.php?bo_table=0304' },
+  { id: 'gbsa',      org: '', gate: 'eval', name: '경기도경제과학진흥원 공지', url: 'https://www.gbsa.or.kr/board/notice.do' },
+  { id: 'djmoel',    org: '', gate: 'eval', name: '대전지방고용노동청 공지',    url: 'https://www.moel.go.kr/local/daejeon/news/notice/noticeList.do' },
+  { id: 'kpc',       org: '', gate: 'eval', name: '한국생산성본부 지원사업 모집공고', url: 'https://www.kpc.or.kr/kpc/PTWHP004_recruit_list.do' },
+  { id: 'djtp',      org: '', gate: 'eval', name: '대전테크노파크 사업공고',    url: 'https://www.djtp.or.kr/board.es?mid=a20102000000&bid=0102' },
+  { id: 'djbea',     org: '', gate: 'eval', name: '대전일자리경제진흥원 사업공고', url: 'https://www.djbea.or.kr/mps/bizTskPbnc?menuKey=TOfnnvp207' },
+  { id: 'kli',       org: '', gate: 'eval', name: '한국노동연구원 공지',        url: 'https://www.kli.re.kr/board.es?mid=a10302000000&bid=0004' }
 ];
 
 /* 여러 기관 글이 섞인 게시판(org 가 빈 것)에서 제목으로 기관을 정한다.
@@ -219,9 +238,31 @@ function isKcplaa(title) {
 }
 /* 지금 잣대가 «일부러 빼는» 말이 든 제목 — 이미 들어온 글을 지울 때만 쓴다.
    ⚠ 「안 맞는 것」 전부가 아니라 «빼는 말»에 걸린 것만 — 찾는 말(WHO·PICK)이 바뀌었다고 옛 글을 통째로 지우지 않는다. */
-function noise(board, title) { const t = String(title || ''); return board && board.rule === 'kcplaa' ? KC_NOT.test(t) : (DONE.test(t) || LEARN.test(t)); }
+function noise(board, title) {
+  const t = String(title || '');
+  if (board && board.rule === 'kcplaa') return KC_NOT.test(t);
+  return DONE.test(t) || LEARN.test(t) || (!!board && board.gate === 'eval' && evalOut(t));
+}
+/* ── 용역 «평가위원» 모집 거르기 (대표 「1단계」 2026-10-11) ──
+   지자체·공공기관은 용역 입찰마다 「제안서 평가위원(후보자) 모집」을 올린다(실측: 천안시·충북연구원·경기도경제과학진흥원).
+   대부분 하수·펌프장·IT 시스템 같은 공학 분야라 노무사 분야가 아니다 → «평가위원만 뽑는» 글은
+   ① 노무·인사·조직·경영·컨설팅 같은 분야 말이 있거나 ② 특정 용역이 아닌 «풀(Pool)·추가 모집»일 때만 통과시킨다.
+   ⚠ 새로 더한 게시판(gate:'eval')에만 건다 — 지방공기업평가원 같은 기존 게시판의 평가위원 글은 그대로다.
+   ⚠ 평가위원 말고 다른 «누구»(컨설턴트·전문가·자문·강사·임원…)가 함께 있으면 건드리지 않는다. */
+const EVAL_ONLY_STRIP = /평가\s*위원|심사\s*위원/g;
+const EVAL_FIELD = /노무|인사|조직|경영|컨설팅|노사|근로|고용|일자리|직무|임금|인적\s*자원|\bHR\b|ESG|평가\s*체계/i;
+const EVAL_POOL = /\bpool\b|풀|추가\s*모집|상시\s*모집|예비\s*위원/i;
+function evalOut(title) {
+  const t = String(title || '');
+  if (!/평가\s*위원|심사\s*위원/.test(t)) return false;
+  if (WHO.test(t.replace(EVAL_ONLY_STRIP, ' '))) return false;   // 다른 «누구»가 함께 있다
+  return !EVAL_FIELD.test(t) && !EVAL_POOL.test(t);
+}
 /* 게시판마다 잣대를 고른다 — rule 이 없으면 일반 잣대 */
-function pass(board, title) { return board && board.rule === 'kcplaa' ? isKcplaa(title) : isRecruit(title); }
+function pass(board, title) {
+  if (board && board.rule === 'kcplaa') return isKcplaa(title);
+  return isRecruit(title) && !(board && board.gate === 'eval' && evalOut(title));
+}
 
 function keyOf(board, row) {
   /* RTDB 열쇠에 못 쓰는 글자를 피한다 — 짧은 지문으로 */
@@ -624,4 +665,4 @@ function decode(buf, contentType) {
   return new TextDecoder(euc ? 'euc-kr' : 'utf-8').decode(buf);
 }
 
-module.exports = { EXTRA_CA, caList, imagesOf, aiPerOf, aiAsk, bodyOf, docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };
+module.exports = { evalOut, EXTRA_CA, caList, imagesOf, aiPerOf, aiAsk, bodyOf, docsOf, docsFromAttach, DOC_KINDS, periodOf, hasDetail, LIMITS, UA, BOARDS, ORG_HINTS, orgHint, makeFetcher, probeBoard, MAX_KEEP, MAX_AGE_DAYS, parseRows, isRecruit, isKcplaa, pass, keyOf, run, updatesOf, decode, clean };

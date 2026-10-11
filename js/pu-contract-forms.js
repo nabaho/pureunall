@@ -967,7 +967,8 @@
     /* 📝 찾아서 채우기 — 이 화면의 «주 단추» (대표 2026-10-09 「눈에 크게 보여야 한다. 그래야 관리가 된다」) */
     + '.pcf-fillbig{border:none;background:#166534;color:#fff;padding:9px 20px;border-radius:8px;font-size:14.5px;font-weight:800;cursor:pointer;font-family:inherit;white-space:nowrap;box-shadow:0 2px 6px rgba(22,101,52,.35);flex:none}'
     + '.pcf-tsub{padding-left:26px!important;font-size:12px}.pcf-tclosed{margin-top:4px;border-top:1px dashed #e2e8f0;color:#64748b}'
-    + '.pcf-tk.pcf-tset{padding-left:12px;border-left:4px solid #cbd5e1;border-radius:4px 6px 6px 4px;margin:2px 0;font-weight:600}.pcf-tk.pcf-tset:hover{filter:brightness(.96)}.pcf-tk.pcf-tset.on{font-weight:700}.pcf-tk.pcf-tset.on i{background:rgba(255,255,255,.25);color:#fff}'
+    + '.pcf-thbtn{display:flex;align-items:center;justify-content:space-between;width:calc(100% - 24px);border:0;background:none;cursor:pointer;text-align:left;font-family:inherit}.pcf-thbtn:hover{filter:brightness(.92)}.pcf-thbtn i{font-style:normal;font-size:10.5px;opacity:.8}'
+    + '.pcf-th.pcf-thset{background:#1d4ed8;color:#fff;border-radius:5px;padding:4px 10px;margin:12px 0 4px;font-size:12px}'
     + '.pcf-fillbig:hover{background:#14532d}.pcf-fillbig:focus-visible{outline:3px solid #86efac;outline-offset:2px}'
     + '.pcf-printb{border:1px solid #cbd5e1;background:#fff;color:#1e293b;padding:8px 14px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;flex:none}'
     + '.pcf-printb:hover{background:#f1f5f9}'
@@ -1107,7 +1108,7 @@
     + '.pcf-tsel{width:100%;padding:8px 8px;border:1px solid #cbd5e1;border-radius:8px;font-size:12.5px;font-family:inherit;background:#fff;color:#334155;font-weight:600}'
     + '.pcf-lp{width:330px;flex:none;display:flex;flex-direction:column;border:1px solid #e2e8f0;border-right:none;border-radius:8px 0 0 8px;background:#fff;min-height:0}'
     + '.pcf-cols.card .pcf-lp{width:auto;flex:1;border-right:1px solid #e2e8f0;border-radius:8px}'
-    + '.pcf-setnote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border-radius:6px;font-size:12px;color:#334155}.pcf-setnote .pcf-b{margin-left:auto}'
+    + '.pcf-setnote{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 9px;border:1px solid #e2e8f0;border-radius:6px;background:#f8fafc;font-size:12px;color:#334155}.pcf-setnote .pcf-b{margin-left:auto}'
     + '.pcf-lh{padding:6px;border-bottom:1px solid #e2e8f0;background:#f8fafc;display:flex;flex-direction:column;gap:5px}'
     + '.pcf-lhr{display:flex;gap:4px;align-items:center}.pcf-lhr .pcf-q{flex:1;min-width:0;max-width:none}'
     + '.pcf-lbody{flex:1;min-height:0;overflow-y:auto}.pcf-lbody .pcf-list{width:auto;border:none;height:auto;overflow:visible}'
@@ -2834,34 +2835,56 @@
     function modal(o) { o.archiveFile = archiveFile; openModal(o); }
 
     /* ── 왼쪽 메뉴 — 계약유형만(양식 이름은 본문 목록) ── */
-    /* 세트마다 다른 색 — 위아래가 한눈에 갈리게(대표 지시 2026-10-10). 세트 열쇠를 글자 차례로 줄 세워 색을 돌려 쓴다 → 차례를 끌어 바꿔도 색은 그대로 */
-    var SET_COLORS = ['#2563eb', '#059669', '#d97706', '#7c3aed', '#db2777', '#0891b2', '#65a30d', '#dc2626', '#4f46e5', '#0d9488'];
-    function setColor(id) {
-      var ids = S.sets.map(function (s) { return s.id; }).sort();
-      var i = ids.indexOf(id);
-      return SET_COLORS[(i < 0 ? 0 : i) % SET_COLORS.length];
+    /* 왼쪽 메뉴 «상위 머리글»(서식 종류 · 세트) 접기·펴기, 서식 종류 차례 끌어 바꾸기 (대표 2026-10-11) — 보는 사람 브라우저에만 기억한다(새 저장 칸·규칙 배포 없음).
+       끌기는 같은 칸 안에서만(칸마다 따로 dragSort) — 세트 차례는 세트 데이터에 저장된다 */
+    function lsGet(k) { try { return w.localStorage.getItem(k); } catch (e) { return null; } }
+    function lsSet(k, v) { try { w.localStorage.setItem(k, v); } catch (e) {} }
+    function isFolded(key) { return lsGet('pcf-fold-' + key) === '1'; }
+    function foldHead(key, text, cls, count) {
+      var f = isFolded(key);
+      return el('button', { type: 'button', 'class': 'pcf-th pcf-thbtn' + (cls ? ' ' + cls : ''), 'aria-expanded': f ? 'false' : 'true',
+        title: f ? '눌러서 펼칩니다' : '눌러서 접습니다',
+        onclick: function () { lsSet('pcf-fold-' + key, f ? '0' : '1'); drawTree(); } },
+        [el('span', { text: (f ? '▸ ' : '▾ ') + text }), f && count != null ? el('i', { text: String(count) }) : null]);
+    }
+    function orderedKinds() {
+      var saved = []; try { saved = JSON.parse(lsGet('pcf-kind-order') || '[]'); } catch (e) {}
+      if (!Array.isArray(saved)) saved = [];
+      var rank = function (k) { var i = saved.indexOf(k.v); return i < 0 ? 1000 + KINDS.indexOf(k) : i; };
+      return KINDS.slice().sort(function (a, b) { return rank(a) - rank(b); });
+    }
+    function moveKind(fromV, toV, after) {
+      var ids = orderedKinds().map(function (k) { return k.v; }), i = ids.indexOf(fromV);
+      if (i < 0 || ids.indexOf(toV) < 0) return;
+      ids.splice(i, 1);
+      var j = ids.indexOf(toV); ids.splice(after ? j + 1 : j, 0, fromV);
+      lsSet('pcf-kind-order', JSON.stringify(ids)); drawTree();
     }
     function drawTree() {
       var t = host.tree; if (!t) return;
       t.innerHTML = '';
       if (!S.loaded) return;
-      t.appendChild(el('div', { 'class': 'pcf-th', text: '📂 서식 종류' }));
-      KINDS.forEach(function (k) {
+      /* 「📂 서식 종류」 머리글은 뺐다(대표 2026-10-11) — 접고 펴기는 상위 「📄 계약서 양식」 단추가 한다(docs-esign.html) */
+      var kindRows = [];
+      orderedKinds().forEach(function (k) {
         var n = S.forms.filter(function (f) { return f.kind === k.v && !isClosed(f); }).length;
         var on = !S.setView && S.kind === k.v;
-        t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
-          onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]));
+        var kb = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
+          title: '누르면 이 종류의 양식이 나옵니다 · 끌어서 차례를 바꿉니다',
+          onclick: function () { pickKind(k.v); } }, [el('span', { text: k.icon + ' ' + k.label }), el('i', { text: String(n) })]);
+        t.appendChild(kb); kindRows.push({ id: k.v, node: kb });
       });
+      dragSort(kindRows, moveKind);
       /* 🗄 종료 서식 — 더 쓰지 않는 서식을 옮겨 두는 보관함(지우지 않는다) */
       var nClosed = S.forms.filter(isClosed).length;
       t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tclosed' + (!S.setView && S.kind === '_closed' ? ' on' : ''), 'aria-current': !S.setView && S.kind === '_closed' ? 'true' : null,
         title: '더 쓰지 않는 서식을 옮겨 둔 곳 — 언제든 되살릴 수 있습니다', onclick: function () { pickKind('_closed'); } }, [el('span', { text: '🗄 종료 서식' }), el('i', { text: String(nClosed) })]));
       /* 📦 세트 (대표 「추천대로」 2026-10-07 화면 개편) — 업무마다 필요한 서류 묶음. 누르면 목록에 그 양식들이 체크된다 */
-      t.appendChild(el('div', { 'class': 'pcf-th', text: '📦 세트' }));
-      var setRows = S.sets.map(function (st) {
-        var on = S.setView === st.id, col = setColor(st.id);
-        var b = el('button', { type: 'button', 'class': 'pcf-tk pcf-tset' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
-          style: on ? 'background:' + col + ';border-left-color:' + col + ';color:#fff' : 'border-left-color:' + col + ';background:' + col + '14',
+      t.appendChild(foldHead('sets', '📦 세트', 'pcf-thset', S.sets.length));   // 색은 이 머리글에만(대표 2026-10-11) — 세트 이름 줄은 무색
+      var foldSets = isFolded('sets');
+      var setRows = foldSets ? [] : S.sets.map(function (st) {
+        var on = S.setView === st.id;
+        var b = el('button', { type: 'button', 'class': 'pcf-tk' + (on ? ' on' : ''), 'aria-current': on ? 'true' : null,
           title: st.name + ' — 누르면 이 세트의 서류만 목록에 체크되어 나옵니다 · 끌어서 차례를 바꿉니다',
           onclick: function () { applySet(st.id); } }, [el('span', { text: st.name }), el('i', { text: String((st.formIds || []).length) })]);
         t.appendChild(b);
@@ -2869,7 +2892,7 @@
         return { id: st.id, node: b };
       });
       dragSort(setRows, moveSet);
-      if (!S.sets.some(function (s) { return s.id === CHEDANG_SET_ID; })) esignTk();
+      if (!foldSets && !S.sets.some(function (s) { return s.id === CHEDANG_SET_ID; })) esignTk();
       /* 👥 집단체불 세트 (대표 「추천대로」 2026-10-09 — 사건계약 밑에서 세트 칸으로) — 체당금 접수 세트를 여러 근로자에게 링크로.
          끌어서 옮기는 세트가 아니다(사건 목록 화면으로 가는 길). 문서관리만 길을 준다 */
       function esignTk() {
@@ -2877,7 +2900,7 @@
         t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk pcf-tsub' + (w.location && w.location.hash === '#esign' ? ' on' : ''), 'data-pane': 'esign',
           title: '체당금 접수 세트를 근로자 여러 명에게 링크로 보내 폰에서 받습니다(사건별)', onclick: function () { host.openEsign(); } }, [el('span', { text: '└ 👥 집단체불 세트' })]));
       }
-      t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk add', text: '+ 세트 만들기', onclick: function () {
+      if (!foldSets) t.appendChild(el('button', { type: 'button', 'class': 'pcf-tk add', text: '+ 세트 만들기', onclick: function () {
         if (S.checked.length) saveAsSet(); else toast('목록에서 양식을 체크한 뒤 다시 누르세요 — 체크한 양식으로 세트를 만듭니다');
       } }));
     }
@@ -3088,12 +3111,11 @@
       }
       var setNow = S.setView ? setById(S.setView) : null;
       if (setNow) {
-        var scol = setColor(setNow.id);
         return el('div', { 'class': 'pcf-lh' }, [
           el('div', { 'class': 'pcf-lhr' }, [q, el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
             chip('☰', S.view === 'list', function () { S.view = 'list'; saveView(); drawMain(); }),
             chip('▦', S.view === 'card', function () { S.view = 'card'; saveView(); drawMain(); })])]),
-          el('div', { 'class': 'pcf-setnote', style: 'border-left:4px solid ' + scol + ';background:' + scol + '14' }, [
+          el('div', { 'class': 'pcf-setnote' }, [
             el('b', { text: '📦 ' + setNow.name }), el('span', { text: ' — 이 세트의 서류 ' + (setViewList() || []).length + '개가 체크되어 있습니다' }),
             el('button', { type: 'button', 'class': 'pcf-b', text: '종류별로 보기', onclick: function () { pickKind(S.kind === '_closed' ? 'company' : S.kind); } })])]);
       }

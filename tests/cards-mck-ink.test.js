@@ -23,3 +23,11 @@ test('★★★ .mck 창은 글자색을 스스로 정한다 — 안 정하면 b
   /* body 가 정말 흰 글자인지 — 이것이 바뀌면 이 검사의 까닭도 바뀐다 */
   assert.match(SRC, /--ink:#f8fafc/, '전제: body 글자는 var(--ink) 흰색');
 });
+
+test('★★★ 🏚 갈래 칸 줄은 접히지 않는다 — 목록이 길면 빈 막대가 됐다(2026-10-11)', () => {
+  /* .mck 는 세로 flex(최대 88vh)다. overflow-x:auto 칸은 최소 높이가 0 이라 flex-shrink 로 납작해진다.
+     목록이 짧은 시험 화면에서는 안 보이고, 360곳이 든 진짜 화면에서만 드러났다. */
+  const m = SRC.match(/\.mck \.gn-cards\{([^}]*)\}/);
+  assert.ok(m, '.gn-cards 규칙을 찾지 못했습니다');
+  assert.match(m[1], /flex:\s*none|flex-shrink:\s*0/, '★★★ 갈래 칸 줄이 접힐 수 있습니다 — 숫자·이름이 사라집니다');
+});

@@ -71,3 +71,13 @@ test('⑤ 문맥 없는 빈칸은 AI 가 짚어도 안 채운다 — 강의경�
   AI.mergeInto(slots, picks);
   assert.ok(!slots[0].guess, '라벨도 머리글도 없는 칸은 비워 둔다');
 });
+
+test('⑥ 서명 줄이 있는 구역의 «빈 작성일»만 오늘로 — 적힌 날짜·서명 줄 없는 서식은 그대로', () => {
+  const 날 = '<hp:p><hp:run charPrIDRef="9"><hp:t>2026년　　월　　일</hp:t></hp:run></hp:p>';
+  const 오늘 = new Date(2026, 9, 10);
+  const r = H.tidySignLine(날 + 줄('권형하', 16), 오늘);
+  assert.ok(r.xml.includes('<hp:t>2026년 10월 10일</hp:t>'), '빈 작성일을 오늘로');
+  const 적힘 = '<hp:p><hp:run charPrIDRef="9"><hp:t>2026년 9월 5일</hp:t></hp:run></hp:p>';
+  assert.ok(H.tidySignLine(적힘 + 줄('권형하', 16), 오늘).xml.includes('2026년 9월 5일'), '이미 적힌 날짜는 그대로');
+  assert.equal(H.tidySignLine(날, 오늘).xml, 날, '서명 줄이 없으면 손대지 않는다');
+});

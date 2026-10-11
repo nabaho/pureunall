@@ -84,7 +84,7 @@ test('⑤ 화면 — 📍 줄은 지도 단추, 동선 창은 ☐ + 번호, 스�
   assert.match(캘린더, /<script src="js\/pu-cal-map\.js\?v=\d+"><\/script>/);
   assert.match(캘린더, /r\.i === "📍"[^\n]*PuCalMap\.cleanPlace/);
   assert.match(캘린더, /data-map="det"/);
-  assert.match(캘린더, /data-map=\\"form\\"/);
+  assert.match(캘린더, /data-map=\\?"form\\?"/);
   assert.match(캘린더, /data-route="/);
   assert.match(캘린더, /data-rpick="/);
   assert.match(캘린더, /data-rall="1"/);

@@ -338,19 +338,25 @@
      색이 서른다섯 가지라 줄로 나열하지 않고 격자로 둔다 — 줄로 두면 창이 길어진다. */
   /* ── 일정 상세 창 (2026-09-27) ──
      구글 달력의 상세 창 꼴 — 색 띄 · 제목 · 언제 · 줄줄이 항목 · 아래 단추. */
-  .modal.det{padding:0;overflow:hidden}
-  .dbar{height:5px}
-  .dtop{padding:13px 16px 4px;display:flex;gap:9px;align-items:flex-start}
-  .ddot{width:13px;height:13px;border-radius:3px;flex-shrink:0;margin-top:4px}
-  .dttl{font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
-  .dwhen{font-size:12.5px;color:var(--gsub);margin-top:2px}
-  .drows{padding:6px 16px 10px}
-  .drow{display:flex;gap:10px;font-size:12.5px;padding:4px 0;align-items:flex-start}
-  .drow .di{width:16px;text-align:center;color:var(--gsub);flex-shrink:0}
-  /* ⚠ 긴 설명이 창을 밀어 넘지지 않게 — 긴 영문 주소 한 줄이 들어오기도 한다 */
+  /* ★ 일정 상세 창 — 구글 캘린더 «일정 팝업» 꼴 (대표 지시 2026-10-10 「모든 것 똑같이」).
+       위에 아이콘 줄(고치기·지우기·동선·구글에서 열기·닫기) · 색 네모 + 제목 22px · 「10월 14일 (수) ⋅ 오후 2:00~오후 3:00」 ·
+       줄마다 선 아이콘 + 글 14px. 아래 단추 줄은 없다(구글 팝업에도 없다). */
+  .modal.det{padding:0;overflow:hidden;border-radius:16px;max-width:min(400px,calc(100vw - 24px));box-shadow:0 8px 28px rgba(0,0,0,.32)}
+  .dtool{display:flex;justify-content:flex-end;gap:0;padding:8px 8px 0}
+  .dtb{width:40px;height:40px;border:none;border-radius:50%;background:transparent;color:var(--gsub);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .dtb:hover{background:var(--bg)}
+  .modal.det .gic{width:24px;height:24px;fill:currentColor;display:block}
+  .dtop{padding:4px 20px 10px;display:flex;gap:16px;align-items:flex-start}
+  .ddot{width:16px;height:16px;border-radius:4px;flex-shrink:0;margin-top:7px}
+  .dttl{font-size:22px;font-weight:400;line-height:28px;word-break:break-word;color:var(--gtext)}
+  .dwhen{font-size:14px;line-height:20px;color:var(--gsub);margin-top:4px}
+  .drows{padding:2px 20px 14px}
+  .drow{display:flex;gap:16px;font-size:14px;line-height:20px;padding:8px 0;align-items:flex-start;color:var(--gtext)}
+  .drow .di{width:20px;flex-shrink:0;color:var(--gsub);display:flex;justify-content:center;padding-top:0}
+  .drow .di .gic{width:20px;height:20px}
   .drow .dt{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
-  .dhint{font-size:11.5px;color:var(--gsub);background:var(--bg);border-radius:6px;
-    padding:7px 10px;margin:0 16px 8px;line-height:1.5}
+  .drow .dt a{color:var(--gtoday)}
+  .dhint{font-size:12px;color:var(--gsub);background:var(--bg);border-radius:8px;padding:8px 12px;margin:0 20px 10px;line-height:1.5}
   .modal.det .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0}
   /* ── 주소 지도 · 하루 동선 (2026-10-09) ── 상세 창 «위»에 겹쳐 뜬다 */
   .veil.top{z-index:44}
@@ -437,43 +443,72 @@
   .fld{margin-bottom:10px}
   .fld label{display:block;font-size:11px;color:var(--sub);margin-bottom:3px;font-weight:700}
   /* ── 구글 꼴 넣기·고치기 창 (modalHtml 머리글) ── */
-  .modal.gform{width:min(460px,94vw);border-radius:28px;padding:10px 20px 18px;background:var(--panel)}
+  .modal.gform{width:min(460px,94vw);border-radius:28px;padding:10px 16px 18px;background:var(--panel)}
   .gform .ghd{display:flex;align-items:center;gap:6px;margin:0 -6px 4px}
   .gform .sp{flex:1}
   .gform .ggrip{color:var(--gsub);font-size:14px;padding:0 6px}
-  .gform .gx{border:none;background:transparent;color:var(--gtext);font-size:18px;width:36px;height:36px;border-radius:50%;cursor:pointer}
+  /* ★ 구글 캘린더 «앱» 입력 화면 그대로 (대표 지시 2026-10-10 「날짜에 데이터 입력형태 등 모든 것 똑같이」).
+       ① 아이콘은 머티리얼 «선 아이콘»(단색, 24px) — 이모지는 색이 제멋대로라 구글과 달랐다
+       ② 칸마다 회색 상자를 두지 않는다 — 글자만(구글은 상자가 없다). 안내 글(placeholder)은 --gsub
+       ③ 날짜는 「10월 10일 (토)」 · 시간은 「오후 9:00」 글자 — 누르면 기기의 날짜·시간 고르개가 뜬다(진짜 입력칸은 투명하게 위에)
+       ④ 「종일」 스위치(구글) — 켜면 시간이 사라진다 · 시작 줄 · 끝 줄(끝나는 날을 따로 고른다)
+       ⑤ 글자 16px · 줄 높이 48px · 아이콘 칸 56px(글자는 왼쪽에서 72px) — 구글 앱을 쟀다 */
+  .gform .gic{width:24px;height:24px;fill:currentColor;display:block}
+  .gform .gx{border:none;background:transparent;color:var(--gtext);width:48px;height:48px;border-radius:50%;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;padding:0}
   .gform .gx:hover{background:var(--bg)}
-  .gform .gtitle{display:block;width:100%;border:none;border-bottom:2px solid var(--gline);background:transparent;
-    font-size:22px;color:var(--gtext);padding:6px 2px 6px 44px;font-family:inherit;outline:none;margin-bottom:10px}
+  .gform .gtitle{display:block;width:calc(100% - 56px);margin-left:56px;border:none;border-bottom:2px solid var(--gline);background:transparent;
+    font-size:22px;color:var(--gtext);padding:10px 0 8px;font-family:inherit;outline:none;margin-bottom:8px;border-radius:0}
   .gform .gtitle:focus{border-bottom-color:var(--gtoday)}
-  .gform .gfrom{margin:-6px 0 8px 44px}
-  .gform .gtabs{display:flex;gap:6px;margin:0 0 10px 44px}
-  .gform .gtabs button{border:none;background:transparent;color:var(--gtext);font-size:13px;padding:7px 12px;border-radius:8px;cursor:pointer;font-family:inherit}
-  .gform .gtabs button.on{background:var(--acc-soft);color:var(--acc2);font-weight:700}
-  .gform .grow{display:flex;align-items:flex-start;gap:12px;padding:5px 0}
-  .gform .gi{width:32px;flex-shrink:0;text-align:center;font-size:17px;line-height:34px;color:var(--gsub)}
+  .gform .gtitle::placeholder{color:var(--gsub)}
+  .gform .gfrom{margin:-6px 0 8px 56px}
+  .gform .gtabs{display:flex;gap:8px;margin:0 0 8px 56px}
+  .gform .gtabs button{border:1px solid var(--gline);background:transparent;color:var(--gtext);font-size:14px;padding:0 16px;height:32px;border-radius:8px;cursor:pointer;font-family:inherit}
+  .gform .gtabs button.on{background:#d3e3fd;border-color:#d3e3fd;color:#0b57d0;font-weight:500}
+  :root[data-theme="dark"] .gform .gtabs button.on{background:#0842a0;border-color:#0842a0;color:#d3e3fd}
+  .gform .grow{display:flex;align-items:center;gap:0;padding:0;min-height:48px}
+  .gform .grow.top{align-items:flex-start}
+  .gform .gi{width:56px;flex:none;color:var(--gsub);display:flex;align-items:center;justify-content:flex-start;font-size:0;line-height:0;min-height:48px}
+  .gform .grow.top .gi{align-items:flex-start;padding-top:12px;min-height:0}
   .gform .gbody{flex:1;min-width:0;display:flex;flex-wrap:wrap;align-items:center;gap:8px}
   .gform .gbody > input,.gform .gbody > select,.gform .gbody > textarea{flex:1;min-width:0;width:100%;border:none;
-    background:var(--bg);border-radius:6px;padding:9px 10px;font-size:13.5px;color:var(--gtext);font-family:inherit}
-  .gform .gbody input[type=date]{flex:0 1 auto;width:auto}
-  .gform .gbody textarea{resize:vertical}
+    background:transparent;border-radius:0;padding:12px 0;font-size:16px;color:var(--gtext);font-family:inherit;outline:none}
+  .gform .gbody > input::placeholder,.gform .gbody > textarea::placeholder{color:var(--gsub)}
+  .gform .gbody > select{padding-left:0;margin-left:-4px;padding-right:4px}
+  .gform .gbody textarea{resize:none;line-height:1.45;field-sizing:content;min-height:48px;max-height:40vh}
+  .gform .cpull .cq{border:none;background:transparent;font-size:16px;padding:12px 0;width:100%;color:var(--gtext);outline:none;font-family:inherit}
+  .gform .cpull.filled{display:flex;align-items:center;gap:8px;padding:6px 0}
+  .gform .cpull .cx{border:none;background:transparent;color:var(--gtoday);font-size:13px;cursor:pointer;font-family:inherit}
+  .gform .gtxt{flex:1;font-size:16px;color:var(--gtext)}
+  .gform .gdtrow{display:flex;justify-content:space-between;align-items:center;width:100%;gap:12px}
+  .gform .gpick{position:relative;display:inline-flex;align-items:center;min-height:48px;font-size:16px;color:var(--gtext);cursor:pointer;white-space:nowrap}
+  .gform .gpick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:none;padding:0;margin:0;font-size:16px}
+  .gform .gpick input::-webkit-calendar-picker-indicator{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+  .gform .gsw{flex:none;position:relative;width:52px;height:32px;border-radius:16px;border:2px solid var(--gsub);background:transparent;padding:0;cursor:pointer}
+  .gform .gsw i{position:absolute;left:6px;top:6px;width:16px;height:16px;border-radius:50%;background:var(--gsub);transition:all .12s}
+  .gform .gsw.on{background:var(--gtoday);border-color:var(--gtoday)}
+  .gform .gsw.on i{left:24px;top:4px;width:24px;height:24px;background:#ffffff}
+  :root[data-theme="dark"] .gform .gsw.on i{background:#131314}
+  .gform .gmapbtn{flex:none;width:40px;height:40px;border:none;border-radius:50%;background:transparent;color:var(--gsub);cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+  .gform .gmapbtn:hover{background:var(--bg)}
   .gform .trange{display:flex;align-items:center;gap:6px}
-  .gform .trange input{border:none;background:var(--bg);border-radius:6px;padding:8px;font-size:13.5px;color:var(--gtext);font-family:inherit;width:auto}
+  .gform .trange input{border:none;background:transparent;padding:8px 0;font-size:16px;color:var(--gtext);font-family:inherit;width:auto}
   .gform .gpill{border:1px solid var(--gline);background:var(--panel);color:var(--acc2);border-radius:999px;padding:6px 14px;font-size:13px;cursor:pointer;font-family:inherit}
-  .gform .glink{border:none;background:transparent;color:var(--acc2);font-size:13px;font-weight:500;cursor:pointer;padding:8px 10px;border-radius:999px;font-family:inherit}
-  .gform .glink:hover{background:var(--acc-soft)}
-  .gform .gsave{border:none;background:#1e40af;color:#ffffff;border-radius:999px;padding:9px 22px;font-size:13.5px;font-weight:500;cursor:pointer;font-family:inherit}
-  .gform .gvis{font-weight:500}
-  .gform .ghint{flex-basis:100%;font-size:11.5px;color:var(--gsub);padding-left:2px}
-  .gform .cpull{flex:1;margin-bottom:0}
+  .gform .glink{border:none;background:transparent;color:var(--gtoday);font-size:14px;font-weight:500;cursor:pointer;padding:10px 12px;border-radius:999px;font-family:inherit}
+  .gform .glink:hover{background:var(--bg)}
+  .gform .gsave{border:none;background:var(--gtoday);color:#ffffff;border-radius:20px;padding:0 24px;height:40px;font-size:14px;font-weight:500;cursor:pointer;font-family:inherit}
+  :root[data-theme="dark"] .gform .gsave{color:#131314}
+  .gform .gvis{font-weight:400}
+  .gform .ghint{flex-basis:100%;font-size:12px;color:var(--gsub);padding:0 0 8px}
+  .gform .cpull{flex:1;margin-bottom:0;border:none;background:transparent;padding:0}
   .gform .gbody > #cardres{flex-basis:100%}
-  .gform .mbtns{margin-top:10px}
+  .gform .mbtns{margin-top:10px}  .gform .mbtns{margin-top:10px}
   /* 넓게 — 구글의 큰 편집 화면: 위에 제목·저장, 왼쪽 세부, 오른쪽 달력·누구 */
   .modal.gform.full{left:0;top:0;transform:none;width:100vw;height:100vh;max-height:none;border-radius:0;
     overflow-y:auto;padding:14px max(18px,calc((100vw - 1100px)/2)) 30px}
   .gform.full .gtitle{font-size:24px}
   .gform.full .gcols{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:28px}
-  @media (max-width:760px){ .gform.full .gcols{display:block} }
+  @media (max-width:760px){ .gform.full .gcols{display:block} .modal.gform.full{padding:6px 16px 28px} }
   /* 기업정보함에서 불러오기 — 창 맨 위 한 칸(고르면 초록으로 «불러옴») */
   .cpull{display:flex;align-items:center;gap:8px;border:1.5px solid #bfdbfe;background:var(--acc-soft);
     border-radius:10px;padding:7px 10px;margin-bottom:10px}
@@ -680,6 +715,28 @@
   body.mob .evs{gap:2px}
   body.mob .more{font-size:11px;line-height:8px;letter-spacing:1px;padding:0;text-align:center;color:var(--gsub)}
   /* 고른 날 — 구글처럼 옅은 칠 한 겹(테두리를 두르면 칸이 들쭉날쭉해 보인다) */
+  /* ★ 폰 머리 — 제목을 누르면 보기 고르기(월·일정·주·일) (2026-10-11) */
+  body.mob .mhead{position:relative}
+  body.mob .mttb{display:flex;align-items:center;gap:6px;border:none;background:transparent;padding:0;cursor:pointer;font-family:inherit;color:var(--gtext)}
+  body.mob .mcar{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:6px solid var(--gtext);margin-top:4px}
+  .vveil{position:fixed;inset:0;z-index:30;background:transparent}
+  .vmenu{position:absolute;left:12px;top:52px;z-index:31;background:var(--panel);border-radius:12px;box-shadow:0 4px 18px rgba(0,0,0,.3);padding:6px 0;min-width:150px}
+  .vmenu button{display:block;width:100%;text-align:left;border:none;background:transparent;padding:12px 20px;font-size:15px;color:var(--gtext);cursor:pointer;font-family:inherit}
+  .vmenu button.on{color:var(--gtoday);font-weight:500}
+  /* 일 보기 — 폰에서도 칩을 «읽을 수 있는 크기»로 (월 칸용 12px 칩을 그대로 쓰면 안 읽힌다) */
+  body.mob .dayview .ev{height:auto;font-size:14px;line-height:20px;padding:8px 12px;white-space:normal;border-radius:8px}
+  /* ★ 「일정」 보기(구글) — 날짜 열 + 색 카드 */
+  .slist{flex:1;min-height:0;overflow-y:auto;padding:4px 0 90px}
+  .sday{display:flex;gap:16px;padding:8px 16px}
+  .sdn{width:44px;flex:none;text-align:center;padding-top:2px}
+  .sdn b{display:block;font-size:22px;font-weight:400;line-height:36px;color:var(--gtext)}
+  .sdn span{font-size:12px;color:var(--gsub)}
+  .sday.today .sdn b{background:#2563eb;color:#ffffff;border-radius:50%;width:36px;margin:0 auto}
+  .scards{flex:1;min-width:0;display:flex;flex-direction:column;gap:6px}
+  .scard{border-radius:8px;padding:8px 12px;cursor:pointer;display:flex;flex-direction:column;gap:2px}
+  .scard b{font-size:14px;font-weight:500;line-height:20px;word-break:break-word}
+  .scard span{font-size:12px;opacity:.9}
+  .snone{font-size:13px;color:var(--gsub);padding:10px 0}
   /* (㉯ — 고른 날 칠은 없다. 구글 위젯에도 없고, 목록 창이 «어느 날인지» 말한다) */
   /* 그날 목록 — 제목이 안 잘리는 크기(12.5px)로 */
   /* 그날 목록 — 아래에서 올라오는 창(㉯). 구글 폰 달력의 «그날 일정 창»과 같은 쓰임 */
@@ -776,6 +833,8 @@ var S = { tab:'cal', ym:'', filter:null, unwatch:[], modal:null, busy:false, toa
           trip:null,
           /* sheet — 폰 월 보기에서 날을 눌렀을 때 올라오는 «그날 목록»(S.pick 이 어느 날인지) (2026-10-10) */
           sheet:false,
+          /* vmenu — 폰 머리의 «보기 고르기»(월·일정·주·일) 메뉴가 열렸나 (2026-10-11) */
+          vmenu:false,
           /* 달력 보기 — 이알피와 같은 셋(월·주·일). date 는 주·일 보기가 보고 있는 날. */
           view:'month', date:'', q:'',
           /* pick — 폰에서 «고른 날»(그날 목록이 보여 주는 날). 주·일 보기의 date 와 따로 둔다:
@@ -2393,10 +2452,21 @@ function 폰(){
   catch(e){ return false; }
 }
 function 폰머리Html(){
-  var 달 = parseInt(String(S.ym).slice(5,7), 10);
-  var 음력 = lunarRange(S.ym);
+  /* 보기마다 제목이 다르다(구글): 월·일정은 「10월 / 병오년8월 – 9월」, 주는 「10월 / 11일 – 17일」, 일은 「10월 / 14일 (수)」.
+     제목을 누르면 «보기 고르기» 메뉴가 열린다(월·일정·주·일) — 구글 폰 앱의 제목 옆 ▾ 와 같다(2026-10-11) */
+  var 기준 = (S.view === "week" || S.view === "day") ? S.date : S.ym + "-01";
+  var 달 = parseInt(String(기준).slice(5,7), 10);
+  function 일글(ymd){ return parseInt(ymd.slice(8,10), 10) + "일"; }
+  var 부제 = S.view === "week" ? (function(){ var w = weekDays(S.date); return 일글(w[0]) + " – " + 일글(w[6]); })()
+    : S.view === "day" ? 일글(S.date) + " (" + ["일","월","화","수","목","금","토"][new Date(S.date + "T00:00:00").getDay()] + ")"
+    : lunarRange(S.ym);
+  var 보기들 = [["month","월"],["sched","일정"],["week","주"],["day","일"]];
   return '<div class="mhead">'
-    + '<div class="mtt"><b>' + 달 + '월</b>' + (음력 ? '<span>' + esc(음력) + '</span>' : '') + '</div>'
+    + '<div class="mtt"><button class="mttb" data-vmenu="1" title="보기 고르기"><b>' + 달 + '월</b><i class="mcar"></i></button>'
+    +   (부제 ? '<span>' + esc(부제) + '</span>' : '') + '</div>'
+    + (S.vmenu ? '<div class="vveil" data-vclose="1"></div><div class="vmenu">' + 보기들.map(function(v){
+        return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>';
+      }).join("") + '</div>' : '')
     /* 거르개가 «꺼져» 있으면 칩을 안 둔다 — 구글 위젯 머리에는 없다(2026-10-10). 켜져 있으면 «걸러 보는 중»을 알려야 하므로 둔다.
        거르개 켜고 끄기는 ☰ 메뉴의 사람 칩에서 한다 */
     + (S.filter ? '<button class="mfilt" data-mf="1" title="누르면 전체 → 공용 → 개인">'
@@ -2471,13 +2541,55 @@ function 폰시트Html(eumOnly){
   return '<div class="veil sheetveil" data-sheetclose="1"></div>'
     + '<div class="msheet"><span class="mgrip"></span>' + 폰목록Html(eumOnly, S.pick) + '</div>';
 }
+/* ★ 「일정」 보기 — 구글 폰 앱의 기본 화면 중 하나(2026-10-11). 그 달에서 «일정이 있는 날»만(오늘은 늘) 날짜별로 늘어놓는다:
+     왼쪽에 날짜 「14 / 수」(오늘은 파란 동그라미), 오른쪽에 일정마다 «색 카드»(제목 + 시간 「오후 2:00 – 3:00」 또는 「종일」).
+   ⚠ 누르는 길은 칩·그날 목록과 같다(data-ev·data-holday) — 두 벌로 나뉘면 한쪽만 고쳐진다.
+   ⚠ 날 칸의 빈 자리를 눌러도 새 일정이 안 생긴다(구글도 그렇다) — 넣기는 ＋ 하나다. */
+function 폰일정Html(eumOnly){
+  var 오늘 = todayYMD(), ym = S.ym;
+  var 끝일 = new Date(+ym.slice(0,4), +ym.slice(5,7), 0).getDate();
+  function 글자색(바탕){
+    var m = /^#([0-9a-f]{6})$/i.exec(String(바탕 || ""));
+    if(!m) return "#ffffff";
+    var n = parseInt(m[1], 16);
+    return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) > 170 ? "#1f1f1f" : "#ffffff";
+  }
+  var 날들 = [];
+  for(var n = 1; n <= 끝일; n++){
+    var ds = ym + "-" + ("0" + n).slice(-2);
+    var h = 공휴칩(ds);
+    var evs = (h ? [h] : []).concat(eventsOn(ds, eumOnly).filter(passFilter).filter(matchSearch));
+    if(!evs.length && ds !== 오늘) continue;
+    evs = evs.map(function(e, i){ return { e:e, i:i }; }).sort(function(a, b){
+      return (목록순(a.e, ds) - 목록순(b.e, ds)) || String(a.e.time || "").localeCompare(String(b.e.time || "")) || (a.i - b.i);
+    }).map(function(x){ return x.e; });
+    var 카드 = evs.map(function(e){
+      var 언제 = e.time ? 시각글(e.time) + (e.endAt ? " – " + 시각글(시분(e.endAt)) : "")
+        : "종일" + (e.end && e.end > ds ? " (~" + parseInt(e.end.slice(5,7), 10) + "/" + parseInt(e.end.slice(8,10), 10) + ")" : "");
+      var 제목 = String(e.text || "");
+      if(e.kind === "priv") 제목 = "🔒 " + 제목;
+      var 색 = e.color || "#70757a";
+      return '<div class="scard" style="background:' + esc(색) + ';color:' + 글자색(색) + '"'
+        + (e.kind === "hol" ? ' data-holday="' + esc(ds) + '"' : ' data-ev="' + esc(e.store) + ':' + esc(e.id) + '"') + '>'
+        + '<b>' + esc(제목) + '</b><span>' + esc(언제) + '</span></div>';
+    }).join("");
+    var d = new Date(ds + "T00:00:00");
+    날들.push('<div class="sday' + (ds === 오늘 ? ' today' : '') + '" data-day="' + ds + '">'
+      + '<div class="sdn"><b>' + n + '</b><span>' + ["일","월","화","수","목","금","토"][d.getDay()] + '</span></div>'
+      + '<div class="scards">' + (카드 || '<div class="snone">일정 없음</div>') + '</div></div>');
+  }
+  return '<div class="cal"><div class="slist">'
+    + (날들.join("") || '<div class="mnone">이 달에는 일정이 없습니다</div>') + '</div></div>';
+}
 function calendarHtml(eumOnly){
   /* 🗄 스위치가 켜져 있거나 구글을 못 받았으면 보관함도 그 달 것을 받는다(같은 달이면 안 받는다) */
   if(fbDb && (S.showGone || GCAL.err) && typeof 보관받기 === "function") 보관받기();
   /* 보는 달이 바뀌었으면 구글을 다시 받는다 — 같은 달이면 아무 일도 안 한다(gcalLoad 안에서 가른다) */
   if(fbDb) gcalLoad();
-  if(S.view === "week") return weekHtml(eumOnly);
-  if(S.view === "day")  return dayHtml(eumOnly);
+  var 폰머리 = (typeof 폰 === "function" && 폰()) ? 폰머리Html() : "";
+  if(S.view === "sched") return 폰머리 + 폰일정Html(eumOnly);
+  if(S.view === "week") return 폰머리 + weekHtml(eumOnly);
+  if(S.view === "day")  return 폰머리 + dayHtml(eumOnly);
   var grid = monthGrid(S.ym), today = todayYMD();
   /* 폰은 그 달에 필요한 줄만 — 마지막 줄이 통째로 다음 달이면 뺀다(구글 위젯이 그렇다) */
   var 폰판 = typeof 폰 === "function" && 폰();
@@ -2645,10 +2757,10 @@ function monthbarHtml(){
   /* 구글 머리줄 꼴 (대표 지시 2026-09-27) — [오늘] ‹ › 2026년 9월 · 음력 · 월|주|일 */
   var 요일 = ["일","월","화","수","목","금","토"];
   function 달글(ymd){ return parseInt(ymd.slice(5,7),10) + "월 " + parseInt(ymd.slice(8,10),10) + "일"; }
-  var 가운데 = S.view === "month" ? (S.ym.slice(0,4) + "년 " + parseInt(S.ym.slice(5,7),10) + "월")
+  var 가운데 = (S.view === "month" || S.view === "sched") ? (S.ym.slice(0,4) + "년 " + parseInt(S.ym.slice(5,7),10) + "월")
     : S.view === "week" ? (function(){ var w = weekDays(S.date); return 달글(w[0]) + " – " + 달글(w[6]); })()
     : (S.date.slice(0,4) + "년 " + 달글(S.date) + " (" + 요일[new Date(S.date + "T00:00:00").getDay()] + ")");
-  var 음력 = S.view === "month" ? lunarRange(S.ym) : "";
+  var 음력 = (S.view === "month" || S.view === "sched") ? lunarRange(S.ym) : "";
   return '<div class="monthbar">'
     + '<button class="todaybtn" data-mv="0">오늘</button>'
     + '<button class="mv" data-mv="-1" title="이전">‹</button>'
@@ -2660,7 +2772,7 @@ function monthbarHtml(){
 /* 월 | 주 | 일 — 구글처럼 머리줄 오른쪽 끝 */
 function segHtml(){
   return '<span class="seg">'
-    + [["month","월"],["week","주"],["day","일"]].map(function(v){
+    + [["month","월"],["sched","일정"],["week","주"],["day","일"]].map(function(v){
         return '<button data-view="' + v[0] + '"' + (S.view === v[0] ? ' class="on"' : '') + '>' + v[1] + '</button>';
       }).join("")
     + '</span>';
@@ -3079,8 +3191,9 @@ function recOf(store, id){
   return null;
 }
 function openNew(ymd){
-  S.modal = { mode:"new", kind:"sch", date:ymd, sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1,
-    vis:"shared", timed:false };
+  /* 구글처럼 «시간 일정»이 기본 — 시작은 다음 정각, 끝은 비워 둔다(저장 때 한 시간 뒤). 종일은 스위치로 */
+  S.modal = { mode:"new", kind:"sch", date:ymd, endDate:"", sid:(ME&&ME.sid)||"", type:"leave", title:"", note:"", hours:1,
+    vis:"shared", timed:true, time:새시각(ymd), endTime:"" };
   /* 못 쓰는 표면 «열자마자» 알린다 — 다 적고 나서 거절당하는 것이 가장 나쁘다 */
   if(옛방식표("my_schedules")) S.modal.err = 옛방식안내("my_schedules");
   render();
@@ -3486,14 +3599,33 @@ function 공휴일상세(ymd){
   return { kind:"hol", title:이름, color:"#d81b60", date:ymd, end:"",
     time:"", endAt:0, rows:[], hint:[], url:"" };
 }
+/* 상세 창의 줄 앞 그림글자(이모지) → 구글 «선 아이콘». 모르는 글자는 그대로 둔다 */
+var 행그림 = { "👤":"person", "📍":"place", "≡":"notes", "✉":"mail", "🕒":"history", "⏱":"schedule", "👥":"group",
+  "🔔":"notifications", "🔁":"repeat", "🎥":"videocam", "📎":"attach", "🏢":"business" };
+function 선아이콘(이름){
+  return (typeof GIC !== "undefined" && GIC[이름])
+    ? '<svg class="gic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + GIC[이름] + '"/></svg>' : "";
+}
+function 행아이콘(그림){ return 선아이콘(행그림[그림]) || esc(그림); }
+function 도구단추(속성, 이름, 뜻){ return '<button class="dtb" ' + 속성 + ' title="' + esc(뜻) + '">' + 선아이콘(이름) + '</button>'; }
 function detailHtml(){
   var d = S.detail; if(!d) return "";
-  var 언제 = 긴날짜(d.date) + (d.time ? " · " + d.time + (d.endAt ? " – " + 시분(d.endAt) : "") : "")
-    + (d.end && d.end !== d.date ? " ~ " + 긴날짜(d.end) : "")
-    + (d.kind === "hol" ? " · 공휴일" : "");
+  /* 「10월 14일 (수) ⋅ 오후 2:00~오후 3:00」 — 구글 팝업의 날짜 줄(올해가 아니면 연도가 붙는다) */
+  var 언제 = 날짜글(d.date) + (d.time ? " ⋅ " + 시각글(d.time) + (d.endAt ? "~" + 시각글(시분(d.endAt)) : "") : "")
+    + (d.end && d.end !== d.date ? " ~ " + 날짜글(d.end) : "")
+    + (d.kind === "hol" ? " ⋅ 공휴일" : "");
+  var 동선있음 = typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length;
   return '<div class="veil" data-close="1"></div>'
-    + '<div class="modal det" style="max-width:340px">'
-    + '<div class="dbar" style="background:' + esc(d.color || "#70757a") + '"></div>'
+    + '<div class="modal det">'
+    + '<div class="dtool">'
+    /* 🚗 이날 동선 — 주소 있는 일정이 그날 하나라도 있으면 */
+    +   (동선있음 ? 도구단추('data-route="' + esc(d.date) + '"', "car", "이날 동선 — 방문지를 시각 순서로") : "")
+    /* ✏️·🗑 구글 일정 고치기·지우기 — 서버가 대표 늘 연결로 대신 한다(functions/gcal-proxy.js gcalEdit).
+       여러 날 일정은 창의 «끝나는 날» 칸으로 (2026-10-10) */
+    +   (d.kind === "gcal" && d.gid ? 도구단추('data-gedit="1"', "edit", "고치기") + 도구단추('data-gdel="1"', "delete", "지우기") : "")
+    +   (d.url ? 도구단추('data-dgo="1"', "open", "구글에서 열기") : "")
+    +   도구단추('data-close="1"', "close", "닫기")
+    + '</div>'
     + '<div class="dtop"><span class="ddot" style="background:' + esc(d.color || "#70757a") + '"></span>'
     +   '<div><div class="dttl">' + esc(d.title || "일정") + '</div>'
     +   '<div class="dwhen">' + esc(언제) + '</div></div></div>'
@@ -3504,8 +3636,8 @@ function detailHtml(){
             if(/^https:\/\//i.test(r.href || "")) 글 = '<a href="' + esc(r.href) + '" target="_blank" rel="noopener">' + 글 + '</a>';
             /* 📍 장소 — 누르면 지도 창(2026-10-09). 온라인 회의 링크 같은 «장소 아닌 것»은 그대로 */
             else if(r.i === "📍" && typeof PuCalMap !== "undefined" && PuCalMap.cleanPlace(r.t))
-              글 = '<a class="maplink" href="#" data-map="det" title="지도 보기">' + 글 + ' 🗺</a>';
-            return '<div class="drow"><span class="di">' + esc(r.i) + '</span>'
+              글 = '<a class="maplink" href="#" data-map="det" title="지도 보기">' + 글 + '</a>';
+            return '<div class="drow"><span class="di">' + 행아이콘(r.i) + '</span>'
               + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
         : "")
@@ -3515,19 +3647,10 @@ function detailHtml(){
     + (d.kind === "gcal" && d.moreErr ? '<div class="dhint">⚠ 구글에서 나머지를 못 받았습니다 — ' + esc(d.moreErr) + '</div>' : "")
     + (d.kind === "gcal" && !d.more && !d.loading && !d.moreErr && typeof GLINK !== "undefined" && GLINK.st === "need"
         ? '<div class="dhint">🔐 구글을 연결하면 참석자·첨부·알림도 여기 나옵니다 — <a href="#" data-glogin="1">연결하기</a></div>' : "")
-    + '<div class="mbtns">'
-    /* 🚗 이날 동선 — 주소 있는 일정이 그날 하나라도 있으면 */
-    + (typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length
-        ? '<button class="btn ghost" data-route="' + esc(d.date) + '" title="이날 방문지를 시각 순서로">🚗 이날 동선</button>' : "")
-    + '<span class="sp"></span>'
-    /* ✏️·🗑 구글 일정 고치기·지우기 — 서버가 대표 늘 연결로 대신 한다(functions/gcal-proxy.js gcalEdit).
-       여러 날 일정은 창의 «끝나는 날» 칸으로 (2026-10-10) */
-    + (d.kind === "gcal" && d.gid
-        ? '<button class="btn ghost" data-gedit="1" title="고치기">✏️</button><button class="btn ghost" data-gdel="1" title="지우기">🗑</button>' : "")
-    + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
     /* 모집 공지 — http(s) 만(PuCalRecruit.safeUrl 이 거른 값) */
-    + (/^https?:\/\//i.test(d.link || "") ? '<a class="btn ghost" href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a>' : "")
-    + '<button class="btn" data-close="1">닫기</button></div></div>';
+    + (/^https?:\/\//i.test(d.link || "")
+        ? '<div class="drows"><div class="drow"><span class="di">' + 선아이콘("open") + '</span><span class="dt"><a href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a></span></div></div>' : "")
+    + '</div>';
 }
 /* 「2026-09-16 (수)」 — 상세 창 머리에 쓰는 긴 날짜 */
 function 긴날짜(ymd){
@@ -3543,6 +3666,56 @@ function 시분(ms){ return new Date(+ms + 9 * 3600000).toISOString().slice(11, 
 function closeModal(){ S.modal = null; S.busy = false; render(); }
 function toast(t){ S.toast = t; render(); setTimeout(function(){ if(S.toast===t){ S.toast=""; render(); } }, 3200); }
 
+/* 구글 머티리얼 «선 아이콘» 길(path) — 24×24. 단색이라 글자색(currentColor)을 따른다 */
+var GIC = {
+  close:"M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z",
+  schedule:"M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z",
+  place:"M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zM7 9c0-2.76 2.24-5 5-5s5 2.24 5 5c0 2.88-2.88 7.19-5 9.88C9.92 16.21 7 11.85 7 9zm5-2.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z",
+  notes:"M3 18h12v-2H3v2zM3 6v2h18V6H3zm0 7h18v-2H3v2z",
+  person:"M12 6c1.1 0 2 .9 2 2s-.9 2-2 2-2-.9-2-2 .9-2 2-2m0 9c2.7 0 5.8 1.29 6 2v1H6v-.99c.2-.72 3.3-2.01 6-2.01m0-11C9.79 4 8 5.79 8 8s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4zm0 9c-2.67 0-8 1.34-8 4v3h16v-3c0-2.66-5.33-4-8-4z",
+  group:"M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
+  calendar:"M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z",
+  business:"M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z",
+  map:"M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z",
+  /* 상세 창(일정 팝업)용 */
+  edit:"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  delete:"M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+  open:"M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
+  car:"M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z",
+  mail:"M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z",
+  history:"M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
+  notifications:"M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z",
+  repeat:"M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z",
+  videocam:"M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM15 16H5V8h10v8z",
+  attach:"M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"
+};
+/* 「10월 10일 (토)」 — 올해가 아니면 「2025년 10월 10일 (금)」. 구글 앱 입력 화면의 날짜 글자 */
+function 날짜글(ymd){
+  var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || ""));
+  if(!m) return "날짜 선택";
+  var d = new Date(+m[1], +m[2] - 1, +m[3]);
+  return (+m[1] !== new Date().getFullYear() ? m[1] + "년 " : "") + (+m[2]) + "월 " + (+m[3]) + "일 ("
+    + ["일","월","화","수","목","금","토"][d.getDay()] + ")";
+}
+/* 「오후 9:00」 — 구글 앱의 시간 글자(24시 「21:00」 이 아니다). 0시는 「오전 12:00」 · 12시는 「오후 12:00」 */
+function 시각글(hm){
+  var m = /^(\d{2}):(\d{2})/.exec(String(hm || ""));
+  if(!m) return "";
+  var h = +m[1];
+  return (h >= 12 ? "오후 " : "오전 ") + (h % 12 === 0 ? 12 : h % 12) + ":" + m[2];
+}
+/* 시작 시각 + 1시간 — 끝 시각을 비워 두면 저장 때 그렇게 정해진다(화면은 «미리» 보여 준다) */
+function 한시간뒤(hm){
+  var m = /^(\d{2}):(\d{2})$/.exec(String(hm || ""));
+  if(!m) return "";
+  var h = +m[1] + 1;
+  return h > 23 ? "23:59" : ("0" + h).slice(-2) + ":" + m[2];
+}
+/* 새 일정의 처음 시각 — 구글처럼 «다음 정각». 오늘이 아닌 날은 아침 9시 */
+function 새시각(ymd){
+  if(ymd === todayYMD()){ var h = new Date().getHours() + 1; return h > 23 ? "23:00" : ("0" + h).slice(-2) + ":00"; }
+  return "09:00";
+}
 function modalHtml(){
   /* ★ 넣기·고치기 창 — 구글 캘린더와 같은 꼴 (대표 지시 2026-09-27 「데이터 입력 및 수정 변경의 양식
        형태도 구글과 같이 해라 똑같이」). 구글의 빠른 창(제목 · 일정/할 일 · 🕒 날짜·시간 추가 · 👥 ·
@@ -3557,64 +3730,74 @@ function modalHtml(){
   var 넓게 = !!m.full || (typeof 폰 === "function" && 폰());
   var 유형들 = PuWork.typesFor("calendar");
   var 불러옴 = m.card ? " <span class=\"from\">불러옴</span>" : "";
-  function 줄(아이콘, 안, 뜻){ return "<div class=\"grow\"><span class=\"gi\" title=\""+esc(뜻||"")+"\">"+아이콘+"</span><div class=\"gbody\">"+안+"</div></div>"; }
-  var 시각 = 일정
-    ? (m.timed
-        ? "<span class=\"trange\"><input type=\"time\" data-m=\"time\" value=\""+esc(m.time||"")+"\" title=\"시작\">"
-          + "<span>–</span><input type=\"time\" data-m=\"endTime\" value=\""+esc(m.endTime||"")+"\" title=\"끝 — 비우면 한 시간 뒤\"></span>"
-          + "<button class=\"glink\" data-mtime=\"0\" title=\"시각을 빼고 하루 종일로\">종일</button>"
-        : "<button class=\"gpill\" data-mtime=\"1\">시간 추가</button>")
-    : (m.type==="leave-hour"
-        ? "<span class=\"trange\"><input type=\"number\" min=\"1\" max=\"8\" data-m=\"hours\" value=\""+esc(m.hours)+"\"><span>시간</span></span>" : "");
-  var 누가 = "<select data-m=\"sid\" title=\"누구\">"
-    + users().map(function(u){ return "<option value=\""+esc(u.sid)+"\""+(u.sid===m.sid?" selected":"")+">"+esc(u.name||u.sid)+"</option>"; }).join("")
-    + "</select>";
-  var 달력 = "<select data-m=\"vis\" class=\"gvis\">"
-    + "<option value=\"shared\""+(m.vis!=="private"?" selected":"")+">👥 푸른노무법인 · 공용 (모두 보기)</option>"
-    + "<option value=\"private\""+(m.vis==="private"?" selected":"")+">🔒 내 일정 · 나만 보기</option></select>"
-    + (m.vis==="private"
-        ? "<div class=\"ghint\">🔒 다른 직원·관리자에게는 안 보입니다. "
+  function 아이콘(이름){ return '<svg class="gic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + GIC[이름] + '"/></svg>'; }
+  function 줄(그림, 안, 뜻, 위){
+    return '<div class="grow' + (위 ? ' top' : '') + '"><span class="gi" title="' + esc(뜻 || "") + '">' + (그림 ? 아이콘(그림) : '') + '</span>'
+      + '<div class="gbody">' + 안 + '</div></div>';
+  }
+  /* 날짜·시간은 «글자»로 보이고, 진짜 입력칸(투명)이 그 위를 덮는다 — 누르면 기기의 고르개가 뜬다 */
+  function 날짜칸(필드, 값){
+    return '<label class="gpick gdate">' + esc(날짜글(값)) + '<input type="date" data-m="' + 필드 + '" value="' + esc(값 || "") + '"></label>';
+  }
+  function 시간칸(필드, 값, 미리){
+    var v = 값 || "";
+    return '<label class="gpick gtime">' + esc(시각글(v || 미리)) + '<input type="time" data-m="' + 필드 + '" value="' + esc(v) + '"></label>';
+  }
+  var 끝날 = (m.endDate && m.endDate > m.date) ? m.endDate : m.date;
+  var 시각줄 = 일정
+    ? 줄("schedule", '<span class="gtxt">종일</span><button class="gsw' + (m.timed ? '' : ' on') + '" role="switch" aria-checked="' + (m.timed ? 'false' : 'true')
+          + '" data-mtime="' + (m.timed ? '0' : '1') + '" title="종일"><i></i></button>', "종일")
+      + 줄("", '<div class="gdtrow">' + 날짜칸("date", m.date) + (m.timed ? 시간칸("time", m.time, "09:00") : '') + '</div>', "시작")
+      + 줄("", '<div class="gdtrow">' + 날짜칸("endDate", 끝날) + (m.timed ? 시간칸("endTime", m.endTime, 한시간뒤(m.time)) : '') + '</div>', "끝")
+    : 줄("schedule", 날짜칸("date", m.date)
+        + (m.type==="leave-hour"
+            ? '<span class="trange"><input type="number" min="1" max="8" data-m="hours" value="' + esc(m.hours) + '"><span>시간</span></span>' : ''), "날짜");
+  var 누가 = '<select data-m="sid" title="누구">'
+    + users().map(function(u){ return '<option value="' + esc(u.sid) + '"' + (u.sid===m.sid ? ' selected' : '') + '>' + esc(u.name||u.sid) + '</option>'; }).join("")
+    + '</select>';
+  var 달력 = '<select data-m="vis" class="gvis">'
+    + '<option value="shared"' + (m.vis!=="private" ? ' selected' : '') + '>푸른노무법인 · 공용 (모두 보기)</option>'
+    + '<option value="private"' + (m.vis==="private" ? ' selected' : '') + '>내 일정 · 나만 보기</option></select>';
+  var 달력힌트 = (m.vis==="private"
+        ? '<div class="ghint">🔒 다른 직원·관리자에게는 안 보입니다. '
           + ((typeof PuGcalAuth !== "undefined" && PuGcalAuth.hasToken())
-              ? "내 구글 달력에도 «비공개»로 들어가 <b>내 폰 구글 캘린더</b>에만 뜹니다.</div>"
-              : "구글 로그인하면 내 폰 구글 캘린더에도 뜹니다 — <button class=\"glink\" data-glogin=\"1\">구글 로그인</button> (적던 것은 저장 뒤에)</div>")
-        : "<div class=\"ghint\">구글 공용 달력에도 들어가 폰 구글 캘린더에 뜹니다(구글 로그인했을 때).</div>");
-  return "<div class=\"veil\" data-close=\"1\"></div><div class=\"modal gform"+(넓게?" full":"")+"\">"
-    + "<div class=\"ghd\">"+(넓게 ? "<button class=\"gx\" data-close=\"1\" title=\"닫기\">✕</button>" : "<span class=\"ggrip\">═</span>")
-    +   "<span class=\"sp\"></span>"
-    +   (넓게 ? "<button class=\"gsave\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>"
-             : "<button class=\"gx\" data-close=\"1\" title=\"닫기\">✕</button>")
-    + "</div>"
-    + (m.err ? "<div class=\"werr\">"+esc(m.err)+"</div>" : "")
+              ? '내 구글 달력에도 «비공개»로 들어가 <b>내 폰 구글 캘린더</b>에만 뜹니다.</div>'
+              : '구글 로그인하면 내 폰 구글 캘린더에도 뜹니다 — <button class="glink" data-glogin="1">구글 로그인</button> (적던 것은 저장 뒤에)</div>')
+        : '<div class="ghint">구글 공용 달력에도 들어가 폰 구글 캘린더에 뜹니다.</div>');
+  달력힌트 = 달력힌트.replace('<div class="ghint">', '<div class="ghint" style="padding-left:56px">');
+  var 저장단추 = '<button class="gsave" data-act="save"' + (S.busy ? ' disabled' : '') + '>' + (S.busy ? '저장 중…' : '저장') + '</button>';
+  return '<div class="veil" data-close="1"></div><div class="modal gform' + (넓게 ? ' full' : '') + '">'
+    + '<div class="ghd">' + (넓게 ? '<button class="gx" data-close="1" title="닫기">' + 아이콘("close") + '</button>' : '<span class="ggrip">═</span>')
+    +   '<span class="sp"></span>'
+    +   (넓게 ? 저장단추 : '<button class="gx" data-close="1" title="닫기">' + 아이콘("close") + '</button>')
+    + '</div>'
+    + (m.err ? '<div class="werr">' + esc(m.err) + '</div>' : '')
     + (일정
-        ? "<input class=\"gtitle\" data-m=\"title\" value=\""+esc(m.title)+"\" placeholder=\"제목 및 시간 추가\">"+(m.card?"<div class=\"gfrom\">"+불러옴+"</div>":"")
-        : "<select class=\"gtitle\" data-m=\"type\">"
-            + 유형들.map(function(t){ return "<option value=\""+esc(t.code)+"\""+(t.code===m.type?" selected":"")+">"
-                + esc(t.icon+" "+PuWork.labelFor(t.code,"calendar"))+"</option>"; }).join("") + "</select>")
-    + (새것 ? "<div class=\"gtabs\"><button data-mk=\"sch\""+(일정?" class=\"on\"":"")+">일정</button>"
-        + "<button data-mk=\"att\""+(일정?"":" class=\"on\"")+">연차·근태</button></div>" : "")
-    + "<div class=\"gcols\"><div class=\"gmain\">"
-    +   줄("🕒", "<input type=\"date\" data-m=\"date\" value=\""+esc(m.date)+"\">"
-          /* 구글 일정은 여러 날일 수 있다 — 끝나는 날(2026-10-10). 시작과 같으면 하루짜리 */
-          + (m.store === "gcal" ? "<span>~</span><input type=\"date\" data-m=\"endDate\" value=\""+esc(m.endDate||m.date)+"\" title=\"끝나는 날\">" : "")
-          + 시각, "날짜·시각")
-    +   (일정 && 새것 ? 줄("🏢", 명함칸Html(m), "기업정보함에서 불러오기") : "")
-    +   (일정 ? 줄("📍", "<input data-m=\"place\" value=\""+esc(m.place||"")+"\" placeholder=\"위치 추가\">"
+        ? '<input class="gtitle" data-m="title" value="' + esc(m.title) + '" placeholder="제목 추가">' + (m.card ? '<div class="gfrom">' + 불러옴 + '</div>' : '')
+        : '<select class="gtitle" data-m="type">'
+            + 유형들.map(function(t){ return '<option value="' + esc(t.code) + '"' + (t.code===m.type ? ' selected' : '') + '>'
+                + esc(t.icon + " " + PuWork.labelFor(t.code, "calendar")) + '</option>'; }).join("") + '</select>')
+    + (새것 ? '<div class="gtabs"><button data-mk="sch"' + (일정 ? ' class="on"' : '') + '>일정</button>'
+        + '<button data-mk="att"' + (일정 ? '' : ' class="on"') + '>연차·근태</button></div>' : '')
+    + '<div class="gcols"><div class="gmain">'
+    +   시각줄
+    +   (일정 && 새것 ? 줄("business", 명함칸Html(m), "기업정보함에서 불러오기") : '')
+    +   (일정 ? 줄("place", '<input data-m="place" value="' + esc(m.place||"") + '" placeholder="위치 추가">'
           /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
-          + (typeof PuCalMap !== "undefined" ? "<button class=\"btn ghost\" data-map=\"form\" title=\"지도 보기\" style=\"flex-shrink:0;padding:4px 8px\">🗺</button>" : ""), "장소") : "")
-    +   (일정 ? 줄("👤", "<input data-m=\"contact\" value=\""+esc(m.contact||"")+"\" placeholder=\"담당자 추가 (이름 · 전화)\">", "담당자") : "")
-    +   줄("≡", "<textarea data-m=\"note\" rows=\""+(넓게?6:2)+"\" placeholder=\"설명 추가\">"+esc(m.note||"")+"</textarea>", "설명")
-    + "</div><div class=\"gside\">"
-    +   줄("👥", 누가, "누구")
-    +   (일정 && m.store !== "gcal" ? 줄("📅", 달력, "누가 보나") : "")
-    +   (m.store === "gcal" ? "<div class=\"ghint\">구글 공용 달력의 일정입니다 — 저장하면 구글이 바로 바뀝니다"
-          + (m.recur ? " (반복 일정은 «이 날 것만» 바뀝니다)" : "") + ".</div>" : "")
-    + "</div></div>"
-    + "<div class=\"mbtns\">"
-    +   (새것 ? "" : "<button class=\"btn danger\" data-act=\"del\""+(S.busy?" disabled":"")+">지우기</button>")
-    +   "<span class=\"sp\"></span>"
-    +   (넓게 ? "" : "<button class=\"glink\" data-mfull=\"1\">옵션 더보기</button>"
-                 + "<button class=\"gsave\" data-act=\"save\""+(S.busy?" disabled":"")+">"+(S.busy?"저장 중…":"저장")+"</button>")
-    + "</div></div>";
+          + (typeof PuCalMap !== "undefined" ? '<button class="gmapbtn" data-map="form" title="지도 보기">' + 아이콘("map") + '</button>' : ''), "장소") : '')
+    +   (일정 ? 줄("person", '<input data-m="contact" value="' + esc(m.contact||"") + '" placeholder="담당자 추가 (이름 · 전화)">', "담당자") : '')
+    +   줄("notes", '<textarea data-m="note" rows="1" placeholder="설명 추가">' + esc(m.note||"") + '</textarea>', "설명", true)
+    + '</div><div class="gside">'
+    +   줄("group", 누가, "누구")
+    +   (일정 && m.store !== "gcal" ? 줄("calendar", 달력, "누가 보나") + 달력힌트 : '')
+    +   (m.store === "gcal" ? '<div class="ghint" style="padding-left:56px">구글 공용 달력의 일정입니다 — 저장하면 구글이 바로 바뀝니다'
+          + (m.recur ? ' (반복 일정은 «이 날 것만» 바뀝니다)' : '') + '.</div>' : '')
+    + '</div></div>'
+    + '<div class="mbtns">'
+    +   (새것 ? '' : '<button class="btn danger" data-act="del"' + (S.busy ? ' disabled' : '') + '>지우기</button>')
+    +   '<span class="sp"></span>'
+    +   (넓게 ? '' : '<button class="glink" data-mfull="1">옵션 더보기</button>' + 저장단추)
+    + '</div></div>';
 }
 
 /* ── 기업정보함 명함 불러오기 ────────────────────────────────────────────
@@ -3655,12 +3838,12 @@ function 명함찾기(q){
 }
 function 명함칸Html(m){
   if(m.card){
-    return '<div class="cpull filled"><span>🏢</span><span class="cq"><b>' + esc(m.card.c || m.card.n) + '</b>'
+    return '<div class="cpull filled"><span class="cq"><b>' + esc(m.card.c || m.card.n) + '</b>'
       + (m.card.n ? ' · ' + esc(m.card.n) + (m.card.ti ? ' ' + esc(m.card.ti) : '') : '') + '</span>'
       + '<button class="cx" data-cardclear="1" title="불러온 것을 뺍니다">✕ 빼기</button></div>';
   }
   var q = m.cq || "";
-  return '<div class="cpull"><span>🏢</span>'
+  return '<div class="cpull">'
     + '<input id="cardq" class="cq" value="' + esc(q) + '" placeholder="기업정보함에서 불러오기 — 회사·담당자 이름" autocomplete="off">'
     + '</div>'
     + '<div id="cardres">' + 명함결과Html(q) + '</div>';
@@ -3723,6 +3906,7 @@ function 개인에넣기(m){
   var 고침 = m.mode === "edit" && m.store === "cal_private";
   var id = 고침 ? m.id : PuCalWrite.newId("prv");
   var item = { id:id, date:m.date, title:String(m.title).trim(), time:String(m.time||""), endTime:String(m.endTime||""),
+    endDate:(m.endDate && m.endDate > m.date) ? m.endDate : "",
     place:String(m.place||"").trim(), contact:String(m.contact||"").trim(), note:String(m.note||"") };
   if(m.card && m.card.k){ item.sourceKind = "card"; item.sourceId = m.card.k; }
   var prev = 고침 ? 개인하나(id) : null;
@@ -3751,7 +3935,7 @@ function 개인지우기조용히(id){
      ⚠ 구글 로그인이 안 돼 있으면 우리 쪽에만 둔다(그렇다고 말한다). 구글이 실패해도 우리 기록은 남는다.
      돌려주는 것: 구글로 보냈나(참/거짓) */
 function 내구글몸(item){
-  return { date:item.date, time:item.time || "", endTime:item.endTime || "", summary:item.title,
+  return { date:item.date, endDate:item.endDate || "", time:item.time || "", endTime:item.endTime || "", summary:item.title,
     location:item.place || "", description:[item.contact ? "담당자: " + item.contact : "", item.note || ""].filter(Boolean).join("\n"),
     visibility:"private", source:{ kind:"cal_private", id:item.id } };
 }
@@ -3808,7 +3992,7 @@ function 구글에넣기(m){
   if(사람) 설명.push("푸른 담당: " + 사람 + (/^[A-Z]-\d{3}$/.test(String(m.sid||"")) ? " (" + m.sid + ")" : ""));
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
-    date: m.date, time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
+    date: m.date, endDate: String(m.endDate||""), time: String(m.time||""), endTime: String(m.endTime||""), summary: String(m.title).trim(),
     location: String(m.place||"").trim(), description: 설명.join("\n"), puSid: String(m.sid||""),
     source: (m.card && m.card.k) ? { kind:"card", id:m.card.k } : null
   }).then(function(){
@@ -3827,10 +4011,28 @@ function 구글에넣기(m){
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
 function modalRead(){
   var m = S.modal; if(!m) return;
+  var 옛시작 = m.date, 옛끝 = m.endDate || m.date, 옛시각 = m.time, 옛끝시각 = m.endTime;
   ["kind","date","endDate","sid","type","title","note","hours","time","endTime","place","contact","vis"].forEach(function(f){
     var el = document.querySelector("[data-m='"+f+"']");
     if(el) m[f] = el.value;
   });
+  /* 구글처럼 — 시작 날을 옮기면 «하루짜리였던» 끝나는 날도 따라가고, 끝이 시작보다 앞서면 시작에 맞춘다 */
+  if(m.date){
+    var 시작바뀜 = m.date !== 옛시작;
+    if(시작바뀜 && 옛끝 > 옛시작 && m.endDate === 옛끝){
+      /* 여러 날이었으면 «길이»를 지켜 끝도 같이 옮긴다(구글) */
+      var 길이 = Math.round((Date.parse(옛끝 + "T00:00:00Z") - Date.parse(옛시작 + "T00:00:00Z")) / 86400000);
+      m.endDate = shiftDay(m.date, 길이);
+    } else if(!m.endDate || m.endDate < m.date || (시작바뀜 && 옛끝 === 옛시작)){
+      m.endDate = m.date;                 /* 하루짜리는 끝도 따라가고, 끝이 시작보다 앞서면 시작에 맞춘다 */
+    }
+  }
+  /* 시작 시각을 옮기면 끝 시각도 «같은 길이»만큼 따라간다(구글). 끝을 직접 고친 때는 건드리지 않는다 */
+  function 분(hm){ var x = /^(\d{2}):(\d{2})$/.exec(String(hm || "")); return x ? +x[1] * 60 + +x[2] : -1; }
+  if(m.timed && 옛시각 && m.time && m.time !== 옛시각 && m.endTime && m.endTime === 옛끝시각 && 분(옛끝시각) > 분(옛시각)){
+    var 끝분 = Math.min(1439, 분(m.time) + (분(옛끝시각) - 분(옛시각)));
+    m.endTime = ("0" + Math.floor(끝분 / 60)).slice(-2) + ":" + ("0" + (끝분 % 60)).slice(-2);
+  }
 }
 
 function doSave(){
@@ -3842,7 +4044,7 @@ function doSave(){
   if(일정 && !String(m.title||"").trim()){ m.err = "무슨 일인지 적어 주세요"; render(); return; }
   /* 시작 ~ 끝: 끝만 적고 시작이 없으면 묻는다, 끝이 비면 한 시간 뒤, 끝이 시작보다 이르면 막는다 */
   /* 구글 일정의 끝나는 날 — 시작보다 앞이면 막는다. 뒤면 «여러 날»: 끝 시각이 시작보다 일러도 된다(다른 날이다) */
-  var 여러날 = m.store === "gcal" && /^\d{4}-\d{2}-\d{2}$/.test(String(m.endDate||"")) && m.endDate !== m.date;
+  var 여러날 = 일정 && /^\d{4}-\d{2}-\d{2}$/.test(String(m.endDate||"")) && m.endDate !== m.date;
   if(여러날 && m.endDate < m.date){ m.err = "끝나는 날이 시작보다 앞입니다"; render(); return; }
   if(일정 && 여러날){
     var 꼴 = /^\d{2}:\d{2}$/;
@@ -3871,6 +4073,7 @@ function doSave(){
   var item = { id:id, date:m.date, sid:m.sid, note:String(m.note||"") };
   if(일정){
     item.title = String(m.title).trim();
+    if(여러날 || (prev && prev.endDate)) item.endDate = 여러날 ? m.endDate : "";
     item.time = String(m.time||"");
     item.endTime = String(m.endTime||"");
     item.place = String(m.place||"").trim();
@@ -4164,11 +4367,19 @@ function render(){
   $('app').innerHTML = html;
   지도그리기();
   끌기손잡이();   /* 판이 새로 그려져도 손잡이는 한 번만 달린다 */
+  /* 「일정」 보기에 들어오면 «오늘»이 보이게 내려 놓는다(구글은 오늘에서 시작한다). 한 번만 — 그 뒤 손으로 굴린 것은 건드리지 않는다 */
+  if(S.schedScroll){
+    S.schedScroll = false;
+    try{
+      var 리스트 = document.querySelector('.slist'), 오늘칸 = document.querySelector('.sday.today');
+      if(리스트 && 오늘칸) 리스트.scrollTop = Math.max(0, 오늘칸.offsetTop - 리스트.offsetTop - 4);
+    }catch(_){}
+  }
   /* 달력 탭에서만 화면에 «딱» 맞춘다 — 다른 탭은 여느 때처럼 제 안에서 굴러간다 */
   $('app').className = 달력 ? 'fit' : '';
   /* 폰 달력 — 맨 위 머리줄을 숨기고 위젯 꼴 머리(폰머리Html)를 쓴다. ☰ 로 머리줄을 편다 */
   try{
-    var 폰달력 = 달력 && S.view === "month" && 폰();
+    var 폰달력 = 달력 && 폰();                       /* 2026-10-11 — 월만이 아니라 일정·주·일 도 폰 머리 */
     document.body.classList.toggle("mob", 폰달력);
     document.body.classList.toggle("mobmenu", 폰달력 && !!S.mobMenu);
   }catch(_){}
@@ -4271,7 +4482,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4326,12 +4537,12 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-mv')){
     S.sheet = false;
     var mv = +t.getAttribute('data-mv');
-    if(mv===0){ S.ym = ymOf(new Date()); S.date = todayYMD(); }
+    if(mv===0){ S.ym = ymOf(new Date()); S.date = todayYMD(); if(S.view === 'sched') S.schedScroll = true; }
     else if(S.tab==='eumppl' && S.scope==='year'){
       var y=new Date(S.ym+'-01'); y.setFullYear(y.getFullYear()+mv); S.ym = ymOf(y);
     }
     /* 달력에서는 보기에 따라 옮기는 폭이 다르다 — 월은 한 달, 주는 이레, 일은 하루 */
-    else if((S.tab==='cal'||S.tab==='eumcal') && S.view!=='month'){
+    else if((S.tab==='cal'||S.tab==='eumcal') && S.view!=='month' && S.view!=='sched'){
       S.date = shiftDay(S.date, S.view==='week' ? mv*7 : mv);
       S.ym = S.date.slice(0,7);
     }
@@ -4344,7 +4555,10 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-gcalretry')){ gcalLoad(true); return; }
   /* ＋ — 폰에서 넣는 «유일한» 길이다. 보고 있는(고른) 날에 넣는다 — 구글과 같다.
      ⚠ 예전엔 언제나 «오늘»이었다. 다음 달을 펴 놓고 ＋ 를 누르면 오늘 것이 생겼다. */
-  if(t.hasAttribute('data-mnew')){ openNew(폰() && S.view === 'month' ? (S.sheet && S.pick ? S.pick : 고른날()) : todayYMD()); return; }
+  if(t.hasAttribute('data-mnew')){
+    openNew(폰() && S.view === 'month' ? (S.sheet && S.pick ? S.pick : 고른날())
+      : (폰() && (S.view === 'week' || S.view === 'day') ? S.date : todayYMD())); return;
+  }
   if(t.hasAttribute('data-gone')){
     S.showGone = !S.showGone;
     try{ localStorage.setItem("pu_cal_gone", S.showGone ? "1" : ""); }catch(_){}
@@ -4365,11 +4579,20 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-mmenu')){ S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
+  if(t.hasAttribute('data-vmenu')){ S.vmenu = !S.vmenu; render(); return; }
+  if(t.hasAttribute('data-vclose')){ S.vmenu = false; render(); return; }
   if(t.hasAttribute('data-view')){
+    var 이전보기 = S.view;
     S.view = t.getAttribute('data-view');
+    S.vmenu = false; S.sheet = false;
+    if(S.view === 'sched' && 이전보기 !== 'sched') S.schedScroll = true;
     if(!S.date) S.date = todayYMD();
-    /* 주·일에서 월로 돌아오면 «보고 있던 날»의 달을 편다 — 엉뚱한 달로 튀지 않게 */
-    if(S.view==='month') S.ym = S.date.slice(0,7);
+    /* 주·일에서 월(일정)로 돌아오면 «보고 있던 날»의 달을 편다 — 엉뚱한 달로 튀지 않게 */
+    if(S.view==='month' || S.view==='sched'){
+      if(이전보기==='week' || 이전보기==='day') S.ym = S.date.slice(0,7);
+    }
+    /* 월·일정에서 주·일로 갈 때는 «보는 달 안의 날»에서 시작한다(오늘이 그 달이면 오늘, 아니면 1일) */
+    else if(S.date.slice(0,7) !== S.ym) S.date = todayYMD().slice(0,7) === S.ym ? todayYMD() : S.ym + "-01";
     render(); return;
   }
   if(t.hasAttribute('data-scope')){ S.scope = t.getAttribute('data-scope'); render(); return; }
@@ -4479,6 +4702,7 @@ document.addEventListener('click', function(e){
        폰에서 넣는 길은 ＋ 하나다 — 고른 날에 넣는다. */
   if(t.hasAttribute('data-day')){
     var 날짜 = t.getAttribute('data-day');
+    if(S.view === 'sched') return;           /* 일정 보기의 빈 자리는 아무 일도 없다(구글처럼) — 넣기는 ＋ */
     if(폰() && S.view === 'month'){ S.pick = 날짜; S.sheet = true; render(); return; }
     openNew(날짜); return;
   }
@@ -4548,7 +4772,8 @@ document.addEventListener('change', function(e){
 document.addEventListener('change', function(e){
   if(!S.modal || !e.target || !e.target.hasAttribute || !e.target.hasAttribute('data-m')) return;
   var f = e.target.getAttribute('data-m');
-  if(f !== 'type' && f !== 'kind') return;
+  /* 날짜·시간은 «글자»로 보여 주므로(날짜글·시각글), 고르고 나면 다시 그려 글자를 맞춘다(2026-10-10) */
+  if(f !== 'type' && f !== 'kind' && f !== 'date' && f !== 'endDate' && f !== 'time' && f !== 'endTime') return;
   modalRead(); render();
 });
 /* ESC 로 창을 닫는다 — 뒤로가기 층과 다투지 않게 여기서만 받는다 */

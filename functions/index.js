@@ -53,6 +53,7 @@ const TypeSafeEvaluate = require("./typesafe-evaluate");
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
+const RecruitDigest = require("./recruit-digest");
 const RehabWatch = require("./rehab-watch");
 
 if (!getApps().length) initializeApp();
@@ -1094,12 +1095,39 @@ function 모집다른길(u, raw, 넘김) {
     req.on("error", no);
   });
 }
+/* ═══ 아침 새 글 요약 메일 (대표 「2단계」 2026-10-11) ═══
+   글 짓기는 functions/recruit-digest.js(순수). 여기는 «보내는 길»만 — 뉴스레터 금요일 검토 메일(뉴스레터메일)과 같은 길이다.
+   ⚠ 절대 던지지 않는다 — 메일이 죽어도 감시 결과(gov_watch/hits)는 이미 적혔다. 돌려주는 값은 한 줄 기록용.
+   ⚠ 끄기: gov_watch/config/mail = false · 받는 주소: gov_watch/config/mailTo (한 개, 올바른 주소만 — 아니면 기본 대표 주소).
+   ⚠ 새 글이 없으면 보내지 않는다. 같은 글은 다음 날 «새 글»이 아니므로 두 번 가지 않는다(hits 에 이미 있다). */
+async function 모집요약보내기(root, hits, today) {
+  try {
+    const 설정 = (await root.child("config").once("value")).val() || {};
+    if (설정.mail === false) return { 상태: "꺼짐", 때: Date.now() };
+    const 요약 = RecruitDigest.build({ hits, today });
+    if (!요약) return { 상태: "새 글 없음", 때: Date.now() };
+    const to = RecruitDigest.validTo(설정.mailTo) || RecruitDigest.DEFAULT_TO;
+    const MBhere = require("./mail-bulk");
+    const 계정주소 = await mailUserAsync();
+    const 뉴스설정 = (await getDatabase().ref("newsletter/config").once("value")).val() || {};
+    const from = MBhere.보내는주소고르기(뉴스설정.보내는주소, 계정주소);
+    const r = await MD.deliver({ db: getDatabase(), body: { to: [to], subject: 요약.subject, body: 요약.body, html: 요약.html },
+      from, pass: mailPass(from), envId: process.env.DAUM_MAIL_ID, byEmail: "컨설턴트 모집 감시",
+      deps: { getStorage: getStorage }, uid: "" });
+    if (r && r.ok) return { 상태: "보냄", 건수: 요약.count, 때: Date.now() };
+    return { 상태: "못 보냄", 까닭: String((r && r.error) || "알 수 없음").slice(0, 200), 건수: 요약.count, 때: Date.now() };
+  } catch (e) {
+    return { 상태: "못 보냄", 까닭: String((e && e.message) || e).slice(0, 200), 때: Date.now() };
+  }
+}
 exports.recruitWatch = functions
   .region(MAIL_REGION)
   /* ILABOR_ID·ILABOR_PW — 공인노무사회 «회원 공지»를 읽으려고 뉴스레터의 로그인 비밀값을 빌린다(2026-10-04).
      코드는 값을 못 본다. 로그인은 하루 한 번, 읽기만 한다. */
   /* GEMINI_KEY — 공인노무사회 공문(그림)의 마감일을 읽으려고(2026-10-09). 하루 6건까지 · readDoc 과 같은 달 한도 */
-  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY"] })
+  /* DAUM_MAIL_PASSWORD·GOOGLE_MAIL_PASSWORD — 새 글이 있는 날 «아침 요약 메일»을 보내려고(2026-10-11, 대표 「2단계」).
+     뉴스레터 금요일 검토 메일과 같은 비밀값·같은 길(모집요약보내기 → MD.deliver). 새 글이 없으면 보내지 않는다. */
+  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
   .pubsub.schedule("every day 07:20")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1158,6 +1186,9 @@ exports.recruitWatch = functions
     };
     const result = await RecruitWatch.run({ existing, today, nowIso, fetchText, details: true, ai });   // 새 글 본문을 열어 접수 기간까지
     await root.update(RecruitWatch.updatesOf(result, existing, nowIso, { fails, today }));
+    /* 새 글이 있으면 아침 요약 메일 — 결과는 gov_watch/last/mail 에 한 줄(보냄·안 보냄·까닭). 실패해도 감시는 멈추지 않는다 */
+    const 메일결과 = await 모집요약보내기(root, result.hits, today);
+    await root.child("last/mail").set(메일결과).catch((e) => console.warn("[컨설턴트 모집 감시] 메일 기록 못 남김", String(e && e.message || e)));
     /* 처음 한 번만 — 회원 공지에 모집 공문이 정말 오는지 다섯 쪽을 훑어 남긴다(대표 확인용, 관리자만 읽힌다).
        ⚠ 로그인이 안 됐으면 남기지 않는다 — 다음 날 다시 해 본다. */
     try {
@@ -1189,6 +1220,8 @@ exports.recruitWatch = functions
    ★ 검색은 서버에 «이미 있는» 열쇠(KAKAO_REST_KEY — 카카오 로그인용)로 다음 웹검색·카카오맵 업체검색을 부른다.
      새로 신청할 것이 없다. 네이버 열쇠는 서버에 없다(대표 결정 「가입 안 하고 진행 안 한다」). */
 const RehabContact = require("./rehab-contact");
+const RehabMatch = require("./rehab-match");
+const RehabAutoMail = require("./rehab-automail");
 
 function rehabProviders() {
   const key = process.env.KAKAO_REST_KEY;
@@ -1217,6 +1250,87 @@ async function rehabPool(list, limit, deadline, worker) {
   };
   await Promise.all(Array.from({ length: limit }, loop));
 }
+
+/* ── 회생광고 자동 메일 — 거래 관계가 있는 곳에만 (functions/rehab-automail.js 머리말) ──
+   rehab_ad/auto/settings  { enabled, dailyCap }   ← rehabAuto 가 적는다(관리자). 기본값은 꺼짐.
+   rehab_ad/auto/optout    { <메일열쇠>: {at, by} } ← 수신거부 명단
+   rehab_ad/auto/sent      { <공고번호>: {email, at, queueId} } ← 걸었다는 기록(두 번 안 보내려고)
+   rehab_ad/auto/preview   { at, enabled, cap, sentToday, items:[…], skipped:[…] } ← 화면이 보여 주는 «보낼 곳»
+   걸린 메일은 pucards/scheduled 에 들어가 sendScheduledMail 이 15분 안에 보낸다. */
+async function rehabAutoRun(db, nowMs, opts) {
+  const root = db.ref("rehab_ad");
+  const [setSnap, optSnap, sentSnap, noticeSnap, markSnap, comp, cont, idxSnap] = await Promise.all([
+    root.child("auto/settings").once("value"), root.child("auto/optout").once("value"), root.child("auto/sent").once("value"),
+    root.child("notices").once("value"), root.child("marks").once("value"),
+    db.ref("data/companies/v").once("value"), db.ref("data/contracts/v").once("value"), db.ref("pucards/idx").once("value"),
+  ]);
+  const settings = RehabAutoMail.cleanSettings(setSnap.val());
+  const index = RehabMatch.buildIndex({ erpCompanies: comp.val(), erpContracts: cont.val(), cardsIdx: idxSnap.val() });
+  const p = RehabAutoMail.plan({ nowMs, settings, notices: noticeSnap.val() || {}, marks: markSnap.val() || {}, index,
+    sent: sentSnap.val() || {}, optout: optSnap.val() || {} });
+  const queueNow = !!(opts && opts.queue) && settings.enabled;
+  const sendAt = RehabAutoMail.nextSendAt(nowMs);
+  const queued = [];
+  const upd = {};
+  if (queueNow) {
+    p.toSend.forEach((c) => {
+      const qid = "rehab-" + c.id + "-" + nowMs.toString(36);
+      upd["pucards/scheduled/" + qid] = RehabAutoMail.queueRow(c, nowMs, sendAt);
+      upd["rehab_ad/auto/sent/" + c.id] = { email: c.email, at: nowMs, queueId: qid, sendAt, name: c.name };
+      queued.push(c.id);
+    });
+  }
+  upd["rehab_ad/auto/preview"] = {
+    at: nowMs, enabled: settings.enabled, cap: p.cap, sentToday: p.sentToday + queued.length, queued: queued.length,
+    items: p.candidates.slice(0, 40).map((c) => ({ id: c.id, name: c.name, email: c.email, ceo: c.ceo, willSend: queueNow ? queued.indexOf(c.id) >= 0 : false })),
+    skipped: p.skipped.slice(0, 40),
+  };
+  await db.ref().update(upd);
+  return { enabled: settings.enabled, candidates: p.candidates.length, queued: queued.length, skipped: p.skipped.length };
+}
+
+exports.rehabAuto = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    res.set("Access-Control-Allow-Origin", "*");
+    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ error: "POST 요청만 허용됩니다." }); return; }
+    try {
+      const m = /^Bearer (.+)$/.exec(req.headers.authorization || "");
+      if (!m) { res.status(401).json({ error: "로그인이 필요합니다." }); return; }
+      const decoded = await getAuth().verifyIdToken(m[1], true);
+      const db = getDatabase();
+      const role = (await db.ref("uid_roles/" + decoded.uid).once("value")).val() || {};
+      if (role.isAdmin !== true) { res.status(403).json({ error: "총괄관리자만 부를 수 있습니다." }); return; }
+      const body = req.body || {};
+      const action = String(body.action || "get");
+      const root = db.ref("rehab_ad");
+      if (action === "set") {
+        const next = RehabAutoMail.cleanSettings({ enabled: body.enabled === true, dailyCap: body.dailyCap });
+        await root.child("auto/settings").set(Object.assign({}, next, { by: decoded.email || decoded.uid, at: Date.now() }));
+      } else if (action === "optout") {
+        const email = String(body.email || "").trim().toLowerCase();
+        if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/.test(email)) { res.status(400).json({ error: "메일 주소 모양이 아닙니다." }); return; }
+        await root.child("auto/optout/" + RehabAutoMail.emailKey(email)).set({ email, at: Date.now(), by: decoded.email || decoded.uid });
+      } else if (action === "optout-remove") {
+        const email = String(body.email || "").trim().toLowerCase();
+        await root.child("auto/optout/" + RehabAutoMail.emailKey(email)).remove();
+      }
+      /* 어떤 일을 했든 «미리보기»는 새로 계산한다 — 걸지는 않는다(queue 없음) */
+      const sum = await rehabAutoRun(db, Date.now(), { queue: false });
+      const [setSnap, optSnap, prevSnap, sentSnap] = await Promise.all([
+        root.child("auto/settings").once("value"), root.child("auto/optout").once("value"),
+        root.child("auto/preview").once("value"), root.child("auto/sent").limitToLast(30).once("value"),
+      ]);
+      res.json({ ok: true, settings: RehabAutoMail.cleanSettings(setSnap.val()), optout: Object.keys(optSnap.val() || {}).map((k) => (optSnap.val()[k] || {}).email || k),
+        preview: prevSnap.val() || null, recent: sentSnap.val() || {}, summary: sum });
+    } catch (err) {
+      console.error("[rehabAuto]", err);
+      res.status(500).json({ error: String((err && err.message) || "처리하지 못했습니다.").slice(0, 160) });
+    }
+  });
 
 exports.rehabWatch = functions
   .region(MAIL_REGION)
@@ -1251,7 +1365,8 @@ exports.rehabWatch = functions
       const week = 7 * 864e5;
       const all = Object.keys(existing).map((k) => existing[k]).concat(result.added).filter((n) => n && n.id && !n._deleted);
       const todo = all.filter((n) => { const x = info[n.id]; return !x || (x.status === "none" && nowMs - (x.checkedAt || 0) > week)
-          || (rehabSearchRefused(x) && nowMs - (x.checkedAt || 0) > 864e5); })   // 한쪽이 거절해 일부만 남은 곳은 하루 뒤 다시
+          || (rehabSearchRefused(x) && nowMs - (x.checkedAt || 0) > 864e5)
+          || (x.homepage && RehabContact.looksLikePost(x.homepage)); })   // 게시판 글을 홈페이지로 잘못 담은 곳은 다시   // 한쪽이 거절해 일부만 남은 곳은 하루 뒤 다시
         .sort((a, b) => String(b.noticeDate).localeCompare(String(a.noticeDate)));
       await rehabPool(todo, 3, t0 + 470 * 1000, async (n) => {
         if (refused >= 3 && !found) return;   // 검색 서비스가 계속 거절하면 그만 둔다
@@ -1267,6 +1382,9 @@ exports.rehabWatch = functions
       upd["runs/" + today].contactNote = "검색 열쇠(KAKAO_REST_KEY)가 서버에 없어 연락처를 찾지 않았습니다";
     }
     await root.update(upd);
+    /* 자동 메일 — 꺼져 있으면(기본) 미리보기만 남긴다. 실패해도 수집은 이미 끝났다. */
+    try { const au = await rehabAutoRun(getDatabase(), Date.now(), { queue: true }); console.log("[회생광고 자동메일]", au); }
+    catch (e) { console.warn("[회생광고 자동메일]", String((e && e.message) || e).slice(0, 160)); }
     console.log("[회생광고 수집]", { checked: result.checked, found: result.found, added: result.added.length,
       updated: Object.keys(result.eventUpdates).length, contact: upd["runs/" + today].contact, errors: result.errors });
     return null;

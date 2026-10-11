@@ -140,6 +140,12 @@ function 함수(이름) {
   const j = HTML.indexOf('\n}\n', i);
   return HTML.slice(i + 1, j + 2);
 }
+/* 여러 줄짜리 var 이름 = { … }; 한 덩이(2026-10-10 상세 창의 선 아이콘 사전) */
+function 블록(이름) {
+  const i = HTML.indexOf('\nvar ' + 이름 + ' = {');
+  assert.ok(i >= 0, 'pu-cal.html 에 var ' + 이름 + ' 이 없습니다');
+  return HTML.slice(i + 1, HTML.indexOf('\n};', i) + 3) + '\n';
+}
 function 변수(이름) {
   const m = new RegExp('\\nvar ' + 이름 + ' = [^\\n]*\\n').exec(HTML);
   assert.ok(m, 'pu-cal.html 에 var ' + 이름 + ' 이 없습니다');
@@ -177,8 +183,9 @@ function 상자(opt) {
   };
   ctx.render = () => { ctx.renders++; };
   vm.createContext(ctx);
-  const 코드 = [변수('RECRUIT'), 변수('_모집칩'), 함수('보이는범위'), 함수('모집칩'), 함수('모집받기'),
-    함수('eventsOn'), 함수('passFilter'), 함수('층상세'), 함수('detailHtml'), 함수('긴날짜'), 함수('시분')].join('\n');
+  const 코드 = [변수('RECRUIT'), 변수('_모집칩'), 블록('GIC'), 블록('행그림'), 함수('보이는범위'), 함수('모집칩'), 함수('모집받기'),
+    함수('eventsOn'), 함수('passFilter'), 함수('층상세'), 함수('detailHtml'), 함수('긴날짜'), 함수('시분'),
+    함수('날짜글'), 함수('시각글'), 함수('선아이콘'), 함수('행아이콘'), 함수('도구단추')].join('\n');
   vm.runInContext(코드, ctx);
   return { ctx, 읽은곳, 쓴곳 };
 }
@@ -245,7 +252,7 @@ test('⑦-2★ 같은 날 두 기관 — 상세 창이 «제 기관»을 연다(
   assert.match(상세.title, /소상공인/);
   ctx.S.detail = 상세;
   const html = ctx.detailHtml();
-  assert.match(html, /<a class="btn ghost" href="https:\/\/example\.org\/semas" target="_blank" rel="noopener">🔗 공지 열기<\/a>/,
+  assert.match(html, /<a href="https:\/\/example\.org\/semas" target="_blank" rel="noopener">🔗 공지 열기<\/a>/,
     '★ 상세 창에 공지 링크가 없습니다');
   /* 링크 없는 기관은 단추를 안 그린다 */
   ctx.S.detail = Object.assign({}, 상세, { link: '' });
