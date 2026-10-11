@@ -303,6 +303,17 @@
     return X.fieldKeyOf(slot.text);
   }
 
+  /* 같은 표·같은 열에서 이 칸 «바로 아래»로 이어지는 빈 칸 줄 수 */
+  function 아래빈줄(slots, s) {
+    var n = 0, r = s.row + 1;
+    for (;;) {
+      var t = slots.filter(function (x) { return x.tbl === s.tbl && x.col === s.col && x.row === r && x.kind === '빈칸' && !x.up && !x.left; })[0];
+      if (!t) break;
+      n++; r++;
+    }
+    return n;
+  }
+
   /* ── 짝 맞추기 ──
      모르면 «모른다»고 남긴다. 지어내면 엉뚱한 자리에 값이 박히고,
      그건 안 채운 것보다 나쁘다 — 잘못 낸 서류는 되돌릴 수 없다.
@@ -340,6 +351,10 @@
             : s.kind === '칸안라벨' ? '__incell'
             : (X.fieldKeyOf(s.left) || X.fieldKeyOf(s.up));
       if (k === 'rrn') { s.guess = ''; s.hint = 'rrn'; return; }
+      /* ★ 위 «머리글»로만 짚은 칸이 아래로 빈 줄이 «둘 이상» 이어지면 목록 표의 몸통이다 (2026-10-11).
+         강의경력 표 머리글 「기관명」 → 소속 으로 읽혀 첫 칸에 「푸른노무법인」이 박혔다.
+         인적사항 가로 표(머리글 한 줄 + 값 한 줄)는 그대로 — 아래로 빈 줄이 이어지지 않는다. */
+      if (k && !s.left && s.up && s.kind === '빈칸' && 아래빈줄(map.slots, s) >= 2) { s.guess = ''; return; }
       s.guess = k || '';
     });
     map.lists.forEach(function (l) { l.guess = l.kind; });
