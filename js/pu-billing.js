@@ -175,7 +175,9 @@
     var over = done.filter(function (d) { return (num(d.parts.etc) || 0) >= ETC_DAY_WON; });
     if (over.length < ETC_MIN_DAYS) return null;
     var etcSum = 0, totSum = 0;
-    done.forEach(function (d) { etcSum += num(d.parts.etc) || 0; if (d.known.total) totSum += num(d.total) || 0; });
+    /* 이레치 합도 깎기 전 값으로 — 자정을 넘겨 늦게 온 칸(어제 +, 오늘 −)이 서로 지워진다 */
+    done.forEach(function (d) { etcSum += (typeof d.etcRaw === 'number') ? d.etcRaw : (num(d.parts.etc) || 0); if (d.known.total) totSum += num(d.total) || 0; });
+    if (etcSum < 0) etcSum = 0;
     return { days: over.length, of: done.length, perDay: Math.round(etcSum / done.length),
              share: totSum > 0 ? Math.round(etcSum / totSum * 100) : null };
   }
@@ -371,8 +373,12 @@
         PARTS.forEach(function (k) { if (row.known[k]) { s += row.parts[k] || 0; anyPart = true; } });
         row.parts.etc = Math.max(0, row.total - s);
         row.known.etc = anyPart || s === 0;
+        /* 깎기 «전» 값도 남긴다 (2026-10-11 대표 「비용이 너무 많이 증가」) — 날·합계·시간당은 이것을 더한다.
+           ⚠ 시간마다 깎은 값을 더하면 «전체가 먼저 온 시간»의 플러스만 남고, 칸이 뒤늦게 온 시간의
+             마이너스는 0 으로 사라져 하루 「그 밖」이 부풀었다 — 실제 하루 ₩100~400 이 ₩1,130 으로 보였다. */
+        row.etcRaw = row.total - s;
       } else {
-        row.parts.etc = null; row.known.etc = false;
+        row.parts.etc = null; row.known.etc = false; row.etcRaw = null;
       }
       out.push(row);
     });
@@ -405,9 +411,12 @@
       PARTS.concat('etc').forEach(function (k) {
         if (b.known && b.known[k]) { row.parts[k] += (num(b.parts[k]) || 0); row.known[k] = true; }
       });
+      if (b.known && b.known.etc && num(b.etcRaw) !== null) { row.etcRaw = (row.etcRaw || 0) + num(b.etcRaw); }
       /* 그 날 «마지막으로 아는» 누적액. 칸이 시간 오름차순이라 덮어쓰면 그것이 마지막이다. */
       if (b.cumKnown) { row.cum = b.cum; row.cumKnown = true; }
     });
+    /* 날의 「그 밖」 = 그 날 전체 − 그 날 쪼갠 것 합 (깎기 전 시간 값을 이어 붙인 것). 마이너스만 0 으로. */
+    order.forEach(function (d) { var r = byDay[d]; if (r.known.etc && typeof r.etcRaw === 'number') r.parts.etc = Math.max(0, r.etcRaw); });
     return order.map(function (d) { return byDay[d]; });
   }
 
@@ -434,6 +443,7 @@
       KEYS.forEach(function (k) {
         if (b.known && b.known[k]) { res.parts[k] += (num((b.parts || {})[k]) || 0); res.known[k] = true; }
       });
+      if (b.known && b.known.etc && num(b.etcRaw) !== null) { res._raw = (res._raw || 0) + num(b.etcRaw); res._rawN = (res._rawN || 0) + 1; }
       /* 가장 «나중» 누적액을 남긴다. 넘겨받는 차례가 오름차순일 수도, 내림차순일 수도
          있으므로 날짜·시각 열쇠로 견준다(줄 차례에 기대지 않는다). */
       if (b.cumKnown) {
@@ -441,7 +451,9 @@
         if (!res.cumKnown || key >= res._at) { res.cum = b.cum; res.cumKnown = true; res._at = key; }
       }
     });
-    delete res._at;
+    /* 「그 밖」 합계도 깎기 전 값으로 — 모든 줄이 그 값을 가졌을 때만(옛 모양 줄이 섞이면 예전 셈 그대로) */
+    if (res._rawN && res._rawN === rows.filter(function (b) { return b && b.known && b.known.etc; }).length) res.parts.etc = Math.max(0, res._raw);
+    delete res._at; delete res._raw; delete res._rawN;
     return res;
   }
 
@@ -455,7 +467,7 @@
       if (!b || !b.known) return;
       KEYS.forEach(function (k) {
         if (!b.known[k]) return;
-        var v = (k === 'total') ? b.total : (b.parts || {})[k];
+        var v = (k === 'total') ? b.total : (k === 'etc' && num(b.etcRaw) !== null) ? b.etcRaw : (b.parts || {})[k];
         if (num(v) === null) return;
         sum[k] += num(v); cnt[k]++;
       });
@@ -465,6 +477,7 @@
     PARTS.concat(['etc']).forEach(function (k) {
       res.parts[k] = cnt[k] ? Math.round(sum[k] / cnt[k]) : null;
     });
+    if (res.parts.etc !== null && res.parts.etc < 0) res.parts.etc = 0;   // 깎기 전 값을 더해 마이너스면 0
     return res;
   }
 
