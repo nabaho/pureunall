@@ -55,7 +55,7 @@
   }
   function coName(c) { return String((c && c.debtorName) || '').replace(/\s+/g, ' ').trim(); }
 
-  /* 법인파산 공고(kind: 'bankruptcy') — 파산선고는 도산대지급금의 지급 사유다. 받는 곳은 파산관재인·대표이사(회사 본점 주소로 간다).
+  /* 법인파산 공고(kind: 'bankruptcy') — 파산선고는 도산대지급금의 지급 사유다. 받는 곳은 회생과 같이 «대표이사»(회사 본점 주소로 간다).
      ⚠ 바우처 비용(12만원)은 회생·사업정리 이야기라 파산 안내에는 싣지 않는다. [확인 필요: 파산 법인에 바우처가 닿는지] */
   function isBk(c) { return !!(c && c.kind === 'bankruptcy'); }
   var BK_SUBJECT = '[' + FIRM.name + '] 파산절차 중 근로자 임금(대지급금) 안내';
@@ -71,7 +71,7 @@
     var t = bkLines();
     return '<section class="letter">' +
       '<h1>파산절차 중 근로자 임금, 푸른노무법인이 도와드립니다</h1>' +
-      '<p class="to">' + esc(coName(c)) + ' 파산관재인 · 대표이사님 귀하</p>' +
+      '<p class="to">' + esc(coName(c)) + (c && c.ceoName ? ' ' + esc(c.ceoName) : '') + ' 대표이사님 귀하</p>' +
       '<p>안녕하십니까. ' + esc(FIRM.name) + '입니다. 법원 공고를 보고 파산절차 중 꼭 필요한 한 가지를 간단히 안내드립니다.</p>' +
       '<div class="big"><span class="no">1</span><div><b>' + esc(t.one) + '</b>' +
       '<div class="max">간이대지급금 최대 <b>' + LIMIT.simple + '</b> · 도산대지급금 최대 <b>' + LIMIT.insolvency + '</b></div>' +
@@ -89,8 +89,9 @@
   function plainBk(c, opts) {
     var t = bkLines();
     return [
-      coName(c) + ' 파산관재인 · ' + (opts && opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께', '',
+      coName(c) + ' ' + (opts && opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께', '',
       '안녕하십니까. ' + FIRM.name + '입니다.',
+      opts && opts.existing ? '평소 ' + FIRM.name + '과 거래해 주셔서 감사드립니다.' : '',
       '법원 공고를 보고 파산절차 중 꼭 필요한 한 가지를 간단히 안내드립니다.', '',
       '1. ' + t.one, '   ' + t.two, '   ' + t.three, '   ' + t.four, '',
       '문의·상담 — 공인노무사가 직접 답해 드립니다.',
@@ -165,6 +166,7 @@
   function buildAdMail(c, opts) {
     opts = opts || {};
     var text = buildPlainText(c, { ceo: opts.ceo, existing: true });
+    var subject = isBk(c) ? '(광고) ' + BK_SUBJECT : AD_SUBJECT;
     var foot = [
       '',
       '──────────',
@@ -172,13 +174,13 @@
       '수신을 원하지 않으시면 이 메일에 회신하여 「수신거부」라고 적어 주시거나 ' + OFFICES[0].tel + '(천안)로 연락 주십시오. 바로 중단하겠습니다.',
       '발신: ' + FIRM.name + ' · ' + FIRM.addr + ' · ' + FIRM.email
     ].join('\n');
-    return { subject: AD_SUBJECT, text: '(광고)\n\n' + text + foot };
+    return { subject: subject, text: '(광고)\n\n' + text + foot };
   }
   /* 푸른 메일 쓰기 창을 «주소줄로» 채울 때 쓰는 짧은 본문 — 주소줄이 길면(약 8KB) 서버가 거절한다.
      한글은 글자마다 9글자로 늘어나므로 본문을 600자 안팎으로 줄였다. 자세한 안내문은 PDF 로 저장해 첨부한다. */
   function buildMailBody(c, opts) {
     opts = opts || {};
-    if (isBk(c)) { var tb = bkLines(); return [coName(c) + ' 파산관재인 · 대표이사님께', '', '안녕하십니까. ' + FIRM.name + '입니다.', '법원 공고를 보고 안내드립니다.', '1. ' + tb.one, tb.two, '', '상담: ' + telLine() + ' / ' + FIRM.email, FIRM.name + ' ' + FIRM.rep, '※ 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'].join('\n'); }
+    if (isBk(c)) { var tb = bkLines(); return [coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께', '', '안녕하십니까. ' + FIRM.name + '입니다.', '법원 공고를 보고 안내드립니다.', '1. ' + tb.one, tb.two, '', '상담: ' + telLine() + ' / ' + FIRM.email, FIRM.name + ' ' + FIRM.rep, '※ 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'].join('\n'); }
     var share = shareWon();
     return [
       coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께',
