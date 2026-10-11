@@ -95,10 +95,34 @@ test('잇기는 사람이 누를 때 한 업체 한 칸만 — 후보는 보여 
   const s = cutFn('function FinanceAuto(');
   assert.doesNotMatch(s, /useEffect\([^)]*erpCmsLinkMember/, '열자마자 잇지 않는다');
 });
-test('되돌리기는 휴지통으로, 그 줄은 다시 자동 확정하지 않게 skip 에 적는다', () => {
+test('되돌리기는 재무 휴지통으로, 그 줄은 다시 자동 확정하지 않게 skip 에 적는다', () => {
   const b = cutFn('function erpCmsUndo(');
-  assert.match(b, /TrashBin\.remove\(\s*['"]finance_income/);
+  assert.match(b, /erpMoveIncomeToTrash\(/);
+  assert.doesNotMatch(b, /TrashBin\.remove\(/, '입금에 딱지만 붙이면 합계에 남는다(2026-10-11 A-10)');
   assert.match(b, /cms_pull\/skip\//);
+});
+test('A-10 — 입금은 재무 휴지통에 담고 입금 목록에서 «뺀다», 마감 달이면 손대지 않는다', () => {
+  const ctx = { Date, Math, String };
+  const store = { finance_income: [{ id: 'i1', companyName: '가나상사', amount: 220000, date: '2026-10-10', advisoryYm: '2026-10' }], trash_fin: [] };
+  let locked = [];
+  Object.assign(ctx, {
+    dbGet: (k, d) => (k in store ? store[k] : d),
+    dbSet: (k, v) => { store[k] = v; return true; },
+    dbRemove: (k, id) => { store[k] = store[k].filter((x) => x.id !== id); return true; },
+    trashKeyFor: () => 'trash_fin', isIncomeLocked: (ym) => locked.includes(ym), showToast: () => {},
+    CURRENT_USER: { sid: 'P-001' }, window: {},
+  });
+  vm.createContext(ctx);
+  vm.runInContext(cutFn('function erpMoveIncomeToTrash('), ctx);
+  locked = ['2026-10'];
+  assert.equal(ctx.erpMoveIncomeToTrash('i1', 'x'), false, '마감 달은 막는다');
+  assert.equal(store.finance_income.length, 1);
+  locked = [];
+  assert.equal(ctx.erpMoveIncomeToTrash('i1', 'CMS 자동 확정 되돌림'), true);
+  assert.equal(store.finance_income.length, 0, '입금 목록에서 빠져야 합계·미수에 안 남는다');
+  assert.equal(store.trash_fin.length, 1);
+  assert.equal(store.trash_fin[0].storeKey, 'finance_income');
+  assert.equal(store.trash_fin[0].item.id, 'i1', '휴지통에서 되살릴 수 있게 원본을 담는다');
 });
 test('스위치는 관리자 화면 안, 기본은 꺼짐', () => {
   const s = cutFn('function FinanceAuto(');
