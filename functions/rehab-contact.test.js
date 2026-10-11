@@ -220,3 +220,9 @@ test("㉒ 홈페이지를 열지 못하면 웹검색 홈페이지의 확신을 �
   const r = await C.lookup({ name: "주식회사 가나다", address: "서울 서초구 매헌로 16", providers, getPage });
   assert.equal(r.confidence, "low");
 });
+
+test("㉓ 정부·공공기관·기업정보 사이트는 회사 홈페이지가 아니다", () => {
+  assert.equal(C.classifyLink("https://opengov.seoul.go.kr/mediahub/23743992"), "dir");
+  assert.equal(C.classifyLink("https://www.theteams.kr/teams/385056"), "dir");
+  assert.equal(C.classifyLink("https://example-corp.co.kr/"), "site");
+});
