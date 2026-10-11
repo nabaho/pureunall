@@ -241,7 +241,7 @@ test('ⓙ 색은 「📦 세트」 머리글에만 — 세트 이름 줄·목록
 });
 
 test('ⓚ 왼쪽 메뉴 — 상위 머리글(서식 종류·세트) 접고 펴기 + 같은 칸 안 끌어 바꾸기 (대표 2026-10-11)', () => {
-  assert.match(SRC, /foldHead\('kinds', '📂 서식 종류'/); assert.match(SRC, /foldHead\('sets', '📦 세트', 'pcf-thset'/);
+  assert.doesNotMatch(SRC, /foldHead\('kinds'/, '「서식 종류」 머리글은 뺐다'); assert.match(SRC, /foldHead\('sets', '📦 세트', 'pcf-thset'/);
   assert.match(SRC, /'aria-expanded': f \? 'false' : 'true'/);
   assert.match(SRC, /function lsGet\(k\) \{ try \{ return w\.localStorage\.getItem\(k\); \} catch \(e\) \{ return null; \} \}/, '저장소가 막혀도 그려진다');
   assert.match(SRC, /dragSort\(kindRows, moveKind\);/, '서식 종류도 끌어서 차례를 바꾼다');
@@ -249,4 +249,13 @@ test('ⓚ 왼쪽 메뉴 — 상위 머리글(서식 종류·세트) 접고 펴�
   assert.match(SRC, /lsSet\('pcf-kind-order', JSON\.stringify\(ids\)\)/, '서식 종류 차례는 이 브라우저에만');
   const i = SRC.indexOf('function moveKind('), g = SRC.slice(i, SRC.indexOf('function drawTree()', i));
   assert.doesNotMatch(g, /db\.|\.set\(|changeForms|changeSets/, '새 저장 칸·거래 없음');
+});
+
+test('ⓛ 「📄 계약서 양식」 = 상위 탭 — 눌러서 아래 메뉴를 접고 펴기 (대표 2026-10-11)', () => {
+  const H = fs.readFileSync(path.join(__dirname, '..', 'docs-esign.html'), 'utf8').replace(/\r\n/g, '\n');
+  assert.match(H, /id="navForms" aria-expanded="true"[^>]*><span>📄 계약서 양식<\/span><i class="nav-chev"/);
+  assert.match(H, /if \(name === 'forms'\) \{ if \(paneFromHash\(\) === 'forms'\) \{ setFormsFold\(!formsFolded\(\)\); return; \} setFormsFold\(false\); \}/, '그 칸에서 다시 누르면 접고 펴며, 다른 칸에서 오면 펼친다');
+  const i = H.indexOf('function setFormsFold('), g = H.slice(i, H.indexOf('setFormsFold(formsFolded());', i));
+  assert.match(g, /localStorage\.setItem\('pcf-fold-forms'/); assert.match(g, /\$\('formsTree'\)[\s\S]*t\.hidden = !!f/);
+  assert.match(g, /catch \(e\) \{\}/, '저장소가 막혀도 동작');
 });

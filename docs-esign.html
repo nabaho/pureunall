@@ -38,6 +38,7 @@
   .shell{display:flex;align-items:flex-start}
   .side{width:240px;flex:none;position:sticky;top:0;max-height:100vh;min-height:calc(100vh - 56px);overflow-y:auto;padding:14px 8px 24px;background:#fff;border-right:1px solid #e2e8f0}
   .nav-tree{margin:2px 0 4px}
+  #navForms{display:flex;align-items:center;justify-content:space-between}.nav-chev{font-style:normal;font-size:11px;color:#64748b;margin-left:6px}
   .nav.soon{color:#64748b;cursor:default}.nav.soon:hover{background:none}
   .nav.soon i{font-style:normal;margin-left:auto;font-size:10.5px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;padding:0 7px}
   .nav{display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:none;border-radius:7px;padding:8px 10px;font-size:13px;color:#1e293b;cursor:pointer;font-family:inherit;white-space:nowrap}
@@ -113,7 +114,7 @@
   <!-- 집단체불 위임장은 «사건계약» 아래로 (대표 지시 2026-10-09 「사무관리서류에서 사건계약에 넣으면 된다」 — 「사건관리」 묶음은 없앴다).
        단추는 계약유형 나무(formsTree)의 사건계약 바로 아래에 js/pu-contract-forms.js 가 그린다(host.openEsign). 앱의 첫 칸은 계약서 양식 -->
   <div class="nav-grp">🗂 사무관리서류</div>
-  <button type="button" class="nav sub on" data-pane="forms">📄 계약서 양식</button>
+  <button type="button" class="nav sub on" data-pane="forms" id="navForms" aria-expanded="true" title="누르면 아래 메뉴를 접고 펼칩니다"><span>📄 계약서 양식</span><i class="nav-chev" aria-hidden="true">▾</i></button>
   <!-- 계약유형 6종 — 계약서 양식을 처음 열 때 js/pu-contract-forms.js 가 채운다 -->
   <div id="formsTree" class="nav-tree"></div>
   <!-- 서식집 — 노무사 검토(Phase 1) 전이라 누를 수 없다. data-pane 이 없어 칸 오가기에 끼지 않는다.
@@ -198,7 +199,7 @@
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=17"></script>
-<script src="js/pu-contract-forms.js?v=52"></script>
+<script src="js/pu-contract-forms.js?v=53"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -894,6 +895,13 @@ function openLibraryNav() {
     if (location.hash === '#lib') showPane('lib');
   });
 }
+function formsFolded() { try { return localStorage.getItem('pcf-fold-forms') === '1'; } catch (e) { return false; } }
+function setFormsFold(f) {
+  try { localStorage.setItem('pcf-fold-forms', f ? '1' : '0'); } catch (e) {}
+  var t = $('formsTree'), b = $('navForms'); if (t) t.hidden = !!f;
+  if (b) { b.setAttribute('aria-expanded', f ? 'false' : 'true'); var i = b.querySelector('.nav-chev'); if (i) i.textContent = f ? '▸' : '▾'; }
+}
+setFormsFold(formsFolded());
 document.querySelectorAll('.side .nav[data-pane]').forEach(function (b) { bindNav(b); });
 function bindNav(b) {
   b.addEventListener('click', function () {
@@ -902,6 +910,8 @@ function bindNav(b) {
        안 바뀐다 — 그런데도 새 걸음을 심으면, 뒤로가기가 «화면이 그대로인 채»
        popstate 만 일으켜 pu-back.js 가 앱을 나가 버린다(대표 제보). 그럴 땐 그냥
        다시 그린다 — 걸음을 심지 않는다. */
+    /* 📄 계약서 양식 = 상위 탭 — 이미 그 칸에서 다시 누르면 아래 메뉴(종류·종료 서식·세트)를 접고 펼친다. 다른 칸에서 오면 펼쳐서 연다 (대표 2026-10-11) */
+    if (name === 'forms') { if (paneFromHash() === 'forms') { setFormsFold(!formsFolded()); return; } setFormsFold(false); }
     if (paneFromHash() === name) { showPane(name); return; }
     var want = name === 'forms' ? '' : '#' + name;
     if (location.hash !== want) history.pushState(null, '', want || (location.pathname + location.search));
