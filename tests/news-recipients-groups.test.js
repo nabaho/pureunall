@@ -132,7 +132,8 @@ test('⑥ 화면 — 탭 둘이 서고, render 가 그린다', () => {
 });
 
 test('⑥ 디자인 — 작은 탭은 밑줄, 거르개에 그림문자 없음, 내보내기 하나', () => {
-  const css = /\.subtabs button\{([^}]*)\}/.exec(화면);
+  /* 2026-10-11 — 탭 모양은 «탭 단추에만» 입힌다(.mini·.btn 은 제 모양을 지킨다) */
+  const css = /\.subtabs button(?::not\(\.mini\):not\(\.btn\))?\{([^}]*)\}/.exec(화면);
   assert.ok(css && /border-bottom:2px solid/.test(css[1]) && !/border-radius:99px/.test(css[1]),
     '작은 탭이 다시 알약이다 — 거르개와 헷갈린다');
   const 명 = 함('명단화면');
