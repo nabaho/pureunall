@@ -338,19 +338,25 @@
      색이 서른다섯 가지라 줄로 나열하지 않고 격자로 둔다 — 줄로 두면 창이 길어진다. */
   /* ── 일정 상세 창 (2026-09-27) ──
      구글 달력의 상세 창 꼴 — 색 띄 · 제목 · 언제 · 줄줄이 항목 · 아래 단추. */
-  .modal.det{padding:0;overflow:hidden}
-  .dbar{height:5px}
-  .dtop{padding:13px 16px 4px;display:flex;gap:9px;align-items:flex-start}
-  .ddot{width:13px;height:13px;border-radius:3px;flex-shrink:0;margin-top:4px}
-  .dttl{font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
-  .dwhen{font-size:12.5px;color:var(--gsub);margin-top:2px}
-  .drows{padding:6px 16px 10px}
-  .drow{display:flex;gap:10px;font-size:12.5px;padding:4px 0;align-items:flex-start}
-  .drow .di{width:16px;text-align:center;color:var(--gsub);flex-shrink:0}
-  /* ⚠ 긴 설명이 창을 밀어 넘지지 않게 — 긴 영문 주소 한 줄이 들어오기도 한다 */
+  /* ★ 일정 상세 창 — 구글 캘린더 «일정 팝업» 꼴 (대표 지시 2026-10-10 「모든 것 똑같이」).
+       위에 아이콘 줄(고치기·지우기·동선·구글에서 열기·닫기) · 색 네모 + 제목 22px · 「10월 14일 (수) ⋅ 오후 2:00~오후 3:00」 ·
+       줄마다 선 아이콘 + 글 14px. 아래 단추 줄은 없다(구글 팝업에도 없다). */
+  .modal.det{padding:0;overflow:hidden;border-radius:16px;max-width:min(400px,calc(100vw - 24px));box-shadow:0 8px 28px rgba(0,0,0,.32)}
+  .dtool{display:flex;justify-content:flex-end;gap:0;padding:8px 8px 0}
+  .dtb{width:40px;height:40px;border:none;border-radius:50%;background:transparent;color:var(--gsub);display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+  .dtb:hover{background:var(--bg)}
+  .modal.det .gic{width:24px;height:24px;fill:currentColor;display:block}
+  .dtop{padding:4px 20px 10px;display:flex;gap:16px;align-items:flex-start}
+  .ddot{width:16px;height:16px;border-radius:4px;flex-shrink:0;margin-top:7px}
+  .dttl{font-size:22px;font-weight:400;line-height:28px;word-break:break-word;color:var(--gtext)}
+  .dwhen{font-size:14px;line-height:20px;color:var(--gsub);margin-top:4px}
+  .drows{padding:2px 20px 14px}
+  .drow{display:flex;gap:16px;font-size:14px;line-height:20px;padding:8px 0;align-items:flex-start;color:var(--gtext)}
+  .drow .di{width:20px;flex-shrink:0;color:var(--gsub);display:flex;justify-content:center;padding-top:0}
+  .drow .di .gic{width:20px;height:20px}
   .drow .dt{flex:1;min-width:0;word-break:break-word;white-space:pre-wrap}
-  .dhint{font-size:11.5px;color:var(--gsub);background:var(--bg);border-radius:6px;
-    padding:7px 10px;margin:0 16px 8px;line-height:1.5}
+  .drow .dt a{color:var(--gtoday)}
+  .dhint{font-size:12px;color:var(--gsub);background:var(--bg);border-radius:8px;padding:8px 12px;margin:0 20px 10px;line-height:1.5}
   .modal.det .mbtns{padding:9px 13px;border-top:1px solid var(--gline);background:var(--bg);margin:0}
   /* ── 주소 지도 · 하루 동선 (2026-10-09) ── 상세 창 «위»에 겹쳐 뜬다 */
   .veil.top{z-index:44}
@@ -3516,14 +3522,33 @@ function 공휴일상세(ymd){
   return { kind:"hol", title:이름, color:"#d81b60", date:ymd, end:"",
     time:"", endAt:0, rows:[], hint:[], url:"" };
 }
+/* 상세 창의 줄 앞 그림글자(이모지) → 구글 «선 아이콘». 모르는 글자는 그대로 둔다 */
+var 행그림 = { "👤":"person", "📍":"place", "≡":"notes", "✉":"mail", "🕒":"history", "⏱":"schedule", "👥":"group",
+  "🔔":"notifications", "🔁":"repeat", "🎥":"videocam", "📎":"attach", "🏢":"business" };
+function 선아이콘(이름){
+  return (typeof GIC !== "undefined" && GIC[이름])
+    ? '<svg class="gic" viewBox="0 0 24 24" aria-hidden="true"><path d="' + GIC[이름] + '"/></svg>' : "";
+}
+function 행아이콘(그림){ return 선아이콘(행그림[그림]) || esc(그림); }
+function 도구단추(속성, 이름, 뜻){ return '<button class="dtb" ' + 속성 + ' title="' + esc(뜻) + '">' + 선아이콘(이름) + '</button>'; }
 function detailHtml(){
   var d = S.detail; if(!d) return "";
-  var 언제 = 긴날짜(d.date) + (d.time ? " · " + d.time + (d.endAt ? " – " + 시분(d.endAt) : "") : "")
-    + (d.end && d.end !== d.date ? " ~ " + 긴날짜(d.end) : "")
-    + (d.kind === "hol" ? " · 공휴일" : "");
+  /* 「10월 14일 (수) ⋅ 오후 2:00~오후 3:00」 — 구글 팝업의 날짜 줄(올해가 아니면 연도가 붙는다) */
+  var 언제 = 날짜글(d.date) + (d.time ? " ⋅ " + 시각글(d.time) + (d.endAt ? "~" + 시각글(시분(d.endAt)) : "") : "")
+    + (d.end && d.end !== d.date ? " ~ " + 날짜글(d.end) : "")
+    + (d.kind === "hol" ? " ⋅ 공휴일" : "");
+  var 동선있음 = typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length;
   return '<div class="veil" data-close="1"></div>'
-    + '<div class="modal det" style="max-width:340px">'
-    + '<div class="dbar" style="background:' + esc(d.color || "#70757a") + '"></div>'
+    + '<div class="modal det">'
+    + '<div class="dtool">'
+    /* 🚗 이날 동선 — 주소 있는 일정이 그날 하나라도 있으면 */
+    +   (동선있음 ? 도구단추('data-route="' + esc(d.date) + '"', "car", "이날 동선 — 방문지를 시각 순서로") : "")
+    /* ✏️·🗑 구글 일정 고치기·지우기 — 서버가 대표 늘 연결로 대신 한다(functions/gcal-proxy.js gcalEdit).
+       여러 날 일정은 창의 «끝나는 날» 칸으로 (2026-10-10) */
+    +   (d.kind === "gcal" && d.gid ? 도구단추('data-gedit="1"', "edit", "고치기") + 도구단추('data-gdel="1"', "delete", "지우기") : "")
+    +   (d.url ? 도구단추('data-dgo="1"', "open", "구글에서 열기") : "")
+    +   도구단추('data-close="1"', "close", "닫기")
+    + '</div>'
     + '<div class="dtop"><span class="ddot" style="background:' + esc(d.color || "#70757a") + '"></span>'
     +   '<div><div class="dttl">' + esc(d.title || "일정") + '</div>'
     +   '<div class="dwhen">' + esc(언제) + '</div></div></div>'
@@ -3534,8 +3559,8 @@ function detailHtml(){
             if(/^https:\/\//i.test(r.href || "")) 글 = '<a href="' + esc(r.href) + '" target="_blank" rel="noopener">' + 글 + '</a>';
             /* 📍 장소 — 누르면 지도 창(2026-10-09). 온라인 회의 링크 같은 «장소 아닌 것»은 그대로 */
             else if(r.i === "📍" && typeof PuCalMap !== "undefined" && PuCalMap.cleanPlace(r.t))
-              글 = '<a class="maplink" href="#" data-map="det" title="지도 보기">' + 글 + ' 🗺</a>';
-            return '<div class="drow"><span class="di">' + esc(r.i) + '</span>'
+              글 = '<a class="maplink" href="#" data-map="det" title="지도 보기">' + 글 + '</a>';
+            return '<div class="drow"><span class="di">' + 행아이콘(r.i) + '</span>'
               + '<span class="dt">' + 글 + '</span></div>';
           }).join("") + '</div>'
         : "")
@@ -3545,19 +3570,10 @@ function detailHtml(){
     + (d.kind === "gcal" && d.moreErr ? '<div class="dhint">⚠ 구글에서 나머지를 못 받았습니다 — ' + esc(d.moreErr) + '</div>' : "")
     + (d.kind === "gcal" && !d.more && !d.loading && !d.moreErr && typeof GLINK !== "undefined" && GLINK.st === "need"
         ? '<div class="dhint">🔐 구글을 연결하면 참석자·첨부·알림도 여기 나옵니다 — <a href="#" data-glogin="1">연결하기</a></div>' : "")
-    + '<div class="mbtns">'
-    /* 🚗 이날 동선 — 주소 있는 일정이 그날 하나라도 있으면 */
-    + (typeof PuCalMap !== "undefined" && d.kind !== "hol" && 동선들(d.date).length
-        ? '<button class="btn ghost" data-route="' + esc(d.date) + '" title="이날 방문지를 시각 순서로">🚗 이날 동선</button>' : "")
-    + '<span class="sp"></span>'
-    /* ✏️·🗑 구글 일정 고치기·지우기 — 서버가 대표 늘 연결로 대신 한다(functions/gcal-proxy.js gcalEdit).
-       여러 날 일정은 창의 «끝나는 날» 칸으로 (2026-10-10) */
-    + (d.kind === "gcal" && d.gid
-        ? '<button class="btn ghost" data-gedit="1" title="고치기">✏️</button><button class="btn ghost" data-gdel="1" title="지우기">🗑</button>' : "")
-    + (d.url ? '<button class="btn ghost" data-dgo="1">구글에서 열기</button>' : "")
     /* 모집 공지 — http(s) 만(PuCalRecruit.safeUrl 이 거른 값) */
-    + (/^https?:\/\//i.test(d.link || "") ? '<a class="btn ghost" href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a>' : "")
-    + '<button class="btn" data-close="1">닫기</button></div></div>';
+    + (/^https?:\/\//i.test(d.link || "")
+        ? '<div class="drows"><div class="drow"><span class="di">' + 선아이콘("open") + '</span><span class="dt"><a href="' + esc(d.link) + '" target="_blank" rel="noopener">🔗 공지 열기</a></span></div></div>' : "")
+    + '</div>';
 }
 /* 「2026-09-16 (수)」 — 상세 창 머리에 쓰는 긴 날짜 */
 function 긴날짜(ymd){
@@ -3583,7 +3599,18 @@ var GIC = {
   group:"M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3 1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z",
   calendar:"M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM5 8V6h14v2H5z",
   business:"M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z",
-  map:"M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z"
+  map:"M20.5 3l-.16.03L15 5.1 9 3 3.36 4.9c-.21.07-.36.25-.36.48V20.5c0 .28.22.5.5.5l.16-.03L9 18.9l6 2.1 5.64-1.9c.21-.07.36-.25.36-.48V3.5c0-.28-.22-.5-.5-.5zM15 19l-6-2.11V5l6 2.11V19z",
+  /* 상세 창(일정 팝업)용 */
+  edit:"M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z",
+  delete:"M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z",
+  open:"M19 19H5V5h7V3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z",
+  car:"M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z",
+  mail:"M20 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 14H4V8l8 5 8-5v10zm-8-7L4 6h16l-8 5z",
+  history:"M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
+  notifications:"M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z",
+  repeat:"M7 7h10v3l4-4-4-4v3H5v6h2V7zm10 10H7v-3l-4 4 4 4v-3h12v-6h-2v4z",
+  videocam:"M17 10.5V7c0-.55-.45-1-1-1H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4zM15 16H5V8h10v8z",
+  attach:"M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5c0-1.38 1.12-2.5 2.5-2.5s2.5 1.12 2.5 2.5v10.5c0 .55-.45 1-1 1s-1-.45-1-1V6H10v9.5c0 1.38 1.12 2.5 2.5 2.5s2.5-1.12 2.5-2.5V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"
 };
 /* 「10월 10일 (토)」 — 올해가 아니면 「2025년 10월 10일 (금)」. 구글 앱 입력 화면의 날짜 글자 */
 function 날짜글(ymd){
