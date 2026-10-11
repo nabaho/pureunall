@@ -81,7 +81,7 @@ test('scal_docs 줄 모양 — 키 꼴 · 상태 다섯 · 시각 숫자 · 날�
   assert.ok(k.how['.validate'].includes('(mail|platform|post|other)'));
   assert.equal(k.ack['.validate'], 'newData.isBoolean()');
   assert.equal(k.$other['.validate'], false);
-  assert.deepEqual(Object.keys(k).sort(), ['$other', '.validate', '.write', 'ack', 'at', 'by', 'gotAt', 'how', 'link', 'note', 'sentAt', 'st']);
+  assert.deepEqual(Object.keys(k).sort(), ['$other', '.validate', '.write', 'ack', 'at', 'by', 'gotAt', 'how', 'link', 'note', 'rd', 'sentAt', 'st']);
 });
 
 test('규칙과 화면 모듈(js/pu-gov-report-track.js)이 같은 값을 쓴다', () => {
@@ -125,4 +125,45 @@ test('대형 3종의 모든 단계 키가 줄 키 규칙(소문자[:숫자] · 2
     assert.ok(keys.length > 0, p.key + '.' + x.id);
     keys.forEach((k) => assert.ok(RULE.test(k.key) && k.key.length <= 20, p.key + ' ' + k.key));
   }));
+});
+
+/* ═══ 회차 기록 rd (2026-10-12, 설계 2026-10-12-gov-report-rounds-design.md §4) ═══ */
+
+/* 규칙 문자열에서 숫자·열거를 읽는다 — 화면 모듈 RD_* 와 같은 값이어야 한다 */
+const upperOf = (s) => { const m = /<= ([0-9]+)/.exec(s); return m ? Number(m[1]) : NaN; };
+const enumOf = (s) => { const m = /matches\(\/\^\(([a-z|]+)\)\$\/\)/.exec(s); return m ? m[1].split('|') : null; };
+
+test('scal_docs 줄의 rd — mode 필수 · 일곱 칸(mode·mins·people·photo·sign·md·kind) · 다른 칸 거절 · 따로 쓰기 문 없음', () => {
+  const k = rules.scal_docs.$co.$rid.items.$key;
+  const r = k.rd;
+  assert.ok(r, 'rd 가지가 없습니다');
+  assert.ok(r['.validate'].includes("newData.hasChildren(['mode'])"), 'mode 필수');
+  assert.equal(r.photo['.validate'], 'newData.isBoolean()');
+  assert.equal(r.sign['.validate'], 'newData.isBoolean()');
+  assert.equal(r.$other['.validate'], false, 'rd 아래 다른 칸은 거절');
+  assert.deepEqual(Object.keys(r).sort(), ['$other', '.validate', 'kind', 'md', 'mins', 'mode', 'people', 'photo', 'sign']);
+  assert.equal(r['.write'], undefined, 'rd 에 따로 쓰기 문을 열지 않는다(줄 쓰기 규칙을 따른다)');
+  assert.ok(Object.keys(k).includes('rd'));
+});
+
+test('rd 한계 — 규칙과 화면 모듈(js/pu-gov-report-track.js)이 같은 값(열거·상한을 규칙 문자열에서 읽는다)', () => {
+  const r = rules.scal_docs.$co.$rid.items.$key.rd;
+  assert.deepEqual(enumOf(r.mode['.validate']), Tr.RD_MODE, '회의 형태 열거');
+  assert.deepEqual(enumOf(r.kind['.validate']), Tr.RD_KIND, '활동 종류 열거');
+  assert.equal(upperOf(r.mins['.validate']), Tr.RD_MINS_MAX, '시간 상한');
+  assert.equal(upperOf(r.people['.validate']), Tr.RD_PEOPLE_MAX, '인원 상한');
+  assert.equal(upperOf(r.md['.validate']), Tr.RD_MD_MAX, 'MD 상한');
+  assert.equal(Tr.RD_MINS_MAX, 600); assert.equal(Tr.RD_PEOPLE_MAX, 99); assert.equal(Tr.RD_MD_MAX, 5);
+  /* 정수 칸 · 0.5 단위 칸 */
+  assert.ok(r.mins['.validate'].includes('% 1 === 0') && r.people['.validate'].includes('% 1 === 0'));
+  assert.ok(r.md['.validate'].includes('(newData.val() * 2) % 1 === 0'), 'MD 는 0.5 단위');
+});
+
+test('rd — 두 규칙 JSON(전체-적용본·rules-paste)이 같은 rd 를 가진다', () => {
+  const fs = require('node:fs');
+  const pick = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', f), 'utf8')).rules.scal_docs.$co.$rid.items.$key.rd;
+  const gen = rules.scal_docs.$co.$rid.items.$key.rd;
+  assert.ok(gen, '생성기 출력에 rd');
+  assert.deepEqual(pick('firebase-rules-전체-적용본.json'), gen, '적용본');
+  assert.deepEqual(pick('rules-paste.json'), gen, 'rules-paste');
 });

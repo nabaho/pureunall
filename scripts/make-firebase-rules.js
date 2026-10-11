@@ -736,6 +736,21 @@ rules.scal_docs = {
             date:   { '.validate': SCAL_DOCS_DAY },
             $other: { '.validate': false }
           },
+          /* 회차 기록 (2026-10-12, 설계 docs/superpowers/specs/2026-10-12-gov-report-rounds-design.md §4)
+             일터혁신 회차별 수행보고서·산업일자리 MD별 수행일지의 형태·시간·인원·증빙 확보 여부·MD. 파일·이름은 담지 않는다.
+             ★ 화면 모듈 RD_*(js/pu-gov-report-track.js)와 같은 값 — tests/gov-report-rules.test.js.
+             ⚠ 게시는 합쳐진 뒤. 게시 전에는 줄의 $other:false 때문에 rd 가 든 저장이 통째로 거절된다(rd 없는 저장은 그대로). */
+          rd: {
+            '.validate': "newData.hasChildren(['mode'])",
+            mode:   { '.validate': "newData.isString() && newData.val().matches(/^(face|remote)$/)" },
+            mins:   { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 600 && newData.val() % 1 === 0' },
+            people: { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 99 && newData.val() % 1 === 0' },
+            photo:  { '.validate': 'newData.isBoolean()' },
+            sign:   { '.validate': 'newData.isBoolean()' },
+            md:     { '.validate': 'newData.isNumber() && newData.val() >= 0 && newData.val() <= 5 && (newData.val() * 2) % 1 === 0' },
+            kind:   { '.validate': "newData.isString() && newData.val().matches(/^(visit|report|research)$/)" },
+            $other: { '.validate': false }
+          },
           $other: { '.validate': false }
         }
       },

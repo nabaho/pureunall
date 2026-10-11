@@ -1061,6 +1061,33 @@
                   ".validate": false
                 }
               },
+              "rd": {
+                ".validate": "newData.hasChildren(['mode'])",
+                "mode": {
+                  ".validate": "newData.isString() && newData.val().matches(/^(face|remote)$/)"
+                },
+                "mins": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 600 && newData.val() % 1 === 0"
+                },
+                "people": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 99 && newData.val() % 1 === 0"
+                },
+                "photo": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "sign": {
+                  ".validate": "newData.isBoolean()"
+                },
+                "md": {
+                  ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 5 && (newData.val() * 2) % 1 === 0"
+                },
+                "kind": {
+                  ".validate": "newData.isString() && newData.val().matches(/^(visit|report|research)$/)"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              },
               "$other": {
                 ".validate": false
               }

@@ -48,7 +48,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp',
   'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink',
   'grSendCtx', 'grSay', 'grRenderSend', 'grApplyFields', 'grMarkSent', 'grLinkReply', 'grCopy', 'grOpenMail', 'grWriteMail', 'grWriteSubmit',
-  'grMailFetch', 'grMailCall',
+  'grMailFetch', 'grMailCall', 'grRdHtml', 'grReadRd', 'grRenderCrit',
   'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
@@ -60,7 +60,7 @@ function world(o) {
   const urls = { made: [], revoked: [] };   // 보기 창이 만든·버린 blob 주소
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
     encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportTrack: Tr,
-    PuGovReportInbox: I, PuGovReportSend: require('../js/pu-gov-report-send.js'), PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout, AbortController,
+    PuGovReportInbox: I, PuGovReportSend: require('../js/pu-gov-report-send.js'), PuGovReportCriteria: require('../js/pu-gov-report-criteria.js'), PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout, AbortController,
     /* 받은 서류함 — 가짜 서버(mailServer)·로그인·blob 주소. 서버를 안 주면 부르는 순간 실패한다 */
     fetch: (o.mail && o.mail.fetch) || (async () => { throw new Error('이 검사는 서버를 부르면 안 된다'); }),
     firebase: { auth: () => ({ currentUser: o.noUser ? null : { getIdToken: async () => 'tok' } }) },
@@ -2116,5 +2116,391 @@ test('80 회귀 — 첨부(attach) 칸 창에는 #cwSend 가 없다 · 간단형
   w.ctx.grCloseCell();
   w.ctx.grOpenCell('c2', 't3', 'submit');
   assert.ok(w.els.cwSend.innerHTML.includes('✉ 제출 메일') && w.els.cellw.innerHTML.includes('제출 방식'));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+/* ══ 회차 기록·기준 점검(칸 창 «회차 기록» · «기준») — 설계 2026-10-12-gov-report-rounds-design.md §5~§7 ══
+   합성 일터혁신(t2 · consulting-02 · 다라정밀)·산업일자리(t5 · consulting-06) 씨앗은 위 bigSeed 를 쓴다(회차 수만 더 키운다).
+   칸 창의 입력은 진짜 DOM 에서는 그려진 값이다 — liveDom 이 그려진 글(cellw.innerHTML)에서 값을 읽어 입력칸에 채운다(그려지지 않은 칸은 비운다).
+   그래서 «그리는 쪽 id» 와 «읽는 쪽 id» 가 어긋나면 이 검사가 깨진다(침묵 우회 없음). */
+
+function rdSeed(o) {
+  o = o || {};
+  const s = bigSeed({ track: o.track });
+  const c2 = s.scal_cos.filter((c) => c.id === 'c2')[0];
+  if (o.n) c2.customRounds.t2 = o.n;
+  if (o.m || o.ind) {   // 산업일자리(plan industry) = 이알피 consulting-07(능률) — 충남(consulting-06)은 다른 틀(industry-cn)이다
+    const m = o.m || 2;
+    s.scal_types.push({ id: 't6', name: '산업일자리능률', fullName: '산업일자리전환 컨설팅(능률)', agency: '', rounds: m });
+    c2.types.push('t6');
+    c2.customRounds.t6 = m;
+    s.scal_scheds.push({ id: 'b5', coId: 'c2', typeId: 't6', date: '2026-08-27', round: 1, isField: true },
+      { id: 'b6', coId: 'c2', typeId: 't6', date: '2026-09-24', round: 2, isField: true });
+    s.scal_erpTypeMap['consulting-07'] = 't6';
+    s.data.consultings.v.k4 = { id: 'k4', companyName: '다라정밀', typeCodes: { consulting: 'consulting-07' },
+      startDate: '2026-08-01', endDate: '2026-10-31', status: 'active', managerMain: 'P-009' };
+    if (o.ind) {
+      s.scal_docs.c2.t6_2026 = { items: {} };
+      Object.keys(o.ind).forEach((k) => { s.scal_docs.c2.t6_2026.items[k] = Object.assign({ by: '홍길동', at: Date.UTC(2026, 8, 20, 3) }, o.ind[k]); });
+    }
+  }
+  return s;
+}
+const RD_IDS = ['cwRdMode', 'cwRdMins', 'cwRdPeople', 'cwRdPhoto', 'cwRdSign', 'cwRdMd', 'cwRdKind'];
+const unEsc = (t) => t.replace(/&#60;/g, '<').replace(/&#62;/g, '>').replace(/&#34;/g, '"').replace(/&#39;/g, "'").replace(/&#38;/g, '&');
+function domFill(w, h) {
+  const g = (id) => w.ctx.$(id);
+  RD_IDS.forEach((id) => { g(id).value = ''; g(id).checked = false; });
+  for (const m of h.matchAll(/<input type="(?:number|date)" id="(\w+)"[^>]*?value="([^"]*)"/g)) g(m[1]).value = unEsc(m[2]);
+  for (const m of h.matchAll(/<input type="checkbox" id="(\w+)"( checked)?/g)) g(m[1]).checked = !!m[2];
+  for (const m of h.matchAll(/<select id="(\w+)"[^>]*>([\s\S]*?)<\/select>/g)) {
+    const sel = m[2].match(/<option value="([^"]*)" selected>/) || m[2].match(/<option value="([^"]*)"/);
+    g(m[1]).value = sel ? unEsc(sel[1]) : '';
+  }
+  for (const m of h.matchAll(/<textarea id="(\w+)"[^>]*>([\s\S]*?)<\/textarea>/g)) g(m[1]).value = unEsc(m[2]);
+}
+function liveDom(w) {
+  const el = w.ctx.$('cellw');
+  let html = '';
+  Object.defineProperty(el, 'innerHTML', { get: () => html, set: (v) => { html = v; domFill(w, v); }, configurable: true });
+  return w;
+}
+const rdWorld = (o) => liveDom(world(o));
+const roundCell = (w) => cellOf(w, 'consulting-02', 'c2', 't2', 'plat', 'round');
+const mdCell = (w) => cellOf(w, 'consulting-07', 'c2', 't6', 'report', 'mdlog');
+const WPR = { mode: 'face', mins: 130, people: 4, photo: true, sign: true };
+const rdOf = (n, rd) => ({ ['round:' + n]: { st: 'done', rd } });
+/* 사람이 입력칸을 고친 것 — 값은 글(DOM 값)·체크는 boolean, 그리고 oninput 이 부르는 grRenderCrit */
+function typeRd(w, o) {
+  const g = (id) => w.ctx.$(id), map = { mode: 'cwRdMode', mins: 'cwRdMins', people: 'cwRdPeople', md: 'cwRdMd', kind: 'cwRdKind' };
+  Object.keys(o).forEach((k) => { if (map[k]) g(map[k]).value = String(o[k]); });
+  if ('photo' in o) g('cwRdPhoto').checked = !!o.photo;
+  if ('sign' in o) g('cwRdSign').checked = !!o.sign;
+  w.ctx.grRenderCrit();
+}
+const critHtml = (w) => w.ctx.$('cwCrit').innerHTML;
+const hasId = (h, id) => h.includes('id="' + id + '"');
+
+test('81 정적 — 기준 모듈은 send 바로 뒤 · 쓰기는 여전히 .set 한 곳 · 새 함수는 직접 쓰거나 부르지 않는다 · 읽는 id 는 그리는 id 와 같다', () => {
+  assert.match(SRC, /<script src="js\/pu-gov-report-send\.js\?v=\d+"><\/script>\r?\n<script src="js\/pu-gov-report-criteria\.js\?v=\d+"><\/script>/);
+  assert.ok(SRC.indexOf('pu-gov-report-track.js') < SRC.indexOf('pu-gov-report-criteria.js'));
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
+  ['grRdHtml', 'grReadRd', 'grRenderCrit'].forEach((n) => assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|mailto:|\.send\s*\(/, n));
+  assert.match(grab('grSaveCell'), /fbDb\.ref\(GR_TRACK_NODES\.docs\+'\/'\+c\.coId\+'\/'\+c\.rid\+'\/items\/'\+c\.key\)\.set\(rec\)/);
+  assert.match(grab('grSaveCell'), /T\.nextRd\(/);
+  /* grReadRd 가 읽는 id 는 모두 grRdHtml 이 그린다 */
+  const read = [...new Set([...grab('grReadRd').matchAll(/'(cwRd\w+)'/g)].map((m) => m[1]))].sort();
+  assert.deepEqual(read, RD_IDS.slice().sort());
+  read.forEach((id) => assert.ok(grab('grRdHtml').includes('"' + id + '"') || grab('grRdHtml').includes("'" + id + "'"), id + ' 을 그리지 않는다'));
+});
+
+test('82 합성 씨앗이 실제로 이어진다 — 일터혁신 round·산업일자리 mdlog 칸 창이 열리고 rd·crit 가 담긴다(열리지 않으면 이 검사가 깨진다)', async () => {
+  let w = rdWorld({ seed: rdSeed({ n: 3 }) });
+  await roundCell(w);
+  assert.ok(w.ctx.GR.cw, '일터혁신 round 칸 창이 열렸다');
+  assert.deepEqual(w.ctx.GR.cw.keys.map((k) => k.key), ['round:1', 'round:2', 'round:3']);
+  assert.equal(w.ctx.GR.cw.rd, true);
+  assert.equal(w.ctx.GR.cw.crit, 'workplace');
+  w = rdWorld({ seed: rdSeed({ m: 2 }) });
+  await mdCell(w);
+  assert.ok(w.ctx.GR.cw, '산업일자리 mdlog 칸 창이 열렸다');
+  assert.deepEqual(w.ctx.GR.cw.keys.map((k) => k.key), ['mdlog:1', 'mdlog:2']);
+  assert.equal(w.ctx.GR.cw.rd, true);
+  assert.equal(w.ctx.GR.cw.crit, 'industry');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('83 칸 창 — rd 항목(일터혁신 round·산업일자리 mdlog)에만 «회차 기록»·#cwCrit · 산업일자리는 MD·종류 더 · 다른 항목·간단형에는 없다', async () => {
+  let w = rdWorld({ seed: rdSeed({ n: 2 }) });
+  await roundCell(w);
+  let h = w.els.cellw.innerHTML;
+  ['cwRdMode', 'cwRdMins', 'cwRdPeople', 'cwRdPhoto', 'cwRdSign', 'cwCrit'].forEach((id) => assert.ok(hasId(h, id), id));
+  assert.ok(!hasId(h, 'cwRdMd') && !hasId(h, 'cwRdKind'), '일터혁신에는 MD·종류가 없다');
+  assert.ok(h.includes('회차 기록') && h.includes('<option value="face">대면</option>') && h.includes('<option value="remote">비대면</option>'));
+  assert.ok(h.indexOf('id="cwRdMode"') < h.indexOf('id="cwNote"'), '«메모» 앞에');
+  assert.ok(h.indexOf('id="cwRdMode"') < h.indexOf('id="cwCrit"'));
+  assert.equal(countOf(h, /id="cwCrit"/g), 1);
+  w.ctx.grCloseCell();
+  w = rdWorld({ seed: rdSeed({ m: 2 }) });
+  await mdCell(w);
+  h = w.els.cellw.innerHTML;
+  RD_IDS.concat(['cwCrit']).forEach((id) => assert.ok(hasId(h, id), id));
+  /* 입력이 바뀌면 «기준» 구역이 바로 따라간다 — 산업일자리 한도는 종류(방문·보고서·자료조사)에 달렸다 */
+  RD_IDS.forEach((id) => {
+    const tag = (h.match(new RegExp('<(?:input|select)[^>]*id="' + id + '"[^>]*>')) || [''])[0];
+    assert.ok(/on(?:input|change)="grRenderCrit\(\)"/.test(tag), id + ' 에 grRenderCrit 연결이 있다: ' + tag);
+  });
+  assert.ok(h.includes('<option value="visit">방문</option>') && h.includes('<option value="report">보고서</option>') && h.includes('<option value="research">자료조사</option>'));
+  /* rd 가 아닌 항목 — 같은 사업의 plan·kickoff·guide · 산업일자리 plan/final · 간단형 */
+  const none = (html) => RD_IDS.concat(['cwCrit']).forEach((id) => assert.ok(!hasId(html, id) && !html.includes('회차 기록'), id));
+  w = rdWorld({ seed: rdSeed({ n: 2, m: 2 }) });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-02');
+  [['plat', 'plan'], ['report', 'kickoff'], ['sign', 'guide'], ['plat', 'follow']].forEach(([st, it]) => {
+    w.ctx.grOpenCell('c2', 't2', st, it);
+    assert.ok(w.ctx.GR.cw, it + ' 이 열렸다');
+    assert.equal(w.ctx.GR.cw.rd, false, it); assert.equal(w.ctx.GR.cw.crit, '', it);
+    none(w.els.cellw.innerHTML);
+    w.ctx.grCloseCell();
+  });
+  w.ctx.grSetBiz('consulting-07');
+  ['kickoff', 'plan', 'final'].forEach((it) => {
+    w.ctx.grOpenCell('c2', 't6', 'report', it);
+    assert.ok(w.ctx.GR.cw, it); assert.equal(w.ctx.GR.cw.rd, false, it);
+    none(w.els.cellw.innerHTML);
+    w.ctx.grCloseCell();
+  });
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  assert.ok(w.ctx.GR.cw && w.ctx.GR.cw.rd === false);
+  none(w.els.cellw.innerHTML);
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't3', 'submit');
+  none(w.els.cellw.innerHTML);
+  assert.equal(w.db.쓴것.length, 0, '열기만으로는 안 쓴다');
+});
+
+test('84 저장 — 형태 대면·130분·4명·사진·서명지: round:1 한 줄에 rd 가 실린다 · 미리 넣어 둔 note·link 는 그대로', async () => {
+  const w = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ n: 2, track: { t2: { 'round:1': { st: 'doing', note: '기존 메모', link: BIG_LINK } } } }) });
+  await roundCell(w);
+  assert.equal(w.ctx.$('cwNote').value, '기존 메모', '그려진 값이 입력칸에 있다');
+  w.ctx.$('cwSt').value = 'done';
+  typeRd(w, { mode: 'face', mins: '130', people: '4', photo: true, sign: true });
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/round:1'], '한 줄만');
+  const v = w.db.쓴것[0].값;
+  assert.deepEqual(v.rd, { mode: 'face', mins: 130, people: 4, photo: true, sign: true });
+  assert.deepEqual(Object.keys(v).sort(), ['at', 'by', 'link', 'note', 'rd', 'st']);
+  assert.deepEqual([v.st, v.note, v.link, v.by], ['done', '기존 메모', BIG_LINK, '홍길동']);
+  assert.deepEqual(w.ctx.GR.track.c2['t2_2026']['round:1'].rd, v.rd, '로컬 표도 같은 값');
+  assert.ok(w.els.cellw.innerHTML.includes('저장했습니다'));
+  /* 저장 뒤 다시 그려도 값이 그대로 보인다 */
+  assert.ok(w.els.cellw.innerHTML.includes('value="130"') && w.els.cellw.innerHTML.includes('value="4"'));
+  assert.equal(w.ctx.$('cwRdMode').value, 'face');
+  assert.equal(w.ctx.$('cwRdPhoto').checked, true);
+  /* 경계값(600분·99명)은 된다 · 비대면 · 사진·서명지 빼기 */
+  w.ctx.grPickCell('round:2');
+  w.ctx.$('cwSt').value = 'doing';
+  typeRd(w, { mode: 'remote', mins: '600', people: '99', photo: false, sign: false });
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.deepEqual(w.db.쓴것[1].값.rd, { mode: 'remote', mins: 600, people: 99, photo: false, sign: false });
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/round:1', 'scal_docs/c2/t2_2026/items/round:2']);
+});
+
+test('85 산업일자리 — mdlog:1 에 MD(0.5 단위)·종류가 rd 로 실린다 · 숫자 칸이 비면 그 키가 없다 · 일터혁신에는 md·kind 키가 없다', async () => {
+  const w = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ m: 2 }) });
+  await mdCell(w);
+  w.ctx.$('cwSt').value = 'done';
+  typeRd(w, { mode: 'remote', md: '1.5', kind: 'report' });
+  await w.ctx.grSaveCell();
+  onlyTrackWrites(w.db);
+  assert.equal(w.db.쓴것[0].자리, 'scal_docs/c2/t6_2026/items/mdlog:1');
+  assert.deepEqual(w.db.쓴것[0].값.rd, { mode: 'remote', photo: false, sign: false, md: 1.5, kind: 'report' }, '빈 시간·인원은 키가 없다(0 으로 두지 않는다)');
+  /* 일터혁신 — md·kind 칸이 없으니 입력칸에 값이 남아 있어도 읽지 않는다 */
+  const x = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ n: 2 }) });
+  await roundCell(x);
+  x.ctx.$('cwRdMd').value = '3'; x.ctx.$('cwRdKind').value = 'report';
+  typeRd(x, { mode: 'face', mins: '120' });
+  await x.ctx.grSaveCell();
+  assert.deepEqual(x.db.쓴것[0].값.rd, { mode: 'face', mins: 120, photo: false, sign: false });
+});
+
+test('86 입력이 비어 있어도 기존 rd 는 지워지지 않는다(옛 rd 이어받기) · rd 가 아닌 항목 저장은 rd 키를 만들지 않는다(옛 rd 가 있을 때만 이어받음)', async () => {
+  const OLD = { mode: 'face', mins: 150, people: 5, photo: true, sign: false };
+  const w = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ n: 2, track: { t2: { 'round:1': { st: 'doing', rd: OLD, note: '메모' }, plan: { st: 'doing' }, follow: { st: 'doing', rd: { mode: 'remote' } } } } }) });
+  await roundCell(w);
+  assert.equal(w.ctx.$('cwRdMode').value, 'face', '저장된 rd 가 그려진다');
+  /* 사람이 형태·숫자·체크를 모두 비웠다 */
+  w.ctx.$('cwRdMode').value = ''; w.ctx.$('cwRdMins').value = ''; w.ctx.$('cwRdPeople').value = '';
+  w.ctx.$('cwRdPhoto').checked = false; w.ctx.$('cwRdSign').checked = false;
+  w.ctx.$('cwSt').value = 'done';
+  await w.ctx.grSaveCell();
+  assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/round:1']);
+  assert.deepEqual(w.db.쓴것[0].값.rd, OLD, '옛 rd 가 이어졌다');
+  assert.equal(w.db.쓴것[0].값.st, 'done', '다른 칸은 고쳐졌다');
+  /* rd 가 아닌 항목(plan) — 입력칸에 값이 남아 있어도 읽지 않고, rd 키도 만들지 않는다 */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'plan');
+  assert.equal(w.ctx.GR.cw.rd, false);
+  w.ctx.$('cwRdMode').value = 'remote'; w.ctx.$('cwRdMins').value = '999';
+  w.ctx.$('cwSt').value = 'done'; w.ctx.$('cwGot').value = '2026-10-10';
+  await w.ctx.grSaveCell();
+  const p = w.db.쓴것[1];
+  assert.equal(p.자리, 'scal_docs/c2/t2_2026/items/plan');
+  assert.ok(!('rd' in p.값), 'rd 키가 없다: ' + JSON.stringify(p.값));
+  assert.equal(p.값.st, 'done');
+  /* 옛 rd 가 이미 있는 rd 아닌 줄(follow) — 이어받기만 한다(입력칸 값은 무시) */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'follow');
+  w.ctx.$('cwRdMode').value = 'face'; w.ctx.$('cwRdMins').value = '500';
+  w.ctx.$('cwSt').value = 'done';
+  await w.ctx.grSaveCell();
+  assert.deepEqual(w.db.쓴것[2].값.rd, { mode: 'remote' }, '옛 rd 이어받기');
+  onlyTrackWrites(w.db);
+  /* 간단형 저장도 rd 키가 없다 */
+  w.ctx.grCloseCell();
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'attach');
+  w.ctx.$('cwSt').value = 'done';
+  await w.ctx.grSaveCell();
+  assert.ok(!('rd' in w.db.쓴것[3].값));
+});
+
+test('87 범위 밖(시간 601·인원 100·MD 0.3·소수 시간)이면 쓰기 없이 «회차 기록 값이 올바르지 않습니다» · 적던 값은 창에 남는다 · 형태 없이 숫자만 적으면 형태를 고르라고 안내', async () => {
+  const w = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ n: 2, track: { t2: { 'round:1': { st: 'doing', rd: WPR } } } }) });
+  await roundCell(w);
+  const tryBad = async (o, show) => {
+    w.ctx.$('cwSt').value = 'done';
+    typeRd(w, o);
+    await w.ctx.grSaveCell();
+    assert.equal(w.db.쓴것.length, 0, JSON.stringify(o) + ' — 쓰지 않는다');
+    const h = w.els.cellw.innerHTML;
+    assert.ok(h.includes('<div class="err-s">' + Tr.RD_BAD + '</div>'), h.slice(-400));
+    assert.ok(h.includes(show), '적던 값이 남는다: ' + show);
+    assert.equal(w.ctx.GR.track.c2['t2_2026']['round:1'].rd.mins, 130, '로컬 표는 그대로');
+  };
+  await tryBad({ mode: 'face', mins: '601' }, 'value="601"');
+  await tryBad({ mode: 'face', mins: '130', people: '100' }, 'value="100"');
+  await tryBad({ mode: 'face', mins: '1.5', people: '4' }, 'value="1.5"');
+  await tryBad({ mode: 'face', mins: '-1', people: '4' }, 'value="-1"');
+  /* 형태 없이 숫자·체크만 */
+  w.ctx.$('cwRdMode').value = ''; w.ctx.$('cwRdMins').value = '90'; w.ctx.$('cwRdPeople').value = ''; w.ctx.$('cwRdPhoto').checked = false; w.ctx.$('cwRdSign').checked = false;
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 0);
+  assert.ok(w.els.cellw.innerHTML.includes('회차 기록의 형태(대면·비대면)를 먼저 골라 주세요') && w.els.cellw.innerHTML.includes('value="90"'));
+  /* 산업일자리 MD 0.3 */
+  const m = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ m: 2 }) });
+  await mdCell(m);
+  m.ctx.$('cwSt').value = 'done';
+  typeRd(m, { mode: 'face', md: '0.3', kind: 'visit' });
+  await m.ctx.grSaveCell();
+  assert.equal(m.db.쓴것.length, 0);
+  assert.ok(m.els.cellw.innerHTML.includes(Tr.RD_BAD));
+  /* 고쳐서 다시 저장하면 된다 */
+  typeRd(m, { md: '0.5' });
+  await m.ctx.grSaveCell();
+  assert.deepEqual(m.db.쓴것.map((x) => x.값.rd.md), [0.5]);
+});
+
+test('88 «기준» 구역(일터혁신) — 3회차 중 2개 기록: 인정 2 · 대면 2/2 (100%, 기준 70% 이상) · 계획 3 · 기록 없는 회차·rd 없는 줄은 건너뛴다 · 미달 사유 · 입력이 바뀌면 #cwCrit 만 다시 그린다', async () => {
+  const w = rdWorld({ seed: rdSeed({ n: 3, track: { t2: Object.assign({}, rdOf(1, WPR), rdOf(2, WPR), { plan: { st: 'done' } }) } }) });
+  await roundCell(w);
+  let h = critHtml(w);
+  assert.ok(h.includes('기준 점검 — 알림일 뿐입니다'), h);
+  assert.ok(h.includes('이 회차: 인정') && h.includes('기록 2회차 · 인정 2 · 계획 3회차'), h);
+  assert.ok(h.includes('대면 2/2 (100%, 기준 70% 이상)'), h);
+  assert.ok(!h.includes('err-s'), '모두 맞으면 빨간 줄 없음');
+  /* 세 번째 회차(기록 없음) — 그 회차는 «아직 기록 없음», 합계는 그대로 */
+  w.ctx.grPickCell('round:3');
+  h = critHtml(w);
+  assert.ok(h.includes('이 회차: 아직 기록 없음') && h.includes('기록 2회차 · 인정 2'), h);
+  assert.equal(w.ctx.$('cwRdMode').value, '', '기록 없는 회차는 빈 입력');
+  /* 입력 중 값으로 바꿔 센다 — 시간 90분이면 미달·사유 · 그 회차 입력으로 합계가 늘어난다(저장 전) */
+  const before = w.els.cellw.innerHTML;
+  typeRd(w, { mode: 'face', mins: '90', people: '4', photo: true, sign: true });
+  h = critHtml(w);
+  assert.ok(h.includes('<div class="err-s">이 회차: 미달 — 회의 2시간 미만(90분)</div>'), h);
+  assert.ok(h.includes('기록 3회차 · 인정 2 · 계획 3회차') && h.includes('대면 3/3 (100%, 기준 70% 이상)'), h);
+  assert.equal(w.els.cellw.innerHTML, before, '칸 창 전체는 다시 그리지 않는다');
+  assert.equal(w.db.쓴것.length, 0, '점검은 쓰지 않는다');
+  /* 사유가 여럿이면 모두 */
+  typeRd(w, { mode: 'face', mins: '', people: '2', photo: false, sign: false });
+  h = critHtml(w);
+  ['회의 시간 없음', '참석 3명 미만(2명)', '시작·종료 사진 없음', '서명지 없음'].forEach((t) => assert.ok(h.includes(t), t));
+  /* 미달이어도 저장은 막지 않는다 — 알림일 뿐 */
+  w.ctx.$('cwSt').value = 'doing';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 1);
+  assert.deepEqual(w.db.쓴것[0].값.rd, { mode: 'face', people: 2, photo: false, sign: false });
+});
+
+test('89 «기준» 구역 — 대면 70% 경계(7/10 인정 · 6/4 «대면 6/10 (60%…)» 빨간 줄) · 기록 0건은 «점검할 기록이 없습니다»', async () => {
+  const mk = (face) => {
+    const t = {};
+    for (let i = 1; i <= 10; i++) Object.assign(t, rdOf(i, Object.assign({}, WPR, { mode: i <= face ? 'face' : 'remote' })));
+    return t;
+  };
+  let w = rdWorld({ seed: rdSeed({ n: 10, track: { t2: mk(7) } }) });
+  await roundCell(w);
+  assert.equal(w.ctx.GR.cw.keys.length, 10, '전제: 회차 10개');
+  let h = critHtml(w);
+  assert.ok(h.includes('<div class="days">대면 7/10 (70%, 기준 70% 이상)</div>'), h);
+  assert.ok(!h.includes('err-s'));
+  w = rdWorld({ seed: rdSeed({ n: 10, track: { t2: mk(6) } }) });
+  await roundCell(w);
+  h = critHtml(w);
+  assert.ok(h.includes('<div class="err-s">대면 6/10 (60%, 기준 70% 이상)</div>'), h);
+  /* 기록 0건 — 줄이 있어도 rd 가 없으면 센 것이 아니다 */
+  w = rdWorld({ seed: rdSeed({ n: 3, track: { t2: { plan: { st: 'done' }, 'round:1': { st: 'doing', note: 'rd 없음' } } } }) });
+  await roundCell(w);
+  h = critHtml(w);
+  assert.ok(h.includes('점검할 기록이 없습니다'), h);
+  assert.ok(!h.includes('NaN') && !h.includes('undefined') && !h.includes('err-s') && !h.includes('대면'), h);
+  /* 입력 중이던 회차가 그 첫 기록이면 곧바로 센다 */
+  typeRd(w, { mode: 'remote', mins: '130', people: '4', photo: true, sign: true });
+  assert.ok(critHtml(w).includes('기록 1회차') && critHtml(w).includes('대면 0/1 (0%, 기준 70% 이상)'), critHtml(w));
+  assert.ok(critHtml(w).includes('class="err-s">대면 0/1'));
+});
+
+test('90 «기준» 구역(산업일자리) — 비대면 보고서 MD 4.5 는 한도 초과(빨간 줄) · 4 는 아니다 · 자료조사 한도 2 · MD 합계', async () => {
+  const mk = (a, b) => ({ 'mdlog:1': { st: 'done', rd: { mode: 'remote', md: a, kind: 'report' } }, 'mdlog:2': { st: 'done', rd: { mode: 'remote', md: b, kind: 'report' } } });
+  let w = rdWorld({ seed: rdSeed({ m: 2, ind: mk(2.5, 2) }) });
+  await mdCell(w);
+  let h = critHtml(w);
+  assert.ok(h.includes('기록 2회차 · MD 합계 4.5 · 계획 2회차'), h);
+  assert.ok(h.includes('<div class="err-s">비대면 보고서 4.5 MD(한도 4)</div>'), h);
+  assert.ok(h.includes('<div class="days">비대면 자료조사 0 MD(한도 2)</div>'), h);
+  assert.ok(h.includes('이 회차: 인정'), h);
+  w = rdWorld({ seed: rdSeed({ m: 2, ind: mk(2, 2) }) });
+  await mdCell(w);
+  h = critHtml(w);
+  assert.ok(h.includes('<div class="days">비대면 보고서 4 MD(한도 4)</div>') && !h.includes('err-s'), h);
+  /* 입력 중 값으로 — 이 회차를 자료조사 2.5MD 로 바꾸면 자료조사 초과 */
+  typeRd(w, { mode: 'remote', md: '2.5', kind: 'research' });
+  h = critHtml(w);
+  assert.ok(h.includes('<div class="err-s">비대면 자료조사 2.5 MD(한도 2)</div>'), h);
+  assert.ok(h.includes('<div class="days">비대면 보고서 2 MD(한도 4)</div>') && h.includes('MD 합계 4.5'), h);
+  /* MD·종류가 없으면 미달(알림) */
+  typeRd(w, { mode: 'face', md: '', kind: '' });
+  assert.ok(critHtml(w).includes('<div class="err-s">이 회차: 미달 — MD 없음 · 종류 없음</div>'), critHtml(w));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('91 «기준» 구역의 바깥 값은 이스케이프 — 사업장 이름·메모·서류 이름·안내 글·점검 사유에 <script>', async () => {
+  const bad = '<script>alert(1)</script>"\'';
+  const esc = '&#60;script&#62;alert(1)&#60;/script&#62;&#34;&#39;';
+  const w = rdWorld({ email: 'p009@pureun.kr', seed: rdSeed({ n: 2, track: { t2: { 'round:1': { st: 'doing', note: bad, rd: WPR } } } }) });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-02');
+  const hostile = (n) => { const p = D.planFor(n); return Object.assign({}, p, { items: p.items.map((i) => (i.id === 'round'
+    ? Object.assign({}, i, { name: bad, note: bad, steps: [bad] }) : i)) }); };
+  w.ctx.PuGovReportDocs = Object.assign({}, D, { planFor: hostile });
+  const C = require('../js/pu-gov-report-criteria.js');
+  w.ctx.PuGovReportCriteria = Object.assign({}, C, { roundCheck: () => ({ state: 'miss', miss: [bad, '<img src=x onerror=alert(3)>'] }) });
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'round');
+  w.ctx.GR.cw.coName = bad;
+  w.ctx.grRenderCell();
+  const h = w.els.cellw.innerHTML;
+  assert.ok(w.ctx.GR.cw.rd, '전제: 칸 창이 rd 항목으로 열렸다');
+  assert.ok(hasId(h, 'cwRdMode') && hasId(h, 'cwCrit'));
+  assert.ok(!/<script|<img/i.test(h), '태그가 그대로 들어갔다');
+  assert.ok(h.includes('<textarea id="cwNote" maxlength="200" rows="3">' + esc + '</textarea>'), '메모 칸도 글자로');
+  assert.ok(h.includes(esc + ' 1회차') || h.includes(esc), '서류 이름·사업장 이름은 글자로');
+  const c = critHtml(w);
+  assert.ok(c.includes('이 회차: 미달 — ' + esc + ' · &#60;img src=x onerror=alert(3)&#62;'), c);
+  assert.ok(!/<script|<img/i.test(c), c);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('92 기록을 못 읽으면(GR.trackErr) rd 칸 창도 열리지 않는다 — 기준 구역도 그려지지 않는다', async () => {
+  const denied = { once: async () => { throw new Error('permission_denied'); } };
+  const w = rdWorld({ seed: rdSeed({ n: 2 }), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-02');
+  assert.equal(w.ctx.GR.trackErr, true);
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'round');
+  assert.equal(w.ctx.GR.cw, null);
+  assert.ok(!hasId(w.els.cellw.innerHTML, 'cwRdMode') && !hasId(w.els.cellw.innerHTML, 'cwCrit'));
+  w.ctx.grRenderCrit();   // 칸 창이 없으면 아무것도 안 한다(던지지 않는다)
   assert.equal(w.db.쓴것.length, 0);
 });
