@@ -680,8 +680,17 @@
     font-size:12px;padding:0 10px;height:30px;cursor:pointer;font-family:inherit;white-space:nowrap}
   body.mob .mnav{border:none;background:transparent;font-size:24px;color:var(--gtext);width:40px;height:40px;
     border-radius:50%;cursor:pointer;font-family:inherit}
-  body.mob .mplus{border:none;background:#2563eb;color:#ffffff;font-size:22px;font-weight:700;width:62px;height:40px;
-    border-radius:20px;margin-left:6px;cursor:pointer;font-family:inherit}
+  /* ★ 구글 폰 «앱» 캡처(2026-10-11, 어두운 화면 일 보기): 새 일정 단추는 머리가 아니라 «오른쪽 아래에 뜬» 둥근 네모(56px·모서리 16px).
+       어두운판 칠 #304678 · 글자 #d9e2ff (실측 — 폰 배경화면에 따라 구글이 색을 입혀 기기마다 조금 다르다). 밝은판은 구글 M3 값 #c2e7ff · #001d35.
+       머리의 파란 알약 ＋ 는 «위젯» 꼴이었다 */
+  body.mob .mplus{position:fixed;right:16px;bottom:88px;z-index:20;border:none;background:#c2e7ff;color:#001d35;font-size:28px;font-weight:400;
+    width:56px;height:56px;border-radius:16px;margin:0;cursor:pointer;font-family:inherit;line-height:1;
+    box-shadow:0 1px 3px rgba(0,0,0,.3),0 4px 8px 3px rgba(0,0,0,.15)}
+  :root[data-theme="dark"] body.mob .mplus{background:#304678;color:#d9e2ff}
+  body.mob .mtoday{border:none;background:transparent;color:var(--gtext);width:40px;height:40px;border-radius:50%;cursor:pointer;
+    font-family:inherit;font-size:12px;font-weight:500;padding:0;position:relative}
+  body.mob .mtoday i{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:2px solid currentColor;
+    border-radius:6px;font-style:normal;line-height:1}
   body.mob .mmenu{border:none;background:transparent;color:var(--gsub);font-size:16px;width:30px;height:40px;cursor:pointer}
   body.mob .cal{border:none;border-radius:0}
   body.mob .mhd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex:none;border-bottom:1px solid var(--gline)}
@@ -2545,6 +2554,7 @@ function 폰머리Html(){
     +   (S.filter === "priv" ? "🔒 개인" : S.filter === "shared" ? "👥 공용" : "👤 걸러 봄") + '</button>' : '')
     + '<button class="mnav" data-mv="-1" title="이전 달">‹</button>'
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
+    + '<button class="mtoday" data-mv="0" title="오늘"><i>' + parseInt(todayYMD().slice(8,10), 10) + '</i></button>'
     + '<button class="mplus" data-mnew="1" title="새로 넣기">＋</button>'
     + '<button class="mmenu" data-mmenu="1" title="메뉴">☰'
     +   ((GLINK.st === "need" && GLINK.why !== "inactive") || GLINK.st === "err" ? '<i class="gd" title="구글 연결 안 됨"></i>' : '')
