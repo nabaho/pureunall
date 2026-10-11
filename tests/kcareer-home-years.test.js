@@ -86,3 +86,22 @@ test('④ 창의 숫자를 누르면 그 목록이 «그 해»로 걸러져 열�
   assert.match(bare, /if\(yr&&\(r\.year\|\|\(r\.issueDate\|\|r\.date\|\|''\)\.slice\(0,4\)\)!==yr\)/);
   assert.match(떼기('function _homeYrKey('), /r\.year\|\|String\(r\.issueDate\|\|r\.date\|\|''\)\.slice\(0,4\)/);
 });
+
+/* ═══ 연도별 실적 요약 — 금액을 싣지 않는다 (대표 지시 2026-10-11 「년도별 사업실적에서 금액 필요없다」) ═══ */
+test('★★ 연도별 실적 요약 카드는 «연도 + 건수»만 — 금액(원)을 세지도 그리지도 않는다', () => {
+  const 홈 = 떼기('function renderHome(');
+  const 줄 = 홈.slice(홈.indexOf('const yrMap={}'), 홈.indexOf('_homeYr=yrMap'));
+  assert.doesNotMatch(줄, /\.amt|\ba:0|\.a\+=/, '금액을 모으는 코드가 남았다');
+  const 그림 = 떼기('function renderHomeYr(');
+  assert.doesNotMatch(그림, /fmtKRW|원<|yrMap\[y\]\.a/, '카드에 금액 줄이 남았다');
+  assert.match(그림, /yrMap\[y\]\.c\+'건/, '건수는 그대로');
+});
+test('★ 연도별 카드를 실제로 그려도 「원」이 한 글자도 없고 건수는 나온다', () => {
+  const box = { innerHTML: '' };
+  const ctx = { _homeYr: { 2026: { c: 174 }, 2025: { c: 97 }, 2016: { c: 1 } },
+    document: { getElementById: (id) => (id === 'homeYrTable' ? box : (id === 'homeYrSel' ? { value: '' } : null)) }, Object };
+  vm.runInNewContext(떼기('function renderHomeYr(') + ';renderHomeYr();', ctx);
+  assert.doesNotMatch(box.innerHTML, /원/);
+  assert.match(box.innerHTML, /174건/); assert.match(box.innerHTML, /97건/); assert.match(box.innerHTML, /1건/);
+  assert.equal((box.innerHTML.match(/<b style="font-size:13px/g) || []).length, 3, '연도 카드 셋');
+});
