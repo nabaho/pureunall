@@ -59,14 +59,26 @@ tr.fr.starred{background:rgba(217,119,6,.07)}
 .tag.red{background:var(--bg);color:var(--red);border:1px solid var(--red)}
 .tag.amber{background:var(--bg);color:var(--amber);border:1px solid var(--amber)}
 .bar{display:flex;gap:7px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+/* ★ 틀고정 (대표 지시 2026-10-11 「이부분들 모두 틀고정」) — 공고 모아보기·발주 예정의 «검색·거르개 줄»(공고는 찾는 말 줄까지)을
+   한 덩어리(.tab-stick)로 머리(#head) 바로 밑에 붙이고, 표 머리줄은 그 밑에 붙인다.
+   ⚠ 덩어리 높이는 «재서» 알려 준다(recStickySync → --tstickH) — 고정값을 박으면 줄바꿈될 때 겹친다.
+   ⚠ 표 머리줄은 .scroll(overflow-x:auto)이 넘침 상자면 안 붙는다 → 1100px 이상에서 풀어 준다(좁은 화면은 가로로 밀어 본다).
+   ⚠ 1100px 아래(태블릿·폰)는 덩어리를 붙이지 않는다 — 줄바꿈으로 높이가 커져 화면의 3분의 1(900px 실측 머리 96 + 덩어리 147 = 243px)을 먹는다. */
+.tab-stick{background:var(--card);padding:6px 0 0;margin-bottom:6px;border-bottom:1px solid var(--border)}
+.tab-stick>.bar{margin-bottom:6px}
+@media (min-width:1100px){
+  .tab-stick{position:sticky;top:var(--headH,94px);z-index:13}
+  #pgFeed .scroll,#pgPlan .scroll{overflow:visible}
+  #pgFeed thead th,#pgPlan thead th{position:sticky;z-index:12;background:var(--card);top:calc(var(--headH,94px) + var(--tstickH,60px))}
+}
 /* 공고 모아보기 머리 — «딱 두 줄»(대표 지시 2026-10-11 「셀 너무 많다 정렬해달라 2줄로」).
    첫 줄 = 검색·거르개 셋·건수·표시·단추 / 둘째 줄 = 찾는 말 알약(넘치면 옆으로 민다 — 줄을 늘리지 않는다).
    ⚠ 1400px 아래(폰·좁은 창)는 예전처럼 줄바꿈을 허용한다 — 못 줄이는 칸을 억지로 밀면 단추가 잘린다. */
 @media (min-width:1400px){
-  #pgFeed .card>.bar:first-child{flex-wrap:nowrap;white-space:nowrap}
-  #pgFeed .card>.bar:first-child #q{flex:1 1 150px;min-width:110px;max-width:260px}
-  #pgFeed .card>.bar:first-child>*{flex-shrink:0}
-  #pgFeed .card>.bar:first-child #q{flex-shrink:1}
+  .tab-stick>.bar:first-child{flex-wrap:nowrap;white-space:nowrap}
+  .tab-stick>.bar:first-child #q{flex:1 1 150px;min-width:110px;max-width:260px}
+  .tab-stick>.bar:first-child>*{flex-shrink:0}
+  .tab-stick>.bar:first-child #q{flex-shrink:1}
   #pgFeed #cnt{font-size:12px}
   #kwBox{flex-wrap:nowrap;overflow-x:auto;white-space:nowrap;padding-bottom:3px;margin-bottom:6px}
   #kwBox>*{flex:none}
@@ -291,6 +303,7 @@ table.cmp td{white-space:nowrap}
 
 <div class="wrap" id="pgFeed">
   <div class="card">
+    <div class="tab-stick">
     <div class="bar">
       <input id="q" placeholder="공고명·기관 검색" style="min-width:190px" oninput="draw()">
       <select id="fSrc" onchange="draw()"><option value="">전체 출처</option>
@@ -308,6 +321,7 @@ table.cmp td{white-space:nowrap}
       <button class="btn" onclick="expCsv()">📤 CSV</button>
     </div>
     <div class="bar" id="kwBox"></div>
+    </div>
     <div id="period"></div>
     <div class="sml" id="matchNoteF" style="margin:-4px 0 6px"></div>
     <div id="note" style="font-size:12.5px;margin-bottom:9px"></div>
@@ -325,6 +339,7 @@ table.cmp td{white-space:nowrap}
      나라장터 «발주계획»(기관이 올린 발주 예정)과 «사전규격»(입찰공고 직전 공개)을 공고 모아보기와 «같은» 찾는 말로 거른다. -->
 <div class="wrap" id="pgPlan" style="display:none">
   <div class="card">
+    <div class="tab-stick">
     <div class="bar">
       <input id="pq" placeholder="사업명·기관 검색" style="min-width:190px" oninput="_planPage=0;planDraw()">
       <select id="pView" onchange="_planPage=0;planDraw()"><option value="ahead">공고 전 · 앞으로</option><option value="past">⌛ 지난 계획</option><option value="posted">✅ 공고 나옴</option>
@@ -336,6 +351,7 @@ table.cmp td{white-space:nowrap}
       <span id="pCnt" class="sub"></span>
       <span id="pPerBox"></span>
       <button class="btn" onclick="fetchAll()">🔄 새로 받기</button>
+    </div>
     </div>
     <div class="sml" id="planNote" style="margin:0 0 8px"></div>
     <div id="planSel"></div>
@@ -1288,7 +1304,8 @@ function setTab(t){
   $('pgRec').style.display  = (t==='rec'?'':'none');
   $('tbFeed').className='tb'+(t==='feed'?' on':'');
   $('tbRec').className ='tb'+(t==='rec'?' on':'');
-  if(t==='rec'){ recDraw(); recWatchPull(); recMailScan(false); recStickySync(); }
+  if(t==='rec'){ recDraw(); recWatchPull(); recMailScan(false); }
+  recStickySync();                        /* 탭을 바꾸면 «보이는» 덩어리 높이를 다시 잰다 */
   lsSet('tab', t);                       /* ⚠ 클라우드로 내보내지 않는다(lsSet 은 안 밀어낸다) */
 }
 
@@ -2450,7 +2467,10 @@ function recStickySync(){
   if(r && r.offsetHeight) root.style.setProperty('--rsubH', r.offsetHeight+'px');
   /* 공인노무사회·공공기관 탭의 한 줄 — 숨은 탭은 0 이라 «보이는 것»만 잰다 */
   if(document.querySelectorAll){ var bh=0; Array.prototype.forEach.call(document.querySelectorAll('.rec-stick'), function(el){ if(el.offsetHeight>bh) bh=el.offsetHeight; });
-    if(bh) root.style.setProperty('--rbarH', bh+'px'); }
+    if(bh) root.style.setProperty('--rbarH', bh+'px');
+    /* 공고 모아보기·발주 예정의 덩어리 — 숨은 탭은 0 이라 «보이는 것»만 */
+    var th=0; Array.prototype.forEach.call(document.querySelectorAll('.tab-stick'), function(el){ if(el.offsetHeight>th) th=el.offsetHeight; });
+    if(th) root.style.setProperty('--tstickH', th+'px'); }
 }
 function recStickyWatch(){
   recStickySync();
@@ -2458,6 +2478,7 @@ function recStickyWatch(){
     if(typeof ResizeObserver==='function'){
       var ro=new ResizeObserver(function(){ recStickySync(); });
       ['head','recSubs'].forEach(function(id){ if($(id)) ro.observe($(id)); });
+      if(document.querySelectorAll) Array.prototype.forEach.call(document.querySelectorAll('.tab-stick'), function(el){ ro.observe(el); });
     }
   }catch(e){}
   try{ window.addEventListener('resize', recStickySync); }catch(e){}
