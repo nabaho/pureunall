@@ -137,7 +137,7 @@ test('③ 메일함에서 찾기 — 가장 많은 폴더 · «Sent Messages» �
 
 /* ───────────────────────── ④ 대장(CSV) ───────────────────────── */
 
-test('④ 대장(CSV) — BOM · CRLF · 머리 12칸 · 날짜 오름차순 번호 · 따옴표·쉼표·줄바꿈', () => {
+test('④ 대장(CSV) — BOM · CRLF · 머리와 줄의 칸 수가 같다 · 날짜 오름차순 번호 · 따옴표·쉼표·줄바꿈', () => {
   const 줄 = N.목록({
     b: 항목('2026-10-02', '둘째, 쉼표가 "따옴표"도 든 제목', { 첨부: ['a.pdf', 'b.hwp'], 업체: ['가나상사', '다라산업'], 미리보기: '첫줄\n둘째줄' }),
     a: 항목('2024-08-01', '첫째')
@@ -146,8 +146,11 @@ test('④ 대장(CSV) — BOM · CRLF · 머리 12칸 · 날짜 오름차순 번
   assert.strictEqual(글.charCodeAt(0), 0xFEFF, '엑셀이 한글을 못 읽는다(BOM 없음)');
   assert.ok(글.endsWith('\r\n'));
   const 줄들 = 글.slice(1).split('\r\n');
-  assert.strictEqual(줄들[0].split(',').length, 12, '머리가 12칸이 아니다');
+  /* 따옴표 안의 쉼표는 칸 끝이 아니다 — 아주 작은 CSV 칸 세개 */
+  const 칸수 = (행) => { let n = 1, 따옴 = false; for (const ch of 행) { if (ch === '"') 따옴 = !따옴; else if (ch === ',' && !따옴) n++; } return n; };
+  assert.ok(칸수(줄들[0]) >= 12, '머리가 너무 짧다 — 열이 빠졌다');
   assert.match(줄들[1], /^1,2024-08-01,/, '번호·날짜 오름차순이 아니다');
+  줄들.slice(1).filter(Boolean).forEach((행, i) => assert.strictEqual(칸수(행), 칸수(줄들[0]), (i + 1) + '번째 줄의 칸 수가 머리와 다르다 — 열이 밀린다'));
   assert.match(글, /"둘째, 쉼표가 ""따옴표""도 든 제목"/, '쉼표·따옴표를 못 감쌌다');
   assert.match(글, /"a\.pdf\nb\.hwp"/, '첨부를 한 칸에 줄바꿈으로 못 묶었다');
   assert.match(글, /"가나상사\n다라산업"/);
@@ -179,4 +182,89 @@ test('화면 전용 — 서버에 옮기는 파일이 아니다(sync-news-lib �
   assert.ok(!/\bdocument\b|\bwindow\b|\blocalStorage\b|\bfirebase\b|\bfetch\(/.test(소스), '순수 도우미가 DOM·DB 를 부른다');
   const sync = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'sync-news-lib.js'), 'utf8');
   assert.ok(!/pu-news-noticelog/.test(sync), '화면 전용 파일이 서버 사본 목록에 들어 있다');
+});
+
+/* ───────────────────────── ⑥ 원문 보관(서버가 지킨 것) ───────────────────────── */
+
+const 표지 = (덧) => Object.assign({ 판: 1, 때: Date.UTC(2026, 9, 11, 18, 55), 방법: 'imap', 본문: true, 첨부수: 0, 해시들: [], 원본: true, 받은곳: true, 메일수: 3 }, 덧 || {});
+
+test('⑥ 표지 상태 — 보관 · 실패 · 전 / 보관 수 / 날짜·크기 글', () => {
+  assert.strictEqual(N.표지상태(표지()), '보관');
+  assert.strictEqual(N.표지상태(표지({ 실패: { 때: 1, 까닭: 'x', 횟수: 1 } })), '실패', '실패 표시가 있는데 «보관»으로 읽었다');
+  assert.strictEqual(N.표지상태({ 판: 1, 실패: { 때: 1, 횟수: 2, 까닭: 'x' } }), '실패');
+  ['전', '전', '전'].forEach((v, i) => assert.strictEqual(N.표지상태([undefined, null, {}][i]), v));
+  assert.strictEqual(N.표지상태({ 판: 0 }), '전');
+  const 줄 = N.목록({ a: 항목('2026-01-01', 'a'), b: 항목('2026-01-02', 'b'), c: 항목('2026-01-03', 'c') });
+  assert.deepStrictEqual(N.보관수(줄, { a: 표지(), b: 표지({ 실패: { 때: 1, 횟수: 1, 까닭: 'x' } }) }), { 보관: 1, 실패: 1, 전: 1 });
+  assert.strictEqual(N.날짜글(Date.UTC(2026, 9, 11, 18, 55)), '2026-10-12', '서울 날짜가 아니다(UTC 18:55 는 서울로 다음 날 03:55)');
+  assert.strictEqual(N.날짜글(0), '');
+  assert.strictEqual(N.크기글(500), '500B'); assert.strictEqual(N.크기글(15 * 1024), '15KB'); assert.strictEqual(N.크기글(19.16 * 1024 * 1024), '19.2MB');
+  assert.strictEqual(N.판글자(1), '①'); assert.strictEqual(N.판글자(10), '⑩'); assert.strictEqual(N.판글자(11), '11');
+});
+
+test('⑥ 창고 주소 — 서버가 만든 토큰 주소만 링크가 된다(javascript:·다른 호스트·따옴표 섞인 글은 막는다)', () => {
+  const 좋은 = 'https://firebasestorage.googleapis.com/v0/b/pureun-erp.firebasestorage.app/o/newsletter_archive%2Ffiles%2Fab%2Fa.pdf?alt=media&token=t-1';
+  assert.strictEqual(N.안전주소(좋은), 좋은);
+  ['javascript:alert(1)', 'http://firebasestorage.googleapis.com/v0/b/x/o/a?alt=media', 'https://evil.test/v0/b/x/o/a', 좋은 + '" onclick="x', 좋은 + ' x', '', null, undefined, 'data:text/html,<b>'].forEach((u) =>
+    assert.strictEqual(N.안전주소(u), '', '링크가 되면 안 되는 주소가 통과했다: ' + String(u).slice(0, 40)));
+});
+
+test('⑥ 판 정보 — 같은 이름·다른 내용을 «판»으로 가르고 처음 보낸 차례로 번호를 매긴다 · 보관 안 된 안내문은 안 센다', () => {
+  const 줄 = N.목록({
+    a: 항목('2024-08-01', '옛 공휴일'), b: 항목('2025-02-03', '그다음'), c: 항목('2026-10-02', '새 공휴일'), d: 항목('2026-11-01', '보관 전'), e: 항목('2026-12-01', '실패')
+  });
+  const 표들 = {
+    a: 표지({ 해시들: [{ 이름: '휴일대체합의서.hwp', 해시: 'h1', 크기: 15000 }, { 이름: '공문.pdf', 해시: 'p1', 크기: 1 }] }),
+    b: 표지({ 해시들: [{ 이름: '휴일대체합의서.hwp', 해시: 'h1', 크기: 15000 }] }),
+    c: 표지({ 해시들: [{ 이름: '휴일대체합의서.hwp', 해시: 'h2', 크기: 16000 }, { 이름: '공문.pdf', 해시: 'p1', 크기: 1 }] }),
+    e: 표지({ 실패: { 때: 1, 횟수: 1, 까닭: 'x' }, 해시들: [{ 이름: '휴일대체합의서.hwp', 해시: 'h3', 크기: 1 }] })
+  };
+  const 판 = N.판정보(줄, 표들);
+  const 합의서 = 판['휴일대체합의서.hwp'].판들;
+  assert.strictEqual(합의서.length, 2, '내용이 다른 판이 둘인데 ' + 합의서.length + '개로 셌다 — 실패한 안내문까지 셌다면 3');
+  assert.deepStrictEqual(합의서.map((v) => [v.번호, v.해시, v.횟수, v.처음, v.마지막]), [[1, 'h1', 2, '2024-08-01', '2025-02-03'], [2, 'h2', 1, '2026-10-02', '2026-10-02']]);
+  assert.strictEqual(판['공문.pdf'].판들.length, 1, '내용이 같은 파일을 두 판으로 갈랐다');
+  assert.strictEqual(판['공문.pdf'].판들[0].횟수, 2);
+  assert.strictEqual(N.판찾기(판, '휴일대체합의서.hwp', 'h2').번호, 2); assert.strictEqual(N.판찾기(판, '휴일대체합의서.hwp', 'zz'), null); assert.strictEqual(N.판찾기(판, '없는.pdf', 'h1'), null);
+  assert.deepStrictEqual(N.판정보(줄, null), {}, '표지가 아직 안 읽혔을 때 던진다');
+  assert.deepStrictEqual(N.판정보([], 표들), {});
+});
+
+test('⑥ 한계 말 — 받은 곳을 원문 머리글로 «확인»했으면 8명 한계 경고를 뺀다 · 확인 못 했으면 그대로', () => {
+  const x = 항목('2026-01-01', 'a');          /* 한통최대 8(기본) */
+  assert.match(N.한계말(x)[0], /8명까지만 남아/);
+  assert.match(N.한계말(x, undefined)[0], /8명까지만/);
+  assert.match(N.한계말(x, { 본문: 'x' })[0], /8명까지만/, '받은 곳을 확인하지 않은 보관본인데 경고를 뺐다');
+  assert.deepStrictEqual(N.한계말(x, { 받은곳: { 받는주소수: 24 } }), [], '원문 머리글로 확인했는데 «실제로는 더 많을 수 있다»는 거짓 경고가 남았다');
+  assert.ok(!N.한계말(항목('2026-01-01', 'a', { 이름없는첨부: 2 }), { 받은곳: {} }).some((t) => /첨부 2개/.test(t)), '원문을 보관해 첨부 이름을 «전부» 아는데 「이름이 기록에 없다」는 말이 남았다');
+  assert.ok(N.한계말(항목('2026-01-01', 'a', { 이름없는첨부: 2 })).some((t) => /첨부 2개/.test(t)), '보관 전인데 이름 없는 첨부 말을 지웠다');
+  assert.ok(N.한계말(항목('2026-01-01', 'a', { 사라짐: 1791728481226 }), { 받은곳: {} }).some((t) => /더 이상 보이지 않습니다/.test(t)), '보관했다고 「메일함에서 사라짐」 말까지 지웠다');
+});
+
+test('⑥ 대장(CSV)에 «원문 보관» 열 — 보관됨 날짜 · 못 함 · 표지를 안 주면 빈 칸', () => {
+  const 줄 = N.목록({ a: 항목('2026-01-01', 'a'), b: 항목('2026-01-02', 'b'), c: 항목('2026-01-03', 'c') });
+  const 글 = N.대장글(줄, { a: 표지(), b: 표지({ 실패: { 때: 1, 횟수: 1, 까닭: 'x' } }) });
+  const 행 = 글.slice(1).split('\r\n');
+  assert.ok(/원문 보관/.test(행[0]));
+  assert.ok(/보관됨 2026-10-12/.test(행[1]), '보관 날짜가 안 나온다'); assert.ok(/보관 못 함/.test(행[2])); assert.ok(!/보관됨|보관 못 함/.test(행[3]));
+  assert.ok(!/보관됨|보관 못 함/.test(N.대장글(줄)), '표지를 안 줬는데 보관 열을 채웠다');
+});
+
+test('⑥ 보관한 안내문은 첨부를 «보관본의 이름 전부»로 센다 — 거울의 5개 한도·이름이 빈 옛 줄을 넘는다 · 한 안내문에 같은 이름이 둘이어도 한 번', () => {
+  const 줄 = N.목록({ a: 항목('2026-01-01', 'a', { 첨부: ['거울이름.pdf'], 이름없는첨부: 2 }), b: 항목('2026-01-02', 'b', { 첨부: [] }), c: 항목('2026-01-03', 'c', { 첨부: ['남은거울.pdf'] }) });
+  const 찾 = (id) => 줄.find((x) => x.id === id);
+  const 표들 = {
+    a: 표지({ 첨부수: 3, 해시들: [{ 이름: '가.pdf', 해시: '1', 크기: 1 }, { 이름: '나.hwp', 해시: '2', 크기: 1 }, { 이름: '다.xlsx', 해시: '3', 크기: 1 }] }),
+    b: 표지({ 첨부수: 2, 해시들: [{ 이름: '가.pdf', 해시: '1', 크기: 1 }, { 이름: '가.pdf', 해시: '9', 크기: 1 }] }),
+    c: 표지({ 첨부수: 0, 해시들: [] })                                             /* 보관은 했는데 서버가 첨부를 하나도 못 찾았다 — 거울 이름을 믿는다 */
+  };
+  assert.deepStrictEqual(N.파일이름들(찾('a'), 표들), ['가.pdf', '나.hwp', '다.xlsx']);
+  assert.deepStrictEqual(N.파일이름들(찾('b'), 표들), ['가.pdf'], '한 안내문에 같은 이름이 둘인데 두 번 나간 것으로 셌다');
+  assert.deepStrictEqual(N.파일이름들(찾('c'), 표들), ['남은거울.pdf'], '보관본에 첨부가 없다는데 거울 이름까지 지웠다');
+  assert.deepStrictEqual(N.파일이름들(찾('a'), null), ['거울이름.pdf'], '표지가 없으면 거울 이름');
+  assert.deepStrictEqual(N.파일이름들(찾('a'), { a: 표지({ 실패: { 때: 1, 횟수: 1, 까닭: 'x' }, 첨부수: 3, 해시들: [{ 이름: '가.pdf', 해시: '1', 크기: 1 }] }) }), ['거울이름.pdf'], '보관 못 한 안내문의 이름을 썼다');
+  assert.strictEqual(N.첨부수(찾('a'), 표들), 3); assert.strictEqual(N.첨부수(찾('a'), {}), 1 + 2, '표지가 없으면 거울 이름 수 + 이름 없는 수');
+  assert.deepStrictEqual(N.파일들(줄, 표들).map((f) => f.이름 + ':' + f.횟수).sort(), ['가.pdf:2', '나.hwp:1', '남은거울.pdf:1', '다.xlsx:1'], '파일별 횟수가 보관본 이름을 못 쓴다');
+  assert.deepStrictEqual(N.파일들(줄).map((f) => f.이름).sort(), ['거울이름.pdf', '남은거울.pdf'], '표지를 안 주면 예전 그대로(거울 이름)');
+  assert.ok(N.대장글(줄, 표들).includes('가.pdf\n나.hwp\n다.xlsx'), 'CSV 의 첨부 칸이 보관본 이름이 아니다');
 });
