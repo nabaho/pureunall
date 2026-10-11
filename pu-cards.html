@@ -38415,13 +38415,6 @@ function coNpsUnpick(key){
   if(!confirm('국민연금 사업장 연결을 풀까요?\n지금까지 받은 숫자 기록은 남겨 둡니다.')) return;
   npsWrite(key, { pick: null, now: null }).then(ok => ok && toast('연결을 풀었습니다', 5000));
 }
-function coNpsSummary(o){
-  const p = (o.extra && o.extra.nps) || {};
-  if(p.pick && p.now) return '가입자 ' + (Number(p.now.cnt) || 0) + '명';
-  if(p.none) return '없음';
-  if(p.cand && p.cand.length) return '후보 ' + p.cand.length + '곳 — 골라 주세요';
-  return '아직 안 찾음';
-}
 function coNpsHtml(o){
   const k = esc(String(o.key).replace(/'/g, "\\'"));
   const p = (o.extra && o.extra.nps) || {};
