@@ -165,7 +165,11 @@
     .closesplit.hasside>.closemain{grid-column:1;grid-row:1;margin-bottom:0;min-width:0}
     .closesplit.hasside>.closeside{grid-column:2;grid-row:1;margin-bottom:0;position:sticky;top:calc(var(--topbar-h,48px) + var(--fundhead-h,73px) + var(--closehead-h,156px) + 8px);max-height:calc(100vh - var(--topbar-h,48px) - var(--fundhead-h,73px) - var(--closehead-h,156px) - 20px);overflow:auto}
     .closesplit.hasside>.closerest{grid-column:1 / -1;margin-bottom:0}
+    .sumstrip.txn{display:none}   /* 붙박이 결산 판이 있으니 요약 띠는 숨긴다 */
   }
+  .sumstrip{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;background:var(--ink);color:#fff;border-radius:9px;padding:6px 12px;margin-top:8px;font-size:12px}
+  .sumstrip b{font-size:12.5px}.sumstrip .sep{opacity:.35}.sumstrip .ok{color:#bbf7d0}.sumstrip .warn{color:#fde68a}
+  .sumstrip button{background:#475569;color:#fff;border:0;padding:3px 10px;font-size:11.5px}
   /* 묶음마다 표가 따로라, 폭을 안 정하면 충남과 경기의 열이 어긋난다 */
   table.fixcol{table-layout:fixed}
   table.fixcol td{overflow:hidden;text-overflow:ellipsis}
@@ -20864,13 +20868,38 @@ function closingTab(f){
        return '<span class="stat'+(got<need.length?' " style="background:var(--warn-bg);color:var(--warn)':'')
          +'" title="출금 거래에 붙은 영수증">증빙 '+got+'/'+need.length+'</span>'; })()
     +(arr.length?(gateOk?'<span class="chip ok">✅ 결산 가능 (미분류·미승인 0)</span>':'<span class="chip warn">결산 관문: 미분류·미승인 0 필요</span>'):'')+reconChip+'</div>'
-    +closeSubBar()+'</div>'
+    +_sumStripHTML(arr)+closeSubBar()+'</div>'
     +monthLockBar(arr)
     /* 장부 표(rows)는 통장 그대로, 그 밖의 장부·재무제표는 결산 조정을 얹은 것(closeArr)으로 */
     +(function(){ var arrC=closeArr(arr,S.fundId,S.year);
       return '<div id="closeBody">'+(S.closeSub==='accts'?'':_rsvPendingNote(arrC)+_closeRiskNote(arrC))+closeBodyHTML(arrC,rows)+'</div>'; })();
 }
 /* 하위 탭 본문 — 어느 장부를 보든 원천(승인 분개)은 같다 */
+/* ══ 결산 요약 띠 (대표 지시 2026-10-11 「결산 재무제표가 가장 아래 있으면 확인 판단이 어렵다」 — 목업 안 A, 좁은 화면용) ══
+   넓은 화면(1850px~)의 «거래·분개입력»은 오른쪽에 결산·재무제표가 붙박이라 이 띠가 필요 없다(CSS 로 숨김).
+   좁은 화면·다른 하위 탭에서는 위쪽 고정 머리 «안»에 한 줄로 붙어, 거래를 내려도 계속 보인다.
+   새 셈은 없다 — 아래 결산 판과 같은 computeFin(closeArr) 이다. 맨 앞에 «승인 N건 기준 · 미승인 n건 빠짐»을 둔다 — 미승인이 남았으면 숫자는 «중간 결과»다. */
+function _sumStripHTML(arr){
+  if(!arr||!arr.length) return '';
+  var arrC=closeArr(arr,S.fundId,S.year), f=computeFin(arrC,S.fundId,S.year);
+  if(!f||!f.appr) return '';
+  var un=arr.filter(function(x){ return !x.approved; }).length, sp=splitPL(f), diff=f.totalAssets-f.totalLiabEq;
+  var bal=f.balanced?'<span class="ok">✅ 대차일치</span>':'<span class="warn">⚠ 대차차이 '+won(diff)+'</span>';
+  var net=(!sp.netP&&!sp.netF)?'<span class="ok">✅ 두 회계 모두 0</span>'
+    :'<span class="warn">'+(sp.netP?'목적사업 '+Number(sp.netP).toLocaleString():'')+(sp.netP&&sp.netF?' · ':'')+(sp.netF?'기금관리 '+Number(sp.netF).toLocaleString():'')+'</span>';
+  return '<div class="sumstrip'+(S.closeSub==='txn'?' txn':'')+'" title="결산·재무제표 요약 — 승인한 분개 기준">'
+    +'<span class="'+(un?'warn':'ok')+'">승인 '+f.appr+'건 기준'+(un?' · 미승인 '+un+'건 빠짐':'')+'</span>'
+    +'<span class="sep">|</span><span>자산 <b>'+won(f.totalAssets)+'</b></span>'
+    +'<span class="sep">|</span><span>부채·자본 <b>'+won(f.totalLiabEq)+'</b> '+bal+'</span>'
+    +'<span class="sep">|</span><span>준비금2 <b>'+won(f.res2)+'</b></span>'
+    +'<span class="sep">|</span><span>당기순이익 '+net+'</span>'
+    +'<span style="flex:1"></span><button onclick="sumGo()">결산·재무제표 보기 →</button></div>';
+}
+function sumGo(){
+  if(S.closeSub!=='txn'){ closeSub('fin'); return; }   // 다른 하위 탭에서는 재무제표·전기 대비로
+  var el=document.querySelector('.closeside')||document.querySelector('.closerest');
+  if(el&&el.scrollIntoView) el.scrollIntoView({behavior:'smooth',block:'start'});
+}
 function closeBodyHTML(arr,rows){
   switch(S.closeSub){
     case 'journal': return journalView(arr);
