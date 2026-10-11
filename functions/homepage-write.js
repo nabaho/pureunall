@@ -638,7 +638,16 @@ function 자동정찰자리(로고글번호) {
        ⚠ 화면 이름은 라이믹스 공개 소스(modules/layout/layout.admin.view.php)에서 «확인한» 것이다.
          처음엔 dispLayoutAdminContent 라고 썼는데 그런 화면은 없다 — 검사는 통과했지만 실제로는 번호를 못 읽었을 것이다. */
     레이아웃목록: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminInstalledList",
-    레이아웃인스턴스: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminAllInstanceList"
+    레이아웃인스턴스: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminAllInstanceList",
+    /* 4차 정찰 — 직원 블록이 노무사 게시판 목록 «끝»에 붙어 있다. 게시판 설정(머리말·꼬리말 칸)·스킨 설정·
+       쪽 설정 중 이름이 든 칸이 있나. ⚠ 화면 이름은 라이믹스 공개 소스(board·page module.xml)에서 «확인한» 것이다.
+       mid 로 연다(구성원쪽고치기가 이미 mid=people 로 열린다 — 모듈 번호를 따로 찾지 않는다). */
+    구성원게시판설정: ORIGIN + "/index.php?mid=people_board&act=dispBoardAdminBoardInfo",
+    구성원게시판스킨: ORIGIN + "/index.php?mid=people_board&act=dispBoardAdminSkinInfo",
+    구성원게시판추가설정: ORIGIN + "/index.php?mid=people_board&act=dispBoardAdminBoardAdditionSetup",
+    구성원쪽정보: ORIGIN + "/index.php?mid=people&act=dispPageAdminInfo",
+    구성원쪽스킨: ORIGIN + "/index.php?mid=people&act=dispPageAdminSkinInfo",
+    구성원쪽추가설정: ORIGIN + "/index.php?mid=people&act=dispPageAdminPageAdditionSetup"
   };
   if (Number.isInteger(n) && n > 0) {
     자리.자문사옛글 = ORIGIN + "/index.php?mid=partner_board&act=dispBoardWrite&document_srl=" + n;
@@ -688,6 +697,29 @@ function 레이아웃이름(html) {
     if (/^[A-Za-z0-9_]{2,40}$/.test(v)) return v;
   }
   return "";
+}
+
+/* ══════ 4차 정찰(2026-10-11) — 직원 이름이 «어느 칸»에 들어 있나 ══════
+   3차 정찰 결과: 직원 이름은 레이아웃 설정 칸(256개+HTML 칸)·쪽 본문에 0번이고, 레이아웃 코드 편집은 막혀 있다(403).
+   남은 후보 — 직원 블록이 노무사 게시판 목록 «끝»에 붙어 있으니 게시판 설정의 꼬리말(footer_text)·스킨 설정, 쪽 설정.
+   ★ 이름이 든 «칸 이름»을 바로 돌려준다 — 칸 이름만 알면 서버가 그 칸 하나를 고치는 길을 지을 수 있다.
+   ⚠ 값·이름은 안 담는다 — «칸 이름과 몇 번 나왔나»만. 입력 칸(input)·넓은 칸(textarea)의 값만 본다. */
+function 이름든칸들(html, 이름들) {
+  const 본문 = String(html || "");
+  const 찾을 = (이름들 || []).map((n) => String(n || "").trim()).filter(Boolean);
+  if (!찾을.length) return [];
+  const 셈 = (글) => 찾을.reduce((s, n) => s + (글.split(n).length - 1), 0);
+  const 칸들 = {};
+  const 더하기 = (이름, 글) => { const k = 셈(글); if (이름 && k > 0) 칸들[이름] = (칸들[이름] || 0) + k; };
+  for (const m of 본문.matchAll(/<textarea\b([^>]*)>([\s\S]*?)<\/textarea>/gi)) {
+    더하기(속성("<t " + m[1] + ">", "name"), 글자되돌리기(m[2]));
+  }
+  for (const m of 본문.matchAll(/<input\b[^>]*>/gi)) {
+    const 종류 = (속성(m[0], "type") || "text").toLowerCase();
+    if (종류 === "password" || 종류 === "file") continue;
+    더하기(속성(m[0], "name"), 글자되돌리기(속성(m[0], "value")));
+  }
+  return Object.keys(칸들).sort().map((k) => ({ 칸: k, 수: 칸들[k] }));
 }
 
 /* 숨은 칸 가운데 «번호»만 — 이름이 srl 로 끝나고 값이 숫자인 것.
@@ -925,7 +957,7 @@ module.exports = {
   칸읽기, 이름표로칸찾기, 이름다듬기, 글자되돌리기, 확인표뽑기, 폼떼기, 비공개자리, 정찰, 번호값들,
   내리는type, 절대안쓰는type, 휴지통몸통, 문서관리보낼주소,
   내릴게시판, 게시판글주소, 게시판확인, 채운칸들, 자동정찰자리, 새구성원몸통, 새글번호,
-  편집기단서, 본문모양, 이름자리모양, 직원이름뽑기, 레이아웃번호들, 레이아웃자리, 레이아웃이름,
+  편집기단서, 본문모양, 이름자리모양, 이름든칸들, 직원이름뽑기, 레이아웃번호들, 레이아웃자리, 레이아웃이름,
   편집기번호, 로고올리기몸통, 올리기답풀기, 로고새글몸통,
   파일칸찾기, 사진종류, 사진최대, 사진받을까, 사진몸통,
   막을까, 갈아끼우기, 몸통, 로그인몸통
