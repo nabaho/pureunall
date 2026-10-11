@@ -354,3 +354,47 @@ test('alertsExtra — blocked 묶음(기존 waitSign·overdue 는 그대로)', (
   assert.deepEqual(x.waitSign, []);
   assert.deepEqual(x.overdue, []);
 });
+
+test('rd — 값 자르기·범위·이상한 값', () => {
+  assert.deepEqual(Tr.normRd({ mode: 'face', mins: 120, people: 3, photo: true, sign: true }), { mode: 'face', mins: 120, people: 3, photo: true, sign: true });
+  assert.deepEqual(Tr.normRd({ mode: 'remote' }), { mode: 'remote' });
+  assert.deepEqual(Tr.normRd({ mode: 'face', md: 1.5, kind: 'report' }), { mode: 'face', md: 1.5, kind: 'report' });
+  assert.equal(Tr.normRd(null), null);
+  assert.equal(Tr.normRd({}), null, 'mode 필수');
+  assert.equal(Tr.normRd({ mode: 'zoom' }), null);
+  assert.equal(Tr.normRd([]), null);
+  assert.deepEqual(Tr.normRd({ mode: 'face', mins: 601 }), { mode: 'face' }, '범위 밖 숫자는 버린다');
+  assert.deepEqual(Tr.normRd({ mode: 'face', mins: 90.5, people: -1, md: 0.3, kind: 'x', photo: 'yes' }), { mode: 'face' });
+  assert.deepEqual(Tr.normRd({ mode: 'face', mins: '120', people: '3' }), { mode: 'face' }, '문자열 숫자는 받지 않는다');
+  assert.deepEqual(Tr.normRd({ mode: 'face', mins: 0, people: 0, md: 0 }), { mode: 'face', mins: 0, people: 0, md: 0 }, '0 은 값이다');
+  assert.deepEqual(Tr.normRd({ mode: 'face', photo: false, sign: false }), { mode: 'face', photo: false, sign: false });
+  const evil = JSON.parse('{"mode":"face","__proto__":{"x":1},"constructor":2}');
+  assert.deepEqual(Tr.normRd(evil), { mode: 'face' });
+  assert.equal(({}).x, undefined);
+});
+
+test('nextRd — 올바른 op.rd 는 그것, 아니면 옛 줄 것, 지우기 없음', () => {
+  const prev = { st: 'doing', rd: { mode: 'face', mins: 90 } };
+  assert.deepEqual(Tr.nextRd(prev, { rd: { mode: 'remote', mins: 60 } }), { mode: 'remote', mins: 60 });
+  assert.deepEqual(Tr.nextRd(prev, undefined), { mode: 'face', mins: 90 });
+  assert.deepEqual(Tr.nextRd(prev, {}), { mode: 'face', mins: 90 });
+  assert.deepEqual(Tr.nextRd(prev, { rd: null }), { mode: 'face', mins: 90 }, '지우기 없음');
+  assert.deepEqual(Tr.nextRd(prev, { rd: { mode: 'zoom' } }), { mode: 'face', mins: 90 }, '틀린 값은 옛 줄');
+  assert.equal(Tr.nextRd(null, undefined), null);
+  assert.equal(Tr.nextRd({ st: 'none' }, {}), null);
+});
+
+test('rd — normalize·patchFor·validate 에 실린다', () => {
+  const raw = { cb: { r1: { items: { 'round:1': { st: 'done', at: 1, rd: { mode: 'face', mins: 130, people: 4, photo: true, sign: true, x: 1 } } } } } };
+  assert.deepEqual(Tr.normalize(raw).cb.r1['round:1'].rd, { mode: 'face', mins: 130, people: 4, photo: true, sign: true });
+  const base = { st: 'done', note: '', sentAt: '', gotAt: '', how: '', ack: false, link: null };
+  const p = Tr.patchFor(Object.assign({}, base, { rd: { mode: 'face', mins: 130 } }), 'x', 5);
+  assert.deepEqual(p.rd, { mode: 'face', mins: 130 });
+  assert.equal(Tr.patchFor(base, 'x', 5).rd, undefined, 'rd 없으면 키도 없다');
+  assert.equal(Tr.validate(Object.assign({}, base, { rd: { mode: 'face', mins: 130 } }), 'plat'), '');
+  assert.equal(Tr.validate(Object.assign({}, base, { rd: { mode: 'zoom' } }), 'plat'), Tr.RD_BAD);
+  assert.equal(Tr.validate(Object.assign({}, base, { rd: null }), 'plat'), '', 'null 은 «없음»');
+  assert.deepEqual([Tr.RD_MINS_MAX, Tr.RD_PEOPLE_MAX, Tr.RD_MD_MAX], [600, 99, 5]);
+  assert.deepEqual(Tr.RD_MODE, ['face', 'remote']);
+  assert.deepEqual(Tr.RD_KIND, ['visit', 'report', 'research']);
+});

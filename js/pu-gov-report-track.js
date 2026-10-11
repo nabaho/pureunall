@@ -14,6 +14,7 @@
    ★ 받은 서류 연결(2026-10-11, 설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md §3) — 줄에 선택 칸 link 하나:
      { src:'mail', key:1~80자, name?:≤100자, date?:'YYYY-MM-DD' }. 읽을 때 틀린 link 는 버리고(줄은 남긴다) 이름은 자른다.
      화면 grSaveCell 은 줄 전체를 .set 하므로, 상태만 고치는 저장이 link 를 지우지 않게 nextLink(옛 줄, 요청)로 이어 받는다.
+   ★ 회차 기록 rd(2026-10-12, 설계 2-B) — 줄에 선택 칸 rd 하나: { mode:'face'|'remote'(필수), mins?, people?, photo?, sign?, md?, kind? }. 범위 밖 값은 버리고 지우는 길은 없다(nextRd).
    ★ 대형 단계 종류 plat·report(2026-10-11, 설계 2-A) — 항목 단위 키(keysForItem)·단계 칩(bigCells)·다음 단계(nextStage)·막힌 단계(blockedOf). 간단형 열(STEPS)은 그대로.
    ⚠ 저장소는 공개다 — 검사는 합성 자료만 쓴다. */
 (function (root) {
@@ -37,6 +38,9 @@
   /* 받은 서류 연결 — 규칙(scal_docs …/$key/link)과 같은 값 */
   var LINK_SRC = 'mail', LINK_KEY_MAX = 80, LINK_NAME_MAX = 100;
   var LINK_BAD = '연결 값이 올바르지 않습니다';
+  /* 회차 기록 — 규칙(scal_docs …/$key/rd)과 같은 값 */
+  var RD_MINS_MAX = 600, RD_PEOPLE_MAX = 99, RD_MD_MAX = 5, RD_MODE = ['face', 'remote'], RD_KIND = ['visit', 'report', 'research'];
+  var RD_BAD = '회차 기록 값이 올바르지 않습니다';
 
   function str(v) { return v == null ? '' : String(v).trim(); }
   function obj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
@@ -93,6 +97,24 @@
     }
     return obj(prev) ? normLink(prev.link) : null;
   }
+  /* 회차 기록 — 틀리면 null(줄은 남긴다). mode 필수, 나머지는 범위 안 값만 */
+  function isInt(v, max) { return typeof v === 'number' && isFinite(v) && Math.floor(v) === v && v >= 0 && v <= max; }
+  function normRd(r) {
+    if (!obj(r) || RD_MODE.indexOf(r.mode) < 0) return null;
+    var o = { mode: r.mode };
+    if (isInt(r.mins, RD_MINS_MAX)) o.mins = r.mins;
+    if (isInt(r.people, RD_PEOPLE_MAX)) o.people = r.people;
+    if (r.photo === true || r.photo === false) o.photo = r.photo;
+    if (r.sign === true || r.sign === false) o.sign = r.sign;
+    if (typeof r.md === 'number' && isFinite(r.md) && r.md >= 0 && r.md <= RD_MD_MAX && Math.round(r.md * 2) === r.md * 2) o.md = r.md;
+    if (typeof r.kind === 'string' && RD_KIND.indexOf(r.kind) >= 0) o.kind = r.kind;
+    return o;
+  }
+  /* 저장할 때 실을 회차 기록 — op.rd 가 올바르면 그것, 그 밖(없음·null·틀림)은 옛 줄의 것(지우는 길은 없다) */
+  function nextRd(prev, op) {
+    if (obj(op) && has(op, 'rd')) { var n = normRd(op.rd); if (n) return n; }
+    return obj(prev) ? normRd(prev.rd) : null;
+  }
   function normRec(r) {
     if (!obj(r) || STATES.indexOf(r.st) < 0) return null;
     var o = { st: r.st, at: Number(r.at) || 0 };
@@ -104,6 +126,8 @@
     if (r.ack === true) o.ack = true;
     var lk = normLink(r.link);
     if (lk) o.link = lk;
+    var rd = normRd(r.rd);
+    if (rd) o.rd = rd;
     return o;
   }
   /* DB 의 scal_docs 통째 → { 업체: { rid: { 키: 줄 } } } (items 한 층을 걷는다) */
@@ -269,6 +293,7 @@
     if (str(e.how) && !has(HOW, str(e.how))) return '제출 방식을 다시 골라 주세요';
     if (str(e.note).length > NOTE_MAX) return '메모는 ' + NOTE_MAX + '자까지입니다';
     if (e.link != null && !normLink(e.link)) return LINK_BAD;
+    if (e.rd != null && !normRd(e.rd)) return RD_BAD;
     return '';
   }
   /* 저장할 줄 하나 — 빈 값은 뺀다(DB 도 빈 값을 저장하지 않는다) */
@@ -283,15 +308,18 @@
     if (str(e.note)) o.note = str(e.note);
     var lk = normLink(e.link);
     if (lk) o.link = lk;
+    var rd = normRd(e.rd);
+    if (rd) o.rd = rd;
     return o;
   }
 
   var api = { keyOf: keyOf, keysFor: keysFor, keysForItem: keysForItem, bigCells: bigCells, nextStage: nextStage, blockedOf: blockedOf, normalize: normalize, recOf: recOf, put: put, stateOf: stateOf, label: label,
     chipOf: chipOf, cellFor: cellFor, itemChip: itemChip, rowTrack: rowTrack, kpiHit: kpiHit, kpiExtra: kpiExtra,
-    alertsExtra: alertsExtra, validate: validate, patchFor: patchFor, normLink: normLink, nextLink: nextLink,
+    alertsExtra: alertsExtra, validate: validate, patchFor: patchFor, normLink: normLink, nextLink: nextLink, normRd: normRd, nextRd: nextRd,
     STATES: STATES, ST_KO: ST_KO, MARK: MARK, ALLOWED: ALLOWED, COL_KO: COL_KO, STEPS: STEPS, HOW: HOW, CHIP: CHIP,
     NOTE_MAX: NOTE_MAX, BY_MAX: BY_MAX, WAIT_SIGN_DAYS: WAIT_SIGN_DAYS, KEY_RE: KEY_RE, SAVE_FAIL: SAVE_FAIL, LOAD_FAIL: LOAD_FAIL,
-    LINK_SRC: LINK_SRC, LINK_KEY_MAX: LINK_KEY_MAX, LINK_NAME_MAX: LINK_NAME_MAX, LINK_BAD: LINK_BAD };
+    LINK_SRC: LINK_SRC, LINK_KEY_MAX: LINK_KEY_MAX, LINK_NAME_MAX: LINK_NAME_MAX, LINK_BAD: LINK_BAD,
+    RD_MINS_MAX: RD_MINS_MAX, RD_PEOPLE_MAX: RD_PEOPLE_MAX, RD_MD_MAX: RD_MD_MAX, RD_MODE: RD_MODE, RD_KIND: RD_KIND, RD_BAD: RD_BAD };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuGovReportTrack = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
