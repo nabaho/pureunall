@@ -2933,6 +2933,13 @@ var FB_FIN_GATED = ['finance_income','finance_expense','finance_invoice','payrol
    ⚠ co_merge_log(89KB)는 여기 없어도 빠진다 — FB_EXCLUDE 라 fbShouldSync 가 거른다.
      (읽는 곳이 한 곳도 없는데 매번 내려오고 있었다.) */
 var FB_COLD_KEYS = ['payroll_audit_log'];
+/* 부팅에서도 안 받고 «구독도 안 하는» 키 — 쓰는 화면이 열릴 때 판(u)을 견줘 바뀌었을 때만 한 번 받는다(erpFreshForms).
+   ■ contract_forms (2026-10-11 대표 「비용이 너무 많이 증가」) — 양식 62개 1.8~3.4MB(첨부 원본 base64).
+     실측: 문서관리에서 양식 한 장을 저장할 때마다 «열려 있는 이알피 창 7~8개»가 목록 통째를 다시 받았다
+     (88초에 29장 저장 → 211MB). 이알피는 양식을 「📄 계약서 출력」 창 한 곳에서만 쓴다.
+   ⚠ erpEnsureKeys 로 받지 말 것 — 그것은 실시간 구독이라 위의 곱셈이 되살아난다. */
+var FB_COLD_ONCE_KEYS = ['contract_forms'];
+function _fbIsColdKey(k){ return FB_COLD_KEYS.indexOf(k) >= 0 || FB_COLD_ONCE_KEYS.indexOf(k) >= 0; }
 // ── [보안규칙 대비] 전체 동기화 키 (키별 폴백 읽기/구독용 — fbUploadAll과 공유) ──
 var FB_ALL_SYNC_KEYS = [
   'contracts','cases','consultings','funds','other_projects','companies',
@@ -4097,9 +4104,12 @@ function serverBackupDaily(force){
      스냅샷은 localStorage 를 훑어서 만든다. 그런데 이 키들은 그 화면을 열어야 내려온다 —
      그날 아무도 급여감사 화면을 안 열었으면 백업에서 통째로 빠지고, **빠진 줄도 모른다.**
      ⚠ 못 받아도 백업은 그대로 간다. 한 칸 때문에 백업 전부를 잃는 것이 더 나쁘다. */
-  var 차가운것 = (window.erpEnsureKeys && typeof FB_COLD_KEYS !== 'undefined')
-    ? window.erpEnsureKeys(FB_COLD_KEYS).catch(function(){ return 0; })
-    : Promise.resolve(0);
+  var 차가운것 = Promise.all([
+    (window.erpEnsureKeys && typeof FB_COLD_KEYS !== 'undefined')
+      ? window.erpEnsureKeys(FB_COLD_KEYS).catch(function(){ return 0; }) : 0,
+    /* 계약서 양식 — 구독 없이 바뀐 판만 한 번(FB_COLD_ONCE_KEYS). 백업에 낡은 양식이 담기지 않게 */
+    window.erpFreshForms ? window.erpFreshForms().catch(function(){ return 0; }) : 0
+  ]);
   return 차가운것.then(function(){ return _serverBackupSave(ymd); });
 }
 function _serverBackupSave(ymd){
@@ -11382,7 +11392,9 @@ function fbUploadAll(onProgress, onDone){
   if(!fbDb){ if(onDone) onDone(false, 'Firebase 미연결'); return; }
   // [보안규칙 대비] 전체 업로드는 관리자·위임관리인 전용 — 일반 직원 실행 시 재무 키 쓰기 거부로 멀티패스 전체 실패하므로 차단
   if(!(CURRENT_USER && (CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin))){ if(onDone) onDone(false, '전체 업로드는 관리자 전용입니다'); return; }
-  var SYNC_KEYS = FB_ALL_SYNC_KEYS;
+  /* ⚠ 계약서 양식(FB_COLD_ONCE_KEYS)은 빼고 올린다 — 이 PC 사본이 낡았을 수 있다(출력 창을 열 때만 받는다).
+       양식을 고치는 곳은 문서관리 한 곳이고, 낡은 사본을 통째로 올리면 그곳에서 고친 것이 사라진다. */
+  var SYNC_KEYS = FB_ALL_SYNC_KEYS.filter(function(k){ return FB_COLD_ONCE_KEYS.indexOf(k) < 0; });
   var updates = {};
   var ts = Date.now();
   var count = 0;
@@ -11554,6 +11566,7 @@ function _fbOnSiblingStorage(e){
   if(!e || !e.key || e.key.indexOf(pre) !== 0 || !e.newValue) return;
   var k = e.key.slice(pre.length);
   if(!k || !fbShouldSync(k)) return;
+  if(typeof FB_COLD_ONCE_KEYS !== 'undefined' && FB_COLD_ONCE_KEYS.indexOf(k) >= 0) return;   // 열 때만 받는 표 — 다른 창이 받았다고 따라 받지 않는다(출력 창이 열 때 견준다)
   clearTimeout(_fbSiblingTimers[k]);
   _fbSiblingTimers[k] = setTimeout(function(){ delete _fbSiblingTimers[k]; _fbSiblingRefresh(k); }, 500);
 }
@@ -11693,7 +11706,7 @@ function _fbPlanMark(mark, t0){
 function _fbFallbackPlan(why, detail){
   var keys = FB_ALL_SYNC_KEYS
     .filter(fbShouldSync)                                          // 올리지 않는 것은 받지도 않는다
-    .filter(function(k){ return FB_COLD_KEYS.indexOf(k) < 0; });
+    .filter(function(k){ return !_fbIsColdKey(k); });
   /* 재무 권한을 못 읽었으므로 재무 표도 넣는다 — 규칙이 막으면 조용히 건너뛴다.
      (「조회 실패 → 전부」는 원래 규칙 그대로다. 여기서 임의로 좁히면 재무
       담당자가 빈 화면을 본다.) */
@@ -11734,7 +11747,7 @@ function _bootKeyPlan(){
     var fin = r[0], shallow = r[1];
     if(!shallow || typeof shallow !== 'object') return _fbFallbackPlan('명단 없음', _fbPlanMark(mark, t0));
     var keys = Object.keys(shallow).filter(fbShouldSync);           // 올리지 않는 것은 받지도 않는다
-    keys = keys.filter(function(k){ return FB_COLD_KEYS.indexOf(k) < 0; });
+    keys = keys.filter(function(k){ return !_fbIsColdKey(k); });
     if(fin === false) keys = keys.filter(function(k){ return FB_FIN_GATED.indexOf(k) < 0; });
     /* ★ 계획이 «섰다» 는 것도 남긴다. 실패만 적어 두면 「잘 되고 있다」를 알 길이 없어,
        늦게 울린 자명종 한 줄에 온 사무실이 놀란다(실제로 그랬다). */
@@ -12165,6 +12178,25 @@ window.erpEnsureKeys = function(keys){
   return Promise.all(want.map(function(k){ return _fbLive(k, {}); }))
     .then(function(rs){ return rs.filter(Boolean).length; });
 };
+/* 계약서 양식처럼 «구독하지 않는» 차가운 키(FB_COLD_ONCE_KEYS)를 지금 손에 쥔다 — 판(u)만 먼저 읽고
+   이 PC 사본의 판(_meta_)과 같으면 아무것도 안 받는다. 다르면 한 번 받아 얹는다. 구독(on)은 하지 않는다.
+   통째 모드·이미 실시간인 키는 이미 손에 있으므로 0. 못 읽으면 조용히 0(화면은 이 PC 사본으로 그린다). */
+window.erpFreshForms = function(){
+  if(!fbDb || !window._fbPerKeyMode) return Promise.resolve(0);
+  return Promise.all(FB_COLD_ONCE_KEYS.filter(fbShouldSync).map(function(k){
+    if(_fbKeyLive[k]) return 0;
+    return fbDb.ref('data/' + k + '/u').once('value').then(function(us){
+      var su = us.val(), mine = Number(localStorage.getItem(KEY + '_meta_' + k) || 0);
+      if(typeof su === 'number' && su === mine && _erpStoreGet(k)) return 0;   // 같은 판 — 받지 않는다
+      return fbDb.ref('data/' + k).once('value').then(function(s){
+        var v = s.val();
+        try { if(v) _fbBytesIn += JSON.stringify(v).length; } catch(_b){}
+        if(!v || v.v === undefined || typeof v.u !== 'number') return 0;
+        return _fbApplyRecord(k, v, { notify:true, force:true }) ? 1 : 0;
+      });
+    }).catch(function(e){ window._erpErrLog && window._erpErrLog(e); return 0; });
+  })).then(function(rs){ return rs.reduce(function(a, b){ return a + (b || 0); }, 0); });
+};
 /* 되돌림 스위치 — 문제가 생기면 콘솔에서 erpBootFullSync(true) 후 새로고침. */
 window.erpBootFullSync = function(on){
   try { localStorage.setItem('pureun_v6_boot_full', on ? '1' : ''); } catch(_){}
@@ -12186,6 +12218,7 @@ window.erpAuditSyncKeys = function(){
     var report = {
       전체: all.length,
       부팅제외_로그류: all.filter(function(k){ return FB_COLD_KEYS.indexOf(k) >= 0; }),
+      부팅제외_열때만: all.filter(function(k){ return FB_COLD_ONCE_KEYS.indexOf(k) >= 0; }),
       부팅제외_올리지않는것: all.filter(function(k){ return !fbShouldSync(k); }),
       재무가르기대상: all.filter(function(k){ return FB_FIN_GATED.indexOf(k) >= 0; })
     };
@@ -41074,7 +41107,25 @@ function ContractDocVault(props){
 }
 
 // ============ 계약서 출력 모달 (종류별 탭) ============
+/* 껍데기 — 계약서 양식은 부팅·구독으로 안 받는다(FB_COLD_ONCE_KEYS, 2026-10-11). 이 창을 열 때 판을 견줘
+   바뀌었으면 한 번 받고(erpFreshForms), 그 «뒤에» 본문을 그린다.
+   ⚠ 본문의 getContractForms() 를 받기 «전에» 부르면 안 된다 — 빈 사본이면 기본 양식으로 서버를 덮는다.
+   ⚠ hooks 차례 때문에 본문은 따로 둔 컴포넌트다(받는 중에 일찍 돌려보내도 본문의 hooks 가 흔들리지 않게). */
 function ContractFormPrintModal(props){
+  var _rd = useState(function(){ return !(typeof fbDb !== 'undefined' && fbDb && window._fbPerKeyMode); });
+  var ready = _rd[0], setReady = _rd[1];
+  useEffect(function(){
+    if(ready) return;
+    var alive = true, done = function(){ if(alive) setReady(true); };
+    (typeof window.erpFreshForms === 'function' ? window.erpFreshForms() : Promise.resolve(0)).then(done, done);
+    return function(){ alive = false; };
+  }, []);
+  if(ready) return h(ContractFormPrintBody, props);
+  return h('div', { className:'modal-bg', onClick:props.onClose },
+    h('div', { className:'modal', style:{ width:'360px' }, onClick:function(e){ e.stopPropagation(); } },
+      h('div', { style:{ padding:'20px', textAlign:'center', color:'#94a3b8', fontSize:'13px' } }, '📄 계약서 양식 불러오는 중…')));
+}
+function ContractFormPrintBody(props){
   useEscClose(props.onClose);
   var contract = props.contract;
   var allForms = getContractForms();
