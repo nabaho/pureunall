@@ -12,6 +12,8 @@
        how 가 없으면 정하지 않은 것이다. 화면이 서명·제출 메일 초안/체크 글에 쓴다.
      · 현장클리닉(2026-10-12)은 운영지침 공식 서식(별지11·13·14·24)으로 줄을 짰다 — 간단형이라 plat·report 줄은 서류 목차에만 나오고
        체크표 ③④⑤ 는 sign·attach·submit 줄만 읽는다(이 틀에는 sign·attach 가 없어 ③④ 는 「—」). 줄 안내 글(note)은 서식이 정한 때·기한뿐.
+     · 틀의 선택 필드 chipItem(줄 id)이 있으면 목차의 ①② 보고서 상태 딱지는 그 줄에만 붙는다(현장클리닉 = result, 별지14).
+       없으면 report 줄마다 붙는 기존 그대로.
      · 대형 틀(2026-10-11, 설계 2-A)은 항목마다 선택 글 steps(플랫폼 입력 순서 · plat 줄)·note(증빙·기준 안내)를 둘 수 있다.
        docsTable 은 대형이면 단계 열(cols = 항목 이름)·칸(cells)·다음 단계(next)를, trackRows 는 막힌 단계(blocked)를 돌려준다.
        간단형 출력은 그대로다(big·next 속성이 없다). 월별 서류의 달은 monthsFor(계약 기간 → 회차 날짜).
@@ -84,7 +86,7 @@
       it('survey', '만족도조사', 'once', 'attach'),
       it('submit', '기관 제출(기술보호울타리)', 'once', 'submit', { how: 'platform', steps: TECHGUARD_STEPS })] },
     /* 현장클리닉 — 운영지침 공식 서식(별지11 수행계획서 · 13 변경요청서 · 14 현장지도결과서 · 24 성과추적관리결과서). 줄 id log·track·submit 은 옛 기록 그대로 */
-    { key: 'clinic', words: ['현장클리닉'], kind: '간단', check: '2026-04 개정 지침 대조(별지 24)', source: SOURCE, items: [
+    { key: 'clinic', words: ['현장클리닉'], kind: '간단', check: '2026-04 개정 지침 대조(별지 24)', chipItem: 'result', source: SOURCE, items: [
       it('plan', '별지11 현장클리닉 수행계획서', 'once', 'plat', { note: '클리닉위원 선정 후 7일 이내 시스템 제출 — 운영기관 승인 전에는 현장클리닉을 수행할 수 없습니다(운영지침 제22조)' }),
       it('change', '별지13 수행계획 변경요청서', 'once', 'plat', { note: '계획 일정·내용을 바꿀 때 — 기 등록된 수행일시 전에 요청(해당 없으면 「해당없음」)' }),
       it('log', '상담일지', 'round', 'report'),
@@ -338,7 +340,7 @@
     var check = plan.check ? '[확인 필요: ' + plan.check + ']' : '';
     var items = plan.items.map(function (x, i) {
       var subs = x.per === 'round' ? range(n) : (x.per === 'month' ? months(s || p.firstDate, e || p.lastDate) : []);
-      var chip = (auto && x.step === 'report' && r && r.st) ? { txt: r.st.label, key: r.st.key } : { txt: '—', key: '' };
+      var chip = (auto && x.step === 'report' && r && r.st && (!plan.chipItem || plan.chipItem === x.id)) ? { txt: r.st.label, key: r.st.key } : { txt: '—', key: '' };
       if (auto && o.rec && x.step !== 'report' && x.step !== 'plat') chip = Track.itemChip(x, o.rec, n, o.today) || chip;
       return { no: i + 1, id: x.id, name: x.name, per: x.per, step: x.step, subs: subs, chip: chip, check: check };
     });

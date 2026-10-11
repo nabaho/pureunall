@@ -746,3 +746,35 @@ test('다른 서류 틀은 그대로 — 간단형 ③④⑤ 불변 · AUTO 는 
   assert.equal(D.planFor('통합기술보호지원단').items.length, 6);
   assert.deepEqual(D.DOC_PLANS.map((p) => p.key), ['industry-cn', 'cci-north', 'cci-seosan', 'techguard', 'clinic', 'rural', 'workplace', 'industry']);
 });
+
+test('tocFor chipItem — 현장클리닉은 ①② 보고서 딱지가 별지14(result) 줄에만 · 다른 간단형은 report 줄마다 그대로', () => {
+  /* chipItem 은 현장클리닉 틀에만 있다 */
+  D.DOC_PLANS.forEach((p) => assert.equal('chipItem' in p, p.key === 'clinic', p.key));
+  const clinic = D.DOC_PLANS.find((p) => p.key === 'clinic');
+  assert.equal(clinic.chipItem, 'result');
+  assert.ok(clinic.items.some((x) => x.id === clinic.chipItem && x.step === 'report'), 'chipItem 은 이 틀의 보고서 줄');
+  const board = { key: 'draft', label: '초안', steps: [true, false, false, false] };
+  /* 현장클리닉 — log·track 은 「—」, result 만 현황판 줄 상태 */
+  const pair = D.pairs(CLX.input, 'td', '2026')[0];
+  const t = D.tocFor({ pair, row: clRow(board), erp: clErp(), cons: null, dir: [] });
+  assert.deepEqual(t.items.map((x) => x.id + ':' + x.chip.txt), ['plan:—', 'change:—', 'log:—', 'result:초안', 'track:—', 'submit:—']);
+  assert.equal(t.items[3].chip.key, 'draft');
+  assert.equal(t.items[2].chip.key, '');
+  assert.equal(t.items[4].chip.key, '');
+  /* 현황판 줄이 없으면 result 도 「—」 */
+  assert.equal(D.tocFor({ pair, row: null, erp: clErp(), cons: null, dir: [] }).items[3].chip.txt, '—');
+  /* 제출 줄 기록 딱지는 그대로(chipItem 과 무관) */
+  const rec = Tr.recOf(clTrack({ submit: { st: 'doing', at: 1 } }), 'cd', 'td_2026');
+  const t2 = D.tocFor({ pair, row: clRow(board), erp: clErp(), cons: null, dir: [], rec, today: '2026-10-12' });
+  assert.deepEqual([t2.items[3].chip.txt, t2.items[5].chip.txt], ['초안', '◐ 제출 준비']);
+  /* 다른 간단형 — report 줄마다 ①② 딱지(기존 그대로) */
+  const r3 = rows().filter((x) => x.coId === 'c3')[0];
+  const sv = D.tocFor({ pair: pairOf('t4', 'c3'), row: r3, erp: code('consulting-05'), cons: null, dir: X.dir });
+  assert.deepEqual(sv.items.map((x) => x.id + ':' + x.chip.txt), ['visit:미작성', 'report:미작성', 'sign:—', 'attach:—', 'submit:—'], '서산 — report 두 줄 모두');
+  const r1 = rows().filter((x) => x.coId === 'c1' && x.typeId === 't1')[0];
+  const tg = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir });
+  assert.deepEqual(tg.items.map((x) => x.id + ':' + x.chip.txt), ['report:초안', 'advice:—', 'pledge:—', 'travel:—', 'survey:—', 'submit:—']);
+  const nb = D.tocFor({ pair: BIGX_PAIR_NORTH(), row: { st: board }, erp: D.erpTypeFor('tc', BIGX.biz, BIGX.tmap), cons: null, dir: [] });
+  assert.deepEqual(nb.items.map((x) => x.id + ':' + x.chip.txt), ['report:초안', 'sign:—', 'attach:—', 'submit:—'], '충남북부');
+});
+function BIGX_PAIR_NORTH() { return D.pairs(BIGX.input, 'tc', '2026')[0]; }
