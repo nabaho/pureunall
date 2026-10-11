@@ -1323,9 +1323,8 @@ const signCell = (w) => cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
 const liOf = (html, s) => html.split('<li>').filter((x) => x.includes(s))[0] || '';
 
 test('56 정적 — 서명 요청 모듈을 inbox 다음에 싣는다 · 쓰기는 여전히 .set 한 곳 · 메일 보내기 호출·mailto 없음', () => {
-  assert.ok(SRC.indexOf('<script src="js/pu-gov-report-inbox.js?v=4"></script>\r\n<script src="js/pu-gov-report-send.js?v=1"></script>') >= 0
-    || SRC.indexOf('<script src="js/pu-gov-report-inbox.js?v=4"></script>\n<script src="js/pu-gov-report-send.js?v=1"></script>') >= 0,
-  'send 모듈은 inbox 바로 뒤');
+  assert.match(SRC, /<script src="js\/pu-gov-report-inbox\.js\?v=\d+"><\/script>\r?\n<script src="js\/pu-gov-report-send\.js\?v=\d+"><\/script>/,
+    'send 모듈은 inbox 바로 뒤');
   assert.match(INLINE, /PuGovReportSend\./);
   assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
