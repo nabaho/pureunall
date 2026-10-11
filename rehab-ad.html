@@ -714,6 +714,8 @@ function draw(){
   }
   var vis={}; VIEW.forEach(function(n){ vis[n.id]=1; });
   Object.keys(SEL).forEach(function(k){ if(!vis[k]) delete SEL[k]; });   /* 안 보이는 줄이 골라져 있으면 안 된다 */
+  /* 거르개·탭으로 목록에서 사라진 회사는 오른쪽에도 남기지 않는다 — 고른 회사가 없으면 안내만 */
+  if(CUR && !VIEW.some(function(n){ return n.id===CUR; })){ CUR=''; $('detail').classList.remove('open'); }
   drawSel(); drawDetail(); drawRunline(); fitLayout();
 }
 function drawPager(from,cnt,pages){
