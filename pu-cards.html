@@ -6882,8 +6882,8 @@ function selToNewsletter(){
       + '<br><br>⚠ 자문 사업장의 담당자·대표자는 <b>넣지 않으셔도 됩니다</b> —'
       + ' 업체관리에서 저절로 들어갑니다.'
       + '<br>⚠ 여기 담은 분은 계약이 끝나도 <b>저절로 안 빠집니다.</b>'
-      + '<br>⚠ 거래 관계 밖이면 <b>사전 동의</b>가 필요합니다 — 「동의 아직」으로 담고,'
-      + ' 그동안은 뉴스레터 제목에 <b>(광고)</b>가 붙습니다.',
+      + '<br>⚠ 거래 관계 밖이면 <b>사전 동의</b>가 필요합니다 — 「동의 받기 전」으로 담고,'
+      + ' <b>동의를 받으실 때까지는 보내지 않습니다</b>(뉴스레터 › 받는 곳 › 지인·잠재에서 「동의 받음」).',
     ok: '명단에 넣기', cancel: '그만두기'
   }).then(async yes=>{
     if(!yes) return;
@@ -6899,7 +6899,7 @@ function selToNewsletter(){
     try{
       await db.ref('newsletter/더한분들').update(묶음);
       state.sel={}; render();
-      toast('📰 ' + Object.keys(묶음).length + '명을 뉴스레터 명단에 넣었습니다', 7000);
+      toast('📰 ' + Object.keys(묶음).length + '명을 뉴스레터 지인·잠재에 넣었습니다 — 동의를 받으시면 갑니다', 7000);
     }catch(e){ toast('넣지 못했습니다: '+((e&&e.message)||''), 8000); }
   });
 }
