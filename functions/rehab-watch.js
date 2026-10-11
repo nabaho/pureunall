@@ -178,9 +178,13 @@ function sortedEvents(list) {
   return (list || []).slice().sort((a, b) => a.d.localeCompare(b.d) || a.t.localeCompare(b.t));
 }
 
+/* 매일 모으는 종류 — 대표 결정(2026-10-11 「우선 회생만 진행」)으로 파산은 잠시 멈춘다.
+   다시 모으려면 ["rehab", "bankruptcy"] 로 바꿔 배포한다(파산 코드·안내문은 그대로 있다). */
+const DEFAULT_KINDS = ["rehab"];
+
 /* 한 번 돌기 — post(url, body) 는 JSON 을 돌려주는 함수(서버·검사가 각자 넣는다).
    existing: 이미 담긴 notices(키 → 레코드). 이미 있는 사건은 상세를 다시 부르지 않고, «새 공고 이력»만 붙인다. */
-async function run({ post, existing = {}, sinceYmd, courts = Object.keys(COURTS), kinds = ["rehab", "bankruptcy"], maxNew = MAX_NEW_DETAILS, nowMs = Date.now(), wait = () => Promise.resolve() }) {
+async function run({ post, existing = {}, sinceYmd, courts = Object.keys(COURTS), kinds = DEFAULT_KINDS, maxNew = MAX_NEW_DETAILS, nowMs = Date.now(), wait = () => Promise.resolve() }) {
   const since = clean(sinceYmd).replace(/\D/g, "");
   const out = { checked: 0, found: 0, added: [], eventUpdates: {}, errors: [] };
   const events = {};          // 사건 열쇠 → 이번에 본 공고들
@@ -257,6 +261,6 @@ function updatesOf(result, today, nowIso, nowMs) {
   return upd;
 }
 
-module.exports = { BASE, LIST, VIEW, HOME, UA, COURTS, TASK_CORP_REHAB, TASK_CORP_BANKRUPT, KINDS, MAX_NEW_DETAILS, TARGET, STAGES,
+module.exports = { BASE, LIST, VIEW, HOME, UA, COURTS, TASK_CORP_REHAB, TASK_CORP_BANKRUPT, KINDS, DEFAULT_KINDS, MAX_NEW_DETAILS, TARGET, STAGES,
   listBody, viewBody, isTarget, noticeKey, pickDetail, toRecord, run, updatesOf, ymd,
   stageOfTitle, stageOfEvents, regionOf, counselOf };
