@@ -23,7 +23,10 @@ const TAB = fn('IncomeCompanyTab');
 function 상자(incomes) {
   const ctx = { incomes, selYear: 2026, String };
   vm.createContext(ctx);
-  vm.runInContext([fn('incomeIsCo'), fn('isPaid', TAB), fn('paidInfo', TAB), fn('getItem', TAB)].join('\n'), ctx);
+  /* 받았나는 공용 판정 erpAdvisoryPaidFor(안에서 incomeIsCo)가 정한다 — 그 묶음과 탭의 색인 함수도 싣는다 */
+  vm.runInContext([fn('incomeIsCo'), require('./fin-one-rule-src').finRuleSrc(B, ['incomeIsCo']),
+    'var _advIdxC = null;', fn('_advIdx', TAB),
+    fn('isPaid', TAB), fn('paidInfo', TAB), fn('getItem', TAB)].join('\n'), ctx);
   return ctx;
 }
 
@@ -48,11 +51,13 @@ test('② 번호 없는 옛 줄·이름만 넘어온 자리는 이름으로 본�
 });
 
 test('③ ★★ 견주는 자리가 모두 incomeIsCo 한 곳을 쓴다 — 이름 견주기가 남지 않는다', () => {
-  ['isPaid', 'paidInfo', 'getItem'].forEach((n) => assert.match(fn(n, TAB), /incomeIsCo\(i, who\)/, '★ ' + n + ' 가 아직 이름으로 견줍니다'));
+  /* 세 자리 모두 «공용 판정» 을 거친다 — 그 판정이 incomeIsCo 로 견준다(2026-10-11 한 곳으로 모음) */
+  assert.match(fn('erpAdvisoryPaidFor'), /incomeIsCo\(i, co\)/, '★ 공용 판정이 업체를 incomeIsCo 로 견주지 않습니다');
+  ['isPaid', 'paidInfo', 'getItem'].forEach((n) => assert.match(fn(n, TAB), /incomeIsCo\(i, who\)|erpAdvisoryPaidFor\(who,/, '★ ' + n + ' 가 아직 이름으로 견줍니다'));
   assert.doesNotMatch(TAB, /(?:isPaid|getItem|paidInfo)\([\w.]*\.name,/, '★★ 탭이 아직 «이름»을 넘깁니다 — 번호로 못 견줍니다');
   assert.doesNotMatch(TAB, /co\.name===i\.companyName/, '한 달 전체 해제가 이름으로 견줍니다');
   const auto = fn('erpAutoMarkCompanyIncome');
-  assert.match(auto, /incomeIsCo\(i, co\)/, '★ 자동 짝짓기의 «이미 냈나»가 이름으로 봅니다');
+  assert.match(auto, /incomeIsCo\(i, co\)|erpAdvisoryPaidFor\(co,/, '★ 자동 짝짓기의 «이미 냈나»가 이름으로 봅니다');
   assert.doesNotMatch(auto, /alreadyPaid\(c\.co\.name/, '자동 짝짓기가 이름을 넘깁니다');
   assert.doesNotMatch(B, /i\.companyName===co\.name/, '★ 이름으로만 견주는 자리가 남았습니다');
 });

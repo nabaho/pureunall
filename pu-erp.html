@@ -219,7 +219,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
      맞추는 일은 이 파일이, 그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
 <script src="js/pu-co-cards.js?v=1"></script>
 <script src="js/pu-co-mismatch.js?v=3"></script>
-<script src="js/pu-cms-auto.js?v=2"></script>
+<script src="js/pu-cms-auto.js?v=3"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
 <script src="js/pu-sanjae-cases.js?v=1"></script>
@@ -7855,7 +7855,8 @@ function _erpFpBuild(){
   var recs = dbGet('finance_income', []) || [];
   if(!Array.isArray(recs)) recs = [];
   recs.forEach(function(r){
-    if(!r) return;
+    // 지운 것·되돌린 것은 «확정됨» 이 아니다 — 되돌린 돈을 «이미 확정» 으로 알려 주지 않게(fin.md 1)
+    if(!erpIncomeLive(r)) return;
     var amt = parseInt(r.amount, 10) || 0;
     if(amt <= 0) return;
     var d = String(r.date || '');
@@ -8685,6 +8686,70 @@ function incomeIsCo(i, co){
   if(id && i.companyId) return i.companyId === id;
   return i.companyName === nm;
 }
+/* ══ 재무 판정 하나로 (2026-10-11 검토 fin.md 1·3·6·7) ══════════════════════
+   같은 «받았나»를 화면마다 다른 잣대로 세어 두 화면이 서로 다르게 말했다. 여기 한 곳에서만 정한다.
+   ⚠ js/pu-cms-auto.js 는 이 전역을 못 본다(노드에서도 돈다) — 같은 규칙을 그 안에 따로 적고
+     tests/erp-fin-one-rule.test.js 가 둘을 견준다. */
+/* 살아 있는 입금인가 — 지운 것(_deleted)·거래내역에서 되돌린 것(undoneDate)은 «없는 돈»이다.
+   ★ 성과(perfSettled — 마감월 성과 그대로 두기)는 이 함수를 쓰지 않는다. 그쪽 규칙은 erpPerfCounts. */
+function erpIncomeLive(fi){
+  return !!fi && !fi._deleted && !fi.undoneDate;
+}
+/* 매출로 세는 입금인가 — 살아 있고, 성과급 조정 줄(perf-adjust: 직원 성과급 차액)이 아닌 것 */
+function erpIncomeIsRevenue(fi){
+  return erpIncomeLive(fi) && fi.sourceKind !== 'perf-adjust';
+}
+/* 몇 월분 자문료인가 — 받을 달(advisoryYm)이 있으면 그것, 없으면 입금일의 달.
+   ⚠ pu-cms-auto.js 의 ymOf 와 같은 결과여야 한다(검사가 견준다). */
+function erpAdvisoryYmOf(fi){
+  var a = String((fi && fi.advisoryYm) == null ? '' : fi.advisoryYm).trim();
+  return a || String((fi && fi.date) == null ? '' : fi.date).trim().slice(0, 7);
+}
+/* 업체 자문료 입금인가 — kind 가 자문료이거나, 옛 줄처럼 kind 없이 업체(company) 입금인 것.
+   CMS 나누기에서 «컨설팅·사건» 으로 고른 줄(sourceKind company + kind 컨설팅)은 자문료가 아니다. */
+function erpIsAdvisoryIncome(fi){
+  if(!fi) return false;
+  return fi.kind === '자문료' || (!fi.kind && fi.sourceKind === 'company');
+}
+/* 그 업체의 그 달 자문료 입금들 — 없으면 빈 배열. 받았나는 .length, 얼마 받았나는 금액 합.
+   co 는 업체 기록(번호 있으면 번호로) 또는 이름 — incomeIsCo 와 같다.
+   incomes 는 입금 배열 또는 erpAdvisoryIndex() 가 만든 색인(표를 그릴 때 한 번만 훑으려고). */
+function erpAdvisoryIndex(incomes){
+  var by = {};
+  (Array.isArray(incomes) ? incomes : []).forEach(function(i){
+    if(!erpIncomeLive(i) || !erpIsAdvisoryIncome(i)) return;
+    var ym = erpAdvisoryYmOf(i);
+    if(!ym) return;
+    (by[ym] = by[ym] || []).push(i);
+  });
+  return { __advIdx:true, byYm:by };
+}
+function erpAdvisoryPaidFor(co, ym, incomes){
+  if(!co || !ym) return [];
+  var list = (incomes && incomes.__advIdx) ? (incomes.byYm[ym] || [])
+           : (Array.isArray(incomes) ? incomes : []);
+  return list.filter(function(i){
+    return erpIncomeLive(i) && erpIsAdvisoryIncome(i) && erpAdvisoryYmOf(i) === ym && incomeIsCo(i, co);
+  });
+}
+/* 입금 마감된 달이면 그 달('YYYY-MM'), 아니면 '' — 입금은 «입금일의 달» 장부에 앉는다 */
+function erpIncomeLockYm(fi){
+  var ym = String((fi && fi.date) || '').slice(0, 7);
+  return (ym && typeof isIncomeLocked === 'function' && isIncomeLocked(ym)) ? ym : '';
+}
+/* 나이스빌 줄 지문 — 자동 처리(PuCmsAuto)가 cmsKey 로 쓰는 것과 같은 글자.
+   보관분(cms_ledger)의 _k 는 지문(+#n)이라 그대로, 갓 읽은 파일 줄(_k='nb3')은 지문을 새로 낸다. */
+function erpCmsRowKey(r){
+  if(!r) return '';
+  var sig = (typeof window !== 'undefined' && window.PuCmsAuto) ? window.PuCmsAuto.rowKey(r) : _nbRowSig(r);
+  var k = String(r._k || '');
+  return (k && k.indexOf(sig) === 0) ? k : sig;
+}
+/* 그 지문으로 이미 들어간 입금이 있나 (되돌린 것까지 — 되돌린 줄을 저절로 다시 만들지 않는다) */
+function erpCmsKeyTaken(key, incomes){
+  if(!key) return false;
+  return (incomes || []).some(function(i){ return i && !i._deleted && i.cmsKey === key; });
+}
 function erpAutoMarkCompanyIncome(txns, year, companies){
   var res = { applied:[], review:[] };
   var yStr = String(year);
@@ -8693,9 +8758,8 @@ function erpAutoMarkCompanyIncome(txns, year, companies){
 
   function alreadyPaid(co, month){
     var ym = yStr + '-' + ('0'+month).slice(-2);
-    return incomes.some(function(i){
-      return incomeIsCo(i, co) && i.sourceKind === 'company' && (i.date||'').slice(0,7) === ym;
-    });
+    /* 받을 달·살아 있는 입금·업체 번호 — 다른 화면과 같은 잣대 (erpAdvisoryPaidFor) */
+    return erpAdvisoryPaidFor(co, ym, incomes).length > 0;
   }
 
   var pool = (companies || []).filter(function(co){ return co && co.name && (co.fee||0) > 0; });
@@ -47549,26 +47613,39 @@ if(typeof window !== 'undefined'){
 /* amount — 실제로 적을 금액. 안 주면 예전처럼 업체관리의 «지금 자문료».
    ⚠ 이것이 없어서, 화면은 275,000원이라 보여주고 저장은 440,000원을 하고 있었다
      (김보람 과장 건의 2026-08-28 · 자문료가 오른 뒤 늦게 들어온 입금). */
-function erpAddCompanyIncome(co, month, year, date, note, kind, amount){
+/* opts.cmsKey — 나이스빌 줄 지문(erpCmsRowKey). 있으면 기록에 남기고, 같은 지문의 입금이 이미 있으면 만들지 않는다
+   (자동 처리·거래내역·입금관리 가 같은 줄을 서로 다른 달로 두 번 만들던 자리 — fin.md 5). */
+function erpAddCompanyIncome(co, month, year, date, note, kind, amount, opts){
   try {
+    opts = opts || {};
     if(!co || !co.name) return false;
     var ym = String(year) + '-' + ('0'+month).slice(-2);
     if(typeof isIncomeLocked === 'function' && isIncomeLocked(ym)){
       showToast('🔒 ' + ym + ' 입금 마감 — 변경 불가'); return false;
     }
-    // 중복 방지 2차 관문 — 같은 업체+월이 이미 있으면 만들지 않는다
-    var exists = (dbGet('finance_income', []) || []).some(function(i){
-      return i && i.sourceKind==='company' && incomeIsCo(i, co) && String(i.date||'').slice(0,7)===ym;
-    });
-    if(exists) return false;
-    return dbUpsert('finance_income', {
+    var all = dbGet('finance_income', []) || [];
+    if(opts.cmsKey && erpCmsKeyTaken(opts.cmsKey, all)) return false;
+    var _kind = kind || '자문료';
+    // 중복 방지 2차 관문 — 같은 업체+받을 달의 자문료가 이미 있으면 만들지 않는다 (잣대는 erpAdvisoryPaidFor 하나)
+    if(_kind === '자문료' && erpAdvisoryPaidFor(co, ym, all).length) return false;
+    // 자문료가 아닌 종류(해지 업체의 컨설팅·사건 미납)는 같은 종류·같은 달이 있으면 만들지 않는다
+    if(_kind !== '자문료' && all.some(function(i){
+      return erpIncomeLive(i) && i.sourceKind === 'company' && i.kind === _kind
+        && incomeIsCo(i, co) && String(i.date || '').slice(0, 7) === ym;
+    })) return false;
+    var rec = {
       id:'fi-adv-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
       date:date, amount:(amount != null ? (parseInt(amount,10)||0) : (co.fee||0)),
+      /* sourceId 는 비워 둔다 — 채우면 되돌리기(erpUndoIncome)가 업체 기록에 paid:false 를 덮는다(자문료가 아닌 종류) */
       sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
-      companyName:co.name, kind:(kind || '자문료'), payDay:co.payDay||'',
+      companyName:co.name, kind:_kind, payDay:co.payDay||'',
       managerSid:co.mainSid||'', managerName:co.mainName||'',
       note:note||'', perfShares:[], createdAt:(new Date()).toISOString()
-    }) !== false;
+    };
+    // 자문료는 받을 달을 적어 둔다 — 입금일의 달과 다를 수 있다(걷은 달 기준 업체 등)
+    if(_kind === '자문료') rec.advisoryYm = ym;
+    if(opts.cmsKey) rec.cmsKey = opts.cmsKey;
+    return dbUpsert('finance_income', rec) !== false;
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
 }
 
@@ -47933,7 +48010,9 @@ function erpNicebillCoIndex(){
       fee: parseInt(c.monthlyAdvisoryFee, 10) || 0,
       payDay: String(c.taxInvoicePaymentDay || ''),
       mainSid: c.managerMain || '',
-      isCMS: !!c.isCMS, cmsPayDay: String(c.cmsPayDay || '')
+      isCMS: !!c.isCMS, cmsPayDay: String(c.cmsPayDay || ''),
+      /* 「몇 월분」 기준 — 이것이 빠져 있어 다시 열면 늘 «들어온 달» 로 돌아갔다(설정이 안 먹었다) */
+      cmsYmBase: c.cmsYmBase || ''
     };
     idx.list.push(e);
     if(e.norm && !idx.byNorm[e.norm]) idx.byNorm[e.norm] = e;
@@ -48438,7 +48517,8 @@ function CmsMatchModal(props){
         && ['자문','급여','노조','기금'].indexOf(c.typeCode) >= 0
         && (c.monthlyAdvisoryFee||0) > 0;
     }).map(function(c){
-      return { name:c.name, fee:c.monthlyAdvisoryFee||0, payDay:c.taxInvoicePaymentDay||'',
+      /* id 를 싣는다 — 빠지면 새 입금이 companyId:'' 로 쌓여 10/4 번호 정리가 다시 무너진다(fin.md 2) */
+      return { id:c.id, name:c.name, fee:c.monthlyAdvisoryFee||0, payDay:c.taxInvoicePaymentDay||'',
                mainSid:c.managerMain||'', mainName:userName(c.managerMain) };
     }).sort(function(a,b){ return (b.fee||0) - (a.fee||0); });
   }
@@ -48460,7 +48540,7 @@ function CmsMatchModal(props){
     poolAllRef.current = (dbGet('companies', null) || []).filter(function(c){
       return c && c.name && !byName[c.name];
     }).map(function(c){
-      return { name:c.name, fee:c.monthlyAdvisoryFee||0, payDay:c.taxInvoicePaymentDay||'',
+      return { id:c.id, name:c.name, fee:c.monthlyAdvisoryFee||0, payDay:c.taxInvoicePaymentDay||'',
                mainSid:c.managerMain||'', mainName:userName(c.managerMain),
                off: (c.status!=='active' ? '해지' : '자문료 없음') };
     }).sort(function(a,b){ return (b.fee||0) - (a.fee||0); });
@@ -48472,9 +48552,11 @@ function CmsMatchModal(props){
 
   var paidRef = useRef(null);
   if(!paidRef.current){
-    var pd = {};
-    (dbGet('finance_income', []) || []).forEach(function(i){
-      if(i && i.sourceKind==='company' && i.companyName && String(i.date||'').slice(0,7)===ym) pd[i.companyName] = 1;
+    /* 그 달 자문료를 받았나 — 다른 화면과 같은 잣대(erpAdvisoryPaidFor: 받을 달·업체 번호·살아 있는 입금).
+       전에는 «입금일의 달 + 이름» 이라, 10/1 에 들어온 9월분을 «10월 받음» 으로 보고 10월분을 건너뛰었다. */
+    var pd = {}, _adx = erpAdvisoryIndex(dbGet('finance_income', []) || []);
+    pool.concat(poolMore).forEach(function(c){
+      if(c && c.name && erpAdvisoryPaidFor(c, ym, _adx).length) pd[c.name] = 1;
     });
     paidRef.current = pd;
   }
@@ -48504,6 +48586,7 @@ function CmsMatchModal(props){
         var inPool = !!(cn && byName[cn]);
         if(!cn) _noLink++;
         _items.push({ name:r.name, coName:cn, amount:parseInt(r.amount,10)||0,
+                      key:erpCmsRowKey(r),           // 나이스빌 줄 지문 — 입금에 cmsKey 로 남긴다
                       inPool:inPool, paid:!!(cn && paidMap[cn]),
                       /* 말없이 붙지 않는다 — 무엇을 보고 붙였는지 줄에 적는다. */
                       prevVia:(_mv.via === 'prev' ? _mv.matched : '') });
@@ -48695,8 +48778,13 @@ function CmsMatchModal(props){
                     : basis === 'guess' ? '금액만 맞춤(확인 필요)'
                     : '사람이 고름';
       var _note = 'CMS 일괄이체 · ' + _basisTxt + (amtFrom(n)==='hand' ? ' · 금액 손수정' : '');
-      if(props.addIncome){ props.addIncome(co, month, d, _note, _k, _amt); }
-      else if(!erpAddCompanyIncome(co, month, year, d, _note, _k, _amt)){ skip++; return; }
+      /* 나이스빌 명세에 이 업체 줄이 «딱 하나» 있으면 그 지문을 cmsKey 로 남긴다 —
+         자동 처리(PuCmsAuto)가 같은 줄을 또 만들지 않는다. 같은 지문이 이미 있으면 만들지 않는다. */
+      var _nbRows = nbData ? nbData.items.filter(function(it){ return it.coName === n; }) : [];
+      var _ck = (_nbRows.length === 1) ? (_nbRows[0].key || '') : '';
+      if(_ck && erpCmsKeyTaken(_ck, dbGet('finance_income', []) || [])){ skip++; return; }
+      if(props.addIncome){ props.addIncome(co, month, d, _note, _k, _amt, { cmsKey:_ck }); }
+      else if(!erpAddCompanyIncome(co, month, year, d, _note, _k, _amt, { cmsKey:_ck })){ skip++; return; }
       paidMap[n] = 1; ok++; okNames.push(n);
     });
     // ── CMS 일괄이체로 들어온 업체 = 실제 CMS 자동이체 업체 → 업체관리 CMS 체크를 켜 둔다 ──
@@ -49669,6 +49757,10 @@ function erpUnmarkBankRow(row){
    두 길이 다른 일을 하면 되돌린 뒤의 장부가 어느 쪽인지 알 수 없게 된다. */
 function erpUndoIncome(fi){
   if(!fi || !fi.id) return false;
+  /* 입금 마감된 달은 무르지 않는다 — 마감한 달 입금 합계가 뒤에서 바뀐다(fin.md 6).
+     문 하나에서 막아 두면 되돌리는 길이 늘어도 빠지지 않는다. */
+  var _lockYm = erpIncomeLockYm(fi);
+  if(_lockYm){ try{ showToast('🔒 ' + _lockYm + ' 입금 마감 — 되돌릴 수 없습니다'); }catch(_t){} return false; }
   try{
     /* 마감된 달의 성과급은 «이미 통장으로 나갔다». 그 달에서 빼면 지급이 끝난
        명세서가 뒤늦게 줄어든다 — 그 달은 그대로 두고 같은 금액을 마이너스로
@@ -50004,13 +50096,12 @@ function FinanceLedger(props){
          전에는 받았는지만(true/false) 봐서, 20만원 중 15만원만 들어와도 그 달이 끝난 걸로
          처리되고 5만원이 사라졌다. 이제 금액을 더해 모자란 만큼만 후보로 남긴다.
          잔금이 다음 달에 들어와도 advisoryYm 을 보고 «받을 달» 로 친다. */
-      var paidAmt = {};
-      (dbGet('finance_income', []) || []).forEach(function(i){
-        if(i && i.kind === '자문료' && i.companyName && i.date){
-          var _k = i.companyName + '|' + (i.advisoryYm || String(i.date).slice(0,7));
-          paidAmt[_k] = (paidAmt[_k] || 0) + (parseInt(i.amount, 10) || 0);
-        }
-      });
+      /* ★ 잣대는 erpAdvisoryPaidFor 하나 (2026-10-11 fin.md 1·3) — 전에는 «이름|받을 달» 로만 세고
+         되돌린 입금(undoneDate)도 받은 돈으로 쳐서, 되돌린 달의 자문료 후보가 다시 안 떴다. */
+      var _advIdx = erpAdvisoryIndex(dbGet('finance_income', []) || []);
+      function _paidAmt(co, ym){
+        return erpAdvisoryPaidFor(co, ym, _advIdx).reduce(function(s, i){ return s + (parseInt(i.amount, 10) || 0); }, 0);
+      }
       /* 명세서의 «가장 늦은 달» 부터 몇 달 거슬러 올라가며 안 걷힌 달을 모두 후보로 올린다.
          전에는 가운데 달 하나만 봐서, 자문료가 몇 달 밀렸다가 한 번에 들어오면
          (다라이엔지 220,000 × 3개월 = 660,000) 맞출 후보가 없었다.
@@ -50048,7 +50139,7 @@ function FinanceLedger(props){
         ymList.forEach(function(ym){
           if(start && ym < start) return;            // 계약 시작 전 달은 받을 것이 없다
           if(erpFeeStopped(co, ym)) return;          // 계약 중단 뒤 달도 마찬가지다
-          var got = paidAmt[co.name + '|' + ym] || 0;
+          var got = _paidAmt(co, ym);
           if(got >= fee) return;                     // 그 달은 다 받았다
           var remain = fee - got;                    // 모자란 만큼만 후보로 남긴다
           var late = (ym !== lastYm);                // 지난 달 것이 아직 안 걷혔다 = 밀림
@@ -50938,7 +51029,9 @@ function FinanceLedger(props){
     /* 만든 기록의 열쇠를 «먼저» 지어 둔다 — 되돌리기(Ctrl+Z)가 방금 만든 이 한 건을
        찾아 물어야 하는데, 나중에 목록에서 뒤지면 같은 금액 다른 건을 물 수 있다. */
     var _fiId = 'fi-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
-    erpUpsertIncome({id:_fiId,
+    /* 저장이 막히면(입금 마감·저장 실패) 여기서 멈춘다 — 그대로 가면 원본에 «받음»만 찍히고 입금은 없다.
+       부르는 쪽은 모두 try/catch 로 받아 그 통장 줄을 «처리됨» 으로 찍지 않는다. */
+    var _saved = erpUpsertIncome({id:_fiId,
       companyName:pItem.companyName, amount:row.amount, date:paidDate,
       kind: isAdv ? '자문료' : (pItem.label || ''),
       category: isAdv ? 'inc-advisory' : undefined,
@@ -50949,11 +51042,14 @@ function FinanceLedger(props){
       // replace('s','') 는 «맨 앞» s 를 지운다 — consultings→conultings, cases→caes 로 깨졌다
       sourceKind: isAdv ? 'company' : pItem.store.replace(/s$/,''),
       sourceId:pItem.item.id,
+      /* 자문료는 업체 번호를 companyId 에도 — 판정(incomeIsCo)은 이 칸을 본다(fin.md 2) */
+      companyId: isAdv ? (pItem.item.id || '') : undefined,
       managerSid: isAdv ? undefined : ((pItem.item||{}).managerMain || (pItem.item||{}).manager || ''),
       deductions: _ded, perfBaseAmount: _perfBase,
       isPersonalIncome: _isPersonal || undefined,
       autoConfirmed: opts.withPerf ? true : undefined,
       perfShares:_perfShares, confirmedAt:new Date().toISOString(), confirmedBy:CURRENT_USER?CURRENT_USER.sid:''});
+    if(_saved === false) throw new Error('입금을 저장하지 못했습니다 (입금 마감된 달이거나 저장 실패)');
     if(isAdv) return _fiId;
     // 수수료 차감 → 차액을 지출로 기록
     if(opts.feeAmount > 0){
@@ -51212,6 +51308,8 @@ function FinanceLedger(props){
          무엇에서 나온 돈인지 짚을 수 있다. 못 찾았으면 빈 채로 둔다(읽는 쪽이
          모두 `if(sourceId && sourceKind)` 로 막고 있어 빈 값이 안전하다). */
       sourceKind:_isAdv ? 'company' : 'other', sourceId:(_isAdv && d.advCoId) ? d.advCoId : '',
+      // 자문료는 업체 번호를 companyId 에도 (판정 incomeIsCo 가 이 칸을 본다 — fin.md 2)
+      companyId:(_isAdv && d.advCoId) ? d.advCoId : undefined,
       docType:d.doc||'cash',                              // tax | cash | none
       payMethod:d.cardMode?'card':'account',
       cardFee:cardFee,
@@ -51770,7 +51868,7 @@ function FinanceLedger(props){
     if(lastAct.kind === 'hold'){ unholdRow(lastAct.row._k); setLastAct(null); return; }
     var fi = (dbGet('finance_income', []) || []).filter(function(x){ return x && x.id === lastAct.fid; })[0];
     if(!fi){ showToast('❌ 되돌릴 기록을 찾지 못했습니다 — 확정 이력에서 확인하세요'); setLastAct(null); return; }
-    if(!erpUndoIncome(fi)){ showToast('❌ 되돌리지 못했습니다'); return; }
+    if(!erpUndoIncome(fi)){ if(!erpIncomeLockYm(fi)) showToast('❌ 되돌리지 못했습니다'); return; }   // 마감이면 그쪽 안내가 이미 떴다
     erpUnmarkBankRow(lastAct.row);            // 다음에 파일을 올려도 「이미 처리」로 숨지 않게
     // 확정하며 「치운 줄」로 적어 둔 것을 도로 푼다 — 안 풀면 새로고침에 다시 사라진다
     setHidRow(function(h){ var n = Object.assign({}, h || {}); delete n[lastAct.row._k]; return n; });
@@ -52150,11 +52248,14 @@ function FinanceLedger(props){
         lockCache[ym] = (typeof isIncomeLocked === 'function') ? !!isIncomeLocked(ym) : false;
       }
       if(lockCache[ym]){ lockN++; return; }                // 마감월은 건너뛴다 (행마다 토스트가 뜨지 않게)
-      var co = { name:r.co.name, fee:(parseInt(r.amount,10) || r.co.fee || 0),
+      /* id 를 싣는다 — 빠지면 새 입금이 companyId:'' 로 쌓인다(fin.md 2) */
+      var co = { id:r.co.id || '', name:r.co.name, fee:(parseInt(r.amount,10) || r.co.fee || 0),
                  payDay:r.co.payDay || '', mainSid:r.co.mainSid || '', mainName:_uName(r.co.mainSid) };
       // 어느 회사로 걷었는지 메모에 남긴다 — 나중에 「이 업체는 효성으로 걷는다」를 되짚을 수 있게
+      // 줄 지문(cmsKey)을 남기고, 같은 지문이 이미 있으면 만들지 않는다 — 자동 처리와 두 달 치로 겹치지 않게(fin.md 5)
       if(erpAddCompanyIncome(co, m, y, d, '['+(r.src==='hyosung'?'효성CMS':'나이스빌CMS')+'] ' + (r.statusRaw||'')
-          + ' · ' + (base==='wdate' ? '걷은 달' : '들어온 달') + ' 기준')){ okN++; doneRows.push(r); }
+          + ' · ' + (base==='wdate' ? '걷은 달' : '들어온 달') + ' 기준', undefined, undefined,
+          { cmsKey: erpCmsRowKey(r) })){ okN++; doneRows.push(r); }
       else skipN++;                                        // 이미 입금됨 · 저장 실패
     });
     /* 수수료 — 명세에 건당 금액이 적혀 있다. 매출은 걷은 금액 그대로 두고 수수료만 지출로 적는다.
@@ -55016,7 +55117,8 @@ function FinanceLedger(props){
               h('button',{onClick:async function(){
                   var msg=_pi.companyName+' '+_row.amount.toLocaleString()+'원 입금확정';
                   if(!(await popConfirm(msg))) return;
-                  saveIncome(_row,_pi);
+                  // 막히면(입금 마감 등) 통장 줄을 처리됨으로 찍지 않는다
+                  try{ saveIncome(_row,_pi); }catch(_se){ showToast('❌ 확정 실패: ' + (_se && _se.message)); return; }
                   erpLearnPayerAlias(_row.memo||_row.note||'',_pi);
                   erpMarkBankRowProcessed(_row,'income',_pi.companyName+' '+_pi.label);
                   removeRow(_row._k,'inc');
@@ -55522,7 +55624,7 @@ function FinanceLedger(props){
         if(!(await popConfirm((fi.companyName||'-')+' '+(fi.kind||'')+' '+(fi.amount||0).toLocaleString()+'원\n\n'
           + '이 확정을 되돌리시겠습니까?\n입금 기록이 취소되고 미입금 상태로 돌아갑니다.'
           + erpLockNoticeFor(fi)))) return;
-        if(!erpUndoIncome(fi)){ showToast('❌ 되돌리지 못했습니다'); return; }
+        if(!erpUndoIncome(fi)){ if(!erpIncomeLockYm(fi)) showToast('❌ 되돌리지 못했습니다'); return; }   // 마감이면 그쪽 안내가 이미 떴다
         erpIncomeLog(fi, '확정을 되돌림', null, null, fixWhy);
         closeFix();
         showToast('↩️ 되돌림: '+(fi.companyName||'-')+' '+(fi.amount||0).toLocaleString()+'원');
@@ -55659,7 +55761,7 @@ function FinanceLedger(props){
                  + '금액 ' + _amt.toLocaleString() + '원 · 날짜 ' + (fi.date||'-') + ' 는 그대로입니다.'
                  + erpLockNoticeFor(fi);
         if(!(await popConfirm(_msg))) return;
-        if(!erpUndoIncome(fi)){ showToast('❌ 앞 확정을 되돌리지 못했습니다'); return; }
+        if(!erpUndoIncome(fi)){ if(!erpIncomeLockYm(fi)) showToast('❌ 앞 확정을 되돌리지 못했습니다'); return; }
         /* 통장 줄 꼴로 되돌려 saveIncome 에 넘긴다.
            적요의 「[하나은행] 」 머리말은 떼어 낸다 — 안 떼면 옮길 때마다 겹쳐 붙는다. */
         var _memo2 = String(fi.memo || '').replace(/^\[하나(은행|카드)\]\s*/, '');
@@ -58375,7 +58477,9 @@ function IncomeCompanyTab(){
       // cmsPayDay: 숫자만 추출
       var cpd = (c.cmsPayDay||c.taxInvoicePaymentDay||'').toString().replace(/[^0-9]/g,'');
       return {
-        name:c.name, fee:c.monthlyAdvisoryFee||0,
+        /* id 를 싣는다 — 이 표로 만드는 입금이 모두 companyId:'' 였다(fin.md 2). 판정도 번호로 하게 된다 */
+        id:c.id, name:c.name, fee:c.monthlyAdvisoryFee||0,
+        cmsYmBase:c.cmsYmBase || '',
         /* 자문료가 바뀐 이력 — 있어야 «그 달» 금액으로 만들 수 있다 */
         feeHistory:c.feeHistory || null,
         payDay:c.taxInvoicePaymentDay||'', issueDay:c.taxInvoiceIssueDay||'',
@@ -58431,18 +58535,21 @@ function IncomeCompanyTab(){
     return ym+'-'+('0'+num).slice(-2);
   }
 
+  /* ★ 받았나·얼마 받았나·그 줄 — 셋 다 erpAdvisoryPaidFor 하나로 (2026-10-11 fin.md 1·3).
+     되돌린 입금(undoneDate)은 «받음» 이 아니다. 표를 그릴 때 한 번만 훑도록 색인을 만든다. */
+  /* ⚠ 함수로 둔다 — 위 SOURCE_LIST(「안 받은 곳만」)가 이 줄보다 먼저 isPaid 를 부른다 */
+  var _advIdxC = null;
+  function _advIdx(){ return _advIdxC || (_advIdxC = erpAdvisoryIndex(incomes)); }
   function isPaid(who,month){   /* who = 업체 기록(번호로 견줌) 또는 이름 — incomeIsCo */
     var ym=selYear+'-'+('0'+month).slice(-2);
-    return incomes.some(function(i){return incomeIsCo(i, who)&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
+    return erpAdvisoryPaidFor(who, ym, _advIdx()).length > 0;
   }
   /* 그 달 자문료를 얼마나 받았는지 — 부분입금(20만 중 15만)을 가려내려고 금액을 더한다.
      잔금이 다음 달에 들어와도 advisoryYm 이 가리키는 «받을 달» 로 센다. */
   function paidInfo(who, month, fee){
     var ym=selYear+'-'+('0'+month).slice(-2);
     var got=0, n=0;
-    incomes.forEach(function(i){
-      if(!incomeIsCo(i, who) || i.sourceKind!=='company') return;
-      if((i.advisoryYm||(i.date||'').slice(0,7))!==ym) return;
+    erpAdvisoryPaidFor(who, ym, _advIdx()).forEach(function(i){
       got += parseInt(i.amount,10)||0; n++;
     });
     var f = parseInt(fee,10)||0;
@@ -58485,25 +58592,30 @@ function IncomeCompanyTab(){
      isPaid 는 「9월 받음」인데 getItem 은 못 찾아 item.date 에서 화면 전체가 멈췄다. */
   function getItem(who,month){
     var ym=selYear+'-'+('0'+month).slice(-2);
-    return incomes.find(function(i){return incomeIsCo(i, who)&&i.sourceKind==='company'&&((i.advisoryYm||(i.date||'').slice(0,7))===ym);});
+    return erpAdvisoryPaidFor(who, ym, _advIdx())[0];
   }
 
   /* kind — 안 주면 자문료 (CMS 나누기에서 해지 업체 종류를 넘겨준다) */
   /* amount — 실제로 적을 금액 (위 erpAddCompanyIncome 과 같은 규칙) */
-  function addIncome(co, month, date, note, kind, amount){
+  /* opts.cmsKey — 나이스빌 줄 지문 (CMS 나누기에서 넘어온다). 같은 지문이 있으면 만들지 않는다 */
+  function addIncome(co, month, date, note, kind, amount, opts){
+    opts = opts || {};
+    if(opts.cmsKey && erpCmsKeyTaken(opts.cmsKey, incomes)){ showToast(co.name+' — 이미 들어간 CMS 줄입니다'); return; }
     var existing=getItem(co,month);
     if(existing){
       if(!incomeLockGuard(existing) || !incomeLockGuard({date:date})) return;
       if(dbPatch('finance_income', existing.id, { date:date, note:note||'' })){ refreshIncomes(); showToast('수정됨'); }
     } else {
-      persistOneIncome({
+      var _rec = {
         id:'fi-adv-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5),
         date:date, amount:(amount != null ? (parseInt(amount,10)||0) : (co.fee||0)),
         sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
         companyName:co.name, kind:(kind || '자문료'), payDay:co.payDay||'',
         managerSid:co.mainSid, managerName:co.mainName,
         note:note||'', perfShares: [], createdAt:(new Date()).toISOString()
-      });
+      };
+      if(opts.cmsKey) _rec.cmsKey = opts.cmsKey;
+      persistOneIncome(_rec);
       showToast(co.name+' '+(date||'').slice(5)+' 입금확정');
     }
   }
@@ -58537,7 +58649,8 @@ function IncomeCompanyTab(){
     var pool = allCompanies.filter(function(c){
       return c && c.status==='active' && ['자문','급여','노조','기금'].indexOf(c.typeCode)>=0 && (c.monthlyAdvisoryFee||0)>0;
     }).map(function(c){
-      return { name:c.name, fee:c.monthlyAdvisoryFee||0, payDay:c.taxInvoicePaymentDay||'',
+      // id 를 싣는다 — 판정·새 입금이 업체 번호로 이어지게(fin.md 2)
+      return { id:c.id, name:c.name, fee:c.monthlyAdvisoryFee||0, payDay:c.taxInvoicePaymentDay||'',
                mainSid:c.managerMain||'', mainName:userName(c.managerMain) };
     });
     var r = erpAutoMarkCompanyIncome(incTxns, selYear, pool);
@@ -58738,12 +58851,15 @@ function IncomeCompanyTab(){
         // 나이스빌 출금결과조회 컬럼 구조 탐지
         // 헤더행 찾기: 회원명 또는 출금일이 있는 행
         var headerRow = -1;
-        var colMap = { date:-1, name:-1, amount:-1, status:-1 };
+        var colMap = { date:-1, name:-1, amount:-1, status:-1, code:-1, setdate:-1 };
         for(var r=0; r<Math.min(10,rows.length); r++){
           var row = rows[r];
           for(var c=0; c<row.length; c++){
             var v = String(row[c]||'').trim();
             if(v==='출금일' || v==='출금일자') colMap.date = c;
+            // 줄 지문(cmsKey)·「몇 월분」 기준에 쓴다 — 없으면 예전처럼 출금일만 본다
+            if(v==='회원코드') colMap.code = c;
+            if(v.indexOf('정산')>=0 && v.indexOf('일')>=0) colMap.setdate = c;
             if(v==='회원명' || v==='회사명' || v==='업체명') colMap.name = c;
             if(v.indexOf('납부금액')>=0 || v==='금액' || v==='출금금액') colMap.amount = c;
             if(v==='상태' || v==='출금상태') colMap.status = c;
@@ -58805,7 +58921,19 @@ function IncomeCompanyTab(){
             if(fuzzyMatch) matchedName = fuzzyMatch;
           }
           var month = parseInt(dateStr.slice(5,7));
-          parsed.push({ rawName:rawName, matchedName:matchedName, date:dateStr, amount:amount, month:month, matched: exactMatch || !!companyNames.find(function(n){return n===matchedName;}) });
+          // 정산(예정)일 — 출금일과 같은 꼴로 읽는다. 못 읽으면 비워 둔다(그러면 출금일로 물러난다)
+          var setStr = '';
+          if(colMap.setdate >= 0){
+            var rawSet = row[colMap.setdate];
+            if(rawSet instanceof Date && !isNaN(rawSet.getTime())){
+              setStr = rawSet.getFullYear()+'-'+String(rawSet.getMonth()+1).padStart(2,'0')+'-'+String(rawSet.getDate()).padStart(2,'0');
+            } else {
+              var sm = String(rawSet||'').trim().replace(/\./g,'-').match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+              if(sm) setStr = sm[1]+'-'+sm[2].padStart(2,'0')+'-'+sm[3].padStart(2,'0');
+            }
+          }
+          var code = colMap.code >= 0 ? String(row[colMap.code]||'').trim() : '';
+          parsed.push({ rawName:rawName, matchedName:matchedName, date:dateStr, setdate:setStr, code:code, amount:amount, month:month, matched: exactMatch || !!companyNames.find(function(n){return n===matchedName;}) });
         }
 
         var matched = parsed.filter(function(x){return x.matched;});
@@ -58893,22 +59021,28 @@ function IncomeCompanyTab(){
       try {
         var companyByName = {};
         SOURCE_LIST.forEach(function(co){ companyByName[co.name] = co; });
-        var existingKeys = {};
-        incomes.forEach(function(i){
-          if(i.sourceKind==='company' && i.companyName){
-            existingKeys[i.companyName+'|'+(i.date||'').slice(0,7)] = true;
-          }
-        });
+        /* ★ 중복 확인·「몇 월분」 을 다른 길과 같은 잣대로 (2026-10-11 fin.md 3·5)
+           · 받았나 = erpAdvisoryPaidFor (받을 달·업체 번호·살아 있는 입금) — 전에는 «이름 + 입금일의 달»
+           · 몇 월분 = 업체의 cmsYmBase (거래내역 나이스빌 입금표시와 같은 규칙) — 전에는 늘 출금일의 달
+           · 줄 지문(cmsKey)을 남기고, 같은 지문이 이미 있으면 만들지 않는다 — 자동 처리와 겹치지 않게 */
+        var _adx = erpAdvisoryIndex(incomes);
+        var made = {}, seq = {};
         var added = [], dup = 0;
         items.forEach(function(x, idx){
-          var ym = x.date.slice(0,7);
-          var key = x.matchedName+'|'+ym;
-          if(existingKeys[key]){ dup++; return; }
           var co = companyByName[x.matchedName];
+          var nbRow = { wdate:x.date, setdate:x.setdate || '', name:x.rawName, amount:x.amount, code:x.code || '' };
+          var sig = erpCmsRowKey(nbRow), si = seq[sig] || 0; seq[sig] = si + 1;
+          var cmsKey = si ? (sig + '#' + si) : sig;         // 같은 줄이 한 파일에 둘이면 #1 (보관분·자동 처리와 같은 규칙)
+          if(erpCmsKeyTaken(cmsKey, incomes)){ dup++; return; }
+          var base = erpCmsYmBase(co);
+          var ym = erpCmsYmOf(nbRow, base) || x.date.slice(0,7);
+          var d = erpCmsDateOf(nbRow, base) || x.date;
+          var who = co || x.matchedName;
+          if(made[x.matchedName+'|'+ym] || erpAdvisoryPaidFor(who, ym, _adx).length){ dup++; return; }
           added.push({
             id:'fi-cms-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)+'-'+idx,
-            date:x.date, amount:x.amount,
-            sourceKind:'company', sourceId:'',
+            date:d, amount:x.amount, advisoryYm:ym, cmsKey:cmsKey,
+            sourceKind:'company', sourceId:'', companyId:(co && co.id) || '',
             companyName:x.matchedName, kind:'자문료',
             payDay: co ? (co.payDay||'') : '',
             managerSid: co ? co.mainSid : '',
@@ -58916,7 +59050,7 @@ function IncomeCompanyTab(){
             note:'[나이스빌CMS] '+x.date+' 자동이체',
             perfShares:[], createdAt:(new Date()).toISOString()
           });
-          existingKeys[key] = true;
+          made[x.matchedName+'|'+ym] = true;
         });
         persistManyIncome(added);
         setCmsImportState({ status:'done', progress:100,
@@ -59000,20 +59134,17 @@ function IncomeCompanyTab(){
         var companyByName = {};
         SOURCE_LIST.forEach(function(co){ companyByName[co.name] = co; });
 
-        var existingKeys = {};
-        incomes.forEach(function(i){
-          if(i.sourceKind==='company' && i.companyName){
-            var ym = (i.date||'').slice(0,7);
-            existingKeys[i.companyName+'|'+ym] = true;
-          }
-        });
+        /* ★ 중복 확인은 다른 화면과 같은 잣대 — erpAdvisoryPaidFor (받을 달·업체 번호·살아 있는 입금, fin.md 3).
+           전에는 «이름 + 입금일의 달» 이라 받을 달이 다른 입금(10/1 에 들어온 9월분)을 그 달 것으로 봤다. */
+        var _adx = erpAdvisoryIndex(incomes);
+        var made = {};
 
         var added = [], duplicate = 0, noMatch = 0;
         items.forEach(function(x, idx){
           var ym = x.date.slice(0,7);
           var key = x.company+'|'+ym;
-          if(existingKeys[key]){ duplicate++; return; }
           var co = companyByName[x.company];
+          if(made[key] || erpAdvisoryPaidFor(co || x.company, ym, _adx).length){ duplicate++; return; }
           if(!co){ noMatch++; }
           added.push({
             id:'fi-imp-'+Date.now().toString(36)+Math.random().toString(36).slice(2,5)+'-'+idx,
@@ -59021,6 +59152,7 @@ function IncomeCompanyTab(){
             amount:x.fee,
             sourceKind:'company',
             sourceId:'',
+            companyId:(co && co.id) || '',
             companyName:x.company,
             kind:'자문료',
             payDay: co ? (co.payDay||'') : '',
@@ -59030,7 +59162,7 @@ function IncomeCompanyTab(){
             perfShares: [],
             createdAt:(new Date()).toISOString()
           });
-          existingKeys[key] = true;
+          made[key] = true;
         });
 
         persistManyIncome(added);
@@ -67379,7 +67511,8 @@ function FinancePnL(){
   var monthlyData = [];
   for(var m=1; m<=12; m++){
     var ymKey = selYear+'-'+String(m).padStart(2,'0');
-    var monthIncomes  = allIncomes.filter(function(i){return (i.date||'').slice(0,7)===ymKey && !i.isPersonalIncome;});
+    /* 매출 = erpIncomeIsRevenue — 되돌린·지운 입금, 성과급 조정 줄(perf-adjust)은 매출이 아니다(fin.md 1·7) */
+    var monthIncomes  = allIncomes.filter(function(i){return erpIncomeIsRevenue(i) && (i.date||'').slice(0,7)===ymKey && !i.isPersonalIncome;});
     var monthExpenses = allExpenses.filter(function(e){return (e.date||'').slice(0,7)===ymKey;});
     var rev = monthIncomes.reduce(function(s,i){
       var v = (i.deductions && i.deductions.vatIncluded && i.perfBaseAmount) ? i.perfBaseAmount : (i.amount||0);
@@ -67412,7 +67545,7 @@ function FinancePnL(){
     byCategory[c] = (byCategory[c]||0) + (e.amount||0);
   });
   // 카드수수료 (입금건 파생): finance_income.cardFee 합산 → 카드수수료 카테고리로 표시
-  var _yearCardFee = allIncomes.filter(function(i){ return (i.date||'').slice(0,4)===selYear && !i.isPersonalIncome; }).reduce(function(s,i){ return s+(i.cardFee||0); }, 0);
+  var _yearCardFee = allIncomes.filter(function(i){ return erpIncomeIsRevenue(i) && (i.date||'').slice(0,4)===selYear && !i.isPersonalIncome; }).reduce(function(s,i){ return s+(i.cardFee||0); }, 0);
   if(_yearCardFee > 0){ byCategory['exp-cardfee'] = (byCategory['exp-cardfee']||0) + _yearCardFee; }
   var catRanking = Object.keys(byCategory).map(function(code){
     var info = catMap[code] || { name:code, color:'#94a3b8' };
@@ -68162,7 +68295,8 @@ function FinanceAuto(props){
     dbSet('app_settings', Object.assign({}, cur, patch)); onS[1](!!v); if(v) erpCmsAutoRun({ write:true });
   }
   var items = (last && last.items) || [];
-  var CHECK = { new_member:'처음 보는 회원', amount:'금액 다름', dup_month:'그 달 입금 이미 있음', locked:'마감된 달' };
+  /* ym_taken — 받을 달만 같은 입금이 있다(금액·날짜는 다름). 자동으로 «이미 있음» 이라 치지 않고 사람이 본다(fin.md 4) */
+  var CHECK = { new_member:'처음 보는 회원', amount:'금액 다름', dup_month:'그 달 입금 이미 있음', locked:'마감된 달', ym_taken:'받을 달 입금 있음' };
   var check = items.filter(function(x){ return CHECK[x.verdict]; });
   var fails = items.filter(function(x){ return x.verdict === 'fail'; });
   var autos = items.filter(function(x){ return x.verdict === 'auto' || x.verdict === 'done'; });
@@ -68258,6 +68392,8 @@ function FinanceVAT(){
   function quarterIncomes(y, q){
     var r = quarterRange(y, q);
     return incomes.filter(function(i){
+      // 되돌린·지운 입금, 성과급 조정 줄(perf-adjust)은 매출이 아니다(fin.md 1·7)
+      if(!erpIncomeIsRevenue(i)) return false;
       if(i.isPersonalIncome) return false; // 개인소득은 매출 미반영
       var d = i.date || '';
       return d >= r.start && d <= r.end;
@@ -75105,6 +75241,10 @@ function erpIncomeLogText(rec){
 /* 성과급이 붙은 입금은 이 문을 지난다 — 확정하는 자리가 여럿이라(수금·확정창·통장·복원…)
    자리마다 따로 막으면 언젠가 한 자리가 빠진다. */
 function erpUpsertIncome(rec){
+  /* 입금 마감된 달(입금일의 달)에는 넣지 않는다 — 거래내역 확정·직접 등록·자동 처리가 모두 이 문을 지난다(fin.md 6).
+     false 를 돌려주면 부르는 쪽은 그 통장 줄을 «처리됨» 으로 찍지 않는다. */
+  var _lockYm = erpIncomeLockYm(rec);
+  if(_lockYm){ try{ showToast('🔒 ' + _lockYm + ' 입금 마감 — 저장하지 않았습니다'); }catch(_t){} return false; }
   if(rec && !rec.perfYM && (rec.perfShares || []).length){
     var to = erpPerfYMFor(rec.date);
     if(to){

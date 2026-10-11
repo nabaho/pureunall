@@ -64,6 +64,8 @@ function realm(opts) {
     'function erpUndoIncome(',
   ];
   vm.runInContext(need.map((d) => cutFn(src, d)).join('\n'), ctx);
+  // 입금 문(erpUpsertIncome·erpUndoIncome)이 부르는 공용 판정(입금 마감 등)도 진짜를 싣는다
+  vm.runInContext(require('./fin-one-rule-src').finRuleSrc(src), ctx);
   vm.runInContext('this.locked = ' + JSON.stringify(locked) + ';', ctx);
   store.locked_payroll_months = locked;
   ctx._store = store;

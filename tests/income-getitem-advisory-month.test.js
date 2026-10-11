@@ -35,7 +35,10 @@ function load(incomes) {
   const ic = erp.indexOf('function incomeIsCo(');
   let j = erp.indexOf('{', ic), d = 0;
   for (; j < erp.length; j++) { if (erp[j] === '{') d++; else if (erp[j] === '}' && --d === 0) break; }
-  vm.runInContext(erp.slice(ic, j + 1) + '\n' + sliceFn('function isPaid(') + '\n' + sliceFn('function getItem('), ctx);
+  /* 받았나·그 줄은 이제 공용 판정 erpAdvisoryPaidFor 가 정한다(2026-10-11) — 그 묶음과 탭의 색인 함수도 싣는다 */
+  vm.runInContext(erp.slice(ic, j + 1) + '\n' + require('./fin-one-rule-src').finRuleSrc(erp, ['incomeIsCo'])
+    + '\nvar _advIdxC = null;\n' + sliceFn('function _advIdx(')
+    + '\n' + sliceFn('function isPaid(') + '\n' + sliceFn('function getItem('), ctx);
   return ctx;
 }
 

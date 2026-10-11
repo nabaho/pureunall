@@ -176,7 +176,10 @@ test('★★ 종류가 «두 갈래 모두»에 넘어간다 (한쪽만 넘기�
 test('★★ 받는 쪽 두 함수가 종류를 «쓴다» (안 쓰면 넘겨도 소용없다)', () => {
   /* 머리줄도 통째로 못 박지 않는다 — 인자가 하나 늘면 못 찾는다 */
   const a = bare(cutBlock(SRC, 'function erpAddCompanyIncome(co, month, year, date, note, kind'));
-  assert.ok(/kind:\(kind \|\| '자문료'\)/.test(a), 'erpAddCompanyIncome 이 종류를 안 쓴다');
+  /* 받은 종류를 «쓰는가» — 바로 쓰든(kind:(kind || '자문료')) 한 번 받아 두고 쓰든(var _kind = kind || '자문료' → kind:_kind) 같다 */
+  const kv = a.match(/(\w+) = kind \|\| '자문료'/);
+  assert.ok(/kind:\(kind \|\| '자문료'\)/.test(a) || (kv && new RegExp('kind:' + kv[1] + '\\b').test(a)),
+    'erpAddCompanyIncome 이 종류를 안 쓴다');
   const b = bare(cutBlock(SRC, '  function addIncome(co, month, date, note, kind'));
   assert.ok(/kind:\(kind \|\| '자문료'\)/.test(b), '업체입금 탭 addIncome 이 종류를 안 쓴다');
   /* 받은 «금액»도 실제로 쓰는가 — 안 쓰면 넘겨도 소용없다 */

@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 const { cutFn } = require('./cut-fn');
+const { finRuleSrc } = require('./fin-one-rule-src');   // 저장 함수가 부르는 공용 판정(받았나·지문)
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').split('\r\n').join('\n');
 
@@ -43,7 +44,7 @@ function runSave(amountArg) {
   };
   box.window = box;
   vm.createContext(box);
-  vm.runInContext(cutFn(src, 'function erpAddCompanyIncome') +
+  vm.runInContext(finRuleSrc(src) + '\n' + cutFn(src, 'function erpAddCompanyIncome') +
     '\n;this.__out = erpAddCompanyIncome(CO, 12, 2025, "2026-02-03", "메모", "자문료", AMT);', box);
   return { saved: saved, box: box };
 }
@@ -62,7 +63,7 @@ function amountWhenGiven(amt) {
   };
   box.window = box;
   vm.createContext(box);
-  vm.runInContext(cutFn(src, 'function erpAddCompanyIncome') +
+  vm.runInContext(finRuleSrc(src) + '\n' + cutFn(src, 'function erpAddCompanyIncome') +
     '\n;erpAddCompanyIncome(CO, 12, 2025, "2026-02-03", "메모", "자문료", AMT);', box);
   return saved.length ? saved[0].amount : null;
 }
@@ -88,8 +89,8 @@ ok('합계가 effAmt 로 셈된다', /sel\.forEach\(function\(n\)\{ sum \+= effA
    '합계만 옛 방식이면 차액이 또 어긋난다');
 ok('확인창이 effAmt 를 보여준다', /var a = effAmt\(n\);/.test(dlg));
 ok('저장에 effAmt 를 넘긴다', /var _amt = effAmt\(n\);/.test(dlg) &&
-   /props\.addIncome\(co, month, d, _note, _k, _amt\)/.test(dlg) &&
-   /erpAddCompanyIncome\(co, month, year, d, _note, _k, _amt\)/.test(dlg),
+   /props\.addIncome\(co, month, d, _note, _k, _amt\b/.test(dlg) &&
+   /erpAddCompanyIncome\(co, month, year, d, _note, _k, _amt\b/.test(dlg),
    '안 넘기면 저장 함수가 다시 「지금 자문료」를 꺼내 쓴다');
 ok('옛 방식(nbAmtByCo || co.fee)이 남아 있지 않다',
    !/nbAmtByCo\[n\] \|\| \(\(c && c\.fee\) \|\| 0\)/.test(dlg) &&
