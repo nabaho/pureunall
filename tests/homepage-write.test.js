@@ -686,9 +686,13 @@ test('★ 3차 정찰 기록에 이름·코드가 새지 않는다 — 입력 �
   assert.ok(기록.채운칸.includes('staff1'), '값이 든 입력 칸의 «이름»은 보여야 어디에 있는지 압니다');
 });
 
-test('자동 정찰 자리에 레이아웃 목록이 있다 — 읽는 화면이다', () => {
-  const u = W.자동정찰자리(185).레이아웃목록;
-  assert.ok(u && /act=dispLayoutAdminContent$/.test(u), String(u));
+test('자동 정찰 자리에 레이아웃 목록 둘이 있다 — 라이믹스에 «실제로 있는» 읽는 화면이다', () => {
+  const 자리 = W.자동정찰자리(185);
+  /* ⚠ 2026-10-11 — 처음엔 dispLayoutAdminContent 라고 썼다. 라이믹스 공개 소스
+     (modules/layout/layout.admin.view.php)의 화면 이름은 아래 둘이다. 없는 이름이면 번호를 못 읽어
+     레이아웃 정찰이 통째로 비는데, 검사는 «우리가 쓴 이름»만 보니 통과했다. 이름을 «고정»해 둔다. */
+  assert.ok(/act=dispLayoutAdminInstalledList$/.test(자리.레이아웃목록 || ''), String(자리.레이아웃목록));
+  assert.ok(/act=dispLayoutAdminAllInstanceList$/.test(자리.레이아웃인스턴스 || ''), String(자리.레이아웃인스턴스));
 });
 /* ══════ 2단계 — 새 거래처 로고 글 짓기 (2026-10-05) ══════
    절차는 라이믹스 공개 파일(common/js/plugins/jquery.fileupload/js/main.js)이 하는 그대로다:

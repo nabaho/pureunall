@@ -634,8 +634,11 @@ function 자동정찰자리(로고글번호) {
     구성원새글: ORIGIN + "/index.php?mid=people_board&act=dispBoardWrite",
     구성원쪽: ORIGIN + "/people",
     구성원쪽고치기: ORIGIN + "/index.php?mid=people&act=dispPageAdminContentModify",
-    /* 3차 정찰 — 레이아웃 목록. 목록에서 번호를 읽어 레이아웃마다 설정 칸·코드 화면을 연다(레이아웃자리). */
-    레이아웃목록: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminContent"
+    /* 3차 정찰 — 레이아웃 목록 둘. 목록에서 번호를 읽어 레이아웃마다 설정 칸·코드 화면을 연다(레이아웃자리).
+       ⚠ 화면 이름은 라이믹스 공개 소스(modules/layout/layout.admin.view.php)에서 «확인한» 것이다.
+         처음엔 dispLayoutAdminContent 라고 썼는데 그런 화면은 없다 — 검사는 통과했지만 실제로는 번호를 못 읽었을 것이다. */
+    레이아웃목록: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminInstalledList",
+    레이아웃인스턴스: ORIGIN + "/index.php?module=admin&act=dispLayoutAdminAllInstanceList"
   };
   if (Number.isInteger(n) && n > 0) {
     자리.자문사옛글 = ORIGIN + "/index.php?mid=partner_board&act=dispBoardWrite&document_srl=" + n;
