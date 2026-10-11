@@ -4960,6 +4960,15 @@ async function 홈자동한번(방식, 받은지문, 누가) {
         return 목록.map((x) => Object.assign({}, x, { 됐나: false, 까닭: 까닭 }));
       }
     },
+    /* 쓰는 일은 한 번에 하나만 (2026-10-11) — 잡으면 «풀기» 함수를, 남이 쥐고 있으면 null 을 준다.
+       ⚠ 찬 자리(null)로 먼저 불려도 잠금 몸통이 값을 내므로 접히지 않는다(서버가 진짜 값으로 다시 부른다). */
+    잠그기: async (p, 지금) => {
+      const r = await db.ref(p).transaction((cur) => HA.잠금몸통(cur, 지금, 누가));
+      if (!r || !r.committed) return null;
+      return async () => {
+        await db.ref(p).transaction((cur) => (cur && cur.at === 지금 ? null : cur)).catch(() => {});
+      };
+    },
     지금: () => Date.now(),
     달: 서울달,
     누가: 누가

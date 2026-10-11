@@ -157,9 +157,19 @@ test('★ 한 번에 고르기 저장 — 업체마다 «칸 단위»로 쓴다(
 function 편집칸상자(partners) {
   const ctx = { App: { partners: partners }, esc: (s) => String(s == null ? '' : s) };
   vm.createContext(ctx);
-  vm.runInContext(fnSource('partnerMark') + '\n' + fnSource('로고연결칸Html'), ctx);
+  vm.runInContext(fnSource('partnerMark') + '\n' + fnSource('내린표시줄Html') + '\n' + fnSource('로고연결칸Html'), ctx);
   return ctx;
 }
+
+/* 2026-10-11 — 재계약하면 «내린 표시» 때문에 자동 연결에서 조용히 빠졌다. 지우는 단추가 보여야 한다 */
+test('★★ 편집칸의 로고 줄 — 내린 표시가 있으면 언제 내렸는지와 «지우기» 단추를 보인다', () => {
+  const 내림 = 편집칸상자({ C1: { boardSrl: 185, takenDown: { at: '2026-11-01', 까닭: '계약종료' } } })
+    .로고연결칸Html({ key: 'C1' });
+  assert.match(내림, /내린 것/);
+  assert.match(내림, /onclick="내린표시지우기\('partner','C1'\)"/, '★★ 재계약해도 내린 표시를 지울 길이 없습니다');
+  const 안내림 = 편집칸상자({ C1: { boardSrl: 185 } }).로고연결칸Html({ key: 'C1' });
+  assert.ok(!/내린표시지우기/.test(안내림), '내리지도 않았는데 지우기 단추를 그립니다');
+});
 
 test('편집칸의 로고 줄 — 안 이었으면 잇기 창으로, 이었으면 번호와 풀기', () => {
   const 안이음 = 편집칸상자({ C1: { posted: true } }).로고연결칸Html({ key: 'C1' });

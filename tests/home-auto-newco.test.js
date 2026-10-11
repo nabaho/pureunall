@@ -54,7 +54,7 @@ function 상자(더) {
   ctx.쓴것 = 쓴것;
   vm.createContext(ctx);
   vm.runInContext([constLine('새거래처기준일'), constLine('로고파일한도'),
-    fnSource('새거래처목록'), fnSource('새로고넣기'), fnSource('공개동의저장'),
+    fnSource('새거래처목록'), fnSource('새로고넣기'), fnSource('공개동의저장'), fnSource('홈페이지에없음확인'),
     fnSource('새로올리기칸Html'), fnSource('partnerMark')].join('\n'), ctx);
   return ctx;
 }
@@ -80,10 +80,44 @@ test('새 거래처 = 기준일 뒤 계약·거래 중·자문료 있음·사무
 test('새 거래처 — 로고·동의를 다 넣었으면 «할 것»이 아니라 «올라갈 것»이다', () => {
   const ctx = 상자();
   ctx.App.companies = [회사('A'), 회사('B')];
-  ctx.App.partners = { B: { posted: true, consent: { date: '2026-10-05' }, logo: { bytes: 9 } } };
+  ctx.App.partners = { B: { posted: true, consent: { date: '2026-10-05' }, logo: { bytes: 9 },
+                            notOnSite: { at: '2026-10-11', by: '관리자' } } };
   const r = JSON.parse(JSON.stringify(ctx.새거래처목록()));
   assert.strictEqual(r.find(x => x.id === 'A').준비, false);
   assert.strictEqual(r.find(x => x.id === 'B').준비, true);
+});
+
+/* 2026-10-11 — 손으로 이미 올린 로고와 두 장이 걸리지 않게, «지금 홈페이지에 없음»을 사람이 확인한다 */
+test('★★ «지금 홈페이지에 없음» 확인이 없으면 «올라갈 것»이 아니다', () => {
+  const ctx = 상자();
+  ctx.App.companies = [회사('B')];
+  ctx.App.partners = { B: { posted: true, consent: { date: '2026-10-05' }, logo: { bytes: 9 } } };
+  assert.strictEqual(JSON.parse(JSON.stringify(ctx.새거래처목록()))[0].준비, false,
+    '★★ 홈페이지에 이미 있는지 아무도 안 봤는데 올라간다고 합니다');
+  const 칸 = ctx.새로올리기칸Html({ key: 'B' });
+  assert.match(칸, /빠진 것:[^<]*홈페이지 확인/, '★ 무엇이 빠졌는지 안 알립니다');
+  assert.match(칸, /onclick="홈페이지에없음확인\('B', true\)"/, '★ 확인 단추가 없습니다');
+});
+
+test('★★ 올렸지만 글 번호를 못 받은 곳은 «다음 달 올라간다»가 아니다 — 다시 안 올린다', () => {
+  const ctx = 상자();
+  ctx.App.companies = [회사('B')];
+  ctx.App.partners = { B: { posted: true, consent: { date: '2026-10-05' }, logo: { bytes: 9 },
+                            notOnSite: { at: '2026-10-11' }, uploadedAt: { at: 1 } } };
+  const 줄 = JSON.parse(JSON.stringify(ctx.새거래처목록()))[0];
+  assert.strictEqual(줄.준비, false);
+  assert.strictEqual(줄.올렸음, true);
+  const 칸 = ctx.새로올리기칸Html({ key: 'B' });
+  assert.ok(!/다음 달 1일에 저절로 올라갑니다/.test(칸), '★★ 이미 올렸는데 다음 달에 또 올라간다고 합니다');
+  assert.match(칸, /글 번호를 못 받았습니다/);
+});
+
+test('홈페이지 없음 확인은 그 회사 «한 칸»에만 쓴다', async () => {
+  const ctx = 상자();
+  assert.strictEqual(await ctx.홈페이지에없음확인('A', true), true);
+  const w = ctx.쓴것[ctx.쓴것.length - 1];
+  assert.strictEqual(w[1], 'homepage/partners/A/notOnSite', '회사 자리를 통째로 덮으면 안 됩니다');
+  assert.ok(w[2] && w[2].at, '누가 언제 확인했는지 안 남습니다');
 });
 
 test('로고 넣기 — 그림은 로고 자리에, 표시는 그 회사 «로고 칸 하나»에만 쓴다', async () => {
@@ -127,9 +161,11 @@ test('공개 동의 — 날짜가 있어야 하고, 저장하면 «올림»도 �
 
 test('편집칸 — 다 넣었으면 «다음 달 1일에 올라간다», 빠졌으면 무엇이 빠졌는지', () => {
   const ctx = 상자();
-  ctx.App.partners = { A: { posted: true, consent: { date: '2026-10-05' }, logo: { bytes: 9, w: 300, h: 80 } } };
+  ctx.App.partners = { A: { posted: true, consent: { date: '2026-10-05' }, logo: { bytes: 9, w: 300, h: 80 },
+                            notOnSite: { at: '2026-10-11' } } };
   const 다 = ctx.새로올리기칸Html({ key: 'A' });
-  assert.match(다, /다음 달 1일/);
+  /* ⚠ 2026-10-11 — 예전에는 /다음 달 1일/ 로 봤다. 칸 제목에도 그 말이 있어 빠진 것이 있어도 통과했다 */
+  assert.match(다, /다음 달 1일에 저절로 올라갑니다/);
   ctx.App.partners = { A: {} };
   const 빠짐 = ctx.새로올리기칸Html({ key: 'A' });
   assert.match(빠짐, /type="file"/, '로고 넣는 칸이 없습니다');

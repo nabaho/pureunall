@@ -122,10 +122,11 @@ test('편집칸의 직원 줄은 «한 줄»이다 — 줄바꿈 상자를 쌓�
 });
 
 /* saveRecord 를 가짜 서버 사본으로 실제로 돌린다 */
-async function 저장해보기(서버값, next) {
+async function 저장해보기(서버값, next, 불러온값) {
   let 쓴것 = null;
   const ctx = {
-    console: { warn() {} }, App: { members: { k: Object.assign({}, 서버값) }, pages: {} },
+    /* 불러온값 — 화면이 «열 때» 읽은 사본. 안 주면 서버값과 같다(그 사이 아무도 안 고침) */
+    console: { warn() {} }, App: { members: { k: Object.assign({}, 불러온값 || 서버값) }, pages: {} },
     currentUserName: () => '관리자', histStamp: () => 't1',
     db: { ref: (p) => ({
       transaction: async (fn) => { 쓴것 = fn(JSON.parse(JSON.stringify(서버값))); return { committed: true }; },
@@ -150,6 +151,50 @@ test('★ 구성원을 편집해 저장해도 «자동 연결 칸»(직원 번�
 test('저장할 것에 그 칸이 «있으면» 그 값이 이긴다(사람이 일부러 바꾼 것)', async () => {
   const 쓴것 = await 저장해보기({ name: '홍길동', updatedAt: 0, sid: 'S1' }, { name: '홍길동', sid: 'S2' });
   assert.strictEqual(쓴것.sid, 'S2');
+});
+
+/* ══════ 2026-10-11 — 서버가 «칸 하나씩» 쓴 값을 화면 저장이 지우던 것 ══════
+   서버(월간 자동)는 올린 표시(uploadedAt)·받은 글 번호(srl)를 칸 하나씩 쓰고 updatedAt 은 안 올린다.
+   그래서 저장 막이가 못 보고, 화면은 «열 때 읽은 사본»으로 덮었다 → 다음 달 같은 글이 또 올라갔다. */
+test('★★★ 서버가 올린 뒤 적은 «올림 표시·새 글 번호»를 화면 저장이 안 지운다', async () => {
+  const 불러온 = { name: '홍길동', srl: '', careers: [], updatedAt: 5, sid: 'S1', publishOk: { 경력글: 'x' } };
+  const 서버 = Object.assign({}, 불러온, { srl: '777', uploadedAt: { at: 1, 달: '2026-11' } });
+  const 쓴것 = await 저장해보기(서버, { name: '홍길동', srl: '', careers: ['現 가'] }, 불러온);
+  assert.strictEqual(쓴것.srl, '777', '★★★ 서버가 받은 글 번호를 지웠다 — 연결이 끊겨 퇴사해도 안 내려간다');
+  assert.ok(쓴것.uploadedAt, '★★★ 올림 표시를 지웠다 — 다음 달 1일에 같은 글이 또 올라간다');
+});
+
+test('★★ 낡은 사본을 «통째로» 저장해도 다른 곳에서 바꾼 칸을 되살리지 않는다', async () => {
+  /* 다른 탭에서 「올리기 허락 풀기」를 했다 — 이 탭의 사본에는 아직 허락이 있다 */
+  const 불러온 = { name: '홍길동', srl: '101', updatedAt: 5, sid: 'S1', publishOk: { 경력글: 'x' } };
+  const 서버 = { name: '홍길동', srl: '101', updatedAt: 5, sid: 'S1' };
+  const next = Object.assign({}, 불러온, { keepOnSite: { why: '지사장' } });   // 남기기 표시처럼 통째로
+  delete next.updatedAt;
+  const 쓴것 = await 저장해보기(서버, next, 불러온);
+  assert.strictEqual(쓴것.publishOk, undefined, '★★ 다른 탭에서 푼 올리기 허락을 되살렸다 — 허락 안 한 글이 올라간다');
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(쓴것.keepOnSite)), { why: '지사장' }, '★ 이번에 바꾼 남기기는 남아야 한다');
+});
+
+test('★★ 남기기를 «풀면» 풀린다 — 칸이 없다고 서버 값을 되살리지 않는다', async () => {
+  const 불러온 = { name: '홍길동', updatedAt: 5, keepOnSite: { why: '지사장' } };
+  const 쓴것 = await 저장해보기(불러온, { name: '홍길동', keepOnSite: null }, 불러온);
+  assert.strictEqual(쓴것.keepOnSite, null, '★★ 풀었는데 남기기가 그대로다');
+  const 몸 = fnSource('writeKeepOnSite').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.ok(!/delete next\.keepOnSite/.test(몸),
+    '★★ 풀 때 칸을 지운다 — 저장은 «없는 칸»을 서버 값으로 채워 남기기가 되살아난다');
+});
+
+test('★★ 되돌리기는 글 번호를 «지금 것»으로 둔다 — 글 번호가 자동 연결의 열쇠다', () => {
+  const ctx = { console };
+  vm.createContext(ctx);
+  vm.runInContext(fnSource('restoredMember'), ctx);
+  const r = JSON.parse(JSON.stringify(ctx.restoredMember(
+    { name: '홍길동', srl: '190', sid: 'S1', uploadedAt: { at: 1 }, careers: ['現 지금'] },
+    { name: '홍길동', srl: '', careers: ['前 그때'] })));
+  assert.strictEqual(r.srl, '190', '★★ 옛 글 번호로 되돌렸다 — 연결이 끊기거나 엉뚱한 글이 내려간다');
+  assert.strictEqual(r.sid, 'S1');
+  assert.ok(r.uploadedAt, '★ 올림 표시를 지웠다');
+  assert.deepStrictEqual(r.careers, ['前 그때'], '내용은 그때 것으로 돌아와야 한다');
 });
 
 test('명부에서 넣을 때 직원 번호를 함께 남긴다 — 그 번호가 «그 이름»일 때만', () => {

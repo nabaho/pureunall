@@ -82,6 +82,28 @@ test('★★★ ② 그 사이 서버가 바뀌었으면 되살리지 «않는�
   assert.match(새탭.saveErr, /되살리지 않았/, '★★ 고치던 것이 사라졌는데 아무 말이 없습니다');
 });
 
+/* 2026-10-11 — 서버(월간 자동)가 칸 하나씩 쓴 글 번호는 updatedAt 을 안 올려 ②의 견줌에 안 잡힌다 */
+test('★★ 되살린 초안의 글 번호 — 사람이 안 고쳤으면 «지금 번호», 고쳤으면 그대로', () => {
+  const 저장소 = 탭저장소();
+  const 원본0 = () => ({ '190': { name: '홍길동', srl: '', careers: ['現 가'], updatedAt: 1000 } });
+  부팅(저장소, { group: 'members', filter: '', dirty: true,
+    draft: { kind: 'member', key: '190', name: '홍길동', srl: '', careers: ['現 가', '前 새 줄'] },
+    members: 원본0(), pages: {}, pageFix: {} }).이어쓰기남기기();
+  const 그사이올림 = 원본0(); 그사이올림['190'].srl = '777';   // 서버가 올리고 글 번호를 받았다(updatedAt 그대로)
+  const 새탭 = { group: 'members', filter: '', dirty: false, draft: null, members: 그사이올림, pages: {}, pageFix: {} };
+  assert.strictEqual(부팅(저장소, 새탭).이어쓰기되살리기(), true);
+  assert.strictEqual(새탭.draft.srl, '777', '★★ 옛 초안의 빈 글 번호를 되살렸다 — 저장하면 연결이 끊긴다');
+
+  /* 사람이 초안에서 글 번호를 직접 고쳤으면 그 값을 지킨다 */
+  const 저장소2 = 탭저장소();
+  부팅(저장소2, { group: 'members', filter: '', dirty: true,
+    draft: { kind: 'member', key: '190', name: '홍길동', srl: '555', careers: ['現 가'] },
+    members: 원본0(), pages: {}, pageFix: {} }).이어쓰기남기기();
+  const 새탭2 = { group: 'members', filter: '', dirty: false, draft: null, members: 그사이올림, pages: {}, pageFix: {} };
+  부팅(저장소2, 새탭2).이어쓰기되살리기();
+  assert.strictEqual(새탭2.draft.srl, '555', '★ 사람이 친 글 번호를 덮었다');
+});
+
 test('★ ③ 고친 것이 없으면 아무것도 안 남긴다 — 지난 것도 지운다', () => {
   const 저장소 = 탭저장소();
   저장소.setItem('pu-home:unsaved', '{"at":1}');
