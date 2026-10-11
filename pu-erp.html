@@ -26744,18 +26744,43 @@ function loaReconcileStatus(todayS){
     if(x.status === 'pending' || x.status === 'rejected') return;   // 아직 승인 안 된 휴직은 휴직이 아니다
     if(x.startDate <= t && t <= end) covering[x.sid] = x;
   });
-  var changed = 0;
+  var changed = 0, retiredNow = [];
   var next = users0.map(function(u){
     if(!u || !u.sid || u.status === 'retired' || u.status === 'scheduled' || u.status === 'standby') return u;
+    /* 퇴직 예정(미래 퇴직일로 퇴사 처리한 사람) — 마지막 근무일이 지나면 그때 «퇴직» (2026-10-11) */
+    var _last = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+    if(u.retirePending && _last && _last < t){
+      changed++; retiredNow.push(u.sid);
+      return Object.assign({}, u, { status:'retired', retirePending:false, leaveStartDate:'', leaveEndDate:'' });
+    }
     var c = covering[u.sid];
     if(c && u.status !== 'leave'){ changed++; return Object.assign({}, u, { status:'leave', leaveStartDate:c.startDate, leaveEndDate:c.endDate || '', leaveReason:c.reason || u.leaveReason || '' }); }
     if(!c && u.status === 'leave'){ changed++; return Object.assign({}, u, { status:'active', leaveStartDate:'', leaveEndDate:'', leaveReason:'' }); }
     return u;
   });
   if(changed) dbSet('user_accounts', next);
+  retiredNow.forEach(function(sid){
+    var x = next.find(function(v){ return v && v.sid === sid; });
+    erpCloseLoaForRetire(sid, String((x && (x.lastWorkDate || x.retireDate)) || t).slice(0, 10));
+  });
   return changed;
 }
 function setLoaList(list){ dbSet('leave_of_absence', list); }
+/* 어느 날 그 사람이 «재직·휴직·퇴직·입사예정» 중 무엇인가 — 화면마다 따로 가르던 잣대를 한 곳에 (2026-10-11)
+   · 퇴직일은 «마지막 근무일»이다(대표 결정 2026-10-11) — 그 날까지는 재직, 다음 날부터 퇴직
+   · 퇴직 예정(retirePending)도 같은 날짜로 가른다 · 휴직은 승인된 휴직 기록(getLoaStatus) 또는 명부 상태 */
+function erpEmpStatusAt(u, ymd){
+  if(!u) return '';
+  var d = String(ymd || todayYMD()).slice(0, 10);
+  if(u.status === 'scheduled' || u.status === 'standby') return u.status;
+  if(u.hireDate && d < String(u.hireDate).slice(0, 10)) return 'scheduled';
+  var last = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+  if(last && d > last && (u.status === 'retired' || u.retirePending)) return 'retired';
+  if(u.status === 'retired' && !last) return 'retired';
+  if(getLoaStatus(u.sid, d)) return 'leave';
+  if(u.status === 'leave' && d >= todayYMD()) return 'leave';
+  return 'active';
+}
 /* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 퇴사한 직원의 질병휴직이 열려 있어
    명부·급여·휴가 화면이 모두 «휴직»으로 보였다).
    · 마지막 근무일 전에 시작한 휴직 → 종료(endedDate = 마지막 근무일, 종료일이 더 이르면 그 날)
@@ -71027,23 +71052,12 @@ function StaffRosterModal(props){
       ),
       h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' } },
         fld('계약만료일', inp('contractEnd','date')),
-        fld('퇴직일', inp('retireDate','date'))
+        fld('퇴직일 (마지막 근무일)', h('input', { type:'date', value:f.retireDate||'',
+          onChange:function(e){ var v = e.target.value; setF(function(prev){ return Object.assign({}, prev, { retireDate:v, lastWorkDate:v }); }); },
+          style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } }))
       ),
       f.status === 'retired' && fld('퇴직사유', sel('leaveReason', ['자발적 퇴사','권고사직','계약만료','해고','사망','기타'])),
-      f.status === 'retired' && fld('마지막 근무일', h('input', { type:'date', value:f.lastWorkDate||'',
-        title:'✏️ 마지막 근무일 — 입력 시 퇴직일이 비어있으면 다음 날로 자동 설정',
-        onChange:function(e){
-          var v = e.target.value;
-          setF(function(prev){
-            var next = Object.assign({}, prev, { lastWorkDate:v });
-            if(v && !prev.retireDate){
-              var d = new Date(v); d.setDate(d.getDate()+1);
-              next.retireDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-            }
-            return next;
-          });
-        },
-        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } })),
+      /* 마지막 근무일 칸은 없앴다 — 퇴직일이 곧 마지막 근무일이다(대표 결정 2026-10-11). 예전에는 마지막 근무일을 넣으면 퇴직일을 «다음 날»로 바꿨다. */
       // 퇴직 정산 스냅샷 — 분쟁·증명서 대응용 최소 기록 (임금채권·퇴직급여 시효 3년 대비)
       f.status === 'retired' && h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'10px 12px', marginBottom:'12px' } },
         h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#854d0e', marginBottom:'8px' } }, '📋 퇴직 정산 스냅샷 (시효 3년 대비 기록 — 원본 서류는 자료보관소에)'),
@@ -72018,8 +72032,10 @@ function RetireModal(props){
       }
     }
     var selDocs = Object.keys(docs).filter(function(k){ return docs[k]; });
+    var _future = f1.retireDate > today;   // 앞날짜 — 그날까지는 재직(퇴직 예정)
     props.onSave(Object.assign({}, u, {
-      status:'retired', retireDate:f1.retireDate, lastWorkDate:f1.lastWorkDate, leaveReason:f1.leaveReason,
+      status: _future ? (u.status === 'leave' ? 'leave' : 'active') : 'retired', retirePending:_future,
+      retireDate:f1.retireDate, lastWorkDate:f1.retireDate, leaveReason:f1.leaveReason,
       retireChecklist:{ isSeveranceTarget:isSev, workYears:Math.round(years*10)/10, proratedPay:prorated, annualLeaveRemain:f2.annualLeaveRemain, annualLeavePay:annualPay, severancePay:severance, totalPay:total },
       retireDocs:selDocs, retiredAt:today,
       leaveRecalcBasis: f2.leaveRecalcApplied ? 'joinDate' : (dbGet('policy_leave',{}).basis||'joinDate'),
@@ -72040,8 +72056,10 @@ function RetireModal(props){
       lbl('직책', u.title||'-'),
       lbl('입사일', u.hireDate||'-', true)
     )),
-    fld('퇴직일 *', inp(f1.retireDate, set1('retireDate'), 'date')),
-    fld('마지막 근무일', inp(f1.lastWorkDate, set1('lastWorkDate'), 'date')),
+    /* 퇴직일 = 마지막 근무일 (대표 결정 2026-10-11) — 두 칸을 따로 받으면 하루 어긋나 급여·퇴직금·연차가 갈렸다 */
+    fld('퇴직일 * (마지막 근무일)', inp(f1.retireDate, function(e){ var v = e.target.value; setF1(Object.assign({}, f1, { retireDate:v, lastWorkDate:v })); }, 'date')),
+    f1.retireDate > today && h('div', { style:{ fontSize:'11.5px', color:'#1e40af', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'6px 10px', marginBottom:'10px' } },
+      '📅 앞날짜입니다 — 그날까지는 «재직»으로 두고 «퇴직 예정»으로 적습니다. 그날이 지나면 저절로 퇴직이 됩니다.'),
     fld('퇴직사유', h('select', { value:f1.leaveReason, onChange:set1('leaveReason'), style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px' } },
       LEAVE_REASONS.map(function(r){ return h('option',{key:r,value:r},r); })
     ))
@@ -78261,7 +78279,7 @@ function LeaveManagement(){
                 var color = ratio>=0.8?'#dc2626':ratio>=0.5?'#d97706':'#16a34a';
                 var isSel = u.sid===selSid;
                 var mono = {textAlign:'right',fontFamily:'monospace',whiteSpace:'nowrap'};
-                var onLoa = u.status==='leave' || !!getLoaStatus(u.sid);
+                var onLoa = erpEmpStatusAt(u) === 'leave';
                 return h('tr',{key:u.sid,onClick:function(){setSelSid(u.sid);},
                   style:{background:isSel?'#eff6ff':i%2===0?'#fff':'#f8fafc',
                     cursor:'pointer',borderLeft:'3px solid '+(isSel?'#1e40af':'transparent'),
@@ -81910,7 +81928,7 @@ function PayrollLedger(props){
             h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'6px' } },
               h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'10px', background:'#475569', borderRadius:'4px', padding:'1px 5px', flexShrink:0 } }, idx+1),
               h('span', { style:{ fontWeight:700, color:'#1e293b', fontSize:'13px', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, u.name),
-              u.status==='leave' && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '휴직'),
+              erpEmpStatusAt(u, (rec.ym || todayYMD().slice(0,7)) + '-15') === 'leave' && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '휴직'),
               (u.status==='resigned'||u.status==='retired') && h('span', { style:{ fontSize:'9.5px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '퇴사'),
               u.title && h('span', { style:{ fontSize:'10px', color:'#64748b', flexShrink:0 } }, u.title),
               h('span', { style:{ fontSize:'10px', background:stBg, color:stFg, padding:'1px 7px', borderRadius:'10px', fontWeight:700, flexShrink:0 } }, stLb)
@@ -84840,6 +84858,13 @@ function StaffRoster(){
 
   function openRetire(u){ setDetailModal(null); setRetireModal(u); }
   function saveRetire(data){
+    if(data.retirePending){
+      /* 퇴직 예정 — 지금은 재직 그대로. 휴직 기록은 그날 저절로 닫힌다(loaReconcileStatus) */
+      persist(users.map(function(u){ return u.sid === data.sid ? data : u; }));
+      setRetireModal(null);
+      showToast('📅 ' + data.name + ' 퇴직 예정 등록 (' + data.retireDate + ' 마지막 근무) — 그날이 지나면 저절로 퇴직');
+      return;
+    }
     data = Object.assign({}, data, { leaveStartDate:'', leaveEndDate:'' });
     persist(users.map(function(u){ return u.sid === data.sid ? data : u; }));
     var _nl = erpCloseLoaForRetire(data.sid, data.lastWorkDate || data.retireDate || todayYMD());
@@ -84849,8 +84874,10 @@ function StaffRoster(){
     showToast(data.name + ' 퇴사 처리 완료');
   }
 
-  // 휴직 자동연동(A): 오늘이 LOA(휴가관리 휴직) 기간이면 재직을 휴직으로 표시 — 데이터는 변경하지 않음
-  function effStatus(u){ return (u && u.status==='active' && getLoaStatus(u.sid)) ? 'leave' : (u?u.status:''); }
+  /* 퇴직 예정일·휴직 날짜를 화면을 열 때 한 번 맞춘다 (2026-10-11) */
+  useEffect(function(){ try { loaReconcileStatus(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, []);
+  // 휴직 자동연동(A): 오늘이 LOA(휴가관리 휴직) 기간이면 재직을 휴직으로 표시 — 데이터는 변경하지 않음 (공용 판정 erpEmpStatusAt)
+  function effStatus(u){ return (u && u.status==='active' && erpEmpStatusAt(u)==='leave') ? 'leave' : (u?u.status:''); }
   var activeCount    = users.filter(function(u){return effStatus(u)==='active';}).length;
   var leaveCount     = users.filter(function(u){return effStatus(u)==='leave';}).length;
   var standbyCount   = users.filter(function(u){return u.status==='standby';}).length;
@@ -85190,8 +85217,11 @@ function StaffRoster(){
       var hist = (Array.isArray(u.employmentHistory) ? u.employmentHistory : []).slice();
       if(u.retireDate || u.leaveReason) hist.push({ hireDate:u.hireDate || '', retireDate:u.retireDate || '', lastWorkDate:u.lastWorkDate || '',
         leaveReason:u.leaveReason || '', reinstatedAt:todayYMD(), by:(CURRENT_USER && CURRENT_USER.name) || '' });
-      return Object.assign({}, u, { status:'active', retireDate:'', leaveReason:'', lastWorkDate:'', employmentHistory:hist });
+      return Object.assign({}, u, { status:'active', retirePending:false, retireDate:'', leaveReason:'', lastWorkDate:'', leaveStartDate:'', leaveEndDate:'', employmentHistory:hist });
     }));
+    /* 복귀 전에 열려 있던 휴직이 있으면 퇴직 시점에 맞춰 닫는다 — 안 그러면 복귀하자마자 다시 «휴직»으로 보인다 (2026-10-11) */
+    var _ru = users.find(function(x){ return x && x.sid === sid; });
+    erpCloseLoaForRetire(sid, String((_ru && (_ru.lastWorkDate || _ru.retireDate)) || todayYMD()).slice(0, 10));
     setDetailModal(null);
     showToast('재직 복귀됨');
   }
@@ -85465,6 +85495,9 @@ function StaffRoster(){
                     u.status==='retired' && h('span', {
                       style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#fef2f2',color:'#991b1b',fontSize:'10.5px',fontWeight:700,verticalAlign:'middle'}
                     }, '퇴직'),
+                    u.retirePending && u.status!=='retired' && h('span', { title:'마지막 근무일 ' + (u.retireDate||'') + ' — 그날이 지나면 저절로 퇴직',
+                      style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#eff6ff',color:'#1e40af',fontSize:'10.5px',fontWeight:700,verticalAlign:'middle',whiteSpace:'nowrap'}
+                    }, '퇴직 예정 ' + String(u.retireDate||'').slice(5)),
                     u.status==='scheduled' && h('span', {
                       style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#f0fdf4',color:'#166534',fontSize:'10.5px',fontWeight:700,verticalAlign:'middle'}
                     }, '📅 입사예정')),
