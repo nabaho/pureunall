@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 사람 확인 필요
 이어하기시도: 0
 작업폴더: C:\Users\fair0\Documents\pu-wt-home1011
 가지: feat/home-staff-recon
