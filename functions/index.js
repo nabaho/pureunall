@@ -53,6 +53,7 @@ const TypeSafeEvaluate = require("./typesafe-evaluate");
 const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
+const RecruitDigest = require("./recruit-digest");
 const RehabWatch = require("./rehab-watch");
 
 if (!getApps().length) initializeApp();
@@ -1094,12 +1095,39 @@ function 모집다른길(u, raw, 넘김) {
     req.on("error", no);
   });
 }
+/* ═══ 아침 새 글 요약 메일 (대표 「2단계」 2026-10-11) ═══
+   글 짓기는 functions/recruit-digest.js(순수). 여기는 «보내는 길»만 — 뉴스레터 금요일 검토 메일(뉴스레터메일)과 같은 길이다.
+   ⚠ 절대 던지지 않는다 — 메일이 죽어도 감시 결과(gov_watch/hits)는 이미 적혔다. 돌려주는 값은 한 줄 기록용.
+   ⚠ 끄기: gov_watch/config/mail = false · 받는 주소: gov_watch/config/mailTo (한 개, 올바른 주소만 — 아니면 기본 대표 주소).
+   ⚠ 새 글이 없으면 보내지 않는다. 같은 글은 다음 날 «새 글»이 아니므로 두 번 가지 않는다(hits 에 이미 있다). */
+async function 모집요약보내기(root, hits, today) {
+  try {
+    const 설정 = (await root.child("config").once("value")).val() || {};
+    if (설정.mail === false) return { 상태: "꺼짐", 때: Date.now() };
+    const 요약 = RecruitDigest.build({ hits, today });
+    if (!요약) return { 상태: "새 글 없음", 때: Date.now() };
+    const to = RecruitDigest.validTo(설정.mailTo) || RecruitDigest.DEFAULT_TO;
+    const MBhere = require("./mail-bulk");
+    const 계정주소 = await mailUserAsync();
+    const 뉴스설정 = (await getDatabase().ref("newsletter/config").once("value")).val() || {};
+    const from = MBhere.보내는주소고르기(뉴스설정.보내는주소, 계정주소);
+    const r = await MD.deliver({ db: getDatabase(), body: { to: [to], subject: 요약.subject, body: 요약.body, html: 요약.html },
+      from, pass: mailPass(from), envId: process.env.DAUM_MAIL_ID, byEmail: "컨설턴트 모집 감시",
+      deps: { getStorage: getStorage }, uid: "" });
+    if (r && r.ok) return { 상태: "보냄", 건수: 요약.count, 때: Date.now() };
+    return { 상태: "못 보냄", 까닭: String((r && r.error) || "알 수 없음").slice(0, 200), 건수: 요약.count, 때: Date.now() };
+  } catch (e) {
+    return { 상태: "못 보냄", 까닭: String((e && e.message) || e).slice(0, 200), 때: Date.now() };
+  }
+}
 exports.recruitWatch = functions
   .region(MAIL_REGION)
   /* ILABOR_ID·ILABOR_PW — 공인노무사회 «회원 공지»를 읽으려고 뉴스레터의 로그인 비밀값을 빌린다(2026-10-04).
      코드는 값을 못 본다. 로그인은 하루 한 번, 읽기만 한다. */
   /* GEMINI_KEY — 공인노무사회 공문(그림)의 마감일을 읽으려고(2026-10-09). 하루 6건까지 · readDoc 과 같은 달 한도 */
-  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY"] })
+  /* DAUM_MAIL_PASSWORD·GOOGLE_MAIL_PASSWORD — 새 글이 있는 날 «아침 요약 메일»을 보내려고(2026-10-11, 대표 「2단계」).
+     뉴스레터 금요일 검토 메일과 같은 비밀값·같은 길(모집요약보내기 → MD.deliver). 새 글이 없으면 보내지 않는다. */
+  .runWith({ timeoutSeconds: 300, memory: "256MB", secrets: ["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"] })
   .pubsub.schedule("every day 07:20")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1158,6 +1186,9 @@ exports.recruitWatch = functions
     };
     const result = await RecruitWatch.run({ existing, today, nowIso, fetchText, details: true, ai });   // 새 글 본문을 열어 접수 기간까지
     await root.update(RecruitWatch.updatesOf(result, existing, nowIso, { fails, today }));
+    /* 새 글이 있으면 아침 요약 메일 — 결과는 gov_watch/last/mail 에 한 줄(보냄·안 보냄·까닭). 실패해도 감시는 멈추지 않는다 */
+    const 메일결과 = await 모집요약보내기(root, result.hits, today);
+    await root.child("last/mail").set(메일결과).catch((e) => console.warn("[컨설턴트 모집 감시] 메일 기록 못 남김", String(e && e.message || e)));
     /* 처음 한 번만 — 회원 공지에 모집 공문이 정말 오는지 다섯 쪽을 훑어 남긴다(대표 확인용, 관리자만 읽힌다).
        ⚠ 로그인이 안 됐으면 남기지 않는다 — 다음 날 다시 해 본다. */
     try {

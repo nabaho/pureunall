@@ -706,7 +706,8 @@ test('★★ 읽는 손은 바이트(raw)도 넘긴다 — 로그인 게시판�
 test('★★ 서버 — AI 는 readDoc 과 같은 문(달 한도·열쇠·셈), 비밀값 GEMINI_KEY · 그림은 바이트로', () => {
   const src = require('fs').readFileSync(require('path').join(__dirname, 'index.js'), 'utf8').replace(/\r\n/g, '\n');
   const i = src.indexOf('exports.recruitWatch'); const body = src.slice(i, src.indexOf('\nexports.', i + 30));
-  assert.match(body, /secrets: \["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY"\]/);
+  /* 앞 셋은 처음부터 — 뒤 둘(메일 비밀값)은 2026-10-11 아침 요약 메일을 보내려고 더했다(functions/recruit-digest.test.js 가 따로 못박는다) */
+  assert.match(body, /secrets: \["ILABOR_ID", "ILABOR_PW", "GEMINI_KEY", "DAUM_MAIL_PASSWORD", "GOOGLE_MAIL_PASSWORD"\]/);
   assert.match(body, /aiMonthSpend\(\)[\s\S]*몫\.over[\s\S]*readGeminiKey\(\)[\s\S]*DR\.callGemini[\s\S]*bumpReadTally\("gov"/);
   assert.match(body, /if \(raw\) return new Uint8Array\(await res\.arrayBuffer\(\)\)/);
   assert.match(body, /if \(raw\) return new Uint8Array\(await r\.arrayBuffer\(\)\)/);
