@@ -16,6 +16,17 @@
   var applyTimer = null;
   var lastActivity = Date.now();
   var saveBlocked = false;
+  /* ══ 숨은 탭은 새 판으로 갈아타지 않고 기다린다 (2026-10-12 대표 「폭주원인 찾아서 불필요하게 나가면 중단시켜」) ══
+     ■ 무엇이 있었나 — 10/11 하루 배포 107번(10/10 은 44번), 그날 요금 ₩8,458(실시간DB ₩7,165)로 최고.
+       화면마다 5분마다 새 판을 보고, 30초 손을 안 대면 스스로 새로고침한다. 뒤에 숨은 탭은 «늘 손을 안 대는 중»이라
+       배포 때마다 거의 매번 새로 켜지며 자료를 다시 받았다(대표 크롬엔 푸른 탭이 열 개 넘게 열려 있다).
+     ■ 그래서 — 숨은 탭은 기다렸다가, 사람이 그 탭을 다시 볼 때 한 번만 갈아탄다(그사이 배포가 몇 번이든 한 번).
+     ⚠ 다만 6시간 넘게 숨어 있으면 갈아탄다 — 옛 코드가 며칠씩 돌며 옛 잘못(새는 받기 등)을 이어 가지 않게. */
+  var HIDDEN_MAX_MS = 6 * 60 * 60 * 1000;
+  var pendingSince = 0;
+  var waitingVisible = false;
+  function isHidden() { try { return window.document.visibilityState === 'hidden'; } catch (_) { return false; } }
+  function shouldWaitHidden(hidden, since, now, max) { return !!hidden && !(since && (now - since) >= max); }
 
   /* ══ 부팅 폭풍 감지 (대표 제보 2026-09-17 「계속 돈이 새고 있다」) ══════════════════
      ■ 무엇이 있었나
@@ -294,8 +305,25 @@
     probeThenGo(target, 0);
   }
 
+  function waitUntilVisible() {
+    if (waitingVisible) return;
+    waitingVisible = true;
+    window.document.addEventListener('visibilitychange', function onVis() {
+      if (isHidden()) return;
+      window.document.removeEventListener('visibilitychange', onVis);
+      waitingVisible = false;
+      lastActivity = Date.now();                       // 돌아온 사람이 손을 놓을 때(30초) 갈아탄다
+      if (applyTimer) window.clearTimeout(applyTimer);
+      applyTimer = window.setTimeout(applyWhenIdle, IDLE_MS);
+    });
+  }
   function applyWhenIdle() {
     if (!pendingVersion) return;
+    if (shouldWaitHidden(isHidden(), pendingSince, Date.now(), HIDDEN_MAX_MS)) {
+      waitUntilVisible();
+      applyTimer = window.setTimeout(applyWhenIdle, 30 * 60 * 1000);   // 숨은 채로 6시간이 지났는지 가끔 본다
+      return;
+    }
     if (saveBlocked || Date.now() - lastActivity < IDLE_MS) {
       applyTimer = window.setTimeout(applyWhenIdle, 5000);
       return;
@@ -317,6 +345,7 @@
   }
 
   function scheduleApply(version) {
+    if (!pendingVersion || !pendingSince) pendingSince = Date.now();   // 처음 새 판을 안 때 — 숨은 채 기다린 시간을 잰다
     pendingVersion = version;
     if (applyTimer) window.clearTimeout(applyTimer);
     applyTimer = window.setTimeout(applyWhenIdle, 1000);
