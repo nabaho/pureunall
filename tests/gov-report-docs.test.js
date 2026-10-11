@@ -510,3 +510,68 @@ test('trackRows — 대형 틀 줄에 막힌 단계·다음 단계가 실리고 
   assert.equal(sr[0].trk.sign.st, 'done');
   assert.deepEqual(sr[0].st.steps, [true, true, true, false]);
 });
+
+/* ═══ blockedAlerts — 「막힌 단계」 알림은 현황판 줄이 아니라 일정 쌍(pairs)과 기록에서 직접 ═══ */
+const blkIn = (extra) => Object.assign({ input: BIGX.input, year: '2026', biz: BIGX.biz, tmap: BIGX.tmap, consultings: [], track: bigTrack({}) }, extra);
+
+test('blockedAlerts — 합성 입력이 실제로 이어진다 · 막힌 대형 단계만 업체·사업·단계 이름·메모로(달은 회차 날짜에서)', () => {
+  assert.equal(typeof D.blockedAlerts, 'function');
+  assert.equal(D.pairs(BIGX.input, 'tb', '2026').length, 1, '전제: 쌍이 잡힌다');
+  assert.equal(D.planFor(D.erpTypeFor('tb', BIGX.biz, BIGX.tmap).name).kind, '대형', '전제: 대형 틀');
+  const r = D.blockedAlerts(blkIn({ track: bigTrack({ log: { st: 'blocked', note: '인증서 만료', at: 1 }, 'monthly:2': { st: 'blocked', at: 1 }, result: { st: 'doing', at: 1 } }) }));
+  assert.deepEqual(r, [{ coId: 'cb', typeId: 'tb', coName: '다라정밀', typeName: '산업일자리(충남)',
+    items: [{ name: '수행일지', note: '인증서 만료' }, { name: '2026-04 월별 수행실적보고서', note: '' }] }]);
+  /* 계약 기간이 있으면 달이 그것을 따른다 */
+  const cons = [{ id: 'k', companyName: '다라정밀', typeCodes: { consulting: 'E1' }, startDate: '2026-03-01', endDate: '2026-06-30' }];
+  const c = D.blockedAlerts(blkIn({ consultings: cons, track: bigTrack({ 'monthly:4': { st: 'blocked', note: 'x', at: 1 } }) }));
+  assert.deepEqual(c[0].items, [{ name: '2026-06 월별 수행실적보고서', note: 'x' }]);
+  /* 해가 다르면 없다 */
+  assert.deepEqual(D.blockedAlerts(blkIn({ year: '2025', track: bigTrack({ log: { st: 'blocked', at: 1 } }) })), []);
+});
+
+test('blockedAlerts — 끝난 것만 있으면 항목이 없다 · 기록을 못 받았으면([]) · 기록은 읽었지만 비었으면 []', () => {
+  assert.deepEqual(D.blockedAlerts(blkIn({ track: bigTrack({ log: { st: 'done', at: 1 }, 'monthly:1': { st: 'doing', at: 1 }, result: { st: 'na', at: 1 } }) })), []);
+  assert.deepEqual(D.blockedAlerts(blkIn({ track: null })), []);
+  assert.deepEqual(D.blockedAlerts(blkIn({ track: undefined })), []);
+  assert.deepEqual(D.blockedAlerts(blkIn({ track: {} })), []);
+  assert.deepEqual(D.blockedAlerts(), []);
+  assert.deepEqual(D.blockedAlerts({}), []);
+  /* 사업 연결(이음표)이 없으면 어느 틀인지 모른다 — 건너뛴다 */
+  assert.deepEqual(D.blockedAlerts(blkIn({ tmap: {}, track: bigTrack({ log: { st: 'blocked', at: 1 } }) })), []);
+});
+
+test('blockedAlerts — 간단형 사업의 막힘 기록은 무시 · 대형과 섞여 있으면 대형만', () => {
+  const simple = bigTrack({ sign: { st: 'blocked', note: '간단형', at: 1 }, submit: { st: 'blocked', at: 1 } }, 'tc_2026');
+  assert.equal(D.pairs(BIGX.input, 'tc', '2026').length, 1, '전제: 간단형 쌍이 있다');
+  assert.deepEqual(D.blockedAlerts(blkIn({ track: simple })), []);
+  const both = Tr.normalize({ cb: { tc_2026: { items: { sign: { st: 'blocked', at: 1 } } }, tb_2026: { items: { after: { st: 'blocked', note: '메모', at: 1 } } } } });
+  const r = D.blockedAlerts(blkIn({ track: both }));
+  assert.equal(r.length, 1);
+  assert.equal(r[0].typeId, 'tb');
+  assert.deepEqual(r[0].items, [{ name: '사후관리 결과보고서', note: '메모' }]);
+});
+
+test('blockedAlerts — 업체 이름 → 사업 이름 차례(같으면 입력 차례) · 받은 값을 바꾸지 않는다', () => {
+  const input = JSON.parse(JSON.stringify(BIGX.input));
+  input.cos.push({ id: 'ca', name: '가나상사', types: ['tb'] }, { id: 'cz', name: '다라정밀', types: ['tb'] });
+  input.scheds.push({ id: 's5', coId: 'ca', typeId: 'tb', date: '2026-03-06', round: 1, isField: true }, { id: 's6', coId: 'cz', typeId: 'tb', date: '2026-03-07', round: 1, isField: true });
+  const track = Tr.normalize({ cb: { tb_2026: { items: { log: { st: 'blocked', at: 1 } } } }, ca: { tb_2026: { items: { log: { st: 'blocked', at: 1 } } } },
+    cz: { tb_2026: { items: { log: { st: 'blocked', at: 1 } } } } });
+  const snap = JSON.stringify([input, track, BIGX.biz, BIGX.tmap]);
+  const r = D.blockedAlerts({ input, year: '2026', track, biz: BIGX.biz, tmap: BIGX.tmap, consultings: [] });
+  assert.deepEqual(r.map((e) => e.coId), ['ca', 'cb', 'cz'], '가나상사 → 다라정밀(입력 차례대로 cb, cz)');
+  assert.equal(JSON.stringify([input, track, BIGX.biz, BIGX.tmap]), snap, '받은 값을 바꾸지 않는다');
+  assert.deepEqual(D.blockedAlerts({ input, year: '2026', track, biz: BIGX.biz, tmap: BIGX.tmap, consultings: [] }), r, '여러 번 불러도 같다');
+});
+
+test('blockedAlerts — 바깥 값(업체 이름·메모)은 글자 그대로 돌려준다(걸러 쓰는 것은 화면의 몫)', () => {
+  const bad = '<script>alert(1)</script>"\'';
+  const input = JSON.parse(JSON.stringify(BIGX.input));
+  input.cos[0].name = '<b>다라</b>' + bad;
+  const r = D.blockedAlerts({ input, year: '2026', biz: BIGX.biz, tmap: BIGX.tmap, consultings: [], track: bigTrack({ log: { st: 'blocked', note: bad, at: 1 } }) });
+  assert.equal(r.length, 1);
+  assert.equal(r[0].coName, '<b>다라</b>' + bad);
+  assert.equal(r[0].items[0].note, bad);
+  assert.deepEqual(Object.keys(r[0]).sort(), ['coId', 'coName', 'items', 'typeId', 'typeName']);
+  assert.deepEqual(Object.keys(r[0].items[0]).sort(), ['name', 'note']);
+});

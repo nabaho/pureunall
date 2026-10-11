@@ -336,7 +336,33 @@
         plan: plan.key, kind: plan.kind, warn: warn },
       items: items };
   }
+  /* 「막힌 단계」 알림 — 현황판 줄(buildRows)이 아니라 일정 쌍(pairs)과 서류 진행 기록에서 직접 만든다(대형 사업은 줄이 없는 일이 많다).
+     이알피 사업이 대형 틀로 이어지는 사업만 본다(간단형 기록은 무시). 기록을 못 받았으면(track 없음) []. 순수 함수 — 받은 값을 바꾸지 않는다.
+     o = { input, year, track, biz, tmap, consultings } → [{ coId, typeId, coName, typeName, items:[{ name, note }] }] (업체 이름 → 사업 이름 차례) */
+  function blockedAlerts(o) {
+    o = o || {};
+    if (!o.track || typeof o.track !== 'object') return [];
+    var out = [];
+    list((o.input || {}).types).forEach(function (t) {
+      var erp = erpTypeFor(t.id, o.biz, o.tmap);
+      if (!erp) return;
+      var plan = planFor(erp.name);
+      if (plan.kind !== '대형') return;
+      pairs(o.input, t.id, o.year).forEach(function (p) {
+        var cons = consFor({ consultings: o.consultings, co: p.co, code: erp.code, typeId: t.id, tmap: o.tmap, biz: o.biz });
+        var n = Math.max(+p.rounds || 0, +p.planned || 0);
+        var items = Track.blockedOf(plan, Track.recOf(o.track, p.coId, p.rid), n, monthsFor(cons, p));
+        if (!items.length) return;
+        out.push({ coId: p.coId, typeId: p.typeId, coName: p.coName, typeName: p.typeName,
+          items: items.map(function (b) { return { name: str(b.name), note: str(b.note) }; }) });
+      });
+    });
+    return out.map(function (e, i) { return { e: e, i: i }; }).sort(function (a, b) {
+      return a.e.coName.localeCompare(b.e.coName, 'ko') || a.e.typeName.localeCompare(b.e.typeName, 'ko') || (a.i - b.i);
+    }).map(function (x) { return x.e; });
+  }
   /* 현황판 줄(buildRows)에 서류 진행 기록을 붙인다 — r.trk(③④⑤ 칸·기한·회신 날수)와 r.st.steps 의 ③④ 막대.
+     (화면의 「막힌 단계」 알림은 이 줄이 아니라 blockedAlerts — 줄은 양식이 있는 사업에만 생긴다)
      간단형 셋(AUTO)과 대형 틀(r.trk.big — 막힌 단계·다음 단계, 막대 ③④ 는 끔). 기록이 없으면(못 읽음) r.trk = null, 막대 ③④ 는 끈다. 여러 번 불러도 같다 */
   function trackRows(rows, o) {
     o = o || {};
@@ -389,7 +415,7 @@
 
   var api = { rowsOf: rowsOf, visibleTypes: visibleTypes, groupByAgency: groupByAgency, planFor: planFor, linkOf: linkOf,
     pairs: pairs, sidebarGroups: sidebarGroups, erpTypeFor: erpTypeFor, coKey: coKey, consCode: consCode, consFor: consFor,
-    sidName: sidName, months: months, monthsFor: monthsFor, docsTable: docsTable, tocFor: tocFor, tocText: tocText, trackRows: trackRows,
+    sidName: sidName, months: months, monthsFor: monthsFor, docsTable: docsTable, tocFor: tocFor, tocText: tocText, trackRows: trackRows, blockedAlerts: blockedAlerts,
     DOC_PLANS: DOC_PLANS, NONE: NONE, AUTO: AUTO, KIND_KO: KIND_KO, COLS: COLS,
     NO_AGENCY: NO_AGENCY, UNLINKED: UNLINKED, NO_PLAN: NO_PLAN, TRACK_COLS: TRACK_COLS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

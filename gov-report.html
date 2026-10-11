@@ -208,8 +208,8 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/pu-gov-report-list.js?v=2"></script>
 <!-- 서류 관리(왼쪽 패널)·목차 — 이알피 컨설팅 사업 · 서류 틀 · 체크표 · 목차(순수 함수)
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
-<script src="js/pu-gov-report-track.js?v=6"></script>
-<script src="js/pu-gov-report-docs.js?v=5"></script>
+<script src="js/pu-gov-report-track.js?v=7"></script>
+<script src="js/pu-gov-report-docs.js?v=6"></script>
 <!-- 받은 서류함 — 주소 맞추기(pu-co-thread) · 서버 부르기(rules-v2/mail-orig 의 makeCall) · 후보·연결 열쇠·첨부 받기 순서(순수 함수)
      설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md. 판독기(pdf·xlsx)는 누를 때 vendor/ 에서 싣는다 -->
 <script src="js/pu-co-thread.js?v=3"></script>
@@ -886,6 +886,9 @@ function grRenderForms(){
 function grRenderAlerts(){
   var L=PuGovReportList, T=PuGovReportTrack, rows=L.filterRows(GR.rows,{year:GR.f.year});
   var a=L.alerts(rows,GR.today), x=T.alertsExtra(rows,GR.today);
+  /* 막힌 단계 — 현황판 줄이 아니라 기록에서 직접(대형 사업은 줄이 없는 일이 많다). 기록을 못 읽었으면 개수 「?」·목록 없음 */
+  var d=GR.docs||{}, blocked=(d.loaded&&!d.err&&!GR.trackErr)?PuGovReportDocs.blockedAlerts({input:GR.input,year:GR.f.year,track:GR.track,biz:d.biz,tmap:d.tmap,consultings:d.cons}):[];
+  var bline=function(e){ return '<li><a href="'+grEsc(L.reportHref(e.coId,e.typeId))+'">'+grEsc(e.coName)+' · '+grEsc(e.typeName)+'</a> <span class="days">'+grEsc(e.items.map(function(b){ return b.name+(b.note?' ('+b.note+')':''); }).join(' · '))+'</span></li>'; };
   var line=function(r,txt){ return '<li><a href="'+grEsc(L.reportHref(r.coId,r.typeId))+'">'+grEsc(r.coName)+' · '+grEsc(r.typeName)+'</a> <span class="days">'+grEsc(txt)+'</span></li>'; };
   $('alerts').innerHTML='<div class="al-h">종료 후 '+L.UNWRITTEN_DAYS+'일 넘은 미작성 <b>'+a.unwritten.length+'</b></div><ul>'
     +a.unwritten.map(function(r){ return line(r,'종료 '+r.st.days+'일'); }).join('')+'</ul>'
@@ -895,8 +898,8 @@ function grRenderAlerts(){
     +x.waitSign.map(function(e){ return line(e.row,'회신 '+e.days+'일째'); }).join('')+'</ul>'
     +'<div class="al-h">제출 기한 지남 <b>'+x.overdue.length+'</b></div><ul>'
     +x.overdue.map(function(e){ return line(e.row,'기한 '+e.due); }).join('')+'</ul>'
-    +'<div class="al-h">막힌 단계 <b>'+x.blocked.length+'</b></div><ul>'
-    +x.blocked.map(function(e){ return line(e.row,e.items.map(function(b){ return b.name+(b.note?' ('+b.note+')':''); }).join(' · ')); }).join('')+'</ul>'
+    +'<div class="al-h">막힌 단계 <b>'+(GR.trackErr?'?':blocked.length)+'</b></div><ul>'
+    +blocked.map(bline).join('')+'</ul>'
     +(GR.trackErr?'<div class="err-s">'+grEsc(T.LOAD_FAIL)+'</div>':'');
 }
 function grRender(){

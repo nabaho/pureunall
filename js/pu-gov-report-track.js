@@ -245,6 +245,7 @@
     });
     return k;
   }
+  /* 화면의 「막힌 단계」 알림은 여기 blocked 가 아니라 PuGovReportDocs.blockedAlerts 를 쓴다(현황판 줄은 양식이 있는 사업에만 생긴다) */
   function alertsExtra(rows, today) {
     var waitSign = [], overdue = [], blocked = [];
     (rows || []).forEach(function (r) {

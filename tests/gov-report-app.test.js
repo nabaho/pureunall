@@ -1802,10 +1802,10 @@ function bigSeed(o) {
       s.scal_docs.c2[tid + '_2026'].items[k] = Object.assign({ by: '홍길동', at: Date.UTC(2026, 8, 20, 3) }, o.track[tid][k]);
     });
   });
-  /* 대형 사업은 저장본(formKey)이 있어야 현황판 줄이 생긴다 — 알림 검사용 */
-  if (o.row) s.scal_reports.c2 = { t2_2026: { formKey: 'techguard', typeId: 't2', state: '초안', ver: 0, updatedAt: Date.UTC(2026, 8, 20, 3), updatedBy: '홍길동', report: {} } };
   return s;
 }
+/* 대형 사업(t2·t5)은 현황판 줄이 없다 — 막힌 단계 알림은 줄이 아니라 기록에서 만든다(검사 76·78·79 가 이 전제를 직접 확인한다) */
+const hasRow = (w, co, ty) => w.ctx.GR.rows.some((r) => r.coId === co && r.typeId === ty);
 const planItem = (biz, id) => D.planFor(biz).items.filter((i) => i.id === id)[0];
 const WP = '일터상생혁신컨설팅';
 const countOf = (h, re) => (h.match(re) || []).length;
@@ -1981,7 +1981,10 @@ test('76 저장 — 대형 단계 칸: scal_docs/<co>/<rid>/items/plan 한 줄�
   onlyTrackWrites(w.db);
   assert.deepEqual(w.db.쓴것.map((x) => x.자리), ['scal_docs/c2/t2_2026/items/plan', 'scal_docs/c2/t2_2026/items/round:2']);
   assert.deepEqual(w.db.쓴것[1].값, { st: 'blocked', note: '서명지 못 받음', by: '홍길동', at: w.db.쓴것[1].값.at });
-  assert.match(w.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/, '현황판 줄이 없는 사업은 알림에 안 나온다(줄은 저장본이 있을 때만)');
+  assert.ok(!hasRow(w, 'c2', 't2'), '전제: 일터 사업은 현황판 줄이 없다');
+  const al = w.els.alerts.innerHTML;
+  assert.match(al, /막힌 단계 <b>1<\/b>/, '줄이 없어도 방금 저장한 막힘이 알림에 나온다');
+  assert.ok(al.includes('다라정밀 · 일터혁신 컨설팅') && al.includes('회차별 수행보고서+사진2장+서명지 2회차 (서명지 못 받음)'), al);
   /* 잘못 적으면 쓰지 않는다 — 대형 단계에도 같은 점검 */
   const n = w.db.쓴것.length;
   w.els.cwSt.value = 'doing'; w.els.cwGot.value = '10/09';
@@ -2020,8 +2023,9 @@ test('78 대형 칸의 바깥 값은 이스케이프 — 체크 글·안내 글(
   const bad = '<script>alert(1)</script>"\'';
   const esc = '&#60;script&#62;alert(1)&#60;/script&#62;&#34;&#39;';
   const evil = Object.freeze([bad, 'x" onerror="alert(2)', '<img src=x onerror=alert(3)>']);
-  const w = world({ seed: bigSeed({ row: true, track: { t2: { plan: { st: 'blocked', note: bad } } } }) });
+  const w = world({ seed: bigSeed({ track: { t2: { plan: { st: 'blocked', note: bad } } } }) });
   await w.ctx.grLoad();
+  assert.ok(!hasRow(w, 'c2', 't2'), '전제: 줄 없이 기록만으로 알림');
   w.ctx.grSetBiz('consulting-02');
   const hostile = (n) => { const p = D.planFor(n); return Object.assign({}, p, { items: p.items.map((i) => (i.id === 'plan' || i.id === 'round' || i.id === 'guide' || i.id === 'kickoff'
     ? Object.assign({}, i, { steps: i.step === 'plat' ? evil : i.steps, note: bad }) : i)) }); };
@@ -2044,18 +2048,20 @@ test('78 대형 칸의 바깥 값은 이스케이프 — 체크 글·안내 글(
   /* 알림의 메모 */
   w.ctx.grRender();
   const a = w.els.alerts.innerHTML;
+  assert.match(a, /막힌 단계 <b>1<\/b>/);
   assert.ok(a.includes('수행계획서 (' + esc + ')'), a);
   assert.ok(!/<script/i.test(a));
   assert.equal(w.db.쓴것.length, 0);
 });
 
 test('79 알림 「막힌 단계」 — 막힘 기록이 있는 대형 줄이 있으면 N · 업체·사업·단계 이름·메모 · 없으면 0 · 막힘이 풀리면 사라진다', async () => {
-  const w = world({ email: 'p009@pureun.kr', seed: bigSeed({ row: true, track: { t2: { plan: { st: 'blocked', note: '인증서 만료' }, 'round:2': { st: 'blocked' }, kickoff: { st: 'doing' } } } }) });
+  const w = world({ email: 'p009@pureun.kr', seed: bigSeed({ track: { t2: { plan: { st: 'blocked', note: '인증서 만료' }, 'round:2': { st: 'blocked' }, kickoff: { st: 'doing' } } } }) });
   await w.ctx.grLoad();
+  assert.ok(!hasRow(w, 'c2', 't2') && !hasRow(w, 'c2', 't5'), '전제: 대형 사업은 현황판 줄이 없다 — 저장본을 심지 않았다');
   let a = w.els.alerts.innerHTML;
   assert.match(a, /막힌 단계 <b>1<\/b>/);
   const li = liOf(a.slice(a.indexOf('막힌 단계')), '다라정밀');
-  assert.ok(li.includes('다라정밀 · 일터혁신 컨설팅') || li.includes('다라정밀 · 일터혁신'), li);
+  assert.ok(li.includes('다라정밀 · 일터혁신 컨설팅'), li);
   assert.ok(li.includes('수행계획서 (인증서 만료)') && li.includes('회차별 수행보고서+사진2장+서명지 2회차'), li);
   assert.ok(li.includes(' · '), '여럿이면 가운뎃점으로');
   assert.ok(li.includes('href="gov-consulting.html#rpt=c2|t2"'));
@@ -2071,17 +2077,26 @@ test('79 알림 「막힌 단계」 — 막힘 기록이 있는 대형 줄이 �
   await w.ctx.grSaveCell();
   assert.match(w.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/);
   /* 막힘 기록이 없다 */
-  const n = world({ seed: bigSeed({ row: true, track: { t2: { plan: { st: 'doing' } } } }) });
+  const n = world({ seed: bigSeed({ track: { t2: { plan: { st: 'doing' } } } }) });
   await n.ctx.grLoad();
   assert.match(n.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/);
   const base = world();
   await base.ctx.grLoad();
   assert.match(base.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/, '간단형만 있는 공용 씨앗도 0');
-  /* 기록을 못 읽으면 0 이 아니라 기존 안내만 — 알림 묶음은 0 으로 그려진다(못 읽음 문구가 함께 나온다) */
+  /* 기록을 못 읽으면 0 이 아니라 「?」 — 목록은 없다(못 읽음 문구가 함께 나온다) */
   const denied = { once: async () => { throw new Error('permission_denied'); } };
-  const r = world({ seed: bigSeed({ row: true }), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  const r = world({ seed: bigSeed({ track: { t2: { plan: { st: 'blocked', note: '못 읽으면 안 보임' } } } }), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
   await r.ctx.grLoad();
-  assert.ok(r.els.alerts.innerHTML.includes('기록을 못 불러왔습니다'));
+  assert.equal(r.ctx.GR.trackErr, true);
+  const ra = r.els.alerts.innerHTML;
+  assert.ok(ra.includes('기록을 못 불러왔습니다'));
+  assert.match(ra, /막힌 단계 <b>\?<\/b><\/div><ul><\/ul>/, '개수 「?」 · 목록 없음');
+  assert.ok(!ra.includes('못 읽으면 안 보임'));
+  /* 사업 목록을 아직 못 읽었으면(GR.docs 안 불러옴) 비어 있다 — 던지지 않는다 */
+  r.ctx.GR.docs = { loaded: false, err: false };
+  r.ctx.GR.trackErr = false;
+  r.ctx.grRenderAlerts();
+  assert.match(r.els.alerts.innerHTML, /막힌 단계 <b>0<\/b>/);
 });
 
 test('80 회귀 — 첨부(attach) 칸 창에는 #cwSend 가 없다 · 간단형 ⑤ 제출·③ 서명 칸 동작은 그대로(기존 57·63 검사) · 간단형 칸 창에는 항목 이름이 안 붙는다', async () => {
