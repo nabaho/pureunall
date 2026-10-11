@@ -73030,7 +73030,9 @@ function PerfManagement(props){
         var fiArr = dbGet('finance_income', []) || [];
         // 중복 방지: 이미 가져온 인센티브(sourceKind:incentive) 키 = 입금일|항목|수령인
         var have = {};
-        fiArr.forEach(function(fi){ if(fi.sourceKind==='incentive') have[(fi.date||'')+'|'+(fi.kind||'')+'|'+((fi.perfShares&&fi.perfShares[0]&&fi.perfShares[0].sid)||'')]=true; });
+        /* ★ 새 줄의 열쇠는 「업체명_유형」 원문(item)인데, 예전엔 있던 줄을 «유형만»(kind)으로 세어 밑줄 든 항목이 걸러지지 않았다 —
+           2026-06-18 같은 파일을 두 번 올려 264쌍(3억 325만)이 겹쳤다(2026-10-11 검토 A-1). 있던 줄도 같은 모양으로 센다. */
+        fiArr.forEach(function(fi){ if(fi.sourceKind==='incentive'){ var _sid=((fi.perfShares&&fi.perfShares[0]&&fi.perfShares[0].sid)||''); var _it=(fi.companyName ? fi.companyName+'_' : '')+(fi.kind||''); have[(fi.date||'')+'|'+_it+'|'+_sid]=true; have[(fi.date||'')+'|'+(fi.kind||'')+'|'+_sid]=true; } });
         var added=0, skipped=0, nomatch={};
         // 컬럼: 0상여구분 1입금일 2항목 3입금금액 4부가세제외 5비율 6성과급 7수령인
         for(var r=hi+1;r<data.length;r++){
