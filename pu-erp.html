@@ -222,6 +222,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-cms-auto.js?v=2"></script>
 <!-- 담당자 연락처가 둘 이상일 때의 규칙 — 기업정보함(pu-cards.html)과 «같은 파일»을 쓴다 -->
 <script src="js/pu-contact.js?v=2"></script>
+<script src="js/pu-sanjae-cases.js?v=1"></script>
 <!-- 서류 판독 층 — 사업자등록증 파서와 브라우저 판독(Tesseract)이 여기 있다.
      ⚠ 여태 «안 싣고» 있었다(2026-09-08 확인). 그래서 13845 줄의
        PuDocRead.mapTo 가 try/catch 안에서 조용히 헛돌고 있었다. -->
@@ -34360,8 +34361,13 @@ function CaseDetailModal(props){
       ['진행상태', h('span', { style:{ background:'#f0fdf4', color:'#166534', fontSize:'11px', padding:'2px 8px', borderRadius:'4px', fontWeight:700 } }, statusInfo.label)],
       ['수임일', (c.receiveDate || '-') + dPlus],
       ['기한', c.dueDate ? c.dueDate + dueWarn : '-'],
-      ['종료일', c.closeDate || '-']
-    ]
+      ['종료일', c.closeDate || '-'],
+      /* ⚖ 비슷한 산재 사례 — 산재 사건에만(대표 「진행」 2026-10-11 목업 ㉮). 근로복지공단 공개 판례·심사결정·질병판정을
+         그 자리에서 찾는다(js/pu-sanjae-cases.js). 고른 사례는 이 사건의 업무 메모(case_memos)에 출처와 함께 붙는다. */
+      erpIsInjuryCase(c, t) && window.PuSanjae ? ['산재 사례', h('button', { onClick:function(){ window.PuSanjae.open({ kind:'jil', q:window.PuSanjae.guessQuery(c),
+          onAttach:function(txt){ erpCaseMemoAdd(c.id, '⚖ 참고 사례 — ' + txt); } }); },
+        style:{ background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'3px 10px', fontSize:'12px', fontWeight:700, cursor:'pointer' } }, '⚖ 비슷한 산재 사례 찾기')] : null
+    ].filter(function(x){ return x; })
   };
 
   var feeSection = {
@@ -34701,6 +34707,20 @@ function erpCaseMemoMigrate(){
 }
 window.erpCaseMemoMigrate = erpCaseMemoMigrate;
 try { window.addEventListener('fb_initial_done', function(){ setTimeout(function(){ try { erpCaseMemoMigrate(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, 5000); }); } catch(e){}
+/* 산재 사건인가 — 유형 코드 case-injury(산재등) 또는 약어 「산재」 */
+function erpIsInjuryCase(c, t){
+  return !!c && (c.typeCode === 'case-injury' || !!(t && /산재/.test(String(t.short || t.name || ''))));
+}
+/* 업무 메모 한 줄 더하기 — CaseMemoPanel 의 addMemo 와 «같은 표·같은 모양»(case_memos). 바깥(⚖ 산재 사례)에서 부른다 */
+function erpCaseMemoAdd(caseId, text){
+  var t = String(text || '').trim(); if(!caseId || !t) return false;
+  var now = (new Date()).toISOString();
+  var row = { id: uid('cm'), entityType: 'case_memo', caseId: String(caseId), text: t,
+    author: (CURRENT_USER && CURRENT_USER.name) || '', authorSid: (CURRENT_USER && CURRENT_USER.sid) || '', at: now, createdAt: now, updatedAt: now };
+  if(!dbSet(CASE_MEMO_KEY, [row].concat(dbGet(CASE_MEMO_KEY, []) || []))){ showToast('❌ 메모 저장 실패'); return false; }
+  try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail: CASE_MEMO_KEY })); } catch(_){}
+  return true;
+}
 function CaseMemoPanel(props){
   var cid = String(props.caseId || '');
   var tk = useState(0); var bump = tk[1];
