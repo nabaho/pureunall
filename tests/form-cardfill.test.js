@@ -254,7 +254,7 @@ test('ⓔ 제안서 값 — 기업: 수신자=회사명, 참조=부서 이름 �
   assert.strictEqual(P.호칭, '귀사');
   assert.strictEqual(P.송부일자, '2026. 9. 29. (화)');
   assert.strictEqual(P.담당노무사, '홍길동');
-  assert.strictEqual(P.노무사연락처, '041-556-0035');
+  assert.strictEqual(P.노무사연락처, '041-556-0034~6');
   assert.strictEqual(P.견적금액, ''); assert.strictEqual(P.비용합계, '');
 });
 test('ⓔ 제안서 값 — 기관: 수신자에 부서·이름·직급님, 참조는 -, 호칭=귀 기관', () => {
@@ -287,7 +287,7 @@ test('ⓔ PROPOSAL_KEYS 는 9개 자리', () => {
 /* 2026-10-03 기금 제안서 PR3 — 메일 기본값·보낸 기록 (설계 2026-09-29 §7) */
 test('ⓕ 메일 기본값 — 담당자·대표 메일, 제목·본문 틀', () => {
   const V = Object.assign(CF.valuesFrom({ co: { c: '가나상사(주)', e: 'ceo@example.com' }, contact: { n: '박담당', ti: '과장', d: '총무팀', e: 'park@example.com' } }),
-    { 수신자: '가나상사(주)', 참조: '총무팀 박담당 과장님', 호칭: '귀사', 담당노무사: '홍길동', 노무사연락처: '041-556-0035' });
+    { 수신자: '가나상사(주)', 참조: '총무팀 박담당 과장님', 호칭: '귀사', 담당노무사: '홍길동', 노무사연락처: '041-556-0034~6' });
   const m = CF.mailDefaults(V, '공동근로복지기금 제안서 및 견적서');
   assert.deepStrictEqual(m.to.map(x => x.v), ['park@example.com', 'ceo@example.com']);
   assert.match(m.to[0].label, /담당자 메일 · 박담당/);
@@ -295,7 +295,7 @@ test('ⓕ 메일 기본값 — 담당자·대표 메일, 제목·본문 틀', ()
   assert.match(m.body, /^총무팀 박담당 과장님, 안녕하십니까\./);
   assert.match(m.body, /푸른노무법인 홍길동 노무사입니다/);
   assert.match(m.body, /귀사의 공동근로복지기금 설립과 관련하여/);
-  assert.match(m.body, /홍길동 드림 · 041-556-0035$/);
+  assert.match(m.body, /홍길동 드림 · 041-556-0034~6$/);
 });
 test('ⓕ 메일 기본값 — 참조가 「-」면 수신자, 같은 메일은 한 번, 회사 없으면 제목 꼬리 없음', () => {
   const V = { 수신자: '가나도청 노동정책과 홍길동 주무관님', 참조: '-', 담당자이메일: 'a@example.com', 대표이메일: 'a@example.com' };

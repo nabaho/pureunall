@@ -107,7 +107,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=57"></script>
+<script src="js/pu-contract-forms.js?v=58"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -207,6 +207,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=66"></script>
+<script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -27224,8 +27225,120 @@ function getDCContributions(sid){
 function setDCContributions(list){ dbSet('dc_contributions', list); }
 
 function getDCBalance(sid){
-  return getDCContributions(sid).reduce(function(s,x){return s+(parseInt(x.amount)||0);}, 0);
+  /* 실제 납입(사업자 납입내역·통장 — kind:'paid')이 있으면 그것만 센다. 없으면 급여 확정 때의 자동 적립(계산값).
+     둘을 더하면 같은 돈을 두 번 센다 (2026-10-11 자동 정리) */
+  var l = getDCContributions(sid);
+  var paid = l.filter(function(x){ return x && x.kind === 'paid'; });
+  return (paid.length ? paid : l.filter(function(x){ return x && x.kind !== 'paid'; })).reduce(function(s,x){return s+(parseInt(x.amount)||0);}, 0);
 }
+
+/* ══ 퇴직연금(DC) 자동 정리 (2026-10-11 대표 「한꺼번에 입력하면 자동으로 모든내용 정리 … 자동입금내역과 년말에 정산내역을 검토」) ══
+   엑셀(통장 거래내역 · 퇴직연금 사업자 납입내역)을 그대로 읽어 «퇴직연금 줄»만 골라 dc_contributions 에 kind:'paid' 로 넣는다.
+   · 통장 줄은 법인 전체 금액이라 sid 가 빈칸(회사 몫) — 사람별은 연말 정산에서 임금 비율로 «추정»만 한다(저장 안 함)
+   · 사업자 줄은 사람별 — 이름이 명부와 «하나로» 맞으면 사번을 «제안»만 하고, 저장은 사람이 미리보기를 보고 확정한다
+     (CLAUDE.md 온톨로지: 이름으로 추정한 관계는 사람이 원본 ID 를 확정하기 전까지 저장하지 않는다)
+   · 주민번호·계좌번호 칸은 읽지 않는다 · 같은 줄(출처·날짜·금액·이름)은 한 번만 */
+function _dcCell(v){ return String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); }
+function _dcNum(v){ var n = parseInt(String(v == null ? '' : v).replace(/[^0-9-]/g, ''), 10); return isNaN(n) ? 0 : n; }
+function _dcDate(v){
+  if(typeof v === 'number' && v > 20000 && v < 80000){ var d = new Date(Math.round((v - 25569) * 86400000)); return d.toISOString().slice(0, 10); }
+  var m = _dcCell(v).match(/(\d{4})[.\-/년 ]\s*(\d{1,2})[.\-/월 ]\s*(\d{1,2})/);
+  return m ? m[1] + '-' + ('0' + m[2]).slice(-2) + '-' + ('0' + m[3]).slice(-2) : '';
+}
+function _dcYm(v){
+  var d = _dcDate(v); if(d) return d.slice(0, 7);
+  var m = _dcCell(v).match(/(\d{4})[.\-/년 ]\s*(\d{1,2})/);
+  return m ? m[1] + '-' + ('0' + m[2]).slice(-2) : '';
+}
+/* 표(행 배열)에서 머리줄을 찾아 «통장»인지 «사업자 납입내역»인지 가른다. 못 알아보면 kind:'' */
+function dcSheetKind(rows){
+  rows = Array.isArray(rows) ? rows : [];
+  for(var i = 0; i < Math.min(rows.length, 20); i++){
+    var r = (rows[i] || []).map(_dcCell);
+    var col = function(re){ for(var k = 0; k < r.length; k++){ if(re.test(r[k])) return k; } return -1; };
+    var memo = col(/^적요$|^내용$|거래내용/), out = col(/^출금|찾으신금액|출금액/), date = col(/거래일|일시|^일자$/);
+    if(memo >= 0 && out >= 0 && date >= 0) return { kind:'bank', head:i, col:{ memo:memo, out:out, date:date, who:col(/의뢰인|수취인|받는분/), note:col(/특이사항|메모|비고/) } };
+    var name = col(/^성명$|가입자|근로자명|^이름$|^성 명$/), amt = col(/부담금|납입금액|납입액|입금액|^금액$/);
+    if(name >= 0 && amt >= 0) return { kind:'provider', head:i, col:{ name:name, amount:amt, date:col(/납입일|입금일|거래일|^일자$|처리일/), ym:col(/귀속|대상월|부담월|해당월|적립월/) } };
+  }
+  return { kind:'', head:-1, col:{} };
+}
+/* 통장 → 퇴직연금 출금 줄만 (적요·특이사항에 «퇴직연금»·«부담금») */
+function dcParseBank(rows, k){
+  var c = k.col, out = [];
+  for(var i = k.head + 1; i < rows.length; i++){
+    var r = rows[i] || [];
+    var text = _dcCell(r[c.memo]) + ' ' + (c.note >= 0 ? _dcCell(r[c.note]) : '') + ' ' + (c.who >= 0 ? _dcCell(r[c.who]) : '');
+    var amt = _dcNum(r[c.out]), date = _dcDate(r[c.date]);
+    if(!date || amt <= 0 || !/퇴직연금|부담금/.test(text)) continue;
+    out.push({ source:'bank', date:date, ym:date.slice(0, 7), amount:amt, memo:_dcCell(r[c.memo]).slice(0, 40), name:'', text:text.trim().slice(0, 80) });
+  }
+  return out;
+}
+/* 사업자 납입내역 → 사람별 줄 (합계·소계 줄은 뺀다) */
+function dcParseProvider(rows, k){
+  var c = k.col, out = [];
+  for(var i = k.head + 1; i < rows.length; i++){
+    var r = rows[i] || [];
+    var name = _dcCell(r[c.name]).replace(/\s+/g, '');
+    var amt = _dcNum(r[c.amount]);
+    if(!name || amt <= 0 || /합계|소계|총계/.test(name)) continue;
+    var date = c.date >= 0 ? _dcDate(r[c.date]) : '';
+    var ym = c.ym >= 0 ? _dcYm(r[c.ym]) : '';
+    if(!ym) ym = date.slice(0, 7);
+    if(!ym) continue;
+    out.push({ source:'provider', date:date, ym:ym, amount:amt, memo:'', name:name });
+  }
+  return out;
+}
+/* 이름 → 사번 «제안» — 명부(퇴직자 포함)에 그 이름이 «딱 한 명»일 때만. 동명이인·없음은 빈칸(사람이 고른다) */
+function dcNameToSid(name, users){
+  var n = String(name || '').replace(/\s+/g, '');
+  if(!n) return '';
+  var hit = (users || []).filter(function(u){ return u && u.sid && String(u.name || '').replace(/\s+/g, '') === n; });
+  return hit.length === 1 ? hit[0].sid : '';
+}
+/* 글 안에 명부 이름이 «딱 한 명» 들어 있으면 그 사번 (통장 특이사항 «○○○ 노무사 퇴직연금 불입액» 같은 줄) — 제안만 */
+function dcNameInText(text, users){
+  var t = String(text || '').replace(/\s+/g, '');
+  if(!t) return '';
+  var hit = (users || []).filter(function(u){ var n = String(u && u.name || '').replace(/\s+/g, ''); return u && u.sid && n.length >= 2 && t.indexOf(n) >= 0; });
+  return hit.length === 1 ? hit[0].sid : '';
+}
+function dcLineKey(l){ return [l.source, l.date || l.ym, l.amount, l.name || l.memo || ''].join('|'); }
+/* 새 줄만 — 이미 있는 줄(originKey)과 같은 파일 안 겹침은 한 번만 */
+function dcNewLines(lines, existing){
+  var seen = {};
+  (existing || []).forEach(function(x){ if(x && x.originKey) seen[x.originKey] = 1; });
+  return (lines || []).filter(function(l){ var k = dcLineKey(l); if(seen[k]) return false; seen[k] = 1; return true; });
+}
+/* 연말 정산 — 사람별 «그해 임금총액 ÷ 12» 와 «낸 부담금» (근로자퇴직급여 보장법 제20조①)
+   · 낸 부담금: 사업자 납입내역(사람별 실제)이 있으면 그것, 없으면 통장(회사 몫) 합을 그해 임금 비율로 나눈 «추정»
+   · 퇴직자: 퇴직일이 그해면 «퇴직 14일 안» 표시 (같은 조 ⑤ [조문 원문 대조 필요]) */
+function dcYearEnd(year, users, wageOf, contribs, companyTotal){
+  var y = String(year);
+  var dc = (users || []).filter(function(u){ return u && u.sid && u.pensionType === 'DC'; });
+  var rows = dc.map(function(u){
+    var wage = Math.round(+wageOf(u.sid, y) || 0);
+    var own = (contribs || []).filter(function(x){ return x && x.kind === 'paid' && x.sid === u.sid && String(x.ym || '').slice(0, 4) === y; });
+    var last = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+    return { sid:u.sid, name:u.name, wage:wage, need:Math.round(wage / 12), paid:own.reduce(function(t, x){ return t + (+x.amount || 0); }, 0),
+      actual:own.length > 0, retiredThisYear: u.status === 'retired' && last.slice(0, 4) === y, lastDay:last };
+  }).filter(function(r){ return r.wage > 0 || r.paid > 0; });
+  /* 회사 몫(통장) 합 — 재무에 올린 통장(ledger_batches)·출금관리까지 모은 값(companyTotal)이 오면 그것을 쓴다.
+     자동 정리로 넣은 통장 줄만 세면 재무 쪽 통장이 빠져 «낸 돈 0»이 된다 (2026-10-11 실제 화면에서 찾음) */
+  var company = companyTotal != null ? +companyTotal || 0 : (contribs || []).filter(function(x){ return x && x.kind === 'paid' && !x.sid && String(x.ym || '').slice(0, 4) === y; })
+    .reduce(function(t, x){ return t + (+x.amount || 0); }, 0);
+  var estRows = rows.filter(function(r){ return !r.actual; });
+  var estWage = estRows.reduce(function(t, r){ return t + r.wage; }, 0);
+  var actualSum = rows.filter(function(r){ return r.actual; }).reduce(function(t, r){ return t + r.paid; }, 0);
+  var pool = Math.max(0, company - actualSum);   // 통장 합에서 사업자 내역으로 이미 확인된 몫은 뺀다
+  estRows.forEach(function(r){ r.paid = estWage > 0 ? Math.round(pool * r.wage / estWage) : 0; r.estimated = true; });
+  rows.forEach(function(r){ r.short = Math.max(0, r.need - r.paid); });
+  return { rows:rows, company:company };
+}
+
+
 
 // 월별급여 확정 시 자동 DC 적립 (sid+ym 단위로 한 번만)
 function autoAccrueDCFromPayroll(rec){
@@ -36308,6 +36421,33 @@ function HolidayModal(props){
   );
 }
 
+/* ══ 📅 공휴일 = 손입력(data/holidays) + 공공데이터 공용 자리(pubdata/common/holidays) (대표 「진행」 2026-10-11) ══
+   공용 자리는 매달 2일 서버가 한국천문연구원 특일 정보에서 올해·내년을 받아 둔다.
+   ★ 손으로 넣은 날(약정휴일·고친 이름)이 이긴다 — 받은 것은 «없는 날만» 더해 보여 준다(PuPubdata.mergeHolidays).
+   ⚠ 합친 것을 data/holidays 에 «저장하지 않는다» — 저장하면 천문연이 고친 날(대체공휴일 등)이 옛것으로 굳는다. */
+var _erpPubHoli = {};           /* { 연도: [{date,name,kind}] } */
+var _erpPubHoliAt = 0;
+function erpPubHolidaysLoad(){
+  if(typeof PuPubdata === 'undefined' || Date.now() - _erpPubHoliAt < 60000) return;
+  _erpPubHoliAt = Date.now();
+  var y = (new Date()).getFullYear();
+  [y - 1, y, y + 1].forEach(function(yy){
+    PuPubdata.holidays(yy).then(function(list){
+      if(!list.length) return;
+      _erpPubHoli[yy] = list;
+      try { window.dispatchEvent(new CustomEvent('fb_data_changed', { detail:'holidays' })); } catch(_){}
+    });
+  });
+}
+if(typeof window !== 'undefined') window.addEventListener('fb_initial_done', erpPubHolidaysLoad);
+function erpHolidays(){
+  var man = dbGet('holidays', []) || [];
+  if(typeof PuPubdata === 'undefined') return man;
+  var pub = [];
+  Object.keys(_erpPubHoli).forEach(function(k){ pub = pub.concat(_erpPubHoli[k]); });
+  return PuPubdata.mergeHolidays(man, pub);
+}
+
 function HolidaySection(){
   var existing = dbGet('holidays', null);
   if(!existing){ dbSet('holidays', HOLIDAY_SEED); existing = HOLIDAY_SEED; }
@@ -36333,8 +36473,16 @@ function HolidaySection(){
   function del(d, n){ (function(){var _ud=list.slice(); persist(list.filter(function(x){ return !(x.date === d && x.name === n); })); showToastUndo('🗑️ 삭제됨', function(){persist(_ud);});})(); }
   function reseed(){ persist(HOLIDAY_SEED.slice()); showToast('시드 복원됨'); }
 
-  var filtered = list.filter(function(x){ return x.date.indexOf(year + '-') === 0; });
-  var years = Array.from(new Set(list.map(function(x){ return parseInt(x.date.slice(0,4),10); }))).sort();
+  /* 🛰 천문연 자료(공용 자리)를 «없는 날만» 얹어 보여 준다 — 그 줄은 고치거나 지울 수 없다(저장된 것이 아니다) */
+  useEffect(function(){ erpPubHolidaysLoad(); }, []);
+  var tk = useState(0); var bump = tk[1];
+  useDbReread(['holidays'], function(){ bump(function(n){ return n + 1; }); });
+  var pubAll = [];
+  Object.keys(_erpPubHoli).forEach(function(k){ pubAll = pubAll.concat(_erpPubHoli[k]); });
+  var shown = typeof PuPubdata !== 'undefined' ? PuPubdata.mergeHolidays(list, pubAll) : list;
+  var filtered = shown.filter(function(x){ return x.date.indexOf(year + '-') === 0; });
+  var nKasi = filtered.filter(function(x){ return x.src === 'kasi'; }).length;
+  var years = Array.from(new Set(shown.map(function(x){ return parseInt(x.date.slice(0,4),10); }))).sort();
   if(years.indexOf(year) < 0) years.push(year);
 
   function dow(dateStr){
@@ -36353,6 +36501,8 @@ function HolidaySection(){
     h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#475569', padding:'6px 0 4px', borderBottom:'2px solid #1e40af', marginBottom:'10px', display:'flex', alignItems:'center', gap:'8px', userSelect:'none' } },
       h('span', null, '공휴일'),
       h('span', { style:{ background:'#e2e8f0', color:'#475569', fontSize:'11px', padding:'2px 8px', borderRadius:'10px', fontWeight:600 } }, filtered.length + '개'),
+      nKasi > 0 && h('span', { title:'한국천문연구원 특일 정보 — 매달 2일 서버가 받아 둡니다. 손으로 넣은 날이 이깁니다.',
+        style:{ color:'#64748b', fontSize:'11px', fontWeight:600, whiteSpace:'nowrap' } }, '🛰 천문연 ' + nKasi + '개 자동'),
       h('select', { value:year, onClick:function(e){ e.stopPropagation(); }, onChange:function(e){ setYear(parseInt(e.target.value,10)); }, style:{ marginLeft:'8px', padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } },
         years.sort().map(function(yy){ return h('option', { key:yy, value:yy }, yy + '년'); })),
       h('div', { style:{ flex:1 } }),
@@ -36379,7 +36529,9 @@ function HolidaySection(){
                 h('td', { className:'ac', style:{ color: weekend ? '#dc2626' : '#475569', fontWeight:600 } }, d),
                 h('td', null, x.name),
                 h('td', null, kindTag(x.kind)),
-                h('td', { className:'ac' },
+                x.src === 'kasi'
+                  ? h('td', { className:'ac', style:{ color:'#64748b', fontSize:'11px', whiteSpace:'nowrap' }, title:'천문연 자료 — 바꾸려면 같은 날짜로 「+ 추가」하면 그것이 이깁니다' }, '🛰 천문연')
+                  : h('td', { className:'ac' },
                   h('button', { className:'dt-row-btn edit', onClick:function(){ openEdit(x); } }, '수정'),
                   h('button', { className:'dt-row-btn del',  onClick:function(){ del(x.date, x.name); } }, '삭제')
                 )
@@ -63650,7 +63802,7 @@ function PersonalCalendar(props){
   var mySchedules = (dbGet('my_schedules', [])||[]).filter(function(s){return s.sid===sid;});
   var myAttendance = (dbGet('attendance_records', [])||[]).filter(function(r){return r.sid===sid;});
   // 공휴일 맵
-  var myHolidays = dbGet('holidays', [])||[];
+  var myHolidays = erpHolidays();
   var myHMap = {}; myHolidays.forEach(function(h){ myHMap[h.date] = h.name; });
   var byDate = {};
   function addEv(date, ev){
@@ -76397,7 +76549,7 @@ function AttendanceManagement(){
     var month = parseInt(selYM.split('-')[1]);
     var firstDay = new Date(year, month-1, 1).getDay();
     var lastDay  = new Date(year, month, 0).getDate();
-    var holidays = dbGet('holidays',[]) || [];
+    var holidays = erpHolidays();
     var hMap = {}; holidays.forEach(function(h){ hMap[h.date]=h.name; });
 
     var dayMap = {};
@@ -79682,6 +79834,16 @@ function dcBankOutflows(){
       by[ym] = (by[ym] || 0) + Math.abs(parseInt(r.amount, 10) || 0);
     });
   });
+  /* 자동 정리(퇴직정산 › 🏦 자동 정리)로 넣은 회사 몫 통장 줄도 함께 — 같은 날·같은 금액이 이미 있으면 건너뛴다 */
+  (dbGet('dc_contributions', []) || []).forEach(function(x){
+    if(!x || x.kind !== 'paid' || x.source !== 'bank' || !x.paidDate) return;
+    var k2 = x.paidDate + '|' + x.amount + '|' + 'dc';
+    var dup = Object.keys(seen).some(function(k){ return k.indexOf(x.paidDate) === 0 && k.indexOf('|' + x.amount + '|') > 0; });
+    if(dup || seen[k2]) return; seen[k2] = 1;
+    if(x.paidDate > last) last = x.paidDate;
+    var ym = String(x.paidDate).slice(0, 7);
+    by[ym] = (by[ym] || 0) + (+x.amount || 0);
+  });
   return { byYm: by, lastDate: last };
 }
 function dcFirmCheck(year){
@@ -79722,6 +79884,194 @@ function dcFirmCheck(year){
       noOutflow:!paid && hasPay && !noBank, noBank:!paid && hasPay && noBank, bankLast:bank.lastDate });
   }
   return rows;
+}
+
+/* 🏦 퇴직연금 자동 정리 탭 — ① 올리기 → ② 월별 → ③ 연말 정산 · 자동입금 내역 (2026-10-11 시안 https://claude.ai/artifact/HU8Lpk6UpDgExic3X9ERFE) */
+function DcAutoTab(props){
+  var year = String(props.year || new Date().getFullYear());
+  var users = dbGet('user_accounts', USERS_SEED) || [];
+  var pvS = useState(null); var preview = pvS[0]; var setPreview = pvS[1];   // { lines:[...], files:[...] }
+  var bmS = useState(0); var bump = bmS[0]; var setBump = bmS[1];
+  var vwS = useState('year'); var view = vwS[0]; var setView = vwS[1];
+  var contribs = dbGet('dc_contributions', []) || [];
+  var paidList = contribs.filter(function(x){ return x && x.kind === 'paid'; });
+  var nameOf = function(sid){ var u = users.find(function(x){ return x && x.sid === sid; }); return u ? u.name : (sid || ''); };
+  var cS = { padding:'6px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'13px', textAlign:'right', fontFamily:'monospace' };
+  var lS = Object.assign({}, cS, { textAlign:'left', fontFamily:'inherit' });
+  var hS = Object.assign({}, cS, { background:'#f8fafc', color:'#475569', fontWeight:700, fontFamily:'inherit', fontSize:'12px' });
+  var hL = Object.assign({}, hS, { textAlign:'left' });
+  var pill = function(t, bg, fg){ return h('span', { style:{ fontSize:'11px', fontWeight:700, padding:'1px 8px', borderRadius:'9px', background:bg, color:fg, whiteSpace:'nowrap' } }, t); };
+
+  function readFiles(fileList){
+    var files = Array.prototype.slice.call(fileList || []);
+    if(!files.length) return;
+    if(typeof XLSX === 'undefined'){ showToast('엑셀 읽기 도구를 못 불렀습니다 — 새로고침 뒤 다시'); return; }
+    var all = [], info = [], left = files.length;
+    files.forEach(function(f){
+      var rd = new FileReader();
+      rd.onload = function(ev){
+        try {
+          var wb = XLSX.read(new Uint8Array(ev.target.result), { type:'array' });
+          var got = 0, kinds = {};
+          wb.SheetNames.forEach(function(sn){
+            var rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header:1, raw:true, defval:'' });
+            var k = dcSheetKind(rows);
+            if(!k.kind) return;
+            var lines = k.kind === 'bank' ? dcParseBank(rows, k) : dcParseProvider(rows, k);
+            lines.forEach(function(l){
+              l.fileName = f.name;
+              l.sid = l.source === 'provider' ? dcNameToSid(l.name, users) : dcNameInText(l.text, users);
+              l.suggested = !!l.sid;
+            });
+            kinds[k.kind] = 1; got += lines.length; all = all.concat(lines);
+          });
+          info.push({ name:f.name, kinds:Object.keys(kinds), n:got });
+        } catch(e){ info.push({ name:f.name, kinds:[], n:0, err:String(e && e.message || e) }); }
+        if(--left === 0){
+          var fresh = dcNewLines(all, contribs);
+          setPreview({ lines:fresh, dup:all.length - fresh.length, files:info });
+        }
+      };
+      rd.readAsArrayBuffer(f);
+    });
+  }
+  function setLineSid(i, sid){ var p = Object.assign({}, preview); p.lines = p.lines.slice(); p.lines[i] = Object.assign({}, p.lines[i], { sid:sid, suggested:false }); setPreview(p); }
+  function saveAll(){
+    if(!preview) return;
+    var ready = preview.lines.filter(function(l){ return l.source === 'bank' || l.sid; });
+    var wait = preview.lines.length - ready.length;
+    if(!ready.length){ showToast('저장할 줄이 없습니다 — 사람을 골라 주세요'); return; }
+    var now = new Date().toISOString();
+    var recs = ready.map(function(l){
+      var key = dcLineKey(l);
+      var hsh = 0; for(var i = 0; i < key.length; i++){ hsh = ((hsh << 5) - hsh + key.charCodeAt(i)) | 0; }
+      return { id:'dcp-' + (l.date || l.ym).replace(/-/g, '') + '-' + (hsh >>> 0).toString(36), entityType:'dcContribution',
+        sid:l.sid || '', ym:l.ym, amount:l.amount, paidDate:l.date || '', kind:'paid', source:l.source, originKey:key,
+        fileName:l.fileName || '', note:(l.source === 'bank' ? '통장 ' + (l.memo || '') : '사업자 납입내역'),
+        createdAt:now, updatedAt:now, by:(CURRENT_USER && CURRENT_USER.name) || '' };
+    });
+    var ok = (typeof dbUpsertMany === 'function') ? dbUpsertMany('dc_contributions', recs) : false;
+    if(!ok){ var cur = dbGet('dc_contributions', []) || []; dbSet('dc_contributions', cur.concat(recs)); }
+    showToast('🏦 퇴직연금 ' + recs.length + '줄 저장' + (wait ? ' · 사람 확인 ' + wait + '줄은 남겨 둠' : ''));
+    var rest = preview.lines.filter(function(l){ return !(l.source === 'bank' || l.sid); });
+    setPreview(rest.length ? Object.assign({}, preview, { lines:rest, dup:0 }) : null);
+    setBump(bump + 1);
+  }
+  function dropLine(id){
+    var cur = dbGet('dc_contributions', []) || [];
+    if(!(typeof dbRemoveMany === 'function' && dbRemoveMany('dc_contributions', [id]))) dbSet('dc_contributions', cur.filter(function(x){ return x && x.id !== id; }));
+    showToast('지웠습니다'); setBump(bump + 1);
+  }
+
+  /* ② 월별 — 기존 법인 대조(dcFirmCheck)에 사업자 납입내역 합을 붙인다 */
+  var firm = dcFirmCheck(year);
+  var provByYm = {};
+  paidList.forEach(function(x){ if(x.source === 'provider' && String(x.ym).slice(0, 4) === year) provByYm[x.ym] = (provByYm[x.ym] || 0) + (+x.amount || 0); });
+  /* ③ 연말 정산 */
+  var pays = dbGet('payroll_monthly', []) || [];
+  var wageOf = function(sid, y){
+    return pays.filter(function(p){ return p && p.empSid === sid && String(p.ym || '').slice(0, 4) === y && (p.status === 'confirmed' || p.status === 'paid'); })
+      .reduce(function(t, p){ var c = {}; try { c = calcPayroll(p) || {}; } catch(e){ c = {}; } return t + (+c.grossPay || 0); }, 0);
+  };
+  var _bk = dcBankOutflows();
+  var bankYear = Object.keys(_bk.byYm).filter(function(ym){ return ym.slice(0, 4) === year; }).reduce(function(t, ym){ return t + (+_bk.byYm[ym] || 0); }, 0);
+  /* 출금관리에만 적힌 달(통장 없음)도 회사 몫으로 — 월별 표와 같은 수 */
+  firm.forEach(function(r){ if(r.src === 'expense') bankYear += +r.paid || 0; });
+  var ye = dcYearEnd(year, users.map(function(u){ return Object.assign({}, u, { pensionType:getStaffPension(u.sid).type }); }), wageOf, paidList, bankYear);
+  var tot = ye.rows.reduce(function(a, r){ a.w += r.wage; a.n += r.need; a.p += r.paid; a.s += r.short; return a; }, { w:0, n:0, p:0, s:0 });
+
+  var card = function(title, body){ return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px 14px', marginBottom:'10px' } },
+    h('div', { style:{ fontSize:'14px', fontWeight:800, color:'#1e293b', marginBottom:'8px' } }, title), body); };
+
+  return h('div', null,
+    card('① 한꺼번에 올리기 — 통장 거래내역 · 퇴직연금 사업자 납입내역 (엑셀 여러 개)',
+      h('div', null,
+        h('div', { onDragOver:function(e){ e.preventDefault(); }, onDrop:function(e){ e.preventDefault(); readFiles(e.dataTransfer.files); },
+            onClick:function(){ var i = document.getElementById('dcAutoFiles'); if(i) i.click(); },
+            style:{ border:'2px dashed #bfdbfe', background:'#eff6ff', color:'#1e40af', borderRadius:'8px', padding:'14px', textAlign:'center', cursor:'pointer', fontSize:'13px' } },
+          '📂 파일을 끌어 놓거나 눌러서 고르기 — 퇴직연금 줄만 골라 읽습니다 (주민번호·계좌번호는 저장하지 않음)'),
+        h('input', { id:'dcAutoFiles', type:'file', multiple:true, accept:'.xls,.xlsx,.csv', style:{ display:'none' }, onChange:function(e){ readFiles(e.target.files); e.target.value = ''; } }),
+        preview && h('div', { style:{ marginTop:'10px' } },
+          h('div', { style:{ display:'flex', flexWrap:'wrap', gap:'8px', fontSize:'12.5px', marginBottom:'6px' } },
+            preview.files.map(function(f, i){ return h('span', { key:i, style:{ border:'1px solid #e2e8f0', borderRadius:'6px', padding:'3px 8px', whiteSpace:'nowrap' } },
+              f.name + ' — ', f.err ? h('b', { style:{ color:'#dc2626' } }, '못 읽음') : (f.n ? h('b', { style:{ color:'#166534' } }, (f.kinds.indexOf('provider') >= 0 ? '사람별 ' : '통장 ') + f.n + '줄') : h('span', { style:{ color:'#d97706' } }, '퇴직연금 줄 없음'))); }),
+            preview.dup ? h('span', { style:{ color:'#64748b' } }, '이미 넣은 줄 ' + preview.dup + '개는 건너뜀') : null),
+          preview.lines.length ? h('div', { style:{ overflowX:'auto', border:'1px solid #e2e8f0', borderRadius:'6px' } },
+            h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+              h('thead', null, h('tr', null, ['출처','날짜','달','금액','이름·적요','누구 몫'].map(function(t, i){ return h('th', { key:i, style:i===3?hS:hL }, t); }))),
+              h('tbody', null, preview.lines.map(function(l, i){
+                return h('tr', { key:i },
+                  h('td', { style:lS }, l.source === 'bank' ? '🏦 통장' : '📄 사업자'),
+                  h('td', { style:lS }, l.date || '-'), h('td', { style:lS }, l.ym),
+                  h('td', { style:cS }, (+l.amount).toLocaleString()),
+                  h('td', { style:Object.assign({}, lS, { maxWidth:'260px', overflow:'hidden', textOverflow:'ellipsis' }), title:l.text || l.name || l.memo || '' }, l.name || l.memo || '-'),
+                  h('td', { style:lS },
+                    h('select', { value:l.sid || '', onChange:function(e){ setLineSid(i, e.target.value); },
+                      style:{ padding:'2px 6px', fontSize:'12.5px', border:'1px solid ' + (l.source === 'provider' && !l.sid ? '#dc2626' : '#cbd5e1'), borderRadius:'5px' } },
+                      h('option', { value:'' }, l.source === 'bank' ? '회사 전체 몫' : '— 사람 고르기 —'),
+                      users.filter(function(u){ return u && u.sid; }).map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name + (u.status === 'retired' ? ' (퇴직)' : '')); })),
+                    l.suggested && h('span', { style:{ marginLeft:'6px', fontSize:'11px', color:'#d97706' }, title:'이름이 명부와 하나로 맞아 제안했습니다 — 맞는지 보고 저장하세요' }, '이름으로 제안')));
+              }))))
+            : h('div', { style:{ fontSize:'12.5px', color:'#64748b' } }, '새로 넣을 퇴직연금 줄이 없습니다.'),
+          h('div', { style:{ display:'flex', gap:'8px', marginTop:'8px' } },
+            preview.lines.length > 0 && h('button', { type:'button', onClick:saveAll, style:{ padding:'6px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'6px', fontWeight:700, cursor:'pointer', fontSize:'13px' } }, '✓ 확인하고 저장'),
+            h('button', { type:'button', onClick:function(){ setPreview(null); }, style:{ padding:'6px 12px', background:'#fff', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'6px', cursor:'pointer', fontSize:'13px' } }, '닫기'))))),
+
+    card('② 월별 — 법인 전체 (' + year + '년)',
+      firm.length ? h('div', { style:{ overflowX:'auto' } }, h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+        h('thead', null, h('tr', null, ['달','자동이체 (통장)','사업자 납입내역 합','법정 최소 (임금총액÷12)','차이','판정'].map(function(t, i){ return h('th', { key:i, style:(i===0||i===5)?hL:hS }, t); }))),
+        h('tbody', null, firm.map(function(r){
+          var prov = provByYm[r.ym] || 0;
+          var paid = Math.max(r.paid || 0, prov);
+          var diff = paid - r.need;
+          return h('tr', { key:r.ym },
+            h('td', { style:lS }, r.ym),
+            h('td', { style:cS }, r.noBank ? pill('통장 내역 없음', '#e2e8f0', '#475569') : (r.paid ? r.paid.toLocaleString() : '0')),
+            h('td', { style:cS }, prov ? prov.toLocaleString() : '-'),
+            h('td', { style:cS }, r.need.toLocaleString()),
+            h('td', { style:Object.assign({}, cS, { color: paid ? (diff < 0 ? '#dc2626' : '#166534') : '#94a3b8' }) }, paid ? ((diff >= 0 ? '+' : '−') + Math.abs(diff).toLocaleString()) : '-'),
+            h('td', { style:lS }, !paid ? pill(r.noBank ? '확인 못 함' : '출금 없음', '#fffbeb', '#854d0e') : (diff >= 0 ? pill('충분', '#f0fdf4', '#166534') : pill('이달 부족 · 연간으로 봄', '#fef2f2', '#dc2626'))));
+        }))))
+        : h('div', { style:{ fontSize:'12.5px', color:'#64748b' } }, '이 해에 DC 급여·납입 기록이 없습니다.')),
+
+    card('③ 연말 정산 · 자동입금 내역 (' + year + '년)',
+      h('div', null,
+        h('div', { style:{ display:'flex', gap:'4px', marginBottom:'8px' } },
+          [{ v:'year', l:'연말 정산' }, { v:'list', l:'자동입금 내역 ' + paidList.filter(function(x){ return String(x.ym).slice(0, 4) === year; }).length }].map(function(o){
+            var on = view === o.v;
+            return h('button', { key:o.v, type:'button', onClick:function(){ setView(o.v); },
+              style:{ padding:'4px 12px', borderRadius:'6px', fontSize:'12.5px', border:'1px solid ' + (on ? '#1e40af' : '#e2e8f0'), background:on ? '#1e40af' : '#fff', color:on ? '#fff' : '#475569', fontWeight:on ? 700 : 500, cursor:'pointer' } }, o.l); })),
+        view === 'year'
+          ? h('div', { style:{ overflowX:'auto' } }, h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+              h('thead', null, h('tr', null, ['이름','임금총액','법정 부담금 (÷12)','낸 부담금','추가로 낼 돈','근거'].map(function(t, i){ return h('th', { key:i, style:(i===0||i===5)?hL:hS }, t); }))),
+              h('tbody', null, ye.rows.map(function(r){
+                return h('tr', { key:r.sid },
+                  h('td', { style:Object.assign({}, lS, { fontWeight:700 }) }, r.name, r.retiredThisYear && h('span', { style:{ marginLeft:'6px' } }, pill('퇴직 ' + r.lastDay.slice(5), '#e2e8f0', '#475569'))),
+                  h('td', { style:cS }, r.wage.toLocaleString()), h('td', { style:cS }, r.need.toLocaleString()),
+                  h('td', { style:cS }, r.paid.toLocaleString()),
+                  h('td', { style:Object.assign({}, cS, { color:r.short > 0 ? '#dc2626' : '#94a3b8', fontWeight:r.short > 0 ? 800 : 400 }) }, r.short.toLocaleString()),
+                  h('td', { style:lS }, r.estimated ? pill('추정 (통장 합을 임금 비율로)', '#fffbeb', '#854d0e') : pill('실제 (사업자 내역)', '#f0fdf4', '#166534'),
+                    (r.retiredThisYear && r.short > 0) && h('span', { style:{ marginLeft:'6px', fontSize:'11px', color:'#dc2626' } }, '퇴직 14일 안 정산')));
+              }),
+              h('tr', null,
+                h('td', { style:Object.assign({}, lS, { fontWeight:800 }) }, '합계 (DC ' + ye.rows.length + '명)'),
+                h('td', { style:Object.assign({}, cS, { fontWeight:800 }) }, tot.w.toLocaleString()), h('td', { style:Object.assign({}, cS, { fontWeight:800 }) }, tot.n.toLocaleString()),
+                h('td', { style:Object.assign({}, cS, { fontWeight:800 }) }, tot.p.toLocaleString()),
+                h('td', { style:Object.assign({}, cS, { fontWeight:800, color:tot.s > 0 ? '#dc2626' : '#94a3b8' }) }, tot.s.toLocaleString()), h('td', { style:lS }, '')))))
+          : h('div', { style:{ overflowX:'auto' } }, h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
+              h('thead', null, h('tr', null, ['날짜','달','누구 몫','금액','출처','파일',''].map(function(t, i){ return h('th', { key:i, style:i===3?hS:hL }, t); }))),
+              h('tbody', null, paidList.filter(function(x){ return String(x.ym).slice(0, 4) === year; }).sort(function(a, b){ return String(b.paidDate || b.ym).localeCompare(String(a.paidDate || a.ym)); }).map(function(x){
+                return h('tr', { key:x.id },
+                  h('td', { style:lS }, x.paidDate || '-'), h('td', { style:lS }, x.ym),
+                  h('td', { style:lS }, x.sid ? nameOf(x.sid) : '회사 전체'), h('td', { style:cS }, (+x.amount).toLocaleString()),
+                  h('td', { style:lS }, x.source === 'bank' ? '🏦 통장' : '📄 사업자'),
+                  h('td', { style:Object.assign({}, lS, { maxWidth:'220px', overflow:'hidden', textOverflow:'ellipsis', color:'#64748b' }), title:x.fileName || '' }, x.fileName || '-'),
+                  h('td', { style:lS }, h('button', { type:'button', onClick:function(){ dropLine(x.id); }, title:'잘못 넣은 줄 지우기',
+                    style:{ border:'1px solid #fecaca', background:'#fff', color:'#dc2626', borderRadius:'5px', padding:'1px 8px', cursor:'pointer', fontSize:'12px' } }, '지우기')));
+              })))),
+        h('div', { style:{ fontSize:'12px', color:'#64748b', marginTop:'8px', lineHeight:'1.6' } },
+          (_bk.lastDate ? '통장 내역은 ' + _bk.lastDate.slice(0, 10) + ' 까지 들어와 있습니다 — 그 뒤 달은 아직 «낸 돈»에 안 잡힙니다. ' : '') + '근거: 근로자퇴직급여 보장법 제20조① — DC 사용자는 가입자 연간 임금총액의 1/12 이상을 연 1회 이상 정기적으로 납입 · 퇴직 시 미납분은 퇴직일부터 14일 안(같은 조 ⑤ — 조문 원문 대조 필요). 통장만 있는 달·사람은 «추정»입니다 — 사업자 납입내역을 올리면 «실제»로 바뀝니다.')))
+  );
 }
 
 function RetirementSettlement(){
@@ -79951,6 +80301,7 @@ function RetirementSettlement(){
       [
         { v:'balance', label:'💰 적립금 현황' },
         { v:'monthly', label:'📅 월별 누계' },
+        { v:'auto',    label:'🏦 자동 정리' },
         { v:'calc',    label:'🧮 퇴직금 계산' },
         { v:'settle',  label:'💼 퇴사자 정산' }
       ].map(function(x){
@@ -80312,6 +80663,7 @@ function RetirementSettlement(){
     })(),
 
     // ─── 탭 4: 퇴직금 계산 ───
+    tab === 'auto' && h(DcAutoTab, { year:selYear }),
     tab === 'calc' && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'14px' } },
       h('div', { style:{ fontSize:'12px', color:'#475569', marginBottom:'10px' } },
         '직원별 [🧮 계산] 버튼을 클릭하면 퇴직일 입력 후 ',

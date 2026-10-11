@@ -37,6 +37,7 @@ function holiKind(name) {
   const s = String(name || "");
   if (/^대체/.test(s)) return "대체공휴일";
   if (/선거/.test(s)) return "선거일";
+  if (/^임시/.test(s)) return "임시공휴일";   /* 이알피 HOLIDAY_KINDS 와 같은 낱말 */
   return "법정공휴일";
 }
 function holiRows(items) {

@@ -293,3 +293,34 @@ test('「N개 더보기」 — 구글 실측(12px/500, 줄 20px, 상자 22px)', 
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /\.more\{font-size:12px;color:var\(--gtext\);padding:1px 6px;cursor:pointer;line-height:20px;\s*font-weight:500;border-radius:6px;/);
 });
+
+test('폰 새 일정 단추 — 구글 앱처럼 오른쪽 아래에 뜬 둥근 네모, 머리에는 «오늘» 단추', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /body\.mob \.mplus\{position:fixed;right:16px;bottom:88px;[^}]*width:56px;\s*height:56px;border-radius:16px/);
+  assert.match(캘, /data-theme="dark"\] body\.mob \.mplus\{background:#304678;color:#d9e2ff\}/);
+  assert.match(캘, /<button class="mtoday" data-mv="0" title="오늘">/);
+});
+
+test('폰 머리 — 구글 앱처럼 ☰ 가 왼쪽 맨 앞, 그다음 제목', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  const i = 캘.indexOf('function 폰머리Html(){');
+  const 몸 = 캘.slice(i, i + 3500);
+  assert.ok(몸.indexOf('class="mmenu"') > 0 && 몸.indexOf('class="mmenu"') < 몸.indexOf('class="mtt"'), '☰ 가 제목보다 앞이어야 합니다');
+});
+
+test('폰 왼쪽 서랍 — ☰ 가 서랍을 연다(일정·일·주·월 + 새로고침), 옛 메뉴는 「더 보기」로 잇는다', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /if\(t\.hasAttribute\('data-mmenu'\)\)\{ S\.drawer = !S\.drawer;/);
+  assert.match(캘, /\[\["sched","일정"\],\["day","일"\],\["3day","3일"\],\["week","주"\],\["month","월"\]\]/);
+  assert.match(캘, /data-dreload="1">새로고침/);
+  assert.match(캘, /data-dmore="1">더 보기/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-dmore'\)\)\{ S\.drawer = false; S\.mobMenu = !S\.mobMenu;/);
+});
+
+test('3일 보기 — 보고 있는 날부터 사흘을 시간 축 격자로, ‹ › 는 사흘씩', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /function threeDayHtml\(eumOnly\)\{ return 격자Html\(사흘날들\(\), eumOnly\); \}/);
+  assert.match(캘, /if\(S\.view === "3day"\) return 폰머리 \+ threeDayHtml\(eumOnly\);/);
+  assert.match(캘, /S\.view==='3day' \? mv\*3 : mv/);
+  assert.match(캘, /if\(S\.view === "3day"\) return \{ from:S\.date, to:shiftDay\(S\.date, 2\) \};/);
+});

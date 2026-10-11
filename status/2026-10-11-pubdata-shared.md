@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 완료
 이어하기시도: 0
 작업폴더: C:\Users\fair0\Documents\pu-wt-pubdata
 가지: pubdata-shared
@@ -10,12 +10,17 @@
 ## 단계
 1. [x] 규칙: pubdata 직원 읽기·쓰기 막음(서버만) · pubdata_req 받아 달라 요청 · 읽기 도구 js/pu-pubdata.js · 온톨로지 INFRA_ROOTS
 2. [x] 서버(nps-monthly.js): pubdata/co/{번호}/nps·ei 씀 + 한 달은 옛 자리(pucards/coInfo)도 · 요청 처리 · 공휴일 pubdata/common/holidays/{연도}
-3. [ ] 기업정보함이 pubdata 읽기 + 있는 자료 한 번 옮김
-4. [ ] 공휴일: 캘린더·이알피·급여관리 · 손입력 약정휴일 그대로
+3. [x] 기업정보함이 pubdata 읽기 + 있는 자료 한 번 옮김
+4. [x] 공휴일: 캘린더·이알피·급여관리 · 손입력 약정휴일 그대로
 5. [ ] 옛 자리 쓰기 멈춤(11월 중순 이후) · 업체관리 한 줄
 
 ## 끝낸 것 / 남은 일
 - 1·2단계: PR(pubdata-shared). 규칙은 10/11 콘솔에 올림(새 자리 pubdata·pubdata_req 둘, 사라진 것 0). 읽기 = pucards 와 같은 MAIL — 보는 사람 안 늘어남.
 - 서버: functions/pubdata.js, nps-monthly 가 pubdata+옛 자리 둘 다 씀, 공휴일 올해·내년, pubdataAsk(요청 처리, 그 회사 한 곳만 읽음), nts-monthly 상태도 pubdata/co/{번호}/nts.
 - ⚠ 합친 뒤 함수 배포: npsMonthly · ntsMonthly · pubdataAsk(새).
-- 남은 일: 3단계(기업정보함 읽기 전환·자료 옮기기) → 4단계(공휴일 화면들).
+- #2514 합침·함수 셋 배포. pubdataAsk 첫 배포가 us-central1 → fetch failed → #2518 로 서울 옮김·재배포, 실요청 시험 OK(새·옛 자리 둘 다 적힘, 요청 지워짐).
+- 3단계: pu-cards 가 pubdata/co 구독(loadPubCo)·coWithPub 로 얹기, 공단 직접 호출 걷어냄(coPubAsk 받아 달라). 사람이 정한 pick·none 만 coInfo.
+- 있는 자료 옮기기: 0건(배포 뒤 기업 상세를 연 곳이 시험한 1곳뿐, 이미 새 자리). 국민연금 고른 곳 0.
+- 4단계: pubdata/common/holidays 2025·2026·2027(20·22·24건) 첫 채움(서버와 같은 holiRows). 캘린더·이알피는 손입력 우선으로 자동 합침(저장 안 함), 급여관리는 「🛰 공휴일 불러오기」로 칸만 채움(임금 계산이라 저장은 사람).
+- npsMonthly 다시 배포함(10/11, 임시공휴일 종류).
+- 1~4단계 끝(#2514·#2518·#2522·#2526). 남은 일: 5단계 — 11월 중순, OLD_TOO=false(functions/pubdata.js)로 옛 자리 쓰기 멈춤 + 이알피 업체관리 근로자 수 한 줄.

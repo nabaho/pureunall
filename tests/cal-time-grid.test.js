@@ -113,7 +113,7 @@ test('④⑤ 처리 — 머리 날짜는 일 보기로 · 빈 칸은 «누른 �
   assert.ok(잼 > 0 && 열기 > 잼, '★ 누른 위치를 창을 띄운 «뒤»에 잽니다 — 판이 다시 그려져 엉뚱한 시각이 들어갑니다');
   assert.match(길, /Math\.min\(1439, \(e\.clientY/, '밤 11시 30분 칸까지 눌려야 합니다');
   assert.match(캘린더, /var 옛격자 = document\.querySelector\('\.tgscroll'\)/, '다시 그릴 때 보던 높이를 안 지킵니다');
-  assert.match(캘린더, /if\(S\.view === 'week' \|\| S\.view === 'day'\) S\.gridScroll = true;/, '들어올 때 지금 근처로 안 내려갑니다');
+  assert.match(캘린더, /if\(S\.view === 'week' \|\| S\.view === 'day' \|\| S\.view === '3day'\) S\.gridScroll = true;/, '들어올 때 지금 근처로 안 내려갑니다');
   assert.match(함수몸('function weekHtml(eumOnly){'), /격자Html\(weekDays\(S\.date\), eumOnly\)/);
   assert.match(함수몸('function dayHtml(eumOnly){'), /격자Html\(\[S\.date\], eumOnly\)/);
 });
@@ -122,4 +122,16 @@ test('PC 머리 크기 — 구글 공식 주 보기 실측(요일 11px·줄 32px
   assert.match(캘린더, /@media \(min-width:701px\)\{\s*\.tgh\{padding:0\}\s*\.tgh \.gwd\{font-weight:500;line-height:32px\}\s*\.tgh \.gdn\{font-size:26px;line-height:46px;min-width:46px;width:46px\}/);
   assert.match(캘린더, /@media \(min-width:701px\)\{ \.tga \.ev\{padding-left:8px\} \}/);
   assert.match(캘린더, /\.tgh \.gdn\{font-size:22px;line-height:36px;min-width:36px/, '폰의 작은 값이 사라졌습니다');
+});
+
+test('폰 한 시간 높이 62px(구글 폰 앱 캡처) · PC 48px — 눈금선도 같이 따라간다', () => {
+  assert.match(캘린더, /격자높이 = \(typeof 폰 === "function" && 폰\(\)\) \? 62 : 48;/);
+  assert.match(캘린더, /background-size:100% var\(--hh,48px\)/);
+  assert.match(캘린더, /;--hh:' \+ 격자높이 \+ 'px;height:'/);
+});
+
+test('폰 일·3일 보기 — 시간 글자 칸 72px · 글자 12px (구글 폰 앱 캡처), 주 보기는 그대로', () => {
+  assert.match(캘린더, /var 눈금폭 = \(typeof 폰 === "function" && 폰\(\) && n <= 3\) \? "72px" : "var\(--tgw,48px\)";/);
+  assert.match(캘린더, /body\.mob \.tgrid\.wide \.tgtime\{font-size:12px\}/);
+  assert.match(캘린더, /<div class="tgrid' \+ \(눈금폭 === "72px" \? ' wide' : ''\) \+ '">/);
 });

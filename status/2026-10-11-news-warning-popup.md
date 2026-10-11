@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 완료
 작업폴더: C:\Users\fair0\Documents\pureunall-news-watch
 가지: fix/news-law-dup-numbers
 이어하기시도: 0
@@ -18,10 +18,22 @@
 ## 할 일
 1. [x] 변환 고치기: `법조문원문` 에서 «내용 맨 앞에 같은 번호가 있는 번호 칸»을 버린다(항·호·목) + 교정 지시에 «원문 쪽 글자 모양은 지적하지 마라»
 2. [x] 검사 `tests/news-law-numbering.test.js` (실제 XML 모양 · 망가뜨린 5가지 모두 걸림) + index.js·뉴스레터를 읽는 검사 209파일 2,763개 통과
-3. [ ] PR → 합침 → `newsletterWatchSunday` 이름으로 배포
-4. [ ] 점검을 «한 번 더» 돌려 현재 경고를 걷는다(일요일 점검 예약 작업 지금 실행 — 점검표 메일이 한 통 더 간다)
-5. [ ] 눌러서 까닭 보는 팝업 — **목업 먼저**(대표 규칙), 승인 뒤 구현:
-       서버 `경고판짓기` 가 줄마다 {말, 까닭} 을 함께 싣고, 포털 `뉴스레터경고달기` 의 ⚠ 를 누르면 팝업(까닭·할 일·자동화 점검 열기)
+3. [x] PR #2506 합침(10/11 19:21) → `newsletterWatchSunday` 이름으로 배포(21:21 · 업데이트 성공)
+4. [x] 점검을 «한 번 더» 돌림(21:22, 예약 작업 «지금 실행» 한 번) — 판정 이상 없음 · 🤖 AI 교정 「확인할 것 없음」 · 경고판 0건 · 점검표 메일 한 통 더 감
+5. [x] 눌러서 까닭 보는 팝업 — 목업(가운데 팝업) → 대표 「추천대로」 → 구현·검사 (이 PR)
+       - 서버 `경고판짓기`: 줄마다 {종류·말·까닭·때}(`줄들`) + 회차 이름. `말들`·`경고수`는 예전 그대로(줄들에서 뽑는다) — 옛 화면도 그대로 돈다
+       - 포털 `enter.html`: ⚠ 를 누르면 `#nlWarnModal` 팝업(왜 떴나요 · 어떻게 하나요 · 시각 · 자동화 점검 열기). 타일의 다른 곳은 예전처럼 앱 열기.
+         까닭 글은 AI 가 쓴 것 → textContent 로만. 옛 경고판(줄들 없음)은 말들로 그린다.
+       - 검사 `tests/news-warning-popup.test.js`(17) + `tests/helpers/fake-dom.js`(새) · `tests/news-portal-alert.test.js` ④ 를 새 가짜 DOM 으로 · 망가뜨린 25가지 모두 걸림
+       - 회귀: enter.html·index.js·뉴스레터를 읽는 검사 319파일 4,264개 통과. 실제 enter.html 의 CSS·HTML·JS 를 뽑아 진짜 브라우저(Edge)에서 눌러 본 화면 3장(실제값·여러 건·옛 형식) 확인
+
+## 배포·확인 (2026-10-11 21:57~22:00)
+- 팝업 PR #2519 합침(검사 통과) → 최신 main(e3822a14)에서 **서버 함수 6개를 이름으로 배포** — 모두 `Successful update operation`:
+  `weeklyNewsletterSend, newsletterWatchRetry, newsletterWatchSunday, newsletterBounceScan, newsletterWatchDelivery, newsletterSundayRefill`
+  (경고판을 쓰는 것 전부 — 하나라도 옛것이면 옛 모양으로 경고판을 다시 써서 팝업이 «까닭 없이» 그려진다)
+- 사이트: 합친 커밋(96ac097b)의 `Test and Deploy Pages` success · 운영 주소의 enter.html 에 `#nlWarnModal`·`뉴스레터경고열기` 가 올라간 것 확인
+- 운영 확인: 3시간마다 도는 `newsletterWatchRetry` 를 예약 작업 «지금 실행» 으로 한 번 돌려 경고판을 새로 쓰게 함 → `newsletter/watch/현재` 에 **`회차이름` 이 실림**(새 코드가 돈다), 경고수 0
+- 지금은 경고가 0건이라 운영에서 팝업을 «눌러 볼» 수는 없다(경고를 일부러 만들지 않는다) — 실제 코드를 진짜 브라우저(Edge)에서 눌러 본 화면 3장으로 확인했다. 다음에 경고가 뜨면 그때 운영에서 확인
 
 ## 남은 일
-- 위 1~5 (진행하며 갱신)
+- 없다.

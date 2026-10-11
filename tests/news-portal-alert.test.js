@@ -8,7 +8,7 @@
      ① 경고 수 = «지금 사람이 볼 것» — 보내기 전엔 막힘+점검(안 나감·확인), 보낸 뒤엔 전달 실패만
      ② 서버가 경고판(newsletter/watch/현재)을 «늘» 새로 쓴다 — 경보·점검·발송·전달·3시간마다
      ③ 06시 발송이 «아예 안 돈» 것도 낮 12시에 잡는다(함수가 죽으면 기록이 없다)
-     ④ 포털은 문제가 있을 때만 «⚠ n» 을 단다 · 누르면 자동화 점검(?tab=watch)으로 간다
+     ④ 포털은 문제가 있을 때만 «⚠ n» 을 단다 · ⚠ 를 누르면 «왜 떴는지» 팝업(news-warning-popup.test.js) · 타일을 누르면 자동화 점검(?tab=watch)으로 간다
      ⑤ 뉴스레터 화면은 ?tab=watch 로 오면 자동화 점검부터 연다 */
 
 const test = require('node:test');
@@ -18,7 +18,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 const W = require('../functions/news-watch.js');
 const { stripJs, stripComments } = require('./strip-comments.js');
-const 서버 = stripJs(fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8')).replace(/\r\n/g, '\n');
+const { 가짜칸 } = require('./helpers/fake-dom.js');
+const 서버 =stripJs(fs.readFileSync(path.join(__dirname, '..', 'functions', 'index.js'), 'utf8')).replace(/\r\n/g, '\n');
 const 포털 = stripComments(fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8')).replace(/\r\n/g, '\n');
 const 뉴스 = stripComments(fs.readFileSync(path.join(__dirname, '..', 'pu-news.html'), 'utf8')).replace(/\r\n/g, '\n');
 const 몸 = (이름) => { const i = 서버.indexOf('exports.' + 이름 + ' '); return 서버.slice(i, 서버.indexOf('\nexports.', i + 10)); };
@@ -65,8 +66,9 @@ test('③ 06시 발송이 아예 안 돌았으면 낮 12시에 알린다', () =>
 });
 
 test('④ 포털 — 문제가 있을 때만 «⚠ n», 누르면 자동화 점검으로', async () => {
-  /* 포털 쪽은 즉시 실행 함수 «안»에 두 칸 들여 있다 — 끝도 두 칸 들인 } 로 찾는다 */
-  const 정의 = (() => { const i = 포털.indexOf('function 뉴스레터경고달기'); return 포털.slice(i, 포털.indexOf('\n  }\n', i) + 4); })();
+  /* 포털 쪽은 즉시 실행 함수 «안»에 두 칸 들여 있다 — 끝도 두 칸 들인 } 로 찾는다.
+     2026-10-11 ⚠ 를 누르면 까닭 팝업이 붙었다 — 종류표(var 뉴스레터종류)부터 한 덩어리로 돌린다(팝업 자체는 news-warning-popup.test.js) */
+  const 정의 = (() => { const 시작 = 포털.indexOf('var 뉴스레터종류'); const i = 포털.indexOf('function 뉴스레터경고달기', 시작); return 포털.slice(시작, 포털.indexOf('\n  }\n', i) + 4); })();
   assert.match(정의, /newsletter\/watch\/현재/);
   assert.match(포털, /hideEmptyRows\(\);\s*뉴스레터경고달기\(\);/, '칸을 다 그린 뒤에 부르지 않는다');
   assert.match(포털, /a\.dataset\.warnTab \? '&tab=' \+ a\.dataset\.warnTab/, '경고가 있어도 그냥 첫 화면으로 간다');
@@ -75,7 +77,7 @@ test('④ 포털 — 문제가 있을 때만 «⚠ n», 누르면 자동화 점�
     const 붙은것 = [];
     const 칸 = { dataset: {}, title: '', href: 'pu-news.html?sso=1',
       querySelector: () => null, appendChild: (x) => 붙은것.push(x) };
-    const 짐 = { document: { querySelector: () => 칸, createElement: () => ({}) },
+    const 짐 = { document: { querySelector: () => 칸, createElement: () => new 가짜칸('span') },
       db: { ref: () => ({ once: () => Promise.resolve({ val: () => 값 }) }) }, Number };
     vm.createContext(짐);
     vm.runInContext(정의 + '\n뉴스레터경고달기();', 짐);
