@@ -55,9 +55,57 @@
   }
   function coName(c) { return String((c && c.debtorName) || '').replace(/\s+/g, ' ').trim(); }
 
+  /* 법인파산 공고(kind: 'bankruptcy') — 파산선고는 도산대지급금의 지급 사유다. 받는 곳은 회생과 같이 «대표이사»(회사 본점 주소로 간다).
+     ⚠ 바우처 비용(12만원)은 회생·사업정리 이야기라 파산 안내에는 싣지 않는다. [확인 필요: 파산 법인에 바우처가 닿는지] */
+  function isBk(c) { return !!(c && c.kind === 'bankruptcy'); }
+  var BK_SUBJECT = '[' + FIRM.name + '] 파산절차 중 근로자 임금(대지급금) 안내';
+  function bkLines() {
+    return {
+      one: '임금을 받지 못한 근로자는 「도산대지급금」을 법에서 정한 최대 금액까지, 빠르면 1개월 내 받을 수 있게 도와드립니다.',
+      two: '간이대지급금 최대 ' + LIMIT.simple + ' · 도산대지급금 최대 ' + LIMIT.insolvency + '까지 받을 수 있습니다(실제 지급액은 연령·체불액·퇴직 시기에 따라 달라집니다, ' + LIMIT.asOf + ').',
+      three: '파산선고는 도산대지급금의 지급 사유입니다. 근로복지공단 신청(도산등사실인정 포함)을 처음부터 끝까지 지원합니다. 근거: 임금채권보장법 제7조',
+      four: '근로자분들께 이 안내를 전해 주시면, 근로자가 직접 신청하실 수 있도록 상담해 드립니다.'
+    };
+  }
+  function buildLetterBk(c, opts) {
+    var t = bkLines();
+    return '<section class="letter">' +
+      '<h1>파산절차 중 근로자 임금, 푸른노무법인이 도와드립니다</h1>' +
+      '<p class="to">' + esc(coName(c)) + (c && c.ceoName ? ' ' + esc(c.ceoName) : '') + ' 대표이사님 귀하</p>' +
+      '<p>안녕하십니까. ' + esc(FIRM.name) + '입니다. 법원 공고를 보고 파산절차 중 꼭 필요한 한 가지를 간단히 안내드립니다.</p>' +
+      '<div class="big"><span class="no">1</span><div><b>' + esc(t.one) + '</b>' +
+      '<div class="max">간이대지급금 최대 <b>' + LIMIT.simple + '</b> · 도산대지급금 최대 <b>' + LIMIT.insolvency + '</b></div>' +
+      '<div class="sub">' + esc(t.three) + '. ' + esc(t.four) + ' (' + esc(LIMIT.asOf) + ')</div></div></div>' +
+      '<h2>문의·상담 — 공인노무사가 직접 답해 드립니다</h2>' +
+      '<p class="tel">' + esc(telLine()) + ' · ' + esc(FIRM.email) + '</p>' +
+      '<table class="off">' + OFFICES.map(function (o) {
+        return '<tr><th>' + esc(o.name) + '</th><td>' + esc(o.addr) + '</td></tr>';
+      }).join('') + '</table>' +
+      '<p class="sign">' + esc(FIRM.name) + ' ' + esc(FIRM.rep) + '</p>' +
+      '<p class="foot">법원 파산 공고를 보고 보내드리는 1회 안내입니다. 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다. 일반 정보이며, 구체적 판단은 상담으로 드립니다.' +
+      (opts && opts.draft ? ' ' + esc(COST.stamp) : '') + '</p>' +
+      '</section>';
+  }
+  function plainBk(c, opts) {
+    var t = bkLines();
+    return [
+      coName(c) + ' ' + (opts && opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께', '',
+      '안녕하십니까. ' + FIRM.name + '입니다.',
+      opts && opts.existing ? '평소 ' + FIRM.name + '과 거래해 주셔서 감사드립니다.' : '',
+      '법원 공고를 보고 파산절차 중 꼭 필요한 한 가지를 간단히 안내드립니다.', '',
+      '1. ' + t.one, '   ' + t.two, '   ' + t.three, '   ' + t.four, '',
+      '문의·상담 — 공인노무사가 직접 답해 드립니다.',
+      '전화 ' + telLine() + ' · 이메일 ' + FIRM.email,
+      OFFICES.map(function (o) { return o.name + ' ' + o.addr; }).join('\n'),
+      FIRM.name + ' ' + FIRM.rep, '',
+      '※ 법원 파산 공고를 보고 드리는 1회 안내입니다. 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'
+    ].join('\n');
+  }
+
   /* 안내문 한 장 — 회사명이 들어간다. 핵심은 두 가지: ① 대지급금 ② 회사 부담 12만원 */
   function buildLetter(c, opts) {
     opts = opts || {};
+    if (isBk(c)) return buildLetterBk(c, opts);
     var share = shareWon();
     return '<section class="letter">' +
       '<h1>회생절차 중 근로자 임금, 푸른노무법인이 도와드립니다</h1>' +
@@ -87,6 +135,7 @@
   var MAIL_SUBJECT = '[' + FIRM.name + '] 회생절차 중 근로자 임금(대지급금) 및 노무 상담 안내';
   function buildPlainText(c, opts) {
     opts = opts || {};
+    if (isBk(c)) return plainBk(c, opts);
     var share = shareWon();
     var to = coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께';
     return [
@@ -117,6 +166,7 @@
   function buildAdMail(c, opts) {
     opts = opts || {};
     var text = buildPlainText(c, { ceo: opts.ceo, existing: true });
+    var subject = isBk(c) ? '(광고) ' + BK_SUBJECT : AD_SUBJECT;
     var foot = [
       '',
       '──────────',
@@ -124,12 +174,13 @@
       '수신을 원하지 않으시면 이 메일에 회신하여 「수신거부」라고 적어 주시거나 ' + OFFICES[0].tel + '(천안)로 연락 주십시오. 바로 중단하겠습니다.',
       '발신: ' + FIRM.name + ' · ' + FIRM.addr + ' · ' + FIRM.email
     ].join('\n');
-    return { subject: AD_SUBJECT, text: '(광고)\n\n' + text + foot };
+    return { subject: subject, text: '(광고)\n\n' + text + foot };
   }
   /* 푸른 메일 쓰기 창을 «주소줄로» 채울 때 쓰는 짧은 본문 — 주소줄이 길면(약 8KB) 서버가 거절한다.
      한글은 글자마다 9글자로 늘어나므로 본문을 600자 안팎으로 줄였다. 자세한 안내문은 PDF 로 저장해 첨부한다. */
   function buildMailBody(c, opts) {
     opts = opts || {};
+    if (isBk(c)) { var tb = bkLines(); return [coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께', '', '안녕하십니까. ' + FIRM.name + '입니다.', '법원 공고를 보고 안내드립니다.', '1. ' + tb.one, tb.two, '', '상담: ' + telLine() + ' / ' + FIRM.email, FIRM.name + ' ' + FIRM.rep, '※ 원하지 않으시면 알려 주십시오 — 다시 보내지 않겠습니다.'].join('\n'); }
     var share = shareWon();
     return [
       coName(c) + ' ' + (opts.ceo ? opts.ceo + ' ' : '') + '대표이사님께',
@@ -198,6 +249,6 @@
       (opts && opts.noPrint ? '' : '<script>window.onload=function(){setTimeout(function(){window.print();},300);};<\/script>') + '</body></html>';
   }
 
-  return { buildAdMail: buildAdMail, AD_SUBJECT: AD_SUBJECT, LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
+  return { isBk: isBk, BK_SUBJECT: BK_SUBJECT, buildAdMail: buildAdMail, AD_SUBJECT: AD_SUBJECT, LIMIT: LIMIT, FIRM: FIRM, OFFICES: OFFICES, COST: COST, MAIL_SUBJECT: MAIL_SUBJECT, buildPlainText: buildPlainText, buildMailBody: buildMailBody, esc: esc, buildLetter: buildLetter, buildLetters: buildLetters, buildLabel: buildLabel,
     buildLabelSheets: buildLabelSheets, buildDocument: buildDocument, CSS: CSS };
 });

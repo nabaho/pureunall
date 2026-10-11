@@ -43,7 +43,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=62"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
-<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
 <script src="js/pu-company-write.js?v=2"></script>
 <script src="js/pu-mgr-watch-core.js?v=1"></script>
@@ -1406,6 +1406,17 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-inq button{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:12px;
   padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 .dm-inq button:hover{background:#eff6ff}
+/* 🤖 받은메일함 위 「AI가 업무 칸으로 옮겼습니다」 띠 (대표 승인 목업 2026-10-11) — 한 줄, 넘치면 … */
+.dm-ai2{display:flex;align-items:center;gap:8px;padding:6px 12px;white-space:nowrap;overflow:hidden;
+  background:#eff6ff;border-bottom:1px solid #bfdbfe;font-size:13px;color:#1e40af}
+.dm-ai2 b{font-weight:800}
+.dm-ai2 .chips{display:flex;gap:6px;flex:1;min-width:0;overflow:hidden}
+.dm-ai2 .chip{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:999px;
+  padding:1px 9px;font-size:12px;cursor:pointer;font-family:inherit}
+.dm-ai2 .chip:hover{background:#eff6ff}
+.dm-ai2 .chip.ad{color:#64748b;border-color:#e2e8f0;cursor:default}
+.dm-ai2 .go{flex:none;border:1px solid #1e40af;background:#fff;color:#1e40af;border-radius:5px;
+  padding:2px 10px;font-size:12px;cursor:pointer;font-family:inherit}
 /* ── 📤 보낸 메일을 사람마다 갈라 보는 칩 줄 (대표 지시 2026-09-16) ── */
 .dm-sentwho{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 12px;
   background:#f8fafc;border-top:1px solid #cbd5e1;border-bottom:1px solid #e2e8f0}
@@ -6882,24 +6893,44 @@ function selToNewsletter(){
       + '<br><br>⚠ 자문 사업장의 담당자·대표자는 <b>넣지 않으셔도 됩니다</b> —'
       + ' 업체관리에서 저절로 들어갑니다.'
       + '<br>⚠ 여기 담은 분은 계약이 끝나도 <b>저절로 안 빠집니다.</b>'
-      + '<br>⚠ 거래 관계 밖이면 <b>사전 동의</b>가 필요합니다 — 「동의 아직」으로 담고,'
-      + ' 그동안은 뉴스레터 제목에 <b>(광고)</b>가 붙습니다.',
+      + '<br>⚠ 거래 관계 밖이면 <b>사전 동의</b>가 필요합니다 — 「동의 받기 전」으로 담고,'
+      + ' <b>동의를 받으실 때까지는 보내지 않습니다</b>(뉴스레터 › 받는 곳 › 지인·잠재에서 「동의 받음」).',
     ok: '명단에 넣기', cancel: '그만두기'
   }).then(async yes=>{
     if(!yes) return;
     const 오늘 = new Date().toISOString().slice(0,10);
-    const 묶음 = {};
-    쓸것.forEach(function(it){
-      const 열쇠 = 'c' + String(it.id||'').replace(/[.#$/[\]]/g,'_').slice(0,40);
-      묶음[열쇠] = { 이름: it.name||'', 소속: it.company||'', 직책: it.title||'',
-                     주소: normEmail(it.email), 전화: it.mobile||it.phone||'',
-                     출처: '명함', 명함번호: String(it.id||''),
-                     담은날: 오늘, 담은이: myEmail||'', 동의: false };
-    });
     try{
-      await db.ref('newsletter/더한분들').update(묶음);
+      /* ★ 이미 담긴 분은 «덮지 않는다» (2026-10-11). 같은 명함을 다시 넣으면 update 가 그 칸을 통째로
+           갈아 끼워, 받아 둔 동의 표시가 「받기 전」으로 되돌아갔다 — 그분은 조용히 발송에서 빠졌다.
+           담기 직전에 서버를 읽어 같은 열쇠·같은 주소는 건너뛴다(뉴스레터 화면의 「기업정보함에서
+           가져오기」와 같은 규칙). */
+      const 이미 = (await db.ref('newsletter/더한분들').once('value')).val() || {};
+      const 이미열쇠 = {}, 이미주소 = {};
+      Object.keys(이미).forEach(function(k){
+        const v = 이미[k];
+        if(!v || typeof v !== 'object' || v.뺌 === true) return;
+        이미열쇠[k] = 1;
+        const e = String(v.주소||'').trim().toLowerCase();
+        if(e) 이미주소[e] = 1;
+      });
+      const 묶음 = {};
+      let 건너뜀 = 0;
+      쓸것.forEach(function(it){
+        const 열쇠 = 'c' + String(it.id||'').replace(/[.#$/[\]]/g,'_').slice(0,40);
+        const 주소 = normEmail(it.email);
+        if(이미열쇠[열쇠] || 이미주소[주소]){ 건너뜀++; return; }
+        묶음[열쇠] = { 이름: it.name||'', 소속: it.company||'', 직책: it.title||'',
+                       주소: 주소, 전화: it.mobile||it.phone||'',
+                       출처: '명함', 명함번호: String(it.id||''),
+                       담은날: 오늘, 담은이: myEmail||'', 동의: false };
+      });
+      const 담은수 = Object.keys(묶음).length;
+      if(담은수) await db.ref('newsletter/더한분들').update(묶음);
       state.sel={}; render();
-      toast('📰 ' + Object.keys(묶음).length + '명을 뉴스레터 명단에 넣었습니다', 7000);
+      toast(담은수
+        ? '📰 ' + 담은수 + '명을 뉴스레터 지인·잠재에 넣었습니다 — 동의를 받으시면 갑니다'
+          + (건너뜀 ? ' · 이미 있던 ' + 건너뜀 + '명은 그대로 두었습니다' : '')
+        : '고른 분이 모두 이미 담겨 있어 그대로 두었습니다', 7000);
     }catch(e){ toast('넣지 못했습니다: '+((e&&e.message)||''), 8000); }
   });
 }
@@ -19111,6 +19142,7 @@ function mbEnsureBins(cb){
     _mbBinsBusy = false;
     if(cb) cb();
     if(state.view==='mail') mbDrawSoon();
+    mbWkLoad();                 /* 업무관리에서 이은 것 — «따로» 읽는다(거절돼도 위 묶음은 멀쩡하게) */
   });
 }
 
@@ -19559,6 +19591,59 @@ function mbInqRows(now0){
                    return !row || !Number(row.r||0); })
     .sort((a,b)=> Number(b.d||0) - Number(a.d||0));
 }
+/* ══════════════════════════════════════════════════════════════════════════
+   🤖 받은메일함 위 「AI가 새 메일 N통을 업무 칸으로 옮겼습니다」 띠 (대표 승인 목업 2026-10-11)
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 왜 — 2026-10-04 AI 자동분류를 켠 뒤 새 메일은 «업무 칸»으로 옮겨져 받은메일함에서 빠진다.
+     실측 2026-10-11: 받은메일함 576통 가운데 10/05~10/11 새 메일 30통이 전부 옮겨졌고, 받은메일함
+     맨 위는 10/04 였다. 사람은 「새 메일이 안 온다 · 받은메일함이 이상하다」로 읽었다.
+     옮기는 동작은 그대로 두고, 「어디로 갔는지」만 받은메일함 맨 위에 알린다.
+   ⚠ 받은메일함 «에서만», 최근 7일 안에 AI 가 옮긴 메일이 있을 때만 뜬다(0통이면 띠 자체가 없다).
+   ⚠ 「AI 가 짚은 것」만 센다(_mbPutBy === 'ai') — 사람이 손으로 옮긴 것은 본인이 아니까 안 센다.
+   ⚠ 숨긴 칸(광고)으로 간 것은 칩이 아니라 «수만» — 눌러도 볼 곳이 없다(전체메일에도 안 나온다).
+   ⚠ 셈은 그리는 동안 한 번만(mbMemoOf) — 줄마다 판정하지 않는다. */
+const MB_AI_DAYS = 7;
+function mbAiMoved(){
+  const m = mbMemoOf();
+  if(m.aiMoved) return m.aiMoved;
+  const out = { n:0, hidden:0, by:{}, order:[] };
+  m.aiMoved = out;
+  const inbox = mbFolderOf('inbox')[0];
+  if(!inbox) return out;
+  const cut = Date.now() - MB_AI_DAYS * 86400000;
+  const box = _mbMsgs[inbox.slug] || {};
+  const by = _mbPutBy || {}, put = _mbPut || {};
+  Object.keys(box).forEach(uid=>{
+    const v = box[uid]; if(!v || Number(v.d||0) < cut) return;
+    const key = inbox.slug + ':' + uid;
+    if(by[key] !== 'ai') return;
+    const bid = String(put[key] || ''); if(!bid) return;
+    if(mbHidden(bid)){ out.hidden++; return; }
+    out.n++;
+    if(!out.by[bid]){ out.by[bid] = 0; out.order.push(bid); }
+    out.by[bid]++;
+  });
+  out.order.sort((a,b)=> out.by[b] - out.by[a]);
+  return out;
+}
+function mbAiStripHtml(){
+  if(mbSentBox()) return '';
+  const inbox = mbFolderOf('inbox')[0];
+  if(!inbox || mbNow() !== inbox.slug) return '';           /* 받은메일함에서만 */
+  const a = mbAiMoved();
+  if(!a.n && !a.hidden) return '';
+  const chip = bid=>{
+    const b = mbBinBy(bid);
+    const name = (b && b.name) || mbBoxName(bid);
+    return `<button type="button" class="chip" onclick="mbGo('${MB_BIN_P}${esc(bid)}')"
+      title="${esc(name)} 칸을 엽니다">${esc(name)} ${a.by[bid]}</button>`;
+  };
+  const ad = a.hidden ? `<span class="chip ad" title="숨긴 칸으로 간 것 — 전체메일에도 안 나옵니다">광고 ${a.hidden} (숨김)</span>` : '';
+  return `<div class="dm-ai2">🤖 <span>최근 ${MB_AI_DAYS}일, AI가 새 메일 <b>${a.n + a.hidden}통</b>을 업무 칸으로 옮겼습니다</span>
+    <span class="chips">${a.order.map(chip).join('')}${ad}</span>
+    <button type="button" class="go" onclick="openMailBox('*all')"
+      title="옮겨진 것까지 날짜순으로 봅니다">전체메일에서 보기</button></div>`;
+}
 function mbInqLineHtml(){
   if(mbSentBox()) return '';               /* 우리가 낸 칸에서는 안 보인다 */
   const rows = mbInqRows();
@@ -19735,11 +19820,12 @@ function mbWhoIndex(){
 
   /* 주소 하나를 표에 넣는다 — 기업정보함과 푸른이알피가 «같은 길»을 쓰게 한 자리.
      ⚠ 먼저 넣은 것이 이긴다(byAddr[em] 이 있으면 안 덮는다). 부르는 차례가 곧 규칙이다. */
-  const put = (email, rec)=>{
+  /* noDom — 주소째만 넣고 도메인으로는 안 넓힌다(세무·대표 메일 칸 — 아래 ①-2) */
+  const put = (email, rec, noDom)=>{
     const em = String(email||'').trim().toLowerCase();
     if(!em || !rec) return;
     const d = mbDomOf(em);
-    const pub = !d || MB_PUB_DOM.indexOf(d) >= 0;
+    const pub = !d || MB_PUB_DOM.indexOf(d) >= 0 || !!noDom;
     /* ── 자문이 끝난 업체인가 (대표 지시 2026-08-26) ──
        ErpMatch 가 이미 status 로 「끝났다(left)」를 적어 둔다 — 새로 만들지 않는다.
        ⚠ 실측 2026-08-26: 371곳 가운데 closed 100곳 · suboffice 66곳 · active 205곳.
@@ -19805,6 +19891,37 @@ function mbWhoIndex(){
     if(okMail(co.email)) put(co.email, rec);
     if(okMail(co.primaryContactEmail)) put(co.primaryContactEmail, rec);
     (co.contacts||[]).forEach(c=>{ if(c && okMail(c.email)) put(c.email, rec); });
+  });
+  /* ①-2 대표·세금계산서·세무 담당 메일 칸 (2026-10-11 「항상 서로 동기화」 실측 뒤 보탬)
+     업무관리는 서버가 붙인 업체 표시로 이 칸의 메일을 이미 그 업체 업무에 붙이는데,
+     메일함은 세 칸만 봐서 「담당 모름」이었다(최근 300통 중 세무 담당 메일 6통).
+     ⚠ «업체 한 곳에만» 적힌 주소만 쓴다 — 세무사무소 한 주소가 여러 업체에 걸린다
+       (실측 taxEmail 주소 38개 중 13개가 2~7곳). 걸린 곳이 둘 이상이면 아무도 안 고른다.
+     ⚠ 위 세 칸보다 «뒤»다 — 먼저 넣은 것이 이기는 표라, 세 칸에 이미 있으면 그대로다.
+     ⚠ 도메인으로는 안 넓힌다(noDom) — 세무사무소 도메인이 통째로 한 업체 것이 된다.
+     ⚠ 서버(functions/mail-owner.js erpAddr)도 «같은 잣대» — tests/mail-owner-one-rule. */
+  const MB_CO_EXTRA = ['ceoEmail', 'taxInvoiceEmail', 'taxEmail'];
+  const extraCos = {};
+  cos.forEach(co=>{
+    if(!co) return;
+    [co.email, co.primaryContactEmail].concat((co.contacts||[]).map(c=>c && c.email))
+      .concat(MB_CO_EXTRA.map(f=>co[f])).forEach(e=>{
+        const em = String(e||'').trim().toLowerCase();
+        if(!okMail(em)) return;
+        const a = extraCos[em] = extraCos[em] || [];
+        if(a.indexOf(co) < 0) a.push(co);
+      });
+  });
+  cos.forEach(co=>{
+    if(!co) return;
+    MB_CO_EXTRA.forEach(f=>{
+      const em = String(co[f]||'').trim().toLowerCase();
+      if(!okMail(em) || (extraCos[em]||[]).length !== 1) return;
+      const rec = (typeof ErpMatch!=='undefined' && ErpMatch.match)
+        ? ErpMatch.match({ bizno: co.bizNo, company: co.name }) : null;
+      if(!rec || (!rec.main && !rec.left)) return;
+      put(em, rec, true);
+    });
   });
 
   /* ② 기업정보함 명함에 적힌 주소 */
@@ -20022,7 +20139,7 @@ function mbEndedOfRow(v, idx0){
   /* 사람이 «끝난 자문사»에 이어 두었으면 그대로 종료 칸이다 (2026-08-29).
      ⚠ 이것을 빼먹으면 끝난 회사에 이어 놓고도 그 회사 담당자 칸에 계속 쌓인다 —
        「자문종료로 옮겼는데 왜 아직 내 칸에 있나」가 된다. */
-  const coRec = mbCoRec(mbCoOf(em));
+  const coRec = mbCoRecOfAddr(em);
   if(coRec && coRec.left) return true;
   const idx = idx0 || mbWhoIndex();
   if(idx.endAddr[em]) return true;
@@ -20844,7 +20961,7 @@ function mbWhoWhyOf(em, idx0, none){
      ⚠ ② 기업정보함보다 앞이다: 여기 이은 것은 «사람이 직접 고른» 회사이고,
        기업정보함은 기계가 이름으로 짚은 것이다. 사람이 먼저다.
      ⚠ 끝난 회사면 담당자를 안 준다 — 자문종료 칸이 가져간다(mbEndedOfRow). */
-  const coRec = mbCoRec(mbCoOf(em));
+  const coRec = mbCoRecOfAddr(em);
   if(coRec && !coRec.left){
     const c1 = mbWhoLive(coRec.main);
     if(c1) return { who:c1, why:'co' };
@@ -20867,6 +20984,99 @@ function mbWhoWhyOf(em, idx0, none){
   return none;                                            /* ⑤ 담당 모름 */
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   업무관리(푸른업무)에서 이은 것 — «읽기만» (대표 지시 2026-10-11 「항상 서로 동기화가 되게」)
+   ══════════════════════════════════════════════════════════════════════════
+   work_erp/mailaddr {열쇠: {addr, co, coid}} — 업무관리 「이 주소는 앞으로도 이 사업장」
+                                               = 메일함의 「자문사에 잇기」(config/mailCo)와 같은 뜻
+   work_erp/maillink {수집함 열쇠: {item, auto}} — 업무관리에서 메일 «한 통»을 업무에 이은 것
+   ★ 베끼지 않고 그대로 읽는다 — 업무관리에서 이으면 메일함 담당도 저절로 따라온다.
+     (거꾸로 메일함에서 이은 것은 업무관리가 config/mailCo·mailWork 를 읽어 따라간다.)
+   ⚠ 메일 열쇠가 두 앱에서 다르다 — 수집함은 Message-ID, 메일함은 「칸:번호」.
+     그래서 서버 mail-sync 의 지문(mailFp: 보낸 주소|분|제목 120자)으로 맞댄다.
+     실측 2026-10-11 — 수집함 300통 중 263통이 메일함 한 줄과 맞물렸다(못 맞은 것은 광고 칸).
+   ⚠ 이은 업무가 끝났으면 «없는 것»으로 본다 — 사람이 잊어도 안전하다.
+   ⚠ 업체는 번호(coid)로만 찾는다. 이름은 안 쓴다(온톨로지 규칙).
+   ⚠ 서버 알림(functions/mail-owner.js)에는 메일 «한 통» 잇기를 안 넣는다 — 화면만.
+     업체 잇기(mailaddr)는 서버도 같은 칸을 본다(tests/mail-owner-one-rule).
+   ⚠ 거절돼도(규칙 밖) 조용히 빈 표 — 메일함 자신의 판정은 그대로 돈다. */
+let _mbWkAddr = null;       /* {주소(소문자): 업체번호} */
+let _mbWkMsg = null;        /* {지문: {mgr, item, co, title, auto}} */
+let _mbWkMsgAddr = null;    /* {주소: 1} — 줄마다 지문을 셈하지 않게 먼저 거른다 */
+let _mbWkBusy = false;
+const MB_WK_MAX = 400;      /* 한 번에 따라 읽을 «이은 메일» 수 — 이은 것만 읽으니 대개 몇 통이다 */
+function mbWkFp(e, dateMs, subject){
+  return String(e||'').trim().toLowerCase() + '|' + Math.floor(Number(dateMs||0)/60000) + '|'
+    + String(subject||'').replace(/\s+/g,' ').trim().slice(0,120);
+}
+function mbWkAddrOf(s){ const m = String(s||'').match(/[\w.+-]+@[\w.-]+\.\w+/); return m ? m[0].toLowerCase() : ''; }
+/* 업무관리 두 표 → 메일함이 쓰는 모양. 순수 함수 — 검사가 그대로 부른다.
+   addrs = work_erp/mailaddr, links = work_erp/maillink, logs = {수집함 열쇠: 줄}, items = {업무 번호: 업무} */
+function mbWkBuild(addrs, links, logs, items){
+  const addr = {}, msg = {}, msgAddr = {};
+  Object.keys(addrs||{}).forEach(k=>{
+    const p = (addrs||{})[k] || {};
+    const e = mbWkAddrOf(p.addr); const id = String(p.coid||'');
+    if(e && id) addr[e] = id;
+  });
+  Object.keys(links||{}).forEach(k=>{
+    const L = (links||{})[k];
+    if(!L || L.none || !L.item) return;
+    const it = (items||{})[String(L.item)], m = (logs||{})[k];
+    if(!it || !m || it.state === 'done') return;
+    const e = mbWkAddrOf(m.from); if(!e) return;
+    msg[mbWkFp(e, m.at, m.subject)] = { mgr:String((it.mgr_main && it.mgr_main.name) || ''), item:String(L.item),
+      co:String(it.company||''), title:String(it.title||''), auto:L.auto ? 1 : 0 };
+    msgAddr[e] = 1;
+  });
+  return { addr, msg, msgAddr };
+}
+function mbWkLoad(){
+  if(_mbWkAddr !== null || _mbWkBusy) return;
+  if(typeof Store === 'undefined' || Store.mode !== 'firebase' || !mbAuthOk()) return;
+  _mbWkBusy = true;
+  const db = firebase.database();
+  let A = {}, Lk = {};
+  Promise.all([db.ref('work_erp/mailaddr').once('value'), db.ref('work_erp/maillink').once('value')])
+    .then(([a, l])=>{
+      A = a.val() || {}; Lk = l.val() || {};
+      const ks = Object.keys(Lk).filter(k=>Lk[k] && Lk[k].item && !Lk[k].none).slice(0, MB_WK_MAX);
+      const ids = {}; ks.forEach(k=>{ ids[String(Lk[k].item)] = 1; });
+      /* 이은 것만 «한 줄씩» 읽는다 — 수집함·업무 목록을 통째로 받지 않는다(요금) */
+      return Promise.all([
+        Promise.all(ks.map(k=>db.ref('paydata/maillog/' + k).once('value').then(s=>[k, s.val()], ()=>[k, null]))),
+        Promise.all(Object.keys(ids).map(id=>db.ref('work_erp/items/' + id).once('value').then(s=>[id, s.val()], ()=>[id, null])))
+      ]);
+    })
+    .then(([logs, its])=>{
+      const lg = {}, im = {};
+      (logs||[]).forEach(([k, v])=>{ if(v) lg[k] = v; });
+      (its||[]).forEach(([k, v])=>{ if(v) im[k] = v; });
+      const r = mbWkBuild(A, Lk, lg, im);
+      _mbWkAddr = r.addr; _mbWkMsg = r.msg; _mbWkMsgAddr = r.msgAddr;
+    })
+    .catch(e=>{ console.warn('[업무관리 연결]', (e&&e.message)||e); })
+    .then(()=>{
+      _mbWkBusy = false;
+      if(_mbWkAddr === null){ _mbWkAddr = {}; _mbWkMsg = {}; _mbWkMsgAddr = {}; }
+      if(state.view === 'mail'){ mbWhoBust(); mbDrawSoon(); }
+    });
+}
+/* 이 메일 한 통을 업무관리에서 이었나 — 이었으면 {mgr, item, co, title, auto} */
+function mbWkMsgOf(v){
+  if(!_mbWkMsgAddr || !v) return null;
+  const em = String(v.e||'').trim().toLowerCase();
+  if(!em || !_mbWkMsgAddr[em]) return null;
+  const src = v._src || v;
+  return (_mbWkMsg||{})[mbWkFp(em, src.d, src.s)] || null;
+}
+/* 이 주소의 업체 기록 — 메일함에서 이은 자문사가 먼저, 없으면 업무관리에서 고정한 사업장(번호로) */
+function mbCoRecOfAddr(em){
+  const r = mbCoRec(mbCoOf(em));
+  if(r) return r;
+  const id = (_mbWkAddr||{})[em];
+  return (id && typeof ErpMatch !== 'undefined' && ErpMatch.byId) ? (ErpMatch.byId[String(id)] || null) : null;
+}
 /* ── 이 메일의 담당자 ── 받은 메일은 «보낸이» 주소로 본다 */
 function mbWhoOfRow(v, idx0){
   const em = String((v&&v.e)||'').trim().toLowerCase();
@@ -20877,6 +21087,12 @@ function mbWhoOfRow(v, idx0){
      ⚠ _key 가 없는 자리에서도 부른다(딱지·귀띔) — 없으면 그냥 건너뛴다. */
   const byMsg = mbWhoLive((v && v._key) ? ((_mbWhoMsg||{})[mbWhoKey(v._key)] || '') : '');
   if(byMsg) return byMsg;
+  /* ①-0b 업무관리에서 이 메일 «한 통»을 업무에 이었다 → 그 업무의 주담당 (2026-10-11 「항상 서로 동기화」).
+     ⚠ 메일함이 박은 것(①-0)보다는 뒤다 — 메일함에서 박은 것이 이 화면의 일이다.
+     ⚠ 주소 규칙보다는 앞이다 — «한 통»을 골라 이은 것이 주소 하나로 미루어 본 것보다 정확하다. */
+  const wkMsg = mbWkMsgOf(v);
+  const byWk = wkMsg ? mbWhoLive(wkMsg.mgr) : '';
+  if(byWk) return byWk;
   const w = mbWhoWhy(em, idx0).who;
   if(w) return w;
   /* ⑥ 이 칸을 보는 사람 — «맨 뒤»다 (대표 승인 목업 2026-10-06).
@@ -21487,7 +21703,7 @@ function mbSubsOfRow(v, idx0){
   const em = String((v&&v.e)||'').trim().toLowerCase();
   if(!em) return [];
   /* 사람이 자문사에 이어 둔 것이 먼저다 — 그 회사의 부담당을 그대로 쓴다 */
-  let rec = mbCoRec(mbCoOf(em));
+  let rec = mbCoRecOfAddr(em);
   if(!rec){
     const idx = idx0 || mbWhoIndex();
     const co = (idx.coAddr||{})[em];
@@ -21608,7 +21824,14 @@ function mbWorkBuild(m, nameBySid, byId, byBiz){
       co:String(r.companyName||r.company||''),
       title:String(r.title||r.typeName||r.brief||r.programName||'') };
     let hasAddr = false;
-    [r.email, r.primaryContactEmail].concat((r.contacts||[]).filter(c=>c && !c.left).map(c=>c.email))
+    /* ★ 건 기록의 «회사정보 상자»(r.company)에 적힌 주소도 본다 (2026-10-11 실측 뒤 보탬).
+         푸른이알피 수정화면의 회사정보 상자가 그 건에 «실제로 쓰는» 연락처인데, 여기는
+         겉의 주소만 봐서 업무관리에는 붙는 메일이 메일함에서는 「담당 모름」이었다(최근 300통 중 3통).
+       ⚠ 서버(functions/mail-owner.js workByAddr)도 «같은 칸»을 본다 — 한쪽만 보면 둘이 어긋난다. */
+    const rc = (r.company && typeof r.company === 'object') ? r.company : {};
+    [r.email, r.primaryContactEmail, rc.email, rc.primaryContactEmail]
+      .concat((r.contacts||[]).filter(c=>c && !c.left).map(c=>c.email))
+      .concat((rc.contacts||[]).filter(c=>c && !c.left).map(c=>c.email))
       .forEach(e=>{
         e = String(e||'').trim().toLowerCase();
         if(e.indexOf('@') < 1 || /@pureun\.kr$/.test(e)) return;   /* 우리 주소는 아니다 */
@@ -21663,7 +21886,7 @@ function mbWorkOfRow(v, idx0, rec0){
   if(!_mbWork.byCo.size) return seed.slice();
   const out = seed.slice();
   /* 업체는 mbSubsOfRow 와 «같은 길»로 찾는다 — 사람이 이은 자문사가 먼저 */
-  let rec = rec0 !== undefined ? rec0 : mbCoRec(mbCoOf(em));
+  let rec = rec0 !== undefined ? rec0 : mbCoRecOfAddr(em);
   if(rec0 === undefined && !rec){
     const idx = idx0 || mbWhoIndex();
     const co = (idx.coAddr||{})[em];
@@ -25640,6 +25863,7 @@ function mbListHtml(){
            [새로고침 ↻] 을 누르면 그때 알려 준다.
          ⚠ 되살리려면 이 자리에 dm-hint 한 줄을 도로 넣으면 된다(git 에 있다). */''}
     </div>
+    ${mbAiStripHtml()}
     ${mbInqLineHtml()}
     ${mbMineLineHtml()}
     ${mbSpamLineHtml()}
@@ -38089,6 +38313,256 @@ function coHeadRepaint(){
   const n = $('coNeedBox'); if(n) n.innerHTML = coNeedHtml(o);
 }
 
+/* ══════ 👥 국민연금 가입자 — 기업 상세 (대표 「진행」 2026-10-11, 목업 승인) ══════
+   공공데이터포털 「국민연금공단_국민연금 가입 사업장 내역」(V2). 열쇠는 국세청과 같은 PU_CFG.ntsKey.
+   ★ 국민연금 자료는 사업자번호를 «앞 6자리»만 공개한다 — 그래서 번호 6자리로 후보를 받고,
+     이 회사가 맞는지는 «사람이 고른다». 이름이 같다고 저절로 고르지 않는다(이름으로 회사 맞추기 금지).
+   ★ 적는 자리: coInfo/{번호}/nps — pick(고른 사업장) · cand(후보) · now(이번 숫자) · hist/{년월}(가입자 수).
+     새 최상위 자리를 내지 않는다. 매달 2일 서버(functions/nps-monthly.js)가 고른 곳의 숫자를 새로 받는다.
+   ⚠ 당월 고지금액(보험료)은 «안 적는다» — 돈은 대표만 보는 자리인데 coInfo 는 직원도 읽는다.
+   ⚠ 가입자 수는 «국민연금 신고 기준»이다 — 상시근로자 수와 다를 수 있어 화면에 «추정»이라 적는다. */
+const NPS_URL = 'https://apis.data.go.kr/B552015/NpsBplcInfoInqireServiceV2/';
+const NPS_CAND_MAX = 8;
+/* 후보 줄 세우기 — 이름이 같은 곳·가입 중인 곳 먼저 (순수 로직). 이름 다듬개는 ErpMatch._norm 하나 */
+function npsCands(items, coName){
+  const n = (typeof ErpMatch !== 'undefined' && ErpMatch._norm) ? ErpMatch._norm : (s=>String(s||'').replace(/\s+/g,''));
+  const me = n(coName || '');
+  return [].concat(items || []).filter(it => it && it.seq).map(it => {
+    const nm = String(it.wkplNm || '').trim();
+    const nn = n(nm);
+    return { seq: String(it.seq), nm: nm, addr: String(it.wkplRoadNmDtlAddr || '').trim(),
+      on: String(it.wkplJnngStcd || '') === '1', ym: String(it.dataCrtYm || ''),
+      same: !!me && !!nn && (nn === me || nn.indexOf(me) === 0 || me.indexOf(nn) === 0) };
+  }).sort((a,b) => (b.same - a.same) || (b.on - a.on) || a.nm.localeCompare(b.nm, 'ko')).slice(0, NPS_CAND_MAX);
+}
+/* 노무 안내 — 가입자 수로 본 «넘은 문턱». 법 조문은 사람이 아는 대로 짧게, 추정이라고 붙인다 */
+function npsCues(cnt){
+  const c = Number(cnt) || 0, out = [];
+  if(c >= 50) out.push('50명 이상 — 장애인 고용의무(장애인고용촉진법 제28조)');
+  if(c >= 30) out.push('30명 이상 — 노사협의회 설치(근로자참여법 제4조)');
+  if(c >= 10) out.push('10명 이상 — 취업규칙 작성·신고(근로기준법 제93조)');
+  if(c >= 5)  out.push('5명 이상 — 근로기준법 대부분 적용(제11조)');
+  return out;
+}
+/* 지난 기록과 견주기 — 12달 전(없으면 가장 오래된 달)과 직전 달 (순수 로직) */
+function npsTrend(hist, ym){
+  const ks = Object.keys(hist || {}).filter(k => /^\d{6}$/.test(k) && k < String(ym || '999999')).sort();
+  if(!ks.length) return null;
+  const y = Number(String(ym).slice(0,4)), m = Number(String(ym).slice(4,6));
+  const yearAgo = String(y - 1) + String(m).padStart(2, '0');
+  const base = ks.filter(k => k <= yearAgo).pop() || ks[0];
+  return { prevYm: ks[ks.length-1], prev: Number(hist[ks[ks.length-1]]) || 0, baseYm: base, base: Number(hist[base]) || 0 };
+}
+function npsKey(){ return String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim(); }
+async function npsGet(op, q){
+  const svc = npsKey();
+  if(!svc) throw new Error('공공데이터 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」');
+  const r = await fetch(NPS_URL + op + '?serviceKey=' + encodeURIComponent(svc) + '&dataType=json&' + q);
+  if(!r.ok) throw new Error('국민연금 답 ' + r.status);
+  const j = await r.json();
+  const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
+  return [].concat(it || []);
+}
+function npsWrite(key, patch){
+  if(Store.mode !== 'firebase'){ toast('실시간DB 연결 상태에서만 적을 수 있습니다'); return Promise.resolve(false); }
+  const upd = {};
+  Object.keys(patch).forEach(f => { upd['coInfo/' + key + '/nps/' + f] = patch[f]; });
+  return Store.db.ref(DB_ROOT).update(upd).then(() => {
+    coListBust(); renderCoSoon();
+    if(state.coPick === key) openCoDetailPanel(key, true);
+    if(_coWork && _coWork.key === key) coWorkMount();
+    return true;
+  }).catch(e => { console.warn('[국민연금 적기]', e); toast('저장하지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); return false; });
+}
+/* 🔍 후보 찾기 — 사업자번호 앞 6자리로 */
+async function coNpsFind(key){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const no = digits(o.bizno || '');
+  if(no.length !== 10) return toast('사업자번호가 있어야 국민연금에서 찾을 수 있습니다', 7000);
+  toast('국민연금 사업장을 찾는 중…', 3000);
+  let items;
+  try{ items = await npsGet('getBassInfoSearchV2', 'bzowrRgstNo=' + no.slice(0,6) + '&numOfRows=100&pageNo=1'); }
+  catch(e){ return toast('국민연금에 못 물어봤습니다 — ' + ((e && e.message) || ''), 9000); }
+  const cand = npsCands(items, o.name);
+  await npsWrite(key, { cand: cand.length ? cand : null, candAt: Date.now(), candN: items.length });
+  if(!cand.length) toast('앞 6자리가 같은 국민연금 사업장이 없습니다 — 가입자 3인 미만 법인·10인 미만 개인사업장은 공개되지 않습니다', 10000);
+}
+/* ✓ 이 사업장이 맞음 — 그 자리에서 숫자를 받아 적는다 */
+async function coNpsPick(key, seq){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const c = ((o.extra && o.extra.nps && o.extra.nps.cand) || []).find(x => x && String(x.seq) === String(seq));
+  if(!c) return toast('그 후보를 찾지 못했습니다 — 다시 찾아 주세요', 6000);
+  toast('가입자 수를 받는 중…', 3000);
+  let now;
+  try{ now = await npsNow(seq, c.ym); }
+  catch(e){ return toast('국민연금에 못 물어봤습니다 — ' + ((e && e.message) || ''), 9000); }
+  const patch = { pick: { seq: String(seq), nm: c.nm, addr: c.addr, by: myEmail || '', at: Date.now() }, now: now, none: null };
+  if(now && now.ym) patch['hist/' + now.ym] = now.cnt;
+  if(await npsWrite(key, patch)) toast('👥 국민연금 사업장을 이었습니다 — 매달 2일 서버가 새 숫자를 받습니다', 6000);
+}
+/* 상세 + 그 달 신규·상실 → now (돈은 빼고) */
+async function npsNow(seq, ym0){
+  const d = (await npsGet('getDetailInfoSearchV2', 'seq=' + encodeURIComponent(seq)))[0] || {};
+  const ym = String(d.dataCrtYm || ym0 || '');
+  let p = {};
+  if(ym){ try{ p = (await npsGet('getPdAcctoSttusInfoSearchV2', 'seq=' + encodeURIComponent(seq) + '&dataCrtYm=' + ym))[0] || {}; }catch(_){ } }
+  return { ym: ym, cnt: Number(d.jnngpCnt) || 0, nw: Number(p.nwAcqzrCnt) || 0, lss: Number(p.lssJnngpCnt) || 0,
+    ind: String(d.vldtVlKrnNm || ''), on: String(d.wkplJnngStcd || '') === '1',
+    adpt: String(d.adptDt || ''), scsn: String(d.scsnDt || ''), at: Date.now() };
+}
+function coNpsNone(key){ npsWrite(key, { none: { by: myEmail || '', at: Date.now() }, cand: null }).then(ok => ok && toast('「국민연금 사업장 없음」으로 적었습니다 — 다시 찾으면 풀립니다', 6000)); }
+function coNpsUnpick(key){
+  if(!confirm('국민연금 사업장 연결을 풀까요?\n지금까지 받은 숫자 기록은 남겨 둡니다.')) return;
+  npsWrite(key, { pick: null, now: null }).then(ok => ok && toast('연결을 풀었습니다', 5000));
+}
+function coNpsHtml(o){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const p = (o.extra && o.extra.nps) || {};
+  const no = digits(o.bizno || '');
+  if(p.pick && p.now){
+    const n = p.now, t = npsTrend(p.hist, n.ym);
+    const ym = n.ym ? n.ym.slice(0,4) + '.' + n.ym.slice(4,6) : '';
+    const d = t ? (Number(n.cnt) || 0) - t.base : null;
+    const tile = (big, small, cls) => `<div style="flex:1;min-width:0;white-space:nowrap;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px"><b style="font-size:17px${cls==='up'?';color:#166534':cls==='dn'?';color:#dc2626':''}">${big}</b> <span style="color:#64748b;font-size:12px">${small}</span></div>`;
+    const cues = npsCues(n.cnt);
+    return `<div style="display:flex;gap:8px">${tile((Number(n.cnt)||0) + '명', '가입자')}${
+        d == null ? tile('—', '지난 기록 없음') : tile((d > 0 ? '+' : '') + d, (t.baseYm.slice(0,4) + '.' + t.baseYm.slice(4)) + '보다', d > 0 ? 'up' : d < 0 ? 'dn' : '')}${
+        tile((Number(n.nw)||0) + ' / ' + (Number(n.lss)||0), '신규 / 상실')}</div>
+      ${cues.length ? `<div style="margin-top:6px">${cues.map(c => `<span class="t" style="background:#fffbeb;color:#854d0e;border:1px solid #fde68a;margin:0 4px 4px 0;display:inline-block">${esc(c)}</span>`).join('')}</div>` : ''}
+      <div class="dim" style="font-size:12px;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"
+        title="${esc(n.ind || '')}">${esc(ym)} 기준 · ${esc(n.ind || '업종 모름')}${n.on ? '' : ' · ⚠ 국민연금 «탈퇴» 사업장'} · 가입자 수는 신고 기준(상시근로자 추정)</div>
+      <div class="dim" style="font-size:12px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">이은 사업장: ${esc(p.pick.nm || '')}
+        </div>
+      <div class="coerppin" style="margin-top:6px"><button onclick="coNpsUnpick('${k}')">연결 풀기</button></div>`;
+  }
+  if(no.length !== 10) return `<div class="dim">사업자번호가 있어야 국민연금에서 찾을 수 있습니다.</div>`;
+  const find = `<span class="coerppin" style="display:inline-flex"><button onclick="coNpsFind('${k}')">🔍 국민연금에서 찾기</button></span>`;
+  if(p.none) return `<div class="dim">「국민연금 사업장 없음」으로 적어 두었습니다. ${find}</div>`;
+  if(p.cand && p.cand.length){
+    return `<div class="dim" style="font-size:12px;margin-bottom:6px">사업자번호 앞 6자리가 같은 곳입니다 — 이 회사가 맞는 줄을 골라 주세요(이름이 같아도 저절로 고르지 않습니다).</div>
+      ${p.cand.map(c => `<div class="coerppin" style="white-space:nowrap">
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis" title="${esc(c.nm + ' · ' + c.addr)}">${c.same ? '★ ' : ''}<b>${esc(c.nm)}</b> <span class="dim">${esc(c.addr)}${c.on ? '' : ' · 탈퇴'}</span></span>
+        <button onclick="coNpsPick('${k}','${esc(c.seq)}')">이 사업장 맞음</button></div>`).join('')}
+      <div class="coerppin" style="margin-top:6px"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
+  }
+  return `<div class="dim" style="margin-bottom:6px">국민연금 가입 사업장에서 가입자 수(≈ 근로자 수)를 받아 옵니다. 처음 한 번은 사업장을 골라 주세요.</div>${find}`;
+}
+/* ══════ 👥 근로자 수 — 한 줄 + 사업장 팝업 (대표 「진행」 2026-10-11, 목업 ㉯ 「칸이 늘어나는 것보다 팝업」) ══════
+   기업 상세에는 «한 줄»만 둔다. 누르면 사업장 창이 뜨고, 위 갈래는 🏢 고용·산재보험 · 💳 국민연금 둘이다.
+   ★ 고용·산재: 근로복지공단 「고용/산재보험 현황정보」 — 사업자번호 «10자리 그대로» 물어 정확히 맞는다.
+     그래서 사람이 고르지 않고, 기업 상세를 열면 저절로 받아 둔다(30일에 한 번). 매달 2일 서버도 받는다.
+     자리: coInfo/{번호}/ei = { at, rows:[{nm,fg(gy|sj),cnt,ind,since,addr}], gy, sj, n } · eiHist/{년월} = 고용 상시인원
+   ★ 국민연금은 앞 6자리만 공개라 그대로 «사람이 고른다»(coNpsHtml) — 그 화면을 이 창 안으로 옮겼다.
+   ⚠ 공단 신고 기준 숫자다 — 상시근로자 «판단»은 법 기준으로 따로 본다고 화면에 적는다. */
+const EI_URL = 'https://apis.data.go.kr/B490001/gySjbPstateInfoService/getGySjBoheomBsshItem';
+const EI_EVERY_DAYS = 30;
+/* 공단 답 → 사업장 줄 (순수 로직). opaBoheomFg 1 = 산재, 2 = 고용 */
+function eiRows(items){
+  return [].concat(items || []).filter(Boolean).map(it => {
+    const fg = String(it.opaBoheomFg || '') === '2' ? 'gy' : 'sj';
+    const d = String(it.seongripDt || '');
+    return { nm: String(it.saeopjangNm || '').trim(), fg: fg, cnt: Number(it.sangsiInwonCnt) || 0,
+      ind: String((fg === 'gy' ? it.gyEopjongNm : it.sjEopjongNm) || it.gyEopjongNm || it.sjEopjongNm || '').trim(),
+      since: d.length >= 6 ? d.slice(0,4) + '.' + d.slice(4,6) : '', addr: String(it.addr || '').trim() };
+  }).sort((a,b) => (b.cnt - a.cnt) || a.nm.localeCompare(b.nm, 'ko'));
+}
+/* 합계 — 고용·산재 상시인원과 사업장 수(이름+주소로 센다) */
+function eiSum(rows){
+  const gy = (rows || []).filter(r => r.fg === 'gy').reduce((n, r) => n + r.cnt, 0);
+  const sj = (rows || []).filter(r => r.fg === 'sj').reduce((n, r) => n + r.cnt, 0);
+  const sites = new Set((rows || []).map(r => r.nm + '|' + r.addr)).size;
+  return { gy: gy, sj: sj, n: sites };
+}
+let _eiAsked = {};          /* 이 화면에서 한 번 물어본 회사 — 실패해도 되풀이하지 않는다 */
+async function coEiFetch(key, quiet){
+  const o = (coList() || []).find(x => x.key === key); if(!o) return;
+  const no = digits(o.bizno || '');
+  if(no.length !== 10){ if(!quiet) toast('사업자번호가 있어야 고용·산재보험에서 찾을 수 있습니다', 7000); return; }
+  const svc = npsKey();
+  if(!svc){ if(!quiet) toast('공공데이터 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」', 9000); return; }
+  _eiAsked[key] = 1;
+  let rows;
+  try{
+    const r = await fetch(EI_URL + '?serviceKey=' + encodeURIComponent(svc) + '&_type=json&numOfRows=100&pageNo=1&v_saeopjaDrno=' + no);
+    if(!r.ok) throw new Error('공단 답 ' + r.status);
+    const j = await r.json();
+    const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
+    rows = eiRows(it);
+  }catch(e){ if(!quiet) toast('고용·산재보험에 못 물어봤습니다 — ' + ((e && e.message) || ''), 8000); return; }
+  const s = eiSum(rows), now = Date.now();
+  const ym = new Date(now + 9 * 3600000).toISOString().slice(0,7).replace('-', '');
+  const upd = {};
+  upd['coInfo/' + key + '/ei'] = { at: now, rows: rows.length ? rows : null, gy: s.gy, sj: s.sj, n: s.n };
+  if(rows.length) upd['coInfo/' + key + '/eiHist/' + ym] = s.gy;
+  if(Store.mode !== 'firebase') return;
+  try{ await Store.db.ref(DB_ROOT).update(upd); }catch(e){ console.warn('[고용·산재 적기]', e); return; }
+  coListBust(); renderCoSoon();
+  if(state.coPick === key) openCoDetailPanel(key, true);
+  if(_coWork && _coWork.key === key) coWorkMount();
+}
+/* 기업 상세를 열 때 — 아직 없거나 30일 지났으면 조용히 받는다(국세청 coNtsAutoOnOpen 과 같은 결) */
+function coEiAutoOnOpen(o){
+  if(!o || _eiAsked[o.key] || Store.mode !== 'firebase') return;
+  if(digits(o.bizno || '').length !== 10 || !npsKey()) return;
+  const ei = o.extra && o.extra.ei;
+  if(ei && ei.at && Date.now() - Number(ei.at) < EI_EVERY_DAYS * 86400000) return;
+  _eiAsked[o.key] = 1;        /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
+  coEiFetch(o.key, true);
+}
+/* 기업 상세의 «한 줄» */
+function coWorkRowHtml(o){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const ei = (o.extra && o.extra.ei) || null, np = (o.extra && o.extra.nps) || {};
+  const npTxt = np.pick && np.now ? '국민연금 ' + (Number(np.now.cnt) || 0) + '명' : '';
+  let big, small;
+  if(ei && ei.rows){ big = '상시 ' + (Number(ei.gy) || Number(ei.sj) || 0) + '명';
+    small = [(Number(ei.gy) ? '고용보험' : '산재보험'), '사업장 ' + (Number(ei.n) || 0) + '곳', npTxt].filter(Boolean).join(' · '); }
+  else if(npTxt){ big = npTxt; small = '고용·산재보험은 아직 못 받음'; }
+  else { big = '근로자 수'; small = ei ? '고용·산재보험에 이 번호의 사업장이 없습니다' : '열면 고용·산재보험에서 받아 옵니다'; }
+  return `<div class="coerppin" style="cursor:pointer;white-space:nowrap;margin-top:10px" onclick="openCoWork('${k}')"
+      title="눌러서 사업장 창 열기">👥 <b>${esc(big)}</b>
+      <span class="dim" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(small)}</span>
+      <span style="color:#2563eb">사업장 ›</span></div>`;
+}
+/* ── 사업장 팝업 ── */
+let _coWork = null;          /* { key, tab:'ei'|'nps' } */
+function openCoWork(key, tab){ _coWork = { key: String(key), tab: tab || 'ei' }; coWorkMount(); }
+function coWorkClose(){ _coWork = null; coWorkMount(); }
+function coWorkTab(t){ if(_coWork){ _coWork.tab = t; coWorkMount(); } }
+function coWorkMount(){
+  let box = document.getElementById('coWorkBox');
+  if(!box){ if(!_coWork) return; box = document.createElement('div'); box.id = 'coWorkBox'; document.body.appendChild(box); }
+  const o = _coWork && (coList() || []).find(x => x.key === _coWork.key);
+  box.innerHTML = o ? coWorkHtml(o, _coWork.tab) : '';
+  if(!o) _coWork = null;
+}
+function coWorkHtml(o, tab){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const tb = (t, label) => `<button onclick="coWorkTab('${t}')" style="height:30px;padding:0 12px;border-radius:8px;font-size:13px;cursor:pointer;border:1px solid ${tab === t ? '#bfdbfe;background:#eff6ff;color:#1e40af;font-weight:700' : '#e2e8f0;background:#ffffff;color:#475569'}">${label}</button>`;
+  return `<div class="mck-dim" onclick="if(event.target===this)coWorkClose()"><div class="mck" style="width:min(760px,100%)">
+    <header><span>🏢</span><h2>${esc(o.name || o.key)} — 사업장</h2><span class="x" onclick="coWorkClose()" title="닫기">✕</span></header>
+    <div style="display:flex;gap:6px;padding:10px 18px 0">${tb('ei', '🏢 고용·산재보험')}${tb('nps', '💳 국민연금')}</div>
+    <div class="body">${tab === 'nps' ? coNpsHtml(o) : coEiHtml(o)}</div></div></div>`;
+}
+function coEiHtml(o){
+  const k = esc(String(o.key).replace(/'/g, "\\'"));
+  const ei = (o.extra && o.extra.ei) || null;
+  const again = `<div class="coerppin" style="margin-top:10px;display:inline-flex"><button onclick="coEiFetch('${k}')">↻ 지금 다시 받기</button></div>`;
+  if(digits(o.bizno || '').length !== 10) return '<p class="em">사업자번호가 있어야 고용·산재보험에서 찾을 수 있습니다.</p>';
+  if(!ei) return '<p class="em">아직 받아 오지 않았습니다.</p>' + again;
+  if(!ei.rows) return '<p class="em">고용·산재보험에 이 사업자번호의 사업장이 없습니다(' + esc(fmtDate(ei.at)) + ' 확인).</p>' + again;
+  const tile = (big, small) => `<div style="flex:1;min-width:0;white-space:nowrap;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px"><b style="font-size:17px">${big}</b> <span style="color:#64748b;font-size:12px">${small}</span></div>`;
+  const cues = npsCues(Number(ei.gy) || Number(ei.sj) || 0);
+  return `<div style="display:flex;gap:8px;margin-bottom:10px">${tile((Number(ei.gy)||0) + '명', '상시 (고용)')}${tile((Number(ei.sj)||0) + '명', '상시 (산재)')}${tile((Number(ei.n)||0) + '곳', '사업장')}</div>
+    <table style="table-layout:fixed"><colgroup><col style="width:24%"><col style="width:48px"><col style="width:52px"><col><col style="width:64px"><col style="width:26%"></colgroup>
+      <tr><th>사업장</th><th>보험</th><th>상시</th><th>업종</th><th>성립</th><th>주소</th></tr>
+      ${ei.rows.map(r => `<tr><td title="${esc(r.nm)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.nm)}</td><td>${r.fg === 'gy' ? '고용' : '산재'}</td>
+        <td style="text-align:right">${Number(r.cnt) || 0}</td><td title="${esc(r.ind)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.ind)}</td>
+        <td>${esc(r.since)}</td><td title="${esc(r.addr)}" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(r.addr)}</td></tr>`).join('')}
+    </table>
+    ${cues.length ? `<div style="margin-top:8px">${cues.map(c => `<span style="display:inline-block;font-size:11.5px;border-radius:6px;padding:1px 7px;margin:0 4px 4px 0;background:#fffbeb;color:#854d0e;border:1px solid #fde68a">${esc(c)}</span>`).join('')}</div>` : ''}
+    <div class="em" style="margin-top:6px">사업자번호로 바로 맞춤 · ${esc(fmtDate(ei.at))} 확인 · 공단 신고 기준(상시근로자 판단은 법 기준으로 따로 확인)</div>${again}`;
+}
 function coDetailPanelHtml(o){
   const folder = o.folder ? _coFolders[o.folder] : null;
   /* ── 머리 한 줄 — 계약·폴더를 «한 줄»에 모은다 (넉 줄이 두 줄로) ──
@@ -38137,6 +38611,9 @@ function coDetailPanelHtml(o){
     <div id="coTiles">${coTilesHtml(o)}</div>
     ${/* 부족한 것 — 하나도 없으면 빈 글자라 칸 자체가 안 뜬다 */''}
     <div id="coNeedBox">${coNeedHtml(o)}</div>
+    ${/* 👥 근로자 수 — 기업 상세에는 «한 줄», 누르면 사업장 팝업(대표 「칸이 늘어나는 것보다 팝업」 2026-10-11 목업 ㉯) */''}
+    ${/* ⚠ typeof — 기업 상세를 «떼어서» 그려 보는 검사(상자 안에 함수 몇 개만 싣는다)가 이 줄 때문에 멎지 않게 */''}
+    ${typeof coWorkRowHtml === 'function' ? coWorkRowHtml(o) : ''}
     ${/* 🔗 여기로 합쳐 둔 줄 — 합쳐진 쪽은 목록에서 사라지므로, 되돌릴 수 있는 자리가
          여기뿐이다. 없으면 빈 글자라 아무 자리도 안 먹는다. */''}
     ${coMergeRowHtml(o)}
@@ -38211,6 +38688,8 @@ function openCoDetailPanel(key, keep){
   /* 🏛 아직 국세청에 안 물어본 회사면 그 자리에서 한 번 묻는다(상태 + 등록증 대조) —
      어느 길로 들어온 등록증이든(수정창·사진첩·일괄) 여기서 빠짐없이 걸린다 */
   coNtsAutoOnOpen(o);
+  /* 👥 고용·산재 상시인원 — 30일에 한 번 저절로(사업자번호 10자리로 정확히 맞으므로 사람이 안 고른다) */
+  if(typeof coEiAutoOnOpen === 'function') coEiAutoOnOpen(o);
 }
 
 /* ══════════════ 👷 근로자 정보함 (대표 지시 2026-09-01 · 2026-09-02 다시 정리) ══════════════

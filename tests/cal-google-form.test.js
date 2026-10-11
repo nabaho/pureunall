@@ -21,6 +21,7 @@ const vm = require('node:vm');
 const ROOT = path.join(__dirname, '..');
 const 캘린더 = fs.readFileSync(path.join(ROOT, 'pu-cal.html'), 'utf8');
 const P = require(path.join(ROOT, 'functions', 'gcal-proxy.js'));
+const AUTH = require(path.join(ROOT, 'js', 'pu-gcal-auth.js'));
 
 function 함수몸(head) {
   const i = 캘린더.indexOf(head);
@@ -151,4 +152,102 @@ test('상세 창 — 위 아이콘 줄 · 선 아이콘 줄 · 「오후 2:00~�
   for (const 이모지 of ['👤', '📍', '≡', '✉', '🕒', '⏱', '👥', '🔔', '🔁', '🎥', '📎']) {
     assert.ok(캘린더.includes('"' + 이모지 + '":"'), '행그림에 없는 이모지: ' + 이모지);
   }
+});
+
+/* ── 「반복 안 함」·「알림 추가」 줄 (구글 입력 화면, 2026-10-11) ── */
+test('반복·알림 — 구글 몸(recurrence·reminders)이 화면과 서버에서 같다', () => {
+  const 경우 = [
+    { date: '2026-10-14', time: '14:00', endTime: '15:00', summary: '매주 회의', repeat: 'WEEKLY', remindMin: 30 },
+    { date: '2026-10-14', time: '', summary: '종일 매년', repeat: 'YEARLY', remindMin: 0 },
+    { date: '2026-10-14', time: '09:00', summary: '알림만', repeat: '', remindMin: 1440 },
+    { date: '2026-10-14', time: '09:00', summary: '이상한 값', repeat: 'HOURLY; BYDAY=MO', remindMin: -5 },
+  ];
+  for (const e of 경우) assert.deepStrictEqual(P.bodyOf(e), AUTH.bodyOf(e), e.summary);
+  const 첫 = P.bodyOf(경우[0]);
+  assert.deepStrictEqual(첫.recurrence, ['RRULE:FREQ=WEEKLY']);
+  assert.deepStrictEqual(첫.reminders, { useDefault: false, overrides: [{ method: 'popup', minutes: 30 }] });
+  assert.ok(!('reminders' in P.bodyOf(경우[1])), '알림 0 은 보내지 않는다(구글 기본 알림을 따른다)');
+  const 이상 = P.bodyOf(경우[3]);
+  assert.ok(!('recurrence' in 이상) && !('reminders' in 이상), '허용 밖 값이 구글 규칙에 섞였다(주입)');
+});
+
+test('반복·알림 — 서버 대신 넣기가 우리 표의 값을 구글로 넘긴다', () => {
+  const ev = P.eventOf({ id: 's1', sid: 'P-005', date: '2026-10-14', time: '10:00', title: '회의', repeat: 'MONTHLY', remindMin: 60 }, 's1', () => '박한별');
+  assert.strictEqual(ev.repeat, 'MONTHLY'); assert.strictEqual(ev.remindMin, 60);
+  assert.deepStrictEqual(P.bodyOf(ev).recurrence, ['RRULE:FREQ=MONTHLY']);
+  const 없음 = P.eventOf({ id: 's2', date: '2026-10-14', title: 't', repeat: 'x', remindMin: 'a' }, 's2');
+  assert.strictEqual(없음.repeat, ''); assert.strictEqual(없음.remindMin, 0);
+});
+
+test('반복·알림 — 줄은 «새 일정»에만 · 글자는 고른 날을 보여 준다 · 저장 길마다 넘긴다', () => {
+  const b = 상자();
+  vm.runInContext(함수몸('function 반복글(ymd){'), b);
+  const 글 = vm.runInContext('반복글("2026-10-14")', b);          /* 2026-10-14 = 수요일 */
+  assert.deepStrictEqual(JSON.parse(JSON.stringify(글)), { D: '매일', W: '매주 (수요일)', M: '매월 14일', Y: '매년 10월 14일' });
+  assert.match(함수몸('function modalHtml(){'), /일정 && 새것 \? 반복알림줄\(m\)/, '반복·알림 줄이 새 일정에만 있어야 합니다');
+  assert.match(함수몸('function 반복알림줄(m){'), /m\.timed \? '<div class="grow">/, '알림은 시간 일정에만');
+  assert.match(함수몸('function 구글에넣기(m){'), /repeat: String\(m\.repeat\|\|""\), remindMin: m\.timed \? \(\+m\.remind \|\| 0\) : 0/);
+  assert.match(함수몸('function doSave(){'), /item\.repeat = String\(m\.repeat\)/);
+  assert.match(함수몸('function 개인에넣기(m){'), /repeat:\(m\.mode === "new" && m\.repeat\)/);
+  assert.match(캘린더, /"vis","repeat","remind"(?:,"guests")?\]\.forEach/, '반복·알림 칸을 읽지 않습니다');
+});
+
+/* ── 「참석자 추가」·「Google Meet 화상 회의 추가」 줄 (구글 입력 화면, 2026-10-11) ── */
+test('참석자·Meet — 구글 몸이 화면과 서버에서 같고, 허용 밖 값은 안 섞인다', () => {
+  const 기본 = { date: '2026-10-14', time: '14:00', endTime: '15:00', summary: '회의' };
+  const 경우 = [
+    Object.assign({}, 기본, { attendees: ['A@B.com', 'c@d.co.kr'], meet: true, meetId: 'pu-abc' }),
+    Object.assign({}, 기본, { attendees: [], meet: true, meetId: '' }),
+    Object.assign({}, 기본, { attendees: ['not-an-email', 'a b@c.d', 'x@y', 'ok@ok.com', 7, null], meet: false, meetId: 'pu-x' }),
+  ];
+  for (const e of 경우) assert.deepStrictEqual(P.bodyOf(e), AUTH.bodyOf(e));
+  const 첫 = P.bodyOf(경우[0]);
+  assert.deepStrictEqual(첫.attendees, [{ email: 'a@b.com' }, { email: 'c@d.co.kr' }], '메일은 소문자로');
+  assert.deepStrictEqual(첫.conferenceData, { createRequest: { requestId: 'pu-abc', conferenceSolutionKey: { type: 'hangoutsMeet' } } });
+  assert.ok(!('conferenceData' in P.bodyOf(경우[1])), '번호(meetId) 없는 Meet 은 보내지 않는다');
+  assert.deepStrictEqual(P.bodyOf(경우[2]).attendees, [{ email: 'ok@ok.com' }], '메일 꼴이 아닌 것이 섞였다');
+  const 많음 = P.bodyOf(Object.assign({}, 기본, { attendees: Array.from({ length: 30 }, (_, i) => 'u' + i + '@x.com') }));
+  assert.strictEqual(많음.attendees.length, 20, '스무 명까지');
+});
+
+test('참석자·Meet — 서버 대신 넣기: 우리 표의 값을 넘기고, Meet 을 구글이 거절하면 일정만', async () => {
+  const ev = P.eventOf({ id: 's1', sid: 'P-005', date: '2026-10-14', time: '10:00', title: '회의', guests: ['a@b.com'], meet: true }, 's1', () => '박한별');
+  assert.deepStrictEqual(ev.attendees, ['a@b.com']); assert.strictEqual(ev.meet, true); assert.strictEqual(ev.meetId, 'pu-s1');
+  assert.deepStrictEqual(P.eventOf({ id: 's2', date: '2026-10-14', title: 't', guests: 'x', meet: 'yes' }, 's2').attendees, []);
+  assert.strictEqual(P.eventOf({ id: 's2', date: '2026-10-14', title: 't', meet: 'yes' }, 's2').meet, false);
+  /* 구글이 Meet 을 거절하는 경우는 tests/gcal-proxy.test.js «Meet 거절 대비» 가 서버를 돌려 본다 */
+});
+
+test('참석자·Meet — 화면: 줄은 새 일정에만 · 메일 검사 · 초대 메일 안 보냄을 말한다 · 클라이언트 Meet 실패 대비', () => {
+  assert.match(함수몸('function modalHtml(){'), /반복알림줄\(m\) \+ 참석자줄\(m\)/);
+  assert.match(함수몸('function 참석자줄(m){'), /초대 메일은 보내지 않습니다/, '초대 메일이 안 간다는 말이 없습니다');
+  assert.match(함수몸('function doSave(){'), /참석자 메일이 올바르지 않습니다/, '틀린 메일을 막지 않습니다');
+  assert.match(함수몸('function 구글에넣기(m){'), /attendees: 참석자목록\(m\.guests\)\.메일, meet: !!m\.meet, meetId:/);
+  assert.match(함수몸('function doSave(){'), /item\.guests = 참석자목록\(m\.guests\)\.메일/);
+  assert.match(함수몸('function doSave(){'), /item\.meet = true/);
+  const 가 = fs.readFileSync(path.join(ROOT, 'js', 'pu-gcal-auth.js'), 'utf8');
+  assert.match(가, /conferenceDataVersion=1/, 'Meet 을 만들려면 conferenceDataVersion 이 필요합니다');
+  assert.match(가, /meet: false \}\), opt\)\.then\(function \(r\) \{ r\.meetFailed = true/, 'Meet 을 거절당했을 때 일정만 다시 넣지 않습니다');
+  assert.match(fs.readFileSync(path.join(ROOT, 'functions', 'gcal-proxy.js'), 'utf8'), /Google Meet 을 구글이 거절해 일정만 넣었습니다/);
+});
+
+/* ── 글꼴은 구글 캘린더와 같은 차례 (2026-10-11) ── */
+test('글꼴 — Roboto 가 한글보다 앞(숫자·영문은 구글 앱과 같게) · 불러오지도 않는 Pretendard 는 앞에 없다', () => {
+  const 줄 = 캘린더.match(/\n\s*body\{margin:0;font-family:([^;]+);/);
+  assert.ok(줄, 'body 글꼴 줄을 못 찾았습니다');
+  const 차례 = 줄[1].split(',').map((x) => x.trim().replace(/['"]/g, ''));
+  assert.ok(차례.indexOf('Roboto') >= 0 && 차례.indexOf('Noto Sans KR') > 차례.indexOf('Roboto'), 'Roboto → Noto Sans KR 차례가 아닙니다: ' + 차례.join(' > '));
+  assert.ok(차례.indexOf('Malgun Gothic') > 차례.indexOf('Noto Sans KR'), '맑은 고딕이 Noto Sans KR 앞에 있습니다');
+  assert.strictEqual(차례.indexOf('Pretendard'), -1, '불러오지 않는 Pretendard 가 다시 들어왔습니다');
+  assert.strictEqual(차례[차례.length - 1], 'sans-serif');
+});
+
+/* ── 일정 칩은 구글 공식 화면 실측 크기 (2026-10-11) ── */
+test('칩 크기 — 구글 실측(글자 12px · 굵기 500 · 줄 20px · 모서리 6px), 칩 사이 틈 2px(= 24px 간격)', () => {
+  const 칩 = 캘린더.match(/\n\s*\.ev\{padding:([^;]+);border-radius:(\d+)px;font-size:(\d+)px;font-weight:(\d+);line-height:(\d+)px;/);
+  assert.ok(칩, '.ev 규칙을 못 찾았습니다');
+  assert.deepStrictEqual([칩[2], 칩[3], 칩[4], 칩[5]], ['6', '12', '500', '20'], '구글 실측(6px·12px·500·20px)과 다릅니다: ' + 칩.slice(1).join(' / '));
+  assert.match(캘린더, /\.evs\{display:flex;flex-direction:column;gap:2px\}/, '칩 사이 틈이 2px 이 아닙니다');
+  /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
+  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
 });

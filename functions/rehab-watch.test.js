@@ -30,7 +30,7 @@ function fakePost(lists, calls) {
 test("① 포괄적 금지명령 공고만 담고, 다른 공고는 버린다", async () => {
   const calls = [];
   const lists = { "000221": [[row(), row({ csNo: "20260130005164", pbancTitlNm: "관계인집회기일 변경공고" })]] };
-  const r = await W.run({ post: fakePost(lists, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab"], post: fakePost(lists, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.added.length, 1);
   assert.equal(r.added[0].debtorName, "주식회사 가나");
   assert.equal(r.added[0].caseType, "간이회생");
@@ -43,7 +43,7 @@ test("② 기간 밖 공고는 담지 않고, 기간을 벗어나면 다음 쪽�
   const calls = [];
   const full = Array.from({ length: 100 }, (_, i) => row({ csNo: String(1000 + i), pbancBgngYmd: i < 50 ? "20261008" : "20260901" }));
   const lists = { "000221": [full, [row({ csNo: "999" })]] };
-  const r = await W.run({ post: fakePost(lists, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab"], post: fakePost(lists, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.added.length, 50);
   assert.equal(calls.filter((u) => u === W.LIST).length, 1, "둘째 쪽을 부르면 안 된다");
 });
@@ -51,7 +51,7 @@ test("② 기간 밖 공고는 담지 않고, 기간을 벗어나면 다음 쪽�
 test("③ 이미 담긴 사건은 상세를 다시 부르지 않는다", async () => {
   const calls = [];
   const key = W.noticeKey(row());
-  const r = await W.run({ post: fakePost({ "000221": [[row()]] }, calls), existing: { [key]: { id: key } },
+  const r = await W.run({ kinds: ["rehab"], post: fakePost({ "000221": [[row()]] }, calls), existing: { [key]: { id: key } },
     sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.added.length, 0);
   assert.equal(r.found, 1);
@@ -59,7 +59,7 @@ test("③ 이미 담긴 사건은 상세를 다시 부르지 않는다", async (
 });
 
 test("④ 대표자·주민번호 같은 칸은 레코드에 들어가지 않는다", async () => {
-  const r = await W.run({ post: fakePost({ "000221": [[row()]] }, []), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab"], post: fakePost({ "000221": [[row()]] }, []), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   const s = JSON.stringify(r.added[0]);
   assert.ok(!/110111|홍길동|Enrrno|rprsnt/.test(s), "개인정보 칸이 새어 들어왔다: " + s);
   assert.ok(!Object.prototype.hasOwnProperty.call(r.added[0], "companyName"), "업체명을 관계 열쇠 칸에 두지 않는다");
@@ -67,7 +67,7 @@ test("④ 대표자·주민번호 같은 칸은 레코드에 들어가지 않는
 
 test("⑤ 법원 하나가 실패해도 다른 법원은 계속 돈다", async () => {
   const lists = { "000221": new Error("HTTP 500"), "000249": [[row({ cortCd: "000249" })]] };
-  const r = await W.run({ post: fakePost(lists, []), sinceYmd: "2026-10-01", courts: ["000221", "000249"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab"], post: fakePost(lists, []), sinceYmd: "2026-10-01", courts: ["000221", "000249"], nowMs: 1 });
   assert.equal(r.errors.length, 1);
   assert.equal(r.errors[0].court, "000221");
   assert.equal(r.added.length, 1);
@@ -101,7 +101,7 @@ test("⑧ 같은 사건의 개시결정 공고는 «이력»과 «단계»로 �
     row({ pbancBgngYmd: "20261008" }),
     row({ csNo: "20260130009999", csNoNm: "2026회합 9999", pbancBgngYmd: "20261009", pbancTitlNm: "회생절차 개시결정 공고" }),
   ]] };
-  const r = await W.run({ post: fakePost(lists, []), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab"], post: fakePost(lists, []), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.added.length, 1, "금지명령이 없는 사건(9999)은 담지 않는다");
   assert.equal(r.added[0].stage, "개시");
   assert.deepEqual(r.added[0].events.map((e) => e.t), ["포괄적 금지명령 공고", "회생절차 개시결정 공고"]);
@@ -111,7 +111,7 @@ test("⑨ 이미 담긴 사건에 새 공고가 생기면 상세를 부르지 �
   const calls = [], key = W.noticeKey(row());
   const existing = { [key]: { id: key, stage: "금지명령", events: [{ d: "2026-10-08", t: "포괄적 금지명령 공고" }] } };
   const lists = { "000221": [[row({ pbancBgngYmd: "20261012", pbancTitlNm: "회생절차 개시결정 공고", inetPbancSeq: 9 }), row()]] };
-  const r = await W.run({ post: fakePost(lists, calls), existing, sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  const r = await W.run({ kinds: ["rehab"], post: fakePost(lists, calls), existing, sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
   assert.equal(r.added.length, 0);
   assert.equal(calls.filter((u) => u === W.VIEW).length, 0);
   assert.equal(r.eventUpdates[key].stage, "개시");
@@ -140,4 +140,43 @@ test("⑪ 본점 주소를 쓰고, 송달주소가 대리인 법률사무소면 
   /* 송달주소가 본점과 같으면 따로 남기지 않는다 */
   const same = W.pickDetail({ rtnMap: { btprtDebtrInf: { btprtZpcd: "06771", btprtAddr: "서울 서초구 매헌로 16", btprtDlvrZpcd: "06771", btprtDlvrAddr: "서울 서초구 매헌로 16" } } });
   assert.deepEqual([same.dlvAddress, same.counsel], ["", ""]);
+});
+/* ── 법인파산 — 파산선고 공고를 같은 방식으로 모은다 ── */
+const bk = (over) => row(Object.assign({ csNo: "20262090001768", csNoNm: "2026하합 1768", pbancTitlNm: "파산선고결정 공고" }, over || {}));
+function fakePost2(byTask, calls) {
+  return async (url, body) => {
+    if (url === W.VIEW) { calls.push(["view", body.dma_popupSearch.taskDvs]); return DETAIL; }
+    calls.push(["list", body.dma_search.taskDvs]);
+    const rows = (byTask[body.dma_search.taskDvs] || [])[body.dma_pageInfo.pageNo - 1] || [];
+    return { data: { dlt_pbancLst: rows } };
+  };
+}
+
+test("⑫ 회생과 파산을 함께 읽고, 종류(kind)와 첫 단계를 붙인다 — 상세는 각자의 업무구분으로 부른다", async () => {
+  const calls = [];
+  const byTask = { "4": [[row()]], "5": [[bk(), bk({ csNo: "20262090001769", pbancTitlNm: "채권자집회소집 공고" })]] };
+  const r = await W.run({ post: fakePost2(byTask, calls), sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  assert.equal(r.added.length, 2, "회생 1 + 파산선고 1 (집회소집 공고는 대상이 아니다)");
+  const reh = r.added.find((x) => x.kind === "rehab"), bnk = r.added.find((x) => x.kind === "bankruptcy");
+  assert.equal(reh.stage, "금지명령");
+  assert.equal(bnk.stage, "파산선고");
+  assert.ok(calls.some((c) => c[0] === "view" && c[1] === "5"), "파산 상세는 업무구분 5 로");
+  assert.ok(calls.some((c) => c[0] === "view" && c[1] === "4"));
+});
+
+test("⑬ 간이파산·기타공고 안의 파산선고도 잡고, 이시폐지가 나오면 «끝난 일»로 바뀐다", async () => {
+  assert.equal(W.isTarget(bk({ pbancTitlNm: "파산선고공고(간이파산)" }), "bankruptcy"), true);
+  assert.equal(W.isTarget(bk({ pbancTitlNm: "기타공고(파산선고 공고)" }), "bankruptcy"), true);
+  assert.equal(W.isTarget(bk({ pbancTitlNm: "배당공고" }), "bankruptcy"), false);
+  const existing = { c000221_20262090001768: { id: "c000221_20262090001768", kind: "bankruptcy", stage: "파산선고", events: [{ d: "2026-10-01", t: "파산선고결정 공고" }] } };
+  const byTask = { "4": [[]], "5": [[bk({ pbancTitlNm: "이시폐지 공고", pbancBgngYmd: "20261009" })]] };
+  const r = await W.run({ post: fakePost2(byTask, []), existing, sinceYmd: "2026-10-01", courts: ["000221"], nowMs: 1 });
+  assert.equal(r.eventUpdates.c000221_20262090001768.stage, "폐지·기각");
+});
+
+test("⑭ 한 번에 상세를 부르는 새 사건 수에 상한이 있다 — 나머지는 다음 회차", async () => {
+  const rows = Array.from({ length: 5 }, (_, i) => bk({ csNo: "2026209000" + (2000 + i), csNoNm: "2026하합 " + (2000 + i) }));
+  const r = await W.run({ post: fakePost2({ "4": [[]], "5": [rows] }, []), sinceYmd: "2026-10-01", courts: ["000221"], maxNew: 3, nowMs: 1 });
+  assert.equal(r.found, 5);
+  assert.equal(r.added.length, 3);
 });

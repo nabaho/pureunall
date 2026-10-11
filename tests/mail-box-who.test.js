@@ -64,9 +64,12 @@ function box(o) {
     remove: () => { sent.push({ p: String(p), v: null });
       return o.failWrite ? Promise.reject(new Error('막힘')) : Promise.resolve(); },
   }) }) };
+  /* 업무관리에서 이은 것(2026-10-11) — 여기서는 «아무것도 안 이은» 때. 잇기는 mail-work-sync 검사 */
+  ctx._mbWkAddr = {}; ctx._mbWkMsg = null; ctx._mbWkMsgAddr = null;
   vm.createContext(ctx);
   ['mbWhoLive', 'mbWhoWhy', 'mbWhoWhyOf', 'mbNoWhoBox', 'mbBoxWhoList', 'mbBoxWhoOfRow',
-    'mbBoxWhoToggle', 'mbBoxWhoPickHtml', 'mbWhoOfRow', 'mbSubsOfRow', 'mbWhoAllOfRow']
+    'mbBoxWhoToggle', 'mbBoxWhoPickHtml', 'mbWhoOfRow', 'mbSubsOfRow', 'mbWhoAllOfRow',
+    'mbWkFp', 'mbWkMsgOf', 'mbCoRecOfAddr']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return { ctx, sent };
 }

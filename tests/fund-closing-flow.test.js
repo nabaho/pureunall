@@ -41,14 +41,17 @@ const B = (() => {
     grabDecl('FLOW_STEPS'), grabDecl('FLOW_LBL'), grabDecl('FLOW_SEAL'), grabDecl('FLOW_SEAL_KEYS'), grabFn('flowSealStat'), grabFn('flowMailUrl'),
     grabFn('flowState'), grabFn('flowTone'), grabFn('flowDue'), grabFn('flowMailText'), grabFn('flowReadme'),
     grabFn('flowView'), grabFn('flowHomeHTML'),
+    /* ④사업계획서·⑤감사가 기금 화면에 그리는 것들 — 예산·감사 명부는 이 시험에서 «없는 기금» */
+    'function _hasBudget(){ return false; } function _auditorsOf(){ return []; } function _flowDetail(){ return ""; } function _ckTd(){ return ""; }',
+    grabFn('flowPlanReady'), grabFn('flowAuditStat'),
     'this.S=S; this.funds=funds; this.state=flowState; this.tone=flowTone; this.due=flowDue; this.mail=flowMailText;',
     'this.seal=flowSealStat; this.mailUrl=flowMailUrl; this.readme=flowReadme; this.view=flowView; this.home=flowHomeHTML; this.STEPS=FLOW_STEPS;',
   ].join('\n')).call(box);
   return box;
 })();
 
-test('★ 여덟 단계 — 자료 요청부터 세무까지, 결산 확정은 잠금 그대로', () => {
-  assert.deepEqual(B.STEPS.map((s) => s[0]), ['req', 'recv', 'lock', 'review', 'reply', 'seal', 'submit', 'tax']);
+test('★ 열 단계 — 자료 요청부터 세무까지(결산 확정 다음에 사업계획서·감사), 결산 확정은 잠금 그대로', () => {
+  assert.deepEqual(B.STEPS.map((s) => s[0]), ['req', 'recv', 'lock', 'plan', 'audit', 'review', 'reply', 'seal', 'submit', 'tax']);
   assert.equal(B.state({ locked: true }, 'lock'), 'locked');
   assert.equal(B.state({}, 'lock'), '');
   assert.equal(B.state({ flow: { seal: { state: 'part' } } }, 'seal'), 'part');
@@ -85,10 +88,11 @@ test('제출 안내문 — 제출처·기한·서류·날인, 넣지 못한 서�
   assert.match(B.readme({ name: '가' }, 2025, [], ''), /\[확인 필요\] 관할 고용노동관서/, '관할을 모르면 지어내지 않는다');
 });
 
-test('★ 기금 화면 — 여덟 줄, 체크칸·번호, 기한 D-day, 메일·묶음 단추', () => {
+test('★ 기금 화면 — 열 줄, 체크칸·번호, 기한 D-day, 메일·묶음 단추', () => {
   B.S.f15Close = { locked: true, locked_at: '2026-02-18', flow: { req: { state: 'sent', at: '2026-01-14' }, reply: { state: 'fix', memo: '추정손익 수정' } } };
   const h = B.view();
-  assert.equal((h.match(/<tr><td><input type="checkbox"><\/td><td class="no">/g) || []).length, 8);
+  assert.equal((h.match(/<tr><td><input type="checkbox"><\/td><td class="no">/g) || []).length, 10);
+  assert.match(h, /flowOpen\('plan'\)/); assert.match(h, /flowOpen\('audit'\)/); assert.match(h, /감사 명부 없음/, '감사가 없으면 알린다');
   assert.match(h, /D-12/);
   assert.match(h, /flowMail\('req'\)/); assert.match(h, /flowMail\('review'\)/);
   assert.match(h, /flowPackage\(\)/);
@@ -96,10 +100,10 @@ test('★ 기금 화면 — 여덟 줄, 체크칸·번호, 기한 D-day, 메일�
   assert.match(h, /○○지방고용노동청 ○○지청/);
 });
 
-test('★ 홈 — 기금마다 1~8 칩, 고른 기금 묶음', () => {
+test('★ 홈 — 기금마다 1~10 칩, 고른 기금 묶음', () => {
   const h = B.home(['F1'], { F1: { 2025: { locked: true, flow: { req: { state: 'sent' }, submit: { state: 'done' } } } } }, 2025);
   assert.match(h, /class="flowpick" value="F1"/);
-  assert.equal((h.match(/class="chip[^"]*" style="font-size:10px;min-width:18px/g) || []).length, 8);
+  assert.equal((h.match(/class="chip[^"]*" style="font-size:10px;min-width:18px/g) || []).length, 10);
   assert.match(h, />제출</, '제출을 마치면 기한 대신 「제출」');
   assert.match(h, /flowPackageMany\(2025\)/);
 });

@@ -93,3 +93,14 @@ test("⑨ functions 의 사본이 js 원본과 같다(두 곳에서 따로 고�
     assert.equal(a, b, f + " 사본이 원본과 다르다 — js/" + f + " 를 functions/ 로 복사하세요");
   });
 });
+
+test("⑩ 파산 공고(kind: bankruptcy)도 회생과 같이 대상이 되고, 파산용 (광고) 메일이 나간다", () => {
+  const p = A.plan({ nowMs: NOW, settings: { enabled: true },
+    notices: { a: Object.assign(notice("a", GA, "서울 서초구 1"), { kind: "bankruptcy" }) },
+    index: idx([erp(GA, "서울 서초구 1", "a@a.kr")]) });
+  assert.equal(p.candidates.length, 1);
+  assert.equal(p.candidates[0].kind, "bankruptcy");
+  const row = A.queueRow(p.candidates[0], NOW, NOW);
+  assert.match(row.payload.subject, /^\(광고\) \[푸른노무법인\] 파산절차 중/);
+  assert.ok(!/재기컨설팅|12만원/.test(row.payload.body));
+});

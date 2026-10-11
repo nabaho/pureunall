@@ -28,29 +28,37 @@ const COURTS = {
   "000443": "부산회생법원", "000411": "울산지방법원", "000530": "제주지방법원",
 };
 const TASK_CORP_REHAB = "4";        // 업무구분 — 1 개인회생 · 2 개인파산 · 3 일반회생 · 4 법인회생 · 5 법인파산
+const TASK_CORP_BANKRUPT = "5";
 const TARGET = "포괄적 금지명령";
+/* 모으는 종류 둘 — 회생은 «포괄적 금지명령» 공고, 파산은 «파산선고» 공고(간이파산·기타공고 안의 파산선고 포함).
+   ⚠ 파산선고 = 도산대지급금(임금채권보장법 제7조)의 지급 사유 중 하나라 근로자 임금 안내와 맞닿는다. */
+const KINDS = {
+  rehab: { task: TASK_CORP_REHAB, match: (t) => t.indexOf(TARGET) >= 0, firstStage: "금지명령" },
+  bankruptcy: { task: TASK_CORP_BANKRUPT, match: (t) => /파산선고/.test(t), firstStage: "파산선고" },
+};
+const MAX_NEW_DETAILS = 120;        // 한 번에 상세를 부르는 새 사건 수 — 처음 돌 때 서버 시간(9분)을 넘기지 않게. 나머지는 다음 날
 const PAGE_SIZE = 100;
 const MAX_PAGES = 10;               // 법원 하나에 최대 1,000건 — 서울이 한 달에 300건 안팎이라 넉넉하다
 
 /* 사건 진행 단계 — 숫자가 클수록 앞서 있다. 폐지·기각은 «끝난 일»이라 따로 둔다. */
-const STAGES = ["금지명령", "개시", "인가", "종결", "폐지·기각"];
+const STAGES = ["금지명령", "파산선고", "개시", "인가", "종결", "폐지·기각"];
 
 function clean(v) { return v == null ? "" : String(v).replace(/\s+/g, " ").trim(); }
 function ymd(s) { s = clean(s).replace(/\D/g, ""); return s.length === 8 ? s.slice(0, 4) + "-" + s.slice(4, 6) + "-" + s.slice(6) : ""; }
 
-function listBody(cortCd, pageNo) {
+function listBody(cortCd, pageNo, task) {
   return {
-    dma_search: { taskDvs: TASK_CORP_REHAB, srchType: "pstgBgng", cortCd, pstgDvs: "999",
+    dma_search: { taskDvs: task || TASK_CORP_REHAB, srchType: "pstgBgng", cortCd, pstgDvs: "999",
       csYr: "", csDvsCd: "", csSrno: "", csNo: "", debtrNm: "", jdbnCd: "" },
     dma_pageInfo: { pageNo, pageSize: PAGE_SIZE, bfPageNo: "", startRowNo: (pageNo - 1) * PAGE_SIZE + 1,
       totalCnt: 0, totalYn: "Y" },
   };
 }
-function viewBody(row) {
+function viewBody(row, task) {
   return { dma_popupSearch: { cortCd: row.cortCd, csNo: row.csNo, inetPbancDvsCd: row.inetPbancDvsCd,
-    inetPbancSeq: String(row.inetPbancSeq), taskDvs: TASK_CORP_REHAB } };
+    inetPbancSeq: String(row.inetPbancSeq), taskDvs: task || TASK_CORP_REHAB } };
 }
-function isTarget(row) { return clean(row && row.pbancTitlNm).indexOf(TARGET) >= 0; }
+function isTarget(row, kind) { return KINDS[kind || "rehab"].match(clean(row && row.pbancTitlNm)); }
 
 /* 영구 ID — 법원코드 + 사건번호(숫자). 같은 사건의 공고가 여러 번 나와도 한 줄이다. */
 function noticeKey(row) {
@@ -67,6 +75,7 @@ function stageOfTitle(title) {
   if (/불인가/.test(t)) return "폐지·기각";
   if (/개시결정|개시 결정/.test(t)) return "개시";
   if (t.indexOf(TARGET) >= 0) return "금지명령";
+  if (/파산선고/.test(t)) return "파산선고";
   return null;
 }
 /* 사건의 공고 목록 → 가장 앞선 단계. 끝난 일(폐지·기각)이 있으면 그것이 이긴다. */
@@ -143,18 +152,18 @@ function regionOf(address) {
 }
 
 /* 공고 한 건 → 저장할 레코드(온톨로지 문서). 회사명은 관계 열쇠가 아니라 «보이는 이름»이다(debtorName). */
-function toRecord(row, detail, nowMs) {
+function toRecord(row, detail, nowMs, kind) {
   const id = noticeKey(row);
   const rg = regionOf(detail.address);
   return {
-    id, entityType: "Document", docKind: "rehabNotice",
+    id, entityType: "Document", docKind: "rehabNotice", kind: kind || "rehab",
     courtCode: clean(row.cortCd), courtName: COURTS[clean(row.cortCd)] || clean(row.cortCd),
     caseNo: clean(row.csNoNm), division: clean(row.jdbnCdNm),
     caseType: detail.caseType, debtorName: clean(row.btprtNm),
     zip: detail.zip, address: detail.address, sido: rg.sido, sigungu: rg.sigungu,
     dlvAddress: detail.dlvAddress || "", dlvZip: detail.dlvZip || "", counsel: detail.counsel || "",
     noticeTitle: clean(row.pbancTitlNm), noticeDate: ymd(row.pbancBgngYmd),
-    stage: "금지명령", events: [],
+    stage: KINDS[kind || "rehab"].firstStage, events: [],
     createdAt: nowMs, updatedAt: nowMs, revision: 1,
   };
 }
@@ -171,44 +180,51 @@ function sortedEvents(list) {
 
 /* 한 번 돌기 — post(url, body) 는 JSON 을 돌려주는 함수(서버·검사가 각자 넣는다).
    existing: 이미 담긴 notices(키 → 레코드). 이미 있는 사건은 상세를 다시 부르지 않고, «새 공고 이력»만 붙인다. */
-async function run({ post, existing = {}, sinceYmd, courts = Object.keys(COURTS), nowMs = Date.now(), wait = () => Promise.resolve() }) {
+async function run({ post, existing = {}, sinceYmd, courts = Object.keys(COURTS), kinds = ["rehab", "bankruptcy"], maxNew = MAX_NEW_DETAILS, nowMs = Date.now(), wait = () => Promise.resolve() }) {
   const since = clean(sinceYmd).replace(/\D/g, "");
   const out = { checked: 0, found: 0, added: [], eventUpdates: {}, errors: [] };
   const events = {};          // 사건 열쇠 → 이번에 본 공고들
-  const targets = [];         // 포괄적 금지명령 공고 줄(처음 보는 것만 상세를 부른다)
-  for (const cort of courts) {
-    try {
-      for (let page = 1; page <= MAX_PAGES; page++) {
-        const j = await post(LIST, listBody(cort, page));
-        await wait();
-        const rows = (j && j.data && j.data.dlt_pbancLst) || [];
-        out.checked += rows.length;
-        for (const row of rows) {
-          if (clean(row.pbancBgngYmd) < since) continue;
-          const key = noticeKey(row);
-          if (!key) continue;
-          addEvent(events, key, row);
-          if (isTarget(row)) targets.push({ key, row });
+  const targets = [];         // 대상 공고 줄(처음 보는 것만 상세를 부른다)
+  const kindOf = {};          // 사건 열쇠 → 종류
+  for (const kind of kinds) {
+    for (const cort of courts) {
+      try {
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          const j = await post(LIST, listBody(cort, page, KINDS[kind].task));
+          await wait();
+          const rows = (j && j.data && j.data.dlt_pbancLst) || [];
+          out.checked += rows.length;
+          for (const row of rows) {
+            if (clean(row.pbancBgngYmd) < since) continue;
+            const key = noticeKey(row);
+            if (!key) continue;
+            kindOf[key] = kind;
+            addEvent(events, key, row);
+            if (isTarget(row, kind)) targets.push({ key, row, kind });
+          }
+          /* 공고일 내림차순 — 마지막 줄이 기간 밖이면 다음 쪽은 볼 필요가 없다 */
+          if (!rows.length || rows.length < PAGE_SIZE || clean(rows[rows.length - 1].pbancBgngYmd) < since) break;
         }
-        /* 공고일 내림차순 — 마지막 줄이 기간 밖이면 다음 쪽은 볼 필요가 없다 */
-        if (!rows.length || rows.length < PAGE_SIZE || clean(rows[rows.length - 1].pbancBgngYmd) < since) break;
+      } catch (e) {
+        out.errors.push({ court: cort, why: (kind + " " + clean(e && e.message || e)).slice(0, 160) });
       }
-    } catch (e) {
-      out.errors.push({ court: cort, why: clean(e && e.message || e).slice(0, 160) });
     }
   }
   const seen = {};
-  for (const { key, row } of targets) {
+  let newDetails = 0;
+  for (const { key, row, kind } of targets) {
     if (seen[key]) continue;
     seen[key] = 1;
     out.found++;
     if (existing[key]) continue;
+    if (newDetails >= maxNew) continue;     // 오늘은 여기까지 — 나머지는 다음 회차에(공고는 그대로 남아 있다)
+    newDetails++;
     try {
-      const v = await post(VIEW, viewBody(row));
+      const v = await post(VIEW, viewBody(row, KINDS[kind].task));
       await wait();
-      const rec = toRecord(row, pickDetail(v && v.data), nowMs);
+      const rec = toRecord(row, pickDetail(v && v.data), nowMs, kind);
       rec.events = sortedEvents(events[key]);
-      rec.stage = stageOfEvents(rec.events) || "금지명령";
+      rec.stage = stageOfEvents(rec.events) || KINDS[kind].firstStage;
       out.added.push(rec);
     } catch (e) {
       out.errors.push({ court: clean(row.cortCd), why: ("상세 " + clean(e && e.message || e)).slice(0, 160) });
@@ -221,7 +237,7 @@ async function run({ post, existing = {}, sinceYmd, courts = Object.keys(COURTS)
     const have = Array.isArray(cur.events) ? cur.events : [];
     const merged = sortedEvents(have.concat(events[key].filter((e) => !have.some((h) => h.d === e.d && h.t === e.t))));
     if (merged.length === have.length) return;
-    out.eventUpdates[key] = { events: merged, stage: stageOfEvents(merged) || cur.stage || "금지명령" };
+    out.eventUpdates[key] = { events: merged, stage: stageOfEvents(merged) || cur.stage || KINDS[cur.kind || "rehab"].firstStage };
   });
   return out;
 }
@@ -241,6 +257,6 @@ function updatesOf(result, today, nowIso, nowMs) {
   return upd;
 }
 
-module.exports = { BASE, LIST, VIEW, HOME, UA, COURTS, TASK_CORP_REHAB, TARGET, STAGES,
+module.exports = { BASE, LIST, VIEW, HOME, UA, COURTS, TASK_CORP_REHAB, TASK_CORP_BANKRUPT, KINDS, MAX_NEW_DETAILS, TARGET, STAGES,
   listBody, viewBody, isTarget, noticeKey, pickDetail, toRecord, run, updatesOf, ymd,
   stageOfTitle, stageOfEvents, regionOf, counselOf };

@@ -1344,7 +1344,8 @@ exports.rehabWatch = functions
     const nowMs = Date.now(), nowIso = new Date(nowMs).toISOString();
     const today = new Date(nowMs + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
     const first = !(await root.child("runs").limitToFirst(1).once("value")).exists();
-    const since = new Date(nowMs + 9 * 3600e3 - (first ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면 한 달 치
+    const noBankruptcyYet = !Object.keys(existing).some((k) => existing[k] && existing[k].kind === "bankruptcy");
+    const since = new Date(nowMs + 9 * 3600e3 - ((first || noBankruptcyYet) ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면(파산을 처음 모을 때도) 한 달 치
     const post = async (u, body) => {
       const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
         headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
@@ -7005,6 +7006,11 @@ exports.mgrWatch = MGRW.mgrWatch;
    실제 코드는 nts-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
 const NTSM = require("./nts-monthly")({ functions, getDatabase, MAIL_REGION });
 exports.ntsMonthly = NTSM.ntsMonthly;
+
+/* 👥 국민연금 가입자 — 매달 2일 07시, 기업 상세에서 «고른» 사업장의 숫자를 새로 받는다(대표 「진행」 2026-10-11).
+   실제 코드는 nps-monthly.js. 여기 한 줄을 안 적으면 배포가 안 된다. */
+const NPSM = require("./nps-monthly")({ functions, getDatabase, MAIL_REGION });
+exports.npsMonthly = NPSM.npsMonthly;
 
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */

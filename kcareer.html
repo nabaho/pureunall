@@ -595,6 +595,8 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .ds-ic{display:inline-flex;gap:2px}
 .ds-ic .btn.sm{padding:1px 6px;font-size:12px;white-space:nowrap}
 .ds-ic .btn.ds-dl{border-color:var(--navy);color:var(--navy);font-weight:700}
+/* 프로필 1장 — 머리를 줄여 A4 가 위로 바짝 올라온다(아래로 안 내려가게) */
+#page-profile1 .page-head{margin-bottom:4px}#page-profile1 .page-desc{display:none}#page-profile1 .page{padding-top:8px}
 .ds-prev{position:sticky;top:10px;border:1px solid var(--border);border-radius:10px;background:var(--card,#fff);padding:10px}
 .ds-pv-empty{color:var(--text-mute);font-size:12px;text-align:center;padding:28px 8px;line-height:1.7}
 .ds-pv-img{background:#e2e8f0;border-radius:6px;min-height:120px;max-height:max(320px,calc(100vh - 400px));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:6px;margin-bottom:8px;cursor:grab;position:relative}
@@ -1366,7 +1368,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-ontology.js?v=62"></script>
 <script src="js/pu-addr.js?v=2"></script>
-<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=8"></script>
@@ -1378,7 +1380,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=5"></script>
+<script src="js/kcareer-profile1.js?v=9"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=9"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -2033,11 +2035,8 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
       <section class="page-view" id="page-profile1"><div class="page">
         <div class="page-head"><div class="page-title">👤 프로필 1장</div><div class="page-desc">경력관리에 든 학력·자격·경력·위촉·실적·강의를 A4 한 장으로 — 넘치면 «최근 N»을 저절로 줄입니다 · 금액·주민번호·계좌는 넣지 않습니다</div></div>
         <div class="p1-wrap" style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start">
-          <div id="p1Side"></div>
-          <div style="min-width:0">
-            <div id="p1Zoom" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"></div>
-            <div id="p1Paper" style="background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;overflow:hidden"></div>
-          </div>
+          <div id="p1Side" style="position:sticky;top:8px;max-height:calc(100vh - 90px);overflow:auto;padding-right:2px"></div>
+          <div id="p1Paper" style="min-width:0;background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;overflow:hidden"></div>
         </div>
       </div></section>
       <section class="page-view" id="page-bizdash"><div class="page">
@@ -7591,7 +7590,7 @@ function _p1AmtOf(r){
 }
 function _p1Model(how){
   var o=_p1Load();
-  var m=KcareerProfile1.build(_p1Src(), { use:o.use, on:o.on, field:o.field, roles:o.roles, pins:o.pins||{},
+  var m=KcareerProfile1.build(_p1Src(), { use:o.use, on:o.on, field:o.field, roles:o.roles, pins:o.pins||{}, lim:o.lim||{}, titles:o.titles||{}, notes:o.notes||{}, intro:o.intro, pubs:o.pubs,
     /* 금액을 다 읽기 전엔 문턱을 걸지 않는다 — 걸면 잠깐 실적이 텅 빈다 */
     amtOf:_p1Amt?_p1AmtOf:undefined, minAmt:KcareerProfile1.MIN_AMT });
   if(how&&how.page){ var fits=_p1Fits(!!o.photo); if(fits) KcareerProfile1.fill(m, fits); }
@@ -7602,7 +7601,7 @@ function renderProfile1(){
   if(!side||!paper||!window.KcareerProfile1) return;
   _p1AmtLoad();
   var o=_p1Load(), m=_p1Model({ page:true });
-  var 전부=KcareerProfile1.build(_p1Src(), { use:o.use, on:{ perf:true }, roles:o.roles });
+  var 전부=KcareerProfile1.build(_p1Src(), { use:o.use, on:{ perf:true, biz:true }, roles:o.roles, pubs:o.pubs });
   var 꽂은수=function(k){ return ((o.pins||{})[k]||[]).length; };
   var 별=function(k){ return (KcareerProfile1.PIN_KEYS.indexOf(k)<0)?'':'<button type="button" class="btn sm" style="padding:1px 7px;font-size:12px" title="중요한 것을 골라 두면 오래된 것이어도 늘 넣습니다 — 바꾸기 전까지 그대로" onclick="event.preventDefault();event.stopPropagation();p1PickOpen(\''+k+'\')">⭐ 중요'+(꽂은수(k)?' '+꽂은수(k):'')+'</button>'; };
   var 금액말=(m.perfAmt&&KcareerProfile1.isOn('perf', o.on, o.use))
@@ -7611,17 +7610,25 @@ function renderProfile1(){
   var by={}; m.sections.forEach(function(x){ by[x.key]=x; });
   var cnt={}; 전부.sections.forEach(function(x){ cnt[x.key]=x.n; });
   var row='display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;white-space:nowrap;cursor:pointer';
-  side.innerHTML='<div style="font-weight:700;margin:2px 0 6px">넣을 칸 고르기</div>'
+  side.innerHTML='<div id="p1Zoom" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)"></div>'
+    +'<div style="font-weight:700;margin:2px 0 6px">넣을 칸 고르기</div>'
     +KcareerProfile1.SECTIONS.map(function(S){
       var 켬=KcareerProfile1.isOn(S.key, o.on, o.use), n=cnt[S.key]||0, x=by[S.key];
       return '<label style="'+row+'"><input type="checkbox"'+(켬?' checked':'')+(n?'':' disabled')+' onchange="p1Toggle(\''+S.key+'\',this.checked)"> '+escapeHtml(S.title)
-        +'<span style="margin-left:auto;color:var(--text-mute);font-size:12px">'+n+'건'+(x&&x.more?' · 넣음 '+x.show:'')+'</span>'+(n?별(S.key):'')+'</label>'
+        +'<span style="margin-left:auto;color:var(--text-mute);font-size:12px">'+n+'건'+(x&&x.more?' · 넣음 '+x.show:'')+'</span>'+(n?별(S.key):'')
+        +(S.key==='role'?'':'<button type="button" class="btn sm" data-k="'+S.key+'" style="padding:1px 7px;font-size:12px'+(_p1OpenKey===S.key?';background:var(--navy);color:#fff':'')+'" title="이 칸의 건수·제목·한 줄 더" onclick="event.preventDefault();event.stopPropagation();p1Open(this.dataset.k)">⚙</button>')+'</label>'
+        +(_p1OpenKey===S.key?p1Panel(S.key,o):'')
         +(S.key==='perf'?금액말:''); }).join('')
     +'<div style="font-weight:700;margin:12px 0 6px">주요 직책 (전·현) <span style="font-weight:400;color:var(--text-mute);font-size:12px">한 줄에 하나</span></div>'
     +'<textarea class="tb-input" rows="4" style="width:100%;min-width:0;font-size:16px;resize:vertical" placeholder="2019~2021 ○○지방공인노무사회 회장&#10;2023~ ○○위원회 위원" onchange="p1Roles(this.value)">'+escapeHtml(o.roles||'')+'</textarea>'
     +'<div style="color:var(--text-mute);font-size:12px;margin-top:2px">끝난 해가 지났으면 (전), 「~」로 열어 두면 (현)을 붙입니다 · 위촉·위원 바로 위에 나옵니다</div>'
     +'<div style="font-weight:700;margin:12px 0 6px">주 분야</div>'
     +'<input class="tb-input" style="width:100%;min-width:0" placeholder="예) 인사노무 컨설팅 · 일터혁신 · 노사관계" value="'+escapeHtml(o.field||'')+'" onchange="p1Field(this.value)">'
+    +'<div style="font-weight:700;margin:12px 0 6px">한 줄 소개 <span style="font-weight:400;color:var(--text-mute);font-size:12px">머리 아래에 한 줄</span></div>'
+    +'<input class="tb-input" style="width:100%;min-width:0" placeholder="예) 사람 중심 인사노무 파트너" value="'+escapeHtml(o.intro||'')+'" onchange="p1Intro(this.value)">'
+    +'<div style="font-weight:700;margin:12px 0 6px">연구·저서·기고 <span style="font-weight:400;color:var(--text-mute);font-size:12px">한 줄에 하나</span></div>'
+    +'<textarea class="tb-input" rows="3" style="width:100%;min-width:0;font-size:16px;resize:vertical" placeholder="2024 근로시간 제도 개편 칼럼 · ○○일보&#10;2023 공저 「일터혁신 실무」" onchange="p1Pubs(this.value)">'+escapeHtml(o.pubs||'')+'</textarea>'
+    +'<div style="color:var(--text-mute);font-size:12px;margin-top:2px">앞에 4자리 연도를 적으면 연도 칸에 들어갑니다 · 위 「연구·저서·기고」 칸을 켜면 나옵니다</div>'
     +'<div style="font-weight:700;margin:12px 0 6px">용도</div>'
     +'<select class="tb-select" style="width:100%" onchange="p1Use(this.value)">'+Object.keys(KcareerProfile1.USES).map(function(k){ return '<option value="'+k+'"'+(k===o.use?' selected':'')+'>'+escapeHtml(KcareerProfile1.USES[k].label)+'</option>'; }).join('')+'</select>'
     +'<label style="'+row+';margin-top:8px"><input type="checkbox"'+(o.photo?' checked':'')+' onchange="p1Photo(this.checked)"> 증명사진 넣기 <span style="margin-left:auto;color:var(--text-mute);font-size:12px">미리보기·PDF</span></label>'
@@ -7634,8 +7641,11 @@ function renderProfile1(){
     +(m.overflow?'⚠ 칸을 다 줄여도 한 장을 조금 넘습니다 — 칸 하나를 끄면 맞습니다':'✔ 한 장에 맞췄습니다'+(m.filled?' — 남는 자리만큼 줄을 더 넣었습니다':''))+'<br>✔ 금액·주민번호·계좌는 넣지 않습니다</div>';
   /* ★ 종이는 «실제 A4 크기»(794×1123px, 여백 14mm)로 그리고 칸 너비에 맞춰 «줄여 보인다» —
        좁은 칸에 바로 그리면 글이 접혀 한 장을 넘는 것처럼 보인다(인쇄와 다르게 보이면 안 된다) */
-  paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
+  if(_p1View==='screen') paper.innerHTML='<style>'+KcareerProfile1.CSS+KcareerProfile1.SCREEN_CSS+'</style><div style="padding:22px 26px">'+KcareerProfile1.toScreenHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
+  else paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
     +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
+  _p1JumpList=m.sections.map(function(x){ return [x.key, x.title]; });
+  if(_p1OpenKey){ var 켠=paper.querySelector('.t-'+_p1OpenKey); if(켠){ 켠.style.outline='2px solid var(--teal)'; 켠.style.outlineOffset='2px'; var 켠h=켠.previousElementSibling; if(켠h&&켠h.tagName==='H4'){ 켠h.style.outline='2px solid var(--teal)'; 켠h.style.outlineOffset='1px'; } } }
   _p1ZoomBar(); _p1Scale();
   /* 사진은 «나중에» 붙인다 — 보관함에서 꺼내는 데 시간이 걸린다.
      ⚠ 예전엔 fileURLAsync 로 꺼냈는데, 사진이 «data: 머리»를 단 채 담겨 있으면 풀다가 조용히 실패해 사진이 영영 안 나왔다
@@ -7656,10 +7666,12 @@ function renderProfile1(){
    · 한 화면 — 한 장 전체가 «스크롤 없이» 보이게 (기본)   · 폭 맞춤 — 칸 너비에 꽉 차게(글자가 큼, 아래로 내림)
    · 전체 화면 — 모니터 전체를 써서 한 장을 가장 크게 (Esc 로 나옴)
    ⚠ 크기만 바꾼다 — 서류 내용·인쇄·저장은 그대로(A4 794×1123). */
-var _p1ZoomMode='fit';
+var _p1ZoomMode='fit', _p1JumpList=[];   /* 기본은 «한 화면» — A4 세로 한 장이 아래로 안 내려가도 다 보인다(대표 지시 2026-10-11 「A4 세로 한 장 · 아래로 안 내려가도」) */
 try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom')||'fit'; }catch(e){}
 function _p1Scale(){
-  var paper=document.getElementById('p1Paper'), a4=paper&&paper.querySelector('.p1-a4'); if(!a4) return;
+  var paper=document.getElementById('p1Paper'); if(!paper) return;
+  if(_p1View==='screen'){ paper.style.width='100%'; paper.style.margin='0'; paper.style.height='auto'; paper.style.overflow='visible'; paper.style.background='#fff'; return; }
+  var a4=paper.querySelector('.p1-a4'); if(!a4) return;
   var full=(document.fullscreenElement===paper), s, W, H;
   if(full){
     s=Math.min(window.innerWidth/794, window.innerHeight/1123);
@@ -7669,21 +7681,28 @@ function _p1Scale(){
   }
   paper.style.background='#fff'; paper.style.overflow='hidden'; a4.style.marginLeft='0';
   var box=paper.parentNode, availW=(box&&box.clientWidth)||794;
-  if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; }
+  if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; paper.style.margin='0'; }
   else{
     var top=paper.getBoundingClientRect().top;
-    var availH=Math.max(300, window.innerHeight-Math.max(0,top)-70);   /* 아래 작업 띠(약 60px) 만큼 비운다 */
-    s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px';
+    var availH=Math.max(300, window.innerHeight-Math.max(0,top)-62);   /* 아래 작업 띠(약 56px) 만큼 비운다 */
+    s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px'; paper.style.margin='0 auto';
   }
   a4.style.transform='scale('+s+')';
   paper.style.height=Math.round(1123*s)+'px';
 }
+var _p1View='a4';   /* 기본은 A4 세로 한 장 — 「화면용(넓게)」는 고르면 */
+try{ _p1View=(localStorage.getItem('kc_p1_view')==='screen')?'screen':'a4'; }catch(e){}
 function _p1ZoomBar(){
   var bar=document.getElementById('p1Zoom'); if(!bar) return;
-  var b=function(m,t,ti){ return '<button class="btn sm'+(_p1ZoomMode===m?' primary':'')+'" type="button" onclick="p1Zoom(\''+m+'\')" title="'+ti+'">'+t+'</button>'; };
-  bar.innerHTML=b('fit','⬍ 한 화면','위아래로 움직이지 않고 한 장 전체가 보이게')+b('width','⬌ 폭 맞춤','칸 너비에 꽉 차게 — 글자가 커집니다(아래로 내려 보기)')
-    +'<button class="btn sm" type="button" onclick="p1Full()" title="모니터 전체로 한 장을 가장 크게 봅니다 · Esc 로 나옵니다">⛶ 전체 화면</button>';
+  var v=function(m,t,ti){ return '<button class="btn sm'+(_p1View===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1View(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };
+  var z=function(m,t,ti){ return '<button class="btn sm'+(_p1ZoomMode===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1Zoom(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };
+  bar.innerHTML='<div style="width:100%;font-size:12px;color:var(--text-mute)">보기</div>'
+    +v('screen','🖥 화면용(넓게)','오른쪽 화면 너비에 맞춰 펼쳐 보입니다')+v('a4','📄 A4 인쇄 미리보기','인쇄·PDF·한글 파일과 같은 A4 한 장 모양')
+    +(_p1View==='a4'?'<div style="width:100%;height:0"></div>'+z('fit','⬍ 한 화면','위아래로 움직이지 않고 한 장 전체가 보이게')+z('width','⬌ 폭 맞춤','칸 너비에 꽉 차게')
+      +'<button class="btn sm" type="button" onclick="p1Full()" title="모니터 전체로 크게 봅니다 · Esc 로 나옵니다">⛶ 전체</button>':'')
+    +(_p1JumpList.length?'<div style="width:100%;font-size:12px;color:var(--text-mute);margin-top:4px">바로 가기</div>'+_p1JumpList.map(function(j){ return '<button class="btn sm" type="button" data-k="'+j[0]+'" onclick="p1Jump(this.dataset.k)">'+escapeHtml(j[1])+'</button>'; }).join(''):'');
 }
+function p1View(m){ _p1View=(m==='a4')?'a4':'screen'; try{ localStorage.setItem('kc_p1_view',_p1View); }catch(e){} renderProfile1(); }
 function p1Zoom(m){ _p1ZoomMode=(m==='width')?'width':'fit'; try{ localStorage.setItem('kc_p1_zoom',_p1ZoomMode); }catch(e){} _p1ZoomBar(); _p1Scale(); }
 function p1Full(){
   var paper=document.getElementById('p1Paper'); if(!paper) return;
@@ -7695,6 +7714,37 @@ if(typeof document!=='undefined' && document.addEventListener) document.addEvent
 if(typeof window!=='undefined' && window.addEventListener) window.addEventListener('resize', function(){ _safe(_p1Scale); });
 function p1Toggle(k,v){ var o=_p1Load(); o.on=Object.assign({}, o.on||{}); o.on[k]=!!v; _p1Keep(); renderProfile1(); }
 function p1Use(v){ _p1Load().use=v; _p1Keep(); renderProfile1(); }
+/* ⚙ 칸 상세 (2026-10-11 목업 B) — 건수·제목·한 줄 더. 정한 건수는 «고정»: 한 장 맞추기가 줄이지 않는다.
+   ⚠ 고른 값은 미리보기·PDF·한글(hwpx)이 «같은 모델»로 쓴다(_p1Model). */
+var _p1OpenKey='';
+function p1Open(k){ _p1OpenKey=(_p1OpenKey===k)?'':k; renderProfile1(); if(_p1OpenKey) _safe(function(){ p1Jump(k); }); }
+function p1Panel(k,o){
+  var S=KcareerProfile1.SECTIONS.filter(function(x){ return x.key===k; })[0]||{ title:k };
+  var cur=(o.lim||{})[k]; cur=(cur==null)?'auto':String(cur);
+  var opts=['auto','3','5','8','10','13','20','all'].map(function(v){
+    return '<option value="'+v+'"'+(v===cur?' selected':'')+'>'+(v==='auto'?'자동(한 장에 맞춤)':v==='all'?'전체':v+'건')+'</option>'; }).join('');
+  var inp='width:100%;min-width:0;font-size:16px';
+  return '<div style="border:1px solid var(--border);border-top:0;border-radius:0 0 8px 8px;padding:8px 10px;margin:-5px 0 6px;background:#f8fafc;white-space:normal">'
+    +'<div style="font-size:12px;color:var(--text-mute);margin-bottom:3px">몇 건 넣을까 <span style="color:var(--text-mute)">(정하면 한 장에 맞추려 줄이지 않습니다)</span></div>'
+    +'<select class="tb-select" style="width:100%" data-k="'+k+'" onchange="p1Lim(this.dataset.k,this.value)">'+opts+'</select>'
+    +'<div style="font-size:12px;color:var(--text-mute);margin:6px 0 3px">제목 바꾸기</div>'
+    +'<input class="tb-input" style="'+inp+'" data-k="'+k+'" placeholder="'+escapeHtml(S.title)+'" value="'+escapeHtml((o.titles||{})[k]||'')+'" onchange="p1Title(this.dataset.k,this.value)">'
+    +'<div style="font-size:12px;color:var(--text-mute);margin:6px 0 3px">이 칸 끝에 한 줄 더</div>'
+    +'<input class="tb-input" style="'+inp+'" data-k="'+k+'" placeholder="예) 그 밖의 위원 이력은 요청 시 제출" value="'+escapeHtml((o.notes||{})[k]||'')+'" onchange="p1Note(this.dataset.k,this.value)">'
+    +'</div>';
+}
+function p1Lim(k,v){ var o=_p1Load(); o.lim=Object.assign({}, o.lim||{}); if(v==='auto') delete o.lim[k]; else o.lim[k]=(v==='all')?'all':Number(v); _p1Keep(); renderProfile1(); }
+function p1Title(k,v){ var o=_p1Load(); o.titles=Object.assign({}, o.titles||{}); var t=String(v||'').trim(); if(t) o.titles[k]=t; else delete o.titles[k]; _p1Keep(); renderProfile1(); }
+function p1Note(k,v){ var o=_p1Load(); o.notes=Object.assign({}, o.notes||{}); var t=String(v||'').trim(); if(t) o.notes[k]=t; else delete o.notes[k]; _p1Keep(); renderProfile1(); }
+/* 바로 가기 — 그 칸이 있는 자리로 (미리보기가 길어도 칸 이름만 누르면 간다) */
+function p1Jump(k){
+  var paper=document.getElementById('p1Paper'); if(!paper) return;
+  var t=paper.querySelector('.t-'+k); if(!t) return;
+  var h=t.previousElementSibling; var el=(h&&h.tagName==='H4')?h:t;
+  if(el.scrollIntoView) el.scrollIntoView({ block:'center', behavior:'smooth' });
+}
+function p1Intro(v){ _p1Load().intro=String(v||'').trim(); _p1Keep(); renderProfile1(); }
+function p1Pubs(v){ _p1Load().pubs=String(v||'').replace(/\r/g,'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean).join('\n'); _p1Keep(); renderProfile1(); }
 function p1Field(v){ _p1Load().field=String(v||'').trim(); _p1Keep(); renderProfile1(); }
 function p1Photo(v){ _p1Load().photo=!!v; _p1Keep(); if(v&&!_p1PhotoUrl) _p1PhotoTried=false; renderProfile1(); }
 function p1Roles(v){ _p1Load().roles=String(v||'').replace(/\r/g,'').split('\n').map(function(l){ return l.trim(); }).filter(Boolean).join('\n'); _p1Keep(); renderProfile1(); }
@@ -7764,7 +7814,7 @@ function _p1Bytes(){
   var body=HWPX.docTitle('프로필')
     +HWPX.para([h.license,h.name].filter(Boolean).join(' ')+((h.org||h.title)?' · '+[h.org,h.title].filter(Boolean).join(' '):''), HWPX.CP.body, {paraPr:HWPX.PP.center})
     +HWPX.spacer();
-  var 머리=[]; if(h.phone||h.email) 머리.push(['연락처', [h.phone,h.email].filter(Boolean).join(' · ')]); if(h.field) 머리.push(['주 분야', h.field]);
+  var 머리=[]; if(h.phone||h.email) 머리.push(['연락처', [h.phone,h.email].filter(Boolean).join(' · ')]); if(h.field) 머리.push(['주 분야', h.field]); if(h.intro) 머리.push(['소개', h.intro]);
   /* 숫자 요약(KPI)은 넣지 않는다 — 대표 2026-10-07 「kpi 필요없다」 */
   if(머리.length) body+=HWPX.tablePara(머리, HWPX.cols([0.16,0.84]))+HWPX.spacer();
   m.sections.forEach(function(x){
@@ -7772,6 +7822,7 @@ function _p1Bytes(){
     var 폭=(x.rows[0]||[]).length;
     var rows=x.rows.map(function(r){ var a=r.slice(); while(a.length<폭) a.push(''); return a; });
     if(x.more) rows.push(폭===2?['','외 '+x.more+'건']:['','외 '+x.more+'건','']);
+    if(x.note) rows.push(폭===2?['',x.note]:['',x.note,'']);
     if(x.key==='perf' && m.perfByYear) rows.push(폭===2?['','연도별: '+m.perfByYear]:['','연도별: '+m.perfByYear,'']);
     body+=HWPX.tablePara(rows, HWPX.cols(폭===2?[0.16,0.84]:[0.12,0.34,0.54]));
   });

@@ -62,6 +62,9 @@ function srvDb(cfg) {
     'pucards/config/mailWork': cfg.workLink || {},
     'pucards/config/staffSucc': cfg.succ || {},
     'pucards/config/mailPush': cfg.push || {},
+    /* 업무관리 「이 주소는 앞으로도 이 사업장」 — 열쇠는 업무관리 꼴(@ → _at_), 값에 주소·번호 */
+    'work_erp/mailaddr': Object.keys(cfg.wkAddr || {}).reduce((o, e) => {
+      o[e.replace('@', '_at_').replace(/\./g, '_')] = { addr: e, co: '아무 이름', coid: cfg.wkAddr[e] }; return o; }, {}),
   };
   SRV.WORK_STORES.forEach(([store]) => { val['data/' + store + '/v'] = WORKS[store] || []; });
   return { ref: (p) => ({ once: () => Promise.resolve({ val: () => val[p] }) }) };
@@ -116,10 +119,13 @@ function appBox(cfg) {
     },
     mbCoRec: (nm) => coByName[norm(nm)] || null,
     mbMemoOf: () => null,
+    /* 업무관리에서 고정한 주소 → 업체 번호 (화면 mbWkLoad 가 채우는 표와 같은 꼴) */
+    _mbWkAddr: cfg.wkAddr || {},
+    ErpMatch: { byId: coById },
   };
   vm.createContext(ctx);
   ['mbWhoLive', 'mbWhoWhy', 'mbWhoWhyOf', 'mbWorkLive', 'mbWorkBuild', 'mbWorkHandOf',
-    'mbWorkMgrOfAddr', 'mbWorkOfRow'].forEach((n) =>
+    'mbWorkMgrOfAddr', 'mbWorkOfRow', 'mbCoRecOfAddr'].forEach((n) =>
     vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   const m = app.match(/const MB_WORK_KIND = \{[^}]*\};/);
   vm.runInContext('var ' + m[0].slice('const '.length), ctx);
@@ -162,6 +168,13 @@ const CASES = [
   ['건이 업체관리 주소보다 세다',
     { workLink: { 'info@gana,kr': { kind: 'case', id: 's3' } } }, 'info@gana.kr', '박한별'],
   ['아무 데도 없는 주소', {}, 'nobody@x.kr', ''],
+  /* ★ 업무관리에서 고정한 주소(2026-10-11 「항상 서로 동기화」) — 번호로만, 자문사 잇기와 같은 자리 */
+  ['업무관리에서 고정한 주소 → 그 업체 주담당', { wkAddr: { 'new1@naver.com': 'co-1' } }, 'new1@naver.com', '권형하'],
+  ['업무관리 고정도 끝난 업체면 안 준다', { wkAddr: { 'new1@naver.com': 'co-2' } }, 'new1@naver.com', ''],
+  ['메일함에서 이은 자문사가 업무관리 고정보다 세다',
+    { co: { 'new1@naver,com': { n: '마바유통', id: 'co-3' } }, wkAddr: { 'new1@naver.com': 'co-1' } }, 'new1@naver.com', '박한별'],
+  ['업무관리 고정이 업체관리에 적힌 주소보다 세다', { wkAddr: { 'info@gana.kr': 'co-3' } }, 'info@gana.kr', '박한별'],
+  ['없는 번호를 가리키면 «없는 것»', { wkAddr: { 'new1@naver.com': 'co-없음' } }, 'new1@naver.com', ''],
   ['우리 주소는 건에 적혀 있어도 안 잇는다', {}, 'p001@pureun.kr', ''],
 ];
 

@@ -107,7 +107,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=53"></script>
+<script src="js/pu-contract-forms.js?v=55"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -203,14 +203,14 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-gcal-auth.js?v=12"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
-<script src="js/pu-billing.js?v=11"></script>
+<script src="js/pu-billing.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
 <script src="js/pu-ontology.js?v=62"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
-<script src="js/pu-ontology-write.js?v=5" data-mode="observe"></script>
+<script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-company-write.js?v=2"></script>
 <!-- 급여담당자 엑셀 → 업체관리 (대표 결정 2026-08-24). 읽고 대조하는 일은 이 파일이,
      그리기는 아래 화면이 한다 — 검사가 이 파일을 그대로 돌린다. -->
@@ -3456,6 +3456,7 @@ function _fbStableId(x){
 }
 function normalizeFbValue(v){
   var arr;
+  if(v && typeof v === 'object' && !Array.isArray(v) && typeof erpFbUnsafeTopKeys === 'function') v = erpFbUnsafeTopKeys(v);
   if(Array.isArray(v)){ arr = v; }  // 마이그레이션 전: 배열
   else if(v && typeof v === 'object'){
     // arrayToIdMap 결과(각 키가 그 값의 .id와 일치)만 배열로 되돌린다.
@@ -3937,6 +3938,35 @@ function erpBackupKey(){
      하나 때문에 매일 백업이 통째로 실패했다. 이 PC 의 작업 자료라 열쇠 모양을 바꿀 수 없으니(바꾸면 짝이 끊긴다)
      «백업에 실을 때만» 이름을 바꾸고 되살릴 때 원래대로 푼다. 바꾼 이름은 ~k~ 로 시작한다 — 옛 백업은 그대로 지나간다. */
 var ERP_FB_BAD_KEY = /[.#$\/\[\]]/;
+/* ★ 동기화 길에서는 «맨 위 열쇠»만 바꾼다(2026-10-11 검토 A-3) — 골라 둔 짝(ledger_picks)의 「…#1」,
+     입금자 별칭·지출 별칭·처리됨 지문의 # $ / 가 섞이면 그 표가 서버에 영영 못 올라갔다. 값 안쪽은 건드리지 않아 싸다.
+     받을 때 normalizeFbValue 가 ~k~ 머리 열쇠만 원래대로 푼다. */
+function erpFbSafeTopKeys(v){
+  if(!v || typeof v !== 'object' || Array.isArray(v)) return v;
+  var bad = false;
+  for(var k in v){ if(Object.prototype.hasOwnProperty.call(v, k) && (ERP_FB_BAD_KEY.test(k) || k.indexOf('~k~') === 0)){ bad = true; break; } }
+  if(!bad) return v;
+  var o = {};
+  Object.keys(v).forEach(function(k){
+    var nk = (ERP_FB_BAD_KEY.test(k) || k.indexOf('~k~') === 0) ? '~k~' + encodeURIComponent(k).replace(/\./g, '%2E') : k;
+    o[nk] = v[k];
+  });
+  return o;
+}
+function erpFbUnsafeTopKeys(v){
+  if(!v || typeof v !== 'object' || Array.isArray(v)) return v;
+  var has = false;
+  for(var k in v){ if(Object.prototype.hasOwnProperty.call(v, k) && k.indexOf('~k~') === 0){ has = true; break; } }
+  if(!has) return v;
+  var o = {};
+  Object.keys(v).forEach(function(k){
+    var nk = k;
+    if(k.indexOf('~k~') === 0){ try { nk = decodeURIComponent(k.slice(3)); } catch(_e){ nk = k; } }
+    o[nk] = v[k];
+  });
+  return o;
+}
+window.erpFbSafeTopKeys = erpFbSafeTopKeys; window.erpFbUnsafeTopKeys = erpFbUnsafeTopKeys;
 function erpFbSafeKeys(v){
   if(!v || typeof v !== 'object') return v;
   if(Array.isArray(v)) return v.map(erpFbSafeKeys);
@@ -4914,7 +4944,7 @@ async function erpPushLocalOnly(){
           if(!add.length) return;                                             // 이미 다 있음 → 중단(변경 없음)
           var merged = curArr.concat(add);
           var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
-          var outV = (typeof DIFF_KEYS !== 'undefined' && DIFF_KEYS.indexOf(store) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged;
+          var outV = erpFbSafeTopKeys((typeof DIFF_KEYS !== 'undefined' && DIFF_KEYS.indexOf(store) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged);
           return { v: outV, u: newTs };
         }, function(err, committed, snap2){
           if(err){ resolve({ ok:false, err:err }); return; }
@@ -5458,7 +5488,7 @@ function dbSet(k, v){
             _metaRollback(); return true;
           }
         }
-        var fbValue = (DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v) && v.every(function(x){return x&&x.id;})) ? arrayToIdMap(v) : v;
+        var fbValue = erpFbSafeTopKeys((DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v) && v.every(function(x){return x&&x.id;})) ? arrayToIdMap(v) : v);
         // ── 근본 급감 차단: 서버 현재 건수 대비 이 기기 데이터가 절반 이하면 = 옛 데이터 → 푸시 차단 ──
         if(Array.isArray(v)){
           // [코덱스 검증 반영] 서버 확인 실패 시 무조건 set 하던 fail-open 제거 — 1회 재시도 후에도
@@ -5514,7 +5544,7 @@ function dbSet(k, v){
                   if(curArr.length >= 10 && merged.length < curArr.length * 0.5 && !_bulkOk2){ _guardMsg = '급감'; return; }
                   // 시계 오차에도 버전이 단조 증가하도록 (서버 u+1 과 현재시각 중 큰 값)
                   var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
-                  var outV = (DIFF_KEYS.indexOf(k) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged;
+                  var outV = erpFbSafeTopKeys((DIFF_KEYS.indexOf(k) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged);
                   return { v: outV, u: newTs };
                 }, function(err, committed, snap){
                   if(err || !committed || !snap){
@@ -10660,8 +10690,35 @@ function useEscClose(onClose){
      어느 화면에 무엇이 붙어 있는지 일일이 적지 않아도 되게 DOM 에서 직접 잰다.
    ⚠ 뜬 것(모달·툴팁 position:fixed/absolute)은 자리를 차지하지 않는다 — 빼면 안 된다.
      이걸 안 걸러내면 모달이 열린 화면에서 표가 240px 로 쪼그라든다. */
-function erpFillHeight(el, min){
+/* 날짜 칸을 글자로 — createdAt 이 숫자(밀리초)로 든 레코드가 있다(공용 저장 관문, 2026-10-10).
+   .slice·.localeCompare 를 바로 부르면 화면이 통째로 멎는다(업체관리 2026-10-10). 숫자면 ISO 글자로, 없으면 빈 글자. */
+function erpDateStr(v){
+  if(v == null || v === '') return '';
+  if(typeof v === 'number'){ var d = new Date(v); return isNaN(d) ? '' : d.toISOString(); }
+  return String(v);
+}
+window.erpDateStr = erpDateStr;
+
+/* exact — 표 아래 줄(쪽 번호 등)과 «실제» 바닥 여백(.page·.main 의 아래 안쪽 여백)까지 빼서
+   표·쪽 번호가 한 화면 안에 들어오게 한다(업체관리 2026-10-11). 안 주면 예전 셈 그대로. */
+function erpFillHeight(el, min, exact){
   if(!el || typeof window === 'undefined') return 0;
+  if(exact){
+    var _top = el.getBoundingClientRect().top, _below = 0, _sib = el.nextElementSibling;
+    while(_sib){
+      var _pos = ''; try { _pos = window.getComputedStyle(_sib).position; } catch(e){ _pos = ''; }
+      if(_pos !== 'fixed' && _pos !== 'absolute'){
+        var _cs = window.getComputedStyle(_sib);
+        _below += _sib.getBoundingClientRect().height + (parseFloat(_cs.marginTop) || 0) + (parseFloat(_cs.marginBottom) || 0);
+      }
+      _sib = _sib.nextElementSibling;
+    }
+    var _pads = 0;
+    [el.parentElement, (typeof document !== 'undefined' ? document.getElementById('main-scroll-area') : null)].forEach(function(p){
+      if(p){ try { _pads += parseFloat(window.getComputedStyle(p).paddingBottom) || 0; } catch(e){} }
+    });
+    return Math.max(min || 240, Math.round(window.innerHeight - _top - _below - _pads - 2));
+  }
   var top = el.getBoundingClientRect().top;
   var below = 0;
   var sib = el.nextElementSibling;
@@ -10688,11 +10745,11 @@ function erpFillExtra(el, rows){
   return (rh > 0 ? rh : 34) * rows;
 }
 /* extraRows — 창 바닥보다 «몇 줄 더» 길게(그만큼 아래 줄은 스크롤로 본다). 안 주면 예전과 같다 */
-function useFillHeight(min, extraRows){
+function useFillHeight(min, extraRows, exact){
   var ref = useRef(null);
   var st = useState(0); var h = st[0]; var setH = st[1];
   function fit(){
-    var want = erpFillHeight(ref.current, min);
+    var want = erpFillHeight(ref.current, min, exact);
     if(!want) return;
     want += erpFillExtra(ref.current, extraRows);
     // 8px 안쪽 차이는 그대로 둔다 — 안 그러면 「재고 → 다시 그리고 → 또 재고」 가 끝나지 않는다
@@ -12207,7 +12264,7 @@ function _healServerKey(k){
     var val = JSON.parse(raw);
     var ts = Date.now();
     localStorage.setItem(KEY+'_meta_'+k, String(ts));
-    fbDb.ref('data/'+k).set({ v:val, u:ts }).catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
+    fbDb.ref('data/'+k).set({ v:erpFbSafeTopKeys(val), u:ts }).catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
     if(typeof showToast === 'function') showToast('현재 '+k+' 데이터로 서버를 교정했습니다');
   } catch(e){ window._erpErrLog && window._erpErrLog(e); }
 }
@@ -21330,7 +21387,7 @@ function ContractModal(props){
               var _stLbl = c.status==='transferred' ? '이관완료 → 종료관리'
                 : (c.permanentArchived||c.closedDate) ? '보관됨 → 종료관리'
                 : '진행중 → 계약관리';
-              var _cd = (c.signDate || c.startDate || c.createdAt || '').slice(0,10);
+              var _cd = erpDateStr(c.signDate || c.startDate || c.createdAt).slice(0,10);
               var sv = contractDupVStyle(r.v ? r.v.verdict : 'diff');
               wrap.appendChild(_card(_kindLbl(c, cKinds), _subText(c, cKinds), c.contractAmount,
                 (c.contractNo||'-'), (u?u.name:'-') + ' · ' + (_cd||'계약일 없음') + ' · ' + _stLbl, sv));
@@ -25675,7 +25732,7 @@ function ContractManagement(props){
     var kindsArr = c.kinds || (c.kind ? [c.kind] : []);
     if(kindFilter !== 'all' && kindsArr.indexOf(kindFilter) < 0) return false;
     if(monthOnly){
-      var d = (c.contractDate||c.signDate||c.createdAt||'').slice(0,7);
+      var d = erpDateStr(c.contractDate||c.signDate||c.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     // 담당자 필터
@@ -25731,7 +25788,7 @@ function ContractManagement(props){
   // 종류별 카운트 (탭 표시용 - 전체 contracts 기준)
   // 선택된 월(selYM)에 등록된 계약만 필터링 (계약일 또는 서명일 또는 생성일 기준)
   var monthContracts = contracts.filter(function(c){
-    var d = (c.contractDate || c.signDate || c.createdAt || '').slice(0,7);
+    var d = erpDateStr(c.contractDate || c.signDate || c.createdAt).slice(0,7);
     return d === selYM;
   });
   function kindCount(kindV){
@@ -26726,18 +26783,43 @@ function loaReconcileStatus(todayS){
     if(x.status === 'pending' || x.status === 'rejected') return;   // 아직 승인 안 된 휴직은 휴직이 아니다
     if(x.startDate <= t && t <= end) covering[x.sid] = x;
   });
-  var changed = 0;
+  var changed = 0, retiredNow = [];
   var next = users0.map(function(u){
     if(!u || !u.sid || u.status === 'retired' || u.status === 'scheduled' || u.status === 'standby') return u;
+    /* 퇴직 예정(미래 퇴직일로 퇴사 처리한 사람) — 마지막 근무일이 지나면 그때 «퇴직» (2026-10-11) */
+    var _last = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+    if(u.retirePending && _last && _last < t){
+      changed++; retiredNow.push(u.sid);
+      return Object.assign({}, u, { status:'retired', retirePending:false, leaveStartDate:'', leaveEndDate:'' });
+    }
     var c = covering[u.sid];
     if(c && u.status !== 'leave'){ changed++; return Object.assign({}, u, { status:'leave', leaveStartDate:c.startDate, leaveEndDate:c.endDate || '', leaveReason:c.reason || u.leaveReason || '' }); }
     if(!c && u.status === 'leave'){ changed++; return Object.assign({}, u, { status:'active', leaveStartDate:'', leaveEndDate:'', leaveReason:'' }); }
     return u;
   });
   if(changed) dbSet('user_accounts', next);
+  retiredNow.forEach(function(sid){
+    var x = next.find(function(v){ return v && v.sid === sid; });
+    erpCloseLoaForRetire(sid, String((x && (x.lastWorkDate || x.retireDate)) || t).slice(0, 10));
+  });
   return changed;
 }
 function setLoaList(list){ dbSet('leave_of_absence', list); }
+/* 어느 날 그 사람이 «재직·휴직·퇴직·입사예정» 중 무엇인가 — 화면마다 따로 가르던 잣대를 한 곳에 (2026-10-11)
+   · 퇴직일은 «마지막 근무일»이다(대표 결정 2026-10-11) — 그 날까지는 재직, 다음 날부터 퇴직
+   · 퇴직 예정(retirePending)도 같은 날짜로 가른다 · 휴직은 승인된 휴직 기록(getLoaStatus) 또는 명부 상태 */
+function erpEmpStatusAt(u, ymd){
+  if(!u) return '';
+  var d = String(ymd || todayYMD()).slice(0, 10);
+  if(u.status === 'scheduled' || u.status === 'standby') return u.status;
+  if(u.hireDate && d < String(u.hireDate).slice(0, 10)) return 'scheduled';
+  var last = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+  if(last && d > last && (u.status === 'retired' || u.retirePending)) return 'retired';
+  if(u.status === 'retired' && !last) return 'retired';
+  if(getLoaStatus(u.sid, d)) return 'leave';
+  if(u.status === 'leave' && d >= todayYMD()) return 'leave';
+  return 'active';
+}
 /* 퇴직하면 그 사람의 «진행 중·대기» 휴직 기록을 닫는다 (2026-10-10 인사관리 — 퇴사한 직원의 질병휴직이 열려 있어
    명부·급여·휴가 화면이 모두 «휴직»으로 보였다).
    · 마지막 근무일 전에 시작한 휴직 → 종료(endedDate = 마지막 근무일, 종료일이 더 이르면 그 날)
@@ -27952,9 +28034,15 @@ function coMgrPendTag(co){
 }
 
 function CompanyManagement(){
-  /* 표가 창 바닥보다 «두 줄 더» — 대표 지시 2026-10-11 「디자인은 그대로하고 아래 사업장정보가 2개정도 더 보이게」.
-     그만큼 쪽 번호 줄은 화면 아래로 내려가 살짝 내리면 보인다(업체관리 화면은 위아래로 스크롤된다). */
-  var _fill1 = useFillHeight(null, 2);
+  /* 표를 «한 화면 안에서» 최대로 — 대표 지시 2026-10-11 「사업장정보가 2개정도 더 보이게」 → 「한화면안에서 쪽 번호가 나오게」.
+     두 줄을 그냥 늘리면 쪽 번호가 화면 밖으로 밀렸다. 그래서 디자인은 그대로 두고 «빈 자리»만 걷는다:
+     ① 안내 두 줄을 쪽 번호와 같은 줄 양옆으로 ② 쪽 번호 줄 위아래 여백을 줄임 ③ 업체관리일 때만 바닥 빈 여백을 걷음
+     ④ 표 높이는 실제 바닥 여백까지 빼서 잰다(exact) — 쪽 번호가 늘 화면 안에 든다. */
+  var _fill1 = useFillHeight(null, 0, true);
+  useEffect(function(){
+    try { document.body.classList.add('co-screen'); } catch(_e){}
+    return function(){ try { document.body.classList.remove('co-screen'); } catch(_e){} };
+  }, []);
   var existing = dbGet('companies', null);
   // 로컬 캐시가 비어 있어도 서버에 쓰지 않는다(빈 값 덮어쓰기로 업체가 사라지는 사고 방지).
   // Firebase 동기화가 끝나면 목록이 채워진다.
@@ -28686,7 +28774,9 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     /* 방금 이관된 업체를 맨 위로 — 나머지는 등록일 최신순 그대로
        (사건·컨설팅·기금·기타가 쓰는 규칙 그대로다. 표시는 이틀 뒤 저절로 사라진다) */
     fresh.sort(function(a,b){ return arvSort(a, b, function(x,y){
-      return (y.createdAt||'').localeCompare(x.createdAt||''); }); });
+      /* createdAt 이 숫자(밀리초)로 든 업체가 있다 — 공용 저장 관문이 옛 업체에 Date.now() 를 채운다(2026-10-10). 글자·숫자 다 받는다 */
+      function _ca(v){ return typeof v === 'number' ? new Date(v).toISOString() : String(v||''); }
+      return _ca(y.createdAt).localeCompare(_ca(x.createdAt)); }); });
     setCompanies(fresh);
   }
   /* 유형·사무대행이 바뀌면 고유번호의 «머리»가 따라 바뀐다 — 그 바뀜을 그 자리에 남긴다
@@ -29058,7 +29148,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     }
     // monthOnly는 담당 깔때기/검색어가 없을 때만 적용
     if(monthOnly && !fMgr.length && !fSub.length && !query){
-      var d = (co.contractStartDate||co.firstContractDate||co.createdAt||'').slice(0,7);
+      var d = erpDateStr(co.contractStartDate||co.firstContractDate||co.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     if(query){
@@ -29257,6 +29347,8 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   }
 
   return h('div', { className:'page' },
+    /* 업체관리일 때만 바닥 빈 여백을 걷는다 — 표·쪽 번호가 한 화면에 들어오게 (2026-10-11) */
+    h('style', null, 'body.co-screen main.main{padding-bottom:0 !important} body.co-screen .page{padding-bottom:4px !important}'),
     // 통일 헤더: 월 네비 + KPI 4개
     h(MonthKpiHeader, {
       selYM: selYM,
@@ -29267,7 +29359,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
         { label:'🏛️ 사무대행', value:companies.filter(function(c){return c.status==='suboffice' || c.isSuboffice;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'💰 월 자문료', value:totalAdvisoryFee.toLocaleString()+'원', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a',
           sub: suspendedFee > 0 ? '중단 ' + suspendedFee.toLocaleString() + '원 제외' : null },
-        { label:'✨ 이번 달 신규', value:companies.filter(function(c){return (c.contractStartDate||c.firstContractDate||c.createdAt||'').slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
+        { label:'✨ 이번 달 신규', value:companies.filter(function(c){return erpDateStr(c.contractStartDate||c.firstContractDate||c.createdAt).slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
         { label:'⏸ 계약 중단', value:companies.filter(function(c){return !!c.suspended;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
       ],
       extra: h('button', { onClick:function(){setMonthOnly(!monthOnly);},
@@ -29381,7 +29473,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             '▽ 필터 ' + activeFilterCount + ' 풀기')
         )
       )
-    : h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'14px', flexWrap:'wrap' } },
+    : h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'8px', flexWrap:'wrap' } },
       /* ★ 검색을 맨 왼쪽으로 (대표 지시 2026-08-27)
          전에는 맨 오른쪽에서 남는 자리를 다 차지해(flex:1) 화면마다 폭이 달랐다.
          사건관리·컨설팅관리가 이미 «왼쪽 260px» 이라 거기에 맞춘다 —
@@ -30004,14 +30096,14 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
         )
       )
     ),
-    // 페이지네이션
-    h(PaginationBar, { page:pg.page, total:pg.total, setPage:pg.setPage, count:pg.count, pageSize:coPageSize, setPageSize:setCoPageSize }),
-    // 하단 안내
-    h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px', marginTop:'10px', fontSize:'11px', color:'#94a3b8' } },
-      h('div', { style:{ display:'flex', justifyContent:'space-between' } },
-        h('div', null, h('span', { style:{ color:'#fbbf24', fontWeight:700 } }, '주황 테두리'), ' = 계약 만료 30일 이내'),
-        h('div', null, '셀 더블클릭 → 인라인 편집 · Enter/클릭밖 → 저장 · ESC → 취소')
-      )
+    // 페이지네이션 + 하단 안내 — 한 줄에 (왼쪽 안내 · 가운데 쪽 번호 · 오른쪽 안내) — 2026-10-11 한 화면에 넣으려고
+    h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', fontSize:'11px', color:'#94a3b8', whiteSpace:'nowrap' } },
+      h('div', { style:{ flex:'1 1 0', minWidth:0, overflow:'hidden', textOverflow:'ellipsis' } },
+        h('span', { style:{ color:'#fbbf24', fontWeight:700 } }, '주황 테두리'), ' = 계약 만료 30일 이내'),
+      h('div', { style:{ flex:'none' } },
+        h(PaginationBar, { page:pg.page, total:pg.total, setPage:pg.setPage, count:pg.count, pageSize:coPageSize, setPageSize:setCoPageSize, compact:true })),
+      h('div', { style:{ flex:'1 1 0', minWidth:0, overflow:'hidden', textOverflow:'ellipsis', textAlign:'right' }, title:'셀 더블클릭 → 인라인 편집 · Enter/클릭밖 → 저장 · ESC → 취소' },
+        '셀 더블클릭 → 인라인 편집 · Enter/클릭밖 → 저장 · ESC → 취소')
     ),
     // 수정 모달
     editModal && h(CompanyEditModal, {
@@ -33099,7 +33191,7 @@ function CaseManagement(props){
     if(typeFilter !== 'all' && c.typeCode !== typeFilter) return false;
     if(stageFilter !== 'all' && (c.stageCode||'') !== stageFilter) return false;
     if(monthOnly){
-      var d = (c.contractDate||c.receiveDate||c.createdAt||'').slice(0,7);
+      var d = erpDateStr(c.contractDate||c.receiveDate||c.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     if(mgrFilter !== 'all' && c.managerMain !== mgrFilter && (c.managerSubs||[]).indexOf(mgrFilter) < 0) return false;
@@ -36245,7 +36337,7 @@ function PaginationBar(props){
   var s = Math.max(1, page-3), e = Math.min(total, s+6);
   s = Math.max(1, e-6);
   for(var i=s; i<=e; i++) pages.push(i);
-  return h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', padding:'10px 0', flexWrap:'wrap' } },
+  return h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'center', gap:'4px', padding:(props.compact ? '4px 0' : '10px 0'), flexWrap:'wrap' } },
     sizeSelector,
     h('button', { onClick:function(){ setPage(1); }, disabled:page===1, style:btnS(false, page===1) }, '«'),
     h('button', { onClick:function(){ setPage(page-1); }, disabled:page===1, style:btnS(false, page===1) }, '‹'),
@@ -42032,7 +42124,7 @@ function DataDiagnostics(){
         if(!c.contractNo) return false;
         var m = (c.contractNo||'').match(/계약-(\d{4})-/);
         if(!m) return false;
-        var cYear = (c.contractDate||c.createdAt||'').slice(0,4);
+        var cYear = erpDateStr(c.contractDate||c.createdAt).slice(0,4);
         return cYear && cYear !== m[1] && cYear !== thisYear;
       });
       if(wrongYear.length) warns.push({ key:'contractno_year', label:'계약번호 연도 불일치', count:wrongYear.length,
@@ -46786,7 +46878,7 @@ function CoNumberPanel(){
             h('td', { key:'s', style:{ padding:'5px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', color:'#854d0e' } },
               (c.status === 'suboffice' || c.isSuboffice) ? '대행' : ''),
             h('td', { key:'d', style:{ padding:'5px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', color:'#64748b' } },
-              (c.createdAt || c.contractStartDate || '').slice(0, 10) || '—')
+              erpDateStr(c.createdAt || c.contractStartDate).slice(0, 10) || '—')
           ]);
         }))));
 }
@@ -48071,9 +48163,33 @@ function erpCmsLinkMember(code, companyId){
 window.erpCmsLinkMember = erpCmsLinkMember;
 
 /* 자동 확정 되돌리기 — 휴지통으로, 그 줄은 skip 에 적어 다시 넣지 않는다 */
+/* 입금 한 건을 «재무 휴지통에 담고 → 입금 목록에서 뺀다» — 입금관리 휴지통과 같은 방식(2026-10-11 검토 A-10).
+   ⚠ TrashBin.remove(딱지만 붙이기)를 입금에 쓰지 말 것 — 입금을 읽는 70여 곳이 딱지를 거르지 않아
+     되돌린 돈이 합계·미수에 그대로 남고, 어느 휴지통 화면에도 안 나와 되살릴 길도 없었다.
+   마감된 달이면 하지 않는다. 휴지통에 못 담으면 지우지 않는다 · 지우기가 실패하면 휴지통 줄을 거둔다. */
+function erpMoveIncomeToTrash(incomeId, reason){
+  var list = dbGet('finance_income', []) || [];
+  var item = list.find(function(x){ return x && x.id === incomeId; });
+  if(!item) return false;
+  var ym = String(item.advisoryYm || item.date || '').slice(0, 7), dm = String(item.date || '').slice(0, 7);
+  if((ym && isIncomeLocked(ym)) || (dm && isIncomeLocked(dm))){ showToast('🔒 ' + (isIncomeLocked(dm) ? dm : ym) + ' 입금 마감 — 되돌릴 수 없습니다'); return false; }
+  var tk = trashKeyFor('finance_income');
+  var trash = dbGet(tk, []) || [];
+  var tid = 'trash-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  var entry = { id: tid, storeKey: 'finance_income', item: item, deletedAt: (new Date()).toISOString(),
+    deletedBy: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.sid || '') : '', reason: reason || '' };
+  if(dbSet(tk, [entry].concat(trash)) === false) return false;
+  if(dbRemove('finance_income', incomeId) === false){
+    dbSet(tk, (dbGet(tk, []) || []).filter(function(x){ return !(x && x.id === tid); }));
+    return false;
+  }
+  return true;
+}
+window.erpMoveIncomeToTrash = erpMoveIncomeToTrash;
+
 function erpCmsUndo(incomeId, key){
   if(!incomeId || !key) return Promise.resolve(false);
-  var ok = TrashBin.remove('finance_income', incomeId, 'CMS 자동 확정 되돌림');
+  var ok = erpMoveIncomeToTrash(incomeId, 'CMS 자동 확정 되돌림');
   if(ok === false) return Promise.resolve(false);
   var warn = function(e){
     showToast('⚠ 되돌림 표시를 서버에 못 적었습니다 — 다음 자동 처리 때 다시 들어갈 수 있습니다. 다시 눌러 주세요');
@@ -68702,7 +68818,7 @@ function ProjectManagementShared(props){
       else if(it.contractPaidDate) d = it.contractPaidDate.slice(0,7);
       else if(it.retainerPaidDate) d = it.retainerPaidDate.slice(0,7);
       else if(it.successPaidDate)  d = it.successPaidDate.slice(0,7);
-      else d = (it.contractDate||it.startDate||it.createdAt||'').slice(0,7);
+      else d = erpDateStr(it.contractDate||it.startDate||it.createdAt).slice(0,7);
       if(d !== thisYM) return false;
     }
     if(mgrFilter !== 'all' && it.managerMain !== mgrFilter && (it.managerSubs||[]).indexOf(mgrFilter) < 0) return false;
@@ -70999,23 +71115,12 @@ function StaffRosterModal(props){
       ),
       h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px' } },
         fld('계약만료일', inp('contractEnd','date')),
-        fld('퇴직일', inp('retireDate','date'))
+        fld('퇴직일 (마지막 근무일)', h('input', { type:'date', value:f.retireDate||'',
+          onChange:function(e){ var v = e.target.value; setF(function(prev){ return Object.assign({}, prev, { retireDate:v, lastWorkDate:v }); }); },
+          style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } }))
       ),
       f.status === 'retired' && fld('퇴직사유', sel('leaveReason', ['자발적 퇴사','권고사직','계약만료','해고','사망','기타'])),
-      f.status === 'retired' && fld('마지막 근무일', h('input', { type:'date', value:f.lastWorkDate||'',
-        title:'✏️ 마지막 근무일 — 입력 시 퇴직일이 비어있으면 다음 날로 자동 설정',
-        onChange:function(e){
-          var v = e.target.value;
-          setF(function(prev){
-            var next = Object.assign({}, prev, { lastWorkDate:v });
-            if(v && !prev.retireDate){
-              var d = new Date(v); d.setDate(d.getDate()+1);
-              next.retireDate = d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
-            }
-            return next;
-          });
-        },
-        style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px', boxSizing:'border-box' } })),
+      /* 마지막 근무일 칸은 없앴다 — 퇴직일이 곧 마지막 근무일이다(대표 결정 2026-10-11). 예전에는 마지막 근무일을 넣으면 퇴직일을 «다음 날»로 바꿨다. */
       // 퇴직 정산 스냅샷 — 분쟁·증명서 대응용 최소 기록 (임금채권·퇴직급여 시효 3년 대비)
       f.status === 'retired' && h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'10px 12px', marginBottom:'12px' } },
         h('div', { style:{ fontSize:'11px', fontWeight:700, color:'#854d0e', marginBottom:'8px' } }, '📋 퇴직 정산 스냅샷 (시효 3년 대비 기록 — 원본 서류는 자료보관소에)'),
@@ -71990,8 +72095,10 @@ function RetireModal(props){
       }
     }
     var selDocs = Object.keys(docs).filter(function(k){ return docs[k]; });
+    var _future = f1.retireDate > today;   // 앞날짜 — 그날까지는 재직(퇴직 예정)
     props.onSave(Object.assign({}, u, {
-      status:'retired', retireDate:f1.retireDate, lastWorkDate:f1.lastWorkDate, leaveReason:f1.leaveReason,
+      status: _future ? (u.status === 'leave' ? 'leave' : 'active') : 'retired', retirePending:_future,
+      retireDate:f1.retireDate, lastWorkDate:f1.retireDate, leaveReason:f1.leaveReason,
       retireChecklist:{ isSeveranceTarget:isSev, workYears:Math.round(years*10)/10, proratedPay:prorated, annualLeaveRemain:f2.annualLeaveRemain, annualLeavePay:annualPay, severancePay:severance, totalPay:total },
       retireDocs:selDocs, retiredAt:today,
       leaveRecalcBasis: f2.leaveRecalcApplied ? 'joinDate' : (dbGet('policy_leave',{}).basis||'joinDate'),
@@ -72012,8 +72119,10 @@ function RetireModal(props){
       lbl('직책', u.title||'-'),
       lbl('입사일', u.hireDate||'-', true)
     )),
-    fld('퇴직일 *', inp(f1.retireDate, set1('retireDate'), 'date')),
-    fld('마지막 근무일', inp(f1.lastWorkDate, set1('lastWorkDate'), 'date')),
+    /* 퇴직일 = 마지막 근무일 (대표 결정 2026-10-11) — 두 칸을 따로 받으면 하루 어긋나 급여·퇴직금·연차가 갈렸다 */
+    fld('퇴직일 * (마지막 근무일)', inp(f1.retireDate, function(e){ var v = e.target.value; setF1(Object.assign({}, f1, { retireDate:v, lastWorkDate:v })); }, 'date')),
+    f1.retireDate > today && h('div', { style:{ fontSize:'11.5px', color:'#1e40af', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'6px 10px', marginBottom:'10px' } },
+      '📅 앞날짜입니다 — 그날까지는 «재직»으로 두고 «퇴직 예정»으로 적습니다. 그날이 지나면 저절로 퇴직이 됩니다.'),
     fld('퇴직사유', h('select', { value:f1.leaveReason, onChange:set1('leaveReason'), style:{ width:'100%', padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px' } },
       LEAVE_REASONS.map(function(r){ return h('option',{key:r,value:r},r); })
     ))
@@ -72921,7 +73030,9 @@ function PerfManagement(props){
         var fiArr = dbGet('finance_income', []) || [];
         // 중복 방지: 이미 가져온 인센티브(sourceKind:incentive) 키 = 입금일|항목|수령인
         var have = {};
-        fiArr.forEach(function(fi){ if(fi.sourceKind==='incentive') have[(fi.date||'')+'|'+(fi.kind||'')+'|'+((fi.perfShares&&fi.perfShares[0]&&fi.perfShares[0].sid)||'')]=true; });
+        /* ★ 새 줄의 열쇠는 「업체명_유형」 원문(item)인데, 예전엔 있던 줄을 «유형만»(kind)으로 세어 밑줄 든 항목이 걸러지지 않았다 —
+           2026-06-18 같은 파일을 두 번 올려 264쌍(3억 325만)이 겹쳤다(2026-10-11 검토 A-1). 있던 줄도 같은 모양으로 센다. */
+        fiArr.forEach(function(fi){ if(fi.sourceKind==='incentive'){ var _sid=((fi.perfShares&&fi.perfShares[0]&&fi.perfShares[0].sid)||''); var _it=(fi.companyName ? fi.companyName+'_' : '')+(fi.kind||''); have[(fi.date||'')+'|'+_it+'|'+_sid]=true; have[(fi.date||'')+'|'+(fi.kind||'')+'|'+_sid]=true; } });
         var added=0, skipped=0, nomatch={};
         // 컬럼: 0상여구분 1입금일 2항목 3입금금액 4부가세제외 5비율 6성과급 7수령인
         for(var r=hi+1;r<data.length;r++){
@@ -76691,6 +76802,47 @@ function erpLeaveGrants(u, untilYmd, policy){
   }
   return before.concat(fix, after);
 }
+/* «이번 연차 기간» — 오늘(퇴직자는 마지막 근무일) 쓸 수 있는 연차가 생긴 날부터 만료일까지 (2026-10-11 대표 「휴가관리 시안대로 진행」)
+   까닭: 입사일 기준인데 표가 달력 연도로 잘라 세어, 작년 11월에 생긴 15일을 올해 쓰면 «부여 0 · 사용 5 · 잔여 −5» 로 보였다.
+   · 생긴 = 그 날 «살아 있는»(생긴 날 ≤ 그 날 ≤ 만료일) 발생분 합 — 판결식 전환 보정분도 함께
+   · 쓴   = 그 기간(첫 발생일 ~ 마지막 만료일) 안의 연차·반차·시간연차 (소정근로시간으로 나눈다)
+   · 수기 부여(leave_grants[sid][그 해]) 가 있으면 «생긴»을 그 값 + 전환 보정 + 이월 로 본다 (해 = 이번 기간 주 발생분의 해)
+   · 다음 = 그 날 뒤에 처음 생길 발생분 (퇴직자는 없음) */
+function erpLeaveCycleNow(u, atYmd, atts, ovMap){
+  var out = { start:'', end:'', granted:0, used:0, remain:0, next:null, firstYear:false, ovYear:'', ov:null, autoDays:0 };
+  if(!u || !u.hireDate) return out;
+  var at = atYmd || localYMD(new Date());
+  var lastDay = String(u.lastWorkDate || u.retireDate || '').slice(0, 10);
+  if(lastDay && lastDay < at) at = lastDay;
+  var all = erpLeaveGrants(Object.assign({}, u, { lastWorkDate:'', retireDate:'' }), '9999-12-31');
+  var live = all.filter(function(g){ return g.date <= at && g.expiry >= at; });
+  var nx = lastDay ? null : (all.filter(function(g){ return g.date > at; })[0] || null);
+  out.next = nx ? { date:nx.date, days:nx.days } : null;
+  if(!live.length){
+    // 아직 하나도 안 생겼다(입사 첫 달) — 기간은 입사일부터 첫 기념일 전날까지
+    var h0 = _lvParse(u.hireDate);
+    if(h0){ out.start = _lvYmd(h0); out.end = _lvYmd(_lvDayBefore(_lvAddMonths(h0, 12))); out.firstYear = true; }
+    return out;
+  }
+  var main = live.filter(function(g){ return g.kind === 'year' && !/전환 보정/.test(String(g.label || '')); }).pop() || live[0];
+  out.firstYear = main.kind === 'under1';
+  out.start = out.firstYear ? String(u.hireDate).slice(0, 10) : live.reduce(function(m, g){ return g.date < m ? g.date : m; }, live[0].date);
+  out.end = live.reduce(function(m, g){ return g.expiry > m ? g.expiry : m; }, live[0].expiry);
+  out.autoDays = live.reduce(function(t, g){ return t + g.days; }, 0);
+  out.granted = out.autoDays;
+  out.ovYear = main.date.slice(0, 4);
+  var ov = ovMap && ovMap[u.sid] && ovMap[u.sid][out.ovYear] ? ovMap[u.sid][out.ovYear] : null;
+  if(ov && !out.firstYear){
+    out.ov = ov;
+    var fix = live.filter(function(g){ return /전환 보정/.test(String(g.label || '')); }).reduce(function(t, g){ return t + g.days; }, 0);
+    out.granted = (ov.total != null ? (+ov.total || 0) + fix : out.autoDays) + (+ov.carryOver || 0);
+  }
+  var dayHours = u.scheduledHours || 8;
+  var recs = (atts || []).filter(function(r){ return r && r.sid === u.sid && r.date && r.date >= out.start && r.date <= out.end; });
+  out.used = (typeof PuWork !== 'undefined' && PuWork.leaveUsed) ? PuWork.leaveUsed(recs, dayHours) : 0;
+  out.remain = Math.round((out.granted - out.used) * 10) / 10;
+  return out;
+}
 /* 그해(달력 1~12월)에 «생긴» 연차 — 오늘·퇴직일 뒤의 것은 아직 없다 */
 function erpLeaveGrantedInYear(u, year, asOfYmd){
   var y = String(year), asOf = asOfYmd || localYMD(new Date());
@@ -77950,6 +78102,23 @@ function LeaveManagement(){
     return {used:PuWork.leaveUsed(rec, dayHours), fullDays:leaveCnt, halfDays:halfCnt, hourTotal:hourTotal};
   }
 
+  /* 보는 기준 — «지금»(이번 연차 기간) / «연도별»(달력 1~12월, 대장·정산용) (2026-10-11 시안) */
+  var lvvS = usePersistedState('leave_view', 'now'); var lvView = lvvS[0]; var setLvView = lvvS[1];
+  function lvRow(u){
+    if(lvView === 'now'){
+      var c = erpLeaveCycleNow(u, todayYMD(), attendance, grants);
+      return { mode:'now', granted:c.granted, used:c.used, remain:c.remain, ov:c.ov, auto:c.autoDays, cycle:c,
+        usedTitle:'이번 연차 기간 ' + c.start + ' ~ ' + c.end + ' 안에 쓴 연차', promoYear:String(new Date().getFullYear()) };
+    }
+    var a = calcGrantDays(u.hireDate, selYear, u.retireDate||u.leaveDate||null);
+    var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
+    var t = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
+    var co = ov?(ov.carryOver||0):0;
+    var us = calcUsed(u.sid, selYear);
+    return { mode:'year', t:t, co:co, granted:t+co, used:us.used, remain:Math.round((t+co-us.used)*10)/10, ov:ov, auto:a.days,
+      usedTitle:'연'+us.fullDays+'·반'+us.halfDays+'·시'+us.hourTotal+'h', promoYear:selYear };
+  }
+
   var selUser = users.find(function(u){return u.sid===selSid;});
 
   // 선택 직원 연차 정보
@@ -77960,6 +78129,9 @@ function LeaveManagement(){
   var grant = total + carryOver;
   var used  = selUser ? calcUsed(selSid, selYear) : {used:0,fullDays:0,halfDays:0,hourTotal:0};
   var remain = grant - used.used;
+  var selCycle = (lvView === 'now' && selUser) ? erpLeaveCycleNow(selUser, todayYMD(), attendance, grants) : null;
+  if(selCycle){ grant = selCycle.granted; used = Object.assign({}, used, { used:selCycle.used }); remain = selCycle.remain; }
+  var lbOpenS = usePersistedState('leave_basis_open', false); var lbOpen = lbOpenS[0]; var setLbOpen = lbOpenS[1];
 
   // 오버라이드 저장
   function openOverride(){
@@ -78090,6 +78262,15 @@ function LeaveManagement(){
         h('button',{onClick:function(){setSelYear(String(parseInt(selYear)+1));},style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'4px',padding:'2px 7px',cursor:'pointer',fontSize:'13px'}},'▶')
       ),
       h('div',{style:{display:'flex',gap:'3px',alignItems:'center',flexShrink:0}},
+        // 보는 기준 — 지금(이번 연차 기간) / 연도별(달력 1~12월)
+        _isAdminView && h('div',{style:{display:'inline-flex',border:'1px solid #cbd5e1',borderRadius:'7px',overflow:'hidden',marginRight:'6px'}},
+          [{v:'now',l:'지금 기준'},{v:'year',l:'연도별'}].map(function(o){
+            var on = lvView === o.v;
+            return h('button',{key:o.v,type:'button',onClick:function(){ setLvView(o.v); },
+              title: o.v==='now' ? '오늘 쓸 수 있는 연차가 생긴 날부터 만료일까지로 셉니다' : '선택한 해(1~12월)에 생기고 쓴 것으로 셉니다 — 대장·정산용',
+              style:{border:'none',padding:'3px 10px',fontSize:'11px',cursor:'pointer',whiteSpace:'nowrap',
+                background: on ? '#1e40af' : '#fff', color: on ? '#fff' : '#64748b', fontWeight: on ? 700 : 500}}, o.l);
+          })),
         // 재직 / 퇴사자 탭 — 목록도 합계도 함께 갈린다
         _isAdminView && h('div',{style:{display:'inline-flex',gap:'3px',alignItems:'center'}},
           [{ v:'active',  label:'재직',      n:leaveLiveN, c:'#1e40af', bg:'#eff6ff', bd:'#bfdbfe' },
@@ -78149,61 +78330,60 @@ function LeaveManagement(){
           h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'11.5px'}},
             h('thead',null,
               h('tr',null,
-                h('th',{rowSpan:2,style:Object.assign({},thS,{width:'40px',textAlign:'center',verticalAlign:'middle'})},'#'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{verticalAlign:'middle'})},'직원'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',verticalAlign:'middle'})},'부여'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',verticalAlign:'middle'})},'이월'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',background:'#eff6ff',verticalAlign:'middle'})},'총'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',background:'#fffbeb',verticalAlign:'middle'})},'사용'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'right',background:'#eff6ff',verticalAlign:'middle'})},'잔여'),
-                h('th',{colSpan:2,style:Object.assign({},thS,{textAlign:'center',background:'#fffbeb',color:'#854d0e',borderBottom:'1px solid #fde68a'})},'\uD83D\uDCE2 \uC0AC\uC6A9\uCD09\uC9C4\uC2DC\uD589'),
-                h('th',{rowSpan:2,style:Object.assign({},thS,{textAlign:'center',width:'36px',verticalAlign:'middle'})},'⚙️')
-              ),
-              h('tr',null,
-                h('th',{style:Object.assign({},thS,{textAlign:'center',background:'#fffbeb',color:'#854d0e',width:'88px'})},'1차 통보'),
-                h('th',{style:Object.assign({},thS,{textAlign:'center',background:'#fffbeb',color:'#854d0e',width:'88px'})},'2차 통보')
+                (lvView === 'now'
+                  ? [['#','center'],['이름','left'],['이번 연차 기간','left'],['생긴','right'],['쓴','right'],['남은','right'],['다음 연차','left'],['촉진','left'],['','center']]
+                  : [['#','center'],['이름','left'],['부여','right'],['이월','right'],['총','right'],['사용','right'],['잔여','right'],['촉진','left'],['','center']])
+                  .map(function(c, k){ return h('th',{key:k,style:Object.assign({},thS,{textAlign:c[1],whiteSpace:'nowrap'})},c[0]); })
               )
             ),
             h('tbody',null,
               leaveUsers.map(function(u,i){
-                var a  = calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
-                var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-                var t  = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
-                var co = ov?(ov.carryOver||0):0;
-                var gr = t+co;
-                var us = calcUsed(u.sid,selYear);
-                var re = gr-us.used;
-                var ratio = gr>0?us.used/gr:0;
+                var R = lvRow(u);
+                var ov = R.ov, gr = R.granted, re = R.remain;
+                var ratio = gr>0?R.used/gr:0;
                 var color = ratio>=0.8?'#dc2626':ratio>=0.5?'#d97706':'#16a34a';
                 var isSel = u.sid===selSid;
+                var mono = {textAlign:'right',fontFamily:'monospace',whiteSpace:'nowrap'};
+                var onLoa = erpEmpStatusAt(u) === 'leave';
                 return h('tr',{key:u.sid,onClick:function(){setSelSid(u.sid);},
                   style:{background:isSel?'#eff6ff':i%2===0?'#fff':'#f8fafc',
                     cursor:'pointer',borderLeft:'3px solid '+(isSel?'#1e40af':'transparent'),
                     borderBottom:'1px solid #f8fafc'}},
                   h('td',{style:Object.assign({},tdS,{textAlign:'center',color:'#94a3b8',fontFamily:'monospace',fontSize:'11px'})},i+1),
-                  h('td',{style:Object.assign({},tdS,{fontWeight:700})},
+                  /* 이름 칸은 한 줄 — 직책은 옆에 작게 (CLAUDE.md 한 칸 한 줄) */
+                  h('td',{style:Object.assign({},tdS,{fontWeight:700,whiteSpace:'nowrap'})},
                     u.name,
-                    (u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'6px', fontWeight:700, verticalAlign:'middle' } }, '퇴사'),
+                    h('span',{style:{fontSize:'10.5px',color:'#94a3b8',fontWeight:400,marginLeft:'5px'}},u.title||''),
+                    onLoa && !(u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '휴직'),
+                    (u.status==='retired'||u.status==='resigned') && h('span', { style:{ marginLeft:'4px', fontSize:'10px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '퇴사'),
                     u.leaveRecalcApplied && h('span', { title:'퇴직 시 입사일 기준 연차 재산정 적용됨',
-                      style:{ marginLeft:'4px', fontSize:'10px', background:'#eff6ff', color:'#2563eb',
-                        padding:'1px 5px', borderRadius:'6px', fontWeight:700, verticalAlign:'middle' } }, '🔄재산정'),
-                    h('div',{style:{fontSize:'10.5px',color:'#94a3b8',fontWeight:400}},u.title)),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace'})},
-                    ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+a.days+'일)'},t+'⚙'):t),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',color:co>0?'#2563eb':'#cbd5e1'})},co>0?co:'-'),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,background:'#eff6ff'})},gr),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:700,color:color,background:'#fffbeb'}),title:'연'+us.fullDays+'·반'+us.halfDays+'·시'+us.hourTotal+'h'},
-                    Math.round(us.used*10)/10),
-                  h('td',{style:Object.assign({},tdS,{textAlign:'right',fontFamily:'monospace',fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},
-                    Math.round(re*10)/10),
-                  // ── 1차/2차 통보 (사용촉진 데이터 인라인) ──
+                      style:{ marginLeft:'4px', fontSize:'10px', background:'#eff6ff', color:'#2563eb', padding:'1px 5px', borderRadius:'6px', fontWeight:700 } }, '🔄재산정')),
+                  R.mode === 'now'
+                    ? [
+                        h('td',{key:'per',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'}),title:R.cycle.firstYear?'입사 1년 미만 — 매달 1일씩 생긴다':''},
+                          R.cycle.start ? (R.cycle.start + ' ~ ' + R.cycle.end) : '-'),
+                        h('td',{key:'g',style:Object.assign({},tdS,mono)},
+                          ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+R.auto+'일)'},gr+'⚙'):gr),
+                        h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color}),title:R.usedTitle},Math.round(R.used*10)/10),
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re),
+                        h('td',{key:'nx',style:Object.assign({},tdS,{fontFamily:'monospace',fontSize:'11px',color:'#64748b',whiteSpace:'nowrap'})},
+                          R.cycle.next ? (R.cycle.next.date + ' · ' + R.cycle.next.days + '일') : '—')
+                      ]
+                    : [
+                        h('td',{key:'g',style:Object.assign({},tdS,mono)},
+                          ov?h('span',{style:{color:'#2563eb',fontWeight:700},title:'수동 설정 (자동:'+R.auto+'일)'},R.t+'⚙'):R.t),
+                        h('td',{key:'co',style:Object.assign({},tdS,mono,{color:R.co>0?'#2563eb':'#cbd5e1'})},R.co>0?R.co:'-'),
+                        h('td',{key:'gr',style:Object.assign({},tdS,mono,{fontWeight:700,background:'#eff6ff'})},gr),
+                        h('td',{key:'u',style:Object.assign({},tdS,mono,{fontWeight:700,color:color,background:'#fffbeb'}),title:R.usedTitle},Math.round(R.used*10)/10),
+                        h('td',{key:'r',style:Object.assign({},tdS,mono,{fontWeight:800,fontSize:'13px',color:re<0?'#dc2626':'#2563eb',background:'#eff6ff'})},re)
+                      ],
+                  // ── 촉진: «한 칸» — 지금 차례인 통보만 보인다 (1차를 했으면 2차) ──
                   (function(){
-                    var pstage = calcLeavePromoStage(u.hireDate, selYear);
+                    var pstage = calcLeavePromoStage(u.hireDate, R.promoYear);
                     var prec = promoRecOf(u.sid);
                     var hasRemain = re > 0;   // 잔여 있을 때만 촉진 대상
                     var isRetiredU = (u.status==='retired' || u.status==='resigned');  // 퇴사자는 촉진 불필요
                     if(isRetiredU) hasRemain = false;
-                    // 통보 셀 렌더: 완료(날짜+✎) / 시기도래(＋기록) / 아직(—)
                     function noticeCell(round){
                       if(isRetiredU) return h('span',{style:{fontSize:'10px',color:'#cbd5e1'}, title:'퇴사자 — 사용촉진 불필요'},'—');
                       if(!pstage.enabled) return h('span',{style:{fontSize:'10px',color:'#cbd5e1'}, title:'사용촉진 미실시 (연차수당 지급 방침)'},'미실시');
@@ -78232,7 +78412,7 @@ function LeaveManagement(){
                           '✓ '+dateVal.slice(5), sentAt ? h('span',{style:{color:'#2563eb',fontSize:'9px'}},'📧') : h('span',{style:{color:'#94a3b8',fontSize:'9px'}},'✎'));
                       }
                       if(reached){
-                        return h('span',{style:{display:'inline-flex',flexDirection:'column',gap:'2px',alignItems:'center'}},
+                        return h('span',{style:{display:'inline-flex',flexDirection:'row',gap:'4px',alignItems:'center',whiteSpace:'nowrap'}},
                           plannedStr ? h('span',{style:{fontSize:'9px',color:'#d97706',fontFamily:'monospace',fontWeight:700}}, plannedStr.slice(5)+(round===2?' 까지':' 예정')) : null,
                           h('span',{style:{display:'flex',gap:'3px'}},
                             h('button',{title:'통보서 메일 발송 + 통보일 기록',
@@ -78255,33 +78435,32 @@ function LeaveManagement(){
                         ? h('span',{style:{fontSize:'9.5px',color:'#cbd5e1',fontFamily:'monospace'}}, plannedStr.slice(5)+(round===2?' 까지':' 예정'))
                         : h('span',{style:{fontSize:'10px',color:'#cbd5e1'}},'—');
                     }
-                    return [
-                      h('td',{key:'n1',style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})}, noticeCell(1)),
-                      h('td',{key:'n2',style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})}, noticeCell(2))
-                    ];
+                    var round = (prec && prec.n1Date) ? 2 : 1;
+                    var body = (!pstage.enabled || isRetiredU || (prec && prec.excluded)) ? h('span',{style:{fontSize:'10px',color:'#cbd5e1'}},'—') : noticeCell(round);
+                    return h('td',{key:'promo',style:Object.assign({},tdS,{padding:'3px 6px',whiteSpace:'nowrap'})},
+                      (pstage.enabled && !isRetiredU && !(prec && prec.excluded)) && h('span',{style:{fontSize:'9.5px',color:'#94a3b8',marginRight:'4px'}}, round+'차'),
+                      body);
                   })(),
                   h('td',{style:Object.assign({},tdS,{textAlign:'center',padding:'3px'})},
                     h('button',{onClick:function(e){e.stopPropagation();setSelSid(u.sid);openOverride();},
-                      style:{padding:'2px 6px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'10px'}},'수정'))
+                      title:'부여일수 수정',
+                      style:{padding:'2px 7px',background:'#f8fafc',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',cursor:'pointer',fontSize:'10.5px',whiteSpace:'nowrap'}},'⚙ 수정'))
                 );
               }),
-              // 합계
-              h('tr',{style:{background:'#1e40af',color:'#fff'}},
-                // 어느 무리의 합인지 밝힌다 — 탭에 따라 숫자가 달라지므로
-                h('td',{style:{padding:'7px 10px',fontWeight:800,whiteSpace:'nowrap'}},
-                  '합계', h('span',{style:{fontWeight:600,fontSize:'10px',opacity:.85,marginLeft:'5px'}},
-                    (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
-                h('td',{colSpan:2,style:{padding:'7px',textAlign:'right',fontFamily:'monospace'}},''),
-                h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;var co=ov?(ov.carryOver||0):0;return s+t+co;},0)),
-                h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  Math.round(leaveUsers.reduce(function(s,u){return s+calcUsed(u.sid,selYear).used;},0)*10)/10),
-                h('td',{style:{padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800}},
-                  Math.round(leaveUsers.reduce(function(s,u){var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);var ov=grants[u.sid]&&grants[u.sid][selYear];var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;var co=ov?(ov.carryOver||0):0;return s+(t+co-calcUsed(u.sid,selYear).used);},0)*10)/10),
-                h('td',null),
-                h('td',null),
-                h('td',null)
-              )
+              // 합계 — 표와 같은 셈(lvRow)
+              (function(){
+                var rows = leaveUsers.map(lvRow);
+                var sum = function(k){ return Math.round(rows.reduce(function(t, r){ return t + (+r[k] || 0); }, 0) * 10) / 10; };
+                var cS = {padding:'7px 10px',textAlign:'right',fontFamily:'monospace',fontWeight:800};
+                return h('tr',{style:{background:'#1e40af',color:'#fff'}},
+                  h('td',{colSpan: lvView==='now' ? 3 : 4,style:{padding:'7px 10px',fontWeight:800,whiteSpace:'nowrap'}},
+                    '합계', h('span',{style:{fontWeight:600,fontSize:'10px',opacity:.85,marginLeft:'5px'}},
+                      (showRetired ? '퇴사자' : '재직') + ' ' + leaveUsers.length + '명')),
+                  h('td',{style:cS},sum('granted')),
+                  h('td',{style:cS},sum('used')),
+                  h('td',{style:cS},sum('remain')),
+                  h('td',{colSpan: lvView==='now' ? 3 : 2}));
+              })()
             )
           )
         ),
@@ -78300,24 +78479,28 @@ function LeaveManagement(){
               h('span',{style:{fontSize:'11px',color:'#94a3b8',marginLeft:'6px'}},'입사 '+(selUser.hireDate||'-'))
             ),
             h('div',{style:{display:'flex',gap:'8px',fontSize:'12px'}},
-              h('span',{style:{background:'#eff6ff',color:'#1e40af',padding:'3px 10px',borderRadius:'6px',fontWeight:700}},'총 '+grant+'일'),
+              h('span',{style:{background:'#eff6ff',color:'#1e40af',padding:'3px 10px',borderRadius:'6px',fontWeight:700,whiteSpace:'nowrap'},
+                title: selCycle ? ('이번 연차 기간 ' + selCycle.start + ' ~ ' + selCycle.end) : (selYear + '년 기준')}, (selCycle ? '생긴 ' : '총 ')+grant+'일'),
               h('span',{style:{background:'#fffbeb',color:'#854d0e',padding:'3px 10px',borderRadius:'6px',fontWeight:700}},'사용 '+Math.round(used.used*10)/10+'일'),
-              h('span',{style:{background:'#eff6ff',color:'#2563eb',padding:'3px 10px',borderRadius:'6px',fontWeight:800,fontSize:'13px'}},'잔여 '+Math.round(remain*10)/10+'일'),
+              h('span',{style:{background:'#eff6ff',color:'#2563eb',padding:'3px 10px',borderRadius:'6px',fontWeight:800,fontSize:'13px',whiteSpace:'nowrap'}},'잔여 '+Math.round(remain*10)/10+'일'+(selCycle && selCycle.end ? ' · 만료 '+selCycle.end : '')),
               h('button',{onClick:openOverride,style:{padding:'3px 8px',background:'#f8fafc',border:'1px solid #cbd5e1',borderRadius:'4px',cursor:'pointer',fontSize:'11px',color:'#475569'}},'부여일수 수정')
             )
           ),
           // 5인이상 전환 안내 (2021-06-01 이전 입사자만)
-          auto.isOldEmp && h('div',{style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:'8px 12px',marginBottom:'10px',fontSize:'11.5px',color:'#854d0e'}},
-            h('span',{style:{fontWeight:700,marginRight:'4px'}},'📋 연차 기산일 안내'),
-            '실제 입사일('+selUser.hireDate+')과 연차 기산일이 다릅니다.',
-            h('br',null),
+          auto.isOldEmp && h('div',{style:{background:'#fffbeb',border:'1px solid #fde68a',borderRadius:'6px',padding:'5px 10px',marginBottom:'8px',fontSize:'11.5px',color:'#854d0e'}},
+            h('div',{style:{display:'flex',alignItems:'center',gap:'6px',whiteSpace:'nowrap',overflow:'hidden'}},
+              h('span',{style:{fontWeight:700}},'📋 연차 기산일 안내'),
+              h('span',{style:{overflow:'hidden',textOverflow:'ellipsis'}},'실제 입사일('+selUser.hireDate+')과 연차 기산일이 다릅니다.'),
+              h('button',{type:'button',onClick:function(){ setLbOpen(!lbOpen); },
+                style:{marginLeft:'auto',border:'1px solid #fde68a',background:'#fff',color:'#854d0e',borderRadius:'5px',padding:'1px 8px',fontSize:'10.5px',cursor:'pointer',flexShrink:0}}, lbOpen ? '접기' : '펼치기')),
+            lbOpen && h('div',{style:{marginTop:'4px'}},
             '푸른노무법인은 ',h('strong',null,'2021년 06월 01일'),' 5인이상 사업장으로 전환되어 근로기준법상 연차가 적용되었습니다.',
             h('br',null),
             '이전 입사자의 연차는 ',h('strong',null,'2021-06-01'),
             '부터 기산하며, 실제 입사일('+selUser.hireDate+')로부터 2021-05-31까지는 연차 미발생 기간입니다.',
             h('br',null),
             /* 2026-10-10 대법원 2023도5476 판결식 전환 — 지난 부여분은 그대로, 다음부터 실제 입사일 기산·가산 */
-            h('strong',null,LEAVE_RULING_FROM+'부터'),' 대법원 2024. 12. 12. 선고 2023도5476 판결에 따라 실제 입사일 기준으로 셉니다(지난 부여분은 그대로 · 모자란 몫은 보정 부여).'
+            h('strong',null,LEAVE_RULING_FROM+'부터'),' 대법원 2024. 12. 12. 선고 2023도5476 판결에 따라 실제 입사일 기준으로 셉니다(지난 부여분은 그대로 · 모자란 몫은 보정 부여).')
           ),
           // 잔여 프로그레스 바
           h('div',{style:{background:'#e2e8f0',borderRadius:'4px',height:'8px',overflow:'hidden'}},
@@ -81810,7 +81993,7 @@ function PayrollLedger(props){
             h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'6px' } },
               h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'10px', background:'#475569', borderRadius:'4px', padding:'1px 5px', flexShrink:0 } }, idx+1),
               h('span', { style:{ fontWeight:700, color:'#1e293b', fontSize:'13px', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, u.name),
-              u.status==='leave' && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '휴직'),
+              erpEmpStatusAt(u, (rec.ym || todayYMD().slice(0,7)) + '-15') === 'leave' && h('span', { style:{ fontSize:'9.5px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '휴직'),
               (u.status==='resigned'||u.status==='retired') && h('span', { style:{ fontSize:'9.5px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '퇴사'),
               u.title && h('span', { style:{ fontSize:'10px', color:'#64748b', flexShrink:0 } }, u.title),
               h('span', { style:{ fontSize:'10px', background:stBg, color:stFg, padding:'1px 7px', borderRadius:'10px', fontWeight:700, flexShrink:0 } }, stLb)
@@ -84740,6 +84923,13 @@ function StaffRoster(){
 
   function openRetire(u){ setDetailModal(null); setRetireModal(u); }
   function saveRetire(data){
+    if(data.retirePending){
+      /* 퇴직 예정 — 지금은 재직 그대로. 휴직 기록은 그날 저절로 닫힌다(loaReconcileStatus) */
+      persist(users.map(function(u){ return u.sid === data.sid ? data : u; }));
+      setRetireModal(null);
+      showToast('📅 ' + data.name + ' 퇴직 예정 등록 (' + data.retireDate + ' 마지막 근무) — 그날이 지나면 저절로 퇴직');
+      return;
+    }
     data = Object.assign({}, data, { leaveStartDate:'', leaveEndDate:'' });
     persist(users.map(function(u){ return u.sid === data.sid ? data : u; }));
     var _nl = erpCloseLoaForRetire(data.sid, data.lastWorkDate || data.retireDate || todayYMD());
@@ -84749,8 +84939,10 @@ function StaffRoster(){
     showToast(data.name + ' 퇴사 처리 완료');
   }
 
-  // 휴직 자동연동(A): 오늘이 LOA(휴가관리 휴직) 기간이면 재직을 휴직으로 표시 — 데이터는 변경하지 않음
-  function effStatus(u){ return (u && u.status==='active' && getLoaStatus(u.sid)) ? 'leave' : (u?u.status:''); }
+  /* 퇴직 예정일·휴직 날짜를 화면을 열 때 한 번 맞춘다 (2026-10-11) */
+  useEffect(function(){ try { loaReconcileStatus(); } catch(e){ window._erpErrLog && window._erpErrLog(e); } }, []);
+  // 휴직 자동연동(A): 오늘이 LOA(휴가관리 휴직) 기간이면 재직을 휴직으로 표시 — 데이터는 변경하지 않음 (공용 판정 erpEmpStatusAt)
+  function effStatus(u){ return (u && u.status==='active' && erpEmpStatusAt(u)==='leave') ? 'leave' : (u?u.status:''); }
   var activeCount    = users.filter(function(u){return effStatus(u)==='active';}).length;
   var leaveCount     = users.filter(function(u){return effStatus(u)==='leave';}).length;
   var standbyCount   = users.filter(function(u){return u.status==='standby';}).length;
@@ -85090,8 +85282,11 @@ function StaffRoster(){
       var hist = (Array.isArray(u.employmentHistory) ? u.employmentHistory : []).slice();
       if(u.retireDate || u.leaveReason) hist.push({ hireDate:u.hireDate || '', retireDate:u.retireDate || '', lastWorkDate:u.lastWorkDate || '',
         leaveReason:u.leaveReason || '', reinstatedAt:todayYMD(), by:(CURRENT_USER && CURRENT_USER.name) || '' });
-      return Object.assign({}, u, { status:'active', retireDate:'', leaveReason:'', lastWorkDate:'', employmentHistory:hist });
+      return Object.assign({}, u, { status:'active', retirePending:false, retireDate:'', leaveReason:'', lastWorkDate:'', leaveStartDate:'', leaveEndDate:'', employmentHistory:hist });
     }));
+    /* 복귀 전에 열려 있던 휴직이 있으면 퇴직 시점에 맞춰 닫는다 — 안 그러면 복귀하자마자 다시 «휴직»으로 보인다 (2026-10-11) */
+    var _ru = users.find(function(x){ return x && x.sid === sid; });
+    erpCloseLoaForRetire(sid, String((_ru && (_ru.lastWorkDate || _ru.retireDate)) || todayYMD()).slice(0, 10));
     setDetailModal(null);
     showToast('재직 복귀됨');
   }
@@ -85365,6 +85560,9 @@ function StaffRoster(){
                     u.status==='retired' && h('span', {
                       style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#fef2f2',color:'#991b1b',fontSize:'10.5px',fontWeight:700,verticalAlign:'middle'}
                     }, '퇴직'),
+                    u.retirePending && u.status!=='retired' && h('span', { title:'마지막 근무일 ' + (u.retireDate||'') + ' — 그날이 지나면 저절로 퇴직',
+                      style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#eff6ff',color:'#1e40af',fontSize:'10.5px',fontWeight:700,verticalAlign:'middle',whiteSpace:'nowrap'}
+                    }, '퇴직 예정 ' + String(u.retireDate||'').slice(5)),
                     u.status==='scheduled' && h('span', {
                       style:{marginLeft:'6px',padding:'1px 6px',borderRadius:'8px',background:'#f0fdf4',color:'#166534',fontSize:'10.5px',fontWeight:700,verticalAlign:'middle'}
                     }, '📅 입사예정')),

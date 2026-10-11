@@ -582,7 +582,7 @@ ok('임원 직위 다섯 가지(이사장·노사 이사·노사 감사)',
   ['이사장', '사용자측 이사', '근로자측 이사', '사용자측 감사', '근로자측 감사']
     .every(r => src.includes("'" + r + "'")) && src.includes('var OFFICER_ROLES='));
 ok('감사를 노·사로 갈라 읽는다', /_auditorsOf/.test(src)
-  && src.includes("side:/사용자/.test(r)?'사용자측':/근로자/.test(r)?'근로자측':''"));
+  && src.includes("side=/사용자/.test(r)?'사용자측':/근로자/.test(r)?'근로자측':''"));
 // 명부를 넣는 길이 실제로 있어야 한다 — 종전에는 읽기만 하고 쓰는 곳이 없어 42개 기금이 모두 비어 있었다
 ok('명부 입력 화면이 있다', src.includes('function officerPanel(') && src.includes('function addOfficerRow(')
   && src.includes('function _readOfficers('));
@@ -691,7 +691,7 @@ ok('대표자는 명부의 이사장 줄에서 온다', src.includes('function _
    ⚠ 예전엔 읽는 목록을 «글자 그대로» 붙들어, 칸을 하나 더하자 뜻은 그대로인데 검사가 깨졌다 — 칸마다 본다. */
 ok('등기임원 명부가 생년월일·소속 회사·직책·주민등록번호·주소를 담는다', src.includes("class=\"off-birth\"") && src.includes("class=\"off-company\"") && src.includes("class=\"off-rrn\"")
   && src.includes("class=\"off-title\"") && src.includes("class=\"off-addr\"")
-  && /\['birth','company','title','rrn','addr'\]\.forEach/.test(src));
+  && /\['birth','company','title','email','rrn','addr'\]\.forEach/.test(src) && src.includes("class=\"off-email\""));
 /* 반복 줄(근로자측 3줄·사용자측 3줄)은 «라벨 다음 칸» 방식으로 못 채운다 */
 /* 2026-09-14: 참여사업장의 사용자대표·근로자대표도 위원이라 sites 를 함께 받는다 */
 ok('위원 격자를 따로 채운다', src.includes('function fillCommittee(root,f,sites){')

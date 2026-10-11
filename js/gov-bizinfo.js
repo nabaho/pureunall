@@ -47,12 +47,12 @@
      '20220727 ~ 20220930' 꼴로 온다. 끝날이 마감이다.
      ⚠ 한쪽만 있거나 아예 없는 것도 있다(상시 접수) — 없으면 «모른다»로 둔다. */
   function period(reqstDt) {
-    var t = s(reqstDt);
-    var m = t.match(/(\d{8})/g);
-    function fmt(v) { return v.slice(0, 4) + '-' + v.slice(4, 6) + '-' + v.slice(6, 8); }
-    if (!m || !m.length) return { start: '', end: '' };
-    if (m.length === 1) return { start: fmt(m[0]), end: '' };
-    return { start: fmt(m[0]), end: fmt(m[1]) };
+    var t = s(reqstDt), m = [], re = /(\d{4})[-.]?(\d{2})[-.]?(\d{2})/g, x;
+    /* ★ 실제 응답(2026-10-11, 인증키로 호출)은 「2026-10-07 ~ 2026-10-14」 꼴이다 — 옛 8자리(20220727)도 그대로 받는다 */
+    while ((x = re.exec(t))) m.push(x[1] + '-' + x[2] + '-' + x[3]);
+    if (!m.length) return { start: '', end: '' };
+    if (m.length === 1) return { start: m[0], end: '' };
+    return { start: m[0], end: m[1] };
   }
 
   /* ── 응답 풀기 ──
@@ -69,24 +69,29 @@
     return { ok: true, err: '', rows: items.map(norm).filter(function (x) { return !!x.no; }) };
   }
 
+  /* ★★ 칸 이름은 «실제 응답»을 따른다(2026-10-11 — 대표 인증키로 처음 호출해 확인).
+     예전엔 RSS 식 이름(title·link·description·pubDate·reqstDt·author·lcategory)으로 짐작해 짰고, 233건을 받고도
+     공고명·날짜가 전부 비어 걸러내기에 «하나도 안 걸렸다». 실제는 pblancNm·pblancUrl·bsnsSumryCn·creatPnttm·
+     reqstBeginEndDe·jrsdInsttNm·pldirSportRealmLclasCodeNm 이다. 옛 이름은 «뒤 후보»로 남긴다(판이 바뀌어도 받게). */
+  function plain(v) { return s(v).replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/\s+/g, ' ').trim(); }
   function norm(it) {
     it = it || {};
-    var p = period(it.reqstDt);
+    var p = period(it.reqstBeginEndDe || it.reqstDt);
     return {
       src: '기업마당',
-      no: s(it.seq) || s(it.pblancId),
-      nm: s(it.title),
-      inst: s(it.excInsttNm) || s(it.author),      /* 수행기관을 먼저 — 실제로 서류를 받는 곳 */
-      ntce: s(it.author),                          /* 소관기관 */
-      openDt: s(it.pubDate).slice(0, 10),
+      no: s(it.pblancId) || s(it.seq),
+      nm: s(it.pblancNm) || s(it.title),
+      inst: s(it.excInsttNm) || s(it.jrsdInsttNm) || s(it.author),   /* 수행기관을 먼저 — 실제로 서류를 받는 곳 */
+      ntce: s(it.jrsdInsttNm) || s(it.author),                       /* 소관기관 */
+      openDt: (s(it.creatPnttm) || s(it.pubDate)).slice(0, 10),
       closeDt: p.end,
       startDt: p.start,
-      field: s(it.lcategory),
+      field: s(it.pldirSportRealmLclasCodeNm) || s(it.lcategory),
       target: s(it.trgetNm),
       prc: 0,                                      /* 지원사업에는 추정가격이 없다 */
       mthd: '',
-      url: s(it.link),
-      memo: s(it.description).slice(0, 200)
+      url: /^https:\/\//.test(s(it.pblancUrl)) ? s(it.pblancUrl) : s(it.link),
+      memo: plain(it.bsnsSumryCn || it.description).slice(0, 200)
     };
   }
 

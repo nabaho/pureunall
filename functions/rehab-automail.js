@@ -68,7 +68,7 @@ function plan(a) {
     const free = tradeMails.filter((e) => !optout[emailKey(e)] && !(lastByEmail[emailKey(e)] && nowMs - lastByEmail[emailKey(e)] < SAME_ADDRESS_DAYS * DAY) && !used[emailKey(e)]);
     if (!free.length) { skip(tradeMails.every((e) => optout[emailKey(e)]) ? "수신거부 명단" : "같은 주소로 최근 보냄"); return; }
     used[emailKey(free[0])] = 1;
-    candidates.push({ id: id, name: n.debtorName, email: free[0], toName: m.client && m.client.name || n.debtorName, ceo: m.ceo || "" });
+    candidates.push({ id: id, name: n.debtorName, email: free[0], toName: m.client && m.client.name || n.debtorName, ceo: m.ceo || "", kind: n.kind === "bankruptcy" ? "bankruptcy" : "rehab" });
   });
   const room = Math.max(0, settings.dailyCap - sentToday);
   return { candidates: candidates, skipped: skipped, cap: settings.dailyCap, sentToday: sentToday, room: room, enabled: settings.enabled, toSend: candidates.slice(0, room) };
@@ -76,7 +76,7 @@ function plan(a) {
 
 /* 예약 대기열 한 줄 — sendScheduledMail 이 15분마다 꺼내 보낸다(pucards/scheduled/<id>) */
 function queueRow(c, nowMs, sendAt) {
-  const mail = L.buildAdMail({ debtorName: c.name, ceoName: c.ceo }, { ceo: c.ceo });
+  const mail = L.buildAdMail({ debtorName: c.name, ceoName: c.ceo, kind: c.kind }, { ceo: c.ceo });
   return {
     at: sendAt, by: "rehab-auto", madeAt: nowMs, state: "waiting", fromWish: "",
     payload: { to: c.email, toName: c.toName, cardCompany: c.toName, subject: mail.subject, body: mail.text, html: "", matIds: [], files: [] }
