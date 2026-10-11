@@ -66509,6 +66509,10 @@ function Certificate(){
   var ct = useState(company.contactTitle || ''); var contactTitle = ct[0]; var setContactTitle = ct[1];
   var cp = useState(company.contactPhone || ''); var contactPhone = cp[0]; var setContactPhone = cp[1];
   var ds2 = useState(''); var dutyInput = ds2[0]; var setDutyInput = ds2[1];
+  /* 제출처 · «근로자가 요구한 사항만» 넣는 칸 (근로기준법 제39조② — 2026-10-11 시안). 주소·퇴직사유는 기본 끔 */
+  var stS = useState(''); var submitTo = stS[0]; var setSubmitTo = stS[1];
+  var iaS = useState(false); var incAddr = iaS[0]; var setIncAddr = iaS[1];
+  var irS = useState(false); var incReason = irS[0]; var setIncReason = irS[1];
   /* 생년월일 — 비워 두면 인사기록(없으면 주민번호)에서 저절로 온다.
      ⚠ 사람을 바꾸면 반드시 비운다. 안 그러면 앞사람의 생년월일이 그대로 따라간다. */
   var bs = useState(''); var birthInput = bs[0]; var setBirthInput = bs[1];
@@ -66554,15 +66558,21 @@ function Certificate(){
     showToast('용도를 적어 주세요 (발급대장에 남습니다)');
     return false;
   }
+  /* 발급번호 — 그해 몇 번째 발급인지(PU-연도-순번). 미리보기(종이에 찍히는 번호)와 발급대장이 같은 셈을 쓴다 (2026-10-11) */
+  function nextCertNo(){
+    var log = dbGet('cert_log', []);
+    var _yr = String(new Date().getFullYear());
+    var _seq = (Array.isArray(log) ? log : []).filter(function(x){ return x && String(x.issuedAt || '').slice(0, 4) === _yr; }).length + 1;
+    return 'PU-' + _yr + '-' + String(_seq).padStart(4, '0');
+  }
   function saveLog(method, recipient){
     if(!u) return;
     var log = dbGet('cert_log', []);
-    /* ★ 발급번호 — 그해 몇 번째 발급인지(PU-연도-순번). 받는 사람(메일)도 남긴다 (2026-10-10) */
-    var _yr = String(new Date().getFullYear());
-    var _seq = (Array.isArray(log) ? log : []).filter(function(x){ return x && String(x.issuedAt || '').slice(0, 4) === _yr; }).length + 1;
+    /* ★ 받는 사람(메일)도 남긴다 (2026-10-10) */
     log.unshift({
       id: 'cl-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5),
-      certNo: 'PU-' + _yr + '-' + String(_seq).padStart(4, '0'),
+      certNo: nextCertNo(),
+      submitTo: String(submitTo || '').trim(),
       recipient: recipient || '',
       issuedAt: (new Date()).toISOString(),
       kind: kind,
@@ -66760,16 +66770,31 @@ function Certificate(){
       statementText = '상기 자의 ' + prevYear + '년 연봉이 위와 같음을 증명함.';
     }
 
+    /* 근속기간 «n년 n개월» — 입사일부터 퇴직일(마지막 근무일) 또는 발급일까지 (2026-10-11 시안) */
+    function tenureText(a, b){
+      var p = function(x){ var m = String(x || '').match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? [+m[1], +m[2], +m[3]] : null; };
+      var A = p(a), B = p(b); if(!A || !B) return '';
+      var mo = (B[0] - A[0]) * 12 + (B[1] - A[1]) - (B[2] + 1 < A[2] ? 1 : 0);
+      if(mo < 0) return '';
+      return (mo >= 12 ? Math.floor(mo / 12) + '년 ' : '') + (mo % 12) + '개월';
+    }
+    var tenure = tenureText(u.hireDate, (kind === 'career' && u.retireDate) ? (u.lastWorkDate || u.retireDate) : issueDate);
+
     // 본문 표 행 (kind에 따라)
     var bodyRows = [];
     if(kind === 'employment' || kind === 'career'){
       bodyRows.push({ label:'직장명', value: company.name || '-' });
+      if(u.branch) bodyRows.push({ label:'소속', value: u.branch });
       bodyRows.push({ label:'직명 및 직위', value: u.title || '-' });
+      /* 담당업무 — 사용증명서 법정 항목 «업무 종류»(근로기준법 제39조①). 재직증명서에도 넣는다 (2026-10-11) */
+      if(kind === 'employment'){
+        bodyRows.push({ label:'담당업무', value: String(dutyInput||'').trim() || certDutyOf(u) || '-' });
+      }
       bodyRows.push({
         label: kind==='employment' ? '재직기간' : '근무기간',
         value: h('div', null,
           h('div', null, hireDateText),
-          h('div', { style:{ marginTop:'4px' } }, '~  ' + endDateText)
+          h('div', { style:{ marginTop:'4px' } }, '~  ' + endDateText + (tenure ? '  (' + tenure + ')' : ''))
         )
       });
       // 경력증명서 - 담당업무 추가 (있는 경우)
@@ -66782,6 +66807,12 @@ function Certificate(){
            직위는 담당업무가 아니다. 직위별 기본 문구는 CERT_DUTY_BY_TITLE 에 있다. */
         var dutyText = String(dutyInput||'').trim() || certDutyOf(u) || '-';
         bodyRows.push({ label:'담당업무', value: dutyText });
+        /* 퇴직사유 — 근로자가 요구한 경우만 (근로기준법 제39조②) */
+        if(incReason && u.retireDate && u.leaveReason) bodyRows.push({ label:'퇴직사유', value: u.leaveReason });
+      }
+      /* 용도·제출처 — 표 안 한 칸 (다른 곳에 다시 쓰이지 않게) */
+      if(String(purpose||'').trim() || String(submitTo||'').trim()){
+        bodyRows.push({ label:'용도 / 제출처', value: (String(purpose||'').trim() || '-') + (String(submitTo||'').trim() ? '  /  ' + String(submitTo).trim() : '') });
       }
     } else if(kind === 'salary'){
       var annual = calcAnnualSalary(u.sid);
@@ -66800,8 +66831,10 @@ function Certificate(){
     return h('div', { id:'cert-preview', className:'cert-doc',
       style:{ fontFamily:'"Malgun Gothic", "맑은 고딕", sans-serif', color:'#000' } },
 
+      /* 발급번호 — 받은 곳이 발급대장과 맞춰 진위를 확인할 수 있게 (2026-10-11 시안) */
+      h('div', { style:{ fontSize:'12px', textAlign:'left', marginTop:'6px' } }, '제 ' + nextCertNo() + ' 호'),
       // 제목 (가운데 + 글자간격 + 밑줄)
-      h('div', { style:{ textAlign:'center', margin:'30px 0 30px' } },
+      h('div', { style:{ textAlign:'center', margin:'24px 0 30px' } },
         h('h1', { style:{ display:'inline-block', fontSize:'28px', fontWeight:700, letterSpacing:'10px',
           paddingBottom:'5px', borderBottom:'2px solid #000', margin:0 } },
           kindLabel.split('').join(' '))
@@ -66820,6 +66853,12 @@ function Certificate(){
           /* ★ 적어 둔 것 → 인사기록 → 주민번호 차례로 본다(대표 지시 2026-09-06).
              예전에는 u.birthDate 하나만 봐서 퇴사자 21명 전원이 「-」였다. */
           h('div', { style:{ fontFamily:'monospace' } }, (String(birthInput||'').trim() || certBirthOf(u)) || '-')
+        ),
+        /* 주소 — 근로자가 요구한 경우만 (개인정보라 기본 끔) */
+        incAddr && h('div', { style:{ display:'flex' } },
+          h('div', { style:{ width:'100px', fontWeight:700, textAlignLast:'justify' } }, '주소'),
+          h('div', { style:{ marginRight:'8px' } }, ': '),
+          h('div', null, ((u.address || '') + (u.addressDetail ? ' ' + u.addressDetail : '')).trim() || '[확인 필요]')
         ),
         h('div', { style:{ display:'flex' } },
           h('div', { style:{ width:'100px', fontWeight:700, textAlignLast:'justify' } }, '담당자'),
@@ -66848,8 +66887,6 @@ function Certificate(){
       // 증명 문구 + 직인 (테두리 안)
       h('div', { style:{ border:documentBorder, borderTop:'none', padding:'50px 20px 60px', textAlign:'center', fontSize:'14px', lineHeight:'2' } },
         h('div', { style:{ marginBottom:'40px', letterSpacing:'1px' } }, statementText),
-        purpose && h('div', { style:{ fontSize:'12px', color:'#475569', marginBottom:'30px', letterSpacing:'0.5px' } },
-          '※ 용도 : ' + purpose),
         h('div', { style:{ fontSize:'15px', marginBottom:'30px', letterSpacing:'2px' } }, formatKDate(issueDate)),
         h('div', { style:{ display:'inline-flex', alignItems:'center', justifyContent:'center', position:'relative' } },
           h('span', { style:{ fontSize:'22px', fontWeight:700, letterSpacing:'8px' } }, company.name || '푸른노무법인'),
@@ -66859,7 +66896,13 @@ function Certificate(){
               style:{ width:'72px', height:'72px', marginLeft:'12px', marginRight:'-30px',
                 position:'relative', top:'4px', objectFit:'contain' } }) : null;
           })()
-        )
+        ),
+        /* 회사 정보 — 대표자·사업자등록번호·주소·전화 (환경설정 회사정보). 은행·관공서가 먼저 보는 칸 (2026-10-11 시안) */
+        h('div', { style:{ fontSize:'12.5px', lineHeight:'1.8', marginTop:'14px', letterSpacing:'0.5px' } },
+          (company.ceo ? h('div', null, '대표노무사  ' + company.ceo) : null),
+          ((company.bizNum || company.bizNo) ? h('div', null, '사업자등록번호  ' + (company.bizNum || company.bizNo)) : null),
+          ((company.addr || company.address || company.phone) ? h('div', null,
+            [company.addr || company.address || '', (company.phone && !/X{3}/.test(company.phone)) ? '☎ ' + company.phone : ''].filter(Boolean).join('  ·  ')) : null))
       )
     );
   }
@@ -66924,11 +66967,23 @@ function Certificate(){
             )
           ),
           h('div', { style:{ marginTop:'6px' } },
-            h('label', { style:{ fontSize:'10.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'2px' } }, '용도·제출처 *'),
+            h('label', { style:{ fontSize:'10.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'2px' } }, '용도 *'),
             h('input', { type:'text', value:purpose, onChange:function(e){setPurpose(e.target.value);},
               placeholder:'예) 은행 대출 신청용, 비자 발급용, 정부지원사업 신청용 등',
               style:{ width:'100%', padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px' } })
           ),
+          h('div', { style:{ marginTop:'6px' } },
+            h('label', { style:{ fontSize:'10.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'2px' } }, '제출처 (선택)'),
+            h('input', { type:'text', value:submitTo, onChange:function(e){setSubmitTo(e.target.value);},
+              placeholder:'예) ○○은행 ○○지점, 출입국외국인청',
+              style:{ width:'100%', padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12.5px' } })
+          ),
+          /* 근로자가 요구한 사항만 적는다(근로기준법 제39조②) — 기본은 넣지 않는다 */
+          h('div', { style:{ marginTop:'6px', display:'flex', gap:'10px', flexWrap:'wrap', fontSize:'11.5px', color:'#475569' } },
+            h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'4px', cursor:'pointer' }, title:'근로자가 요청했을 때만 — 주소는 개인정보입니다' },
+              h('input', { type:'checkbox', checked:incAddr, onChange:function(e){ setIncAddr(e.target.checked); } }), '주소 넣기(요청 시)'),
+            kind === 'career' && h('label', { style:{ display:'inline-flex', alignItems:'center', gap:'4px', cursor:'pointer' }, title:'근로자가 요청했을 때만 (근로기준법 제39조②)' },
+              h('input', { type:'checkbox', checked:incReason, onChange:function(e){ setIncReason(e.target.checked); } }), '퇴직사유 넣기(요청 시)')),
           /* ★ 담당자 — 늘 같은 값이라 «한 줄로 접어» 둔다. 고칠 때만 눌러서 편다.
              (좁은 칸에 이름·직위·연락처 셋을 나란히 두면 모두 잘린다) */
           !contactOpen && h('div', { style:{ marginTop:'6px' } },
@@ -66962,7 +67017,7 @@ function Certificate(){
               style:{ justifySelf:'start', padding:'3px 9px', border:'1px solid #cbd5e1', borderRadius:'4px',
                 background:'#fff', color:'#475569', fontSize:'10.5px', fontWeight:700, cursor:'pointer' } }, '▲ 접기')
           ),
-          kind === 'career' && h('div', { style:{ marginTop:'10px' } },
+          (kind === 'career' || kind === 'employment') && h('div', { style:{ marginTop:'10px' } },
             h('label', { style:{ fontSize:'10.5px', fontWeight:600, color:'#475569', display:'block', marginBottom:'2px' } }, '담당업무 (직접 입력)'),
             h('input', { type:'text', value:dutyInput, onChange:function(e){setDutyInput(e.target.value);},
               placeholder:'비워두면 직위에 따라 자동 입력 (예: 노무자문, 사건수임, 컨설팅)',
