@@ -58,7 +58,7 @@ test('planFor — ERP 사업 이름(공백 뺀) 낱말로 틀을 고른다 · �
   ['기초컨설팅푸른법인', '사회적기업컨설팅', '혁신바우처컨설팅', '노동전환컨설팅', '', null].forEach((n) => assert.equal(k(n), 'none', String(n)));
   assert.deepEqual(D.planFor('인사노무컨설팅충남북부상의').items.map((x) => x.name), ['결과보고서', '업체 서명본', '산출물 별첨', '기관 제출']);
   assert.deepEqual(D.planFor('인사노무컨설팅서산').items.map((x) => x.id + ':' + x.per), ['visit:round', 'report:once', 'sign:once', 'attach:once', 'submit:once']);
-  assert.equal(D.planFor('현장클리닉').check, '운영지침');
+  assert.equal(D.planFor('현장클리닉').check, '2026-04 개정 지침 대조(별지 24)');
   assert.equal(D.planFor('농촌융복합6차산업현장코칭').check, '양식 글자');
   assert.equal(D.planFor('산업일자리전환컨설팅충남').items[1].per, 'month');
   assert.equal(D.planFor('없는사업').kind, '없음');
@@ -74,7 +74,7 @@ test('DOC_PLANS — 틀마다 kind·source·줄이 있고, 줄 id 는 겹치지 
     assert.equal(new Set(p.items.map((x) => x.id)).size, p.items.length, p.key + ' id 겹침');
     p.items.forEach((x) => { assert.ok(PER.includes(x.per), p.key + '/' + x.id); assert.ok(STEP.includes(x.step), p.key + '/' + x.id); });
   });
-  assert.deepEqual(Object.keys(D.AUTO).sort(), ['cci-north', 'cci-seosan', 'techguard']);
+  assert.deepEqual(Object.keys(D.AUTO).sort(), ['cci-north', 'cci-seosan', 'clinic', 'techguard']);
 });
 
 test('linkOf · pairs — 이음표 번호가 정부사업일정에 있어야 연결 · 지운 업체·사전진단·다른 해는 뺀다', () => {
@@ -223,8 +223,8 @@ test('tocFor — 연결 없음 · 틀 없음 · [확인 필요] 틀 · 대형 �
   assert.deepEqual(none.items, []);
   assert.equal(none.head.kind, '없음');
   const cl = D.tocFor({ pair: p, erp: code('consulting-01'), cons: null });
-  assert.ok(cl.items.length && cl.items.every((x) => x.check === '[확인 필요: 운영지침]'));
-  assert.equal(cl.items[0].chip.txt, '—', '현장클리닉은 자동 상태가 없다');
+  assert.ok(cl.items.length && cl.items.every((x) => x.check === '[확인 필요: 2026-04 개정 지침 대조(별지 24)]'));
+  assert.equal(cl.items[0].chip.txt, '—', '첫 줄(별지11)은 plat 줄이고 보고서 줄(row)도 없으니 딱지가 없다');
   const wp = D.tocFor({ pair: pairOf('t2', 'c1'), erp: code('consulting-02'), cons: null });
   assert.equal(wp.items.filter((x) => x.per === 'round')[0].subs.length, 8, '정한 회차 8');
   const cn = D.tocFor({ pair: p, erp: code('consulting-06'), cons: { startDate: '2026-03-15', endDate: '2026-06-10' } });
@@ -252,7 +252,7 @@ test('tocText — 복사용 글(머리말·[확인 필요]·번호 줄·회차 �
   ].join('\n'));
   const cl = D.tocText(D.tocFor({ pair: pairOf('t1', 'c1'), erp: code('consulting-01'), cons: null }));
   assert.ok(cl.includes('[확인 필요] 푸른이알피 계약 못 찾음'));
-  assert.ok(cl.includes('1. 상담일지 (—) [확인 필요: 운영지침]'));
+  assert.ok(cl.includes('1. 별지11 현장클리닉 수행계획서 (—) [확인 필요: 2026-04 개정 지침 대조(별지 24)]'));
   const no = D.tocText(D.tocFor({ pair: pairOf('t1', 'c1'), erp: code('consulting-10'), cons: null }));
   assert.ok(no.includes('사업: 기초컨설팅푸른법인 (기관 미지정) · 서류 틀 없음'));
   assert.ok(no.includes('서류 틀 없음 — 목차는 머리말만'));
@@ -348,14 +348,15 @@ test('trackRows — 현황판 줄에 r.trk(③④⑤·기한·회신 날수)와 
   assert.deepEqual(D.TRACK_COLS, ['sign', 'attach', 'submit']);
 });
 
-test('제출 방식 · 체크 글 — 충남북부·서산은 메일, 기술보호는 플랫폼+순서 글, 현장클리닉은 아직 정하지 않음', () => {
+test('제출 방식 · 체크 글 — 충남북부·서산은 메일, 기술보호·현장클리닉은 플랫폼+순서 글', () => {
   const sub = (key) => D.DOC_PLANS.find((p) => p.key === key).items.find((x) => x.step === 'submit');
   assert.equal(sub('cci-north').how, 'mail');
   assert.equal(sub('cci-seosan').how, 'mail');
   assert.equal(sub('techguard').how, 'platform');
   assert.ok(Array.isArray(sub('techguard').steps) && sub('techguard').steps.length >= 5);
   assert.ok(sub('techguard').steps.every((s) => typeof s === 'string' && s.trim()));
-  assert.equal(sub('clinic').how, undefined, '운영지침 확인 전 — 정하지 않는다');
+  assert.equal(sub('clinic').how, 'platform', '2026-10-12 운영지침 별지 서식으로 — 비즈니스지원단 시스템 제출');
+  assert.equal(sub('clinic').steps.length, 5);
   D.DOC_PLANS.forEach((p) => p.items.forEach((x) => {
     if (x.how !== undefined) assert.ok(['mail', 'platform'].includes(x.how), p.key + '.' + x.id);
     if (x.how !== undefined) assert.equal(x.step, 'submit', 'how 는 제출 줄에만 둔다');
@@ -379,7 +380,8 @@ test('대형 항목 체크 글 — steps 는 배열·note 는 글, 주소·전�
     if (x.note !== undefined) { assert.ok(typeof x.note === 'string' && x.note.trim(), p.key + '.' + x.id); withText++; }
   }));
   assert.ok(withText >= 8, '대형 항목에 체크 글·안내가 충분히 있다');
-  D.DOC_PLANS.filter((p) => p.kind !== '대형').forEach((p) => p.items.forEach((x) => {
+  /* 현장클리닉(2026-10-12, 운영지침 별지 서식 안내)만 간단형 가운데 항목 note 를 둔다 — 다른 간단형은 그대로 */
+  D.DOC_PLANS.filter((p) => p.kind !== '대형' && p.key !== 'clinic').forEach((p) => p.items.forEach((x) => {
     assert.equal(x.note, undefined, p.key + '.' + x.id + ' 간단형에는 note 가 없다');
   }));
   const all = JSON.stringify(D.DOC_PLANS);
@@ -590,4 +592,157 @@ test('DOC_PLANS — rd 칸은 일터혁신 round · 산업일자리 mdlog 둘뿐
   assert.equal(rd.name, '회차별 수행보고서+사진2장+서명지');
   assert.equal(rd.per, 'round');
   assert.equal(rd.step, 'plat');
+});
+
+/* ═══ 현장클리닉 서류 틀 — 운영지침 공식 서식(별지11·13·14·24), 2026-10-12 ═══ */
+
+/* 합성 자료 — 사업 이름이 현장클리닉 틀에 걸리고, 업체·회차가 pairs 에 실제로 잡힌다 */
+const CLX = (() => {
+  const biz = [{ code: 'E3', name: '현장클리닉', agency: '비즈니스지원단(중기청)', sortOrder: 1 }];
+  const input = {
+    types: [{ id: 'td', name: '현장클리닉', rounds: 2 }],
+    cos: [{ id: 'cd', name: '라마상사', types: ['td'] }],
+    scheds: [{ id: 'q1', coId: 'cd', typeId: 'td', date: '2026-04-07', round: 1, isField: true },
+      { id: 'q2', coId: 'cd', typeId: 'td', date: '2026-05-12', round: 2, isField: true }],
+    staff: [],
+  };
+  return { biz, input, tmap: { E3: 'td' } };
+})();
+const clErp = () => D.erpTypeFor('td', CLX.biz, CLX.tmap);
+const clRow = (st) => ({ coId: 'cd', typeId: 'td', year: '2026', rid: 'td_2026', coName: '라마상사', typeName: '현장클리닉', rounds: 2, maxRounds: 0, st });
+const clTrack = (items) => Tr.normalize({ cd: { td_2026: { items } } });
+const clOpts = (extra) => Object.assign({ erp: clErp(), typeId: 'td', input: CLX.input, rows: [], year: '2026', consultings: [], tmap: CLX.tmap, biz: CLX.biz, today: '2026-10-12' }, extra);
+
+test('현장클리닉 합성 입력이 실제로 연결된다(검사가 조용히 건너뛰지 않게)', () => {
+  const pr = D.pairs(CLX.input, 'td', '2026');
+  assert.equal(pr.length, 1);
+  assert.equal(pr[0].rid, 'td_2026');
+  assert.equal(pr[0].rounds, 2);
+  assert.equal(clErp().code, 'E3');
+  assert.equal(D.planFor(clErp().name).key, 'clinic');
+  assert.equal(D.docsTable(clOpts()).lines.length, 1, '표 줄이 실제로 나온다');
+});
+
+test('DOC_PLANS.clinic — 공식 서식 줄(별지11·13·상담일지·14·24·제출) · id·이름·per·step 순서 · check · 안내 글', () => {
+  const plan = D.DOC_PLANS.find((p) => p.key === 'clinic');
+  assert.deepEqual(plan.words, ['현장클리닉']);
+  assert.equal(plan.kind, '간단');
+  assert.equal(plan.check, '2026-04 개정 지침 대조(별지 24)');
+  assert.deepEqual(plan.items.map((x) => x.id + ':' + x.name + ':' + x.per + ':' + x.step), [
+    'plan:별지11 현장클리닉 수행계획서:once:plat',
+    'change:별지13 수행계획 변경요청서:once:plat',
+    'log:상담일지:round:report',
+    'result:별지14 현장지도결과서:once:report',
+    'track:별지24 성과추적관리결과서:once:report',
+    'submit:기관 제출(비즈니스지원단 시스템):once:submit']);
+  /* 저장된 기록이 있을 수 있는 옛 id 는 그대로 */
+  ['log', 'track', 'submit'].forEach((id) => assert.ok(plan.items.some((x) => x.id === id), id));
+  /* 안내 글(note)은 서식이 정하는 때·기한만 — 비지 않은 글 */
+  const byId = (id) => plan.items.find((x) => x.id === id);
+  ['plan', 'change', 'result', 'track'].forEach((id) => assert.ok(typeof byId(id).note === 'string' && byId(id).note.trim(), id + ' note'));
+  assert.equal(byId('log').note, undefined);
+  assert.equal(byId('submit').note, undefined);
+  assert.ok(byId('plan').note.includes('7일') && byId('plan').note.includes('운영지침 제22조'));
+  assert.ok(byId('change').note.includes('해당없음'));
+  assert.ok(byId('result').note.includes('14일') && byId('result').note.includes('70점'));
+  assert.ok(byId('track').note.includes('원문 확인 필요'));
+  /* 제출 줄 — 플랫폼 + 순서 5줄(로그인·«제출» 단추는 사람이) */
+  const sub = byId('submit');
+  assert.equal(sub.how, 'platform');
+  assert.equal(sub.steps.length, 5);
+  assert.ok(sub.steps.every((t) => typeof t === 'string' && t.trim()));
+  assert.ok(sub.steps[0].includes('사람이 합니다') && sub.steps[3].includes('사람이 누릅니다'));
+  /* 공개 저장소 — 주소·전화·메일 꼴 없음 */
+  const txt = JSON.stringify(plan);
+  assert.ok(!/https?:|www\.|\.(kr|com|net|org)\b/i.test(txt), '주소 꼴 없음');
+  assert.ok(!/@[a-z0-9-]+\.[a-z]{2,}|\d{2,3}-\d{3,4}-\d{4}/i.test(txt));
+  /* 회차 기록(rd)·기준(criteria)은 일터혁신·산업일자리 전용 — 현장클리닉에는 없다 */
+  assert.ok(plan.items.every((x) => !('rd' in x)) && !('criteria' in plan));
+  assert.equal(D.planFor('현장클리닉').items, plan.items, 'planFor 가 이 틀을 돌려준다');
+});
+
+test('모든 서류 틀 항목 id 는 줄 키 규칙(^[a-z]+(:[0-9]+)?$ · 20자) — 회차 꼬리표(:60)를 붙여도 넘지 않는다', () => {
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => {
+    assert.match(x.id, /^[a-z]+$/, p.key + '.' + x.id);
+    assert.ok((x.id + ':60').length <= 20 && /^[a-z]+(:[0-9]+)?$/.test(x.id + ':60'), p.key + '.' + x.id);
+  }));
+});
+
+test('AUTO.clinic — 현장클리닉 체크표: ①② 칩은 현황판 줄에서, ③④ 는 「—」, ⑤ 는 제출 기록 · big 없음 · 5열', () => {
+  assert.strictEqual(D.AUTO.clinic, true);
+  /* 줄 없음·기록 없음 */
+  const a = D.docsTable(clOpts());
+  assert.equal(a.plan.key, 'clinic');
+  assert.equal(a.auto, true);
+  assert.equal(a.big, undefined);
+  assert.ok(!('big' in a));
+  assert.deepEqual(a.cols, D.COLS);
+  assert.equal(a.cols.length, 5);
+  assert.equal(a.lines.length, 1);
+  assert.equal(a.lines[0].coName, '라마상사');
+  assert.equal(a.lines[0].cells.length, 5);
+  assert.ok(a.lines[0].cells.every((c) => c.txt === '—'), '줄(보고서)이 아직 없으면 전부 「—」');
+  assert.ok(!('next' in a.lines[0]));
+  /* ①② — 현황판 줄 상태 그대로 */
+  const b = D.docsTable(clOpts({ rows: [clRow({ key: 'draft', label: '초안', steps: [true, false, false, false] })] }));
+  assert.deepEqual(b.lines[0].cells.slice(0, 2), [{ txt: '초안', key: 'draft' }, { txt: '—', key: '' }]);
+  const dn = D.docsTable(clOpts({ rows: [clRow({ key: 'done', label: '검토완료 v1', steps: [true, true, false, false] })] }));
+  assert.deepEqual(dn.lines[0].cells.slice(0, 2), [{ txt: '✓', key: 'done' }, { txt: '검토완료 v1', key: 'done' }]);
+  /* 기록을 못 읽었으면 ③④⑤ 는 지금처럼 「—」 */
+  assert.deepEqual(b.lines[0].cells.slice(2).map((c) => c.txt), ['—', '—', '—']);
+  /* ③④⑤ — 이 틀에는 서명(sign)·별첨(attach) 줄이 없다: ③④ 「—」, ⑤ 는 submit 칩 */
+  const c = D.docsTable(clOpts({ rows: [clRow({ key: 'draft', label: '초안', steps: [true, false, false, false] })], track: clTrack({}) }));
+  assert.deepEqual(c.lines[0].cells.slice(2).map((x) => x.txt + '/' + x.key), ['—/', '—/', '○ 없음/wait']);
+  const d = D.docsTable(clOpts({ rows: [clRow({ key: 'draft', label: '초안', steps: [true, false, false, false] })],
+    track: clTrack({ submit: { st: 'done', at: 1 }, track: { st: 'done', at: 1 }, result: { st: 'doing', at: 1 } }) }));
+  assert.deepEqual(d.lines[0].cells.slice(2).map((x) => x.txt + '/' + x.key + '/' + (x.step || '')), ['—//', '—//', '● 제출함/done/submit'],
+    '보고서(report)·plat 줄 기록은 체크표 ③④⑤ 에 섞이지 않는다');
+  assert.deepEqual(Object.keys(d), ['plan', 'auto', 'cols', 'lines']);
+  assert.deepEqual(Object.keys(d.lines[0]), ['coId', 'coName', 'typeId', 'year', 'rid', 'rounds', 'planned', 'cells', 'due']);
+});
+
+test('trackRows — 현장클리닉 줄: ③ 서명 없음 → 막대 ③ 은 ⑤ 제출을 따른다(기술보호와 같다) · 기록이 없으면 null', () => {
+  const mk = () => [clRow({ key: 'draft', label: '초안', steps: [true, true, false, false] })];
+  const base = { input: CLX.input, biz: CLX.biz, tmap: CLX.tmap, consultings: [], today: '2026-10-12' };
+  const open = mk();
+  D.trackRows(open, Object.assign({ track: clTrack({ submit: { st: 'doing', at: 1 } }) }, base));
+  assert.ok(open[0].trk && !('big' in open[0].trk));
+  assert.equal(open[0].trk.sign, null);
+  assert.equal(open[0].trk.submit.st, 'doing');
+  assert.deepEqual(open[0].st.steps, [true, true, false, false]);
+  const done = mk();
+  D.trackRows(done, Object.assign({ track: clTrack({ submit: { st: 'done', at: 1 } }) }, base));
+  assert.equal(done[0].trk.bar4, true);
+  assert.equal(done[0].trk.bar3, true, '서명 줄이 없는 틀은 ③ 막대가 ④ 를 따른다(기술보호와 같다)');
+  assert.deepEqual(done[0].st.steps, [true, true, true, true]);
+  D.trackRows(done, { track: null });
+  assert.equal(done[0].trk, null);
+  assert.deepEqual(done[0].st.steps, [true, true, false, false]);
+});
+
+test('tocFor — 현장클리닉 목차: 틀 순서대로 6줄 · 상담일지는 회차 펼침 · check 딱지 · 보고서 줄만 ①② 딱지 · 제출 줄은 기록 딱지', () => {
+  const pair = D.pairs(CLX.input, 'td', '2026')[0];
+  const row = clRow({ key: 'draft', label: '초안', steps: [true, false, false, false] });
+  const t = D.tocFor({ pair, row, erp: clErp(), cons: null, dir: [], rec: Tr.recOf(clTrack({ submit: { st: 'doing', at: 1 } }), 'cd', 'td_2026'), today: '2026-10-12' });
+  assert.equal(t.head.plan, 'clinic');
+  assert.deepEqual(t.items.map((x) => x.no + '.' + x.name), ['1.별지11 현장클리닉 수행계획서', '2.별지13 수행계획 변경요청서', '3.상담일지',
+    '4.별지14 현장지도결과서', '5.별지24 성과추적관리결과서', '6.기관 제출(비즈니스지원단 시스템)']);
+  assert.deepEqual(t.items[2].subs, ['1회차', '2회차']);
+  assert.ok(t.items.every((x) => x.check === '[확인 필요: 2026-04 개정 지침 대조(별지 24)]'));
+  assert.deepEqual(t.items.map((x) => x.step), ['plat', 'plat', 'report', 'report', 'report', 'submit']);
+  assert.deepEqual(t.items[0].chip, { txt: '—', key: '' });
+  assert.deepEqual(t.items[1].chip, { txt: '—', key: '' });
+  assert.deepEqual(t.items[3].chip, { txt: '초안', key: 'draft' });
+  assert.equal(t.items[5].chip.txt, '◐ 제출 준비');
+  const text = D.tocText(t);
+  assert.ok(text.includes('1. 별지11 현장클리닉 수행계획서 (—) [확인 필요: 2026-04 개정 지침 대조(별지 24)]'));
+  assert.ok(text.includes('   - 2회차'));
+});
+
+test('다른 서류 틀은 그대로 — 간단형 ③④⑤ 불변 · AUTO 는 한 줄만 늘었다', () => {
+  const shape = (k) => D.DOC_PLANS.find((p) => p.key === k).items.map((x) => x.id + ':' + x.name + ':' + x.per + ':' + x.step + ':' + (x.how || '') + ':' + (x.note || '')).join('|');
+  assert.equal(shape('cci-north'), 'report:결과보고서:once:report::|sign:업체 서명본:once:sign::|attach:산출물 별첨:once:attach::|submit:기관 제출:once:submit:mail:');
+  assert.equal(shape('rural'), 'plan:사업계획서:once:report::|result:결과보고서:round:report::|receipt:수당 영수증·청렴서약서:once:attach::|photo:현장 사진:once:attach::');
+  assert.equal(D.planFor('통합기술보호지원단').items.length, 6);
+  assert.deepEqual(D.DOC_PLANS.map((p) => p.key), ['industry-cn', 'cci-north', 'cci-seosan', 'techguard', 'clinic', 'rural', 'workplace', 'industry']);
 });
