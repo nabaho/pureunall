@@ -28131,6 +28131,15 @@ function coMgrPendTag(co){
     style:{ flexShrink:0, fontSize:'10.5px', color:'#854d0e', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'3px', padding:'0 4px' } }, '⏳');
 }
 
+/* ── «살아 있는 업체» 판정 하나 (2026-10-11 검토 §6) ──
+   종료(closed)·휴지통(_deleted) 업체는 사무대행·계약 중단 탭과 건수, 세무사 메일 명단,
+   보수총액 엑셀 맞추기에 들어가지 않는다 — 끝난 업체 자료를 세무사에게 요청하는 메일이 나갈 뻔했다.
+   ⚠ 종료할 때 isSuboffice·suspended 는 지우지 않는다(복원 때 원래 자리로 돌아가야 한다) —
+     그래서 «표시하는 쪽»이 이 판정을 먼저 거친다. */
+function erpCoAlive(co){
+  return !!(co && !co._deleted && co.status !== 'closed');
+}
+
 function CompanyManagement(){
   /* 표를 «한 화면 안에서» 최대로 — 대표 지시 2026-10-11 「사업장정보가 2개정도 더 보이게」 → 「한화면안에서 쪽 번호가 나오게」.
      두 줄을 그냥 늘리면 쪽 번호가 화면 밖으로 밀렸다. 그래서 디자인은 그대로 두고 «빈 자리»만 걷는다:
@@ -28181,7 +28190,7 @@ function CompanyManagement(){
   function importWageXlsx(e){
     var file = e.target.files && e.target.files[0]; if(!file) return;
     if(typeof XLSX === 'undefined'){ showToast('엑셀 모듈 로딩중'); return; }
-    var agents = companies.filter(function(co){ return co.status==='suboffice' || co.isSuboffice; });
+    var agents = companies.filter(function(co){ return erpCoAlive(co) && (co.status==='suboffice' || co.isSuboffice); });   // 종료·휴지통 업체는 맞추지 않는다(검토 §6)
     var reader = new FileReader();
     reader.onload = function(ev){
       try {
@@ -28433,6 +28442,8 @@ function CompanyManagement(){
   function buildTaxGroups(){
     var byEmail = {};
     companies.forEach(function(co){
+      // ⚠ 종료·휴지통 업체는 세무사에게 자료를 요청하지 않는다 — 외부로 나가는 메일이다(검토 §6)
+      if(!erpCoAlive(co)) return;
       if(!(co.status==='suboffice' || co.isSuboffice)) return;
       var em = (co.taxEmail||'').trim().toLowerCase();
       if(!em) return;
@@ -29211,9 +29222,10 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   // 상태 탭 범위 — 목록 거르기와 유형별 건수가 같은 기준을 쓰도록 따로 뺐다
   function coInTab(co){
     // ★ 계약 중단 탭
-    if(statusTab === 'suspended') return !!co.suspended;
+    // ⚠ 계약 중단·사무대행 탭은 «살아 있는 업체»만 — 종료해도 표시는 남겨 둬(복원용) 여기서 거른다(검토 §6)
+    if(statusTab === 'suspended') return erpCoAlive(co) && !!co.suspended;
     // 사무대행 탭: status='suboffice' OR active+isSuboffice 모두 표시 (자문과 중복인 경우)
-    if(statusTab === 'suboffice') return co.status === 'suboffice' || !!co.isSuboffice;
+    if(statusTab === 'suboffice') return erpCoAlive(co) && (co.status === 'suboffice' || !!co.isSuboffice);
     /* ⚠ 폐업 탭을 없앴다(대표 지시 2026-09-06 「폐업은 필요없다. 삭제해라」).
        2026-08-17 에 「폐업 정산 신고가 남으니 목록에 남겨 두자」며 만들었으나
        373곳 어디에도 한 번도 켜진 적이 없다(실측 0곳). 폐업한 곳은 이제
@@ -29328,7 +29340,8 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
 
   // 카운트
   var activeCount = companies.filter(function(c){return c.status==='active';}).length;
-  var subofficeCount = companies.filter(function(c){return c.status==='suboffice' || c.isSuboffice;}).length;
+  var subofficeCount = companies.filter(function(c){return erpCoAlive(c) && (c.status==='suboffice' || c.isSuboffice);}).length;
+  var suspendedCount = companies.filter(function(c){return erpCoAlive(c) && !!c.suspended;}).length;
   /* ★ 계약 중단한 업체는 그 달 자문료에서 뺀다 (대표 지시 2026-09-08).
      빼기만 하고 말없이 넘어가면 「어제보다 금액이 줄었는데?」가 된다 —
      얼마를 왜 뺐는지 칸 아래에 함께 적는다. */
@@ -29452,13 +29465,13 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
       selYM: selYM,
       onMonthChange: function(ym){ setSelYM(ym); },  // monthOnly 자동 활성화 제거 (다른 달 계약 사라지는 버그 수정)
       kpis: [
-        { label:'🏢 운영 업체', value:companies.filter(function(c){return c.status!=='closed';}).length+'개', bg:'#f8fafc', fg:'#1e293b', color:'#1e293b', border:'#e2e8f0' },
+        { label:'🏢 운영 업체', value:companies.filter(erpCoAlive).length+'개', bg:'#f8fafc', fg:'#1e293b', color:'#1e293b', border:'#e2e8f0' },
         { label:'💼 활성 자문', value:companies.filter(function(c){return c.status==='active';}).length+'개', bg:'#eff6ff', fg:'#1e40af', color:'#1e40af', border:'#bfdbfe' },
-        { label:'🏛️ 사무대행', value:companies.filter(function(c){return c.status==='suboffice' || c.isSuboffice;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
+        { label:'🏛️ 사무대행', value:subofficeCount+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'💰 월 자문료', value:totalAdvisoryFee.toLocaleString()+'원', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a',
           sub: suspendedFee > 0 ? '중단 ' + suspendedFee.toLocaleString() + '원 제외' : null },
         { label:'✨ 이번 달 신규', value:companies.filter(function(c){return erpDateStr(c.contractStartDate||c.firstContractDate||c.createdAt).slice(0,7)===selYM;}).length+'개', bg:'#f0fdf4', fg:'#166534', color:'#16a34a', border:'#bbf7d0' },
-        { label:'⏸ 계약 중단', value:companies.filter(function(c){return !!c.suspended;}).length+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
+        { label:'⏸ 계약 중단', value:suspendedCount+'개', bg:'#fffbeb', fg:'#854d0e', color:'#fbbf24', border:'#fde68a' }
       ],
       extra: h('button', { onClick:function(){setMonthOnly(!monthOnly);},
         title:MONTH_ONLY_TIP,
@@ -29624,7 +29637,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
           color: statusTab==='suspended' ? '#fff' : '#854d0e',
           border: '1px solid '+(statusTab==='suspended' ? '#fbbf24' : '#fde68a'),
           fontSize:'12px', fontWeight:700, cursor:'pointer' } },
-        '⏸ 계약 중단 (' + companies.filter(function(c){return !!c.suspended;}).length + ')'),
+        '⏸ 계약 중단 (' + suspendedCount + ')'),
       // (종료 탭 제거: 종료 업체는 종료관리에서 조회)
       // (폐업 탭 제거 2026-09-06: 폐업한 곳은 「종료 처리」에서 사유 「업체 폐업」으로 넘긴다)
       // (담당·부담당·급여일 필터는 표 머리 깔때기로 옮겼다 — 도구줄에는 두지 않는다)
@@ -30499,7 +30512,7 @@ h('td', { style:{ color:'#94a3b8', textAlign:'center', fontSize:'10.5px' } }, id
     // ★ 세무사무실 보수총액 신고자료 일괄요청 모달
     taxMailModal && (function(){
       var groups = buildTaxGroups();
-      var noEmail = companies.filter(function(c){ return (c.status==='suboffice'||c.isSuboffice) && !((c.taxEmail||'').trim()); });
+      var noEmail = companies.filter(function(c){ return erpCoAlive(c) && (c.status==='suboffice'||c.isSuboffice) && !((c.taxEmail||'').trim()); });
       return h('div', { onClick:function(){ if(!taxSending) setTaxMailModal(false); },
         style:{ position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', zIndex:9999, display:'flex', alignItems:'center', justifyContent:'center', padding:'16px' } },
         h('div', { onClick:function(e){ e.stopPropagation(); },
