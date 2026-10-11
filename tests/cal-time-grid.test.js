@@ -131,7 +131,14 @@ test('폰 한 시간 높이 62px(구글 폰 앱 캡처) · PC 48px — 눈금선
 });
 
 test('폰 일·3일 보기 — 시간 글자 칸 72px · 글자 12px (구글 폰 앱 캡처), 주 보기는 그대로', () => {
-  assert.match(캘린더, /var 눈금폭 = \(typeof 폰 === "function" && 폰\(\) && n <= 3\) \? "72px" : "var\(--tgw,48px\)";/);
+  assert.match(캘린더, /var 눈금폭 = \(typeof 폰 === "function" && 폰\(\)\) \? "72px" : "var\(--tgw,48px\)";/);
   assert.match(캘린더, /body\.mob \.tgrid\.wide \.tgtime\{font-size:12px\}/);
   assert.match(캘린더, /<div class="tgrid' \+ \(눈금폭 === "72px" \? ' wide' : ''\) \+ '">/);
+});
+
+test('폰 주·3일·일 보기 — 시간마다 둥근 칸(구글 앱 캡처), 바깥은 연한 면', () => {
+  assert.match(캘린더, /<i class="hs" style="top:'/);
+  assert.match(캘린더, /\.hs\{position:absolute;left:4px;right:4px;margin-top:1\.5px;border-radius:12px;background:var\(--gslot\)/);
+  assert.match(캘린더, /:root\[data-theme="dark"\]\{--gsurf:#3a3a3c;--gslot:#171719\}/);
+  assert.match(캘린더, /document\.body\.classList\.toggle\("gv"/);
 });

@@ -718,6 +718,7 @@ const NR = require("./news-ready");
 /* 금요일 13시 자동 준비 · 월요일 다시 봉인 (대표 지시 2026-09-27) — functions/news-friday.js */
 const NF = require("./news-friday");
 const NWatch = require("./news-watch");
+const NoticeLog = require("./news-notice-log");   /* 안내문 발송 대장 짓개(순수) — 다음메일 거울을 읽기만 한다 */
 const NCore = require("./news-lib/pu-news-core.js");   /* 화면과 같은 한 벌(사본) — 일요일 보충이 고르개를 쓴다 */
 
 exports.sendBulkMail = functions
@@ -1970,6 +1971,21 @@ exports.newsletterBounceScan = functions
     await db.ref().update(upd);
     await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
     console.log("[반송 확인]", JSON.stringify({ 회차: 보낸, 새로: Object.keys(r.쓸).length, 뺀것: Object.keys(r.막을).length }));
+    return null;
+  });
+
+/* 안내문 발송 대장 — 다음메일 거울의 «우리가 여러 곳에 보낸 안내문»을 매일 새벽 한 번 정리한다
+   (대표 지시 2026-10-11 「다음메일함에서 비정기적으로 자문사에 안내문을 보낸적이 많이 있다 … 파일이 언제 어떤내용으로 보냈는지 확인」
+    → 목업 A(안내문별)·B(파일별) → 「추천대로」).
+   ⚠ 읽기만 — 거울·업체·명함은 그대로, 쓰는 곳은 newsletter/noticeLog 하나. 판단은 news-notice-log.js(순수) — 여기는 부르기만.
+   ⚠ 메일함(IMAP)을 안 건드려 비밀값이 없다. 배포는 이름으로: firebase deploy --only functions:newsletterNoticeLogBuild */
+exports.newsletterNoticeLogBuild = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "512MB" })
+  .pubsub.schedule("every day 03:40")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    await NoticeLog.돌리기({ db: getDatabase(), now: Date.now(), 로그: (m) => console.log(m) });
     return null;
   });
 
