@@ -36,12 +36,17 @@
   검사가 세는 합계는 **23 → 22**. 숫자를 외워 고치지 말고 직접 세어 맞출 것(`.pubsub.schedule(` 개수, index.js + mail-sync.js).
 - 정리 예약 작업이 «succeeded» 여도 일이 됐다는 뜻은 아니었다 — 이번처럼 «결과(서버 목록·코드)»를 직접 확인할 것.
 
+## 서버 삭제 — 끝 (2026-10-11 후속)
+위 코드 정리(#2460)가 병합된 뒤, 작업 요청자가 확인 창에서 「대표 승인 받음 — 지금 삭제」 를 골라 서버 함수를 지웠다
+(되돌리기 어려운 운영 변경이라 그 승인 전에는 실행하지 않았다).
+- 실행: `firebase functions:delete newsletterRefillOnce20261004 --region asia-northeast3 --project pureun-erp --force`
+  (Git Bash · `FUNCTIONS_DISCOVERY_TIMEOUT=180`) → `functions[newsletterRefillOnce20261004(asia-northeast3)] Successful delete operation.` 종료코드 0.
+- 확인: `firebase functions:list` 삭제 전 97개 → 후 96개. 사라진 것은 `newsletterRefillOnce20261004` 하나뿐이고,
+  이웃 뉴스레터 함수 7개(`newsletterSundayRefill` · `newsletterBounceScan` · `newsletterWatchRetry` · `newsletterWatchSunday` ·
+  `newsletterWatchDelivery` · `weeklyNewsletterPrepare` · `weeklyNewsletterSend`)는 그대로다.
+- ⚠ **못 본 것**: Cloud Scheduler 의 같은 이름 작업(보통 `firebase-schedule-newsletterRefillOnce20261004-asia-northeast3`)이
+  같이 지워졌는지는 이 PC 에 gcloud 가 없어 확인하지 못했다. 콘솔(Cloud Scheduler · asia-northeast3)에서 남아 있으면 지운다.
+  남아 있어도 받을 함수가 없어 해롭지 않다(다음 발화 2027-10-04).
+
 ## 남은 일
-- ⚠ **서버에서 지우기 — 대표 승인 뒤에만 실행한다**(되돌리기 어려운 운영 변경). 이 기록을 쓸 때까지 **실행하지 않았다.**
-  ```powershell
-  $env:FUNCTIONS_DISCOVERY_TIMEOUT=180
-  firebase functions:delete newsletterRefillOnce20261004 --region asia-northeast3 --project pureun-erp
-  ```
-  지운 뒤: `firebase functions:list` 에서 사라졌는지, Cloud Scheduler 에 같은 이름의 작업(보통 `firebase-schedule-newsletterRefillOnce20261004-asia-northeast3`)이 안 남았는지 본다.
-  지우고 나면 이 줄을 «지움(날짜)» 로 고친다.
-  급하지 않다 — 다음 발화는 2027-10-04 이고 그날도 날짜 문지기가 막는다(남겨 두어도 일은 안 한다).
+- 위 ⚠ 한 가지(Cloud Scheduler 에 같은 이름 작업이 남았는지 콘솔에서 한 번 보기)뿐이다.
