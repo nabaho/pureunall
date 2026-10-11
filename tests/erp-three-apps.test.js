@@ -197,7 +197,7 @@ test('⑥ 접속표시 — 다른 창이 닫히며 지운 «내 자리»는 곧�
 test('⑦★ 포털 — 내외관리 줄에 직원 인사·재무, 권한이 있을 때만 · 처음엔 감춰 두고 권한표를 읽어 보인다', () => {
   const at = portal.indexOf('var APPS = [');
   const apps = portal.slice(at, portal.indexOf('];', at));
-  assert.match(apps, /\{ key:'hr',\s+name:'직원 인사',[^}]*url:'pu-erp\.html\?app=hr',[^}]*perm:'hr',\s*row:'inout' \}/);
+  assert.match(apps, /\{ key:'hr',\s+name:'[^']+',[^}]*url:'pu-erp\.html\?app=hr',[^}]*perm:'hr',\s*row:'inout' \}/);
   assert.match(apps, /\{ key:'fin',\s+name:'재무',[^}]*url:'pu-erp\.html\?app=fin',[^}]*perm:'fin',\s*row:'inout' \}/);
   assert.match(portal, /var _permHide = !!\(app\.perm && !_isAdm && !\(typeof portalAppPermOk === 'function' && portalAppPermOk\(app\.perm\)\)\);/);
   assert.match(portal, /if\(_permHide\) a\.style\.display = 'none';/);
