@@ -765,6 +765,7 @@
   .tgallday .tgtime span{position:static;display:block;padding:6px 6px 0 0;text-align:right;font-size:10px;color:var(--gsub)}
   .tgscroll{flex:1;min-height:0;overflow-y:auto}
   .tgtime{position:relative;font-size:10px;color:var(--gsub);min-width:0}
+  body.mob .tgrid.wide .tgtime{font-size:12px}
   .tgbody .tgtime span{position:absolute;right:6px;transform:translateY(-50%);white-space:nowrap}
   .tgcol{position:relative;border-left:1px solid var(--gline);min-width:0;
     background-image:linear-gradient(to bottom,var(--gline) 1px,transparent 1px);background-size:100% var(--hh,48px)}
@@ -2902,7 +2903,9 @@ function 격자Html(days, eumOnly){
   격자높이 = (typeof 폰 === "function" && 폰()) ? 62 : 48;
   var 오늘 = todayYMD(), n = days.length;
   var 열 = days.map(function(ds){ return 격자일정(ds, eumOnly); });
-  var 칸틀 = 'grid-template-columns:var(--tgw,48px) repeat(' + n + ',minmax(0,1fr))';
+  /* 폰 일·3일 보기는 시간 글자 칸을 넓힌다 — 구글 폰 앱 일 보기 캡처: 칸 폭 ≈73px · 글자 ≈12.5px (주 보기는 7열이라 그대로) */
+  var 눈금폭 = (typeof 폰 === "function" && 폰() && n <= 3) ? "72px" : "var(--tgw,48px)";
+  var 칸틀 = 'grid-template-columns:' + 눈금폭 + ' repeat(' + n + ',minmax(0,1fr))';
   var 배치 = 줄배치(days, 열.map(function(c){ return c.종일; }), n === 1 ? 6 : 3, 7);
   var 머리 = days.map(function(ds){
     var d = new Date(ds + "T00:00:00");
@@ -2924,7 +2927,7 @@ function 격자Html(days, eumOnly){
     return '<div class="tgcol' + (ds === 오늘 ? ' today' : '') + '" data-day="' + ds + '">' + 블록
       + (ds === 오늘 ? '<div class="tnow" style="top:' + (지금분 / 60 * 격자높이) + 'px"></div>' : '') + '</div>';
   }).join("");
-  return '<div class="cal"><div class="tgrid">'
+  return '<div class="cal"><div class="tgrid' + (눈금폭 === "72px" ? ' wide' : '') + '">'
     + '<div class="tghead" style="' + 칸틀 + '"><div class="tgtime"></div>' + 머리 + '</div>'
     + '<div class="tgallday" style="' + 칸틀 + '"><div class="tgtime"><span>종일</span></div>' + 종일줄 + '</div>'
     + '<div class="tgscroll"><div class="tgbody" style="' + 칸틀 + ';--hh:' + 격자높이 + 'px;height:' + (24 * 격자높이) + 'px">'
