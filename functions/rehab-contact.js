@@ -19,7 +19,7 @@ const PAGE_MAX_BYTES = 1500000;
 const MAX_CONTACT_PAGES = 2;
 
 /* 홈페이지가 «아닌» 곳 — 구직·기업정보 사이트(참고 링크로만 보여 준다)와 SNS·포털 */
-const DIRECTORY_RE = /(saramin|jobkorea|jobplanet|wanted\.co|catch\.co\.kr|thevc|nicebizinfo|nicednb|kreditjob|bizno\.net|teamblind|innoforest|findcompany|companyinfo|cretop|dart\.fss|kind\.krx|opencorporates|incruit|alba|albamon|career\.co\.kr|smes\.go|bizinfo|ok-info|credit|infoseek|jobsarang|work\.go\.kr|worldjob|inthefund|kisline|kiscredit)/i;
+const DIRECTORY_RE = /(\.go\.kr$|\.or\.kr$|theteams|mediahub|namu\.wiki|saramin|jobkorea|jobplanet|wanted\.co|catch\.co\.kr|thevc|nicebizinfo|nicednb|kreditjob|bizno\.net|teamblind|innoforest|findcompany|companyinfo|cretop|dart\.fss|kind\.krx|opencorporates|incruit|alba|albamon|career\.co\.kr|smes\.go|bizinfo|ok-info|credit|infoseek|jobsarang|work\.go\.kr|worldjob|inthefund|kisline|kiscredit)/i;
 const SOCIAL_RE = /(blog\.naver|cafe\.naver|post\.naver|in\.naver|map\.naver|place\.map|m\.place|naver\.me|kakao\.com|daum\.net|tistory|brunch|youtube|youtu\.be|instagram|facebook|twitter|x\.com|linkedin|threads\.net|wikipedia|namu\.wiki|google\.|bing\.com|danawa|11st|gmarket|coupang|smartstore)/i;
 
 function clean(v) { return v == null ? "" : String(v).replace(/\s+/g, " ").trim(); }
