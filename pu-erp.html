@@ -3456,6 +3456,7 @@ function _fbStableId(x){
 }
 function normalizeFbValue(v){
   var arr;
+  if(v && typeof v === 'object' && !Array.isArray(v) && typeof erpFbUnsafeTopKeys === 'function') v = erpFbUnsafeTopKeys(v);
   if(Array.isArray(v)){ arr = v; }  // 마이그레이션 전: 배열
   else if(v && typeof v === 'object'){
     // arrayToIdMap 결과(각 키가 그 값의 .id와 일치)만 배열로 되돌린다.
@@ -3937,6 +3938,35 @@ function erpBackupKey(){
      하나 때문에 매일 백업이 통째로 실패했다. 이 PC 의 작업 자료라 열쇠 모양을 바꿀 수 없으니(바꾸면 짝이 끊긴다)
      «백업에 실을 때만» 이름을 바꾸고 되살릴 때 원래대로 푼다. 바꾼 이름은 ~k~ 로 시작한다 — 옛 백업은 그대로 지나간다. */
 var ERP_FB_BAD_KEY = /[.#$\/\[\]]/;
+/* ★ 동기화 길에서는 «맨 위 열쇠»만 바꾼다(2026-10-11 검토 A-3) — 골라 둔 짝(ledger_picks)의 「…#1」,
+     입금자 별칭·지출 별칭·처리됨 지문의 # $ / 가 섞이면 그 표가 서버에 영영 못 올라갔다. 값 안쪽은 건드리지 않아 싸다.
+     받을 때 normalizeFbValue 가 ~k~ 머리 열쇠만 원래대로 푼다. */
+function erpFbSafeTopKeys(v){
+  if(!v || typeof v !== 'object' || Array.isArray(v)) return v;
+  var bad = false;
+  for(var k in v){ if(Object.prototype.hasOwnProperty.call(v, k) && (ERP_FB_BAD_KEY.test(k) || k.indexOf('~k~') === 0)){ bad = true; break; } }
+  if(!bad) return v;
+  var o = {};
+  Object.keys(v).forEach(function(k){
+    var nk = (ERP_FB_BAD_KEY.test(k) || k.indexOf('~k~') === 0) ? '~k~' + encodeURIComponent(k).replace(/\./g, '%2E') : k;
+    o[nk] = v[k];
+  });
+  return o;
+}
+function erpFbUnsafeTopKeys(v){
+  if(!v || typeof v !== 'object' || Array.isArray(v)) return v;
+  var has = false;
+  for(var k in v){ if(Object.prototype.hasOwnProperty.call(v, k) && k.indexOf('~k~') === 0){ has = true; break; } }
+  if(!has) return v;
+  var o = {};
+  Object.keys(v).forEach(function(k){
+    var nk = k;
+    if(k.indexOf('~k~') === 0){ try { nk = decodeURIComponent(k.slice(3)); } catch(_e){ nk = k; } }
+    o[nk] = v[k];
+  });
+  return o;
+}
+window.erpFbSafeTopKeys = erpFbSafeTopKeys; window.erpFbUnsafeTopKeys = erpFbUnsafeTopKeys;
 function erpFbSafeKeys(v){
   if(!v || typeof v !== 'object') return v;
   if(Array.isArray(v)) return v.map(erpFbSafeKeys);
@@ -4914,7 +4944,7 @@ async function erpPushLocalOnly(){
           if(!add.length) return;                                             // 이미 다 있음 → 중단(변경 없음)
           var merged = curArr.concat(add);
           var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
-          var outV = (typeof DIFF_KEYS !== 'undefined' && DIFF_KEYS.indexOf(store) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged;
+          var outV = erpFbSafeTopKeys((typeof DIFF_KEYS !== 'undefined' && DIFF_KEYS.indexOf(store) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged);
           return { v: outV, u: newTs };
         }, function(err, committed, snap2){
           if(err){ resolve({ ok:false, err:err }); return; }
@@ -5458,7 +5488,7 @@ function dbSet(k, v){
             _metaRollback(); return true;
           }
         }
-        var fbValue = (DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v) && v.every(function(x){return x&&x.id;})) ? arrayToIdMap(v) : v;
+        var fbValue = erpFbSafeTopKeys((DIFF_KEYS.indexOf(k) >= 0 && Array.isArray(v) && v.every(function(x){return x&&x.id;})) ? arrayToIdMap(v) : v);
         // ── 근본 급감 차단: 서버 현재 건수 대비 이 기기 데이터가 절반 이하면 = 옛 데이터 → 푸시 차단 ──
         if(Array.isArray(v)){
           // [코덱스 검증 반영] 서버 확인 실패 시 무조건 set 하던 fail-open 제거 — 1회 재시도 후에도
@@ -5514,7 +5544,7 @@ function dbSet(k, v){
                   if(curArr.length >= 10 && merged.length < curArr.length * 0.5 && !_bulkOk2){ _guardMsg = '급감'; return; }
                   // 시계 오차에도 버전이 단조 증가하도록 (서버 u+1 과 현재시각 중 큰 값)
                   var newTs = Math.max(((cur && typeof cur.u === 'number') ? cur.u : 0) + 1, Date.now());
-                  var outV = (DIFF_KEYS.indexOf(k) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged;
+                  var outV = erpFbSafeTopKeys((DIFF_KEYS.indexOf(k) >= 0 && merged.every(function(x){ return x && x.id; })) ? arrayToIdMap(merged) : merged);
                   return { v: outV, u: newTs };
                 }, function(err, committed, snap){
                   if(err || !committed || !snap){
@@ -12234,7 +12264,7 @@ function _healServerKey(k){
     var val = JSON.parse(raw);
     var ts = Date.now();
     localStorage.setItem(KEY+'_meta_'+k, String(ts));
-    fbDb.ref('data/'+k).set({ v:val, u:ts }).catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
+    fbDb.ref('data/'+k).set({ v:erpFbSafeTopKeys(val), u:ts }).catch(function(e){ window._erpErrLog && window._erpErrLog(e); });
     if(typeof showToast === 'function') showToast('현재 '+k+' 데이터로 서버를 교정했습니다');
   } catch(e){ window._erpErrLog && window._erpErrLog(e); }
 }
