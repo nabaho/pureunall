@@ -1936,7 +1936,9 @@ exports.newsletterBounceScan = functions
     const 받은 = Object.keys(폴더).find((k) => 폴더[k] && 폴더[k].kind === "inbox") || "INBOX";
     const [받은메일, 대기열, 설정, 사업장들, 더한분들, 기존] = await Promise.all([
       db.ref("mailbox/msgs/" + 받은).orderByKey().limitToLast(800).once("value").then((x) => x.val() || {}),
-      db.ref(MD.CARDS_ROOT + "/scheduled").once("value").then((x) => x.val() || {}),
+      회차들[보낸].batchId
+        ? db.ref(MD.CARDS_ROOT + "/scheduled").orderByChild("bulk").equalTo(String(회차들[보낸].batchId)).once("value").then((x) => x.val() || {})
+        : Promise.resolve({}),
       db.ref("newsletter/config").once("value").then((x) => x.val() || {}),
       db.ref("data/companies/v").once("value").then((x) => x.val() || {}),
       db.ref("newsletter/더한분들").once("value").then((x) => x.val() || {}),
@@ -1986,7 +1988,8 @@ exports.newsletterWatchDelivery = functions
       return null;
     }
     if (ready.상태 !== "완료" || ready.보낼날 !== today || !ready.batchId) return null;
-    const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled").once("value")).val() || {};
+    const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled")
+      .orderByChild("bulk").equalTo(String(ready.batchId)).once("value")).val() || {};
     const 셈 = NWatch.전달셈(줄들, ready.batchId);
     await db.ref("newsletter/watch/" + ready.회차열쇠 + "/전달").set(Object.assign({ 때: Date.now(), 받는수: ready.받는수 || 0 }, 셈));
     if (셈.실패 || 셈.확인필요) {
