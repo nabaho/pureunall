@@ -1163,6 +1163,22 @@ test('㊾ 긴 첨부 이름 — 거울의 잘린 이름으로도 서버에 물�
   assert.equal(v.ctx.GR.avBusy, false);
 });
 
+test('㊾-2 60자 첨부 X 와 줄이면 X 가 되는 70자 첨부 — 거울에 X 가 두 번 · 어느 줄을 눌러도 거절(바이트 안 받음)', async () => {
+  const X = '가'.repeat(60), Y = X + '나머지 열 글자.pdf';
+  const s = F.seed();
+  s.mailbox.msgs['INBOX-0a1b2c3d']['101'].an = [X, I.mirrorName(Y)];
+  const mail = mailServer({ atts: [{ i: 0, part: '2', name: X, size: 4 }, { i: 1, part: '3', name: Y, size: 4 }] });
+  const w = world({ seed: s, mail, pdfjs: fakePdf().lib });
+  await cellOf(w, 'consulting-04', 'c2', 't3', 'sign');
+  for (const j of [0, 1]) {
+    assert.equal((await w.ctx.grOpenCand(3, j)).ok, false);
+    assert.ok(w.els.cwInbox.innerHTML.includes(I.MSG.AMBIG), 'row ' + j);
+    assert.equal(w.ctx.GR.avBusy, false);
+  }
+  assert.deepEqual(mail.calls.map((c) => c.fn), ['readMailMessage', 'readMailMessage'], '받기는 부르지 않는다');
+  assert.equal(w.ctx.GR.av, null);
+});
+
 test('㊿ 404 에 서버가 적은 까닭(최근 400통 밖 등)을 그대로 — 이스케이프해서', async () => {
   const why = '이 칸에서는 최근 400통만 열어 줍니다 — <b>그 밖</b>';
   const mail = mailServer({ status: 404, error: why });

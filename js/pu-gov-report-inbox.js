@@ -211,8 +211,8 @@
     return MSG.FAIL + (msg || '알 수 없는 오류');
   }
   /* 첨부 찾기 — 목록(peek: 읽음 표시를 건드리지 않는다)에서 이름으로. 바이트는 받지 않는다.
-     ① 이름이 똑같은 것 ② 없으면 서버 이름을 거울 꼴(mirrorName)로 줄여 같은 것 — 60자로 잘린 거울 이름.
-        그런 것이 이름이 다른 둘 이상이면 어느 것인지 모르므로 거절한다(엉뚱한 파일을 열지 않는다).
+     서버 첨부 가운데 온 이름이 똑같거나, 거울 꼴(mirrorName — 60자로 잘린 거울 이름)로 줄인 것이 같은 것을 모두 모은다.
+        온 이름이 서로 다른 것이 둘 이상이면 어느 것인지 모르므로 거절한다(엉뚱한 파일을 열지 않는다 — 똑같은 이름이 있어도).
      돌려주는 name 은 «서버의 온 이름» — 형식(kindOf)은 이 이름으로 정한다. 온 이름에 개인 자료 말(PRIV_RE)이 있으면 거절.
      ⚠ readMailMessage 는 본문도 함께 돌려준다 — 여기서 버린다(돌려주지 않는다). */
   async function findAtt(o) {
@@ -224,13 +224,12 @@
     var atts = ((head && Array.isArray(head.atts)) ? head.atts : []).map(function (a, i) {
       return (a && typeof a === 'object') ? { a: a, idx: a.i == null ? i : a.i, name: String(a.name == null ? '' : a.name) } : null;
     }).filter(Boolean);
-    var hit = atts.filter(function (x) { return x.name === name; })[0] || null;
-    if (!hit) {
-      var near = atts.filter(function (x) { return mirrorName(x.name) === name; });
-      var names = near.map(function (x) { return x.name; }).filter(function (n, i, all) { return all.indexOf(n) === i; });
-      if (names.length > 1) throw fail(409, '이름 앞부분이 같은 첨부가 여럿입니다', 'ambig');
-      hit = near[0] || null;
-    }
+    /* 온 이름이 같거나 거울 꼴이 같은 것을 «모두» 모은다 — 똑같은 이름이 있어도 다른 첨부가 같은 거울 이름으로 줄면
+       거울에는 둘 다 같은 이름으로 보이므로(예: 60자 X 와 줄여서 X 가 되는 70자 · 「a\tb.pdf」와 「a b.pdf」) 어느 줄인지 모른다 */
+    var near = atts.filter(function (x) { return x.name === name || mirrorName(x.name) === name; });
+    var names = near.map(function (x) { return x.name; }).filter(function (n, i, all) { return all.indexOf(n) === i; });
+    if (names.length > 1) throw fail(409, '이름 앞부분이 같은 첨부가 여럿입니다', 'ambig');
+    var hit = near[0] || null;
     if (!hit) throw fail(404, '그 첨부가 없습니다', 'gone');
     if (PRIV_RE.test(hit.name)) throw fail(403, '개인 자료', 'priv');
     if (Number(hit.a.size || 0) > ATT_MAX) throw fail(413, '너무 큽니다');

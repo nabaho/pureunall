@@ -255,6 +255,24 @@ test('긴 이름 — 똑같은 이름이 먼저 · 앞 60자가 같은 것이 �
   assert.equal((await I.findAtt({ call: dup.call, ref: REF, name: I.mirrorName(LONG_PDF) })).idx, 0, '이름까지 같은 둘은 똑같은 이름 규칙처럼 첫 것');
 });
 
+test('겹치는 거울 이름 — 똑같은 이름이 있어도 다른 첨부가 같은 거울 이름으로 줄면 두 줄 모두 거절(바이트 안 받음)', async () => {
+  const X = '가'.repeat(60), Y = X + '나머지 열 글자.pdf';   // Y 를 거울 꼴로 줄이면 X
+  assert.equal(I.mirrorName(Y), X);
+  for (const pair of [[X, Y], ['a\tb.pdf', 'a b.pdf']]) {
+    const atts = pair.map((n, i) => ({ i, part: String(i + 2), name: n, size: 10 }));
+    for (const clicked of pair.map(I.mirrorName)) {
+      const f = fakeCall(atts);
+      await assert.rejects(I.fetchAtt({ call: f.call, ref: REF, name: clicked }), (e) => e.code === 'ambig', JSON.stringify([pair, clicked]));
+      assert.equal(f.calls.length, 1, '목록만 — 바이트를 받지 않는다');
+    }
+  }
+  /* 하나뿐이면 그대로 — 똑같은 이름 하나 · 거울 꼴 하나 */
+  const one = fakeCall([{ i: 0, part: '2', name: X, size: 10 }, { i: 1, part: '3', name: '다른.pdf', size: 10 }]);
+  assert.equal((await I.findAtt({ call: one.call, ref: REF, name: X })).idx, 0);
+  const tab = fakeCall([{ i: 0, part: '2', name: 'a\tb.pdf', size: 10 }]);
+  assert.deepEqual(await I.fetchAtt({ call: tab.call, ref: REF, name: 'a b.pdf' }), { name: 'a\tb.pdf', b64: 'UEsDBA==' });
+});
+
 test('긴 이름 — 개인 자료 말이 60자 뒤에 있으면(거울 딱지는 못 봄) 온 이름으로 다시 보고 받지 않는다', async () => {
   const name = '가'.repeat(62) + ' 9월 급여대장.xlsx';
   const cut = I.mirrorName(name);
