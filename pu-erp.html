@@ -48124,9 +48124,33 @@ function erpCmsLinkMember(code, companyId){
 window.erpCmsLinkMember = erpCmsLinkMember;
 
 /* 자동 확정 되돌리기 — 휴지통으로, 그 줄은 skip 에 적어 다시 넣지 않는다 */
+/* 입금 한 건을 «재무 휴지통에 담고 → 입금 목록에서 뺀다» — 입금관리 휴지통과 같은 방식(2026-10-11 검토 A-10).
+   ⚠ TrashBin.remove(딱지만 붙이기)를 입금에 쓰지 말 것 — 입금을 읽는 70여 곳이 딱지를 거르지 않아
+     되돌린 돈이 합계·미수에 그대로 남고, 어느 휴지통 화면에도 안 나와 되살릴 길도 없었다.
+   마감된 달이면 하지 않는다. 휴지통에 못 담으면 지우지 않는다 · 지우기가 실패하면 휴지통 줄을 거둔다. */
+function erpMoveIncomeToTrash(incomeId, reason){
+  var list = dbGet('finance_income', []) || [];
+  var item = list.find(function(x){ return x && x.id === incomeId; });
+  if(!item) return false;
+  var ym = String(item.advisoryYm || item.date || '').slice(0, 7), dm = String(item.date || '').slice(0, 7);
+  if((ym && isIncomeLocked(ym)) || (dm && isIncomeLocked(dm))){ showToast('🔒 ' + (isIncomeLocked(dm) ? dm : ym) + ' 입금 마감 — 되돌릴 수 없습니다'); return false; }
+  var tk = trashKeyFor('finance_income');
+  var trash = dbGet(tk, []) || [];
+  var tid = 'trash-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+  var entry = { id: tid, storeKey: 'finance_income', item: item, deletedAt: (new Date()).toISOString(),
+    deletedBy: (typeof CURRENT_USER !== 'undefined' && CURRENT_USER) ? (CURRENT_USER.sid || '') : '', reason: reason || '' };
+  if(dbSet(tk, [entry].concat(trash)) === false) return false;
+  if(dbRemove('finance_income', incomeId) === false){
+    dbSet(tk, (dbGet(tk, []) || []).filter(function(x){ return !(x && x.id === tid); }));
+    return false;
+  }
+  return true;
+}
+window.erpMoveIncomeToTrash = erpMoveIncomeToTrash;
+
 function erpCmsUndo(incomeId, key){
   if(!incomeId || !key) return Promise.resolve(false);
-  var ok = TrashBin.remove('finance_income', incomeId, 'CMS 자동 확정 되돌림');
+  var ok = erpMoveIncomeToTrash(incomeId, 'CMS 자동 확정 되돌림');
   if(ok === false) return Promise.resolve(false);
   var warn = function(e){
     showToast('⚠ 되돌림 표시를 서버에 못 적었습니다 — 다음 자동 처리 때 다시 들어갈 수 있습니다. 다시 눌러 주세요');
