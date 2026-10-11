@@ -86,3 +86,10 @@ test('화면 — 오른쪽은 이력서만, 보기·바로 가기 단추는 왼�
   assert.ok(/_p1View==='screen'/.test(r) && /toScreenHtml/.test(r), '기본은 화면용');
   assert.ok(/function p1View\(/.test(SRC));
 });
+
+test('넣을 칸은 «두 줄(2열)»로 넓게 — 왼쪽 칸이 넓고, 칸 상세는 두 열을 가로지른다', () => {
+  assert.ok(/class="p1-wrap" style="display:grid;grid-template-columns:\d{3}px/.test(SRC), '왼쪽 폭이 세 자리 px');
+  const r = strip(SRC.slice(SRC.indexOf('function renderProfile1('), SRC.indexOf('function _p1Scale(')));
+  assert.ok(/grid-template-columns:1fr 1fr/.test(r), '넣을 칸 2열');
+  assert.ok(/grid-column:1\/-1/.test(strip(SRC.slice(SRC.indexOf('function p1Panel('), SRC.indexOf('function p1Lim(')))), '칸 상세는 두 열 전체');
+});
