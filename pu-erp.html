@@ -31,7 +31,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   var a = (location.search.match(/(?:^|[?&])app=(hr|fin)(?:&|$)/) || [])[1];
   if(!a) return;
   var info = a === 'hr' ? { title:'인사관리', emo:'👥', mf:'pu-hr-manifest.json', png:'icon-hr-192.png' }
-                        : { title:'재무',      emo:'📒', mf:'pu-fin-manifest.json', png:'icon-fin-192.png' };
+                        : { title:'재무관리',    emo:'📒', mf:'pu-fin-manifest.json', png:'icon-fin-192.png' };
   document.title = info.title;
   var m = document.querySelector('link[rel=manifest]'); if(m) m.href = info.mf;
   var t = document.querySelector('meta[name=apple-mobile-web-app-title]'); if(t) t.content = info.title;
@@ -1128,7 +1128,7 @@ var MENUS = [
 var PU_APPS = {
   erp: { name:'푸른이알피', short:'', groups:['dash','biz','env'], env:['company','biz','policy','dup','archive','nas','system'], start:'dash/my' },
   hr:  { name:'인사관리', short:'인사관리', groups:['hr','env'], env:['hr'], start:'hr/staff', icon:'👥' },
-  fin: { name:'재무', short:'재무', groups:['fin','env'], env:['fin'], start:'fin/ledger', icon:'📒' }
+  fin: { name:'재무관리', short:'재무관리', groups:['fin','env'], env:['fin'], start:'fin/ledger', icon:'📒' }
 };
 var PU_APP = (function(){
   try { var a = new URLSearchParams(window.location.search).get('app'); if(a === 'hr' || a === 'fin') return a; } catch(e){}
