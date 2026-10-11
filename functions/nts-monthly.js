@@ -27,6 +27,7 @@ const NTS_VALIDATE_CAP = 100;
 const NTS_SKIP_DAYS = 30;
 const BULK_PATCH_CHUNK = 200;
 const ROOT = "pucards";
+const PUBD = require("./pubdata");
 
 const digits = (s) => String(s == null ? "" : s).replace(/[^0-9]/g, "");
 function val(o, f) {
@@ -145,6 +146,16 @@ function statusWrites(hits, day) {
     out.push(upd);
   }
   return out;
+}
+/* 국세청 상태 → pubdata/co/{번호}/nts = { state, at, end } (등록증 대조 ntsMatch 는 기업정보함 안의 일이라 옮기지 않는다) */
+function pubStatusWrites(hits, day) {
+  const u = {};
+  (hits || []).forEach((h) => {
+    const no = digits(h.key);
+    if (no.length !== 10) return;
+    u[PUBD.PUB + "/co/" + no + "/nts"] = h.end ? { state: h.state, at: day, end: h.end } : { state: h.state, at: day };
+  });
+  return u;
 }
 function matchWrites(hits, day) {
   const out = [];
@@ -266,6 +277,9 @@ async function runOnce(deps, opts) {
         const u = {}; Object.keys(upd).forEach((k) => { u[ROOT + "/" + k] = upd[k]; });
         await db.ref().update(u);
       }
+      /* 🗂 공용 자리에도 — 이알피·인사관리가 기업정보함을 거치지 않고 읽는다(functions/pubdata.js) */
+      const pu = pubStatusWrites(hits, day);
+      if (Object.keys(pu).length) await db.ref().update(pu);
     } catch (e) {
       out.status.failed++;
       console.warn("nts-monthly 상태 한 묶음 실패:", String((e && e.message) || e).slice(0, 160));
@@ -312,6 +326,6 @@ function make(deps) {
 }
 
 module.exports = make;
-Object.assign(module.exports, { word, cls, endOf, ceoOf, dayOf, nameOf, nameVariants, matchOf, matchReq, reqId,
+Object.assign(module.exports, { pubStatusWrites, word, cls, endOf, ceoOf, dayOf, nameOf, nameVariants, matchOf, matchReq, reqId,
   matchChunks, matchBody, matchJudge, chunks, statusMatch, statusWrites, matchWrites, daysFrom, statusTargets,
   matchTargets, companiesOf, todayKst, runOnce });

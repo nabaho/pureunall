@@ -1503,6 +1503,19 @@
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       ".write": false
     },
+    "pubdata": {
+      ".read": "auth != null && auth.token.email != null",
+      ".write": false
+    },
+    "pubdata_req": {
+      "$no": {
+        ".write": "auth != null && auth.token.email != null",
+        ".validate": "$no.matches(/^[0-9]{10}$/) && (!newData.exists() || (newData.child('at').isNumber() && (!newData.child('k').exists() || newData.child('k').val() === 'ei' || newData.child('k').val() === 'nps') && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
+        "$other": {
+          ".validate": "$other === 'at' || $other === 'k' || $other === 'nm'"
+        }
+      }
+    },
     "rehab_ad": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       "notices": {
