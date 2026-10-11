@@ -362,7 +362,7 @@ test('⑭ 서류 체크표 — 간단형은 ①~⑤ 열(①② 자동, ③④⑤
   assert.equal(w.db.쓴것.length, 0);
 });
 
-test('⑮ 대형·틀 없음은 «서류 목차 보기» 줄만 · 연결 없는 사업은 안내 · [확인 필요] 틀 딱지', async () => {
+test('⑮ 대형은 단계 표(목차 단추 유지) · 틀 없음은 «서류 목차 보기» 줄만 · 연결 없는 사업은 안내 · [확인 필요] 틀 딱지', async () => {
   const w = world();
   await w.ctx.grLoad();
   w.ctx.grSetBiz('consulting-02');

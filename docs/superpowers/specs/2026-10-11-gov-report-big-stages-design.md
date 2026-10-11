@@ -41,7 +41,7 @@
 - `bigCells(plan, rec, n, months, today)` → `[{ id, name, step, chip }, …]` — 칩은 기존 `chipOf` 계열(여럿이면 `완료/전체`).
 - `nextStage(plan, rec, n, months)` → 첫 «미완» 단계 `{ id, name } | null`(전부 완료·해당없음이면 `null`).
 - `blockedOf(plan, rec, n, months)` → `[{ id, key, name, note }]`.
-- `alertsExtra` 에 `blocked` 묶음 추가(대형 사업 줄만). 기존 `waitSign`·`overdue` 는 건드리지 않는다.
+- `alertsExtra` 에 `blocked` 묶음과 `trackRows` 의 `r.trk.blocked` 를 더했지만(검사됨) **화면 알림은 쓰지 않는다** — 대형 사업은 현황판 줄(타입 보고서)이 없는 경우가 많아서다. 화면 알림은 순수 함수 `PuGovReportDocs.blockedAlerts({input,year,track,biz,tmap,consultings})` 가 «기록에서 직접» 만든다(대형 사업의 `blocked` 줄만, 간단형 무시, 기록 못 읽으면 `[]`). 기존 `waitSign`·`overdue` 는 건드리지 않는다.
 - `PuGovReportDocs.docsTable` — `plan.kind === '대형'` 이면 `{ big:true, cols:[단계 이름…, '다음 단계'], lines[].cells:[{id, name, step, chip}], lines[].next }` 를 돌려준다(간단형은 지금 그대로). `months(start,end)` 는 이미 목차에 있다 — 그것을 쓴다.
 - `DOC_PLANS` 대형 항목에 선택 필드 `steps`(입력 순서 체크 글)·`note`(증빙·기준 안내 글)를 더한다(코드 상수, 간단형 `how/steps` 와 같은 방식). 글은 **[노무사 확인]** 초안:
   - 일터혁신: 수행계획서 · 회차별 수행보고서(+시작·종료 사진 2장, 참석자 전원 서명지) · 디자인팀·이행관리 등록 · 이행결과표.
@@ -53,7 +53,7 @@
 - `grRenderDocs` 가 `t.big` 이면 단계 열 표를 그린다: 업체 | 단계 열들(칩 단추 `data-cell` + `data-item`) | 다음 단계 | 기한 | 목차. 단계가 많아(최대 10열) 가로 스크롤을 허용한다.
 - `grOpenCell(coId, typeId, step, itemId)` — `itemId` 가 있으면 `keysForItem` 으로 키를 만든다(없으면 지금처럼 `keysFor`). 저장은 **기존 `grSaveCell` 한 곳**(줄 하나 `.set`) — `validate(entry, c.step)` 이 `plat`/`report` 를 받아들이게 된다.
 - 칸 창: `plat`·`report` 단계는 상태 · 완료일(`gotAt`) · 메모 · 받은 서류 연결. `plat` 은 `#cwSend` 구역에 체크 글(`item.steps`)과 증빙 안내(`item.note`)를 보인다(글자로만 — `grEsc`).
-- ⏰ 알림: 「막힌 단계 N」 묶음(사업장 · 단계 이름 · 메모 — 메모는 이미 있는 사람이 쓴 글이라 `grEsc`).
+- ⏰ 알림: 「막힌 단계 N」 묶음(사업장 · 사업 — 단계 이름 (메모) — 모두 `grEsc`). 기록을 못 읽으면(`GR.trackErr`) 「?」, 사업 목록을 못 읽었으면 0.
 - 대형 사업 줄에는 기존 «서류 목차 보기» 단추를 그대로 둔다.
 
 ## 5. 개인정보 · 쓰는 곳
