@@ -14,14 +14,17 @@
    ★ 받은 서류 연결(2026-10-11, 설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md §3) — 줄에 선택 칸 link 하나:
      { src:'mail', key:1~80자, name?:≤100자, date?:'YYYY-MM-DD' }. 읽을 때 틀린 link 는 버리고(줄은 남긴다) 이름은 자른다.
      화면 grSaveCell 은 줄 전체를 .set 하므로, 상태만 고치는 저장이 link 를 지우지 않게 nextLink(옛 줄, 요청)로 이어 받는다.
+   ★ 대형 단계 종류 plat·report(2026-10-11, 설계 2-A) — 항목 단위 키(keysForItem)·단계 칩(bigCells)·다음 단계(nextStage)·막힌 단계(blockedOf). 간단형 열(STEPS)은 그대로.
    ⚠ 저장소는 공개다 — 검사는 합성 자료만 쓴다. */
 (function (root) {
   var STATES = ['none', 'doing', 'done', 'blocked', 'na'];
   var ST_KO = { none: '없음', doing: '진행', done: '완료', blocked: '막힘', na: '해당없음' };
   var MARK = { none: '○', doing: '◐', done: '●', blocked: '✕', na: '—' };
-  var STEP_KO = { sign: { doing: '발송함', done: '회신 받음' }, attach: {}, submit: { doing: '제출 준비', done: '제출함' } };
-  var ALLOWED = { sign: ['none', 'doing', 'done', 'blocked'], attach: ['none', 'doing', 'done', 'na'], submit: ['none', 'doing', 'done', 'blocked'] };
-  var COL_KO = { sign: '③ 업체 서명본', attach: '④ 산출물 별첨', submit: '⑤ 기관 제출' };
+  var STEP_KO = { sign: { doing: '발송함', done: '회신 받음' }, attach: {}, submit: { doing: '제출 준비', done: '제출함' },
+    plat: { doing: '입력 중', done: '등록함' }, report: { doing: '작성 중', done: '작성 완료' } };
+  var ALLOWED = { sign: ['none', 'doing', 'done', 'blocked'], attach: ['none', 'doing', 'done', 'na'], submit: ['none', 'doing', 'done', 'blocked'],
+    plat: ['none', 'doing', 'done', 'blocked', 'na'], report: ['none', 'doing', 'done', 'blocked', 'na'] };
+  var COL_KO = { sign: '③ 업체 서명본', attach: '④ 산출물 별첨', submit: '⑤ 기관 제출', plat: '플랫폼 입력', report: '보고서' };
   var STEPS = ['sign', 'attach', 'submit'];
   var HOW = { mail: '메일', platform: '플랫폼', post: '우편', other: '기타' };
   /* 화면 딱지 이름(.st-*) — 완료 초록 · 진행 노랑 · 막힘 빨강 · 없음 회색 · 해당없음 딱지 없음 */
@@ -53,6 +56,21 @@
       if (x.per === 'round') { for (var i = 1; i <= m; i++) out.push({ key: keyOf(x, i), id: x.id, name: x.name + ' ' + i + '회차', round: i }); }
       else if (x.per === 'once') out.push({ key: keyOf(x, 0), id: x.id, name: x.name, round: 0 });
     });
+    return out;
+  }
+  /* 대형 단계 — 항목(id) 하나의 줄 키들. once → [id] · round → id:1..n · month → id:1..m(달 이름 앞에). 이상한 id 는 키를 만들지 않는다 */
+  function keysForItem(plan, itemId, n, months) {
+    var out = [], x = null;
+    ((plan && plan.items) || []).forEach(function (it) { if (it && it.id === itemId) x = it; });
+    if (!x || !okKey(keyOf(x, 0))) return out;
+    var c = Math.min(Math.max(+n || 0, 0), MAX_ROUNDS);
+    if (x.per === 'once') out.push({ key: keyOf(x, 0), id: x.id, name: x.name, round: 0 });
+    else if (x.per === 'round') { for (var i = 1; i <= c; i++) out.push({ key: keyOf(x, i), id: x.id, name: x.name + ' ' + i + '회차', round: i }); }
+    else if (x.per === 'month') {
+      (Array.isArray(months) ? months : []).slice(0, MAX_ROUNDS).forEach(function (m, i) {
+        out.push({ key: keyOf(x, i + 1), id: x.id, name: str(m) + ' ' + x.name, round: i + 1, month: str(m) });
+      });
+    }
     return out;
   }
 
@@ -169,6 +187,39 @@
     var c = chipOf(item.step, keys, rec, today);
     return { txt: c.txt, key: c.key };
   }
+  /* 대형 틀 — 단계(항목)마다 칩. 키가 없으면(회차·달 0) chip 은 null */
+  function bigCells(plan, rec, n, months, today) {
+    rec = obj(rec) ? rec : {};
+    return ((plan && plan.items) || []).map(function (x) {
+      var keys = keysForItem(plan, x.id, n, months);
+      if (!keys.length) return { id: x.id, name: x.name, step: x.step, chip: null, st: 'none' };
+      var c = chipOf(x.step, keys, rec, today);
+      return { id: x.id, name: x.name, step: x.step, chip: { txt: c.txt, key: c.key }, st: c.st };
+    });
+  }
+  /* 「다음 단계」 — 키가 있는 단계 가운데 done·na 가 아닌 첫 번째(표시일 뿐, 순서를 강제하지 않는다) */
+  function nextStage(plan, rec, n, months) {
+    rec = obj(rec) ? rec : {};
+    var items = (plan && plan.items) || [];
+    for (var i = 0; i < items.length; i++) {
+      var keys = keysForItem(plan, items[i].id, n, months);
+      if (!keys.length) continue;
+      var st = stateOf(keys.map(function (k) { return has(rec, k.key) && rec[k.key] ? rec[k.key].st : 'none'; }));
+      if (st !== 'done' && st !== 'na') return { id: items[i].id, name: items[i].name };
+    }
+    return null;
+  }
+  function blockedOf(plan, rec, n, months) {
+    rec = obj(rec) ? rec : {};
+    var out = [];
+    ((plan && plan.items) || []).forEach(function (x) {
+      keysForItem(plan, x.id, n, months).forEach(function (k) {
+        var r = has(rec, k.key) ? rec[k.key] : null;
+        if (r && r.st === 'blocked') out.push({ id: x.id, key: k.key, name: k.name, note: str(r.note) });
+      });
+    });
+    return out;
+  }
   /* 현황판 줄 하나의 기록 — 막대 ③ = 서명본 완료(틀에 ③ 이 없으면 ⑤ 를 따른다), ④ = 기관 제출 완료 */
   function rowTrack(plan, rec, n, due, today) {
     var t = { due: str(due).slice(0, 10) };
@@ -194,16 +245,17 @@
     return k;
   }
   function alertsExtra(rows, today) {
-    var waitSign = [], overdue = [];
+    var waitSign = [], overdue = [], blocked = [];
     (rows || []).forEach(function (r) {
       var t = r && r.trk;
       if (!t) return;
       if (t.waitDays != null && t.waitDays > WAIT_SIGN_DAYS) waitSign.push({ row: r, days: t.waitDays });
       if (t.submit && t.submit.st !== 'done' && isDay(t.due) && isDay(today) && t.due < today) overdue.push({ row: r, due: t.due });
+      if (Array.isArray(t.blocked) && t.blocked.length) blocked.push({ row: r, items: t.blocked.map(function (b) { return { name: str(b && b.name), note: str(b && b.note) }; }) });
     });
     waitSign.sort(function (a, b) { return b.days - a.days; });
     overdue.sort(function (a, b) { return a.due < b.due ? -1 : (a.due > b.due ? 1 : 0); });
-    return { waitSign: waitSign, overdue: overdue };
+    return { waitSign: waitSign, overdue: overdue, blocked: blocked };
   }
 
   /* 칸 창에서 받은 값 검사 — 틀리면 문구, 맞으면 '' */
@@ -232,7 +284,7 @@
     return o;
   }
 
-  var api = { keyOf: keyOf, keysFor: keysFor, normalize: normalize, recOf: recOf, put: put, stateOf: stateOf, label: label,
+  var api = { keyOf: keyOf, keysFor: keysFor, keysForItem: keysForItem, bigCells: bigCells, nextStage: nextStage, blockedOf: blockedOf, normalize: normalize, recOf: recOf, put: put, stateOf: stateOf, label: label,
     chipOf: chipOf, cellFor: cellFor, itemChip: itemChip, rowTrack: rowTrack, kpiHit: kpiHit, kpiExtra: kpiExtra,
     alertsExtra: alertsExtra, validate: validate, patchFor: patchFor, normLink: normLink, nextLink: nextLink,
     STATES: STATES, ST_KO: ST_KO, MARK: MARK, ALLOWED: ALLOWED, COL_KO: COL_KO, STEPS: STEPS, HOW: HOW, CHIP: CHIP,

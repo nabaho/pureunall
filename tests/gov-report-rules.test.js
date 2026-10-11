@@ -12,6 +12,7 @@ const ROOT = path.join(__dirname, '..');
 const out = cp.execFileSync('node', [path.join(ROOT, 'scripts', 'make-firebase-rules.js')], { encoding: 'utf8' });
 const rules = JSON.parse(out).rules;
 const Tr = require('../js/pu-gov-report-track.js');
+const D = require('../js/pu-gov-report-docs.js');
 
 test('세 자리가 생성기 출력에 있다', () => {
   for (const k of ['scal_reports', 'scal_rptForms', 'scal_rptFormsIndex']) {
@@ -113,4 +114,15 @@ test('link 한계 — 규칙과 화면 모듈(js/pu-gov-report-track.js)이 같�
   assert.ok(l.src['.validate'].includes("'" + Tr.LINK_SRC + "'"), '연결 갈래');
   assert.ok(l.key['.validate'].endsWith('<= ' + Tr.LINK_KEY_MAX), '열쇠 길이');
   assert.ok(l.name['.validate'].endsWith('<= ' + Tr.LINK_NAME_MAX), '이름 길이');
+});
+
+test('대형 3종의 모든 단계 키가 줄 키 규칙(소문자[:숫자] · 20자 이하)을 통과한다 — 새 규칙이 필요 없다', () => {
+  const RULE = /^[a-z]+(:[0-9]+)?$/;
+  const bigs = D.DOC_PLANS.filter((p) => p.kind === '대형');
+  assert.ok(bigs.length >= 3);
+  bigs.forEach((p) => p.items.forEach((x) => {
+    const keys = Tr.keysForItem(p, x.id, 60, Array.from({ length: 36 }, (_, i) => '2026-' + String((i % 12) + 1).padStart(2, '0')));
+    assert.ok(keys.length > 0, p.key + '.' + x.id);
+    keys.forEach((k) => assert.ok(RULE.test(k.key) && k.key.length <= 20, p.key + ' ' + k.key));
+  }));
 });

@@ -16,7 +16,8 @@ const TG = D.planFor('통합기술보호지원단');
 test('상수 — 상태 다섯 · 칸마다 고를 수 있는 상태 · 방식 넷 · 한도', () => {
   assert.deepEqual(Tr.STATES, ['none', 'doing', 'done', 'blocked', 'na']);
   assert.deepEqual(Tr.ALLOWED, { sign: ['none', 'doing', 'done', 'blocked'], attach: ['none', 'doing', 'done', 'na'],
-    submit: ['none', 'doing', 'done', 'blocked'] });
+    submit: ['none', 'doing', 'done', 'blocked'], plat: ['none', 'doing', 'done', 'blocked', 'na'],
+    report: ['none', 'doing', 'done', 'blocked', 'na'] });
   assert.deepEqual(Tr.STEPS, ['sign', 'attach', 'submit']);
   assert.deepEqual(Object.keys(Tr.HOW), ['mail', 'platform', 'post', 'other']);
   assert.equal(Tr.NOTE_MAX, 200);
@@ -142,14 +143,14 @@ test('rowTrack · kpiHit · kpiExtra · alertsExtra — 서명은 진행·완료
   const a = Tr.alertsExtra(rows, T0);
   assert.deepEqual(a.waitSign.map((x) => x.row.coName + ':' + x.days), ['다라정밀:20']);
   assert.deepEqual(a.overdue.map((x) => x.row.coName + ':' + x.due), ['가나상사:2026-09-30']);
-  assert.deepEqual(Tr.alertsExtra(null, T0), { waitSign: [], overdue: [] });
+  assert.deepEqual(Tr.alertsExtra(null, T0), { waitSign: [], overdue: [], blocked: [] });
 });
 
 test('validate — 칸마다 고를 수 있는 상태 · 날짜 꼴 · 회신일 ≥ 발송일 · 방식 · 메모 200자', () => {
   assert.equal(Tr.validate({ st: 'done' }, 'sign'), '');
   assert.equal(Tr.validate({ st: 'na' }, 'sign'), '이 칸에서 고를 수 없는 상태입니다');
   assert.equal(Tr.validate({ st: 'blocked' }, 'attach'), '이 칸에서 고를 수 없는 상태입니다');
-  assert.equal(Tr.validate({ st: 'done' }, 'report'), '이 칸에서 고를 수 없는 상태입니다');
+  assert.equal(Tr.validate({ st: 'done' }, 'nostep'), '이 칸에서 고를 수 없는 상태입니다');
   assert.equal(Tr.validate({ st: 'doing', sentAt: '2026/09/01' }, 'sign'), '날짜는 YYYY-MM-DD 꼴로 적어 주세요');
   assert.equal(Tr.validate({ st: 'done', sentAt: '2026-09-10', gotAt: '2026-09-01' }, 'sign'), '회신일이 발송일보다 앞섭니다');
   assert.equal(Tr.validate({ st: 'done', how: 'fax' }, 'submit'), '제출 방식을 다시 골라 주세요');
@@ -260,4 +261,84 @@ test('put — link 가 든 줄을 로컬 표에 그대로 · 저장 관문은 li
   assert.deepEqual(Tr.put({}, 'c2', 't3_2026', 'sign', { st: 'doing', at: 1, link: L }).c2.t3_2026.sign.link, L);
   const p = Tr.patchFor({ st: 'doing', link: L }, '홍길동', 1);
   assert.equal(W.inspectWrite({ kind: 'set', path: 'scal_docs/c2/t3_2026/items/sign', value: p, mode: 'enforce' }).ok, true);
+});
+
+const BIGPLAN = { key: 'big', kind: '대형', items: [
+  { id: 'guide', name: '참여 안내서', per: 'once', step: 'sign' },
+  { id: 'plan', name: '수행계획서', per: 'once', step: 'plat' },
+  { id: 'round', name: '회차별 수행보고서', per: 'round', step: 'plat' },
+  { id: 'monthly', name: '월별 수행실적보고서', per: 'month', step: 'report' },
+  { id: 'final', name: '최종보고', per: 'once', step: 'report' },
+] };
+
+test('단계 종류 plat·report — 허용 상태·열 이름·글', () => {
+  assert.deepEqual(Tr.ALLOWED.plat, ['none', 'doing', 'done', 'blocked', 'na']);
+  assert.deepEqual(Tr.ALLOWED.report, ['none', 'doing', 'done', 'blocked', 'na']);
+  assert.equal(Tr.COL_KO.plat, '플랫폼 입력');
+  assert.equal(Tr.COL_KO.report, '보고서');
+  assert.equal(Tr.label('plat', 'doing'), '◐ 입력 중');
+  assert.equal(Tr.label('plat', 'done'), '● 등록함');
+  assert.equal(Tr.label('report', 'doing'), '◐ 작성 중');
+  assert.equal(Tr.label('report', 'done'), '● 작성 완료');
+  const base = { st: 'none', note: '', sentAt: '', gotAt: '', how: '', ack: false, link: null };
+  assert.equal(Tr.validate(Object.assign({}, base, { st: 'doing' }), 'plat'), '');
+  assert.equal(Tr.validate(Object.assign({}, base, { st: 'na' }), 'report'), '');
+  assert.notEqual(Tr.validate(Object.assign({}, base, { st: 'bad' }), 'plat'), '');
+  assert.deepEqual(Tr.STEPS, ['sign', 'attach', 'submit'], '간단형 열은 그대로');
+});
+
+test('keysForItem — once · round · month · 이상한 id 거부 · 상한', () => {
+  assert.deepEqual(Tr.keysForItem(BIGPLAN, 'plan', 3, []).map((k) => k.key), ['plan']);
+  assert.deepEqual(Tr.keysForItem(BIGPLAN, 'round', 3, []).map((k) => [k.key, k.name, k.round]),
+    [['round:1', '회차별 수행보고서 1회차', 1], ['round:2', '회차별 수행보고서 2회차', 2], ['round:3', '회차별 수행보고서 3회차', 3]]);
+  assert.deepEqual(Tr.keysForItem(BIGPLAN, 'monthly', 0, ['2026-03', '2026-04']).map((k) => [k.key, k.name, k.month]),
+    [['monthly:1', '2026-03 월별 수행실적보고서', '2026-03'], ['monthly:2', '2026-04 월별 수행실적보고서', '2026-04']]);
+  assert.deepEqual(Tr.keysForItem(BIGPLAN, 'monthly', 5, []), [], '기간도 달도 없으면 키 없음');
+  assert.deepEqual(Tr.keysForItem(BIGPLAN, 'round', 0, []), []);
+  assert.deepEqual(Tr.keysForItem(BIGPLAN, 'none-such', 3, []), []);
+  assert.equal(Tr.keysForItem(BIGPLAN, 'round', 999, []).length, 60, '상한 60');
+  const evil = { items: [{ id: '__proto__', name: 'x', per: 'once', step: 'plat' }, { id: 'Plan', name: 'x', per: 'once', step: 'plat' },
+    { id: 'abcdefghijklmnopqrstu', name: 'x', per: 'once', step: 'plat' }] };
+  ['__proto__', 'Plan', 'abcdefghijklmnopqrstu'].forEach((id) => assert.deepEqual(Tr.keysForItem(evil, id, 3, []), [], id));
+  assert.deepEqual(Tr.keysForItem(null, 'plan', 3, []), []);
+});
+
+test('bigCells · nextStage · blockedOf — 합성 기록', () => {
+  const rec = {
+    guide: { st: 'done', at: 1 }, plan: { st: 'done', at: 1 },
+    'round:1': { st: 'done', at: 1 }, 'round:2': { st: 'blocked', note: '서명지 못 받음', at: 1 }, 'round:3': { st: 'none', at: 1 },
+    'monthly:1': { st: 'na', at: 1 },
+  };
+  const cells = Tr.bigCells(BIGPLAN, rec, 3, ['2026-03'], '2026-10-11');
+  assert.deepEqual(cells.map((c) => c.id), ['guide', 'plan', 'round', 'monthly', 'final']);
+  assert.deepEqual(cells.map((c) => c.step), ['sign', 'plat', 'plat', 'report', 'report']);
+  assert.equal(cells[0].chip.txt, '● 회신 받음');
+  assert.equal(cells[1].chip.txt, '● 등록함');
+  assert.equal(cells[2].st, 'blocked');
+  assert.ok(/1\/3|막힘|✕/.test(cells[2].chip.txt) && cells[2].chip.key === 'todo', cells[2].chip.txt);
+  assert.equal(cells[3].st, 'na');
+  assert.equal(cells[4].st, 'none');
+  assert.equal(Tr.bigCells(BIGPLAN, rec, 0, [], '2026-10-11')[2].chip, null, '회차 0 이면 키 없음 → chip null');
+  assert.deepEqual(Tr.nextStage(BIGPLAN, rec, 3, ['2026-03']), { id: 'round', name: '회차별 수행보고서' }, '막힘도 «미완» — 첫 미완 단계');
+  assert.deepEqual(Tr.blockedOf(BIGPLAN, rec, 3, ['2026-03']), [{ id: 'round', key: 'round:2', name: '회차별 수행보고서 2회차', note: '서명지 못 받음' }]);
+  const all = { guide: { st: 'done', at: 1 }, plan: { st: 'done', at: 1 }, 'round:1': { st: 'na', at: 1 }, 'round:2': { st: 'na', at: 1 }, 'round:3': { st: 'na', at: 1 },
+    'monthly:1': { st: 'done', at: 1 }, final: { st: 'done', at: 1 } };
+  assert.equal(Tr.nextStage(BIGPLAN, all, 3, ['2026-03']), null, '전부 끝');
+  assert.equal(Tr.nextStage(BIGPLAN, {}, 3, []).id, 'guide');
+  assert.deepEqual(Tr.blockedOf(BIGPLAN, {}, 3, []), []);
+  assert.equal(Tr.nextStage(null, {}, 3, []), null);
+});
+
+test('alertsExtra — blocked 묶음(기존 waitSign·overdue 는 그대로)', () => {
+  const rows = [
+    { coName: 'A', trk: { due: '', waitDays: null, submit: null, blocked: [{ name: '수행계획서', note: '메모' }] } },
+    { coName: 'B', trk: { due: '', waitDays: null, submit: null, blocked: [] } },
+    { coName: 'C', trk: null },
+    { coName: 'D' },
+  ];
+  const x = Tr.alertsExtra(rows, '2026-10-11');
+  assert.deepEqual(x.blocked.map((e) => e.row.coName), ['A']);
+  assert.deepEqual(x.blocked[0].items, [{ name: '수행계획서', note: '메모' }]);
+  assert.deepEqual(x.waitSign, []);
+  assert.deepEqual(x.overdue, []);
 });
