@@ -75,11 +75,12 @@ main{max-width:none;margin:0 auto;padding:12px 20px 40px}
 .mfoot .hint{flex:1;font-size:12px;color:var(--mute)}
 @media (min-width:1101px){
   th.ck,td.ck{position:sticky;left:0;z-index:1;background:var(--card)}
-  th.no,td.no{position:sticky;left:36px;z-index:1;background:var(--card)}
-  th.co,td.co{position:sticky;left:80px;z-index:1;background:var(--card);box-shadow:1px 0 0 var(--line2)}
-  .tbl thead th.ck,.tbl thead th.no,.tbl thead th.co{z-index:4;background:var(--bg)}
-  tbody tr:hover td.ck,tbody tr:hover td.no,tbody tr:hover td.co{background:var(--bg)}
-  tbody tr.cur td.ck,tbody tr.cur td.no,tbody tr.cur td.co{background:var(--blue-bg)}
+  th.sr,td.sr{position:sticky;left:36px;z-index:1;background:var(--card)}
+  th.no,td.no{position:sticky;left:72px;z-index:1;background:var(--card)}
+  th.co,td.co{position:sticky;left:116px;z-index:1;background:var(--card);box-shadow:1px 0 0 var(--line2)}
+  .tbl thead th.ck,.tbl thead th.sr,.tbl thead th.no,.tbl thead th.co{z-index:4;background:var(--bg)}
+  tbody tr:hover td.ck,tbody tr:hover td.sr,tbody tr:hover td.no,tbody tr:hover td.co{background:var(--bg)}
+  tbody tr.cur td.ck,tbody tr.cur td.sr,tbody tr.cur td.no,tbody tr.cur td.co{background:var(--blue-bg)}
 }
 @media (max-width:1100px){ .guide{grid-template-columns:1fr} }
 .auto{background:var(--card);border:1px solid var(--line);border-radius:10px;margin-bottom:8px;font-size:12.5px}
@@ -111,6 +112,11 @@ td.lg{font-size:12px;color:var(--ink2)}
 .dhead{position:sticky;top:-14px;z-index:5;margin:-14px -15px 8px;padding:12px 15px 6px;background:var(--card);border-bottom:1px solid var(--line)}
 .dhead h2{margin-top:0}
 .dhead .meta{margin-bottom:2px}
+td.sr,th.sr{text-align:center;padding:0;cursor:pointer;font-size:17px;line-height:1}
+td.sr{color:var(--line2)}
+td.sr.on,.starbtn.on{color:var(--amber)}
+td.sr:hover{color:var(--amber)}
+.starbtn{font-size:15px;line-height:1;padding:2px 8px}
 .fsteps{display:grid;grid-template-columns:repeat(5,minmax(0,1fr)) auto;gap:8px;align-items:stretch}
 .fsteps>button{font-size:12px;padding:3px 10px;white-space:nowrap}
 .fs{border:1px solid var(--line);border-radius:8px;padding:3px 10px;cursor:pointer;background:var(--card);position:relative;overflow:hidden}
@@ -156,8 +162,8 @@ td.lg{font-size:12px;color:var(--ink2)}
 #selbar label{font-size:12px;color:var(--ink2);display:flex;gap:4px;align-items:center}
 .layout{display:grid;grid-template-columns:minmax(0,1fr) clamp(380px,28vw,540px);gap:12px;align-items:start}
 .tbl{background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:auto}
-table{border-collapse:collapse;width:100%;min-width:1240px;table-layout:fixed}
-col.c-ck{width:36px}col.c-no{width:44px}col.c-co{width:240px}col.c-kind{width:84px}col.c-pgm{width:158px}col.c-ceo{width:84px}col.c-tr{width:116px}col.c-rg{width:116px}col.c-ico{width:116px}col.c-stat{width:84px}col.c-log{width:150px}
+table{border-collapse:collapse;width:100%;min-width:1280px;table-layout:fixed}
+col.c-ck{width:36px}col.c-sr{width:36px}col.c-no{width:44px}col.c-co{width:240px}col.c-kind{width:84px}col.c-pgm{width:158px}col.c-ceo{width:84px}col.c-tr{width:116px}col.c-rg{width:116px}col.c-ico{width:116px}col.c-stat{width:84px}col.c-log{width:150px}
 th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap;vertical-align:middle;overflow:hidden;text-overflow:ellipsis}
 th{background:var(--bg);font-size:12px;color:var(--mute);font-weight:600}
 tbody tr{cursor:pointer}
@@ -275,7 +281,7 @@ td.ceo{}
     </select>
 <select id="fType" aria-label="사건종류"><option value="">모든 종류</option><option value="reh">법인회생 전체</option><option value="bk">법인파산 전체</option><option value="회생">회생</option><option value="간이회생">간이회생</option></select>
 <select id="fSort" aria-label="정렬">
-      <option value="date">공고일 최신순</option><option value="trade">거래·연결 있는 순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
+      <option value="date">공고일 최신순</option><option value="star">별표 먼저</option><option value="trade">거래·연결 있는 순</option><option value="contact">연락처 있는 순</option><option value="name">회사명순</option><option value="region">지역순</option>
     </select>
     <button class="sm" id="moreBtn" onclick="toggleMore()">필터 더 보기 ▾</button></div>
   <div class="moreF" id="moreF" style="display:none">
@@ -304,6 +310,8 @@ td.ceo{}
       <button class="sm" onclick="bulk('hold')">⏸ 보류</button>
       <button class="sm" onclick="bulk('skip')">🚫 제외</button>
       <button class="sm" onclick="bulk('new')">↩ 미검토로</button>
+      <button class="sm" onclick="bulkStar(true)">★ 별표 달기</button>
+      <button class="sm" onclick="bulkStar(false)">☆ 별표 빼기</button>
       <button class="sm" onclick="bulk('sent')">✅ 발송 완료로</button>
     </span>
     <span class="div"></span>
@@ -327,10 +335,10 @@ td.ceo{}
   <div class="layout">
     <div class="tbl" id="tblbox">
       <table>
-        <colgroup><col class="c-ck"><col class="c-no"><col class="c-co"><col class="c-kind"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ico"><col class="c-log"><col class="c-stat"></colgroup>
+        <colgroup><col class="c-ck"><col class="c-sr"><col class="c-no"><col class="c-co"><col class="c-kind"><col class="c-pgm"><col class="c-ceo"><col class="c-tr"><col class="c-rg"><col class="c-ico"><col class="c-log"><col class="c-stat"></colgroup>
         <thead><tr>
           <th class="ck"><input type="checkbox" id="ckAll" aria-label="조건에 맞는 전체 선택" title="조건에 맞는 전체(모든 쪽)를 고릅니다"></th>
-          <th class="no">번호</th><th class="co">회사명</th><th>구분</th><th>공고·단계</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>연락처</th><th>발송·반응</th><th>상태</th>
+          <th class="sr" title="별표">★</th><th class="no">번호</th><th class="co">회사명</th><th>구분</th><th>공고·단계</th><th>대표자</th><th>거래·연결</th><th>지역</th><th>연락처</th><th>발송·반응</th><th>상태</th>
         </tr></thead>
         <tbody id="rows"></tbody>
       </table>
@@ -537,6 +545,22 @@ function stageCell(n){
   if(first) return '<span class="chip pgm" style="margin-left:0">'+(isBk(n)?'파산선고':'포괄금지명령')+' '+d+'</span>';
   return '<span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'" style="margin-left:0">'+esc(n.stage||'')+'</span> <span style="color:var(--mute);font-size:11.5px">'+d+'</span>';
 }
+/* ═══ 별표 — 중요한 회사에 표시(marks/<id>/star). 「★ 별표만」으로 모아 본다 ═══ */
+var STAR_ONLY=false;
+function isStar(id){ var m=MARKS[id]; return !!(m && !m._deleted && m.star===true); }
+async function toggleStar(id){
+  if(!id) return;
+  var on=!isStar(id);
+  try{ await saveMark(id, function(){ return { star:on }; }); await loadMarks(); draw(); toast(on?'별표를 달았습니다':'별표를 뺐습니다'); }
+  catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
+}
+async function bulkStar(on){
+  var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
+  var res=await Promise.allSettled(list.map(function(n){ return saveMark(n.id, function(){ return { star:on }; }); }));
+  var fail=res.filter(function(r){ return r.status==='rejected'; });
+  await loadMarks(); draw();
+  toast(fail.length ? ((list.length-fail.length)+'곳 저장 · '+fail.length+'곳 실패') : list.length+'곳에 별표를 '+(on?'달았습니다':'뺐습니다'));
+}
 function isBk(n){ return n && n.kind==='bankruptcy'; }
 function pgmDate(n){
   var re=isBk(n)?/파산선고/:/포괄적\s*금지명령/;
@@ -586,6 +610,7 @@ function baseList(skip){
     if(stage && n.stage!==stage) return false;
     if(ct){ var c=contactOf(n.id); if(ct==='has' && !c.any) return false; if(ct==='none' && c.any) return false; if(ct==='check' && !c.check) return false; }
     if(tr){ var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(tr==='client' && !(b&&b.kind==='client')) return false; if(tr==='cards' && !(b&&b.kind==='cards')) return false; if(tr==='any' && !b) return false; if(tr==='none' && b) return false; }
+    if(STAR_ONLY && !isStar(n.id)) return false;
     var lgf=$('fLog').value;
     if(lgf){ var LG=logOf(n.id);
       if(lgf==='none' && LG.length) return false;
@@ -602,6 +627,7 @@ function sortList(list){
     if(s==='name') return (a.debtorName||'').localeCompare(b.debtorName||'','ko');
     if(s==='region') return ((a.sido||'')+(a.sigungu||'')).localeCompare((b.sido||'')+(b.sigungu||''),'ko') || (b.noticeDate||'').localeCompare(a.noticeDate||'');
     if(s==='contact'){ var d=(contactOf(b.id).any?1:0)-(contactOf(a.id).any?1:0); if(d) return d; }
+    if(s==='star'){ var q=(isStar(b.id)?1:0)-(isStar(a.id)?1:0); if(q) return q; }
     if(s==='trade'){ var t=(MATCH[b.id]&&RehabMatch.badge(MATCH[b.id])?1:0)-(MATCH[a.id]&&RehabMatch.badge(MATCH[a.id])?1:0); if(t) return t; }
     return (b.noticeDate||'').localeCompare(a.noticeDate||'') || (a.courtName||'').localeCompare(b.courtName||'');
   });
@@ -621,7 +647,9 @@ function drawFunnel(base){
   var has=0, link=0;
   base.forEach(function(n){ if(contactOf(n.id).any) has++; var b=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null; if(b) link++; });
   var cur=$('fSido').value;
-  var h='<button class="qp'+($('fContact').value==='has'?' on':'')+'" data-step="has" title="연락처를 찾은 곳만">연락처 있음<b>'+has+'</b></button>'+
+  var stars=base.filter(function(n){ return isStar(n.id); }).length;
+  var h='<button class="qp'+(STAR_ONLY?' on':'')+'" data-step="star" title="별표를 단 곳만">★ 별표만<b>'+stars+'</b></button>'+
+        '<button class="qp'+($('fContact').value==='has'?' on':'')+'" data-step="has" title="연락처를 찾은 곳만">연락처 있음<b>'+has+'</b></button>'+
         '<button class="qp'+($('fTrade').value==='any'?' on':'')+'" data-step="link" title="우리 이알피·기업정보함에 있는 곳만">거래·연결<b>'+link+'</b></button>'+
         '<button class="qp'+((FUN_OPEN||cur||DATE)?' on':'')+'" data-more="1" title="지역별·공고일별로 보기">지역·공고일'+((cur||DATE)?' ('+(cur?esc(cur):'')+(cur&&DATE?' · ':'')+(DATE?esc(DATE.slice(5)):'')+')':'')+(FUN_OPEN?' ▲':' ▼')+'</button>';
   if(FUN_OPEN){
@@ -639,6 +667,7 @@ function drawFunnel(base){
 }
 function toggleMore(){ var m=$('moreF'); m.style.display = m.style.display==='none' ? '' : 'none'; fitLayout(); drawFunnel(baseList()); }
 function funnelClick(step){
+  if(step==='star'){ STAR_ONLY=!STAR_ONLY; draw(); return; }
   if(step==='all'){ $('fContact').value=''; $('fTrade').value=''; TAB='all'; }
   if(step==='has'){ $('fContact').value=($('fContact').value==='has'?'':'has'); }
   if(step==='link'){ $('fTrade').value=($('fTrade').value==='any'?'':'any'); }
@@ -654,7 +683,7 @@ function iconsOf(c){
 function draw(){
   var base=baseList(); drawTabs(base); drawFunnel(base);
   VIEW=sortList(base.filter(function(n){ return TAB==='all' || statusOf(n.id)===TAB; }));
-  var sig=['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fLog','fSort','fText'].map(function(id){ return $(id).value; }).join('|')+'|'+TAB+'|'+DATE;
+  var sig=['fDays','fCourt','fSido','fType','fStage','fContact','fTrade','fLog','fSort','fText'].map(function(id){ return $(id).value; }).join('|')+'|'+TAB+'|'+DATE+'|'+STAR_ONLY;
   if(sig!==SIG){ SIG=sig; PG=0; }
   var pages=Math.max(1,Math.ceil(VIEW.length/PSIZE)); if(PG>=pages) PG=pages-1; if(PG<0) PG=0;
   var from=PG*PSIZE, shown=VIEW.slice(from,from+PSIZE);
@@ -664,6 +693,7 @@ function draw(){
     var ce=ceoOf(n.id);
     return '<tr data-id="'+esc(n.id)+'" class="'+(CUR===n.id?'cur':'')+'">'+
       '<td class="ck"><input type="checkbox" data-ck="'+esc(n.id)+'"'+(SEL[n.id]?' checked':'')+' aria-label="고르기"></td>'+
+      '<td class="sr'+(isStar(n.id)?' on':'')+'" data-star="'+esc(n.id)+'" title="'+(isStar(n.id)?'별표 빼기':'별표 달기')+'">'+(isStar(n.id)?'★':'☆')+'</td>'+
       '<td class="no">'+(i+1)+'</td>'+
       '<td class="co" title="'+esc(n.debtorName+' · '+n.courtName+' '+n.caseNo)+'"><div class="cn"><span class="nm">'+esc(n.debtorName)+'</span></div></td>'+
       '<td><span class="chip '+kindChip(n)+'" style="margin-left:0">'+esc(kindLabel(n))+'</span></td>'+
@@ -735,7 +765,7 @@ function drawDetail(){
   var c=contactOf(n.id), st=statusOf(n.id), mk=MARKS[n.id]||{}, mc=mk.contact||{};
   var addrQ=encodeURIComponent(n.address||''), nameQ=encodeURIComponent((n.debtorName||'').replace(/주식회사|\(주\)|㈜/g,'').trim()+' '+(n.sigungu||''));
   var h='<div class="dhead"><button class="sm close dclose" onclick="closeDetail()">닫기</button>';
-  h+='<h2>'+esc(n.debtorName)+'</h2>';
+  h+='<h2><button class="sm starbtn'+(isStar(n.id)?' on':'')+'" onclick="toggleStar(\''+esc(n.id)+'\')" title="'+(isStar(n.id)?'별표 빼기':'별표 달기')+'">'+(isStar(n.id)?'★':'☆')+'</button> '+esc(n.debtorName)+'</h2>';
   h+='<div class="meta"><span class="chip pgm" style="margin-left:0">'+pgmLabel(n)+' '+esc(pgmDate(n))+'</span> <span class="chip '+(STAGE_CHIP[n.stage]||'c-gray')+'">현재 '+esc(n.stage||'')+'</span> <span class="chip '+(n.caseType==='간이회생'?'c-gray':'c-blue')+'">'+esc(n.caseType)+'</span> <span class="chip '+ST_CHIP[st]+'">'+STATUS[st]+'</span></div></div>';
   var ce=ceoOf(n.id);
   h+='<dl class="kv"><dt>대표자</dt><dd>'+(ce.name?'<b>'+esc(ce.name)+'</b> <span style="color:var(--mute);font-size:11.5px">'+esc(ce.src)+'</span>':'<span style="color:var(--mute)">확인 전 — 법원 공고에는 대표자가 없습니다. 아래 「사업자번호 조회」·인터넷등기소에서 확인해 입력하세요.</span>')+'</dd><dt>법원</dt><dd>'+esc(n.courtName)+(n.division?' · '+esc(n.division):'')+'</dd><dt>사건번호</dt><dd>'+esc(n.caseNo)+'</dd><dt>공고일</dt><dd>'+esc(n.noticeDate)+' · '+esc(n.noticeTitle)+'</dd></dl>';
@@ -955,11 +985,11 @@ function printDocs(what){ printList(VIEW.filter(function(n){ return SEL[n.id]; }
 function printOne(what){ var n=NOTICES[CUR]; if(n) printList([n], what); }
 function downloadCsv(){
   var list=VIEW.filter(function(n){ return SEL[n.id]; }); if(!list.length) return;
-  var head=['포괄금지명령일','법원','사건번호','종류','단계','회사명','대표자','거래·연결','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','우리 자료의 메일','홈페이지','최근 발송일','발송 방법','반응','상태','메모'];
+  var head=['별표','포괄금지명령일','법원','사건번호','종류','단계','회사명','대표자','거래·연결','우편번호','본점 주소','송달주소','대리인','전화','팩스','이메일','우리 자료의 메일','홈페이지','최근 발송일','발송 방법','반응','상태','메모'];
   var q=function(v){ v=String(v==null?'':v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; };
   var body=list.map(function(n){ var c=contactOf(n.id), m=MARKS[n.id]||{}, lg=lastLog(n.id)||{};
     var bd=MATCH[n.id]?RehabMatch.badge(MATCH[n.id]):null, own=((MATCH[n.id]||{}).emails||[]).map(function(e){ return e.email; });
-    return [pgmDate(n),n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,ceoOf(n.id).name,bd?bd.text:'',n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),own.join(' / '),c.homepage,lg.d||'',lg.m||'',lg.r||'',STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
+    return [isStar(n.id)?'★':'',pgmDate(n),n.courtName,n.caseNo,n.caseType,n.stage,n.debtorName,ceoOf(n.id).name,bd?bd.text:'',n.zip,n.address,n.dlvAddress,n.counsel,c.phones.join(' / '),c.faxes.join(' / '),c.emails.join(' / '),own.join(' / '),c.homepage,lg.d||'',lg.m||'',lg.r||'',STATUS[statusOf(n.id)],m.memo].map(q).join(','); });
   var blob=new Blob(['﻿'+[head.join(',')].concat(body).join('\r\n')],{type:'text/csv;charset=utf-8'});
   var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='회생광고_'+seoulToday()+'_'+list.length+'곳.csv';
   document.body.appendChild(a); a.click(); setTimeout(function(){ URL.revokeObjectURL(a.href); a.remove(); },500);
@@ -975,7 +1005,7 @@ async function reload(){
     loadLinks(); loadAuto();
   }catch(e){ toast('불러오지 못했습니다: '+(e&&e.message||e)); }
 }
-function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fLog').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; draw(); }
+function resetFilters(){ $('fDays').value='31'; $('fCourt').value=''; $('fSido').value=''; $('fType').value=''; $('fStage').value=''; $('fContact').value=''; $('fTrade').value=''; $('fLog').value=''; $('fSort').value='date'; $('fText').value=''; DATE=''; TAB='all'; STAR_ONLY=false; draw(); }
 function clearSel(){ SEL={}; draw(); }
 
 /* ═══ 로그인·잠금 — 모르면 잠근다 ═══ */
@@ -1005,6 +1035,7 @@ function boot(){
   });
   $('tabs').addEventListener('click',function(e){ var t=e.target.closest('.tab'); if(!t) return; TAB=t.getAttribute('data-tab'); draw(); });
   $('rows').addEventListener('click',function(e){
+    var sc=e.target.closest('td.sr'); if(sc){ toggleStar(sc.getAttribute('data-star')); return; }
     if(e.target.matches('input[data-ck]')){ var id=e.target.getAttribute('data-ck'); if(e.target.checked) SEL[id]=1; else delete SEL[id]; drawSel(); return; }
     var tr=e.target.closest('tr[data-id]'); if(tr) openDetail(tr.getAttribute('data-id'));
   });
