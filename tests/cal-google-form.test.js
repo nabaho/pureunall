@@ -241,3 +241,13 @@ test('글꼴 — Roboto 가 한글보다 앞(숫자·영문은 구글 앱과 같
   assert.strictEqual(차례.indexOf('Pretendard'), -1, '불러오지 않는 Pretendard 가 다시 들어왔습니다');
   assert.strictEqual(차례[차례.length - 1], 'sans-serif');
 });
+
+/* ── 일정 칩은 구글 공식 화면 실측 크기 (2026-10-11) ── */
+test('칩 크기 — 구글 실측(글자 12px · 굵기 500 · 줄 20px · 모서리 6px), 칩 사이 틈 2px(= 24px 간격)', () => {
+  const 칩 = 캘린더.match(/\n\s*\.ev\{padding:([^;]+);border-radius:(\d+)px;font-size:(\d+)px;font-weight:(\d+);line-height:(\d+)px;/);
+  assert.ok(칩, '.ev 규칙을 못 찾았습니다');
+  assert.deepStrictEqual([칩[2], 칩[3], 칩[4], 칩[5]], ['6', '12', '500', '20'], '구글 실측(6px·12px·500·20px)과 다릅니다: ' + 칩.slice(1).join(' / '));
+  assert.match(캘린더, /\.evs\{display:flex;flex-direction:column;gap:2px\}/, '칩 사이 틈이 2px 이 아닙니다');
+  /* 폰 위젯 칩(캡처 실측)은 따로다 — 월 위젯 규칙이 그대로여야 한다 */
+  assert.match(캘린더, /body\.mob \.ev\{font-size:9\.5px;line-height:12px;height:12px;padding:0 3px;border-radius:3px/);
+});

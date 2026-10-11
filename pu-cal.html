@@ -256,7 +256,10 @@
        종일 일정 = 색을 «꽉» 채운 둥근 네모 + 흰 글자 (지난 것은 옅게 + 회색 글자)
        시각 일정 = 바탕 없이 «색 점 · 시각 · 제목» (data-g="t")
      ⚠ 두 꼴의 높이가 같아야 한다 — 칸 용량을 첫 칩 하나로 재기 때문이다. */
-  .ev{padding:1px 6px;border-radius:4px;font-size:12px;font-weight:500;line-height:18px;
+  /* ★ 칩 크기 — 구글 공식 달력 화면(calendar.google.com/calendar/embed)에서 2026-10-11 «직접 잰» 값:
+       글자 12px · 굵기 500 · 줄 높이 20px · 높이 22px · 모서리 6px · 왼쪽 여백 6px · 칩 사이 24px 간격(= 칩 22 + 틈 2).
+       (예전 4px·18px 는 다른 캡처에서 쟀던 값 — 지금 구글이 내놓는 화면과 달라 바꿨다. 폰 위젯 칩은 아래 body.mob 규칙) */
+  .ev{padding:1px 6px;border-radius:6px;font-size:12px;font-weight:500;line-height:20px;
     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;flex:none}
   .ev[data-g="t"]{padding:1px 4px;font-weight:400;background:transparent}
   .ev[data-g="t"]:hover{background:var(--bg)}
