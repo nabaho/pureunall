@@ -203,9 +203,10 @@ table.mx td.dot.yes{background:var(--green-bg)}
 </script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-govaid-match.js?v=1"></script>
+<script src="js/pu-govaid-match.js?v=2"></script>
 <script src="js/pu-govaid-view.js?v=1"></script>
 <script src="js/pu-govaid-seed.js?v=1"></script>
+<script src="js/pu-govaid-records.js?v=1"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, ME={sid:''}, YEAR=GovaidMatch.kstYear();
@@ -260,7 +261,8 @@ function tbl(name, head, rows){
     + '</tbody></table></div>';
 }
 function picked(name){ return Object.keys(SEL).filter(function(k){ return k.indexOf(name+'|')===0; }).map(function(k){ return k.slice(name.length+1); }); }
-function clearSel(name){ picked(name).forEach(function(id){ delete SEL[name+'|'+id]; }); draw(); }
+function dropPicked(names){ names.forEach(function(name){ picked(name).forEach(function(id){ delete SEL[name+'|'+id]; }); }); }
+function clearSel(name){ dropPicked([name]); draw(); }
 function drawBulk(){
   document.querySelectorAll('[data-bulk]').forEach(function(el){
     var name=el.getAttribute('data-bulk'), n=picked(name).length, kind=BULK[name];
@@ -507,14 +509,15 @@ function readEditor(cur){
       facts:facts, manual:$('eManual').value.split('\n').map(function(s){ return s.trim(); }).filter(Boolean) },
     source:{ title:$('eSrcTitle').value.trim(), no:$('eSrcNo').value.trim(), page:$('eSrcPage').value.trim(), url:url } };
 }
-/* 조건이 하나라도 있는가 — 엔진과 같은 잣대(빈 사업장으로 판정해 조건 글자가 나오는지) */
-function hasCond(p){ return GovaidMatch.judge({vals:{},facts:{}}, Object.assign({}, p, {status:'confirmed', baseYear:YEAR}), YEAR).items.length>0; }
+/* 잴 수 있는 조건이 하나라도 있는가 — 엔진과 같은 잣대(빈 사업장으로 판정해 조건 글자가 나오는지).
+   «사람이 볼 조건»만으로는 안 된다 — 엔진이 그런 사업을 계산하지 않는다(모든 회사가 후보로 쏟아지므로) */
+function hasCond(p){ return GovaidMatch.judge({vals:{},facts:{}}, Object.assign({}, p, {status:'confirmed', baseYear:YEAR}), YEAR).items.some(function(i){ return i.state!=='manual'; }); }
 async function saveProgram(mode){
   var cur=CUR_CHECK==='__new'?null:progById(CUR_CHECK), patch;
   try{ patch=readEditor(cur); }catch(e){ toast(e.message); return; }
   var id = cur ? cur.id : 'gp-'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
   if(mode==='confirm'){
-    if(!hasCond(patch)){ toast('조건이 하나도 없어 확정할 수 없습니다 — 조건을 넣거나 «사람이 볼 조건»을 적으세요'); return; }
+    if(!hasCond(patch)){ toast('숫자·선택 조건이 하나도 없어 확정할 수 없습니다 — 인원·업력·규모·지역·업종·예/아니오 중 하나는 넣으세요(«사람이 볼 조건»만으로는 계산하지 않습니다)'); return; }
     if(!patch.agency && !confirm('담당기관이 비어 있습니다. 그래도 확정할까요?')) return;
     Object.assign(patch, { status:'confirmed', baseYear:YEAR, confirmedAt:Date.now(), confirmedBy:ME.sid });
   } else patch.status='draft';
@@ -524,16 +527,20 @@ async function saveProgram(mode){
     CUR_CHECK=id; await reload(); toast(mode==='confirm' ? '확정했습니다 — 이제 후보 계산에 들어갑니다' : '초안으로 저장했습니다');
   }catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
 }
+/* ⚠ 레코드는 GovaidRecords 로 만든다 — 거래가 «찬 자리»(null)로 먼저 불려도 id 를 가진 레코드를 돌려줘야
+   서버 값으로 다시 불린다(rtdb-transaction-cold-abort). 공용 gate.remove 는 그 첫 부름에서 접혀 쓰지 않는다. */
 function confirmOne(id){
   var p=progById(id); if(!p) return Promise.reject(new Error('사업을 찾지 못했습니다'));
-  var probe=GovaidMatch.judge({vals:{},facts:{}}, Object.assign({}, p, {status:'confirmed', baseYear:YEAR}), YEAR);
-  if(!probe.items.length) return Promise.reject(new Error('「'+nm(p)+'」은 조건이 비어 확정하지 않았습니다'));
-  return gate.save(fbDb.ref('govaid/programs/'+id), function(prev){ return Object.assign({}, prev||{}, { status:'confirmed', baseYear:YEAR, confirmedAt:Date.now(), confirmedBy:ME.sid }); }, { entityType:'SupportProgram' });
+  if(!hasCond(p)) return Promise.reject(new Error('「'+nm(p)+'」은 잴 수 있는 조건이 없어 확정하지 않았습니다'));
+  return gate.save(fbDb.ref('govaid/programs/'+id), function(prev){ return GovaidRecords.confirmed(prev, p, YEAR, ME.sid, Date.now()); }, { entityType:'SupportProgram' });
+}
+function softDrop(path, known, entityType){
+  return gate.save(fbDb.ref(path), function(prev){ return GovaidRecords.softDeleted(prev, known, ME.sid, Date.now()); }, { entityType:entityType });
 }
 async function dropProgram(id){
   var p=D.programs[id]; if(!p) return;
   if(!confirm('「'+nm(p)+'」을(를) 사전에서 뺍니다. 지난 검토 기록은 남습니다. 뺄까요?')) return;
-  try{ await gate.remove(fbDb.ref('govaid/programs/'+id), p, { entityType:'SupportProgram' }); CUR_CHECK=''; await reload(); toast('사전에서 뺐습니다'); }
+  try{ await softDrop('govaid/programs/'+id, p, 'SupportProgram'); CUR_CHECK=''; await reload(); toast('사전에서 뺐습니다'); }
   catch(e){ toast('빼지 못했습니다: '+(e&&e.message||e)); }
 }
 
@@ -614,7 +621,15 @@ async function saveSubject(){
       await gate.save(fbDb.ref('govaid/prospects/'+id), function(prev){ var base=Object.assign({}, prev||{}, rec); if(!base.companyLinkStatus) base.companyLinkStatus='pending'; return base; },
         S.isNew ? { entityType:'Organization', expectedRevision:-1 } : { entityType:'Organization' });
       key = rec.companyLinkStatus==='linked' ? 'co_'+link : 'pr_'+id;
-      if(rec.companyLinkStatus!=='linked') await saveExtras('pr_'+id, vals, facts);
+      var movedMsg='';
+      if(rec.companyLinkStatus==='linked'){
+        /* 이은 뒤 목록에는 업체로만 보인다 — 예비 고객 때 넣은 값을 업체 보충값의 «빈 칸에만» 옮긴다(지역·규모는 원장 값을 둔다) */
+        var co=companyById(link)||{}, auto=GovaidMatch.headcountAuto((D.pub||{})[GovaidMatch.digits(co.bizNo)]);
+        var carry=GovaidRecords.carryToCompany(D.extras['co_'+link], rec, vals, facts, { hasAutoHeadcount: auto.v!=null });
+        if(carry.moved.length){ await saveExtras('co_'+link, carry.vals, carry.facts); movedMsg=' · 업체 쪽으로 옮긴 값 '+carry.moved.length+'개'; }
+      } else await saveExtras('pr_'+id, vals, facts);
+      closeModal(); CUR_CO=key; await reload(); toast('저장했습니다'+movedMsg);
+      return;
     } else {
       Object.assign(vals, { headcount:n('xHc'), foundedYear:year('xFy'), region:$('xReg').value, industry:$('xInd').value, size:$('xSize').value });
       await saveExtras(key, vals, facts);
@@ -656,8 +671,9 @@ function clickReview(t){
   if((b=t.closest('[data-jdec]'))){ judgeSave(b.getAttribute('data-jdec')); return true; }
   if((b=t.closest('td.dot[data-k]'))){ openJudge(b.getAttribute('data-k'), b.getAttribute('data-p')); return true; }
   if((b=t.closest('[data-foldno]'))){ OPEN_NO=!OPEN_NO; drawCoDetail(); drawBulk(); return true; }
-  if((b=t.closest('[data-co]'))){ CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; draw(); return true; }
-  if((b=t.closest('[data-pg]'))){ CUR_PROG=b.getAttribute('data-pg'); draw(); return true; }
+  /* 회사·사업을 바꾸면 그 화면 표의 고르기를 푼다 — 고르기 열쇠에 회사·사업이 없어, 남겨 두면 새 화면의 쌍에 저장된다 */
+  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; draw(); return true; }
+  if((b=t.closest('[data-pg]'))){ dropPicked(['progCand','progUnk']); CUR_PROG=b.getAttribute('data-pg'); draw(); return true; }
   return false;
 }
 function rowClick(name,id){
@@ -672,10 +688,10 @@ async function bulkDo(name, d){
   var ids=picked(name); if(!ids.length) return;
   var kind=BULK[name], jobs=[], label='';
   if(kind==='review'){ var r=reviewJobs(name, ids, d); jobs=r.jobs; label=r.label; }
-  else if(kind==='dropProgram'){ label='사전에서 빼기'; jobs=ids.map(function(id){ return function(){ return gate.remove(fbDb.ref('govaid/programs/'+id), D.programs[id], {entityType:'SupportProgram'}); }; }); }
+  else if(kind==='dropProgram'){ label='사전에서 빼기'; jobs=ids.map(function(id){ return function(){ return softDrop('govaid/programs/'+id, D.programs[id], 'SupportProgram'); }; }); }
   else if(kind==='dropProspect'){
     label='예비 고객 빼기(기존 고객사는 건너뜀)';
-    jobs=ids.filter(function(k){ return /^pr_/.test(k); }).map(function(k){ var id=k.slice(3); return function(){ return gate.remove(fbDb.ref('govaid/prospects/'+id), D.prospects[id], {entityType:'Organization'}); }; });
+    jobs=ids.filter(function(k){ return /^pr_/.test(k); }).map(function(k){ var id=k.slice(3); return function(){ return softDrop('govaid/prospects/'+id, D.prospects[id], 'Organization'); }; });
   }
   else { label='확정('+YEAR+' 기준)'; jobs=ids.map(function(id){ return function(){ return confirmOne(id); }; }); }
   if(!jobs.length){ toast('할 수 있는 것이 없습니다'); return; }

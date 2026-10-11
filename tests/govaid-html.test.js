@@ -16,7 +16,7 @@ test('인라인 스크립트가 문법에 맞다', () => {
 });
 
 test('엔진·묶음·씨앗 모듈을 캐시 번호와 함께 싣는다', () => {
-  ['pu-govaid-match', 'pu-govaid-view', 'pu-govaid-seed'].forEach((n) =>
+  ['pu-govaid-match', 'pu-govaid-view', 'pu-govaid-seed', 'pu-govaid-records'].forEach((n) =>
     assert.match(NOC, new RegExp('src="js/' + n + '\\.js\\?v=\\d+"'), n));
 });
 
@@ -43,10 +43,31 @@ test('예비 고객은 업체관리 원장(data/companies)에 쓰지 않는다 �
   assert.doesNotMatch(NOC, /gate\.(?:save|remove)\(fbDb\.ref\('data\//);
 });
 
-test('조건이 하나도 없으면 확정하지 않는다 — 화면도 엔진과 같은 잣대(judge 의 items)로 막는다', () => {
+test('잴 수 있는 조건이 없으면 확정하지 않는다 — 화면도 엔진과 같은 잣대(judge, «사람이 볼 조건»만은 안 됨)', () => {
+  const has = NOC.slice(NOC.indexOf('function hasCond('), NOC.indexOf('function hasCond(') + 400);
+  assert.match(has, /GovaidMatch\.judge\(/);
+  assert.match(has, /!==\s*'manual'/);
   const fn = NOC.slice(NOC.indexOf('function confirmOne('), NOC.indexOf('function confirmOne(') + 600);
-  assert.match(fn, /GovaidMatch\.judge\(/);
-  assert.match(fn, /items\.length/);
+  assert.match(fn, /hasCond\(/);
+});
+
+test('찬 자리 거래에서 접히는 공용 gate.remove 를 쓰지 않고, 지우기·확정은 GovaidRecords 로 만든다', () => {
+  assert.doesNotMatch(NOC, /gate\.remove\(/);
+  assert.match(NOC, /GovaidRecords\.softDeleted\(/);
+  assert.match(NOC, /GovaidRecords\.confirmed\(/);
+});
+
+test('회사·사업을 바꾸면 그 화면의 고르기(☐)를 푼다 — 안 보이는 쌍에 검토가 저장되지 않게', () => {
+  const fn = NOC.slice(NOC.indexOf('function clickReview('), NOC.indexOf('function clickReview(') + 1400);
+  const co = fn.slice(fn.indexOf("'[data-co]'"), fn.indexOf("'[data-co]'") + 200);
+  const pg = fn.slice(fn.indexOf("'[data-pg]'"), fn.indexOf("'[data-pg]'") + 200);
+  assert.match(co, /dropPicked\(\[[^\]]*'coCand'/);
+  assert.match(pg, /dropPicked\(\[[^\]]*'progCand'/);
+});
+
+test('예비 고객을 업체와 이으면 그때 값을 업체 보충값의 빈 칸으로 옮긴다', () => {
+  const fn = NOC.slice(NOC.indexOf('async function saveSubject('), NOC.indexOf('async function saveSubject(') + 3000);
+  assert.match(fn, /GovaidRecords\.carryToCompany\(/);
 });
 
 test('예비 고객 → 업체 잇기는 사업자번호 10자리가 같아야 한다(이름만으로 잇지 않는다)', () => {

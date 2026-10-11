@@ -123,3 +123,8 @@ test('서울 시각으로 해를 센다 — 12월 31일 15시(UTC)는 서울로 
   assert.equal(M.kstYear(Date.UTC(2026, 11, 31, 15, 0, 0)), 2027);
   assert.equal(M.kstYear(Date.UTC(2026, 11, 31, 14, 0, 0)), 2026);
 });
+
+test('«사람이 볼 조건»만 있는 사업은 계산하지 않는다 — 모든 회사가 후보로 쏟아지지 않게', () => {
+  const r = M.judge(pf({ headcount: 9 }), prog({ manual: ['경영상 이유로 고용조정이 불가피할 것'] }), Y);
+  assert.equal(r.verdict, 'unconfirmed');
+});

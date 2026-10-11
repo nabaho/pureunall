@@ -168,8 +168,10 @@
       else add('fact:' + f.key, label, got.v === want ? 'ok' : 'no');
     });
     list(c.manual).forEach(function (m, i) { if (clean(m)) add('manual:' + i, clean(m), 'manual'); });
-    if (!items.length) return { verdict: 'unconfirmed', items: items };
     var states = items.map(function (x) { return x.state; });
+    /* 기계가 잴 수 있는 조건(manual 이 아닌 것)이 하나도 없으면 계산하지 않는다 —
+       «사람이 볼 조건»만으로는 모든 회사가 후보로 쏟아진다(2026-10-11 최종 검토) */
+    if (!states.filter(function (s) { return s !== 'manual'; }).length) return { verdict: 'unconfirmed', items: items };
     var verdict = states.indexOf('no') >= 0 ? 'no' : (states.indexOf('unknown') >= 0 ? 'unknown' : 'candidate');
     return { verdict: verdict, items: items };
   }
