@@ -75113,7 +75113,7 @@ function erpPerfBreakdown(empSid, period){
     (item.perfShares || []).forEach(function(p){
       if(!p) return;
       // 옛 자료는 사번 자리에 이름이 들어 있다 — 급여 쪽과 같은 방식으로 찾는다
-      var match = p.sid === empSid || (empName && p.sid === empName) || (p.name && p.name === empName);
+      var match = erpPerfShareIsMine(p, empSid, empName);
       if(!match || (p.amount || 0) === 0) return;    // 0원(수습·퇴사·요율0)은 세지 않는다
       var got = p.amount || 0;
       /* 「몫」은 그 사람 앞으로 잡힌 성과 기준액이다 — 분할%가 이미 반영돼 있다.
@@ -75290,7 +75290,7 @@ function calcPerfBonus(empSid, ym){
     if(!erpPerfCounts(item, true)) return;
     (item.perfShares||[]).forEach(function(p){
       // sid 직접 일치 또는 (옛 데이터) 이름 일치
-      var match = p.sid === empSid || (empName && p.sid === empName) || (p.name && p.name === empName);
+      var match = erpPerfShareIsMine(p, empSid, empName);
       if(match && (p.amount||0) !== 0){   // 음수(수기 차감 조정)도 산입
         var amt = p.amount||0;
         total += amt;
@@ -75319,8 +75319,27 @@ function calcPerfBonus(empSid, ym){
 }
 
 // ===== 성과급 건별 수동조정 (원천 finance_income.perfShares 직접 수정 → 성과관리·급여 자동 동기화) =====
+/* ★ 성과 몫이 «이 사람 것인가» — 사번으로 먼저, 이름은 «옛 자료 호환»으로만 (2026-10-11 검토 A6).
+   예전에는 이름이 같으면 사번이 달라도 맞췄다 — 동명이인이면 한 사람의 성과급이 다른 사람 급여에 붙거나 두 번 나갈 수 있었다.
+   이름으로 맞추는 조건(셋 모두): ① 명부(재직·퇴직 전부)에 그 이름이 «하나뿐» ② 적힌 값이 «누구의 사번도 아님»(옛 자료는 사번 자리에 이름)
+   ③ 몫에 사번이 없거나, 사번 자리에 이름이 든 경우. 사번이 있는 몫은 사번만 본다. */
+function erpPerfShareIsMine(p, empSid, empName){
+  if(!p || !empSid) return false;
+  if(p.sid === empSid) return true;
+  var nm = String(empName || '').trim();
+  if(!nm) return false;
+  var all = [];
+  try { all = (dbGet('user_accounts', []) || []).concat(dbGet('user_dir', []) || []); } catch(_e){ all = []; }
+  var sids = {}, byName = {};
+  all.forEach(function(u){ if(u && u.sid){ sids[u.sid] = 1; if(u.name){ var k = String(u.name).trim(); (byName[k] = byName[k] || {})[u.sid] = 1; } } });
+  if(Object.keys(byName[nm] || {}).length !== 1) return false;     // 동명이인이면 이름으로 맞추지 않는다
+  if(p.sid){ return !sids[p.sid] && String(p.sid).trim() === nm; } // 사번 자리에 «이름»이 든 옛 자료만
+  return String(p.name || '').trim() === nm;                       // 사번이 없는 옛 몫
+}
+window.erpPerfShareIsMine = erpPerfShareIsMine;
+
 function _perfShareMatch(p, empSid, empName){
-  return p.sid === empSid || (empName && p.sid === empName) || (p.name && p.name === empName);
+  return erpPerfShareIsMine(p, empSid, empName);
 }
 // 그 입금에서 이 사람 앞으로 잡힌 성과금액 — 이력에 「얼마에서 얼마로」를 적으려면 필요하다
 function _perfAmountOf(fiArr, incomeId, empSid, empName){
