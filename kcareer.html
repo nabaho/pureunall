@@ -1378,7 +1378,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=4"></script>
+<script src="js/kcareer-profile1.js?v=5"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=9"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -2034,7 +2034,10 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <div class="page-head"><div class="page-title">👤 프로필 1장</div><div class="page-desc">경력관리에 든 학력·자격·경력·위촉·실적·강의를 A4 한 장으로 — 넘치면 «최근 N»을 저절로 줄입니다 · 금액·주민번호·계좌는 넣지 않습니다</div></div>
         <div class="p1-wrap" style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start">
           <div id="p1Side"></div>
-          <div id="p1Paper" style="background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;max-width:640px;overflow:hidden"></div>
+          <div style="min-width:0">
+            <div id="p1Zoom" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"></div>
+            <div id="p1Paper" style="background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;overflow:hidden"></div>
+          </div>
         </div>
       </div></section>
       <section class="page-view" id="page-bizdash"><div class="page">
@@ -7633,7 +7636,7 @@ function renderProfile1(){
        좁은 칸에 바로 그리면 글이 접혀 한 장을 넘는 것처럼 보인다(인쇄와 다르게 보이면 안 된다) */
   paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
     +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
-  _p1Scale();
+  _p1ZoomBar(); _p1Scale();
   /* 사진은 «나중에» 붙인다 — 보관함에서 꺼내는 데 시간이 걸린다.
      ⚠ 예전엔 fileURLAsync 로 꺼냈는데, 사진이 «data: 머리»를 단 채 담겨 있으면 풀다가 조용히 실패해 사진이 영영 안 나왔다
        (대표 물음 2026-10-07 「증명사진 넣기에 왜 사진은 없나?」). 이력서 «사진 넣기»와 같은 길(_rhPhotoPng)로 꺼내
@@ -7649,11 +7652,46 @@ function renderProfile1(){
       .catch(function(e){ _p1PhotoWhy='사진을 불러오지 못했습니다 — '+((e&&e.message)||e); renderProfile1(); });
   }
 }
+/* 👁 보는 크기 (대표 지적 2026-10-11 「글자가 안 보인다 · 위아래로 움직이지 않고 한 화면에 다 보이게」)
+   · 한 화면 — 한 장 전체가 «스크롤 없이» 보이게 (기본)   · 폭 맞춤 — 칸 너비에 꽉 차게(글자가 큼, 아래로 내림)
+   · 전체 화면 — 모니터 전체를 써서 한 장을 가장 크게 (Esc 로 나옴)
+   ⚠ 크기만 바꾼다 — 서류 내용·인쇄·저장은 그대로(A4 794×1123). */
+var _p1ZoomMode='fit';
+try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom')||'fit'; }catch(e){}
 function _p1Scale(){
   var paper=document.getElementById('p1Paper'), a4=paper&&paper.querySelector('.p1-a4'); if(!a4) return;
-  var s=Math.min(1, (paper.clientWidth||794)/794); a4.style.transform='scale('+s+')';
+  var full=(document.fullscreenElement===paper), s, W, H;
+  if(full){
+    s=Math.min(window.innerWidth/794, window.innerHeight/1123);
+    paper.style.width='100vw'; paper.style.height='100vh'; paper.style.background='var(--navy)'; paper.style.overflow='auto';
+    a4.style.transform='scale('+s+')'; a4.style.marginLeft=Math.max(0,Math.round((window.innerWidth-794*s)/2))+'px';
+    return;
+  }
+  paper.style.background='#fff'; paper.style.overflow='hidden'; a4.style.marginLeft='0';
+  var box=paper.parentNode, availW=(box&&box.clientWidth)||794;
+  if(_p1ZoomMode==='width'){ s=Math.min(1.4, availW/794); paper.style.width='100%'; }
+  else{
+    var top=paper.getBoundingClientRect().top;
+    var availH=Math.max(300, window.innerHeight-Math.max(0,top)-70);   /* 아래 작업 띠(약 60px) 만큼 비운다 */
+    s=Math.min(1, availW/794, availH/1123); paper.style.width=Math.round(794*s)+2+'px';
+  }
+  a4.style.transform='scale('+s+')';
   paper.style.height=Math.round(1123*s)+'px';
 }
+function _p1ZoomBar(){
+  var bar=document.getElementById('p1Zoom'); if(!bar) return;
+  var b=function(m,t,ti){ return '<button class="btn sm'+(_p1ZoomMode===m?' primary':'')+'" type="button" onclick="p1Zoom(\''+m+'\')" title="'+ti+'">'+t+'</button>'; };
+  bar.innerHTML=b('fit','⬍ 한 화면','위아래로 움직이지 않고 한 장 전체가 보이게')+b('width','⬌ 폭 맞춤','칸 너비에 꽉 차게 — 글자가 커집니다(아래로 내려 보기)')
+    +'<button class="btn sm" type="button" onclick="p1Full()" title="모니터 전체로 한 장을 가장 크게 봅니다 · Esc 로 나옵니다">⛶ 전체 화면</button>';
+}
+function p1Zoom(m){ _p1ZoomMode=(m==='width')?'width':'fit'; try{ localStorage.setItem('kc_p1_zoom',_p1ZoomMode); }catch(e){} _p1ZoomBar(); _p1Scale(); }
+function p1Full(){
+  var paper=document.getElementById('p1Paper'); if(!paper) return;
+  if(document.fullscreenElement){ document.exitFullscreen(); return; }
+  if(paper.requestFullscreen) paper.requestFullscreen().catch(function(){ toast('전체 화면을 열 수 없습니다 — 「⬌ 폭 맞춤」을 쓰세요'); });
+  else toast('이 브라우저는 전체 화면을 지원하지 않습니다 — 「⬌ 폭 맞춤」을 쓰세요');
+}
+if(typeof document!=='undefined' && document.addEventListener) document.addEventListener('fullscreenchange', function(){ _safe(_p1Scale); });
 if(typeof window!=='undefined' && window.addEventListener) window.addEventListener('resize', function(){ _safe(_p1Scale); });
 function p1Toggle(k,v){ var o=_p1Load(); o.on=Object.assign({}, o.on||{}); o.on[k]=!!v; _p1Keep(); renderProfile1(); }
 function p1Use(v){ _p1Load().use=v; _p1Keep(); renderProfile1(); }
