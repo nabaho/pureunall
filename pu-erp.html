@@ -31,7 +31,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   var a = (location.search.match(/(?:^|[?&])app=(hr|fin)(?:&|$)/) || [])[1];
   if(!a) return;
   var info = a === 'hr' ? { title:'인사관리', emo:'👥', mf:'pu-hr-manifest.json', png:'icon-hr-192.png' }
-                        : { title:'재무',      emo:'📒', mf:'pu-fin-manifest.json', png:'icon-fin-192.png' };
+                        : { title:'재무관리',    emo:'📒', mf:'pu-fin-manifest.json', png:'icon-fin-192.png' };
   document.title = info.title;
   var m = document.querySelector('link[rel=manifest]'); if(m) m.href = info.mf;
   var t = document.querySelector('meta[name=apple-mobile-web-app-title]'); if(t) t.content = info.title;
@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=25"></script>
+  <script src="js/pu-appbar.js?v=26"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -206,7 +206,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-billing.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=62"></script>
+<script src="js/pu-ontology.js?v=63"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
@@ -1128,7 +1128,7 @@ var MENUS = [
 var PU_APPS = {
   erp: { name:'푸른이알피', short:'', groups:['dash','biz','env'], env:['company','biz','policy','dup','archive','nas','system'], start:'dash/my' },
   hr:  { name:'인사관리', short:'인사관리', groups:['hr','env'], env:['hr'], start:'hr/staff', icon:'👥' },
-  fin: { name:'재무', short:'재무', groups:['fin','env'], env:['fin'], start:'fin/ledger', icon:'📒' }
+  fin: { name:'재무관리', short:'재무관리', groups:['fin','env'], env:['fin'], start:'fin/ledger', icon:'📒' }
 };
 var PU_APP = (function(){
   try { var a = new URLSearchParams(window.location.search).get('app'); if(a === 'hr' || a === 'fin') return a; } catch(e){}
