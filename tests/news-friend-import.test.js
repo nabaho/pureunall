@@ -454,7 +454,10 @@ test('표의 한 칸은 «한 줄» — 칸마다 …로 줄이고 전문은 tit
   assert.match(표, /<th class="ck"><\/th><th class="n">#<\/th>/);
   assert.match(표, /<td class="ck"><input type="checkbox" class="chk5"[^>]*><\/td><td class="n">1<\/td>/);
   /* 폰 — 16px 미만 입력칸은 아이폰이 화면을 키운다 */
-  assert.match(화면, /@media\(max-width:700px\)\{#friendbox input,#friendbox select\{font-size:16px !important\}\}/);
+  /* 2026-10-11 — 지역 고르개(select)가 지인 탭 필터 줄에도 생겨 선택자가 늘었다. 뜻은 같다: 폰에서 입력칸·select 는 16px. */
+  assert.match(화면, /@media\(max-width:700px\)\{#friendbox input,#friendbox select,[^{}]*\{font-size:16px !important\}\}/);
+  const 폰 = /@media\(max-width:700px\)\{([^{}]*)\{font-size:16px !important\}\}/.exec(화면);
+  assert.ok(폰 && /#friendbox select/.test(폰[1]) && /\.chips\.filt select/.test(폰[1]), '폰 규칙이 지역 select 를 빠뜨렸다');
 });
 
 /* ═══ 지인·잠재 표 — 고르기 · 찾기 · 한꺼번에 동의/빼기 ═════════════════════ */
