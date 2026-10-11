@@ -69,7 +69,7 @@ function box(o) {
   vm.createContext(ctx);
   ['mbWhoLive', 'mbWhoWhy', 'mbWhoWhyOf', 'mbNoWhoBox', 'mbBoxWhoList', 'mbBoxWhoOfRow',
     'mbBoxWhoToggle', 'mbBoxWhoPickHtml', 'mbWhoOfRow', 'mbSubsOfRow', 'mbWhoAllOfRow',
-    'mbWkFp', 'mbWkMsgOf', 'mbCoRecOfAddr']
+    'mbWkFp', 'mbWkMsgOf', 'mbCoRecOfAddr', 'mbHqRec']
     .forEach((n) => vm.runInContext(sliceFn(app, 'function ' + n + '('), ctx));
   return { ctx, sent };
 }

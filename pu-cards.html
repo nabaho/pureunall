@@ -19830,12 +19830,15 @@ function mbWhoIndex(){
     if(!em || !rec) return;
     const d = mbDomOf(em);
     const pub = !d || MB_PUB_DOM.indexOf(d) >= 0 || !!noDom;
+    /* 지사(사무대행)면 담당·종료 여부는 «본사» 기록 기준 (대표 결정 2026-10-11 — mbHqRec 머리글).
+       ⚠ 이름·유형(coAddr·typeAddr)은 그 기록 그대로 둔다 — 지사 기록을 건드리지 않는다. */
+    const eff = mbHqRec(rec);
     /* ── 자문이 끝난 업체인가 (대표 지시 2026-08-26) ──
        ErpMatch 가 이미 status 로 「끝났다(left)」를 적어 둔다 — 새로 만들지 않는다.
        ⚠ 실측 2026-08-26: 371곳 가운데 closed 100곳 · suboffice 66곳 · active 205곳.
          suboffice 는 «지사»라 끝난 것이 아니다 — 넣으면 66곳이 통째로 종료로 간다.
          ErpMatch.left 는 inactive·terminated·closed 만 보므로 그대로 쓴다. */
-    if(rec.left){
+    if(eff.left){
       endAddr[em] = 1;
       if(!pub) (endDomHit[d] = endDomHit[d] || {}).end = 1;
     } else if(!pub){
@@ -19852,7 +19855,7 @@ function mbWhoIndex(){
     if(!coAddr[em] && rec.company) coAddr[em] = String(rec.company);
     /* 푸른이알피의 업체 유형(자문·급여·노조·기금·사무대행) — 담긴 칸과 견주려고 담는다 */
     if(!typeAddr[em] && rec.type) typeAddr[em] = String(rec.type);
-    const who = mbPerson(rec.main);   /* ⚠ 사번이 사람 이름 자리에 굳지 않게 */
+    const who = mbPerson(eff.main);   /* ⚠ 사번이 사람 이름 자리에 굳지 않게 */
     if(!who) return;
     if(!byAddr[em]) byAddr[em] = who;
     if(!pub) (domHit[d] = domHit[d] || {})[who] = 1;
@@ -21075,11 +21078,52 @@ function mbWkMsgOf(v){
   return (_mbWkMsg||{})[mbWkFp(em, src.d, src.s)] || null;
 }
 /* 이 주소의 업체 기록 — 메일함에서 이은 자문사가 먼저, 없으면 업무관리에서 고정한 사업장(번호로) */
+/* ══════════════════════════════════════════════════════════════════════════
+   지사(사무대행) 메일의 담당은 «본사»의 푸른이알피 주담당 기준 (대표 결정 2026-10-11)
+   「기준은 이알피 주담당기준으로 항상한다」 — 앞선 「지사메일 본사로」 와 한 짝이다.
+   ══════════════════════════════════════════════════════════════════════════
+   ★ 지사(suboffice)와 본사(업체관리)는 «다른 기록»이다 — 합치지 않는다(co-dup-suboffice-apart).
+     바꾸는 것은 «이 메일이 누구 칸으로 가나» 하나뿐이다. 지사 기록을 건드리지 않는다.
+   ★ 열쇠는 사업자번호 — 열 자리가 같고 종사업장이 본사업장(비었거나 0)인 지사를,
+     그 번호의 본사 «한 곳»에만. 업무관리 work.html subIndex 와 «같은 규칙»이다
+     (두 파일은 코드를 나눠 쓸 수 없어 복사해 두었다 — 한쪽을 고치면 다른 쪽도.
+      tests/mail-owner-erp-main 이 같은 자료를 두 길에 넣어 답을 맞댄다).
+   ⚠ 종사업장이 다른 지사·본사가 둘 이상인 번호는 안 잇는다 — 지사 기록 그대로.
+   ⚠ 담당·부담당·종료 여부가 모두 본사 기록을 따른다. 사람이 박은 것(①·①-0)은 그대로 더 세다.
+   ⚠ 서버(functions/mail-owner.js)도 «같은 잣대» — 알림과 메일함 칸이 어긋나면 안 된다. */
+let _mbHqMapV = null, _mbHqFor = null, _mbHqLen = -1;
+function mbHqMap(){
+  const cos = (typeof ErpMatch !== 'undefined' && ErpMatch.companies) ? ErpMatch.companies : null;
+  if(!cos || !cos.length) return {};
+  if(_mbHqMapV && _mbHqFor === cos && _mbHqLen === cos.length) return _mbHqMapV;
+  const by = {};
+  cos.forEach(co=>{
+    if(!co || !co.id) return;
+    const d = String(co.bizNo || '').replace(/\D/g, '');
+    if(d.length < 10 || !/^0*$/.test(d.slice(10))) return;
+    const g = by[d.slice(0, 10)] = by[d.slice(0, 10)] || { hq:[], sub:[] };
+    (String(co.status || '') === 'suboffice' ? g.sub : g.hq).push(String(co.id));
+  });
+  const out = {};
+  Object.keys(by).forEach(b=>{
+    if(by[b].hq.length === 1) by[b].sub.forEach(id=>{ out[id] = by[b].hq[0]; });
+  });
+  _mbHqMapV = out; _mbHqFor = cos; _mbHqLen = cos.length;
+  return out;
+}
+/* 지사 기록이면 짝이 되는 본사 기록, 아니면 그대로 */
+function mbHqRec(rec){
+  if(!rec || String(rec.status || '') !== 'suboffice' || !rec.id) return rec;
+  const hq = mbHqMap()[String(rec.id)];
+  const r = hq && ErpMatch.byId ? ErpMatch.byId[hq] : null;
+  return r || rec;
+}
 function mbCoRecOfAddr(em){
   const r = mbCoRec(mbCoOf(em));
-  if(r) return r;
+  if(r) return mbHqRec(r);
   const id = (_mbWkAddr||{})[em];
-  return (id && typeof ErpMatch !== 'undefined' && ErpMatch.byId) ? (ErpMatch.byId[String(id)] || null) : null;
+  const w = (id && typeof ErpMatch !== 'undefined' && ErpMatch.byId) ? (ErpMatch.byId[String(id)] || null) : null;
+  return w ? mbHqRec(w) : null;
 }
 /* ── 이 메일의 담당자 ── 받은 메일은 «보낸이» 주소로 본다 */
 function mbWhoOfRow(v, idx0){
@@ -21711,7 +21755,7 @@ function mbSubsOfRow(v, idx0){
   if(!rec){
     const idx = idx0 || mbWhoIndex();
     const co = (idx.coAddr||{})[em];
-    rec = co ? mbCoRec(co) : null;
+    rec = co ? mbHqRec(mbCoRec(co)) : null;
   }
   const out = [];
   const main = (rec && rec.main) || '';
@@ -21894,7 +21938,7 @@ function mbWorkOfRow(v, idx0, rec0){
   if(rec0 === undefined && !rec){
     const idx = idx0 || mbWhoIndex();
     const co = (idx.coAddr||{})[em];
-    rec = co ? mbCoRec(co) : null;
+    rec = co ? mbHqRec(mbCoRec(co)) : null;
   }
   if(rec && !rec.left) (_mbWork.byCo.get(rec) || []).forEach(w=>{
     if(!out.some(x=>x.kind===w.kind && x.id===w.id)) out.push(w);
