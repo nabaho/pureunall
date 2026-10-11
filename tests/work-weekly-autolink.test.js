@@ -72,7 +72,7 @@ function makeDb(seed, opts) {
 const FNS = [
   'safeKey', 'pad', 'ymd', 'addDays', 'mondayOf', 'weekKeyOf', 'weekYear', 'md', '_normCo',
   'isOf', 'isMine', 'mgrSubNames', 'allItems', 'openItems',
-  '_mailAddr', 'mailKeysOf', 'mailHit', 'mailKey', 'mailBrief', '_mailWhen', 'mailLogLine',
+  '_mailAddr', 'mbKeyAddr', 'mbKeyDom', 'mailKeysOf', 'mailHit', 'mailKey', 'mailBrief', '_mailWhen', 'mailLogLine',
   '_coDigits', '_coNorm', 'coKeysOf', 'cmNeed', 'cmLoad', 'cmDay', 'cmMatchKey', 'cmKey', 'cmLogLine',
   'sentNeed', 'sentLoad', 'sentKey', 'sentBrief', 'sentLogLine', '_mlkWho',
   'alWeeks', 'alIn', 'alItems', 'alMailSure', 'alNarrow', 'alCoNarrow', 'alCatNarrow', 'alMailRows', 'alGroups', 'alAddCand',
@@ -102,6 +102,7 @@ function box(o) {
     fbDb: db, NS: 'work_erp',
     S: { me: o.me || { sid: 'S1', name: '박한별' } },
     items: o.items || {}, maillink: o.maillink || {}, mailchk: o.mailchk || {}, mailaddr: {},
+    mbCoLink: {}, mbWorkLink: {},   /* 메일함에서 이은 것(읽기만, 2026-10-11) — 여기서는 없다 */
     mailSrc: o.mail || [], cmSrc: {}, _cmT: {}, sentSrc: {}, _sentT: {}, calSrc: {},
     wkCache: {}, itemLogsCache: {}, alBox: {}, _alBusy: false, _alShareDone: false,
     routed: 0, toasts: []

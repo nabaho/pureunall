@@ -76,11 +76,13 @@ async function loadTables(db) {
   const paths = ["data/user_dir", "data/companies", "uid_roles",
     MAIL_ROOT + "/config/mailWho", MAIL_ROOT + "/config/mailCo",
     MAIL_ROOT + "/config/mailWork", MAIL_ROOT + "/config/staffSucc",
-    PUSH_CFG, MAIL_ROOT + "/config/mailBoxWho", MAIL_ROOT + "/config/mailNoWho"];
+    PUSH_CFG, MAIL_ROOT + "/config/mailBoxWho", MAIL_ROOT + "/config/mailNoWho",
+    /* 업무관리 「이 주소는 앞으로도 이 사업장」 — 화면 mbCoRecOfAddr 와 같은 칸 (2026-10-11) */
+    "work_erp/mailaddr"];
   const FIXED_PATHS = paths.length;
   paths.push.apply(paths, WORK_STORES.map(([store]) => "data/" + store + "/v"));
   const snaps = await Promise.all(paths.map((p) => db.ref(p).once("value")));
-  const [dir, cos, roles, hand, co, workLink, succ, pushCfg, boxWho, noWho] = snaps;
+  const [dir, cos, roles, hand, co, workLink, succ, pushCfg, boxWho, noWho, wkAddrSnap] = snaps;
 
   /* 사람 — 사번↔이름, 퇴사, 이어받기, 사번→로그인(uid) */
   const nameBySid = {}, sidByName = {}, retired = {};
@@ -130,6 +132,31 @@ async function loadTables(db) {
         if (!erpAddr[e]) erpAddr[e] = rec.main;
       });
   });
+  /* 대표·세금계산서·세무 담당 메일 칸 — 화면 mbWhoIndex ①-2 와 «같은 잣대» (2026-10-11).
+     ⚠ 업체 한 곳에만 적힌 주소만(세무사무소 한 주소가 여러 업체에 걸린다).
+     ⚠ 위 세 칸보다 뒤 — 먼저 넣은 것이 이긴다. 끝난 업체·담당 없는 업체는 안 담는다. */
+  const CO_EXTRA = ["ceoEmail", "taxInvoiceEmail", "taxEmail"];
+  const extraCos = {};
+  const coArr = arr(cos.val());
+  coArr.forEach((c) => {
+    if (!c) return;
+    [c.email, c.primaryContactEmail].concat((c.contacts || []).map((x) => x && x.email))
+      .concat(CO_EXTRA.map((f) => c[f])).forEach((e0) => {
+        const e = String(e0 || "").trim().toLowerCase();
+        if (!okMail(e)) return;
+        const a = extraCos[e] = extraCos[e] || [];
+        if (a.indexOf(c) < 0) a.push(c);
+      });
+  });
+  coArr.forEach((c) => {
+    if (!c || coLeft(c) || !c.managerMain) return;
+    const main = nameBySid[c.managerMain] || c.managerMain;
+    CO_EXTRA.forEach((f) => {
+      const e = String(c[f] || "").trim().toLowerCase();
+      if (!okMail(e) || /@pureun\.kr$/.test(e) || (extraCos[e] || []).length !== 1) return;
+      if (!erpAddr[e]) erpAddr[e] = main;
+    });
+  });
 
   /* 진행 중인 사건·컨설팅 — 주소로 · 번호로 */
   const workByAddr = {}, workByKey = {};
@@ -144,8 +171,11 @@ async function loadTables(db) {
         co: String(r.companyName || r.company || ""),
         title: String(r.title || r.typeName || "") };
       if (id) workByKey[kind + ":" + id] = w;
-      [r.email, r.primaryContactEmail]
+      /* 건 기록의 «회사정보 상자»(r.company)도 본다 — 화면 mbWorkBuild 와 같은 칸 (2026-10-11) */
+      const rc = (r.company && typeof r.company === "object") ? r.company : {};
+      [r.email, r.primaryContactEmail, rc.email, rc.primaryContactEmail]
         .concat((r.contacts || []).filter((c) => c && !c.left).map((c) => c.email))
+        .concat((rc.contacts || []).filter((c) => c && !c.left).map((c) => c.email))
         .forEach((e0) => {
           const e = String(e0 || "").trim().toLowerCase();
           if (e.indexOf("@") < 1 || /@pureun\.kr$/.test(e)) return;
@@ -155,7 +185,17 @@ async function loadTables(db) {
     });
   });
 
-  return { hand: hand.val() || {}, co: co.val() || {}, workLink: workLink.val() || {},
+  /* 업무관리에서 고정한 주소 → 업체 번호. ⚠ 번호(coid)가 있는 것만 — 이름으로는 안 찾는다 */
+  const wkAddr = {};
+  const wa = (wkAddrSnap && wkAddrSnap.val()) || {};
+  Object.keys(wa).forEach((k) => {
+    const x = wa[k] || {};
+    const m = String(x.addr || "").match(/[^\s<>"]+@[^\s<>"]+\.[^\s<>"]+/);
+    const e = m ? m[0].toLowerCase() : "";
+    if (e && x.coid) wkAddr[e] = String(x.coid);
+  });
+
+  return { hand: hand.val() || {}, co: co.val() || {}, workLink: workLink.val() || {}, wkAddr,
     succ: succ.val() || {}, pushCfg: pushCfg.val() || {},
     boxWho: boxWho.val() || {}, noWho: noWho.val() || {},
     nameBySid, sidByName, retired, uidBySid, coById, coByName, coByBiz, erpAddr,
@@ -171,7 +211,11 @@ function live(w, T) {
 /* 이 주소에 이어 둔 업체 기록 — 열쇠(id)가 있으면 그것이 먼저다(이름은 겹친다) */
 function coRecOf(em, T) {
   const v = T.co[whoKey(em)];
-  if (!v) return null;
+  if (!v) {
+    /* 메일함에서 이은 자문사가 없으면 업무관리에서 고정한 사업장(번호로) — 화면과 같은 차례 */
+    const id = (T.wkAddr || {})[String(em || "").trim().toLowerCase()];
+    return id ? (T.coById[String(id)] || null) : null;
+  }
   if (typeof v === "object") {
     if (v.id && T.coById[String(v.id)]) return T.coById[String(v.id)];
     return T.coByName[normName(v.n)] || null;
