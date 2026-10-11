@@ -690,6 +690,8 @@
   :root[data-theme="dark"] body.mob .mplus{background:#304678;color:#d9e2ff}
   body.mob .mtoday{border:none;background:transparent;color:var(--gtext);width:40px;height:40px;border-radius:50%;cursor:pointer;
     font-family:inherit;font-size:12px;font-weight:500;padding:0;position:relative}
+  body.mob .mavatar{border:none;width:32px;height:32px;border-radius:50%;background:#7986cb;color:#ffffff;font-size:12px;font-weight:500;
+    cursor:pointer;font-family:inherit;padding:0;margin-left:2px;flex:none}
   body.mob .mtoday .gic{width:24px;height:24px;fill:currentColor}
   body.mob .msrch{padding:12px 10px 8px 6px;gap:6px}
   body.mob .msrch input{flex:1;min-width:0;border:none;background:transparent;color:var(--gtext);font-size:22px;font-family:inherit;outline:none;padding:6px 4px}
@@ -2597,6 +2599,8 @@ function 폰머리Html(){
     + '<button class="mnav" data-mv="1" title="다음 달">›</button>'
     + '<button class="mtoday" data-srch="1" title="일정 검색">' + 선아이콘("search") + '</button>'
     + '<button class="mtoday" data-mv="0" title="오늘"><i>' + parseInt(todayYMD().slice(8,10), 10) + '</i></button>'
+    /* 내 동그라미 — 구글 앱 머리 오른쪽 끝의 프로필(2026-10-11 캡처). 누르면 «내 계정» 창(메일·로그아웃)이 열린다 */
+    + '<button class="mavatar" data-mavatar="1" title="내 계정">' + esc(String((typeof document !== "undefined" && document.getElementById("me") && document.getElementById("me").textContent) || "·").trim().slice(0, 2)) + '</button>'
     + '<button class="mplus" data-mnew="1" title="새로 넣기">＋</button>'
     + '</div>';
 }
@@ -4784,7 +4788,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -4879,6 +4883,12 @@ document.addEventListener('click', function(e){
   }
   if(t.hasAttribute('data-mfull')){ modalRead(); S.modal.full = true; render(); return; }
   if(t.hasAttribute('data-mmenu')){ S.drawer = !S.drawer; render(); return; }
+  if(t.hasAttribute('data-mavatar')){
+    /* 윗줄(#topbar)의 «내 동그라미» 창을 그대로 쓴다 — 윗줄을 잠깐 펴서 그 단추를 누른다 */
+    S.mobMenu = true; render();
+    setTimeout(function(){ var m = document.getElementById('me'); if(m) m.click(); }, 0);
+    return;
+  }
   if(t.hasAttribute('data-sback')){ S.srch = false; S.q = ''; render(); return; }
   if(t.hasAttribute('data-dclose')){ S.drawer = false; render(); return; }
   if(t.hasAttribute('data-dreload')){ S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return; }

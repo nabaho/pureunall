@@ -332,3 +332,9 @@ test('폰 머리 검색 — 🔍 로 «← 검색» 머리가 열리고, 폰에�
   assert.match(캘, /if\(typeof 폰 === "function" && 폰\(\)\) return 잇기단추Html\(\);/);
   assert.match(캘, /if\(t\.hasAttribute\('data-sback'\)\)\{ S\.srch = false; S\.q = ''; render\(\); return; \}/);
 });
+
+test('폰 머리 — 구글 앱처럼 오른쪽에 내 동그라미(이니셜), 누르면 내 계정 창', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /<button class="mavatar" data-mavatar="1" title="내 계정">/);
+  assert.match(캘, /if\(t\.hasAttribute\('data-mavatar'\)\)\{[^}]*S\.mobMenu = true; render\(\);/);
+});
