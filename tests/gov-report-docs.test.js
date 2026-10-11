@@ -342,3 +342,21 @@ test('trackRows — 현황판 줄에 r.trk(③④⑤·기한·회신 날수)와 
   assert.deepEqual(by('c3').st.steps, [false, false, false, false], '기록을 못 읽으면 막대는 ①② 만');
   assert.deepEqual(D.TRACK_COLS, ['sign', 'attach', 'submit']);
 });
+
+test('제출 방식 · 체크 글 — 충남북부·서산은 메일, 기술보호는 플랫폼+순서 글, 현장클리닉은 아직 정하지 않음', () => {
+  const sub = (key) => D.DOC_PLANS.find((p) => p.key === key).items.find((x) => x.step === 'submit');
+  assert.equal(sub('cci-north').how, 'mail');
+  assert.equal(sub('cci-seosan').how, 'mail');
+  assert.equal(sub('techguard').how, 'platform');
+  assert.ok(Array.isArray(sub('techguard').steps) && sub('techguard').steps.length >= 5);
+  assert.ok(sub('techguard').steps.every((s) => typeof s === 'string' && s.trim()));
+  assert.equal(sub('clinic').how, undefined, '운영지침 확인 전 — 정하지 않는다');
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => {
+    if (x.how !== undefined) assert.ok(['mail', 'platform'].includes(x.how), p.key + '.' + x.id);
+    if (x.how !== undefined || x.steps !== undefined) assert.equal(x.step, 'submit', '제출 줄에만 둔다');
+    if (x.steps !== undefined) assert.equal(x.how, 'platform', 'steps 는 플랫폼 제출 줄에만');
+  }));
+  /* 공개 저장소 — 주소·전화·실제 이름 꼴 없음 */
+  const all = JSON.stringify(D.DOC_PLANS);
+  assert.ok(!/@[a-z0-9-]+\.[a-z]{2,}|\d{2,3}-\d{3,4}-\d{4}/i.test(all));
+});
