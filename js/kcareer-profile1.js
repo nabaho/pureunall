@@ -17,7 +17,10 @@
   var USES = {
     general:    { label: '일반(1장)',                  lim: { work: 5, wic: 10, perf: 8, lec: 5, award: 4 }, grow: ['lec', 'work', 'award', 'wic', 'perf'] },
     committee:  { label: '위원 신청용 — 위촉 위주',     lim: { work: 4, wic: 18, perf: 4, lec: 4, award: 4 }, grow: ['wic', 'lec', 'work', 'award', 'perf'] },
-    consultant: { label: '컨설턴트 모집용 — 실적 위주', lim: { work: 4, wic: 6, perf: 14, lec: 5, award: 3 }, grow: ['perf', 'lec', 'work', 'wic', 'award'] }
+    consultant: { label: '컨설턴트 모집용 — 실적 위주', lim: { work: 4, wic: 6, perf: 14, lec: 5, award: 3 }, grow: ['perf', 'lec', 'work', 'wic', 'award'] },
+    /* 2026-10-11 용도 추가 — 칸 켜기·건수·넓힐 차례를 용도에 맞게 미리 맞춘다(고른 뒤 칸마다 바꿀 수 있다) */
+    lecturer:   { label: '강사 섭외용 — 강의 위주',     lim: { work: 3, wic: 5, perf: 4, lec: 14, award: 3 }, grow: ['lec', 'wic', 'work', 'award', 'perf'] },
+    bid:        { label: '입찰·제안용 — 실적·자격 위주', lim: { work: 3, wic: 5, perf: 16, lec: 3, award: 3 }, grow: ['perf', 'wic', 'work', 'lec', 'award'] }
   };
   var SECTIONS = [
     { key: 'edu', title: '학력' }, { key: 'cert', title: '자격' }, { key: 'work', title: '주요 경력' },
@@ -57,7 +60,7 @@
     return [per, what];
   }
   /* 칸을 넣나 — 실적은 «켰을 때만»(컨설턴트 모집용은 저절로), 나머지는 «끄지 않았으면». 화면 고르기 칸도 이 한 곳을 본다 */
-  function isOn(k, on, use) { on = on || {}; return k === 'perf' ? (on.perf === true || (on.perf == null && use === 'consultant')) : on[k] !== false; }
+  function isOn(k, on, use) { on = on || {}; return k === 'perf' ? (on.perf === true || (on.perf == null && (use === 'consultant' || use === 'bid'))) : on[k] !== false; }
   function isAward(r) { return /표창|상장|감사|공로|포상|수상/.test(s(r && r.type)); }
   function isCourse(r) { return /수료|이수|과정|양성|교육/.test(s(r && r.title)); }
   var 국가 = /노무사|변호사|세무사|회계사|감정평가사|법무사|변리사|기술사|기사|지도사/;
@@ -144,8 +147,13 @@
     SECTIONS.forEach(function (S) {
       if (!살(S.key) || !all[S.key].length) return;
       var pin = 고정수[S.key] || 0;
-      model.sections.push({ key: S.key, title: S.title, all: all[S.key], n: all[S.key].length, pin: pin,
-        show: Math.min(Math.max(limit[S.key], pin), all[S.key].length) });
+      /* ★ 칸마다 사람이 정한 것(2026-10-11) — 건수(숫자 · 'all'=전체) · 제목 · 한 줄 더.
+         건수를 정하면 «고정»이다 — 한 장 맞추기·남는 자리 채우기가 이 칸은 건드리지 않는다(넘치면 넘친다고 알린다). */
+      var 정함 = (opts.lim || {})[S.key], 고정건수 = (정함 === 'all' || (typeof 정함 === 'number' && 정함 > 0));
+      var 건수 = 정함 === 'all' ? all[S.key].length : (고정건수 ? 정함 : limit[S.key]);
+      model.sections.push({ key: S.key, title: s((opts.titles || {})[S.key]) || S.title, note: s((opts.notes || {})[S.key]), fixed: 고정건수,
+        all: all[S.key], n: all[S.key].length, pin: pin,
+        show: Math.min(Math.max(건수, pin), all[S.key].length) });
     });
     return fit(model);
   }
@@ -165,7 +173,7 @@
       for (var i = 0; i < SHRINK.length; i++) {
         var x = by[SHRINK[i][0]];
         /* ⚠ 고정(⭐)한 만큼은 바닥 — 한 장에 맞추느라 사람이 고른 것을 빼면 안 된다 */
-        if (x && x.show > Math.max(Math.min(SHRINK[i][1], x.n), x.pin || 0)) { x.show--; 줄임 = true; break; }
+        if (x && !x.fixed && x.show > Math.max(Math.min(SHRINK[i][1], x.n), x.pin || 0)) { x.show--; 줄임 = true; break; }
       }
       if (!줄임) break;                                  /* 더 줄일 곳이 없다 — 넘친다고 알린다 */
     }
@@ -181,7 +189,7 @@
     if (typeof fits !== 'function') return model;
     var by = {}; model.sections.forEach(function (x) { by[x.key] = x; });
     if (!fits(model)) { model.overflow = true; return model; }
-    var 열림 = ((USES[model.use] || USES.general).grow || []).filter(function (k) { return by[k]; }), guard = 400;
+    var 열림 = ((USES[model.use] || USES.general).grow || []).filter(function (k) { return by[k] && !by[k].fixed; }), guard = 400;
     while (열림.length && guard-- > 0) {
       열림 = 열림.filter(function (k) {
         var x = by[k]; if (x.show >= x.n) return false;
@@ -203,6 +211,7 @@
       return '<h4>' + esc(x.title) + (머리말 ? ' <small>' + 머리말 + '</small>' : '') + '</h4><table class="t-' + x.key + '">'
         + x.rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td' + (i === 0 ? ' class="y"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('')
         + (x.more ? '<tr><td class="y"></td><td colspan="2" class="more">외 ' + x.more + '건</td></tr>' : '')
+        + (x.note ? '<tr><td class="y"></td><td colspan="2" class="more">' + esc(x.note) + '</td></tr>' : '')
         + (x.key === 'perf' && model.perfByYear ? '<tr><td class="y"></td><td colspan="2" class="more">연도별: ' + esc(model.perfByYear) + '</td></tr>' : '')
         + '</table>';
     };
