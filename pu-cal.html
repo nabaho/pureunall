@@ -420,8 +420,9 @@
   .pchip[data-me="1"]{box-shadow:0 0 0 2px var(--card),0 0 0 3.5px #2563eb}
   /* 접힌 것이 몇인지 — 누르면 그 자리에서 펼쳐 보인다 */
   /* 「N개 더보기」 — 구글처럼 바탕 없는 짙은 회색 글자 */
-  .more{font-size:12px;color:var(--gtext);padding:0 6px;cursor:pointer;line-height:18px;
-    font-weight:500;border-radius:4px;background:transparent;flex:none;white-space:nowrap}
+  /* 구글 공식 실측(2026-10-11): 「7개 더보기」 12px/500 #1f1f1f · 줄 20px · 상자 높이 22px(칩과 같은 키) */
+  .more{font-size:12px;color:var(--gtext);padding:1px 6px;cursor:pointer;line-height:20px;
+    font-weight:500;border-radius:6px;background:transparent;flex:none;white-space:nowrap}
   .more:hover{background:var(--bg)}
   /* 펼침 창 — 화면에 못 박아 띄운다(칸 안에 두면 달력 테두리에 잘린다) */
   /* 펼침 창 — 구글의 「더보기」 창 꼴: 위에 요일(작게)·날짜(크게), 오른쪽 위 ✕ */

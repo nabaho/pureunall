@@ -288,3 +288,8 @@ test('첨부파일 줄 — 새 일정에 드라이브 링크 입력, 다른 주�
   assert.match(캘, /attachments: 첨부목록\(m\.attach\)\.링크/);
   assert.match(캘, /첨부는 구글 드라이브 링크/);
 });
+
+test('「N개 더보기」 — 구글 실측(12px/500, 줄 20px, 상자 22px)', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /\.more\{font-size:12px;color:var\(--gtext\);padding:1px 6px;cursor:pointer;line-height:20px;\s*font-weight:500;border-radius:6px;/);
+});
