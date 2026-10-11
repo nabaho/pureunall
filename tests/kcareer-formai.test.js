@@ -438,3 +438,16 @@ test('★★ 담아 둔 답에 «낡은 열쇠»가 있어도 받지 않는다 �
   assert.equal(slots[2].guess, 'phoneWork', '멀쩡한 것까지 버렸습니다');
   assert.equal(n, 1, '얹은 수가 틀립니다: ' + n);
 });
+
+test('★ 머리글로만 짚은 칸 아래로 빈 줄이 둘 이상 이어지면 목록 몸통 — 소속이 박히지 않는다 (강사카드 강의경력 2026-10-11)', () => {
+  const 목록 = tbl([['기 관 명', '강 의 기 간', '강 의 내 용'], ['', '', ''], ['', '', ''], ['', '', '']]);
+  const m = M.guess(M.scan(목록), { fields: WHO });
+  const 첫 = m.slots.filter((s) => s.row === 1 && s.col === 0)[0];
+  assert.ok(first(첫), '첫 칸 슬롯');
+  assert.ok(!첫.guess, '목록 몸통 첫 칸에 소속이 짚이면 안 된다: ' + 첫.guess);
+  /* 가로 인적사항 표(머리글 한 줄 + 값 한 줄)는 그대로 짚는다 — 뒷걸음질 금지 */
+  const 가로 = tbl([['소 속', '직 위'], ['', '']]);
+  const g = M.guess(M.scan(가로), { fields: WHO });
+  assert.ok(g.slots.some((s) => s.guess === 'org'), '한 줄짜리 가로 표의 소속은 그대로 짚는다');
+});
+function first(x) { return !!x; }
