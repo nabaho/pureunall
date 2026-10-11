@@ -694,6 +694,41 @@ test('자동 정찰 자리에 레이아웃 목록 둘이 있다 — 라이믹스
   assert.ok(/act=dispLayoutAdminInstalledList$/.test(자리.레이아웃목록 || ''), String(자리.레이아웃목록));
   assert.ok(/act=dispLayoutAdminAllInstanceList$/.test(자리.레이아웃인스턴스 || ''), String(자리.레이아웃인스턴스));
 });
+/* ══════ 4차 정찰 — 직원 이름이 든 «칸 이름» (2026-10-11) ══════
+   3차에서 레이아웃엔 이름이 없다고 나왔다. 게시판·쪽 설정 화면까지 열어, 이름이 든 칸의 «이름»만 본다.
+   ★ 이름은 예시(홍길동·김가나)만. 값은 기록에 안 남는다. */
+test('이름든칸들 — 이름이 든 입력 칸의 «칸 이름과 횟수»만, 값은 안 새고 비밀번호·파일 칸은 건너뛴다', () => {
+  const 화면 = '<form><textarea name="footer_text">&lt;b&gt;홍길동&lt;/b&gt; 김가나 홍길동</textarea>'
+    + '<input type="text" name="title" value="홍길동 사무장">'
+    + '<input type="password" name="pw" value="홍길동"><input type="file" name="up" value="홍길동">'
+    + '<input type="text" name="other" value="상관없음"></form>';
+  const r = W.이름든칸들(화면, ['홍길동', '김가나', '이다라']);
+  const 칸 = Object.fromEntries(r.map(x => [x.칸, x.수]));
+  assert.equal(칸.footer_text, 3, JSON.stringify(r));
+  assert.equal(칸.title, 1);
+  assert.ok(!('pw' in 칸) && !('up' in 칸) && !('other' in 칸), '건너뛸 칸까지 읽었습니다: ' + JSON.stringify(r));
+  const 글 = JSON.stringify(r);
+  ['홍길동', '김가나', '사무장'].forEach(v => assert.ok(!글.includes(v), '값이 새었다: ' + v));
+  assert.deepEqual(W.이름든칸들(화면, []), [], '찾을 이름이 없는데 칸을 냈습니다');
+  assert.deepEqual(W.이름든칸들('', ['홍길동']), []);
+});
+
+test('4차 정찰 자리 — 게시판·쪽 설정 화면 여섯 곳이 모두 «보기 전용(disp…)»이고 mid 가 정해져 있다', () => {
+  const 자리 = W.자동정찰자리(185);
+  const 새것 = Object.keys(자리).filter(k => /^구성원(게시판|쪽)(설정|스킨|추가설정|정보)/.test(k));
+  assert.ok(새것.length >= 6, '새 정찰 자리가 모자랍니다: ' + 새것.join(','));
+  새것.forEach(k => {
+    assert.ok(/[?&]act=disp(Board|Page)Admin\w+$/.test(자리[k]), k + ' 가 «보는» 화면이 아닙니다: ' + 자리[k]);
+    assert.ok(!/act=proc/i.test(자리[k]), k + ' 가 «하는» 주소(proc)입니다');
+    assert.match(자리[k], /[?&]mid=(people|people_board)&/, k + ' 의 대상 모듈이 정해져 있지 않습니다');
+  });
+  /* ⚠ 화면 이름은 라이믹스 공개 소스(modules/board·page)에서 확인한 것 — 우리 상수만 보고 통과시키지 않도록 «고정» */
+  const 이름들 = 새것.map(k => 자리[k].split('act=')[1]).sort();
+  ['dispBoardAdminBoardInfo', 'dispBoardAdminSkinInfo', 'dispBoardAdminBoardAdditionSetup',
+    'dispPageAdminInfo', 'dispPageAdminSkinInfo', 'dispPageAdminPageAdditionSetup']
+    .forEach(n => assert.ok(이름들.includes(n), n + ' 가 정찰 자리에 없습니다'));
+});
+
 /* ══════ 2단계 — 새 거래처 로고 글 짓기 (2026-10-05) ══════
    절차는 라이믹스 공개 파일(common/js/plugins/jquery.fileupload/js/main.js)이 하는 그대로다:
    ① 새 글 화면의 편집기 번호(data-editor-sequence) ② procFileUpload 로 그림 올리기

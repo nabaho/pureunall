@@ -5716,7 +5716,7 @@ async function 자동기록다시읽기() {
    ⚠ 이레에 한 번만 — 화면을 열 때마다 홈페이지 관리자로 들어가지 않게. */
 const 자동정찰간격 = 7 * 24 * 60 * 60 * 1000;
 /* 정찰 판 — 서버(functions/homepage-auto.js 정찰판)와 «같아야» 한다. 다르면 이레가 안 지났어도 다시 정찰한다. */
-const 자동정찰판 = 3;
+const 자동정찰판 = 4;
 async function 자동정찰저절로() {
   if (!App.isAdmin) return false;
   try {
