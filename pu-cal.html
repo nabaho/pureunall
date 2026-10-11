@@ -69,7 +69,10 @@
      문서가 굴러가지 않게 몸통을 «세로 세 칸»으로 세운다 — 머리줄·탭줄·본문.
      본문만 제 안에서 굴러간다(달력 탭에서는 그것조차 안 굴러간다). */
   html,body{height:100%}
-  body{margin:0;font-family:'Pretendard','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
+  /* ★ 글꼴 — 구글 캘린더와 같은 차례(2026-10-11 「/goal … 글자모양」): 숫자·영문은 Roboto(구글 앱이 쓴다),
+       한글은 Noto Sans KR → 기기 기본. 「Pretendard」는 이 쪽에서 불러오지 않아(@font-face 없음) 깔려 있는 기계에서만
+       잡혀 구글과 달라질 뿐이라 뺐다. Roboto 가 없는 PC(윈도우)는 맑은 고딕으로 넘어간다 */
+  body{margin:0;font-family:'Google Sans Text','Google Sans','Roboto','Noto Sans KR','Noto Sans CJK KR','Malgun Gothic',system-ui,sans-serif;color:var(--ink);
     background:var(--bg);font-size:14px;-webkit-font-smoothing:antialiased;
     display:flex;flex-direction:column;overflow:hidden}
 

@@ -230,3 +230,14 @@ test('참석자·Meet — 화면: 줄은 새 일정에만 · 메일 검사 · �
   assert.match(가, /meet: false \}\), opt\)\.then\(function \(r\) \{ r\.meetFailed = true/, 'Meet 을 거절당했을 때 일정만 다시 넣지 않습니다');
   assert.match(fs.readFileSync(path.join(ROOT, 'functions', 'gcal-proxy.js'), 'utf8'), /Google Meet 을 구글이 거절해 일정만 넣었습니다/);
 });
+
+/* ── 글꼴은 구글 캘린더와 같은 차례 (2026-10-11) ── */
+test('글꼴 — Roboto 가 한글보다 앞(숫자·영문은 구글 앱과 같게) · 불러오지도 않는 Pretendard 는 앞에 없다', () => {
+  const 줄 = 캘린더.match(/\n\s*body\{margin:0;font-family:([^;]+);/);
+  assert.ok(줄, 'body 글꼴 줄을 못 찾았습니다');
+  const 차례 = 줄[1].split(',').map((x) => x.trim().replace(/['"]/g, ''));
+  assert.ok(차례.indexOf('Roboto') >= 0 && 차례.indexOf('Noto Sans KR') > 차례.indexOf('Roboto'), 'Roboto → Noto Sans KR 차례가 아닙니다: ' + 차례.join(' > '));
+  assert.ok(차례.indexOf('Malgun Gothic') > 차례.indexOf('Noto Sans KR'), '맑은 고딕이 Noto Sans KR 앞에 있습니다');
+  assert.strictEqual(차례.indexOf('Pretendard'), -1, '불러오지 않는 Pretendard 가 다시 들어왔습니다');
+  assert.strictEqual(차례[차례.length - 1], 'sans-serif');
+});
