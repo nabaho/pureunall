@@ -575,3 +575,19 @@ test('blockedAlerts — 바깥 값(업체 이름·메모)은 글자 그대로 �
   assert.deepEqual(Object.keys(r[0]).sort(), ['coId', 'coName', 'items', 'typeId', 'typeName']);
   assert.deepEqual(Object.keys(r[0].items[0]).sort(), ['name', 'note']);
 });
+
+test('DOC_PLANS — rd 칸은 일터혁신 round · 산업일자리 mdlog 둘뿐, criteria 는 대형 두 계획만', () => {
+  const rdItems = [];
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => { if (x.rd) rdItems.push(p.key + '.' + x.id); }));
+  assert.deepEqual(rdItems.sort(), ['industry.mdlog', 'workplace.round']);
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => { if (x.rd) assert.strictEqual(x.rd, true); }));
+  const crit = {};
+  D.DOC_PLANS.forEach((p) => { if ('criteria' in p) crit[p.key] = p.criteria; });
+  assert.deepEqual(crit, { workplace: 'workplace', industry: 'industry' });
+  /* 기존 칸은 그대로 */
+  const wp = D.DOC_PLANS.filter((p) => p.key === 'workplace')[0];
+  const rd = wp.items.filter((x) => x.id === 'round')[0];
+  assert.equal(rd.name, '회차별 수행보고서+사진2장+서명지');
+  assert.equal(rd.per, 'round');
+  assert.equal(rd.step, 'plat');
+});

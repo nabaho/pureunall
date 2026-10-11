@@ -38,7 +38,7 @@
   function digits(v) { return str(v).replace(/\D/g, ''); }
   function it(id, name, per, step, extra) {
     var o = { id: id, name: name, per: per, step: step };
-    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; if (extra.note) o.note = extra.note; }
+    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; if (extra.note) o.note = extra.note; if (extra.rd) o.rd = true; }
     return o;
   }
   /* 기술보호울타리 제출 순서 — 2024 «시스템 사용 매뉴얼(전문가용)» 기준 초안. [노무사 확인] — 화면이 바뀌면 고친다.
@@ -91,7 +91,7 @@
       it('receipt', '수당 영수증·청렴서약서', 'once', 'attach'),
       it('photo', '현장 사진', 'once', 'attach')] },
     /* 이알피 이름이 「일터상생혁신컨설팅」이다(옛 「일터혁신상생컨설팅」은 숨김·합침) — 낱말 둘 다 본다 */
-    { key: 'workplace', words: ['일터혁신', '일터상생혁신'], kind: '대형', source: SOURCE, items: [
+    { key: 'workplace', words: ['일터혁신', '일터상생혁신'], kind: '대형', criteria: 'workplace', source: SOURCE, items: [
       it('guide', '참여 안내서(서명)', 'once', 'sign', { note: '담당자 서명 후 플랫폼에 업로드' }),
       it('plan', '수행계획서', 'once', 'plat', { steps: [PLAT_LOGIN, '진단 결과 문제점·개선 필요사항 입력',
         '개선과제 최대 5개와 우선순위(공식 «개선과제명» 사용) · 선택 과제 2개(특화는 3개)',
@@ -100,16 +100,16 @@
         '회차 수행보고서 입력: 진단기간·참여인력·수행일시·회차·회의형태·참석자(성명·부서·직급)',
         '회의안건·주요 논의사항·기타(다음 안건 등) — «○회차 디자인팀 회의» 같은 형식적 문구는 쓰지 않습니다',
         '시작·종료 사진(타임스탬프 앱) 2장과 참석자 전원 서명지 스캔 첨부', PLAT_SUBMIT],
-        note: '회의 2시간 이상 · 기업 참여 3명 이상 · 대면 70% 이상(비대면은 ZOOM 등 공식 프로그램만 — 전화·메일은 인정 안 됨)' }),
+        note: '회의 2시간 이상 · 기업 참여 3명 이상 · 대면 70% 이상(비대면은 ZOOM 등 공식 프로그램만 — 전화·메일은 인정 안 됨)', rd: true }),
       it('kickoff', '착수보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
       it('mid', '중간보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
       it('final', '최종보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
       it('follow', '이행관리 등록', 'once', 'plat', { steps: [PLAT_LOGIN, '이행관리 수행내용 등록', PLAT_SUBMIT] }),
       it('outcome', '이행결과표', 'once', 'report')] },
-    { key: 'industry', words: ['산업일자리'], kind: '대형', source: SOURCE, items: [
+    { key: 'industry', words: ['산업일자리'], kind: '대형', criteria: 'industry', source: SOURCE, items: [
       it('kickoff', '착수보고서(PPT)', 'once', 'report', { note: '표준 PPT — 사업개요·컨설팅 추진 계획·운영 체계. 업로드하면 1MD 로 인정' }),
       it('plan', '수행계획서', 'once', 'report', { note: '운영기관 승인이 나야 수행을 시작합니다' }),
-      it('mdlog', 'MD별 수행일지', 'round', 'report', { note: '비대면은 보고서 4MD·자료조사 2MD 까지(연속 불가)' }),
+      it('mdlog', 'MD별 수행일지', 'round', 'report', { note: '비대면은 보고서 4MD·자료조사 2MD 까지(연속 불가)', rd: true }),
       it('final', '최종결과보고서', 'once', 'report', { note: '표준 HWP + 체크리스트: KPI 4개 이상(필수 2·선택 2) · 정부지원사업 2개 이상 연계(산업일자리전환지원금 필수) · 기업 현황 최신 연도 · 다른 보고서와 중복 금지' }),
       it('meeting', '최종보고회', 'once', 'report', { note: '최종 MD 대면 결과보고회' }),
       it('link', '연계지원사업 등록', 'once', 'plat', { steps: [PLAT_LOGIN, '수행일지·최종결과보고서 등록 확인',
