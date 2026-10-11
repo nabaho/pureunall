@@ -27315,7 +27315,7 @@ function dcNewLines(lines, existing){
 /* 연말 정산 — 사람별 «그해 임금총액 ÷ 12» 와 «낸 부담금» (근로자퇴직급여 보장법 제20조①)
    · 낸 부담금: 사업자 납입내역(사람별 실제)이 있으면 그것, 없으면 통장(회사 몫) 합을 그해 임금 비율로 나눈 «추정»
    · 퇴직자: 퇴직일이 그해면 «퇴직 14일 안» 표시 (같은 조 ⑤ [조문 원문 대조 필요]) */
-function dcYearEnd(year, users, wageOf, contribs){
+function dcYearEnd(year, users, wageOf, contribs, companyTotal){
   var y = String(year);
   var dc = (users || []).filter(function(u){ return u && u.sid && u.pensionType === 'DC'; });
   var rows = dc.map(function(u){
@@ -27325,7 +27325,9 @@ function dcYearEnd(year, users, wageOf, contribs){
     return { sid:u.sid, name:u.name, wage:wage, need:Math.round(wage / 12), paid:own.reduce(function(t, x){ return t + (+x.amount || 0); }, 0),
       actual:own.length > 0, retiredThisYear: u.status === 'retired' && last.slice(0, 4) === y, lastDay:last };
   }).filter(function(r){ return r.wage > 0 || r.paid > 0; });
-  var company = (contribs || []).filter(function(x){ return x && x.kind === 'paid' && !x.sid && String(x.ym || '').slice(0, 4) === y; })
+  /* 회사 몫(통장) 합 — 재무에 올린 통장(ledger_batches)·출금관리까지 모은 값(companyTotal)이 오면 그것을 쓴다.
+     자동 정리로 넣은 통장 줄만 세면 재무 쪽 통장이 빠져 «낸 돈 0»이 된다 (2026-10-11 실제 화면에서 찾음) */
+  var company = companyTotal != null ? +companyTotal || 0 : (contribs || []).filter(function(x){ return x && x.kind === 'paid' && !x.sid && String(x.ym || '').slice(0, 4) === y; })
     .reduce(function(t, x){ return t + (+x.amount || 0); }, 0);
   var estRows = rows.filter(function(r){ return !r.actual; });
   var estWage = estRows.reduce(function(t, r){ return t + r.wage; }, 0);
@@ -79971,7 +79973,11 @@ function DcAutoTab(props){
     return pays.filter(function(p){ return p && p.empSid === sid && String(p.ym || '').slice(0, 4) === y && (p.status === 'confirmed' || p.status === 'paid'); })
       .reduce(function(t, p){ var c = {}; try { c = calcPayroll(p) || {}; } catch(e){ c = {}; } return t + (+c.grossPay || 0); }, 0);
   };
-  var ye = dcYearEnd(year, users.map(function(u){ return Object.assign({}, u, { pensionType:getStaffPension(u.sid).type }); }), wageOf, paidList);
+  var _bk = dcBankOutflows();
+  var bankYear = Object.keys(_bk.byYm).filter(function(ym){ return ym.slice(0, 4) === year; }).reduce(function(t, ym){ return t + (+_bk.byYm[ym] || 0); }, 0);
+  /* 출금관리에만 적힌 달(통장 없음)도 회사 몫으로 — 월별 표와 같은 수 */
+  firm.forEach(function(r){ if(r.src === 'expense') bankYear += +r.paid || 0; });
+  var ye = dcYearEnd(year, users.map(function(u){ return Object.assign({}, u, { pensionType:getStaffPension(u.sid).type }); }), wageOf, paidList, bankYear);
   var tot = ye.rows.reduce(function(a, r){ a.w += r.wage; a.n += r.need; a.p += r.paid; a.s += r.short; return a; }, { w:0, n:0, p:0, s:0 });
 
   var card = function(title, body){ return h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px 14px', marginBottom:'10px' } },
@@ -80064,7 +80070,7 @@ function DcAutoTab(props){
                     style:{ border:'1px solid #fecaca', background:'#fff', color:'#dc2626', borderRadius:'5px', padding:'1px 8px', cursor:'pointer', fontSize:'12px' } }, '지우기')));
               })))),
         h('div', { style:{ fontSize:'12px', color:'#64748b', marginTop:'8px', lineHeight:'1.6' } },
-          '근거: 근로자퇴직급여 보장법 제20조① — DC 사용자는 가입자 연간 임금총액의 1/12 이상을 연 1회 이상 정기적으로 납입 · 퇴직 시 미납분은 퇴직일부터 14일 안(같은 조 ⑤ — 조문 원문 대조 필요). 통장만 있는 달·사람은 «추정»입니다 — 사업자 납입내역을 올리면 «실제»로 바뀝니다.')))
+          (_bk.lastDate ? '통장 내역은 ' + _bk.lastDate.slice(0, 10) + ' 까지 들어와 있습니다 — 그 뒤 달은 아직 «낸 돈»에 안 잡힙니다. ' : '') + '근거: 근로자퇴직급여 보장법 제20조① — DC 사용자는 가입자 연간 임금총액의 1/12 이상을 연 1회 이상 정기적으로 납입 · 퇴직 시 미납분은 퇴직일부터 14일 안(같은 조 ⑤ — 조문 원문 대조 필요). 통장만 있는 달·사람은 «추정»입니다 — 사업자 납입내역을 올리면 «실제»로 바뀝니다.')))
   );
 }
 
