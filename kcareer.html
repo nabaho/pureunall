@@ -1378,7 +1378,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=7"></script>
+<script src="js/kcareer-profile1.js?v=8"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=9"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -2034,10 +2034,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
         <div class="page-head"><div class="page-title">👤 프로필 1장</div><div class="page-desc">경력관리에 든 학력·자격·경력·위촉·실적·강의를 A4 한 장으로 — 넘치면 «최근 N»을 저절로 줄입니다 · 금액·주민번호·계좌는 넣지 않습니다</div></div>
         <div class="p1-wrap" style="display:grid;grid-template-columns:300px 1fr;gap:14px;align-items:start">
           <div id="p1Side" style="position:sticky;top:8px;max-height:calc(100vh - 90px);overflow:auto;padding-right:2px"></div>
-          <div style="min-width:0">
-            <div id="p1Zoom" style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap;position:sticky;top:0;z-index:5;background:var(--bg);padding:4px 0"></div>
-            <div id="p1Paper" style="background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;overflow:hidden"></div>
-          </div>
+          <div id="p1Paper" style="min-width:0;background:#fff;border:1px solid var(--border);box-shadow:0 4px 18px rgba(0,0,0,.08);width:100%;overflow:hidden"></div>
         </div>
       </div></section>
       <section class="page-view" id="page-bizdash"><div class="page">
@@ -7611,7 +7608,8 @@ function renderProfile1(){
   var by={}; m.sections.forEach(function(x){ by[x.key]=x; });
   var cnt={}; 전부.sections.forEach(function(x){ cnt[x.key]=x.n; });
   var row='display:flex;align-items:center;gap:8px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;margin-bottom:5px;white-space:nowrap;cursor:pointer';
-  side.innerHTML='<div style="font-weight:700;margin:2px 0 6px">넣을 칸 고르기</div>'
+  side.innerHTML='<div id="p1Zoom" style="display:flex;gap:5px;align-items:center;flex-wrap:wrap;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border)"></div>'
+    +'<div style="font-weight:700;margin:2px 0 6px">넣을 칸 고르기</div>'
     +KcareerProfile1.SECTIONS.map(function(S){
       var 켬=KcareerProfile1.isOn(S.key, o.on, o.use), n=cnt[S.key]||0, x=by[S.key];
       return '<label style="'+row+'"><input type="checkbox"'+(켬?' checked':'')+(n?'':' disabled')+' onchange="p1Toggle(\''+S.key+'\',this.checked)"> '+escapeHtml(S.title)
@@ -7641,7 +7639,8 @@ function renderProfile1(){
     +(m.overflow?'⚠ 칸을 다 줄여도 한 장을 조금 넘습니다 — 칸 하나를 끄면 맞습니다':'✔ 한 장에 맞췄습니다'+(m.filled?' — 남는 자리만큼 줄을 더 넣었습니다':''))+'<br>✔ 금액·주민번호·계좌는 넣지 않습니다</div>';
   /* ★ 종이는 «실제 A4 크기»(794×1123px, 여백 14mm)로 그리고 칸 너비에 맞춰 «줄여 보인다» —
        좁은 칸에 바로 그리면 글이 접혀 한 장을 넘는 것처럼 보인다(인쇄와 다르게 보이면 안 된다) */
-  paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
+  if(_p1View==='screen') paper.innerHTML='<style>'+KcareerProfile1.CSS+KcareerProfile1.SCREEN_CSS+'</style><div style="padding:22px 26px">'+KcareerProfile1.toScreenHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
+  else paper.innerHTML='<style>'+KcareerProfile1.CSS+'</style><div class="p1-a4" style="width:794px;height:1123px;padding:53px;box-sizing:border-box;transform-origin:0 0;overflow:hidden">'
     +KcareerProfile1.toHtml(m, o.photo?_p1PhotoUrl:'')+'</div>';
   _p1JumpList=m.sections.map(function(x){ return [x.key, x.title]; });
   if(_p1OpenKey){ var 켠=paper.querySelector('.t-'+_p1OpenKey); if(켠){ 켠.style.outline='2px solid var(--teal)'; 켠.style.outlineOffset='2px'; var 켠h=켠.previousElementSibling; if(켠h&&켠h.tagName==='H4'){ 켠h.style.outline='2px solid var(--teal)'; 켠h.style.outlineOffset='1px'; } } }
@@ -7668,7 +7667,9 @@ function renderProfile1(){
 var _p1ZoomMode='width', _p1JumpList=[];   /* 기본은 «폭 맞춤» — 글자가 크게 읽힌다(대표 선택 2026-10-11 목업 B안) */
 try{ _p1ZoomMode=localStorage.getItem('kc_p1_zoom')||'width'; }catch(e){}
 function _p1Scale(){
-  var paper=document.getElementById('p1Paper'), a4=paper&&paper.querySelector('.p1-a4'); if(!a4) return;
+  var paper=document.getElementById('p1Paper'); if(!paper) return;
+  if(_p1View==='screen'){ paper.style.width='100%'; paper.style.height='auto'; paper.style.overflow='visible'; paper.style.background='#fff'; return; }
+  var a4=paper.querySelector('.p1-a4'); if(!a4) return;
   var full=(document.fullscreenElement===paper), s, W, H;
   if(full){
     s=Math.min(window.innerWidth/794, window.innerHeight/1123);
@@ -7687,13 +7688,19 @@ function _p1Scale(){
   a4.style.transform='scale('+s+')';
   paper.style.height=Math.round(1123*s)+'px';
 }
+var _p1View='screen';
+try{ _p1View=(localStorage.getItem('kc_p1_view')==='a4')?'a4':'screen'; }catch(e){}
 function _p1ZoomBar(){
   var bar=document.getElementById('p1Zoom'); if(!bar) return;
-  var b=function(m,t,ti){ return '<button class="btn sm'+(_p1ZoomMode===m?' primary':'')+'" type="button" onclick="p1Zoom(\''+m+'\')" title="'+ti+'">'+t+'</button>'; };
-  bar.innerHTML=b('fit','⬍ 한 화면','위아래로 움직이지 않고 한 장 전체가 보이게')+b('width','⬌ 폭 맞춤','칸 너비에 꽉 차게 — 글자가 커집니다(아래로 내려 보기)')
-    +'<button class="btn sm" type="button" onclick="p1Full()" title="모니터 전체로 한 장을 가장 크게 봅니다 · Esc 로 나옵니다">⛶ 전체 화면</button>'
-    +(_p1JumpList.length?'<span style="flex:1"></span><span style="font-size:12px;color:var(--text-mute)">바로 가기</span>'+_p1JumpList.map(function(j){ return '<button class="btn sm" type="button" data-k="'+j[0]+'" onclick="p1Jump(this.dataset.k)">'+escapeHtml(j[1])+'</button>'; }).join(''):'');
+  var v=function(m,t,ti){ return '<button class="btn sm'+(_p1View===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1View(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };
+  var z=function(m,t,ti){ return '<button class="btn sm'+(_p1ZoomMode===m?' primary':'')+'" type="button" data-m="'+m+'" onclick="p1Zoom(this.dataset.m)" title="'+ti+'">'+t+'</button>'; };
+  bar.innerHTML='<div style="width:100%;font-size:12px;color:var(--text-mute)">보기</div>'
+    +v('screen','🖥 화면용(넓게)','오른쪽 화면 너비에 맞춰 펼쳐 보입니다')+v('a4','📄 A4 인쇄 미리보기','인쇄·PDF·한글 파일과 같은 A4 한 장 모양')
+    +(_p1View==='a4'?'<div style="width:100%;height:0"></div>'+z('fit','⬍ 한 화면','위아래로 움직이지 않고 한 장 전체가 보이게')+z('width','⬌ 폭 맞춤','칸 너비에 꽉 차게')
+      +'<button class="btn sm" type="button" onclick="p1Full()" title="모니터 전체로 크게 봅니다 · Esc 로 나옵니다">⛶ 전체</button>':'')
+    +(_p1JumpList.length?'<div style="width:100%;font-size:12px;color:var(--text-mute);margin-top:4px">바로 가기</div>'+_p1JumpList.map(function(j){ return '<button class="btn sm" type="button" data-k="'+j[0]+'" onclick="p1Jump(this.dataset.k)">'+escapeHtml(j[1])+'</button>'; }).join(''):'');
 }
+function p1View(m){ _p1View=(m==='a4')?'a4':'screen'; try{ localStorage.setItem('kc_p1_view',_p1View); }catch(e){} renderProfile1(); }
 function p1Zoom(m){ _p1ZoomMode=(m==='width')?'width':'fit'; try{ localStorage.setItem('kc_p1_zoom',_p1ZoomMode); }catch(e){} _p1ZoomBar(); _p1Scale(); }
 function p1Full(){
   var paper=document.getElementById('p1Paper'); if(!paper) return;
