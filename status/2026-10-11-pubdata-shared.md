@@ -10,7 +10,7 @@
 ## 단계
 1. [x] 규칙: pubdata 직원 읽기·쓰기 막음(서버만) · pubdata_req 받아 달라 요청 · 읽기 도구 js/pu-pubdata.js · 온톨로지 INFRA_ROOTS
 2. [x] 서버(nps-monthly.js): pubdata/co/{번호}/nps·ei 씀 + 한 달은 옛 자리(pucards/coInfo)도 · 요청 처리 · 공휴일 pubdata/common/holidays/{연도}
-3. [ ] 기업정보함이 pubdata 읽기 + 있는 자료 한 번 옮김
+3. [x] 기업정보함이 pubdata 읽기 + 있는 자료 한 번 옮김
 4. [ ] 공휴일: 캘린더·이알피·급여관리 · 손입력 약정휴일 그대로
 5. [ ] 옛 자리 쓰기 멈춤(11월 중순 이후) · 업체관리 한 줄
 
@@ -18,4 +18,6 @@
 - 1·2단계: PR(pubdata-shared). 규칙은 10/11 콘솔에 올림(새 자리 pubdata·pubdata_req 둘, 사라진 것 0). 읽기 = pucards 와 같은 MAIL — 보는 사람 안 늘어남.
 - 서버: functions/pubdata.js, nps-monthly 가 pubdata+옛 자리 둘 다 씀, 공휴일 올해·내년, pubdataAsk(요청 처리, 그 회사 한 곳만 읽음), nts-monthly 상태도 pubdata/co/{번호}/nts.
 - ⚠ 합친 뒤 함수 배포: npsMonthly · ntsMonthly · pubdataAsk(새).
-- 남은 일: 3단계(기업정보함 읽기 전환·자료 옮기기) → 4단계(공휴일 화면들).
+- #2514 합침·함수 셋 배포. pubdataAsk 첫 배포가 us-central1 → fetch failed → #2518 로 서울 옮김·재배포, 실요청 시험 OK(새·옛 자리 둘 다 적힘, 요청 지워짐).
+- 3단계: pu-cards 가 pubdata/co 구독(loadPubCo)·coWithPub 로 얹기, 공단 직접 호출 걷어냄(coPubAsk 받아 달라). 사람이 정한 pick·none 만 coInfo.
+- 남은 일: 있는 자료 한 번 옮기기(살아 있는 자료) → 4단계(공휴일 화면들) → 5단계(11월 중순 옛 자리 쓰기 멈춤).

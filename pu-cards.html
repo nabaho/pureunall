@@ -42,6 +42,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=66"></script>
+<script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <!-- 업체 한 건을 판 번호째 트랜잭션으로 쓰는 공용 관문 — 명함 「업체관리에 올리기」(cardErpSync)가 쓴다 -->
@@ -31684,6 +31685,7 @@ const CO_FIELDS = [
 /* 회사별 딸림 정보(서식에서 읽은 칸 등). 항목(items)을 건드리지 않으려고 따로 둔다 —
    items 를 늘리면 검색 색인·중복정리가 다 따라 움직인다. 열쇠는 사업자번호. */
 let _coInfo = {};
+let _pubCo = {};            /* 🗂 공공데이터 공용 자리 pubdata/co — 서버만 쓴다(js/pu-pubdata.js) */
 let _coInfoOn = false;
 function loadCoInfo(cb){
   if(_coInfoOn || Store.mode!=='firebase'){ cb && cb(); return; }
@@ -31700,6 +31702,16 @@ function loadCoInfo(cb){
   watchCardMap(Store.db.ref(DB_ROOT+'/coInfo'), value => { _coInfo = value || {}; },
                () => { coListBust(); renderCoSoon(); });
   cb && cb();
+}
+/* 🗂 공공데이터 공용 자리 구독 (2026-10-11) — 근로자 수·국민연금 숫자는 서버가 pubdata/co 에 쓴다.
+   «받아 달라»를 남기면 몇 초 뒤 서버가 쓰고, 그때 이 구독이 화면을 다시 그린다.
+   ⚠ loadCoInfo 와 «따로» 둔다 — 한 함수에 두 구독을 넣으면 coInfo 구독만 떼어 보는 검사가 엉킨다. */
+let _pubCoOn = false;
+function loadPubCo(){
+  if(_pubCoOn || Store.mode !== 'firebase') return;
+  _pubCoOn = true;
+  watchCardMap(Store.db.ref('pubdata/co'), value => { _pubCo = value || {}; },
+               () => { coListBust(); renderCoSoon(); coPubRepaint(); });
 }
 const coKeyOf = it => { const d=digits(it.bizno||''); return d.length>=10 ? d : ('n'+_norm(it.company||'')); };
 
@@ -31965,6 +31977,11 @@ function coListBuild(){
        ⚠ 위에서 이미 읽어 둔 것을 쓴다 — 두 번 읽으면 4,158곳에서 두 배가 된다. */
     const ex = exBy[o.key];
     if(ex){ o.extra = ex; o.folder = ex.folder || ''; }
+    /* ⑤ 🗂 공공데이터 공용 자리 — 받아 온 숫자는 거기가 이긴다(사람이 정한 pick·none 은 coInfo 그대로) */
+    if(typeof coWithPub === 'function' && typeof _pubCo !== 'undefined' && _pubCo){
+      const pb = _pubCo[digits(o.bizno || '')];
+      if(pb) o.extra = coWithPub(o.extra, pb);
+    }
   });
   /* ⚠ 이름이 없어도 «사업자번호가 있으면» 남긴다 (대표 지시 2026-08-30, 안 ⓓ 선행).
      등록증 사진에서 번호는 또렷한데 상호가 흐려 못 읽는 일이 있다. 예전에는 여기서
@@ -32018,7 +32035,7 @@ function enterCoView(){
   try{ state.coPageSize = coPageSizeOk(localStorage.getItem('pucards_co_pagesize')); }catch(_){}
   state.coPage = 0;
   render();
-  loadCoInfo(); loadCoFolders(); loadCoTagHidden();
+  loadCoInfo(); if(typeof loadPubCo === 'function') loadPubCo(); loadCoFolders(); loadCoTagHidden();
 }
 /* PC 전용 뒷정리만 여기 남긴다. 성능 진단은 ?prof=1 로 연 개발 화면에서만 돈다.
    일반 직원 화면에 초시계를 달면 진단 자체가 화면을 늦추므로 여기서 늘 시작하지 않는다. */
@@ -38320,24 +38337,13 @@ function coHeadRepaint(){
    공공데이터포털 「국민연금공단_국민연금 가입 사업장 내역」(V2). 열쇠는 국세청과 같은 PU_CFG.ntsKey.
    ★ 국민연금 자료는 사업자번호를 «앞 6자리»만 공개한다 — 그래서 번호 6자리로 후보를 받고,
      이 회사가 맞는지는 «사람이 고른다». 이름이 같다고 저절로 고르지 않는다(이름으로 회사 맞추기 금지).
-   ★ 적는 자리: coInfo/{번호}/nps — pick(고른 사업장) · cand(후보) · now(이번 숫자) · hist/{년월}(가입자 수).
-     새 최상위 자리를 내지 않는다. 매달 2일 서버(functions/nps-monthly.js)가 고른 곳의 숫자를 새로 받는다.
+   ★ 적는 자리(2026-10-11 공용 자리로 옮김): 사람이 정한 pick(고른 사업장)·none 만 coInfo/{번호}/nps.
+     cand(후보) · now(이번 숫자) · hist/{년월}(가입자 수)는 서버가 pubdata/co/{번호}/nps 에 쓴다(coWithPub 로 얹어 본다).
+     매달 2일 서버(functions/nps-monthly.js)가 고른 곳의 숫자를 새로 받는다.
    ⚠ 당월 고지금액(보험료)은 «안 적는다» — 돈은 대표만 보는 자리인데 coInfo 는 직원도 읽는다.
    ⚠ 가입자 수는 «국민연금 신고 기준»이다 — 상시근로자 수와 다를 수 있어 화면에 «추정»이라 적는다. */
-const NPS_URL = 'https://apis.data.go.kr/B552015/NpsBplcInfoInqireServiceV2/';
-const NPS_CAND_MAX = 8;
-/* 후보 줄 세우기 — 이름이 같은 곳·가입 중인 곳 먼저 (순수 로직). 이름 다듬개는 ErpMatch._norm 하나 */
-function npsCands(items, coName){
-  const n = (typeof ErpMatch !== 'undefined' && ErpMatch._norm) ? ErpMatch._norm : (s=>String(s||'').replace(/\s+/g,''));
-  const me = n(coName || '');
-  return [].concat(items || []).filter(it => it && it.seq).map(it => {
-    const nm = String(it.wkplNm || '').trim();
-    const nn = n(nm);
-    return { seq: String(it.seq), nm: nm, addr: String(it.wkplRoadNmDtlAddr || '').trim(),
-      on: String(it.wkplJnngStcd || '') === '1', ym: String(it.dataCrtYm || ''),
-      same: !!me && !!nn && (nn === me || nn.indexOf(me) === 0 || me.indexOf(nn) === 0) };
-  }).sort((a,b) => (b.same - a.same) || (b.on - a.on) || a.nm.localeCompare(b.nm, 'ko')).slice(0, NPS_CAND_MAX);
-}
+/* ⚠ 2026-10-11 공용 자리로 옮김 — 공단에 묻고 후보를 줄 세우는 일은 서버(functions/nps-monthly.js)가 한다.
+     화면은 «받아 달라»(coPubAsk)만 남기고, 서버가 pubdata/co/{번호}/nps 에 쓰면 구독이 다시 그린다. */
 /* 노무 안내 — 가입자 수로 본 «넘은 문턱». 법 조문은 사람이 아는 대로 짧게, 추정이라고 붙인다 */
 function npsCues(cnt){
   const c = Number(cnt) || 0, out = [];
@@ -38356,64 +38362,33 @@ function npsTrend(hist, ym){
   const base = ks.filter(k => k <= yearAgo).pop() || ks[0];
   return { prevYm: ks[ks.length-1], prev: Number(hist[ks[ks.length-1]]) || 0, baseYm: base, base: Number(hist[base]) || 0 };
 }
-function npsKey(){ return String((typeof PU_CFG !== 'undefined' && PU_CFG && PU_CFG.ntsKey) || '').trim(); }
-async function npsGet(op, q){
-  const svc = npsKey();
-  if(!svc) throw new Error('공공데이터 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」');
-  const r = await fetch(NPS_URL + op + '?serviceKey=' + encodeURIComponent(svc) + '&dataType=json&' + q);
-  if(!r.ok) throw new Error('국민연금 답 ' + r.status);
-  const j = await r.json();
-  const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
-  return [].concat(it || []);
-}
+/* 사람이 정한 것만 coInfo/{번호}/nps 에 적는다 — pick(고른 사업장)·none(없음). 숫자는 서버가 공용 자리에 */
 function npsWrite(key, patch){
   if(Store.mode !== 'firebase'){ toast('실시간DB 연결 상태에서만 적을 수 있습니다'); return Promise.resolve(false); }
   const upd = {};
   Object.keys(patch).forEach(f => { upd['coInfo/' + key + '/nps/' + f] = patch[f]; });
   return Store.db.ref(DB_ROOT).update(upd).then(() => {
-    coListBust(); renderCoSoon();
-    if(state.coPick === key) openCoDetailPanel(key, true);
-    if(_coWork && _coWork.key === key) coWorkMount();
+    coListBust(); renderCoSoon(); coPubRepaint(key);
     return true;
   }).catch(e => { console.warn('[국민연금 적기]', e); toast('저장하지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); return false; });
 }
-/* 🔍 후보 찾기 — 사업자번호 앞 6자리로 */
+/* 🔍 후보 찾기 — 서버가 사업자번호 앞 6자리로 받아 줄 세운다. 「없음」은 다시 찾으면 풀린다 */
 async function coNpsFind(key){
   const o = (coList() || []).find(x => x.key === key); if(!o) return;
-  const no = digits(o.bizno || '');
-  if(no.length !== 10) return toast('사업자번호가 있어야 국민연금에서 찾을 수 있습니다', 7000);
-  toast('국민연금 사업장을 찾는 중…', 3000);
-  let items;
-  try{ items = await npsGet('getBassInfoSearchV2', 'bzowrRgstNo=' + no.slice(0,6) + '&numOfRows=100&pageNo=1'); }
-  catch(e){ return toast('국민연금에 못 물어봤습니다 — ' + ((e && e.message) || ''), 9000); }
-  const cand = npsCands(items, o.name);
-  await npsWrite(key, { cand: cand.length ? cand : null, candAt: Date.now(), candN: items.length });
-  if(!cand.length) toast('앞 6자리가 같은 국민연금 사업장이 없습니다 — 가입자 3인 미만 법인·10인 미만 개인사업장은 공개되지 않습니다', 10000);
+  if(digits(o.bizno || '').length !== 10) return toast('사업자번호가 있어야 국민연금에서 찾을 수 있습니다', 7000);
+  const p = (o.extra && o.extra.nps) || {};
+  if(p.none && !(await npsWrite(key, { none: null }))) return;
+  if(await coPubAsk(o, 'nps')) toast('국민연금 사업장을 찾는 중 — 몇 초 뒤 저절로 나옵니다', 5000);
 }
-/* ✓ 이 사업장이 맞음 — 그 자리에서 숫자를 받아 적는다 */
+/* ✓ 이 사업장이 맞음 — 고른 것은 기업정보함에 적고, 숫자는 서버에 «받아 달라» */
 async function coNpsPick(key, seq){
   const o = (coList() || []).find(x => x.key === key); if(!o) return;
   const c = ((o.extra && o.extra.nps && o.extra.nps.cand) || []).find(x => x && String(x.seq) === String(seq));
   if(!c) return toast('그 후보를 찾지 못했습니다 — 다시 찾아 주세요', 6000);
-  toast('가입자 수를 받는 중…', 3000);
-  let now;
-  try{ now = await npsNow(seq, c.ym); }
-  catch(e){ return toast('국민연금에 못 물어봤습니다 — ' + ((e && e.message) || ''), 9000); }
-  const patch = { pick: { seq: String(seq), nm: c.nm, addr: c.addr, by: myEmail || '', at: Date.now() }, now: now, none: null };
-  if(now && now.ym) patch['hist/' + now.ym] = now.cnt;
-  if(await npsWrite(key, patch)) toast('👥 국민연금 사업장을 이었습니다 — 매달 2일 서버가 새 숫자를 받습니다', 6000);
+  if(!(await npsWrite(key, { pick: { seq: String(seq), nm: c.nm, addr: c.addr, by: myEmail || '', at: Date.now() }, none: null }))) return;
+  if(await coPubAsk(o, 'nps')) toast('👥 국민연금 사업장을 이었습니다 — 가입자 수를 받는 중이고, 매달 2일 서버가 새 숫자를 받습니다', 6000);
 }
-/* 상세 + 그 달 신규·상실 → now (돈은 빼고) */
-async function npsNow(seq, ym0){
-  const d = (await npsGet('getDetailInfoSearchV2', 'seq=' + encodeURIComponent(seq)))[0] || {};
-  const ym = String(d.dataCrtYm || ym0 || '');
-  let p = {};
-  if(ym){ try{ p = (await npsGet('getPdAcctoSttusInfoSearchV2', 'seq=' + encodeURIComponent(seq) + '&dataCrtYm=' + ym))[0] || {}; }catch(_){ } }
-  return { ym: ym, cnt: Number(d.jnngpCnt) || 0, nw: Number(p.nwAcqzrCnt) || 0, lss: Number(p.lssJnngpCnt) || 0,
-    ind: String(d.vldtVlKrnNm || ''), on: String(d.wkplJnngStcd || '') === '1',
-    adpt: String(d.adptDt || ''), scsn: String(d.scsnDt || ''), at: Date.now() };
-}
-function coNpsNone(key){ npsWrite(key, { none: { by: myEmail || '', at: Date.now() }, cand: null }).then(ok => ok && toast('「국민연금 사업장 없음」으로 적었습니다 — 다시 찾으면 풀립니다', 6000)); }
+function coNpsNone(key){ npsWrite(key, { none: { by: myEmail || '', at: Date.now() } }).then(ok => ok && toast('「국민연금 사업장 없음」으로 적었습니다 — 다시 찾으면 풀립니다', 6000)); }
 function coNpsUnpick(key){
   if(!confirm('국민연금 사업장 연결을 풀까요?\n지금까지 받은 숫자 기록은 남겨 둡니다.')) return;
   npsWrite(key, { pick: null, now: null }).then(ok => ok && toast('연결을 풀었습니다', 5000));
@@ -38440,6 +38415,8 @@ function coNpsHtml(o){
   }
   if(no.length !== 10) return `<div class="dim">사업자번호가 있어야 국민연금에서 찾을 수 있습니다.</div>`;
   const find = `<span class="coerppin" style="display:inline-flex"><button onclick="coNpsFind('${k}')">🔍 국민연금에서 찾기</button></span>`;
+  if(p.pick) return `<div class="dim">「${esc(p.pick.nm || '')}」을 이었습니다 — 가입자 수를 받는 중입니다(몇 초 뒤 저절로 바뀝니다).</div>
+      <div class="coerppin" style="margin-top:6px"><button onclick="coNpsUnpick('${k}')">연결 풀기</button></div>`;
   if(p.none) return `<div class="dim">「국민연금 사업장 없음」으로 적어 두었습니다. ${find}</div>`;
   if(p.cand && p.cand.length){
     return `<div class="dim" style="font-size:12px;margin-bottom:6px">사업자번호 앞 6자리가 같은 곳입니다 — 이 회사가 맞는 줄을 골라 주세요(이름이 같아도 저절로 고르지 않습니다).</div>
@@ -38448,6 +38425,9 @@ function coNpsHtml(o){
         <button onclick="coNpsPick('${k}','${esc(c.seq)}')">이 사업장 맞음</button></div>`).join('')}
       <div class="coerppin" style="margin-top:6px"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
   }
+  if(p.candAt) return `<div class="dim" style="margin-bottom:6px">앞 6자리가 같은 국민연금 사업장이 없습니다 — 가입자 3인 미만 법인·10인 미만 개인사업장은 공개되지 않습니다.</div>
+      <div class="coerppin"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
+  if(_pubAsked[o.key]) return `<div class="dim">국민연금 사업장을 찾는 중입니다 — 몇 초 뒤 저절로 나옵니다.</div>`;
   return `<div class="dim" style="margin-bottom:6px">국민연금 가입 사업장에서 가입자 수(≈ 근로자 수)를 받아 옵니다. 처음 한 번은 사업장을 골라 주세요.</div>${find}`;
 }
 /* ══════ 👥 근로자 수 — 한 줄 + 사업장 팝업 (대표 「진행」 2026-10-11, 목업 ㉯ 「칸이 늘어나는 것보다 팝업」) ══════
@@ -38457,59 +38437,56 @@ function coNpsHtml(o){
      자리: coInfo/{번호}/ei = { at, rows:[{nm,fg(gy|sj),cnt,ind,since,addr}], gy, sj, n } · eiHist/{년월} = 고용 상시인원
    ★ 국민연금은 앞 6자리만 공개라 그대로 «사람이 고른다»(coNpsHtml) — 그 화면을 이 창 안으로 옮겼다.
    ⚠ 공단 신고 기준 숫자다 — 상시근로자 «판단»은 법 기준으로 따로 본다고 화면에 적는다. */
-const EI_URL = 'https://apis.data.go.kr/B490001/gySjbPstateInfoService/getGySjBoheomBsshItem';
 const EI_EVERY_DAYS = 30;
-/* 공단 답 → 사업장 줄 (순수 로직). opaBoheomFg 1 = 산재, 2 = 고용 */
-function eiRows(items){
-  return [].concat(items || []).filter(Boolean).map(it => {
-    const fg = String(it.opaBoheomFg || '') === '2' ? 'gy' : 'sj';
-    const d = String(it.seongripDt || '');
-    return { nm: String(it.saeopjangNm || '').trim(), fg: fg, cnt: Number(it.sangsiInwonCnt) || 0,
-      ind: String((fg === 'gy' ? it.gyEopjongNm : it.sjEopjongNm) || it.gyEopjongNm || it.sjEopjongNm || '').trim(),
-      since: d.length >= 6 ? d.slice(0,4) + '.' + d.slice(4,6) : '', addr: String(it.addr || '').trim() };
-  }).sort((a,b) => (b.cnt - a.cnt) || a.nm.localeCompare(b.nm, 'ko'));
+/* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
+   숫자는 서버가 받아 pubdata/co/{번호} 에 쓰고, 이 화면은 읽기만 한다. 새로 받고 싶으면 «받아 달라»를 남긴다.
+   ⚠ 화면이 공단에 직접 묻거나 숫자를 적지 않는다 — 쓰는 곳이 둘이면 같은 회사 숫자가 화면마다 달라진다.
+   ⚠ 사람이 정한 것(국민연금 pick·none)은 공공데이터가 아니라 기업정보함 coInfo 에 남는다. */
+let _pubAsked = {};         /* 이 화면에서 «받아 달라»를 남긴 회사 — 되풀이하지 않는다 */
+async function coPubAsk(o, k){
+  if(!o || Store.mode !== 'firebase' || typeof PuPubdata === 'undefined') return false;
+  const ok = await PuPubdata.ask(o.bizno, k, o.name || '');
+  if(ok){ _pubAsked[o.key] = 1; coPubRepaint(o.key); }
+  else toast('요청을 남기지 못했습니다 — 로그인을 확인해 주세요', 6000);
+  return ok;
 }
-/* 합계 — 고용·산재 상시인원과 사업장 수(이름+주소로 센다) */
-function eiSum(rows){
-  const gy = (rows || []).filter(r => r.fg === 'gy').reduce((n, r) => n + r.cnt, 0);
-  const sj = (rows || []).filter(r => r.fg === 'sj').reduce((n, r) => n + r.cnt, 0);
-  const sites = new Set((rows || []).map(r => r.nm + '|' + r.addr)).size;
-  return { gy: gy, sj: sj, n: sites };
+/* 받아 온 숫자를 기업 상세 extra 에 얹는다(순수 로직) — 받아 온 것은 공용 자리가 이기고, pick·none 은 coInfo 것만 */
+function coWithPub(ex, pb){
+  if(!pb) return ex;
+  const out = Object.assign({}, ex);
+  if(pb.ei) out.ei = pb.ei;
+  if(pb.eiHist) out.eiHist = Object.assign({}, ex && ex.eiHist, pb.eiHist);
+  if(pb.nps){
+    const mine = (ex && ex.nps) || {}, n = Object.assign({}, mine, pb.nps);
+    delete n.pick; delete n.none; delete n.nowSeq;
+    if(mine.pick) n.pick = mine.pick;
+    if(mine.none){ n.none = mine.none; delete n.cand; }
+    n.hist = Object.assign({}, mine.hist, pb.nps.hist);
+    /* 지금 숫자는 «지금 고른 사업장의 것»일 때만 — 바꿨거나 풀었으면 옛 숫자를 보이지 않는다 */
+    n.now = !mine.pick ? null : (String(pb.nps.nowSeq || '') === String(mine.pick.seq) ? (pb.nps.now || null) : (mine.now || null));
+    out.nps = n;
+  }
+  return out;
 }
-let _eiAsked = {};          /* 이 화면에서 한 번 물어본 회사 — 실패해도 되풀이하지 않는다 */
+/* 서버가 써서 숫자가 바뀌면 — 열려 있는 상세·사업장 창만 다시 그린다 */
+function coPubRepaint(key){
+  if(key && state.coPick !== key && !(_coWork && _coWork.key === key)) return;
+  if(state.coPick && (!key || state.coPick === key)) openCoDetailPanel(state.coPick, true);
+  if(_coWork && (!key || _coWork.key === key)) coWorkMount();
+}
+/* 고용·산재 받기 — 서버에 «받아 달라». 사업자번호 «10자리 그대로» 묻는 것은 서버다(nps-monthly.js oneEi) */
 async function coEiFetch(key, quiet){
   const o = (coList() || []).find(x => x.key === key); if(!o) return;
-  const no = digits(o.bizno || '');
-  if(no.length !== 10){ if(!quiet) toast('사업자번호가 있어야 고용·산재보험에서 찾을 수 있습니다', 7000); return; }
-  const svc = npsKey();
-  if(!svc){ if(!quiet) toast('공공데이터 열쇠가 없습니다 — 포털 환경설정의 「국세청 사업자번호 조회 키」', 9000); return; }
-  _eiAsked[key] = 1;
-  let rows;
-  try{
-    const r = await fetch(EI_URL + '?serviceKey=' + encodeURIComponent(svc) + '&_type=json&numOfRows=100&pageNo=1&v_saeopjaDrno=' + no);
-    if(!r.ok) throw new Error('공단 답 ' + r.status);
-    const j = await r.json();
-    const it = j && j.response && j.response.body && j.response.body.items && j.response.body.items.item;
-    rows = eiRows(it);
-  }catch(e){ if(!quiet) toast('고용·산재보험에 못 물어봤습니다 — ' + ((e && e.message) || ''), 8000); return; }
-  const s = eiSum(rows), now = Date.now();
-  const ym = new Date(now + 9 * 3600000).toISOString().slice(0,7).replace('-', '');
-  const upd = {};
-  upd['coInfo/' + key + '/ei'] = { at: now, rows: rows.length ? rows : null, gy: s.gy, sj: s.sj, n: s.n };
-  if(rows.length) upd['coInfo/' + key + '/eiHist/' + ym] = s.gy;
-  if(Store.mode !== 'firebase') return;
-  try{ await Store.db.ref(DB_ROOT).update(upd); }catch(e){ console.warn('[고용·산재 적기]', e); return; }
-  coListBust(); renderCoSoon();
-  if(state.coPick === key) openCoDetailPanel(key, true);
-  if(_coWork && _coWork.key === key) coWorkMount();
+  if(digits(o.bizno || '').length !== 10){ if(!quiet) toast('사업자번호가 있어야 고용·산재보험에서 찾을 수 있습니다', 7000); return; }
+  if((await coPubAsk(o, 'ei')) && !quiet) toast('고용·산재보험에서 받는 중 — 몇 초 뒤 저절로 바뀝니다', 5000);
 }
-/* 기업 상세를 열 때 — 아직 없거나 30일 지났으면 조용히 받는다(국세청 coNtsAutoOnOpen 과 같은 결) */
+/* 기업 상세를 열 때 — 아직 없거나 30일 지났으면 조용히 «받아 달라»(국세청 coNtsAutoOnOpen 과 같은 결) */
 function coEiAutoOnOpen(o){
-  if(!o || _eiAsked[o.key] || Store.mode !== 'firebase') return;
-  if(digits(o.bizno || '').length !== 10 || !npsKey()) return;
+  if(!o || _pubAsked[o.key] || Store.mode !== 'firebase') return;
+  if(digits(o.bizno || '').length !== 10) return;
   const ei = o.extra && o.extra.ei;
   if(ei && ei.at && Date.now() - Number(ei.at) < EI_EVERY_DAYS * 86400000) return;
-  _eiAsked[o.key] = 1;        /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
+  _pubAsked[o.key] = 1;       /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
   coEiFetch(o.key, true);
 }
 /* 기업 상세의 «한 줄» */
