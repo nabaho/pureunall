@@ -198,7 +198,7 @@ test('⑦★ 포털 — 내외관리 줄에 직원 인사·재무, 권한이 있
   const at = portal.indexOf('var APPS = [');
   const apps = portal.slice(at, portal.indexOf('];', at));
   assert.match(apps, /\{ key:'hr',\s+name:'직원 인사',[^}]*url:'pu-erp\.html\?app=hr',[^}]*perm:'hr',\s*row:'inout' \}/);
-  assert.match(apps, /\{ key:'fin',\s+name:'재무',[^}]*url:'pu-erp\.html\?app=fin',[^}]*perm:'fin',\s*row:'inout' \}/);
+  assert.match(apps, /\{ key:'fin',\s+name:'재무관리',[^}]*url:'pu-erp\.html\?app=fin',[^}]*perm:'fin',\s*row:'inout' \}/);
   assert.match(portal, /var _permHide = !!\(app\.perm && !_isAdm && !\(typeof portalAppPermOk === 'function' && portalAppPermOk\(app\.perm\)\)\);/);
   assert.match(portal, /if\(_permHide\) a\.style\.display = 'none';/);
   assert.match(portal, /portalLoadAppPerm\(\);/);
