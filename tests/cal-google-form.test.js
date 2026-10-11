@@ -371,3 +371,10 @@ test('폰 일정 보기 카드 — 장소가 있으면 「장소, 시각」', ()
   const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
   assert.match(캘, /if\(e\.place\) 언제 = String\(e\.place\)\.trim\(\) \+ \(언제 \? ", " \+ 언제 : ""\);/);
 });
+
+test('「구글 앱 색」 — 서랍에서 켜면 구글 색 없는 일정이 전부 캘린더 초록(#87ac5c), 끄면(기본) 사람별 색', () => {
+  const 캘 = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'pu-cal.html'), 'utf8');
+  assert.match(캘, /if\(!gColor && localStorage\.getItem\("pucal_gmono"\) === "1"\) color = "#87ac5c";/);
+  assert.match(캘, /data-dmono="1">/);
+  assert.match(캘, /localStorage\.setItem\("pucal_gmono", _모노\(\) \? "0" : "1"\)/);
+});
