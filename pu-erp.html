@@ -64402,9 +64402,10 @@ function MyDeskV2(props){
     var autoDays = _gyMe.days;
     // 오버라이드
     var ov = grants[sid] && grants[sid][year] ? grants[sid][year] : null;
-    var total = ov && ov.total!=null ? ov.total + erpRulingFixDays(_gyMe.list) : autoDays;
-    var carryOver = ov ? (ov.carryOver||0) : 0;
-    var grant = total + carryOver;
+    var _yg = erpLeaveYearGrant(ov, _gyMe);   // 부여 합은 한 함수에서 (2026-10-11 A1)
+    var total = _yg.total;
+    var carryOver = _yg.carry;
+    var grant = _yg.granted;
     // 사용량
     var rec = attendance.filter(function(r){ return r.sid===sid && (r.date||'').slice(0,4)===year; });
     var leaveCnt = rec.filter(function(r){return r.type==='leave';}).length;
@@ -77171,6 +77172,18 @@ var LEAVE_RULING_FROM = '2026-10-10';
 /* 판결식 전환 «보정» 몫 — 손으로 고친 부여일수(leave_grants)는 판결 전환 «전»에 정한 값이라 보정분을 덮으면 안 된다.
    그래서 수기 부여가 있는 해에도 이 몫은 «위에 더한다» (2026-10-10 실제 화면에서 찾음 — 사무장 17일이 18일이 아니었다) */
 function erpRulingFixDays(list){ return (list || []).filter(function(g){ return g && /전환 보정/.test(String(g.label || '')); }).reduce(function(s, g){ return s + (+g.days || 0); }, 0); }
+/* ★ 그해 연차 «부여 합» 은 이 함수 «하나»로 낸다 (2026-10-11 검토 A1)
+     자동(발생 장부) / 수기 부여(leave_grants.total) / 판결식 전환 보정분 / 이월 — 이 넷의 합.
+     예전에는 화면마다 이 한 줄을 다시 짰고, 휴가관리 «선택 직원 상세»·«연도별 이력» 두 곳이 보정분을 빼먹어
+     같은 사람이 목록 18일 · 상세 17일로 보였다. 이력은 이월·수기가 «숫자형» 일 때만 읽어 또 달랐다.
+     gy = 그해 발생 장부 결과 { days, list } (erpLeaveGrantedInYear · calcGrantDays 가 같은 꼴로 돌려준다). */
+function erpLeaveYearGrant(ov, gy){
+  var autoDays = (gy && +gy.days) || 0;
+  var manual = !!(ov && ov.total != null);
+  var total = manual ? (+ov.total || 0) + erpRulingFixDays(gy && gy.list) : autoDays;
+  var carry = ov ? (+ov.carryOver || 0) : 0;
+  return { auto:autoDays, total:total, carry:carry, granted:total + carry, manual:manual };
+}
 function erpLeaveGrants(u, untilYmd, policy){
   var out = [];
   if(!u || !u.hireDate) return out;
@@ -77294,9 +77307,10 @@ function getLeaveRemain(sid, year){
   var _gyU = (hire <= yearEnd) ? erpLeaveGrantedInYear(u, y) : { days:0, list:[] };
   var autoDays = _gyU.days;
   var ov = grants[sid] && grants[sid][y] ? grants[sid][y] : null;
-  var total = ov && ov.total!=null ? ov.total + erpRulingFixDays(_gyU.list) : autoDays;
-  var carry = ov ? (ov.carryOver||0) : 0;
-  var grant = total + carry;
+  var _yg = erpLeaveYearGrant(ov, _gyU);   // 부여 합은 한 함수에서 (2026-10-11 A1)
+  var total = _yg.total;
+  var carry = _yg.carry;
+  var grant = _yg.granted;
   var atts = dbGet('attendance_records', []).filter(function(r){
     return r.sid===sid && (r.date||'').slice(0,4)===y;
   });
@@ -78520,8 +78534,9 @@ function LeaveManagement(){
     }
     var a = calcGrantDays(u.hireDate, selYear, u.retireDate||u.leaveDate||null);
     var ov = grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-    var t = ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
-    var co = ov?(ov.carryOver||0):0;
+    var _yg = erpLeaveYearGrant(ov, a);   // 목록·상세·이력·CSV 가 같은 함수 (2026-10-11 A1)
+    var t = _yg.total;
+    var co = _yg.carry;
     var us = calcUsed(u.sid, selYear);
     return { mode:'year', t:t, co:co, granted:t+co, used:us.used, remain:Math.round((t+co-us.used)*10)/10, ov:ov, auto:a.days,
       usedTitle:'연'+us.fullDays+'·반'+us.halfDays+'·시'+us.hourTotal+'h', promoYear:selYear };
@@ -78532,9 +78547,11 @@ function LeaveManagement(){
   // 선택 직원 연차 정보
   var auto = selUser ? calcGrantDays(selUser.hireDate, selYear, selUser.retireDate||selUser.leaveDate||null) : {days:0,reason:''};
   var override = selSid && grants[selSid] && grants[selSid][selYear] ? grants[selSid][selYear] : null;
-  var total = override && override.total!=null ? override.total : auto.days;
-  var carryOver = override ? (override.carryOver||0) : 0;
-  var grant = total + carryOver;
+  /* ★ 목록과 같은 함수 — 예전에는 여기만 판결식 보정분을 안 더해 목록 18일·상세 17일로 보였다 (2026-10-11 A1) */
+  var _selYg = erpLeaveYearGrant(override, auto);
+  var total = _selYg.total;
+  var carryOver = _selYg.carry;
+  var grant = _selYg.granted;
   var used  = selUser ? calcUsed(selSid, selYear) : {used:0,fullDays:0,halfDays:0,hourTotal:0};
   var remain = grant - used.used;
   var selCycle = (lvView === 'now' && selUser) ? erpLeaveCycleNow(selUser, todayYMD(), attendance, grants) : null;
@@ -78632,8 +78649,9 @@ function LeaveManagement(){
     leaveUsers.forEach(function(u){
       var a=calcGrantDays(u.hireDate,selYear,u.retireDate||u.leaveDate||null);
       var ov=grants[u.sid]&&grants[u.sid][selYear]?grants[u.sid][selYear]:null;
-      var t=ov&&ov.total!=null?ov.total+erpRulingFixDays(a.list):a.days;
-      var co=ov?(ov.carryOver||0):0;
+      var _yg=erpLeaveYearGrant(ov,a);
+      var t=_yg.total;
+      var co=_yg.carry;
       var us=calcUsed(u.sid,selYear);
       rows.push([u.name,u.title,u.hireDate||'',a.days,co,t+co,Math.round(us.used*10)/10,Math.round((t+co-us.used)*10)/10,ov?'수동':'자동']);
     });
@@ -79016,11 +79034,14 @@ function LeaveManagement(){
             var ystr = String(y);
             var grantInfo = calcGrantDays(selUser.hireDate, y, selUser.retireDate||selUser.leaveDate||null);
             var override = (grants[selUser.sid]||{})[ystr];
-            var grantDays = override && typeof override.total==='number' ? override.total : grantInfo.days;
-            var carry = override && typeof override.carryOver==='number' ? override.carryOver : 0;
-            var totalGrant = grantDays + carry;
+            /* ★ 목록·상세와 같은 함수·같은 잣대 (2026-10-11 A1·A2) — 예전에는 판결식 보정분이 빠지고,
+                 시간연차를 8시간으로 나눠 1일 4시간 근로자의 4시간이 이력에서만 0.5일이었다 */
+            var _yg = erpLeaveYearGrant(override, grantInfo);
+            var grantDays = _yg.total;
+            var carry = _yg.carry;
+            var totalGrant = _yg.granted;
             var recs = allRecs.filter(function(r){return r.date.startsWith(ystr+'-');});
-            var used = PuWork.leaveUsed(recs);
+            var used = PuWork.leaveUsed(recs, selUser.scheduledHours || 8);
             return { y:y, totalGrant:totalGrant, grantDays:grantDays, carry:carry, used:used, remain:Math.max(0,totalGrant-used), recs:recs };
           }
           var years = [];
