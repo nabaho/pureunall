@@ -101,3 +101,43 @@ test('저장본 병합 — __proto__·constructor·prototype 키로 Object.proto
   assert.equal({}.polluted2, undefined);
   assert.equal(Object.prototype.hasOwnProperty.call(Object.prototype, 'polluted'), false);
 });
+
+/* ── 비즈니스지원단 현장클리닉 (2026-10-12) ── */
+test('resolveFormKey — 현장클리닉은 clinic, 기술보호·서산·충남북부가 먼저다', () => {
+  assert.equal(B.resolveFormKey({ name: '비즈니스지원단 현장클리닉' }, '').formKey, 'clinic');
+  assert.equal(B.resolveFormKey({ name: '현장클리닉', fullName: '비즈니스지원단 현장클리닉', agency: '중소벤처기업부' }, '').formKey, 'clinic');
+  assert.equal(B.resolveFormKey({ name: '컨설팅' }, '비즈니스지원단 현장클리닉').formKey, 'clinic', '이알피 사업명으로도 고른다');
+  assert.equal(B.resolveFormKey({ name: '비즈니스지원단 현장클리닉' }, '').ask, false);
+  assert.equal(B.resolveFormKey({ name: '기술보호 현장클리닉 최종산출물' }, '').formKey, 'techguard', '기술보호가 이긴다');
+  assert.equal(B.resolveFormKey({ name: '인사서산 현장클리닉' }, '').formKey, 'cci-seosan');
+  assert.equal(B.resolveFormKey({ name: '인사충남', fullName: '현장클리닉' }, '').formKey, 'cci-north');
+  assert.equal(B.resolveFormKey({ name: '인사노무' }, '인사노무컨설팅충남북부상의 현장클리닉').formKey, 'cci-north');
+  /* 기존 판정 불변 */
+  assert.equal(B.resolveFormKey({ name: '인사충남' }, '').formKey, 'cci-north');
+  assert.equal(B.resolveFormKey({ name: '인사서산' }, '').formKey, 'cci-seosan');
+  assert.equal(B.resolveFormKey({ name: '기술보호', fullName: '기술보호울타리' }, '').formKey, 'techguard');
+  assert.equal(B.resolveFormKey({ name: '일터혁신' }, '').formKey, null);
+});
+test('buildReport — 현장클리닉은 지원단 소속 기본값(푸른노무법인), 저장된 초안이 이긴다', () => {
+  const i = base(); i.type = { id: 'c1', name: '비즈니스지원단 현장클리닉', agency: '중소벤처기업부' }; i.cons = null;
+  const r = B.buildReport(i);
+  assert.equal(r.formKey, 'clinic');
+  assert.equal(r.report.consultantOrg, '푸른노무법인');
+  assert.equal(r.techguard, false);
+  assert.ok(!r.warnings.some((w) => /양식 대상이 아닙니다|어느 기관/.test(w)));
+  assert.deepEqual(r.report.rounds.map((x) => x.date), ['2025-09-04', '2025-10-02']);
+  const j = base(); j.type = i.type; j.saved = { report: { consultantOrg: '다른곳' } };
+  assert.equal(B.buildReport(j).report.consultantOrg, '다른곳', '저장된 초안이 이긴다');
+  const k = base(); k.type = i.type; k.saved = { report: { consultantOrg: '' } };
+  assert.equal(B.buildReport(k).report.consultantOrg, '', '사람이 비운 값도 저장본이 이긴다(기존 규칙)');
+  const z = base(); z.type = i.type; z.saved = { report: { company: { workers: '12' } } };
+  assert.equal(B.buildReport(z).report.consultantOrg, '푸른노무법인', '저장본에 소속이 없으면 기본값');
+});
+test('buildReport — 현장클리닉이 아닌 사업에는 지원단 소속을 넣지 않는다', () => {
+  assert.equal(B.buildReport(base()).report.consultantOrg, undefined);
+  const t = base(); t.type = { id: 't4', name: '기술보호', fullName: '기술보호울타리' };
+  assert.equal(B.buildReport(t).report.consultantOrg, undefined);
+  const c = base(); c.type = { name: '비즈니스지원단 현장클리닉' };
+  assert.equal(B.buildReport(c).report.rounds.length, 2);
+  assert.ok(B.buildReport(c).warnings.every((w) => !/기관 기준/.test(w)), '현장클리닉 회차 1~3 은 기준 안');
+});

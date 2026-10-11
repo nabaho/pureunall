@@ -13,6 +13,8 @@
   var PRIV_RE = /급여|근태|명부|4대|원천|주민|통장|연말정산/;
   var WORKERS_WARN = '근로자수(상시근로자수)는 이알피에 없습니다 — 직접 넣어 주세요';
 
+  var CLINIC_ORG = '푸른노무법인';       // 비즈니스지원단 현장클리닉의 «지원단 소속» 기본값(우리 법인)
+
   function str(v) { return v == null ? '' : String(v).trim(); }
 
   /* 사업 종류 → 양식. 이름·정식명·이알피 사업명을 한 줄로 이어 본다 */
@@ -20,6 +22,7 @@
     if (line.indexOf('서산') >= 0) return 'cci-seosan';
     if (line.indexOf('충남북부') >= 0 || name === '인사충남') return 'cci-north';
     if (line.indexOf('기술보호') >= 0) return 'techguard';
+    if (line.indexOf('현장클리닉') >= 0) return 'clinic';          // 기술보호 뒤 — 기술보호 가공품 이름에 «현장클리닉 최종산출물» 이 섞여 있다
     return null;
   }
   /* 사업 종류 자신의 이름이 먼저다 — 이알피 사업명(programName)은 종류만으로 못 가릴 때만 보탠다
@@ -98,6 +101,8 @@
       consultant: str(input.staffName), writtenAt: str(input.today),
     };
     if (report.summary.outputs.length) src['산출물목록'] = FROM_SCHED;
+    /* 현장클리닉 — 지원단 소속은 우리 법인이다. 기본값을 먼저 넣고 저장된 초안이 덮는다(사람이 고친 값이 이긴다) */
+    if (formKey === 'clinic' && !str(report.consultantOrg)) report.consultantOrg = CLINIC_ORG;
     if (input.saved && isObj(input.saved.report)) deepMerge(report, input.saved.report);
 
     if (!str(report.company && report.company.workers)) warnings.push(WORKERS_WARN);
