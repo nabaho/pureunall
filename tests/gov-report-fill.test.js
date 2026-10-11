@@ -441,3 +441,317 @@ test('missing — 해마다 바뀐 양식에서 지도 칸이 없으면 조용�
   assert.ok(!r.missing.includes('T2.C4.P0'), '있는 칸은 missing 이 아니다');
   assert.deepEqual(G.fillForm(seosanVisitXml(), 'cci-seosan', 'visit', report2(3)).missing, []);
 });
+
+/* ── 비즈니스지원단 현장클리닉 현장지도결과서(별지 14) (2026-10-12) ──
+ * 합성 XML 은 2025.2.17 개정 운영지침 별지14 를 한글로 HWPX 변환한 양식의 «주소 꼴»(T0~T6 · 칸 차례 · 문단 차례)만 흉내 낸다.
+ * 일정 칸 3개(T2) 는 «(수정 불가)»(시스템이 채우는 칸)·«(작성란)» 글자가 들어 있고, 큰 칸(T1·T3·T5)은 칸마다 다른 문단·글자 모양이다.
+ * 값은 다라정밀·홍길동·이푸른(합성)이다 — 실제 양식 파일·고객사 이름은 저장소에 두지 않는다. */
+const CL_LABEL = ['수행일자', '지원기업담당자', '수행시간', '현장수행시간'];
+function clinicXml() {
+  /* «(수정 불가)»·«(작성란)» 안내 칸은 실제 양식처럼 회색·가운데 맞춤 모양(문단 136 · 글자 152), 합계 칸은 글자 188 */
+  const NB = { t: '(수정 불가)', pp: 136, cp: 152 }, WR = { t: '(작성란)', pp: 136, cp: 152 };
+  const 일정 = (n, 일자라벨) => [String(n), 일자라벨, NB, '지원기업담당자', NB, '수행시간', NB,
+    '현장수행시간', NB, ['수행내용', NB], '특이사항', WR];
+  const 전후 = (n) => [String(n), null, null, '(파일첨부)'];
+  return SEC(
+    P(EMPTY), P(RUN('【별지 14】')), P(EMPTY), P(RUN('현장클리닉 현장지도결과서')), P(EMPTY), P(RUN('1. 현장클리닉 개요')), P(EMPTY),
+    tbl('지원기업명', { t: null, pp: 140, cp: 65 }, ['지원기업 ', '담당자명'], null, '지원단 소속', null, '지원단 명', null, '분야', null,
+      '총 수행일수', null, '테마', null, '수행 일자', null),
+    P(EMPTY), P(RUN('2. 지원기업 애로사항 및 문제점')), P(EMPTY),
+    tbl({ t: null, pp: 9, cp: 9 }),                                              // T1.C0 — 큰 칸(기준과 다른 모양)
+    P(EMPTY), P(EMPTY), P(RUN('3. 현장클리닉 일정별 수행 내역(수행계획서 작성내용) 및 특이사항')), P(EMPTY),
+    tbl('번호', '수행내역', ...일정(1, CL_LABEL[0]), ...일정(2, CL_LABEL[0]), ...일정(3, '수행 일자'),
+      '총 수행시간', { t: '00시간 00분', pp: 136, cp: 188 }, '현장 수행시간', { t: '00시간 00분(  %)', pp: 136, cp: 188 }),
+    P(EMPTY), P(RUN('4. 현장클리닉 수행 내용(상세입력)')), P(EMPTY),
+    tbl('구분', '수행내용', ['기업', '현황'], { t: null, pp: 23, cp: 7 }, ['문제', '진단'], { t: null, pp: 11, cp: 11 },
+      ['처방', '내용'], { t: null, pp: 11, cp: 11 }),                              // T3.C3 = 기준 칸(23·7)
+    P(RUN('5. 현장클리닉 결과 및 성과(현장클리닉 전후 비교)')), P(EMPTY),
+    tbl('순번', '현장클리닉 전(개선 전)', '현장클리닉 후(개선 후)', '산출물(필수)', ...전후(1), ...전후(2), ...전후(3), ...전후(4)),
+    P(EMPTY), P(RUN('6. 향후 추진사항 및 성과추적관리 방안')), P(EMPTY),
+    tbl({ t: null, pp: 9, cp: 9 }),                                              // T5.C0
+    P(EMPTY), P(RUN('7. 첨부파일(필수사항-시스템기재 내용 보완을 위한 별도의 현장지도결과서 제출용)')), P(EMPTY), P(RUN('8. 작성기준')),
+    tbl(['1. 현장지도결과서 작성 기준', ' ○ 수행계획서의 내용을 충실히 반영', '  - 기업 애로 해결 과정을 논리적으로 기록한 완결된 보고서를 제출해야 하며']),
+    P(RUN('* 70점 미만인 경우 지침 29조에 의거 현장클리닉 취소 및 사업비 미지급 예정이오니 유의하시기 바랍니다.')));
+}
+/* 회차 n 개(날짜는 일부러 뒤섞어 둔다 — 날짜 순으로 써야 한다) */
+function clinicReport(n, over) {
+  const r = report2(n);
+  r.company = Object.assign({}, r.company, { name: '다라정밀' });
+  r.field = '노무'; r.consultantOrg = '푸른노무법인';
+  r.summary = { theme: '취업규칙 정비', inquiryDiag: '애로 첫줄\n애로 둘째줄', status: '제조업 12명', diag: '연장근로 규정 미비', remedy: '개정안 제시',
+    effects: '규정 없음 → 규정 신설\n연차 관리 수기 → 전산 관리', followUp: '반기 점검' };
+  return Object.assign(r, over || {});
+}
+const CLINIC_TOKS = ['업체명', '담당자', '소속', '지원단명', '분야', '총수행일수', '테마', '수행일자목록', '애로사항',
+  '일자1', '담당1', '시간1', '현장시간1', '내용1', '특이1', '일자2', '담당2', '시간2', '현장시간2', '내용2', '특이2',
+  '일자3', '담당3', '시간3', '현장시간3', '내용3', '특이3', '총시간', '총현장시간', '기업현황', '문제진단', '처방내용',
+  '전1', '후1', '산출1', '전2', '후2', '산출2', '전3', '후3', '산출3', '전4', '후4', '산출4', '향후'];
+const clAddrs = (xml) => X.scan(xml).map((p) => p.addr);
+const clRuleAddr = (r) => r.at || r.cell || r.drop;
+const clHas = (addrs, a) => addrs.some((x) => x === a || (a.endsWith('.') && x.startsWith(a)));
+
+test('현장클리닉 — FORMS.clinic 모양 · 표지 목록이 지도와 같고 겹치지 않는다', () => {
+  const f = G.FORMS.clinic;
+  assert.ok(f && f.files.main);
+  assert.equal(f.name, '비즈니스지원단 현장클리닉 현장지도결과서(별지 14)');
+  assert.equal(f.agency, '중소벤처기업부 비즈니스지원단');
+  assert.deepEqual(f.rounds, { min: 1, max: 3 });
+  assert.deepEqual(Object.keys(f.files), ['main']);
+  const toks = f.files.main.set.map((r) => r.tok);
+  assert.deepEqual(toks, CLINIC_TOKS);
+  assert.equal(new Set(toks).size, toks.length, '같은 표지를 두 칸에 쓰면 한 값이 두 번 들어간다');
+});
+
+test('현장클리닉 — 지도의 주소가 합성 양식에 실제로 있고, 표지가 칸마다 한 번씩 박힌다 (검사가 헛돌지 않는다는 보증)', () => {
+  const xml = clinicXml(), addrs = clAddrs(xml);
+  /* 합성 양식이 실제 별지14 꼴인지 — 지도가 가리키는 칸 + «(수정 불가)»/«(작성란)» 자리 */
+  assert.equal(textAt(xml, 'T2.C4.P0'), '(수정 불가)');
+  assert.equal(textAt(xml, 'T2.C11.P1'), '(수정 불가)');
+  assert.equal(textAt(xml, 'T2.C13.P0'), '(작성란)');
+  assert.equal(textAt(xml, 'T2.C41.P0'), '00시간 00분(  %)');
+  assert.equal(textAt(xml, 'T0.C15.P0'), '');
+  assert.equal(textAt(xml, 'T4.C18.P0'), '');
+  assert.equal(textAt(xml, 'T5.C0.P0'), '');
+  const rules = G.FORMS.clinic.files.main.set;
+  rules.forEach((r) => assert.ok(clHas(addrs, clRuleAddr(r)), '양식에 없는 주소: ' + clRuleAddr(r)));
+  rules.forEach((r) => { if (r.like) assert.ok(addrs.includes(r.like), '양식에 없는 기준 칸: ' + r.like); });
+  /* 기준 칸은 지도 자신의 값 칸이어야 한다(안내 글자 칸·이름표 칸을 기준 삼으면 회색·가운데 맞춤이 번진다) */
+  const own = rules.map((r) => (r.cell ? r.cell + 'P0' : r.at));
+  [...new Set(rules.filter((r) => r.like).map((r) => r.like))].forEach((a) => assert.ok(own.includes(a), '기준 칸이 지도의 값 칸이 아니다: ' + a));
+  assert.deepEqual([...new Set(rules.filter((r) => r.like).map((r) => r.like))].sort(), ['T0.C1.P0', 'T3.C3.P0']);
+  const tk = G.tokenize(xml, 'clinic', 'main');
+  CLINIC_TOKS.forEach((t) => assert.equal(tk.split('{{' + t + '}}').length - 1, 1, '표지 {{' + t + '}} 가 한 번씩 박혀야 한다'));
+  /* 헛돌지 않는다 — 칸이 없는 양식으로 바꾸면 검사가 실제로 알린다 */
+  const noT4 = xml.replace(/<hp:p [^>]*><hp:run><hp:tbl><hp:tr>(?:(?!<\/hp:tbl>)[\s\S])*순번[\s\S]*?<\/hp:tbl><\/hp:run>[\s\S]*?<\/hp:p>/, '');
+  assert.notEqual(noT4, xml, '검사 준비: 전후 비교 표가 빠져야 한다');
+  const bad = G.fillForm(noT4, 'clinic', 'main', clinicReport(3));
+  assert.ok(bad.missing.length > 0, '칸이 빠진 양식인데 missing 이 비면 검사가 헛도는 것이다');
+});
+
+test('현장클리닉 — 회차 3개: 값이 제 칸에 들어가고 «(수정 불가)»·«(작성란)» 글자가 남지 않는다', () => {
+  const xml = clinicXml();
+  const r = G.fillForm(xml, 'clinic', 'main', clinicReport(3));
+  assert.deepEqual(r.missing, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.left, []);
+  assert.equal(r.short, null); assert.equal(r.over, null);
+  assert.doesNotMatch(r.xml, /{{|}}/);
+  assert.ok(!textAll(r.xml).includes('(수정 불가)'), '«(수정 불가)» 글자가 남았다');
+  assert.ok(!textAll(r.xml).includes('(작성란)'), '«(작성란)» 글자가 남았다');
+  assert.ok(!textAll(r.xml).includes('00시간 00분'), '시스템 자리표시 글자가 남았다');
+  /* 1. 개요 */
+  assert.equal(textAt(r.xml, 'T0.C1.P0'), '다라정밀');
+  assert.equal(textAt(r.xml, 'T0.C3.P0'), '홍길동');
+  assert.equal(textAt(r.xml, 'T0.C5.P0'), '푸른노무법인');
+  assert.equal(textAt(r.xml, 'T0.C7.P0'), '이푸른');
+  assert.equal(textAt(r.xml, 'T0.C9.P0'), '노무');
+  assert.equal(textAt(r.xml, 'T0.C11.P0'), '3일');
+  assert.equal(textAt(r.xml, 'T0.C13.P0'), '취업규칙 정비');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '2025.04.16, 2025.05.07, 2025.06.11', '날짜 순');
+  assert.match(rawAt(r.xml, 'T1.C0.P0'), /애로 첫줄<hp:lineBreak\/>애로 둘째줄/);
+  /* 3. 일정 3칸 — 회차는 날짜 순(04-16 → 05-07 → 06-11) */
+  [['C4', '2025.04.16'], ['C16', '2025.05.07'], ['C28', '2025.06.11']].forEach(([c, d]) => assert.equal(textAt(r.xml, 'T2.' + c + '.P0'), d, c));
+  ['C6', 'C18', 'C30'].forEach((c) => assert.equal(textAt(r.xml, 'T2.' + c + '.P0'), '홍길동', c));
+  ['C8', 'C10', 'C20', 'C22', 'C32', 'C34', 'C13', 'C25', 'C37', 'C39', 'C41'].forEach((c) =>
+    assert.equal(textAt(r.xml, 'T2.' + c + '.P0'), ' ', 'T2.' + c + ' — 보고서에 없는 값은 지어내지 않고 빈칸(밑줄 아님)'));
+  assert.match(rawAt(r.xml, 'T2.C11.P1'), /문의: 문의2025-04-16<hp:lineBreak\/>진단: 진단2025-04-16<hp:lineBreak\/>자문: 자문2025-04-16<hp:lineBreak\/>성과: 성과2025-04-16<hp:lineBreak\/>향후: 향후2025-04-16/);
+  assert.ok(textAt(r.xml, 'T2.C23.P1').startsWith('문의: 문의2025-05-07'));
+  assert.ok(textAt(r.xml, 'T2.C35.P1').startsWith('문의: 문의2025-06-11'));
+  /* 4. 수행 내용 */
+  assert.equal(textAt(r.xml, 'T3.C3.P0'), '제조업 12명');
+  assert.equal(textAt(r.xml, 'T3.C5.P0'), '연장근로 규정 미비');
+  assert.equal(textAt(r.xml, 'T3.C7.P0'), '개정안 제시');
+  assert.equal(textAt(r.xml, 'T5.C0.P0'), '반기 점검');
+  /* 원본 이름표·제목·작성기준·산출물 안내는 그대로, 문단 수도 그대로 */
+  ['【별지 14】', '현장클리닉 현장지도결과서', '지원기업명', '지원단 소속', '번호', '수행내역', '수행일자', '지원기업담당자', '수행시간', '현장수행시간',
+    '수행내용', '특이사항', '총 수행시간', '현장 수행시간', '구분', '순번', '산출물(필수)', '1. 현장지도결과서 작성 기준']
+    .forEach((t) => assert.ok(X.scan(r.xml).some((p) => p.text === t), '원본 글이 사라짐: ' + t));
+  assert.equal(count(r.xml, '(파일첨부)'), 0, '산출물 칸의 «(파일첨부)» 글자가 남았다');
+  assert.equal(textAt(r.xml, 'T4.C7.P0'), ' ', '산출물 값이 없으면 빈칸');
+  assert.equal(X.scan(r.xml).length, X.scan(xml).length, '문단 수가 바뀌면 안 된다');
+  assert.equal(count(r.xml, '2. 지원기업 애로사항 및 문제점'), 1);
+});
+
+test('현장클리닉 — 모양 빌리기: 큰 칸(애로사항·문제진단·처방내용·향후)은 기업현황 칸(T3.C3)의 문단·글자 모양', () => {
+  const r = G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3));
+  ['T1.C0.P0', 'T3.C3.P0', 'T3.C5.P0', 'T3.C7.P0', 'T5.C0.P0'].forEach((a) => {
+    assert.equal(ppAt(r.xml, a), '23', a);
+    assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['7'], a);
+  });
+  assert.deepEqual(r.missing, []);
+  /* 기준 칸(T3.C3.P0)이 없으면 지어내지 않고 missing 으로 알린다 */
+  const noRef = clinicXml().replace(/<hp:p [^>]*paraPrIDRef="23">(?:(?!<\/hp:p>)[\s\S])*<\/hp:p>/, '');
+  const r2 = G.fillForm(noRef, 'clinic', 'main', clinicReport(3));
+  assert.ok(r2.missing.includes('like T3.C3.P0'), JSON.stringify(r2.missing));
+});
+
+test('현장클리닉 — 일정 칸 값은 «(수정 불가)» 안내 글자 모양(회색·가운데)을 버리고 개요 값 칸(140·65)·큰 칸(23·7) 모양', () => {
+  const xml = clinicXml();
+  assert.equal(ppAt(xml, 'T2.C4.P0'), '136'); assert.deepEqual(cpsAt(xml, 'T2.C4.P0'), ['152'], '검사 준비: 원본 칸이 안내 모양이어야 한다');
+  for (const n of [0, 1, 3]) {
+    const r = G.fillForm(xml, 'clinic', 'main', clinicReport(n));
+    assert.deepEqual(r.missing, [], '회차 ' + n);
+    for (let k = 0; k < 3; k++) {
+      [4, 6, 8, 10].forEach((c) => { const a = 'T2.C' + (12 * k + c) + '.P0'; assert.equal(ppAt(r.xml, a), '140', a); assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['65'], a); });
+      ['T2.C' + (12 * k + 11) + '.P1', 'T2.C' + (12 * k + 13) + '.P0'].forEach((a) => {
+        assert.equal(ppAt(r.xml, a), '23', a); assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['7'], a);
+      });
+    }
+    ['T2.C39.P0', 'T2.C41.P0'].forEach((a) => { assert.equal(ppAt(r.xml, a), '140', a); assert.deepEqual([...new Set(cpsAt(r.xml, a))], ['65'], a); });
+    assert.doesNotMatch(r.xml, /paraPrIDRef="136"|charPrIDRef="(152|188)"/, '안내·자리표시 글자 모양이 값에 남았다');
+    /* 이름표 칸은 그대로 */
+    assert.equal(ppAt(r.xml, 'T2.C3.P0'), '0'); assert.equal(textAt(r.xml, 'T2.C3.P0'), '수행일자');
+    assert.equal(textAt(r.xml, 'T2.C11.P0'), '수행내용');
+  }
+  /* 기준 칸(개요 값 칸 T0.C1.P0)이 없으면 지어내지 않고 missing 으로 알린다 */
+  const noRef = xml.replace(/<hp:p [^>]*paraPrIDRef="140">(?:(?!<\/hp:p>)[\s\S])*<\/hp:p>/, '');
+  assert.notEqual(noRef, xml);
+  assert.ok(G.fillForm(noRef, 'clinic', 'main', clinicReport(3)).missing.includes('like T0.C1.P0'));
+});
+
+test('현장클리닉 — 회차 0·1·2개: 안 쓴 일정 칸은 빈칸 한 칸(밑줄·옛 글자 아님), 모자람 알림', () => {
+  /* 일정 칸 k(0~2)의 값 칸 = 첫 칸 번호 + 12k — 일자 4 · 담당 6 · 시간 8 · 현장시간 10 · 특이 13 (수행내용은 C11 의 둘째 문단) */
+  const empty = (xml, n) => {
+    for (let k = n; k < 3; k++) {
+      [4, 6, 8, 10, 13].forEach((c) => assert.equal(textAt(xml, 'T2.C' + (12 * k + c) + '.P0'), ' ', 'T2.C' + (12 * k + c) + ' (일정 ' + (k + 1) + ')'));
+      assert.equal(textAt(xml, 'T2.C' + (12 * k + 11) + '.P1'), ' ', '수행내용 ' + (k + 1));
+    }
+  };
+  const clean = (r) => {
+    assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
+    assert.ok(!textAll(r.xml).includes('(수정 불가)')); assert.ok(!textAll(r.xml).includes('(작성란)'));
+  };
+  const r0 = G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(0));
+  clean(r0); empty(r0.xml, 0);
+  assert.deepEqual(r0.short, { need: 1, have: 0 });
+  assert.equal(textAt(r0.xml, 'T0.C11.P0'), X.BLANK, '회차가 없으면 총 수행일수는 모르는 값 — 밑줄');
+  assert.equal(textAt(r0.xml, 'T0.C15.P0'), X.BLANK);
+  const r1 = G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(1));
+  clean(r1); empty(r1.xml, 1);
+  assert.equal(r1.short, null);
+  assert.equal(textAt(r1.xml, 'T0.C11.P0'), '1일');
+  assert.equal(textAt(r1.xml, 'T0.C15.P0'), '2025.06.11');
+  assert.equal(textAt(r1.xml, 'T2.C4.P0'), '2025.06.11');
+  assert.equal(textAt(r1.xml, 'T2.C6.P0'), '홍길동');
+  assert.equal(textAt(r1.xml, 'T2.C16.P0'), ' ');
+  const r2 = G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(2));
+  clean(r2); empty(r2.xml, 2);
+  assert.equal(textAt(r2.xml, 'T0.C11.P0'), '2일');
+  assert.equal(textAt(r2.xml, 'T2.C16.P0'), '2025.06.11', '둘 중 날짜 순 — 04-16 이 먼저, 06-11 이 둘째');
+  assert.equal(textAt(r2.xml, 'T2.C4.P0'), '2025.04.16');
+  assert.equal(textAt(r2.xml, 'T2.C28.P0'), ' ');
+  assert.equal(textAt(r2.xml, 'T2.C35.P1'), ' ');
+});
+
+test('현장클리닉 — 회차 4개는 셋째까지만 쓰고 넘침을 알린다 (넷째가 조용히 사라지지 않는다)', () => {
+  const rp = clinicReport(3);
+  rp.rounds.push({ date: '2025-08-14', visit: true, inquiry: '넷째 문의', diagnosis: '', advice: '', result: '', next: '' });
+  const r = G.fillForm(clinicXml(), 'clinic', 'main', rp);
+  assert.deepEqual(r.over, { max: 3, have: 4 });
+  assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
+  assert.ok(!textAll(r.xml).includes('넷째 문의'), '양식 한도(3)까지만 쓴다');
+  assert.ok(!textAll(r.xml).includes('2025.08.14'));
+  assert.equal(textAt(r.xml, 'T0.C11.P0'), '3일');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '2025.04.16, 2025.05.07, 2025.06.11');
+});
+
+test('현장클리닉 — 전후 비교 4행: 줄 4개·2개·«→» 없는 줄·5줄(초과는 무시)·없음', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  const row = (r, k) => [textAt(r.xml, 'T4.C' + (4 * k + 5) + '.P0'), textAt(r.xml, 'T4.C' + (4 * k + 6) + '.P0')];
+  const out = (r, k) => textAt(r.xml, 'T4.C' + (4 * k + 7) + '.P0');
+  let r = eff('가1 → 나1\n가2 → 나2\n가3 → 나3\n가4 → 나4');
+  assert.deepEqual([0, 1, 2, 3].map((k) => row(r, k)), [['가1', '나1'], ['가2', '나2'], ['가3', '나3'], ['가4', '나4']]);
+  assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
+  r = eff('가1 → 나1\r\n  가2→나2  \r\n');
+  assert.deepEqual([0, 1].map((k) => row(r, k)), [['가1', '나1'], ['가2', '나2']], 'CRLF·공백 정리');
+  assert.deepEqual([2, 3].map((k) => row(r, k)), [[' ', ' '], [' ', ' ']], '줄이 없는 행은 빈칸 한 칸 — 밑줄이 아니다');
+  assert.deepEqual(r.left, []);
+  r = eff('개선 전만 적은 줄\n\n가2 → 나2 → 나3');
+  assert.deepEqual(row(r, 0), ['개선 전만 적은 줄', ' '], '«→» 가 없으면 «전» 에만 넣고 «후» 는 빈칸');
+  assert.deepEqual(row(r, 1), ['가2', '나2'], '첫 «→» 에서 나눈다(빈 줄은 건너뜀)');
+  assert.equal(out(r, 0), ' ');
+  assert.equal(out(r, 1), '나3', '둘째 «→» 뒤는 산출물');
+  r = eff('1 → 가\n2 → 나\n3 → 다\n4 → 라\n다섯째줄 → 여섯째줄');
+  assert.deepEqual([0, 1, 2, 3].map((k) => row(r, k)), [['1', '가'], ['2', '나'], ['3', '다'], ['4', '라']]);
+  assert.ok(!textAll(r.xml).includes('다섯째줄'), '5째 줄은 양식에 칸이 없다 — 무시');
+  assert.equal(X.scan(r.xml).length, X.scan(clinicXml()).length);
+  r = eff(undefined);
+  assert.deepEqual([0, 1, 2, 3].map((k) => row(r, k)), [[' ', ' '], [' ', ' '], [' ', ' '], [' ', ' ']]);
+  assert.deepEqual(r.left, []);
+  r = eff('→ 후만\n전만 →');
+  assert.deepEqual(row(r, 0), [' ', '후만'], '전이 비면 빈칸');
+  assert.deepEqual(row(r, 1), ['전만', ' '], '후가 비면 빈칸');
+});
+
+test('현장클리닉 — 전후 비교 줄은 «개선 전 → 개선 후 → 산출물» 셋까지, 산출물 칸의 «(파일첨부)» 는 남지 않는다', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  const cells = (r, k) => [5, 6, 7].map((o) => textAt(r.xml, 'T4.C' + (4 * k + o) + '.P0'));
+  let r = eff('규정 없음 → 규정 신설 → 취업규칙.hwp\n수기 → 전산\n수기만\n전 → 후 → 산출 → 더');
+  assert.deepEqual(cells(r, 0), ['규정 없음', '규정 신설', '취업규칙.hwp'], '3쪽');
+  assert.deepEqual(cells(r, 1), ['수기', '전산', ' '], '2쪽 — 산출물은 빈칸(밑줄 아님)');
+  assert.deepEqual(cells(r, 2), ['수기만', ' ', ' '], '1쪽');
+  assert.deepEqual(cells(r, 3), ['전', '후', '산출 → 더'], '둘째 구분 뒤는 모두 산출물');
+  assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
+  assert.ok(!textAll(r.xml).includes('(파일첨부)'), '(파일첨부) 가 남았다');
+  assert.equal(X.scan(r.xml).length, X.scan(clinicXml()).length);
+  r = eff(undefined);
+  [0, 1, 2, 3].forEach((k) => assert.deepEqual(cells(r, k), [' ', ' ', ' ']));
+  assert.ok(!textAll(r.xml).includes('(파일첨부)'));
+  r = eff('→ → 산출만');
+  assert.deepEqual(cells(r, 0), [' ', ' ', '산출만']);
+});
+
+test('현장클리닉 — 전후 비교 구분은 «→» «->» «=>» 모두(공백 있든 없든), 섞어 써도 된다', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  const cells = (r, k) => [5, 6, 7].map((o) => textAt(r.xml, 'T4.C' + (4 * k + o) + '.P0'));
+  let r = eff('가1 -> 나1\n가2=>나2\n가3->나3=>다3\n가4 → 나4 -> 다4');
+  assert.deepEqual([0, 1, 2, 3].map((k) => cells(r, k)),
+    [['가1', '나1', ' '], ['가2', '나2', ' '], ['가3', '나3', '다3'], ['가4', '나4', '다4']]);
+  assert.deepEqual(r.left, []); assert.deepEqual(r.missing, []);
+  r = eff('구분 없는 한 줄(예: 주 5일 근무)');
+  assert.deepEqual(cells(r, 0), ['구분 없는 한 줄(예: 주 5일 근무)', ' ', ' '], '구분이 없으면 전체가 «전», 후·산출물은 빈칸');
+  const V = G.buildValues({ summary: { effects: 'a->b' } }, 'clinic');
+  assert.equal(V['전1'], 'a'); assert.equal(V['후1'], 'b'); assert.equal(V['산출1'], ' ');
+});
+
+test('현장클리닉 — 총수행일수는 «서로 다른 날» 수, 수행일자목록은 같은 날을 한 번만 · 일정 칸은 회차마다', () => {
+  const rp = clinicReport(3);
+  rp.rounds = [{ date: '2025-04-16', inquiry: '오전' }, { date: '2025-04-16', inquiry: '오후' }];
+  let r = G.fillForm(clinicXml(), 'clinic', 'main', rp);
+  assert.equal(textAt(r.xml, 'T0.C11.P0'), '1일', '같은 날 두 회차는 1일');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '2025.04.16', '같은 날은 한 번만');
+  assert.equal(textAt(r.xml, 'T2.C4.P0'), '2025.04.16'); assert.equal(textAt(r.xml, 'T2.C16.P0'), '2025.04.16', '일정 칸은 회차마다');
+  assert.ok(textAt(r.xml, 'T2.C23.P1').includes('오후'));
+  assert.deepEqual(r.left, []); assert.deepEqual(r.missing, []);
+  rp.rounds = [{ date: '2025-06-11' }, { date: '2025-04-16' }, { date: '2025-04-16' }];
+  r = G.fillForm(clinicXml(), 'clinic', 'main', rp);
+  assert.equal(textAt(r.xml, 'T0.C11.P0'), '2일');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '2025.04.16, 2025.06.11', '날짜 순으로 한 번씩');
+  rp.rounds = [{ date: '2025-02-30' }];
+  assert.equal(textAt(G.fillForm(clinicXml(), 'clinic', 'main', rp).xml, 'T0.C11.P0'), X.BLANK, '있을 수 없는 날짜만 있으면 모르는 값 — 밑줄');
+});
+
+test('현장클리닉 — 전후 비교가 4줄을 넘으면 effectsOver 로 알린다(조용히 빠지지 않는다)', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  assert.deepEqual(eff('1 → a\n2 → b\n3 → c\n4 → d\n5 → e\n\n6 → f').effectsOver, { max: 4, have: 6 });
+  assert.equal(eff('1 → a\n2 → b\n3 → c\n4 → d').effectsOver, null);
+  assert.equal(eff('').effectsOver, null);
+  assert.equal(eff(undefined).effectsOver, null);
+  assert.equal(G.fillForm(northXml(), 'cci-north', 'main', report()).effectsOver, null, '다른 양식은 이 알림이 없다');
+});
+
+test('현장클리닉 — 비어 있는 값은 밑줄(모르는 값), 시간 칸은 빈칸(보고서에 없다)', () => {
+  const rp = clinicReport(3); rp.summary = {}; rp.company = {}; rp.consultantOrg = ''; delete rp.field; delete rp.consultant;
+  const r = G.fillForm(clinicXml(), 'clinic', 'main', rp);
+  assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
+  ['T0.C1.P0', 'T0.C3.P0', 'T0.C5.P0', 'T0.C7.P0', 'T0.C9.P0', 'T0.C13.P0', 'T1.C0.P0', 'T3.C3.P0', 'T3.C5.P0', 'T3.C7.P0', 'T5.C0.P0']
+    .forEach((a) => assert.equal(textAt(r.xml, a), X.BLANK, a + ' — 모르는 값은 밑줄(지어내지 않는다)'));
+  assert.equal(textAt(r.xml, 'T2.C6.P0'), X.BLANK, '담당자 이름을 모르면 밑줄');
+  assert.equal(textAt(r.xml, 'T2.C8.P0'), ' ');
+  assert.equal(textAt(r.xml, 'T4.C5.P0'), ' ');
+});
+
+test('현장클리닉 — 간단형 세 양식의 buildValues 는 그대로(clinic 분기가 새지 않는다)', () => {
+  const BASE = JSON.parse('{"cci-north":{"업체명":"가나상사","사업자번호":"123-45-67890","대표자":"김가나","업종":"제조업","소재지":"충남 천안시 서북구 가나로 1","근로자수":"12명","담당자":"홍길동","담당부서직위":"대리","일자1":"2025년 4월 16일","방문체크1":"■방문 □사무활동","수행내역1":"문의: 문의2025-04-16\\n진단: 진단2025-04-16\\n자문: 자문2025-04-16\\n성과: 성과2025-04-16\\n향후: 향후2025-04-16","일자2":"2025년 5월 7일","방문체크2":"■방문 □사무활동","수행내역2":"문의: 문의2025-05-07\\n진단: 진단2025-05-07\\n자문: 자문2025-05-07\\n성과: 성과2025-05-07\\n향후: 향후2025-05-07","일자3":"2025년 6월 11일","방문체크3":"■방문 □사무활동","수행내역3":"문의: 문의2025-06-11\\n진단: 진단2025-06-11\\n자문: 자문2025-06-11\\n성과: 성과2025-06-11\\n향후: 향후2025-06-11","문의진단종합":"요청 첫줄\\n요청 둘째줄","결과종합_검토":"연장근로·휴가 규정","결과종합_조치":"개정안 확정","산출물목록":"#1 취업규칙 개정안\\n#2 임금체계 검토 의견서","기타":"없음","작성일":"2025년 5월 10일","상담역줄":"이푸른","대표자서명줄":"김가나"},"cci-seosan":{"업체명":"가나상사","사업자번호":"123-45-67890","업종":"제조업","소재지":"충남 천안시 서북구 가나로 1","근로자수":"12명","근무형태":"주간근무","담당부서":"총무팀","담당직위":"대리","담당자":"홍길동","연락처":"000-000-0000","팩스":"","이메일":"hong@example.com","상담분야":"인사노무","상담일시":"2025.04.16","요청진단":"요청 첫줄\\n요청 둘째줄","자문결과":"자문 결과 첫줄\\n자문 결과 둘째줄","작성일":"2025년 5월 10일","상담역줄":"이푸른","업체담당자줄":"홍길동","회차":[{"방문일":"2025.04.16","회차명":"1회차","문의":"문의2025-04-16","진단":"진단2025-04-16","자문":"자문2025-04-16"},{"방문일":"2025.05.07","회차명":"2회차","문의":"문의2025-05-07","진단":"진단2025-05-07","자문":"자문2025-05-07"},{"방문일":"2025.06.11","회차명":"3회차","문의":"문의2025-06-11","진단":"진단2025-06-11","자문":"자문2025-06-11"}]},"techguard":{"분야_사전예방":true,"분야_스타트업":false,"업체명":"가나상사","지원일1":"4/16(수)","지원일2":"5/7(수)","지원일3":"6/11(수)","지원일4":" ","지원일5":" ","지원일6":" ","지원일7":" ","자문내용":"자문 결과 첫줄\\n자문 결과 둘째줄","총평":"총평 한 줄","대표자서명줄":"김가나","담당자서명줄":"홍길동","상담역줄":"이푸른","회차":[{"자문일":"2025년 4월 16일","문제점":"진단2025-04-16","자문":"자문2025-04-16","성과":"성과2025-04-16","향후":"향후2025-04-16"},{"자문일":"2025년 5월 7일","문제점":"진단2025-05-07","자문":"자문2025-05-07","성과":"성과2025-05-07","향후":"향후2025-05-07"},{"자문일":"2025년 6월 11일","문제점":"진단2025-06-11","자문":"자문2025-06-11","성과":"성과2025-06-11","향후":"향후2025-06-11"}]}}');
+  ['cci-north', 'cci-seosan', 'techguard'].forEach((k) => assert.deepEqual(G.buildValues(report2(3), k), BASE[k], k));
+  assert.deepEqual(Object.keys(G.FORMS).sort(), ['cci-north', 'cci-seosan', 'clinic', 'techguard']);
+  assert.deepEqual(G.FORMS['cci-north'].rounds, { min: 3, max: 3 });
+});

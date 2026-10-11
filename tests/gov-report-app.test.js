@@ -372,7 +372,7 @@ test('⑮ 대형은 단계 표(목차 단추 유지) · 틀 없음은 «서류 �
   w.ctx.grSetBiz('consulting-01');
   h = w.els.docs.innerHTML;
   assert.ok(h.includes('정부사업일정에 사업 없음'));
-  assert.ok(h.includes('[확인 필요: 운영지침]'));
+  assert.ok(h.includes('[확인 필요: 2026-04 개정 지침 대조(별지 24)]'));
   w.ctx.grSetBiz('consulting-01');
   assert.equal(w.els.docs.style.display, 'none', '다시 누르면 체크표도 닫힌다');
 });
@@ -1635,7 +1635,7 @@ test('63 grRenderSend — 제출 칸: 메일 사업은 「제출 메일 쓰기�
   assert.ok(h.includes('<div class="days">제출 방식 확인 필요 — 운영지침 도착 뒤 정합니다</div>'));
   assert.ok(!h.includes('<button') && !h.includes('<ol') && !h.includes('grWriteSubmit'));
   assert.equal(await w.ctx.grWriteSubmit(), false);
-  assert.equal(D.planFor('현장클리닉').items.filter((i) => i.step === 'submit')[0].how, undefined, '진짜 현장클리닉 줄도 방식이 없다');
+  assert.equal(D.planFor('현장클리닉').items.filter((i) => i.step === 'submit')[0].how, 'platform', '현장클리닉은 2026-10-12 부터 플랫폼 제출(방식 모르는 꼴은 위 합성 틀로 본다)');
   assert.equal(w.db.쓴것.length, 0);
 });
 

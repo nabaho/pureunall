@@ -6,10 +6,14 @@
      · 읽기만 한다 — 받은 값으로 사업 목록·체크표·목차를 만들 뿐 아무 데도 쓰지 않는다.
      · 서류 틀은 ERP 사업 «이름»(공백 뺀)에 낱말이 들어 있는가로 고른다 — 코드(consulting-…)는 환경마다 다르다.
        DOC_PLANS 차례가 뜻이다: 좁은 낱말이 먼저(산업일자리전환컨설팅충남 → 산업일자리).
-     · ①② 자동은 정부사업일정 보고서 창이 채우는 간단형 셋(AUTO)만 — 현황판 줄(buildRows)의 상태를 그대로 쓴다.
-     · [확인 필요] 는 지어내지 않고 딱지로 보인다(현장클리닉 운영지침 · 농촌융복합 양식 글자 · 연결·계약 못 찾음).
+     · ①② 자동은 정부사업일정 보고서 창이 채우는 간단형 넷(AUTO — 현장클리닉 포함, 2026-10-12)만 — 현황판 줄(buildRows)의 상태를 그대로 쓴다.
+     · [확인 필요] 는 지어내지 않고 딱지로 보인다(현장클리닉 2026-04 개정 지침 대조 · 농촌융복합 양식 글자 · 연결·계약 못 찾음).
      · 제출 줄(step 'submit')에만 선택 필드 how('mail'|'platform')·steps(플랫폼 제출 순서 글)를 둘 수 있다(2026-10-11).
-       how 가 없으면(현장클리닉 — 운영지침 확인 전) 정하지 않은 것이다. 화면이 서명·제출 메일 초안/체크 글에 쓴다.
+       how 가 없으면 정하지 않은 것이다. 화면이 서명·제출 메일 초안/체크 글에 쓴다.
+     · 현장클리닉(2026-10-12)은 운영지침 공식 서식(별지11·13·14·24)으로 줄을 짰다 — 간단형이라 plat·report 줄은 서류 목차에만 나오고
+       체크표 ③④⑤ 는 sign·attach·submit 줄만 읽는다(이 틀에는 sign·attach 가 없어 ③④ 는 「—」). 줄 안내 글(note)은 서식이 정한 때·기한뿐.
+     · 틀의 선택 필드 chipItem(줄 id)이 있으면 목차의 ①② 보고서 상태 딱지는 그 줄에만 붙는다(현장클리닉 = result, 별지14).
+       없으면 report 줄마다 붙는 기존 그대로.
      · 대형 틀(2026-10-11, 설계 2-A)은 항목마다 선택 글 steps(플랫폼 입력 순서 · plat 줄)·note(증빙·기준 안내)를 둘 수 있다.
        docsTable 은 대형이면 단계 열(cols = 항목 이름)·칸(cells)·다음 단계(next)를, trackRows 는 막힌 단계(blocked)를 돌려준다.
        간단형 출력은 그대로다(big·next 속성이 없다). 월별 서류의 달은 monthsFor(계약 기간 → 회차 날짜).
@@ -26,7 +30,7 @@
   var UNLINKED = '정부사업일정에 사업 없음';
   var NO_PLAN = '서류 틀 없음';
   var SOURCE = '컨설팅보고서_사업별_양식·항목_정리_2026-10-09.md §2';
-  var AUTO = { 'cci-north': true, 'cci-seosan': true, techguard: true };
+  var AUTO = { 'cci-north': true, 'cci-seosan': true, techguard: true, clinic: true };
   var KIND_KO = { '간단': '간단형', '대형': '대형', '없음': NO_PLAN };
   var COLS = ['①초안', '②확정', '③서명본', '④별첨', '⑤제출'];
   var TRACK_COLS = ['sign', 'attach', 'submit'];   // 체크표 ③④⑤ 칸 = 서류 틀 줄의 step
@@ -81,10 +85,19 @@
       it('travel', '별지8 여비지급신청서', 'once', 'attach'),
       it('survey', '만족도조사', 'once', 'attach'),
       it('submit', '기관 제출(기술보호울타리)', 'once', 'submit', { how: 'platform', steps: TECHGUARD_STEPS })] },
-    { key: 'clinic', words: ['현장클리닉'], kind: '간단', check: '운영지침', source: SOURCE, items: [
+    /* 현장클리닉 — 운영지침 공식 서식(별지11 수행계획서 · 13 변경요청서 · 14 현장지도결과서 · 24 성과추적관리결과서). 줄 id log·track·submit 은 옛 기록 그대로 */
+    { key: 'clinic', words: ['현장클리닉'], kind: '간단', check: '2026-04 개정 지침 대조(별지 24)', chipItem: 'result', source: SOURCE, items: [
+      it('plan', '별지11 현장클리닉 수행계획서', 'once', 'plat', { note: '클리닉위원 선정 후 7일 이내 시스템 제출 — 운영기관 승인 전에는 현장클리닉을 수행할 수 없습니다(운영지침 제22조)' }),
+      it('change', '별지13 수행계획 변경요청서', 'once', 'plat', { note: '계획 일정·내용을 바꿀 때 — 기 등록된 수행일시 전에 요청(해당 없으면 「해당없음」)' }),
       it('log', '상담일지', 'round', 'report'),
-      it('track', '별지24 성과추적관리결과서', 'once', 'report'),
-      it('submit', '기관 제출', 'once', 'submit')] },
+      it('result', '별지14 현장지도결과서', 'once', 'report', { note: '최종 수행일로부터 14일 이내(반려 후 7일 이내 재제출) · 시스템 입력 + 별도 결과서 파일 첨부(최대 3개·30MB 이하) · 70점 미만이면 취소·사업비 미지급' }),
+      it('track', '별지24 성과추적관리결과서', 'once', 'report', { note: '운영기관이 성과추적관리를 요청한 기업만 — 2026-04 개정 지침 원문 확인 필요' }),
+      it('submit', '기관 제출(비즈니스지원단 시스템)', 'once', 'submit', { how: 'platform', steps: [
+        '비즈니스지원단 시스템(중소벤처기업부 비즈니스지원단 사이트)에 로그인 — 사람이 합니다(인증은 자동으로 다루지 않습니다)',
+        '현장클리닉 상담신청 및 현황에서 그 기업 건을 열어 수행일·시간 확인',
+        '별지14 현장지도결과서 항목을 입력하고 결과서 파일을 첨부(최대 3개 · 파일당 30MB 이하)',
+        '최종 수행일로부터 14일 이내인지 확인 후 «제출» 단추 — 사람이 누릅니다',
+        '제출 화면(접수 상태)을 캡처해 두고 이 칸의 «접수 확인»에 표시'] })] },
     { key: 'rural', words: ['농촌융복합'], kind: '간단', check: '양식 글자', source: SOURCE, items: [
       it('plan', '사업계획서', 'once', 'report'),
       it('result', '결과보고서', 'round', 'report'),
@@ -327,7 +340,7 @@
     var check = plan.check ? '[확인 필요: ' + plan.check + ']' : '';
     var items = plan.items.map(function (x, i) {
       var subs = x.per === 'round' ? range(n) : (x.per === 'month' ? months(s || p.firstDate, e || p.lastDate) : []);
-      var chip = (auto && x.step === 'report' && r && r.st) ? { txt: r.st.label, key: r.st.key } : { txt: '—', key: '' };
+      var chip = (auto && x.step === 'report' && r && r.st && (!plan.chipItem || plan.chipItem === x.id)) ? { txt: r.st.label, key: r.st.key } : { txt: '—', key: '' };
       if (auto && o.rec && x.step !== 'report' && x.step !== 'plat') chip = Track.itemChip(x, o.rec, n, o.today) || chip;
       return { no: i + 1, id: x.id, name: x.name, per: x.per, step: x.step, subs: subs, chip: chip, check: check };
     });

@@ -188,7 +188,56 @@
         },
       },
     },
+    /* 비즈니스지원단 현장클리닉 현장지도결과서(별지 14) — 2025.2.17 개정 운영지침 별지를 한글로 HWPX 변환해 그 쪽만 잘라 낸 단독 양식에서 잼(2026-10-12).
+       일정 칸은 3개 고정(수행일자·지원기업담당자·수행시간·현장수행시간·수행내용·특이사항) — 4일 이상은 운영지침상 예외(3일 이내 원칙)라 범위 밖(over 로 알린다).
+       «(수정 불가)»(시스템이 채우는 칸)도 우리 값/빈칸으로 바꾼다 — 시스템 제출용 첨부 결과서로 쓰기 때문이다. */
+    clinic: {
+      name: '비즈니스지원단 현장클리닉 현장지도결과서(별지 14)',
+      agency: '중소벤처기업부 비즈니스지원단',
+      rounds: { min: 1, max: 3 },
+      files: {
+        main: {
+          set: [
+            { at: 'T0.C1.P0', tok: '업체명' }, { at: 'T0.C3.P0', tok: '담당자' },
+            { at: 'T0.C5.P0', tok: '소속' }, { at: 'T0.C7.P0', tok: '지원단명' },
+            { at: 'T0.C9.P0', tok: '분야' }, { at: 'T0.C11.P0', tok: '총수행일수' },
+            { at: 'T0.C13.P0', tok: '테마' }, { at: 'T0.C15.P0', tok: '수행일자목록' },
+            { cell: 'T1.C0.', tok: '애로사항', like: 'T3.C3.P0' },
+            /* 일정 칸 값은 «(수정 불가)»·«(작성란)» 안내 글자 모양(회색·가운데 맞춤)을 물려받으므로 모양을 빌린다 —
+               짧은 값(일자·담당·시간·합계)은 개요 값 칸 T0.C1.P0 (검정), 긴 글(수행내용·특이사항)은 큰 칸 기준 T3.C3.P0 (왼쪽 맞춤) */
+            { at: 'T2.C4.P0', tok: '일자1', like: 'T0.C1.P0' }, { at: 'T2.C6.P0', tok: '담당1', like: 'T0.C1.P0' }, { at: 'T2.C8.P0', tok: '시간1', like: 'T0.C1.P0' },
+            { at: 'T2.C10.P0', tok: '현장시간1', like: 'T0.C1.P0' }, { at: 'T2.C11.P1', tok: '내용1', like: 'T3.C3.P0' }, { at: 'T2.C13.P0', tok: '특이1', like: 'T3.C3.P0' },
+            { at: 'T2.C16.P0', tok: '일자2', like: 'T0.C1.P0' }, { at: 'T2.C18.P0', tok: '담당2', like: 'T0.C1.P0' }, { at: 'T2.C20.P0', tok: '시간2', like: 'T0.C1.P0' },
+            { at: 'T2.C22.P0', tok: '현장시간2', like: 'T0.C1.P0' }, { at: 'T2.C23.P1', tok: '내용2', like: 'T3.C3.P0' }, { at: 'T2.C25.P0', tok: '특이2', like: 'T3.C3.P0' },
+            { at: 'T2.C28.P0', tok: '일자3', like: 'T0.C1.P0' }, { at: 'T2.C30.P0', tok: '담당3', like: 'T0.C1.P0' }, { at: 'T2.C32.P0', tok: '시간3', like: 'T0.C1.P0' },
+            { at: 'T2.C34.P0', tok: '현장시간3', like: 'T0.C1.P0' }, { at: 'T2.C35.P1', tok: '내용3', like: 'T3.C3.P0' }, { at: 'T2.C37.P0', tok: '특이3', like: 'T3.C3.P0' },
+            { at: 'T2.C39.P0', tok: '총시간', like: 'T0.C1.P0' }, { at: 'T2.C41.P0', tok: '총현장시간', like: 'T0.C1.P0' },
+            { cell: 'T3.C3.', tok: '기업현황' }, { cell: 'T3.C5.', tok: '문제진단', like: 'T3.C3.P0' }, { cell: 'T3.C7.', tok: '처방내용', like: 'T3.C3.P0' },
+            /* 산출물(필수) 칸 «(파일첨부)» — 전후 비교 줄의 셋째 쪽(파일 이름 등). 없으면 빈칸 */
+            { at: 'T4.C5.P0', tok: '전1' }, { at: 'T4.C6.P0', tok: '후1' }, { at: 'T4.C7.P0', tok: '산출1' },
+            { at: 'T4.C9.P0', tok: '전2' }, { at: 'T4.C10.P0', tok: '후2' }, { at: 'T4.C11.P0', tok: '산출2' },
+            { at: 'T4.C13.P0', tok: '전3' }, { at: 'T4.C14.P0', tok: '후3' }, { at: 'T4.C15.P0', tok: '산출3' },
+            { at: 'T4.C17.P0', tok: '전4' }, { at: 'T4.C18.P0', tok: '후4' }, { at: 'T4.C19.P0', tok: '산출4' },
+            { cell: 'T5.C0.', tok: '향후', like: 'T3.C3.P0' },
+          ],
+        },
+      },
+    },
   };
+
+  /* 전후 비교 글 → 빈 줄 뺀 줄 목록, 줄 하나 → [개선 전, 개선 후, 산출물]. 구분은 «→» «->» «=>» 중 먼저 나오는 것(둘째 구분 뒤는 모두 산출물) */
+  var ARROW = /→|->|=>/;
+  function effectLines(v) {
+    return String(v == null ? '' : v).split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean);
+  }
+  function splitEffect(line) {
+    var m = ARROW.exec(line);
+    if (!m) return [line.trim(), '', ''];
+    var rest = line.slice(m.index + m[0].length), m2 = ARROW.exec(rest);
+    return [line.slice(0, m.index).trim(),
+      (m2 ? rest.slice(0, m2.index) : rest).trim(),
+      (m2 ? rest.slice(m2.index + m2[0].length) : '').trim()];
+  }
 
   /* 보고서 자료 → 표지 값. 빈 값은 ''(엔진이 밑줄로), keep 칸의 «모름»은 null */
   function buildValues(report, formKey) {
@@ -241,6 +290,36 @@
       V['작성일'] = koDate(report.writtenAt);
       V['상담역줄'] = str(report.consultant);
       V['대표자서명줄'] = str(c.ceo);
+    } else if (formKey === 'clinic') {
+      V['업체명'] = str(c.name); V['담당자'] = str(c.contact); V['소속'] = str(report.consultantOrg);
+      V['지원단명'] = str(report.consultant); V['분야'] = str(report.field);
+      /* 수행일수 = 서로 다른 «날»의 수(같은 날 두 회차는 1일 — 운영지침: 1일 1개 지원기업·1일 3시간). 일정 칸은 회차마다 한 칸 */
+      var days = [];
+      use.forEach(function (r) { var d = dotDate(r.date); if (d && days.indexOf(d) < 0) days.push(d); });
+      V['총수행일수'] = days.length ? days.length + '일' : '';
+      V['테마'] = str(s.theme);
+      V['수행일자목록'] = days.join(', ');
+      V['애로사항'] = str(s.inquiryDiag);
+      /* 일정 칸 3개 — 안 쓴 칸·보고서에 없는 값(수행시간 등)은 «빈칸» 한 칸(' ')이다. '' 는 엔진이 밑줄(모르는 값 표시)로 바꾼다 */
+      for (var q = 0; q < 3; q++) {
+        var rr = use[q];
+        V['일자' + (q + 1)] = rr ? dotDate(rr.date) : ' ';
+        V['담당' + (q + 1)] = rr ? str(c.contact) : ' ';
+        V['시간' + (q + 1)] = ' '; V['현장시간' + (q + 1)] = ' ';       // 보고서에 시간이 없다 — 지어내지 않고 빈칸
+        V['내용' + (q + 1)] = rr ? roundText(rr) : ' ';
+        V['특이' + (q + 1)] = ' ';
+      }
+      V['총시간'] = ' '; V['총현장시간'] = ' ';
+      V['기업현황'] = str(s.status); V['문제진단'] = str(s.diag); V['처방내용'] = str(s.remedy);
+      /* 전후 비교 4행 — 줄마다 «개선 전 → 개선 후 → 산출물». 줄이 없거나 쪽이 비면 «빈칸» 한 칸(밑줄 아님), 5째 줄부터는 양식에 칸이 없어 무시(fillForm 이 effectsOver 로 알린다) */
+      var fx = effectLines(s.effects);
+      for (var e2 = 0; e2 < 4; e2++) {
+        var ep = splitEffect(fx[e2] || '');
+        V['전' + (e2 + 1)] = ep[0] || ' ';
+        V['후' + (e2 + 1)] = ep[1] || ' ';
+        V['산출' + (e2 + 1)] = ep[2] || ' ';
+      }
+      V['향후'] = str(s.followUp);
     }
     return V;
   }
@@ -343,6 +422,9 @@
       left: left,
       short: (lim.min && have < lim.min) ? { need: lim.min, have: have } : null,
       over: (lim.max && have > lim.max) ? { max: lim.max, have: have } : null,
+      /* 현장클리닉 전후 비교는 4줄까지만 양식에 들어간다 — 넘는 줄은 조용히 빠지지 않게 알린다 */
+      effectsOver: (formKey === 'clinic' && effectLines(report && report.summary && report.summary.effects).length > 4)
+        ? { max: 4, have: effectLines(report.summary.effects).length } : null,
       missing: t.missing,
     };
   }
