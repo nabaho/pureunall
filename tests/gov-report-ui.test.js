@@ -907,6 +907,15 @@ test('미리보기 ② 내려받기는 그대로 — 같은 채우기 뒤 grpSav
   assert.match(w.calls.notes[w.calls.notes.length - 1], /내려받았습니다 — 양식에서 못 찾은 칸 1곳 · 기관 기준을 넘는 회차는 양식에 안 들어갔습니다/);
   assert.match(w.ctx.__toasts[w.ctx.__toasts.length - 1].m, /^내려받았습니다 — /);
 });
+test('내려받기 — 전후 비교가 4줄을 넘으면 안 들어간 줄 수를 알린다', async () => {
+  const w = pvWorld({ result: { missing: [], short: false, over: false, effectsOver: { max: 4, have: 6 } } });
+  const r = await w.ctx.grpDownload('main');
+  assert.strictEqual(r.ok, true);
+  assert.match(w.calls.notes[w.calls.notes.length - 1], /내려받았습니다 — 전후 비교는 4줄까지만 양식에 들어갑니다\(지금 6줄\)/);
+  const w2 = pvWorld({ result: { missing: [], short: false, over: false, effectsOver: null } });
+  await w2.ctx.grpDownload('main');
+  assert.doesNotMatch(w2.calls.notes[w2.calls.notes.length - 1] || '', /전후 비교/);
+});
 test('미리보기 ③ 서고에 양식이 없으면 열지 않고 안내 — 내려받기와 같은 자리', async () => {
   const w = pvWorld({ noTpl: true });
   const r = await w.ctx.grpPreview('main');
@@ -1102,6 +1111,7 @@ test('clinic ① grpFieldsFor — 칸 경로·꼴·이름표(별지 14), written
   assert.match(by('summary.effects').ph, /한 줄에 하나/);
   assert.match(by('summary.effects').ph, /개선 전 → 개선 후/);
   assert.match(by('summary.effects').ph, /최대 4줄/);
+  assert.match(by('summary.effects').ph, /개선 전 → 개선 후 → 산출물\(파일명\)/);
   ['writtenAt', 'company.bizNo', 'company.ceo', 'company.bizType', 'company.address', 'company.workers', 'summary.outputs'].forEach((p) =>
     assert.ok(!L.some((x) => x.path === p), p + ' 는 현장클리닉 칸이 아니다'));
   assert.ok(!L.some((x) => x.sec === 4 && x.kind === 'date'), '작성일 칸 없음(별지 14 에 작성일이 없다)');

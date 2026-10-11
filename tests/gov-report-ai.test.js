@@ -265,7 +265,7 @@ test('clinic — LIMITS·LABEL·LABEL_FORM: 새 칸 한도와 이름표, 애로�
   assert.equal(lab.status, '기업 현황');
   assert.equal(lab.diag, '문제 진단');
   assert.equal(lab.remedy, '처방 내용');
-  assert.equal(lab.effects, '전후 비교(줄마다 «개선 전 → 개선 후»)');
+  assert.equal(lab.effects, '전후 비교(줄마다 «개선 전 → 개선 후 → 산출물(파일명)»)');
   assert.equal(lab.followUp, '향후 추진사항');
   assert.equal(A.labelsFor('cci-north').inquiryDiag, '문의·진단 종합');
   assert.equal(A.labelsFor('cci-seosan').inquiryDiag, '요청 진단');
@@ -274,7 +274,7 @@ test('clinic — LIMITS·LABEL·LABEL_FORM: 새 칸 한도와 이름표, 애로�
 
 test('clinic — GUIDE: 별지 14 작성기준, 노무사 확인 전 초안이라는 주석, 다른 양식 문구 불변', () => {
   assert.match(A.GUIDE.clinic, /별지 14/);
-  assert.match(A.GUIDE.clinic, /개선 전 → 개선 후/);
+  assert.match(A.GUIDE.clinic, /개선 전 → 개선 후 → 산출물\(파일명\)/);
   assert.match(A.GUIDE.clinic, /40%/);
   assert.ok(A.GUIDE['cci-north'].startsWith('충남북부상공회의소 인사노무 컨설팅 결과보고서.'));
   assert.ok(A.GUIDE['cci-seosan'].startsWith('서산상공회의소 인사노무 경영컨설팅.'));
@@ -288,7 +288,7 @@ test('clinic — buildRequest: 새 종합 칸이 채울 칸·시스템 글에 �
   r.summary = { theme: '', inquiryDiag: '', status: '', diag: '', remedy: '', effects: '', followUp: '', outputs: [] };
   const q = A.buildRequest(r, [], 'clinic', {});
   assert.deepEqual(q.want.filter((p) => p.startsWith('summary.')), CLINIC_SUMMARY.map((k) => 'summary.' + k));
-  assert.match(q.system, /effects=전후 비교\(줄마다 «개선 전 → 개선 후»\) 600자/);
+  assert.match(q.system, /effects=전후 비교\(줄마다 «개선 전 → 개선 후 → 산출물\(파일명\)»\) 600자/);
   assert.match(q.system, /inquiryDiag=애로사항 및 문제점 600자/);
   assert.match(q.system, /별지 14/);
   assert.ok(!/review=|adviceAll=|overall=/.test(q.system), '현장클리닉이 안 쓰는 칸은 묻지 않는다');

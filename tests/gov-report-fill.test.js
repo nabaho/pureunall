@@ -485,7 +485,7 @@ function clinicReport(n, over) {
 const CLINIC_TOKS = ['업체명', '담당자', '소속', '지원단명', '분야', '총수행일수', '테마', '수행일자목록', '애로사항',
   '일자1', '담당1', '시간1', '현장시간1', '내용1', '특이1', '일자2', '담당2', '시간2', '현장시간2', '내용2', '특이2',
   '일자3', '담당3', '시간3', '현장시간3', '내용3', '특이3', '총시간', '총현장시간', '기업현황', '문제진단', '처방내용',
-  '전1', '후1', '전2', '후2', '전3', '후3', '전4', '후4', '향후'];
+  '전1', '후1', '산출1', '전2', '후2', '산출2', '전3', '후3', '산출3', '전4', '후4', '산출4', '향후'];
 const clAddrs = (xml) => X.scan(xml).map((p) => p.addr);
 const clRuleAddr = (r) => r.at || r.cell || r.drop;
 const clHas = (addrs, a) => addrs.some((x) => x === a || (a.endsWith('.') && x.startsWith(a)));
@@ -564,7 +564,8 @@ test('현장클리닉 — 회차 3개: 값이 제 칸에 들어가고 «(수정 
   ['【별지 14】', '현장클리닉 현장지도결과서', '지원기업명', '지원단 소속', '번호', '수행내역', '수행일자', '지원기업담당자', '수행시간', '현장수행시간',
     '수행내용', '특이사항', '총 수행시간', '현장 수행시간', '구분', '순번', '산출물(필수)', '1. 현장지도결과서 작성 기준']
     .forEach((t) => assert.ok(X.scan(r.xml).some((p) => p.text === t), '원본 글이 사라짐: ' + t));
-  assert.equal(count(r.xml, '(파일첨부)'), 4);
+  assert.equal(count(r.xml, '(파일첨부)'), 0, '산출물 칸의 «(파일첨부)» 글자가 남았다');
+  assert.equal(textAt(r.xml, 'T4.C7.P0'), ' ', '산출물 값이 없으면 빈칸');
   assert.equal(X.scan(r.xml).length, X.scan(xml).length, '문단 수가 바뀌면 안 된다');
   assert.equal(count(r.xml, '2. 지원기업 애로사항 및 문제점'), 1);
 });
@@ -655,6 +656,7 @@ test('현장클리닉 — 회차 4개는 셋째까지만 쓰고 넘침을 알린
 test('현장클리닉 — 전후 비교 4행: 줄 4개·2개·«→» 없는 줄·5줄(초과는 무시)·없음', () => {
   const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
   const row = (r, k) => [textAt(r.xml, 'T4.C' + (4 * k + 5) + '.P0'), textAt(r.xml, 'T4.C' + (4 * k + 6) + '.P0')];
+  const out = (r, k) => textAt(r.xml, 'T4.C' + (4 * k + 7) + '.P0');
   let r = eff('가1 → 나1\n가2 → 나2\n가3 → 나3\n가4 → 나4');
   assert.deepEqual([0, 1, 2, 3].map((k) => row(r, k)), [['가1', '나1'], ['가2', '나2'], ['가3', '나3'], ['가4', '나4']]);
   assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
@@ -664,7 +666,9 @@ test('현장클리닉 — 전후 비교 4행: 줄 4개·2개·«→» 없는 줄
   assert.deepEqual(r.left, []);
   r = eff('개선 전만 적은 줄\n\n가2 → 나2 → 나3');
   assert.deepEqual(row(r, 0), ['개선 전만 적은 줄', ' '], '«→» 가 없으면 «전» 에만 넣고 «후» 는 빈칸');
-  assert.deepEqual(row(r, 1), ['가2', '나2 → 나3'], '첫 «→» 에서 나눈다(빈 줄은 건너뜀)');
+  assert.deepEqual(row(r, 1), ['가2', '나2'], '첫 «→» 에서 나눈다(빈 줄은 건너뜀)');
+  assert.equal(out(r, 0), ' ');
+  assert.equal(out(r, 1), '나3', '둘째 «→» 뒤는 산출물');
   r = eff('1 → 가\n2 → 나\n3 → 다\n4 → 라\n다섯째줄 → 여섯째줄');
   assert.deepEqual([0, 1, 2, 3].map((k) => row(r, k)), [['1', '가'], ['2', '나'], ['3', '다'], ['4', '라']]);
   assert.ok(!textAll(r.xml).includes('다섯째줄'), '5째 줄은 양식에 칸이 없다 — 무시');
@@ -675,6 +679,63 @@ test('현장클리닉 — 전후 비교 4행: 줄 4개·2개·«→» 없는 줄
   r = eff('→ 후만\n전만 →');
   assert.deepEqual(row(r, 0), [' ', '후만'], '전이 비면 빈칸');
   assert.deepEqual(row(r, 1), ['전만', ' '], '후가 비면 빈칸');
+});
+
+test('현장클리닉 — 전후 비교 줄은 «개선 전 → 개선 후 → 산출물» 셋까지, 산출물 칸의 «(파일첨부)» 는 남지 않는다', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  const cells = (r, k) => [5, 6, 7].map((o) => textAt(r.xml, 'T4.C' + (4 * k + o) + '.P0'));
+  let r = eff('규정 없음 → 규정 신설 → 취업규칙.hwp\n수기 → 전산\n수기만\n전 → 후 → 산출 → 더');
+  assert.deepEqual(cells(r, 0), ['규정 없음', '규정 신설', '취업규칙.hwp'], '3쪽');
+  assert.deepEqual(cells(r, 1), ['수기', '전산', ' '], '2쪽 — 산출물은 빈칸(밑줄 아님)');
+  assert.deepEqual(cells(r, 2), ['수기만', ' ', ' '], '1쪽');
+  assert.deepEqual(cells(r, 3), ['전', '후', '산출 → 더'], '둘째 구분 뒤는 모두 산출물');
+  assert.deepEqual(r.left, []); assert.deepEqual(r.unknown, []); assert.deepEqual(r.missing, []);
+  assert.ok(!textAll(r.xml).includes('(파일첨부)'), '(파일첨부) 가 남았다');
+  assert.equal(X.scan(r.xml).length, X.scan(clinicXml()).length);
+  r = eff(undefined);
+  [0, 1, 2, 3].forEach((k) => assert.deepEqual(cells(r, k), [' ', ' ', ' ']));
+  assert.ok(!textAll(r.xml).includes('(파일첨부)'));
+  r = eff('→ → 산출만');
+  assert.deepEqual(cells(r, 0), [' ', ' ', '산출만']);
+});
+
+test('현장클리닉 — 전후 비교 구분은 «→» «->» «=>» 모두(공백 있든 없든), 섞어 써도 된다', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  const cells = (r, k) => [5, 6, 7].map((o) => textAt(r.xml, 'T4.C' + (4 * k + o) + '.P0'));
+  let r = eff('가1 -> 나1\n가2=>나2\n가3->나3=>다3\n가4 → 나4 -> 다4');
+  assert.deepEqual([0, 1, 2, 3].map((k) => cells(r, k)),
+    [['가1', '나1', ' '], ['가2', '나2', ' '], ['가3', '나3', '다3'], ['가4', '나4', '다4']]);
+  assert.deepEqual(r.left, []); assert.deepEqual(r.missing, []);
+  r = eff('구분 없는 한 줄(예: 주 5일 근무)');
+  assert.deepEqual(cells(r, 0), ['구분 없는 한 줄(예: 주 5일 근무)', ' ', ' '], '구분이 없으면 전체가 «전», 후·산출물은 빈칸');
+  const V = G.buildValues({ summary: { effects: 'a->b' } }, 'clinic');
+  assert.equal(V['전1'], 'a'); assert.equal(V['후1'], 'b'); assert.equal(V['산출1'], ' ');
+});
+
+test('현장클리닉 — 총수행일수는 «서로 다른 날» 수, 수행일자목록은 같은 날을 한 번만 · 일정 칸은 회차마다', () => {
+  const rp = clinicReport(3);
+  rp.rounds = [{ date: '2025-04-16', inquiry: '오전' }, { date: '2025-04-16', inquiry: '오후' }];
+  let r = G.fillForm(clinicXml(), 'clinic', 'main', rp);
+  assert.equal(textAt(r.xml, 'T0.C11.P0'), '1일', '같은 날 두 회차는 1일');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '2025.04.16', '같은 날은 한 번만');
+  assert.equal(textAt(r.xml, 'T2.C4.P0'), '2025.04.16'); assert.equal(textAt(r.xml, 'T2.C16.P0'), '2025.04.16', '일정 칸은 회차마다');
+  assert.ok(textAt(r.xml, 'T2.C23.P1').includes('오후'));
+  assert.deepEqual(r.left, []); assert.deepEqual(r.missing, []);
+  rp.rounds = [{ date: '2025-06-11' }, { date: '2025-04-16' }, { date: '2025-04-16' }];
+  r = G.fillForm(clinicXml(), 'clinic', 'main', rp);
+  assert.equal(textAt(r.xml, 'T0.C11.P0'), '2일');
+  assert.equal(textAt(r.xml, 'T0.C15.P0'), '2025.04.16, 2025.06.11', '날짜 순으로 한 번씩');
+  rp.rounds = [{ date: '2025-02-30' }];
+  assert.equal(textAt(G.fillForm(clinicXml(), 'clinic', 'main', rp).xml, 'T0.C11.P0'), X.BLANK, '있을 수 없는 날짜만 있으면 모르는 값 — 밑줄');
+});
+
+test('현장클리닉 — 전후 비교가 4줄을 넘으면 effectsOver 로 알린다(조용히 빠지지 않는다)', () => {
+  const eff = (effects) => G.fillForm(clinicXml(), 'clinic', 'main', clinicReport(3, { summary: Object.assign(clinicReport(3).summary, { effects }) }));
+  assert.deepEqual(eff('1 → a\n2 → b\n3 → c\n4 → d\n5 → e\n\n6 → f').effectsOver, { max: 4, have: 6 });
+  assert.equal(eff('1 → a\n2 → b\n3 → c\n4 → d').effectsOver, null);
+  assert.equal(eff('').effectsOver, null);
+  assert.equal(eff(undefined).effectsOver, null);
+  assert.equal(G.fillForm(northXml(), 'cci-north', 'main', report()).effectsOver, null, '다른 양식은 이 알림이 없다');
 });
 
 test('현장클리닉 — 비어 있는 값은 밑줄(모르는 값), 시간 칸은 빈칸(보고서에 없다)', () => {

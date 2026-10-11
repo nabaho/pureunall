@@ -159,3 +159,39 @@ test('yearsOf · staffNames · dayOf', () => {
   assert.equal(L.dayOf(Date.UTC(2026, 8, 19, 16)), '2026-09-20', '서울 날짜');
   assert.equal(L.dayOf(0), '');
 });
+
+test('buildRows — 현장클리닉 사업(이름에 «현장클리닉»)은 formKey clinic 으로 줄이 생긴다, 상태·종료 규칙은 다른 사업과 같다', () => {
+  const i = F.input(T);
+  i.types = i.types.concat([
+    { id: 'tc', name: '비즈니스지원단 현장클리닉', fullName: '', agency: '', rounds: 3 },
+    { id: 'td', name: '비즈니스지원단 현장 클리닉', fullName: '', agency: '', rounds: 3 },
+  ]);
+  i.cos = i.cos.concat([
+    { id: 'cx', name: '가상상사', types: ['tc'], defAtt: 'a1' },        // 3회 중 2회 — 아직 진행
+    { id: 'cy', name: '가상정밀', types: ['tc'], defAtt: 'a2' },        // 3/3 끝, 종료 표시 없음
+    { id: 'cz', name: '가상산업', types: ['td'], defAtt: 'a1', endedTypes: { td: '2026-09-20' } },   // 종료 표시
+  ]);
+  i.scheds = i.scheds.concat([
+    { id: 'x1', coId: 'cx', typeId: 'tc', date: '2026-08-04', round: 1, isField: true },
+    { id: 'x2', coId: 'cx', typeId: 'tc', date: '2026-09-01', round: 2, isField: true },
+    { id: 'y1', coId: 'cy', typeId: 'tc', date: '2026-05-04', round: 1, isField: true },
+    { id: 'y2', coId: 'cy', typeId: 'tc', date: '2026-05-11', round: 2, isField: true },
+    { id: 'y3', coId: 'cy', typeId: 'tc', date: '2026-05-18', round: 3, isField: true },
+    { id: 'z1', coId: 'cz', typeId: 'td', date: '2026-09-10', round: 1, isField: true },
+  ]);
+  const rows = L.buildRows(i), by = (id) => rows.find((r) => r.coId === id);
+  ['cx', 'cy', 'cz'].forEach((id) => { assert.ok(by(id), id + ' 줄이 있어야 한다'); assert.equal(by(id).formKey, 'clinic', id); assert.equal(by(id).askForm, false, id); });
+  assert.equal(by('cx').st.key, 'wait'); assert.equal(by('cx').st.label, '작성 전');
+  assert.deepEqual(by('cx').st.action, { label: '📄 작성', enabled: false, why: '회차가 남았습니다' });
+  assert.equal(by('cx').ended, false);
+  assert.equal(by('cy').st.key, 'todo', '회차를 다 채우고 마지막 날이 지났으면 미작성');
+  assert.equal(by('cy').st.days, 145, '마지막 회차 2026-05-18 부터');
+  assert.equal(by('cz').st.key, 'todo', '종료 표시가 있으면 회차 수와 상관없이 미작성');
+  assert.equal(by('cz').st.days, 20);
+  /* 다른 사업 줄은 그대로 */
+  const old = L.buildRows(F.input(T));
+  const sig = (rs) => rs.map((r) => [key(r), r.formKey, r.st.key, r.st.days].join('|')).sort();
+  assert.deepEqual(sig(rows.filter((r) => !['cx', 'cy', 'cz'].includes(r.coId))), sig(old), '다른 사업 줄·상태는 그대로');
+  assert.deepEqual(old.map((r) => r.formKey).sort(), ['', 'cci-north', 'techguard', 'techguard']);
+  assert.deepEqual(L.reportKeys(i).filter((k) => ['cx', 'cy', 'cz'].includes(k.coId)).map((k) => k.rid).sort(), ['tc_2026', 'tc_2026', 'td_2026']);
+});

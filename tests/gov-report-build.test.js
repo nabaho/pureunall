@@ -141,3 +141,11 @@ test('buildReport — 현장클리닉이 아닌 사업에는 지원단 소속을
   assert.equal(B.buildReport(c).report.rounds.length, 2);
   assert.ok(B.buildReport(c).warnings.every((w) => !/기관 기준/.test(w)), '현장클리닉 회차 1~3 은 기준 안');
 });
+test('resolveFormKey — «현장 클리닉»(띄어쓰기)도 현장클리닉, 기술보호가 먼저', () => {
+  assert.equal(B.resolveFormKey({ name: '비즈니스지원단 현장 클리닉' }, '').formKey, 'clinic');
+  assert.equal(B.resolveFormKey({ name: '현장  클리닉' }, '').formKey, 'clinic');
+  assert.equal(B.resolveFormKey({ name: '컨설팅' }, '비즈니스지원단 현장 클리닉').formKey, 'clinic');
+  assert.equal(B.resolveFormKey({ name: '기술보호 현장 클리닉 최종산출물' }, '').formKey, 'techguard');
+  assert.equal(B.resolveFormKey({ name: '인사서산 현장 클리닉' }, '').formKey, 'cci-seosan');
+  assert.equal(B.resolveFormKey({ name: '현장' }, '').formKey, null);
+});

@@ -22,7 +22,7 @@
     if (line.indexOf('서산') >= 0) return 'cci-seosan';
     if (line.indexOf('충남북부') >= 0 || name === '인사충남') return 'cci-north';
     if (line.indexOf('기술보호') >= 0) return 'techguard';
-    if (line.indexOf('현장클리닉') >= 0) return 'clinic';          // 기술보호 뒤 — 기술보호 가공품 이름에 «현장클리닉 최종산출물» 이 섞여 있다
+    if (/현장\s*클리닉/.test(line)) return 'clinic';          // 기술보호 뒤 — 기술보호 가공품 이름에 «현장클리닉 최종산출물» 이 섞여 있다
     return null;
   }
   /* 사업 종류 자신의 이름이 먼저다 — 이알피 사업명(programName)은 종류만으로 못 가릴 때만 보탠다

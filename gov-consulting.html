@@ -1332,10 +1332,10 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
   <script src="js/pu-hwpx-fill.js?v=6"></script>
   <script src="js/pu-hwp-engine.js?v=21"></script>
   <script src="js/pu-hwp-preview.js?v=2"></script>
-  <script src="js/pu-gov-report.js?v=3"></script>
-  <script src="js/pu-gov-report-build.js?v=4"></script>
+  <script src="js/pu-gov-report.js?v=4"></script>
+  <script src="js/pu-gov-report-build.js?v=5"></script>
   <script src="js/pu-gov-report-pack.js?v=1"></script>
-  <script src="js/pu-gov-report-ai.js?v=2"></script>
+  <script src="js/pu-gov-report-ai.js?v=3"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
   <!-- 회사 열쇠(사업자번호) — 보고서 창이 기업정보함 메일·보낸 자료를 그 열쇠로만 찾는다 -->
   <script src="js/pu-cokey.js?v=1"></script>
@@ -7884,7 +7884,7 @@ function grpFieldsFor(fk){
   add(3,C,'summary.diag','문제 진단','','multi');
   add(3,C,'summary.remedy','처방 내용','','multi');
   /* 전후 비교 — 줄마다 «개선 전 → 개선 후»(buildValues 가 줄로 나눈다). 글자 칸이어야 한다: lines 꼴이면 배열이 되어 쉼표로 붙는다 */
-  add(3,C,'summary.effects','전후 비교','','multi','한 줄에 하나 — 「개선 전 → 개선 후」, 최대 4줄');
+  add(3,C,'summary.effects','전후 비교','','multi','한 줄에 하나 — 「개선 전 → 개선 후 → 산출물(파일명)」, 산출물은 없으면 생략, 최대 4줄');
   add(3,C,'summary.followUp','향후 추진사항','','multi');
   add(4,N||S,'writtenAt','작성일','','date');      // 현장클리닉 별지 14 에는 작성일 칸이 없다
   add(4,!C,'consultant',T?'자문위원(상담역)':'경영상담역','');
@@ -8104,6 +8104,7 @@ function grpFillSay(res){
   if(res.missing&&res.missing.length) say.push('양식에서 못 찾은 칸 '+res.missing.length+'곳');
   if(res.short) say.push('회차가 모자랍니다');
   if(res.over) say.push('기관 기준을 넘는 회차는 양식에 안 들어갔습니다');
+  if(res.effectsOver) say.push('전후 비교는 '+res.effectsOver.max+'줄까지만 양식에 들어갑니다(지금 '+res.effectsOver.have+'줄)');
   return say;
 }
 /* ⬇ HWPX — 서고 양식(그 해 또는 그 이전 최근 해)에 지금 화면 값을 채운다 */
