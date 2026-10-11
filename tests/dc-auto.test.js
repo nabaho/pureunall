@@ -91,3 +91,12 @@ test('퇴직정산에 «🏦 자동 정리» 탭이 붙는다', () => {
   assert.match(SRC, /\{ v:'auto',\s+label:'🏦 자동 정리' \}/);
   assert.match(SRC, /tab === 'auto' && h\(DcAutoTab, \{ year:selYear \}\)/);
 });
+
+test('★ 연말 정산의 회사 몫 합은 재무 통장까지 모은 값(companyTotal)을 쓴다 — 자동 정리로 넣은 줄만 세면 «낸 돈 0»', () => {
+  const X = env();
+  const users = [{ sid: 'A', name: '가', pensionType: 'DC' }, { sid: 'B', name: '나', pensionType: 'DC' }];
+  const r = X.ye('2026', users, (sid) => (sid === 'A' ? 24000000 : 12000000), [], 3000000);
+  assert.equal(r.company, 3000000);
+  assert.equal(r.rows.find(x => x.sid === 'A').paid, 2000000);
+  assert.match(SRC, /dcYearEnd\(year, [\s\S]{0,160}, wageOf, paidList, bankYear\)/);
+});
