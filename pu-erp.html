@@ -10680,12 +10680,21 @@ function erpFillHeight(el, min){
    fill.ref 를 상자에 달고, maxHeight 에 (fill.max || 지금까지 쓰던 값) 을 준다.
    ★ 아직 못 쟀으면 fill.max 가 없다 — 그때는 «지금까지 쓰던 값» 이 그대로 쓰인다.
      재는 데 실패해도 오늘보다 나빠지지 않는다. */
-function useFillHeight(min){
+/* 표 한 줄의 높이로 «몇 줄 더» 를 픽셀로 — 줄이 아직 없으면 34px(업체관리 한 줄)로 어림한다 */
+function erpFillExtra(el, rows){
+  if(!rows || rows <= 0) return 0;
+  var tr = el && el.querySelector ? el.querySelector('tbody tr') : null;
+  var rh = tr ? Math.round(tr.getBoundingClientRect().height) : 0;
+  return (rh > 0 ? rh : 34) * rows;
+}
+/* extraRows — 창 바닥보다 «몇 줄 더» 길게(그만큼 아래 줄은 스크롤로 본다). 안 주면 예전과 같다 */
+function useFillHeight(min, extraRows){
   var ref = useRef(null);
   var st = useState(0); var h = st[0]; var setH = st[1];
   function fit(){
     var want = erpFillHeight(ref.current, min);
     if(!want) return;
+    want += erpFillExtra(ref.current, extraRows);
     // 8px 안쪽 차이는 그대로 둔다 — 안 그러면 「재고 → 다시 그리고 → 또 재고」 가 끝나지 않는다
     setH(function(prev){ return Math.abs(prev - want) < 8 ? prev : want; });
   }
@@ -27943,7 +27952,9 @@ function coMgrPendTag(co){
 }
 
 function CompanyManagement(){
-  var _fill1 = useFillHeight();   // 표가 창 바닥까지 (전: 100vh - 240px)
+  /* 표가 창 바닥보다 «두 줄 더» — 대표 지시 2026-10-11 「디자인은 그대로하고 아래 사업장정보가 2개정도 더 보이게」.
+     그만큼 쪽 번호 줄은 화면 아래로 내려가 살짝 내리면 보인다(업체관리 화면은 위아래로 스크롤된다). */
+  var _fill1 = useFillHeight(null, 2);
   var existing = dbGet('companies', null);
   // 로컬 캐시가 비어 있어도 서버에 쓰지 않는다(빈 값 덮어쓰기로 업체가 사라지는 사고 방지).
   // Firebase 동기화가 끝나면 목록이 채워진다.
