@@ -118,7 +118,7 @@ function cbox(o) {
     mbCoRec: (nm) => (o.coByName || {})[nm] || null,
     ErpMatch: { byId: o.byId || {} } };
   vm.createContext(b);
-  vm.runInContext(['mbWkFp', 'mbWkAddrOf', 'mbWkBuild', 'mbWkMsgOf', 'mbCoRecOfAddr', 'mbWhoOfRow']
+  vm.runInContext(['mbWkFp', 'mbWkAddrOf', 'mbWkBuild', 'mbWkMsgOf', 'mbCoRecOfAddr', 'mbHqRec', 'mbWhoOfRow']
     .map((n) => sliceFn(C, 'function ' + n + '(')).join('\n'), b);
   return b;
 }
@@ -245,7 +245,8 @@ function screenIdx() {
       const c = XCOS.find((x) => x.name === q.company);
       return c ? { main: XNAME[c.managerMain], left: false, company: c.name } : null; } } };
   vm.createContext(b);
-  vm.runInContext(sliceFn(C, 'function mbDomOf(') + '\n' + sliceFn(C, 'function mbWhoIndex('), b);
+  vm.runInContext(['mbDomOf', 'mbHqMap', 'mbHqRec', 'mbWhoIndex']
+    .map((n) => sliceFn(C, 'function ' + n + '(')).join('\n'), b);
   return b.mbWhoIndex();
 }
 test('★★★ 화면 — 한 업체에만 적힌 세무·대표·세금계산서 메일은 그 업체 담당, 걸린 곳이 둘이면 아무도 아님', () => {

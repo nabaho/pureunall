@@ -89,7 +89,8 @@ test('★★ 사람 이름은 «안 건드린다» — 잘못 지우면 훨씬 �
 
 /* ══════ ④ 세 자리가 그 길을 쓴다 ══════ */
 test('★★ 회사 담당자·사무관리 부담당·옆줄이 «모두» 그 길을 쓴다', () => {
-  assert.match(fnBody('mbWhoIndex'), /const who = mbPerson\(rec\.main\)/,
+  /* 규칙은 «담당을 mbPerson 으로 거친다» — 어느 기록의 main 이냐(지사면 본사 기록, 2026-10-11)는 아니다 */
+  assert.match(fnBody('mbWhoIndex'), /const who = mbPerson\(\w+\.main\)/,
     '★ 회사 담당자가 사번인 채로 표에 들어갑니다');
   assert.match(fnBody('mbSubsOfRow'), /mbPerson\(s\)/,
     '★ 사무관리 부담당이 사번인 채로 나옵니다');
