@@ -1053,14 +1053,18 @@ function boot(){
   $('pager').addEventListener('change',function(e){ if(e.target.id==='pgSize'){ PSIZE=Number(e.target.value)||50; lsSet('pgSize',String(PSIZE)); PG=0; draw(); } });
   window.addEventListener('resize',fitLayout);
   if(lsGet('guideOff')==='1') $('guide').style.display='none';
-  $('funnel').addEventListener('click',function(e){
+  /* 지역·공고일 칩(.fchip)은 #funnelMore 에, 빠른 단추(.qp)는 #funnel 에 그려진다 — 두 곳 모두에 듣개를 건다.
+     (#funnel 에만 걸면 칩이 «눌러도 반응 없음» — 2026-10-12) */
+  function funnelHandler(e){
     if(e.target.closest('[data-more]')){ FUN_OPEN=!FUN_OPEN; draw(); return; }
     var st=e.target.closest('[data-step]'); if(st){ funnelClick(st.getAttribute('data-step')); return; }
     var c=e.target.closest('.fchip'); if(!c) return;
     if(c.hasAttribute('data-sido')){ $('fSido').value=c.getAttribute('data-sido'); lsSet('fSido',$('fSido').value); }
     if(c.hasAttribute('data-date')){ DATE=c.getAttribute('data-date'); }
     draw();
-  });
+  }
+  $('funnel').addEventListener('click',funnelHandler);
+  $('funnelMore').addEventListener('click',funnelHandler);
   $('tabs').addEventListener('click',function(e){ var t=e.target.closest('.tab'); if(!t) return; TAB=t.getAttribute('data-tab'); draw(); });
   $('rows').addEventListener('click',function(e){
     var sc=e.target.closest('td.sr'); if(sc){ toggleStar(sc.getAttribute('data-star')); return; }
