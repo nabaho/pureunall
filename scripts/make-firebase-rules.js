@@ -1202,7 +1202,11 @@ rules.govaid = { '.read': LOGIN,
   programs:  { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   prospects: { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   extras:    { $k:  { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k" } },
-  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } } };
+  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } },
+  /* 기업마당 공고 함(2026-10-12 「매년 … 자동 업데이트」) — 서버 govaidNoticeWatch 가 매일 쌓고(관리자 SDK), 직원은 «처리»(잇기·초안·관계없음)만 적는다.
+     읽기는 위의 LOGIN 그대로 — 공개 공고라 원장보다 넓히는 것이 없다. noticeLast(감시 기록)는 서버만 쓴다 */
+  notices:   { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
+  noticeLast: { '.write': false } };
 
 /* ══ 📺 전광판(pu-signboard.html + 이 PC 의 심부름꾼) — 외부 전광판 광고 (2026-10-12) ══
    설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 대표 「대표 + 관리직원」.

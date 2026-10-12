@@ -229,7 +229,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=70"></script>
+<script src="js/pu-ontology.js?v=71"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
@@ -333,8 +333,11 @@ function closeModal(){ $('modal').style.display='none'; $('mbox').innerHTML=''; 
 /* ═══ 불러오기 — 하나가 막혀도 나머지로 이어 간다. 못 읽은 자료에서 오는 값은 «모름» ═══ */
 async function reload(){
   var names=['정부지원금 자료','업체관리','국민연금·고용보험 인원'], fail=[];
-  var res=await Promise.allSettled([fbDb.ref('govaid').once('value'), fbDb.ref('data/companies/v').once('value'), fbDb.ref('pubdata/co').once('value')]);
-  if(res[0].status==='fulfilled'){ var g=res[0].value.val()||{}; D.programs=g.programs||{}; D.prospects=g.prospects||{}; D.extras=g.extras||{}; D.reviews=g.reviews||{}; } else fail.push(names[0]);
+  /* govaid 는 칸마다 따로 읽는다 — 서버가 매일 쌓는 공고 함(govaid/notices)은 「새 공고」를 열 때만 읽는다(2026-10-12) */
+  var G=['programs','prospects','extras','reviews'], GP=['govaid/programs','govaid/prospects','govaid/extras','govaid/reviews'];
+  var gres=await Promise.allSettled(GP.map(function(p){ return fbDb.ref(p).once('value'); }));
+  var res=await Promise.allSettled([Promise.resolve(null), fbDb.ref('data/companies/v').once('value'), fbDb.ref('pubdata/co').once('value')]);
+  if(gres.every(function(x){ return x.status==='fulfilled'; })){ G.forEach(function(k,i){ D[k]=gres[i].value.val()||{}; }); } else fail.push(names[0]);
   if(res[1].status==='fulfilled') D.companies=res[1].value.val(); else fail.push(names[1]);
   if(res[2].status==='fulfilled') D.pub=res[2].value.val()||{}; else fail.push(names[2]);
   $('loadNote').style.display=fail.length?'':'none';

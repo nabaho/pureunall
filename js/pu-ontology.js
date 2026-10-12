@@ -220,8 +220,10 @@
       writeContracts:[{path:'govaid/programs/{id}',entityType:'SupportProgram'},
                       {path:'govaid/prospects/{id}',entityType:'Organization'},
                       {path:'govaid/extras/{key}',entityType:'Organization'},
-                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'}],
-      entityTypes:['Organization','SupportProgram','EligibilityReview'] },
+                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'},
+                      /* 기업마당 공고 함(2026-10-12) — 서버 govaidNoticeWatch 가 쌓고, 화면은 «처리»(잇기·초안·관계없음)만 적는다 */
+                      {path:'govaid/notices/{id}',entityType:'Document'}],
+      entityTypes:['Organization','SupportProgram','EligibilityReview','Document'] },
     /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
        ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).

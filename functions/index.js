@@ -1246,6 +1246,34 @@ exports.govFeedCollect = functions
     return null;
   });
 
+/* 🎯 정부지원금 — 매일 기업마당 공고 감시 (대표 지시 2026-10-12 「매년 사업관련 자동 업데이트」 → 「둘다」, functions/govaid-notice-watch.js)
+   govaid/notices/{공고번호} 에 쌓고 사전 사업과 이름이 비슷한 것을 «제안»만 한다. 사람이 이은(program.bizinfo) 사업만 접수 상태를 맞춘다.
+   ⚠ 인증키는 정부사업신청 대표 자리(gov/{uid}/key_biz)에서 읽기만 — 로그·결과에 안 남긴다. 사람이 표시한 접수 상태·처리는 덮지 않는다.
+   08:10 — 공고 모으기(07:40)와 겹치지 않게. 분야마다 한 번(약 8회). */
+const GovaidNoticeWatch = require("./govaid-notice-watch");
+exports.govaidNoticeWatch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("every day 08:10")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase(), g = db.ref("govaid");
+    const r = await GovaidNoticeWatch.run({
+      roles: async () => (await db.ref("uid_roles").once("value")).val(),
+      cfg: async (uid) => {
+        const b = await db.ref("gov/" + uid + "/key_biz").once("value");
+        return { keyBiz: b.val() };
+      },
+      programs: async () => (await g.child("programs").once("value")).val(),
+      existing: async () => (await g.child("notices").once("value")).val(),
+      write: (updates) => g.update(updates),
+      getJson: async (u) => (await fetch(u, { signal: AbortSignal.timeout(25000) })).json(),
+    });
+    const L = r.last || {};
+    console.log("[정부지원금 공고 감시]", { ok: r.ok, received: L.received, added: L.added, suggested: L.suggested, closureChanged: L.closureChanged, errors: L.errors, error: L.error });
+    return null;
+  });
+
 /* 회생광고 — 전국 회생 관할 법원 공고에서 «법인회생 포괄적 금지명령» 기업을 모은다 (2026-10-10).
    대표 지시 「포괄금지명령 나온 기업들만 모아서 … 푸른통합시스템에 앱 만든다. 회생광고로」
         「주소가 있으면 기업 홈페이지 등을 직접 찾아서 연락처·메일·팩스를 정렬해서 볼 수 있게」.
