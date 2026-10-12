@@ -100,6 +100,7 @@
       it('pledge', '보안서약서', 'once', 'attach'),
       it('travel', '별지8 여비지급신청서', 'once', 'attach'),
       it('survey', '만족도조사', 'once', 'attach'),
+      it('purge', '제공받은 자료 반납·삭제 확인', 'once', 'plat', { note: '상담 완료 후 제공받은 자료 일체를 반납하고 PC 등 보관 자료를 완전 삭제 — 보안서약서(별지 9)에 서약한 의무(2025 통합 기술보호지원반 운영지침). 반납·삭제 기한은 지침에 따로 정해져 있지 않습니다' }),
       it('submit', '기관 제출(기술보호울타리)', 'once', 'submit', { how: 'platform', steps: TECHGUARD_STEPS })] },
     /* 현장클리닉 — 운영지침 공식 서식(별지11 수행계획서 · 13 변경요청서 · 14 현장지도결과서 · 24 성과추적관리결과서). 줄 id log·track·submit 은 옛 기록 그대로 */
     { key: 'clinic', words: ['현장클리닉'], kind: '간단', check: '2026-04 개정 지침 대조(별지 24)', chipItem: 'result', source: SOURCE, items: [

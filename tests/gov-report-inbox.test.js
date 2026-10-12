@@ -27,7 +27,7 @@ test('상수 — 50건 · 열쇠 80자(기록 모듈과 같다) · 20MB · 기�
   assert.equal(I.MSG.LOAD_FAIL, '메일함을 불러오지 못했습니다');
   assert.equal(I.MSG.MORE, '50건만 보입니다');
   assert.equal(I.MSG.PRIV, '개인 자료 · 목록에만');
-  assert.equal(I.MSG.TECH, '기술보호 자료');
+  assert.equal(I.MSG.TECH, '기술보호 자료 · 상담 완료 후 반납·삭제 대상');
   assert.equal(I.MSG.CANT, '이 형식은 앱에서 열 수 없습니다 — 메일함에서 받아 주세요');
   assert.equal(I.MSG.NO_REPLY, '메일 서버 응답이 없습니다 — 잠시 뒤 다시');
   assert.equal(I.MSG.LOGIN, '로그인을 확인해 주세요');
@@ -84,7 +84,7 @@ test('candidates — 주소 일치 · 첨부 있음 · 기간 안 · 날짜 내�
   assert.deepEqual(I.badges(r.list[3]), []);
   assert.equal(r.list[0].out, true);
   const t = I.candidates(ROWS, { addrs: DARA, win: WIN, tech: true });
-  assert.deepEqual(I.badges(t.list[2]), [{ txt: '개인 자료 · 목록에만', key: 'todo' }, { txt: '기술보호 자료', key: 'draft' }]);
+  assert.deepEqual(I.badges(t.list[2]), [{ txt: '개인 자료 · 목록에만', key: 'todo' }, { txt: '기술보호 자료 · 상담 완료 후 반납·삭제 대상', key: 'draft' }]);
   const subj = I.candidates([{ slug: 'B', uid: '1', out: false, from: 'dara@example.com', to: [], who: '', s: '4대보험 명부', d: 1,
     day: '2026-09-01', a: 1, an: ['a.pdf'] }], { addrs: DARA, win: WIN });
   assert.equal(subj.list[0].priv, true, '제목으로도 가린다');

@@ -920,7 +920,7 @@ test('㊳ 주소가 없는 업체는 안내 · 기술보호 사업은 딱지(열
   w.ctx.grOpenCell('c1', 't1', 'attach');
   await w.ctx.grLoadInbox();
   const h = w.els.cwInbox.innerHTML;
-  assert.ok(h.includes('자문 일지 회신') && h.includes('<span class="st st-draft">기술보호 자료</span>'));
+  assert.ok(h.includes('자문 일지 회신') && h.includes('<span class="st st-draft">기술보호 자료 · 상담 완료 후 반납·삭제 대상</span>'));
   assert.match(h, /onclick="grOpenCand\(0,0\)">열어 보기/, '기술보호 자료도 열어 볼 수 있다');
   assert.equal(n, 1, '메일함 폴더 표는 한 번만 읽는다');
 });

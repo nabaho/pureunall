@@ -189,7 +189,7 @@ test('tocFor — 머리말(계약 기간·담당·회차)과 번호 줄, 회차 
   assert.deepEqual(t.head, { coName: '가나상사', bizName: '통합기술보호지원단', agency: '비즈니스지원단(중기청)',
     period: '2026-05-01 ~ 2026-09-30', manager: '홍길동', rounds: 3, plan: 'techguard', kind: '간단', warn: [] });
   assert.deepEqual(t.items.map((x) => x.no + '.' + x.name), ['1.별지11 완료보고서', '2.법률 자문 일지', '3.보안서약서',
-    '4.별지8 여비지급신청서', '5.만족도조사', '6.기관 제출(기술보호울타리)']);
+    '4.별지8 여비지급신청서', '5.만족도조사', '6.제공받은 자료 반납·삭제 확인', '7.기관 제출(기술보호울타리)']);
   assert.deepEqual(t.items[0].chip, { txt: '초안', key: 'draft' });
   assert.deepEqual(t.items[1].chip, { txt: '—', key: '' });
   assert.deepEqual(t.items[1].subs, ['1회차', '2회차', '3회차']);
@@ -248,7 +248,8 @@ test('tocText — 복사용 글(머리말·[확인 필요]·번호 줄·회차 �
     '3. 보안서약서 (—)',
     '4. 별지8 여비지급신청서 (—)',
     '5. 만족도조사 (—)',
-    '6. 기관 제출(기술보호울타리) (—)',
+    '6. 제공받은 자료 반납·삭제 확인 (—)',
+    '7. 기관 제출(기술보호울타리) (—)',
   ].join('\n'));
   const cl = D.tocText(D.tocFor({ pair: pairOf('t1', 'c1'), erp: code('consulting-01'), cons: null }));
   assert.ok(cl.includes('[확인 필요] 푸른이알피 계약 못 찾음'));
@@ -326,7 +327,7 @@ test('tocFor — rec(그 업체·rid 기록)를 주면 ③④⑤ 줄 딱지 · �
   assert.ok(D.tocText(t).includes('5. 기관 제출 (● 제출함)'));
   const r1 = rows().filter((x) => x.coId === 'c1' && x.typeId === 't1')[0];
   const g = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir, rec: {}, today: T });
-  assert.deepEqual(g.items.map((x) => x.chip.txt), ['초안', '○ 없음 0/3', '○ 없음', '○ 없음', '○ 없음', '○ 없음']);
+  assert.deepEqual(g.items.map((x) => x.chip.txt), ['초안', '○ 없음 0/3', '○ 없음', '○ 없음', '○ 없음', '—', '○ 없음']);
   const plain = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir });
   assert.deepEqual(plain.items[1].chip, { txt: '—', key: '' });
 });
@@ -381,7 +382,9 @@ test('대형 항목 체크 글 — steps 는 배열·note 는 글, 주소·전�
   }));
   assert.ok(withText >= 8, '대형 항목에 체크 글·안내가 충분히 있다');
   /* 현장클리닉(2026-10-12, 운영지침 별지 서식 안내)만 간단형 가운데 항목 note 를 둔다 — 다른 간단형은 그대로 */
+  /* 기술보호 purge(2026-10-12, 보안서약서 별지 9)만 간단형에서 note 를 더 둔다 */
   D.DOC_PLANS.filter((p) => p.kind !== '대형' && p.key !== 'clinic').forEach((p) => p.items.forEach((x) => {
+    if (p.key === 'techguard' && x.id === 'purge') return;
     assert.equal(x.note, undefined, p.key + '.' + x.id + ' 간단형에는 note 가 없다');
   }));
   const all = JSON.stringify(D.DOC_PLANS);
@@ -743,7 +746,7 @@ test('다른 서류 틀은 그대로 — 간단형 ③④⑤ 불변 · AUTO 는 
   const shape = (k) => D.DOC_PLANS.find((p) => p.key === k).items.map((x) => x.id + ':' + x.name + ':' + x.per + ':' + x.step + ':' + (x.how || '') + ':' + (x.note || '')).join('|');
   assert.equal(shape('cci-north'), 'report:결과보고서:once:report::|sign:업체 서명본:once:sign::|attach:산출물 별첨:once:attach::|submit:기관 제출:once:submit:mail:');
   assert.equal(shape('rural'), 'plan:사업계획서:once:report::|result:결과보고서:round:report::|receipt:수당 영수증·청렴서약서:once:attach::|photo:현장 사진:once:attach::');
-  assert.equal(D.planFor('통합기술보호지원단').items.length, 6);
+  assert.equal(D.planFor('통합기술보호지원단').items.length, 7);
   assert.deepEqual(D.DOC_PLANS.map((p) => p.key), ['industry-cn', 'cci-north', 'cci-seosan', 'techguard', 'clinic', 'rural', 'workplace', 'industry']);
 });
 
@@ -773,7 +776,7 @@ test('tocFor chipItem — 현장클리닉은 ①② 보고서 딱지가 별지14
   assert.deepEqual(sv.items.map((x) => x.id + ':' + x.chip.txt), ['visit:미작성', 'report:미작성', 'sign:—', 'attach:—', 'submit:—'], '서산 — report 두 줄 모두');
   const r1 = rows().filter((x) => x.coId === 'c1' && x.typeId === 't1')[0];
   const tg = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir });
-  assert.deepEqual(tg.items.map((x) => x.id + ':' + x.chip.txt), ['report:초안', 'advice:—', 'pledge:—', 'travel:—', 'survey:—', 'submit:—']);
+  assert.deepEqual(tg.items.map((x) => x.id + ':' + x.chip.txt), ['report:초안', 'advice:—', 'pledge:—', 'travel:—', 'survey:—', 'purge:—', 'submit:—']);
   const nb = D.tocFor({ pair: BIGX_PAIR_NORTH(), row: { st: board }, erp: D.erpTypeFor('tc', BIGX.biz, BIGX.tmap), cons: null, dir: [] });
   assert.deepEqual(nb.items.map((x) => x.id + ':' + x.chip.txt), ['report:초안', 'sign:—', 'attach:—', 'submit:—'], '충남북부');
 });
@@ -848,4 +851,60 @@ test('chapters — 기존 항목 필드는 그대로(chapters 만 더했다) · 
   assert.deepEqual(Object.keys(it('workplace', 'guide')), ['id', 'name', 'per', 'step', 'note']);
   assert.deepEqual(Object.keys(it('workplace', 'kickoff')), ['id', 'name', 'per', 'step', 'note', 'chapters']);
   assert.deepEqual(Object.keys(it('industry-cn', 'after')), ['id', 'name', 'per', 'step', 'chapters']);
+});
+/* ═══ 기술보호 «반납·삭제 의무» 안내(2026-10-12) — 보안서약서(별지 9) 문구, 기한 없음 ═══ */
+
+test('techguard purge — 서류 틀에 once·plat 줄 하나(survey 뒤·submit 앞), 기한(일수)을 지어내지 않는다', () => {
+  const plan = D.DOC_PLANS.find((p) => p.key === 'techguard');
+  assert.deepEqual(plan.items.map((x) => x.id), ['report', 'advice', 'pledge', 'travel', 'survey', 'purge', 'submit']);
+  const x = plan.items.find((i) => i.id === 'purge');
+  assert.equal(x.name, '제공받은 자료 반납·삭제 확인');
+  assert.equal(x.per, 'once');
+  assert.equal(x.step, 'plat');
+  assert.ok(x.note.includes('보안서약서(별지 9)') && x.note.includes('반납하고') && x.note.includes('완전 삭제'));
+  assert.ok(x.note.includes('기한은 지침에 따로 정해져 있지 않습니다'));
+  assert.ok(!/\d+\s*일/.test(x.note), '일수를 넣지 않는다(서약문에 기한이 없다)');
+  assert.ok(/^[a-z]+(:[0-9]+)?$/.test(x.id), '키 규칙');
+  /* 나머지 줄은 그대로 */
+  assert.equal(plan.items.filter((i) => i.id !== 'purge').map((i) => i.id + ':' + i.name + ':' + i.per + ':' + i.step).join('|'),
+    'report:별지11 완료보고서:once:report|advice:법률 자문 일지:round:attach|pledge:보안서약서:once:attach|travel:별지8 여비지급신청서:once:attach|survey:만족도조사:once:attach|submit:기관 제출(기술보호울타리):once:submit');
+});
+
+test('techguard purge — plat 이라 ③④⑤ 칸·키 목록·칩에 끼지 않는다(기존 기록은 purge 키가 없어도 그대로)', () => {
+  const plan = D.planFor('통합기술보호지원단');
+  ['sign', 'attach', 'submit'].forEach((s) => assert.ok(!Tr.keysFor(plan, s, 3).some((k) => k.id === 'purge'), s));
+  assert.deepEqual(Tr.keysFor(plan, 'attach', 3).map((k) => k.key), ['advice:1', 'advice:2', 'advice:3', 'pledge', 'travel', 'survey']);
+  assert.deepEqual(Tr.keysFor(plan, 'submit', 3).map((k) => k.key), ['submit']);
+  assert.deepEqual(Tr.keysFor(plan, 'plat', 3).map((k) => k.key), ['purge'], 'plat 키는 이 줄 하나');
+  /* 합성 기록 — ④ 별첨 칩이 purge 유무와 무관하게 같다 */
+  const rec = { 'advice:1': { st: 'done', at: 1 }, 'advice:2': { st: 'done', at: 1 }, pledge: { st: 'done', at: 1 }, travel: { st: 'na', at: 1 }, survey: { st: 'doing', at: 1 } };
+  const withP = Tr.cellFor(plan, rec, 'attach', 3, T);
+  const noP = Tr.cellFor({ items: plan.items.filter((i) => i.id !== 'purge') }, rec, 'attach', 3, T);
+  assert.deepEqual(withP, noP);
+  assert.equal(withP.total, 5);
+  assert.equal(withP.done, 3);
+  const sub = Tr.cellFor(plan, rec, 'submit', 3, T);
+  assert.deepEqual(sub, Tr.cellFor({ items: plan.items.filter((i) => i.id !== 'purge') }, rec, 'submit', 3, T));
+  /* docsTable ④ 칸 — 기록을 받은 간단형 줄 */
+  const track = Tr.normalize(F.track());
+  const t = D.docsTable({ erp: code('consulting-03'), typeId: 't1', input: F.input(T), rows: rows(), year: '2026',
+    consultings: X.cons, tmap: X.tmap, biz: X.biz, track, today: T });
+  assert.deepEqual(t.cols, ['①초안', '②확정', '③서명본', '④별첨', '⑤제출']);
+  assert.equal(t.lines[0].cells.length, 5);
+  const rc = Tr.recOf(track, t.lines[0].coId, t.lines[0].rid);
+  assert.deepEqual(t.lines[0].cells[3], Tr.cellFor({ items: plan.items.filter((i) => i.id !== 'purge') }, rc, 'attach', Math.max(+t.lines[0].rounds || 0, +t.lines[0].planned || 0), T) || { txt: '—', key: '' });
+});
+
+test('techguard purge — 서류 목차에는 나타나고(7번째 아님·6번째), 딱지는 「—」', () => {
+  const r1 = rows().filter((x) => x.coId === 'c1' && x.typeId === 't1')[0];
+  const t = D.tocFor({ pair: pairOf('t1', 'c1'), row: r1, erp: code('consulting-03'), cons: X.cons.v.k1, dir: X.dir, rec: {}, today: T });
+  const i = t.items.find((x) => x.id === 'purge');
+  assert.equal(i.no, 6);
+  assert.equal(i.step, 'plat');
+  assert.deepEqual(i.chip, { txt: '—', key: '' });
+  assert.deepEqual(i.subs, []);
+  assert.ok(D.tocText(t).includes('6. 제공받은 자료 반납·삭제 확인'));
+  assert.ok(D.tocText(t).includes('7. 기관 제출(기술보호울타리)'));
+  /* 다른 틀은 purge 가 없다 */
+  D.DOC_PLANS.filter((p) => p.key !== 'techguard').forEach((p) => assert.ok(!p.items.some((x) => x.id === 'purge'), p.key));
 });
