@@ -523,7 +523,7 @@ function grDashHtml(t,S){
   }).join('')+'</div>':'';
   if(!S.known) return '<div class="dsh">'+sw+'<div class="dsh-un">기록을 못 불러와 단계 현황을 알 수 없습니다 · 업체 '+grEsc(K.n)+'곳</div></div>';
   var kc=function(cls,n,label,tip){ return '<div class="dsh-k'+cls+'"><b>'+grEsc(n)+'</b><span'+(tip?' title="'+grEsc(tip)+'"':'')+'>'+grEsc(label)+'</span></div>'; };
-  var nums='<div class="dsh-ks">'+kc('',K.n-K.finished,'진행 업체','전체 '+K.n+'곳 중 아직 끝나지 않은 업체')
+  var nums='<div class="dsh-ks">'+kc('',K.n,'진행 업체','이 연도에 이 사업에 걸린 업체 전체(끝난 업체 '+K.finished+'곳 포함)')
     +kc(K.blocked>0?' bad':'',K.blocked,'막힌 업체','막힌 단계가 하나라도 있는 업체')
     +kc(K.soon>0?' warn':'',K.soon,'기한 14일 안','이미 지난 것 포함 · 끝난 업체 제외')
     +kc('',K.finished,'모두 끝','판정할 수 있는 단계가 모두 완료')+'</div>';
@@ -572,6 +572,7 @@ function grSetDashView(v){
   GR.dashView=(v==='board')?'board':'table';
   try{ localStorage.setItem('gov_dash_view',GR.dashView); }catch(e){}
   grRenderDocs();
+  try{ var nb=document.querySelector('#docs [data-dv="'+GR.dashView+'"]'); if(nb&&nb.focus) nb.focus(); }catch(e){}
 }
 /* 종결된 사업(고른 해 기준)을 골랐을 때 서류 패널 위 배너 — 종결일·사유·처리자 + 「↩ 되돌리기」 */
 function grClosedBanner(){
