@@ -254,7 +254,7 @@
         r.after ? adSummary(r.after) : (r.version != null ? r.version + '번 판' + (r.count != null ? ' · 광고 ' + r.count + '건' : '') + (r.note ? ' · ' + r.note : '') : ''),
         r.after ? periodSummary(r.after.period) : '']);
     });
-    return '﻿' + rows.map(function (row) { return row.map(csvCell).join(','); }).join('\r\n') + '\r\n';
+    return '\uFEFF' + rows.map(function (row) { return row.map(csvCell).join(','); }).join('\r\n') + '\r\n';
   }
 
   return {
