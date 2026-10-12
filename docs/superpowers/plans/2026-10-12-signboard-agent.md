@@ -1,5 +1,8 @@
 # 전광판 심부름꾼 Implementation Plan
 
+> **✅ 구현 완료 (2026-10-12) — 이 계획은 끝났다. 다시 실행하지 말 것.**
+> 구현 중 계획과 달라진 점: ① **보관함**(활동 기록 `signboard/log` 덧붙이기 전용 · 지운 광고 되살리기 · «그때 내용»·«그 판 내용» 보기 · 표(엑셀) 내려받기)이 더해졌다(설계서 §15, 대표 요구). ② 이미 있는 광고를 고쳐 저장할 때 gate 의 `expectedRevision` 이 찬 자리(null) 거래에서 접혀 저장이 조용히 실패하는 결함을 고쳤다(판 비교를 «진짜 값이 올 때만»). ③ 표(엑셀) BOM 은 소스에 `\uFEFF` 로 적는다. 이 문서의 코드 블록은 이 변경 «전»의 것이라 **기준은 저장소의 실제 파일**이다.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 이 PC에서 도는 «심부름꾼»(`scripts/signboard-agent`)을 만든다 — 포털이 올린 판(`signboard/published`)을 가져와 灰度 전광판 장비에 보낸다. **시험 모드(기본)는 장비 없이 끝난다**(설계서 M2). 실전 연결(M3)은 대표 준비물이 온 뒤 이 문서 맨 끝의 «런북»으로 사람과 함께 한다.
