@@ -110,3 +110,14 @@ test('짧은 이름 — 사람이 넣은 것이 먼저, 없으면 해·괄호·�
   assert.equal(V.shortName({ name: '고용유지지원금' }), '고용유지지원금');
   assert.ok(V.shortName({ name: '국가인적자원개발컨소시엄 지원 — 산업맞춤형 공동훈련센터' }).length <= 10);
 });
+
+test('사업종료 — 회사별 묶음에 «종료» 칸, 사업별로는 종료된 사업이 후보를 내지 않는다', () => {
+  const pf = { key: 'co_x', kind: 'co', vals: { headcount: { v: 10 } }, facts: {} };
+  const P = { id: 'z', name: '마감 사업', status: 'confirmed', baseYear: Y, cond: { headcount: { min: 5 } }, closure: { state: 'closed', reason: 'budget' } };
+  const g = V.forSubject(pf, [P], Y);
+  assert.equal(g.closed.length, 1);
+  assert.equal(g.candidate.length, 0);
+  const fp = V.forProgram(P, [pf], Y);
+  assert.equal(fp.candidate.length, 0);
+  assert.equal(fp.closed, 1);
+});
