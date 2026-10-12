@@ -17,7 +17,8 @@
 - **읽기 실패**(규칙 게시 전·권한)는 «끌어서 정한 순서 없음»으로 보고 앱은 그대로 돈다(오류 줄 없음).
 - **업체 번호**: `□ 1`, `□ 2` … — 현황판 표(업체 칸) · 서류 체크표(업체 칸) · 사업 대시보드 업체 줄. 번호는 그 목록의 보이는 순서(1부터), **현황판 표는 사업이 바뀌면 1로 돌아간다**. 번호는 CSS 카운터(`counter-reset`/`counter-increment`, `::before`)로만 — 글자 노드를 바꾸지 않는다. 오늘 할 일·보드 카드는 번호 없음(알림 줄·열별 카드라 번호가 뜻이 없다).
 - **현황판 표 정렬**: 사업 묶음 순서(= 위 순서 규칙의 순위)로 정렬하고 같은 사업 안에서는 지금 순서 그대로(안정 정렬). 이알피 사업에 이어지지 않은 일정 사업은 맨 뒤.
-- **화면 잘림**: `@media (max-width:1500px){ .grid{grid-template-columns:240px minmax(0,1fr)} .side{grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px} }` — 기존 1100px 이하(220px + 1fr)·900px 이하(1열) 규칙은 그대로(뒤에 둔다). 표 셀 `.co`·`.ty` 는 줄바꿈 허용 대신 지금 모양 유지, 표는 `overflow:auto` 그대로(좁아도 가로로 밀 수 있다).
+- **화면 잘림 · 전체 폭(대표 「사업은 왼쪽으로 대시보드로 만들어라 좌우로 넓게 모든화면 다 사용해라」)**: 원인 = `main{max-width:1280px;margin:0 auto}`(가운데 칸이 눌림). → `main{max-width:none;margin:0;padding:14px clamp(12px,1.5vw,28px) 60px}`(화면 전체 사용), 격자 `grid-template-columns:clamp(300px,23vw,420px) minmax(0,1fr) clamp(280px,18vw,340px)`, `@media (max-width:1500px){ .grid{grid-template-columns:clamp(280px,24vw,360px) minmax(0,1fr)} .side{grid-column:1/-1; display:grid; grid-template-columns:repeat(auto-fit,minmax(280px,1fr)); gap:12px} }` — 기존 1100px 이하(220px + 1fr)·900px 이하(1열) 규칙은 그대로(뒤에 둔다). 왼쪽 패널 `.bizp` 는 `position:sticky; top:<머리 높이>; max-height:calc(100vh - <머리 높이> - 16px); overflow:auto` 로 사업이 많아도 따라온다(머리 높이는 `#head` 실제 높이를 JS 로 읽지 말고 CSS 변수 `--head-h:64px` 고정값 + 줄바꿈 시 `top` 만 어긋나는 정도는 허용). 표는 `overflow:auto` 그대로.
+- **왼쪽 = 사업 대시보드**: 이름이 잘리지 않게(말줄임 없음 — 이름은 줄바꿈) 사업 카드로: 위 한 줄 요약(진행 사업 N · 업체 M · 막힘 K — 고른 연도·종결 제외), 카드마다 **사업 이름(굵게)** · (수행기관)·종류 딱지 · 업체 N곳 · 단계 누적 막대(3단계 `grTodayCalc` 결과의 사업 카드 데이터 `bar` 재사용, 계산을 다시 하지 않는다) · 「막힘 n」/「기한 n」 딱지. 막대 데이터가 없는 사업(서류 틀 없음·업체 없음·기록 못 읽음)은 막대 없이 업체 수만. 묶음(업체 없음·서류 틀 없음·연결 없음·종결)은 지금처럼 접는 목록(작은 줄)로 둔다. 끌기(Task 2)·클릭(고르기/풀기)·종결 표시는 그대로 동작한다.
 
 ## Global Constraints
 
@@ -88,15 +89,15 @@
 
 ---
 
-### Task 3: 화면 — 업체 □ 번호 · 화면 잘림(격자)
+### Task 3: 화면 — 업체 □ 번호 · 전체 폭 격자 · 왼쪽 사업 대시보드
 
-**Files:** Modify `gov-report.html`(CSS 와 필요한 `class` 한두 개), `tests/gov-report-app.test.js`
+**Files:** Modify `gov-report.html`(CSS · `grRenderBiz`/`grBizBtn` · 필요한 `class`), `tests/gov-report-app.test.js`(+ 왼쪽 패널 DOM 을 읽는 기존 검사들 — `grep -n "\.bz\b\|bz-nm\|bz-ag\|bz-k\|data-biz\|grBizBtn" tests/*.test.js` 로 찾아, **그 검사가 지키던 뜻**(목록에 보인 사업·업체 수·클릭 시 거르기·같은 사업 다시 누르면 풀림·종결 표시·끌기)을 지키며 새 모양에 맞게 고친다)
 
-- [ ] **Step 1: 실패하는 검사 쓰기** — CSS 에 `counter-reset`/`counter-increment`/`::before`/`content:"□ "`(또는 `\25A1`) 규칙이 `#rows`·`.docs table`·`.dsh-l` 업체 칸에 있다 · 번호 CSS 는 hex·rgb 없음 · `.co`·`.dsh-c` 안 **글자 노드는 그대로**(기존 검사가 읽는 `>가나상사<` 형태 유지) · `@media (max-width:1500px)` 규칙이 `.grid` 2열과 `.side{grid-column:1 / -1}` 를 갖고 1100px·900px 규칙보다 **앞**에 있다.
+- [ ] **Step 1: 실패하는 검사 쓰기** — (a) 번호: CSS 에 `counter-reset`/`counter-increment`/`::before`/`content:"□ "`(또는 `\25A1`) 규칙이 `#rows`·`.docs table`·`.dsh-l` 업체 칸에 있다 · 번호 CSS 는 hex·rgb 없음 · `.co`·`.dsh-c` 안 **글자 노드는 그대로**(기존 검사가 읽는 `>가나상사<` 형태 유지). (b) 폭: `main{…}` 에 `max-width:1280px` 가 없고(`max-width:none`) 격자 3열이 `clamp(` 로 정해지며, `@media (max-width:1500px)` 규칙이 `.grid` 2열과 `.side{grid-column:1 / -1}` 를 갖고 1100px·900px 규칙보다 **앞**에 있다 · `.bizp` 에 `position:sticky`. (c) 왼쪽 대시보드: 합성 자료로 `#biz` 에 요약 줄(진행 사업 N · 업체 M)과 사업 카드(이름이 `title` 만이 아니라 본문에 전체로 들어 있음 — 말줄임 클래스 없음)·카드의 막대(`dsh-bar` 재사용) 또는 막대 없는 업체 수, 기록 못 읽음이면 막대 없이 업체 수만, 종결 사업은 종결 묶음에, 끌기용 `draggable`·`data-grp` 가 그대로, 같은 사업 다시 누르면 풀림.
 - [ ] **Step 2: 실패 확인**.
-- [ ] **Step 3: 구현** — `#rows{counter-reset:co}` + `#rows tr td.co::before{counter-increment:co; content:"□ " counter(co) " "; color:var(--sub); font-weight:400; margin-right:2px}` + `#rows tr.ng{counter-reset:co}`(같은 요소에서 reset 이 increment 보다 먼저라 첫 행이 1) 꼴. 서류 체크표(`.docs table tbody`)·대시보드 업체 줄(`.dsh-l` / `.dsh-c`)도 같은 방식, 각각 자기 컨테이너에서 `counter-reset`. 격자 규칙은 «정한 것» 그대로.
-- [ ] **Step 4: 통과 확인**.
-- [ ] **Step 5: 커밋** — `feat(gov-report): 업체에 □ 번호 · 1500px 아래 2열로(표 잘림)`.
+- [ ] **Step 3: 구현** — 번호: `#rows{counter-reset:co}` + `#rows tr td.co::before{counter-increment:co; content:"□ " counter(co) " "; color:var(--mute); font-weight:400; margin-right:2px}` + `#rows tr.ng{counter-reset:co}`(같은 요소에서 reset 이 increment 보다 먼저라 첫 행이 1) 꼴. 서류 체크표(`.docs table tbody`)·사업 대시보드 업체 줄(`.dsh-l` / `.dsh-c`)도 같은 방식, 각각 자기 컨테이너에서 `counter-reset`. 폭·왼쪽 대시보드는 «정한 것» 그대로 — 카드 막대 데이터는 `GR.td`(3단계 `grTodayCalc` 캐시)의 사업 카드 항목을 사업 코드로 찾아 쓴다(캐시가 없으면 그 자리에서 계산하지 말고 막대 없이 업체 수만 — 첫 그림 뒤 `grRender` 가 다시 돌며 채워진다는 점을 확인; 안 채워지면 `grRenderBiz` 앞에서 `grTodayCalc()` 를 부르되 캐시 열쇠가 같으면 재계산 없음을 검사로 확인).
+- [ ] **Step 4: 통과 확인** — `gov-report-*`·`photos-staff-share`·`test-pin-guard`·훅.
+- [ ] **Step 5: 커밋** — `feat(gov-report): 업체 □ 번호 · 화면 전체 폭 · 왼쪽 사업 대시보드(막대·막힘·기한)`.
 
 ---
 
