@@ -68,3 +68,22 @@ test('확인할 조건 — 초안이거나 지난해 확정이면 확인 필요'
   assert.equal(V.needsCheck(P3, Y), true);
   assert.equal(V.needsCheck(Object.assign({}, P1, { baseYear: Y - 1 }), Y), true);
 });
+
+/* 사업 중심 — 부처(관) 중심으로 묶는다 (대표 지시 2026-10-12 「고용노동부 등 관 중심으로 우선 재편」) */
+test('담당기관 → 부처: 앞머리만 (괄호·가운뎃점·빗금 뒤는 산하기관)', () => {
+  assert.equal(V.ministryOf('고용노동부(기업훈련지원과)·한국산업인력공단'), '고용노동부');
+  assert.equal(V.ministryOf('중소벤처기업부 · 중소벤처기업진흥공단'), '중소벤처기업부');
+  assert.equal(V.ministryOf('병무청(선정·인원배정) / 분야별 추천권자: 중소벤처기업부 등'), '병무청');
+  assert.equal(V.ministryOf('특허청'), '특허청');
+  assert.equal(V.ministryOf(''), '기관 모름');
+});
+test('부처 묶음 — 고용노동부가 맨 앞, 그다음 사업이 많은 부처, 기관 모름은 맨 끝', () => {
+  const mk = (id, agency) => ({ id, name: id, agency });
+  const g = V.byMinistry([mk('a', '중소벤처기업부'), mk('b', '특허청'), mk('c', '중소벤처기업부'), mk('d', ''), mk('e', '고용노동부·한국산업인력공단')]);
+  assert.deepEqual(g.map((x) => x.ministry), ['고용노동부', '중소벤처기업부', '특허청', '기관 모름']);
+  assert.deepEqual(g[1].items.map((p) => p.id), ['a', 'c'], '묶음 안에서는 받은 차례 그대로');
+});
+test('목록에 보일 이름 — 앞의 «2026년(도)»는 떼고 해는 따로 돌려준다', () => {
+  assert.deepEqual(V.shortTitle({ name: '2026년도 중소기업 클라우드 서비스 보급·확산 사업' }), { title: '중소기업 클라우드 서비스 보급·확산 사업', year: '2026' });
+  assert.deepEqual(V.shortTitle({ name: '고용유지지원금' }), { title: '고용유지지원금', year: '' });
+});
