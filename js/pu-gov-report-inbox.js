@@ -13,6 +13,7 @@
        거울 이름은 60자로 잘려 있을 수 있다 — 똑같은 이름이 없으면 서버 이름을 거울 꼴로 줄여 맞추고, 형식은 서버 이름으로 정한다.
      · 첨부 받기는 «부르는 함수(call)»를 받아서만 한다 — 화면이 js/rules-v2/mail-orig.js 의 makeCall 로 만든다.
        받은 것(b64)은 돌려주기만 하고 어디에도 담지 않는다. 20MB(서버 ATT_MAX) 넘으면 받지 않는다.
+     · 전역 받은 서류 확인(2026-10-12) — sinceWindow(오늘 −45일 창)·pending(연결 안 된 받은 메일, 업체 사이 중복 제거). 순수 함수만 — 화면은 따로.
    ⚠ 저장소는 공개다 — 검사는 합성 자료만 쓴다. */
 (function (root) {
   var isNode = typeof module !== 'undefined' && module.exports;
@@ -73,6 +74,27 @@
   function windowOf(first, last) {
     var a = shift(first, -BEFORE), b = shift(str(last) || first, AFTER);
     return (a && b) ? { from: a, to: b } : null;
+  }
+  /* 전역 받은 서류 확인 — 오늘 기준 «최근 days 일» 창(2026-10-12). today 가 YYYY-MM-DD 가 아니면 null */
+  var GLOBAL_DAYS = 45, GLOBAL_MAX = 30;
+  function sinceWindow(today, days) {
+    var to = shift(today, 0), n = Number(days);
+    if (!to || !isFinite(n)) return null;
+    return { from: shift(to, -n), to: to };
+  }
+  /* 아직 서류 줄에 연결 안 된 «받은» 메일 — out:false · key 있음 · linked·seen 에 없음. 날짜 내림차순(같으면 열쇠 순) 최대 GLOBAL_MAX.
+     seen 은 «이미 다른 업체에서 나온 열쇠» — 보이는 항목의 열쇠를 여기에 적어 같은 메일이 두 업체에 겹쳐 뜨지 않게 한다. 원본 항목은 바꾸지 않는다 */
+  function pending(list, linked, seen) {
+    var lk = obj(linked) ? linked : {}, sn = obj(seen) ? seen : {};
+    var arr = (Array.isArray(list) ? list : []).filter(function (m) {
+      return obj(m) && m.out === false && okId(m.key) && !has(lk, m.key) && !has(sn, m.key);
+    }).sort(function (a, b) {
+      return ((Number(b.d) || 0) - (Number(a.d) || 0)) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+    });
+    var dup = {}, uniq = arr.filter(function (m) { if (has(dup, m.key)) return false; dup[m.key] = 1; return true; });   // 같은 목록 안의 겹친 열쇠
+    var out = uniq.slice(0, GLOBAL_MAX);
+    out.forEach(function (m) { sn[m.key] = 1; });
+    return { list: out, more: uniq.length > GLOBAL_MAX };
   }
 
   /* ── 업체 주소 ── 주소 → 업체관리에 «먼저» 적은 업체의 자리 */
@@ -253,7 +275,7 @@
     return readAtt({ ref: o.ref, call: o.call, att: f });
   }
 
-  var api = { windowOf: windowOf, addrsFor: addrsFor, boxesOf: boxesOf, mailRows: mailRows, candidates: candidates, badges: badges,
+  var api = { windowOf: windowOf, sinceWindow: sinceWindow, pending: pending, GLOBAL_DAYS: GLOBAL_DAYS, GLOBAL_MAX: GLOBAL_MAX, addrsFor: addrsFor, boxesOf: boxesOf, mailRows: mailRows, candidates: candidates, badges: badges,
     kindOf: kindOf, imgType: imgType, linkKey: linkKey, linkFrom: linkFrom, errText: errText,
     findAtt: findAtt, readAtt: readAtt, fetchAtt: fetchAtt, mirrorName: mirrorName, mayBeCut: mayBeCut, NAME_CUT: NAME_CUT,
     MAX: MAX, KEY_MAX: KEY_MAX, ATT_MAX: ATT_MAX, BEFORE: BEFORE, AFTER: AFTER, SHEET_ROWS: SHEET_ROWS,

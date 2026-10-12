@@ -298,3 +298,68 @@ test('errText — 404 에 서버가 적어 보낸 까닭이 있으면 그 글(�
   assert.equal(I.errText(Object.assign(new Error('그 첨부가 없습니다'), { status: 404, code: 'gone' })), I.MSG.GONE);
   assert.equal(I.errText(Object.assign(new Error('가'.repeat(500)), { status: 404 })).length, 200, '너무 긴 글은 자른다');
 });
+
+/* ── 전역 받은 서류 확인(2026-10-12) ── */
+test('sinceWindow — 오늘 − 45일 ~ 오늘 · 해를 넘어도 맞다 · 꼴이 틀리면 null · 상수', () => {
+  assert.equal(I.GLOBAL_DAYS, 45);
+  assert.equal(I.GLOBAL_MAX, 30);
+  assert.deepEqual(I.sinceWindow('2026-10-12', I.GLOBAL_DAYS), { from: '2026-08-28', to: '2026-10-12' });
+  assert.deepEqual(I.sinceWindow('2026-01-10', 45), { from: '2025-11-26', to: '2026-01-10' });
+  assert.deepEqual(I.sinceWindow('2026-10-12', 0), { from: '2026-10-12', to: '2026-10-12' });
+  assert.equal(I.sinceWindow('x', 45), null);
+  assert.equal(I.sinceWindow('', 45), null);
+  assert.equal(I.sinceWindow(null, 45), null);
+  assert.equal(I.sinceWindow('2026/10/12', 45), null);
+});
+
+function pend(uid, day, o) {
+  return Object.assign({ slug: 'B', uid: String(uid), out: false, who: '', s: '서류 ' + uid, d: Date.parse(day + 'T03:00:00Z'), day,
+    a: 1, key: 'i:B:' + uid, priv: false, tech: false, atts: [{ name: uid + '.pdf', kind: 'pdf' }] }, o || {});
+}
+
+test('pending — 연결된 것·보낸 것·열쇠 없는 것은 빠진다 · 날짜 내림차순(같으면 열쇠 순) · 원본은 그대로', () => {
+  const list = [pend(1, '2026-09-01'), pend(2, '2026-09-05'), pend(3, '2026-09-03', { out: true }), pend(4, '2026-09-04', { key: '' }),
+    pend(5, '2026-09-05'), pend(6, '2026-09-02'), pend(7, '2026-09-06', { key: undefined })];
+  const before = JSON.stringify(list), order = list.slice();
+  const r = I.pending(list, { 'i:B:6': 1 }, {});
+  assert.deepEqual(r.list.map((m) => m.uid), ['2', '5', '1'], '6 은 연결됨 · 3 은 보낸 것 · 4·7 은 열쇠 없음 · 2·5 는 같은 때라 열쇠 순');
+  assert.equal(r.more, false);
+  assert.equal(JSON.stringify(list), before, '원본 항목을 바꾸지 않는다');
+  list.forEach((m, i) => assert.equal(m, order[i], '원본 배열 순서·항목 그대로'));
+  assert.notEqual(r.list, list, '새 배열');
+});
+
+test('pending — seen 에 열쇠를 적어 두 번째 호출(다른 업체)에서 같은 메일을 건너뛴다', () => {
+  const seen = {};
+  const a = I.pending([pend(1, '2026-09-01'), pend(2, '2026-09-02')], {}, seen);
+  assert.deepEqual(a.list.map((m) => m.uid), ['2', '1']);
+  assert.deepEqual(Object.keys(seen).sort(), ['i:B:1', 'i:B:2']);
+  const b = I.pending([pend(2, '2026-09-02'), pend(3, '2026-09-03')], {}, seen);
+  assert.deepEqual(b.list.map((m) => m.uid), ['3'], '2 는 앞 업체에서 이미 나왔다');
+  assert.ok(seen['i:B:3']);
+  const c = I.pending([pend(1, '2026-09-01', { out: true })], {}, {});
+  assert.deepEqual(c.list, []);
+  const s2 = {};
+  I.pending([pend(1, '2026-09-01', { out: true }), pend(2, '2026-09-02', { key: '' })], {}, s2);
+  assert.deepEqual(s2, {}, '걸러진 것은 seen 에 적지 않는다');
+});
+
+test('pending — 30건까지 · 넘으면 more · 늦은 것이 위 · 자른 것은 seen 에 적지 않는다', () => {
+  const many = [];
+  for (let i = 1; i <= 31; i++) many.push(pend(i, '2026-09-' + String(Math.min(i, 28)).padStart(2, '0'), { d: Date.UTC(2026, 8, 1) + i * 60000 }));
+  const seen = {};
+  const r = I.pending(many, {}, seen);
+  assert.deepEqual([r.list.length, r.more], [30, true]);
+  assert.equal(r.list[0].uid, '31');
+  assert.equal(r.list[29].uid, '2');
+  assert.equal(Object.keys(seen).length, 30, '보이는 30건만 적는다');
+  assert.equal(I.pending(many.slice(0, 30), {}, {}).more, false, '딱 30건이면 more 아님');
+});
+
+test('pending — list·linked·seen 이 null 이어도 오류 없다', () => {
+  assert.deepEqual(I.pending(null, null, null), { list: [], more: false });
+  assert.deepEqual(I.pending(undefined, {}, {}), { list: [], more: false });
+  const r = I.pending([pend(1, '2026-09-01')], null, null);
+  assert.deepEqual(r.list.map((m) => m.uid), ['1']);
+  assert.deepEqual(I.pending([null, 5, pend(2, '2026-09-02')], undefined, undefined).list.map((m) => m.uid), ['2']);
+});
