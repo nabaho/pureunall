@@ -773,7 +773,7 @@ function drawRunline(){
 }
 function fillFilters(){
   var courts={}, sidos={}, stages={};
-  Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(!n) return; if(n.courtCode) courts[n.courtCode]=n.courtName; if(n.sido) sidos[n.sido]=1; if(n.stage) stages[n.stage]=1; });
+  Object.keys(NOTICES).forEach(function(k){ var n=NOTICES[k]; if(!n) return; if(n.courtCode) courts[n.courtCode]=n.courtName; sidos[n.sido||'기타']=1; if(n.stage) stages[n.stage]=1; });
   function fill(id,first,items,labels){
     var cur=$(id).value;
     $(id).innerHTML='<option value="">'+first+'</option>'+items.map(function(v){ return '<option value="'+esc(v)+'">'+esc(labels?labels[v]:v)+'</option>'; }).join('');
