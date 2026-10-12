@@ -581,7 +581,7 @@ async function grSaveCell(op){
   if(base&&GR.track===base&&!GR.trackErr){
     GR.track=T.put(GR.track,c.coId,c.rid,c.key,rec);
     c.busy=false; c.draft=null; c.msg=done; c.err=false;
-    grApplyTrack(); grRender();
+    grGlobalRefresh(); grApplyTrack(); grRender();
   }else{
     c.busy=false; c.msg=done+' — 목록을 다시 불러온 뒤 확인해 주세요'; c.err=false;
   }
@@ -1183,32 +1183,24 @@ function grRenderAlerts(){
 /* ═══ 전역 「📥 받은 서류 확인」 — 오른쪽 패널 #ginbox (계획 docs/superpowers/plans/2026-10-12-gov-report-global-inbox.md)
    모든 업체에서 «최근 GLOBAL_DAYS 일 안에 받은 · 아직 어느 서류 줄에도 연결 안 된 첨부 메일»을 한 목록으로. 단추를 눌렀을 때만 메일함을 읽는다(grLoadInbox 재사용 — 한 번).
    ★ 읽기만 — 저장·새 규칙 없음. 연결·열어 보기는 여기서 하지 않고 «서류 칸 열기»로 기존 칸 창(grOpenCell)에서 한다.
+   ★ 목록은 «누른 때의 연도(GR.f.year)» 기준 — 연도를 바꾸면 처음 상태로 돌아가고(grGiReset), 칸 창에서 연결·지운 뒤에는 메일함을 다시 읽지 않고 목록만 다시 계산한다(grGlobalRefresh).
    업체·사업 쌍은 D.erpTypeFor 와 같은 짝(일정 사업마다 먼저 보이는 이알피 사업) · 틀이 없는 사업은 뺀다 · 업체 귀속은 주소로만(addrsFor) · 같은 메일은 먼저 적힌 쌍(업체 이름 → 사업 이름 차례) 한 곳에만 */
-async function grGlobalInbox(){
-  var I=PuGovReportInbox, D=PuGovReportDocs, T=PuGovReportTrack;
+function grGiReset(msg){
   if(GR.gi.st==='loading') return;
-  var stop=function(msg){ GR.gi={st:'err',list:[],noAddr:0,more:false,clipped:false,msg:msg}; grRenderGlobalInbox(); };
-  var NOTRK='기록을 못 불러와 연결 여부를 알 수 없습니다 — 화면을 새로 열어 주세요';
-  var NODOC='사업 목록을 불러오지 못해 확인할 수 없습니다 — 화면을 새로 열어 주세요';
-  var ready=function(){ return !!GR.docs&&GR.docs.loaded&&!GR.docs.err&&!!GR.input; };
-  if(!GR.track||GR.trackErr) return stop(NOTRK);
-  if(!ready()) return stop(NODOC);
+  GR.gi={st:'idle',list:[],noAddr:0,more:false,clipped:false,year:'',msg:msg||''};
+}
+/* 계산 — GR.inbox(읽은 메일 줄)·GR.track·GR.input·GR.docs 만 본다(읽기·쓰기 없음). 던질 수 있으니 부르는 쪽이 잡는다 */
+function grGlobalCompute(){
+  var I=PuGovReportInbox, D=PuGovReportDocs, T=PuGovReportTrack, ib=GR.inbox, d=GR.docs, year=GR.f.year, ps=[], used=[];
   var win=I.sinceWindow(GR.today,I.GLOBAL_DAYS);
-  if(!win) return stop('오늘 날짜를 알 수 없어 확인할 수 없습니다');
-  GR.gi={st:'loading',list:[],noAddr:0,more:false,clipped:false,msg:''}; grRenderGlobalInbox();
-  await grLoadInbox();
-  for(var k=0;k<3&&GR.inbox.st==='loading'&&GR.inboxP;k++) await GR.inboxP;
-  if(GR.inbox.st!=='ok') return stop(I.MSG.LOAD_FAIL);
-  if(!GR.track||GR.trackErr) return stop(NOTRK);
-  if(!ready()) return stop(NODOC);
-  var ib=GR.inbox, d=GR.docs, ps=[], used=[];
+  if(!win) throw new Error('오늘 날짜를 알 수 없다');
   D.visibleTypes(d.biz).forEach(function(erp){
     var typeId=D.linkOf(erp.code,d.tmap,GR.input.types);
     if(!typeId||used.indexOf(typeId)>=0) return;
     used.push(typeId);
     var plan=D.planFor(erp.name);
     if(plan===D.NONE) return;
-    D.pairs(GR.input,typeId,GR.f.year).forEach(function(p){ ps.push({p:p,erp:erp,plan:plan,i:ps.length}); });
+    D.pairs(GR.input,typeId,year).forEach(function(p){ ps.push({p:p,erp:erp,plan:plan,i:ps.length}); });
   });
   ps.sort(function(a,b){ return a.p.coName.localeCompare(b.p.coName,'ko')||a.p.typeName.localeCompare(b.p.typeName,'ko')||(a.i-b.i); });
   /* 연결된 메일 — 어느 업체·어느 줄이든 link.key 가 같으면 연결된 것(기록 GR.track = {업체:{rid:{줄 키:줄}}}) */
@@ -1226,51 +1218,82 @@ async function grGlobalInbox(){
     var step=['sign','submit','attach'].filter(function(s){ return T.keysFor(x.plan,s,n).length>0; })[0]||'';
     var r=I.pending(I.candidates(ib.rows,{addrs:addrs,win:win,tech:false}).list,linked,seen);
     if(r.more) more=true;
-    r.list.forEach(function(m){ got.push(Object.assign({},m,{coId:p.coId,coName:p.coName,typeId:p.typeId,typeName:p.typeName,erpCode:x.erp.code,step:step})); });
+    r.list.forEach(function(m){ got.push(Object.assign({},m,{coId:p.coId,coName:p.coName,typeId:p.typeId,typeName:p.typeName,erpCode:x.erp.code,step:step,year:year})); });
   });
   got.sort(function(a,b){ return (b.d-a.d)||(a.key<b.key?-1:(a.key>b.key?1:0)); });
   if(got.length>I.GLOBAL_MAX){ more=true; got=got.slice(0,I.GLOBAL_MAX); }
-  GR.gi={st:'ok',list:got,noAddr:miss.filter(function(id){ return hit.indexOf(id)<0; }).length,more:more,clipped:!!ib.clipped,msg:''};
+  return {st:'ok',list:got,noAddr:miss.filter(function(id){ return hit.indexOf(id)<0; }).length,more:more,clipped:!!ib.clipped,year:year,msg:''};
+}
+/* 단추 — force(「다시 확인」)면 메일함을 새로 읽는다, 아니면 이미 읽은 것을 쓴다. 어떤 일이 생겨도 «불러오는 중»에 멈추지 않는다 */
+async function grGlobalInbox(force){
+  var I=PuGovReportInbox;
+  if(GR.gi.st==='loading') return;
+  var stop=function(msg){ GR.gi={st:'err',list:[],noAddr:0,more:false,clipped:false,year:'',msg:msg}; grRenderGlobalInbox(); };
+  var NOTRK='기록을 못 불러와 연결 여부를 알 수 없습니다 — 화면을 새로 열어 주세요';
+  var NODOC='사업 목록을 불러오지 못해 확인할 수 없습니다 — 화면을 새로 열어 주세요';
+  var ready=function(){ return !!GR.docs&&GR.docs.loaded&&!GR.docs.err&&!!GR.input; };
+  if(!GR.track||GR.trackErr) return stop(NOTRK);
+  if(!ready()) return stop(NODOC);
+  GR.gi={st:'loading',list:[],noAddr:0,more:false,clipped:false,year:'',msg:''}; grRenderGlobalInbox();
+  try{
+    await grLoadInbox(force===true);
+    for(var k=0;k<3&&GR.inbox.st==='loading'&&GR.inboxP;k++) await GR.inboxP;
+    if(GR.inbox.st!=='ok') return stop(I.MSG.LOAD_FAIL);
+    if(!GR.track||GR.trackErr) return stop(NOTRK);
+    if(!ready()) return stop(NODOC);
+    GR.gi=grGlobalCompute();
+  }catch(e){
+    console.warn('[컨설팅보고서] 받은 서류 확인 못 함',e);
+    return stop('받은 서류를 확인하지 못했습니다 — 다시 시도해 주세요');
+  }
   grRenderGlobalInbox();
+}
+/* 칸 창에서 연결·연결 지우기를 저장한 뒤 — 메일함은 다시 읽지 않고 목록만 다시 계산한다(그릴 곳 grRender 가 바로 뒤에 온다) */
+function grGlobalRefresh(){
+  if(GR.gi.st!=='ok'||!GR.inbox||GR.inbox.st!=='ok'||!GR.track||GR.trackErr) return;
+  try{ GR.gi=grGlobalCompute(); }
+  catch(e){ console.warn('[컨설팅보고서] 받은 서류 목록 다시 계산 못 함',e); GR.gi={st:'err',list:[],noAddr:0,more:false,clipped:false,year:'',msg:'받은 서류를 확인하지 못했습니다 — 다시 시도해 주세요'}; }
 }
 function grRenderGlobalInbox(){
   var I=PuGovReportInbox, el=$('ginbox'), g=GR.gi||{};
   if(!el) return;
-  var btn=function(label){ return '<button type="button" onclick="grGlobalInbox()"'+(GR.loaded?'':' disabled')+'>'+label+'</button>'; };
+  var btn=function(label,arg){ return '<button type="button" onclick="grGlobalInbox('+(arg||'')+')"'+(GR.loaded?'':' disabled')+'>'+label+'</button>'; };
   if(g.st==='loading'){ el.innerHTML='<div class="days">불러오는 중…</div>'; return; }
   if(g.st==='err'){ el.innerHTML='<div class="err-s">'+grEsc(g.msg)+'</div>'+btn('다시 시도'); return; }
   if(g.st!=='ok'){
-    el.innerHTML='<div class="days">최근 '+I.GLOBAL_DAYS+'일 안에 받은 첨부 메일 가운데 아직 서류 줄에 연결하지 않은 것을 찾습니다</div>'+btn('📥 확인');
+    el.innerHTML=(g.msg?'<div class="err-s">'+grEsc(g.msg)+'</div>':'')
+      +'<div class="days">최근 '+I.GLOBAL_DAYS+'일 안에 받은 첨부 메일 가운데 아직 서류 줄에 연결하지 않은 것을 찾습니다</div>'+btn('📥 확인');
     return;
   }
-  var h='<div class="days">연결 안 된 받은 서류 '+g.list.length+'건 · 최근 '+I.GLOBAL_DAYS+'일</div>';
+  var h='<div class="days">연결 안 된 받은 서류 '+g.list.length+'건 · 최근 '+I.GLOBAL_DAYS+'일 · '+grEsc(g.year)+'년 사업 기준</div>';
   if(!g.list.length) h+='<div class="days">연결할 새 받은 서류가 없습니다</div>';
   else h+='<ul class="ib">'+g.list.map(function(m,i){
     var tags=I.badges(m).map(function(b){ return ' <span class="st st-'+b.key+'">'+grEsc(b.txt)+'</span>'; }).join('');
     var atts=m.atts.length?m.atts.map(function(a){ return '<div class="ib-a"><span>📎 '+grEsc(a.name)+'</span></div>'; }).join('')
       :'<div class="days">첨부 '+grEsc(m.a)+'개 — 이름이 없어 메일함에서 확인해 주세요</div>';
-    return '<li><div class="ib-h">받음 ← '+grEsc(m.who)+' · '+grEsc(m.day)+' · '+grEsc(m.coName)+' · '+grEsc(m.typeName)+tags+'</div>'
+    /* 표시 이름이 없으면 거울이 주소를 대신 넣는다 — 주소는 화면에 그리지 않는다 */
+    var who=String(m.who||'').indexOf('@')>=0?'(보낸이 이름 없음)':m.who;
+    return '<li><div class="ib-h">받음 ← '+grEsc(who)+' · '+grEsc(m.day)+' · '+grEsc(m.coName)+' · '+grEsc(m.typeName)+tags+'</div>'
       +'<div class="ib-s">'+grEsc(m.s||'(제목 없음)')+'</div>'+atts
       +(m.step?'<div class="ib-a"><button type="button" class="act" onclick="grOpenFromInbox('+i+')">서류 칸 열기</button></div>':'')+'</li>';
   }).join('')+'</ul>';
   if(g.more) h+='<div class="days">'+I.GLOBAL_MAX+'건만 보입니다</div>';
   if(g.noAddr>0) h+='<div class="days">메일 주소가 없는 업체 '+g.noAddr+'곳은 건너뛰었습니다</div>';
   if(g.clipped) h+='<div class="days">'+grEsc(I.MSG.CLIPPED)+'</div>';
-  el.innerHTML=h+btn('다시 확인');
+  el.innerHTML=h+btn('다시 확인','true');
 }
-/* 「서류 칸 열기」 — 그 사업을 왼쪽에서 골라 주고(grOpenCell 이 고른 사업을 읽는다 · 이미 고른 사업은 grSetBiz 가 다시 누르면 푸니 건드리지 않는다) 기존 칸 창을 연다 */
+/* 「서류 칸 열기」 — 그 사업을 왼쪽에서 골라 주고(grOpenCell 이 고른 사업을 읽는다 · 이미 고른 사업은 grSetBiz 가 다시 누르면 푸니 건드리지 않는다) 기존 칸 창을 연다.
+   목록을 만든 뒤 연도를 바꿨으면 열지 않는다(칸 창은 지금 고른 연도의 줄을 연다 — 엉뚱한 해의 창이 열리지 않게) */
 function grOpenFromInbox(i){
   var m=GR.gi&&GR.gi.list?GR.gi.list[i]:null;
   if(!m||!m.step) return;
+  if(m.year!==GR.f.year){ grGiReset('연도를 바꿨습니다 — 다시 확인해 주세요'); grRenderGlobalInbox(); return; }
   if(GR.f.biz!==m.erpCode) grSetBiz(m.erpCode);
   grOpenCell(m.coId,m.typeId,m.step,'');
   /* 칸 창 후보는 그 쌍의 회차 기간(첫 회차 −30일 ~ 끝 회차 +90일)만 본다 — 목록의 메일이 그 밖이면 이 창에서만 기간을 넓혀 같은 메일이 보이게 한다(보통 열기의 기본 기간은 그대로) */
-  var c=GR.cw;
-  if(!c||c.coId!==m.coId||c.typeId!==m.typeId||!m.day) return;
-  var w=c.win;
-  if(!w) c.win={from:m.day,to:m.day};
-  else if(m.day<w.from||m.day>w.to) c.win={from:m.day<w.from?m.day:w.from,to:m.day>w.to?m.day:w.to};
-  else return;
+  var c=GR.cw, w=c&&c.win;
+  if(!c||c.coId!==m.coId||c.typeId!==m.typeId||!m.day||!w||(m.day>=w.from&&m.day<=w.to)) return;
+  c.win={from:m.day<w.from?m.day:w.from,to:m.day>w.to?m.day:w.to};
   grRenderInbox();
 }
 function grRender(){
@@ -1283,8 +1306,10 @@ function grRender(){
   grRenderBiz(); grRenderFilters(); grRenderKpis(); grRenderDocs(); grRenderRows(); grRenderForms(); grRenderAlerts(); grRenderGlobalInbox();
 }
 function grReset(){
+  var y0=GR.f.year;
   GR.f.year=GR.today.slice(0,4); GR.f.type=''; GR.f.att=''; GR.f.status=''; GR.f.co=''; GR.f.mine=false; GR.f.biz='';
   $('fCo').value=''; $('fMine').checked=false;
+  if(GR.f.year!==y0) grGiReset();
   grRender();
 }
 
@@ -1367,7 +1392,7 @@ function grBoot(){
     if(!b||b.disabled) return;
     grSetStatus(b.getAttribute('data-st'));
   });
-  Object.keys(GR_FIELDS).forEach(function(id){ $(id).addEventListener('change',function(){ GR.f[GR_FIELDS[id]]=this.value; grRender(); }); });
+  Object.keys(GR_FIELDS).forEach(function(id){ $(id).addEventListener('change',function(){ var y0=GR.f.year; GR.f[GR_FIELDS[id]]=this.value; if(GR.f.year!==y0) grGiReset(); grRender(); }); });
   $('fCo').addEventListener('input',function(){ GR.f.co=this.value; grRender(); });
   $('fMine').addEventListener('change',function(){ GR.f.mine=this.checked; grRender(); });
   $('fReset').addEventListener('click',grReset);
