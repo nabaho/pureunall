@@ -121,3 +121,27 @@ test('사업종료 — 회사별 묶음에 «종료» 칸, 사업별로는 종�
   assert.equal(fp.candidate.length, 0);
   assert.equal(fp.closed, 1);
 });
+
+/* 📰 새 공고 목록 (2026-10-12) — 서버가 쌓은 공고를 «처리할 것»부터 거른다 */
+test('새 공고 거르기 — 비슷한 것·전체·이은 것·관계없음, 접수 중만, 이은 사업은 program.bizinfo 로 안다', () => {
+  const T = '2026-10-12';
+  const N = {
+    a: { id: 'a', no: 'a', nm: '청년 공고', field: '인력', closeDt: '2026-11-30', openDt: '2026-10-01', suggest: [{ id: 'p1', score: 0.9 }] },
+    b: { id: 'b', no: 'b', nm: '마감 공고', field: '금융', closeDt: '2026-04-30', openDt: '2026-03-01', suggest: [{ id: 'p1', score: 0.7 }] },
+    c: { id: 'c', no: 'c', nm: '관계없는 공고', field: '경영', closeDt: '', openDt: '2026-10-05', decision: 'ignore' },
+    d: { id: 'd', no: 'd', nm: '이은 공고', field: '수출', closeDt: '2026-12-31', openDt: '2026-09-01' },
+    e: { id: 'e', no: 'e', nm: '그냥 공고', field: '기술', closeDt: '', openDt: '2026-10-10' },
+  };
+  const P = [{ id: 'p1', name: '청년도약', status: 'confirmed', baseYear: 2026 }, { id: 'p2', name: '수출', bizinfo: ['d'] }];
+  const ids = (o) => V.noticeRows(N, P, Object.assign({ today: T }, o)).map((r) => r.n.id);
+  assert.deepEqual(ids({ view: 'sug', openOnly: true }), ['a']);
+  assert.deepEqual(ids({ view: 'sug', openOnly: false }).sort(), ['a', 'b']);
+  assert.deepEqual(ids({ view: 'all', openOnly: true }).sort(), ['a', 'e'], '처리했거나 이은 것은 «전체»에서도 뺀다');
+  assert.deepEqual(ids({ view: 'labor', openOnly: false }), ['a'], '인력·경영 분야만(처리 안 한 것)');
+  assert.deepEqual(ids({ view: 'linked' }), ['d']);
+  assert.equal(V.noticeRows(N, P, { view: 'linked', today: T })[0].linkedTo.id, 'p2');
+  assert.deepEqual(ids({ view: 'ignored' }), ['c']);
+  assert.equal(V.noticeRows(N, P, { view: 'sug', today: T })[0].sug[0].p.id, 'p1', '제안은 사업 레코드로 돌려준다');
+  assert.deepEqual(ids({ view: 'all', q: '그냥' }), ['e']);
+  assert.equal(V.noticeCount(N, P, T), 1, '탭 숫자 = 처리 안 한 «비슷한» 공고 중 접수 중');
+});
