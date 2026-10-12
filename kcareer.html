@@ -576,19 +576,6 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 #dbTools{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;min-width:0;flex:1 1 360px}
 #dbTools .toolbar{margin:0!important;padding:4px 0;border:0;background:none;box-shadow:none;flex-wrap:wrap;gap:6px;flex:1 1 auto;min-width:0;justify-content:flex-end}
 #dbTools .toolbar .tb-input{min-width:180px!important}
-/* 왼쪽 목록 칸 맨 위 — 탭·검색·단추를 모아 둔다(_dsHeadDock). 오른쪽 문서는 화면 맨 위에서 시작한다 */
-#page-docbox.ds-docked>.page{padding-top:6px}
-#page-docbox.ds-docked .db-top{display:none}
-.ds-head{border-bottom:2px solid var(--border);margin:0 0 6px;padding-bottom:6px}
-.ds-head #db-tabrow{margin:0 0 6px;border-bottom:none;flex-wrap:wrap;gap:2px}
-.ds-head #dbTools{display:block;margin:0;flex:none;width:100%}
-.ds-head #dbTools .toolbar{justify-content:flex-start;padding:0;gap:6px}
-.ds-head #dbTools .toolbar .tb-input{min-width:0!important;flex:1 1 100%}
-.ds-head #dbTools .toolbar .tb-spacer{display:none}
-.ds-head #dbTools .toolbar .btn{flex:1 1 auto}
-.ds-head #dbTools .toolbar .cnt{margin-left:auto}
-#page-docbox.ds-docked .ds-prev{top:0;max-height:100vh;overflow-y:auto}
-#page-docbox.ds-docked .ds-pv-img{max-height:max(320px,calc(100vh - 170px))}
 .ds-split{display:grid;grid-template-columns:minmax(0,1fr) 10px var(--ds-pv,320px);gap:0;align-items:start;margin-top:6px;min-width:0}
 .ds-gut{cursor:col-resize;align-self:stretch;min-height:120px;position:relative}
 .ds-gut::after{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--border)}
@@ -634,6 +621,19 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .ds-dupbar .m{color:var(--text-mute);font-size:11px}
 .ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
 .ds-pv-btns .btn.sm{padding:2px 8px}
+/* 왼쪽 목록 칸 맨 위 — 탭·검색·단추를 모아 둔다(_dsHeadDock). 오른쪽 문서는 화면 맨 위에서 시작한다 */
+#page-docbox.ds-docked>.page{padding-top:6px}
+#page-docbox.ds-docked .db-top{display:none}
+.ds-head{border-bottom:2px solid var(--border);margin:0 0 6px;padding-bottom:6px}
+.ds-head #db-tabrow{margin:0 0 6px;border-bottom:none;flex-wrap:wrap;gap:2px}
+.ds-head #dbTools{display:block;margin:0;flex:none;width:100%}
+.ds-head #dbTools .toolbar{justify-content:flex-start;padding:0;gap:6px}
+.ds-head #dbTools .toolbar .tb-input{min-width:0!important;flex:1 1 100%}
+.ds-head #dbTools .toolbar .tb-spacer{display:none}
+.ds-head #dbTools .toolbar .btn{flex:1 1 auto}
+.ds-head #dbTools .toolbar .cnt{margin-left:auto}
+#page-docbox.ds-docked .ds-prev{top:0;max-height:100vh;overflow-y:auto}
+#page-docbox.ds-docked .ds-pv-img{max-height:max(320px,calc(100vh - 170px))}
 #page-resume-hub .rc-h,#page-docbox .rc-h{margin-bottom:6px}
 #page-resume-hub .empty,#page-docbox .empty{padding:12px 0}
 #page-resume-hub .dropzone,#page-docbox .dropzone{padding:11px 14px}
