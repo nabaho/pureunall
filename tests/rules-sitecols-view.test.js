@@ -206,45 +206,42 @@ test('손잡이 이음 — 창 밖의 입력칸·선택칸을 누르면 그 칸�
   assert.equal(w2.el.popup.removed, false);
 });
 
-test('한글 조합 — 조합 중 input 은 손잡이를 부르지 않고, 조합이 끝나면 한 번만 부른다 (colq·sq)', () => {
+test('한글 조합 — input 은 조합 중에도 «늘 그때 값»을 손잡이에 넘기고, 깃발만 세운다 (colq·sq)', () => {
   const w = wire({ pop: 'biz' });
   ['colq', 'sq'].forEach((role) => {
     w.el.oninput({ isComposing: true, target: fakeTarget({ tag: 'INPUT', dataset: { role }, value: 'ㄷㅗ' }) });
-    assert.equal(w.count(role), 0, role + ' 조합 중에는 다시 그리지 않는다');
+    assert.deepEqual(w.calls.filter((c) => c[0] === role).pop(), [role, 'ㄷㅗ'], role + ' 조합 중에도 현재 값이 간다');
+    assert.equal(w.el.__pdComposing, true, '조합 중 깃발');
     w.el.oninput({ isComposing: false, target: fakeTarget({ tag: 'INPUT', dataset: { role }, value: '도' }) });
-    assert.equal(w.count(role), 1, role + ' 조합 아닌 input 은 그대로');
+    assert.deepEqual(w.calls.filter((c) => c[0] === role).pop(), [role, '도']);
+    assert.equal(w.el.__pdComposing, false, '조합 아닌 input 이 오면 깃발이 내려간다(갇히지 않는다)');
   });
-  const ends = w.el.listeners.filter((l) => l.type === 'compositionend');
-  assert.equal(ends.length, 1, 'compositionend 는 한 번만 단다');
-  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '도소매' }) });
-  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'sq' }, value: '홍' }) });
-  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'sm' }, value: 'x' }) });
+  assert.equal(w.count('colq'), 2); assert.equal(w.count('sq'), 2);
+  const on = (type) => w.el.listeners.filter((l) => l.type === type);
+  assert.equal(on('compositionstart').length, 1, 'compositionstart 는 한 번만 단다');
+  assert.equal(on('compositionend').length, 1, 'compositionend 는 한 번만 단다');
+  on('compositionstart')[0].fn({});
+  assert.equal(w.el.__pdComposing, true);
+  on('compositionend')[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '도소매' }) });
+  assert.equal(w.el.__pdComposing, false, 'compositionend 가 깃발을 내린다');
+  on('compositionend')[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'sq' }, value: '홍길동' }) });
+  on('compositionend')[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'sm' }, value: 'x' }) });
   assert.deepEqual(w.calls.filter((c) => c[0] === 'colq').pop(), ['colq', '도소매']);
-  assert.deepEqual(w.calls.filter((c) => c[0] === 'sq').pop(), ['sq', '홍']);
-  assert.equal(w.count('colq'), 2); assert.equal(w.count('sq'), 2, '관계없는 칸은 안 부른다');
+  assert.deepEqual(w.calls.filter((c) => c[0] === 'sq').pop(), ['sq', '홍길동'], '마지막 글자까지 담긴 값');
+  assert.equal(w.count('colq'), 3); assert.equal(w.count('sq'), 3, '관계없는 칸은 안 부른다');
   // 다시 그려도 겹쳐 달지 않는다 — 같은 el 에 render 를 또 돌린다
   const real = global.PuRulesV2Sites.model;
   global.PuRulesV2Sites.model = () => MANY.slice(0, 3);
   try { V.render(w.el, w.state, {}); V.render(w.el, w.state, {}); } finally { global.PuRulesV2Sites.model = real; }
-  assert.equal(w.el.listeners.filter((l) => l.type === 'compositionend').length, 1, '다시 그려도 한 개');
+  assert.equal(on('compositionend').length, 1, '다시 그려도 한 개'); assert.equal(on('compositionstart').length, 1);
   // 새 handlers 가 쓰인다(옛 것을 붙들지 않는다)
   let got = null;
   global.PuRulesV2Sites.model = () => MANY.slice(0, 3);
   try { V.render(w.el, w.state, { colq: (v) => { got = v; } }); } finally { global.PuRulesV2Sites.model = real; }
-  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '새' }) });
+  on('compositionend')[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '새' }) });
   assert.equal(got, '새');
 });
 
-test('Esc — 창이 열려 있으면 colClose, 닫혀 있으면 아무 일도 없다', () => {
-  const w = wire({ pop: 'biz' });
-  w.el.onkeydown({ key: 'a' });
-  assert.equal(w.count('colClose'), 0);
-  w.el.onkeydown({ key: 'Escape' });
-  assert.equal(w.count('colClose'), 1);
-  const w2 = wire({ pop: '' });
-  w2.el.onkeydown({ key: 'Escape' });
-  assert.equal(w2.count('colClose'), 0);
-});
 
 test('낡은 창 — 손잡이가 다시 그리지 않았으면(예: 확인 취소) 창 노드를 뗀다 · 창 안·머리 단추 누름은 그대로', () => {
   const w = wire({ pop: 'biz' });

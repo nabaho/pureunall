@@ -50,7 +50,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/store.js?v=4"></script>
 <script src="js/rules-v2/view-library.js?v=3"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=6"></script>
+<script src="js/rules-v2/view-sites.js?v=7"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -375,7 +375,7 @@ var ST = { data: { docs: {}, human: {}, rounds: {}, run: null }, view: 'mail', f
     cols: {}, sort: null, page: 1, pop: '', popq: '', popPos: null },
   /* 담당 거르기 — 명부(사번→이름)·로그인한 사람의 사번. 사번은 「P-001」 꼴로 맞춘다(업체관리 managerMain 과 같은 꼴) */
   staff: {}, me: '' };
-var S = null, qTimer = 0;
+var S = null, qTimer = 0, cqTimer = 0;
 
 /* 지금 보이는 갈래를 그린다 — 🏢 면 사업장, 아니면 📥 모은 자료(📚 는 제 부품이 따로 그린다).
    안 보이는 갈래는 그 갈래로 들어갈 때 rv2Route 가 새로 그린다. 사업장 줄 셈은 그릴 때 한 번(가볍다). */
@@ -692,9 +692,13 @@ var H = {
   /* ── 🏢 사업장 ── */
   siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' ? d.f : 'has'; ST.sites.page = 1; draw(); },
   sq: function (v) {
+    /* 값은 바로 상태에 넣는다(다른 일로 다시 그려도 낡은 글이 안 보이게). 다시 그리는 것만 미룬다 —
+       한글 조합 중($sites.__pdComposing)에는 그리지 않고, 조합이 끝나면 뷰가 한 번 더 부른다 */
+    ST.sites.q = v; ST.sites.page = 1;
     clearTimeout(qTimer);
     qTimer = setTimeout(function () {
-      ST.sites.q = v; ST.sites.page = 1; draw();
+      if ($sites.__pdComposing) return;
+      draw();
       var q = $sites.querySelector(ST.sites.pop === 'name' ? '.cpop [data-role="sq"]' : '[data-role="sq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
     }, 200);
   },
@@ -730,8 +734,13 @@ var H = {
   colsClear: function () { ST.sites.cols = {}; ST.sites.page = 1; draw(); },
   colWho: function (d) { ST.sites.who = String(d.v || ''); ST.sites.page = 1; draw(); },
   colq: function (v) {
-    ST.sites.popq = v; drawKeepList();
-    var q = $sites.querySelector('[data-role="colq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    ST.sites.popq = v;   // 상태는 바로, 그리기는 미룬다(sq 와 같은 방식 — 조합 중에는 그리지 않는다)
+    clearTimeout(cqTimer);
+    cqTimer = setTimeout(function () {
+      if ($sites.__pdComposing || !ST.sites.pop) return;
+      drawKeepList();
+      var q = $sites.querySelector('[data-role="colq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+    }, 250);
   },
   pageGo: function (d) {
     var p = Number(d.p); if (!(p >= 1)) return;
@@ -797,6 +806,13 @@ document.querySelector('.top .rmode').addEventListener('click', function (ev) {
   if (window.RV2_MODE(hash) !== window.__rv2Mode) history.pushState(null, '', hash);
   rv2Route();
 });
+/* Esc — 열린 머리줄 창을 닫는다. 창을 열면 다시 그려 포커스가 body 로 떨어지므로 문서 전체에서 듣는다(한 번만 단다) */
+if (!window.__rv2EscSites) {
+  window.__rv2EscSites = true;
+  document.addEventListener('keydown', function (ev) {
+    if (ev.key === 'Escape' && window.__rv2Mode === 'sites' && ST.sites.pop) H.colClose();
+  });
+}
 rv2Route();
 
 function boot(store, o) {

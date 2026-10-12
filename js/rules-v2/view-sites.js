@@ -285,7 +285,8 @@
       else if (H.colClose) H.colClose();
     };
     /* 한글은 조합해 가며 들어온다 — 조합 중에 다시 그리면 칸이 새로 만들어져 「ㄷㅗ」 처럼 조각난다.
-       조합 중에는 그리지 않고, 끝난 뒤(compositionend)에만 한 번 부른다.
+       값은 «늘» 그때그때 손잡이에 넘긴다(낡은 값이 남지 않게). 다시 그리는 일을 미루는 것은 손잡이 몫이다 —
+       손잡이가 el.__pdComposing 을 보고 조합 중에는 그리지 않고, 조합이 끝나면(compositionend) 한 번 더 불린다.
        ⚠ oncompositionend 는 표준 핸들러 «속성»이 아니다(rules.html 같은 주의) — addEventListener 로, render 가 겹쳐 달지 않게 한 번만 */
     el.__pdCur = { H: H, s: s };
     var typed = function (t, cur) {
@@ -293,15 +294,13 @@
       if (t.dataset.role === 'sq' && cur.H.sq) cur.H.sq(t.value);
       if (t.dataset.role === 'colq' && cur.H.colq) cur.H.colq(t.value);
     };
-    el.oninput = function (ev) { if (ev.isComposing) return; typed(ev.target, el.__pdCur); };
+    // input 이벤트가 조합 여부를 알려 준다 — compositionend 가 못 닿는 경우(칸이 떨어져 나감)에도 깃발이 갇히지 않게 여기서도 맞춘다
+    el.oninput = function (ev) { el.__pdComposing = !!ev.isComposing; typed(ev.target, el.__pdCur); };
     if (!el.__pdComp && el.addEventListener) {
       el.__pdComp = true;
-      el.addEventListener('compositionend', function (ev) { typed(ev.target, el.__pdCur); });
+      el.addEventListener('compositionstart', function () { el.__pdComposing = true; });
+      el.addEventListener('compositionend', function (ev) { el.__pdComposing = false; typed(ev.target, el.__pdCur); });
     }
-    // Esc — 열린 창을 닫는다
-    el.onkeydown = function (ev) {
-      if (ev.key === 'Escape' && s.pop && H.colClose) H.colClose();
-    };
     el.onchange = function (ev) {
       var t = ev.target;
       if (t.dataset && t.dataset.role === 'sm' && H.sm) H.sm(t.value);

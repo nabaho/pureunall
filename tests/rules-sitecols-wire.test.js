@@ -86,7 +86,64 @@ test('머리줄 창은 위쪽 띠·머리보다 위, 모달 베일보다 아래'
   assert.ok(pop < z(rule('.veil')), '모달 베일보다 아래');
 });
 
-test('한 칸은 한 줄 — 머리 단추·창 목록 글은 넘치면 … 로 줄인다', () => {
+/* sq·colq 손잡이를 가짜 상태·가짜 타이머로 «실제로 돌린다» — 조합 중에는 그리지 않고, 값은 늘 상태에 */
+function liveHandlers(pop) {
+  const ST = { sites: { q: '', popq: '', page: 3, pop: pop || '' } };
+  const input = { focus() {}, setSelectionRange() {}, value: '' };
+  const $sites = { __pdComposing: false, querySelector: () => input };
+  const log = { draws: 0 };
+  let timers = [], seq = 0;
+  const setT = (f) => { const id = ++seq; timers.push({ id, f }); return id; };
+  const clrT = (id) => { timers = timers.filter((t) => t.id !== id); };
+  const mk = (k) => new Function('ST', '$sites', 'draw', 'drawKeepList', 'setTimeout', 'clearTimeout', 'qTimer', 'cqTimer',
+    'return {' + fn(k) + '};')(ST, $sites, () => { log.draws++; }, () => { log.draws++; }, setT, clrT, 0, 0)[k];
+  return { ST, $sites, log, sq: mk('sq'), colq: mk('colq'), fire: () => { const t = timers; timers = []; t.forEach((x) => x.f()); }, pending: () => timers.length };
+}
+
+test('조합 중에는 값만 상태에 넣고 그리지 않는다 · 조합이 끝나면 마지막 값으로 한 번만 그린다 — 사업장 검색(sq)', () => {
+  const h = liveHandlers();
+  h.$sites.__pdComposing = true;
+  h.sq('홍'); h.sq('홍길'); h.fire();
+  assert.equal(h.ST.sites.q, '홍길', '조합 중에도 상태는 현재 값');
+  assert.equal(h.ST.sites.page, 1);
+  assert.equal(h.log.draws, 0, '조합 중에는 그리지 않는다');
+  h.$sites.__pdComposing = false;        // compositionend — 뷰가 한 번 더 부른다
+  h.sq('홍길동'); h.sq('홍길동'); h.fire();
+  assert.equal(h.ST.sites.q, '홍길동');
+  assert.equal(h.log.draws, 1, '디바운스로 한 번만');
+});
+
+test('조합 중에는 값만 상태에 넣고 그리지 않는다 · 조합이 끝나면 한 번만 그린다 — 업태 찾기(colq)', () => {
+  const h = liveHandlers('biz');
+  assert.equal(h.pending(), 0);
+  h.$sites.__pdComposing = true;
+  h.colq('도'); h.colq('도소'); h.fire();
+  assert.equal(h.ST.sites.popq, '도소');
+  assert.equal(h.log.draws, 0, '조합 중에는 칸을 새로 만들지 않는다');
+  h.$sites.__pdComposing = false;
+  h.colq('도소매'); h.colq('도소매');
+  assert.equal(h.pending(), 1, '디바운스 — 타이머는 하나');
+  h.fire();
+  assert.equal(h.ST.sites.popq, '도소매');
+  assert.equal(h.log.draws, 1);
+  const h2 = liveHandlers('');   // 창이 닫힌 뒤에 도착한 타이머는 그릴 일이 없다
+  h2.colq('x'); h2.fire();
+  assert.equal(h2.log.draws, 0);
+});
+
+test('Esc — 문서 전체에서 한 번만 듣고, 사업장 갈래에서 창이 열려 있을 때만 colClose', () => {
+  const m = /document\.addEventListener\('keydown',[\s\S]*?\}\);/.exec(HTML);
+  assert.ok(m, '문서 keydown 귀');
+  assert.match(m[0], /ev\.key === 'Escape'/);
+  assert.match(m[0], /__rv2Mode === 'sites'/);
+  assert.match(m[0], /ST\.sites\.pop/);
+  assert.match(m[0], /H\.colClose\(\)/);
+  const at = HTML.indexOf(m[0]);
+  assert.match(HTML.slice(Math.max(0, at - 160), at), /if \(!window\.__rv2EscSites\)/, '겹쳐 달지 않는 깃발');
+  assert.equal(HTML.split("document.addEventListener('keydown'").length - 1, 1, '한 개');
+});
+
+test('한 칸은 한 줄 —머리 단추·창 목록 글은 넘치면 … 로 줄인다', () => {
   assert.match(rule('#sites th.ch .h'), /overflow:\s*hidden/);
   ['#sites th.ch .h .lb', '.cpop label .t,.cpop .wo .t'].forEach((sel) => {
     const r = rule(sel);
