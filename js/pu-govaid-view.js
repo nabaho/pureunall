@@ -78,8 +78,29 @@
   function snapshot(result) {
     return { verdict: result.verdict, items: (result.items || []).map(function (i) { return { key: i.key, label: i.label, state: i.state }; }) };
   }
+  /* 사업 중심 — 부처(관) 묶음 (대표 지시 2026-10-12 「고용노동부 등 관 중심으로 우선 재편」).
+     담당기관 칸의 «앞머리»가 부처다 — 괄호·가운뎃점·빗금 뒤는 산하기관·담당과 */
+  var NO_MIN = '기관 모름', FIRST_MIN = '고용노동부';
+  function ministryOf(agency) {
+    var a = clean(agency).split(/[(（·・\/,]/)[0].trim();
+    return a || NO_MIN;
+  }
+  /* 고용노동부가 맨 앞(노무법인의 본업), 그다음 사업이 많은 부처, 기관 모름은 맨 끝. 묶음 안은 받은 차례 그대로 */
+  function byMinistry(progs) {
+    var map = {}, order = [];
+    progs.forEach(function (p) { var m = ministryOf(p.agency); if (!map[m]) { map[m] = []; order.push(m); } map[m].push(p); });
+    function rank(m) { return m === FIRST_MIN ? 0 : (m === NO_MIN ? 2 : 1); }
+    return order.sort(function (a, b) { return (rank(a) - rank(b)) || (map[b].length - map[a].length) || a.localeCompare(b, 'ko'); })
+      .map(function (m) { return { ministry: m, items: map[m] }; });
+  }
+  /* 목록에 보일 이름 — 앞의 «2026년(도)»는 떼어 이름이 먼저 보이게, 해는 따로 */
+  function shortTitle(p) {
+    var n = clean(p && p.name), m = n.match(/^(\d{4})년도?\s+(.+)$/);
+    return m ? { title: m[2], year: m[1] } : { title: n, year: '' };
+  }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
   return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
-    forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck };
+    forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
+    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle };
 });

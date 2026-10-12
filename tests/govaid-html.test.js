@@ -94,3 +94,11 @@ test('조건 편집기는 AI 조사 초안의 확신도·메모를 보여 준다
   assert.match(fn, /aiDraft/);
   assert.match(fn, /esc\([^)]*notes/);
 });
+
+test('사업 중심 목록은 부처(관)로 묶고, 목록 칸이 넓다 — 사업 이름이 보이게 (대표 지시 2026-10-12)', () => {
+  const body = SRC.match(/function drawProg\(\)\{[\s\S]*?\n\}/);
+  assert.ok(body, 'drawProg 를 찾지 못함');
+  assert.match(body[0], /GovaidView\.byMinistry\(/, '부처 묶음을 쓰지 않는다');
+  assert.match(body[0], /GovaidView\.shortTitle\(/, '앞의 «2026년»을 떼지 않는다');
+  assert.match(SRC, /id="p-prog">\s*<div class="split wide">/, '사업 중심 칸이 넓지 않다');
+});

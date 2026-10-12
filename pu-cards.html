@@ -38471,7 +38471,7 @@ function coNpsHtml(o){
   }
   if(p.candAt) return `<div class="dim" style="margin-bottom:6px">앞 6자리가 같은 국민연금 사업장이 없습니다 — 가입자 3인 미만 법인·10인 미만 개인사업장은 공개되지 않습니다.</div>
       <div class="coerppin"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
-  if(_pubAsked[o.key]) return `<div class="dim">국민연금 사업장을 찾는 중입니다 — 몇 초 뒤 저절로 나옵니다.</div>`;
+  if(_pubAsked[o.key + ':nps']) return `<div class="dim">국민연금 사업장을 찾는 중입니다 — 몇 초 뒤 저절로 나옵니다.</div>`;
   return `<div class="dim" style="margin-bottom:6px">국민연금 가입 사업장에서 가입자 수(≈ 근로자 수)를 받아 옵니다. 처음 한 번은 사업장을 골라 주세요.</div>${find}`;
 }
 /* ══════ 👥 근로자 수 — 한 줄 + 사업장 팝업 (대표 「진행」 2026-10-11, 목업 ㉯ 「칸이 늘어나는 것보다 팝업」) ══════
@@ -38486,11 +38486,12 @@ const EI_EVERY_DAYS = 30;
    숫자는 서버가 받아 pubdata/co/{번호} 에 쓰고, 이 화면은 읽기만 한다. 새로 받고 싶으면 «받아 달라»를 남긴다.
    ⚠ 화면이 공단에 직접 묻거나 숫자를 적지 않는다 — 쓰는 곳이 둘이면 같은 회사 숫자가 화면마다 달라진다.
    ⚠ 사람이 정한 것(국민연금 pick·none)은 공공데이터가 아니라 기업정보함 coInfo 에 남는다. */
-let _pubAsked = {};         /* 이 화면에서 «받아 달라»를 남긴 회사 — 되풀이하지 않는다 */
+let _pubAsked = {};         /* 이 화면에서 «받아 달라»를 남긴 회사·갈래({열쇠}:ei|nps) — 되풀이하지 않는다.
+                               ⚠ 갈래별로 적는다 — 열 때 고용·산재만 청했는데 국민연금 칸이 「찾는 중」에 멈춰 있었다(10/12 실화면) */
 async function coPubAsk(o, k){
   if(!o || Store.mode !== 'firebase' || typeof PuPubdata === 'undefined') return false;
   const ok = await PuPubdata.ask(o.bizno, k, o.name || '');
-  if(ok){ _pubAsked[o.key] = 1; coPubRepaint(o.key); }
+  if(ok){ _pubAsked[o.key + ':' + (k || 'all')] = 1; coPubRepaint(o.key); }
   else toast('요청을 남기지 못했습니다 — 로그인을 확인해 주세요', 6000);
   return ok;
 }
@@ -38526,11 +38527,11 @@ async function coEiFetch(key, quiet){
 }
 /* 기업 상세를 열 때 — 아직 없거나 30일 지났으면 조용히 «받아 달라»(국세청 coNtsAutoOnOpen 과 같은 결) */
 function coEiAutoOnOpen(o){
-  if(!o || _pubAsked[o.key] || Store.mode !== 'firebase') return;
+  if(!o || _pubAsked[o.key + ':ei'] || Store.mode !== 'firebase') return;
   if(digits(o.bizno || '').length !== 10) return;
   const ei = o.extra && o.extra.ei;
   if(ei && ei.at && Date.now() - Number(ei.at) < EI_EVERY_DAYS * 86400000) return;
-  _pubAsked[o.key] = 1;       /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
+  _pubAsked[o.key + ':ei'] = 1;       /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
   coEiFetch(o.key, true);
 }
 /* 기업 상세의 «한 줄» */

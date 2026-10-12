@@ -99,3 +99,15 @@ test('★★ ⑤ 서버 — 번호 회사만, 25일 안에 받은 곳은 건너�
   assert.equal(writes['pucards/coInfo/1234567890/ei'].gy, 32);
   assert.equal(writes['pucards/coInfo/1234567890/eiHist/202610'], 32);
 });
+
+test('★★ 요청 표시는 갈래별 — 열 때 고용·산재만 청했으면 국민연금 칸은 「찾는 중」이 아니다 (10/12 실화면)', () => {
+  const ctx = { String, Number, Object, Array, Date, JSON, Store: { mode: 'firebase' }, coEiFetch: () => {},
+    esc: v => String(v == null ? '' : v), digits: s => String(s || '').replace(/\D/g, '') };
+  vm.createContext(ctx);
+  vm.runInContext([line(/const EI_EVERY_DAYS = [^\n]*/), 'let _pubAsked = {};', fn('function coEiAutoOnOpen('),
+    fn('function npsCues('), fn('function npsTrend('), fn('function coNpsHtml(')].join('\n'), ctx);
+  const o = { key: '1234567890', bizno: '1234567890', extra: { nps: {} } };
+  ctx.coEiAutoOnOpen(o);                     /* 열 때 — 고용·산재만 청한다 */
+  assert.doesNotMatch(ctx.coNpsHtml(o), /찾는 중/, '★★ 고용·산재만 청했는데 국민연금이 「찾는 중」에 멈춥니다');
+  assert.match(ctx.coNpsHtml(o), /국민연금에서 찾기/, '찾기 단추가 안 보입니다');
+});
