@@ -576,6 +576,19 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 #dbTools{margin-left:auto;display:flex;align-items:center;justify-content:flex-end;min-width:0;flex:1 1 360px}
 #dbTools .toolbar{margin:0!important;padding:4px 0;border:0;background:none;box-shadow:none;flex-wrap:wrap;gap:6px;flex:1 1 auto;min-width:0;justify-content:flex-end}
 #dbTools .toolbar .tb-input{min-width:180px!important}
+/* 왼쪽 목록 칸 맨 위 — 탭·검색·단추를 모아 둔다(_dsHeadDock). 오른쪽 문서는 화면 맨 위에서 시작한다 */
+#page-docbox.ds-docked>.page{padding-top:6px}
+#page-docbox.ds-docked .db-top{display:none}
+.ds-head{border-bottom:2px solid var(--border);margin:0 0 6px;padding-bottom:6px}
+.ds-head #db-tabrow{margin:0 0 6px;border-bottom:none;flex-wrap:wrap;gap:2px}
+.ds-head #dbTools{display:block;margin:0;flex:none;width:100%}
+.ds-head #dbTools .toolbar{justify-content:flex-start;padding:0;gap:6px}
+.ds-head #dbTools .toolbar .tb-input{min-width:0!important;flex:1 1 100%}
+.ds-head #dbTools .toolbar .tb-spacer{display:none}
+.ds-head #dbTools .toolbar .btn{flex:1 1 auto}
+.ds-head #dbTools .toolbar .cnt{margin-left:auto}
+#page-docbox.ds-docked .ds-prev{top:0;max-height:100vh;overflow-y:auto}
+#page-docbox.ds-docked .ds-pv-img{max-height:max(320px,calc(100vh - 170px))}
 .ds-split{display:grid;grid-template-columns:minmax(0,1fr) 10px var(--ds-pv,320px);gap:0;align-items:start;margin-top:6px;min-width:0}
 .ds-gut{cursor:col-resize;align-self:stretch;min-height:120px;position:relative}
 .ds-gut::after{content:'';position:absolute;left:4px;top:0;bottom:0;width:2px;border-radius:2px;background:var(--border)}
@@ -8310,7 +8323,21 @@ async function cdReOcr(id){
   }catch(e){ console.warn('cdReOcr', e); toast('읽기 실패 — 원본을 확인해 주세요'); }
 }
 
+/* ★ 탭·검색·단추를 «왼쪽 목록 칸 맨 위»로 (대표 승인 2026-10-12 「캡쳐1 왼쪽으로 모두 정리 · 오른쪽 문서는 위로 최대한」)
+   목록을 다시 그릴 때(innerHTML) 옮겨 둔 줄이 같이 지워지지 않게 «먼저 제자리(.db-top)로» 돌려놓고, 그린 뒤에 다시 얹는다.
+   ⚠ 줄(노드)을 «옮길 뿐» 새로 만들지 않는다 — 단추 이벤트·검색칸 값이 그대로 산다. */
+function _dsHeadPark(){
+  var top=document.querySelector('#page-docbox .db-top'); if(!top) return;
+  ['db-tabrow','dbTools'].forEach(function(id){ var el=document.getElementById(id); if(el && el.parentNode!==top) top.appendChild(el); });
+  var pg=document.getElementById('page-docbox'); if(pg) pg.classList.remove('ds-docked');
+}
+function _dsHeadDock(domain){
+  var head=document.getElementById('dsHead-'+domain), pg=document.getElementById('page-docbox'); if(!head||!pg) return;
+  ['db-tabrow','dbTools'].forEach(function(id){ var el=document.getElementById(id); if(el) head.appendChild(el); });
+  pg.classList.add('ds-docked');
+}
 function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.getElementById(D.page); if(!sec) return;
+  if(domain==='resume'||domain==='profile'||domain==='feedoc'||domain==='certdoc') _safe(_dsHeadPark);
   _safe(function(){ dbToolsMount((typeof _dbDomain!=='undefined'&&_dbDomain)||'resume'); });
   const arr=get(D.store);
   const orgSel=document.getElementById(D.orgFilter); if(!orgSel) return; const cur=orgSel.value;
@@ -8389,9 +8416,10 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
   const 겹침줄=겹침.clusters?`<div class="ds-dupbar">⚠ 같은 서류가 겹쳐 있습니다 — ${겹침.clusters}묶음 · 이전 판 ${겹침.old}건`
     +(겹침.kept?` <span class="m">(제출기록이 있는 ${겹침.kept}건은 정리에서 뺍니다)</span>`:'')
     +`<span style="flex:1"></span>`+(겹침.cleanable?`<button class="btn sm" onclick="dsDupClean('${domain}',this)">이전 판 한 번에 정리</button>`:'')+`</div>`:'';
-  body.innerHTML=allChk+dsBar+겹침줄+`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list">${목록}</div>`
+  body.innerHTML=`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list"><div class="ds-head" id="dsHead-${domain}"></div>${allChk}${dsBar}${겹침줄}${목록}</div>`
     +`<div class="ds-gut" title="끌어서 폭을 바꿉니다 · 두 번 누르면 처음 폭" onmousedown="dsGutDown(event)" ondblclick="dsGutReset()"></div>`
     +`<div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
+  _safe(function(){ _dsHeadDock(domain); });
   _safe(function(){ dsSameCheck(body); });
   _safe(function(){ var 고른=_dsPicked[domain]; if(고른) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ if(el.getAttribute('data-id')===고른) el.classList.add('pick'); }); dsPrevDraw(domain); });
   _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
