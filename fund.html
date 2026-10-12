@@ -18172,11 +18172,19 @@ function _isLocked(){ return !!(S.f15Close&&S.f15Close.locked); }
    ③ 천원 끝수 — 서식은 칸마다 천원으로 반올림한다. 칸끼리 더한 값과 합계 칸이 1천원 어긋나면
       노동부 시스템 입력 때 합계가 맞지 않는다고 나온다. 어느 합계인지 짚어 준다.
    순수 함수 — 검사가 그대로 돌린다. 판단은 사람이 한다(숫자를 고쳐 쓰지 않는다). */
-function f15Checks(R){
+/* 손실대비특별적립금 분개 — 세무사 결산본은 출연금 10%를 기본재산에서 이 계정(자본잉여금)으로 옮겨
+   ⑳(별지15호)과 재무상태표 기본재산이 갈린다(외부 세무사 결산 검토 ②, 2026-10-07). 승인된 분개의 건수·금액. 순수 */
+function spresvOf(arr){
+  var n=0, sum=0;
+  (arr||[]).forEach(function(x){ if(x&&x.approved&&(x.debit==='손실대비특별적립금'||x.credit==='손실대비특별적립금')){ n++; sum+=(num(x.amount)||0); } });
+  return {n:n, sum:Math.round(sum)};
+}
+function f15Checks(R,sp){
   var K=_k1000, out=[], fin=R.fin||{};
   var book=Math.round(num(fin.basic)||0), end=Math.round(R.bfEnd||0);
-  if(K(book)!==K(end)) out.push({lv:'err',t:'⑳ 기본재산 총액이 재무상태표와 다릅니다',
-    d:'⑳ '+K(end).toLocaleString()+'천원 · 재무상태표 기본재산 '+K(book).toLocaleString()+'천원 — 아래 «기본재산 변동» 목록에서 증가 분개를 ⑰ 사용으로(또는 반대로) 고르지 않았는지 보세요.'});
+  if(K(book)!==K(end)) out.push({lv:'err',k:'bf20',t:'⑳ 기본재산 총액이 재무상태표와 다릅니다',
+    d:'⑳ '+K(end).toLocaleString()+'천원 · 재무상태표 기본재산 '+K(book).toLocaleString()+'천원 — 아래 «기본재산 변동» 목록에서 증가 분개를 ⑰ 사용으로(또는 반대로) 고르지 않았는지 보세요.'
+      +((sp&&sp.n)?' 또 장부에 «손실대비특별적립금» 분개가 '+sp.n+'건('+K(sp.sum).toLocaleString()+'천원) 있습니다 — 출연금 일부를 기본재산에서 특별적립금(자본잉여금)으로 옮긴 결산이면 두 서류가 이만큼 갈립니다. 기본재산은 사용(준비금 설정)·분할 외에는 줄지 않으므로 세무사 확인이 필요합니다.':'')});
   var run=R.run||{}, inv=(run.trust||0)+(run.secu||0)+(run.own||0)+(run.reit||0)+(run.etc||0);
   if(inv>end+500) out.push({lv:'err',t:'㉒~㉖ 운용 상품이 ⑳ 기본재산보다 많습니다',
     d:'운용 상품 '+K(inv).toLocaleString()+'천원 · ⑳ '+K(end).toLocaleString()+'천원 — ㉑ 예입이 0 으로 잘려 ㉑~㉖ 합이 ⑳ 과 맞지 않습니다. 준비금으로 산 상품은 기본재산 운용이 아닙니다.'});
@@ -18265,7 +18273,7 @@ function f15View(arr){
     +hlp('close.lock')+'</div>'
     +'<div class="row" style="gap:18px;align-items:flex-start;margin-top:12px;flex-wrap:wrap">'
     +'<div style="min-width:300px;flex:1"><div style="font-weight:700;margin-bottom:6px">기본재산 현황 ⑫~⑳ (천원)</div><table>'
-      +(function(){ var ck=f15Checks(R); if(!ck.length) return '';
+      +(function(){ var ck=f15Checks(R,spresvOf(Object.keys(S.txns||{}).map(function(k){ return S.txns[k]; }))); if(!ck.length) return '';
         return '<tr><td colspan="2" style="padding:0">'+ck.map(function(c){
           return '<div class="msg '+c.lv+'" style="margin:6px 0;font-size:11.5px;line-height:1.55"><b>⚠ '+esc(c.t)+'</b><br>'+esc(c.d)+'</div>'; }).join('')+'</td></tr>'; })()
       +'<tr><td>⑫ 직전 회계연도 말</td><td style="text-align:right">'+_n(_k1000(R.bfOpen))+'</td></tr>'
@@ -20422,6 +20430,8 @@ function lockClosing(shortNote){
   if(S.f15For===fid+'/'+yr && S.f15Sites){
     var _R=buildF15(arr,fid,yr,S.f15Rep,S.f15Sites,S.f15Welf);
     var _cc=contribCheck(_R.bf.employer+_R.bf.other,S.f15Sites,S.f15Sy);
+    /* ⑳ 기본재산 총액이 재무상태표와 다르면 확정 전에 짚는다 — 두 서류가 같은 해에 다른 기본재산을 들고 나간다 */
+    f15Checks(_R,spresvOf(arr)).forEach(function(c){ if(c.k==='bf20') msg+='\n\n⚠️ '+c.t+'\n   '+c.d; });
     if(_cc.off) msg+='\n\n⚠️ 출연금이 사업장 명부와 다릅니다 — 장부 '+won(_cc.book)+' · 사업장 명부 '+won(_cc.site)
       +'\n   별지15호는 장부를, 지원신청서·기금출연확인서는 사업장 명부를 씁니다.';
   }
