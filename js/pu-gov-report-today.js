@@ -5,7 +5,7 @@
      · 읽기만 한다 — 이미 있는 알림 결과(List.alerts · Track.alertsExtra · Docs.blockedAlerts)와 대시보드 업체 줄(Dash.summarize().lines)·사업 띠 자료를 받아
        새 값을 만들 뿐 받은 값을 바꾸지 않고, 결과도 입력과 객체를 나눠 쓰지 않는다. DOM·전역·다른 모듈에 기대지 않는다(이 모듈은 아무것도 호출하지 않고 받기만 한다).
      · 할 일 한 줄 = 한 업체·사업(coId|typeId)의 한 가지 일. 같은 쌍이 여러 알림에 걸리면 KINDS 순서가 앞선(더 급한) 종류 한 줄만 남는다.
-         hot  = overdue(제출 기한 지남) · blocked(막힌 단계) · unwritten(종료 후 미작성)
+         hot  = overdue(제출 기한 지남 — 간단형은 extra.overdue, 대형은 업체 줄 lines 의 지난 기한(미완료)) · blocked(막힌 단계) · unwritten(종료 후 미작성)
          mid  = waitSign(서명 회신 대기) · soon(계약 종료 임박)
          low  = staleDraft(초안 묵음)
      · 기록을 못 읽었으면(known 이 참이 아님) 서류 진행 기록이 있어야 아는 blocked·waitSign·overdue·soon 은 아예 만들지 않는다 — «정상»처럼 보이게 하지 않는다.
@@ -138,6 +138,15 @@
         c.due = str(e.due); c.days = days;
         byKind.overdue.push(task('overdue', c));
       });
+      /* 대형 사업은 현황판 줄이 없어 extra.overdue 가 못 만든다 — 업체 줄의 지난 기한(미완료)도 overdue.
+         extra.overdue 에 이미 있는 쌍은 위에서 먼저 들어갔으므로 아래 중복 걸러내기가 그쪽 줄만 남긴다 */
+      lines.forEach(function (l) {
+        var d = num(l.dueDays);
+        if (l.finished === true || d === null || d >= 0) return;
+        var c = base(l, biz);
+        c.due = str(l.due); c.days = -d;
+        byKind.overdue.push(task('overdue', c));
+      });
       arr(o.blocked).forEach(function (b) {
         if (!obj(b)) return;
         var c = base(b, biz);
@@ -216,7 +225,7 @@
       var blocked = nonNeg(s.blockedN), soon = nonNeg(s.soonN), notes = [];
       out.bar = barOf(s.cols);
       if (blocked > 0) notes.push('막힘 ' + blocked);
-      if (soon > 0) notes.push('기한 ' + soon);
+      if (soon > 0) notes.push('기한 14일 안 ' + soon);   // 2단계 대시보드 기준(이미 지난 것 포함) — 목록의 «기한 임박»(7일 이하)과 다르다
       out.note = notes.length ? notes.join(' · ') : '정상';
       out.tone = blocked > 0 ? 'bad' : (soon > 0 ? 'warn' : 'ok');
       return out;

@@ -56,7 +56,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grChapCopyText', 'grChapCopy', 'grChapCopyAll', 'grChapAi',
   'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv',
   'grDashHtml', 'grBoardHtml', 'grLoadDashView', 'grSetDashView', 'grBizBlocked',
-  'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grApplyTodayView'];
+  'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grErpFor', 'grApplyTodayView'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -4214,7 +4214,7 @@ test('142 정적 — 오늘 할 일 모듈은 대시보드 모듈 다음 · 화�
   assert.ok(SRC.includes('오늘 급한 일이 없습니다'), '할 일이 없을 때 문구');
   assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES, '새 쓰기 명령이 없다');
   /* 첫 화면 그리기는 메일함을 자동으로 읽지 않는다 — 단추의 onclick 글자만 있다 */
-  ['grRenderToday', 'grTodayCalc', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grApplyTodayView', 'grOpenTask'].forEach((n) => {
+  ['grRenderToday', 'grTodayCalc', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grApplyTodayView', 'grOpenTask', 'grErpFor'].forEach((n) => {
     const body = grab(n).replace(/onclick="grGlobalInbox\([^"]*"/g, '').replace(/onclick="grOpenFromInbox\([^"]*"/g, '');
     assert.doesNotMatch(body, /grLoadInbox\(|grGlobalInbox\(|fbDb|\.set\(|\.update\(|\.remove\(|fetch\(|localStorage|grSaveCell|https?:\/\//, n + ' 은 읽어 그리기만 한다(메일함은 단추로만)');
   });
@@ -4229,6 +4229,8 @@ test('142 정적 — 오늘 할 일 모듈은 대시보드 모듈 다음 · 화�
   assert.match(SRC, /closest\('\[data-td-open\]'\)/);
   assert.match(SRC, /closest\('\[data-td-more\]'\)/);
   assert.match(SRC, /closest\('\[data-home\]'\)/);
+  ['grLoad', 'grLoadDocs', 'grRetryDocs', 'grLoadTrack', 'grLoadBizState', 'grSaveCell', 'grCloseBiz', 'grReopenBiz'].forEach((n) => assert.match(grab(n), /GR\.dver\+\+/, n + ' 이 자료 버전을 올린다(계산 캐시 열쇠)'));
+  assert.match(grab('grTodayCalc'), /GR\.tdKey===key/, '캐시 열쇠');
   const css = SRC.slice(SRC.indexOf('<style>'), SRC.indexOf('</style>'));
   const tdCss = css.split(/\r?\n/).filter((l) => /\.td-/.test(l)).join('\n');
   assert.ok(tdCss.length > 0);
@@ -4446,4 +4448,177 @@ test('148 탭 저장 — localStorage gov_home_tab 은 all 만 인정 · 막혀�
   none.ctx.grLoadTab(); none.ctx.grSetTab('all');
   assert.equal(none.ctx.GR.tab, 'all');
   assert.equal(w.db.쓴것.length, 0);
+});
+
+/* ═══ 수정 라운드 1 — 못 읽은 자료를 «정상»으로 말하지 않는다 · 계산 캐시 · 종결된 이알피 사업을 고르지 않는다 · 대형 지난 기한 · «기한 14일 안» · 더 보기 되돌리기 ═══ */
+const deniedAt = (path) => (db) => ({ ref: (p) => (p === path ? { once: async () => { throw new Error('permission_denied'); } } : db.ref(p)) });
+const TD_REAL = require('../js/pu-gov-report-today.js');
+
+test('149 사업 목록·이음표·계약을 못 읽으면 첫 화면이 원인별로 알린다 — 가짜 «진행 사업이 없습니다»·«오늘 급한 일이 없습니다» 없음 · 다시 시도는 grRetryDocs', async () => {
+  /* 사업 목록(data/biz_cons_types) */
+  const a = world({ db: deniedAt('data/biz_cons_types') });
+  await a.ctx.grLoad();
+  assert.equal(a.ctx.GR.docs.err, true);
+  assert.equal(a.ctx.GR.td.known, false);
+  let h = a.els.today.innerHTML;
+  assert.ok(h.includes('사업 목록을 못 불러왔습니다'), '카드 띠 자리');
+  assert.match(h, /<button type="button" onclick="grRetryDocs\(\)">다시 시도<\/button>/);
+  assert.ok(h.includes('사업 목록을 못 불러와 일부 할 일을 알 수 없습니다'));
+  assert.ok(!h.includes('진행 사업이 없습니다') && !h.includes('data-biz='), '가짜 «없음» 없음');
+  assert.ok(!h.includes('서명 회신을 기다리는'), '기록·사업 목록이 있어야 아는 줄은 없다');
+  assert.ok(h.includes('보고서를 아직 안 썼습니다'), '현황판 줄만으로 아는 것은 그대로');
+  a.ctx.GR.f.year = '1999'; a.ctx.grRender();
+  assert.ok(!a.els.today.innerHTML.includes('오늘 급한 일이 없습니다'), '못 읽었으면 «없습니다» 라고 하지 않는다');
+  /* 이음표(scal_erpTypeMap) */
+  const b = world({ db: deniedAt('scal_erpTypeMap') });
+  await b.ctx.grLoad();
+  assert.equal(b.ctx.GR.docs.err, false);
+  assert.equal(b.ctx.GR.docs.bad.tmap, true);
+  assert.equal(b.ctx.GR.td.known, false);
+  assert.equal(b.ctx.GR.td.stripErr, 'tmap');
+  h = b.els.today.innerHTML;
+  assert.ok(h.includes('푸른이알피 사업 연결을 못 불러와 사업 카드를 만들 수 없습니다') && h.includes('푸른이알피 사업 연결(이음표)을 못 불러와 일부 할 일을 알 수 없습니다'));
+  assert.ok(h.includes('grRetryDocs()') && !h.includes('진행 사업이 없습니다'));
+  b.ctx.GR.f.year = '1999'; b.ctx.grRender();
+  assert.ok(!b.els.today.innerHTML.includes('오늘 급한 일이 없습니다'));
+  /* 계약(data/consultings) — 기한을 모른다 */
+  const c = world({ db: deniedAt('data/consultings') });
+  await c.ctx.grLoad();
+  assert.equal(c.ctx.GR.td.known, false);
+  assert.ok(c.els.today.innerHTML.includes('계약 정보를 못 불러와 일부 할 일을 알 수 없습니다'));
+  /* 대조 — 읽었는데 비어 있는 이음표({})는 «못 읽음» 이 아니다 */
+  const s = F.seed(); s.scal_erpTypeMap = {};
+  const e = world({ seed: s });
+  await e.ctx.grLoad();
+  assert.ok(!e.ctx.GR.docs.bad.tmap, '읽은 빈 노드');
+  assert.equal(e.ctx.GR.td.known, true);
+  assert.equal(e.ctx.GR.td.stripErr, '');
+  assert.ok(!e.els.today.innerHTML.includes('일부 할 일을 알 수 없습니다'));
+  /* 다시 시도 — 읽을 수 있게 되면 안내가 사라진다 */
+  const flaky = { fail: true };
+  const r = world({ db: (db) => ({ ref: (p) => (p === 'data/biz_cons_types' && flaky.fail ? { once: async () => { throw new Error('permission_denied'); } } : db.ref(p)) }) });
+  await r.ctx.grLoad();
+  assert.ok(r.els.today.innerHTML.includes('사업 목록을 못 불러왔습니다'));
+  flaky.fail = false;
+  await r.ctx.grRetryDocs();
+  assert.ok(!r.els.today.innerHTML.includes('사업 목록을 못 불러왔습니다') && r.els.today.innerHTML.includes('data-biz="consulting-04"'), '다시 읽으면 카드 띠가 돌아온다');
+  assert.equal(a.db.쓴것.length, 0);
+});
+
+test('149-2 사업 하나가 docsTable 에서 던지면 그 사업만 건너뛴다 — known 은 그대로 · «일부 사업을 읽지 못했습니다» 한 줄 · 건너뛴 게 있으면 «없습니다» 라고 하지 않는다', async () => {
+  const w = world();
+  w.ctx.PuGovReportDocs = Object.assign({}, D, { docsTable() { throw new Error('boom'); } });
+  await w.ctx.grLoad();
+  const td = w.ctx.GR.td;
+  assert.equal(td.known, true, 'known 을 낮추지 않는다');
+  assert.ok(td.skipped >= 3);
+  const h = w.els.today.innerHTML;
+  assert.ok(h.includes('일부 사업을 읽지 못했습니다'));
+  assert.ok(h.includes('보고서를 아직 안 썼습니다'), '나머지 줄은 그대로');
+  assert.match(h, /class="td-biz td-idle"/, '건너뛴 사업도 카드는 업체 수만으로');
+  w.ctx.GR.td = { model: { hot: [], mid: [], low: [], total: 0 }, strip: [], known: true, why: [], stripErr: '', skipped: 2 };
+  w.ctx.grRenderToday();
+  assert.ok(!w.els.today.innerHTML.includes('오늘 급한 일이 없습니다'), '건너뛴 사업이 있으면 없다고 하지 않는다');
+  w.ctx.GR.td.skipped = 0; w.ctx.grRenderToday();
+  assert.ok(w.els.today.innerHTML.includes('오늘 급한 일이 없습니다'), '모두 읽었고 줄이 0 일 때만');
+});
+
+test('150 계산 캐시 — 거르개·탭·사업 선택·검색으로는 다시 세지 않고, 연도·오늘·자료(불러오기·기록 저장)가 바뀌면 다시 센다', async () => {
+  const w = world({ email: 'p009@pureun.kr' });
+  let n = 0;
+  w.ctx.PuGovReportToday = Object.assign({}, TD_REAL, { build(o) { n++; return TD_REAL.build(o); } });
+  await w.ctx.grLoad();
+  const n0 = n;
+  assert.ok(n0 >= 1);
+  const tabN = w.els.tdTabs.innerHTML.match(/<b>(\d+)<\/b>/)[1];
+  for (let i = 0; i < 3; i++) w.ctx.grRender();
+  w.ctx.GR.f.co = '가'; w.ctx.grRender();
+  w.ctx.GR.f.status = 'todo'; w.ctx.GR.f.att = 'a1'; w.ctx.GR.f.mine = true; w.ctx.GR.f.type = 't1'; w.ctx.grRender();
+  w.ctx.grSetTab('all'); w.ctx.grSetBiz('consulting-03'); w.ctx.grSetBiz('consulting-03'); w.ctx.grGoHome();
+  assert.equal(n, n0, '같은 열쇠로 그리기 여러 번 — 계산은 한 번');
+  assert.equal(w.els.tdTabs.innerHTML.match(/<b>(\d+)<\/b>/)[1], tabN, '탭 숫자는 캐시 결과');
+  /* 연도 */
+  w.ctx.grSetYear('2025'); assert.equal(n, n0 + 1, '연도를 바꾸면 다시');
+  w.ctx.grSetYear('2025'); w.ctx.grRender(); assert.equal(n, n0 + 1);
+  w.ctx.grSetYear('2026'); assert.equal(n, n0 + 2);
+  /* 오늘 날짜 */
+  w.ctx.GR.today = '2026-10-11'; w.ctx.grRender(); assert.equal(n, n0 + 3, '날짜가 바뀌면 다시');
+  w.ctx.GR.today = '2026-10-10'; w.ctx.grRender(); assert.equal(n, n0 + 4);
+  /* 기록 저장 — 서명이 끝나면 «서명 회신 대기» 줄이 사라진다 */
+  assert.ok(w.els.today.innerHTML.includes('서명 회신을 기다리는 중입니다'));
+  w.ctx.grSetBiz('consulting-04');
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  w.els.cwSt.value = 'done'; w.els.cwSent.value = '2026-09-20'; w.els.cwGot.value = '2026-10-08'; w.els.cwNote.value = '';
+  const before = n;
+  await w.ctx.grSaveCell();
+  assert.equal(n, before + 1, '저장 뒤 다시');
+  w.ctx.grGoHome();
+  assert.ok(!w.els.today.innerHTML.includes('서명 회신을 기다리는 중입니다'), '저장한 기록이 첫 화면에 반영');
+  assert.equal(n, before + 1, '돌아와도 다시 세지 않는다');
+  /* 기록을 다시 읽으면 */
+  await w.ctx.grLoadTrack(); w.ctx.grRender();
+  assert.equal(n, before + 2, '기록을 다시 읽으면 다시');
+  /* 종결 — 상태가 바뀌면 */
+  const bs = n;
+  w.ctx.GR.bizState = { 'consulting-05': { closedFrom: '2026', at: 1 } }; w.ctx.GR.dver++; w.ctx.grRender();
+  assert.equal(n, bs + 1);
+  assert.ok(!w.els.today.innerHTML.includes('data-biz="consulting-05"'), '종결 사업은 카드·줄에서 빠진다');
+  assert.equal(w.db.쓴것.length, 1, '쓰기는 기록 저장 한 번뿐');
+});
+
+test('151 서류 열기 — 같은 일정 사업에 종결된 이알피 사업이 앞 순서로 이어져 있어도 종결되지 않은 첫째를 고른다 · 모두 종결이면 erpTypeFor 결과', async () => {
+  const s = F.seed();
+  s.data.biz_cons_types.v.push({ code: 'consulting-12', name: '인사노무컨설팅충남북부상의(옛)', short: '', agency: '', sortOrder: 0 });
+  s.scal_erpTypeMap['consulting-12'] = 't3';
+  s.scal_bizState = { 'consulting-12': { closedFrom: '2026', at: 1 } };
+  const w = world({ seed: s });
+  await w.ctx.grLoad();
+  const d = w.ctx.GR.docs;
+  assert.equal(w.ctx.PuGovReportDocs.erpTypeFor('t3', d.biz, d.tmap).code, 'consulting-12', '전제 — erpTypeFor 는 종결된 사업이 먼저');
+  assert.equal(w.ctx.grErpFor('t3').code, 'consulting-04', '종결되지 않은 첫째');
+  assert.equal(w.ctx.grErpFor('t1').code, 'consulting-03', '이어진 사업이 하나면 그대로');
+  assert.equal(w.ctx.grErpFor('없는사업'), null);
+  assert.ok(w.els.today.innerHTML.includes('data-td-open="1" data-co="c2" data-ty="t3"'), '줄 그리기도 같은 판정(단추가 있다)');
+  w.ctx.grOpenTask('c2', 't3');
+  assert.equal(w.ctx.GR.f.biz, 'consulting-04', '서류 열기가 종결 사업을 고르지 않는다');
+  assert.ok(w.ctx.GR.toc && w.ctx.GR.toc.head.coName === '다라정밀');
+  /* 이 해에 종결이 아닌(다른 해부터 종결) 사업은 진행으로 본다 */
+  s.scal_bizState['consulting-12'] = { closedFrom: '2027', at: 1 };
+  const y = world({ seed: s });
+  await y.ctx.grLoad();
+  assert.equal(y.ctx.grErpFor('t3').code, 'consulting-12', '2026년에는 종결이 아니다 — 첫째 그대로');
+  /* 모두 종결 — erpTypeFor 의 첫째(종결 배너가 정상으로 뜬다) */
+  s.scal_bizState = { 'consulting-12': { closedFrom: '2026', at: 1 }, 'consulting-04': { closedFrom: '2026', at: 1 } };
+  const z = world({ seed: s });
+  await z.ctx.grLoad();
+  assert.equal(z.ctx.grErpFor('t3').code, 'consulting-12');
+  z.ctx.grOpenTask('c2', 't3');
+  assert.equal(z.ctx.GR.f.biz, 'consulting-12');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('152 대형 사업의 지난 기한 — 계약 종료일이 지났고 안 끝난 업체는 급함 줄 · 기록을 못 읽으면 만들지 않는다', async () => {
+  const w = world({ seed: bigSeed({ end: '2026-10-05' }) });
+  await w.ctx.grLoad();
+  const hot = tdSec(w.els.today.innerHTML, 'hot');
+  assert.ok(hot.includes('다라정밀 · 제출 기한이 지났습니다'), '대형(산업일자리충남) — 현황판 줄이 없어도');
+  assert.ok(hot.includes('기한 2026-10-05 (5일 지남)'));
+  assert.ok(hot.includes('data-co="c2" data-ty="t5"'));
+  assert.equal(countOf(hot, /다라정밀 · 제출 기한이 지났습니다/g), 1, '한 줄');
+  const off = world({ seed: bigSeed({ end: '2026-10-05' }), db: deniedAt('scal_docs') });
+  await off.ctx.grLoad();
+  assert.ok(!off.els.today.innerHTML.includes('제출 기한이 지났습니다'));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('153 사업 카드 문구 «기한 14일 안 n» · 「더 보기」 펼침은 연도 변경·「🎯 오늘 할 일」·거르개 풀기에서 되돌아간다', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  const card = w.els.today.innerHTML.match(/<button type="button" class="td-biz [^"]*" data-biz="consulting-03"[^>]*>[\s\S]*?<\/button>/)[0];
+  assert.ok(card.includes('업체 1곳 · 기한 14일 안 1'), '2단계 기준(지난 것 포함)임이 문구에 보인다');
+  const open = () => { w.ctx.grTodayMore('hot'); assert.equal(w.ctx.GR.todayMore.hot, 9999); };
+  open(); w.ctx.grSetYear('2025'); assert.equal(Object.keys(J(w.ctx.GR.todayMore)).length, 0, '연도 변경');
+  open(); w.ctx.grGoHome(); assert.equal(Object.keys(J(w.ctx.GR.todayMore)).length, 0, '「🎯 오늘 할 일」');
+  open(); w.ctx.grSetTab('all'); w.ctx.grSetTab('today'); assert.equal(w.ctx.GR.todayMore.hot, 9999, '탭을 오가는 것만으로는 그대로');
+  open(); w.ctx.grReset(); assert.equal(Object.keys(J(w.ctx.GR.todayMore)).length, 0, '거르개 풀기');
 });

@@ -13,7 +13,7 @@
 ## 정한 것 (제가 정했다 — 대표 「묻지말고 끝까지」)
 - **자리·전환**: `GR.f.biz === ''`(사업 안 고름)일 때 가운데 영역에 탭 둘 — 「🎯 오늘 할 일 N」(기본) · 「📋 전체 현황」(지금의 숫자 칸·거르개·전체 표). 사업을 고르면 탭은 숨고 2단계 사업 대시보드 + 표/보드. 왼쪽 목록 머리에 「🎯 오늘 할 일」 단추를 둬 사업을 푼다(`grSetBiz('')` + 탭 `today`). 연도 막대는 두 탭 모두 위에 그대로.
 - **할 일 종류와 묶음**(한 업체·사업 쌍은 한 줄만 — 아래 순서가 앞선 종류가 이긴다):
-  1. 🔥 급함 `hot`: `overdue`(제출 기한 지남 — `alertsExtra.overdue`, 간단형) · `blocked`(막힌 단계 — `blockedAlerts`) · `unwritten`(종료 14일 넘은 미작성 — `alerts.unwritten`)
+  1. 🔥 급함 `hot`: `overdue`(제출 기한 지남 — `alertsExtra.overdue`, 간단형. 대형은 `lines` 의 지난 기한(미완료)도 — 현황판 줄이 없어 `alertsExtra` 가 못 만든다) · `blocked`(막힌 단계 — `blockedAlerts`) · `unwritten`(종료 14일 넘은 미작성 — `alerts.unwritten`)
   2. ⏳ 챙기기 `mid`: `waitSign`(서명 회신 7일 넘게 기다림 — `alertsExtra.waitSign`) · `soon`(계약 종료 7일 안·아직 안 끝남 — 대시보드 업체 줄의 `dueDays` 0~7 && !finished, 기한 지난 것은 `overdue` 쪽에서 다룸; 간단형·대형 모두)
   3. 📝 이번 주 `low`: `staleDraft`(초안 7일 넘게 묵음 — `alerts.staleDraft`)
   - 종결 사업은 이미 입력에서 빠져 있다(호출하는 쪽이 `grClosedTypes` 로 거른다). 기록을 못 읽었으면(`trackErr`) `blocked`·`waitSign`·`overdue`·`soon` 은 못 만든다 — 목록 위에 «기록을 못 불러와 일부 할 일을 알 수 없습니다» 한 줄.

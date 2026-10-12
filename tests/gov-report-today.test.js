@@ -199,8 +199,38 @@ test('soon — soonDays 를 바꿀 수 있고, 없거나 이상하면 7', () => 
   assert.equal(P.build(input({ lines, soonDays: 'x' })).mid.length, 0);
   assert.equal(P.build(input({ lines, soonDays: NaN })).mid.length, 0);
 });
-test('soon — 기한이 지난 것은 soon 이 아니다(overdue 쪽 몫): dueDays 음수는 줄이 안 생긴다', () => {
-  assert.equal(P.build(input({ lines: [line('c1', '가나상사', 't1', 'A', -1), line('c2', '다라정밀', 't1', 'A', -30)] })).total, 0);
+test('soon — 기한이 지난 것은 soon 이 아니다(overdue 쪽 몫): dueDays 음수는 soon 줄이 안 생긴다', () => {
+  const r = P.build(input({ lines: [line('c1', '가나상사', 't1', 'A', -1), line('c2', '다라정밀', 't1', 'A', -30)] }));
+  assert.equal(r.mid.length, 0);
+  assert.deepEqual([].concat(r.hot, r.mid, r.low).map((t) => t.kind), ['overdue', 'overdue'], '지난 기한은 overdue 가 맡는다');
+});
+
+/* ---------- overdue — 대형 사업: 현황판 줄이 없어 extra.overdue 가 못 만든 지난 기한을 lines 로 ---------- */
+test('overdue(lines) — 기한이 지났고 안 끝난 업체는 overdue 줄(hot): 제목·근거·days(지난 일수) · 끝난 업체·기한 안 지난 것·모름은 아니다', () => {
+  const r = P.build(input({ lines: [
+    line('c1', '가나상사', 't2', '대형', -3, { due: '2026-10-09', bizName: '일터혁신' }),
+    line('c2', '다라정밀', 't2', '대형', -3, { finished: true }),
+    line('c3', '마바전자', 't2', '대형', 0), line('c4', '사아테크', 't2', '대형', 5), line('c5', '자차산업', 't2', '대형', null)] }));
+  assert.deepEqual(ids(r.hot), ['c1|t2']);
+  const t = r.hot[0];
+  assert.equal(t.kind, 'overdue'); assert.equal(t.level, 'hot');
+  assert.equal(t.title, '가나상사 · 제출 기한이 지났습니다');
+  assert.equal(t.meta, '대형 · 기한 2026-10-09 (3일 지남)');
+  assert.deepEqual(t.tags, ['일터혁신', '제출']);
+  assert.equal(t.days, 3);
+  assert.equal(t.id, 'overdue|c1|t2');
+  assert.deepEqual(ids(r.mid).sort(), ['c3|t2', 'c4|t2'], '오늘·앞으로는 soon');
+});
+test('overdue(lines) — 같은 업체·사업이 extra.overdue 에 이미 있으면 그쪽 줄 한 줄(중복 없음) · 더 급한 blocked 가 이긴다 · known:false 면 만들지 않는다', () => {
+  const co = ['c1', '가나상사', 't1', '대형'];
+  const both = P.build(input({ extra: { waitSign: [], overdue: [{ row: row(...co, null), due: '2026-10-01' }] }, lines: [line(...co, -5, { due: '2026-10-07' })] }));
+  assert.equal(both.hot.length, 1);
+  assert.equal(both.hot[0].days, 11, 'extra 쪽 문구(today − due)');
+  assert.ok(both.hot[0].meta.includes('2026-10-01'));
+  const blk = P.build(input({ blocked: [{ coId: 'c1', typeId: 't1', coName: '가나상사', typeName: '대형', items: [{ name: 'x', note: '' }] }], lines: [line(...co, -5)] }));
+  assert.deepEqual(blk.hot.map((t) => t.kind), ['overdue'], '우선순위 그대로 — overdue 가 blocked 보다 앞선 종류라 한 줄만 남는다');
+  const off = P.build(input({ known: false, lines: [line(...co, -5)] }));
+  assert.equal(off.total, 0);
 });
 
 /* ---------- known:false ---------- */
@@ -369,8 +399,8 @@ test('stripOf — known:false 또는 hasPlan:false 면 bar:null · 「업체 n�
 test('stripOf — note·tone: 막힘 > 기한 > 정상', () => {
   const r = P.stripOf([stripItem({ blockedN: 2 }), stripItem({ soonN: 3 }), stripItem({ blockedN: 1, soonN: 2 }), stripItem()]);
   assert.equal(r[0].note, '막힘 2'); assert.equal(r[0].tone, 'bad');
-  assert.equal(r[1].note, '기한 3'); assert.equal(r[1].tone, 'warn');
-  assert.equal(r[2].note, '막힘 1 · 기한 2'); assert.equal(r[2].tone, 'bad');
+  assert.equal(r[1].note, '기한 14일 안 3'); assert.equal(r[1].tone, 'warn');
+  assert.equal(r[2].note, '막힘 1 · 기한 14일 안 2'); assert.equal(r[2].tone, 'bad');
   assert.equal(r[3].note, '정상'); assert.equal(r[3].tone, 'ok');
 });
 test('stripOf — 이상한 입력·빈 입력은 던지지 않는다, 입력 불변·공유 없음', () => {
