@@ -102,11 +102,11 @@ function namesOf(v) {
 
 /* ⚠ 못 읽으면 «건너뛴다»(반환값 null) — 자동 파이프라인은 사람이 다시 안 보므로,
      못 가린 채 내보내는 것보다 이번 회차를 거르는 쪽이 낫다. */
-async function loadNameLists(db) {
+async function loadNameLists(db, readCompanies) {
   try {
     const [s, c] = await Promise.all([
       db.ref("data/user_accounts/v").once("value"),
-      db.ref("data/companies/v").once("value"),
+      readCompanies ? readCompanies().then((v) => ({ val: () => v })) : db.ref("data/companies/v").once("value"),
     ]);
     return { staff: namesOf(s.val()), companies: namesOf(c.val()) };
   } catch (e) {
@@ -187,7 +187,7 @@ async function classifyNewInbox(deps, opts) {
   if (left <= 0) { out.skipped = rows.length; return out; }
 
   /* ⚠★ 이름을 못 가리면 «통째로 건너뛴다» — 사람이 다시 안 보는 자리라 더 엄하다 */
-  const names = await loadNameLists(db);
+  const names = await loadNameLists(db, o.readCompanies);
   if (!names) { out.skipped = rows.length; return out; }
 
   const [binsSnap, putSnap] = await Promise.all([

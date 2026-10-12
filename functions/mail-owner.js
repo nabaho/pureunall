@@ -72,7 +72,7 @@ function arr(v) {
 }
 
 /* ══ 표를 한 번에 만든다 — 회차마다 한 번만 읽는다 ══ */
-async function loadTables(db) {
+async function loadTables(db, readCompanies) {
   const paths = ["data/user_dir", "data/companies", "uid_roles",
     MAIL_ROOT + "/config/mailWho", MAIL_ROOT + "/config/mailCo",
     MAIL_ROOT + "/config/mailWork", MAIL_ROOT + "/config/staffSucc",
@@ -81,7 +81,8 @@ async function loadTables(db) {
     "work_erp/mailaddr"];
   const FIXED_PATHS = paths.length;
   paths.push.apply(paths, WORK_STORES.map(([store]) => "data/" + store + "/v"));
-  const snaps = await Promise.all(paths.map((p) => db.ref(p).once("value")));
+  const snaps = await Promise.all(paths.map((p) => p === "data/companies" && readCompanies
+    ? readCompanies().then((v) => ({ val: () => ({ v: v }) })) : db.ref(p).once("value")));
   const [dir, cos, roles, hand, co, workLink, succ, pushCfg, boxWho, noWho, wkAddrSnap] = snaps;
 
   /* 사람 — 사번↔이름, 퇴사, 이어받기, 사번→로그인(uid) */
@@ -330,7 +331,7 @@ async function notifyOwners(deps, opts) {
   out.ran = true; out.rows = rows.length;
 
   const db = deps.getDatabase();
-  const T = await loadTables(db);
+  const T = o.readTables ? await o.readTables() : await loadTables(db, o.readCompanies);
 
   /* 사람마다 모은다 — 회차에 한 번만 울린다 */
   const mine = {};
