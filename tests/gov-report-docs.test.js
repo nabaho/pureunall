@@ -778,3 +778,74 @@ test('tocFor chipItem — 현장클리닉은 ①② 보고서 딱지가 별지14
   assert.deepEqual(nb.items.map((x) => x.id + ':' + x.chip.txt), ['report:초안', 'sign:—', 'attach:—', 'submit:—'], '충남북부');
 });
 function BIGX_PAIR_NORTH() { return D.pairs(BIGX.input, 'tc', '2026')[0]; }
+
+/* ═══ 대형 사업 장별 AI 초안의 장 목록(설계 2-C, 2026-10-12) — 항목의 chapters ═══ */
+
+const CH = require('../js/pu-gov-report-chapters.js');
+const CH_WANT = {
+  'workplace.kickoff': ['overview', 'analysis', 'tasks', 'org'],
+  'workplace.mid': ['progress', 'results', 'issues', 'plan'],
+  'workplace.final': ['overview', 'progress', 'results', 'effects', 'follow'],
+  'industry.kickoff': ['background', 'scope', 'diag', 'roles', 'org'],
+  'industry.final': ['summary', 'overview', 'status', 'issues', 'results', 'support'],
+  'industry-cn.result': ['overview', 'status', 'diag', 'kpi', 'effects', 'follow'],
+  'industry-cn.after': ['progress', 'results', 'follow'],
+};
+
+test('chapters — 장 목록은 정확히 이 7개 항목에만 · 키 차례와 제목이 계획대로', () => {
+  const got = {};
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => { if ('chapters' in x) got[p.key + '.' + x.id] = x.chapters.map((c) => c.k); }));
+  assert.deepEqual(got, CH_WANT);
+  const t = (key, id) => D.DOC_PLANS.find((p) => p.key === key).items.find((x) => x.id === id).chapters.map((c) => c.t);
+  assert.deepEqual(t('workplace', 'kickoff'), ['진단 개요(기업 현황·진단 방법)', '진단 결과 요약(인사시스템 수준·노동관계법 준수)', '개선과제 후보와 수행 계획', '추진 체계(디자인팀)·일정']);
+  assert.deepEqual(t('workplace', 'mid'), ['수행 경과(회차별 요약)', '주요 논의·성과', '문제점과 조치', '향후 일정']);
+  assert.deepEqual(t('workplace', 'final'), ['진단·수행 개요', '수행 경과(회차별 요약)', '개선 성과', '기대효과', '이행관리 계획']);
+  assert.deepEqual(t('industry', 'kickoff'), ['사업개요 — 추진 배경·필요성', '사업 내용·추진 절차', '진단결과 요약·컨설팅 영역', '역할 분담·필요자료', '운영 체계·일정']);
+  assert.deepEqual(t('industry', 'final'), ['성과 요약(기업 스토리·KPI)', '컨설팅 개요(수행 일수·절차)', '기업 현황', '애로사항 원인 분석과 해결 방안', '결과 종합(정량·정성)', '연계 정부지원사업 검토(적합·부적합 사유)']);
+  assert.deepEqual(t('industry-cn', 'result'), ['컨설팅 개요(배경·목표·기대효과)', '수진기업 개요', '진단 결과 및 전환 과제', '핵심 추진과제·KPI·로드맵', '기대효과(기업·근로자·지역)', '이행 계획·사후관리 방안']);
+  assert.deepEqual(t('industry-cn', 'after'), ['이행 현황', '성과', '향후 관리']);
+});
+
+test('chapters — 모두 chaptersOf 를 그대로 통과(8장 이하·소문자 키·겹침 없음·제목 있음) · 간단형·다른 대형 항목에는 없다', () => {
+  let n = 0;
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => {
+    const id = p.key + '.' + x.id;
+    if (id in CH_WANT) {
+      n++;
+      assert.equal(p.kind, '대형', id);
+      assert.deepEqual(CH.chaptersOf(x), x.chapters, id + ' — 걸러지는 것이 없다');
+      assert.ok(x.chapters.length >= 1 && x.chapters.length <= CH.CH_MAX, id);
+      assert.ok(x.chapters.every((c) => /^[a-z]+$/.test(c.k) && c.t.trim()), id);
+      assert.equal(new Set(x.chapters.map((c) => c.k)).size, x.chapters.length, id + ' 키 겹침');
+    } else {
+      assert.ok(!('chapters' in x), id + ' 에는 chapters 가 없다');
+      assert.deepEqual(CH.chaptersOf(x), [], id);
+    }
+  }));
+  assert.equal(n, 7);
+  ['plan', 'round', 'mdlog', 'monthly', 'log', 'guide', 'follow', 'outcome', 'meeting', 'link', 'done'].forEach((id) => {
+    D.DOC_PLANS.filter((p) => p.kind === '대형').forEach((p) => p.items.filter((x) => x.id === id).forEach((x) => assert.equal(x.chapters, undefined, p.key + '.' + id)));
+  });
+  D.DOC_PLANS.filter((p) => p.kind !== '대형').forEach((p) => p.items.forEach((x) => assert.equal(x.chapters, undefined, p.key + '.' + x.id)));
+});
+
+test('chapters — 기존 항목 필드는 그대로(chapters 만 더했다) · 장 목록이 note·rd·steps 를 지우지 않는다', () => {
+  const ALLOWED = ['id', 'name', 'per', 'step', 'how', 'steps', 'note', 'rd', 'chapters'];
+  D.DOC_PLANS.forEach((p) => p.items.forEach((x) => Object.keys(x).forEach((k) => assert.ok(ALLOWED.includes(k), p.key + '.' + x.id + ' 낯선 필드 ' + k))));
+  const it = (k, id) => D.DOC_PLANS.find((p) => p.key === k).items.find((x) => x.id === id);
+  assert.equal(it('workplace', 'kickoff').note, '통합진단보고서(PPT) — 디자인팀 전원 참석');
+  assert.equal(it('workplace', 'mid').note, '통합진단보고서(PPT) — 디자인팀 전원 참석');
+  assert.equal(it('workplace', 'final').note, '통합진단보고서(PPT) — 디자인팀 전원 참석');
+  assert.ok(it('industry', 'kickoff').note.startsWith('표준 PPT'));
+  assert.ok(it('industry', 'final').note.startsWith('표준 HWP + 체크리스트'));
+  assert.ok(it('industry-cn', 'result').note.startsWith('컨설팅 개요 · 진단 결과'));
+  assert.equal(it('industry-cn', 'after').note, undefined, '사후관리 결과보고서는 원래 note 가 없다');
+  assert.equal(it('workplace', 'round').rd, true);
+  assert.equal(it('industry', 'mdlog').rd, true);
+  assert.equal(it('workplace', 'kickoff').rd, undefined);
+  assert.ok(Array.isArray(it('workplace', 'plan').steps) && it('workplace', 'plan').steps.length === 5);
+  /* it() 가 chapters 를 안 주면 키를 만들지 않는다 — 기존 항목 모양 그대로 */
+  assert.deepEqual(Object.keys(it('workplace', 'guide')), ['id', 'name', 'per', 'step', 'note']);
+  assert.deepEqual(Object.keys(it('workplace', 'kickoff')), ['id', 'name', 'per', 'step', 'note', 'chapters']);
+  assert.deepEqual(Object.keys(it('industry-cn', 'after')), ['id', 'name', 'per', 'step', 'chapters']);
+});

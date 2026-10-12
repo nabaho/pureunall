@@ -17,6 +17,8 @@
      · 대형 틀(2026-10-11, 설계 2-A)은 항목마다 선택 글 steps(플랫폼 입력 순서 · plat 줄)·note(증빙·기준 안내)를 둘 수 있다.
        docsTable 은 대형이면 단계 열(cols = 항목 이름)·칸(cells)·다음 단계(next)를, trackRows 는 막힌 단계(blocked)를 돌려준다.
        간단형 출력은 그대로다(big·next 속성이 없다). 월별 서류의 달은 monthsFor(계약 기간 → 회차 날짜).
+     · 대형 틀의 큰 보고서 줄 일곱 곳(workplace 착수·중간·최종, industry 착수·최종, industry-cn 결과·사후관리)은 선택 필드
+       chapters([{k,t}] — 「장별 AI 초안」이 채울 장, 2026-10-12 설계 2-C)를 둔다. 읽는 쪽은 pu-gov-report-chapters.js chaptersOf.
      · 목차에는 업체 이름·담당 이름·날짜·서류 이름·상태만 — 연락처·금액·보고서 본문은 담지 않는다.
      · ③④⑤ 칸·목차 딱지·현황판 줄 기록(trackRows)은 서류 진행 기록(scal_docs, pu-gov-report-track.js)을
        «받았을 때만» 계산한다 — 못 읽었으면(규칙 게시 전·권한 없음) 지금처럼 「—」. 이 모듈은 여전히 쓰지 않는다.
@@ -42,9 +44,23 @@
   function digits(v) { return str(v).replace(/\D/g, ''); }
   function it(id, name, per, step, extra) {
     var o = { id: id, name: name, per: per, step: step };
-    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; if (extra.note) o.note = extra.note; if (extra.rd) o.rd = true; }
+    if (extra) { if (extra.how) o.how = extra.how; if (extra.steps) o.steps = extra.steps; if (extra.note) o.note = extra.note; if (extra.rd) o.rd = true; if (extra.chapters) o.chapters = extra.chapters; }
     return o;
   }
+  /* 대형 보고서 장 목록 — 「장별 AI 초안」이 채울 장(키·제목). 정리본 §2-5~2-7 기준 초안 [노무사 확인].
+     chapters 는 대형 report 줄 일곱 곳에만 둔다 — 걸러 읽는 것은 pu-gov-report-chapters.js 의 chaptersOf(소문자 키·최대 8장). */
+  var CH_WP_KICKOFF = [{ k: 'overview', t: '진단 개요(기업 현황·진단 방법)' }, { k: 'analysis', t: '진단 결과 요약(인사시스템 수준·노동관계법 준수)' },
+    { k: 'tasks', t: '개선과제 후보와 수행 계획' }, { k: 'org', t: '추진 체계(디자인팀)·일정' }];
+  var CH_WP_MID = [{ k: 'progress', t: '수행 경과(회차별 요약)' }, { k: 'results', t: '주요 논의·성과' }, { k: 'issues', t: '문제점과 조치' }, { k: 'plan', t: '향후 일정' }];
+  var CH_WP_FINAL = [{ k: 'overview', t: '진단·수행 개요' }, { k: 'progress', t: '수행 경과(회차별 요약)' }, { k: 'results', t: '개선 성과' },
+    { k: 'effects', t: '기대효과' }, { k: 'follow', t: '이행관리 계획' }];
+  var CH_IN_KICKOFF = [{ k: 'background', t: '사업개요 — 추진 배경·필요성' }, { k: 'scope', t: '사업 내용·추진 절차' }, { k: 'diag', t: '진단결과 요약·컨설팅 영역' },
+    { k: 'roles', t: '역할 분담·필요자료' }, { k: 'org', t: '운영 체계·일정' }];
+  var CH_IN_FINAL = [{ k: 'summary', t: '성과 요약(기업 스토리·KPI)' }, { k: 'overview', t: '컨설팅 개요(수행 일수·절차)' }, { k: 'status', t: '기업 현황' },
+    { k: 'issues', t: '애로사항 원인 분석과 해결 방안' }, { k: 'results', t: '결과 종합(정량·정성)' }, { k: 'support', t: '연계 정부지원사업 검토(적합·부적합 사유)' }];
+  var CH_CN_RESULT = [{ k: 'overview', t: '컨설팅 개요(배경·목표·기대효과)' }, { k: 'status', t: '수진기업 개요' }, { k: 'diag', t: '진단 결과 및 전환 과제' },
+    { k: 'kpi', t: '핵심 추진과제·KPI·로드맵' }, { k: 'effects', t: '기대효과(기업·근로자·지역)' }, { k: 'follow', t: '이행 계획·사후관리 방안' }];
+  var CH_CN_AFTER = [{ k: 'progress', t: '이행 현황' }, { k: 'results', t: '성과' }, { k: 'follow', t: '향후 관리' }];
   /* 기술보호울타리 제출 순서 — 2024 «시스템 사용 매뉴얼(전문가용)» 기준 초안. [노무사 확인] — 화면이 바뀌면 고친다.
      로그인(공동인증서·통합로그인)과 «제출» 단추는 사람이 한다. 비밀번호·인증서는 다루지 않는다. */
   var TECHGUARD_STEPS = [
@@ -65,8 +81,8 @@
     { key: 'industry-cn', words: ['산업일자리전환컨설팅충남'], kind: '대형', source: SOURCE, items: [
       it('log', '수행일지', 'once', 'plat', { note: '컨설팅 수행일지 — 기본정보(사업명·수행기관·컨설턴트·기업)와 회차별 수행 내용' }),
       it('monthly', '월별 수행실적보고서', 'month', 'report', { note: '달마다 한 부' }),
-      it('result', '결과보고서', 'once', 'report', { note: '컨설팅 개요 · 진단 결과·전환 과제 · 핵심 과제·KPI · 로드맵 · 기대효과 · 이행 계획 · 사후관리 방안' }),
-      it('after', '사후관리 결과보고서', 'once', 'report')] },
+      it('result', '결과보고서', 'once', 'report', { note: '컨설팅 개요 · 진단 결과·전환 과제 · 핵심 과제·KPI · 로드맵 · 기대효과 · 이행 계획 · 사후관리 방안', chapters: CH_CN_RESULT }),
+      it('after', '사후관리 결과보고서', 'once', 'report', { chapters: CH_CN_AFTER })] },
     { key: 'cci-north', words: ['충남북부'], kind: '간단', source: SOURCE, items: [
       it('report', '결과보고서', 'once', 'report'),
       it('sign', '업체 서명본', 'once', 'sign'),
@@ -114,16 +130,16 @@
         '회의안건·주요 논의사항·기타(다음 안건 등) — «○회차 디자인팀 회의» 같은 형식적 문구는 쓰지 않습니다',
         '시작·종료 사진(타임스탬프 앱) 2장과 참석자 전원 서명지 스캔 첨부', PLAT_SUBMIT],
         note: '회의 2시간 이상 · 기업 참여 3명 이상 · 대면 70% 이상(비대면은 ZOOM 등 공식 프로그램만 — 전화·메일은 인정 안 됨)', rd: true }),
-      it('kickoff', '착수보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
-      it('mid', '중간보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
-      it('final', '최종보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석' }),
+      it('kickoff', '착수보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석', chapters: CH_WP_KICKOFF }),
+      it('mid', '중간보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석', chapters: CH_WP_MID }),
+      it('final', '최종보고', 'once', 'report', { note: '통합진단보고서(PPT) — 디자인팀 전원 참석', chapters: CH_WP_FINAL }),
       it('follow', '이행관리 등록', 'once', 'plat', { steps: [PLAT_LOGIN, '이행관리 수행내용 등록', PLAT_SUBMIT] }),
       it('outcome', '이행결과표', 'once', 'report')] },
     { key: 'industry', words: ['산업일자리'], kind: '대형', criteria: 'industry', source: SOURCE, items: [
-      it('kickoff', '착수보고서(PPT)', 'once', 'report', { note: '표준 PPT — 사업개요·컨설팅 추진 계획·운영 체계. 업로드하면 1MD 로 인정' }),
+      it('kickoff', '착수보고서(PPT)', 'once', 'report', { note: '표준 PPT — 사업개요·컨설팅 추진 계획·운영 체계. 업로드하면 1MD 로 인정', chapters: CH_IN_KICKOFF }),
       it('plan', '수행계획서', 'once', 'report', { note: '운영기관 승인이 나야 수행을 시작합니다' }),
       it('mdlog', 'MD별 수행일지', 'round', 'report', { note: '비대면은 보고서 4MD·자료조사 2MD 까지(연속 불가)', rd: true }),
-      it('final', '최종결과보고서', 'once', 'report', { note: '표준 HWP + 체크리스트: KPI 4개 이상(필수 2·선택 2) · 정부지원사업 2개 이상 연계(산업일자리전환지원금 필수) · 기업 현황 최신 연도 · 다른 보고서와 중복 금지' }),
+      it('final', '최종결과보고서', 'once', 'report', { note: '표준 HWP + 체크리스트: KPI 4개 이상(필수 2·선택 2) · 정부지원사업 2개 이상 연계(산업일자리전환지원금 필수) · 기업 현황 최신 연도 · 다른 보고서와 중복 금지', chapters: CH_IN_FINAL }),
       it('meeting', '최종보고회', 'once', 'report', { note: '최종 MD 대면 결과보고회' }),
       it('link', '연계지원사업 등록', 'once', 'plat', { steps: [PLAT_LOGIN, '수행일지·최종결과보고서 등록 확인',
         '연계지원사업 등록(산업일자리전환지원금 포함 2개 이상 — 적합·부적합 사유)', PLAT_SUBMIT] }),
