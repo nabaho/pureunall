@@ -220,7 +220,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <!-- 대형 보고서 「✨ 장별 AI 초안」 — 가리기(ai, 양식 표 모듈 다음) → 서버 부르기(정부사업일정 보고서 창과 같은 번호) → 장별 모듈. 저장·쓰기 없음 -->
 <script src="js/pu-gov-report-ai.js?v=4"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
-<script src="js/pu-gov-report-chapters.js?v=1"></script>
+<script src="js/pu-gov-report-chapters.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="js/pu-hwp-preview.js?v=2"></script>
 <script src="js/pu-back.js?v=2"></script>
@@ -592,14 +592,14 @@ async function grSaveCell(op){
    ★ 재료(회차 메모·서류 메모)가 없으면 부르지도 동의를 묻지도 않는다. 동의는 정부사업일정 보고서 창과 같은 키(gov_ai_ok).
    ★ 바깥으로 나가는 부름은 grChapCall 하나뿐(PuAiCall → 서버 readDoc, Gemini · 로그인·월 한도).
    ★ gov-consulting.html 의 grpAiConsent·grpAiCall·grpAiNames·grpAiErrMsg·GRP_AI_MSG 를 같은 동작·문구·키로 옮겼다(함수 이름만 gr…). */
-var GR_AI={ok:'gov_ai_ok',wait:90000,msg:{login:'로그인을 확인해 주세요',budget:'이번 달 AI 사용 한도를 넘었습니다 — 대표에게 문의',net:'AI 응답이 없습니다 — 잠시 뒤 다시',parse:'AI 답을 읽지 못했습니다',noChap:'이 서류에는 AI 가 채울 장이 없습니다',overwrite:'이미 만든 초안이 있습니다 — 고친 글이 새 초안으로 바뀝니다. 계속할까요?',copyFail:'복사하지 못했습니다 — 글을 골라 직접 복사해 주세요'}};
+var GR_AI={ok:'gov_ai_ok',wait:90000,msg:{login:'로그인을 확인해 주세요',budget:'이번 달 AI 사용 한도를 넘었습니다 — 대표에게 문의',net:'AI 응답이 없습니다 — 잠시 뒤 다시',parse:'AI 답을 읽지 못했습니다',noChap:'이 서류에는 AI 가 채울 장이 없습니다',overwrite:'이미 만든 초안이 있습니다 — 고친 글이 새 초안으로 바뀝니다. 계속할까요?',copyFail:'복사하지 못했습니다 — 글을 골라 직접 복사해 주세요',noCons:'이알피 계약이 연결되지 않아 대표자·담당자 이름은 가려지지 않습니다 — 회차 메모에 사람 이름이 있으면 그대로 전송됩니다',noConsAsk:'이알피 계약이 연결되지 않아 대표자·담당자 이름은 가려지지 않습니다.\n회차 메모에 사람 이름이 있으면 그대로 외부 AI 로 전송됩니다.\n\n그래도 보낼까요?',noMod:'AI 모듈을 불러오지 못했습니다 — 새로 고친 뒤 다시'}};
 /* 인라인에 넣는 장 키 — 소문자 글자만(모듈 chaptersOf 와 같은 꼴), 객체 기본 이름은 뺀다 */
 function grOkChapKey(k){ return typeof k==='string'&&/^[a-z]+$/.test(k)&&k!=='constructor'&&k!=='prototype'; }
 function grChapAsk(msg){ try{ return typeof confirm==='function'?!!confirm(msg):false; }catch(e){ return false; } }
 function grChapConsent(){
   try{ if(localStorage.getItem(GR_AI.ok)==='1') return true; }catch(e){}
   var ok=grChapAsk('✨ AI 초안\n\n업체 자료가 외부 AI(Google Gemini)로 전송됩니다 — 가림 처리 후\n'
-    +'(업체·대표자·담당자 이름은 자리 표시로 바꾸고, 전화·메일·주민번호·계좌·사업자번호는 [가림]으로 지웁니다. '
+    +'(업체 이름은 자리 표시로 바꾸고, 이알피 계약이 연결된 업체는 대표자·담당자 이름도 자리 표시로 바꿉니다. 전화·메일·주민번호·계좌·사업자번호는 [가림]으로 지웁니다. '
     +'급여·명부 같은 개인 자료와 첨부 원본은 보내지 않습니다.)\n\n계속할까요? (이 브라우저에서 한 번만 묻습니다)');
   if(ok){ try{ localStorage.setItem(GR_AI.ok,'1'); }catch(e){} }
   return !!ok;
@@ -653,8 +653,16 @@ function grChapNames(c){
   });
   return out;
 }
+/* 이알피 계약이 연결돼 대표자·담당자 이름을 «알고» 있는가 — 모르면 사업장 이름만 가려진다(메모 속 사람 이름은 못 가린다) */
+function grChapLinked(c){
+  var cons=(c&&c.cons)||null;
+  if(!cons) return false;
+  var cc=(cons.company&&typeof cons.company==='object')?cons.company:{};
+  var ct=Array.isArray(cc.contacts)?cc.contacts:[];
+  return !!String(cc.ceo||'').trim()||ct.some(function(x){ return !!String((x&&x.name)||'').trim(); });
+}
 /* 재료 — 회차는 목록이 «보는» 그 회차들(D.pairs 와 같은 거름: 그 업체·사업의 사전진단 아닌 일정 중 날짜 꼴인 것, 날짜순),
-   회차 기록(rd)은 이 rid 의 rd 항목(round·mdlog) 줄 round:N·mdlog:N 의 저장된 rd 를 회차 번호 순서대로(없으면 생략), 메모는 이 칸의 저장된 메모.
+   회차 기록(rd)은 이 rid 의 rd 항목(round·mdlog) 줄 round:N·mdlog:N 의 저장된 rd 를 회차 번호 순서대로(없으면 생략), 서류 메모는 칸 창 입력칸(#cwNote)의 «지금 값»(저장 전이어도) — 입력칸이 없으면 저장된 메모.
    급여·명부·첨부·메일은 읽지 않는다 */
 function grChapInput(c){
   var D=PuGovReportDocs, T=PuGovReportTrack;
@@ -662,20 +670,22 @@ function grChapInput(c){
   var rdItem=((plan&&plan.items)||[]).filter(function(x){ return x&&x.rd&&x.per==='round'; })[0]||null;
   var raw=GR.input&&GR.input.scheds;
   var all=Array.isArray(raw)?raw:(raw&&typeof raw==='object'?Object.keys(raw).map(function(k){ return raw[k]; }):[]);
-  var sc=all.filter(function(s){ return s&&typeof s==='object'&&s.coId===c.coId&&s.typeId===c.typeId&&s.phase!=='pre'&&/^\d{4}-\d{2}-\d{2}$/.test(String(s.date||'')); })
-    .sort(function(a,b){ return String(a.date)<String(b.date)?-1:(String(a.date)>String(b.date)?1:0); });
+  var day=function(s){ return String(s.date==null?'':s.date).trim(); };
+  var sc=all.filter(function(s){ return s&&typeof s==='object'&&s.id&&s.coId===c.coId&&s.typeId===c.typeId&&s.phase!=='pre'&&/^\d{4}-\d{2}-\d{2}$/.test(day(s)); })
+    .sort(function(a,b){ return day(a)<day(b)?-1:(day(a)>day(b)?1:0); });
   var rounds=sc.map(function(s,i){
-    var r={date:String(s.date),visit:s.isField===true?true:(s.isField===false?false:null),memo:String(s.memo||'')};
+    var r={date:day(s),visit:s.isField===true?true:(s.isField===false?false:null),memo:String(s.memo||'')};
     var rec=rdItem?recs[T.keyOf(rdItem,i+1)]:null;
     if(rec&&rec.rd) r.rd=rec.rd;
     return r;
   });
-  var k=c.keys.filter(function(x){ return x.key===c.key; })[0]||c.keys[0], saved=recs[c.key]||null;
+  var k=c.keys.filter(function(x){ return x.key===c.key; })[0]||c.keys[0], saved=recs[c.key]||null, live=$('cwNote');
+  var note=(live&&typeof live.value==='string')?live.value:String((saved&&saved.note)||'');
   var cons=c.cons||{}, cc=(cons.company&&typeof cons.company==='object')?cons.company:{};
   var company={name:c.coName};
   var bt=String(cc.bizType||cc.bizCategory||'').trim();
   if(bt) company.bizType=bt;                       // 근로자수는 이알피에 없다(보고서 창과 같다) — 보내지 않는다
-  return {itemName:k.name,company:company,rounds:rounds,notes:[{label:k.name,text:String((saved&&saved.note)||'')}]};
+  return {itemName:k.name,company:company,rounds:rounds,notes:[{label:k.name,text:note}]};
 }
 /* 안내·오류 줄(#cwChapMsg) — 칸 창을 다시 그리지 않는다 */
 function grChapSay(m,bad){
@@ -686,12 +696,13 @@ function grChapSay(m,bad){
   if(e){ e.textContent=m; e.className=bad?'err-s':'days'; }
 }
 function grRenderChap(){
-  var C=PuGovReportChapters, c=GR.cw, el=$('cwChap');
-  if(!c||!c.chap||!c.chaps||!c.chaps.length||!el) return;
+  var C=(typeof PuGovReportChapters!=='undefined')?PuGovReportChapters:null, c=GR.cw, el=$('cwChap');
+  if(!C||!c||!c.chap||!c.chaps||!c.chaps.length||!el) return;
   var ch=c.chap, own=function(k){ return Object.prototype.hasOwnProperty.call(ch.draft,k); }, any=false;
   var h='<div class="toc-h">✨ 장별 AI 초안</div>'
     +'<div class="days">'+grEsc(C.MSG.NOT_SAVED)+'</div>'
-    +'<div class="days">업체 자료가 가려진 뒤 외부 AI 로 전송됩니다</div>'
+    +'<div class="days">업체 이름·전화·메일 등은 가려진 뒤 외부 AI 로 전송됩니다(대표자·담당자 이름은 이알피 계약이 연결된 경우에만 가려집니다)</div>'
+    +(grChapLinked(c)?'':'<div id="cwChapNoCons" class="err-s">'+grEsc(GR_AI.msg.noCons)+'</div>')
     +'<div class="cw-b"><button type="button" id="cwChapGo" onclick="grChapAi()"'+(ch.busy?' disabled':'')+'>'+(ch.busy?'쓰는 중…':'AI 초안 만들기')+'</button></div>'
     +'<div id="cwChapMsg" class="'+(ch.err?'err-s':'days')+'">'+grEsc(ch.msg||'')+'</div>';
   c.chaps.forEach(function(x){
@@ -708,8 +719,8 @@ function grRenderChap(){
 }
 /* 글칸을 고치면 — 값만 옮기고 그 장의 경고 줄만 다시 계산한다(글칸은 다시 그리지 않는다: 입력·초점 보존). 비교 대상은 «보낸 글을 되돌린 것»(chap.sent) */
 function grChapEdit(k){
-  var C=PuGovReportChapters, c=GR.cw;
-  if(!c||!c.chap||!c.chaps||!grOkChapKey(k)||!c.chaps.some(function(x){ return x.k===k; })) return;
+  var C=(typeof PuGovReportChapters!=='undefined')?PuGovReportChapters:null, c=GR.cw;
+  if(!C||!c||!c.chap||!c.chaps||!grOkChapKey(k)||!c.chaps.some(function(x){ return x.k===k; })) return;
   var t=$('cwChapK_'+k);
   if(!t) return;
   var v=String(t.value==null?'':t.value);
@@ -747,12 +758,15 @@ function grChapCopyAll(){
 /* 「AI 초안 만들기」 — 재료 모으기 → 가리기(모듈) → 재료 없으면 끝(부르지도 묻지도 않음) → 동의 → 부르기(못 읽으면 한 번 더) → 숫자 점검 → 그리기.
    칸 창이 닫히거나 다른 칸으로 바뀌면(GR.cw !== c) 받은 것은 버린다 */
 async function grChapAi(){
-  var C=PuGovReportChapters, A=PuGovReportAi, c=GR.cw;
+  var c=GR.cw;
   if(!c||!c.chap||!c.chaps||c.chap.busy) return;
+  if(typeof PuGovReportChapters==='undefined'||!PuGovReportChapters||typeof PuGovReportAi==='undefined'||!PuGovReportAi){ grChapSay(GR_AI.msg.noMod,true); return; }   // 스크립트를 못 불렀다 — 던지지 않고 알린다
+  var C=PuGovReportChapters, A=PuGovReportAi;
   var ch=c.chap, inp=grChapInput(c);
   var req=C.buildRequest({bizName:c.biz,itemName:inp.itemName,chapters:c.chaps,company:inp.company,names:grChapNames(c),rounds:inp.rounds,notes:inp.notes});
   if(req.empty){ grChapSay(req.noChapters?GR_AI.msg.noChap:C.MSG.NO_MATERIAL,false); return; }
   if(!grChapConsent()) return;                                           // 동의 안 하면 아무것도 보내지 않는다
+  if(!grChapLinked(c)&&!grChapAsk(GR_AI.msg.noConsAsk)) return;           // 이알피 계약이 없으면 사람 이름이 가려지지 않는다 — 한 번 더 묻는다
   if(Object.keys(ch.draft).length&&!grChapAsk(GR_AI.msg.overwrite)) return;
   var sent=A.unmask(req.sent,req.back);                                  // 숫자 점검은 «가리지 않은» 보낸 글과 견준다(업체 이름 속 숫자가 경고로 잡히지 않게)
   ch.busy=true; ch.msg=''; ch.err=false; grRenderChap();
