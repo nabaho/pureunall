@@ -25,3 +25,8 @@ test('저장 단추가 판정을 거치고, 사람이 고른 것·이미 다른 
   assert.ok(/await rhAutoSaveDomain\(rhSaveDomain\(\)\)/.test(strip(SRC)), '저장 단추가 판정을 부른다');
   assert.ok(/id="rhModeSel" onchange="_rhModeTouched=true;/.test(SRC), '고르개를 만지면 기억');
 });
+
+test('협회 서류에 한정 — 「협회」가 없으면 지급 낱말이 있어도 비용으로 보내지 않는다', () => {
+  const f = strip(떼기('async function rhAutoSaveDomain('));
+  assert.ok(/\/협회\/\.test\(글\)\s*&&\s*RH_FEE_WORDS\.test\(글\)/.test(f), '협회 + 지급 낱말 둘 다');
+});
