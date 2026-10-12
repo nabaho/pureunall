@@ -25,7 +25,10 @@ firebase.messaging().onBackgroundMessage(function (payload) {
   self.registration.showNotification(d.title || '푸른노무법인', {
     body: d.body || '',
     icon: '/pureunall/icon-192.png',
-    badge: '/pureunall/icon-192.png',
+    /* ⚠ badge 는 폰 맨 위 상태줄의 작은 아이콘이다. 안드로이드는 «모양(투명도)만» 쓰고 흰색으로 칠한다.
+       바탕이 꽉 찬 icon-192.png 를 주면 «흰 네모» 가 된다(2026-10-12 대표 「누구건지 모르겠다」).
+       투명 바탕 + 「푸」 획만 있는 그림을 준다 — 만들개: scripts/make-badge-icon.js */
+    badge: '/pureunall/icon-badge-96.png',
     tag: d.tag || 'pu-suggestion',      // 같은 tag면 알림이 쌓이지 않고 최신 것으로 갈린다
     renotify: true,
     /* 🚗 출장 출발 알림은 누를 때까지 남긴다 — 운전 준비 중에 사라지면 못 찾는다(2026-10-09) */
