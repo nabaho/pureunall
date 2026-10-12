@@ -1233,6 +1233,13 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .gn-tag.nts{background:#fef2f2;color:#991b1b}
 .mck .gn-tag.dom{background:#fffbeb;color:#854d0e}
 .mck .gn-tag.bnc{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.mck .gn-tag.nps{background:#fef2f2;color:#991b1b}
+.mck .gn-tag.alive{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;font-weight:700}
+.mck .gn-tag.einone{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;font-weight:400}
+.mck .gn-cd.grn b{color:#166534}
+.mck .gn-pub{display:flex;align-items:center;gap:10px;margin:0 18px 10px;padding:7px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;font-size:12.5px;white-space:nowrap}
+.mck .gn-pub span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mck .gn-pub button{height:28px;padding:0 12px;border:1px solid #2563eb;background:#2563eb;color:#ffffff;border-radius:7px;font-size:12.5px;cursor:pointer}
 .mck .gn-lnk{color:#2563eb;cursor:pointer}
 .mck .act button.mv,.mck .gn-bulk button.mv{border-color:#fecaca;background:#fef2f2;color:#991b1b;font-weight:600}
 .mck .act button.ok,.mck .gn-bulk button.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
@@ -12345,11 +12352,35 @@ function nameChkHtml(){
        근거가 바뀌면(새 반송·다음 달 국세청 답) 다시 올라온다 — 사람의 확인이 새 사실을 덮지 않게(국세청 ntsOkOf 와 같은 결).
    ⚠ 업체관리(이알피) 기록은 고치지 않는다 — 계약 종료는 업체관리에서 사람이 한다.
    ⚠ 국세청에서 이미 「🧹 폐업 정리」·「영업 중 확인」한 곳(coNtsHandled)은 다시 안 올린다.
-   ⚠ 남의 잠긴 폴더 명함은 안 본다(세지도 옮기지도 않는다). */
+   ⚠ 남의 잠긴 폴더 명함은 안 본다(세지도 옮기지도 않는다).
+   ── 공단 근거 (대표 「진행」 2026-10-12, 목업 승인) — 공공데이터 공용 자리(pubdata, coWithPub 로 extra 에 얹힘)
+     💳 국민연금 탈퇴 — 기업정보함에서 «고른» 사업장이 탈퇴로 바뀐 곳. 정식 근거라 혼자서도 줄을 만든다.
+     🟢 4대보험 사업장 살아 있음 — 국세청은 폐업인데 공단 사업장이 살아 있다 → «번호만 바뀐 곳»일 수 있다. 맨 위로.
+     🏢 4대보험 사업장 없음 — 직원 없는 곳일 수 있어 혼자서는 줄을 안 만든다. 다른 근거 옆에만.
+     ⚠★ 보조 근거(🟢·🏢, GONE_SUPPORT)는 «지문»(sig)에 넣지 않는다 — 넣으면 이미 「정리함·살아 있음」으로
+       처리한 줄이 공단 자료가 들어오는 순간 전부 다시 올라온다. */
 let _gone = null, _goneAsk = false;
 const GONE_PAGE = 50;
 const GONE_FOLDER_RE = /업체\s*종료/;
-const GONE_RANK = { nts:0, dom:1, bnc:2 };
+const GONE_RANK = { nts:0, nps:1, dom:2, bnc:3, alive:8, einone:9 };
+const GONE_SUPPORT = { alive:1, einone:1 };
+/* 공단 근거 — 회사 하나(o)의 extra 에서 (순수 로직) */
+function gonePubEv(o){
+  const ex = (o && o.extra) || {}, out = [];
+  const np = ex.nps || {};
+  if(np.pick && np.now && np.now.on === false){
+    const d = String(np.now.scsn || '');
+    out.push({ t:'nps', txt:'국민연금 탈퇴' + (d.length >= 6 ? ' ' + d.slice(0,4) + '.' + d.slice(4,6) : ''), at:np.now.at });
+  }
+  const ei = ex.ei;
+  if(ei && ei.rows){
+    const n = Number(ei.gy) || Number(ei.sj) || 0;
+    if(n > 0) out.push({ t:'alive', txt:(Number(ei.gy) ? '고용보험' : '산재보험') + ' 상시 ' + n + '명 살아 있음', at:ei.at });
+  } else if(ei && ei.at){
+    out.push({ t:'einone', txt:'4대보험 사업장 없음', at:ei.at });
+  }
+  return out;
+}
 function goneLoad(cb){
   if(_gone !== null){ cb && cb(); return; }
   if(_goneAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
@@ -12387,6 +12418,17 @@ function goneRows(){
     const r = rowOf('n:' + (nrm(nm) || o.key), nm);
     r.o = o;
     addEv(r, { t:'nts', txt:(c === 'gone' ? '폐업' : '휴업') + (coVal(o, 'ntsEndDt') ? ' ' + coVal(o, 'ntsEndDt') : ''), at:coVal(o, 'ntsAt') });
+    gonePubEv(o).forEach(ev => addEv(r, ev));
+    (o.cards || []).forEach(it => addCard(r, it));
+  });
+  /* 💳 국민연금 탈퇴 — 정식 근거라 국세청이 멀쩡해도 줄을 만든다 */
+  (typeof coList === 'function' ? (coList() || []) : []).forEach(function(o){
+    const evs = gonePubEv(o);
+    if(!evs.some(x => x.t === 'nps')) return;
+    const nm = o.name || coVal(o, 'company') || o.key;
+    const r = rowOf('n:' + (nrm(nm) || o.key), nm);
+    r.o = r.o || o;
+    evs.forEach(ev => addEv(r, ev));
     (o.cards || []).forEach(it => addCard(r, it));
   });
   /* 🌐 도메인 · ↩ 반송 — 명함으로 회사를 찾는다 */
@@ -12422,9 +12464,12 @@ function goneRows(){
     const r = rows[k];
     r.cards = Object.keys(r.cards).map(id => r.cards[id]);
     r.ev.sort((a,b)=> GONE_RANK[a.t] - GONE_RANK[b.t]);
-    r.sig = r.ev.map(x => x.t + ':' + x.txt).sort().join('|');
-    r.at = r.ev.reduce((m, x) => Math.max(m, goneMs(x.at)), 0);
-    r.rank = GONE_RANK[r.ev[0].t];
+    const main = r.ev.filter(x => !GONE_SUPPORT[x.t]);
+    r.sig = main.map(x => x.t + ':' + x.txt).sort().join('|');
+    r.at = main.reduce((m, x) => Math.max(m, goneMs(x.at)), 0);
+    /* 🟢 국세청은 폐업인데 공단 사업장이 살아 있다 — 잘못 정리하기 전에 먼저 보게 맨 위로 */
+    r.hint = r.ev.some(x => x.t === 'alive') && main.some(x => x.t === 'nts');
+    r.rank = r.hint ? -1 : GONE_RANK[main[0].t];
     let who = r.o && r.o.erp && r.o.erp.main;
     if(!who && EM && EM.match) for(const it of r.cards){ const m = EM.match(it); if(m && m.main){ who = m.main; break; } }
     r.who = who || '';
@@ -12447,8 +12492,23 @@ function goneFolder(){
   gs.sort((a,b)=> (/퇴사/.test(b.name) ? 1 : 0) - (/퇴사/.test(a.name) ? 1 : 0));
   return gs[0] || null;
 }
+/* 🏢 공단 자료 받기 — 국세청 폐업·휴업인데 공단 자료가 아직 없는 회사(사업자번호 10자리)만 */
+let _goneAsked = false;
+function goneNoPub(rows){
+  return (rows || []).filter(r => r.o && r.ev.some(x => x.t === 'nts')
+    && digits(r.o.bizno || '').length === 10 && !(r.o.extra && r.o.extra.ei));
+}
+async function goneAskPub(){
+  if(typeof PuPubdata === 'undefined' || _goneAsked) return;
+  const list = goneNoPub(goneRows().filter(r => r.state === 'todo'));
+  if(!list.length){ toast('받을 곳이 없습니다', 4000); return; }
+  _goneAsked = true; goneMount();
+  toast('공단 자료 ' + list.length + '곳을 청했습니다 — 몇 분 안에 저절로 붙습니다', 7000);
+  for(const r of list){ try{ await PuPubdata.ask(r.o.bizno, 'ei', r.o.name || ''); }catch(_){ } }
+}
 function goneOpen(){
   state.goneOn = true; state.goneTab = 'todo'; state.goneSel = {}; state.goneRow = ''; state.gonePage = 1;
+  if(typeof loadPubCo === 'function') loadPubCo();      /* 공단 근거 — 기업 상세를 안 거쳐 열어도 */
   goneLoad(goneMount);
   goneMount();
 }
@@ -12531,10 +12591,13 @@ function goneHtml(){
   const list = tab === 'done' ? doneRows : tab === 'todo' ? todo : todo.filter(r => r.ev.some(x => x.t === tab));
   const show = list.slice(0, (state.gonePage || 1) * GONE_PAGE);
   const card = (t, n, l, cls) => '<div class="gn-cd' + (tab === t ? ' on' : '') + (cls ? ' ' + cls : '') + '" onclick="goneTabSet(\'' + t + '\')"><b>' + n + '</b><span>' + l + '</span></div>';
-  const tag = x => '<span class="gn-tag ' + x.t + '">' + ({ nts:'🏛 ', dom:'🌐 ', bnc:'↩ ' })[x.t] + esc(x.txt) + '</span>';
+  const tag = x => '<span class="gn-tag ' + x.t + '">' + ({ nts:'🏛 ', dom:'🌐 ', bnc:'↩ ', nps:'💳 ', alive:'🟢 ', einone:'🏢 ' })[x.t] + esc(x.txt) + '</span>';
   const onlyDom = r => r.ev.length === 1 && r.ev[0].t === 'dom' && r.cards.length;
   const btns = function(r){
     if(r.state !== 'todo') return '<button onclick="goneUndo(\'' + esc(r.key) + '\')">↩ 되돌리기</button>';
+    if(r.hint) return '<button class="ok" onclick="goneMark([\'' + esc(r.key) + '\'],\'alive\')">살아 있음</button>'
+      + (r.o ? '<button onclick="coNtsNewNoAsk(\'' + esc(String(r.o.key).replace(/'/g, "\\'")) + '\')">🏛 새 번호 확인</button>' : '')
+      + '<button onclick="goneMark([\'' + esc(r.key) + '\'],\'done\')">✓ 정리함</button>';
     return (r.cards.length ? '<button class="mv" onclick="goneMove([\'' + esc(r.key) + '\'])">📁 명함 옮기기</button>' : '')
       + (onlyDom(r) ? '<button onclick="goneFix(\'' + r.cards[0].id + '\')">✎ 메일 고치기</button>' : '')
       + '<button class="ok" onclick="goneMark([\'' + esc(r.key) + '\'],\'done\')">✓ 정리함</button>'
@@ -12548,6 +12611,11 @@ function goneHtml(){
       + (o && o.erp ? ' · 업체관리 「' + esc(o.erp.status || '등록') + '」' : '')
       + (r.state !== 'todo' ? ' &nbsp;|&nbsp; ' + (r.state === 'alive' ? '살아 있음' : '정리함') + ' ' + esc(goneDay((_gone.done[goneKey(r.key)] || {}).at)) : '');
   };
+  /* 🏢 공단 자료가 아직 없는 국세청 폐업·휴업 회사 — «받아 달라»를 한 번에 */
+  const noPub = goneNoPub(todo);
+  const pubBand = (tab === 'done' || !noPub.length || typeof PuPubdata === 'undefined') ? ''
+    : '<div class="gn-pub"><span>🏢 국세청 폐업·휴업 <b>' + noPub.length + '곳</b>은 아직 공단 자료가 없습니다 — 받아 두면 «번호만 바뀐 곳»을 가려냅니다.</span>'
+      + (_goneAsked ? '<span class="em" style="flex:none">받는 중 — 몇 분 안에 저절로 붙습니다</span>' : '<button onclick="goneAskPub()">공단 자료 받기 (' + noPub.length + '곳)</button>') + '</div>';
   let body;
   if(_gone === null) body = '<p class="em">근거를 읽는 중입니다…</p>';
   else if(!list.length) body = '<p class="em">' + (tab === 'done' ? '정리한 줄이 없습니다' : '✓ 정리할 곳이 없습니다') + '</p>';
@@ -12590,7 +12658,9 @@ function goneHtml(){
     + '<span class="x" onclick="goneClose()" title="닫기">✕</span></header>'
     + '<div class="gn-cards">' + card('todo', todo.length, '정리할 것 (회사)') + card('nts', cnt('nts'), '🏛 국세청 폐업·휴업', 'red')
     + card('dom', cnt('dom'), '🌐 메일 도메인 없어짐 · 명함 ' + domCards + '장', 'amb') + card('bnc', cnt('bnc'), '↩ 반송 메일')
-    + card('done', doneRows.length, '정리한 것 · 살아 있음') + '</div>'
+    + (cnt('nps') ? card('nps', cnt('nps'), '💳 국민연금 탈퇴', 'red') : '')
+    + card('alive', cnt('alive'), '🟢 번호 바뀐 듯 (4대보험 살아 있음)', 'grn')
+    + card('done', doneRows.length, '정리한 것 · 살아 있음') + '</div>' + pubBand
     + '<div class="body">' + body + '</div></div></div>';
 }
 
@@ -38515,6 +38585,7 @@ function coWithPub(ex, pb){
 }
 /* 서버가 써서 숫자가 바뀌면 — 열려 있는 상세·사업장 창만 다시 그린다 */
 function coPubRepaint(key){
+  if(state.goneOn && typeof goneMount === 'function'){ goneBust(); goneMount(); }   /* 🏚 공단 근거 */
   if(key && state.coPick !== key && !(_coWork && _coWork.key === key)) return;
   if(state.coPick && (!key || state.coPick === key)) openCoDetailPanel(state.coPick, true);
   if(_coWork && (!key || _coWork.key === key)) coWorkMount();
