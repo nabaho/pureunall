@@ -272,7 +272,7 @@ test('★★ 운영상황보고서 검산(책 대조 D8) — ⑳ = 재무상태�
   /* 천원 끝수 — 400원 + 400원 = 800원: 칸마다 0천원인데 합은 1천원 */
   const c = box.ck(R({ src: { income: 400, contrib: 400, capExcess: 0, basicRange: 0, support: 0, carry: 82000000, total: 82000800 } }));
   assert.equal(c.length, 1); assert.equal(c[0].lv, 'warn'); assert.match(c[0].d, /㉟ 재원 합계/);
-  assert.match(SRC, /var ck=f15Checks\(R\)/, '운영상황보고서 화면에 붙어 있다');
+  assert.match(SRC, /var ck=f15Checks\(R[,)]/, '운영상황보고서 화면에 붙어 있다');
 });
 
 test('★ 기부금영수증(책 대조 D11) — 회사 출연은 손비(시행령 제19조제22호)라 짚지 않고, 사업주 외 출연만 짚는다(정부·지자체 지원금 제외)', () => {
