@@ -101,7 +101,8 @@
         + fin
         + '</tr>';
     }).join('');
-    if (!body) body = '<tr><td colspan="8" class="empty" title="">맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요</td></tr>';
+    var condOn = opt && SC().conditions(opt.cols).length > 0;
+    if (!body) body = '<tr><td colspan="8" class="empty" title="">' + (condOn ? '거른 조건에 맞는 사업장이 없습니다 — 조건을 풀어 보세요' : '맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요') + '</td></tr>';
     return '<table class="sites"><colgroup><col style="width:44px"><col><col style="width:120px"><col style="width:96px"><col style="width:84px"><col style="width:250px"><col style="width:80px"><col style="width:80px"></colgroup>'
       + (opt ? headHtml(st, opt) : '<thead><tr><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>')
       + '<tbody>' + body + '</tbody></table>';
@@ -120,7 +121,7 @@
   function headCell(st, opt, key, label) {
     var sk = SC().SORT_OF[key], so = opt.sort || {}, arrow = so.key === sk ? (so.dir === 'desc' ? ' <span class="ar">▼</span>' : ' <span class="ar">▲</span>') : '';
     var on = colOn(opt, key, st) || so.key === sk;
-    return '<th class="ch' + (on ? ' on' : '') + '"><button class="h" data-act="colOpen" data-key="' + key + '" title="' + esc(label) + ' — 거르기·순서">'
+    return '<th class="ch' + (on ? ' on' : '') + '"><button class="h" data-act="colOpen" data-key="' + esc(key) + '" title="' + esc(label) + ' — 거르기·순서">'
       + esc(label) + arrow + '<span class="fl">▾</span></button></th>';
   }
   function headHtml(st, opt) {
@@ -131,18 +132,21 @@
   function popHtml(st, key, rows) {
     var s = st.sites || {}, cols = s.cols || {}, so = s.sort || {}, sk = SC().SORT_OF[key];
     var pos = s.popPos || { x: 40, y: 140 };
-    var sort = '<div class="sort"><button class="' + (so.key === sk && so.dir !== 'desc' ? 'on' : '') + '" data-act="colSort" data-key="' + key + '" data-dir="asc">▲ 오름</button>'
-      + '<button class="' + (so.key === sk && so.dir === 'desc' ? 'on' : '') + '" data-act="colSort" data-key="' + key + '" data-dir="desc">▼ 내림</button></div>';
+    var sort = '<div class="sort"><button class="' + (so.key === sk && so.dir !== 'desc' ? 'on' : '') + '" data-act="colSort" data-key="' + esc(key) + '" data-dir="asc">▲ 오름</button>'
+      + '<button class="' + (so.key === sk && so.dir === 'desc' ? 'on' : '') + '" data-act="colSort" data-key="' + esc(key) + '" data-dir="desc">▼ 내림</button></div>';
     var body = '';
     if (key === 'name') {
       body = '<input type="text" data-role="sq" placeholder="🔍 이름 · 사업자번호" value="' + esc(s.q || '') + '">';
     } else if (key === 'who') {
-      var oc = Sx().ownerCounts(rows), me = st.me, ids = Object.keys(oc).filter(function (k) { return k !== '-'; })
+      var oc = Sx().ownerCounts(rows), me = st.me;
+      // 지금 고른 담당은 이 목록에 0곳이어도 보인다(SC.options 가 고른 값을 남기는 것과 같다)
+      if (s.who && !(s.who in oc)) oc[s.who] = 0;
+      var ids =Object.keys(oc).filter(function (k) { return k !== '-'; })
         .sort(function (a, b) { return staffName(st, a).localeCompare(staffName(st, b), 'ko'); });
       var wopt = function (v, label, n) {
         return '<button class="wo' + ((s.who || '') === v ? ' on' : '') + '" data-act="colWho" data-v="' + esc(v) + '">' + esc(label) + '<span>' + n + '</span></button>';
       };
-      body = '<div class="list">' + wopt('', '모두', (rows || []).length) + (oc['-'] ? wopt('-', '담당 없음', oc['-']) : '')
+      body = '<div class="list">' + wopt('', '모두', (rows || []).length) + (oc['-'] || s.who === '-' ? wopt('-', '담당 없음', oc['-'] || 0) : '')
         + ids.map(function (k) { return wopt(k, staffName(st, k) + (k === me ? ' (나)' : ''), oc[k]); }).join('') + '</div>';
     } else {
       var q = String(s.popq || '').trim();
@@ -150,12 +154,12 @@
       if (q) opts = opts.filter(function (o) { return o.label.indexOf(q) >= 0 || sel.indexOf(o.v) >= 0; });
       body = (key === 'biz' ? '<input type="text" data-role="colq" placeholder="🔍 업태 찾기" value="' + esc(s.popq || '') + '">' : '')
         + '<div class="list">' + (opts.map(function (o) {
-          return '<label><input type="checkbox" data-role="colchk" data-key="' + key + '" data-v="' + esc(o.v) + '"' + (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '> '
+          return '<label><input type="checkbox" data-role="colchk" data-key="' + esc(key) + '" data-v="' + esc(o.v) + '"' + (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '> '
             + esc(o.label) + '<span>' + o.n + '</span></label>';
         }).join('') || '<div class="none">값이 없습니다</div>') + '</div>';
     }
     return '<div class="cpop" style="position:fixed;left:' + Math.round(pos.x) + 'px;top:' + Math.round(pos.y) + 'px">' + sort + body
-      + '<div class="foot"><button data-act="colClear" data-key="' + key + '">이 칸 풀기</button><button class="p" data-act="colClose">닫기</button></div></div>';
+      + '<div class="foot"><button data-act="colClear" data-key="' + esc(key) + '">이 칸 풀기</button><button class="p" data-act="colClose">닫기</button></div></div>';
   }
   function condHtml(cols, total) {
     var c = SC().conditions(cols);
@@ -259,11 +263,15 @@
       + (st.busy ? '<div class="busy">' + esc(st.busy) + '</div>' : '');
     var H = handlers || {};
     el.onclick = function (ev) {
-      // 창 밖을 누르면 창을 닫는다(창 안·머리 단추는 빼고)
-      if (s.pop && !(ev.target.closest && (ev.target.closest('.cpop') || ev.target.closest('[data-act="colOpen"]'))) && H.colClose) H.colClose();
+      // 눌린 것을 «먼저» 읽는다 — 닫기가 다시 그리면 눌린 단추가 떨어져 나가 그 누름이 삼켜진다
       var b = ev.target.closest && ev.target.closest('[data-act]');
-      if (!b || !el.contains(b) || b.tagName === 'INPUT') return;
-      if (H[b.dataset.act]) { ev.preventDefault(); H[b.dataset.act](b.dataset, ev); }
+      // 창 밖을 누르면 창을 닫는다(창 안·머리 단추는 빼고) — 여기서는 상태만 비우고 다시 그리지 않는다.
+      // 누른 것에 손잡이가 있으면 그 손잡이의 그림이 닫힌 창으로 그린다. 없을 때만 colClose 가 직접 그린다
+      var out = !!s.pop && !(ev.target.closest && (ev.target.closest('.cpop') || ev.target.closest('[data-act="colOpen"]')));
+      if (out) { s.pop = ''; s.popq = ''; }
+      var run = b && el.contains(b) && b.tagName !== 'INPUT' && H[b.dataset.act];
+      if (run) { ev.preventDefault(); run(b.dataset, ev); return; }
+      if (out && H.colClose) H.colClose();
     };
     el.oninput = function (ev) {
       var t = ev.target;

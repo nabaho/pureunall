@@ -125,3 +125,91 @@ test('render — 머리줄 조건·순서가 먼저 걸리고 띠의 곳 수는 
   const w = run({ pop: 'who', who: 'P-002' });
   assert.match(w, /data-act="colWho" data-v="P-001"/, '담당을 P-002 로 걸어도 창에는 다른 담당도 남는다');
 });
+
+/* ── 손잡이 이음 — 가짜 이벤트로 el.onclick/onchange/oninput 을 부른다 ── */
+function fakeTarget(o) {
+  o = o || {};
+  const t = { tagName: o.tag || 'BUTTON', dataset: o.dataset || {}, checked: !!o.checked, value: o.value || '',
+    closest(sel) {
+      if (sel === '[data-act]' && o.dataset && o.dataset.act && !o.noAct) return t;
+      const hit = (o.closest || {})[sel];
+      return hit === undefined ? null : hit;
+    } };
+  return t;
+}
+function wire(sites, handlers) {
+  // 진짜 colClose 는 다시 그려서 눌린 단추를 DOM 에서 떼어 낸다 — 그 뒤 el.contains 는 거짓이 된다
+  let redrawn = false;
+  const el = { innerHTML: '', contains: () => !redrawn };
+  const state = st(sites);
+  const calls = [];
+  const H = {};
+  ['colClose', 'siteSel', 'colToggle', 'colq', 'reload'].forEach((n) => {
+    H[n] = (...a) => { calls.push([n].concat(a)); if (n === 'colClose') redrawn = true; };
+  });
+  Object.assign(H, handlers || {});
+  const real = global.PuRulesV2Sites.model;
+  global.PuRulesV2Sites.model = () => MANY.slice(0, 3);
+  try { V.render(el, state, H); } finally { global.PuRulesV2Sites.model = real; }
+  return { el, state, calls, count: (n) => calls.filter((c) => c[0] === n).length };
+}
+const ev = (t) => ({ target: t, preventDefault() {} });
+
+test('손잡이 이음 — 창 안을 누르면 닫지 않는다, 머리 단추도 여기서 닫지 않는다', () => {
+  const w = wire({ pop: 'biz', popq: '제' });
+  w.el.onclick(ev(fakeTarget({ closest: { '.cpop': {} } })));
+  assert.equal(w.count('colClose'), 0); assert.equal(w.state.sites.pop, 'biz'); assert.equal(w.state.sites.popq, '제');
+  w.el.onclick(ev(fakeTarget({ dataset: { act: 'colOpen', key: 'biz' }, closest: { '[data-act="colOpen"]': {} } })));
+  assert.equal(w.count('colClose'), 0); assert.equal(w.state.sites.pop, 'biz');
+});
+
+test('손잡이 이음 — 창 밖의 누름은 삼켜지지 않는다: 손잡이가 불리고 창 상태는 비워진다', () => {
+  const w = wire({ pop: 'biz', popq: '제' });
+  w.el.onclick(ev(fakeTarget({ dataset: { act: 'siteSel', co: 'c1' } })));
+  assert.equal(w.count('siteSel'), 1, '밖의 행을 눌러도 그 누름이 일을 한다');
+  assert.equal(w.state.sites.pop, ''); assert.equal(w.state.sites.popq, '');
+  assert.equal(w.count('colClose'), 0, '손잡이가 있으면 colClose 는 따로 부르지 않는다');
+});
+
+test('손잡이 이음 — 손잡이가 불릴 때 창 상태는 이미 비어 있다(그림이 닫힌 창으로 그려진다)', () => {
+  let seen = null; let state = null;
+  const w = wire({ pop: 'biz' }, { siteSel() { seen = w.state.sites.pop; } });
+  state = w.state;
+  w.el.onclick(ev(fakeTarget({ dataset: { act: 'siteSel' } })));
+  assert.equal(seen, ''); assert.equal(state.sites.pop, '');
+});
+
+test('손잡이 이음 — 창 밖, 손잡이 없는 곳을 누르면 colClose 한 번, 창이 닫혀 있으면 아무 일도 없다', () => {
+  const w = wire({ pop: 'biz' });
+  w.el.onclick(ev(fakeTarget()));
+  assert.equal(w.count('colClose'), 1); assert.equal(w.state.sites.pop, '');
+  const w2 = wire({ pop: '' });
+  w2.el.onclick(ev(fakeTarget()));
+  w2.el.onclick(ev(fakeTarget({ dataset: { act: 'siteSel' } })));
+  assert.equal(w2.count('colClose'), 0); assert.equal(w2.count('siteSel'), 1);
+});
+
+test('손잡이 이음 — 체크 바뀜은 colToggle(칸, 값, 체크), 업태 찾기 글은 colq(글)', () => {
+  const w = wire({ pop: 'biz' });
+  w.el.onchange({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colchk', key: 'biz', v: '제조업' }, checked: true }) });
+  assert.deepEqual(w.calls.filter((c) => c[0] === 'colToggle')[0], ['colToggle', 'biz', '제조업', true]);
+  w.el.oninput({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '도소' }) });
+  assert.deepEqual(w.calls.filter((c) => c[0] === 'colq')[0], ['colq', '도소']);
+});
+
+test('창 — 담당 창은 지금 고른 담당을 0곳이어도 보여 준다 · 키는 걸러 넣는다', () => {
+  const h = V.popHtml(st({ pop: 'who', who: 'P-777' }), 'who', [row(1)]);
+  assert.match(h, /data-act="colWho" data-v="P-777"/);
+  const none = V.popHtml(st({ pop: 'who', who: '-' }), 'who', [row(1)]);
+  assert.match(none, /data-v="-"/);
+  const k = V.popHtml(st({ pop: 'biz' }), 'x"><i', [row(1)]);
+  assert.doesNotMatch(k, /data-key="x"><i/);
+});
+
+test('빈 표 — 머리줄 조건 때문이면 «조건을 풀어 보세요», 아니면 옛 안내', () => {
+  const on = V.listHtml(st(), [], { offset: 0, cols: { biz: ['제조업'] }, sort: null, pop: '' });
+  assert.match(on, /거른 조건에 맞는 사업장이 없습니다/);
+  const off = V.listHtml(st(), [], { offset: 0, cols: {}, sort: null, pop: '' });
+  assert.match(off, /모든 거래처/); assert.doesNotMatch(off, /거른 조건에 맞는/);
+  assert.match(V.listHtml(st(), []), /모든 거래처/);
+});
