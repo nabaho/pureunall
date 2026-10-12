@@ -2836,7 +2836,7 @@ test('100 쓰기 0 — 초안을 만들고 고치고 복사해도 아무것도 �
   assert.equal(w.db.쓴것.length, 1, '저장은 서류 진행 기록 한 줄'); onlyTrackWrites(w.db);
   assert.equal(w.db.쓴것[0].자리, 'scal_docs/c2/t2_2026/items/kickoff');
   const rec = w.db.쓴것[0].값;
-  assert.ok(!JSON.stringify(w.db.쓴것).includes('손으로 고친 글') && !JSON.stringify(w.db.쓴것).includes('777'), '초안은 저장되지 않는다');
+  assert.ok(!JSON.stringify(w.db.쓴것).includes('손으로 고친 글') && !JSON.stringify(w.db.쓴것).includes('점검 결과 777건'), '초안은 저장되지 않는다');   // 시각(Date.now())에 «777» 이 들어 있어도 흔들리지 않게 문장째로 본다
   assert.ok(!('chap' in rec) && !('draft' in rec));
   assert.equal(w.ctx.GR.cw.chap.draft.overview, '손으로 고친 글', '저장해도 초안은 화면에 남는다');
   assert.equal(taOf(w, 'overview'), '손으로 고친 글', '칸 창을 다시 그려도 장 구역이 다시 채워진다');
