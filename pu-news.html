@@ -366,7 +366,9 @@ input,select,textarea{font-family:inherit;font-size:14px}
      바탕이 없으면 그 틈으로 아래 기사 제목이 지나가는 것이 보인다(글자가 두 겹).
    ⚠ 층은 앱바(#top, 30)보다 «아래»여야 한다 — 위면 앱바를 덮는다.
    ⚠ flex:0 0 auto — 넓은 화면에서 .colL 은 flex 칸이다. 없으면 덩이가 늘어나
-     꼭지 자리를 빼앗는다. */
+     꼭지 자리를 빼앗는다.
+   ★ 폰(560px 이하)에서는 «푼다» — 덩이가 ≈ 240px 라 굴리는 내내 화면의 1/3 을 가린다(대표 지시 2026-10-12 「추천대로」).
+     아래 폰 규칙 ⑩. 태블릿·PC 에서는 그대로 붙는다. */
 .colL>.nowtop{position:sticky;top:var(--tophi,0px);z-index:12;
   flex:0 0 auto;background:var(--paper);padding-bottom:10px}
 /* ★★★ 꼭지를 «탭»으로 (대표 지시 2026-09-08)
@@ -1114,7 +1116,15 @@ table.list tr:hover td{background:#fcfcfd}
   .ways>.btn,.jarhead .mini,.jarhead .btn{font-size:11.5px;padding:6px 9px}
   .ways .sep{display:none}
   .ways .lab{font-size:11px}
-  .colL>.nowtop{padding-bottom:6px}
+  /* ⑩ 머리 덩이(.nowtop)는 폰에서 «붙이지 않는다» (대표 지시 2026-10-12 「추천대로」 — 제안은 «폰에서만 풀기»였다).
+       폰에서는 이 덩이가 ≈ 240px 라, 탭 줄 밑에 붙으면 굴리는 내내 화면(≈ 700px)의 1/3 을 가린다 — 기사 제목을 훑을 자리가 ≈ 430px 뿐이었다
+       (진짜 Edge 375×700 실측: 붙었을 때 기사 자리 431px → 풀면 664px).
+       2026-09-14 「이부분 틀고정」은 «넓은 화면»에서 꼭지를 훑을 때의 일이라 태블릿(561px~)·PC 에서는 그대로 붙는다.
+       폰에서도 아무것도 감추지 않는다 — 맨 위로 올라가면 회차 머리와 담는 법이 그대로 있다.
+     ⚠ static 이 아니라 «relative + top:auto» 다.
+       · relative 라야 z-index:12 가 산다 — ⓘ 도움말 풀이(.tip)는 이 덩이 «아래»로 펴져 뒤따르는 꼭지 탭·기사 줄을 덮어야 한다(static 이면 층이 안 먹는다).
+       · top 을 auto 로 안 되돌리면 위 .colL>.nowtop 에 붙는 자리로 넣어 둔 --tophi(탭 높이)만큼 덩이가 «아래로 밀린다»(실측: 36px 밀림). */
+  .colL>.nowtop{position:relative;top:auto;padding-bottom:6px}
 
   /* ③ 꼭지 탭 — 세 칸 바둑판(다섯이 두 줄). 이름이 긴 꼭지는 그 칸만 두 줄이 된다(수 «5/5» 는 늘 보인다) */
   .jartabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:5px 7px 6px}
