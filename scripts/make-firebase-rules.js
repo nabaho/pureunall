@@ -777,7 +777,24 @@ rules.scal_bizState = {
   }
 };
 
-/* ══ 백업 ══════════════════════════════════════════════════════════════
+/* 컨설팅보고서 앱 — 사업 순서 (2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-order.md)
+   scal_bizOrder/main = { list:'코드,코드,…'(대표가 끌어서 정한 사업 순서), by?, at } — 문서 하나, 통째로 .set. 이 목록에 없는 사업은 이알피 순서로 뒤를 잇는다.
+   ★ 읽기는 직원, 쓰기는 관리자·위임관리인(MGR) — 모두가 같은 순서를 보되 바꾸는 일은 직원 손에 두지 않는다. 루트에는 쓰기 문이 없다.
+   ★ 규칙은 list 의 글자 꼴(코드 글자·쉼표)과 길이만 본다 — 코드 개수(ORDER_MAX 200)·중복은 화면이 지키고 읽을 때도 걸러낸다.
+   ★ 화면 모듈 ORDER_LEN_MAX 4000(js/pu-gov-report-nav.js)과 같은 값 — tests/gov-report-rules.test.js. 게시는 합친 뒤. */
+rules.scal_bizOrder = {
+  '.read': LOGIN,
+  main: {
+    '.write': MGR,
+    '.validate': "newData.hasChildren(['list','at'])",
+    list:   { '.validate': "newData.isString() && newData.val().length <= 4000 && newData.val().matches(/^[A-Za-z0-9_,-]*$/)" },
+    by:     { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    at:     { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
+};
+
+/* ══ 백업══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).
      전에는 전 직원이 쓸 수 있었다 — 직원 한 사람의 실수나 계정 하나가
      털리면 **백업 스무 벌을 통째로 지울 수 있었다**. 백업은 마지막 방패라

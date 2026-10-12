@@ -279,10 +279,11 @@ test('정적 — 새 읽기 넷은 GR_DOC_NODES 로만 · 등록부가 빌려 �
   assert.match(SRC, /\$\('biz'\)\.addEventListener\('click'/);
   const g = O.PROGRAMS.govreport;
   ['data/biz_cons_types', 'data/consultings', 'scal_erpTypeMap', 'mailbox', 'data/companies'].forEach((r) => assert.ok(g.sharedRoots.includes(r), r));
-  assert.deepEqual(g.writeContracts.map((w) => w.path), ['activeWriter/gov_report', 'scal_docs/{co}/{rid}/items/{key}', 'scal_bizState/{code}'],
-    '쓰는 자리는 서류 진행 기록 줄 하나 + 사업 종결 표시 하나(2026-10-12)');
+  assert.deepEqual(g.writeContracts.map((w) => w.path), ['activeWriter/gov_report', 'scal_docs/{co}/{rid}/items/{key}', 'scal_bizState/{code}', 'scal_bizOrder/main'],
+    '쓰는 자리는 서류 진행 기록 줄 하나 + 사업 종결 표시 하나 + 사업 순서 문서 하나(2026-10-12)');
   assert.ok(g.primaryRoots.includes('scal_docs'), '서류 진행 기록의 주인은 이 앱');
   assert.ok(g.primaryRoots.includes('scal_bizState'), '사업 종결 표시의 주인도 이 앱');
+  assert.ok(g.primaryRoots.includes('scal_bizOrder'), '사업 순서의 주인도 이 앱');
   assert.match(SRC, /컨설팅 사업 목록을 불러오지 못했습니다/);
   assert.match(SRC, /환경설정 → 컨설팅관리에 컨설팅 사업이 없습니다/);
 });
