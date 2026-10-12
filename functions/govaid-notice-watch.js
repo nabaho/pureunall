@@ -17,7 +17,8 @@ const Feed = require('./gov-feed-collect.js');
 const AUTO_BY = '자동(기업마당)';
 const AI_BY = ['AI-조사초안', AUTO_BY];         // 사람이 아닌 표식 — 이것만 서버가 고쳐 쓴다
 const FIELDS = Object.keys(BIZ.FIELDS);          // 금융·기술·인력·수출·내수·창업·경영·기타
-const MIN_SCORE = 0.5, MAX_SUGGEST = 3;
+/* 0.65 — 2026-10-12 첫 실측(공고 1,462건): 0.5 면 115건 중 «보증료 → 고용보험료» 같은 엉뚱한 짝이 섞였고, 0.65 에서 56건으로 대부분 맞았다 */
+const MIN_SCORE = 0.65, MAX_SUGGEST = 3;
 const KEEP_DAYS = 150;                           // 사람이 처리하지 않은 공고를 남기는 날수(마지막으로 본 날부터)
 const SERVER_FIELDS = ['nm', 'url', 'inst', 'ntce', 'field', 'startDt', 'closeDt', 'openDt', 'memo', 'suggest', 'seenAt', 'updatedAt'];
 
