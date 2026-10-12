@@ -167,3 +167,66 @@ test('rd — 두 규칙 JSON(전체-적용본·rules-paste)이 같은 rd 를 가
   assert.deepEqual(pick('firebase-rules-전체-적용본.json'), gen, '적용본');
   assert.deepEqual(pick('rules-paste.json'), gen, 'rules-paste');
 });
+
+/* ═══ 사업 종결 표시 scal_bizState (2026-10-12, 설계 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md) ═══ */
+
+const Nav = require('../js/pu-gov-report-nav.js');
+
+test('scal_bizState — 읽기는 로그인 직원 · 루트 쓰기 문 없음 · $code 쓰기는 관리자·위임관리인(MGR) 식 그대로', () => {
+  const r = rules.scal_bizState;
+  const login = rules.scal_scheds['.read'];            /* LOGIN 식 그대로 */
+  const admin = rules.serverBackups['.read'];          /* ADMIN 식 그대로 */
+  const mgr = rules.serverBackups['.write'];           /* MGR 식 그대로(생성기의 MGR 상수) */
+  assert.ok(r, 'scal_bizState 자리가 없습니다');
+  assert.equal(r['.read'], login, '읽기는 로그인(재직 직원)');
+  assert.equal(r['.write'], undefined, '루트에 쓰기 문을 열지 않는다(통째 지우기·덮어쓰기 방지)');
+  assert.equal(r.$code['.write'], mgr, '종결 표시 쓰기·지우기는 관리자·위임관리인');
+  assert.notEqual(mgr, admin, 'MGR 은 ADMIN 과 다른 식(위임관리인 포함)이어야 한다');
+  assert.ok(mgr.includes(admin), 'MGR 은 ADMIN 을 포함한다');
+  assert.deepEqual(Object.keys(r).sort(), ['$code', '.read']);
+});
+
+test('scal_bizState 기록 모양 — 코드 키 꼴 · closedFrom 4자리 · closedAt 날짜 꼴 · reason·by ≤40자 · at 숫자 · 다른 칸 거절', () => {
+  const c = rules.scal_bizState.$code;
+  assert.ok(c['.validate'].includes('$code.matches(/^[A-Za-z0-9_-]{1,40}$/)'), '사업 코드 키 꼴');
+  assert.ok(c['.validate'].includes("newData.hasChildren(['closedFrom','at'])"), 'closedFrom·at 필수');
+  assert.ok(c.closedFrom['.validate'].includes('newData.isString()'));
+  assert.ok(c.closedFrom['.validate'].includes('matches(/^[0-9]{4}$/)'), 'closedFrom 은 4자리 연도');
+  assert.equal(c.closedAt['.validate'], rules.scal_docs.$co.$rid.items.$key.sentAt['.validate'], '종결일 날짜 꼴은 scal_docs 날짜 칸과 같은 식');
+  assert.ok(c.closedAt['.validate'].includes('/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/'));
+  assert.equal(c.at['.validate'], 'newData.isNumber()');
+  assert.equal(c.$other['.validate'], false, '다른 칸은 거절');
+  assert.deepEqual(Object.keys(c).sort(), ['$other', '.validate', '.write', 'at', 'by', 'closedAt', 'closedFrom', 'reason']);
+  /* 읽는 쪽이 쓰는 칸마다 따로 쓰기 문을 열지 않는다 */
+  ['closedFrom', 'closedAt', 'reason', 'by', 'at'].forEach((f) => assert.equal(c[f]['.write'], undefined, f + ' 에 따로 쓰기 문 없음'));
+});
+
+test('scal_bizState 한계 — 규칙과 화면 모듈(js/pu-gov-report-nav.js)이 같은 값(숫자를 규칙 문자열에서 읽는다)', () => {
+  const c = rules.scal_bizState.$code;
+  assert.equal(upperOf(c.reason['.validate']), Nav.REASON_MAX, '사유 길이');
+  assert.equal(Nav.REASON_MAX, 40);
+  assert.equal(upperOf(c.by['.validate']), 40, '처리자 이름 길이');
+  assert.ok(/^[0-9]{4}$/.test(Nav.ALL_FROM), '사업 전체 = 4자리 연도 — 규칙 정규식을 통과한다');
+  const m = /matches\(\/(.+)\/\)/.exec(c.closedFrom['.validate']);
+  assert.ok(m, 'closedFrom 정규식을 읽지 못했습니다');
+  assert.ok(new RegExp(m[1]).test(Nav.ALL_FROM), 'ALL_FROM(' + Nav.ALL_FROM + ') 이 규칙 정규식을 통과한다');
+  const e = Nav.closeEntry({ from: '2026', at: '2026-10-12', reason: 'x'.repeat(60), by: 'y'.repeat(60), now: 1760000000000 });
+  assert.ok(e.reason.length <= upperOf(c.reason['.validate']), '모듈이 만든 사유가 규칙 한도 안');
+  assert.ok(e.by.length <= upperOf(c.by['.validate']), '모듈이 만든 처리자가 규칙 한도 안');
+  assert.ok(new RegExp(m[1]).test(e.closedFrom), '모듈이 만든 closedFrom 이 규칙 정규식을 통과');
+  /* 모듈이 만드는 칸은 규칙이 아는 칸뿐이다($other:false) */
+  Object.keys(e).forEach((k) => assert.ok(Object.prototype.hasOwnProperty.call(c, k), '규칙이 모르는 칸: ' + k));
+});
+
+test('scal_bizState — 두 규칙 JSON(전체-적용본·rules-paste)이 같은 블록을 가지고 생성기 출력과 같다', () => {
+  const fs = require('node:fs');
+  const pick = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', f), 'utf8')).rules;
+  const gen = rules.scal_bizState;
+  assert.ok(gen, '생성기 출력에 scal_bizState');
+  const a = pick('firebase-rules-전체-적용본.json');
+  const p = pick('rules-paste.json');
+  assert.deepEqual(a.scal_bizState, gen, '적용본');
+  assert.deepEqual(p.scal_bizState, gen, 'rules-paste');
+  assert.deepEqual(a, rules, '적용본 전체가 생성기 출력과 같다');
+  assert.deepEqual(p, rules, 'rules-paste 전체가 생성기 출력과 같다');
+});
