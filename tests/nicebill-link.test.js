@@ -104,7 +104,7 @@ const th = (NBT.match(/h\('th'/g) || []).length
          + (NBT.match(/nbSortTh\(/g) || []).length;
 t('명세 표 머리가 여덟 칸', th, 8);
 t('빈 줄이 표 전체를 덮는다', /colSpan:8,style:\{padding:'26px'/.test(NBB), true);
-t('묶음 머리도 표 전체를 덮는다', /fontSize:'11px'\}\),colSpan:8\}/.test(NBB), true);
+t('묶음 머리도 표 전체를 덮는다', /fontSize:'[\d.]+px'\}\),colSpan:8\}/.test(NBB), true);
 t('몸통에 옛 일곱 칸이 남아 있지 않다', /colSpan:7/.test(NBB), false);
 
 console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===');
