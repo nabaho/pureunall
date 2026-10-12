@@ -65,21 +65,30 @@ function bar(x0, y0, x1, y1, r) {
   };
 }
 
+/* 「푸」 마크 — make-portal-icon.js(포털 홈 아이콘)의 획 자리를 «그대로» 옮겨 온다
+   (대표 「푸 마크로」). 포털 아이콘은 가운데 48% 에 그리므로, 같은 모양을 KX 배 키워
+   칸을 거의 다 쓰게 한다 — 모양·비율은 같고 크기만 다르다. 획만 조금 굵게(WX) 해
+   상태줄(24dp 안팎)에서 끊기지 않게 한다. */
+const KX = 1.74, CX = .5, CY = .506;           // CY = 포털 마크 위(.250)·아래(.762) 가운데
+const WX = 1.25;
+function mark() {
+  const L = .272, R = .728, W = .048 * WX, r = .019, IN = .082;
+  const P_TOP = .250, P_BOT = .492;
+  return [
+    [L, P_TOP, R, P_TOP + W],                                   // ㅍ 윗 가로
+    [L, P_BOT - W, R, P_BOT],                                   // ㅍ 아랫 가로
+    [L + IN, P_TOP + W * .55, L + IN + W, P_BOT - W * .55],     // ㅍ 왼 세로
+    [R - IN - W, P_TOP + W * .55, R - IN, P_BOT - W * .55],     // ㅍ 오른 세로
+    [L, .597, R, .597 + W],                                     // ㅜ 가로
+    [.5 - W * .56, .597 + W * .55, .5 + W * .56, .762],         // ㅜ 기둥
+  ].map(([x0, y0, x1, y1]) => bar(
+    CX + (x0 - CX) * KX, CY + (y0 - CY) * KX,
+    CX + (x1 - CX) * KX, CY + (y1 - CY) * KX, r * KX));
+}
+
 function draw(size) {
   const S = 4;                                  // 한 칸을 4×4 로 훑어 가장자리를 부드럽게
-  const L = .12, R = .88;                       // 글자 좌우 — 칸을 거의 다 쓴다
-  const W = .115;                               // 획 굵기 — 작게 보여도 안 끊기게 굵게
-  const r = .03;
-  const IN = .13;                               // ㅍ 세로획을 가장자리에서 들이는 정도(«H» 가 안 되게)
-  const P_TOP = .05, P_BOT = .50;
-  const strokes = [
-    bar(L, P_TOP, R, P_TOP + W, r),                                  // ㅍ 윗 가로
-    bar(L, P_BOT - W, R, P_BOT, r),                                  // ㅍ 아랫 가로
-    bar(L + IN, P_TOP + W * .5, L + IN + W, P_BOT - W * .5, r),     // ㅍ 왼 세로
-    bar(R - IN - W, P_TOP + W * .5, R - IN, P_BOT - W * .5, r),     // ㅍ 오른 세로
-    bar(L - .04, .60, R + .04, .60 + W, r),                          // ㅜ 가로
-    bar(.5 - W * .58, .60 + W * .5, .5 + W * .58, .96, r),           // ㅜ 기둥
-  ];
+  const strokes = mark();
   function isInk(u, v) {
     for (let i = 0; i < strokes.length; i++) if (strokes[i](u, v)) return true;
     return false;
