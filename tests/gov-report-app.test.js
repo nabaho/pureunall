@@ -3766,7 +3766,7 @@ test('126 종결 사업을 고르면 배너(종결일·사유·처리자)와 그
   w.ctx.grSetBiz('consulting-05');
   const d = w.els.docs.innerHTML;
   assert.equal(w.els.docs.style.display, '');
-  ['종결된 사업입니다.', '2026년부터 종결 (2026-09-30)', '사유: 사업 기간 끝남', '종결 처리: 홍길동', '숫자·챙길 것·받은 서류 확인에서는 빠져 있고',
+  ['종결된 사업입니다.', '2026년부터 종결 (2026-09-30)', '사유: 사업 기간 끝남', '종결 처리: 홍길동', '다른 사업의 숫자·알림에서는 빠져 있습니다',
     '<button type="button" class="act" data-cm="reopen">↩ 진행 사업으로 되돌리기</button>', '📋 서류 — 인사노무컨설팅서산', '마바산업'].forEach((x) => assert.ok(d.includes(x), x));
   assert.ok(!d.includes('data-cm="open"'), '종결된 사업에는 «종결» 단추가 없다');
   assert.ok(w.els.rows.innerHTML.includes('마바산업'), '그 사업 행이 보인다');

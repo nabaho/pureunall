@@ -3,7 +3,7 @@
    ⚠ 진짜 DB 는 null · 빈 목록([]) · 빈 객체({})를 저장하지 않는다. 이것을 흉내 내지 않으면
      «기억 속 값»과 «DB 에서 읽은 값»이 늘 같아 보여, 그 차이로 나는 고장이 검사에서 숨는다
      (확정본 도장이 hr:[] 하나로 매주 어긋날 판이었다 — tests/news-friday.test.js).
-   쓰는 것: ref(p).once('value') · set · remove(2026-10-12 — 쓴 것 목록에 {remove:true} 로 남는다) · update(여러 자리 'a/b') · transaction · child · push().key */
+   쓰는 것: ref(p).once('value') · set · update(여러 자리 'a/b') · transaction · child · push().key */
 
 function 다듬기(v) {
   if (v === null || v === undefined) return undefined;
@@ -50,7 +50,6 @@ function 만들기(처음) {
     return {
       once: async () => { const v = 읽기(자리); return { val: () => (v === undefined ? null : 복사(v)) }; },
       set: async (v) => { 쓴것.push({ 자리, 값: 복사(v) }); 쓰기(자리, v); },
-      remove: async () => { 쓴것.push({ 자리, 값: null, remove: true }); 쓰기(자리, null); },
       update: async (o) => {
         쓴것.push({ 자리, 값: 복사(o), update: true });
         Object.keys(o || {}).forEach((k) => 쓰기(자리 ? 자리 + '/' + k : k, o[k]));

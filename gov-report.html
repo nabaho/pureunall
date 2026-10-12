@@ -210,8 +210,9 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <script src="js/pu-ontology.js?v=68"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다 — 이 앱은 유예 목록(LEGACY_OBSERVE_PROGRAMS)에
-     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면의 쓰기는 서류 진행 기록 줄 하나 .set 뿐이다
-     (레코드 모양이 아니라 관문을 지난다 — 부분 update 는 관문이 막으므로 쓰지 않는다). -->
+     없으므로 관문이 «강제»(enforce)로 돈다. 이 화면의 쓰기는 알려진 .set 셋뿐이다 —
+     서류 진행 기록 줄(grSaveCell) · 사업 종결(grCloseBiz) · 되돌림 표시 closedFrom 9999(grReopenBiz). 물리적 삭제(remove)는 관문이 막으므로 쓰지 않는다
+     (레코드 모양이 아니라 관문을 지난다 — 부분 update 도 관문이 막으므로 쓰지 않는다). -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-appbar.js?v=28"></script>
@@ -459,7 +460,7 @@ function grClosedBanner(){
   if(!st) return '';
   return '<div class="cl-bn">🗄 <div class="cl-bt"><b>종결된 사업입니다.</b> '+grEsc(grClosedText(st))
     +(st.reason?' · 사유: '+grEsc(st.reason):'')+(st.by?' · 종결 처리: '+grEsc(st.by):'')
-    +'<div class="days">숫자·챙길 것·받은 서류 확인에서는 빠져 있고, 기록은 그대로 읽고 고칠 수 있습니다.</div>'
+    +'<div class="days">다른 사업의 숫자·알림에서는 빠져 있습니다 — 이 사업은 골라서 보는 동안 행·숫자가 보이고, 기록은 그대로 읽고 고칠 수 있습니다.</div>'
     +(GR.bmsg?'<div class="err-s">'+grEsc(GR.bmsg)+'</div>':'')+'</div>'
     +'<button type="button" class="act" data-cm="reopen"'+(GR.bbusy?' disabled':'')+'>↩ 진행 사업으로 되돌리기</button></div>';
 }

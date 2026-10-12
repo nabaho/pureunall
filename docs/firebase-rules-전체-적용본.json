@@ -1103,7 +1103,7 @@
       ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
       "$code": {
         ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
-        ".validate": "$code.matches(/^[A-Za-z0-9_-]{1,40}$/) && newData.hasChildren(['closedFrom','at'])",
+        ".validate": "$code.length <= 40 && $code.matches(/^[A-Za-z0-9_-]+$/) && newData.hasChildren(['closedFrom','at'])",
         "closedFrom": {
           ".validate": "newData.isString() && newData.val().matches(/^[0-9]{4}$/)"
         },

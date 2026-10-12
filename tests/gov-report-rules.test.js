@@ -188,7 +188,8 @@ test('scal_bizState — 읽기는 로그인 직원 · 루트 쓰기 문 없음 �
 
 test('scal_bizState 기록 모양 — 코드 키 꼴 · closedFrom 4자리 · closedAt 날짜 꼴 · reason·by ≤40자 · at 숫자 · 다른 칸 거절', () => {
   const c = rules.scal_bizState.$code;
-  assert.ok(c['.validate'].includes('$code.matches(/^[A-Za-z0-9_-]{1,40}$/)'), '사업 코드 키 꼴');
+  assert.ok(c['.validate'].includes('$code.length <= 40 && $code.matches(/^[A-Za-z0-9_-]+$/)'), '사업 코드 키 꼴(scal_docs 처럼 길이 한도 + 글자 꼴, {m,n} 범위 없음)');
+  assert.doesNotMatch(c['.validate'], /\{\d+,\d+\}/, '배포된 규칙에 쓰인 적 없는 {m,n} 범위 한정자를 쓰지 않는다');
   assert.ok(c['.validate'].includes("newData.hasChildren(['closedFrom','at'])"), 'closedFrom·at 필수');
   assert.ok(c.closedFrom['.validate'].includes('newData.isString()'));
   assert.ok(c.closedFrom['.validate'].includes('matches(/^[0-9]{4}$/)'), 'closedFrom 은 4자리 연도');
