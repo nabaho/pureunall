@@ -18,3 +18,11 @@ test('적립금 표: 글자 13px 이상 · 칸 너비를 정해(colgroup) 직원
   assert.match(seg, /h\('colgroup', null,/);
   assert.doesNotMatch(seg, /h\('table', \{ style:\{ width:'100%'/, '표가 다시 화면 전체 폭을 씁니다');
 });
+
+test('퇴직정산 나머지 탭(월별 누계·퇴직금 계산·퇴사자 정산)도 11px 아래 글자가 없다 (2026-10-12 «추천대로»)', () => {
+  const a = SRC.indexOf("tab === 'monthly' && (function(){");
+  const b = SRC.indexOf('\nfunction ', a + 10);
+  assert.ok(a > 0 && b > a, '퇴직정산 탭 자리를 못 찾았습니다');
+  const small = (SRC.slice(a, b).match(/fontSize:\s*'(?:[0-9]|10(?:\.\d)?)px'/g) || []);
+  assert.equal(small.length, 0, '아직 작은 글자: ' + small.slice(0, 5).join(' '));
+});
