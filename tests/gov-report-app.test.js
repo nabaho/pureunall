@@ -15,6 +15,7 @@ const F = require('./helpers/gov-report-fixture.js');
 const L = require('../js/pu-gov-report-list.js');
 const Rpt = require('../js/pu-gov-report.js');
 const D = require('../js/pu-gov-report-docs.js');
+const Nav = require('../js/pu-gov-report-nav.js');
 const Tr = require('../js/pu-gov-report-track.js');
 const I = require('../js/pu-gov-report-inbox.js');
 const MO = require('../js/rules-v2/mail-orig.js');
@@ -47,6 +48,8 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
   'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp',
   'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink', 'grGlobalInbox', 'grRenderGlobalInbox', 'grOpenFromInbox', 'grGlobalCompute', 'grGlobalRefresh', 'grGiReset',
+  'grClosedTypes', 'grLive', 'grRenderYearBar', 'grSetYear', 'grClosedText', 'grBizState', 'grBizBtn', 'grToggleBizGrp', 'grClosedBanner',
+  'grLoadBizState', 'grOkBizCode', 'grCloseOpen', 'grCloseCm', 'grRenderCm', 'grCloseBiz', 'grReopenBiz',
   'grSendCtx', 'grSay', 'grRenderSend', 'grApplyFields', 'grMarkSent', 'grLinkReply', 'grCopy', 'grOpenMail', 'grWriteMail', 'grWriteSubmit',
   'grMailFetch', 'grMailCall', 'grRdHtml', 'grReadRd', 'grRenderCrit',
   'grOkChapKey', 'grChapAsk', 'grChapConsent', 'grChapCall', 'grChapErrMsg', 'grChapNames', 'grChapLinked', 'grChapInput', 'grChapSay', 'grRenderChap', 'grChapEdit',
@@ -61,7 +64,7 @@ function world(o) {
   ['cwKey', 'cwSt', 'cwSent', 'cwGot', 'cwHow', 'cwAck', 'cwNote', 'cwHwpMsg'].forEach((id) => { els[id] = fakeEl(); }); // 칸 창 입력 — 진짜 DOM 에서는 innerHTML 이 만든다
   const urls = { made: [], revoked: [] };   // 보기 창이 만든·버린 blob 주소
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
-    encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportTrack: Tr,
+    encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportNav: Nav, PuGovReportTrack: Tr,
     PuGovReportInbox: I, PuGovReportSend: require('../js/pu-gov-report-send.js'), PuGovReportCriteria: require('../js/pu-gov-report-criteria.js'), PuGovReportAi: require('../js/pu-gov-report-ai.js'), PuGovReportChapters: require('../js/pu-gov-report-chapters.js'), PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout, AbortController,
     /* 받은 서류함 — 가짜 서버(mailServer)·로그인·blob 주소. 서버를 안 주면 부르는 순간 실패한다 */
     fetch: (o.mail && o.mail.fetch) || (async () => { throw new Error('이 검사는 서버를 부르면 안 된다'); }),
@@ -79,13 +82,15 @@ function world(o) {
   ctx.navigator = o.nav || { clipboard: { writeText: async (t) => { ctx.copied = t; } } };
   vm.createContext(ctx);
   vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR_TRACK_NODES'), varLine('GR_INBOX_NODES'),
-    varLine('GR_MAIL'), varLine('GR_AI'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
+    varLine('GR_MAIL'), varLine('GR_BIZ'), varLine('GR_AI'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
     + "\ngrToday=function(){ return '2026-10-10'; };", ctx);
   if (o.email) vm.runInContext('GR.email=' + JSON.stringify(o.email) + ';', ctx);
   return { ctx, db, els, urls };
 }
 
 /* 쓰기는 서류 진행 기록 줄 하나뿐 — 자리 꼴 scal_docs/{업체}/{rid}/items/{키}, set 만 */
+/* 이 화면의 쓰기 명령 목록(인라인 스크립트 속 차례) — 서류 줄 grSaveCell .set · 사업 종결 grCloseBiz .set · 되돌리기 grReopenBiz .remove (2026-10-12) */
+const WRITES = ['.set(', '.set(', '.remove('];
 const TRACK_PATH = /^scal_docs\/[^/]+\/[^/]+\/items\/[a-z]+(:[0-9]+)?$/;
 function onlyTrackWrites(db) {
   db.쓴것.forEach((x) => assert.ok(TRACK_PATH.test(x.자리) && !x.update && !x.transaction, '허락 밖 쓰기: ' + x.자리));
@@ -98,6 +103,8 @@ test('정적 — 공통 머리와 새 모듈을 차례대로 싣는다', () => {
   assert.ok(SRC.indexOf('pu-gov-report-build.js') < SRC.indexOf('pu-gov-report-list.js'), 'build 를 먼저 싣는다');
   assert.ok(SRC.indexOf('pu-gov-report-list.js') < SRC.indexOf('pu-gov-report-docs.js'), '목록 모듈 다음에 싣는다');
   assert.ok(SRC.indexOf('pu-gov-report-track.js') < SRC.indexOf('pu-gov-report-docs.js'), '기록 모듈을 서류 모듈보다 먼저 싣는다');
+  assert.match(SRC, /<script src="js\/pu-gov-report-nav\.js\?v=\d+"><\/script>/, '사업 목록 모델(종결 판정)');
+  assert.ok(SRC.indexOf('pu-gov-report-docs.js') < SRC.indexOf('pu-gov-report-nav.js'), '새 모듈은 서류 모듈 다음에 싣는다(옆 모듈을 불러 쓴다)');
   assert.match(SRC, /pu-ontology-write\.js\?v=\d+" data-mode="observe"/);
   assert.match(SRC, /PuGate\.show\(/);
   assert.match(SRC, /PuBack\.guard\(/);
@@ -117,7 +124,7 @@ test('정적 — 받은 서류함 모듈을 차례대로 싣는다(주소 맞추
 });
 
 test('정적 — 쓰기는 한 곳뿐(서류 진행 기록 줄 하나 .set) · 일정 자리는 GR_NODES 로만 부른다', () => {
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES, '쓰기 명령은 grSaveCell 의 .set · grCloseBiz 의 .set · grReopenBiz 의 .remove 뿐');
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/, '쓰기 명령이 있다');
   assert.match(grab('grSaveCell'), /fbDb\.ref\(GR_TRACK_NODES\.docs\+'\/'\+c\.coId\+'\/'\+c\.rid\+'\/items\/'\+c\.key\)\.set\(rec\)/);
   assert.match(SRC, /var GR_TRACK_NODES=\{docs:'scal_docs'\};/);
@@ -276,15 +283,16 @@ test('정적 — 새 읽기 넷은 GR_DOC_NODES 로만 · 등록부가 빌려 �
   assert.match(SRC, /환경설정 → 컨설팅관리에 컨설팅 사업이 없습니다/);
 });
 
-test('⑩ 왼쪽 패널 — 기관별 묶음(첫 sortOrder 순) · 숨김·합친 사업 없음 · 연결 없는 것은 맨 끝 · 읽기만', async () => {
+test('⑩ 왼쪽 패널 — «사업 이름 (수행기관)» 두 줄(진행 사업 sortOrder 순) · 숨김·합친 사업 없음 · 연결 없는 것은 접는 묶음으로 맨 끝 · 읽기만', async () => {
   const w = world();
   await w.ctx.grLoad();
   const h = w.els.biz.innerHTML;
   const at = (s) => { const i = h.indexOf(s); assert.ok(i >= 0, s); return i; };
-  assert.ok(at('기관 미지정') < at('비즈니스지원단(중기청)'));
-  assert.ok(at('비즈니스지원단(중기청)') < at('충남북부상공회의소'));
-  assert.ok(at('충남북부상공회의소') < at('서산상공회의소'));
-  assert.ok(at('서산상공회의소') < at('정부사업일정에 사업 없음'));
+  /* 옛 검사는 «기관 이름 머리» 순서를 봤다 — 이제 기관 머리가 없고 사업 이름 아래 (기관) 이 붙는다. 같은 차례(사업 sortOrder 순)를 이름·기관 두 줄로 */
+  assert.ok(at('일터상생혁신컨설팅</span><span class="bz-ag">(기관 미지정)') < at('통합기술보호지원단</span><span class="bz-ag">(비즈니스지원단(중기청))'));
+  assert.ok(at('통합기술보호지원단</span>') < at('인사노무컨설팅충남북부상의</span><span class="bz-ag">(충남북부상공회의소)'));
+  assert.ok(at('인사노무컨설팅충남북부상의</span>') < at('인사노무컨설팅서산</span><span class="bz-ag">(서산상공회의소)'));
+  assert.ok(at('인사노무컨설팅서산</span>') < at('정부사업일정에 사업 없음'));
   assert.ok(!h.includes('일터혁신상생컨설팅'), '숨긴 사업');
   assert.ok(!h.includes('혁신바우처컨설팅'), '합친 사업');
   assert.match(h, /data-biz="consulting-03"[^>]*>.*?통합기술보호지원단.*?간단형.*?<b>1<\/b>/);
@@ -338,7 +346,7 @@ test('⑬ 사업 목록이 비면 「환경설정 → 컨설팅관리에 컨설�
   await v.ctx.grLoad();
   assert.ok(!v.els.biz.innerHTML.includes('<img'), '이스케이프 안 됨');
   assert.ok(v.els.biz.innerHTML.includes('&#60;img src=x&#62;'));
-  assert.ok(v.els.biz.innerHTML.includes('<div class="bz-h">&#60;b&#62;</div>'), '기관 이름도 이스케이프');
+  assert.ok(v.els.biz.innerHTML.includes('<span class="bz-ag">(&#60;b&#62;)</span>'), '기관 이름도 이스케이프(사업 이름 아래 (기관) 줄)');
 });
 
 test('정적 — 목록·체크표의 「목차」 단추와 창 닫기 · 창은 PuBack 이 닫을 수 있게 data-close', () => {
@@ -1330,7 +1338,7 @@ test('56 정적 — 서명 요청 모듈을 inbox 다음에 싣는다 · 쓰기�
   assert.match(SRC, /<script src="js\/pu-gov-report-inbox\.js\?v=\d+"><\/script>\r?\n<script src="js\/pu-gov-report-send\.js\?v=\d+"><\/script>/,
     'send 모듈은 inbox 바로 뒤');
   assert.match(INLINE, /PuGovReportSend\./);
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES, '쓰기 명령은 서류 줄 .set · 종결 .set · 되돌리기 .remove 뿐');
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
   assert.doesNotMatch(INLINE, /sendMaterialMail|mailto:|\.send\s*\(|sendMail|httpsCallable/, '자동 발송 호출이 있다');
   ['grMarkSent', 'grLinkReply', 'grApplyFields', 'grWriteMail', 'grOpenMail', 'grRenderSend', 'grSendCtx'].forEach((n) =>
@@ -1772,7 +1780,7 @@ test('67 플랫폼 체크 글 — 값은 글자로만(이스케이프) · 상수
 });
 
 test('68 정적 — 제출 메일도 쓰기 길은 grSaveCell 한 곳 · 자동 발송 호출 없음', () => {
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES);
   ['grWriteSubmit', 'grRenderSend', 'grMarkSent'].forEach((n) => assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|mailto:|\.send\s*\(|sendMail|httpsCallable/, n));
   assert.match(grab('grWriteSubmit'), /grOpenMail\(S\.composeParts\(d,to,cc\)\)/);
   assert.match(grab('grWriteSubmit'), /\.then\(function\(r\)/, '안내는 grOpenMail 이 끝난 뒤 다시 쓴다');
@@ -1814,7 +1822,7 @@ const WP = '일터상생혁신컨설팅';
 const countOf = (h, re) => (h.match(re) || []).length;
 
 test('69 정적 — 단계 칸의 data-item 이 칸 창 네 번째 인자로 간다 · 쓰기는 여전히 .set 한 곳 · 새 쓰기 길이 없다', () => {
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES);
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
   assert.match(SRC, /grOpenCell\(c\.getAttribute\('data-co'\),c\.getAttribute\('data-ty'\),c\.getAttribute\('data-step'\),c\.getAttribute\('data-item'\)\|\|''\)/);
   assert.match(grab('grOpenCell'), /^function grOpenCell\(coId,typeId,step,itemId\)/);
@@ -2187,7 +2195,7 @@ const hasId = (h, id) => h.includes('id="' + id + '"');
 test('81 정적 — 기준 모듈은 send 바로 뒤 · 쓰기는 여전히 .set 한 곳 · 새 함수는 직접 쓰거나 부르지 않는다 · 읽는 id 는 그리는 id 와 같다', () => {
   assert.match(SRC, /<script src="js\/pu-gov-report-send\.js\?v=\d+"><\/script>\r?\n<script src="js\/pu-gov-report-criteria\.js\?v=\d+"><\/script>/);
   assert.ok(SRC.indexOf('pu-gov-report-track.js') < SRC.indexOf('pu-gov-report-criteria.js'));
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES);
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
   ['grRdHtml', 'grReadRd', 'grRenderCrit'].forEach((n) => assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|mailto:|\.send\s*\(/, n));
   assert.match(grab('grSaveCell'), /fbDb\.ref\(GR_TRACK_NODES\.docs\+'\/'\+c\.coId\+'\/'\+c\.rid\+'\/items\/'\+c\.key\)\.set\(rec\)/);
@@ -2588,7 +2596,7 @@ test('93 정적 — 스크립트 셋은 ai → ai-call → chapters 차례 · ?v
     const v = (CONS.match(new RegExp('js/' + f.replace(/\./g, '\\.') + '\\?v=(\\d+)')) || [])[1];
     assert.ok(v && v === tag(f), f + ' ?v 가 정부사업일정 보고서 창과 같아야 한다');
   });
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES);
   assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
   const NEW = ['grOkChapKey', 'grChapAsk', 'grChapConsent', 'grChapCall', 'grChapErrMsg', 'grChapNames', 'grChapLinked', 'grChapInput', 'grChapSay', 'grRenderChap',
     'grChapEdit', 'grChapCopyText', 'grChapCopy', 'grChapCopyAll', 'grChapAi'];
@@ -3070,7 +3078,7 @@ function giSeed(o) {
 }
 
 test('108 정적 — 새 구역 #ginbox 는 「챙길 것」 아래 · 쓰기는 여전히 .set 한 곳 · 새 세 함수에는 fbDb·.set(·fetch(·grSaveCell 이 없고 단추에는 번호만 끼운다', () => {
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES, '쓰기 명령은 서류 줄 .set · 종결 .set · 되돌리기 .remove 뿐');
   assert.match(SRC, /<section><h2>📥 받은 서류 확인<\/h2><div id="ginbox"><\/div><\/section>/);
   assert.ok(SRC.indexOf('id="alerts"') > 0 && SRC.indexOf('id="alerts"') < SRC.indexOf('id="ginbox"'), '챙길 것 구역 아래');
   ['grGlobalInbox', 'grGlobalCompute', 'grGlobalRefresh', 'grGiReset', 'grRenderGlobalInbox', 'grOpenFromInbox'].forEach((n) => {
@@ -3429,4 +3437,513 @@ test('121 보낸이 표시이름이 없으면(거울이 주소를 대신 넣는�
   const h = giHtml(w);
   assert.ok(h.includes('받음 ← (보낸이 이름 없음) · 2026-10-09 · 다라정밀'));
   assert.ok(!h.includes('@'), '주소는 그리지 않는다');
+});
+
+/* ══ 연도 막대 · 사업이름 (수행기관) 목록 · 사업 종결 (2026-10-12) — 계획 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md Task 3 ══
+   합성 씨앗(navSeed)은 «진짜로 이어지게» 짠다 — 아래 122·123 이 묶음 배정과 업체 수를 직접 확인한다(이어지지 않으면 그 검사가 깨진다).
+   오늘 = 2026-10-10 · 2026년 업체: 02(가나상사 1)·03(가나상사 1)·04(다라정밀 1)·05(마바산업 1)·14(자차금속 1)·15(자차금속 1) — 2025년은 03(사아테크 1) 뿐
+   01 현장클리닉(일정 사업 t9 = 없음)·06·07·09·10 은 연결 없음 · 12 농촌융복합시험사업(서류 틀 있음, 업체 없음) · 13 가나기획자문(서류 틀 없음)
+   14·15 는 이름이 같고 기관만 다르다(가기관·나기관) */
+function navSeed(o) {
+  o = o || {};
+  const s = F.seed();
+  s.scal_types.push({ id: 't5', name: '농촌 시험', fullName: '', agency: '', rounds: 1 }, { id: 't6', name: '기획 시험', fullName: '', agency: '', rounds: 1 },
+    { id: 't7', name: '혁신 시험 가', fullName: '', agency: '', rounds: 1 }, { id: 't8', name: '혁신 시험 나', fullName: '', agency: '', rounds: 1 });
+  s.scal_cos.push({ id: 'c7', name: '자차금속', types: ['t7', 't8'], defAtt: 'a1' });
+  s.scal_scheds.push({ id: 's30', coId: 'c7', typeId: 't7', date: '2026-06-01', round: 1, isField: true },
+    { id: 's31', coId: 'c7', typeId: 't8', date: '2026-06-08', round: 1, isField: true });
+  const nm = (code, name, agency) => ({ code, name, short: '', agency, sortOrder: +code.slice(-2) });
+  s.data.biz_cons_types.v.push(nm('consulting-12', '농촌융복합시험사업', '가기관'), nm('consulting-13', '가나기획자문', ''),
+    nm('consulting-14', o.hostile ? '<script>alert(1)</script>가' : '일터혁신 같은이름', o.hostile ? '"><img src=x onerror=1>' : '가기관'),
+    nm('consulting-15', o.hostile ? '<img src=x onerror=2>나' : '일터혁신 같은이름', o.hostile ? "'><svg onload=3>" : '나기관'));
+  Object.assign(s.scal_erpTypeMap, { 'consulting-12': o.twin ? 't1' : 't5', 'consulting-13': 't6', 'consulting-14': 't7', 'consulting-15': 't8' });
+  return s;
+}
+const CLOSED05 = { 'consulting-05': { closedFrom: '2026', closedAt: '2026-09-30', reason: '사업 기간 끝남', by: '홍길동', at: 1760000000000 } };
+/* o.state = 처음부터 DB 에 있는 종결 표시 · o.denyRead / o.denyWrite = 규칙 거절 흉내 · 쓰기·지우기는 w.db.쓴것 에 남는다 */
+function navWorld(o) {
+  o = o || {};
+  const s = o.seed || navSeed(o.seedOpt);
+  if (o.state !== undefined) s.scal_bizState = o.state;
+  const paths = [];
+  const w = world({ seed: s, email: o.email === undefined ? 'p009@pureun.kr' : o.email, db: (db) => ({ ref: (p) => {
+    paths.push(p);
+    const r = db.ref(p);
+    if (p.indexOf('scal_bizState') !== 0) return r;
+    if (o.denyRead && p === 'scal_bizState') return { once: async () => { throw new Error('permission_denied'); } };
+    if (o.denyWrite) return { once: r.once, set: async () => { throw new Error('permission_denied'); }, remove: async () => { throw new Error('permission_denied'); } };
+    return r;
+  } }) });
+  w.paths = paths;
+  ['cm', 'cmDay', 'cmWhy', 'cmFromY', 'cmFromA'].forEach((id) => w.ctx.$(id));   // 진짜 DOM 에서는 종결 창 입력이 그리는 대로 생긴다(칸 창 입력과 같은 흉내)
+  return w;
+}
+const grpOf = (h, k) => { const i = h.indexOf('data-grp="' + k + '"'); if (i < 0) return ''; return h.slice(i, h.indexOf('</details>', i)); };
+const openSec = (h) => h.slice(0, h.indexOf('<details'));
+const kpiN = (w, st) => (w.els.kpis.innerHTML.match(new RegExp('data-st="' + st + '"[^>]*><b>([^<]*)</b>')) || [])[1];
+const alertN = (w, head) => (w.els.alerts.innerHTML.match(new RegExp(head + ' <b>([^<]*)</b>')) || [])[1];
+const bizBtn = (h, code) => { const i = h.indexOf('data-biz="' + code + '"'); return i < 0 ? '' : h.slice(i, h.indexOf('</button>', i)); };
+const FAIL = '저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)';
+
+test('122 정적 — 새 쓰기 길은 scal_bizState 한 곳(종결 .set · 되돌리기 .remove) · 나머지 쓰기 명령은 없다 · 연도 막대는 숫자 칸 위 · 종결 창 자리 · 보이지 않는 #fYear', () => {
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(', '.set(', '.remove('], '서류 줄 .set · 종결 .set · 되돌리기 .remove — 이 차례 그대로');
+  assert.doesNotMatch(INLINE, /\.(update|transaction)\s*\(|ref\([^)]*\)\.push\(/, '그 밖의 쓰기 명령이 있다');
+  assert.match(SRC, /var GR_BIZ=\{node:'scal_bizState',code:\/\^\[A-Za-z0-9_-\]\{1,40\}\$\/,/, '규칙의 열쇠 꼴과 같은 점검');
+  const c = grab('grCloseBiz'), r = grab('grReopenBiz');
+  assert.match(c, /fbDb\.ref\(GR_BIZ\.node\+'\/'\+code\)\.set\(entry\)/);
+  assert.match(r, /fbDb\.ref\(GR_BIZ\.node\+'\/'\+code\)\.remove\(\)/);
+  [c, r].forEach((src, i) => assert.equal((src.match(/ref\(/g) || []).length, 1, ['grCloseBiz', 'grReopenBiz'][i] + ' 은 scal_bizState 한 길만 쓴다'));
+  assert.doesNotMatch(c + r, /scal_docs|GR_TRACK_NODES|GR_NODES|GR_DOC_NODES/, '다른 자리를 쓰지 않는다');
+  assert.match(grab('grLoadBizState'), /fbDb\.ref\(GR_BIZ\.node\)\.once\('value'\)/, '읽기는 통째 한 번');
+  assert.ok(SRC.indexOf('id="yrbar"') > 0 && SRC.indexOf('id="yrbar"') < SRC.indexOf('id="kpis"'), '연도 막대는 숫자 칸 위(가운데 열 맨 위)');
+  assert.match(SRC, /<select id="fYear" aria-label="연도" style="display:none"><\/select>/, '기존 거르개는 보이지 않게 두고 값만 맞춘다');
+  assert.match(SRC, /<div id="cm" class="toc" style="display:none"><\/div>/);
+  assert.match(grab('grRender'), /grRenderYearBar\(\)/);
+  assert.match(grab('grRenderKpis'), /grLive\(/); assert.match(grab('grView'), /grLive\(/);
+  assert.match(grab('grRenderAlerts'), /grClosedTypes\(/); assert.match(grab('grGlobalCompute'), /grClosedTypes\(/);
+  assert.match(grab('grLoad'), /await grLoadDocs\(\);[\s\S]*await grLoadBizState\(\);[\s\S]*await grLoadTrack\(\);/, '왼쪽 자료 다음 · 서류 기록 앞에서 한 번');
+  ['grClosedTypes', 'grLive', 'grRenderYearBar', 'grRenderBiz', 'grBizBtn', 'grRenderCm', 'grClosedBanner', 'grLoadBizState'].forEach((n) =>
+    assert.doesNotMatch(grab(n).replace(/fbDb\.ref\(GR_BIZ\.node\)\.once\('value'\)/, ''), /fbDb|\.set\(|\.update\(|\.remove\(|\.transaction\(|fetch\(/, n + ' 에 쓰기가 있다'));
+  assert.match(SRC, /\$\('yrbar'\)\.addEventListener\('click'/);
+  assert.match(SRC, /data-close onclick="grCloseCm\(\)">닫기<\/button>/, '창은 PuBack 이 닫을 수 있게 data-close');
+});
+
+test('123 왼쪽 목록 — 진행 사업 · 접는 묶음(업체 없음·서류 틀 없음·연결 없음·종결) · «이름 (기관)» 두 줄 · 기관 없음은 「기관 미지정」 · 이름 같고 기관 다른 두 사업이 구분된다 · 업체 수', async () => {
+  const w = navWorld({ state: CLOSED05 });
+  await w.ctx.grLoad();
+  const h = w.els.biz.innerHTML, op = openSec(h);
+  /* 전제 — 합성 씨앗이 진짜로 이어진다(Nav.build 가 같은 묶음을 낸다) */
+  const m = J(Nav.build({ biz: w.ctx.GR.docs.biz, tmap: w.ctx.GR.docs.tmap, input: w.ctx.GR.input, year: '2026', state: w.ctx.GR.bizState }));
+  assert.deepEqual(m.open.map((x) => x.code), ['consulting-02', 'consulting-03', 'consulting-04', 'consulting-14', 'consulting-15']);
+  assert.deepEqual([m.quiet.map((x) => x.code), m.noPlan.map((x) => x.code), m.closed.map((x) => x.code)],
+    [['consulting-12'], ['consulting-13'], ['consulting-05']]);
+  assert.ok(m.unlinked.length >= 5 && m.unlinked.every((x) => !x.typeId));
+  /* 묶음과 차례 */
+  const at = (s) => { const i = h.indexOf(s); assert.ok(i >= 0, s); return i; };
+  assert.ok(at('진행 사업') < at('data-grp="quiet"') && at('data-grp="quiet"') < at('data-grp="noPlan"') && at('data-grp="noPlan"') < at('data-grp="unlinked"') && at('data-grp="unlinked"') < at('data-grp="closed"'));
+  ['업체 없음 <span class="bz-k">1</span>', '서류 틀 없음 <span class="bz-k">1</span>', '정부사업일정에 사업 없음 <span class="bz-k">', '🗄 종결 사업 <span class="bz-k">1</span>']
+    .forEach((x) => assert.ok(h.includes(x), x));
+  assert.ok(op.includes('진행 사업 <span class="bz-k">5</span>'));
+  /* 항목 두 줄 */
+  assert.match(bizBtn(h, 'consulting-02'), /^data-biz="consulting-02"[^>]*>.*?<span class="bz-nm">일터상생혁신컨설팅<\/span><span class="bz-ag">\(기관 미지정\)<\/span>.*?<b>1<\/b>/, '기관이 비면 (기관 미지정)');
+  assert.match(bizBtn(h, 'consulting-03'), /<span class="bz-nm">통합기술보호지원단<\/span><span class="bz-ag">\(비즈니스지원단\(중기청\)\)<\/span><\/span><span class="bz-k">간단형<\/span><b>1<\/b>/);
+  ['consulting-02', 'consulting-03', 'consulting-04', 'consulting-14', 'consulting-15'].forEach((c) => assert.ok(op.includes('data-biz="' + c + '"'), c + ' 는 진행 사업'));
+  assert.ok(!op.includes('data-biz="consulting-05"'), '종결 사업은 진행 사업에 없다');
+  assert.ok(grpOf(h, 'quiet').includes('data-biz="consulting-12"') && bizBtn(h, 'consulting-12').includes('<b>0</b>'), '업체 없음 묶음 · 업체 수 0');
+  assert.ok(grpOf(h, 'noPlan').includes('data-biz="consulting-13"') && bizBtn(h, 'consulting-13').includes('<span class="bz-k">' + D.NO_PLAN + '</span><b>0</b>'), '서류 틀 없음 묶음');
+  assert.ok(grpOf(h, 'unlinked').includes('data-biz="consulting-01"') && bizBtn(h, 'consulting-01').includes('ERP 연결에 이 사업이 없습니다'), '연결 없음 묶음 · 안내 title');
+  /* 이름이 같고 기관만 다른 두 사업 */
+  const same = '<span class="bz-nm">일터혁신 같은이름</span><span class="bz-ag">';
+  assert.equal(countOf(h, new RegExp(same.replace(/[()]/g, '\\$&'), 'g')), 2, '같은 이름이 두 줄');
+  assert.ok(bizBtn(h, 'consulting-14').includes(same + '(가기관)</span>') && bizBtn(h, 'consulting-15').includes(same + '(나기관)</span>'));
+  assert.notEqual(bizBtn(h, 'consulting-14').match(/title="[^"]*"/)[0], bizBtn(h, 'consulting-15').match(/title="[^"]*"/)[0], 'title 도 다르다');
+  /* 종결 사업 — 눌러 고를 수 있는 단추 · 흐린 글 · YYYY-MM 종결 */
+  assert.match(grpOf(h, 'closed'), /<button type="button" class="bz cl" data-biz="consulting-05"[^>]*>.*?<span class="bz-nm">인사노무컨설팅서산<\/span><span class="bz-ag">\(서산상공회의소\)<\/span>.*?<span class="bz-d">2026-09 종결<\/span>/);
+  assert.ok(!/<details[^>]* open/.test(h), '묶음은 접혀 있다');
+  assert.equal(w.db.쓴것.length, 0, '읽기만');
+  assert.equal(w.paths.filter((p) => p === 'scal_bizState').length, 1, '종결 표시는 한 번만 읽는다');
+});
+
+test('123-2 목록에서 사업을 누르면 거르고(고른 사업이 든 묶음은 펼친다) 다시 누르면 풀린다 · 묶음 머리는 펼침·접힘을 기억한다 · 이상한 묶음 이름은 무시', async () => {
+  const w = navWorld({ state: CLOSED05 });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  let h = w.els.biz.innerHTML;
+  assert.ok(w.els.rows.innerHTML.includes('가나상사') && !w.els.rows.innerHTML.includes('다라정밀') && !w.els.rows.innerHTML.includes('마바산업'));
+  assert.match(h, /class="bz on" data-biz="consulting-03"/);
+  w.ctx.grSetBiz('consulting-03');
+  assert.ok(w.els.rows.innerHTML.includes('다라정밀'), '다시 누르면 풀린다');
+  /* 종결 사업을 고르면 그 묶음이 펼쳐지고 행이 보인다 */
+  w.ctx.grSetBiz('consulting-05');
+  h = w.els.biz.innerHTML;
+  assert.match(h, /<details class="bz-g off" open><summary class="bz-t" data-grp="closed">/);
+  assert.match(grpOf(h, 'closed'), /class="bz on cl" data-biz="consulting-05"/);
+  assert.ok(w.els.rows.innerHTML.includes('마바산업'), '종결 사업을 골랐을 때는 그 행이 보인다');
+  w.ctx.grSetBiz('consulting-05');
+  /* 묶음 머리 */
+  w.ctx.grToggleBizGrp('quiet');
+  assert.match(w.els.biz.innerHTML, /<details class="bz-g off" open><summary class="bz-t" data-grp="quiet">/);
+  w.ctx.grSetBiz('consulting-03'); w.ctx.grSetBiz('consulting-03');   // 다시 그려도 기억한다
+  assert.match(w.els.biz.innerHTML, /<details class="bz-g off" open><summary class="bz-t" data-grp="quiet">/);
+  w.ctx.grToggleBizGrp('quiet');
+  assert.doesNotMatch(w.els.biz.innerHTML, /<details class="bz-g off" open><summary class="bz-t" data-grp="quiet">/);
+  const before = JSON.stringify(w.ctx.GR.bzOpen);
+  ['__proto__', 'constructor', 'open', '', undefined].forEach((k) => w.ctx.grToggleBizGrp(k));
+  assert.equal(JSON.stringify(w.ctx.GR.bzOpen), before, '목록에 없는 묶음 이름은 무시');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('124 연도 막대 — 연도 버튼이 보이지 않는 #fYear 와 같은 상태 · 누르면 그 해 기준(왼쪽 목록·숫자 칸·표) · 작은 글 = 그 해 업체 수(종결 사업 제외)', async () => {
+  const w = navWorld({ state: CLOSED05 });
+  await w.ctx.grLoad();
+  let y = w.els.yrbar.innerHTML;
+  assert.match(y, /<button type="button" class="on" data-yr="2026" aria-pressed="true" title="[^"]*">2026<small>5곳<\/small><\/button>/, '종결(05)을 뺀 5곳');
+  assert.match(y, /<button type="button" class="" data-yr="2025" aria-pressed="false" title="[^"]*">2025<small>1곳<\/small><\/button>/, '2025 는 05 가 아직 진행 — 03 한 곳');
+  assert.ok(y.indexOf('data-yr="2026"') < y.indexOf('data-yr="2025"'), '최신 연도가 앞');
+  assert.equal(w.els.fYear.value, '2026');
+  /* 대조 — 종결 표시가 없으면 2026 은 6곳(05 포함) */
+  const n = navWorld({ state: {} });
+  await n.ctx.grLoad();
+  assert.match(n.els.yrbar.innerHTML, /data-yr="2026"[^>]*>2026<small>6곳<\/small>/);
+  /* 누르면 */
+  w.ctx.grSetYear('2025');
+  assert.equal(w.ctx.GR.f.year, '2025');
+  assert.equal(w.els.fYear.value, '2025', '보이지 않는 거르개도 같은 값');
+  assert.ok(w.els.fYear.innerHTML.includes('<option value="2025" selected>2025년</option>'));
+  assert.match(w.els.yrbar.innerHTML, /class="on" data-yr="2025"/);
+  assert.match(w.els.yrbar.innerHTML, /class="" data-yr="2026"/);
+  assert.equal(kpiN(w, ''), '1', '숫자 칸이 2025 기준');
+  assert.ok(w.els.rows.innerHTML.includes('사아테크') && !w.els.rows.innerHTML.includes('가나상사'));
+  const h = w.els.biz.innerHTML;
+  assert.deepEqual([...openSec(h).matchAll(/data-biz="([^"]+)"/g)].map((x) => x[1]), ['consulting-03'], '2025 에 업체가 있는 사업은 03 하나');
+  assert.ok(grpOf(h, 'quiet').includes('data-biz="consulting-02"') && grpOf(h, 'quiet').includes('data-biz="consulting-05"'), '나머지는 업체 없음으로');
+  assert.ok(!grpOf(h, 'closed'), '05 의 종결은 2026 부터 — 2025 에는 종결 묶음이 없다');
+  w.ctx.grSetYear('2025');   // 같은 해는 그대로
+  assert.equal(w.ctx.GR.f.year, '2025');
+  w.ctx.grSetYear('');   // 이상한 값은 무시
+  assert.equal(w.ctx.GR.f.year, '2025');
+  /* 옛 거르개(#fYear 의 change)와 같은 상태 — 고치는 길이 둘이어도 어긋나지 않는다 */
+  w.ctx.GR.f.year = '2026'; w.ctx.grRender();
+  assert.equal(w.els.fYear.value, '2026');
+  assert.match(w.els.yrbar.innerHTML, /class="on" data-yr="2026"/);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('124-2 종결 사업은 숫자 칸·현황판 줄에서 빠진다(고른 사업이 종결이면 보인다) · 연도 막대·상태를 못 읽었을 때·연도가 비었을 때도 던지지 않는다', async () => {
+  const base = navWorld({ state: {} });
+  await base.ctx.grLoad();
+  assert.deepEqual([kpiN(base, ''), kpiN(base, 'todo')], ['3', '1']);
+  assert.ok(base.els.rows.innerHTML.includes('마바산업'));
+  const w = navWorld({ state: CLOSED05 });
+  await w.ctx.grLoad();
+  assert.deepEqual([kpiN(w, ''), kpiN(w, 'todo')], ['2', '0'], '05 의 마바산업(미작성)이 숫자에서 빠진다');
+  assert.ok(!w.els.rows.innerHTML.includes('마바산업') && w.els.rows.innerHTML.includes('가나상사') && w.els.rows.innerHTML.includes('다라정밀'));
+  w.ctx.grSetStatus('submitted');   // 서명·제출 거름도 같은 길
+  assert.ok(!w.els.rows.innerHTML.includes('마바산업'), '제출 완료 = 마바산업 하나였다 — 종결이라 빠진다');
+  w.ctx.grSetStatus('submitted');
+  /* 종결 사업을 골랐을 때 */
+  w.ctx.grSetBiz('consulting-05');
+  assert.deepEqual([kpiN(w, ''), kpiN(w, 'todo')], ['1', '1'], '고른 종결 사업의 숫자는 보인다');
+  assert.ok(w.els.rows.innerHTML.includes('마바산업') && !w.els.rows.innerHTML.includes('가나상사'));
+  /* 연도가 비면 종결로 보지 않는다 — 던지지 않는다 */
+  w.ctx.grSetBiz('consulting-05');
+  w.ctx.GR.f.year = ''; w.ctx.grRender();
+  assert.doesNotMatch(w.els.yrbar.innerHTML, /class="on"/, '고른 연도가 없다');
+  assert.equal(kpiN(w, ''), '4', '연도 없이 보면 종결 판정이 없다(전체 연도 줄)');
+});
+
+test('125 「⋯ 사업 종결」 — 창(종결일 기본 오늘·사유·이 연도부터/사업 전체·업체 수 안내) → 확인하면 scal_bizState/<코드> 한 번 쓰기 · 목록이 종결로 옮겨지고 숫자·챙길 것에서 빠진다', async () => {
+  const w = navWorld();
+  await w.ctx.grLoad();
+  assert.equal(w.els.docs.style.display, 'none');
+  w.ctx.grSetBiz('consulting-05');
+  assert.match(w.els.docs.innerHTML, /<button type="button" class="act cm-b" data-cm="open">⋯ 사업 종결<\/button>/, '서류 패널 머리에 단추');
+  assert.ok(!w.els.docs.innerHTML.includes('종결된 사업입니다'));
+  assert.equal(w.els.cm.innerHTML, '', '단추를 누르기 전에는 창이 없다');
+  w.ctx.grCloseOpen();
+  const c = w.els.cm.innerHTML;
+  assert.equal(w.els.cm.style.display, '');
+  ['role="dialog" aria-label="사업 종결"', '인사노무컨설팅서산 (서산상공회의소) 을(를) 종결 사업으로 옮깁니다', 'id="cmDay" value="2026-10-10"', '<b>2026년</b>부터 종결', '사업 전체 — 모든 연도에서 종결',
+    '2026년 업체 1곳이 걸려 있습니다', 'data-close onclick="grCloseCm()">닫기', 'onclick="grCloseBiz()">종결 사업으로 옮기기'].forEach((x) => assert.ok(c.includes(x), x));
+  Nav.REASONS.forEach((r) => assert.ok(c.includes('<option value="' + r + '"'), r));
+  assert.ok(c.includes('id="cmFromY" checked>') && c.includes('id="cmFromA">'), '기본은 «이 연도부터»');
+  assert.equal(w.db.쓴것.length, 0, '창을 여는 것만으로는 쓰지 않는다');
+  /* 확인 */
+  w.els.cmDay.value = '2026-12-31'; w.els.cmWhy.value = '계약 종료';
+  await w.ctx.grCloseBiz();
+  assert.equal(w.db.쓴것.length, 1, '쓰기는 한 번');
+  const wr = J(w.db.쓴것[0]);
+  assert.equal(wr.자리, 'scal_bizState/consulting-05');
+  assert.ok(!wr.update && !wr.transaction && !wr.remove);
+  assert.deepEqual(Object.keys(wr.값).sort(), ['at', 'by', 'closedAt', 'closedFrom', 'reason']);
+  assert.deepEqual([wr.값.closedFrom, wr.값.closedAt, wr.값.reason, wr.값.by], ['2026', '2026-12-31', '계약 종료', '홍길동']);
+  assert.equal(typeof wr.값.at, 'number');
+  assert.deepEqual(J(w.db.읽기('scal_bizState/consulting-05')), wr.값, '진짜로 저장됐다');
+  assert.deepEqual(J(w.ctx.GR.bizState['consulting-05']), wr.값);
+  assert.equal(w.ctx.GR.cm, null); assert.equal(w.els.cm.style.display, 'none', '창이 닫힌다');
+  /* 목록·숫자·챙길 것 */
+  const h = w.els.biz.innerHTML;
+  assert.ok(grpOf(h, 'closed').includes('data-biz="consulting-05"') && grpOf(h, 'closed').includes('2026-12 종결'));
+  assert.ok(!openSec(h).includes('consulting-05'));
+  assert.match(w.els.yrbar.innerHTML, /data-yr="2026"[^>]*>2026<small>5곳<\/small>/);
+  assert.match(w.els.docs.innerHTML, /종결된 사업입니다\./, '고른 채라 배너가 바로 선다');
+  assert.ok(!w.els.docs.innerHTML.includes('data-cm="open"'));
+  w.ctx.grSetBiz('consulting-05');   // 고름 풀기
+  assert.deepEqual([kpiN(w, ''), kpiN(w, 'todo')], ['2', '0']);
+  assert.equal(alertN(w, '종료 후 14일 넘은 미작성'), '0', '⏰ 알림에서도 빠진다(마바산업 미작성이었다)');
+  assert.ok(!w.els.alerts.innerHTML.includes('마바산업'));
+  assert.equal(w.db.쓴것.length, 1, '다시 그리기만으로는 더 쓰지 않는다');
+});
+
+test('125-2 「사업 전체」 → closedFrom 2000(모든 연도 종결) · 종결 전 해로 바꿔도 종결로 남는다 · 이 연도부터는 그 앞 해가 진행으로 보인다', async () => {
+  const w = navWorld();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  w.ctx.grCloseOpen();
+  w.els.cmDay.value = '2026-10-10'; w.els.cmWhy.value = '기타'; w.els.cmFromA.checked = true;
+  await w.ctx.grCloseBiz();
+  assert.equal(w.db.쓴것.length, 1);
+  assert.equal(J(w.db.쓴것[0].값).closedFrom, '2000');
+  assert.match(w.els.docs.innerHTML, /사업 전체 종결 \(2026-10-10\)/);
+  w.ctx.grSetYear('2025');
+  assert.ok(grpOf(w.els.biz.innerHTML, 'closed').includes('data-biz="consulting-03"'), '2025 에도 종결 — 사업 전체');
+  assert.match(w.els.docs.innerHTML, /종결된 사업입니다\./);
+  /* 이 연도부터(2026) 로 종결한 사업은 2025 에서 진행으로 보인다 */
+  const v = navWorld();
+  await v.ctx.grLoad();
+  v.ctx.grSetBiz('consulting-03'); v.ctx.grCloseOpen();
+  v.els.cmDay.value = '2026-10-10'; v.els.cmWhy.value = '계약 종료'; v.els.cmFromA.checked = false;
+  await v.ctx.grCloseBiz();
+  assert.equal(J(v.db.쓴것[0].값).closedFrom, '2026');
+  v.ctx.grSetYear('2025');
+  assert.ok(openSec(v.els.biz.innerHTML).includes('data-biz="consulting-03"'), '종결 전 연도(2025)에서는 진행 사업');
+  assert.ok(!v.els.docs.innerHTML.includes('종결된 사업입니다') && v.els.docs.innerHTML.includes('data-cm="open"'));
+  assert.equal(kpiN(v, ''), '1', '2025 숫자에 사아테크 한 곳');
+  v.ctx.grSetYear('2027');   // 연도 막대에는 없는 해 — 직접 넣어도 던지지 않는다(종결 판정은 closedFrom <= 연도)
+  v.ctx.grRender();
+  assert.equal(v.ctx.GR.f.year, '2027');
+});
+
+test('125-3 쓰기 거절(관리자가 아님·규칙 게시 전) — 창에 「저장하지 못했습니다 — 관리자만 종결할 수 있습니다(…)」 · 목록·숫자·상태는 그대로 · 다시 눌러 볼 수 있다', async () => {
+  const w = navWorld({ denyWrite: true });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-05');
+  assert.ok(w.els.docs.innerHTML.includes('data-cm="open"'), '직원에게도 단추는 보인다');
+  w.ctx.grCloseOpen();
+  w.els.cmDay.value = '2026-10-10'; w.els.cmWhy.value = Nav.REASONS[0];
+  await w.ctx.grCloseBiz();
+  assert.ok(w.els.cm.innerHTML.includes('<div class="err-s">' + FAIL + '</div>'), w.els.cm.innerHTML);
+  assert.equal(w.els.cm.style.display, '', '창은 열려 있다');
+  assert.equal(w.ctx.GR.cm.busy, false);
+  assert.deepEqual(J(w.ctx.GR.bizState), {}, '상태는 그대로');
+  assert.ok(openSec(w.els.biz.innerHTML).includes('data-biz="consulting-05"') && !grpOf(w.els.biz.innerHTML, 'closed'), '목록은 그대로');
+  assert.equal(w.db.쓴것.length, 0);
+  assert.ok(!w.els.cm.innerHTML.includes('onclick="grCloseBiz()" disabled'), '다시 누를 수 있다');
+  w.ctx.grCloseCm();
+  assert.equal(w.els.cm.style.display, 'none');
+});
+
+test('125-4 막는 것 — 연도가 비었을 때 「이 연도부터」는 못 쓴다(사업 전체만) · 규칙 열쇠 꼴이 아닌 사업 코드·프로토타입 이름은 쓰지 않는다 · 창을 두 번 눌러도 쓰기는 한 번', async () => {
+  const w = navWorld();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-05');
+  w.ctx.GR.f.year = ''; w.ctx.grRender();
+  w.ctx.grCloseOpen();
+  const c = w.els.cm.innerHTML;
+  assert.ok(c.includes('id="cmFromY" disabled>') && c.includes('id="cmFromA" checked>'), '이 연도부터는 쓸 수 없고 사업 전체가 골라져 있다');
+  assert.ok(c.includes('연도를 고르지 않아 쓸 수 없습니다'));
+  w.els.cmFromA.checked = false;   // (눌러 풀 수는 없지만) 강제로 풀어도 쓰지 않는다
+  await w.ctx.grCloseBiz();
+  assert.equal(w.db.쓴것.length, 0);
+  assert.ok(w.els.cm.innerHTML.includes('종결 연도를 정할 수 없습니다 — 연도를 고르거나 「사업 전체」를 골라 주세요'));
+  /* 사업 코드 점검 */
+  for (const bad of ['a/b', '__proto__', 'constructor', 'prototype', 'x'.repeat(41), '가나', 'a b', 'consulting-99']) {
+    w.ctx.GR.cm = { code: bad, day: '2026-10-10', reason: '기타', from: 'all', msg: '', err: false, busy: false };
+    w.els.cmFromA.checked = true;
+    await w.ctx.grCloseBiz();
+    assert.equal(w.db.쓴것.length, 0, '쓰면 안 되는 코드: ' + bad);
+    assert.ok(w.ctx.GR.cm.msg.includes('사업 코드를 확인할 수 없어 종결하지 않았습니다'), bad);
+  }
+  assert.deepEqual(J(w.ctx.GR.bizState), {});
+  assert.equal(w.ctx.grOkBizCode('consulting-05'), true);
+  assert.equal(w.ctx.grOkBizCode('A_b-9'), true);
+  /* 겹쳐 눌러도 한 번 */
+  const v = navWorld();
+  await v.ctx.grLoad();
+  v.ctx.grSetBiz('consulting-04'); v.ctx.grCloseOpen();
+  v.els.cmDay.value = '2026-10-10'; v.els.cmWhy.value = '기타'; v.els.cmFromA.checked = false;
+  await Promise.all([v.ctx.grCloseBiz(), v.ctx.grCloseBiz()]);
+  assert.equal(v.db.쓴것.length, 1, '두 번 눌러도 한 번');
+});
+
+test('126 종결 사업을 고르면 배너(종결일·사유·처리자)와 그 행·서류 패널이 보인다 · 「↩ 되돌리기」→ .remove() 한 번 → 진행 사업으로 · 종결 전 연도로 바꾸면 진행 사업으로 보인다', async () => {
+  const w = navWorld({ state: CLOSED05 });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-05');
+  const d = w.els.docs.innerHTML;
+  assert.equal(w.els.docs.style.display, '');
+  ['종결된 사업입니다.', '2026년부터 종결 (2026-09-30)', '사유: 사업 기간 끝남', '종결 처리: 홍길동', '숫자·챙길 것·받은 서류 확인에서는 빠져 있고',
+    '<button type="button" class="act" data-cm="reopen">↩ 진행 사업으로 되돌리기</button>', '📋 서류 — 인사노무컨설팅서산', '마바산업'].forEach((x) => assert.ok(d.includes(x), x));
+  assert.ok(!d.includes('data-cm="open"'), '종결된 사업에는 «종결» 단추가 없다');
+  assert.ok(w.els.rows.innerHTML.includes('마바산업'), '그 사업 행이 보인다');
+  assert.ok(d.indexOf('종결된 사업입니다') < d.indexOf('📋 서류'), '배너는 서류 패널 위');
+  assert.equal(w.db.쓴것.length, 0, '읽기만');
+  /* 종결 전 연도로 */
+  w.ctx.grSetYear('2025');
+  assert.ok(!w.els.docs.innerHTML.includes('종결된 사업입니다') && w.els.docs.innerHTML.includes('data-cm="open"'), '2025 에는 진행 사업');
+  assert.ok(grpOf(w.els.biz.innerHTML, 'quiet').includes('consulting-05') && !grpOf(w.els.biz.innerHTML, 'closed'));
+  w.ctx.grSetYear('2026');
+  /* 되돌리기 */
+  await w.ctx.grReopenBiz();
+  assert.equal(w.db.쓴것.length, 1, '지우기는 한 번');
+  assert.deepEqual(J(w.db.쓴것[0]), { 자리: 'scal_bizState/consulting-05', 값: null, remove: true });
+  assert.equal(w.db.읽기('scal_bizState/consulting-05'), null, '노드가 지워졌다');
+  assert.deepEqual(J(w.ctx.GR.bizState), {});
+  assert.ok(!w.els.docs.innerHTML.includes('종결된 사업입니다') && w.els.docs.innerHTML.includes('data-cm="open"'));
+  const h = w.els.biz.innerHTML;
+  assert.ok(openSec(h).includes('data-biz="consulting-05"') && !grpOf(h, 'closed'), '진행 사업으로 돌아왔다');
+  assert.match(w.els.yrbar.innerHTML, /data-yr="2026"[^>]*>2026<small>6곳<\/small>/, '막대 숫자도 돌아왔다');
+  w.ctx.grSetBiz('consulting-05');
+  assert.deepEqual([kpiN(w, ''), kpiN(w, 'todo')], ['3', '1'], '숫자·행에 다시 들어온다');
+  assert.ok(w.els.rows.innerHTML.includes('마바산업'));
+  await w.ctx.grReopenBiz();   // 이미 진행 — 지울 것이 없다
+  assert.equal(w.db.쓴것.length, 1);
+});
+
+test('126-2 되돌리기 거절 — 배너에 같은 안내 문구 · 상태·목록 그대로 · 잠금은 풀린다 · 모든 연도 종결(closedFrom 2000)도 되돌리면 전부 진행', async () => {
+  const w = navWorld({ state: CLOSED05, denyWrite: true });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-05');
+  await w.ctx.grReopenBiz();
+  assert.ok(w.els.docs.innerHTML.includes('<div class="err-s">' + FAIL + '</div>'));
+  assert.equal(w.ctx.GR.bbusy, false);
+  assert.ok('consulting-05' in J(w.ctx.GR.bizState), '상태는 그대로');
+  assert.ok(grpOf(w.els.biz.innerHTML, 'closed').includes('consulting-05'));
+  assert.equal(w.db.쓴것.length, 0);
+  w.ctx.grSetBiz('consulting-05'); w.ctx.grSetBiz('consulting-05');
+  assert.ok(!w.els.docs.innerHTML.includes(FAIL), '다른 사업을 거쳐 오면 옛 오류는 지워진다');
+  const a = navWorld({ state: { 'consulting-05': { closedFrom: '2000', at: 1 } } });
+  await a.ctx.grLoad();
+  a.ctx.grSetYear('2025'); a.ctx.grSetBiz('consulting-05');
+  assert.match(a.els.docs.innerHTML, /사업 전체 종결/);
+  await a.ctx.grReopenBiz();
+  ['2025', '2026'].forEach((y) => { a.ctx.grSetYear(y); assert.ok(!grpOf(a.els.biz.innerHTML, 'closed'), y); });
+});
+
+test('127 종결 사업은 ⏰ 챙길 것(미작성·초안·서명 회신·제출 기한)·막힌 단계에서 빠진다 — 사업마다 자기 알림만 빠진다', async () => {
+  const base = navWorld({ state: {} });
+  await base.ctx.grLoad();
+  const heads = ['종료 후 14일 넘은 미작성', '초안 7일 넘음', '서명 회신 기다림 \\(7일 넘음\\)', '제출 기한 지남'];
+  assert.deepEqual(heads.map((x) => alertN(base, x)), ['1', '1', '1', '1'], '대조 — 종결이 없으면 각 하나');
+  /* 사업 코드 → 어느 알림이 빠지나 (05 마바산업 미작성 · 03 가나상사 초안·제출 기한 · 04 다라정밀 서명 회신) */
+  const cases = [['consulting-05', ['0', '1', '1', '1']], ['consulting-03', ['1', '0', '1', '0']], ['consulting-04', ['1', '1', '0', '1']]];
+  for (const [code, want] of cases) {
+    const w = navWorld({ state: { [code]: { closedFrom: '2026', at: 1 } } });
+    await w.ctx.grLoad();
+    assert.deepEqual(heads.map((x) => alertN(w, x)), want, code + ' 종결');
+  }
+  /* 고른 사업이 종결이어도 알림에서는 빠진 채다 */
+  const s = navWorld({ state: CLOSED05 });
+  await s.ctx.grLoad();
+  s.ctx.grSetBiz('consulting-05');
+  assert.equal(alertN(s, '종료 후 14일 넘은 미작성'), '0');
+  /* 막힌 단계 — 대형 사업 기록(일터혁신 plan 막힘) */
+  const track = { t2: { plan: { st: 'blocked', note: '인증서 만료' } } };
+  const b0 = navWorld({ seed: bigSeed({ track }) });
+  await b0.ctx.grLoad();
+  assert.equal(alertN(b0, '막힌 단계'), '1', '대조 — 막힌 단계 하나');
+  const seed = bigSeed({ track }); seed.scal_bizState = { 'consulting-02': { closedFrom: '2026', at: 1 } };
+  const b1 = navWorld({ seed });
+  await b1.ctx.grLoad();
+  assert.equal(alertN(b1, '막힌 단계'), '0', '종결 사업의 막힌 단계는 알림에서 빠진다');
+  assert.ok(!b1.els.alerts.innerHTML.includes('인증서 만료'));
+  const seed2 = bigSeed({ track }); seed2.scal_bizState = { 'consulting-02': { closedFrom: '2027', at: 1 } };
+  const b2 = navWorld({ seed: seed2 });
+  await b2.ctx.grLoad();
+  assert.equal(alertN(b2, '막힌 단계'), '1', '2027 부터 종결이면 2026 알림은 그대로');
+});
+
+test('128 종결 사업은 전역 「📥 받은 서류 확인」 쌍 모으기에서 빠진다 — 그 업체 메일이 목록에서 사라진다(다른 쌍에 이어지면 그쪽으로)', async () => {
+  const run = async (state) => {
+    const s = giSeed(); if (state) s.scal_bizState = state;
+    const w = giWorld({ seed: s });
+    await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+    assert.equal(w.ctx.GR.gi.st, 'ok');
+    return giList(w);
+  };
+  const all = await run(null);
+  assert.deepEqual(all.map((m) => m.uid), ['111', '108', '102', '101', '110'], '대조 — 종결이 없을 때(기존 검사 110 과 같다)');
+  /* 04 = 다라정밀 충남북부(t3) 종결 → 다라정밀 메일이 모두 빠지고 두 업체에 걸린 111 만 남는다 */
+  const c4 = await run({ 'consulting-04': { closedFrom: '2026', at: 1 } });
+  assert.deepEqual(c4.map((m) => m.uid), ['111']);
+  assert.ok(c4.every((m) => m.coName !== '다라정밀'));
+  /* 03 = 가나상사 기술보호(t1) 종결 → 111 은 «다음 쌍»(마바산업)으로 이어진다 */
+  const c3 = await run({ 'consulting-03': { closedFrom: '2026', at: 1 } });
+  assert.deepEqual(c3.map((m) => m.uid), ['111', '108', '102', '101', '110']);
+  assert.equal(c3.filter((m) => m.uid === '111')[0].coName, '마바산업', '종결 사업의 쌍은 모으지 않는다 — 111 이 다음 쌍으로');
+  /* 종결이 2027 부터면(고른 해 2026) 그대로 */
+  assert.deepEqual((await run({ 'consulting-04': { closedFrom: '2027', at: 1 } })).map((m) => m.uid), all.map((m) => m.uid));
+  /* 종결 → 되돌리기 뒤 목록이 메일함을 다시 읽지 않고 다시 계산된다 */
+  const s = giSeed();
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const reads = mailReads(w).length;
+  w.ctx.grSetBiz('consulting-04'); w.ctx.grCloseOpen();
+  w.ctx.$('cmDay').value = '2026-10-10'; w.ctx.$('cmWhy').value = '기타'; w.ctx.$('cmFromA').checked = false;
+  await w.ctx.grCloseBiz();
+  assert.deepEqual(giList(w).map((m) => m.uid), ['111'], '종결하자 바로 줄어든다');
+  await w.ctx.grReopenBiz();
+  assert.deepEqual(giList(w).map((m) => m.uid), ['111', '108', '102', '101', '110'], '되돌리면 돌아온다');
+  assert.equal(mailReads(w).length, reads, '메일함은 다시 읽지 않았다');
+});
+
+test('129 상태를 못 읽으면(규칙 게시 전·권한 거절) 평소처럼 돈다 — 종결 없음 · 오류 줄 없음 · 모양이 이상한 값도 종결이 아니다', async () => {
+  const w = navWorld({ state: CLOSED05, denyRead: true });
+  await w.ctx.grLoad();
+  assert.deepEqual(J(w.ctx.GR.bizState), {});
+  assert.equal(w.els.err.style.display, 'none', '오류 줄 없음');
+  assert.notEqual(w.els.board.style.display, 'none');
+  assert.ok(w.els.rows.innerHTML.includes('마바산업'), '종결로 보지 않으니 05 행도 그대로');
+  assert.ok(openSec(w.els.biz.innerHTML).includes('data-biz="consulting-05"'));
+  assert.ok(!w.els.biz.innerHTML.includes('불러오지 못했습니다'));
+  assert.match(w.els.yrbar.innerHTML, /data-yr="2026"[^>]*>2026<small>6곳<\/small>/);
+  assert.equal(w.ctx.GR.loaded, true);
+  assert.equal(alertN(w, '종료 후 14일 넘은 미작성'), '1');
+  /* 모양이 이상한 값 — 노드가 배열·글자·값 없음 */
+  for (const [bad, want] of [[['x'], {}], ['x', {}], [5, {}], [{ 'consulting-05': 'x' }, { 'consulting-05': 'x' }], [{ 'consulting-05': { closedFrom: '26' } }, { 'consulting-05': { closedFrom: '26' } }]]) {
+    const v = navWorld({ state: bad });
+    await v.ctx.grLoad();
+    assert.deepEqual(J(v.ctx.GR.bizState), want, '읽은 값 정리: ' + JSON.stringify(bad));
+    assert.ok(openSec(v.els.biz.innerHTML).includes('data-biz="consulting-05"'), JSON.stringify(bad) + ' 는 종결이 아니다');
+  }
+  /* 상태를 못 읽어도 종결 창은 열리고 거절은 안내로 — 목록은 그대로 */
+  w.ctx.grSetBiz('consulting-05'); w.ctx.grCloseOpen();
+  assert.equal(w.els.cm.style.display, '');
+});
+
+test('130 같은 일정 사업에 아직 진행인 이알피 사업이 이어져 있으면(두 사업이 같은 일정 사업) 종결로 그 업체를 가리지 않는다 · 종결 사업만 목록에서 옮겨진다', async () => {
+  const w = navWorld({ seedOpt: { twin: true }, state: { 'consulting-03': { closedFrom: '2026', at: 1 } } });
+  await w.ctx.grLoad();
+  const m = J(Nav.build({ biz: w.ctx.GR.docs.biz, tmap: w.ctx.GR.docs.tmap, input: w.ctx.GR.input, year: '2026', state: w.ctx.GR.bizState }));
+  assert.deepEqual(m.closed.map((x) => x.code), ['consulting-03']);
+  assert.ok(m.open.some((x) => x.code === 'consulting-12' && x.typeId === 't1'), '전제: 12 가 같은 일정 사업(t1)에 이어져 진행 중');
+  assert.deepEqual(J(w.ctx.grClosedTypes('2026', false)), {}, '진행 사업이 같은 종류를 쓰므로 거르지 않는다');
+  assert.equal(kpiN(w, ''), '3', '가나상사 기술보호 줄이 숫자에 남는다');
+  assert.ok(w.els.rows.innerHTML.includes('가나상사'));
+  assert.equal(alertN(w, '초안 7일 넘음'), '1');
+  assert.ok(grpOf(w.els.biz.innerHTML, 'closed').includes('consulting-03'), '목록에서는 03 이 종결로 간다');
+  /* 대조 — 둘로 나뉘지 않은 씨앗은 종류가 걸러진다 */
+  const n = navWorld({ state: { 'consulting-03': { closedFrom: '2026', at: 1 } } });
+  await n.ctx.grLoad();
+  assert.deepEqual(J(n.ctx.grClosedTypes('2026', false)), { t1: 1 });
+  assert.deepEqual(J(n.ctx.grClosedTypes('2025', false)), {}, '2025 는 종결 전');
+  assert.equal(kpiN(n, ''), '2');
+  n.ctx.grSetBiz('consulting-03');
+  assert.deepEqual(J(n.ctx.grClosedTypes('2026', true)), {}, '고른 사업이면 거르지 않는다');
+  /* 사업 목록·일정을 못 읽었으면 아무것도 거르지 않는다 */
+  n.ctx.GR.docs = { loaded: false, err: false };
+  assert.deepEqual(J(n.ctx.grClosedTypes('2026', false)), {});
+});
+
+test('131 바깥 값은 이스케이프 — 사업 이름·기관·사유·종결 처리자·종결 창 · <script>·따옴표', async () => {
+  const hostile = { 'consulting-14': { closedFrom: '2026', closedAt: '2026-10-01', reason: '<script>r</script>"', by: '<b>x</b>\'', at: 1 } };
+  const w = navWorld({ seedOpt: { hostile: true }, state: hostile });
+  await w.ctx.grLoad();
+  const bad = /<script|<img|<svg|<b>x/;
+  const biz = w.els.biz.innerHTML;
+  assert.doesNotMatch(biz, bad, '목록(이름·기관·title)');
+  assert.ok(biz.includes('&#60;script&#62;alert(1)&#60;/script&#62;가') && biz.includes('(&#34;&#62;&#60;img src=x onerror=1&#62;)'), '이름·기관이 글자로 나온다');
+  assert.doesNotMatch(w.els.yrbar.innerHTML, bad);
+  w.ctx.grSetBiz('consulting-14');
+  const d = w.els.docs.innerHTML;
+  assert.doesNotMatch(d, bad, '배너·서류 패널 머리');
+  ['사유: &#60;script&#62;r&#60;/script&#62;&#34;', '종결 처리: &#60;b&#62;x&#60;/b&#62;&#39;'].forEach((x) => assert.ok(d.includes(x), x));
+  assert.doesNotMatch(w.els.rows.innerHTML, bad);
+  /* 종결 창 — 이름이 위험한 사업 */
+  w.ctx.grSetBiz('consulting-15');
+  w.ctx.grCloseOpen();
+  assert.doesNotMatch(w.els.cm.innerHTML, bad, '종결 창');
+  assert.ok(w.els.cm.innerHTML.includes('&#60;img src=x onerror=2&#62;나 (&#39;&#62;&#60;svg onload=3&#62;) 을(를) 종결 사업으로'));
+  /* 거절 문구·돌려받은 값도 글자로 */
+  assert.doesNotMatch(w.els.docs.innerHTML + w.els.alerts.innerHTML + w.els.ginbox.innerHTML, bad);
 });

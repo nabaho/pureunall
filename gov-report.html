@@ -12,7 +12,9 @@
 
      ★ 보고서는 «읽기만» 한다 — 모든 사업장·사업의 보고서 상태를 보고, 쓰는 일은
        정부사업일정의 보고서 창(gov-consulting.html#rpt=업체|사업)으로 건너가서 한다.
-     ★ 이 화면이 쓰는 곳은 «하나»다 — 서류 진행 기록(③서명본·④별첨·⑤제출) 줄 하나씩:
+     ★ 사업 종결(2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md) — 쓰는 곳이 하나 더 있다: scal_bizState/{이알피 사업 코드}
+       (종결 = 한 칸 쓰기 grCloseBiz, 되돌리기 = 그 칸 지우기 grReopenBiz). 규칙은 관리자·위임관리인만 허락한다. 읽기가 거절되면 «종결 없음»으로 돈다.
+     ★ 서류 줄 쓰기는 «하나»다 — 서류 진행 기록(③서명본·④별첨·⑤제출) 줄 하나씩:
        scal_docs/{업체}/{rid}/items/{줄 키} 를 .set (grSaveCell). 설계 docs/superpowers/specs/2026-10-10-gov-report-track-design.md
        scal_docs 규칙은 2026-10-11 부터 게시되어 돈다. 읽기가 거절되면(권한 없음) 읽기 전용으로 돈다(「기록을 못 불러왔습니다 — 규칙 게시 또는 권한 확인」).
        게시를 기다리는 것은 줄 안의 link 가지뿐 — 그 전에는 link 가 든 저장만 거절된다.
@@ -85,6 +87,19 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 .bz-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13px}
 .bz-k{font-size:11px;color:var(--mute)}
 .bz b{font-size:12px;font-variant-numeric:tabular-nums}
+.bz-nm{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+.bz-ag{display:block;font-size:12px;color:var(--mute);overflow:hidden;text-overflow:ellipsis}
+.bz.on .bz-ag{color:var(--blue-ink)}
+.bz.cl{color:var(--mute)}
+.bz-d{font-size:12px;color:var(--mute);white-space:nowrap}
+.bz-t{cursor:pointer;font-size:12px;font-weight:600;color:var(--mute);padding:4px 2px}
+.yrs{display:flex;gap:4px;flex-wrap:wrap;background:var(--line);border-radius:10px;padding:3px;margin-bottom:12px}
+.yrs button{flex:1;min-width:64px;border:0;background:transparent;color:var(--mute);border-radius:8px;padding:6px 0}
+.yrs button.on{background:var(--card);color:var(--navy);font-weight:800;box-shadow:0 1px 3px rgba(15,23,42,.06)}
+.yrs small{display:block;font-weight:400;font-size:12px;line-height:1.2}
+.cl-bn{display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--bg);border:1px dashed var(--mute);border-radius:12px;padding:10px 14px;margin-bottom:10px}
+.cl-bt{flex:1;min-width:200px}
+.cm-b{margin-left:auto}
 .docs{background:var(--card);border:1px solid var(--blue-line);border-radius:10px;padding:10px;margin-bottom:10px;overflow:auto}
 .dc-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .dc-wide{overflow-x:auto}
@@ -152,9 +167,10 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
   <div class="grid" id="board" style="display:none">
     <aside class="bizp"><section><h2>📂 컨설팅 사업</h2><div id="biz"></div></section></aside>
     <div>
+      <div class="yrs" id="yrbar" role="group" aria-label="연도"></div>
       <div class="kpis" id="kpis"></div>
       <div class="filters">
-        <select id="fYear" aria-label="연도"></select>
+        <select id="fYear" aria-label="연도" style="display:none"></select>
         <select id="fType" aria-label="사업"></select>
         <select id="fAtt" aria-label="담당"></select>
         <select id="fStatus" aria-label="상태">
@@ -185,6 +201,7 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 <div id="toc" class="toc" style="display:none"></div>
 <div id="cellw" class="toc" style="display:none"></div>
 <div id="attv" class="toc" style="display:none"></div>
+<div id="cm" class="toc" style="display:none"></div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
@@ -211,6 +228,8 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
 <script src="js/pu-gov-report-track.js?v=8"></script>
 <script src="js/pu-gov-report-docs.js?v=11"></script>
+<!-- 왼쪽 사업 목록 모델(사업 이름 (수행기관))·사업 종결 판정(순수 함수) — docs 가 불러 쓰므로 docs 다음에 싣는다 -->
+<script src="js/pu-gov-report-nav.js?v=1"></script>
 <!-- 받은 서류함 — 주소 맞추기(pu-co-thread) · 서버 부르기(rules-v2/mail-orig 의 makeCall) · 후보·연결 열쇠·첨부 받기 순서(순수 함수)
      설계 docs/superpowers/specs/2026-10-11-gov-report-inbox-design.md. 판독기(pdf·xlsx)는 누를 때 vendor/ 에서 싣는다 -->
 <script src="js/pu-co-thread.js?v=3"></script>
@@ -243,7 +262,9 @@ var GR_TRACK_NODES={docs:'scal_docs'};
 var GR_INBOX_NODES={folders:'mailbox/folders',msgs:'mailbox/msgs',cos:'data/companies'};
 /* 서버 함수 자리(취업규칙 화면 MAIL_FN_BASE 와 같은 곳) · 폴더마다 읽을 최근 통 수 · 응답 기다림(ms, 지난 메일은 1분쯤) */
 var GR_MAIL={fn:'https://asia-northeast3-pureun-erp.cloudfunctions.net/',per:3000,wait:180000};
-var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
+/* 사업 종결 표시 — 이 앱의 쓰기 자리 둘째(scal_bizState/{이알피 사업 코드}). 읽기는 통째 한 번, 쓰기는 사업 하나(종결 .set · 되돌리기 .remove) */
+var GR_BIZ={node:'scal_bizState',code:/^[A-Za-z0-9_-]{1,40}$/,fail:'저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)'};
+var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,bizState:{},bseq:0,bzOpen:{},cm:null,bmsg:'',bbusy:false,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -259,6 +280,7 @@ function grFilter(){ var f=GR.f; return {year:f.year,type:f.biz?(grBizType()||'-
 function grRenderFilters(){
   var L=PuGovReportList, seenT={}, seenA={};
   $('fYear').innerHTML=L.yearsOf(GR.rows,GR.today).map(function(y){ return '<option value="'+y+'"'+(y===GR.f.year?' selected':'')+'>'+y+'년</option>'; }).join('');
+  $('fYear').value=GR.f.year;   /* 보이지 않는 거르개 — 위 연도 막대와 같은 상태(GR.f.year)를 따라간다 */
   GR.rows.forEach(function(r){ seenT[r.typeId]=r.typeName; r.attIds.forEach(function(id){ if(GR.staffMap[id]) seenA[id]=GR.staffMap[id]; }); });
   var opts=function(all,seen,cur){ return '<option value="">'+all+'</option>'+Object.keys(seen).sort(function(a,b){ return seen[a].localeCompare(seen[b],'ko'); })
     .map(function(id){ return '<option value="'+grEsc(id)+'"'+(id===cur?' selected':'')+'>'+grEsc(seen[id])+'</option>'; }).join(''); };
@@ -270,7 +292,7 @@ function grRenderFilters(){
 }
 function grRenderKpis(){
   var L=PuGovReportList, T=PuGovReportTrack, base=grFilter(); base.status='';
-  var view=L.filterRows(GR.rows,base), k=L.kpis(view), x=T.kpiExtra(view);
+  var view=grLive(L.filterRows(GR.rows,base),true), k=L.kpis(view), x=T.kpiExtra(view);
   var cells=[['','전체',k.all],['todo','미작성',k.todo],['draft','초안',k.draft],['done','검토완료',k.done],['signed','서명',x.signed],['submitted','제출',x.submitted]];
   var tip={signed:' title="③ 업체 서명본이 진행(발송)·완료인 줄"',submitted:' title="⑤ 기관 제출을 마친 줄"'};
   if(GR.trackErr){ tip.signed=tip.submitted=' title="기록을 못 불러왔습니다"'; cells[4][2]=cells[5][2]='?'; }
@@ -283,12 +305,25 @@ function grSetStatus(st){
   GR.f.status=(st&&GR.f.status!==st)?st:'';
   grRender();
 }
+/* 고른 해에 종결인 사업이 이어진 일정 사업 종류 {typeId:1} — 숫자·현황판 줄·챙길 것·막힌 단계·받은 서류 확인·연도 막대가 모두 이것 하나로 거른다.
+   같은 일정 사업에 «아직 진행인» 다른 이알피 사업이 이어져 있으면 그 종류는 거르지 않는다(진행 업체를 가리지 않게).
+   keepSel: 왼쪽에서 고른 사업이 종결이면 그 종류는 거르지 않는다 — 눌러 고르면 그 사업 행·서류 패널이 보인다. 상태를 못 읽었으면 아무것도 거르지 않는다 */
+function grClosedTypes(year,keepSel){
+  var N=PuGovReportNav, D=PuGovReportDocs, d=GR.docs||{};
+  if(!d.loaded||d.err||!GR.input) return {};
+  var cl=N.closedTypeIds({biz:d.biz,tmap:d.tmap,input:GR.input,year:year,state:GR.bizState}), live={};
+  D.visibleTypes(d.biz).forEach(function(t){ if(N.closedFor(GR.bizState,t.code,year)) return; var id=D.linkOf(t.code,d.tmap,GR.input.types); if(id) live[id]=1; });
+  Object.keys(cl).forEach(function(id){ if(live[id]) delete cl[id]; });
+  if(keepSel&&GR.f.biz) delete cl[grBizType()];
+  return cl;
+}
+function grLive(rows,keepSel){ var cl=grClosedTypes(GR.f.year,keepSel); return rows.filter(function(r){ return !cl[r.typeId]; }); }
 /* 목록에 보일 줄 — 「서명」「제출」은 현황판 상태가 아니라 기록(r.trk)으로 거른다 */
 function grView(){
   var L=PuGovReportList, f=grFilter(), k=f.status;
-  if(k!=='signed'&&k!=='submitted') return L.filterRows(GR.rows,f);
+  if(k!=='signed'&&k!=='submitted') return grLive(L.filterRows(GR.rows,f),true);
   f.status='';
-  return L.filterRows(GR.rows,f).filter(function(r){ return PuGovReportTrack.kpiHit(r,k); });
+  return grLive(L.filterRows(GR.rows,f),true).filter(function(r){ return PuGovReportTrack.kpiHit(r,k); });
 }
 function grRenderRows(){
   var L=PuGovReportList, view=grView();
@@ -314,25 +349,64 @@ function grRenderRows(){
   $('empty').textContent=yearRows?'조건에 맞는 보고서가 없습니다.':'올해 걸린 보고서가 없습니다 — 사업 걸기는 정부사업일정에서';
   $('empty').style.display=(GR.loaded&&!view.length)?'':'none';
 }
-/* 왼쪽 패널 — 이알피 「환경설정 → 컨설팅관리 → 컨설팅 사업」을 기관별로. 숫자는 고른 해의 업체 수 */
+/* 연도 막대 — 위쪽 «2026 · 2025 · …» 버튼. 눌러서 바꾸는 연도는 보이지 않는 #fYear 와 같은 상태(GR.f.year). 작은 글 = 그 해 업체 수(종결 사업 제외) */
+function grRenderYearBar(){
+  var L=PuGovReportList, N=PuGovReportNav, d=GR.docs||{}, el=$('yrbar');
+  var ok=!!GR.loaded&&!!d.loaded&&!d.err&&!!GR.input;
+  el.innerHTML=L.yearsOf(GR.rows,GR.today).map(function(y){
+    var n=ok?N.build({biz:d.biz,tmap:d.tmap,input:GR.input,year:y,state:GR.bizState}).total:null;
+    return '<button type="button" class="'+(y===GR.f.year?'on':'')+'" data-yr="'+grEsc(y)+'" aria-pressed="'+(y===GR.f.year)+'"'
+      +(n==null?'':' title="'+grEsc(y+'년 업체 '+n+'곳(사업별 합계) · 종결 사업 제외')+'"')+'>'+grEsc(y)+'<small>'+(n==null?'—':n+'곳')+'</small></button>';
+  }).join('');
+}
+function grSetYear(y){
+  if(!y||GR.f.year===y) return;
+  GR.f.year=y; grGiReset(); grRender();
+}
+/* 종결 사업 글 — short: «YYYY-MM 종결»(목록 작은 글) · 아니면 «2026년부터 종결 (2026-12-31)» */
+function grClosedText(st,short){
+  if(!st) return '종결';
+  var all=st.closedFrom===PuGovReportNav.ALL_FROM, day=String(st.closedAt||'');
+  if(short) return day?day.slice(0,7)+' 종결':(all?'전체 종결':st.closedFrom+'년부터 종결');
+  return (all?'사업 전체':st.closedFrom+'년부터')+' 종결'+(day?' ('+day+')':'');
+}
+function grBizState(code){ return (GR.bizState&&Object.prototype.hasOwnProperty.call(GR.bizState,code))?GR.bizState[code]:null; }
+/* 항목 한 줄 = «사업 이름» 굵게 + «(수행기관)» 작게(기관이 비면 「기관 미지정」) · 종류 딱지 · 업체 수(종결 사업은 «YYYY-MM 종결») */
+function grBizBtn(t,grp){
+  var D=PuGovReportDocs, cl=grp==='closed';
+  var tip=t.label.text+(grp==='unlinked'?' — 정부사업일정의 ERP 연결에 이 사업이 없습니다':'')+(cl?' — '+grClosedText(grBizState(t.code)):'');
+  return '<button type="button" class="bz'+(t.code===GR.f.biz?' on':'')+(cl?' cl':'')+'" data-biz="'+grEsc(t.code)+'" title="'+grEsc(tip)+'">'
+    +'<span class="bz-n"><span class="bz-nm">'+grEsc(t.label.name)+'</span><span class="bz-ag">('+grEsc(t.label.agency)+')</span></span>'
+    +'<span class="bz-k">'+grEsc(D.KIND_KO[t.kind])+'</span>'
+    +(cl?'<span class="bz-d">'+grEsc(grClosedText(grBizState(t.code),true))+'</span>':'<b>'+t.count+'</b>')+'</button>';
+}
+/* 왼쪽 패널 — 이알피 「환경설정 → 컨설팅관리 → 컨설팅 사업」을 «고른 해 기준»으로: 진행 사업(업체 있음) 위에, 나머지는 접는 묶음
+   (업체 없음 · 서류 틀 없음 · 정부사업일정에 사업 없음 · 🗄 종결 사업). 모델은 PuGovReportNav.build. 고른 사업이 든 묶음은 늘 펼쳐 둔다 */
 function grRenderBiz(){
-  var D=PuGovReportDocs, d=GR.docs, el=$('biz');
+  var d=GR.docs, el=$('biz');
   if(d.err){ el.innerHTML='<div class="err-s">컨설팅 사업 목록을 불러오지 못했습니다</div><button type="button" onclick="grRetryDocs()">다시 시도</button>'; return; }
   if(!d.loaded){ el.innerHTML='<div class="days">불러오는 중…</div>'; return; }
-  var groups=D.sidebarGroups(d.biz,d.tmap,GR.input,GR.f.year);
-  if(!groups.length){ el.innerHTML='<div class="days">환경설정 → 컨설팅관리에 컨설팅 사업이 없습니다</div>'; return; }
-  el.innerHTML=groups.map(function(g){
-    return '<div class="bz-g'+(g.unlinked?' off':'')+'"><div class="bz-h">'+grEsc(g.agency)+'</div>'+g.types.map(function(t){
-      return '<button type="button" class="bz'+(t.code===GR.f.biz?' on':'')+'" data-biz="'+grEsc(t.code)+'"'
-        +(g.unlinked?' title="정부사업일정의 ERP 연결에 이 사업이 없습니다"':'')+'>'
-        +'<span class="bz-n" title="'+grEsc(t.name)+'">'+grEsc(t.name)+'</span><span class="bz-k">'+grEsc(D.KIND_KO[t.kind])+'</span><b>'+t.count+'</b></button>';
-    }).join('')+'</div>';
-  }).join('');
+  var m=PuGovReportNav.build({biz:d.biz,tmap:d.tmap,input:GR.input,year:GR.f.year,state:GR.bizState});
+  if(!(m.open.length+m.quiet.length+m.noPlan.length+m.unlinked.length+m.closed.length)){ el.innerHTML='<div class="days">환경설정 → 컨설팅관리에 컨설팅 사업이 없습니다</div>'; return; }
+  var h='<div class="bz-g"><div class="bz-h">진행 사업 <span class="bz-k">'+m.open.length+'</span></div>'
+    +(m.open.length?m.open.map(function(t){ return grBizBtn(t,'open'); }).join(''):'<div class="days">'+grEsc(GR.f.year)+'년에 업체가 있는 사업이 없습니다</div>')+'</div>';
+  [['quiet','업체 없음',m.quiet],['noPlan','서류 틀 없음',m.noPlan],['unlinked','정부사업일정에 사업 없음',m.unlinked],['closed','🗄 종결 사업',m.closed]].forEach(function(g){
+    if(!g[2].length) return;
+    var on=GR.bzOpen[g[0]]===true||g[2].some(function(t){ return t.code===GR.f.biz; });
+    h+='<details class="bz-g off"'+(on?' open':'')+'><summary class="bz-t" data-grp="'+g[0]+'">'+g[1]+' <span class="bz-k">'+g[2].length+'</span></summary>'
+      +g[2].map(function(t){ return grBizBtn(t,g[0]); }).join('')+'</details>';
+  });
+  el.innerHTML=h;
+}
+/* 접는 묶음 머리를 누르면 펼침·접힘 — 다시 그려도 기억한다 */
+function grToggleBizGrp(k){
+  if(['quiet','noPlan','unlinked','closed'].indexOf(k)<0) return;
+  GR.bzOpen[k]=!GR.bzOpen[k]; grRenderBiz();
 }
 /* 같은 사업을 다시 누르면 풀린다 */
 function grSetBiz(code){
   GR.f.biz=(code&&GR.f.biz!==code)?code:'';
-  GR.f.type='';
+  GR.f.type=''; GR.bmsg='';
   grRender();
 }
 /* 서류 체크표 — 고른 사업의 업체들. 간단형 셋(충남북부·서산·기술보호)만 ①② 를 현황판 상태로 채우고
@@ -349,9 +423,11 @@ function grRenderDocs(){
   var cell=function(x,c){
     return c.step?'<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" title="눌러서 기록">'+chip(c)+'</button>':chip(c);
   };
+  var closed=PuGovReportNav.closedFor(GR.bizState,GR.f.biz,GR.f.year);
   var head='<div class="dc-h"><b>📋 서류 — '+grEsc(erp?erp.name:'')+'</b><span class="tag">'+grEsc(D.KIND_KO[t.plan.kind])+'</span>'
     +(t.plan.check?'<span class="tag-chk">[확인 필요: '+grEsc(t.plan.check)+']</span>':'')
-    +((t.auto||t.big)&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')+'</div>';
+    +((t.auto||t.big)&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')
+    +(closed?'':'<button type="button" class="act cm-b" data-cm="open">⋯ 사업 종결</button>')+'</div>';
   var body;
   if(!tid) body='<div class="empty">'+grEsc(D.UNLINKED)+' — 사업 잇기는 정부사업일정의 ERP 연결에서</div>';
   else if(!t.lines.length) body='<div class="empty">'+grEsc(GR.f.year)+'년에 이 사업 업체가 없습니다</div>';
@@ -374,7 +450,17 @@ function grRenderDocs(){
         +'<td>'+grEsc(x.due||'—')+'</td><td>'+btn(x,'목차')+'</td></tr>';
     }).join('')+'</tbody></table>';
   else body=t.lines.map(function(x){ return '<div class="dc-l"><span>'+grEsc(x.coName)+'</span>'+btn(x,'서류 목차 보기')+'</div>'; }).join('');
-  el.innerHTML=head+body; el.style.display='';
+  el.innerHTML=(closed?grClosedBanner():'')+head+body; el.style.display='';
+}
+/* 종결된 사업(고른 해 기준)을 골랐을 때 서류 패널 위 배너 — 종결일·사유·처리자 + 「↩ 되돌리기」 */
+function grClosedBanner(){
+  var st=grBizState(GR.f.biz);
+  if(!st) return '';
+  return '<div class="cl-bn">🗄 <div class="cl-bt"><b>종결된 사업입니다.</b> '+grEsc(grClosedText(st))
+    +(st.reason?' · 사유: '+grEsc(st.reason):'')+(st.by?' · 종결 처리: '+grEsc(st.by):'')
+    +'<div class="days">숫자·챙길 것·받은 서류 확인에서는 빠져 있고, 기록은 그대로 읽고 고칠 수 있습니다.</div>'
+    +(GR.bmsg?'<div class="err-s">'+grEsc(GR.bmsg)+'</div>':'')+'</div>'
+    +'<button type="button" class="act" data-cm="reopen"'+(GR.bbusy?' disabled':'')+'>↩ 진행 사업으로 되돌리기</button></div>';
 }
 /* 목차 창 — 업체 한 곳·사업 하나. 이알피 사업은 왼쪽에서 고른 것, 안 골랐으면 이음표를 거꾸로 찾는다 */
 function grOpenToc(coId,typeId){
@@ -1162,10 +1248,11 @@ function grRenderForms(){
   }).join('')+'<a class="more" href="'+L.FORMS_HREF+'">⚙ 등록·바꾸기 — 정부사업일정 양식 서고</a>';
 }
 function grRenderAlerts(){
-  var L=PuGovReportList, T=PuGovReportTrack, rows=L.filterRows(GR.rows,{year:GR.f.year});
+  var L=PuGovReportList, T=PuGovReportTrack, cl=grClosedTypes(GR.f.year,false), live=function(r){ return !cl[r.typeId]; };
+  var rows=L.filterRows(GR.rows,{year:GR.f.year}).filter(live);   /* 종결 사업은 챙길 것에서 뺀다 */
   var a=L.alerts(rows,GR.today), x=T.alertsExtra(rows,GR.today);
   /* 막힌 단계 — 현황판 줄이 아니라 기록에서 직접(대형 사업은 줄이 없는 일이 많다). 기록을 못 읽었으면 개수 「?」·목록 없음 */
-  var d=GR.docs||{}, blocked=(d.loaded&&!d.err&&!GR.trackErr)?PuGovReportDocs.blockedAlerts({input:GR.input,year:GR.f.year,track:GR.track,biz:d.biz,tmap:d.tmap,consultings:d.cons}):[];
+  var d=GR.docs||{}, blocked=(d.loaded&&!d.err&&!GR.trackErr)?PuGovReportDocs.blockedAlerts({input:GR.input,year:GR.f.year,track:GR.track,biz:d.biz,tmap:d.tmap,consultings:d.cons}).filter(live):[];
   var bline=function(e){ return '<li><a href="'+grEsc(L.reportHref(e.coId,e.typeId))+'">'+grEsc(e.coName)+' · '+grEsc(e.typeName)+'</a> <span class="days">'+grEsc(e.items.map(function(b){ return b.name+(b.note?' ('+b.note+')':''); }).join(' · '))+'</span></li>'; };
   var line=function(r,txt){ return '<li><a href="'+grEsc(L.reportHref(r.coId,r.typeId))+'">'+grEsc(r.coName)+' · '+grEsc(r.typeName)+'</a> <span class="days">'+grEsc(txt)+'</span></li>'; };
   $('alerts').innerHTML='<div class="al-h">종료 후 '+L.UNWRITTEN_DAYS+'일 넘은 미작성 <b>'+a.unwritten.length+'</b></div><ul>'
@@ -1191,13 +1278,14 @@ function grGiReset(msg){
 }
 /* 계산 — GR.inbox(읽은 메일 줄)·GR.track·GR.input·GR.docs 만 본다(읽기·쓰기 없음). 던질 수 있으니 부르는 쪽이 잡는다 */
 function grGlobalCompute(){
-  var I=PuGovReportInbox, D=PuGovReportDocs, T=PuGovReportTrack, ib=GR.inbox, d=GR.docs, year=GR.f.year, ps=[], used=[];
+  var I=PuGovReportInbox, D=PuGovReportDocs, T=PuGovReportTrack, ib=GR.inbox, d=GR.docs, year=GR.f.year, ps=[], used=[], closed=grClosedTypes(year,false);
   var win=I.sinceWindow(GR.today,I.GLOBAL_DAYS);
   if(!win) throw new Error('오늘 날짜를 알 수 없다');
   D.visibleTypes(d.biz).forEach(function(erp){
     var typeId=D.linkOf(erp.code,d.tmap,GR.input.types);
     if(!typeId||used.indexOf(typeId)>=0) return;
     used.push(typeId);
+    if(closed[typeId]) return;   /* 종결 사업은 받은 서류 확인에서 뺀다 */
     var plan=D.planFor(erp.name);
     if(plan===D.NONE) return;
     D.pairs(GR.input,typeId,year).forEach(function(p){ ps.push({p:p,erp:erp,plan:plan,i:ps.length}); });
@@ -1303,7 +1391,7 @@ function grRender(){
     $('err').style.display=''; $('board').style.display='none'; return;
   }
   $('err').style.display='none'; $('board').style.display=GR.loaded?'':'none';
-  grRenderBiz(); grRenderFilters(); grRenderKpis(); grRenderDocs(); grRenderRows(); grRenderForms(); grRenderAlerts(); grRenderGlobalInbox();
+  grRenderYearBar(); grRenderBiz(); grRenderFilters(); grRenderKpis(); grRenderDocs(); grRenderRows(); grRenderForms(); grRenderAlerts(); grRenderGlobalInbox();
 }
 function grReset(){
   var y0=GR.f.year;
@@ -1349,6 +1437,8 @@ async function grLoad(){
   }
   await grLoadDocs();
   if(seq!==GR.seq) return;
+  await grLoadBizState();
+  if(seq!==GR.seq) return;
   await grLoadTrack();
   if(seq!==GR.seq) return;
   grApplyTrack();
@@ -1385,6 +1475,73 @@ function grApplyTrack(){
   PuGovReportDocs.trackRows(GR.rows,{track:GR.track,input:GR.input,biz:d.biz,tmap:d.tmap,consultings:d.cons,today:GR.today});
 }
 
+/* ═══ 사업 종결 — 계획 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md (UI 재정리 1단계) ═══
+   ★ 새 쓰기 길은 «scal_bizState/{이알피 사업 코드}» 한 곳 — 종결(grCloseBiz: 그 사업 기록 하나를 쓴다)·되돌리기(grReopenBiz: 그 기록을 지운다).
+     규칙은 관리자·위임관리인만 허락한다 — 직원이 눌러 거절되면 창에 알리고 값은 그대로 둔다. 서류 줄 쓰기(grSaveCell)는 그대로.
+   ★ 종결 = 고른 해 >= closedFrom(「사업 전체」는 2000). 종결 사업은 숫자·챙길 것·받은 서류 확인에서 빠진다(grClosedTypes) — 눌러 고르면 행·서류가 그대로 보인다.
+   ★ 상태를 못 읽어도(규칙 게시 전·권한) «종결 없음»으로 돌고 오류 줄은 없다 */
+async function grLoadBizState(){
+  var seq=++GR.bseq;
+  try{ var v=(await fbDb.ref(GR_BIZ.node).once('value')).val(); if(seq!==GR.bseq) return; GR.bizState=(v&&typeof v==='object'&&!Array.isArray(v))?v:{}; }
+  catch(e){ if(seq!==GR.bseq) return; console.warn('[컨설팅보고서] 못 읽음 '+GR_BIZ.node,e); GR.bizState={}; }
+}
+/* 쓰기 자리에 들어갈 사업 코드 점검 — 규칙 열쇠 꼴 + 프로토타입 이름 막기 */
+function grOkBizCode(k){ return typeof k==='string'&&GR_BIZ.code.test(k)&&k!=='__proto__'&&k!=='constructor'&&k!=='prototype'; }
+/* 「⋯ 사업 종결」 — 서류 패널 머리 단추. 창을 연다(아직 쓰지 않는다) */
+function grCloseOpen(){
+  var code=GR.f.biz;
+  if(!code||!grErp(code)) return;
+  GR.cm={code:code,day:GR.today,reason:PuGovReportNav.REASONS[0],from:'year',msg:'',err:false,busy:false};
+  grRenderCm();
+}
+function grCloseCm(){ GR.cm=null; grRenderCm(); }
+function grRenderCm(){
+  var N=PuGovReportNav, D=PuGovReportDocs, c=GR.cm, el=$('cm');
+  if(!c){ el.style.display='none'; el.innerHTML=''; return; }
+  var lab=N.label(grErp(c.code)||{name:c.code}), yr=/^[0-9]{4}$/.test(GR.f.year)?GR.f.year:'', all=c.from==='all'||!yr;
+  var tid=D.linkOf(c.code,(GR.docs||{}).tmap,GR.input&&GR.input.types), n=tid?D.pairs(GR.input,tid,all?'':yr).length:0;
+  var opt=function(val,txt,cur){ return '<option value="'+grEsc(val)+'"'+(val===cur?' selected':'')+'>'+grEsc(txt)+'</option>'; };
+  el.innerHTML='<div class="toc-box" role="dialog" aria-label="사업 종결">'
+    +'<div class="toc-top"><b>사업 종결</b><span class="sp"></span><button type="button" data-close onclick="grCloseCm()">닫기</button></div>'
+    +'<div class="toc-h">'+grEsc(lab.text)+' 을(를) 종결 사업으로 옮깁니다. 기록은 지워지지 않고, 목록·숫자·챙길 것·받은 서류 확인에서만 빠집니다.</div>'
+    +'<label class="cw-f"><span>종결일</span><input type="date" id="cmDay" value="'+grEsc(c.day)+'"></label>'
+    +'<label class="cw-f"><span>사유 (선택)</span><select id="cmWhy">'+N.REASONS.map(function(r){ return opt(r,r,c.reason); }).join('')+'</select></label>'
+    +'<label class="cw-c"><input type="radio" name="cmFrom" id="cmFromY"'+(all?'':' checked')+(yr?'':' disabled')+'> '
+      +(yr?'<b>'+grEsc(yr)+'년</b>부터 종결 — 그 앞 연도의 업체는 그대로 보입니다':'이 연도부터 종결 — 연도를 고르지 않아 쓸 수 없습니다')+'</label>'
+    +'<label class="cw-c"><input type="radio" name="cmFrom" id="cmFromA"'+(all?' checked':'')+'> 사업 전체 — 모든 연도에서 종결</label>'
+    +(n?'<div class="tag-chk">⚠ '+(all?'모든 연도 합쳐':grEsc(yr)+'년')+' 업체 '+n+'곳이 걸려 있습니다 — 종결해도 «종결 사업»에서 열어 기록할 수 있습니다</div>':'')
+    +(c.msg?'<div class="'+(c.err?'err-s':'days')+'">'+grEsc(c.msg)+'</div>':'')
+    +'<div class="cw-b"><button type="button" onclick="grCloseBiz()"'+(c.busy?' disabled':'')+'>종결 사업으로 옮기기</button></div></div>';
+  el.style.display='';
+}
+/* 종결 — scal_bizState/{사업 코드} 한 칸을 쓴다 { closedFrom, closedAt, reason, by, at }. 거절되면(권한 없음·규칙 게시 전) 창에 알리고 목록은 그대로 */
+async function grCloseBiz(){
+  var N=PuGovReportNav, c=GR.cm;
+  if(!c||c.busy) return;
+  c.day=String($('cmDay').value||''); c.reason=String($('cmWhy').value||''); c.from=$('cmFromA').checked?'all':'year';
+  var code=c.code, yr=/^[0-9]{4}$/.test(GR.f.year)?GR.f.year:'';
+  var entry=(grOkBizCode(code)&&grErp(code))?N.closeEntry({from:c.from==='all'?N.ALL_FROM:yr,at:c.day,reason:c.reason,by:GR.staffMap[GR.me]||'',now:Date.now()}):null;
+  if(!entry){ c.msg=(grOkBizCode(code)&&grErp(code))?'종결 연도를 정할 수 없습니다 — 연도를 고르거나 「사업 전체」를 골라 주세요':'사업 코드를 확인할 수 없어 종결하지 않았습니다'; c.err=true; grRenderCm(); return; }
+  c.busy=true; c.msg='저장하는 중…'; c.err=false; grRenderCm();
+  try{ await fbDb.ref(GR_BIZ.node+'/'+code).set(entry); }
+  catch(e){ console.warn('[컨설팅보고서] 종결 저장 못 함',e); c.busy=false; c.msg=GR_BIZ.fail; c.err=true; if(GR.cm===c) grRenderCm(); return; }
+  var next=Object.assign({},GR.bizState); next[code]=entry; GR.bizState=next;
+  if(GR.cm===c){ GR.cm=null; grRenderCm(); }
+  grGlobalRefresh(); grRender();
+}
+/* 되돌리기 — 그 사업의 종결 칸을 지운다(모든 연도가 진행으로). 거절되면 배너에 알리고 상태는 그대로 */
+async function grReopenBiz(){
+  var code=GR.f.biz;
+  if(!code||GR.bbusy||!grBizState(code)) return;
+  if(!grOkBizCode(code)){ GR.bmsg='사업 코드를 확인할 수 없어 되돌리지 않았습니다'; grRenderDocs(); return; }
+  GR.bbusy=true; GR.bmsg=''; grRenderDocs();
+  try{ await fbDb.ref(GR_BIZ.node+'/'+code).remove(); }
+  catch(e){ console.warn('[컨설팅보고서] 되돌리기 못 함',e); GR.bbusy=false; GR.bmsg=GR_BIZ.fail; grRenderDocs(); return; }
+  GR.bbusy=false; GR.bmsg='';
+  var next=Object.assign({},GR.bizState); delete next[code]; GR.bizState=next;
+  grGlobalRefresh(); grRender();
+}
+
 /* ═══ 로그인 — 포털 앱과 같은 문 ═══ */
 function grBoot(){
   $('kpis').addEventListener('click',function(e){
@@ -1397,8 +1554,19 @@ function grBoot(){
   $('fMine').addEventListener('change',function(){ GR.f.mine=this.checked; grRender(); });
   $('fReset').addEventListener('click',grReset);
   $('biz').addEventListener('click',function(e){
+    var g=e.target&&e.target.closest?e.target.closest('[data-grp]'):null;
+    if(g){ if(e.preventDefault) e.preventDefault(); grToggleBizGrp(g.getAttribute('data-grp')); return; }
     var b=e.target&&e.target.closest?e.target.closest('[data-biz]'):null;
     if(b) grSetBiz(b.getAttribute('data-biz'));
+  });
+  $('yrbar').addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('[data-yr]'):null;
+    if(b&&!b.disabled) grSetYear(b.getAttribute('data-yr'));
+  });
+  $('docs').addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('[data-cm]'):null;
+    if(!b||b.disabled) return;
+    if(b.getAttribute('data-cm')==='open') grCloseOpen(); else if(b.getAttribute('data-cm')==='reopen') grReopenBiz();
   });
   ['rows','docs'].forEach(function(id){ $(id).addEventListener('click',function(e){
     var c=e.target&&e.target.closest?e.target.closest('[data-cell]'):null;
@@ -1409,6 +1577,7 @@ function grBoot(){
   $('toc').addEventListener('click',function(e){ if(e.target===this) grCloseToc(); });
   $('cellw').addEventListener('click',function(e){ if(e.target===this) grCloseCell(); });
   $('attv').addEventListener('click',function(e){ if(e.target===this) grCloseAv(); });
+  $('cm').addEventListener('click',function(e){ if(e.target===this) grCloseCm(); });
   if(location.protocol==='file:'){ lock('file:// 로 열면 로그인할 수 없습니다 — 주소로 여세요'); return; }
   if(typeof firebase==='undefined'){ lock('인터넷이 필요합니다'); return; }
   if(!firebase.apps||!firebase.apps.length) firebase.initializeApp(FB_CONFIG);
