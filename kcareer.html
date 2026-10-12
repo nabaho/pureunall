@@ -6843,7 +6843,7 @@ async function rhAutoSaveDomain(v){
       var ns=Object.keys(z.files).filter(function(n){ return /^Contents\/section\d+\.xml$/i.test(n); });
       for(var i=0;i<ns.length;i++){ 글+=' '+(await z.file(ns[i]).async('string')).replace(/<[^>]+>/g,' '); }
     }
-    if(RH_FEE_WORDS.test(글)){ toast('💰 지급 확인 서류라 «회의·비용관리 › 저장 서류»로 담습니다 (이력서로 담으려면 위 고르개를 바꾸세요)', 6000); return 'feedoc'; }
+    if(/협회/.test(글) && RH_FEE_WORDS.test(글)){   /* 협회 서류에 한정 — 협회가 아닌 곳의 지급확인서는 이력서 보관함 그대로(대표 지시 2026-10-12 「비용관리 한정 협회」) */ toast('💰 협회 지급 확인 서류라 «회의·비용관리 › 저장 서류»로 담습니다 (이력서로 담으려면 위 고르개를 바꾸세요)', 6000); return 'feedoc'; }
   }catch(e){ console.warn('비용 서류 판정', e); }
   return v;
 }
