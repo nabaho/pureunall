@@ -249,7 +249,7 @@ test('항목 넷을 «한 표에» 늘어놓는다 — 두 번 그리지 않는�
   assert.strictEqual(/id="billItems"/.test(P), true);
   const fn = P.slice(P.indexOf('function billPaintItems'), P.indexOf('function billPaintItems') + 1800);
   assert.strictEqual(/'지금까지'|>지금까지</.test(fn), true, '「지금까지」 열이 없다');
-  assert.strictEqual(/'시간당'|>시간당</.test(fn), true, '「시간당」 열이 없다');
+  assert.strictEqual(/>알림 시간 평균</.test(fn), true, '알림 도착 기준 평균 열이 없다');
 });
 
 /* 함수 «몸통만» 떼어낸다 — 창을 글자수로 잡으면 다음 함수까지 넘어가고,
@@ -273,12 +273,11 @@ test('한쪽 값이 늦게 와도 다른 쪽을 지우지 않는다', () => {
     '시간당을 낸 뒤 항목 표를 안 그린다');
 });
 
-test('「모르는 시간을 셈에서 뺐다」를 시간당 옆에 적는다', () => {
-  /* 이 말이 없으면 낮게 나온 숫자를 그대로 믿고 안심한다.
-     ※ 「칸 읽는 법」의 「소식이 없어」와 «다른» 문구다 — 하나로 갈음할 수 없다. */
+test('알림 시간 평균은 실제 시간당 비용이 아니라고 밝힌다', () => {
+  /* 알림이 늦게 몰려오므로 이 수치로 실제 사용 속도를 단정하면 안 된다. */
   const it = body('billPaintItems');
-  assert.strictEqual(/셈에서 뺐습니다/.test(it), true, '시간당 옆 안내가 없다');
-  assert.strictEqual(/«낮게»|낮게/.test(it), true, '「낮게 나온다」는 말이 없다');
+  assert.match(it, /알림이 오지 않은 시간은 평균에서 빠졌습니다/, '평균의 분모가 불분명하다');
+  assert.match(it, /실제 시간당 사용액이나 현재 추세를 뜻하지 않습니다/, '실제 비용 속도로 오인할 수 있다');
 });
 
 test('기록이 비면 시간당도 함께 지운다', () => {
@@ -339,6 +338,26 @@ test('기록은 «한 번만» 읽는다 — 구독하지 않는다', () => {
   const fn = P.slice(P.indexOf('function billHistLoad'), P.indexOf('function billHistLoad') + 900);
   assert.strictEqual(/\.once\(/.test(fn), true, 'once() 로 안 읽는다');
   assert.strictEqual(/\.on\(/.test(fn), false, '구독하고 있다');
+});
+
+test('다시 연 기록은 새 청구 알림이 왔거나 캐시가 낡았으면 다시 읽는다', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8');
+  const fn = page.slice(page.indexOf('function billHistLoad(){'),
+    page.indexOf('function billSpanFilter('));
+  assert.match(fn, /newest <= _billHistAt/, '새 알림이 온 뒤에도 예전 표를 재사용한다');
+  assert.match(fn, /Date\.now\(\) - _billHistAt\s*</, '시간이 지나도 예전 표를 재사용한다');
+  assert.match(fn, /\.once\('value'\)/, '기록을 여러 번 구독하면 비용이 늘어난다');
+  assert.doesNotMatch(fn, /\.on\('value'/, '실시간 구독을 붙이면 기록 전송이 불필요하게 늘어난다');
+});
+
+test('청구 알림 도착 시각과 실제 사용 시각을 화면에서 구분한다', () => {
+  const page = fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8');
+  assert.match(page, /class="bnotice"[^>]*>표의 시각·평균은 청구 알림 도착 기준입니다\./,
+    '숨겨진 도움말이 아닌 표 바로 위에 시각의 뜻을 밝혀야 한다');
+  assert.match(page, /id="billHistTh1"[^>]*>알림 시각<\/th>/,
+    '표 머리의 시각을 실제 사용 시간으로 오인할 수 있다');
+  assert.match(page, /Firebase 다운로드량<\/a>/,
+    '실제 사용량을 확인할 경로가 없다');
 });
 
 /* 대표 지시 2026-08-17: "이거 한화면에 모두볼수있게 고쳐줘"
