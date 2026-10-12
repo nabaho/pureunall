@@ -471,6 +471,10 @@ function drawEditor(){
   box.innerHTML='<div class="bar"><b style="font-size:15px">'+(p.id?esc(nm(p)):'새 사업')+'</b>'+(p.id?statusChip(p):'')
     +(L(p.seedRow).length?'<span class="hint">캡처 번호 '+esc(L(p.seedRow).join('·'))+'</span>':'')+'<span class="sp"></span>'
     +(src.url&&/^https?:\/\//.test(src.url)?'<a href="'+esc(src.url)+'" target="_blank" rel="noopener">🔗 공고 원문</a>':'')+'</div>'
+    /* AI 조사 초안(2026-10-12 대표 「조건채워라」) — 확정하는 사람이 «확인 못 한 점»을 보고 정하도록 확신도·메모를 그대로 보인다 */
+    +(p.aiDraft ? '<div class="note" style="margin:0 12px">🤖 AI 가 공고를 찾아 채운 <b>초안</b>입니다 · 확신도 <b>'+esc({high:'높음',medium:'중간',low:'낮음'}[p.aiDraft.confidence]||p.aiDraft.confidence||'?')+'</b>'
+        +(p.aiDraft.applicability==='individual'?' · <b>근로자 개인이 신청하는 사업</b>(기업 조건 없음)':'')
+        +(p.aiDraft.notes?'<br>'+esc(p.aiDraft.notes):'')+'<br>공고 원문과 맞춰 본 뒤 확정하세요.</div>' : '')
     +'<div class="ed">'
     +'<label class="k" for="eName">사업명</label><input id="eName" value="'+v(p.name)+'">'
     +'<label class="k" for="eAgency">담당기관</label><input id="eAgency" value="'+v(p.agency)+'" placeholder="모르면 비워 두세요">'

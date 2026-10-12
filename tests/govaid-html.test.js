@@ -88,3 +88,9 @@ test('한 번에 고친 검토는 사유를 지우지 않는다(사유를 안 �
   const fn = NOC.slice(NOC.indexOf('function saveReview('), NOC.indexOf('function saveReview(') + 1200);
   assert.match(fn, /reason==null\s*\?\s*\(prev\.reason\|\|''\)/);
 });
+
+test('조건 편집기는 AI 조사 초안의 확신도·메모를 보여 준다 — 확정하는 사람이 «확인 못 한 점»을 보고 정하게', () => {
+  const fn = NOC.slice(NOC.indexOf('function drawEditor('), NOC.indexOf('function drawEditor(') + 4000);
+  assert.match(fn, /aiDraft/);
+  assert.match(fn, /esc\([^)]*notes/);
+});
