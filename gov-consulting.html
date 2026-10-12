@@ -1301,6 +1301,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -2696,6 +2697,7 @@ function fbInit(){
       if(!FB_READY || _fbAuthUid!==u.uid){
         fbUnsubscribeAll();
         FB_READY=true; _fbAuthUid=u.uid;
+        pubHolidaysLoad();
         /* ★ 밀린 저장을 «먼저» 올린다 — 내려받기가 이 기기를 클라우드 옛 값으로 덮기 전에.
            (2026-10-05: 연결 전에 한 저장이 여기서 조용히 사라지던 길) */
         fbFlushDirty();
@@ -3126,7 +3128,27 @@ const HOLIDAYS={
   '2033-09-07':'추석연휴','2033-09-08':'추석','2033-09-09':'추석연휴',
   '2033-10-10':'대체공휴일','2033-12-26':'대체공휴일',
 };
+/* 🗂 공공데이터 공용 자리의 공휴일(한국천문연구원 특일, pubdata/common/holidays) — 2026-10-12 대표 「진행」.
+   ★ 받아 온 해는 «천문연이 이긴다». 위 표는 미리 계산해 둔 것이라 나중에 정해진 날이 빠져 있었다
+     (실측 10/12: 2026·2027 노동절·제헌절, 2027 대체공휴일 둘이 없었다 — 그날 일정이 잡혔다).
+   ★ 받지 못한 해(먼 미래·오프라인)는 위 표로 물러선다. 매달 2일 서버가 올해·내년을 받는다.
+   ⚠ 이 화면은 읽기만 한다. */
+const PUB_HOLI={}, PUB_HOLI_YEARS={};
+function pubHolidaysLoad(){
+  if(typeof PuPubdata==='undefined')return;
+  const y=new Date().getFullYear();
+  [y-1,y,y+1].forEach(yy=>{
+    if(PUB_HOLI_YEARS[yy])return;
+    PuPubdata.holidays(yy).then(list=>{
+      if(!list.length)return;
+      list.forEach(x=>{ if(x&&x.date)PUB_HOLI[x.date]=x.name||'공휴일'; });
+      PUB_HOLI_YEARS[yy]=1;
+      try{ if(typeof renderCal==='function')renderCal(); }catch(_){}
+    });
+  });
+}
 function getHoliday(ds){
+  if(PUB_HOLI_YEARS[String(ds).slice(0,4)])return PUB_HOLI[ds]||null;
   if(HOLIDAYS[ds])return HOLIDAYS[ds];
   const mm=ds.slice(5);
   if(HOLIDAYS[mm])return HOLIDAYS[mm];

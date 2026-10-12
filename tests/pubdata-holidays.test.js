@@ -67,3 +67,16 @@ test('★ ④ 세 화면이 읽기 도구를 캐시 번호와 함께 싣는다',
   [['pu-cal.html', CAL], ['pu-erp.html', ERP], ['payroll-os.html', PAY], ['pu-cards.html', read('pu-cards.html')]].forEach(([n, s]) =>
     assert.match(s, /<script src="js\/pu-pubdata\.js\?v=\d+"><\/script>/, n + ' 가 읽기 도구를 안 싣거나 캐시 번호가 없습니다'));
 });
+
+test('★★★ 정부사업일정 — 받아 온 해는 천문연이 이기고, 못 받은 해는 미리 계산한 표로', () => {
+  const G = read('gov-consulting.html');
+  const a = G.indexOf('const HOLIDAYS={'), b = G.indexOf('};', a);
+  const ctx = {};
+  vm.createContext(ctx);
+  vm.runInContext(G.slice(a, b + 2) + '\nconst PUB_HOLI={"2027-05-01":"노동절","2027-01-01":"1월1일"}, PUB_HOLI_YEARS={2027:1};\n' + fnOf(G, 'function getHoliday(') + '\nthis.getHoliday=getHoliday;', ctx);
+  assert.equal(ctx.getHoliday('2027-05-01'), '노동절', '★★★ 표에 없던 노동절이 안 잡힙니다 — 그날 일정이 잡힙니다');
+  assert.equal(ctx.getHoliday('2027-03-01'), null, '받아 온 해에는 천문연에 없는 날을 표로 덧붙이지 않습니다');
+  assert.equal(ctx.getHoliday('2031-03-01'), '삼일절', '★★ 못 받은 해는 표로 물러서야 합니다');
+  assert.match(G, /<script src="js\/pu-pubdata\.js\?v=\d+"><\/script>/);
+  assert.match(G, /_fbAuthUid=u\.uid;\s*\n\s*pubHolidaysLoad\(\);/, '로그인 뒤 공휴일을 안 받습니다');
+});
