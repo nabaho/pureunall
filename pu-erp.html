@@ -19688,6 +19688,24 @@ function erpValidateWorkBatch(store,items,allowExisting){
   if(!checked.ok){showToast('⚠ 일괄 저장 보류 — '+checked.errors.slice(0,3).map(function(x){return x.row+'행: '+x.message;}).join(' / '));return false;}
   return true;
 }
+/* 이관이 «업체 연결» 때문에 막히는지 미리 본다 — 막히면 그 이유 글을 돌려준다(없으면 '').
+   ★ 왜: 막혔을 때 예전에는 «잠깐 뜨는 알림 한 줄»뿐이었다. 대천맛김 계약(-124)은 이관을 눌러도 계약확정에
+     그대로 남았고, 대표는 이관했다고 생각했다(2026-10-12). 이유를 창으로 남겨 알리고, 푸는 길까지 적는다.
+   ⚠ erpPrepareContractTransfer 와 같은 규칙을 «읽기만» 한다 — 알림을 띄우거나 저장하지 않는다. */
+function erpTransferBlockReason(contract){
+  var O=window.PuOntology;
+  if(!O||typeof O.validateCompanyLink!=='function')return '';
+  var cos=dbGet('companies',[]);
+  var form=erpDropDeadCoLink(contract,cos);
+  var r=O.validateCompanyLink(form,cos);
+  if(!r.ok)return String(r.message||'업체 연결을 확인할 수 없습니다.');
+  var kinds=(contract&&contract.kinds&&contract.kinds.length)?contract.kinds:[contract&&contract.kind];
+  if(kinds.indexOf('company')>=0&&!r.companyId){
+    if(r.status!=='pending'||(typeof O.companyLinkCandidates==='function'&&O.companyLinkCandidates(Object.assign({},form,{companyLinkStatus:r.status}),cos,'').length))
+      return '업체 이관 전 기존 업체를 명시적으로 선택하세요. 신규 업체만 연결 보류로 둘 수 있습니다.';
+  }
+  return '';
+}
 function erpPrepareContractTransfer(contract){
   var O=window.PuOntology;
   if(!O||typeof O.validateWorkBatch!=='function'){showToast('참조 검증 모듈을 불러오지 못해 이관을 보류합니다.');return null;}
@@ -25663,6 +25681,15 @@ function ContractManagement(props){
     kindsList = kindsList.filter(function(v,i){ return _VK.indexOf(v)>=0 && kindsList.indexOf(v)===i; });
     if(kindsList.length === 0){ showToast('계약유형 없음'); return; }
     var labels = kindsList.map(function(v){ var k = kindInfo(v); return k.icon + ' ' + k.label; }).join(', ');
+    // 업체 연결이 비어 막히는 계약은 «이유를 창으로» 알린다 — 알림 한 줄은 놓쳐서 이관한 줄 안다(대천맛김 -124)
+    var _blockWhy = erpTransferBlockReason(ct);
+    if(_blockWhy){
+      await popConfirm('⚠ 이관되지 않았습니다 — ' + (ct.contractNo||'') + ' ' + (ct.companyName||'') +
+        '\n\n사유: ' + _blockWhy +
+        '\n\n해결: 계약 수정 → 「기업정보」 탭 → 「업체 연결 확인」에서 업체를 고르거나, 새 업체면 「연결 보류」를 켜고 저장한 뒤 다시 이관하세요.',
+        { okText:'확인', cancelText:'닫기', danger:false });
+      return;
+    }
     // 중복검사: 이 계약이 실제 이관될 대상 모듈만 검사 (타 모듈 잔여 레코드로 인한 오차단 방지)
     var _KIND_STORE = { company:['companies','업체'], case:['cases','사건'], consulting:['consultings','컨설팅'], fund:['funds','기금'], other:['other_projects','기타사업'] };
     var _targetStores = [];
@@ -70958,6 +70985,8 @@ function ClosedManagement(){
           transferMissing && h('button',{
             onClick:(function(ct){ return async function(){
               if(!(await popConfirm('이관 데이터가 없습니다. 다시 이관하시겠습니까? 컨설팅관리에 새로 추가됩니다.'))) return;
+              var _why = erpTransferBlockReason(ct);
+              if(_why){ await popConfirm('⚠ 재이관되지 않았습니다 — ' + (ct.contractNo||'') + ' ' + (ct.companyName||'') + '\n\n사유: ' + _why + '\n\n해결: 계약 수정 → 「기업정보」 탭 → 「업체 연결 확인」에서 업체를 고르거나 「연결 보류」를 켜고 저장한 뒤 다시 하세요.', { okText:'확인', cancelText:'닫기', danger:false }); return; }
               var results = transferContract(ct);
               if(results && results.length > 0){
                 showToast('✅ 재이관 완료: ' + results.map(function(r){return r.no;}).join(', '));
