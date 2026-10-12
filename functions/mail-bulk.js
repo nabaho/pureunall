@@ -18,6 +18,8 @@
 
 'use strict';
 
+const OC = require('./mail-one-copy');
+
 /* 한 번에 걸 수 있는 최대 — 대표 지시(300곳 미만)보다 조금 넉넉하게.
    상한이 없으면 실수로 6천 곳을 걸어 계정이 막힌다. */
 const MAX_BULK = 400;
@@ -212,8 +214,16 @@ function validateBulk(p) {
    그래야 검사에서 「무엇이 담기는가」를 그대로 들여다볼 수 있다.
    ⚠ 첫 통도 곧바로 보내지 않는다(+1칸). 예약 발송기가 30초 안쪽을 집어 가면
      사람이 「아차」 하고 취소할 틈이 없다. */
-function buildQueue(v, now, by, batchId) {
+function buildQueue(v, now, by, batchId, opts) {
   const t0 = Number(now) || 0;
+  /* ★ 보낸메일함 사본 «한 번에 한 통» (대표 지시 2026-10-12) — opts.sentCopy === 'one' 일 때만.
+       뉴스레터·안내문은 모든 곳에 같은 편지라, 곳마다 사본을 쌓으면 보낸함이 묻힌다(177통).
+       그래서 줄마다 «사본 규칙»을 달아 둔다 — 앞의 몇 줄은 대표 사본 후보, 나머지는 사본 없음.
+     ⚠ 안 주면 칸을 아예 안 만든다 — 기업정보함 묶음 편지(회사마다 내용이 다른 업무 메일)는
+       곳별 사본이 기록이라 예전 그대로다. */
+  const 한통 = opts && opts.sentCopy === 'one'
+    ? { 방식: 'one', 묶음: String(batchId || ''), 주소들: v.targets.map(function (t) { return t.email; }) }
+    : null;
   return v.targets.map(function (t, i) {
     const vals = { 이름: t.name, 회사: t.company, 직책: t.title,
                    name: t.name, company: t.company, title: t.title,
@@ -239,7 +249,7 @@ function buildQueue(v, now, by, batchId) {
                    추적열쇠: String(t.track || '').trim()
                      || String(t.email || '').trim().toLowerCase()
                           .replace(/[.#$/[\]]/g, '_') };
-    return {
+    const row = {
       at: t0 + (i + 1) * v.gapMs,
       by: String(by || ''),
       madeAt: t0,
@@ -263,6 +273,11 @@ function buildQueue(v, now, by, batchId) {
         files: v.files || [],
       },
     };
+    /* 사본 규칙은 «줄 바깥»에 둔다 — payload 는 그대로 deliver 의 body 가 되어,
+       거기 두면 화면이 보낸 값으로 사본 규칙을 바꿀 길이 된다. */
+    const 사본 = OC.줄규칙(i, 한통);
+    if (사본) row.copy = 사본;
+    return row;
   });
 }
 

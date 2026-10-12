@@ -201,10 +201,16 @@ test('사본 남기기는 배달이 끝난 «뒤»에 한다', () => {
 });
 
 test('사본 남기기는 try 로 감싸 배달 결과를 흔들지 않는다', () => {
-  const i = DEL.indexOf('archiveSent(');
-  const before = DEL.slice(Math.max(0, i - 400), i);
-  assert.ok(before.lastIndexOf('try {') > before.lastIndexOf('} catch'),
-    'try 밖에 두면 사본 실패가 「메일이 안 나갔다」로 보고된다');
+  /* ⚠ «앞 400자 창»으로 재지 않는다 — 사본이 곳별·대표 사본·건너뜀 셋으로 갈라지며(2026-10-12)
+       try 가 창 밖으로 밀려 «멀쩡한 코드가 빨갛게» 되었다. 규칙은 «열린 try 안에 있다»:
+       호출 바로 앞의 마지막 try { 가 마지막 } catch 보다 뒤에 있어야 한다. 사본을 넣는 길 «모두»에 건다. */
+  ['archiveSent(', '대표사본넣기('].forEach((호출) => {
+    const i = DEL.indexOf(호출);
+    assert.ok(i > 0, 호출 + ' 을 deliver 에서 못 찾았다');
+    const before = DEL.slice(0, i);
+    assert.ok(before.lastIndexOf('try {') > before.lastIndexOf('} catch'),
+      호출 + ' 이 try 밖에 있다 — 사본 실패가 「메일이 안 나갔다」로 보고된다');
+  });
 });
 
 test('사본을 못 남겼다고 실패로 돌려주지 않는다', () => {

@@ -81,9 +81,13 @@ function pickSentBox(list) {
 
 /* 편지 한 통을 실제 바이트로 굽는다 — IMAP 은 완성된 편지만 받는다.
    보내기에 쓴 것과 **같은 재료**로 굽는다(제목·본문·첨부가 어긋나면 사본이 거짓이 된다). */
-async function buildRaw(mail) {
+async function buildRaw(mail, opt) {
   const MailComposer = require('nodemailer/lib/mail-composer');
-  return await new MailComposer(mail).compile().build();
+  const node = new MailComposer(mail).compile();
+  /* ★ 숨은참조(Bcc) 머리글은 기본으로 «뺀다»(받는 쪽에 보이면 안 되니까). 보낸함에 넣는 사본은 받는 쪽이 아니라
+       «우리 보관본»이라 대표 사본(받는 곳 전체)에서만 남긴다 — mail-one-copy.js */
+  if (opt && opt.keepBcc) node.keepBcc = true;
+  return await node.build();
 }
 
 /* 실제 IMAP 접속. 아이디 후보를 차례로 해 본다 — 보내기와 같은 차례를 쓴다
