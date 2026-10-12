@@ -49,6 +49,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/lib-sites.js?v=2"></script>
 <script src="js/rules-v2/store.js?v=4"></script>
 <script src="js/rules-v2/view-library.js?v=3"></script>
+<script src="js/rules-v2/lib-sitecols.js?v=1"></script>
 <script src="js/rules-v2/view-sites.js?v=4"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
@@ -221,6 +222,36 @@ button{font:inherit;cursor:pointer}
 #sites .rh b{font-size:13px}
 #sites .rh .m{color:#475569}
 #sites .rh .k,#sites .rh .btn{margin-left:auto}
+/* 머리줄 거르기·순서·쪽 (설계 §12) */
+#sites th.ch{padding:0}
+#sites th.ch .h{display:flex;align-items:center;gap:3px;width:100%;height:32px;padding:0 8px;border:0;background:none;color:inherit;font:inherit;text-align:left;white-space:nowrap}
+#sites th.ch .h:hover{background:#eff6ff}
+#sites th.ch .h .ar{color:#1e40af;font-size:10px}
+#sites th.ch .h .fl{margin-left:auto;color:#94a3b8;font-size:11px}
+#sites th.ch.on .h{background:#eff6ff;color:#1e40af}#sites th.ch.on .h .fl{color:#1e40af}
+.cpop{z-index:30;width:236px;background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 22px rgba(30,41,59,.18);padding:8px;font-size:12px;color:#1e293b}
+.cpop .sort{display:flex;gap:6px;margin-bottom:6px}
+.cpop .sort button{flex:1;height:26px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px}
+.cpop .sort button.on{background:#1e40af;border-color:#1e40af;color:#ffffff}
+.cpop input[type=text]{width:100%;height:28px;border:1px solid #cbd5e1;border-radius:7px;padding:0 8px;font-size:16px;margin-bottom:6px}
+.cpop .list{max-height:170px;overflow:auto;border:1px solid #e2e8f0;border-radius:7px}
+.cpop label,.cpop .wo{display:flex;gap:6px;align-items:center;width:100%;padding:4px 8px;font-size:12px;color:#1e293b;border:0;background:none;text-align:left}
+.cpop label span,.cpop .wo span{margin-left:auto;color:#475569}
+.cpop .wo.on{background:#eff6ff;color:#1e40af;font-weight:700}
+.cpop .none{padding:8px;color:#475569}
+.cpop .foot{display:flex;gap:6px;margin-top:6px}
+.cpop .foot button{flex:1;height:26px;border-radius:7px;border:1px solid #cbd5e1;background:#f8fafc;font-size:12px}
+.cpop .foot .p{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
+#sites .cact{display:flex;flex-wrap:wrap;gap:6px;align-items:center;padding:7px 20px;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e40af;font-size:12px}
+#sites .cact .tag{display:inline-flex;gap:3px;align-items:center;background:#ffffff;border:1px solid #bfdbfe;border-radius:10px;padding:1px 4px 1px 9px}
+#sites .cact .tag button{border:0;background:none;color:#1e40af;padding:0 4px}
+#sites .cact .clr{margin-left:auto;border:0;background:none;color:#1e40af;text-decoration:underline}
+#sites .pager{display:flex;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0}
+#sites .pager .info{color:#475569;font-size:12px;margin-right:auto;white-space:nowrap}#sites .pager .info b{color:#1e293b}
+#sites .pg{min-width:28px;height:26px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px;white-space:nowrap}
+#sites .pg.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
+#sites .pg[disabled]{opacity:.45;cursor:default}
+#sites .pager .dots{color:#475569;padding:0 2px}
 #sites .rflow{display:flex;flex-wrap:wrap;gap:4px;padding:8px 12px;font-size:12px;color:#475569}
 #sites .rflow i{font-style:normal;padding:2px 8px;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
 #sites .rflow i.f{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:700}
@@ -336,7 +367,9 @@ function libMsg(t) { $lib.innerHTML = $sites.innerHTML = '<div class="msg">' + P
 var ST = { data: { docs: {}, human: {}, rounds: {}, run: null }, view: 'mail', filt: {}, picked: new Set(), sel: '',
   text: null, diff: {}, companies: [], isAdmin: false, picker: null, busy: '',
   /* 🏢 사업장 — 거르개(has·wait·all)·찾기·고른 사업장 id. 다시 읽어도(reload) 그대로 둔다 */
-  sites: { f: 'has', q: '', sel: '', who: '' },
+  sites: { f: 'has', q: '', sel: '', who: '',
+    /* 머리줄 거르기·순서·쪽(설계 §12) — 저장하지 않는다. cols={band:[…],biz:[…],docs:[…],last:[…],fin:[…]} · pop=열린 창의 칸 */
+    cols: {}, sort: null, page: 1, pop: '', popq: '', popPos: null },
   /* 담당 거르기 — 명부(사번→이름)·로그인한 사람의 사번. 사번은 「P-001」 꼴로 맞춘다(업체관리 managerMain 과 같은 꼴) */
   staff: {}, me: '' };
 var S = null, qTimer = 0;
@@ -648,16 +681,54 @@ var H = {
     tFinalMany(list.map(function (r) { return { companyId: r.companyId, roundKey: r.roundKey, docId: T().ver[r.roundId] || r.pre }; }), '고른 ' + list.length + '회차');
   },
   /* ── 🏢 사업장 ── */
-  siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' ? d.f : 'has'; draw(); },
+  siteF: function (d) { ST.sites.f = d.f === 'wait' || d.f === 'all' ? d.f : 'has'; ST.sites.page = 1; draw(); },
   sq: function (v) {
     clearTimeout(qTimer);
     qTimer = setTimeout(function () {
-      ST.sites.q = v; draw();
-      var q = $sites.querySelector('[data-role="sq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+      ST.sites.q = v; ST.sites.page = 1; draw();
+      var q = $sites.querySelector(ST.sites.pop === 'name' ? '.cpop [data-role="sq"]' : '[data-role="sq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
     }, 200);
   },
   siteSel: function (d) { ST.sites.sel = d.co || ''; draw(); },
-  sm: function (v) { ST.sites.who = String(v || ''); draw(); },
+  sm: function (v) { ST.sites.who = String(v || ''); ST.sites.page = 1; draw(); },
+  /* 머리줄 거르기·순서·쪽 (설계 §12) — 조건이 바뀌면 1쪽으로. siteSel(고르기)·reload() 는 쪽을 안 건드린다(그리는 쪽이 없는 쪽을 당긴다) */
+  colOpen: function (d, ev) {
+    var s = ST.sites, key = d.key;
+    if (s.pop === key) { s.pop = ''; draw(); return; }
+    var b = ev && ev.target && ev.target.closest && ev.target.closest('button'), r = b && b.getBoundingClientRect();
+    s.pop = key; s.popq = '';
+    s.popPos = r ? { x: Math.max(8, Math.min(r.left, (window.innerWidth || 1200) - 250)), y: r.bottom + 2 } : { x: 40, y: 140 };
+    draw();
+  },
+  colClose: function () { ST.sites.pop = ''; ST.sites.popq = ''; draw(); },   // 늘 다시 그린다 — render 가 «열려 있을 때만» 부른다
+  colSort: function (d) {
+    var s = ST.sites, sk = PuRulesV2SiteCols.SORT_OF[d.key], dir = d.dir === 'desc' ? 'desc' : 'asc';
+    s.sort = s.sort && s.sort.key === sk && s.sort.dir === dir ? null : { key: sk, dir: dir };
+    s.page = 1; draw();
+  },
+  colToggle: function (key, v, on) {
+    var s = ST.sites, a = (s.cols[key] || []).slice(), i = a.indexOf(v);
+    if (on && i < 0) a.push(v); else if (!on && i >= 0) a.splice(i, 1);
+    if (a.length) s.cols[key] = a; else delete s.cols[key];
+    s.page = 1; draw();
+  },
+  colClear: function (d) {
+    var s = ST.sites;
+    if (d.key === 'name') s.q = ''; else if (d.key === 'who') s.who = ''; else delete s.cols[d.key];
+    s.page = 1; draw();
+  },
+  colsClear: function () { ST.sites.cols = {}; ST.sites.page = 1; draw(); },
+  colWho: function (d) { ST.sites.who = String(d.v || ''); ST.sites.page = 1; draw(); },
+  colq: function (v) {
+    ST.sites.popq = v; draw();
+    var q = $sites.querySelector('[data-role="colq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
+  },
+  pageGo: function (d) {
+    var p = Number(d.p); if (!(p >= 1)) return;
+    ST.sites.page = p; draw();
+    var t = $sites.querySelector('.stbl'); if (t) t.scrollTop = 0;
+    var w = $sites.querySelector('.swrap'); if (w && w.scrollIntoView && w.getBoundingClientRect().top < 0) w.scrollIntoView();
+  },
   /* 후보를 한 번에 확정 — 그 사업장의 열린 후보 «전부»(메일 단위로 모인 것)를 이 업체 id 로 잇는다 */
   siteLink: function (d) {
     var row = siteRow(d.co);
