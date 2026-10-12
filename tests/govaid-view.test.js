@@ -87,3 +87,26 @@ test('목록에 보일 이름 — 앞의 «2026년(도)»는 떼고 해는 따�
   assert.deepEqual(V.shortTitle({ name: '2026년도 중소기업 클라우드 서비스 보급·확산 사업' }), { title: '중소기업 클라우드 서비스 보급·확산 사업', year: '2026' });
   assert.deepEqual(V.shortTitle({ name: '고용유지지원금' }), { title: '고용유지지원금', year: '' });
 });
+
+/* 회사별 «준비할 서류» — 후보 사업의 서류를 낱말로 모아, 서류마다 쓰이는 사업을 단다 (대표 지시 2026-10-12) */
+test('준비할 서류 — 후보 사업만, 같은 낱말은 하나로 모으고 노무 서류가 먼저', () => {
+  const pf = { key: 'co_x', kind: 'co', vals: { headcount: { v: 10 } }, facts: {} };
+  const A = { id: 'a', name: '가 장려금', status: 'confirmed', baseYear: Y, cond: { headcount: { min: 5 } },
+    docs: [{ key: 'bizReg', label: '사업자등록증' }, { key: 'contract', label: '근로계약서(채용자)' }] };
+  const B = { id: 'b', name: '나 장려금', status: 'confirmed', baseYear: Y, cond: { headcount: { min: 1 } },
+    docs: [{ key: 'contract', label: '근로계약서' }, { key: 'other', label: '특허 등록원부' }] };
+  const C = { id: 'c', name: '다 사업', status: 'confirmed', baseYear: Y, cond: { headcount: { min: 50 } },
+    docs: [{ key: 'payroll', label: '임금대장' }] };
+  const out = V.docsFor(pf, [A, B, C], Y);
+  assert.equal(out[0].key, 'contract', '노무 서류가 맨 앞');
+  assert.equal(out[0].labor, true);
+  assert.deepEqual(out[0].programs.map((p) => p.id), ['a', 'b']);
+  assert.ok(!out.some((d) => d.key === 'payroll'), '후보가 아닌 사업(다)의 서류는 빼고');
+  assert.ok(out.some((d) => d.key === 'other' && d.label === '특허 등록원부'), '«그 밖»은 공고 이름 그대로');
+});
+test('짧은 이름 — 사람이 넣은 것이 먼저, 없으면 해·괄호·꼬리 «지원사업»을 떼고 10자 넘으면 자른다', () => {
+  assert.equal(V.shortName({ name: '체계적 현장훈련(S-OJT) 지원', short: 'S-OJT' }), 'S-OJT');
+  assert.equal(V.shortName({ name: '2026년 중소기업 혁신바우처 사업' }), '중소기업 혁신바우처');
+  assert.equal(V.shortName({ name: '고용유지지원금' }), '고용유지지원금');
+  assert.ok(V.shortName({ name: '국가인적자원개발컨소시엄 지원 — 산업맞춤형 공동훈련센터' }).length <= 10);
+});
