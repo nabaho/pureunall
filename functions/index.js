@@ -55,6 +55,7 @@ const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
 const RecruitDigest = require("./recruit-digest");
 const RehabWatch = require("./rehab-watch");
+const RehabFsc = require("./rehab-fsc");
 
 if (!getApps().length) initializeApp();
 
@@ -1385,6 +1386,32 @@ exports.rehabWatch = functions
     /* 온톨로지 판 표시 — 서버는 관리자 SDK 라 규칙을 건너뛰므로 레코드 모양을 여기서 갖춘다 */
     result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
     const upd = RehabWatch.updatesOf(result, today, nowIso, nowMs);
+
+    /* ── 금융위 기업기본정보로 대표자·전화·팩스·홈페이지 채우기 (functions/rehab-fsc.js 머리말) ──
+       «이름 + 시·군·구가 모두 맞는 하나»만 채운다. 실패해도 수집은 계속 — 호출이 실패한 곳은 저장하지 않아 내일 다시 본다. ── */
+    try {
+      const fscKey = String(process.env.NTS_KEY || "").trim() || String((await getDatabase().ref("data/app_config/ntsKey").once("value")).val() || "").trim();
+      if (fscKey) {
+        const fscSaved = (await root.child("fsc").once("value")).val() || {};
+        const byId = {};
+        Object.keys(existing).map((k) => existing[k]).concat(result.added).forEach((n) => { if (n && n.id) byId[n.id] = n; });
+        const todoF = RehabFsc.plan(byId, fscSaved, nowMs, 80);
+        let fFound = 0, fNone = 0, fErr = 0, fTried = 0;
+        for (const n of todoF) {
+          if (Date.now() > t0 + 150 * 1000 || fErr >= 5) break;   // 시간 상자 · 연달아 막히면 그만
+          fTried++;
+          try {
+            const r = await RehabFsc.lookup({ notice: n, key: fscKey, fetchFn: (u) => fetch(u, { signal: AbortSignal.timeout(20000) }) });
+            upd["fsc/" + n.id] = Object.assign(RehabFsc.record(n, r, Date.now()), { schemaVersion: 3, contractVersion: OntologyServerWrite.CONTRACT_VERSION });
+            if (r.status === "found") fFound++; else fNone++;
+          } catch (e) { fErr++; console.warn("[회생광고 금융위]", String((e && e.message) || e).replace(fscKey, "***").slice(0, 120)); }
+          await new Promise((ok) => setTimeout(ok, 150));
+        }
+        upd["runs/" + today].fsc = { tried: fTried, found: fFound, none: fNone, error: fErr, left: Math.max(0, todoF.length - fTried) };
+      } else {
+        upd["runs/" + today].fscNote = "공공데이터 열쇠(ntsKey)가 없어 금융위 기업기본정보를 부르지 않았습니다";
+      }
+    } catch (e) { console.warn("[회생광고 금융위]", String((e && e.message) || e).slice(0, 120)); }
 
     /* ── 연락처 찾기 — 아직 안 찾은 곳(또는 «못 찾음»이 이레 지난 곳)을 최신 공고부터, 시간 상자 안에서 ── */
     const providers = rehabProviders();

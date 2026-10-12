@@ -467,7 +467,7 @@ function autoOptout(){ var e=$('autoOptIn').value.trim(); if(!e){ toast('메일 
 function autoOptRemove(e){ if(!confirm(e+' 을(를) 수신거부 명단에서 뺄까요?')) return; autoCall({action:'optout-remove', email:e}, '명단에서 뺐습니다'); }
 var ENRICH_URL='https://asia-northeast3-pureun-erp.cloudfunctions.net/rehabEnrich';
 var fbDb=null, gate=null;
-var NOTICES={}, MARKS={}, INFO={}, LASTRUN=null, IDX=null, MATCH={}, LINKNOTE='';
+var NOTICES={}, MARKS={}, INFO={}, FSC={}, LASTRUN=null, IDX=null, MATCH={}, LINKNOTE='';
 var VIEW=[], SEL={}, CUR='', TAB='all';
 var STATUS={new:'미검토',send:'발송 예정',hold:'보류',skip:'제외',sent:'발송 완료'};
 var ST_CHIP={new:'c-gray',send:'c-blue',hold:'c-amber',skip:'c-red',sent:'c-green'};
@@ -588,9 +588,14 @@ function pgmDate(n){
 }
 function pgmLabel(n){ return isBk(n)?'파산선고':'포괄금지명령'; }
 /* 대표자 — 직접 적은 것 → 홈페이지에서 읽은 것 → 기업정보함·이알피. 법원 공고에는 대표자가 없다 */
+/* 금융위 기업기본정보(서버가 rehab_ad/fsc 에 담음) — «이름 + 시·군·구가 맞는 하나»로 확인된 것만 status:'found' 로 온다 */
+var FSC_SRC='금융위 기업기본정보';
+function fscOf(id){ var f=FSC[id]; return (f && f.status==='found') ? f : {}; }
 function ceoOf(id){
   var m=(MARKS[id]&&MARKS[id].contact)||{}, i=INFO[id]||{}, k=MATCH[id]||{};
+  var f=fscOf(id);
   if(m.ceo) return {name:m.ceo, src:'직접 입력'};
+  if(f.ceo) return {name:f.ceo, src:'금융위 기업기본정보(이름·지역 일치)'};
   if(i.ceo) return {name:i.ceo, src:'홈페이지'};
   if(k.ceo) return {name:k.ceo, src:'기업정보함·이알피'+(k.level==='weak'?' (후보)':'')};
   return {name:'', src:''};
@@ -601,16 +606,19 @@ function tradeBadge(id){
   return '<span class="chip '+cls+'" style="margin-left:0" title="'+(b.strong?'이름과 지역이 같습니다':'이름만 같은 후보입니다 — 확인하세요')+'">'+(b.kind==='client'?'🤝 ':b.kind==='cards'?'📇 ':'')+esc(b.text)+'</span>';
 }
 function contactOf(id){
-  var i=INFO[id]||{}, m=(MARKS[id]&&MARKS[id].contact)||{};
-  var phones=uniq([m.phone].concat(i.phones||[]));
-  var faxes=uniq([m.fax].concat(i.faxes||[]));
+  var i=INFO[id]||{}, m=(MARKS[id]&&MARKS[id].contact)||{}, f=fscOf(id);
+  var phones=uniq([m.phone].concat(i.phones||[], f.phone?[f.phone]:[]));
+  var faxes=uniq([m.fax].concat(i.faxes||[], f.fax?[f.fax]:[]));
   var emails=uniq([m.email].concat(i.emails||[]));
-  var homepage=m.homepage||i.homepage||'';
+  var homepage=m.homepage||f.homepage||i.homepage||'';
+  var fscUsed=!!(f.phone||f.fax||f.homepage);
+  /* «확인 필요» 경고는 연락처 찾기(웹검색) 쪽 값에 대한 것이다 — 금융위 값이 더해져도 그 값의 경고는 그대로 둔다 */
+  var infoHas=!!((i.phones||[]).length||(i.faxes||[]).length||(i.emails||[]).length||i.homepage);
   var manual=!!(m.phone||m.fax||m.email||m.homepage);
   var any=phones.length||faxes.length||emails.length;
   return { phones:phones, faxes:faxes, emails:emails, homepage:homepage, manual:manual, any:!!any,
-    check: !manual && i.confidence==='low' && !!(any||homepage), conf:i.confidence||'', note:i.note||'', refs:i.refs||[],
-    sources:i.sources||[], checkedAt:i.checkedAt||0, status:i.status||'', searched:!!INFO[id] };
+    check: !manual && i.confidence==='low' && infoHas, conf:(fscUsed&&!infoHas)?'high':(i.confidence||''), note:i.note||'', refs:i.refs||[],
+    sources:(i.sources||[]).concat(fscUsed?[FSC_SRC]:[]), checkedAt:i.checkedAt||(fscUsed?f.at:0)||0, status:i.status||'', searched:!!INFO[id]||fscUsed };
 }
 
 /* ═══ 거르기·정렬 ═══ */
@@ -940,6 +948,7 @@ function saveMark(id, patch){
 }
 async function loadMarks(){ MARKS=(await fbDb.ref('rehab_ad/marks').once('value')).val()||{}; }
 async function loadInfo(){ INFO=(await fbDb.ref('rehab_ad/info').once('value')).val()||{}; }
+async function loadFsc(){ try{ FSC=(await fbDb.ref('rehab_ad/fsc').once('value')).val()||{}; }catch(e){ FSC={}; } }
 async function setStatus(id, st){
   try{ await saveMark(id, function(prev,now){ return { status:st, statusAt:now, sentAt: st==='sent'?now:(prev.sentAt||null) }; }); await loadMarks(); draw(); toast('「'+STATUS[st]+'」(으)로 표시했습니다'); }
   catch(e){ toast('저장하지 못했습니다: '+(e&&e.message||e)); }
@@ -1026,7 +1035,7 @@ function downloadCsv(){
 /* ═══ 불러오기 ═══ */
 async function reload(){
   try{
-    var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(), loadInfo(), fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
+    var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(), loadInfo(), loadFsc(), fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
     NOTICES=r[0].val()||{};
     var runs=r[3].val()||{}, k=Object.keys(runs).pop(); LASTRUN=k?Object.assign({date:k},runs[k]):null;
     fillFilters(); recomputeMatch(); draw();
