@@ -137,13 +137,13 @@ test('★ 화면 읽기 도구는 쓰지 않는다 — 요청 자리 말고는 s
 });
 
 test('★★★ 요청 함수는 서울 — 매달 함수와 같은 지역(공공데이터포털은 바깥 아이피를 막는다)', () => {
-  const regions = [];
-  const chain = { region: (r) => { regions.push(r); return chain; }, runWith: () => chain,
+  const regions = []; let made_n = 0;
+  const chain = { region: (r) => { regions.push(r); return chain; }, runWith: () => { made_n++; return chain; },
     pubsub: { schedule: () => ({ timeZone: () => ({ onRun: () => 'sched' }) }) },
-    database: { ref: () => ({ onCreate: () => 'ask' }) } };
+    database: { ref: () => ({ onCreate: () => 'ask', onWrite: () => 'mirror' }) } };
   const made = NPSM({ functions: chain, getDatabase: () => null, MAIL_REGION: 'asia-northeast3' });
-  assert.equal(made.pubdataAsk, 'ask');
-  assert.equal(regions.length, 2, '★★★ 지역을 안 적은 함수가 있습니다 — 기본(us-central1)에서는 「fetch failed」');
+  assert.equal(made.pubdataAsk, 'ask'); assert.equal(made.pubdataNtsMirror, 'mirror');
+  assert.equal(regions.length, made_n, '★★★ 지역을 안 적은 함수가 있습니다 — 기본(us-central1)에서는 「fetch failed」');
   assert.ok(regions.every(r => r === 'asia-northeast3'), '★★★ 서울이 아닙니다: ' + regions);
 });
 
@@ -152,4 +152,13 @@ test('★★ 요청 — 한 갈래가 실패해도 오류로 끝나지 않고, �
   const r = await NPSM.askOnce({ getDatabase: () => f.db, fetch: async () => { throw new Error('fetch failed'); } }, '1234567890', {}, { key: 'k', now: 1 });
   assert.ok(r.failed && r.failed.length >= 1, '실패를 적지 않았습니다');
   assert.deepEqual(f.removed, ['pubdata_req/1234567890']);
+});
+
+test('★★ 국세청 상태 옮겨 적기 — 그대로 옮기고, 번호 아닌 열쇠·빈 상태는 건너뛴다', () => {
+  assert.deepEqual(PUBD.ntsMirrorOf('1234567890', { ntsState: '폐업자', ntsAt: '2026-10-12', ntsEndDt: '2024-01-31', folder: 'x' }),
+    { 'pubdata/co/1234567890/nts': { state: '폐업자', at: '2026-10-12', end: '2024-01-31' } });
+  assert.equal(PUBD.ntsMirrorOf('n가나상사', { ntsState: '계속사업자' }), null, '★★ 이름 열쇠를 공용 자리에 적었습니다');
+  assert.equal(PUBD.ntsMirrorOf('123-45-67890', { ntsState: '계속사업자' }), null, '열쇠는 숫자 열 자리 그대로여야 합니다');
+  assert.equal(PUBD.ntsMirrorOf('1234567890', { folder: 'x' }), null, '상태가 없는데 적었습니다');
+  assert.ok(PUBD.NTS_FIELDS.ntsState && PUBD.NTS_FIELDS.ntsAt && !PUBD.NTS_FIELDS.folder, '국세청 칸이 아닌 것에도 반응합니다');
 });

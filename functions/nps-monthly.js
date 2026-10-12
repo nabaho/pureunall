@@ -271,7 +271,21 @@ function make(deps) {
       console.log("pubdata-ask", JSON.stringify(r));
       return null;
     });
-  return { npsMonthly, pubdataAsk, runOnce, askOnce };
+  /* 🏛 기업정보함이 국세청 상태를 적으면 공용 자리로 옮겨 적는다(functions/pubdata.js ntsMirrorOf).
+     ⚠ 칸 하나하나에 걸린다 — 국세청 칸(NTS_FIELDS)이 아니면 곧바로 돌아간다(폴더 옮기기 등은 아무 일도 안 한다). */
+  const pubdataNtsMirror = deps.functions
+    .region(deps.MAIL_REGION)
+    .runWith({ timeoutSeconds: 30, memory: "128MB" })
+    .database.ref("/pucards/coInfo/{no}/{field}")
+    .onWrite(async (change, context) => {
+      if (!PUBD.NTS_FIELDS[context.params.field]) return null;
+      const db = deps.getDatabase();
+      const info = (await db.ref(ROOT + "/coInfo/" + context.params.no).once("value")).val();
+      const u = PUBD.ntsMirrorOf(context.params.no, info);
+      if (u) await db.ref().update(u);
+      return null;
+    });
+  return { npsMonthly, pubdataAsk, pubdataNtsMirror, runOnce, askOnce };
 }
 
 module.exports = make;

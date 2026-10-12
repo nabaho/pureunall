@@ -83,4 +83,21 @@ function reqKinds(req, cur, now) {
   });
 }
 
-module.exports = { PUB, OLD_TOO, coPaths, put, holiKind, holiRows, holidaysOnce, kstYear, reqKinds, REQ_SKIP_MS, digits };
+/* ── 🏛 국세청 상태 옮겨 적기 (2026-10-12 대표 「진행」) ──
+   기업정보함은 국세청에 «그 자리에서» 묻고 답을 보며 사람이 판단한다(새 번호 확인·영업 중 확인·등록증 대조).
+   그 흐름은 그대로 두고, 기업 상세(pucards/coInfo/{번호})에 상태가 적히면 서버가 공용 자리로 «그대로» 옮긴다.
+   ★ 우리가 고치지 않는다 — 국세청이 준 말과 확인한 날을 그대로 옮긴다.
+   ⚠ 상태가 지워지면 공용 자리는 그대로 둔다(마지막으로 안 사실). 번호 아닌 열쇠(이름 열쇠)는 건너뛴다. */
+const NTS_FIELDS = { ntsState: 1, ntsAt: 1, ntsEndDt: 1 };
+function ntsMirrorOf(no, info) {
+  const n = digits(no);
+  if (n.length !== 10 || String(no) !== n) return null;
+  const i = info || {};
+  if (!i.ntsState) return null;
+  const v = { state: String(i.ntsState), at: String(i.ntsAt || "") };
+  if (i.ntsEndDt) v.end = String(i.ntsEndDt);
+  const u = {}; u[PUB + "/co/" + n + "/nts"] = v;
+  return u;
+}
+
+module.exports = { NTS_FIELDS, ntsMirrorOf, PUB, OLD_TOO, coPaths, put, holiKind, holiRows, holidaysOnce, kstYear, reqKinds, REQ_SKIP_MS, digits };
