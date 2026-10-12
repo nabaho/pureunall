@@ -416,7 +416,7 @@ table.cmp td{white-space:nowrap}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=70"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <!-- 포털에 타일을 걸면 갖춰야 하는 것들 — 어느 앱도 «섬»이 되면 안 된다.
@@ -445,6 +445,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-sync.js?v=7"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
+<script src="js/gov-inbox.js?v=1"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script>
@@ -891,6 +892,29 @@ function ageOut(){
     var d=GovG2b.dday(r.closeDt,today); if(d!=null&&d<0){ r.type='지나감'; n++; } });
   if(n) set('feed',a); return n;
 }
+/* ═══ 🛰 서버가 매일 모은 공고 (대표 지시 2026-10-12 「매일매일 공고를 크롤링 하고 모을 수 있나」) ═══
+   서버(govFeedCollect, 매일 07:40)가 나라장터·알리오·기업마당을 받아 gov_feed/rows 에 쌓는다. 여기서는 «열 때» 거기서 내 목록에 없는 것을 가져다 합친다.
+   ⚠ 읽기만 한다(서버 칸에 안 쓴다). ⚠ 번호가 내 목록에 이미 있으면(숨긴 것 포함) 건드리지 않는다. ⚠ 관리자만 읽힌다 — 못 읽으면 조용히 넘어간다.
+   ⚠ 인증키는 서버가 대표 자리에서 읽어 쓴다 — 이 화면은 키를 서버로 보내지 않는다. */
+var _feedSrv, _feedMerged=0;     /* undefined = 아직 안 읽음 · null = 못 읽음(권한·인터넷) */
+async function inboxPull(){
+  if(!fbDb||!fbUid) return;
+  try{
+    var v=(await fbDb.ref('gov_feed').once('value')).val()||{};
+    _feedSrv={ last:v.last||null };
+    var buf=get('feed'), kw=kws(), today=new Date().toISOString().slice(0,10);
+    var m=GovInbox.merge(buf, v.rows||{}, { today:today, dday:GovG2b.dday, keep:function(r){ return GovG2b.judge(r, kw).length>0; } });
+    m.adds.forEach(function(r){ r.id=nextId(buf); buf.unshift(r); });
+    if(m.adds.length){ set('feed',buf); ageOut(); _feedMerged+=m.adds.length;
+      toast('🛰 서버가 매일 모은 공고 '+m.adds.length+'건을 목록에 합쳤습니다'); }
+  }catch(e){ _feedSrv=null; }
+}
+function feedSrvHtml(){
+  if(_feedSrv===undefined || _feedSrv===null) return '';
+  var st=GovInbox.status(_feedSrv.last, new Date().toISOString().slice(0,10));
+  return '<div class="sml" style="margin-top:2px;'+(st.k==='bad'||st.k==='late'?'color:var(--red)':'')+'">🛰 서버가 매일 아침 공고를 모읍니다 — '+esc(st.text)
+    +(_feedMerged?' · 이번에 목록에 합친 것 '+_feedMerged+'건':'')+'</div>';
+}
 function auto(){ if(!keyData()&&!keyBiz()) return;
   if(lsGet('last')===new Date().toISOString().slice(0,10)){ ageOut(); return; }
   fetchAll(); }
@@ -983,7 +1007,7 @@ function draw(){
   matchEnsure();
   var mnf=$('matchNoteF'); if(mnf) mnf.innerHTML=matchNoteHtml();
   var v=feedVisible(), all=v.all, rows=v.rows;
-  var pdv=$('period'); if(pdv) pdv.innerHTML=periodHtml();
+  var pdv=$('period'); if(pdv) pdv.innerHTML=periodHtml()+feedSrvHtml();
   var vis={}; rows.forEach(function(r){ vis[r.id]=1; });
   Object.keys(_feedSel).forEach(function(id){ if(!vis[id]) delete _feedSel[id]; });
   var sn=Object.keys(_feedSel).length, hiddenN=v.every.length-all.length;
@@ -2517,7 +2541,7 @@ function boot(){
     var r=await whoAmI(u);
     if(!r.ok){ applyLock('lock', r.why); return; }
     applyLock('ok');
-    await cloudPull(); srcBackfill(); rejudge(); drawKw(); draw(); readyNote(); auto();
+    await cloudPull(); await inboxPull(); srcBackfill(); rejudge(); drawKw(); draw(); readyNote(); auto();
     /* 마지막으로 보던 문을 다시 연다 — 재료 탭이면 그때 받아온다(setTab 이 부른다) */
     setTab(lsGet('tab'));
   });
