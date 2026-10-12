@@ -56,7 +56,8 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grChapCopyText', 'grChapCopy', 'grChapCopyAll', 'grChapAi',
   'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv',
   'grDashHtml', 'grBoardHtml', 'grLoadDashView', 'grSetDashView', 'grBizBlocked',
-  'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grErpFor', 'grApplyTodayView'];
+  'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grErpFor', 'grApplyTodayView',
+  'grLoadBizOrder', 'grSaveBizOrder', 'grDragBiz', 'grDragMark', 'grDropAfter', 'grByBiz'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -93,7 +94,7 @@ function world(o) {
 /* 쓰기는 서류 진행 기록 줄 하나뿐 — 자리 꼴 scal_docs/{업체}/{rid}/items/{키}, set 만 */
 /* 이 화면의 쓰기 명령 목록(인라인 스크립트 속 차례) — 서류 줄 grSaveCell .set · 사업 종결 grCloseBiz .set · 되돌리기 grReopenBiz .set(closedFrom 9999 표시) (2026-10-12).
    .remove 는 어디에도 없다 — 저장 관문(pu-ontology-write.js)이 물리적 삭제를 막는다(조정관 판정: 지우지 않고 표시로) */
-const WRITES = ['.set(', '.set(', '.set('];
+const WRITES = ['.set(', '.set(', '.set(', '.set('];   // 넷째 = 사업 순서 grSaveBizOrder .set (2026-10-12, UI 4단계 — scal_bizOrder/main 한 문서)
 const TRACK_PATH = /^scal_docs\/[^/]+\/[^/]+\/items\/[a-z]+(:[0-9]+)?$/;
 function onlyTrackWrites(db) {
   db.쓴것.forEach((x) => assert.ok(TRACK_PATH.test(x.자리) && !x.update && !x.transaction, '허락 밖 쓰기: ' + x.자리));
@@ -3491,7 +3492,7 @@ const bizBtn = (h, code) => { const i = h.indexOf('data-biz="' + code + '"'); re
 const FAIL = '저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)';
 
 test('122 정적 — 새 쓰기 길은 scal_bizState 한 곳(종결 .set · 되돌림 표시 .set — .remove 없음) · 나머지 쓰기 명령은 없다 · 연도 막대는 숫자 칸 위 · 종결 창 자리 · 보이지 않는 #fYear', () => {
-  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(', '.set(', '.set('], '서류 줄 .set · 종결 .set · 되돌림 표시 .set — 이 차례 그대로');
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(', '.set(', '.set(', '.set('], '서류 줄 .set · 종결 .set · 되돌림 표시 .set · 사업 순서 .set — 이 차례 그대로');
   assert.doesNotMatch(SRC, /\.remove\s*\(/, 'gov-report.html 어디에도 .remove( 가 없다(저장 관문이 물리적 삭제를 막는다)');
   assert.doesNotMatch(INLINE, /\.(update|transaction)\s*\(|ref\([^)]*\)\.push\(/, '그 밖의 쓰기 명령이 있다');
   assert.match(SRC, /var GR_BIZ=\{node:'scal_bizState',code:\/\^\[A-Za-z0-9_-\]\{1,40\}\$\/,/, '규칙의 열쇠 꼴과 같은 점검');
@@ -4622,4 +4623,332 @@ test('153 사업 카드 문구 «기한 14일 안 n» · 「더 보기」 펼침
   open(); w.ctx.grGoHome(); assert.equal(Object.keys(J(w.ctx.GR.todayMore)).length, 0, '「🎯 오늘 할 일」');
   open(); w.ctx.grSetTab('all'); w.ctx.grSetTab('today'); assert.equal(w.ctx.GR.todayMore.hot, 9999, '탭을 오가는 것만으로는 그대로');
   open(); w.ctx.grReset(); assert.equal(Object.keys(J(w.ctx.GR.todayMore)).length, 0, '거르개 풀기');
+});
+
+/* ══ 사업 순서 — 이알피 순서 · 끌어서 바꾸기 · 현황판 사업 묶음 정렬 (2026-10-12, UI 4단계 Task 2) — 계획 docs/superpowers/plans/2026-10-12-gov-report-order.md ══
+   쓰기 자리 = scal_bizOrder/main 한 문서(GR_BIZ.orderNode·orderKey) — 읽기는 통째 한 번, 쓰기는 grSaveBizOrder 의 .set 하나.
+   끌기는 브라우저 이벤트를 흉내 낸다: grDragBiz(e) 를 직접 부른다(e.type · e.target.closest · e.clientY · e.dataTransfer · e.preventDefault) */
+const ORDER_FAIL = '저장하지 못했습니다 — 관리자만 사업 순서를 바꿀 수 있습니다';
+function ordSeed(o) {
+  o = o || {};
+  const s = navSeed(o.seedOpt);
+  if (o.more) {   // 04 충남북부에 업체 하나 더(업체 수가 가장 많아진다) + 이알피에 이어지지 않은 일정 사업 t10 한 줄
+    s.scal_cos.push({ id: 'c8', name: '차카공업', types: ['t3'], defAtt: 'a1' }, { id: 'c9', name: '카타상회', types: ['t10'], defAtt: 'a1' }, { id: 'c10', name: '파하물산', types: ['t11'], defAtt: 'a1' });
+    s.scal_types.push({ id: 't10', name: '기술보호', fullName: '기술보호 컨설팅(연결 없음 가)', agency: '', rounds: 3 }, { id: 't11', name: '기술보호', fullName: '기술보호 컨설팅(연결 없음 나)', agency: '', rounds: 3 });   // 이름이 기술보호라 현황판 줄은 생기지만 scal_erpTypeMap 에는 없다
+    s.scal_scheds.push({ id: 's40', coId: 'c8', typeId: 't3', date: '2026-03-02', round: 1, isField: true },
+      { id: 's41', coId: 'c9', typeId: 't10', date: '2026-02-02', round: 1, isField: true }, { id: 's42', coId: 'c10', typeId: 't11', date: '2026-02-03', round: 1, isField: true }, { id: 's43', coId: 'c9', typeId: 't10', date: '2026-03-03', round: 2, isField: true });
+  }
+  s.scal_bizState = CLOSED05;   // 05 서산은 종결 — 2026 진행 사업은 02·03·04·14·15 다섯(123번과 같은 전제)
+  if (o.order !== undefined) s.scal_bizOrder = { main: o.order };
+  return s;
+}
+/* o.order = 처음부터 DB 에 있는 순서 문서 · o.denyRead / o.denyWrite = 규칙 거절 흉내 · o.gate = 쓰기를 붙잡아 두는 약속({p}) */
+function ordWorld(o) {
+  o = o || {};
+  const paths = [];
+  const w = world({ seed: o.seed || ordSeed(o), email: o.email === undefined ? 'p009@pureun.kr' : o.email, db: (db) => ({ ref: (p) => {
+    paths.push(p);
+    const r = db.ref(p);
+    if (p.indexOf('scal_bizOrder') !== 0) return r;
+    if (o.denyRead && p === 'scal_bizOrder') return { once: async () => { throw new Error('permission_denied'); } };
+    if (o.denyWrite) return { once: r.once, set: async () => { if (o.gate) await o.gate.p; throw new Error('permission_denied'); } };
+    if (o.gate) return { once: r.once, set: async (v) => { await o.gate.p; return r.set(v); } };
+    return r;
+  } }) });
+  w.paths = paths;
+  return w;
+}
+/* 가짜 항목(.bz) — 속성·classList·위치(위쪽 100, 높이 20 → 가운데 110)만 */
+function bzEl(code, grp) {
+  const cls = new Set();
+  return { cls, getAttribute: (k) => ({ 'data-biz': code, 'data-grp': grp })[k],
+    classList: { add: (...c) => c.forEach((x) => cls.add(x)), toggle: (c, on) => { if (on) cls.add(c); else cls.delete(c); } },
+    getBoundingClientRect: () => ({ top: 100, height: 20 }) };
+}
+function dragEv(type, el, y) {
+  const data = {};
+  return { type, clientY: y, prevented: false, data, preventDefault() { this.prevented = true; },
+    target: { closest: (sel) => (el && sel.indexOf('.bz') >= 0 ? el : null) },
+    dataTransfer: { effectAllowed: '', dropEffect: '', setData: (k, v) => { data[k] = v; }, getData: (k) => data[k] } };
+}
+const BEFORE = 105, AFTER = 115;   // 항목 위쪽 절반 · 아래쪽 절반
+const bizCodes = (h) => [...h.matchAll(/data-biz="([^"]+)"/g)].map((m) => m[1]);
+const rowTypes = (w) => [...w.els.rows.innerHTML.matchAll(/data-toc="1" data-co="[^"]*" data-ty="([^"]+)"/g)].map((m) => m[1]);
+
+test('154 정적 — 순서 쓰기는 GR_BIZ.orderNode·orderKey 한 자리 .set 하나(grSaveBizOrder) · 읽기는 통째 한 번 · 이름 표로 부른다 · 끌기 위임 다섯 · 항목 draggable·data-grp · N.build 는 모두 order · 묶음 머리만 펼침·접힘', () => {
+  [...SRC.matchAll(/<script>([\s\S]*?)<\/script>/g)].forEach((m, i) => assert.doesNotThrow(() => new vm.Script(m[1]), '인라인 스크립트 ' + i + ' 번이 문법 오류 없이 읽힌다(닫히지 않은 주석 등)'));
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES, '쓰기 명령은 .set 넷 — 서류 줄 · 종결 · 되돌림 · 순서');
+  assert.doesNotMatch(INLINE, /\.(update|transaction|remove)\s*\(|ref\([^)]*\)\.push\(/, '그 밖의 쓰기 명령이 있다');
+  assert.doesNotMatch(SRC, /\.remove\s*\(/, '.remove( 는 없다');
+  assert.match(SRC, /orderNode:'scal_bizOrder',orderKey:'main'/);
+  assert.equal(Nav.ORDER_NODE_KEY, 'main', '모듈의 문서 이름과 같다');
+  assert.doesNotMatch(INLINE, /ref\(\s*['"]scal_bizOrder/, 'GR_BIZ 를 거치지 않았다');
+  const sv = grab('grSaveBizOrder');
+  assert.match(sv, /fbDb\.ref\(GR_BIZ\.orderNode\+'\/'\+GR_BIZ\.orderKey\)\.set\(entry\)/);
+  assert.equal((sv.match(/ref\(/g) || []).length, 1, '순서 문서 한 길만 쓴다');
+  assert.match(sv, /Nav\.orderEntry\(|N\.orderEntry\(/, '기록은 Nav.orderEntry 로 만든다');
+  assert.doesNotMatch(sv, /scal_docs|GR_TRACK_NODES|GR_NODES|GR_DOC_NODES|GR_BIZ\.node\b/, '다른 자리를 쓰지 않는다');
+  assert.match(grab('grLoadBizOrder'), /fbDb\.ref\(GR_BIZ\.orderNode\)\.once\('value'\)/, '읽기는 통째 한 번');
+  assert.match(grab('grLoadBizOrder'), /parseOrder\(/);
+  assert.match(grab('grLoadBizState'), /grLoadBizOrder\(\)/, '종결 표시를 읽을 때 같이 읽는다');
+  ['grRenderBiz', 'grBizBtn', 'grDragBiz', 'grDragMark', 'grDropAfter', 'grLoadBizState', 'grView', 'grByBiz', 'grRenderRows'].forEach((n) =>
+    assert.doesNotMatch(grab(n).replace(/fbDb\.ref\(GR_BIZ\.node\)\.once\('value'\)/, ''), /fbDb|\.set\(|\.update\(|\.remove\(|\.transaction\(|fetch\(/, n + ' 이 직접 읽고 쓴다'));
+  /* 항목 · 위임 */
+  assert.match(grab('grBizBtn'), /draggable="true"/);
+  assert.match(grab('grBizBtn'), /data-grp="'\+grEsc\(grp\)\+'"/, '묶음 키는 이스케이프');
+  assert.ok(SRC.includes("['dragstart','dragover','dragleave','drop','dragend'].forEach(function(t){ $('biz').addEventListener(t,grDragBiz); });"), '끌기 이벤트 다섯을 #biz 한 곳에서 위임');
+  assert.match(SRC, /closest\('\.bz-t\[data-grp\]'\)/, '묶음 머리(summary)만 펼침·접힘 — 항목의 data-grp 는 눌러도 접히지 않는다');
+  assert.doesNotMatch(SRC, /closest\('\[data-grp\]'\)/);
+  assert.ok(SRC.includes('⇅ 끌어서 순서를 바꿉니다'));
+  /* PuGovReportNav.build 를 부르는 곳은 모두 order 를 넘긴다 */
+  const calls = INLINE.match(/(?:PuGovReportNav|N)\.build\(\{[^}]*\}\)/g) || [];
+  assert.ok(calls.length >= 3, 'build 호출 — 왼쪽 목록 · 연도 막대 · 오늘 할 일');
+  calls.forEach((c) => assert.ok(c.includes('order:GR.bizOrder'), c));
+  /* 새 CSS 는 색을 직접 지정하지 않는다 */
+  const css = SRC.match(/\.bz\.drop-before[^}]*\}|\.bz\.drop-after[^}]*\}|\.bz-hint[^}]*\}/g) || [];
+  assert.equal(css.length, 3, '놓을 자리 표시 둘 · 안내 한 줄');
+  css.forEach((c) => assert.doesNotMatch(c, /#[0-9a-fA-F]{3,8}\b|rgba?\(/, c));
+});
+
+test('155 순서 — 정한 순서가 없으면 이알피 순서(업체 수와 무관) · 있으면 그 목록이 앞, 없는 사업이 뒤 · 안내 한 줄 · 읽기만', async () => {
+  const w = ordWorld({ more: true });
+  await w.ctx.grLoad();
+  assert.deepEqual(J(w.ctx.GR.bizOrder), [], '정한 순서 없음');
+  const h = w.els.biz.innerHTML;
+  assert.deepEqual(bizCodes(openSec(h)), ['consulting-02', 'consulting-03', 'consulting-04', 'consulting-14', 'consulting-15'], '이알피 순서 — 업체가 둘인 04 가 앞서지 않는다');
+  assert.ok(bizBtn(h, 'consulting-04').includes('<b>2</b>'), '준비 — 04 는 업체가 둘이다');
+  assert.ok(h.includes('<div class="bz-hint">⇅ 끌어서 순서를 바꿉니다</div>'));
+  assert.ok(h.indexOf('bz-hint') < h.indexOf('진행 사업'), '안내는 목록 머리');
+  assert.ok(!h.includes('class="err-s"'), '오류 줄 없음');
+  assert.equal(w.paths.filter((p) => p === 'scal_bizOrder').length, 1, '통째 한 번');
+  assert.equal(w.db.쓴것.length, 0, '읽기만');
+  const o = ordWorld({ more: true, order: { list: 'consulting-15,consulting-04,consulting-99,consulting-02', by: '홍길동', at: 1 } });
+  await o.ctx.grLoad();
+  assert.deepEqual(J(o.ctx.GR.bizOrder), ['consulting-15', 'consulting-04', 'consulting-99', 'consulting-02'], '읽은 값은 parseOrder 로 걸러 담는다(사라진 코드도 그대로 담지만 그리지는 않는다)');
+  const oh = o.els.biz.innerHTML;
+  assert.deepEqual(bizCodes(openSec(oh)), ['consulting-15', 'consulting-04', 'consulting-02', 'consulting-03', 'consulting-14'], '목록의 사업이 그 순서로 앞 · 나머지는 이알피 순서');
+  assert.ok(!oh.includes('consulting-99'), '지워진 사업은 그리지 않는다');
+  assert.deepEqual(bizCodes(grpOf(oh, 'unlinked')).slice(0, 3), ['consulting-01', 'consulting-06', 'consulting-07'], '다른 묶음은 이알피 순서 그대로');
+  /* 이상한 값 — 던지지 않고 순서 없음 */
+  for (const bad of ['list', { list: 5 }, { list: '__proto__,<b>,,x y' }, [1, 2], null]) {
+    const v = ordWorld({ order: bad });
+    await v.ctx.grLoad();
+    assert.equal(v.ctx.GR.loaded, true);
+    assert.deepEqual(bizCodes(openSec(v.els.biz.innerHTML)), ['consulting-02', 'consulting-03', 'consulting-04', 'consulting-14', 'consulting-15']);
+  }
+});
+
+test('156 순서를 못 읽으면(규칙 게시 전·권한) «정한 순서 없음» 으로 돈다 — 오류 줄 없음 · 종결 표시 읽기와 따로', async () => {
+  const w = ordWorld({ denyRead: true, order: { list: 'consulting-15,consulting-02' } });
+  await w.ctx.grLoad();
+  assert.equal(w.ctx.GR.loaded, true); assert.equal(w.ctx.GR.err, '');
+  assert.deepEqual(J(w.ctx.GR.bizOrder), []);
+  const h = w.els.biz.innerHTML;
+  assert.deepEqual(bizCodes(openSec(h)), ['consulting-02', 'consulting-03', 'consulting-04', 'consulting-14', 'consulting-15']);
+  assert.ok(!h.includes('class="err-s"') && !h.includes('불러오지 못했습니다'));
+  assert.equal(w.els.err.style.display, 'none');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('157 끌어서 놓기 — 같은 묶음 항목 위·아래 절반 표시 · 놓으면 새 전체 순서를 .set 한 번(scal_bizOrder/main) · 화면이 바뀐다 · 다른 묶음·자기 자신·바뀐 게 없는 놓기는 무시', async () => {
+  const w = ordWorld();
+  await w.ctx.grLoad();
+  const g = w.ctx.GR, d = g.docs;
+  const src = bzEl('consulting-15', 'open'), t02 = bzEl('consulting-02', 'open'), t03 = bzEl('consulting-03', 'open'), q12 = bzEl('consulting-12', 'quiet');
+  /* 시작 */
+  const s = dragEv('dragstart', src, 0);
+  w.ctx.grDragBiz(s);
+  assert.deepEqual(J(g.drag), { code: 'consulting-15', grp: 'open' });
+  assert.equal(s.data['text/plain'], 'consulting-15'); assert.equal(s.dataTransfer.effectAllowed, 'move');
+  /* 위로 지나가기 — 같은 묶음만 허락, 위/아래 절반 표시 */
+  let ev = dragEv('dragover', t02, BEFORE); w.ctx.grDragBiz(ev);
+  assert.ok(ev.prevented && ev.dataTransfer.dropEffect === 'move'); assert.ok(t02.cls.has('drop-before') && !t02.cls.has('drop-after'));
+  ev = dragEv('dragover', t03, AFTER); w.ctx.grDragBiz(ev);
+  assert.ok(ev.prevented && t03.cls.has('drop-after')); assert.ok(!t02.cls.has('drop-before') && !t02.cls.has('drop-after'), '표시는 한 곳에만 — 다른 항목에서는 지워진다(실제 DOM 은 grDragMark 가 querySelectorAll 로 지운다)');
+  ev = dragEv('dragover', q12, BEFORE); w.ctx.grDragBiz(ev);
+  assert.ok(!ev.prevented, '다른 묶음 항목 위에서는 놓을 수 없다(표시 없음)'); assert.equal(q12.cls.size, 0);
+  ev = dragEv('dragover', src, BEFORE); w.ctx.grDragBiz(ev);
+  assert.ok(!ev.prevented, '자기 자신 위에도 놓을 수 없다');
+  ev = dragEv('dragleave', t03, 0); w.ctx.grDragBiz(ev); assert.ok(!ev.prevented);
+  /* 무시되는 놓기 — 쓰기 없음, 상태 그대로 */
+  w.ctx.grDragBiz(dragEv('drop', q12, BEFORE));
+  assert.equal(g.drag, null, '놓으면(어디든) 끌기 상태는 끝난다');
+  w.ctx.grDragBiz(dragEv('dragstart', src, 0)); w.ctx.grDragBiz(dragEv('drop', src, BEFORE));
+  w.ctx.grDragBiz(dragEv('dragstart', t02, 0)); w.ctx.grDragBiz(dragEv('drop', t03, BEFORE));   // 02 는 이미 03 앞 — 바뀐 게 없다
+  w.ctx.grDragBiz(dragEv('drop', t03, BEFORE));   // 끌기 시작 없이 놓기
+  w.ctx.grDragBiz(dragEv('dragstart', { getAttribute: () => null }, 0)); assert.equal(g.drag, null, '항목이 아닌 곳에서 시작한 끌기는 무시');
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(w.db.쓴것.length, 0); assert.deepEqual(J(g.bizOrder), []);
+  /* 진짜 놓기 — 15 를 02 앞으로 */
+  const expect = Nav.reorder({ biz: d.biz, order: [] }, 'consulting-15', 'consulting-02', false);
+  assert.deepEqual(expect.slice(0, 3), ['consulting-01', 'consulting-15', 'consulting-02'], '준비 — 전체 순서에서 02 바로 앞');
+  const dver = g.dver;
+  w.ctx.grDragBiz(dragEv('dragstart', src, 0));
+  const drop = dragEv('drop', t02, BEFORE);
+  const p = w.ctx.grDragBiz(drop);
+  assert.ok(drop.prevented, '놓기는 동기로 막는다(브라우저 기본 동작 없음)');
+  assert.deepEqual(J(g.bizOrder), expect, '낙관적 갱신 — 저장을 기다리지 않고 바뀐다');
+  assert.deepEqual(bizCodes(openSec(w.els.biz.innerHTML)), ['consulting-15', 'consulting-02', 'consulting-03', 'consulting-04', 'consulting-14']);
+  assert.ok(g.dver > dver, '자료 버전이 오른다(오늘 할 일 캐시)');
+  await p;
+  assert.equal(w.db.쓴것.length, 1, '쓰기는 한 번'); const wr = J(w.db.쓴것[0]);
+  assert.equal(wr.자리, 'scal_bizOrder/main'); assert.ok(!wr.update && !wr.transaction);
+  assert.deepEqual(Object.keys(wr.값).sort(), ['at', 'by', 'list']);
+  assert.equal(wr.값.list, expect.join(',')); assert.equal(wr.값.by, '홍길동'); assert.equal(typeof wr.값.at, 'number');
+  assert.deepEqual(Nav.parseOrder(J(w.db.읽기('scal_bizOrder/main'))), expect, '진짜로 저장됐다');
+  assert.equal(g.bbmsg, ''); assert.equal(g.obusy, false);
+  assert.ok(!w.els.biz.innerHTML.includes('class="err-s"'));
+  /* 다시 — 02 를 15 앞으로(= 15,02 가 02,15 로) */
+  w.ctx.grDragBiz(dragEv('dragstart', t02, 0));
+  await w.ctx.grDragBiz(dragEv('drop', bzEl('consulting-15', 'open'), BEFORE));
+  assert.equal(w.db.쓴것.length, 2);
+  assert.deepEqual(bizCodes(openSec(w.els.biz.innerHTML)), ['consulting-02', 'consulting-15', 'consulting-03', 'consulting-04', 'consulting-14']);
+  assert.deepEqual(J(g.bizOrder), Nav.reorder({ biz: d.biz, order: expect }, 'consulting-02', 'consulting-15', false));
+  /* 새로 열어도 그 순서 */
+  const w2 = ordWorld({ order: J(w.db.읽기('scal_bizOrder/main')) });
+  await w2.ctx.grLoad();
+  assert.deepEqual(bizCodes(openSec(w2.els.biz.innerHTML)), ['consulting-02', 'consulting-15', 'consulting-03', 'consulting-04', 'consulting-14']);
+  /* 다른 묶음 안(연결 없음 묶음)에서도 된다 */
+  const u = ordWorld();
+  await u.ctx.grLoad();
+  u.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-01', 'unlinked'), 0));
+  await u.ctx.grDragBiz(dragEv('drop', bzEl('consulting-06', 'unlinked'), AFTER));
+  assert.equal(u.db.쓴것.length, 1);
+  const ub = bizCodes(grpOf(u.els.biz.innerHTML, 'unlinked'));
+  assert.ok(ub.indexOf('consulting-06') < ub.indexOf('consulting-01') && ub.indexOf('consulting-01') < ub.indexOf('consulting-07'), '06 뒤 · 07 앞');
+});
+
+test('158 저장이 거절되면(직원 계정·규칙 게시 전) 원래 순서로 돌아가고 안내가 보인다 · 저장하는 동안에는 새 끌기를 받지 않는다 · 다시 끌어 볼 수 있다', async () => {
+  let release; const gate = { p: new Promise((r) => { release = r; }) };
+  const w = ordWorld({ denyWrite: true, gate });
+  await w.ctx.grLoad();
+  const g = w.ctx.GR, before = bizCodes(openSec(w.els.biz.innerHTML));
+  w.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  const p = w.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.equal(g.obusy, true);
+  assert.deepEqual(bizCodes(openSec(w.els.biz.innerHTML)).slice(0, 2), ['consulting-15', 'consulting-02'], '저장을 기다리는 동안은 새 순서');
+  const s2 = dragEv('dragstart', bzEl('consulting-04', 'open'), 0); w.ctx.grDragBiz(s2);
+  assert.ok(s2.prevented && g.drag === null, '저장하는 동안에는 새 끌기를 막는다');
+  release(); await p;
+  assert.deepEqual(J(g.bizOrder), [], '이전 목록으로 복원');
+  assert.deepEqual(bizCodes(openSec(w.els.biz.innerHTML)), before);
+  assert.equal(g.bbmsg, ORDER_FAIL); assert.equal(g.obusy, false);
+  assert.ok(w.els.biz.innerHTML.includes('<div class="err-s">' + ORDER_FAIL + '</div>'), '안내 줄이 목록 위에 보인다');
+  assert.ok(w.els.biz.innerHTML.indexOf('err-s') < w.els.biz.innerHTML.indexOf('진행 사업'));
+  assert.equal(w.db.쓴것.length, 0);
+  /* 안내는 다음 끌기가 성공하면 사라진다 · 다시 끌 수 있다(잠금이 풀렸다) */
+  const ok = ordWorld();
+  await ok.ctx.grLoad();
+  ok.ctx.GR.bbmsg = ORDER_FAIL;
+  ok.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  await ok.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.equal(ok.ctx.GR.bbmsg, ''); assert.ok(!ok.els.biz.innerHTML.includes('class="err-s"'));
+  /* 거절 뒤 복원은 그 사이 바뀐 목록을 덮지 않는다 */
+  const w3 = ordWorld({ denyWrite: true });
+  await w3.ctx.grLoad();
+  w3.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  await w3.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.deepEqual(J(w3.ctx.GR.bizOrder), [], '원래대로'); assert.equal(w3.ctx.GR.obusy, false);
+  w3.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-14', 'open'), 0)); assert.equal(w3.ctx.GR.drag.code, 'consulting-14', '다시 끌 수 있다');
+});
+
+test('159 저장할 수 없는 목록(순서 기록을 못 만듦)은 쓰지 않고 되돌린다 · 목록이 비면 쓰지 않는다(Nav.orderEntry 가 null)', async () => {
+  const s = ordSeed();
+  s.data.biz_cons_types.v.push({ code: 'consulting 16', name: '코드에 공백', short: '', agency: '', sortOrder: 16 });   // 규칙 열쇠 꼴이 아닌 코드
+  const w = ordWorld({ seed: s });
+  await w.ctx.grLoad();
+  assert.ok(bizCodes(w.els.biz.innerHTML).includes('consulting 16'), '준비 — 목록에는 보인다');
+  w.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  await w.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.equal(w.db.쓴것.length, 0, '쓰기 없음'); assert.deepEqual(J(w.ctx.GR.bizOrder), [], '되돌렸다');
+  assert.ok(w.ctx.GR.bbmsg && w.ctx.GR.bbmsg !== ORDER_FAIL, '관리자 탓이 아닌 다른 안내'); assert.equal(w.ctx.GR.obusy, false);
+  assert.equal(await w.ctx.grSaveBizOrder([]), null); assert.equal(await w.ctx.grSaveBizOrder(undefined), null);
+  assert.equal(w.db.쓴것.length, 0);
+  assert.equal(await w.ctx.grSaveBizOrder(['consulting-02']), true);
+  assert.equal(w.db.쓴것.length, 1); assert.equal(J(w.db.쓴것[0]).자리, 'scal_bizOrder/main');
+});
+
+test('160 순서가 바뀌면 오늘 할 일의 사업 카드 띠 순서도 따라간다(캐시가 낡은 값을 보이지 않는다) · 연도 막대·숫자는 그대로', async () => {
+  const w = ordWorld();
+  await w.ctx.grLoad();
+  const strip = () => [...w.els.today.innerHTML.matchAll(/class="td-biz [^"]*" data-biz="([^"]+)"/g)].map((m) => m[1]);
+  assert.deepEqual(strip(), ['consulting-02', 'consulting-03', 'consulting-04', 'consulting-14', 'consulting-15']);
+  const yr = w.els.yrbar.innerHTML;
+  w.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  await w.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.deepEqual(strip(), ['consulting-15', 'consulting-02', 'consulting-03', 'consulting-04', 'consulting-14']);
+  assert.equal(w.els.yrbar.innerHTML, yr);
+  assert.ok(w.ctx.GR.tdKey.endsWith('|' + w.ctx.GR.dver), '캐시 열쇠는 자료 버전을 담는다');
+});
+
+test('161 현황판 표 — 사업 묶음 순서로 정렬(같은 사업 안 순서는 그대로 · 이알피에 안 이어진 사업은 맨 뒤) · 사업이 바뀌는 첫 줄만 class="ng" · 순서를 바꾸면 표도 따라간다', async () => {
+  const w = ordWorld({ more: true });
+  await w.ctx.grLoad();
+  const types = rowTypes(w);
+  /* 현황판 줄이 생기는 일정 사업은 기술보호 꼴 t1(03 에 이어짐) · 인사노무 t3(04) · 연결 없는 t10·t11(이름만 기술보호) — 02(t2)는 대형이라 줄이 없다 */
+  assert.deepEqual([...new Set(types)].slice(0, 2), ['t1', 't3'], '이알피 순서: 03(t1) → 04(t3)');
+  assert.deepEqual([...new Set(types)].slice(2).sort(), ['t10', 't11'], '이알피에 이어지지 않은 일정 사업은 맨 뒤');
+  assert.equal(countOf(w.els.rows.innerHTML, /<tr>/g) + countOf(w.els.rows.innerHTML, /<tr class="ng">/g), types.length);
+  const runs = types.filter((t, i) => i === 0 || t !== types[i - 1]);
+  assert.equal(runs.length, new Set(types).size, '한 사업의 줄은 이어져 있다(두 번 나오지 않는다)');
+  const trs = [...w.els.rows.innerHTML.matchAll(/<tr( class="ng")?>/g)].map((m) => !!m[1]);
+  assert.deepEqual(trs, types.map((t, i) => i > 0 && t !== types[i - 1]), '사업이 바뀌는 첫 줄만 ng(맨 위 줄은 #rows 의 카운터가 1 로 시작한다)');
+  assert.equal(trs.filter(Boolean).length, 3, '사업 넷 — 바뀌는 곳 셋');
+  assert.ok(types.filter((t) => t === 't3').length === 2, '준비 — 04 는 업체가 둘');
+  /* 같은 사업 안 순서는 정렬 전 그대로 */
+  const raw = L.filterRows(w.ctx.GR.rows, { year: '2026' }).filter((r) => r.typeId === 't3').map((r) => r.coId);
+  const got = [...w.els.rows.innerHTML.matchAll(/data-toc="1" data-co="([^"]*)" data-ty="t3"/g)].map((m) => m[1]);
+  assert.equal(got.length, 2); assert.deepEqual(got, raw, '같은 사업 안 순서 그대로');
+  /* 끌어서 정한 순서가 표 순서가 된다 */
+  const o = ordWorld({ more: true, order: { list: 'consulting-15,consulting-04', at: 1 } });
+  await o.ctx.grLoad();
+  assert.deepEqual([...new Set(rowTypes(o))].slice(0, 2), ['t3', 't1'], '정한 순서가 이알피 순서보다 먼저(04 → 03)');
+  o.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-03', 'open'), 0));
+  await o.ctx.grDragBiz(dragEv('drop', bzEl('consulting-04', 'open'), BEFORE));
+  assert.deepEqual([...new Set(rowTypes(o))].slice(0, 2), ['t1', 't3'], '놓자마자 표도 다시 그려진다');
+  assert.equal(o.db.쓴것.length, 1);
+  /* 이알피 목록을 못 읽었거나 연결을 못 읽으면 정렬하지 않고 던지지도 않는다 */
+  w.ctx.GR.docs = { loaded: true, err: true };
+  assert.doesNotThrow(() => w.ctx.grRenderRows());
+  assert.ok(rowTypes(w).length >= types.length, '못 읽었으면 종결 거르기도 못 하니 줄이 더 보일 수 있다');
+  w.ctx.GR.docs = { loaded: false, err: false };
+  assert.doesNotThrow(() => w.ctx.grRenderRows());
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('162 값은 이스케이프 — 순서 안내·묶음 키 · 이상한 순서 문서로는 던지지 않는다 · 끌기 이벤트가 이상해도(대상 없음·값 없음) 던지지 않는다', async () => {
+  const w = ordWorld({ order: { list: 'consulting-02,<img src=x onerror=1>,consulting-15' } });
+  await w.ctx.grLoad();
+  assert.ok(!w.els.biz.innerHTML.includes('<img'));
+  assert.deepEqual(bizCodes(openSec(w.els.biz.innerHTML)).slice(0, 2), ['consulting-02', 'consulting-15'], '이상한 코드는 걸러지고 나머지는 그 순서');
+  for (const e of [{ type: 'dragstart' }, { type: 'dragover', target: {} }, { type: 'drop', target: { closest: () => null } }, { type: 'dragend' }, { type: 'dragleave', target: null }, { type: 'nope' }, {}]) {
+    assert.doesNotThrow(() => w.ctx.grDragBiz(e), JSON.stringify(e));
+  }
+  assert.equal(w.ctx.GR.drag, null);
+  const ev = dragEv('dragend', bzEl('consulting-02', 'open'), 0);
+  w.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-02', 'open'), 0)); w.ctx.grDragBiz(ev);
+  assert.equal(w.ctx.GR.drag, null, '끌기가 끝나면(놓지 않고 끝나도) 상태가 비워진다');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('163 실제 관문(강제 모드) — 사업 순서 .set(scal_bizOrder/main · Nav.orderEntry 모양)은 통과하고 .remove 는 막힌다 · 순서 쓰기는 이 화면에서 한 자리뿐', async () => {
+  const W = require('../js/pu-ontology-write.js');
+  const calls = [];
+  const ref = (p) => ({
+    child: (c) => ref((p ? p + '/' : '') + c),
+    set: (v) => { calls.push({ kind: 'set', path: p, value: v }); return Promise.resolve(); },
+    remove: () => { calls.push({ kind: 'remove', path: p }); return Promise.resolve(); },
+    update: (v) => { calls.push({ kind: 'update', path: p, value: v }); return Promise.resolve(); },
+    transaction: () => { calls.push({ kind: 'transaction', path: p }); return Promise.resolve({ committed: true }); },
+  });
+  const fb = { database: function () { return { ref }; } };
+  W.clearIssues();
+  assert.equal(W.installFirebaseCompat(fb, { mode: W.runtimeMode('govreport', 'observe'), program: 'govreport', reporter: () => {} }), true);
+  const entry = Nav.orderEntry(['consulting-15', 'consulting-02', 'consulting-03'], '홍길동', 1760000000000);
+  await fb.database().ref('scal_bizOrder/' + Nav.ORDER_NODE_KEY).set(entry);
+  assert.deepEqual(calls.map((c) => [c.kind, c.path, c.value.list]), [['set', 'scal_bizOrder/main', 'consulting-15,consulting-02,consulting-03']], '관문을 통과해 쓰인다');
+  assert.deepEqual(W.getIssues(), [], '관문이 아무 위반도 적지 않는다');
+  await assert.rejects(() => fb.database().ref('scal_bizOrder/main').remove(), /삭제 표식/, '.remove 는 관문이 막는다 — 화면에는 없다');
+  assert.equal(calls.length, 1);
+  assert.equal((INLINE.match(/fbDb\.ref\(GR_BIZ\.orderNode/g) || []).length, 2, '순서 자리를 부르는 곳은 읽기 하나 · 쓰기 하나');
 });
