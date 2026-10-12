@@ -20,7 +20,7 @@
 ## 진행
 - [x] A 순수 로직 functions/govaid-notice-watch.js + 검사 9건
 - [x] A 예약 함수 govaidNoticeWatch(index.js) · 규칙 govaid.notices/noticeLast(콘솔에 올림, 다시 읽어 같음) · 온톨로지 쓰기 계약 · 사용액 화면 자동 일정 문구(하루 512번) · 앱이 govaid 를 칸마다 따로 읽기
-- [ ] A 함수 배포(이 PR 합친 뒤) — firebase deploy --only functions:govaidNoticeWatch
+- [x] A 함수 배포 — govaidNoticeWatch(asia-northeast3) 올림(FUNCTIONS_DISCOVERY_TIMEOUT=60). 같은 run() 을 이 PC 에서 한 번 돌려 운영 공고 함 1,462건 채움(오류 0) · 제안 56건(기준 0.65 — #2614)
 - [x] B 스크립트 scripts/govaid-refresh/(common·export·load-close·load-yearly·BRIEF 둘·README) — 오늘 자료로 마른 돌리기 확인
 - [x] B 예약 작업 govaid-monthly-closure(매월 1일 09:30) · govaid-yearly-refresh(1월 20일 10:00) — 이 PC 데스크톱 앱이 켜져 있어야 돈다
-- [ ] 화면 «📰 새 공고» 탭 — 시안 승인 뒤
+- [ ] 화면 «📰 새 공고» 탭 — 시안(잇기·새 사업 초안·관계없음) 보냄, 대표 승인 대기. 사람이 잇기 전에는 서버가 사업 접수 상태를 안 바꾼다(지금 이은 사업 0)
