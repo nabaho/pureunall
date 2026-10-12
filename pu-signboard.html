@@ -273,10 +273,18 @@ function refreshPreview(){ if(!EDIT) return; var ad=V.adFromForm(EDIT.base, read
 async function saveEdit(){
   var ad=V.adFromForm(EDIT.base, readValues()), r=C.validateAd(ad);
   if(!r.ok){ renderEditor(ad, r.errors); return; }
-  var isNew=EDIT.isNew, rev=Number(EDIT.base.revision||0);
+  var isNew=EDIT.isNew, rev=Number(EDIT.base.revision||0), lost=false;
   try{
-    await gate.save(adRef(ad.id), function(prev){ return C.patchedAd(prev, ad, ad); }, isNew?{ entityType:'SignboardAd', expectedRevision:-1 }:{ entityType:'SignboardAd', expectedRevision:rev });
-  }catch(e){ toast('저장하지 못했습니다: '+errMsg(e)); return; }
+    /* ⚠ 고칠 때 gate 의 expectedRevision 을 쓰지 않는다 — 찬 자리 거래는 먼저 null 로 불리는데 그때 «판이 다르다»며 접어 버려
+       서버에 묻지도 않고 저장이 조용히 실패한다. 남이 먼저 고쳤는지는 «진짜 값이 올 때만» 직접 견준다. */
+    await gate.save(adRef(ad.id), function(prev){
+      if(!isNew && prev && Number(prev.revision||0)!==rev){ lost=true; return undefined; }
+      lost=false; return C.patchedAd(prev, ad, ad);
+    }, isNew?{ entityType:'SignboardAd', expectedRevision:-1 }:{ entityType:'SignboardAd' });
+  }catch(e){
+    if(lost){ toast('다른 사용자가 먼저 고쳤습니다 — 최신 내용을 다시 불러옵니다. 다시 열어 고쳐 주세요'); closeEditor(); await reload(); return; }
+    toast('저장하지 못했습니다: '+errMsg(e)); return;
+  }
   await logEvent(isNew?'create':'edit', { ad:ad });
   closeEditor(); await reload();
   toast('저장했습니다 — «전광판에 올리기»를 눌러야 전광판에 나갑니다');

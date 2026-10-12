@@ -146,9 +146,12 @@ test('사진·동영상 — 종류·크기를 올리기 전에 거르고, 창고
   assert.match(NOC, /storage\('gs:\/\/pureun-erp-hrphotos'\)/);
 });
 
-test('편집은 서버 최신 판(revision)을 다시 비교한다 — 새 광고는 -1', () => {
+test('편집은 «진짜 서버 값이 올 때만» 판(revision)을 견준다 — 찬 자리 null 에서 접지 않는다(저장이 조용히 실패하는 덫)', () => {
   const fn = fnBody('async function saveEdit(');
-  assert.match(fn, /expectedRevision:-1/); assert.match(fn, /expectedRevision:rev/);
+  assert.match(fn, /expectedRevision:-1/, '새 광고는 -1(서버에 없어야 한다)');
+  assert.doesNotMatch(fn, /expectedRevision:rev/, '고칠 때 gate 의 expectedRevision 을 쓰면 찬 자리 null 에서 접힌다');
+  assert.match(fn, /if\(!isNew && prev && Number\(prev\.revision\|\|0\)!==rev\)\{ lost=true; return undefined; \}/);
+  assert.match(fn, /다른 사용자가 먼저 고쳤습니다/);
 });
 
 test('심부름꾼이 20분 넘게 조용하면 알리도록 상태 탭이 30초마다 다시 읽는다', () => {
