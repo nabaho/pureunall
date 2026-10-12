@@ -60,7 +60,9 @@
   /* 조회 구간은 YYYYMMDDHHmm 열두 자리다 */
   function stamp(d, endOfDay) {
     var t = (d instanceof Date) ? d : new Date(String(d));
-    return String(t.getFullYear()) + pad(t.getMonth() + 1) + pad(t.getDate()) +
+    /* 서울 날짜로 만든다 — 서버(UTC)에서 돌아도 하루가 밀리지 않게. 07:40(서울)은 UTC 로는 «전날» 22:40 이다 */
+    var k = new Date(t.getTime() + 9 * 3600000);
+    return String(k.getUTCFullYear()) + pad(k.getUTCMonth() + 1) + pad(k.getUTCDate()) +
            (endOfDay ? '2359' : '0000');
   }
 
