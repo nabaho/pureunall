@@ -256,10 +256,23 @@
   }
   function indName(k) { return INDUSTRIES[k] || k; }
 
+  /* 사업종료 — 예산 소진·접수 마감·폐지 (대표 지시 2026-10-12 「예산이 소진되었다는 부분 … 사업종료 표시」).
+     program.closure = { state: open|partial|closed|unknown, reason: budget|deadline|abolished|other, closedAt, note, sources, confidence, checkedAt, by }
+     closed  → 확정 사업이어도 후보가 아니다(verdict 'closed') — 신청할 수 없는 사업을 권하지 않는다
+     partial → 일부 운영기관·지역만 마감: 후보로 두되 «사람 확인» 조건을 붙인다 */
+  var CLOSE_REASON = { budget: '사업종료 · 예산 소진', deadline: '접수 마감', abolished: '사업 폐지', other: '사업종료' };
+  function closureOf(p) {
+    var c = (p && p.closure) || {}, st = clean(c.state);
+    if (st === 'closed') return { closed: true, partial: false, label: CLOSE_REASON[clean(c.reason)] || CLOSE_REASON.other, at: clean(c.closedAt), note: clean(c.note) };
+    if (st === 'partial') return { closed: false, partial: true, label: '일부 마감' + (c.reason === 'budget' ? '(예산 소진)' : ''), at: clean(c.closedAt), note: clean(c.note) };
+    return { closed: false, partial: false, label: '', at: '', note: '' };
+  }
   function judge(profile, program, year) {
     program = program || {}; profile = profile || {};
     var vals = profile.vals || {}, facts = profile.facts || {}, c = program.cond || {}, items = [];
     if (program.status !== 'confirmed' || !(num(program.baseYear) >= num(year))) return { verdict: 'unconfirmed', items: items };
+    var cl = closureOf(program);
+    if (cl.closed) return { verdict: 'closed', items: items };
     function v(k) { return (vals[k] || {}).v; }
     function add(key, label, state) { items.push({ key: key, label: label, state: state }); }
     function range(key, r, val, label, unit) {
@@ -297,6 +310,7 @@
       else add('fact:' + f.key, label, got.v === want ? 'ok' : 'no');
     });
     list(c.manual).forEach(function (m, i) { if (clean(m)) add('manual:' + i, clean(m), 'manual'); });
+    if (cl.partial) add('closure', cl.label + (cl.note ? ' — ' + cl.note : '') + ' · 신청 가능 여부 확인', 'manual');
     var states = items.map(function (x) { return x.state; });
     /* 기계가 잴 수 있는 조건(manual 이 아닌 것)이 하나도 없으면 계산하지 않는다 —
        «사람이 볼 조건»만으로는 모든 회사가 후보로 쏟아진다(2026-10-11 최종 검토) */
@@ -306,7 +320,7 @@
   }
 
   return {
-    SIZES: SIZES, REGIONS: REGIONS, INDUSTRIES: INDUSTRIES, FACTS: FACTS, DOCS: DOCS, docKeyOf: docKeyOf,
+    SIZES: SIZES, REGIONS: REGIONS, INDUSTRIES: INDUSTRIES, FACTS: FACTS, DOCS: DOCS, docKeyOf: docKeyOf, closureOf: closureOf,
     list: list, digits: digits, blank: blank, num: num, kstYear: kstYear, regionOf: regionOf,
     headcountAuto: headcountAuto, prioritySupportAuto: prioritySupportAuto, industryFromName: industryFromName, industryAuto: industryAuto, profileFromCompany: profileFromCompany, profileFromProspect: profileFromProspect,
     judge: judge

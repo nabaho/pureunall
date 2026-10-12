@@ -48,7 +48,7 @@
     return null;
   }
   function forSubject(profile, progs, year) {
-    var g = { candidate: [], unknown: [], no: [], unconfirmed: [] };
+    var g = { candidate: [], unknown: [], no: [], unconfirmed: [], closed: [] };
     progs.forEach(function (p) { var r = M.judge(profile, p, year); g[r.verdict].push({ program: p, result: r }); });
     return g;
   }
@@ -67,11 +67,12 @@
     return { cols: progs.filter(function (p) { return used[p.id]; }), rows: out };
   }
   function forProgram(program, profiles, year) {
-    var g = { candidate: [], unknown: [], no: 0 };
+    var g = { candidate: [], unknown: [], no: 0, closed: 0 };
     profiles.forEach(function (pf) {
       var r = M.judge(pf, program, year);
       if (r.verdict === 'candidate' || r.verdict === 'unknown') g[r.verdict].push({ profile: pf, result: r });
       else if (r.verdict === 'no') g.no++;
+      else if (r.verdict === 'closed') g.closed++;
     });
     return g;
   }
