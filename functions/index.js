@@ -859,7 +859,10 @@ exports.sendBulkMail = functions
     }
 
     const batchId = "b" + now.toString(36) + Math.random().toString(36).slice(2, 6);
-    const rows = MB.buildQueue(v, now, sender.email || "", batchId);
+    /* ★ 뉴스레터·안내문은 보낸함에 «한 번에 한 통»만 남긴다(대표 지시 2026-10-12).
+         기업정보함 묶음 편지는 회사마다 내용이 다른 업무 메일이라 곳별 사본 그대로 둔다. */
+    const rows = MB.buildQueue(v, now, sender.email || "", batchId,
+      (newsletterSend || noticeSend) ? { sentCopy: "one" } : undefined);
 
     if (noticeSend) {
       try {
@@ -1004,6 +1007,9 @@ exports.sendScheduledMail = functions
           from: 이통from, pass: mailPass(이통from),
           envId: process.env.DAUM_MAIL_ID,
           byEmail: row.by || "",
+          /* ★ 보낸함 사본 규칙 — 대량 줄(뉴스레터·안내문)은 «한 번에 한 통»만 남긴다(2026-10-12).
+               줄에 없으면 undefined → 예전 그대로 곳별 사본. 검증은 mail-one-copy.js 규칙() 이 한다. */
+          copy: row.copy,
           /* ★ 창고를 열 길 — 없으면 첨부가 «조용히 빠진 채로» 나간다
                (대표 결정 2026-09-06 「첨부도 붙인다」).
              ⚠ uid 는 안 넘긴다. 예약 발송은 사람이 없는 자리에서 도므로
@@ -1554,7 +1560,8 @@ exports.weeklyNewsletterSend = functions
       if (!v.ok) throw new Error(v.error);
       const now = Date.now();
       const batchId = "nw" + now.toString(36);
-      const rows = MB.buildQueue(v, now, ready.준비한이 || "weeklyNewsletterSend", batchId);
+      /* 보낸함 사본은 «한 번에 한 통» — 손으로 거는 뉴스레터(sendBulkMail)와 같은 규칙 */
+      const rows = MB.buildQueue(v, now, ready.준비한이 || "weeklyNewsletterSend", batchId, { sentCopy: "one" });
       const upd = {};
       rows.forEach((row) => {
         const key = db.ref(MD.CARDS_ROOT + "/scheduled").push().key;

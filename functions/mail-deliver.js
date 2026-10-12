@@ -11,6 +11,7 @@
 
 const MS = require('./mail-send');
 const MA = require('./mail-archive');
+const OC = require('./mail-one-copy');
 const SG = require('./mail-sign');
 
 const DAUM_HOST = 'smtp.daum.net';
@@ -570,14 +571,28 @@ async function deliverOnce(opts) {
      ⚠ 배달은 «이미 끝났다». 여기서 무슨 일이 나도 배달 결과를 바꾸지 않는다 —
        실패를 되돌려 주면 대표가 「안 나갔다」고 오해해 같은 메일을 두 번 보낸다. */
   try {
-    const raws = [];
-    for (const m of batches) raws.push(await MA.buildRaw(m));
-    const kept = await MA.archiveSent({
-      user: usedId, loginIds: loginIds(from, envId), pass: pass,
-      raws: raws, bytes: v.bytes,
-    });
-    if (!kept.ok) console.warn('archiveSent 못 남김:', kept.why, kept.box);
-    else if (kept.dropped) console.warn('archiveSent 상한 초과 —', kept.dropped, '통은 사본 없음');
+    /* ★ 대량 줄(뉴스레터·안내문)은 곳별 사본을 넣지 않는다 — 보낸함에 «한 번에 한 통»만 남기려고
+         (대표 지시 2026-10-12 「한번에 보내면 한번에 보낸 걸로」). 규칙은 대기열 줄이 들고 온다(opts.copy).
+       ⚠ 안 주거나 알 수 없으면 «예전 그대로»(곳별 사본)다 — 사본이 하나 더 쌓이는 쪽이 없어지는 쪽보다 낫다. */
+    const 사본규칙 = OC.규칙(opts.copy);
+    if (사본규칙.mode === 'skip') {
+      /* 대표 사본이 따로 있다 — 여기서는 아무것도 넣지 않는다 */
+    } else if (사본규칙.mode === 'one') {
+      const 결과 = await OC.대표사본넣기({
+        db: db, MA: MA, 편지: batches[0], 규칙: 사본규칙, 보낸주소: from,
+        이름들: loginIds(from, envId), 아이디: usedId, 열쇠: pass, 바이트: v.bytes, 지금: at,
+      });
+      if (결과.did === 'fail') console.warn('대표 사본 못 남김:', 결과.why);
+    } else {
+      const raws = [];
+      for (const m of batches) raws.push(await MA.buildRaw(m));
+      const kept = await MA.archiveSent({
+        user: usedId, loginIds: loginIds(from, envId), pass: pass,
+        raws: raws, bytes: v.bytes,
+      });
+      if (!kept.ok) console.warn('archiveSent 못 남김:', kept.why, kept.box);
+      else if (kept.dropped) console.warn('archiveSent 상한 초과 —', kept.dropped, '통은 사본 없음');
+    }
   } catch (e) { console.warn('archiveSent', (e && e.message) || e); }
   /* 창고에서 꺼내 쓴 임시 파일을 치운다 — 나간 «뒤»에 치운다(먼저 치우면 못 붙인다).
      ⚠ 치우다 실패해도 보내기는 성공이다 — 안에서 삼킨다(sweepMailOut). */
