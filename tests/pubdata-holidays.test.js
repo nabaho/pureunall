@@ -78,5 +78,5 @@ test('★★★ 정부사업일정 — 받아 온 해는 천문연이 이기고,
   assert.equal(ctx.getHoliday('2027-03-01'), null, '받아 온 해에는 천문연에 없는 날을 표로 덧붙이지 않습니다');
   assert.equal(ctx.getHoliday('2031-03-01'), '삼일절', '★★ 못 받은 해는 표로 물러서야 합니다');
   assert.match(G, /<script src="js\/pu-pubdata\.js\?v=\d+"><\/script>/);
-  assert.match(G, /_fbAuthUid=u\.uid;\s*\n\s*pubHolidaysLoad\(\);/, '로그인 뒤 공휴일을 안 받습니다');
+  assert.match(G, /_fbAuthUid=u\.uid;\s*\n\s*if\(typeof pubHolidaysLoad==='function'\)pubHolidaysLoad\(\);/, '로그인 뒤 공휴일을 안 받습니다');
 });
