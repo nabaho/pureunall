@@ -1380,7 +1380,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="js/kcareer-biz.js?v=9"></script>
 <script src="js/kcareer-pack.js?v=2"></script>
 <script src="js/kcareer-kv.js?v=1"></script>
-<script src="js/kcareer-profile1.js?v=11"></script>
+<script src="js/kcareer-profile1.js?v=12"></script>
 <script src="js/kcareer-pastcv.js?v=1"></script>
 <script src="js/kcareer-pusync.js?v=9"></script>
 <script src="js/kcareer-adv-summary.js?v=1"></script>
@@ -7879,7 +7879,6 @@ function _p1Bytes(){
     body+=HWPX.para('■ '+x.title+(x.more?'  (최근 '+x.show+' · 전체 '+x.n+')':''), HWPX.CP.body);
     var 폭=(x.rows[0]||[]).length;
     var rows=x.rows.map(function(r){ var a=r.slice(); while(a.length<폭) a.push(''); return a; });
-    if(x.more) rows.push(폭===2?['','외 '+x.more+'건']:['','외 '+x.more+'건','']);
     if(x.note) rows.push(폭===2?['',x.note]:['',x.note,'']);
     if(x.key==='perf' && m.perfByYear) rows.push(폭===2?['','연도별: '+m.perfByYear]:['','연도별: '+m.perfByYear,'']);
     body+=HWPX.tablePara(rows, HWPX.cols(폭===2?[0.16,0.84]:[0.12,0.34,0.54]));

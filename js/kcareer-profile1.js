@@ -233,11 +233,28 @@
 
   function esc(v) { return s(v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   /* A4 미리보기·인쇄(PDF)용 글 — 화면과 인쇄가 «같은 글»이다 */
+  /* 컨설팅 실적은 «사업별»로 묶어 보인다(대표 지시 2026-10-12 「컨설팅실적도 사업별로 정리」) —
+     고른 실적(최근 N·⭐)은 그대로이고, 같은 사업(유형)끼리 한 줄로: 연도 · 사업명(건수) · 기관들. 없는 값은 지어내지 않는다. */
+  function perfByBiz(rows) {
+    var g = {}, order = [];
+    (rows || []).forEach(function (r) {
+      var t = s(r[1]) || '기타';
+      if (!g[t]) { g[t] = { ys: [], orgs: [] }; order.push(t); }
+      if (s(r[0])) g[t].ys.push(s(r[0]));
+      var o = s(r[2]); if (o && g[t].orgs.indexOf(o) < 0) g[t].orgs.push(o);
+    });
+    return order.map(function (t) {
+      var ys = g[t].ys.slice().sort(), y = ys.length ? (ys[0] === ys[ys.length - 1] ? ys[0] : ys[0] + '~' + ys[ys.length - 1]) : '';
+      var n = rows.filter(function (r) { return (s(r[1]) || '기타') === t; }).length;
+      return [y, t + ' (' + n + '건)', g[t].orgs.join(' · ')];
+    });
+  }
+  /* 「외 N건」 줄은 그리지 않는다(대표 지시 2026-10-12) — 몇 건 중 몇 건인지는 칸 제목 옆 «(최근 N · 전체 M)» 이 말한다 */
   function secHtml(model, x) {
       var 머리말 = !x.more ? '' : (x.pin ? '(주요 ' + x.pin + (x.show > x.pin ? ' · 최근 ' + (x.show - x.pin) : '') + ' · 전체 ' + x.n + ')' : '(최근 ' + x.show + ' · 전체 ' + x.n + ')');
+      var rows = x.key === 'perf' ? perfByBiz(x.rows) : x.rows;
       return '<h4>' + esc(x.title) + (머리말 ? ' <small>' + 머리말 + '</small>' : '') + '</h4><table class="t-' + x.key + '">'
-        + x.rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td' + (i === 0 ? ' class="y"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('')
-        + (x.more ? '<tr><td class="y"></td><td colspan="2" class="more">외 ' + x.more + '건</td></tr>' : '')
+        + rows.map(function (r) { return '<tr>' + r.map(function (c, i) { return '<td' + (i === 0 ? ' class="y"' : '') + '>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('')
         + (x.note ? '<tr><td class="y"></td><td colspan="2" class="more">' + esc(x.note) + '</td></tr>' : '')
         + (x.key === 'perf' && model.perfByYear ? '<tr><td class="y"></td><td colspan="2" class="more">연도별: ' + esc(model.perfByYear) + '</td></tr>' : '')
         + '</table>';
@@ -282,7 +299,7 @@
     + '.p1s .cols3{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:22px;align-items:start}'
     + '.p1s h4{font-size:14px;margin:0 0 4px;padding:3px 8px}.p1s h4+table{margin-bottom:16px}'
     + '.p1s td{white-space:normal;font-size:13.5px;padding:2px 4px;vertical-align:top}.p1s td.y{width:62px}.p1s .t-work td.y,.p1s .t-role td.y{width:104px}'
-    + '.p1s td.more{font-size:12.5px}';
+    + '.p1s td.more{font-size:12.5px}.p1s .t-perf td.y{width:90px}';
 
   var CSS = '.p1{font-family:"Malgun Gothic",sans-serif;color:#1e293b;font-size:12.5px;line-height:1.45}'
     + '.p1 h2{font-size:20px;border-bottom:2px solid #1e293b;padding-bottom:4px;margin:0 0 8px;display:flex;align-items:baseline;gap:10px}'
@@ -291,12 +308,13 @@
     + '.p1 h4{font-size:13px;background:#f8fafc;border-left:3px solid #166534;padding:2px 6px;margin:8px 0 3px}'
     + '.p1 table{width:100%;border-collapse:collapse;table-layout:fixed}.p1 td{padding:1px 4px;border-bottom:1px solid #f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.p1 td.y{width:60px;color:#64748b}.p1 td.more{color:#64748b}'
+    + '.p1 .t-perf td.y{width:84px}'
     /* 기간 칸(「2019.03~2021.02」)은 해 하나보다 길다 — 「2017.10 …」으로 잘리던 것 */
     + '.p1 .t-work td.y,.p1 .t-role td.y{width:112px}'
     + '.p1 .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}';
 
   var api = { toScreenHtml: toScreenHtml, SCREEN_CSS: SCREEN_CSS, USES: USES, SECTIONS: SECTIONS, BUDGET: BUDGET, MIN_AMT: MIN_AMT, PIN_KEYS: PIN_KEYS, perfClass: perfClass,
-    build: build, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
+    build: build, perfByBiz: perfByBiz, fit: fit, fill: fill, roleRow: roleRow, isOn: isOn, lines: lines, toHtml: toHtml, CSS: CSS, dkey: dkey };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerProfile1 = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);
