@@ -394,6 +394,8 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .jartabs .n{font-size:11px;font-weight:700;color:var(--faint)}
 .jartabs button.on .n{color:var(--brown)}
 .jartabs .n b{color:var(--ok)}
+/* 긴 말(.lg)과 짧은 말(.sh) — 넓은 화면은 긴 말, 폰은 짧은 말(아래 폰 규칙). 짧게 줄여도 원래 말은 title 에 남긴다. */
+#main .sh{display:none}
 .jarpanel{background:#fff;border:1px solid var(--line);border-radius:0 0 12px 12px;
   display:flex;flex-direction:column;min-height:0;min-width:0}
 .jarhead{display:flex;align-items:center;gap:8px;padding:9px 13px;flex-wrap:wrap;
@@ -557,7 +559,8 @@ table.list.fz th.cap .cnt{font-size:11px;font-weight:800;color:var(--sub);backgr
 .nafind{width:auto!important;flex:0 1 260px;padding:6px 10px!important;line-height:1.4!important}
 .hint{font-size:11.5px;color:var(--faint);margin-top:6px;line-height:1.65}
 
-.pv{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:sticky;top:12px}
+.pv{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;position:sticky;top:calc(var(--tophi,0px) + 12px);
+  scroll-margin-top:calc(var(--tophi,0px) + 8px)}
 /* ⚠ 머리띠와 여백을 얇게 (대표 지시 2026-09-06 「뉴스레터 화면 더 위로 올려라」).
      11px+13px+11px 짜리 띠와 12px 여백이 편지를 40px 넘게 눌러 내리고 있었다.
      편지를 보시는 자리라 «편지가 차지하는 높이»가 값이다. */
@@ -604,7 +607,9 @@ table.list{width:100%;border-collapse:collapse;font-size:13px}
      (대표 확인 2026-09-07 「폰에서는 목업대로 그러나 피시에서는 좌우 화면으로」). */
 .pad.g2{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px 12px}
 .pad.g2 .w2{grid-column:span 2}
-@media(max-width:560px){ .pad.g2{grid-template-columns:1fr}
+/* ⚠ 한 열도 minmax(0,1fr) 이다 — 그냥 1fr 은 minmax(auto,1fr) 라 «내용보다 작아지지 않는다».
+     폰에서 고르개의 가장 긴 선택지 글(「켜짐 — 정리하고 검토 메일을 보냄」)이 칸을 1,112px 로 밀어 설정 탭이 옆으로 775px 넘쳤다(실측 2026-10-12). */
+@media(max-width:560px){ .pad.g2{grid-template-columns:minmax(0,1fr)}
   .pad.g2 .w2{grid-column:span 1} }
 /* 천안 본사 · 서산지사 — [이름 | 주소 | 전화] 세 열을 두 줄이 «같이» 쓴다 (2026-09-28).
    ⚠ 폭을 한 격자에서 정한다 — 줄마다 따로 격자를 두면 주소 칸 길이가 줄마다 달라져 열이 어긋난다.
@@ -648,7 +653,7 @@ details.fold>summary .act{font-size:11px;font-weight:800;color:var(--brown);
   white-space:nowrap}
 details.fold[open]>summary .act:after{content:'접기'}
 /* 보낸 결과 KPI (2026-10-05) — 작게 · 위에 붙고 · 누르면 그 줄만 */
-.res-head{position:sticky;top:0;z-index:5;background:var(--paper);padding:8px 0 6px;margin:-8px 0 4px}
+.res-head{position:sticky;top:var(--tophi,0px);z-index:5;background:var(--paper);padding:8px 0 6px;margin:-8px 0 4px}
 .kpis{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
 /* 한 줄 머리 (2026-10-05 「1줄로」) */
 .res-one{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -1023,9 +1028,13 @@ table.list tr:hover td{background:#fcfcfd}
 
    ★ 고른 잣대: «누르는 것»은 손가락만큼 크게 두고, «읽는 것»은 폭을 다 준다.
    ⚠ 아무것도 «감추지 않는다» — 감추면 폰에서만 할 수 없는 일이 생긴다.
-     자리를 바꾸거나(▲▼는 줄창으로), 줄을 옮기거나, 가로로 굴리게 할 뿐이다. */
+     자리를 바꾸거나(▲▼는 줄창으로), 줄을 옮기거나, 가로로 굴리게 할 뿐이다.
+   ★ 2026-10-12 폰 콤팩트(대표 지시 2026-10-11 「한화면에서 가급적 모두 보게」 → 목업 7장 승인): 아래 덩이에서 탭·머리·담는 법·꼭지·줄을 한 번 더 줄였고,
+     표(지난 회차·받는 곳·보낸 결과)는 옆으로 굴리던 것을 «카드»로 바꿨다. 표·받는 곳·보낸 결과·설정·안내문은 그 뒤의 「폰 콤팩트」 덩이가 맡는다. */
 @media(max-width:560px){
-  .wrap{padding:10px}
+  .wrap{padding:8px 10px 10px}
+  /* 탭 줄 바로 밑에서 «이번 회차» 머리가 시작한다 — 위 여백 24px 는 폰에서는 사치다 */
+  #main[data-tab=now]>.cols{margin-top:0}
 
   /* ⚠⚠ 칸이 «안 줄어드는» 것부터 막는다. 바둑판(grid)의 칸은 기본이 min-width:auto 라,
        안에 «안 접히는 줄»(아래 .ways 의 nowrap)이 하나만 있어도 그 줄의 온폭만큼
@@ -1034,77 +1043,433 @@ table.list tr:hover td{background:#fcfcfd}
   .cols>*{min-width:0}
   .ways{min-width:0;max-width:100%}
 
-  /* ⓪ 탭 다섯이 469px 라 오른쪽 둘(보낸 결과·설정)이 화면 밖에 있었다.
-       굴려서 찾게 두지 말고 «다 보이게» 줄인다 — 폰에서는 가로로 굴릴 수 있다는 것이
-       눈에 안 띄어, 없는 탭으로 여기게 된다. */
-  #tabs{padding:0 3px;gap:0}
-  /* ⚠ 탭이 일곱이 되자(2026-09-27 「주소 없는 곳」) 한 칸이 53px 이다. 「주소 없는 곳 13」은
-       87px 라 nowrap 이면 옆 탭 위로 넘쳐 겹친다(「받는 명단 60」도 71px 로 이미 넘치고 있었다).
-     ★ 긴 이름은 «두 줄로 접는다» — 낱말째(keep-all)로. 줄이는 것보다 읽힌다. */
-  #tabs button{flex:1 1 0;min-width:0;padding:9px 3px;font-size:12px;white-space:normal;
-    word-break:keep-all;line-height:1.25}
-  #tabs button span{font-size:10px}
-  #bar{padding:10px 12px}
-  #bar .logo{font-size:16px}
+  /* ⓪ 탭 여섯이 «한 줄»에 다 보인다 (대표 지시 2026-10-11 「폰화면 콤팩트하게」 → 목업 승인 2026-10-12).
+       예전에는 한 칸이 55px 라 「받는 곳 253」이 두 줄로 접혀 탭 줄이 두꺼웠다.
+       2026-09-12 에는 탭 다섯이 469px 라 오른쪽 둘이 화면 밖에 있었다 — 굴려서 찾게 두지 않고 «다 보이게»
+       줄이는 것은 그대로다. 굴릴 수 있다는 것이 폰에서는 눈에 안 띄어 없는 탭으로 여기게 된다.
+     ★ 글 길이만큼 자리를 주고(flex:1 1 auto) 남는 자리는 나눠 갖는다. 접지 않는다(nowrap) —
+       숫자는 작게(10px) 붙인다. 원래 이름은 render() 가 title·aria-label 에 달아 둔다. */
+  #tabs{padding:0 2px;gap:0;scrollbar-width:none}
+  #tabs::-webkit-scrollbar{display:none}
+  #tabs button{flex:1 1 auto;min-width:0;padding:9px 4px 8px;font-size:12px;white-space:nowrap;
+    line-height:1.25}
+  #tabs button span{font-size:10px;margin-left:1px}
+  /* ★ 위 «앱바»(로고줄)는 굴리면 올라가고 «탭 줄»만 위에 붙어 남는다.
+       ⚠ 붙는 것(sticky)은 «제 부모의 상자 안»에서만이다 — #top 이 상자이면 그 안의 #tabs 는 못 붙는다
+         (2026-09-12 에 #tabs 대신 #top 을 붙인 까닭). 그래서 폰에서는 #top 의 «상자를 없앤다»(display:contents) —
+         #bar 와 #tabs 가 #shell 의 직접 자식처럼 놓이고, #tabs 만 붙는다.
+       ⚠ position 도 static 으로 되돌린다 — 위쪽 980px 규칙의 sticky 가 계산값에 남으면 위높이재기() 가 «#top 이
+         붙어 있다»고 읽고 높이 0 을 넣는다(붙은 것은 이제 #tabs). */
+  #top{position:static;display:contents}
+  #tabs{position:sticky;top:0;z-index:30;box-shadow:0 2px 8px rgba(15,23,42,.07)}
+  #bar{padding:5px 12px}
+  #bar .logo{font-size:15px}
 
-  /* ① 회차 머리 — 이름은 제 줄, 단추는 두 칸 바둑판.
-       ★ 「보내기」만 한 줄을 온전히 쓴다 — 되돌릴 수 없는 일이라 옆 단추와
-         나란히 두면 엄지로 잘못 누르기 쉽다. */
-  .hdbar{gap:7px;padding:11px 12px}
-  .hdbar>.no{flex:1 1 100%;font-size:17px}
-  .hdbar>.btn{flex:1 1 calc(50% - 4px);justify-content:center;text-align:center;
-    font-size:12.5px;padding:9px 6px}
-  .hdbar>.btn.pri{flex:1 1 100%}
-  /* ⚠ 폰에서만은 «접는다» — 넓은 화면의 폴더 탭 머리(.nowtop, 2026-09-27)는
+  /* ① 회차 머리 — 네 줄: [이름 · 딱지] / [기간 · 실린 것 · 👁 크게 보기] / [↻ 다시 담기 · ✉ 시험 발송 · 🤖 예약] / [📨 N곳에 보내기]
+       ★ 「보내기」만 한 줄을 온전히 쓴다 — 되돌릴 수 없는 일이라 옆 단추와 나란히 두면 엄지로 잘못 누르기 쉽다.
+       ★ 줄을 가르는 것은 «보이지 않는 줄바꿈 막대»(::before·::after, flex:0 0 100%)다 — 마크업에 줄 상자를 더 만들면
+         넓은 화면의 한 줄 머리(.nowtop .hdbar>*)가 흔들린다. 차례는 order 로 정한다.
+       ⚠ 줄 사이는 row-gap 이 아니라 «칸의 위 여백»으로 띄운다 — 막대 줄(높이 0)에도 row-gap 이 붙어 두 배로 벌어진다.
+       ⚠ overflow 를 이 두 덩이(.hdbar·.ways)에 걸지 않는다 — ⓘ 풀이(.tip)가 줄 밖으로 뜨는 창이라 잘린다.
+         줄여야 하는 칸(이름·기간)에만 건다. */
+  .nowtop .hdbar{gap:0 6px;padding:2px 11px 8px}
+  .nowtop .hdbar>*{margin-top:4px}
+  .nowtop .hdbar::before,.nowtop .hdbar::after{content:"";flex:0 0 100%;height:0;margin:0}
+  .nowtop .hdbar .no{order:1;flex:0 1 auto;min-width:0;font-size:16px;overflow:hidden;text-overflow:ellipsis}
+  .nowtop .hdbar .badge{order:2}
+  .nowtop .hdbar::before{order:3}
+  .nowtop .hdbar .meta{order:4;flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:11.5px}
+  .nowtop .hdbar .why{order:5}
+  .nowtop .hdbar .lnk.look{order:6;padding:4px 2px;font-size:11.5px}
+  .nowtop .hdbar::after{order:7}
+  .nowtop .hdbar .lnk.redo{order:8;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--ink)}
+  .nowtop .hdbar .btn.test{order:9}
+  .nowtop .hdbar .btn.rsv{order:10}
+  .nowtop .hdbar .lnk.redo,.nowtop .hdbar .btn.test,.nowtop .hdbar .btn.rsv{flex:1 1 0;min-width:0;
+    justify-content:center;text-align:center;font-size:12px;padding:6px 3px;font-weight:700}
+  .nowtop .hdbar .btn.pri{order:11;flex:1 1 100%;font-size:13.5px;padding:8px 8px;text-align:center}
+  /* ⚠ 아래 「.nowtop .hdbar,.nowtop .ways{flex-wrap:wrap}」 은 폰에서만은 «접는다» 는 규칙이다 — 넓은 화면의 폴더 탭 머리(.nowtop, 2026-09-27)는
        안 접히게(nowrap) 짜여 있는데, 375px 에 두 줄은 안 들어간다. 여기서 되돌린다.
        빠지면 단추가 화면 밖으로 밀려 나가 보내기를 못 누른다. */
   .nowtop .hdbar,.nowtop .ways{flex-wrap:wrap}
   .nowtop .hdbar .sp,.nowtop .ways .sp{display:none}
-  /* ⚠ 아래 「.ways .tail{display:none}」은 옛 꼬리말(ⓘ 와 같은 말)을 접던 것이다.
-       2026-09-27 부터 꼬리에는 «연습용 샘플·그대로 전달» 길이 산다 — 접으면 폰에서
-       그 길이 통째로 사라진다(removing-a-path). 머리 덩이 안에서는 되살린다. */
-  .nowtop .ways .tail{display:inline-block;padding:8px 6px}
 
-  /* ② 담는 법 · 꼭지 도구줄 — 단추를 작게 해 두 줄에 담는다.
-       ⚠ 가로로 굴리게 해 봤더니 끝 단추가 «잘린 채» 서서 고장난 것처럼 보였다.
-         폰에서는 굴릴 수 있다는 것이 눈에 안 띈다 — 작게 해서 다 보이는 편이 낫다. */
-  .ways,.jarhead{gap:5px;padding:8px 10px}
+  /* ② 담는 법 — 두 줄 바둑판(4×2): 이 주치로 채우기 · 받은 것 붙여넣기 · 노무사회 자료 · 지역뉴스 / 명절 인사 · 연습용 샘플 · 그대로 전달 · ⓘ 도움말.
+       ⚠ 안 줄이고 «옮길 뿐»이다 — 꼬리(.tail)의 두 길은 같은 바둑판의 칸이 되고(display:contents), 둘 사이의 「·」(.mid)만 접는다.
+       ⚠ ⓘ 는 «도움말» 칸이 되어 맨 끝으로 간다(order). 풀이(.tip)는 아래 「받는 곳」 줄의 규칙대로 화면 폭에 맞춰 편다. */
+  .nowtop .ways{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding:5px 8px 6px;align-items:stretch}
+  /* ⚠ 옛 폰 규칙 「.ways .tail{display:none}」은 꼬리말(ⓘ 와 같은 말)을 접던 것이다. 2026-09-27 부터 꼬리에는 «연습용 샘플·그대로 전달» 길이
+       살아서, 접으면 폰에서 그 길이 통째로 사라진다(removing-a-path) — 되살렸다가(inline-block) 이제는 바둑판의 칸이 된다. */
+  .nowtop .ways .tail{display:contents}
+  .nowtop .ways .tail .mid{display:none}
+  .nowtop .ways .wt,.nowtop .ways .tail a{display:flex;align-items:center;justify-content:center;min-height:33px;
+    border:1px solid var(--line);border-radius:9px;background:#fff;padding:3px 2px;
+    font-size:11px;font-weight:700;line-height:1.25;color:var(--sub);text-align:center;word-break:keep-all;
+    white-space:normal;cursor:pointer}
+  .nowtop .ways .wt.on{background:var(--brown-soft);border-color:var(--line);color:#4a3c2e}
+  .nowtop .ways .tipwrap{order:2;display:flex}
+  .nowtop .ways .tipwrap .ib{flex:1;width:auto;height:auto;min-height:33px;margin:0;border-radius:9px;background:#fff;border:1px solid var(--line);
+    font-size:11px;font-weight:700;color:var(--sub)}
+  .nowtop .ways .tipwrap .ib:after{content:"\00a0도움말"}
   .ways>.btn,.jarhead .mini,.jarhead .btn{font-size:11.5px;padding:6px 9px}
   .ways .sep{display:none}
   .ways .lab{font-size:11px}
-  /* 「제목·원문 링크만 싣습니다」 꼬리말은 ⓘ 와 같은 말이라 폰에서는 접는다 */
-  .ways .tail{display:none}
+  .colL>.nowtop{padding-bottom:6px}
 
-  /* ③ 꼭지 탭 — 두 칸 바둑판. 넷이 두 줄에 반듯하게 선다 */
-  .jartabs{display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:7px}
-  .jartabs button{border:1px solid var(--line);border-radius:9px;padding:9px 7px;
-    font-size:12.5px;justify-content:center}
+  /* ③ 꼭지 탭 — 세 칸 바둑판(다섯이 두 줄). 이름이 긴 꼭지는 그 칸만 두 줄이 된다(수 «5/5» 는 늘 보인다) */
+  .jartabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;padding:5px 7px 6px}
+  .jartabs button{border:1px solid var(--line);border-radius:9px;padding:6px 3px;
+    font-size:11.5px;justify-content:center;text-align:center;line-height:1.25;gap:3px}
+  #main .lg{display:none}
+  #main .sh{display:inline}
+  /* 꼭지 도구줄 — 첫 줄은 이름·수·AI 단추, 둘째 줄은 「모두 싣기·모두 빼기·손으로 담기」 셋이 한 줄에 */
+  .jarhead{gap:0 5px;padding:5px 10px 6px}
+  .jarhead>.mini{margin-top:4px}
+  .jarhead .sp{display:none}
+  .jarhead .ttl{font-size:12.5px}
+  .jarhead .cnt{font-size:11.5px;font-weight:700;color:var(--sub)}
+  .jarhead .ful{display:none}
+  .jarhead::before{content:"";order:1;flex:0 0 100%;height:0}
+  .jarhead .tool{order:2;flex:1 1 0;min-width:0;text-align:center;padding:6px 4px}
 
   /* ④ 줄 — 바둑판으로 짜서 [ㅁ][제목][✕] 한 줄, 출처는 제목 아래로.
        ⚠ ▲▼ 는 폰에서 감춘다 — 손가락보다 작아 눌러도 안 맞는다.
-         차례 바꾸기는 PC 에서 하거나, 줄을 눌러 여는 창에서 한다. */
-  .item{display:grid;grid-template-columns:auto 1fr auto;gap:3px 8px;
-    align-items:start;padding:10px 11px}
+         차례 바꾸기는 PC 에서 하거나, 줄을 눌러 여는 창에서 한다.
+       ★ 딱지(.wtag: 「원문 그대로 나갑니다 — 제목·매체·링크」)는 «한 줄»로 — 넘치면 … 이고 전문은 title 에 있다.
+         예전에는 딱지가 제목 아래에서 두 줄로 접혀 줄 하나가 네 줄 높이였다. */
+  .item{display:grid;grid-template-columns:auto 1fr auto;gap:1px 8px;
+    align-items:start;padding:6px 10px}
   .item>.ck{grid-column:1;grid-row:1;margin-top:2px}
   .item .mv{display:none}
-  .item .t{grid-column:2;grid-row:1;font-size:13px}
+  .item .t{grid-column:2;grid-row:1;font-size:13px;line-height:1.35}
   .item .x{grid-column:3;grid-row:1;padding:0 2px}
   .item .src{grid-column:2;grid-row:2;padding-top:0}
+  .item .wtag{max-width:100%;overflow:hidden;text-overflow:ellipsis;vertical-align:top;margin:2px 4px 0 0;font-size:10px;padding:0 6px}
+  .item .wtag .wl{display:none}
 
   /* ⑤ 요약 — 이름표를 «위»로 올려 값이 폭을 다 쓴다. 그래야 칩이 옆으로 선다 */
   .sum .row{flex-wrap:wrap;gap:4px;padding:10px 12px}
   .sum .row .k{width:100%;flex:1 1 100%;padding-top:0}
   .sum .row .v{flex:1 1 100%}
 
-  /* ⑥ 표(받는 명단·보낸 결과) — 폰에서는 «옆으로 굴려» 본다.
-       ⚠ 그냥 두면 열 여덟 칸이 355px 에 밀려 들어가 회사 이름이 «한 글자씩 세로로»
-         쏟아진다(㈜/성/보/물/류). 실측 2026-09-12: 113줄짜리 명단이 23,345px 였다.
-       ★ 칸을 안 접게 하고(nowrap) 표에 제 폭을 준 뒤, 상자를 굴리게 한다.
-       ⚠ 「이번 회차」의 상자에는 표가 없어 이 규칙이 아무 일도 안 한다 — 해롭지 않다. */
+  /* ⑥ 안전판 — 칸 안에 «줄일 수 없는 것»이 남아 있어도 쪽이 옆으로 밀리지 않는다(상자 안에서 구른다).
+       2026-09-12 에는 표를 일부러 이 상자 안에서 굴렸다. 이제 표는 카드로 바뀌어 굴릴 일이 없지만(아래 «폰 콤팩트» 덩이),
+       이 상자 규칙은 그물로 남긴다 — 빠지면 못 줄이는 줄 하나가 쪽 전체를 오른쪽으로 민다(실측 2026-10-12 설정 탭 340px). */
   .box{overflow-x:auto}
-  table.list{min-width:620px}
-  table.list th,table.list td{white-space:nowrap}
 }
+/* ▼▼ 폰 콤팩트 — 표는 «카드»로, 탭마다 한 화면에 (2026-10-12) ▼▼
+   ══════════════════════════════════════════════════════════════════════════
+   대표 지시 2026-10-11 「폰화면 콤팩트하게 한화면에서 가급적 모두 보게 정리」 → 목업 7장 승인 2026-10-12.
+   예전(2026-09-12)에는 표를 «옆으로 굴려» 보게 했다(table.list{min-width:620px}) — 그랬더니 «실린 것»·담당자·나갔나·열람이
+   화면 밖에 있었다. 이제는 굴리지 않는다: 표의 열을 «카드 한 장»의 칸으로 바꾼다.
+   ★ 원칙은 그대로다 — 아무것도 감추지 않는다. 자리를 바꾸고, 줄을 옮기고, 접거나 한 줄로 합칠 뿐이다.
+     접힌 것은 «눌러서» 편다(줄을 누르면 .open — 표라벨달기·폰다듬기 아래의 눌림 손잡이).
+   ★ 렌더 함수는 한 벌이다. 카드는 CSS 가 만든다 — 머리글(th)이 안 보이는 대신 칸마다 이름표(data-l)가 달려 있다(표라벨달기).
+   ⚠ #main[data-tab=…] 으로 «어느 탭의 표인가»를 가른다 — 표 마크업(<table class="list fz">…)은 검사들이 글자로 지키고 있어 못 건드린다.
+   ⚠ 규칙의 값(px)은 «재서» 정했다(2026-10-12, 진짜 폭 360·375 에서 scrollWidth ≤ clientWidth). */
+@media(max-width:560px){
+  /* ── 공통: 카드 바탕 ── */
+  #main table.list{display:block;min-width:0;width:100%}
+  #main table.list>thead,#main table.list>tbody{display:block}
+  #main table.list tr{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px 10px;padding:8px 11px;
+    border-bottom:1px solid #f1f5f9}
+  #main table.list td,#main table.list th{display:block;padding:0;border:0;white-space:normal;max-width:none;min-width:0}
+  #main table.list tr:has(>th){display:none}                       /* 머리글 줄 — 칸 이름은 칸마다(data-l) 달려 있다 */
+  /* thead 가 없는 표(지난 회차·해지한 곳)는 머리글 줄이 tbody 안에 있어 아래 «카드 줄» 규칙이 덮는다 — 그 줄만 못 박아 접는다 */
+  #main table.list>tbody>tr:has(>th){display:none!important}
+  #main table.list td[data-empty]{display:none}                     /* 값 없는 칸(—)은 접는다 */
+  #main table.list tr:not(.open)>td[data-quiet]{display:none}       /* 「표시 없음」 같은 조용한 칸은 눌러 펴야 보인다 */
+  #main table.list td[colspan]{padding:14px 12px}                   /* 「읽는 중…」·「없습니다」 한 줄 안내 */
+  /* ⚠ :where() — 이 «기본» 규칙의 무게를 0 으로 둔다. 탭마다의 규칙(#main[data-tab=…] …)이 늘 이긴다. */
+  #main table.list :where(td[data-l]:not(.ck):not(.n))::before{content:attr(data-l);margin-right:5px;
+    font-size:10.5px;font-weight:700;color:var(--faint)}
+  #main table.list td.n{width:auto;text-align:left;padding:0}
+
+  /* 이 파일의 .one(받는 곳 한 칸 — 한 줄 nowrap flex)과 이름이 겹쳐 「.note.one」 안내 글도 한 줄로 안 접혔다 — 폰에서는 글답게 접는다 */
+  #main .note.one{display:block;white-space:normal}
+
+  /* ── 지난 회차 — 「회차 이름 + 날짜 / 상태 딱지 + 실린 수·받는 곳」 카드. 줄을 누르면 그 회차가 아래에 열린다 ── */
+  #main[data-tab=past] table.list tr.pick{display:grid;grid-template-columns:22px minmax(0,1fr) auto auto;
+    column-gap:8px;row-gap:1px;align-items:center;padding:9px 11px;cursor:pointer}
+  #main[data-tab=past] table.list tr.pick:active,#main[data-tab=past] table.list tr.pick.on{background:var(--brown-soft)}
+  #main[data-tab=past] tr.pick>td.n{grid-column:1;grid-row:1/3;color:var(--faint);align-self:center}
+  #main[data-tab=past] tr.pick>td:nth-child(2){display:contents}     /* 이름(b)과 기간(div)을 각각 제 칸에 */
+  #main[data-tab=past] tr.pick>td:nth-child(2)::before,#main[data-tab=past] tr.pick>td:nth-child(3)::before{content:none}
+  #main[data-tab=past] tr.pick>td:nth-child(2)>b{grid-column:2;grid-row:1;font-size:13.5px;
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=past] tr.pick>td:nth-child(2)>div{grid-column:2;grid-row:2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=past] tr.pick>td:nth-child(3){grid-column:3/5;grid-row:1;justify-self:end}
+  #main[data-tab=past] tr.pick>td:nth-child(4){grid-column:3;grid-row:2;font-size:11px;color:var(--sub);white-space:nowrap}
+  #main[data-tab=past] tr.pick>td:nth-child(5){grid-column:4;grid-row:2;font-size:11px;color:var(--sub);white-space:nowrap}
+  #main[data-tab=past] tr.pick>td:nth-child(5)::before{content:none}
+  #main[data-tab=past] tr.pick>td:nth-child(6){grid-column:2/5;grid-row:3;font-size:10.5px;color:var(--faint)}
+  /* 긴 안내(「이미 보낸 회차는 다시 못 보냅니다 …」)는 한 줄로 접고 눌러서 편다 */
+  #main[data-tab=past] .note[data-f1]{margin-top:8px;padding:8px 12px;line-height:1.6}
+  #main[data-tab=past] .note[data-f1]:not(.open)::before{content:"ⓘ ";font-weight:800}
+  /* 지난 회차 미리보기 머리 — 이름은 한 줄(…)이고, 단추는 글자가 세로로 쪼개지지 않게 한 줄 */
+  #main[data-tab=past] .pvhd{flex-wrap:wrap;gap:6px 8px;padding:7px 12px}
+  #main[data-tab=past] .pvhd b{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=past] .pvhd .sp{display:none}
+  #main[data-tab=past] .pvhd .mini{white-space:nowrap}
+
+  /* ── 눌러서 펴는 한 줄 글(폰다듬기가 data-f1 을 단다) ── */
+  /* ⚠ -webkit-line-clamp 를 안 쓴다 — 안쪽 여백(padding)이 있는 상자에서는 잘린 «다음 줄»의 윗부분이 여백 자리에 비쳐 보인다.
+       한 줄 말줄임(nowrap + ellipsis)이면 여백이 있어도 깔끔하고, 글 속의 줄바꿈(<br>)은 접힌 동안 이어 붙인다. */
+  [data-f1]:not(.open){white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+  [data-f1]:not(.open) br{display:none}
+  [data-f1].open{cursor:pointer}
+
+  /* ── 안내문 — 잘림 없이, 끌어놓기 상자는 접고, «보내기 전 자료 확인»은 눌러서 편다 ──
+       ⚠ 오른쪽이 잘리던 까닭: 미리보기 틀(.ltrwrap 안의 iframe)이 980px 라 바둑판 칸(1fr = minmax(auto,1fr))이
+         그만큼 벌어졌다. 칸이 줄어들 수 있게(min-width:0) 하고, 펴기 전에는 틀이 자리를 안 먹게(display:none) 한다. */
+  #main[data-tab=note] .notegrid{gap:10px;margin-top:10px}
+  #main[data-tab=note] .notegrid>*{min-width:0}
+  #main[data-tab=note] .dropbox{display:none}
+  #main[data-tab=note] .phfold>h3{cursor:pointer;margin:0;padding:10px 12px;border-bottom:0}
+  #main[data-tab=note] .phfold>h3::after{content:"펼치기 ▾";margin-left:auto;font-size:11px;font-weight:700;color:var(--sub)}
+  #main[data-tab=note] .phfold.open>h3{border-bottom:1px solid var(--line)}
+  #main[data-tab=note] .phfold.open>h3::after{content:"접기 ▴"}
+  #main[data-tab=note] .phfold:not(.open)>.pad{display:none}
+  #main[data-tab=note] .nlist>.pad.hint[data-f1]{padding:6px 15px 8px}
+
+  /* ══ 받는 곳 — 명단 · 지인·잠재 · 해지한 곳 · 주소 없는 곳 · 반송·거부 ══ */
+
+  /* ── 작은 탭 줄 — 다섯이 «한 줄»(짧은 이름) + 그 밑에 [다시 읽기·내보내기 · ⓘ · 설명] 한 줄 ──
+       ⚠ 설명(.stat)은 «자리가 있으면 같은 줄, 없으면 아래 줄»이다(flex-basis 150px) — 단추가 긴 탭에서 0 폭으로 짜부라지거나 글이 잘리지 않게. */
+  #main .subtabs{margin-top:0}
+  #main .subtabs button:not(.mini):not(.btn){font-size:11.5px;padding:9px 4px 7px}
+  #main .subtabs.bar{flex-wrap:wrap;gap:0 5px;padding:0 6px 8px;border-radius:12px 12px 0 0}
+  #main .subtabs.bar::after{content:"";order:1;flex:0 0 100%;height:0}
+  #main .subtabs.bar>.cut,#main .subtabs.bar>.sp{display:none}
+  #main .subtabs.bar>.badge,#main .subtabs.bar>.mini,#main .subtabs.bar>.menu{order:2;margin:7px 0 0}
+  #main .subtabs.bar>.tipwrap{order:3;margin-top:7px}
+  #main .subtabs.bar>.stat{order:4;flex:1 1 150px;min-width:0;margin-top:7px;font-size:10.5px}
+  /* 내보내기 ▾ 의 풀이 상자는 단추의 «오른쪽으로» 편다 — 폰에서는 단추가 왼쪽에 있어 오른쪽 맞춤이면 화면 밖으로 나간다 */
+  #main .menu .pop{left:0;right:auto}
+
+  /* ⓘ 풀이 — 폰에서는 «화면 폭»에 맞춰 편다(어느 칸에 있든 가장자리에 걸리지 않게) */
+  .tipwrap .tip{position:fixed;left:10px;right:10px;top:auto;width:auto;max-width:none}
+
+  /* ── 거르개 줄 — 유형·담당을 한 줄씩 ── */
+  #main .chips.tight.filt{padding:6px 8px;gap:5px 6px;margin-bottom:6px}
+  #main .chips .chip,#main .seg .chip{padding:5px 8px}
+  #main .chips .sp1{flex:0 0 100%;height:0;min-width:0}
+  #main .chips .k{white-space:normal;line-height:1.35}
+  #main .chips.filt select{flex:1 1 calc(50% - 4px);min-width:0;max-width:none}
+  #main .chips.filt .nafind{flex:1 1 100%}
+  #main .picked{margin-top:6px;padding:7px 10px;gap:6px}
+
+  /* ── 카드 바탕에 쓰는 말 ── */
+  #main[data-tab=who] table.list input.chk,#main[data-tab=who] table.list input.chk3,#main[data-tab=who] table.list input.chk4,
+  #main[data-tab=who] table.list input.chkh,#main[data-tab=friend] table.list input[type=checkbox],
+  #main[data-tab=noaddr] table.list input[type=checkbox]{width:20px;height:20px}
+  #main:is([data-tab=who],[data-tab=friend],[data-tab=noaddr]) table.list>tbody>tr.open{background:#fcfcfd}
+
+  /* ── 받는 명단 — 「☐ # 유형  회사 / 담당자 · 대표자 ▸」 한 줄 카드. 줄을 누르면 직책·주소·전화·단추가 펴진다 ──
+       열이 여섯(☐·#·유형·회사·대표자·담당자)이던 것을 카드 한 장의 칸으로 옮긴다.
+       ★ 접힌 줄은 «이름만» 보인다(.one.tidy 의 .nm). 직책·주소·전화·딱지·수신거부·✎바꾸기는 펴면 나온다.
+       ⚠ 담당자가 여럿인 곳은 쉼표로 이어 한 줄에(마지막 .one.tidy 만 쉼표가 없다), 줄이 넘치면 … 다. */
+  #main[data-tab=who] table.list.fz>thead{position:static}
+  #main[data-tab=who] table.list.fz>thead>tr{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;background:var(--paper)}
+  #main[data-tab=who] table.list.fz>thead th{display:none;padding:0;background:none;box-shadow:none}
+  #main[data-tab=who] table.list.fz>thead th.ck{display:block}
+  #main[data-tab=who] table.list.fz>thead th:nth-child(4){display:flex;align-items:baseline;gap:6px;flex:1 1 auto;min-width:0;font-size:13px;color:var(--ink)}
+  #main[data-tab=who] table.list.fz>thead th:nth-child(4)::after{content:"줄을 누르면 펼쳐집니다";margin-left:auto;font-size:10.5px;font-weight:600;color:var(--faint)}
+  #main[data-tab=who] table.list.fz>tbody>tr{display:grid;grid-template-columns:26px 24px 32px fit-content(62%) minmax(0,1fr) 16px;
+    column-gap:6px;row-gap:0;align-items:center;padding:6px 8px 6px 6px;cursor:pointer}
+  #main[data-tab=who] tr>td.ck{grid-column:1;grid-row:1/3;justify-self:center}
+  #main[data-tab=who] tr>td.n{grid-column:2;grid-row:1/3;text-align:right;font-size:11px;color:var(--faint)}
+  #main[data-tab=who] tr>td:nth-child(3){grid-column:3;grid-row:1/3;font-size:11px}
+  #main[data-tab=who] tr>td.co{grid-column:4/6;grid-row:1}
+  #main[data-tab=who] tr>td.co>b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+  #main[data-tab=who] tr>td:nth-child(6){grid-column:4;grid-row:2}
+  #main[data-tab=who] tr>td:nth-child(5){grid-column:5;grid-row:2}
+  #main[data-tab=who] tr>td:nth-child(5),#main[data-tab=who] tr>td:nth-child(6){font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=who] tr>td:nth-child(3)::before,#main[data-tab=who] tr>td.co::before{content:none}
+  #main[data-tab=who] table.list.fz>tbody>tr::after{content:"▸";grid-column:6;grid-row:1/3;justify-self:end;font-size:11px;color:var(--faint)}
+  #main[data-tab=who] table.list.fz>tbody>tr.open::after{content:"▾"}
+  /* 접힌 줄 — 「담당자 이름, 이름 · 대표자 이름」 */
+  #main[data-tab=who] tr:not(.open)>td:nth-child(5)::before{content:"· " attr(data-l) " "}
+  #main[data-tab=who] tr:not(.open) .one.tidy{display:inline;white-space:nowrap}
+  #main[data-tab=who] tr:not(.open) .one.tidy>*{display:none}
+  #main[data-tab=who] tr:not(.open) .one.tidy>.nm,#main[data-tab=who] tr:not(.open) .one.tidy>.no{display:inline;font-weight:600;font-size:11px}
+  #main[data-tab=who] tr:not(.open) .one.tidy:not(:last-child)>.nm::after{content:", "}
+  #main[data-tab=who] tr:not(.open) td>div:not(.one){display:none}
+  /* 펴진 줄 — 이름·직책 / 주소 / 전화·딱지 / 단추, 담당자 → 대표자 차례 */
+  #main[data-tab=who] table.list.fz>tbody>tr.open{grid-template-columns:26px 24px 32px minmax(0,1fr) 16px}
+  #main[data-tab=who] tr.open>td:nth-child(5),#main[data-tab=who] tr.open>td:nth-child(6){font-size:12px;color:var(--ink)}
+  #main[data-tab=who] tr.open>td.co{grid-column:4;grid-row:1}
+  #main[data-tab=who] tr.open::after{grid-column:5;grid-row:1}
+  #main[data-tab=who] tr.open>td:nth-child(6){grid-column:4/6;grid-row:2;margin-top:5px;white-space:normal;overflow:visible}
+  #main[data-tab=who] tr.open>td:nth-child(5){grid-column:4/6;grid-row:3;margin-top:5px;white-space:normal;overflow:visible}
+  #main[data-tab=who] tr.open>td:nth-child(5)::before,#main[data-tab=who] tr.open>td:nth-child(6)::before{content:attr(data-l);display:block;margin:0 0 1px}
+  #main[data-tab=who] tr.open .one.tidy{display:grid;grid-template-columns:auto minmax(0,1fr);gap:2px 8px;align-items:baseline;padding:2px 0 5px;white-space:normal}
+  #main[data-tab=who] tr.open .one.tidy>.nm{grid-column:1;grid-row:1}
+  #main[data-tab=who] tr.open .one.tidy>.jt{grid-column:2;grid-row:1}
+  #main[data-tab=who] tr.open .one.tidy>.mail{grid-column:1/3;grid-row:2}
+  #main[data-tab=who] tr.open .one.tidy>.ph{grid-column:1;grid-row:3}
+  #main[data-tab=who] tr.open .one.tidy>.tag{grid-column:2;grid-row:3}
+  #main[data-tab=who] tr.open .one.tidy>.act{grid-column:1/3;grid-row:4;justify-content:flex-start;gap:6px;overflow:visible}
+  #main[data-tab=who] tr.open .one.tidy>.no{grid-column:1/3;grid-row:1}
+  #main[data-tab=who] tr.open .one.tidy>:empty{display:none}
+  #main[data-tab=who] tr.open td>div:not(.one){margin:2px 0}
+  #main[data-tab=who] tr.open .one.tidy .mini{padding:6px 11px}
+
+  /* 펴진 줄에서는 ☐·번호·유형이 «첫 줄»에 붙는다(카드가 길어져도 가운데로 내려가지 않게) */
+  #main[data-tab=who] tr.open>td.ck,#main[data-tab=who] tr.open>td.n,#main[data-tab=who] tr.open>td:nth-child(3){grid-row:1;align-self:center}
+
+  /* ── 지인·잠재 — 「☐ # 이름·직책 / 소속 · 지역   ✓ 동의 ▸」. 펴면 보낼 주소·담은 날·동의 내용·단추 ── */
+  #main[data-tab=friend] table.list>thead>tr{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;background:var(--paper)}
+  #main[data-tab=friend] table.list>thead th{display:none;padding:0;background:none}
+  #main[data-tab=friend] table.list>thead th.ck{display:block}
+  #main[data-tab=friend] table.list>thead th:nth-child(3){display:flex;flex:1 1 auto;min-width:0;font-size:13px;color:var(--ink)}
+  #main[data-tab=friend] table.list>thead th:nth-child(3)::after{content:"줄을 누르면 펼쳐집니다";margin-left:auto;font-size:10.5px;font-weight:600;color:var(--faint)}
+  #main[data-tab=friend] table.list>tbody>tr{display:grid;grid-template-columns:26px 24px fit-content(60%) minmax(0,1fr) 16px;
+    column-gap:6px;row-gap:0;align-items:center;padding:6px 8px 6px 6px;cursor:pointer}
+  #main[data-tab=friend] tr>td.ck{grid-column:1;grid-row:1/3;justify-self:center}
+  #main[data-tab=friend] tr>td.n{grid-column:2;grid-row:1/3;text-align:right;font-size:11px;color:var(--faint)}
+  #main[data-tab=friend] tr>td:nth-child(3){grid-column:3/5;grid-row:1;font-size:13.5px}
+  #main[data-tab=friend] tr>td:nth-child(4){grid-column:3;grid-row:2}
+  #main[data-tab=friend] tr>td:nth-child(5){grid-column:4;grid-row:2}
+  #main[data-tab=friend] tr>td:nth-child(4),#main[data-tab=friend] tr>td:nth-child(5){font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=friend] tr>td:nth-child(8){grid-column:4;grid-row:1;justify-self:end;font-size:12px;white-space:nowrap}
+  #main[data-tab=friend] tr>td:nth-child(3),#main[data-tab=friend] tr>td:nth-child(8){white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=friend] tr>td:nth-child(3)::before,#main[data-tab=friend] tr>td:nth-child(4)::before,
+  #main[data-tab=friend] tr>td:nth-child(5)::before,#main[data-tab=friend] tr>td:nth-child(8)::before{content:none}
+  #main[data-tab=friend] table.list>tbody>tr::after{content:"▸";grid-column:5;grid-row:1/3;justify-self:end;font-size:11px;color:var(--faint)}
+  #main[data-tab=friend] table.list>tbody>tr.open::after{content:"▾"}
+  #main[data-tab=friend] tr:not(.open)>td:nth-child(6),#main[data-tab=friend] tr:not(.open)>td:nth-child(7),
+  #main[data-tab=friend] tr:not(.open)>td:nth-child(9),#main[data-tab=friend] tr:not(.open)>td:nth-child(8) .tg{display:none}
+  #main[data-tab=friend] tr.open>td:nth-child(6){grid-column:3/6;grid-row:3;margin-top:5px;font-size:12px;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=friend] tr.open>td:nth-child(7){grid-column:3/6;grid-row:4;font-size:11px;color:var(--sub)}
+  #main[data-tab=friend] tr.open>td:nth-child(9){grid-column:3/6;grid-row:5;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+  #main[data-tab=friend] tr.open>td:nth-child(9) .mini{padding:6px 11px}
+  #main[data-tab=friend] tr.open>td.ck,#main[data-tab=friend] tr.open>td.n{grid-row:1}
+
+  /* ── 해지한 곳 — 「# 유형 회사 / 해지일 · 받는 분   보냄·멈춤 [동의 받음]」. 펴면 까닭·기한 ── */
+  #main[data-tab=closed] table.list>tbody>tr{display:grid;grid-template-columns:24px 32px fit-content(60%) minmax(0,1fr) auto 16px;
+    column-gap:6px;row-gap:0;align-items:center;padding:6px 8px 6px 8px;cursor:pointer}
+  #main[data-tab=closed] tr>td.n{grid-column:1;grid-row:1/3;text-align:right;font-size:11px;color:var(--faint)}
+  #main[data-tab=closed] tr>td:nth-child(2){grid-column:2;grid-row:1/3;font-size:11px}
+  #main[data-tab=closed] tr>td.co{grid-column:3/5;grid-row:1}
+  #main[data-tab=closed] tr>td.co>b{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:13.5px}
+  #main[data-tab=closed] tr>td:nth-child(4){grid-column:3;grid-row:2}
+  #main[data-tab=closed] tr>td:nth-child(5){grid-column:3/5;grid-row:4}
+  #main[data-tab=closed] tr>td:nth-child(4),#main[data-tab=closed] tr>td:nth-child(5){font-size:11px;color:var(--sub);white-space:nowrap}
+  #main[data-tab=closed] tr:not(.open)>td:nth-child(5){display:none}
+  #main[data-tab=closed] tr>td:nth-child(6){grid-column:5;grid-row:1;justify-self:end;font-size:12px;white-space:nowrap}
+  #main[data-tab=closed] tr>td:nth-child(7){grid-column:5;grid-row:2;justify-self:end}
+  #main[data-tab=closed] tr>td:nth-child(2)::before,#main[data-tab=closed] tr>td.co::before,#main[data-tab=closed] tr>td:nth-child(6)::before{content:none}
+  #main[data-tab=closed] table.list>tbody>tr::after{content:"▸";grid-column:6;grid-row:1/3;justify-self:end;font-size:11px;color:var(--faint)}
+  #main[data-tab=closed] table.list>tbody>tr.open::after{content:"▾"}
+  #main[data-tab=closed] tr:not(.open)>td:nth-child(6) .tg{display:none}
+  #main[data-tab=closed] tr.open>td:nth-child(6){grid-column:3/6;grid-row:3;justify-self:start;margin-top:2px;white-space:normal}
+
+  /* ── 주소 없는 곳 — 「☐ # 유형 회사 / 대표자 · 명함」. 펴면 「명함에서 담기」·「기업정보함」 단추 ── */
+  #main[data-tab=noaddr] table.list>thead>tr{display:flex;align-items:center;gap:8px;padding:8px 10px 8px 12px;background:var(--paper)}
+  #main[data-tab=noaddr] table.list>thead th{display:none;padding:0;background:none;box-shadow:none}
+  #main[data-tab=noaddr] table.list>thead th.ck{display:block}
+  #main[data-tab=noaddr] table.list>thead th:nth-child(4){display:flex;flex:1 1 auto;min-width:0;font-size:13px;color:var(--ink)}
+  #main[data-tab=noaddr] table.list>thead th:nth-child(4)::after{content:"줄을 누르면 펼쳐집니다";margin-left:auto;font-size:10.5px;font-weight:600;color:var(--faint)}
+  #main[data-tab=noaddr] table.list>thead{position:static}
+  #main[data-tab=noaddr] table.list>tbody>tr{display:grid;grid-template-columns:26px 24px 32px fit-content(62%) minmax(0,1fr) 16px;
+    column-gap:6px;row-gap:0;align-items:center;padding:6px 8px 6px 6px;cursor:pointer}
+  #main[data-tab=noaddr] tr>td.ck{grid-column:1;grid-row:1/3;justify-self:center}
+  #main[data-tab=noaddr] tr>td.n{grid-column:2;grid-row:1/3;text-align:right;font-size:11px;color:var(--faint)}
+  #main[data-tab=noaddr] tr>td:nth-child(3){grid-column:3;grid-row:1/3;font-size:11px}
+  #main[data-tab=noaddr] tr>td.co{grid-column:4/6;grid-row:1}
+  #main[data-tab=noaddr] tr>td.co>b{font-size:13.5px}
+  #main[data-tab=noaddr] tr>td:nth-child(5){grid-column:4;grid-row:2}
+  #main[data-tab=noaddr] tr>td:nth-child(6){grid-column:5;grid-row:2}
+  #main[data-tab=noaddr] tr>td:nth-child(5),#main[data-tab=noaddr] tr>td:nth-child(6){font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=noaddr] tr>td:nth-child(3)::before,#main[data-tab=noaddr] tr>td.co::before,#main[data-tab=noaddr] tr>td:nth-child(6)::before{content:none}
+  #main[data-tab=noaddr] table.list>tbody>tr::after{content:"▸";grid-column:6;grid-row:1/3;justify-self:end;font-size:11px;color:var(--faint)}
+  #main[data-tab=noaddr] table.list>tbody>tr.open::after{content:"▾"}
+  #main[data-tab=noaddr] tr:not(.open)>td:nth-child(7){display:none}
+  #main[data-tab=noaddr] tr.open>td:nth-child(7){grid-column:4/6;grid-row:3;margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;text-align:left}
+  #main[data-tab=noaddr] tr.open>td:nth-child(7) .mini{padding:6px 11px}
+  #main[data-tab=noaddr] tr.open>td.ck,#main[data-tab=noaddr] tr.open>td.n,#main[data-tab=noaddr] tr.open>td:nth-child(3){grid-row:1}
+
+  /* ── 반송·거부 — 「갈래 딱지 · 사업장 / 받는 분 / 주소」 + 처리 단추(늘 보인다). 펴면 원문 한 줄 ──
+       ⚠ 옛 폰 규칙은 이 표를 «옆으로 굴려» 보게 했는데 상자에 overflow:hidden 이 박혀 있어(인라인) 처리 칸이 화면 밖에서 잘렸다 —
+         사람이 눌러야 하는 단추를 못 누르는 자리였다. */
+  #main[data-tab=bounce] table.bn-t>tbody>tr:not(:has(>td[colspan])){display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;row-gap:1px;
+    align-items:center;padding:8px 11px;cursor:pointer}
+  #main[data-tab=bounce] table.bn-t td{white-space:normal;max-width:none;overflow:visible;text-overflow:clip}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(1){grid-column:1;grid-row:1}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(2){grid-column:2;grid-row:1;font-weight:800;font-size:13.5px}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(3){grid-column:2;grid-row:2;font-size:11.5px;color:var(--sub)}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(4){grid-column:2;grid-row:3;font-size:11px;color:var(--faint);overflow-wrap:anywhere}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(5){grid-column:2;grid-row:4;font-size:11px;color:var(--sub);margin-top:3px}
+  #main[data-tab=bounce] table.bn-t tr:not(.open)>td:nth-child(5){display:none}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(6){grid-column:1/3;grid-row:5;margin-top:6px;display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(1)::before,#main[data-tab=bounce] table.bn-t tr>td:nth-child(2)::before,
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(4)::before,#main[data-tab=bounce] table.bn-t tr>td:nth-child(6)::before{content:none}
+  #main[data-tab=bounce] table.bn-t tr>td:nth-child(6) .mini{padding:6px 11px}
+
+  /* ══ 보낸 결과 ══ */
+  /* 머리 — 회차 고르기 + 새로고침 한 줄 · 기준 시각 · 숫자 칩 일곱(4열 바둑판).
+       ⚠ 폰에서는 «붙이지» 않는다 — 이 머리가 두 줄·바둑판이라 붙이면 화면의 1/4 이 늘 가려진다. 폰에서는 원래도 앱바 뒤에 가려
+         붙지 않았다(2026-10-05 의 「틀고정」은 PC 화면의 일이다). 숫자 칩을 누르면 그 줄만 보이는 일은 그대로다. */
+  #main[data-tab=res]>.pad{padding:0}
+  #main[data-tab=res] .res-head{position:static;margin:0 0 8px;padding:0}
+  #main[data-tab=res] .res-one{gap:6px;align-items:center}
+  /* 첫 줄은 [회차 고르기 · ⟳], 둘째 줄은 [기준 시각 · ⓘ] — 줄을 가르는 것은 ::before(높이 0, 폭 100%) 다 */
+  #main[data-tab=res] .res-one>select{order:1;flex:1 1 0!important;width:auto!important;min-width:0!important}
+  #main[data-tab=res] .res-one>.mini{order:2;flex:0 0 40px;padding:8px 0;text-align:center}
+  #main[data-tab=res] .res-one::before{content:"";order:3;flex:0 0 100%;height:0}
+  #main[data-tab=res] .res-one>span[style]{order:4;flex:1 1 0;min-width:0}
+  #main[data-tab=res] .res-one>.tipwrap,#main[data-tab=res] .res-one>.kpi-warn{order:5}
+  #main[data-tab=res] .res-one>.kpis{order:6}
+  #main[data-tab=res] .res-one>.kpi-now{order:7}
+  #main[data-tab=res] .res-one .cut{display:none}
+  #main[data-tab=res] .res-one .kpis{flex:0 0 100%;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;margin-top:2px}
+  #main[data-tab=res] .kpi{display:flex;flex-direction:column-reverse;align-items:center;justify-content:center;gap:0;padding:5px 2px 4px;border-radius:9px}
+  #main[data-tab=res] .kpi .k{font-size:10.5px}
+  #main[data-tab=res] .kpi b{font-size:15px;line-height:1.2}
+  #main[data-tab=res] .kpi-now{flex:1 0 100%;font-size:11.5px}
+
+  /* 표 — 「# 업체 · 담당자 / 상태 칩」 한 줄 카드. 펴면 보낼 주소(와 「표시 없음」) */
+  #main[data-tab=res] table.list{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  #main[data-tab=res] table.list>tbody>tr:not(:has(>td[colspan])){display:grid;grid-template-columns:24px minmax(0,1fr) auto auto auto 16px;
+    column-gap:6px;row-gap:0;align-items:center;padding:6px 8px;cursor:pointer}
+  #main[data-tab=res] table.list>tbody>tr.open{background:#fcfcfd}
+  #main[data-tab=res] tr>td:nth-child(1){grid-column:1;grid-row:1/3;text-align:right;font-size:11px}
+  #main[data-tab=res] tr>td:nth-child(1)::before{content:none}
+  #main[data-tab=res] tr>td:nth-child(2){grid-column:2;grid-row:1;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #main[data-tab=res] tr>td:nth-child(3){grid-column:2;grid-row:2;font-size:11px;color:var(--sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #main[data-tab=res] tr>td:nth-child(5){grid-column:3;grid-row:1/3}
+  #main[data-tab=res] tr>td:nth-child(6){grid-column:4;grid-row:1/3}
+  #main[data-tab=res] tr>td:nth-child(7){grid-column:5;grid-row:1/3}
+  #main[data-tab=res] tr>td:nth-child(5)::before,#main[data-tab=res] tr>td:nth-child(6)::before,#main[data-tab=res] tr>td:nth-child(7)::before,
+  #main[data-tab=res] tr>td:nth-child(2)::before,#main[data-tab=res] tr>td:nth-child(3)::before,#main[data-tab=res] tr>td:nth-child(4)::before{content:none}
+  #main[data-tab=res] tr:not(.open)>td:nth-child(4){display:none}
+  #main[data-tab=res] tr.open>td:nth-child(4){grid-column:2/6;grid-row:3;margin-top:3px;font-size:11.5px!important;color:var(--sub);overflow-wrap:anywhere}
+  #main[data-tab=res] table.list>tbody>tr:not(:has(>td[colspan]))::after{content:"▸";grid-column:6;grid-row:1/3;justify-self:end;font-size:11px;color:var(--faint)}
+  #main[data-tab=res] table.list>tbody>tr.open::after{content:"▾"}
+
+  /* ══ 설정 — 「라벨 왼쪽 · 값 오른쪽」 한 줄(칸 높이 44px 안팎) ══
+       예전에는 라벨이 위에, 값 칸이 그 아래에 «큰 칸»으로 섰다(칸 하나가 80px — 한 화면에 설정 넷).
+       ★ 긴 풀이는 라벨 아래 «한 줄»로 줄이고(data-f1) 누르면 전문이 열린다. 자세한 풀이는 ⓘ 를 누르면 나온다.
+       ⚠ 라벨과 칸이 «한 상자의 직계»인 줄만 바꾼다(:has(>label.f)) — 천안 본사·서산지사(.offices)와 접는 칸(details)은 제 짜임이 있다. */
+  #main[data-tab=cfg] .pad.g2{padding:2px 12px 10px;gap:0}
+  #main[data-tab=cfg] .pad.g2>div:has(>label.f){display:grid;grid-template-columns:minmax(0,5fr) minmax(0,6fr);column-gap:10px;
+    align-items:center;min-height:46px;padding:2px 0;border-top:1px solid #f1f5f9}
+  #main[data-tab=cfg] .pad.g2>div:has(>label.f):first-child{border-top:0}
+  #main[data-tab=cfg] .pad.g2>div>label.f{grid-column:1;grid-row:1;margin:0;font-size:12px;line-height:1.35;word-break:keep-all}
+  #main[data-tab=cfg] .pad.g2>div>select,#main[data-tab=cfg] .pad.g2>div>input[type=text]{grid-column:2;grid-row:1;min-width:0;padding:8px 10px;line-height:1.3}
+  #main[data-tab=cfg] .pad.g2>div>.hint{grid-column:1/-1;margin:0;padding:0 0 5px;line-height:1.5}
+  #main[data-tab=cfg] .pad.g2>.w2>.note[data-f1]{margin-top:10px;padding:8px 12px}
+  #main[data-tab=cfg] .pad.g2 .sep{margin-top:8px;padding-top:8px}
+  /* 자료 자동 가져오기 — 한 줄이 «이름 · 때 · 상태 · 말»이라 폰에서는 안 들어간다. 이름·상태가 첫 줄, 때·말이 둘째 줄로 접힌다(줄 안에서는 한 줄 …). */
+  #main[data-tab=cfg] .arow2{flex-wrap:wrap;gap:1px 8px;padding:8px 12px}
+  #main[data-tab=cfg] .arow2>b{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  #main[data-tab=cfg] .arow2>.ok,#main[data-tab=cfg] .arow2>.warn,#main[data-tab=cfg] .arow2>.wait{order:2}
+  #main[data-tab=cfg] .arow2::after{content:"";order:3;flex:0 0 100%;height:0}
+  #main[data-tab=cfg] .arow2>.when{order:4;padding-left:26px}
+  #main[data-tab=cfg] .arow2>.st{order:5;flex:1 1 0}
+}
+/* ▲▲ 폰 콤팩트 끝 ▲▲ */
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -1613,10 +1978,10 @@ async function 회차저장(자료){
 const 탭묶음 = { friend:'who', closed:'who', noaddr:'who', bounce:'who', watch:'cfg' };
 const 작은탭들 = {
   /* ★ 받는 명단 = 고객사 · 지인·잠재 · 해지한 곳 (대표 지시 2026-10-11 「추천대로 둘다」) */
-  who: [ { t:'who', 이름:'받는 명단', 수: () => 고객사줄들(명단셈()).length },
+  who: [ { t:'who', 이름:'받는 명단', 짧은:'명단', 수: () => 고객사줄들(명단셈()).length },
          { t:'friend', 이름:'지인·잠재', 수: () => Object.keys(App.더한분들 || {}).filter(k => (App.더한분들[k]||{}).뺌 !== true).length },
-         { t:'closed', 이름:'해지한 곳', 수: () => ((명단셈().해지 || {}).곳들 || []).filter(x => x.보냄).length },
-         { t:'noaddr', 이름:'주소 없는 곳', 수: () => (명단셈().주소없는곳 || []).length },
+         { t:'closed', 이름:'해지한 곳', 짧은:'해지', 수: () => ((명단셈().해지 || {}).곳들 || []).filter(x => x.보냄).length },
+         { t:'noaddr', 이름:'주소 없는 곳', 짧은:'주소없음', 수: () => (명단셈().주소없는곳 || []).length },
          /* ★ 반송·거부 (2026-10-05) — 빨간 숫자 = 사람이 볼 것 */
          { t:'bounce', 이름:'반송·거부', 수: () => 반송볼것수(), 빨강: true } ],
   cfg: [ { t:'cfg', 이름:'설정' },
@@ -1636,8 +2001,11 @@ function 작은탭(가운데, 오른쪽){
   return '<div class="subtabs' + (덧 ? ' bar' : '') + '">' + 줄.map(function(x){
     const n = x.수 ? x.수() : 0;
     const 수 = n ? (x.빨강 ? ' <span class="wdot">' + n + '</span>' : ' <span class="n">' + n + '</span>') : '';
-    return '<button class="' + (x.t === App.tab ? 'on' : '') + '" onclick="App.tab=\'' + x.t + '\';render()">'
-      + x.이름 + 수 + '</button>';
+    /* ★ 폰에서는 짧은 이름(.sh) — 다섯이 한 줄에 서야 한다. 원래 이름은 title 에 있다(탭이름달기가 aria-label 도 단다).
+         넓은 화면은 긴 이름(.lg) 그대로다. */
+    const 이름글 = x.짧은 ? '<span class="lg">' + x.이름 + '</span><span class="sh">' + x.짧은 + '</span>' : x.이름;
+    return '<button class="' + (x.t === App.tab ? 'on' : '') + '" title="' + esc(x.이름 + (n ? ' ' + n : '')) + '"'
+      + ' onclick="App.tab=\'' + x.t + '\';render()">' + 이름글 + 수 + '</button>';
   }).join('') + 덧 + '</div>';
 }
 function render(){
@@ -1653,6 +2021,8 @@ function render(){
   { const n = Object.keys(App.회차들).filter(k=>(App.회차들[k]||{}).상태==='발송').length;
     const el = $('cRes'); if(el) el.textContent = n || ''; }
   const m = $('main');
+  /* ★ 폰 CSS 가 «어느 탭인가»로 표를 카드로 바꾼다(#main[data-tab=…]) — 클래스(now·who)는 넓은 화면의 껍데기용이라 따로 둔다 */
+  m.dataset.tab = App.tab;
   /* 5:5 껍데기는 «이번 회차»에만 — 다른 탭엔 .cols 가 없어 걸면 스크롤을 잃는다 */
   m.classList.toggle('now', App.tab==='now');
   /* 받는 명단도 위(머리+유형 칩)를 얼린다 — 대표 지시 2026-09-03 「캡쳐1 틀고정」.
@@ -1691,6 +2061,7 @@ function render(){
   서랍그리기();
   줄창그리기();
   글칸맞추기();
+  폰다듬기();
   if(App.tab==='past') 지난미리보기그리기();
 }
 
@@ -1713,6 +2084,102 @@ function 글칸맞추기(){
       : el.scrollHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)
     ) + 'px';
   });
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   폰 콤팩트 도우미 (2026-10-12) — 눈에 보이는 일은 «CSS»가 하고, 여기서는 CSS 가 쓸 이름표만 붙인다
+   ══════════════════════════════════════════════════════════════════════════
+   「폰화면 콤팩트하게 한화면에서 가급적 모두 보게 정리」 → 목업 7장 승인(2026-10-12).
+   ★ 원칙은 이 파일의 폰 정리(2026-09-12)와 같다 — «아무것도 감추지 않는다». 자리를 바꾸고, 줄을 옮기고,
+     접거나 한 줄로 합칠 뿐이다. 접힌 것은 «눌러서» 편다.
+   ★ 렌더 함수를 폰용·PC용 두 벌로 가르지 않는다. 한 벌이 그리고, 폰 CSS 가 표를 «열 → 카드»로 바꾼다.
+     카드가 되면 머리글(th)이 안 보이므로 «이 칸이 무슨 칸인가»를 칸마다(data-l) 적어 두고 CSS 가 ::before 로 보인다.
+   ⚠ 이름표는 «눈에 안 보인다» — 넓은 화면은 아무것도 달라지지 않는다.
+   ⚠ 표를 다시 그리는 자리(render·지인표다시그리기·빈곳찾기)마다 불러야 한다 — 새로 생긴 칸에는 이름표가 없다. */
+function 표칸이름(th){
+  /* 「회사 164곳」·「대표자 39」의 센 수는 뗀다 — 칸 이름만 쓴다 */
+  return String(th && th.textContent || '').replace(/\s+/g, ' ').trim().replace(/\s*[\d,]+\s*(곳|명|건|개)?\s*$/, '').trim();
+}
+function 표라벨달기(루트){
+  const 안 = 루트 || $('main');
+  if(!안 || !안.querySelectorAll) return;
+  Array.prototype.forEach.call(안.querySelectorAll('table.list'), function(표){
+    const 줄들 = Array.prototype.slice.call(표.querySelectorAll('tr'));
+    /* 머리글 줄 = th 만 든 첫 줄(thead 가 있든 없든) */
+    const 머리 = 줄들.filter(function(tr){ return Array.prototype.some.call(tr.children, function(c){ return c.tagName === 'TH'; }); })[0];
+    if(!머리) return;
+    const 이름들 = Array.prototype.map.call(머리.children, 표칸이름);
+    줄들.forEach(function(tr){
+      if(tr === 머리) return;
+      let 자리 = 0;
+      Array.prototype.forEach.call(tr.children, function(td){
+        if(td.tagName !== 'TD') return;
+        const 칸수 = Number(td.getAttribute('colspan') || 1);
+        if(칸수 > 1){ 자리 += 칸수; return; }                   /* 「읽는 중…」·「없습니다」 같은 한 줄 안내 — 이름표가 없다 */
+        const 이름 = 이름들[자리] || '';
+        if(이름) td.setAttribute('data-l', 이름); else td.removeAttribute('data-l');
+        /* 값이 없는 칸(— · 빈 칸)은 카드에서 접는다 — 빈 줄이 쌓이면 콤팩트한 뜻이 없다. 단추·체크칸은 늘 남긴다 */
+        const 말 = String(td.textContent || '').replace(/\s+/g, '').replace(/[—-]/g, '');
+        if(!말 && !td.querySelector('input,button,select,a')) td.setAttribute('data-empty', '1'); else td.removeAttribute('data-empty');
+        /* 「표시 없음」 같은 «아는 것이 없다»는 말은 줄마다 되풀이되어 카드를 어지럽힌다 — 접어 두고 펴면 보인다 */
+        if(말 === '표시없음') td.setAttribute('data-quiet', '1'); else td.removeAttribute('data-quiet');
+        자리 += 1;
+      });
+    });
+  });
+}
+/* 탭의 «원래 이름»을 title·aria-label 에 달아 둔다 — 폰에서는 글을 줄여 담으므로(숫자는 작게, 작은 탭은 짧은 이름) 이름이 어딘가에 온전히 있어야 한다. */
+function 탭이름달기(){
+  Array.prototype.forEach.call(document.querySelectorAll('#tabs button, .subtabs button:not(.mini):not(.btn)'), function(b){
+    const 이름 = String(b.textContent || '').replace(/\s+/g, ' ').trim();
+    if(!이름) return;
+    if(!b.getAttribute('title')) b.setAttribute('title', 이름);
+    b.setAttribute('aria-label', b.getAttribute('title'));
+  });
+}
+/* 폰에서 «한 줄로 접어 두고 눌러서 펴는» 안내글 — CSS([data-f1])가 접고, 아래 눌림 손잡이가 편다.
+   ⚠ 무엇을 접을지는 «이 목록 한 곳»에서 정한다 — 마크업에 하나씩 속성을 달면 새 안내글이 늘 때 빠뜨린다.
+   ⚠ 지우는 것이 아니다 — 넓은 화면에서는 아무 일도 없고(CSS 가 폰 규칙뿐), 폰에서는 누르면 전문이 열린다. */
+const 한줄접이들 = [
+  '#main[data-tab=past] .cols>div>.note',
+  '#main[data-tab=note] .nlist>.pad.hint',
+  '#main[data-tab=cfg] .pad.g2>div>.hint',      /* 설정 칸 밑의 풀이(금요일 준비 기록·시험 주소 주의) */
+  '#main[data-tab=cfg] .pad.g2>.w2>.note'        /* 「보내는 때는 아직 손으로 누르십니다」 */
+];
+function 한줄접이달기(){
+  Array.prototype.forEach.call(document.querySelectorAll('#main [data-f1]'), function(e){ e.removeAttribute('data-f1'); });
+  한줄접이들.forEach(function(sel){
+    Array.prototype.forEach.call(document.querySelectorAll(sel), function(e){ e.setAttribute('data-f1', '1'); });
+  });
+}
+function 폰다듬기(){
+  탭이름달기();
+  표라벨달기();
+  한줄접이달기();
+}
+/* ★ 폰의 «눌러서 펴기» 손잡이 하나 — 줄·한 줄 글·접힌 미리보기를 눌러 펴고 접는다.
+   ⚠ 단추·칸·링크·ⓘ 를 눌렀을 때는 그 일만 한다(여기서 가로채지 않는다).
+   ⚠ .open 에 걸린 CSS 는 «폰 규칙뿐»이라 넓은 화면에서는 눈에 보이는 일이 없다. */
+document.addEventListener('click', function(ev){
+  const t = ev.target;
+  if(!t || !t.closest) return;
+  if(t.closest('a,button,input,select,textarea,label,summary,.tipwrap,.menu')) return;
+  const 접이 = t.closest('[data-f1]');
+  if(접이){ 접이.classList.toggle('open'); return; }
+  const 접이제목 = t.closest('.phfold>h3');
+  if(접이제목){
+    접이상자펴기(접이제목.parentNode);
+    return;
+  }
+  /* 고르기 칸(☐)의 «둘레»를 눌러도 줄이 펴지지 않는다 — 손가락이 조금 빗나가 줄이 펴지면 고르다 짜증이 난다 */
+  if(t.closest('td.ck')) return;
+  const 줄 = t.closest('#main table.list tr');
+  if(줄 && !줄.querySelector('th')) 줄.classList.toggle('open');
+});
+function 접이상자펴기(상자){
+  상자.classList.toggle('open');
+  /* 접혀 있던 미리보기 틀은 폭이 0 이라 줄여 맞추지 못했다 — 펴는 순간 다시 맞춘다 */
+  try{ if(typeof _편지맞추기 === 'function') _편지맞추기(); }catch(_){ /* 틀이 없으면 할 일 없다 */ }
 }
 
 function 명단셈(){
@@ -1847,10 +2314,10 @@ function 이번회차화면(){
     <span class="meta" title="${esc(d.회차.기간)}"><span class="lng">${esc(String(d.회차.기간||'').replace(/\d{4}-/g, ''))} · </span>실린 것 ${실린수}</span>
     <!-- ★ 보는 것(크게 보기·다시 담기)은 «글자 손잡이»로 물러나고, 단추 모양은
          보내는 셋만 갖는다 — 눈이 오른쪽 끝 한 묶음에 모인다. -->
-    <button class="lnk" onclick="크게보기()" title="크게 보기">👁<span class="t"> 크게 보기</span></button>
+    <button class="lnk look" onclick="크게보기()" title="크게 보기">👁<span class="t"> 크게 보기</span></button>
     <!-- ↻ 전문 다시 담기 — 편지 서식을 고쳐도 «담아 둔 전문»은 안 바뀐다.
          ⚠ 보낸 회차에는 안 보인다. 그 쪽은 「그때 나간 그대로」여야 한다. -->
-    ${d.상태 === '발송' ? '' : `<button class="lnk" onclick="전문다시담기()"
+    ${d.상태 === '발송' ? '' : `<button class="lnk redo" onclick="전문다시담기()"
       title="전문 다시 담기 — 편지 서식을 고친 뒤 「전문 보기」가 옛 모습이면 눌러 주세요"
       ${App.isAdmin?'':'disabled'}>↻<span class="t"> 다시 담기</span></button>`}
     <span class="sp"></span>
@@ -1860,13 +2327,13 @@ function 이번회차화면(){
     ${갈수있나.ok ? '' : `<span class="why" title="${esc(갈수있나.까닭)}">●</span>`}
     <!-- ★ 「나에게」가 아니다 (대표 지시 2026-09-13) — 보낼 때 주소를 골라 넣는다.
          법인 메일에서 «개인 메일»로 보내 봐야 진짜로 가는지 안다. -->
-    <button class="btn" onclick="시험발송()" ${시험갈수있나.ok?'':'disabled'}
+    <button class="btn test" onclick="시험발송()" ${시험갈수있나.ok?'':'disabled'}
       title="시험 발송 — 받을 주소를 넣어 한 통만 보냅니다. 거래처에는 나가지 않습니다">✉<span class="t"> 시험 발송</span></button>
     <!-- ★ 확정본이 낡았는지를 «이 단추 한 줄»로 말한다 (2026-09-13).
          ⚠ 셋째 줄을 만들지 않는다 — 머리가 늘어나면 대표가 같은 것을 보려고 더 굴린다.
          ★ 단추에는 «짧은 말», 긴 말은 title 에 — 긴 말(「확정본이 낡아 안 나갔습니다 —
            다시 준비」)이 단추에 서면 그것만으로 줄이 넘친다. -->
-    <button class="btn ${예약.꼴}" onclick="자동발송준비()"
+    <button class="btn rsv ${예약.꼴}" onclick="자동발송준비()"
       title="${esc(예약.글 + ' — ' + (갈수있나.ok ? (예약.곁||'') : 갈수있나.까닭))}"
       ${갈수있나.ok && App.isAdmin?'':'disabled'}>${esc(예약.짧은 || 예약.글)}</button>
     <button class="btn pri" onclick="진짜보내기()"
@@ -1884,7 +2351,7 @@ function 이번회차화면(){
        «지금 어느 판인지»가 밑줄 하나로 보인다. 색은 갈색 하나, 누른 것에만. -->
   <div class="ways">
     <button class="wt ${App.길==='auto'?'on':''}" onclick="길바꾸기('auto')"
-      title="이 주치로 채우기"><span class="ic">⟳ </span><span class="ful">이 주치로 </span>채우기${모음셈().이회차 ? ' <span class="cnt">' + 모음셈().이회차 + '</span>' : ''}</button>
+      title="이 주치로 채우기"><span class="wi"><span class="ic">⟳ </span><span class="ful">이 주치로 </span>채우기${모음셈().이회차 ? ' <span class="cnt">' + 모음셈().이회차 + '</span>' : ''}</span></button>
     <!-- ★ 안내를 ⓘ 로 (대표 지시 2026-09-08 「간략히 핵심만」).
          예전에는 이 아래에 «셋째 줄»이 열려 「⟳ 다시 채우기」와 두 줄 안내를 담았다.
          그런데 이 단추가 «누를 때마다» 담으므로(길바꾸기) 그 줄은 할 일이 없었다 —
@@ -1896,22 +2363,22 @@ function 이번회차화면(){
       + '그 주 것으로 봅니다 (창 ' + 모음셈().창시작 + ' ~ ' + 모음셈().창끝 + ').<br><br>'
       + '편지에는 <b>제목·원문 링크만</b> 싣습니다.')}
     <button class="wt ${App.길==='paste'?'on':''}" onclick="길바꾸기('paste')"
-      title="받은 것 붙여넣기"><span class="ic">↧ </span><span class="ful">받은 것 </span>붙여넣기</button>
+      title="받은 것 붙여넣기"><span class="wi"><span class="ic">↧ </span><span class="ful">받은 것 </span>붙여넣기</span></button>
     ${/* ⚠ 건수가 0 이면 알약을 안 그린다 — 「0」은 아무것도 안 알려 주면서 자리만 먹는다
          (CLAUDE.md 「표의 한 칸은 한 줄」). */''}
     <button class="wt ${App.길==='ilabor'?'on':''}" onclick="길바꾸기('ilabor')"
-      title="공인노무사회 자료"><span class="ic">📥 </span>노무사회<span class="ful"> 자료</span>${(App.노무사회||[]).length ? ' <span class="cnt">' + (App.노무사회||[]).length + '</span>' : ''}</button>
+      title="공인노무사회 자료"><span class="wi"><span class="ic">📥 </span>노무사회<span class="ful"> 자료</span>${(App.노무사회||[]).length ? ' <span class="cnt">' + (App.노무사회||[]).length + '</span>' : ''}</span></button>
     <button class="wt ${App.길==='region'?'on':''}" onclick="길바꾸기('region')"
-      title="지역뉴스"><span class="ic">📍 </span>지역<span class="ful">뉴스</span>${(d.지역뉴스||[]).length ? ' <span class="cnt">' + (d.지역뉴스||[]).length + '</span>' : ''}</button>
+      title="지역뉴스"><span class="wi"><span class="ic">📍 </span>지역<span class="ful">뉴스</span>${(d.지역뉴스||[]).length ? ' <span class="cnt">' + (d.지역뉴스||[]).length + '</span>' : ''}</span></button>
     ${/* ★ 인사 — 부정기라 «담겼을 때만» 눈에 띄게 한다(대표 지시 2026-09-23).
          늘 굵게 두면 마흔여덟 주 동안 「안 쓴 칸」이 도드라진다. */''}
     <button class="wt ${App.길==='greet'?'on':''}" onclick="길바꾸기('greet')"
-      title="명절 인사"><span class="ic">🎁 </span><span class="ful">명절 </span>인사${인사담겼나(d) ? ' <b class="dot">●</b>' : ''}</button>
+      title="명절 인사"><span class="wi"><span class="ic">🎁 </span><span class="ful">명절 </span>인사${인사담겼나(d) ? ' <b class="dot">●</b>' : ''}</span></button>
     <span class="sp"></span>
     ${/* ⚠ 「그대로 전달」을 «없애지는» 않았다 — 지금 그 길로 다니시던 일이다.
          잘 안 쓰는 둘이라 오른쪽 끝 작은 글씨로 둔다. */''}
-    <span class="tail"><a onclick="연습채우기()" title="연습용 샘플로 채우기 — 연습은 「시험 발송」으로만">🧪<span class="t"> 연습<span class="ful">용 샘플</span></span></a>
-      · <a onclick="길바꾸기('fwd')" title="받은 것 그대로 전달">↪<span class="t"> 그대로 전달</span></a></span>
+    <span class="tail"><a onclick="연습채우기()" title="연습용 샘플로 채우기 — 연습은 「시험 발송」으로만"><span class="wi">🧪<span class="t"> 연습<span class="ful">용 샘플</span></span></span></a>
+      <span class="mid">·</span> <a onclick="길바꾸기('fwd')" title="받은 것 그대로 전달"><span class="wi">↪<span class="t"> 그대로 전달</span></span></a></span>
   </div>
   </div><!-- /nowtop — 여기까지가 «붙어 있는» 덩이다 -->
 
@@ -2287,9 +2754,16 @@ function 꼭지탭줄(d){
     /* 우리 글 꼭지는 «글 한 칸»이 더 있어 담긴 수만으로는 빈지 아닌지 알 수 없다 */
     const 글 = g.갈래==='우리글' && String(d.우리글||'').trim() ? 1 : 0;
     return `<button class="${App.보는꼭지===g.키?'on':''}" onclick="꼭지보기('${g.키}')"
-      title="${esc(g.이름)} — 실릴 것 ${c.실림+글}건 · 담긴 것 ${c.담김+글}건">${esc(g.이름)}
+      title="${esc(g.이름)} — 실릴 것 ${c.실림+글}건 · 담긴 것 ${c.담김+글}건">${꼭지이름(g)}
       <span class="n"><b>${c.실림+글}</b>/${c.담김+글}</span></button>`;
   }).join('') + `</div>`;
+}
+
+/* 폰에서는 긴 꼭지 이름을 짧은 이름(차림표이름)으로 보인다 — 넓은 화면은 긴 이름 그대로(.lg 만 보임). 원래 이름은 탭의 title 에 있다. */
+function 꼭지이름(g){
+  return (g.차림표이름 && g.차림표이름 !== g.이름)
+    ? '<span class="lg">' + esc(g.이름) + '</span><span class="sh">' + esc(g.차림표이름) + '</span>'
+    : esc(g.이름);
 }
 
 /* ══════ 보고 있는 꼭지 하나 ══════
@@ -2340,8 +2814,9 @@ function 꼭지칸하나(d){
     const 딱지 = !기사인가 ? ''
       : 자동글 ? '<span class="wtag no" title="금요일 자동 준비가 AI 초안을 그대로 실었습니다 — 눌러서 읽고 저장하시면 표가 사라집니다">🤖 AI 가 쓴 글 — 아직 안 읽음</span>'
       : (내글 ? '<span class="wtag">✎ 우리 말 있음</span>'
-              : (AI글 ? '<span class="wtag no">✨ AI 초안 — 옮기면 이 글이 나갑니다</span>'
-                       : '<span class="wtag no">↗ 원문 그대로 나갑니다 — 제목·매체·링크</span>'));
+              /* ⚠ title 에 «전문»을 둔다 — 폰에서는 딱지를 한 줄로 줄여(…) 보이므로 전문이 어디엔가 있어야 한다 */
+              : (AI글 ? '<span class="wtag no" title="AI 초안 — 옮기면 이 글이 나갑니다">✨ AI 초안 — 옮기면 이 글이 나갑니다</span>'
+                       : '<span class="wtag no" title="원문 그대로 나갑니다 — 제목·매체·링크">↗ 원문 그대로<span class="wl"> 나갑니다 — 제목·매체·링크</span></span>'));
     return `<div class="item${실?'':' off'}">
       <input type="checkbox" class="ck" ${실?'checked':''}
         onchange="실음바꾸기('${g.키}',${i})" onclick="event.stopPropagation()"
@@ -2359,7 +2834,7 @@ function 꼭지칸하나(d){
   return `<div class="jarpanel">
     <div class="jarhead">
      <span class="ttl">${esc(g.이름)}</span>
-     <span class="cnt">실릴 것 ${셈.실림} / 담긴 것 ${셈.담김}</span>
+     <span class="cnt" title="실릴 것 ${셈.실림}건 · 담긴 것 ${셈.담김}건">실릴<span class="ful"> 것</span> ${셈.실림} / 담긴<span class="ful"> 것</span> ${셈.담김}</span>
      <span class="sp"></span>
      ${g.키==='news' && 것.length ? `<button class="mini" onclick="AI초안짓기()"
        ${App.AI중?'disabled':''}>✨ ${App.AI중?'AI 작성 중…':'AI '+것.filter(x=>!String(x.우리말||'').trim()).length+'건 초안'}</button>` : ''}
@@ -2371,9 +2846,9 @@ function 꼭지칸하나(d){
      ${/* ★ 한마디는 «우리글 꼭지»에서 직접 지을 수 있어야 한다 — 채우기를 다시 누르지 않고 */''}
      ${g.갈래==='우리글' && !String(d.우리글||'').trim() ? `<button class="mini" onclick="한마디초안짓기()"
        ${App.AI중?'disabled':''}>✨ ${App.AI중?'AI 작성 중…':'한마디 초안'}</button>` : ''}
-     ${것.length ? `<button class="mini" onclick="꼭지모두('${g.키}',true)">☑ 모두 싣기</button>
-     <button class="mini" onclick="꼭지모두('${g.키}',false)">☐ 모두 빼기</button>` : ''}
-     <button class="mini" onclick="손으로담기('${g.키}')">＋ 손으로 담기</button>
+     ${것.length ? `<button class="mini tool" onclick="꼭지모두('${g.키}',true)">☑ 모두 싣기</button>
+     <button class="mini tool" onclick="꼭지모두('${g.키}',false)">☐ 모두 빼기</button>` : ''}
+     <button class="mini tool" onclick="손으로담기('${g.키}')">＋ 손으로 담기</button>
     </div>
     <div class="jarbody">${글칸}${줄}</div></div>`;
 }
@@ -3553,9 +4028,15 @@ window.addEventListener('resize', function(){ if(_편지맞추기) _편지맞추
      0 을 안 넣으면 덩이 위에 앱바 높이만큼 빈 자리가 생긴다. */
 function 위높이재기(){
   try{
-    const t = document.getElementById('top');
-    const 붙었나 = !!t && getComputedStyle(t).position === 'sticky';
-    const h = 붙었나 ? Math.round(t.getBoundingClientRect().height) : 0;
+    const t = document.getElementById('top'), 탭 = document.getElementById('tabs');
+    /* ★ 붙어 있는 «머리»가 둘이다 (2026-10-12 폰 콤팩트).
+         · 태블릿(561~980px) — #top(앱바+탭)이 통째로 붙는다.
+         · 폰(560px 아래) — 앱바는 굴리면 올라가고 «탭 줄»만 붙는다. 그때 #top 은 상자를 잃고(display:contents)
+           높이가 0 이라, 붙은 것은 #tabs 다 — 그 높이를 잰다.
+       ⚠ #tabs 는 넓은 화면에서도 «sticky» 로 계산된다(#top 안에서 붙으나 마나) — #top 이 display:contents 일 때만 믿는다. */
+    const 붙은머리 = (t && getComputedStyle(t).position === 'sticky') ? t
+      : (t && 탭 && getComputedStyle(t).display === 'contents' && getComputedStyle(탭).position === 'sticky') ? 탭 : null;
+    const h = 붙은머리 ? Math.round(붙은머리.getBoundingClientRect().height) : 0;
     document.documentElement.style.setProperty('--tophi', h + 'px');
   }catch(_){ /* 재다 넘어져도 화면은 살아 있어야 한다 — 0 이면 예전 그대로다 */ }
 }
@@ -3563,8 +4044,9 @@ window.addEventListener('load', 위높이재기);
 /* ⚠ 탭 글자가 늘거나(숫자가 붙는다) 창이 좁아져 앱바가 두 줄이 되면 높이가 바뀐다.
      그때 다시 재지 않으면 덩이가 앱바에 물리거나 뜬 채로 남는다. */
 if(window.ResizeObserver){
-  const t = document.getElementById('top');
+  const t = document.getElementById('top'), 탭 = document.getElementById('tabs');
   if(t) new ResizeObserver(위높이재기).observe(t);
+  if(탭) new ResizeObserver(위높이재기).observe(탭);      /* 폰은 #top 이 상자가 없어 #tabs 가 대신 잰다 */
 }
 
 function 크게보기(){
@@ -4063,7 +4545,9 @@ function 기록오른쪽(){
    빈 영역 자체를 놓는 자리로 쓴다. dragenter/dragleave 는 자식 사이를 오갈 때도 불리므로
    relatedTarget 이 안쪽이면 모양을 풀지 않는다. */
 function 안내빈화면(){
-  return `<div class="box">
+  /* ★ .dropbox — 폰에서는 끌어놓을 일이 없어 접는다(왼쪽 «안내문» 상자의 「파일 직접 고르기」가 그 일을 한다). 넓은 화면은 그대로.
+     ★ .phfold — 「보내기 전 자료 확인」은 폰에서 «접어 두고 눌러서» 편다(미리보기 틀이 980px 라 폰에서는 펴기 전엔 자리를 안 먹게). */
+  return `<div class="box dropbox">
     <div class="pad">
       <div id="ntDrop" class="notedrop" ondragenter="안내끌기(event,true)" ondragover="안내끌기(event,true)"
         ondragleave="안내끌기(event,false)" ondrop="안내자료놓기(event)">
@@ -4072,7 +4556,7 @@ function 안내빈화면(){
       </div>
     </div>
    </div>
-   <div class="box notedefault">
+   <div class="box notedefault phfold">
     <h3>보내기 전 자료 확인 <span class="tag">미리보기</span></h3>
     <div class="pad"><div class="hint">자료를 올리면 제목과 내려받기 단추가 이 화면에 반영됩니다. 지금은 기본 발송 모양입니다.</div>
       <div id="ntDefaultPreview"></div></div>
@@ -4987,7 +5471,7 @@ function 지난회차화면(){
    <div>
     <div class="box" style="margin:0">
      <h3>지난 회차 <span class="cnt">${열쇠들.length}</span><span class="sp"></span>
-      <span style="font-size:11px;color:var(--faint)">줄을 누르면 오른쪽에 보입니다</span></h3>
+      <span style="font-size:11px;color:var(--faint)">줄을 누르면 <span class="lg">오른쪽에</span><span class="sh">아래에</span> 보입니다</span></h3>
      <table class="list"><tr><th class="n">#</th><th>회차</th><th>상태</th><th>실린 것</th>
        <th>받는 곳</th><th>보낸 때</th></tr>${줄}</table>
     </div>
@@ -5011,6 +5495,22 @@ function 지난회차화면(){
 function 회차보기(k){
   App.본회차 = k;
   render();
+  /* ★ 폰·태블릿(980px 아래)은 목록 «아래»에 미리보기가 놓인다 — 줄을 눌러 바꾸면 그 자리로 내려가 준다.
+       안 내려가면 화면이 바뀐 줄 모르고 「눌러도 아무 일 없다」로 겪는다. 넓은 화면은 오른쪽에 바로 보이니 그대로다.
+     ⚠ 미리보기 틀은 «불러와진 뒤에야» 키가 커진다 — 그 전에는 쪽이 짧아 가려 해도 44px 에서 멈춘다.
+       그래서 지금 한 번 가고, 틀이 불러와지면(지난미리보기그리기의 onload) 한 번 더 간다. */
+  App._내려갈때 = Date.now();
+  미리보기로내려가기();
+}
+function 미리보기로내려가기(){
+  try{
+    if(!(window.matchMedia && window.matchMedia('(max-width:980px)').matches)) return;
+    const 칸 = document.querySelector('#main .pv'); if(!칸) return;
+    /* ⚠ scrollIntoView 를 안 쓴다 — 미리보기 상자는 붙는(sticky) 상자라 그 함수가 엉뚱한 자리로 보낸다.
+         붙은 머리(앱바·탭) «밑»에 오도록 직접 셈해서 바로 간다(부드럽게 가면 틀이 불러와져 키가 바뀔 때 중간에서 끊긴다). */
+    const 머리 = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--tophi')) || 0;
+    window.scrollTo(0, Math.max(0, 칸.getBoundingClientRect().top + (window.pageYOffset || 0) - 머리 - 8));
+  }catch(_){ /* 못 내려가도 화면은 이미 바뀌었다 */ }
 }
 
 /* 지난 회차 미리보기를 그린다 — 「이번 회차」의 미리보기와 «같은 짓는 층»을 쓴다.
@@ -5032,6 +5532,8 @@ function 지난미리보기그리기(){
   f.srcdoc = '<!doctype html><meta charset="utf-8"><base target="_blank"><body style="margin:0">' + html;
   f.onload = function(){
     try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){}
+    /* 방금 줄을 눌러 내려가려던 참이면 — 키가 커진 지금 다시 간다(3초 안에 눌렀을 때만 — 그 뒤에 딴 데를 보고 있으면 끌어오지 않는다) */
+    if(App._내려갈때 && Date.now() - App._내려갈때 < 3000){ App._내려갈때 = 0; 미리보기로내려가기(); }
   };
 }
 
@@ -5228,7 +5730,7 @@ function 지인화면(){
 function 지인표다시그리기(){
   const 줄 = 지인줄들();
   const 보일 = 지인거른것(줄);
-  const b = $('jnBody'); if(b) b.innerHTML = 지인표줄(보일);
+  const b = $('jnBody'); if(b){ b.innerHTML = 지인표줄(보일); 표라벨달기(); }   /* 새 줄에도 폰 카드용 이름표 */
   const 걸렀나 = String(App.지인찾기 || '').trim() || App.지인시도;
   const c = $('jnFindCnt'); if(c) c.textContent = 걸렀나 ? '검색 결과 ' + 보일.length + '명' : '';
   const h = document.querySelector('.chkh'); if(h) h.checked = false;
@@ -6133,7 +6635,7 @@ function 빈곳칩(v){ App.빈곳명함 = (App.빈곳명함 === v) ? '' : String
 function 빈곳찾기(v){
   App.빈곳찾기 = String(v || '');
   const 보일 = 빈곳거르기(빈곳줄들());
-  const b = $('naBody'); if(b) b.innerHTML = 빈곳표줄(보일);
+  const b = $('naBody'); if(b){ b.innerHTML = 빈곳표줄(보일); 표라벨달기(); }   /* 새 줄에도 폰 카드용 이름표 */
   const c = $('naCnt'); if(c) c.textContent = 보일.length;
 }
 function 빈곳기업정보함(id){

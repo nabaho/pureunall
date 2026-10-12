@@ -153,11 +153,11 @@ test('★ 「0」은 안 그린다 — 건수 알약은 건수가 있을 때만 
 test('★★ 잘 안 쓰는 두 길(연습용 샘플·그대로 전달)이 «있다» — 넓은 화면에도 폰에도', () => {
   assert.match(덩이, /onclick="연습채우기\(\)"/, '★★ 연습용 샘플로 갈 길이 없어졌다');
   assert.match(덩이, /onclick="길바꾸기\('fwd'\)"/, '★★ 그대로 전달로 갈 길이 없어졌다');
-  /* ⚠ 옛 폰 규칙 「.ways .tail{display:none}」 이 두 길을 폰에서 통째로 감춘다 — 되살려야 한다 */
-  if (/\.ways \.tail\{display:\s*none/.test(폰)) {
-    assert.match(폰, /\.nowtop \.ways \.tail\{display:\s*inline/,
-      '★★ 폰에서 연습용 샘플·그대로 전달이 사라진다(removing-a-path)');
-  }
+  /* ⚠ 폰에서 꼬리(.tail)가 «숨겨지지 않는다» — 옛 폰 규칙 「.ways .tail{display:none}」 이 두 길을 폰에서 통째로 감췄다(2026-09-27 에 되살렸다).
+       2026-10-12 폰 콤팩트에서 그 옛 규칙을 걷고 꼬리를 «바둑판의 칸»(display:contents)으로 만들었다 — 어느 쪽이든 «감추면» 안 된다. */
+  assert.ok(!/\.ways \.tail\{[^}]*display:\s*none/.test(폰), '★★ 폰에서 연습용 샘플·그대로 전달이 사라진다(removing-a-path)');
+  assert.match(폰, /\.nowtop \.ways \.tail\{[^}]*display:\s*(inline|contents|flex|block|grid)/,
+    '★★ 폰에서 꼬리를 어떻게 보일지 안 정했다 — 기본값(보임)에 기대면 옛 규칙이 되살아날 때 조용히 사라진다');
 });
 
 test('★ 담는 법 탭은 «누른 것만» 갈색이다 — 색을 하나로', () => {

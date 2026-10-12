@@ -21,7 +21,9 @@ test('★ KPI 는 누르는 단추이고, 위에 붙는 머리 안에 있다', (
   assert.ok(!/const 안내 = '<div class="note"/.test(몸), '안내가 아직 두 줄짜리 상자다');
   assert.match(몸, /const 안내 = 도움\(/);
   assert.match(화면, /\.res-one\{display:flex;align-items:center/);
-  assert.match(화면, /\.res-head\{position:sticky;top:0/);
+  /* ★ 붙는 머리다 — 붙는 자리는 «0» 이거나 «잰 높이(--tophi)» 다. 2026-10-12 폰 콤팩트에서 top:0 을 top:var(--tophi,0px) 로 바꿨다
+       (태블릿에서 앱바+탭이 위에 붙어 있으면 top:0 은 그 «뒤»로 들어간다). 규칙은 «sticky 이고 붙는 자리가 있다»다. */
+  assert.match(화면, /\.res-head\{position:sticky;top:(0|var\(--tophi)/);
   /* 작게 — 숫자가 19px 큰 칸이 아니다 */
   assert.ok(!/font-size:19px/.test(몸), 'KPI 숫자가 아직 크다');
 });
