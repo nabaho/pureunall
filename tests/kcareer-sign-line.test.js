@@ -81,3 +81,13 @@ test('⑥ 서명 줄이 있는 구역의 «빈 작성일»만 오늘로 — 적�
   assert.ok(H.tidySignLine(적힘 + 줄('권형하', 16), 오늘).xml.includes('2026년 9월 5일'), '이미 적힌 날짜는 그대로');
   assert.equal(H.tidySignLine(날, 오늘).xml, 날, '서명 줄이 없으면 손대지 않는다');
 });
+
+test('⑦ 「확   인 : ____ (서명)」 줄에도 이름이 들어간다 — 「(서명)」 만 있는 꼬리도 · 문장 속 「확인」은 건드리지 않는다 (충남사회복지사협회 지급확인서 2026-10-12)', () => {
+  const X = require('../js/kcareer-hwpxfill.js');
+  const 채움 = (s) => { const rep = { fields: [] }; const o = X.fillParagraphs('<hp:p><hp:run charPrIDRef="9"><hp:t>' + s + '</hp:t></hp:run></hp:p>', { name: '홍길동' }, rep, new Date(2026, 9, 12)); return { txt: o.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(), n: rep.fields.length }; };
+  const a = 채움('확   인 :          (서명)');
+  assert.ok(/확 인 : 홍길동 \(서명\)/.test(a.txt) && a.n === 1, '이름이 들어가야 한다: ' + a.txt);
+  assert.equal(채움('위 내용을 확인합니다 (서명)').n, 0, '문장 속 확인은 서명 줄이 아니다');
+  assert.ok(/성명 : 홍길동 \(인\)/.test(채움('성명 :        (인)').txt), '예전 모양도 그대로');
+  assert.equal(H.whoOf('확   인 : 홍길동 (서명)'), '홍길동', '도장이 이름을 읽는다');
+});
