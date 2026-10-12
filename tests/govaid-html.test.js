@@ -27,10 +27,11 @@ test('저장 관문을 Firebase 초기화 전에 싣고, 강제 모드 관문으
   assert.doesNotMatch(NOC, /fbDb\.ref\([^)]*\)\s*\.(set|update|push|remove|transaction)\(/, '관문을 건너뛴 쓰기');
 });
 
-test('쓰는 자리는 govaid 아래 네 곳뿐이다', () => {
+/* 2026-10-12 📰 새 공고 — 공고 함(notices)에 «처리»를 적는 자리가 늘어 다섯 */
+test('쓰는 자리는 govaid 아래 다섯 곳뿐이다', () => {
   const refs = [...NOC.matchAll(/gate\.(?:save|remove)\(fbDb\.ref\('([^']+)'/g)].map((m) => m[1]);
   assert.ok(refs.length >= 1);
-  refs.forEach((r) => assert.match(r, /^govaid\/(programs|prospects|extras|reviews)\//, r));
+  refs.forEach((r) => assert.match(r, /^govaid\/(programs|prospects|extras|reviews|notices)\//, r));
 });
 
 test('자료 표는 맨 왼쪽 ☐ + 번호 — 보기 전용 표만 예외(data-viewonly)', () => {
@@ -166,4 +167,25 @@ test('불러오기는 govaid 를 통째로 읽지 않는다 — 공고 함(notic
   assert.doesNotMatch(f, /fbDb\.ref\('govaid'\)\.once/, 'govaid 전체를 읽는다');
   ['programs', 'prospects', 'extras', 'reviews'].forEach((k) => assert.match(f, new RegExp("govaid/" + k), k + ' 를 따로 읽지 않는다'));
   assert.doesNotMatch(f, /govaid\/notices/, '열 때마다 공고 함을 읽는다');
+});
+
+/* 📰 새 공고 탭 (대표 승인 2026-10-12 「네」 — 시안: 잇기·새 사업 초안·관계없음) */
+test('새 공고 — 탭이 있고, 공고 함은 그 탭을 열 때만 읽고, 목록은 ☐ + 번호 표(tbl)로 거른 것만', () => {
+  assert.match(NOC, /data-tab="news"/);
+  assert.match(fnBody('loadNotices'), /govaid\/notices/);
+  const f = fnBody('drawNews');
+  assert.match(f, /GovaidView\.noticeRows\(/);
+  assert.match(f, /tbl\('news'/);
+  assert.match(f, /loadNotices\(/);
+});
+test('새 공고 — 잇기·풀기는 사업 레코드에(noticeLinked), 처리는 공고에(noticeDecided), 초안은 programFromNotice 로', () => {
+  const all = fnBody('linkNotice') + fnBody('decideNotice') + fnBody('draftFromNotice');
+  assert.match(all, /GovaidRecords\.noticeLinked\(/);
+  assert.match(all, /GovaidRecords\.noticeDecided\(/);
+  assert.match(all, /GovaidRecords\.programFromNotice\(/);
+  assert.match(fnBody('draftFromNotice'), /expectedRevision:-1/, '같은 공고로 만든 초안을 덮지 않게 새 자리만');
+});
+test('편집 창에서 기업마당 공고번호를 직접 넣고 뺄 수 있다', () => {
+  assert.match(fnBody('editorHtml'), /id="eBiz"/);
+  assert.match(fnBody('readEditor'), /eBiz/);
 });

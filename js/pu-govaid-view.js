@@ -124,9 +124,34 @@
     });
     return out.sort(function (a, b) { return (b.labor - a.labor) || (b.programs.length - a.programs.length) || (order.indexOf(a.key) - order.indexOf(b.key)); });
   }
+  /* 📰 새 공고 (2026-10-12) — 서버 govaidNoticeWatch 가 쌓은 기업마당 공고를 «처리할 것»부터 거른다.
+     view: sug(비슷한 사전 사업이 있는 것) · all(처리 안 한 것 전체) · labor(인력·경영 분야) · linked(사업에 이은 것) · ignored(관계없음)
+     «이은 것»은 공고 쪽이 아니라 사업의 bizinfo 로 안다 — 잇기의 근거는 사업 레코드 하나다 */
+  var LABOR_FIELDS = ['인력', '경영'];
+  function noticeRows(noticesMap, progs, opt) {
+    opt = opt || {};
+    var today = clean(opt.today), view = opt.view || 'sug', q = clean(opt.q).toLowerCase(), byId = {}, linkOf = {};
+    progs.forEach(function (p) { if (!p || !p.id || p._deleted) return; byId[p.id] = p; M.list(p.bizinfo).forEach(function (no) { linkOf[clean(no)] = p; }); });
+    return rows(noticesMap).filter(function (n) { return n && clean(n.id); }).map(function (n) {
+      var sug = M.list(n.suggest).filter(function (s) { return s && byId[s.id]; }).map(function (s) { return { p: byId[s.id], score: s.score }; });
+      return { n: n, linkedTo: linkOf[clean(n.no || n.id)] || null, sug: sug };
+    }).filter(function (r) {
+      var n = r.n, open = !clean(n.closeDt) || clean(n.closeDt) >= today, fresh = !n.decision && !r.linkedTo;
+      if (opt.openOnly && !open) return false;
+      if (q && (clean(n.nm) + ' ' + clean(n.ntce) + ' ' + clean(n.inst)).toLowerCase().indexOf(q) < 0) return false;
+      if (view === 'linked') return !!r.linkedTo;
+      if (view === 'ignored') return n.decision === 'ignore';
+      if (!fresh) return false;
+      if (view === 'sug') return r.sug.length > 0;
+      if (view === 'labor') return LABOR_FIELDS.indexOf(clean(n.field)) >= 0;
+      return true;
+    }).sort(function (a, b) { return clean(b.n.openDt).localeCompare(clean(a.n.openDt)) || clean(a.n.nm).localeCompare(clean(b.n.nm), 'ko'); });
+  }
+  function noticeCount(noticesMap, progs, today) { return noticeRows(noticesMap, progs, { view: 'sug', openOnly: true, today: today }).length; }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
   return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
-    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor };
+    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor,
+    noticeRows: noticeRows, noticeCount: noticeCount };
 });

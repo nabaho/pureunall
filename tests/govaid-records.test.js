@@ -61,3 +61,38 @@ test('예비 고객을 업체와 이을 때 — 업체 보충값의 빈 칸만 �
   const withAuto = R.carryToCompany(null, prospect, {}, {}, { hasAutoHeadcount: true });
   assert.equal(withAuto.vals.headcount, undefined, '국민연금·고용보험 인원이 있으면 옛 입력으로 덮지 않는다');
 });
+
+/* 📰 새 공고 (2026-10-12) — 잇기·풀기·처리. 찬 자리(null) 부름에서도 id 를 가진 레코드를 돌려줘야 한다 */
+test('공고 잇기 — 사업의 bizinfo 에 공고번호를 더하고(겹치지 않게), 풀면 뺀다', () => {
+  const known = { id: 'gp-r12', name: '스마트공장', bizinfo: ['P0'] };
+  const a = R.noticeLinked(null, known, 'P1', true);
+  assert.equal(a.id, 'gp-r12', '찬 자리에서도 id');
+  assert.deepEqual(a.bizinfo, ['P0', 'P1']);
+  assert.deepEqual(R.noticeLinked(a, known, 'P1', true).bizinfo, ['P0', 'P1'], '두 번 이어도 하나');
+  assert.deepEqual(R.noticeLinked(a, known, 'P1', false).bizinfo, ['P0']);
+  assert.deepEqual(R.noticeLinked({ id: 'gp-r12', bizinfo: { 0: 'P0' } }, known, 'P2', true).bizinfo, ['P0', 'P2'], '파이어베이스가 배열을 객체로 줘도');
+});
+test('공고 처리 — 사람 칸(decision·decidedBy·decidedAt)만 바꾸고 서버 칸은 그대로, 풀면 처리를 지운다', () => {
+  const known = { id: 'P1', no: 'P1', nm: '어느 공고', suggest: [{ id: 'gp-r12', score: 0.9 }], seenAt: 5 };
+  const d = R.noticeDecided(null, known, 'ignore', 'A-001', 9);
+  assert.equal(d.id, 'P1');
+  assert.equal(d.entityType, 'Document');
+  assert.equal(d.docKind, 'govNotice');
+  assert.equal(d.decision, 'ignore');
+  assert.equal(d.decidedBy, 'A-001');
+  assert.equal(d.nm, '어느 공고', '서버 칸을 그대로 둔다');
+  const u = R.noticeDecided(d, known, '', 'A-001', 10);
+  assert.equal(u.decision, null, '처리 지우기');
+});
+test('공고 → 새 사업 초안 — 이름·기관·요약·원문·공고번호를 옮기고 조건은 비운 초안', () => {
+  const n = { id: 'PBLN_1', no: 'PBLN_1', nm: '2026년 어느 지원사업 공고', ntce: '중소벤처기업부', inst: '어느 진흥원', memo: '요약', url: 'https://www.bizinfo.go.kr/a', field: '인력' };
+  const p = R.programFromNotice(n, 2026);
+  assert.equal(p.id, 'gp-b' + 'PBLN_1');
+  assert.equal(p.status, 'draft');
+  assert.equal(p.name, n.nm);
+  assert.equal(p.agency, '중소벤처기업부 · 어느 진흥원');
+  assert.deepEqual(p.bizinfo, ['PBLN_1']);
+  assert.equal(p.source.url, n.url);
+  assert.deepEqual(p.fields, ['인력']);
+  assert.equal(p.baseYear, 2026);
+});
