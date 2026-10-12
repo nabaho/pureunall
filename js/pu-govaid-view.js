@@ -98,9 +98,34 @@
     var n = clean(p && p.name), m = n.match(/^(\d{4})년도?\s+(.+)$/);
     return m ? { title: m[2], year: m[1] } : { title: n, year: '' };
   }
+  /* 한눈 표 열 머리용 짧은 이름 — 사람이 넣은 short 가 먼저. 없으면 앞의 해·괄호·«— 뒤»·꼬리 «지원사업/사업/지원»을 떼고
+     10자가 넘으면 9자 + … (대표 지시 2026-10-12 한눈 표 시안 A: 머리 글자를 가로로 읽히게) */
+  function shortName(p) {
+    var s = clean(p && p.short);
+    if (s) return s;
+    s = shortTitle(p).title.replace(/\s*[—–-]\s.*$/, '').replace(/\([^)]*\)/g, '').replace(/\s*(지원\s*사업|사업|지원)$/, '').trim();
+    return s.length > 10 ? s.slice(0, 9) + '…' : s;
+  }
+  /* 회사별 «준비할 서류» — 후보(candidate) 사업의 docs 를 낱말(key)로 모은다. «그 밖»은 공고 이름별로.
+     노무 서류(DOCS[key].labor) 먼저 → 쓰이는 사업이 많은 것 → 낱말표 차례 */
+  function docsFor(profile, progs, year) {
+    var D = M.DOCS, order = Object.keys(D), map = {}, out = [];
+    progs.forEach(function (p) {
+      if (M.judge(profile, p, year).verdict !== 'candidate') return;
+      M.list(p.docs).forEach(function (d) {
+        if (!d) return;
+        var key = D[d.key] ? d.key : 'other', label = key === 'other' ? clean(d.label) || '그 밖' : D[key].label, id = key + '|' + (key === 'other' ? label : '');
+        if (!map[id]) { map[id] = { key: key, label: label, labor: !!D[key].labor, programs: [], stages: [] }; out.push(map[id]); }
+        var e = map[id];
+        if (!e.programs.some(function (x) { return x.id === p.id; })) e.programs.push({ id: p.id, name: clean(p.name), short: shortName(p) });
+        if (d.stage && e.stages.indexOf(d.stage) < 0) e.stages.push(d.stage);
+      });
+    });
+    return out.sort(function (a, b) { return (b.labor - a.labor) || (b.programs.length - a.programs.length) || (order.indexOf(a.key) - order.indexOf(b.key)); });
+  }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
   return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
-    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle };
+    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor };
 });

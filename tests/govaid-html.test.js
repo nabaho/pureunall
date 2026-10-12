@@ -90,7 +90,7 @@ test('한 번에 고친 검토는 사유를 지우지 않는다(사유를 안 �
 });
 
 test('조건 편집기는 AI 조사 초안의 확신도·메모를 보여 준다 — 확정하는 사람이 «확인 못 한 점»을 보고 정하게', () => {
-  const fn = NOC.slice(NOC.indexOf('function drawEditor('), NOC.indexOf('function drawEditor(') + 4000);
+  const fn = NOC.slice(NOC.indexOf('function editorHtml('), NOC.indexOf('function editorHtml(') + 4000);
   assert.match(fn, /aiDraft/);
   assert.match(fn, /esc\([^)]*notes/);
 });
@@ -101,4 +101,42 @@ test('사업 중심 목록은 부처(관)로 묶고, 목록 칸이 넓다 — �
   assert.match(body[0], /GovaidView\.byMinistry\(/, '부처 묶음을 쓰지 않는다');
   assert.match(body[0], /GovaidView\.shortTitle\(/, '앞의 «2026년»을 떼지 않는다');
   assert.match(SRC, /id="p-prog">\s*<div class="split wide">/, '사업 중심 칸이 넓지 않다');
+});
+
+/* 대표 지시 2026-10-12 「확인조건을 한페이지에 다 볼수 있게 … 필요서류 … 구체적으로」 · 한눈 표 시안 A */
+function fnBody(name) {
+  const i = NOC.indexOf('function ' + name + '(');
+  assert.ok(i >= 0, name + ' 가 없다');
+  let d = 0, j = NOC.indexOf('{', i);
+  for (; j < NOC.length; j++) { if (NOC[j] === '{') d++; else if (NOC[j] === '}' && --d === 0) break; }
+  return NOC.slice(i, j + 1);
+}
+test('확인할 조건은 «한 표» — 부처별 묶음, ☐ + 번호, 줄을 누르면 그 자리에서 펼침(옆 편집 칸 없음)', () => {
+  const f = fnBody('drawCheck') + fnBody('checkRow') + fnBody('checkDetail');
+  assert.match(f, /GovaidView\.byMinistry\(/, '부처로 묶지 않는다');
+  assert.match(f, /data-all="check"/, '☐ 모두 고르기가 없다');
+  assert.match(f, /OPEN_CK/, '펼침 상태가 없다');
+  assert.match(f, /docs/, '필요서류를 안 보인다');
+  assert.doesNotMatch(NOC, /id="cDetail"/, '옆 편집 칸이 남아 있다');
+});
+test('사업 편집은 창(모달)으로 — 어느 탭에서 열어도 탭이 바뀌지 않는다', () => {
+  assert.match(fnBody('openEditor'), /openModal\(/);
+  assert.doesNotMatch(NOC, /CUR_CHECK='__new'; TAB='check'/, '새 사업 단추가 탭을 바꾼다');
+});
+test('편집 창에서 필요서류·짧은 이름·노무 준비를 고칠 수 있고, 서류 이름은 낱말로 바꿔 저장한다', () => {
+  const ed = fnBody('editorHtml'), rd = fnBody('readEditor') + fnBody('readDocs');
+  ['eDocs', 'eShort', 'eLaborPrep'].forEach((id) => assert.match(ed, new RegExp('id="' + id + '"'), id));
+  assert.match(rd, /GovaidMatch\.docKeyOf\(/);
+  assert.match(rd, /docs:/);
+});
+test('회사 중심에 «준비할 서류» — 후보 사업의 서류를 모아 보인다(보기 전용 표)', () => {
+  const f = fnBody('drawCoDetail') + fnBody('coDocs');
+  assert.match(f, /GovaidView\.docsFor\(/);
+  assert.match(f, /준비할 서류/);
+});
+test('한눈 표 머리는 가로 짧은 이름 + 부처 묶음 머리 — 세로로 돌린 글자 금지', () => {
+  const f = fnBody('drawGrid');
+  assert.match(f, /GovaidView\.shortName\(/);
+  assert.match(f, /GovaidView\.byMinistry\(/);
+  assert.doesNotMatch(NOC, /writing-mode:\s*vertical/);
 });
