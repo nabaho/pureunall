@@ -1597,6 +1597,38 @@
         }
       }
     },
+    "signboard": {
+      ".read": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+      "ads": {
+        "$id": {
+          ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+          ".validate": "newData.child('id').val() === $id"
+        }
+      },
+      "published": {
+        ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+        ".validate": "newData.child('id').val() === 'published'"
+      },
+      "history": {
+        "$v": {
+          ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+          ".validate": "newData.child('id').val() === $v"
+        }
+      },
+      "control": {
+        ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && newData.exists()",
+        ".validate": "newData.child('id').val() === 'control'"
+      },
+      "log": {
+        "$id": {
+          ".write": "(auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)) && !data.exists() && newData.exists()",
+          ".validate": "newData.child('id').val() === $id"
+        }
+      },
+      "state": {
+        ".write": false
+      }
+    },
     "rehab_ad": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       "notices": {

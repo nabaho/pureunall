@@ -1197,6 +1197,23 @@ rules.govaid = { '.read': LOGIN,
   extras:    { $k:  { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k" } },
   reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } } };
 
+/* ══ 📺 전광판(pu-signboard.html + 이 PC 의 심부름꾼) — 외부 전광판 광고 (2026-10-12) ══
+   설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 대표 「대표 + 관리직원」.
+   ⚠ 읽기·쓰기 = MGR(관리자 또는 위임관리인) — 길거리에 그대로 보이는 문구라 일반 직원 열림 없음.
+   ⚠ 지우기(빈 값 쓰기)는 막는다 — 지우는 것은 _deleted 표식(공용 관문 tombstone)으로만.
+   ⚠ 열쇠와 레코드 id 가 어긋나면 막는다(ads/$id · history/$v · log/$id). published·control 은 id 가 이름 그대로다.
+   ⚠★ log = «덧붙이기 전용» — 새로 만들기만 허락한다(!data.exists()). 고치기·지우기는 관리자도 못 한다(대표 요구 「항상 보관」).
+   ⚠ state = 심부름꾼이 «관리자 권한 CLI»로 쓴다(규칙을 건너뛴다) — 화면에서는 아무도 못 쓴다. */
+const SIGNBOARD_W = `(${MGR}) && newData.exists()`;
+const SIGNBOARD_LOG_W = `(${MGR}) && !data.exists() && newData.exists()`;
+rules.signboard = { '.read': MGR,
+  ads:       { $id: { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === $id" } },
+  published: { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === 'published'" },
+  history:   { $v:  { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === $v" } },
+  control:   { '.write': SIGNBOARD_W, '.validate': "newData.child('id').val() === 'control'" },
+  log:       { $id: { '.write': SIGNBOARD_LOG_W, '.validate': "newData.child('id').val() === $id" } },
+  state:     { '.write': false } };
+
 /* ══ 회생광고(서버 rehabWatch + rehab-ad.html) — 법인회생 포괄적 금지명령 기업 (2026-10-10) ══
    담기는 것은 법원 «공개 공고»의 회사명·주소·사건 정보뿐이다(대표자·주민번호 없음).
    ⚠ 읽기 = 관리자만. 누구에게 무엇을 보낼지는 대표가 정한다 — 직원 화면엔 안 보인다.
