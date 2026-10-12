@@ -79,6 +79,59 @@
     if (ei && list(ei.rows).length && num(ei.gy) != null) return { v: num(ei.gy), src: '고용보험 상시인원' };
     return { v: null, src: '' };
   }
+  /* 업종 이름 → 표준산업분류 대분류. 위에서부터 «처음 걸리는 것» — 순서가 규칙이다.
+     표준산업분류 이름은 «끝말»이 업종이라 끝말을 먼저 본다(«…산업용 건물 건설업»은 건설, «…가공식품 도매업»은 도소매).
+     그다음 제조·가공 > 사진촬영 > 정보통신 > 도소매 > 숙박음식 > 전문기술 > 건설 …
+     («건설용 금속제품제조업»은 제조, «조리 반찬류 소매업»은 도소매, «건축기술·엔지니어링»은 전문기술).
+     ⚠ 뜻이 갈리는 이름(서비스·사업서비스업·위생 및 유사서비스업·개인 및 가사서비스업·비영리법인·각급사무소)은
+       어디에도 안 걸리게 둔다 → 모름.
+     ⚠ 76 임대업(N 안에서 100명 기준)은 일부러 대분류로 보내지 않는다. 34 산업용 기계 수리업은 «수리업»으로 S 에 간다
+       — 우선지원 기준(그 밖의 업종 100명)과는 맞고, 업종 조건 «제조업»과는 어긋날 수 있다 */
+  var INDUSTRY_RULES = [
+    ['F', /(건설|공사)업$/], ['G', /(도매|소매)업$/], ['O', /지방자치단체|행정/],
+    ['C', /제조|가공|인쇄|피막|열처리|코팅|도정|제분/], ['M', /사진|촬영|회사\s*본부/],
+    ['J', /소프트웨어|정보처리|컴퓨터|전기통신|통신업|출판|방송|데이터베이스|포털|프로그래밍/],
+    ['G', /도매|소매|도\.?소매|상품.*중개|슈퍼마켓/],
+    ['I', /음식|식당|숙박|호텔|요식|주점|제과점|한식|중식|일식|패스트푸드|커피|분식|치킨/],
+    ['M', /엔지니어링|설계|기술서비스|연구|시험|검사|분석|광고|회계|법무|세무|컨설팅|디자인|수의/],
+    ['F', /건설|공사/],
+    ['Q', /의원|병원|보건|복지|요양|어린이집|간호/],
+    ['H', /운수|운송|화물|택배|창고|물류|여객/],
+    ['K', /금융|보험업|신용조합|은행|증권|여신|대부/],
+    ['N', /인력\s*공급|고용\s*알선|사무지원|사업시설|포장 및 충전|근로자\s*파견|경비|청소|건물.*관리|시설관리|여행사/],
+    ['E', /폐기물|하수|재활용|수도/], ['P', /교육|학원/], ['L', /부동산/], ['B', /광업|채석|채굴|채취/],
+    ['A', /농업|임업|어업|양계|양돈|축산|재배/], ['O', /국방|사회보장/],
+    ['R', /스포츠|체육|오락|예술|공연|골프|유원지/], ['D', /전기업|발전업|가스|증기/],
+    ['S', /협회|단체$|수리업|미용|세탁|이용업/]
+  ];
+  function industryFromName(name, opt) {
+    var s = clean(name);
+    if (!s) return '';
+    if (opt && opt.strict) {
+      /* 업체관리 «업태» — «제조업, 도매 및 소매업»처럼 둘이 섞이면 모름, «제조 외»는 첫 업태 */
+      var got = s.split(/[,·\/]|\s및\s|\s외$|\s외\s/).map(function (x) { return industryFromName(x); }).filter(Boolean);
+      var uniq = got.filter(function (x, i) { return got.indexOf(x) === i; });
+      return uniq.length === 1 ? uniq[0] : '';
+    }
+    for (var i = 0; i < INDUSTRY_RULES.length; i++) if (INDUSTRY_RULES[i][1].test(s)) return INDUSTRY_RULES[i][0];
+    return '';
+  }
+  /* 고용·산재보험 사업장 줄(pubdata/co ei.rows: fg gy/sj, ind 업종명, cnt) — 시행령 제12조⑤2 처럼 인원이 많은 사업장의 업종 */
+  function industryAuto(pub, co) {
+    var rows = list(((pub || {}).ei || {}).rows);
+    var kinds = [['gy', '고용보험 업종'], ['sj', '산재보험 업종']];
+    for (var k = 0; k < kinds.length; k++) {
+      var best = null;
+      rows.forEach(function (r) {
+        if (!r || r.fg !== kinds[k][0]) return;
+        var L = industryFromName(r.ind), n = num(r.cnt) || 0;
+        if (L && (!best || n > best.n)) best = { v: L, n: n, src: kinds[k][1] + ' «' + clean(r.ind) + '»' };
+      });
+      if (best) return { v: best.v, src: best.src };
+    }
+    var t = clean((co || {}).bizType), L2 = industryFromName(t, { strict: true });
+    return L2 ? { v: L2, src: '업체관리 업태 «' + t + '»' } : { v: null, src: '' };
+  }
   function factsOf(extra) {
     var f = (extra && extra.facts) || {}, out = {};
     Object.keys(FACTS).forEach(function (k) { if (typeof f[k] === 'boolean') out[k] = { v: f[k], src: MINE }; });
@@ -120,7 +173,7 @@
   /* 기존 고객사 — 업체관리 원장(data/companies/v 한 줄) + 공공데이터 + 보충값(govaid/extras/co_{id}) */
   function profileFromCompany(co, pub, extra) {
     co = co || {};
-    var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub);
+    var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub), ia = industryAuto(pub, co);
     return withPriority({
       key: 'co_' + clean(co.id), kind: 'co', id: clean(co.id), name: clean(co.name), bizno: digits(co.bizNo), aliases: [],
       vals: {
@@ -128,7 +181,7 @@
         foundedYear: first([[num(ex.foundedYear), MINE], [num(autoOf(extra, 'foundedYear')[0]), autoOf(extra, 'foundedYear')[1]]]),
         size: first([[sizeOk(ex.size), MINE], [sizeOk(co.companySize), '업체관리'], [autoSizeOk(autoOf(extra, 'size')[0]), autoOf(extra, 'size')[1]]]),
         region: first([[regionOk(ex.region), MINE], [regionOf(co.address), '업체관리 주소']]),
-        industry: first([[industryOk(ex.industry), MINE]]),
+        industry: first([[industryOk(ex.industry), MINE], [ia.v, ia.src]]),
         salesDropPct: first([[num(ex.salesDropPct), MINE]])
       },
       facts: factsOf(extra)
@@ -137,7 +190,7 @@
   /* 예비 고객 — govaid/prospects/{id} + 공공데이터(사업자번호가 있으면) + 보충값(govaid/extras/pr_{id}) */
   function profileFromProspect(pr, pub, extra) {
     pr = pr || {};
-    var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub), IN = '예비 고객 입력';
+    var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub), ia = industryAuto(pub, null), IN = '예비 고객 입력';
     return withPriority({
       key: 'pr_' + clean(pr.id), kind: 'pr', id: clean(pr.id), name: clean(pr.name), bizno: digits(pr.bizno), aliases: [],
       vals: {
@@ -145,7 +198,7 @@
         foundedYear: first([[num(ex.foundedYear), MINE], [num(pr.foundedYear), IN]]),
         size: first([[sizeOk(ex.size), MINE], [sizeOk(pr.size), IN]]),
         region: first([[regionOk(ex.region), MINE], [regionOk(pr.region), IN]]),
-        industry: first([[industryOk(ex.industry), MINE], [industryOk(pr.industry), IN]]),
+        industry: first([[industryOk(ex.industry), MINE], [industryOk(pr.industry), IN], [ia.v, ia.src]]),
         salesDropPct: first([[num(ex.salesDropPct), MINE]])
       },
       facts: factsOf(extra)
@@ -213,7 +266,7 @@
   return {
     SIZES: SIZES, REGIONS: REGIONS, INDUSTRIES: INDUSTRIES, FACTS: FACTS,
     list: list, digits: digits, blank: blank, num: num, kstYear: kstYear, regionOf: regionOf,
-    headcountAuto: headcountAuto, prioritySupportAuto: prioritySupportAuto, profileFromCompany: profileFromCompany, profileFromProspect: profileFromProspect,
+    headcountAuto: headcountAuto, prioritySupportAuto: prioritySupportAuto, industryFromName: industryFromName, industryAuto: industryAuto, profileFromCompany: profileFromCompany, profileFromProspect: profileFromProspect,
     judge: judge
   };
 });
