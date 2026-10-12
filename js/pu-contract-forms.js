@@ -1090,7 +1090,8 @@
         + '.pcf-cols{display:flex;align-items:stretch;height:100%}'
     + '.pcf-cols .pcf-sheetwrap{flex:1;min-width:0;height:100%;overflow-y:auto}'
     + '.pcf-list{width:250px;flex:none;border:1px solid #e2e8f0;border-top:none;border-right:none;background:#fff;height:100%;overflow-y:auto;padding:4px}'
-    + '.pcf-lg{font-size:11px;color:#94a3b8;padding:8px 8px 2px;font-weight:700}'
+    + '.pcf-lg{font-size:12px;color:#fff;background:#334155;padding:6px 10px;font-weight:700;letter-spacing:.2px}.pcf-lgn{float:right;font-weight:400;opacity:.8;font-size:11px}'
+    + '.pcf-lt .pcf-lnm.col{flex-direction:column;align-items:stretch;gap:1px}.pcf-l1{display:flex;align-items:center;gap:4px;min-width:0}.pcf-lsub{font-size:10.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pcf-li{display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;border-radius:6px;padding:6px 8px;font-size:12.5px;color:#334155;cursor:pointer;text-align:left;font-family:inherit}'
     + '.pcf-li:hover{background:#eff6ff}.pcf-li.on{background:#dbeafe;color:#1e40af;font-weight:700}.pcf-li.off .pcf-ln{color:#94a3b8;text-decoration:line-through}.pcf-li.add{color:#2563eb;font-size:12px}'
     + '.pcf-ln{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -3215,6 +3216,13 @@
       var n = String(f.name || '').replace(/\s*-\s*푸른\s*표준\s*$/, '').replace(/\s*\((?:근로자|사용자|근로자측|사용자측|근로자·노동조합|사용자·근로자)\)\s*$/, '').trim();
       return n || String(f.name || '');
     }
+    /* 사건계약 줄 밑 한 줄 — 이름에 든 서류 조각(약정서·위임장·진정취하서·동의서·신고서)을 그대로 보여 줘 «몇 가지가 한 파일에 묶였나»가 한눈에 갈린다 */
+    var PARTS = [['위임약정서', '위임약정서'], ['위임계약서', '위임계약서'], ['위임장', '위임장'], ['진정취하서', '진정취하서'], ['개인정보', '개인정보 동의서'], ['대리인선임', '대리인 선임신고서'], ['대리인 선임', '대리인 선임신고서'], ['신고서', '신고서']];
+    function caseParts(f) {
+      var n = String(f.name || ''), out = [];
+      PARTS.forEach(function (p) { if (n.indexOf(p[0]) >= 0 && out.indexOf(p[1]) < 0 && !(p[0] === '신고서' && out.some(function (x) { return /신고서/.test(x); }))) out.push(p[1]); });
+      return out.length ? out.length + '종 · ' + out.join(' · ') : '';
+    }
     function sideShort(v) { return v === 'worker' ? '근로자' : v === 'employer' ? '사용자' : '공통'; }
     function chip(label, on, fn) {
       return el('button', { type: 'button', 'class': 'pcf-chip' + (on ? ' on' : ''), 'aria-pressed': on ? 'true' : 'false', onclick: fn }, [label]);
@@ -3472,11 +3480,12 @@
       all.addEventListener('change', function () { list.forEach(function (f) { toggleCheck(f.id, all.checked); }); drawList(); });
       var tb = el('tbody');
       if (!list.length) tb.appendChild(el('tr', null, [el('td', { colspan: '4', 'class': 'pcf-muted', style: 'padding:14px;font-size:12px', text: S.kind === '_closed' ? '종료한 서식이 없습니다 — 양식의 ⋯ 메뉴에서 「🗄 종료 서식으로 옮기기」' : '맞는 양식이 없습니다' })]));
-      var prev = null, n = 0, rows = [];
+      var prev = null, n = 0, rows = [], gcount = {};
+      if (S.kind === 'case' && !S.setView) list.forEach(function (f) { var g0 = groupOf(f); gcount[g0] = (gcount[g0] || 0) + 1; });
       list.forEach(function (f) {
         if (S.kind === 'case' && !S.setView) {
           var g = groupOf(f);
-          if (g !== prev) { prev = g; tb.appendChild(el('tr', { 'class': 'pcf-lgr' }, [el('td', { colspan: '4', 'class': 'pcf-lg', text: g })])); }
+          if (g !== prev) { prev = g; tb.appendChild(el('tr', { 'class': 'pcf-lgr' }, [el('td', { colspan: '4', 'class': 'pcf-lg' }, [el('span', { text: g }), el('span', { 'class': 'pcf-lgn', text: gcount[g] + '개' })])])); }
         }
         n++;
         var on = S.sel === f.id, sd = sideOf(f), st = srcType(f);
@@ -3489,8 +3498,13 @@
           'aria-current': on ? 'true' : null, onclick: function () { select(f.id); } }, [
           el('td', { 'class': 'pcf-lc' }, [ck]),
           el('td', { 'class': 'pcf-ln2' }, [el('span', { 'class': 'pcf-grip', 'aria-hidden': 'true', text: '⠿' }), String(n)]),
-          el('td', { 'class': 'pcf-lnm' }, [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }),
-            (S.setView || S.quote) ? el('span', { 'class': 'pcf-sd both', text: kindInfo(f.kind).label }) : S.kind === '_closed' ? el('span', { 'class': 'pcf-sd both', title: (f.closedAt || '') + ' 종료', text: kindInfo(f.kind).label }) : (sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null)]),
+          (function () {
+            var kids = [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }),
+            (S.setView || S.quote) ? el('span', { 'class': 'pcf-sd both', text: kindInfo(f.kind).label }) : S.kind === '_closed' ? el('span', { 'class': 'pcf-sd both', title: (f.closedAt || '') + ' 종료', text: kindInfo(f.kind).label }) : (sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null)];
+            var sub = (S.kind === 'case' && !S.setView) ? caseParts(f) : '';
+            if (!sub) return el('td', { 'class': 'pcf-lnm' }, kids);
+            return el('td', { 'class': 'pcf-lnm col' }, [el('div', { 'class': 'pcf-l1' }, kids), el('div', { 'class': 'pcf-lsub', text: sub })]);
+          })(),
           el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]);
         tb.appendChild(tr); rows.push({ id: f.id, node: tr });
       });

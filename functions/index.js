@@ -54,6 +54,7 @@ const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
 const RecruitDigest = require("./recruit-digest");
+const GovFeedCollect = require("./gov-feed-collect");
 const RehabWatch = require("./rehab-watch");
 const RehabFsc = require("./rehab-fsc");
 
@@ -1216,6 +1217,33 @@ exports.recruitWatch = functions
       }
     } catch (e) { console.warn("[컨설턴트 모집 감시] 회원 공지 첫 훑기 실패", String(e && e.message || e)); }
     console.log("[컨설턴트 모집 감시]", { checked: result.checked, added: result.hits.length, errors: result.errors });
+    return null;
+  });
+
+/* 📋 공고 모아보기 — 매일 아침 공고 모으기 (대표 지시 2026-10-12 「매일매일 공고를 크롤링 하고 모을 수 있나? 그게 가능하게 만들어 달라」)
+   나라장터·알리오·기업마당을 화면과 «같은 모듈·같은 낱말»로 받아 gov_feed/rows 에 쌓는다. 화면은 열 때 거기서 빠진 공고를 목록에 합친다.
+   ⚠ 인증키는 대표 자리(gov/{uid}/key_data·key_biz)에서 읽기만 한다 — 로그·결과 어디에도 안 남긴다.
+   ⚠ 대표의 목록(gov/{uid}/feed)에는 쓰지 않는다(숨김·별표를 덮지 않게). 하루 약 22회 — 하루 1,000회 제한 안.
+   07:40 — 컨설턴트 모집 감시(07:20)가 끝난 뒤. */
+exports.govFeedCollect = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("every day 07:40")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase(), feed = db.ref("gov_feed");
+    const r = await GovFeedCollect.run({
+      roles: async () => (await db.ref("uid_roles").once("value")).val(),
+      cfg: async (uid) => {
+        const g = db.ref("gov/" + uid);
+        const [d, b, k] = await Promise.all(["key_data", "key_biz", "kw"].map((n) => g.child(n).once("value")));
+        return { keyData: d.val(), keyBiz: b.val(), kw: k.val() };
+      },
+      existing: async () => (await feed.child("rows").once("value")).val(),
+      write: (updates) => feed.update(updates),
+      getJson: async (u) => (await fetch(u, { signal: AbortSignal.timeout(25000) })).json(),
+    });
+    console.log("[공고 모으기]", { ok: r.ok, added: r.last.added, counts: r.last.counts, errors: r.last.errors, error: r.last.error });
     return null;
   });
 

@@ -263,3 +263,28 @@ test('서류 이름 → 낱말 — 공고에 적힌 이름을 낱말표로, 모�
   assert.equal(M.docKeyOf('지급신청서'), 'applyForm');
   assert.equal(M.docKeyOf('특허 등록원부'), 'other');
 });
+
+/* 사업종료 — 예산 소진·접수 마감·폐지 (대표 지시 2026-10-12 「예산이 소진되었다는 부분 … 사업종료 표시」) */
+test('종료된 확정 사업은 «사업종료» — 조건이 맞아도 후보가 아니다', () => {
+  const p = prog({ headcount: { min: 5 } }, { closure: { state: 'closed', reason: 'budget', closedAt: '2026-08-31' } });
+  assert.equal(M.judge(pf({ headcount: 10 }), p, Y).verdict, 'closed');
+  assert.equal(M.closureOf(p).label, '사업종료 · 예산 소진');
+});
+test('일부만 마감(운영기관별 배정 소진)은 후보로 두되 «사람 확인» 조건을 붙인다', () => {
+  const p = prog({ headcount: { min: 5 } }, { closure: { state: 'partial', reason: 'budget', note: '서울 운영기관 마감' } });
+  const r = M.judge(pf({ headcount: 10 }), p, Y);
+  assert.equal(r.verdict, 'candidate');
+  assert.ok(r.items.some((i) => i.state === 'manual' && /일부 마감/.test(i.label)));
+});
+test('초안은 종료 표시가 있어도 «조건 미확정» — 확정 규칙이 먼저', () => {
+  const p = prog({ headcount: { min: 5 } }, { status: 'draft', closure: { state: 'closed', reason: 'deadline' } });
+  assert.equal(M.judge(pf({ headcount: 10 }), p, Y).verdict, 'unconfirmed');
+  assert.equal(M.closureOf(p).label, '접수 마감');
+});
+test('접수 중·모름·표시 없음은 판정에 영향 없음', () => {
+  ['open', 'unknown', undefined].forEach((s) => {
+    const p = prog({ headcount: { min: 5 } }, s ? { closure: { state: s } } : {});
+    assert.equal(M.judge(pf({ headcount: 10 }), p, Y).verdict, 'candidate', String(s));
+    assert.equal(M.closureOf(p).closed, false);
+  });
+});

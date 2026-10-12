@@ -30,7 +30,7 @@ function runApp(seed, opt) {
     GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'), GovCareer: require('../js/gov-career.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'), GovAlio: require('../js/gov-alio.js'),
     GovBizinfo: require('../js/gov-bizinfo.js'), GovRecruit: require('../js/gov-recruit.js'),
-    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'), GovSync: require('../js/gov-sync.js'),
+    GovSubmit: require('../js/gov-submit.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'), GovInbox: require('../js/gov-inbox.js'), GovSync: require('../js/gov-sync.js'),
     firebase: undefined, fetch: () => Promise.reject(new Error('no net')),
     AbortController: function(){ this.abort = () => {}; this.signal = null; },
     URL: { createObjectURL: () => 'blob:x', revokeObjectURL(){} }, Blob: function(){},
@@ -48,7 +48,7 @@ function runApp(seed, opt) {
     + 'kwTog,star,recSeenAll,recFold,recFoldOpen,popClose,recWatchHits,get,recSub,recSubCur,recKindSet,'
     + 'recSelTog,recSelAll,recSelSeen,recSelSkip,recSelUndo,recSelSt,recSelN,recPer,recLiveTog,recDueSave,recOpenPost,'
     + 'matchOpen,matchMark,matchSel,matchBulk,lineSend,lineMark,lineKind,linesOf,docsOpen,docsSel,docsToNeed,docsJudge,recNeedOf,recDirInfo:_recDirInfo,setMatDocs:function(d){ _matDocs=d; },'
-    + 'orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
+    + 'inboxPull,feedSrvHtml,orgRecTag,orgRecBlock,orgRecOpen,orgRecEnsure,orgRecFind,feedStarOnly,feedStarBtn,recWatchLoad,feedPop,find,'
     + 'toast:function(f){ toast=f; },setFb:function(db,uid){fbDb=db;fbUid=uid;}};', ctx);
   ctx.__api.toast((m) => toasts.push(m));
   ctx.__api.setOpen = (fn) => { opt._open = fn; };
@@ -1505,4 +1505,77 @@ test('★ 빈 목록 줄의 칸 수(colspan)가 머리 칸 수와 같다 — 별
   const r = runApp({}, { Date: FixedDate(TODAY) });
   r.api.draw();
   assert.match(r.el('tb').innerHTML, new RegExp('colspan="' + ths + '"'), '머리 칸 ' + ths + '개인데 빈 줄 colspan 이 다르다');
+});
+
+/* ═══ 🛰 서버가 매일 모은 공고 — 화면에서 합치기 (대표 지시 2026-10-12) ═══ */
+const INBOX = {
+  rows: {
+    s1: { no: 'S1', nm: '2026년 노무 컨설팅 용역', src: '나라장터', org: '서산시', ntce: '서산시', openDt: '2026-10-11 09:00:00', closeDt: '2026-10-30 10:00:00', prc: 3000000, mthd: '제한경쟁', url: 'https://g2b.go.kr/s1', kw: '노무', at: '2026-10-11T22:40:00.000Z' },
+    s2: { no: 'S2', nm: '수출기업 해외마케팅 컨설팅', src: '나라장터', org: 'x', at: '2026-10-11T22:40:00.000Z' },
+    s3: { no: 'S3', nm: '숨겨 둔 노무 용역', src: '나라장터', org: 'y', closeDt: '2026-10-30 10:00:00', at: '2026-10-11T22:40:00.000Z' }
+  },
+  last: { at: '2026-10-11T22:40:00.000Z', today: '2026-10-12', counts: { g2b: 40, alio: 6, biz: 9 }, added: 3 }
+};
+function fbInbox(val, fail) {
+  const writes = [];
+  return { writes, db: { ref: (p) => ({
+    once: () => (fail ? Promise.reject(Object.assign(new Error('permission_denied'), { code: 'PERMISSION_DENIED' })) : Promise.resolve({ val: () => (p === 'gov_feed' ? val : null) })),
+    set: () => { writes.push(p); return Promise.resolve(); }, update: () => { writes.push(p); return Promise.resolve(); } }) } };
+}
+test('★★★ 서버 받은 함의 공고를 내 목록에 합친다 — 낱말에 맞는 것만 · 이미 있는(숨긴) 번호는 그대로 · 알림 한 번', async () => {
+  const r = runApp({ feed: [{ id: 'G0001', no: 'S3', nm: '숨겨 둔 노무 용역', hidden: true, type: '새 공고' }] }, { Date: FixedDate('2026-10-12T09:00:00') });
+  const f = fbInbox(INBOX); r.api.setFb(f.db, 'U1');
+  await r.api.inboxPull();
+  const feed = r.api.get('feed');
+  assert.deepEqual(feed.map((x) => x.no).sort(), ['S1', 'S3'], 'S2(마케팅)는 낱말에 안 맞고, S3 는 이미 있다');
+  const s1 = feed.find((x) => x.no === 'S1');
+  assert.equal(s1.type, '새 공고'); assert.equal(s1.org, '서산시'); assert.equal(s1.url, 'https://g2b.go.kr/s1'); assert.ok(s1.id && s1.id !== 'G0001');
+  assert.equal(feed.find((x) => x.no === 'S3').hidden, true, '숨긴 공고가 되살아났다');
+  assert.equal(r.toasts.filter((t) => /서버가 매일 모은 공고 1건/.test(t)).length, 1);
+});
+test('★★★ 화면은 서버 칸(gov_feed)에 «쓰지 않는다» — 읽기만(set·update 호출 0)', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-12T09:00:00') });
+  const f = fbInbox(INBOX); r.api.setFb(f.db, 'U1');
+  await r.api.inboxPull();
+  assert.deepEqual(f.writes, []);
+  assert.doesNotMatch(src, /ref\('gov_feed[^)]*'\)\s*\.(set|update|push|remove)/);
+});
+test('★ 마감이 이미 지난 공고를 합치면 바로 「지나감」 — 새 공고로 남아 있으면 지난 것이 위에 쌓인다', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-12T09:00:00') });
+  r.api.setFb(fbInbox({ rows: { p: { no: 'P1', nm: '노무 용역', src: '나라장터', closeDt: '2026-10-01 10:00:00', at: '2026-10-10T22:40:00.000Z' }, q: { no: 'Q1', nm: '노무 컨설팅', src: '나라장터', closeDt: '2026-11-01 10:00:00', at: '2026-10-10T22:40:00.000Z' } } }).db, 'U1');
+  await r.api.inboxPull();
+  const f = r.api.get('feed');
+  assert.equal(f.find((x) => x.no === 'P1').type, '지나감'); assert.equal(f.find((x) => x.no === 'Q1').type, '새 공고');
+});
+test('★ 두 번 불러도 같은 공고가 두 줄이 되지 않는다(멱등)', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-12T09:00:00') });
+  r.api.setFb(fbInbox(INBOX).db, 'U1');
+  await r.api.inboxPull(); await r.api.inboxPull();
+  assert.equal(r.api.get('feed').filter((x) => x.no === 'S1').length, 1);
+});
+test('★ 읽을 권한이 없으면(직원) 조용히 넘어간다 — 오류를 띄우지 않고 목록·상태 줄도 그대로', async () => {
+  const r = runApp({ feed: [{ id: 'G0001', no: 'K', nm: '노무 용역' }] }, { Date: FixedDate('2026-10-12T09:00:00') });
+  r.api.setFb(fbInbox(null, true).db, 'U1');
+  await r.api.inboxPull();
+  assert.equal(r.api.get('feed').length, 1); assert.equal(r.api.feedSrvHtml(), ''); assert.deepEqual(r.toasts, []);
+});
+test('★ 서버 상태 줄 — 공고 목록 위 「📅 … 마지막으로 받은 때」 밑에 «마지막 시각·출처별 건수»가 보인다', async () => {
+  const r = runApp({ feed: [{ id: 'G0001', no: 'K', nm: '노무 용역', openDt: '2026-10-01', savedAt: '2026-10-01T00:00:00Z' }] }, { Date: FixedDate('2026-10-12T09:00:00') });
+  r.api.draw();
+  assert.doesNotMatch(r.el('period').innerHTML, /서버가 매일 아침/, '아직 안 읽었으면 말하지 않는다');
+  r.api.setFb(fbInbox(INBOX).db, 'U1'); await r.api.inboxPull(); r.api.draw();
+  const h = r.el('period').innerHTML;
+  assert.match(h, /🛰 서버가 매일 아침 공고를 모읍니다/); assert.match(h, /나라장터 40 · 알리오 6 · 기업마당 9/); assert.match(h, /이번에 목록에 합친 것 2건/);
+});
+test('★ 서버가 아직 한 번도 안 돌았으면 그렇게 말한다 · 멈춘 지 이틀이면 빨갛게', async () => {
+  const r = runApp({}, { Date: FixedDate('2026-10-12T09:00:00') });
+  r.api.setFb(fbInbox({}).db, 'U1'); await r.api.inboxPull();
+  assert.match(r.api.feedSrvHtml(), /아직 한 번도 안 돌았습니다/);
+  const r2 = runApp({}, { Date: FixedDate('2026-10-12T09:00:00') });
+  r2.api.setFb(fbInbox({ last: { at: '2026-10-09T22:40:00.000Z', today: '2026-10-10', counts: {}, added: 0 } }).db, 'U1'); await r2.api.inboxPull();
+  assert.match(r2.api.feedSrvHtml(), /color:var\(--red\)[^>]*>🛰[\s\S]*2일째 새로 안 돌았습니다/);
+});
+test('★ 불러오기는 로그인 뒤 cloudPull «다음», 규칙(rejudge) «앞»이다 — 순서가 바뀌면 합친 줄이 걸러지지 않는다', () => {
+  assert.match(src, /await cloudPull\(\); await inboxPull\(\); srcBackfill\(\); rejudge\(\);/);
+  assert.match(src, /<script src="js\/gov-inbox\.js\?v=\d+"><\/script>/, '화면이 모듈을 싣는다');
 });

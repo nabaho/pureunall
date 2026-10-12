@@ -140,3 +140,23 @@ test('한눈 표 머리는 가로 짧은 이름 + 부처 묶음 머리 — 세�
   assert.match(f, /GovaidView\.byMinistry\(/);
   assert.doesNotMatch(NOC, /writing-mode:\s*vertical/);
 });
+
+/* 사업종료 표시 · 편집 창 줄이기 (대표 지시 2026-10-12) */
+test('사업종료 — 상태 표시가 엔진의 closureOf 를 쓰고, 회사·사업 화면에 «사업종료» 수를 보인다', () => {
+  assert.match(fnBody('statusChip') + fnBody('closureChip'), /GovaidMatch\.closureOf\(/);
+  assert.match(fnBody('statusChip'), /closureChip\(/);
+  assert.match(fnBody('drawCoDetail'), /closed/);
+  assert.match(NOC, /closed:'사업종료'/, 'VERDICT 에 사업종료가 없다');
+});
+test('편집 창에서 접수 상태(사업종료·일부 마감)를 넣고, 누가 언제 표시했는지 남긴다', () => {
+  const rd = fnBody('readEditor') + fnBody('readClosure');
+  assert.match(rd, /eClState/);
+  assert.match(rd, /checkedAt/);
+  assert.match(rd, /ME\.sid/);
+});
+test('편집 창 — 예/아니오는 한 칸에 여럿(격자), 숫자 조건은 한 줄', () => {
+  const ed = fnBody('editorHtml');
+  assert.match(ed, /class="facts"/);
+  const seg = ed.slice(ed.indexOf('id="eHcMin"'), ed.indexOf('id="eSdMin"'));
+  assert.ok(seg.length > 0 && seg.indexOf('class="k"') < 0, '근로자·업력·매출 감소 사이에 다른 줄 이름표가 끼었다(한 줄이 아니다)');
+});
