@@ -1,0 +1,10 @@
+{
+  "deviceHost": "",
+  "deviceId": "",
+  "sdkKey": "",
+  "sdkSecret": "",
+  "liveEnabled": false,
+  "dateStyle": "rfc1123",
+  "project": "pureun-erp",
+  "pollSec": 60
+}

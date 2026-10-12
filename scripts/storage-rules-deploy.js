@@ -60,7 +60,8 @@ const 쓰는자리 = [
   ['erp_docs/UID/D123/reason.hwp', '옛 서면함 자리 — 화면은 2026-09-14 에 뺐고 규칙만 남겼다'],
   ['gov_evidence/SID/F.png', '자문관리 증빙'],
   ['kcareer_forms/UID/CVFORM123.hwpx', '경력관리 기관 양식 (kcareer.html kcFormPath)'],
-  ['erp_img/img_mfx1abc_k2j9q', '이알피 레코드 그림 — 명함·사업자등록증·직인 (pu-erp.html erpImgCloudPath)']
+  ['erp_img/img_mfx1abc_k2j9q', '이알피 레코드 그림 — 명함·사업자등록증·직인 (pu-erp.html erpImgCloudPath)'],
+  ['signboard/ad_lq3k9x2a4f0001_m1a2b3.jpg', '전광판 광고 사진·동영상 (pu-signboard.html onFile)']
 ];
 
 /* 규칙 한 칸이 «이 길»에 맞나 — 창고 규칙의 짝짓기를 그대로 흉내낸다.

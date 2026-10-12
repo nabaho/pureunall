@@ -50,6 +50,7 @@ const DONE = [
   ['rehab-ad.html', '회생광고'],
   ['gov-report.html', '컨설팅보고서'],
   ['pu-govaid.html', '정부지원금'],
+  ['pu-signboard.html', '전광판'],
 ];
 
 /* 일부러 남긴 것. ★ 이 목록을 늘리지 말 것 — 예외가 늘면 팔레트가 무너진다. */
@@ -100,6 +101,8 @@ const EXCEPT = {
   'gov-report.html': new Set([]),
   /* 정부지원금(2026-10-11) — 처음부터 팔레트만 쓴다. 예외를 채워 넣지 말 것 */
   'pu-govaid.html': new Set([]),
+  /* 전광판(2026-10-12) — 처음부터 팔레트만 쓴다. LED 글자색은 화면 색이 아니라 «장비에 보낼 자료»라 js/pu-signboard-core.js 에 둔다 */
+  'pu-signboard.html': new Set([]),
   /* ⚠ DONE 에 든 파일은 EXCEPT 에도 칸이 있어야 한다 — 없으면 팔레트 밖 색이
      나왔을 때 «무엇이 잘못됐는지 말하는 대신» TypeError 로 터진다(2026-09-19 에 그랬다). */
   /* 대표 지시 2026-09-27 「캘린더 ui 와 화면을 구글캘린더 화면과 글자색·테두리·글자형태로
