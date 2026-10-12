@@ -24,7 +24,9 @@ test('새 스크립트는 캐시 번호를 달고 lib-sites 뒤·view-sites 앞�
 });
 
 test('상태 — cols·sort·page·pop 이 ST.sites 에 있다', () => {
-  const i = HTML.indexOf('sites: {');
+  const t0 = HTML.indexOf('var ST = {');
+  assert.ok(t0 >= 0, 'ST 첫 값');
+  const i = HTML.indexOf('sites: {', t0);
   assert.ok(i >= 0, 'ST.sites');
   const st = HTML.slice(i, HTML.indexOf('staff:', i));
   assert.ok(st.length > 10);
@@ -60,4 +62,42 @@ test('고르기·새로고침은 쪽을 건드리지 않는다 (없는 쪽은 �
 
 test('순서 단추를 같은 방향으로 다시 누르면 순서가 풀린다', () => {
   assert.match(fn('colSort'), /\.sort\s*=[^;]*\?\s*null\s*:/);
+});
+
+/* CSS 한 규칙의 몸통 — 선택자로 찾는다 */
+const rule = (sel) => {
+  const i = HTML.indexOf(sel + '{');
+  assert.ok(i >= 0, sel + ' 규칙');
+  return HTML.slice(i, HTML.indexOf('}', i));
+};
+
+test('쪽 막대는 좁은 폭에서 줄을 바꿔 흰 상자 안에 남는다', () => {
+  assert.match(rule('#sites .pager'), /flex-wrap:\s*wrap/);
+  const info = rule('#sites .pager .info');
+  assert.match(info, /flex:\s*1 1 auto/);
+  assert.doesNotMatch(info, /white-space:\s*nowrap/, '안내 글이 한 줄을 강요하지 않는다');
+  assert.match(HTML, /@media \(max-width:\s*900px\)\{#sites \.pager \.info\{flex-basis:\s*100%/);
+});
+
+test('머리줄 창은 위쪽 띠·머리보다 위, 모달 베일보다 아래', () => {
+  const z = (r) => Number(/z-index:\s*(\d+)/.exec(r)[1]);
+  const pop = z(rule('.cpop'));
+  assert.ok(pop > z(rule('.top')), '위쪽 띠보다 위');
+  assert.ok(pop < z(rule('.veil')), '모달 베일보다 아래');
+});
+
+test('순서 열쇠가 없는 칸을 누르면 아무 일도 안 한다', () => {
+  assert.match(fn('colSort'), /if\s*\(\s*!sk\s*\)\s*return/);
+});
+
+test('창 목록은 체크·찾기로 다시 그려도 읽던 자리를 지킨다', () => {
+  const d = HTML.match(/function drawKeepList\(\)[\s\S]*?\r?\n\}/);
+  assert.ok(d, 'drawKeepList');
+  assert.match(d[0], /scrollTop/);
+  assert.match(fn('colToggle'), /drawKeepList\(\)/);
+  assert.match(fn('colq'), /drawKeepList\(\)/);
+});
+
+test('창은 아래 화면 밖으로 밀려 나가지 않게 세로도 눌러 둔다', () => {
+  assert.match(fn('colOpen'), /innerHeight/);
 });

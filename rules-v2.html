@@ -50,7 +50,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/store.js?v=4"></script>
 <script src="js/rules-v2/view-library.js?v=3"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=4"></script>
+<script src="js/rules-v2/view-sites.js?v=5"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -229,7 +229,7 @@ button{font:inherit;cursor:pointer}
 #sites th.ch .h .ar{color:#1e40af;font-size:10px}
 #sites th.ch .h .fl{margin-left:auto;color:#94a3b8;font-size:11px}
 #sites th.ch.on .h{background:#eff6ff;color:#1e40af}#sites th.ch.on .h .fl{color:#1e40af}
-.cpop{z-index:30;width:236px;background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 22px rgba(30,41,59,.18);padding:8px;font-size:12px;color:#1e293b}
+.cpop{z-index:10;width:236px;background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 22px rgba(30,41,59,.18);padding:8px;font-size:12px;color:#1e293b}
 .cpop .sort{display:flex;gap:6px;margin-bottom:6px}
 .cpop .sort button{flex:1;height:26px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px}
 .cpop .sort button.on{background:#1e40af;border-color:#1e40af;color:#ffffff}
@@ -246,8 +246,9 @@ button{font:inherit;cursor:pointer}
 #sites .cact .tag{display:inline-flex;gap:3px;align-items:center;background:#ffffff;border:1px solid #bfdbfe;border-radius:10px;padding:1px 4px 1px 9px}
 #sites .cact .tag button{border:0;background:none;color:#1e40af;padding:0 4px}
 #sites .cact .clr{margin-left:auto;border:0;background:none;color:#1e40af;text-decoration:underline}
-#sites .pager{display:flex;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0}
-#sites .pager .info{color:#475569;font-size:12px;margin-right:auto;white-space:nowrap}#sites .pager .info b{color:#1e293b}
+#sites .pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0}
+#sites .pager .info{color:#475569;font-size:12px;flex:1 1 auto}#sites .pager .info b{color:#1e293b}
+@media (max-width:900px){#sites .pager .info{flex-basis:100%}}
 #sites .pg{min-width:28px;height:26px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px;white-space:nowrap}
 #sites .pg.on{background:#1e40af;border-color:#1e40af;color:#ffffff;font-weight:700}
 #sites .pg[disabled]{opacity:.45;cursor:default}
@@ -389,6 +390,12 @@ function busy(t, p) {
   return Promise.resolve(p).then(function (v) { ST.busy = ''; return v; }, function (e) {
     ST.busy = ''; draw(); alert((e && e.message) || String(e)); throw e;
   });
+}
+/* 창 안 목록(.cpop .list)은 다시 그리면 맨 위로 돌아간다 — 체크·찾기 때 읽던 자리를 지킨다 */
+function drawKeepList() {
+  var l = $sites && $sites.querySelector && $sites.querySelector('.cpop .list'), top = l ? l.scrollTop : 0;
+  draw();
+  if (top) { l = $sites.querySelector('.cpop .list'); if (l) l.scrollTop = top; }
 }
 function reload() {
   // 📚 조별 문안의 모델은 이 저장 «전»의 자료다 — 낡았다고 표시해 두면 다음에 #topics 로 들어올 때 새로 셈한다
@@ -697,12 +704,13 @@ var H = {
     if (s.pop === key) { s.pop = ''; draw(); return; }
     var b = ev && ev.target && ev.target.closest && ev.target.closest('button'), r = b && b.getBoundingClientRect();
     s.pop = key; s.popq = '';
-    s.popPos = r ? { x: Math.max(8, Math.min(r.left, (window.innerWidth || 1200) - 250)), y: r.bottom + 2 } : { x: 40, y: 140 };
+    s.popPos = r ? { x: Math.max(8, Math.min(r.left, (window.innerWidth || 1200) - 250)), y: Math.max(8, Math.min(r.bottom + 2, (window.innerHeight || 800) - 300)) } : { x: 40, y: 140 };
     draw();
   },
   colClose: function () { ST.sites.pop = ''; ST.sites.popq = ''; draw(); },   // 늘 다시 그린다 — render 가 «열려 있을 때만» 부른다
   colSort: function (d) {
     var s = ST.sites, sk = PuRulesV2SiteCols.SORT_OF[d.key], dir = d.dir === 'desc' ? 'desc' : 'asc';
+    if (!sk) return;   // 순서 열쇠가 없는 칸 — 아무 일도 하지 않는다
     s.sort = s.sort && s.sort.key === sk && s.sort.dir === dir ? null : { key: sk, dir: dir };
     s.page = 1; draw();
   },
@@ -710,7 +718,7 @@ var H = {
     var s = ST.sites, a = (s.cols[key] || []).slice(), i = a.indexOf(v);
     if (on && i < 0) a.push(v); else if (!on && i >= 0) a.splice(i, 1);
     if (a.length) s.cols[key] = a; else delete s.cols[key];
-    s.page = 1; draw();
+    s.page = 1; drawKeepList();
   },
   colClear: function (d) {
     var s = ST.sites;
@@ -720,7 +728,7 @@ var H = {
   colsClear: function () { ST.sites.cols = {}; ST.sites.page = 1; draw(); },
   colWho: function (d) { ST.sites.who = String(d.v || ''); ST.sites.page = 1; draw(); },
   colq: function (v) {
-    ST.sites.popq = v; draw();
+    ST.sites.popq = v; drawKeepList();
     var q = $sites.querySelector('[data-role="colq"]'); if (q) { q.focus(); q.setSelectionRange(q.value.length, q.value.length); }
   },
   pageGo: function (d) {

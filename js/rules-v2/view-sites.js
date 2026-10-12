@@ -271,7 +271,11 @@
       if (out) { s.pop = ''; s.popq = ''; }
       var run = b && el.contains(b) && b.tagName !== 'INPUT' && H[b.dataset.act];
       if (run) { ev.preventDefault(); run(b.dataset, ev); return; }
-      if (out && H.colClose) H.colClose();
+      if (!out) return;
+      // 입력칸·선택칸을 눌렀으면 다시 그리지 않는다 — 그리면 그 칸이 DOM 에서 떨어져 나가 커서·열린 목록이 사라진다. 창만 떼어 낸다
+      var tg = ev.target, inCtl = /^(INPUT|SELECT|TEXTAREA)$/.test((tg && tg.tagName) || '') || !!(tg && tg.closest && tg.closest('input,select,textarea'));
+      if (inCtl) { var pp = el.querySelector && el.querySelector('.cpop'); if (pp && pp.remove) pp.remove(); }
+      else if (H.colClose) H.colClose();
     };
     el.oninput = function (ev) {
       var t = ev.target;

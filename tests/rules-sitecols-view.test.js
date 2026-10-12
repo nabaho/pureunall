@@ -140,7 +140,8 @@ function fakeTarget(o) {
 function wire(sites, handlers) {
   // 진짜 colClose 는 다시 그려서 눌린 단추를 DOM 에서 떼어 낸다 — 그 뒤 el.contains 는 거짓이 된다
   let redrawn = false;
-  const el = { innerHTML: '', contains: () => !redrawn };
+  const popup = { removed: false, remove() { popup.removed = true; } };
+  const el = { innerHTML: '', contains: () => !redrawn, querySelector: (q) => (q === '.cpop' ? popup : null), popup };
   const state = st(sites);
   const calls = [];
   const H = {};
@@ -187,6 +188,20 @@ test('손잡이 이음 — 창 밖, 손잡이 없는 곳을 누르면 colClose �
   w2.el.onclick(ev(fakeTarget()));
   w2.el.onclick(ev(fakeTarget({ dataset: { act: 'siteSel' } })));
   assert.equal(w2.count('colClose'), 0); assert.equal(w2.count('siteSel'), 1);
+});
+
+test('손잡이 이음 — 창 밖의 입력칸·선택칸을 누르면 그 칸을 다시 그리지 않는다: 상태만 비우고 창 DOM 만 뗀다', () => {
+  [{ tag: 'INPUT' }, { tag: 'SELECT' }, { closest: { 'input,select,textarea': {} } }].forEach((o) => {
+    const w = wire({ pop: 'biz', popq: '제' });
+    w.el.onclick(ev(fakeTarget(o)));
+    assert.equal(w.count('colClose'), 0, 'colClose 를 부르면 눌린 칸이 떨어져 나간다');
+    assert.equal(w.state.sites.pop, ''); assert.equal(w.state.sites.popq, '');
+    assert.equal(w.el.popup.removed, true, '창 DOM 은 뗀다');
+  });
+  const w2 = wire({ pop: 'biz' });
+  w2.el.onclick(ev(fakeTarget()));
+  assert.equal(w2.count('colClose'), 1, '버튼 따위를 눌렀을 때는 지금처럼 colClose');
+  assert.equal(w2.el.popup.removed, false);
 });
 
 test('손잡이 이음 — 체크 바뀜은 colToggle(칸, 값, 체크), 업태 찾기 글은 colq(글)', () => {
