@@ -1,7 +1,9 @@
-/* 이관이 업체 연결 때문에 막히면 «이유를 창으로» 알린다 (2026-10-12 대천맛김 계약-2026-124)
-   까닭: 연결 방식이 비어 이관이 조용히 막혔고(알림 한 줄뿐), 계약확정 칸에 그대로 남아 대표는 이관한 줄 알았다.
+/* 이관이 막히면 «이유와 푸는 길»을 팝업으로 알린다 (2026-10-12 대천맛김 계약-2026-124, 대표 지시)
+   까닭: 연결 방식이 비어 이관이 조용히 막혔고(알림 2초), 계약확정 칸에 그대로 남아 대표는 이관한 줄 알았다.
    규칙: ① 연결 방식이 비면 사유 글이 나온다 ② 연결 보류(신규)·업체 연결이면 막지 않는다
-        ③ doTransfer 는 이관 처리 «전에» 이 사유를 보고 창으로 알린다. */
+        ③ 막히는 «모든» 경우 — 사유마다 푸는 길이 붙는다
+        ④ 검증 함수들이 알림으로만 알리던 글도 모아 팝업으로 다시 보인다
+        ⑤ doTransfer·재이관은 알림 한 줄로만 끝나지 않는다. */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -39,11 +41,40 @@ test('업체 ID 로 연결돼 있으면 막지 않는다', () => {
   assert.equal(ctx.erpTransferBlockReason(c), '');
 });
 
-test('doTransfer 는 이관 처리 전에 사유를 보고 창으로 알린다', () => {
+test('사유마다 푸는 길이 붙는다 — 업체 연결·담당자·원본 변경·서버 저장', () => {
+  const c = { window: {} }; vm.createContext(c);
+  vm.runInContext(cutFn('function erpXferFixFor('), c);
+  assert.match(c.erpXferFixFor('업체를 선택하거나 신규·미확정 업체는 연결 보류를 선택하세요.'), /업체 연결 확인/);
+  assert.match(c.erpXferFixFor('명부에서 사번을 유일하게 확인할 수 없습니다: P-004'), /담당자/);
+  assert.match(c.erpXferFixFor('원본 계약이 변경됐습니다. 다시 열고 이관하세요.'), /새로고침/);
+  assert.match(c.erpXferFixFor('서버 저장 확인 실패 (기술보호-2026-011)'), /새로고침/);
+  assert.ok(c.erpXferFixFor('처음 보는 사유').length > 10, '모르는 사유도 빈 말로 두지 않는다');
+});
+
+test('이관 중 뜬 알림 글을 모아 두고, stop 뒤에는 모으지 않는다', () => {
+  const ctx = { window: {} }; vm.createContext(ctx);
+  vm.runInContext(cutFn('function erpXferToastCapture('), ctx);
+  const seen = [];
+  ctx.window.showToast = (m) => seen.push(m);
+  const cap = ctx.erpXferToastCapture();
+  ctx.window.showToast('원본 계약이 변경됐습니다.');
+  const got = cap.stop();
+  assert.equal(JSON.stringify(got), JSON.stringify(['원본 계약이 변경됐습니다.']));
+  assert.deepEqual(seen, ['원본 계약이 변경됐습니다.'], '알림은 그대로 뜬다');
+  ctx.window.showToast('뒤 알림');
+  assert.equal(got.length, 1, 'stop 뒤에는 모으지 않는다');
+});
+
+test('doTransfer 는 이관 처리 전에 사유를 보고, 막힘을 알림 한 줄로만 끝내지 않는다', () => {
   const a = src.indexOf('erpTransferBlockReason(ct)');
   const b = src.indexOf('results = transferContract(ct, _xferOpt)');
   assert.ok(a > 0 && b > 0, '두 호출을 못 찾음');
   assert.ok(a < b, '사유 확인이 이관 처리보다 앞에 있어야 함');
   assert.ok(b - a < 20000, '같은 함수 안이어야 함');
-  assert.match(src.slice(a, a + 900), /popConfirm\(/, '알림 한 줄(showToast)이 아니라 창(popConfirm)으로 알린다');
+  assert.match(src.slice(a, a + 300), /erpXferBlockedPopup\(/, '창으로 알린다');
+  const i = src.indexOf('async function doTransfer(');
+  const head = src.slice(i, b);
+  assert.doesNotMatch(head, /showToast\('(계약유형 없음|⚠ '\+_unverifiedT|⚠ 일부 업무만)/, '막힘 알림 한 줄이 남아 있다');
+  assert.match(src.slice(b, b + 2500), /erpXferBlockedPopup\(ct, _tmsgs/, '검증 함수가 알린 글을 팝업으로 다시 보인다');
+  assert.match(src, /erpXferBlockedPopup\(ct, _rmsgs/, '종료관리 재이관도 팝업');
 });
