@@ -718,6 +718,8 @@ const NR = require("./news-ready");
 /* 금요일 13시 자동 준비 · 월요일 다시 봉인 (대표 지시 2026-09-27) — functions/news-friday.js */
 const NF = require("./news-friday");
 const NWatch = require("./news-watch");
+/* 반송 안내의 «본문»까지 읽어 갈래·실패 주소를 판정(대표 「추천대로」 2026-10-12) — newsletterBounceScan 이 부른다 */
+const BounceBody = require("./news-bounce-body");
 const NoticeLog = require("./news-notice-log");   /* 안내문 발송 대장 짓개(순수) — 다음메일 거울을 읽기만 한다 */
 const NCore = require("./news-lib/pu-news-core.js");   /* 화면과 같은 한 벌(사본) — 일요일 보충이 고르개를 쓴다 */
 
@@ -1929,7 +1931,7 @@ exports.newsletterSundayRefill = functions
    ⚠ 보낸 지 14일이 지나면 안 본다(그 뒤 반송은 다음 회차가 잡는다). */
 exports.newsletterBounceScan = functions
   .region(MAIL_REGION)
-  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["GEMINI_KEY"] })
+  .runWith({ timeoutSeconds: 300, memory: "512MB", secrets: ["GEMINI_KEY", "DAUM_MAIL_PASSWORD"] })
   .pubsub.schedule("every day 09:00")
   .timeZone("Asia/Seoul")
   .onRun(async () => {
@@ -1957,14 +1959,28 @@ exports.newsletterBounceScan = functions
     const 메일들 = Object.assign({}, 받은메일, NWatch.대기열실패를메일로(대기열, 회차들[보낸].batchId));
     /* 명단은 «막은 주소까지» — 이미 막은 주소의 반송도 기록은 남긴다 */
     const 명단 = (NF.명단짓기({ 설정, 사업장들, 더한분들, 막은주소: {} }).ok || []);
-    const r = NWatch.반송모으기({ 메일들, 명단, 보낸때: Number(회차들[보낸].보낸때), 회차: 보낸, 기존, now });
+    /* ★ 본문까지 읽어 판정을 «보강» 한다(2026-10-12) — 사유가 본문 HTML 에 있는 반송(가비아 하이웍스·고객사 서버)은
+         제목·미리보기 140자로는 «까닭 모름»이거나 아예 못 알아봐, 사람이 원문을 열어 손으로 정리해야 했다.
+       ⚠ 읽기만 한다(읽기 전용으로 연다 — 읽음 표시·이동·삭제 없음). 후보만 12통까지, 어떻게 되든 스캔은 그대로 돈다.
+       ⚠ 자동으로 명단에서 빼는 것은 «확실한 근거»가 있을 때만 — 애매한 것은 «모름»으로 내려 사람이 본다(news-bounce-body.js). */
+    let 보강 = { 메일들, 후보수: 0, 읽은수: 0, 고친수: 0, 오류: "" };
+    try {
+      const MS = require("./mail-sync");
+      const { simpleParser } = require("mailparser");
+      보강 = await BounceBody.보강하기({
+        메일들, 명단, 보낸때: Number(회차들[보낸].보낸때), 기존, 한도: BounceBody.한도기본,
+        읽기: BounceBody.IMAP읽개({ 열기: (fn) => MS.withFolder(MAIL_DEPS, 받은, fn), 풀기: (src) => simpleParser(src) }),
+      });
+      if (보강.오류) console.warn("[반송 본문] 읽기 실패 — 예전 판정만 씁니다:", 보강.오류);
+    } catch (e) { console.warn("[반송 본문]", e.message); }
+    const r = NWatch.반송모으기({ 메일들: 보강.메일들, 명단, 보낸때: Number(회차들[보낸].보낸때), 회차: 보낸, 기존, now });
     /* ★ 까닭 모를 반송 — AI 가 원문을 읽고 갈래를 «제안»만 (확정은 사람이 화면에서). 한 번에 다섯 통까지 */
     let AI수 = 0;
     for (const k of Object.keys(r.쓸)) {
       const b = r.쓸[k];
       if (b.갈래 !== "모름" || b.AI || AI수 >= 5) continue;
       const 마지막 = Object.keys(b.메일 || {}).pop();
-      const m = 메일들[마지막] || {};
+      const m = 보강.메일들[마지막] || {};
       try {
         const 답 = await 뉴스레터AI(NWatch.반송AI지시(b, m), { temperature: 0, maxOutputTokens: 256 });
         b.AI = Object.assign(NWatch.반송AI답읽기(답, String(m.s || "") + " " + String(m.p || "")), { 때: now });
@@ -1977,7 +1993,8 @@ exports.newsletterBounceScan = functions
     upd["newsletter/bounceMeta"] = { 때: now, 회차: 보낸, 새로: Object.keys(r.쓸).length, 뺀것: Object.keys(r.막을).length, 메일함: 받은 };
     await db.ref().update(upd);
     await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
-    console.log("[반송 확인]", JSON.stringify({ 회차: 보낸, 새로: Object.keys(r.쓸).length, 뺀것: Object.keys(r.막을).length }));
+    console.log("[반송 확인]", JSON.stringify({ 회차: 보낸, 새로: Object.keys(r.쓸).length, 뺀것: Object.keys(r.막을).length,
+      본문: { 후보: 보강.후보수, 읽음: 보강.읽은수, 고침: 보강.고친수 } }));
     return null;
   });
 

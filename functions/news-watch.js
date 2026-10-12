@@ -455,7 +455,9 @@ function 반송모으기(o) {
   Object.keys(메일들).sort((a, b) => (Number((메일들[a] || {}).d) || 0) - (Number((메일들[b] || {}).d) || 0)).forEach((k) => {
     const m = 메일들[k] || {};
     if ((Number(m.d) || 0) < 보낸때) return;
-    const r = Core.반송갈래(m);
+    /* ★ 본문까지 읽어 «이미 판정한» 줄이면 그 판정을 쓴다(news-bounce-body.js, 2026-10-12) — 없으면 예전 그대로.
+         제목·미리보기 140자만으로는 사유가 본문 HTML 에 있는 반송(가비아 하이웍스·고객사 서버)을 못 가른다. */
+    const r = (m.판정 && m.판정.갈래) ? m.판정 : Core.반송갈래(m);
     if (!r.갈래 || r.갈래 === '자동회신') return;
     const 주소 = (r.주소들 || []).find((a) => 명[a]);
     if (!주소) return;
