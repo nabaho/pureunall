@@ -54,7 +54,8 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grMailFetch', 'grMailCall', 'grRdHtml', 'grReadRd', 'grRenderCrit',
   'grOkChapKey', 'grChapAsk', 'grChapConsent', 'grChapCall', 'grChapErrMsg', 'grChapNames', 'grChapLinked', 'grChapInput', 'grChapSay', 'grRenderChap', 'grChapEdit',
   'grChapCopyText', 'grChapCopy', 'grChapCopyAll', 'grChapAi',
-  'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv'];
+  'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv',
+  'grDashHtml', 'grBoardHtml', 'grLoadDashView', 'grSetDashView', 'grBizBlocked'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -64,7 +65,7 @@ function world(o) {
   ['cwKey', 'cwSt', 'cwSent', 'cwGot', 'cwHow', 'cwAck', 'cwNote', 'cwHwpMsg'].forEach((id) => { els[id] = fakeEl(); }); // 칸 창 입력 — 진짜 DOM 에서는 innerHTML 이 만든다
   const urls = { made: [], revoked: [] };   // 보기 창이 만든·버린 blob 주소
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
-    encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportNav: Nav, PuGovReportTrack: Tr,
+    encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportNav: Nav, PuGovReportTrack: Tr, PuGovReportDash: require('../js/pu-gov-report-dash.js'),
     PuGovReportInbox: I, PuGovReportSend: require('../js/pu-gov-report-send.js'), PuGovReportCriteria: require('../js/pu-gov-report-criteria.js'), PuGovReportAi: require('../js/pu-gov-report-ai.js'), PuGovReportChapters: require('../js/pu-gov-report-chapters.js'), PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout, AbortController,
     /* 받은 서류함 — 가짜 서버(mailServer)·로그인·blob 주소. 서버를 안 주면 부르는 순간 실패한다 */
     fetch: (o.mail && o.mail.fetch) || (async () => { throw new Error('이 검사는 서버를 부르면 안 된다'); }),
@@ -1851,7 +1852,7 @@ test('70 대형 사업 체크표 — 단계 열 머리·「다음 단계」·기
   assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t2" data-step="plat" data-item="plan"'));
   assert.ok(h.includes('data-cell="1" data-co="c2" data-ty="t2" data-step="report" data-item="kickoff"'));
   assert.ok(h.includes('<span class="st st-wait">○ 없음 0/2</span>'), '회차 서류는 0/2 (회차 둘)');
-  const line = h.split('<tr>').filter((x) => x.includes('다라정밀'))[0];
+  const line = h.split('<tr>').filter((x) => x.includes('<td class="co"') && x.includes('다라정밀'))[0];   // 대시보드 점 줄에도 이름이 있다 — 표의 줄만
   assert.ok(line.includes('<td>참여 안내서(서명)</td>'), '기록이 없으면 다음 단계는 첫 단계');
   assert.equal(w.db.쓴것.length, 0);
   /* 간단형 — 지금과 같은 5열 */
@@ -1982,7 +1983,7 @@ test('76 저장 — 대형 단계 칸: scal_docs/<co>/<rid>/items/plan 한 줄�
   assert.deepEqual(Object.keys(v).sort(), ['at', 'by', 'gotAt', 'link', 'note', 'st'], '규칙 밖 필드 없음');
   assert.deepEqual([v.st, v.gotAt, v.note, v.by, typeof v.at, v.link], ['done', '2026-10-09', '플랫폼 입력 마침', '홍길동', 'number', BIG_LINK]);
   assert.ok(w.els.cellw.innerHTML.includes('저장했습니다'));
-  const row = w.els.docs.innerHTML.split('<tr>').filter((x) => x.includes('다라정밀'))[0];
+  const row = w.els.docs.innerHTML.split('<tr>').filter((x) => x.includes('<td class="co"') && x.includes('다라정밀'))[0];   // 대시보드 점 줄에도 이름이 있다 — 표의 줄만
   assert.ok(row.includes('<span class="st st-done">● 등록함</span>'), row);
   assert.ok(row.includes('<td>참여 안내서(서명)</td>'), '다음 단계는 아직 첫 단계');
   /* 회차 칸 — 고른 줄 키 하나만 */
@@ -4023,4 +4024,173 @@ test('132 실제 관문(강제 모드) — 종결 .set·되돌림 표시 .set �
   assert.equal(calls.length, 2, '막힌 .remove 는 나가지 않았다');
   /* 대조 — 화면 코드에는 .remove 가 없으므로 이 막힘이 운영에서 되돌리기를 깨지 않는다 */
   assert.doesNotMatch(INLINE, /\.remove\s*\(/);
+});
+
+/* ═══ 사업별 대시보드(UI 재정리 2단계, 2026-10-12) — 순수 모듈 PuGovReportDash 를 화면에 잇는다. 읽기만 — 새 쓰기·새 DB 칸 없음 ═══ */
+test('133 정적 — 대시보드 모듈은 서류 모듈 다음 · 화면이 요약·보드·막힌 수를 부른다 · 쓰기는 여전히 .set 셋 · 보기 저장은 try/catch 안의 localStorage 뿐 · 색을 직접 지정하지 않는다', () => {
+  assert.match(SRC, /<script src="js\/pu-gov-report-dash\.js\?v=\d+"><\/script>/);
+  assert.ok(SRC.indexOf('pu-gov-report-docs.js') < SRC.indexOf('pu-gov-report-dash.js'), '서류 모듈 다음에 싣는다');
+  ['PuGovReportDash.summarize(', 'PuGovReportDash.board(', 'PuGovReportDash.blockedCounts(', 'data-dv=', 'dsh', 'bd-card', 'bz-al'].forEach((s) => assert.ok(SRC.includes(s), s));
+  assert.ok(SRC.includes('단계 현황을 알 수 없습니다'), '기록을 못 읽었을 때 안내 문구');
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], WRITES, '새 쓰기 명령이 없다');
+  ['grDashHtml', 'grBoardHtml'].forEach((n) => assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|fetch\(|localStorage/, n + ' 은 읽어 그리기만'));
+  const ls = INLINE.match(/localStorage\.[a-zA-Z]+\([^)]*gov_dash_view[^)]*\)/g) || [];
+  assert.ok(ls.length >= 2, '보기 선택 읽기·쓰기');
+  assert.match(grab('grLoadDashView'), /try\s*\{[^}]*localStorage\.getItem[^}]*\}\s*catch/);
+  assert.match(grab('grSetDashView'), /try\s*\{[^}]*localStorage\.setItem[^}]*\}\s*catch/);
+  const css = SRC.slice(SRC.indexOf('<style>'), SRC.indexOf('</style>'));
+  const dshCss = css.split(/\r?\n/).filter((l) => /\.dsh|\.dp-|\.bd-|\.bz-al/.test(l)).join('\n');
+  assert.ok(dshCss.length > 0);
+  assert.doesNotMatch(dshCss, /#[0-9a-fA-F]{3,8}\b|rgba?\(/, '새 CSS 는 기존 변수만');
+  assert.match(grab('grRenderDocs'), /\[data-dv\]|PuGovReportDash\.summarize/);
+  assert.match(SRC, /closest\('\[data-dv\]'\)/);
+});
+
+test('134 대형 대시보드 — 숫자 4칸(막힌 업체 .bad)·단계 막대·업체 점(title)·회차·표/보드 단추 · 기본은 표 · 값은 이스케이프 · 읽기만', async () => {
+  const w = world({ seed: bigSeed({ track: { t2: { plan: { st: 'blocked', note: '<b>x</b>' } } } }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  const h = w.els.docs.innerHTML;
+  assert.match(h, /<div class="dsh">/);
+  assert.equal(countOf(h, /class="dsh-k[ "]/g), 4, '숫자 4칸');
+  ['진행 업체', '막힌 업체', '기한 14일 안', '모두 끝'].forEach((s) => assert.ok(h.includes(s), s));
+  assert.match(h, /class="dsh-k bad"><b>1<\/b>/, '막힌 업체 1 — 붉은 칸');
+  assert.ok(h.includes('class="dsh-p"') && h.includes('class="dsh-l"'));
+  ['참여 안내서(서명)', '수행계획서', '이행결과표'].forEach((s) => assert.ok(new RegExp('class="dsh-pn">' + s.replace(/[()]/g, '\\$&')).test(h), s + ' 막대 이름'));
+  assert.match(h, /완료 \d+ · 진행 \d+ · 막힘 1/, '막대 글줄');
+  assert.match(h, /title="수행계획서: 막힘"/, '점마다 단계: 상태');
+  assert.ok(h.includes('data-dv="table"') && h.includes('data-dv="board"'), '대형은 표·보드 단추');
+  assert.ok(h.includes('<div class="dc-wide"><table>') && !h.includes('bd-col'), '기본은 표');
+  assert.ok(h.indexOf('class="dsh"') < h.indexOf('<div class="dc-wide">') && h.indexOf('class="dc-h"') < h.indexOf('class="dsh"'), '머리줄 아래 · 표 위');
+  assert.ok(!h.includes('<b>x</b>'), '값은 글자로');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('135 간단형 대시보드 — 숫자·막대·점은 있고 표/보드 단추는 없다 · 서류 틀 없는 사업·연결 없는 사업에는 대시보드가 없다', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  let h = w.els.docs.innerHTML;
+  assert.match(h, /<div class="dsh">/);
+  assert.equal(countOf(h, /class="dsh-k[ "]/g), 4);
+  assert.ok(!h.includes('data-dv='), '표/보드 전환은 대형만');
+  assert.ok(h.includes('class="dsh-pn">①초안'), '간단형 열 ①~⑤');
+  assert.ok(!h.includes('data-item') && !h.includes('dc-wide') && !h.includes('다음 단계'), '기존 간단형 표 검사와 같다');
+  w.ctx.grSetBiz('consulting-01');
+  assert.ok(!w.els.docs.innerHTML.includes('dsh'), '연결 없는 사업');
+  w.ctx.grSetBiz('consulting-01');
+  w.ctx.GR.f.year = '1999'; w.ctx.grSetBiz('consulting-03');
+  assert.ok(w.els.docs.innerHTML.includes('이 사업 업체가 없습니다') && !w.els.docs.innerHTML.includes('dsh'), '업체 0곳이면 안 그린다');
+});
+
+test('136 보드 — 단추를 누르면 열(단계)·카드(button.cellb.bd-card, 막힘은 딱지) · 선택은 localStorage 에 저장되고 다음 번에도 · 「표」로 돌아온다 · 읽기 거절이어도 던지지 않는다', async () => {
+  const store = {};
+  const ls = { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } };
+  const w = world({ seed: bigSeed({ track: { t2: { plan: { st: 'blocked' } } } }), ls });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  assert.equal(w.ctx.GR.dashView, 'table');
+  w.ctx.grSetDashView('board');
+  let h = w.els.docs.innerHTML;
+  assert.equal(store.gov_dash_view, 'board');
+  assert.ok(h.includes('class="bd"') && h.includes('bd-col') && !h.includes('<table>'), '표 대신 보드');
+  assert.equal(countOf(h, /<button[^>]*class="[^"]*bd-card/g), 2, '업체 둘 = 카드 둘');
+  assert.match(h, /<button type="button" class="cellb bd-card bd-blk" data-cell="1" data-co="c2" data-ty="t2" data-step="sign" data-item="guide"/, '막힌 업체(다라정밀)의 카드는 다음 단계(첫 단계) 열에서 그 칸 창을 연다');
+  assert.ok(h.includes('bd-blk') && h.includes('막힘'), '막힘 딱지');
+  assert.ok(h.includes('모두 끝') && h.includes('수행계획서'), '열 이름');
+  assert.ok(h.includes('data-dv="board"') && h.includes('aria-pressed="true"'));
+  w.ctx.grSetDashView('table');
+  assert.ok(w.els.docs.innerHTML.includes('<div class="dc-wide"><table>'));
+  assert.equal(store.gov_dash_view, 'table');
+  /* 시작 때 읽기 — board 만 인정 */
+  store.gov_dash_view = 'board'; w.ctx.grLoadDashView(); assert.equal(w.ctx.GR.dashView, 'board');
+  store.gov_dash_view = 'zzz'; w.ctx.grLoadDashView(); assert.equal(w.ctx.GR.dashView, 'table');
+  /* 저장소가 막혀도(없음·던짐) 던지지 않는다 */
+  const bad = world({ seed: bigSeed(), ls: { getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); } } });
+  await bad.ctx.grLoad();
+  bad.ctx.grSetBiz('consulting-02');
+  bad.ctx.grLoadDashView();
+  bad.ctx.grSetDashView('board');
+  assert.ok(bad.els.docs.innerHTML.includes('bd-col'), '저장은 못 해도 이번 보기는 바뀐다');
+  const none = world({ seed: bigSeed() });
+  await none.ctx.grLoad();
+  none.ctx.grLoadDashView();
+  assert.equal(none.ctx.GR.dashView, 'table');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('137 보드 카드 — 칸 칩이 없는 단계 카드는 «목차» 단추(data-toc) · 이름은 이스케이프', async () => {
+  /* docsTable 은 칩 없는 단계를 «다음 단계» 로 고르지 않는다 — 그래도 칩 없는 칸이 다음 단계로 들어오면(손으로 만든 합성 표) 칸 창이 아니라 목차 단추다 */
+  const w = world();
+  const table = { big: true, cols: ['가단계', '나단계'], plan: { items: [{ id: 'a' }, { id: 'b' }] }, lines: [
+    { coId: 'c1', typeId: 't1', coName: '합성<b>상사</b>', due: '', rounds: 0, planned: 0, next: { id: 'a', name: '가단계' },
+      cells: [{ id: 'a', step: 'sign', chip: null }, { id: 'b', step: 'sign', chip: { key: 'wait', txt: '없음' }, st: 'none' }] }] };
+  const S = require('../js/pu-gov-report-dash.js').summarize(table, { trackKnown: true, today: '2026-10-10' });
+  const h = w.ctx.grBoardHtml(table, S);
+  assert.match(h, /<button type="button" class="bd-card" data-toc="1" data-co="c1" data-ty="t1"/);
+  assert.ok(!h.includes('data-cell') && !h.includes('<b>상사'), '칸 창 없음 · 이름은 글자로');
+  const s = bigSeed(); s.scal_cos.filter((c) => c.id === 'c2')[0].name = '<img src=x onerror=1>';
+  const x = world({ seed: s });
+  await x.ctx.grLoad();
+  x.ctx.grSetBiz('consulting-02');
+  x.ctx.GR.dashView = 'board'; x.ctx.grRenderDocs();
+  assert.ok(!x.els.docs.innerHTML.includes('<img') && x.els.docs.innerHTML.includes('&#60;img src=x'), '카드·점 줄 이름');
+});
+
+test('138 기록을 못 읽으면 — 숫자 4칸·막대 없이 «단계 현황을 알 수 없습니다» 한 줄 + 업체 수만 · 가짜 0%·100% 없음 · 보드 단추는 남고 카드는 모두 «기록 미확인»', async () => {
+  const denied = { once: async () => { throw new Error('permission_denied'); } };
+  const w = world({ seed: bigSeed(), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  const h = w.els.docs.innerHTML;
+  assert.equal(w.ctx.GR.trackErr, true);
+  assert.ok(h.includes('기록을 못 불러와 단계 현황을 알 수 없습니다'));
+  assert.ok(/업체 2곳/.test(h));
+  assert.ok(!h.includes('dsh-k') && !h.includes('dsh-p') && !h.includes('dsh-seg') && !h.includes('%'), '숫자 칸·막대 없음');
+  assert.ok(h.includes('data-dv="board"'));
+  w.ctx.grSetDashView('board');
+  const b = w.els.docs.innerHTML;
+  assert.ok(b.includes('기록 미확인') && !b.includes('data-cell'), '못 읽었으니 칸 창을 열지 않고 목차 단추로');
+  assert.equal(countOf(b, /<button[^>]*bd-card/g), 2);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('139 막대 — 해당 없음 열은 «해당 없음» · 나눗셈·% 없음 · 간단형 기술보호 ③ 열', async () => {
+  const w = world();
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-03');
+  const h = w.els.docs.innerHTML;
+  assert.ok(h.includes('해당 없음'), '기술보호는 ③ 서명본이 없다');
+  assert.ok(!/NaN|Infinity/.test(h));
+  assert.ok(/class="dsh-pn">③서명본<\/span>[^]*?해당 없음/.test(h));
+});
+
+test('140 종결 사업을 골라도 종결 배너 아래에 대시보드가 보인다', async () => {
+  const s = bigSeed({ track: { t2: { plan: { st: 'blocked' } } } }); s.scal_bizState = { 'consulting-02': { closedFrom: '2026', at: 1 } };
+  const w = world({ seed: s });
+  await w.ctx.grLoad();
+  w.ctx.grSetBiz('consulting-02');
+  const h = w.els.docs.innerHTML;
+  assert.ok(h.includes('class="cl-bn"') && h.includes('class="dsh"'));
+  assert.ok(h.indexOf('class="cl-bn"') < h.indexOf('class="dsh"'));
+});
+
+test('141 왼쪽 붉은 숫자 — 막힌 단계가 있는 업체 수를 항목에 · 0·종결·기록 못 읽음에는 안 단다', async () => {
+  const track = { t2: { plan: { st: 'blocked' }, 'round:1': { st: 'blocked' } } };
+  const w = world({ seed: bigSeed({ track }) });
+  await w.ctx.grLoad();
+  const item = (ww, code) => { const m = ww.els.biz.innerHTML.match(new RegExp('<button[^>]*data-biz="' + code + '"[^>]*>[\\s\\S]*?</button>')); assert.ok(m, code); return m[0]; };
+  assert.ok(item(w, 'consulting-02').includes('<span class="bz-al" title="막힌 단계가 있는 업체 1곳">1</span>'), '같은 업체의 막힌 단계가 둘이어도 업체 1곳');
+  assert.ok(!item(w, 'consulting-03').includes('bz-al'), '0 은 안 단다');
+  /* 종결 사업 */
+  const s = bigSeed({ track }); s.scal_bizState = { 'consulting-02': { closedFrom: '2026', at: 1 } };
+  const c = world({ seed: s });
+  await c.ctx.grLoad();
+  assert.ok(!item(c, 'consulting-02').includes('bz-al'), '종결 항목');
+  /* 기록을 못 읽음 */
+  const denied = { once: async () => { throw new Error('permission_denied'); } };
+  const r = world({ seed: bigSeed({ track }), db: (db) => ({ ref: (p) => (p === 'scal_docs' ? denied : db.ref(p)) }) });
+  await r.ctx.grLoad();
+  assert.ok(!r.els.biz.innerHTML.includes('bz-al'));
+  assert.equal(w.db.쓴것.length, 0);
 });

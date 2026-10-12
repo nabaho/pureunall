@@ -104,6 +104,50 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
 .docs{background:var(--card);border:1px solid var(--blue-line);border-radius:10px;padding:10px;margin-bottom:10px;overflow:auto}
 .dc-h{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
 .dc-wide{overflow-x:auto}
+/* 사업 대시보드 — 숫자 4칸(.dsh-k) · 단계 막대(.dsh-p) · 업체 점 줄(.dsh-l) · 대형 보드(.bd) — 색은 위 변수만 */
+.dsh{border:1px solid var(--line);border-radius:10px;padding:10px;margin-bottom:10px;background:var(--bg)}
+.dsh-v{display:flex;gap:4px;justify-content:flex-end;margin-bottom:8px}
+.dsh-v button{font-size:12px;padding:3px 10px}
+.dsh-v button.on{background:var(--blue-bg);border-color:var(--blue);color:var(--blue-ink);font-weight:700}
+.dsh-un{font-size:13px;color:var(--mute);padding:4px 0}
+.dsh-ks{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:10px}
+.dsh-k{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.dsh-k b{display:block;font-size:20px;font-variant-numeric:tabular-nums}
+.dsh-k span{font-size:12px;color:var(--mute)}
+.dsh-k.bad{background:var(--red-bg);border-color:var(--red)}
+.dsh-k.bad b{color:var(--red)}
+.dsh-k.warn{background:var(--amber-bg);border-color:var(--amber)}
+.dsh-k.warn b{color:var(--amber)}
+.dsh-p{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:10px}
+.dsh-pc{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:6px 8px;min-width:0}
+.dsh-pn{display:block;font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-bar{display:flex;height:8px;border-radius:4px;overflow:hidden;background:var(--line);margin:4px 0}
+.dsh-sd{background:var(--green)}
+.dsh-sg{background:var(--amber)}
+.dsh-sb{background:var(--red)}
+.dsh-sn{background:var(--line)}
+.dsh-pt{font-size:11px;color:var(--mute)}
+.dsh-l{max-height:240px;overflow:auto;border-top:1px solid var(--line)}
+.dsh-r{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:5px 0;border-bottom:1px solid var(--line);font-size:13px}
+.dsh-c{font-weight:600;min-width:90px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dsh-d{display:inline-flex;gap:4px}
+.dsh-m{font-size:12px;color:var(--mute)}
+.dsh-b{border-radius:999px;padding:1px 8px;font-size:11px;background:var(--red-bg);color:var(--red)}
+.dp{display:inline-block;width:12px;height:12px;border-radius:50%;border:1px solid var(--mute);background:var(--card)}
+.dp-done{background:var(--green);border-color:var(--green)}
+.dp-doing{background:var(--amber);border-color:var(--amber)}
+.dp-blocked{background:var(--red);border-color:var(--red)}
+.dp-na{border-style:dashed;border-color:var(--line)}
+.dp-unknown{background:var(--line)}
+.bd{display:flex;gap:8px;overflow-x:auto;align-items:flex-start;padding-bottom:6px}
+.bd-col{flex:0 0 190px;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:6px}
+.bd-h{display:flex;justify-content:space-between;gap:4px;font-size:12px;font-weight:700;color:var(--mute);margin-bottom:6px}
+button.bd-card{display:block;width:100%;text-align:left;background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:6px 8px;margin-bottom:6px}
+button.bd-card.bd-blk{border-left-color:var(--red)}
+.bd-nm{display:block;font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bd-sub{display:block;font-size:12px;color:var(--mute)}
+.bz-al{min-width:18px;text-align:center;border-radius:999px;padding:0 6px;font-size:11px;font-weight:700;background:var(--red);color:var(--card)}
+@media (max-width:760px){ .dsh-ks{grid-template-columns:repeat(2,minmax(0,1fr))} .dsh-p{grid-template-columns:repeat(2,minmax(0,1fr))} }
 .dc-l{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--line)}
 .tag-chk{display:inline-block;border-radius:6px;padding:1px 6px;font-size:11px;background:var(--amber-bg);color:var(--amber);border:1px solid #fde68a}
 .tocb{margin-left:4px}
@@ -230,6 +274,8 @@ button.act{border-color:var(--line);background:var(--card);color:var(--mute)}
      서류 진행 기록(③서명본·④별첨·⑤제출) — 칸 상태·저장 꼴(순수 함수). docs 가 불러 쓰므로 먼저 싣는다 -->
 <script src="js/pu-gov-report-track.js?v=8"></script>
 <script src="js/pu-gov-report-docs.js?v=11"></script>
+<!-- 사업별 대시보드(숫자 4칸·단계 막대·업체 점·보드) 계산 — docs 의 서류 표 출력을 읽기만 한다(순수 함수) -->
+<script src="js/pu-gov-report-dash.js?v=1"></script>
 <!-- 왼쪽 사업 목록 모델(사업 이름 (수행기관))·사업 종결 판정(순수 함수) — docs 가 불러 쓰므로 docs 다음에 싣는다 -->
 <script src="js/pu-gov-report-nav.js?v=2"></script>
 <!-- 받은 서류함 — 주소 맞추기(pu-co-thread) · 서버 부르기(rules-v2/mail-orig 의 makeCall) · 후보·연결 열쇠·첨부 받기 순서(순수 함수)
@@ -266,7 +312,7 @@ var GR_INBOX_NODES={folders:'mailbox/folders',msgs:'mailbox/msgs',cos:'data/comp
 var GR_MAIL={fn:'https://asia-northeast3-pureun-erp.cloudfunctions.net/',per:3000,wait:180000};
 /* 사업 종결 표시 — 이 앱의 쓰기 자리 둘째(scal_bizState/{이알피 사업 코드}). 읽기는 통째 한 번, 쓰기는 사업 하나(종결 .set · 되돌리기 = 같은 칸에 closedFrom 9999 표시 .set) */
 var GR_BIZ={node:'scal_bizState',code:/^[A-Za-z0-9_-]{1,40}$/,fail:'저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)',reopen:'되돌림'};
-var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,bizState:{},bseq:0,bzOpen:{},cm:null,bmsg:'',bbusy:false,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
+var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,bizState:{},bseq:0,bzOpen:{},dashView:'table',cm:null,bmsg:'',bbusy:false,f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
 function lock(why){ $('app').style.display='none'; $('lock').style.display='block'; $('lockWhy').textContent=why||''; }
@@ -374,29 +420,39 @@ function grClosedText(st,short){
 }
 function grBizState(code){ return (GR.bizState&&Object.prototype.hasOwnProperty.call(GR.bizState,code))?GR.bizState[code]:null; }
 /* 항목 한 줄 = «사업 이름» 굵게 + «(수행기관)» 작게(기관이 비면 「기관 미지정」) · 종류 딱지 · 업체 수(종결 사업은 «YYYY-MM 종결») */
-function grBizBtn(t,grp){
+function grBizBtn(t,grp,al){
   var D=PuGovReportDocs, cl=grp==='closed';
   var tip=t.label.text+(grp==='unlinked'?' — 정부사업일정의 ERP 연결에 이 사업이 없습니다':'')+(cl?' — '+grClosedText(grBizState(t.code)):'');
   return '<button type="button" class="bz'+(t.code===GR.f.biz?' on':'')+(cl?' cl':'')+'" data-biz="'+grEsc(t.code)+'" title="'+grEsc(tip)+'">'
     +'<span class="bz-n"><span class="bz-nm">'+grEsc(t.label.name)+'</span><span class="bz-ag">('+grEsc(t.label.agency)+')</span></span>'
     +'<span class="bz-k">'+grEsc(D.KIND_KO[t.kind])+'</span>'
+    +(!cl&&al>0?'<span class="bz-al" title="막힌 단계가 있는 업체 '+grEsc(al)+'곳">'+grEsc(al)+'</span>':'')
     +(cl?'<span class="bz-d">'+grEsc(grClosedText(grBizState(t.code),true))+'</span>':'<b>'+t.count+'</b>')+'</button>';
+}
+/* 사업(일정 사업 번호)별 «막힌 단계가 있는 업체 수» — 서류 진행 기록에서 직접 센다(알림의 「막힌 단계」와 같은 계산).
+   기록을 못 읽었으면 빈 값 — 0 처럼 보이게 하지 않는다 */
+function grBizBlocked(){
+  var d=GR.docs||{};
+  if(!d.loaded||d.err||GR.trackErr||!GR.track||!GR.input) return {};
+  try{ return PuGovReportDash.blockedCounts(PuGovReportDocs.blockedAlerts({input:GR.input,year:GR.f.year,track:GR.track,biz:d.biz,tmap:d.tmap,consultings:d.cons})); }
+  catch(e){ console.warn('[컨설팅보고서] 막힌 단계 수를 못 셈',e); return {}; }
 }
 /* 왼쪽 패널 — 이알피 「환경설정 → 컨설팅관리 → 컨설팅 사업」을 «고른 해 기준»으로: 진행 사업(업체 있음) 위에, 나머지는 접는 묶음
    (업체 없음 · 서류 틀 없음 · 정부사업일정에 사업 없음 · 🗄 종결 사업). 모델은 PuGovReportNav.build. 고른 사업이 든 묶음은 늘 펼쳐 둔다 */
 function grRenderBiz(){
-  var d=GR.docs, el=$('biz');
+  var d=GR.docs, el=$('biz'), D0=PuGovReportDocs;
   if(d.err){ el.innerHTML='<div class="err-s">컨설팅 사업 목록을 불러오지 못했습니다</div><button type="button" onclick="grRetryDocs()">다시 시도</button>'; return; }
   if(!d.loaded){ el.innerHTML='<div class="days">불러오는 중…</div>'; return; }
   var m=PuGovReportNav.build({biz:d.biz,tmap:d.tmap,input:GR.input,year:GR.f.year,state:GR.bizState});
   if(!(m.open.length+m.quiet.length+m.noPlan.length+m.unlinked.length+m.closed.length)){ el.innerHTML='<div class="days">환경설정 → 컨설팅관리에 컨설팅 사업이 없습니다</div>'; return; }
+  var bc=grBizBlocked(), al=function(t){ var id=D0.linkOf(t.code,d.tmap,GR.input&&GR.input.types); return (id&&Object.prototype.hasOwnProperty.call(bc,id))?bc[id]:0; };
   var h='<div class="bz-g"><div class="bz-h">진행 사업 <span class="bz-k">'+m.open.length+'</span></div>'
-    +(m.open.length?m.open.map(function(t){ return grBizBtn(t,'open'); }).join(''):'<div class="days">'+grEsc(GR.f.year)+'년에 업체가 있는 사업이 없습니다</div>')+'</div>';
+    +(m.open.length?m.open.map(function(t){ return grBizBtn(t,'open',al(t)); }).join(''):'<div class="days">'+grEsc(GR.f.year)+'년에 업체가 있는 사업이 없습니다</div>')+'</div>';
   [['quiet','업체 없음',m.quiet],['noPlan','서류 틀 없음',m.noPlan],['unlinked','정부사업일정에 사업 없음',m.unlinked],['closed','🗄 종결 사업',m.closed]].forEach(function(g){
     if(!g[2].length) return;
     var on=GR.bzOpen[g[0]]===true||g[2].some(function(t){ return t.code===GR.f.biz; });
     h+='<details class="bz-g off"'+(on?' open':'')+'><summary class="bz-t" data-grp="'+g[0]+'">'+g[1]+' <span class="bz-k">'+g[2].length+'</span></summary>'
-      +g[2].map(function(t){ return grBizBtn(t,g[0]); }).join('')+'</details>';
+      +g[2].map(function(t){ return grBizBtn(t,g[0],al(t)); }).join('')+'</details>';
   });
   el.innerHTML=h;
 }
@@ -426,6 +482,8 @@ function grRenderDocs(){
     return c.step?'<button type="button" class="cellb" data-cell="1" data-co="'+grEsc(x.coId)+'" data-ty="'+grEsc(x.typeId)+'" data-step="'+grEsc(c.step)+'" title="눌러서 기록">'+chip(c)+'</button>':chip(c);
   };
   var closed=PuGovReportNav.closedFor(GR.bizState,GR.f.biz,GR.f.year);
+  /* 사업 대시보드 — 서류 틀이 있고(간단형·대형) 업체가 있을 때만. 기록을 못 읽었으면 요약이 «모름»(가짜 0% 없음) */
+  var S=(tid&&(t.big||t.auto)&&t.lines.length)?PuGovReportDash.summarize(t,{trackKnown:!GR.trackErr&&!!GR.track,today:GR.today}):null;
   var head='<div class="dc-h"><b>📋 서류 — '+grEsc(erp?erp.name:'')+'</b><span class="tag">'+grEsc(D.KIND_KO[t.plan.kind])+'</span>'
     +(t.plan.check?'<span class="tag-chk">[확인 필요: '+grEsc(t.plan.check)+']</span>':'')
     +((t.auto||t.big)&&GR.trackErr?'<span class="err-s">'+grEsc(T.LOAD_FAIL)+'</span>':'')
@@ -433,6 +491,7 @@ function grRenderDocs(){
   var body;
   if(!tid) body='<div class="empty">'+grEsc(D.UNLINKED)+' — 사업 잇기는 정부사업일정의 ERP 연결에서</div>';
   else if(!t.lines.length) body='<div class="empty">'+grEsc(GR.f.year)+'년에 이 사업 업체가 없습니다</div>';
+  else if(S&&t.big&&GR.dashView==='board') body=grBoardHtml(t,S);
   else if(t.big){
     /* 대형 — 단계(항목)마다 한 열. 단계 칸은 칩이 있을 때만 단추(칸 창) · 키가 없으면 「—」 · 기록을 못 읽었으면 「?」 */
     var bcell=function(x,c){
@@ -452,7 +511,67 @@ function grRenderDocs(){
         +'<td>'+grEsc(x.due||'—')+'</td><td>'+btn(x,'목차')+'</td></tr>';
     }).join('')+'</tbody></table>';
   else body=t.lines.map(function(x){ return '<div class="dc-l"><span>'+grEsc(x.coName)+'</span>'+btn(x,'서류 목차 보기')+'</div>'; }).join('');
-  el.innerHTML=(closed?grClosedBanner():'')+head+body; el.style.display='';
+  el.innerHTML=(closed?grClosedBanner():'')+head+(S?grDashHtml(t,S):'')+body; el.style.display='';
+}
+/* 사업 대시보드 카드 — 숫자 4칸 · 단계 막대 · 업체 점 줄(대형은 표/보드 단추도). 읽어서 그리기만 한다(쓰기 없음).
+   기록을 못 읽었으면 숫자·막대 없이 안내 한 줄 + 업체 수만. 막대 열이 전부 «해당 없음»이면 글자만(나눗셈 없음) */
+function grDashHtml(t,S){
+  var KO={done:'완료',doing:'진행',blocked:'막힘',none:'미착수',na:'해당 없음',unknown:'확인 불가'}, K=S.kpi;
+  var sw=t.big?'<div class="dsh-v" role="group" aria-label="서류 보기">'+[['table','표'],['board','보드']].map(function(v){
+    var on=(GR.dashView==='board')===(v[0]==='board');
+    return '<button type="button" class="'+(on?'on':'')+'" data-dv="'+v[0]+'" aria-pressed="'+on+'">'+v[1]+'</button>';
+  }).join('')+'</div>':'';
+  if(!S.known) return '<div class="dsh">'+sw+'<div class="dsh-un">기록을 못 불러와 단계 현황을 알 수 없습니다 · 업체 '+grEsc(K.n)+'곳</div></div>';
+  var kc=function(cls,n,label,tip){ return '<div class="dsh-k'+cls+'"><b>'+grEsc(n)+'</b><span'+(tip?' title="'+grEsc(tip)+'"':'')+'>'+grEsc(label)+'</span></div>'; };
+  var nums='<div class="dsh-ks">'+kc('',K.n-K.finished,'진행 업체','전체 '+K.n+'곳 중 아직 끝나지 않은 업체')
+    +kc(K.blocked>0?' bad':'',K.blocked,'막힌 업체','막힌 단계가 하나라도 있는 업체')
+    +kc(K.soon>0?' warn':'',K.soon,'기한 14일 안','이미 지난 것 포함 · 끝난 업체 제외')
+    +kc('',K.finished,'모두 끝','판정할 수 있는 단계가 모두 완료')+'</div>';
+  var bars='<div class="dsh-p">'+S.cols.map(function(c){
+    var b;
+    if(!c.total) b='<div class="dsh-pt">해당 없음</div>';
+    else b='<div class="dsh-bar" title="'+grEsc('완료 '+c.done+' · 진행 '+c.doing+' · 막힘 '+c.blocked+' · 미착수 '+c.none)+'">'
+      +[['done','dsh-sd'],['doing','dsh-sg'],['blocked','dsh-sb'],['none','dsh-sn']].map(function(p){ return c[p[0]]?'<i class="'+p[1]+'" style="flex:'+c[p[0]]+'"></i>':''; }).join('')
+      +'</div><div class="dsh-pt">완료 '+c.done+' · 진행 '+c.doing+' · 막힘 '+c.blocked+'</div>';
+    return '<div class="dsh-pc"><span title="'+grEsc(c.name)+'" class="dsh-pn">'+grEsc(c.name)+'</span>'+b+'</div>';
+  }).join('')+'</div>';
+  var rows='<div class="dsh-l">'+S.lines.map(function(x){
+    var dots=x.states.map(function(s,i){ return '<i class="dp dp-'+grEsc(s)+'" title="'+grEsc(((S.cols[i]||{}).name||'')+': '+(KO[s]||''))+'"></i>'; }).join('');
+    var due='';
+    if(x.soon) due=x.dueDays<0?'<span class="dsh-b">기한 '+grEsc(-x.dueDays)+'일 지남</span>':'<span class="dsh-m">기한 '+(x.dueDays===0?'오늘':grEsc(x.dueDays)+'일 남음')+'</span>';
+    return '<div class="dsh-r"><span class="dsh-c" title="'+grEsc(x.coName)+'">'+grEsc(x.coName)+'</span><span class="dsh-d">'+dots+'</span>'
+      +(x.planned>0?'<span class="dsh-m">회차 '+grEsc(x.rounds)+'/'+grEsc(x.planned)+'</span>':'')
+      +((t.big&&x.next!==undefined)?'<span class="dsh-m">'+(x.next?'다음: '+grEsc(x.next.name):'모두 끝')+'</span>':'')
+      +(x.blockedN>0?'<span class="dsh-b">막힘 '+grEsc(x.blockedN)+'</span>':'')+due+'</div>';
+  }).join('')+'</div>';
+  return '<div class="dsh">'+sw+nums+bars+rows+'</div>';
+}
+/* 대형 보드 — 열 = 단계(+모두 끝·기록 미확인), 카드 = 업체(그 업체의 다음 단계 열에 한 장). 칸 칩이 있으면 칸 창(.cellb 위임), 없으면 목차 창(data-toc 위임) */
+function grBoardHtml(t,S){
+  var B=PuGovReportDash.board(t,S);
+  return '<div class="bd">'+B.cols.map(function(c){
+    return '<div class="bd-col"><div class="bd-h"><span>'+grEsc(c.name)+'</span><span>'+c.cards.length+'</span></div>'
+      +(c.cards.length?c.cards.map(function(k){
+        var cls='bd-card'+(k.blockedN>0?' bd-blk':''), at='data-co="'+grEsc(k.coId)+'" data-ty="'+grEsc(k.typeId)+'"';
+        var sub=(k.planned>0?'회차 '+grEsc(k.rounds)+'/'+grEsc(k.planned):'')+(k.due?(k.planned>0?' · ':'')+'기한 '+grEsc(k.due):'');
+        var inner='<span class="bd-nm" title="'+grEsc(k.coName)+'">'+grEsc(k.coName)+'</span>'+(sub?'<span class="bd-sub">'+sub+'</span>':'')
+          +(k.blockedN>0?'<span class="dsh-b">막힘 '+grEsc(k.blockedN)+'</span>':'');
+        return k.cell
+          ?'<button type="button" class="cellb '+cls+'" data-cell="1" '+at+' data-step="'+grEsc(k.cell.step)+'" data-item="'+grEsc(k.cell.id)+'" title="눌러서 기록">'+inner+'</button>'
+          :'<button type="button" class="'+cls+'" data-toc="1" '+at+' title="목차 보기">'+inner+'</button>';
+      }).join(''):'<div class="bd-sub">—</div>')+'</div>';
+  }).join('')+'</div>';
+}
+/* 표/보드 보기 — 브라우저에만 적는 편의(실패해도 이번 보기는 바뀐다). 읽을 때는 board 만 인정, 나머지는 표 */
+function grLoadDashView(){
+  var v='table';
+  try{ if(localStorage.getItem('gov_dash_view')==='board') v='board'; }catch(e){}
+  GR.dashView=v;
+}
+function grSetDashView(v){
+  GR.dashView=(v==='board')?'board':'table';
+  try{ localStorage.setItem('gov_dash_view',GR.dashView); }catch(e){}
+  grRenderDocs();
 }
 /* 종결된 사업(고른 해 기준)을 골랐을 때 서류 패널 위 배너 — 종결일·사유·처리자 + 「↩ 되돌리기」 */
 function grClosedBanner(){
@@ -1549,6 +1668,7 @@ async function grReopenBiz(){
 
 /* ═══ 로그인 — 포털 앱과 같은 문 ═══ */
 function grBoot(){
+  grLoadDashView();
   $('kpis').addEventListener('click',function(e){
     var b=e.target&&e.target.closest?e.target.closest('[data-st]'):null;
     if(!b||b.disabled) return;
@@ -1569,6 +1689,8 @@ function grBoot(){
     if(b&&!b.disabled) grSetYear(b.getAttribute('data-yr'));
   });
   $('docs').addEventListener('click',function(e){
+    var v=e.target&&e.target.closest?e.target.closest('[data-dv]'):null;
+    if(v&&!v.disabled){ grSetDashView(v.getAttribute('data-dv')); return; }
     var b=e.target&&e.target.closest?e.target.closest('[data-cm]'):null;
     if(!b||b.disabled) return;
     if(b.getAttribute('data-cm')==='open') grCloseOpen(); else if(b.getAttribute('data-cm')==='reopen') grReopenBiz();
