@@ -1264,6 +1264,14 @@ function grOpenFromInbox(i){
   if(!m||!m.step) return;
   if(GR.f.biz!==m.erpCode) grSetBiz(m.erpCode);
   grOpenCell(m.coId,m.typeId,m.step,'');
+  /* 칸 창 후보는 그 쌍의 회차 기간(첫 회차 −30일 ~ 끝 회차 +90일)만 본다 — 목록의 메일이 그 밖이면 이 창에서만 기간을 넓혀 같은 메일이 보이게 한다(보통 열기의 기본 기간은 그대로) */
+  var c=GR.cw;
+  if(!c||c.coId!==m.coId||c.typeId!==m.typeId||!m.day) return;
+  var w=c.win;
+  if(!w) c.win={from:m.day,to:m.day};
+  else if(m.day<w.from||m.day>w.to) c.win={from:m.day<w.from?m.day:w.from,to:m.day>w.to?m.day:w.to};
+  else return;
+  grRenderInbox();
 }
 function grRender(){
   $('loading').style.display=GR.loaded?'none':'';

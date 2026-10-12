@@ -3284,3 +3284,38 @@ test('115 바깥 값은 이스케이프 — 업체·사업·보낸이·메일 �
   assert.equal(w.ctx.GR.cw.coName, CO);
   assert.equal(w.db.쓴것.length, 0, '쓰기 0');
 });
+
+test('116 목록에서 연 칸 창은 그 메일이 쌍의 기본 기간 밖이어도 보이게 기간을 넓힌다 · 보통 열기는 기본 기간 그대로 · 창 안 다른 메일은 그대로', async () => {
+  const s = giSeed();
+  s.data.companies.v.push({ id: 'm3', name: '마바산업', email: 'mava@example.com' });
+  const box = s.mailbox.msgs[GI_SLUG];
+  box[120] = { u: 120, f: '마바 담당', e: 'mava@example.com', t: 'office@pureun.kr', s: '늦게 온 자료', d: kst(10, 1), a: 1, an: ['늦은자료.pdf'] };
+  box[121] = { u: 121, f: '마바 담당', e: 'mava@example.com', t: 'office@pureun.kr', s: '6월 자료', d: kst(6, 1), a: 1, an: ['유월.pdf'] };
+  const base = I.windowOf('2026-03-03', '2026-05-12');   // 마바산업 t4 의 첫·끝 회차
+  assert.equal(base.to, '2026-08-10');
+  assert.ok(Math.round((Date.UTC(2026, 9, 1) - Date.UTC(2026, 4, 12)) / 864e5) >= 120, '준비 — 끝 회차 120일 뒤 메일');
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const list = giList(w), i = list.findIndex((m) => m.uid === '120');
+  assert.ok(i >= 0, '준비 — 전역 목록에 올라 있다(45일 안)');
+  assert.deepEqual([list[i].coId, list[i].typeId, list[i].step], ['c3', 't4', 'sign']);
+  assert.ok(!list.some((m) => m.uid === '121'), '준비 — 6월 메일은 45일 밖이라 목록에 없다');
+  w.ctx.grOpenFromInbox(i);
+  const c = w.ctx.GR.cw;
+  assert.deepEqual([c.coId, c.typeId, J(c.win)], ['c3', 't4', { from: base.from, to: '2026-10-01' }], '기간 끝만 메일 날짜로 넓힌다');
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes('늦게 온 자료') && h.includes('📎 늦은자료.pdf'), '칸 창 후보에 그 메일');
+  assert.ok(h.includes('6월 자료'), '창 안의 다른 메일은 그대로');
+  assert.equal(w.db.쓴것.length, 0);
+  /* 보통 열기(목록 밖) — 기본 기간 그대로, 기간 밖 메일은 안 보인다 */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c3', 't4', 'sign', '');
+  assert.deepEqual(J(w.ctx.GR.cw.win), base);
+  const h2 = w.els.cwInbox.innerHTML;
+  assert.ok(!h2.includes('늦게 온 자료') && h2.includes('6월 자료'));
+  /* 기간 안 메일(다라정밀 108)은 기간을 건드리지 않는다 */
+  const j = list.findIndex((m) => m.uid === '108');
+  w.ctx.grCloseCell(); w.ctx.grOpenFromInbox(j);
+  assert.deepEqual(J(w.ctx.GR.cw.win), J(I.windowOf('2026-08-10', '2026-09-14')));
+  assert.equal(w.db.쓴것.length, 0);
+});
