@@ -49,6 +49,8 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink',
   'grSendCtx', 'grSay', 'grRenderSend', 'grApplyFields', 'grMarkSent', 'grLinkReply', 'grCopy', 'grOpenMail', 'grWriteMail', 'grWriteSubmit',
   'grMailFetch', 'grMailCall', 'grRdHtml', 'grReadRd', 'grRenderCrit',
+  'grOkChapKey', 'grChapAsk', 'grChapConsent', 'grChapCall', 'grChapErrMsg', 'grChapNames', 'grChapInput', 'grChapSay', 'grRenderChap', 'grChapEdit',
+  'grChapCopyText', 'grChapCopy', 'grChapCopyAll', 'grChapAi',
   'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
@@ -60,10 +62,11 @@ function world(o) {
   const urls = { made: [], revoked: [] };   // 보기 창이 만든·버린 blob 주소
   const ctx = { console: { warn() {} }, Promise, Object, Array, JSON, String, Number, Math, Date, RegExp, Error, isFinite,
     encodeURIComponent, PuGovReportList: L, PuGovReport: { FORMS: Rpt.FORMS }, PuGovReportDocs: D, PuGovReportTrack: Tr,
-    PuGovReportInbox: I, PuGovReportSend: require('../js/pu-gov-report-send.js'), PuGovReportCriteria: require('../js/pu-gov-report-criteria.js'), PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout, AbortController,
+    PuGovReportInbox: I, PuGovReportSend: require('../js/pu-gov-report-send.js'), PuGovReportCriteria: require('../js/pu-gov-report-criteria.js'), PuGovReportAi: require('../js/pu-gov-report-ai.js'), PuGovReportChapters: require('../js/pu-gov-report-chapters.js'), PuRulesMailOrig: MO, PuCoThread: CT, setTimeout, clearTimeout, AbortController,
     /* 받은 서류함 — 가짜 서버(mailServer)·로그인·blob 주소. 서버를 안 주면 부르는 순간 실패한다 */
     fetch: (o.mail && o.mail.fetch) || (async () => { throw new Error('이 검사는 서버를 부르면 안 된다'); }),
     firebase: { auth: () => ({ currentUser: o.noUser ? null : { getIdToken: async () => 'tok' } }) },
+    PuAiCall: o.ai, localStorage: o.ls, confirm: o.confirm,   // 장별 AI 초안 검사용 가짜들(안 주면 없는 것으로)
     URL: { createObjectURL: (b) => { urls.made.push(b); return 'blob:' + urls.made.length; }, revokeObjectURL: (u) => { urls.revoked.push(u); } },
     Blob: function (parts, opt) { this.parts = parts; this.type = opt && opt.type; },
     $: (id) => (els[id] = els[id] || fakeEl()),
@@ -76,7 +79,7 @@ function world(o) {
   ctx.navigator = o.nav || { clipboard: { writeText: async (t) => { ctx.copied = t; } } };
   vm.createContext(ctx);
   vm.runInContext([varLine('GR_NODES'), varLine('GR_FIELDS'), varLine('GR_DOC_NODES'), varLine('GR_TRACK_NODES'), varLine('GR_INBOX_NODES'),
-    varLine('GR_MAIL'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
+    varLine('GR_MAIL'), varLine('GR_AI'), varLine('GR')].join('\n') + '\n' + NAMES.map(grab).join('\n')
     + "\ngrToday=function(){ return '2026-10-10'; };", ctx);
   if (o.email) vm.runInContext('GR.email=' + JSON.stringify(o.email) + ';', ctx);
   return { ctx, db, els, urls };
@@ -2502,5 +2505,422 @@ test('92 기록을 못 읽으면(GR.trackErr) rd 칸 창도 열리지 않는다 
   assert.equal(w.ctx.GR.cw, null);
   assert.ok(!hasId(w.els.cellw.innerHTML, 'cwRdMode') && !hasId(w.els.cellw.innerHTML, 'cwCrit'));
   w.ctx.grRenderCrit();   // 칸 창이 없으면 아무것도 안 한다(던지지 않는다)
+  assert.equal(w.db.쓴것.length, 0);
+});
+/* ══ 장별 AI 초안(칸 창 「✨ 장별 AI 초안」) — 계획 docs/superpowers/plans/2026-10-12-gov-report-chapters.md Task 2 (2026-10-12) ══
+   합성 일터혁신(t2 · consulting-02)·산업일자리(t6 · consulting-07)·충남(t5 · consulting-06) 씨앗은 위 rdSeed·bigSeed 를 쓴다 — 회차 메모·계약 업체 정보만 더한다.
+   PuAiCall·firebase.auth·navigator.clipboard·localStorage·confirm 은 모두 가짜다(진짜 AI·로그인 화면은 못 본다). 칸 창은 liveDom 으로 그려진 값이 입력칸에 들어간다. */
+const CHM = require('../js/pu-gov-report-chapters.js');
+const CH_NAME = '다라정밀', CH_DIGIT_NAME = '3S정밀';
+const CH_MEMO1 = (n) => n + ' 박대표 면담 — 010-1234-5678 / choi@example.com 로 연락. 주 52시간 점검';
+const CH_MEMO2 = (n) => n + ' 정부담당 동석, 최담당이 서류 준비. 취업규칙 개정 논의';
+function chapSeed(o) {
+  o = o || {};
+  const nm = o.name || CH_NAME;
+  const s = rdSeed({ n: 2, m: 2, ind: o.ind, track: o.track });
+  const sc = (id) => s.scal_scheds.filter((x) => x.id === id)[0];
+  if (o.memo !== false) {
+    sc('b1').memo = CH_MEMO1(nm); sc('b2').memo = CH_MEMO2(nm);
+    sc('b5').memo = '산업 ' + CH_MEMO1(nm); sc('b6').memo = '산업 ' + CH_MEMO2(nm);
+    sc('b3').memo = '충남 ' + CH_MEMO1(nm);
+  }
+  if (o.name) {
+    s.scal_cos.filter((c) => c.id === 'c2')[0].name = nm;
+    ['k3', 'k4'].forEach((k) => { s.data.consultings.v[k].companyName = nm; });   // k5 는 아래에서 nm 으로 만든다
+  }
+  /* 이알피 계약 — 일터혁신(consulting-02)은 이 검사가 더한다(k5). 산업일자리(k4)·충남(k3)은 위 씨앗에 이미 있다 */
+  s.data.consultings.v.k5 = { id: 'k5', companyName: nm, typeCodes: { consulting: 'consulting-02' }, startDate: '2026-08-01', endDate: '2026-10-31', status: 'active', managerMain: 'P-009' };
+  ['k3', 'k4', 'k5'].forEach((k) => {
+    s.data.consultings.v[k].company = { name: nm, ceo: '박대표', bizType: '금속가공',
+      contacts: [{ name: '정부담당', phone: '010-0000-0000' }, { name: '최담당', isPrimary: true, email: 'choi@example.com' }] };
+  });
+  return s;
+}
+/* 가짜 AI — replies 는 차례로(마지막은 되풀이), Error 면 던진다. 답은 {text} · textOf 는 text 를 그대로 */
+function fakeAi(replies) {
+  const calls = [], q = (replies || []).slice();
+  return { calls, textOf: (r) => r.text,
+    ask: async (parts, opts) => { calls.push({ parts, opts }); const r = q.length > 1 ? q.shift() : q[0]; if (r instanceof Error) throw r; return r; } };
+}
+const jr = (o) => ({ text: JSON.stringify(o) });
+/* 세계 — o.say: 동의창 답(기본 yes · 함수면 그 글을 보고) · o.consented: 이미 동의한 브라우저 · o.noLs: localStorage 없음 */
+function chapW(o) {
+  o = o || {};
+  const asked = [], store = o.consented ? { gov_ai_ok: '1' } : {}, copies = [], ai = o.ai || fakeAi(o.replies || []);
+  const nav = { clipboard: { writeText: async (t) => { if (o.copyFail) throw new Error('denied'); copies.push(t); } } };
+  const w = rdWorld({ seed: o.seed || chapSeed(o), email: 'p009@pureun.kr', ai, nav,
+    confirm: (m) => { asked.push(m); return o.say === undefined ? true : (typeof o.say === 'function' ? o.say(m) : o.say); },
+    ls: o.noLs ? undefined : { getItem: (k) => (k in store ? store[k] : null), setItem: (k, v) => { store[k] = String(v); } },
+    noUser: o.noUser });
+  liveChap(w);
+  return Object.assign(w, { asked, store, copies, ai });
+}
+const kickCell = (w) => cellOf(w, 'consulting-02', 'c2', 't2', 'report', 'kickoff');
+const chapHtml = (w) => w.els.cwChap.innerHTML;
+const taOf = (w, k) => { const m = chapHtml(w).match(new RegExp('<textarea id="cwChapK_' + k + '"[^>]*>([\\s\\S]*?)</textarea>')); return m ? unEsc(m[1]) : null; };
+const warnOf = (w, k) => ({ cls: w.ctx.$('cwChapW_' + k).className, text: w.ctx.$('cwChapW_' + k).textContent });
+const msgOf = (w) => ({ cls: w.ctx.$('cwChapMsg').className, text: w.ctx.$('cwChapMsg').textContent });
+const sentOf = (w, i) => w.ai.calls[i || 0].parts[1].text;
+/* 입력칸을 사람이 고친 것 — 글칸 값만 바꾸고 oninput 이 부르는 grChapEdit */
+function typeChap(w, k, v) { w.ctx.$('cwChapK_' + k).value = v; w.ctx.grChapEdit(k); }
+/* #cwChap 이 «그려질 때» — 진짜 DOM 이 하는 일을 흉내 낸다: 글칸 값·경고 줄·안내 줄이 그 요소에 들어가고, 그린 횟수(w.sets)를 센다 */
+function liveChap(w) {
+  const el = w.ctx.$('cwChap');
+  let html = '';
+  w.sets = 0;
+  Object.defineProperty(el, 'innerHTML', { configurable: true, get: () => html, set: (v) => {
+    html = v; w.sets++;
+    for (const m of v.matchAll(/<textarea id="(cwChapK_\w+)"[^>]*>([\s\S]*?)<\/textarea>/g)) w.ctx.$(m[1]).value = unEsc(m[2]);
+    for (const m of v.matchAll(/<div id="(cwChapW_\w+|cwChapMsg)" class="([^"]*)">([\s\S]*?)<\/div>/g)) { const e = w.ctx.$(m[1]); e.className = m[2]; e.textContent = unEsc(m[3]); }
+  } });
+}
+const J = (x) => JSON.parse(JSON.stringify(x));   // vm 안 객체는 prototype 이 달라 deepEqual 전에 걸러 낸다
+const OK = jr({ chapters: { overview: '[해당 기업] 은(는) 2026-08-20 에 착수함. [대표자] 면담함.', analysis: '[해당 기업] 점검 결과 777건 확인함.' } });
+const THREE = { overview: '[해당 기업] 은(는) 2026-08-20 에 착수함. [대표자] 면담함.', analysis: '[해당 기업] 점검 결과 777건 확인함.' };
+
+test('93 정적 — 스크립트 셋은 ai → ai-call → chapters 차례 · ?v 는 보고서 창과 같은 번호 · 쓰기는 여전히 .set 한 곳 · AI 는 PuAiCall 로만 · 새 함수는 쓰지 않는다', () => {
+  const tag = (f) => (SRC.match(new RegExp('<script src="js/' + f.replace(/\./g, '\\.') + '\\?v=(\\d+)"></script>')) || [])[1];
+  ['pu-gov-report-ai.js', 'pu-ai-call.js', 'pu-gov-report-chapters.js'].forEach((f) => assert.ok(tag(f), f + ' 을(를) 싣는다'));
+  assert.ok(SRC.indexOf('pu-gov-report-ai.js') < SRC.indexOf('pu-gov-report-chapters.js'), 'ai 를 chapters 보다 먼저');
+  assert.ok(SRC.indexOf('pu-gov-report.js') < SRC.indexOf('pu-gov-report-ai.js'), 'ai 는 양식 표 모듈 다음');
+  const CONS = fs.readFileSync(path.join(__dirname, '..', 'gov-consulting.html'), 'utf8');
+  ['pu-gov-report-ai.js', 'pu-ai-call.js'].forEach((f) => {
+    const v = (CONS.match(new RegExp('js/' + f.replace(/\./g, '\\.') + '\\?v=(\\d+)')) || [])[1];
+    assert.ok(v && v === tag(f), f + ' ?v 가 정부사업일정 보고서 창과 같아야 한다');
+  });
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set(']);
+  assert.doesNotMatch(INLINE, /ref\([^)]*\)\.push\(/);
+  const NEW = ['grOkChapKey', 'grChapAsk', 'grChapConsent', 'grChapCall', 'grChapErrMsg', 'grChapNames', 'grChapInput', 'grChapSay', 'grRenderChap',
+    'grChapEdit', 'grChapCopyText', 'grChapCopy', 'grChapCopyAll', 'grChapAi'];
+  NEW.forEach((n) => assert.doesNotMatch(grab(n), /grSaveCell|fbDb|\.set\(|\.update\(|fetch\(|XMLHttpRequest|mailto:|\.send\s*\(/, n + ' 이 쓰거나 직접 부른다'));
+  assert.match(grab('grChapCall'), /PuAiCall\.ask\(parts,\{auth:auth,app:'erp',generationConfig:/);
+  assert.match(grab('grChapCall'), /90000|GR_AI\.wait/);
+  assert.match(SRC, /var GR_AI=\{ok:'gov_ai_ok',wait:90000,/);
+  assert.match(CONS, /const GRP_AI_OK='gov_ai_ok';/, '보고서 창과 같은 동의 열쇠');
+});
+
+test('94 장이 있는 항목 칸 창(일터혁신 착수·산업일자리 최종·충남 결과)에는 #cwChap 와 「AI 초안 만들기」 — 없는 항목·간단형·서명·제출에는 없다', async () => {
+  const w = chapW();
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-02');
+  const has = (st, it) => { w.ctx.grOpenCell('c2', 't2', st, it); const h = w.els.cellw.innerHTML; return hasId(h, 'cwChap') ? chapHtml(w) : null; };
+  [['report', 'kickoff'], ['report', 'mid'], ['report', 'final']].forEach(([st, it]) => {
+    const h = has(st, it);
+    assert.ok(h && h.includes('✨ 장별 AI 초안') && h.includes('AI 초안 만들기') && h.includes(CHM.MSG.NOT_SAVED) && h.includes('업체 자료가 가려진 뒤 외부 AI 로 전송됩니다'), it);
+    assert.deepEqual(J(w.ctx.GR.cw.chaps), CHM.chaptersOf(planItem(WP, it)), it);
+    assert.deepEqual(J(w.ctx.GR.cw.chap), { busy: false, msg: '', err: false, draft: {}, warn: {}, sent: '' });
+    assert.ok(w.els.cellw.innerHTML.indexOf('id="cwChap"') < w.els.cellw.innerHTML.indexOf('id="cwNote"'), '«메모» 앞에');
+    assert.equal(countOf(w.els.cellw.innerHTML, /id="cwChap"/g), 1);
+    w.ctx.grCloseCell();
+  });
+  [['plat', 'plan'], ['plat', 'round'], ['sign', 'guide'], ['plat', 'follow'], ['report', 'outcome']].forEach(([st, it]) => {
+    assert.equal(has(st, it), null, it + ' 에는 없다');
+    assert.deepEqual(J(w.ctx.GR.cw.chaps), []); assert.equal(w.ctx.GR.cw.chap, null);
+    w.ctx.grCloseCell();
+  });
+  w.ctx.grSetBiz('consulting-07');
+  w.ctx.grOpenCell('c2', 't6', 'report', 'final');
+  assert.ok(hasId(w.els.cellw.innerHTML, 'cwChap') && chapHtml(w).includes('AI 초안 만들기'), '산업일자리 최종결과보고서');
+  assert.deepEqual(w.ctx.GR.cw.chaps.map((c) => c.k), ['summary', 'overview', 'status', 'issues', 'results', 'support']);
+  w.ctx.grCloseCell();
+  ['kickoff'].forEach((it) => { w.ctx.grOpenCell('c2', 't6', 'report', it); assert.ok(hasId(w.els.cellw.innerHTML, 'cwChap'), '산업일자리 ' + it); w.ctx.grCloseCell(); });
+  ['plan', 'mdlog', 'meeting', 'done'].forEach((it) => {
+    w.ctx.grOpenCell('c2', 't6', 'report', it);
+    assert.ok(w.ctx.GR.cw, it + ' 이 열렸다'); assert.ok(!hasId(w.els.cellw.innerHTML, 'cwChap'), '산업일자리 ' + it);
+    w.ctx.grCloseCell();
+  });
+  w.ctx.grSetBiz('consulting-06');
+  w.ctx.grOpenCell('c2', 't5', 'report', 'result');
+  assert.ok(hasId(w.els.cellw.innerHTML, 'cwChap') && chapHtml(w).includes('AI 초안 만들기'), '충남 결과보고서');
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't5', 'report', 'after');
+  assert.ok(hasId(w.els.cellw.innerHTML, 'cwChap'), '충남 사후관리');
+  w.ctx.grCloseCell();
+  ['monthly'].forEach((it) => { w.ctx.grOpenCell('c2', 't5', 'report', it); assert.ok(w.ctx.GR.cw, it); assert.ok(!hasId(w.els.cellw.innerHTML, 'cwChap'), '충남 ' + it); w.ctx.grCloseCell(); });
+  w.ctx.grSetBiz('consulting-04');
+  ['sign', 'submit', 'attach'].forEach((st) => { w.ctx.grOpenCell('c2', 't3', st); assert.ok(w.ctx.GR.cw, st); assert.ok(!hasId(w.els.cellw.innerHTML, 'cwChap'), '간단형 ' + st); assert.equal(w.ctx.GR.cw.chap, null); w.ctx.grCloseCell(); });
+  assert.equal(w.db.쓴것.length, 0, '열기만으로는 안 쓴다');
+  assert.equal(w.ai.calls.length, 0, '열기만으로는 AI 를 부르지 않는다');
+});
+
+test('95 재료가 없으면(회차 메모·서류 메모 모두 비어 있음 · 공백뿐도) 안내만 — PuAiCall.ask 0회 · 동의 창 0회 · 저장 0', async () => {
+  const w = chapW({ memo: false });
+  await kickCell(w);
+  assert.ok(w.ctx.GR.cw && w.ctx.GR.cw.chap, '전제: 장 칸 창이 열렸다');
+  w.ctx.GR.input.scheds.filter((s) => s.typeId === 't2').forEach((s) => { s.memo = '   '; });
+  await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 0); assert.equal(w.asked.length, 0, '동의도 묻지 않는다');
+  assert.equal(w.ctx.GR.cw.chap.msg, CHM.MSG.NO_MATERIAL);
+  assert.equal(w.ctx.GR.cw.chap.busy, false);
+  assert.deepEqual(msgOf(w), { cls: 'days', text: CHM.MSG.NO_MATERIAL });
+  assert.ok(!chapHtml(w).includes('<textarea'), '초안 글칸 없음');
+  assert.equal(w.db.쓴것.length, 0); assert.deepEqual(w.store, {});
+  /* 장 목록이 비면(항목에 장이 없을 때) 재료가 있어도 «채울 장이 없습니다» — 역시 부르지 않는다 */
+  const w2 = chapW();
+  await kickCell(w2);
+  w2.ctx.GR.cw.chaps = [];
+  await w2.ctx.grChapAi();
+  assert.equal(w2.ai.calls.length, 0); assert.equal(w2.asked.length, 0);
+  assert.equal(w2.ctx.GR.cw.chap.msg, '이 서류에는 AI 가 채울 장이 없습니다');
+});
+
+test('96 동의 — 안 하면 호출 0회 · 하면 한 번만 부르고 열쇠 gov_ai_ok · 보낸 글에는 업체 이름·대표자·담당자·전화·메일이 없고 자리 표시와 [가림]이 있으며 회차 날짜·메모는 있다', async () => {
+  let w = chapW({ say: false, replies: [OK] });
+  await kickCell(w);
+  await w.ctx.grChapAi();
+  assert.equal(w.asked.length, 1); assert.ok(w.asked[0].includes('외부 AI') && w.asked[0].includes('[가림]'));
+  assert.equal(w.ai.calls.length, 0, '동의 안 하면 아무것도 보내지 않는다');
+  assert.deepEqual(w.store, {}); assert.equal(w.ctx.GR.cw.chap.busy, false);
+  assert.deepEqual(J(w.ctx.GR.cw.chap.draft), {});
+
+  w = chapW({ replies: [OK], track: { t2: { 'round:1': { st: 'done', rd: WPR }, 'round:2': { st: 'done', rd: { mode: 'remote', mins: 100, people: 6 } },
+    kickoff: { st: 'doing', note: '착수 메모 주 40시간 ' + CH_NAME } } } });
+  await kickCell(w);
+  await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 1, 'PuAiCall.ask 한 번');
+  assert.equal(w.asked.length, 1); assert.equal(w.store.gov_ai_ok, '1', '같은 열쇠');
+  const call = w.ai.calls[0];
+  assert.equal(call.parts.length, 2);
+  assert.ok(call.parts[0].text.includes('채울 장') && call.parts[0].text.includes('overview') && call.parts[0].text.includes('입력에 없는 숫자'), '시스템 글');
+  assert.equal(call.opts.app, 'erp'); assert.ok(call.opts.auth && call.opts.auth.currentUser); assert.ok(call.opts.generationConfig);
+  const sent = sentOf(w);
+  ['다라정밀', '박대표', '최담당', '정부담당', '010-1234-5678', 'choi@example.com', 'example.com'].forEach((x) => assert.ok(!sent.includes(x) && !call.parts[0].text.includes(x), '나가면 안 되는 글: ' + x));
+  ['[해당 기업]', '[대표자]', '[담당자]', '[담당자2]', '[가림]'].forEach((x) => assert.ok(sent.includes(x), x + ' 이 있다'));
+  ['2026-08-20', '2026-09-17', '주 52시간 점검', '취업규칙 개정 논의', '착수 메모 주 40시간', '대면 130분 4명', '비대면 100분 6명', '금속가공'].forEach((x) => assert.ok(sent.includes(x), x + ' 이 있다'));
+  assert.ok(sent.includes('"방식": "방문"'), '방문 여부');
+  /* 이미 동의한 브라우저는 다시 묻지 않는다(보고서 창과 같은 열쇠) */
+  const w3 = chapW({ consented: true, replies: [OK] });
+  await kickCell(w3); await w3.ctx.grChapAi();
+  assert.equal(w3.asked.length, 0); assert.equal(w3.ai.calls.length, 1);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('97 가짜 답 — 일부 장만(숫자 경고는 그 장에만 err-s) · 값은 되돌린 업체 이름(이름 속 숫자는 경고 아님) · 글칸 고치면 경고만 다시 계산하고 글칸은 다시 그리지 않는다 · 복사', async () => {
+  const w = chapW({ name: CH_DIGIT_NAME, replies: [OK] });
+  await kickCell(w);
+  assert.equal(w.ctx.GR.cw.coName, CH_DIGIT_NAME, '전제: 업체 이름에 숫자');
+  await w.ctx.grChapAi();
+  const sent = sentOf(w);
+  assert.ok(!sent.includes(CH_DIGIT_NAME) && sent.includes('[해당 기업]'));
+  assert.ok(!/(?<![\d])3(?![\d])/.test(sent), '전제: 보낸 글에는 숫자 3 이 이름 밖에 없다(가린 글만 견주면 «3» 이 경고로 잡힌다)');
+  const ch = w.ctx.GR.cw.chap;
+  assert.deepEqual(Object.keys(ch.draft).sort(), ['analysis', 'overview'], '일부 장만');
+  assert.equal(ch.draft.overview, '3S정밀 은(는) 2026-08-20 에 착수함. 박대표 면담함.', 'unmask');
+  assert.equal(taOf(w, 'overview'), ch.draft.overview);
+  assert.equal(taOf(w, 'tasks'), null, '못 받은 장은 글칸이 없다'); assert.equal(taOf(w, 'org'), null);
+  assert.deepEqual(J(ch.warn), { analysis: ['777'] }, '이름 속 3 은 경고가 아니다');
+  assert.deepEqual(warnOf(w, 'analysis'), { cls: 'err-s', text: CHM.MSG.CHECK + '777' });
+  assert.equal(warnOf(w, 'overview').cls, 'days'); assert.equal(warnOf(w, 'overview').text, '');
+  assert.ok(msgOf(w).text.includes('초안을 만들었습니다') && msgOf(w).text.includes('채우지 못한 장'), msgOf(w).text);
+  const titles = CHM.chaptersOf(planItem(WP, 'kickoff'));
+  assert.ok(chapHtml(w).includes('<span>' + titles[0].t + '</span>') && chapHtml(w).includes('<span>' + titles[1].t + '</span>'));
+  assert.equal((chapHtml(w).match(/>이 장 복사</g) || []).length, 2); assert.ok(chapHtml(w).includes('>전체 복사<'));
+  assert.ok(chapHtml(w).includes('oninput="grChapEdit(\'overview\')"'));
+  /* 고치기 — 경고만 다시 계산, 글칸은 다시 그리지 않는다 */
+  const before = w.sets;
+  typeChap(w, 'analysis', '고친 글 888건 과 777건');
+  assert.equal(w.sets, before, '#cwChap 을 다시 그리지 않았다(입력·초점 보존)');
+  assert.equal(w.ctx.$('cwChapK_analysis').value, '고친 글 888건 과 777건', '글칸 값 그대로');
+  assert.equal(ch.draft.analysis, '고친 글 888건 과 777건');
+  assert.deepEqual(J(ch.warn.analysis), ['888', '777']);
+  assert.equal(w.ctx.$('cwChapW_analysis').className, 'err-s'); assert.equal(w.ctx.$('cwChapW_analysis').textContent, CHM.MSG.CHECK + '888, 777');
+  typeChap(w, 'overview', '20 장 52 개');   // 보낸 글에 있던 숫자(20·52)만
+  assert.ok(!('overview' in ch.warn)); assert.equal(w.ctx.$('cwChapW_overview').className, 'days'); assert.equal(w.ctx.$('cwChapW_overview').textContent, '');
+  typeChap(w, 'analysis', '숫자 없음');
+  assert.deepEqual(J(ch.warn), {}); assert.equal(w.ctx.$('cwChapW_analysis').className, 'days');
+  assert.equal(w.sets, before);
+  typeChap(w, 'analysis', '다시 999');
+  /* 복사 — 「이 장 복사」 = 그 장 글, 「전체 복사」 = 제목\n글 을 장 순서대로 빈 줄로 */
+  assert.equal(await w.ctx.grChapCopy('analysis'), true);
+  assert.deepEqual(w.copies, ['다시 999']);
+  assert.equal(w.ctx.GR.cw.chap.msg, '이 장을 복사했습니다 — 붙여 넣으세요'); assert.equal(w.ctx.$('cwChapMsg').textContent, '이 장을 복사했습니다 — 붙여 넣으세요');
+  assert.equal(await w.ctx.grChapCopyAll(), true);
+  assert.equal(w.copies[1], titles[0].t + '\n20 장 52 개\n\n' + titles[1].t + '\n다시 999');
+  assert.equal(w.sets, before, '복사해도 글칸을 다시 그리지 않는다');
+  assert.equal(await w.ctx.grChapCopy('tasks'), false, '초안 없는 장'); assert.equal(await w.ctx.grChapCopy('bad key'), false);
+  assert.equal(w.copies.length, 2);
+  assert.equal(w.db.쓴것.length, 0, '초안·복사는 아무것도 쓰지 않는다');
+  /* 복사가 거절되면 안내(빨간 줄) */
+  const f = chapW({ name: CH_DIGIT_NAME, replies: [OK], copyFail: true });
+  await kickCell(f); await f.ctx.grChapAi();
+  assert.equal(await f.ctx.grChapCopy('overview'), false);
+  assert.equal(f.ctx.GR.cw.chap.msg, '복사하지 못했습니다 — 글을 골라 직접 복사해 주세요'); assert.equal(f.ctx.GR.cw.chap.err, true);
+  assert.equal(f.ctx.$('cwChapMsg').className, 'err-s');
+});
+
+test('98 오류 — 못 읽는 답은 한 번 더 묻고 둘 다 실패면 문구 · 한 번 실패 뒤 성공 · 로그인 없음 · 시간 초과 · 월 한도 · 401 — 기존 GRP_AI_MSG 와 같은 글, 초안은 그대로', async () => {
+  const MSG = { login: '로그인을 확인해 주세요', budget: '이번 달 AI 사용 한도를 넘었습니다 — 대표에게 문의', net: 'AI 응답이 없습니다 — 잠시 뒤 다시', parse: 'AI 답을 읽지 못했습니다' };
+  const CONS = fs.readFileSync(path.join(__dirname, '..', 'gov-consulting.html'), 'utf8');
+  Object.keys(MSG).forEach((k) => assert.ok(CONS.includes(k + ":'" + MSG[k] + "'"), '보고서 창 문구와 같다: ' + k));
+  let w = chapW({ replies: [{ text: '답이 아닙니다' }, { text: '{"chapters":{"zzz":"모르는 장"}}' }] });
+  await kickCell(w); await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 2, '못 읽으면 한 번 더');
+  assert.equal(w.ctx.GR.cw.chap.msg, MSG.parse); assert.equal(w.ctx.GR.cw.chap.err, true);
+  assert.deepEqual(msgOf(w), { cls: 'err-s', text: MSG.parse }); assert.equal(w.ctx.GR.cw.chap.busy, false);
+  assert.ok(chapHtml(w).includes('AI 초안 만들기') && !chapHtml(w).includes('disabled'), '다시 누를 수 있다');
+  w = chapW({ replies: [{ text: '앞잡글' }, OK] });
+  await kickCell(w); await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 2); assert.deepEqual(Object.keys(w.ctx.GR.cw.chap.draft).sort(), ['analysis', 'overview']);
+  assert.equal(w.ctx.GR.cw.chap.err, false);
+  w = chapW({ noUser: true, replies: [OK] });
+  await kickCell(w); await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 0, '로그인이 없으면 부르지 않는다'); assert.equal(w.ctx.GR.cw.chap.msg, MSG.login);
+  const budget = Object.assign(new Error('한도'), { overBudget: true });
+  w = chapW({ replies: [budget] });
+  await kickCell(w); await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 1, '한도·망 오류는 되풀이하지 않는다'); assert.equal(w.ctx.GR.cw.chap.msg, MSG.budget);
+  w = chapW({ replies: [Object.assign(new Error('x'), { status: 401 })] });
+  await kickCell(w); await w.ctx.grChapAi();
+  assert.equal(w.ctx.GR.cw.chap.msg, MSG.login);
+  w = chapW({ replies: [Object.assign(new Error('x'), { status: 500 })] });
+  await kickCell(w); await w.ctx.grChapAi();
+  assert.equal(w.ctx.GR.cw.chap.msg, MSG.net);
+  /* 90초 — 가짜 시계로 그 타이머만 바로 울린다(끝나지 않는 부름) */
+  const never = { calls: [], textOf: () => '', ask: (p, o) => { never.calls.push(p); return new Promise(() => {}); } };
+  w = chapW({ ai: never });
+  await kickCell(w);
+  const waits = [], real = setTimeout;
+  w.ctx.setTimeout = (fn, ms) => { waits.push(ms); return real(fn, ms >= 90000 ? 0 : ms); };
+  await w.ctx.grChapAi();
+  assert.deepEqual(waits, [90000], '90초 제한'); assert.equal(never.calls.length, 1);
+  assert.equal(w.ctx.GR.cw.chap.msg, MSG.net); assert.equal(w.ctx.GR.cw.chap.busy, false);
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('99 부르는 사이 칸 창을 닫거나 다른 칸을 열면 결과는 버려지고 새 칸 창은 깨끗하다 · 부르는 중엔 단추가 잠긴다 · 겹쳐 눌러도 한 번만', async () => {
+  let go;
+  const gate = new Promise((r) => { go = r; });
+  const ai = { calls: [], textOf: (r) => r.text, ask: async (p) => { ai.calls.push(p); await gate; return OK; } };
+  const w = chapW({ ai });
+  await kickCell(w);
+  const c = w.ctx.GR.cw;
+  const p = w.ctx.grChapAi();
+  assert.equal(c.chap.busy, true);
+  assert.ok(chapHtml(w).includes('쓰는 중…') && /id="cwChapGo"[^>]*disabled/.test(chapHtml(w)), '잠김');
+  await w.ctx.grChapAi();                  // 겹쳐 눌러도 무시
+  assert.equal(ai.calls.length, 1);
+  w.ctx.grCloseCell();
+  const htmlAtClose = chapHtml(w);
+  go(); await p;
+  assert.equal(w.ctx.GR.cw, null);
+  assert.deepEqual(J(c.chap.draft), {}, '닫은 창에는 초안이 들어가지 않는다');
+  assert.equal(chapHtml(w), htmlAtClose, '닫은 뒤 화면을 건드리지 않는다');
+  /* 다른 칸으로 바뀐 경우 */
+  let go2;
+  const gate2 = new Promise((r) => { go2 = r; });
+  /* 답은 보낸 장 목록을 보고 — 착수(overview·analysis)와 중간(progress·results)에 각각 맞는 글 */
+  const ai2 = { calls: [], textOf: (r) => r.text, ask: async (p2) => { ai2.calls.push(p2); await gate2; return p2[1].text.includes('"키": "progress"') ? jr({ chapters: { progress: '경과 글', results: '성과 글' } }) : OK; } };
+  const v = chapW({ ai: ai2 });
+  await kickCell(v);
+  const old = v.ctx.GR.cw, p2 = v.ctx.grChapAi();
+  v.ctx.grOpenCell('c2', 't2', 'report', 'mid');
+  const fresh = v.ctx.GR.cw;
+  assert.notEqual(fresh, old); assert.equal(fresh.item, 'mid');
+  go2(); await p2;
+  assert.equal(v.ctx.GR.cw, fresh);
+  assert.deepEqual(J(fresh.chap), { busy: false, msg: '', err: false, draft: {}, warn: {}, sent: '' }, '새 칸 창이 오염되지 않았다');
+  assert.ok(!chapHtml(v).includes('<textarea') && !chapHtml(v).includes('쓰는 중…'), '새 칸 창 화면도 깨끗하다');
+  assert.deepEqual(J(old.chap.draft), {});
+  /* 새 칸 창은 바로 쓸 수 있다 */
+  await v.ctx.grChapAi();
+  assert.deepEqual(Object.keys(v.ctx.GR.cw.chap.draft).sort(), ['progress', 'results'], '새 칸 창 자기 장만');
+  assert.equal(v.db.쓴것.length, 0);
+});
+
+test('100 쓰기 0 — 초안을 만들고 고치고 복사해도 아무것도 안 쓴다 · 저장은 grSaveCell 한 줄뿐이고 저장해도 초안은 그대로(칸 창만 다시 그려진다) · 다른 칸 창 회귀 없음', async () => {
+  const w = chapW({ replies: [OK] });
+  await kickCell(w);
+  await w.ctx.grChapAi(); typeChap(w, 'overview', '손으로 고친 글'); await w.ctx.grChapCopyAll();
+  assert.equal(w.db.쓴것.length, 0);
+  w.ctx.$('cwSt').value = 'doing';
+  await w.ctx.grSaveCell();
+  assert.equal(w.db.쓴것.length, 1, '저장은 서류 진행 기록 한 줄'); onlyTrackWrites(w.db);
+  assert.equal(w.db.쓴것[0].자리, 'scal_docs/c2/t2_2026/items/kickoff');
+  const rec = w.db.쓴것[0].값;
+  assert.ok(!JSON.stringify(w.db.쓴것).includes('손으로 고친 글') && !JSON.stringify(w.db.쓴것).includes('777'), '초안은 저장되지 않는다');
+  assert.ok(!('chap' in rec) && !('draft' in rec));
+  assert.equal(w.ctx.GR.cw.chap.draft.overview, '손으로 고친 글', '저장해도 초안은 화면에 남는다');
+  assert.equal(taOf(w, 'overview'), '손으로 고친 글', '칸 창을 다시 그려도 장 구역이 다시 채워진다');
+  assert.ok(hasId(w.els.cellw.innerHTML, 'cwChap'));
+  /* 회귀 — 다른 칸 창 */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't2', 'plat', 'round');
+  let h = w.els.cellw.innerHTML;
+  assert.ok(hasId(h, 'cwRdMode') && hasId(h, 'cwCrit') && !hasId(h, 'cwChap'), '회차 기록·기준 점검');
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't2', 'sign', 'guide');
+  assert.ok(hasId(w.els.cellw.innerHTML, 'cwSend') && !hasId(w.els.cellw.innerHTML, 'cwChap'), '서명 요청');
+  w.ctx.grSetBiz('consulting-04'); w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c2', 't3', 'sign');
+  assert.ok(hasId(w.els.cellw.innerHTML, 'cwSend') && !hasId(w.els.cellw.innerHTML, 'cwChap'), '간단형 서명');
+  assert.equal(w.db.쓴것.length, 1);
+});
+
+test('101 이미 만든 초안이 있으면 다시 만들기 전에 한 번 묻는다 — 거절하면 호출 없이 그대로 · 동의 창과 별개', async () => {
+  let say = true;
+  const w = chapW({ replies: [OK], say: () => say, consented: true });
+  await kickCell(w);
+  await w.ctx.grChapAi();
+  assert.equal(w.asked.length, 0, '처음엔 묻지 않는다(이미 동의)');
+  typeChap(w, 'overview', '고친 글');
+  say = false;
+  await w.ctx.grChapAi();
+  assert.equal(w.asked.length, 1); assert.ok(w.asked[0].includes('이미 만든 초안'));
+  assert.equal(w.ai.calls.length, 1, '거절하면 다시 부르지 않는다'); assert.equal(w.ctx.GR.cw.chap.draft.overview, '고친 글');
+  say = true;
+  await w.ctx.grChapAi();
+  assert.equal(w.ai.calls.length, 2);
+  assert.equal(w.ctx.GR.cw.chap.draft.overview.includes('고친 글'), false, '새 초안으로 바뀐다');
+});
+
+test('102 이름 점검 — 계약 업체명 두 곳·대표자·주담당·다른 담당자는 자리 표시로, 회차는 목록이 보는 그 회차(사전진단 제외·날짜순)·회차 기록은 round:N 순서대로, 서류 메모는 저장된 것만', async () => {
+  const s = chapSeed({ track: { t2: { 'round:2': { st: 'done', rd: { mode: 'face', mins: 90, people: 5 } }, kickoff: { st: 'doing', note: '저장된 메모' } } } });
+  s.scal_scheds.push({ id: 'zz1', coId: 'c2', typeId: 't2', date: '2026-07-01', round: 0, phase: 'pre', isField: true, memo: '사전진단 메모' },
+    { id: 'zz2', coId: 'c2', typeId: 't2', date: '2026-10-01', round: 3, isField: null, memo: '' },
+    { id: 'zz3', coId: 'c1', typeId: 't2', date: '2026-08-21', round: 1, isField: true, memo: '남의 업체 메모' },
+    { id: 'zz4', coId: 'c2', typeId: 't2', date: '날짜아님', isField: true, memo: '날짜 없는 메모' });
+  s.data.consultings.v.k5.company.contacts.push({ name: '셋째담당' });
+  s.data.consultings.v.k5.companyName = '계약표기상사';
+  const w = chapW({ seed: s, replies: [OK] });
+  await kickCell(w);
+  const names = w.ctx.grChapNames(w.ctx.GR.cw);
+  assert.deepEqual(J(names.map((n) => n.as + ':' + n.v)), ['[해당 기업]:다라정밀', '[해당 기업]:계약표기상사', '[대표자]:박대표', '[담당자]:최담당', '[담당자2]:정부담당', '[담당자3]:셋째담당']);
+  const inp = w.ctx.grChapInput(w.ctx.GR.cw);
+  assert.deepEqual(inp.rounds.map((r) => r.date), ['2026-08-20', '2026-09-17', '2026-10-01'], '사전진단·남의 업체·날짜 없는 일정은 빠진다(목록 pairs 와 같은 거름)');
+  assert.deepEqual(inp.rounds.map((r) => r.visit), [true, true, null]);
+  assert.deepEqual(inp.rounds.map((r) => !!r.rd), [false, true, false], 'rd 는 round:N 줄이 있는 회차에만');
+  assert.deepEqual(J(inp.rounds[1].rd), { mode: 'face', mins: 90, people: 5 });
+  assert.deepEqual(J(inp.notes), [{ label: inp.itemName, text: '저장된 메모' }]);
+  assert.deepEqual(J(inp.company), { name: '다라정밀', bizType: '금속가공' }, '근로자수는 보내지 않는다(없는 값을 0 으로 쓰지 않는다)');
+  w.ctx.$('cwNote').value = '저장 안 한 입력';   // 칸 창에 적고 아직 저장하지 않은 메모는 보내지 않는다(저장된 것만)
+  await w.ctx.grChapAi();
+  const sent = sentOf(w);
+  assert.ok(!sent.includes('저장 안 한 입력'));
+  ['다라정밀', '계약표기상사', '박대표', '최담당', '정부담당', '셋째담당', '사전진단 메모', '남의 업체 메모', '날짜 없는 메모'].forEach((x) => assert.ok(!sent.includes(x), x));
+  assert.ok(sent.includes('저장된 메모') && sent.includes('2026-10-01') && sent.includes('"방식": "모름"'));
+});
+
+test('103 바깥 값은 이스케이프 — 장 제목·글칸·경고·안내·사업장 이름·메모·AI 답에 <script>·따옴표', async () => {
+  const bad = '<script>alert(1)</script>"\'';
+  const esc = '&#60;script&#62;alert(1)&#60;/script&#62;&#34;&#39;';
+  const w = chapW({ seed: chapSeed({ track: { t2: { kickoff: { st: 'doing', note: bad } } } }), replies: [jr({ chapters: { overview: bad + ' 4444', analysis: '<img src=x onerror=alert(2)>' } })] });
+  await w.ctx.grLoad(); w.ctx.grSetBiz('consulting-02');
+  const hostile = (n) => { const p = D.planFor(n); return Object.assign({}, p, { items: p.items.map((i) => (i.id === 'kickoff'
+    ? Object.assign({}, i, { chapters: [{ k: 'overview', t: bad }, { k: 'analysis', t: '<b>' + bad + '</b>' }] }) : i)) }); };
+  w.ctx.PuGovReportDocs = Object.assign({}, D, { planFor: hostile });
+  w.ctx.PuGovReportChapters = Object.assign({}, CHM, { MSG: Object.assign({}, CHM.MSG, { CHECK: bad + ' 숫자: ' }) });
+  w.ctx.GR.input.scheds.filter((s) => s.id === 'b1')[0].memo = bad;
+  w.ctx.grOpenCell('c2', 't2', 'report', 'kickoff');
+  w.ctx.GR.cw.coName = bad;
+  w.ctx.grRenderCell();
+  assert.ok(w.ctx.GR.cw.chaps.length === 2, '전제: 장이 열렸다');
+  await w.ctx.grChapAi();
+  const h = chapHtml(w);
+  assert.ok(Object.keys(w.ctx.GR.cw.chap.draft).length === 2, '전제: 초안이 그려졌다');
+  assert.ok(!/<script|<img|<b>/i.test(h), '태그가 그대로 들어갔다: ' + h);
+  assert.ok(h.includes('<span>' + esc + '</span>'), '장 제목은 글자로');
+  assert.ok(h.includes('rows="8" oninput="grChapEdit(\'overview\')">' + esc + ' 4444</textarea>'), '글칸 값은 글자로');
+  assert.ok(h.includes('&#60;img src=x onerror=alert(2)&#62;'));
+  assert.ok(h.includes(esc + ' 숫자: 4444'), '경고는 글자로: ' + h);
+  assert.ok(!/<script|<img/i.test(w.els.cellw.innerHTML), '칸 창 머리·메모도 글자로');
   assert.equal(w.db.쓴것.length, 0);
 });
