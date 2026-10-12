@@ -85,6 +85,14 @@
     return out;
   }
   function sizeOk(v) { return SIZES.indexOf(clean(v)) >= 0 ? clean(v) : ''; }
+  /* «중소기업» — 소기업인지 중기업인지 모르는 중소기업(매출로 추정할 때). 조건 칸에는 쓰지 않고 사업장 값으로만 온다 */
+  var SME = '중소기업';
+  function autoSizeOk(v) { return clean(v) === SME ? SME : sizeOk(v); }
+  /* 보충값의 «자동» 칸 — 공공데이터·기업정보함에서 기계가 채운 값(govaid/extras/{key}.auto). 사람 값·원장보다 뒤 */
+  function autoOf(extra, k) {
+    var a = (extra && extra.auto) || {}, v = (a.vals || {})[k], s = (a.src || {})[k];
+    return [v, clean(s) || '자동'];
+  }
   function regionOk(v) { return REGIONS.indexOf(clean(v)) >= 0 ? clean(v) : ''; }
   function industryOk(v) { return Object.prototype.hasOwnProperty.call(INDUSTRIES, clean(v)) ? clean(v) : ''; }
 
@@ -95,9 +103,9 @@
     return {
       key: 'co_' + clean(co.id), kind: 'co', id: clean(co.id), name: clean(co.name), bizno: digits(co.bizNo), aliases: [],
       vals: {
-        headcount: first([[num(ex.headcount), MINE], [hc.v, hc.src]]),
-        foundedYear: first([[num(ex.foundedYear), MINE]]),
-        size: first([[sizeOk(ex.size), MINE], [sizeOk(co.companySize), '업체관리']]),
+        headcount: first([[num(ex.headcount), MINE], [hc.v, hc.src], [num(autoOf(extra, 'headcount')[0]), autoOf(extra, 'headcount')[1]]]),
+        foundedYear: first([[num(ex.foundedYear), MINE], [num(autoOf(extra, 'foundedYear')[0]), autoOf(extra, 'foundedYear')[1]]]),
+        size: first([[sizeOk(ex.size), MINE], [sizeOk(co.companySize), '업체관리'], [autoSizeOk(autoOf(extra, 'size')[0]), autoOf(extra, 'size')[1]]]),
         region: first([[regionOk(ex.region), MINE], [regionOf(co.address), '업체관리 주소']]),
         industry: first([[industryOk(ex.industry), MINE]]),
         salesDropPct: first([[num(ex.salesDropPct), MINE]])
@@ -152,7 +160,12 @@
     var fy = num(v('foundedYear'));
     range('yearsInBiz', c.yearsInBiz, fy == null ? null : num(year) - fy, '업력', '년');
     range('salesDropPct', c.salesDropPct, num(v('salesDropPct')), '매출 감소', '%');
-    oneOf('size', c.sizes, v('size'), '규모');
+    var sizes = list(c.sizes);
+    if (sizes.length && v('size') === SME) {
+      /* 소·중 미구분 중소기업 — 둘 다 받으면 맞음, 둘 다 안 받으면 안 맞음, 하나만 받으면 모름 */
+      var hasS = sizes.indexOf('소기업') >= 0, hasM = sizes.indexOf('중기업') >= 0;
+      add('size', '규모: ' + sizes.join('·'), hasS && hasM ? 'ok' : (!hasS && !hasM ? 'no' : 'unknown'));
+    } else oneOf('size', c.sizes, v('size'), '규모');
     oneOf('region', c.regions, v('region'), '지역');
     var ind = c.industries || {}, inc = list(ind.include), exc = list(ind.exclude), iv = v('industry');
     if (inc.length || exc.length) {
