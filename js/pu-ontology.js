@@ -172,11 +172,16 @@
        ★ 받은 서류함(2026-10-11, 설계 2026-10-11-gov-report-inbox-design.md) — 칸 창 「📥 받은 서류 후보」가 메일함 거울
          (mailbox/folders · mailbox/msgs 머리글, 주인은 푸른 메일 mail)과 업체관리(data/companies, 주소 세 칸)를 빌려 읽는다
          (이름 표 GR_INBOX_NODES, 칸 창을 처음 열 때 한 번). 첨부는 서버 함수로 한 건씩 받아 화면에서만 보고 버린다.
-         연결은 scal_docs 줄 안의 link 한 칸 — 쓰기 계약은 그대로다. */
-    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report','scal_docs'],
+         연결은 scal_docs 줄 안의 link 한 칸 — 쓰기 계약은 그대로다.
+       ★ 사업 종결 표시(2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md) — 이 앱의 둘째 쓰기 자리:
+         scal_bizState/{이알피 컨설팅 사업 코드} = { closedFrom:'YYYY', closedAt?, reason?, by?, at } (사업 하나 = 노드 하나, .set). 주인은 이 앱이다.
+         되돌리기는 지우지 않고 같은 칸에 closedFrom '9999' 표시를 .set 한다 — 저장 관문이 물리적 삭제(.remove)를 막는다(레코드 모양이 아니라 관문을 지난다).
+         쓰기는 관리자·위임관리인만(규칙 MGR). 이름 표 GR_BIZ 로 부른다. */
+    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report','scal_docs','scal_bizState'],
       sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir',
                    'data/biz_cons_types','data/consultings','scal_erpTypeMap','mailbox','data/companies'],
-      writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'},{path:'scal_docs/{co}/{rid}/items/{key}',entityType:'Document'}],
+      writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'},{path:'scal_docs/{co}/{rid}/items/{key}',entityType:'Document'},
+                      {path:'scal_bizState/{code}',entityType:'Project'}],
       entityTypes:['Organization','Project','Document'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
        이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
@@ -489,7 +494,7 @@
     consult_core:{program:'consult',strategy:'local',path:'data/consultings',parser:'erp'},
     /* 컨설팅보고서 — 제 업무 자료가 없다(보고서는 consult 의 자리). 소유 자리는 «보던 자리» 예약뿐이라 in_app */
     govreport_view:{program:'govreport',strategy:'in_app',path:'activeWriter/gov_report',parser:'coverage',
-      gives:'이름 자리(예약) · 서류 진행 기록(scal_docs, 앱 안에서만 본다). 보고서 상태는 정부사업일정(consult)의 자리다'},
+      gives:'이름 자리(예약) · 서류 진행 기록(scal_docs)·사업 종결 표시(scal_bizState) — 앱 안에서만 본다. 보고서 상태는 정부사업일정(consult)의 자리다'},
     /* 푸른 캘린더 — 업무 자료를 «따로 담지 않는다». 일정·근태의 주인은 이알피이고
        그것은 erp_core 가 이미 읽는다. 여기서 또 읽으면 같은 일정이 두 번 세어진다.
        제 자리(data/cal_view)에 있는 것은 «어느 탭을 보고 있었나»뿐이라 업무 개체가 아니다.

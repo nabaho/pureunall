@@ -7,6 +7,7 @@
      · 사업 한 줄 = «사업 이름 (수행기관)». 기관이 비면 「기관 미지정」. 이름이 같고 기관만 다른 사업은 label.text 로 구분된다.
      · 종결 표시는 scal_bizState/{사업 코드} = { closedFrom:'YYYY', closedAt?, reason?, by?, at }. 사업이 «종결» 인 해 = 고른 해 >= closedFrom.
        closedFrom 은 정확히 4자리 숫자 문자열이고, 문자열끼리 견준다(연도 숫자 인자도 String 으로). 「사업 전체」 = ALL_FROM('2000').
+       되돌리기 = 기록을 지우는 것이 아니라 closedFrom NEVER_FROM('9999') 표시(저장 관문이 물리적 삭제를 막고, 처리자·시각도 남는다) — 어느 정상 연도에서도 종결이 아니다.
        상태 객체는 «자기 소유 속성»만 읽는다(__proto__·constructor·toString 같은 이름·프로토타입 쪽 값은 종결이 아니다).
      · 종결 사업도 목록(closed 묶음)에는 남고 실제 업체 수(count)를 그대로 담는다 — 단, 숫자 합계(total)에는 들어가지 않는다.
      · 묶음 정하는 차례는 PuGovReportDocs.sidebarGroups 와 같은 조건(visibleTypes·linkOf·pairs·planFor)을 그대로 호출한다 — 거기를 고치지 않는다.
@@ -19,6 +20,7 @@
   var REASON_MAX = 40;
   var BY_MAX = 40;
   var ALL_FROM = '2000';
+  var NEVER_FROM = '9999';   // 되돌림 표시 — closedFrom 이 이 값이면 어느 연도에서도 종결이 아니다(노드를 지우지 않고 «누가 언제 되돌렸는지» 남긴다)
   var NO_AGENCY = Docs.NO_AGENCY;   // 「기관 미지정」 — 옆 모듈과 같은 말
 
   function str(v) { return v == null ? '' : String(v).trim(); }
@@ -47,6 +49,13 @@
     if (!e || typeof e !== 'object' || Array.isArray(e)) return false;
     var y = String(year);
     return isYear(e.closedFrom) && isYear(y) && e.closedFrom <= y;
+  }
+
+  /* 되돌림 표시인가 — 이 사업 기록의 closedFrom 이 NEVER_FROM(자기 소유 속성만 읽는다) */
+  function isReopened(state, code) {
+    if (!state || typeof state !== 'object' || Array.isArray(state) || !has(state, code)) return false;
+    var e = state[code];
+    return !!e && typeof e === 'object' && !Array.isArray(e) && e.closedFrom === NEVER_FROM;
   }
 
   /* 종결 기록 한 줄 — 규칙이 받아들이는 모양만 만든다. from·now 가 이상하면 null */
@@ -102,8 +111,8 @@
     return out;
   }
 
-  var api = { REASONS: REASONS, REASON_MAX: REASON_MAX, ALL_FROM: ALL_FROM, NO_AGENCY: NO_AGENCY,
-    label: label, closedFor: closedFor, closeEntry: closeEntry, build: build, closedTypeIds: closedTypeIds };
+  var api = { REASONS: REASONS, REASON_MAX: REASON_MAX, ALL_FROM: ALL_FROM, NEVER_FROM: NEVER_FROM, NO_AGENCY: NO_AGENCY,
+    label: label, closedFor: closedFor, isReopened: isReopened, closeEntry: closeEntry, build: build, closedTypeIds: closedTypeIds };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.PuGovReportNav = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

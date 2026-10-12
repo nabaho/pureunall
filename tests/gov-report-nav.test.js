@@ -257,3 +257,46 @@ test('closedTypeIds — 종결 사업의 typeId 만, 연도에 따라 달라진�
   assert.deepEqual(f('2026', undefined), {});
   assert.deepEqual(N.closedTypeIds(), {});
 });
+
+/* ── 되돌림 표시(2026-10-12 조정관 판정: 지우지 않고 closedFrom '9999' 로 표시 — 저장 관문이 물리적 삭제를 막는다) ── */
+test('NEVER_FROM — 「9999」 · 규칙 정규식 꼴(4자리)을 통과하고 closeEntry 가 만들 수 있다', () => {
+  assert.equal(N.NEVER_FROM, '9999');
+  assert.ok(/^[0-9]{4}$/.test(N.NEVER_FROM));
+  assert.deepEqual(N.closeEntry({ from: N.NEVER_FROM, at: '2026-10-12', reason: '되돌림', by: '홍길동', now: 5 }),
+    { closedFrom: '9999', closedAt: '2026-10-12', reason: '되돌림', by: '홍길동', at: 5 });
+  assert.equal(N.closeEntry({ from: '9999', now: 5 }).closedFrom, '9999');
+  assert.equal(N.closeEntry({ from: '99999', now: 5 }), null, '다른 검사(4자리)는 그대로');
+  assert.equal(N.closeEntry({ from: '9999' }), null, 'now 없음은 그대로 null');
+});
+
+test('closedFor — closedFrom 「9999」 는 어느 정상 연도에서도 종결이 아니다(2000·2026·2099 까지)', () => {
+  const st = { x1: { closedFrom: '9999', at: 1 } };
+  ['2000', '2019', '2025', '2026', '2027', '2099', 2026].forEach((y) => assert.equal(N.closedFor(st, 'x1', y), false, String(y)));
+  assert.equal(N.closedFor(st, 'x1', ''), false);
+});
+
+test('isReopened — 자기 소유 속성의 closedFrom 이 9999 일 때만 · 이상한 값·프로토타입 이름은 false', () => {
+  assert.equal(N.isReopened({ x1: { closedFrom: '9999', at: 1 } }, 'x1'), true);
+  assert.equal(N.isReopened({ x1: { closedFrom: '2026' } }, 'x1'), false);
+  assert.equal(N.isReopened({ x1: { closedFrom: '2000' } }, 'x1'), false);
+  [undefined, null, '9999', 5, [], ['x1']].forEach((bad) => assert.equal(N.isReopened(bad, 'x1'), false, String(bad)));
+  [null, '9999', [], {}, { closedFrom: 9999 }].forEach((e) => assert.equal(N.isReopened({ x1: e }, 'x1'), false, JSON.stringify(e)));
+  assert.equal(N.isReopened({ x1: { closedFrom: '9999' } }, 'nope'), false);
+  ['__proto__', 'constructor', 'toString'].forEach((k) => assert.equal(N.isReopened({ x1: { closedFrom: '9999' } }, k), false, k));
+  assert.equal(N.isReopened(Object.create({ x1: { closedFrom: '9999' } }), 'x1'), false, '프로토타입 쪽 값은 읽지 않는다');
+});
+
+test('build·closedTypeIds — 되돌림 표시(9999)된 사업은 종결 묶음이 아니라 진행/업체 없음/…으로 간다', () => {
+  const st = { 'N-F': { closedFrom: '9999', at: 1 }, 'N-C': { closedFrom: '9999', at: 1 }, 'N-D': { closedFrom: '9999', at: 1 }, 'N-E': { closedFrom: '9999', at: 1 } };
+  const r = bld({ state: st });
+  assert.deepEqual(codes(r.closed), []);
+  assert.deepEqual(codes(r.open), ['N-A', 'N-B', 'N-F', 'N-G', 'N-H'], '업체가 있는 되돌림 사업은 진행');
+  assert.deepEqual(codes(r.quiet), ['N-C']);
+  assert.deepEqual(codes(r.noPlan), ['N-D']);
+  assert.deepEqual(codes(r.unlinked), ['N-E']);
+  assert.equal(r.total, 6, '되돌린 사업의 업체도 total 에 든다');
+  const m = mk();
+  assert.deepEqual(N.closedTypeIds({ biz: m.biz, tmap: m.tmap, input: m.input, year: '2026', state: st }), {});
+  /* 대조 — 같은 사업이 다시 종결로 덮이면(덮어쓰기) 종결 */
+  assert.deepEqual(codes(bld({ state: { 'N-F': { closedFrom: '2026', at: 2 } } }).closed), ['N-F']);
+});

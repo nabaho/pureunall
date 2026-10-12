@@ -210,6 +210,10 @@ test('scal_bizState 한계 — 규칙과 화면 모듈(js/pu-gov-report-nav.js)�
   const m = /matches\(\/(.+)\/\)/.exec(c.closedFrom['.validate']);
   assert.ok(m, 'closedFrom 정규식을 읽지 못했습니다');
   assert.ok(new RegExp(m[1]).test(Nav.ALL_FROM), 'ALL_FROM(' + Nav.ALL_FROM + ') 이 규칙 정규식을 통과한다');
+  assert.ok(new RegExp(m[1]).test(Nav.NEVER_FROM), '되돌림 표시 NEVER_FROM(' + Nav.NEVER_FROM + ') 도 규칙 정규식을 통과한다 — 규칙을 바꾸지 않고 .set 으로 되돌린다');
+  const re = Nav.closeEntry({ from: Nav.NEVER_FROM, at: '2026-10-12', reason: '되돌림', by: '홍길동', now: 1760000000000 });
+  Object.keys(re).forEach((k) => assert.ok(Object.prototype.hasOwnProperty.call(c, k), '되돌림 표시에 규칙이 모르는 칸: ' + k));
+  assert.ok(upperOf(c.reason['.validate']) >= re.reason.length, '사유 «되돌림» 은 한도 안');
   const e = Nav.closeEntry({ from: '2026', at: '2026-10-12', reason: 'x'.repeat(60), by: 'y'.repeat(60), now: 1760000000000 });
   assert.ok(e.reason.length <= upperOf(c.reason['.validate']), '모듈이 만든 사유가 규칙 한도 안');
   assert.ok(e.by.length <= upperOf(c.by['.validate']), '모듈이 만든 처리자가 규칙 한도 안');
