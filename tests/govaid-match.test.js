@@ -128,3 +128,24 @@ test('«사람이 볼 조건»만 있는 사업은 계산하지 않는다 — �
   const r = M.judge(pf({ headcount: 9 }), prog({ manual: ['경영상 이유로 고용조정이 불가피할 것'] }), Y);
   assert.equal(r.verdict, 'unconfirmed');
 });
+
+test('자동 칸(auto) — 사람이 넣은 값 > 업체관리 > 공공데이터 > 자동 추정 순서', () => {
+  const extra = { vals: {}, auto: { vals: { headcount: 12, size: '중소기업', foundedYear: 2010 }, src: { headcount: '기업정보함 상시근로자수', size: '추정: 직전년도 매출 72억', foundedYear: '금융위 설립일' } } };
+  const a = M.profileFromCompany({ id: 'c1', name: '(예시)회사', companySize: '' }, null, extra);
+  assert.deepEqual(a.vals.headcount, { v: 12, src: '기업정보함 상시근로자수' });
+  assert.deepEqual(a.vals.size, { v: '중소기업', src: '추정: 직전년도 매출 72억' });
+  assert.deepEqual(a.vals.foundedYear, { v: 2010, src: '금융위 설립일' });
+  const withPub = M.profileFromCompany({ id: 'c1', companySize: '중기업' }, { ei: { rows: [{ fg: 'gy', cnt: 30 }], gy: 30 } }, extra);
+  assert.equal(withPub.vals.headcount.v, 30, '공공데이터가 자동 추정보다 먼저');
+  assert.equal(withPub.vals.size.v, '중기업', '업체관리 규모가 자동 추정보다 먼저');
+  const mine = M.profileFromCompany({ id: 'c1' }, null, Object.assign({}, extra, { vals: { headcount: 40 } }));
+  assert.equal(mine.vals.headcount.v, 40, '사람이 넣은 값이 맨 먼저');
+});
+
+test('규모 «중소기업»(소·중 미구분) — 조건이 소·중을 다 받으면 맞음, 둘 다 안 받으면 안 맞음, 하나만 받으면 모름', () => {
+  const v = { headcount: null, foundedYear: null, size: '중소기업', region: null, industry: null, salesDropPct: null };
+  assert.equal(M.judge(pf(v), prog({ sizes: ['소기업', '중기업'] }), Y).verdict, 'candidate');
+  assert.equal(M.judge(pf(v), prog({ sizes: ['소기업', '중기업', '중견기업'] }), Y).verdict, 'candidate');
+  assert.equal(M.judge(pf(v), prog({ sizes: ['중견기업', '대기업'] }), Y).verdict, 'no');
+  assert.equal(M.judge(pf(v), prog({ sizes: ['소기업'] }), Y).verdict, 'unknown');
+});
