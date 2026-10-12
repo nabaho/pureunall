@@ -24,6 +24,8 @@
       ReviewCriterion:'검토 기준', LegalProvision:'법령 조문',
       /* 정부지원금(2026-10-11) — 지원사업 사전 한 건 · (회사, 사업) 한 쌍에 대한 노무사의 검토 결정 */
       SupportProgram:'정부 지원사업', EligibilityReview:'지원 검토',
+      /* 전광판(2026-10-12) — 광고 한 건 · 전광판에 «올린 판» 한 벌(기록 포함) · 첫 전송 허락 같은 제어값 */
+      SignboardAd:'전광판 광고', SignboardPublish:'전광판 올린 판', SignboardControl:'전광판 제어', SignboardLog:'전광판 활동 기록',
       /* 경력관리의 실적 한 줄 (2026-09-29 온톨로지 검토) — 이알피 사건·사업·자문에서 «나온» 사람별 기록.
          ⚠ 사건 그 자체가 아니다: 사건 하나를 여러 사람이 실적으로 가진다. 그래서 번호(CS0034)가
            이알피 관리번호(산재등-2026-901)와 다른 것이 맞다. 둘을 잇는 것은 sourceKind·sourceId(영구 id)다.
@@ -220,6 +222,18 @@
                       {path:'govaid/extras/{key}',entityType:'Organization'},
                       {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'}],
       entityTypes:['Organization','SupportProgram','EligibilityReview'] },
+    /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
+       설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
+       ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).
+         state 는 심부름꾼이 쓴다 — 화면은 읽기만.
+       ⚠ 길거리에 그대로 보이는 것이라 읽기·쓰기 모두 관리자·위임관리인만(규칙 signboard). */
+    signboard:{ name:'전광판', file:'pu-signboard.html', primaryRoots:['signboard'], sharedRoots:['uid_roles'],
+      writeContracts:[{path:'signboard/ads/{id}',entityType:'SignboardAd'},
+                      {path:'signboard/published',entityType:'SignboardPublish'},
+                      {path:'signboard/history/{version}',entityType:'SignboardPublish'},
+                      {path:'signboard/control',entityType:'SignboardControl'},
+                      {path:'signboard/log/{id}',entityType:'SignboardLog'}],
+      entityTypes:['SignboardAd','SignboardPublish','SignboardControl','SignboardLog'] },
     /* ⚠ 저장 자리가 둘이다 — 옛 자리(pucards/mailbox)와 지금 쓰는 자리(mailbox).
        다음메일함 통째 동기화(functions/mail-sync.js)는 «최상위 mailbox» 에 담는다.
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
@@ -517,6 +531,9 @@
     /* 정부지원금 — 고객사 이름·인원·검토가 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
     govaid_core:{program:'govaid',strategy:'in_app',path:'govaid',parser:'coverage',
       gives:'지원사업 사전·예비 고객·보충값·검토 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
+    /* 전광판 — 광고 문구·올린 판이 든 자리라 통합 진단에서 읽지 않는다(앱 안에서만 본다). */
+    signboard_core:{program:'signboard',strategy:'in_app',path:'signboard',parser:'coverage',
+      gives:'전광판 광고·올린 판·올린 기록·심부름꾼 상태 (앱 안에서만 — 통합 진단에서 읽지 않는다)'},
     cards_index:{program:'cards',strategy:'remote',path:'pucards/idx',parser:'cardIndex'},
     /* ── 기업 상세·근로자 정보함 (대표 지시 2026-09-02) ──
        예전에는 기업정보함에서 pucards/idx 하나만 읽었다. 값이 모여 있는 곳은 coInfo 다.
