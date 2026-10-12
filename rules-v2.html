@@ -50,7 +50,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/store.js?v=4"></script>
 <script src="js/rules-v2/view-library.js?v=3"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=5"></script>
+<script src="js/rules-v2/view-sites.js?v=6"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -224,10 +224,11 @@ button{font:inherit;cursor:pointer}
 #sites .rh .k,#sites .rh .btn{margin-left:auto}
 /* 머리줄 거르기·순서·쪽 (설계 §12) */
 #sites th.ch{padding:0}
-#sites th.ch .h{display:flex;align-items:center;gap:3px;width:100%;height:32px;padding:0 8px;border:0;background:none;color:inherit;font:inherit;text-align:left;white-space:nowrap}
+#sites th.ch .h{display:flex;align-items:center;gap:3px;width:100%;height:32px;padding:0 8px;border:0;background:none;color:inherit;font:inherit;text-align:left;white-space:nowrap;overflow:hidden}
+#sites th.ch .h .lb{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #sites th.ch .h:hover{background:#eff6ff}
-#sites th.ch .h .ar{color:#1e40af;font-size:10px}
-#sites th.ch .h .fl{margin-left:auto;color:#94a3b8;font-size:11px}
+#sites th.ch .h .ar{color:#1e40af;font-size:10px;flex:none}
+#sites th.ch .h .fl{flex:none;margin-left:auto;color:#94a3b8;font-size:11px}
 #sites th.ch.on .h{background:#eff6ff;color:#1e40af}#sites th.ch.on .h .fl{color:#1e40af}
 .cpop{z-index:10;width:236px;background:#ffffff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 8px 22px rgba(30,41,59,.18);padding:8px;font-size:12px;color:#1e293b}
 .cpop .sort{display:flex;gap:6px;margin-bottom:6px}
@@ -236,7 +237,8 @@ button{font:inherit;cursor:pointer}
 .cpop input[type=text]{width:100%;height:28px;border:1px solid #cbd5e1;border-radius:7px;padding:0 8px;font-size:16px;margin-bottom:6px}
 .cpop .list{max-height:170px;overflow:auto;border:1px solid #e2e8f0;border-radius:7px}
 .cpop label,.cpop .wo{display:flex;gap:6px;align-items:center;width:100%;padding:4px 8px;font-size:12px;color:#1e293b;border:0;background:none;text-align:left}
-.cpop label span,.cpop .wo span{margin-left:auto;color:#475569}
+.cpop label span,.cpop .wo span{margin-left:auto;color:#475569;flex:none}
+.cpop label .t,.cpop .wo .t{margin-left:0;flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:inherit}
 .cpop .wo.on{background:#eff6ff;color:#1e40af;font-weight:700}
 .cpop .none{padding:8px;color:#475569}
 .cpop .foot{display:flex;gap:6px;margin-top:6px}

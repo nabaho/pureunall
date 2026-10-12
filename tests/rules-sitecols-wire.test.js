@@ -86,6 +86,17 @@ test('머리줄 창은 위쪽 띠·머리보다 위, 모달 베일보다 아래'
   assert.ok(pop < z(rule('.veil')), '모달 베일보다 아래');
 });
 
+test('한 칸은 한 줄 — 머리 단추·창 목록 글은 넘치면 … 로 줄인다', () => {
+  assert.match(rule('#sites th.ch .h'), /overflow:\s*hidden/);
+  ['#sites th.ch .h .lb', '.cpop label .t,.cpop .wo .t'].forEach((sel) => {
+    const r = rule(sel);
+    assert.match(r, /white-space:\s*nowrap/, sel);
+    assert.match(r, /text-overflow:\s*ellipsis/, sel);
+    assert.match(r, /overflow:\s*hidden/, sel);
+    assert.match(r, /min-width:\s*0/, sel);
+  });
+});
+
 test('순서 열쇠가 없는 칸을 누르면 아무 일도 안 한다', () => {
   assert.match(fn('colSort'), /if\s*\(\s*!sk\s*\)\s*return/);
 });

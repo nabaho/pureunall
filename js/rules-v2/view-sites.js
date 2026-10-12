@@ -122,7 +122,7 @@
     var sk = SC().SORT_OF[key], so = opt.sort || {}, arrow = so.key === sk ? (so.dir === 'desc' ? ' <span class="ar">▼</span>' : ' <span class="ar">▲</span>') : '';
     var on = colOn(opt, key, st) || so.key === sk;
     return '<th class="ch' + (on ? ' on' : '') + '"><button class="h" data-act="colOpen" data-key="' + esc(key) + '" title="' + esc(label) + ' — 거르기·순서">'
-      + esc(label) + arrow + '<span class="fl">▾</span></button></th>';
+      + '<span class="lb">' + esc(label) + '</span>' + arrow + '<span class="fl">▾</span></button></th>';
   }
   function headHtml(st, opt) {
     var cells = HEAD.map(function (h) { return headCell(st, opt, h[0], h[1]); });
@@ -144,7 +144,7 @@
       var ids =Object.keys(oc).filter(function (k) { return k !== '-'; })
         .sort(function (a, b) { return staffName(st, a).localeCompare(staffName(st, b), 'ko'); });
       var wopt = function (v, label, n) {
-        return '<button class="wo' + ((s.who || '') === v ? ' on' : '') + '" data-act="colWho" data-v="' + esc(v) + '">' + esc(label) + '<span>' + n + '</span></button>';
+        return '<button class="wo' + ((s.who || '') === v ? ' on' : '') + '" data-act="colWho" data-v="' + esc(v) + '" title="' + esc(label) + '"><span class="t">' + esc(label) + '</span><span>' + n + '</span></button>';
       };
       body = '<div class="list">' + wopt('', '모두', (rows || []).length) + (oc['-'] || s.who === '-' ? wopt('-', '담당 없음', oc['-'] || 0) : '')
         + ids.map(function (k) { return wopt(k, staffName(st, k) + (k === me ? ' (나)' : ''), oc[k]); }).join('') + '</div>';
@@ -154,8 +154,8 @@
       if (q) opts = opts.filter(function (o) { return o.label.indexOf(q) >= 0 || sel.indexOf(o.v) >= 0; });
       body = (key === 'biz' ? '<input type="text" data-role="colq" placeholder="🔍 업태 찾기" value="' + esc(s.popq || '') + '">' : '')
         + '<div class="list">' + (opts.map(function (o) {
-          return '<label><input type="checkbox" data-role="colchk" data-key="' + esc(key) + '" data-v="' + esc(o.v) + '"' + (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '> '
-            + esc(o.label) + '<span>' + o.n + '</span></label>';
+          return '<label title="' + esc(o.label) + '"><input type="checkbox" data-role="colchk" data-key="' + esc(key) + '" data-v="' + esc(o.v) + '"' + (sel.indexOf(o.v) >= 0 ? ' checked' : '') + '> '
+            + '<span class="t">' + esc(o.label) + '</span><span>' + o.n + '</span></label>';
         }).join('') || '<div class="none">값이 없습니다</div>') + '</div>';
     }
     return '<div class="cpop" style="position:fixed;left:' + Math.round(pos.x) + 'px;top:' + Math.round(pos.y) + 'px">' + sort + body
@@ -250,11 +250,13 @@
     var cols = s.cols || {};
     var base = Sx().filter(rows, s.f || 'has', s.q || '', s.who || '');        // 위쪽 칩·담당·검색
     var kept = SC().apply(base, cols);                                          // 머리줄 조건
-    var sorted = SC().sortRows(kept, s.sort, function (sid) { return staffName(st, sid); });
+    // 순서에는 «이름을 못 찾은 사번»을 사번 글자 그대로 넣지 않는다 — 빈 값으로 보내 오름·내림 모두 맨 끝에 둔다(표시는 staffName 그대로)
+    var sorted = SC().sortRows(kept, s.sort, function (sid) { return (st.staff || {})[sid] || ''; });
     var pg = SC().page(sorted, s.page);
     // 담당 창은 «담당 거르기 전» 목록(위쪽 칩·검색만 건)에서 사람별 수를 센다. 나머지 창은 base 를 넘기고
     // options 가 cols 로 «그 칸 자신만 빼고» 센다
-    var popRows = s.pop === 'who' ? Sx().filter(rows, s.f || 'has', s.q || '', '') : base;
+    // 머리줄 조건(cols)은 그대로 걸린다 — 담당 창의 수도 «지금 보이는 표»를 기준으로 센다(설계 §12-2)
+    var popRows = s.pop === 'who' ? SC().apply(Sx().filter(rows, s.f || 'has', s.q || '', ''), cols) : base;
     var row = s.sel ? rows.filter(function (r) { return r.id === s.sel; })[0] : null;
     var opt = { offset: pg.from ? pg.from - 1 : 0, cols: cols, sort: s.sort, pop: s.pop };
     el.innerHTML = filterHtml(st, Sx().counts(rows), Sx().ownerCounts(rows)) + condHtml(cols, kept.length)
@@ -270,17 +272,35 @@
       var out = !!s.pop && !(ev.target.closest && (ev.target.closest('.cpop') || ev.target.closest('[data-act="colOpen"]')));
       if (out) { s.pop = ''; s.popq = ''; }
       var run = b && el.contains(b) && b.tagName !== 'INPUT' && H[b.dataset.act];
-      if (run) { ev.preventDefault(); run(b.dataset, ev); return; }
+      if (run) {
+        ev.preventDefault(); run(b.dataset, ev);
+        // 손잡이가 다시 그리지 않았으면(예: 확인창에서 취소) 낡은 창이 화면에 남는다 — 상태는 닫혔으니 창 노드도 뗀다
+        if (out && !s.pop) { var stale = el.querySelector && el.querySelector('.cpop'); if (stale && stale.remove) stale.remove(); }
+        return;
+      }
       if (!out) return;
       // 입력칸·선택칸을 눌렀으면 다시 그리지 않는다 — 그리면 그 칸이 DOM 에서 떨어져 나가 커서·열린 목록이 사라진다. 창만 떼어 낸다
       var tg = ev.target, inCtl = /^(INPUT|SELECT|TEXTAREA)$/.test((tg && tg.tagName) || '') || !!(tg && tg.closest && tg.closest('input,select,textarea'));
       if (inCtl) { var pp = el.querySelector && el.querySelector('.cpop'); if (pp && pp.remove) pp.remove(); }
       else if (H.colClose) H.colClose();
     };
-    el.oninput = function (ev) {
-      var t = ev.target;
-      if (t.dataset && t.dataset.role === 'sq' && H.sq) H.sq(t.value);
-      if (t.dataset && t.dataset.role === 'colq' && H.colq) H.colq(t.value);
+    /* 한글은 조합해 가며 들어온다 — 조합 중에 다시 그리면 칸이 새로 만들어져 「ㄷㅗ」 처럼 조각난다.
+       조합 중에는 그리지 않고, 끝난 뒤(compositionend)에만 한 번 부른다.
+       ⚠ oncompositionend 는 표준 핸들러 «속성»이 아니다(rules.html 같은 주의) — addEventListener 로, render 가 겹쳐 달지 않게 한 번만 */
+    el.__pdCur = { H: H, s: s };
+    var typed = function (t, cur) {
+      if (!t || !t.dataset) return;
+      if (t.dataset.role === 'sq' && cur.H.sq) cur.H.sq(t.value);
+      if (t.dataset.role === 'colq' && cur.H.colq) cur.H.colq(t.value);
+    };
+    el.oninput = function (ev) { if (ev.isComposing) return; typed(ev.target, el.__pdCur); };
+    if (!el.__pdComp && el.addEventListener) {
+      el.__pdComp = true;
+      el.addEventListener('compositionend', function (ev) { typed(ev.target, el.__pdCur); });
+    }
+    // Esc — 열린 창을 닫는다
+    el.onkeydown = function (ev) {
+      if (ev.key === 'Escape' && s.pop && H.colClose) H.colClose();
     };
     el.onchange = function (ev) {
       var t = ev.target;

@@ -23,7 +23,7 @@ test('머리 — #을 뺀 일곱 칸이 단추, 걸린 칸은 on, 순서 화살�
   const keys = [...h.matchAll(/data-act="colOpen"[^>]*data-key="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(keys.sort(), ['band', 'biz', 'docs', 'fin', 'last', 'name', 'who']);
   assert.match(h, /<th class="[^"]*\bon\b[^"]*"[^>]*>\s*<button[^>]*data-key="biz"/, '걸린 업태 머리가 on');
-  assert.match(h, /data-key="band"[^>]*>[^<]*(?:<[^>]+>)*[^<]*▲/, '순서 걸린 규모에 ▲');
+  assert.match(h, /data-key="band"[^>]*>(?:(?!<\/button>)[\s\S])*▲/, '순서 걸린 규모에 ▲');
   assert.match(h, /<th class="c">#<\/th>/, '# 머리는 단추가 아니다');
 });
 
@@ -141,11 +141,13 @@ function wire(sites, handlers) {
   // 진짜 colClose 는 다시 그려서 눌린 단추를 DOM 에서 떼어 낸다 — 그 뒤 el.contains 는 거짓이 된다
   let redrawn = false;
   const popup = { removed: false, remove() { popup.removed = true; } };
-  const el = { innerHTML: '', contains: () => !redrawn, querySelector: (q) => (q === '.cpop' ? popup : null), popup };
+  const listeners = [];
+  const el = { innerHTML: '', contains: () => !redrawn, querySelector: (q) => (q === '.cpop' ? popup : null), popup,
+    addEventListener: (type, fn) => listeners.push({ type, fn }), listeners };
   const state = st(sites);
   const calls = [];
   const H = {};
-  ['colClose', 'siteSel', 'colToggle', 'colq', 'reload'].forEach((n) => {
+  ['colClose', 'siteSel', 'colToggle', 'colq', 'sq', 'reload'].forEach((n) => {
     H[n] = (...a) => { calls.push([n].concat(a)); if (n === 'colClose') redrawn = true; };
   });
   Object.assign(H, handlers || {});
@@ -202,6 +204,87 @@ test('손잡이 이음 — 창 밖의 입력칸·선택칸을 누르면 그 칸�
   w2.el.onclick(ev(fakeTarget()));
   assert.equal(w2.count('colClose'), 1, '버튼 따위를 눌렀을 때는 지금처럼 colClose');
   assert.equal(w2.el.popup.removed, false);
+});
+
+test('한글 조합 — 조합 중 input 은 손잡이를 부르지 않고, 조합이 끝나면 한 번만 부른다 (colq·sq)', () => {
+  const w = wire({ pop: 'biz' });
+  ['colq', 'sq'].forEach((role) => {
+    w.el.oninput({ isComposing: true, target: fakeTarget({ tag: 'INPUT', dataset: { role }, value: 'ㄷㅗ' }) });
+    assert.equal(w.count(role), 0, role + ' 조합 중에는 다시 그리지 않는다');
+    w.el.oninput({ isComposing: false, target: fakeTarget({ tag: 'INPUT', dataset: { role }, value: '도' }) });
+    assert.equal(w.count(role), 1, role + ' 조합 아닌 input 은 그대로');
+  });
+  const ends = w.el.listeners.filter((l) => l.type === 'compositionend');
+  assert.equal(ends.length, 1, 'compositionend 는 한 번만 단다');
+  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '도소매' }) });
+  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'sq' }, value: '홍' }) });
+  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'sm' }, value: 'x' }) });
+  assert.deepEqual(w.calls.filter((c) => c[0] === 'colq').pop(), ['colq', '도소매']);
+  assert.deepEqual(w.calls.filter((c) => c[0] === 'sq').pop(), ['sq', '홍']);
+  assert.equal(w.count('colq'), 2); assert.equal(w.count('sq'), 2, '관계없는 칸은 안 부른다');
+  // 다시 그려도 겹쳐 달지 않는다 — 같은 el 에 render 를 또 돌린다
+  const real = global.PuRulesV2Sites.model;
+  global.PuRulesV2Sites.model = () => MANY.slice(0, 3);
+  try { V.render(w.el, w.state, {}); V.render(w.el, w.state, {}); } finally { global.PuRulesV2Sites.model = real; }
+  assert.equal(w.el.listeners.filter((l) => l.type === 'compositionend').length, 1, '다시 그려도 한 개');
+  // 새 handlers 가 쓰인다(옛 것을 붙들지 않는다)
+  let got = null;
+  global.PuRulesV2Sites.model = () => MANY.slice(0, 3);
+  try { V.render(w.el, w.state, { colq: (v) => { got = v; } }); } finally { global.PuRulesV2Sites.model = real; }
+  ends[0].fn({ target: fakeTarget({ tag: 'INPUT', dataset: { role: 'colq' }, value: '새' }) });
+  assert.equal(got, '새');
+});
+
+test('Esc — 창이 열려 있으면 colClose, 닫혀 있으면 아무 일도 없다', () => {
+  const w = wire({ pop: 'biz' });
+  w.el.onkeydown({ key: 'a' });
+  assert.equal(w.count('colClose'), 0);
+  w.el.onkeydown({ key: 'Escape' });
+  assert.equal(w.count('colClose'), 1);
+  const w2 = wire({ pop: '' });
+  w2.el.onkeydown({ key: 'Escape' });
+  assert.equal(w2.count('colClose'), 0);
+});
+
+test('낡은 창 — 손잡이가 다시 그리지 않았으면(예: 확인 취소) 창 노드를 뗀다 · 창 안·머리 단추 누름은 그대로', () => {
+  const w = wire({ pop: 'biz' });
+  w.el.onclick(ev(fakeTarget({ dataset: { act: 'siteSel', co: 'c1' } })));
+  assert.equal(w.el.popup.removed, true);
+  const w2 = wire({ pop: 'biz' });
+  w2.el.onclick(ev(fakeTarget({ dataset: { act: 'colToggle' }, closest: { '.cpop': {} } })));
+  assert.equal(w2.el.popup.removed, false);
+  const w3 = wire({ pop: '' });
+  w3.el.onclick(ev(fakeTarget({ dataset: { act: 'siteSel', co: 'c1' } })));
+  assert.equal(w3.el.popup.removed, false, '창이 닫혀 있었으면 건드리지 않는다');
+});
+
+function renderHtml(extra, rs, staff) {
+  const el = { innerHTML: '', contains: () => true };
+  const real = global.PuRulesV2Sites.model;
+  global.PuRulesV2Sites.model = () => rs;
+  try { V.render(el, Object.assign(st(extra), staff ? { staff } : {}), {}); } finally { global.PuRulesV2Sites.model = real; }
+  return el.innerHTML;
+}
+
+test('담당 창의 수는 머리줄 조건(업태 등)을 따른다 — 담당 거르기만 뺀다', () => {
+  const rs = [row(1, { bizType: '제조업', mgr: 'P-001' }), row(2, { bizType: '도소매', mgr: 'P-001' }), row(3, { bizType: '도소매', mgr: 'P-002' }), row(4, { bizType: '제조업', mgr: 'P-002' })];
+  const staff = { 'P-001': '홍길동', 'P-002': '김철수' };
+  const all = renderHtml({ pop: 'who' }, rs, staff);
+  const cnt = (h, v, name) => new RegExp('data-v="' + v + '"[^>]*><span class="t">' + name + '</span><span>(\\d+)</span>').exec(h);
+  assert.equal(cnt(all, '', '모두')[1], '4');
+  const f = renderHtml({ pop: 'who', cols: { biz: ['제조업'] } }, rs, staff);
+  assert.equal(cnt(f, '', '모두')[1], '2', '모두 = 업태로 걸러진 수');
+  assert.equal(cnt(f, 'P-001', '홍길동')[1], '1');
+  assert.equal(cnt(f, 'P-002', '김철수')[1], '1');
+});
+
+test('담당 순서 — 이름을 못 찾은 사번은 오름·내림 모두 맨 끝', () => {
+  const rs = [row(1, { mgr: 'P-001' }), row(2, { mgr: 'P-999' }), row(3, { mgr: 'P-002' })];
+  const staff = { 'P-001': '홍길동', 'P-002': '김철수' };
+  const order = (dir) => [...renderHtml({ sort: { key: 'who', dir } }, rs, staff).matchAll(/<tr data-act="siteSel"[^>]*>.*?<b>(회사\d+)<\/b>/g)].map((m) => m[1]);
+  assert.equal(order('asc').pop(), '회사2', '오름 — 모르는 담당이 끝');
+  assert.equal(order('desc').pop(), '회사2', '내림 — 모르는 담당이 끝');
+  assert.deepEqual(order('asc').slice(0, 2), ['회사3', '회사1']);
 });
 
 test('손잡이 이음 — 체크 바뀜은 colToggle(칸, 값, 체크), 업태 찾기 글은 colq(글)', () => {
