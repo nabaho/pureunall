@@ -84,6 +84,27 @@
     Object.keys(FACTS).forEach(function (k) { if (typeof f[k] === 'boolean') out[k] = { v: f[k], src: MINE }; });
     return out;
   }
+  /* 우선지원대상기업 — 고용보험법 시행령 제12조·별표 1(개정 2025. 10. 1., 2026-10-12 원문 확인).
+     업종별 상시 근로자 상한. 표에 없는 업종(그 밖의 업종)은 100명. C 안의 34(산업용 기계 수리업)·N 안의 76(임대업)은 100명 */
+  var PRIORITY_MAX = { C: 500, B: 300, F: 300, H: 300, J: 300, N: 300, M: 300, Q: 300, G: 200, I: 200, K: 200, R: 200 };
+  var PRIORITY_LOW = 100;
+  /* 사람 답이 없을 때만 «예»를 추정한다 — «아니오»는 추정하지 않는다
+     (중소기업이면 인원과 상관없이 예(②), 상한을 넘어도 5년은 예(③) — 기계가 아니라고 단정할 수 없다).
+     ⚠ 상호출자제한기업집단 소속(④)은 기계가 모른다 → 추정 꼬리표로 남긴다 */
+  function prioritySupportAuto(vals) {
+    var hc = num((vals.headcount || {}).v), ind = industryOk((vals.industry || {}).v), sz = clean((vals.size || {}).v);
+    if (hc != null && hc > 0) {
+      var max = ind ? (PRIORITY_MAX[ind] || PRIORITY_LOW) : PRIORITY_LOW;
+      if (hc <= max) return { v: true, src: '추정: 상시 ' + hc + '명 ≤ ' + max + '명(시행령 별표 1, ' + (ind ? indName(ind) : '업종 모름 → 가장 낮은 기준') + ')'
+        + ((ind === 'C' || ind === 'N') && hc > PRIORITY_LOW ? ' — 수리업·임대업이면 100명' : '') };
+    }
+    if (sz === '소기업' || sz === '중기업' || sz === SME) return { v: true, src: '추정: 규모 ' + sz + ' → 중소기업은 우선지원(시행령 제12조②)' };
+    return null;
+  }
+  function withPriority(p) {
+    if (!p.facts.prioritySupport) { var a = prioritySupportAuto(p.vals); if (a) p.facts.prioritySupport = a; }
+    return p;
+  }
   function sizeOk(v) { return SIZES.indexOf(clean(v)) >= 0 ? clean(v) : ''; }
   /* «중소기업» — 소기업인지 중기업인지 모르는 중소기업(매출로 추정할 때). 조건 칸에는 쓰지 않고 사업장 값으로만 온다 */
   var SME = '중소기업';
@@ -100,7 +121,7 @@
   function profileFromCompany(co, pub, extra) {
     co = co || {};
     var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub);
-    return {
+    return withPriority({
       key: 'co_' + clean(co.id), kind: 'co', id: clean(co.id), name: clean(co.name), bizno: digits(co.bizNo), aliases: [],
       vals: {
         headcount: first([[num(ex.headcount), MINE], [hc.v, hc.src], [num(autoOf(extra, 'headcount')[0]), autoOf(extra, 'headcount')[1]]]),
@@ -111,13 +132,13 @@
         salesDropPct: first([[num(ex.salesDropPct), MINE]])
       },
       facts: factsOf(extra)
-    };
+    });
   }
   /* 예비 고객 — govaid/prospects/{id} + 공공데이터(사업자번호가 있으면) + 보충값(govaid/extras/pr_{id}) */
   function profileFromProspect(pr, pub, extra) {
     pr = pr || {};
     var ex = (extra && extra.vals) || {}, hc = headcountAuto(pub), IN = '예비 고객 입력';
-    return {
+    return withPriority({
       key: 'pr_' + clean(pr.id), kind: 'pr', id: clean(pr.id), name: clean(pr.name), bizno: digits(pr.bizno), aliases: [],
       vals: {
         headcount: first([[num(ex.headcount), MINE], [num(pr.headcount), IN], [hc.v, hc.src]]),
@@ -128,7 +149,7 @@
         salesDropPct: first([[num(ex.salesDropPct), MINE]])
       },
       facts: factsOf(extra)
-    };
+    });
   }
 
   function hasRange(r) { return !!r && (num(r.min) != null || num(r.max) != null); }
@@ -192,7 +213,7 @@
   return {
     SIZES: SIZES, REGIONS: REGIONS, INDUSTRIES: INDUSTRIES, FACTS: FACTS,
     list: list, digits: digits, blank: blank, num: num, kstYear: kstYear, regionOf: regionOf,
-    headcountAuto: headcountAuto, profileFromCompany: profileFromCompany, profileFromProspect: profileFromProspect,
+    headcountAuto: headcountAuto, prioritySupportAuto: prioritySupportAuto, profileFromCompany: profileFromCompany, profileFromProspect: profileFromProspect,
     judge: judge
   };
 });

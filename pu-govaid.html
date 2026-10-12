@@ -203,7 +203,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 </script>
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
-<script src="js/pu-govaid-match.js?v=3"></script>
+<script src="js/pu-govaid-match.js?v=4"></script>
 <script src="js/pu-govaid-view.js?v=1"></script>
 <script src="js/pu-govaid-seed.js?v=1"></script>
 <script src="js/pu-govaid-records.js?v=1"></script>
@@ -379,9 +379,10 @@ function valTxt(key,x){
 }
 function profLine(pf){
   var v=pf.vals, cells=[['업종','industry'],['지역','region'],['근로자','headcount'],['개업','foundedYear'],['규모','size'],['매출 감소','salesDropPct']];
-  var f=Object.keys(GovaidMatch.FACTS).filter(function(k){ return pf.facts[k]; }).map(function(k){ return GovaidMatch.FACTS[k]+': '+(pf.facts[k].v?'예':'아니오'); });
+  /* 사실도 출처 꼬리표를 단다 — 우선지원대상기업은 기계가 «추정»으로 채울 수 있다(사람 답은 «직접 입력») */
+  var f=Object.keys(GovaidMatch.FACTS).filter(function(k){ return pf.facts[k]; }).map(function(k){ var x=pf.facts[k]; return esc(GovaidMatch.FACTS[k]+': '+(x.v?'예':'아니오'))+(x.src?' <span class="chip">'+esc(x.src)+'</span>':''); });
   return '<div class="prof">'+cells.map(function(c){ return '<span><b>'+c[0]+'</b>'+valTxt(c[1],v[c[1]])+'</span>'; }).join('')
-    +(f.length?'<span><b>사실</b>'+esc(f.join(' · '))+'</span>':'')+'</div>';
+    +(f.length?'<span><b>사실</b>'+f.join(' · ')+'</span>':'')+'</div>';
 }
 function drawCo(){
   var q=$('coQ').value.trim().toLowerCase(), k=$('coKind').value;
