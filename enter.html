@@ -4503,6 +4503,15 @@ body.portal-mode #moreFab{display:flex;}
   //    기본 scope(/pureunall/)로 등록하면 기업정보함 공유 수신용 pu-cards-sw.js 를 밀어낸다.
   var PUSH_SCOPE = 'push/';                 // enter.html 기준 상대경로 → /pureunall/push/
   var PUSH_LS = 'pu_push_token';            // 이 기기에 등록된 토큰 기억
+  /* 알림 워커 파일이 바뀌어도(2026-10-12 상태줄 「푸」 아이콘 등) 브라우저는 하루쯤 옛 워커를 쓴다.
+     포털을 열 때 이미 등록된 워커만 «새것이 있나» 한 번 본다 — 등록 안 한 기기에는 아무 일도 없다. */
+  try {
+    if('serviceWorker' in navigator && navigator.serviceWorker.getRegistration){
+      navigator.serviceWorker.getRegistration(PUSH_SCOPE).then(function(r){
+        if(r && r.update) r.update()['catch'](function(){});
+      })['catch'](function(){});
+    }
+  } catch(e){}
   function pushSupported(){
     return !!(window.isSecureContext && 'serviceWorker' in navigator && 'Notification' in window
               && window.firebase && firebase.messaging);
@@ -4608,7 +4617,7 @@ body.portal-mode #moreFab{display:flex;}
       firebase.messaging().onMessage(function(payload){
         var d = (payload && payload.data) || {};
         sgUpdateBadge();
-        try { new Notification(d.title || '푸른노무법인', { body: d.body || '', icon: 'icon-192.png', tag: d.tag || 'pu-suggestion' }); } catch(e){}
+        try { new Notification(d.title || '푸른노무법인', { body: d.body || '', icon: 'icon-192.png', badge: 'icon-badge-96.png', tag: d.tag || 'pu-suggestion' }); } catch(e){}
       });
       _pushFgOn = true;
     } catch(e){ /* 워커 미등록 등 — 다음 켜기 때 다시 시도 */ }

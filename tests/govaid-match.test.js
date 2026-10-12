@@ -149,3 +149,40 @@ test('규모 «중소기업»(소·중 미구분) — 조건이 소·중을 다 
   assert.equal(M.judge(pf(v), prog({ sizes: ['중견기업', '대기업'] }), Y).verdict, 'no');
   assert.equal(M.judge(pf(v), prog({ sizes: ['소기업'] }), Y).verdict, 'unknown');
 });
+
+/* 우선지원대상기업 — 고용보험법 시행령 제12조·별표 1(개정 2025. 10. 1., 2026-10-12 원문 확인).
+   숫자 500·300·200·100 은 법이 정한 업종별 상한이다 — 검사고정-허용: 시행령 별표 1 의 기준 그 자체 */
+function coWith(vals, facts) {
+  return M.profileFromCompany({ id: 'c1', name: '(예시)회사', companySize: vals.companySize || '' }, null,
+    { vals: Object.assign({}, vals.mine || {}), facts: facts || {}, auto: { vals: vals.auto || {}, src: {} } });
+}
+test('우선지원 — 상시 인원이 업종 상한 이하면 «예»(추정), 업종을 모르면 가장 낮은 상한으로 본다', () => {
+  const t = coWith({ mine: { headcount: 80 } });
+  assert.equal(t.facts.prioritySupport.v, true);
+  assert.match(t.facts.prioritySupport.src, /^추정/);
+  assert.match(t.facts.prioritySupport.src, /별표 1/);
+  assert.equal(coWith({ mine: { headcount: 450, industry: 'C' } }).facts.prioritySupport.v, true, '제조업 상한 500명'); // 검사고정-허용: 별표 1
+  assert.equal(coWith({ mine: { headcount: 250, industry: 'F' } }).facts.prioritySupport.v, true, '건설업 상한 300명'); // 검사고정-허용: 별표 1
+  assert.equal(coWith({ mine: { headcount: 150, industry: 'G' } }).facts.prioritySupport.v, true, '도소매 상한 200명'); // 검사고정-허용: 별표 1
+  assert.equal(coWith({ mine: { headcount: 150, industry: 'P' } }).facts.prioritySupport, undefined, '그 밖의 업종 100명 초과 — 모름');
+  assert.equal(coWith({ mine: { headcount: 150 } }).facts.prioritySupport, undefined, '업종 모름 + 100명 초과 — 모름');
+});
+test('우선지원 — 중소기업이면 인원과 상관없이 «예»(시행령 제12조 ②), 아니라고는 추정하지 않는다', () => {
+  const s = coWith({ mine: { headcount: 900 }, auto: { size: '중소기업' } });
+  assert.equal(s.facts.prioritySupport.v, true);
+  assert.match(s.facts.prioritySupport.src, /제12조/);
+  assert.equal(coWith({ companySize: '소기업' }).facts.prioritySupport.v, true);
+  /* 대기업이라도 5년 유예(③)·업종 상한이 있어 «아니오»는 사람이 판단한다 */
+  assert.equal(coWith({ mine: { headcount: 900 }, companySize: '대기업' }).facts.prioritySupport, undefined);
+});
+test('우선지원 — 사람이 넣은 답이 추정을 이긴다 (아니오 포함)', () => {
+  const t = coWith({ mine: { headcount: 10 } }, { prioritySupport: false });
+  assert.deepEqual(t.facts.prioritySupport, { v: false, src: '직접 입력' });
+});
+test('우선지원 — 인원 0 은 추정 근거가 아니다(가입자 0 은 «근로자 없음»이 아닐 수 있다)', () => {
+  assert.equal(coWith({ mine: { headcount: 0 } }).facts.prioritySupport, undefined);
+});
+test('우선지원 — 예비 고객도 같은 규칙', () => {
+  const p = M.profileFromProspect({ id: 'p1', name: '(예시)예비', headcount: 30 }, null, null);
+  assert.equal(p.facts.prioritySupport.v, true);
+});
