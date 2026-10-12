@@ -46,7 +46,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grBizType', 'grErp', 'grSetBiz', 'grLoadDocs', 'grRetryDocs', 'grRenderBiz',
   'grRenderDocs', 'grOpenToc', 'grRenderToc', 'grCopyToc', 'grCloseToc',
   'grView', 'grLoadTrack', 'grApplyTrack', 'grOpenCell', 'grPickCell', 'grRenderCell', 'grSaveCell', 'grCloseCell', 'grOkId', 'grPickHwp', 'grOpenHwp',
-  'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink',
+  'grLoadInbox', 'grReadInbox', 'grRetryInbox', 'grRenderInbox', 'grLinkCand', 'grUnlink', 'grGlobalInbox', 'grRenderGlobalInbox', 'grOpenFromInbox', 'grGlobalCompute', 'grGlobalRefresh', 'grGiReset',
   'grSendCtx', 'grSay', 'grRenderSend', 'grApplyFields', 'grMarkSent', 'grLinkReply', 'grCopy', 'grOpenMail', 'grWriteMail', 'grWriteSubmit',
   'grMailFetch', 'grMailCall', 'grRdHtml', 'grReadRd', 'grRenderCrit',
   'grOkChapKey', 'grChapAsk', 'grChapConsent', 'grChapCall', 'grChapErrMsg', 'grChapNames', 'grChapLinked', 'grChapInput', 'grChapSay', 'grRenderChap', 'grChapEdit',
@@ -2836,7 +2836,7 @@ test('100 쓰기 0 — 초안을 만들고 고치고 복사해도 아무것도 �
   assert.equal(w.db.쓴것.length, 1, '저장은 서류 진행 기록 한 줄'); onlyTrackWrites(w.db);
   assert.equal(w.db.쓴것[0].자리, 'scal_docs/c2/t2_2026/items/kickoff');
   const rec = w.db.쓴것[0].값;
-  assert.ok(!JSON.stringify(w.db.쓴것).includes('손으로 고친 글') && !JSON.stringify(w.db.쓴것).includes('777'), '초안은 저장되지 않는다');
+  assert.ok(!JSON.stringify(w.db.쓴것).includes('손으로 고친 글') && !JSON.stringify(w.db.쓴것).includes('점검 결과 777건'), '초안은 저장되지 않는다');   // 시각(Date.now())에 «777» 이 들어 있어도 흔들리지 않게 문장째로 본다
   assert.ok(!('chap' in rec) && !('draft' in rec));
   assert.equal(w.ctx.GR.cw.chap.draft.overview, '손으로 고친 글', '저장해도 초안은 화면에 남는다');
   assert.equal(taOf(w, 'overview'), '손으로 고친 글', '칸 창을 다시 그려도 장 구역이 다시 채워진다');
@@ -3029,4 +3029,404 @@ test('107 모듈을 못 불렀으면(PuGovReportAi·PuGovReportChapters 없음) 
     w.ctx.grChapEdit('overview'); w.ctx.grRenderChap();   // 이것들도 던지지 않는다
     assert.equal(w.db.쓴것.length, 0);
   }
+});
+
+/* ══ 전역 「📥 받은 서류 확인」(2026-10-12) — 계획 docs/superpowers/plans/2026-10-12-gov-report-global-inbox.md Task 2 ══
+   world 의 오늘 = 2026-10-10 → 창은 2026-08-26 ~ 2026-10-10(45일). 합성 씨앗은 «진짜로 이어지게» 짠다 — 아래 검사가 이음을 직접 확인한다.
+   읽기 전용: 메일함 읽기는 기존 grLoadInbox 뿐, 쓰기 0. */
+const GI_SLUG = 'INBOX-0a1b2c3d';
+const kst = (m, d) => Date.UTC(2026, m - 1, d, 1);   // 한국 시간 그날 10시
+const giHtml = (w) => w.els.ginbox.innerHTML;
+const giList = (w) => J(w.ctx.GR.gi.list);
+const mailReads = (w) => w.paths.filter((p) => p.indexOf('mailbox') === 0 || p === 'data/companies');
+/* 읽는 자리를 적어 두는 세계 — fail(자리) 이 참이면 그 자리 읽기는 거절 */
+function giWorld(o) {
+  o = o || {};
+  const paths = [];
+  const w = world({ seed: o.seed || giSeed(), email: o.email, db: (db) => ({ ref: (p) => {
+    paths.push(p);
+    return (o.fail && o.fail(p)) ? { once: async () => { throw new Error('permission_denied'); } } : db.ref(p);
+  } }) });
+  w.paths = paths;
+  return w;
+}
+/* 다라정밀(c2·t3) dara@ 메일 + 가나상사(c1·t1)·마바산업(c3·t4) 둘에 걸린 both@ 메일 하나.
+   기간 안: 111(10-07 both@) 108(10-05) 107(09-29 — 마바산업 줄의 link 로 이미 연결) 102(09-26 개인 자료) 101(09-25) 110(08-26 = 45일째)
+   빠지는 것: 109(08-25 = 46일 전) 103(첨부 없음) 104(06-01) 105(먼저상사 주소) 106(07-20) 201(보낸 메일) 301(스팸 폴더) */
+function giSeed(o) {
+  o = o || {};
+  const s = F.seed();
+  const box = s.mailbox.msgs[GI_SLUG];
+  const mail = (uid, from, subject, d, names, e) => { box[uid] = { u: uid, f: from, e: e || 'dara@example.com', t: 'office@pureun.kr', s: subject, d, a: names.length, an: names }; };
+  mail(108, '다라정밀 담당', '최신 점검표', kst(10, 5), ['점검표.pdf']);
+  mail(109, '다라정밀 담당', '46일 전 자료', kst(8, 25), ['옛날자료.pdf']);
+  mail(110, '다라정밀 담당', '45일째 자료', kst(8, 26), ['경계.pdf']);
+  mail(111, '공동 발신', '두 업체 자료', kst(10, 7), ['공동자료.pdf'], 'both@example.com');
+  s.data.consultings.v.k1.contacts.push({ name: '공동', email: 'both@example.com' });
+  s.data.consultings.v.k5 = { id: 'k5', companyName: '마바산업', typeCodes: { consulting: 'consulting-05' },
+    startDate: '2026-03-01', endDate: '2026-09-30', status: 'active', managerMain: 'P-009', contacts: [{ name: '공동', email: 'both@example.com' }] };
+  if (!o.noLink) s.scal_docs.c3.t4_2026.items.submit.link = { src: 'mail', key: 'i:' + GI_SLUG + ':107', name: '현장.jpg', date: '2026-09-29' };
+  return s;
+}
+
+test('108 정적 — 새 구역 #ginbox 는 「챙길 것」 아래 · 쓰기는 여전히 .set 한 곳 · 새 세 함수에는 fbDb·.set(·fetch(·grSaveCell 이 없고 단추에는 번호만 끼운다', () => {
+  assert.deepEqual(INLINE.match(/\.(set|update|remove|transaction)\s*\(/g) || [], ['.set('], '쓰기 명령은 grSaveCell 의 .set 하나뿐');
+  assert.match(SRC, /<section><h2>📥 받은 서류 확인<\/h2><div id="ginbox"><\/div><\/section>/);
+  assert.ok(SRC.indexOf('id="alerts"') > 0 && SRC.indexOf('id="alerts"') < SRC.indexOf('id="ginbox"'), '챙길 것 구역 아래');
+  ['grGlobalInbox', 'grGlobalCompute', 'grGlobalRefresh', 'grGiReset', 'grRenderGlobalInbox', 'grOpenFromInbox'].forEach((n) => {
+    assert.doesNotMatch(grab(n), /fbDb|\.set\(|\.update\(|\.remove\(|\.transaction\(|fetch\(|grSaveCell|localStorage|https?:\/\//, n + ' 에 쓰기·서버 부르기가 있다');
+  });
+  assert.match(grab('grRender'), /grRenderGlobalInbox\(\)/, '처음 그릴 때·바뀔 때 구역도 그린다');
+  assert.match(grab('grSaveCell'), /grGlobalRefresh\(\); grApplyTrack\(\); grRender\(\);/, '저장 뒤 목록 다시 계산(메일함은 안 읽는다)');
+  assert.match(SRC, /var y0=GR\.f\.year; GR\.f\[GR_FIELDS\[id\]\]=this\.value; if\(GR\.f\.year!==y0\) grGiReset\(\);/, '연도 거르개가 바뀌면 목록을 처음 상태로');
+  const render = grab('grRenderGlobalInbox');
+  assert.match(render, /onclick="grOpenFromInbox\('\+i\+'\)"/, '단추에는 번호만 끼운다');
+  assert.match(grab('grOpenFromInbox'), /grSetBiz\(/);
+  assert.match(grab('grOpenFromInbox'), /grOpenCell\(/);
+});
+
+test('109 처음 그릴 때는 설명 한 줄과 「📥 확인」 단추뿐 — 메일함·업체관리를 읽지 않는다', async () => {
+  const w = giWorld();
+  await w.ctx.grLoad();
+  const h = giHtml(w);
+  assert.ok(h.includes('최근 45일 안에 받은 첨부 메일 가운데 아직 서류 줄에 연결하지 않은 것을 찾습니다'));
+  assert.match(h, /<button type="button" onclick="grGlobalInbox\(\)">📥 확인<\/button>/);
+  assert.doesNotMatch(h, /<li>|disabled|err-s/);
+  assert.deepEqual(mailReads(w), [], '단추를 누르기 전에는 메일함을 읽지 않는다');
+  assert.equal(w.ctx.GR.gi.st, 'idle');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('110 「📥 확인」 — 연결 안 된 최근 45일 받은 메일만 · 두 업체에 걸린 메일은 한 번(먼저 적힌 업체) · 날짜 내림차순 · 첨부·딱지 · 메일함은 한 번만', async () => {
+  const s = giSeed();
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad();
+  /* 합성 자료가 진짜로 겹친다 — 마바산업 사업에도 같은 주소가 걸려 있어야 «한 번만» 검사가 헛돌지 않는다 */
+  const cos = s.data.companies.v, ks = s.data.consultings.v;
+  assert.ok(I.addrsFor({ companies: cos, cons: ks.k1, name: '가나상사' })['both@example.com'], '가나상사 기술보호에 걸린다');
+  assert.ok(I.addrsFor({ companies: cos, cons: ks.k5, name: '마바산업' })['both@example.com'], '마바산업 사업에도 걸린다');
+  assert.equal(w.ctx.GR.gi.st, 'idle');
+  const p1 = w.ctx.grGlobalInbox(), p2 = w.ctx.grGlobalInbox();   // 겹쳐 눌러도 한 번
+  assert.equal(w.ctx.GR.gi.st, 'loading');
+  assert.ok(giHtml(w).includes('불러오는 중…'));
+  await Promise.all([p1, p2]);
+  const g = J(w.ctx.GR.gi);
+  assert.equal(g.st, 'ok');
+  assert.deepEqual(g.list.map((m) => m.uid), ['111', '108', '102', '101', '110'], '날짜 내림차순 · 연결(107)·46일 전(109)·보낸·첨부 없음·스팸·남의 주소 제외');
+  assert.deepEqual(g.list.map((m) => m.coName), ['가나상사', '다라정밀', '다라정밀', '다라정밀', '다라정밀'], '두 업체에 걸린 111 은 먼저 적힌 가나상사 한 곳');
+  assert.deepEqual(g.list.map((m) => m.typeName).slice(0, 2), ['기술보호 컨설팅', '충남북부 인사노무 컨설팅']);
+  assert.deepEqual([g.more, g.noAddr, g.clipped], [false, 0, false]);
+  const h = giHtml(w);
+  assert.equal(countOf(h, /<li>/g), 5);
+  assert.equal(countOf(h, /공동자료\.pdf/g), 1, '두 업체에 걸린 메일은 한 번만 나온다');
+  ['받음 ← 공동 발신 · 2026-10-07 · 가나상사 · 기술보호 컨설팅', '받음 ← 다라정밀 담당 · 2026-10-05 · 다라정밀 · 충남북부 인사노무 컨설팅',
+    '📎 공동자료.pdf', '📎 점검표.pdf', '📎 서명본.hwpx', '📎 확인서.pdf', '📎 경계.pdf', '두 업체 자료', '최신 점검표', '서명본 보내드립니다'].forEach((x) => assert.ok(h.includes(x), x));
+  ['첨부 없음', '46일 전 자료', '기간 밖', '현장 사진', '다른 업체 주소', '자문 일지 회신', '보고서 초안 보내드립니다', '스팸'].forEach((x) => assert.ok(!h.includes(x), x + ' 가 나왔다'));
+  const priv = liOf(h, '9월 급여대장.xlsx');
+  assert.ok(priv.includes('<span class="st st-todo">개인 자료 · 목록에만</span>'), '개인 자료 딱지');
+  assert.ok(priv.includes('서류 칸 열기'), '개인 자료도 칸 창으로 가는 단추는 낸다');
+  assert.ok(!priv.includes('grOpenCand') && !priv.includes('grLinkCand'), '목록에서 연결·열어 보기는 하지 않는다');
+  assert.ok(!h.includes('@'), '메일 주소는 그리지 않는다');
+  assert.deepEqual(mailReads(w).slice().sort(), ['data/companies', 'mailbox/folders', 'mailbox/msgs/' + GI_SLUG, 'mailbox/msgs/Sent-1b2c3d4e'], '폴더 표 한 번 · 폴더마다 한 번 · 업체관리 한 번');
+  assert.ok(h.includes('· 2026년 사업 기준</div>'), '어느 해 기준인지 머리에 적는다');
+  assert.ok(h.includes('onclick="grGlobalInbox(true)">다시 확인</button>'), '「다시 확인」은 메일함을 새로 읽는 단추');
+  const before = mailReads(w).length;
+  await w.ctx.grGlobalInbox(); await w.ctx.grGlobalInbox();
+  assert.equal(mailReads(w).length, before, '단추를 다시 눌러(인자 없음) 계산만 해서는 메일함을 다시 읽지 않는다');
+  assert.equal(w.ctx.GR.gi.st, 'ok');
+  assert.equal(w.db.쓴것.length, 0, '읽기만');
+  /* 대조 — 107 의 link 가 없으면 107 도 나온다(위 목록에서 빠진 것은 «연결됨» 때문) */
+  const w2 = giWorld({ seed: giSeed({ noLink: true }) });
+  await w2.ctx.grLoad(); await w2.ctx.grGlobalInbox();
+  assert.deepEqual(giList(w2).map((m) => m.uid), ['111', '108', '107', '102', '101', '110']);
+});
+
+test('111 안내 — 주소 없는 업체 N곳 · 31건 이상이면 30건만 · 폴더마다 최근 메일만(clipped)', async () => {
+  const s = F.seed();   // 마바산업은 주소가 없다 + 아자공업을 더해 둘
+  s.scal_cos.push({ id: 'c6', name: '아자공업', types: ['t4'], defAtt: 'a1' });
+  s.scal_scheds.push({ id: 's20', coId: 'c6', typeId: 't4', date: '2026-09-01', round: 1, isField: true });
+  for (let i = 0; i < 35; i++) {
+    const n = String(i).padStart(3, '0');
+    s.mailbox.msgs[GI_SLUG][400 + i] = { u: 400 + i, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '일괄 ' + n, d: kst(10, 1) + i * 3600e3, a: 1, an: ['일괄' + n + '.pdf'] };
+  }
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const g = J(w.ctx.GR.gi), h = giHtml(w);
+  assert.equal(g.st, 'ok');
+  assert.equal(g.list.length, 30);
+  assert.equal(g.more, true);
+  assert.equal(g.noAddr, 2, '마바산업·아자공업');
+  assert.equal(countOf(h, /<li>/g), 30);
+  assert.ok(h.includes('30건만 보입니다'));
+  assert.ok(h.includes('메일 주소가 없는 업체 2곳은 건너뛰었습니다'));
+  assert.ok(h.includes('일괄 034') && h.includes('일괄 005') && !h.includes('일괄 004'), '날짜 내림차순으로 위 30건');
+  assert.ok(!h.includes(I.MSG.CLIPPED));
+  /* 폴더마다 최근 메일만 읽는 한계에 닿으면 기존 안내 */
+  const w2 = giWorld({ seed: giSeed() });
+  vm.runInContext('GR_MAIL.per=2;', w2.ctx);
+  await w2.ctx.grLoad(); await w2.ctx.grGlobalInbox();
+  assert.equal(w2.ctx.GR.gi.clipped, true);
+  assert.ok(giHtml(w2).includes(I.MSG.CLIPPED));
+  /* 대조 — 안내가 없는 경우 */
+  const w3 = giWorld({ seed: giSeed() });
+  await w3.ctx.grLoad(); await w3.ctx.grGlobalInbox();
+  assert.ok(!giHtml(w3).includes('30건만') && !giHtml(w3).includes('건너뛰었습니다') && !giHtml(w3).includes(I.MSG.CLIPPED));
+});
+
+test('112 비면 「연결할 새 받은 서류가 없습니다」 · 기록을 못 읽었으면 안내만(메일함 0회) · 메일함을 못 읽으면 오류 문구 + 「다시 시도」', async () => {
+  const s = giSeed();
+  Object.keys(s.mailbox.msgs).forEach((k) => { delete s.mailbox.msgs[k]; });
+  s.mailbox.msgs[GI_SLUG] = { 1: { u: 1, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '첨부 없음', d: kst(10, 5), a: 0 } };
+  const w0 = giWorld({ seed: s });
+  await w0.ctx.grLoad(); await w0.ctx.grGlobalInbox();
+  assert.equal(w0.ctx.GR.gi.st, 'ok');
+  assert.ok(giHtml(w0).includes('연결할 새 받은 서류가 없습니다') && !giHtml(w0).includes('<li>'));
+
+  const w = giWorld({ fail: (p) => p.indexOf('scal_docs') === 0 });
+  await w.ctx.grLoad();
+  assert.equal(w.ctx.GR.trackErr, true, '준비 — 기록을 못 읽었다');
+  await w.ctx.grGlobalInbox();
+  assert.equal(w.ctx.GR.gi.st, 'err');
+  const h = giHtml(w);
+  assert.ok(h.includes('기록을 못 불러와 연결 여부를 알 수 없습니다'));
+  assert.ok(!h.includes('연결할 새 받은 서류가 없습니다') && !h.includes('<li>'), '연결 여부를 모른 채 «새로 온 서류»라고 하지 않는다');
+  assert.deepEqual(mailReads(w), [], '기록을 못 읽었으면 메일함도 읽지 않는다');
+  assert.equal(w.db.쓴것.length, 0);
+
+  let deny = true;
+  const w2 = giWorld({ fail: (p) => deny && p.indexOf('mailbox') === 0 });
+  await w2.ctx.grLoad(); await w2.ctx.grGlobalInbox();
+  assert.equal(w2.ctx.GR.gi.st, 'err');
+  assert.ok(giHtml(w2).includes(I.MSG.LOAD_FAIL) && giHtml(w2).includes('onclick="grGlobalInbox()">다시 시도'));
+  deny = false;
+  await w2.ctx.grGlobalInbox();
+  assert.equal(w2.ctx.GR.gi.st, 'ok', '다시 시도하면 메일함을 다시 읽는다');
+  assert.ok(giHtml(w2).includes('서명본 보내드립니다'));
+});
+
+test('113 「서류 칸 열기」 — 그 업체·사업의 칸 창이 열리고 받은 서류 후보에 같은 메일 · 사업을 대신 골라 준다(이미 고른 사업은 풀지 않는다)', async () => {
+  const w = giWorld();
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const list = giList(w), at = (uid) => list.findIndex((m) => m.uid === uid);
+  const i = at('108');
+  assert.deepEqual([list[i].coId, list[i].typeId, list[i].step, list[i].erpCode], ['c2', 't3', 'sign', 'consulting-04']);
+  assert.ok(giHtml(w).includes('onclick="grOpenFromInbox(' + i + ')">서류 칸 열기</button>'));
+  assert.equal(w.ctx.GR.f.biz, '');
+  w.ctx.grOpenFromInbox(i);
+  let c = w.ctx.GR.cw;
+  assert.deepEqual([c.coId, c.typeId, c.step, w.ctx.GR.f.biz], ['c2', 't3', 'sign', 'consulting-04']);
+  await w.ctx.grLoadInbox();
+  assert.ok(w.els.cwInbox.innerHTML.includes('최신 점검표'), '칸 창 받은 서류 후보에 같은 메일');
+  w.ctx.grCloseCell();
+  /* 이미 그 사업을 골랐으면 다시 눌러 풀어 버리지 않는다(grSetBiz 는 같은 사업을 다시 누르면 푼다) */
+  assert.equal(w.ctx.GR.f.biz, 'consulting-04');
+  w.ctx.grOpenFromInbox(i);
+  assert.equal(w.ctx.GR.f.biz, 'consulting-04');
+  assert.equal(w.ctx.GR.cw.coId, 'c2');
+  w.ctx.grCloseCell();
+  /* 다른 사업이 골라져 있으면 이 사업으로 바꾼다 — 기술보호(가나상사·기술보호 컨설팅)는 서명이 없어 제출 칸 */
+  const j = at('111');
+  assert.deepEqual([list[j].coId, list[j].typeId, list[j].step, list[j].erpCode], ['c1', 't1', 'submit', 'consulting-03']);
+  w.ctx.grOpenFromInbox(j);
+  c = w.ctx.GR.cw;
+  assert.deepEqual([c.coId, c.typeId, c.step, w.ctx.GR.f.biz], ['c1', 't1', 'submit', 'consulting-03']);
+  assert.ok(w.els.cwInbox.innerHTML.includes('두 업체 자료'), '칸 창 후보에 같은 메일(주소는 그 업체 계약 연락처로)');
+  assert.ok(!w.els.cwInbox.innerHTML.includes('@'));
+  assert.equal(w.db.쓴것.length, 0, '열기만으로는 쓰지 않는다');
+  w.ctx.grOpenFromInbox(99); w.ctx.grOpenFromInbox(-1); w.ctx.grOpenFromInbox('x');   // 없는 번호는 아무 일도 없다
+  assert.equal(w.ctx.GR.cw.coId, 'c1');
+});
+
+test('114 서류 틀에 서명·제출·별첨이 모두 없는 사업은 단추가 없다(업체·사업 이름만) · 같은 업체의 다른 사업은 먼저 적힌 쪽 하나에 붙는다 · 대형(일터혁신)도 열린다', async () => {
+  const s = bigSeed();   // 다라정밀(c2)에 t3 충남북부(sign) · t2 일터혁신(대형, 참여 안내서 sign) · t5 산업일자리충남(대형, plat·report 뿐)
+  const planNone = D.planFor('산업일자리전환컨설팅충남');
+  ['sign', 'submit', 'attach'].forEach((st) => assert.equal(Tr.keysFor(planNone, st, 2).length, 0, '준비 — 충남 산업일자리 틀에는 ' + st + ' 가 없다'));
+  assert.ok(Tr.keysFor(D.planFor(WP), 'sign', 2).length > 0, '준비 — 일터혁신 틀에는 서명(참여 안내서)이 있다');
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const list = giList(w);
+  assert.deepEqual(list.map((m) => m.uid), ['107', '102', '101'], '준비 — 다라정밀 메일 셋이 진짜로 이어졌다');
+  assert.ok(list.length >= 3 && list.every((m) => m.coId === 'c2'));
+  assert.equal(new Set(list.map((m) => m.uid)).size, list.length, '같은 메일은 한 번씩');
+  assert.ok(list.every((m) => m.typeId === 't5' && m.step === '' && m.erpCode === 'consulting-06'), '한글 순서로 먼저인 산업일자리 쪽 하나에만 붙고 단추 없는 사업이다');
+  const h = giHtml(w);
+  assert.ok(!h.includes('grOpenFromInbox') && !h.includes('서류 칸 열기'), '단추 없음');
+  assert.ok(h.includes('다라정밀 · 산업일자리전환 컨설팅(충남)'), '업체·사업 이름은 보인다');
+  w.ctx.grOpenFromInbox(0);
+  assert.equal(w.ctx.GR.cw, null, '단추가 없으니 눌러도 열리지 않는다');
+  /* 산업일자리를 빼면 일터혁신(대형) 쪽 하나에 붙고 서명 칸으로 열린다 */
+  const s2 = bigSeed();
+  s2.scal_cos.filter((c) => c.id === 'c2')[0].types = ['t3', 't2'];
+  const w2 = giWorld({ seed: s2 });
+  await w2.ctx.grLoad(); await w2.ctx.grGlobalInbox();
+  const l2 = giList(w2);
+  assert.ok(l2.length >= 3 && l2.every((m) => m.typeId === 't2' && m.step === 'sign' && m.erpCode === 'consulting-02'));
+  w2.ctx.grOpenFromInbox(0);
+  const c = w2.ctx.GR.cw;
+  assert.deepEqual([c.coId, c.typeId, c.step, w2.ctx.GR.f.biz], ['c2', 't2', 'sign', 'consulting-02']);
+  assert.equal(w2.db.쓴것.length, 0);
+});
+
+test('115 바깥 값은 이스케이프 — 업체·사업·보낸이·메일 제목·첨부 이름에 <script>·따옴표 · 쓰기 0', async () => {
+  const CO = '다라<img src=x onerror=alert(1)>"\'&정밀', TY = '충남<b>북부</b>"\'&', FROM = '<i>보낸이</i>"\'', SUBJ = '<script>alert("s")</script>\'', ATT = '<svg onload=alert(1)>"\'.pdf';
+  const s = giSeed();
+  s.scal_cos.filter((c) => c.id === 'c2')[0].name = CO;
+  s.scal_types.filter((t) => t.id === 't3')[0].fullName = TY;
+  s.data.companies.v.filter((c) => c.id === 'm2')[0].name = CO;
+  Object.assign(s.mailbox.msgs[GI_SLUG][108], { f: FROM, s: SUBJ, a: 1, an: [ATT] });
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const list = giList(w), m = list.filter((x) => x.uid === '108')[0];
+  assert.ok(m, '준비 — 위험한 이름의 업체가 진짜로 이어졌다');
+  assert.deepEqual([m.coName, m.typeName, m.who, m.s, m.atts[0].name], [CO, TY, FROM, SUBJ, ATT]);
+  const h = giHtml(w), e = w.ctx.grEsc;
+  [CO, TY, FROM, SUBJ, ATT].forEach((x) => assert.ok(h.includes(e(x)), '이스케이프된 글이 보인다: ' + x));
+  assert.doesNotMatch(h, /<(script|img|b|i|svg)\b/, '꺼낸 태그가 없다');
+  assert.ok(!h.includes('onerror=alert(1)>') && !h.includes('onload=alert(1)>'));
+  assert.equal(countOf(h, /"/g) % 2, 0, '속성 따옴표가 짝지어 있다');
+  w.ctx.grOpenFromInbox(list.findIndex((x) => x.uid === '108'));
+  assert.equal(w.ctx.GR.cw.coName, CO);
+  assert.equal(w.db.쓴것.length, 0, '쓰기 0');
+});
+
+test('116 목록에서 연 칸 창은 그 메일이 쌍의 기본 기간 밖이어도 보이게 기간을 넓힌다 · 보통 열기는 기본 기간 그대로 · 창 안 다른 메일은 그대로', async () => {
+  const s = giSeed();
+  s.data.companies.v.push({ id: 'm3', name: '마바산업', email: 'mava@example.com' });
+  const box = s.mailbox.msgs[GI_SLUG];
+  box[120] = { u: 120, f: '마바 담당', e: 'mava@example.com', t: 'office@pureun.kr', s: '늦게 온 자료', d: kst(10, 1), a: 1, an: ['늦은자료.pdf'] };
+  box[121] = { u: 121, f: '마바 담당', e: 'mava@example.com', t: 'office@pureun.kr', s: '6월 자료', d: kst(6, 1), a: 1, an: ['유월.pdf'] };
+  const base = I.windowOf('2026-03-03', '2026-05-12');   // 마바산업 t4 의 첫·끝 회차
+  assert.equal(base.to, '2026-08-10');
+  assert.ok(Math.round((Date.UTC(2026, 9, 1) - Date.UTC(2026, 4, 12)) / 864e5) >= 120, '준비 — 끝 회차 120일 뒤 메일');
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const list = giList(w), i = list.findIndex((m) => m.uid === '120');
+  assert.ok(i >= 0, '준비 — 전역 목록에 올라 있다(45일 안)');
+  assert.deepEqual([list[i].coId, list[i].typeId, list[i].step], ['c3', 't4', 'sign']);
+  assert.ok(!list.some((m) => m.uid === '121'), '준비 — 6월 메일은 45일 밖이라 목록에 없다');
+  w.ctx.grOpenFromInbox(i);
+  const c = w.ctx.GR.cw;
+  assert.deepEqual([c.coId, c.typeId, J(c.win)], ['c3', 't4', { from: base.from, to: '2026-10-01' }], '기간 끝만 메일 날짜로 넓힌다');
+  const h = w.els.cwInbox.innerHTML;
+  assert.ok(h.includes('늦게 온 자료') && h.includes('📎 늦은자료.pdf'), '칸 창 후보에 그 메일');
+  assert.ok(h.includes('6월 자료'), '창 안의 다른 메일은 그대로');
+  assert.equal(w.db.쓴것.length, 0);
+  /* 보통 열기(목록 밖) — 기본 기간 그대로, 기간 밖 메일은 안 보인다 */
+  w.ctx.grCloseCell();
+  w.ctx.grOpenCell('c3', 't4', 'sign', '');
+  assert.deepEqual(J(w.ctx.GR.cw.win), base);
+  const h2 = w.els.cwInbox.innerHTML;
+  assert.ok(!h2.includes('늦게 온 자료') && h2.includes('6월 자료'));
+  /* 기간 안 메일(다라정밀 108)은 기간을 건드리지 않는다 */
+  const j = list.findIndex((m) => m.uid === '108');
+  w.ctx.grCloseCell(); w.ctx.grOpenFromInbox(j);
+  assert.deepEqual(J(w.ctx.GR.cw.win), J(I.windowOf('2026-08-10', '2026-09-14')));
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+/* ══ 전역 「📥 받은 서류 확인」 검토 반영(2026-10-12) — 연도·연결 뒤 다시 계산·계산 중 오류·다시 확인·보낸이 주소 ══ */
+test('117 연도를 바꾸면 목록은 처음 상태로 돌아가고, 옛 연도 항목은 눌러도 열리지 않는다(엉뚱한 해의 칸 창 없음)', async () => {
+  const w = giWorld();
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const list = giList(w), i = list.findIndex((m) => m.uid === '108');
+  assert.ok(i >= 0, '준비 — 목록에 올라 있다');
+  assert.equal(w.ctx.GR.gi.year, '2026');
+  assert.ok(list.every((m) => m.year === '2026'), '항목마다 계산한 연도를 담는다');
+  /* 연도 거르개만 바뀐 채(처음 상태로 돌리기 전) 눌러도 — 거절하고 안내 */
+  w.ctx.GR.f.year = '2025';
+  w.ctx.grOpenFromInbox(i);
+  assert.equal(w.ctx.GR.cw, null, '칸 창이 열리지 않는다');
+  assert.equal(w.ctx.GR.f.biz, '', '사업도 고르지 않는다');
+  assert.equal(w.ctx.GR.gi.st, 'idle');
+  const h = giHtml(w);
+  assert.ok(h.includes('연도를 바꿨습니다 — 다시 확인해 주세요') && !h.includes('<li>'));
+  assert.match(h, /onclick="grGlobalInbox\(\)">📥 확인<\/button>/);
+  /* 그 해로 다시 확인하면 그 해 기준 */
+  await w.ctx.grGlobalInbox();
+  assert.equal(w.ctx.GR.gi.st, 'ok');
+  assert.equal(w.ctx.GR.gi.year, '2025');
+  assert.ok(giHtml(w).includes('2025년 사업 기준') && !giHtml(w).includes('최신 점검표'), '2026년 쌍의 메일은 2025년 기준에 없다');
+  assert.equal(w.db.쓴것.length, 0);
+  /* 거르개 풀기(grReset)로 해가 바뀌어도 처음 상태 · 해가 그대로면 목록을 지키지 않고 지우지도 않는다 */
+  const w2 = giWorld();
+  await w2.ctx.grLoad(); await w2.ctx.grGlobalInbox();
+  w2.ctx.grReset();
+  assert.equal(w2.ctx.GR.gi.st, 'ok', '해가 같으면 그대로');
+  w2.ctx.GR.f.year = '2025'; w2.ctx.grReset();
+  assert.equal(w2.ctx.GR.gi.st, 'idle', '해가 바뀌면 처음 상태');
+});
+
+test('118 칸 창에서 「연결」하면 메일함을 다시 읽지 않고 목록이 다시 계산된다 — 연결한 메일은 빠지고, 「연결 지우기」하면 돌아온다', async () => {
+  const w = giWorld({ email: 'p009@pureun.kr' });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const reads = mailReads(w).length;
+  let list = giList(w);
+  const i = list.findIndex((m) => m.uid === '108');
+  assert.ok(i >= 0 && giHtml(w).includes('최신 점검표'), '준비 — 목록에 M(108)이 있다');
+  w.ctx.grOpenFromInbox(i);
+  const k = w.ctx.GR.cw.cands.findIndex((m) => m.uid === '108');
+  assert.ok(k >= 0, '준비 — 칸 창 후보에도 같은 메일');
+  w.els.cwSt.value = 'doing'; w.els.cwSent.value = '2026-09-20';
+  await w.ctx.grLinkCand(k, 0);
+  assert.equal(w.db.쓴것.length, 1); onlyTrackWrites(w.db);
+  assert.equal(w.db.쓴것[0].값.link.key, 'i:' + GI_SLUG + ':108');
+  list = giList(w);
+  assert.deepEqual(list.map((m) => m.uid), ['111', '102', '101', '110'], '연결한 108 만 빠진다');
+  assert.ok(!giHtml(w).includes('최신 점검표') && giHtml(w).includes('두 업체 자료'));
+  assert.equal(w.ctx.GR.gi.st, 'ok');
+  assert.equal(mailReads(w).length, reads, '메일함을 다시 읽지 않았다');
+  await w.ctx.grUnlink();
+  assert.deepEqual(giList(w).map((m) => m.uid), ['111', '108', '102', '101', '110'], '연결을 지우면 다시 나온다');
+  assert.equal(mailReads(w).length, reads);
+  /* 목록을 만들기 전(idle)에 저장해도 목록을 만들지 않는다 */
+  const w2 = giWorld({ email: 'p009@pureun.kr' });
+  await w2.ctx.grLoad();
+  w2.ctx.grSetBiz('consulting-04'); w2.ctx.grOpenCell('c2', 't3', 'sign');
+  w2.els.cwSt.value = 'doing'; w2.els.cwSent.value = '2026-09-20';
+  await w2.ctx.grSaveCell();
+  assert.equal(w2.ctx.GR.gi.st, 'idle', '칸 창을 직접 열어 저장해도 전역 목록은 만들어지지 않는다');
+});
+
+test('119 계산 중 예상 밖 오류가 나도 «불러오는 중»에 멈추지 않는다 — 오류 문구 + 「다시 시도」 · 고치면 다시 된다 · 연결 뒤 다시 계산이 던져도 오류 상태', async () => {
+  const w = giWorld();
+  await w.ctx.grLoad();
+  const orig = D.pairs;
+  D.pairs = () => { throw new Error('boom'); };
+  try { await w.ctx.grGlobalInbox(); } finally { D.pairs = orig; }
+  assert.equal(w.ctx.GR.gi.st, 'err');
+  assert.ok(giHtml(w).includes('받은 서류를 확인하지 못했습니다') && giHtml(w).includes('onclick="grGlobalInbox()">다시 시도'));
+  assert.ok(!giHtml(w).includes('불러오는 중'));
+  await w.ctx.grGlobalInbox();
+  assert.equal(w.ctx.GR.gi.st, 'ok', '다시 시도하면 된다');
+  D.pairs = () => { throw new Error('boom'); };
+  try { w.ctx.grGlobalRefresh(); } finally { D.pairs = orig; }
+  assert.equal(w.ctx.GR.gi.st, 'err');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('120 「다시 확인」은 메일함을 새로 읽는다 — 그 사이 새로 온 메일이 나온다(그냥 단추는 읽은 것을 쓴다)', async () => {
+  const w = giWorld();
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  assert.ok(!giList(w).some((m) => m.uid === '112'));
+  await w.db.ref('mailbox/msgs/' + GI_SLUG + '/112').set({ u: 112, f: '다라정밀 담당', e: 'dara@example.com', t: 'office@pureun.kr', s: '새로 온 자료', d: kst(10, 9), a: 1, an: ['새것.pdf'] });
+  w.db.쓴것.length = 0;   // 검사 준비로 넣은 메일 — 화면의 쓰기가 아니다
+  await w.ctx.grGlobalInbox();
+  assert.ok(!giList(w).some((m) => m.uid === '112'), '읽은 것을 다시 쓸 뿐이다');
+  const before = mailReads(w).length;
+  await w.ctx.grGlobalInbox(true);
+  assert.equal(giList(w)[0].uid, '112', '새로 읽어 맨 위에 나온다');
+  assert.equal(mailReads(w).length - before, 4, '폴더 표·폴더 둘·업체관리를 다시 읽는다');
+  assert.equal(w.db.쓴것.length, 0);
+});
+
+test('121 보낸이 표시이름이 없으면(거울이 주소를 대신 넣는다) 주소를 그리지 않고 「(보낸이 이름 없음)」', async () => {
+  const s = giSeed();
+  s.mailbox.msgs[GI_SLUG][112] = { u: 112, f: '', e: 'dara@example.com', t: 'office@pureun.kr', s: '이름 없는 보낸이', d: kst(10, 9), a: 1, an: ['익명.pdf'] };
+  const w = giWorld({ seed: s });
+  await w.ctx.grLoad(); await w.ctx.grGlobalInbox();
+  const m = giList(w).filter((x) => x.uid === '112')[0];
+  assert.ok(m && m.who === 'dara@example.com', '준비 — 거울이 주소를 표시이름 자리에 넣었다');
+  const h = giHtml(w);
+  assert.ok(h.includes('받음 ← (보낸이 이름 없음) · 2026-10-09 · 다라정밀'));
+  assert.ok(!h.includes('@'), '주소는 그리지 않는다');
 });
