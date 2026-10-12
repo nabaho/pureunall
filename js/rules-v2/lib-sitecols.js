@@ -13,7 +13,7 @@
   var COL_NAME = { name: '사업장', band: '규모', biz: '업태', who: '담당', docs: '취업규칙 자료', last: '최근', fin: '★최종본' };
   function str(v) { return v == null ? '' : String(v); }
   // 최근 메일 연도 — 한국 시간(서머타임 없음 +9시간)
-  function yearOf(ms) { return ms ? String(new Date(Number(ms) + 9 * 36e5).getUTCFullYear()) : ''; }
+  function yearOf(ms) { return Number(ms) > 0 ? String(new Date(Number(ms) + 9 * 36e5).getUTCFullYear()) : ''; }
 
   function tagsOf(r, key) {
     if (key === 'band') return [str(r.band)];
@@ -50,6 +50,7 @@
     left.forEach(function (r) { tagsOf(r, key).forEach(function (v) { n[v] = (n[v] || 0) + 1; }); });
     sel.forEach(function (v) { if (!(v in n)) n[v] = 0; });
     var vs = Object.keys(n);
+    // 규모 값은 BANDS 네 개뿐이다 — lib-sites.js band() 가 이 네 라벨만 만든다(그 밖의 값은 생기지 않는다)
     if (key === 'band') vs = BANDS.filter(function (v) { return v in n; }).concat('' in n ? [''] : []);
     else if (key === 'docs') vs = ['linked', 'cand', 'none'].filter(function (v) { return v in n; });
     else if (key === 'fin') vs = ['set', 'none', ''].filter(function (v) { return v in n; });
@@ -65,12 +66,14 @@
     if (key === 'size') return r.size > 0 ? r.size : null;
     if (key === 'biz') return str(r.bizType) || null;
     if (key === 'who') {
+      // 사번은 있는데 이름을 못 찾으면(퇴사·모름) '' 또는 undefined → 빈 값으로 보고 맨 끝
       var w = r.mgr || (r.subs || [])[0] || '';
-      return w ? str(nameOf ? nameOf(w) : w) : null;
+      return w ? (str(nameOf ? nameOf(w) : w) || null) : null;
     }
-    if (key === 'docs') return (r.linked || 0) + (r.cand || 0);
+    // 자료 0건(확정·후보 둘 다 없음)은 «값 없음» — 오름·내림 모두 맨 끝 (규모 0 과 같다)
+    if (key === 'docs') { var n = (r.linked || 0) + (r.cand || 0); return n > 0 ? n : null; }
     if (key === 'last') return r.last > 0 ? r.last : null;
-    // 오름: 정함 → 미정 → (없음은 맨 끝). 순위 숫자는 오름 차례 그대로
+    // 오름: 정함 → 미정 → 없음 (없음은 내림에서도 끝)
     if (key === 'fin') return r.fin && r.fin.state === 'set' ? 1 : r.fin && r.fin.state === 'none' ? 2 : null;
     return null;
   }

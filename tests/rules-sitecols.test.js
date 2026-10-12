@@ -26,6 +26,7 @@ test('한 곳이 확정·후보를 둘 다 가지면 두 값에 모두 속한다
   assert.deepEqual(S.tagsOf(R[3], 'fin'), ['']);
   assert.equal(S.tagsOf(R[0], 'last')[0], '2026');     // 한국 시간 연도
   assert.deepEqual(S.tagsOf(R[3], 'last'), ['']);
+  assert.deepEqual(S.tagsOf({ last: 'abc' }, 'last'), ['']);   // 숫자가 아닌 값은 NaN 이 아니라 빈 값
 });
 
 test('apply — 칸 안은 «또는», 칸끼리는 «그리고», 비면 안 건다', () => {
@@ -62,10 +63,30 @@ test('sortRows — 안정, 빈 값·모름은 오름·내림 모두 맨 끝', ()
   const who = ids(S.sortRows(R, { key: 'who', dir: 'asc' }, nameOf));
   assert.deepEqual(who.slice(0, 2), ['나다물산', '가나상사']);          // 김보람 < 홍길동, 담당 없음은 끝
   assert.deepEqual(ids(S.sortRows(R, { key: 'last', dir: 'desc' }, nameOf))[0], '가나상사');
-  assert.deepEqual(ids(S.sortRows(R, { key: 'fin', dir: 'asc' }, nameOf)).slice(0, 2), ['가나상사', '다라산업']);   // 정함 > 미정 > 없음
+  assert.deepEqual(ids(S.sortRows(R, { key: 'fin', dir: 'asc' }, nameOf)), ['가나상사', '다라산업', '나다물산', '라마전자']);   // 오름: 정함 → 미정 → 없음 (없음은 내림에서도 끝)
+  assert.deepEqual(ids(S.sortRows(R, { key: 'fin', dir: 'desc' }, nameOf)), ['다라산업', '가나상사', '나다물산', '라마전자']);   // 내림: 미정 → 정함 → 없음(맨 끝)
   assert.deepEqual(ids(S.sortRows(R, null, nameOf)), ids(R), '순서를 안 정하면 그대로');
   assert.deepEqual(ids(S.sortRows(R, { key: 'name', dir: 'desc' }, nameOf))[0], '라마전자');
   const before = ids(R); S.sortRows(R, { key: 'name', dir: 'asc' }, nameOf); assert.deepEqual(ids(R), before, '원본을 안 바꾼다');
+});
+
+test('sortRows — 담당 이름을 못 찾으면(퇴사·모름 사번) 빈 값: 오름·내림 모두 맨 끝', () => {
+  // P-999 는 목록에 없어 undefined, P-003 은 '' 를 돌려준다 — 둘 다 빈 값
+  const nameOf = (s) => ({ 'P-001': '홍길동', 'P-002': '김보람', 'P-003': '' }[s]);
+  const W = [
+    row('x1', { mgr: 'P-999' }),
+    row('x2', { mgr: 'P-003' }),
+    row('x3', { mgr: 'P-002' }),
+    row('x4', { mgr: 'P-001' }),
+  ];
+  assert.deepEqual(ids(S.sortRows(W, { key: 'who', dir: 'asc' }, nameOf)), ['x3', 'x4', 'x1', 'x2']);   // 김보람 < 홍길동, 빈 값 둘은 원래 차례로 끝
+  assert.deepEqual(ids(S.sortRows(W, { key: 'who', dir: 'desc' }, nameOf)), ['x4', 'x3', 'x1', 'x2']);  // 내림에서도 빈 값은 끝
+});
+
+test('sortRows — 자료 0건(확정·후보 모두 없음)은 오름·내림 모두 맨 끝', () => {
+  const D0 = [row('가', { linked: 0, cand: 0 }), row('나', { linked: 1 }), row('다', { cand: 2 })];
+  assert.deepEqual(ids(S.sortRows(D0, { key: 'docs', dir: 'asc' })), ['나', '다', '가']);    // 1건 < 2건, 0건은 끝
+  assert.deepEqual(ids(S.sortRows(D0, { key: 'docs', dir: 'desc' })), ['다', '나', '가']);   // 내림에서도 0건은 끝
 });
 
 test('page — 50곳, 경계, 없는 쪽은 당긴다, 비면 0', () => {
