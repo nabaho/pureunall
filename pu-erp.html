@@ -80476,8 +80476,8 @@ function RetirementSettlement(){
       var grandBalance = dcRows.reduce(function(s,r){return s+r.totalBalance;}, 0);
 
       // 셀 스타일
-      var thMo = { padding:'7px 4px', textAlign:'right', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', fontSize:'10.5px', minWidth:'68px', background:'#f8fafc' };
-      var tdMo = { padding:'6px 4px', textAlign:'right', fontFamily:'monospace', fontSize:'10.5px', borderBottom:'1px solid #f8fafc' };
+      var thMo = { padding:'7px 4px', textAlign:'right', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', fontSize:'12.5px', minWidth:'68px', background:'#f8fafc' };
+      var tdMo = { padding:'6px 4px', textAlign:'right', fontFamily:'monospace', fontSize:'12.5px', borderBottom:'1px solid #f8fafc' };
 
       function changeYear(d){
         var y = parseInt(selYear, 10) + d;
@@ -80485,11 +80485,11 @@ function RetirementSettlement(){
       }
 
       var firm = dcFirmCheck(selYear);
-      var cS = { padding:'4px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'11px', textAlign:'right', fontFamily:'monospace' };
+      var cS = { padding:'4px 8px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', fontSize:'13px', textAlign:'right', fontFamily:'monospace' };
       var firmBox = firm.length ? h('div', { style:{ background:'#fff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'10px 12px', marginBottom:'10px' } },
         /* 제목 줄은 «한 줄» — 넘치면 … 으로 줄이고 전문은 title 에 (CLAUDE.md 한 칸 한 줄 규칙) */
-        h('div', { title:'근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요', style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', marginBottom:'6px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, '🏦 법인 DC 납입 대조 — 퇴직연금 출금 «근로자» 몫 vs DC 가입자 임금총액 ÷ 12',
-          h('span', { style:{ fontWeight:400, color:'#64748b', marginLeft:'8px', fontSize:'10.5px' } }, '근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요')),
+        h('div', { title:'근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요', style:{ fontSize:'13.5px', fontWeight:800, color:'#1e40af', marginBottom:'6px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, '🏦 법인 DC 납입 대조 — 퇴직연금 출금 «근로자» 몫 vs DC 가입자 임금총액 ÷ 12',
+          h('span', { style:{ fontWeight:400, color:'#64748b', marginLeft:'8px', fontSize:'12.5px' } }, '근로자퇴직급여 보장법 제20조① · 사람별 금액은 퇴직연금 사업자 내역 필요')),
         h('table', { style:{ width:'100%', borderCollapse:'collapse' } },
           h('thead', null, h('tr', { style:{ background:'#f8fafc' } }, ['달', '낸 근로자 몫', '그달 임금총액÷12', '비율', '전달 임금총액÷12', '비율'].map(function(t){ return h('th', { key:t, style:Object.assign({}, cS, { fontFamily:'inherit', color:'#475569', fontWeight:700 }) }, t); }))),
           h('tbody', null, firm.map(function(r){
@@ -80511,26 +80511,26 @@ function RetirementSettlement(){
         h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'12px 14px', marginBottom:'10px',
           display:'flex', gap:'10px', alignItems:'center', flexWrap:'wrap' } },
           h('button', { onClick:function(){changeYear(-1);},
-            style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', cursor:'pointer', fontSize:'12px' } }, '◀'),
+            style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', cursor:'pointer', fontSize:'13.5px' } }, '◀'),
           h('span', { style:{ fontSize:'15px', fontWeight:700, color:'#1e293b', minWidth:'70px', textAlign:'center' } }, selYear + '년'),
           h('button', { onClick:function(){changeYear(1);},
-            style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', cursor:'pointer', fontSize:'12px' } }, '▶'),
+            style:{ padding:'5px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', background:'#fff', cursor:'pointer', fontSize:'13.5px' } }, '▶'),
           h('select', { value:selYear, onChange:function(e){setSelYear(e.target.value);},
-            style:{ padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px' } },
+            style:{ padding:'5px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'13.5px' } },
             yearList.map(function(y){return h('option', { key:y, value:y }, y+'년');})
           ),
           h('div', { style:{ flex:1 } }),
-          h('div', { style:{ fontSize:'11px', color:'#64748b' } },
+          h('div', { style:{ fontSize:'13px', color:'#64748b' } },
             '※ 연 합계: ', h('strong', { style:{ color:'#1e40af', fontFamily:'monospace' } }, grandYearTotal.toLocaleString()), '원',
             ' / 누계 잔액: ', h('strong', { style:{ color:'#16a34a', fontFamily:'monospace' } }, grandBalance.toLocaleString()), '원')
         ),
         // 매트릭스 표
         dcRows.length === 0
-          ? h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'40px', textAlign:'center', color:'#94a3b8', fontSize:'12px' } },
+          ? h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'40px', textAlign:'center', color:'#94a3b8', fontSize:'13.5px' } },
               h('div', { style:{ fontSize:'30px', marginBottom:'8px' } }, '📅'),
               selYear + '년 적립 기록이 없습니다.')
           : h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'auto', zoom:retZoom/100 } },
-              h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11px', minWidth:'1100px' } },
+              h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'13px', minWidth:'1100px' } },
                 h('thead', null,
                   h('tr', null,
                     h('th', { style:{ padding:'7px 10px', textAlign:'left', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0', background:'#f8fafc', position:'sticky', left:0, zIndex:2, minWidth:'90px' } }, '직원'),
@@ -80616,13 +80616,13 @@ function RetirementSettlement(){
                       h('td', { style:{ padding:'6px 10px', fontWeight:600, position:'sticky', left:0, background: idx%2===0?'#fff':'#f8fafc', zIndex:1, borderBottom:'1px solid #f8fafc' } },
                     h('div',{style:{display:'flex',alignItems:'baseline',gap:'6px',whiteSpace:'nowrap',minWidth:0}},
                         h('span', { style:{ fontWeight:600 } }, r.u.name),
-                        h('span', { style:{ fontSize:'10px', color:'#94a3b8' } }, r.u.title)
+                        h('span', { style:{ fontSize:'12px', color:'#94a3b8' } }, r.u.title)
                       )),
                       h('td', { style:{ padding:'5px 7px', textAlign:'center', borderBottom:'1px solid #f8fafc' } },
                         h('span', { style:{ padding:'1px 6px', borderRadius:'10px',
                           background: r.pension.type==='DC'?'#eff6ff':'#fef2f2',
                           color: r.pension.type==='DC'?'#1e40af':'#dc2626',
-                          fontSize:'10px', fontWeight:700 } },
+                          fontSize:'12px', fontWeight:700 } },
                           r.pension.type==='DC'?'DC':r.pension.type==='DB'?'DB':'미가입')
                       ),
                       r.monthAmts.map(function(amt, mi){
@@ -80651,13 +80651,13 @@ function RetirementSettlement(){
                             textAlign:'center', padding:'4px 2px',
                             opacity: disabled ? 0.3 : 1 }) },
                           disabled
-                            ? h('div', { style:{ fontSize:'10px', color:'#cbd5e1' } }, beforeHire?'입사전':'퇴사후')
+                            ? h('div', { style:{ fontSize:'12px', color:'#cbd5e1' } }, beforeHire?'입사전':'퇴사후')
                             : h('div', { style:{ display:'flex', flexDirection:'column', alignItems:'center', gap:'1px' } },
                                 h('input', { type:'checkbox', checked:checked, readOnly:true,
                                   style:{ width:'14px', height:'14px', accentColor:'#16a34a',
                                     cursor: canEdit?'pointer':'not-allowed', pointerEvents:'none' } }),
-                                paidMMDD && h('div', { style:{ fontSize:'10px', color:'#94a3b8', fontFamily:'monospace' } }, paidMMDD),
-                                amt>0 && h('div', { style:{ fontSize:'10.5px', color:'#166534', fontWeight:700, fontFamily:'monospace' } }, amt.toLocaleString())
+                                paidMMDD && h('div', { style:{ fontSize:'12px', color:'#94a3b8', fontFamily:'monospace' } }, paidMMDD),
+                                amt>0 && h('div', { style:{ fontSize:'12.5px', color:'#166534', fontWeight:700, fontFamily:'monospace' } }, amt.toLocaleString())
                               )
                         );
                       }),
@@ -80672,20 +80672,20 @@ function RetirementSettlement(){
                 h('tfoot', null,
                   h('tr', { style:{ background:'#f8fafc', borderTop:'2px solid #cbd5e1' } },
                     h('td', { style:{ padding:'8px 10px', fontWeight:700, color:'#1e293b', position:'sticky', left:0, background:'#f8fafc', zIndex:1 } }, '합계'),
-                    h('td', { style:{ padding:'7px', textAlign:'center', color:'#64748b', fontSize:'10px' } }, dcRows.length+'명'),
+                    h('td', { style:{ padding:'7px', textAlign:'center', color:'#64748b', fontSize:'12px' } }, dcRows.length+'명'),
                     monthSums.map(function(s, mi){
                       return h('td', { key:mi, style:Object.assign({}, tdMo, { fontWeight:700, color: s>0?'#1e293b':'#cbd5e1' }) },
                         s>0 ? s.toLocaleString() : '-');
                     }),
-                    h('td', { style:Object.assign({}, tdMo, { background:'#eff6ff', fontWeight:800, color:'#1e40af', fontSize:'11.5px' }) },
+                    h('td', { style:Object.assign({}, tdMo, { background:'#eff6ff', fontWeight:800, color:'#1e40af', fontSize:'13.5px' }) },
                       grandYearTotal.toLocaleString()),
-                    h('td', { style:Object.assign({}, tdMo, { background:'#f0fdf4', fontWeight:800, color:'#166534', fontSize:'11.5px' }) },
+                    h('td', { style:Object.assign({}, tdMo, { background:'#f0fdf4', fontWeight:800, color:'#166534', fontSize:'13.5px' }) },
                       grandBalance.toLocaleString())
                   )
                 )
               )
             ),
-        h('div', { style:{ marginTop:'8px', fontSize:'10.5px', color:'#94a3b8', lineHeight:'1.6' } },
+        h('div', { style:{ marginTop:'8px', fontSize:'12.5px', color:'#94a3b8', lineHeight:'1.6' } },
           '💡 ',h('strong',null,'연합계'),'는 해당 연도 적립금 합계, ',
           h('strong',null,'누계잔액'),'은 가입 후 전 기간 누적 적립금입니다. ',
           'DC 가입자만 매월 자동 적립되며, 미가입자/DB는 적립금이 표시되지 않습니다.')
@@ -80695,7 +80695,7 @@ function RetirementSettlement(){
     // ─── 탭 4: 퇴직금 계산 ───
     tab === 'auto' && h(DcAutoTab, { year:selYear }),
     tab === 'calc' && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'14px' } },
-      h('div', { style:{ fontSize:'12px', color:'#475569', marginBottom:'10px' } },
+      h('div', { style:{ fontSize:'13.5px', color:'#475569', marginBottom:'10px' } },
         '직원별 [🧮 계산] 버튼을 클릭하면 퇴직일 입력 후 ',
         h('strong', null, 'DC 가입자는 적립금 잔액'), ', ',
         h('strong', null, '미가입자는 법정 퇴직금'), '이 자동 계산됩니다.'),
@@ -80704,17 +80704,17 @@ function RetirementSettlement(){
           return h('div', { key:r.u.sid,
             style:{ border:'1px solid '+TYPE_BG[r.pension.type], borderRadius:'7px', padding:'10px 12px', background:'#fff' } },
             h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' } },
-              h('div', { style:{ fontWeight:700, fontSize:'12.5px' } }, r.u.name),
+              h('div', { style:{ fontWeight:700, fontSize:'14px' } }, r.u.name),
               h('span', { style:{ padding:'2px 7px', borderRadius:'10px',
                 background:TYPE_BG[r.pension.type], color:TYPE_COLOR[r.pension.type],
-                fontSize:'10.5px', fontWeight:700 } }, TYPE_LABEL[r.pension.type])
+                fontSize:'12.5px', fontWeight:700 } }, TYPE_LABEL[r.pension.type])
             ),
-            h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginBottom:'8px' } }, r.u.title),
+            h('div', { style:{ fontSize:'12.5px', color:'#94a3b8', marginBottom:'8px' } }, r.u.title),
             r.pension.type === 'DC'
               ? h('div', { style:{ fontSize:'14px', fontWeight:700, color:'#16a34a', fontFamily:'monospace' } }, r.balance.toLocaleString()+'원')
-              : h('div', { style:{ fontSize:'10.5px', color:'#dc2626', fontWeight:600 } }, '⚠️ 법정퇴직금 발생'),
+              : h('div', { style:{ fontSize:'12.5px', color:'#dc2626', fontWeight:600 } }, '⚠️ 법정퇴직금 발생'),
             h('button', { onClick:function(){openCalcModal(r.u);},
-              style:{ marginTop:'8px', width:'100%', padding:'5px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'11px', fontWeight:600 } }, '🧮 계산하기')
+              style:{ marginTop:'8px', width:'100%', padding:'5px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'13px', fontWeight:600 } }, '🧮 계산하기')
           );
         })
       )
@@ -80737,7 +80737,7 @@ function RetirementSettlement(){
               h('option', { value:'DC' }, 'DC형 (확정기여)'),
               h('option', { value:'DB' }, 'DB형 (확정급여)')
             ),
-            h('div', { style:{ fontSize:'10.5px', color:'#94a3b8', marginTop:'3px' } },
+            h('div', { style:{ fontSize:'12.5px', color:'#94a3b8', marginTop:'3px' } },
               setupModal.type==='DC' ? '💡 매월 임금의 1/12 이상을 적립. 월별급여 확정 시 자동 누적.'
               : setupModal.type==='DB' ? '💡 회사가 운용 책임. 퇴직 시 평균임금 30일분×근속연수 지급.'
               : '⚠️ 퇴직 시 근로기준법에 따라 법정 퇴직금 지급 의무 발생')
@@ -80811,7 +80811,7 @@ function RetirementSettlement(){
               deleteContrib(contribModal.id);
               setContribModal(null);
             },
-            style:{ padding:'7px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'4px', cursor:'pointer', fontSize:'12px', fontWeight:700, marginRight:'auto' }
+            style:{ padding:'7px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'4px', cursor:'pointer', fontSize:'13.5px', fontWeight:700, marginRight:'auto' }
           }, '🗑 적립 취소'),
           h('button', { className:'btn-secondary', onClick:function(){setContribModal(null);} }, '취소'),
           h('button', { className:'btn-primary', onClick:saveContrib }, '✅ 저장')
@@ -80846,41 +80846,41 @@ function RetirementSettlement(){
             ),
             // DC 가입자
             calcModal.pension.type === 'DC' && h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'7px', padding:'14px', marginTop:'10px' } },
-              h('div', { style:{ fontSize:'12px', color:'#1e40af', fontWeight:700, marginBottom:'6px' } }, '🏦 DC형 퇴직연금 적립금'),
-              h('div', { style:{ fontSize:'10.5px', color:'#1e40af', marginBottom:'8px' } },
+              h('div', { style:{ fontSize:'13.5px', color:'#1e40af', fontWeight:700, marginBottom:'6px' } }, '🏦 DC형 퇴직연금 적립금'),
+              h('div', { style:{ fontSize:'12.5px', color:'#1e40af', marginBottom:'8px' } },
                 '※ DC형은 회사가 매월 적립한 금액 + 운용 수익이 퇴직급여가 됩니다. (실제 수령액은 운용성과에 따라 변동)'),
               h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0', borderTop:'1px solid #bfdbfe' } },
-                h('div', { style:{ fontSize:'12px', color:'#1e40af', fontWeight:600 } }, '회사 적립 누계'),
+                h('div', { style:{ fontSize:'13.5px', color:'#1e40af', fontWeight:600 } }, '회사 적립 누계'),
                 h('div', { style:{ fontSize:'18px', fontWeight:800, color:'#1e40af', fontFamily:'monospace' } }, dcBalance.toLocaleString()+'원')
               ),
-              h('div', { style:{ fontSize:'10.5px', color:'#64748b', marginTop:'4px' } },
+              h('div', { style:{ fontSize:'12.5px', color:'#64748b', marginTop:'4px' } },
                 '➕ 운용수익은 ',(calcModal.pension.provider||'금융기관'),' (',(calcModal.pension.account||'-'),')에서 조회')
             ),
             // DB / NONE → 법정퇴직금 계산
             (calcModal.pension.type === 'NONE' || calcModal.pension.type === 'DB') && calc && (
               !calc.eligible
                 ? h('div', { style:{ background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'7px', padding:'14px', marginTop:'10px' } },
-                    h('div', { style:{ fontSize:'12.5px', color:'#991b1b', fontWeight:700 } }, '⚠️ '+calc.reason),
+                    h('div', { style:{ fontSize:'14px', color:'#991b1b', fontWeight:700 } }, '⚠️ '+calc.reason),
                     /* 「1년 미만」과 「셈할 자료가 없다」는 다른 말이다 —
                        뒤엣것을 「대상 아님」으로 읽으면 줘야 할 돈을 안 주게 된다. */
-                    h('div', { style:{ fontSize:'11px', color:'#991b1b', marginTop:'4px' } },
+                    h('div', { style:{ fontSize:'13px', color:'#991b1b', marginTop:'4px' } },
                       calc.cannotCalc
                         ? '퇴직 대상이 «아니라는 뜻이 아닙니다». 급여관리에서 확정된 급여가 있어야 평균임금을 셈합니다 — 확정 후 다시 열어 주세요.'
                         : '근속기간 1년 미만은 퇴직금 지급 대상이 아닙니다.')
                   )
                 : h('div', { style:{ marginTop:'10px' } },
                     h('div', { style:{ background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'7px', padding:'12px', marginBottom:'10px' } },
-                      h('div', { style:{ fontSize:'11.5px', color:'#854d0e', fontWeight:700, marginBottom:'8px' } },
+                      h('div', { style:{ fontSize:'13.5px', color:'#854d0e', fontWeight:700, marginBottom:'8px' } },
                         '📐 법정 퇴직금 계산식 (근로기준법 §34, 시행령 §2)'),
-                      h('div', { style:{ fontSize:'11px', color:'#854d0e', lineHeight:'1.7', fontFamily:'monospace' } },
+                      h('div', { style:{ fontSize:'13px', color:'#854d0e', lineHeight:'1.7', fontFamily:'monospace' } },
                         h('div', null, '퇴직금 = ', h('strong',null,'1일 평균임금'), ' × ', h('strong',null,'30일'), ' × ', h('strong',null,'근속연수')),
-                        h('div', { style:{ fontSize:'10px', color:'#854d0e', marginTop:'4px' } },
+                        h('div', { style:{ fontSize:'12px', color:'#854d0e', marginTop:'4px' } },
                           '* 1일 평균임금 = 퇴직 전 3개월 임금총액 / 그 기간의 총일수'),
-                        h('div', { style:{ fontSize:'10px', color:'#854d0e' } },
+                        h('div', { style:{ fontSize:'12px', color:'#854d0e' } },
                           '* 통상일급이 평균일급보다 클 경우 통상일급 적용 (근로자 유리)')
                       )
                     ),
-                    h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'11.5px', marginBottom:'10px' } },
+                    h('table', { style:{ width:'100%', borderCollapse:'collapse', fontSize:'13.5px', marginBottom:'10px' } },
                       h('tbody', null,
                         h('tr', null,
                           h('td', { style:{ padding:'6px 10px', background:'#f8fafc', fontWeight:600, color:'#475569', width:'140px' } }, '근속기간'),
@@ -80915,13 +80915,13 @@ function RetirementSettlement(){
                       )
                     ),
                     h('div', { style:{ background:'#f0fdf4', border:'2px solid #bbf7d0', borderRadius:'7px', padding:'14px' } },
-                      h('div', { style:{ fontSize:'11.5px', color:'#166534', fontWeight:700, marginBottom:'5px' } }, '💰 법정 퇴직금'),
-                      h('div', { style:{ fontSize:'10.5px', color:'#16a34a', fontFamily:'monospace', marginBottom:'8px' } },
+                      h('div', { style:{ fontSize:'13.5px', color:'#166534', fontWeight:700, marginBottom:'5px' } }, '💰 법정 퇴직금'),
+                      h('div', { style:{ fontSize:'12.5px', color:'#16a34a', fontFamily:'monospace', marginBottom:'8px' } },
                         calc.dailyApplied.toLocaleString()+' × 30일 × '+calc.years+'년'),
                       h('div', { style:{ fontSize:'24px', fontWeight:800, color:'#166534', fontFamily:'monospace', textAlign:'right' } },
                         calc.severance.toLocaleString()+'원')
                     ),
-                    calc.averageWage.months.length > 0 && h('div', { style:{ marginTop:'10px', fontSize:'10.5px', color:'#64748b' } },
+                    calc.averageWage.months.length > 0 && h('div', { style:{ marginTop:'10px', fontSize:'12.5px', color:'#64748b' } },
                       '📋 산정 기준 월별 임금: ',
                       calc.averageWage.months.map(function(m){return m.ym+' '+m.wage.toLocaleString();}).join(' / ')
                     )
@@ -80995,9 +80995,9 @@ function RetirementSettlement(){
       }
 
       return h('div', null,
-        h('div', { style:{background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'7px', padding:'10px 14px', marginBottom:'12px', fontSize:'11.5px', color:'#991b1b'} },
+        h('div', { style:{background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'7px', padding:'10px 14px', marginBottom:'12px', fontSize:'13.5px', color:'#991b1b'} },
           '💼 ', h('strong', null, '퇴사자 정산 시스템'),
-          h('div', { style:{marginTop:'4px', color:'#991b1b', fontSize:'11px'} },
+          h('div', { style:{marginTop:'4px', color:'#991b1b', fontSize:'13px'} },
             '재직 기간 자동 계산 + 평균임금/퇴직금 자동 산정. 모든 항목은 수동 조정 가능. 정산 확정 시 출금관리에 자동 연동(예정).')
         ),
 
@@ -81008,26 +81008,26 @@ function RetirementSettlement(){
           var paid = settlements.filter(function(s){return s.status==='paid';}).length;
           return h('div', { style:{display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:'8px', marginBottom:'12px'} },
             h('div', { style:{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'10px 12px'} },
-              h('div', { style:{fontSize:'10.5px', color:'#854d0e', fontWeight:600} }, '👥 퇴사자 총 수'),
+              h('div', { style:{fontSize:'12.5px', color:'#854d0e', fontWeight:600} }, '👥 퇴사자 총 수'),
               h('div', { style:{fontSize:'13px', fontWeight:800, color:'#854d0e'} }, retiredList.length+'명')),
             h('div', { style:{background:'#f8fafc', border:'1px solid #cbd5e1', borderRadius:'6px', padding:'10px 12px'} },
-              h('div', { style:{fontSize:'10.5px', color:'#475569', fontWeight:600} }, '📝 정산 작성중'),
+              h('div', { style:{fontSize:'12.5px', color:'#475569', fontWeight:600} }, '📝 정산 작성중'),
               h('div', { style:{fontSize:'13px', fontWeight:800, color:'#475569'} }, draft+'건')),
             h('div', { style:{background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 12px'} },
-              h('div', { style:{fontSize:'10.5px', color:'#1e40af', fontWeight:600} }, '✓ 정산 확정'),
+              h('div', { style:{fontSize:'12.5px', color:'#1e40af', fontWeight:600} }, '✓ 정산 확정'),
               h('div', { style:{fontSize:'13px', fontWeight:800, color:'#1e40af'} }, confirmed+'건')),
             h('div', { style:{background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'6px', padding:'10px 12px'} },
-              h('div', { style:{fontSize:'10.5px', color:'#166534', fontWeight:600} }, '💰 지급 완료'),
+              h('div', { style:{fontSize:'12.5px', color:'#166534', fontWeight:600} }, '💰 지급 완료'),
               h('div', { style:{fontSize:'13px', fontWeight:800, color:'#166534'} }, paid+'건'))
           );
         })(),
 
         // 퇴사자 목록 테이블
         retiredList.length === 0
-          ? h('div', { style:{textAlign:'center', padding:'40px', color:'#94a3b8', fontSize:'12px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px'} },
+          ? h('div', { style:{textAlign:'center', padding:'40px', color:'#94a3b8', fontSize:'13.5px', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px'} },
               '퇴사자가 없습니다. 환경설정 → 사용자관리에서 상태를 [퇴직]으로 변경하면 여기 표시됩니다.')
           : h('div', { style:{background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden'} },
-              h('table', { style:{width:'100%', borderCollapse:'collapse', fontSize:'11.5px'} },
+              h('table', { style:{width:'100%', borderCollapse:'collapse', fontSize:'13.5px'} },
                 h('thead', null, h('tr', { style:{background:'#f8fafc'} },
                   h('th', { style:{padding:'8px', textAlign:'left', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0'} }, '직원'),
                   h('th', { style:{padding:'8px', textAlign:'left', fontWeight:700, color:'#475569', borderBottom:'1px solid #e2e8f0'} }, '직책'),
@@ -81055,10 +81055,10 @@ function RetirementSettlement(){
                       h('td', { style:{padding:'7px 8px', textAlign:'right', fontFamily:'monospace', fontWeight:700} },
                         st ? (st.netPay||0).toLocaleString()+'원' : '-'),
                       h('td', { style:{padding:'7px 8px', textAlign:'center'} },
-                        h('span', { style:{background:statusBg, color:statusColor, padding:'2px 8px', borderRadius:'10px', fontSize:'10.5px', fontWeight:700} }, statusLabel)),
+                        h('span', { style:{background:statusBg, color:statusColor, padding:'2px 8px', borderRadius:'10px', fontSize:'12.5px', fontWeight:700} }, statusLabel)),
                       h('td', { style:{padding:'7px 8px', textAlign:'center'} },
                         h('button', { onClick:function(){openSettle(u);},
-                          style:{padding:'3px 10px', background:st?'#eff6ff':'#1e40af', color:st?'#1e40af':'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'11px', fontWeight:600} },
+                          style:{padding:'3px 10px', background:st?'#eff6ff':'#1e40af', color:st?'#1e40af':'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'13px', fontWeight:600} },
                           st ? '📝 수정/조회' : '➕ 정산 작성'))
                     );
                   })
@@ -81133,9 +81133,9 @@ function RetirementSettlement(){
         showToast('💼 ' + settleModal.name + ' 정산 ' + (s==='paid'?'지급 완료':s==='confirmed'?'확정':'저장됨'));
       }
 
-      var lblS = {minWidth:'120px', color:'#475569', fontWeight:600, fontSize:'11.5px'};
+      var lblS = {minWidth:'120px', color:'#475569', fontWeight:600, fontSize:'13.5px'};
       var rowS = {display:'flex', alignItems:'center', gap:'8px', padding:'5px 0', borderBottom:'1px dashed #e2e8f0'};
-      var inS = {flex:1, padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'monospace', textAlign:'right'};
+      var inS = {flex:1, padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'13.5px', fontFamily:'monospace', textAlign:'right'};
 
       return h('div', { className:'modal-bg', onClick:function(e){if(e.target===e.currentTarget)setSettleModal(null);} },
         h('div', { className:'modal', style:{width:'640px', maxHeight:'92vh', overflowY:'auto'}, onClick:function(e){e.stopPropagation();} },
@@ -81146,7 +81146,7 @@ function RetirementSettlement(){
           h('div', { className:'modal-b' },
             // 기본 정보
             h('div', { style:{background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px'} },
-              h('div', { style:{fontSize:'12px', fontWeight:700, color:'#475569', marginBottom:'8px'} }, '📋 기본 정보'),
+              h('div', { style:{fontSize:'13.5px', fontWeight:700, color:'#475569', marginBottom:'8px'} }, '📋 기본 정보'),
               h('div', { style:rowS }, h('span', { style:lblS }, '입사일'),
                 h(KoreanDatePicker, { value:settleModal.joinDate||'', onChange:function(e){upd('joinDate', e.target.value);} })),
               h('div', { style:rowS }, h('span', { style:lblS }, '퇴사일'),
@@ -81156,7 +81156,7 @@ function RetirementSettlement(){
             ),
             // 평균임금 + 퇴직금
             h('div', { style:{background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px'} },
-              h('div', { style:{fontSize:'12px', fontWeight:700, color:'#854d0e', marginBottom:'8px'} }, '💰 평균임금 · 퇴직금'),
+              h('div', { style:{fontSize:'13.5px', fontWeight:700, color:'#854d0e', marginBottom:'8px'} }, '💰 평균임금 · 퇴직금'),
               /* ★ 「0원으로 산정된 건」을 화면이 스스로 짚는다 (2026-09-05).
                  급여 기록을 p.sid 로 찾던 흠 때문에 최근 3개월을 못 찾아 평균임금이
                  0 이 된 건이 있을 수 있다(고침 f85c123). 저장된 값이 0 인데 그 사람
@@ -81164,7 +81164,7 @@ function RetirementSettlement(){
                  ⚠ 자동으로 고치지 않는다. 이미 지급한 건일 수 있어 사람이 판단한다. */
               retireZeroSuspect(settleModal, dbGet('payroll_monthly', [])) &&
                 h('div', { style:{background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'6px',
-                    padding:'9px 11px', marginBottom:'9px', fontSize:'11.5px', color:'#991b1b', lineHeight:1.7} },
+                    padding:'9px 11px', marginBottom:'9px', fontSize:'13.5px', color:'#991b1b', lineHeight:1.7} },
                   h('div', { style:{fontWeight:800, marginBottom:'3px'} }, '⚠ 평균임금이 0원으로 산정된 건입니다'),
                   '이 사람의 급여 기록은 ', h('b', null,
                     retireMonthsBefore(settleModal, dbGet('payroll_monthly', [])) + '개월치'),
@@ -81198,14 +81198,14 @@ function RetirementSettlement(){
                 if(due) bits.push(h('span', { key:'d', style:{ color: late ? '#dc2626' : '#475569', fontWeight:700 } }, (late ? '⚠ 지급 기한 지남 ' : '지급 기한 ') + due + ' (퇴직일+14일)'));
                 if(settleModal.severanceNote) bits.push(h('span', { key:'n', style:{ color:'#1e40af', fontWeight:700 } }, settleModal.severanceNote));
                 if(settleModal.severanceIncomeTax != null) bits.push(h('span', { key:'t', style:{ color:'#475569' } }, '퇴직소득세 어림 ' + (+settleModal.severanceIncomeTax).toLocaleString() + '원 + 지방 ' + (+settleModal.severanceLocalTax||0).toLocaleString() + '원 (IRP 이전이면 과세이연)'));
-                return bits.length ? h('div', { style:{ display:'flex', gap:'12px', flexWrap:'nowrap', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', fontSize:'10.5px', marginTop:'6px' } }, bits) : null;
+                return bits.length ? h('div', { style:{ display:'flex', gap:'12px', flexWrap:'nowrap', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis', fontSize:'12.5px', marginTop:'6px' } }, bits) : null;
               })(),
-              h('div', { style:{fontSize:'10.5px', color:'#854d0e', marginTop:'6px', fontStyle:'italic'} },
+              h('div', { style:{fontSize:'12.5px', color:'#854d0e', marginTop:'6px', fontStyle:'italic'} },
                 '* 자동값 = 마지막 근무일 전 3개월 임금(걸친 달은 날수만큼) + 상여·연차수당 12개월분 × 3/12, 휴직 기간 제외 — 통상임금보다 적으면 통상임금. 다르면 수동 조정')
             ),
             // 미지급 항목
             h('div', { style:{background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px'} },
-              h('div', { style:{fontSize:'12px', fontWeight:700, color:'#1e40af', marginBottom:'8px'} }, '💵 미지급 항목'),
+              h('div', { style:{fontSize:'13.5px', fontWeight:700, color:'#1e40af', marginBottom:'8px'} }, '💵 미지급 항목'),
               h('div', { style:rowS }, h('span', { style:lblS }, '미지급 급여'),
                 h('input', { type:'text', value:settleModal.unpaidSalary||'',
                   placeholder:'마지막 월 일할 금액',
@@ -81224,27 +81224,27 @@ function RetirementSettlement(){
             // 사용자 정의 항목
             h('div', { style:{background:'#f8fafc', border:'1px solid #cbd5e1', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px'} },
               h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'8px'} },
-                h('div', { style:{fontSize:'12px', fontWeight:700, color:'#475569'} }, '➕ 추가 지급 항목 (사용자 정의)'),
+                h('div', { style:{fontSize:'13.5px', fontWeight:700, color:'#475569'} }, '➕ 추가 지급 항목 (사용자 정의)'),
                 h('button', { onClick:addCustom,
-                  style:{padding:'3px 10px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'10.5px', fontWeight:600} }, '+ 추가')),
+                  style:{padding:'3px 10px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'12.5px', fontWeight:600} }, '+ 추가')),
               (settleModal.customItems||[]).length === 0
-                ? h('div', { style:{fontSize:'10.5px', color:'#94a3b8', fontStyle:'italic', padding:'4px 0'} }, '없음. [+ 추가] 클릭해서 항목 입력')
+                ? h('div', { style:{fontSize:'12.5px', color:'#94a3b8', fontStyle:'italic', padding:'4px 0'} }, '없음. [+ 추가] 클릭해서 항목 입력')
                 : (settleModal.customItems||[]).map(function(it, i){
                     return h('div', { key:i, style:{display:'flex', gap:'6px', marginBottom:'4px'} },
                       h('input', { type:'text', value:it.name||'', placeholder:'항목명 (예: 인센티브)',
                         onChange:function(e){updCustom(i,'name',e.target.value);},
-                        style:{flex:1, padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px'} }),
+                        style:{flex:1, padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'13.5px'} }),
                       h('input', { type:'text', value:it.amount||'', placeholder:'금액',
                         onChange:function(e){updCustom(i,'amount',e.target.value.replace(/[^0-9]/g,''));},
-                        style:{width:'120px', padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', textAlign:'right', fontFamily:'monospace'} }),
+                        style:{width:'120px', padding:'4px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'13.5px', textAlign:'right', fontFamily:'monospace'} }),
                       h('button', { onClick:function(){delCustom(i);},
-                        style:{padding:'2px 8px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'10.5px'} }, '✕')
+                        style:{padding:'2px 8px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'12.5px'} }, '✕')
                     );
                   })
             ),
             // 공제
             h('div', { style:{background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'6px', padding:'10px 14px', marginBottom:'12px'} },
-              h('div', { style:{fontSize:'12px', fontWeight:700, color:'#991b1b', marginBottom:'8px'} }, '➖ 공제 항목'),
+              h('div', { style:{fontSize:'13.5px', fontWeight:700, color:'#991b1b', marginBottom:'8px'} }, '➖ 공제 항목'),
               h('div', { style:rowS }, h('span', { style:lblS }, '소득세'),
                 h('input', { type:'text', value:settleModal.incomeTax||'',
                   onChange:function(e){upd('incomeTax', e.target.value.replace(/[^0-9]/g,''));}, style:inS })),
@@ -81257,28 +81257,28 @@ function RetirementSettlement(){
                   onChange:function(e){upd('insuranceAdjust', e.target.value.replace(/[^0-9]/g,''));}, style:inS })),
               // 사용자 정의 공제
               h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', margin:'8px 0 4px'} },
-                h('div', { style:{fontSize:'11px', color:'#991b1b', fontWeight:600} }, '➕ 기타 공제 (가불금·대출상환 등)'),
+                h('div', { style:{fontSize:'13px', color:'#991b1b', fontWeight:600} }, '➕ 기타 공제 (가불금·대출상환 등)'),
                 h('button', { onClick:addCustomDeduct,
-                  style:{padding:'3px 10px', background:'#991b1b', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'10.5px', fontWeight:600} }, '+ 추가')),
+                  style:{padding:'3px 10px', background:'#991b1b', color:'#fff', border:'none', borderRadius:'4px', cursor:'pointer', fontSize:'12.5px', fontWeight:600} }, '+ 추가')),
               (settleModal.customDeducts||[]).map(function(it, i){
                 return h('div', { key:i, style:{display:'flex', gap:'6px', marginBottom:'4px'} },
                   h('input', { type:'text', value:it.name||'', placeholder:'공제명',
                     onChange:function(e){updCustomDeduct(i,'name',e.target.value);},
-                    style:{flex:1, padding:'4px 8px', border:'1px solid #fecaca', borderRadius:'4px', fontSize:'11.5px'} }),
+                    style:{flex:1, padding:'4px 8px', border:'1px solid #fecaca', borderRadius:'4px', fontSize:'13.5px'} }),
                   h('input', { type:'text', value:it.amount||'', placeholder:'금액',
                     onChange:function(e){updCustomDeduct(i,'amount',e.target.value.replace(/[^0-9]/g,''));},
-                    style:{width:'120px', padding:'4px 8px', border:'1px solid #fecaca', borderRadius:'4px', fontSize:'11.5px', textAlign:'right', fontFamily:'monospace'} }),
+                    style:{width:'120px', padding:'4px 8px', border:'1px solid #fecaca', borderRadius:'4px', fontSize:'13.5px', textAlign:'right', fontFamily:'monospace'} }),
                   h('button', { onClick:function(){delCustomDeduct(i);},
-                    style:{padding:'2px 8px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'10.5px'} }, '✕')
+                    style:{padding:'2px 8px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'12.5px'} }, '✕')
                 );
               })
             ),
             // 합계
             h('div', { style:{background:'#1e293b', color:'#fff', borderRadius:'7px', padding:'14px 18px', marginBottom:'12px'} },
-              h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', fontSize:'12px', color:'#cbd5e1'} },
+              h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', fontSize:'13.5px', color:'#cbd5e1'} },
                 h('span', null, '지급 총액'),
                 h('span', { style:{fontFamily:'monospace', fontWeight:700} }, totalGross.toLocaleString()+'원')),
-              h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', fontSize:'12px', color:'#cbd5e1'} },
+              h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'4px 0', fontSize:'13.5px', color:'#cbd5e1'} },
                 h('span', null, '공제 총액'),
                 h('span', { style:{fontFamily:'monospace', fontWeight:700} }, '-'+totalDeduct.toLocaleString()+'원')),
               h('div', { style:{display:'flex', justifyContent:'space-between', alignItems:'center', padding:'8px 0 0', borderTop:'1px solid #475569', marginTop:'4px'} },
@@ -81289,11 +81289,11 @@ function RetirementSettlement(){
             h('div', { style:rowS }, h('span', { style:lblS }, '지급일'),
               h(KoreanDatePicker, { value:settleModal.paidDate||'', onChange:function(e){upd('paidDate', e.target.value);} })),
             h('div', { style:{marginTop:'8px'} },
-              h('label', { style:{display:'block', fontSize:'11.5px', color:'#475569', fontWeight:600, marginBottom:'4px'} }, '메모'),
+              h('label', { style:{display:'block', fontSize:'13.5px', color:'#475569', fontWeight:600, marginBottom:'4px'} }, '메모'),
               h('textarea', { value:settleModal.note||'',
                 onChange:function(e){upd('note', e.target.value);},
                 placeholder:'특이사항·지급방법 등',
-                rows:2, style:{width:'100%', padding:'6px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'11.5px', fontFamily:'inherit'} }))
+                rows:2, style:{width:'100%', padding:'6px 8px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'13.5px', fontFamily:'inherit'} }))
           ),
           h('div', { className:'modal-f', style:{justifyContent:'space-between'} },
             h('div', null,
@@ -81304,19 +81304,19 @@ function RetirementSettlement(){
                 setSettleModal(null); setRefresh(refresh+1);
                 showToastUndo('🗑️ 퇴직정산 삭제됨', function(){ if(_bak) dbUpsert('retirement_settlements', _bak); });
               },
-                style:{padding:'6px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600} }, '🗑️ 삭제')
+                style:{padding:'6px 14px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px', cursor:'pointer', fontSize:'13.5px', fontWeight:600} }, '🗑️ 삭제')
             ),
             h('div', { style:{display:'flex', gap:'6px'} },
               h('button', { className:'btn-secondary', onClick:function(){setSettleModal(null);} }, '취소'),
               h('button', { onClick:function(){saveSettle('draft');},
-                style:{padding:'6px 14px', background:'#f8fafc', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:600} }, '💾 임시 저장'),
+                style:{padding:'6px 14px', background:'#f8fafc', color:'#475569', border:'1px solid #cbd5e1', borderRadius:'5px', cursor:'pointer', fontSize:'13.5px', fontWeight:600} }, '💾 임시 저장'),
               h('button', { onClick:function(){saveSettle('confirmed');},
-                style:{padding:'6px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700} }, '✓ 확정'),
+                style:{padding:'6px 14px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'13.5px', fontWeight:700} }, '✓ 확정'),
               h('button', { onClick:async function(){
                 if(!(await popConfirm('지급 완료 처리하시겠습니까?\n\n→ 출금관리에 자동 반영(예정)\n→ 감사 로그 기록'))) return;
                 saveSettle('paid');
               },
-                style:{padding:'6px 14px', background:'#16a34a', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'11.5px', fontWeight:700} }, '💰 지급완료')
+                style:{padding:'6px 14px', background:'#16a34a', color:'#fff', border:'none', borderRadius:'5px', cursor:'pointer', fontSize:'13.5px', fontWeight:700} }, '💰 지급완료')
             )
           )
         )
