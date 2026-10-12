@@ -44,7 +44,7 @@
    │  signboard/published (올린 판: 번호 + 광고 목록)
    ▼
 이 PC의 심부름꾼 (scripts/signboard-agent/)   ← 1분마다 «새 판 있나?»
-   │  ① 새 판이면 사진·동영상 내려받기(크기·md5 확인)
+   │  ① 새 판이면 사진·동영상 내려받기(기록된 크기와 대조)
    │  ② 灰度 통로로 파일 올리기 → 프로그램 «전체 교체»(replace)
    │  ③ 결과·장비 정보를 signboard/state 에 기록
    ▼
@@ -65,14 +65,14 @@
 - 앱 안 잠금: `uid_roles/{uid}` 에서 `status==='active'` 이고 `isAdmin` 또는 `isSubAdmin` 이 참이 아니면 «권한이 없습니다» 로 잠근다.
 
 ### 4.2 화면 (모양은 구현 전에 목업으로 먼저 확인받는다)
-탭 넷. 각 목록은 «맨 왼쪽 ☐ + 번호», 표의 한 칸은 «한 줄»(`…` + `title`)로 그린다.
+탭 셋 + «편집 상자»(§14-1). 각 목록은 «맨 왼쪽 ☐ + 번호», 표의 한 칸은 «한 줄»(`…` + `title`)로 그린다.
 
 | 탭 | 내용 |
 |---|---|
-| ① 광고 | 광고 목록(순서·제목·종류·기간·상태). 위/아래 순서 바꾸기, 켜기/끄기, 복사, 지우기(휴지통 → 복구 가능). «+ 새 광고» |
-| ② 광고 만들기 | 종류 선택(글자/사진/동영상). 글자: 문구·글자 크기·색·효과·속도·머무는 초. 사진·동영상: 파일 올리기·맞춤 방식. 공통: 시작일·종료일·요일·시간대(비우면 «늘»). 오른쪽에 전광판 비율의 **미리보기** |
-| ③ 전광판 | 심부름꾼 마지막 응답, 장비 해상도·시계·밝기, 마지막 전송 결과, 지금 올라가 있는 판 번호. 어긋남 경고 |
-| ④ 올린 기록 | 판 번호·올린 사람·시각·광고 수. «이 판으로 되돌리기» |
+| ① 광고 | 광고 목록(순서·제목·종류·기간·상태·«전광판에 올라갔나»). 위/아래 순서 바꾸기, 켜기/끄기, 지우기(표식만 — 올린 기록에는 남는다). «+ 새 광고»·제목 클릭 → 편집 상자 |
+| (편집 상자) | 종류 선택(글자/사진/동영상). 글자: 문구·글자 크기·색·효과·속도·머무는 초. 사진·동영상: 파일 올리기·맞춤 방식. 공통: 시작일·종료일·요일·시간대(비우면 «늘»). 아래에 전광판 비율의 **미리보기**, 맨 위에 **경고**(이모지·이미 끝난 기간) |
+| ② 전광판 상태 | 심부름꾼 마지막 응답, 장비 해상도·시계·밝기, 마지막 전송 결과, 지금 올라가 있는 판 번호. 어긋남 경고. 첫 전송 확인 단추 |
+| ③ 올린 기록 | 판 번호·올린 사람·시각·광고 수. «이 판으로 되돌리기» |
 
 - 상단 «전광판에 올리기»: 누르면 확인 창(**「길거리 전광판에 그대로 보입니다」** + 올라갈 광고 목록·기간 요약) → 확인 시 `published` 새 판.
 - 아직 올리지 않은 변경이 있으면 «올리지 않은 변경 N건» 띠를 띄운다.
@@ -85,22 +85,23 @@ signboard/ads/{id}:
   id, entityType:'SignboardAd', schemaVersion, contractVersion, createdAt, updatedAt, revision,
   title, kind:'text'|'image'|'video', enabled:boolean, order:number, _deleted/deletedAt/deletedBy,
   text:{ string, size, color:'#RRGGBB', bold, effectType, effectSpeed, holdSec },     (kind=text)
-  media:{ path, url, md5, size, fit:'fill'|'center'|'stretch'|'tile', holdSec },       (kind=image|video)
+  media:{ path, url, name, contentType, size, fit:'fill'|'center'|'stretch'|'tile', holdSec, effectType, effectSpeed },  (kind=image|video — md5 는 브라우저에 없어 심부름꾼이 계산한다)
   period:{ start:'YYYY-MM-DD'|'', end:'YYYY-MM-DD'|'', weekdays:['Mon',…]|[], times:[{start,end}] }
 signboard/published:
   version:number, publishedAt, publishedBy:sid, ads:[…광고 사본…], note
 signboard/history/{version}:   올린 판 사본 (되돌리기 기준)
+signboard/control:             첫 전송 허락 — 포털이 쓴다  { id:'control', firstReplaceConfirmed, confirmedBy:sid, confirmedAt }
 signboard/state:               심부름꾼이 쓴다
   agentSeenAt, mode:'dry-run'|'live', sentVersion, sentAt, result:'ok'|'fail', message,
   device:{ id, width, height, time, timeZone, luminance, fwVersion }, clockSkewSec,
-  firstReplaceConfirmed:boolean, existingPrograms:[…]
+  existingPrograms:[…], deviceReachable, deviceError, clockWarning, screenAssumed
 ```
 
 - 새 레코드는 `id`·`entityType`·`schemaVersion`·`contractVersion`·생성/수정 시각·`revision` 을 갖춘다. 물리 삭제 대신 `_deleted`.
 - **온톨로지** (`js/pu-ontology.js`): `TERMS` 에 개체 종류 `SignboardAd` 추가 · `PROGRAMS.signboard`(`primaryRoots:['signboard']`, `sharedRoots:['uid_roles']`, `writeContracts` 로 `signboard/ads/{id}`·`published`·`history/{version}` 선언) · `READ_ADAPTERS.signboard_core`(`strategy:'in_app'` — 광고 문구는 원본을 통합 화면에 열지 않는다). 사람·업체를 가리키는 칸은 `sid` 만 쓴다(`publishedBy`).
 - **실시간DB 규칙** (`scripts/make-firebase-rules.js` 만들개에서만): `signboard` 최상위 칸. 읽기·쓰기 모두 `MGR`(관리자 또는 위임관리인 — `isAdmin`/`isSubAdmin`). `ads/$id` 는 `newData.child('id').val() === $id`, 지우기 금지(`newData.exists()`). `state` 는 심부름꾼이 쓴다(§6.4). 새 최상위 칸이라 **짝 검사 4개**(`tests/perf-rules.test.js` `allowTop`, `tests/photos-staff-share.test.js` `PENDING` 등)를 함께 고친다.
 - **창고(Storage)** `pureun-erp-hrphotos` 버킷의 `signboard/{파일}` 칸 새로 — `docs/firebase-storage-전체(붙여넣기용).txt` 에 넣고 `storage-rules-deploy.js` 의 «쓰는자리» 목록에도 적는다. ⚠ 창고 규칙은 DB의 권한표를 못 읽는다 → 쓰기는 `isStaff()`(@pureun.kr)까지만 막을 수 있다. 그래도 «올리기»(`published` 쓰기)는 DB 규칙 `MGR` 이 막으므로 **파일이 올라가도 전광판에는 나가지 않는다.**
-  - 사진 10MB(`okImage()`), 동영상 상한은 가안 **50MB** [확인 필요 — 장비 저장공간을 읽은 뒤 확정. 확정 전에는 동영상 상한을 이 값으로 둔다]. 올리기는 기존 선례대로 compat `ref.put()` + 진행률 표시. 동영상 업로드 선례는 저장소에 없다.
+  - 사진은 `okImage()`(10MB, 사진만)를 그대로 쓰고, 동영상은 새 보조 함수 `okSignVideo()`(가안 **50MB**) [확인 필요 — 장비 저장공간을 읽은 뒤 확정]. 지우기는 막는다(올린 기록으로 되돌릴 때 그 판의 파일이 남아 있어야 한다). 올리기는 기존 선례대로 compat `ref.put()` + 진행률 표시. 동영상 업로드 선례는 저장소에 없다.
 - 규칙은 «묻지 않고 내가 올린다»(CLAUDE.md) — 단 `rules-deploy.js` 의 «사라질 규칙 있으면 멈춤» 안전장치를 그대로 지키고, 보고에 «어느 칸이 누구에게 보이게 됐는지»를 적는다. 창고는 기준이 «대표님이 옮겨 주신 콘솔 사본»이라 약한 안전장치임을 보고에서 숨기지 않는다.
 
 ## 6. 심부름꾼 (이 PC)
@@ -114,9 +115,9 @@ signboard/state:               심부름꾼이 쓴다
 - 설정은 **저장소 밖** `%APPDATA%\pureun-signboard\config.json` — `deviceHost`(IP:30080), `deviceId`, `sdkKey`, `sdkSecret`, `liveEnabled`.
 - 저장소에는 빈 칸만 있는 `config.example.json` 만 둔다. 열쇠는 로그·화면·DB·채팅 어디에도 찍지 않는다. 값의 앞 4글자도 안 찍는다.
 
-### 6.3 한 바퀴 (1분마다)
+### 6.3 한 바퀴 (1분마다 확인 · 장비 정보·심장박동 기록은 5분마다)
 1. `signboard/published/version` 읽기. 로컬에 적어 둔 «마지막으로 보낸 판 번호»와 같으면 **장비 정보만 갱신**하고 끝.
-2. 다르면 광고 목록을 받아 사진·동영상을 내려받는다(크기·md5 검증, 안 맞으면 **전송 중단**).
+2. 다르면 광고 목록을 받아 사진·동영상을 내려받는다(우리 창고 주소만, 기록된 크기와 대조 — 안 맞으면 **전송 중단**). md5 는 심부름꾼이 계산해 장비에 알린다.
 3. `liveEnabled` 가 아니거나 `--dry-run` 이면: 보낼 JSON 을 파일(`%APPDATA%\pureun-signboard\outbox\판번호.json`)에 기록하고 `state.mode='dry-run'` 으로 알린다. **장비에는 연결하지 않는다.**
 4. 실전이면: 파일 올리기(`POST /api/file/{장비ID}`, 서명 규칙2) → 프로그램 전체 교체(`POST /api/program/{장비ID}`, `method:"replace"`, 서명 규칙1).
 5. 결과를 `signboard/state` 에 쓰고, 성공이면 «마지막으로 보낸 판 번호»를 갱신한다.
@@ -151,7 +152,7 @@ signboard/state:               심부름꾼이 쓴다
 - «전체 교체(replace)»를 쓴다 — `published` 가 «전광판에 있어야 할 전부»이기 때문이다.
 
 확인 필요
-- ⚠★ **`replace` 는 장비에 이미 있는 프로그램(HDPlayer로 넣어 둔 것)을 지운다.** 첫 실전 전송 전에 `getAll` 로 기존 목록을 읽어 `state.existingPrograms` 에 보관하고, 포털 ③탭에서 대표가 «지워도 된다»를 눌러 `firstReplaceConfirmed` 가 켜져야만 첫 `replace` 를 보낸다.
+- ⚠★ **`replace` 는 장비에 이미 있는 프로그램(HDPlayer로 넣어 둔 것)을 지운다.** 첫 실전 전송 전에 `getAll` 로 기존 목록을 읽어 `state.existingPrograms` 에 보관하고, 포털 «전광판 상태» 탭에서 대표가 «지워도 된다»를 눌러 `signboard/control` 의 `firstReplaceConfirmed` 가 켜져야만 첫 `replace` 를 보낸다.
 - 灰度 문서의 서명 예시는 본문 원문이 없어 **우리 서명 함수와 대조할 수 없다.** 시험 벡터는 표준 HMAC-MD5 값(자체 계산)으로 두고, 장비가 서명을 받아 주는지는 **실제 장비 앞에서만** 최종 확인된다.
 - 장비 시계가 한국 시간인지(중국 시간이면 기간 예약이 1시간 어긋남). 심부름꾼이 `time.timeZone`·`time` 을 읽어 어긋나면 ③탭에 경고한다.
 - 장비 가용 저장공간(동영상 상한 확정에 필요) — 문서에서 읽는 방법을 못 찾았다.
@@ -164,9 +165,10 @@ signboard/state:               심부름꾼이 쓴다
 | 고친 뒤 «올리기»를 안 누름 | 전광판은 그대로. 포털에 «올리지 않은 변경 N건» 띠 |
 | 심부름꾼 PC가 꺼짐 | 이미 보낸 광고는 장비 안에서 계속 돎(기간 예약도 장비가 지킴). 포털은 «마지막 응답 N분 전» 경고 |
 | 장비가 응답 없음 | 재시도 3회 → `state` 에 실패 사유 → ③탭 빨간 띠. 장비의 기존 광고는 건드리지 않음 |
-| 파일 크기·md5 불일치 | 그 판 전송 중단, 장비의 기존 광고 유지 |
+| 파일 크기 불일치·내려받기 실패(창고 주소 만료·삭제) | 그 판 전송 중단, 장비의 기존 광고 유지, 3번까지 다시 해 보고 멈춤 |
 | 잘못 올림 | ④탭 «이 판으로 되돌리기» → 새 판 번호로 다시 `published` |
 | 열쇠 분실·유출 | PC 설정 파일에만 있으므로 PC 점검. 灰度에 재발급 문의 |
+| 광고 0건인 판 | 화면이 올리기를 막고, 심부름꾼도 0건 판은 보내지 않는다(전광판을 비우지 않는다) |
 | 직원이 몰래 올림 | 규칙 `MGR` 이 `published` 쓰기를 막음. 올린 기록에 `publishedBy` 남음 |
 
 ## 9. 검사 (규칙을 못 박는다 — 「지금 값」 아님)
@@ -176,7 +178,7 @@ signboard/state:               심부름꾼이 쓴다
 - `signboard-html` — 화면이 실제로 그려진다(하네스: 가짜 firebase), 권한 없으면 잠긴다, 표의 한 칸은 한 줄, 폰 입력칸 16px 이상.
 - `signboard-program` — 광고 → 灰度 JSON: 기간·요일·시간대 번역, 글자/사진/동영상 모양, 순서, 화면 전체 area. (값이 규칙인 곳: 효과 번호·`playControl` 키 이름 → `검사고정-허용` + «灰度 공식 문서의 규칙» 이유 병기)
 - `signboard-sign` — HMAC-MD5 규칙1·2가 표준 시험 벡터와 같다(값이 규칙이므로 박는 게 맞다 — `검사고정-허용` + 이유).
-- `signboard-agent` — 한 바퀴를 **가짜 장비·가짜 DB**로 돌려 본다: 새 판일 때만 전송, 시험 모드는 장비 호출 0회, md5 불일치면 전송 중단, 첫 `replace` 는 `firstReplaceConfirmed` 없으면 안 보냄, 실패 재시도 3회, 열쇠가 로그에 안 찍힘. («모의는 한 걸음 앞에서 멈춘다» — 가짜가 «null 먼저» 같은 현실의 불편한 동작도 하게 한다.)
+- `signboard-agent` — 한 바퀴를 **가짜 장비·가짜 DB**로 돌려 본다: 새 판일 때만 전송, 시험 모드는 장비 호출 0회, 파일 크기 불일치·내려받기 실패면 전송 중단, 첫 `replace` 는 `control.firstReplaceConfirmed` 없으면 안 보냄, 실패 재시도 3회, 열쇠가 로그에 안 찍힘. («모의는 한 걸음 앞에서 멈춘다» — 가짜가 «null 먼저» 같은 현실의 불편한 동작도 하게 한다.)
 - `signboard-rules` — 규칙 만들개가 `signboard` 를 `MGR` 로 잠그고, 지우기를 막고, `allowTop`·`PENDING` 등록부에 올라 있다.
 - `signboard-ontology` — `PROGRAMS.signboard`·`READ_ADAPTERS.signboard_core`·`TERMS.SignboardAd`·`writeContracts` 가 있고 `enter.html`·`pu-appbar.js` 타일과 짝이다.
 - 뮤테이션: 위 검사가 «실제로 깨지는지» 일부러 망가뜨려 확인한다(앵커는 유일하게, CRLF/LF 주의).
@@ -216,3 +218,20 @@ M1·M2 는 기계 없이 끝낼 수 있다. M3 만 대표님 준비물이 필요
 - 동영상 상한(가안 50MB)과 장비 저장공간
 - CLI vs REST (§6.4) — 계획서에서 속도로 결정
 - 전광판 해상도와 비율 — 미리보기 비율에 쓴다. 장비를 읽어야 안다. 그 전에는 **128×64**(灰度 문서 예시 값)를 «자리표시»로만 쓰고 이 값을 확정값으로 취급하지 않는다 [확인 필요]
+
+## 14. 구현 계획 단계에서 보정된 점 (2026-10-12)
+
+구현을 «실제로 돌려 보며»(임시 작업폴더에서 검사 전체·브라우저 확인·가짜 장비·가짜 firebase CLI) 달라진 것이다. 앞 절과 다르면 **이 절이 이긴다**(본문도 함께 고쳤다).
+
+| # | 바뀐 것 | 까닭 |
+|---|---|---|
+| 1 | 화면은 «탭 셋 + 편집 상자»(광고 만들기를 탭에서 상자로) | 폰에서 목록과 편집을 오가기 쉽고, 한 화면에 한 가지 일 |
+| 2 | 사진·동영상의 `md5` 를 저장하지 않는다 — 심부름꾼이 계산 | 브라우저(SubtleCrypto)에 MD5 가 없다. 크기 대조로 내려받기 오류를 거른다 |
+| 3 | 첫 전송 허락은 `signboard/state` 가 아니라 **`signboard/control`**(포털이 씀) | `state` 는 심부름꾼만 쓰는 자리여야 «쓰는 사람이 갈라진다». 규칙·온톨로지 쓰기 계약 4개: ads·published·history·control |
+| 4 | 창고 규칙은 `okImage()` 재사용 + `okSignVideo()` 추가, 지우기 금지 | 같은 숫자를 새로 적으면 배포 검사(`storage-rules-deploy.test`)가 엉뚱한 칸을 조인다 — 그것을 «보조 함수 한 곳»으로 모았다 |
+| 5 | 심장박동은 5분마다, 20분 넘게 조용하면 포털이 경고 | 매분 쓰면 하루 1,440번 쓴다 |
+| 6 | 시간대끼리 겹치면 막고, 이모지·끝난 기간은 «경고» | 장비가 거절하거나 네모로 나올 수 있다 |
+| 7 | 광고 0건 판은 화면이 막고 심부름꾼도 안 보낸다 | 전광판을 통째로 비우는 사고 방지 |
+| 8 | 날짜 머리글 모양 두 가지(`rfc1123`·`java`)를 설정으로 둔다 | 공식 문서 예시는 RFC 1123, 공식 파이썬 SDK 는 자바식이다 — 장비 앞에서 확인(§7) |
+| 9 | 실시간DB 규칙 미리보기: «새로 생기는 규칙 1개(/signboard), 바뀜 0, 사라짐 0». 창고 미리보기는 `erp_img` 도 «새로 생김»으로 나온다 | `erp_img` 는 다른 방이 만들개에 넣어 둔 것이 아직 콘솔에 없다 — 올릴 때 함께 나간다고 보고서에 밝힌다 |
+| 10 | «올리기»는 **올린 판을 먼저, 올린 기록은 그 뒤에** 쓴다(처음 설계는 반대) | 기록을 먼저 쓰면 동시에 누른 두 사람 가운데 늦은 쪽이 **남의 기록을 덮어쓴다**(가짜 DB 로 재현해 확인). 판을 먼저 쓰면 늦은 쪽은 판 번호 비교에서 접힌다. 기록 쓰기만 실패하면 지금 판은 올린 판에서 직접 그려 준다 |
