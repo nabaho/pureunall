@@ -1562,7 +1562,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
               <!-- 마우스로 끌어다 놓아도 올라간다 — 단추이면서 드롭존이다 -->
               <button class="btn primary rc-drop-btn" id="rcDrop" style="font-weight:700" title="끌어다 놓아도 됩니다 · HWP·HWPX·PDF·DOCX">📄 양식 올리기 <span class="rc-drop-sub">끌어다 놓아도 됩니다 · HWP·HWPX·PDF·DOCX</span></button>
               <input type="file" id="rcFile" accept=".pdf,.hwp,.hwpx,.docx" style="display:none">
-              <select class="tb-select" id="rhModeSel" onchange="rhSetDomain(this.value)" title="어느 보관함에 저장할지">
+              <select class="tb-select" id="rhModeSel" onchange="_rhModeTouched=true;rhSetDomain(this.value)" title="어느 보관함에 저장할지">
                 <option value="resume">📄 이력서로 저장</option><option value="profile">👤 프로필로 저장</option>
                 <!-- 회의·비용관리 › ✍️ 서류 만들기로 들어오면 이것이 골라진다(nav_to) -->
                 <option value="feedoc">🧾 비용 서류로 저장</option>
@@ -6827,6 +6827,26 @@ function rhSetDomain(domain){
 /* 「💾 완성본 생성」이 담을 보관함 — 올리기 줄의 고르개(rhModeSel)를 «누르는 그 순간» 읽는다.
    ⚠ 전에는 화면을 열 때 이력서로 묶어 두어, 「👤 프로필로 저장」을 골라도 이력서 보관함에 담겼다. */
 function rhSaveDomain(){ var v=(document.getElementById('rhModeSel')||{}).value; return (v&&DOMAINS[v])?v:'resume'; }
+/* ★ 협회 비용 서류는 «기본으로» 회의·비용관리 저장 서류로 (대표 지시 2026-10-12 「협회서류 위 내용 보고 기본적으로 회의 쪽으로 보내라」).
+   서류 «내용»을 본다 — 지급확인서·상담비·강사비·원고료·지급금액처럼 돈을 받았다는 확인 서류면 비용 서류.
+   ⚠ 사람이 보관함 고르개를 직접 바꿨으면 그것이 이긴다(_rhModeTouched). 이력서·프로필처럼 보이는 서류는 그대로 둔다. */
+var _rhModeTouched=false;
+var RH_FEE_WORDS=/지급\s*확인서|노무\s*상담비|상담비|강사비|강사료|원고료|지급\s*금액|비용\s*지급/;
+async function rhAutoSaveDomain(v){
+  v=v||rhSaveDomain();
+  if(v!=='resume' || _rhModeTouched) return v;
+  try{
+    var 글=String((_rhDoc&&_rhDoc.name)||'');
+    if(_rhDoc && _rhDoc.bytes && /^hwpx$/i.test(_rhDoc.ext||'')){
+      await _ensureJSZip();
+      var z=await JSZip.loadAsync(_rhDoc.bytes);
+      var ns=Object.keys(z.files).filter(function(n){ return /^Contents\/section\d+\.xml$/i.test(n); });
+      for(var i=0;i<ns.length;i++){ 글+=' '+(await z.file(ns[i]).async('string')).replace(/<[^>]+>/g,' '); }
+    }
+    if(RH_FEE_WORDS.test(글)){ toast('💰 지급 확인 서류라 «회의·비용관리 › 저장 서류»로 담습니다 (이력서로 담으려면 위 고르개를 바꾸세요)', 6000); return 'feedoc'; }
+  }catch(e){ console.warn('비용 서류 판정', e); }
+  return v;
+}
 /* ⚠ renderRhDocList 를 되살리지 말 것 — 보관함을 그리는 코드는 renderDocStore «하나»다.
    전에는 같은 자료를 두 코드가 서로 다른 모양으로 그렸고, 저장해도 한쪽이 갱신되지 않아
    「저장했는데 보관함에 안 보인다」가 됐다. 화면을 합쳤으니 그릴 곳도 하나다. */
@@ -8721,7 +8741,7 @@ function initDocCreate(domain){ const cfg=DOMAINS[domain].create; const drop=doc
     });
   }
   const fillBtn=document.getElementById(cfg.fillBtn); if(fillBtn) fillBtn.onclick=()=>toggleFillPanel(domain);
-  const saveBtn=document.getElementById(cfg.saveBtn); if(saveBtn) saveBtn.onclick=()=>openDocSaveModal(cfg===DOMAINS.resume.create?rhSaveDomain():domain,'generate');
+  const saveBtn=document.getElementById(cfg.saveBtn); if(saveBtn) saveBtn.onclick=async ()=>openDocSaveModal(cfg===DOMAINS.resume.create?await rhAutoSaveDomain(rhSaveDomain()):domain,'generate');
   renderFormLib();
 }
 
