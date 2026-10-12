@@ -1355,11 +1355,30 @@ exports.rehabWatch = functions
     const first = !(await root.child("runs").limitToFirst(1).once("value")).exists();
     const noBankruptcyYet = RehabWatch.DEFAULT_KINDS.indexOf("bankruptcy") >= 0 && !Object.keys(existing).some((k) => existing[k] && existing[k].kind === "bankruptcy");
     const since = new Date(nowMs + 9 * 3600e3 - ((first || noBankruptcyYet) ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면(파산을 처음 모을 때도) 한 달 치
+    /* ★ 2026-10-12 아침 수집이 15개 법원 전부 «fetch failed» 로 끝났다(160초, 한 건도 못 읽음) — 원인이 안 남아 알 수 없었다.
+       ① 오류에 진짜 까닭(err.cause: ETIMEDOUT·ENOTFOUND·ECONNRESET …)을 붙인다
+       ② 접속 자체가 막힌 것은 한 번 더 시도한다(일시 장애)
+       ③ 연달아 4번 접속이 안 되면 «출처가 닫혔다»고 보고 나머지 요청을 바로 포기한다 — 540초를 헛되이 쓰지 않으려고 */
+    let netFails = 0;
     const post = async (u, body) => {
-      const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
-        headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
+      if (netFails >= 4) throw new Error("출처 접속 불가(앞선 요청 연속 실패)");
+      let last;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+            headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
+          netFails = 0;
+          if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { noRetry: true });
+          return await r.json();
+        } catch (err) {
+          if (err && err.noRetry) throw err;
+          netFails++;
+          const why = err && err.cause ? String(err.cause.code || err.cause.message || err.cause) : "";
+          last = new Error(String((err && err.message) || err) + (why ? " (" + why + ")" : ""));
+          if (attempt < 2) await new Promise((ok) => setTimeout(ok, 2000));
+        }
+      }
+      throw last;
     };
     const result = await RehabWatch.run({ post, existing, sinceYmd: since, nowMs,
       wait: () => new Promise((ok) => setTimeout(ok, 800)) });
