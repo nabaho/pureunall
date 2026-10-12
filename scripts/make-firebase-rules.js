@@ -759,6 +759,24 @@ rules.scal_docs = {
   }
 };
 
+/* 컨설팅보고서 앱 — 사업 종결 표시 (2026-10-12, 설계 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md)
+   scal_bizState/{이알피 컨설팅 사업 코드} = { closedFrom:'YYYY'(이 해부터 종결), closedAt?, reason?, by?, at } — 되돌림은 closedFrom '9999' 표시(.set) — 지우지 않는다.
+   ★ 읽기는 직원, 쓰기는 관리자·위임관리인(MGR) — 사업 하나를 «종결 사업»으로 옮기는 일이라 직원 손에 두지 않는다.
+   ★ 화면 모듈 REASON_MAX 40(js/pu-gov-report-nav.js)과 같은 값 — tests/gov-report-rules.test.js. 게시는 합친 뒤. */
+rules.scal_bizState = {
+  '.read': LOGIN,
+  $code: {
+    '.write': MGR,
+    '.validate': "$code.length <= 40 && $code.matches(/^[A-Za-z0-9_-]+$/) && newData.hasChildren(['closedFrom','at'])",
+    closedFrom: { '.validate': "newData.isString() && newData.val().matches(/^[0-9]{4}$/)" },
+    closedAt:   { '.validate': SCAL_DOCS_DAY },
+    reason:     { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    by:         { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    at:         { '.validate': 'newData.isNumber()' },
+    $other:     { '.validate': false }
+  }
+};
+
 /* ══ 백업 ══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).
      전에는 전 직원이 쓸 수 있었다 — 직원 한 사람의 실수나 계정 하나가

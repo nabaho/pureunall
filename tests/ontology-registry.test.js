@@ -143,3 +143,19 @@ test('푸른ERP 화면이 등록 현황과 구멍을 실제로 보여 준다', (
     has(new RegExp(code + "\\s*:\\s*'"), '★ ' + code + ': 화면에 우리말 이름표가 없습니다');
   });
 });
+
+test('scal_bizState(컨설팅보고서의 사업 종결 표시)는 컨설팅보고서(govreport) 하나만 소유한다 · 쓰는 자리도 선언돼 있다', () => {
+  const owners = Object.keys(O.PROGRAMS).filter(k => (O.PROGRAMS[k].primaryRoots || []).some(r => r.split('/')[0] === 'scal_bizState'));
+  assert.deepEqual(owners, ['govreport'], '주인은 컨설팅보고서 하나');
+  const seen = O.auditRoots(['scal_bizState', 'scal_docs']);
+  assert.deepEqual(seen.unowned, [], 'scal_bizState 가 주인 없는 자리로 잡히지 않는다');
+  assert.deepEqual(seen.doubleOwned.filter(d => /scal_bizState/.test(d.root)), []);
+  const g = O.PROGRAMS.govreport;
+  const wc = g.writeContracts.filter(w => w.path === 'scal_bizState/{code}');
+  assert.equal(wc.length, 1, '쓰기 계약 한 줄');
+  assert.ok(g.entityTypes.indexOf(wc[0].entityType) >= 0, '쓰기 계약의 개체 종류는 이 프로그램이 다루는 종류');
+  assert.ok(O.TERMS.entityTypes[wc[0].entityType], '사전에 있는 개체 종류');
+  /* 화면이 실제로 부르는 자리(이름 표 GR_BIZ.node)가 등록된 자리와 같다 */
+  const html = src('gov-report.html');
+  assert.match(html, /var GR_BIZ=\{node:'scal_bizState'/);
+});
