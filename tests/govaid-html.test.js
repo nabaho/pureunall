@@ -160,3 +160,10 @@ test('편집 창 — 예/아니오는 한 칸에 여럿(격자), 숫자 조건�
   const seg = ed.slice(ed.indexOf('id="eHcMin"'), ed.indexOf('id="eSdMin"'));
   assert.ok(seg.length > 0 && seg.indexOf('class="k"') < 0, '근로자·업력·매출 감소 사이에 다른 줄 이름표가 끼었다(한 줄이 아니다)');
 });
+
+test('불러오기는 govaid 를 통째로 읽지 않는다 — 공고 함(notices)이 커져도 앱을 열 때 내려받지 않게', () => {
+  const f = fnBody('reload');
+  assert.doesNotMatch(f, /fbDb\.ref\('govaid'\)\.once/, 'govaid 전체를 읽는다');
+  ['programs', 'prospects', 'extras', 'reviews'].forEach((k) => assert.match(f, new RegExp("govaid/" + k), k + ' 를 따로 읽지 않는다'));
+  assert.doesNotMatch(f, /govaid\/notices/, '열 때마다 공고 함을 읽는다');
+});

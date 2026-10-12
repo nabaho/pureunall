@@ -51,3 +51,15 @@ test('열쇠와 레코드 id 가 어긋나면 막는다', () => {
   assert.equal(ev(rv, { newData: { id: 'co_c1__gp-r71' }, $k: 'co_c1', $p: 'gp-r71' }), true);
   assert.equal(ev(rv, { newData: { id: 'co_c2__gp-r71' }, $k: 'co_c1', $p: 'gp-r71' }), false);
 });
+
+/* 매일 공고 감시(2026-10-12) — notices 는 서버가 쌓고 직원은 «처리»만 적는다(같은 잣대·지우기 금지·열쇠=id). noticeLast 는 서버만 */
+test('공고 함(notices) — 재직 직원 쓰기, 지우기 금지, 열쇠와 id 일치 · 감시 기록(noticeLast)은 아무도 못 쓴다', () => {
+  assert.ok(G.notices && G.notices.$id, 'rules.govaid.notices 가 없다');
+  const w = G.notices.$id['.write'];
+  assert.equal(ev(w, { auth: auth('staffUid'), newData: { id: 'PBLN_1' } }), true);
+  assert.equal(ev(w, { auth: auth('retiredUid'), newData: { id: 'PBLN_1' } }), false);
+  assert.equal(ev(w, { auth: auth('staffUid'), newData: null }), false);
+  assert.equal(ev(G.notices.$id['.validate'], { newData: { id: 'PBLN_1' }, $id: 'PBLN_1' }), true);
+  assert.equal(ev(G.notices.$id['.validate'], { newData: { id: 'PBLN_2' }, $id: 'PBLN_1' }), false);
+  assert.equal(G.noticeLast['.write'], false);
+});
