@@ -1389,6 +1389,150 @@
       + '<tr><td style="height:20px;line-height:20px;font-size:1px;">&nbsp;</td></tr>';
   }
 
+  /* ═══════════════════════════════════════════════════════════════════════════
+     핵심판 — 메일은 «이번 주 꼭 알아야 할 3가지»만 (대표 지시 2026-10-13)
+     ═══════════════════════════════════════════════════════════════════════════
+     「뉴스레터에 너무 불필요한 정보가 많으면 기업에서는 전혀 참고를 안할 것 같다 … 핵심만 … 쉽고 직관적으로」
+     → 목업 승인(대표 「네」). 데이터·고르는 기준은 js/pu-news-core.js 의 «핵심» 함수들이다.
+
+     ★ 언제 이 판이 되나 — 회차에 핵심 카드가 있고 ① 웹 전문이 «아니고» ② 요약판이 아니고
+       ③ 「전체 소식 보기」가 갈 곳(웹주소)이 있을 때. 하나라도 어긋나면 «지금처럼 전문판»이다.
+       그래서 안 고른 주에도, 추적 주소를 안 적은 시험 환경에서도 편지가 깨지지 않는다.
+     ★ 호출하는 쪽은 안 바뀐다 — 메일은 옵션.웹 이 없고 웹 전문은 웹:true 다. 이미 보낸 옛 회차는 핵심 칸이
+       없으니 «그때 나간 그대로» 전문판이다.
+     ⚠ 메일은 flex·grid·<style> 이 지워진다(발송기). 카드는 «표»로 짠다 — 자료 카드가 셋씩 표인 것과 같다.
+       폰 쌓기는 미리보기에서만 듣는 반응 규칙(쌓을칸)이다.
+     ⚠ 목업의 글(제목·설명 따위)은 «예시»였다. 여기서는 사람이 확인한 카드 글만 그린다 — 지어 넣는 글이 없다. */
+  function 핵심밖갈래말(셈) {
+    var 이름 = { 기사: '기사', 자료: '정부·기관 자료', 판례: '판례·해석', 법령: '법령' };
+    var 차례 = ['기사', '자료', '판례', '법령'];
+    var 갈래별 = (셈 && 셈.갈래별) || {};
+    var 말 = [];
+    차례.forEach(function (갈) { if (갈래별[갈]) 말.push((이름[갈] || 갈) + ' ' + 갈래별[갈]); });
+    Object.keys(갈래별).forEach(function (갈) {
+      if (차례.indexOf(갈) < 0 && 갈래별[갈]) 말.push(갈 + ' ' + 갈래별[갈]);
+    });
+    return 말.join(' · ');
+  }
+
+  /* 카드 한 장 — 위(번호·딱지) · 제목 · 설명 · 「우리 회사는?」 · 시기 · 자세히 보기.
+     ⚠ 눌러서 갈 곳은 «카드의 원문», 없으면 «전체 소식 보기» 주소다. 글자를 눌러도 단추와 같은 곳이다(_글링크). */
+  function 핵심카드(c, 번호, 웹주소) {
+    var 갈곳 = href(c.링크) || href(웹주소);
+    var 위 = '<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>'
+      /* 번호 동그라미 — 아웃룩은 둥근 모서리를 모른다(네모로 나온다). 그래도 읽힌다. */
+      + '<td width="26" height="26" align="center" valign="middle" bgcolor="' + 색.갈 + '"'
+      + ' style="width:26px;height:26px;background-color:' + 색.갈 + ';border-radius:13px;'
+      + 'font-size:14px;font-weight:bold;line-height:26px;color:#ffffff;font-family:' + 폰트 + ';">' + 번호 + '</td>'
+      + '<td valign="middle" style="padding-left:8px;"><span style="font-size:11.5px;font-weight:bold;line-height:1.4;'
+      + 'color:' + 색.딱지 + ';border:1px solid ' + 색.표지테 + ';background-color:' + 색.살구 + ';padding:1px 7px;'
+      + 'font-family:' + 폰트 + ';">' + esc(c.종류) + '</span></td></tr></table>';
+    var 몸 = '<div style="margin:10px 0 0 0;font-size:17px;font-weight:bold;line-height:1.45;'
+      + 'color:' + 색.짙은갈 + ';font-family:' + 폰트 + ';">' + _글링크(갈곳, esc(c.제목), 색.짙은갈) + '</div>';
+    if (c.설명) {
+      몸 += '<div style="margin:8px 0 0 0;font-size:13.5px;line-height:1.7;color:' + 색.글 + ';'
+        + 'font-family:' + 폰트 + ';">' + esc(c.설명) + '</div>';
+    }
+    /* 「우리 회사는?」 — 대상·할 일이 «있는 것만» 한 줄씩. 둘 다 없으면 칸 자체를 안 그린다(빈 상자 금지). */
+    var 줄 = [];
+    if (c.대상) 줄.push('<b style="color:' + 색.딱지 + ';">대상</b>&nbsp; ' + esc(c.대상));
+    if (c.할일) 줄.push('<b style="color:' + 색.딱지 + ';">할 일</b>&nbsp; ' + esc(c.할일));
+    if (줄.length) {
+      /* ⚠ margin-top 이 아니라 margin 약식이다 — 발송기 허용 목록(STYLE_OK)에는 margin 과 margin-left 만 있다.
+           margin-top 은 미리보기에서는 보이지만 «실제 메일에서는 조용히 지워져» 간격이 사라진다. */
+      몸 += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:12px 0 0 0;">'
+        + '<tr><td bgcolor="' + 색.상자 + '" style="background-color:' + 색.상자 + ';border-left:3px solid ' + 색.장식 + ';'
+        + 'padding:9px 11px;font-size:13px;line-height:1.7;color:' + 색.글 + ';font-family:' + 폰트 + ';">'
+        + '<div style="font-size:11px;font-weight:bold;line-height:1.5;color:' + 색.딱지 + ';">우리 회사는?</div>'
+        + 줄.join('<br>') + '</td></tr></table>';
+    }
+    if (c.때) {
+      몸 += '<div style="margin:12px 0 0 0;font-size:12.5px;font-weight:bold;line-height:1.5;color:' + 색.남색 + ';">'
+        + '시기 · ' + esc(c.때) + '</div>';
+    }
+    var 아래 = 갈곳
+      ? '<div style="border-top:1px dashed ' + 색.줄 + ';padding-top:9px;font-size:13px;font-weight:bold;line-height:1.5;">'
+        + '<a href="' + 갈곳 + '"' + 새탭 + ' style="color:' + 색.남색 + ';text-decoration:none;">자세히 보기 ▸</a></div>'
+      : '';
+    /* ⚠ 첫 줄에 height="100%" — 키가 다른 카드끼리 «자세히 보기»가 바닥에 서게 한다(표가 못 맞추는 자리를 이것이 밀어 준다). */
+    return '<table role="presentation" width="100%" height="100%" cellpadding="0" cellspacing="0" border="0"'
+      + ' style="border:1px solid ' + 색.줄 + ';border-top:4px solid ' + 색.갈 + ';background-color:#ffffff;">'
+      + '<tr><td valign="top" height="100%" style="padding:16px 16px 6px 16px;">' + 위 + 몸 + '</td></tr>'
+      + '<tr><td valign="bottom" style="padding:0 16px 14px 16px;">' + (아래 || '&nbsp;') + '</td></tr></table>';
+  }
+
+  /* 띠 · 한 줄 안내 · 카드 줄 · 「그 밖의 소식」 띠 — «한 화면»이 목표다. */
+  function 핵심판속(카드들, 안, 웹주소) {
+    var n = 카드들.length;
+    var 말 = '이번 주 꼭 알아야 할 ' + n + '가지';
+    var 띠 = '<tr><td style="padding:14px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
+      + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="' + 색.갈 + '"'
+      + ' style="background-color:' + 색.갈 + ';"><tr><td align="center" style="padding:11px 14px;font-size:15px;'
+      + 'font-weight:bold;letter-spacing:0.5px;line-height:1.4;color:#ffffff;font-family:' + 폰트 + ';">'
+      + esc(말) + '</td></tr></table></td></tr>';
+    var 안내 = '<tr><td style="padding:16px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;font-size:15px;line-height:1.6;'
+      + 'color:' + 색.글 + ';font-family:' + 폰트 + ';">바쁘시면 <b style="color:' + 색.남색 + ';">이 '
+      + n + '가지만</b> 보셔도 됩니다. '
+      + '<span style="color:' + 색.흐린글 + ';">(읽는 시간 1분)</span></td></tr>';
+    /* 카드 칸 — 한 장이면 전체 폭, 둘이면 반반, 셋이면 삼등분. 폭을 «세어서» 나눈다(셋 고정이면 두 장일 때 한쪽이 빈다). */
+    var 몫 = Math.floor(100 / n);
+    var 칸들 = 카드들.map(function (c, i) {
+      return '<td class="' + 쌓을칸 + '" width="' + 몫 + '%" valign="top" style="width:' + 몫 + '%;padding:0 7px 12px 7px;">'
+        + 핵심카드(c, i + 1, 웹주소) + '</td>';
+    }).join('');
+    var 줄 = '<tr><td style="padding:12px 15px 0 15px;">'
+      /* ★ height="1" — 표는 «내용만큼만» 늘어나는데, 이 한 줄이 있어야 칸의 키가 «줄 높이»로 정해져 카드 속 표(height:100%)가
+           제 칸을 가득 채운다. 없으면 키가 다른 카드끼리 아래 테두리와 「자세히 보기」가 제각각이다(실측 354/331/353px → 모두 354). */
+      + '<table role="presentation" width="100%" height="1"'
+      + ' cellpadding="0" cellspacing="0" border="0"><tr>' + 칸들 + '</tr></table></td></tr>';
+    /* 그 밖의 소식 — 카드로 올린 건은 뺀 수. 전문(웹)은 그대로 있다는 말이 이 띠의 일이다. */
+    var 셈 = Core.핵심밖건수(안, 카드들);
+    var 가는 = href(웹주소);
+    var 밖 = '';
+    if (가는) {
+      var 갈래말 = 핵심밖갈래말(셈);
+      var 앞 = 셈.밖 > 0
+        ? '<b>그 밖의 소식 ' + 셈.밖 + '건</b>'
+          + (갈래말 ? '<br><span style="font-size:12px;color:' + 색.흐린글 + ';">' + esc(갈래말) + ' — 필요하신 분만 보세요</span>' : '')
+        : '<b>전체 소식은 웹에서 보실 수 있습니다</b>';
+      밖 = '<tr><td style="padding:6px ' + 옆여백 + 'px 0 ' + 옆여백 + 'px;">'
+        + '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="' + 색.상자 + '"'
+        + ' style="background-color:' + 색.상자 + ';border:1px solid ' + 색.가는줄 + ';"><tr>'
+        /* ⚠ 칸(td)에 padding 을 주지 않고 «안쪽 div» 가 준다 — 폰에서 칸이 width:100% 로 쌓일 때 칸의 padding 이 더해져
+             8px 넘치던 것(기존 자료 카드가 그렇다)을 새로 만든 곳에서는 안 만든다. */
+        + '<td class="' + 쌓을칸 + '" valign="middle" style="font-size:13.5px;line-height:1.6;'
+        + 'color:' + 색.글 + ';font-family:' + 폰트 + ';"><div style="padding:13px 16px;">' + 앞 + '</div></td>'
+        + '<td class="' + 쌓을칸 + '" align="right" valign="middle"><div style="padding:13px 16px;text-align:right;">'
+        + '<a href="' + 가는 + '"' + 새탭 + ' style="display:inline-block;background-color:' + 색.남색 + ';color:#ffffff;'
+        + 'font-size:14px;font-weight:bold;line-height:1.4;padding:10px 20px;text-decoration:none;'
+        + 'font-family:' + 폰트 + ';">전체 소식 보기 ▸</a></div></td></tr></table></td></tr>';
+    }
+    return 띠 + 안내 + 줄 + 밖;
+  }
+
+  /* 평문 몫 — 서식을 못 읽는 프로그램에게. ⚠ 서식(핵심판속)과 «같은 내용»이어야 한다(한쪽만 고치면 받는 분마다 다른 편지). */
+  function 핵심평문(카드들, 안, 웹주소) {
+    var 줄 = ['이번 주 꼭 알아야 할 ' + 카드들.length + '가지', ''];
+    카드들.forEach(function (c, i) {
+      줄.push((i + 1) + '. [' + c.종류 + '] ' + c.제목);
+      if (c.설명) 줄.push('   ' + c.설명);
+      if (c.대상) 줄.push('   · 대상: ' + c.대상);
+      if (c.할일) 줄.push('   · 할 일: ' + c.할일);
+      if (c.때) 줄.push('   · 시기: ' + c.때);
+      if (c.링크) 줄.push('   ▸ 자세히: ' + c.링크);
+      줄.push('');
+    });
+    var 셈 = Core.핵심밖건수(안, 카드들);
+    if (웹주소) {
+      var 갈래말 = 핵심밖갈래말(셈);
+      줄.push(셈.밖 > 0 ? ('그 밖의 소식 ' + 셈.밖 + '건' + (갈래말 ? ' (' + 갈래말 + ')' : '')) : '전체 소식은 웹에서 보실 수 있습니다');
+      줄.push('▸ 전체 소식 보기: ' + 웹주소);
+      줄.push('');
+    }
+    return 줄;
+  }
+
+
   /* ══════════════════════════════════════════════════════════════════════
      편지 한 통 — 서식 몫
      ══════════════════════════════════════════════════════════════════════ */
@@ -1451,6 +1595,12 @@
     var 웹주소 = (밑 && 회열) ? (밑 + '/newsView?i=' + encodeURIComponent(회열)) : '';
     if (!웹주소) 요약 = false;
 
+    /* ★★ 핵심판인가 (대표 지시 2026-10-13) — 회차에 핵심 카드가 있고, 웹 전문이 «아니고», 요약판이 아니고,
+       「전체 소식 보기」가 갈 곳(웹주소)이 있을 때만. 하나라도 어긋나면 «지금처럼 전문판»이다.
+       ⚠ 옵션.핵심판 === false 로 끌 수 있다(전문 그대로 보내야 할 때). 이미 보낸 옛 회차는 핵심 칸이 없어 그대로다. */
+    var 핵카드 = Core.핵심다듬기(d.핵심);
+    var 핵심판 = !요약 && !웹 && 핵카드.length > 0 && !!웹주소 && !(옵션 && 옵션.핵심판 === false);
+
     /* ★★ 건«마다» 자리표를 붙인다 — 요약의 줄과 전문의 그 건을 잇는 끈이다.
        ⚠ «꼭지 안의 차례»로 번호를 매긴다. 전문은 갈래(자료·판례·기사)로 갈라
          그리므로 그린 차례로 세면 요약의 셋째 줄이 전문의 첫 칸을 가리키게 된다.
@@ -1493,6 +1643,7 @@
          그래서 이 목록을 여기서 채워야 한다. 순서도 이 차례 그대로다(번호로 짝짓는다). */
     var 그린꼭지들 = [];
     Core.꼭지들.forEach(function (g) {
+      if (핵심판) return;                /* 핵심판은 꼭지를 안 그린다 — 아래에서 카드로 */
       if (요약) {
         var 것들요 = 안[g.키] || [];
         var 글요 = (g.갈래 === '우리글') ? d.우리글 : '';
@@ -1526,6 +1677,7 @@
       그린것++;
     });
     if (요약) 속 += 요약두칸(요약칸들);
+    if (핵심판) { 속 += 핵심판속(핵카드, 안, 웹주소); 그린것 = 핵카드.length; }
 
     /* ★ 실을 것이 하나도 없으면 «만들지 않는다». 빈 뉴스레터를 보내면
        그 주 한 통이 통째로 빈 껍데기가 된다 — 안 보내느니만 못하다.
@@ -1550,7 +1702,7 @@
       /* ★ 요약판은 «신문 머리» 하나로 연다 (대표 결정 2026-09-17).
            큰 사진 띠(184px)와 차림표(85px)는 요약에서 걷었다 — 차림표는 메일에서
            눌러도 아무 데도 안 간다. 전문 보기 쪽은 그대로 둔다(거기서는 붙잡히는 줄이다). */
-      + 요약머리(회, 설) + 인사그린것 + (요약 ? '' : 차림표(그린꼭지들))
+      + 요약머리(회, 설) + 인사그린것 + ((요약 || 핵심판) ? '' : 차림표(그린꼭지들))
       + 속 + 지역칸 + 꼬리(설, 범위, 더한것)
       + '</table></td></tr></table>';
 
@@ -1577,7 +1729,8 @@
       /* ⚠ 평문에도 «같은 ▶ 주소»가 가야 한다 — 위에서 지은 인사자료를 넘긴다.
            회차자료를 그대로 넘기면 평문만 ▶ 가 빠진다(서식·평문이 어긋난 자리가 또 생긴다). */
       본문: 평문짓기(인사자료 === d.인사 ? 회차자료 : Object.assign({}, d, { 인사: 인사자료 }),
-        설정, (옵션 && 옵션.지역) || (미리 ? '전국' : '')),
+        설정, (옵션 && 옵션.지역) || (미리 ? '전국' : ''),
+        핵심판 ? { 카드들: 핵카드, 안: 안, 웹주소: 웹주소 } : null),
       회차: 회,
       꼭지수: 그린것,
       /* 서버가 «번호»로 찾을 목록. 보낼 때 회차에 함께 담아 두어야 클릭이 통한다. */
@@ -1590,7 +1743,7 @@
      ══════════════════════════════════════════════════════════════════════
      ⚠ 서버가 서식에서 «알아서» 뽑게 두면 표 뼈대가 글자로 쏟아진다.
        여기서 사람이 읽을 모양으로 따로 짓는다. */
-  function 평문짓기(회차자료, 설정, 받는지역) {
+  function 평문짓기(회차자료, 설정, 받는지역, 핵심판자료) {
     var d = 회차자료 || {};
     var 회 = d.회차 || (Core.회차(d.날짜 || new Date().toISOString().slice(0, 10)));
     /* ⚠ 서식을 못 읽는 프로그램이 보는 몫이다 — 여기서도 같이 걸러야 한다.
@@ -1620,7 +1773,12 @@
       줄.push('');
     }
 
+    /* ★ 핵심판 — 서식(핵심판속)과 «같은 내용»이다. 한쪽만 고치면 서식을 못 읽는 프로그램으로 받으신 분에게 다른 편지가 간다. */
+    if (핵심판자료) {
+      핵심평문(핵심판자료.카드들, 핵심판자료.안, 핵심판자료.웹주소).forEach(function (x) { 줄.push(x); });
+    }
     Core.꼭지들.forEach(function (g) {
+      if (핵심판자료) return;            /* 핵심판은 꼭지를 안 그린다 — 위에서 카드로 적었다 */
       /* ⚠ 우리글 꼭지는 «글 다음에 자료»가 온다 (2026-09-06). 예전에는 글만 적고
            돌아서서, 서식 못 읽는 프로그램에서는 연구자료가 통째로 빠졌다.
            여기서 return 하지 않고 아래 자료 그리기로 «이어» 간다. */
