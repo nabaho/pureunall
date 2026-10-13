@@ -12372,6 +12372,11 @@ const GONE_FOLDER_RE = /업체\s*종료/;
 const GONE_RANK = { nts:0, nps:1, dom:2, bnc:3, alive:8, einone:9 };
 const GONE_SUPPORT = { alive:1, einone:1 };
 /* 공단 근거 — 회사 하나(o)의 extra 에서 (순수 로직) */
+/* 보여 줄 차례 (순수 로직) — r.hint 줄은 🟢 를 맨 앞에. 기록 차례(r.ev·지문)는 그대로 둔다 */
+function goneShowEv(r){
+  if(!r || !r.hint) return (r && r.ev) || [];
+  return r.ev.filter(x => x.t === 'alive').concat(r.ev.filter(x => x.t !== 'alive'));
+}
 function gonePubEv(o){
   const ex = (o && o.extra) || {}, out = [];
   const np = ex.nps || {};
@@ -12382,7 +12387,9 @@ function gonePubEv(o){
   const ei = ex.ei;
   if(ei && ei.rows){
     const n = Number(ei.gy) || Number(ei.sj) || 0;
-    if(n > 0) out.push({ t:'alive', txt:(Number(ei.gy) ? '고용보험' : '산재보험') + ' 상시 ' + n + '명 살아 있음', at:ei.at });
+    /* ⚠ «살아 있다»고 단정하지 않는다 — 공단 자료엔 사업장 소멸 여부 칸이 없다(실측 10/13: 폐업 6곳 모두 사업장이 남아 나왔다).
+       «공단 기록에 남아 있다»까지만 말한다. 번호가 바뀌었는데 보험만 옛 번호로 남은 곳·소멸 신고가 늦은 곳 둘 다 이렇게 보인다. */
+    if(n > 0) out.push({ t:'alive', txt:'4대보험 ' + n + '명 기록 남음', at:ei.at });
   } else if(ei && ei.at){
     out.push({ t:'einone', txt:'4대보험 사업장 없음', at:ei.at });
   }
@@ -12611,6 +12618,8 @@ function bzrNewNo(k){
 function goneOpen(){
   state.goneOn = true; state.goneTab = 'todo'; state.goneSel = {}; state.goneRow = ''; state.gonePage = 1;
   if(typeof loadPubCo === 'function') loadPubCo();      /* 공단 근거 — 기업 상세를 안 거쳐 열어도 */
+  /* 🏛 국세청 근거는 기업 상세(coInfo)에 있다 — 명함 화면에서 바로 열면 아직 안 읽어 「폐업 0」으로 보였다(10/13 실화면) */
+  if(typeof loadCoInfo === 'function') loadCoInfo();
   goneLoad(goneMount);
   goneMount();
 }
@@ -12738,7 +12747,7 @@ function goneHtml(){
             + '<td class="em" style="text-align:right">' + (i + 1) + '</td>'
             + '<td title="' + esc(r.name) + '"><b>' + esc(r.name) + '</b></td>'
             + '<td><span class="gn-lnk" onclick="goneRowToggle(\'' + esc(r.key) + '\')">' + r.cards.length + '장 ›</span></td>'
-            + '<td title="' + esc(r.ev.map(x => x.txt).join(' · ')) + '">' + r.ev.map(tag).join(' ') + '</td>'
+            + '<td title="' + esc(r.ev.map(x => x.txt).join(' · ')) + '">' + goneShowEv(r).map(tag).join(' ') + '</td>'
             + '<td class="em">' + esc(goneDay(r.at)) + '</td>'
             + '<td>' + (r.who ? '<span class="t">' + esc(r.who) + '</span>' : '<span class="em">—</span>') + '</td>'
             + '<td class="act">' + btns(r) + '</td></tr>'
@@ -12748,7 +12757,7 @@ function goneHtml(){
       body += show.map(function(r, i){
         return '<div class="gn-m"><div class="l1">' + (tab === 'done' ? '' : '<input type="checkbox" ' + (sel[r.key] ? 'checked' : '') + ' onclick="goneSel(\'' + esc(r.key) + '\')"> ')
           + '<span class="em">' + (i + 1) + '</span> <b onclick="goneRowToggle(\'' + esc(r.key) + '\')">' + esc(r.name) + '</b> ' + r.cards.length + '장 '
-          + r.ev.map(tag).join(' ') + '</div><div class="l2 act">' + btns(r) + '</div>'
+          + goneShowEv(r).map(tag).join(' ') + '</div><div class="l2 act">' + btns(r) + '</div>'
           + (state.goneRow === r.key ? '<div class="gn-open">' + detail(r) + '</div>' : '') + '</div>';
       }).join('');
     }
@@ -12761,7 +12770,7 @@ function goneHtml(){
     + '<div class="gn-cards">' + card('todo', todo.length, '정리할 것 (회사)') + card('nts', cnt('nts'), '🏛 국세청 폐업·휴업', 'red')
     + card('dom', cnt('dom'), '🌐 메일 도메인 없어짐 · 명함 ' + domCards + '장', 'amb') + card('bnc', cnt('bnc'), '↩ 반송 메일')
     + (cnt('nps') ? card('nps', cnt('nps'), '💳 국민연금 탈퇴', 'red') : '')
-    + card('alive', cnt('alive'), '🟢 번호 바뀐 듯 (4대보험 살아 있음)', 'grn')
+    + card('alive', cnt('alive'), '🟢 4대보험 기록 남음 (번호 바뀐 듯·확인)', 'grn')
     + card('done', doneRows.length, '정리한 것 · 살아 있음') + '</div>' + pubBand
     + '<div class="body">' + body + '</div></div></div>';
 }
@@ -31919,7 +31928,7 @@ function loadCoInfo(cb){
      ⚠ 화면을 다시 그리는 시점은 그대로다 — watchCardMap 이 잔물결을 140ms 로 묶어
        settled 에서 한 번만 부른다. 첫 적재에 4,000번 그리지 않는다. */
   watchCardMap(Store.db.ref(DB_ROOT+'/coInfo'), value => { _coInfo = value || {}; },
-               () => { coListBust(); renderCoSoon(); });
+               () => { coListBust(); renderCoSoon(); if(state.goneOn && typeof goneMount === 'function') goneMount(); });
   cb && cb();
 }
 /* 🗂 공공데이터 공용 자리 구독 (2026-10-11) — 근로자 수·국민연금 숫자는 서버가 pubdata/co 에 쓴다.

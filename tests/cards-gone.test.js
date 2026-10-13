@@ -102,7 +102,7 @@ function box(o) {
   vm.createContext(ctx);
   const line = (re) => { const m = SRC.match(re); assert.ok(m, re); return m[0]; };
   vm.runInContext(['let _gone = ' + JSON.stringify(o.gone || { dom: {}, bounce: {}, done: {} }) + ';',
-    line(/const GONE_FOLDER_RE = [^\n]*/), line(/const GONE_RANK = [^\n]*/), line(/const GONE_SUPPORT = [^\n]*/), sliceFn(SRC, 'function gonePubEv('),
+    line(/const GONE_FOLDER_RE = [^\n]*/), line(/const GONE_RANK = [^\n]*/), line(/const GONE_SUPPORT = [^\n]*/), sliceFn(SRC, 'function gonePubEv('), sliceFn(SRC, 'function goneShowEv('),
     ...['goneKey(', 'goneDay(', 'goneMs(', 'goneRows(', 'goneFolder('].map((h) => sliceFn(SRC, 'function ' + h)),
     sliceFn(SRC, 'async function goneMark('), sliceFn(SRC, 'async function goneMove('), sliceFn(SRC, 'async function goneUndo(')].join('\n'), ctx);
   return ctx;
@@ -185,4 +185,14 @@ test('★★ 국민연금 탈퇴는 혼자서도 줄을 만들고, 4대보험 «
   const rows = JSON.parse(JSON.stringify(vm.runInContext('goneRows()', box({ cos }))));
   assert.deepEqual(rows.map(r => r.name), ['마바테크'], '★★ 탈퇴 줄이 없거나, 「없음」·고르지 않은 사업장이 혼자 줄을 만들었다');
   assert.match(rows[0].ev[0].txt, /국민연금 탈퇴 2025\.07/);
+});
+
+test('★★ 맨 위로 올린 줄은 🟢 가 먼저 보인다 · «살아 있음»이라 단정하지 않는다 (10/13 실화면)', () => {
+  const cos = [{ key: '1230000001', name: '가나상사', extra: { ntsState: '폐업자', ntsEndDt: '2021-01-31', ntsAt: '2026-10-07', ei: { at: 5, rows: [{}], gy: 15, n: 1 } }, cards: [] }];
+  const c = box({ cos });
+  const shown = JSON.parse(JSON.stringify(vm.runInContext('goneShowEv(goneRows()[0])', c)));
+  assert.equal(shown[0].t, 'alive', '★★ 근거 칸이 좁아 🟢 가 … 뒤로 잘린다');
+  assert.doesNotMatch(shown[0].txt, /살아 있/, '★★ 공단 자료엔 소멸 여부가 없다 — «살아 있음»이라 단정했다');
+  assert.equal(JSON.parse(JSON.stringify(vm.runInContext('goneRows()[0].ev', c)))[0].t, 'nts', '기록 차례(지문)는 그대로여야 한다');
+  assert.match(SRC.slice(SRC.indexOf('\nfunction goneOpen('), SRC.indexOf('\nfunction goneOpen(') + 600), /loadCoInfo\(\)/, '★★ 명함 화면에서 열면 국세청 근거가 0 으로 보인다');
 });
