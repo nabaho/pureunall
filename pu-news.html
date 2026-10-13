@@ -311,6 +311,27 @@ input,select,textarea{font-family:inherit;font-size:14px}
 .nowtop .ways .tail{margin-left:0;align-self:center;white-space:nowrap;font-size:11.5px;padding:0 4px}
 .nowtop .ways .tail a{text-decoration:none}
 .nowtop .ways .tail a:hover{text-decoration:underline}
+/* ⭐ 핵심 카드 편집 (대표 지시 2026-10-13) */
+.kcstat{display:flex;gap:8px;padding:9px 12px;font-size:12px;line-height:1.7;border-radius:8px;margin:0 0 10px}
+.kcstat.ok{background:#f0fdf4;border:1px solid #bbf7d0;color:var(--ok)}
+.kcstat.warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
+.kc{border:1px solid var(--line);border-top:3px solid var(--brown);border-radius:8px;padding:10px 12px;margin:0 0 10px;background:#fff}
+.kct{display:flex;align-items:center;gap:6px;margin-bottom:8px;flex-wrap:wrap}
+.kct .sp{flex:1 1 0;min-width:0}
+.kct select{width:auto;max-width:100%;padding:5px 8px;font-size:12.5px;border-radius:7px}
+.kct .x{background:none;border:0;color:var(--faint);cursor:pointer;font-size:14px;padding:0 4px}
+.kct .x:hover{color:var(--bad)}
+.kcn{width:22px;height:22px;border-radius:50%;background:var(--brown);color:#fff;font-size:12px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.kcn.ai{width:auto;min-width:22px;padding:0 6px;border-radius:11px;background:var(--sub);font-size:11px}
+.kcg{display:grid;grid-template-columns:auto minmax(0,1fr) auto minmax(0,1fr);gap:6px 10px;align-items:center}
+.kcg .w{grid-column:2 / -1}
+.kcg label{font-size:11.5px;font-weight:800;color:var(--sub)}
+.kcg textarea{min-height:0}
+.kcands{margin:0 0 6px}
+.kcand{border:1px dashed #d9d2c8;background:var(--brown-soft);border-radius:8px;padding:9px 11px;margin:0 0 8px;font-size:13px;line-height:1.6}
+.kcand .tag{font-size:11px;font-weight:700;color:var(--brown);border:1px solid #d9d2c8;border-radius:3px;padding:0 6px;background:#fff}
+.kcs{font-size:12px;color:var(--sub);margin-top:2px;line-height:1.6}
+@media(max-width:560px){.kcg{grid-template-columns:minmax(0,1fr)}.kcg .w{grid-column:auto}.kcg label{margin-top:4px}.kcg input,.kcg textarea,.kct select{font-size:16px}}
 /* ★ 자리가 모자라면 «글을 줄인다» — 줄은 늘리지 않는다.
      걷는 차례(덜 아까운 것부터): 기간 → 탭의 긴 이름 → 연도 → 손잡이 글 → 「에 보내기」
      → 「실린 것」·탭 아이콘. 걷은 글은 모두 title 로 남는다(올려 보면 나온다).
@@ -1980,6 +2001,8 @@ async function 회차저장(자료){
     /* ★ 명절 인사 — 부정기 칸(2026-09-23). 안 쓴 회차에는 빈 것이 담긴다.
          편지 쪽이 «빈 것을 아예 안 그리므로» 빈 값이 담겨도 해가 없다. */
     인사: 자료.인사 || {},
+    /* ★ 핵심판 카드(나가는 것)와 AI 후보(안 나가는 것) — 대표 지시 2026-10-13. 여기 안 적으면 저장이 안 된다. */
+    핵심: 자료.핵심 || [], 핵심후보: 자료.핵심후보 || [],
     범위: 자료.범위 || App.설정.범위 || '자문중',
     판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
@@ -2393,6 +2416,9 @@ function 이번회차화면(){
          늘 굵게 두면 마흔여덟 주 동안 「안 쓴 칸」이 도드라진다. */''}
     <button class="wt ${App.길==='greet'?'on':''}" onclick="길바꾸기('greet')"
       title="명절 인사"><span class="wi"><span class="ic">🎁 </span><span class="ful">명절 </span>인사${인사담겼나(d) ? ' <b class="dot">●</b>' : ''}</span></button>
+    ${/* ★ 핵심 — 메일에 나가는 «이번 주 꼭 알아야 할 3가지» (대표 지시 2026-10-13). 카드가 있으면 ● 과 장수를 붙인다. */''}
+    <button class="wt ${App.길==='core'?'on':''}" onclick="길바꾸기('core')"
+      title="핵심 — 메일에는 꼭 알아야 할 것만 나갑니다"><span class="wi"><span class="ic">⭐ </span>핵심${Core.핵심있나(d) ? ' <span class="cnt">' + Core.핵심다듬기(d.핵심).length + '</span>' : ''}</span></button>
     <span class="sp"></span>
     ${/* ⚠ 「그대로 전달」을 «없애지는» 않았다 — 지금 그 길로 다니시던 일이다.
          잘 안 쓰는 둘이라 오른쪽 끝 작은 글씨로 둔다. */''}
@@ -2415,6 +2441,8 @@ function 이번회차화면(){
      ⚠ 비워 두면 편지에서 «통째로 사라진다» — 안내에 그 말을 꼭 적는다.
        안 적으면 「한 번 쓰면 매주 나가나?」를 물어보셔야 한다. */''}
   ${App.길==='greet' ? 인사판(d) : ''}
+
+  ${App.길==='core' ? 핵심판화면(d) : ''}
 
   ${App.길==='paste' ? `
    <div class="box" style="margin-top:12px">
@@ -2473,14 +2501,15 @@ function 편지요약(d, r, 갈수있나){
   const 모 = 모음셈();
   const 밀림 = Core.밀린해석수(d.안, App.판례거리 || []);
   const 추적 = String((App.설정||{}).추적밑주소||'').trim();
+  const 핵심켬 = 핵심판켜짐(d);       /* 핵심판이면 메일에 한마디·꼭지 글이 안 나간다 — 그 경고는 걷는다 */
 
   /* 경고 — 조건에 맞는 것만. 없으면 줄 자체를 안 그린다(빈 상자를 그리지 않는다) */
   const 경고 = [];
   if(!갈수있나.ok) 경고.push(`<b>아직 못 보냅니다</b> — ${esc(갈수있나.까닭)}`);
-  if(!String(d.우리글||'').trim())
+  if(!핵심켬 && !String(d.우리글||'').trim())
     경고.push('<b>인사·노무관리에 「우리 글」이 비어 있습니다.</b> 이 칸만 우리가 씁니다 — '
       + '비우면 연구자료만 나갑니다.');
-  if(밀림)
+  if(!핵심켬 && 밀림)
     경고.push(`<b>행정해석 ${밀림}건이 «자리가 없어» 못 들어갔습니다</b> — `
       + '판례 한 건을 ✕ 로 빼시면 들어갑니다.');
   if(!모.이회차)
@@ -2492,7 +2521,7 @@ function 편지요약(d, r, 갈수있나){
   {
     const 기 = (d.안.news || []).filter(x => x && x.갈래 === '기사' && Core.실릴까(x));
     const 쓴것 = 기.filter(x => String(x.우리말||'').trim()).length;
-    if(기.length && 쓴것 < 기.length)
+    if(!핵심켬 && 기.length && 쓴것 < 기.length)
       경고.push(`<b>주간노동뉴스 ${기.length}건 가운데 ${쓴것}건만 «우리 말»로 썼습니다</b> — `
         + `나머지 ${기.length - 쓴것}건은 원문 제목·매체·링크 그대로 나갑니다. `
         + `줄을 눌러 쓰시면 그 글로 바뀝니다.`);
@@ -2515,6 +2544,9 @@ function 편지요약(d, r, 갈수있나){
    <div class="ttl">${편 ? esc(편.제목) : '<span style="color:var(--faint)">실을 것이 없습니다 — 왼쪽에서 담아 주세요</span>'}</div>
    ${경고.length ? `<div class="warns"><span>⚠</span>
      <div>${경고.length===1 ? 경고[0] : '<ul>' + 경고.map(x=>'<li>'+x+'</li>').join('') + '</ul>'}</div></div>` : ''}
+   <div class="row"><span class="k">나가는 판</span><span class="v">${핵심켬
+     ? `<b>핵심판</b> · 카드 ${Core.핵심다듬기(d.핵심).length}장 <span class="hint">+ 그 밖의 소식 ${Core.핵심밖건수(Core.실릴것만(d.안 || {}, { 보낸것: d.상태 === '발송' }), d.핵심).밖}건은 웹 「전체 소식 보기」로</span>`
+     : `<b>전체 소식</b> <span class="hint">${Core.핵심있나(d) ? '핵심 카드가 있으나 «추적 밑주소»가 비어 지금처럼 전부 나갑니다' : '핵심 카드가 없어 지금처럼 전부 나갑니다'} · <a onclick="길바꾸기('core')" style="cursor:pointer;text-decoration:underline">핵심 정하기</a></span>`}</span></div>
    <div class="row"><span class="k">꼭지</span><span class="v jarline">${꼭지칩}</span></div>
    <div class="row"><span class="k">첨부</span><span class="v">${
      첨.파일들.length
@@ -3264,6 +3296,223 @@ function 길바꾸기(v){
    ★ 누를 때마다 담는다. «합쳐 담기»라 두 번 눌러도 늘지 않고 지워지지도 않는다. */
   if(v === 'auto') 자동담기();
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⭐ 핵심 — 메일에 나가는 «이번 주 꼭 알아야 할 3가지» (대표 지시 2026-10-13)
+   ═══════════════════════════════════════════════════════════════════════════
+   「뉴스레터에 너무 불필요한 정보가 많으면 기업에서는 전혀 참고를 안할 것 같다 … 핵심만 … 쉽고 직관적으로」
+   → 목업 승인(대표 「네」). 데이터·기준·AI 지시는 Core(핵심*), 편지 모양은 Tpl(핵심판) 몫이다.
+
+   ★ 카드가 «있으면» 메일은 핵심판(카드 + 그 밖의 소식 + 전체 소식 보기), «없으면» 지금처럼 전문판이다.
+     전문은 웹(newsView)에 그대로 있다 — 글을 버리는 것이 아니라 «고르는 것»이다.
+   ★ AI 는 «후보»만 낸다(핵심후보). 사람이 사실을 확인하고 «쓰기»를 눌러 핵심에 넣고, 고친 것만 나간다.
+   ⚠ 이 화면의 카드는 «초안 상태(제목 없음)»도 저장한다 — 편지 쪽(Core.핵심다듬기)이 제목 없는 카드를 걸러 낸다.
+     화면에서 걸러 버리면 새 카드를 만들자마자 사라진다. */
+
+/* DB 가 듬성듬성한 배열을 번호 붙은 객체로 돌려줘도 «화면용 목록»(초안 카드 포함)으로 편다 */
+function 핵심목록(d){
+  const v = (d || {}).핵심;
+  if(Array.isArray(v)) return v.slice();
+  if(v && typeof v === 'object') return Object.keys(v).sort((a,b)=>Number(a)-Number(b)).map(k=>v[k]);
+  return [];
+}
+/* 「핵심판으로 나가나」 — 편지 짓는 층(Tpl)의 조건과 «같은 잣대»다(카드 있음 + 갈 곳(추적 밑주소) 있음) */
+function 핵심판켜짐(d){
+  return Core.핵심있나(d) && !!String((App.설정||{}).추적밑주소||'').trim();
+}
+/* 쓰는 중에 다시 그려도 «손가락 자리»를 지킨다 — 안 지키면 한 칸 치고 저장될 때마다 커서가 사라진다 */
+function 핵심그리기(){
+  const a = document.activeElement;
+  const id = (a && a.id && /^kc/.test(a.id)) ? a.id : '';
+  const 선택 = (id && typeof a.selectionStart === 'number') ? [a.selectionStart, a.selectionEnd] : null;
+  const 굴림 = document.querySelector('.colL');
+  const 위 = 굴림 ? 굴림.scrollTop : 0;
+  render();
+  const 새굴림 = document.querySelector('.colL');
+  if(새굴림 && 위) 새굴림.scrollTop = 위;
+  if(id){
+    const n = document.getElementById(id);
+    if(n){ n.focus(); try{ if(선택) n.setSelectionRange(선택[0], 선택[1]); }catch(_){ /* 못 맞춰도 입력은 산다 */ } }
+  }
+}
+
+function 핵심판화면(d){
+  const 잠김 = d.상태 === '발송';
+  const 막 = 잠김 ? ' disabled' : '';
+  const 목 = 핵심목록(d);
+  const 후보 = Array.isArray(d.핵심후보) ? d.핵심후보 : [];
+  const 개수 = Core.핵심다듬기(d.핵심).length;
+  const 밑있음 = !!String((App.설정||{}).추적밑주소||'').trim();
+  const 건들 = Core.핵심거리(d);
+  const 밖 = Core.핵심밖건수(Core.실릴것만(d.안 || {}, { 보낸것: d.상태 === '발송' }), d.핵심);
+  const 상태줄 = 개수
+    ? (밑있음
+        ? `<div class="kcstat ok"><span>✔</span><div><b>핵심판으로 나갑니다</b> — 카드 ${개수}장 + 그 밖의 소식 ${밖.밖}건(웹 「전체 소식 보기」)</div></div>`
+        : `<div class="kcstat warn"><span>⚠</span><div><b>핵심판이 안 켜집니다</b> — 설정의 «추적 밑주소»가 비어 있어 「전체 소식 보기」가 갈 곳이 없습니다. 지금처럼 전체가 나갑니다.</div></div>`)
+    : `<div class="hint" style="margin:0 0 10px">카드가 없어 <b>지금처럼 전체 소식이 메일에 그대로</b> 나갑니다. 카드를 한 장이라도 만들면 <b>핵심판</b>으로 바뀝니다.</div>`;
+
+  const 종류칸 = (i, 값) => `<select id="kc${i}-종류" onchange="핵심바뀜()"${막}>${
+    Core.핵심종류들.concat(Core.핵심종류들.indexOf(값) < 0 && 값 ? [값] : [])
+      .map(t=>`<option${t === (값 || '꼭 확인') ? ' selected' : ''}>${esc(t)}</option>`).join('')}</select>`;
+  const 건고르기 = (i) => 건들.거리.length ? `<select onchange="핵심건고르기(${i}, this.value)"${막} title="이 회차에 담긴 건에서 원문 링크를 가져옵니다 — 그 건은 「그 밖의 소식」에서 빠집니다">
+      <option value="">원문 건에서 고르기…</option>${건들.거리.map(g=>`<option value="${g.번호}">${esc((g.갈래 ? g.갈래 + ' · ' : '') + g.글.slice(0, 34))}</option>`).join('')}</select>` : '';
+  const 글자 = (i, k, 값, 한도, 자리, 넓게) => `<input type="text" id="kc${i}-${k}"${넓게 ? ' class="w"' : ''} value="${esc(값 || '')}" maxlength="${한도}" placeholder="${esc(자리)}" oninput="핵심바뀜()"${막}>`;
+
+  const 카드들 = 목.map((c, i) => {
+    c = c || {};
+    const 한 = Core.핵심칸한도;
+    return `
+    <div class="kc">
+     <div class="kct">
+      <span class="kcn">${i + 1}</span>
+      ${종류칸(i, c.종류)}
+      ${건고르기(i)}
+      <span class="sp"></span>
+      ${잠김 ? '' : `<button class="mini" onclick="핵심옮기기(${i},-1)" ${i === 0 ? 'disabled' : ''} title="위로">▲</button>
+       <button class="mini" onclick="핵심옮기기(${i},1)" ${i === 목.length - 1 ? 'disabled' : ''} title="아래로">▼</button>
+       <button class="x" onclick="핵심빼기(${i})" title="이 카드를 뺍니다">✕</button>`}
+     </div>
+     <div class="kcg">
+      <label for="kc${i}-제목">제목</label>${글자(i, '제목', c.제목, 한.제목, '쉬운 말 한 줄 — 예) 1주에 한 번은 유급휴일을 꼭 주어야 합니다', true)}
+      <label for="kc${i}-설명">설명</label><textarea id="kc${i}-설명" class="w" rows="2" maxlength="${한.설명}" placeholder="무슨 뜻인지 한두 문장" oninput="핵심바뀜()"${막}>${esc(c.설명 || '')}</textarea>
+      <label for="kc${i}-대상">대상</label>${글자(i, '대상', c.대상, 한.대상, '누구에게 해당하나')}
+      <label for="kc${i}-할일">할 일</label>${글자(i, '할일', c.할일, 한.할일, '사업장이 할 일')}
+      <label for="kc${i}-때">시기</label>${글자(i, '때', c.때, 한.때, '예) 10/16까지 · 10/18 시행 · 상시 적용')}
+      <label for="kc${i}-링크">원문 링크</label>${글자(i, '링크', c.링크, 한.링크, 'https:// — 비우면 「전체 소식 보기」로 갑니다')}
+     </div>
+    </div>`;
+  }).join('');
+
+  const 후보줄 = 후보.map((c, i) => `
+    <div class="kcand">
+     <div><span class="kcn ai">AI</span> <span class="tag">${esc(c.종류 || '')}</span> <b>${esc(c.제목 || '')}</b></div>
+     ${c.설명 ? `<div class="kcs">${esc(c.설명)}</div>` : ''}
+     <div class="kcs">${[c.대상 ? '대상 ' + esc(c.대상) : '', c.할일 ? '할 일 ' + esc(c.할일) : '', c.때 ? '시기 ' + esc(c.때) : ''].filter(Boolean).join(' · ') || '<span style="color:var(--faint)">대상·할 일·시기는 근거가 없어 비웠습니다 — 쓰신 뒤 채워 주세요</span>'}</div>
+     ${(c.비운칸 || []).length ? `<div class="kcs" style="color:var(--warn)">⚠ AI 가 쓴 «${esc(c.비운칸.join('·'))}» 칸은 그 건에 근거가 없어 비웠습니다</div>` : ''}
+     ${c.출처 ? `<div class="kcs" style="color:var(--faint)">출처 건: ${esc(c.출처)}</div>` : ''}
+     ${잠김 ? '' : `<div style="margin-top:6px;display:flex;gap:6px"><button class="btn" onclick="핵심후보쓰기(${i})">쓰기 ▸</button>
+       <button class="mini" onclick="핵심후보지우기(${i})">✕ 지우기</button></div>`}
+    </div>`).join('');
+
+  return `
+   <div class="box" style="margin-top:12px">
+    <h3>⭐ 이번 주 꼭 알아야 할 것 — 메일에는 이것만 나갑니다${잠김 ? ' <span class="pill">보낸 회차 — 잠김</span>' : ''}</h3>
+    <div class="pad">
+     ${상태줄}
+     <div class="hint" style="margin:0 0 10px">
+       <b>고르는 기준</b> — 하나 이상 해당할 때만: ① 시행일·기한이 있는 것 ② 우리 회사가 직접 할 일이 있는 것 ③ 어기면 과태료·분쟁 위험이 있는 것.
+       해당하는 것이 둘이면 <b>둘만</b> 쓰세요 — 억지로 3개를 채우지 않습니다.
+     </div>
+     <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px">
+      ${잠김 ? '' : `<button class="btn" onclick="핵심후보뽑기()" ${App.AI중 ? 'disabled' : ''} title="실릴 건 가운데 기준에 맞는 것을 AI 가 «후보»로 고릅니다 — 사실을 확인하고 «쓰기»를 눌러야 편지에 실립니다">${App.AI중 ? '⏳ 고르는 중…' : '🤖 후보 뽑기'}</button>
+      <button class="btn" onclick="핵심더하기()" ${목.length >= Core.핵심한도 ? 'disabled' : ''}>＋ 카드 직접 쓰기 <span style="color:var(--faint)">${목.length}/${Core.핵심한도}</span></button>`}
+     </div>
+     ${후보.length ? `<label class="f">AI 후보 — 아직 편지에 안 실립니다</label><div class="kcands">${후보줄}</div>` : ''}
+     <label class="f" style="margin-top:6px">나가는 카드 ${목.length}/${Core.핵심한도}</label>
+     ${카드들 || '<div class="hint">카드가 없습니다 — 위의 「🤖 후보 뽑기」나 「＋ 카드 직접 쓰기」로 시작하세요.</div>'}
+     <div class="hint">
+       ⚠ <b>법률 문장입니다.</b> 시행일·사건번호·숫자는 원문과 한 번 더 대조해 주세요 — AI 후보는 «초안»입니다.<br>
+       ⚠ 「전체 소식 보기」는 <b>웹 전문</b>으로 갑니다. 미리보기에서는 보내기 전이라 열리지 않을 수 있습니다(보낼 때 전문이 담깁니다).
+     </div>
+    </div></div>`;
+}
+
+/* 화면의 «모든 카드 칸»을 한꺼번에 읽어 담는다 — 칸마다 따로 저장하면 빨리 치실 때 앞 칸 값이 담기기 전에
+   다음 저장이 덮어 옛 값이 되살아난다(인사바뀜과 같은 까닭). 화면에 없는 칸은 옛 값을 그대로 둔다. */
+function 핵심읽기(d){
+  const g = (id, 옛) => { const e = document.getElementById(id); return e ? e.value : (옛 == null ? '' : 옛); };
+  return 핵심목록(d).map((c, i) => {
+    c = c || {};
+    return { 종류: g('kc' + i + '-종류', c.종류), 제목: g('kc' + i + '-제목', c.제목), 설명: g('kc' + i + '-설명', c.설명),
+      대상: g('kc' + i + '-대상', c.대상), 할일: g('kc' + i + '-할일', c.할일), 때: g('kc' + i + '-때', c.때),
+      링크: g('kc' + i + '-링크', c.링크) };
+  });
+}
+function 핵심바뀜(){
+  const d = 지금회차();
+  if(d.상태 === '발송') return;
+  d.핵심 = 핵심읽기(d);
+  App.회차들[d.열쇠] = d;
+  clearTimeout(핵심바뀜._t);
+  핵심바뀜._t = setTimeout(()=>{ 회차저장(d).then(핵심그리기).catch(()=>{}); }, 700);
+}
+/* 한 번 누르면 끝나는 일(더하기·빼기·옮기기·쓰기)은 곧바로 담는다 */
+function 핵심곧저장(고치기){
+  const d = 지금회차();
+  if(d.상태 === '발송') return Promise.resolve(false);
+  clearTimeout(핵심바뀜._t);
+  d.핵심 = 핵심읽기(d);                         /* 치던 글을 먼저 거두고 */
+  고치기(d);
+  App.회차들[d.열쇠] = d;
+  return 회차저장(d).then(r=>{ 핵심그리기(); return r; });
+}
+function 핵심더하기(){
+  if(핵심목록(지금회차()).length >= Core.핵심한도) return toast('카드는 ' + Core.핵심한도 + '장까지입니다 — 하나를 빼고 쓰세요', 7000);
+  핵심곧저장(d=>{ d.핵심 = d.핵심.concat([{ 종류:'꼭 확인', 제목:'', 설명:'', 대상:'', 할일:'', 때:'', 링크:'' }]); })
+    .then(()=>{ const 칸 = document.getElementById('kc' + (핵심목록(지금회차()).length - 1) + '-제목'); if(칸) 칸.focus(); });
+}
+function 핵심빼기(i){ 핵심곧저장(d=>{ d.핵심.splice(i, 1); }); }
+function 핵심옮기기(i, 방향){
+  핵심곧저장(d=>{
+    const j = i + 방향;
+    if(j < 0 || j >= d.핵심.length) return;
+    const t = d.핵심[i]; d.핵심[i] = d.핵심[j]; d.핵심[j] = t;
+  });
+}
+/* 이 회차에 담긴 건에서 «원문 링크»를 가져온다. 제목이 비어 있으면 그 건의 말도 가져온다(고치시라고). */
+function 핵심건고르기(i, 번호){
+  if(번호 === '' || 번호 == null) return;
+  const d0 = 지금회차();
+  const 건 = Core.핵심거리(d0).원본[Number(번호)];
+  if(!건) return;
+  핵심곧저장(d=>{
+    const c = d.핵심[i]; if(!c) return;
+    const u = String(건.링크 || '').trim();
+    if(/^https?:\/\//i.test(u)) c.링크 = u;
+    if(!String(c.제목 || '').trim()) c.제목 = String(건.우리말 || 건.한줄 || 건.제목 || '').replace(/\s+/g, ' ').trim().slice(0, Core.핵심칸한도.제목);
+  });
+}
+
+/* ── AI 후보 — 제목·출처·시행일 같은 «공개 정보»만 보낸다. 결과는 핵심후보에만 담긴다(편지에 안 실린다). ── */
+async function 핵심후보뽑기(){
+  if(App.AI중) return;
+  const d = 지금회차();
+  if(d.상태 === '발송') return toast('보낸 회차는 고치지 않습니다', 6000);
+  const { 거리, 원본 } = Core.핵심거리(d);
+  if(!거리.length) return toast('후보로 삼을 건이 없습니다 — 먼저 «이 주치로 채우기»로 담아 주세요', 9000);
+  if(!window.PuAiCall) return toast('AI 호출기를 불러오지 못했습니다', 8000);
+  App.AI중 = true; 핵심그리기();
+  try{
+    const 답 = await PuAiCall.ask([{ text: Core.핵심후보지시(거리) }], {
+      auth: firebase.auth(), fetch: window.fetch.bind(window), app: 'news',
+      generationConfig: { temperature: 0, maxOutputTokens: 4096 }
+    });
+    const 후보 = Core.핵심후보받기(PuAiCall.textOf(답), 원본);
+    const 지금 = 지금회차();                      /* AI 를 기다린 사이 고치신 것(카드·글)을 덮지 않게 «지금 것»에 얹는다 */
+    지금.핵심후보 = 후보;
+    App.회차들[지금.열쇠] = 지금;
+    if(!(await 회차저장(지금))) return;
+    toast(후보.length
+      ? '✨ 후보 ' + 후보.length + '장 — 사실을 확인하고 «쓰기»를 눌러 주세요(아직 편지에 안 실립니다)'
+      : '이번 주는 기준(시행일·할 일·위험)에 해당하는 것이 없다고 봤습니다 — 직접 쓰셔도 됩니다', 12000);
+  }catch(e){
+    toast('후보를 만들지 못했습니다: ' + ((e && e.message) || e), 12000);
+  }finally{ App.AI중 = false; 핵심그리기(); }
+}
+function 핵심후보쓰기(i){
+  const d0 = 지금회차();
+  const c = (Array.isArray(d0.핵심후보) ? d0.핵심후보 : [])[i];
+  if(!c) return;
+  if(핵심목록(d0).length >= Core.핵심한도) return toast('카드는 ' + Core.핵심한도 + '장까지입니다 — 하나를 빼고 쓰세요', 7000);
+  핵심곧저장(d=>{
+    d.핵심 = d.핵심.concat([{ 종류: c.종류, 제목: c.제목, 설명: c.설명, 대상: c.대상, 할일: c.할일, 때: c.때, 링크: c.링크 }]);
+    d.핵심후보 = (Array.isArray(d.핵심후보) ? d.핵심후보 : []).filter((_, k) => k !== i);
+  });
+}
+function 핵심후보지우기(i){
+  핵심곧저장(d=>{ d.핵심후보 = (Array.isArray(d.핵심후보) ? d.핵심후보 : []).filter((_, k) => k !== i); });
+}
+
 
 /* 인사가 담겼나 — 「명절 인사」 단추에 ● 을 붙일지 정한다.
    ⚠ 서식 쪽(인사칸)과 «같은 잣대»다: 그림도 제목도 글도 없으면 안 담긴 것이다.
