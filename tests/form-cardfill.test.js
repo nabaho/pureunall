@@ -342,7 +342,7 @@ test('ⓒ 위임계약 칸 배선 — 표지가 있으면 고르기 칸이 열�
   const forms = read('js/pu-contract-forms.js');
   assert.match(forms, /function drawCase\(/, '위임계약 고르기 칸이 없습니다');
   assert.match(forms, /CF\.CASE_KEYS\.indexOf\(x\.key\)/, '표지로 칸을 여닫지 않습니다');
-  const vi = forms.indexOf('CF.caseValues(st.wi)'), ei = forms.indexOf("Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });");
+  const vi = forms.indexOf('CF.caseValues(st.wi)'), ei = forms.indexOf("Object.keys(st.edits).forEach(function (k) { if (k === '계약번호' && noLocked()) return; V[k] = st.edits[k]; });");
   assert.ok(vi > 0 && ei > vi, '사람이 고친 값(edits)이 고르기 값보다 나중에 와야 합니다');
   assert.match(forms, /\[propBox, caseBox, valBox\]/);
 });
