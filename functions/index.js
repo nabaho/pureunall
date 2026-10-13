@@ -7230,6 +7230,10 @@ exports.npsMonthly = NPSM.npsMonthly;
 exports.pubdataAsk = NPSM.pubdataAsk;
 /* 🏛 기업정보함 국세청 상태 → 공용 자리 옮겨 적기 (2026-10-12) */
 exports.pubdataNtsMirror = NPSM.pubdataNtsMirror;
+/* 📥 사업자등록증 자동 검토 — 사진첩·메일 첨부·기업정보함 어디로 들어와도 서버가 바로 (2026-10-13, functions/bizreg-review.js) */
+const BIZREG = require("./bizreg-review")({ functions, getDatabase, MAIL_REGION });
+exports.bizregReviewDoc = BIZREG.bizregReviewDoc;
+exports.bizregReviewCard = BIZREG.bizregReviewCard;
 
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */
