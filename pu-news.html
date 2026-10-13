@@ -2418,7 +2418,7 @@ function 이번회차화면(){
       title="명절 인사"><span class="wi"><span class="ic">🎁 </span><span class="ful">명절 </span>인사${인사담겼나(d) ? ' <b class="dot">●</b>' : ''}</span></button>
     ${/* ★ 핵심 — 메일에 나가는 «이번 주 꼭 알아야 할 3가지» (대표 지시 2026-10-13). 카드가 있으면 ● 과 장수를 붙인다. */''}
     <button class="wt ${App.길==='core'?'on':''}" onclick="길바꾸기('core')"
-      title="핵심 — 메일에는 꼭 알아야 할 것만 나갑니다"><span class="wi"><span class="ic">⭐ </span>핵심${Core.핵심있나(d) ? ' <span class="cnt">' + Core.핵심다듬기(d.핵심).length + '</span>' : ''}</span></button>
+      title="핵심 — 메일에는 꼭 알아야 할 것만 나갑니다"><span class="wi"><span class="ic">⭐ </span>핵심${Core.핵심있나(d) ? ' <span class="cnt">' + Core.핵심다듬기(d.핵심).length + '</span>' : ((Array.isArray(d.핵심후보) && d.핵심후보.length) ? ' <b class="dot" title="AI 후보가 있습니다 — 확인하고 «쓰기»">●</b>' : '')}</span></button>
     <span class="sp"></span>
     ${/* ⚠ 「그대로 전달」을 «없애지는» 않았다 — 지금 그 길로 다니시던 일이다.
          잘 안 쓰는 둘이라 오른쪽 끝 작은 글씨로 둔다. */''}

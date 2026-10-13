@@ -130,3 +130,78 @@ test('★★ 카드를 «고치면» 문지기가 «준비한 뒤 바뀌었다»
   assert.strictEqual(뒤.ok, false, '★★★ 카드를 고쳤는데 문지기가 모른다 — 고치기 전 카드가 월요일에 나간다');
   assert.strictEqual(뒤.다름, true);
 });
+
+/* ───── 금요일 «핵심 후보» + 검토 메일 안내 (대표 지시 2026-10-13) ───── */
+
+const 핵심AI = (기록, 옵션) => async (글) => {
+  기록.push(글);
+  if (/핵심 카드/.test(글)) {
+    if (옵션 && 옵션.핵심실패) throw new Error('핵심 AI 장애');
+    const 목 = JSON.parse(글.slice(글.lastIndexOf('\n\n') + 2));
+    return JSON.stringify([{ 번호: 목[0].번호, 종류: '노동법', 제목: '후보 제목 하나', 설명: '후보 설명', 대상: '', 할일: '', 때: '' }]);
+  }
+  if (/JSON 배열만/.test(글)) {
+    const 목 = JSON.parse(글.slice(글.lastIndexOf('\n\n') + 2));
+    return JSON.stringify(목.map((x) => ({ 번호: x.번호, 초안: 'AI가 정리한 ' + x.제목 + ' 이야기입니다.' })));
+  }
+  return '대법원은 __실제 근로시간 기록이 약정보다 앞선다__고 보았습니다. 사업장에서는 기록을 다시 보셔야 합니다.';
+};
+async function 핵심돌리기(씨, 옵션) {
+  const db = FakeDB.만들기(씨 || 씨앗());
+  const 물음 = [], 보냄 = [];
+  const 보고 = await NF.금요일준비({ db, ai: 핵심AI(물음, 옵션), 메일: async (편) => { 보냄.push(편); return { ok: true }; }, now: 금요일,
+    무작위: (() => { let i = 0; return () => ((i++ * 0.6180339) % 1); })() });
+  return { db, 물음, 보냄, 보고 };
+}
+const 핵심물음 = (물음) => 물음.filter((q) => /핵심 카드/.test(q));
+
+test('★★★ 금요일에 AI 가 «후보»를 골라 두되 — 나가는 카드(핵심)는 안 건드리고, 편지는 전문판 그대로다', async () => {
+  const { db, 보고, 보냄 } = await 핵심돌리기();
+  assert.ok(보고.확정본됨, '확정본을 못 만들었다: ' + 보고.못한까닭);
+  const 열 = C.회차(월요일).열쇠;
+  const 회 = db.읽기('newsletter/issues/' + 열);
+  assert.ok(Array.isArray(회.핵심후보) && 회.핵심후보.length === 1, '후보가 안 담겼다');
+  assert.strictEqual(회.핵심후보[0].제목, '후보 제목 하나');
+  assert.ok(!회.핵심, '★★★ AI 가 나가는 카드(핵심)에 직접 썼다 — 사람이 안 읽은 법률 문장이 월요일에 나간다');
+  const g = 문지기(db);
+  assert.ok(!/이번 주 꼭 알아야 할/.test(g.ready.html), '후보만 있는데 핵심판이 나간다 — 사람이 «쓰기»를 안 눌렀다');
+  assert.ok(g.판정.ok, '후보를 담았다고 문지기가 막는다(후보는 도장에 안 들어가야 한다) — ' + g.판정.까닭);
+  const 검토 = 보냄[0];
+  assert.match(검토.body + 검토.html, /핵심 후보 1장/, '검토 메일이 후보를 안 알린다 — 대표님이 «쓰기»를 눌러야 한다는 것을 모른다');
+  assert.match(검토.html, /안 실립니다/, '후보가 «아직 안 실린다»는 말이 없다');
+});
+
+test('★★ 카드가 이미 있으면 후보 AI 를 안 부른다 · 검토 메일은 «핵심판으로 나갑니다»', async () => {
+  const 열 = C.회차(월요일).열쇠;
+  const 씨 = 씨앗();
+  씨.newsletter.issues = { [열]: { 회차: C.회차(월요일), 상태: '초안', 우리글: '한마디', 핵심: [카드()] } };
+  const { db, 물음, 보냄 } = await 핵심돌리기(씨);
+  assert.strictEqual(핵심물음(물음).length, 0, '카드가 있는데 후보 AI 를 불렀다 — 사람이 고른 것이 있는데 돈만 쓴다');
+  assert.ok(!db.읽기('newsletter/issues/' + 열).핵심후보, '카드가 있는데 후보가 담겼다');
+  assert.match(보냄[0].body + 보냄[0].html, /핵심판/, '검토 메일이 핵심판으로 나간다고 안 알린다');
+  assert.match(보냄[0].html, /이번 주 꼭 알아야 할 1가지/, '검토 메일 속 «월요일에 나갈 편지»가 핵심판이 아니다');
+});
+
+test('이미 받아 둔 후보는 덮지 않는다 — 금요일 준비를 다시 돌려도 AI 를 또 부르지 않는다', async () => {
+  const 열 = C.회차(월요일).열쇠;
+  const 씨 = 씨앗();
+  씨.newsletter.issues = { [열]: { 회차: C.회차(월요일), 상태: '초안', 우리글: '한마디', 핵심후보: [{ 종류: '꼭 확인', 제목: '먼저 받은 후보', 설명: '', 대상: '', 할일: '', 때: '', 링크: '' }] } };
+  const { db, 물음 } = await 핵심돌리기(씨);
+  assert.strictEqual(핵심물음(물음).length, 0, '후보가 이미 있는데 AI 를 또 불렀다');
+  assert.strictEqual(db.읽기('newsletter/issues/' + 열).핵심후보[0].제목, '먼저 받은 후보', '받아 둔 후보를 덮었다');
+});
+
+test('★★ 후보 AI 가 실패해도 준비는 계속된다 — 확정본은 만들어지고 알림에만 적힌다', async () => {
+  const { 보고, db } = await 핵심돌리기(null, { 핵심실패: true });
+  assert.ok(보고.확정본됨, '★★ 후보 AI 장애로 확정본이 안 만들어졌다 — 월요일 발송이 통째로 막힌다');
+  assert.ok(보고.알림들.some((m) => /핵심 후보를 못 골랐습니다/.test(m)), '실패가 검토 메일에 안 적힌다');
+  assert.ok(문지기(db).판정.ok);
+});
+
+test('카드도 후보도 없으면 검토 메일이 «전체 소식이 지금처럼 나갑니다 · 핵심 정하려면…»이라고 말한다', async () => {
+  const 씨 = 씨앗();
+  씨.homepage.newsBrief.모음 = {};                 /* 건이 모자라 후보를 못 고르는 주 */
+  씨.homepage.newsDocs.모음 = {};
+  const { 보냄 } = await 핵심돌리기(씨);
+  assert.match(보냄[0].body + 보냄[0].html, /핵심 카드가 없어/, '카드가 없다는 말이 없다 — 지금 무엇이 나가는지 모른다');
+});
