@@ -198,8 +198,8 @@
 <script src="js/pu-hwp-store.js?v=1"></script>
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
-<script src="js/pu-form-cardfill.js?v=18"></script>
-<script src="js/pu-contract-forms.js?v=59"></script>
+<script src="js/pu-form-cardfill.js?v=19"></script>
+<script src="js/pu-contract-forms.js?v=60"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
@@ -550,7 +550,7 @@ async function formMailSend(p, files) {
    o.await — 계약서등관리에서 만든 «계약서»면 📬 서명본 대기에도 한 줄(pu_docs/await). 기업별 계약서 다시 보내기는 안 적는다 */
 function formMailRecord(row, V, o) {
   var keys = PuFormCardFill.sentKeys(row, V), at = Date.now();
-  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', kind: o.kind, names: o.names, who: o.how === '받기' ? '(받기)' : o.who });
+  var rec = PuFormCardFill.sentRecord({ at: at, by: (curUser && curUser.email) || '', kind: o.kind, names: o.names, who: o.how === '받기' ? '(받기)' : o.who, contract: o.contract });
   var jobs = keys.map(function (k) { return trackedWrite(db.ref('pucards/sentDocs/' + k).push(rec)); });
   var coName = String((V && V.회사명) || (row && row.c) || '').trim();
   if (o.await && o.kind === '계약서' && coName)

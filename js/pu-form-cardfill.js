@@ -428,8 +428,16 @@
   /* 보낸 기록 한 줄 — ⚠ 받는 주소는 남기지 않는다(기업정보함 보낸 서류와 같은 원칙) */
   function sentRecord(o) {
     o = o || {};
-    return { at: Number(o.at) || 0, by: String(o.by || ''), kind: String(o.kind || '그 밖'),
+    var r = { at: Number(o.at) || 0, by: String(o.by || ''), kind: String(o.kind || '그 밖'),
       names: (o.names || []).map(function (v) { return String(v || ''); }).filter(Boolean), card: '', who: String(o.who || '').trim() };
+    /* 이알피 계약에서 채웠으면 그 계약의 «ID»를 함께 — 온톨로지는 번호가 아니라 ID 로만 잇는다(pu-ontology.js sourceContractId).
+       번호(sourceContractNo)는 사람이 보는 참고용 — 번호가 바뀌어도 ID 로 이어진다 */
+    var ct = o.contract;
+    if (ct && String(ct.id || '').trim()) {
+      r.sourceContractId = String(ct.id).trim().slice(0, 80);
+      if (String(ct.no || '').trim()) r.sourceContractNo = String(ct.no).trim().slice(0, 60);
+    }
+    return r;
   }
   /* ══ 📇 공단 연락처 (대표 2026-10-09 「공단지사도 메일함에서 찾아서 연결시켜라」) ══
      푸른메일함 목록(mailbox 의 한 줄: e 보낸 주소, f 보낸 이름, d 날짜, s 제목, p 미리보기)에서
