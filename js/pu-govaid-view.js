@@ -148,10 +148,13 @@
     }).sort(function (a, b) { return clean(b.n.openDt).localeCompare(clean(a.n.openDt)) || clean(a.n.nm).localeCompare(clean(b.n.nm), 'ko'); });
   }
   function noticeCount(noticesMap, progs, today) { return noticeRows(noticesMap, progs, { view: 'sug', openOnly: true, today: today }).length; }
+  /* ★ 노무사 직접 사업 — 화면마다 같은 잣대(대표 지시 2026-10-13 「모든 영역에서」) */
+  function isStar(p) { return !!(p && p.star && p.star.on === true); }
+  function starOnly(progs, on) { return on ? progs.filter(isStar) : progs; }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
   return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
     ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor,
-    noticeRows: noticeRows, noticeCount: noticeCount };
+    noticeRows: noticeRows, noticeCount: noticeCount, isStar: isStar, starOnly: starOnly };
 });
