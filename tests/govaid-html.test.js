@@ -202,3 +202,12 @@ test('★만 보기 — 한 스위치가 모든 화면의 사업 목록을 같�
   ['drawCo', 'drawCoDetail', 'coDocs', 'drawGrid', 'drawProg', 'drawDict', 'drawCheck'].forEach((f) =>
     assert.match(fnBody(f), /VP\(\)/, f + ' 가 ★만 보기를 따르지 않는다'));
 });
+
+/* 회사 목록 열 정리 (대표 지시 2026-10-13 「기업정보에서 주소등 뒤에 불필요한것은 안보여도 된다. 그리고 열정리해라」) */
+test('회사 목록 — 지역·인원 꼬리말을 빼고, ☐·번호·사업장·구분·후보가 같은 자리에 오는 열(머리줄 포함)', () => {
+  const f = fnBody('drawCo');
+  assert.doesNotMatch(f, /v\.region|v\.headcount|지역 모름|인원 모름/, '회사명 뒤 꼬리말이 남아 있다');
+  assert.match(f, /class="li co-row/, '열 맞춘 줄(co-row)이 아니다');
+  assert.match(f, /co-head/, '열 머리줄이 없다');
+  assert.match(NOC, /\.li\.co-row\{[^}]*grid-template-columns/, '열을 격자로 맞추지 않는다');
+});
