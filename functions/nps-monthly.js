@@ -289,4 +289,4 @@ function make(deps) {
 }
 
 module.exports = make;
-Object.assign(module.exports, { cands, nowOf, plan, runOnce, askOnce, withPub, norm, eiRows, eiSum, eiPlan });
+Object.assign(module.exports, { cands, nowOf, plan, runOnce, askOnce, withPub, oneEi, norm, eiRows, eiSum, eiPlan });
