@@ -68,6 +68,13 @@
       bizinfo: [String(n.no || n.id)] };
   }
 
-  return { softDeleted: softDeleted, confirmed: confirmed, carryToCompany: carryToCompany,
+  /* ★ 노무사 직접 사업 (대표 지시 2026-10-13 「공인노무사가 직접 할 수 있는 사업은 별표시 … 모든 영역에서」).
+     법인 전체가 같은 별을 본다(사람마다 따로가 아니다). 끈 것도 {on:false} 로 남긴다 — 정기 조사·초기 표시가 다시 켜지 않게 */
+  function starred(prev, known, on, why, actor, now) {
+    var b = base(prev, known), cur = b.star || {};
+    return Object.assign(b, { id: b.id, star: { on: !!on, why: (why || cur.why || ''), by: actor, at: now } });
+  }
+
+  return { softDeleted: softDeleted, confirmed: confirmed, carryToCompany: carryToCompany, starred: starred,
     noticeLinked: noticeLinked, noticeDecided: noticeDecided, programFromNotice: programFromNotice };
 });

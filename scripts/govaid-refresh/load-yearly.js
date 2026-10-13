@@ -10,7 +10,8 @@
    ⚠ 쓰기 직전 다시 읽어 바뀐 사업이 있으면 멈춘다(종료코드 2), 조건·서류 낱말이 엔진 목록 밖이면 멈춘다(종료코드 3). */
 'use strict';
 const fs = require('fs'), path = require('path');
-const { M, W, AI_BY, ACTOR, get, update, cut, sources } = require('./common.js');
+const { M, V, W, AI_BY, ACTOR, get, update, cut, sources } = require('./common.js');
+const STAR_WHY = '공인노무사법 제2조제1항제1호 — 노동 관계 법령(시행령 별표 1: 고용보험법·고용정책기본법·장애인고용촉진법·산업안전보건법 등)에 따른 신청 대행 · AI 초안, 노무사 확인';
 const dir = process.argv[2], GO = process.argv.includes('--go'), NOW = Date.now();
 if (!dir) { console.log('쓰는 법: node load-yearly.js <결과폴더> [--go]'); process.exit(1); }
 /* 조사 결과는 배열 파일만 — 남기는 *-plan.json(쓸 계획)은 건너뛴다 */
@@ -79,6 +80,8 @@ read(/^new-.*\.json$/).forEach((r) => {
     docs: docsOf(id, r.docs), laborPrep: cut(r.laborPrep, 300), docsInfo: info(r),
     aiDraft: { at: NOW, confidence: r.confidence || '', applicability: r.applicability || '', notes: cut(r.notes, 1000), baseYearSeen: r.baseYear || null } };
   if (r.applicability === 'individual') rec.applicability = 'individual';
+  /* ★ 노무사 직접 사업(대표 지시 2026-10-13) — 고용노동부 계열 사업주 신청 사업은 처음부터 ★(AI 초안). 근거: 공인노무사법 제2조제1항제1호 */
+  else if (V.ministryOf(rec.agency) === '고용노동부') rec.star = { on: true, why: STAR_WHY, by: ACTOR, at: NOW };
   if (live[id]) bad.push(id + ': 자리에 이미 무엇이 있음');
   const p = W.prepareRecord(rec, { entityType: 'SupportProgram', now: NOW, actor: ACTOR, expectedRevision: -1 });
   if (!p.ok) { bad.push(id + ': 관문 ' + p.issues.map((i) => i.code).join(',')); return; }

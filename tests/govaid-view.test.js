@@ -145,3 +145,10 @@ test('새 공고 거르기 — 비슷한 것·전체·이은 것·관계없음, 
   assert.deepEqual(ids({ view: 'all', q: '그냥' }), ['e']);
   assert.equal(V.noticeCount(N, P, T), 1, '탭 숫자 = 처리 안 한 «비슷한» 공고 중 접수 중');
 });
+
+test('별표 — 켜진 사업만 ★, 거르기는 별 사업만 남긴다', () => {
+  const P = [{ id: 'a', star: { on: true } }, { id: 'b', star: { on: false } }, { id: 'c' }];
+  assert.deepEqual(P.map(V.isStar), [true, false, false]);
+  assert.deepEqual(V.starOnly(P, true).map((p) => p.id), ['a']);
+  assert.deepEqual(V.starOnly(P, false).map((p) => p.id), ['a', 'b', 'c']);
+});
