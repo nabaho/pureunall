@@ -57,7 +57,7 @@ const NAMES = ['grEsc', 'grToday', 'grFilter', 'grRenderFilters', 'grRenderKpis'
   'grOpenCand', 'grOpenLinked', 'grOpenAtt', 'grLib', 'grShowAtt', 'grRenderAv', 'grPdfDraw', 'grPdfPage', 'grCloseAv',
   'grDashHtml', 'grBoardHtml', 'grLoadDashView', 'grSetDashView', 'grBizBlocked', 'grBarHtml',
   'grLoadTab', 'grSetTab', 'grGoHome', 'grTodayCalc', 'grRenderToday', 'grTodayTask', 'grTodayStrip', 'grTodayInboxHtml', 'grRenderTodayInbox', 'grTodayMore', 'grOpenTask', 'grErpFor', 'grApplyTodayView',
-  'grLoadBizOrder', 'grSaveBizOrder', 'grDragBiz', 'grDragMark', 'grDropAfter', 'grByBiz'];
+  'grLoadBizOrder', 'grSaveBizOrder', 'grDragBiz', 'grDragMark', 'grDropAfter', 'grByBiz', 'grDragEnd', 'grHasDragType'];
 
 function fakeEl() { return { innerHTML: '', textContent: '', value: '', checked: false, disabled: false, style: {} }; }
 function world(o) {
@@ -4668,11 +4668,16 @@ function bzEl(code, grp) {
     classList: { add: (...c) => c.forEach((x) => cls.add(x)), toggle: (c, on) => { if (on) cls.add(c); else cls.delete(c); } },
     getBoundingClientRect: () => ({ top: 100, height: 20 }) };
 }
-function dragEv(type, el, y) {
-  const data = {};
-  return { type, clientY: y, prevented: false, data, preventDefault() { this.prevented = true; },
+const DRAG_TYPE = 'application/x-gr-biz';   // 우리 항목을 끌 때만 dataTransfer 에 실리는 전용 형식(값 = 사업 코드)
+let LAST_DRAG = '';
+/* 브라우저는 dragstart 에서 실은 데이터를 같은 끌기의 dragover·drop 에 그대로 준다 — 마지막 dragstart 의 코드를 흉내. o.external = 다른 앱에서 끌어온 글자(전용 형식 없음) */
+function dragEv(type, el, y, o) {
+  o = o || {};
+  if (type === 'dragstart' && el && el.getAttribute('data-biz')) LAST_DRAG = el.getAttribute('data-biz');
+  const data = o.external ? { 'text/plain': '외부 글자' } : ((type === 'dragover' || type === 'drop') ? { [DRAG_TYPE]: LAST_DRAG } : {});
+  return { type, clientY: y, relatedTarget: o.related || null, prevented: false, data, preventDefault() { this.prevented = true; },
     target: { closest: (sel) => (el && sel.indexOf('.bz') >= 0 ? el : null) },
-    dataTransfer: { effectAllowed: '', dropEffect: '', setData: (k, v) => { data[k] = v; }, getData: (k) => data[k] } };
+    dataTransfer: { effectAllowed: '', dropEffect: '', get types() { return Object.keys(data); }, setData: (k, v) => { data[k] = v; }, getData: (k) => data[k] } };
 }
 const BEFORE = 105, AFTER = 115;   // 항목 위쪽 절반 · 아래쪽 절반
 const bizCodes = (h) => [...h.matchAll(/data-biz="([^"]+)"/g)].map((m) => m[1]);
@@ -4762,7 +4767,7 @@ test('157 끌어서 놓기 — 같은 묶음 항목 위·아래 절반 표시 ·
   const s = dragEv('dragstart', src, 0);
   w.ctx.grDragBiz(s);
   assert.deepEqual(J(g.drag), { code: 'consulting-15', grp: 'open' });
-  assert.equal(s.data['text/plain'], 'consulting-15'); assert.equal(s.dataTransfer.effectAllowed, 'move');
+  assert.equal(s.data[DRAG_TYPE], 'consulting-15'); assert.ok(!('text/plain' in s.data), '다른 앱에 글자로 붙지 않는다'); assert.equal(s.dataTransfer.effectAllowed, 'move');
   /* 위로 지나가기 — 같은 묶음만 허락, 위/아래 절반 표시 */
   let ev = dragEv('dragover', t02, BEFORE); w.ctx.grDragBiz(ev);
   assert.ok(ev.prevented && ev.dataTransfer.dropEffect === 'move'); assert.ok(t02.cls.has('drop-before') && !t02.cls.has('drop-after'));
@@ -5018,7 +5023,7 @@ test('165 화면 전체 폭 — main 폭 제한 없음 · 3열 격자는 clamp �
   const m1500 = cssBlock('@media (max-width:1500px)');
   assert.match(m1500, /\.grid\{grid-template-columns:\s*clamp\(280px,\s*24vw,\s*360px\) minmax\(0,\s*1fr\)\}/, '2열');
   assert.match(m1500, /\.side\{[^}]*grid-column:\s*1 \/ -1/, '오른쪽 패널은 아래 전체 폭');
-  assert.match(m1500, /\.side\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(280px,\s*1fr\)\)/, '패널은 격자로 나란히');
+  assert.match(m1500, /\.side\{[^}]*display:\s*grid[^}]*grid-template-columns:\s*repeat\(auto-fit,\s*minmax\(min\(280px,\s*100%\),\s*1fr\)\)/, '패널은 격자로 나란히 — 아주 좁은 화면에서는 한 칸이 100% 라 가로로 넘치지 않는다');
   const at = (s) => { const i = CSS.indexOf(s); assert.ok(i >= 0, s); return i; };
   assert.ok(at('@media (max-width:1500px)') < at('@media (max-width:1100px)') && at('@media (max-width:1100px)') < at('@media (max-width:900px)'), '1500 → 1100 → 900 차례(뒤 규칙이 앞 규칙을 덮는다)');
   assert.ok(at('.grid{') < at('@media (max-width:1500px)'), '기본 격자가 먼저');
@@ -5156,4 +5161,74 @@ test('168 왼쪽 그리기는 새 계산을 만들지 않는다 — 막대는 gr
   assert.match(g, /GR\.td\b/, '캐시를 읽는다');
   assert.doesNotMatch(g, /summarize\(|docsTable\(|stripOf\(|PuGovReportToday|PuGovReportDash/, '자체 계산이 없다');
   assert.equal(w.db.쓴것.length, 0);
+});
+
+test('164 끌기 안전 — 전용 형식 없는 놓기(다른 앱의 글자·파일)는 무시 · GR.drag 가 남아 있어도 외부 놓기는 쓰기 0 · document 의 dragend·drop 이 끌기 상태를 비운다 · 코드가 끌던 항목과 다르면 무시', async () => {
+  const w = ordWorld();
+  await w.ctx.grLoad();
+  const g = w.ctx.GR;
+  assert.match(SRC, /dragType:'application\/x-gr-biz'/);
+  assert.ok(SRC.includes("document.addEventListener('dragend',grDragEnd,true); document.addEventListener('drop',grDragEnd);"), 'document 단위 끝 처리(drop 은 #biz 가 먼저 읽도록 거품 단계)');
+  const src = bzEl('consulting-15', 'open'), t02 = bzEl('consulting-02', 'open');
+  /* 끌기는 시작됐고(GR.drag 가 남았고) 외부 것이 같은 묶음 항목 위로 온다 */
+  w.ctx.grDragBiz(dragEv('dragstart', src, 0));
+  let ev = dragEv('dragover', t02, BEFORE, { external: true }); w.ctx.grDragBiz(ev);
+  assert.ok(!ev.prevented && t02.cls.size === 0, '전용 형식이 없으면 놓을 자리로 받지 않는다');
+  ev = dragEv('drop', t02, BEFORE, { external: true });
+  await w.ctx.grDragBiz(ev);
+  assert.ok(!ev.prevented); assert.equal(w.db.쓴것.length, 0, '외부 놓기는 쓰기 0'); assert.deepEqual(J(g.bizOrder), []);
+  assert.equal(g.drag, null, '놓았으니 끌기는 끝난다');
+  /* 전용 형식은 있는데 코드가 끌던 항목과 다르다(남의 형식 흉내) */
+  w.ctx.grDragBiz(dragEv('dragstart', src, 0));
+  const fake = dragEv('drop', t02, BEFORE); fake.data[DRAG_TYPE] = 'consulting-04';
+  await w.ctx.grDragBiz(fake);
+  assert.equal(w.db.쓴것.length, 0, '코드가 다르면 무시');
+  /* dragstart 없이(GR.drag 없음) 전용 형식만 오는 놓기 */
+  await w.ctx.grDragBiz(dragEv('drop', t02, BEFORE));
+  assert.equal(w.db.쓴것.length, 0);
+  /* 정상 끌기는 그대로 된다 */
+  w.ctx.grDragBiz(dragEv('dragstart', src, 0));
+  await w.ctx.grDragBiz(dragEv('drop', t02, BEFORE));
+  assert.equal(w.db.쓴것.length, 1);
+  /* document 단위 끝 처리 — 끌던 항목이 다시 그려져 dragend 가 #biz 까지 안 와도 비운다 */
+  g.drag = { code: 'consulting-15', grp: 'open' }; g.dmark = bzEl('consulting-02', 'open'); g.dmark.cls.add('drop-after');
+  w.ctx.grDragEnd();
+  assert.equal(g.drag, null); assert.equal(g.dmark, null);
+  assert.equal(w.ctx.grHasDragType({}), false); assert.equal(w.ctx.grHasDragType({ dataTransfer: {} }), false);
+  assert.equal(w.ctx.grHasDragType({ dataTransfer: { types: ['Files'] } }), false);
+  assert.equal(w.ctx.grHasDragType({ dataTransfer: { types: ['text/plain', DRAG_TYPE] } }), true);
+});
+
+test('165 저장 잠금은 항상 풀린다 — 그리다 던져도 obusy 가 풀리고 순서는 되돌아가며 다음 끌기가 된다', async () => {
+  const w = ordWorld();
+  await w.ctx.grLoad();
+  const g = w.ctx.GR, real = w.ctx.grRender;
+  let n = 0;
+  w.ctx.grRender = () => { if (++n === 1) throw new Error('그리기 실패'); return real(); };   // 첫 그리기(낙관적 갱신)만 던진다
+  w.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  await w.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.equal(g.obusy, false, '잠금이 풀렸다');
+  assert.deepEqual(J(g.bizOrder), [], '순서는 이전으로'); assert.equal(w.db.쓴것.length, 0, '그리다 던졌으니 저장하지 않았다');
+  assert.ok(g.bbmsg, '안내가 있다');
+  w.ctx.grRender = real;
+  w.ctx.grDragBiz(dragEv('dragstart', bzEl('consulting-15', 'open'), 0));
+  assert.equal(g.drag && g.drag.code, 'consulting-15', '다음 끌기가 된다');
+  await w.ctx.grDragBiz(dragEv('drop', bzEl('consulting-02', 'open'), BEFORE));
+  assert.equal(w.db.쓴것.length, 1);
+});
+
+test('166 dragleave — 같은 항목 안쪽으로 옮겨 간 것(relatedTarget 이 항목 안)은 표시를 지우지 않는다 · 밖으로 나가면 지운다', async () => {
+  const w = ordWorld();
+  await w.ctx.grLoad();
+  const src = bzEl('consulting-15', 'open'), t02 = bzEl('consulting-02', 'open'), inner = {};
+  t02.contains = (n) => n === inner;
+  w.ctx.grDragBiz(dragEv('dragstart', src, 0));
+  w.ctx.grDragBiz(dragEv('dragover', t02, BEFORE));
+  assert.ok(t02.cls.has('drop-before'));
+  w.ctx.grDragBiz(dragEv('dragleave', t02, 0, { related: inner }));
+  assert.ok(t02.cls.has('drop-before'), '안쪽 이동은 깜박이지 않는다');
+  w.ctx.grDragBiz(dragEv('dragleave', t02, 0, { related: {} }));
+  assert.equal(t02.cls.size, 0, '밖으로 나가면 지운다');
+  w.ctx.grDragBiz(dragEv('dragover', t02, BEFORE)); w.ctx.grDragBiz(dragEv('dragleave', t02, 0));
+  assert.equal(t02.cls.size, 0, 'relatedTarget 을 모르면 지운다(dragover 가 다시 단다)');
 });

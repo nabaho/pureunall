@@ -250,7 +250,7 @@ button.td-biz.td-ok{border-left-color:var(--green)}
 .al-h{font-size:13px;margin:8px 0 4px}
 #alerts ul{margin:0;padding-left:18px;font-size:12px}
 #alerts a{color:var(--blue-ink)}
-@media (max-width:1500px){ .grid{grid-template-columns:clamp(280px,24vw,360px) minmax(0,1fr)} .side{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px} .side section{margin-bottom:0} }
+@media (max-width:1500px){ .grid{grid-template-columns:clamp(280px,24vw,360px) minmax(0,1fr)} .side{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:12px} .side section{margin-bottom:0} }
 @media (max-width:1100px){ .grid{grid-template-columns:220px minmax(0,1fr)} .side{grid-column:1 / -1} }
 @media (max-width:900px){ .grid{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} .bizp{position:static;max-height:none;overflow:visible} }
 @media (max-width:640px){ input,select{font-size:16px} }
@@ -381,7 +381,7 @@ var GR_MAIL={fn:'https://asia-northeast3-pureun-erp.cloudfunctions.net/',per:300
 /* 사업 종결 표시 — 이 앱의 쓰기 자리 둘째(scal_bizState/{이알피 사업 코드}). 읽기는 통째 한 번, 쓰기는 사업 하나(종결 .set · 되돌리기 = 같은 칸에 closedFrom 9999 표시 .set)
    사업 순서 — 쓰기 자리 셋째(scal_bizOrder/main 한 문서 { list:'코드,코드', by, at }). 읽기는 통째 한 번, 쓰기는 grSaveBizOrder 의 .set 하나
    ⚠ 이름 표로 부른다 — 글자 그대로 ref('scal_biz…') 를 쓰지 않는다(화면 검사가 막는다) */
-var GR_BIZ={node:'scal_bizState',code:/^[A-Za-z0-9_-]{1,40}$/,fail:'저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)',reopen:'되돌림',orderNode:'scal_bizOrder',orderKey:'main',orderFail:'저장하지 못했습니다 — 관리자만 사업 순서를 바꿀 수 있습니다',orderBad:'순서를 저장할 수 없습니다 — 사업 코드를 확인해 주세요'};
+var GR_BIZ={node:'scal_bizState',code:/^[A-Za-z0-9_-]{1,40}$/,fail:'저장하지 못했습니다 — 관리자만 종결할 수 있습니다(규칙 게시 또는 권한 확인)',reopen:'되돌림',orderNode:'scal_bizOrder',orderKey:'main',orderFail:'저장하지 못했습니다 — 관리자만 사업 순서를 바꿀 수 있습니다',orderBad:'순서를 저장할 수 없습니다 — 사업 코드를 확인해 주세요',dragType:'application/x-gr-biz'};
 var GR={seq:0,dseq:0,rows:[],input:null,staffMap:{},index:null,indexErr:false,err:'',loaded:false,me:'',email:'',today:'',docs:{loaded:false,err:false},toc:null,tocMsg:'',tocFail:false,track:null,trackErr:false,tseq:0,saving:{},cw:null,inbox:{st:'',rows:[],cos:null,clipped:false},inboxP:null,iseq:0,gi:{st:'idle',list:[],noAddr:0,more:false,clipped:false,msg:''},av:null,avBusy:false,avMsg:'',avErr:false,bizState:{},bseq:0,bzOpen:{},dashView:'table',tab:'today',todayMore:{},td:null,tdKey:'',dver:0,cm:null,bmsg:'',bbusy:false,bizOrder:[],oseq:0,drag:null,dmark:null,obusy:false,bbmsg:'',f:{year:'',type:'',att:'',status:'',co:'',mine:false,biz:''}};
 
 function $(id){ return document.getElementById(id); }
@@ -1980,6 +1980,13 @@ function grDropAfter(el,e){
   var r=(el&&el.getBoundingClientRect)?el.getBoundingClientRect():null;
   return !!r&&typeof e.clientY==='number'&&e.clientY>r.top+r.height/2;
 }
+/* 끌기 상태를 비운다 — #biz 의 dragend·drop 과 document 의 dragend·drop(끌던 항목이 다시 그려져 사라지면 #biz 까지 안 온다)에서 */
+function grDragEnd(){ GR.drag=null; grDragMark(null); }
+/* 끌려 오는 것이 우리 항목인가 — dataTransfer.types 에 전용 형식(GR_BIZ.dragType)이 있을 때만 */
+function grHasDragType(e){
+  var t=e&&e.dataTransfer?e.dataTransfer.types:null;
+  return !!t&&Array.prototype.indexOf.call(t,GR_BIZ.dragType)>=0;
+}
 /* #biz 위임 — dragstart / dragover / dragleave / drop / dragend. 같은 묶음(data-grp) 항목 위에서만 놓을 수 있다 */
 async function grDragBiz(e){
   if(!e) return;
@@ -1988,29 +1995,35 @@ async function grDragBiz(e){
     if(!el||!code||!grp) return;
     if(GR.obusy){ if(e.preventDefault) e.preventDefault(); return; }   /* 저장하는 동안에는 새 끌기를 받지 않는다 */
     GR.drag={code:code,grp:grp};
-    if(e.dataTransfer){ try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData('text/plain',code); }catch(x){} }
+    if(e.dataTransfer){ try{ e.dataTransfer.effectAllowed='move'; e.dataTransfer.setData(GR_BIZ.dragType,code); }catch(x){} }   /* 전용 형식 — 받는 쪽이 «우리 항목»인지 알아보는 표 */
     return;
   }
   if(e.type==='dragover'){
-    if(!d||!el||grp!==d.grp||code===d.code){ grDragMark(null); return; }
+    if(!d||!el||grp!==d.grp||code===d.code||!grHasDragType(e)){ grDragMark(null); return; }   /* 우리 항목을 끌 때만 받는다 — 다른 앱의 글자·파일은 받지 않는다 */
     if(e.preventDefault) e.preventDefault();
     if(e.dataTransfer) e.dataTransfer.dropEffect='move';
     grDragMark(el,grDropAfter(el,e)?'drop-after':'drop-before');
     return;
   }
-  if(e.type==='dragleave'){ grDragMark(null); return; }
-  if(e.type==='dragend'){ GR.drag=null; grDragMark(null); return; }
+  if(e.type==='dragleave'){
+    var rt=e.relatedTarget;
+    if(rt&&el&&el.contains&&el.contains(rt)) return;   /* 같은 항목 안쪽으로 옮겨 간 것 — 표시를 지우면 깜박인다 */
+    grDragMark(null); return;
+  }
+  if(e.type==='dragend'){ grDragEnd(); return; }
   if(e.type!=='drop') return;
-  GR.drag=null; grDragMark(null);   /* 놓으면 어디든 끌기는 끝난다(다시 그리면 끌던 항목이 사라져 dragend 가 안 올 수 있다) */
-  if(!d||!el||grp!==d.grp||code===d.code||GR.obusy) return;
+  var got=''; try{ got=e.dataTransfer?String(e.dataTransfer.getData(GR_BIZ.dragType)||''):''; }catch(x){ got=''; }
+  grDragEnd();   /* 놓으면 어디든 끌기는 끝난다(다시 그리면 끌던 항목이 사라져 dragend 가 안 올 수 있다) */
+  if(!d||!el||grp!==d.grp||code===d.code||GR.obusy||!grHasDragType(e)||got!==d.code) return;   /* 전용 형식에 실린 코드가 끌던 항목과 같을 때만 */
   if(e.preventDefault) e.preventDefault();
   var dd=GR.docs||{}, next=PuGovReportNav.reorder({biz:dd.biz,order:GR.bizOrder},d.code,code,grDropAfter(el,e));
   if(!next) return;   /* 모르는 사업이거나 바뀐 것이 없다 */
   var prev=GR.bizOrder;
   GR.bizOrder=next; GR.dver++; GR.bbmsg=''; GR.obusy=true;
-  grRender();
   var ok=false;
-  try{ ok=await grSaveBizOrder(next); }finally{ GR.obusy=false; }
+  try{ grRender(); ok=await grSaveBizOrder(next); }
+  catch(x){ console.warn('[컨설팅보고서] 사업 순서 그리기·저장 중 오류',x); ok=null; }   /* 그리다 던지면 저장하지 않고 되돌린다 */
+  finally{ GR.obusy=false; }   /* 어떤 경우에도 잠금은 풀린다 */
   if(ok!==true){
     if(GR.bizOrder===next){ GR.bizOrder=prev; GR.dver++; }   /* 그 사이 다른 읽기가 목록을 바꿨으면 덮지 않는다 */
     GR.bbmsg=(ok===null)?GR_BIZ.orderBad:GR_BIZ.orderFail;
@@ -2052,6 +2065,8 @@ function grBoot(){
     if(b) grSetBiz(b.getAttribute('data-biz'));
   });
   ['dragstart','dragover','dragleave','drop','dragend'].forEach(function(t){ $('biz').addEventListener(t,grDragBiz); });
+  /* 끌던 항목이 다시 그려져 사라지면 dragend 가 #biz 까지 안 온다 — document 에서도 끝을 받는다. drop 은 #biz 가 먼저 읽도록 거품 단계(캡처 아님) */
+  document.addEventListener('dragend',grDragEnd,true); document.addEventListener('drop',grDragEnd);
   $('yrbar').addEventListener('click',function(e){
     var b=e.target&&e.target.closest?e.target.closest('[data-yr]'):null;
     if(b&&!b.disabled) grSetYear(b.getAttribute('data-yr'));
