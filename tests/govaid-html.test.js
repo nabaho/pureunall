@@ -189,3 +189,16 @@ test('편집 창에서 기업마당 공고번호를 직접 넣고 뺄 수 있다
   assert.match(fnBody('editorHtml'), /id="eBiz"/);
   assert.match(fnBody('readEditor'), /eBiz/);
 });
+
+/* ★ 노무사 직접 사업 (대표 지시 2026-10-13 「공인노무사가 직접 할 수 있는 사업은 별표시 하고 계속 확인할 수 있게 … 모든 영역에서」) */
+test('★ — 모든 화면에서 별을 켜고 끌 수 있다(회사 중심·한눈 표·사업 중심·사전·확인할 조건·새 공고·편집 창)', () => {
+  ['drawCoDetail', 'drawGrid', 'drawProg', 'drawProgDetail', 'drawDict', 'checkRow', 'drawNews', 'editorHtml'].forEach((f) =>
+    assert.match(fnBody(f), /starBtn\(/, f + ' 에 ★ 단추가 없다'));
+  assert.match(fnBody('toggleStar'), /GovaidRecords\.starred\(/);
+});
+test('★만 보기 — 한 스위치가 모든 화면의 사업 목록을 같이 거른다(GovaidView.starOnly)', () => {
+  assert.match(NOC, /id="starOnly"/);
+  assert.match(fnBody('VP'), /GovaidView\.starOnly\(PROGS/);
+  ['drawCo', 'drawCoDetail', 'coDocs', 'drawGrid', 'drawProg', 'drawDict', 'drawCheck'].forEach((f) =>
+    assert.match(fnBody(f), /VP\(\)/, f + ' 가 ★만 보기를 따르지 않는다'));
+});

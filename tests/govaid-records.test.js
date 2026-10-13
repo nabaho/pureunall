@@ -96,3 +96,15 @@ test('공고 → 새 사업 초안 — 이름·기관·요약·원문·공고번
   assert.deepEqual(p.fields, ['인력']);
   assert.equal(p.baseYear, 2026);
 });
+
+/* ★ 노무사 직접 사업 (대표 지시 2026-10-13 「공인노무사가 직접 할 수 있는 사업은 별표시 … 모든 영역에서」) */
+test('별표 — 켜고 끄는 사람·때·까닭을 남긴다(끈 것도 남겨 다시 켜지지 않게), 찬 자리에서도 id', () => {
+  const known = { id: 'gp-r71', name: '청년도약' };
+  const on = R.starred(null, known, true, '신청 대행', 'A-001', 5);
+  assert.equal(on.id, 'gp-r71');
+  assert.deepEqual(on.star, { on: true, why: '신청 대행', by: 'A-001', at: 5 });
+  const off = R.starred(on, known, false, '', 'A-002', 6);
+  assert.equal(off.star.on, false);
+  assert.equal(off.star.by, 'A-002');
+  assert.equal(off.star.why, '신청 대행', '끌 때 까닭을 비우면 앞 까닭을 둔다');
+});
