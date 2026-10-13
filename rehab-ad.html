@@ -1035,7 +1035,7 @@ function downloadCsv(){
 /* ═══ 불러오기 ═══ */
 async function reload(){
   try{
-    var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(), loadInfo(), loadFsc(), fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value')]);
+    var r=await Promise.all([fbDb.ref('rehab_ad/notices').once('value'), loadMarks(), loadInfo(), fbDb.ref('rehab_ad/runs').orderByKey().limitToLast(1).once('value'), loadFsc()]);   /* 번호로 읽으니(r[0]·r[3]) 새 읽기는 «맨 끝»에 둔다 — 중간에 끼우면 번호가 밀린다 */
     NOTICES=r[0].val()||{};
     var runs=r[3].val()||{}, k=Object.keys(runs).pop(); LASTRUN=k?Object.assign({date:k},runs[k]):null;
     fillFilters(); recomputeMatch(); draw();
