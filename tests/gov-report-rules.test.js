@@ -235,3 +235,72 @@ test('scal_bizState — 두 규칙 JSON(전체-적용본·rules-paste)이 같은
   assert.deepEqual(a, rules, '적용본 전체가 생성기 출력과 같다');
   assert.deepEqual(p, rules, 'rules-paste 전체가 생성기 출력과 같다');
 });
+
+/* ═══ 사업 순서 scal_bizOrder (2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-order.md) ═══ */
+
+test('scal_bizOrder — 읽기는 로그인 직원 · 루트 쓰기 문 없음 · main 쓰기는 관리자·위임관리인(MGR) 식 그대로', () => {
+  const r = rules.scal_bizOrder;
+  const login = rules.scal_scheds['.read'];            /* LOGIN 식 그대로 */
+  const admin = rules.serverBackups['.read'];          /* ADMIN 식 그대로 */
+  const mgr = rules.serverBackups['.write'];           /* MGR 식 그대로(생성기의 MGR 상수) */
+  assert.ok(r, 'scal_bizOrder 자리가 없습니다');
+  assert.equal(r['.read'], login, '읽기는 로그인(재직 직원)');
+  assert.equal(r['.write'], undefined, '루트에 쓰기 문을 열지 않는다(통째 지우기·덮어쓰기 방지)');
+  assert.equal(r.main['.write'], mgr, '순서 바꾸기는 관리자·위임관리인');
+  assert.notEqual(mgr, admin, 'MGR 은 ADMIN 과 다른 식(위임관리인 포함)이어야 한다');
+  assert.ok(mgr.includes(admin), 'MGR 은 ADMIN 을 포함한다');
+  assert.deepEqual(Object.keys(r).sort(), ['.read', 'main'], 'main 말고 다른 자식 칸은 만들지 않는다($변수 없음 — 규칙에 없는 자리는 기본 거부)');
+});
+
+test('scal_bizOrder/main 모양 — list·at 필수 · list 길이·글자 꼴 · by ≤40자 · at 숫자 · 다른 칸 거절 · {m,n} 범위 없음', () => {
+  const m = rules.scal_bizOrder.main;
+  assert.equal(m['.validate'], "newData.hasChildren(['list','at'])", 'list·at 필수');
+  assert.ok(m.list['.validate'].includes('newData.isString()'));
+  assert.ok(m.list['.validate'].includes('matches(/^[A-Za-z0-9_,-]*$/)'), 'list 는 코드 글자와 쉼표만');
+  assert.equal(m.by['.validate'], 'newData.isString() && newData.val().length <= 40');
+  assert.equal(m.at['.validate'], 'newData.isNumber()');
+  assert.equal(m.$other['.validate'], false, '다른 칸은 거절');
+  assert.deepEqual(Object.keys(m).sort(), ['$other', '.validate', '.write', 'at', 'by', 'list']);
+  ['list', 'by', 'at'].forEach((f) => assert.equal(m[f]['.write'], undefined, f + ' 에 따로 쓰기 문 없음'));
+  const all = JSON.stringify(rules.scal_bizOrder);
+  assert.doesNotMatch(all, /\{\d+,\d*\}/, '배포된 규칙에 쓰인 적 없는 {m,n} 범위 한정자를 쓰지 않는다');
+});
+
+test('scal_bizOrder 한계 — 규칙과 화면 모듈(js/pu-gov-report-nav.js)이 같은 값(숫자·글자 꼴을 규칙 문자열에서 읽는다)', () => {
+  const m = rules.scal_bizOrder.main;
+  assert.equal(upperOf(m.list['.validate']), Nav.ORDER_LEN_MAX, '목록 전체 길이');
+  assert.equal(Nav.ORDER_LEN_MAX, 4000);
+  assert.equal(upperOf(m.by['.validate']), 40, '처리자 이름 길이');
+  const re = /matches\(\/(.+)\/\)/.exec(m.list['.validate']);
+  assert.ok(re, 'list 정규식을 읽지 못했습니다');
+  const rule = new RegExp(re[1]);
+  assert.equal(Nav.ORDER_NODE_KEY, 'main', '화면이 쓰는 문서 이름이 규칙의 이름 붙은 칸과 같다');
+  assert.ok(Object.prototype.hasOwnProperty.call(rules.scal_bizOrder, Nav.ORDER_NODE_KEY));
+  /* 화면 모듈이 만든 기록은 규칙을 통과하는 모양이다 */
+  const codes = Array.from({ length: Nav.ORDER_MAX }, (_, i) => 'N-' + String(i).padStart(3, '0'));
+  const e = Nav.orderEntry(codes, 'y'.repeat(60), 1760000000000);
+  assert.ok(e, '200 개짜리 기록이 만들어진다');
+  assert.ok(rule.test(e.list), '모듈이 만든 list 글자가 규칙 정규식을 통과');
+  assert.ok(e.list.length <= upperOf(m.list['.validate']), '모듈이 만든 list 길이가 규칙 한도 안');
+  assert.ok(e.by.length <= upperOf(m.by['.validate']), '모듈이 만든 처리자가 규칙 한도 안');
+  Object.keys(e).forEach((k) => assert.ok(Object.prototype.hasOwnProperty.call(m, k), '규칙이 모르는 칸: ' + k));
+  assert.ok(['list', 'at'].every((k) => k in e), '필수 칸 list·at 이 있다');
+  /* 코드 꼴(모듈) ⊂ 규칙 글자 꼴 — 모듈이 받아들이는 코드는 규칙 정규식도 통과한다 */
+  ['A', 'a-1', 'B_2', 'X'.repeat(40)].forEach((c) => assert.ok(rule.test(c), c));
+  assert.equal(rule.test('A B'), false);
+  assert.equal(rule.test('가나'), false);
+  assert.equal(rule.test('A;B'), false);
+});
+
+test('scal_bizOrder — 두 규칙 JSON(전체-적용본·rules-paste)이 같은 블록을 가지고 생성기 출력과 같다', () => {
+  const fs = require('node:fs');
+  const pick = (f) => JSON.parse(fs.readFileSync(path.join(ROOT, 'docs', f), 'utf8')).rules;
+  const gen = rules.scal_bizOrder;
+  assert.ok(gen, '생성기 출력에 scal_bizOrder');
+  const a = pick('firebase-rules-전체-적용본.json');
+  const p = pick('rules-paste.json');
+  assert.deepEqual(a.scal_bizOrder, gen, '적용본');
+  assert.deepEqual(p.scal_bizOrder, gen, 'rules-paste');
+  assert.deepEqual(a, rules, '적용본 전체가 생성기 출력과 같다');
+  assert.deepEqual(p, rules, 'rules-paste 전체가 생성기 출력과 같다');
+});

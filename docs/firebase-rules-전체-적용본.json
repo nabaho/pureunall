@@ -1124,6 +1124,25 @@
         }
       }
     },
+    "scal_bizOrder": {
+      ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+      "main": {
+        ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)",
+        ".validate": "newData.hasChildren(['list','at'])",
+        "list": {
+          ".validate": "newData.isString() && newData.val().length <= 4000 && newData.val().matches(/^[A-Za-z0-9_,-]*$/)"
+        },
+        "by": {
+          ".validate": "newData.isString() && newData.val().length <= 40"
+        },
+        "at": {
+          ".validate": "newData.isNumber()"
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "serverBackups": {
       ".read": "root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       ".write": "auth != null && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || root.child('uid_roles').child(auth.uid).child('isSubAdmin').val() == true)"
