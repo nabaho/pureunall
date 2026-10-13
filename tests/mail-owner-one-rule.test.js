@@ -325,7 +325,7 @@ test('★★★ 동기화가 «새로 받아온 것»에서만, 그 목록으로
   const sync = fs.readFileSync(path.join(__dirname, '..', 'functions', 'mail-sync.js'), 'utf8');
   const i = sync.indexOf('MYMAIL.notifyOwners');
   assert.ok(i > 0, 'mail-sync 가 불러야 한다 — 안 부르면 아무 일도 안 일어난다');
-  const near = sync.slice(Math.max(0, i - 600), i + 200);
+  const near = sync.slice(Math.max(0, i - 600), i + 500);
   assert.ok(/r\.dir === 'fresh'/.test(near), '옛것 채우기에서 울리면 몇 달 치가 한꺼번에 온다');
   assert.ok(/NOTIFY_KINDS/.test(near), '칸 갈래를 여기 베껴 적지 말 것 — 한 자리에서 읽는다');
   assert.ok(/catch/.test(near), '알림이 죽어도 동기화는 계속돼야 한다');

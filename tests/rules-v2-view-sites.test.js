@@ -13,6 +13,7 @@ const { stripComments } = require('./strip-comments');
 
 global.PuRulesV2Order = require('../js/rules-v2/lib-order.js');
 global.PuRulesV2Sites = require('../js/rules-v2/lib-sites.js');
+global.PuRulesV2SiteCols = require('../js/rules-v2/lib-sitecols.js');   // render 가 머리줄 거르기·쪽 셈을 쓴다
 global.PuRulesV2Lib = require('../js/rules-v2/view-library.js');
 const O = global.PuRulesV2Order, L = global.PuRulesV2Sites, Lib = global.PuRulesV2Lib;
 const V = require('../js/rules-v2/view-sites.js');

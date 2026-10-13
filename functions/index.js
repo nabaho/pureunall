@@ -54,7 +54,9 @@ const RulesLawWatch = require("./rules-lawwatch");
 const RULES_LAWWATCH_LIST = require("./rules-lawwatch-laws.json");
 const RecruitWatch = require("./recruit-watch");
 const RecruitDigest = require("./recruit-digest");
+const GovFeedCollect = require("./gov-feed-collect");
 const RehabWatch = require("./rehab-watch");
+const RehabFsc = require("./rehab-fsc");
 
 if (!getApps().length) initializeApp();
 
@@ -1218,6 +1220,61 @@ exports.recruitWatch = functions
     return null;
   });
 
+/* 📋 공고 모아보기 — 매일 아침 공고 모으기 (대표 지시 2026-10-12 「매일매일 공고를 크롤링 하고 모을 수 있나? 그게 가능하게 만들어 달라」)
+   나라장터·알리오·기업마당을 화면과 «같은 모듈·같은 낱말»로 받아 gov_feed/rows 에 쌓는다. 화면은 열 때 거기서 빠진 공고를 목록에 합친다.
+   ⚠ 인증키는 대표 자리(gov/{uid}/key_data·key_biz)에서 읽기만 한다 — 로그·결과 어디에도 안 남긴다.
+   ⚠ 대표의 목록(gov/{uid}/feed)에는 쓰지 않는다(숨김·별표를 덮지 않게). 하루 약 22회 — 하루 1,000회 제한 안.
+   07:40 — 컨설턴트 모집 감시(07:20)가 끝난 뒤. */
+exports.govFeedCollect = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("every day 07:40")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase(), feed = db.ref("gov_feed");
+    const r = await GovFeedCollect.run({
+      roles: async () => (await db.ref("uid_roles").once("value")).val(),
+      cfg: async (uid) => {
+        const g = db.ref("gov/" + uid);
+        const [d, b, k] = await Promise.all(["key_data", "key_biz", "kw"].map((n) => g.child(n).once("value")));
+        return { keyData: d.val(), keyBiz: b.val(), kw: k.val() };
+      },
+      existing: async () => (await feed.child("rows").once("value")).val(),
+      write: (updates) => feed.update(updates),
+      getJson: async (u) => (await fetch(u, { signal: AbortSignal.timeout(25000) })).json(),
+    });
+    console.log("[공고 모으기]", { ok: r.ok, added: r.last.added, counts: r.last.counts, errors: r.last.errors, error: r.last.error });
+    return null;
+  });
+
+/* 🎯 정부지원금 — 매일 기업마당 공고 감시 (대표 지시 2026-10-12 「매년 사업관련 자동 업데이트」 → 「둘다」, functions/govaid-notice-watch.js)
+   govaid/notices/{공고번호} 에 쌓고 사전 사업과 이름이 비슷한 것을 «제안»만 한다. 사람이 이은(program.bizinfo) 사업만 접수 상태를 맞춘다.
+   ⚠ 인증키는 정부사업신청 대표 자리(gov/{uid}/key_biz)에서 읽기만 — 로그·결과에 안 남긴다. 사람이 표시한 접수 상태·처리는 덮지 않는다.
+   08:10 — 공고 모으기(07:40)와 겹치지 않게. 분야마다 한 번(약 8회). */
+const GovaidNoticeWatch = require("./govaid-notice-watch");
+exports.govaidNoticeWatch = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 300, memory: "256MB" })
+  .pubsub.schedule("every day 08:10")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const db = getDatabase(), g = db.ref("govaid");
+    const r = await GovaidNoticeWatch.run({
+      roles: async () => (await db.ref("uid_roles").once("value")).val(),
+      cfg: async (uid) => {
+        const b = await db.ref("gov/" + uid + "/key_biz").once("value");
+        return { keyBiz: b.val() };
+      },
+      programs: async () => (await g.child("programs").once("value")).val(),
+      existing: async () => (await g.child("notices").once("value")).val(),
+      write: (updates) => g.update(updates),
+      getJson: async (u) => (await fetch(u, { signal: AbortSignal.timeout(25000) })).json(),
+    });
+    const L = r.last || {};
+    console.log("[정부지원금 공고 감시]", { ok: r.ok, received: L.received, added: L.added, suggested: L.suggested, closureChanged: L.closureChanged, errors: L.errors, error: L.error });
+    return null;
+  });
+
 /* 회생광고 — 전국 회생 관할 법원 공고에서 «법인회생 포괄적 금지명령» 기업을 모은다 (2026-10-10).
    대표 지시 「포괄금지명령 나온 기업들만 모아서 … 푸른통합시스템에 앱 만든다. 회생광고로」
         「주소가 있으면 기업 홈페이지 등을 직접 찾아서 연락처·메일·팩스를 정렬해서 볼 수 있게」.
@@ -1355,17 +1412,62 @@ exports.rehabWatch = functions
     const first = !(await root.child("runs").limitToFirst(1).once("value")).exists();
     const noBankruptcyYet = RehabWatch.DEFAULT_KINDS.indexOf("bankruptcy") >= 0 && !Object.keys(existing).some((k) => existing[k] && existing[k].kind === "bankruptcy");
     const since = new Date(nowMs + 9 * 3600e3 - ((first || noBankruptcyYet) ? 35 : 10) * 864e5).toISOString().slice(0, 10);   // 처음이면(파산을 처음 모을 때도) 한 달 치
+    /* ★ 2026-10-12 아침 수집이 15개 법원 전부 «fetch failed» 로 끝났다(160초, 한 건도 못 읽음) — 원인이 안 남아 알 수 없었다.
+       ① 오류에 진짜 까닭(err.cause: ETIMEDOUT·ENOTFOUND·ECONNRESET …)을 붙인다
+       ② 접속 자체가 막힌 것은 한 번 더 시도한다(일시 장애)
+       ③ 연달아 4번 접속이 안 되면 «출처가 닫혔다»고 보고 나머지 요청을 바로 포기한다 — 540초를 헛되이 쓰지 않으려고 */
+    let netFails = 0;
     const post = async (u, body) => {
-      const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
-        headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
-      if (!r.ok) throw new Error("HTTP " + r.status);
-      return r.json();
+      if (netFails >= 4) throw new Error("출처 접속 불가(앞선 요청 연속 실패)");
+      let last;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const r = await fetch(u, { method: "POST", body: JSON.stringify(body), signal: AbortSignal.timeout(30000),
+            headers: { "Content-Type": "application/json; charset=UTF-8", "User-Agent": RehabWatch.UA } });
+          netFails = 0;
+          if (!r.ok) throw Object.assign(new Error("HTTP " + r.status), { noRetry: true });
+          return await r.json();
+        } catch (err) {
+          if (err && err.noRetry) throw err;
+          netFails++;
+          const why = err && err.cause ? String(err.cause.code || err.cause.message || err.cause) : "";
+          last = new Error(String((err && err.message) || err) + (why ? " (" + why + ")" : ""));
+          if (attempt < 2) await new Promise((ok) => setTimeout(ok, 2000));
+        }
+      }
+      throw last;
     };
     const result = await RehabWatch.run({ post, existing, sinceYmd: since, nowMs,
       wait: () => new Promise((ok) => setTimeout(ok, 800)) });
     /* 온톨로지 판 표시 — 서버는 관리자 SDK 라 규칙을 건너뛰므로 레코드 모양을 여기서 갖춘다 */
     result.added.forEach((r) => { r.schemaVersion = 3; r.contractVersion = OntologyServerWrite.CONTRACT_VERSION; });
     const upd = RehabWatch.updatesOf(result, today, nowIso, nowMs);
+
+    /* ── 금융위 기업기본정보로 대표자·전화·팩스·홈페이지 채우기 (functions/rehab-fsc.js 머리말) ──
+       «이름 + 시·군·구가 모두 맞는 하나»만 채운다. 실패해도 수집은 계속 — 호출이 실패한 곳은 저장하지 않아 내일 다시 본다. ── */
+    try {
+      const fscKey = String(process.env.NTS_KEY || "").trim() || String((await getDatabase().ref("data/app_config/ntsKey").once("value")).val() || "").trim();
+      if (fscKey) {
+        const fscSaved = (await root.child("fsc").once("value")).val() || {};
+        const byId = {};
+        Object.keys(existing).map((k) => existing[k]).concat(result.added).forEach((n) => { if (n && n.id) byId[n.id] = n; });
+        const todoF = RehabFsc.plan(byId, fscSaved, nowMs, 80);
+        let fFound = 0, fNone = 0, fErr = 0, fTried = 0;
+        for (const n of todoF) {
+          if (Date.now() > t0 + 150 * 1000 || fErr >= 5) break;   // 시간 상자 · 연달아 막히면 그만
+          fTried++;
+          try {
+            const r = await RehabFsc.lookup({ notice: n, key: fscKey, fetchFn: (u) => fetch(u, { signal: AbortSignal.timeout(20000) }) });
+            upd["fsc/" + n.id] = Object.assign(RehabFsc.record(n, r, Date.now()), { schemaVersion: 3, contractVersion: OntologyServerWrite.CONTRACT_VERSION });
+            if (r.status === "found") fFound++; else fNone++;
+          } catch (e) { fErr++; console.warn("[회생광고 금융위]", String((e && e.message) || e).replace(fscKey, "***").slice(0, 120)); }
+          await new Promise((ok) => setTimeout(ok, 150));
+        }
+        upd["runs/" + today].fsc = { tried: fTried, found: fFound, none: fNone, error: fErr, left: Math.max(0, todoF.length - fTried) };
+      } else {
+        upd["runs/" + today].fscNote = "공공데이터 열쇠(ntsKey)가 없어 금융위 기업기본정보를 부르지 않았습니다";
+      }
+    } catch (e) { console.warn("[회생광고 금융위]", String((e && e.message) || e).slice(0, 120)); }
 
     /* ── 연락처 찾기 — 아직 안 찾은 곳(또는 «못 찾음»이 이레 지난 곳)을 최신 공고부터, 시간 상자 안에서 ── */
     const providers = rehabProviders();

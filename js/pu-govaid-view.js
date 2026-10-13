@@ -48,7 +48,7 @@
     return null;
   }
   function forSubject(profile, progs, year) {
-    var g = { candidate: [], unknown: [], no: [], unconfirmed: [] };
+    var g = { candidate: [], unknown: [], no: [], unconfirmed: [], closed: [] };
     progs.forEach(function (p) { var r = M.judge(profile, p, year); g[r.verdict].push({ program: p, result: r }); });
     return g;
   }
@@ -67,11 +67,12 @@
     return { cols: progs.filter(function (p) { return used[p.id]; }), rows: out };
   }
   function forProgram(program, profiles, year) {
-    var g = { candidate: [], unknown: [], no: 0 };
+    var g = { candidate: [], unknown: [], no: 0, closed: 0 };
     profiles.forEach(function (pf) {
       var r = M.judge(pf, program, year);
       if (r.verdict === 'candidate' || r.verdict === 'unknown') g[r.verdict].push({ profile: pf, result: r });
       else if (r.verdict === 'no') g.no++;
+      else if (r.verdict === 'closed') g.closed++;
     });
     return g;
   }
@@ -98,9 +99,59 @@
     var n = clean(p && p.name), m = n.match(/^(\d{4})년도?\s+(.+)$/);
     return m ? { title: m[2], year: m[1] } : { title: n, year: '' };
   }
+  /* 한눈 표 열 머리용 짧은 이름 — 사람이 넣은 short 가 먼저. 없으면 앞의 해·괄호·«— 뒤»·꼬리 «지원사업/사업/지원»을 떼고
+     10자가 넘으면 9자 + … (대표 지시 2026-10-12 한눈 표 시안 A: 머리 글자를 가로로 읽히게) */
+  function shortName(p) {
+    var s = clean(p && p.short);
+    if (s) return s;
+    s = shortTitle(p).title.replace(/\s*[—–-]\s.*$/, '').replace(/\([^)]*\)/g, '').replace(/\s*(지원\s*사업|사업|지원)$/, '').trim();
+    return s.length > 10 ? s.slice(0, 9) + '…' : s;
+  }
+  /* 회사별 «준비할 서류» — 후보(candidate) 사업의 docs 를 낱말(key)로 모은다. «그 밖»은 공고 이름별로.
+     노무 서류(DOCS[key].labor) 먼저 → 쓰이는 사업이 많은 것 → 낱말표 차례 */
+  function docsFor(profile, progs, year) {
+    var D = M.DOCS, order = Object.keys(D), map = {}, out = [];
+    progs.forEach(function (p) {
+      if (M.judge(profile, p, year).verdict !== 'candidate') return;
+      M.list(p.docs).forEach(function (d) {
+        if (!d) return;
+        var key = D[d.key] ? d.key : 'other', label = key === 'other' ? clean(d.label) || '그 밖' : D[key].label, id = key + '|' + (key === 'other' ? label : '');
+        if (!map[id]) { map[id] = { key: key, label: label, labor: !!D[key].labor, programs: [], stages: [] }; out.push(map[id]); }
+        var e = map[id];
+        if (!e.programs.some(function (x) { return x.id === p.id; })) e.programs.push({ id: p.id, name: clean(p.name), short: shortName(p) });
+        if (d.stage && e.stages.indexOf(d.stage) < 0) e.stages.push(d.stage);
+      });
+    });
+    return out.sort(function (a, b) { return (b.labor - a.labor) || (b.programs.length - a.programs.length) || (order.indexOf(a.key) - order.indexOf(b.key)); });
+  }
+  /* 📰 새 공고 (2026-10-12) — 서버 govaidNoticeWatch 가 쌓은 기업마당 공고를 «처리할 것»부터 거른다.
+     view: sug(비슷한 사전 사업이 있는 것) · all(처리 안 한 것 전체) · labor(인력·경영 분야) · linked(사업에 이은 것) · ignored(관계없음)
+     «이은 것»은 공고 쪽이 아니라 사업의 bizinfo 로 안다 — 잇기의 근거는 사업 레코드 하나다 */
+  var LABOR_FIELDS = ['인력', '경영'];
+  function noticeRows(noticesMap, progs, opt) {
+    opt = opt || {};
+    var today = clean(opt.today), view = opt.view || 'sug', q = clean(opt.q).toLowerCase(), byId = {}, linkOf = {};
+    progs.forEach(function (p) { if (!p || !p.id || p._deleted) return; byId[p.id] = p; M.list(p.bizinfo).forEach(function (no) { linkOf[clean(no)] = p; }); });
+    return rows(noticesMap).filter(function (n) { return n && clean(n.id); }).map(function (n) {
+      var sug = M.list(n.suggest).filter(function (s) { return s && byId[s.id]; }).map(function (s) { return { p: byId[s.id], score: s.score }; });
+      return { n: n, linkedTo: linkOf[clean(n.no || n.id)] || null, sug: sug };
+    }).filter(function (r) {
+      var n = r.n, open = !clean(n.closeDt) || clean(n.closeDt) >= today, fresh = !n.decision && !r.linkedTo;
+      if (opt.openOnly && !open) return false;
+      if (q && (clean(n.nm) + ' ' + clean(n.ntce) + ' ' + clean(n.inst)).toLowerCase().indexOf(q) < 0) return false;
+      if (view === 'linked') return !!r.linkedTo;
+      if (view === 'ignored') return n.decision === 'ignore';
+      if (!fresh) return false;
+      if (view === 'sug') return r.sug.length > 0;
+      if (view === 'labor') return LABOR_FIELDS.indexOf(clean(n.field)) >= 0;
+      return true;
+    }).sort(function (a, b) { return clean(b.n.openDt).localeCompare(clean(a.n.openDt)) || clean(a.n.nm).localeCompare(clean(b.n.nm), 'ko'); });
+  }
+  function noticeCount(noticesMap, progs, today) { return noticeRows(noticesMap, progs, { view: 'sug', openOnly: true, today: today }).length; }
   function needsCheck(p, year) { return !p || p.status !== 'confirmed' || !(Number(p.baseYear) >= Number(year)); }
 
   return { rows: rows, programs: programs, companies: companies, subjects: subjects, reviewOf: reviewOf,
     forSubject: forSubject, grid: grid, forProgram: forProgram, snapshot: snapshot, needsCheck: needsCheck,
-    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle };
+    ministryOf: ministryOf, byMinistry: byMinistry, shortTitle: shortTitle, shortName: shortName, docsFor: docsFor,
+    noticeRows: noticeRows, noticeCount: noticeCount };
 });

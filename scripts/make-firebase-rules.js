@@ -1187,6 +1187,13 @@ rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'a
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 고쳐 쓸 일이 없다. */
 rules.gov_watch = { '.read': 'auth != null && ' + ADMIN, '.write': false };
 
+/* ══ 공고 «받은 함» — 서버가 매일 아침 모은 공고 (대표 지시 2026-10-12 「매일매일 공고를 크롤링 하고 모을 수 있나」) ══
+   서버(govFeedCollect, 07:40)가 나라장터·알리오·기업마당을 받아 rows/{번호} 에 쌓고 last 에 건수·오류를 남긴다.
+   화면(정부사업신청)은 열 때 여기서 «빠진 공고»를 가져다 자기 목록에 합친다.
+   담기는 것은 «공개 공고»의 제목·기관·날짜·주소뿐이다(인증키·개인정보 없음).
+   ⚠ 읽기 = 관리자만(gov_watch 와 같다 — 무엇을 지켜보는지가 곧 대표의 관심이다). ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
+rules.gov_feed = { '.read': 'auth != null && ' + ADMIN, '.write': false };
+
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
    ⚠ 읽기 = 기업정보함(pucards)과 «같은» MAIL — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 MAIL 이 읽는다.
@@ -1212,7 +1219,11 @@ rules.govaid = { '.read': LOGIN,
   programs:  { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   prospects: { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   extras:    { $k:  { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k" } },
-  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } } };
+  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } },
+  /* 기업마당 공고 함(2026-10-12 「매년 … 자동 업데이트」) — 서버 govaidNoticeWatch 가 매일 쌓고(관리자 SDK), 직원은 «처리»(잇기·초안·관계없음)만 적는다.
+     읽기는 위의 LOGIN 그대로 — 공개 공고라 원장보다 넓히는 것이 없다. noticeLast(감시 기록)는 서버만 쓴다 */
+  notices:   { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
+  noticeLast: { '.write': false } };
 
 /* ══ 📺 전광판(pu-signboard.html + 이 PC 의 심부름꾼) — 외부 전광판 광고 (2026-10-12) ══
    설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 대표 「대표 + 관리직원」.

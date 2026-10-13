@@ -40,3 +40,13 @@ test('지원사업 레코드가 강제 관문을 통과한다', () => {
     { entityType: 'EligibilityReview', now: 1, actor: 'A-001' });
   assert.equal(r.ok, true, JSON.stringify(r.issues));
 });
+
+test('공고 함(govaid/notices) 쓰기 계약 — 직원이 «처리»를 적는 Document(govNotice) 레코드가 강제 관문을 통과한다', () => {
+  const g = O.PROGRAMS.govaid;
+  const c = g.writeContracts.find((w) => w.path.indexOf('govaid/notices/') === 0);
+  assert.ok(c, 'notices 쓰기 계약이 없다');
+  assert.equal(c.entityType, 'Document');
+  assert.ok(g.entityTypes.indexOf('Document') >= 0);
+  const n = W.prepareRecord({ id: 'PBLN_1', docKind: 'govNotice', no: 'PBLN_1', nm: '어느 공고', decision: 'ignore' }, { entityType: 'Document', now: 1, actor: 'A-001' });
+  assert.equal(n.ok, true, JSON.stringify(n.issues));
+});

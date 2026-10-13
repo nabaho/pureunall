@@ -64,10 +64,10 @@ function collectEmails(obj, addrs, doms) {
 }
 
 /* 「아는 곳」 표 — 후보가 있을 때만 한 번 읽는다(대부분의 회차는 후보가 0) */
-async function loadKnown(db) {
+async function loadKnown(db, readCompanies) {
   const addrs = {}, doms = {}, keys = {};
   const [cos, items, users, mailCo, mailWho, notCo] = await Promise.all([
-    db.ref("data/companies/v").once("value"),
+    readCompanies ? readCompanies().then((v) => ({ val: () => v })) : db.ref("data/companies/v").once("value"),
     db.ref(MAIL_ROOT + "/items").once("value"),
     db.ref("data/user_accounts/v").once("value"),
     db.ref(MAIL_ROOT + "/config/mailCo").once("value"),
@@ -102,7 +102,7 @@ async function notifyNewInquiries(deps, opts) {
   out.ran = true; out.cand = rows.length;
   const db = deps.getDatabase();
 
-  const known = await loadKnown(db);
+  const known = await loadKnown(db, o.readCompanies);
   const slug = String(o.slug || "");
   const fresh = rows.filter((r) => !isKnown(known, r.e));
   if (!fresh.length) return out;

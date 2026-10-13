@@ -200,7 +200,7 @@
        빌려 읽는 곳: data/user_dir(대표인지 확인) · uid_roles(권한). 쓰지는 않는다. */
     /* ⚠ kcareer/{uid}/ls 는 «읽기만» 한다 — 원본은 경력관리다(2026-09-10 「신청 재료」 탭).
        ⚠ 노드를 통째로 읽지 않는다: 밑에 API 열쇠(_secrets)와 첨부 조각(수 MB)이 있다. */
-    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */],
+    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */,'gov_feed' /* 공고 받은 함(서버 govFeedCollect 가 매일 모음) — 2026-10-12 */],
       sharedRoots:['data/user_dir','uid_roles','kcareer/{uid}/ls'],
       entityTypes:['Organization','Project','Document'] },
     /* 회생광고 — 법원 회생 공고(법인회생 «포괄적 금지명령»)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
@@ -223,8 +223,10 @@
       writeContracts:[{path:'govaid/programs/{id}',entityType:'SupportProgram'},
                       {path:'govaid/prospects/{id}',entityType:'Organization'},
                       {path:'govaid/extras/{key}',entityType:'Organization'},
-                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'}],
-      entityTypes:['Organization','SupportProgram','EligibilityReview'] },
+                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'},
+                      /* 기업마당 공고 함(2026-10-12) — 서버 govaidNoticeWatch 가 쌓고, 화면은 «처리»(잇기·초안·관계없음)만 적는다 */
+                      {path:'govaid/notices/{id}',entityType:'Document'}],
+      entityTypes:['Organization','SupportProgram','EligibilityReview','Document'] },
     /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
        ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).

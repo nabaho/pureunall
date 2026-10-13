@@ -295,3 +295,11 @@ test('ⓝ EDI 위임장 3종 글자 본문 — 네모 칸(┌│└)을 쓰지 �
   }
   assert.match(SRC, /원두정8길 6, 두정빌딩 3층 301호/, '시드 본문 주소도 3층 301호');
 });
+
+test('ⓞ 사건계약 목록 — 묶음 머리줄을 진하게(이름+개수) · 줄 밑에 «몇 종이 한 파일에» 구성 줄 (대표 2026-10-12 「구분이 안 된다」)', () => {
+  assert.match(SRC, /\.pcf-lg\{font-size:12px;color:#fff;background:#334155;/, '묶음 머리줄은 진한 띠');
+  assert.match(SRC, /'class': 'pcf-lgn', text: gcount\[g\] \+ '개'/, '묶음마다 개수');
+  assert.match(SRC, /function caseParts\(f\)/); assert.match(SRC, /out\.length \+ '종 · ' \+ out\.join\(' · '\)/);
+  assert.match(SRC, /'class': 'pcf-lnm col'/, '이름 줄 + 구성 줄');
+  assert.match(SRC, /S\.kind === 'case' && !S\.setView\) \? caseParts\(f\)/, '사건계약 목록에서만');
+});
