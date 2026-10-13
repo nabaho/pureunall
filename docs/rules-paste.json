@@ -1215,6 +1215,15 @@
           ".write": "auth != null && auth.token.email != null"
         }
       },
+      "bizreg": {
+        ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
+        ".indexOn": [
+          "at"
+        ],
+        "$k2": {
+          ".write": "auth != null && auth.token.email != null"
+        }
+      },
       "$k": {
         ".write": "(auth != null && auth.token.email != null) && (newData.exists() || root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true)",
         "$k2": {
