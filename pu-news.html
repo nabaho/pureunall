@@ -598,7 +598,12 @@ table.list.fz th.cap .cnt{font-size:11px;font-weight:800;color:var(--sub);backgr
 .pv .pvhd{font-size:12.5px;font-weight:800;padding:6px 12px;border-bottom:1px solid var(--line);
   display:flex;align-items:center;gap:8px}
 .pv .pvhd .sp{flex:1}
-.pv .paper{background:#e9e7e3;padding:4px 4px 8px;max-height:70vh;overflow:auto}
+/* ★ 지난 회차는 «한눈에» (대표 지시 2026-10-13 「지난회차 보는부분 한눈에 보게 해라 그래야 앞으로 수정가능하다」)
+     예전에는 이 상자가 70vh 로 갇혀(안쪽 스크롤) 있고, 편지 틀은 상자 폭 그대로라 편지(980px)의 오른쪽이 잘렸다(틀 안 가로 스크롤).
+     이제 편지를 «통째로 줄여» 폭에 맞추고(편지창채우기), 안쪽 스크롤 없이 쪽 하나로 끝까지 보여 준다.
+   ⚠ max-height·overflow:auto 를 되살리지 말 것 — 되살리면 한눈에 못 보고 안쪽에서 또 굴려야 한다. */
+.pv .paper{background:#e9e7e3;padding:4px 4px 8px}
+.pv .ltrwrap{margin:0 auto;overflow:hidden}
 .pv iframe{width:100%;border:0;background:#fff;display:block}
 
 table.list{width:100%;border-collapse:collapse;font-size:13px}
@@ -932,6 +937,10 @@ table.list tr:hover td{background:#fcfcfd}
   #shell>.wrap{flex:1;min-height:0;overflow-y:auto;padding-bottom:14px}
   /* 이번 회차만 — 회차 머리줄까지 얼리고 아래를 두 칸으로 */
   #shell>.wrap.now{overflow:hidden;display:flex;flex-direction:column}
+  /* 지난 회차는 목록보다 «편지»가 주인이다 — 넓은 화면(2칸)에서 미리보기 칸을 더 준다(5 : 7). 줄인 편지의 글자가 그만큼 커진다.
+     ⚠ 목록 칸에 «최소 폭(540px)»이 있어야 한다 — 없으면 1100px 창에서 목록이 440px 로 좁아져 «시험» 배지가 세로로 쪼개지고 회차 이름이 두 줄로 꺾인다(실측 2026-10-13).
+     ⚠ 1:1 로 되돌리면 1280px 창에서 편지가 0.62배로 줄어 글자가 작아진다. 폰·태블릿(1칸)은 영향이 없다. */
+  #main[data-tab=past] .cols{grid-template-columns:minmax(540px,5fr) minmax(0,7fr)}
   /* ★ 회차 머리줄을 얇게 (대표 지시 2026-09-05 「캡쳐4의 부분 캡쳐3으로 모두 넣어라」).
      제 한 줄을 통째로 먹고 있어서, 그만큼 아래 꼭지가 밀렸다. */
   /* ⚠ 「>」 하나를 뺀다 — 2026-09-06 부터 회차 줄은 «왼쪽 칸 안»에 있다(손자다).
@@ -3996,14 +4005,33 @@ function 지역판요약(명단){
      700 이 박혀 있었는데 편지가 980 으로 넓어지자 미리보기 틀만 700 에 머물러
      오른쪽이 잘렸다(대표 화면: 팝업 아래 가로 스크롤). 한 곳에서만 정한다. */
 const 편지폭 = (window.PuNewsTpl && window.PuNewsTpl.전문넓이) || 980;
-let _편지맞추기 = null;
-function 편지창채우기(자리, 서식){
+/* 이 폭보다 좁은 칸에서는 편지를 «줄이지 않는다» — 980px 편지를 이보다 좁게 줄이면 배율이 0.5 아래가 되어
+   글자가 못 읽을 만큼 작아진다(980 × 0.49 ≈ 480). 그 폭에서는 편지가 «스스로» 폰 모양(한 줄 쌓기, 640px 아래)으로 접혀 읽을 만하다.
+   ⚠ 640 으로 두면 1280px 창(칸 600px 안팎)에서도 쌓은 모양이 떠 «실제로 나가는 모양(980px 세 칸)»과 달라진다 — 한눈에 못 본다. */
+const 폰꼴폭 = 480;
+/* 줄여 맞추는 틀이 «여럿»일 수 있다(지난 회차 옆 미리보기 + 크게 창) — 자리마다 따로 맞춘다.
+   ⚠ 하나만 두면 나중에 그린 틀이 앞의 것을 덮어, 화면 크기를 바꿔도 앞의 틀이 안 맞춰진다. */
+const _맞추기들 = {};
+let _편지맞추기 = function(){
+  Object.keys(_맞추기들).forEach(function(자리){
+    const g = _맞추기들[자리];
+    if(g && g.el.isConnected) g.fn(); else delete _맞추기들[자리];   /* 다시 그려져 사라진 틀은 치운다 */
+  });
+};
+/* 옵션: 좁으면그대로(폰꼴폭 아래에서는 안 줄인다) · 틀스크롤없이(틀 키가 편지 키라 안쪽 스크롤이 필요 없다 — 틀 안에 스크롤바가 끼면 폭이 15px 줄어 오른쪽이 잘린다)
+   · 불러온뒤(함수 — 틀이 불러와져 키가 정해진 뒤 한 번) */
+function 편지창채우기(자리, 서식, 옵션){
   const el = $(자리); if(!el) return;
-  el.innerHTML = '<div class="ltrwrap"><iframe class="ltrf" title="미리보기"'
+  const 뜻 = 옵션 || {};
+  el.innerHTML = '<div class="ltrwrap"><iframe class="ltrf" title="미리보기"' + (뜻.틀스크롤없이 ? ' scrolling="no"' : '')
     + ' style="width:' + 편지폭 + 'px;border:0;background:#fff;display:block;'
     + 'transform-origin:top left"></iframe></div>';
   const f = el.querySelector('.ltrf');
   const wrap = f.parentNode;
+  function 키맞추기(){
+    /* 폭이 바뀌면 줄바꿈이 달라져 편지 키도 달라진다 — 그때마다 다시 잰다 */
+    try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){}
+  }
   function 맞추기(){
     /* 쓸 수 있는 폭 — ⚠ clientWidth 는 «안쪽 여백을 품는다». 그대로 쓰면 여백만큼
          넓게 그려 가로 스크롤이 28px 생긴다(실측 2026-09-12). 여백을 빼야 딱 맞는다. */
@@ -4011,6 +4039,15 @@ function 편지창채우기(자리, 서식){
     const 쓸폭 = el.clientWidth
       - (parseFloat(cs.paddingLeft) || 0) - (parseFloat(cs.paddingRight) || 0);
     if(!(쓸폭 > 0)) return;
+    if(뜻.좁으면그대로 && 쓸폭 < 폰꼴폭){
+      /* 폰 폭 — 틀을 쓸 수 있는 폭 «그대로» 둔다. 편지가 스스로 폰 모양으로 접힌다 */
+      f.style.width = 쓸폭 + 'px'; f.style.transform = '';
+      키맞추기();
+      wrap.style.width = 쓸폭 + 'px'; wrap.style.height = (parseFloat(f.style.height) || 0) + 'px';
+      return;
+    }
+    f.style.width = 편지폭 + 'px';
+    키맞추기();
     const k = Math.min(1, 쓸폭 / 편지폭);
     f.style.transform = k < 1 ? 'scale(' + k + ')' : '';
     const h = parseFloat(f.style.height) || 0;
@@ -4019,10 +4056,17 @@ function 편지창채우기(자리, 서식){
   }
   f.srcdoc = '<!doctype html><meta charset="utf-8"><base target="_blank"><body style="margin:0">' + 서식;
   f.onload = function(){
-    try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){}
     맞추기();
+    if(typeof 뜻.불러온뒤 === 'function'){ try{ 뜻.불러온뒤(f); }catch(_){ /* 덤으로 하는 일이 틀을 막지 않는다 */ } }
   };
-  _편지맞추기 = 맞추기;
+  _맞추기들[자리] = { el: el, fn: 맞추기 };
+  /* ★ 쪽이 길어져 세로 스크롤바가 생기면 «칸 폭»이 줄어도 창 크기 이벤트는 안 온다 —
+       칸 자체를 지켜봐야 오른쪽이 잘리지 않는다(스크롤바 폭만큼 잘리던 것). */
+  if(window.ResizeObserver){
+    if(el._편지지켜보기) el._편지지켜보기.disconnect();
+    el._편지지켜보기 = new ResizeObserver(맞추기);
+    el._편지지켜보기.observe(el);
+  }
 }
 /* 창을 열어 둔 채 화면 크기를 바꿔도 다시 맞춘다 — 안 맞추면 그때부터 다시 잘린다 */
 window.addEventListener('resize', function(){ if(_편지맞추기) _편지맞추기(); 위높이재기(); });
@@ -4066,7 +4110,7 @@ function 크게보기(){
   편지창채우기('bigB', 편.서식);
   $('big').classList.add('on');
 }
-function closeBig(){ $('big').classList.remove('on'); _편지맞추기 = null; }
+function closeBig(){ $('big').classList.remove('on'); delete _맞추기들.bigB; }
 
 /* ── 노무사회 자료 서랍 (떠 있는 창) ── */
 function 서랍열기(){ App.서랍 = true; render(); }
@@ -5496,7 +5540,7 @@ function 지난회차화면(){
     <div class="pvhd">👁 <b>${몇번}. ${esc(본회.이름||고른것)}</b><span class="sp"></span>
      <button class="mini" onclick="회차열기('${고른것}')">이번 회차로 열기</button>
      <button class="mini" onclick="회차크게('${고른것}')">크게</button></div>
-    <div class="paper"><iframe id="pastFrame" title="지난 회차 미리보기"></iframe></div>
+    <div class="paper" id="pastPaper"></div>
    </div>
   </div>`;
 }
@@ -5526,7 +5570,7 @@ function 미리보기로내려가기(){
 /* 지난 회차 미리보기를 그린다 — 「이번 회차」의 미리보기와 «같은 짓는 층»을 쓴다.
    ⚠ 여기서 편지를 다시 짜지 않는다. 두 벌이면 지난 회차가 실제로 나간 것과 달라 보인다. */
 function 지난미리보기그리기(){
-  const f = $('pastFrame'); if(!f) return;
+  const 자리 = $('pastPaper'); if(!자리) return;
   const 열쇠들 = Object.keys(App.회차들).sort().reverse();
   const k = (App.본회차 && App.회차들[App.본회차]) ? App.본회차 : 열쇠들[0];
   const d = App.회차들[k]; if(!d) return;
@@ -5539,12 +5583,12 @@ function 지난미리보기그리기(){
   const html = 편 ? 편.서식
     : '<div style="padding:24px;font-family:sans-serif;color:#94a3b8;font-size:13px">'
       + '이 회차에는 실린 것이 없습니다.</div>';
-  f.srcdoc = '<!doctype html><meta charset="utf-8"><base target="_blank"><body style="margin:0">' + html;
-  f.onload = function(){
-    try{ f.style.height = (f.contentDocument.body.scrollHeight + 8) + 'px'; }catch(_){}
+  /* ★ 한눈에 (대표 지시 2026-10-13) — 편지를 «통째로 줄여» 칸 폭에 맞춘다. 잘리지도, 안쪽에서 또 굴리지도 않는다.
+       폰처럼 좁은 칸(폰꼴폭 아래)은 줄이지 않고 편지가 스스로 접히게 둔다(옵션 좁으면그대로). */
+  편지창채우기('pastPaper', html, { 좁으면그대로: true, 틀스크롤없이: true, 불러온뒤: function(){
     /* 방금 줄을 눌러 내려가려던 참이면 — 키가 커진 지금 다시 간다(3초 안에 눌렀을 때만 — 그 뒤에 딴 데를 보고 있으면 끌어오지 않는다) */
     if(App._내려갈때 && Date.now() - App._내려갈때 < 3000){ App._내려갈때 = 0; 미리보기로내려가기(); }
-  };
+  } });
 }
 
 /* 지난 회차를 큰 창으로 */
