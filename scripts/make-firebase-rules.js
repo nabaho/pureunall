@@ -843,6 +843,8 @@ rules.pucards = {
   tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
   /* 예약 발송과 회차별 결과는 필요한 줄만 읽는다. 이름 붙인 칸이라 $k 쓰기 권한을 그대로 옮긴다. */
   scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': MAIL } },
+  /* 🧾 사업자등록증 자동 검토 기록(서버 bizreg-review) — 화면은 최근 30일만 at 로 추려 읽는다. 「확인함」은 줄의 done 에 직원이 쓴다 (2026-10-13) */
+  bizreg: { '.write': pucardsWrite, '.indexOn': ['at'], $k2: { '.write': MAIL } },
   $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
