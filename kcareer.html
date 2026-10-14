@@ -15475,7 +15475,7 @@ function packOpen(){
 }
 async function _pkPdfText(bytes){
   if(!(await _pdfLoadLib())) return '';
-  var doc=await window._pdfjs.getDocument({data:bytes.slice()}).promise, out=[];
+  var doc=await window._pdfjs.getDocument({isEvalSupported:false, data:bytes.slice()}).promise, out=[];
   for(var i=1;i<=doc.numPages;i++){
     var tc=await (await doc.getPage(i)).getTextContent(), line='', lastY=null;
     tc.items.forEach(function(it){ var y=Math.round(it.transform[5]); if(lastY!==null && Math.abs(y-lastY)>3){ out.push(line); line=''; } line+=it.str; lastY=y; });
@@ -15697,7 +15697,7 @@ async function packCheck(){
 /* 쪽을 보이는 그대로 그림으로 (글꼴 없는 쪽) — 150dpi */
 async function _pkRasterPages(bytes, idxs){
   if(!(await _pdfLoadLib())) throw new Error('PDF 그리기 도구를 못 받았습니다');
-  var doc=await window._pdfjs.getDocument({data:bytes.slice()}).promise, out={};
+  var doc=await window._pdfjs.getDocument({isEvalSupported:false, data:bytes.slice()}).promise, out={};
   for(var i=0;i<idxs.length;i++){
     var pg=await doc.getPage(idxs[i]+1), vp=pg.getViewport({scale:150/72}), c=document.createElement('canvas');
     c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
