@@ -7247,6 +7247,12 @@ const BIZREG = require("./bizreg-review")({ functions, getDatabase, MAIL_REGION 
 exports.bizregReviewDoc = BIZREG.bizregReviewDoc;
 exports.bizregReviewCard = BIZREG.bizregReviewCard;
 
+/* 🔐 로그인 증표에 «재직자» 표시(staff:true) — 창고 규칙이 직원을 가리는 잣대 (2026-10-14, functions/staff-claim.js).
+   uid_roles 가 바뀔 때 바로 + 한 시간마다 전체를 맞춘다. 화면 코드는 안 고친다(증표는 한 시간마다 스스로 새로 받는다). */
+const STAFF_CLAIM = require("./staff-claim")({ functions, getDatabase, MAIL_REGION });
+exports.staffClaimOnRole = STAFF_CLAIM.staffClaimOnRole;
+exports.staffClaimSweep = STAFF_CLAIM.staffClaimSweep;
+
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */
 const GONE = require("./gone-watch")({ functions, getDatabase, MAIL_REGION });

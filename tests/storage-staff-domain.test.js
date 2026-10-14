@@ -60,6 +60,16 @@ test('⑤ 익명 로그인은 «여전히» 막힌다 — 이메일이 없는 �
   assert.match(isStaff, /request\.auth\s*!=\s*null/, '로그인 여부를 안 봅니다.');
 });
 
+/* 2026-10-14 사무실 보안 검토 — 도메인만으로는 모자랐다. 메일 인증을 안 보므로 누구나
+   아무개@pureun.kr 로 가입한다. 서버가 uid_roles 재직자에게만 새기는 staff 표시를 «함께» 본다
+   (functions/staff-claim.js · tests/staff-claim.test.js). */
+test('⑤-2 ★★ 서버가 새긴 «재직자 표시»를 본다 — 도메인으로 가입만 한 사람은 못 지나간다', () => {
+  assert.match(isStaff, /request\.auth\.token\.staff\s*==\s*true/,
+    'isStaff() 가 staff 표시를 안 봅니다 — 아무개@pureun.kr 로 가입만 하면 급여자료·서고 원본이 열립니다.');
+  /* 「또는」으로 묶으면 표시가 없어도 도메인만으로 지나간다 */
+  assert.ok(!/\|\|/.test(isStaff), 'isStaff() 에 «또는»이 있습니다 — 문 둘 중 하나만 지나도 통과합니다.');
+});
+
 test('⑥ signedIn() 은 «안» 건드린다 — 전자서명 근로자와 본인 전용 자리가 여기 매여 있다', () => {
   assert.equal(새것.함수.signedIn, 'return request.auth != null;',
     'signedIn() 이 바뀌었습니다 — 근로자(익명)가 쓰는 자리가 통째로 막힐 수 있습니다.');
