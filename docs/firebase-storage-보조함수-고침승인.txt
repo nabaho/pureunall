@@ -13,8 +13,3 @@
 #  ▶ 올린 뒤에 할 일: 콘솔 원문을 새 날짜 파일로 남기고 «이 승인 줄을 지운다».
 #    그때부터는 새 몸이 기준이라, 남겨 두면 다음 사람이 헷갈린다.
 # ═══════════════════════════════════════════════════════════════════
-
-[isStaff]
-왜: 2026-10-14 사무실 보안 검토 — 도메인만 보면 누구나 아무개@pureun.kr 로 «가입»해 지나간다(메일 인증 안 봄). 서버가 uid_roles 재직자에게만 새기는 staff 표시를 함께 본다. 조이는 쪽.
-옛: return request.auth != null && request.auth.token.email != null && request.auth.token.email.matches('^[^@]+@pureun[.]kr$');
-새: return request.auth != null && request.auth.token.staff == true && request.auth.token.email != null && request.auth.token.email.matches('^[^@]+@pureun[.]kr$');

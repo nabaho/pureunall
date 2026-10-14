@@ -1,4 +1,4 @@
-상태: 이어하기 대기
+상태: 완료
 작업폴더: C:\Users\fair0\Documents\pu-wt-security
 가지: security/office-audit-1014
 이어하기시도: 0
@@ -21,16 +21,14 @@
 2. 서버 — requireStaff·requireReader·지문 등록에 재직자 문(`functions/staff-gate.js`)
 3. 화면 — PDF 미리보기 isEvalSupported:false 빠진 5곳 · 자료함 주소 https 만
 4. 공개 자료 — 이알피 2026 경비 시드·`reference/puerp` 삭제 · 배포에서 android/·.gitignore·firebase.database.json 제외
-5. 창고 — 서버가 재직자에게 staff 표시(`functions/staff-claim.js`) + isStaff() 가 그것을 함께 봄(코드·승인 파일까지)
+5. 창고 — 서버가 재직자에게 staff 표시(`functions/staff-claim.js`) + isStaff() 가 그것을 함께 봄. **세 창고 게시 완료**(22:38 표시 10명 새김 → 한 시간 뒤 sweep same:10 확인 → 23:4x 게시). 새 기준 `docs/firebase-storage-콘솔원문-2026-10-14.txt`, 승인 줄 지움
 6. `docs/보안-사무실-점검표.md` — PC·계정·퇴사자·NAS·네트워크 분기 점검표
 
-검사: 전체 26,269 · 실패 0(마지막 묶음 기준). 새 검사마다 고장넣기로 무는 것 확인.
+검사: 전체 26,274 · 실패 0. 새 검사마다 고장넣기로 무는 것 확인.
 
 ## 남은 일 (순서 중요)
-- [ ] 서버 함수 배포 — 문을 지나는 18개 + 새 2개(staffClaimOnRole·staffClaimSweep)
-- [ ] 배포 뒤 staffClaimSweep 기록으로 «재직자 10명에게 새김» 확인 → **한 시간 넘게 기다린 뒤** 창고 규칙 게시
-      (`node scripts/storage-rules-deploy.js --deploy`) → 콘솔 원문 새 날짜 파일 · 승인 줄 지우기
-      ⚠ 거꾸로 하면 직원 사진첩·급여데이터함이 멎는다
+- [x] 서버 함수 20개 배포(증표 없는 요청 401 확인)
+- [x] staffClaimSweep 기록으로 «재직자 10명에게 새김» 확인 → 한 시간 넘게 기다린 뒤 창고 규칙 게시
 - [ ] PR 합치기(화면·공개 자료 고침은 합치면 자동 배포)
 - [ ] 대표 결정: 저장소 비공개(GitHub Pro $4/월 권장 — STATUS.md 「대표 결정 대기」) · 그 밖은 비공개 보고서 4절
 
