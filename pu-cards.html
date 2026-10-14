@@ -7558,6 +7558,10 @@ async function openMaterialHwp(bytes,name){
   try{ await PureunHwp.renderPreview($('matHwpBody'),bytes,name); }
   catch(e){ $('matHwpBody').innerHTML='<div class="mpmsg">미리보기를 만들지 못했습니다.<br>원본은 그대로 보관되어 있습니다.<br>아래 원본 저장을 이용해 주세요.</div>'; }
 }
+/* 자료함 «주소» 자료는 https 만 연다 (2026-10-14 사무실 보안 검토).
+   esc 는 따옴표만 막는다 — javascript: 주소는 그대로 지나가 미리보기를 누르는 순간 우리 화면 주소에서 돈다.
+   앱 열다섯 개가 한 주소를 쓰므로, 여기서 돈 것은 모든 앱의 로그인 증표를 읽는다. */
+function matSafeUrl(u){ const s=String(u||'').trim(); return /^https:\/\/[^\s<>"']+$/i.test(s) ? s : ''; }
 async function fillMatPreview(id){
   const box=$('mpBody'); if(!box) return;
   /* 한글 자료를 열어 두었으면 다시 받지 않는다 — 고치던 글이 날아가면 안 된다.
@@ -7570,7 +7574,12 @@ async function fillMatPreview(id){
   if(!m){ box.innerHTML='<div class="mpmsg">자료가 없습니다 (지워졌을 수 있습니다)</div>'; return; }
   const t=matType(m.fileName)||{};
   const dl=`<button class="mattab" style="margin-top:10px" onclick="downloadMaterial('${id}')">📥 내려받아 확인</button>`;
-  if(m.url){ _mpFor=id; _mpHtml=`<iframe src="${esc(m.url)}"></iframe>`; box.innerHTML=_mpHtml; return; }
+  if(m.url){
+    const u=matSafeUrl(m.url); _mpFor=id;
+    _mpHtml = u ? `<iframe src="${esc(u)}" referrerpolicy="no-referrer"></iframe>`
+                : `<div class="mpmsg">이 자료의 주소는 미리 볼 수 없습니다 — https 주소만 엽니다.</div>`;
+    box.innerHTML=_mpHtml; return;
+  }
   if(!t.view && !/^(hwp|hwpx)$/.test(matExt(m.fileName))){
     _mpFor=id;
     _mpHtml=`<div class="mpmsg">📎 ${esc(m.fileName||'')}<br>이 형식은 브라우저로 미리 볼 수 없습니다.<br>${dl}</div>`;
@@ -28397,7 +28406,7 @@ function mbPvDraw(kind, buf, a){
     return mbPvLib('vendor/pdf.min.js?v=1', ()=>!!window.pdfjsLib)
       .then(()=>{
         try{ pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js?v=1'; }catch(_){ }
-        return pdfjsLib.getDocument({ data: buf }).promise;
+        return pdfjsLib.getDocument({ isEvalSupported: false, data: buf }).promise;
       })
       .then(doc=>({ pdf: doc, page: 1, pages: Number(doc.numPages || 1) }));
   }

@@ -116,7 +116,13 @@ function 문상자(옵션) {
         return Promise.resolve(Object.assign({ uid: 'u1', firebase: { sign_in_provider: o.방식 || 'password' } }, o.더 || {}));
       },
       getUser: (uid) => Promise.resolve({ uid, email: 'hong@example.com' })
-    })
+    }),
+    /* 재직자 문(functions/staff-gate.js) — 그 문 자체는 tests/staff-gate.test.js 가 돌려 본다 */
+    STAFF_GATE: {
+      assertActive: (uid) => o.비재직
+        ? Promise.reject(Object.assign(new Error('재직 중인 직원만 쓸 수 있습니다.'), { status: 403 }))
+        : Promise.resolve({ sid: 'P1', status: 'active' })
+    }
   };
   vm.createContext(c);
   vm.runInContext(떼기('requireStaff', fns), c);
@@ -155,6 +161,13 @@ test('★ 이메일 로그인 계정만 보낸다', async () => {
   const c2 = 문상자({ 방식: 'custom' });
   await assert.rejects(() => c2.requireStaff(요청({ authorization: 'Bearer x' })),
     (e) => e.status === 403, '★ 카카오 표시 없는 서버 표도 메일을 보냅니다');
+});
+
+/* 2026-10-14 — 가입이 열려 있어 «비밀번호로 들어왔다»만으로는 우리 직원이 아니다 */
+test('★★★ 비번 계정이라도 재직자가 아니면 막는다 — 가입만 한 바깥 사람이 회사 이름으로 못 보낸다', async () => {
+  const c = 문상자({ 비재직: true });
+  await assert.rejects(() => c.requireStaff(요청({ authorization: 'Bearer x' })),
+    (e) => e.status === 403, '★★★ 가입만 한 계정이 메일을 보냅니다');
 });
 
 /* 대표 지시 2026-09-27 「관리자도 카카오 로그인되게 해라」 — 카카오로 들어온 대표님이

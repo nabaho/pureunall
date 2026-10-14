@@ -145,5 +145,6 @@ test('★★ 규칙에 색인이 있다 — 없으면 파이어베이스가 6,60
   /* 이름으로 적는 순간 $k 가 안 걸린다 — 쓰기 허락을 옮겨 적었는가 */
   assert.match(p, /items: \{ '\.write': pucardsWrite/, '★★ 명함 저장이 통째로 막힙니다');
   assert.match(p, /tomb:\s*\{ '\.write': pucardsWrite/, '★ 자국을 못 남깁니다');
-  assert.match(p, /items: \{[^}]*\$k2: \{ '\.write': MAIL \}/, '★ 명함 한 칸 고치기가 막힙니다');
+  /* 문턱 이름은 박지 않는다 — 2026-10-14 에 MAIL → LOGIN 으로 올렸다. 「한 칸 쓰기 허락이 옮겨 적혔는가」만 본다 */
+  assert.match(p, /items: \{[^}]*\$k2: \{ '\.write': [A-Z]+ \}/, '★ 명함 한 칸 고치기가 막힙니다');
 });

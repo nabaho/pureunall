@@ -44,7 +44,10 @@ const MGR   = `auth != null && (${ADMIN} || ${SUB})`;      // 관리자 또는 �
 const FIN   = "root.child('uid_roles').child(auth.uid).child('fin').val() == true";
 /* 푸른 자기 직원 인사 자료를 고치는 사람 — 재무 권한자 또는 관리자·위임관리인 (2026-10-10) */
 const HRW   = `auth != null && (${FIN} || ${ADMIN} || ${SUB})`;
-const MAIL  = "auth != null && auth.token.email != null";
+/* ⚠ 옛 MAIL(「이메일이 있는 계정」)은 2026-10-14 에 «없앴다» — 되살리지 말 것.
+     이메일은 가입할 때 아무거나 적는 값이라, 가입이 열린 이 집에서는 «아무나»와 같다.
+     기업정보함(명함 6,600장)·전자서명 개인키·공공데이터가 그 문 뒤에 있었다.
+     그 자리들은 이제 LOGIN(재직자)이다. tests/firebase-auth-gate.test.js 가 되살아남을 막는다. */
 
 /* 「업무 칸」 한 벌 — 읽기는 전 직원, 새로 만들고 고치는 것도 전 직원,
    그러나 **지우는 것은 관리자만**. 실수로 통째 지우는 것을 막는 얼개다
@@ -836,16 +839,16 @@ rules.backup_key = {
    ⚠⚠ 이름으로 적는 순간 그 칸은 더 이상 아래 $k 에 안 걸린다 — 그래서 $k 가 주던
        쓰기 허락을 **글자 그대로 옮겨 적는다**. 안 옮기면 명함 저장이 통째로 막힌다
        (허락은 위에서 아래로 흐르지만, $k 는 «이름 없는 칸»에만 걸린다). */
-const pucardsWrite = `(${MAIL}) && (newData.exists() || ${ADMIN})`;
+const pucardsWrite = `(${LOGIN}) && (newData.exists() || ${ADMIN})`;
 rules.pucards = {
-  '.read': MAIL, '.write': ADMIN,
-  items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': MAIL } },
-  tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
+  '.read': LOGIN, '.write': ADMIN,
+  items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': LOGIN } },
+  tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': LOGIN } },
   /* 예약 발송과 회차별 결과는 필요한 줄만 읽는다. 이름 붙인 칸이라 $k 쓰기 권한을 그대로 옮긴다. */
-  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': MAIL } },
+  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': LOGIN } },
   /* 🧾 사업자등록증 자동 검토 기록(서버 bizreg-review) — 화면은 최근 30일만 at 로 추려 읽는다. 「확인함」은 줄의 done 에 직원이 쓴다 (2026-10-13) */
-  bizreg: { '.write': pucardsWrite, '.indexOn': ['at'], $k2: { '.write': MAIL } },
-  $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
+  bizreg: { '.write': pucardsWrite, '.indexOn': ['at'], $k2: { '.write': LOGIN } },
+  $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
 rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
@@ -860,10 +863,10 @@ rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', 
 
    ★ 왜 pucards «밖»인가
      규칙은 위에서 아래로 흐르고, 부모가 준 읽기를 자식이 못 뺏는다.
-     pucards 는 '.read': MAIL — 로그인한 직원 누구나 읽는다. 그 아래에 기록을 두면
+     pucards 는 '.read': LOGIN — 재직 직원 누구나 읽는다. 그 아래에 기록을 두면
      「관리자만」이라고 적어도 직원이 그대로 읽는다. 그래서 맨 위 칸이다.
 
-   ★ 왜 쓰기 문턱이 MAIL 인가 (LOGIN 이 아니라)
+   ★ 왜 쓰기 문턱이 LOGIN 인가 (2026-10-14 까지는 옛 MAIL 이었다)
      pucards 읽기와 «같아야» 한다. 더 좁히면 「기업정보함은 쓰는데 기록은 못 남기는」
      사람이 생기고, 그 사람은 앱이 내려받기를 아예 거절한다.
 
@@ -878,7 +881,7 @@ rules.exportLog = {
   $id: {
     /* !data.exists() = 새로 만드는 것만. 고치기·지우기는 «아무도» 못 한다 —
        자기 기록을 지울 수 있으면 기록은 아무 뜻이 없다. */
-    '.write': `(${MAIL}) && !data.exists()`,
+    '.write': `(${LOGIN}) && !data.exists()`,
     '.validate': "newData.hasChildren(['at','by','uid','kind','what','n'])",
     at:   { '.validate': 'newData.isNumber() && newData.val() === now' },   /* 날짜 속이기 금지 */
     uid:  { '.validate': 'newData.isString() && newData.val() === auth.uid' }, /* 남의 이름 금지 */
@@ -1198,14 +1201,14 @@ rules.gov_feed = { '.read': 'auth != null && ' + ADMIN, '.write': false };
 
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
-   ⚠ 읽기 = 기업정보함(pucards)과 «같은» MAIL — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 MAIL 이 읽는다.
+   ⚠ 읽기 = 기업정보함(pucards)과 «같은» LOGIN — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 같은 사람이 읽는다.
      자리만 옮기는 것이라 보는 사람이 늘지 않는다. 담긴 것: 근로자 수·사업장 이름/주소·사업 상태·공휴일.
      돈(보험료)은 서버가 애초에 담지 않는다(functions/nps-monthly.js nowOf).
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 숫자를 고치면 원본과 어긋난다.
    ⚠ pubdata_req = 화면의 «받아 달라». 번호 10자리 열쇠에 {at, k, nm} 만 받는다. 읽기는 아무도 —
      누가 무엇을 열었는지가 남는 자리가 아니다(서버가 받자마자 지운다). */
-rules.pubdata = { '.read': MAIL, '.write': false };
-rules.pubdata_req = { $no: { '.write': MAIL,
+rules.pubdata = { '.read': LOGIN, '.write': false };
+rules.pubdata_req = { $no: { '.write': LOGIN,
   '.validate': "$no.matches(/^[0-9]{10}$/) && (!newData.exists() || (newData.child('at').isNumber()"
     + " && (!newData.child('k').exists() || newData.child('k').val() === 'ei' || newData.child('k').val() === 'nps')"
     + " && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
@@ -1297,20 +1300,23 @@ rules.kcareer_inbox = {
      (meta·secret·…)에만 적어 두면 목록은 permission_denied 로 막힌다.
      실제로 막혀 있었다(장애알림 9건, 마지막 2026-09-18). 사건이 0건이라 아무도
      못 느꼈을 뿐이다.
-   ⚠ 새로 보이게 되는 것은 «없다» — 여기서 주는 MAIL 은 아래 칸들이 이미 MAIL 에게
-     주고 있는 것과 똑같다(secret·arrears·submissions 모두 MAIL, meta 는 더 넓은
-     auth != null). 부모에 적는다고 아래가 좁아지지도 넓어지지도 않는다.
+   ⚠ 새로 보이게 되는 것은 «없다» — 여기서 주는 LOGIN 은 아래 칸들이 이미 LOGIN 에게
+     주고 있는 것과 똑같다(secret·arrears·submissions 모두 LOGIN, meta 읽기는 더 넓은
+     auth != null — 링크를 연 근로자). 부모에 적는다고 아래가 좁아지지도 넓어지지도 않는다.
+   ★ 2026-10-14 — 직원 쪽 문턱을 옛 MAIL(이메일만 있으면)에서 LOGIN(재직자)으로 올렸다.
+     MAIL 이던 동안 가입만 한 바깥 사람이 secret(잠긴 개인키)을 받아 가거나 meta 의
+     공개키를 바꿔치기할 수 있었다. 근로자 쪽 길(meta 읽기·링크 열쇠로 한 번 내기)은 그대로다.
    ※ 같은 것을 규칙 올리개(scripts/rules-deploy.js)도 따로 찾았다 — 이 줄이 만들개에
      없던 동안 「콘솔에만 있는 규칙이 사라진다」며 멈춰 세웠다. 안전장치가 맞물린 자리다. */
-rules.esign = { cases: { '.read': MAIL, $caseId: {
-  meta:        { '.read': 'auth != null', '.write': MAIL },
-  secret:      { '.read': MAIL, '.write': MAIL },
-  arrears:     { '.read': MAIL, '.write': MAIL },
+rules.esign = { cases: { '.read': LOGIN, $caseId: {
+  meta:        { '.read': 'auth != null', '.write': LOGIN },
+  secret:      { '.read': LOGIN, '.write': LOGIN },
+  arrears:     { '.read': LOGIN, '.write': LOGIN },
   submissions: {
-    '.read': MAIL,
+    '.read': LOGIN,
     $subId: {
-      '.write': `(auth != null && !data.exists() && newData.child('t').val() === root.child('esign/cases/' + $caseId + '/meta/linkToken').val() && root.child('esign/cases/' + $caseId + '/meta/status').val() === 'active') || (${MAIL})`,
-      '.validate': `newData.hasChildren(['enc','encKey','iv','t','submittedAt','reviewState']) || (${MAIL})`,
+      '.write': `(auth != null && !data.exists() && newData.child('t').val() === root.child('esign/cases/' + $caseId + '/meta/linkToken').val() && root.child('esign/cases/' + $caseId + '/meta/status').val() === 'active') || (${LOGIN})`,
+      '.validate': `newData.hasChildren(['enc','encKey','iv','t','submittedAt','reviewState']) || (${LOGIN})`,
       enc:    { '.validate': 'newData.isString() && newData.val().length < 400000' },
       encKey: { '.validate': 'newData.isString() && newData.val().length < 1000' },
       iv:     { '.validate': 'newData.isString() && newData.val().length < 100' },

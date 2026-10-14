@@ -2219,7 +2219,7 @@ async function recFileText(name, buf){
       return r&&r.text ? { text:r.text, lines:await recRowLines(buf) } : { text:null, why:'글자를 읽지 못했습니다 — 눈으로 확인하세요' };
     }
     if(ext==='pdf'){
-      var L=await recPdfLib(), doc=await L.getDocument({ data:new Uint8Array(buf) }).promise, out=[];
+      var L=await recPdfLib(), doc=await L.getDocument({ isEvalSupported:false, data:new Uint8Array(buf) }).promise, out=[];
       for(var p=1;p<=Math.min(doc.numPages,40);p++){
         var tc=await (await doc.getPage(p)).getTextContent();
         out.push(tc.items.map(function(x){ return x.str; }).join(' '));

@@ -3156,7 +3156,7 @@
       return new Promise(function (res, rej) {
         _ensurePdfjs2(function (err) {
           if (err) { rej(new Error(err)); return; }
-          w.pdfjsLib.getDocument({ data: u8 }).promise.then(function (pdf) {
+          w.pdfjsLib.getDocument({ isEvalSupported: false, data: u8 }).promise.then(function (pdf) {
             var chain = Promise.resolve();
             for (var i = 1; i <= pdf.numPages; i++) (function (n) {
               chain = chain.then(function () {

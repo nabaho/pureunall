@@ -66,6 +66,10 @@ function getDatabase() {
   return OntologyServerWrite.wrapDatabase(getRawDatabase(), { program: "functions" });
 }
 
+/* 「재직 직원인가」 공용 문 — requireStaff·requireReader 가 함께 쓴다 (2026-10-14).
+   가입이 열려 있어 «비밀번호로 들어왔다»만으로는 우리 직원이 아니다. 자세한 까닭은 staff-gate.js 머리말. */
+const STAFF_GATE = require("./staff-gate").makeStaffGate({ getDatabase });
+
 const RESEND_KEY = process.env.RESEND_API_KEY || "";
 
 /* ══════════════════════════════════════════════════════════════════════════
@@ -107,8 +111,10 @@ function setCors(req, res) {
   res.set("Cache-Control", "no-store");
 }
 
-// 메일 발송은 로그인한 직원이면 할 수 있다.
+// 메일 발송은 «재직 중인» 직원이면 할 수 있다.
 // 총괄관리자만으로 묶지 않는 이유: 급여명세서·사용촉진 통보는 담당 직원이 보낸다.
+// ⚠ 2026-10-14 까지는 「비밀번호로 들어왔는가」만 보았다 — 가입만 한 바깥 사람이
+//   회사 발신 주소로 아무에게나 메일을 보낼 수 있었다. 이제 uid_roles 재직자만(STAFF_GATE).
 async function requireStaff(req) {
   const match = /^Bearer\s+(.+)$/i.exec(String(req.headers.authorization || ""));
   if (!match) {
@@ -128,6 +134,7 @@ async function requireStaff(req) {
   if (byKakao && !decoded.email) {
     decoded.email = (await getAuth().getUser(decoded.uid)).email || "";
   }
+  await STAFF_GATE.assertActive(decoded.uid);
   return decoded;
 }
 
@@ -3373,6 +3380,8 @@ async function requireReader(req) {
     error.status = 403;
     throw error;
   }
+  /* 실시간DB 규칙 LOGIN 의 «뒤 절반» — 재직자인가 (2026-10-14, 가입만 한 계정이 AI 한도를 태우지 못하게) */
+  await STAFF_GATE.assertActive(decoded.uid);
   return decoded;
 }
 
@@ -7237,6 +7246,12 @@ exports.pubdataNtsMirror = NPSM.pubdataNtsMirror;
 const BIZREG = require("./bizreg-review")({ functions, getDatabase, MAIL_REGION });
 exports.bizregReviewDoc = BIZREG.bizregReviewDoc;
 exports.bizregReviewCard = BIZREG.bizregReviewCard;
+
+/* 🔐 로그인 증표에 «재직자» 표시(staff:true) — 창고 규칙이 직원을 가리는 잣대 (2026-10-14, functions/staff-claim.js).
+   uid_roles 가 바뀔 때 바로 + 한 시간마다 전체를 맞춘다. 화면 코드는 안 고친다(증표는 한 시간마다 스스로 새로 받는다). */
+const STAFF_CLAIM = require("./staff-claim")({ functions, getDatabase, MAIL_REGION });
+exports.staffClaimOnRole = STAFF_CLAIM.staffClaimOnRole;
+exports.staffClaimSweep = STAFF_CLAIM.staffClaimSweep;
 
 /* 🏚 없어진 듯한 곳 — 명함 메일의 회사 도메인이 사라졌는지 매일 06:30(30일에 한 번씩) 본다(대표 승인 목업 2026-10-09).
    실제 코드는 gone-watch.js. 반송 메일은 메일 동기화가 같은 파일로 적는다. */
