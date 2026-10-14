@@ -35670,181 +35670,10 @@ function migrateExpenseCategories(){
   }
 })();
 
-// ── 2026년 1~4월 경비 자료 시드 (실제 엑셀 자료 기반, 1회) ──
-function seed2026Expenses(){
-  // 1. 매월 반복 정기출금 마스터
-  var REC = [
-    {payee:'효성 CMS사용료',          category:'exp-system',     amount:33000,   dayOfMonth:5,  note:'5일 자동이체'},
-    {payee:'복합기 임대',              category:'exp-system',     amount:143000,  dayOfMonth:5,  note:'5일 자동이체 (변동)'},
-    {payee:'문자수수료',               category:'exp-comm',       amount:800,     dayOfMonth:5,  note:'5일 자동이체'},
-    {payee:'노사포커스 뉴스레터',      category:'exp-system',     amount:65000,   dayOfMonth:10, note:'10일 자동이체 (변동)'},
-    {payee:'더빌관리비(천안)',         category:'exp-rent',       amount:95000,   dayOfMonth:10, note:'10일 자동이체 (변동)'},
-    {payee:'SK매직(서산정수기)',       category:'exp-supply',     amount:19900,   dayOfMonth:10, note:'10일 자동이체'},
-    {payee:'서산원룸 월세',            category:'exp-rent',       amount:300000,  dayOfMonth:10, note:'10일'},
-    {payee:'관리비(썬샤인빌딩)',       category:'exp-rent',       amount:1100000, dayOfMonth:10, note:'10일 / 임대료100+부가세10'},
-    {payee:'세화회계장부기장',         category:'exp-outsource',  amount:165000,  dayOfMonth:20, note:'20일 자동이체'},
-    {payee:'LG U+ 인터넷(천안)',       category:'exp-comm',       amount:115000,  dayOfMonth:20, note:'20일 자동이체 (변동)'},
-    {payee:'SK매직(천안정수기)',       category:'exp-supply',     amount:18900,   dayOfMonth:20, note:'20일 자동이체'},
-    {payee:'노사포커스 구독료',        category:'exp-system',     amount:153000,  dayOfMonth:20, note:'20일 자동이체 / 90부'},
-    {payee:'이카운트 ERP',             category:'exp-system',     amount:44000,   dayOfMonth:20, note:'20일 자동이체'},
-    {payee:'노사포커스 우편발송',      category:'exp-system',     amount:70400,   dayOfMonth:20, note:'카드결제'},
-    {payee:'KT M 모바일',              category:'exp-comm',       amount:63010,   dayOfMonth:21, note:'21일 자동이체'},
-    {payee:'공인노무사회비(소속)',     category:'exp-outsource',  amount:80000,   dayOfMonth:21, note:'박한별·김혜민·박재원'},
-    {payee:'법인차량(신한카드)',       category:'exp-vehicle',    amount:979770,  dayOfMonth:26, note:'26일 자동이체'},
-    {payee:'LG U+ 통신넷(서산)',       category:'exp-comm',       amount:40000,   dayOfMonth:31, note:'말일 자동이체 (변동)'}
-  ];
-
-  // 2. 1~4월 법인카드 결제 합계 (카드별·월별)
-  var CARDS = [
-    // 1월
-    {date:'2026-01-25', payee:'권형하 대표(하나-7362)',                amount:2405620},
-    {date:'2026-01-25', payee:'사무실 공용(하나-8279·비씨-9950)',       amount:2902042},
-    {date:'2026-01-25', payee:'후불하이패스(비씨-3902)',               amount:43960},
-    {date:'2026-01-25', payee:'최기운 사무장(하나-1212)',              amount:175300},
-    {date:'2026-01-25', payee:'박재원 노무사(하나-4442)',              amount:218826},
-    {date:'2026-01-26', payee:'법인차량(신한카드)',                    amount:979770},
-    // 2월
-    {date:'2026-02-25', payee:'권형하 대표(하나-7362)',                amount:939890},
-    {date:'2026-02-25', payee:'사무실 공용(하나-8279·비씨-9950)',       amount:2176216},
-    {date:'2026-02-25', payee:'후불하이패스(비씨-3902)',               amount:31100},
-    {date:'2026-02-25', payee:'최기운 사무장(하나-1212)',              amount:483420},
-    {date:'2026-02-25', payee:'박재원 노무사(하나-4442)',              amount:314500},
-    {date:'2026-02-26', payee:'법인차량(신한카드)',                    amount:979770},
-    // 3월
-    {date:'2026-03-25', payee:'권형하 대표(하나-7362)',                amount:2261600},
-    {date:'2026-03-25', payee:'사무실 공용(하나-8279·비씨-9950)',       amount:2104662},
-    {date:'2026-03-25', payee:'후불하이패스(비씨-3902)',               amount:44500},
-    {date:'2026-03-25', payee:'최기운 사무장(하나-1212)',              amount:95420},
-    {date:'2026-03-25', payee:'박재원 노무사(하나-4442)',              amount:200180},
-    {date:'2026-03-26', payee:'법인차량(신한카드)',                    amount:979770},
-    {date:'2026-03-26', payee:'하나카드 선결제',                       amount:2191839},
-    // 4월
-    {date:'2026-04-25', payee:'권형하 대표(하나-7362)',                amount:1815905},
-    {date:'2026-04-25', payee:'사무실 공용(하나-8279·비씨-9950)',       amount:2358630},
-    {date:'2026-04-25', payee:'후불하이패스(비씨-3902)',               amount:34700},
-    {date:'2026-04-25', payee:'최기운 사무장(하나-1212)',              amount:309280},
-    {date:'2026-04-25', payee:'박재원 노무사(하나-4442)',              amount:305540},
-    {date:'2026-04-26', payee:'법인차량(신한카드)',                    amount:979770},
-    {date:'2026-04-15', payee:'하나카드 선결제',                       amount:665000}
-  ];
-
-  // 3. 1~4월 4대보험·퇴직연금·세금·관리비 (세부항목 분해)
-  var ETC = [
-    // 4대보험 (월별 details: 국민·건강·고용·산재)
-    {date:'2026-01-10', category:'exp-tax',     payee:'4대보험(국민·건강·고용·산재)', amount:5611500, note:'10일 자동이체',
-      details:[{name:'국민연금',amount:2288020},{name:'건강보험',amount:2589160},{name:'고용보험',amount:547330},{name:'산재보험',amount:186990}]},
-    {date:'2026-02-10', category:'exp-tax',     payee:'4대보험(국민·건강·고용·산재)', amount:4709880, note:'10일 자동이체',
-      details:[{name:'국민연금',amount:1913640},{name:'건강보험',amount:2189480},{name:'고용보험',amount:444470},{name:'산재보험',amount:162290}]},
-    {date:'2026-03-10', category:'exp-tax',     payee:'4대보험(국민·건강·고용·산재)', amount:4708660, note:'10일 자동이체',
-      details:[{name:'국민연금',amount:1913640},{name:'건강보험',amount:2189480},{name:'고용보험',amount:443450},{name:'산재보험',amount:162090}]},
-    {date:'2026-04-10', category:'exp-tax',     payee:'4대보험(국민·건강·고용·산재)', amount:5157680, note:'10일 자동이체',
-      details:[{name:'국민연금',amount:2118460},{name:'건강보험',amount:2364900},{name:'고용보험',amount:493810},{name:'산재보험',amount:180510}]},
-    // 퇴직연금 (대표·근로자)
-    {date:'2026-01-25', category:'exp-pension', payee:'퇴직연금(대표·근로자)',         amount:3083970, note:'5일·25일 자동이체',
-      details:[{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2447970}]},
-    {date:'2026-02-25', category:'exp-pension', payee:'퇴직연금(대표·근로자)',         amount:3182620, note:'5일·25일 자동이체',
-      details:[{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2546620}]},
-    {date:'2026-03-25', category:'exp-pension', payee:'퇴직연금(대표·근로자)',         amount:3183300, note:'5일·25일 자동이체',
-      details:[{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2547300}]},
-    {date:'2026-04-25', category:'exp-pension', payee:'퇴직연금(대표·근로자)',         amount:3182920, note:'5일·25일 자동이체',
-      details:[{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2546920}]},
-    // 세금 (소득세 합산건은 details로 분해)
-    {date:'2026-01-10', category:'exp-tax',     payee:'근로·지방·기타소득세(2025-12)', amount:2903930, note:'',
-      details:[{name:'근로소득세(2025-12)',amount:2599970},{name:'지방소득세(2025-12)',amount:263960},{name:'기타소득세(2025-12)',amount:40000}]},
-    {date:'2026-01-15', category:'exp-tax',     payee:'등록면허세',                    amount:40500,   note:''},
-    {date:'2026-01-25', category:'exp-tax',     payee:'부가가치세(2025년 2기 확정)',   amount:15873010,note:''},
-    {date:'2026-02-10', category:'exp-tax',     payee:'근로·지방·기타소득세(2026-01)', amount:777720,  note:'',
-      details:[{name:'근로소득세(2026-01)',amount:667060},{name:'지방소득세(2026-01)',amount:70660},{name:'기타소득세(2026-01)',amount:40000}]},
-    {date:'2026-03-31', category:'exp-tax',     payee:'법인세',                        amount:3568810, note:''},
-    {date:'2026-04-15', category:'exp-tax',     payee:'법인지방세(천안·대전·세종)',    amount:357640,  note:''},
-    {date:'2026-04-25', category:'exp-tax',     payee:'부가가치세(2026년 1기 예정)',   amount:16709110,note:''},
-    // 관리비
-    {date:'2026-01-31', category:'exp-rent',    payee:'관리비(천안)',                  amount:2983247, note:'1월'},
-    {date:'2026-02-28', category:'exp-rent',    payee:'관리비(천안)',                  amount:3047947, note:'2월'},
-    {date:'2026-03-31', category:'exp-rent',    payee:'관리비(천안)',                  amount:2913368, note:'3월'},
-    {date:'2026-04-30', category:'exp-rent',    payee:'관리비(천안)',                  amount:2820537, note:'4월'}
-  ];
-
-  // 등록
-  var rec = dbGet('recurring_expenses', []);
-  var existPayees = {}; rec.forEach(function(r){ existPayees[r.payee] = true; });
-  var newRec = 0;
-  REC.forEach(function(s){
-    if(!existPayees[s.payee]){
-      rec.push(Object.assign({id:'r-2026-'+Math.random().toString(36).slice(2,8), active:true}, s));
-      newRec++;
-    }
-  });
-  dbSet('recurring_expenses', rec);
-
-  var fe = dbGet('finance_expense', []);
-  var newFe = 0;
-  CARDS.forEach(function(c,i){
-    fe.push({
-      id:'fe-2026card-'+i, date:c.date, category:'exp-card',
-      payee:c.payee, cardSource:c.payee, amount:c.amount,
-      note:'엑셀 자료 입력 (월별예상경비)', paid:true,
-      importedFrom:'2026 월별예상경비'
-    });
-    newFe++;
-  });
-  ETC.forEach(function(e,i){
-    fe.push(Object.assign({id:'fe-2026etc-'+i, paid:true, importedFrom:'2026 월별예상경비'}, e));
-    newFe++;
-  });
-  dbSet('finance_expense', fe);
-  console.log('[seed2026] 정기출금 '+newRec+'건, 출금 '+newFe+'건 등록');
-}
-(function(){
-  if(!dbGet('expense_2026_seed_v1_done', false)){
-    seed2026Expenses();
-    dbSet('expense_2026_seed_v1_done', true);
-  }
-})();
-
-// 기존 시드 데이터에 세부항목 소급 적용 (1회)
-function backfill2026Details(){
-  var DETAIL_MAP = {
-    // 4대보험
-    '2026-01-10|4대보험(국민·건강·고용·산재)': [{name:'국민연금',amount:2288020},{name:'건강보험',amount:2589160},{name:'고용보험',amount:547330},{name:'산재보험',amount:186990}],
-    '2026-02-10|4대보험(국민·건강·고용·산재)': [{name:'국민연금',amount:1913640},{name:'건강보험',amount:2189480},{name:'고용보험',amount:444470},{name:'산재보험',amount:162290}],
-    '2026-03-10|4대보험(국민·건강·고용·산재)': [{name:'국민연금',amount:1913640},{name:'건강보험',amount:2189480},{name:'고용보험',amount:443450},{name:'산재보험',amount:162090}],
-    '2026-04-10|4대보험(국민·건강·고용·산재)': [{name:'국민연금',amount:2118460},{name:'건강보험',amount:2364900},{name:'고용보험',amount:493810},{name:'산재보험',amount:180510}],
-    // 퇴직연금
-    '2026-01-25|퇴직연금(대표·근로자)': [{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2447970}],
-    '2026-02-25|퇴직연금(대표·근로자)': [{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2546620}],
-    '2026-03-25|퇴직연금(대표·근로자)': [{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2547300}],
-    '2026-04-25|퇴직연금(대표·근로자)': [{name:'대표(교보생명)',amount:636000},{name:'근로자(근로복지공단)',amount:2546920}],
-    // 소득세
-    '2026-01-10|근로·지방·기타소득세(2025-12)': [{name:'근로소득세(2025-12)',amount:2599970},{name:'지방소득세(2025-12)',amount:263960},{name:'기타소득세(2025-12)',amount:40000}],
-    '2026-02-10|근로·지방·기타소득세(2026-01)': [{name:'근로소득세(2026-01)',amount:667060},{name:'지방소득세(2026-01)',amount:70660},{name:'기타소득세(2026-01)',amount:40000}]
-  };
-  var fe = dbGet('finance_expense', []);
-  var changed = 0;
-  fe.forEach(function(e){
-    if(e.details && e.details.length>0) return;  // 이미 있으면 패스
-    var key = (e.date||'')+'|'+(e.payee||'');
-    if(DETAIL_MAP[key]){
-      e.details = DETAIL_MAP[key];
-      changed++;
-    }
-  });
-  if(changed>0){
-    dbSet('finance_expense', fe);
-    console.log('[backfill] 세부항목 '+changed+'건 소급 적용');
-  }
-}
-
-// ============ 2026 1~4월 급여 시드 (Excel 파싱 결과) ============
-
-
-(function(){
-  // 시드 완료 후에만 backfill 의미 있음
-  if(dbGet('expense_2026_seed_v1_done', false) && !dbGet('expense_2026_details_v1_done', false)){
-    backfill2026Details();
-    dbSet('expense_2026_details_v1_done', true);
-  }
-})();
+// ── 2026년 1~4월 경비 시드는 2026-10-14 에 걷어냈다 (사무실 보안 검토) ──
+//   공개 저장소·사이트에 대표·직원 실명과 법인카드 끝자리·월별 사용액·세금액이 그대로 있었다.
+//   클라우드 data/finance_expense 에 그 45건(카드 26·기타 19, 세부 10)이 이미 들어간 것을 확인하고 지웠다.
+//   ⚠ 빈 시드로 되살리지 말 것 — 빈 배열이 서버를 지운 전례가 있다(2026-07). 자료는 클라우드가 원본이다.
 
 // ============ 임금항목 '결근공제' 자동 추가 (1회) ============
 
@@ -78804,13 +78633,9 @@ function LeaveManagement(){
   }
   function bumpComp(){ setCompRefresh(compRefresh+1); }
 
-  // 연차 자동 부여 계산
-  function calcBonus(fullYears){
-    var bonusStart = policy.bonusStart||3;
-    var bonusEvery = policy.bonusEvery||2;
-    if(fullYears < bonusStart) return 0;
-    return Math.floor((fullYears - bonusStart) / bonusEvery) + 1;
-  }
+  // 연차 자동 부여 계산 — 가산 연차는 발생 장부 한 벌(erpLeaveGrantedInYear)이 센다
+  //   (옛 calcBonus 는 2026-10-10 인사관리 2단계 뒤 부르는 곳이 없었다. 옛 사본 reference/puerp 가 «부르는 척»
+  //    해 주다가 2026-10-14 그 폴더를 지우며 드러나 걷어냈다)
   function calcGrantDays(hireDate, year, leaveDate){
     if(!hireDate) return {days:0, reason:'입사일 없음'};
     // 2021-06-01 이전 입사자는 연차 기산일을 2021-06-01로 적용
