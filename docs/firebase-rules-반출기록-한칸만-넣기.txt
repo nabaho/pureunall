@@ -27,7 +27,7 @@
     "exportLog": {
       ".read": "auth != null && root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true",
       "$id": {
-        ".write": "(auth != null && auth.token.email != null) && !data.exists()",
+        ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && !data.exists()",
         ".validate": "newData.hasChildren(['at','by','uid','kind','what','n'])",
         "at": { ".validate": "newData.isNumber() && newData.val() === now" },
         "uid": { ".validate": "newData.isString() && newData.val() === auth.uid" },
@@ -73,7 +73,7 @@
 파이어베이스 규칙은 위에서 아래로 흐르고, **부모가 준 읽기 권한을 자식이 뺏을 수 없습니다.**
 지금 pucards 는 이렇게 되어 있습니다:
 
-    "pucards": { ".read": "auth != null && auth.token.email != null", ... }
+    "pucards": { ".read": "(재직자 — LOGIN)", ... }
 
 즉 «로그인한 직원 누구나» 읽습니다. 그 아래에 기록을 두면 「관리자만」이라고 아무리 적어도
 직원이 그대로 읽습니다. 그래서 반드시 맨 위 칸(rules 바로 아래)에 두어야 합니다.
@@ -86,7 +86,7 @@ paydata/access_log 와 paydata/handoff_log 가 «덧붙이기만 되는 관리�
 ── 쓰기 문턱을 pucards 읽기와 «같게» 둔 까닭 ──
 쓰기를 더 좁히면 「기업정보함은 쓰는데 기록은 못 남기는」 사람이 생깁니다.
 그 사람은 앱이 내려받기를 아예 막아 버립니다. 그래서 문턱을 같게 두었습니다
-(auth.token.email != null — 지금 pucards 읽기와 같은 조건).
+(재직자 LOGIN — 지금 pucards 읽기와 같은 조건. 2026-10-14 까지는 «이메일만 있으면»이었다).
 
 ── 넣은 뒤 확인 ──
 기업정보함 → 환경설정 → 계정·AI → 「🧾 반출 기록」 을 누르면 목록이 뜹니다.

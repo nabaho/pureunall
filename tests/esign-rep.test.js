@@ -37,7 +37,8 @@ test('ⓒ 대표 근로자 — meta 밖, 파기 때 지움', () => {
   assert.doesNotMatch(H, /\/meta'\)\.update\(up\)/);
   const rules = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'make-firebase-rules.js'), 'utf8');
   assert.match(rules, /meta: +\{ '\.read': 'auth != null'/, 'meta 는 링크를 연 근로자도 읽는다(그래서 옮겼다)');
-  assert.match(rules, /secret: +\{ '\.read': MAIL, '\.write': MAIL \}/, 'secret 은 직원만');
+  /* 「직원만」은 재직자(LOGIN)다 — 2026-10-14 옛 MAIL(이메일만 있으면)에서 올렸다. 이메일만으로 열리는지는 firebase-auth-gate 가 본다 */
+  assert.match(rules, /secret: +\{ '\.read': LOGIN, '\.write': LOGIN \}/, 'secret 은 재직 직원만');
   const cut = (s) => H.slice(H.indexOf(s), H.indexOf('\n}\n', H.indexOf(s)));
   assert.match(cut('function moveRepOut('), /secret\/rep'\)\.set\(rep\)[\s\S]*\/meta'\)\.update\(\{ repName: null, office: null \}\)/, '예전 사건은 열 때 옮긴다');
   assert.match(H, /await moveRepOut\(caseId\);/);
