@@ -42,3 +42,21 @@ test('★ 칸은 셋뿐 — 다른 것은 못 넣는다, 길이 한도', () => {
 test('표 이름은 다섯뿐 — 다른 이름으로 아무 데나 쓰지 못한다', () => {
   assert.match(rec['.validate'], /cases\|contracts\|consultings\|funds\|other_projects/);
 });
+
+/* 2026-10-15 옛 값 90칸을 비운 뒤 — 공개 덩어리 근로자 줄에 셋을 «다시 못 쓴다» */
+test('★★ 공개 덩어리(사건·계약·컨설팅)의 근로자 줄에 주민번호·계좌·예금주를 못 쓴다', () => {
+  const d = rules.data || {};
+  const rows = {
+    cases: d.cases && d.cases.v && d.cases.v.$id && d.cases.v.$id.workers && d.cases.v.$id.workers.$i,
+    contracts: d.contracts && d.contracts.v && d.contracts.v.$id && d.contracts.v.$id.company
+      && d.contracts.v.$id.company.workers && d.contracts.v.$id.company.workers.$i,
+    consultings: d.consultings && d.consultings.v && d.consultings.v.$id && d.consultings.v.$id.workers && d.consultings.v.$id.workers.$i
+  };
+  for (const [k, row] of Object.entries(rows)) {
+    assert.ok(row, k + ' 근로자 줄 규칙이 없습니다 — 옛 화면이 주민번호를 다시 실으면 재직 직원 누구나 읽습니다');
+    for (const f of ['rrn', 'account', 'holder']) {
+      assert.equal(row[f] && row[f]['.validate'], false, '★★ ' + k + ' 근로자 줄에 ' + f + ' 를 쓸 수 있습니다');
+    }
+  }
+  assert.ok(String(d.cases['.read']).length > 20, '막다가 읽기 권한을 지웠습니다');
+});

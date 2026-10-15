@@ -226,7 +226,26 @@
       },
       "contracts": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        "v": {
+          "$id": {
+            "company": {
+              "workers": {
+                "$i": {
+                  "rrn": {
+                    ".validate": false
+                  },
+                  "account": {
+                    ".validate": false
+                  },
+                  "holder": {
+                    ".validate": false
+                  }
+                }
+              }
+            }
+          }
+        }
       },
       "contract_requests": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
@@ -250,11 +269,45 @@
       },
       "consultings": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        "v": {
+          "$id": {
+            "workers": {
+              "$i": {
+                "rrn": {
+                  ".validate": false
+                },
+                "account": {
+                  ".validate": false
+                },
+                "holder": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        }
       },
       "cases": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
-        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'"
+        ".write": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
+        "v": {
+          "$id": {
+            "workers": {
+              "$i": {
+                "rrn": {
+                  ".validate": false
+                },
+                "account": {
+                  ".validate": false
+                },
+                "holder": {
+                  ".validate": false
+                }
+              }
+            }
+          }
+        }
       },
       "case_memos": {
         ".read": "auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active'",
