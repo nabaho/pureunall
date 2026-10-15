@@ -205,8 +205,10 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-billing.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
+<!-- 사건·계약 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (2026-10-15) -->
+<script src="js/pu-worker-secret.js?v=2"></script>
 <!-- 푸른통합 온톨로지 공통 사전·읽기 전용 관계 진단 -->
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-cokey.js?v=1"></script>
 <script src="js/pu-addr.js?v=2"></script>
@@ -5268,6 +5270,11 @@ function dbSet(k, v){
   /* 지운 명단 — 합쳐서 없앤 업체는 다시 올리지 않는다(되살림 막기, 2026-09-29, CO_TOMB 머리글).
      ⚠ 이 기기 사본에서도 함께 빠진다 — 저장 «전» 에 걷으므로 로컬·서버가 같은 목록을 본다. */
   if(k === 'companies' && Array.isArray(v) && typeof _coTombStrip === 'function') v = _coTombStrip(k, v);
+  /* 근로자 주민번호·계좌·예금주 — 통째 저장은 «떼기만» 한다(2026-10-15, dbUpsert 위 머리글).
+     휴지통에 든 사건·계약도 같다 — 휴지통은 재직 직원 누구나 읽는다. 담당자 칸은 건 id 그대로 남아,
+     되살리면 그 건의 담당자가 다시 본다. */
+  if(typeof _wsOn === 'function' && _wsOn(k) && Array.isArray(v)) v = v.map(function(x){ return PuWorkerSecret.split(k, x).record; });
+  if(k === 'trash_bin' && Array.isArray(v) && typeof _wsTrashStrip === 'function' && window.PuWorkerSecret) v = v.map(_wsTrashStrip);
   /* 일반 휴지통에 돈 기록이 섞이면 재무 전용 휴지통으로 옮긴다(재무 권한 기기만 — 아니면 그대로 둔다, 잃지 않게) */
   if(k === 'trash_bin' && Array.isArray(v) && typeof _trashFinSplit === 'function') v = _trashFinSplit(v);
   /* 근로자명부는 번호 = 사번(사번 열쇠 지도로 바뀐 사람만 주고받는다 — 2026-10-10, 사번정리 뒤에도 맞게 늘 다시 붙인다) */
@@ -6660,9 +6667,86 @@ function _attendLockDateOf(k, id){
   for(var i=0;i<arr.length;i++){ if(arr[i] && arr[i].id === id) return arr[i].date || ''; }
   return '';
 }
+// ── 근로자 주민번호·계좌·예금주 — 저장 «입구»에서 뗀다 (대표 결정 2026-10-15) ──────────
+//   사건·계약 덩어리는 재직 직원 누구나 읽는다. 그래서 이 셋은 덩어리에 안 싣고
+//   worker_secret(그 건의 담당자와 대표만 — 규칙이 서버에서 따진다)으로 보낸다.
+//   ★ 입구 넷(dbUpsert·dbPatch·dbUpsertMany·dbSet) 맨 앞이라, 어느 화면이 저장하든 빠짐없이 걸리고
+//     이 PC 사본(dbGet)에도 안 남는다. 창은 열 때 PuWorkerSecret.read 로 받아 제 상태에만 붙인다.
+//   ⚠ dbSet(통째)은 «떼기만» 한다 — 통째 저장에 실린 값은 대개 옛 사본이라 담당자 칸에 쓰지 않는다.
+//     한 건을 고친 값은 dbUpsert·dbPatch·dbUpsertMany 가 보낸다.
+//   설계: status/2026-10-15-rrn-owner-only.md · js/pu-worker-secret.js
+function _wsOn(k){ return !!(window.PuWorkerSecret && PuWorkerSecret.isKind(k)); }
+/* 휴지통 한 줄({storeKey, item}) — 사건·계약이 담겼으면 그 안에서 뗀다 */
+function _wsTrashStrip(t){
+  if(!t || !t.item || !_wsOn(t.storeKey)) return t;
+  var s = PuWorkerSecret.split(t.storeKey, t.item);
+  return s.any ? Object.assign({}, t, { item: s.record }) : t;
+}
+var _wsToastAt = 0;
+function _wsFail(r){
+  console.warn('[담당자 칸] 저장 못함', r && (r.error || (r.denied ? 'denied' : '')));
+  if(Date.now() - _wsToastAt < 30000) return;     // 한 번에 여러 건이면 한 번만
+  _wsToastAt = Date.now();
+  try { showToast(r && r.denied
+    ? '🔒 주민번호·계좌는 그 건의 담당자와 대표만 저장할 수 있습니다 — 그 칸은 저장되지 않았습니다'
+    : '⚠ 주민번호·계좌를 저장하지 못했습니다(연결 확인 후 다시 저장해 주세요)'); } catch(e){}
+}
+/* 창(계약·사건)이 열릴 때 — 담당자 칸을 읽어 그 창 상태에만 붙인다. 상태: loading → ok | denied | err
+   ⚠ 「누가 볼 수 있나」를 화면이 흉내 내지 않는다 — 읽어 보고 서버가 거절하면 denied. */
+function useErpWorkerSecret(kind, id, setF, onMerged){
+  var st = useState(id ? 'loading' : 'ok'); var state = st[0]; var setState = st[1];
+  useEffect(function(){
+    if(!id){ setState('ok'); return; }
+    if(!window.PuWorkerSecret || !fbDb){ setState('err'); return; }
+    var alive = true;
+    PuWorkerSecret.read(fbDb, kind, id).then(function(r){
+      if(!alive) return;
+      if(r.ok){
+        setF(function(prev){ var next = PuWorkerSecret.merge(kind, prev, r.map); if(onMerged && next !== prev) onMerged(prev, next); return next; });
+        setState('ok');
+      }
+      else setState(r.denied ? 'denied' : 'err');
+    });
+    return function(){ alive = false; };
+  }, [kind, id]);
+  return state;
+}
+/* 근로자 줄의 주민번호·계좌·예금주 칸 — 담당자(ok)면 입력 칸, 아니면 잠김 표시.
+   field: 'rrn' | 'account' | 'holder' (예금주는 계좌의 «있다» 표시를 따른다) */
+function erpWsCell(state, wk, field, inputProps){
+  if(state === 'ok') return h('input', inputProps);
+  var has = field === 'rrn' ? wk.hasRrn : wk.hasAccount;
+  var label = state === 'loading' ? '불러오는 중…'
+            : state === 'denied' ? (has ? '🔒 담당자만' : '—')
+            : '⚠ 못 불러옴 — 다시 열어 주세요';
+  var tip = state === 'denied' ? '주민번호·계좌는 이 건의 주담당·부담당과 대표만 봅니다' : '';
+  return h('span', { title: tip, 'data-ws': state,
+    style: Object.assign({}, (inputProps && inputProps.style) || {}, { display:'inline-flex', alignItems:'center',
+      background:'#f8fafc', color:'#64748b', border:'1px solid #e2e8f0', whiteSpace:'nowrap', overflow:'hidden' }) }, label);
+}
+/* 이관·되돌리기 — 출발 건의 담당자 칸을 도착 건으로. 근로자 열쇠(id)는 이관해도 그대로라 그대로 옮긴다.
+   ⚠ 출발 건을 휴지통에 보내기 «전»에 부른다 — 보낸 뒤엔 규칙이 출발 건의 담당자를 알 수 없다.
+   ⚠ 못 읽으면(출발 건의 담당자가 아님) 조용히 넘기지 않고 알린다. */
+function erpWsCarry(srcKind, srcId, dstKind, dstId){
+  if(!window.PuWorkerSecret || !srcId || !dstId) return;
+  if(!fbDb){ _wsFail({ error:'연결 없음' }); return; }
+  PuWorkerSecret.carry(fbDb, srcKind, srcId, dstKind, dstId).then(function(r){
+    if(r.ok) return;
+    if(r.denied){ try { showToast('🔒 근로자 주민번호·계좌는 옮기지 못했습니다 — 출발 건의 담당자나 대표가 새 건에 다시 넣어야 합니다'); } catch(e){} }
+    else _wsFail(r);
+  });
+}
+function _wsSend(k, id, secrets){
+  if(!secrets || !id) return;
+  if(!fbDb){ _wsFail({ error:'연결 없음' }); return; }
+  PuWorkerSecret.write(fbDb, k, id, secrets).then(function(r){ if(!r.ok) _wsFail(r); });
+}
 // 1건 추가/수정. 반환 true=저장됨.
 function dbUpsert(k, item){
   if(!item || typeof item.id !== 'string' || !item.id){ console.warn('[dbUpsert] '+k+': id 없는 항목 거부'); return false; }
+  /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로 보낸다(위 머리글) */
+  var _wsSec = null;
+  if(typeof _wsOn === 'function' && _wsOn(k)){ var _wsS = PuWorkerSecret.split(k, item); if(_wsS.any){ item = _wsS.record; _wsSec = _wsS.secrets; } }
   // 지운 명단에 오른 업체는 되살리지 않는다 — 되돌리기는 명단에서 먼저 뺀 뒤 부른다(coMergeUndo)
   if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(item.id)){ console.warn('[지운 명단] ' + item.id + ' — 합쳐서 없앤 업체라 다시 올리지 않습니다'); return false; }
   if(ATTEND_LOCK_TABLES[k]){
@@ -6692,13 +6776,19 @@ function dbUpsert(k, item){
     if(!_recLocalSave(k, next)) return false;
     // 바뀐 칸만 보낸다 — 남이 만진 다른 칸을 되돌리지 않게 (dbPatch 와 같은 규칙)
     _recServerWrite(k, _recFieldPaths(item, _prevRec));
+    if(_wsSec) _wsSend(k, item.id, _wsSec);
     return true;
   }
-  return dbSet(k, next); // 폴백: 전체 보호 경유 (동기화 전 보류 포함)
+  var _upOk = dbSet(k, next); // 폴백: 전체 보호 경유 (동기화 전 보류 포함)
+  if(_upOk && _wsSec) _wsSend(k, item.id, _wsSec);
+  return _upOk;
 }
 // 1건의 특정 필드만 수정 (상태변경 등). 반환 true=저장됨, false=대상 없음/실패.
 function dbPatch(k, id, fields){
   if(typeof id !== 'string' || !id || !fields){ console.warn('[dbPatch] '+k+': 인자 오류'); return false; }
+  /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로(dbUpsert 위 머리글) */
+  var _wsSec = null;
+  if(typeof _wsOn === 'function' && _wsOn(k)){ var _wsP = PuWorkerSecret.splitPatch(k, fields); if(_wsP.any){ fields = _wsP.fields; _wsSec = _wsP.secrets; } }
   /* 지운 명단 업체의 칸만 고쳐 보내면 서버에 «껍데기» 업체가 되살아난다(칸 경로 쓰기는 없는 줄도 만든다) */
   if(k === 'companies' && typeof coIsTomb === 'function' && coIsTomb(id)){ console.warn('[지운 명단] ' + id + ' — 합쳐서 없앤 업체라 고치지 않습니다'); return false; }
   if(ATTEND_LOCK_TABLES[k]){
@@ -6749,9 +6839,12 @@ function dbPatch(k, id, fields){
        ⚠ 지우지 말 것. tests/patch-sends-id.test.js 가 기계로 지킨다. */
     cp[id+'/id'] = id;
     _recServerWrite(k, cp);
+    if(_wsSec) _wsSend(k, id, _wsSec);
     return true;
   }
-  return dbSet(k, next);
+  var _ptOk = dbSet(k, next);
+  if(_ptOk && _wsSec) _wsSend(k, id, _wsSec);
+  return _ptOk;
 }
 // 1건 삭제. 반환 true=처리됨.
 function dbRemove(k, id){
@@ -6774,6 +6867,15 @@ function dbRemove(k, id){
 // 여러 건 추가/수정 — 한 번의 요청에 건별 child 경로로 (통째 교체 없음). 자동생성·엑셀 일괄용.
 function dbUpsertMany(k, items){
   if(!Array.isArray(items) || items.length === 0) return true;
+  /* 근로자 주민번호·계좌·예금주를 뗀다 — 성공한 자리에서만 담당자 칸으로(dbUpsert 위 머리글) */
+  var _wsAll = [];
+  if(typeof _wsOn === 'function' && _wsOn(k)){
+    items = items.map(function(it){
+      var s = PuWorkerSecret.split(k, it);
+      if(s.any && it && it.id) _wsAll.push([it.id, s.secrets]);
+      return s.record;
+    });
+  }
   // 지운 명단에 오른 업체는 빼고 나머지만 올린다(한 건 때문에 전부를 막지는 않는다)
   if(k === 'companies' && typeof _coTombStrip === 'function'){
     items = _coTombStrip(k, items);
@@ -6814,9 +6916,12 @@ function dbUpsertMany(k, items){
     if(!_recLocalSave(k, next)) return false;
     var cp = {}; items.forEach(function(it){ cp[it.id] = it; });
     _recServerWrite(k, cp);
+    _wsAll.forEach(function(p){ _wsSend(k, p[0], p[1]); });
     return true;
   }
-  return dbSet(k, next);
+  var _mnOk = dbSet(k, next);
+  if(_mnOk) _wsAll.forEach(function(p){ _wsSend(k, p[0], p[1]); });
+  return _mnOk;
 }
 // 여러 건 삭제 — 한 번의 요청에 건별 null
 function dbRemoveMany(k, ids){
@@ -16336,7 +16441,7 @@ function searchPastCompanies(query){
     if(match(co.name || c.companyName, co.bizNo || c.bizNo)){
       results.push({
         source:'계약관리', sourceColor:'#2563eb', sourceBg:'#eff6ff',
-        sourceId:c.id, label: co.name || c.companyName, bizNo: co.bizNo || c.bizNo || '',
+        sourceId:c.id, sourceKind:'contracts', label: co.name || c.companyName, bizNo: co.bizNo || c.bizNo || '',
         date: c.signDate, status: c.status,
         company: Object.assign({}, co, { name: co.name || c.companyName, bizNo: co.bizNo || c.bizNo })
       });
@@ -16347,7 +16452,7 @@ function searchPastCompanies(query){
     if(match(co.name, co.bizNo)){
       results.push({
         source:'업체관리', sourceColor:'#854d0e', sourceBg:'#fde68a',
-        sourceId:co.id, label: co.name, bizNo: co.bizNo || '',
+        sourceId:co.id, sourceKind:'companies', label: co.name, bizNo: co.bizNo || '',
         date: co.contractStartDate, status: co.status,
         company: co
       });
@@ -16364,7 +16469,7 @@ function searchPastCompanies(query){
       if(match(it.companyName, it.bizNo)){
         results.push({
           source: mod.label, sourceColor: mod.color, sourceBg: mod.bg,
-          sourceId: it.id, label: it.companyName, bizNo: it.bizNo || '',
+          sourceId: it.id, sourceKind: mod.key, label: it.companyName, bizNo: it.bizNo || '',
           date: it.startDate || it.estDate || it.receiveDate, status: it.status,
           company: {
             name: it.companyName, bizNo: it.bizNo || '',
@@ -20320,6 +20425,12 @@ function ContractModal(props){
     return init;
   });
   var f = s[0]; var setF = s[1];
+  /* 근로자 주민번호·계좌·예금주 — 담당자 칸에서 받아 이 창에만 붙인다(대표 결정 2026-10-15) */
+  /* 아직 아무것도 안 고쳤으면 «처음 모양»도 함께 옮긴다 — 안 그러면 「저장 안 된 변경사항」이 거짓으로 뜨고
+     1초 뒤 임시저장이 주민번호를 이 PC 에 남긴다 */
+  var wsState = useErpWorkerSecret('contracts', f.id, setF, function(prev, next){
+    if(_initialSnapS && JSON.stringify(prev) === _initialSnapS[0]) _initialSnapS[1](JSON.stringify(next));
+  });
   var clq=useState(''); var companyLinkQuery=clq[0]; var setCompanyLinkQuery=clq[1];
   var clm=useState(false); var companyLinkManualOpen=clm[0]; var setCompanyLinkManualOpen=clm[1];
   var companyLinkEngine=window.PuOntology&&typeof window.PuOntology.validateCompanyLink==='function'&&typeof window.PuOntology.companyLinkCandidates==='function'?window.PuOntology:null;
@@ -20617,12 +20728,12 @@ function ContractModal(props){
   /* 지난 기록(업체·계약·사건·컨설팅·기금·기타)에서 그 줄의 «원본»을 찾는다. */
   function _pastCoRecord(r){
     var allSrc = [
-      { list: dbGetLive('contracts'), nameKey:'companyName', isContract:true },
-      { list: dbGet('companies',[]), nameKey:'name', isCompany:true },
-      { list: dbGetLive('cases'), nameKey:'companyName' },
-      { list: dbGetLive('consultings'), nameKey:'companyName' },
-      { list: dbGetLive('funds'), nameKey:'companyName' },
-      { list: dbGetLive('other_projects'), nameKey:'companyName' }
+      { list: dbGetLive('contracts'), nameKey:'companyName', isContract:true, kind:'contracts' },
+      { list: dbGet('companies',[]), nameKey:'name', isCompany:true, kind:'companies' },
+      { list: dbGetLive('cases'), nameKey:'companyName', kind:'cases' },
+      { list: dbGetLive('consultings'), nameKey:'companyName', kind:'consultings' },
+      { list: dbGetLive('funds'), nameKey:'companyName', kind:'funds' },
+      { list: dbGetLive('other_projects'), nameKey:'companyName', kind:'other_projects' }
     ];
     var out = null;
     allSrc.forEach(function(src){
@@ -20632,7 +20743,7 @@ function ContractModal(props){
         var xBiz = x.bizNo || (x.company && x.company.bizNo) || '';
         return nameOk && xBiz === ((r && r.bizNo) || '');
       });
-      if(item) out = { item:item, isContract:!!src.isContract, isCompany:!!src.isCompany };
+      if(item) out = { item:item, isContract:!!src.isContract, isCompany:!!src.isCompany, kind:src.kind };
     });
     return out;
   }
@@ -20664,11 +20775,26 @@ function ContractModal(props){
         어느 이름을 골랐든 번호는 «가지고 있는 줄»에서 온다.
      ★ 이미 적힌 칸은 절대 안 덮는다 — 손으로 고쳐 둔 값이 말없이 바뀌면 안 된다.
      ★ 순서가 곧 신뢰 순서다(erpHitPri) — 업체관리 → 기업정보함 → 계약 → 나머지. */
+  /* 옛 건의 근로자를 가져올 때 — 그 건의 담당자(또는 대표)면 주민번호·계좌도 함께 붙인다(대표 결정 2026-10-15).
+     아니면 이름·연락처 등만 온다. 「있다」 표시는 떼고 가져온다 — 이 새 계약에는 아직 값이 없으므로. */
+  function wsBareWorkers(list){
+    return (list || []).map(function(w){
+      if(!w || (!('hasRrn' in w) && !('hasAccount' in w))) return w;
+      var c = Object.assign({}, w); delete c.hasRrn; delete c.hasAccount; return c;
+    });
+  }
+  function wsPullFrom(srcKind, srcId){
+    if(!srcKind || !srcId || !window.PuWorkerSecret || !PuWorkerSecret.isKind(srcKind) || !fbDb) return;
+    PuWorkerSecret.read(fbDb, srcKind, srcId).then(function(r){
+      if(r.ok) setF(function(prev){ return PuWorkerSecret.merge('contracts', prev, r.map); });
+    });
+  }
   function applyCoGroup(g, opts){
     if(!g || !g.rows || !g.rows.length) return;
     var c = Object.assign({}, f.company || {});
     var contacts = (c.contacts || []).slice();
     var filled = [];
+    var _wsPullAfter = null;   /* 근로자를 가져온 옛 건 — 담당자 칸을 이어 읽는다 */
     g.rows.slice().sort(function(a,b){ return erpHitPri(a) - erpHitPri(b); }).forEach(function(r){
       var src = _coFieldsOf(r) || {};
       ERP_CO_FILL_KEYS.forEach(function(k){
@@ -20691,8 +20817,13 @@ function ContractModal(props){
         var mg = mergeCompanyContacts(contacts, src.contacts);
         if(mg && mg.added > 0) contacts = mg.contacts;
       }
-      if(!(c.workers||[]).length && src.workers && src.workers.length) c.workers = src.workers.slice();
+      if(!(c.workers||[]).length && src.workers && src.workers.length){
+        c.workers = wsBareWorkers(src.workers);
+        var _wsFo = _pastCoRecord(r);
+        if(_wsFo && _wsFo.item) _wsPullAfter = [_wsFo.kind, _wsFo.item.id];
+      }
     });
+    if(_wsPullAfter) setTimeout(function(){ wsPullFrom(_wsPullAfter[0], _wsPullAfter[1]); }, 0);
     c.contacts = contacts;
     if(g.name) c.name = g.name;
     setF(function(prev){ return Object.assign({}, prev, {
@@ -20728,7 +20859,7 @@ function ContractModal(props){
   var pcq = useState(''); var pastInitialQuery = pcq[0]; var setPastInitialQuery = pcq[1];
 
   // 초기 state 스냅샷 (변경 감지용)
-  var initialSnap = useState(function(){ return JSON.stringify(init); })[0];
+  var _initialSnapS = useState(function(){ return JSON.stringify(init); }); var initialSnap = _initialSnapS[0];
   var savedRef = useState({ value:false })[0];  // 저장 성공 플래그
 
   // 자동 임시저장 (1초 디바운스)
@@ -20819,7 +20950,7 @@ function ContractModal(props){
       contacts: (src.contacts && src.contacts.length > 0)
         ? src.contacts.map(function(c){ return c.pcId ? Object.assign({}, c, { pcAt: c.pcAt || (new Date()).toISOString().slice(0,10) }) : c; })
         : f.company.contacts,
-      workers: (src.workers && src.workers.length > 0) ? src.workers.slice() : (f.company.workers || []),
+      workers: (src.workers && src.workers.length > 0) ? wsBareWorkers(src.workers) : (f.company.workers || []),
       businessCardImg: src.businessCardImg || f.company.businessCardImg || '',
       bizLicenseImg: src.bizLicenseImg || f.company.bizLicenseImg || ''
     });
@@ -20828,6 +20959,7 @@ function ContractModal(props){
       companyName: nextC.name,
       bizNo: nextC.bizNo
     }); });
+    if(src.workers && src.workers.length) wsPullFrom(picked.sourceKind, picked.sourceId);   /* 담당자면 주민번호·계좌도(2026-10-15) */
     setPastSearch(false);
     showToast('"' + (src.name || '회사') + '" 정보 불러옴 (' + picked.source + ')');
   }
@@ -21088,13 +21220,15 @@ function ContractModal(props){
     var added = 0;
     rows.forEach(function(r){
       if(!r[0]) return; // 이름 없으면 스킵
-      workers.push({
+      var nwk = {
         id:'wk-' + Date.now().toString(36)+Math.random().toString(36).slice(2,5) + '-' + Math.random().toString(36).slice(2,5) + '-' + added,
         name: r[0] || '', position: r[1] || '', phone: fmtPhone(r[2] || ''),
-        rrn: r[3] || '', address: r[4] || '', email: r[5] || '',
+        address: r[4] || '', email: r[5] || '',
         hireDate:'', leaveDate:'', note:'',
         isPrimary: workers.length === 0
-      });
+      };
+      if(wsState === 'ok') nwk.rrn = r[3] || '';   /* 담당자가 아니면 주민번호 열은 안 받는다(2026-10-15) */
+      workers.push(nwk);
       added++;
     });
     var nextC = Object.assign({}, f.company, { workers: workers });
@@ -22070,6 +22204,7 @@ function ContractModal(props){
                     var nw = Object.assign({}, workers[idx]);
                     var filled = 0;
                     cols.forEach(function(v,i){
+                      if(fields[i] === 'rrn' && wsState !== 'ok') return;   /* 담당자가 아니면 주민번호는 안 받는다 */
                       if(v && fields[i]){ nw[fields[i]] = v; filled++; }
                     });
                     workers[idx] = nw;
@@ -22079,7 +22214,7 @@ function ContractModal(props){
                   onChange:function(e){ setWorker(idx, 'name', e.target.value); },
                   placeholder:'이름 *',
                   style:{ padding:'7px 10px', border:'1px solid #cbd5e1', borderRadius:'4px', fontSize:'12px', fontFamily:'inherit' } }),
-                h('input', { type:'text', value:wk.rrn || '',
+                erpWsCell(wsState, wk, 'rrn', { type:'text', value:wk.rrn || '',
                   onChange:function(e){ setWorker(idx, 'rrn', e.target.value); },
                   placeholder:'주민번호 (951212-1234567)',
                   maxLength:14,
@@ -24398,6 +24533,7 @@ function transferContract(contract, opt){
       // 사건관리 목록 맨 위로 올려 어디로 갔는지 바로 보이게
       Object.assign(newCase, arvStamp('계약', contract.contractNo));
       if(!dbUpsert('cases', newCase)) throw new Error('사건관리 저장 실패');
+      if(typeof erpWsCarry === 'function') erpWsCarry('contracts', contract.id, 'cases', newCase.id);   /* 근로자 주민번호·계좌도 함께(2026-10-15) */
       results.push({ type:'case', no:caseNo, id:newCase.id });
       return;
     }
@@ -24488,6 +24624,7 @@ function transferContract(contract, opt){
     if(kindV === 'fund'){ item2.estDate = contract.signDate; delete item2.startDate; delete item2.endDate; }
     // (제거) 컨설팅 이관 시 업체관리 자동 등록 — 컨설팅 사업장은 컨설팅관리에서만 관리
     if(!dbUpsert(storageMap[kindV], item2)) throw new Error(k.label + ' 저장 실패');
+    if(typeof erpWsCarry === 'function') erpWsCarry('contracts', contract.id, storageMap[kindV], item2.id);   /* 근로자 주민번호·계좌도 함께(2026-10-15) */
     // 컨설팅은 계약일(startDate)순 자동 재정렬 (소급 입력 자연 정렬)
     if(kindV === 'consulting'){
       reorderConsultingNos();
@@ -24615,6 +24752,7 @@ async function returnToContract(storeKey, itemId){
         if(typeof showToast==='function') showToast('❌ 계약 되살리기 실패 — 아무것도 바꾸지 않았습니다');
         return;
       }
+      if(typeof erpWsCarry === 'function') erpWsCarry(storeKey, itemId, 'contracts', ctBack.id);   /* 휴지통에 보내기 «전» — 그 사이 고친 주민번호·계좌를 계약으로 */
       if(!ctReturnPark(storeKey, itemId, plan.contractNo)){
         dbUpsert('contracts', plan.contract);        // 되돌림: 계약을 원래대로
         if(typeof showToast==='function') showToast('❌ 복귀 실패 — 계약을 원래대로 두었습니다');
@@ -24669,6 +24807,7 @@ async function returnToContract(storeKey, itemId){
     Object.assign(newContract, arvStamp(storeLabel, itemNo));
 
     if(!dbUpsert('contracts', newContract)){ if(typeof showToast==='function') showToast('❌ 계약관리 생성 실패'); return; }
+    if(typeof erpWsCarry === 'function') erpWsCarry(storeKey, itemId, 'contracts', newContract.id);   /* 휴지통에 보내기 «전» */
     if(!ctReturnPark(storeKey, itemId, newContract.contractNo)){
       // 롤백: 방금 생성한 계약 제거 (모듈 원본은 그대로 유지)
       dbRemove('contracts', newContract.id);
@@ -32446,6 +32585,11 @@ function CaseEditModal(props){
   var isBothCase = caseClientType === 'both';
   // 작성 중 이탈 방지: 초기 스냅샷과 비교
   var _initSnapS = useState(function(){ return JSON.stringify(s[0]); }); var _caseInitSnap = _initSnapS[0];
+  /* 근로자 주민번호·계좌·예금주 — 담당자 칸에서 받아 이 창에만 붙인다(대표 결정 2026-10-15).
+     아직 아무것도 안 고쳤으면 «처음 모양»도 함께 옮긴다 — 안 그러면 닫을 때 「저장 안 된 변경사항」이 거짓으로 뜬다. */
+  var wsState = useErpWorkerSecret('cases', f.id, setF, function(prev, next){
+    if(JSON.stringify(prev) === _caseInitSnap) _initSnapS[1](JSON.stringify(next));
+  });
   async function caseSafeClose(){
     var dirty = JSON.stringify(f) !== _caseInitSnap;
     if(!dirty){ props.onClose(); return; }
@@ -32474,6 +32618,7 @@ function CaseEditModal(props){
   }
   /* 근로자 줄의 「📗 통장」 단추 — 이름을 아직 안 적었으면 안 낸다(찾을 열쇠가 없다) */
   function bankBtn(w, wi){
+    if(wsState !== 'ok') return null;          /* 계좌는 담당자만(2026-10-15) */
     if(!String(w.name || '').trim()) return null;
     return h('button', { type:'button', onClick:function(){ setBankPick({ wi:wi, name:w.name }); },
       title:'사진첩에 읽어 둔 통장에서 은행·계좌·예금주를 채웁니다',
@@ -32676,11 +32821,11 @@ function CaseEditModal(props){
                       h('button', { type:'button', onClick:function(){ setF(function(prev){ var ws=(prev.workers||[]).filter(function(_,i){return i!==wi;}); return Object.assign({},prev,{workers:ws}); }); },
                         style:{ padding:'2px 6px', background:'#fef2f2', color:'#991b1b', border:0, borderRadius:'4px', fontSize:'10px', cursor:'pointer' } }, '×')),
                     h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px' } },
-                      h('input', { type:'text', value:w.rrn||'', onChange:updWL('rrn'), placeholder:'주민번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
+                      erpWsCell(wsState, w, 'rrn', { type:'text', value:w.rrn||'', onChange:updWL('rrn'), placeholder:'주민번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
                       h('input', { type:'text', value:w.addr||'', onChange:updWL('addr'), placeholder:'주소', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
                       h('input', { type:'text', value:w.bank||'', onChange:updWL('bank'), placeholder:'은행', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
-                      h('input', { type:'text', value:w.account||'', onChange:updWL('account'), placeholder:'계좌번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
-                      h('input', { type:'text', value:w.holder||'', onChange:updWL('holder'), placeholder:'예금주', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
+                      erpWsCell(wsState, w, 'account', { type:'text', value:w.account||'', onChange:updWL('account'), placeholder:'계좌번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
+                      erpWsCell(wsState, w, 'holder', { type:'text', value:w.holder||'', onChange:updWL('holder'), placeholder:'예금주', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
                       h('input', { type:'text', value:w.pos||'', onChange:updWL('pos'), placeholder:'직위', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } })),
                     /* 이 사람이 낸 서류 · 아직 안 낸 서류 — 담지 않고 «볼 때» 읽는다
                        + 📗 통장에서 계좌 채우기 (대표 결정 2026-09-03 ㉡) */
@@ -32806,11 +32951,11 @@ function CaseEditModal(props){
                       h('button', { type:'button', onClick:function(){ setF(function(prev){ var ws=(prev.workers||[]).filter(function(_,i){return i!==wi;}); return Object.assign({},prev,{workers:ws}); }); },
                         style:{ padding:'2px 6px', background:'#fef2f2', color:'#991b1b', border:0, borderRadius:'4px', fontSize:'10px', cursor:'pointer' } }, '×')),
                     h('div', { style:{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:'4px' } },
-                      h('input', { type:'text', value:w.rrn||'', onChange:updWR('rrn'), placeholder:'주민번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
+                      erpWsCell(wsState, w, 'rrn', { type:'text', value:w.rrn||'', onChange:updWR('rrn'), placeholder:'주민번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
                       h('input', { type:'text', value:w.addr||'', onChange:updWR('addr'), placeholder:'주소', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
                       h('input', { type:'text', value:w.bank||'', onChange:updWR('bank'), placeholder:'은행', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
-                      h('input', { type:'text', value:w.account||'', onChange:updWR('account'), placeholder:'계좌번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
-                      h('input', { type:'text', value:w.holder||'', onChange:updWR('holder'), placeholder:'예금주', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
+                      erpWsCell(wsState, w, 'account', { type:'text', value:w.account||'', onChange:updWR('account'), placeholder:'계좌번호', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
+                      erpWsCell(wsState, w, 'holder', { type:'text', value:w.holder||'', onChange:updWR('holder'), placeholder:'예금주', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } }),
                       h('input', { type:'text', value:w.pos||'', onChange:updWR('pos'), placeholder:'직위', style:{ padding:'4px 6px', border:'1px solid #e2e8f0', borderRadius:'4px', fontSize:'10.5px' } })),
                     /* 이 사람이 낸 서류 · 아직 안 낸 서류 — 담지 않고 «볼 때» 읽는다
                        + 📗 통장에서 계좌 채우기 (대표 결정 2026-09-03 ㉡) */
@@ -41334,7 +41479,17 @@ function ContractFormPrintModal(props){
     (typeof window.erpFreshForms === 'function' ? window.erpFreshForms() : Promise.resolve(0)).then(done, done);
     return function(){ alive = false; };
   }, []);
-  if(ready) return h(ContractFormPrintBody, props);
+  /* 근로자 주민번호 — 담당자 칸에서 받아 붙인 뒤에 채운다(대표 결정 2026-10-15). 담당자가 아니면 그 칸은 빈칸. */
+  var _wc = useState(null); var wsContract = _wc[0], setWsContract = _wc[1];
+  useEffect(function(){
+    var c = props.contract, alive = true;
+    if(!c || !c.id || !window.PuWorkerSecret || !fbDb){ setWsContract(c || {}); return; }
+    PuWorkerSecret.read(fbDb, 'contracts', c.id).then(function(r){
+      if(alive) setWsContract(r.ok ? PuWorkerSecret.merge('contracts', c, r.map) : c);
+    });
+    return function(){ alive = false; };
+  }, []);
+  if(ready && wsContract) return h(ContractFormPrintBody, Object.assign({}, props, { contract: wsContract }));
   return h('div', { className:'modal-bg', onClick:props.onClose },
     h('div', { className:'modal', style:{ width:'360px' }, onClick:function(e){ e.stopPropagation(); } },
       h('div', { style:{ padding:'20px', textAlign:'center', color:'#94a3b8', fontSize:'13px' } }, '📄 계약서 양식 불러오는 중…')));
@@ -43350,6 +43505,7 @@ function BackupSection(){
     //  - raw-dump : data["pureun_v6_contracts"] = "..."  (LS 키 + 문자열)
     var writes = [];      // { lsKey, raw } — localStorage에 쓸 항목
     var fbUpdates = {};   // 'data/<key>' = { v, u } — Firebase 반영
+    var wsRestore = [];   // [표, 건 id, {근로자:{칸:값}}] — 근로자 주민번호·계좌·예금주는 담당자 칸으로(2026-10-15)
     var summary = [];     // 미리보기용 "키: N건"
     var now = Date.now();
     Object.keys(d).forEach(function(kk){
@@ -43365,6 +43521,19 @@ function BackupSection(){
         raw = JSON.stringify(valueObj);
       }
       if(logicalKey.indexOf('_meta_') === 0) return;  // 백업에 든 옛 메타는 무시(아래서 새로 설정)
+      /* ★ 근로자 주민번호·계좌·예금주 — 복원도 공개 덩어리·이 PC 사본에 싣지 않는다(2026-10-15).
+         이 길은 dbSet 을 «안 거치고» 서버에 바로 쓰므로 여기서 따로 뗀다. 옛 백업에 든 값은 담당자 칸으로 되돌린다. */
+      if(typeof _wsOn === 'function' && _wsOn(logicalKey)){
+        if(!haveObj){ try { valueObj = JSON.parse(raw); haveObj = true; } catch(_){ } }
+        if(haveObj && Array.isArray(valueObj)){
+          valueObj = valueObj.map(function(x){
+            var sp = PuWorkerSecret.split(logicalKey, x);
+            if(sp.any && x && x.id && Object.keys(sp.secrets).length) wsRestore.push([logicalKey, x.id, sp.secrets]);
+            return sp.record;
+          });
+          raw = JSON.stringify(valueObj);
+        }
+      }
       writes.push({ lsKey: lsKey, raw: raw });
       if(fbShouldSync(logicalKey)){
         if(!haveObj){ try { valueObj = JSON.parse(raw); haveObj = true; } catch(_){ haveObj = false; } }
@@ -43431,6 +43600,12 @@ function BackupSection(){
       if(fbDb && Object.keys(fbUpdates).length){
         try { await fbDb.ref().update(fbUpdates); }
         catch(e){ fbOk = false; showToast('⚠ 로컬은 복원됨 / 서버 반영 실패: ' + (e && e.message) + ' — 콘솔에서 erpSyncNow() 시도하세요'); }
+      }
+      /* 근로자 주민번호·계좌 — 건이 서버에 들어간 «뒤», 새로고침 «전»에 담당자 칸으로 */
+      if(fbOk && fbDb && wsRestore.length && window.PuWorkerSecret){
+        var wsRes = await Promise.all(wsRestore.map(function(t){ return PuWorkerSecret.write(fbDb, t[0], t[1], t[2]); }));
+        var wsBad = wsRes.filter(function(r){ return !r.ok; }).length;
+        if(wsBad) showToast('⚠ 근로자 주민번호·계좌 ' + wsBad + '건은 되돌리지 못했습니다(담당자 칸 권한) — 대표 계정으로 다시 복원해 주세요');
       }
       var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:0, fileName:(sourceLabel||'백업'), keyCount: Object.keys(fbUpdates).length || writes.length };
       saveHistory([rec].concat(history).slice(0,50));

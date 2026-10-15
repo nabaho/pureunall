@@ -1325,6 +1325,34 @@ rules.esign = { cases: { '.read': LOGIN, $caseId: {
   }
 } } };
 
+/* ══ 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (대표 결정 2026-10-15) ══
+   설계: status/2026-10-15-rrn-owner-only.md · 화면 쪽: js/pu-worker-secret.js
+   ★ 왜 따로인가 — data/cases·data/contracts 는 «한 덩어리»라 재직 직원 누구나 통째로 읽는다.
+     덩어리 안의 칸 하나만 막을 수 없어 이 셋을 떼어 여기 둔다.
+   ★ 담당자는 «그 건의 지금 칸»을 그때그때 읽는다 — 담당자를 바꾸면 새 담당자가 바로 보고,
+     전 담당자는 바로 못 본다. 건이 지워지면(managerMain 없음) 대표만 본다.
+   ⚠ 위임관리인은 «담당일 때만»(대표 결정 2026-10-15). SUB 를 여기 넣지 말 것.
+   ⚠ 부담당은 앞 다섯 자리까지 본다(2026-10-15 실측 최대 2명). 여섯째 부담당은 못 본다.
+   ⚠ 내 사번이 없으면(null) 통째로 거절 — 담당 칸도 비었을 때 null === null 로 열리는 것을 막는다. */
+const 내사번 = "root.child('uid_roles').child(auth.uid).child('sid').val()";
+const 그건 = "root.child('data').child($kind).child('v').child($rec)";
+const 그건담당 = `(${내사번} != null && (${그건}.child('managerMain').val() === ${내사번}`
+  + [0, 1, 2, 3, 4].map(function (i) { return ` || ${그건}.child('managerSubs').child('${i}').val() === ${내사번}`; }).join('')
+  + '))';
+const WS_OWNER = `(${LOGIN}) && (${ADMIN} || ${그건담당})`;
+const wsText = (n) => `newData.isString() && newData.val().length <= ${n}`;
+rules.worker_secret = { $kind: { $rec: {
+  '.read': WS_OWNER,
+  '.write': WS_OWNER,
+  '.validate': "$kind.matches(/^(cases|contracts|consultings|funds|other_projects)$/)",
+  $wid: {
+    rrn:     { '.validate': wsText(20) },
+    account: { '.validate': wsText(40) },
+    holder:  { '.validate': wsText(40) },
+    $other:  { '.validate': false }
+  }
+} } };
+
 /* ══ 취업규칙 관리 ═════════════════════════════════════════════════════ */
 const revWrite = `auth != null && ( !data.exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} ) && ( !newData.exists() || newData.child('ownerUid').val() === auth.uid )`;
 const origWrite = `auth != null && ( !data.exists() || !data.child('ownerUid').exists() || data.child('ownerUid').val() === auth.uid || ${ADMIN} )`;
