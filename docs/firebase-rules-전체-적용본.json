@@ -1731,6 +1731,29 @@
         }
       }
     },
+    "worker_secret": {
+      "$kind": {
+        "$rec": {
+          ".read": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (root.child('data').child($kind).child('v').child($rec).child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))",
+          ".write": "(auth != null && (auth.token.firebase.sign_in_provider === 'password' || auth.token.passkey === true || auth.token.kakao === true) && root.child('uid_roles').child(auth.uid).child('status').val() === 'active') && (root.child('uid_roles').child(auth.uid).child('isAdmin').val() == true || (root.child('uid_roles').child(auth.uid).child('sid').val() != null && (root.child('data').child($kind).child('v').child($rec).child('managerMain').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('0').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('1').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('2').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('3').val() === root.child('uid_roles').child(auth.uid).child('sid').val() || root.child('data').child($kind).child('v').child($rec).child('managerSubs').child('4').val() === root.child('uid_roles').child(auth.uid).child('sid').val())))",
+          ".validate": "$kind.matches(/^(cases|contracts|consultings|funds|other_projects)$/)",
+          "$wid": {
+            "rrn": {
+              ".validate": "newData.isString() && newData.val().length <= 20"
+            },
+            "account": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "holder": {
+              ".validate": "newData.isString() && newData.val().length <= 40"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        }
+      }
+    },
     "rules_mgmt": {
       "wip": {
         "$uid": {
