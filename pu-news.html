@@ -49,10 +49,10 @@
 </script>
 <script src="xlsx_gen.js?v=15"></script>
 <script src="js/pu-ai-call.js?v=4"></script>
-<script src="js/pu-news-core.js?v=59"></script>
+<script src="js/pu-news-core.js?v=60"></script>
 <!-- ⚠ 편지 짓개(tpl)보다 «먼저» 싣는다 — tpl 이 「장면이 있나」를 이것에게 묻는다 -->
 <script src="js/pu-news-show.js?v=1"></script>
-<script src="js/pu-news-tpl.js?v=49"></script>
+<script src="js/pu-news-tpl.js?v=50"></script>
 <!-- ⚠ 편지 짓개(tpl) «다음»에 싣는다 — 안내문이 그 빛깔(Tpl.색)을 빌린다 -->
 <script src="js/pu-news-notice.js?v=3"></script>
 <!-- ★ 지난 안내문(다음메일 기록) 대장의 «순수 도우미» — 파일별 모으기·연도 칩·대장(CSV) (대표 지시 2026-10-11) -->
@@ -1899,17 +1899,21 @@ function 도움(글){
 }
 
 /* 지금 회차 한 벌(없으면 빈 것을 만들어 준다 — 자리에 쓰지는 않는다) */
-function 지금회차(){
-  const 열쇠 = App.지금열쇠;
+function 회차한벌(열쇠){
   const 있는것 = App.회차들[열쇠];
   const 회 = Core.회차(오늘());
-  const 회차한벌 = (있는것 && 있는것.회차) || (열쇠 === 회.열쇠 ? 회 : 회차로부터(열쇠));
+  const 이번회차 = (있는것 && 있는것.회차) || (열쇠 === 회.열쇠 ? 회 : 회차로부터(열쇠));
   return Object.assign({
-    열쇠: 열쇠, 회차: 회차한벌, 상태: '초안',
+    열쇠: 열쇠, 회차: 이번회차, 상태: '초안',
     /* ⚠ 꼭지 이름을 손으로 적지 않는다(2026-09-23) — 꼭지를 더하면 그 꼭지만
          «담을 자리 없이» 조용히 사라진다. 목록은 한 곳(Core.꼭지들)에서 온다. */
     안: Core.꼭지들.reduce((a,g)=>{ a[g.키]=[]; return a; }, {}), 우리글: '', 지역뉴스: []
   }, 있는것 || {});
+}
+/* 지금 보고 있는 회차 한 벌. ⚠ AI 처럼 «기다리는 일»은 시작할 때 열쇠를 잡아 두고 끝나면 회차한벌(열쇠)로 다시 읽는다 —
+   그 사이 다른 회차로 옮기면 지금회차() 는 «다른 회차»를 돌려준다(2026-10-15 Codex 검토 4번). */
+function 지금회차(){
+  return 회차한벌(App.지금열쇠);
 }
 /* 열쇠(2026-08-w5)에서 회차 한 벌을 되살린다 — 지난 회차를 열 때 쓴다 */
 function 회차로부터(열쇠){
@@ -1963,7 +1967,8 @@ async function 판올리기(열쇠, 본판){
 /* 서버에 있는 것으로 이 회차를 다시 읽는다.
    ⚠ 회차를 통째로 읽지 않는다 — 안에 전문과 받는 분들 주소가 있다. */
 async function 회차다시읽기(열쇠){
-  const 칸 = ['회차','상태','안','우리글','우리글초안','인사','범위','지역뉴스','판'];
+  /* ★ 핵심·핵심후보도 읽는다 (2026-10-15 Codex 검토 1번) — 안 읽으면 충돌 뒤 화면에서 두 칸이 사라지고, 다음 저장이 서버의 카드를 지운다. */
+  const 칸 = ['회차','상태','안','우리글','우리글초안','인사','범위','지역뉴스','판','핵심','핵심후보'];
   const 값들 = await Promise.all(칸.map(k => db.ref('newsletter/issues/' + 열쇠 + '/' + k).once('value')));
   const d = { 열쇠: 열쇠 };
   칸.forEach((k, i) => { const v = 값들[i].val(); if(v != null) d[k] = v; });
@@ -1971,8 +1976,29 @@ async function 회차다시읽기(열쇠){
   return d;
 }
 
+/* ★★ 저장은 «회차마다 차례로» 한다 (2026-10-15 Codex 검토 2번)
+   ═════════════════════════════════════════════════════════════════
+   예전에는 저장이 끝나는 순간 `App.회차들[열쇠] = 자료` 로 «그 저장을 시작할 때의 옛 객체»를 다시 꽂았다.
+   먼저 시작한 저장이 판 거래를 기다리는 사이 더 치신 글(새 객체)이 있으면, 저장이 끝나며 옛 객체가 새 것을 덮어
+   화면이 «치기 전 내용»으로 다시 그려지고, 뒤따르는 저장은 옛 판을 들고 있어 「남이 고쳤다」로 막혔다.
+   ★ 이제: ① 같은 회차의 저장은 줄을 서서 «하나씩» ② 저장이 끝나도 더 새 객체가 있으면 «판만» 올린다(내용은 안 덮는다)
+          ③ 뒤에 줄 선 저장은 앞 저장이 올린 판을 이어받는다(같은 흐름 위에서 고친 것이므로).
+   ⚠ 남이 먼저 고쳐 «막힌» 경우는 그대로다 — 줄 선 저장도 옛 판이라 같은 까닭으로 막히고, 화면은 서버 것으로 새로 읽힌다. */
+const _저장줄 = {};      /* 열쇠 → 마지막 저장 약속(늘 끝나는 약속이라 줄이 끊기지 않는다) */
+const _저장대기 = {};    /* 열쇠 → 아직 시작 안 한 저장 자료들 */
+function 회차저장(자료){
+  const 열 = 자료.열쇠;
+  (_저장대기[열] = _저장대기[열] || []).push(자료);
+  const 이번 = (_저장줄[열] || Promise.resolve()).then(() => 회차저장하기(자료));
+  _저장줄[열] = 이번.then(() => {}, () => {});
+  return 이번;
+}
+
 /* 저장됐으면 true. 남이 먼저 고쳤으면 «알리고» false — 부르는 쪽이 이어 가지 않게. */
-async function 회차저장(자료){
+async function 회차저장하기(자료){
+  const 대기 = _저장대기[자료.열쇠] || [];
+  const 내자리 = 대기.indexOf(자료);
+  if(내자리 >= 0) 대기.splice(내자리, 1);               /* 이제 시작한다 — 대기에서 뺀다 */
   const 새판 = await 판올리기(자료.열쇠, Number(자료.판 || 0));
   if(!새판){
     const 다시 = await 회차다시읽기(자료.열쇠);
@@ -1991,8 +2017,11 @@ async function 회차저장(자료){
     return false;
   }
   자료.판 = 새판;
-  App.회차들[자료.열쇠] = 자료;
-  await db.ref('newsletter/issues/' + 자료.열쇠).update({
+  대기.forEach(p => { p.판 = 새판; });                  /* 이 저장 «뒤에» 줄 선 것은 이 저장 위에서 고친 것 — 올린 판을 이어받는다 */
+  const 최신 = App.회차들[자료.열쇠];
+  if(최신 && 최신 !== 자료) 최신.판 = 새판;               /* 저장하는 사이 더 새로 고친 것이 있으면 «판만» 올린다 — 옛 객체로 덮지 않는다 */
+  else App.회차들[자료.열쇠] = 자료;
+  const 쓸것 = {
     회차: 자료.회차, 상태: 자료.상태 || '초안', 안: 자료.안 || {},
     우리글: 자료.우리글 || '',
     /* ★ 「이 한마디는 기계가 쓴 초안입니다」를 새로 고쳐도 잊지 않게 함께 적는다.
@@ -2001,12 +2030,16 @@ async function 회차저장(자료){
     /* ★ 명절 인사 — 부정기 칸(2026-09-23). 안 쓴 회차에는 빈 것이 담긴다.
          편지 쪽이 «빈 것을 아예 안 그리므로» 빈 값이 담겨도 해가 없다. */
     인사: 자료.인사 || {},
-    /* ★ 핵심판 카드(나가는 것)와 AI 후보(안 나가는 것) — 대표 지시 2026-10-13. 여기 안 적으면 저장이 안 된다. */
-    핵심: 자료.핵심 || [], 핵심후보: 자료.핵심후보 || [],
     범위: 자료.범위 || App.설정.범위 || '자문중',
     판: 새판,
     고친이: (App.me && App.me.email) || '', 고친때: Date.now()
-  });
+  };
+  /* ★ 핵심판 카드(나가는 것)와 AI 후보(안 나가는 것) — 대표 지시 2026-10-13.
+     ⚠⚠ «읽지 않은 칸은 쓰지 않는다» (2026-10-15 Codex 검토 1번). 이 회차 자료에 핵심이 «아예 없으면»(undefined — 아직 안 읽었거나
+       새 회차) 빈 목록으로 쓰면 서버에 있는 카드를 지워 버린다. 일부러 «다 뺀» 것은 [] 로 오므로 그때만 칸이 지워진다. */
+  if(자료.핵심 !== undefined) 쓸것.핵심 = 자료.핵심 || [];
+  if(자료.핵심후보 !== undefined) 쓸것.핵심후보 = 자료.핵심후보 || [];
+  await db.ref('newsletter/issues/' + 자료.열쇠).update(쓸것);
   return true;
 }
 
@@ -2546,7 +2579,7 @@ function 편지요약(d, r, 갈수있나){
      <div>${경고.length===1 ? 경고[0] : '<ul>' + 경고.map(x=>'<li>'+x+'</li>').join('') + '</ul>'}</div></div>` : ''}
    <div class="row"><span class="k">나가는 판</span><span class="v">${핵심켬
      ? `<b>핵심판</b> · 카드 ${Core.핵심다듬기(d.핵심).length}장 <span class="hint">+ 그 밖의 소식 ${Core.핵심밖건수(Core.실릴것만(d.안 || {}, { 보낸것: d.상태 === '발송' }), d.핵심).밖}건은 웹 「전체 소식 보기」로</span>`
-     : `<b>전체 소식</b> <span class="hint">${Core.핵심있나(d) ? '핵심 카드가 있으나 «추적 밑주소»가 비어 지금처럼 전부 나갑니다' : '핵심 카드가 없어 지금처럼 전부 나갑니다'} · <a onclick="길바꾸기('core')" style="cursor:pointer;text-decoration:underline">핵심 정하기</a></span>`}</span></div>
+     : `<b>전체 소식</b> <span class="hint">${Core.핵심있나(d) ? esc('핵심 카드가 있으나 ' + 핵심판안켜진까닭(d) + ' — 지금처럼 전부 나갑니다') : '핵심 카드가 없어 지금처럼 전부 나갑니다'} · <a onclick="길바꾸기('core')" style="cursor:pointer;text-decoration:underline">핵심 정하기</a></span>`}</span></div>
    <div class="row"><span class="k">꼭지</span><span class="v jarline">${꼭지칩}</span></div>
    <div class="row"><span class="k">첨부</span><span class="v">${
      첨.파일들.length
@@ -3318,7 +3351,20 @@ function 핵심목록(d){
 }
 /* 「핵심판으로 나가나」 — 편지 짓는 층(Tpl)의 조건과 «같은 잣대»다(카드 있음 + 갈 곳(추적 밑주소) 있음) */
 function 핵심판켜짐(d){
-  return Core.핵심있나(d) && !!String((App.설정||{}).추적밑주소||'').trim();
+  /* ★ 편지 짓는 층(Tpl.핵심판켜짐) «한 곳»의 판단을 그대로 쓴다 — 화면·서버·편지가 따로 판단하면
+     「화면은 핵심판이라는데 실제로는 전문판이 나가는」 어긋남이 생긴다(2026-10-15 Codex 검토 8번). */
+  return Tpl.핵심판켜짐(d, App.설정 || {}, {});
+}
+/* 카드가 있는데 핵심판이 «안 켜질 때» 왜인지 — 화면이 이유를 말해야 한다 */
+function 핵심판안켜진까닭(d){
+  if(!Core.핵심있나(d)) return '';
+  if(!String((App.설정||{}).추적밑주소||'').trim())
+    return '설정의 «추적 밑주소»가 비어 있어 「전체 소식 보기」가 갈 곳이 없습니다';
+  if(!d.회차 || !d.회차.열쇠)
+    return '이 회차의 열쇠가 없어 「전체 소식 보기」 주소를 못 짓습니다';
+  if(!Core.전문거리있나(d))
+    return '웹 전문(전체 소식)에 실을 건이 없습니다 — 먼저 «이 주치로 채우기»로 소식을 담아 주세요(소식이 하나도 없으면 편지를 보낼 수 없습니다)';
+  return '핵심판 조건을 못 채웠습니다';
 }
 /* 쓰는 중에 다시 그려도 «손가락 자리»를 지킨다 — 안 지키면 한 칸 치고 저장될 때마다 커서가 사라진다 */
 function 핵심그리기(){
@@ -3342,13 +3388,13 @@ function 핵심판화면(d){
   const 목 = 핵심목록(d);
   const 후보 = Array.isArray(d.핵심후보) ? d.핵심후보 : [];
   const 개수 = Core.핵심다듬기(d.핵심).length;
-  const 밑있음 = !!String((App.설정||{}).추적밑주소||'').trim();
   const 건들 = Core.핵심거리(d);
   const 밖 = Core.핵심밖건수(Core.실릴것만(d.안 || {}, { 보낸것: d.상태 === '발송' }), d.핵심);
+  const 켜짐 = 핵심판켜짐(d);
   const 상태줄 = 개수
-    ? (밑있음
+    ? (켜짐
         ? `<div class="kcstat ok"><span>✔</span><div><b>핵심판으로 나갑니다</b> — 카드 ${개수}장 + 그 밖의 소식 ${밖.밖}건(웹 「전체 소식 보기」)</div></div>`
-        : `<div class="kcstat warn"><span>⚠</span><div><b>핵심판이 안 켜집니다</b> — 설정의 «추적 밑주소»가 비어 있어 「전체 소식 보기」가 갈 곳이 없습니다. 지금처럼 전체가 나갑니다.</div></div>`)
+        : `<div class="kcstat warn"><span>⚠</span><div><b>핵심판이 안 켜집니다</b> — ${esc(핵심판안켜진까닭(d))}. 지금처럼 전체가 나갑니다.</div></div>`)
     : `<div class="hint" style="margin:0 0 10px">카드가 없어 <b>지금처럼 전체 소식이 메일에 그대로</b> 나갑니다. 카드를 한 장이라도 만들면 <b>핵심판</b>으로 바뀝니다.</div>`;
 
   const 종류칸 = (i, 값) => `<select id="kc${i}-종류" onchange="핵심바뀜()"${막}>${
@@ -3389,6 +3435,7 @@ function 핵심판화면(d){
      ${c.설명 ? `<div class="kcs">${esc(c.설명)}</div>` : ''}
      <div class="kcs">${[c.대상 ? '대상 ' + esc(c.대상) : '', c.할일 ? '할 일 ' + esc(c.할일) : '', c.때 ? '시기 ' + esc(c.때) : ''].filter(Boolean).join(' · ') || '<span style="color:var(--faint)">대상·할 일·시기는 근거가 없어 비웠습니다 — 쓰신 뒤 채워 주세요</span>'}</div>
      ${(c.비운칸 || []).length ? `<div class="kcs" style="color:var(--warn)">⚠ AI 가 쓴 «${esc(c.비운칸.join('·'))}» 칸은 그 건에 근거가 없어 비웠습니다</div>` : ''}
+     ${(c.확인칸 || []).length ? `<div class="kcs" style="color:var(--warn)">⚠ «${esc(c.확인칸.join('·'))}» 칸에 건의 글에 없는 숫자가 있습니다 — 원문과 대조해 주세요</div>` : ''}
      ${c.출처 ? `<div class="kcs" style="color:var(--faint)">출처 건: ${esc(c.출처)}</div>` : ''}
      ${잠김 ? '' : `<div style="margin-top:6px;display:flex;gap:6px"><button class="btn" onclick="핵심후보쓰기(${i})">쓰기 ▸</button>
        <button class="mini" onclick="핵심후보지우기(${i})">✕ 지우기</button></div>`}
@@ -3434,8 +3481,26 @@ function 핵심바뀜(){
   d.핵심 = 핵심읽기(d);
   App.회차들[d.열쇠] = d;
   clearTimeout(핵심바뀜._t);
-  핵심바뀜._t = setTimeout(()=>{ 회차저장(d).then(핵심그리기).catch(()=>{}); }, 700);
+  핵심바뀜._t = setTimeout(()=>{ 회차저장(d).then(핵심저장뒤).catch(()=>{}); }, 700);
 }
+/* 저장이 끝난 뒤 — 아직 «치는 중»이면 다시 그리지 않는다 (2026-10-15 Codex 검토 2번).
+   다시 그리면 한글 조합(IME) 중인 글자가 끊기고, 더 새 입력이 있으면 치기 전 모양으로 되돌려 보일 수 있다.
+   ⚠ 안 그린 것은 «밀어 둔다» — 칸을 떠나는 순간(focusout) 한 번 그린다. 오른쪽 요약(카드 장수 등)이 그때 맞춰진다. */
+function 핵심저장뒤(){
+  const a = document.activeElement;
+  if(a && a.closest && a.closest('.kc')){ 핵심저장뒤.밀림 = true; return; }
+  핵심저장뒤.밀림 = false;
+  핵심그리기();
+}
+document.addEventListener('focusout', function(){
+  if(!핵심저장뒤.밀림) return;
+  setTimeout(function(){
+    const a = document.activeElement;
+    if(a && a.closest && a.closest('.kc')) return;     /* 다른 칸으로 옮겨 간 것 — 그 칸을 떠날 때 다시 본다 */
+    if(!핵심저장뒤.밀림) return;
+    핵심저장뒤.밀림 = false; 핵심그리기();
+  }, 150);
+});
 /* 한 번 누르면 끝나는 일(더하기·빼기·옮기기·쓰기)은 곧바로 담는다 */
 function 핵심곧저장(고치기){
   const d = 지금회차();
@@ -3477,6 +3542,8 @@ function 핵심건고르기(i, 번호){
 async function 핵심후보뽑기(){
   if(App.AI중) return;
   const d = 지금회차();
+  const 열쇠 = d.열쇠;                               /* ★ 요청한 «그 회차»를 잡아 둔다 — AI 를 기다리는 사이 다른 회차로 옮기면 지금회차() 가 다른 회차를 돌려준다 */
+  const 이름 = (d.회차 && d.회차.이름) || 열쇠;
   if(d.상태 === '발송') return toast('보낸 회차는 고치지 않습니다', 6000);
   const { 거리, 원본 } = Core.핵심거리(d);
   if(!거리.length) return toast('후보로 삼을 건이 없습니다 — 먼저 «이 주치로 채우기»로 담아 주세요', 9000);
@@ -3488,12 +3555,15 @@ async function 핵심후보뽑기(){
       generationConfig: { temperature: 0, maxOutputTokens: 4096 }
     });
     const 후보 = Core.핵심후보받기(PuAiCall.textOf(답), 원본);
-    const 지금 = 지금회차();                      /* AI 를 기다린 사이 고치신 것(카드·글)을 덮지 않게 «지금 것»에 얹는다 */
+    /* AI 를 기다린 사이 고치신 것(카드·글)을 덮지 않게 «요청한 그 회차의 지금 것»에 얹는다.
+       ⚠ 그 사이 «보낸 회차»가 됐으면 안 쓴다 — 응답 때 잠김을 다시 본다(Codex 검토 4번). */
+    const 지금 = 회차한벌(열쇠);
+    if(지금.상태 === '발송') return toast(이름 + ' 은(는) 그 사이 보낸 회차가 되어 후보를 담지 않았습니다', 9000);
     지금.핵심후보 = 후보;
     App.회차들[지금.열쇠] = 지금;
     if(!(await 회차저장(지금))) return;
     toast(후보.length
-      ? '✨ 후보 ' + 후보.length + '장 — 사실을 확인하고 «쓰기»를 눌러 주세요(아직 편지에 안 실립니다)'
+      ? '✨ ' + 이름 + ' 후보 ' + 후보.length + '장 — 사실을 확인하고 «쓰기»를 눌러 주세요(아직 편지에 안 실립니다)'
       : '이번 주는 기준(시행일·할 일·위험)에 해당하는 것이 없다고 봤습니다 — 직접 쓰셔도 됩니다', 12000);
   }catch(e){
     toast('후보를 만들지 못했습니다: ' + ((e && e.message) || e), 12000);
@@ -4264,7 +4334,11 @@ const _맞추기들 = {};
 let _편지맞추기 = function(){
   Object.keys(_맞추기들).forEach(function(자리){
     const g = _맞추기들[자리];
-    if(g && g.el.isConnected) g.fn(); else delete _맞추기들[자리];   /* 다시 그려져 사라진 틀은 치운다 */
+    if(g && g.el.isConnected) g.fn();
+    else{                                                    /* 다시 그려져 사라진 틀은 «지켜보기도 풀고» 치운다(2026-10-15 Codex 검토 11번) */
+      if(g && g.el._편지지켜보기) g.el._편지지켜보기.disconnect();
+      delete _맞추기들[자리];
+    }
   });
 };
 /* 옵션: 좁으면그대로(폰꼴폭 아래에서는 안 줄인다) · 틀스크롤없이(틀 키가 편지 키라 안쪽 스크롤이 필요 없다 — 틀 안에 스크롤바가 끼면 폭이 15px 줄어 오른쪽이 잘린다)
@@ -4308,6 +4382,8 @@ function 편지창채우기(자리, 서식, 옵션){
     맞추기();
     if(typeof 뜻.불러온뒤 === 'function'){ try{ 뜻.불러온뒤(f); }catch(_){ /* 덤으로 하는 일이 틀을 막지 않는다 */ } }
   };
+  const 옛틀 = _맞추기들[자리];
+  if(옛틀 && 옛틀.el !== el && 옛틀.el._편지지켜보기) 옛틀.el._편지지켜보기.disconnect();   /* 같은 자리에 새 틀을 그리면 옛 틀의 지켜보기를 푼다 */
   _맞추기들[자리] = { el: el, fn: 맞추기 };
   /* ★ 쪽이 길어져 세로 스크롤바가 생기면 «칸 폭»이 줄어도 창 크기 이벤트는 안 온다 —
        칸 자체를 지켜봐야 오른쪽이 잘리지 않는다(스크롤바 폭만큼 잘리던 것). */
@@ -4359,7 +4435,7 @@ function 크게보기(){
   편지창채우기('bigB', 편.서식);
   $('big').classList.add('on');
 }
-function closeBig(){ $('big').classList.remove('on'); delete _맞추기들.bigB; }
+function closeBig(){ $('big').classList.remove('on'); const 틀 = _맞추기들.bigB; if(틀 && 틀.el._편지지켜보기) 틀.el._편지지켜보기.disconnect(); delete _맞추기들.bigB; }
 
 /* ── 노무사회 자료 서랍 (떠 있는 창) ── */
 function 서랍열기(){ App.서랍 = true; render(); }
@@ -8129,6 +8205,12 @@ async function 감시읽기(){
     const v = (await db.ref('newsletter/watch').orderByKey().limitToLast(1).once('value')).val() || {};
     const k = Object.keys(v).sort().pop();
     App.감시 = k ? Object.assign({ 열쇠: k }, v[k]) : { 열쇠: '' };
+    /* ★★ 「기사 모으기」 마지막 날 — homepage/newsBrief/«모은날» (문자열 하나)에서 읽는다 (2026-10-15 고침).
+         예전에는 App.브리핑.모은날 을 읽었는데, App.브리핑 은 homepage/newsBrief/«모음»(기사 목록)이라 그 칸이 «없다» —
+         모으기가 멀쩡히 돌아도 이 화면은 늘 「⚠ 없음 뒤로 멈춤」이라고 거짓 경고를 띄웠다(감시꾼을 만든 날부터).
+       ⚠ 못 읽으면 null — 「멈췄다」가 아니라 「읽는 중/못 읽음」으로 말한다(못 읽은 것을 멈춘 것으로 단정하지 않는다). */
+    try{ App.모은날 = String((await db.ref('homepage/newsBrief/모은날').once('value')).val() || ''); }
+    catch(_){ App.모은날 = null; }
   }catch(e){ App.감시 = { 열쇠: '', 탈: (e && e.message) || String(e) }; }
   App._감시읽는중 = false;
   const el = $('cWatch'); if(el) el.textContent = 감시볼것수() || '';
@@ -8147,12 +8229,14 @@ function 감시화면(){
   if(w.탈) return '<div class="note" style="color:var(--bad)">점검 기록을 못 읽었습니다 — ' + esc(w.탈) + '</div>';
   const 오늘날 = 오늘();
   const 어제 = (function(){ const d = new Date(오늘날 + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1); return d.toISOString().slice(0,10); })();
-  const b = App.금요일기록, 모은날 = String((App.브리핑||{}).모은날||'');
+  const b = App.금요일기록, 모은날 = (App.모은날 == null) ? null : String(App.모은날);
   const AI탈 = b && (b.알림||[]).some(m => /AI 정리를 못 했|한마디를 못 지었/.test(String(m)));
   const 칸 = (때, 이름, 말, 꼴) => `<div class="wst ${꼴}"><div class="w">${때}</div><div class="n">${이름}</div><div class="s">${말}</div></div>`;
   const 점 = w.점검 || null, 발 = w.발송 || null, 전 = w.전달 || null;
   const 흐름 = [
-    칸('매일 07:00', '기사 모으기', 모은날 >= 어제 ? '✓ 정상' : '⚠ ' + (모은날 || '없음') + ' 뒤로 멈춤', 모은날 >= 어제 ? 'ok' : 'warn'),
+    칸('매일 07:00', '기사 모으기',
+      모은날 === null ? '… 읽는 중' : 모은날 >= 어제 ? '✓ 정상' : '⚠ ' + (모은날 || '없음') + ' 뒤로 멈춤',
+      모은날 === null ? 'wait' : 모은날 >= 어제 ? 'ok' : 'warn'),
     칸('금 13:00', 'AI 초안', !b ? '기다림' : AI탈 ? '⚠ 빠짐' : b.다시한때 ? '↻ 다시 해서 됨' : '✓ 정상',
       !b ? 'wait' : AI탈 ? 'warn' : b.다시한때 ? 'fix' : 'ok'),
     칸('일 18:00', '보내기 전 점검', !점 ? '기다림' : 점.판정 === 'ok' ? '✓ 이상 없음'
