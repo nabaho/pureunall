@@ -145,9 +145,12 @@ function okFetch(log) {
   };
 }
 const CRED = { apiKey: "KEY", apiSecret: "SECRET", from: "01099998888" };
+/* 솔라피 길 시험용 — 기본은 폰 길이라 설정으로 바꿔 준다 */
+const SOLAPI = Object.assign({}, SEED, { scal_env: { visitSms: { config: { provider: "solapi" } } } });
+const SOLAPI_AUTO = Object.assign({}, SEED, { scal_env: { visitSms: { config: { provider: "solapi", mode: "auto" } } } });
 
 test("승인 발송: 서버가 번호를 다시 읽어 보내고, 두 번째 요청은 막는다", async () => {
-  const db = fakeDb(SEED);
+  const db = fakeDb(SOLAPI);
   await V.prepare(db, { nowMs: NOW });
   const log = [];
   const r1 = await V.sendApproved(db, { keys: [DATE + "_c1"], by: "uid1", nowMs: NOW, cred: CRED, fetchImpl: okFetch(log) });
@@ -166,7 +169,7 @@ test("승인 발송: 서버가 번호를 다시 읽어 보내고, 두 번째 요
 });
 
 test("화면이 보낸 번호·문구는 믿지 않는다 — 열쇠만 받는다", async () => {
-  const db = fakeDb(SEED);
+  const db = fakeDb(SOLAPI);
   const log = [];
   await V.sendApproved(db, { keys: [DATE + "_c1"], to: "01000000000", text: "아무말", by: "u", nowMs: NOW, cred: CRED, fetchImpl: okFetch(log) });
   const body = JSON.parse(log[0].init.body);
@@ -188,7 +191,7 @@ test("오늘이 아닌 날짜 요청은 거절", async () => {
 });
 
 test("발송 실패는 failed 로 남고 다시 시도할 수 있다", async () => {
-  const db = fakeDb(SEED);
+  const db = fakeDb(SOLAPI);
   const bad = async () => ({ ok: false, status: 400, json: async () => ({ errorCode: "X", errorMessage: "발신번호 미등록" }) });
   const r1 = await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW, cred: CRED, fetchImpl: bad });
   assert.equal(r1.failed, 1);
@@ -200,14 +203,14 @@ test("발송 실패는 failed 로 남고 다시 시도할 수 있다", async () 
 });
 
 test("열쇠·발신번호가 없으면 보내지 않고 failed 로 남긴다", async () => {
-  const db = fakeDb(SEED);
+  const db = fakeDb(SOLAPI);
   const r = await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW, cred: { apiKey: "", apiSecret: "", from: "" } });
   assert.equal(r.failed, 1);
   assert.match(db.root.scal_env.visitSms.queue[DATE][DATE + "_c1"].error, /설정/);
 });
 
 test("자동 방식은 9시 목록 만들기에서 바로 보낸다", async () => {
-  const db = fakeDb(Object.assign({}, SEED, { scal_env: { visitSms: { config: { mode: "auto" } } } }));
+  const db = fakeDb(SOLAPI_AUTO);
   const log = [];
   const out = await V.prepare(db, { nowMs: NOW, cred: CRED, fetchImpl: okFetch(log) });
   assert.equal(out.sent, 1);
@@ -225,4 +228,112 @@ test("원본(일정·사업장·업체)은 고치지 않는다", async () => {
   await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW, cred: CRED, fetchImpl: okFetch([]) });
   const after = JSON.stringify({ a: db.root.scal_scheds, b: db.root.scal_cos, c: db.root.data, d: db.root.scal_staff });
   assert.equal(after, before);
+});
+
+/* ══ 폰 길(기본) ══ */
+const T10 = Date.parse("2026-10-15T01:00:00.000Z");    // 서울 10:00
+const approveDb = async () => { const db = fakeDb(SEED); await V.prepare(db, { nowMs: NOW }); return db; };
+const q1 = (db) => db.root.scal_env.visitSms.queue[DATE][DATE + "_c1"];
+
+test("폰 길: 승인은 곧바로 보내지 않고 approved(폰 발송 대기)로만 바꾼다", async () => {
+  const db = await approveDb();
+  const log = [];
+  const r = await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW, cred: CRED, fetchImpl: okFetch(log) });
+  assert.equal(r.queued, 1);
+  assert.equal(log.length, 0, "폰 길인데 서버가 직접 보냈다");
+  assert.equal(q1(db).status, "approved");
+});
+
+test("폰 길: 승인 전(ready)에는 폰이 받아 가지 못한다 — 승인 방식은 사람이 눌러야 나간다", async () => {
+  const db = await approveDb();
+  const jobs = await V.claimPhoneJobs(db, { nowMs: T10 });
+  assert.equal(jobs.length, 0);
+  assert.equal(q1(db).status, "ready");
+});
+
+test("폰 길: 승인된 줄을 폰이 받아 가고, 번호·문구는 서버가 다시 만든 것이다", async () => {
+  const db = await approveDb();
+  await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW });
+  const jobs = await V.claimPhoneJobs(db, { nowMs: T10 });
+  assert.equal(jobs.length, 1);
+  assert.deepEqual(Object.keys(jobs[0]).sort(), ["key", "text", "to"]);
+  assert.equal(jobs[0].to, "01012345678");
+  assert.match(jobs[0].text, /권형하/);
+  assert.equal(q1(db).status, "sending");
+  assert.ok(!JSON.stringify(db.root.scal_env).includes("01012345678"), "진짜 번호가 DB 에 남았다");
+});
+
+test("폰 길: 같은 줄을 두 번 내주지 않는다(안부가 겹쳐도)", async () => {
+  const db = await approveDb();
+  await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW });
+  const a = await V.claimPhoneJobs(db, { nowMs: T10 });
+  const b = await V.claimPhoneJobs(db, { nowMs: T10 + 1000 });
+  assert.equal(a.length, 1);
+  assert.equal(b.length, 0);
+});
+
+test("폰 길: 결과가 오면 sent/failed 로 바뀌고, 받아 가지 않은 줄은 못 바꾼다", async () => {
+  const db = await approveDb();
+  await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW });
+  await V.claimPhoneJobs(db, { nowMs: T10 });
+  const evil = await V.recordPhoneResult(db, { nowMs: T10, results: [{ key: DATE + "_c2", ok: true }, { key: "../x", ok: true }, { key: DATE + "_c1", ok: true }] });
+  assert.equal(evil.sent, 1);
+  assert.equal(evil.ignored, 2);
+  assert.equal(q1(db).status, "sent");
+  assert.equal(q1(db).sentBy, "phone");
+  // 이미 보낸 줄에 또 «실패»가 와도 못 뒤집는다
+  const again = await V.recordPhoneResult(db, { nowMs: T10, results: [{ key: DATE + "_c1", ok: false, error: "x" }] });
+  assert.equal(again.ignored, 1);
+  assert.equal(q1(db).status, "sent");
+});
+
+test("폰 길: 실패 결과는 failed 로 남고 사람이 다시 승인할 수 있다", async () => {
+  const db = await approveDb();
+  await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW });
+  await V.claimPhoneJobs(db, { nowMs: T10 });
+  await V.recordPhoneResult(db, { nowMs: T10, results: [{ key: DATE + "_c1", ok: false, error: "SEND_SMS 권한 없음" }] });
+  assert.equal(q1(db).status, "failed");
+  const re = await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: T10 });
+  assert.equal(re.queued, 1);
+  assert.equal(q1(db).status, "approved");
+});
+
+test("폰 길: 받아 간 뒤 한 시간 넘게 결과가 없으면 failed(확인 필요) — 자동으로 다시 보내지 않는다", async () => {
+  const db = await approveDb();
+  await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW });
+  await V.claimPhoneJobs(db, { nowMs: T10 });
+  const later = T10 + V.PHONE_STALE_MS + 60000;
+  const jobs = await V.claimPhoneJobs(db, { nowMs: later });
+  assert.equal(jobs.length, 0, "결과를 모르는 줄을 다시 내줬다 — 두 번 나갈 수 있다");
+  assert.equal(q1(db).status, "failed");
+  assert.match(q1(db).error, /확인/);
+});
+
+test("폰 길: 한밤·이른 아침에는 내주지 않는다", async () => {
+  const db = await approveDb();
+  await V.sendApproved(db, { keys: [DATE + "_c1"], by: "u", nowMs: NOW });
+  const night = Date.parse("2026-10-15T12:30:00.000Z");   // 서울 21:30
+  assert.equal((await V.claimPhoneJobs(db, { nowMs: night })).length, 0);
+  assert.equal(q1(db).status, "approved");
+});
+
+test("폰 길: 자동 방식이면 승인 없이 ready 줄을 폰이 받아 간다", async () => {
+  const db = fakeDb(Object.assign({}, SEED, { scal_env: { visitSms: { config: { mode: "auto" } } } }));
+  const out = await V.prepare(db, { nowMs: NOW, cred: CRED, fetchImpl: async () => { throw new Error("서버가 직접 보내면 안 된다"); } });
+  assert.equal(out.sent, 0);
+  const jobs = await V.claimPhoneJobs(db, { nowMs: T10 });
+  assert.equal(jobs.length, 1);
+});
+
+test("폰 길: 꺼짐(off)이거나 솔라피로 설정돼 있으면 폰에 일을 주지 않는다", async () => {
+  const off = fakeDb(Object.assign({}, SEED, { scal_env: { visitSms: { config: { mode: "off" } } } }));
+  assert.equal((await V.claimPhoneJobs(off, { nowMs: T10 })).length, 0);
+  const sol = fakeDb(SOLAPI_AUTO);
+  await V.prepare(sol, { nowMs: NOW, cred: { apiKey: "", apiSecret: "", from: "" } });
+  assert.equal((await V.claimPhoneJobs(sol, { nowMs: T10 })).length, 0);
+});
+
+test("폰 길: 9시 목록 만들기 전(queue 에 줄이 없음)에는 내주지 않는다", async () => {
+  const db = fakeDb(Object.assign({}, SEED, { scal_env: { visitSms: { config: { mode: "auto" } } } }));
+  assert.equal((await V.claimPhoneJobs(db, { nowMs: T10 })).length, 0);
 });

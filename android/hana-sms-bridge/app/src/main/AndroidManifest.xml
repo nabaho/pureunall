@@ -14,6 +14,11 @@
          없으면 사람이 설정 앱을 헤매야 하고, 그러면 아무도 안 한다.
          ⚠ 사내 배포용 앱이다(플레이스토어에 올리지 않는다). -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 방문 사업장 «사전 안내 문자» 보내기 (2026-10-15, 대표 지시 「돈 안 내고 내 폰에서」).
+         ⚠ 앱을 열어 「방문 안내 문자 보내기 허용」을 «눌렀을 때만» 묻는다. 누르지 않으면 묻지 않고,
+           권한이 없으면 서버도 이 폰에 문자 일을 주지 않는다.
+         ⚠ 서버가 준 «열쇠·휴대폰 번호·문구»만 보낸다(VisitSmsSender). 앱이 스스로 문자를 지어 보내지 않는다. -->
+    <uses-permission android:name="android.permission.SEND_SMS" />
 
     <application
         android:allowBackup="false"

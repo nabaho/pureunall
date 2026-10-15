@@ -33,7 +33,7 @@
   }
 
   function countBy(rows) {
-    var c = { ready: 0, sent: 0, failed: 0, skip: 0, sending: 0 };
+    var c = { ready: 0, approved: 0, sent: 0, failed: 0, skip: 0, sending: 0 };
     rows.forEach(function (r) { if (c[r.status] != null) c[r.status]++; });
     return c;
   }
@@ -43,7 +43,8 @@
 
   function statusLabel(r) {
     if (r.status === 'sent') return '✓ 발송됨';
-    if (r.status === 'sending') return '… 보내는 중';
+    if (r.status === 'approved') return '⏳ 폰 대기';
+    if (r.status === 'sending') return '… 폰이 보내는 중';
     if (r.status === 'failed') return '✕ 실패';
     if (r.status === 'skip') return '⚠ 확인 필요';
     return '대기';
@@ -93,7 +94,7 @@
     var c = countBy(rows);
     var can = sendable(rows);
     var auto = mode === 'auto';
-    var head = '📨 오늘 방문 사업장 안내 문자 <span class="vsms-sub">보낼 곳 ' + (c.ready + c.failed) + ' · 발송됨 ' + c.sent
+    var head = '📨 오늘 방문 사업장 안내 문자 <span class="vsms-sub">보낼 곳 ' + (c.ready + c.failed) + (c.approved + c.sending ? ' · 폰 대기 ' + (c.approved + c.sending) : '') + ' · 발송됨 ' + c.sent
       + (c.skip ? ' · 번호 확인 필요 ' + c.skip : '') + (auto ? ' · 자동 발송 중' : '') + '</span>';
     var prev = rows[0] && rows[0].text ? '<div class="vsms-prev">문구: ' + esc(rows[0].text) + '</div>' : '';
     var act = auto ? '' : '<div class="vsms-act"><button type="button" class="btn btn-p" id="vsmsSend"' + ((S.busy || !can.length) ? ' disabled' : '') + '>선택한 곳에 보내기</button>'
@@ -119,7 +120,7 @@
         body: JSON.stringify({ keys: keys, date: todayKey() }),
       });
       var body = await res.json().catch(function () { return {}; });
-      S.msg = body.ok ? ('발송 ' + body.sent + '건' + (body.failed ? ' · 실패 ' + body.failed + '건' : '') + (body.skipped ? ' · 건너뜀 ' + body.skipped + '건' : ''))
+      S.msg = body.ok ? ((body.queued ? ('폰에 맡겼습니다 ' + body.queued + '건 — 폰이 15분 안에 보냅니다') : ('발송 ' + body.sent + '건')) + (body.failed ? ' · 실패 ' + body.failed + '건' : '') + (body.skipped ? ' · 건너뜀 ' + body.skipped + '건' : ''))
         : ('보내지 못했습니다 — ' + (body.error || ('HTTP ' + res.status)));
     } catch (e) {
       S.msg = '보내지 못했습니다 — 연결을 확인하세요.';

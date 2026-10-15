@@ -55,7 +55,7 @@ test("새 최상위 DB 자리를 만들지 않는다 — scal_env 아래에만 �
   assert.equal(UI.ROOT, m[1], "화면과 서버의 저장 자리가 다르다");
 });
 
-test("index.js: 예약 함수는 서울 시각·승인 함수는 직원만, 비밀값은 둘 다 같은 목록", () => {
+test("index.js: 예약 함수는 서울 시각·승인 함수는 직원만, 비밀값 선언은 없다", () => {
   const i = IDX.indexOf("exports.visitSmsPrepare");
   assert.ok(i > 0);
   const j = IDX.indexOf("exports.visitSmsSend");
@@ -64,8 +64,9 @@ test("index.js: 예약 함수는 서울 시각·승인 함수는 직원만, 비�
   assert.match(IDX.slice(i, j), /timeZone\("Asia\/Seoul"\)/);
   const send = IDX.slice(j);
   assert.match(send, /requireStaff\(req\)/, "직원 확인 없이 부를 수 있다");
-  assert.match(send, /secrets:\s*VISIT_SMS_SECRETS/);
-  assert.match(IDX.slice(i, j), /secrets:\s*VISIT_SMS_SECRETS/);
+  /* 폰 길(기본)은 비밀값이 필요 없다 — 선언하면 비밀값이 없을 때 배포가 «통째로» 멈춘다.
+     솔라피로 바꿀 때만 다시 선언한다(index.js 머리말). */
+  assert.doesNotMatch(IDX.slice(i), /secrets:\s*(VISIT_SMS_SECRETS|\[\s*"SOLAPI)/, "비밀값을 선언하면 폰 길만 쓸 때도 배포가 멈춘다");
 });
 
 test("컨설팅일정이 띠를 싣는다 — 캐시 번호가 붙고, 놓을 자리가 있다", () => {

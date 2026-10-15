@@ -20,6 +20,15 @@
    ⚠ 사업장 일정에는 «시각»이 없다(날짜만) — 문구에 시각을 넣지 않는다.
    ⚠ 원본(scal_scheds·scal_cos·data/companies)은 읽기만 한다. 고치지 않는다.
 
+   ★ 보내는 길이 둘이다 — config.provider (대표 결정 2026-10-15 「돈 안 내고 내 폰에서」)
+     'phone'  (기본) 대표 폰의 «하나문자 앱»이 15분마다 서버에 안부(sweepPing)를 물을 때
+              오늘 보낼 일을 받아 «폰의 문자 기능»으로 보낸다. 돈이 안 든다. 폰이 켜져 있어야 한다.
+              → 승인 단추는 곧바로 보내지 않고 줄을 'approved'(폰 발송 대기)로 바꾼다.
+     'solapi' 문자 업체(솔라피)로 서버가 직접 보낸다. 열쇠 셋이 필요하다(아래 어댑터).
+   ⚠ 폰이 «받아 갔다»(sending)와 «보냈다»(sent)는 다르다. 받아 간 뒤 결과가 안 오면
+     자동으로 다시 보내지 않는다 — 보냈는데 결과만 못 알렸을 수 있어, 다시 보내면 두 번 나간다.
+     (60분이 지나면 failed·「폰 응답 없음」으로 바꿔 사람이 확인하게 한다.)
+
    저장 자리: scal_env/visitSms/{config, queue/{날짜}/{열쇠}} — 새 최상위 자리를 만들지 않는다
    (scal_* 규칙이 이미 있다). 권한은 scal() 규칙(로그인 직원 읽기·쓰기)을 따른다. */
 
@@ -29,7 +38,12 @@ const ROOT = "scal_env/visitSms";
 
 /* 설정이 아직 없을 때의 기본값 — 승인 방식, 권형하(일정관리 직원 id a1) 한 명.
    mode: 'off'(아무것도 안 함) | 'approve'(목록만 만들고 사람이 누른다) | 'auto'(9시에 바로 보낸다) */
-const DEFAULT_CONFIG = { mode: "approve", targetAttIds: ["a1"] };
+const DEFAULT_CONFIG = { mode: "approve", provider: "phone", targetAttIds: ["a1"] };
+
+/* 폰이 문자를 보내도 되는 시간(서울 시각) — 한밤·이른 아침에 고객사 폰을 울리지 않는다 */
+const PHONE_HOURS = { from: 8, to: 20 };
+const PHONE_STALE_MS = 60 * 60 * 1000;
+const PHONE_MAX_JOBS = 20;
 
 const DEFAULT_TEMPLATE = "[푸른노무법인] 안녕하세요. 오늘({날짜}) 푸른노무법인 {담당} 담당자가 귀사를 방문할 예정입니다. 감사합니다.";
 
@@ -220,7 +234,8 @@ async function prepare(db, opt) {
   if (Object.keys(updates).length) await db.ref().update(updates);
   rows.forEach((r) => { if (r.status === "ready") out.ready++; else out.skip++; });
 
-  if (mode === "auto") {
+  /* 자동 + 솔라피일 때만 서버가 «바로» 보낸다. 폰 길은 폰이 안부를 물을 때 가져간다(claimPhoneJobs). */
+  if (mode === "auto" && ((src.config && src.config.provider) || DEFAULT_CONFIG.provider) === "solapi") {
     const s = await sendRows(db, { date, rows, by: "auto", nowMs, cred: o.cred, fetchImpl: o.fetchImpl });
     out.sent = s.sent; out.failed = s.failed;
   }
@@ -268,11 +283,100 @@ async function sendApproved(db, o) {
   const want = new Set((o.keys || []).map(String));
   const rows = planToday(src).filter((r) => want.has(r.key));
   if (!rows.length) { const e = new Error("보낼 수 있는 항목이 없습니다."); e.status = 404; throw e; }
+  const provider = (src.config && src.config.provider) || DEFAULT_CONFIG.provider;
+  if (provider === "phone") return approveForPhone(db, { date: today, rows, by: o.by, nowMs });
   return sendRows(db, { date: today, rows, by: o.by, nowMs, cred: o.cred, fetchImpl: o.fetchImpl });
+}
+
+/* ── 폰 길 ── */
+
+/* 승인: ready/failed → approved (폰이 다음 안부 때 받아 간다). 보낸 것·받아 간 것은 건드리지 않는다. */
+async function approveForPhone(db, o) {
+  const res = { sent: 0, failed: 0, skipped: 0, queued: 0, results: [] };
+  const qBase = `${ROOT}/queue/${o.date}`;
+  for (const r of o.rows) {
+    if (r.status !== "ready") { res.skipped++; res.results.push({ key: r.key, status: "skip", why: r.why }); continue; }
+    const claim = await db.ref(`${qBase}/${r.key}/status`).transaction((cur) => {
+      if (cur === "sent" || cur === "sending" || cur === "approved") return undefined;
+      return "approved";
+    });
+    if (!claim.committed) { res.skipped++; res.results.push({ key: r.key, status: "already" }); continue; }
+    await db.ref(`${qBase}/${r.key}`).update(Object.assign(toQueueRow(r, o.nowMs), { status: "approved", approvedAt: o.nowMs, approvedBy: o.by, error: null }));
+    res.queued++; res.results.push({ key: r.key, status: "approved" });
+  }
+  return res;
+}
+
+/* 폰이 안부를 물을 때 «지금 보낼 것»을 내준다. 줄을 sending 으로 «차지»한 것만 준다 —
+   같은 줄을 두 번 주지 않는다(폰 둘이 물어도, 앞뒤 안부가 겹쳐도).
+   주는 것: 승인된(approved) 줄 + (자동 방식이면) 대기(ready) 줄.
+   ⚠ 번호·문구는 «여기서» 업체관리에서 다시 읽어 만든다 — queue 에 적힌 것을 믿지 않는다. */
+async function claimPhoneJobs(db, o) {
+  const nowMs = o.nowMs != null ? o.nowMs : Date.now();
+  const date = seoulDate(nowMs);
+  const src = await readSources(db, date);
+  const cfg = Object.assign({}, DEFAULT_CONFIG, src.config || {});
+  if (cfg.provider !== "phone" || cfg.mode === "off") return [];
+  const hour = Number(new Date(nowMs + 9 * 3600 * 1000).toISOString().slice(11, 13));
+  if (hour < PHONE_HOURS.from || hour >= PHONE_HOURS.to) return [];
+
+  const qBase = `${ROOT}/queue/${date}`;
+  const queue = (await db.ref(qBase).once("value")).val() || {};
+
+  /* 받아 갔는데 한 시간 넘게 결과가 없는 줄 — 자동으로 다시 보내지 않고 사람이 보게 한다 */
+  for (const k of Object.keys(queue)) {
+    const q = queue[k] || {};
+    if (q.status === "sending" && Number(q.claimedAt || 0) && nowMs - Number(q.claimedAt) > PHONE_STALE_MS) {
+      await db.ref(`${qBase}/${k}`).update({ status: "failed", failedAt: nowMs, error: "폰에서 결과를 받지 못했습니다 — 보냈는지 폰의 보낸 문자함을 확인하세요" });
+    }
+  }
+
+  const rows = planToday(src).filter((r) => r.status === "ready");
+  const jobs = [];
+  for (const r of rows) {
+    if (jobs.length >= PHONE_MAX_JOBS) break;
+    const q = queue[r.key];
+    if (!q) continue;                                             // 9시 목록 만들기 전이면 아직
+    const eligible = q.status === "approved" || (cfg.mode === "auto" && q.status === "ready");
+    if (!eligible) continue;
+    const claim = await db.ref(`${qBase}/${r.key}/status`).transaction((cur) => {
+      if (cur === "approved" || (cfg.mode === "auto" && cur === "ready")) return "sending";
+      return undefined;
+    });
+    if (!claim.committed) continue;
+    await db.ref(`${qBase}/${r.key}`).update({ claimedAt: nowMs });
+    jobs.push({ key: r.key, to: r.phone, text: r.text });
+  }
+  return jobs;
+}
+
+/* 폰이 «보냈다/못 보냈다»를 알려 온다. sending 인 줄만 바꾼다(남의 줄·보낸 줄은 못 건드린다). */
+async function recordPhoneResult(db, o) {
+  const nowMs = o.nowMs != null ? o.nowMs : Date.now();
+  const out = { sent: 0, failed: 0, ignored: 0 };
+  const list = Array.isArray(o.results) ? o.results.slice(0, 50) : [];
+  for (const r of list) {
+    const key = String((r && r.key) || "");
+    const m = /^(\d{4}-\d{2}-\d{2})_[A-Za-z0-9_-]{1,40}$/.exec(key);
+    if (!m) { out.ignored++; continue; }
+    const base = `${ROOT}/queue/${m[1]}/${key}`;
+    const cur = (await db.ref(`${base}/status`).once("value")).val();
+    if (cur !== "sending") { out.ignored++; continue; }
+    if (r.ok === true) {
+      await db.ref(base).update({ status: "sent", sentAt: nowMs, sentBy: "phone", error: null });
+      out.sent++;
+    } else {
+      await db.ref(base).update({ status: "failed", failedAt: nowMs, sentBy: "phone", error: String((r && r.error) || "폰에서 보내지 못함").slice(0, 200) });
+      out.failed++;
+    }
+  }
+  return out;
 }
 
 module.exports = {
   ROOT, DEFAULT_CONFIG, DEFAULT_TEMPLATE,
   seoulDate, normMobile, maskPhone, pickContact, buildMessage, planToday, toQueueRow,
+  PHONE_HOURS, PHONE_STALE_MS, PHONE_MAX_JOBS,
   solapiHeader, solapiSendOne, credFromEnv, readSources, prepare, sendRows, sendApproved,
+  approveForPhone, claimPhoneJobs, recordPhoneResult,
 };
