@@ -6961,11 +6961,30 @@ exports.hanaMessageBridge = functions
              ⚠ 옛 판은 안 보낸다. 안 보내면 «모름»으로 둔다(거짓으로 치면 안 된다). */
           ...(typeof body.batteryFree === "boolean"
             ? { sweepBatteryFree: body.batteryFree } : {}),
+          /* 문자 «보내기» 권한 — 방문 안내 문자를 맡길 수 있는 폰인지 화면이 알 수 있게 (2026-10-15) */
+          ...(typeof body.canSendSms === "boolean" ? { sweepCanSendSms: body.canSendSms } : {}),
         }).catch(() => {});
         /* 카톡 업무방 목록을 함께 내려 준다 — 폰은 이 목록에 «정확히» 있는 방만 보낸다.
            ⚠ 못 읽으면 kakaoRooms 를 아예 안 싣는다(빈 목록과 다르다) — 폰은 가진 목록을 그대로 쓴다. */
         const kakaoRooms = await KakaoWork.readRooms(db).catch(() => null);
-        hanaJson(res, 200, { ok: true, pong: true, ...(kakaoRooms ? { kakaoRooms } : {}) }); return;
+        /* ★ 방문 사업장 안내 문자 (2026-10-15) — 폰이 «문자를 보낼 수 있다»고 말한 «스스로 도는 안부»에만
+           오늘 보낼 일을 내준다. 인사(hello)·손으로 누른 것(byHand)에는 안 준다.
+           ⚠ 못 읽으면 일을 «안 준다»(빈 것으로) — 줄을 차지(sending)한 뒤에 터지면 안 되므로
+             차지는 claimPhoneJobs 안에서 줄마다 한다. */
+        let visitSmsJobs = [];
+        if (!hello && !byHand && body.canSendSms === true) {
+          try { visitSmsJobs = await require("./visit-sms").claimPhoneJobs(db, {}); }
+          catch (e) { console.warn("visitSms claim", (e && e.message) || e); visitSmsJobs = []; }
+        }
+        hanaJson(res, 200, { ok: true, pong: true, ...(kakaoRooms ? { kakaoRooms } : {}), ...(visitSmsJobs.length ? { visitSmsJobs } : {}) }); return;
+      }
+
+      /* 폰이 방문 안내 문자를 «보냈다/못 보냈다»를 알린다 (2026-10-15) — 받아 간(sending) 줄만 바뀐다 */
+      if (action === "visitSmsResult") {
+        const linked = await requireHanaDevice(req, body);
+        const out = await require("./visit-sms").recordPhoneResult(db, { results: body.results });
+        await hanaDeviceRef(linked).update({ lastTalkAt: Date.now(), visitSmsLastAt: Date.now() }).catch(() => {});
+        hanaJson(res, 200, { ok: true, ...out }); return;
       }
 
       /* ══ 카톡 업무방 알림 (2026-10-09) ═══════════════════════════════════════
@@ -7644,5 +7663,63 @@ exports.puDocSecretMove = functions
     } catch (e) {
       console.error("puDocSecretMove", String((e && e.message) || e));
       res.status(500).json({ ok: false, error: "서명본으로 옮기지 못했습니다." });
+    }
+  });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   방문 사업장 사전 안내 문자 (2026-10-15, 대표 지시) — 본문은 visit-sms.js
+   ══════════════════════════════════════════════════════════════════════════
+   매일 09:00(서울)에 오늘 «현장방문» 목록을 만든다. 처음 한 주는 승인 방식(기본) —
+   목록만 만들고 대표 폰에 알린 뒤, 컨설팅일정 화면에서 사람이 눌러 보낸다.
+   ★ 보내는 길 기본은 «대표 폰»이다(config.provider 'phone') — 돈이 안 든다.
+     폰의 하나문자 앱이 15분마다 하는 안부(hanaMessageBridge sweepPing)에 오늘 보낼 일이 실려 가고,
+     폰이 보낸 뒤 visitSmsResult 로 결과를 알린다. 그래서 «비밀값이 필요 없다».
+   ⚠ 솔라피(provider 'solapi')로 바꿀 때만 열쇠 셋(SOLAPI_API_KEY·SOLAPI_API_SECRET·SMS_SENDER)이
+     필요하다 — 그때 이 두 함수의 runWith 에 secrets 를 «다시» 선언하고 올린다.
+     (선언해 두면 비밀값이 없을 때 배포가 멈추므로 지금은 선언하지 않는다.)
+   ⚠ 직원 폰 알림은 동의 전이라 «관리자(대표) 폰»에만 알린다(push-admins). */
+
+exports.visitSmsPrepare = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB" })
+  .pubsub.schedule("every day 09:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const VS = require("./visit-sms");
+    const db = getDatabase();
+    const out = await VS.prepare(db, { cred: VS.credFromEnv() });
+    console.log("visitSmsPrepare", JSON.stringify(out));
+    if (out.mode === "approve" && (out.ready + out.skip) > 0) {
+      await PUSH.pushAdmins(db, getMessaging(), {
+        title: "오늘 방문 사업장 안내 문자",
+        body: `보낼 곳 ${out.ready}곳${out.skip ? ` · 번호 확인 필요 ${out.skip}곳` : ""} — 컨설팅일정에서 확인 후 보내세요.`,
+        tag: "visit-sms-" + out.date,
+        url: "/pureunall/gov-consulting.html",
+      }).catch((e) => console.warn("visitSmsPrepare push", (e && e.message) || e));
+    }
+    return null;
+  });
+
+exports.visitSmsSend = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB" })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireStaff(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const VS = require("./visit-sms");
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const keys = Array.isArray(body.keys) ? body.keys.map(String).slice(0, 50) : [];
+    if (!keys.length) { res.status(400).json({ ok: false, error: "보낼 항목이 없습니다." }); return; }
+    try {
+      /* ⚠ 번호·문구는 받지 않는다 — 열쇠만 받고 서버가 다시 만든다(visit-sms.js 머리말) */
+      const r = await VS.sendApproved(getDatabase(), { keys, date: body.date, by: me.uid, cred: VS.credFromEnv() });
+      res.status(200).json({ ok: true, sent: r.sent, failed: r.failed, skipped: r.skipped, queued: r.queued || 0, results: r.results });
+    } catch (e) {
+      if (!e.status) console.error("visitSmsSend", String((e && e.message) || e));
+      res.status(e.status || 500).json({ ok: false, error: e.status ? String(e.message) : "문자를 보내지 못했습니다." });
     }
   });

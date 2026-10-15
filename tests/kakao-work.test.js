@@ -109,7 +109,10 @@ test('폰: 카톡 알림은 하나 거래 그물보다 «먼저» 갈라 나가�
 test('폰: 방 목록은 서버 답에서만 받고, 답에 목록이 없으면 가진 것을 지우지 않는다', () => {
   const r = read(JAVA + 'KakaoRooms.java');
   assert.match(r, /if \(context == null \|\| response == null \|\| !response\.has\("kakaoRooms"\)\) return;/);
-  assert.match(read(JAVA + 'HanaSweepWorker.java'), /KakaoRooms\.absorb\(context, HanaUploadWorker\.post\(ping, token\)\)/);
+  /* 규칙: 훑기의 안부 답을 그대로 방 목록에 넘긴다 — 답을 변수에 받아 넘겨도(문자 일을 함께 읽으려고) 된다 */
+  const sweep = read(JAVA + 'HanaSweepWorker.java');
+  assert.match(sweep, /KakaoRooms\.absorb\(context,\s*(HanaUploadWorker\.post\(ping, token\)|[A-Za-z_]\w*)\)/);
+  assert.match(sweep, /[A-Za-z_]\w*\s*=\s*HanaUploadWorker\.post\(ping, token\)|KakaoRooms\.absorb\(context, HanaUploadWorker\.post\(ping, token\)\)/);
   assert.match(read(JAVA + 'MainActivity.java'), /KakaoRooms\.absorb\(this, HanaUploadWorker\.post\(ping/);
 });
 
@@ -133,7 +136,8 @@ test('서버: sweepPing·kakaoIngest 는 재무 담당자 검사보다 앞에 �
     assert.ok(at > 0, a + ' 갈래가 없다');
     assert.ok(at < staff, a + ' 가 재무 담당자 검사 뒤에 있다 — 폰의 말이 401 로 튕긴다');
   }
-  assert.match(fn, /hanaJson\(res, 200, \{ ok: true, pong: true, \.\.\.\(kakaoRooms \? \{ kakaoRooms \} : \{\}\) \}\)/);
+  /* 규칙: 안부 답에 방 목록은 «읽었을 때만» 실린다(못 읽었으면 키 자체가 없다). 다른 것이 더 실려도 된다. */
+  assert.match(fn, /hanaJson\(res, 200, \{ ok: true, pong: true, \.\.\.\(kakaoRooms \? \{ kakaoRooms \} : \{\}\)/);
 });
 
 test('서버: 화면용 카톡 갈래(kakaoList·kakaoRooms·kakaoRoomsSet)는 총괄관리자만', () => {

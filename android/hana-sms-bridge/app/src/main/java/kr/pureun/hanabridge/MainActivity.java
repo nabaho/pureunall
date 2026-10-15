@@ -29,6 +29,7 @@ public final class MainActivity extends Activity {
     /* 지난 문자 가져오기 — 최근 며칠치를 볼 것인가 (대표 지시 2026-08-29: 「최근 1개월」) */
     static final int HISTORY_DAYS = 30;
     private static final int ASK_READ_SMS = 4301;
+    private static final int ASK_SEND_SMS = 4302;   // 방문 안내 문자 보내기 (2026-10-15)
 
     private final ExecutorService executor = Executors.newSingleThreadExecutor();
     private TextView status;
@@ -92,6 +93,7 @@ public final class MainActivity extends Activity {
             ping.put("canReadSms", checkSelfPermission(Manifest.permission.READ_SMS)
                     == PackageManager.PERMISSION_GRANTED);
             ping.put("batteryFree", batteryFree());
+            ping.put("canSendSms", VisitSmsSender.canSend(this));
             /* 답에 카톡 업무방 목록이 실려 온다(2026-10-09) — 앱을 열면 곧바로 새 목록을 받는다. */
             KakaoRooms.absorb(this, HanaUploadWorker.post(ping, SecureStore.token(this)));
         } catch (Exception ignored) {
@@ -245,6 +247,12 @@ public final class MainActivity extends Activity {
         });
         moreBox.addView(clear, withTop(matchWrap(), 8));
 
+        /* 방문 사업장 안내 문자 (2026-10-15) — 이 폰이 서버가 시킨 문자를 «대신 보낸다».
+           누를 때만 권한을 묻는다. 이미 켜져 있으면 그렇게 말해 준다. */
+        Button sendSms = button("방문 안내 문자 보내기 허용", Color.rgb(37, 99, 235));
+        sendSms.setOnClickListener(v -> askSendSms());
+        moreBox.addView(sendSms, withTop(matchWrap(), 8));
+
         /* ⚠ 예전에는 「문자 읽기 권한은 사용하지 않습니다」라고 적혀 있었다.
              지난 문자 가져오기를 넣으면서 그 말이 «거짓»이 되었다 —
              화면의 약속과 앱이 하는 일이 어긋나면 그 안내는 안 하느니만 못하다.
@@ -322,8 +330,28 @@ public final class MainActivity extends Activity {
         importHistory();
     }
 
+    /* 방문 사업장 안내 문자를 이 폰이 보내게 허락한다 — 누를 때만 묻는다 */
+    private void askSendSms() {
+        if (!SecureStore.connected(this)) {
+            Toast.makeText(this, "먼저 연결번호로 연결해 주세요.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (VisitSmsSender.canSend(this)) {
+            Toast.makeText(this, "이미 켜져 있습니다. 서버가 시키면 15분 안에 이 폰이 문자를 보냅니다.", Toast.LENGTH_LONG).show();
+            return;
+        }
+        requestPermissions(new String[]{ Manifest.permission.SEND_SMS }, ASK_SEND_SMS);
+    }
+
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+        if (requestCode == ASK_SEND_SMS) {
+            boolean ok = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
+            Toast.makeText(this, ok ? "켰습니다. 방문 안내 문자를 이 폰이 보냅니다."
+                    : "허용하지 않아 방문 안내 문자는 이 폰이 보내지 않습니다.", Toast.LENGTH_LONG).show();
+            if (ok) executor.execute(this::sayHello);   // 서버가 «보낼 수 있는 폰»임을 바로 알게
+            return;
+        }
         if (requestCode != ASK_READ_SMS) return;
         boolean granted = results.length > 0 && results[0] == PackageManager.PERMISSION_GRANTED;
         if (granted) {
