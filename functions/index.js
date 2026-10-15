@@ -7646,3 +7646,59 @@ exports.puDocSecretMove = functions
       res.status(500).json({ ok: false, error: "서명본으로 옮기지 못했습니다." });
     }
   });
+
+/* ══════════════════════════════════════════════════════════════════════════
+   방문 사업장 사전 안내 문자 (2026-10-15, 대표 지시) — 본문은 visit-sms.js
+   ══════════════════════════════════════════════════════════════════════════
+   매일 09:00(서울)에 오늘 «현장방문» 목록을 만든다. 처음 한 주는 승인 방식(기본) —
+   목록만 만들고 대표 폰에 알린 뒤, 컨설팅일정 화면에서 사람이 눌러 보낸다.
+   ⚠ 비밀값 셋이 «먼저» 있어야 배포된다(없으면 배포가 멈춘다):
+       SOLAPI_API_KEY · SOLAPI_API_SECRET · SMS_SENDER(솔라피에 등록한 발신번호)
+     넣는 법은 secret-set-read-host 메모 참고 — Read-Host 한 줄.
+   ⚠ 직원 폰 알림은 동의 전이라 «관리자(대표) 폰»에만 알린다(push-admins). */
+const VISIT_SMS_SECRETS = ["SOLAPI_API_KEY", "SOLAPI_API_SECRET", "SMS_SENDER"];
+
+exports.visitSmsPrepare = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 120, memory: "256MB", secrets: VISIT_SMS_SECRETS })
+  .pubsub.schedule("every day 09:00")
+  .timeZone("Asia/Seoul")
+  .onRun(async () => {
+    const VS = require("./visit-sms");
+    const db = getDatabase();
+    const out = await VS.prepare(db, { cred: VS.credFromEnv() });
+    console.log("visitSmsPrepare", JSON.stringify(out));
+    if (out.mode === "approve" && (out.ready + out.skip) > 0) {
+      await PUSH.pushAdmins(db, getMessaging(), {
+        title: "오늘 방문 사업장 안내 문자",
+        body: `보낼 곳 ${out.ready}곳${out.skip ? ` · 번호 확인 필요 ${out.skip}곳` : ""} — 컨설팅일정에서 확인 후 보내세요.`,
+        tag: "visit-sms-" + out.date,
+        url: "/pureunall/gov-consulting.html",
+      }).catch((e) => console.warn("visitSmsPrepare push", (e && e.message) || e));
+    }
+    return null;
+  });
+
+exports.visitSmsSend = functions
+  .region(MAIL_REGION)
+  .runWith({ timeoutSeconds: 60, memory: "256MB", secrets: VISIT_SMS_SECRETS })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 허용됩니다." }); return; }
+    let me;
+    try { me = await requireStaff(req); }
+    catch (e) { res.status(e.status || 401).json({ ok: false, error: String(e.message || e) }); return; }
+    const VS = require("./visit-sms");
+    const body = (req.body && typeof req.body === "object") ? req.body : {};
+    const keys = Array.isArray(body.keys) ? body.keys.map(String).slice(0, 50) : [];
+    if (!keys.length) { res.status(400).json({ ok: false, error: "보낼 항목이 없습니다." }); return; }
+    try {
+      /* ⚠ 번호·문구는 받지 않는다 — 열쇠만 받고 서버가 다시 만든다(visit-sms.js 머리말) */
+      const r = await VS.sendApproved(getDatabase(), { keys, date: body.date, by: me.uid, cred: VS.credFromEnv() });
+      res.status(200).json({ ok: true, sent: r.sent, failed: r.failed, skipped: r.skipped, results: r.results });
+    } catch (e) {
+      if (!e.status) console.error("visitSmsSend", String((e && e.message) || e));
+      res.status(e.status || 500).json({ ok: false, error: e.status ? String(e.message) : "문자를 보내지 못했습니다." });
+    }
+  });

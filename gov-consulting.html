@@ -1306,6 +1306,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-visit-sms.js?v=1"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=9"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
@@ -1485,6 +1486,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
         </div>
       </div>
     </div>
+    <div id="visitSmsBar"></div><!-- 방문 사업장 안내 문자 승인 띠(js/pu-visit-sms.js) — 오늘 목록이 있을 때만 보인다 -->
     <div class="dash-body" id="dashList"></div>
     <button class="dash-settings" id="dashSettingsBtn">⚙️ 환경설정</button>
   </aside>
@@ -2698,6 +2700,8 @@ function fbInit(){
         fbUnsubscribeAll();
         FB_READY=true; _fbAuthUid=u.uid;
         if(typeof pubHolidaysLoad==='function')pubHolidaysLoad();
+        /* 방문 사업장 안내 문자 승인 띠 — 오늘 목록은 서버가 09:00 에 만든다(한 번만 건다) */
+        if(window.PuVisitSms&&!window._vsmsOn){ window._vsmsOn=true; try{ PuVisitSms.init({db:_fbDB,auth:()=>firebase.auth(),me:()=>({id:myId(),isAdmin:isAdmin()})}); }catch(e){} }
         /* ★ 밀린 저장을 «먼저» 올린다 — 내려받기가 이 기기를 클라우드 옛 값으로 덮기 전에.
            (2026-10-05: 연결 전에 한 저장이 여기서 조용히 사라지던 길) */
         fbFlushDirty();
@@ -7207,6 +7211,7 @@ function bindProg(){
 }
 
 function renderDash(){
+  if(window.PuVisitSms)PuVisitSms.paint();   // 로그인 정보(내 id)가 뒤늦게 와도 띠가 따라온다
   refreshStaffDropdowns();
   if(q('#viewProg')?.style.display==='flex')renderProg();   // 자료가 바뀌면 진행 보기도 함께
   const search=S.dashSearch;
