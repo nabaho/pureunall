@@ -18,7 +18,7 @@ const 사건 = () => ({
   workers: [
     { id: 'w1', name: '김예시', rrn: '900101-1000000', phone: '010-0000-1111' },
     { id: 'w2', name: '박샘플', phone: '010-0000-2222' },                  /* 칸 없음 = 모름 */
-    { id: 'w3', name: '이보기', rrn: '', account: '', holder: '' }            /* 빈칸 = 지웠다 */
+    { id: 'w3', name: '이보기', rrn: '', account: '', holder: '', hasRrn: true, hasAccount: true }  /* 있던 것을 빈칸으로 = 지웠다 */
   ]
 });
 
@@ -47,6 +47,13 @@ test('★ ③ 빈칸은 «지우기»(null)로 보낸다', () => {
   assert.equal(p['worker_secret/cases/c-1/w3/rrn'], null);
   assert.equal(p['worker_secret/cases/c-1/w3/account'], null);
   assert.equal(p['worker_secret/cases/c-1/w1/rrn'], '900101-1000000');
+});
+
+test('★★ 새 줄의 빈칸은 아무것도 안 보낸다 — 담당이 아닌 직원이 근로자를 «추가»만 해도 거절 알림이 뜨면 안 된다', () => {
+  const s2 = W.split('cases', { id: 'c-3', workers: [{ id: 'wn', name: '새 사람', rrn: '', account: '', holder: '' }] });
+  assert.equal(s2.any, true, '빈 칸은 공개 덩어리에서 걷어야 한다');
+  assert.equal('rrn' in s2.record.workers[0], false);
+  assert.deepEqual(s2.secrets, {}, '★★ 보낼 것이 없는데 담당자 칸에 씁니다');
 });
 
 test('계약은 company.workers — 다른 칸은 그대로 둔다', () => {

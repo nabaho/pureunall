@@ -38,7 +38,6 @@
   };
 
   function isKind(k) { return Object.prototype.hasOwnProperty.call(WORKER_PATH, k); }
-  function clone(o) { return o == null ? o : JSON.parse(JSON.stringify(o)); }
   function newWid() { return 'w-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
 
   function workersOf(kind, rec) {
@@ -56,15 +55,19 @@
       if (!has) return w;
       var c = Object.assign({}, w);
       if (!c.id) c.id = newWid();          /* 열쇠 없는 근로자는 담당자 칸에 둘 자리가 없다 */
-      var s = {};
+      var s = {}, n = 0;
       FIELDS.forEach(function (f) {
         if (!Object.prototype.hasOwnProperty.call(c, f)) return;
         var v = c[f] == null ? '' : String(c[f]).trim();
-        s[f] = v;
+        /* 빈칸은 «있던 것을 지웠다»일 때만 지우기로 보낸다. 새 줄의 빈칸(표시가 안 켜짐)은 보낼 것이 없다 —
+           보내면 담당이 아닌 직원이 근로자를 «추가»만 해도 담당자 칸 쓰기가 거절되어 알림이 뜬다. */
+        var flag = FLAG[f] || (f === 'holder' ? 'hasAccount' : '');
+        if (v || (flag && w[flag] === true)) { s[f] = v; n++; }
         if (FLAG[f]) c[FLAG[f]] = !!v;
         delete c[f];
       });
-      secrets[c.id] = s; any = true;
+      if (n) secrets[c.id] = s;
+      any = true;
       return c;
     });
     return { workers: out, secrets: secrets, any: any };
@@ -98,14 +101,25 @@
   }
 
   /* 담당자 칸 값 → 창 상태에 붙인다(저장하면 다시 떼어진다). 원본은 안 바꾼다. */
+  /* ⚠ 창 상태 «전체»를 복제하지 않는다 — 근로자 자리만 얕게 새로 만든다(날짜·함수 등이 섞여 있어도 안전) */
   function merge(kind, rec, map) {
     if (!isKind(kind) || !rec || !map) return rec;
-    var copy = clone(rec), list = workersOf(kind, copy);
-    if (!list) return copy;
-    list.forEach(function (w) {
-      if (!w || !w.id || !map[w.id]) return;
-      FIELDS.forEach(function (f) { if (map[w.id][f] != null && w[f] == null) w[f] = map[w.id][f]; });
+    var p = WORKER_PATH[kind], list = workersOf(kind, rec);
+    if (!list) return rec;
+    var touched = false;
+    var next = list.map(function (w) {
+      if (!w || !w.id || !map[w.id]) return w;
+      var c = null;
+      FIELDS.forEach(function (f) {
+        if (map[w.id][f] != null && w[f] == null) { c = c || Object.assign({}, w); c[f] = map[w.id][f]; }
+      });
+      if (c) touched = true;
+      return c || w;
     });
+    if (!touched) return rec;
+    var copy = Object.assign({}, rec);
+    if (p.length === 1) copy[p[0]] = next;
+    else { copy[p[0]] = Object.assign({}, rec[p[0]]); copy[p[0]][p[1]] = next; }
     return copy;
   }
 
