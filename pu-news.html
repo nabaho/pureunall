@@ -8129,6 +8129,12 @@ async function 감시읽기(){
     const v = (await db.ref('newsletter/watch').orderByKey().limitToLast(1).once('value')).val() || {};
     const k = Object.keys(v).sort().pop();
     App.감시 = k ? Object.assign({ 열쇠: k }, v[k]) : { 열쇠: '' };
+    /* ★★ 「기사 모으기」 마지막 날 — homepage/newsBrief/«모은날» (문자열 하나)에서 읽는다 (2026-10-15 고침).
+         예전에는 App.브리핑.모은날 을 읽었는데, App.브리핑 은 homepage/newsBrief/«모음»(기사 목록)이라 그 칸이 «없다» —
+         모으기가 멀쩡히 돌아도 이 화면은 늘 「⚠ 없음 뒤로 멈춤」이라고 거짓 경고를 띄웠다(감시꾼을 만든 날부터).
+       ⚠ 못 읽으면 null — 「멈췄다」가 아니라 「읽는 중/못 읽음」으로 말한다(못 읽은 것을 멈춘 것으로 단정하지 않는다). */
+    try{ App.모은날 = String((await db.ref('homepage/newsBrief/모은날').once('value')).val() || ''); }
+    catch(_){ App.모은날 = null; }
   }catch(e){ App.감시 = { 열쇠: '', 탈: (e && e.message) || String(e) }; }
   App._감시읽는중 = false;
   const el = $('cWatch'); if(el) el.textContent = 감시볼것수() || '';
@@ -8147,12 +8153,14 @@ function 감시화면(){
   if(w.탈) return '<div class="note" style="color:var(--bad)">점검 기록을 못 읽었습니다 — ' + esc(w.탈) + '</div>';
   const 오늘날 = 오늘();
   const 어제 = (function(){ const d = new Date(오늘날 + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate()-1); return d.toISOString().slice(0,10); })();
-  const b = App.금요일기록, 모은날 = String((App.브리핑||{}).모은날||'');
+  const b = App.금요일기록, 모은날 = (App.모은날 == null) ? null : String(App.모은날);
   const AI탈 = b && (b.알림||[]).some(m => /AI 정리를 못 했|한마디를 못 지었/.test(String(m)));
   const 칸 = (때, 이름, 말, 꼴) => `<div class="wst ${꼴}"><div class="w">${때}</div><div class="n">${이름}</div><div class="s">${말}</div></div>`;
   const 점 = w.점검 || null, 발 = w.발송 || null, 전 = w.전달 || null;
   const 흐름 = [
-    칸('매일 07:00', '기사 모으기', 모은날 >= 어제 ? '✓ 정상' : '⚠ ' + (모은날 || '없음') + ' 뒤로 멈춤', 모은날 >= 어제 ? 'ok' : 'warn'),
+    칸('매일 07:00', '기사 모으기',
+      모은날 === null ? '… 읽는 중' : 모은날 >= 어제 ? '✓ 정상' : '⚠ ' + (모은날 || '없음') + ' 뒤로 멈춤',
+      모은날 === null ? 'wait' : 모은날 >= 어제 ? 'ok' : 'warn'),
     칸('금 13:00', 'AI 초안', !b ? '기다림' : AI탈 ? '⚠ 빠짐' : b.다시한때 ? '↻ 다시 해서 됨' : '✓ 정상',
       !b ? 'wait' : AI탈 ? 'warn' : b.다시한때 ? 'fix' : 'ok'),
     칸('일 18:00', '보내기 전 점검', !점 ? '기다림' : 점.판정 === 'ok' ? '✓ 이상 없음'
