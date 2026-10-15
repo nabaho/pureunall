@@ -77,7 +77,8 @@ test('★ 배열 안의 undefined 는 «null 로» 남는다 (자리를 잃지 �
 test('★★ 한 건·여러 건 저장도 «이 길»로 온다 (칸마다 막지 않아도 된다)', () => {
   ['function dbUpsert(k, item){', 'function dbUpsertMany(k, items){'].forEach(function (h) {
     const fn = bare(cutBlock(ERP, h));
-    assert.ok(/return dbSet\(k,/.test(fn),
+    /* «return» 을 박지 않는다 — 2026-10-15 담당자 칸(근로자 주민번호) 때문에 결과를 받아 쓰게 됐다. 규칙은 «dbSet 을 거치는가» */
+    assert.ok(/\bdbSet\(k,/.test(fn),
       '★ ' + h + ' 이 dbSet 을 안 거친다 — 그 길로 들어온 undefined 는 못 막는다');
   });
 });
