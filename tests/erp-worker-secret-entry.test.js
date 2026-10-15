@@ -97,8 +97,9 @@ test('다른 표(업체)는 그대로 — 셋 이름의 칸이 있어도', () =>
 });
 
 test('★ 통째 저장(dbSet)·휴지통도 뗀다 — 떼기만, 담당자 칸에는 안 쓴다', () => {
+  /* 고정 폭이 아니라 «다음 최상위 함수 앞까지» — dbSet 은 2만 9천 자다(test-cut-truncation) */
   const at = ERP.indexOf('function dbSet(k, v){');
-  const head = ERP.slice(at, at + 6000).replace(/\/\*[\s\S]*?\*\//g, '');
+  const head = ERP.slice(at, ERP.indexOf('\nfunction ', at + 10)).replace(/\/\*[\s\S]*?\*\//g, '');
   assert.match(head, /_wsOn\(k\)[^\n]*PuWorkerSecret\.split\(k, x\)\.record/, '★ 통째 저장이 주민번호를 공개 덩어리로 올립니다');
   assert.match(head, /k === 'trash_bin'[^\n]*_wsTrashStrip/, '★ 휴지통에 든 사건·계약의 주민번호가 남습니다');
   assert.doesNotMatch(head.slice(0, head.indexOf('_wsTrashStrip') + 40), /_wsSend/, '통째 저장이 옛 사본 값을 담당자 칸에 씁니다');

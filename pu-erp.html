@@ -43505,6 +43505,7 @@ function BackupSection(){
     //  - raw-dump : data["pureun_v6_contracts"] = "..."  (LS 키 + 문자열)
     var writes = [];      // { lsKey, raw } — localStorage에 쓸 항목
     var fbUpdates = {};   // 'data/<key>' = { v, u } — Firebase 반영
+    var wsRestore = [];   // [표, 건 id, {근로자:{칸:값}}] — 근로자 주민번호·계좌·예금주는 담당자 칸으로(2026-10-15)
     var summary = [];     // 미리보기용 "키: N건"
     var now = Date.now();
     Object.keys(d).forEach(function(kk){
@@ -43520,6 +43521,19 @@ function BackupSection(){
         raw = JSON.stringify(valueObj);
       }
       if(logicalKey.indexOf('_meta_') === 0) return;  // 백업에 든 옛 메타는 무시(아래서 새로 설정)
+      /* ★ 근로자 주민번호·계좌·예금주 — 복원도 공개 덩어리·이 PC 사본에 싣지 않는다(2026-10-15).
+         이 길은 dbSet 을 «안 거치고» 서버에 바로 쓰므로 여기서 따로 뗀다. 옛 백업에 든 값은 담당자 칸으로 되돌린다. */
+      if(typeof _wsOn === 'function' && _wsOn(logicalKey)){
+        if(!haveObj){ try { valueObj = JSON.parse(raw); haveObj = true; } catch(_){ } }
+        if(haveObj && Array.isArray(valueObj)){
+          valueObj = valueObj.map(function(x){
+            var sp = PuWorkerSecret.split(logicalKey, x);
+            if(sp.any && x && x.id && Object.keys(sp.secrets).length) wsRestore.push([logicalKey, x.id, sp.secrets]);
+            return sp.record;
+          });
+          raw = JSON.stringify(valueObj);
+        }
+      }
       writes.push({ lsKey: lsKey, raw: raw });
       if(fbShouldSync(logicalKey)){
         if(!haveObj){ try { valueObj = JSON.parse(raw); haveObj = true; } catch(_){ haveObj = false; } }
@@ -43586,6 +43600,12 @@ function BackupSection(){
       if(fbDb && Object.keys(fbUpdates).length){
         try { await fbDb.ref().update(fbUpdates); }
         catch(e){ fbOk = false; showToast('⚠ 로컬은 복원됨 / 서버 반영 실패: ' + (e && e.message) + ' — 콘솔에서 erpSyncNow() 시도하세요'); }
+      }
+      /* 근로자 주민번호·계좌 — 건이 서버에 들어간 «뒤», 새로고침 «전»에 담당자 칸으로 */
+      if(fbOk && fbDb && wsRestore.length && window.PuWorkerSecret){
+        var wsRes = await Promise.all(wsRestore.map(function(t){ return PuWorkerSecret.write(fbDb, t[0], t[1], t[2]); }));
+        var wsBad = wsRes.filter(function(r){ return !r.ok; }).length;
+        if(wsBad) showToast('⚠ 근로자 주민번호·계좌 ' + wsBad + '건은 되돌리지 못했습니다(담당자 칸 권한) — 대표 계정으로 다시 복원해 주세요');
       }
       var rec = { id:Date.now(), ts:new Date().toISOString(), kind:'restore', status:'success', size:0, fileName:(sourceLabel||'백업'), keyCount: Object.keys(fbUpdates).length || writes.length };
       saveHistory([rec].concat(history).slice(0,50));

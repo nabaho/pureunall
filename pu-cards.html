@@ -39400,7 +39400,7 @@ async function wkRrnToggle(key){
 function wkRrnCellHtml(p){
   if(!p.hasRrn) return '<span class="dim">사건에 적혀 있지 않습니다</span>';
   const v = _wkRrnVal[p.key];
-  const k = esc(String(p.key).replace(/'/g,"\\'"));
+  const k = esc(String(p.key).replace(/\x27/g, '\\\x27'));   /* 따옴표를 글자로 안 쓴다 — 검사의 함수 자르개가 정규식 속 따옴표를 문자열 시작으로 읽는다 */
   if(v === 'denied') return '<span class="dim" title="주민번호는 그 사건의 주담당·부담당과 대표만 봅니다">🔒 담당자만</span>';
   if(v === 'none') return '<span class="dim">사건에 적혀 있지 않습니다</span>';
   if(v === 'err') return '<span class="dim">⚠ 불러오지 못했습니다 — 다시 열어 주세요</span>';
