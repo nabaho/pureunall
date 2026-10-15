@@ -204,6 +204,7 @@ test('카드 줄 표에 height="1" — 키가 다른 카드끼리 아래 테두�
   /* 실측 2026-10-13(진짜 Edge): 이 한 줄이 없으면 카드 높이가 354/331/353px 로 제각각, 있으면 모두 354px.
      ⚠ 구현 «꼴»을 박은 검사다 — 이 트릭을 다른 길로 바꾸면 그때 이 검사를 함께 고치되, 실측으로 다시 확인할 것. */
   const 편 = 짓기(회차({ 핵심: 두장() }));
-  assert.match(편.서식, /<table role="presentation" width="100%" height="1" cellpadding="0" cellspacing="0" border="0"><tr><td class="pu-c"/,
+  /* 속성 «순서»가 아니라 「카드 칸들을 담은 표에 height="1" 이 있다」를 본다(Codex 검토: 구현 모양에 과하게 묶인 검사) */
+  assert.match(편.서식, /<table\b[^>]*\sheight="1"[^>]*>\s*<tr><td class="pu-c"/,
     '카드 줄 표의 height="1" 이 사라졌다 — 카드 높이가 제각각이 된다');
 });

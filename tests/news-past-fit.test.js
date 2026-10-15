@@ -111,7 +111,8 @@ test('★ 넓은 화면에서 지난 회차 목록 칸에는 «최소 폭»이 �
   while (i < 코드.length && 깊이 > 0) { if (코드[i] === '{') 깊이++; else if (코드[i] === '}') 깊이--; i++; }
   assert.ok(/#main\[data-tab=past\] \.cols\{/.test(코드.slice(a, i)),
     '★★ 지난 회차 칸 나눔이 넓은 화면 껍데기 «밖»에 있다 — 폰·태블릿에 샌다');
-  /* ⚠ 껍데기 앞에 같은 조건의 @media 를 또 두면 안 된다 — 검사들이 «처음 나오는 것»을 껍데기로 본다 */
-  assert.strictEqual(코드.indexOf(열쇠), a);
-  assert.ok(코드.slice(0, a).indexOf('@media(min-width:981px)') < 0, '껍데기보다 앞에 같은 조건의 @media 가 또 있다');
+  /* ⚠ 처음 나오는 @media(min-width:981px){…} 가 «진짜 껍데기»여야 한다 — 다른 검사들(newsletter-app)이 «처음 나오는 것»을 껍데기로 본다.
+     (예전 단언 둘은 `a` 를 indexOf 로 정한 뒤 같은 식과 견줘 «항상 참»이었다 — 2026-10-15 Codex 검토 12번. 껍데기의 «내용»으로 견준다.) */
+  assert.ok(/html,body\{[^}]*overflow:hidden/.test(코드.slice(a, i)),
+    '★★ 처음 나오는 @media(min-width:981px){…} 가 «넓은 화면 껍데기»가 아니다 — 껍데기보다 앞에 같은 조건의 블록이 생겼다(다른 검사들이 처음 나오는 것을 껍데기로 본다)');
 });
