@@ -65,6 +65,13 @@ function workspace(extra) {
 
 /* 재무 칸 — 재무 권한을 가진 사람만 */
 const finOnly = { '.read': FIN, '.write': FIN };
+/* ══ 공개 덩어리의 근로자 줄에 주민번호·계좌·예금주를 «못 쓴다» (대표 결정 2026-10-15) ══
+   그 셋은 worker_secret(그 건의 담당자와 대표만)에만 둔다. 화면은 저장 입구에서 떼지만(js/pu-worker-secret.js),
+   옛 화면·다른 길이 다시 실으면 재직 직원 누구나 읽는 자리로 돌아간다 — 그래서 서버에서도 막는다.
+   ⚠ 지우기(null)는 통과한다 — .validate 는 «새로 생기는 값»에만 걸린다.
+   ⚠ 2026-10-15 옛 값 90칸을 비운 «뒤»에 올렸다(scripts/worker-secret-migrate.js --clear). 그 전에 올리면
+     옛 값이 든 기록의 저장이 통째로 막힌다. */
+const 근로자칸막기 = { rrn: { '.validate': false }, account: { '.validate': false }, holder: { '.validate': false } };
 
 const rules = {};
 
@@ -216,7 +223,8 @@ rules.data = {
 
   /* 여러 앱이 함께 쓰는 업무 자료 — 푸른이알피·사진첩·급여데이터함이 모두 읽고 쓴다 */
   companies:      { '.read': LOGIN, '.write': LOGIN },   /* 거래처 원장 */
-  contracts:      { '.read': LOGIN, '.write': LOGIN },   /* 계약 기록 */
+  contracts:      { '.read': LOGIN, '.write': LOGIN,     /* 계약 기록 */
+                    v: { $id: { company: { workers: { $i: 근로자칸막기 } } } } },
   /* 사진첩에서 「담당자 고르고 계약 만들기」를 누르면 남는 «요청 한 줄» (2026-09-19).
      계약관리가 열릴 때 읽어 검사하고, 만들면 지운다(걸린 것은 까닭을 적어 남긴다).
      ⚠ 계약과 «같은 권한»이다 — 담기는 것이 계약에 들어갈 회사 정보 그대로다.
@@ -236,11 +244,13 @@ rules.data = {
      검사 눈에 안 띄었다. 「현장클리닉 보내기」(clinic-intake.html)가 글자 그대로 읽으며 드러났다.
      ★ 권한은 «그대로»(재직 직원 전원 읽고 쓰기) — 이알피 설정 화면에서 유형을 고친다. */
   biz_cons_types: { '.read': LOGIN, '.write': LOGIN },
-  consultings:   { '.read': LOGIN, '.write': LOGIN },   /* 컨설팅 사업(금액 포함) */
+  consultings:   { '.read': LOGIN, '.write': LOGIN,     /* 컨설팅 사업(금액 포함) */
+                   v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 기록. 여태 이름이 없어 $other 로 떨어져 있었다 — 권한은 «그대로»
      재직 직원 전원이고, 이름을 붙여 어디에 무엇이 있는지 드러낸 것뿐이다.
      (2026-09-06 메일 수집기가 이 자리의 업체 담당자 주소를 읽게 되면서 드러났다) */
-  cases:          { '.read': LOGIN, '.write': LOGIN },   /* 사건 기록 */
+  cases:          { '.read': LOGIN, '.write': LOGIN,     /* 사건 기록 */
+                    v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 «업무 메모» (2026-10-05) — 여태 그 PC 의 localStorage 에만 있어 다른 PC 에서 안 보였다
      (pu-erp.html CaseMemoPanel). 권한은 사건 기록과 «같게» — 사건을 보는 사람이 그 메모도 본다. */
   case_memos:     { '.read': LOGIN, '.write': LOGIN },
