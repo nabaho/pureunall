@@ -108,7 +108,8 @@
          규칙은 일부러 안 건드렸다 — 규칙 지우기는 안전장치를 건드리는 별개의 일이다.
          다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
-      primaryRoots:['data','improve_requests','ieum_public'],
+      /* worker_secret — 사건·계약 근로자 주민번호·계좌·예금주. 그 건의 담당자와 대표만(대표 결정 2026-10-15) */
+      primaryRoots:['data','improve_requests','ieum_public','worker_secret'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
@@ -244,7 +245,7 @@
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
     mail:{ name:'푸른 메일', file:'pu-cards.html?view=mail', primaryRoots:['pucards/mailbox','pucards/sentBox','pucards/scheduled','mailbox'],
       entityTypes:['Person','Organization','Message','Document'] },
-    cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies'],
+    cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies','worker_secret'],
       entityTypes:['Organization','Person','Document','MediaAsset','Message'] },
     photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'],
       /* data/contract_requests — 「담당자 고르고 계약 만들기」가 남기는 요청 (2026-09-19).
@@ -272,7 +273,7 @@
     docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs','pu_sign'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
-      sharedRoots:['data/contract_forms','data/contract_forms_removed'],
+      sharedRoots:['data/contract_forms','data/contract_forms_removed','worker_secret'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },

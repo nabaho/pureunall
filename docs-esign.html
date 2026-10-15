@@ -177,13 +177,15 @@
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=9"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
+<!-- 계약 근로자 주민번호 — 그 계약의 담당자와 대표만 (2026-10-15) -->
+<script src="js/pu-worker-secret.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -801,6 +803,12 @@ async function formContract(id) {
   var data = await formContractData();
   var c = data.cs.filter(function (x) { return String(x.id) === String(id); })[0];
   if (!c) throw new Error('계약을 찾지 못했습니다 — 지워졌거나 아직 저장 전일 수 있습니다');
+  /* 근로자 주민번호 — 그 계약의 담당자 칸에서 받아 붙인다(대표 결정 2026-10-15). 담당자가 아니면 그 칸은 빈칸.
+     ⚠ 묶음 사본(_formCtData)은 안 고친다 — 붙인 값이 다른 계약 채우기로 새지 않게 이 한 건만. */
+  if (window.PuWorkerSecret) {
+    var ws = await PuWorkerSecret.read(db, 'contracts', c.id);
+    if (ws.ok) c = PuWorkerSecret.merge('contracts', c, ws.map);
+  }
   return formContractInfo(c, data);
 }
 /* 📦 계약 여러 건 — 고를 목록(가벼운 칸만). 늘 새로 읽는다(창을 열 때 한 번) */

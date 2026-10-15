@@ -41,7 +41,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -53,6 +53,8 @@
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=9"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
+<!-- 사건 근로자 주민번호 — 그 사건의 담당자와 대표만 (2026-10-15) -->
+<script src="js/pu-worker-secret.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 서버가 든다(2026-08-17). 브라우저는 사진만 보낸다. -->
@@ -39190,11 +39192,13 @@ function wkListBuild(erp, info){
       const p = by[k] = by[k] || {
         key: k, name: nm, company: row.company, bizno: row.bizno,
         cases: [], docs: [],
-        rrn: '', phone: '', email: '', address: '', position: '',
+        hasRrn: false, rrnRefs: [], phone: '', email: '', address: '', position: '',
         hireDate: '', leaveDate: '', primaryOf: {}, paid: {}, last: 0
       };
       if(!p.bizno) p.bizno = row.bizno;
-      take(p, 'rrn', w.rrn);
+      /* 주민번호는 «공개 덩어리에서 읽지 않는다» — 그 사건의 담당자 칸(worker_secret)에만 있다(2026-10-15).
+         여기서는 «있다»와 «어느 사건의 어느 근로자»만 기억하고, 「보기」를 누를 때 읽는다(거절되면 🔒). */
+      if((w.hasRrn || w.rrn) && rec.id && w.id){ p.hasRrn = true; p.rrnRefs.push({ id: rec.id, wid: w.id }); }
       take(p, 'phone', w.phone);
       take(p, 'email', w.email);
       take(p, 'address', w.address || w.addr);
@@ -39371,20 +39375,41 @@ function wkMaskRrn(v){
   return d.slice(0,6).replace(/./g,'■') + '-' + '*'.repeat(d.length-6);
 }
 function wkRrnShown(key){ return !!_wkRrnOpen[key]; }
-function wkRrnToggle(key){
-  _wkRrnOpen[key] = !_wkRrnOpen[key];
+/* 「보기」를 눌렀을 때만 그 사건의 담당자 칸을 읽는다(2026-10-15) — 값: 글자 | 'denied' | 'none' | 'err'.
+   ⚠ «누가 볼 수 있나»를 화면이 흉내 내지 않는다 — 읽어 보고 서버가 거절하면 🔒. */
+const _wkRrnVal = {};
+async function wkRrnLoad(p){
+  if(_wkRrnVal[p.key] != null) return _wkRrnVal[p.key];
+  if(!window.PuWorkerSecret) return (_wkRrnVal[p.key] = 'err');
+  let denied = false, err = false;
+  for(const ref of (p.rrnRefs || [])){
+    const r = await PuWorkerSecret.read(firebase.database(), 'cases', ref.id);
+    if(r.ok){ const v = r.map && r.map[ref.wid] && r.map[ref.wid].rrn; if(v) return (_wkRrnVal[p.key] = String(v)); }
+    else if(r.denied) denied = true; else err = true;
+  }
+  return (_wkRrnVal[p.key] = denied ? 'denied' : (err ? 'err' : 'none'));
+}
+async function wkRrnToggle(key){
   const p = wkList().filter(x=>x.key===key)[0];
+  if(!p) return;
+  if(!_wkRrnOpen[key]) await wkRrnLoad(p);
+  _wkRrnOpen[key] = !_wkRrnOpen[key];
   const el = document.getElementById('wkRrn');
-  if(el && p) el.innerHTML = wkRrnCellHtml(p);
+  if(el) el.innerHTML = wkRrnCellHtml(p);
 }
 function wkRrnCellHtml(p){
-  if(!p.rrn) return '<span class="dim">사건에 적혀 있지 않습니다</span>';
-  if(wkRrnShown(p.key)){
-    return `<b class="wkrrn">${esc(p.rrn)}</b>
-      <button class="wkeye" onclick="wkRrnToggle('${esc(String(p.key).replace(/'/g,"\\'"))}')">가리기</button>`;
+  if(!p.hasRrn) return '<span class="dim">사건에 적혀 있지 않습니다</span>';
+  const v = _wkRrnVal[p.key];
+  const k = esc(String(p.key).replace(/'/g,"\\'"));
+  if(v === 'denied') return '<span class="dim" title="주민번호는 그 사건의 주담당·부담당과 대표만 봅니다">🔒 담당자만</span>';
+  if(v === 'none') return '<span class="dim">사건에 적혀 있지 않습니다</span>';
+  if(v === 'err') return '<span class="dim">⚠ 불러오지 못했습니다 — 다시 열어 주세요</span>';
+  if(v && wkRrnShown(p.key)){
+    return `<b class="wkrrn">${esc(v)}</b>
+      <button class="wkeye" onclick="wkRrnToggle('${k}')">가리기</button>`;
   }
-  return `<span class="wkmask">${esc(wkMaskRrn(p.rrn))}</span>
-    <button class="wkeye" onclick="wkRrnToggle('${esc(String(p.key).replace(/'/g,"\\'"))}')" title="눌러야 나옵니다 — 볼 일이 있을 때만">보기</button>`;
+  return `<span class="wkmask">${esc(v ? wkMaskRrn(v) : '■■■■■■-*******')}</span>
+    <button class="wkeye" onclick="wkRrnToggle('${k}')" title="눌러야 나옵니다 — 그 사건의 담당자와 대표만">보기</button>`;
 }
 
 /* ══════ 👷 근로자 정보함 — 화면 ══════ */
@@ -39400,6 +39425,7 @@ const WK_DOC_ICON = { idcard:'🪪', resident:'📃', mandate:'✍', consent:'�
 function enterWkView(){
   state.view='wk'; state.wkPage=0;
   _wkRrnOpen = {};                       /* 화면을 나서면 드러낸 주민번호는 다시 가려진다 */
+  Object.keys(_wkRrnVal).forEach(function(k){ delete _wkRrnVal[k]; });   /* 읽어 둔 번호도 잊는다(2026-10-15) */
   render();
   loadWkInfo();
   /* 사람과 사건이 모두 이알피에서 온다 — 처음 열 때 한 번 읽는다 */
