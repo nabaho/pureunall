@@ -10,6 +10,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-addr.js?v=2"></script>
+<script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
 <script src="js/pu-big-store.js?v=3"></script>
@@ -2935,7 +2936,7 @@ function _rvItems(D,yr){
 var RV_KINDS=[['all','전체'],['prov','칸 값'],['est','추정 출연금'],['xfer','이체 짝'],['txn','분개 승인']];
 function _rvSrcLabel(src){
   src=String(src||'');
-  var m={card:'기업정보함',erp:'업체관리','guess:office':'소재지로 추정','import:fundinfo':'기금정보 가져오기','import:subsidy':'지원금 자료 가져오기',
+  var m={card:'기업정보함',erp:'업체관리','guess:office':'소재지로 추정','lookup:zip':'소재지로 찾은 우편번호','import:fundinfo':'기금정보 가져오기','import:subsidy':'지원금 자료 가져오기',
     'import:xlsx':'엑셀 등록','import:json':'JSON 가져오기','rule:urep_same':'사용자대표=대표자(한번에)','copy:prev':'작년 값 불러오기',
     'calc:budget':'예산 자동 계산','calc:rate':'사람수 × 단가','scan:wrep':'재직증명서 판독','scan:committee':'위원 명단 판독',
     'scan:bizreg':'사업자등록증 판독', list:'값 목록(모아 넣음)', mail:'푸른메일함', auto:'기계'};
@@ -10818,6 +10819,7 @@ function renderFund(){
      늘 있는 것이 아니라 붙이지 않는다 — 붙이면 그만큼 화면이 줄어든다. */
   $('app').innerHTML=head+'<div id="fundhead">'+idline+tabbar+'</div>'+body;
   _syncTopbarH();
+  if(S.tab==='info') fundAutoZip('fd-');   // 📮 소재지만 있고 우편번호가 비면 저절로 찾아 넣는다
   if(S.tab==='docs'){   // 서식은 기금 상세 안에 끼워 렌더(화면 이동 없음)
     S.formFund=S.fundId; S.formsCtx='fund'; S.formsHost='fundDocsHost'; renderForms();
   } else if(S.formsHost==='fundDocsHost'){ S.formsHost=null; }
@@ -13944,7 +13946,7 @@ function _provSub(fid){
   PV.ref.on('value',function(sn){ if(PV.fid!==fid) return; PV.v=sn.val()||{}; _provPaint();
     if(typeof _formGatePaint==='function') _formGatePaint(); },function(){ PV.v={}; });   // 서식 목록의 🤖 미확인 N 도 함께
 }
-var PV_SRC={hand:'사람',card:'기업정보함',erp:'업체관리',auto:'기계','guess:office':'소재지로 추정','copy:prev':'작년 값','calc:budget':'계산','calc:rate':'사람수 × 단가'};
+var PV_SRC={hand:'사람',card:'기업정보함',erp:'업체관리',auto:'기계','guess:office':'소재지로 추정','lookup:zip':'소재지로 찾음','copy:prev':'작년 값','calc:budget':'계산','calc:rate':'사람수 × 단가'};
 function _provSrcLabel(src){
   src=String(src||'');
   if(PV_SRC[src]) return PV_SRC[src];
@@ -14570,6 +14572,21 @@ function fdAddrSearch(){
     toast('주소를 채웠습니다 — 확인 후 저장');
   }, cur?cur.value:'');
 }
+/* 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17 「우편번호찾기 기능있는데 자동으로 니가 찾아서 항상 입력해라」)
+   소재지는 있는데 우편번호가 비면 서버(zipLookup — 카카오 주소검색)에 물어 칸을 채운다(js/pu-zip.js).
+   위 [🔍 우편번호 검색]은 그대로 둔다 — 한 곳으로 딱 떨어지지 않으면 안 넣으니 그때 쓴다.
+   ⚠ 칸에 채울 뿐이다 — 저장은 사람이 [저장]을 누를 때다(푸른이알피와 같다). 열어 보기만 하고 나가도
+     「저장하지 않은 변경」 경고가 뜨지 않게 markDirty 를 부르지 않는다(saveInfo·saveSite 는 칸 값을 읽어 담는다).
+   ⚠ 기계가 넣은 값이라 _provMark 로 표시한다 — 그대로 저장하면 출처가 «사람»이 아니라 «소재지로 찾음»(🤖)이다.
+   prefix: 'fd-'(기금 정보) · 'se-'(사업장 편집 창) — _addrStack 에 준 것과 같다 */
+function fundAutoZip(prefix){
+  if(!window.PuZip) return;
+  var zEl=$(prefix+'zipcode');
+  PuZip.bind($(prefix+'address'), zEl, function(z){
+    if(typeof _provMark==='function') _provMark(zEl,'lookup:zip','');
+    toast('📮 우편번호 '+z+' — 적어 둔 소재지로 찾아 넣었습니다 · 확인 후 [저장]');
+  });
+}
 /* ★ 참여 상태 — 탈퇴·폐업 (대표 지시 2026-10-04 「폐업으로 체크할 수 있는 항목도 만들어라」, 목업 승인).
      탈퇴(status:'closed')한 곳은 해마다 쓰는 서류(지원금·예산)에서 빠지고, 설립 서류에는 남는다(estabSites).
      폐업은 «탈퇴한 곳만» 고를 수 있다 — 참여 중인데 폐업이면 먼저 탈퇴 처리를 해야 한다.
@@ -14714,7 +14731,7 @@ function editSite(sid,prefill){
     +'<div class="row" style="justify-content:flex-end;margin-top:16px">'
     +(isNew?'':'<button onclick="delSite(\''+sid+'\')" style="margin-right:auto;color:var(--danger)">삭제</button>')
     +'<button onclick="closeM()">취소</button><button class="primary" onclick="saveSite(\''+sid+'\')">저장</button></div>'
-    ,{after:function(){ bindSiteDocIntake(); siteCoBarPaint(); }});
+    ,{after:function(){ bindSiteDocIntake(); siteCoBarPaint(); fundAutoZip('se-'); }});
   if(typeof _provApplyPend==='function') _provApplyPend();   // 판독·기업정보함으로 채워 연 칸에 «기계» 표시
 }
 /* 「대표자와 같은 사람」을 켜고 끌 때 성명 칸을 즉시 맞춘다 — 저장해 봐야 아는 것이 아니라
