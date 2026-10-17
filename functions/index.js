@@ -1806,6 +1806,32 @@ async function 뉴스레터경보(열쇠, 자리, 말) {
       message: "📰 " + String(말).slice(0, 200) })));
   await 뉴스레터경고판갱신(db).catch((e) => console.warn("[경고판]", e.message));
 }
+/* 못 간 통이 «이미 서버가 처리한 주소인가» 를 가르는 두 자료 — 명단에서 뺀 주소(newsletter/blocked)와 반송 기록(newsletter/bounces).
+   둘 다 몇십 줄 안팎이다. 이미 읽은 반송 기록이 있으면 다시 읽지 않는다. */
+async function 전달처리판읽기(db, 이미읽은반송들) {
+  const 막힘 = (await db.ref("newsletter/blocked").once("value")).val() || {};
+  const 반송들 = 이미읽은반송들 || (await db.ref("newsletter/bounces").once("value")).val() || {};
+  return { 막힘, 반송들 };
+}
+/* 걸려 있는 «전달 실패» 경고를 지금 대기열·처리판으로 다시 세어, 사람 몫이 없으면 «정리됨» 으로 고친다(news-watch.js 전달경보다시보기).
+   돌려주는 것 = 전달경보 칸에 고쳐 쓴 것(없으면 null). ⚠ 이 회차 대기열만 읽는다(bulk 색인) — 끝난 줄은 대기열에서 지워지므로 몇 줄 안 된다. */
+async function 뉴스레터전달경보다시보기(db, 열쇠, w, 반송들) {
+  const 경보 = w && w.전달경보;
+  if (!경보 || 경보.상태 !== "block") return null;
+  const 배치 = String(경보.batchId || (w.발송 && w.발송.batchId) || "");
+  if (!배치) return null;
+  const [줄들, 처리판] = await Promise.all([
+    db.ref(MD.CARDS_ROOT + "/scheduled").orderByChild("bulk").equalTo(배치).once("value").then((x) => x.val() || {}),
+    전달처리판읽기(db, 반송들)]);
+  const 셈 = NWatch.전달사람몫(줄들, 배치, 처리판);
+  const 바뀜 = NWatch.전달경보다시보기(경보, 셈, Date.now());
+  if (!바뀜) return null;
+  const upd = {};
+  Object.keys(바뀜).forEach((k) => { upd["newsletter/watch/" + 열쇠 + "/전달경보/" + k] = 바뀜[k]; });
+  if (w.전달) upd["newsletter/watch/" + 열쇠 + "/전달/처리됨"] = 셈.처리됨;
+  await db.ref().update(upd);
+  return 바뀜;
+}
 /* 포털 경고판 — newsletter/watch/현재 (대표 지시 2026-10-04 「푸른 통합로그인 … 뉴스레터 앱에 경고 표시」)
    가장 최근 회차의 감시 기록에서 «지금 사람이 볼 것»을 세어 둔다. 포털이 이 한 칸만 읽는다.
    ⚠ 3시간마다(감시꾼) · 점검 · 경보 · 발송 · 전달 뒤에 늘 새로 쓴다 — 고치면 저절로 사라진다. */
@@ -1813,6 +1839,14 @@ async function 뉴스레터경고판갱신(db) {
   const v = (await db.ref("newsletter/watch").orderByKey().limitToLast(4).once("value")).val() || {};
   const 열쇠 = Object.keys(v).filter((k) => /^\d{4}-\d{2}-w\d{1,2}$/.test(k)).sort().pop();
   const 반송들 = (await db.ref("newsletter/bounces").once("value")).val() || {};
+  /* ★ 걸려 있는 «전달 실패» 경고를 다시 센다 — 못 간 주소를 서버가 이미 처리했으면(반송 자동 확인이 «없는 주소» 로 뺌 등)
+       스스로 꺼진다(2026-10-17 «⚠ 1» 이 엿새 떠 있던 일). 어떤 탈이 나도 경고판 갱신은 계속 돈다 — 못 세면 경고는 그대로 남는다. */
+  if (열쇠) {
+    try {
+      const 바뀜 = await 뉴스레터전달경보다시보기(db, 열쇠, v[열쇠], 반송들);
+      if (바뀜) v[열쇠] = Object.assign({}, v[열쇠], { 전달경보: Object.assign({}, v[열쇠].전달경보, 바뀜) });
+    } catch (e) { console.warn("[전달경보 다시 세기]", e.message); }
+  }
   /* 손으로 보낸 회차 — 감시 기록에 발송 ok 가 안 남는다. 회차 원본의 보낸때로 가린다(2026-10-09) */
   const 보낸때 = 열쇠 ? Number((await db.ref("newsletter/issues/" + 열쇠 + "/보낸때").once("value")).val()) || 0 : 0;
   /* 팝업 머리말에 «2026년 10월 2주차» 처럼 사람이 읽는 이름을 쓴다(대표 지시 2026-10-11) — 없으면 비워 둔다 */
@@ -2145,9 +2179,13 @@ exports.newsletterWatchDelivery = functions
     const 줄들 = (await db.ref(MD.CARDS_ROOT + "/scheduled")
       .orderByChild("bulk").equalTo(String(ready.batchId)).once("value")).val() || {};
     const 셈 = NWatch.전달셈(줄들, ready.batchId);
-    await db.ref("newsletter/watch/" + ready.회차열쇠 + "/전달").set(Object.assign({ 때: Date.now(), 받는수: ready.받는수 || 0 }, 셈));
-    if (셈.실패 || 셈.확인필요) {
-      await 뉴스레터경보(ready.회차열쇠, "전달경보", "뉴스레터 " + (셈.실패 + 셈.확인필요) + "통이 못 나갔거나 확인이 필요합니다 — 뉴스레터 › 보낸 결과에서 주소를 보십시오");
+    /* ★ 못 간 통이 «이미 서버가 처리한 주소»(없는 주소로 자동 차단 등)면 사람이 할 일이 없다 — 경고를 안 건다(2026-10-17).
+         처리판을 못 읽으면 {} — 전부 사람 몫(예전 그대로)이라 경고가 빠지는 쪽으로는 틀리지 않는다. */
+    const 처리판 = await 전달처리판읽기(db).catch((e) => { console.warn("[전달 처리판]", e.message); return {}; });
+    const 사람 = NWatch.전달사람몫(줄들, ready.batchId, 처리판);
+    await db.ref("newsletter/watch/" + ready.회차열쇠 + "/전달").set(Object.assign({ 때: Date.now(), 받는수: ready.받는수 || 0 }, 셈, { 처리됨: 사람.처리됨 }));
+    if (사람.사람몫 > 0) {
+      await 뉴스레터경보(ready.회차열쇠, "전달경보", NWatch.전달경보말(사람.사람몫));
     }
     await 뉴스레터경고판갱신(db).catch(() => null);
     /* ★ 결과 보고 메일 (2026-10-05 「추천대로」) — 숫자는 서버가 세고, AI 는 세 줄 요약만. 요약을 못 붙여도 메일은 간다 */
