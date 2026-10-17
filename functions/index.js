@@ -2666,7 +2666,16 @@ async function payMailStoreOne(db, bucket, att, mail) {
     up[PAYDATA_ROOT + "/u/" + route.seat + "/pending/" + id] = MR.pendingRecordFor(common);
   }
   await db.ref().update(up);
-  return { id: id, seat: route.seat, shared: route.shared, why: route.why, filed: !!drawer };
+  /* filedTo — 바로 서랍에 넣었으면 «어느 서랍»인지 (2026-10-17).
+     메일함의 「→ 급여데이터함」이 이것을 받아 말한다. 예전에는 서랍에 들어가도 화면이
+     늘 「대기 칸에 담았습니다 · 사업장·귀속월을 골라 주세요」라고 해, 이미 들어간 자료를
+     대기 칸에서 한참 찾게 했다. */
+  const filedTo = drawer ? {
+    companyName: String((route.tag && route.tag.companyName) || ""),
+    month: String((route.tag && route.tag.month) || ""),
+    kind: String((route.tag && route.tag.kind) || ""),
+  } : null;
+  return { id: id, seat: route.seat, shared: route.shared, why: route.why, filed: !!drawer, filedTo: filedTo };
 }
 
 /* 메일 한 회차 — 30분마다 도는 것과 사람이 누르는 「지금 가져오기」가 **함께** 쓴다.

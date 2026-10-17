@@ -668,18 +668,33 @@ function tagFor(o, company) {
     if (mo >= 1 && mo <= 12) month = m[1] + '-' + (mo < 10 ? '0' : '') + mo;
   }
 
-  let kind = '';
-  if (/근로계약|계약서/.test(text)) kind = 'contract';
-  else if (/명세서|이체|신고|취득|상실/.test(text)) kind = 'output';
-  else if (/급여대장|노임|임금대장|대장/.test(text)) kind = 'ledger';
-  else if (/근태|출근|출역|근무|시간/.test(text)) kind = 'attend';
-  /* 「급여」 + 자료를 뜻하는 말 — 「26.07월 가나공장_급여확정」·「9월 급여 기초자료」
-     (대표 승인 2026-10-03 목업 ③). ⚠ 「급여」 «하나만»으로는 안 잡는다 — 「8월급여수정
-     요청」 같은 부탁 메일까지 대장으로 잡힌다(2026-08 에 그래서 일부러 비워 둔 것).
-     그래서 자료 말이 함께 있어야 하고, 부탁·고침 말이 있으면 안 잡는다.
-     ⚠ **맨 뒤에** 본다 — 「급여명세서」는 우리 산출물, 「급여 근태」는 근태가 먼저다.
-     ⚠ 화면 guessTag 와 같아야 한다(PAY_DATA_RE·PAY_ASK_RE 를 똑같이 쓴다). */
-  else if (/급여/.test(text) && PAY_DATA_RE.test(text) && !PAY_ASK_RE.test(text)) kind = 'ledger';
+  /* 종류는 **파일 이름이 먼저다** (2026-10-17).
+     예전에는 파일 이름과 메일 제목을 한 덩어리로 보았다. 그래서 고객이 「퇴사자
+     상실신고 부탁드립니다」 제목에 「9월 급여대장.xlsx」를 붙여 보내면 제목의
+     「상실·신고」가 먼저 걸려 «우리 산출물»이 됐다 — 산출물도 바로 넣는 종류라
+     (SURE_KINDS) 급여대장이 산출물 서랍으로 조용히 들어갔다.
+     ★ 파일 이름으로 먼저 가르고, 거기서 못 가른 것만 제목까지 본다.
+     ⚠ 제목에서는 신고·취득·상실을 산출물로 «안» 본다 — 고객 메일 제목의 그 말은
+       거의 늘 «해 달라»는 부탁이다(신고는 우리가 한다). 명세서·이체도 부탁 말이
+       함께 있으면 안 본다(「급여명세서 재발행 요청」).
+       못 가르면 종류가 비고, 비면 바로 넣지 않는다(sureFor) — 사람이 대기 칸에서 고른다.
+     ⚠ 화면 guessTag 와 같아야 한다 — tests/paydata-kind-file-first.test.js 가 견준다. */
+  const kindOf = function (t, fileOnly) {
+    if (/근로계약|계약서/.test(t)) return 'contract';
+    if (fileOnly ? /명세서|이체|신고|취득|상실/.test(t)
+                 : (/명세서|이체/.test(t) && !PAY_ASK_RE.test(t))) return 'output';
+    if (/급여대장|노임|임금대장|대장/.test(t)) return 'ledger';
+    if (/근태|출근|출역|근무|시간/.test(t)) return 'attend';
+    /* 「급여」 + 자료를 뜻하는 말 — 「26.07월 가나공장_급여확정」·「9월 급여 기초자료」
+       (대표 승인 2026-10-03 목업 ③). ⚠ 「급여」 «하나만»으로는 안 잡는다 — 「8월급여수정
+       요청」 같은 부탁 메일까지 대장으로 잡힌다(2026-08 에 그래서 일부러 비워 둔 것).
+       그래서 자료 말이 함께 있어야 하고, 부탁·고침 말이 있으면 안 잡는다.
+       ⚠ **맨 뒤에** 본다 — 「급여명세서」는 우리 산출물, 「급여 근태」는 근태가 먼저다.
+       ⚠ 화면 guessTag 와 같아야 한다(PAY_DATA_RE·PAY_ASK_RE 를 똑같이 쓴다). */
+    if (/급여/.test(t) && PAY_DATA_RE.test(t) && !PAY_ASK_RE.test(t)) return 'ledger';
+    return '';
+  };
+  const kind = kindOf(String(o.filename || ''), true) || kindOf(text, false);
 
   return {
     companyId: company ? String(company.id || '') : '',

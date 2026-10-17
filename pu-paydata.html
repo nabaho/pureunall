@@ -1711,15 +1711,24 @@ function guessTag(rec, companies) {
     if (mo >= 1 && mo <= 12) month = m[1] + '-' + (mo < 10 ? '0' : '') + mo;
   }
 
-  let kind = 'etc';
-  if (/근로계약|계약서/.test(text)) kind = 'contract';
-  else if (/명세서|이체|신고|취득|상실/.test(text)) kind = 'output';
-  else if (/급여대장|노임|임금대장|대장/.test(text)) kind = 'ledger';
-  else if (/근태|출근|출역|근무|시간/.test(text)) kind = 'attend';
-  /* 「급여」 + 자료 말(급여확정·급여 기초자료) — 맨 뒤에 본다. 서버 tagFor 와 같다.
-     ⚠ 「급여」 하나만으로는 안 잡는다 — 「8월급여수정 요청」이 대장이 되면 안 된다. */
-  else if (/급여/.test(text) && /확정|예정|기초|자료|내역|지급/.test(text)
-    && !/수정|요청|문의|변경|정정/.test(text)) kind = 'ledger';
+  /* 종류는 **파일 이름이 먼저다** (2026-10-17) — 서버 tagFor 와 같은 규칙.
+     제목(note)의 「상실신고 부탁」이 붙은 급여대장이 «우리 산출물»로 잡히던 것을 막는다.
+     파일 이름으로 못 가른 것만 제목까지 보고, 제목에서는 신고·취득·상실을 산출물로
+     안 본다(고객 제목의 그 말은 부탁이다). 명세서·이체도 부탁 말이 함께면 안 본다.
+     ⚠ 서버와 같아야 한다 — tests/paydata-kind-file-first.test.js 가 견준다. */
+  const kindOf = function (t, fileOnly) {
+    if (/근로계약|계약서/.test(t)) return 'contract';
+    if (fileOnly ? /명세서|이체|신고|취득|상실/.test(t)
+                 : (/명세서|이체/.test(t) && !/수정|요청|문의|변경|정정/.test(t))) return 'output';
+    if (/급여대장|노임|임금대장|대장/.test(t)) return 'ledger';
+    if (/근태|출근|출역|근무|시간/.test(t)) return 'attend';
+    /* 「급여」 + 자료 말(급여확정·급여 기초자료) — 맨 뒤에 본다. 서버 tagFor 와 같다.
+       ⚠ 「급여」 하나만으로는 안 잡는다 — 「8월급여수정 요청」이 대장이 되면 안 된다. */
+    if (/급여/.test(t) && /확정|예정|기초|자료|내역|지급/.test(t)
+      && !/수정|요청|문의|변경|정정/.test(t)) return 'ledger';
+    return '';
+  };
+  const kind = kindOf(String((rec && rec.filename) || ''), true) || kindOf(text, false) || 'etc';
 
   return { companyId: hit ? hit.id : '', companyName: hit ? hit.name : '', month: month, kind: kind };
 }
@@ -2276,7 +2285,7 @@ function takeShared() {
 }
 
 /* ══════ 메일로 온 것 — 공용 대기 칸 (대표 지시 2026-08-17) ══════
-   서버(functions/index.js receivePaydataMail)가 10분마다 다음메일을 살펴 아는
+   서버(functions/index.js receivePaydataMail)가 30분마다 다음메일을 살펴 아는
    곳에서 온 첨부를 paydata/pending_shared 에 담는다. **여태 그 칸을 읽는 화면이
    없어**, 자료는 들어오는데 아무에게도 안 보였다.
    ⚠ 서버는 「누구 자리」를 모른다 — 그래서 공용 칸이고, 사람이 **맡아야** 제
