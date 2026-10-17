@@ -148,6 +148,30 @@ test('⑩★ 부담당은 «사람마다 칸 하나»다 — 한 칸에 몰아 �
     '★ 그 자리에서 «사람을 고를» 수 없다 — 대표 지시는 「셀로 사람 선택하게」였다');
 });
 
+test('⑩-2★ 부담당 칸이 주담당과 «한 줄»에 선다 — 이름표가 줄을 차지하지 않는다', () => {
+  /* 대표 지시 2026-10-17 「부담당 줄 이상하다 줄일치시켜달라」.
+     주담당·「+ 부담당 추가」는 라벨 없는 칸(fldn6 → pu-n6)인데, 부담당만 라벨이 위에
+     한 줄을 차지하는 칸(pu-c4)이라 그 칸만 이름표 높이만큼 아래로 처졌다.
+     ★ 규칙: ① 부담당 칸도 같은 칸 모양(pu-n6)이다 ② 이름표는 흐름 밖(absolute)이다.
+       class 이름은 코드에서 읽어 온다 — 이름을 바꿔도 규칙만 지키면 안 깨진다. */
+  const at = MODAL.indexOf("'부담당 ' + (i+1)");
+  assert.ok(at > 0, '부담당 자리 이름표를 못 찾았다');
+  const ci = MODAL.lastIndexOf("className:'", at);
+  assert.ok(ci > 0 && at - ci < 300, '부담당 칸의 className 을 못 찾았다');
+  const cls = MODAL.slice(ci + 11, MODAL.indexOf("'", ci + 11)).split(/\s+/).filter(Boolean);
+  assert.ok(cls.includes('pu-n6'),
+    '★ 부담당 칸이 주담당과 다른 칸 모양이다 — 이 칸만 줄이 처진다: ' + cls.join(' '));
+  assert.ok(!cls.includes('pu-c4'),
+    '★ 부담당 칸이 «라벨이 위에 한 줄» 칸(pu-c4)으로 돌아갔다 — 그 칸만 아래로 처진다');
+  const slot = cls.find(function(c){ return c !== 'pu-n6'; });
+  assert.ok(slot, '부담당 이름표를 칸 위에 얹을 class 가 없다 — 이름표가 select 옆에 흐름으로 끼어든다');
+  const esc = slot.replace(/[-]/g, '\\-');
+  assert.match(CSS, new RegExp('\\.' + esc + '\\s*>\\s*label\\s*\\{[^}]*position:\\s*absolute'),
+    '★ 부담당 이름표가 흐름 안에 있다 — 칸 위에 한 줄을 차지해 다시 처진다');
+  assert.match(CSS, new RegExp('\\.' + esc + '\\s*\\{[^}]*position:\\s*relative'),
+    '부담당 칸이 이름표의 기준(relative)이 아니다 — 이름표가 엉뚱한 자리로 날아간다');
+});
+
 test('⑪★ 한 자리만 뺄 수 있고, 뺀 뒤에도 남은 자리 번호가 안 흔들린다', () => {
   const fn = stripJs(cutFn(RAW, 'function setSubAt(i, sid)'));
   assert.match(fn, /subs\.splice\(i,\s*1\)/,

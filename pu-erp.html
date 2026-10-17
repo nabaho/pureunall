@@ -173,7 +173,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=15">
+<link rel="stylesheet" href="css/pu-erp.css?v=16">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -23514,7 +23514,8 @@ function ContractModal(props){
       /* ⚠ 부담당 슬롯(아래)은 라벨을 그대로 둔다 — 「부담당 몇 번째」라는 자리값과
          ✕(그 사람만 빼기) 단추를 함께 얹을 자리가 필요해서다. placeholder 만으로는
          값을 채운 뒤 «몇 번째 부담당인지» 알 길이 없다(대표 지시 2026-09-19 원칙의
-         예외 — status 기록에 남겨 둔다). 주담당은 단순 선택이라 없앤다. */
+         예외 — status 기록에 남겨 둔다). 주담당은 단순 선택이라 없앤다.
+         단, 그 라벨은 칸 «테두리 위»에 얹어 줄을 안 차지한다(2026-10-17 줄 맞춤). */
       // 새 선택값은 사번이다. 과거 이름은 별도 옵션으로 보존하며 자동 치환하지 않는다.
       (function(){
         var currentSid = f.managerMain || '';
@@ -23567,7 +23568,11 @@ function ContractModal(props){
         if(sid && !optList.find(function(u){ return u.sid === sid; })){
           optList = optList.concat([Object.assign({}, u0||{sid:sid,name:sid}, { _statusLabel: st.label })]);
         }
-        return h('div', { key:'sub'+i, className:'pu-c4' },
+        /* ⚠★ 칸은 주담당과 «같은» pu-n6 이다 (대표 지시 2026-10-17 「부담당 줄 이상하다
+             줄일치시켜달라」). 전에는 pu-c4(라벨이 위에 한 줄)라 이 칸만 이름표 높이만큼
+             아래로 처졌다. 이름표는 css 의 .pu-sub-slot 이 칸 «테두리 위»에 얹는다 —
+             줄을 차지하지 않는다. tests/contract-4col-order.test.js 가 막는다. */
+        return h('div', { key:'sub'+i, className:'pu-n6 pu-sub-slot' },
           h('label', null,
             (needReassign ? '🚫 ' : '') + '부담당 ' + (i+1),
             h('button', { type:'button', onClick:function(){ setSubAt(i, ''); },
