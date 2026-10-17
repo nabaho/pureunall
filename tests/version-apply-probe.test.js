@@ -149,6 +149,25 @@ async function run(){
        '옮겨 간 곳: ' + w.navigated);
   }
 
+  /* 카카오 인증 중에는 1회용 인가코드를 새로고침으로 잃지 않는다. */
+  {
+    const w = makeWorld(200);
+    w.win.__kkReturning = true;
+    vm.createContext(w.win);
+    vm.runInContext(SRC, w.win);
+    await settle(); await settle();
+    w.tick(2000); await settle(); await settle();
+    w.tick(60000); await settle(); await settle();
+    ok('카카오 복귀 중에는 새 판으로 갈아타지 않는다', w.navigated === null && w.probes === 0);
+    w.win.__kkReturning = false;
+    w.win.__puPortalEntering = true;
+    w.tick(5000); await settle(); await settle();
+    ok('포털을 준비하는 동안에도 갈아타지 않는다', w.navigated === null && w.probes === 0);
+    w.win.__puPortalEntering = false;
+    w.tick(5000); await settle(); await settle();
+    ok('인증이 끝나면 대기 중인 새 판을 적용한다', !!w.navigated && w.probes === 1);
+  }
+
   console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
   process.exit(fail ? 1 : 0);
 }
