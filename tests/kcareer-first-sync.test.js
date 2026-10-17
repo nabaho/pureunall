@@ -54,14 +54,14 @@ test('④ 도장 목록은 합쳐 오간다 · 기기 이름표에 브라우저'
   assert.ok(/<script src="js\/kcareer-notices\.js\?v=\d+"><\/script>/.test(SRC));
 });
 
-test('⑤ 더 새 기록이 오면 — 안 올라간 고침이 없고 잃을 것이 없을 때만 받아 온다', () => {
+test('⑤ 더 새 기록이 오면 — 두 기기 기록을 «합쳐» 받고 올린다(띠로 한쪽을 버리게 하지 않는다 · 2026-10-18)', () => {
   assert.ok(/kind==='newer'\)\{ fbNewerSync\(\); return; \}/.test(떼기('function fbWatch(')), 'fbWatch');
   assert.ok(/cloudAt>(_fbBase|base)\)\{ fbNewerSync\(\)/.test(떼기('function fbAutoPush(')), 'fbAutoPush — 올리기가 막힌 그 자리');
   const f = 떼기('function fbNewerSync(');
-  assert.ok(/_fbpending|_fbPendingNow\(\)/.test(f) && f.indexOf('pending') < f.indexOf('kcApplyRestore'), '★ 안 올라간 고침이 있으면 받지 않는다 — 덮으면 그 고침이 사라진다');
+  assert.ok(/KcareerNotices\.mergeLs\(/.test(f) && f.indexOf('mergeLs') < f.indexOf('kcApplyRestore'), '★ 안 올라간 고침이 있어도 «합친 것»을 받는다 — 덮지 않는다');
+  assert.ok(!/\.safe/.test(f), '「잃을 것」이 있다고 멈추지 않는다 — 합치면 잃지 않는다');
   assert.ok(/\.modal-ov\.open/.test(f), '창이 열려 있으면 새로고침하지 않는다');
-  assert.ok(f.indexOf('r.safe') < f.indexOf('kcApplyRestore'), '잃을 것을 먼저 본다');
-  assert.ok(!/_fbDoPush/.test(f), '받기만 한다');
+  assert.ok(f.indexOf('kcApplyRestore') < f.indexOf('_fbDoPush'), '이 기기에 쓴 뒤, 합친 것을 클라우드에 올린다');
   /* 표시는 일련번호로(2026-10-07) — 고칠 때마다 새 번호, 올리기는 «모을 때 본 번호»일 때만 지운다 */
   assert.ok(/_fbPendingMark\(\)/.test(떼기('function fbScheduleAuto(')), '고치면 표시');
   assert.ok(/(localStorage\.setItem|LS\.set)\(NS\+'_fbpending'/.test(떼기('function _fbPendingMark(')), '표시는 이 기기에');

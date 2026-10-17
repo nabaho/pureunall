@@ -1421,7 +1421,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
-<script src="js/kcareer-notices.js?v=3"></script>
+<script src="js/kcareer-notices.js?v=4"></script>
 <!-- 「합치기」 안전장치 — 다른 서류를 합쳐 잃지 않게 막는다(kcareer-mergeguard.js) -->
 <script src="js/kcareer-mergeguard.js?v=1"></script>
 <!-- 「잘못 붙은 원본 찾기」 — 기록 날짜와 붙은 파일 이름이 크게 어긋난 줄을 찾는다 -->
@@ -22287,9 +22287,8 @@ function _fbDoPush(hereTotal, quiet, o){
       var 앞섬=/permission|PERMISSION_DENIED/i.test(String((ex&&ex.code)||'')+' '+String((ex&&ex.message)||ex));
       if(앞섬){
         /* 다른 기기가 먼저 올렸다 — 이 기기 고침은 그대로 두고(표시도 그대로) 사람이 고르게 한다 */
-        fbShowNotice('newer');
-        if(!_fbDoPush._said || Date.now()-_fbDoPush._said>60000){ _fbDoPush._said=Date.now();
-          toast('☁ 다른 기기가 먼저 저장해 이 기기 고침을 올리지 않았습니다 — 위 띠에서 «저장(이 기기 것)» 또는 «불러오기»를 골라 주세요', 9000); }
+        /* ★ 띠로 사람에게 떠넘기지 않는다 — 클라우드와 «합쳐서» 다시 올린다(fbNewerSync). 합치기가 계속 실패해야 띠가 뜬다 */
+        if(!_fbMerging) setTimeout(fbNewerSync, 800);
       }else if(!_fbDoPush._said || Date.now()-_fbDoPush._said>60000){ _fbDoPush._said=Date.now();
         toast('☁ 클라우드 저장 실패 — '+((ex&&ex.message)||ex)+' · 고친 것은 이 기기에 있고 다음에 다시 올립니다', 7000); }
       throw ex;
@@ -22494,30 +22493,56 @@ function fbFirstSync(){
    올리기도 멈춘 채 서로 달라진 채로 남았다(누를 때까지). 받아도 잃을 것이 없으면 받는다.
    ⚠ 이 기기에 안 올라간 고침(_fbpending)이 있으면 받지 않는다 — 띠로 사람이 고른다(덮으면 그 고침이 사라진다).
    ⚠ 창(모달)이 열려 있으면 받지 않는다 — 새로고침이 쓰던 것을 날린다. 띠만 띄운다. */
-var _fbNewerTried=false;
+var _fbMerging=false, _fbMergeFails=0, _fbBusyWait=0;
+/* ★★ 두 기기가 서로 고쳤으면 «합친다» — 띠로 한쪽을 버리게 하지 않는다 (대표 지시 2026-10-18)
+   「폰 하면서 코딩하는데 항상 상단에 다른 기기에 데이터 관련돼서 체크 항목이 나온다 — 한 번에 해결하고 표시 안 나오게」.
+   ■ 예전엔 막다른 길이었다: 클라우드가 새것이면 올리기를 멈추고, 이 기기에 안 올라간 고침이 있으면 받기를 멈췄다.
+     폰과 PC 가 둘 다 고치면 «둘 다 막혀» 사람이 「불러오기」(이 기기 고침 버림)나 「저장」(PC 고침 버림)을 누를 때까지 띠가 남았다.
+   ■ 이제: 클라우드를 읽어 «번호별로 합치고»(KcareerNotices.mergeLs — 더하기만, 지운 기록표 존중) → 이 기기에 쓰고 → 클라우드에 올린다.
+     띠는 «합치지 못했을 때»만 뜬다(저장 공간 부족·여러 번 실패 등).
+   ⚠ 창이 열려 있거나 한글 서식·폴더 담기 중이면 «기다린다» — 새로고침이 쓰던 것을 날린다. 띠도 띄우지 않고 15초 뒤 다시 본다(최대 40번).
+   ⚠ 합친 결과가 이 기기와 같으면 새로고침하지 않는다. 클라우드와 같으면 올리지 않는다. */
+function _fbSame(a, b){
+  if(a===b) return true;
+  try{
+    var x=JSON.parse(a), y=JSON.parse(b);
+    if(Array.isArray(x)&&Array.isArray(y)&&x.length===y.length&&x.length&&x[0]&&x[0].id!=null){
+      var m={}; y.forEach(function(r){ if(r&&r.id!=null) m[String(r.id)]=JSON.stringify(r); });
+      return x.every(function(r){ return r&&r.id!=null&&m[String(r.id)]===JSON.stringify(r); });
+    }
+  }catch(e){}
+  return false;
+}
 function fbNewerSync(){
   if(!fbAutoOn()) return;                           /* 꺼 두었으면 저절로 받지 않는다(☁ 불러오기는 그대로 된다) */
-  var pending=!!_fbPendingNow();
-  /* 창이 열려 있거나 · 한글 서식을 쓰는 중이거나 · 폴더에서 여러 개를 담는 중이면 새로고침하지 않는다 */
+  /* 창이 열려 있거나 · 한글 서식을 쓰는 중이거나 · 폴더에서 여러 개를 담는 중이면 새로고침하지 않는다 — 띠 없이 잠시 뒤 다시 */
   var busy=!!document.querySelector('.modal-ov.open') || (typeof _rhDoc!=='undefined' && _rhDoc && _rhDoc.bytes) || !!window._kcBusyImport;
-  if(_fbNewerTried || pending || busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
-  _fbNewerTried=true;
+  if(busy && _fbBusyWait<40){ _fbBusyWait++; setTimeout(fbNewerSync, 15000); return; }
+  if(busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
+  if(_fbMerging) return;
+  _fbMerging=true; _fbBusyWait=0;
+  var 실패=function(e){ _fbMerging=false; _fbMergeFails++;
+    if(e) console.warn('fbNewerSync', e);
+    if(_fbMergeFails<5){ setTimeout(fbNewerSync, 4000*_fbMergeFails); }   /* 다른 기기가 또 저장했을 수 있다 — 조금 뒤 다시 합친다 */
+    else fbShowNotice('newer'); };
   fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
     var v=snap.val();
-    if(!v||!v.ls){ fbShowNotice('newer'); return; }
-    /* 같은 PC 다른 탭이 방금 올린 것이면 받을 것이 없다 — 새로고침하지 않는다 */
-    if(v.at && v.at===fbGetBase()){ _fbNewerTried=false; fbHideNotice(); return; }
-    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP.concat(FB_UNION), TOMB_KEY);
-    if(!r.safe){ fbShowNotice('newer'); return; }
-    /* 받는 사이에 이 기기에서 고친 것이 생겼으면 덮지 않는다 */
-    if(_fbPendingNow()){ fbShowNotice('newer'); return; }
-    if(kcRestoreFailed(kcApplyRestore(v.ls, 'pull'))) return;
-    if(v.at) fbSetBase(v.at);
-    _fbPendingClear(null);
-    fbHideNotice();
-    toast('☁ 다른 기기('+(v.device||'')+')에서 저장한 최신 기록을 받아 왔습니다 — 새로고침합니다', 5000);
-    kcReload(1500);
-  }).catch(function(e){ console.warn('fbNewerSync', e); fbShowNotice('newer'); });
+    if(!v||!v.ls){ _fbMerging=false; fbShowNotice('newer'); return; }
+    /* 같은 PC 다른 탭이 방금 올린 것이면 받을 것이 없다 */
+    if(v.at && v.at===fbGetBase()){ _fbMerging=false; _fbMergeFails=0; fbHideNotice(); if(_fbPendingNow()) _fbSchedulePush(); return; }
+    var here=fbGatherLS();
+    var m=KcareerNotices.mergeLs(here, v.ls, { skip:FB_SKIP, tombKey:TOMB_KEY });
+    var keys=Object.keys(m.ls);
+    var 내게=keys.some(function(k){ return !_fbSame(m.ls[k], here[k]); });
+    var 구름에=keys.some(function(k){ return !_fbSame(m.ls[k], v.ls[k]); });
+    /* 받는 사이에 또 고쳤으면 그 고침까지 합쳐야 한다 — 다시 읽는다 */
+    if(내게){ if(kcRestoreFailed(kcApplyRestore(m.ls, 'pull'))){ _fbMerging=false; return; } }
+    fbSetBase(v.at);
+    var 끝=function(){ _fbMerging=false; _fbMergeFails=0; fbHideNotice();
+      if(내게){ toast('☁ 폰·PC 기록을 합쳤습니다'+(m.fromLocal?(' (이 기기에만 있던 '+m.fromLocal+'건 포함)'):'')+' — 새로고침합니다', 5000); kcReload(1500); } };
+    if(!구름에){ _fbPendingClear(null); 끝(); return; }      /* 클라우드는 이미 같다 — 올릴 것 없음 */
+    _fbDoPush(_fbCounts(null).total, true).then(끝, 실패);
+  }).catch(실패);
 }
 /* ★ 직원 «보기 전용»에서는 클라우드로 «올리지 않는다» (대표 지시 2026-09-02).
    사본에서 읽은 대표 기록이 직원 자기 칸(kcareer/{직원uid})에 눌러앉으면,
