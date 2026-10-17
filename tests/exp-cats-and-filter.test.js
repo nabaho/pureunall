@@ -101,7 +101,11 @@ test('★ 거르기를 «풀 수 있다»', () => {
 
 test('★ 거르는 줄은 «머리 칸이 아니다» (th 로 세면 칸 수가 어긋난다)', () => {
   const src = bare(ERP);
-  const at = src.indexOf('h(\'tr\',{style:{background:\'#f8fafc\'}},');
+  /* ⚠ 줄의 모양(style 글자)으로 찾지 않는다 — 2026-10-17 에 폰 손잡이(className)가 붙었다.
+     거르는 줄을 만드는 자리(fTd 다음의 tr)로 찾는다. */
+  const fAt = src.indexOf("var fTd = Object.assign({}, tdS,");
+  assert.ok(fAt > 0, '거르는 줄을 못 찾았다');
+  const at = src.indexOf("return h('tr',", fAt);
   assert.ok(at > 0, '거르는 줄을 못 찾았다');
   const seg = src.slice(at, at + 1800);
   assert.ok(seg.indexOf("h('th',") < 0,
@@ -129,6 +133,9 @@ test('★★ 거르는 줄은 «얇다» — 손잡이가 폭을 다 먹지 않�
     "★ 찾기 칸이 폭 100% 다 — 굵은 띠가 표 위에 얹힌다");
   assert.ok(!/width:'100%',fontSize:'11px'/.test(seg),
     '★ 아직 폭을 100% 로 늘린다');
-  assert.ok(/colSpan:4/.test(seg),
-    '★ 빈 칸 넷을 따로 그린다 — 한 칸으로 묶으면 줄이 얇아진다');
+  /* ⚠ 칸 «수»를 못 박지 않는다 — 2026-10-17 에 맨 왼쪽 ☐ 칸이 늘어 4→5 가 됐다.
+     볼 것은 «앞의 빈 칸들을 한 칸으로 묶었는가» 다. */
+  const cs = seg.match(/colSpan:(\d+)/);
+  assert.ok(cs && Number(cs[1]) >= 2,
+    '★ 빈 칸들을 따로 그린다 — 한 칸으로 묶으면 줄이 얇아진다');
 });
