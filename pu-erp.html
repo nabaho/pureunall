@@ -200,7 +200,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-labor-core.js?v=6"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
 <script src="js/pu-case-due.js?v=2"></script>
-<script src="js/pu-gcal-auth.js?v=13"></script>
+<script src="js/pu-gcal-auth.js?v=14"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-billing.js?v=12"></script>
@@ -76344,6 +76344,164 @@ function getPayrollAuditFor(empSid, ym){
 // 데이터: attendance_records [{id,date,sid,type,hours,note,createdAt}]
 // 타입: leave/halfday-am/halfday-pm/leave-hour/sick/public/late/early/absent/trip
 // ============================================================
+/* ══ 캘린더(구글 공용 달력)의 휴가·재택 → 인사관리 근태 (2026-10-17 대표 「캘린더에 넣었던것 인사관리에 자동으로」) ══
+   시안 https://claude.ai/artifact/EqUrqhnEmtwrXHQkH2RV9A · 결정: 워라밸·리프레시 휴가는 연차에서 안 뺌(특별휴가) ·
+   앞날짜(신청)도 넣고 «예정» 표시 · «확실한» 줄(제목의 이름 = 올린 사람 구글 계정)은 저절로 넣음.
+   · 사람 열쇠는 사번이다 — 제목의 이름은 «제안»일 뿐, 올린 계정(gcal_mail_sid, 사람이 이어 준 표)과 같을 때만 확실.
+     이름이 없거나 둘이 다르면 «사람 확인»으로 남긴다(CLAUDE.md 온톨로지: 이름으로 추정한 관계는 사람이 확정).
+   · 넣은 줄은 sourceKind:'gcal' · sourceId(일정 번호)를 남겨 두 번 들어가지 않고, 캘린더에서 사라지면 알린다(저절로 지우지 않음).
+   · 육아휴직·출산휴가는 넣지 않는다 — 휴직 기록(휴가관리 › 휴직)이 맡는다. */
+var GCAL_ATT_CAL_ID = 'euh07th7tvlco9corqen9lqpts@group.calendar.google.com';   // pu-cal.html GCAL_CAL_ID 와 같은 달력
+var GCAL_ATT_KEY = 'AIzaSyA0I_VD_dvFo9CPCDrPCiewcnuG0VeTkuo';                   // pu-cal.html GCAL_API_KEY (공개 읽기 열쇠)
+function gcalAttClassify(title){
+  var t = String(title || '');
+  if(/예비군|민방위/.test(t) && !/우수기업|출산육아|강의/.test(t)) return { type:'public', period:'full', label:'공가(' + (/민방위/.test(t) ? '민방위' : '예비군') + ')' };   // «예비군 교육»이 아래 «교육»에 걸리지 않게 먼저
+  if(/우수기업|출산육아|강의|간담회|점검|심사|교육|방문|설명회|회의/.test(t)) return null;   // 휴가가 아닌 일정
+  if(/육아휴직|출산휴가/.test(t)) return null;
+  var am = /오전/.test(t), pm = /오후/.test(t);
+  if(/재택/.test(t)) return { type:'telework', period: am ? 'am' : (pm ? 'pm' : 'full'), label:'재택' + (am ? '(오전)' : pm ? '(오후)' : '') };
+  if(/반차/.test(t)){
+    if(am) return { type:'halfday-am', period:'full', label:'오전 반차' };
+    if(pm) return { type:'halfday-pm', period:'full', label:'오후 반차' };
+    return { type:'halfday-am', period:'full', label:'반차(오전/오후 모름)', unsure:true };
+  }
+  if(/워라밸|리프레시/.test(t)) return { type:'special-leave', period:'full', label:'회사 휴가(' + (/리프레시/.test(t) ? '리프레시' : '워라밸') + ')' };
+  if(/연차/.test(t)) return { type:'leave', period:'full', label:'연차' };
+  return null;
+}
+/* 일정의 날짜들 — 종일 일정의 끝날은 «다음 날»(구글 규칙)이라 빼고, 평일·공휴일 아닌 날만 */
+function gcalAttDays(ev, holiMap){
+  var st = String((ev.start && (ev.start.date || ev.start.dateTime)) || '').slice(0, 10);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(st)) return [];
+  var allDay = !!(ev.start && ev.start.date);
+  var en = String((ev.end && (ev.end.date || ev.end.dateTime)) || '').slice(0, 10) || st;
+  var out = [], d = new Date(st + 'T00:00:00Z'), last = new Date(en + 'T00:00:00Z');
+  if(allDay) last = new Date(last.getTime() - 86400000);
+  if(last < d) last = d;
+  for(var i = 0; i < 62 && d <= last; i++){
+    var ymd = d.toISOString().slice(0, 10), w = d.getUTCDay();
+    if(w !== 0 && w !== 6 && !(holiMap && holiMap[ymd])) out.push(ymd);
+    d = new Date(d.getTime() + 86400000);
+  }
+  return out;
+}
+/* 할 일 만들기 — 확실(sure) · 사람 확인(ask) · 이미 있음(dup) · 마감(locked) · 사라짐(gone) */
+function gcalAttPlan(events, users, mailSid, existing, holiMap, today, isLocked){
+  var people = (users || []).filter(function(u){ return u && u.sid && u.name; });
+  var byDay = {}, bySrc = {}, evIds = {};
+  (existing || []).forEach(function(r){
+    if(!r || r._deleted) return;
+    (byDay[r.sid + '|' + r.date] = byDay[r.sid + '|' + r.date] || []).push(r);
+    if(r.id) bySrc[r.id] = 1;
+  });
+  var plan = { sure:[], ask:[], dup:[], locked:[], gone:[] };
+  (events || []).forEach(function(ev){
+    if(!ev || ev.status === 'cancelled') return;
+    evIds[ev.id] = 1;
+    var k = gcalAttClassify(ev.summary);
+    if(!k) return;
+    var flat = String(ev.summary || '').replace(/\s+/g, '');
+    var hit = people.filter(function(u){ return flat.indexOf(String(u.name).replace(/\s+/g, '')) >= 0; });
+    var nameSid = hit.length === 1 ? hit[0].sid : '';
+    var mail = String((ev.creator && ev.creator.email) || '').toLowerCase().replace(/\./g, ',');
+    var creatorSid = (mailSid && mailSid[mail]) || '';
+    var sure = !!nameSid && nameSid === creatorSid && !k.unsure;
+    var why = !nameSid ? '제목에 이름 없음' : (k.unsure ? '오전/오후 모름' : (creatorSid && creatorSid !== nameSid ? '올린 사람이 다름' : (!creatorSid ? '올린 계정이 명부와 안 이어짐' : '')));
+    gcalAttDays(ev, holiMap).forEach(function(day){
+      var item = { evId:ev.id, title:String(ev.summary || ''), date:day, type:k.type, period:k.period, label:k.label,
+        sid: nameSid || creatorSid || '', planned: day > today, why:why, id:'gc-' + ev.id + '-' + day.replace(/-/g, '') };
+      if(bySrc[item.id]) { plan.dup.push(item); return; }
+      var same = item.sid ? (byDay[item.sid + '|' + day] || []) : [];
+      if(same.length){ item.why = '근태에 같은 날 기록 있음'; plan.dup.push(item); return; }
+      if(isLocked && isLocked(day)){ plan.locked.push(item); return; }
+      (sure ? plan.sure : plan.ask).push(item);
+    });
+  });
+  (existing || []).forEach(function(r){
+    if(r && !r._deleted && r.sourceKind === 'gcal' && r.sourceId && !evIds[r.sourceId]) plan.gone.push(r);
+  });
+  return plan;
+}
+function gcalAttRecord(item, sid, nowIso){
+  return { id:item.id, entityType:'attendanceRecord', sid:sid, date:item.date, type:item.type, period:item.period || 'full',
+    hours:(typeof PuWork !== 'undefined' && PuWork.hoursOf) ? PuWork.hoursOf(item.type) : 8,
+    note:(item.planned ? '예정 · ' : '') + '📅 캘린더: ' + item.title, planned:!!item.planned,
+    sourceKind:'gcal', sourceId:item.evId, createdAt:nowIso, updatedAt:nowIso };
+}
+/* 근태관리 위 띠 — 열 때 한 번 구글을 읽어 확실한 줄은 저절로 넣고, 나머지는 «열기»로 보여 준다 */
+function GcalAttSync(){
+  var canWrite = !!(CURRENT_USER && (CURRENT_USER.isAdmin || CURRENT_USER.isSubAdmin || (typeof _erpCanFin === 'function' && _erpCanFin())));
+  var pS = useState(null); var plan = pS[0]; var setPlan = pS[1];
+  var aS = useState(0); var added = aS[0]; var setAdded = aS[1];
+  var oS = useState(false); var open = oS[0]; var setOpen = oS[1];
+  var eS = useState(''); var err = eS[0]; var setErr = eS[1];
+  var pickS = useState({}); var pick = pickS[0]; var setPick = pickS[1];
+  function run(){
+    var y = String(new Date().getFullYear());
+    /* 읽기는 공용 모듈 한 곳(js/pu-gcal-auth.js listEvents — 시간 제한·실패 처리 포함) */
+    var page = function(){ return (typeof PuGcalAuth !== 'undefined' && PuGcalAuth.listEvents) ? PuGcalAuth.listEvents(GCAL_ATT_CAL_ID, GCAL_ATT_KEY, y + '-01-01T00:00:00Z', (+y + 1) + '-01-01T00:00:00Z') : Promise.reject(new Error('달력 읽기 도구를 못 불렀습니다 — 새로고침')); };
+    page().then(function(events){
+      var holi = {}; try { erpHolidays().forEach(function(h){ holi[h.date] = 1; }); } catch(e){}
+      var p = gcalAttPlan(events, dbGet('user_accounts', USERS_SEED) || [], dbGet('gcal_mail_sid', {}) || {},
+        dbGet('attendance_records', []) || [], holi, todayYMD(), function(d){ return !!_attendLockDenied('attendance_records', d); });
+      if(canWrite && p.sure.length){
+        var now = new Date().toISOString();
+        var recs = p.sure.map(function(it){ return gcalAttRecord(it, it.sid, now); });
+        if(dbUpsertMany('attendance_records', recs)){ setAdded(recs.length); p = Object.assign({}, p, { done:p.sure, sure:[] }); }
+      }
+      setPlan(p);
+    }).catch(function(e){ setErr(String(e && e.message || e)); });
+  }
+  useEffect(function(){ run(); }, []);
+  if(err) return h('div', { style:{ fontSize:'12.5px', color:'#d97706', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'6px', padding:'5px 10px', marginBottom:'8px' } }, '📅 캘린더를 읽지 못했습니다 — ' + err);
+  if(!plan) return null;
+  var askN = plan.ask.length, goneN = plan.gone.length;
+  function saveAsk(){
+    var now = new Date().toISOString();
+    var recs = plan.ask.filter(function(it){ return (pick[it.id] || it.sid); }).map(function(it){ return gcalAttRecord(it, pick[it.id] || it.sid, now); });
+    if(!recs.length){ showToast('사람을 골라 주세요'); return; }
+    if(dbUpsertMany('attendance_records', recs)){ showToast('📅 ' + recs.length + '건 넣었습니다'); setAdded(added + recs.length); setPlan(Object.assign({}, plan, { ask:plan.ask.filter(function(it){ return !recs.some(function(r){ return r.id === it.id; }); }) })); }
+  }
+  function dropGone(r){
+    if(dbRemoveMany('attendance_records', [r.id])){ showToast('지웠습니다'); setPlan(Object.assign({}, plan, { gone:plan.gone.filter(function(x){ return x.id !== r.id; }) })); }
+  }
+  var people = (dbGet('user_accounts', USERS_SEED) || []).filter(function(u){ return u && u.sid && u.status !== 'retired'; });
+  var nameOf = function(sid){ var u = (dbGet('user_accounts', USERS_SEED) || []).find(function(x){ return x && x.sid === sid; }); return u ? u.name : sid; };
+  var cS = { padding:'6px 8px', borderBottom:'1px solid #e2e8f0', fontSize:'13px', whiteSpace:'nowrap', textAlign:'left' };
+  return h('div', { style:{ marginBottom:'10px' } },
+    h('div', { style:{ display:'flex', flexWrap:'wrap', alignItems:'center', gap:'8px', fontSize:'13px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'7px', padding:'6px 10px' } },
+      h('b', { style:{ color:'#1e40af' } }, '📅 캘린더 연동'),
+      h('span', null, '저절로 넣음 ', h('b', null, added), '건'),
+      h('span', { style:{ color: askN ? '#dc2626' : '#64748b' } }, '사람 확인 ', h('b', null, askN)),
+      h('span', { style:{ color:'#64748b' } }, '이미 있음 ' + plan.dup.length),
+      plan.locked.length ? h('span', { style:{ color:'#64748b' } }, '마감된 달 ' + plan.locked.length + '(안 넣음)') : null,
+      goneN ? h('span', { style:{ color:'#d97706' } }, '캘린더에서 사라짐 ' + goneN) : null,
+      !canWrite && h('span', { style:{ color:'#64748b' } }, '· 넣기는 관리자만'),
+      (askN || goneN) && h('button', { type:'button', onClick:function(){ setOpen(!open); },
+        style:{ marginLeft:'auto', border:'1px solid #1e40af', background:open?'#1e40af':'#fff', color:open?'#fff':'#1e40af', borderRadius:'6px', padding:'3px 12px', fontSize:'12.5px', fontWeight:700, cursor:'pointer' } }, open ? '닫기' : '열기')),
+    open && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderTop:'none', borderRadius:'0 0 7px 7px', padding:'8px 10px', overflowX:'auto' } },
+      askN ? h('div', null,
+        h('table', { style:{ borderCollapse:'collapse', width:'100%' } },
+          h('thead', null, h('tr', null, ['날짜','사람','종류','캘린더 제목','까닭'].map(function(t){ return h('th', { key:t, style:Object.assign({}, cS, { color:'#64748b', fontSize:'12px', background:'#f8fafc' }) }, t); }))),
+          h('tbody', null, plan.ask.map(function(it){
+            return h('tr', { key:it.id },
+              h('td', { style:Object.assign({}, cS, { fontFamily:'monospace' }) }, it.date + (it.planned ? ' 예정' : '')),
+              h('td', { style:cS }, h('select', { value: pick[it.id] || it.sid || '', disabled:!canWrite, onChange:function(e){ var p2 = Object.assign({}, pick); p2[it.id] = e.target.value; setPick(p2); },
+                  style:{ fontSize:'13px', padding:'2px 6px', border:'1px solid ' + ((pick[it.id] || it.sid) ? '#cbd5e1' : '#dc2626'), borderRadius:'5px' } },
+                h('option', { value:'' }, '— 사람 고르기 —'),
+                people.map(function(u){ return h('option', { key:u.sid, value:u.sid }, u.name); }))),
+              h('td', { style:cS }, it.label),
+              h('td', { style:Object.assign({}, cS, { color:'#475569', maxWidth:'260px', overflow:'hidden', textOverflow:'ellipsis' }), title:it.title }, it.title),
+              h('td', { style:Object.assign({}, cS, { color:'#dc2626', fontSize:'12px' }) }, it.why));
+          }))),
+        canWrite && h('button', { type:'button', onClick:saveAsk, style:{ marginTop:'6px', background:'#1e40af', color:'#fff', border:'none', borderRadius:'6px', padding:'5px 14px', fontWeight:700, cursor:'pointer', fontSize:'13px' } }, '✓ 고른 사람으로 넣기')) : null,
+      goneN ? h('div', { style:{ marginTop:'10px' } },
+        h('div', { style:{ fontSize:'12.5px', color:'#d97706', fontWeight:700, marginBottom:'4px' } }, '캘린더에서 지워진 일정 — 근태에는 남아 있습니다'),
+        plan.gone.map(function(r){ return h('div', { key:r.id, style:{ display:'flex', gap:'8px', alignItems:'center', fontSize:'13px', padding:'3px 0', whiteSpace:'nowrap' } },
+          h('span', { style:{ fontFamily:'monospace' } }, r.date), h('b', null, nameOf(r.sid)), h('span', { style:{ color:'#64748b', overflow:'hidden', textOverflow:'ellipsis' } }, r.note || ''),
+          canWrite && h('button', { type:'button', onClick:function(){ dropGone(r); }, style:{ border:'1px solid #fecaca', color:'#dc2626', background:'#fff', borderRadius:'5px', padding:'1px 8px', cursor:'pointer', fontSize:'12px' } }, '근태에서 지우기')); })) : null));
+}
+
 function AttendanceManagement(){
   /* 휴직자도 근태 기록을 볼 수 있게 — 예전에는 목록에서 사라졌다 (2026-10-10) */ var users = getActiveUsers().concat(sortUsers((dbGet('user_accounts', USERS_SEED) || []).filter(function(x){ return x && x.status === 'leave'; })));
   var rs = useState(dbGet('attendance_records', [])); var records = rs[0]; var setRecords = rs[1];
@@ -76739,6 +76897,7 @@ function AttendanceManagement(){
   var inputS={padding:'7px 10px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12px'};
 
   return h('div',{className:'page'},
+    h(GcalAttSync, null),   // 📅 캘린더의 휴가·재택을 근태로 (2026-10-17)
     // ─ 탭
     h('div',{style:{display:'flex',gap:'4px',marginBottom:'10px',borderBottom:'1px solid #e2e8f0'}},
       [{v:'individual',label:'👤 개별'},{v:'matrix',label:'📅 월별 매트릭스 + 집계'}].map(function(t){
