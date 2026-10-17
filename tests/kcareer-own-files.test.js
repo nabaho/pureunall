@@ -71,7 +71,8 @@ test('① 같은 번호는 받은 것이 이긴다 · 다른 목록은 예전처
 
 test('① 처음 받기의 «잃을 것» 셈에서도 합치는 목록은 뺀다', () => {
   const n = (SRC.match(/KcareerNotices\.firstPullLoss\(fbGatherLS\(\), v\.ls, FB_SKIP\.concat\(FB_UNION\), TOMB_KEY\)/g) || []).length;
-  assert.ok(n >= 2, '받는 문 둘(fbFirstSync·fbNewerSync) 모두');
+  assert.ok(n >= 1, '처음 받는 문(fbFirstSync)은 잃을 것을 센다');
+  assert.ok(/KcareerNotices\.mergeLs\(fbGatherLS\(\)|KcareerNotices\.mergeLs\(here/.test(SRC), '더 새 기록을 받는 문(fbNewerSync)은 합친다 — 안 오가는 열쇠(FB_SKIP)는 넘긴다');
 });
 
 test('② 사진·도장·법인 서류는 본인 창고 자리로 오간다 — 데려오는 곳은 한 곳', () => {

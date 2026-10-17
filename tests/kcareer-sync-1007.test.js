@@ -150,8 +150,8 @@ test('★★★ ⑤ 올리기는 «내가 본 판» 위에만 — 다른 기기�
   assert.equal(서버.at, 999, '서버는 남의 판 그대로');
   assert.equal(vm.runInContext('fbGetBase()', A), 기준전, '★ 실패했는데 기준을 옮기면 다음에 남의 고침을 덮는다');
   assert.ok(vm.runInContext('_fbPendingNow()', A), '★ 못 올린 고침의 표시를 지우면 받아 오며 덮인다');
-  assert.equal(A.띠, 'newer', '사람이 고르게 띠를 띄운다');
-  assert.ok(A.알림.some((m) => /먼저 저장/.test(m)), '★ 조용히 버리지 않는다');
+  assert.notEqual(A.띠, 'newer', '★ 띠로 떠넘기지 않는다(2026-10-18) — 합쳐서 다시 올린다');
+  assert.match(cut('function _fbDoPush('), /setTimeout\(fbNewerSync/, '다른 기기가 먼저 올렸으면 합치기(fbNewerSync)로 간다');
   /* ☁ 저장 단추(force)는 «지금 서버 시각»을 막 읽어 그 위에 쓴다 */
   await vm.runInContext('_fbDoPush(3, false, {force:true})', A);
   assert.equal(A.보낸것[A.보낸것.length - 1].prevAt, 999);
