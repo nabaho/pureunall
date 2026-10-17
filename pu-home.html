@@ -168,14 +168,18 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .dcard .n em{font-size:11px;font-weight:700;color:var(--faint);font-style:normal;margin-left:1px}
 /* 상태 한 마디 — 자리를 못 박아 두어 카드마다 딱지 왼쪽 끝이 나란하다 */
 .dcard .st{flex:none;width:74px;text-align:right}
+/* 짧은 이름·짧은 표(sw)는 폰에서만 쓴다 — 아래 560px 구간 참조 */
+.dcard .sw{display:none}
 .mini{font-size:11px;font-weight:800;border-radius:6px;padding:1px 7px;white-space:nowrap;
   border:1px solid transparent;display:inline-block}
 .mini.bad{background:var(--bad-bg);color:#991b1b;border-color:#fecaca}
 .mini.ok{background:var(--ok-bg);color:#166534;border-color:#cbd5e1}
 /* «아직 안 봤다» — 색을 쓰지 않는다. 이것을 초록(깨끗함)으로 두면 조용히 틀린다 */
 .mini.none{background:#fff;color:var(--faint);border-color:var(--line)}
-/* «할 수 없다»(자문사현황) — 점선으로 «못 하는 것»임을 밝힌다 */
-.mini.dash{background:#fff;color:var(--faint);border:1px dashed #cbd5e1}
+/* «할 수 없다»(자문사현황) — 점선으로 «못 하는 것»임을 밝힌다
+   ⚠ 이름을 .dash 로 두지 말 것 — 갈래 카드판이 .dash 라, 좁은 화면 구간의 판 규칙
+     (붙박이·그림자·격자)이 이 딱지에도 그대로 얹혔다(2026-10-17 에 cant 로 떼어 냄). */
+.mini.cant{background:#fff;color:var(--faint);border:1px dashed #cbd5e1}
 
 /* 할 일 — 안내 띠를 여기 모은다. 위에 쌓아 두면 몸통 높이를 최대 34% 까지 먹었다 */
 /* 월간 자동 연결 카드 (2026-10-05) — 한 줄 = 말 · 숫자. 팔레트 밖 색을 쓰지 않는다(변수만). */
@@ -791,9 +795,24 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   .appbar .btn{padding:5px 9px;font-size:12px}
   .appbar select{padding:3px 7px;font-size:12px}
   .rail .rh{padding:4px 10px}
-  .dash{gap:3px;padding:4px 6px}
-  .dcard{padding:4px 8px;gap:6px}
-  .dcard .st{width:64px}
+  /* ── 갈래 카드판: 다섯 장을 «한 줄»에 (대표 지시 2026-10-17 「폰 화면 광고판 콤팩트 하게」) ──
+     두 장씩 놓았더니 「구성원 소개 9명 이상 없음」이 반쪽에 안 들어가 넉 줄로 쌓였고,
+     그 판이 화면 위에 붙어 다녀 폰 한 화면의 1/5 을 늘 먹었다(360px 실측 130 → 50px).
+     다섯 칸 한 줄 = 앱의 탭줄 모양. 칸 안은 「이름 / 숫자·표」 두 단이다 —
+     칸이 60px 남짓이라 그렇다(자리가 «좁아서»이고, 넓은 칸을 두 줄로 만든 것이 아니다).
+     ⚠ 이름은 짧은 이름(구성원·자문사), 상태는 짧은 표(✓ ? – !)로 바꾼다. 긴 말은 PC 에 그대로다.
+     ⚠ 할 일 수는 ✓ 자리에 «빨갛게 채운» 숫자다 — 테두리만 두르면 「9명 3」처럼 숫자 둘로 읽힌다.
+       칸 모서리 방울로 띄웠더니 좁은 칸에서 이름(「자문사」의 «사»)을 덮었다(360px 실측). */
+  .dash{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:4px 6px}
+  .dcard{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;
+    gap:0 3px;padding:3px 2px;min-width:0;text-align:center}
+  .dcard .t{grid-column:1 / -1;font-size:12px;line-height:1.3;overflow:hidden;text-overflow:ellipsis}
+  .dcard .n{margin-left:0;font-size:13px;line-height:1.3}
+  .dcard .st{width:auto;line-height:1}
+  .dcard .lw{display:none}
+  .dcard .sw{display:inline}
+  .dcard .mini{padding:1px 4px;font-size:11px;line-height:1.2}
+  .dcard .mini.bad{border-radius:9px;background:var(--bad);border-color:var(--bad);color:#fff}
   .todo .th{padding:5px 10px}
   .todo .sc{padding:5px 6px 8px}
   .job{padding:6px 9px}
@@ -923,7 +942,9 @@ PAGE_IDS.forEach(function (mid, i) {
 
 /* 왼쪽 갈래 다섯 */
 const GROUPS = [
-  { key: 'members',  label: '구성원 소개' },
+  /* short — 폰 카드판에서만 쓰는 짧은 이름. 다섯 장을 한 줄에 놓으면 칸이 60px 남짓이라
+     「구성원 소개」·「자문사현황」(다섯 글자)이 안 들어간다. 없으면 label 을 그대로 쓴다. */
+  { key: 'members',  label: '구성원 소개', short: '구성원' },
   { key: 'work',     label: '주요업무' },
   { key: 'inquiry',  label: '오시는길' },
   { key: 'greeting', label: '인사말' },
@@ -932,7 +953,7 @@ const GROUPS = [
      그래서 딱지는 늘 「대조 못 함 (그림)」이고, 올렸는지는 «사람이» 표시한다.
      못 하는 것을 「같음」으로 뭉개면 올리지도 않은 회사가 올라간 것처럼 보인다.
      목록은 푸른ERP 업체관리(data/companies)에서 읽고, 여기서 회사를 만들지 않는다. */
-  { key: 'partner',  label: '자문사현황' }
+  { key: 'partner',  label: '자문사현황', short: '자문사' }
 ];
 
 /* 자문사 표시가 남는 자리. 업체 열쇠는 업체관리의 id(co-…)를 그대로 쓴다 —
@@ -6382,17 +6403,21 @@ const OWN_CLS = { left: 'rm', leave: 'lv', none: 'ask', dup: 'ask', nobase: 'ask
      할 일 있음 → (자문사) 못 함 → 확인 안 함 → 이상 없음. */
 function statusChip(group) {
   const s = statOf(group);
+  /* 한 마디를 «긴 말(lw)·짧은 표(sw)» 두 벌로 적는다 (대표 지시 2026-10-17 「폰 화면 광고판 콤팩트」).
+     폰은 다섯 장을 한 줄에 놓느라 「이상 없음」이 안 들어가 짧은 표만, PC 는 긴 말만 보인다.
+     ★ 짧은 표도 «같은 판정»이다 — 대조 안 함(?)과 이상 없음(✓)은 폰에서도 갈린다. */
+  const two = (l, sh) => '<span class="lw">' + l + '</span><span class="sw">' + sh + '</span>';
   if (group === 'partner' && App.companiesErr) {
-    return '<span class="mini bad" title="푸른ERP 업체관리를 읽지 못했습니다">못 읽음</span>';
+    return '<span class="mini bad" title="푸른ERP 업체관리를 읽지 못했습니다">' + two('못 읽음', '!') + '</span>';
   }
-  if (s.hot) return '<span class="mini bad">할 일 ' + s.hot + '</span>';
+  if (s.hot) return '<span class="mini bad" title="할 일 ' + s.hot + '">' + two('할 일 ' + s.hot, s.hot) + '</span>';
   /* 자문사현황은 «못 한다» — 확인을 눌러도 달라지지 않는다(홈페이지가 로고 그림이다).
      「대조 안 함」으로 적으면 누르면 될 것처럼 들린다. */
   if (group === 'partner') {
-    return '<span class="mini dash" title="홈페이지가 로고 그림이라 글자 대조를 못 합니다">대조 못 함</span>';
+    return '<span class="mini cant" title="홈페이지가 로고 그림이라 글자 대조를 못 합니다">' + two('대조 못 함', '–') + '</span>';
   }
-  if (!App.check) return '<span class="mini none">대조 안 함</span>';
-  return '<span class="mini ok">이상 없음</span>';
+  if (!App.check) return '<span class="mini none" title="대조 안 함">' + two('대조 안 함', '?') + '</span>';
+  return '<span class="mini ok" title="이상 없음">' + two('이상 없음', '✓') + '</span>';
 }
 
 const GROUP_UNIT = { members: '명', work: '쪽', inquiry: '쪽', greeting: '쪽', partner: '개사' };
@@ -6415,7 +6440,8 @@ function dashHtml() {
     const n = cardCount(g.key);
     return '<button class="dcard' + (App.group === g.key ? ' on' : '') + '"'
       + ' onclick="App.go(\'' + g.key + '\')">'
-      + '<span class="t">' + esc(g.label) + '</span>'
+      + '<span class="t"><span class="lw">' + esc(g.label) + '</span>'
+      + '<span class="sw">' + esc(g.short || g.label) + '</span></span>'
       + '<span class="n">' + (n ? n + '<em>' + (GROUP_UNIT[g.key] || '개') + '</em>' : '') + '</span>'
       + '<span class="st">' + statusChip(g.key) + '</span>'
       + '</button>';
