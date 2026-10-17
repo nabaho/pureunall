@@ -8,6 +8,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const source = fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8');
+const recoveryMs = Number(/var AUTH_RECOVERY_MS = (\d+);/.exec(source)?.[1]);
+assert.ok(recoveryMs >= 10000, '모바일 인증 복원 대기 시간이 너무 짧습니다');
 const marker = 'auth.onAuthStateChanged(function(user){';
 const start = source.indexOf(marker);
 const end = source.indexOf('\n  });', start);
@@ -23,6 +25,7 @@ function boot(logoutAt) {
     window: { _puAuthAt: 100, __kkReturning: false },
     auth: { currentUser: user },
     _handled: true, _portalUid: 'U1', _portalReady: true, _authRecheckTimer: null,
+    AUTH_RECOVERY_MS: recoveryMs,
     _loginGuard: { cover() { events.push('cover'); }, userSeen() { events.push('seen'); }, shown() {} },
     _rmBootSplash() { events.push('uncover'); },
     enterPortal() { events.push('enter'); },
@@ -44,7 +47,7 @@ test('같은 사람의 인증이 잠깐 비었다 돌아오면 로그인 화면�
   b.ctx.auth.currentUser = null;
   b.fire(null);
   assert.deepEqual(b.events, ['cover']);
-  assert.equal([...b.timers.values()][0].delay, 2500);
+  assert.ok([...b.timers.values()][0].delay >= 10000);
   b.ctx.auth.currentUser = b.user;
   b.fire(b.user);
   b.run();

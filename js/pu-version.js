@@ -319,6 +319,11 @@
   }
   function applyWhenIdle() {
     if (!pendingVersion) return;
+    /* 카카오 인가코드 교환이나 포털 진입 도중 새로고침하면 1회용 코드를 잃는다. */
+    if (window.__kkReturning || window.__puPortalEntering) {
+      applyTimer = window.setTimeout(applyWhenIdle, 5000);
+      return;
+    }
     if (shouldWaitHidden(isHidden(), pendingSince, Date.now(), HIDDEN_MAX_MS)) {
       waitUntilVisible();
       applyTimer = window.setTimeout(applyWhenIdle, 30 * 60 * 1000);   // 숨은 채로 6시간이 지났는지 가끔 본다
@@ -337,7 +342,7 @@
      ⚠ 저장 중일 때만은 예외다. 저장이 끝나기 전에 새로 열면 쓰던 것이 날아간다.
         그때는 예약만 해 두고(원래 길이 이어받는다) 거짓을 돌려준다. */
   function applyNow() {
-    if (!pendingVersion || saveBlocked) return false;
+    if (!pendingVersion || saveBlocked || window.__kkReturning || window.__puPortalEntering) return false;
     var version = pendingVersion;
     pendingVersion = null;
     doApply(version);
