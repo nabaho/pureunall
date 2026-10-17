@@ -211,7 +211,9 @@ test('ⓘ 종료 서식 — 옮기기·되살리기 배선(한 건만 거래로,
   assert.match(SRC, /text: '↩ 되살리기'/);
 });
 test('ⓘ 내용 고치기 — 한글 원본을 저장소 안 편집기로 고쳐 새 원본으로(이전 원본은 보관함에)', () => {
-  assert.match(SRC, /host\.hwpEdit && hwpOrigOf\(fm\)\) \? el\('button'[^\n]*text: '✏ 내용 고치기'/, '도구줄에 단추');
+  /* 규칙은 «편집기가 있고 한글 원본이 있을 때 도구줄에 단추» — 조건을 변수로 묶어도(폰 ⋯ 줄과 함께 쓰려고, 2026-10-17) 깨지지 않게 둘로 나눠 본다 */
+  assert.match(SRC, /host\.hwpEdit && hwpOrigOf\(fm\)/, '내용 고치기는 편집기(host.hwpEdit)와 한글 원본이 있을 때만');
+  assert.match(SRC, /el\('button'[^\n]*text: '✏ 내용 고치기'/, '도구줄에 단추');
   const i = SRC.indexOf('function editOriginal(fm) {'), j = SRC.indexOf('function del(fm) {', i);
   const f = SRC.slice(i, j);
   assert.match(f, /host\.hwpEdit\(u8, src\.name\)/, '저장소 안 편집기만(외부로 안 나간다)');
