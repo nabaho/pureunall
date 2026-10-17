@@ -194,3 +194,21 @@ test('⑤ 즐겨찾기 — 폰에서 떠 있는 손잡이는 숨고 머리 ⭐ �
   r.api.favDown(b); r.api.favOpen(b);
   assert.equal(opened, 2, '한 번 닫은 뒤에는 다시 열려야 합니다');
 });
+
+test('⑥ 컨설턴트 모집 표 — 폰에서 카드(제목이 첫 줄), 옛 «세로 쌓기»는 되살리지 않는다', () => {
+  /* 옛 규칙: 칸 너비를 못박은 표(.rec-fixed) 안에서 줄을 block 으로 쌓자 줄 전체가 첫 칸(32px)에 갇혀 한 글자씩 내려갔다 */
+  assert.doesNotMatch(bare(CSS), /\.rec-hits tr\{display:block/, '옛 세로 쌓기 규칙이 돌아왔습니다 — 폰에서 한 글자씩 내려갑니다');
+  const R = rules(phoneBlock().body);
+  assert.ok(R.some((r) => r.sel.includes('.rec-hits') && /display:block/.test(r.body)), '표 자체를 풀지 않으면 줄이 첫 칸에 갇힙니다');
+  assert.ok(R.some((r) => r.sel.includes('.rec-hits tbody tr') && r.sel.includes('#recTb tr') && /display:flex/.test(r.body) && /flex-wrap:wrap/.test(r.body)));
+  assert.ok(R.some((r) => r.sel.includes('.rec-hits tbody td.tt') && r.sel.includes('#recTb td.onm') && /order:-1/.test(r.body) && /flex:1 0 100%/.test(r.body)),
+    '제목(기관)이 첫 줄을 차지해야 합니다');
+  /* ☐·№ 는 숨기지 않고 왼쪽에 붙인다 */
+  assert.ok(R.some((r) => r.sel.includes('.rec-hits tbody td.chk') && /position:absolute/.test(r.body) && !/display:none/.test(r.body)));
+  /* 칸 이름표 — 폰 카드가 자리를 정하는 데 쓴다 */
+  const r = runApp({ recruit_scan: [{ y: String(new Date().getFullYear()), name: new Date().getFullYear() + ' 지방공기업평가원 자문위원 신청서', t: 0 }] });
+  r.ctx.recDraw();
+  const tb = r.el('recTb').innerHTML;
+  ['onm', 'omo', 'oyr', 'ost', 'act'].forEach((c) => assert.match(tb, new RegExp('<td class="' + c + '"'), '지원 이력 칸 이름표 ' + c + ' 가 없습니다'));
+  assert.match(src, /'<td class="kd"><span class="sml">'\+ki\.icon/, '갈래 칸 이름표(kd)가 없습니다 — 폰에서 못 숨깁니다');
+});
