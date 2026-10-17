@@ -527,7 +527,23 @@
   .wkh.td{color:var(--acc);border-bottom-color:var(--acc)}
   .wkc{min-width:0;border-radius:6px;padding:1px}
   .wkc.td{background:#f8fafc}
-  .wkc .wklog{font-size:11px;line-height:1.4;padding:1px 3px;word-break:break-all}
+  /* 칸의 기록은 «한 줄 + …» (대표 지시 2026-08-30 표의 한 칸은 한 줄) — 전체는 눌러서 창으로(wkLogOpen).
+     ⚠ 예전에는 좁은 칸에서 글자 단위로 줄바꿈되어 메일 한 줄이 네댓 줄로 내려갔다(2026-10-17 보고). */
+  .wkc .wklog{font-size:11px;line-height:1.4;padding:1px 3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+    cursor:pointer;position:relative;border-radius:4px}
+  .wkc .wklog:hover{background:#eff6ff}
+  /* ✎ ✕ 는 마우스를 올릴 때만, 글자 «위에» 겹쳐 뜬다 — 자리를 먹으면 한 줄이 더 짧아진다 */
+  .wkc .wklog .lgbox{display:none;position:absolute;right:0;top:0;bottom:0;padding-left:12px;
+    background:linear-gradient(90deg,transparent,#eff6ff 10px);align-items:center}
+  .wkc .wklog:hover .lgbox{display:inline-flex}
+  .wkc .wklog .lgbox .lgx{opacity:.85}
+  /* 요일 칸 입력칸 옆 «⤢» — 크게 쓰는 창(wkBigOpen). 터치 화면에는 호버가 없어 늘 보인다 */
+  .wkinw{display:block;position:relative}
+  .wkbig{position:absolute;right:3px;top:50%;transform:translateY(-50%);font-size:12px;line-height:18px;
+    padding:0 5px;border-radius:5px;background:#eff6ff;color:#2563eb;cursor:pointer;opacity:0;user-select:none}
+  .wkinw:hover .wkbig,.wkinw:focus-within .wkbig{opacity:1}
+  @media (hover:none){ .wkbig{opacity:1} }
+  .wkbig:hover{background:#bfdbfe}
   .wkc .wkin{font-size:11.5px;padding:3px 5px;border-color:transparent;background:transparent;margin-top:1px}
   .wkc .wkin:hover{border-color:#bfdbfe;background:#fff}
   .wkc .wkin:focus{border-color:var(--acc);background:#fff;outline:none}
@@ -870,7 +886,7 @@
   .wksep::after{content:"";flex:1;height:1px;background:#e2e8f0}
   .fe{display:flex;gap:10px;padding:5px 0;font-size:12.5px;align-items:baseline}
   .fe .dt{width:58px;flex-shrink:0;color:var(--faint);font-size:10.5px;font-variant-numeric:tabular-nums}
-  .fe .tx{flex:1;color:#1e293b;word-break:break-word}
+  .fe .tx{flex:1;color:#1e293b;word-break:break-word;white-space:pre-line}   /* 크게 쓰기 창에서 여러 줄로 적으므로 줄바꿈을 보인다 */
   .fe .by{font-size:10px;color:var(--faint);margin-left:5px}
   .wklog .by{font-size:9.5px;font-weight:700;color:#2563eb;background:#f8fafc;border-radius:3px;padding:0 4px}
   .wklog .ed{font-size:9px;color:var(--faint)}
@@ -7236,7 +7252,7 @@ function rowHTML(it,no,rowIdx){
   var logs=wkLogsOf(it._id);
   // 공동 작업이 보이도록, 내가 아닌 사람이 쓴 기록에는 작성자를 붙인다
   var logHtml=logs.map(function(l){
-    return '<div class="wklog'+(l.auto?' al':'')+'"><span class="d">'+esc(md(l.d))+'</span>'+esc(l.t)
+    return '<div class="wklog'+(l.auto?' al':'')+'" title="눌러서 전체 보기" style="cursor:pointer" onclick="wkLogOpen(\''+escJ(it._id)+'\',\''+escJ(l._id||'')+'\')"><span class="d">'+esc(md(l.d))+'</span>'+esc(l.t)
       +(l.byName&&l.byName!==(S.me&&S.me.name)?' <span class="by">'+esc(l.byName)+'</span>':'')
       +(l.ed_at?' <span class="ed" title="'+esc((l.ed_by||'')+' '+String(l.ed_at).slice(0,10)+' 수정')+'">(수정)</span>':'')
       +(l.k==='ho'?' 🔄':'')+logBtns(it._id,l)+'</div>'; }).join('');
@@ -7263,8 +7279,8 @@ function rowHTML(it,no,rowIdx){
     +colTD('my','last',lastHtml)
     +'<td class="wkcell'+(wkSplitOn()?' sp':'')+'">'
     +(wkSplitOn()?wkCellHTML(it,logs,rowIdx||0)
-      :logHtml+'<input class="wkin" data-id="'+esc(it._id)+'" placeholder="'
-        +(isCurWeek()?'이번 주 기록…':'그 주 기록 보완…')+'" onkeydown="wkKey(event,this)">')
+      :logHtml+'<span class="wkinw"><input class="wkin" data-id="'+esc(it._id)+'" placeholder="'
+        +(isCurWeek()?'이번 주 기록…':'그 주 기록 보완…')+'" onkeydown="wkKey(event,this)">'+WK_BIG_BTN+'</span>')
     +'</td>'
     +colTD('my','due',nx)
     +'<td style="text-align:center"><button class="endbtn" onclick="event.stopPropagation();completeItem(\''+escJ(it._id)+'\')" title="이 업무를 끝내고 종료 화면으로 옮깁니다'+(peLinked(it)?' (푸른이알피 종료 연동)':'')+'">종료'+(peLinked(it)?'<span class="lk">🔗</span>':'')+'</button></td>'
@@ -7378,6 +7394,126 @@ function wkHeadHTML(){
           +WDS[(dt.getDay()+6)%7]+' '+dt.getDate()+'</div>';
       }).join('')+'</div>';
 }
+/* ══════════════════════════════════════════════════════════════════════
+   주간 칸 — «크게 쓰기» 창 · «긴 기록 전체 보기» 창 (대표 지시 2026-10-17, 목업 ① 가 + ② 가)
+   ══════════════════════════════════════════════════════════════════════
+   「기록을 넣을 때 화면이 너무 작다 — 팝업처럼 창이 열려서 직접 내용을 넣을 수 있나 /
+     메일로 들어온 내용이 너무 길게 내려가면 안 보인다 — 클릭하면 팝업으로 전체를 볼 수 있나」
+   ★ 한 줄 입력칸(Enter 저장·↑↓←→ 이동)은 «그대로»다. 크게 쓰는 길을 «덧붙일» 뿐이다.
+   ★ 창에서 저장해도 지금 한 줄 입력과 «같은 길»(wkSave)을 지난다 — 오늘 이후 날짜면 «할 일»이 되는
+     규칙(isPlanDay)·주간 기록·업무별 기록·성과 집계가 똑같이 갱신된다. 저장 길을 새로 만들지 않는다.
+   ★ 칸 안의 기록은 «한 줄 + …»(표의 한 칸은 한 줄). 전체는 누르면 창으로 — 창에서 고치기·지우기도 된다.
+   ⚠ 메일 «본문 전체»는 업무관리에 없다 — 서버가 받은 미리보기(앞 160자)까지다. 본문은 푸른메일함이라
+     창에 «푸른메일함에서 열기»를 둔다. 없는 본문을 있는 척하지 않는다. */
+var WK_BIG_BTN='<span class="wkbig" onclick="event.stopPropagation();wkBigOpen(this)" title="크게 쓰기 (창으로)">⤢</span>';
+/* 칸의 기록 줄에 겹쳐 뜨는 ✎ ✕ — 권한이 없으면(logBtns 가 빈 글) 상자도 안 만든다 */
+function wkLgBox(itemId,l){ var b=logBtns(itemId,l); return b?'<span class="lgbox">'+b+'</span>':''; }
+function wkBigOpen(btn){
+  var inp=btn&&btn.parentNode&&btn.parentNode.querySelector('.wkin'); if(!inp) return;
+  var id=inp.getAttribute('data-id'), it=items[id];
+  if(!it){ toast('업무를 찾지 못했습니다','warn'); return; }
+  // 그 칸의 요일. 한 칸 보기는 오늘(지난 주는 그 주 금요일) — wkKey 와 같은 셈
+  var day=inp.getAttribute('data-d')||(isCurWeek()?todayStr():ymd(addDays(S.week,4)));
+  S._big={id:id,day:day};
+  var dow=['일','월','화','수','목','금','토'][new Date(day+'T00:00:00').getDay()]||'';
+  var today=todayStr();
+  showModal('<h2 style="margin:0 0 8px">✎ 기록 쓰기</h2>'
+    +'<div style="font-size:13px;margin-bottom:10px"><b>'+esc(it.company||it.client||'')+'</b> '+catBadge(it.cat)
+    +(itemName(it)?' <span class="muted">'+esc(itemName(it))+'</span>':'')+'</div>'
+    +'<div class="row" style="gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">'
+    +'<span class="muted" style="font-size:12px;font-weight:700;width:34px">날짜</span>'
+    +'<input type="date" id="wkb-d" value="'+esc(day)+'" onchange="wkBigHint()">'
+    +'<button type="button" onclick="wkBigDay(\''+escJ(day)+'\')">'+esc(md(day))+' ('+dow+')</button>'
+    +(day!==today?'<button type="button" onclick="wkBigDay(\''+escJ(today)+'\')">오늘 '+esc(md(today))+'</button>':'')
+    +'</div>'
+    +'<textarea id="wkb-t" rows="8" placeholder="여러 줄로 써도 됩니다" onkeydown="wkBigKey(event)" '
+    +'style="width:100%;min-height:170px;padding:10px 12px;border:1.6px solid var(--acc);border-radius:10px;font-size:13.5px;'
+    +'line-height:1.6;font-family:inherit;resize:vertical">'+esc(inp.value||'')+'</textarea>'
+    +'<div id="wkb-msg" class="muted" style="font-size:12px;min-height:18px;margin:4px 0 6px"></div>'
+    +'<div class="row" style="justify-content:flex-end;gap:8px;align-items:center">'
+    +'<span class="muted" style="font-size:11.5px;margin-right:auto">Ctrl+Enter 저장 · Esc 닫기</span>'
+    +'<button onclick="closeM()">취소</button>'
+    +'<button class="primary" id="wkb-save" onclick="wkBigSave()">저장</button></div>');
+  wkBigHint();
+  setTimeout(function(){ var t=$('wkb-t'); if(t){ t.focus(); t.setSelectionRange(t.value.length,t.value.length); } },60);
+}
+function wkBigDay(d){ var e=$('wkb-d'); if(e){ e.value=d; } wkBigHint(); }
+/* 오늘 이후 날짜면 «할 일», 아니면 «기록»으로 저장된다 — 저장 전에 알려 준다(isPlanDay 와 같은 규칙) */
+function wkBigHint(){
+  var d=(($('wkb-d')||{}).value||''), m=$('wkb-msg'); if(!m) return;
+  m.textContent=isPlanDay(d)?'오늘 이후 날짜라 «할 일»로 저장됩니다.':'';
+}
+function wkBigKey(e){
+  if(_ime(e)) return;                                   // 한글 조합 중 Enter 는 글자 확정이다
+  if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){ e.preventDefault(); wkBigSave(); }
+}
+function wkBigSave(){
+  var b=S._big; if(!b) return;
+  var t=(($('wkb-t')||{}).value||'').trim(), d=(($('wkb-d')||{}).value||'').trim(), m=$('wkb-msg');
+  if(!t){ if(m) m.textContent='내용을 적어 주세요.'; return; }
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){ if(m) m.textContent='날짜를 확인해 주세요.'; return; }
+  var btn=$('wkb-save'); if(btn) btn.disabled=true;     // 두 번 눌러도 한 번만 저장된다
+  wkSave(b.id,t,d).then(function(ok){
+    if(btn) btn.disabled=false;
+    if(!ok){ var m2=$('wkb-msg'); if(m2) m2.textContent='저장하지 못했습니다. 다시 눌러 주세요.'; return; }
+    closeM(); S._big=null;
+    if(d!==b.day) toast('✎ '+md(d)+' 에 저장했습니다');
+    route();
+  });
+}
+/* 칸의 기록 한 줄 → 전체 창 */
+function wkLogFind(itemId,lid){
+  var o=((wkCache[weekKeyOf(S.week)]||{})[itemId]||{})[lid];
+  if(!o) o=(itemLogsCache[itemId]||{})[lid];
+  if(o) o._id=lid;
+  return o||null;
+}
+function wkLogOpen(itemId,lid){
+  var l=wkLogFind(itemId,lid), it=items[itemId];
+  if(!l||!it){ toast('기록을 찾을 수 없습니다','warn'); return; }
+  var kind=String(l.sourceKind||''), isMail=kind==='mail';
+  var ico=isMail?'✉':(kind==='gcal'||kind==='schedule'||l.k==='cal')?'📅':'✎';
+  var what=isMail?'받은 메일':(kind==='gcal'||kind==='schedule')?'일정':kind==='coMail'?'사업장 메일 요약':kind==='sentDoc'?'보낸 자료':'기록';
+  var a=escJ(itemId), b=escJ(lid);
+  var mine=canLog(l,itemId);
+  showModal('<h2 style="margin:0 0 4px">'+ico+' '+esc(what)+' — '+esc(it.company||it.client||'')+'</h2>'
+    +'<div class="muted" style="font-size:12px;margin-bottom:10px">'+esc(md(l.d))
+    +(l.byName&&!l.auto?' · 작성 '+esc(l.byName):'')+(l.auto?' · <b>자동</b>으로 들어온 기록':'')
+    +(l.at?' · '+esc(String(l.at).slice(0,16).replace('T',' ')):'')
+    +(l.ed_at?' · (수정 '+esc(String(l.ed_at).slice(0,10))+')':'')+'</div>'
+    +'<div id="wkl-text" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.7;'
+    +'white-space:pre-wrap;word-break:break-word;max-height:38vh;overflow:auto">'+esc(l.t||'')+'</div>'
+    +(isMail?'<div id="wkl-mail" style="margin-top:10px"></div>':'')
+    +'<div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px;align-items:center">'
+    +(mine?'<button style="color:var(--danger);border-color:#f87171" onclick="closeM();delLog(\''+a+'\',\''+b+'\')">🗑 지우기</button>'
+          +'<button onclick="closeM();editLog(\''+a+'\',\''+b+'\')">✎ 고치기</button>':'')
+    +'<span style="flex:1"></span>'
+    +(isMail?'<button onclick="mbGo(mbCoId(items[\''+a+'\']))" title="푸른메일함의 이 사업장 메일을 엽니다">🔎 푸른메일함에서 열기 ↗</button>':'')
+    +'<button class="primary" onclick="closeM()">닫기</button></div>');
+  if(isMail) wkLogMail(l);
+}
+/* 받은 메일 줄이면 제목·보낸이·시각·미리보기를 보탠다 — 수집함을 아직 안 읽었으면 읽은 뒤에 채운다 */
+function wkLogMail(l){
+  var box=$('wkl-mail'); if(!box) return;
+  var fill=function(){
+    var bx=$('wkl-mail'); if(!bx) return;                       // 그 사이 창이 닫혔다
+    var m=null; (mailSrc||[]).forEach(function(x){ if(mailKey(x)===String(l.sourceId||'')) m=x; });
+    if(!m){
+      bx.innerHTML='<div class="muted" style="font-size:12px">이 메일을 수집함 목록에서 찾지 못했습니다(오래됐을 수 있습니다) — 푸른메일함에서 확인하세요.</div>';
+      return;
+    }
+    bx.innerHTML='<div class="lab" style="font-size:11.5px;color:var(--faint);font-weight:700;margin:6px 0 2px">제목</div>'
+      +'<div style="font-weight:700;font-size:13.5px">'+esc(String(m.subject||'(제목 없음)'))+'</div>'
+      +'<div class="muted" style="font-size:12px;margin-top:4px">'+esc(String(m.from||'(보낸이 모름)'))+' · '+esc(_mailWhen(m.at))+' 받음'
+      +(Number(m.atts||0)?' · 첨부 '+Number(m.atts)+'개':'')+'</div>'
+      +(m.preview?'<div class="lab" style="font-size:11.5px;color:var(--faint);font-weight:700;margin:8px 0 2px">미리보기 (서버가 받은 앞부분)</div>'
+        +'<div style="background:var(--bg);border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.65;color:var(--sub)">'+esc(String(m.preview))+'</div>':'')
+      +'<div class="muted" style="font-size:11.5px;margin-top:6px">본문 전체는 푸른메일함에서 봅니다.</div>';
+  };
+  if(mailSrc){ fill(); return; }
+  box.innerHTML='<div class="muted" style="font-size:12px">메일 내용을 불러오는 중…</div>';
+  mailLoad().then(fill,fill);
+}
 function wkCellHTML(it,logs,rowIdx){
   var days=wkDays(), today=todayStr(), byd={}, byp={};
   // 체크가 만든 기록은 단계 줄에 이미 나오므로 칸에 다시 그리지 않는다
@@ -7389,13 +7525,14 @@ function wkCellHTML(it,logs,rowIdx){
         return '<div class="wkc'+(d===today?' td':'')+(d===S.calDay?' pick':'')+'">'+mk
           +ps.map(function(s){ return planRowHTML(it,s); }).join('')
           +ls.map(function(l){
-              return '<div class="wklog'+(l.auto?' al':'')+'">'+esc(l.t)
+              return '<div class="wklog'+(l.auto?' al':'')+'" title="'+esc(l.t)+'  ·  눌러서 전체 보기" '
+                +'onclick="wkLogOpen(\''+escJ(it._id)+'\',\''+escJ(l._id||'')+'\')">'+esc(l.t)
                 +(l.byName&&l.byName!==(S.me&&S.me.name)?' <span class="by">'+esc(l.byName)+'</span>':'')
                 +(l.ed_at?' <span class="ed" title="'+esc((l.ed_by||'')+' '+String(l.ed_at).slice(0,10)+' 수정')+'">(수정)</span>':'')
-                +(l.k==='ho'?' 🔄':'')+logBtns(it._id,l)+'</div>';
+                +(l.k==='ho'?' 🔄':'')+wkLgBox(it._id,l)+'</div>';
             }).join('')
-          +'<input class="wkin" data-id="'+esc(it._id)+'" data-d="'+d+'" data-r="'+rowIdx+'" data-c="'+ci+'" '
-          +'placeholder="'+(isPlanDay(d)?'할 일…':'기록…')+'" onkeydown="wkKey(event,this)">'
+          +'<span class="wkinw"><input class="wkin" data-id="'+esc(it._id)+'" data-d="'+d+'" data-r="'+rowIdx+'" data-c="'+ci+'" '
+          +'placeholder="'+(isPlanDay(d)?'할 일…':'기록…')+'" onkeydown="wkKey(event,this)">'+WK_BIG_BTN+'</span>'
           +'</div>';
       }).join('')+'</div>';
 }
