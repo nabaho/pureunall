@@ -62,6 +62,20 @@
     .modal-bg{padding:10px;align-items:flex-start;overflow-y:auto}.modal{padding:17px;max-height:none;margin:8px 0;overflow-x:auto}
     .modal input,.modal select{max-width:100%}.btn{padding:9px 12px}
     .hwp-preview{min-height:300px;max-height:none}.hwp-actions{display:grid!important;grid-template-columns:1fr 1fr}.hwp-actions .btn{width:100%}
+    /* ── 📱 폰 한눈에 (대표 지시 2026-10-17 「폰 화면 한눈에 볼 수 있게 깔끔하게 모두 정리」) ──
+       ① 메뉴 줄은 «옆으로 밀지 않고» 한 줄에 다 보인다 — 「🗂 사무관리서류」 이름표는 빼고(경로가 같은 말),
+          ▾ 는 뺀다(폰에는 접을 나무가 없다 — 눌러도 아무것도 안 보이고 접힘 상태만 바뀌었다)
+       ② 칸 위 「사무관리서류 › …」 경로줄은 뺀다 — 바로 위 메뉴에서 이미 그 칸이 눌려 있다
+       ③ 계약서 양식 칸은 상자를 얇게, 옆 스크롤(overflow-x)을 풀어 «아래에 붙는 막대»(sticky)가 산다.
+          ⚠ 표 최소폭 640px 은 위임장 표(사건 목록)용이다 — 양식 목록 표에까지 걸려 이름이 잘리고
+            「원본」 칸이 화면 밖으로 밀려났다(대표 캡처 2026-10-17). 양식 목록은 js/pu-contract-forms.js 가 0 으로 푼다 */
+    .nav-grp,.nav-chev{display:none}
+    .side{gap:2px;padding:6px 6px;overflow-x:auto}
+    .side .nav{flex:1 1 0;min-width:max-content;justify-content:center;padding:8px 6px;font-size:13px}
+    .crumb{display:none}
+    .shell .main{margin:8px auto;padding:0 6px}
+    #paneForms .card{padding:8px;overflow:visible}
+    #viewList>div:first-child{flex-wrap:wrap}#viewList>div:first-child>div{flex:1 1 100%!important}
   }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
@@ -201,7 +215,7 @@
 <script src="js/esign-hwp-tpl.js?v=7"></script>
 <script src="js/pu-hwp-mark.js?v=1"></script>
 <script src="js/pu-form-cardfill.js?v=18"></script>
-<script src="js/pu-contract-forms.js?v=60"></script>
+<script src="js/pu-contract-forms.js?v=61"></script>
 <script src="js/pu-photo-store.js?v=34"></script>
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
