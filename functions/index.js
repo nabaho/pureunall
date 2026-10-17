@@ -3281,6 +3281,37 @@ exports.kakaoLink         = _kakao.kakaoLink;
 exports.kakaoUnlink       = _kakao.kakaoUnlink;
 exports.kakaoLoginFinish  = _kakao.kakaoLoginFinish;
 
+/* 📮 주소 → 우편번호 (대표 지시 2026-10-17 「우편번호찾기 기능있는데 자동으로 니가 찾아서 항상 입력해라」)
+   판단은 functions/zip-lookup.js — «한 곳으로 딱 떨어질 때만» 돌려준다. 저장은 안 한다.
+   재직 직원만 부른다(requireStaff) — 아무나 부르면 카카오 한도를 남이 쓴다.
+   서울에 둔다 — 이알피 화면이 부르는 다른 함수들과 같은 곳. */
+const ZipLookup = require("./zip-lookup");
+exports.zipLookup = functions
+  .region("asia-northeast3")
+  .runWith({ timeoutSeconds: 20, memory: "256MB", secrets: ["KAKAO_REST_KEY"] })
+  .https.onRequest(async (req, res) => {
+    setCors(req, res);
+    if (req.method === "OPTIONS") { res.status(204).send(""); return; }
+    if (req.method !== "POST") { res.status(405).json({ ok: false, error: "POST 요청만 받습니다." }); return; }
+    try {
+      await requireStaff(req);
+    } catch (e) {
+      res.status(e.status || 401).json({ ok: false, error: String(e.message || e) });
+      return;
+    }
+    const input = ZipLookup.cleanInput(req.body || {});
+    if (input.q.length < 4) { res.json({ ok: true, zip: "", road: "", n: 0, why: "주소가 짧음" }); return; }
+    const restKey = String(process.env.KAKAO_REST_KEY || "").trim();
+    if (!/^[0-9a-f]{32}$/i.test(restKey)) { res.status(500).json({ ok: false, error: "서버에 카카오 열쇠(KAKAO_REST_KEY)가 없습니다." }); return; }
+    try {
+      const r = await ZipLookup.lookupZip(Object.assign({ get: ZipLookup.kakaoGetter(restKey) }, input));
+      res.json(Object.assign({ ok: true }, r));
+    } catch (e) {
+      console.warn("[zipLookup]", e.status || "", String(e.message || e).slice(0, 120));
+      res.status(502).json({ ok: false, error: "주소검색이 응답하지 않았습니다" + (e.status ? " (" + e.status + ")" : "") });
+    }
+  });
+
 
 // ══════════ 파이어베이스 사용액 받아 적기 (2026-08-15, 대표 지시) ══════════
 // 대표님: "결제한 금액 잔여량이 얼마인지 실시간으로 확인 가능한지, 화면에 넣을 수 있는지."

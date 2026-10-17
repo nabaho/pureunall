@@ -1663,6 +1663,64 @@ function openAddressSearch(onComplete, prefill){
   initPostcode();
 }
 
+/* ── 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17 「우편번호찾기 기능있는데 자동으로 니가 찾아서 항상 입력해라」) ──
+   주소는 있는데 우편번호가 비면, 서버(zipLookup — 카카오 주소검색)에 물어 그 칸을 채운다.
+   위 openAddressSearch 의 다음 위젯은 결과를 코드로 못 읽어 사람이 한 번 눌러야 했다.
+   ⚠★ 서버는 «한 곳으로 딱 떨어질 때만» 우편번호를 준다(functions/zip-lookup.js) — 갈리면 안 넣고
+     🔍 우편번호 찾기 단추가 그대로 남는다.
+   ⚠ 주소 칸은 안 고친다 — 우편번호만 넣는다. 이미 적힌 우편번호도 안 덮는다.
+   ⚠ 저장은 사람이 «저장»을 누를 때다 — 창에 채워 둘 뿐이다.
+   ⚠ 서버로 가는 것은 주소 글자뿐이다(회사명·사람 이름은 안 간다). */
+var ZIP_LOOKUP_URL = 'https://asia-northeast3-pureun-erp.cloudfunctions.net/zipLookup';
+var _erpZipMemo = {};   // 찾을 말 → Promise<우편번호|''> — 같은 주소는 한 번만 묻는다
+function erpZipFor(addr){
+  var PA = (typeof window !== 'undefined' && window.PuAddr) || null;
+  var a = String(addr || '').trim();
+  if(!PA || a.length < 4) return Promise.resolve('');
+  var q = PA.query(a), key = PA.key(a), alt = PA.clean(a);
+  if(q.length < 4) return Promise.resolve('');
+  var memo = q + '|' + key;
+  if(_erpZipMemo[memo]) return _erpZipMemo[memo];
+  var u = null;
+  try { u = (window.firebase && firebase.auth && firebase.auth().currentUser) || null; } catch(e){}
+  if(!u) return Promise.resolve('');
+  var p = u.getIdToken().then(function(tok){
+    return fetchT(ZIP_LOOKUP_URL, { method:'POST',
+      headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer ' + tok },
+      body: JSON.stringify({ q:q, key:key, alt:alt }) }, 15000);
+  }).then(function(r){
+    if(!r.ok) throw new Error('zipLookup ' + r.status);
+    return r.json();
+  }).then(function(j){
+    return (j && j.ok && /^\d{5}$/.test(String(j.zip || ''))) ? String(j.zip) : '';
+  }).catch(function(e){
+    delete _erpZipMemo[memo];   // 그물·서버 탓이면 다음에 다시 묻는다 — «없음»으로 굳히지 않는다
+    console.warn('[우편번호 자동]', e && e.message || e);
+    return '';
+  });
+  _erpZipMemo[memo] = p;
+  return p;
+}
+/* 창마다 한 줄: useAutoZip(주소, 우편번호, function(우편번호, 그때주소){ … 칸에 넣기 … }).
+   put 은 «그때주소»가 지금도 같고 우편번호가 아직 비었을 때만 넣어야 한다(setF 안에서 다시 본다).
+   ⚠ 타자 치는 동안 묻지 않게 잠깐(0.7초) 기다렸다 묻는다. */
+function useAutoZip(addr, zip, put){
+  var a = String(addr || '').trim();
+  var empty = !String(zip || '').trim();
+  useEffect(function(){
+    if(!empty || a.length < 4) return;
+    var live = true;
+    var t = setTimeout(function(){
+      erpZipFor(a).then(function(z){
+        if(!live || !z) return;
+        put(z, a);
+        showToast('📮 우편번호 ' + z + ' — 적어 둔 주소로 찾아 넣었습니다');
+      });
+    }, 700);
+    return function(){ live = false; clearTimeout(t); };
+  }, [a, empty]);
+}
+
 // ============ 편의기능 패키지 v1 (CONVENIENCE PACK) ============
 // 1) 입력 자동 포맷팅 (사업자번호/전화/우편번호) - blur 시 자동 하이픈
 // 2) Enter → 다음 필드 이동
@@ -20862,6 +20920,34 @@ function ContractModal(props){
   var _initialSnapS = useState(function(){ return JSON.stringify(init); }); var initialSnap = _initialSnapS[0];
   var savedRef = useState({ value:false })[0];  // 저장 성공 플래그
 
+  /* 📮 우편번호 저절로 넣기 — 사업장 주소·본사주소 (대표 지시 2026-10-17, useAutoZip 머리말).
+     아무것도 안 고친 창이면 «처음 모양»도 함께 옮긴다 — 안 그러면 열어 보기만 해도 닫을 때
+     「저장 안 된 변경사항」이 거짓으로 뜬다(근로자 비밀 칸 useErpWorkerSecret 과 같은 방식). */
+  function zipKeepPristine(prev, next){
+    if(JSON.stringify(prev) === _initialSnapS[0]) _initialSnapS[1](JSON.stringify(next));
+  }
+  useAutoZip(f.company && f.company.address, f.company && f.company.zipcode, function(z, a){
+    setF(function(prev){
+      var c = prev.company || {};
+      if(String(c.zipcode || '').trim() || String(c.address || '').trim() !== a) return prev;
+      var next = Object.assign({}, prev, { company: Object.assign({}, c, { zipcode: z }) });
+      zipKeepPristine(prev, next);
+      return next;
+    });
+  });
+  // 본사주소는 「(우편번호) 주소」 한 줄 글자다 — 아래 본사주소 칸 머리말(새 칸을 안 만든 까닭) 참고
+  var _headZipM = /^\((\d{3,7})\)\s*(.*)$/.exec(String((f.company && f.company.addressDetail) || ''));
+  useAutoZip(_headZipM ? _headZipM[2] : (f.company && f.company.addressDetail), _headZipM ? _headZipM[1] : '', function(z, a){
+    setF(function(prev){
+      var c = prev.company || {};
+      var d = String(c.addressDetail || '').trim();
+      if(/^\(\d{3,7}\)/.test(d) || d !== a) return prev;
+      var next = Object.assign({}, prev, { company: Object.assign({}, c, { addressDetail: '(' + z + ') ' + d }) });
+      zipKeepPristine(prev, next);
+      return next;
+    });
+  });
+
   // 자동 임시저장 (1초 디바운스)
   // SEQ124: stringify·비교를 타이머 안으로 이동 — 이미지(base64) 포함 시 키 입력마다
   // 수 MB 직렬화로 입력이 굳던 문제 수정. 입력 중에는 무거운 작업 없음.
@@ -31102,6 +31188,13 @@ function CompanyEditModal(props){
   useEscClose(props.onClose);
   useEnterSave(function(){ var saveBtn=document.querySelector('.modal-bg .modal .btn-primary'); if(saveBtn) saveBtn.click(); });
   var s = useState(props.cur); var f = s[0]; var setF = s[1];
+  /* 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17 「…자동으로 니가 찾아서 항상 입력해라」, useAutoZip 머리말) */
+  useAutoZip(f.address, f.zipcode, function(z, a){
+    setF(function(prev){
+      if(String(prev.zipcode || '').trim() || String(prev.address || '').trim() !== a) return prev;
+      return Object.assign({}, prev, { zipcode: z });
+    });
+  });
   var pcpk = useState(null); var pcPickMode = pcpk[0]; var setPcPickMode = pcpk[1];  // 기업정보함 찾기: 'ceo' | 'contact' | 'tax'
   var txh = useState([]); var taxHits = txh[0]; var setTaxHits = txh[1];             // 세무사무실 자동완성 후보
   var pccp = useState(false); var pcCoPick = pccp[0]; var setPcCoPick = pccp[1];     // 기업정보함에서 사업자등록증(회사정보) 찾기
@@ -70259,6 +70352,13 @@ function ProjectEditModal(props){
       return [];
     })()
   })); var f = s[0]; var setF = s[1];
+  /* 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17 「…자동으로 니가 찾아서 항상 입력해라」, useAutoZip 머리말) */
+  useAutoZip(f.address, f.zipcode, function(z, a){
+    setF(function(prev){
+      if(String(prev.zipcode || '').trim() || String(prev.address || '').trim() !== a) return prev;
+      return Object.assign({}, prev, { zipcode: z });
+    });
+  });
   function set(k){ return function(e){
     var v = e.target.type === 'number' ? (parseInt(e.target.value||0,10)||0) : e.target.value;
     setF(function(prev){ return Object.assign({}, prev, (function(){var x={}; x[k]=v; return x;})()); });
@@ -71546,6 +71646,14 @@ function StaffRosterModal(props){
     education:'대졸', memo:''
   };
   var s = useState(init); var f = s[0]; var setF = s[1];
+  /* 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17, useAutoZip 머리말) — 이 창은 칸 이름이 zipCode 다.
+     서버로 가는 것은 주소 글자뿐이다(이름·주민번호는 안 간다) — 🔍 검색 단추도 같은 주소를 카카오에 보낸다. */
+  useAutoZip(f.address, f.zipCode, function(z, a){
+    setF(function(prev){
+      if(String(prev.zipCode || '').trim() || String(prev.address || '').trim() !== a) return prev;
+      return Object.assign({}, prev, { zipCode: z });
+    });
+  });
   var tb = useState(props.initialTab || 'basic'); var tab = tb[0]; var setTab = tb[1];
   useEffect(function(){ if(props.initialTab) setTab(props.initialTab); }, [props.initialTab]);
   // 부모가 user 갱신 시 폼 state 동기화 (저장 후 다음 탭 이동 시)
