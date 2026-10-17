@@ -270,3 +270,11 @@ test('★ 폰 띠 첫 줄은 좁은 만큼 «그림·낱말»만 접는다 — �
   assert.match(F, /\(sp>0 \? label\.slice\(sp\+1\) : label\)\+' '\+cnt,/);
   assert.match(F, /h\('span',\{className:'ld-tab-todo-w'\},'미처리 '\),todo\)/);
 });
+
+test('★ 떠 있는 공용 단추(즐겨찾기·최신)를 목록이 비켜 선다 — 줄 끝 금액·맨 끝 줄이 안 가린다', () => {
+  /* 412px 실측: 오른쪽 「즐겨찾기」 손잡이(폭 25px)가 금액 끝 13px 를, 「● 최신」이 맨 끝 줄을 덮었다.
+     두 단추는 24개 앱 공용이라 옮기지 않고 목록이 비킨다. 값이 아니라 «비키는 규칙이 있는가»를 본다. */
+  const pr = PHONE.match(/\.ld-xt tbody tr, \.ld-tb tbody tr\{ padding-right:(\d+)px !important; \}/);
+  assert.ok(pr && Number(pr[1]) > 8, '★ 줄 오른쪽 여백이 없어 즐겨찾기 손잡이가 금액을 가린다');
+  assert.match(PHONE, /\.ld-xt tfoot, \.ld-tb tfoot\{ margin-bottom:\d+px; \}/, '★ 맨 끝 줄이 최신 단추 밑에 깔린다');
+});

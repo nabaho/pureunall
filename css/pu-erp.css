@@ -990,8 +990,9 @@ button{ font-family:inherit !important; }
            flex-wrap:wrap !important; }
   .ld-bar button{ font-size:10.5px !important; padding:4px 8px !important; }
   /* 접었을 때는 탭 둘과 ⚙ 가 한 줄에 들어가야 한다.
-     ⚠ 옛 10px 은 칸 셋에 일곱 개를 넣던 때 값이다 — 이제 첫 줄에 넷뿐이라 읽히는 크기로 올린다. */
-  .ld-bar:not(.on) .ld-tab{ font-size:11.5px !important; padding:3px 8px !important; }
+     ⚠ 옛 10px 은 칸 셋에 일곱 개를 넣던 때 값이다 — 이제 첫 줄에 넷뿐이라 12px(재무 글자 하한,
+       대표 지시 2026-10-12)로 올린다. */
+  .ld-bar:not(.on) .ld-tab{ font-size:12px !important; padding:3px 8px !important; }
   .ld-bar select{ font-size:11.5px !important; padding:3px 6px !important; }
   .ld-bar .ld-bar-nav button{ height:26px !important; padding:0 7px !important; }
   .ld-bar .ld-bar-prog{ flex:1 1 60px !important; min-width:56px !important; }
@@ -1166,9 +1167,9 @@ button{ font-family:inherit !important; }
   .ld-xt tbody td{ display:block; padding:0 !important; border:none !important;
                    min-width:0; max-width:none !important; }
   .ld-xt .ld-x-chk { grid-column:1; grid-row:1 / 3; text-align:center; }
-  .ld-xt .ld-x-no  { grid-column:2; grid-row:1 / 3; font-size:11.5px !important; }
+  .ld-xt .ld-x-no  { grid-column:2; grid-row:1 / 3; font-size:12px !important; }
   /* 줄1 — 날짜 · 적요 · 금액 */
-  .ld-xt .ld-x-date{ grid-column:3; grid-row:1; font-size:11.5px !important; color:#94a3b8; }
+  .ld-xt .ld-x-date{ grid-column:3; grid-row:1; font-size:12px !important; color:#94a3b8; }
   .ld-xt .ld-x-memo{ grid-column:4; grid-row:1; font-size:13px !important; }
   .ld-xt .ld-x-amt { grid-column:5; grid-row:1; text-align:right; font-size:13.5px !important; }
   /* 줄2 — 카드 · 고르개 · 등록 (고르개가 적요 바로 아래 선다) */
@@ -1197,15 +1198,27 @@ button{ font-family:inherit !important; }
 
   /* 고른 것 띠 — 고르개를 한 치수 줄여 한 줄에 */
   .ld-x-sel select{ font-size:12.5px !important; min-height:32px !important; }
+
+  /* ── 떠 있는 공용 단추를 «피한다» (대표 2026-10-17 「이상한 곳 찾고 한 화면에 모두 보이게」) ──
+     오른쪽 가장자리 「즐겨찾기」 손잡이(폭 25px, 화면 세로 한가운데)가 줄 끝 금액을 13px 가렸고,
+     오른쪽 아래 「● 최신」 단추가 목록 맨 끝 줄을 덮었다(412px 실측).
+     ⚠ 두 단추는 24개 앱 공용이라 자리를 옮기지 않는다 — 이 목록이 비켜 선다.
+       오른쪽 여백 14px(손잡이가 가리는 만큼) · 맨 끝에 46px(최신 단추 높이 + 틈). */
+  .ld-xt tbody tr, .ld-tb tbody tr{ padding-right:14px !important; }
+  .ld-xt tfoot, .ld-tb tfoot{ margin-bottom:46px; }
 }
 /* 폰 첫 줄(📆 오늘 · 입금 · 출금 · ⚙)이 «한 줄»에 앉도록, 좁은 만큼 차례로 접는다.
    412px 에서 「📆 오늘 3 · 입금 206 · 미처리 12 · 출금 304 · 미처리 269 · ⚙ 도구」는 넘쳤다(실측).
    ⚠ 숫자는 끝까지 접지 않는다 — 접는 것은 그림·낱말뿐이고 뜻은 title 에 남는다. */
 @media (max-width:440px){
+  /* 보는 종류 줄도 «한 줄» — 360px 에서 「📱」 칩이 둘째 줄로 떨어졌다(실측) */
+  .ld-src-row{ gap:4px !important; }
+  .ld-src{ padding:4px 8px; }
+  .ld-src-alert{ padding:4px 7px !important; }
   .ld-bar:not(.on){ gap:4px !important; }
   .ld-bar:not(.on) .ld-tools-w,
   .ld-bar:not(.on) .ld-tab-ico{ display:none; }
-  .ld-bar:not(.on) .ld-tab{ padding:3px 7px !important; }
+  .ld-bar:not(.on) .ld-tab{ padding:3px 6px !important; }
 }
 /* 아주 좁은 폰(≤380px · 글자를 키워 둔 폰도 여기 든다) — 「미처리」 낱말까지 접는다(「출금 304 · 269」) */
 @media (max-width:380px){

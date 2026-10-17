@@ -173,7 +173,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=17">
+<link rel="stylesheet" href="css/pu-erp.css?v=18">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -53136,34 +53136,60 @@ function FinanceLedger(props){
 
   return h('div',{style:{padding:'0 2px'}},
 
+    /* ══ 입금 사업장 확인 창 — 촘촘하게 (대표 지시 2026-10-17 「팝업창 너무 크게 나온다」) ══
+       폰에서 한 건이 화면 ⅓(약 330px)을 먹어 83건 가운데 한 건 반만 보였다. 까닭이 셋이었다 —
+         ㉠ 480px 아래 공용 줄바꿈 규칙([style*="display: flex"][style*="gap"])이 머리줄을 접어
+            ✕ 가 제목 아래 «혼자 한 줄»로 떨어졌다 → 머리줄·줄마다 flexWrap:'nowrap' 를 못 박는다
+         ㉡ 단추 셋이 «폭 150px 이상»이라 한 줄에 하나씩 세로로 쌓였다 → 짧은 이름으로 한 줄에
+            (「거래내역에서 이 입금 보기」→「📄 거래내역」 — 긴 뜻은 title. 360px 에서도 안 잘리게)
+         ㉢ 「계좌번호 680******45904」(늘 같은 우리 통장)가 입금자 이름을 둘째 줄로 밀었다
+            → 이름만 앞에 두고 온전한 적요는 title 에 남긴다
+       ★ 한 건 = 「금액 · 입금자 ··· 상태」 / 「날짜 · 할 일」 / 단추 한 줄 → 약 100px(폰에 대여섯 건).
+       ⚠ 머리줄은 붙어 있고 목록만 구른다 — 아래로 내려가도 ✕ 와 건수가 늘 보인다. */
     hanaAlertOpen && _meNow().isAdmin && h('div',{role:'dialog','aria-modal':'true','aria-label':'입금 사업장 확인 알림',
       onClick:function(){setHanaAlertOpen(false);},
-      style:{position:'fixed',inset:0,zIndex:10045,background:'rgba(15,23,42,.62)',display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}},
+      style:{position:'fixed',inset:0,zIndex:10045,background:'rgba(15,23,42,.62)',display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}},
       h('div',{onClick:function(e){e.stopPropagation();},
-        style:{width:'min(560px,100%)',maxHeight:'min(78vh,720px)',overflow:'auto',background:'#fff',borderRadius:'18px',padding:'20px',boxShadow:'0 24px 70px rgba(15,23,42,.35)'}},
-        h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',marginBottom:'12px'}},
-          h('div',null,
-            h('strong',{style:{fontSize:'19px',color:'#1e293b'}},'💰 입금 사업장 확인 '+hanaAlerts.length+'건'),
-            h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},'총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다')),
-          h('button',{onClick:function(){setHanaAlertOpen(false);},'aria-label':'닫기',style:{border:0,background:'#f8fafc',borderRadius:'9px',width:'34px',height:'34px',cursor:'pointer',fontSize:'18px'}},'×')),
-        !hanaAlerts.length && h('div',{style:{padding:'28px 8px',textAlign:'center',color:'#64748b'}},'확인할 새 입금이 없습니다.'),
+        style:{width:'min(480px,100%)',maxHeight:'min(76vh,620px)',display:'flex',flexDirection:'column',overflow:'hidden',
+          background:'#fff',borderRadius:'14px',boxShadow:'0 24px 70px rgba(15,23,42,.35)'}},
+        h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'nowrap',flexShrink:0,
+            padding:'10px 10px 9px 14px',borderBottom:'1px solid #e2e8f0'}},
+          h('strong',{style:{fontSize:'15px',color:'#1e293b',whiteSpace:'nowrap'}},'💰 입금 사업장 확인 '+hanaAlerts.length+'건'),
+          h('span',{title:'총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다',
+            style:{flex:'1 1 auto',minWidth:0,fontSize:'12px',color:'#94a3b8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
+            '총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다'),
+          h('button',{onClick:function(){setHanaAlertOpen(false);},'aria-label':'닫기',
+            style:{flexShrink:0,border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:'8px',width:'32px',height:'32px',minHeight:'32px',
+              cursor:'pointer',fontSize:'18px',lineHeight:1,padding:0,color:'#475569'}},'×')),
+        h('div',{style:{overflow:'auto',padding:'8px 10px 4px'}},
+        !hanaAlerts.length && h('div',{style:{padding:'24px 8px',textAlign:'center',color:'#64748b'}},'확인할 새 입금이 없습니다.'),
         hanaAlerts.map(function(a){
           var missing=a.officeStatus!=='matched';
-          return h('div',{key:a.alertKey,style:{border:'1px solid '+(missing?'#fde68a':'#bfdbfe'),background:missing?'#fffbeb':'#eff6ff',borderRadius:'12px',padding:'13px',marginBottom:'9px'}},
-            h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',alignItems:'flex-start'}},
-              h('div',null,
-                h('strong',{style:{fontSize:'16px',color:'#1e293b'}},Number(a.amount||0).toLocaleString('ko-KR')+'원 입금'),
-                h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},String(a.date||'')+' · '+String(a.memo||'입금'))),
-              h('span',{style:{fontSize:'13px',fontWeight:800,color:missing?'#d97706':'#2563eb',whiteSpace:'nowrap'}},missing?'확인 필요':'후보 확인됨')),
-            h('div',{style:{marginTop:'9px',fontSize:'13px',fontWeight:800,color:missing?'#854d0e':'#1e40af'}},
-              missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('입금 사업장 후보: '+String(a.companyName||'확인 필요'))),
-            h('div',{style:{display:'flex',gap:'7px',marginTop:'11px',flexWrap:'wrap'}},
+          var memo=String(a.memo||'입금');
+          /* 「계좌번호 680******45904 신수진」 → 「신수진」 (보이는 것만 줄인다 — 온전한 적요는 title) */
+          var who=memo.replace(/^\s*계좌번호\s*\S+\s*/,'').trim() || memo;
+          var line={display:'flex',alignItems:'center',gap:'6px',flexWrap:'nowrap',minWidth:0};
+          var btn={flex:'1 1 auto',minWidth:0,padding:'6px 6px',borderRadius:'7px',fontSize:'12.5px',fontWeight:800,
+            cursor:'pointer',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontFamily:'inherit'};
+          return h('div',{key:a.alertKey,style:{border:'1px solid '+(missing?'#fde68a':'#bfdbfe'),background:missing?'#fffbeb':'#eff6ff',borderRadius:'10px',padding:'8px 10px',marginBottom:'6px'}},
+            h('div',{style:line},
+              h('strong',{style:{fontSize:'15px',color:'#1e293b',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}},Number(a.amount||0).toLocaleString('ko-KR')+'원'),
+              h('span',{title:memo,style:{flex:'1 1 auto',minWidth:0,fontSize:'13px',fontWeight:700,color:'#1e293b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},who),
+              h('span',{style:{flexShrink:0,fontSize:'12px',fontWeight:800,color:missing?'#d97706':'#2563eb',whiteSpace:'nowrap'}},missing?'확인 필요':'후보 확인됨')),
+            h('div',{title:missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('입금 사업장 후보: '+String(a.companyName||'확인 필요')),
+              style:{marginTop:'2px',fontSize:'12px',color:missing?'#854d0e':'#1e40af',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
+              h('span',{style:{color:'#64748b',fontVariantNumeric:'tabular-nums'}},String(a.date||'').slice(5,16)+' · '),
+              missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('🏢 '+String(a.companyName||'확인 필요'))),
+            h('div',{style:Object.assign({},line,{gap:'5px',marginTop:'6px'})},
               /* 2026-09-27 — 짝 맞추기 추천은 거래내역에 있다. 그 줄을 바로 연다 */
-              h('button',{onClick:function(){hanaJumpTo(a);},title:'거래내역에서 이 입금 줄을 열어 짝 맞추기 추천을 봅니다',style:{flex:'1 1 150px',padding:'9px',border:'1px solid #bfdbfe',background:'#eff6ff',color:'#1e40af',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'거래내역에서 이 입금 보기'),
-              a.officeStatus==='missing' && h('button',{onClick:function(){setHanaAlertOpen(false);window.navigateTo('biz/contract');},title:'맞는 계약이 아직 없으면 먼저 만듭니다',style:{flex:'1 1 150px',padding:'9px',border:'1px solid #fbbf24',background:'#fff',color:'#854d0e',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'계약 먼저 만들기'),
-              h('button',{onClick:function(){resolveHanaAdminAlert(a);},style:{flex:'1 1 130px',padding:'9px',border:0,background:'#2563eb',color:'#fff',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'확인 완료'))
+              h('button',{onClick:function(){hanaJumpTo(a);},title:'거래내역에서 이 입금 줄을 열어 짝 맞추기 추천을 봅니다',
+                style:Object.assign({},btn,{border:'1px solid #bfdbfe',background:'#ffffff',color:'#1e40af'})},'📄 거래내역'),
+              a.officeStatus==='missing' && h('button',{onClick:function(){setHanaAlertOpen(false);window.navigateTo('biz/contract');},title:'맞는 계약이 아직 없으면 먼저 만듭니다',
+                style:Object.assign({},btn,{border:'1px solid #fbbf24',background:'#ffffff',color:'#854d0e'})},'📝 계약 만들기'),
+              h('button',{onClick:function(){resolveHanaAdminAlert(a);},
+                style:Object.assign({},btn,{border:0,background:'#2563eb',color:'#ffffff'})},'✓ 확인 완료'))
           );
-        })
+        }))
       )
     ),
 
@@ -54655,7 +54681,8 @@ function FinanceLedger(props){
                       +' · 다음 달부터는 저절로 됩니다');
                   },style:{flex:'1 1 auto',minWidth:0,width:'100%',fontSize:'13px',padding:'3px 5px',border:'1px solid #e2e8f0',borderRadius:'4px',
                     background:cat?'#fffbeb':'#fff',color:cat?'#854d0e':'#475569',fontWeight:cat?700:400}},
-                    h('option',{value:''},'-- 카테고리 선택 --'),
+                    /* 「-- … --」 를 뗐다 — 폰 카드의 좁은 고르개에서 「-- 카테고리 선」으로 잘렸다 */
+                    h('option',{value:''},'카테고리 선택'),
                     EXP_CATS.map(function(c){return h('option',{key:c.code,value:c.code},c.name);})
                   ),
                   learned>0 && h('span',{title:'같은 적요로 '+learned+'회 등록한 카테고리입니다',
