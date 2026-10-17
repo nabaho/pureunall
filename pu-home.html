@@ -813,6 +813,21 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   .dcard .sw{display:inline}
   .dcard .mini{padding:1px 4px;font-size:11px;line-height:1.2}
   .dcard .mini.bad{border-radius:9px;background:var(--bad);border-color:var(--bad);color:#fff}
+  /* ── 경력 줄: 글칸에 자리를 몰아준다 (대표 지시 2026-10-17 「캡처하면 컴팩트하게 좀 정리해달라」) ──
+     글칸이 411px 폰에서 161px, 360px 폰에서 110px 뿐이라 경력 글이 일곱 자 남짓에서 잘렸다.
+     손잡이·번호·現前·▲▼✕ 와 그 사이 틈이 나머지를 다 먹고 있었다.
+     ⚠ 단추는 «빼지 않는다» — 폰은 끌기(⣿)가 잘 안 먹어 ▲▼ 가 유일한 길이다. 숨만 줄인다.
+     ⚠ 줄은 그대로 «한 줄»이다. 글씨 16px 도 그대로다(아이폰 확대 막이 — phone-input-zoom). */
+  .car{padding:2px}
+  .car .l{gap:3px;padding:2px}
+  .car .grip{width:10px}
+  .car .l .no{width:16px;font-size:11px}
+  .car .era > button{padding:4px}
+  .car .l input{padding:3px 4px}
+  /* 단추는 줄 높이를 꽉 채운다 — 폭이 좁아진 만큼 위아래로 누를 자리를 준다 */
+  .car .l .x{align-self:stretch;padding:0 3px}
+  /* ✕ 는 ▼ 와 살짝 띄운다 — 붙어 있으면 내리려다 지운다 */
+  .car .l .x[title="줄 삭제"]{margin-left:3px}
   .todo .th{padding:5px 10px}
   .todo .sc{padding:5px 6px 8px}
   .job{padding:6px 9px}
