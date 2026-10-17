@@ -1381,6 +1381,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-addr.js?v=2"></script>
+<script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
@@ -13566,7 +13567,7 @@ function renderPersonal(){ const g=document.getElementById('piGrid'); if(!g) ret
         +`<div style="display:flex;gap:6px"><input id="pi-${k}" type="password" autocomplete="off" value="${v}" style="flex:1">`
         +`<button type="button" class="btn sm" onclick="piPeek('${k}',this)" title="잠깐 보기">보기</button></div></div>`;
     }).join('')+`</div></div>`).join('');
-  renderPersonalDocs(); renderPiEdu(); }
+  renderPersonalDocs(); renderPiEdu(); piAutoZip(); }
 /* ===== 한자 성명 고르기 =====
    ⚠ 후보를 «고르게만» 한다. 같은 소리에 한자가 여럿이고 어느 것이 본인 이름인지는
       본인만 안다 — 지어서 넣으면 위촉 서류에 틀린 이름이 박힌다.
@@ -19970,7 +19971,7 @@ function renderFirmTab(){
       : (lv ? '<span class="firm-src loc">여기서 적음</span>' : '<span class="firm-src none">비어 있음</span>');
     var wide=(k==='addr')?' style="grid-column:1/-1"':'';
     var 칸=ev
-      ? '<input class="firm-ro" readonly value="'+_jsAttr(ev)+'" title="푸른이알피 회사정보에서 옵니다 — 고치려면 이알피에서 고치세요">'
+      ? '<input class="firm-ro" data-firm-ro="'+k+'" readonly value="'+_jsAttr(ev)+'" title="푸른이알피 회사정보에서 옵니다 — 고치려면 이알피에서 고치세요">'
       : '<input data-firm="'+k+'" value="'+_jsAttr(lv)+'" placeholder="이알피에 없습니다 — 여기서 적어 두세요">';
     /* ★ 📮 우편번호는 주소로 찾아 넣는다 (대표 지시 2026-09-28) — 이알피가 준 값이면 단추를 안 둔다(못 고친다) */
     if(k==='zip' && !ev){
@@ -19992,6 +19993,7 @@ function renderFirmTab(){
       +'<br>이알피 값을 고치려면 <b>푸른이알피 › 회사정보</b>에서 고치세요 — 그러면 모든 서류가 함께 바뀝니다.';
   }
   _safe(renderFirmSeal);
+  firmAutoZip();
 }
 /* ── 🏢 법인 도장 (대표 지시 2026-10-09) ──
    도장 보관함의 한 줄에 firm:true 를 단다 — 하나만. 그림은 보관함 한 곳에 있다.
@@ -20059,6 +20061,8 @@ function firmTabSave(quiet){
    ⚠★ «누를 때만» 받는다 — 부팅 때 남의 스크립트를 싣지 않는다.
    ⚠ 적힌 주소로 «미리 찾아 둔 채» 연다 — 맞는 것을 한 번 누르면 우편번호가 들어가고 곧바로 저장된다.
      사람 손을 아예 안 거치려면 카카오 REST 열쇠가 필요하다(위젯은 결과를 코드로 못 읽는다).
+     → 2026-10-17 부터 서버(zipLookup)가 그 열쇠로 찾아 준다 — 아래 piAutoZip·firmAutoZip 이 저절로 넣는다.
+       이 「📮 찾기」는 한 곳으로 딱 떨어지지 않을 때 쓰라고 그대로 둔다.
    ⚠ 주소 칸은 «비어 있을 때만» 채운다 — 찾은 도로명 주소에는 건물명·호수가 없어 적어 둔 것이 줄어든다. */
 var KC_POSTCODE_SRC='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 function _kcLoadPostcode(){
@@ -20128,6 +20132,42 @@ async function firmZipFind(){
     var aa=칸('addr'); if(aa && !aa.value.trim() && r.address) aa.value=r.address;
     firmTabSave(true);
     toast('📮 우편번호 '+r.zipcode+' 을 넣고 저장했습니다');
+  });
+}
+/* ── 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17 「우편번호찾기 기능있는데 자동으로 니가 찾아서 항상 입력해라」) ──
+   주소는 있는데 우편번호가 비면 서버(zipLookup — 카카오 주소검색)에 물어 그 칸을 채운다(js/pu-zip.js).
+   ⚠★ 한 곳으로 딱 떨어질 때만 넣는다 — 갈리면 위 「📮 찾기」 단추가 그대로 남는다.
+   ⚠ 위 찾기처럼 «넣고 저장»하되, 저장은 «우편번호 한 칸»만 한다 — 그것도 저장된 주소가 찾은 주소와 같고
+     저장된 우편번호가 빌 때만. 폼 전체를 저장(savePersonalInfo·firmTabSave)하면 치던 다른 칸까지 담기고,
+     다시 그려서 입력 중인 칸을 빼앗는다. 아직 저장 안 한 주소로 찾은 것은 칸에만 넣는다 —
+     사람이 저장할 때(그 두 함수가 칸 값을 읽는다) 함께 담긴다.
+   ⚠ 서버로 가는 것은 주소 글자뿐이다(이름·주민번호는 안 간다). */
+function piAutoZip(){
+  if(!window.PuZip) return;
+  Object.keys(PI_ZIP_OF).forEach(function(k){
+    var zk=PI_ZIP_OF[k];
+    PuZip.bind(document.getElementById('pi-'+k), document.getElementById('pi-'+zk), function(z, a){
+      var o=piObj(), 담음=false;
+      if(String(o[k]||'').trim()===a && !String(o[zk]||'').trim()){ o[zk]=z; 담음=set('profile_info',o)!==false; }
+      toast('📮 우편번호 '+z+' — 적어 둔 주소로 찾아 '+(담음?'넣고 저장했습니다':'넣었습니다 · 「기본정보 저장」을 누르면 담깁니다'), 4000);
+    });
+  });
+}
+/* 법인정보 — 이알피가 주소를 주면 그 주소(읽기 전용 칸)로 찾는다. 이알피가 우편번호를 주면 칸이 없어 안 묻는다 */
+function firmAutoZip(){
+  if(!window.PuZip) return;
+  var g=document.getElementById('firmGrid'); if(!g) return;
+  var zEl=g.querySelector('input[data-firm="zip"]');
+  var aEl=g.querySelector('input[data-firm="addr"]')||g.querySelector('input[data-firm-ro="addr"]');
+  PuZip.bind(aEl, zEl, function(z, a){
+    var l=firmLocal(), 담음=false;
+    if(String(firmInfo().addr||'').trim()===a && !String(l.zip||'').trim()){
+      l.zip=z; l.savedAt=Date.now();
+      /* firmTabSave 와 같은 자리·같은 길 — LS.set 은 꽉 차면 false, 클라우드는 fbScheduleAuto 로 */
+      try{ 담음=LS.set(NS+FIRM_LOCAL, JSON.stringify(l))!==false; }catch(e){}
+      if(담음 && typeof fbScheduleAuto==='function') fbScheduleAuto(FIRM_LOCAL);
+    }
+    toast('📮 우편번호 '+z+' — 적어 둔 주소로 찾아 '+(담음?'넣고 저장했습니다':'넣었습니다 · 「법인정보 저장」을 누르면 담깁니다'), 4000);
   });
 }
 /* ── 📎 법인 서류로 채우기 (대표 지시 2026-09-28 「신분증 계좌의 형태와 같이 한화면에서 정보 ocr 입력」) ──
