@@ -298,6 +298,9 @@
       window.sessionStorage.setItem(NOTICE_KEY, '1');
     } catch (_) {}
     var url = new URL(window.location.href);
+    /* 카카오 인가코드는 한 번만 쓸 수 있다. 모바일 브라우저가 주소 정리에 실패했어도
+       새 버전 주소에 코드를 복사하지 않는다(재복귀·진행 화면 재표시 방지). */
+    ['code', 'state', 'error', 'error_description'].forEach(function (key) { url.searchParams.delete(key); });
     url.searchParams.set('v', version.shortSha || String(version.sha).slice(0, 8));
     var target = url.toString();
     /* fetch 가 없는 아주 옛 브라우저에서는 예전처럼 그냥 간다 */
@@ -324,6 +327,10 @@
       applyTimer = window.setTimeout(applyWhenIdle, 5000);
       return;
     }
+    /* 복귀 문서에서 바로 다시 열면 포털이 한 번 보인 뒤 진행 화면이 재등장한다.
+       이 문서에서는 자동 교체를 보류하고, 새 버전 단추의 수동 적용만 허용한다.
+       다음에 타일로 앱을 열면 그 문서는 평소처럼 자동 업데이트한다. */
+    if (window.__puKakaoReturnPage) return;
     if (shouldWaitHidden(isHidden(), pendingSince, Date.now(), HIDDEN_MAX_MS)) {
       waitUntilVisible();
       applyTimer = window.setTimeout(applyWhenIdle, 30 * 60 * 1000);   // 숨은 채로 6시간이 지났는지 가끔 본다

@@ -88,6 +88,12 @@ function makeWorld(pageStatus){
 const settle = () => new Promise(r => setImmediate(r));
 
 async function run(){
+  {
+    const portal = fs.readFileSync(path.join(__dirname, '..', 'enter.html'), 'utf8');
+    const marker = portal.indexOf('window.__puKakaoReturnPage = true');
+    const watcher = portal.indexOf('src="js/pu-version.js');
+    ok('카카오 복귀 표시는 버전 감시기보다 먼저 선다', marker >= 0 && watcher > marker);
+  }
   /* ── ① 배포가 아직 안 퍼졌을 때: 옮겨 가지 않는다 ── */
   {
     const w = makeWorld(503);
@@ -149,10 +155,13 @@ async function run(){
        '옮겨 간 곳: ' + w.navigated);
   }
 
-  /* 카카오 인증 중에는 1회용 인가코드를 새로고침으로 잃지 않는다. */
+  /* 카카오 복귀 문서는 포털을 연 뒤에도 자동 새로고침하지 않는다.
+     주소 정리가 실패한 모바일 브라우저에서도 수동 업데이트에 1회용 코드를 싣지 않는다. */
   {
     const w = makeWorld(200);
+    w.win.__puKakaoReturnPage = true;
     w.win.__kkReturning = true;
+    w.win.location.href = 'https://x.test/enter.html?code=ONE_USE&state=NONCE&other=keep';
     vm.createContext(w.win);
     vm.runInContext(SRC, w.win);
     await settle(); await settle();
@@ -165,7 +174,11 @@ async function run(){
     ok('포털을 준비하는 동안에도 갈아타지 않는다', w.navigated === null && w.probes === 0);
     w.win.__puPortalEntering = false;
     w.tick(5000); await settle(); await settle();
-    ok('인증이 끝나면 대기 중인 새 판을 적용한다', !!w.navigated && w.probes === 1);
+    ok('포털이 열린 뒤에도 복귀 문서는 자동으로 다시 열지 않는다', w.navigated === null && w.probes === 0);
+    ok('사람이 새 버전을 누르면 적용한다', w.win.PUVersion.applyNow() === true);
+    await settle(); await settle();
+    ok('다시 여는 주소에는 일회용 카카오 코드가 없다', !!w.navigated && !/[?&](code|state)=/.test(w.navigated));
+    ok('관계없는 주소 값은 지킨다', !!w.navigated && /[?&]other=keep/.test(w.navigated));
   }
 
   console.log('\n  === ' + pass + ' 통과 / ' + fail + ' 실패 ===\n');
