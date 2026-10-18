@@ -52033,7 +52033,8 @@ function FinanceLedger(props){
   var _ldFill = useFillHeight();
   // maxHeight 로 둔다 — 목록이 짧으면 빈 상자가 크게 남지 않게
   var _ldBox={overflow:'auto',maxHeight:(_ldFill.max || 'calc(100vh - 330px)'),minHeight:'240px',
-    border:'1px solid #f8fafc',borderRadius:'6px'};
+    /* 폰: 테두리를 걷는다 — 줄(카드)이 이미 제 바탕색으로 갈리고, 상자 안 상자가 되어 양옆이 한 겹 더 좁아졌다(폰화면관리 2026-10-18) */
+    border: window.innerWidth <= 768 ? '0' : '1px solid #f8fafc',borderRadius:'6px'};
 
   /* 통장과 카드가 한 통에 쌓이므로, 지금 고른 종류의 것만 보여준다.
      섞어 보이면 같은 달에 통장 306건과 카드 200건이 뒤엉켜 무엇이 무엇인지 알 수 없다.
@@ -64446,7 +64447,7 @@ function PersonalCalendar(props){
 
   var DOW = ['일','월','화','수','목','금','토'];
 
-  return h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding: window.IS_MOBILE?'8px':'12px',display:'flex',flexDirection:'column',gap: window.IS_MOBILE?'6px':'10px'}},
+  return h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding: window.IS_MOBILE?'8px 7px':'12px',display:'flex',flexDirection:'column',gap: window.IS_MOBILE?'6px':'10px'}},   // 폰 좌우 7px — 글이 화면 끝 14px 안쪽(폰화면관리 2026-10-18)
     // 헤더
     h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
       h('div',{style:{fontSize:'13px',fontWeight:700,color:'#1e293b'}},'📅 내 캘린더'),
@@ -66171,7 +66172,7 @@ function MyDeskV2(props){
         ),
         // (크기 조절 툴바 제거)
         // 🏖️ 내 휴가 잔여 — 캘린더 위로 이동됨 (SEQ127). 오른쪽 열이 좁아 컴팩트 표시
-        myLeave && h('div', { style:{ marginBottom:'10px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'7px 10px' } },
+        myLeave && h('div', { style:{ marginBottom:'10px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding: window.IS_MOBILE ? '7px 7px' : '7px 10px' } },   // 폰 좌우 7px(폰화면관리 2026-10-18)
           h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'5px' } },
             h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#2563eb' } },
               '🏖️ 내 휴가 잔여 (' + myLeave.year + '년)'
@@ -79698,7 +79699,8 @@ function LeaveManagement(){
       _isAdminView && h('div',null,
         h('div',{style:{fontWeight:700,fontSize:'15px',color:'#1e293b',marginBottom:'6px'}},'👥 직원별 연차 현황'),
         h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'13.5px',marginBottom:'5px',boxSizing:'border-box'}}),
-        h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
+        /* 폰: 양옆 테두리를 걷는다 — 줄 바탕색이 이미 줄을 가르고, 상자 안 상자가 되어 한 겹 더 좁았다(폰화면관리 2026-10-18) */
+        h('div',{style:_lvM ? {borderTop:'1px solid #e2e8f0',borderBottom:'1px solid #e2e8f0',overflow:'hidden'} : {border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
           /* 폰: display:table — 폰 공통 «.page table{display:block}» 이 표를 글자 폭으로 줄여 오른쪽 119px 이 비었다.
              이 표는 폰에서 한 줄 다섯 칸이라 넘치지 않는다(바깥 상자는 overflow:hidden). */
           h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'15px',display:_lvM?'table':undefined}},
@@ -83446,7 +83448,9 @@ function PayrollLedger(props){
               style:{padding:'6px 10px',background:'#fff',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:600,whiteSpace:'nowrap'} }, '🔓 마감 잠금')
       ),
       // ── 보조액션 + 확정 (월이동 옆 같은 줄) ──
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap', flex:1, minWidth:0 } },
+      /* 폰: 제 글자 폭(auto)을 기준으로 — 자리가 모자라면 «통째로» 다음 줄로 간다. flex:1(기준 0)이면 화면을 넓힌 뒤
+         한 줄에 끼어 10px 로 눌리고 도구·확정 단추가 본문 밖으로 41px 밀려났다(폰화면관리 2026-10-18). */
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap', flex: IS_M ? '1 1 auto' : 1, minWidth:0 } },
         IS_M && h('button', { onClick:function(){ setToolsOpen(!toolsOpen); },
           style:{padding:'6px 10px',background:toolsOpen?'#1e40af':'#f8fafc',color:toolsOpen?'#fff':'#475569',border:'1px solid '+(toolsOpen?'#1e40af':'#cbd5e1'),borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, toolsOpen?'도구 ▴':'🛠 도구 ▾'),
         h('div', { style:{ display: (IS_M && !toolsOpen)?'none':'flex', gap:'4px', alignItems:'center', flexWrap: IS_M?'wrap':'nowrap', flex:1, paddingBottom:'2px', minWidth:0, width: IS_M?'100%':'auto', order: IS_M?3:0 } },

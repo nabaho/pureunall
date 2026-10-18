@@ -1308,6 +1308,9 @@ input[type="search"]::-webkit-search-cancel-button{
   .m-card{ padding-left:4px !important; padding-right:7px !important; }
   /* 입력 상자(근태 입력·증명서 발급 — className 'm-box') — 화면 끝 ~ 상자 6px, 상자 ~ 칸 7px */
   .m-box{ padding-left:7px !important; padding-right:7px !important; }
+  /* 환경설정 탭띠 — 흰 판 안 여백(16px)만큼 음수 여백으로 «판 끝까지» 펴던 것. 판 여백을 줄였으니 같이 줄인다
+     (안 줄이면 띠가 화면보다 10px 넓어 본문이 옆으로 구른다). */
+  .env-tabs-wrap{ top:-6px; margin:-2px -6px 10px; padding:6px 6px 0; }
 }
 
 /* ══ 데이터 감시 알림(erpAlert) — 폰에서는 한 치수 작게 (대표 폰 화면 2026-10-18) ══

@@ -158,3 +158,59 @@ test('⑦ 폰 월 달력 칸의 「더 보기」는 «건» 을 접어 날짜와
     assert.ok(폭 && Number(폭) <= 768, '「건」 접기가 폰 구간이 아닌 곳에 있습니다: ' + 감싼);
   }
 });
+
+/* ── 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」) ──
+   폰에서 «겉 여백이 PC 보다 작은가» · «안쪽 상자를 걷었는가»를 본다(값을 박지 않는다 — PC 값과 견준다). */
+function sidePad(decl) {
+  const px = (v) => { v = v.trim(); const c = v.match(/^clamp\(\s*([\d.]+)px/); if (c) return +c[1]; const m = v.match(/^([\d.]+)(px)?$/); return m ? +m[1] : NaN; };
+  let L = null, R = null;
+  const sh = decl.match(/(?:^|;)\s*padding\s*:\s*([^;!]+)/);
+  if (sh) { const v = sh[1].trim().split(/\s+(?![^(]*\))/).map(px); R = v.length === 1 ? v[0] : v[1]; L = v.length === 4 ? v[3] : R; }
+  const pl = decl.match(/padding-left\s*:\s*([^;!]+)/); if (pl) L = px(pl[1]);
+  const pr = decl.match(/padding-right\s*:\s*([^;!]+)/); if (pr) R = px(pr[1]);
+  return L === null && R === null ? null : Math.max(L || 0, R || 0);
+}
+const ruleList = (body) => body.split('}').map((r) => r.split('{')).filter((x) => x.length === 2).map(([sel, decl]) => ({ sels: sel.split(',').map((s) => s.trim()), decl }));
+/* 폰 덩이들 가운데 «마지막» 규칙(뒤가 이긴다) · PC(덩이 밖) 규칙 */
+function lastPhone(sel, declRe) {
+  let hit = null;
+  BLOCKS.filter((b) => isPhone(b.q)).forEach((b) => ruleList(b.body).forEach((r) => { if (r.sels.includes(sel) && (!declRe || declRe.test(r.decl))) hit = r.decl; }));
+  return hit;
+}
+function pcRule(sel, declRe) {
+  let hit = null;
+  ruleList(TOP).forEach((r) => { if (r.sels.includes(sel) && (!declRe || declRe.test(r.decl))) hit = r.decl; });
+  return hit;
+}
+
+test('⑧ 양옆 빈자리 — 폰의 겉 여백이 PC 보다 작다(달력·타임라인·종료 사업장·진행 목록·창·사업장 판)', () => {
+  [['.cal-body', /padding/], ['.timeline-page', /padding/], ['.ended-page', /padding/], ['.mp-list', /padding/], ['.mb', /padding/], ['.dash-body', /padding/]].forEach(([sel, re]) => {
+    const pc = pcRule(sel, re), ph = lastPhone(sel, re);
+    assert.ok(pc && sidePad(pc) !== null, sel + ' PC 여백 규칙을 못 찾았습니다');
+    assert.ok(ph && sidePad(ph) !== null, sel + ' 폰에서 양옆 여백을 줄이지 않았습니다 — 글이 화면 끝에서 멀리 떨어져 시작합니다');
+    assert.ok(sidePad(ph) < sidePad(pc), sel + ' 폰 양옆 여백(' + sidePad(ph) + ')이 PC(' + sidePad(pc) + ')보다 작지 않습니다');
+  });
+  /* 창은 화면 폭을 다 쓴다 — 예전 94vw 처럼 «화면의 몇 %» 가 아니라 바깥(.mb) 여백만 남긴다 */
+  assert.match(lastPhone('.modal', /width/) || '', /width:\s*100%/, '폰 창이 화면 폭을 다 쓰지 않습니다');
+});
+
+test('⑧ 양옆 빈자리 — 상자 안 상자를 한 겹으로(안쪽 상자의 테두리·바탕을 걷는다)', () => {
+  assert.match(lastPhone('.end-confirm-item', /border/) || '', /border:\s*0/, '종료 확인 줄이 창 안에서 또 상자입니다');
+  assert.match(lastPhone('.end-confirm-item', /background/) || '', /background:\s*transparent/);
+  assert.match(lastPhone('.grp-card', /border/) || '', /border:\s*0/, '보고서 창 칸 상자를 걷지 않았습니다');
+  assert.match(lastPhone('.ended-row', /background/) || '', /background:\s*transparent/, '종료 사업장 카드 안 줄이 또 상자입니다');
+  assert.match(lastPhone('.cal-body .mg', /border/) || '', /border-left:\s*0/, '월 달력 옆 테두리를 걷지 않았습니다(달력이 화면 폭을 다 못 씀)');
+  /* 화면(보기) 바탕은 body 와 같은 색 — 폰에서 투명이어야 한 겹이 준다 */
+  assert.match(TOP, /html,body\{[^}]*background:var\(--bg\)/, 'body 바탕이 var(--bg) 가 아닙니다 — 보기 바탕을 투명으로 두면 색이 바뀝니다');
+  ['#viewProg', '#viewTimeline', '#viewEnded'].forEach((id) => {
+    assert.match(SRC, new RegExp('id="' + id.slice(1) + '"[^>]*background:var\\(--bg\\)'), id + ' 바탕이 var(--bg) 가 아닙니다');
+    assert.match(lastPhone(id, /background/) || '', /background:\s*transparent/, id + ' 바탕을 폰에서 걷지 않았습니다');
+  });
+  /* 일 보기 — 인라인 모양이라 이름표가 있어야 폰 규칙이 잡는다 */
+  const rd = SRC.slice(SRC.indexOf('function renderDay('), SRC.indexOf('function renderWeek('));
+  ['dv', 'dv-hd', 'dv-it'].forEach((c) => assert.match(rd, new RegExp('class="' + c + '"'), '일 보기에 ' + c + ' 이름표가 없습니다'));
+  assert.match(lastPhone('.dv', /border/) || '', /border-left:\s*0/, '일 보기 상자 옆 테두리를 걷지 않았습니다');
+  const pcIt = rd.match(/class="dv-it"[^>]*style="[^"]*padding:\s*([^;"]+)/);
+  assert.ok(pcIt, '일 보기 줄의 PC 여백(인라인)을 못 찾았습니다');
+  assert.ok(sidePad(lastPhone('.dv-it', /padding/) || '') < sidePad('padding:' + pcIt[1]), '일 보기 줄 안쪽 여백이 PC 그대로입니다');
+});

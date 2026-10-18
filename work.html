@@ -1148,7 +1148,8 @@
       transform:translateX(-100%);transition:transform .2s ease;z-index:120}
     /* 그림자는 «열렸을 때만» — 닫힌 서랍의 40px 그림자가 화면 왼쪽 끝에 회색 띠로 늘 비쳐
        왼쪽 빈자리를 한 겹 더 만들었다(2026-10-18 양옆 빈공백) */
-    body.sideopen #side{transform:none;box-shadow:0 0 40px rgba(15,32,60,.22)}
+    body.sideopen #side{transform:none}
+    body.sideopen #side{box-shadow:0 0 40px rgba(15,32,60,.22)}
     #sideveil{position:fixed;inset:0;background:rgba(15,32,60,.42);z-index:110}
     body.sideopen #sideveil{display:block}
     #menubtn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
@@ -1344,6 +1345,8 @@
   #app > .bdwrap .bdhd{padding:7px 6px 5px}
   #app > .bdwrap .bdbody{padding:0;overflow:visible}
   #app > .bdwrap .bdcard{padding-left:8px;padding-right:8px}
+  /* 타임라인 — 업무 이름 칸은 정한 폭에서 … 로 줄인다(긴 이름 줄만 칸이 넓어져 날짜 줄이 들쭉날쭉했다) */
+  #app > .tlwrap .tlname{min-width:0}
   /* 빠른 기록 바 — 양옆 6px */
   #qwrap{left:6px;right:6px}
   #qbar{padding-left:10px;padding-right:10px}
@@ -1357,8 +1360,8 @@
   #drawer .honote{margin-left:0;margin-right:0;border-left-width:0;border-right-width:0;border-radius:0}
   #drawer .honote .hh,#drawer .honote .hb{padding-left:12px;padding-right:12px}
   /* 창(새 업무·묶기·보기 …) — 바깥 20px·안 22px 이 겹쳐 글이 42px 안쪽이었다. 창 틀은 인라인이라 !important */
-  #modalbg,#confirmbg{padding:6px!important}
-  #modalbg > div,#confirmbg > div{padding:14px 12px!important}
+  #modalbg,#confirmbg{padding:4px!important}
+  #modalbg > div,#confirmbg > div{padding:14px 10px!important}
 }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
