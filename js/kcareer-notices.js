@@ -142,7 +142,68 @@
     return { lost: lost, safe: lost.length === 0 };
   }
 
-  var api = { decide: decide, newerText: newerText, dismissedStill: dismissedStill, firstPullLoss: firstPullLoss };
+  /* ── 두 기기 기록을 «합친다» (대표 지시 2026-10-18 「폰과 PC 데이터가 항상 차이 나 띠가 뜬다 — 한 번에 해결」) ──
+     ■ 왜 띠가 «늘» 떴나 — 막다른 길이었다:
+         · 클라우드가 더 새것이면 «올리기»를 멈추고(남의 고침을 덮지 않으려고)
+         · 이 기기에 안 올라간 고침이 있으면 «받기»를 멈췄다(내 고침을 덮지 않으려고).
+       폰과 PC 가 둘 다 고치면 둘 다 «새것이면서 안 올린 것»이 되어, 사람이 「불러오기」나 「저장」을 눌러 한쪽을 버릴 때까지
+       띠가 영영 남았다. 둘 다 «맞는 말»이라 둘 중 하나를 버리게 하면 안 된다 — 합치면 된다.
+     ■ 합치는 법(잃는 것이 없게 «더하기»만 한다):
+         · 목록(기록마다 id 가 있는 것) = 번호로 합친다. 한쪽에만 있으면 그대로 · 양쪽에 있으면 «저장 시각이 더 늦은 것»
+           (시각이 같거나 둘 다 없으면 클라우드). 이 기기에서 고친 것은 시각이 있고 클라우드 것은 없거나 옛것이므로 이 기기 것이 남는다.
+         · 지운 기록표(_tomb·_tombrev) = 번호마다 «더 늦은 시각»으로 합친다. 지웠다고 적힌 번호는 «살아난 시각»이 더 늦지 않은 한 뺀다
+           (한쪽에서 지운 것이 다른 쪽에서 되살아나지 않게).
+         · 목록이 아닌 열쇠(설정 한 덩이) = 클라우드 것. 같은 설정을 «두 기기에서 같은 시간대에» 고친 경우만 한쪽이 진다.
+         · 안 오가는 열쇠(skip)는 합친 결과에 넣지 않는다.
+     돌려주는 것: { ls, fromLocal(이 기기에만 있어 더한 기록), localWins(이 기기 고침이 이긴 기록), dead(지운 기록표로 뺀 것) } */
+  function mergeLs(localLs, cloudLs, opts) {
+    opts = opts || {}; localLs = localLs || {}; cloudLs = cloudLs || {};
+    var skip = opts.skip || [], TK = opts.tombKey || '_tomb', RK = TK + 'rev';
+    var parse = function (raw) { try { return JSON.parse(raw); } catch (e) { return null; } };
+    var obj = function (raw) { var o = parse(raw); return (o && typeof o === 'object' && !Array.isArray(o)) ? o : {}; };
+    var tomb = {}, rev = {};
+    [[tomb, TK], [rev, RK]].forEach(function (p) {
+      [obj(localLs[p[1]]), obj(cloudLs[p[1]])].forEach(function (o) {
+        Object.keys(o).forEach(function (id) { var v = Number(o[id]) || 0; if (v > (Number(p[0][id]) || 0)) p[0][id] = v; });
+      });
+    });
+    var dead = function (id) { var t = Number(tomb[id]) || 0; return t > 0 && t > (Number(rev[id]) || 0); };
+    var stamp = function (r) { return String((r && (r.updatedAt || r.savedAt)) || ''); };
+    var isList = function (a) { return Array.isArray(a) && a.length && a[0] && a[0].id != null; };
+    var out = {}, st = { fromLocal: 0, localWins: 0, dead: 0 };
+    var keys = {}; Object.keys(localLs).concat(Object.keys(cloudLs)).forEach(function (k) { keys[k] = 1; });
+    Object.keys(keys).forEach(function (k) {
+      if (skip.indexOf(k) >= 0) return;
+      if (k === TK) { out[k] = JSON.stringify(tomb); return; }
+      if (k === RK) { out[k] = JSON.stringify(rev); return; }
+      var hasL = Object.prototype.hasOwnProperty.call(localLs, k), hasC = Object.prototype.hasOwnProperty.call(cloudLs, k);
+      if (!hasL) { out[k] = cloudLs[k]; return; }
+      if (!hasC) { out[k] = localLs[k]; return; }
+      var L = parse(localLs[k]), C = parse(cloudLs[k]);
+      if (!isList(L) && !isList(C)) { out[k] = cloudLs[k]; return; }          /* 설정 한 덩이 — 클라우드 것 */
+      if (!Array.isArray(L)) L = [];
+      if (!Array.isArray(C)) C = [];
+      var mine = {}; L.forEach(function (r) { if (r && r.id != null) mine[String(r.id)] = r; });
+      var seen = {}, rows = [];
+      C.forEach(function (r) {
+        if (!r || r.id == null) { rows.push(r); return; }
+        var id = String(r.id); seen[id] = 1;
+        if (dead(id)) { st.dead++; return; }
+        var m = mine[id];
+        if (m) { var a = stamp(m), b = stamp(r); if (a && (!b || a > b)) { rows.push(m); st.localWins++; return; } }
+        rows.push(r);
+      });
+      L.forEach(function (r) {
+        if (!r || r.id == null || seen[String(r.id)]) return;
+        if (dead(String(r.id))) { st.dead++; return; }
+        rows.push(r); st.fromLocal++;
+      });
+      out[k] = JSON.stringify(rows);
+    });
+    return { ls: out, fromLocal: st.fromLocal, localWins: st.localWins, dead: st.dead };
+  }
+
+  var api = { decide: decide, newerText: newerText, dismissedStill: dismissedStill, firstPullLoss: firstPullLoss, mergeLs: mergeLs };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.KcareerNotices = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

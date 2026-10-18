@@ -60,7 +60,7 @@ function load(over) {
   vm.createContext(ctx);
   vm.runInContext([
     grab(/^const _norm = [^\n]*;\r?$/m, '_norm'),
-    'var _wkInfo = {}, _wkInfoOn = false, _wkListMemo = null, _wkOpen = {}, _wkRrnOpen = {};',
+    'var _wkInfo = {}, _wkInfoOn = false, _wkListMemo = null, _wkOpen = {}, _wkRrnOpen = {}, _wkRrnVal = {};',
     grab(/const WK_DOC_LABEL = \{[\s\S]*?\};/, 'WK_DOC_LABEL'),
     grab(/const WK_DOC_ICON = \{[\s\S]*?\};/, 'WK_DOC_ICON'),
     grab(/const WK_FOLDERS = \[[\s\S]*?\n\];/, 'WK_FOLDERS'),
@@ -161,8 +161,9 @@ test('★★★ 주민번호는 «사건에서만» 온다 — 사진첩 쪽에�
   const list = c.wkListBuild(cases, info);
   assert.equal(list.length, 1);
   assert.equal(list[0].docs.length, 1, '서류가 안 붙었습니다');
-  assert.equal(list[0].rrn, '',
+  assert.equal(list[0].hasRrn, false,
     '★★★ 사진첩 자리에 있던 주민번호를 그대로 읽었습니다 — 그 자리에는 담기지 않습니다');
+  assert.ok(JSON.stringify(list[0]).indexOf('900101') < 0, '★★★ 사람 줄에 주민번호가 실렸습니다');
   assert.equal(list[0].address, '', '★★★ 주소를 사진첩 자리에서 읽었습니다');
   const flat = JSON.stringify(list[0].docs);
   assert.ok(flat.indexOf('900101') < 0, '★★★ 서류 줄에 주민번호가 남았습니다: ' + flat);
@@ -347,14 +348,27 @@ test('★★★ 주민번호는 «가려서» 보인다', () => {
   assert.ok(m.indexOf('1234567') < 0, '★★★ 뒷자리가 그대로 보입니다: ' + m);
 });
 
-test('★★★ 눌러야 나온다 — 처음에는 가려져 있다', () => {
+test('★★★ 눌러야 나온다 — 처음에는 가려져 있다 · 담당자가 아니면 🔒 (2026-10-15)', () => {
   const c = load();
-  const p = { key: 'k', rrn: '900101-1234567' };
+  const p = { key: 'k', hasRrn: true, rrnRefs: [{ id: 'C1', wid: 'w1' }] };
   const shut = c.wkRrnCellHtml(p);
   assert.ok(shut.indexOf('900101') < 0, '★★★ 누르지도 않았는데 번호가 보입니다: ' + shut);
   assert.match(shut, /wkRrnToggle/, '★ 볼 길이 아예 없습니다');
-  c._wkRrnOpen.k = true;
+  /* 「보기」를 누르면 담당자 칸을 읽는다(wkRrnLoad) — 읽어 온 뒤의 모양 */
+  c._wkRrnVal.k = '900101-1234567'; c._wkRrnOpen.k = true;
   assert.ok(c.wkRrnCellHtml(p).indexOf('900101-1234567') >= 0, '누르고도 안 나옵니다');
+  c._wkRrnVal.k = 'denied';
+  const no = c.wkRrnCellHtml(p);
+  assert.match(no, /🔒 담당자만/, '★★ 담당자가 아닌데 잠김 표시가 없습니다');
+  assert.doesNotMatch(no, /wkRrnToggle/, '거절된 사람에게 「보기」를 또 낸다');
+});
+
+test('★★★ 사람 줄은 공개 덩어리의 번호를 «안 읽는다» — 「있다」와 자리만 (2026-10-15)', () => {
+  const c = load();
+  const p = c.wkListBuild(erp([caseRec({ id: 'C9', workers: [W('강석', { id: 'w9', rrn: '900101-1234567' })] })]), {})[0];
+  assert.equal(p.hasRrn, true);
+  assert.deepEqual(JSON.parse(JSON.stringify(p.rrnRefs)), [{ id: 'C9', wid: 'w9' }]);
+  assert.ok(JSON.stringify(p).indexOf('900101') < 0, '★★★ 공개 덩어리의 주민번호를 사람 줄에 실었습니다 — 담당자가 아니어도 봅니다');
 });
 
 test('★ 화면이 「저장하지 않는다」고 말한다 — 안 그러면 여기 주민번호가 쌓이는 줄 안다', () => {

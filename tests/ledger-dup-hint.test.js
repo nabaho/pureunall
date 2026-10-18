@@ -148,8 +148,9 @@ test('세 줄이 얽혀도 모두 짚는다', () => {
 test('★ 표를 화면 줄로 «옮긴다» — 안 옮기면 만들고도 안 보인다', () => {
   /* 화면 줄은 칸을 하나하나 적어 만든다. 새 칸은 적어 주지 않으면 그대로 사라진다. */
   const rowsOf = cutFn(app, 'function _rowsOfBatches(');
-  assert.match(rowsOf, /_hint:\s*x\.dupHint/, '★ 쌓인 자료에서 표가 사라집니다');
-  assert.ok(/_hint:\s*x\.dupHint/.test(app.slice(app.indexOf('var _pst2 = erpBankProcessedStore();'),
+  /* ⚠ 2026-10-17: 1/0 → !! 로 바뀌었다(0 이 화면에 「0」으로 찍혔다). 볼 것은 «옮기는가» 다. */
+  assert.match(rowsOf, /_hint:\s*!*x\.dupHint/, '★ 쌓인 자료에서 표가 사라집니다');
+  assert.ok(/_hint:\s*!*x\.dupHint/.test(app.slice(app.indexOf('var _pst2 = erpBankProcessedStore();'),
     app.indexOf('var _pst2 = erpBankProcessedStore();') + 900)),
     '★ 방금 올린 파일에서 표가 사라집니다');
 });

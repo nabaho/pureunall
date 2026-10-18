@@ -13,14 +13,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-labor-core.js?v=6"></script>
@@ -206,6 +206,54 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
   header .cobar .cn{max-width:none}
   header .cobar .kpis{flex-wrap:wrap}
 }
+/* ══════ 폰 3칸 (폰화면관리 2026-10-18) — 3칸이 위아래로 쌓일 때 «지금 할 일»이 첫 화면에 오게 ══════
+   ⚠ 실측(360·411px, 지어낸 30곳·한 곳 28명):
+     · 보기 띠가 178px 폭(3칸 치수 nav.viewbar 가 폰의 nav{width:100%} 를 이겼다) — 알약이 「자료 안 온 곳」에서 잘리고 오른쪽은 빈 흰 칸.
+     · 회사를 열어도 보기 띠·회사 목록(42vh)이 그대로 위에 있어 탭·내용이 600px 아래에서 시작했다 — 첫 화면에 아무 일도 안 보였다.
+     · 회사 칸 지표 열 개가 네 줄(약 110px), 탭 일곱 개가 두 줄.
+     · 직원별 급여표의 성명이 「점/검/누/리」 한 글자씩 세로로 쌓였다(숫자 칸이 안 접혀 이름 칸만 짓눌렸다).
+     · 설정 카드의 ✎ 가 11×12px — 폰에는 «올려 보기(hover)»가 없어 흐린 색 그대로라 보이지도 않았다.
+   처방: 회사를 열면 보기·목록을 접는다(머리의 ← 뒤로로 목록에 돌아온다) · 안 열었으면 안내 칸을 접고 목록을 다 편다 ·
+         지표·탭은 «옆으로 미는 한 줄» · 급여표 칸은 한 줄, 성명은 왼쪽에 붙여 둔다 · ✎ 는 손가락 크기. PC(761px~)는 그대로. */
+@media (max-width:760px){
+  nav.viewbar{width:100%}
+  body.co-open nav.viewbar,body.co-open #colist{display:none}
+  body.co-none #main{display:none}
+  body.co-none #colist{max-height:none}
+  header .cobar .kpis{flex-wrap:nowrap;overflow-x:auto;max-width:100%;scrollbar-width:none}
+  header .cobar .kpis::-webkit-scrollbar{display:none}
+  header .cobar .kpis .kpi{flex:none}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs>button{flex:none;white-space:nowrap}
+  .emptbl th,.emptbl td{white-space:nowrap}
+  /* 근태·연차·퇴직·신고 표도 같은 병 — 성명(첫째·둘째 칸)이 「점검/누리」로 접혔다. 이름 칸만 한 줄로 묶는다
+     (뒤쪽 «설명» 칸까지 묶으면 법정휴가 표가 끝없이 넓어진다) */
+  #main div[style*="overflow:auto"]>table :is(th,td):nth-child(-n+2){white-space:nowrap}
+  .emptbl td:nth-child(2),.emptbl th:nth-child(2){position:sticky;left:0;background:#fff;box-shadow:1px 0 0 var(--line)}
+  .emptbl th:nth-child(2){background:var(--paper)}
+  .pen{font-size:15px;color:var(--sub);min-width:30px;min-height:30px;padding:4px 6px}
+  .mfile{display:none}
+  /* ── 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 … 좌우 옆공간 모두 채워서」) ──
+     본문 여백(12px) 안에 흰 카드(둥근 모서리·테두리) 안에 줄 여백(16px)이 겹쳐 글이 화면 끝에서 29px 안쪽에서 시작했고,
+     오른쪽 «›»·값도 같은 만큼 안쪽에서 끝났다. 카드·표 상자는 줄마다 style= 로 박혀 있어 !important 로만 덮인다.
+     · 본문 여백 8px — 제목·안내·단추는 화면 끝에서 8px
+     · 본문 바로 아래의 흰 카드·표 상자는 그 여백만큼 밖으로 펴 «화면 폭 그대로», 둥근 모서리·옆 테두리는 걷는다(위아래 선으로 가른다)
+     · 카드 안 줄 여백 16 → 8px · 설정 카드도 같다 · 탭 띠도 화면 끝까지 */
+  main{padding:10px 8px}
+  #main>[style*="border-radius:14px"],#main .tabbody>[style*="border-radius:14px"],
+  #main>[style*="border-radius:12px"],#main .tabbody>[style*="border-radius:12px"]{
+    border-radius:0!important;border-left:0!important;border-right:0!important;margin-left:-8px!important;margin-right:-8px!important}
+  #main>[style*="border-radius:12px"],#main .tabbody>[style*="border-radius:12px"]{padding-left:8px!important;padding-right:8px!important}
+  /* 표 상자는 6px 만 남긴다 — 칸 안 여백(8~10px)이 이미 있어 끝까지 펴면 칸 테두리가 화면 끝에 붙는다 */
+  #main>div[style*="overflow:auto"],#main .tabbody>div[style*="overflow:auto"]{margin-left:-2px!important;margin-right:-2px!important}
+  #main [style*="px 16px"]{padding-left:8px!important;padding-right:8px!important}
+  .tabs{margin-left:-8px;margin-right:-8px;padding:0 2px}
+  .tabs>button{padding:8px}
+  nav.viewbar{padding:6px 8px}   /* 3칸 치수(padding 4px 0)가 폰까지 와서 첫 알약이 화면 끝에 붙었다 */
+  .cards{margin-left:-8px;margin-right:-8px;gap:8px}
+  .c{border-radius:0;border-left:0;border-right:0;padding:10px 8px}
+}
 @media print{header,nav,#colist,.noprint{display:none !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
@@ -218,7 +266,7 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
 }
 </style>
 <!-- 프로그램 사이 이동 (공용 앱바) — 문서관리와 함께 이 앱에만 빠져 있었다(2026-08-13) -->
-<script src="js/pu-appbar.js?v=29"></script>
+<script src="js/pu-appbar.js?v=33"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
@@ -679,13 +727,15 @@ function screenPayroll(){
        '</div>';
     h+='<div style="background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden">';
     var shown=0;
+    /* mfile — 파일 이름. 폰(760px 이하)에서는 접는다: 「(주)…_2026년 1월 급여대장(최종).xlsx」가 달마다 네댓 줄로 접혀
+       열두 달이 1,400px 이 됐고, 정작 «이슈»(최저임금 미달 등)는 그 아래로 밀렸다. 회사 이름은 머리에 이미 있다. */
     recs.forEach(function(r){ var lk=isLocked(App.site,r.월); var s=effSig(r);
       if(App.onlyReview && (lk || s==='green')) return;   // 검토 필요만: 확정·초록 숨김
       shown++;
       var extra=(s==='gray')?' · <span style="color:'+SIG.gray+'">데이터부족(확인)</span>':'';
       h+='<div style="display:flex;align-items:center;gap:12px;padding:12px 16px;border-bottom:1px solid var(--line)">'+
         '<span title="'+sigLabel(s)+'" style="width:11px;height:11px;border-radius:50%;background:'+SIG[s]+';flex-shrink:0"></span>'+
-        '<div style="flex:1;cursor:pointer" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})"><b>'+r.월+'</b> <span style="font-size:12px;color:var(--sub)">직원 '+empCount(r)+'명'+(r.파일?' · '+r.파일:'')+extra+(r.이슈?' · '+r.이슈:'')+'</span></div>'+
+        '<div style="flex:1;cursor:pointer" onclick="navTo({month:\''+r.월.replace(/'/g,"")+'\'})"><b>'+r.월+'</b> <span style="font-size:12px;color:var(--sub)">직원 '+empCount(r)+'명'+(r.파일?'<span class="mfile"> · '+r.파일+'</span>':'')+extra+(r.이슈?' · '+r.이슈:'')+'</span></div>'+
         (lk?'<span class="badge ok">확정됨</span> <button class="btn sec" onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')">되돌리기</button>'
            :'<button class="btn" '+(s==='red'?'disabled style="background:#cbd5e1" title="빨강 해결 후 확정"':'onclick="toggleLock(\''+sEsc+'\',\''+r.월.replace(/'/g,"")+'\')"')+'>확정</button>')+
         '</div>';
@@ -707,7 +757,8 @@ function screenPayroll(){
   var raw=loaded, emps=dedupeEmps(raw);
   var dupNote=(raw.length>emps.length)?' <span style="color:var(--warn)">(중복 '+(raw.length-emps.length)+'건 정리)</span>':'';
   h+='<div class="sub"><a href="#" onclick="goBack();return false">← '+App.site+'</a> · <b>'+App.month+'</b> 직원별 ('+emps.length+'명)'+dupNote+'</div>';
-  h+='<div style="overflow:auto"><table style="width:100%;border-collapse:collapse;font-size:12.5px;background:#fff">'+
+  /* emptbl — 폰에서 칸이 한 줄이게(성명이 「점/검/누/리」 한 글자씩 쌓였다)·성명을 왼쪽에 붙여 두는 이름표(@media 760px) */
+  h+='<div style="overflow:auto"><table class="emptbl" style="width:100%;border-collapse:collapse;font-size:12.5px;background:#fff">'+
      '<tr style="background:var(--paper);text-align:right">'+['순번','성명','기본급','과세총액','소득세','지방세','국민연금','건강보험','고용보험','공제총액','실수령'].map(function(c,i){return '<th style="padding:8px 10px;'+(i<2?'text-align:left':'')+'">'+c+'</th>';}).join('')+'</tr>';
   emps.forEach(function(e,i){
     h+='<tr style="border-top:1px solid var(--line);text-align:right">'+
@@ -3483,6 +3534,12 @@ function render(){
   else m.innerHTML=screenInbox();
   var cb=document.getElementById('coBar');
   if(cb){ cb.innerHTML=(shell&&model)?coBarHtml(model):''; document.body.classList.toggle('has-co', !!cb.innerHTML); }
+  /* 폰(760px 이하) 3칸 가르기 (폰화면관리 2026-10-18) — 3칸이 위아래로 쌓이는 폰에서는
+     회사를 열면 «보기·목록»을 접고(← 뒤로로 돌아온다), 아무 회사도 안 열었으면 «안내 칸»을 접고 목록을 다 편다.
+     ⚠ 접는 것은 «돌아갈 걸음이 있을 때»(navDepth>0)만 — 없으면 목록으로 갈 길이 사라진다. 모양은 CSS(@media) 몫, PC 는 그대로다. */
+  var _coOpen=shell&&!!(App.coId||App.loose);
+  document.body.classList.toggle('co-open', _coOpen&&navDepth>0);
+  document.body.classList.toggle('co-none', shell&&!!model&&!_coOpen);
   drawCardEdit();      /* 창은 main 밖에 있다 — 다시 그려도 안 지워진다 */
 }
 /* 간이세액표 올리기 — 모양을 먼저 본다. 잘못된 파일이 들어가면 세금이
@@ -3522,7 +3579,7 @@ window.importCards=importCards;window.doLogin=doLogin;window.doLogout=doLogout;w
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <!-- 파일 끌어다 놓기(2026-10-10) — JSON 을 받는 네 곳. 모두 서버를 덮어쓰는 일이라 exact: 단추 «위»에서만 받는다(화면 아무 데나 놓아 덮어쓰지 않게) -->
 <script>try{ PuDnd.init({ rules:{ importPayroll:{ext:['json'],argc:0,exact:true}, importCards:{ext:['json'],argc:0,exact:true}, importTaxTable:{ext:['json'],argc:0,exact:true}, uploadRrn:{ext:['json'],argc:0,exact:true} } }); }catch(e){}</script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>

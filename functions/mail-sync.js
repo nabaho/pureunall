@@ -161,6 +161,24 @@ async function runSync(deps, opts) {
   const deadline = nowMs() + Math.max(20000, Number(o.deadlineMs || 460000));
   const db = deps.getDatabase();
   const out = { ok: true, folders: 0, rows: 0, removed: 0, ready: 0, waiting: 0, err: '', gone: [] };
+  /* 같은 동기화 회차의 문의·담당 알림이 업체 전체를 따로 받지 않게 한다.
+     회차 밖에는 보관하지 않으며, 자동채우기가 업체를 고치면 다음 읽기를 새로 한다. */
+  let companyRead = null;
+  const readCompanies = () => {
+    if (!companyRead) {
+      companyRead = db.ref('data/companies/v').once('value').then((s) => s.val() || {})
+        .catch((e) => { companyRead = null; throw e; });
+    }
+    return companyRead;
+  };
+  let ownerTables = null;
+  const readOwnerTables = () => {
+    if (!ownerTables) {
+      ownerTables = MYMAIL.loadTables(db, readCompanies)
+        .catch((e) => { ownerTables = null; throw e; });
+    }
+    return ownerTables;
+  };
 
   const user = await deps.mailUserAsync();
   const pass = deps.mailPass();
@@ -502,7 +520,7 @@ async function runSync(deps, opts) {
                   .map((p2) => ({ slug: p2.slug, name: p2.box.name || p2.box.path }));
                 const ai = await AICLASSIFY.classifyNewInbox(deps, {
                   slug: p.slug, rows: held.map((g) => g.row),
-                  deadline: deadline, customFolders: customFolders,
+                  deadline: deadline, customFolders: customFolders, readCompanies: readCompanies,
                 });
                 if (ai.ran) console.log('mail-ai-classify', JSON.stringify(ai));
               } catch (e) {
@@ -511,7 +529,7 @@ async function runSync(deps, opts) {
               /* ── 📥 신규 문의 → 관리자 폰 알림 + 메일함 띠 (대표 승인 2026-10-04) ──
                  ⚠ 실패해도 던지지 않는다 — 알림이 죽어도 동기화는 계속된다. */
               try {
-                const inq = await NEWINQ.notifyNewInquiries(deps, { slug: p.slug, rows: held.map((g) => g.row) });
+                const inq = await NEWINQ.notifyNewInquiries(deps, { slug: p.slug, rows: held.map((g) => g.row), readCompanies: readCompanies });
                 if (inq.ran) console.log('mail-new-inquiry', JSON.stringify(inq));
               } catch (e) {
                 console.warn('mail-new-inquiry 실패(동기화는 계속합니다):', String((e && e.message) || e));
@@ -521,6 +539,7 @@ async function runSync(deps, opts) {
                  ⚠ 실패해도 던지지 않는다 — 채우기가 죽어도 동기화는 계속된다. */
               try {
                 const mf = await MAILFILL.fillFromNewMail(deps, { rows: held.map((g) => g.row) });
+                if (mf.added) { companyRead = null; ownerTables = null; }
                 if (mf.ran) console.log('mail-fill', JSON.stringify(mf));
               } catch (e) {
                 console.warn('mail-fill 실패(동기화는 계속합니다):', String((e && e.message) || e));
@@ -541,7 +560,7 @@ async function runSync(deps, opts) {
                ⚠ 실패해도 던지지 않는다 — 알림이 죽어도 동기화는 계속된다. */
             if (r.dir === 'fresh' && held.length && MYMAIL.NOTIFY_KINDS.indexOf(MB.folderKind(p.box)) >= 0) {
               try {
-                const mine = await MYMAIL.notifyOwners(deps, { slug: p.slug, rows: held.map((g) => g.row) });
+                const mine = await MYMAIL.notifyOwners(deps, { slug: p.slug, rows: held.map((g) => g.row), readTables: readOwnerTables });
                 if (mine.ran) console.log('mail-owner', JSON.stringify(mine));
               } catch (e) {
                 console.warn('mail-owner 실패(동기화는 계속합니다):', String((e && e.message) || e));
@@ -1834,7 +1853,7 @@ module.exports = function build(deps) {
 
     /* ══════ 첨부를 «급여데이터함으로» 바로 넘기기 (대표 결정 2026-08-30) ══════
        급여자료가 메일로 오면 여태 «내려받아 → 급여데이터함을 열어 → 다시 올리는»
-       세 걸음이었다. 서버가 10분마다 스스로 훑는 길(receivePaydataMail)은 이미
+       세 걸음이었다. 서버가 30분마다 스스로 훑는 길(receivePaydataMail)은 이미
        있지만 그것은 «아는 곳에서 온 것»만 담는다 — 모르는 주소로 온 자료, 지난
        메일에서 뒤늦게 찾은 자료는 사람이 손으로 옮겨야 했다.
 
@@ -1882,8 +1901,11 @@ module.exports = function build(deps) {
           contentType: got.mime, size: got.buf.length,
         }, { from: String(b.from || ''), subject: String(b.subject || ''), box: slug });
 
+        /* filed·filedTo — 다섯 잣대를 다 통과하면 대기 칸을 건너뛰고 서랍으로 간다
+           (payMailStoreOne → sureFor). 그것을 화면에 넘겨야 «어디로 갔는지» 바로 말한다. */
         reply(res, 200, { ok: true, id: r.id, seat: r.seat, shared: r.shared,
-          why: r.why, name: got.name, bytes: got.buf.length });
+          why: r.why, name: got.name, bytes: got.buf.length,
+          filed: !!r.filed, filedTo: r.filedTo || null });
       })),
 
     /* ══════ 본문까지 찾기 (대표 결정 2026-08-30) ══════

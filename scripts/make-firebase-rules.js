@@ -44,7 +44,10 @@ const MGR   = `auth != null && (${ADMIN} || ${SUB})`;      // 관리자 또는 �
 const FIN   = "root.child('uid_roles').child(auth.uid).child('fin').val() == true";
 /* 푸른 자기 직원 인사 자료를 고치는 사람 — 재무 권한자 또는 관리자·위임관리인 (2026-10-10) */
 const HRW   = `auth != null && (${FIN} || ${ADMIN} || ${SUB})`;
-const MAIL  = "auth != null && auth.token.email != null";
+/* ⚠ 옛 MAIL(「이메일이 있는 계정」)은 2026-10-14 에 «없앴다» — 되살리지 말 것.
+     이메일은 가입할 때 아무거나 적는 값이라, 가입이 열린 이 집에서는 «아무나»와 같다.
+     기업정보함(명함 6,600장)·전자서명 개인키·공공데이터가 그 문 뒤에 있었다.
+     그 자리들은 이제 LOGIN(재직자)이다. tests/firebase-auth-gate.test.js 가 되살아남을 막는다. */
 
 /* 「업무 칸」 한 벌 — 읽기는 전 직원, 새로 만들고 고치는 것도 전 직원,
    그러나 **지우는 것은 관리자만**. 실수로 통째 지우는 것을 막는 얼개다
@@ -62,6 +65,13 @@ function workspace(extra) {
 
 /* 재무 칸 — 재무 권한을 가진 사람만 */
 const finOnly = { '.read': FIN, '.write': FIN };
+/* ══ 공개 덩어리의 근로자 줄에 주민번호·계좌·예금주를 «못 쓴다» (대표 결정 2026-10-15) ══
+   그 셋은 worker_secret(그 건의 담당자와 대표만)에만 둔다. 화면은 저장 입구에서 떼지만(js/pu-worker-secret.js),
+   옛 화면·다른 길이 다시 실으면 재직 직원 누구나 읽는 자리로 돌아간다 — 그래서 서버에서도 막는다.
+   ⚠ 지우기(null)는 통과한다 — .validate 는 «새로 생기는 값»에만 걸린다.
+   ⚠ 2026-10-15 옛 값 90칸을 비운 «뒤»에 올렸다(scripts/worker-secret-migrate.js --clear). 그 전에 올리면
+     옛 값이 든 기록의 저장이 통째로 막힌다. */
+const 근로자칸막기 = { rrn: { '.validate': false }, account: { '.validate': false }, holder: { '.validate': false } };
 
 const rules = {};
 
@@ -213,7 +223,8 @@ rules.data = {
 
   /* 여러 앱이 함께 쓰는 업무 자료 — 푸른이알피·사진첩·급여데이터함이 모두 읽고 쓴다 */
   companies:      { '.read': LOGIN, '.write': LOGIN },   /* 거래처 원장 */
-  contracts:      { '.read': LOGIN, '.write': LOGIN },   /* 계약 기록 */
+  contracts:      { '.read': LOGIN, '.write': LOGIN,     /* 계약 기록 */
+                    v: { $id: { company: { workers: { $i: 근로자칸막기 } } } } },
   /* 사진첩에서 「담당자 고르고 계약 만들기」를 누르면 남는 «요청 한 줄» (2026-09-19).
      계약관리가 열릴 때 읽어 검사하고, 만들면 지운다(걸린 것은 까닭을 적어 남긴다).
      ⚠ 계약과 «같은 권한»이다 — 담기는 것이 계약에 들어갈 회사 정보 그대로다.
@@ -233,11 +244,13 @@ rules.data = {
      검사 눈에 안 띄었다. 「현장클리닉 보내기」(clinic-intake.html)가 글자 그대로 읽으며 드러났다.
      ★ 권한은 «그대로»(재직 직원 전원 읽고 쓰기) — 이알피 설정 화면에서 유형을 고친다. */
   biz_cons_types: { '.read': LOGIN, '.write': LOGIN },
-  consultings:   { '.read': LOGIN, '.write': LOGIN },   /* 컨설팅 사업(금액 포함) */
+  consultings:   { '.read': LOGIN, '.write': LOGIN,     /* 컨설팅 사업(금액 포함) */
+                   v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 기록. 여태 이름이 없어 $other 로 떨어져 있었다 — 권한은 «그대로»
      재직 직원 전원이고, 이름을 붙여 어디에 무엇이 있는지 드러낸 것뿐이다.
      (2026-09-06 메일 수집기가 이 자리의 업체 담당자 주소를 읽게 되면서 드러났다) */
-  cases:          { '.read': LOGIN, '.write': LOGIN },   /* 사건 기록 */
+  cases:          { '.read': LOGIN, '.write': LOGIN,     /* 사건 기록 */
+                    v: { $id: { workers: { $i: 근로자칸막기 } } } },
   /* 사건 «업무 메모» (2026-10-05) — 여태 그 PC 의 localStorage 에만 있어 다른 PC 에서 안 보였다
      (pu-erp.html CaseMemoPanel). 권한은 사건 기록과 «같게» — 사건을 보는 사람이 그 메모도 본다. */
   case_memos:     { '.read': LOGIN, '.write': LOGIN },
@@ -777,7 +790,24 @@ rules.scal_bizState = {
   }
 };
 
-/* ══ 백업 ══════════════════════════════════════════════════════════════
+/* 컨설팅보고서 앱 — 사업 순서 (2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-order.md)
+   scal_bizOrder/main = { list:'코드,코드,…'(대표가 끌어서 정한 사업 순서), by?, at } — 문서 하나, 통째로 .set. 이 목록에 없는 사업은 이알피 순서로 뒤를 잇는다.
+   ★ 읽기는 직원, 쓰기는 관리자·위임관리인(MGR) — 모두가 같은 순서를 보되 바꾸는 일은 직원 손에 두지 않는다. 루트에는 쓰기 문이 없다.
+   ★ 규칙은 list 의 글자 꼴(코드 글자·쉼표)과 길이만 본다 — 코드 개수(ORDER_MAX 200)·중복은 화면이 지키고 읽을 때도 걸러낸다.
+   ★ 화면 모듈 ORDER_LEN_MAX 4000(js/pu-gov-report-nav.js)과 같은 값 — tests/gov-report-rules.test.js. 게시는 합친 뒤. */
+rules.scal_bizOrder = {
+  '.read': LOGIN,
+  main: {
+    '.write': MGR,
+    '.validate': "newData.hasChildren(['list','at'])",
+    list:   { '.validate': "newData.isString() && newData.val().length <= 4000 && newData.val().matches(/^[A-Za-z0-9_,-]*$/)" },
+    by:     { '.validate': 'newData.isString() && newData.val().length <= 40' },
+    at:     { '.validate': 'newData.isNumber()' },
+    $other: { '.validate': false }
+  }
+};
+
+/* ══ 백업══════════════════════════════════════════════════════════════
    ★ 바뀐 곳: 쓰기를 «관리자·위임관리인» 으로 좁혔다 (2026-08-29).
      전에는 전 직원이 쓸 수 있었다 — 직원 한 사람의 실수나 계정 하나가
      털리면 **백업 스무 벌을 통째로 지울 수 있었다**. 백업은 마지막 방패라
@@ -819,14 +849,16 @@ rules.backup_key = {
    ⚠⚠ 이름으로 적는 순간 그 칸은 더 이상 아래 $k 에 안 걸린다 — 그래서 $k 가 주던
        쓰기 허락을 **글자 그대로 옮겨 적는다**. 안 옮기면 명함 저장이 통째로 막힌다
        (허락은 위에서 아래로 흐르지만, $k 는 «이름 없는 칸»에만 걸린다). */
-const pucardsWrite = `(${MAIL}) && (newData.exists() || ${ADMIN})`;
+const pucardsWrite = `(${LOGIN}) && (newData.exists() || ${ADMIN})`;
 rules.pucards = {
-  '.read': MAIL, '.write': ADMIN,
-  items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': MAIL } },
-  tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': MAIL } },
+  '.read': LOGIN, '.write': ADMIN,
+  items: { '.write': pucardsWrite, '.indexOn': ['updatedAt'], $k2: { '.write': LOGIN } },
+  tomb:  { '.write': pucardsWrite, '.indexOn': '.value',      $k2: { '.write': LOGIN } },
   /* 예약 발송과 회차별 결과는 필요한 줄만 읽는다. 이름 붙인 칸이라 $k 쓰기 권한을 그대로 옮긴다. */
-  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': MAIL } },
-  $k: { '.write': pucardsWrite, $k2: { '.write': MAIL } }
+  scheduled: { '.write': pucardsWrite, '.indexOn': ['at', 'bulk'], $k2: { '.write': LOGIN } },
+  /* 🧾 사업자등록증 자동 검토 기록(서버 bizreg-review) — 화면은 최근 30일만 at 로 추려 읽는다. 「확인함」은 줄의 done 에 직원이 쓴다 (2026-10-13) */
+  bizreg: { '.write': pucardsWrite, '.indexOn': ['at'], $k2: { '.write': LOGIN } },
+  $k: { '.write': pucardsWrite, $k2: { '.write': LOGIN } }
 };
 /* 입금 알림은 서버 관리자 SDK만 쓰고 읽는다. 인덱스만 더해 기존 기본 거부를 유지한다. */
 rules.hanaSmsBridge = { adminAlerts: { '.indexOn': ['receivedAt'] } };
@@ -841,10 +873,10 @@ rules.pucards_private = { $uid: { '.read': 'auth != null && auth.uid === $uid', 
 
    ★ 왜 pucards «밖»인가
      규칙은 위에서 아래로 흐르고, 부모가 준 읽기를 자식이 못 뺏는다.
-     pucards 는 '.read': MAIL — 로그인한 직원 누구나 읽는다. 그 아래에 기록을 두면
+     pucards 는 '.read': LOGIN — 재직 직원 누구나 읽는다. 그 아래에 기록을 두면
      「관리자만」이라고 적어도 직원이 그대로 읽는다. 그래서 맨 위 칸이다.
 
-   ★ 왜 쓰기 문턱이 MAIL 인가 (LOGIN 이 아니라)
+   ★ 왜 쓰기 문턱이 LOGIN 인가 (2026-10-14 까지는 옛 MAIL 이었다)
      pucards 읽기와 «같아야» 한다. 더 좁히면 「기업정보함은 쓰는데 기록은 못 남기는」
      사람이 생기고, 그 사람은 앱이 내려받기를 아예 거절한다.
 
@@ -859,7 +891,7 @@ rules.exportLog = {
   $id: {
     /* !data.exists() = 새로 만드는 것만. 고치기·지우기는 «아무도» 못 한다 —
        자기 기록을 지울 수 있으면 기록은 아무 뜻이 없다. */
-    '.write': `(${MAIL}) && !data.exists()`,
+    '.write': `(${LOGIN}) && !data.exists()`,
     '.validate': "newData.hasChildren(['at','by','uid','kind','what','n'])",
     at:   { '.validate': 'newData.isNumber() && newData.val() === now' },   /* 날짜 속이기 금지 */
     uid:  { '.validate': 'newData.isString() && newData.val() === auth.uid' }, /* 남의 이름 금지 */
@@ -1170,16 +1202,23 @@ rules.gov = { $uid: { '.read': 'auth != null && auth.uid === $uid', '.write': 'a
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 고쳐 쓸 일이 없다. */
 rules.gov_watch = { '.read': 'auth != null && ' + ADMIN, '.write': false };
 
+/* ══ 공고 «받은 함» — 서버가 매일 아침 모은 공고 (대표 지시 2026-10-12 「매일매일 공고를 크롤링 하고 모을 수 있나」) ══
+   서버(govFeedCollect, 07:40)가 나라장터·알리오·기업마당을 받아 rows/{번호} 에 쌓고 last 에 건수·오류를 남긴다.
+   화면(정부사업신청)은 열 때 여기서 «빠진 공고»를 가져다 자기 목록에 합친다.
+   담기는 것은 «공개 공고»의 제목·기관·날짜·주소뿐이다(인증키·개인정보 없음).
+   ⚠ 읽기 = 관리자만(gov_watch 와 같다 — 무엇을 지켜보는지가 곧 대표의 관심이다). ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). */
+rules.gov_feed = { '.read': 'auth != null && ' + ADMIN, '.write': false };
+
 /* ══ 🗂 공공데이터 공용 자리 (대표 「진행」 2026-10-11, 구조 목업 승인) ══
    공단·국세청·천문연의 «공개» 자료를 서버가 한 번 받아 두고 기업정보함·이알피·인사·캘린더가 읽는다.
-   ⚠ 읽기 = 기업정보함(pucards)과 «같은» MAIL — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 MAIL 이 읽는다.
+   ⚠ 읽기 = 기업정보함(pucards)과 «같은» LOGIN — 지금 이 숫자들은 pucards/coInfo 에 있어 이미 같은 사람이 읽는다.
      자리만 옮기는 것이라 보는 사람이 늘지 않는다. 담긴 것: 근로자 수·사업장 이름/주소·사업 상태·공휴일.
      돈(보험료)은 서버가 애초에 담지 않는다(functions/nps-monthly.js nowOf).
    ⚠ 쓰기 = 아무도(서버는 관리자 권한으로 규칙을 건너뛴다). 화면이 숫자를 고치면 원본과 어긋난다.
    ⚠ pubdata_req = 화면의 «받아 달라». 번호 10자리 열쇠에 {at, k, nm} 만 받는다. 읽기는 아무도 —
      누가 무엇을 열었는지가 남는 자리가 아니다(서버가 받자마자 지운다). */
-rules.pubdata = { '.read': MAIL, '.write': false };
-rules.pubdata_req = { $no: { '.write': MAIL,
+rules.pubdata = { '.read': LOGIN, '.write': false };
+rules.pubdata_req = { $no: { '.write': LOGIN,
   '.validate': "$no.matches(/^[0-9]{10}$/) && (!newData.exists() || (newData.child('at').isNumber()"
     + " && (!newData.child('k').exists() || newData.child('k').val() === 'ei' || newData.child('k').val() === 'nps')"
     + " && (!newData.child('nm').exists() || (newData.child('nm').isString() && newData.child('nm').val().length <= 100))))",
@@ -1195,7 +1234,11 @@ rules.govaid = { '.read': LOGIN,
   programs:  { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   prospects: { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
   extras:    { $k:  { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k" } },
-  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } } };
+  reviews:   { $k:  { $p: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $k + '__' + $p" } } },
+  /* 기업마당 공고 함(2026-10-12 「매년 … 자동 업데이트」) — 서버 govaidNoticeWatch 가 매일 쌓고(관리자 SDK), 직원은 «처리»(잇기·초안·관계없음)만 적는다.
+     읽기는 위의 LOGIN 그대로 — 공개 공고라 원장보다 넓히는 것이 없다. noticeLast(감시 기록)는 서버만 쓴다 */
+  notices:   { $id: { '.write': GOVAID_W, '.validate': "newData.child('id').val() === $id" } },
+  noticeLast: { '.write': false } };
 
 /* ══ 📺 전광판(pu-signboard.html + 이 PC 의 심부름꾼) — 외부 전광판 광고 (2026-10-12) ══
    설계 docs/superpowers/specs/2026-10-12-signboard-design.md §5 · 대표 「대표 + 관리직원」.
@@ -1267,25 +1310,56 @@ rules.kcareer_inbox = {
      (meta·secret·…)에만 적어 두면 목록은 permission_denied 로 막힌다.
      실제로 막혀 있었다(장애알림 9건, 마지막 2026-09-18). 사건이 0건이라 아무도
      못 느꼈을 뿐이다.
-   ⚠ 새로 보이게 되는 것은 «없다» — 여기서 주는 MAIL 은 아래 칸들이 이미 MAIL 에게
-     주고 있는 것과 똑같다(secret·arrears·submissions 모두 MAIL, meta 는 더 넓은
-     auth != null). 부모에 적는다고 아래가 좁아지지도 넓어지지도 않는다.
+   ⚠ 새로 보이게 되는 것은 «없다» — 여기서 주는 LOGIN 은 아래 칸들이 이미 LOGIN 에게
+     주고 있는 것과 똑같다(secret·arrears·submissions 모두 LOGIN, meta 읽기는 더 넓은
+     auth != null — 링크를 연 근로자). 부모에 적는다고 아래가 좁아지지도 넓어지지도 않는다.
+   ★ 2026-10-14 — 직원 쪽 문턱을 옛 MAIL(이메일만 있으면)에서 LOGIN(재직자)으로 올렸다.
+     MAIL 이던 동안 가입만 한 바깥 사람이 secret(잠긴 개인키)을 받아 가거나 meta 의
+     공개키를 바꿔치기할 수 있었다. 근로자 쪽 길(meta 읽기·링크 열쇠로 한 번 내기)은 그대로다.
    ※ 같은 것을 규칙 올리개(scripts/rules-deploy.js)도 따로 찾았다 — 이 줄이 만들개에
      없던 동안 「콘솔에만 있는 규칙이 사라진다」며 멈춰 세웠다. 안전장치가 맞물린 자리다. */
-rules.esign = { cases: { '.read': MAIL, $caseId: {
-  meta:        { '.read': 'auth != null', '.write': MAIL },
-  secret:      { '.read': MAIL, '.write': MAIL },
-  arrears:     { '.read': MAIL, '.write': MAIL },
+rules.esign = { cases: { '.read': LOGIN, $caseId: {
+  meta:        { '.read': 'auth != null', '.write': LOGIN },
+  secret:      { '.read': LOGIN, '.write': LOGIN },
+  arrears:     { '.read': LOGIN, '.write': LOGIN },
   submissions: {
-    '.read': MAIL,
+    '.read': LOGIN,
     $subId: {
-      '.write': `(auth != null && !data.exists() && newData.child('t').val() === root.child('esign/cases/' + $caseId + '/meta/linkToken').val() && root.child('esign/cases/' + $caseId + '/meta/status').val() === 'active') || (${MAIL})`,
-      '.validate': `newData.hasChildren(['enc','encKey','iv','t','submittedAt','reviewState']) || (${MAIL})`,
+      '.write': `(auth != null && !data.exists() && newData.child('t').val() === root.child('esign/cases/' + $caseId + '/meta/linkToken').val() && root.child('esign/cases/' + $caseId + '/meta/status').val() === 'active') || (${LOGIN})`,
+      '.validate': `newData.hasChildren(['enc','encKey','iv','t','submittedAt','reviewState']) || (${LOGIN})`,
       enc:    { '.validate': 'newData.isString() && newData.val().length < 400000' },
       encKey: { '.validate': 'newData.isString() && newData.val().length < 1000' },
       iv:     { '.validate': 'newData.isString() && newData.val().length < 100' },
       reviewState: { '.validate': "newData.isString() && newData.val().matches(/^(pending|confirmed|hold)$/)" }
     }
+  }
+} } };
+
+/* ══ 근로자 주민번호·계좌·예금주 — 그 건의 담당자와 대표만 (대표 결정 2026-10-15) ══
+   설계: status/2026-10-15-rrn-owner-only.md · 화면 쪽: js/pu-worker-secret.js
+   ★ 왜 따로인가 — data/cases·data/contracts 는 «한 덩어리»라 재직 직원 누구나 통째로 읽는다.
+     덩어리 안의 칸 하나만 막을 수 없어 이 셋을 떼어 여기 둔다.
+   ★ 담당자는 «그 건의 지금 칸»을 그때그때 읽는다 — 담당자를 바꾸면 새 담당자가 바로 보고,
+     전 담당자는 바로 못 본다. 건이 지워지면(managerMain 없음) 대표만 본다.
+   ⚠ 위임관리인은 «담당일 때만»(대표 결정 2026-10-15). SUB 를 여기 넣지 말 것.
+   ⚠ 부담당은 앞 다섯 자리까지 본다(2026-10-15 실측 최대 2명). 여섯째 부담당은 못 본다.
+   ⚠ 내 사번이 없으면(null) 통째로 거절 — 담당 칸도 비었을 때 null === null 로 열리는 것을 막는다. */
+const 내사번 = "root.child('uid_roles').child(auth.uid).child('sid').val()";
+const 그건 = "root.child('data').child($kind).child('v').child($rec)";
+const 그건담당 = `(${내사번} != null && (${그건}.child('managerMain').val() === ${내사번}`
+  + [0, 1, 2, 3, 4].map(function (i) { return ` || ${그건}.child('managerSubs').child('${i}').val() === ${내사번}`; }).join('')
+  + '))';
+const WS_OWNER = `(${LOGIN}) && (${ADMIN} || ${그건담당})`;
+const wsText = (n) => `newData.isString() && newData.val().length <= ${n}`;
+rules.worker_secret = { $kind: { $rec: {
+  '.read': WS_OWNER,
+  '.write': WS_OWNER,
+  '.validate': "$kind.matches(/^(cases|contracts|consultings|funds|other_projects)$/)",
+  $wid: {
+    rrn:     { '.validate': wsText(20) },
+    account: { '.validate': wsText(40) },
+    holder:  { '.validate': wsText(40) },
+    $other:  { '.validate': false }
   }
 } } };
 

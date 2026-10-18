@@ -43,5 +43,38 @@
     return { vals: vals, facts: facts, moved: moved };
   }
 
-  return { softDeleted: softDeleted, confirmed: confirmed, carryToCompany: carryToCompany };
+  /* 📰 새 공고 (2026-10-12 「매년 … 자동 업데이트」) — 서버 govaidNoticeWatch 가 쌓은 기업마당 공고를 사람이 처리한다 */
+  function list(v) { return Array.isArray(v) ? v.slice() : (v && typeof v === 'object' ? Object.keys(v).map(function (k) { return v[k]; }) : []); }
+  /* 사업에 공고번호를 잇거나 푼다 — 이은 사업만 서버가 날마다 접수 상태를 맞춘다 */
+  function noticeLinked(prev, known, no, add) {
+    var b = base(prev, known), cur = list(b.bizinfo).filter(function (x) { return x != null && String(x) !== String(no); });
+    if (add) cur.push(String(no));
+    return Object.assign(b, { id: b.id, bizinfo: cur });
+  }
+  /* 사람의 처리 — 잇기(linked)·초안 만듦(drafted)·관계없음(ignore). 빈 값이면 처리를 지운다. 서버 칸은 손대지 않는다 */
+  function noticeDecided(prev, known, decision, actor, now) {
+    var b = base(prev, known);
+    return Object.assign(b, { id: b.id, entityType: 'Document', docKind: 'govNotice',
+      decision: decision || null, decidedBy: decision ? actor : null, decidedAt: decision ? now : null });
+  }
+  /* 사전에 없는 사업 — 공고로 초안을 만든다(조건·서류는 노무사가 채워 확정). id 는 공고번호에서 — 같은 공고로 두 번 만들지 않게 */
+  function programFromNotice(n, year) {
+    n = n || {};
+    var ag = [n.ntce, n.inst].map(function (x) { return x == null ? '' : String(x).trim(); }).filter(Boolean)
+      .filter(function (x, i, a) { return a.indexOf(x) === i; }).join(' · ');
+    return { id: 'gp-b' + n.id, name: String(n.nm || '').slice(0, 200), agency: ag, fields: n.field ? [String(n.field)] : [],
+      summary: String(n.memo || '').slice(0, 600), status: 'draft', baseYear: year, cond: {},
+      source: { title: String(n.nm || '').slice(0, 200), no: String(n.no || ''), page: '', url: /^https:\/\//.test(n.url || '') ? n.url : '' },
+      bizinfo: [String(n.no || n.id)] };
+  }
+
+  /* ★ 노무사 직접 사업 (대표 지시 2026-10-13 「공인노무사가 직접 할 수 있는 사업은 별표시 … 모든 영역에서」).
+     법인 전체가 같은 별을 본다(사람마다 따로가 아니다). 끈 것도 {on:false} 로 남긴다 — 정기 조사·초기 표시가 다시 켜지 않게 */
+  function starred(prev, known, on, why, actor, now) {
+    var b = base(prev, known), cur = b.star || {};
+    return Object.assign(b, { id: b.id, star: { on: !!on, why: (why || cur.why || ''), by: actor, at: now } });
+  }
+
+  return { softDeleted: softDeleted, confirmed: confirmed, carryToCompany: carryToCompany, starred: starred,
+    noticeLinked: noticeLinked, noticeDecided: noticeDecided, programFromNotice: programFromNotice };
 });

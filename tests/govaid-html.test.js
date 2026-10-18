@@ -27,10 +27,11 @@ test('저장 관문을 Firebase 초기화 전에 싣고, 강제 모드 관문으
   assert.doesNotMatch(NOC, /fbDb\.ref\([^)]*\)\s*\.(set|update|push|remove|transaction)\(/, '관문을 건너뛴 쓰기');
 });
 
-test('쓰는 자리는 govaid 아래 네 곳뿐이다', () => {
+/* 2026-10-12 📰 새 공고 — 공고 함(notices)에 «처리»를 적는 자리가 늘어 다섯 */
+test('쓰는 자리는 govaid 아래 다섯 곳뿐이다', () => {
   const refs = [...NOC.matchAll(/gate\.(?:save|remove)\(fbDb\.ref\('([^']+)'/g)].map((m) => m[1]);
   assert.ok(refs.length >= 1);
-  refs.forEach((r) => assert.match(r, /^govaid\/(programs|prospects|extras|reviews)\//, r));
+  refs.forEach((r) => assert.match(r, /^govaid\/(programs|prospects|extras|reviews|notices)\//, r));
 });
 
 test('자료 표는 맨 왼쪽 ☐ + 번호 — 보기 전용 표만 예외(data-viewonly)', () => {
@@ -90,7 +91,123 @@ test('한 번에 고친 검토는 사유를 지우지 않는다(사유를 안 �
 });
 
 test('조건 편집기는 AI 조사 초안의 확신도·메모를 보여 준다 — 확정하는 사람이 «확인 못 한 점»을 보고 정하게', () => {
-  const fn = NOC.slice(NOC.indexOf('function drawEditor('), NOC.indexOf('function drawEditor(') + 4000);
+  const fn = NOC.slice(NOC.indexOf('function editorHtml('), NOC.indexOf('function editorHtml(') + 4000);
   assert.match(fn, /aiDraft/);
   assert.match(fn, /esc\([^)]*notes/);
+});
+
+test('사업 중심 목록은 부처(관)로 묶고, 목록 칸이 넓다 — 사업 이름이 보이게 (대표 지시 2026-10-12)', () => {
+  const body = SRC.match(/function drawProg\(\)\{[\s\S]*?\n\}/);
+  assert.ok(body, 'drawProg 를 찾지 못함');
+  assert.match(body[0], /GovaidView\.byMinistry\(/, '부처 묶음을 쓰지 않는다');
+  assert.match(body[0], /GovaidView\.shortTitle\(/, '앞의 «2026년»을 떼지 않는다');
+  assert.match(SRC, /id="p-prog">\s*<div class="split wide">/, '사업 중심 칸이 넓지 않다');
+});
+
+/* 대표 지시 2026-10-12 「확인조건을 한페이지에 다 볼수 있게 … 필요서류 … 구체적으로」 · 한눈 표 시안 A */
+function fnBody(name) {
+  const i = NOC.indexOf('function ' + name + '(');
+  assert.ok(i >= 0, name + ' 가 없다');
+  let d = 0, j = NOC.indexOf('{', i);
+  for (; j < NOC.length; j++) { if (NOC[j] === '{') d++; else if (NOC[j] === '}' && --d === 0) break; }
+  return NOC.slice(i, j + 1);
+}
+test('확인할 조건은 «한 표» — 부처별 묶음, ☐ + 번호, 줄을 누르면 그 자리에서 펼침(옆 편집 칸 없음)', () => {
+  const f = fnBody('drawCheck') + fnBody('checkRow') + fnBody('checkDetail');
+  assert.match(f, /GovaidView\.byMinistry\(/, '부처로 묶지 않는다');
+  assert.match(f, /data-all="check"/, '☐ 모두 고르기가 없다');
+  assert.match(f, /OPEN_CK/, '펼침 상태가 없다');
+  assert.match(f, /docs/, '필요서류를 안 보인다');
+  assert.doesNotMatch(NOC, /id="cDetail"/, '옆 편집 칸이 남아 있다');
+});
+test('사업 편집은 창(모달)으로 — 어느 탭에서 열어도 탭이 바뀌지 않는다', () => {
+  assert.match(fnBody('openEditor'), /openModal\(/);
+  assert.doesNotMatch(NOC, /CUR_CHECK='__new'; TAB='check'/, '새 사업 단추가 탭을 바꾼다');
+});
+test('편집 창에서 필요서류·짧은 이름·노무 준비를 고칠 수 있고, 서류 이름은 낱말로 바꿔 저장한다', () => {
+  const ed = fnBody('editorHtml'), rd = fnBody('readEditor') + fnBody('readDocs');
+  ['eDocs', 'eShort', 'eLaborPrep'].forEach((id) => assert.match(ed, new RegExp('id="' + id + '"'), id));
+  assert.match(rd, /GovaidMatch\.docKeyOf\(/);
+  assert.match(rd, /docs:/);
+});
+test('회사 중심에 «준비할 서류» — 후보 사업의 서류를 모아 보인다(보기 전용 표)', () => {
+  const f = fnBody('drawCoDetail') + fnBody('coDocs');
+  assert.match(f, /GovaidView\.docsFor\(/);
+  assert.match(f, /준비할 서류/);
+});
+test('한눈 표 머리는 가로 짧은 이름 + 부처 묶음 머리 — 세로로 돌린 글자 금지', () => {
+  const f = fnBody('drawGrid');
+  assert.match(f, /GovaidView\.shortName\(/);
+  assert.match(f, /GovaidView\.byMinistry\(/);
+  assert.doesNotMatch(NOC, /writing-mode:\s*vertical/);
+});
+
+/* 사업종료 표시 · 편집 창 줄이기 (대표 지시 2026-10-12) */
+test('사업종료 — 상태 표시가 엔진의 closureOf 를 쓰고, 회사·사업 화면에 «사업종료» 수를 보인다', () => {
+  assert.match(fnBody('statusChip') + fnBody('closureChip'), /GovaidMatch\.closureOf\(/);
+  assert.match(fnBody('statusChip'), /closureChip\(/);
+  assert.match(fnBody('drawCoDetail'), /closed/);
+  assert.match(NOC, /closed:'사업종료'/, 'VERDICT 에 사업종료가 없다');
+});
+test('편집 창에서 접수 상태(사업종료·일부 마감)를 넣고, 누가 언제 표시했는지 남긴다', () => {
+  const rd = fnBody('readEditor') + fnBody('readClosure');
+  assert.match(rd, /eClState/);
+  assert.match(rd, /checkedAt/);
+  assert.match(rd, /ME\.sid/);
+});
+test('편집 창 — 예/아니오는 한 칸에 여럿(격자), 숫자 조건은 한 줄', () => {
+  const ed = fnBody('editorHtml');
+  assert.match(ed, /class="facts"/);
+  const seg = ed.slice(ed.indexOf('id="eHcMin"'), ed.indexOf('id="eSdMin"'));
+  assert.ok(seg.length > 0 && seg.indexOf('class="k"') < 0, '근로자·업력·매출 감소 사이에 다른 줄 이름표가 끼었다(한 줄이 아니다)');
+});
+
+test('불러오기는 govaid 를 통째로 읽지 않는다 — 공고 함(notices)이 커져도 앱을 열 때 내려받지 않게', () => {
+  const f = fnBody('reload');
+  assert.doesNotMatch(f, /fbDb\.ref\('govaid'\)\.once/, 'govaid 전체를 읽는다');
+  ['programs', 'prospects', 'extras', 'reviews'].forEach((k) => assert.match(f, new RegExp("govaid/" + k), k + ' 를 따로 읽지 않는다'));
+  assert.doesNotMatch(f, /govaid\/notices/, '열 때마다 공고 함을 읽는다');
+});
+
+/* 📰 새 공고 탭 (대표 승인 2026-10-12 「네」 — 시안: 잇기·새 사업 초안·관계없음) */
+test('새 공고 — 탭이 있고, 공고 함은 그 탭을 열 때만 읽고, 목록은 ☐ + 번호 표(tbl)로 거른 것만', () => {
+  assert.match(NOC, /data-tab="news"/);
+  assert.match(fnBody('loadNotices'), /govaid\/notices/);
+  const f = fnBody('drawNews');
+  assert.match(f, /GovaidView\.noticeRows\(/);
+  assert.match(f, /tbl\('news'/);
+  assert.match(f, /loadNotices\(/);
+});
+test('새 공고 — 잇기·풀기는 사업 레코드에(noticeLinked), 처리는 공고에(noticeDecided), 초안은 programFromNotice 로', () => {
+  const all = fnBody('linkNotice') + fnBody('decideNotice') + fnBody('draftFromNotice');
+  assert.match(all, /GovaidRecords\.noticeLinked\(/);
+  assert.match(all, /GovaidRecords\.noticeDecided\(/);
+  assert.match(all, /GovaidRecords\.programFromNotice\(/);
+  assert.match(fnBody('draftFromNotice'), /expectedRevision:-1/, '같은 공고로 만든 초안을 덮지 않게 새 자리만');
+});
+test('편집 창에서 기업마당 공고번호를 직접 넣고 뺄 수 있다', () => {
+  assert.match(fnBody('editorHtml'), /id="eBiz"/);
+  assert.match(fnBody('readEditor'), /eBiz/);
+});
+
+/* ★ 노무사 직접 사업 (대표 지시 2026-10-13 「공인노무사가 직접 할 수 있는 사업은 별표시 하고 계속 확인할 수 있게 … 모든 영역에서」) */
+test('★ — 모든 화면에서 별을 켜고 끌 수 있다(회사 중심·한눈 표·사업 중심·사전·확인할 조건·새 공고·편집 창)', () => {
+  ['drawCoDetail', 'drawGrid', 'drawProg', 'drawProgDetail', 'drawDict', 'checkRow', 'drawNews', 'editorHtml'].forEach((f) =>
+    assert.match(fnBody(f), /starBtn\(/, f + ' 에 ★ 단추가 없다'));
+  assert.match(fnBody('toggleStar'), /GovaidRecords\.starred\(/);
+});
+test('★만 보기 — 한 스위치가 모든 화면의 사업 목록을 같이 거른다(GovaidView.starOnly)', () => {
+  assert.match(NOC, /id="starOnly"/);
+  assert.match(fnBody('VP'), /GovaidView\.starOnly\(PROGS/);
+  ['drawCo', 'drawCoDetail', 'coDocs', 'drawGrid', 'drawProg', 'drawDict', 'drawCheck'].forEach((f) =>
+    assert.match(fnBody(f), /VP\(\)/, f + ' 가 ★만 보기를 따르지 않는다'));
+});
+
+/* 회사 목록 열 정리 (대표 지시 2026-10-13 「기업정보에서 주소등 뒤에 불필요한것은 안보여도 된다. 그리고 열정리해라」) */
+test('회사 목록 — 지역·인원 꼬리말을 빼고, ☐·번호·사업장·구분·후보가 같은 자리에 오는 열(머리줄 포함)', () => {
+  const f = fnBody('drawCo');
+  assert.doesNotMatch(f, /v\.region|v\.headcount|지역 모름|인원 모름/, '회사명 뒤 꼬리말이 남아 있다');
+  assert.match(f, /class="li co-row/, '열 맞춘 줄(co-row)이 아니다');
+  assert.match(f, /co-head/, '열 머리줄이 없다');
+  assert.match(NOC, /\.li\.co-row\{[^}]*grid-template-columns/, '열을 격자로 맞추지 않는다');
 });

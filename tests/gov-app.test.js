@@ -122,7 +122,7 @@ function runApp(seed) {
     document: { getElementById: el, createElement: () => ({ click(){}, style:{} }) },
     location: { protocol: 'https:' },
     GovG2b: require('../js/gov-g2b.js'), GovPlan: require('../js/gov-plan.js'),
-    GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'),
+    GovCareer: require('../js/gov-career.js'), GovMatch: require('../js/gov-match.js'), GovOrgRec: require('../js/gov-orgrec.js'), GovInbox: require('../js/gov-inbox.js'),
     KcareerAdvSummary: require('../js/kcareer-adv-summary.js'),
     Promise, navigator: {},
     GovAlio: require('../js/gov-alio.js'),
@@ -304,7 +304,7 @@ test('★★ 클라우드가 비었으면 «☁ 저장을 한 번 누르시라»
 });
 
 test('★ 출처가 빠진 옛 줄을 부팅 때 되살린다 — 두 번 돌려도 같다', () => {
-  assert.match(src, /await cloudPull\(\); srcBackfill\(\);/, '로그인 뒤 불러온 다음에 되살려야 합니다');
+  assert.match(src, /await cloudPull\(\); (?:await inboxPull\(\); )?srcBackfill\(\);/, '로그인 뒤 불러온 다음에 되살려야 합니다');
   const m = src.match(/function srcBackfill\(\)\{[\s\S]*?\n\}/);
   assert.ok(m);
   assert.match(m[0], /if\(r && !r\.src\)/, '이미 출처가 있는 줄은 건드리지 않습니다');
@@ -387,7 +387,7 @@ test('★★ 이미 받은 줄에도 새 규칙을 댄다 — 사람이 손댄 �
 });
 
 test('★ 로그인 뒤 불러온 다음에 규칙을 댄다', () => {
-  assert.ok(src.indexOf('await cloudPull(); srcBackfill(); rejudge();') >= 0);
+  assert.ok(src.indexOf('await cloudPull(); await inboxPull(); srcBackfill(); rejudge();') >= 0, '불러온 «다음»에 서버 받은 함을 합치고, 그 다음에 규칙을 댄다(순서가 바뀌면 합친 줄이 규칙 전에 안 걸러진다)');
 });
 
 const rowCount = (h) => (h.match(/class="row-chk"/g) || []).length;

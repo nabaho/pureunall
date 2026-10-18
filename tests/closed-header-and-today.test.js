@@ -53,8 +53,11 @@ ok('탭은 왼쪽에 남고 검색이 밀어내지 않는다',
 console.log('\n[① 월 12칸이 연도와 같은 줄에]');
 ok('★ 월 칸을 연도 줄 안에서 그린다', /yearFilter !== 'all' && monthGrid\(\)/.test(src));
 ok('월 칸은 따로 함수로 (같은 줄에 들어갈 크기)', /function monthGrid\(\)/.test(src));
+/* 월 칸 함수 «몸통 안»에서 찾는다 — 예전엔 «이름에서 1,400자 안»으로 재서, 폰 정리(2026-10-18)로
+   같은 함수에 줄 둘이 늘자 규칙은 그대로인데 깨졌다(CLAUDE.md 「지금 값이 아니라 규칙을」). */
+const 월칸몸통 = (/function monthGrid\(\)\{[\s\S]*?\n    \}\n/.exec(src) || [''])[0];
 ok('12칸이 한 줄에 들어가게 「건」 글자를 뗐다',
-   /monthGrid[\s\S]{0,1400}?fontFamily:'monospace', fontWeight:700 \} \}, cnt\)/.test(src),
+   /fontFamily:'monospace', fontWeight:700 \} \}, cnt\)/.test(월칸몸통) && !/\}, cnt ?\+ ?'건'\)/.test(월칸몸통),
    "cnt+'건' 이 아니라 cnt 만 그린다");
 
 console.log('\n[① 종료일 미상 — 숨기지 않고 적는다]');

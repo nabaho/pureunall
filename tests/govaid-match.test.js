@@ -186,3 +186,105 @@ test('우선지원 — 예비 고객도 같은 규칙', () => {
   const p = M.profileFromProspect({ id: 'p1', name: '(예시)예비', headcount: 30 }, null, null);
   assert.equal(p.facts.prioritySupport.v, true);
 });
+
+/* 업종 — 고용·산재보험 업종명·업체관리 업태를 표준산업분류 대분류로. 뜻이 갈리면 «모름»(틀린 업종보다 모름이 낫다) */
+test('업종명 → 대분류 — 제조·가공이 먼저, 소매가 음식보다 먼저, 기술서비스가 건설보다 먼저', () => {
+  assert.equal(M.industryFromName('자동차부분품제조업'), 'C');
+  assert.equal(M.industryFromName('그 외 기타 금속가공업'), 'C');
+  assert.equal(M.industryFromName('건설용 금속제품제조업'), 'C', '건설용이어도 제조');
+  assert.equal(M.industryFromName('한식 일반 음식점업'), 'I');
+  assert.equal(M.industryFromName('조리 반찬류 소매업'), 'G', '반찬 «소매»는 도소매');
+  assert.equal(M.industryFromName('건축기술, 엔지니어링 및 관련기술서비스업'), 'M');
+  assert.equal(M.industryFromName('기타건설공사'), 'F');
+  assert.equal(M.industryFromName('일반 의원'), 'Q');
+  assert.equal(M.industryFromName('구역화물운수업'), 'H');
+  assert.equal(M.industryFromName('시스템 소프트웨어 개발 및 공급업'), 'J');
+  assert.equal(M.industryFromName('인물사진 및 행사용 영상 촬영업'), 'M', '사진 촬영은 전문서비스');
+  assert.equal(M.industryFromName('신용조합'), 'K');
+  assert.equal(M.industryFromName('지정 외 폐기물 수집, 운반업'), 'E');
+});
+test('업종명 → 대분류 — 뜻이 갈리는 이름은 모름', () => {
+  ['서비스', '서비스업', '사업서비스업', '비영리법인', '각급사무소', '위생 및 유사서비스업', '', null].forEach((n) => {
+    assert.equal(M.industryFromName(n), '', String(n));
+  });
+  assert.equal(M.industryFromName('제조업, 도매 및 소매업', { strict: true }), '', '업태에 둘이 섞이면 모름');
+  assert.equal(M.industryFromName('제조 외', { strict: true }), 'C', '«외»는 첫 업태');
+});
+test('업종 값의 순서 — 사람 > 고용보험 업종 > 산재보험 업종 > 업체관리 업태, 사업장이 여럿이면 인원 많은 곳', () => {
+  const ei = { gy: 30, rows: [{ fg: 'sj', ind: '음식 및 숙박업', cnt: 30 }, { fg: 'gy', ind: '자동차부분품제조업', cnt: 5 }, { fg: 'gy', ind: '한식 일반 음식점업', cnt: 25 }] };
+  const a = M.profileFromCompany({ id: 'c1', bizType: '제조업' }, { ei: ei }, null);
+  assert.equal(a.vals.industry.v, 'I', '고용보험 줄 가운데 인원이 많은 사업장');
+  assert.match(a.vals.industry.src, /고용보험/);
+  const b = M.profileFromCompany({ id: 'c1', bizType: '제조업' }, { ei: { gy: 0, rows: [{ fg: 'sj', ind: '건설업본사', cnt: 3 }] } }, null);
+  assert.equal(b.vals.industry.v, 'F');
+  assert.match(b.vals.industry.src, /산재/);
+  const c = M.profileFromCompany({ id: 'c1', bizType: '음식업' }, null, null);
+  assert.equal(c.vals.industry.v, 'I');
+  assert.match(c.vals.industry.src, /업태/);
+  assert.equal(M.profileFromCompany({ id: 'c1', bizType: '제조업' }, { ei: ei }, { vals: { industry: 'G' } }).vals.industry.v, 'G');
+  assert.equal(M.profileFromCompany({ id: 'c1', bizType: '서비스' }, null, null).vals.industry.v, null, '갈리는 업태는 모름');
+});
+test('업종을 알면 우선지원 상한도 그 업종으로 — 제조업 고용보험 업종 + 450명은 «예»', () => {
+  const p = M.profileFromCompany({ id: 'c1' }, { ei: { gy: 450, rows: [{ fg: 'gy', ind: '자동차부분품제조업', cnt: 450 }] } }, null);
+  assert.equal(p.facts.prioritySupport.v, true); // 검사고정-허용: 별표 1 제조업 500명
+});
+test('업종명 → 대분류 — 표준산업분류 이름은 «끝말»이 업종이다 (운영 자료에서 틀렸던 것)', () => {
+  assert.equal(M.industryFromName('제조업 및 유사 산업용 건물 건설업'), 'F');
+  assert.equal(M.industryFromName('기타 신선식품 및 단순 가공식품 도매업'), 'G');
+  assert.equal(M.industryFromName('국가 및 지방자치단체의 사업'), 'O');
+  assert.equal(M.industryFromName('호텔업'), 'I');
+  assert.equal(M.industryFromName('임시 및 일용 인력 공급업'), 'N');
+  assert.equal(M.industryFromName('경 인쇄업'), 'C');
+  assert.equal(M.industryFromName('기타 산업 회사 본부'), 'M');
+  assert.equal(M.industryFromName('부동산 중개 및 대리업'), 'L', '부동산 중개는 도소매의 «상품 중개»가 아니다');
+  assert.equal(M.industryFromName('요식업', { strict: true }), 'I');
+});
+
+/* 필요서류 낱말표 — 사업마다 서류 이름이 갈라지면 회사별로 모을 수 없다(대표 지시 2026-10-12 「취업규칙 근로계약서 등등 … 구체적으로」) */
+test('서류 낱말표 — 노무 서류는 따로 표시(노무법인이 준비해 줄 수 있는 것)', () => {
+  ['contract', 'rules', 'payroll', 'attendance', 'laborAgree'].forEach((k) => {
+    assert.ok(M.DOCS[k], k + ' 가 없다');
+    assert.equal(M.DOCS[k].labor, true, k + ' 는 노무 서류');
+  });
+  ['bizReg', 'taxPaid', 'other'].forEach((k) => assert.equal(M.DOCS[k].labor, false, k));
+});
+test('서류 이름 → 낱말 — 공고에 적힌 이름을 낱말표로, 모르면 other', () => {
+  assert.equal(M.docKeyOf('근로계약서 사본(채용 근로자)'), 'contract');
+  assert.equal(M.docKeyOf('취업규칙 신고필증'), 'rules');
+  assert.equal(M.docKeyOf('임금대장'), 'payroll');
+  assert.equal(M.docKeyOf('임금 지급 계좌이체 내역'), 'wageProof');
+  assert.equal(M.docKeyOf('출근부'), 'attendance');
+  assert.equal(M.docKeyOf('근로자대표 서면합의서'), 'laborAgree');
+  assert.equal(M.docKeyOf('사업자등록증 사본'), 'bizReg');
+  assert.equal(M.docKeyOf('국세 완납증명서'), 'taxPaid');
+  assert.equal(M.docKeyOf('4대보험 완납증명서'), 'insPaid', '세금보다 4대보험이 먼저');
+  assert.equal(M.docKeyOf('고용보험 피보험자격 이력내역서'), 'eiRoster');
+  assert.equal(M.docKeyOf('사업계획서'), 'bizPlan');
+  assert.equal(M.docKeyOf('지급신청서'), 'applyForm');
+  assert.equal(M.docKeyOf('특허 등록원부'), 'other');
+});
+
+/* 사업종료 — 예산 소진·접수 마감·폐지 (대표 지시 2026-10-12 「예산이 소진되었다는 부분 … 사업종료 표시」) */
+test('종료된 확정 사업은 «사업종료» — 조건이 맞아도 후보가 아니다', () => {
+  const p = prog({ headcount: { min: 5 } }, { closure: { state: 'closed', reason: 'budget', closedAt: '2026-08-31' } });
+  assert.equal(M.judge(pf({ headcount: 10 }), p, Y).verdict, 'closed');
+  assert.equal(M.closureOf(p).label, '사업종료 · 예산 소진');
+});
+test('일부만 마감(운영기관별 배정 소진)은 후보로 두되 «사람 확인» 조건을 붙인다', () => {
+  const p = prog({ headcount: { min: 5 } }, { closure: { state: 'partial', reason: 'budget', note: '서울 운영기관 마감' } });
+  const r = M.judge(pf({ headcount: 10 }), p, Y);
+  assert.equal(r.verdict, 'candidate');
+  assert.ok(r.items.some((i) => i.state === 'manual' && /일부 마감/.test(i.label)));
+});
+test('초안은 종료 표시가 있어도 «조건 미확정» — 확정 규칙이 먼저', () => {
+  const p = prog({ headcount: { min: 5 } }, { status: 'draft', closure: { state: 'closed', reason: 'deadline' } });
+  assert.equal(M.judge(pf({ headcount: 10 }), p, Y).verdict, 'unconfirmed');
+  assert.equal(M.closureOf(p).label, '접수 마감');
+});
+test('접수 중·모름·표시 없음은 판정에 영향 없음', () => {
+  ['open', 'unknown', undefined].forEach((s) => {
+    const p = prog({ headcount: { min: 5 } }, s ? { closure: { state: s } } : {});
+    assert.equal(M.judge(pf({ headcount: 10 }), p, Y).verdict, 'candidate', String(s));
+    assert.equal(M.closureOf(p).closed, false);
+  });
+});

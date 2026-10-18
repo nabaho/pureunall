@@ -69,8 +69,8 @@ const document = {
 function $(id) { return null; }
 
 eval(gvar('WDS') + '\n' + gvar('WKSPLIT_KEY') + '\n' + gvar('NAV_KEYS') + '\n' + gvar('KEYS') + '\n'
-  + gvar('_KCODE') + '\n'
-  + ['stepsOf', '_cut', 'wkDays', 'wkMarks', 'wkHeadHTML', 'wkCellHTML',
+  + gvar('_KCODE') + '\n' + gvar('WK_BIG_BTN') + '\n'
+  + ['stepsOf', '_cut', 'wkDays', 'wkMarks', 'wkHeadHTML', 'wkCellHTML', 'wkLgBox',
      'isPlanDay', 'planRowHTML',
      'wkPut', 'wkFocus', 'wkMove', 'wkSide',
      '_inTyping', '_ime', '_k', '_kNum', 'canLog'].map(grab).join('\n'));

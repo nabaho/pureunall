@@ -23,14 +23,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-paydata-store.js?v=12"></script>
 <script src="js/pu-hr-intake.js?v=1"></script>
 <!-- ?v= 는 판독기 판 번호(READ_VERSION)와 **같이 올린다**(2026-08-15).
@@ -50,7 +50,7 @@
 <script src="js/pu-paydata-files.js?v=2"></script>
 <!-- 긋기·사본 만들기 — 사진첩과 나눠 쓴다(2026-08-17 「안 1」) -->
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
-<script src="js/pu-appbar.js?v=29"></script>
+<script src="js/pu-appbar.js?v=33"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -418,6 +418,10 @@ h1{font-size:18px;margin-bottom:4px}
   .grp{padding:9px 10px;gap:6px}
   .gl{padding:7px 10px 7px 30px}
   .gdet{padding:6px 10px 10px 30px}
+  /* 확인 대기 줄 — 「사업장·달·종류 ?」 딱지와 「서랍으로」가 자리를 먹어 파일 이름이 「Kaka…」 4글자만 남았다(2026-10-18 전수점검).
+     파일 이름이 줄의 주인이다 — 이름이 줄의 4할을 지키고, 모자란 몫은 딱지가 «…» 로 줄어든다(전문은 눌러서 고치는 칸에 그대로). */
+  .gl .gt{min-width:38%}
+  .gl .tg{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
 /* ── 막힌 자리를 이 줄에서 잇기 (대표 결정 2026-08-27) ──
    고치는 단추는 「내가 맡기」와 **색을 갈라 둔다** — 맡기는 내 일이고,
@@ -674,6 +678,101 @@ table.grid td.who{font-weight:700}
 table.grid td.src{cursor:pointer;color:var(--navy);text-decoration:underline dotted;text-underline-offset:3px}
 table.grid td.src:hover{background:#f8fafc}
 table.grid td.iffy{background:#fffbeb}
+/* ══ 폰화면관리 (대표 지시 2026-10-18) — 폰에서 «옆으로 밀리는 페이지»와 «세로로 깨진 이름»을 없앤다 ══
+   재 본 것(360·411px, 사업장 30곳·서랍 28건):
+     · 머리줄(.dhead) 단추가 화면 밖으로 나가 페이지 폭이 472px(첫 화면)·790px(서랍)로 벌어졌다 —
+       폰이 화면을 통째로 줄여 그려 글씨가 작아지거나, 옆으로 밀어야 단추가 보였다.
+     · 사업장 이름·파일 이름 칸이 좁아 한 글자씩 세로로 쌓였다(한 줄이 열 줄 높이).
+     · 서랍 탭이 찾기 칸(최소 160px)에 밀려 한 칸에 하나씩 세로로 쌓였다.
+   ⚠ PC 는 그대로다 — 아래 묶음 상자(.sl2·.dl2·.dl2b)는 PC 에서 display:contents 라
+     상자가 없고, 나머지는 모두 폰 구간 안에만 있다. */
+.sl2,.dl2,.dl2b{display:contents}
+@media(max-width:760px){
+  /* 머리줄 — 넘치면 접는다(옆으로 밀지 않는다). 단추 묶음은 제 줄에서 옆으로 민다. */
+  .dhead[data-h]{flex-wrap:wrap;row-gap:6px}
+  .dhead[data-h] .dtitle{flex:1 1 0;min-width:60px}
+  .dhead[data-h] .dkpi{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .dhead[data-h] .dacts{flex:0 1 auto;min-width:0;max-width:100%;overflow-x:auto;
+    scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .dhead[data-h] .dacts::-webkit-scrollbar{display:none}
+  .dhead[data-h] .dacts>*{flex:0 0 auto;white-space:nowrap}
+  /* 서랍 — 1줄 ← 사업장 이름 📧담당, 2줄 몇 건 · 단추들 */
+  .dhead[data-h="co"] .comail{order:1;flex:0 1 auto;min-width:0;max-width:46%}
+  .dhead[data-h="co"]::after{content:'';order:2;flex:0 0 100%;height:0}
+  .dhead[data-h="co"] .dmeta{order:3;flex:0 1 auto;max-width:50%;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .dhead[data-h="co"] .dacts{order:3;flex:1 1 0;margin-left:0}
+  .dhead[data-h="co"] .dacts>:first-child{margin-left:auto}
+  /* 달 줄 — 「직접 적기」 하나만 셋째 줄로 떨어지던 것. 한 줄로 두고 넘치면 옆으로 민다. */
+  .mstrip{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  .mstrip::-webkit-scrollbar{display:none}
+  .mstrip>*{flex:0 0 auto;white-space:nowrap}
+  /* 서랍 거르개 — 달 / 탭·폴더 / 찾기를 한 줄씩. 탭은 옆으로 민다(이름이 잘리지 않는다). */
+  #findBar .mstrip{flex:1 1 100%;min-width:0}
+  #findBar #tabsBar{flex:1 1 100%;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+  #findBar #tabsBar::-webkit-scrollbar{display:none}
+  #findBar #tabsBar>*,#findBar #tabsBar .foldbar>*{flex:0 0 auto}
+  #findBar #tabsBar .foldbar{flex-wrap:nowrap;margin-bottom:0}
+  #findBar .dfind{flex:1 1 100%;min-width:0}
+  /* 첫 화면 띠 둘 — 한 줄. 설명만 …로 줄이고 숫자·「보러 가기」는 온전히. */
+  .mailbar,.warnbar{white-space:nowrap;gap:8px}
+  .mailbar>*,.warnbar>*{flex:0 0 auto}
+  .mailbar>span:not(.go){flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .warnbar>span:last-child{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:right}
+  /* 「멈춤」이 긴 설명에 밀려 「멈/춤」 두 줄이 되던 것 */
+  .sumbar .btn{flex:0 0 auto;white-space:nowrap}
+  /* 서류 보기 머리 — 긴 파일 이름에 밀려 「← 돌아/가기」 두 줄이 되던 것. 이름은 …로 줄인다. */
+  #viewer .bar{gap:10px}
+  #viewer .back{flex:0 0 auto;white-space:nowrap}
+  #viewer .bar span{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* 이 달 값 표 — 옆으로 밀어도 근로자 이름은 왼쪽에 붙어 있게(이름이 «석 줄 세로»로 깨지던 것) */
+  table.grid td.who,table.grid tr>th:first-child{position:sticky;left:0;z-index:1;white-space:nowrap;
+    box-shadow:1px 0 0 var(--line)}
+  table.grid td.who{background:var(--card)}
+  table.grid td.num{white-space:nowrap}
+}
+@media(max-width:640px){
+  /* 사업장 줄 — 두 줄 카드: 1줄 ☐·№·이름·장수 / 2줄 상태·무엇이 왔나 */
+  .row.siterow{display:grid;grid-template-columns:auto auto auto minmax(0,1fr) auto;
+    grid-template-areas:"ck no nm nm ct" ". . st sl sl";column-gap:8px;row-gap:3px;padding:9px 12px}
+  .row.siterow>label{grid-area:ck}
+  .row.siterow>.pkno{grid-area:no}
+  .row.siterow>.snm{grid-area:nm;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row.siterow>.scnt{grid-area:ct;white-space:nowrap}
+  .row.siterow>.stpill{grid-area:st;justify-self:start}
+  .row.siterow>.sl2{grid-area:sl;display:flex;gap:6px;min-width:0;overflow:hidden;white-space:nowrap}
+  .row.siterow>.sl2>*{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  /* 서랍 줄 — 두 줄 카드: 1줄 ☐·№·파일 이름 / 2줄 날짜·딱지 · 폴더·🗑 */
+  .row.drow{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;
+    grid-template-areas:"ck no nm nm" ". . l2 l2b";column-gap:8px;row-gap:4px;padding:9px 12px}
+  .row.drow>label{grid-area:ck}
+  .row.drow>.pkno{grid-area:no}
+  .row.drow>.dnm{grid-area:nm;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .row.drow>.dl2{grid-area:l2;display:flex;align-items:center;gap:6px;min-width:0;overflow:hidden;white-space:nowrap}
+  .row.drow>.dl2b{grid-area:l2b;display:flex;align-items:center;gap:6px;justify-content:flex-end;flex-wrap:wrap}
+  /* ☐ — 손가락으로 누를 만큼. 칸 자리(그리드)는 그대로 두고 누르는 자리만 넓힌다. */
+  .row.siterow>label,.row.drow>label,.grp>label,.gl>label{display:flex;align-items:center;padding:7px;margin:-7px}
+  .row.siterow>label input,.row.drow>label input,.grp>label input,.gl>label input,
+  .pkbar label input{width:18px;height:18px;margin:0}
+
+  /* ── 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서」) ──
+     본문 여백 12 + 카드 테두리 1 + 줄 안쪽 12~14 가 겹겹이 쌓여 글이 화면 끝에서 23~25px 에서 시작했다.
+     폰에서는: 본문 글(제목·안내)은 10px 에서, 카드·띠는 화면 끝 4px 까지 넓히고(음수 margin)
+     그 안쪽 여백을 9px 로 — 카드 안 글도 화면 끝에서 14px 에서 시작한다. */
+  #main{padding:10px 10px 12px}
+  .stickhead{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}
+  #main>.card,#main>.mailbar,#main>.warnbar,#main>.sumbar,#main>.hrbanner,#main>.coseat,
+  #main>.warnline,#main>.okline,#main>.badline,.stickhead .seatbar{margin-left:-6px;margin-right:-6px}
+  #main>.mailbar,#main>.warnbar,#main>.sumbar,#main>.hrbanner,#main>.coseat,
+  #main>.warnline,#main>.okline,#main>.badline,.stickhead .seatbar{padding-left:9px;padding-right:9px}
+  #main>.card>.row,#main>.card>.pkbar,#main>.card>.grp,.row.siterow,.row.drow{padding-left:9px;padding-right:9px}
+  .gl{padding-right:9px}
+  /* 상자 안의 상자 — 펼친 줄(.gl)은 흰 카드 위의 흰 바탕이라 눈에는 안 보이는 «한 겹»이었다. 고른 줄 색만 남긴다. */
+  .gl:not(.pkon){background:transparent}
+  /* 창 — 폰에서는 양옆 6px 까지 넓게(가운데 작은 상자로 띄우면 글이 접힌다) */
+  .modalWrap{padding:6px}
+  .modalCard{padding:12px 10px}
+  .fxbox{max-width:calc(100vw - 12px);padding:14px 10px}
+}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -1497,7 +1596,8 @@ function screenSites() {
   App.monthIds = v.rows.map(r => r.id);
 
   h += '<div class="stickhead">' + bannerHtml()
-    + '<div class="dhead">'
+    /* data-h — 폰에서 이 머리만 두 줄로 접는 손잡이(2026-10-18, CSS 폰 구간 참고) */
+    + '<div class="dhead" data-h="sites">'
     /* 제목도 왼쪽 칸과 **같은 말**이어야 한다 — 왼쪽이 「김보람 담당」이면 여기도
        그렇다. 예전에는 늘 「사업장 전체」라 적혀 있어 무엇을 보는지 어긋났다. */
     + '<b class="dtitle" title="' + esc(tip) + '">' + esc(v.title) + '</b>'
@@ -1540,8 +1640,11 @@ function screenSites() {
       + '<button class="btn" onclick="copyDunningText()" title="아직 안 온 곳에만 보낼 문구를 만듭니다">✉ 독촉 문구</button>'
       + '<button class="btn" onclick="downloadArrivalCsv()">⬇ 도착 현황 내려받기</button></span>');
     const siteSel = pickOf('sites');
+    /* ⚠ 폰(≤640px)에서는 이 줄이 «두 줄 카드»가 된다(2026-10-18 폰화면관리) —
+       1줄 ☐·№·이름·장수, 2줄 상태·종류. 칸이 좁아 이름이 한 글자씩 세로로 깨졌다.
+       .sl2 는 PC 에서 display:contents 라 상자가 없다 — PC 줄은 예전 그대로다. */
     h += v.rows.map((r, i) =>
-      '<div class="row' + (pickOn(siteSel, r.id) ? ' pkon' : '') + '">'
+      '<div class="row siterow' + (pickOn(siteSel, r.id) ? ' pkon' : '') + '">'
       + '<label onclick="event.stopPropagation()"><input type="checkbox" '
       + (pickOn(siteSel, r.id) ? 'checked' : '') + ' onchange="pickHit(\'sites\',\'' + jsq(r.id) + '\')"></label>'
       + '<span class="pkno">' + (i + 1) + '</span>'
@@ -1550,18 +1653,20 @@ function screenSites() {
          자리에 있는 자료가 안 보이는데도 「0건」이라 적혀, 자료가 없는 것으로
          읽혔다. 같은 사업장이 왼쪽에서는 안 열리고 여기서는 열리던 어긋남도
          이것 때문이었다(대표 지적 「분리된 느낌」). */
-      + '<b style="flex:1;cursor:pointer" onclick="openColCompany(\'' + jsq(r.id) + '\',\'' + jsq(r.name)
+      + '<b class="snm" style="flex:1;cursor:pointer" title="' + esc(r.name) + '" onclick="openColCompany(\'' + jsq(r.id) + '\',\'' + jsq(r.name)
       + '\',' + (r.mine ? 'true' : 'false') + ',\'' + jsq(r.ownerUid) + '\',\'' + jsq(r.ownerName) + '\')">'
       + esc(r.name) + '</b>'
+      + '<span class="sl2">'
       + (v.showOwner && r.owner ? '<span class="sub" style="margin:0">' + esc(r.owner) + '</span>' : '')
       /* 무엇이 왔는지를 종류별로 적는다 — 「3장」만으로는 근태표인지 급여대장인지
          모른다(대표 지시 2026-08-17). 왼쪽 좁은 칸에는 안 넣는다, 이름이 잘린다. */
       + (r.kinds && r.kinds.length
         ? '<span class="what">' + esc(r.kinds.map(k => k.label + ' ' + k.n).join(' · ')) + '</span>' : '')
+      + '</span>'
       + (function (s) {
         return '<span class="stpill ' + s.key + '" title="' + esc(s.tip) + '">' + esc(s.label) + '</span>';
       })(siteState(r))
-      + '<span class="sub" style="margin:0">' + r.count + '장</span></div>').join('');
+      + '<span class="sub scnt" style="margin:0">' + r.count + '장</span></div>').join('');
   } else {
     /* 빈 까닭을 갈라 말한다 — 「명단을 못 읽었다」와 「이 보기에 없다」는 다르다. */
     h += '<div class="empty">'
@@ -1711,15 +1816,24 @@ function guessTag(rec, companies) {
     if (mo >= 1 && mo <= 12) month = m[1] + '-' + (mo < 10 ? '0' : '') + mo;
   }
 
-  let kind = 'etc';
-  if (/근로계약|계약서/.test(text)) kind = 'contract';
-  else if (/명세서|이체|신고|취득|상실/.test(text)) kind = 'output';
-  else if (/급여대장|노임|임금대장|대장/.test(text)) kind = 'ledger';
-  else if (/근태|출근|출역|근무|시간/.test(text)) kind = 'attend';
-  /* 「급여」 + 자료 말(급여확정·급여 기초자료) — 맨 뒤에 본다. 서버 tagFor 와 같다.
-     ⚠ 「급여」 하나만으로는 안 잡는다 — 「8월급여수정 요청」이 대장이 되면 안 된다. */
-  else if (/급여/.test(text) && /확정|예정|기초|자료|내역|지급/.test(text)
-    && !/수정|요청|문의|변경|정정/.test(text)) kind = 'ledger';
+  /* 종류는 **파일 이름이 먼저다** (2026-10-17) — 서버 tagFor 와 같은 규칙.
+     제목(note)의 「상실신고 부탁」이 붙은 급여대장이 «우리 산출물»로 잡히던 것을 막는다.
+     파일 이름으로 못 가른 것만 제목까지 보고, 제목에서는 신고·취득·상실을 산출물로
+     안 본다(고객 제목의 그 말은 부탁이다). 명세서·이체도 부탁 말이 함께면 안 본다.
+     ⚠ 서버와 같아야 한다 — tests/paydata-kind-file-first.test.js 가 견준다. */
+  const kindOf = function (t, fileOnly) {
+    if (/근로계약|계약서/.test(t)) return 'contract';
+    if (fileOnly ? /명세서|이체|신고|취득|상실/.test(t)
+                 : (/명세서|이체/.test(t) && !/수정|요청|문의|변경|정정/.test(t))) return 'output';
+    if (/급여대장|노임|임금대장|대장/.test(t)) return 'ledger';
+    if (/근태|출근|출역|근무|시간/.test(t)) return 'attend';
+    /* 「급여」 + 자료 말(급여확정·급여 기초자료) — 맨 뒤에 본다. 서버 tagFor 와 같다.
+       ⚠ 「급여」 하나만으로는 안 잡는다 — 「8월급여수정 요청」이 대장이 되면 안 된다. */
+    if (/급여/.test(t) && /확정|예정|기초|자료|내역|지급/.test(t)
+      && !/수정|요청|문의|변경|정정/.test(t)) return 'ledger';
+    return '';
+  };
+  const kind = kindOf(String((rec && rec.filename) || ''), true) || kindOf(text, false) || 'etc';
 
   return { companyId: hit ? hit.id : '', companyName: hit ? hit.name : '', month: month, kind: kind };
 }
@@ -2276,7 +2390,7 @@ function takeShared() {
 }
 
 /* ══════ 메일로 온 것 — 공용 대기 칸 (대표 지시 2026-08-17) ══════
-   서버(functions/index.js receivePaydataMail)가 10분마다 다음메일을 살펴 아는
+   서버(functions/index.js receivePaydataMail)가 30분마다 다음메일을 살펴 아는
    곳에서 온 첨부를 paydata/pending_shared 에 담는다. **여태 그 칸을 읽는 화면이
    없어**, 자료는 들어오는데 아무에게도 안 보였다.
    ⚠ 서버는 「누구 자리」를 모른다 — 그래서 공용 칸이고, 사람이 **맡아야** 제
@@ -4044,9 +4158,10 @@ function screenDrawer() {
      예전에는 탭·찾기만 각자 붙어 있어, 그 위의 자리 띠·이름·달은 다 따라
      올라갔다 — 마흔 번째 자료에서 무슨 달·누구 자리인지 알 수 없었다. */
   let h = '<div class="stickhead">' + bannerHtml()
-    + '<div class="dhead">'
+    /* data-h — 폰에서 이 머리만 두 줄로 접는 손잡이(2026-10-18, CSS 폰 구간 참고) */
+    + '<div class="dhead" data-h="co">'
     + '<button class="btn sm" onclick="App.go(\'sites\')" title="사업장 목록으로">←</button>'
-    + '<b class="dtitle">' + esc(App.companyName || App.companyId) + '</b>'
+    + '<b class="dtitle" title="' + esc(App.companyName || App.companyId) + '">' + esc(App.companyName || App.companyId) + '</b>'
     + '<span class="dmeta">'
     + (at >= 0 ? (at + 1) + ' / ' + vlist.rows.length + ' · ' : '')
     + (meRow && meRow.owner ? '담당 ' + esc(meRow.owner) + ' · ' : '')
@@ -4129,13 +4244,18 @@ function screenDrawer() {
       + '<button class="btn" onclick="bulkDrawerTrash()">🗑 휴지통으로</button></span>'
     : '';
 
+  /* ⚠ 폰(≤640px)에서는 한 줄이 «두 줄 카드»가 된다(2026-10-18 폰화면관리) —
+     1줄 ☐·№·파일 이름(…로 줄이고 전문은 title), 2줄 날짜·딱지 · 폴더·🗑.
+     예전에는 이름 칸이 좁아 파일 이름이 한 글자씩 세로로 깨져 한 줄이 열 줄 높이였다.
+     .dl2·.dl2b 는 PC 에서 display:contents 라 상자가 없다 — PC 줄은 예전 그대로다. */
   h += '<div class="card">' + (rows.length ? pickBar('drawer', ids, drawerActs) + rows.map((r, i) =>
-    '<div class="row' + (pickOn(sel, r.id) ? ' pkon' : '') + '">'
+    '<div class="row drow' + (pickOn(sel, r.id) ? ' pkon' : '') + '">'
     + '<label onclick="event.stopPropagation()"><input type="checkbox" ' + (pickOn(sel, r.id) ? 'checked' : '')
     + ' onchange="pickHit(\'drawer\',\'' + esc(r.id) + '\')"></label>'
     + '<span class="pkno">' + (i + 1) + '</span>'
-    + '<b style="flex:1;cursor:pointer" onclick="openViewer(\'' + esc(r.id) + '\')">'
+    + '<b class="dnm" style="flex:1;cursor:pointer" title="' + esc(r.filename || '') + '" onclick="openViewer(\'' + esc(r.id) + '\')">'
     + esc(r.filename || '(이름 없음)') + '</b>'
+    + '<span class="dl2">'
     + (r.expired ? '<span class="expbadge">지난 것</span>' : '')
     + (r.auto ? '<span class="autobadge" title="메일에서 서버가 바로 넣었습니다 — 틀렸으면 「틀림 — 확인 대기로」">🤖</span>' : '')
     /* 누가 담았는지 — 함께 맡은 업체에서는 줄마다 다르다. 내 것은 굳이 안 적는다
@@ -4144,6 +4264,7 @@ function screenDrawer() {
       ? '<span class="bywho" title="' + esc(byName(r._by)) + ' 님이 담았습니다 — 여기서는 못 고칩니다">'
         + esc(byName(r._by)) + '</span>' : '')
     + '<span class="sub" style="margin:0">' + (r.filedAt ? new Date(r.filedAt).toLocaleDateString() : '') + '</span>'
+    + '</span><span class="dl2b">'
     + (editable && canEditRow(r)
       ? '<select class="btn" style="font-size:11.5px;padding:4px 6px" onclick="event.stopPropagation()"'
         + ' onchange="assignFolder(\'' + esc(r.id) + '\',this.value)">'
@@ -4158,7 +4279,7 @@ function screenDrawer() {
         ? '<span class="offacts" title="' + esc(byName(r._by)) + ' 님이 담은 것이라 여기서는 못 고칩니다">'
           + '📁 <span>🗑</span></span>'
         : (r.folder && App.folders[r.folder] ? '<span class="sub" style="margin:0">' + esc(App.folders[r.folder].name) + '</span>' : '')))
-    + '</div>').join('')
+    + '</span></div>').join('')
     : '<div class="empty">' + (App.query ? '찾는 자료가 없습니다.'
       : (App.folderPick !== 'all' ? '이 폴더에 담긴 자료가 없습니다.'
         : '이 칸에 담긴 자료가 없습니다. 다른 월이나 다른 종류를 보세요.')) + '</div>')
@@ -6182,7 +6303,7 @@ window.cancelDeputy = cancelDeputy;
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

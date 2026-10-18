@@ -165,8 +165,12 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
   .dt td{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
   .dt td::before{content:attr(data-label);flex:0 0 66px;color:var(--text-mute);
     font-size:11px;font-weight:700;line-height:1.5;white-space:nowrap}
-  /* 번호·빈 칸은 접는다 — 카드에서 빈 줄이 쌓이면 컴팩트한 뜻이 없다 */
-  .dt td.rownum,.dt td[data-empty]{display:none}
+  /* 빈 칸은 접는다 — 카드에서 빈 줄이 쌓이면 컴팩트한 뜻이 없다.
+     ⚠ 번호 칸(☐ + №)은 «접지 않는다» (대표 지시 2026-10-05 「모든 프로그램에 가장 왼쪽에 ㅁ 표시와
+       넘버링」 — 폰에서도 빼지 않는다). 2026-08-17 에는 번호만 든 칸이라 접었는데, 그 뒤 ☐ 가 같은
+       칸에 들어와 폰에서는 고를 길이 아예 없었다(폰화면관리 2026-10-18 실측). 아래 «카드 첫 줄»에서
+       ID·번호와 한 줄로 세운다 — 카드가 한 줄도 안 길어진다. */
+  .dt td[data-empty]{display:none}
   /* ── 관리 단추는 카드 «오른쪽» 에 세로로 (대표 지시 2026-08-20
        "첨부 삭제등 셀을 아래 말고 오른쪽으로") ──
      아래에 깔면 카드마다 줄이 하나씩 더 붙어, 스무 장이면 스무 줄이 늘어난다.
@@ -176,12 +180,25 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
        단추 칸이 첫 줄 높이에만 붙는다. 그래서 repeat(16,auto) 로 넉넉히 적어 둔다 —
        빈 줄은 auto 라 높이가 0 이고 사이도 0(row-gap 없음)이라 카드가 안 늘어난다.
      ⚠ 단추는 안쪽 style=inline-flex 로 감싸여 있어 !important 로 세워야 한다. */
-  .dt tr{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(72px,auto);
+  /* 칸은 셋 — [이름표 66px][값][단추]. 이름표 칸은 «이름표 폭과 같다» — 보통 줄은 앞 두 칸을
+     가로질러(td 안의 ::before 66px + 틈 8px) 쓰고, 첫 줄만 ☐ № 가 이름표 자리에 선다.
+     그래서 첫 줄 값(ID·번호)이 아래 줄 값들과 세로로 맞는다. */
+  .dt tr{display:grid!important;grid-template-columns:66px minmax(0,1fr) minmax(72px,auto);
     /* 72px 아래로는 안 준다 — 카드마다 단추 폭이 제각각이면 나누는 줄이
        들쭉날쭉해 목록이 어수선해 보인다 */
     grid-template-rows:repeat(16,auto);column-gap:8px;row-gap:0;align-items:start}
-  .dt td{grid-column:1}
-  .dt td:last-child{grid-column:2;grid-row:1/-1;align-self:stretch;
+  .dt td{grid-column:1 / 3}
+  /* ── 카드 첫 줄: ☐ № · ID (폰화면관리 2026-10-18) ──
+     ☐ № 는 이름표 칸에, 바로 뒤 칸(ID·번호 — 스스로 무엇인지 말하는 값)은 값 칸에 같은 줄로.
+     ⚠ 뒤 칸의 이름표(ID·번호)만 감춘다 — 값은 그대로 보인다. 다른 줄 이름표는 그대로다. */
+  .dt td.rownum{grid-column:1;grid-row:1;display:flex;align-items:center;overflow:visible!important}
+  .dt td.rownum::before{content:none}
+  .dt td.rownum + td{grid-column:2;grid-row:1}
+  .dt td.rownum + td::before{content:none}
+  /* ☐ 는 손가락으로 누를 만큼(PC 의 14px 로는 폰에서 안 맞는다). 번호 글자까지 label 이라 그것을 눌러도 골라진다 */
+  .dt td.rownum input[type=checkbox]{width:24px;height:24px}
+  .dt td.rownum label.rn-chk span{font-size:11.5px;font-variant-numeric:tabular-nums}
+  .dt td:last-child{grid-column:3;grid-row:1/-1;align-self:stretch;
     display:flex;flex-direction:column;justify-content:center;gap:4px;
     border-top:none!important;border-left:1px dashed var(--border-soft)!important;
     margin:0!important;padding:0 0 0 8px!important}
@@ -226,6 +243,27 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
   /* 홈 위쪽 여백도 줄인다 */
   .kpi-grid{gap:6px!important}
   .kpi-grid > .card{padding:9px 10px!important}
+
+  /* ── 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) ── */
+  /* ① 머리줄 — 「🚪 로그아웃」이 화면 밖으로 밀렸다(360px 실측: 「서류 보관함」·「프로필 1장」에서 364~400px).
+       머리줄은 모든 칸이 줄지 않게(.topbar>*{flex-shrink:0}) 되어 있어, 긴 화면 이름이면 맨 끝 단추가
+       옆으로 밀어야만 보이는 자리로 나갔다. «로그인한 사람» 글만 줄어들게 한다 — 넘치면 … 이고
+       전문은 PC 와 같다. 단추와 화면 이름은 그대로다. */
+  .topbar>.kc-who{flex-shrink:1;min-width:0}
+  /* ② 프로필 1장 — 설정 칸이 500px 로 박혀 있어(인라인·p1SideApply) 폰에서는 옆으로 밀리고,
+       그림(A4) 칸은 폭 0 이 되어 «아예 안 보였다». 폰에서는 위아래로 쌓는다 — 설정 위, 그림 아래.
+       설정 칸의 붙박이(sticky)·높이 한도도 푼다 — 쌓이면 붙을 자리가 없고, 한도가 있으면 칸 안에서 또 구른다.
+       ⚠ 인라인 style 을 이겨야 해서 !important 다. 접기(◀ 설정 접기)는 그대로 듣는다(display:none). */
+  .p1-wrap{grid-template-columns:minmax(0,1fr)!important}
+  #p1Side{position:static!important;max-height:none!important;overflow:visible!important}
+  /* ③ 목록 툴바 — 폰에서는 줄 수가 곧 «틀고정 높이»다(360px 실측: 위촉장 6줄 179px · 컨설팅 11줄 387px).
+       아무것도 감추지 않고, 단추의 숨(여백·글씨)만 줄여 한 줄에 둘씩 앉게 한다.
+       ⚠ 틀고정(sticky) 자체는 그대로다 — 2026-08-29 「① 툴바 틀고정」. 폰에서 풀지는 대표가 정한다. */
+  .toolbar{padding:6px 8px!important}
+  .toolbar > .btn,.toolbar > .more-wrap > .btn,.toolbar .tb-extra .btn{padding:5px 8px;font-size:11.5px}
+  /* ④ 백업 재촉 띠의 「💾 지금 백업」이 줄 끝에서 «💾 / 지금 백업» 으로 갈라졌다 — 단추 이름은 한 덩이로.
+       (띠 자체는 그대로다 — js/kcareer-notices.js 「함부로 줄이지 않는다」) */
+  #bkNotice a{white-space:nowrap}
 }
 @media (max-width:780px){ .scroll-hint{display:block;text-align:center;font-size:11px;color:var(--text-mute);margin-top:6px} }
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -621,6 +659,19 @@ html.dark [style*="color:var(--navy)"]:not([style*="background:#"]):not([style*=
 .ds-dupbar .m{color:var(--text-mute);font-size:11px}
 .ds-pv-btns{display:flex;gap:4px;flex-wrap:wrap;margin-top:5px}
 .ds-pv-btns .btn.sm{padding:2px 8px}
+/* 왼쪽 목록 칸 맨 위 — 탭·검색·단추를 모아 둔다(_dsHeadDock). 오른쪽 문서는 화면 맨 위에서 시작한다 */
+#page-docbox.ds-docked>.page{padding-top:6px}
+#page-docbox.ds-docked .db-top{display:none}
+.ds-head{border-bottom:2px solid var(--border);margin:0 0 6px;padding-bottom:6px}
+.ds-head #db-tabrow{margin:0 0 6px;border-bottom:none;flex-wrap:wrap;gap:2px}
+.ds-head #dbTools{display:block;margin:0;flex:none;width:100%}
+.ds-head #dbTools .toolbar{justify-content:flex-start;padding:0;gap:6px}
+.ds-head #dbTools .toolbar .tb-input{min-width:0!important;flex:1 1 100%}
+.ds-head #dbTools .toolbar .tb-spacer{display:none}
+.ds-head #dbTools .toolbar .btn{flex:1 1 auto}
+.ds-head #dbTools .toolbar .cnt{margin-left:auto}
+#page-docbox.ds-docked .ds-prev{top:0;max-height:100vh;overflow-y:auto}
+#page-docbox.ds-docked .ds-pv-img{max-height:max(320px,calc(100vh - 170px))}
 #page-resume-hub .rc-h,#page-docbox .rc-h{margin-bottom:6px}
 #page-resume-hub .empty,#page-docbox .empty{padding:12px 0}
 #page-resume-hub .dropzone,#page-docbox .dropzone{padding:11px 14px}
@@ -1105,6 +1156,16 @@ body:has(.modal-ov.open) .cv-pop{display:none!important}
 .pi-side #galleryGrid,.pi-side #stampGrid{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))!important}
 @media(max-width:1200px){ .pi-two{grid-template-columns:1fr} }
 @media(max-width:760px){ .pi-side{grid-template-columns:1fr} }
+/* 폰: 환경설정 › 개인정보보관의 입력칸이 화면 오른쪽 밖으로 130px 나가 본문(main)이 옆으로 굴렀다 (폰화면관리 2026-10-18 전수점검).
+   1fr 은 «내용보다 작아지지 않는» 칸이라(minmax(auto,1fr)) 안쪽의 가장 넓은 것만큼 칸이 늘었다 — 0 까지 줄 수 있게 한다. */
+@media(max-width:760px){
+  .pi-two{grid-template-columns:minmax(0,1fr)}
+  .pi-two>*,.pi-two .card,.field-grid>*{min-width:0}
+  .field-grid{grid-template-columns:minmax(0,1fr)!important}
+  /* 서류 만들기 탭 줄 — 줄어들지 않게(flex:none) 박혀 있어 「PDF 편집」 탭이 화면 밖으로 29px 밀고 본문을 굴렸다.
+     탭 줄은 원래 «제 안에서 옆으로 미는» 줄이다(.tabrow overflow-x:auto) — 줄어들게만 풀면 그 길이 산다. */
+  .rh-topbar #rh-tabrow{flex:0 1 auto;min-width:0}
+}
 #rcEditCard.rh-doc #rhwpEditor,#rcEditCard.rh-doc #rhwpEditor>*{min-height:min(78vh,980px)}
 #rcEditCard.rh-doc #rhMapList{max-height:min(62vh,760px)}
 /* ── ✍ 서식 입력판 ──
@@ -1355,6 +1416,21 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+/* ── 폰: 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」) ──
+   글이 화면 끝에서 21~24px 안쪽에서 시작했다(411px 실측) — 쪽 여백(12) + 표 상자 테두리 + 카드 테두리 +
+   카드 안 여백(10)이 겹겹이 쌓였다. 폰에서는 쪽 여백 6px · 상자 한 겹 · 상자 안 여백 7px —
+   글이 끝에서 14px 안에서 시작한다. 쪽 여백을 0 으로 하지 않는 까닭: 상자 밖 글(제목·접는 줄)이 끝에 붙는다.
+   ⚠ 이 덩이는 «맨 뒤»에 둔다 — 780px 덩이의 .page{padding:14px 12px!important} 가 앞쪽 520px 덩이의
+     .page{padding:10px 10px!important} 를 이기고 있었다(무게가 같으면 뒤가 이긴다). */
+@media(max-width:520px){
+  .page{padding:10px 6px!important}
+  /* 표 바깥 상자(흰 바탕·테두리·둥근 모서리) — 폰에서는 줄마다 카드라 카드 한 겹이면 된다 */
+  .dt table{background:transparent;border:0;border-radius:0!important;box-shadow:none}
+  .dt tr{padding:6px 7px}
+  .card{padding:8px 7px!important}
+  .toolbar{padding:6px 7px!important}
+  .sel-bar,.dup-badge-bar{padding-left:7px!important;padding-right:7px!important}
+}
 </style>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="hwpx_gen.js?v=14"></script>
@@ -1366,12 +1442,13 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- ⚠ 양식 원본을 창고에 두려면 이 줄이 있어야 한다 — 없으면 firebase.storage 가 없어
      다른 PC 에서 「원본을 찾을 수 없습니다」로 되돌아간다 (2026-09-21) -->
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-addr.js?v=2"></script>
+<script src="js/pu-zip.js?v=1"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/kcareer-scan.js?v=2"></script>
@@ -1407,7 +1484,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
 <!-- 파일이름으로 원본 짝짓기 — 잣대를 떼어 내 «돌려 볼 수 있게» 했다(kcareer-fnmatch.js) -->
 <script src="js/kcareer-fnmatch.js?v=1"></script>
 <!-- 화면 맨 위 「띠」를 언제 띄울지 — 폰 거짓 경보를 끊는 자(kcareer-notices.js) -->
-<script src="js/kcareer-notices.js?v=3"></script>
+<script src="js/kcareer-notices.js?v=4"></script>
 <!-- 「합치기」 안전장치 — 다른 서류를 합쳐 잃지 않게 막는다(kcareer-mergeguard.js) -->
 <script src="js/kcareer-mergeguard.js?v=1"></script>
 <!-- 「잘못 붙은 원본 찾기」 — 기록 날짜와 붙은 파일 이름이 크게 어긋난 줄을 찾는다 -->
@@ -1425,7 +1502,7 @@ body.rh-work-on #rcTplLib,body.rh-work-on #rhUploadBar{display:none!important}
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
-  <script src="js/pu-appbar.js?v=29"></script>
+  <script src="js/pu-appbar.js?v=33"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -8310,7 +8387,21 @@ async function cdReOcr(id){
   }catch(e){ console.warn('cdReOcr', e); toast('읽기 실패 — 원본을 확인해 주세요'); }
 }
 
+/* ★ 탭·검색·단추를 «왼쪽 목록 칸 맨 위»로 (대표 승인 2026-10-12 「캡쳐1 왼쪽으로 모두 정리 · 오른쪽 문서는 위로 최대한」)
+   목록을 다시 그릴 때(innerHTML) 옮겨 둔 줄이 같이 지워지지 않게 «먼저 제자리(.db-top)로» 돌려놓고, 그린 뒤에 다시 얹는다.
+   ⚠ 줄(노드)을 «옮길 뿐» 새로 만들지 않는다 — 단추 이벤트·검색칸 값이 그대로 산다. */
+function _dsHeadPark(){
+  var top=document.querySelector('#page-docbox .db-top'); if(!top) return;
+  ['db-tabrow','dbTools'].forEach(function(id){ var el=document.getElementById(id); if(el && el.parentNode!==top) top.appendChild(el); });
+  var pg=document.getElementById('page-docbox'); if(pg) pg.classList.remove('ds-docked');
+}
+function _dsHeadDock(domain){
+  var head=document.getElementById('dsHead-'+domain), pg=document.getElementById('page-docbox'); if(!head||!pg) return;
+  ['db-tabrow','dbTools'].forEach(function(id){ var el=document.getElementById(id); if(el) head.appendChild(el); });
+  pg.classList.add('ds-docked');
+}
 function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.getElementById(D.page); if(!sec) return;
+  if(domain==='resume'||domain==='profile'||domain==='feedoc'||domain==='certdoc') _safe(_dsHeadPark);
   _safe(function(){ dbToolsMount((typeof _dbDomain!=='undefined'&&_dbDomain)||'resume'); });
   const arr=get(D.store);
   const orgSel=document.getElementById(D.orgFilter); if(!orgSel) return; const cur=orgSel.value;
@@ -8389,9 +8480,10 @@ function renderDocStore(domain){ const D=DOMAINS[domain]; const sec=document.get
   const 겹침줄=겹침.clusters?`<div class="ds-dupbar">⚠ 같은 서류가 겹쳐 있습니다 — ${겹침.clusters}묶음 · 이전 판 ${겹침.old}건`
     +(겹침.kept?` <span class="m">(제출기록이 있는 ${겹침.kept}건은 정리에서 뺍니다)</span>`:'')
     +`<span style="flex:1"></span>`+(겹침.cleanable?`<button class="btn sm" onclick="dsDupClean('${domain}',this)">이전 판 한 번에 정리</button>`:'')+`</div>`:'';
-  body.innerHTML=allChk+dsBar+겹침줄+`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list">${목록}</div>`
+  body.innerHTML=`<div class="ds-split" style="--ds-pv:${dsPvWidth()}px"><div class="ds-list"><div class="ds-head" id="dsHead-${domain}"></div>${allChk}${dsBar}${겹침줄}${목록}</div>`
     +`<div class="ds-gut" title="끌어서 폭을 바꿉니다 · 두 번 누르면 처음 폭" onmousedown="dsGutDown(event)" ondblclick="dsGutReset()"></div>`
     +`<div class="ds-prev" id="dsPrev-${domain}"></div></div>`;
+  _safe(function(){ _dsHeadDock(domain); });
   _safe(function(){ dsSameCheck(body); });
   _safe(function(){ var 고른=_dsPicked[domain]; if(고른) [].forEach.call(body.querySelectorAll('[data-dsrow]'), function(el){ if(el.getAttribute('data-id')===고른) el.classList.add('pick'); }); dsPrevDraw(domain); });
   _safe(function(){ bindDragSel(body, function(){ docSelSync(domain); }); });
@@ -13538,7 +13630,7 @@ function renderPersonal(){ const g=document.getElementById('piGrid'); if(!g) ret
         +`<div style="display:flex;gap:6px"><input id="pi-${k}" type="password" autocomplete="off" value="${v}" style="flex:1">`
         +`<button type="button" class="btn sm" onclick="piPeek('${k}',this)" title="잠깐 보기">보기</button></div></div>`;
     }).join('')+`</div></div>`).join('');
-  renderPersonalDocs(); renderPiEdu(); }
+  renderPersonalDocs(); renderPiEdu(); piAutoZip(); }
 /* ===== 한자 성명 고르기 =====
    ⚠ 후보를 «고르게만» 한다. 같은 소리에 한자가 여럿이고 어느 것이 본인 이름인지는
       본인만 안다 — 지어서 넣으면 위촉 서류에 틀린 이름이 박힌다.
@@ -15447,7 +15539,7 @@ function packOpen(){
 }
 async function _pkPdfText(bytes){
   if(!(await _pdfLoadLib())) return '';
-  var doc=await window._pdfjs.getDocument({data:bytes.slice()}).promise, out=[];
+  var doc=await window._pdfjs.getDocument({isEvalSupported:false, data:bytes.slice()}).promise, out=[];
   for(var i=1;i<=doc.numPages;i++){
     var tc=await (await doc.getPage(i)).getTextContent(), line='', lastY=null;
     tc.items.forEach(function(it){ var y=Math.round(it.transform[5]); if(lastY!==null && Math.abs(y-lastY)>3){ out.push(line); line=''; } line+=it.str; lastY=y; });
@@ -15669,7 +15761,7 @@ async function packCheck(){
 /* 쪽을 보이는 그대로 그림으로 (글꼴 없는 쪽) — 150dpi */
 async function _pkRasterPages(bytes, idxs){
   if(!(await _pdfLoadLib())) throw new Error('PDF 그리기 도구를 못 받았습니다');
-  var doc=await window._pdfjs.getDocument({data:bytes.slice()}).promise, out={};
+  var doc=await window._pdfjs.getDocument({isEvalSupported:false, data:bytes.slice()}).promise, out={};
   for(var i=0;i<idxs.length;i++){
     var pg=await doc.getPage(idxs[i]+1), vp=pg.getViewport({scale:150/72}), c=document.createElement('canvas');
     c.width=Math.ceil(vp.width); c.height=Math.ceil(vp.height);
@@ -19942,7 +20034,7 @@ function renderFirmTab(){
       : (lv ? '<span class="firm-src loc">여기서 적음</span>' : '<span class="firm-src none">비어 있음</span>');
     var wide=(k==='addr')?' style="grid-column:1/-1"':'';
     var 칸=ev
-      ? '<input class="firm-ro" readonly value="'+_jsAttr(ev)+'" title="푸른이알피 회사정보에서 옵니다 — 고치려면 이알피에서 고치세요">'
+      ? '<input class="firm-ro" data-firm-ro="'+k+'" readonly value="'+_jsAttr(ev)+'" title="푸른이알피 회사정보에서 옵니다 — 고치려면 이알피에서 고치세요">'
       : '<input data-firm="'+k+'" value="'+_jsAttr(lv)+'" placeholder="이알피에 없습니다 — 여기서 적어 두세요">';
     /* ★ 📮 우편번호는 주소로 찾아 넣는다 (대표 지시 2026-09-28) — 이알피가 준 값이면 단추를 안 둔다(못 고친다) */
     if(k==='zip' && !ev){
@@ -19964,6 +20056,7 @@ function renderFirmTab(){
       +'<br>이알피 값을 고치려면 <b>푸른이알피 › 회사정보</b>에서 고치세요 — 그러면 모든 서류가 함께 바뀝니다.';
   }
   _safe(renderFirmSeal);
+  firmAutoZip();
 }
 /* ── 🏢 법인 도장 (대표 지시 2026-10-09) ──
    도장 보관함의 한 줄에 firm:true 를 단다 — 하나만. 그림은 보관함 한 곳에 있다.
@@ -20031,6 +20124,8 @@ function firmTabSave(quiet){
    ⚠★ «누를 때만» 받는다 — 부팅 때 남의 스크립트를 싣지 않는다.
    ⚠ 적힌 주소로 «미리 찾아 둔 채» 연다 — 맞는 것을 한 번 누르면 우편번호가 들어가고 곧바로 저장된다.
      사람 손을 아예 안 거치려면 카카오 REST 열쇠가 필요하다(위젯은 결과를 코드로 못 읽는다).
+     → 2026-10-17 부터 서버(zipLookup)가 그 열쇠로 찾아 준다 — 아래 piAutoZip·firmAutoZip 이 저절로 넣는다.
+       이 「📮 찾기」는 한 곳으로 딱 떨어지지 않을 때 쓰라고 그대로 둔다.
    ⚠ 주소 칸은 «비어 있을 때만» 채운다 — 찾은 도로명 주소에는 건물명·호수가 없어 적어 둔 것이 줄어든다. */
 var KC_POSTCODE_SRC='https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js';
 function _kcLoadPostcode(){
@@ -20100,6 +20195,42 @@ async function firmZipFind(){
     var aa=칸('addr'); if(aa && !aa.value.trim() && r.address) aa.value=r.address;
     firmTabSave(true);
     toast('📮 우편번호 '+r.zipcode+' 을 넣고 저장했습니다');
+  });
+}
+/* ── 📮 우편번호 저절로 넣기 (대표 지시 2026-10-17 「우편번호찾기 기능있는데 자동으로 니가 찾아서 항상 입력해라」) ──
+   주소는 있는데 우편번호가 비면 서버(zipLookup — 카카오 주소검색)에 물어 그 칸을 채운다(js/pu-zip.js).
+   ⚠★ 한 곳으로 딱 떨어질 때만 넣는다 — 갈리면 위 「📮 찾기」 단추가 그대로 남는다.
+   ⚠ 위 찾기처럼 «넣고 저장»하되, 저장은 «우편번호 한 칸»만 한다 — 그것도 저장된 주소가 찾은 주소와 같고
+     저장된 우편번호가 빌 때만. 폼 전체를 저장(savePersonalInfo·firmTabSave)하면 치던 다른 칸까지 담기고,
+     다시 그려서 입력 중인 칸을 빼앗는다. 아직 저장 안 한 주소로 찾은 것은 칸에만 넣는다 —
+     사람이 저장할 때(그 두 함수가 칸 값을 읽는다) 함께 담긴다.
+   ⚠ 서버로 가는 것은 주소 글자뿐이다(이름·주민번호는 안 간다). */
+function piAutoZip(){
+  if(!window.PuZip) return;
+  Object.keys(PI_ZIP_OF).forEach(function(k){
+    var zk=PI_ZIP_OF[k];
+    PuZip.bind(document.getElementById('pi-'+k), document.getElementById('pi-'+zk), function(z, a){
+      var o=piObj(), 담음=false;
+      if(String(o[k]||'').trim()===a && !String(o[zk]||'').trim()){ o[zk]=z; 담음=set('profile_info',o)!==false; }
+      toast('📮 우편번호 '+z+' — 적어 둔 주소로 찾아 '+(담음?'넣고 저장했습니다':'넣었습니다 · 「기본정보 저장」을 누르면 담깁니다'), 4000);
+    });
+  });
+}
+/* 법인정보 — 이알피가 주소를 주면 그 주소(읽기 전용 칸)로 찾는다. 이알피가 우편번호를 주면 칸이 없어 안 묻는다 */
+function firmAutoZip(){
+  if(!window.PuZip) return;
+  var g=document.getElementById('firmGrid'); if(!g) return;
+  var zEl=g.querySelector('input[data-firm="zip"]');
+  var aEl=g.querySelector('input[data-firm="addr"]')||g.querySelector('input[data-firm-ro="addr"]');
+  PuZip.bind(aEl, zEl, function(z, a){
+    var l=firmLocal(), 담음=false;
+    if(String(firmInfo().addr||'').trim()===a && !String(l.zip||'').trim()){
+      l.zip=z; l.savedAt=Date.now();
+      /* firmTabSave 와 같은 자리·같은 길 — LS.set 은 꽉 차면 false, 클라우드는 fbScheduleAuto 로 */
+      try{ 담음=LS.set(NS+FIRM_LOCAL, JSON.stringify(l))!==false; }catch(e){}
+      if(담음 && typeof fbScheduleAuto==='function') fbScheduleAuto(FIRM_LOCAL);
+    }
+    toast('📮 우편번호 '+z+' — 적어 둔 주소로 찾아 '+(담음?'넣고 저장했습니다':'넣었습니다 · 「법인정보 저장」을 누르면 담깁니다'), 4000);
   });
 }
 /* ── 📎 법인 서류로 채우기 (대표 지시 2026-09-28 「신분증 계좌의 형태와 같이 한화면에서 정보 ocr 입력」) ──
@@ -22219,9 +22350,8 @@ function _fbDoPush(hereTotal, quiet, o){
       var 앞섬=/permission|PERMISSION_DENIED/i.test(String((ex&&ex.code)||'')+' '+String((ex&&ex.message)||ex));
       if(앞섬){
         /* 다른 기기가 먼저 올렸다 — 이 기기 고침은 그대로 두고(표시도 그대로) 사람이 고르게 한다 */
-        fbShowNotice('newer');
-        if(!_fbDoPush._said || Date.now()-_fbDoPush._said>60000){ _fbDoPush._said=Date.now();
-          toast('☁ 다른 기기가 먼저 저장해 이 기기 고침을 올리지 않았습니다 — 위 띠에서 «저장(이 기기 것)» 또는 «불러오기»를 골라 주세요', 9000); }
+        /* ★ 띠로 사람에게 떠넘기지 않는다 — 클라우드와 «합쳐서» 다시 올린다(fbNewerSync). 합치기가 계속 실패해야 띠가 뜬다 */
+        if(!_fbMerging) setTimeout(fbNewerSync, 800);
       }else if(!_fbDoPush._said || Date.now()-_fbDoPush._said>60000){ _fbDoPush._said=Date.now();
         toast('☁ 클라우드 저장 실패 — '+((ex&&ex.message)||ex)+' · 고친 것은 이 기기에 있고 다음에 다시 올립니다', 7000); }
       throw ex;
@@ -22426,30 +22556,56 @@ function fbFirstSync(){
    올리기도 멈춘 채 서로 달라진 채로 남았다(누를 때까지). 받아도 잃을 것이 없으면 받는다.
    ⚠ 이 기기에 안 올라간 고침(_fbpending)이 있으면 받지 않는다 — 띠로 사람이 고른다(덮으면 그 고침이 사라진다).
    ⚠ 창(모달)이 열려 있으면 받지 않는다 — 새로고침이 쓰던 것을 날린다. 띠만 띄운다. */
-var _fbNewerTried=false;
+var _fbMerging=false, _fbMergeFails=0, _fbBusyWait=0;
+/* ★★ 두 기기가 서로 고쳤으면 «합친다» — 띠로 한쪽을 버리게 하지 않는다 (대표 지시 2026-10-18)
+   「폰 하면서 코딩하는데 항상 상단에 다른 기기에 데이터 관련돼서 체크 항목이 나온다 — 한 번에 해결하고 표시 안 나오게」.
+   ■ 예전엔 막다른 길이었다: 클라우드가 새것이면 올리기를 멈추고, 이 기기에 안 올라간 고침이 있으면 받기를 멈췄다.
+     폰과 PC 가 둘 다 고치면 «둘 다 막혀» 사람이 「불러오기」(이 기기 고침 버림)나 「저장」(PC 고침 버림)을 누를 때까지 띠가 남았다.
+   ■ 이제: 클라우드를 읽어 «번호별로 합치고»(KcareerNotices.mergeLs — 더하기만, 지운 기록표 존중) → 이 기기에 쓰고 → 클라우드에 올린다.
+     띠는 «합치지 못했을 때»만 뜬다(저장 공간 부족·여러 번 실패 등).
+   ⚠ 창이 열려 있거나 한글 서식·폴더 담기 중이면 «기다린다» — 새로고침이 쓰던 것을 날린다. 띠도 띄우지 않고 15초 뒤 다시 본다(최대 40번).
+   ⚠ 합친 결과가 이 기기와 같으면 새로고침하지 않는다. 클라우드와 같으면 올리지 않는다. */
+function _fbSame(a, b){
+  if(a===b) return true;
+  try{
+    var x=JSON.parse(a), y=JSON.parse(b);
+    if(Array.isArray(x)&&Array.isArray(y)&&x.length===y.length&&x.length&&x[0]&&x[0].id!=null){
+      var m={}; y.forEach(function(r){ if(r&&r.id!=null) m[String(r.id)]=JSON.stringify(r); });
+      return x.every(function(r){ return r&&r.id!=null&&m[String(r.id)]===JSON.stringify(r); });
+    }
+  }catch(e){}
+  return false;
+}
 function fbNewerSync(){
   if(!fbAutoOn()) return;                           /* 꺼 두었으면 저절로 받지 않는다(☁ 불러오기는 그대로 된다) */
-  var pending=!!_fbPendingNow();
-  /* 창이 열려 있거나 · 한글 서식을 쓰는 중이거나 · 폴더에서 여러 개를 담는 중이면 새로고침하지 않는다 */
+  /* 창이 열려 있거나 · 한글 서식을 쓰는 중이거나 · 폴더에서 여러 개를 담는 중이면 새로고침하지 않는다 — 띠 없이 잠시 뒤 다시 */
   var busy=!!document.querySelector('.modal-ov.open') || (typeof _rhDoc!=='undefined' && _rhDoc && _rhDoc.bytes) || !!window._kcBusyImport;
-  if(_fbNewerTried || pending || busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
-  _fbNewerTried=true;
+  if(busy && _fbBusyWait<40){ _fbBusyWait++; setTimeout(fbNewerSync, 15000); return; }
+  if(busy || KC_SAFE || kcNoPush() || !fbUid || !fbDb){ fbShowNotice('newer'); return; }
+  if(_fbMerging) return;
+  _fbMerging=true; _fbBusyWait=0;
+  var 실패=function(e){ _fbMerging=false; _fbMergeFails++;
+    if(e) console.warn('fbNewerSync', e);
+    if(_fbMergeFails<5){ setTimeout(fbNewerSync, 4000*_fbMergeFails); }   /* 다른 기기가 또 저장했을 수 있다 — 조금 뒤 다시 합친다 */
+    else fbShowNotice('newer'); };
   fbDb.ref('kcareer/'+fbUid).once('value').then(function(snap){
     var v=snap.val();
-    if(!v||!v.ls){ fbShowNotice('newer'); return; }
-    /* 같은 PC 다른 탭이 방금 올린 것이면 받을 것이 없다 — 새로고침하지 않는다 */
-    if(v.at && v.at===fbGetBase()){ _fbNewerTried=false; fbHideNotice(); return; }
-    var r=KcareerNotices.firstPullLoss(fbGatherLS(), v.ls, FB_SKIP.concat(FB_UNION), TOMB_KEY);
-    if(!r.safe){ fbShowNotice('newer'); return; }
-    /* 받는 사이에 이 기기에서 고친 것이 생겼으면 덮지 않는다 */
-    if(_fbPendingNow()){ fbShowNotice('newer'); return; }
-    if(kcRestoreFailed(kcApplyRestore(v.ls, 'pull'))) return;
-    if(v.at) fbSetBase(v.at);
-    _fbPendingClear(null);
-    fbHideNotice();
-    toast('☁ 다른 기기('+(v.device||'')+')에서 저장한 최신 기록을 받아 왔습니다 — 새로고침합니다', 5000);
-    kcReload(1500);
-  }).catch(function(e){ console.warn('fbNewerSync', e); fbShowNotice('newer'); });
+    if(!v||!v.ls){ _fbMerging=false; fbShowNotice('newer'); return; }
+    /* 같은 PC 다른 탭이 방금 올린 것이면 받을 것이 없다 */
+    if(v.at && v.at===fbGetBase()){ _fbMerging=false; _fbMergeFails=0; fbHideNotice(); if(_fbPendingNow()) _fbSchedulePush(); return; }
+    var here=fbGatherLS();
+    var m=KcareerNotices.mergeLs(here, v.ls, { skip:FB_SKIP, tombKey:TOMB_KEY });
+    var keys=Object.keys(m.ls);
+    var 내게=keys.some(function(k){ return !_fbSame(m.ls[k], here[k]); });
+    var 구름에=keys.some(function(k){ return !_fbSame(m.ls[k], v.ls[k]); });
+    /* 받는 사이에 또 고쳤으면 그 고침까지 합쳐야 한다 — 다시 읽는다 */
+    if(내게){ if(kcRestoreFailed(kcApplyRestore(m.ls, 'pull'))){ _fbMerging=false; return; } }
+    fbSetBase(v.at);
+    var 끝=function(){ _fbMerging=false; _fbMergeFails=0; fbHideNotice();
+      if(내게){ toast('☁ 폰·PC 기록을 합쳤습니다'+(m.fromLocal?(' (이 기기에만 있던 '+m.fromLocal+'건 포함)'):'')+' — 새로고침합니다', 5000); kcReload(1500); } };
+    if(!구름에){ _fbPendingClear(null); 끝(); return; }      /* 클라우드는 이미 같다 — 올릴 것 없음 */
+    _fbDoPush(_fbCounts(null).total, true).then(끝, 실패);
+  }).catch(실패);
 }
 /* ★ 직원 «보기 전용»에서는 클라우드로 «올리지 않는다» (대표 지시 2026-09-02).
    사본에서 읽은 대표 기록이 직원 자기 칸(kcareer/{직원uid})에 눌러앉으면,
@@ -22590,7 +22746,7 @@ _safe(()=>setTimeout(()=>{ initNavDrag(); initTabScroll(); initSideResize(); },1
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return rhBackGuard(); });   /* 먼저 단 것이 나중에 물린다 — 떠 있는 창을 먼저 닫고, 그다음 서식에서 나간다 */
   PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>

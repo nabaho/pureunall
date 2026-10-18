@@ -44,11 +44,11 @@
     { key: 'consult', row: 'client', name: '정부사업일정', icon: '📅', url: 'gov-consulting.html', desc: '보고서 일정및사진관리' },
     /* 컨설팅보고서(2026-10-10) — 포털 타일과 짝. 쓰는 일은 정부사업일정의 보고서 창이 한다 */
     { key: 'govreport', row: 'client', name: '컨설팅보고서', icon: '📑', url: 'gov-report.html',     desc: '보고서 현황·작성' },
+    { key: 'govaid',  row: 'client', name: '정부지원금',   icon: '🎯', url: 'pu-govaid.html',      desc: '지원사업 찾기·검토' },
     { key: 'work',    row: 'store', name: '업무관리',     icon: '📋', url: 'work.html',           desc: '주간 업무기록' },
     { key: 'career',  row: 'inside', name: '경력관리',     icon: '🗂', url: 'kcareer.html',        desc: '개인 이력서', adminOnly: true },
     { key: 'govbid',  row: 'sales', name: '정부사업신청', icon: '🏛', url: 'gov.html',            desc: '공고 모아보기', adminOnly: true },
     { key: 'rehabad', row: 'sales', name: '회생광고',     icon: '⚖️', url: 'rehab-ad.html',       desc: '회생기업 안내 발송', adminOnly: true },
-    { key: 'govaid',  row: 'sales', name: '정부지원금',   icon: '🎯', url: 'pu-govaid.html',      desc: '지원사업 찾기·검토' },
     { key: 'signboard', row: 'sales', name: '전광판',   icon: '📺', url: 'pu-signboard.html', desc: '외부 전광판 광고 바꾸기', perm: 'signboard' },
     { key: 'cards',   row: 'store', name: '기업정보함',    icon: '📇', url: 'pu-cards.html',       desc: '사업자·명함·계약서' },
     /* ⚠ 메일은 기업정보함과 같은 파일이고 주소(?view=mail)만 다르다.
@@ -248,6 +248,132 @@
     return y;
   }
 
+  /* ══ 폰: 떠 있는 것은 «손잡이 하나»만 (대표 지시 2026-10-18 「폰화면관리」) ══════════
+     폰 전수점검(tools/phone-audit)에서 재 보니 거의 모든 앱에서 «떠 있는 단추 셋»이 목록을 덮었다 —
+       · 「즐겨찾기」 손잡이(오른쪽 가운데, 25×78) — 줄 끝의 금액·기한·남은 날을 덮는다
+       · 「최신」(오른쪽 아래, 62×29) · 「백업·복구」(왼쪽 아래, 78×32, 관리자) — 목록 아래쪽 줄과 ＋단추 옆을 덮는다
+     하루에 한 번도 안 누르는 둘이 화면을 늘 차지하고 있었다.
+     ★ 그래서 폰에서는 «최신·백업·복구»를 손잡이 목록 맨 아래 두 줄로 옮기고, 손잡이는 가늘게 한다.
+       포털이 같은 둘을 ⋯ 안으로 넣은 것(enter.html moreDock)·정부사업일정 ⋯ 메뉴와 같은 길이다.
+     ⚠ 새 버전이 «있을 때»(data-state="has")와 확인 중·결과를 알리는 동안은 「최신」을 그대로 띄운다 —
+       눌러야 할 일이 생기면 눈에 띄어야 한다(pu-version.js 가 state 를 적는다).
+     ⚠ PC 는 그대로다 — 자리가 넉넉하다.
+     ⚠ 단추를 지우지 않고 «숨기기만» 한다 — 목록의 줄이 그 단추를 눌러 준다(같은 일을 두 벌 만들지 않는다).
+     ⚠ 이 규칙은 앱바를 싣는 앱에만 걸린다. 포털(enter.html)은 앱바를 안 싣고 제 ⋯ 를 쓴다. */
+  var PHONE_MQ = '(max-width:640px)';
+  function isPhone() {
+    try { return !!(global.matchMedia && global.matchMedia(PHONE_MQ).matches); } catch (e) { return false; }
+  }
+  function phoneCss() {
+    try { phoneCssNow(); } catch (e) { /* 꾸밈 한 벌이 안 붙어도 손잡이·이동은 그대로 돈다 */ }
+  }
+  function phoneCssNow() {
+    if (!document.head || document.getElementById('pu-appbar-phone-css')) return;
+    var st = document.createElement('style');
+    st.id = 'pu-appbar-phone-css';
+    st.textContent = '@media ' + PHONE_MQ + '{' +
+      /* 손잡이를 가늘게 — 글자는 그대로 «즐겨찾기»(어느 앱에서나 같은 자리·같은 말).
+         2026-10-18 「양옆 빈공백 … 모두 채워서」로 본문이 화면 끝 8~14px 까지 오게 되어, 손잡이도 그 옆 여백 안에 들게 더 가늘게(약 13px) */
+      '[data-pu-appbar-tab]{padding:8px 1px!important;font-size:9.5px!important;letter-spacing:0!important;opacity:.6!important}' +
+      'body>#pu-version-fab[data-state="ok"]{display:none!important}' +
+      /* 「새 버전 있음 · 누르기」는 바닥 가까이 — 높이는 아래 fabLift 가 잰다(바닥 막대가 있으면 그 위) */
+      'body>#pu-version-fab{bottom:calc(var(--pu-fab-bottom,' + FAB_LOW + 'px) + env(safe-area-inset-bottom,0px))!important}' +
+      'body>#pu-backup-admin-button{display:none!important}' +
+      '}';
+    document.head.appendChild(st);
+  }
+  /* 「새 버전 있음 · 누르기」를 폰에서 바닥 가까이 (대표 지시 2026-10-18 「너무 위에 있다 … 위치를 조금 낮게」)
+     공용 pu-version.js 의 bottom:96px 는 PC 와 앱바 없는 화면(카메라 셔터·포털 📷)을 비키는 높이라 그대로 두고,
+     앱바 앱의 폰에서만 바닥 FAB_LOW 로 내린다(위 phoneCss 의 --pu-fab-bottom).
+     ★ 그 자리에 «화면에 박힌 것»이 있으면 그 위로 올린다 — 단추가 그 누를 것을 늘 덮으면 안 된다.
+       2026-10-18 폰 전수(23앱 · 360·411px)에서 바닥 가까이에 박힌 것:
+         업무관리 빠른 입력줄(fixed, 바닥 14px) · 경력관리 바닥 탭(fixed) · 기업정보함 ＋·선택 막대(fixed) ·
+         메일 ✏️ 쓰기(fixed 몸통 안의 absolute) · 취업규칙 쪽 막대(sticky bottom — 사업장 50곳 넘을 때). 쪽 막대는 폰에서 두세 줄로 접혀 높이가 화면마다 달라
+       숫자로 박지 않고 그때그때 잰다.
+     ⚠ 평소(「최신」)에는 폰에서 단추가 숨어 있어 재지 않는다 — 새 버전·확인 중·결과일 때만 돈다.
+     ⚠ 앱에서 이 단추 자리를 따로 박지 말 것 — 두 곳이 정하면 한쪽만 고쳐진다. */
+  var FAB_LOW = 24, FAB_GAP = 8;
+  function fabLift() {
+    var fab = document.getElementById('pu-version-fab');
+    if (!fab || !isPhone() || !document.elementFromPoint) return;
+    if (global.getComputedStyle(fab).display === 'none') return;
+    var W = global.innerWidth, H = global.innerHeight, r = fab.getBoundingClientRect(), top = H;
+    var vis = fab.style.visibility;
+    fab.style.visibility = 'hidden';                 // 단추 «밑»을 본다
+    // 다섯 × 세 점 — 둥근 ＋ 단추(기업정보함)는 모서리가 비어 성긴 점으로는 빠진다(360px 실측)
+    [0.02, 0.25, 0.5, 0.75, 0.98].forEach(function (fx) {
+      var x = r.left + r.width * fx;
+      [3, r.height / 2, r.height - 3].forEach(function (dy) {
+        var y = H - FAB_LOW - dy;
+        // 위로 올라가며 «화면에 박힌 것»을 찾는다 — 스크롤해도 그 자리에 그대로 있어 단추가 늘 덮게 되는 것
+        for (var e = document.elementFromPoint(x, y), abs = null; e && e !== document.body && e !== document.documentElement; e = e.parentElement) {
+          var cs = global.getComputedStyle(e), p = cs.position;
+          if (/(auto|scroll)/.test(cs.overflowY) && e.scrollHeight > e.clientHeight) abs = null;   // 스크롤 상자 안의 것은 같이 움직인다
+          else if (p === 'absolute' && !abs) abs = e;
+          if (p !== 'fixed' && p !== 'sticky') continue;
+          // sticky 는 «바닥에» 붙는 것만 막대다 — 옆으로만 붙는 이름칸(업무관리 타임라인)은 위아래로 흘러가니
+          // 그때마다 비키면 스크롤할 때 단추가 오르내린다
+          if (p === 'sticky' && cs.bottom === 'auto') continue;
+          var b = e.getBoundingClientRect();
+          // 작은 fixed/sticky 는 그 자체가 막대(쪽 막대·빠른 입력줄·바닥 탭). 화면 거의 전부인 fixed(메일처럼 앱 몸통)는
+          // 막대가 아니고, 그 «안에 박힌» absolute(메일 ✏️ 쓰기)만 비킨다
+          var hit = b.width * b.height < W * H * 0.5 ? e : abs;
+          var ht = hit ? (hit === e ? b.top : hit.getBoundingClientRect().top) : H;
+          // 막대는 화면 아래쪽 절반에 있다 — 위까지 닿는 판(메일 서랍처럼 몸통 안의 absolute)은 막대가 아니다.
+          // 그것까지 비키면 단추가 화면 밖으로 나간다(2026-10-18 실측: 메일 서랍에서 808px)
+          if (ht >= H / 2) top = Math.min(top, ht);
+          break;
+        }
+      });
+    });
+    fab.style.visibility = vis;
+    var want = top < H ? Math.ceil(H - top + FAB_GAP) : FAB_LOW;
+    document.documentElement.style.setProperty('--pu-fab-bottom', want + 'px');
+  }
+  var fabWatching = false, fabTimer = 0;
+  function fabSoon() {
+    if (fabTimer) return;
+    fabTimer = setTimeout(function () { fabTimer = 0; try { fabLift(); } catch (e) { /* 못 재면 바닥 FAB_LOW 그대로 */ } }, 120);
+  }
+  /* 단추 상태가 바뀔 때(새 버전을 찾았을 때)·스크롤·폭 바뀜·누름(쪽 넘김으로 막대가 생기고 없어진다) 뒤에 다시 잰다 */
+  function fabWatch() {
+    if (fabWatching || !global.MutationObserver || !global.addEventListener) return;
+    var fab = document.getElementById('pu-version-fab');
+    if (!fab) return;                                // 아직 안 붙었다 — auto() 가 1.2초 뒤 한 번 더 부른다
+    fabWatching = true;
+    new global.MutationObserver(fabSoon).observe(fab, { attributes: true, attributeFilter: ['data-state'] });
+    global.addEventListener('scroll', fabSoon, { capture: true, passive: true });
+    global.addEventListener('resize', fabSoon);
+    global.addEventListener('click', fabSoon, true);
+    fabSoon();
+  }
+  /* 폰에서만 목록 맨 아래에 붙는 두 줄 — 숨긴 단추를 대신 눌러 준다 */
+  function phoneRows(pop) {
+    if (!isPhone()) return;
+    var acts = [
+      { id: 'pu-version-fab', label: '🔄 새 버전 확인', key: 'version' },
+      { id: 'pu-backup-admin-button', label: '🗄 백업·복구', key: 'backup' }
+    ];
+    var box = null;
+    acts.forEach(function (a) {
+      var target = document.getElementById(a.id);
+      if (!target) return;                       // 백업·복구는 관리자에게만 생긴다
+      if (!box) {
+        box = document.createElement('div');
+        box.style.cssText = 'display:flex;gap:6px;padding:6px 10px;border-top:1px solid #eef2f6;background:#fff';
+        pop.appendChild(box);
+      }
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('data-pu-phone-act', a.key);
+      b.textContent = a.label;
+      b.style.cssText = 'flex:1;min-width:0;white-space:nowrap;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;' +
+        'border-radius:7px;padding:8px 6px;font:700 12px/1.2 -apple-system,"Malgun Gothic",sans-serif;cursor:pointer';
+      b.addEventListener('click', function () { closePop(); try { target.click(); } catch (e) {} });
+      box.appendChild(b);
+    });
+  }
+
   function openPop(btn) {
     if (_pop) { closePop(); return; }
     var r = btn.getBoundingClientRect();
@@ -353,6 +479,7 @@
     home.addEventListener('click', function () { closePop(); navTo('enter.html?' + bust(), null); });
     foot.appendChild(home);
     pop.appendChild(foot);
+    phoneRows(pop);
 
     document.body.appendChild(pop);
     _pop = pop;
@@ -483,6 +610,8 @@
        앱이 mount({current}) 로 알려 준 것을 빈 값으로 지워 버리면
        「보던 화면」이 어느 앱 것인지 몰라 기록이 안 남는다. */
     _me = whoAmI() || _me;
+    phoneCss();
+    try { fabWatch(); } catch (e) { /* 자리 재기가 안 돌아도 단추는 바닥 FAB_LOW 에 그대로 있다 */ }
     if (document.querySelector('[data-pu-appbar-btn]')) return;   // 두 번 붙지 않게
     if (!document.body) return;
     document.body.appendChild(makeTab());
@@ -525,6 +654,9 @@
     ROWS: ROWS,
     toggleFav: toggleFav,
     ordered: ordered,
-    _close: closePop
+    _close: closePop,
+    // 검사용 — 「새 버전」 단추 자리 재기(tests/version-fab-phone-low.test.js)
+    _fabLift: fabLift,
+    FAB_LOW: FAB_LOW
   };
 })(window);

@@ -102,7 +102,7 @@ function box(o) {
   vm.createContext(ctx);
   const line = (re) => { const m = SRC.match(re); assert.ok(m, re); return m[0]; };
   vm.runInContext(['let _gone = ' + JSON.stringify(o.gone || { dom: {}, bounce: {}, done: {} }) + ';',
-    line(/const GONE_FOLDER_RE = [^\n]*/), line(/const GONE_RANK = [^\n]*/),
+    line(/const GONE_FOLDER_RE = [^\n]*/), line(/const GONE_RANK = [^\n]*/), line(/const GONE_SUPPORT = [^\n]*/), sliceFn(SRC, 'function gonePubEv('), sliceFn(SRC, 'function goneShowEv('),
     ...['goneKey(', 'goneDay(', 'goneMs(', 'goneRows(', 'goneFolder('].map((h) => sliceFn(SRC, 'function ' + h)),
     sliceFn(SRC, 'async function goneMark('), sliceFn(SRC, 'async function goneMove('), sliceFn(SRC, 'async function goneUndo(')].join('\n'), ctx);
   return ctx;
@@ -150,4 +150,49 @@ test('★ 여는 곳 둘(PC 옆줄·폰 메뉴) · 칸은 한 줄 · 목록 맨 
   assert.match(SRC, /goneOpen\(\)">🏚 없어진 듯한 곳/);
   assert.match(SRC, /\.mck table\.gn td\{white-space:nowrap;overflow:hidden;text-overflow:ellipsis\}/);
   assert.match(sliceFn(SRC, 'function goneHtml('), /type="checkbox"[\s\S]{0,220}\(i \+ 1\)/);
+});
+
+/* ── 공단 근거 (대표 「진행」 2026-10-12, 목업 승인) ── */
+test('★★★ 공단 근거 — 폐업인데 4대보험 살아 있으면 맨 위 · 보조 근거는 지문에 안 들어간다(처리한 줄이 다시 안 올라옴)', async () => {
+  const items = { a: 명함('a', 'hong@gone.example') };
+  const dead = { key: '1230000002', name: '다라물산', extra: { ntsState: '폐업자', ntsAt: '2026-10-07' }, cards: [] };
+  const cos = [{ key: '1230000001', name: '(주)가나상사', extra: { ntsState: '폐업자', ntsAt: '2026-10-07' }, cards: [items.a] }, dead];
+  const c = box({ items, cos });
+  /* 공단 자료 없이 «정리함» */
+  const k = vm.runInContext("goneRows().find(r => r.name === '(주)가나상사').key", c);
+  await vm.runInContext("goneMark(['" + k + "'],'done')", c);
+  /* 그 뒤 공단 자료가 들어온다 */
+  cos[0].extra.ei = { at: 5, rows: [{}], gy: 12, n: 1 };
+  dead.extra.ei = { at: 5, rows: null, gy: 0 };
+  const rows = JSON.parse(JSON.stringify(vm.runInContext('goneRows()', c)));
+  const g = rows.find(r => r.name === '(주)가나상사');
+  assert.ok(g.ev.some(x => x.t === 'alive'), '살아 있음 근거가 안 붙었다');
+  assert.equal(g.state, 'done', '★★★ 공단 자료가 들어오자 이미 정리한 줄이 다시 올라왔다(보조 근거가 지문에 들어감)');
+  assert.ok(rows.find(r => r.name === '다라물산').ev.some(x => x.t === 'einone'));
+  /* 처리 안 한 회사끼리는 «살아 있음»이 맨 위 */
+  vm.runInContext('_gone.done = {}', c);
+  const top = JSON.parse(JSON.stringify(vm.runInContext('goneRows()', c)))[0];
+  assert.equal(top.name, '(주)가나상사', '★★ 번호만 바뀐 듯한 곳이 맨 위가 아니다');
+  assert.equal(top.hint, true);
+});
+
+test('★★ 국민연금 탈퇴는 혼자서도 줄을 만들고, 4대보험 «없음»·고르지 않은 사업장은 혼자서 줄을 안 만든다', () => {
+  const cos = [
+    { key: '1230000003', name: '마바테크', extra: { nps: { pick: { seq: '1' }, now: { on: false, scsn: '20250701', at: 3 } } }, cards: [] },
+    { key: '1230000004', name: '사아상회', extra: { ei: { at: 3, rows: null, gy: 0 } }, cards: [] },
+    { key: '1230000005', name: '자차물산', extra: { nps: { now: { on: false } } }, cards: [] },
+  ];
+  const rows = JSON.parse(JSON.stringify(vm.runInContext('goneRows()', box({ cos }))));
+  assert.deepEqual(rows.map(r => r.name), ['마바테크'], '★★ 탈퇴 줄이 없거나, 「없음」·고르지 않은 사업장이 혼자 줄을 만들었다');
+  assert.match(rows[0].ev[0].txt, /국민연금 탈퇴 2025\.07/);
+});
+
+test('★★ 맨 위로 올린 줄은 🟢 가 먼저 보인다 · «살아 있음»이라 단정하지 않는다 (10/13 실화면)', () => {
+  const cos = [{ key: '1230000001', name: '가나상사', extra: { ntsState: '폐업자', ntsEndDt: '2021-01-31', ntsAt: '2026-10-07', ei: { at: 5, rows: [{}], gy: 15, n: 1 } }, cards: [] }];
+  const c = box({ cos });
+  const shown = JSON.parse(JSON.stringify(vm.runInContext('goneShowEv(goneRows()[0])', c)));
+  assert.equal(shown[0].t, 'alive', '★★ 근거 칸이 좁아 🟢 가 … 뒤로 잘린다');
+  assert.doesNotMatch(shown[0].txt, /살아 있/, '★★ 공단 자료엔 소멸 여부가 없다 — «살아 있음»이라 단정했다');
+  assert.equal(JSON.parse(JSON.stringify(vm.runInContext('goneRows()[0].ev', c)))[0].t, 'nts', '기록 차례(지문)는 그대로여야 한다');
+  assert.match(SRC.slice(SRC.indexOf('\nfunction goneOpen('), SRC.indexOf('\nfunction goneOpen(') + 600), /loadCoInfo\(\)/, '★★ 명함 화면에서 열면 국세청 근거가 0 으로 보인다');
 });

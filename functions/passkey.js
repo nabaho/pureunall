@@ -49,6 +49,16 @@ const DB_CHAL = "passkeys/challenges";    // {키} = 아직 안 쓴 도전값
 
 function db() { return OntologyServerWrite.wrapDatabase(getRawDatabase(), { program: "passkey" }); }
 
+/* 등록은 «재직 중인 그 사번 본인»만 (2026-10-14 사무실 보안 검토).
+   예전에는 어떤 증표든(익명까지) 받고, 본문에 적힌 «아무 사번»에나 기기를 붙였다 —
+   남의 사번마다 기기 한도를 채워 등록을 막을 수 있었다. 잣대는 functions/staff-gate.js 와 같다. */
+const STAFF_GATE = require("./staff-gate").makeStaffGate({ getDatabase: db });
+async function ownSidOk(user, sid) {
+  if (!user || user.firebase && user.firebase.sign_in_provider === "anonymous") return false;
+  try { const role = await STAFF_GATE.assertActive(user.uid); return normSid(role.sid) === sid; }
+  catch (e) { return false; }
+}
+
 function setCors(req, res) {
   const origin = String((req && req.headers && req.headers.origin) || "");
   if (origin === ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
@@ -113,6 +123,7 @@ exports.passkeyRegisterStart = functions.region(REGION).https.onRequest(async (r
 
   const sid = normSid((req.body && req.body.sid) || "");
   if (!sid) return bad(res, 400, "사번이 없습니다");
+  if (!(await ownSidOk(user, sid))) return bad(res, 403, "본인 사번으로만, 재직 중일 때만 등록할 수 있습니다");
 
   const have = await listCreds(sid);
   if (have.length >= MAX_DEVICES) {
@@ -147,6 +158,7 @@ exports.passkeyRegisterFinish = functions.region(REGION).https.onRequest(async (
   const sid = normSid((req.body && req.body.sid) || "");
   const resp = req.body && req.body.response;
   if (!sid || !resp) return bad(res, 400, "보낸 값이 모자랍니다");
+  if (!(await ownSidOk(user, sid))) return bad(res, 403, "본인 사번으로만, 재직 중일 때만 등록할 수 있습니다");
 
   const expected = await takeChallenge("reg", sid);
   if (!expected) return bad(res, 400, "등록 시간이 지났습니다. 다시 시도해 주세요");

@@ -300,3 +300,203 @@ test('build·closedTypeIds — 되돌림 표시(9999)된 사업은 종결 묶음
   /* 대조 — 같은 사업이 다시 종결로 덮이면(덮어쓰기) 종결 */
   assert.deepEqual(codes(bld({ state: { 'N-F': { closedFrom: '2026', at: 2 } } }).closed), ['N-F']);
 });
+
+/* ── 사업 순서(2026-10-12, UI 4단계 — 계획 docs/superpowers/plans/2026-10-12-gov-report-order.md) ──
+   이알피 순서(sortOrder → 이름)가 기본, 끌어서 바꾼 순서(scal_bizOrder/main {list:'A,B'})가 있으면 그것이 먼저 ── */
+const orderBiz = () => [
+  { code: 'O-A', name: '가사업', agency: '가기관', sortOrder: 1 },
+  { code: 'O-B', name: '나사업', agency: '가기관', sortOrder: 2 },
+  { code: 'O-C', name: '다사업', agency: '나기관', sortOrder: 3 },
+  { code: 'O-D', name: '라사업', agency: '나기관', sortOrder: 4 },
+];
+const ranked = (o) => { const r = N.rankMap(o); return Object.keys(r).sort((a, b) => r[a] - r[b]); };
+
+test('순서 상수 — ORDER_MAX 200 · ORDER_LEN_MAX 4000 · ORDER_NODE_KEY main', () => {
+  assert.equal(N.ORDER_MAX, 200);
+  assert.equal(N.ORDER_LEN_MAX, 4000);
+  assert.equal(N.ORDER_NODE_KEY, 'main');
+});
+
+test('parseOrder — 정상 · 중복은 처음 것만 · 잘못된 코드 · __proto__·constructor·prototype · 200 초과 · 이상한 값은 []', () => {
+  assert.deepEqual(N.parseOrder({ list: 'A,B,C' }), ['A', 'B', 'C']);
+  assert.deepEqual(N.parseOrder({ list: 'A-1,b_2,C3', by: '홍길동', at: 1 }), ['A-1', 'b_2', 'C3']);
+  assert.deepEqual(N.parseOrder({ list: 'A,B,A,C,B' }), ['A', 'B', 'C'], '중복은 처음 것만');
+  assert.deepEqual(N.parseOrder({ list: 'A,,B, ,가나,C d,E' }), ['A', 'B', 'E'], '빈 칸·공백·한글·공백 낀 코드는 버린다');
+  assert.deepEqual(N.parseOrder({ list: 'a'.repeat(41) + ',B' }), ['B'], '41자 코드는 버린다');
+  assert.deepEqual(N.parseOrder({ list: 'a'.repeat(40) + ',B' }), ['a'.repeat(40), 'B'], '40자는 된다');
+  assert.deepEqual(N.parseOrder({ list: '__proto__,constructor,prototype,A,toString' }), ['A', 'toString'], '세 이름만 뺀다');
+  const many = Array.from({ length: 250 }, (_, i) => 'C' + i);
+  assert.equal(N.parseOrder({ list: many.join(',') }).length, 200, '200 개까지');
+  assert.deepEqual(N.parseOrder({ list: many.join(',') }), many.slice(0, 200));
+  [undefined, null, '', 'A,B', 5, true, [], ['A,B'], {}, { list: null }, { list: 5 }, { list: ['A'] }, { list: '' }, { by: 'x' }].forEach((bad) =>
+    assert.deepEqual(N.parseOrder(bad), [], JSON.stringify(bad)));
+  assert.deepEqual(N.parseOrder(Object.create({ list: 'A,B' })), [], '프로토타입 쪽 값은 읽지 않는다');
+  assert.deepEqual(N.parseOrder(JSON.parse('{"list":"__proto__,A"}')), ['A']);
+  const e = { list: 'A,B' }, snap = JSON.stringify(e);
+  N.parseOrder(e);
+  assert.equal(JSON.stringify(e), snap, '입력 불변');
+});
+
+test('rankMap — order 가 앞 · 나머지는 이알피 순서 · order 에만 있는 코드는 무시', () => {
+  const biz = orderBiz();
+  assert.deepEqual(N.rankMap({ biz, order: [] }), { 'O-A': 0, 'O-B': 1, 'O-C': 2, 'O-D': 3 }, 'order 없으면 이알피 순서');
+  assert.deepEqual(N.rankMap({ biz }), { 'O-A': 0, 'O-B': 1, 'O-C': 2, 'O-D': 3 }, 'order 자체가 없어도');
+  assert.deepEqual(ranked({ biz, order: ['O-C', 'O-A'] }), ['O-C', 'O-A', 'O-B', 'O-D'], 'order 먼저, 나머지는 이알피 순');
+  assert.deepEqual(ranked({ biz, order: ['O-D', 'O-C', 'O-B', 'O-A'] }), ['O-D', 'O-C', 'O-B', 'O-A']);
+  assert.deepEqual(ranked({ biz, order: ['GONE', 'O-B', 'ALSO-GONE'] }), ['O-B', 'O-A', 'O-C', 'O-D'], 'order 에만 있는 코드는 무시');
+  assert.equal('GONE' in N.rankMap({ biz, order: ['GONE'] }), false, '순위 칸도 안 만든다');
+  assert.deepEqual(ranked({ biz, order: ['O-B', 'O-B', 'O-A', 'O-B'] }), ['O-B', 'O-A', 'O-C', 'O-D'], 'order 의 중복은 처음 것만');
+  assert.deepEqual(Object.values(N.rankMap({ biz, order: ['O-C'] })).sort(), [0, 1, 2, 3], '순위는 0..n-1');
+});
+
+test('rankMap — 숨김·합친 사업은 순위가 없다 · sortOrder 없는 사업은 뒤 · 이름 같은 두 사업은 안정 · 잘못된 입력은 빈 순위', () => {
+  const biz = orderBiz().concat([
+    { code: 'O-H', name: '숨김', hidden: true, sortOrder: 0 },
+    { code: 'O-M', name: '합침', mergedInto: 'O-A', sortOrder: 0 },
+    { code: 'O-N', name: '순서없는 사업' },
+    { code: 'O-S1', name: '같은이름', agency: '가기관', sortOrder: 9 },
+    { code: 'O-S2', name: '같은이름', agency: '나기관', sortOrder: 9 },
+  ]);
+  const r = N.rankMap({ biz, order: ['O-H', 'O-M'] });
+  assert.equal('O-H' in r, false);
+  assert.equal('O-M' in r, false);
+  assert.deepEqual(ranked({ biz, order: [] }), ['O-A', 'O-B', 'O-C', 'O-D', 'O-S1', 'O-S2', 'O-N'], 'sortOrder 없는 사업은 맨 뒤, 이름·순서 같으면 들어온 차례');
+  assert.deepEqual(ranked({ biz: biz.filter((x) => /^O-S/.test(x.code)).reverse(), order: [] }), ['O-S2', 'O-S1'], '같은 이름·순서는 들어온 차례 그대로(안정)');
+  assert.deepEqual(ranked({ biz, order: ['O-S2'] }).slice(0, 2), ['O-S2', 'O-A'], '같은 이름이라도 코드로 구분된다');
+  assert.deepEqual(N.rankMap(), {});
+  assert.deepEqual(N.rankMap({}), {});
+  assert.deepEqual(N.rankMap({ biz: null, order: null }), {});
+  assert.deepEqual(N.rankMap({ biz: orderBiz(), order: 'O-C' }), { 'O-A': 0, 'O-B': 1, 'O-C': 2, 'O-D': 3 }, 'order 가 배열이 아니면 없는 것으로');
+});
+
+test('rankMap — 받은 값을 바꾸지 않는다 · __proto__ 코드가 있어도 던지지 않고 순위 객체를 오염시키지 않는다', () => {
+  const biz = orderBiz(), order = ['O-C', 'O-A'];
+  const snap = JSON.stringify([biz, order]);
+  N.rankMap({ biz, order });
+  assert.equal(JSON.stringify([biz, order]), snap);
+  const r = N.rankMap({ biz: [{ code: '__proto__', name: '이상한', sortOrder: 1 }, { code: 'O-A', name: '가', sortOrder: 2 }], order: ['__proto__'] });
+  assert.equal(Object.getPrototypeOf(r), Object.prototype, '프로토타입이 그대로');
+  assert.equal(Object.prototype.hasOwnProperty.call(r, 'O-A'), true);
+  assert.equal(Object.prototype.hasOwnProperty.call(r, '__proto__'), true, '자기 소유 칸으로 담긴다');
+});
+
+test('reorder — 앞·뒤·맨 앞·맨 끝으로 옮긴 새 전체 순서 · rankMap 순이 기준', () => {
+  const biz = orderBiz();
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-C', 'O-A', false), ['O-C', 'O-A', 'O-B', 'O-D'], '맨 앞(첫 사업 앞)');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-D', 'O-B', false), ['O-A', 'O-D', 'O-B', 'O-C'], '앞');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-A', 'O-C', true), ['O-B', 'O-C', 'O-A', 'O-D'], '뒤');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-A', 'O-D', true), ['O-B', 'O-C', 'O-D', 'O-A'], '마지막 뒤(맨 끝)');
+  assert.deepEqual(N.reorder({ biz, order: ['O-D', 'O-C'] }, 'O-A', 'O-D', false), ['O-A', 'O-D', 'O-C', 'O-B'], '현재 전체 순서(D,C,A,B)가 기준');
+  assert.deepEqual(N.reorder({ biz, order: ['O-D', 'GONE', 'O-C'] }, 'O-B', 'O-C', true), ['O-D', 'O-C', 'O-B', 'O-A'], 'order 에만 있는 사라진 코드는 결과에 없다');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-B', 'O-A', false), ['O-B', 'O-A', 'O-C', 'O-D'], 'B 를 A 앞으로 — 바뀐 것이 있다');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-A', 'O-B', true), ['O-B', 'O-A', 'O-C', 'O-D'], 'A 를 B 뒤로');
+});
+
+test('reorder — 같은 코드·모르는 코드·숨긴 사업·변화 없음은 null', () => {
+  const biz = orderBiz();
+  assert.equal(N.reorder({ biz, order: [] }, 'O-B', 'O-B', false), null, '자기 자신 앞');
+  assert.equal(N.reorder({ biz, order: [] }, 'O-B', 'O-B', true), null, '자기 자신 뒤');
+  assert.equal(N.reorder({ biz, order: [] }, 'NOPE', 'O-B', false), null, '모르는 코드');
+  assert.equal(N.reorder({ biz, order: [] }, 'O-B', 'NOPE', true), null, '모르는 목표');
+  assert.equal(N.reorder({ biz, order: ['GONE'] }, 'GONE', 'O-B', false), null, 'order 에만 있는 코드는 보이는 사업이 아니다');
+  assert.equal(N.reorder({ biz: [{ code: 'O-H', name: '숨김', hidden: true }].concat(biz), order: [] }, 'O-H', 'O-B', false), null, '숨긴 사업');
+  assert.equal(N.reorder({ biz, order: [] }, 'O-B', 'O-C', false), null, '이미 그 자리(B 는 C 바로 앞)');
+  assert.equal(N.reorder({ biz, order: [] }, 'O-B', 'O-A', true), null, '이미 그 자리(B 는 A 바로 뒤)');
+  assert.equal(N.reorder({ biz, order: [] }, 'O-D', 'O-C', true), null, '마지막 사업을 끝 바로 앞 사업 뒤로 = 그대로');
+  assert.equal(N.reorder({ biz, order: [] }, 'O-A', 'O-B', false), null, '첫 사업을 둘째 앞으로 = 그대로');
+  assert.equal(N.reorder({ biz, order: [] }, undefined, 'O-B', false), null);
+  assert.equal(N.reorder({ biz, order: [] }, 'O-A', null, false), null);
+  assert.equal(N.reorder(), null);
+  assert.equal(N.reorder({}, 'O-A', 'O-B', false), null);
+});
+
+test('reorder — 입력 불변 · after 는 참/거짓으로만 · 결과가 rankMap 의 order 로 쓰이면 같은 순서를 만든다', () => {
+  const biz = orderBiz(), order = ['O-D', 'O-C'];
+  const snap = JSON.stringify([biz, order]);
+  const out = N.reorder({ biz, order }, 'O-A', 'O-D', false);
+  assert.equal(JSON.stringify([biz, order]), snap, '입력 불변');
+  assert.notEqual(out, order, '새 배열');
+  assert.deepEqual(ranked({ biz, order: out }), out, '결과를 order 로 쓰면 그 순서가 그대로 선다');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-A', 'O-C', 1), ['O-B', 'O-C', 'O-A', 'O-D'], '참으로 보이는 값은 뒤');
+  assert.deepEqual(N.reorder({ biz, order: [] }, 'O-A', 'O-C'), ['O-B', 'O-A', 'O-C', 'O-D'], 'after 를 안 주면 앞');
+});
+
+test('orderEntry — 정상 · 중복·꼴·개수·길이 위반은 null · by 40자 · now 가 숫자여야', () => {
+  assert.deepEqual(N.orderEntry(['A', 'B'], '홍길동', 1760000000000), { list: 'A,B', by: '홍길동', at: 1760000000000 });
+  assert.equal(N.orderEntry(['A'], 'ㄱ'.repeat(50), 5).by.length, 40, 'by 는 40자');
+  assert.equal(N.orderEntry(['A'], ' 홍길동 ', 5).by, '홍길동', '앞뒤 공백은 뗀다');
+  assert.equal('by' in N.orderEntry(['A'], '', 5), false, '이름이 비면 칸을 두지 않는다');
+  assert.equal('by' in N.orderEntry(['A'], undefined, 5), false);
+  assert.equal(N.orderEntry(['A', 'B', 'A'], 'x', 5), null, '중복');
+  ['A b', '가나', 'a/b', 'a,b', '', 'a'.repeat(41), '__proto__', 'constructor', 'prototype'].forEach((c) =>
+    assert.equal(N.orderEntry(['OK', c], 'x', 5), null, '코드 ' + JSON.stringify(c)));
+  [5, null, {}, undefined].forEach((c) => assert.equal(N.orderEntry(['OK', c], 'x', 5), null, '코드가 문자열이 아님 ' + String(c)));
+  ['A,B', null, undefined, 5, {}, { 0: 'A', length: 1 }].forEach((l) => assert.equal(N.orderEntry(l, 'x', 5), null, '목록이 배열이 아님 ' + JSON.stringify(l)));
+  assert.equal(N.orderEntry([], 'x', 5), null, '빈 목록은 만들지 않는다');
+  const n = (k) => Array.from({ length: k }, (_, i) => 'C' + i);
+  assert.equal(N.orderEntry(n(200), 'x', 5).list.split(',').length, 200, '200 개는 된다');
+  assert.equal(N.orderEntry(n(201), 'x', 5), null, '201 개');
+  const long = (last) => Array.from({ length: 97 }, (_, i) => String(i).padStart(2, '0') + 'a'.repeat(38)).concat(['b'.repeat(last)]);
+  assert.equal(N.orderEntry(long(23), 'x', 5).list.length, 4000, '전체 길이 4000 은 된다');
+  assert.equal(N.orderEntry(long(24), 'x', 5), null, '4001 자');
+  [undefined, null, NaN, Infinity, '5'].forEach((now) => assert.equal(N.orderEntry(['A'], 'x', now), null, 'now=' + String(now)));
+  const a = ['A', 'B'], snap = JSON.stringify(a);
+  N.orderEntry(a, 'x', 5);
+  assert.equal(JSON.stringify(a), snap, '입력 불변');
+});
+
+test('orderEntry ↔ parseOrder — 만든 기록을 다시 읽으면 같은 목록 · 만든 칸은 규칙이 아는 칸(list·by·at)뿐', () => {
+  const list = ['N-B', 'N-A', 'x_1'];
+  const e = N.orderEntry(list, '홍길동', 5);
+  assert.deepEqual(N.parseOrder(e), list);
+  assert.deepEqual(Object.keys(e).sort(), ['at', 'by', 'list']);
+  assert.deepEqual(Object.keys(N.orderEntry(list, '', 5)).sort(), ['at', 'list']);
+});
+
+test('build — 진행 사업은 업체 수 내림차순이 아니다 · 이알피 순서(sortOrder → 이름)', () => {
+  const m = mk();
+  m.biz.find((b) => b.code === 'N-B').sortOrder = 0;   /* 업체 1 인 N-B 가 업체 2 인 N-A 보다 이알피 순서가 앞 */
+  const r = N.build({ biz: m.biz, tmap: m.tmap, input: m.input, year: '2026', state: {} });
+  assert.deepEqual(codes(r.open), ['N-B', 'N-A', 'N-F', 'N-G', 'N-H'], 'N-B(업체 1)가 N-A(업체 2) 앞 — 업체 수로 정렬하지 않는다');
+  assert.deepEqual(r.open.map((x) => x.count), [1, 2, 1, 1, 1]);
+  assert.equal(r.total, 6, 'total 은 그대로 open 의 count 합');
+});
+
+test('build — order 가 있으면 각 묶음이 그 순서로 · 진행 사업도 · 목록에 없는 사업은 뒤에 이알피 순서', () => {
+  const st = { 'N-F': { closedFrom: '2026', at: 1 } };
+  const r = bld({ state: st, order: ['N-H', 'N-G', 'N-B'] });
+  assert.deepEqual(codes(r.open), ['N-H', 'N-G', 'N-B', 'N-A'], '진행: order 의 N-H·N-G·N-B → 그 뒤 목록에 없는 N-A');
+  assert.deepEqual(r.open.map((x) => x.count), [1, 1, 1, 2], '업체 수 2 인 N-A 가 맨 뒤여도 그대로');
+  assert.equal(r.total, 5);
+  const r2 = bld({ state: st, order: ['N-D', 'N-C', 'N-E', 'N-F'] });
+  assert.deepEqual(codes(r2.quiet), ['N-C']);
+  assert.deepEqual(codes(r2.noPlan), ['N-D']);
+  assert.deepEqual(codes(r2.unlinked), ['N-E']);
+  assert.deepEqual(codes(r2.closed), ['N-F']);
+  assert.deepEqual(codes(r2.open), ['N-A', 'N-B', 'N-G', 'N-H'], 'order 에 없는 진행 사업은 이알피 순서');
+  /* 묶음을 건너 섞인 order — 한 묶음 안에서는 order 의 상대 순서만 쓴다 */
+  const m = mk();
+  const r3 =N.build({ biz: m.biz, tmap: m.tmap, input: m.input, year: '2026', state: {}, order: ['N-H', 'N-C', 'N-A', 'N-E', 'N-B'] });
+  assert.deepEqual(codes(r3.open), ['N-H', 'N-A', 'N-B', 'N-F', 'N-G']);
+  assert.deepEqual(codes(r3.quiet), ['N-C']);
+});
+
+test('build — order 에만 있는 코드·이상한 order 는 던지지 않는다 · order 없으면 이알피 순서와 같다 · 입력 불변', () => {
+  const base = bld();
+  assert.deepEqual(base, bld({ order: [] }), 'order 가 비면 order 없는 것과 같다');
+  assert.deepEqual(base, bld({ order: ['GONE', 'N-ZZ'] }), 'order 에만 있는 코드는 무시');
+  [null, 'N-A,N-B', 5, {}].forEach((bad) => assert.deepEqual(base, bld({ order: bad }), 'order=' + JSON.stringify(bad)));
+  assert.deepEqual(codes(bld({ order: ['GONE', 'N-H'] }).open), ['N-H', 'N-A', 'N-B', 'N-F', 'N-G']);
+  const order = ['N-H', 'N-A'], snap = JSON.stringify(order);
+  bld({ order });
+  assert.equal(JSON.stringify(order), snap, 'order 불변');
+  /* 출력 모양은 그대로 */
+  const r = bld({ order });
+  assert.deepEqual(Object.keys(r).sort(), ['closed', 'noPlan', 'open', 'quiet', 'total', 'unlinked']);
+  assert.deepEqual(Object.keys(r.open[0]).sort(), ['agency', 'closedFrom', 'code', 'count', 'kind', 'label', 'name', 'plan', 'typeId']);
+});
+
+test('build — 이름 같고 기관만 다른 두 사업도 order 의 코드로 구분된다', () => {
+  assert.deepEqual(codes(bld({ order: ['N-H', 'N-G'] }).open).filter((c) => c === 'N-G' || c === 'N-H'), ['N-H', 'N-G']);
+  assert.deepEqual(codes(bld({ order: ['N-G', 'N-H'] }).open).filter((c) => c === 'N-G' || c === 'N-H'), ['N-G', 'N-H']);
+});

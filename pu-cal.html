@@ -16,17 +16,17 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-version.js?v=12"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-work-core.js?v=1"></script>
-<script src="js/pu-gcal-auth.js?v=13"></script>
+<script src="js/pu-gcal-auth.js?v=14"></script>
 <script src="js/pu-ieum-public.js?v=1"></script>
 <script src="js/pu-cal-read.js?v=3"></script>
 <script src="js/pu-case-due.js?v=2"></script>
@@ -691,13 +691,24 @@
   /* ── 폰 달력 — 구글 캘린더 위젯 꼴 (body.mob · 폰머리Html 머리글 참고) ── */
   .mhead{display:none}
   body.mob #topbar{display:none}
-  body.mob.mobmenu #topbar{display:flex;overflow-x:auto}
+  /* ⚠ overflow-x:auto 를 다시 넣지 말 것 (2026-10-18 폰화면관리) — 넣으면 머리줄이 «잘라 내는 상자»가 되어
+       동그라미를 눌러도 «내 계정» 창(로그아웃·구글 연결·사람 색)이 머리줄 밑으로 잘려 안 보였다.
+       넘치는 것은 탭 줄(#tabs)이 제 안에서 민다 — 아래 «폰 머리줄» 규칙 참고. */
+  body.mob.mobmenu #topbar{display:flex}
   body.mob #app.fit{padding:0;background:var(--panel)}
   body.mob .calwrap{border:none;border-radius:0;padding:0}
   body.mob .mhead{display:flex;align-items:center;gap:4px;padding:12px 10px 8px 16px}
   body.mob .mtt{flex:1;min-width:0;display:flex;flex-direction:column}
   body.mob .mtt b{font-size:22px;font-weight:700;color:var(--gtext);line-height:1.15}
   body.mob .mtt span{font-size:12px;font-weight:700;color:var(--gtext);margin-top:2px}
+  /* ★ 제목·부제는 «한 줄» — 세로로 깨지지 않는다 (2026-10-18 폰화면관리)
+     360px 폰에서 부제 「병오년8월 – 9월」의 「9월」이 둘째 줄로 떨어졌고, 거르개 칩(🔒 개인 등)이 켜지면
+     제목 칸이 15px 로 눌려 「10/월」·「병/오/년/8/월…」 한 글자씩 세로로 쌓여 머리가 190px 이 됐다.
+     ① 제목 칸은 «제목(10월 ▾)보다 좁아지지 않는다»(min-content) — 모자라면 옆 단추가 줄어든다
+     ② 부제는 제 폭을 주장하지 않고(width:0) 칸을 채우며, 넘치면 … 로 줄인다 */
+  body.mob .mtt{min-width:min-content}
+  body.mob .mttb,body.mob .mtt b{white-space:nowrap}
+  body.mob .mtt span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:0;min-width:100%}
   body.mob .mfilt{border:1px solid var(--gline);background:var(--panel);color:var(--gtext);border-radius:999px;
     font-size:12px;padding:0 10px;height:30px;cursor:pointer;font-family:inherit;white-space:nowrap}
   body.mob .mnav{border:none;background:transparent;font-size:24px;color:var(--gtext);width:40px;height:40px;
@@ -719,6 +730,9 @@
   body.mob .mtoday i{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border:2px solid currentColor;
     border-radius:6px;font-style:normal;line-height:1}
   body.mob .mmenu{border:none;background:transparent;color:var(--gtext);font-size:20px;width:40px;height:40px;cursor:pointer;margin-left:-8px}
+  /* 좁은 폰(360px 안팎) — ‹ › 🔍 오늘 단추 폭을 조금 줄여 부제(음력 범위)가 한 줄에 다 들게 한다.
+     누르는 높이는 그대로다. 넓은 폰(411px 이상)은 그대로다. */
+  @media (max-width:400px){ body.mob .mnav,body.mob .mtoday{width:36px} }
   body.mob .cal{border:none;border-radius:0}
   body.mob .mhd{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));flex:none;border-bottom:1px solid var(--gline)}
   body.mob .mhd div{text-align:center;font-size:13px;font-weight:500;color:var(--gtext);padding:4px 0;
@@ -915,6 +929,63 @@
     #conn span.t{display:none}
     .day{min-height:66px}
     .ev{font-size:9.5px}
+  }
+  /* ── 폰 머리줄 — 탭은 «제 줄»에 (2026-10-18 폰화면관리) ──
+     폰에서 머리줄은 ☰ ▸ 「더 보기」와 인원 현황·외부 공유 탭에서만 보인다. 그런데 한 줄에 다 넣으려다
+     탭 그릇(#tabs)이 폭 0 으로 눌려 «탭이 하나도 안 보였다» — 인원 현황으로 간 사람이 캘린더로
+     돌아올 길이 없었고, 「더 보기 (탭·사람·거르개)」를 눌러도 탭·사람·거르개가 안 나왔다.
+     ★ 폰에서만 탭 그릇을 둘째 줄로 내린다(그 줄은 제 안에서 옆으로 민다). 첫 줄은 밝기·회전 단추가
+       «자리만큼» 줄어들어(… ) 동그라미가 늘 화면 안에 있다 — 눌러야 «내 계정» 창이 뜬다.
+     ⚠ 넓은 화면(PC)은 그대로 한 줄이다(cal-head-one-line ⑧). 폰 판정은 폰() 과 같은 조건이다. */
+  @media (max-width:700px), (max-height:500px) and (pointer:coarse){
+    #topbar{flex-wrap:wrap;row-gap:4px}
+    #tabs{order:9;flex:1 0 100%}
+    #topbar .themebtn{flex:1 1 0;min-width:0;max-width:max-content;overflow:hidden;text-overflow:ellipsis}
+    #topbar .avawrap{margin-left:auto}
+    #gstat:empty{display:none}
+  }
+  /* ══ 📱 폰: 양옆 빈자리·상자 겹을 걷는다 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서」) ══
+     ① 달력 판 — 화면 끝까지 이미 닿아 있지만 바탕이 «세 겹»(#app · 판 틀 · 달력)으로 겹쳐 있었다.
+        같은 색을 세 번 칠한 것이라 안쪽 둘을 걷는다(색은 #app 한 겹이 그대로 낸다 — 보기마다 같은 색).
+     ② 「일정」 보기 — 날짜 열·카드 양옆 16px 을 줄여 카드가 화면 폭을 쓴다(글은 끝에서 8~14px).
+     ③ 인원 현황 — 틀 상자를 화면 폭 다로, 표는 «두 줄 카드»로(옆으로 밀어야 법률상담·연락처·비고가 보였다).
+     ⚠ 넓은 화면은 그대로다 — ①② 는 폰 달력(body.mob)에서만, ③ 은 폰 폭(700px 이하)에서만 산다. */
+  body.mob .calwrap{background:transparent}
+  body.mob #app.fit .cal{background:transparent}
+  body.mob.gv #app.fit .tgrid.wide{background:transparent}
+  body.mob .sday{padding:8px 6px 8px 8px;gap:10px}
+  body.mob .swk{padding-left:68px}
+  body.mob .scard{padding:8px 8px 8px 10px}
+  @media (max-width:700px){
+    .ieumbar,.ppltable{margin-left:-8px;margin-right:-8px;border-left-width:0;border-right-width:0;border-radius:0}
+    .scopepilot,.kcell{padding-left:10px;padding-right:10px}
+    /* 인원 현황 표 → 줄마다 두 줄 카드: 1줄 번호·이름·구분·이음근무 막대 · 2줄 법률상담·연락처·비고 */
+    .ppltable{overflow-x:visible}
+    .ppltable table{min-width:0;display:block}
+    .ppltable thead{display:none}
+    .ppltable tbody{display:block}
+    .ppltable tr.prow{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;padding:8px 10px;
+      border-bottom:1px solid var(--line)}
+    .ppltable tr.prow > td{display:block;padding:0;border:0;min-width:0}
+    .ppltable tr.prow > td.no{order:1;width:auto;min-width:16px;text-align:left}
+    .ppltable tr.prow > td:nth-child(2){order:2;flex:1 1 0}
+    .ppltable tr.prow > td:nth-child(3){order:3}
+    .ppltable tr.prow > td:nth-child(4){order:4;flex:0 0 40%}
+    .ppltable tr.prow > td.chev{order:4}
+    /* 둘째 줄로 끊는 자리 — 폭 100% 짜리 빈 칸 */
+    .ppltable tr.prow::after{content:'';order:5;flex:0 0 100%;height:0}
+    /* 둘째 줄 첫머리 — 번호 칸만큼 비워 이름 밑에 줄을 맞춘다 */
+    .ppltable tr.prow::before{content:'';order:6;flex:0 0 16px}
+    .ppltable tr.prow > td:nth-child(5){order:7}
+    .ppltable tr.prow > td:nth-child(5)::before{content:'법률상담 ';font-size:10.5px;font-weight:600;color:var(--faint)}
+    .ppltable tr.prow > td:nth-child(6){order:8}
+    .ppltable tr.prow > td.notecell{order:9;flex:1 1 0}
+    .ppltable tr.prow > td.notecell span{max-width:100%}
+    /* «말이 없는» 칸(—)은 안 그린다 */
+    .ppltable tr.prow > td:has(> .dash:only-child){display:none}
+    .ppltable tr.detail,.ppltable tr.detail > td{display:block}
+    .ppltable tr.detail > td{padding:10px}
+    .detailgrid{grid-template-columns:minmax(0,1fr)}
   }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
@@ -5336,7 +5407,7 @@ try{
   $('app').innerHTML = '<div class="panel muted">초기화 실패: '+esc(e.message)+'</div>';
 }
 </script>
-<script src="js/pu-appbar.js?v=29"></script>
+<script src="js/pu-appbar.js?v=33"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script>try{

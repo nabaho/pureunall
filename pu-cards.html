@@ -41,7 +41,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -51,8 +51,10 @@
 <script src="js/pu-mail-fill-core.js?v=2"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
+<!-- 사건 근로자 주민번호 — 그 사건의 담당자와 대표만 (2026-10-15) -->
+<script src="js/pu-worker-secret.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-lockkey.js?v=2"></script>
 <!-- AI 판독 호출기 — 열쇠는 서버가 든다(2026-08-17). 브라우저는 사진만 보낸다. -->
@@ -277,6 +279,8 @@ html.mailview #tabs,html.mailview #subbar{display:none}
   .rowmain .l1,.rowmain .l2{font-size:12.5px;margin-top:3px}
   .rowmain .erpmgr{font-size:11.5px;margin-top:3px;padding:1px 6px}
   #fab{width:52px;height:52px;font-size:28px;right:14px;bottom:18px}
+  /* 양옆 채우기(대표 「양옆 빈공백이 많다」 2026-10-18) — 날짜·⭐ 머리만 18px 로 들어가 있었다. 줄(.row)과 같은 자리에서 시작한다 */
+  .datehead{padding-left:12px;padding-right:12px}
 }
 
 /* ── 주황 FAB ── */
@@ -296,6 +300,9 @@ html.mailview #tabs,html.mailview #subbar{display:none}
 .modal{background:#1e293b;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
   border-radius:20px 20px 0 0;padding:18px 18px 30px;border:1px solid #1e293b}
 @media(min-width:761px){.modalbg{align-items:center}.modal{border-radius:20px}}
+/* 폰(양옆 채우기 2026-10-18) — 아래에서 올라오는 창은 이미 화면 폭 그대로다. 안쪽 여백(18px)만 줄여
+   글이 화면 끝에서 12px 안에서 시작하게 한다(대표 「양옆 빈공백이 많다 · 좌우 옆공간 모두 채워서」). */
+@media(max-width:760px){ body:not(.pc) .modal{padding-left:12px;padding-right:12px} }
 .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .mhead b{font-size:17px}
 .sheetbtn{display:flex;align-items:center;gap:12px;width:100%;padding:15px 12px;
@@ -312,6 +319,9 @@ html.mailview #tabs,html.mailview #subbar{display:none}
 #menuM .sheetbtn{padding:9px 10px;font-size:14.5px;gap:9px;min-width:0}
 #menuM .sheetbtn .msub{margin-left:auto;color:var(--sub);font-size:11.5px;font-weight:600;
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px}
+/* 폰: 칸 이름은 «한 줄» (폰화면관리 2026-10-18) — 360px 에서 「새 등록 / 증」·「엑셀로 내보내 / 기」로
+   낱말 가운데서 접혔다. 줄어드는 것은 오른쪽 설명(.msub — … 으로 줄어든다) 하나뿐이어야 한다. */
+@media(max-width:760px){ #menuM .sheetbtn{white-space:nowrap} }
 /* 묶음 이름표 — 여백으로 가르던 것을 가는 줄로 가른다(여백보다 덜 먹고 더 또렷하다) */
 #menuM .mgrp{font-size:11px;font-weight:800;color:#94a3b8;letter-spacing:.02em;
   padding:9px 6px 3px;margin-top:5px;border-top:1px solid #1e293b}
@@ -324,6 +334,14 @@ body.pc #menuM .mgrp{border-top-color:#e2e8f0}
 #menuM>.mhead{position:sticky;top:0;z-index:2;background:#1e293b;
   margin:0 -18px 6px;padding:15px 18px 9px;border-bottom:1px solid #1e293b}
 body.pc #menuM>.mhead{background:#fff;border-bottom-color:#e2e8f0}
+/* 폰 양옆 채우기(2026-10-18) — 창 여백(18)과 칸 여백(10)이 겹쳐 칸 이름이 28px 에 섰다. 둘 다 줄여 칸은 8px, 글은 14px 에서
+   시작한다. 붙박이 머리줄은 창 끝까지 덮게 함께 맞춘다.
+   ⚠ 위 기본 규칙들 «뒤»에 둔다 — 검사들이 «첫 규칙»을 읽어 기본 값을 확인한다. */
+@media(max-width:760px){
+  body:not(.pc) #menuM{padding-left:8px;padding-right:8px}
+  body:not(.pc) #menuM .sheetbtn{padding-left:6px;padding-right:6px}
+  body:not(.pc) #menuM > .mhead{margin-left:-8px;margin-right:-8px;padding-left:14px;padding-right:14px}
+}
 /* 위험 구역 — 여백만 조인다. 빛깔과 「복구 불가」는 그대로 둔다(겁내야 하는 자리다) */
 #menuM .mdanger{border:1px solid #fecaca;background:#f8fafc;border-radius:10px;
   padding:7px 9px;margin-top:12px}
@@ -334,10 +352,16 @@ body.pc #menuM>.mhead{background:#fff;border-bottom-color:#e2e8f0}
    즐겨찾기 손잡이·백업·복구 알약·「● 최신」이 시트 «위» 에 떠 있어 칸을 덮고 있었다
    (대표 화면 2026-08-21: 「전체 비우기」가 백업·복구 알약에 가려 「…체 비우기」로 보였다).
    덮는 것은 곧 못 누르는 것이다 — 손가락이 알약을 먼저 만난다.
-   ⚠ 시트를 닫으면 그대로 돌아온다. 없애는 것이 아니라 비켜 두는 것이다. */
+   ⚠ 시트를 닫으면 그대로 돌아온다. 없애는 것이 아니라 비켜 두는 것이다.
+   ⚠ 메일함의 창(.mck-dim — 첨부 미리보기·점검·처음 보는 주소 …)도 같다 (2026-10-17).
+     시트만 넣어 두어, 첨부 미리보기의 「닫기」가 「● 최신」 알약에 가렸다(대표 화면).
+     .mck-dim 은 열릴 때만 그려지므로 «있으면 열린 것»이다. */
 body:has(.modalbg.open) [data-pu-appbar-btn],
 body:has(.modalbg.open) #pu-backup-admin-button,
-body:has(.modalbg.open) #pu-version-fab{display:none!important}
+body:has(.modalbg.open) #pu-version-fab,
+body:has(.mck-dim) [data-pu-appbar-btn],
+body:has(.mck-dim) #pu-backup-admin-button,
+body:has(.mck-dim) #pu-version-fab{display:none!important}
 .field{margin-bottom:10px}
 .field label{display:block;font-size:12px;font-weight:700;color:var(--sub);margin-bottom:4px}
 .field input,.field select,.field textarea{width:100%;padding:10px 12px;border:1px solid var(--line);
@@ -410,6 +434,17 @@ body:has(.modalbg.open) #pu-version-fab{display:none!important}
 #selbar{position:fixed;left:0;right:0;bottom:0;display:none;align-items:center;gap:8px;
   background:#1e293b;border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:60}
 #selbar .btn{flex:none;padding:10px 16px}
+/* ── 폰: 고른 뒤 띠는 «한 줄» (폰화면관리 2026-10-18) ──
+   360px 폰에서 「1개 선택」이 한 글자씩 세로로 쌓이고(「1 / 개 / 선 / 택」) 「삭제」가 화면 밖으로 나갔다.
+   글자 칸이 줄어들 수 있어서 단추 넷에게 자리를 다 내준 탓이다.
+   ⚠ 글자는 접지 않는다(한 칸은 한 줄) — 단추 여백을 조이고, 그래도 좁은 폰이면 띠 안에서 옆으로 민다.
+   ⚠ #selbar 는 폰에만 뜬다(body.pc 에서는 숨는다) — PC 는 그대로다. */
+@media(max-width:760px){
+  #selbar{gap:6px;padding-left:12px;padding-right:12px;overflow-x:auto;scrollbar-width:none}
+  #selbar::-webkit-scrollbar{display:none}
+  #selbar>span{flex:none;white-space:nowrap;font-size:13px}
+  #selbar .btn{white-space:nowrap;padding:10px 9px;font-size:13.5px}
+}
 .row .fav{color:var(--orange);font-size:14px;margin-right:4px}
 /* ── 인앱 카메라는 여기 없다 (대표 지시 2026-08-09: "카메라 하나로 통일") ──
    촬영 화면·초점·명함틀 코드가 사진첩(pu-photos.html)과 두 벌이었다. 한쪽만
@@ -595,6 +630,10 @@ table.sbox tr.bad td{background:#f8fafc}
 @media(max-width:760px){
   .ctwrap{flex-direction:column;gap:8px}
   .ctside{flex:none;width:auto;max-height:160px}
+  /* 양옆 채우기(2026-10-18) — 위아래로 쌓인 뒤에도 사업장 칸이 «글 길이만큼»(411px 폰에서 287px) 좁게 서 있었다.
+     폭을 다 쓰고, 칸 겉·안 여백을 줄여 이름이 덜 잘리게 한다 */
+  body:not(.pc) .ctside{align-self:stretch;margin-left:-8px;margin-right:-8px;padding:3px}
+  body:not(.pc) .ctco{padding-left:6px;padding-right:6px}
 }
 
 /* ══════════ 다음메일함과 같은 차림 (대표 지시 2026-08-24) ══════════
@@ -894,6 +933,17 @@ body:not(.pc) .cn-t.todo col:nth-child(5){width:0}
 body:not(.pc) .cn-t.todo td.sj,body:not(.pc) .cn-t.todo th:nth-child(5){font-size:0;padding:0}
 body:not(.pc) .cn-t button{padding:3px 7px}
 body:not(.pc) .cn-t button .lb{display:none}   /* 폰: 「🔍 다른 업체」는 🔍 하나로 — 안 그러면 🙈 가 칸 밖으로 밀린다 */
+/* 폰(폰화면관리 2026-10-18) — 360px 폰에서는 칸 너비를 다 더하면(364px) 화면보다 넓어 맨 오른쪽 🙈 가
+   반쯤 잘렸다. 좁은 폰에서만 이름 칸을 조금 줄이고 단추 칸이 «남는 자리»를 갖는다(411px 폭과 같은 단추 자리).
+   ☐ 고르기 칸은 손가락으로 누를 만큼 키운다 — 칸 여백을 줄여 그 안에 들인다(CLAUDE.md 「☐ 고르기 칸 + 번호」). */
+@media(max-width:400px){
+  body:not(.pc) .cn-t col.nm{width:80px}
+  body:not(.pc) .cn-t col.act{width:auto}
+}
+@media(max-width:760px){
+  body:not(.pc) .cn-t td.ck,body:not(.pc) .cn-t th.ck{padding:0 2px;text-align:center}
+  body:not(.pc) .cn-t .ck input{width:18px;height:18px;margin:0;vertical-align:middle}
+}
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -1233,6 +1283,20 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .mck .gn-tag.nts{background:#fef2f2;color:#991b1b}
 .mck .gn-tag.dom{background:#fffbeb;color:#854d0e}
 .mck .gn-tag.bnc{background:#f8fafc;color:#475569;border:1px solid #e2e8f0}
+.mck .gn-tag.nps{background:#fef2f2;color:#991b1b}
+.mck .gn-tag.alive{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;font-weight:700}
+.mck.bzr-box{width:min(1100px,100%)}
+.mck .bzr-c{display:inline-block;border-radius:9px;padding:0 7px;font-size:11.5px;border:1px solid;margin-right:3px}
+.mck .bzr-c.ok{color:#166534;background:#f0fdf4;border-color:#bbf7d0}
+.mck .bzr-c.no{color:#991b1b;background:#fef2f2;border-color:#fecaca}
+.mck .bzr-c.wa{color:#854d0e;background:#fffbeb;border-color:#fde68a}
+.mck .bzr-c.dim{color:#64748b;background:#f8fafc;border-color:#e2e8f0}
+.mck table.gn tr.bzr-need td{background:#fffbeb}
+.mck .gn-tag.einone{background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;font-weight:400}
+.mck .gn-cd.grn b{color:#166534}
+.mck .gn-pub{display:flex;align-items:center;gap:10px;margin:0 18px 10px;padding:7px 12px;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;font-size:12.5px;white-space:nowrap}
+.mck .gn-pub span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.mck .gn-pub button{height:28px;padding:0 12px;border:1px solid #2563eb;background:#2563eb;color:#ffffff;border-radius:7px;font-size:12.5px;cursor:pointer}
 .mck .gn-lnk{color:#2563eb;cursor:pointer}
 .mck .act button.mv,.mck .gn-bulk button.mv{border-color:#fecaca;background:#fef2f2;color:#991b1b;font-weight:600}
 .mck .act button.ok,.mck .gn-bulk button.ok{border-color:#bbf7d0;background:#f0fdf4;color:#166534;font-weight:600}
@@ -1268,6 +1332,20 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .pvstage .pvsheet th{background:#f8fafc;color:#64748b;font-weight:600}
 .pvstage .pvnone{text-align:center;color:#64748b;font-size:13px;line-height:2}
 .pvstage .pvnone b{display:block;color:#1e293b;font-size:14px;margin-bottom:4px}
+/* ── 아래 단추 줄 — 단추 글자는 «한 줄» (대표 화면 2026-10-17) ──
+   폰(355px)에서 네 단추가 한 줄에 끼어 들며 줄어들어 「→ 급 / 여데 / 이터」처럼 세 줄로
+   접히고, 단추 높이(30px) 밖은 잘렸다. 무슨 단추인지 읽을 수 없었다.
+   ★ 글자는 접지 않는다(nowrap). 폰에서는 두 칸 격자로 줄을 나눈다 — 단추를 줄이지 않고
+     줄을 늘린다. 손가락 자리라 높이도 넉넉히 둔다. */
+.mck.pvbox>footer button{white-space:nowrap;flex:none}
+@media(max-width:760px){
+  .mck-dim.pvdim{padding:10px}
+  .mck.pvbox>footer{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px}
+  .mck.pvbox>footer .sp{display:none}
+  .mck.pvbox>footer .pvpg{grid-column:1/-1;justify-content:center}
+  .mck.pvbox>footer button{height:40px;padding:0 6px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .mck.pvbox>footer .pvpg button{height:36px;padding:0 14px}
+}
 .mck-empty{text-align:center;color:#64748b;padding:40px 0;font-size:13px}
 .mck-empty b{display:block;font-size:15px;color:#16a34a;margin-bottom:6px}
 .mck>footer{display:flex;align-items:center;gap:10px;padding:12px 18px;
@@ -1572,6 +1650,43 @@ table.mstab2 tr:last-child td{border-bottom:none}
   .dm-row .who{width:102px}
   .dm-row .box{display:none}
   .dm-search{width:100%}
+}
+/* ══ 폰 메일함 — 폰화면관리 (2026-10-18, 폰 폭으로 실제로 그려 재 보고 고친 셋) ══ */
+@media(max-width:760px){
+  /* ① 기업정보함의 주황 ＋(명함 촬영)가 메일 «쓰기» ✏️ 를 정확히 덮고 있었다 — 같은 자리(오른쪽 아래)라
+       ✏️ 를 누르면 사진첩 카메라가 열렸다. 메일 화면에서는 명함 촬영이 할 일이 아니다.
+       ⚠ html.mailview 를 함께 적는다 — <head> 가 미리 붙이는 것은 <html> 이다(#tabs 와 같은 까닭). */
+  body.mailview #fab,html.mailview #fab{display:none}
+  /* ② 고르기 칸·체크 칸이 «줄 너비만큼» 늘어났다 — #mmBody input{width:100%}(번호 선택자)가 다 이겼다.
+       ☑ 모드의 고르기 칸은 보낸이 이름 한가운데 떠 있었고, 쓰기 창의 「한명씩 발송」은
+       칸이 다 먹은 나머지 자리에 「한명 / 씩 발 / 송」으로 세로로 쌓였다. 체크 칸은 제 크기로 둔다. */
+  #mmBody input[type=checkbox],#mmBody input[type=radio]{width:auto;min-width:0;flex:none}
+  #mmBody input.dmm-chk{width:22px;min-width:22px;height:22px}
+  /* ③ 메일함 밖의 메일 화면(읽기·쓰기·보낸·수신기록·사업장별)은 PC 화면을 «그대로» 그린다(renderMailMobile).
+       그 차림은 흰 종이 위에 맞춰 짙은 글씨를 박아 두었는데 폰 바탕은 검정이라
+       메일 «제목·본문»(검정)과 보내는사람·임시저장 같은 글이 바탕에 묻혀 안 보였다.
+       PC 와 «같은 종이»를 깐다 — 색 변수도 PC 창(body.pc .modal)과 같은 값으로 돌린다.
+       ⚠ 메일함 목록(.dmm)은 제 빛깔(다음 앱 차림)을 스스로 정하므로 그대로다. */
+  body.mailview #listwrap{background:#fff}
+  body.mailview #mmBody{--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;--bg2:#f8fafc;--row:#fff;color:#1e293b}
+  /* ④ 읽기 화면 단추가 네 줄로 접혀 제목이 화면 3분의 1 아래에서 시작했다 —
+       이 메일에 하는 일은 한 줄로 두고 옆으로 민다(목록·위·아래 줄은 그대로 보인다). */
+  #mmBody .dm-read .rtop .lft{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;padding-bottom:2px}
+  #mmBody .dm-read .rtop .lft::-webkit-scrollbar{display:none}
+  #mmBody .dm-read .rtop .lft>*{flex:none;white-space:nowrap}
+  /* ⑤ 📎 자료함 — 폰에서도 이제 그린다(renderMatMobile). PC 자리(#pcMat)와 같은 종이·같은 색 변수를 깐다.
+       명함 갈래 줄·거르개 줄·＋ 는 이 화면 것이 아니라 접는다(메일 화면과 같은 까닭). */
+  body.matview #tabs,body.matview #subbar,body.matview #fab{display:none}
+  body.matview #listwrap{background:#fff}
+  #matM{padding:12px 8px 90px;--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;color:#1e293b}
+  /* 양옆 채우기(2026-10-18) — 자료 한 장(.matcard)이 겉 12px + 안 14px 로 두 겹이었다. 폰에서는 옆 테두리·둥근 모서리를
+     걷어 화면 끝까지 펴고(위아래 줄로만 가른다) 안 여백만 남긴다. 「모두 고르기」 ☐ 도 장마다의 ☐ 와 한 줄에 선다 */
+  #matM .matcard{margin-left:-8px;margin-right:-8px;border-left:0;border-right:0;border-radius:0;
+    padding-left:10px;padding-right:10px;background:transparent}
+  #matM .matcard.pkon{background:#f8fafc}   /* 고른 장은 그대로 표가 난다 */
+  #matM .matpkhead{padding-left:2px;padding-right:2px}
+  /* ☐ 고르기 칸은 손가락으로 누를 만큼(CLAUDE.md 「☐ 고르기 칸 + 번호」) — PC 의 16px 는 폰 손끝에 작다 */
+  #matM .matpk input,#matM .matpkhead input{width:22px;height:22px}
 }
 
 /* ══════════ 폰 메일함 — 다음메일 «앱»과 같은 차림 (대표 화면 2026-08-24) ══════════
@@ -3401,6 +3516,26 @@ body.pc #pcDetail{display:flex}
 .coerppin.on button:hover{background:#166534;color:#ffffff}
 .coerppin.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
 .coerppin.bad b{color:#991b1b}
+/* 폰 🏢 기업 상세 — 양옆 채우기(2026-10-18, 대표 「양옆 빈공백이 많다」)
+   겉 여백 18px + 상자 안 여백 10~11px 이 겹쳐 글이 화면 끝에서 30px 에 섰다.
+   겉 여백을 6px 로 줄이고, 안쪽 상자(접는 칸·근로자 수 띠·한 일 줄)는 옆 테두리·둥근 모서리를 걷어
+   위아래 줄로만 가른다(한 겹). 상자 안 여백도 8px 로 — 글은 화면 끝에서 14px 안에서 시작한다.
+   ⚠ 이 상자들의 기본 규칙(.pdbody·.cohist-row·.cocard·.coerppin) «뒤»에 둔다 — 검사들이 «첫 규칙»을 읽는다. */
+@media(max-width:760px){
+  body:not(.pc) #pcDetail .pdhead{padding-left:10px;padding-right:10px}
+  body:not(.pc) #pcDetail .pdbody{padding-left:6px;padding-right:6px}
+  body:not(.pc) #pcDetail .pdbody>.pdname,
+  body:not(.pc) #pcDetail .pdbody>.pdsub,
+  body:not(.pc) #pcDetail .pdsec{padding-left:4px;padding-right:4px}
+  body:not(.pc) #pcDetail .cocard,
+  body:not(.pc) #pcDetail .pdbody>.coerppin,
+  body:not(.pc) #pcDetail .cohist-row{border-left:0;border-right:0;border-radius:0}
+  body:not(.pc) #pcDetail .cocard>.h,
+  body:not(.pc) #pcDetail .cocard>.b,
+  body:not(.pc) #pcDetail .pdbody>.coerppin,
+  body:not(.pc) #pcDetail .cohist-row{padding-left:8px;padding-right:8px}
+  body:not(.pc) #pcDetail .cohist-row{background:transparent}
+}
 .coerppin.bad button{color:#991b1b;background:#fecaca}
 .coerppin.bad button:hover{background:#991b1b;color:#ffffff}
 /* 업체 고르기 창 */
@@ -3553,6 +3688,18 @@ body.pc #pcDetail{display:flex}
 /* 폰 — 같은 표를 옆으로 굴려 본다(칸을 두 줄로 접지 않는다) */
 .wkmob{padding:10px 8px 40px}
 .wkmob .tblbox{overflow-x:auto}
+/* 폰(폰화면관리 2026-10-18) — .wkmob 은 폰에만 있다.
+   ① 제목 「👷 근로자 N명」이 PC 의 짙은 글씨(#1e293b) 그대로라 검은 폰 바탕에 묻혀 거의 안 보였다.
+   ② 부제가 두 줄로 접혀 표를 밀어 내렸다 — 한 줄로 두고 넘치면 … 로 줄인다(한 칸은 한 줄).
+   ③ 집단 줄을 펴는 ▸ 는 16px 짜리라 손끝이 자꾸 옆 칸을 눌렀다 — 줄 높이는 그대로 두고 누를 자리만 넓힌다. */
+@media(max-width:760px){
+  .wkmob .wkbar b{color:var(--ink)}
+  .wkmob .wkhint{flex:1 1 100%;margin-left:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wkmob .wkfold{width:28px;padding:6px 0;margin:-6px 0;text-align:center}
+  /* 양옆 채우기(2026-10-18) — 표가 이미 옆으로 구르는 상자라 겉 여백은 거의 걷는다(머리 글만 화면 끝에서 띄운다) */
+  .wkmob{padding-left:6px;padding-right:6px}
+  .wkmob .wkbar{padding-left:4px;padding-right:4px}
+}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -3566,7 +3713,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=29"></script>
+  <script src="js/pu-appbar.js?v=33"></script>
   <script src="js/pu-handoff.js?v=1"></script>
   <script src="js/pu-doc-pick.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -4640,7 +4787,11 @@ const Store = {
                ⚠ 「연락처 정리」는 메일함 자료를 쓴다 — openCntPage 가 폴더·쪽지를 스스로
                  불러온다(이 자리에서 또 읽으면 두 벌이 된다). */
             if(!urlWantsMail() && typeof cntFromUrl === 'function' && cntFromUrl()){
-              try{ openCntPage(); }catch(_){ }
+              /* ⚠ openCntPage 도 맨 아래 덩어리에 있다 — 페이지를 다 읽기 전이면 try 가 「없다」를 삼켜
+                   조용히 아무것도 안 열렸다(restoreLastScreen 머리글과 같은 까닭). 다 읽은 뒤에 연다. */
+              const _cnt = function(){ try{ openCntPage(); }catch(_){ } };
+              if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _cnt, { once:true });
+              else _cnt();
             }
             /* 취업규칙 이력 색인을 미리 받아 둔다 — 회사를 열 때 기다리지 않게.
                못 읽어도(권한·그물) 그 칸만 빠지고 기업정보함은 그대로 뜼다. */
@@ -7392,8 +7543,21 @@ function openMatPage(){ _matFrom = (state.view==='mail') ? 'mail' : 'list';
   try{ document.getElementById('pcMain').scrollTop=0; }catch(_){}
   loadMaterials(()=>{ if(state.view==='mat') renderMatPage(); }); }
 function closeMatPage(){ state.view=_matFrom; render(); }
+/* ── 폰 📎 자료함 (폰화면관리 2026-10-18) ──
+   메일 서랍·쓰기 창의 「📎 자료함」을 누르면 폰에서는 «명함 목록»이 떴다 — 자료함은 PC 자리(#pcMat)에만
+   그렸고, 폰 render() 에는 'mat' 갈래가 없어 명함 목록으로 흘렀다. 이제 폰은 목록 자리(#list)에 그린다.
+   ⚠ 그리는 몸은 PC 와 «한 벌»이다(renderMatPage) — 그릴 자리만 matHost() 가 가른다. */
+function renderMatMobile(){
+  const el=$('list'); if(!el) return;
+  if(!$('matM')) el.innerHTML = '<div id="matM"></div>';
+  renderMatPage();
+}
+function matHost(){
+  try{ if(!document.body.classList.contains('pc')){ const m=$('matM'); if(m) return m; } }catch(_){}
+  return $('pcMat');
+}
 function renderMatPage(){
-  const el=$('pcMat'); if(!el) return;
+  const el=matHost(); if(!el) return;
   const cat = state.matCat || 'all';
   const cats = MAT_CATS_NOW();
   const all  = matList();
@@ -7544,6 +7708,10 @@ async function openMaterialHwp(bytes,name){
   try{ await PureunHwp.renderPreview($('matHwpBody'),bytes,name); }
   catch(e){ $('matHwpBody').innerHTML='<div class="mpmsg">미리보기를 만들지 못했습니다.<br>원본은 그대로 보관되어 있습니다.<br>아래 원본 저장을 이용해 주세요.</div>'; }
 }
+/* 자료함 «주소» 자료는 https 만 연다 (2026-10-14 사무실 보안 검토).
+   esc 는 따옴표만 막는다 — javascript: 주소는 그대로 지나가 미리보기를 누르는 순간 우리 화면 주소에서 돈다.
+   앱 열다섯 개가 한 주소를 쓰므로, 여기서 돈 것은 모든 앱의 로그인 증표를 읽는다. */
+function matSafeUrl(u){ const s=String(u||'').trim(); return /^https:\/\/[^\s<>"']+$/i.test(s) ? s : ''; }
 async function fillMatPreview(id){
   const box=$('mpBody'); if(!box) return;
   /* 한글 자료를 열어 두었으면 다시 받지 않는다 — 고치던 글이 날아가면 안 된다.
@@ -7556,7 +7724,12 @@ async function fillMatPreview(id){
   if(!m){ box.innerHTML='<div class="mpmsg">자료가 없습니다 (지워졌을 수 있습니다)</div>'; return; }
   const t=matType(m.fileName)||{};
   const dl=`<button class="mattab" style="margin-top:10px" onclick="downloadMaterial('${id}')">📥 내려받아 확인</button>`;
-  if(m.url){ _mpFor=id; _mpHtml=`<iframe src="${esc(m.url)}"></iframe>`; box.innerHTML=_mpHtml; return; }
+  if(m.url){
+    const u=matSafeUrl(m.url); _mpFor=id;
+    _mpHtml = u ? `<iframe src="${esc(u)}" referrerpolicy="no-referrer"></iframe>`
+                : `<div class="mpmsg">이 자료의 주소는 미리 볼 수 없습니다 — https 주소만 엽니다.</div>`;
+    box.innerHTML=_mpHtml; return;
+  }
   if(!t.view && !/^(hwp|hwpx)$/.test(matExt(m.fileName))){
     _mpFor=id;
     _mpHtml=`<div class="mpmsg">📎 ${esc(m.fileName||'')}<br>이 형식은 브라우저로 미리 볼 수 없습니다.<br>${dl}</div>`;
@@ -10917,7 +11090,10 @@ function render(){ if(_quiet) return; saveLastScreen(); syncMobileTabs(); syncMo
   /* <head> 에서 미리 붙여 둔 것을 여기서 이어받는다 — 「‹ 목록」으로 명함으로 가면
      떼어 줘야 갈래 줄이 다시 나온다. */
   try{ document.documentElement.classList.toggle('mailview', state.view==='mail'); }catch(_){}
+  /* 📎 자료함도 갈래 줄·거르개 줄·＋ 를 접는다 — 메일 서랍·쓰기 창에서 들어오는 메일 도구다 */
+  try{ document.body.classList.toggle('matview', state.view==='mat'); }catch(_){}
   if(state.view==='mail') return renderMailMobile();
+  if(state.view==='mat') return renderMatMobile();
   if(state.view==='co') return renderCoMobileList();
   if(state.view==='wk') return renderWkMobile();
   if(state.view==='cnt') return renderCntPage();   /* 📥 연락처 정리 — 폰도 이 창 안에(목업 ㉮ 2026-10-07) */
@@ -11077,6 +11253,26 @@ let _lastScreenDone = false;
 function restoreLastScreen(){
   if(_lastScreenDone) return;
   if(!myUid && !myEmail) return;       // 아직 누구인지 모른다 — 다음 기회에
+  /* ★★ 페이지를 «다 읽기 전»이면 다 읽은 뒤로 미룬다 (폰화면관리 2026-10-18)
+     ── 무엇이 있었나
+       메일 문(?view=mail)이 「읽고 있습니다…」에서 영영 멈췄다 — 오류 「openMailBox is not defined」.
+       이 함수는 로그인이 확인되자마자 불린다(메일 문은 명함을 안 기다리고 «지금» 연다).
+       그런데 여기서 부르는 openMailBox·switchTab·openWhoPage·openMnewPage 는 «맨 아래 큰 덩어리»에 있고,
+       함수 끌어올림은 자기 <script> 안에서만 된다(allItems·syncPcSearchFor 가 겪은 그 일).
+       페이지가 2.7MB 라 폰에서는 그 덩어리를 다 읽기 «전»에 로그인 답이 먼저 올 수 있다.
+       ⚠ 더 나빴던 것 — _lastScreenDone 을 먼저 세운 뒤 터져서, 명함이 다 와서 다시 불러도
+         그냥 지나갔다. 그래서 «잠깐» 이 아니라 «영영» 빈 화면이었다.
+     ── 어떻게
+       아직 읽는 중(loading)이면 표를 세우지 않고 DOMContentLoaded 에 한 번 더 부른다.
+       다 읽은 뒤라면 예전 그대로 바로 연다 — 늦어지는 것이 없다.
+     ⚠ typeof document — 이 함수만 떠서 돌리는 검사(vm)에는 document 가 없다. */
+  if(typeof document !== 'undefined' && document.readyState === 'loading'){
+    if(!restoreLastScreen._wait){
+      restoreLastScreen._wait = true;
+      document.addEventListener('DOMContentLoaded', function(){ restoreLastScreen._wait = false; restoreLastScreen(); });
+    }
+    return;
+  }
   _lastScreenDone = true;
   /* ★ 「푸른 메일」 아이콘으로 들어왔으면 주소가 이긴다 — 저장된 마지막 화면보다 앞선다.
      안 그러면 메일 아이콘을 눌렀는데 «마지막에 보던 명함 목록»이 열린다.
@@ -12345,11 +12541,42 @@ function nameChkHtml(){
        근거가 바뀌면(새 반송·다음 달 국세청 답) 다시 올라온다 — 사람의 확인이 새 사실을 덮지 않게(국세청 ntsOkOf 와 같은 결).
    ⚠ 업체관리(이알피) 기록은 고치지 않는다 — 계약 종료는 업체관리에서 사람이 한다.
    ⚠ 국세청에서 이미 「🧹 폐업 정리」·「영업 중 확인」한 곳(coNtsHandled)은 다시 안 올린다.
-   ⚠ 남의 잠긴 폴더 명함은 안 본다(세지도 옮기지도 않는다). */
+   ⚠ 남의 잠긴 폴더 명함은 안 본다(세지도 옮기지도 않는다).
+   ── 공단 근거 (대표 「진행」 2026-10-12, 목업 승인) — 공공데이터 공용 자리(pubdata, coWithPub 로 extra 에 얹힘)
+     💳 국민연금 탈퇴 — 기업정보함에서 «고른» 사업장이 탈퇴로 바뀐 곳. 정식 근거라 혼자서도 줄을 만든다.
+     🟢 4대보험 사업장 살아 있음 — 국세청은 폐업인데 공단 사업장이 살아 있다 → «번호만 바뀐 곳»일 수 있다. 맨 위로.
+     🏢 4대보험 사업장 없음 — 직원 없는 곳일 수 있어 혼자서는 줄을 안 만든다. 다른 근거 옆에만.
+     ⚠★ 보조 근거(🟢·🏢, GONE_SUPPORT)는 «지문»(sig)에 넣지 않는다 — 넣으면 이미 「정리함·살아 있음」으로
+       처리한 줄이 공단 자료가 들어오는 순간 전부 다시 올라온다. */
 let _gone = null, _goneAsk = false;
 const GONE_PAGE = 50;
 const GONE_FOLDER_RE = /업체\s*종료/;
-const GONE_RANK = { nts:0, dom:1, bnc:2 };
+const GONE_RANK = { nts:0, nps:1, dom:2, bnc:3, alive:8, einone:9 };
+const GONE_SUPPORT = { alive:1, einone:1 };
+/* 공단 근거 — 회사 하나(o)의 extra 에서 (순수 로직) */
+/* 보여 줄 차례 (순수 로직) — r.hint 줄은 🟢 를 맨 앞에. 기록 차례(r.ev·지문)는 그대로 둔다 */
+function goneShowEv(r){
+  if(!r || !r.hint) return (r && r.ev) || [];
+  return r.ev.filter(x => x.t === 'alive').concat(r.ev.filter(x => x.t !== 'alive'));
+}
+function gonePubEv(o){
+  const ex = (o && o.extra) || {}, out = [];
+  const np = ex.nps || {};
+  if(np.pick && np.now && np.now.on === false){
+    const d = String(np.now.scsn || '');
+    out.push({ t:'nps', txt:'국민연금 탈퇴' + (d.length >= 6 ? ' ' + d.slice(0,4) + '.' + d.slice(4,6) : ''), at:np.now.at });
+  }
+  const ei = ex.ei;
+  if(ei && ei.rows){
+    const n = Number(ei.gy) || Number(ei.sj) || 0;
+    /* ⚠ «살아 있다»고 단정하지 않는다 — 공단 자료엔 사업장 소멸 여부 칸이 없다(실측 10/13: 폐업 6곳 모두 사업장이 남아 나왔다).
+       «공단 기록에 남아 있다»까지만 말한다. 번호가 바뀌었는데 보험만 옛 번호로 남은 곳·소멸 신고가 늦은 곳 둘 다 이렇게 보인다. */
+    if(n > 0) out.push({ t:'alive', txt:'4대보험 ' + n + '명 기록 남음', at:ei.at });
+  } else if(ei && ei.at){
+    out.push({ t:'einone', txt:'4대보험 사업장 없음', at:ei.at });
+  }
+  return out;
+}
 function goneLoad(cb){
   if(_gone !== null){ cb && cb(); return; }
   if(_goneAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
@@ -12387,6 +12614,17 @@ function goneRows(){
     const r = rowOf('n:' + (nrm(nm) || o.key), nm);
     r.o = o;
     addEv(r, { t:'nts', txt:(c === 'gone' ? '폐업' : '휴업') + (coVal(o, 'ntsEndDt') ? ' ' + coVal(o, 'ntsEndDt') : ''), at:coVal(o, 'ntsAt') });
+    gonePubEv(o).forEach(ev => addEv(r, ev));
+    (o.cards || []).forEach(it => addCard(r, it));
+  });
+  /* 💳 국민연금 탈퇴 — 정식 근거라 국세청이 멀쩡해도 줄을 만든다 */
+  (typeof coList === 'function' ? (coList() || []) : []).forEach(function(o){
+    const evs = gonePubEv(o);
+    if(!evs.some(x => x.t === 'nps')) return;
+    const nm = o.name || coVal(o, 'company') || o.key;
+    const r = rowOf('n:' + (nrm(nm) || o.key), nm);
+    r.o = r.o || o;
+    evs.forEach(ev => addEv(r, ev));
     (o.cards || []).forEach(it => addCard(r, it));
   });
   /* 🌐 도메인 · ↩ 반송 — 명함으로 회사를 찾는다 */
@@ -12422,9 +12660,12 @@ function goneRows(){
     const r = rows[k];
     r.cards = Object.keys(r.cards).map(id => r.cards[id]);
     r.ev.sort((a,b)=> GONE_RANK[a.t] - GONE_RANK[b.t]);
-    r.sig = r.ev.map(x => x.t + ':' + x.txt).sort().join('|');
-    r.at = r.ev.reduce((m, x) => Math.max(m, goneMs(x.at)), 0);
-    r.rank = GONE_RANK[r.ev[0].t];
+    const main = r.ev.filter(x => !GONE_SUPPORT[x.t]);
+    r.sig = main.map(x => x.t + ':' + x.txt).sort().join('|');
+    r.at = main.reduce((m, x) => Math.max(m, goneMs(x.at)), 0);
+    /* 🟢 국세청은 폐업인데 공단 사업장이 살아 있다 — 잘못 정리하기 전에 먼저 보게 맨 위로 */
+    r.hint = r.ev.some(x => x.t === 'alive') && main.some(x => x.t === 'nts');
+    r.rank = r.hint ? -1 : GONE_RANK[main[0].t];
     let who = r.o && r.o.erp && r.o.erp.main;
     if(!who && EM && EM.match) for(const it of r.cards){ const m = EM.match(it); if(m && m.main){ who = m.main; break; } }
     r.who = who || '';
@@ -12447,8 +12688,120 @@ function goneFolder(){
   gs.sort((a,b)=> (/퇴사/.test(b.name) ? 1 : 0) - (/퇴사/.test(a.name) ? 1 : 0));
   return gs[0] || null;
 }
+/* 🏢 공단 자료 받기 — 국세청 폐업·휴업인데 공단 자료가 아직 없는 회사(사업자번호 10자리)만 */
+let _goneAsked = false;
+function goneNoPub(rows){
+  return (rows || []).filter(r => r.o && r.ev.some(x => x.t === 'nts')
+    && digits(r.o.bizno || '').length === 10 && !(r.o.extra && r.o.extra.ei));
+}
+async function goneAskPub(){
+  if(typeof PuPubdata === 'undefined' || _goneAsked) return;
+  const list = goneNoPub(goneRows().filter(r => r.state === 'todo'));
+  if(!list.length){ toast('받을 곳이 없습니다', 4000); return; }
+  _goneAsked = true; goneMount();
+  toast('공단 자료 ' + list.length + '곳을 청했습니다 — 몇 분 안에 저절로 붙습니다', 7000);
+  for(const r of list){ try{ await PuPubdata.ask(r.o.bizno, 'ei', r.o.name || ''); }catch(_){ } }
+}
+/* ══════ 🧾 새로 들어온 사업자등록증 — 서버 자동 검토 결과 (대표 지시 2026-10-12, 목업 승인) ══════
+   서버(functions/bizreg-review.js)가 등록증이 들어올 때마다 국세청 상태·등록증 대조·4대보험·옛 번호·어긋난 칸을 보고
+   pucards/bizreg/{열쇠} 에 적는다. 이 창은 그것을 «보여 주고», 사람은 노란 줄만 처리한다.
+   ⚠ 저절로 고치거나 잇지 않는다. 「옛 번호에 새 번호 적기」는 국세청 «새 번호»(coNtsNewNoAsk 와 같은 칸)를 적을 뿐 합치지 않는다.
+   ⚠ 최근 30일만 받는다(색인 at). 「확인함」은 그 줄의 done 에 누가·언제만 적는다. */
+const BZR_DAYS = 30;
+let _bzr = null, _bzrAsk = false;
+function bzrLoad(cb){
+  if(_bzr !== null){ cb && cb(); return; }
+  if(_bzrAsk || typeof Store === 'undefined' || Store.mode !== 'firebase' || !Store.db) return;
+  _bzrAsk = true;
+  Store.db.ref(DB_ROOT + '/bizreg').orderByChild('at').startAt(Date.now() - BZR_DAYS * 86400000).once('value').then(function(snap){
+    _bzr = snap.val() || {}; cb && cb();
+  }).catch(function(){ _bzrAsk = false; });
+}
+/* 줄 (순수 로직) — 새것이 위. 노란 줄 = need 이고 아직 확인 안 함 */
+function bzrRows(map){
+  return Object.keys(map || {}).map(function(k){ return Object.assign({ key:k }, map[k]); })
+    .filter(x => x && x.no)
+    .map(function(x){ x.todo = !!x.need && !(x.done && x.done.at); return x; })
+    .sort((a,b)=> (Number(b.at) || 0) - (Number(a.at) || 0));
+}
+function bzrCount(){ if(_bzr === null){ bzrLoad(function(){ try{ renderSoon(); }catch(_){ } }); return 0; } return bzrRows(_bzr).filter(x => x.todo).length; }
+/* 검토 결과 꼬리표 (순수 로직) */
+function bzrTags(x){
+  const t = [], c = (k, s) => '<span class="bzr-c ' + k + '">' + s + '</span>';
+  const st = x.nts && x.nts.state ? String(x.nts.state) : '';
+  if(st){ const g = /폐업|휴업|등록되지 않은/.test(st);
+    t.push(c(g ? 'no' : 'ok', '🏛 ' + esc(/등록되지 않은/.test(st) ? '국세청에 없는 번호' : st) + (x.nts.end ? ' ' + esc(x.nts.end) : ''))); }
+  else t.push(c('dim', '🏛 못 물어봄'));
+  if(x.match === 'ok') t.push(c('ok', '🧾 등록증 일치'));
+  else if(x.match === 'bad') t.push(c('no', '🧾 대표자·개업일 다름'));
+  else if(x.match === 'name') t.push(c('wa', '🧾 상호 다름'));
+  if(x.ei) t.push(x.ei.none ? c('dim', '🏢 4대보험 사업장 없음') : c('ok', '🏢 상시 ' + (Number(x.ei.n) || 0) + '명'));
+  if((x.old || []).length) t.push(c('wa', '🔗 같은 대표·상호의 옛 번호 ' + x.old.length + '곳'));
+  else t.push(c('dim', x.link === 'existing' ? '🔗 기존 회사에 붙음' : '🔗 새 회사'));
+  if((x.conflicts || []).length) t.push(c('wa', '⚠ 지금 값과 다른 칸 ' + x.conflicts.length));
+  return t.join('');
+}
+function bzrOpen(){ state.bzrOn = true; bzrLoad(bzrMount); bzrMount(); }
+function bzrClose(){ state.bzrOn = false; bzrMount(); }
+function bzrMount(){
+  let box = document.getElementById('bzrBox');
+  if(!box){ if(!state.bzrOn) return; box = document.createElement('div'); box.id = 'bzrBox'; document.body.appendChild(box); }
+  box.innerHTML = state.bzrOn ? bzrHtml() : '';
+}
+function bzrHtml(){
+  const rows = bzrRows(_bzr), todo = rows.filter(x => x.todo);
+  const okN = rows.filter(x => !x.need).length, goneN = rows.filter(x => x.nts && /폐업|휴업/.test(x.nts.state || '')).length;
+  const card = (n, l, cls) => '<div class="gn-cd' + (cls ? ' ' + cls : '') + '" style="cursor:default"><b>' + n + '</b><span>' + l + '</span></div>';
+  const src = x => x.src === 'card' ? '🗂 기업정보함' : '📷 사진첩·메일';
+  const day = x => { const d = new Date(Number(x.at) || 0); return (d.getMonth() + 1) + '/' + d.getDate(); };
+  const act = function(x){
+    const k = esc(String(x.key).replace(/'/g, "\\'")), no = esc(x.no);
+    if(!x.need) return '<span class="em">끝</span>';
+    if(!x.todo) return '<span class="em">확인함' + (x.done && x.done.by ? ' · ' + esc(x.done.by) : '') + '</span>';
+    return '<button onclick="bzrOpenCo(\'' + no + '\')">기업 상세 열기</button>'
+      + ((x.old || []).length ? '<button onclick="bzrNewNo(\'' + k + '\')">옛 번호에 새 번호 적기</button>' : '')
+      + '<button class="ok" onclick="bzrDone(\'' + k + '\')">✓ 확인함</button>';
+  };
+  let body;
+  if(_bzr === null) body = '<p class="em">읽는 중입니다…</p>';
+  else if(!rows.length) body = '<p class="em">최근 ' + BZR_DAYS + '일 동안 들어온 등록증이 없습니다.</p>';
+  else body = '<table class="gn"><colgroup><col style="width:64px"><col style="width:18%"><col style="width:120px"><col><col style="width:330px"></colgroup>'
+    + '<tr><th>들어온 날</th><th>회사</th><th>어디서</th><th>검토 결과</th><th>처리</th></tr>'
+    + rows.map(x => '<tr class="' + (x.todo ? 'bzr-need' : '') + '"><td class="em">' + day(x) + '</td>'
+      + '<td title="' + esc(x.name || x.no) + '"><b>' + esc(x.name || x.no) + '</b></td><td>' + src(x) + '</td>'
+      + '<td title="' + esc((x.conflicts || []).join(', ')) + '">' + bzrTags(x) + '</td><td class="act">' + act(x) + '</td></tr>').join('')
+    + '</table>';
+  return '<div class="mck-dim" onclick="if(event.target===this)bzrClose()"><div class="mck gn-box bzr-box">'
+    + '<header><span>🧾</span><h2>새로 들어온 등록증</h2><span class="em">최근 ' + BZR_DAYS + '일 · 들어오자마자 서버가 검토합니다. 저절로 고치거나 잇지 않습니다.</span>'
+    + '<span class="x" onclick="bzrClose()" title="닫기">✕</span></header>'
+    + '<div class="gn-cards">' + card(rows.length, '들어옴') + card(okN, '✓ 다 맞음 (끝)', 'grn') + card(todo.length, '⚠ 사람 확인', 'amb') + card(goneN, '🏛 폐업·휴업', 'red') + '</div>'
+    + '<div class="body">' + body + '</div></div></div>';
+}
+function bzrOpenCo(no){ bzrClose(); state.coPick = String(no); openCoDetailPanel(String(no)); }
+async function bzrDone(k){
+  if(Store.mode !== 'firebase') return;
+  let me = myEmail || '';
+  try{ const w = window.PuWhoami && PuWhoami.get && PuWhoami.get(); me = (w && w.name) || me; }catch(_){ }
+  const v = { by: me, at: Date.now() };
+  try{ await Store.db.ref(DB_ROOT + '/bizreg/' + k + '/done').set(v); }catch(e){ toast('적지 못했습니다 — 쓰기 권한을 확인해 주세요', 6000); return; }
+  if(_bzr && _bzr[k]) _bzr[k].done = v;
+  bzrMount(); renderSoon();
+}
+/* 옛 번호(폐업 등)에 «새 번호»를 적는다 — 🏚 와 국세청 칩이 「새 번호」로 처리된 곳으로 본다. 합치지 않는다 */
+function bzrNewNo(k){
+  const x = _bzr && _bzr[k]; if(!x || !(x.old || []).length) return;
+  const o = x.old[0];
+  const st = x.nts && x.nts.state ? x.nts.state : '';
+  if(!/계속/.test(st)){ toast('새 번호가 계속사업자가 아니라 적지 않습니다 — 국세청 「' + (st || '모름') + '」', 8000); return; }
+  if(!confirm('옛 번호 ' + o.no + (o.state ? ' (' + o.state + ')' : '') + ' 에\n새 번호 ' + x.no + ' (' + st + ') 를 적어 둡니다.\n\n· 옛 회사가 「🏚 없어진 듯한 곳」·국세청 확인에서 빠집니다\n· 두 회사를 합치지는 않습니다\n\n계속할까요?')) return;
+  coSaveInfoPatch(o.no, { ntsNewNo: x.no, ntsNewState: st, ntsNewAt: todayYmd() }, '🏛 옛 번호에 새 번호 ' + x.no + ' 를 적었습니다');
+  bzrDone(k);
+}
 function goneOpen(){
   state.goneOn = true; state.goneTab = 'todo'; state.goneSel = {}; state.goneRow = ''; state.gonePage = 1;
+  if(typeof loadPubCo === 'function') loadPubCo();      /* 공단 근거 — 기업 상세를 안 거쳐 열어도 */
+  /* 🏛 국세청 근거는 기업 상세(coInfo)에 있다 — 명함 화면에서 바로 열면 아직 안 읽어 「폐업 0」으로 보였다(10/13 실화면) */
+  if(typeof loadCoInfo === 'function') loadCoInfo();
   goneLoad(goneMount);
   goneMount();
 }
@@ -12531,10 +12884,13 @@ function goneHtml(){
   const list = tab === 'done' ? doneRows : tab === 'todo' ? todo : todo.filter(r => r.ev.some(x => x.t === tab));
   const show = list.slice(0, (state.gonePage || 1) * GONE_PAGE);
   const card = (t, n, l, cls) => '<div class="gn-cd' + (tab === t ? ' on' : '') + (cls ? ' ' + cls : '') + '" onclick="goneTabSet(\'' + t + '\')"><b>' + n + '</b><span>' + l + '</span></div>';
-  const tag = x => '<span class="gn-tag ' + x.t + '">' + ({ nts:'🏛 ', dom:'🌐 ', bnc:'↩ ' })[x.t] + esc(x.txt) + '</span>';
+  const tag = x => '<span class="gn-tag ' + x.t + '">' + ({ nts:'🏛 ', dom:'🌐 ', bnc:'↩ ', nps:'💳 ', alive:'🟢 ', einone:'🏢 ' })[x.t] + esc(x.txt) + '</span>';
   const onlyDom = r => r.ev.length === 1 && r.ev[0].t === 'dom' && r.cards.length;
   const btns = function(r){
     if(r.state !== 'todo') return '<button onclick="goneUndo(\'' + esc(r.key) + '\')">↩ 되돌리기</button>';
+    if(r.hint) return '<button class="ok" onclick="goneMark([\'' + esc(r.key) + '\'],\'alive\')">살아 있음</button>'
+      + (r.o ? '<button onclick="coNtsNewNoAsk(\'' + esc(String(r.o.key).replace(/'/g, "\\'")) + '\')">🏛 새 번호 확인</button>' : '')
+      + '<button onclick="goneMark([\'' + esc(r.key) + '\'],\'done\')">✓ 정리함</button>';
     return (r.cards.length ? '<button class="mv" onclick="goneMove([\'' + esc(r.key) + '\'])">📁 명함 옮기기</button>' : '')
       + (onlyDom(r) ? '<button onclick="goneFix(\'' + r.cards[0].id + '\')">✎ 메일 고치기</button>' : '')
       + '<button class="ok" onclick="goneMark([\'' + esc(r.key) + '\'],\'done\')">✓ 정리함</button>'
@@ -12548,6 +12904,11 @@ function goneHtml(){
       + (o && o.erp ? ' · 업체관리 「' + esc(o.erp.status || '등록') + '」' : '')
       + (r.state !== 'todo' ? ' &nbsp;|&nbsp; ' + (r.state === 'alive' ? '살아 있음' : '정리함') + ' ' + esc(goneDay((_gone.done[goneKey(r.key)] || {}).at)) : '');
   };
+  /* 🏢 공단 자료가 아직 없는 국세청 폐업·휴업 회사 — «받아 달라»를 한 번에 */
+  const noPub = goneNoPub(todo);
+  const pubBand = (tab === 'done' || !noPub.length || typeof PuPubdata === 'undefined') ? ''
+    : '<div class="gn-pub"><span>🏢 국세청 폐업·휴업 <b>' + noPub.length + '곳</b>은 아직 공단 자료가 없습니다 — 받아 두면 «번호만 바뀐 곳»을 가려냅니다.</span>'
+      + (_goneAsked ? '<span class="em" style="flex:none">받는 중 — 몇 분 안에 저절로 붙습니다</span>' : '<button onclick="goneAskPub()">공단 자료 받기 (' + noPub.length + '곳)</button>') + '</div>';
   let body;
   if(_gone === null) body = '<p class="em">근거를 읽는 중입니다…</p>';
   else if(!list.length) body = '<p class="em">' + (tab === 'done' ? '정리한 줄이 없습니다' : '✓ 정리할 곳이 없습니다') + '</p>';
@@ -12568,7 +12929,7 @@ function goneHtml(){
             + '<td class="em" style="text-align:right">' + (i + 1) + '</td>'
             + '<td title="' + esc(r.name) + '"><b>' + esc(r.name) + '</b></td>'
             + '<td><span class="gn-lnk" onclick="goneRowToggle(\'' + esc(r.key) + '\')">' + r.cards.length + '장 ›</span></td>'
-            + '<td title="' + esc(r.ev.map(x => x.txt).join(' · ')) + '">' + r.ev.map(tag).join(' ') + '</td>'
+            + '<td title="' + esc(r.ev.map(x => x.txt).join(' · ')) + '">' + goneShowEv(r).map(tag).join(' ') + '</td>'
             + '<td class="em">' + esc(goneDay(r.at)) + '</td>'
             + '<td>' + (r.who ? '<span class="t">' + esc(r.who) + '</span>' : '<span class="em">—</span>') + '</td>'
             + '<td class="act">' + btns(r) + '</td></tr>'
@@ -12578,7 +12939,7 @@ function goneHtml(){
       body += show.map(function(r, i){
         return '<div class="gn-m"><div class="l1">' + (tab === 'done' ? '' : '<input type="checkbox" ' + (sel[r.key] ? 'checked' : '') + ' onclick="goneSel(\'' + esc(r.key) + '\')"> ')
           + '<span class="em">' + (i + 1) + '</span> <b onclick="goneRowToggle(\'' + esc(r.key) + '\')">' + esc(r.name) + '</b> ' + r.cards.length + '장 '
-          + r.ev.map(tag).join(' ') + '</div><div class="l2 act">' + btns(r) + '</div>'
+          + goneShowEv(r).map(tag).join(' ') + '</div><div class="l2 act">' + btns(r) + '</div>'
           + (state.goneRow === r.key ? '<div class="gn-open">' + detail(r) + '</div>' : '') + '</div>';
       }).join('');
     }
@@ -12590,7 +12951,9 @@ function goneHtml(){
     + '<span class="x" onclick="goneClose()" title="닫기">✕</span></header>'
     + '<div class="gn-cards">' + card('todo', todo.length, '정리할 것 (회사)') + card('nts', cnt('nts'), '🏛 국세청 폐업·휴업', 'red')
     + card('dom', cnt('dom'), '🌐 메일 도메인 없어짐 · 명함 ' + domCards + '장', 'amb') + card('bnc', cnt('bnc'), '↩ 반송 메일')
-    + card('done', doneRows.length, '정리한 것 · 살아 있음') + '</div>'
+    + (cnt('nps') ? card('nps', cnt('nps'), '💳 국민연금 탈퇴', 'red') : '')
+    + card('alive', cnt('alive'), '🟢 4대보험 기록 남음 (번호 바뀐 듯·확인)', 'grn')
+    + card('done', doneRows.length, '정리한 것 · 살아 있음') + '</div>' + pubBand
     + '<div class="body">' + body + '</div></div></div>';
 }
 
@@ -14953,6 +15316,8 @@ function openMenu(){
       <span class="msub">중복·유사·빈·깨짐·휴지통</span></button>
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');goneOpen()">🏚 없어진 듯한 곳
       <span class="msub">국세청 폐업·도메인 없어짐·반송 메일</span></button>
+    <button class="sheetbtn" onclick="menuBg.classList.remove('open');bzrOpen()">🧾 새 등록증
+      <span class="msub">들어오자마자 서버가 검토 · 확인할 것만 노랗게</span></button>
 
     ${hd('📥 데이터')}
     <button class="sheetbtn" onclick="menuBg.classList.remove('open');importInput.click()">📥 파일 가져오기
@@ -17624,6 +17989,7 @@ function renderPCSide(){
          수는 메일 창이 마지막에 센 값이다(이 창에는 메일이 없다). */''}
     <button class="${state.view==='cnt'?'on':''}" onclick="openCntPage()" title="메일에서 처음 온 상대를 업체 담당자 · 명함으로 정리합니다 — 이 창에서 열립니다">📥<em>연락처 정리</em><span>${mnewLsCount() ? mnewLsCount().toLocaleString() : ''}</span></button>
     ${/* 🏚 없어진 듯한 곳 (대표 승인 목업 2026-10-09) — 창으로 연다. 수는 «정리할 것» 회사 수 */''}
+    <button onclick="bzrOpen()" title="최근 30일 들어온 사업자등록증 — 서버가 국세청·4대보험·옛 번호를 검토했습니다. 수는 사람이 확인할 것">🧾<em>새 등록증</em><span>${(n => n ? n.toLocaleString() : '')(typeof bzrCount === 'function' ? bzrCount() : 0)}</span></button>
     <button onclick="goneOpen()" title="국세청 폐업 · 메일 도메인 없어짐 · 반송 메일로 «없어진 듯한 회사»를 모아 봅니다">🏚<em>없어진 듯한 곳</em><span>${(n => n ? n.toLocaleString() : '')(typeof goneCount === 'function' ? goneCount() : 0)}</span></button>
   </div></div>`;
   /* ⚠ 갈래 줄의 끝(`</div></div>`)이 .pcside-top 까지 «같이» 닫는다. 메일 창은 위에서
@@ -28213,7 +28579,7 @@ function mbPvDraw(kind, buf, a){
     return mbPvLib('vendor/pdf.min.js?v=1', ()=>!!window.pdfjsLib)
       .then(()=>{
         try{ pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js?v=1'; }catch(_){ }
-        return pdfjsLib.getDocument({ data: buf }).promise;
+        return pdfjsLib.getDocument({ isEvalSupported: false, data: buf }).promise;
       })
       .then(doc=>({ pdf: doc, page: 1, pages: Number(doc.numPages || 1) }));
   }
@@ -28313,7 +28679,7 @@ function mbPvHtml(){
   const sub = p.kind === 'doc' ? ' · 글자만 뽑아 보여 드립니다(모양은 다릅니다)'
             : p.kind === 'xls' ? (p.sheets > 1 ? ` · 「${esc(p.sheet)}」 등 ${p.sheets}장 중 첫 장` : '')
             : '';
-  return `<div class="mck-dim" onclick="if(event.target===this)mbPvClose()">
+  return `<div class="mck-dim pvdim" onclick="if(event.target===this)mbPvClose()">
     <div class="mck pvbox">
       <header><span>👁</span><h2>${esc(p.name)}</h2>
         <span class="pvsz">${p.size?esc(fmtMB(p.size)):''}${sub}</span>
@@ -28696,7 +29062,16 @@ function mbAttToPay(i){
     .then(j=>{
       if(!j.ok) throw new Error(j.error||'담지 못했습니다');
       /* ⚠ «어디로» 갔는지 반드시 말한다 — 담았다고만 하면 급여데이터함을 열어
-           한참 찾게 된다. 임자를 못 찾았으면 그 까닭까지. */
+           한참 찾게 된다. 임자를 못 찾았으면 그 까닭까지.
+         ⚠ 서랍으로 «바로» 들어갔으면 그렇다고 말한다 (2026-10-17). 다섯 잣대를 다
+           통과하면 서버가 대기 칸을 건너뛴다 — 그때 「대기 칸 · 골라 주세요」라고 하면
+           이미 들어간 자료를 대기 칸에서 찾다 「안 들어왔다」고 여긴다. */
+      const KIND_NAME = { contract:'근로계약서', attend:'근태', ledger:'급여대장', output:'우리 산출물' };
+      const ft = j.filedTo || {};
+      const where = [ft.companyName, ft.month, KIND_NAME[ft.kind]].filter(Boolean).join(' · ');
+      if(j.filed) return toast('📥 '+(j.name||'첨부')+' 를 급여데이터함 «서랍»에 바로 넣었습니다'
+        + (where?' — '+where:'') + (j.seat?' ('+j.seat+' 자리)':'')
+        + ' · 사업장·귀속월이 확실해 확인을 건너뛰었습니다', 10000);
       toast(j.shared
         ? '📥 '+(j.name||'첨부')+' 를 급여데이터함 «공용 대기 칸»에 담았습니다'
           + (j.why?' — '+j.why:'')+' · 사업장·귀속월을 골라 주세요'
@@ -31744,7 +32119,7 @@ function loadCoInfo(cb){
      ⚠ 화면을 다시 그리는 시점은 그대로다 — watchCardMap 이 잔물결을 140ms 로 묶어
        settled 에서 한 번만 부른다. 첫 적재에 4,000번 그리지 않는다. */
   watchCardMap(Store.db.ref(DB_ROOT+'/coInfo'), value => { _coInfo = value || {}; },
-               () => { coListBust(); renderCoSoon(); });
+               () => { coListBust(); renderCoSoon(); if(state.goneOn && typeof goneMount === 'function') goneMount(); });
   cb && cb();
 }
 /* 🗂 공공데이터 공용 자리 구독 (2026-10-11) — 근로자 수·국민연금 숫자는 서버가 pubdata/co 에 쓴다.
@@ -38471,7 +38846,7 @@ function coNpsHtml(o){
   }
   if(p.candAt) return `<div class="dim" style="margin-bottom:6px">앞 6자리가 같은 국민연금 사업장이 없습니다 — 가입자 3인 미만 법인·10인 미만 개인사업장은 공개되지 않습니다.</div>
       <div class="coerppin"><button onclick="coNpsNone('${k}')">여기 없음</button><button onclick="coNpsFind('${k}')">🔍 다시 찾기</button></div>`;
-  if(_pubAsked[o.key]) return `<div class="dim">국민연금 사업장을 찾는 중입니다 — 몇 초 뒤 저절로 나옵니다.</div>`;
+  if(_pubAsked[o.key + ':nps']) return `<div class="dim">국민연금 사업장을 찾는 중입니다 — 몇 초 뒤 저절로 나옵니다.</div>`;
   return `<div class="dim" style="margin-bottom:6px">국민연금 가입 사업장에서 가입자 수(≈ 근로자 수)를 받아 옵니다. 처음 한 번은 사업장을 골라 주세요.</div>${find}`;
 }
 /* ══════ 👥 근로자 수 — 한 줄 + 사업장 팝업 (대표 「진행」 2026-10-11, 목업 ㉯ 「칸이 늘어나는 것보다 팝업」) ══════
@@ -38486,11 +38861,12 @@ const EI_EVERY_DAYS = 30;
    숫자는 서버가 받아 pubdata/co/{번호} 에 쓰고, 이 화면은 읽기만 한다. 새로 받고 싶으면 «받아 달라»를 남긴다.
    ⚠ 화면이 공단에 직접 묻거나 숫자를 적지 않는다 — 쓰는 곳이 둘이면 같은 회사 숫자가 화면마다 달라진다.
    ⚠ 사람이 정한 것(국민연금 pick·none)은 공공데이터가 아니라 기업정보함 coInfo 에 남는다. */
-let _pubAsked = {};         /* 이 화면에서 «받아 달라»를 남긴 회사 — 되풀이하지 않는다 */
+let _pubAsked = {};         /* 이 화면에서 «받아 달라»를 남긴 회사·갈래({열쇠}:ei|nps) — 되풀이하지 않는다.
+                               ⚠ 갈래별로 적는다 — 열 때 고용·산재만 청했는데 국민연금 칸이 「찾는 중」에 멈춰 있었다(10/12 실화면) */
 async function coPubAsk(o, k){
   if(!o || Store.mode !== 'firebase' || typeof PuPubdata === 'undefined') return false;
   const ok = await PuPubdata.ask(o.bizno, k, o.name || '');
-  if(ok){ _pubAsked[o.key] = 1; coPubRepaint(o.key); }
+  if(ok){ _pubAsked[o.key + ':' + (k || 'all')] = 1; coPubRepaint(o.key); }
   else toast('요청을 남기지 못했습니다 — 로그인을 확인해 주세요', 6000);
   return ok;
 }
@@ -38514,6 +38890,7 @@ function coWithPub(ex, pb){
 }
 /* 서버가 써서 숫자가 바뀌면 — 열려 있는 상세·사업장 창만 다시 그린다 */
 function coPubRepaint(key){
+  if(state.goneOn && typeof goneMount === 'function'){ goneBust(); goneMount(); }   /* 🏚 공단 근거 */
   if(key && state.coPick !== key && !(_coWork && _coWork.key === key)) return;
   if(state.coPick && (!key || state.coPick === key)) openCoDetailPanel(state.coPick, true);
   if(_coWork && (!key || _coWork.key === key)) coWorkMount();
@@ -38526,11 +38903,11 @@ async function coEiFetch(key, quiet){
 }
 /* 기업 상세를 열 때 — 아직 없거나 30일 지났으면 조용히 «받아 달라»(국세청 coNtsAutoOnOpen 과 같은 결) */
 function coEiAutoOnOpen(o){
-  if(!o || _pubAsked[o.key] || Store.mode !== 'firebase') return;
+  if(!o || _pubAsked[o.key + ':ei'] || Store.mode !== 'firebase') return;
   if(digits(o.bizno || '').length !== 10) return;
   const ei = o.extra && o.extra.ei;
   if(ei && ei.at && Date.now() - Number(ei.at) < EI_EVERY_DAYS * 86400000) return;
-  _pubAsked[o.key] = 1;       /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
+  _pubAsked[o.key + ':ei'] = 1;       /* 묻기 «전»에 적는다 — 답이 오기 전에 다시 그려도 두 번 묻지 않게 */
   coEiFetch(o.key, true);
 }
 /* 기업 상세의 «한 줄» */
@@ -38995,11 +39372,13 @@ function wkListBuild(erp, info){
       const p = by[k] = by[k] || {
         key: k, name: nm, company: row.company, bizno: row.bizno,
         cases: [], docs: [],
-        rrn: '', phone: '', email: '', address: '', position: '',
+        hasRrn: false, rrnRefs: [], phone: '', email: '', address: '', position: '',
         hireDate: '', leaveDate: '', primaryOf: {}, paid: {}, last: 0
       };
       if(!p.bizno) p.bizno = row.bizno;
-      take(p, 'rrn', w.rrn);
+      /* 주민번호는 «공개 덩어리에서 읽지 않는다» — 그 사건의 담당자 칸(worker_secret)에만 있다(2026-10-15).
+         여기서는 «있다»와 «어느 사건의 어느 근로자»만 기억하고, 「보기」를 누를 때 읽는다(거절되면 🔒). */
+      if((w.hasRrn || w.rrn) && rec.id && w.id){ p.hasRrn = true; p.rrnRefs.push({ id: rec.id, wid: w.id }); }
       take(p, 'phone', w.phone);
       take(p, 'email', w.email);
       take(p, 'address', w.address || w.addr);
@@ -39176,20 +39555,41 @@ function wkMaskRrn(v){
   return d.slice(0,6).replace(/./g,'■') + '-' + '*'.repeat(d.length-6);
 }
 function wkRrnShown(key){ return !!_wkRrnOpen[key]; }
-function wkRrnToggle(key){
-  _wkRrnOpen[key] = !_wkRrnOpen[key];
+/* 「보기」를 눌렀을 때만 그 사건의 담당자 칸을 읽는다(2026-10-15) — 값: 글자 | 'denied' | 'none' | 'err'.
+   ⚠ «누가 볼 수 있나»를 화면이 흉내 내지 않는다 — 읽어 보고 서버가 거절하면 🔒. */
+const _wkRrnVal = {};
+async function wkRrnLoad(p){
+  if(_wkRrnVal[p.key] != null) return _wkRrnVal[p.key];
+  if(!window.PuWorkerSecret) return (_wkRrnVal[p.key] = 'err');
+  let denied = false, err = false;
+  for(const ref of (p.rrnRefs || [])){
+    const r = await PuWorkerSecret.read(firebase.database(), 'cases', ref.id);
+    if(r.ok){ const v = r.map && r.map[ref.wid] && r.map[ref.wid].rrn; if(v) return (_wkRrnVal[p.key] = String(v)); }
+    else if(r.denied) denied = true; else err = true;
+  }
+  return (_wkRrnVal[p.key] = denied ? 'denied' : (err ? 'err' : 'none'));
+}
+async function wkRrnToggle(key){
   const p = wkList().filter(x=>x.key===key)[0];
+  if(!p) return;
+  if(!_wkRrnOpen[key]) await wkRrnLoad(p);
+  _wkRrnOpen[key] = !_wkRrnOpen[key];
   const el = document.getElementById('wkRrn');
-  if(el && p) el.innerHTML = wkRrnCellHtml(p);
+  if(el) el.innerHTML = wkRrnCellHtml(p);
 }
 function wkRrnCellHtml(p){
-  if(!p.rrn) return '<span class="dim">사건에 적혀 있지 않습니다</span>';
-  if(wkRrnShown(p.key)){
-    return `<b class="wkrrn">${esc(p.rrn)}</b>
-      <button class="wkeye" onclick="wkRrnToggle('${esc(String(p.key).replace(/'/g,"\\'"))}')">가리기</button>`;
+  if(!p.hasRrn) return '<span class="dim">사건에 적혀 있지 않습니다</span>';
+  const v = _wkRrnVal[p.key];
+  const k = esc(String(p.key).replace(/\x27/g, '\\\x27'));   /* 따옴표를 글자로 안 쓴다 — 검사의 함수 자르개가 정규식 속 따옴표를 문자열 시작으로 읽는다 */
+  if(v === 'denied') return '<span class="dim" title="주민번호는 그 사건의 주담당·부담당과 대표만 봅니다">🔒 담당자만</span>';
+  if(v === 'none') return '<span class="dim">사건에 적혀 있지 않습니다</span>';
+  if(v === 'err') return '<span class="dim">⚠ 불러오지 못했습니다 — 다시 열어 주세요</span>';
+  if(v && wkRrnShown(p.key)){
+    return `<b class="wkrrn">${esc(v)}</b>
+      <button class="wkeye" onclick="wkRrnToggle('${k}')">가리기</button>`;
   }
-  return `<span class="wkmask">${esc(wkMaskRrn(p.rrn))}</span>
-    <button class="wkeye" onclick="wkRrnToggle('${esc(String(p.key).replace(/'/g,"\\'"))}')" title="눌러야 나옵니다 — 볼 일이 있을 때만">보기</button>`;
+  return `<span class="wkmask">${esc(v ? wkMaskRrn(v) : '■■■■■■-*******')}</span>
+    <button class="wkeye" onclick="wkRrnToggle('${k}')" title="눌러야 나옵니다 — 그 사건의 담당자와 대표만">보기</button>`;
 }
 
 /* ══════ 👷 근로자 정보함 — 화면 ══════ */
@@ -39205,6 +39605,7 @@ const WK_DOC_ICON = { idcard:'🪪', resident:'📃', mandate:'✍', consent:'�
 function enterWkView(){
   state.view='wk'; state.wkPage=0;
   _wkRrnOpen = {};                       /* 화면을 나서면 드러낸 주민번호는 다시 가려진다 */
+  Object.keys(_wkRrnVal).forEach(function(k){ delete _wkRrnVal[k]; });   /* 읽어 둔 번호도 잊는다(2026-10-15) */
   render();
   loadWkInfo();
   /* 사람과 사건이 모두 이알피에서 온다 — 처음 열 때 한 번 읽는다 */
@@ -41227,7 +41628,7 @@ function delMailBlock(email){
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){
   /* ⚠ «한 걸음 물러서기»가 «닫기»보다 먼저다. 순서를 바꾸면 기업 상세에서 연 명함이
      ✕ 로 닫혀 회사까지 사라진다(2026-09-12). */

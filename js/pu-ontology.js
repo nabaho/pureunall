@@ -108,7 +108,8 @@
          규칙은 일부러 안 건드렸다 — 규칙 지우기는 안전장치를 건드리는 별개의 일이다.
          다시 만들 일이 없다고 정해지면 그때 scripts/make-firebase-rules.js 에서 함께 뺀다. */
     erp:{ name:'푸른이알피', file:'pu-erp.html',
-      primaryRoots:['data','improve_requests','ieum_public'],
+      /* worker_secret — 사건·계약 근로자 주민번호·계좌·예금주. 그 건의 담당자와 대표만(대표 결정 2026-10-15) */
+      primaryRoots:['data','improve_requests','ieum_public','worker_secret'],
       entityTypes:['Organization','Person','Employment','Contract','Case','Project','ScheduleEvent','FinancialTransaction','Invoice','PayrollRecord','Policy','Document'] },
     /* ══ 직원 인사 · 재무 — 푸른이알피에서 갈라 낸 두 앱 (대표 지시 2026-10-09 「완벽히 분리해서 별도앱으로 …
          파이어베이스와 나스 등 연결되어있는부분도 각자 데이터를 잘 관리」) ══
@@ -178,12 +179,15 @@
        ★ 사업 종결 표시(2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-nav-closed.md) — 이 앱의 둘째 쓰기 자리:
          scal_bizState/{이알피 컨설팅 사업 코드} = { closedFrom:'YYYY', closedAt?, reason?, by?, at } (사업 하나 = 노드 하나, .set). 주인은 이 앱이다.
          되돌리기는 지우지 않고 같은 칸에 closedFrom '9999' 표시를 .set 한다 — 저장 관문이 물리적 삭제(.remove)를 막는다(레코드 모양이 아니라 관문을 지난다).
-         쓰기는 관리자·위임관리인만(규칙 MGR). 이름 표 GR_BIZ 로 부른다. */
-    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report','scal_docs','scal_bizState'],
+         쓰기는 관리자·위임관리인만(규칙 MGR). 이름 표 GR_BIZ 로 부른다.
+       ★ 사업 순서(2026-10-12, 계획 docs/superpowers/plans/2026-10-12-gov-report-order.md) — 이 앱의 셋째 쓰기 자리:
+         scal_bizOrder/main = { list:'코드,코드,…', by?, at } (대표가 끌어서 정한 사업 순서, 문서 하나를 통째로 .set — 목록에 없는 사업은 이알피 순서로 뒤를 잇는다).
+         주인은 이 앱이다. 쓰기는 관리자·위임관리인만(규칙 MGR), 읽기는 직원. 규칙 게시 전에는 읽기 실패 = «정한 순서 없음»으로 본다. */
+    govreport:{ name:'컨설팅보고서', file:'gov-report.html', primaryRoots:['activeWriter/gov_report','scal_docs','scal_bizState','scal_bizOrder'],
       sharedRoots:['scal_cos','scal_types','scal_scheds','scal_staff','scal_reports','scal_rptFormsIndex','data/user_dir',
                    'data/biz_cons_types','data/consultings','scal_erpTypeMap','mailbox','data/companies'],
       writeContracts:[{path:'activeWriter/gov_report',entityType:'Document'},{path:'scal_docs/{co}/{rid}/items/{key}',entityType:'Document'},
-                      {path:'scal_bizState/{code}',entityType:'Project'}],
+                      {path:'scal_bizState/{code}',entityType:'Project'},{path:'scal_bizOrder/main',entityType:'Project'}],
       entityTypes:['Organization','Project','Document'] },
     /* kakaoWork — 카톡 업무방 알림(2026-10-09). 서버(hanaMessageBridge)만 쓰고 규칙이 없다(기본 거부).
        이 화면은 kakaoList 로만 받는다 — 직원끼리 나눈 업무 대화라 RTDB 를 직접 열지 않는다. */
@@ -197,7 +201,7 @@
        빌려 읽는 곳: data/user_dir(대표인지 확인) · uid_roles(권한). 쓰지는 않는다. */
     /* ⚠ kcareer/{uid}/ls 는 «읽기만» 한다 — 원본은 경력관리다(2026-09-10 「신청 재료」 탭).
        ⚠ 노드를 통째로 읽지 않는다: 밑에 API 열쇠(_secrets)와 첨부 조각(수 MB)이 있다. */
-    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */],
+    govbid:{ name:'정부사업신청', file:'gov.html', primaryRoots:['gov/{uid}','gov_watch' /* 컨설턴트 모집 감시(서버 recruitWatch) — 2026-10-04 */,'gov_feed' /* 공고 받은 함(서버 govFeedCollect 가 매일 모음) — 2026-10-12 */],
       sharedRoots:['data/user_dir','uid_roles','kcareer/{uid}/ls'],
       entityTypes:['Organization','Project','Document'] },
     /* 회생광고 — 법원 회생 공고(법인회생 «포괄적 금지명령»)에서 기업을 모아 우편 안내 대상을 고른다(대표 지시 2026-10-10).
@@ -220,8 +224,10 @@
       writeContracts:[{path:'govaid/programs/{id}',entityType:'SupportProgram'},
                       {path:'govaid/prospects/{id}',entityType:'Organization'},
                       {path:'govaid/extras/{key}',entityType:'Organization'},
-                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'}],
-      entityTypes:['Organization','SupportProgram','EligibilityReview'] },
+                      {path:'govaid/reviews/{key}/{programId}',entityType:'EligibilityReview'},
+                      /* 기업마당 공고 함(2026-10-12) — 서버 govaidNoticeWatch 가 쌓고, 화면은 «처리»(잇기·초안·관계없음)만 적는다 */
+                      {path:'govaid/notices/{id}',entityType:'Document'}],
+      entityTypes:['Organization','SupportProgram','EligibilityReview','Document'] },
     /* 전광판 — 외부 전광판에 나갈 광고를 만들고 «올리기». 실제 전송은 이 PC 의 심부름꾼(scripts/signboard-agent)이 한다(대표 지시 2026-10-12).
        설계 docs/superpowers/specs/2026-10-12-signboard-design.md.
        ★ 쓰는 것: ads(SignboardAd) · published(올린 판) · history(올린 기록) · control(첫 전송 허락) · log(활동 기록 — 덧붙이기 전용).
@@ -239,7 +245,7 @@
        등록부에 없던 탓에 2026-09-05 까지 온톨로지가 그 자료를 못 보고 있었다. */
     mail:{ name:'푸른 메일', file:'pu-cards.html?view=mail', primaryRoots:['pucards/mailbox','pucards/sentBox','pucards/scheduled','mailbox'],
       entityTypes:['Person','Organization','Message','Document'] },
-    cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies'],
+    cards:{ name:'기업정보함', file:'pu-cards.html', primaryRoots:['pucards'], sharedRoots:['data/companies','worker_secret'],
       entityTypes:['Organization','Person','Document','MediaAsset','Message'] },
     photos:{ name:'사진첩', file:'pu-photos.html', primaryRoots:['puphotos'],
       /* data/contract_requests — 「담당자 고르고 계약 만들기」가 남기는 요청 (2026-09-19).
@@ -267,7 +273,7 @@
     docs:{ name:'계약서등관리', file:'docs-esign.html', primaryRoots:['esign','pu_docs','pu_sign'],
       /* 2026-09-26 사무관리서류 › 계약서 양식 — 이알피 표를 «함께» 쓴다(자료 주인은 이알피)
          2026-09-27 원본 보관함·기업별 계약서(pu_docs) — 이 프로그램이 정본으로 쓴다 */
-      sharedRoots:['data/contract_forms','data/contract_forms_removed'],
+      sharedRoots:['data/contract_forms','data/contract_forms_removed','worker_secret'],
       entityTypes:['Organization','Person','Case','Document','Submission'] },
     payroll:{ name:'급여관리', file:'payroll-os.html', primaryRoots:['payroll_os'], sharedRoots:['data/user_dir'],
       entityTypes:['Organization','Person','Employment','PayrollRecord','Document'] },
@@ -508,7 +514,7 @@
     consult_core:{program:'consult',strategy:'local',path:'data/consultings',parser:'erp'},
     /* 컨설팅보고서 — 제 업무 자료가 없다(보고서는 consult 의 자리). 소유 자리는 «보던 자리» 예약뿐이라 in_app */
     govreport_view:{program:'govreport',strategy:'in_app',path:'activeWriter/gov_report',parser:'coverage',
-      gives:'이름 자리(예약) · 서류 진행 기록(scal_docs)·사업 종결 표시(scal_bizState) — 앱 안에서만 본다. 보고서 상태는 정부사업일정(consult)의 자리다'},
+      gives:'이름 자리(예약) · 서류 진행 기록(scal_docs)·사업 종결 표시(scal_bizState)·사업 순서(scal_bizOrder) — 앱 안에서만 본다. 보고서 상태는 정부사업일정(consult)의 자리다'},
     /* 푸른 캘린더 — 업무 자료를 «따로 담지 않는다». 일정·근태의 주인은 이알피이고
        그것은 erp_core 가 이미 읽는다. 여기서 또 읽으면 같은 일정이 두 번 세어진다.
        제 자리(data/cal_view)에 있는 것은 «어느 탭을 보고 있었나»뿐이라 업무 개체가 아니다.

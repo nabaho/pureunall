@@ -60,8 +60,9 @@ jobs:
           set -eu
           # ⚠ node_modules 는 위에서 «검사를 돌리려고» 깐 것이다(jsdom). 앱은 부르지 않는다.
           #   안 지우면 수십 MB 의 남의 코드가 주소만 알면 열린다.
+          # ⚠ android 는 휴대폰 하나문자 앱의 «소스»다(2026-10-14 더함) — 사이트는 빌드된 hana-bridge.apk 만 내려준다.
           for d in tests fund-erp docs harness scripts engine app tools reference functions _scan_out \
-                   node_modules status \
+                   node_modules status android \
                    .github .claude .agents .githooks .superpowers .codex-worktrees; do
             if [ -e "$d" ]; then rm -rf "$d"; echo "제외: $d"; fi
           done
@@ -74,8 +75,9 @@ jobs:
           # ⚠ 최상위 .js 는 건드리지 않는다 — fund_forms·hwp_extract·hwpx_gen·
           #   rules_std·std_2026·xlsx_gen 과 서비스워커들을 HTML 이 실제로 부른다.
           # package-lock.json 은 npm 이 남길 수 있다 — 앱과 무관하다.
-          rm -f -- *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json
-          echo "제외: 최상위 *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json"
+          # .gitignore(실무자 폴더 이름이 적혀 있다)·firebase.database.json(규칙 배포 설정)도 앱이 부르지 않는다 (2026-10-14).
+          rm -f -- *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json
+          echo "제외: 최상위 *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json"
           # 앱이 실제로 쓰는 것이 실수로 사라졌으면 여기서 배포를 멈춘다
           # ⚠ install.html·아이콘도 «앱으로 깔기» 의 길이다 — 사라지면 폰에 못 깐다
           # ⚠ hana-bridge.apk 는 휴대폰 하나문자 앱이다 (2026-08-29).

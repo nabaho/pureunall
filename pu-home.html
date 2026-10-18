@@ -28,14 +28,14 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=69"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <!-- 앱바가 관리자 전용 줄(경력관리·홈페이지 관리)을 가리려면 신원을 알아야 한다 — 앱바보다 먼저 -->
 <script src="js/pu-whoami.js?v=3"></script>
-<script src="js/pu-appbar.js?v=29"></script>
+<script src="js/pu-appbar.js?v=33"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 이 앱은 머리줄에 스스로 이름을 그린다 — 부품이 표를 또 띄우면 겹친다.
@@ -168,14 +168,18 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
 .dcard .n em{font-size:11px;font-weight:700;color:var(--faint);font-style:normal;margin-left:1px}
 /* 상태 한 마디 — 자리를 못 박아 두어 카드마다 딱지 왼쪽 끝이 나란하다 */
 .dcard .st{flex:none;width:74px;text-align:right}
+/* 짧은 이름·짧은 표(sw)는 폰에서만 쓴다 — 아래 560px 구간 참조 */
+.dcard .sw{display:none}
 .mini{font-size:11px;font-weight:800;border-radius:6px;padding:1px 7px;white-space:nowrap;
   border:1px solid transparent;display:inline-block}
 .mini.bad{background:var(--bad-bg);color:#991b1b;border-color:#fecaca}
 .mini.ok{background:var(--ok-bg);color:#166534;border-color:#cbd5e1}
 /* «아직 안 봤다» — 색을 쓰지 않는다. 이것을 초록(깨끗함)으로 두면 조용히 틀린다 */
 .mini.none{background:#fff;color:var(--faint);border-color:var(--line)}
-/* «할 수 없다»(자문사현황) — 점선으로 «못 하는 것»임을 밝힌다 */
-.mini.dash{background:#fff;color:var(--faint);border:1px dashed #cbd5e1}
+/* «할 수 없다»(자문사현황) — 점선으로 «못 하는 것»임을 밝힌다
+   ⚠ 이름을 .dash 로 두지 말 것 — 갈래 카드판이 .dash 라, 좁은 화면 구간의 판 규칙
+     (붙박이·그림자·격자)이 이 딱지에도 그대로 얹혔다(2026-10-17 에 cant 로 떼어 냄). */
+.mini.cant{background:#fff;color:var(--faint);border:1px dashed #cbd5e1}
 
 /* 할 일 — 안내 띠를 여기 모은다. 위에 쌓아 두면 몸통 높이를 최대 34% 까지 먹었다 */
 /* 월간 자동 연결 카드 (2026-10-05) — 한 줄 = 말 · 숫자. 팔레트 밖 색을 쓰지 않는다(변수만). */
@@ -791,9 +795,39 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   .appbar .btn{padding:5px 9px;font-size:12px}
   .appbar select{padding:3px 7px;font-size:12px}
   .rail .rh{padding:4px 10px}
-  .dash{gap:3px;padding:4px 6px}
-  .dcard{padding:4px 8px;gap:6px}
-  .dcard .st{width:64px}
+  /* ── 갈래 카드판: 다섯 장을 «한 줄»에 (대표 지시 2026-10-17 「폰 화면 광고판 콤팩트 하게」) ──
+     두 장씩 놓았더니 「구성원 소개 9명 이상 없음」이 반쪽에 안 들어가 넉 줄로 쌓였고,
+     그 판이 화면 위에 붙어 다녀 폰 한 화면의 1/5 을 늘 먹었다(360px 실측 130 → 50px).
+     다섯 칸 한 줄 = 앱의 탭줄 모양. 칸 안은 「이름 / 숫자·표」 두 단이다 —
+     칸이 60px 남짓이라 그렇다(자리가 «좁아서»이고, 넓은 칸을 두 줄로 만든 것이 아니다).
+     ⚠ 이름은 짧은 이름(구성원·자문사), 상태는 짧은 표(✓ ? – !)로 바꾼다. 긴 말은 PC 에 그대로다.
+     ⚠ 할 일 수는 ✓ 자리에 «빨갛게 채운» 숫자다 — 테두리만 두르면 「9명 3」처럼 숫자 둘로 읽힌다.
+       칸 모서리 방울로 띄웠더니 좁은 칸에서 이름(「자문사」의 «사»)을 덮었다(360px 실측). */
+  .dash{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:3px;padding:4px 6px}
+  .dcard{display:grid;grid-template-columns:auto auto;justify-content:center;align-items:center;
+    gap:0 3px;padding:3px 2px;min-width:0;text-align:center}
+  .dcard .t{grid-column:1 / -1;font-size:12px;line-height:1.3;overflow:hidden;text-overflow:ellipsis}
+  .dcard .n{margin-left:0;font-size:13px;line-height:1.3}
+  .dcard .st{width:auto;line-height:1}
+  .dcard .lw{display:none}
+  .dcard .sw{display:inline}
+  .dcard .mini{padding:1px 4px;font-size:11px;line-height:1.2}
+  .dcard .mini.bad{border-radius:9px;background:var(--bad);border-color:var(--bad);color:#fff}
+  /* ── 경력 줄: 글칸에 자리를 몰아준다 (대표 지시 2026-10-17 「캡처하면 컴팩트하게 좀 정리해달라」) ──
+     글칸이 411px 폰에서 161px, 360px 폰에서 110px 뿐이라 경력 글이 일곱 자 남짓에서 잘렸다.
+     손잡이·번호·現前·▲▼✕ 와 그 사이 틈이 나머지를 다 먹고 있었다.
+     ⚠ 단추는 «빼지 않는다» — 폰은 끌기(⣿)가 잘 안 먹어 ▲▼ 가 유일한 길이다. 숨만 줄인다.
+     ⚠ 줄은 그대로 «한 줄»이다. 글씨 16px 도 그대로다(아이폰 확대 막이 — phone-input-zoom). */
+  .car{padding:2px}
+  .car .l{gap:3px;padding:2px}
+  .car .grip{width:10px}
+  .car .l .no{width:16px;font-size:11px}
+  .car .era > button{padding:4px}
+  .car .l input{padding:3px 4px}
+  /* 단추는 줄 높이를 꽉 채운다 — 폭이 좁아진 만큼 위아래로 누를 자리를 준다 */
+  .car .l .x{align-self:stretch;padding:0 3px}
+  /* ✕ 는 ▼ 와 살짝 띄운다 — 붙어 있으면 내리려다 지운다 */
+  .car .l .x[title="줄 삭제"]{margin-left:3px}
   .todo .th{padding:5px 10px}
   .todo .sc{padding:5px 6px 8px}
   .job{padding:6px 9px}
@@ -817,6 +851,60 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   /* 줄바꿈만 만들던 빈 칸 — 폰에서는 그 한 줄이 아깝다 */
   .eft > span[style]:empty{display:none}
   .band{padding:7px 10px;font-size:12.5px;line-height:1.5;margin-bottom:6px}
+  /* ── 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) ──
+     ① 위 띠의 ⋯ 칸이 «화면 왼쪽 밖»으로 펴졌다(360px 실측: 칸 왼끝 -155px).
+        띠가 세 줄로 접혀 ⋯ 가 둘째 줄 «왼쪽 끝»에 오는데, 칸은 ⋯ 의 오른끝에 맞춰
+        왼쪽으로 펴서 「채우기 단추 넣기」·「바뀐 기록」을 아무도 못 눌렀다.
+        ⋯ 가 어느 줄·어느 자리에 오든 안 나가게, 폰에서는 칸을 «띠 전체»에 걸어
+        띠 바로 아래 양옆 여백 안에 편다. (PC 는 ⋯ 밑에 그대로 편다.) */
+  .appbar{position:relative}
+  .appbar .more{position:static}
+  .appbar .morebox{left:10px;right:10px;top:100%}
+  /* 닫힌 ⋯ 의 칸은 자리도 안 잡게 한다 — 닫힌 칸은 띠가 아니라 ⋯ 를 기준으로 재어져
+     (점검 도구가) 화면 밖에 있는 것처럼 읽는다. 열면 위 규칙대로 띠 아래에 편다. */
+  .more:not([open]) > .morebox{display:none}
+  /* ② 접는 안내 한 줄(.note1) — 이름표(<b>)가 «한 글자씩» 접혔다(「줄을/하나/씩」 세 줄).
+        flex 줄에서 이름표·풀이·「왜」 단추가 폭을 셋으로 나눠 가진 탓이다.
+        폰에서는 글처럼 흘려 쓰고 「왜」 단추는 글 끝에 붙인다 — 접기·펴기는 그대로다. */
+  .note1 > summary{display:block}
+  .note1 .more{display:inline-block;margin-left:6px}
+  /* ③ 쪽 차례 ▲▼ — 20×13px 라 손가락으로 못 누른다. 줄 높이 안에서 위아래로 키운다.
+        (폰은 끌기가 잘 안 먹어 ▲▼ 가 차례를 바꾸는 유일한 길이다 — 빼지 않는다) */
+  .ord{gap:2px}
+  .ob{width:30px;height:22px;font-size:11px}
+  /* ④ 목록 이름은 «한 줄» — 긴 업체명이 두 줄로 접혀 줄마다 키가 커졌다.
+        넘치면 … 로 끝내고 전문은 title 과 편집칸 머리에 있다. */
+  .list .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  /* ── 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」) ──
+     글이 화면 끝에서 21~39px 안쪽에서 시작했다(411px 실측). 겉 여백(main 10) + 틀(.app) 테두리 +
+     할 일 칸 여백 + 카드 여백이 «겹겹이» 쌓인 탓이다. 폰에서는 틀을 화면 폭 그대로 펴고,
+     안의 상자는 한 겹(옆 테두리·둥근 모서리 없이 위아래 줄로만 가름)으로, 글은 끝에서 8~10px 에서 시작한다.
+     ⚠ 틀의 흰 바탕은 페이지 바탕으로 옮긴다 — 틀 상자가 사라져도 화면 색은 그대로다. */
+  body{background:var(--card)}
+  main{padding:0 0 40px}
+  header{padding:8px 10px}
+  .app{border:0;border-radius:0;box-shadow:none;background:transparent}
+  /* 자동 연결 카드·할 일 — 화면 폭 그대로, 왼쪽 색 선(급함 표시)만 남긴다 */
+  .autocard{margin:0;border-width:0 0 1px;border-radius:0;padding:6px 10px}
+  .todo{background:transparent}
+  .todo .sc{padding:0 0 6px}
+  .job{border-width:0 0 1px 3px;border-radius:0;margin-bottom:0;padding:6px 10px 6px 8px}
+  .chips{padding-left:8px;padding-right:8px}
+  .list .lh{padding-left:8px;padding-right:8px}
+  .list .r{padding-left:6px;padding-right:8px}
+  /* 편집칸 — 흰 바탕 겹(편집칸·붙는 머리)을 걷고, 여백은 끝에서 8px */
+  .edit{background:transparent}
+  .stick{background:transparent}
+  .ehd{padding:8px 8px 0}
+  .esc{padding:0 8px 12px}
+  .eft{padding:6px 8px}
+  /* 발(저장 줄)의 ⋯ 칸도 위 띠의 ⋯ 처럼 «발 전체»에 걸어 양옆 8px 안에서 위로 편다 —
+     ⋯ 오른끝에 맞추면 화면 가운데에 좁은 칸으로 떠 글이 잘린다 */
+  .eft{position:relative}
+  .eft .more{position:static}
+  .eft .morebox{left:8px;right:8px}
+  /* 경력 상자는 «줄을 담는 그릇»이라 한 겹이면 된다 — 옆 테두리·둥근 모서리를 걷고 위아래 줄만 */
+  .car{border-left:0;border-right:0;border-radius:0;padding:2px 0}
 }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
@@ -923,7 +1011,9 @@ PAGE_IDS.forEach(function (mid, i) {
 
 /* 왼쪽 갈래 다섯 */
 const GROUPS = [
-  { key: 'members',  label: '구성원 소개' },
+  /* short — 폰 카드판에서만 쓰는 짧은 이름. 다섯 장을 한 줄에 놓으면 칸이 60px 남짓이라
+     「구성원 소개」·「자문사현황」(다섯 글자)이 안 들어간다. 없으면 label 을 그대로 쓴다. */
+  { key: 'members',  label: '구성원 소개', short: '구성원' },
   { key: 'work',     label: '주요업무' },
   { key: 'inquiry',  label: '오시는길' },
   { key: 'greeting', label: '인사말' },
@@ -932,7 +1022,7 @@ const GROUPS = [
      그래서 딱지는 늘 「대조 못 함 (그림)」이고, 올렸는지는 «사람이» 표시한다.
      못 하는 것을 「같음」으로 뭉개면 올리지도 않은 회사가 올라간 것처럼 보인다.
      목록은 푸른ERP 업체관리(data/companies)에서 읽고, 여기서 회사를 만들지 않는다. */
-  { key: 'partner',  label: '자문사현황' }
+  { key: 'partner',  label: '자문사현황', short: '자문사' }
 ];
 
 /* 자문사 표시가 남는 자리. 업체 열쇠는 업체관리의 id(co-…)를 그대로 쓴다 —
@@ -6382,17 +6472,21 @@ const OWN_CLS = { left: 'rm', leave: 'lv', none: 'ask', dup: 'ask', nobase: 'ask
      할 일 있음 → (자문사) 못 함 → 확인 안 함 → 이상 없음. */
 function statusChip(group) {
   const s = statOf(group);
+  /* 한 마디를 «긴 말(lw)·짧은 표(sw)» 두 벌로 적는다 (대표 지시 2026-10-17 「폰 화면 광고판 콤팩트」).
+     폰은 다섯 장을 한 줄에 놓느라 「이상 없음」이 안 들어가 짧은 표만, PC 는 긴 말만 보인다.
+     ★ 짧은 표도 «같은 판정»이다 — 대조 안 함(?)과 이상 없음(✓)은 폰에서도 갈린다. */
+  const two = (l, sh) => '<span class="lw">' + l + '</span><span class="sw">' + sh + '</span>';
   if (group === 'partner' && App.companiesErr) {
-    return '<span class="mini bad" title="푸른ERP 업체관리를 읽지 못했습니다">못 읽음</span>';
+    return '<span class="mini bad" title="푸른ERP 업체관리를 읽지 못했습니다">' + two('못 읽음', '!') + '</span>';
   }
-  if (s.hot) return '<span class="mini bad">할 일 ' + s.hot + '</span>';
+  if (s.hot) return '<span class="mini bad" title="할 일 ' + s.hot + '">' + two('할 일 ' + s.hot, s.hot) + '</span>';
   /* 자문사현황은 «못 한다» — 확인을 눌러도 달라지지 않는다(홈페이지가 로고 그림이다).
      「대조 안 함」으로 적으면 누르면 될 것처럼 들린다. */
   if (group === 'partner') {
-    return '<span class="mini dash" title="홈페이지가 로고 그림이라 글자 대조를 못 합니다">대조 못 함</span>';
+    return '<span class="mini cant" title="홈페이지가 로고 그림이라 글자 대조를 못 합니다">' + two('대조 못 함', '–') + '</span>';
   }
-  if (!App.check) return '<span class="mini none">대조 안 함</span>';
-  return '<span class="mini ok">이상 없음</span>';
+  if (!App.check) return '<span class="mini none" title="대조 안 함">' + two('대조 안 함', '?') + '</span>';
+  return '<span class="mini ok" title="이상 없음">' + two('이상 없음', '✓') + '</span>';
 }
 
 const GROUP_UNIT = { members: '명', work: '쪽', inquiry: '쪽', greeting: '쪽', partner: '개사' };
@@ -6415,7 +6509,8 @@ function dashHtml() {
     const n = cardCount(g.key);
     return '<button class="dcard' + (App.group === g.key ? ' on' : '') + '"'
       + ' onclick="App.go(\'' + g.key + '\')">'
-      + '<span class="t">' + esc(g.label) + '</span>'
+      + '<span class="t"><span class="lw">' + esc(g.label) + '</span>'
+      + '<span class="sw">' + esc(g.short || g.label) + '</span></span>'
       + '<span class="n">' + (n ? n + '<em>' + (GROUP_UNIT[g.key] || '개') + '</em>' : '') + '</span>'
       + '<span class="st">' + statusChip(g.key) + '</span>'
       + '</button>';
@@ -6778,7 +6873,7 @@ function rowsHtml() {
     const line = joinOnce([r.desc, r.kept ? (r.keptWhy || '(사유 없음)') : '', 명부말, r.reason]);
     return '<div class="r ' + (r.key === App.pick ? 'on' : '') + '" onclick="App.select(\'' + esc(r.key) + '\')">'
       + '<span class="num">' + (r._no || (i + 1)) + '</span>'
-      + '<div class="who"><div class="nm">' + esc(r.name) + '</div>'
+      + '<div class="who"><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div>'
       + '<div class="po" title="' + esc(line) + '">' + esc(line) + '</div></div>'
       /* 딱지 둘 — 위가 명부 딱지(늘 붙는다), 아래가 대조 딱지(확인을 누를 때만 새로 붙는다).
          ★ 자문사 줄은 대조 딱지 자리에 «사람이 표시한 값»이 온다. 「확인 전」이라고 적으면
@@ -8651,7 +8746,7 @@ function legendHtml() {
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

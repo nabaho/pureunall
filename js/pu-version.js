@@ -298,6 +298,9 @@
       window.sessionStorage.setItem(NOTICE_KEY, '1');
     } catch (_) {}
     var url = new URL(window.location.href);
+    /* 카카오 인가코드는 한 번만 쓸 수 있다. 모바일 브라우저가 주소 정리에 실패했어도
+       새 버전 주소에 코드를 복사하지 않는다(재복귀·진행 화면 재표시 방지). */
+    ['code', 'state', 'error', 'error_description'].forEach(function (key) { url.searchParams.delete(key); });
     url.searchParams.set('v', version.shortSha || String(version.sha).slice(0, 8));
     var target = url.toString();
     /* fetch 가 없는 아주 옛 브라우저에서는 예전처럼 그냥 간다 */
@@ -319,6 +322,15 @@
   }
   function applyWhenIdle() {
     if (!pendingVersion) return;
+    /* 카카오 인가코드 교환이나 포털 진입 도중 새로고침하면 1회용 코드를 잃는다. */
+    if (window.__kkReturning || window.__puPortalEntering) {
+      applyTimer = window.setTimeout(applyWhenIdle, 5000);
+      return;
+    }
+    /* 복귀 문서에서 바로 다시 열면 포털이 한 번 보인 뒤 진행 화면이 재등장한다.
+       이 문서에서는 자동 교체를 보류하고, 새 버전 단추의 수동 적용만 허용한다.
+       다음에 타일로 앱을 열면 그 문서는 평소처럼 자동 업데이트한다. */
+    if (window.__puKakaoReturnPage) return;
     if (shouldWaitHidden(isHidden(), pendingSince, Date.now(), HIDDEN_MAX_MS)) {
       waitUntilVisible();
       applyTimer = window.setTimeout(applyWhenIdle, 30 * 60 * 1000);   // 숨은 채로 6시간이 지났는지 가끔 본다
@@ -337,7 +349,7 @@
      ⚠ 저장 중일 때만은 예외다. 저장이 끝나기 전에 새로 열면 쓰던 것이 날아간다.
         그때는 예약만 해 두고(원래 길이 이어받는다) 거짓을 돌려준다. */
   function applyNow() {
-    if (!pendingVersion || saveBlocked) return false;
+    if (!pendingVersion || saveBlocked || window.__kkReturning || window.__puPortalEntering) return false;
     var version = pendingVersion;
     pendingVersion = null;
     doApply(version);
@@ -431,9 +443,14 @@
     try { return window.sessionStorage.getItem(SESSION_KEY) || ''; } catch (_) { return ''; }
   }
 
+  /* state — ok(평소) · busy(확인 중) · done(누른 뒤 결과를 잠깐 알림) · has(새 버전 있음).
+     ★ 폰에서는 앱바(js/pu-appbar.js)가 «ok» 일 때만 이 단추를 숨기고 손잡이 목록의 「🔄 새 버전 확인」 줄로 대신한다
+       (대표 지시 2026-10-18 「폰화면관리」). 그래서 상태를 data-state 로 «겉에» 적는다 —
+       확인 중·결과·새 버전은 숨기면 안 된다(눌렀는데 아무 반응 없는 화면이 된다). */
   function setFab(state, text) {
     if (!fab) return;
     fabState = state;
+    fab.setAttribute('data-state', state);
     var color = state === 'has' ? '#1e40af' : (state === 'busy' ? '#64748b' : '#15803d');
     var bg = state === 'has' ? '#1e40af' : 'rgba(255,255,255,.94)';
     var fg = state === 'has' ? '#fff' : '#475569';
@@ -454,11 +471,11 @@
         if (!applyNow()) setFab('has', '저장 끝나면 바로');   // 저장 중이면 기다린다
         return;
       }
-      setFab('ok', '최신입니다');
-      window.setTimeout(function () { if (fabState === 'ok') setFab('ok', '최신'); }, 1600);
+      setFab('done', '최신입니다');
+      window.setTimeout(function () { if (fabState === 'done') setFab('ok', '최신'); }, 1600);
     }).catch(function () {
-      setFab('ok', '확인 실패');
-      window.setTimeout(function () { if (fabState === 'ok') setFab('ok', '최신'); }, 1600);
+      setFab('done', '확인 실패');
+      window.setTimeout(function () { if (fabState === 'done') setFab('ok', '최신'); }, 1600);
     });
   }
 
