@@ -234,6 +234,25 @@ header .kpi.warn{background:#fffbeb;color:#854d0e;border-color:#fde68a}
   .emptbl th:nth-child(2){background:var(--paper)}
   .pen{font-size:15px;color:var(--sub);min-width:30px;min-height:30px;padding:4px 6px}
   .mfile{display:none}
+  /* ── 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 … 좌우 옆공간 모두 채워서」) ──
+     본문 여백(12px) 안에 흰 카드(둥근 모서리·테두리) 안에 줄 여백(16px)이 겹쳐 글이 화면 끝에서 29px 안쪽에서 시작했고,
+     오른쪽 «›»·값도 같은 만큼 안쪽에서 끝났다. 카드·표 상자는 줄마다 style= 로 박혀 있어 !important 로만 덮인다.
+     · 본문 여백 8px — 제목·안내·단추는 화면 끝에서 8px
+     · 본문 바로 아래의 흰 카드·표 상자는 그 여백만큼 밖으로 펴 «화면 폭 그대로», 둥근 모서리·옆 테두리는 걷는다(위아래 선으로 가른다)
+     · 카드 안 줄 여백 16 → 8px · 설정 카드도 같다 · 탭 띠도 화면 끝까지 */
+  main{padding:10px 8px}
+  #main>[style*="border-radius:14px"],#main .tabbody>[style*="border-radius:14px"],
+  #main>[style*="border-radius:12px"],#main .tabbody>[style*="border-radius:12px"]{
+    border-radius:0!important;border-left:0!important;border-right:0!important;margin-left:-8px!important;margin-right:-8px!important}
+  #main>[style*="border-radius:12px"],#main .tabbody>[style*="border-radius:12px"]{padding-left:8px!important;padding-right:8px!important}
+  /* 표 상자는 6px 만 남긴다 — 칸 안 여백(8~10px)이 이미 있어 끝까지 펴면 칸 테두리가 화면 끝에 붙는다 */
+  #main>div[style*="overflow:auto"],#main .tabbody>div[style*="overflow:auto"]{margin-left:-2px!important;margin-right:-2px!important}
+  #main [style*="px 16px"]{padding-left:8px!important;padding-right:8px!important}
+  .tabs{margin-left:-8px;margin-right:-8px;padding:0 2px}
+  .tabs>button{padding:8px}
+  nav.viewbar{padding:6px 8px}   /* 3칸 치수(padding 4px 0)가 폰까지 와서 첫 알약이 화면 끝에 붙었다 */
+  .cards{margin-left:-8px;margin-right:-8px;gap:8px}
+  .c{border-radius:0;border-left:0;border-right:0;padding:10px 8px}
 }
 @media print{header,nav,#colist,.noprint{display:none !important}body{background:#fff}main{padding:0}.layout{min-height:0}.slip{border:none;border-radius:0;max-width:none;margin:0}}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──

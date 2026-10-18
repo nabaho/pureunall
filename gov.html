@@ -295,8 +295,15 @@ table.cmp td{white-space:nowrap}
   #tabs .tb{flex:1 0 auto;padding:8px 6px;font-size:12.5px;white-space:nowrap}
   .rsubs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0}   /* 컨설턴트 모집 하위 탭도 한 줄 */
   .rsub{flex:none;padding:8px 9px;font-size:13px;white-space:nowrap}
-  .wrap{padding:8px 6px 60px}
-  .card{padding:8px}
+  /* 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다, 좌우 옆공간 모두 채워서」) —
+     겉 여백(.wrap 6px) + 상자 테두리 + 상자 안 여백(8px)이 겹쳐 글이 화면 끝에서 15~20px 에서 시작했다.
+     폰에서는 상자를 화면 폭 그대로(옆 테두리·둥근 모서리 없이 위아래 줄로만), 안쪽 여백 하나만 남긴다. 팝업도 화면 폭 그대로 */
+  .wrap{padding:6px 0 60px}
+  .card{padding:8px 10px;border-left:0;border-right:0;border-radius:0}
+  .pop{padding:0}
+  .pop-box{border-radius:0;min-height:100%;padding:12px 10px 16px}
+  .sel-bar{border-left:0;border-right:0;border-radius:0;background:none;margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}   /* 상자 안의 상자 → 위아래 줄만 */
+  .rec-hits tbody td.chk,#recTb td.chk,.rec-hits thead th.chk,#recViewOrg thead th.chk{text-align:left}   /* ☐ 를 카드 안쪽 여백 끝에 붙인다 */
   /* 검색·거르개 세 줄 — 줄 끊기는 덩이의 ::before·::after(폭 100%)가 한다. 단추는 그림만(이름은 title) */
   .tab-stick>.bar:first-child{gap:5px}
   .tab-stick>.bar:first-child::before,.tab-stick>.bar:first-child::after{content:'';flex-basis:100%;height:0}

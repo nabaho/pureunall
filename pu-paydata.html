@@ -753,6 +753,25 @@ table.grid td.iffy{background:#fffbeb}
   .row.siterow>label,.row.drow>label,.grp>label,.gl>label{display:flex;align-items:center;padding:7px;margin:-7px}
   .row.siterow>label input,.row.drow>label input,.grp>label input,.gl>label input,
   .pkbar label input{width:18px;height:18px;margin:0}
+
+  /* ── 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서」) ──
+     본문 여백 12 + 카드 테두리 1 + 줄 안쪽 12~14 가 겹겹이 쌓여 글이 화면 끝에서 23~25px 에서 시작했다.
+     폰에서는: 본문 글(제목·안내)은 10px 에서, 카드·띠는 화면 끝 4px 까지 넓히고(음수 margin)
+     그 안쪽 여백을 9px 로 — 카드 안 글도 화면 끝에서 14px 에서 시작한다. */
+  #main{padding:10px 10px 12px}
+  .stickhead{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px}
+  #main>.card,#main>.mailbar,#main>.warnbar,#main>.sumbar,#main>.hrbanner,#main>.coseat,
+  #main>.warnline,#main>.okline,#main>.badline,.stickhead .seatbar{margin-left:-6px;margin-right:-6px}
+  #main>.mailbar,#main>.warnbar,#main>.sumbar,#main>.hrbanner,#main>.coseat,
+  #main>.warnline,#main>.okline,#main>.badline,.stickhead .seatbar{padding-left:9px;padding-right:9px}
+  #main>.card>.row,#main>.card>.pkbar,#main>.card>.grp,.row.siterow,.row.drow{padding-left:9px;padding-right:9px}
+  .gl{padding-right:9px}
+  /* 상자 안의 상자 — 펼친 줄(.gl)은 흰 카드 위의 흰 바탕이라 눈에는 안 보이는 «한 겹»이었다. 고른 줄 색만 남긴다. */
+  .gl:not(.pkon){background:transparent}
+  /* 창 — 폰에서는 양옆 6px 까지 넓게(가운데 작은 상자로 띄우면 글이 접힌다) */
+  .modalWrap{padding:6px}
+  .modalCard{padding:12px 10px}
+  .fxbox{max-width:calc(100vw - 12px);padding:14px 10px}
 }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)

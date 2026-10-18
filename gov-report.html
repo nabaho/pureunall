@@ -268,14 +268,19 @@ button.td-biz.td-ok{border-left-color:var(--green)}
    ⑥ 서류 체크표(사업을 고르면) — 옆으로 밀어도 업체 칸은 왼쪽에 붙어 있다
    ⑦ 사업 대시보드 숫자 넷·단계 막대 칸이 2열로 쌓여 업체 목록이 500px 아래로 밀렸다 → 한 줄 딱지·옆으로 미는 한 줄
    ⑧ 목차·칸 창 머리의 단추(복사·닫기)가 «복/사» 두 줄로 접혔다
+   ⑨ 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」) — 겉 여백 6px, 상자 안 상자는 한 겹.
+     사업 대시보드 칸(테두리 상자) 안에 사업 카드, 서류 패널(테두리) 안에 대시보드(바탕 상자) 안에 숫자 칸 — 세 겹으로 여백이 쌓였다.
+     겉 상자의 테두리·바탕을 걷고(위아래 줄·제목으로 가른다) 안쪽 카드만 남긴다. 겉 여백은 6px(상자 없는 글도 화면 끝에 붙지 않게).
    tests/govreport-phone.test.js 가 지킨다. */
 @media (max-width:760px){
   .top{flex-wrap:nowrap;gap:8px;padding:8px 12px}
   .top h1{font-size:15px;white-space:nowrap;flex-shrink:0}
   #who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
   #outBtn{flex-shrink:0;padding:5px 10px}
-  main{padding:10px 10px 60px}
-  .bizp section{padding:10px}
+  main{padding:10px 6px 60px}
+  .bizp section{border:0;background:transparent;padding:0}
+  .bizp section h2{padding:0 4px}
+  .bizp .bz-card{padding:8px 7px}
   .bz-hint{display:none}
   .bizp div.bz-g+div.bz-g{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
   .bizp div.bz-g+div.bz-g>.bz-sum{flex:0 0 auto;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:2px;margin:0;padding:0 2px;white-space:nowrap}
@@ -292,7 +297,7 @@ button.td-biz.td-ok{border-left-color:var(--green)}
   #tbl{background:transparent;border:0;overflow:visible}
   #tbl table,#tbl tbody{display:block}
   #tbl thead{display:none}
-  #rows tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+  #rows tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 7px;margin-bottom:6px}
   #rows tr.ng{margin-top:12px}
   #rows tr::after{content:"";order:3;flex:0 0 100%;height:0}
   #rows td{display:block;padding:0;border:0;min-width:0}
@@ -304,20 +309,22 @@ button.td-biz.td-ok{border-left-color:var(--green)}
   #rows td.num{order:6;font-size:12px}
   #rows td:nth-child(3),#rows td:nth-child(7),#rows td:nth-child(8){display:none}
   #rows td:nth-child(9){order:9;display:flex;gap:4px;flex-shrink:0;margin-left:auto}
-  .docs{padding:8px}
+  .docs{border-left:0;border-right:0;border-radius:0;background:transparent;padding:8px 2px}
   .docs table td.co,.docs table thead th:first-child{position:sticky;left:0;z-index:1;background:var(--card);max-width:120px}
   .docs table thead th:first-child{background:var(--bg)}
   /* ⑦ 사업 대시보드(사업을 고르면) — 숫자 넷은 한 줄 딱지, 단계 막대 칸은 옆으로 미는 한 줄. 업체 점 줄은 이름을 줄여 한 줄에 */
-  .dsh{padding:8px}
+  .dsh{border:0;background:transparent;padding:0}
   .dsh-ks{gap:6px}
-  .dsh-k{display:flex;align-items:baseline;gap:5px;min-width:0;padding:5px 8px;white-space:nowrap;overflow:hidden}
+  .dsh-k{display:flex;align-items:baseline;gap:5px;min-width:0;padding:5px 6px;white-space:nowrap;overflow:hidden}
   .dsh-k b{display:inline;font-size:16px}
   .dsh-k span{min-width:0;overflow:hidden;text-overflow:ellipsis}
   .dsh-p{display:flex;overflow-x:auto;padding-bottom:4px}
   .dsh-pc{flex:0 0 min(46%,170px)}
   .dsh-c{min-width:0;max-width:36%}
   /* ⑧ 창 머리 단추(복사·닫기)가 긴 업체 이름에 눌려 «복/사» 두 줄로 접혔다 */
-  .toc{padding:16px 8px}
+  .toc{padding:10px 4px}
+  .toc-box{padding:10px}
+  .side section{padding:10px 8px}
   .toc-top>b{min-width:0}
   .toc-top>button{flex-shrink:0;white-space:nowrap}
 }

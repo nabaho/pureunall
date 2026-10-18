@@ -279,6 +279,8 @@ html.mailview #tabs,html.mailview #subbar{display:none}
   .rowmain .l1,.rowmain .l2{font-size:12.5px;margin-top:3px}
   .rowmain .erpmgr{font-size:11.5px;margin-top:3px;padding:1px 6px}
   #fab{width:52px;height:52px;font-size:28px;right:14px;bottom:18px}
+  /* 양옆 채우기(대표 「양옆 빈공백이 많다」 2026-10-18) — 날짜·⭐ 머리만 18px 로 들어가 있었다. 줄(.row)과 같은 자리에서 시작한다 */
+  .datehead{padding-left:12px;padding-right:12px}
 }
 
 /* ── 주황 FAB ── */
@@ -298,6 +300,9 @@ html.mailview #tabs,html.mailview #subbar{display:none}
 .modal{background:#1e293b;width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
   border-radius:20px 20px 0 0;padding:18px 18px 30px;border:1px solid #1e293b}
 @media(min-width:761px){.modalbg{align-items:center}.modal{border-radius:20px}}
+/* 폰(양옆 채우기 2026-10-18) — 아래에서 올라오는 창은 이미 화면 폭 그대로다. 안쪽 여백(18px)만 줄여
+   글이 화면 끝에서 12px 안에서 시작하게 한다(대표 「양옆 빈공백이 많다 · 좌우 옆공간 모두 채워서」). */
+@media(max-width:760px){ body:not(.pc) .modal{padding-left:12px;padding-right:12px} }
 .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .mhead b{font-size:17px}
 .sheetbtn{display:flex;align-items:center;gap:12px;width:100%;padding:15px 12px;
@@ -316,7 +321,12 @@ html.mailview #tabs,html.mailview #subbar{display:none}
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px}
 /* 폰: 칸 이름은 «한 줄» (폰화면관리 2026-10-18) — 360px 에서 「새 등록 / 증」·「엑셀로 내보내 / 기」로
    낱말 가운데서 접혔다. 줄어드는 것은 오른쪽 설명(.msub — … 으로 줄어든다) 하나뿐이어야 한다. */
-@media(max-width:760px){ #menuM .sheetbtn{white-space:nowrap} }
+@media(max-width:760px){
+  #menuM .sheetbtn{white-space:nowrap}
+  /* 양옆 채우기 — 칸마다 제 여백(10px)이 있으니 창 여백은 거의 걷는다. 붙박이 머리줄은 창 끝까지 덮게 함께 맞춘다 */
+  body:not(.pc) #menuM{padding-left:4px;padding-right:4px}
+  body:not(.pc) #menuM>.mhead{margin-left:-4px;margin-right:-4px;padding-left:14px;padding-right:14px}
+}
 /* 묶음 이름표 — 여백으로 가르던 것을 가는 줄로 가른다(여백보다 덜 먹고 더 또렷하다) */
 #menuM .mgrp{font-size:11px;font-weight:800;color:#94a3b8;letter-spacing:.02em;
   padding:9px 6px 3px;margin-top:5px;border-top:1px solid #1e293b}
@@ -617,6 +627,10 @@ table.sbox tr.bad td{background:#f8fafc}
 @media(max-width:760px){
   .ctwrap{flex-direction:column;gap:8px}
   .ctside{flex:none;width:auto;max-height:160px}
+  /* 양옆 채우기(2026-10-18) — 위아래로 쌓인 뒤에도 사업장 칸이 «글 길이만큼»(411px 폰에서 287px) 좁게 서 있었다.
+     폭을 다 쓰고, 칸 겉·안 여백을 줄여 이름이 덜 잘리게 한다 */
+  body:not(.pc) .ctside{align-self:stretch;margin-left:-8px;margin-right:-8px;padding:3px}
+  body:not(.pc) .ctco{padding-left:6px;padding-right:6px}
 }
 
 /* ══════════ 다음메일함과 같은 차림 (대표 지시 2026-08-24) ══════════
@@ -1661,7 +1675,13 @@ table.mstab2 tr:last-child td{border-bottom:none}
        명함 갈래 줄·거르개 줄·＋ 는 이 화면 것이 아니라 접는다(메일 화면과 같은 까닭). */
   body.matview #tabs,body.matview #subbar,body.matview #fab{display:none}
   body.matview #listwrap{background:#fff}
-  #matM{padding:12px 12px 90px;--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;color:#1e293b}
+  #matM{padding:12px 8px 90px;--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;color:#1e293b}
+  /* 양옆 채우기(2026-10-18) — 자료 한 장(.matcard)이 겉 12px + 안 14px 로 두 겹이었다. 폰에서는 옆 테두리·둥근 모서리를
+     걷어 화면 끝까지 펴고(위아래 줄로만 가른다) 안 여백만 남긴다. 「모두 고르기」 ☐ 도 장마다의 ☐ 와 한 줄에 선다 */
+  #matM .matcard{margin-left:-8px;margin-right:-8px;border-left:0;border-right:0;border-radius:0;
+    padding-left:10px;padding-right:10px;background:transparent}
+  #matM .matcard.pkon{background:#f8fafc}   /* 고른 장은 그대로 표가 난다 */
+  #matM .matpkhead{padding-left:2px;padding-right:2px}
   /* ☐ 고르기 칸은 손가락으로 누를 만큼(CLAUDE.md 「☐ 고르기 칸 + 번호」) — PC 의 16px 는 폰 손끝에 작다 */
   #matM .matpk input,#matM .matpkhead input{width:22px;height:22px}
 }
@@ -3058,6 +3078,15 @@ body.pc #pcDetail{display:flex}
 @media(max-width:760px){
   body:not(.pc) #pcDetail.open{display:flex;position:fixed;inset:0;width:100%;max-width:100%;height:100%;
     transform:none;border-left:none;box-shadow:none}
+  /* 양옆 채우기(2026-10-18) — 겉 여백 18px + 상자 안 여백 10~11px 이 겹쳐 글이 화면 끝에서 30px 에 섰다.
+     겉 여백을 줄이고, 안쪽 상자(접는 칸·근로자 수 띠·한 일 줄)는 옆 테두리·둥근 모서리를 걷어 화면 끝까지 편다 —
+     위아래 줄로만 가른다. 상자 안 글은 제 여백(10~11px)에서 시작한다. */
+  body:not(.pc) #pcDetail .pdhead,
+  body:not(.pc) #pcDetail .pdbody{padding-left:10px;padding-right:10px}
+  body:not(.pc) #pcDetail .cocard,
+  body:not(.pc) #pcDetail .pdbody>.coerppin,
+  body:not(.pc) #pcDetail .cohist-row{margin-left:-10px;margin-right:-10px;border-left:0;border-right:0;border-radius:0}
+  body:not(.pc) #pcDetail .cohist-row{background:transparent}
 }
 #pcDetail .pdhead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;z-index:1}
 #pcDetail .pdhead .ttl{font-size:13px;color:#64748b;font-weight:700}
@@ -3653,6 +3682,8 @@ body.pc #pcDetail{display:flex}
   .wkmob .wkbar b{color:var(--ink)}
   .wkmob .wkhint{flex:1 1 100%;margin-left:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .wkmob .wkfold{width:28px;padding:6px 0;margin:-6px 0;text-align:center}
+  /* 양옆 채우기(2026-10-18) — 표가 이미 옆으로 구르는 상자라 겉 여백은 거의 걷는다 */
+  .wkmob{padding-left:4px;padding-right:4px}
 }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)

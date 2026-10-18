@@ -79,6 +79,24 @@
     #viewList>div:first-child{flex-wrap:wrap}#viewList>div:first-child>div{flex:1 1 100%!important}
     /* 사건 목록 「🔗 링크」 단추가 좁은 칸에서 두 줄로 접혔다(2026-10-18 폰화면관리 실측 56×53) — 단추 글자는 한 줄 */
     #caseRows .btn{white-space:nowrap}
+    /* ── 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다, 좌우 옆공간 모두 채워서」) ──
+       겉 여백(본문 6px) + 카드 안 여백(8~10px) + 양식 목록 상자 테두리·안 여백이 겹쳐(세 겹) 글이 화면 끝에서 19~24px 에서 시작했다.
+       폰에서는 카드를 화면 폭 그대로(둥근 모서리·그림자 없이 위아래 줄로만), 카드 안 상자(양식 목록·고른 양식 막대·종이 바탕)의
+       옆 테두리·둥근 모서리·옆 여백을 걷어 «한 겹»으로 — 안쪽 여백은 줄마다 8~10px 하나만 남긴다.
+       ⚠ 양식 모듈(js/pu-contract-forms.js)은 이알피도 싣는다 — 여기서 #paneForms 로 좁혀 이 화면에만 건다 */
+    .shell .main{margin:6px 0;padding:0}
+    .card{border-radius:0;box-shadow:none;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:10px}
+    #paneForms .card{padding:8px 0}
+    #paneForms .pcf-msel{padding:0 8px}
+    #paneForms .pcf-lp,#paneForms .pcf-vp .pcf-top,#paneForms .pcf-sheetwrap{border-left:0;border-right:0;border-radius:0}
+    #paneForms .pcf-lh{padding:6px 8px}
+    #paneForms .pcf-lbody{padding:0 6px}
+    #paneForms .pcf-lt .pcf-lc{width:36px;padding-left:4px}
+    #paneForms .pcf-lt td:last-child,#paneForms .pcf-lt th:last-child{padding-right:6px}
+    /* 흰 카드 안의 흰 상자(목록 틀·종이)는 보이지 않는 겹이다 — 바탕을 걷어 한 겹으로. 종이는 위아래 줄로만 가른다 */
+    #paneForms .pcf-lp,#paneForms .pcf-list{background:none}
+    #paneForms .pcf-sheetwrap{padding:0;background:none}
+    #paneForms .pcf-sheet{padding:16px 10px;background:none;box-shadow:none;border-bottom:1px solid #e2e8f0}
   }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
