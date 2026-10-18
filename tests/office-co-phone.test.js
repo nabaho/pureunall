@@ -65,7 +65,8 @@ test('① 폰에서 회사 목록은 접혀 있다 — 「회사 바꾸기」·�
   assert.doesNotMatch(M.wide, /\.pod-co:not\(\.pick\)/, '넓은 화면의 회사 목록까지 접었습니다 — 왼쪽 목록은 늘 보여야 합니다');
   assert.match(coPane, /'class': 'pod-co' \+ \(S\.pickOpen \? ' pick' : ''\)/, '목록 펼침 상태가 .pod-co 에 안 붙습니다');
   assert.match(coPane, /'pod-b pod-pickbtn'[^]*?onclick: function \(\) \{ S\.pickOpen = !S\.pickOpen; draw\(\); \}/, '「회사 바꾸기」 단추가 목록을 여닫지 않습니다');
-  assert.match(rule(M.wide, '.pod-pickbtn,.pod-ftog'), /display:none/, '넓은 화면에 폰 전용 단추(회사 바꾸기·표 펼치기)가 보입니다');
+  /* 폰 전용 단추는 넓은 화면에서 숨는다 — 묶음 선택자에 다른 단추가 더해져도 깨지지 않게 하나씩 본다 */
+  ['pod-pickbtn', 'pod-ftog', 'pod-ktog'].forEach((c) => assert.match(M.wide, new RegExp('\\.' + c + '[^{}]*\\{display:none'), '넓은 화면에 폰 전용 단추(' + c + ')가 보입니다'));
   assert.match(coPane, /S\.sel = c\.key; S\.pickOpen = false;/, '회사를 골라도 목록이 안 접힙니다 — 고른 회사 내용이 목록 밑에 묻힙니다');
   /* 칩으로 거르면 걸러진 회사 목록을 «보여 줘야» 한다 — 접힌 채면 칩을 눌러도 아무 일이 없어 보인다 */
   const chips = coPane.slice(coPane.indexOf('function kindChips('), coPane.indexOf('function recForDoc('));
@@ -118,4 +119,15 @@ test('⑦ 폰에서 회사를 바꾸거나 파일을 누르면 그 자리로 데
   assert.match(coPane, /if \(isPhone\(\)\) \{[^}]*cohd\.scrollIntoView/, '회사를 골라도 화면이 목록 밑에 머뭅니다');
   assert.match(coPane, /prev\.scrollIntoView/, '파일 줄을 눌러도 맨 아래 미리보기로 안 갑니다');
   assert.match(coPane, /matchMedia\('\(max-width:700px\)'\)/, '폰 판단이 CSS 폰 구간(700px)과 다릅니다');
+});
+
+test('⑧ 폰에서 긴 갈래 카드는 앞 몇 줄만 — 나머지는 「▾ N줄 더」로 펼친다 (넓은 화면은 그대로)', () => {
+  /* 사건계약이 많은 회사는 기록(파일 없음)·파일(기록 없음)이 엇갈려 한 카드가 12줄 — 그것만으로 화면 하나를 먹었다 */
+  assert.match(M.phone, /\.pod-kmore\{display:none/, '폰에서 갈래 카드 줄을 접지 않습니다');
+  assert.doesNotMatch(M.wide, /\.pod-kmore\{display:none/, '넓은 화면의 갈래 카드 줄까지 접었습니다');
+  const kb = coPane.slice(coPane.indexOf('function kindBox('), coPane.indexOf('function draw()', coPane.indexOf('function kindBox(')));
+  assert.match(kb, /i >= KFOLD && !S\.kopen\[v\] \? ' pod-kmore'/, '앞 몇 줄 뒤의 줄에 접힘 표시(pod-kmore)가 안 붙습니다');
+  /* 접은 줄의 단추(+ 기록 만들기 · ✏ 종류 정하기)에 닿을 길 — 펼치기 단추가 반드시 함께 있다 */
+  assert.match(kb, /'pod-b pod-ktog'[^]*?onclick: function \(\) \{ S\.kopen\[v\] = !S\.kopen\[v\]; draw\(\); \}/, '★ 줄을 접었는데 펼치는 단추가 없습니다 — 접힌 줄의 「+ 기록 만들기」를 폰에서 못 누릅니다');
+  assert.match(kb, /Math\.min\(list\.length, 12\) > KFOLD/, '접을 줄이 없는 카드에도 펼치기 단추가 나옵니다');
 });
