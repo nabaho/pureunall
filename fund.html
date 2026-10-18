@@ -442,6 +442,9 @@
     .ledchips+.ledgerwrap td:nth-last-child(1){order:11;flex:1 1 0;max-width:max-content;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
     .ledchips+.ledgerwrap td:nth-last-child(1):empty{display:none}
     .ledchips+.ledgerwrap td:only-child{order:1;flex:1 1 100%}
+    /* 카드에서는 고르기·승인 칸과 ✂·× 를 손가락 크기로 (13px 상자·20px 단추였다) */
+    .ledchips+.ledgerwrap input[type=checkbox]{width:24px;height:24px}
+    .ledchips+.ledgerwrap td button{min-width:32px;min-height:32px}
   }
   /* ⑤ 기금 현황 표 머리가 줄 «사이»에 떠서 셋째 줄을 가렸다(폰화면관리 2026-10-18 · 411px 실측: 머리가 284px 에, 그 자리의 3번 기금이 안 보였다).
        까닭: 폰(860px 이하)에서는 .panel 이 가로 스크롤 상자(overflow-x:auto)라, 붙어 있는 머리(sticky)가 «화면»이 아니라
