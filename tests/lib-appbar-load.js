@@ -50,6 +50,9 @@ function load(opts) {
     },
     setInterval: () => 0, clearInterval() { }, setTimeout: () => 0
   };
+  /* setup(ctx, win) — 검사가 화면 크기·그 자리의 요소 같은 «더 필요한 것»을 얹는다
+     (tests/version-fab-phone-low.test.js 가 elementFromPoint·getComputedStyle 을 준다) */
+  if (o.setup) o.setup(ctx, win);
   vm.createContext(ctx);
   vm.runInContext(fs.readFileSync(path.join(R, 'js', 'pu-appbar.js'), 'utf8'), ctx);
 

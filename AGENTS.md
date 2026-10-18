@@ -74,9 +74,10 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 넓은 표는 폰에서 줄마다 «두 줄 카드»(1줄 ☐·№·이름·핵심값, 2줄 말하는 값만), 탭은 한 줄,
 머리 한 줄, 입력칸 16px 이상(확대는 막지 않는다), 양옆 빈자리 없이(글은 화면 끝 8~14px 안, 상자는 한 겹). 떠 있는 단추를 앱마다 새로 만들지 않는다 —
 폰에서는 공용 앱바가 「최신」·「백업·복구」를 손잡이 목록 안으로 옮긴다(`js/pu-appbar.js` `phoneRows`).
+「새 버전 있음」 단추의 폰 자리도 앱바가 정한다 — 바닥 가까이, 바닥 막대가 있으면 재서 그 위로(`fabLift`). 앱에서 그 `bottom` 을 따로 박지 않는다.
 확인은 `node tools/phone-audit/run.mjs <앱 key>`(가짜 파이어베이스로 로그인한 채 360·411px 에서 재고 갈무리).
 **새 앱은 `tools/phone-audit/seeds/<key>.js`(지어낸 자료만)를 함께 만든다.** 앱별 상태는 `docs/폰화면-현황.md`.
-→ `tests/phone-screen-rules.test.js` · `tests/phone-input-zoom.test.js`
+→ `tests/phone-screen-rules.test.js` · `tests/phone-input-zoom.test.js` · `tests/version-fab-phone-low.test.js`
 
 ---
 

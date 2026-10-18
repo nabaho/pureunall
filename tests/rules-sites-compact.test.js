@@ -11,7 +11,8 @@
      ② (PC 표) 이름 칸 고정(sticky)의 left 는 # 칸 폭과 같다 — 다르면 겹치거나 틈이 난다.
         폰(900px 이하)은 두 줄 카드(CLAUDE.md 「폰 화면」)라 고정을 걸지 않는다
      ③ 폰에서 새로고침은 ↻ 만 남는다(글자는 접을 뿐 title 에 있다)
-     ④ 「새로보기」 단추는 이 앱 폰 화면에서 공용 높이보다 낮다 — 공용 값은 건드리지 않는다
+     (「새 버전」 단추를 폰에서 낮게 — 처음엔 여기서 박았으나 쪽 막대를 덮어 모든 앱 한 곳으로 옮겼다:
+      tests/version-fab-phone-low.test.js)
    실행: node --test tests/rules-sites-compact.test.js */
 'use strict';
 const test = require('node:test');
@@ -28,7 +29,6 @@ const V = require('../js/rules-v2/view-sites.js');
 
 const R = (f) => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 const CSS = stripComments(R('rules-v2.html').split('</style>')[0]);
-const SHELL = stripComments(R('css/rules-shell.css'));
 const NAME_MIN = 140;   // 「(주)가나다라상사」 정도가 13px 굵은 글씨로 읽히는 폭 — 이보다 좁으면 이름이 잘린다
 
 const st = () => ({ data: { docs: {}, human: {}, rounds: {} }, companies: [], sites: { f: 'all', q: '', sel: '' }, busy: '' });
@@ -92,16 +92,4 @@ test('③ 폰 거르개 — 새로고침은 ↻ 만, 글자는 접고 title 에 
   assert.match(b[0], /<span class="rl-t">[^<]*새로고침<\/span>/);
   const phone = mediaBlocks(CSS).filter((b) => b.w <= 768).map((b) => b.body).join('\n');
   assert.match(phone, /#sites \.flt \.rl-t\{display:none\}/, '폰에서 「새로고침」 글자를 안 접는다');
-});
-
-test('④ 「새로보기」 단추 — 이 앱 폰 화면에서만 공용 높이보다 낮다', () => {
-  const shared = Number((R('js/pu-version.js').match(/id = 'pu-version-fab'[\s\S]*?bottom:(\d+)px/) || [])[1]);
-  assert.ok(shared > 0, 'pu-version.js 에서 공용 bottom 을 못 읽었다');
-  const m = SHELL.match(/@media\(max-width:(\d+)px\)\{#pu-version-fab\{bottom:([^}]*)!important\}\}/);
-  assert.ok(m, 'css/rules-shell.css 에 폰용 #pu-version-fab 자리가 없다');
-  assert.ok(Number(m[1]) <= 768, '폰 폭에서만 낮춰야 한다(PC 는 공용 그대로)');
-  const px = Number((m[2].match(/(\d+)px/) || [])[1]);
-  assert.ok(px > 0 && px < shared, '★ 공용(' + shared + 'px)보다 낮지 않다: ' + m[2]);
-  // 두 파일 모두 이 한 벌을 싣는다 — 한쪽만 실으면 갈래를 오갈 때 단추가 뛴다
-  ['rules.html', 'rules-v2.html'].forEach((f) => assert.match(R(f), /css\/rules-shell\.css\?v=\d+/, f));
 });
