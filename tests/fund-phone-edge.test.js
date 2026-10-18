@@ -20,7 +20,8 @@ const path = require('node:path');
    base(선택자)  : @media 밖(PC 에도 걸리는) 규칙의 선언 — 같은 선택자가 여럿이면 뒤의 것이 이긴다
    phone(선택자) : 폰 폭(max-width ≤ LIMIT, min-width 없음) @media 안 규칙의 선언(나온 차례대로 이어 붙임)
    side(선언, 'padding'|'margin', 'left'|'right') : 마지막으로 정한 옆 값(px) — 줄임꼴(1~4값)도 푼다 */
-function stripComments(s) { return s.replace(/\/\*[\s\S]*?\*\//g, ' '); }
+/* CSS 주석만 걷는다 — CSS 에는 // 주석이 없어(url(http://…) 를 주석으로 읽으면 안 된다) 공용 걷개(strip-comments.js, JS·HTML 용)와 일이 다르다 */
+function cssBare(s) { return s.replace(/\/\*[\s\S]*?\*\//g, ' '); }
 function blocks(css) {
   const out = []; const re = /@media([^{]*)\{/g; let m, last = 0, base = '';
   while ((m = re.exec(css))) {
@@ -44,7 +45,7 @@ function side(decl, prop, which) {
 }
 
 const SRC = fs.readFileSync(path.join(__dirname, '..', 'fund.html'), 'utf8');
-const CSS = stripComments([...SRC.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n'));
+const CSS = cssBare([...SRC.matchAll(/<style[^>]*>([\s\S]*?)<\/style>/g)].map((m) => m[1]).join('\n'));
 const B = blocks(CSS);
 const BASE = rules(B.base);
 const mq = (lo, hi) => [].concat(...B.media.filter((b) => { const w = Number((b.q.match(/max-width\s*:\s*(\d+)px/) || [])[1]); return w && w > lo && w <= hi && !/min-width/.test(b.q); }).map((b) => rules(b.body)));
