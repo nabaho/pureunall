@@ -10,7 +10,8 @@
 
    지키는 규칙 (px 값은 박지 않는다 — «그런 모양인가» 만 본다):
      ① 폰 구간에서 사업장 표는 최소 폭을 풀고, 줄은 접히는 flex(두 줄 카드)다 — 줄 바꿈 조각이 있다
-     ② ★ CSS 가 기대는 칸 차례(2째 = 사업장 이름, 6째 = 취업규칙 자료)가 실제 그림과 맞다 — 어긋나면 엉뚱한 칸이 커진다
+     ② ★ CSS 가 기대는 칸 차례(사업장 이름 칸 · 취업규칙 자료 칸)가 실제 그림과 맞다 — 어긋나면 엉뚱한 칸이 커진다.
+        맨 앞 둘은 ☐ · № (CLAUDE.md 「맨 왼쪽은 ☐ 고르기 칸 + 번호」 — 카드로 접어도 왼쪽 끝)
      ③ 고른 사업장은 폰에서 화면을 덮는 판(fixed)이고, 판에는 「← 목록」(고른 것 비우기)이 있다 · PC 에서는 그 단추가 숨는다
      ④ 폰 뒤로가기는 판이 떠 있을 때 «판만» 닫는다 — 실제로 돌려서 본다
      ⑤ 📥 메일 순 표만 카드로 접는 이름표가 있고, 폰의 고르기 칸은 손가락 크기다
@@ -80,18 +81,25 @@ test('★① 폰에서 사업장 표는 최소 폭을 풀고, 줄은 접히는 f
   assert.match(decl(P, /^#sites \.sites tbody tr::after$/), /flex-basis\s*:\s*100%/, '첫 줄과 둘째 줄을 가르는 조각이 없다');
 });
 
-test('★② CSS 가 기대는 칸 차례가 실제 그림과 맞다 — 2째 칸이 사업장 이름, 6째 칸이 자료 딱지', () => {
+test('★② CSS 가 기대는 칸 차례가 실제 그림과 맞다 — 맨 앞 ☐·№, 이름 칸은 남는 자리, 자료 딱지는 안 줄어든다', () => {
   const st = { sites: { sel: '' }, staff: {}, data: { docs: {} } };
   const row = { id: 'c9', name: '점검가나다상사', bizNo: '', size: 12, band: '10~29인', bizType: '제조업', closed: false,
     linked: 2, cand: 1, candIds: ['d1'], candMails: 1, last: Date.UTC(2026, 8, 1), groups: [], fin: { state: 'none' }, mgr: '', subs: [] };
   const h = VS.listHtml(st, [row]);
   const tds = [...h.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)].map((m) => m[1]);
   assert.ok(tds.length >= 8, '칸이 모자란다');
-  assert.match(tds[1], /점검가나다상사/, '2째 칸이 이름이 아니면 폰에서 엉뚱한 칸이 자리를 다 가져간다');
-  assert.match(tds[5], /확정|후보/, '6째 칸이 자료 딱지가 아니면 첫 줄에 엉뚱한 값이 선다');
-  // 그 차례에 맞춰 이름 칸이 «남는 자리를 갖는다»
-  assert.match(decl(P, /^#sites \.sites td:nth-child\(2\)$/), /flex\s*:\s*1/, '이름 칸이 남는 자리를 안 가져간다');
-  assert.match(decl(P, /^#sites \.sites td:nth-child\(6\)$/), /flex\s*:\s*none/, '자료 딱지가 줄어 잘린다');
+  // 칸 «차례»는 박지 않는다 — 실제 그림에서 찾아 CSS 의 nth-child 와 견준다(칸이 늘어도 둘이 함께 맞으면 된다)
+  assert.match(tds[0], /type="checkbox"/, '맨 앞 칸이 ☐ 고르기가 아니다');
+  assert.match(tds[1], /^1$/, '둘째 칸이 번호가 아니다');
+  const name = tds.findIndex((t) => /점검가나다상사/.test(t)) + 1;
+  const docs = tds.findIndex((t) => /확정|후보/.test(t)) + 1;
+  assert.ok(name > 0 && docs > 0, '이름·자료 칸을 못 찾았다');
+  assert.ok(Number(decl(P, /^#sites \.sites td:nth-child\(1\)$/).match(/order\s*:\s*(\d+)/)[1]) <
+    Number(decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + name + '\\)$')).match(/order\s*:\s*(\d+)/)[1]), '☐ 가 이름보다 앞에 서야 한다');
+  assert.match(decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + name + '\\)$')), /flex\s*:\s*1/,
+    '이름 칸(' + name + '째)이 남는 자리를 안 가져간다 — 칸이 늘었으면 폰 CSS 의 nth-child 를 함께 고친다');
+  assert.match(decl(P, new RegExp('^#sites \\.sites td:nth-child\\(' + docs + '\\)$')), /flex\s*:\s*none/,
+    '자료 딱지 칸(' + docs + '째)이 줄어 잘린다 — 칸이 늘었으면 폰 CSS 의 nth-child 를 함께 고친다');
 });
 
 test('★③ 고른 사업장은 폰에서 화면을 덮는 판 — 「← 목록」으로 닫고, PC 에서는 그 단추가 없다', () => {

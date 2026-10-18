@@ -79,8 +79,16 @@
     return td('', t, esc(main || subs[0]) + (main && subs.length ? ' <span class="k none">+' + subs.length + '</span>' : ''));
   }
   /* ── 왼쪽 표 ── (rows 는 이미 거른 것) */
+  /* ☐ 고르기 칸 (CLAUDE.md 「맨 왼쪽은 ☐ + 번호」, 대표 「추천대로」 2026-10-18) — 고르기만으로는 아무것도 안 바뀐다.
+     label 로 칸 전체를 누를 자리로(폰 손가락). 줄 누름(siteSel)은 이 칸에서는 안 돈다(render 의 onclick) */
+  function pickCell(picked, r) {
+    var on = !!(picked && picked.has(r.id));
+    return td('pk', on ? '고름 — 다시 누르면 풂' : '고르기 — 여러 곳을 한꺼번에 «자료 맞음»으로',
+      '<label><input type="checkbox" data-pick="' + esc(r.id) + '"' + (on ? ' checked' : '') + '></label>');
+  }
   function listHtml(st, rows, opt) {
-    var sel = (st.sites || {}).sel || '', off = opt ? opt.offset || 0 : 0;
+    var sel = (st.sites || {}).sel || '', off = opt ? opt.offset || 0 : 0, picked = (st.sites || {}).picked;
+    var allOn = !!(rows && rows.length && picked && rows.every(function (r) { return picked.has(r.id); }));
     var body = (rows || []).map(function (r, i) {
       var size = r.size > 0 ? r.size + '명' + (r.band ? ' · ' + r.band : '') : '';
       var doc = [], docT = [];
@@ -93,7 +101,9 @@
         ? td('', '★최종본 ' + (r.fin.at ? ymd(r.fin.at) : ''), '<span class="fin">★' + (r.fin.at ? ' ' + esc(ymd(r.fin.at).slice(2, 7)) : '') + '</span>')
         : r.fin && r.fin.state === 'none' ? td('', '최종본을 아직 안 정했습니다', '<span class="k none">미정</span>')
           : td('', '확정된 자료가 없습니다', '<span class="k none">—</span>');
-      return '<tr data-act="siteSel" data-co="' + esc(r.id) + '"' + (sel === r.id ? ' class="sel"' : '') + '>'
+      var cls = [sel === r.id ? 'sel' : '', picked && picked.has(r.id) ? 'ck' : ''].filter(Boolean).join(' ');
+      return '<tr data-act="siteSel" data-co="' + esc(r.id) + '"' + (cls ? ' class="' + cls + '"' : '') + '>'
+        + pickCell(picked, r)
         + td('no', String(off + i + 1), String(off + i + 1))
         + td('', r.name + (r.closed ? ' (폐업)' : ''), '<b>' + esc(r.name) + '</b>' + (r.closed ? ' <span class="k none">폐업</span>' : ''))
         + td('', size || '인원 모름', size ? esc(size) : '<span class="k none">—</span>')
@@ -105,12 +115,12 @@
         + '</tr>';
     }).join('');
     var condOn = opt && SC().conditions(opt.cols).length > 0;
-    if (!body) body = '<tr><td colspan="8" class="empty" title="">' + (condOn ? '거른 조건에 맞는 사업장이 없습니다 — 조건을 풀어 보세요' : '맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요') + '</td></tr>';
+    if (!body) body = '<tr><td colspan="9" class="empty" title="">' + (condOn ? '거른 조건에 맞는 사업장이 없습니다 — 조건을 풀어 보세요' : '맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요') + '</td></tr>';
     /* 칸 폭 — 사업장 이름(폭 없는 칸)은 «남는 자리»를 받는다. 표의 min-width(rules-v2.html .sites)가 다른 칸 합보다
        넉넉해야 이름이 산다 — 모자라면 이름이 「삼…」 한 글자만 남는다(2026-10-18 폰 실측). # 칸 폭은 .sites 의
        이름 칸 고정(left)과 같아야 한다 — tests/rules-sites-compact.test.js 가 견준다 */
-    return '<table class="sites"><colgroup><col style="width:36px"><col><col style="width:120px"><col style="width:88px"><col style="width:76px"><col style="width:250px"><col style="width:72px"><col style="width:76px"></colgroup>'
-      + (opt ? headHtml(st, opt) : '<thead><tr><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>')
+    return '<table class="sites"><colgroup><col style="width:28px"><col style="width:36px"><col><col style="width:120px"><col style="width:88px"><col style="width:76px"><col style="width:250px"><col style="width:72px"><col style="width:76px"></colgroup>'
+      + (opt ? headHtml(st, opt, allOn) : '<thead><tr><th class="c pk"></th><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>')
       + '<tbody>' + body + '</tbody></table>';
   }
 
@@ -130,9 +140,27 @@
     return '<th class="ch' + (on ? ' on' : '') + '"><button class="h" data-act="colOpen" data-key="' + esc(key) + '" title="' + esc(label) + ' — 거르기·순서">'
       + '<span class="lb">' + esc(label) + '</span>' + arrow + '<span class="fl">▾</span></button></th>';
   }
-  function headHtml(st, opt) {
+  function headHtml(st, opt, allOn) {
     var cells = HEAD.map(function (h) { return headCell(st, opt, h[0], h[1]); });
-    return '<thead><tr><th class="c">#</th>' + cells.join('') + '</tr></thead>';
+    // 머리 ☐ 는 «지금 보이는 줄»(이 쪽에 그려진 줄)만 고른다 — 걸러져 안 보이는 줄·다른 쪽은 고르지 않는다
+    return '<thead><tr><th class="c pk"><label title="보이는 줄 모두 고르기"><input type="checkbox" data-act="sitePickAll"' + (allOn ? ' checked' : '') + '>'
+      + '<span class="pk-t"> 모두</span></label></th><th class="c">#</th>' + cells.join('') + '</tr></thead>';
+  }
+  /* 고르면 뜨는 띠 — 「N곳 골랐습니다」와 할 수 있는 일. 후보가 없는 곳은 «자료 맞음»에서 건너뛴다(건수를 미리 보인다) */
+  function bulkHtml(st, rows) {
+    var picked = (st.sites || {}).picked;
+    if (!picked || !picked.size) return '';
+    var on = (rows || []).filter(function (r) { return picked.has(r.id); });
+    var cand = on.filter(function (r) { return r.cand > 0; }), docs = 0;
+    cand.forEach(function (r) { docs += r.cand; });
+    var skip = on.length - cand.length;
+    return '<div class="sbulk">☑ <b>' + on.length + '곳</b> 골랐습니다'
+      + '<button class="btn sm g" data-act="siteBulkLink"' + (cand.length ? '' : ' disabled')
+      + ' title="' + esc(cand.length ? '후보가 있는 ' + cand.length + '곳의 후보 ' + docs + '건을 각 사업장 자료로 확정합니다' : '고른 곳에 확정할 후보가 없습니다') + '">'
+      + '✓ 자료 맞음' + (cand.length ? ' ' + cand.length + '곳·' + docs + '건' : '') + '</button>'
+      + '<button class="btn sm" data-act="siteUnpick">고르기 풀기</button>'
+      + (skip ? '<span class="hint" title="후보 자료가 없는 곳은 확정할 것이 없습니다">후보 없는 ' + skip + '곳은 건너뜀</span>' : '')
+      + '</div>';
   }
   /* 창 — 한 번에 하나. position:fixed (표 칸이 가로 스크롤이라 안에 두면 잘린다) */
   function popHtml(st, key, rows) {
@@ -262,13 +290,18 @@
     // 순서에는 «이름을 못 찾은 사번»을 사번 글자 그대로 넣지 않는다 — 빈 값으로 보내 오름·내림 모두 맨 끝에 둔다(표시는 staffName 그대로)
     var sorted = SC().sortRows(kept, s.sort, function (sid) { return (st.staff || {})[sid] || ''; });
     var pg = SC().page(sorted, s.page);
+    // 걸러져 안 보이게 된 줄은 고른 것에서 뺀다 — 모르는 것이 골라진 채 「자료 맞음」에 끼지 않게(다른 쪽은 그대로 둔다)
+    if (s.picked && s.picked.size) {
+      var shown = {}; sorted.forEach(function (r) { shown[r.id] = 1; });
+      s.picked.forEach(function (id) { if (!shown[id]) s.picked.delete(id); });
+    }
     // 담당 창은 «담당 거르기 전» 목록(위쪽 칩·검색만 건)에서 사람별 수를 센다. 나머지 창은 base 를 넘기고
     // options 가 cols 로 «그 칸 자신만 빼고» 센다
     // 머리줄 조건(cols)은 그대로 걸린다 — 담당 창의 수도 «지금 보이는 표»를 기준으로 센다(설계 §12-2)
     var popRows = s.pop === 'who' ? SC().apply(Sx().filter(rows, s.f || 'has', s.q || '', ''), cols) : base;
     var row = s.sel ? rows.filter(function (r) { return r.id === s.sel; })[0] : null;
     var opt = { offset: pg.from ? pg.from - 1 : 0, cols: cols, sort: s.sort, pop: s.pop };
-    el.innerHTML = filterHtml(st, Sx().counts(rows), Sx().ownerCounts(rows)) + condHtml(cols, kept.length)
+    el.innerHTML = filterHtml(st, Sx().counts(rows), Sx().ownerCounts(rows)) + condHtml(cols, kept.length) + bulkHtml(st, rows)
       + '<div class="swrap"><div class="stbl">' + listHtml(st, pg.items, opt) + pagerHtml(pg) + '</div>' + sideHtml(st, row) + '</div>'
       + (s.pop ? popHtml(st, s.pop, popRows) : '')
       + (st.busy ? '<div class="busy">' + esc(st.busy) + '</div>' : '');
@@ -280,7 +313,9 @@
       // 누른 것에 손잡이가 있으면 그 손잡이의 그림이 닫힌 창으로 그린다. 없을 때만 colClose 가 직접 그린다
       var out = !!s.pop && !(ev.target.closest && (ev.target.closest('.cpop') || ev.target.closest('[data-act="colOpen"]')));
       if (out) { s.pop = ''; s.popq = ''; }
-      var run = b && el.contains(b) && b.tagName !== 'INPUT' && H[b.dataset.act];
+      // ☐ 칸(.pk)은 줄(tr, siteSel) «안»에 있다 — 거기서 누른 것은 줄 열기가 아니라 고르기(바뀜은 onchange 가 받는다)
+      var pk = ev.target.closest && ev.target.closest('.pk'), inPick = !!(pk && pk !== b);
+      var run = b && el.contains(b) && b.tagName !== 'INPUT' && !inPick && H[b.dataset.act];
       if (run) {
         ev.preventDefault(); run(b.dataset, ev);
         // 손잡이가 다시 그리지 않았으면(예: 확인창에서 취소) 낡은 창이 화면에 남는다 — 상태는 닫혔으니 창 노드도 뗀다
@@ -314,11 +349,13 @@
       var t = ev.target;
       if (t.dataset && t.dataset.role === 'sm' && H.sm) H.sm(t.value);
       if (t.dataset && t.dataset.role === 'colchk' && H.colToggle) H.colToggle(t.dataset.key, t.dataset.v, t.checked);
+      if (t.dataset && t.dataset.pick != null && H.sitePick) H.sitePick(t.dataset.pick, t.checked);
+      if (t.dataset && t.dataset.act === 'sitePickAll' && H.sitePickAll) H.sitePickAll(t.checked);
     };
   }
 
   var api = { render: render, listHtml: listHtml, sideHtml: sideHtml, filterHtml: filterHtml,
-    headHtml: headHtml, popHtml: popHtml, condHtml: condHtml, pagerHtml: pagerHtml };
+    headHtml: headHtml, popHtml: popHtml, condHtml: condHtml, pagerHtml: pagerHtml, bulkHtml: bulkHtml };
   if (root) root.PuRulesV2SitesView = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
 })(typeof window !== 'undefined' ? window : (typeof globalThis !== 'undefined' ? globalThis : null));
