@@ -287,7 +287,7 @@
      앱바 앱의 폰에서만 바닥 FAB_LOW 로 내린다(위 phoneCss 의 --pu-fab-bottom).
      ★ 그 자리에 «화면에 박힌 것»이 있으면 그 위로 올린다 — 단추가 그 누를 것을 늘 덮으면 안 된다.
        2026-10-18 폰 전수(23앱 · 360·411px)에서 바닥 가까이에 박힌 것:
-         업무관리 빠른 입력줄(fixed, 바닥 14px) · 경력관리 바닥 탭(fixed) · 명함첩 ＋·선택 막대(fixed) ·
+         업무관리 빠른 입력줄(fixed, 바닥 14px) · 경력관리 바닥 탭(fixed) · 기업정보함 ＋·선택 막대(fixed) ·
          메일 ✏️ 쓰기(fixed 몸통 안의 absolute) · 취업규칙 쪽 막대(sticky bottom — 사업장 50곳 넘을 때). 쪽 막대는 폰에서 두세 줄로 접혀 높이가 화면마다 달라
        숫자로 박지 않고 그때그때 잰다.
      ⚠ 평소(「최신」)에는 폰에서 단추가 숨어 있어 재지 않는다 — 새 버전·확인 중·결과일 때만 돈다.
@@ -300,7 +300,7 @@
     var W = global.innerWidth, H = global.innerHeight, r = fab.getBoundingClientRect(), top = H;
     var vis = fab.style.visibility;
     fab.style.visibility = 'hidden';                 // 단추 «밑»을 본다
-    // 다섯 × 세 점 — 둥근 ＋ 단추(명함첩)는 모서리가 비어 성긴 점으로는 빠진다(360px 실측)
+    // 다섯 × 세 점 — 둥근 ＋ 단추(기업정보함)는 모서리가 비어 성긴 점으로는 빠진다(360px 실측)
     [0.02, 0.25, 0.5, 0.75, 0.98].forEach(function (fx) {
       var x = r.left + r.width * fx;
       [3, r.height / 2, r.height - 3].forEach(function (dy) {
