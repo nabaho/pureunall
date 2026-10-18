@@ -36,8 +36,5 @@
      띠 31 → 40, 줄 수 그대로 1줄, 가로 넘침 0). */
 @media(max-width:768px){.rmode a{min-height:38px;display:inline-flex;align-items:center}}
 
-/* 「새로보기」 단추(● 최신 / 새 버전 있음 · 누르기)를 폰에서 낮춘다 (대표 지시 2026-10-18 「너무 위에 있다 … 조금 낮게」)
-   공용(js/pu-version.js)은 bottom:96px 이다 — 다른 앱 바닥에 붙은 ＋·📷 단추를 비키려는 높이라 공용 값은 그대로 둔다
-   (tests/version-refresh-fab.test.js 가 «80 이상»을 지킨다). 취업규칙 두 파일에는 바닥에 붙은 단추가 없어 «이 앱에서만» 낮춘다.
-   ⚠ 그 단추는 자리를 style= 로 박으므로 !important 가 없으면 안 듣는다. 폰 아래 손잡이 띠(safe-area)만큼은 더 띄운다 */
-@media(max-width:768px){#pu-version-fab{bottom:calc(24px + env(safe-area-inset-bottom,0px))!important}}
+/* 「새 버전 있음 · 누르기」 단추의 폰 자리는 이 파일에 두지 않는다 — 모든 앱 한 곳(js/pu-appbar.js fabLift)에서 정한다.
+   (2026-10-18 한때 여기서 24px 로 박았더니 폰 쪽 막대(sticky)를 덮었다 — 막대 높이를 재서 비키는 일은 앱바가 한다) */
