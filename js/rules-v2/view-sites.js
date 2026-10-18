@@ -55,15 +55,18 @@
   function filterHtml(st, c, oc) {
     var s = st.sites || {}, f = s.f || 'has';
     c = c || { has: 0, wait: 0, all: 0 };
-    function chip(v, label, extra) {
-      return '<button class="chip' + (extra ? ' ' + extra : '') + (f === v ? ' on' : '') + '" data-act="siteF" data-f="' + v + '">'
+    function chip(v, label, extra, tip) {
+      return '<button class="chip' + (extra ? ' ' + extra : '') + (f === v ? ' on' : '') + '" data-act="siteF" data-f="' + v + '" title="' + esc(tip) + '">'
         + esc(label) + '<b>' + (c[v] || 0) + '</b></button>';
     }
+    /* 폰에서 두 줄로 들어가게 (대표 지시 2026-10-18 「UI 컴팩트하게 다시 정리해라」) — 칩 셋이 한 줄, 담당·찾기·↻ 가 한 줄.
+       칩 글자는 짧게(「취업규칙」은 이 앱 이름이라 뺐다 — 뜻은 title 에), 새로고침은 폰에서 ↻ 만 */
     return '<div class="flt">'
-      + chip('has', '취업규칙 자료 있는 곳') + chip('wait', '확정 기다림', 'warn') + chip('all', '모든 거래처')
+      + chip('has', '자료 있는 곳', '', '취업규칙 자료가 있는 거래처') + chip('wait', '확정 기다림', 'warn', '후보 자료를 «이 회사 것이 맞다»고 확정하기를 기다리는 거래처')
+      + chip('all', '모든 거래처', '', '자료가 없는 곳까지 모든 거래처')
       + ownerSelect(st, oc)
       + '<input class="q" data-role="sq" placeholder="🔍 회사 이름 · 사업자번호" value="' + esc(s.q || '') + '">'
-      + '<button class="btn" data-act="reload">새로고침</button>'
+      + '<button class="btn rl" data-act="reload" title="새로고침">↻<span class="rl-t"> 새로고침</span></button>'
       + '</div>';
   }
 
@@ -103,7 +106,10 @@
     }).join('');
     var condOn = opt && SC().conditions(opt.cols).length > 0;
     if (!body) body = '<tr><td colspan="8" class="empty" title="">' + (condOn ? '거른 조건에 맞는 사업장이 없습니다 — 조건을 풀어 보세요' : '맞는 사업장이 없습니다 — 「모든 거래처」에서 찾아보세요') + '</td></tr>';
-    return '<table class="sites"><colgroup><col style="width:44px"><col><col style="width:120px"><col style="width:96px"><col style="width:84px"><col style="width:250px"><col style="width:80px"><col style="width:80px"></colgroup>'
+    /* 칸 폭 — 사업장 이름(폭 없는 칸)은 «남는 자리»를 받는다. 표의 min-width(rules-v2.html .sites)가 다른 칸 합보다
+       넉넉해야 이름이 산다 — 모자라면 이름이 「삼…」 한 글자만 남는다(2026-10-18 폰 실측). # 칸 폭은 .sites 의
+       이름 칸 고정(left)과 같아야 한다 — tests/rules-sites-compact.test.js 가 견준다 */
+    return '<table class="sites"><colgroup><col style="width:36px"><col><col style="width:120px"><col style="width:88px"><col style="width:76px"><col style="width:250px"><col style="width:72px"><col style="width:76px"></colgroup>'
       + (opt ? headHtml(st, opt) : '<thead><tr><th class="c">#</th><th>사업장</th><th>규모</th><th>업태</th><th>담당</th><th>취업규칙 자료</th><th>최근</th><th>★최종본</th></tr></thead>')
       + '<tbody>' + body + '</tbody></table>';
   }

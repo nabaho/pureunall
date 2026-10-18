@@ -50,7 +50,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/store.js?v=4"></script>
 <script src="js/rules-v2/view-library.js?v=4"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=8"></script>
+<script src="js/rules-v2/view-sites.js?v=9"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -201,7 +201,10 @@ button{font:inherit;cursor:pointer}
 #sites .flt select.who{height:28px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font:inherit;font-size:12px;color:#1e293b;background:#ffffff;margin-left:6px}
 #sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
 #sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
-.sites{width:100%;border-collapse:collapse;table-layout:fixed;min-width:800px}
+.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:880px}
+/* ↑ min-width 는 «다른 칸 폭의 합 + 이름 칸 몫»이다 — 칸 폭은 view-sites.js 의 colgroup.
+     800 이던 때 다른 칸 합이 754 라 이름 칸이 46px 만 남아 폰·좁은 PC 에서 「삼…」 한 글자만 보였다(2026-10-18).
+   ⚠ separate(+간격 0)인 까닭 — collapse 이면 아래 «이름 칸 고정»의 줄금이 옆으로 밀 때 따라오지 않는다 */
 .sites th{font-size:11.5px;color:#475569;font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
 .sites th.c{text-align:center}
 .sites td{padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffff}
@@ -255,7 +258,7 @@ button{font:inherit;cursor:pointer}
 #sites .cact .tag{display:inline-flex;gap:3px;align-items:center;background:#ffffff;border:1px solid #bfdbfe;border-radius:10px;padding:1px 4px 1px 9px}
 #sites .cact .tag button{border:0;background:none;color:#1e40af;padding:0 4px}
 #sites .cact .clr{margin-left:auto;border:0;background:none;color:#1e40af;text-decoration:underline}
-#sites .pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0}
+#sites .pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0;left:0}
 #sites .pager .info{color:#475569;font-size:12px;flex:1 1 auto}#sites .pager .info b{color:#1e293b}
 @media (max-width:900px){#sites .pager .info{flex-basis:100%}}
 #sites .pg{min-width:28px;height:26px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px;white-space:nowrap}
@@ -272,6 +275,16 @@ button{font:inherit;cursor:pointer}
 #sites .items .why{color:#854d0e;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:40%}
 #sites .items .lnk{flex-shrink:0}
 #sites .none{padding:10px 2px;color:#475569}
+/* 폰 거르개 — 칩 셋을 한 줄에, 새로고침은 ↻ 만 (대표 지시 2026-10-18 「UI 컴팩트하게 다시 정리해라. 글자 너무 안 보인다」)
+   칩 글자를 줄이고(「취업규칙」은 이 앱 이름이라 뺐다 — view-sites.js) 안쪽 여백을 줄여 412px 에서 칩 셋이 한 줄,
+   담당·찾기·↻ 가 한 줄 — 거르개 네 줄(150px)이 두 줄(73px)이 된다. 글씨 크기는 줄이지 않는다 */
+@media (max-width:760px){
+  #sites .flt{padding:7px 8px;gap:5px}
+  #sites .flt .chip{padding:3px 8px}
+  #sites .flt select.who{margin-left:0;max-width:42%}
+  #sites .flt .btn{height:28px;padding:0 10px;margin-left:0}
+  #sites .flt .rl-t{display:none}
+}
 @media (max-width:900px){#sites .swrap{grid-template-columns:1fr}#sites .stbl{border-right:0;border-bottom:1px solid #e2e8f0}#sites .flt .q{width:100%;margin-left:0}}
 /* ── 폰(900px 이하) 🏢 사업장 — 표를 «두 줄 카드»로 (폰화면관리 2026-10-18) ──
    ⚠ 표가 min-width:800px 이라, 폰에서는 다른 칸 폭을 다 빼고 남은 «사업장» 칸이 46px 남짓이었다 —
@@ -375,6 +388,12 @@ button{font:inherit;cursor:pointer}
   #sites>.swrap{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr)}
   #sites .stbl{overflow:auto;min-height:0}
   #sites .sites th{position:sticky;top:0;z-index:2}
+  /* # · 사업장 이름 칸 고정 — 좁은 PC 에서 표를 옆으로 밀어도 «어느 회사 줄인지»가 남는다(2026-10-18).
+     ⚠ 이름 칸의 left 는 # 칸 폭(view-sites.js colgroup 첫 칸)과 같아야 한다 — 다르면 겹치거나 틈이 난다.
+     PC(표 모양)에서만 — 폰(900px 이하)은 두 줄 카드라 옆으로 밀 일이 없고, 걸면 카드 안에 세로 줄금이 그어진다 */
+  .sites td:nth-child(1),.sites th:nth-child(1){position:sticky;left:0;z-index:1}
+  .sites td:nth-child(2),.sites th:nth-child(2){position:sticky;left:36px;z-index:1;box-shadow:inset -1px 0 0 #e2e8f0}
+  #sites .sites th:nth-child(-n+2){z-index:3}
   #sites .sside{overflow:auto;min-height:0}
   #lib>.run,#lib>.flt,#lib>.bulk{flex:0 0 auto}
   #lib>.wrap{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
@@ -419,7 +438,7 @@ button{font:inherit;cursor:pointer}
 .tflow i.f{background:#fffbeb;border-color:#fde68a;color:#854d0e;font-weight:700}
 .tflow i.rep{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
 </style>
-<link rel="stylesheet" href="css/rules-shell.css?v=2">
+<link rel="stylesheet" href="css/rules-shell.css?v=3">
 </head>
 <body>
 <div class="top rs-head">
