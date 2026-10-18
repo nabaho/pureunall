@@ -62,7 +62,7 @@ test('★ 갈래 넷과 법정 기한 — 해산통지·해산등기 3주, 탈�
 
 test('★ 배선 — 서식 자료실 ⑥ 탭, 변경 이벤트(옛 해산 목록은 새로 못 고름), 기준일 저장', () => {
   assert.ok(SRC.includes("PH=PH.concat([['dis','⑥ 해산·탈퇴']]);"));
-  assert.ok(SRC.includes("} else if(S.formPhase==='dis'){\n    body=dsLibHTML(cur,fundMode);"));
+  assert.ok(SRC.includes("} else if(S.formPhase==='dis'){\n    body=dsLibHTML(cur,fundMode,"));
   assert.ok(SRC.includes("site_leave:{label:'사업장 탈퇴',gong:true,legacy:true,"));
   assert.ok(SRC.includes("dissolve:{label:'해산·청산',legacy:true,"));
   const ev = fnSrc('eventsTab');

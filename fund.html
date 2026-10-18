@@ -782,7 +782,7 @@ var DS_FLOWS={
     ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57(회의록 10년)','','ops_minutes_use','별지 13호 회의록',''],
     ['청산인 취임 — 취임승낙서','민법 §82','','reg_accept','취임승낙서',''],
     ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','reg_apply','해산·청산인 취임 등기신청서',''],
-    ['해산통지서 + 첨부 4종(해산 증명·정관·재산목록·처분계획서) — 지방노동관서','영 §52 · 규칙 §28 · 민법 §86','liq+21d','','별지 14호 해산통지서',''],
+    ['해산통지서 + 첨부 4종(해산 증명·정관·재산목록·처분계획서) — 지방노동관서','영 §52 · 규칙 §28 · 민법 §86','liq+21d','dis_notice','별지 14호 해산통지서',''],
     ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
     ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
     ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
@@ -796,7 +796,7 @@ var DS_FLOWS={
     ['공동기금협의회 협의·결정 — 탈퇴 회사 위원은 의결권 없음(기한 넘기면 탈퇴 결정 간주)','영 §55의5③④','apply+3m','ops_minutes_use','별지 13호 회의록',''],
     ['배분 재산 계산 — 탈퇴 당시 재산가액 × 그 사업주 출연액 ÷ 조성된 공동기금','법 §86의8② · 규칙 §29의2','','','재산배분 계산서',''],
     ['재산 배분 → 받은 사업주는 사내기금 설치 또는 출연(출연금 처리)','법 §86의8③ · 해석 3866','','','배분 재산목록',''],
-    ['탈퇴 보고서 + 회의록·사유 증명·배분 재산목록 — 지방노동관서','영 §55의5⑤ · 규칙 §29의3','leaveDay+21d','','별지 14호의2 탈퇴 보고서',''],
+    ['탈퇴 보고서 + 회의록·사유 증명·배분 재산목록 — 지방노동관서','영 §55의5⑤ · 규칙 §29의3','leaveDay+21d','dis_leave','별지 14호의2 탈퇴 보고서',''],
     ['기본재산 총액 변경 보고','영 §35② · 규칙 §22','','ops_asset_change','별지 10호',''],
     ['정관 변경 인가(참여 사업주가 정관에 적혀 있으면)','법 §53 준용','','','별지 11호',''],
     ['지원금 영향 점검 — 남는 곳이 1곳이면 지원 대상 아님','해석 3961','','','',''],
@@ -814,7 +814,7 @@ var DS_FLOWS={
     ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57','','ops_minutes_use','별지 13호 회의록',''],
     ['청산인 취임 — 취임승낙서','민법 §82','','reg_accept','취임승낙서',''],
     ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','reg_apply','해산·청산인 취임 등기신청서',''],
-    ['해산통지서 + 첨부 4종 — 지방노동관서','영 §55의6→§52 · 규칙 §28','liq+21d','','별지 14호 해산통지서',''],
+    ['해산통지서 + 첨부 4종 — 지방노동관서','영 §55의6→§52 · 규칙 §28','liq+21d','dis_notice','별지 14호 해산통지서',''],
     ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
     ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
     ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
@@ -4634,7 +4634,7 @@ function renderForms(){
         : opsRow('운영상황보고서·결산서·변경이벤트','<span class="muted" style="font-size:12px">실데이터 기반 — 각 기금의 <b>📑 서식</b>/해당 탭에서</span>'))
       +'</div></div>';
   } else if(S.formPhase==='dis'){
-    body=dsLibHTML(cur,fundMode);
+    body=dsLibHTML(cur,fundMode,docsFor(DOC_DIS,cur.fund_type||'공동').map(formRow).join(''));
   } else {
     body='<div class="panel">'
       +phaseHead('⑤ 근복지원금 신청 서식','forms.sub','sub',
@@ -5187,7 +5187,7 @@ var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex
   reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
   ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동', ops_audit:'공동', ops_minutes_close:'공동',
   sub_required:'공동', subsidy:'공동', sub_welfare_plan:'공동', sub_assets:'공동', sub_payment:'공동',
-  sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+  sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동', dis_notice:'공동', dis_leave:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues, inka_annex:_hwpInkaAnnexValues,
   agreement:_hwpAgreementValues, charter:_hwpCharterValues, charter_sane:_hwpCharterSaneValues, contrib:_hwpContribValues,
@@ -5197,7 +5197,8 @@ var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpI
   ops_asset_change:_hwpOpsValues, ops_minutes_scope:_hwpOpsValues, ops_minutes_use:_hwpOpsValues,
   ops_audit:_hwpAuditValues, ops_minutes_close:_hwpCloseValues,
   sub_required:_hwpSubValues, subsidy:_hwpSubValues, sub_welfare_plan:_hwpSubValues, sub_assets:_hwpSubValues,
-  sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues};
+  sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues,
+  dis_notice:_hwpDisValues, dis_leave:_hwpDisValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다 */
 var HWP_TPL_STRICT={charter:1};
 /* ★ 2026-09-27 사내 정관도 원본 한글 틀로 — 서식 이름(charter)은 하나, 틀만 기금 유형으로 고른다.
@@ -5555,6 +5556,59 @@ function _hwpTaxValues(f,sites){
    재산변동은 HTML 과 같은 장부 숫자(S._docBf — 별지15호 ⑫~⑳ 과 같은 기본재산 분개)로 «변경일마다 한 장»
    ({{#쪽:변경}}). 이 기금·이 해 것이 아니면 쓰지 않는다(남의 금액을 노동청에 내게 된다).
    재산목록(둘째 장)의 금액 칸은 비운다 — HTML 도 「따로 만들어 붙이세요」다. */
+/* ⑥ 해산·탈퇴 법정서식 두 장(2026-10-18) — 별지 제14호 해산통지서 · 별지 제14호의2 탈퇴 보고서(2026-08-25 신설).
+   틀은 국가법령정보센터 원본 그대로에 표지만 넣었다. 값은 기금 자료에서만 — 지어내지 않는다:
+   · 해산통지서: 해산일·사유 = [기금 정보] 계약관계의 종료일·사유(기록보관), 청산인 = 대표 이사(민법 §82 — 정관·협의회가 달리 정하면 고친다)
+   · 탈퇴 보고서: «가장 최근에 탈퇴한» 참여사업장(탈퇴일 기준) — _docExtra 가 탈퇴한 곳까지 읽어 둔다(S._dsLeave). 탈퇴 사유는 손으로.
+   ⚠ «[ ] 사내 / [ ] 공동» 체크 줄이 있어 공동↔사내 말 바꾸기를 하지 않는다(FTYPE_SKIP). */
+function _hwpDisValues(f,sites,kind){
+  f=f||{};
+  var b=_boss(f), sane=f.fund_type==='사내';
+  var V={기금명:String(f.name||''), 인가번호:String(f.inka_no||''), 소재지:String(f.address||''),
+    관할관서:String(f.labor_office||'').trim()||'○○지방고용노동청(○○○○지청)', 사내V:sane?'√':'  ', 공동V:sane?'  ':'√'};
+  if(kind==='dis_leave'){
+    var L=(S._dsLeave&&S._dsLeave.fid===S.formFund)?S._dsLeave:null, s=L&&L.site;
+    V.대표자=String(b.name||f.chairman||'');
+    V.탈퇴일=(s&&s.leave_date)?_hwpKoDate(s.leave_date):'';
+    V.사업장명=s?String(s.name||''):''; V.사업장대표=s?String(s.ceo||''):'';
+    V.사업장소재지=s?String(s.address||''):''; V.근로자수=s?String(s.company_size||''):'';
+    V.탈퇴사유='';
+    V._note=s?('가장 최근에 탈퇴한 사업장(「'+V.사업장명+'」'+(L.n>1?' 외 '+(L.n-1)+'곳':'')+')으로 채웠습니다 — 탈퇴 사유는 적어 주세요')
+      :'탈퇴한 사업장이 없습니다 — 참여사업장에서 «탈퇴»로 바꾸고 탈퇴일을 넣으면 채워집니다';
+    return V;
+  }
+  V.해산일=f.end_date?_hwpKoDate(f.end_date):'';
+  V.해산사유=String(f.end_reason||'').replace(/^해산\s*[—-]\s*/,'');
+  V.청산인=String(b.name||f.chairman||''); V.청산인생년월일=String(b.birth||''); V.청산인직책=String(b.title||f.rep_position||'');
+  V._note='청산인은 대표 이사로 채웠습니다(민법 제82조 — 정관·협의회가 달리 정했으면 고치세요) · 해산일·사유는 [기금 정보] 계약관계의 종료일·사유';
+  return V;
+}
+/* 탈퇴 보고서의 «탈퇴한 사업장» — 탈퇴한 곳까지 읽어 가장 최근(탈퇴일) 한 곳 */
+function _dsLeaveLoad(f){
+  var fid=S.formFund; S._dsLeave=null;
+  if(!fid||!f||f._sample) return Promise.resolve(null);
+  return _loadSites(fid,{withClosed:true}).then(function(a){
+    var c=(a||[]).filter(function(s){ return (s.status||'active')==='closed'; })
+      .sort(function(x,y){ return String(y.leave_date||'').localeCompare(String(x.leave_date||'')); });
+    S._dsLeave={fid:fid, site:c[0]||null, n:c.length}; return S._dsLeave;
+  }).catch(function(){ S._dsLeave={fid:fid, site:null, n:0}; return null; });
+}
+/* 틀이 없을 때·샘플일 때의 HTML 미리보기 — 같은 값 함수에서 */
+function _dsDocHTML(kind,f,sites){
+  var V=_hwpDisValues(f,sites,kind), R=function(k,v){ return '<tr><th style="width:150px">'+k+'</th><td>'+dgV(v,14)+'</td></tr>'; };
+  var note="<p class='note docnote'>※ 법정서식(근로복지기본법 시행규칙) 초안 — 원본 한글 틀로 보면 원본 모양 그대로입니다. 밑줄 공란은 수기 기입.</p>";
+  if(kind==='dis_leave') return note+'<h1>공동근로복지기금법인의 탈퇴 보고서</h1><p style="font-size:11px">[별지 제14호의2서식] &lt;신설 2026. 8. 25.&gt;</p><table>'
+    +R('탈퇴 연월일',V.탈퇴일)+R('공동기금법인 명칭',V.기금명)+R('인가번호',V.인가번호)+R('주사무소 소재지',V.소재지)
+    +R('탈퇴 사업장명',V.사업장명)+R('대표자명',V.사업장대표)+R('사업장 소재지',V.사업장소재지)+R('근로자 수(명)',V.근로자수)+R('탈퇴 사유',V.탈퇴사유)
+    +'</table><p>「근로복지기본법」 제86조의8제1항, 같은 법 시행령 제55조의5제5항 및 같은 법 시행규칙 제29조의3에 따라 위와 같이 사업주가 공동근로복지기금법인에서 탈퇴한 사실을 보고합니다.</p>'
+    +'<p style="text-align:right">공동근로복지기금법인 대표자 '+dgV(V.대표자,6)+' (서명 또는 인)</p><p>'+esc(V.관할관서)+'장 귀하</p>';
+  return note+'<h1>해산통지서</h1><p style="font-size:11px">[별지 제14호서식] &lt;개정 2021. 6. 9.&gt; · ['+(V.사내V==='√'?'√':' ')+'] 사내근로복지기금법인 ['+(V.공동V==='√'?'√':' ')+'] 공동근로복지기금법인</p><table>'
+    +R('해산 연월일',V.해산일)+R('청산인 성명',V.청산인)+R('청산인 생년월일',V.청산인생년월일)+R('청산인 직책',V.청산인직책)
+    +R('기금법인 명칭',V.기금명)+R('인가번호',V.인가번호)+R('주사무소 소재지',V.소재지)+R('해산 사유',V.해산사유)
+    +'</table><p>「근로복지기본법 시행령」 제52조ㆍ제55조의6 및 같은 법 시행규칙 제28조에 따라 위와 같이 기금법인의 해산을 알립니다.</p>'
+    +'<p style="text-align:right">(청산인) '+dgV(V.청산인,6)+' (서명 또는 인)</p><p>'+esc(V.관할관서)+'장 귀하</p>'
+    +'<p style="font-size:11px">첨부서류: 1. 해산을 증명하는 서류 2. 정관 3. 재산목록 4. 재산의 처분방법 및 처분계획서</p>';
+}
 function _hwpOpsValues(f,sites){
   f=f||{}; sites=sites||[];
   var b=_boss(f), amt=0; try{ amt=Math.round(foundContribLive(f,sites)||0); }catch(e){}
@@ -6171,13 +6225,15 @@ var DOC_SUB=[['sub_required','지원금 신청 시 필요서류(안내)','공동
   ['charter','기금법인 정관 (①인가와 같은 서식)','공동'],
   ['sub_assets','재산목록표','공동'],['sub_payment','지원금 지급신청서(계좌)','공동']];
 /* ⑥ 인센티브(비용청구서) 단계는 뗐다(2026-09-06, 대표 지시 「불필요하다」). */
-var DOC_ALL=[].concat(DOC_KINDS,DOC_REG,DOC_TAX,DOC_OPS,DOC_SUB);
+// ⑥ 해산·탈퇴 법정서식(2026-10-18) — 절차·기한은 dsLibHTML
+var DOC_DIS=[['dis_notice','해산통지서(별지 제14호)'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동']];
+var DOC_ALL=[].concat(DOC_KINDS,DOC_REG,DOC_TAX,DOC_OPS,DOC_SUB,DOC_DIS);
 /* 서식이 «어느 단계에» 사는지 — 목록에서 직접 찾는다.
    따로 적어 두면 서식을 옮겼을 때 표만 옛말이 되어, 눌러도 엉뚱한 단계가 열린다.
    실제로 그랬다: 지원금 제출서류의 [서식]을 눌러도 ①인가가 열려 다시 찾아야 했다
    (갈 곳을 «누른 서식»이 아니라 «화면의 단계»로 정하고 있었다). */
 var DOC_PHASE=[['inka',DOC_KINDS],['reg',DOC_REG],['tax',DOC_TAX],
-               ['ops',DOC_OPS],['subsidy',DOC_SUB]];
+               ['ops',DOC_OPS],['subsidy',DOC_SUB],['dis',DOC_DIS]];
 /* prefer — «누른 사람이 있던 단계». 한 서식을 여러 단계에 일부러 두기도 한다
    (사업계획서는 ①인가와 ⑤지원금에 같이 있다). 그때는 있던 자리에서 열어야
    «왜 딴 데로 갔지» 하지 않는다. */
@@ -8310,7 +8366,7 @@ function fillSubsidyDoc(root,f){
      ② 설립인가신청서 : 「[ ] 사내 / [V] 공동」 둘 다 적어 놓고 «고르는» 칸이다. 표만 옮긴다.
      ③ 지원사업 서식 : 공동기금 전용이라 사내 기금은 아예 오지 못한다(화면에서 이미 막는다).
    ①②③ 밖에서도, 한 덩이 안에 두 유형이 «나란히» 적혀 있으면 고르는 칸으로 보고 비껴간다. */
-var FTYPE_SKIP={charter:1,charter_sane:1,inka:1,subsidy:1};
+var FTYPE_SKIP={charter:1,charter_sane:1,inka:1,subsidy:1,dis_notice:1,dis_leave:1};
 function ftypeSkipDoc(kind){ return !!(FTYPE_SKIP[kind]||/^sub_/.test(String(kind||''))); }
 /* 두 갈래 모두 바꾸는 짝 — «긴 말부터» 본다(짧은 말이 먼저 먹으면 긴 말이 깨진다) */
 var FTYPE_PAIRS=[['공동근로복지기금협의회','사내근로복지기금협의회'],
@@ -8861,6 +8917,7 @@ function docBody(kind,f,sites){
   /* 설립 서류(_estabKind 와 같은 규칙)만 탈퇴한 곳도 — 그 밖은 뺀다 */
   if(!/^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''))) sites=sites.filter(function(s){ return s&&(s.status||'active')!=='closed'; });
   var _real=hwpFormHTML(kind,f,sites); if(_real) return _real;   // 원본 변환본 우선
+  if(kind==='dis_notice'||kind==='dis_leave') return _dsDocHTML(kind,f,sites);
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
   var note="<p class='note docnote'>※ 초안 자동생성본 — 제출 전 담당자 검토 필수. 밑줄 공란은 수기 기입. 이 창에서 바로 수정할 수 있습니다.</p>";
@@ -9723,6 +9780,7 @@ function _bizBaseLoad(f){
 }
 function _docExtra(kind,f){
   if(kind==='bizplan') return _bizBaseLoad(f);   // 장부 서식이 아니라 «앞 해 기말»만 — S._docR 는 그대로 둔다(묶음에서 다른 서식이 읽은 것을 지우지 않게)
+  if(kind==='dis_leave') return _dsLeaveLoad(f);   // 탈퇴 보고서 — 탈퇴한 사업장까지
   S._docBf=null; S._docR=null;
   if(!DOC_NEEDS_LEDGER[kind]||!f||f._sample) return Promise.resolve(null);
   var fid=S.formFund, yr=S.year;
@@ -16772,7 +16830,7 @@ function dsDocBtn(s,ctx){
   return out||'<span class="muted">—</span>';
 }
 /* 서식 자료실 «⑥ 해산·탈퇴» — 안내판(체크는 저장하지 않는다). 실제 진행은 기금의 변경 이벤트에서 */
-function dsLibHTML(cur,fundMode){
+function dsLibHTML(cur,fundMode,formRows){
   var t=(cur&&cur.fund_type==='사내')?'사내':'공동';
   var ks=Object.keys(DS_FLOWS).filter(function(k){ return DS_FLOWS[k].type===t; });
   if(ks.indexOf(S.dsFlow)<0) S.dsFlow=ks[0];
@@ -16797,7 +16855,8 @@ function dsLibHTML(cur,fundMode){
     +'<span style="flex:1"></span>'
     +(fundMode?'<button class="primary" onclick="gotoFundTab(\'events\')" style="padding:5px 11px">🔁 이 기금에서 진행(변경 이벤트) →</button>':'')+'</div>'
     +ways+'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th>#</th><th>단계</th><th>기한</th><th>근거</th><th>서식</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
-    +calc+'</div>';
+    +calc
+    +(formRows?'<h3 style="font-size:13px;margin:14px 0 4px">법정서식</h3>'+formRows:'')+'</div>';
 }
 function dsCalc(){
   var g=function(id){ var el=$(id); return el?el.value:''; }, r=withdrawShare(g('ds-v'),g('ds-c'),g('ds-t')), o=$('ds-r');
