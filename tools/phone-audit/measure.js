@@ -5,6 +5,7 @@
  * 재는 것 (모두 «사람이 폰에서 겪는 일» 로 고른 것이다):
  *   overflowX  — 페이지가 옆으로 밀린다(문서 폭 > 화면 폭)
  *   offscreen  — 화면 밖으로 나가 «못 누르는/못 읽는» 것 (옆 스크롤 상자 안은 뺀다 — 일부러 민다)
+ *                + 잘라 내는 상자(overflow:hidden) 밖으로 밀려나 못 누르는 단추(clipped)
  *   vertical   — 칸이 좁아 글자가 «한두 글자씩 세로로» 깨진 것
  *   squeezed   — 네 글자 넘는 말이 글자 세 개 폭도 안 되는 칸에 «…» 로 잘린 것
  *   wrapBtn    — 단추·탭 글자가 두 줄로 접힌 것
@@ -105,6 +106,21 @@ function __paMeasure(opts) {
     // 화면 밖 — «말이 있는» 것·누를 것만 센다. 부모가 이미 나갔으면 자식은 안 센다.
     var interactive = el.matches(TAP);
     var hasText = ownText(el).length > 0;
+    /* 잘라 내는(overflow:hidden·clip) 상자 밖으로 나간 «누를 것» — 화면 안이어도 못 누른다
+       (정부사업일정 사업장 카드의 종료·▾ 단추, 2026-10-18). 글자만 있는 것은 «…» 줄임이 흔해서 안 센다. */
+    if (interactive && r.right <= W + 2 && r.left >= -2) {
+      for (var cp = el.parentElement; cp && cp !== document.body; cp = cp.parentElement) {
+        var cox = getComputedStyle(cp).overflowX;
+        if (cox === 'auto' || cox === 'scroll') break;           // 미는 상자 — 밀면 보인다
+        if (cox === 'hidden' || cox === 'clip') {
+          var cr = cp.getBoundingClientRect();
+          if (r.right > cr.right + 2 || r.left < cr.left - 2) {
+            offscreen.push({ sel: sel(el), text: txt(el), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), clipped: true });
+          }
+          break;
+        }
+      }
+    }
     if ((interactive || hasText) && (r.right > W + 2 || r.left < -2) && r.top < out.docH) {
       if (!clippedByScroller(el) && !inFixedHidden(el)) {
         var dup = false;
