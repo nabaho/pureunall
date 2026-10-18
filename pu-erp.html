@@ -15092,8 +15092,20 @@ function Header(props){
         location.href = 'enter.html?v=' + Math.floor(Date.now()/600000);   // 10분 버킷 캐시 우회 (구버전 포털 HTML 방지)
       },
       style:{ marginLeft:'2px', padding:'5px 9px', fontSize:'13px', cursor:'pointer', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'5px', color:'#166534', fontWeight:700, flexShrink:0, lineHeight:1.2 } }, '🏠'),
+    /* 폰 전용: ⭐ 즐겨찾기 — 오른쪽 가운데 떠 있는 「즐겨찾기」 손잡이가 화면 끝까지 편 목록의 줄 끝(금액·입사일)을
+       덮었다(2026-10-18 양옆 여백 걷은 뒤). 폰에서는 그 손잡이를 숨기고 같은 목록을 여기서 연다
+       (css/pu-erp.css «.hd-fav» · 정부지원금 gov.html #mFavBtn 과 같은 길 — PuAppBar.open).
+       ⚠ 열린 채 다시 누르면 닫혀야 한다 — 목록은 바깥을 누르는 순간 먼저 닫히므로 «누르기 시작할 때» 열려 있었는지를 본다. */
+    window.IS_MOBILE && h('button', { className:'hd-fav', title:'즐겨찾기 — 다른 프로그램으로 이동',
+      onPointerDown:function(e){ e.currentTarget._wasOpen = !!document.querySelector('[data-pu-appbar-pop]'); },
+      onClick:function(e){
+        var b = e.currentTarget;
+        if(b._wasOpen){ b._wasOpen = false; return; }
+        if(window.PuAppBar && PuAppBar.open) PuAppBar.open(b);
+      },
+      style:{ marginLeft:'2px', padding:'5px 8px', fontSize:'13px', cursor:'pointer', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'5px', color:'#1e40af', fontWeight:700, flexShrink:0, lineHeight:1.2 } }, '⭐'),
     // 폰 전용: 헤더 우측이 화면 밖으로 밀려 안 보이므로, 항상 보이는 왼쪽에 새로고침·로그아웃 배치
-    window.IS_MOBILE && h('button', { title:'앱 새로 시작(최신 버전 새로고침)',
+    window.IS_MOBILE && h('button', { title:'앱 새로 시작(최신 버전 새로고침)', className:'hd-reload',
       onClick:function(){
         showConfirm('앱을 최신 버전으로 새로 시작할까요?\n(저장 안 된 입력 중인 내용은 사라질 수 있어요)', { title:'🔄 새로 시작', confirmText:'새로 시작', cancelText:'취소' })
           .then(function(ok){ if(ok){ try { location.replace(erpReloadUrl()); } catch(_){ try{ location.reload(); }catch(__){} } } });
