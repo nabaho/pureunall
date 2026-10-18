@@ -1567,6 +1567,9 @@
     /* 📄 이 회사 이알피 계약 — 회사를 고르면 그 회사 계약을 보여 주고, 누르면 계약번호·금액·기간 등이 채워진다(읽기만) */
     var ctPickBox = el('div', { 'class': 'pcf-ctpick' });
     function ctxOf() { return st.ct || host.contractCtx || null; }
+    /* 이알피 계약 연결 — 계약번호는 «번호»가 아니라 계약 ID 로 잇는다(온톨로지). 연결했으면 번호 칸은 잠그고 ID 를 보낸 기록에 함께 남긴다 */
+    function ctxRef() { var x = ctxOf(); return x && x.id ? { id: x.id, no: x.no || '' } : null; }
+    function noLocked() { var x = ctxOf(); return !!(x && x.id && x.vals && x.vals['계약번호']); }
     function drawCtPick(r, list) {
       ctPickBox.innerHTML = '';
       if (host.contractCtx || !r) return;
@@ -1584,7 +1587,8 @@
             ctPickBox.innerHTML = ''; ctPickBox.appendChild(el('div', { 'class': 'pcf-fnote', text: '계약 자료 읽는 중…' }));
             host.contractLoad(c.id).then(function (info) {
               if (st.co !== r) return;
-              st.ct = { vals: info.vals, label: '계약 ' + (info.contractNo || info.id) };
+              st.ct = { id: info.id || c.id, no: info.contractNo || c.contractNo || '', vals: info.vals, label: '계약 ' + (info.contractNo || info.id) };
+              delete st.edits['계약번호'];
               drawCtPick(r, list); drawVals();
             }, function (e) { drawCtPick(r, list); toast('⚠ 이알피 계약을 읽지 못했습니다 — ' + ((e && e.message) || e)); });
           } }, [el('b', { text: c.contractNo || '(번호 없음)' }),
@@ -1630,7 +1634,7 @@
         var Cv = CF.caseValues(st.wi);
         Object.keys(Cv).forEach(function (k) { if (Cv[k]) V[k] = Cv[k]; });
       }
-      Object.keys(st.edits).forEach(function (k) { V[k] = st.edits[k]; });
+      Object.keys(st.edits).forEach(function (k) { if (k === '계약번호' && noLocked()) return; V[k] = st.edits[k]; });
       return V;
     }
     function markersOf(it) {
@@ -1738,9 +1742,11 @@
       var shown = {};
       ks.forEach(function (x, i) {
         var k = x.key;
-        var inp = el('input', { type: 'text', 'aria-label': k, placeholder: '비워 두면 밑줄 — 손으로 적게 됩니다' });
+        var lockNo = k === '계약번호' && noLocked();
+        var inp = el('input', { type: 'text', 'aria-label': k, placeholder: k === '계약번호' ? '이알피 계약을 고르면 자동으로 — 없으면 직접 적으세요' : '비워 두면 밑줄 — 손으로 적게 됩니다' });
         inp.value = V[k] == null ? '' : V[k];
-        inp.addEventListener('input', function () { st.edits[k] = inp.value; });
+        if (lockNo) { inp.readOnly = true; inp.title = '이알피 계약에서 가져온 번호입니다 — 다른 계약이면 위에서 「풀기」 후 다시 고르세요'; inp.style.background = '#f1f5f9'; }
+        else inp.addEventListener('input', function () { st.edits[k] = inp.value; });
         var used = one ? null : el('small', { 'class': 'pcf-fu', title: x.forms.join(', '), text: x.forms.length === items.length ? '모든 양식' : x.forms[0] + (x.forms.length > 1 ? ' 외 ' + (x.forms.length - 1) : '') });
         var src = srcOf(k);
         var box = el('input', { type: 'checkbox', 'aria-label': k + ' 확인' });
@@ -2031,7 +2037,7 @@
       }
       next().then(function () {
         busy = false; refresh(); note.textContent = ''; warnOf(rs);
-        openSend({ fm: items[0].fm, title: title || '서류 묶음', V: V, row: st.co || {}, bytes: rs[0].bytes, name: names[0], isHwp: false,
+        openSend({ fm: items[0].fm, title: title || '서류 묶음', V: V, row: st.co || {}, contract: ctxRef(), bytes: rs[0].bytes, name: names[0], isHwp: false,
           extra: rs.slice(1).map(function (r, i) { return { name: names[i + 1], bytes: r.bytes }; }) }, host);
       }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
@@ -2043,7 +2049,7 @@
       busy = true; refresh(); note.textContent = '채우는 중…';
       fillOne(it, it.state === 'fail').then(function (r) {
         busy = false; refresh(); note.textContent = '';
-        openSend({ fm: it.fm, V: values(), row: st.co || {}, bytes: r.bytes, pdfSrc: r.preview || null, name: outName(it).replace(/\.[^.]+$/, '') + r.ext,
+        openSend({ fm: it.fm, V: values(), row: st.co || {}, contract: ctxRef(), bytes: r.bytes, pdfSrc: r.preview || null, name: outName(it).replace(/\.[^.]+$/, '') + r.ext,
           isHwp: !!it.src && !isXl(it) && r.ext !== '.txt' }, host);
       }).catch(function (e) { busy = false; refresh(); note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
@@ -2089,7 +2095,7 @@
     function recordGet(its, names) {
       if (!st.co || !host.mail || !host.mail.record) return;
       var kind = its.some(function (x) { return CF.SENT_KIND_OF(x.fm.groupName || '') === '계약서'; }) ? '계약서' : '제안서';
-      Promise.resolve().then(function () { return host.mail.record(st.co, values(), { kind: kind, names: names, how: '받기', await: true }); })
+      Promise.resolve().then(function () { return host.mail.record(st.co, values(), { kind: kind, names: names, how: '받기', await: true, contract: ctxRef() }); })
         .then(function () { toast('받았습니다 — 보낸 서류에 「받기」로 기록했습니다' + (kind === '계약서' ? ' · 📬 서명본 대기에 올렸습니다' : '')); },
           function (e) { toast('받았습니다 — ⚠ 기록은 남기지 못했습니다: ' + ((e && e.message) || e)); });
     }
@@ -2250,7 +2256,7 @@
       /* 공단(근로복지·건강·연금)에 낸 서류는 받는 분을 기관으로 적고, 회사 서명본을 기다리지 않는다(검토 2026-10-09) */
       var ag = CF.agencyOrgOf ? CF.agencyOrgOf(toAddr()) : '';
       /* ⚠ 메일은 이미 나갔다 — 기록·보관이 실패해도(동기 throw 포함) «보내기 실패»로 보이면 안 된다(다시 눌러 두 번 간다) */
-      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: ag || V.담당자 || '', await: !ag }); }];
+      var jobs = [function () { return host.mail.record(o.row, V, { kind: kind, names: fs.map(function (f) { return f.name; }), who: ag || V.담당자 || '', await: !ag, contract: o.contract }); }];
       if (keepCk.checked) [{ name: o.name, bytes: o.bytes }].concat(o.extra || []).forEach(function (f, i) {
         jobs.push(function () { return host.mail.keep(V, { name: f.name, size: f.bytes.length, type: '', bytes: f.bytes }, '[보냄] ' + (i ? f.name.replace(/\.[^.]+$/, '') : (o.fm.name || '서류'))); });
       });
@@ -2284,7 +2290,7 @@
         busy = false;
         if (w.confirm('엔팩스로 보내셨으면 「보낸 서류」에 기록을 남길까요? (팩스번호는 남기지 않습니다)')) {
           var kind = CF.SENT_KIND_OF(o.fm.groupName || '');
-          return host.mail.record(o.row, V, { kind: kind, names: [pdfName()], who: '(팩스)', await: true }).then(function () { note.textContent += ' · 보낸 서류에 기록했습니다'; });
+          return host.mail.record(o.row, V, { kind: kind, names: [pdfName()], who: '(팩스)', await: true, contract: o.contract }).then(function () { note.textContent += ' · 보낸 서류에 기록했습니다'; });
         }
       }).catch(function (e) { busy = false; note.textContent = '⚠ ' + ((e && e.message) || e); });
     }
@@ -2584,7 +2590,7 @@
       if (!host.contractLoad) return;
       toast('이알피 계약 자료를 읽는 중…');
       host.contractLoad(host.contract).then(function (info) {
-        host.contractCtx = { vals: info.vals, coKey: info.coKey, label: '계약 ' + (info.contractNo || info.id) };
+        host.contractCtx = { id: info.id || host.contract, no: info.contractNo || '', vals: info.vals, coKey: info.coKey, label: '계약 ' + (info.contractNo || info.id) };
         var ids = contractPick(S.forms, Object.assign({ sets: S.sets }, info));
         if (!ids.length) { drawMain(); toast('이 계약 종류의 양식이 아직 없습니다 — 계약 자료는 「찾아서 채우기」에 그대로 쓰입니다'); return; }
         var first = S.forms.filter(function (f) { return f.id === ids[0]; })[0];
