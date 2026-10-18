@@ -108,3 +108,38 @@ test('⑤ 쌓이는 폭에서만 고른 상세로 내려 준다 — 넓은 화�
   /* 붙박이 머리에 가리지 않게 상세 위에 여백 */
   phoneHas(/#coDetail,#pDetail/, /scroll-margin-top/, '내려 준 상세의 머리가 붙박이 머리에 가립니다');
 });
+
+/* ── 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」) ──
+   폰에서 «겉 여백이 PC 보다 작은가» · «안쪽 상자를 걷었는가»를 본다(값을 박지 않는다 — PC 값과 견준다). */
+function sidePad(decl) {
+  const px = (v) => { v = v.trim(); const c = v.match(/^clamp\(\s*([\d.]+)px/); if (c) return +c[1]; const m = v.match(/^([\d.]+)(px)?$/); return m ? +m[1] : NaN; };
+  let L = null, R = null;
+  const sh = decl.match(/(?:^|;)\s*padding\s*:\s*([^;!]+)/);
+  if (sh) { const v = sh[1].trim().split(/\s+(?![^(]*\))/).map(px); R = v.length === 1 ? v[0] : v[1]; L = v.length === 4 ? v[3] : R; }
+  const pl = decl.match(/padding-left\s*:\s*([^;!]+)/); if (pl) L = px(pl[1]);
+  const pr = decl.match(/padding-right\s*:\s*([^;!]+)/); if (pr) R = px(pr[1]);
+  return L === null && R === null ? null : Math.max(L || 0, R || 0);
+}
+/* 폰 덩이 가운데 «마지막» 규칙(뒤가 이긴다) · PC(덩이 밖) 규칙 — 선택자가 쉼표 묶음 안에 있어도 찾는다 */
+function lastPhone(sel, declRe) {
+  let hit = null;
+  BLOCKS.filter((b) => maxW(b.q) !== null && maxW(b.q) <= 768).forEach((b) => rules(b.body).forEach((r) => { if (r.sel.split(',').map((s) => s.trim()).includes(sel) && (!declRe || declRe.test(r.decl))) hit = r.decl; }));
+  return hit;
+}
+function pcRule(sel, declRe) {
+  let hit = null;
+  rules(TOP).forEach((r) => { if (r.sel.split(',').map((s) => s.trim()).includes(sel) && (!declRe || declRe.test(r.decl))) hit = r.decl; });
+  return hit;
+}
+function narrower(sel) {
+  const pc = pcRule(sel, /padding/), ph = lastPhone(sel, /padding/);
+  assert.ok(pc && sidePad(pc) !== null, sel + ' PC 여백 규칙을 못 찾았습니다');
+  assert.ok(ph && sidePad(ph) !== null, sel + ' 폰에서 양옆 여백을 줄이지 않았습니다 — 글이 화면 끝에서 멀리 떨어져 시작합니다');
+  assert.ok(sidePad(ph) < sidePad(pc), sel + ' 폰 양옆 여백(' + sidePad(ph) + ')이 PC(' + sidePad(pc) + ')보다 작지 않습니다');
+}
+
+test('⑥ 양옆 빈자리 — 겉 여백·목록 줄·창 여백이 PC 보다 작다', () => {
+  ['main', '.bar', '.li', '.modal', '.mhead'].forEach(narrower);
+  /* PC 는 그대로 — 덩이 밖 main 여백은 넓은 화면 값 그대로 */
+  assert.ok(sidePad(pcRule('main', /padding/)) > sidePad(lastPhone('main', /padding/)));
+});

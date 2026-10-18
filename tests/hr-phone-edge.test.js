@@ -157,7 +157,8 @@ test('환경설정(인사관리 창) — 탭이 하나뿐이면 탭 줄을 접�
 });
 
 test('증명서 폰 — 이름표+칸 «둘만» 든 줄은 이름표를 칸 왼쪽에 (한 칸 = 한 줄)', () => {
-  assert.match(SRC, /className:'cert-form'/, '증명서 입력 상자 이름표(cert-form)가 없습니다');
+  /* 이름표가 «있는가»만 본다 — 다른 이름표와 함께 붙어도 된다(폰화면관리 양옆 정리의 m-box 와 같이 산다, 2026-10-18 합침) */
+  assert.match(SRC, /className:'[^']*\bcert-form\b[^']*'/, '증명서 입력 상자 이름표(cert-form)가 없습니다');
   const m = PHONE.match(/html\.pu-app-hr \.cert-form div:has\(> label\[style\*="display: block"\]:first-child:nth-last-child\(2\)\)\s*\{([^}]*)\}/);
   assert.ok(m, '★ 이름표를 칸 왼쪽에 두는 규칙이 없습니다 — 입력 열 줄이 스무 줄이 됩니다');
   assert.match(m[1], /grid-template-columns:\s*\d+px\s+minmax\(0,\s*1fr\)/, '칸은 줄어들 수 있어야 합니다(minmax(0,1fr))');

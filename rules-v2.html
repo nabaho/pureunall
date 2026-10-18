@@ -298,7 +298,10 @@ button{font:inherit;cursor:pointer}
      · 고른 사업장의 이력은 화면을 덮는 판으로 — 「← 목록」·폰 뒤로가기로 닫는다(목록은 보던 자리 그대로).
      · 바깥 상자 좌우 여백 22px → 6px (360px 폰에서 44px 이 그냥 빈자리였다). */
 @media (max-width:900px){
-  #lib,#topics,#sites{margin:8px 6px 16px;border-radius:12px}
+  /* 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 … 좌우 옆공간 모두 채워서」) —
+     회색 바탕 위 바깥 상자(여백·테두리·둥근 모서리) 안에 흰 줄·흰 카드가 또 겹쳐, 사업장 이름이 화면 끝에서 45px 안쪽에서 시작했다.
+     폰에서는 바깥 상자를 «없는 셈»으로(여백·테두리·바탕 0) 두고, 안쪽 띠·줄이 화면 폭 그대로 한 겹이 된다. 글은 화면 끝에서 8~10px. */
+  #lib,#topics,#sites{margin:0 0 16px;border:0;border-radius:0;background:transparent}
   #sites .stbl{overflow-x:visible}
   #sites .sites{min-width:0;display:block}
   #sites .sites colgroup{display:none}
@@ -309,17 +312,17 @@ button{font:inherit;cursor:pointer}
   #sites .sites thead th:first-child{display:none}
   #sites th.ch .h{height:32px;border:1px solid #cbd5e1;border-radius:16px;background:#ffffff;padding:0 11px}
   #sites .sites tbody{display:block}
-  #sites .sites tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px 8px 0;border-bottom:1px solid #e2e8f0;background:#ffffff}
+  #sites .sites tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px;border-bottom:1px solid #e2e8f0;background:#ffffff}
   #sites .sites tbody tr.sel{background:#eff6ff}
   #sites .sites tbody tr::after{content:'';order:4;flex-basis:100%;height:0}
   #sites .sites td{display:block;padding:0;border:0;background:none;min-width:0}
   #sites .sites tr.sel td{background:none}
-  #sites .sites td:nth-child(1){order:1;flex:0 0 30px}
+  #sites .sites td:nth-child(1){order:1;flex:0 0 22px}
   #sites .sites td:nth-child(2){order:2;flex:1 1 0}
   #sites .sites td:nth-child(6){order:3;flex:none}
   #sites .sites td:nth-child(6) .btn{display:none}
   #sites .sites td:nth-child(n+3):not(:nth-child(6)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
-  #sites .sites td:nth-child(7){order:5;margin-left:38px}
+  #sites .sites td:nth-child(7){order:5;margin-left:30px}
   #sites .sites td:nth-child(8){order:6}
   #sites .sites td:nth-child(5){order:7}
   #sites .sites td:nth-child(3){order:8}
@@ -327,7 +330,7 @@ button{font:inherit;cursor:pointer}
   #sites .sites td:is(:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(8)):has(> .k.none:only-child){display:none}
   #sites .sites td.empty{flex:1 1 100%;padding:30px 10px;white-space:normal}
   #sites .sside.empty{display:none}
-  #sites .sside:not(.empty){position:fixed;inset:0;z-index:40;overflow-y:auto;overscroll-behavior:contain;padding:10px 14px 40px}
+  #sites .sside:not(.empty){position:fixed;inset:0;z-index:40;overflow-y:auto;overscroll-behavior:contain;padding:10px 10px 40px}
   #sites .sside .sback{display:inline-flex;align-items:center;min-height:36px;margin-bottom:4px;font-weight:700}
   /* 찾기칸 옆에 「새로고침」 — 찾기칸이 한 줄을 통째로 먹어 새로고침이 넷째 줄로 혼자 내려갔다 */
   #sites .flt .q{width:auto;flex:1 1 160px;min-width:0}
@@ -370,6 +373,19 @@ button{font:inherit;cursor:pointer}
   #lib .lmail tr.mail td:last-child b{min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
   #lib .lmail tr.mail td:last-child .btn{flex:none;margin-left:auto}
   #lib .lmail td.empty{flex:1 1 100%;padding:30px 10px;white-space:normal;max-width:none;margin-left:0}
+  /* 📚 조별 문안 — 문안 카드가 바깥 상자·본문 칸(좌우 22px) 안에 또 둥근 카드(14px)로 앉아 글이 44px 안쪽이었다.
+     폰에서는 본문 칸을 흰 띠 하나로 펴고, 카드는 옆 테두리·둥근 모서리·바탕을 걷어 위아래 선으로만 가른다(한 겹) */
+  #topics .main{padding:10px 0;background:#ffffff}
+  #topics .main>.head,#topics .main>.lead,#topics .main>.fail,#topics .main>.msg{margin-left:10px;margin-right:10px}
+  #topics .card{border-left:0;border-right:0;border-radius:0;background:transparent;margin-bottom:8px}
+  #topics .ch2,#topics .txt{padding-left:10px;padding-right:10px}
+  #topics .warn{padding:0 10px 10px}
+  #topics .who{padding:6px 10px 10px}
+  /* 조 주제 목록 — 장 제목 16px·주제 22px 안쪽에서 시작했다. 목록 띠에 6px 를 두고 줄 안 여백을 6px 로(글은 12px) */
+  #topics .left{padding:0 6px 8px}
+  #topics .tq{margin:10px 0;width:100%}
+  #topics .ch{padding:8px 6px 4px}
+  #topics .tp{padding:6px;border-radius:8px}
 }
 #sites .sback{display:none}
 /* ── 틀 고정 (대표 지시 2026-10-04 「틀고정」·「대시보드 고정」) ──
@@ -457,7 +473,7 @@ button{font:inherit;cursor:pointer}
 <div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=31"></script>
+<script src="js/pu-appbar.js?v=32"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>

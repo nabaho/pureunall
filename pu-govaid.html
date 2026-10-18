@@ -160,6 +160,8 @@ table.mx td.dot.yes{background:var(--green-bg)}
    ④ 한눈 표 — 왼쪽에 붙는 사업장 칸이 폭을 다 먹어 사업 칸(● 후보)이 화면 밖이었다 → 사업장 칸을 줄인다(… + 말풍선).
    ⑤ 목록과 상세가 위아래로 쌓이는 폭(860px 이하)에서는 고른 회사·사업으로 내려 준다(pickedShow) — 상세가 목록 아래
      화면 밖에 그려져, 눌러도 아무 일 없는 것처럼 보였다.
+   ⑥ 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」)
+     겉 여백 8 + 상자 안 여백 10~12px 가 쌓여 글이 화면 끝에서 17~19px 안쪽에서 시작했다 → 겉 5px, 상자 안 8px. 창은 양옆 6px.
    tests/govaid-phone.test.js 가 지킨다. */
 @media (max-width:760px){
   .top{flex-wrap:nowrap;gap:8px;padding:8px 12px}
@@ -171,7 +173,15 @@ table.mx td.dot.yes{background:var(--green-bg)}
   .tabs::-webkit-scrollbar{display:none}
   .tabs button{flex-shrink:0;padding:8px 9px}
   .tabs .starsw{flex-shrink:0;margin-left:8px;padding-right:6px}
-  main{padding:10px 8px 40px}
+  main{padding:8px 5px 40px}
+  .bar{padding:8px}
+  .li{padding:8px}
+  .co-head{padding:6px 8px}
+  .sec{padding:8px}
+  .prof{padding:8px}
+  .modal{padding:10px 6px}
+  .mhead,.mfoot{padding:10px}
+  .ed{padding:8px}
   .co-head,.li.co-row{grid-template-columns:26px 26px minmax(0,1fr) 42px 34px}
   #coList input[type=checkbox],table.t th.c input[type=checkbox],table.t td.c input[type=checkbox]{width:24px;height:24px;margin:0}
   button.star{min-width:26px;min-height:26px;font-size:16px}
@@ -292,7 +302,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=31"></script>
+<script src="js/pu-appbar.js?v=32"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
 <script>

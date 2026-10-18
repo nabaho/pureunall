@@ -175,11 +175,11 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=21">
+<link rel="stylesheet" href="css/pu-erp.css?v=22">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=31"></script>
+  <script src="js/pu-appbar.js?v=32"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -26360,7 +26360,7 @@ function ContractManagement(props){
       return h('div', { key:c.id,
         onClick:function(){ openEdit(c); },
         style:{ background: justMoved ? '#eff6ff' : '#fff', border:'1px solid '+(justMoved?'#2563eb':'#e2e8f0'), borderRadius:'6px',
-          padding:'5px 8px', marginBottom:'4px', cursor:'pointer', minWidth:0, position:'relative' } },
+          padding:'5px 7px', marginBottom:'4px', cursor:'pointer', minWidth:0, position:'relative' } },
         // 1행: 배지 · 회사명 · 금액
         h('div', { style:{ display:'flex', alignItems:'center', gap:'5px', minWidth:0 } },
           kindsArr.length > 0 && h('span', { style:{ background:mk0.bg||'#f8fafc', color:mk0.color, fontSize:'9.5px', padding:'1px 6px', borderRadius:'9px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, border:'1px solid '+mk0.color+'33' } },
@@ -26643,9 +26643,12 @@ function ContractManagement(props){
           onDragOver:onDragOver(s.v),
           onDragLeave:onDragLeave,
           onDrop:onDrop(s.v),
+          /* 폰에서는 칸 상자를 걷는다 (폰화면관리 2026-10-18 「양옆 빈공백」) — 칸(회색 상자) 안에 카드(흰 상자)가
+             다시 들어 있어 글이 화면 끝에서 54px 안쪽에서 시작했다. 폰은 머리띠(상담접수·협의·확정)만 남기고
+             카드가 화면 폭을 쓴다. 끌어다 놓기(isOver)는 폰에 없으니 넓은 화면 모양 그대로 둔다. */
           style:{
-            background: isOver ? s.bg : '#f8fafc',
-            border: isOver ? '2px dashed '+s.color : '1px solid #e2e8f0',
+            background: isOver ? s.bg : (window.innerWidth<=768 ? 'transparent' : '#f8fafc'),
+            border: isOver ? '2px dashed '+s.color : (window.innerWidth<=768 ? 'none' : '1px solid #e2e8f0'),
             borderRadius:'8px',
             minHeight: window.innerWidth<=768 ? '60px' : '200px',
             minWidth:0, overflow:'hidden',   // 폰: 메모(nowrap)가 컬럼을 화면보다 넓게 밀어 가로 잘리던 문제 차단
@@ -26689,7 +26692,7 @@ function ContractManagement(props){
           // 걸린 조건 (그 칸 것만)
           h(FunnelChips, { picks: stPicks(s.v), onClear: function(){ stClear(s.v); } }),
           // 카드 영역 (단독 보기 시 카드는 가로 한 줄 레이아웃 - CSS로 반응형)
-          h('div', { style:{ padding:'10px' } },
+          h('div', { style:{ padding: window.innerWidth<=768 ? '6px 0 2px' : '10px' } },
             cards.length === 0
               ? h('div', { style:{ color:'#cbd5e1', fontSize:'12px', textAlign:'center', padding:'16px 10px', border:'1px dashed #e2e8f0', borderRadius:'6px' } }, '없음')
               : (function(){
@@ -30310,7 +30313,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               var typeColors = { '자문':['#eff6ff','#1e40af'], '급여':['#f0fdf4','#166534'], '노조':['#eff6ff','#2563eb'], '기금':['#fffbeb','#854d0e'] };
               var tc = typeColors[co.typeCode||'자문'] || typeColors['자문'];
               var picked = selIds.has(co.id);
-              return h('div', { key:co.id, onClick:function(){setDetailModal(co);},
+              return h('div', { key:co.id, className:'m-card', onClick:function(){setDetailModal(co);},
                 style:{ background: picked?'#eff6ff':(suspended?'#fffbeb':'#fff'), border:'1px solid '+(picked?'#2563eb':(suspended?'#fde68a':(expiring?'#fbbf24':'#e2e8f0'))),
                   borderLeft:'4px solid '+(suspended?'#fbbf24':(expiring?'#fbbf24':tc[1])),
                   borderRadius:'8px', padding:'8px 12px 8px 6px', cursor:'pointer',
@@ -34192,7 +34195,7 @@ function CaseManagement(props){
                 var dueDiff = Math.floor((new Date(c.dueDate)-new Date())/(1000*60*60*24));
                 if(dueDiff < 7) dueWarn = true;
               }
-              var _card = h('div', { key:c.id, onClick:function(){ setDetailModal(c); },
+              var _card = h('div', { key:c.id, className:'m-card', onClick:function(){ setDetailModal(c); },
                 style:{ background:'#fff', border:'1px solid #e2e8f0',
                   borderLeft:'4px solid '+(stColor||'#94a3b8'),
                   borderRadius:'8px', padding:'10px 12px', cursor:'pointer',
@@ -52037,7 +52040,8 @@ function FinanceLedger(props){
   var _ldFill = useFillHeight();
   // maxHeight 로 둔다 — 목록이 짧으면 빈 상자가 크게 남지 않게
   var _ldBox={overflow:'auto',maxHeight:(_ldFill.max || 'calc(100vh - 330px)'),minHeight:'240px',
-    border:'1px solid #f8fafc',borderRadius:'6px'};
+    /* 폰: 테두리를 걷는다 — 줄(카드)이 이미 제 바탕색으로 갈리고, 상자 안 상자가 되어 양옆이 한 겹 더 좁아졌다(폰화면관리 2026-10-18) */
+    border: window.innerWidth <= 768 ? '0' : '1px solid #f8fafc',borderRadius:'6px'};
 
   /* 통장과 카드가 한 통에 쌓이므로, 지금 고른 종류의 것만 보여준다.
      섞어 보이면 같은 달에 통장 306건과 카드 200건이 뒤엉켜 무엇이 무엇인지 알 수 없다.
@@ -53252,7 +53256,8 @@ function FinanceLedger(props){
         borderRadius:'14px',padding:'3px 10px',whiteSpace:'nowrap'}}, txt);
   }
 
-  return h('div',{style:{padding:'0 2px'}},
+  /* 폰 좌우 6px — 이 화면은 .page 밖이라 본문 겉 여백(지금 0)이 곧 화면 끝 여백이다(폰화면관리 2026-10-18) */
+  return h('div',{style:{padding: window.innerWidth <= 768 ? '0 6px' : '0 2px'}},
 
     /* ══ 입금 사업장 확인 창 — 촘촘하게 (대표 지시 2026-10-17 「팝업창 너무 크게 나온다」) ══
        폰에서 한 건이 화면 ⅓(약 330px)을 먹어 83건 가운데 한 건 반만 보였다. 까닭이 셋이었다 —
@@ -57812,7 +57817,7 @@ function IncomePendingTab(props){
             var fee = p.kind==='contract'||p.kind==='retainer';
             return h('div', { key:p.itemId+'-'+p.kind,
                 style:{ background:(isClosed||ci.closed)?'#fffbeb':'#fff', border:'1px solid #e2e8f0', borderRadius:'8px',
-                  padding:'6px 8px', minWidth:0 } },
+                  padding:'6px 7px', minWidth:0 } },
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 } },
                 h('span', { style:{ width:'22px', textAlign:'right', color:'#94a3b8', fontSize:'12px', fontFamily:'monospace',
                   fontVariantNumeric:'tabular-nums', flexShrink:0 } }, idx + 1),
@@ -57825,7 +57830,7 @@ function IncomePendingTab(props){
               ),
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0, marginTop:'3px' } },
                 h('span', { style:{ background:fee?'#eff6ff':'#fffbeb', color:fee?'#1e40af':'#854d0e', padding:'1px 6px',
-                  borderRadius:'8px', fontSize:'12px', fontWeight:700, flexShrink:0, whiteSpace:'nowrap', marginLeft:'28px' } }, p.kindLabel),
+                  borderRadius:'8px', fontSize:'12px', fontWeight:700, flexShrink:0, whiteSpace:'nowrap' } }, p.kindLabel),
                 h('span', { title:info.join(' · ') + (hit ? '\n통장 적요 「' + (hit.row.memo || '-') + '」' : ''),
                   style:{ flex:1, minWidth:0, fontSize:'12px', color:ok?'#166534':'#64748b', whiteSpace:'nowrap',
                     overflow:'hidden', textOverflow:'ellipsis' } }, info.join(' · ')),
@@ -64450,7 +64455,7 @@ function PersonalCalendar(props){
 
   var DOW = ['일','월','화','수','목','금','토'];
 
-  return h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding: window.IS_MOBILE?'8px':'12px',display:'flex',flexDirection:'column',gap: window.IS_MOBILE?'6px':'10px'}},
+  return h('div',{style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'10px',padding: window.IS_MOBILE?'8px 7px':'12px',display:'flex',flexDirection:'column',gap: window.IS_MOBILE?'6px':'10px'}},   // 폰 좌우 7px — 글이 화면 끝 14px 안쪽(폰화면관리 2026-10-18)
     // 헤더
     h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between'}},
       h('div',{style:{fontSize:'13px',fontWeight:700,color:'#1e293b'}},'📅 내 캘린더'),
@@ -66175,7 +66180,7 @@ function MyDeskV2(props){
         ),
         // (크기 조절 툴바 제거)
         // 🏖️ 내 휴가 잔여 — 캘린더 위로 이동됨 (SEQ127). 오른쪽 열이 좁아 컴팩트 표시
-        myLeave && h('div', { style:{ marginBottom:'10px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding:'7px 10px' } },
+        myLeave && h('div', { style:{ marginBottom:'10px', background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', padding: window.IS_MOBILE ? '7px 7px' : '7px 10px' } },   // 폰 좌우 7px(폰화면관리 2026-10-18)
           h('div', { style:{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'5px' } },
             h('div', { style:{ fontSize:'12px', fontWeight:700, color:'#2563eb' } },
               '🏖️ 내 휴가 잔여 (' + myLeave.year + '년)'
@@ -67601,7 +67606,7 @@ function Certificate(){
       // ── 좌: 발급 폼 ──
       h('div', null,
         // 입력 폼 — cert-form: 인사관리 폰에서 이름표를 칸 왼쪽에 붙인다(css/pu-erp.css)
-        h('div', { className:'cert-form', style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px', marginBottom:'10px' } },
+        h('div', { className:'m-box cert-form', style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px', marginBottom:'10px' } },
           /* ★ 세로로 쌓는다 — 왼쪽 칸이 좁아 가로로 두면 글이 잘린다 */
           h('div', { style:{ display:'grid', gridTemplateColumns:'1fr', gap:'6px' } },
             h('div', null,
@@ -69058,14 +69063,18 @@ function MonthClose(props){
 
     steps.length === 0
       ? h('div', { style:{ padding:'20px', textAlign:'center', color:'#94a3b8', fontSize:'12.5px' } }, '월을 선택하세요')
-      : h('div', { style:{ border:'1px solid '+C.line, borderRadius:'8px', overflow:'hidden' } },
+      /* 폰: 바깥 상자의 양옆 테두리·둥근 모서리를 걷어 단계 줄이 화면 폭을 쓴다 (폰화면관리 2026-10-18
+         「양옆 빈공백」 — 상자 안에 색 줄이 다시 들어 있어 글이 화면 끝에서 53px 안쪽에서 시작했다). 넓은 화면은 그대로. */
+      : h('div', { style: window.innerWidth <= 768
+            ? { borderTop:'1px solid '+C.line, borderBottom:'1px solid '+C.line, overflow:'hidden' }
+            : { border:'1px solid '+C.line, borderRadius:'8px', overflow:'hidden' } },
         steps.map(function(st, i){
           // 지금 차례 = 잠기지 않았고 앞이 막지 않는 첫 단계
           var isNow = st.canLock && !steps.slice(0,i).some(function(p){ return p.canLock; });
           var bg = st.locked ? '#fff' : isNow ? C.nowBg : '#f8fafc';
           return h('div', { key:st.key, style:{ background:bg, borderTop: i ? '1px solid '+C.line : 'none',
-            padding:'11px 13px' } },
-            h('div', { style:{ display:'flex', alignItems:'center', gap:'11px', flexWrap:'wrap' } },
+            padding: window.innerWidth <= 768 ? '10px 8px' : '11px 13px' } },
+            h('div', { style:{ display:'flex', alignItems:'center', gap: window.innerWidth <= 768 ? '8px' : '11px', flexWrap:'wrap' } },
               // 번호
               h('span', { style:{ width:'22px', height:'22px', borderRadius:'50%', flexShrink:0,
                 background: st.locked ? C.okBg : isNow ? '#fff' : '#f8fafc',
@@ -69196,7 +69205,7 @@ function FinanceAuto(props){
   }
   var head = h('tr', null, ['☐', '번호', '무엇', '출금일', '더빌 회원명', '금액', '이알피에서 본 것', '할 일'].map(function(t){ return h('th', { key:t, style:th }, t); }));
   var list = faTab === 'fail' ? fails : (faTab === 'auto' ? autos : check);
-  return h('div', { style:{ padding:'14px' } },
+  return h('div', { style:{ padding: window.innerWidth <= 768 ? '6px' : '14px' } },   // 폰 6px — .page 밖 화면이라 제 여백이 곧 화면 끝 여백(폰화면관리 2026-10-18)
     h('div', { style:{ display:'flex', gap:'16px', alignItems:'center', flexWrap:'wrap', padding:'9px 12px', borderRadius:'8px',
       background: st.needLogin ? '#fef2f2' : '#eff6ff', border:'1px solid ' + (st.needLogin ? '#fecaca' : '#bfdbfe'), fontWeight:700 } },
       st.needLogin ? h('span', { style:{ color:'#dc2626' } }, noTab ? 'Aside 를 켜고 더빌에 로그인해 주세요 (더빌 탭이 없음)' : '더빌 로그인이 풀렸습니다 — Aside 에서 로그인해 주세요') : null,
@@ -70216,7 +70225,7 @@ function ProjectManagementShared(props){
               var st = it.status||'progress';
               var stColor = st==='closed'?'#16a34a':st==='pending'?'#d97706':'#1e40af';
               var stLabel = st==='closed'?'종료':st==='pending'?'대기':'진행중';
-              var _card = h('div', { key:it.id,
+              var _card = h('div', { key:it.id, className:'m-card',
                 style:{ background:'#fff', border:'1px solid #e2e8f0',
                   borderLeft:'4px solid '+stColor,
                   borderRadius:'8px', padding:'10px 12px',
@@ -71541,7 +71550,7 @@ function ClosedManagement(){
         allRows.length === 0
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } }, '등록된 데이터가 없습니다')
           : P.paged.map(function(row, idx){
-              return h('div', { key:idx,
+              return h('div', { key:idx, className:'m-card',
                 style:{ background:'#fff', border:'1px solid #e2e8f0',
                   borderLeft:'4px solid '+(row._kindColor||'#94a3b8'),
                   borderRadius:'8px', padding:'10px 12px',
@@ -77391,7 +77400,7 @@ function AttendanceManagement(){
         renderPersonCalendar()
       ),
       // 입력폼 (개별 직원 선택 시만)
-      selUser && h('div', {style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'8px',padding:'10px',marginBottom:'6px'}},
+      selUser && h('div', {className:'m-box', style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'8px',padding:'10px',marginBottom:'6px'}},
         // 직원명 + 월
         h('div', {style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'8px'}},
           h('span', {style:{fontWeight:700,fontSize:'13px',color:'#1e293b'}}, selUser.name),
@@ -79709,9 +79718,10 @@ function LeaveManagement(){
       _isAdminView && h('div',null,
         h('div',{style:{fontWeight:700,fontSize:'15px',color:'#1e293b',marginBottom:'6px'}},'👥 직원별 연차 현황'),
         h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'13.5px',marginBottom:'5px',boxSizing:'border-box'}}),
-        h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
-          /* 폰은 칸이 다섯뿐이라 화면에 다 든다 — 폰 공통 규칙(.page table → display:block, 옆으로 밀기)이
-             표를 제 글자 폭으로 줄여 오른쪽 1/4 이 비었다. 이 표만 다시 «표»로 펴 폭을 채운다 */
+        /* 폰: 양옆 테두리를 걷는다 — 줄 바탕색이 이미 줄을 가르고, 상자 안 상자가 되어 한 겹 더 좁았다(폰화면관리 2026-10-18) */
+        h('div',{style:_lvM ? {borderTop:'1px solid #e2e8f0',borderBottom:'1px solid #e2e8f0',overflow:'hidden'} : {border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
+          /* 폰: display:table — 폰 공통 «.page table{display:block}» 이 표를 글자 폭으로 줄여 오른쪽 119px 이 비었다.
+             이 표는 폰에서 한 줄 다섯 칸이라 넘치지 않는다(바깥 상자는 overflow:hidden). */
           h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'15px',display:_lvM?'table':undefined}},
             h('thead',null,
               h('tr',null,
@@ -85555,7 +85565,7 @@ function PayrollIrregular(props){
               '등록된 항목이 없습니다.')
           : viewRecs.map(function(r){
               var clr = typeColor(r.type);
-              return h('div', { key:r.id,
+              return h('div', { key:r.id, className:'m-card',
                 style:{ background:'#fff', border:'1px solid #e2e8f0', borderLeft:'4px solid '+clr,
                   borderRadius:'8px', padding:'10px 12px' } },
                 // 줄1: 유형배지 + 이름 + 상태
@@ -87184,7 +87194,7 @@ function StaffRoster(){
               var isLawyer = roleOf(u) === 'lawyer';   // 노무사(P·T)·직원(A·T) — 사번이 아니라 roleOf 로 가른다
               var st1 = es1==='leave'?['휴직','#fffbeb','#854d0e']:es1==='retired'?['퇴직','#fef2f2','#dc2626']:es1==='scheduled'?['입사예정','#f0fdf4','#16a34a']:null;
               return h('div', { key:u.sid, onClick:function(){ setDetailModal(u); },
-                style:{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 10px', borderBottom:'1px solid #e2e8f0', cursor:'pointer', whiteSpace:'nowrap', fontSize:'13.5px' } },
+                style:{ display:'flex', alignItems:'center', gap:'6px', padding:'8px 7px', borderBottom:'1px solid #e2e8f0', cursor:'pointer', whiteSpace:'nowrap', fontSize:'13.5px' } },   // 폰 줄 — 좌우 7px (화면 폭을 쓴다, 폰화면관리 2026-10-18)
                 h('span', { style:{ fontFamily:'monospace', fontSize:'13.5px', color:'#94a3b8', width:'42px', flexShrink:0 } }, u.sid),
                 h('span', { style:{ fontWeight:800, color:'#1e293b', flexShrink:0 } }, u.name),
                 isLawyer && h('span', { title:'노무사', style:{ fontSize:'13px', flexShrink:0 } }, '⚖️'),

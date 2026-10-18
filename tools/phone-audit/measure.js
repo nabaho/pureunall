@@ -196,6 +196,42 @@ function __paMeasure(opts) {
   out.smallInput = smallInput.slice(0, 10); out.smallInputN = smallInput.length;
   out.fixed = fixed.slice(0, 15);
   out.fixedCoverPct = Math.round(100 * fixedArea / (W * H));
+  /* 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백 … 좌우 옆공간 모두 채워서」)
+     ① 글 시작 — 첫 화면 안에서 «말이 있는» 맨 안쪽 조각들이 화면 왼쪽 끝에서 몇 px 떨어져 시작하나(아래 1/10 값)
+     ② 글 끝 여백 — 오른쪽 끝 단추·값이 화면 오른쪽 끝에서 몇 px 떨어져 끝나나(아래 1/10 값)
+     ③ 상자 겹 — 배경·테두리·그림자가 있는 상자가 몇 겹 겹쳐 그 안에 글이 있나(겹마다 안쪽 여백이 쌓인다)
+     떠 있는 것·머리줄(맨 위 60px)은 뺀다 — 목록·본문의 양옆을 본다. */
+  (function () {
+    var lefts = [], rights = [], depths = [];
+    function boxed(e) {
+      var c = getComputedStyle(e);
+      var bg = c.backgroundColor && !/rgba\(0, 0, 0, 0\)|transparent/.test(c.backgroundColor);
+      var bd = parseFloat(c.borderLeftWidth) > 0 || parseFloat(c.borderRightWidth) > 0;
+      var sh = c.boxShadow && c.boxShadow !== 'none';
+      var r = e.getBoundingClientRect();
+      return (bg || bd || sh) && r.width > W * 0.5 && r.width < W + 2;
+    }
+    all.forEach(function (el) {
+      if (el.closest('script,style,svg,noscript,template')) return;
+      var ot = ownText(el);
+      if (ot.length < 2 && !el.matches('button,input,select,textarea')) return;
+      var r = el.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0 || r.top < 60 || r.top > H) return;
+      /* 떠 있는 «작은» 것(단추·띠) 안은 뺀다. 화면 거의 전부를 덮는 fixed 덩어리(메일 .dmm 처럼 앱 몸통이 fixed)는 본문이다 */
+      for (var e = el; e && e !== document.body; e = e.parentElement) {
+        if (getComputedStyle(e).position !== 'fixed') continue;
+        var fr = e.getBoundingClientRect();
+        if (fr.width * fr.height < W * H * 0.6) return;
+      }
+      if (r.left < -1 || r.right > W + 1) return;
+      lefts.push(r.left); rights.push(W - r.right);
+      var d = 0; for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) if (boxed(p)) d++;
+      depths.push(d);
+    });
+    function p10(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); return Math.round(a[Math.floor(a.length * 0.1)]); }
+    function med(a) { if (!a.length) return null; a = a.slice().sort(function (x, y) { return x - y; }); return a[Math.floor(a.length / 2)]; }
+    out.sideL = p10(lefts); out.sideR = p10(rights); out.boxDepth = med(depths);
+  })();
   out.gate = !!document.getElementById('pu-gate') && shown(document.getElementById('pu-gate'));
   out.title = document.title;
   out.bodyText = (document.body ? document.body.innerText : '').replace(/\s+/g, ' ').slice(0, 300);

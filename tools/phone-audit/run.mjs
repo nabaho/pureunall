@@ -160,7 +160,7 @@ async function auditOne(browser, base, app, width) {
 function line(r) {
   const m = r.m || {};
   const n = (v, w) => String(v ?? '?').padStart(w);
-  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}%${m.gate ? ' · ⚠잠금화면' : ''}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
+  return `${(r.key + (r.view === 'home' ? '' : ':' + r.view)).padEnd(22)} ${String(r.width).padEnd(4)} 옆넘침 ${n(m.overflowX, 4)} · 화면밖 ${n(m.offscreenN, 3)} · 세로깨짐 ${n(m.verticalN, 3)} · 짓눌림 ${n(m.squeezedN, 3)} · 두줄단추 ${n(m.wrapBtnN, 3)} · 작은단추 ${n(m.smallTapN, 3)} · 작은입력 ${n(m.smallInputN, 2)} · 떠있음 ${n(m.fixedCoverPct, 3)}% · 양옆 ${m.sideL ?? '?'}/${m.sideR ?? '?'}px·겹${m.boxDepth ?? '?'}${m.gate ? ' · ⚠잠금화면' : ''}${r.navErr ? ' · ⚠' + r.navErr : ''}${r.errors.length ? ' · 오류' + r.errors.length : ''}`;
 }
 
 async function main() {

@@ -40,7 +40,7 @@
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-whoami.js?v=3"></script>
-<script src="js/pu-appbar.js?v=31"></script>
+<script src="js/pu-appbar.js?v=32"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script>
 <script>
@@ -1515,6 +1515,28 @@ table.list tr:hover td{background:#fcfcfd}
   #main[data-tab=cfg] .arow2::after{content:"";order:3;flex:0 0 100%;height:0}
   #main[data-tab=cfg] .arow2>.when{order:4;padding-left:26px}
   #main[data-tab=cfg] .arow2>.st{order:5;flex:1 1 0}
+
+  /* ── 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」) ──
+       글이 화면 끝에서 19~52px 안쪽에서 시작·끝났다(411px 실측) — 겉 여백(.wrap) + 상자 테두리 + 상자 안 여백이 겹쳤다.
+       폰에서는 상자를 화면 폭 그대로 펴고(옆 테두리·둥근 모서리를 걷어 위아래 줄로만 가른다), 상자 안 여백은 끝에서 10px.
+       ⚠ 위아래 테두리는 남긴다 — 상자와 상자 사이를 가르는 것은 그 줄이다. */
+  .wrap{padding-left:0;padding-right:0}
+  #main .box,#main .note,#main .pv,
+  #main .hdbar,#main .ways,#main .jartabs,#main .jarpanel,
+  #main .subtabs.bar,#main .chips.tight.filt{border-left-width:0;border-right-width:0;border-radius:0}
+  #main .pad,#main .box>h3{padding-left:10px;padding-right:10px}
+  #main table.list tr{padding-left:10px;padding-right:10px}
+  /* 보낸 결과 머리(회차 고르기·숫자 칩)는 상자 밖이라 겉 여백(.wrap)을 걷으면 끝에 붙는다 — 제 여백을 준다 */
+  #main[data-tab=res] .res-head{padding-left:10px;padding-right:10px}
+  #main[data-tab=res] table.list{border-left-width:0;border-right-width:0;border-radius:0}
+  /* 보낸 결과 줄 — 비어 접힌 칸(열람·클릭 없음)도 칸 사이 틈(6px)은 남아, 상태 칩이 오른쪽 끝에서 18px 더 안으로 밀렸다.
+     틈을 칸 «앞 여백»으로 옮겨, 보이는 칸만 띄운다 */
+  #main[data-tab=res] table.list>tbody>tr:not(:has(>td[colspan])){column-gap:0}
+  #main[data-tab=res] tr>td:nth-child(2),#main[data-tab=res] tr>td:nth-child(3){padding-left:6px}
+  #main[data-tab=res] tr>td:nth-child(5),#main[data-tab=res] tr>td:nth-child(6),#main[data-tab=res] tr>td:nth-child(7){margin-left:6px}
+  #main[data-tab=res] tr.open>td:nth-child(4){padding-left:6px}
+  /* 이번 회차 머리 덩이 — 폰에서는 붙지 않으므로(⑩) 페이지와 같은 바탕을 한 번 더 깔 까닭이 없다(상자 한 겹) */
+  .colL>.nowtop{background:transparent}
 }
 /* ▲▲ 폰 콤팩트 끝 ▲▲ */
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──

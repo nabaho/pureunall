@@ -130,8 +130,16 @@ main{padding:12px 16px 40px}
   .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
   .tabs::-webkit-scrollbar{display:none}
   .tabs button{flex:0 0 auto;padding:8px 6px;font-size:13px}
-  main{padding:10px 10px 60px}
-  .bar{padding:8px}
+  /* 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다, 좌우 옆공간 모두 채워서」) —
+     겉 여백(main 10px) + 상자 테두리 + 상자 안 여백이 겹쳐 글이 화면 끝에서 17~25px 에서 시작했다.
+     폰에서는 겉 여백을 없애고 상자는 화면 폭 그대로(옆 테두리·둥근 모서리 없이 위아래 줄로만 가른다), 안쪽 여백 하나(10px)만 남긴다 */
+  main{padding:8px 0 60px}
+  .card{border-left:0;border-right:0;border-radius:0}
+  .cards{gap:8px}
+  .cardp{padding:10px}
+  .sec{padding:10px 10px 2px}
+  #pane-archive>.hint{padding:0 10px}
+  .bar{padding:8px 10px}
   .bar .hint{flex:1 1 0;min-width:0}
   .bulk{flex-wrap:wrap}
   /* 표 → 줄마다 카드 (머리줄 th 는 접는다 — 광고 표만 ☐(보이는 것 모두)·번호를 남긴다) */
@@ -140,7 +148,7 @@ main{padding:12px 16px 40px}
   .t[data-name=ads] thead{display:block}
   .t[data-name=ads] thead tr{display:flex;align-items:center}
   .t[data-name=ads] thead th{display:none}
-  .t[data-name=ads] thead th.c{display:block;width:36px;padding:6px 0}
+  .t[data-name=ads] thead th.c{display:block;width:36px;padding:6px 0;margin-left:4px}
   .t[data-name=ads] thead th.n{display:block;width:auto;text-align:left;padding:6px 0}
   .t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;position:relative;padding:7px 10px;border-bottom:1px solid var(--line)}
   .t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
@@ -150,9 +158,9 @@ main{padding:12px 16px 40px}
   .t[data-name] tbody td[data-k="btn"],.t[data-name] tbody td[data-k="act"]{order:8}
   .t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
   /* 광고 */
-  .t[data-name=ads] tbody tr{padding-left:66px;min-height:46px}
-  .t[data-name=ads] tbody td.c{position:absolute;left:0;top:7px;width:36px;text-align:center}
-  .t[data-name=ads] tbody td.n{position:absolute;left:36px;top:10px;width:24px;text-align:right}
+  .t[data-name=ads] tbody tr{padding-left:70px;min-height:46px}
+  .t[data-name=ads] tbody td.c{position:absolute;left:4px;top:7px;width:36px;text-align:center}
+  .t[data-name=ads] tbody td.n{position:absolute;left:40px;top:10px;width:24px;text-align:right}
   .t[data-name=ads] tbody td[data-k="mv"]{order:4}
   .t[data-name=ads] tbody td[data-k="mv"] button{padding:4px 9px}
   .t[data-name=ads] tbody td[data-k="en"]{order:4}
@@ -238,7 +246,7 @@ main{padding:12px 16px 40px}
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=31"></script>
+<script src="js/pu-appbar.js?v=32"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
 <script>

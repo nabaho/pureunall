@@ -1145,9 +1145,11 @@
   #sideveil{display:none}
   @media (max-width:760px){
     #side{display:flex;width:238px;height:100dvh;overflow-y:auto;padding:14px 10px;
-      transform:translateX(-100%);transition:transform .2s ease;z-index:120;
-      box-shadow:0 0 40px rgba(15,32,60,.22)}
+      transform:translateX(-100%);transition:transform .2s ease;z-index:120}
+    /* 그림자는 «열렸을 때만» — 닫힌 서랍의 40px 그림자가 화면 왼쪽 끝에 회색 띠로 늘 비쳐
+       왼쪽 빈자리를 한 겹 더 만들었다(2026-10-18 양옆 빈공백) */
     body.sideopen #side{transform:none}
+    body.sideopen #side{box-shadow:0 0 40px rgba(15,32,60,.22)}
     #sideveil{position:fixed;inset:0;background:rgba(15,32,60,.42);z-index:110}
     body.sideopen #sideveil{display:block}
     #menubtn{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;
@@ -1308,6 +1310,59 @@
     #mytbl th,#mytbl td{padding:5px 6px;font-size:11.5px}
     #mytbl .co{font-weight:700;font-size:12.5px}
   }
+/* ══ 📱 폰: 양옆 빈자리를 걷는다 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서」) ══
+   화면 끝 ~ 글 사이가 «겉 여백 12 + 상자 테두리 1 + 상자 안 여백 10~18»로 겹겹이 쌓여 411px 폰에서
+   글이 23~42px 안쪽에서 시작했다(치울 것·종료는 상자 안 상자라 더 깊었다).
+   ① 겉 여백은 8px — 머리줄·안내 글은 화면 끝에서 8px.
+   ② 맨 위 상자(목록·표·카드)는 «화면 폭 다» — 옆 테두리·둥근 모서리를 걷고 위아래 줄로만 가른다.
+      상자 안 여백은 10px 라 글은 화면 끝에서 10px.
+   ③ 상자 안의 상자(치울 것의 도구줄·표, 보드의 칸)는 바탕·옆 테두리를 걷어 한 겹으로.
+   ④ 창·서랍은 화면 전체를 쓴다.
+   ⚠ 이 블록은 맨 아래에 둔다 — 위의 폰 규칙들(#app 12px · 업무량 카드 · 서랍 18px)을 «뒤에서» 덮는다.
+   ⚠ 넓은 화면은 한 글자도 안 바뀐다(560px 아래에서만 산다). */
+@media (max-width:560px){
+  #app{padding:10px 8px 90px}
+  #app > .phbar,#app > .phl,#app > .panel,#app > .hocard,#app > .tlwrap,#app > .histbanner,
+  #app > .wsfold,#app > .tmwrap,#app > .bdwrap{margin-left:-8px;margin-right:-8px;
+    border-left-width:0;border-right-width:0;border-radius:0}
+  #app > .phbar,#app > .panel:not(.tbl),#app > .hocard,#app > .histbanner,#app > .wsfold{padding-left:10px;padding-right:10px}
+  #app > .hocard .hct{margin-left:-10px;margin-right:-10px;padding-left:10px;padding-right:10px;border-radius:0}
+  /* 사업장으로 묶은 줄의 들여쓰기(30px)도 걷는다 — 회색 머리줄이 이미 «어느 회사 밑»인지 가른다 */
+  #app > .phl .phr.ind{padding-left:10px}
+  /* 팀 현황판 — 사람 칸도 화면 폭 다(줄로 가른다) */
+  #app > .tmwrap{gap:6px}
+  #app > .tmwrap .tmc{border-left-width:0;border-right-width:0;border-radius:0;padding-left:10px;padding-right:10px}
+  /* 업무량 카드 — 둥근 카드를 화면 폭 줄로 */
+  #stattbl tr{border-left-width:0;border-right-width:0;border-radius:0}
+  /* 치울 것 — 상자(패널) 안의 도구줄·표는 바탕·옆 테두리를 걷어 한 겹으로, 표는 패널 끝까지 */
+  #app > .panel .wsbar{background:transparent;border-left-width:0;border-right-width:0;border-radius:0;padding-left:0;padding-right:0}
+  #app > .panel .panel.tbl{margin-left:-10px;margin-right:-10px;background:transparent;
+    border-left-width:0;border-right-width:0;border-radius:0}
+  /* 보드 — 폰에서는 상태 칸을 «위아래로» 쌓는다. 옆으로 258px 칸을 밀어 보면 오른쪽 절반이 늘 비었다.
+     칸 상자는 걷고(머리줄만 남김) 카드가 화면 폭을 쓴다. */
+  #app > .bdwrap{flex-direction:column;align-items:stretch;overflow-x:visible;padding:2px 4px 10px;gap:4px}
+  #app > .bdwrap .bdcol{flex:none;max-height:none;background:transparent;border:0;border-radius:0}
+  #app > .bdwrap .bdhd{padding:7px 6px 5px}
+  #app > .bdwrap .bdbody{padding:0;overflow:visible}
+  #app > .bdwrap .bdcard{padding-left:8px;padding-right:8px}
+  /* 타임라인 — 업무 이름 칸은 정한 폭에서 … 로 줄인다(긴 이름 줄만 칸이 넓어져 날짜 줄이 들쭉날쭉했다) */
+  #app > .tlwrap .tlname{min-width:0}
+  /* 빠른 기록 바 — 양옆 6px */
+  #qwrap{left:6px;right:6px}
+  #qbar{padding-left:10px;padding-right:10px}
+  /* 업무 서랍 — 화면 전체. 칸(상자)은 옆 테두리를 걷어 서랍 폭 다 */
+  #drawer{width:100%;max-width:100%;border-left:0}
+  #drawer .dh,#feed{padding-left:12px;padding-right:12px}
+  #drawer .dbox{margin-left:0;margin-right:0;border-left-width:0;border-right-width:0;border-radius:0}
+  #drawer .dbox .bh,#drawer .dbox .bb{padding-left:12px;padding-right:12px}
+  #drawer .dfoldx,#drawer .dsec,#drawer .dfmore,#drawer .dcase,#drawer .dbody > .nextbox,
+  #drawer .recvbtn,#drawer .mlkfoot{margin-left:12px;margin-right:12px}
+  #drawer .honote{margin-left:0;margin-right:0;border-left-width:0;border-right-width:0;border-radius:0}
+  #drawer .honote .hh,#drawer .honote .hb{padding-left:12px;padding-right:12px}
+  /* 창(새 업무·묶기·보기 …) — 바깥 20px·안 22px 이 겹쳐 글이 42px 안쪽이었다. 창 틀은 인라인이라 !important */
+  #modalbg,#confirmbg{padding:4px!important}
+  #modalbg > div,#confirmbg > div{padding:14px 10px!important}
+}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -1319,7 +1374,7 @@
 }
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=31"></script>
+  <script src="js/pu-appbar.js?v=32"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->

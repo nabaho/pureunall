@@ -272,8 +272,9 @@
     var st = document.createElement('style');
     st.id = 'pu-appbar-phone-css';
     st.textContent = '@media ' + PHONE_MQ + '{' +
-      /* 손잡이를 가늘게 — 글자는 그대로 «즐겨찾기»(어느 앱에서나 같은 자리·같은 말) */
-      '[data-pu-appbar-tab]{padding:9px 2px!important;font-size:10px!important;letter-spacing:0!important;opacity:.6!important}' +
+      /* 손잡이를 가늘게 — 글자는 그대로 «즐겨찾기»(어느 앱에서나 같은 자리·같은 말).
+         2026-10-18 「양옆 빈공백 … 모두 채워서」로 본문이 화면 끝 8~14px 까지 오게 되어, 손잡이도 그 옆 여백 안에 들게 더 가늘게(약 13px) */
+      '[data-pu-appbar-tab]{padding:8px 1px!important;font-size:9.5px!important;letter-spacing:0!important;opacity:.6!important}' +
       'body>#pu-version-fab[data-state="ok"]{display:none!important}' +
       'body>#pu-backup-admin-button{display:none!important}' +
       '}';

@@ -449,6 +449,17 @@
     /* 카드에서는 고르기·승인 칸과 ✂·× 를 손가락 크기로 (13px 상자·20px 단추였다) */
     .ledchips+.ledgerwrap input[type=checkbox]{width:24px;height:24px}
     .ledchips+.ledgerwrap td button{min-width:28px;min-height:28px;padding:2px 5px!important}
+    /* ⑥ 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 … 좌우 옆공간 모두 채워서」)
+          본문 여백(8px) + 패널 테두리 + 패널 안 여백(10px) + 표 칸 여백(6px)이 쌓여 기금명이 화면 끝에서 21~51px 안쪽이었다.
+          패널은 화면 폭 그대로(본문 옆 여백 0 · 둥근 모서리·옆 테두리를 걷고 위아래 선으로 가른다), 안 여백은 8px.
+          패널이 아닌 기금 머리(#fundhead)만 제 여백 8px 을 갖는다. 창(모달)은 양옆 4px · 안 여백 10px. */
+    #app{padding-left:0;padding-right:0}
+    .panel{border-radius:0;border-left:0;border-right:0;padding-left:8px;padding-right:8px;margin-bottom:6px}
+    #fundhead,#app>.row{padding-left:8px;padding-right:8px}   /* 패널 밖에 바로 놓인 줄(기금 머리·회계의 월마감 줄)은 제 여백 */
+    /* 기금 정보의 묶음 상자(.secbox)도 화면 폭 그대로 — 둥근 상자 안 여백 16px 이 겹쳐 글이 17px 안쪽이었다 */
+    .secbox{border-radius:0;border-left:0;border-right:0;padding-left:8px!important;padding-right:8px!important}
+    #modalbg,#confirmbg{padding:4px!important}
+    #modalbg>div,#confirmbg>div{padding:10px!important}
   }
   /* ⑤ 기금 현황 표 머리가 줄 «사이»에 떠서 셋째 줄을 가렸다(폰화면관리 2026-10-18 · 411px 실측: 머리가 284px 에, 그 자리의 3번 기금이 안 보였다).
        까닭: 폰(860px 이하)에서는 .panel 이 가로 스크롤 상자(overflow-x:auto)라, 붙어 있는 머리(sticky)가 «화면»이 아니라
@@ -498,7 +509,7 @@
 }
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=31"></script>
+  <script src="js/pu-appbar.js?v=32"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
