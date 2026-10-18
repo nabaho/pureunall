@@ -19,6 +19,13 @@ for (let i = 0; i < 28; i++) {
     }
   }
 }
+/* 사건계약이 많은 회사 — 기록(파일 없음)과 파일(기록 없음)이 엇갈려 갈래 카드가 10줄을 넘는다(대표 폰 갈무리 2026-10-18 과 같은 꼴, 지어낸 자료) */
+co['n점검사건'] = { name: '점검사건많은회사', n: 5, r: 5, lastAt: T0 };
+co_recs['n점검사건'] = {}; co_docs['n점검사건'] = {};
+for (let j = 0; j < 5; j++) {
+  co_recs['n점검사건']['r' + j] = { date: '2025-0' + (j + 1) + '-05', kind: '사건', src: 'import', at: T0 + j * 3600e3, by: 'pa-uid-1', byName: '점검대표' };
+  co_docs['n점검사건']['d' + j] = { fileId: 'fs' + j, title: ['위임장(중노위)', '위임약정서', '위임장(회사)'][j % 3] + '-점검사건많은회사', date: '2025-0' + (j + 1) + '-05', src: 'folder', at: T0 + j * 864e5, by: 'pa-uid-1', byName: '점검대표' };
+}
 for (let i = 0; i < 30; i++) originals['o' + String(i).padStart(3, '0')] = { name: '점검_계약서_가나다라마바사아자차카타파하_' + i + (i % 3 ? '.pdf' : '.hwp'), size: 120000 + i * 4096, type: i % 3 ? 'application/pdf' : 'application/x-hwp', sha256: 'h' + i, path: 'pu_docs/originals/o' + i + '/x', at: T0 + i * 3600e3, by: 'pa-uid-1', byName: '점검대표' };
 const cases = {};
 for (let i = 0; i < 26; i++) cases['c' + String(i).padStart(3, '0')] = { meta: { title: '집단체불 위임 사건 ' + (i + 1) + (i % 4 === 0 ? ' — 가나다라마바사아자차카타파하 공장 임금체불' : ''), company: 회사[i % 회사.length], status: i % 3 ? 'active' : 'closed', createdAt: T0 + i * 864e5 }, submissions: Object.fromEntries(Array.from({ length: i % 5 }, (_, k) => ['s' + k, { at: T0 }])) };
@@ -29,6 +36,8 @@ module.exports = {
     { name: 'fill', run: async (p) => { await p.click('text=찾아서 채우기'); }, back: async (p) => { await p.keyboard.press('Escape'); } },
     { name: 'esign', run: async (p) => { await p.evaluate(() => { location.hash = '#esign'; showPane('esign'); }); } },
     { name: 'co', run: async (p) => { await p.click('.side [data-pane=co]'); } },
+    /* 사건계약이 많은 회사 — 폰은 회사 목록이 접혀 있어 「회사 바꾸기」로 펼쳐 고른다 */
+    { name: 'co-case', run: async (p) => { await p.click('.side [data-pane=co]'); await p.click('.pod-pickbtn'); await p.click('.pod-co-ls button:has-text("점검사건많은회사")'); } },
     { name: 'arc', run: async (p) => { await p.click('.side [data-pane=arc]'); } },
   ],
 };

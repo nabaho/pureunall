@@ -315,14 +315,14 @@
           펼치면 화면 폭에 맞는다: 기록 ☐·#·계약일·종류·금액 / 파일 ☐·#·제목·계약일·📥 (✏ 는 줄을 눌러 여는 미리보기에)
        ⚠ 넓은 화면은 그대로다 — pod-pickbtn·pod-ftog 단추는 폰에서만 보이고, 접힘은 폰에서만 먹는다.
          tests/office-co-phone.test.js 가 지킨다 */
-    + '.pod-pickbtn,.pod-ftog{display:none}'
+    + '.pod-pickbtn,.pod-ftog,.pod-ktog{display:none}'
     + '@media(max-width:700px){'
     + '.pod-ttl{display:none}.pod-ttl+.pod-b{margin-left:auto}'
     + '.pod-kchips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.pod-kchip{flex:none}'
     + '.pod-cohd{flex-wrap:nowrap!important;gap:6px!important}.pod-cohd .pod-cocnt,.pod-lg{display:none}.pod-cohd>b{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pod-cohd .pod-tag{flex:none;white-space:nowrap;margin:0}.pod-cohd .pod-b{flex:none}'
     /* 갈래 카드 줄 — 「△ 기록 없음」·「❓ 종류 모름」 옆에는 같은 말을 하는 단추(+ 기록 만들기 · ✏ 종류 정하기)가 있다. 폰에서는 단추만 — 제목 자리를 넓힌다 */
     + '.pod-krow .pod-ks.norec,.pod-krow .pod-ks.none{display:none}.pod-bar{margin-bottom:6px}.pod-bar .pod-b{padding:6px 10px}'
-    + '.pod-pickbtn,.pod-ftog{display:inline-block}'
+    + '.pod-pickbtn,.pod-ftog,.pod-ktog{display:inline-block}.pod-kmore{display:none}.pod-ktog{margin-top:4px;padding:4px 10px}'
     + '.pod-co:not(.pick) .pod-co-l{display:none}'
     + '.pod-co-l{display:grid;grid-template-columns:minmax(0,1fr) auto;max-height:none;overflow:visible}.pod-co-l select{width:auto!important}.pod-co-l .pod-co-ls{grid-column:1/-1;max-height:50vh}'
     + '.pod-fold:not(.open) .pod-fbody{display:none}'
@@ -719,7 +719,9 @@
     var store = host.store;
     var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false,
       tab: opts && (opts.tab === 'await' || opts.tab === 'sign') ? opts.tab : 'co', aw: null, awErr: null, awPicked: {}, idx: null, grp: '', chk: '', sg: null, sgErr: null, sgNote: '', sgBusy: false,
-      pickOpen: false, open: null };
+      pickOpen: false, open: null, kopen: {} };
+    /* 📱 폰 갈래 카드에 처음 보이는 줄 수 — 사건계약이 많은 회사는 한 카드가 12줄이라 화면 하나를 다 먹었다(대표 확인 2026-10-18 「추천대로」) */
+    var KFOLD = 4;
     /* 📱 폰 — 접어 둔 표(계약 기록·계약서 파일). 펼친 것은 이 기기에 기억한다(사람마다 편한 대로 — 못 적어도 화면은 돈다) */
     function isPhone() { return !!(w.matchMedia && w.matchMedia('(max-width:700px)').matches); }
     function foldOpen(k) {
@@ -1652,17 +1654,20 @@
         return el('div', { 'class': 'pod-kcard' + (S.grp && S.grp !== v ? ' dim' : '') }, [
           el('div', { 'class': 'pod-kh' }, [el('b', { text: g.icon + ' ' + g.label }),
             el('span', { text: '기록 ' + list.filter(function (i) { return i.type === 'rec'; }).length + ' · 파일 ' + list.filter(function (i) { return i.doc; }).length })]),
-          el('div', null, list.slice(0, 12).map(function (it) {
+          el('div', null, list.slice(0, 12).map(function (it, i) {
             var act = it.state === 'norec' || it.state === 'none'
               ? [el('button', { type: 'button', 'class': 'pod-b', text: it.state === 'none' ? '✏ 종류 정하기' : '+ 기록 만들기',
                   title: it.state === 'none' ? '이 파일의 계약 종류를 정합니다' : '이 파일에 이어진 계약 기록을 만듭니다(종류·날짜는 짐작값 — 고치세요)',
                   onclick: function () { if (it.state === 'none') openDoc(it.doc); else recForDoc(x.items, it); } })]
               : [];
-            return el('div', { 'class': 'pod-krow' }, [
+            /* 📱 폰에서는 앞 KFOLD 줄만 — 나머지는 아래 「▾ N줄 더」로 (pod-kmore 는 폰 구간에서만 숨는다) */
+            return el('div', { 'class': 'pod-krow' + (i >= KFOLD && !S.kopen[v] ? ' pod-kmore' : '') }, [
               el('span', { 'class': 'pod-kd', text: it.kind || '—' }),
               el('span', { 'class': 'pod-kt', title: it.title, text: (it.date ? it.date + ' · ' : '') + it.title + (it.guessed ? ' (짐작)' : '') }),
               el('span', { 'class': 'pod-ks ' + it.state, text: stTxt[it.state] })].concat(act));
-          }).concat(list.length > 12 ? [el('div', { style: 'font-size:11px;color:#94a3b8', text: '외 ' + (list.length - 12) + '줄 — 아래 표에서' })] : []))]);
+          }).concat(Math.min(list.length, 12) > KFOLD ? [el('button', { type: 'button', 'class': 'pod-b pod-ktog', 'aria-expanded': S.kopen[v] ? 'true' : 'false',
+              text: S.kopen[v] ? '▴ 접기' : '▾ ' + (Math.min(list.length, 12) - KFOLD) + '줄 더', onclick: function () { S.kopen[v] = !S.kopen[v]; draw(); } })] : [])
+            .concat(list.length > 12 ? [el('div', { style: 'font-size:11px;color:#94a3b8', text: '외 ' + (list.length - 12) + '줄 — 아래 표에서' })] : []))]);
       }));
     }
 
