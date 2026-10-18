@@ -55,8 +55,12 @@ test('★★ 탭(은행·카드·CMS)은 «서랍 밖»에 있다 — 접어도 
 });
 
 test('★★ 「입금 확인」·연결 표가 «한 벌»이다', () => {
-  assert.strictEqual((E.match(/🔔 입금 확인 /g) || []).length, 1,
+  /* ⚠ 글자 「🔔 입금 확인 」을 통째로 세지 않는다 — 2026-10-17 에 폰에서 「확인·건」을 접으려고
+     낱말을 떼어 냈다(「🔔 입금 83」). 볼 것은 «그 단추가 한 벌인가» 다. */
+  assert.strictEqual((E.match(/className:'ld-src-alert'/g) || []).length, 1,
     '★ 두 군데에 그리면 서랍을 열었을 때 같은 것이 두 개 보인다');
+  assert.strictEqual((E.match(/onClick:function\(\)\{setHanaAlertOpen\(true\);\}/g) || []).length, 1,
+    '★ 「입금 확인」을 여는 단추가 두 벌이다');
   /* ⚠ 함수 «정의»(function hanaStatChip())까지 세면 안 된다 — 부르는 곳만 센다. */
   assert.strictEqual((E.match(/(?<!function )hanaStatChip\(\)/g) || []).length, 1,
     '★ 연결 표가 두 벌이다');

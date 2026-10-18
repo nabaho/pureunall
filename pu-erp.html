@@ -173,7 +173,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=17">
+<link rel="stylesheet" href="css/pu-erp.css?v=20">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -311,20 +311,22 @@ var Component = React.Component;
         document.body.appendChild(wrap);
       }
       var bg = level==='danger' ? '#991b1b' : '#854d0e';
-      var d=document.createElement('div');
+      /* 손잡이(erp-alert-*) — 폰에서는 css 가 한 치수 줄인다(대표 폰 화면 2026-10-18: 경보 둘이 화면을 다 덮었다).
+         넓은 화면은 그대로다. */
+      var d=document.createElement('div'); d.className='erp-alert';
       d.style.cssText='background:'+bg+';color:#fff;border-radius:10px;padding:12px 14px;box-shadow:0 8px 24px rgba(0,0,0,.35);font-size:13px;line-height:1.5;';
-      var tEl=document.createElement('div'); tEl.style.cssText='font-weight:700;font-size:14px;';
+      var tEl=document.createElement('div'); tEl.className='erp-alert-t'; tEl.style.cssText='font-weight:700;font-size:14px;';
       tEl.textContent=(level==='danger'?'🛑 ':'⚠️ ')+title; d.appendChild(tEl);
-      if(detail){ var de=document.createElement('div'); de.style.cssText='margin-top:4px;opacity:.95;'; de.textContent=detail; d.appendChild(de); }
-      if(advice){ var ad=document.createElement('div'); ad.style.cssText='margin-top:6px;padding:7px 9px;background:rgba(255,255,255,.14);border-radius:6px;'; ad.textContent='👉 '+advice; d.appendChild(ad); }
-      var tm=document.createElement('div'); tm.style.cssText='margin-top:4px;font-size:11px;opacity:.7;'; tm.textContent=new Date(now).toLocaleString(); d.appendChild(tm);
+      if(detail){ var de=document.createElement('div'); de.className='erp-alert-d'; de.style.cssText='margin-top:4px;opacity:.95;'; de.textContent=detail; d.appendChild(de); }
+      if(advice){ var ad=document.createElement('div'); ad.className='erp-alert-a'; ad.style.cssText='margin-top:6px;padding:7px 9px;background:rgba(255,255,255,.14);border-radius:6px;'; ad.textContent='👉 '+advice; d.appendChild(ad); }
+      var tm=document.createElement('div'); tm.className='erp-alert-tm'; tm.style.cssText='margin-top:4px;font-size:11px;opacity:.7;'; tm.textContent=new Date(now).toLocaleString(); d.appendChild(tm);
       /* ★ 「할 일」을 알림 «안»에 둔다 (2026-09-13).
          까닭: 안내가 «어디로 가라»는 글자뿐이면, 그 자리에 갔을 때 누를 것이 없는
          일이 생긴다. 실제로 「자문수입에 id 없는 기록」 알림은 데이터 관리를
          가리켰지만 거기엔 id 를 고칠 자리가 없었다 — 그래서 같은 알림이 켤 때마다
          되풀이됐다. 고칠 길이 있으면 그 길을 여기에 «붙인다».
          ⚠ 알림 기록(logAlert)에는 함수를 안 넣는다 — 남는 것은 글자뿐이다. */
-      var bar=document.createElement('div'); bar.style.cssText='margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;';
+      var bar=document.createElement('div'); bar.className='erp-alert-bar'; bar.style.cssText='margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;';
       if(action && action.label && typeof action.run==='function'){
         var act=document.createElement('button'); act.textContent=action.label;
         act.style.cssText='background:#16a34a;color:#fff;border:none;border-radius:6px;padding:5px 12px;font-weight:700;cursor:pointer;font-size:12px;';
@@ -7361,30 +7363,48 @@ function erpExpenseCatGuess(memo){
 }
 
 // 출금 등록 확정 시 호출 — 적요와 선택한 카테고리의 관계를 기억한다
+/* 기억 한 줄을 «받은 st 안에서만» 고친다 — 저장은 부르는 쪽이 한다(한 줄 · 여러 줄 공용) */
+function _erpExpCatApply(st, memo, category){
+  var raw = String(memo===null||memo===undefined?'':memo).trim();
+  var cat = String(category===null||category===undefined?'':category).trim();
+  if(!raw || !cat) return false;
+  var key = erpExpCatKey(raw);
+  if(!key) return false;
+  var cur = st[key];
+  if(cur && cur.category === cat){
+    cur.count = (parseInt(cur.count,10)||0) + 1;
+    cur.lastAt = new Date().toISOString();
+    var sm = (cur.samples || []).slice();
+    if(sm.indexOf(raw) < 0) sm.unshift(raw);
+    cur.samples = sm.slice(0,3);
+    st[key] = cur;
+  } else {
+    // 신규 또는 다른 카테고리로 재학습 (최근 선택을 신뢰)
+    st[key] = { category:cat, count:1, lastAt:new Date().toISOString(), samples:[raw] };
+  }
+  return true;
+}
 function erpLearnExpenseCat(memo, category){
   try {
-    var raw = String(memo===null||memo===undefined?'':memo).trim();
-    var cat = String(category===null||category===undefined?'':category).trim();
-    if(!raw || !cat) return false;
-    var key = erpExpCatKey(raw);
-    if(!key) return false;
-
     var st = erpExpCatStore();
-    var cur = st[key];
-    if(cur && cur.category === cat){
-      cur.count = (parseInt(cur.count,10)||0) + 1;
-      cur.lastAt = new Date().toISOString();
-      var sm = (cur.samples || []).slice();
-      if(sm.indexOf(raw) < 0) sm.unshift(raw);
-      cur.samples = sm.slice(0,3);
-      st[key] = cur;
-    } else {
-      // 신규 또는 다른 카테고리로 재학습 (최근 선택을 신뢰)
-      st[key] = { category:cat, count:1, lastAt:new Date().toISOString(), samples:[raw] };
-    }
+    if(!_erpExpCatApply(st, memo, category)) return false;
     dbSet(EXP_CAT_ALIAS_KEY, st);
     return true;
   } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return false; }
+}
+/* 여러 줄을 «한 번»에 배운다 — pairs: [{memo, category}] · 돌려주는 값 = 배운 줄 수
+   ★ 왜 (대표 폰 화면 2026-10-17 「⚠ 동기화 충돌 의심: expense_cat_aliases」)
+     출금 35건을 한꺼번에 등록하면 줄마다 dbSet 을 불러 이 표가 35번 바뀌었다.
+     다른 기기는 그것을 «1분에 6번 넘게 바뀜 = 구버전 PC 의 되돌림»으로 읽고 경보를 띄웠다.
+     실은 한 사람이 한 번 누른 것이다 — 저장도 «한 번»이어야 한다(CLAUDE.md 「한 번에 저장」). */
+function erpLearnExpenseCatMany(pairs){
+  try {
+    if(!pairs || !pairs.length) return 0;
+    var st = erpExpCatStore(), n = 0;
+    pairs.forEach(function(p){ if(p && _erpExpCatApply(st, p.memo, p.category)) n++; });
+    if(!n) return 0;
+    return dbSet(EXP_CAT_ALIAS_KEY, st) === false ? 0 : n;
+  } catch(e){ if(window._erpErrLog) window._erpErrLog(e); return 0; }
 }
 
 function erpForgetExpenseCat(key){
@@ -7562,7 +7582,9 @@ function erpMarkBankRowProcessed(row, kind, targetLabel){
 }
 
 // 여러 줄을 한 번에 '처리됨'으로 — 저장은 «한 번»(dbSet 한 번). 🤖 CMS 자동 처리용 (2026-10-09)
-//   list: [{row, label, incomeId?}] · 모양은 erpMarkBankRowProcessed 와 같고 incomeId 만 더 붙는다(이미 가져간 입금 표시)
+//   list: [{row, label, kind?, incomeId?}] · 모양은 erpMarkBankRowProcessed 와 같고 incomeId 만 더 붙는다(이미 가져간 입금 표시)
+//   kind 는 2026-10-17 에 더했다 — 출금 한꺼번에 등록도 줄마다 저장하다 「동기화 충돌 의심: bank_processed」를 냈다.
+//   ⚠ kind 가 없으면 예전처럼 'income' 이다(CMS 자동 처리가 그렇게 부른다).
 function erpMarkBankRowsProcessed(list){
   try {
     if(!list || !list.length) return 0;
@@ -7571,7 +7593,7 @@ function erpMarkBankRowsProcessed(list){
     list.forEach(function(m){
       var row = m && m.row; var k = row ? erpBankRowKey(row) : '';
       if(!k) return;
-      var e = { at:now, kind:'income',
+      var e = { at:now, kind:(m.kind === 'expense' ? 'expense' : 'income'),
                 target:String(m.label===null||m.label===undefined?'':m.label).slice(0,120), by:by,
                 date:String(row.date || '').slice(0,10),
                 amount:parseInt(row.amount, 10) || 0,
@@ -9011,6 +9033,7 @@ window.erpAutoTidyOk = erpAutoTidyOk;
 window.erpFindCombo = erpFindCombo;
 window.erpFindComboCached = erpFindComboCached;
 window.erpLearnExpenseCat = erpLearnExpenseCat;
+window.erpLearnExpenseCatMany = erpLearnExpenseCatMany;
 window.erpExpenseCatGuess = erpExpenseCatGuess;
 window.erpExpCatStore = erpExpCatStore;
 window.erpForgetExpenseCat = erpForgetExpenseCat;
@@ -11711,7 +11734,7 @@ function _fbApplyRecordInner(k, v, opts){
      그래서 같은 판(v.u === 표시)이면 이 창에도 얹는다. 표시보다 «옛» 판은 여전히 안 얹는다(내가 못 보낸 새것이 있다). */
   if(v.u > localTime || (opts.force && v.u >= localTime)){
     try {
-      if(opts.storm){ try { opts.storm(k); } catch(_s){} }
+      if(opts.storm){ try { opts.storm(k, v); } catch(_s){} }
       // #4 Tier 3: 객체 형식이면 배열화 (LS는 배열 유지)
       var arrValue = normalizeFbValue(v.v);
       /* 통째 동기화 되돌림 모드에서도 삭제표시는 화면 자료로 풀지 않는다.
@@ -12643,22 +12666,55 @@ function _shrinkPump(){
 // 초기 동기화가 deferGate로 모아둔 급감 보류 큐를 완료 후 처리 — 펌프가 유효 항목을 순서대로 소진.
 function _drainShrinkQueue(){ _shrinkPump(); }
 window.erpHealServerKey = _healServerKey;  // 관리자 수동 서버 교정용 (자동 호출 금지)
+/* ══ 동기화 핑퐁 감지 — «자주 바뀜»이 아니라 «되돌아감»을 본다 (2026-10-18 대표 폰 화면) ══
+   ■ 무엇이 있었나 — 같은 표가 1분에 6번 바뀌기만 하면 「⚠ 동기화 충돌 의심」을 띄웠다.
+     그런데 출금 35건을 한꺼번에 등록하면(또는 한 줄씩 빨리 등록하면) 배운 카테고리·처리 표시 표가
+     줄마다 저장돼 1분에 35번 바뀐다. 다른 기기는 그것을 «구버전 PC 의 되돌림»으로 읽고
+     큰 갈색 경보 둘을 띄웠다 — 실은 한 사람이 일을 한 것뿐이다. 거짓 경보가 잦으면 진짜 경보도 안 본다.
+   ■ 진짜 핑퐁은 «앞뒤로» 간다 — 옛 PC 가 옛 꼴(배열↔객체)이나 옛 건수로 덮고, 새 PC 가 다시 덮는다.
+     그래서 받은 값의 «꼴·건수» 지문이 «앞서 본 지문으로 되돌아오면»(A…B…A) 그때 경보한다.
+     건수가 늘기만 하거나(등록) 같은 채로 값만 바뀌면(학습 횟수 +1) 되돌림이 아니다.
+   ⚠ 그래도 1분에 20번을 넘으면 꼴과 상관없이 경보한다 — 사람 손으로는 안 나오는 «멈추지 않는 고리»다.
+   ⚠ 내 기기가 보낸 것은 원래 여기 안 온다(_fbApplyRecord 가 받은 판 표시로 걸러 낸다). */
+function erpStormSig(v){
+  try {
+    var x = v && v.v;
+    if(Array.isArray(x)) return 'A' + x.length;
+    if(x && typeof x === 'object') return 'O' + Object.keys(x).length;
+    return 'S' + String(x).length;
+  } catch(_e){ return '?'; }
+}
+/* 지문 줄에서 «앞서 지나온 지문으로 되돌아온» 적이 있나 — 같은 지문이 잇달아 오는 것은 되돌림이 아니다 */
+function erpStormBack(sigs){
+  var seen = {}, last = null;
+  for(var i = 0; i < (sigs || []).length; i++){
+    var g = sigs[i];
+    if(g === last) continue;
+    if(seen.hasOwnProperty(g)) return true;
+    if(last !== null) seen[last] = true;
+    last = g;
+  }
+  return false;
+}
+var ERP_STORM_MIN = 6, ERP_STORM_LOOP = 20, ERP_STORM_WIN = 60000;
 function fbSetupListener(){
   if(!fbDb) return;
   if(_fbListenerSetup) return; // 중복 등록 차단
   _fbListenerSetup = true;
-  // 동기화 핑퐁 감지: 같은 키가 60초 내 6회 이상 변경 수신되면 경보 (구버전 기기와의 형식 되돌리기 충돌 의심)
+  // 동기화 핑퐁 감지: 같은 키가 60초 안에 6회 이상 «앞뒤로» 바뀌어 들어오면 경보 (위 erpStormBack 머리글)
   var _fbStorm = {};
-  function _stormCheck(k){
+  function _stormCheck(k, v){
     var now = Date.now();
-    var s = _fbStorm[k] || (_fbStorm[k] = []);
-    s.push(now);
-    while(s.length && now - s[0] > 60000) s.shift();
-    if(s.length === 6){
-      window.erpAlert && erpAlert('warn', '동기화 충돌 의심: ' + k,
-        '같은 데이터가 1분에 ' + s.length + '회 이상 변경 수신됨. 구버전으로 열려있는 PC가 데이터를 되돌리고 있을 수 있습니다.',
-        '모든 사무실 PC에서 Ctrl+Shift+R로 최신 코드를 적용하세요.');
-    }
+    var s = _fbStorm[k] || (_fbStorm[k] = { at:[], sig:[], told:0 });
+    s.at.push(now); s.sig.push(erpStormSig(v));
+    while(s.at.length && now - s.at[0] > ERP_STORM_WIN){ s.at.shift(); s.sig.shift(); }
+    var n = s.at.length;
+    if(n < ERP_STORM_MIN || now - s.told < ERP_STORM_WIN) return;   // 한 번 알렸으면 1분은 다시 안 띄운다
+    if(!erpStormBack(s.sig) && n < ERP_STORM_LOOP) return;
+    s.told = now;
+    window.erpAlert && erpAlert('warn', '동기화 충돌 의심: ' + k,
+      '같은 데이터가 1분에 ' + n + '회 ' + (n >= ERP_STORM_LOOP ? '넘게 계속' : '앞뒤로') + ' 바뀌어 들어왔습니다. 구버전으로 열려있는 PC가 데이터를 되돌리고 있을 수 있습니다.',
+      '모든 사무실 PC에서 Ctrl+Shift+R로 최신 코드를 적용하세요.');
   }
   // [보안규칙 대비] 원격 레코드 적용 — 실시간 경로 얇은 래퍼. 본문은 공용 _fbApplyRecord로 통일.
   //   실시간이므로 폭풍감지(_stormCheck) 전달 + 적용 즉시 리렌더(notify). 급감 게이트는 즉시 모달(deferGate 없음).
@@ -50745,7 +50801,7 @@ function FinanceLedger(props){
                   note:x.note||'', amount:parseInt(x.amount,10)||0, balance:parseInt(x.balance,10)||0,
                   /* ⚠ 여기 칸을 «하나하나 적어» 만든다 — 안 적으면 그대로 사라진다.
                      같은 결제를 두 길(문자·이용내역)이 다르게 적어 두 줄이 된 표시다. */
-                  _hint: x.dupHint ? 1 : 0 };
+                  _hint: !!x.dupHint };
       var pk = erpBankRowKey(row);
       if(pk && pst[pk]) row._dup = true;
       if(x.type === 'expense') exp.push(row); else inc.push(row);
@@ -51404,7 +51460,7 @@ function FinanceLedger(props){
                       cancel:!!x.cancel, originSystem:x.originSystem||'', originId:x.originId||'',
                       amount:parseInt(x.amount,10)||0, balance:parseInt(x.balance,10)||0,
                       /* 방금 올린 파일에서도 곧바로 보여야 한다 — 안 옮기면 새로 고쳐야 뜬다 */
-                      _hint: x.dupHint ? 1 : 0 };
+                      _hint: !!x.dupHint };
           var _pk = erpBankRowKey(row);
           if(_pk && _pst2[_pk]) row._dup = true;
           if(x.type === 'expense') _exp.push(row); else _inc.push(row);
@@ -51993,31 +52049,16 @@ function FinanceLedger(props){
      카드 번호는 문자를 읽을 때 note 에 「하나카드 승인 문자 · ****9950」으로 적힌다.
      ⚠ 옛 줄에도 그대로 들어 있으므로 note 에서 «읽어» 쓴다 — 자료를 새로 만들지 않는다. */
   var expCardS = useState(''); var expCardPick = expCardS[0]; var setExpCardPick = expCardS[1];
-  var expCardCnt = (function(){
-    var c = {};
-    expList.forEach(function(r){ var t = erpCardTail(r); if(t) c[t] = (c[t]||0) + 1; });
-    return c;
-  })();
   /* ── 표 머리에서 거르기 (대표 지시 2026-08-29 「필터링 기능」) ──
      98건·398건짜리 표에서 「급여만」·「아직 안 고른 것만」을 볼 수 있어야 한다.
-   ⚠ 세는 것(카드별 건수)은 «거르기 전»으로 센다 — 거른 뒤에 세면
-     「9950 52건」이 걸러진 수로 줄어 몇 건이 남았는지 알 수 없게 된다. */
+     (거른 목록 expCardList 는 달·오늘을 거른 «뒤»에 만든다 — 아래) */
   var expQS = useState(''); var expQ = expQS[0]; var setExpQ = expQS[1];
   var expCatFS = useState(''); var expCatF = expCatFS[0]; var setExpCatF = expCatFS[1];
-  var expCardList = expList.filter(function(r){
-    if(expCardPick && erpCardTail(r) !== expCardPick) return false;
-    if(expQ){
-      var q = String(expQ).toLowerCase();
-      var hay = String((r.memo||'') + ' ' + (r.note||'')).toLowerCase();
-      if(hay.indexOf(q) < 0) return false;
-    }
-    if(expCatF){
-      var c = expCat[r._k] || '';
-      if(expCatF === '__none'){ if(c) return false; }
-      else if(c !== expCatF) return false;
-    }
-    return true;
-  });
+  /* ☐ 고른 출금 (CLAUDE.md 「맨 왼쪽은 ☐ + 번호」 대표 지시 2026-10-05).
+     ⚠ 고르기만으로는 아무것도 안 바뀐다 — 목록 위 「N건 선택」 띠의 단추를 눌러야 한다.
+     ⚠ 보이는 것이 바뀌면(달·탭·종류·거르기) 비운다(아래 효과) — 안 보이는 줄이 골라진 채 남지 않게.
+       그래도 띠는 «지금 보이는 것»만 센다(expChkVis) — 한 겹 더. */
+  var expChkS = useState({}); var expChk = expChkS[0]; var setExpChk = expChkS[1];
 
   // ── 월별 필터 (입금·출금 공용) ──
   var _ldMonSet={};
@@ -52041,8 +52082,80 @@ function FinanceLedger(props){
     expList = expList.filter(function(r){ return String(r.date||'').slice(0,10) === _ldToday; });
   }
 
+  /* ⚠★ 카드별 수·거른 목록은 «달·오늘을 거른 뒤»에 만든다 (2026-10-17).
+     예전에는 달 거르기보다 «앞»에서 만들어, 10월을 골라도 출금 표에는 모든 달이 그려졌다 —
+     머리에는 「10월 출금 내역 35건」, 표에는 304줄이 섞여 있었다.
+     ⚠ 세는 것(카드별 건수)은 그래도 «머리 거르기(적요·카테고리) 전»이다 — 거른 뒤에 세면
+       「9950 52건」이 걸러진 수로 줄어 몇 건이 남았는지 알 수 없다. */
+  var expCardCnt = (function(){
+    var c = {};
+    expList.forEach(function(r){ var t = erpCardTail(r); if(t) c[t] = (c[t]||0) + 1; });
+    return c;
+  })();
+  var expCardList = expList.filter(function(r){
+    if(expCardPick && erpCardTail(r) !== expCardPick) return false;
+    if(expQ){
+      var q = String(expQ).toLowerCase();
+      var hay = String((r.memo||'') + ' ' + (r.note||'')).toLowerCase();
+      if(hay.indexOf(q) < 0) return false;
+    }
+    if(expCatF){
+      var c = expCat[r._k] || '';
+      if(expCatF === '__none'){ if(c) return false; }
+      else if(c !== expCatF) return false;
+    }
+    return true;
+  });
+  /* ☐ — «지금 화면에 그려진» 줄만 대상이다(ldShow 까지). 거르기로 숨은 줄·아직 안 그린 줄은 안 고른다. */
+  var _expVisOk   = expCardList.slice(0,ldShow).filter(function(r){ return !r._dup; });
+  var expChkVis   = _expVisOk.filter(function(r){ return expChk[r._k]; });
+  var expChkReady = expChkVis.filter(function(r){ return expCat[r._k]; }).length;
+  /* 머리 ☐ — 넓은 화면은 이름표 줄에, 폰은 거르는 줄에 선다(같은 함수 한 벌) */
+  function expAllBox(){
+    var allOn = _expVisOk.length>0 && expChkVis.length===_expVisOk.length;
+    return h('input',{type:'checkbox',style:{cursor:'pointer'},checked:allOn,
+      title: allOn ? '고른 것을 모두 풉니다' : ('보이는 '+_expVisOk.length+'건을 모두 고릅니다'),
+      'aria-label':'보이는 출금 모두 고르기',
+      onChange:function(){
+        if(allOn){ setExpChk({}); return; }
+        var nm={};
+        _expVisOk.forEach(function(r){ nm[r._k]=true; });
+        setExpChk(nm);
+      }});
+  }
+
   var inMatchedCnt  = incList.filter(function(r){return !r._dup && inMatch[r._k];}).length;
   var expReadyCnt   = expList.filter(function(r){return !r._dup && expCat[r._k];}).length;
+  /* ── 카테고리를 고른 출금을 «한꺼번에» 등록한다 — 「출금 N건 등록」·「고른 것 등록」이 함께 쓴다 ──
+     ⚠ 한 벌로 둔다. 두 단추가 저마다 등록하면 언젠가 한쪽만 고친다(학습·처리 표시가 빠진다).
+     ⚠★ 넘겨받은 «그 줄들»만 등록한다 (2026-10-17). 예전에는 확인창은 이 달 건수(expReadyCnt)를
+        묻고 실제로는 expAll(모든 달)을 등록했다 — 「10월 35건」을 눌렀는데 9월 것까지 들어갔다.
+        묻는 건수와 하는 일이 같아야 한다.
+     ⚠★ 배우기(expense_cat_aliases)·처리 표시(bank_processed)는 «한 번»에 저장한다 (2026-10-18 대표 폰 화면).
+        줄마다 저장하던 때는 35건이면 두 표가 35번씩 바뀌어, 다른 기기에 「⚠ 동기화 충돌 의심」이
+        둘이나 떴다 — 한 사람이 한 번 누른 것인데도. (출금 장부는 건별 저장이라 그대로 한 건씩이다)
+     ⚠ 한 줄이 실패해도 나머지는 끝까지 하고, «저장된 줄만» 처리 표시를 한다 — 처리 표시만 남고
+        장부에 없으면 그 줄을 다시 등록할 길이 사라진다.
+     catMap — 고른 카테고리(없으면 지금 화면의 expCat). 고르는 «그 자리»에서 등록할 때는 아직
+              화면에 안 들어간 새 값을 넘긴다. */
+  function registerExpRows(list, catMap){
+    var cats=catMap||expCat, done=[], learn=[], marks=[];
+    (list||[]).forEach(function(row){
+      if(!row || row._dup) return;
+      var cat=cats[row._k];
+      if(!cat) return;
+      try { saveExpense(row,cat); }
+      catch(e){ if(window._erpErrLog) window._erpErrLog(e); return; }
+      var _cn=EXP_CATS.find(function(c){return c.code===cat;});
+      learn.push({ memo:(row.memo||row.note||''), category:cat });
+      marks.push({ row:row, kind:'expense', label:(_cn?_cn.name:cat) });
+      done.push(row._k);
+    });
+    if(learn.length) erpLearnExpenseCatMany(learn);
+    if(marks.length) erpMarkBankRowsProcessed(marks);
+    done.forEach(function(k){removeRow(k,'exp');});
+    return done.length;
+  }
 
   // ── 화면에 보이는 행의 금액 합계 (넘버링·합계 표시용) ──
   function _sumAmt(list){ return list.reduce(function(s,r){ return s + (parseInt(r&&r.amount,10)||0); }, 0); }
@@ -52059,12 +52172,18 @@ function FinanceLedger(props){
   else if(ldTabEff==='inc' && incCnt===0 && expCnt>0) ldTabEff='exp';
   function ledgerTabBtn(v, label, cnt, todo){
     var on = ldTabEff===v;
+    /* 폰에서는 좁은 만큼 차례로 접는다 — 맨 앞 그림(.ld-tab-ico, ≤440px) → 「미처리」 낱말(.ld-tab-todo-w, ≤380px).
+       「출금 304 · 미처리 269」의 «숫자»는 끝까지 남는다(뜻은 title). 넓은 화면은 그대로다. */
+    var sp = label.indexOf(' ');
     return h('button',{key:v, className:'ld-tab', onClick:function(){setLdTab(v);},
+      title: label.slice(sp+1)+' '+cnt+'건'+(todo>0?' · 미처리 '+todo+'건':''),
       style:{padding:'4px 11px', borderRadius:'14px', cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
         border: on?'1px solid #1e40af':'1px solid #cbd5e1',
         background: on?'#1e40af':'#fff', color: on?'#fff':'#64748b',
         fontWeight: on?700:500, fontSize:'13px'}},
-      label+' '+cnt+(todo>0?' · 미처리 '+todo:''));
+      sp>0 && h('span',{className:'ld-tab-ico'},label.slice(0,sp+1)),
+      (sp>0 ? label.slice(sp+1) : label)+' '+cnt,
+      todo>0 && h('span',null,' · ',h('span',{className:'ld-tab-todo-w'},'미처리 '),todo));
   }
 
   // ── 자동 매칭 추천 (행별 상위 3후보) — 입금 탭에서만 계산 (출금 탭에서는 불필요) ──
@@ -52294,17 +52413,20 @@ function FinanceLedger(props){
   /* 초록 줄 확정 — 일괄 확정 단추와 저절로 확정이 «같은 길»을 쓴다.
      ⚠ 갈래가 둘이면 저장 내용이 어긋난다(2026-08 에 실제로 그랬다 — 단추마다 저장하는 것이 달랐다). */
   function confirmReadyList(list){
-    var ok=0, ng=0, done=[];
+    var ok=0, ng=0, done=[], marks=[];
     (list||[]).forEach(function(r){
       try{
         saveIncome(r.row, r.pItem, { withPerf:true, feeAmount:r.fee,
           feeCat:(r.row.src==='card'||r.row.src==='nicebill')?'exp-cardfee':'exp-bankfee' });
         erpLearnPayerAlias(r.row.memo||r.row.note||'', r.pItem);
-        erpMarkBankRowProcessed(r.row,'income',r.pItem.companyName+' '+(r.pItem.label||'')
-          +(r.fee?' (수수료차감)':''));
+        /* 처리 표시는 모아서 «한 번»에 (2026-10-18) — 줄마다 저장하면 다른 기기에
+           「동기화 충돌 의심: bank_processed」가 뜬다(출금 한꺼번에 등록과 같은 까닭) */
+        marks.push({ row:r.row, kind:'income', label:r.pItem.companyName+' '+(r.pItem.label||'')
+          +(r.fee?' (수수료차감)':'') });
         ok++; done.push(r.row._k);
       }catch(_e){ ng++; if(window._erpErrLog) window._erpErrLog(_e); }
     });
+    if(marks.length) erpMarkBankRowsProcessed(marks);
     done.forEach(function(k){ removeRow(k,'inc'); });
     return { ok:ok, ng:ng };
   }
@@ -52568,22 +52690,17 @@ function FinanceLedger(props){
      ⚠ 이미 처리된 줄(_dup)은 건드리지 않는다. */
   useEffect(function(){
     if(!rows || ldTabEff!=='exp' || !expAutoReg) return;
-    var done = [];
-    expAll.forEach(function(row){
-      if(row._dup) return;
+    var todo = expAll.filter(function(row){
+      if(row._dup) return false;
       var cat = expCat[row._k];
-      if(!cat) return;
+      if(!cat) return false;
       var g = expGuess[row._k];
-      if(!g || g.category !== cat) return;      /* 배운 것과 같을 때만 */
-      saveExpense(row, cat);
-      erpLearnExpenseCat(row.memo||row.note||'', cat);
-      var _cn = EXP_CATS.find(function(c){ return c.code===cat; });
-      erpMarkBankRowProcessed(row, 'expense', (_cn?_cn.name:cat));
-      done.push(row._k);
+      return !!(g && g.category === cat);       /* 배운 것과 같을 때만 */
     });
-    if(!done.length) return;
-    done.forEach(function(k){ removeRow(k,'exp'); });
-    showToast('🤖 배운 대로 출금 ' + done.length + '건을 등록했습니다');
+    if(!todo.length) return;
+    /* 저장은 한 벌(registerExpRows) — 배우기·처리 표시가 «한 번»에 간다(줄마다 가면 다른 기기에 충돌 경보) */
+    var n = registerExpRows(todo);
+    if(n) showToast('🤖 배운 대로 출금 ' + n + '건을 등록했습니다');
   }, [rows, ldTabEff, _ldSrc, expAutoReg, expCat]);
   /* ⚠★★ 여기에 의존목록이 없던 것이 특히 위험했다 (2026-09-22 전체점검 ②).
      이 효과는 «서버에 쓴다» — saveExpense 가 dbUpsert('finance_expense', …) 를 부르고,
@@ -52593,6 +52710,12 @@ function FinanceLedger(props){
      시계가 돌 때 이 길이 다시 열리지 않는다.
      ⚠ 값의 목록이 아니라 «무엇이 바뀌면 다시 해야 하는가» 를 적은 것이다.
        expAll·expGuess 는 그릴 때마다 새로 만드는 값이라 여기 넣으면 안 된다(위 효과 참고). */
+
+  /* ☐ 고른 출금은 «보이는 것이 바뀌면» 비운다 (CLAUDE.md 「고른 것은 화면을 떠나면 비운다」).
+     ⚠ 비울 것이 없으면 부르지 않는다 — 부르면 다시 그리고, 다시 그리면 또 부른다. */
+  useEffect(function(){
+    if(Object.keys(expChk).length) setExpChk({});
+  }, [incMon, ldTabEff, _ldSrc, ldOnlyToday, expCardPick, expQ, expCatF]);
 
   /* ── 카드 「취소」의 짝 (2026-08-26 대표 지시: 「자동 짝지어 달라」) ──
      ⚠ 여기서 «찾기만» 한다. 상계는 사람이 누른다 — 되돌리는 것은 되돌릴 수 없다.
@@ -53124,34 +53247,60 @@ function FinanceLedger(props){
 
   return h('div',{style:{padding:'0 2px'}},
 
+    /* ══ 입금 사업장 확인 창 — 촘촘하게 (대표 지시 2026-10-17 「팝업창 너무 크게 나온다」) ══
+       폰에서 한 건이 화면 ⅓(약 330px)을 먹어 83건 가운데 한 건 반만 보였다. 까닭이 셋이었다 —
+         ㉠ 480px 아래 공용 줄바꿈 규칙([style*="display: flex"][style*="gap"])이 머리줄을 접어
+            ✕ 가 제목 아래 «혼자 한 줄»로 떨어졌다 → 머리줄·줄마다 flexWrap:'nowrap' 를 못 박는다
+         ㉡ 단추 셋이 «폭 150px 이상»이라 한 줄에 하나씩 세로로 쌓였다 → 짧은 이름으로 한 줄에
+            (「거래내역에서 이 입금 보기」→「📄 거래내역」 — 긴 뜻은 title. 360px 에서도 안 잘리게)
+         ㉢ 「계좌번호 680******45904」(늘 같은 우리 통장)가 입금자 이름을 둘째 줄로 밀었다
+            → 이름만 앞에 두고 온전한 적요는 title 에 남긴다
+       ★ 한 건 = 「금액 · 입금자 ··· 상태」 / 「날짜 · 할 일」 / 단추 한 줄 → 약 100px(폰에 대여섯 건).
+       ⚠ 머리줄은 붙어 있고 목록만 구른다 — 아래로 내려가도 ✕ 와 건수가 늘 보인다. */
     hanaAlertOpen && _meNow().isAdmin && h('div',{role:'dialog','aria-modal':'true','aria-label':'입금 사업장 확인 알림',
       onClick:function(){setHanaAlertOpen(false);},
-      style:{position:'fixed',inset:0,zIndex:10045,background:'rgba(15,23,42,.62)',display:'flex',alignItems:'center',justifyContent:'center',padding:'16px'}},
+      style:{position:'fixed',inset:0,zIndex:10045,background:'rgba(15,23,42,.62)',display:'flex',alignItems:'center',justifyContent:'center',padding:'12px'}},
       h('div',{onClick:function(e){e.stopPropagation();},
-        style:{width:'min(560px,100%)',maxHeight:'min(78vh,720px)',overflow:'auto',background:'#fff',borderRadius:'18px',padding:'20px',boxShadow:'0 24px 70px rgba(15,23,42,.35)'}},
-        h('div',{style:{display:'flex',alignItems:'center',justifyContent:'space-between',gap:'10px',marginBottom:'12px'}},
-          h('div',null,
-            h('strong',{style:{fontSize:'19px',color:'#1e293b'}},'💰 입금 사업장 확인 '+hanaAlerts.length+'건'),
-            h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},'총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다')),
-          h('button',{onClick:function(){setHanaAlertOpen(false);},'aria-label':'닫기',style:{border:0,background:'#f8fafc',borderRadius:'9px',width:'34px',height:'34px',cursor:'pointer',fontSize:'18px'}},'×')),
-        !hanaAlerts.length && h('div',{style:{padding:'28px 8px',textAlign:'center',color:'#64748b'}},'확인할 새 입금이 없습니다.'),
+        style:{width:'min(480px,100%)',maxHeight:'min(76vh,620px)',display:'flex',flexDirection:'column',overflow:'hidden',
+          background:'#fff',borderRadius:'14px',boxShadow:'0 24px 70px rgba(15,23,42,.35)'}},
+        h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'nowrap',flexShrink:0,
+            padding:'10px 10px 9px 14px',borderBottom:'1px solid #e2e8f0'}},
+          h('strong',{style:{fontSize:'15px',color:'#1e293b',whiteSpace:'nowrap'}},'💰 입금 사업장 확인 '+hanaAlerts.length+'건'),
+          h('span',{title:'총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다',
+            style:{flex:'1 1 auto',minWidth:0,fontSize:'12px',color:'#94a3b8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
+            '총괄관리자 전용 · 거래내역에서 확정하면 저절로 닫힙니다'),
+          h('button',{onClick:function(){setHanaAlertOpen(false);},'aria-label':'닫기',
+            style:{flexShrink:0,border:'1px solid #e2e8f0',background:'#f8fafc',borderRadius:'8px',width:'32px',height:'32px',minHeight:'32px',
+              cursor:'pointer',fontSize:'18px',lineHeight:1,padding:0,color:'#475569'}},'×')),
+        h('div',{style:{overflow:'auto',padding:'8px 10px 4px'}},
+        !hanaAlerts.length && h('div',{style:{padding:'24px 8px',textAlign:'center',color:'#64748b'}},'확인할 새 입금이 없습니다.'),
         hanaAlerts.map(function(a){
           var missing=a.officeStatus!=='matched';
-          return h('div',{key:a.alertKey,style:{border:'1px solid '+(missing?'#fde68a':'#bfdbfe'),background:missing?'#fffbeb':'#eff6ff',borderRadius:'12px',padding:'13px',marginBottom:'9px'}},
-            h('div',{style:{display:'flex',justifyContent:'space-between',gap:'10px',alignItems:'flex-start'}},
-              h('div',null,
-                h('strong',{style:{fontSize:'16px',color:'#1e293b'}},Number(a.amount||0).toLocaleString('ko-KR')+'원 입금'),
-                h('div',{style:{fontSize:'12px',color:'#64748b',marginTop:'3px'}},String(a.date||'')+' · '+String(a.memo||'입금'))),
-              h('span',{style:{fontSize:'13px',fontWeight:800,color:missing?'#d97706':'#2563eb',whiteSpace:'nowrap'}},missing?'확인 필요':'후보 확인됨')),
-            h('div',{style:{marginTop:'9px',fontSize:'13px',fontWeight:800,color:missing?'#854d0e':'#1e40af'}},
-              missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('입금 사업장 후보: '+String(a.companyName||'확인 필요'))),
-            h('div',{style:{display:'flex',gap:'7px',marginTop:'11px',flexWrap:'wrap'}},
+          var memo=String(a.memo||'입금');
+          /* 「계좌번호 680******45904 신수진」 → 「신수진」 (보이는 것만 줄인다 — 온전한 적요는 title) */
+          var who=memo.replace(/^\s*계좌번호\s*\S+\s*/,'').trim() || memo;
+          var line={display:'flex',alignItems:'center',gap:'6px',flexWrap:'nowrap',minWidth:0};
+          var btn={flex:'1 1 auto',minWidth:0,padding:'6px 6px',borderRadius:'7px',fontSize:'12.5px',fontWeight:800,
+            cursor:'pointer',whiteSpace:'nowrap',overflow:'hidden',textOverflow:'ellipsis',fontFamily:'inherit'};
+          return h('div',{key:a.alertKey,style:{border:'1px solid '+(missing?'#fde68a':'#bfdbfe'),background:missing?'#fffbeb':'#eff6ff',borderRadius:'10px',padding:'8px 10px',marginBottom:'6px'}},
+            h('div',{style:line},
+              h('strong',{style:{fontSize:'15px',color:'#1e293b',whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}},Number(a.amount||0).toLocaleString('ko-KR')+'원'),
+              h('span',{title:memo,style:{flex:'1 1 auto',minWidth:0,fontSize:'13px',fontWeight:700,color:'#1e293b',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},who),
+              h('span',{style:{flexShrink:0,fontSize:'12px',fontWeight:800,color:missing?'#d97706':'#2563eb',whiteSpace:'nowrap'}},missing?'확인 필요':'후보 확인됨')),
+            h('div',{title:missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('입금 사업장 후보: '+String(a.companyName||'확인 필요')),
+              style:{marginTop:'2px',fontSize:'12px',color:missing?'#854d0e':'#1e40af',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}},
+              h('span',{style:{color:'#64748b',fontVariantNumeric:'tabular-nums'}},String(a.date||'').slice(5,16)+' · '),
+              missing?'사무관리에서 내용을 입력 또는 확인해야 합니다.':('🏢 '+String(a.companyName||'확인 필요'))),
+            h('div',{style:Object.assign({},line,{gap:'5px',marginTop:'6px'})},
               /* 2026-09-27 — 짝 맞추기 추천은 거래내역에 있다. 그 줄을 바로 연다 */
-              h('button',{onClick:function(){hanaJumpTo(a);},title:'거래내역에서 이 입금 줄을 열어 짝 맞추기 추천을 봅니다',style:{flex:'1 1 150px',padding:'9px',border:'1px solid #bfdbfe',background:'#eff6ff',color:'#1e40af',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'거래내역에서 이 입금 보기'),
-              a.officeStatus==='missing' && h('button',{onClick:function(){setHanaAlertOpen(false);window.navigateTo('biz/contract');},title:'맞는 계약이 아직 없으면 먼저 만듭니다',style:{flex:'1 1 150px',padding:'9px',border:'1px solid #fbbf24',background:'#fff',color:'#854d0e',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'계약 먼저 만들기'),
-              h('button',{onClick:function(){resolveHanaAdminAlert(a);},style:{flex:'1 1 130px',padding:'9px',border:0,background:'#2563eb',color:'#fff',borderRadius:'8px',fontWeight:800,cursor:'pointer'}},'확인 완료'))
+              h('button',{onClick:function(){hanaJumpTo(a);},title:'거래내역에서 이 입금 줄을 열어 짝 맞추기 추천을 봅니다',
+                style:Object.assign({},btn,{border:'1px solid #bfdbfe',background:'#ffffff',color:'#1e40af'})},'📄 거래내역'),
+              a.officeStatus==='missing' && h('button',{onClick:function(){setHanaAlertOpen(false);window.navigateTo('biz/contract');},title:'맞는 계약이 아직 없으면 먼저 만듭니다',
+                style:Object.assign({},btn,{border:'1px solid #fbbf24',background:'#ffffff',color:'#854d0e'})},'📝 계약 만들기'),
+              h('button',{onClick:function(){resolveHanaAdminAlert(a);},
+                style:Object.assign({},btn,{border:0,background:'#2563eb',color:'#ffffff'})},'✓ 확인 완료'))
           );
-        })
+        }))
       )
     ),
 
@@ -53225,27 +53374,33 @@ function FinanceLedger(props){
        그중 스물이 «가끔 쓰는 연장»인데 화면의 100%를 차지하고 있었다.
      ★ 늘 쓰는 것만 남긴다: 어느 표를 보는가 · 지금 볼 일이 있는가.
      ★ 할 일 칩은 «있을 때만» 나온다 — 늘 떠 있으면 아무 뜻이 없다. */
-    h('div',{style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',
+    /* ⚠ 폰에서는 이 줄이 «한 줄»이다 (대표 지시 2026-10-17 「컴팩트하고 깔끔하게 한눈에」).
+       라디오 동그라미 셋이 줄의 절반을 먹어 「입금 확인」이 둘째 줄로 밀려났다 —
+       폰(css .ld-src)에서는 동그라미를 감추고 알약으로 그리며, 긴 말(.ld-lw)을 접는다.
+       넓은 화면은 그대로다. */
+    h('div',{className:'ld-src-row',style:{display:'flex',alignItems:'center',gap:'8px',flexWrap:'wrap',
       marginBottom:'8px'}},
       // 파일 종류 선택
-      h('label',{style:{display:'flex',alignItems:'center',gap:'4px',cursor:'pointer',fontSize:'13.5px',whiteSpace:'nowrap',fontWeight:fileType==='bank'?700:400,color:fileType==='bank'?'#2563eb':'#64748b'}},
+      h('label',{className:'ld-src'+(fileType==='bank'?' on':''),style:{display:'flex',alignItems:'center',gap:'4px',cursor:'pointer',fontSize:'13.5px',whiteSpace:'nowrap',fontWeight:fileType==='bank'?700:400,color:fileType==='bank'?'#2563eb':'#64748b'}},
         /* 종전에는 종류를 바꾸면 올린 것을 비웠다. 이제는 통장·카드를 함께 쌓아 두므로
            «비우기»가 아니라 «보는 쪽 바꾸기»다 — 올릴 때도 이 종류로 들어간다. */
-        h('input',{type:'radio',name:'ledgerType',checked:fileType==='bank',onChange:function(){setFileType('bank');setDetected(null);setIncChk({});}}),'🏦 은행 통장'),
-      h('label',{style:{display:'flex',alignItems:'center',gap:'4px',cursor:'pointer',fontSize:'13.5px',whiteSpace:'nowrap',fontWeight:fileType==='card'?700:400,color:fileType==='card'?'#2563eb':'#64748b'}},
+        h('input',{type:'radio',name:'ledgerType',checked:fileType==='bank',onChange:function(){setFileType('bank');setDetected(null);setIncChk({});}}),'🏦 ',h('span',{className:'ld-lw'},'은행 '),'통장'),
+      h('label',{className:'ld-src'+(fileType==='card'?' on':''),style:{display:'flex',alignItems:'center',gap:'4px',cursor:'pointer',fontSize:'13.5px',whiteSpace:'nowrap',fontWeight:fileType==='card'?700:400,color:fileType==='card'?'#2563eb':'#64748b'}},
         h('input',{type:'radio',name:'ledgerType',checked:fileType==='card',onChange:function(){setFileType('card');setDetected(null);setIncChk({});}}),'💳 카드'),
-      h('label',{title:'나이스빌 → CMS 출금 결과 내역 엑셀 (회원명·납부금액·정산예정일)',
+      h('label',{className:'ld-src'+(fileType==='nicebill'?' on':''),title:'나이스빌 → CMS 출금 결과 내역 엑셀 (회원명·납부금액·정산예정일)',
         style:{display:'flex',alignItems:'center',gap:'4px',cursor:'pointer',fontSize:'13.5px',whiteSpace:'nowrap',fontWeight:fileType==='nicebill'?700:400,color:fileType==='nicebill'?'#2563eb':'#64748b'}},
-        h('input',{type:'radio',name:'ledgerType',checked:fileType==='nicebill',onChange:function(){setFileType('nicebill');setRows(null);setDetected(null);}}),'🏦 나이스빌 CMS'),
+        h('input',{type:'radio',name:'ledgerType',checked:fileType==='nicebill',onChange:function(){setFileType('nicebill');setRows(null);setDetected(null);}}),'🏦 ',h('span',{className:'ld-lw'},'나이스빌 '),'CMS'),
       h('span',{style:{flex:1}}),
       /* 할 일 — 없으면 이 자리가 통째로 빈다 */
       hanaAlerts.length>0 && _meNow().isAdmin && h('button',{
         onClick:function(){setHanaAlertOpen(true);},
         title:'휴대폰으로 들어온 입금 가운데 사업장을 확인해야 하는 것',
+        className:'ld-src-alert',
         style:{padding:'3px 10px',background:'#fffbeb',color:'#854d0e',
           border:'1px solid #fde68a',borderRadius:'8px',fontSize:'13px',
           fontWeight:800,cursor:'pointer',whiteSpace:'nowrap',fontFamily:'inherit'}},
-        '🔔 입금 확인 '+hanaAlerts.length+'건'),
+        /* 폰에서는 「확인」·「건」을 접는다 — 숫자와 「입금」이 뜻을 다 말한다 */
+        '🔔 입금 ',h('span',{className:'ld-lw'},'확인 '),hanaAlerts.length,h('span',{className:'ld-lw'},'건')),
       hanaStatChip(),
     ),
     h('div',{
@@ -53677,7 +53832,8 @@ function FinanceLedger(props){
             navBtn(1,'▶', !showAll && idx<ldMonths.length-1)),
           /* ★ 「📆 오늘」 — 숫자를 함께 적어 «눌러 보기 전에» 몇 건인지 안다.
              오늘 것이 없으면 흐리게 두고 안 눌린다 — 헛되이 누르지 않게. */
-          h('button',{key:'td',
+          /* ⚠ 폰에서 0건이면 접는다(css .ld-bar-today.off) — 안 눌리는 흐린 단추가 탭 한 칸을 먹었다 */
+          h('button',{key:'td',className:'ld-bar-today'+(ldTodayCnt?'':' off'),
             onClick:function(){
               if(!ldTodayCnt) return;
               var on = !ldOnlyToday;
@@ -53742,7 +53898,8 @@ function FinanceLedger(props){
           style:{padding:'4px 10px',background:ldStF==='auto'?'#1e40af':'#eff6ff',color:ldStF==='auto'?'#fff':'#1e40af',
             border:'1px solid #bfdbfe',borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}},
           '🤖 저절로 확정 후보 '+autoRows.length+'건'),
-        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autot',
+        /* 설정 스위치는 폰에서 ⚙ 뒤로 접는다(.ld-bar-auto) — 한 번 정하면 그만인 것이다 */
+        ldTabEff==='inc' && _meNow().isAdmin && h('label',{key:'autot',className:'ld-bar-auto',
           title:'켜면 거래내역을 열 때 위 후보를 저절로 확정합니다 — 「확정 이력」에서 되돌릴 수 있습니다',
           style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',
             padding:'3px 8px',borderRadius:'6px',color:autoTidyOn?'#166534':'#64748b',
@@ -53769,8 +53926,11 @@ function FinanceLedger(props){
           style:{padding:'4px 10px',background:ldTools?'#1e40af':'#fff',
             color:ldTools?'#fff':'#475569',border:'1px solid '+(ldTools?'#1e40af':'#cbd5e1'),
             borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap'}},
-          ldTools ? '✕ 도구 접기' : '⚙ 도구'),
-        ldTabEff==='exp' && expCnt>0 && h('button',{
+          /* 폰(≤440px)에서는 「도구」 낱말을 접어 ⚙ 만 — 첫 줄(📆·입금·출금·⚙)이 한 줄에 앉게 */
+          ldTools ? '✕ 도구 접기' : ['⚙',h('span',{key:'w',className:'ld-tools-w'},' 도구')]),
+        /* 폰에서는 ⚙ 뒤로 접는다(.ld-bar-auto) — 배운 것은 열자마자 저절로 채워져(아래 효과)
+           이 단추는 «가끔» 쓴다. 넓은 화면은 그대로다. */
+        ldTabEff==='exp' && expCnt>0 && h('button',{className:'ld-bar-auto',
           onClick:function(){
             var nm=Object.assign({},expCat);
             var okN=0;
@@ -53823,7 +53983,7 @@ function FinanceLedger(props){
             whiteSpace:'nowrap',flexShrink:0,fontFamily:'inherit'}
         },'🧹 겹친 줄 치우기 ' + expDupPairs.length),
         /* 켜 두면 매달 누를 것이 없다 — 배운 것은 열자마자 등록된다. */
-        ldTabEff==='exp' && h('label',{
+        ldTabEff==='exp' && h('label',{className:'ld-bar-auto',
           title:'전에 등록한 적요와 같은 출금은, 열자마자 그때 고른 카테고리로 저절로 등록합니다. '
             +'처음 보는 적요는 그대로 남아 직접 고르시면 됩니다.',
           style:{display:'inline-flex',alignItems:'center',gap:'5px',fontSize:'13px',
@@ -53835,22 +53995,11 @@ function FinanceLedger(props){
             onChange:function(){ setExpAutoReg(!expAutoReg); },
             style:{cursor:'pointer'}}),
           expAutoReg ? '🤖 배운 것은 저절로 등록 (켜짐)' : '🤖 배운 것은 저절로 등록'),
-        ldTabEff==='exp' && expReadyCnt>0 && h('button',{
+        /* 폰에서는 «주 단추»(.ld-bar-go) — 띠 맨 아래 한 줄을 통째로 쓴다(입금 탭의 확정 단추와 같은 자리) */
+        ldTabEff==='exp' && expReadyCnt>0 && h('button',{className:'ld-bar-go',
           onClick:async function(){
             if(!(await popConfirm('카테고리 선택된 출금 '+expReadyCnt+'건을 등록합니다.'))) return;
-            var done=[];
-            expAll.forEach(function(row){
-              if(row._dup) return;
-              if(expCat[row._k]){
-                saveExpense(row,expCat[row._k]);
-                erpLearnExpenseCat(row.memo||row.note||'', expCat[row._k]);
-                var _cn=EXP_CATS.find(function(c){return c.code===expCat[row._k];});
-                erpMarkBankRowProcessed(row,'expense',(_cn?_cn.name:expCat[row._k]));
-                done.push(row._k);
-              }
-            });
-            done.forEach(function(k){removeRow(k,'exp');});
-            showToast('✅ 출금 '+done.length+'건 등록');
+            showToast('✅ 출금 '+registerExpRows(expList)+'건 등록');
           },
           style:{padding:'4px 11px',background:'#d97706',color:'#fff',border:'none',borderRadius:'6px',fontSize:'13px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',flexShrink:0}
         },'💸 출금 '+expReadyCnt+'건 등록')
@@ -54353,10 +54502,15 @@ function FinanceLedger(props){
 
       // ── 출금 테이블 (출금 탭에서만 렌더) ──
       ldTabEff==='exp' && expList.length>0 && h('div',null,
-        h('div',{style:{fontWeight:700,fontSize:'12px',color:'#854d0e',marginBottom:'6px',padding:'4px 10px',background:'#fffbeb',borderRadius:'5px',display:'flex',alignItems:'center',gap:'8px'}},
-          '💸 '+(incMon?parseInt(incMon.slice(5),10)+'월 ':'')+'출금 내역 — 카테고리 선택 후 출금관리 등록',
+        /* ⚠ 폰에서는 «한 줄»(css .ld-exp-head) — 안내 글(.ld-lw)을 접는다. 고르는 칸이 눈앞에 있어
+           「카테고리 선택 후 등록」은 읽지 않아도 안다. 넓은 화면은 그대로다. */
+        h('div',{className:'ld-exp-head',style:{fontWeight:700,fontSize:'12px',color:'#854d0e',marginBottom:'6px',padding:'4px 10px',background:'#fffbeb',borderRadius:'5px',display:'flex',alignItems:'center',gap:'8px'}},
+          /* 제목과 안내는 «한 덩이» — 따로 두면 머리줄 gap 이 둘 사이를 벌린다 */
+          h('span',{style:{whiteSpace:'nowrap'}},
+            '💸 '+(incMon?parseInt(incMon.slice(5),10)+'월 ':'')+'출금 내역',
+            h('span',{className:'ld-lw'},' — 카테고리 선택 후 출금관리 등록')),
           /* 카드별로 갈라 보기 — 어떤 카드가 몇 건인지 함께 적는다(0건이면 눌러 볼 것이 없다). */
-          Object.keys(expCardCnt).length > 0 && h('span',{style:{display:'inline-flex',gap:'4px',marginLeft:'8px',flexWrap:'wrap'}},
+          Object.keys(expCardCnt).length > 0 && h('span',{className:'ld-exp-cards',style:{display:'inline-flex',gap:'4px',marginLeft:'8px',flexWrap:'wrap'}},
             [''].concat(Object.keys(expCardCnt).sort()).map(function(t){
               var on = expCardPick === t;
               return h('button',{key:t||'all',type:'button',
@@ -54368,12 +54522,49 @@ function FinanceLedger(props){
                   background:on?'#1e40af':'#ffffff',color:on?'#ffffff':'#475569'}},
                 (t ? (t+' '+expCardCnt[t]) : '전체 '+expList.length));
             })),
-          h('span',{style:{marginLeft:'auto',fontWeight:800,color:'#d97706'}},
-            expList.length+'건 · 합계 '+expSum.toLocaleString()+'원')),
+          h('span',{className:'ld-exp-sum',style:{marginLeft:'auto',fontWeight:800,color:'#d97706',whiteSpace:'nowrap'}},
+            expList.length+'건 · ',h('span',{className:'ld-lw'},'합계 '),expSum.toLocaleString()+'원')),
+        /* ── ☐ 고른 것 띠 — 고른 것이 있을 때만 (CLAUDE.md 「고른 뒤 목록 위에 N건 선택과 할 수 있는 일」) ──
+           ⚠ «지금 보이는» 고른 줄(expChkVis)만 센다 — 거르기로 숨은 줄은 건드리지 않는다.
+           ⚠ 카테고리를 한꺼번에 «고르기만» 한다. 등록은 따로 누르고, 누를 때 건수를 묻는다. */
+        expChkVis.length>0 && h('div',{className:'ld-x-sel',style:{display:'flex',alignItems:'center',gap:'6px',flexWrap:'wrap',
+            marginBottom:'6px',padding:'4px 10px',background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'5px'}},
+          h('span',{style:{fontSize:'12.5px',fontWeight:800,color:'#1e40af',whiteSpace:'nowrap'}},'✓ '+expChkVis.length+'건 선택'),
+          h('select',{value:'',title:'고른 줄에 같은 카테고리를 한꺼번에 고릅니다 — 등록은 아직 안 합니다',
+            onChange:function(e){
+              var v=e.target.value;
+              if(!v) return;
+              var nm=Object.assign({},expCat);
+              expChkVis.forEach(function(r){ nm[r._k]=v; });
+              setExpCat(nm);
+              var _cn=EXP_CATS.find(function(c){return c.code===v;});
+              showToast('고른 '+expChkVis.length+'건에 「'+(_cn?_cn.name:v)+'」를 골랐습니다 — 등록은 「고른 것 등록」을 누르세요');
+            },
+            style:{fontSize:'12.5px',padding:'2px 6px',border:'1px solid #bfdbfe',borderRadius:'5px',
+              background:'#ffffff',color:'#1e40af',fontFamily:'inherit',maxWidth:'100%'}},
+            h('option',{value:''},'카테고리 한꺼번에 고르기'),
+            EXP_CATS.map(function(c){ return h('option',{key:c.code,value:c.code},c.name); })),
+          expChkReady>0 && h('button',{type:'button',
+            onClick:async function(){
+              if(!(await popConfirm('고른 출금 가운데 카테고리가 있는 '+expChkReady+'건을 등록합니다.'))) return;
+              var n=registerExpRows(expChkVis);
+              setExpChk({});
+              showToast('✅ 출금 '+n+'건 등록');
+            },
+            style:{padding:'3px 10px',background:'#d97706',color:'#ffffff',border:'none',borderRadius:'5px',
+              fontSize:'12.5px',fontWeight:800,cursor:'pointer',whiteSpace:'nowrap',fontFamily:'inherit'}},
+            '💸 고른 것 등록 '+expChkReady+'건'),
+          h('button',{type:'button',onClick:function(){ setExpChk({}); },
+            style:{padding:'3px 9px',background:'#ffffff',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'5px',
+              fontSize:'12.5px',fontWeight:700,cursor:'pointer',whiteSpace:'nowrap',fontFamily:'inherit'}},'선택 풀기')),
         h('div',{ref:_ldFill.ref,style:_ldBox},
-          h('table',{style:{width:'100%',borderCollapse:'separate',borderSpacing:0}},
+          /* ld-xt — 폰에서 줄 하나를 «카드 두 줄»로 (대표 지시 2026-10-17 「컴팩트하고 깔끔하게 한눈에」).
+             여태 이 표만 폰 손질이 없어, 일곱 칸이 옆으로 밀려 금액·카드·적요 셋만 보였다(대표 화면).
+             칸마다 손잡이(ld-x-*)를 달아 css 가 자리를 정한다 — 넓은 화면은 그대로다. */
+          h('table',{className:'ld-xt',style:{width:'100%',borderCollapse:'separate',borderSpacing:0}},
             h('thead',null,h('tr',null,
-              h('th',{style:Object.assign({},thS,{width:'34px',textAlign:'right'})},'#'),
+              h('th',{className:'ld-x-chk',style:Object.assign({},thS,{width:'28px',textAlign:'center',padding:'6px 2px'})},expAllBox()),
+              h('th',{style:Object.assign({},thS,{width:'36px',textAlign:'right'})},'#'),
               h('th',{style:thS},'날짜'),h('th',{style:thS},'출금액'),
               /* 카드를 «따로» 세운다 — 적요에 섞여 있으면 카드만 골라 볼 수가 없다. */
               h('th',{style:Object.assign({},thS,{width:'64px'})},'카드'),
@@ -54390,19 +54581,20 @@ function FinanceLedger(props){
                 var fTd = Object.assign({}, tdS, { padding:'2px 6px' });
                 var fIn = { fontSize:'13px', padding:'2px 6px', fontFamily:'inherit',
                   border:'1px solid #e2e8f0', borderRadius:'5px' };
-                return h('tr',{style:{background:'#f8fafc'}},
-                  h('td',{style:fTd,colSpan:4},''),
-                  h('td',{style:fTd},
+                /* 폰에서는 이름표 줄을 접으므로 «☐ 전체»를 이 줄 첫 칸에 한 번 더 둔다(.ld-x-allm) */
+                return h('tr',{className:'ld-x-filter',style:{background:'#f8fafc'}},
+                  h('td',{className:'ld-x-allm',style:fTd,colSpan:5},expAllBox()),
+                  h('td',{className:'ld-x-q',style:fTd},
                     h('input',{type:'search',value:expQ,placeholder:'적요 찾기',
                       onInput:function(e){ setExpQ(e.target.value); },
                       style:Object.assign({},fIn,{width:'150px',maxWidth:'100%'})})),
-                  h('td',{style:fTd},
+                  h('td',{className:'ld-x-catf',style:fTd},
                     h('select',{value:expCatF,onChange:function(e){ setExpCatF(e.target.value); },
                       style:Object.assign({},fIn,{maxWidth:'100%'})},
                       h('option',{value:''},'카테고리 전체'),
                       h('option',{value:'__none'},'아직 안 고른 것만'),
                       EXP_CATS.map(function(c){ return h('option',{key:c.code,value:c.code},c.name); }))),
-                  h('td',{style:fTd},
+                  h('td',{className:'ld-x-clr',style:fTd},
                     (expQ||expCatF) ? h('button',{type:'button',
                       onClick:function(){ setExpQ(''); setExpCatF(''); },
                       style:{padding:'1px 7px',fontSize:'12.5px',fontWeight:700,cursor:'pointer',
@@ -54416,18 +54608,32 @@ function FinanceLedger(props){
               var g=expGuess[row._k];
               var learned=(g && g.category && cat===g.category) ? (parseInt(g.count,10)||0) : 0;
               var dupInfoE=row._dup?erpIsBankRowProcessed(row):null;
-              return h('tr',{key:row._k,style:{background:cat?'#fffbeb':'#fff',opacity:row._dup?0.55:1}},
-                h('td',{style:Object.assign({},tdS,{textAlign:'right',color:'#94a3b8',fontSize:'12.5px',fontVariantNumeric:'tabular-nums'})},_re+1),
+              return h('tr',{key:row._k,style:{background:expChk[row._k]?'#eff6ff':(cat?'#fffbeb':'#fff'),opacity:row._dup?0.55:1}},
+                /* ☐ — 이미 처리된 줄(_dup)은 고를 것이 없다(입금 표와 같다) */
+                h('td',{className:'ld-x-chk',style:Object.assign({},tdS,{textAlign:'center',padding:'5px 2px'})},
+                  !row._dup && h('input',{type:'checkbox',style:{cursor:'pointer'},checked:!!expChk[row._k],
+                    'aria-label':(_re+1)+'번 줄 고르기',
+                    /* 함수꼴로 고친다 — 빨리 연달아 누르면 앞에 누른 것이 낡은 값에 덮이지 않게 */
+                    onChange:function(){
+                      setExpChk(function(cur){
+                        var nm=Object.assign({},cur);
+                        if(nm[row._k]) delete nm[row._k]; else nm[row._k]=true;
+                        return nm;
+                      });
+                    }})),
+                h('td',{className:'ld-x-no',style:Object.assign({},tdS,{textAlign:'right',color:'#94a3b8',fontSize:'12.5px',fontVariantNumeric:'tabular-nums'})},_re+1),
                 /* ⚠ 「2026-01-12 04:50:40」을 그대로 두면 좁은 칸에서 «석 줄» 로 접힌다
                    (대표 화면 2026-08-30: 「2중 3중으로 만들지 말고 한 줄씩」).
                    연도와 초는 어느 출금인지 가리는 데 안 쓰인다 — 온전한 값은 title 에 남긴다.
                    ⚠ 줄바꿈을 막는 것만으로는 모자라다. 막기만 하면 칸이 넓어져
                      옆 칸들이 밀려난다 — 글자 자체를 줄여야 한 줄이 된다. */
-                h('td',{style:Object.assign({},tdS,{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}),
-                  title:row.date||''}, String(row.date||'').slice(5,16)),
-                h('td',{style:Object.assign({},tdS,{fontWeight:700,color:'#854d0e',whiteSpace:'nowrap'})},row.amount.toLocaleString()+'원'),
+                h('td',{className:'ld-x-date',style:Object.assign({},tdS,{whiteSpace:'nowrap',fontVariantNumeric:'tabular-nums'}),
+                  title:row.date||''}, String(row.date||'').slice(5,10),
+                  /* 시각은 폰에서 접는다(.ld-lw) — 412px 에서 적요·고르개 자리를 40px 먹었다. 넓은 화면은 그대로 */
+                  h('span',{className:'ld-lw'},String(row.date||'').slice(10,16))),
+                h('td',{className:'ld-x-amt',style:Object.assign({},tdS,{fontWeight:700,color:'#854d0e',whiteSpace:'nowrap'})},row.amount.toLocaleString()+'원'),
                 /* 카드 칸 — 없으면 비워 둔다(은행 줄). 「-」 같은 것을 채우지 않는다. */
-                h('td',{style:Object.assign({},tdS,{whiteSpace:'nowrap'})},
+                h('td',{className:'ld-x-card',style:Object.assign({},tdS,{whiteSpace:'nowrap'})},
                   /* ★ 적요 아래에 있던 「하나카드 승인 문자 · ****9950」을 «여기로» 옮겼다
                      (대표 지시 2026-08-29). 적요 칸에 두 줄로 붙어 있으면 가게 이름을 가리고,
                      카드 칸에는 번호만 있어 두 곳이 같은 말을 나눠 갖고 있었다. */
@@ -54442,7 +54648,9 @@ function FinanceLedger(props){
                       h('span',{style:{fontSize:'12.5px',fontWeight:800,color:'#1e40af',
                         background:'#eff6ff',border:'1px solid #bfdbfe',borderRadius:'6px',
                         padding:'1px 5px'}}, t),
-                      h('span',{style:{fontSize:'12px',fontWeight:700,
+                      /* 폰에서는 「승인」을 접는다(.ld-x-cardst) — 거의 모든 줄이 같은 말이라 자리만 먹는다.
+                         「취소」는 남긴다 — 그것이 알아야 할 말이다. */
+                      h('span',{className:'ld-x-cardst'+(isC?' c':''),style:{fontSize:'12px',fontWeight:700,
                         color: isC ? '#991b1b' : '#64748b'}}, isC ? '취소' : '승인'));
                   })()),
                 /* ══ 적요 칸은 «한 줄»이다 (대표 지시 2026-08-30) ══════════════════
@@ -54454,7 +54662,7 @@ function FinanceLedger(props){
                      넓힐 수 있으면 넓히고, 그래도 넘치면 «…» 로 자르고 title 에 담는다.
                    ⚠ 아래 표들(취소 짝·이미 처리됨·인사 급여·같은 결제)도 «같은 줄»에 선다.
                      하나라도 위아래로 쌓으면 그 줄만 키가 커져 표 전체가 성글어 보인다. */
-                h('td',{style:Object.assign({},tdS,{color:'#475569',maxWidth:'360px'})},
+                h('td',{className:'ld-x-memo',style:Object.assign({},tdS,{color:'#475569',maxWidth:'360px'})},
                   h('div',{style:{display:'flex',alignItems:'center',gap:'5px',
                     whiteSpace:'nowrap',minWidth:0}},
                   h('span',{title:row.memo||'',
@@ -54525,11 +54733,17 @@ function FinanceLedger(props){
                        장부에서 한 건이 조용히 사라진다. 고르는 것은 사람이 한다.
                      ⚠ 인사 급여 표(바로 위)와 «나란히» 산다 — 2026-08-30 리베이스에서
                        둘이 같은 자리를 다퉜다. 한쪽을 고르면 다른 쪽 일이 통째로 사라진다. */
-                  ,row._hint && h('span',{title:'날짜·금액이 같고 가게 이름의 앞부분도 같은 줄이 또 있습니다.\n휴대폰 문자와 카드사 이용내역이 같은 결제를 다르게 적으면 이렇게 됩니다.\n같은 것이면 한 줄을 지우세요 — 다른 가게라면 그냥 두시면 됩니다.',
+                  /* ⚠★ «!!» 를 떼지 말 것 (2026-10-17 대표 폰 화면). 예전에 _hint 가 1/0 이었고,
+                     「0 && …」 은 false 가 아니라 «0» 이라 Preact 가 글자 「0」을 그렸다 —
+                     출금 304줄 전부 적요 뒤에 「0」이 붙어 있었다(은행 메모 0 은 이미 걷었는데도). */
+                  ,!!row._hint && h('span',{title:'날짜·금액이 같고 가게 이름의 앞부분도 같은 줄이 또 있습니다.\n휴대폰 문자와 카드사 이용내역이 같은 결제를 다르게 적으면 이렇게 됩니다.\n같은 것이면 한 줄을 지우세요 — 다른 가게라면 그냥 두시면 됩니다.',
                     style:{marginLeft:'3px',display:'inline-block',background:'#eff6ff',color:'#1e40af',
                       border:'1px solid #bfdbfe',borderRadius:'8px',padding:'0 5px',fontSize:'12px',fontWeight:700}},
                     '↔ 같은 결제일 수 있음'))),
-                h('td',{style:tdS},
+                h('td',{className:'ld-x-cat',style:tdS},
+                  /* ⚠ 고르개와 「학습됨」은 «한 줄»이다 (CLAUDE.md 「표의 한 칸은 한 줄」).
+                     예전에는 고르개를 폭 100% 로 두고 학습됨을 그 아래에 붙여, 배운 줄만 두 줄이었다. */
+                  h('div',{style:{display:'flex',alignItems:'center',gap:'4px',minWidth:0}},
                   /* ══ 고르는 «그 자리»에서 끝낸다 (대표 지시 2026-08-29) ══════════
                      「이렇게 멀리서 클릭하는거 마우스 움직임 불편하다,
                        어떻게 한번에 처리방법 없나?」
@@ -54564,29 +54778,25 @@ function FinanceLedger(props){
                       if(same.length>1) showToast('같은 적요 '+same.length+'건을 함께 골랐습니다 — 「출금 N건 등록」을 누르세요');
                       return;
                     }
-                    /* 스위치가 켜져 있다 — 여기서 끝낸다. */
-                    var done=[];
-                    same.forEach(function(r){
-                      saveExpense(r,v);
-                      erpLearnExpenseCat(r.memo||r.note||'', v);
-                      erpMarkBankRowProcessed(r,'expense',_nm2);
-                      done.push(r._k);
-                    });
-                    done.forEach(function(k){ removeRow(k,'exp'); });
-                    showToast('✅ '+_nm2+' '+done.length+'건 등록'
-                      +(done.length>1?' — 같은 적요를 함께 처리했습니다':'')
+                    /* 스위치가 켜져 있다 — 여기서 끝낸다.
+                       저장은 한 벌(registerExpRows)에 «방금 고른 값(nm)»을 넘긴다 — 같은 적요 여러 줄이어도
+                       배우기·처리 표시는 한 번에 간다(줄마다 가면 다른 기기에 충돌 경보). */
+                    var doneN=registerExpRows(same, nm);
+                    showToast('✅ '+_nm2+' '+doneN+'건 등록'
+                      +(doneN>1?' — 같은 적요를 함께 처리했습니다':'')
                       +' · 다음 달부터는 저절로 됩니다');
-                  },style:{width:'100%',fontSize:'13px',padding:'3px 5px',border:'1px solid #e2e8f0',borderRadius:'4px',
+                  },style:{flex:'1 1 auto',minWidth:0,width:'100%',fontSize:'13px',padding:'3px 5px',border:'1px solid #e2e8f0',borderRadius:'4px',
                     background:cat?'#fffbeb':'#fff',color:cat?'#854d0e':'#475569',fontWeight:cat?700:400}},
-                    h('option',{value:''},'-- 카테고리 선택 --'),
+                    /* 「-- … --」 를 뗐다 — 폰 카드의 좁은 고르개에서 「-- 카테고리 선」으로 잘렸다 */
+                    h('option',{value:''},'카테고리 선택'),
                     EXP_CATS.map(function(c){return h('option',{key:c.code,value:c.code},c.name);})
                   ),
                   learned>0 && h('span',{title:'같은 적요로 '+learned+'회 등록한 카테고리입니다',
-                    style:{display:'inline-block',marginTop:'2px',background:'#f0fdf4',color:'#166534',
+                    style:{flexShrink:0,whiteSpace:'nowrap',background:'#f0fdf4',color:'#166534',
                       border:'1px solid #bbf7d0',borderRadius:'8px',padding:'0 5px',fontSize:'12px',fontWeight:700}},
                     '학습됨 ×'+learned)
-                ),
-                h('td',{style:Object.assign({},tdS,{whiteSpace:'nowrap'})},
+                )),
+                h('td',{className:'ld-x-act',style:Object.assign({},tdS,{whiteSpace:'nowrap'})},
                   cat
                     ? h('button',{onClick:async function(){
                         if(!(await popConfirm((row._dup?'⚠️ 이미 처리된 행입니다.\n\n':'')+(catName?catName.name:'') +' '+row.amount.toLocaleString()+'원 출금 등록'))) return;
@@ -54596,9 +54806,10 @@ function FinanceLedger(props){
                         removeRow(row._k,'exp');
                         showToast(_lc ? '✅ 출금 등록 · 카테고리 학습됨' : '✅ 출금 등록');
                       },style:{padding:'4px 10px',background:'#d97706',color:'#fff',border:'none',borderRadius:'5px',fontSize:'13px',fontWeight:700,cursor:'pointer'}},'💸 등록')
-                    : h('span',{style:{fontSize:'12px',color:'#94a3b8'}},'선택 필요'),
+                    : h('span',{className:'ld-x-need',style:{fontSize:'12px',color:'#94a3b8'}},'선택 필요'),
                   ' ',
-                  h('button',{onClick:function(){removeRow(row._k,'exp');},
+                  /* ✕ 는 폰에서 접는다(.ld-act-x) — 좁은 자리에서 실수로 누르기 쉽고 기록이 안 남는다(입금 표와 같다) */
+                  h('button',{className:'ld-act-x',title:'화면에서만 지웁니다 — 기록은 남지 않습니다',onClick:function(){removeRow(row._k,'exp');},
                     style:{padding:'4px 7px',background:'#f8fafc',color:'#94a3b8',border:'none',borderRadius:'4px',fontSize:'12px',cursor:'pointer'}},'✕')
                 )
               );
@@ -54607,7 +54818,7 @@ function FinanceLedger(props){
             h('tfoot',null,
               // 아직 안 그린 행 잇기 — 입금 표와 같은 이유(그리는 양 줄이기)
               expList.length>ldShow && h('tr',null,
-                h('td',{colSpan:7,style:{padding:'8px',textAlign:'center',background:'#fffbeb'}},
+                h('td',{colSpan:8,style:{padding:'8px',textAlign:'center',background:'#fffbeb'}},
                   h('button',{onClick:function(){ setLdShow(ldShow+200); },
                     style:{padding:'6px 18px',background:'#fff',color:'#d97706',border:'1px solid #fde68a',
                       borderRadius:'7px',fontSize:'12px',fontWeight:800,cursor:'pointer'}},
@@ -54619,10 +54830,10 @@ function FinanceLedger(props){
                       borderRadius:'7px',fontSize:'13px',fontWeight:700,cursor:'pointer'}},
                     '모두 펼치기'))),
               h('tr',{style:{background:'#fffbeb',borderTop:'2px solid #fde68a'}},
-              h('td',{style:Object.assign({},tdS,{textAlign:'right',fontWeight:800,color:'#d97706',fontSize:'13px'})},'합계'),
+              h('td',{colSpan:2,style:Object.assign({},tdS,{textAlign:'right',fontWeight:800,color:'#d97706',fontSize:'13px'})},'합계'),
               h('td',{style:Object.assign({},tdS,{fontWeight:700,color:'#d97706',fontSize:'13px',whiteSpace:'nowrap'})},expList.length+'건'),
               h('td',{style:Object.assign({},tdS,{fontWeight:800,color:'#d97706',whiteSpace:'nowrap'})},expSum.toLocaleString()+'원'),
-              h('td',{style:tdS,colSpan:3},'')
+              h('td',{style:tdS,colSpan:4},'')
             ))
           )
         )
