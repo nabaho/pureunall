@@ -15,7 +15,7 @@ new Function(['var S={formFund:"F1",_dsLeave:null};',
   'function _boss(f){ return (f.officers||[]).filter(function(o){ return /이사장/.test(o.role||""); })[0]||{name:f.chairman||""}; }',
   'function _prepCommittee(f,side){ return (f.officers||[]).filter(function(o){ return (o.role||"").indexOf(side==="사용자측"?"사용자":"근로자")>=0; }).map(function(o){ return {name:o.name}; }); }',
   'function _hwpTodayIso(){ return "2026-10-18"; }',
-  fnSrc('_hwpKoDate'), fnSrc('_hwpKoDate2'), fnSrc('_dotDate'), varSrc('DS_REASON'), fnSrc('_dsReasonOf'), fnSrc('_hwpDisValues'),
+  fnSrc('dsDue'), fnSrc('withdrawShare'), fnSrc('_hwpKoDate'), fnSrc('_hwpKoDate2'), fnSrc('_dotDate'), varSrc('DS_REASON'), fnSrc('_dsReasonOf'), fnSrc('_hwpDisValues'),
   'this.S=S; this.V=_hwpDisValues; this.R=_dsReasonOf;'].join('\n')).call(box);
 
 const F = { name: '가나다공동근로복지기금', fund_type: '공동', inka_no: '0000-2026-1', address: '충청남도 천안시 가상로 1',
@@ -47,12 +47,12 @@ test('★ 탈퇴 보고서 — 미리 읽어 둔 «가장 최근 탈퇴한 사�
 });
 
 test('★ 배선 — 목록·단계·한글 틀·말 바꾸기 안 함·미리 읽기·HTML 미리보기', () => {
-  assert.ok(SRC.includes("['dis_notice','해산통지서(별지 제14호)'],['dis_plan','재산 처분계획서'],['dis_close_reg','청산종결 등기신청서'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동']];"));
+  assert.ok(SRC.includes("['dis_notice','해산통지서(별지 제14호)'],['dis_plan','재산 처분계획서'],['dis_close_reg','청산종결 등기신청서'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동'],\n  ['dis_creditor','채권신고 공고문'],['leave_apply','공동기금 탈퇴 신청서','공동'],['leave_calc','탈퇴 사업주 재산배분 계산서','공동']];"));
   assert.ok(SRC.includes('DOC_SUB,DOC_DIS);') && SRC.includes("['dis',DOC_DIS]]"));
   assert.ok(/dis_notice:'공동', dis_leave:'공동'/.test(SRC), 'HWP_TPL_KINDS');
   assert.ok(SRC.includes('dis_notice:_hwpDisValues, dis_leave:_hwpDisValues,'), 'HWP_TPL_VALUES');
   assert.ok(SRC.includes('dis_notice:1,dis_leave:1};'), '«[ ] 사내 / [ ] 공동» 줄이 말 바꾸기로 깨지면 안 된다');
-  assert.ok(fnSrc('_docExtra').includes("if(kind==='dis_leave') return _dsLeaveLoad(f);"));
+  assert.ok(fnSrc('_docExtra').includes("if(/^(dis_leave|leave_apply|leave_calc)$/.test(String(kind||''))) return _dsLeaveLoad(f);"));
   assert.ok(fnSrc('_dsLeaveLoad').includes('withClosed:true'), '탈퇴한 곳까지 읽어야 한다');
   assert.ok(fnSrc('docBody').includes("if(/^dis_/.test(String(kind||''))) return _dsDocHTML(kind,f,sites);"));
   assert.ok(/'liq\+21d','dis_notice','별지 14호 해산통지서'/.test(SRC) && /'leaveDay\+21d','dis_leave','별지 14호의2 탈퇴 보고서'/.test(SRC), '단계에서 서식으로 바로 간다');
@@ -90,4 +90,35 @@ test('★ 배선 — 다섯 틀은 사내 작성본(공동이면 말 바꿈), �
   assert.equal((SRC.match(/'dis_accept','취임승낙서'/g) || []).length, 2, '사내 해산·공동 해산 둘 다');
   assert.equal((SRC.match(/'closeDay\+21d','dis_close_reg','청산종결 등기신청서'/g) || []).length, 2);
   assert.equal((SRC.match(/'dis_minutes','별지 13호 회의록'/g) || []).length, 2);
+});
+
+test('★ 채권신고 공고문 — 공고일은 오늘, 신고 마감은 공고 뒤 2개월, 해산 사유·청산인은 기금 자료', () => {
+  const G = Object.assign({}, F, { name: '가나다사내근로복지기금', fund_type: '사내', end_reason: '해산 — 근로복지기본법 제70조제4호' });
+  const V = box.V(G, [], 'dis_creditor');
+  assert.equal(V.공고일, '2026년 10월 18일'); assert.equal(V.신고마감, '2026년 12월 18일');
+  assert.match(V.해산사유, /제70조제4호\(해당 사업주의 공동근로복지기금의 조성 참여/); assert.equal(V.청산인, '김철수'); assert.equal(V.기금명, '가나다사내근로복지기금');
+});
+
+test('★ 탈퇴 신청서·재산배분 계산서 — 탈퇴한 사업장 칸, 계산기 숫자, 모르면 비움(지어내지 않음)', () => {
+  box.S._dsLeave = { fid: 'F1', n: 1, site: { name: '(주)예시전자', ceo: '홍길동', address: '충청남도 아산시 예시로 22', company_size: '37', leave_date: '2026-10-01', contrib: '90,000,000' } };
+  box.S._dsCalc = { fid: 'F1', v: '1,200,000,000', c: '', t: '900,000,000' };
+  const V = box.V(F, [], 'leave_calc');
+  assert.equal(V.배분사업장, '(주)예시전자'); assert.equal(V.배분기준일, '2026년 10월 1일');
+  assert.equal(V.재산가액, '1,200,000,000'); assert.equal(V.출연액, '90,000,000', '계산기에 출연액을 안 적었으면 사업장의 기본 출연금'); assert.equal(V.조성기금, '900,000,000');
+  assert.equal(V.배분액, '120,000,000');
+  const A = box.V(F, [], 'leave_apply');
+  assert.equal(A.신청사업장, '(주)예시전자'); assert.equal(A.신청대표, '홍길동'); assert.equal(A.신청근로자수, '37'); assert.equal(A.탈퇴사유, '');
+  assert.equal(A.신청일, '      년    월    일', '신청일은 손으로');
+  box.S._dsCalc = { fid: 'F1', v: '1,200,000,000', c: '', t: '' };
+  assert.equal(box.V(F, [], 'leave_calc').배분액, '', '조성 기금을 모르면 배분액을 지어내지 않는다');
+  box.S._dsCalc = { fid: 'OTHER', v: '9', c: '9', t: '9' };
+  assert.equal(box.V(F, [], 'leave_calc').재산가액, '', '다른 기금에서 적은 계산은 안 쓴다');
+});
+
+test('★ 배선 — 세 장은 단계에서 바로 가고, 계산기는 숫자를 보관한다', () => {
+  assert.ok(/dis_creditor:'공동', leave_apply:'공동', leave_calc:'공동'/.test(SRC));
+  assert.ok(SRC.includes('dis_creditor:_hwpDisValues, leave_apply:_hwpDisValues, leave_calc:_hwpDisValues}'));
+  assert.equal((SRC.match(/'liq\+2m','dis_creditor','채권신고 공고문'/g) || []).length, 2);
+  assert.ok(/'leave_apply','탈퇴 신청서'/.test(SRC)); assert.equal((SRC.match(/'leave_calc','재산배분 계산서'/g) || []).length, 2);
+  assert.ok(fnSrc('dsCalc').includes('S._dsCalc={fid:S.formFund,'), '계산기 숫자를 서식이 읽게');
 });

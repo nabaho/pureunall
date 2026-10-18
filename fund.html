@@ -788,7 +788,7 @@ var DS_FLOWS={
     ['청산인 취임 — 취임승낙서','민법 §82','','dis_accept','취임승낙서',''],
     ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','dis_reg','해산·청산인 취임 등기신청서',''],
     ['해산통지서 + 첨부 4종(해산 증명·정관·재산목록·처분계획서) — 지방노동관서','영 §52 · 규칙 §28 · 민법 §86','liq+21d','dis_notice','별지 14호 해산통지서',''],
-    ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
+    ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','dis_creditor','채권신고 공고문',''],
     ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
     ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
     ['잔여재산 처리 — 폐지: 미지급 임금 → 50% 이내 생활안정자금 → 정관 지정자·진흥기금 / 공동기금 참여: 그 공동기금에 귀속(기본재산·준비금 구분 승계)','법 §71 · 영 §53 · 해석 3866','','dis_plan','재산 처분계획서','closing'],
@@ -797,9 +797,9 @@ var DS_FLOWS={
     ['(진흥기금 귀속일 때만) 잔여재산 목록 제출·인도','영 §54','closeDay+21d','','잔여재산 목록',''],
     ['고유번호 폐지·계좌 해지·서류 보관 → 기금 «기록보관»','법 §57·§65','','','','info']]},
   leave:{label:'공동기금 탈퇴', type:'공동', sub:'참여 사업주 한 곳이 나감 — 2026-08-25 탈퇴 보고 신설', bases:[['apply','탈퇴 신청일'],['leaveDay','탈퇴일']], steps:[
-    ['탈퇴 사유 확인 + 증빙 — 도급 종료 / 미출연 3회+재고·생산·매출 악화 / 근로자 과반수 요구','영 §55의5①②','','','탈퇴 신청서',''],
+    ['탈퇴 사유 확인 + 증빙 — 도급 종료 / 미출연 3회+재고·생산·매출 악화 / 근로자 과반수 요구','영 §55의5①②','','leave_apply','탈퇴 신청서',''],
     ['공동기금협의회 협의·결정 — 탈퇴 회사 위원은 의결권 없음(기한 넘기면 탈퇴 결정 간주)','영 §55의5③④','apply+3m','ops_minutes_use','별지 13호 회의록',''],
-    ['배분 재산 계산 — 탈퇴 당시 재산가액 × 그 사업주 출연액 ÷ 조성된 공동기금','법 §86의8② · 규칙 §29의2','','','재산배분 계산서',''],
+    ['배분 재산 계산 — 탈퇴 당시 재산가액 × 그 사업주 출연액 ÷ 조성된 공동기금','법 §86의8② · 규칙 §29의2','','leave_calc','재산배분 계산서',''],
     ['재산 배분 → 받은 사업주는 사내기금 설치 또는 출연(출연금 처리)','법 §86의8③ · 해석 3866','','','배분 재산목록',''],
     ['탈퇴 보고서 + 회의록·사유 증명·배분 재산목록 — 지방노동관서','영 §55의5⑤ · 규칙 §29의3','leaveDay+21d','dis_leave','별지 14호의2 탈퇴 보고서',''],
     ['기본재산 총액 변경 보고','영 §35② · 규칙 §22','','ops_asset_change','별지 10호',''],
@@ -808,7 +808,7 @@ var DS_FLOWS={
     ['참여사업장 «탈퇴» 처리(탈퇴일)','','','','','sites']]},
   bizclose:{label:'공동기금 참여사 폐업', type:'공동', sub:'과반수 아님 — 그 몫은 근로자에게, 남으면 공동기금', bases:[['occur','폐업일']], steps:[
     ['폐업 증빙 — 폐업사실증명·청산 등','해석 2308(사업 폐지의 뜻)','','','',''],
-    ['그 사업주 몫 계산(탈퇴와 같은 산식)','법 §86의9① · 규칙 §29의2','','','재산배분 계산서',''],
+    ['그 사업주 몫 계산(탈퇴와 같은 산식)','법 §86의9① · 규칙 §29의2','','leave_calc','재산배분 계산서',''],
     ['미지급 임금 등 우선(사업주가 청산할 능력 없음을 증명) → 50% 이내 소속 근로자 생활안정자금','법 §86의9① · 영 §53①','','','',''],
     ['쓰고 남은 것은 공동기금에 귀속','법 §86의9②','','','',''],
     ['협의회 회의록','법 §57','','ops_minutes_use','별지 13호 회의록',''],
@@ -820,7 +820,7 @@ var DS_FLOWS={
     ['청산인 취임 — 취임승낙서','민법 §82','','dis_accept','취임승낙서',''],
     ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','dis_reg','해산·청산인 취임 등기신청서',''],
     ['해산통지서 + 첨부 4종 — 지방노동관서','영 §55의6→§52 · 규칙 §28','liq+21d','dis_notice','별지 14호 해산통지서',''],
-    ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
+    ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','dis_creditor','채권신고 공고문',''],
     ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
     ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
     ['재산 배분 — 출연한 비율로 참여 사업주에게, 잔여재산은 정관대로','법 §86의12','','dis_plan','재산 처분계획서','closing'],
@@ -5402,6 +5402,7 @@ var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex
   ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동', ops_audit:'공동', ops_minutes_close:'공동',
   sub_required:'공동', subsidy:'공동', sub_welfare_plan:'공동', sub_assets:'공동', sub_payment:'공동',
   sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동', dis_notice:'공동', dis_leave:'공동',
+  dis_creditor:'공동', leave_apply:'공동', leave_calc:'공동',
   dis_minutes:'사내', dis_accept:'사내', dis_reg:'사내', dis_plan:'사내', dis_close_reg:'사내'};   // 해산 절차 다섯은 2024 사내기금 작성본 — 공동이면 말을 바꾼다   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues, inka_annex:_hwpInkaAnnexValues,
@@ -5414,7 +5415,8 @@ var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpI
   sub_required:_hwpSubValues, subsidy:_hwpSubValues, sub_welfare_plan:_hwpSubValues, sub_assets:_hwpSubValues,
   sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues,
   dis_notice:_hwpDisValues, dis_leave:_hwpDisValues, dis_minutes:_hwpDisValues, dis_accept:_hwpDisValues,
-  dis_reg:_hwpDisValues, dis_plan:_hwpDisValues, dis_close_reg:_hwpDisValues};
+  dis_reg:_hwpDisValues, dis_plan:_hwpDisValues, dis_close_reg:_hwpDisValues,
+  dis_creditor:_hwpDisValues, leave_apply:_hwpDisValues, leave_calc:_hwpDisValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다 */
 var HWP_TPL_STRICT={charter:1};
 /* ★ 2026-09-27 사내 정관도 원본 한글 틀로 — 서식 이름(charter)은 하나, 틀만 기금 유형으로 고른다.
@@ -5796,13 +5798,22 @@ function _hwpDisValues(f,sites,kind){
   var b=_boss(f), sane=f.fund_type==='사내';
   var V={기금명:String(f.name||''), 인가번호:String(f.inka_no||''), 소재지:String(f.address||''),
     관할관서:String(f.labor_office||'').trim()||'○○지방고용노동청(○○○○지청)', 사내V:sane?'√':'  ', 공동V:sane?'  ':'√'};
-  if(kind==='dis_leave'){
+  if(kind==='dis_leave'||kind==='leave_apply'||kind==='leave_calc'){
     var L=(S._dsLeave&&S._dsLeave.fid===S.formFund)?S._dsLeave:null, s=L&&L.site;
     V.대표자=String(b.name||f.chairman||'');
     V.탈퇴일=(s&&s.leave_date)?_hwpKoDate(s.leave_date):'';
     V.사업장명=s?String(s.name||''):''; V.사업장대표=s?String(s.ceo||''):'';
     V.사업장소재지=s?String(s.address||''):''; V.근로자수=s?String(s.company_size||''):'';
     V.탈퇴사유='';
+    /* 탈퇴 신청서·재산배분 계산서 — 같은 사업장 칸을 다른 이름으로. 신청일은 모르니 손으로(지어내지 않는다) */
+    var blankD='      년    월    일';
+    V.신청사업장=V.사업장명; V.신청대표=V.사업장대표; V.신청소재지=V.사업장소재지; V.신청근로자수=V.근로자수; V.신청일=blankD;
+    var cv=(S._dsCalc&&S._dsCalc.fid===S.formFund)?S._dsCalc:{}, ct=(cv.c!==undefined&&cv.c!=='')?cv.c:((s&&s.contrib)||'');
+    var Wn=function(v){ var n=Number(String(v==null?'':v).replace(/[,\s원]/g,'')); return (v===''||v==null||isNaN(n))?'':n.toLocaleString(); };
+    var sh=withdrawShare(cv.v,ct,cv.t);
+    V.배분사업장=V.사업장명; V.배분기준일=(s&&s.leave_date)?_hwpKoDate(s.leave_date):blankD;
+    V.재산가액=Wn(cv.v); V.출연액=Wn(ct); V.조성기금=Wn(cv.t); V.배분액=(sh==null)?'':sh.toLocaleString();
+    V.작성일=_hwpKoDate(_hwpTodayIso());
     V._note=s?('가장 최근에 탈퇴한 사업장(「'+V.사업장명+'」'+(L.n>1?' 외 '+(L.n-1)+'곳':'')+')으로 채웠습니다 — 탈퇴 사유는 적어 주세요')
       :'탈퇴한 사업장이 없습니다 — 참여사업장에서 «탈퇴»로 바꾸고 탈퇴일을 넣으면 채워집니다';
     return V;
@@ -5819,6 +5830,7 @@ function _hwpDisValues(f,sites,kind){
   V.신청일=_hwpKoDate(_hwpTodayIso(),['    ','    ']); V.기금소재지=V.소재지; V.청산인주소=String(b.addr||'');
   V.등기번호=String(f.reg_no||''); V.등기소=String(f.registry_office||'')||'            지방법원            등기소';
   V.회의장소=''; V.청산종결='';
+  V.공고일=_hwpKoDate(_hwpTodayIso()); var _dl=dsDue('x+2m',{x:_hwpTodayIso()}); V.신고마감=_dl?_hwpKoDate(_dl):'';   // 민법 §88 — 공고 뒤 2개월 이상
   V.근위원=_prepCommittee(f,'근로자측',sites||[]).map(function(o){ return String(o.name||''); });
   V.사위원=_prepCommittee(f,'사용자측',sites||[]).map(function(o){ return String(o.name||''); });
   if(R.code==='4'){
@@ -5859,11 +5871,17 @@ function _dsLeaveLoad(f){
 /* 틀이 없을 때·샘플일 때의 HTML 미리보기 — 같은 값 함수에서 */
 function _dsDocHTML(kind,f,sites){
   var V=_hwpDisValues(f,sites,kind), R=function(k,v){ return '<tr><th style="width:150px">'+k+'</th><td>'+dgV(v,14)+'</td></tr>'; };
+  if(kind==='leave_apply'||kind==='leave_calc'){
+    var nt="<p class='note docnote'>※ 초안 — 원본 한글 틀로 보면 모양 그대로입니다. 밑줄 공란은 수기 기입.</p>";
+    return nt+(kind==='leave_apply'
+      ?'<h1>공동근로복지기금 탈퇴 신청서</h1><table>'+R('신청 사업장',V.신청사업장)+R('대표자',V.신청대표)+R('소재지',V.신청소재지)+R('근로자 수(명)',V.신청근로자수)+R('탈퇴 사유',V.탈퇴사유)+'</table><p>시행령 제55조의5 — 사유: 도급 관계 종료 / 미출연 3회+경영 악화 / 근로자 과반수 요구. 첨부: 사유를 증명하는 서류.</p>'
+      :'<h1>탈퇴 사업주 재산배분 계산서</h1><table>'+R('탈퇴(폐업) 사업주',V.배분사업장)+R('기준일',V.배분기준일)+R('당시 재산가액',V.재산가액)+R('출연 재산가액',V.출연액)+R('조성된 공동기금',V.조성기금)+R('배분액',V.배분액)+'</table><p>산식: 재산가액 × 출연액 ÷ 조성된 공동기금(시행규칙 제29조의2)</p>');
+  }
   if(kind!=='dis_leave'&&kind!=='dis_notice'){
-    var T={dis_minutes:'해산 결의 협의회 회의록',dis_accept:'청산인 취임승낙서',dis_reg:'해산 및 청산인 취임 등기신청서',dis_plan:'재산 처분계획서',dis_close_reg:'청산종결 등기신청서'}[kind]||docLabel(kind);
+    var T={dis_minutes:'해산 결의 협의회 회의록',dis_accept:'청산인 취임승낙서',dis_reg:'해산 및 청산인 취임 등기신청서',dis_plan:'재산 처분계획서',dis_close_reg:'청산종결 등기신청서',dis_creditor:'채권신고 공고'}[kind]||docLabel(kind);
     return "<p class='note docnote'>※ 초안 — 원본 한글 틀로 보면 2024 제출본 모양 그대로입니다. 밑줄 공란은 수기 기입.</p><h1>"+esc(T)+'</h1><table>'
       +R('기금법인',V.기금명)+R('주사무소',V.기금소재지)+R('해산 결의일',V.결의일)+R('해산 사유',V.해산사유)+R('청산인',V.청산인+(V.청산인직책?' ('+V.청산인직책+')':''))
-      +(kind==='dis_plan'?R('처분 목적',V.처분목적)+R('처분 방법',V.처분방법):'')+(kind==='dis_minutes'?R('잔여재산',V.잔여처리)+R('근로자위원',V.근위원.join(', '))+R('사용자위원',V.사위원.join(', ')):'')
+      +(kind==='dis_plan'?R('처분 목적',V.처분목적)+R('처분 방법',V.처분방법):'')+(kind==='dis_creditor'?R('공고일',V.공고일)+R('신고 마감',V.신고마감):'')+(kind==='dis_minutes'?R('잔여재산',V.잔여처리)+R('근로자위원',V.근위원.join(', '))+R('사용자위원',V.사위원.join(', ')):'')
       +'</table>';
   }
   var note="<p class='note docnote'>※ 법정서식(근로복지기본법 시행규칙) 초안 — 원본 한글 틀로 보면 원본 모양 그대로입니다. 밑줄 공란은 수기 기입.</p>";
@@ -6497,7 +6515,8 @@ var DOC_SUB=[['sub_required','지원금 신청 시 필요서류(안내)','공동
 /* ⑥ 인센티브(비용청구서) 단계는 뗐다(2026-09-06, 대표 지시 「불필요하다」). */
 // ⑥ 해산·탈퇴 법정서식(2026-10-18) — 절차·기한은 dsLibHTML
 var DOC_DIS=[['dis_minutes','해산 결의 협의회 회의록(별지 제13호)'],['dis_accept','청산인 취임승낙서'],['dis_reg','해산·청산인 취임 등기신청서'],
-  ['dis_notice','해산통지서(별지 제14호)'],['dis_plan','재산 처분계획서'],['dis_close_reg','청산종결 등기신청서'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동']];
+  ['dis_notice','해산통지서(별지 제14호)'],['dis_plan','재산 처분계획서'],['dis_close_reg','청산종결 등기신청서'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동'],
+  ['dis_creditor','채권신고 공고문'],['leave_apply','공동기금 탈퇴 신청서','공동'],['leave_calc','탈퇴 사업주 재산배분 계산서','공동']];
 var DOC_ALL=[].concat(DOC_KINDS,DOC_REG,DOC_TAX,DOC_OPS,DOC_SUB,DOC_DIS);
 /* 서식이 «어느 단계에» 사는지 — 목록에서 직접 찾는다.
    따로 적어 두면 서식을 옮겼을 때 표만 옛말이 되어, 눌러도 엉뚱한 단계가 열린다.
@@ -10051,7 +10070,7 @@ function _bizBaseLoad(f){
 }
 function _docExtra(kind,f){
   if(kind==='bizplan') return _bizBaseLoad(f);   // 장부 서식이 아니라 «앞 해 기말»만 — S._docR 는 그대로 둔다(묶음에서 다른 서식이 읽은 것을 지우지 않게)
-  if(kind==='dis_leave') return _dsLeaveLoad(f);   // 탈퇴 보고서 — 탈퇴한 사업장까지
+  if(/^(dis_leave|leave_apply|leave_calc)$/.test(String(kind||''))) return _dsLeaveLoad(f);   // 탈퇴 서류 — 탈퇴한 사업장까지
   S._docBf=null; S._docR=null;
   if(!DOC_NEEDS_LEDGER[kind]||!f||f._sample) return Promise.resolve(null);
   var fid=S.formFund, yr=S.year;
@@ -17131,6 +17150,7 @@ function dsLibHTML(cur,fundMode,formRows){
 }
 function dsCalc(){
   var g=function(id){ var el=$(id); return el?el.value:''; }, r=withdrawShare(g('ds-v'),g('ds-c'),g('ds-t')), o=$('ds-r');
+  S._dsCalc={fid:S.formFund, v:g('ds-v'), c:g('ds-c'), t:g('ds-t')};   // 탈퇴 사업주 재산배분 계산서가 이 숫자를 쓴다
   if(o) o.textContent=(r==null)?'—':won(r);
 }
 /* 기금 변경 이벤트 — 해산·탈퇴 갈래는 기준일을 넣으면 단계마다 기한이 붙는다 */
