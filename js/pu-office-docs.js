@@ -302,7 +302,34 @@
     + '.pod-sgst.seen{background:#dbeafe;color:#1e40af}.pod-sgst.submitted{background:#ede9fe;color:#5b21b6}.pod-sgst.saved{background:#dcfce7;color:#166534}'
     + '.pod-sgst.expired,.pod-sgst.void{background:#fee2e2;color:#991b1b}'
     + '.pod-toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#1e293b;color:#fff;padding:9px 16px;border-radius:8px;font-size:13px;z-index:1400}'
-    + '@media(max-width:700px){.pod-co{display:block}.pod-cl{width:auto;margin-bottom:10px;max-height:30vh;overflow-y:auto}.pod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pod th:nth-child(5),.pod td:nth-child(5){display:none}}';
+    + '@media(max-width:700px){.pod-co{display:block}.pod-cl{width:auto;margin-bottom:10px;max-height:30vh;overflow-y:auto}.pod-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pod th:nth-child(5),.pod td:nth-child(5){display:none}}'
+    /* 갈래 묶음은 한 칸(minmax(0,1fr)) — 그냥 grid 면 줄 글자(nowrap)만큼 칸이 넓어져 오른쪽 「✓ 서명본」이 잘렸다(대표 폰 캡처 2026-10-18) */
+    + '.pod-kbox{grid-template-columns:minmax(0,1fr)}'
+    /* ── 📱 폰 — 기업별 계약서 한눈에 (대표 2026-10-18 「UI 가 너무 아래까지 내려온다. 깔끔하게 정리」) ──
+       한 회사를 보려면 1,700px 를 내려가야 했다: 칩 세 줄 · 회사 줄 세 줄 · 회사 목록 상자(30vh) · 갈래 카드 ·
+       계약 기록 표 · 계약서 파일 표 — 같은 계약이 갈래 카드·기록 표·파일 표에 «세 번» 나왔다.
+       ① 회사 목록은 「▾ 회사 바꾸기」로 접는다(칩을 누르면 걸러진 목록이 펼쳐진다). 고르면 다시 접힌다
+       ② 갈래 칩은 한 줄 — 옆으로 민다
+       ③ 회사 줄은 한 줄 — 건수(아래 묶음 머리가 같은 말)·「다른 회사를 여기로」 글자는 빼고 🔗 만
+       ④ 계약 기록·계약서 파일 표는 접어 두고 건수만(「▾ 6건 보기」) — 갈래 카드가 같은 계약을 이미 보인다.
+          펼치면 화면 폭에 맞는다: 기록 ☐·#·계약일·종류·금액 / 파일 ☐·#·제목·계약일·📥 (✏ 는 줄을 눌러 여는 미리보기에)
+       ⚠ 넓은 화면은 그대로다 — pod-pickbtn·pod-ftog 단추는 폰에서만 보이고, 접힘은 폰에서만 먹는다.
+         tests/office-co-phone.test.js 가 지킨다 */
+    + '.pod-pickbtn,.pod-ftog{display:none}'
+    + '@media(max-width:700px){'
+    + '.pod-ttl{display:none}.pod-ttl+.pod-b{margin-left:auto}'
+    + '.pod-kchips{flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.pod-kchip{flex:none}'
+    + '.pod-cohd{flex-wrap:nowrap!important;gap:6px!important}.pod-cohd .pod-cocnt,.pod-lg{display:none}.pod-cohd>b{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.pod-cohd .pod-tag{flex:none;white-space:nowrap;margin:0}.pod-cohd .pod-b{flex:none}'
+    /* 갈래 카드 줄 — 「△ 기록 없음」·「❓ 종류 모름」 옆에는 같은 말을 하는 단추(+ 기록 만들기 · ✏ 종류 정하기)가 있다. 폰에서는 단추만 — 제목 자리를 넓힌다 */
+    + '.pod-krow .pod-ks.norec,.pod-krow .pod-ks.none{display:none}.pod-bar{margin-bottom:6px}.pod-bar .pod-b{padding:6px 10px}'
+    + '.pod-pickbtn,.pod-ftog{display:inline-block}'
+    + '.pod-co:not(.pick) .pod-co-l{display:none}'
+    + '.pod-co-l{display:grid;grid-template-columns:minmax(0,1fr) auto;max-height:none;overflow:visible}.pod-co-l select{width:auto!important}.pod-co-l .pod-co-ls{grid-column:1/-1;max-height:50vh}'
+    + '.pod-fold:not(.open) .pod-fbody{display:none}'
+    + '.pod-co .pod-rt{min-width:0}'
+    + '.pod .pod-recs th:nth-child(5),.pod .pod-recs td:nth-child(5){display:table-cell}.pod .pod-recs th:nth-child(n+6),.pod .pod-recs td:nth-child(n+6){display:none}'
+    + '.pod .pod-docs{table-layout:fixed}.pod .pod-docs th:nth-child(2){width:30px!important}.pod .pod-docs th:nth-child(4){width:84px!important}.pod .pod-docs th:nth-child(6){width:46px!important}.pod-docs .pod-ed{display:none}.pod-docs td .pod-b{padding:4px 8px}'
+    + '}';
   function css() {
     if (w.document.getElementById('pod-css')) return;
     var st = w.document.createElement('style'); st.id = 'pod-css'; st.textContent = CSS; w.document.head.appendChild(st);
@@ -684,7 +711,20 @@
     css();
     var store = host.store;
     var S = { cos: [], sel: null, docs: [], recs: [], sent: [], recsDenied: false, picked: {}, q: '', loaded: false, err: null, denied: false,
-      tab: opts && (opts.tab === 'await' || opts.tab === 'sign') ? opts.tab : 'co', aw: null, awErr: null, awPicked: {}, idx: null, grp: '', chk: '', sg: null, sgErr: null, sgNote: '', sgBusy: false };
+      tab: opts && (opts.tab === 'await' || opts.tab === 'sign') ? opts.tab : 'co', aw: null, awErr: null, awPicked: {}, idx: null, grp: '', chk: '', sg: null, sgErr: null, sgNote: '', sgBusy: false,
+      pickOpen: false, open: null };
+    /* 📱 폰 — 접어 둔 표(계약 기록·계약서 파일). 펼친 것은 이 기기에 기억한다(사람마다 편한 대로 — 못 적어도 화면은 돈다) */
+    function isPhone() { return !!(w.matchMedia && w.matchMedia('(max-width:700px)').matches); }
+    function foldOpen(k) {
+      if (!S.open) { S.open = {}; ['recs', 'docs'].forEach(function (x) { try { S.open[x] = w.localStorage.getItem('pod-open-' + x) === '1'; } catch (e) { S.open[x] = false; } }); }
+      return !!S.open[k];
+    }
+    function foldBtn(k, n) {
+      var open = foldOpen(k);
+      return el('button', { type: 'button', 'class': 'pod-b pod-ftog', 'aria-expanded': open ? 'true' : 'false', text: open ? '▴ 접기' : '▾ ' + n + ' 보기',
+        onclick: function () { S.open[k] = !open; try { w.localStorage.setItem('pod-open-' + k, open ? '0' : '1'); } catch (e) {} draw(); } });
+    }
+    var seen = { co: null, doc: null };   /* 📱 마지막으로 그린 회사·미리보기 — 바뀌었을 때만 그 자리로 데려간다 */
 
     function load(keepSel) {
       S.err = null;
@@ -1570,13 +1610,13 @@
       var row = [chip(!S.grp && !S.chk, '전체 ' + S.cos.length, '거르기 풀기', function () { S.grp = ''; S.chk = ''; draw(); })];
       KIND_GROUPS.forEach(function (g) {
         var n = cnt(function (x) { return x.groups[g.v]; });
-        if (n) row.push(chip(S.grp === g.v, g.icon + ' ' + g.label + ' ' + n, g.label + ' 계약이 있는 회사', function () { S.grp = S.grp === g.v ? '' : g.v; draw(); }));
+        if (n) row.push(chip(S.grp === g.v, g.icon + ' ' + g.label + ' ' + n, g.label + ' 계약이 있는 회사', function () { S.grp = S.grp === g.v ? '' : g.v; if (S.grp) S.pickOpen = true; draw(); }));
       });
       row.push(el('span', { style: 'width:1px;height:18px;background:#cbd5e1;margin:0 4px' }));
       [['ok', '✓ 맞음', '기록과 파일이 이어진 줄', 'g'], ['missing', '✗ 파일 없음', '계약 기록은 있는데 서명본 파일이 없는 줄 — 회수 필요', 'r'],
         ['norec', '△ 기록 없음', '파일만 있고 계약 기록이 없는 줄 — 기록 만들기', 'a'], ['none', '❓ 미분류 파일', '종류를 알 수 없는 파일 — ✏ 로 종류를 정하세요', 'a']].forEach(function (c) {
         var n = sum(c[0]);
-        if (n) row.push(chip(S.chk === c[0], c[1] + ' ' + n, c[2], function () { S.chk = S.chk === c[0] ? '' : c[0]; draw(); }, c[3]));
+        if (n) row.push(chip(S.chk === c[0], c[1] + ' ' + n, c[2], function () { S.chk = S.chk === c[0] ? '' : c[0]; if (S.chk) S.pickOpen = true; draw(); }, c[3]));
       });
       return el('div', { 'class': 'pod-kchips', role: 'group', 'aria-label': '갈래·대조로 거르기' }, row);
     }
@@ -1629,7 +1669,7 @@
         ['🖼 사진첩에서 가져오기', '내 사진첩의 계약서를 가져옵니다', openPhotoImport],
         host.coLink ? ['🔗 이알피 업체와 맞추기', '사업자번호를 넣고, 같은 회사가 다른 이름으로 들어온 것을 합칩니다', openLink] : null,
         host.secretMove ? ['🔒 서명본으로 옮기기', '이미 올린 사진첩 계약서 중 직원 누구나 여는 것을 🔒 서명본으로 옮깁니다(대표·관리자)', openSecretMove] : null].filter(Boolean);
-      wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { text: '🏢 기업별 계약서' }),
+      wrap.appendChild(el('div', { 'class': 'pod-bar' }, [el('b', { 'class': 'pod-ttl', text: '🏢 기업별 계약서' }),
         el('button', { type: 'button', 'class': 'pod-b' + (S.menuOpen ? ' on' : ''), 'aria-haspopup': 'menu', 'aria-expanded': S.menuOpen ? 'true' : 'false',
           text: '📥 가져오기·정리 ' + (S.menuOpen ? '▴' : '▾'), onclick: function () { S.menuOpen = !S.menuOpen; draw(); } }),
         el('button', { type: 'button', 'class': 'pod-b p', text: '📎 업로드', onclick: openUpload })]));
@@ -1667,7 +1707,7 @@
         if (!shownCos.length) listBox.appendChild(el('div', { style: 'padding:12px;color:#94a3b8;font-size:12px', text: '맞는 회사가 없습니다' }));
         shownCos.forEach(function (c, i) {
           listBox.appendChild(el('button', { type: 'button', 'class': c.key === S.sel ? 'on' : null, 'aria-current': c.key === S.sel ? 'true' : null,
-            onclick: function () { S.sel = c.key; loadDocs(); } }, [el('span', { text: (i + 1) + '. ' + c.name }),
+            onclick: function () { S.sel = c.key; S.pickOpen = false; loadDocs(); } }, [el('span', { text: (i + 1) + '. ' + c.name }),
               S.idx && S.idx[c.key] ? el('b', { style: 'font-weight:400;font-size:11px;margin-left:auto;padding-right:4px', title: KIND_GROUPS.filter(function (g) { return S.idx[c.key].groups[g.v]; }).map(function (g) { return g.label; }).join(' · '),
                 text: KIND_GROUPS.filter(function (g) { return S.idx[c.key].groups[g.v]; }).map(function (g) { return g.icon; }).join('') }) : null,
               el('i', { title: '계약 기록 ' + (c.r || 0) + ' · 파일 ' + (c.n || 0), text: String((c.n || 0) + (c.r || 0)) })]));
@@ -1685,7 +1725,7 @@
         var cb = el('input', { type: 'checkbox', 'aria-label': (d.title || '계약서') + ' 고르기', checked: !!S.dpicked[d.id] });
         cb.addEventListener('click', function (e) { e.stopPropagation(); });
         cb.addEventListener('change', function () { S.dpicked[d.id] = cb.checked; draw(); });
-        var ed = el('button', { type: 'button', 'class': 'pod-b', title: '제목·계약일 고치기 · 이 회사에서 빼기', 'aria-label': (d.title || '계약서') + ' 고치기', text: '✏' });
+        var ed = el('button', { type: 'button', 'class': 'pod-b pod-ed', title: '제목·계약일 고치기 · 이 회사에서 빼기', 'aria-label': (d.title || '계약서') + ' 고치기', text: '✏' });
         ed.addEventListener('click', function (e) { e.stopPropagation(); openDoc(d); });
         var dl = el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': (d.title || '계약서') + ' 내려받기', text: '📥' });
         dl.addEventListener('click', function (e) { e.stopPropagation(); host.download(d.fileId, d.title); });
@@ -1700,26 +1740,32 @@
         [el('option', { value: '', text: '출처 전체' })].concat(DOC_SRCS.map(function (o) { return el('option', { value: o[0], text: o[1] }); })));
       srcSel.value = S.dsrc || '';
       srcSel.addEventListener('change', function () { S.dsrc = srcSel.value; draw(); });
-      var grid = el('div', null, [
+      var grid = el('div', { 'class': 'pod-fbody' }, [
         el('div', { 'class': 'pod-fil' }, [srcSel,
           dPicked.length && host.zip ? el('button', { type: 'button', 'class': 'pod-b p', text: S.zbusy ? '묶는 중…' : '📦 선택 ' + dPicked.length + '개 묶어 받기', onclick: zipDocs }) : null,
           dPicked.length && host.mail ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 선택 ' + dPicked.length + '개 보내기', onclick: function () { openResend(S.dpicked); } }) : null,
           dPicked.length ? el('button', { type: 'button', 'class': 'pod-b', text: '선택 풀기', onclick: function () { S.dpicked = {}; draw(); } }) : null,
           el('span', { style: 'margin-left:auto', text: docRows.length === S.docs.length ? S.docs.length + '개' : docRows.length + '개 / 전체 ' + S.docs.length })]),
-        docRows.length ? el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { style: 'width:34px' }, [dAll]), el('th', { style: 'width:40px', text: '#' }),
+        docRows.length ? el('table', { 'class': 'pod-rt pod-docs' }, [el('thead', null, [el('tr', null, [el('th', { style: 'width:34px' }, [dAll]), el('th', { style: 'width:40px', text: '#' }),
           el('th', { text: '제목' }), el('th', { style: 'width:96px', text: '계약일' }), el('th', { style: 'width:76px', text: '출처' }), el('th', { style: 'width:90px', text: '' })])]), dtb])
           : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '맞는 파일이 없습니다' })]);
       var selCo = S.cos.filter(function (c) { return c.key === S.sel; })[0] || {};
-      wrap.appendChild(el('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px' }, [el('b', null, [coName(S.sel)]),
+      var cohd = el('div', { 'class': 'pod-cohd', style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px' }, [el('b', { title: coName(S.sel) }, [coName(S.sel)]),
         selCo.bz ? el('span', { 'class': 'pod-tag', title: '사업자번호', text: fmtBz(selCo.bz) }) : null,
-        el('span', { style: 'flex:1;min-width:160px;font-weight:400;color:#64748b;font-size:12px', text: '계약 기록 ' + S.recs.length + '건 · 보낸 서류 ' + S.sent.length + '건 · 계약서 파일 ' + S.docs.length + '건' }),
-        host.coMerge ? el('button', { type: 'button', 'class': 'pod-b', text: '🔗 다른 회사를 여기로 합치기', onclick: openMerge }) : null]));
+        el('span', { 'class': 'pod-cocnt', style: 'flex:1;min-width:160px;font-weight:400;color:#64748b;font-size:12px', text: '계약 기록 ' + S.recs.length + '건 · 보낸 서류 ' + S.sent.length + '건 · 계약서 파일 ' + S.docs.length + '건' }),
+        /* 📱 폰에서만 — 회사 목록을 접고 펼친다(넓은 화면은 목록이 늘 왼쪽에 있다) */
+        el('button', { type: 'button', 'class': 'pod-b pod-pickbtn', 'aria-expanded': S.pickOpen ? 'true' : 'false', text: S.pickOpen ? '▴ 목록 닫기' : '▾ 회사 바꾸기', title: '회사 ' + S.cos.length + '곳 — 찾아서 고릅니다',
+          onclick: function () { S.pickOpen = !S.pickOpen; draw(); } }),
+        host.coMerge ? el('button', { type: 'button', 'class': 'pod-b', title: '다른 회사를 여기로 합치기', 'aria-label': '다른 회사를 여기로 합치기', onclick: openMerge }, ['🔗', el('span', { 'class': 'pod-lg', text: ' 다른 회사를 여기로 합치기' })]) : null]);
+      wrap.appendChild(cohd);
       /* 계약 기록 표 — ☐·# 맨 앞, 선택 지우기 (목록 관례) */
       var recBox = el('div');
       if (S.recsDenied) recBox.appendChild(el('div', { 'class': 'pod-note pod-warn', text: '⚠ 계약 기록 규칙이 아직 게시되지 않았습니다 — 파일 카드만 보입니다.' }));
       else {
         var picked = Object.keys(S.picked).filter(function (k) { return S.picked[k]; }).length;
+        recBox.className = 'pod-fold' + (foldOpen('recs') ? ' open' : '');
         recBox.appendChild(el('div', { 'class': 'pod-bar', style: 'margin-bottom:6px' }, [el('b', { style: 'font-size:13px', text: '계약 기록' }),
+          S.recs.length ? foldBtn('recs', S.recs.length + '건') : null,
           picked ? el('button', { type: 'button', 'class': 'pod-b', text: '선택 ' + picked + '건 지우기', onclick: removePicked }) : null,
           el('button', { type: 'button', 'class': 'pod-b', text: '+ 기록 더하기', onclick: function () { openRec(null); } })]));
         if (S.recs.length) {
@@ -1736,7 +1782,7 @@
               el('td', { text: [r.payDay ? '매월 ' + String(r.payDay).replace(/일$/, '') + '일' : '', r.edi ? 'EDI ' + r.edi : ''].filter(Boolean).join(' · ') || '—' }),
               el('td', { text: r.staff || '' }), el('td', { 'class': 'muted', text: r.src === 'import' ? '엑셀 명단' : r.src === 'folder' ? 'PC 폴더' : '손으로' })]));
           });
-          recBox.appendChild(el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', null, [allCb]), el('th', { text: '#' }), el('th', { text: '계약일' }),
+          recBox.appendChild(el('table', { 'class': 'pod-rt pod-recs pod-fbody' }, [el('thead', null, [el('tr', null, [el('th', null, [allCb]), el('th', { text: '#' }), el('th', { text: '계약일' }),
             el('th', { text: '종류' }), el('th', { text: '금액' }), el('th', { text: '지급일·EDI' }), el('th', { text: '담당' }), el('th', { text: '출처' })])]), tb]));
         } else recBox.appendChild(el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '계약 기록이 없습니다' }));
       }
@@ -1755,14 +1801,22 @@
           el('div', { style: 'overflow-x:auto' }, [el('table', { 'class': 'pod-rt' }, [el('thead', null, [el('tr', null, [el('th', { text: '보낸 때' }), el('th', { text: '종류' }),
             el('th', { text: '서류' }), el('th', { text: '받는 분' }), el('th', { text: '보낸 이' })])]), stb])])]);
       }
-      var right = el('div', { 'class': 'pod-co-r' }, [kindBox(), recBox, sentBox, el('div', { 'class': 'pod-bar', style: 'margin:4px 0 6px' }, [el('b', { style: 'font-size:13px', text: '계약서 파일' }),
-        host.mail && S.docs.length ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 파일 골라 보내기', onclick: function () { openResend(S.dpicked); } }) : null]),
-        S.docs.length ? grid : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '올린 계약서 파일이 없습니다' })]);
+      var right = el('div', { 'class': 'pod-co-r' }, [kindBox(), recBox, sentBox, el('div', { 'class': 'pod-fold' + (foldOpen('docs') ? ' open' : '') }, [
+        el('div', { 'class': 'pod-bar', style: 'margin:4px 0 6px' }, [el('b', { style: 'font-size:13px', text: '계약서 파일' }),
+          S.docs.length ? foldBtn('docs', S.docs.length + '개') : null,
+          host.mail && S.docs.length ? el('button', { type: 'button', 'class': 'pod-b', text: '✉ 파일 골라 보내기', onclick: function () { openResend(S.dpicked); } }) : null]),
+        S.docs.length ? grid : el('div', { 'class': 'pod-empty', style: 'padding:12px', text: '올린 계약서 파일이 없습니다' })])]);
       var prev = el('div', { 'class': 'pod-arc-r' });
       if (!S.dsel) prev.hidden = true;
-      wrap.appendChild(el('div', { 'class': 'pod-co' }, [el('div', { 'class': 'pod-cl pod-co-l' }, [search, coFil, listBox]), right, prev]));
+      wrap.appendChild(el('div', { 'class': 'pod-co' + (S.pickOpen ? ' pick' : '') }, [el('div', { 'class': 'pod-cl pod-co-l' }, [search, coFil, listBox]), right, prev]));
       root.appendChild(wrap);
       if (S.dsel) drawDocPreview(prev);
+      /* 📱 폰 — 회사를 바꾸면 그 회사 줄로, 파일 줄을 누르면 맨 아래 미리보기로 데려간다(안 그러면 눌러도 화면이 그대로다) */
+      if (isPhone()) {
+        if (seen.co != null && seen.co !== S.sel) cohd.scrollIntoView({ block: 'start' });
+        else if (S.dsel && seen.doc !== S.dsel.id) prev.scrollIntoView({ block: 'start' });
+      }
+      seen.co = S.sel; seen.doc = S.dsel ? S.dsel.id : null;
     }
     /* 오른쪽 미리보기 — 원본 보관함과 같다(PDF·그림 그대로, 한글·엑셀은 문서 엔진, 🔒 은 서버가 대표·관리자에게만) */
     var dPrevUrl = null, dPrevBytes = null;  /* 미리보기 파일은 고른 줄이 바뀔 때만 다시 받는다 */
