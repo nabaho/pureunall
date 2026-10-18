@@ -19918,6 +19918,59 @@ function erpValidateWorkBatch(store,items,allowExisting){
   if(!checked.ok){showToast('⚠ 일괄 저장 보류 — '+checked.errors.slice(0,3).map(function(x){return x.row+'행: '+x.message;}).join(' / '));return false;}
   return true;
 }
+/* ── 이관이 막히면 «이유와 푸는 길»을 팝업으로 — 알림 한 줄(2초)은 놓친다 (대표 지시 2026-10-12) ──
+   대천맛김 계약-2026-124: 이관을 눌렀는데 알림이 2초 떴다 사라져 계약확정에 남은 까닭을 몰랐다.
+   ★ 막는 자리마다 문구가 흩어져 있어, 그 글을 «모아» 푸는 길을 붙여 한 팝업으로 보인다.
+   ⚠ 이관 규칙은 건드리지 않는다 — 막힌 사실을 «알리는» 방식만 바꾼다. */
+function erpXferFixFor(why){
+  var w = String(why || '');
+  if(/업체 ID|업체를 선택|연결 보류|업체 연결|기존 업체/.test(w)) return '계약 수정 → 「기업정보」 탭 → 「업체 연결 확인」에서 업체를 고르거나, 새 업체면 「연결 보류」를 켜고 저장한 뒤 다시 이관하세요.';
+  if(/사번|담당자|명부/.test(w)) return '계약 수정 → 「담당자 · 일지」 탭에서 «지금 재직 중인» 담당자로 주담당·부담당을 다시 지정하고 저장한 뒤 이관하세요. (퇴사·휴직자는 담당이 될 수 없습니다)';
+  if(/원본 계약이 변경/.test(w)) return '다른 곳에서 이 계약이 방금 바뀌었습니다. 화면을 새로고침(Ctrl+Shift+R)한 뒤 다시 이관하세요.';
+  if(/원본 계약 ID|중복되어/.test(w)) return '같은 계약이 둘 이상이거나 번호가 없습니다. 「번호 재정렬」 또는 총괄관리자 확인이 필요합니다.';
+  if(/번호만 남|원본 ID|일부 업무만|이미 이관/.test(w)) return '이관 대상 모듈(컨설팅·기금·사건 등)에 이 계약으로 만든 기록이 이미 있는지 확인하고, 그 기록의 「원본 계약 연결」을 맞춘 뒤 다시 이관하세요. 같은 기록을 또 만들지 않으려 멈춘 것입니다.';
+  if(/서버 저장|일부 실패|저장 실패|오류/.test(w)) return '네트워크가 불안정했을 수 있습니다. 새로고침(Ctrl+Shift+R) 후 대상 모듈에 기록이 생겼는지 확인하고, 없으면 다시 이관하세요. 계약은 그대로 남아 있어 잃은 자료는 없습니다.';
+  if(/계약유형/.test(w)) return '계약 수정 → 「계약정보」 탭에서 계약 유형(업체·사건·컨설팅·기금·기타)을 고른 뒤 저장하고 다시 이관하세요.';
+  if(/검증 모듈/.test(w)) return '화면을 새로고침(Ctrl+Shift+R)한 뒤 다시 이관하세요.';
+  return '새로고침(Ctrl+Shift+R) 후 다시 이관해 보세요. 같은 사유가 반복되면 위 사유 글을 그대로 알려 주세요.';
+}
+/* ⚠★ 막힘 창은 «알림창»(단추 하나 — window.showAlert)이다. 고르는 창(popConfirm)을 쓰지 않는다.
+     까닭(온톨로지 규칙): 번호만 남은 기록·일부 이관처럼 «확인 안 된» 상태에서는 완료를 묻는 창을 열지 않는다.
+       popConfirm 은 「확인/취소」를 돌려주는 «고르기» 창이라, 같은 doTransfer 안의
+       「이관완료로 정리하시겠습니까?」와 모양이 같다 — 「확인」을 누르면 정리된 줄 안다.
+       돌려받는 값이 있으면 언젠가 그 값으로 이어 가는 길이 생긴다. 알림창은 돌려주는 것이 없다.
+   ★ 알림 한 줄도 그대로 남긴다 — 창을 못 띄우는 자리(검사·옛 화면)에서도 막힌 까닭이 사라지지 않게. */
+async function erpXferBlockedPopup(ct, why, title){
+  var head = (title || '⚠ 이관되지 않았습니다') + ' — ' + ((ct && ct.contractNo) || '') + ' ' + ((ct && ct.companyName) || '');
+  var reason = String(why || '알 수 없음').replace(/^[⚠❌✓\s]+/, '');
+  if(typeof showToast === 'function') showToast((title || '⚠ 이관되지 않았습니다') + ' — ' + reason);
+  if(typeof window.showAlert === 'function')
+    await window.showAlert('사유: ' + reason + '\n\n해결: ' + erpXferFixFor(why), { title:head, okText:'닫기' });
+}
+/* 이관 처리 중 뜬 알림 글을 «모아» 둔다 — 막힌 까닭이 알림으로만 나오는 옛 경로(검증 함수들)를 팝업으로 옮기려고. */
+function erpXferToastCapture(){
+  var orig = window.showToast, got = [];
+  window.showToast = function(m){ try { got.push(String(m)); } catch(_){} return orig.apply(this, arguments); };
+  return { stop:function(){ window.showToast = orig; return got; } };
+}
+/* 이관이 «업체 연결» 때문에 막히는지 미리 본다 — 막히면 그 이유 글을 돌려준다(없으면 '').
+   ★ 왜: 막혔을 때 예전에는 «잠깐 뜨는 알림 한 줄»뿐이었다. 대천맛김 계약(-124)은 이관을 눌러도 계약확정에
+     그대로 남았고, 대표는 이관했다고 생각했다(2026-10-12). 이유를 창으로 남겨 알리고, 푸는 길까지 적는다.
+   ⚠ erpPrepareContractTransfer 와 같은 규칙을 «읽기만» 한다 — 알림을 띄우거나 저장하지 않는다. */
+function erpTransferBlockReason(contract){
+  var O=window.PuOntology;
+  if(!O||typeof O.validateCompanyLink!=='function')return '';
+  var cos=dbGet('companies',[]);
+  var form=erpDropDeadCoLink(contract,cos);
+  var r=O.validateCompanyLink(form,cos);
+  if(!r.ok)return String(r.message||'업체 연결을 확인할 수 없습니다.');
+  var kinds=(contract&&contract.kinds&&contract.kinds.length)?contract.kinds:[contract&&contract.kind];
+  if(kinds.indexOf('company')>=0&&!r.companyId){
+    if(r.status!=='pending'||(typeof O.companyLinkCandidates==='function'&&O.companyLinkCandidates(Object.assign({},form,{companyLinkStatus:r.status}),cos,'').length))
+      return '업체 이관 전 기존 업체를 명시적으로 선택하세요. 신규 업체만 연결 보류로 둘 수 있습니다.';
+  }
+  return '';
+}
 function erpPrepareContractTransfer(contract){
   var O=window.PuOntology;
   if(!O||typeof O.validateWorkBatch!=='function'){showToast('참조 검증 모듈을 불러오지 못해 이관을 보류합니다.');return null;}
@@ -25962,8 +26015,11 @@ function ContractManagement(props){
     // [버그방지] 알수없는/중복 종류 제거 (임시저장 누수 대비)
     var _VK = CONTRACT_KINDS.map(function(x){ return x.v; });
     kindsList = kindsList.filter(function(v,i){ return _VK.indexOf(v)>=0 && kindsList.indexOf(v)===i; });
-    if(kindsList.length === 0){ showToast('계약유형 없음'); return; }
+    if(kindsList.length === 0){ await erpXferBlockedPopup(ct, '계약유형이 없습니다'); return; }
     var labels = kindsList.map(function(v){ var k = kindInfo(v); return k.icon + ' ' + k.label; }).join(', ');
+    // 업체 연결이 비어 막히는 계약은 «이유를 창으로» 알린다 — 알림 한 줄은 놓쳐서 이관한 줄 안다(대천맛김 -124)
+    var _blockWhy = erpTransferBlockReason(ct);
+    if(_blockWhy){ await erpXferBlockedPopup(ct, _blockWhy); return; }
     // 중복검사: 이 계약이 실제 이관될 대상 모듈만 검사 (타 모듈 잔여 레코드로 인한 오차단 방지)
     var _KIND_STORE = { company:['companies','업체'], case:['cases','사건'], consulting:['consultings','컨설팅'], fund:['funds','기금'], other:['other_projects','기타사업'] };
     var _targetStores = [];
@@ -25978,8 +26034,8 @@ function ContractManagement(props){
       }).length;
       if(n > 0) _dupT.push(p[1]+' '+n+'건');
     });
-    if(_unverifiedT.length){showToast('⚠ '+_unverifiedT.join(', ')+'에 번호만 남거나 서로 다른 원본 ID가 있습니다. 원본 연결을 확인하기 전에는 재이관·완료 처리를 하지 않습니다.');return;}
-    if(_dupT.length&&_dupT.length<_targetStores.length){showToast('⚠ 일부 업무만 이관된 기록이 있습니다. 계약은 완료 처리하지 않았습니다. 각 업무의 원본 연결과 저장 상태를 확인하세요.');return;}
+    if(_unverifiedT.length){await erpXferBlockedPopup(ct, _unverifiedT.join(', ')+'에 번호만 남거나 서로 다른 원본 ID가 있습니다. 원본 연결을 확인하기 전에는 재이관·완료 처리를 하지 않습니다.');return;}
+    if(_dupT.length&&_dupT.length<_targetStores.length){await erpXferBlockedPopup(ct, '일부 업무만 이관된 기록이 있습니다('+_dupT.join(', ')+'). 계약은 완료 처리하지 않았습니다.');return;}
     if(_dupT.length > 0){
       // 데드락 복구: 대상 레코드는 이미 있는데 계약이 '이관완료'로 안 바뀐 상태
       //  → 중복 생성하지 말고, 계약 상태만 정리해 계약관리에서 내보냄
@@ -26027,20 +26083,24 @@ function ContractManagement(props){
     window._transferInFlight[id] = true;
     var _unlockTransfer = function(){ try { delete window._transferInFlight[id]; } catch(_u){} };
     var results;
+    var _tcap = erpXferToastCapture();
     try {
       results = transferContract(ct, _xferOpt);
     } catch(err){
+      _tcap.stop();
       console.error('[이관 오류]', err);
-      showToast('❌ 이관 처리 중 오류: ' + (err && err.message ? err.message : '알 수 없는 오류'));
+      await erpXferBlockedPopup(ct, '이관 처리 중 오류: ' + (err && err.message ? err.message : '알 수 없는 오류'));
       _unlockTransfer(); return;
     }
+    var _tmsgs = _tcap.stop();
     if(!results || results.length === 0){
-      // transferContract가 알려 준 구체적인 검증/저장 오류를 일반 문구로 덮지 않는다.
+      // transferContract가 알려 준 구체적인 검증/저장 오류를 «팝업»으로 다시 보인다(알림은 2초 만에 사라진다).
+      await erpXferBlockedPopup(ct, _tmsgs.length ? _tmsgs.join(' / ') : '이관 처리가 중단됐습니다(사유 알림 없음)');
       _unlockTransfer(); return;
     }
     // [P1] 부분 이관 방지: 선택 종류 수만큼 결과가 안 나오면 아카이브하지 않음(데이터 유실·오아카이브 차단)
     if(results.length < kindsList.length){
-      showToast('❌ 이관 일부 실패 ('+results.length+'/'+kindsList.length+') — 계약은 그대로 두었습니다. 새로고침 후 다시 시도하세요');
+      await erpXferBlockedPopup(ct, '이관 일부 실패 ('+results.length+'/'+kindsList.length+') — 계약은 그대로 두었습니다.');
       _unlockTransfer(); return;
     }
     // [안전망 · 코덱스 검증 반영] 로컬 캐시는 네트워크 전송 전에 이미 기록되므로 로컬 확인만으론
@@ -26074,7 +26134,7 @@ function ContractManagement(props){
     }
     if(_missing.length > 0){
       console.error('[이관 검증 실패]', _missing);
-      showToast('❌ 서버 저장 확인 실패 (' + _missing.map(function(m){ return m.no; }).join(', ') + ') — 계약을 그대로 두었습니다. 새로고침(Ctrl+Shift+R) 후 다시 이관하세요');
+      await erpXferBlockedPopup(ct, '서버 저장 확인 실패 (' + _missing.map(function(m){ return m.no; }).join(', ') + ') — 계약을 그대로 두었습니다.');
       _unlockTransfer(); return;
     }
     _unlockTransfer();   // 검증 통과 — 이후 아카이브/이동 단계
@@ -71477,7 +71537,11 @@ function ClosedManagement(){
           transferMissing && h('button',{
             onClick:(function(ct){ return async function(){
               if(!(await popConfirm('이관 데이터가 없습니다. 다시 이관하시겠습니까? 컨설팅관리에 새로 추가됩니다.'))) return;
-              var results = transferContract(ct);
+              var _why = erpTransferBlockReason(ct);
+              if(_why){ await erpXferBlockedPopup(ct, _why, '⚠ 재이관되지 않았습니다'); return; }
+              var _rcap = erpXferToastCapture(), results, _rmsgs;
+              try { results = transferContract(ct); } finally { _rmsgs = _rcap.stop(); }
+              if(!results || results.length === 0){ await erpXferBlockedPopup(ct, _rmsgs.length ? _rmsgs.join(' / ') : '재이관이 중단됐습니다(사유 알림 없음)', '⚠ 재이관되지 않았습니다'); return; }
               if(results && results.length > 0){
                 showToast('✅ 재이관 완료: ' + results.map(function(r){return r.no;}).join(', '));
               }
