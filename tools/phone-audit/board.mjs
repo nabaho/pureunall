@@ -19,10 +19,16 @@ const BOARD = path.join(root, 'docs', '폰화면-현황.md');
 const START = '<!-- 자동:시작 — tools/phone-audit/board.mjs 가 만든다. 손으로 고치지 말 것 -->';
 const END = '<!-- 자동:끝 -->';
 
-const resultFile = path.join(here, 'out', 'result.json');
-if (!fs.existsSync(resultFile)) { console.error('먼저 node tools/phone-audit/run.mjs 로 전수 측정을 하십시오'); process.exit(2); }
-const results = JSON.parse(fs.readFileSync(resultFile, 'utf8'));
-const measuredAt = fs.statSync(resultFile).mtime;
+/* 결과 파일을 «모두» 모은다 — 앱을 나눠 여러 번(동시에) 재면 result-<앱들>.json 으로 갈라진다.
+   같은 앱·화면·폭이 여러 파일에 있으면 더 새 파일의 것을 쓴다. */
+const outDir = path.join(here, 'out');
+const files = fs.existsSync(outDir) ? fs.readdirSync(outDir).filter(f => /^result.*\.json$/.test(f))
+  .map(f => path.join(outDir, f)).sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs) : [];
+if (!files.length) { console.error('먼저 node tools/phone-audit/run.mjs 로 전수 측정을 하십시오'); process.exit(2); }
+const byId = new Map();
+for (const f of files) for (const r of JSON.parse(fs.readFileSync(f, 'utf8'))) byId.set(r.key + '|' + r.view + '|' + r.width, r);
+const results = [...byId.values()];
+const measuredAt = fs.statSync(files[files.length - 1]).mtime;
 
 const tests = fs.readdirSync(path.join(root, 'tests')).filter(f => /\.test\.js$/.test(f) && /(phone|mobile)/.test(f));
 const testSrc = Object.fromEntries(tests.map(f => [f, fs.readFileSync(path.join(root, 'tests', f), 'utf8')]));

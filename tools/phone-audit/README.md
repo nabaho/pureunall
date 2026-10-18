@@ -11,6 +11,9 @@ node tools/phone-audit/run.mjs work --view=week   # views 가운데 하나만
 
 결과: `tools/phone-audit/out/` (갈무리 `<key>[-<view>]-<폭>.png` · `result*.json`) — 저장소에 안 올린다.
 
+전체는 200화면 남짓이라 한 번에 돌리면 오래 걸린다 — 앱을 넷으로 나눠 «동시에» 돌려도 된다(결과 파일이 갈라지고, `board.mjs` 가 모아 읽는다).
+현황판 표: `node tools/phone-audit/board.mjs` → `docs/폰화면-현황.md` 의 자동 칸.
+
 ## 어떻게 로그인하나 — 안 한다
 
 gstatic 의 `firebase-*-compat.js` 를 `fake-firebase.js` 로 바꿔 끼운다. 앱 코드는 그대로다.
