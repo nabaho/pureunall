@@ -64,12 +64,21 @@ test('★ 폰에서는 «접는다» — 늘 보이는 것은 탭·확정·⚙ �
 
 test('접었을 때는 «고른 칸»으로 늘어놓는다 — 혼자 한 줄을 쓰는 칸이 없게', () => {
   /* 흘려 놓으면 폭이 좁을 때 「⚙ 도구」가 혼자 한 줄을 썼다(대표 화면 2026-08-20).
-     칸을 나눠 두면 탭 둘과 ⚙ 가 늘 한 줄에 앉고, 큰 초록 단추가 그 아래를 통째로
-     쓴다 — 폭이 280px 이든 412px 이든 두 줄이다. */
+     2026-10-17 에는 칸 셋에 일곱 개를 흘려 넣어 출금 탭이 석 줄을 먹고 ⚙ 가 또 혼자 앉았다
+     (대표 「컴팩트하고 깔끔하게 한눈에」). 그래서 첫 줄의 자리를 «정해 준다»:
+     📆 오늘 · 탭 · ⚙ 는 1줄, 그 밖의 것(주 단추 등)은 저마다 제 줄을 통째로.
+     ⚠ 칸 «값»이 아니라 규칙을 본다 — 탭 칸을 똑같이 나누지 않는가 · ⚙ 가 첫 줄인가 · 주 단추가 통째인가. */
   const b = phoneBlock();
   assert.match(b, /\.ld-bar:not\(\.on\)\{ display:grid !important/);
-  assert.match(b, /grid-template-columns:minmax\(0,1fr\) minmax\(0,1fr\) auto/,
-    '★ 셋을 똑같이 나누면 탭의 「미처리 232」가 잘립니다 — ⚙ 는 제 몸집만큼만.');
+  const cols = (b.match(/\.ld-bar:not\(\.on\)\{ display:grid !important;\s*grid-template-columns:([^;]+);/) || [])[1] || '';
+  assert.ok(cols, '접힌 띠의 칸 나누기를 못 찾았습니다');
+  assert.doesNotMatch(cols, /minmax\(0,\s*1fr\)\s+minmax\(0,\s*1fr\)/,
+    '★ 탭 칸을 똑같이 나누면 「미처리 232」가 잘립니다 — 탭은 제 글자만큼.');
+  assert.match(b, /\.ld-bar:not\(\.on\) \.ld-tools-btn\{ grid-row:1;/,
+    '★ ⚙ 가 첫 줄에 서지 않으면 혼자 한 줄을 씁니다.');
+  assert.match(b, /\.ld-bar:not\(\.on\) \.ld-tab\{ grid-row:1; \}/);
+  assert.match(b, /\.ld-bar:not\(\.on\) > :not\(\.ld-tab\):not\(\.ld-tools-btn\):not\(\.ld-bar-today\)\{ grid-column:1 \/ -1; \}/,
+    '★ 첫 줄 밖의 것이 칸 하나에 끼면 그 칸 폭이 첫 줄을 밀어냅니다.');
   assert.match(b, /\.ld-bar:not\(\.on\) \.ld-bar-go\{ grid-column:1 \/ -1; \}/);
   /* 요약 칩은 남는 자리를 서로 나눠 갖는다 — 줄 끝이 들쭉날쭉하지 않게 */
   assert.match(b, /\.ld-sum > \*\{ flex:1 1 auto; \}/);

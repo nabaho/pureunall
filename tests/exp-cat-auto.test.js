@@ -90,9 +90,11 @@ test('★★ 「저절로 등록」은 «배운 것»만 등록한다', () => {
   const src = bare(ERP);
   const seg = src.slice(src.indexOf('if(!rows || ldTabEff!==\'exp\' || !expAutoReg) return;'));
   assert.ok(seg.length > 0, '저절로 등록하는 덩이를 못 찾았다');
-  assert.ok(/if\(!g \|\| g\.category !== cat\) return;/.test(seg.slice(0, 900)),
+  /* ⚠ 거르는 «꼴»(return; / return false)은 못 박지 않는다 — 2026-10-18 에 줄마다 저장하던 고리를
+     「거른 뒤 한 번에 등록(registerExpRows)」으로 바꿨다. 볼 것은 «배운 것과 같을 때만»·«처리된 줄 빼기» 다. */
+  assert.ok(/if\(!g \|\| g\.category !== cat\) return(?: false)?;|return !!\(g && g\.category === cat\);/.test(seg.slice(0, 900)),
     '★★ 사람이 고르다 만 것까지 대신 눌러 버린다 — 배운 것과 같을 때만 등록해야 한다');
-  assert.ok(/if\(row\._dup\) return;/.test(seg.slice(0, 900)),
+  assert.ok(/if\(row\._dup\) return(?: false)?;/.test(seg.slice(0, 900)),
     '★ 이미 처리된 줄을 다시 등록한다');
 });
 
@@ -138,12 +140,14 @@ test('★★ 스위치가 켜져 있으면 «그 자리»에서 등록한다', (
   const s = catSelect();
   assert.ok(/if\(!expAutoReg\)\{/.test(s),
     '★ 스위치와 상관없이 등록한다 — 켜지도 않았는데 장부에 적힌다');
-  assert.ok(/saveExpense\(r,v\);/.test(s) && /removeRow\(k,'exp'\);/.test(s),
+  /* 2026-10-18: 줄마다 저장하던 것을 한 벌(registerExpRows)에 «방금 고른 값»을 넘기는 꼴로 바꿨다 —
+     배우기·처리 표시가 한 번에 가야 다른 기기에 「동기화 충돌 의심」이 안 뜬다. */
+  assert.ok(/registerExpRows\(same, ?nm\)/.test(s) || (/saveExpense\(r,v\);/.test(s) && /removeRow\(k,'exp'\);/.test(s)),
     '★ 고른 자리에서 등록이 안 된다 — 오른쪽 끝까지 또 가야 한다');
 });
 
 test('★ 몇 건을 함께 처리했는지 «말해 준다»', () => {
   const s = catSelect();
-  assert.ok(/done\.length\+'건 등록'/.test(s),
+  assert.ok(/(?:done\.length|doneN)\+'건 등록'/.test(s),
     '★ 몇 건이 등록됐는지 안 알려 주면, 한 줄만 고른 줄 알고 지나간다');
 });
