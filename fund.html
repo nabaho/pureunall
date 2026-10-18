@@ -760,13 +760,72 @@ var ACCT_RULES=[
 ];
 var WELF_CATS=['격려금','복리후생','의료비','기념품비','주택자금','우리사주구입자금','생활안정자금','장학금','재난구호금','체육문화비','모성보호비','근로자의날행사비','근로복지시설비','경조사비','동호회비','대부사업','기타복지비'];
 var EVENT_KINDS={
-  site_leave:{label:'사업장 탈퇴',gong:true,steps:['탈퇴 사유 확인·정리','참여사업장 탭에서 탈퇴 처리','기본재산 총액 변경 여부 검토','필요 시 기본재산 변경보고(별지 제10호)','탈퇴 관련 서류 스캔 보관']},
+  site_leave:{label:'사업장 탈퇴',gong:true,legacy:true,steps:['탈퇴 사유 확인·정리','참여사업장 탭에서 탈퇴 처리','기본재산 총액 변경 여부 검토','필요 시 기본재산 변경보고(별지 제10호)','탈퇴 관련 서류 스캔 보관']},
   charter:{label:'정관 변경',steps:['변경안 작성','협의회(총회) 의결·회의록','정관변경 인가신청(별지 제11호)','인가증 수령','변경등기 신청','변경 정관·등기부 스캔 보관','정관 버전 갱신']},
   officer:{label:'임원·이사 변경',steps:['변경 대상·사유 확인','선임·해임 의결(회의록)','취임승낙서 등 등기서류 준비','임원 변경등기 신청','등기 완료 확인','임원 명부 갱신','변경 서류 스캔 보관']},
   address:{label:'주소 이전',steps:['이전 결정·의결','소재지 변경등기 신청','기금 기본정보 소재지 수정','관할 세무서·노동청 변경 확인','변경 서류 스캔 보관']},
-  dissolve:{label:'해산·청산',steps:['해산 사유·의결','해산 인가·신고','해산등기','청산 절차·잔여재산 처리','해산통지서(별지 제14호)','청산종결등기','기록 보관 전환']},
+  dissolve:{label:'해산·청산',legacy:true,steps:['해산 사유·의결','해산 인가·신고','해산등기','청산 절차·잔여재산 처리','해산통지서(별지 제14호)','청산종결등기','기록 보관 전환']},
   etc:{label:'기타 변경',steps:['내용 확인','처리','관련 서류 스캔 보관']}
 };
+/* ══ 해산·탈퇴 (대표 지시 2026-10-18 「해산과 관련된 프로세스·서식 모두 정리해서 수행할 수 있게」 — 목업 승인 「추천대로」) ══
+   근거: 01_계획·설계/기금해산·탈퇴_절차·서식_정리_20261018.md — 근로복지기본법·시행령(2026-08-25)·시행규칙·지침 예규169·
+   민법 §77~96(법 §80 준용)·법인세법 §29·고용노동부 행정해석(국가법령정보센터 조회 2026-10-18).
+   갈래 넷: 사내기금 해산 / 공동기금 탈퇴 / 공동기금 참여사 폐업(과반수 아님) / 공동기금 해산.
+   단계 = [단계, 근거, 기한 규칙(기준일+N일·N개월), 이미 있는 서식 열쇠, 서식 이름, 바로 갈 탭].
+   ⚠ 기한 규칙의 기준일은 사람이 넣는다(사유 발생일·청산인 취임일 등) — 지어내지 않는다.
+   ⚠ 옛 «해산·청산»·«사업장 탈퇴» 이벤트(legacy)는 이미 만든 것만 그대로 보이고, 새로는 이 갈래로 시작한다
+     — 옛 목록에는 법에 없는 «해산 인가» 단계가 있었다(해산은 인가가 아니라 통지 — 영 §52·규칙 §28). */
+var DS_LIQ_BASES=[['occur','해산 사유 발생일'],['liq','청산인 취임일'],['credEnd','채권신고 기간 끝'],['closeDay','청산 종결일']];
+var DS_FLOWS={
+  dis_in:{label:'사내기금 해산', type:'사내', sub:'사업 폐지 · 합병 · 분할 · 공동기금 참여(법 §70)', bases:DS_LIQ_BASES, steps:[
+    ['해산 사유 확인·증빙 — 폐업사실증명 / 합병·분할 계약 / 공동기금 설립인가증','법 §70 · 지침 §24②','','','',''],
+    ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57(회의록 10년)','','ops_minutes_use','별지 13호 회의록',''],
+    ['청산인 취임 — 취임승낙서','민법 §82','','reg_accept','취임승낙서',''],
+    ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','reg_apply','해산·청산인 취임 등기신청서',''],
+    ['해산통지서 + 첨부 4종(해산 증명·정관·재산목록·처분계획서) — 지방노동관서','영 §52 · 규칙 §28 · 민법 §86','liq+21d','','별지 14호 해산통지서',''],
+    ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
+    ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
+    ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
+    ['잔여재산 처리 — 폐지: 미지급 임금 → 50% 이내 생활안정자금 → 정관 지정자·진흥기금 / 공동기금 참여: 그 공동기금에 귀속(기본재산·준비금 구분 승계)','법 §71 · 영 §53 · 해석 3866','','','재산 처분계획서','closing'],
+    ['법인세 — 준비금 잔액 익금산입(포괄 양도면 승계 가능), 해산 사업연도 신고(세무사)','법인세법 §29④⑤','','','','closing'],
+    ['청산종결 등기 + 노동관서 신고','민법 §94','closeDay+21d','','청산종결 등기신청서',''],
+    ['(진흥기금 귀속일 때만) 잔여재산 목록 제출·인도','영 §54','closeDay+21d','','잔여재산 목록',''],
+    ['고유번호 폐지·계좌 해지·서류 보관 → 기금 «기록보관»','법 §57·§65','','','','info']]},
+  leave:{label:'공동기금 탈퇴', type:'공동', sub:'참여 사업주 한 곳이 나감 — 2026-08-25 탈퇴 보고 신설', bases:[['apply','탈퇴 신청일'],['leaveDay','탈퇴일']], steps:[
+    ['탈퇴 사유 확인 + 증빙 — 도급 종료 / 미출연 3회+재고·생산·매출 악화 / 근로자 과반수 요구','영 §55의5①②','','','탈퇴 신청서',''],
+    ['공동기금협의회 협의·결정 — 탈퇴 회사 위원은 의결권 없음(기한 넘기면 탈퇴 결정 간주)','영 §55의5③④','apply+3m','ops_minutes_use','별지 13호 회의록',''],
+    ['배분 재산 계산 — 탈퇴 당시 재산가액 × 그 사업주 출연액 ÷ 조성된 공동기금','법 §86의8② · 규칙 §29의2','','','재산배분 계산서',''],
+    ['재산 배분 → 받은 사업주는 사내기금 설치 또는 출연(출연금 처리)','법 §86의8③ · 해석 3866','','','배분 재산목록',''],
+    ['탈퇴 보고서 + 회의록·사유 증명·배분 재산목록 — 지방노동관서','영 §55의5⑤ · 규칙 §29의3','leaveDay+21d','','별지 14호의2 탈퇴 보고서',''],
+    ['기본재산 총액 변경 보고','영 §35② · 규칙 §22','','ops_asset_change','별지 10호',''],
+    ['정관 변경 인가(참여 사업주가 정관에 적혀 있으면)','법 §53 준용','','','별지 11호',''],
+    ['지원금 영향 점검 — 남는 곳이 1곳이면 지원 대상 아님','해석 3961','','','',''],
+    ['참여사업장 «탈퇴» 처리(탈퇴일)','','','','','sites']]},
+  bizclose:{label:'공동기금 참여사 폐업', type:'공동', sub:'과반수 아님 — 그 몫은 근로자에게, 남으면 공동기금', bases:[['occur','폐업일']], steps:[
+    ['폐업 증빙 — 폐업사실증명·청산 등','해석 2308(사업 폐지의 뜻)','','','',''],
+    ['그 사업주 몫 계산(탈퇴와 같은 산식)','법 §86의9① · 규칙 §29의2','','','재산배분 계산서',''],
+    ['미지급 임금 등 우선(사업주가 청산할 능력 없음을 증명) → 50% 이내 소속 근로자 생활안정자금','법 §86의9① · 영 §53①','','','',''],
+    ['쓰고 남은 것은 공동기금에 귀속','법 §86의9②','','','',''],
+    ['협의회 회의록','법 §57','','ops_minutes_use','별지 13호 회의록',''],
+    ['기본재산 총액 변경 보고','영 §35② · 규칙 §22','','ops_asset_change','별지 10호',''],
+    ['참여사업장 «탈퇴·폐업» 처리','','','','','sites']]},
+  dis_gong:{label:'공동기금 해산', type:'공동', sub:'과반수 폐지·탈퇴 · 합병 · 분할(법 §86의11)', bases:DS_LIQ_BASES, steps:[
+    ['해산 사유 확인·증빙 — 과반수 사업주의 폐지·탈퇴 / 합병 / 분할','법 §86의11 · 지침 §24②','','','',''],
+    ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57','','ops_minutes_use','별지 13호 회의록',''],
+    ['청산인 취임 — 취임승낙서','민법 §82','','reg_accept','취임승낙서',''],
+    ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','reg_apply','해산·청산인 취임 등기신청서',''],
+    ['해산통지서 + 첨부 4종 — 지방노동관서','영 §55의6→§52 · 규칙 §28','liq+21d','','별지 14호 해산통지서',''],
+    ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
+    ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
+    ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
+    ['재산 배분 — 출연한 비율로 참여 사업주에게, 잔여재산은 정관대로','법 §86의12','','','재산배분 계산서','closing'],
+    ['정부 지원금 정산·반환 확인(근로복지공단)','운영규정 §11·§14','','','',''],
+    ['법인세 — 준비금 잔액 익금산입, 해산 사업연도 신고(세무사)','법인세법 §29⑤','','','','closing'],
+    ['청산종결 등기 + 노동관서 신고','민법 §94','closeDay+21d','','청산종결 등기신청서',''],
+    ['고유번호 폐지·계좌 해지·서류 보관 → 기금 «기록보관»','법 §57·§65','','','','info']]}
+};
+Object.keys(DS_FLOWS).forEach(function(k){ var F=DS_FLOWS[k];
+  EVENT_KINDS[k]={label:F.label, ds:k, gong:F.type==='공동', sane:F.type==='사내', steps:F.steps.map(function(s){ return s[0]; })}; });
 var SITE_FIELDS=[['seq_label','연번','text'],['name','상호','text'],['ceo','대표자','text'],
   ['biz_no','사업자등록번호','text'],['corp_no','법인등록번호','text'],['biz_type','업종','text'],
   ['company_size','상시근로자수','text'],['contrib','기본 출연금(원)','text'],
@@ -4535,6 +4594,7 @@ function renderForms(){
   // 단계 탭 — 기금 생애주기 순서. 공동 전용 단계(지원금·인센티브)는 사내 기금에서 숨김
   var PH=[['inka','① 인가'],['reg','② 법인설립'],['tax','③ 고유번호증'],['ops','④ 운영']];
   if(isGong) PH=PH.concat([['subsidy','⑤ 근복지원금']]);
+  PH=PH.concat([['dis','⑥ 해산·탈퇴']]);   // 사내·공동 모두 — 갈래는 기금 유형으로 고른다(dsLibHTML)
   if(PH.map(function(p){return p[0];}).indexOf(S.formPhase)<0) S.formPhase='inka';
   var phBar='<div class="tabbar">'+PH.map(function(p){return '<div class="tab'+(S.formPhase===p[0]?' on':'')+'" onclick="S.formPhase=\''+p[0]+'\';renderForms()">'+p[1]+'</div>';}).join('')+'</div>';
   // 공동/사내 기본서식을 구분해 보여주는 표시
@@ -4573,6 +4633,8 @@ function renderForms(){
           +opsRow('연간 일정·총회/협의회','<button onclick="gotoFundTab(\'annual\')" style="padding:4px 10px">📅 연간 일정으로 →</button>')
         : opsRow('운영상황보고서·결산서·변경이벤트','<span class="muted" style="font-size:12px">실데이터 기반 — 각 기금의 <b>📑 서식</b>/해당 탭에서</span>'))
       +'</div></div>';
+  } else if(S.formPhase==='dis'){
+    body=dsLibHTML(cur,fundMode);
   } else {
     body='<div class="panel">'
       +phaseHead('⑤ 근복지원금 신청 서식','forms.sub','sub',
@@ -16647,8 +16709,9 @@ function eventsTab(f){
     return '<div class="panel">'+loadingHTML()+'</div>'; }
   var ev=S.ev||{}, arr=Object.keys(ev).map(function(k){var o=Object.assign({},ev[k]);o._id=k;return o;});
   arr.sort(function(a,b){return (a.status==='완료'?1:0)-(b.status==='완료'?1:0)||(b.started_date||'').localeCompare(a.started_date||'');});
-  var opts=Object.keys(EVENT_KINDS).filter(function(k){return !(EVENT_KINDS[k].gong&&f.fund_type==='사내');}).map(function(k){return '<option value="'+k+'">'+EVENT_KINDS[k].label+'</option>';}).join('');
+  var opts=Object.keys(EVENT_KINDS).filter(function(k){ var K=EVENT_KINDS[k]; return !K.legacy&&!(K.gong&&f.fund_type==='사내')&&!(K.sane&&f.fund_type!=='사내'); }).map(function(k){return '<option value="'+k+'">'+EVENT_KINDS[k].label+'</option>';}).join('');
   var cards=arr.map(function(e){
+    if(e.ds&&DS_FLOWS[e.ds]) return dsEventCard(e);   // 해산·탈퇴 — 기준일·기한
     var done=e.status==='완료', steps=(e.steps||[]);
     var dc=steps.filter(function(s){return s.done;}).length;
     var sh=steps.map(function(s,i){return '<div style="display:flex;gap:8px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--line);flex-wrap:wrap'+(s.done?';opacity:.55':'')+'"><input type="checkbox"'+(s.done?' checked':'')+(done?' disabled':'')+' onchange="toggleStep(\''+e._id+'\','+i+',this.checked)"><span style="font-size:12.5px'+(s.done?';text-decoration:line-through':'')+'">'+esc(s.label)+'</span>'+_evtBtn(s.label||'')+'</div>';}).join('');
@@ -16663,9 +16726,115 @@ function eventsTab(f){
     +'<p class="muted" style="font-size:11.5px;margin:8px 0 0">유형을 고르면 처리 체크리스트가 자동 생성됩니다.</p></div>'
     +(arr.length?cards:'<div class="panel muted">등록된 변경 이벤트가 없습니다. 정관변경·임원변경·탈퇴·해산 등을 여기서 관리하세요.</div>');
 }
+/* ── 해산·탈퇴: 기한 셈 — 순수 함수(검사가 그대로 돌린다) ──
+   규칙 «기준일+N일» 또는 «기준일+N개월». 개월은 말일을 넘지 않게(1/31+1개월 → 2/28). 기준일이 비면 '' — 지어내지 않는다. */
+function dsDue(rule,bases){
+  var m=/^(\w+)\+(\d+)([dm])$/.exec(String(rule||'')); if(!m) return '';
+  var b=String((bases||{})[m[1]]||''); if(!/^\d{4}-\d{2}-\d{2}$/.test(b)) return '';
+  var y=+b.slice(0,4), mo=+b.slice(5,7)-1, d=+b.slice(8,10), n=+m[2], dt;
+  if(m[3]==='d') dt=new Date(Date.UTC(y,mo,d+n));
+  else { var last=new Date(Date.UTC(y,mo+n+1,0)).getUTCDate(); dt=new Date(Date.UTC(y,mo+n,Math.min(d,last))); }
+  return dt.toISOString().slice(0,10);
+}
+/* 기한까지 남은 날 — 지났으면 빨강, 7일 안이면 노랑. 끝낸 단계·기한 없는 단계는 null */
+function dsDueState(due,today,done){
+  if(!due||done) return null;
+  var a=Date.parse(due+'T00:00:00Z'), t=Date.parse(String(today||'')+'T00:00:00Z'); if(isNaN(a)||isNaN(t)) return null;
+  var n=Math.round((a-t)/86400000);
+  if(n<0) return {cls:'dg', txt:(-n)+'일 지남'};
+  if(n<=7) return {cls:'warn', txt:n===0?'오늘까지':'D-'+n};
+  return {cls:'', txt:'D-'+n};
+}
+/* 기한 규칙을 사람 말로 — 「청산인 취임일 + 3주」 */
+function dsDueText(F,rule){
+  var m=/^(\w+)\+(\d+)([dm])$/.exec(String(rule||'')); if(!m) return rule?String(rule):'—';
+  var b=((F&&F.bases||[]).filter(function(x){ return x[0]===m[1]; })[0]||['',''])[1], n=+m[2];
+  if(!n) return b+' 이후';
+  return b+' + '+(m[3]==='m'?n+'개월':(n%7===0?(n/7)+'주':n+'일'));
+}
+/* 탈퇴·폐업 배분액 — 시행규칙 §29의2: 그때 재산가액 × 그 사업주 출연액 ÷ 법 §86의2로 조성된 공동기금. 모르는 칸이 있으면 null */
+function withdrawShare(value,contrib,total){
+  var P=function(v){ var s=String(v==null?'':v).replace(/[,\s원]/g,''); return s===''?NaN:Number(s); };
+  var V=P(value), C=P(contrib), T=P(total);
+  if(isNaN(V)||isNaN(C)||!(T>0)) return null;
+  return Math.round(V*C/T);
+}
+/* 갈래별 ⓘ — 열쇠를 «글자 그대로» 둔다(화면에 놓이지 않은 도움말을 찾는 검사가 글자로 된 열쇠를 센다) */
+function dsHelp(k){ return ({dis_in:hlp('ds.dis_in'), leave:hlp('ds.leave'), bizclose:hlp('ds.bizclose'), dis_gong:hlp('ds.dis_gong')})[k]||''; }
+/* 단계의 서식·바로가기 단추 — ctx: 'lib'(서식 자료실) · 'event'(기금 변경 이벤트) */
+function dsDocBtn(s,ctx){
+  var doc=s[3], form=s[4], tab=s[5], out='';
+  if(doc) out+=ctx==='event'
+    ? '<button onclick="event.stopPropagation();openFundDoc(S.fundId,\''+doc+'\')" style="padding:2px 8px;font-size:11px">📄 '+esc(form||docLabel(doc))+'</button>'
+    : '<button onclick="selectForm(\''+doc+'\')" style="padding:2px 8px;font-size:11px">📄 '+esc(form||docLabel(doc))+'</button>';
+  else if(form) out+='<span class="chip" style="font-size:10.5px" title="한글 틀은 준비 중입니다 — 원본은 국가법령정보센터 서식">'+esc(form)+'</span>';
+  if(tab&&ctx==='event') out+=' <button onclick="event.stopPropagation();goTab(\''+tab+'\')" style="padding:2px 8px;font-size:11px">'+esc(({closing:'회계·결산',sites:'참여사업장',info:'기금 정보'})[tab]||tab)+' →</button>';
+  return out||'<span class="muted">—</span>';
+}
+/* 서식 자료실 «⑥ 해산·탈퇴» — 안내판(체크는 저장하지 않는다). 실제 진행은 기금의 변경 이벤트에서 */
+function dsLibHTML(cur,fundMode){
+  var t=(cur&&cur.fund_type==='사내')?'사내':'공동';
+  var ks=Object.keys(DS_FLOWS).filter(function(k){ return DS_FLOWS[k].type===t; });
+  if(ks.indexOf(S.dsFlow)<0) S.dsFlow=ks[0];
+  var F=DS_FLOWS[S.dsFlow];
+  var ways='<div class="row" style="gap:8px;margin:8px 0;align-items:stretch;flex-wrap:wrap">'+ks.map(function(k){ var on=k===S.dsFlow;
+    return '<div onclick="S.dsFlow=\''+k+'\';renderForms()" style="flex:1;min-width:150px;cursor:pointer;border-radius:9px;padding:8px 10px;'
+      +(on?'border:2px solid var(--acc);background:var(--acc-soft)':'border:1px solid var(--line);background:var(--bg)')+'">'
+      +'<b style="font-size:13px">'+esc(DS_FLOWS[k].label)+'</b><div class="muted" style="font-size:11px">'+esc(DS_FLOWS[k].sub)+'</div></div>'; }).join('')+'</div>';
+  var rows=F.steps.map(function(s,i){
+    return '<tr>'+_ckTd()+'<td class="muted" style="font-size:11.5px">'+(i+1)+'</td><td>'+esc(s[0])+'</td>'
+      +'<td style="white-space:nowrap;font-size:11.5px">'+esc(dsDueText(F,s[2]))+'</td>'
+      +'<td class="muted" style="font-size:11px">'+esc(s[1])+'</td><td>'+dsDocBtn(s,'lib')+'</td></tr>'; }).join('');
+  var calc=(S.dsFlow==='leave'||S.dsFlow==='bizclose')
+    ? '<div style="background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:10px 12px;margin-top:10px;max-width:520px">'
+      +'<div class="row"><b>재산배분 계산</b>'+hlp('ds.calc')+'</div>'
+      +[['ds-v','탈퇴(폐업) 당시 공동기금 재산가액'],['ds-c','그 사업주가 출연한 재산가액'],['ds-t','법 §86의2로 조성된 공동기금']].map(function(x){
+        return '<div class="row" style="justify-content:space-between;padding:4px 0;border-bottom:1px dashed var(--line)"><span style="font-size:12px">'+x[1]+'</span>'
+          +'<input id="'+x[0]+'" oninput="dsCalc()" inputmode="numeric" style="width:160px;text-align:right;padding:4px 7px;border:1px solid var(--line);border-radius:7px"></div>'; }).join('')
+      +'<div class="row" style="justify-content:space-between;padding-top:6px"><b>배분액</b><b id="ds-r">—</b></div></div>'
+    : '';
+  return '<div class="panel"><div class="row"><h2 style="font-size:15px">⑥ 해산·탈퇴 — 절차·기한·서식</h2>'+hlp('ds.law')+dsHelp(S.dsFlow)
+    +'<span style="flex:1"></span>'
+    +(fundMode?'<button class="primary" onclick="gotoFundTab(\'events\')" style="padding:5px 11px">🔁 이 기금에서 진행(변경 이벤트) →</button>':'')+'</div>'
+    +ways+'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th>#</th><th>단계</th><th>기한</th><th>근거</th><th>서식</th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+    +calc+'</div>';
+}
+function dsCalc(){
+  var g=function(id){ var el=$(id); return el?el.value:''; }, r=withdrawShare(g('ds-v'),g('ds-c'),g('ds-t')), o=$('ds-r');
+  if(o) o.textContent=(r==null)?'—':won(r);
+}
+/* 기금 변경 이벤트 — 해산·탈퇴 갈래는 기준일을 넣으면 단계마다 기한이 붙는다 */
+function dsEventCard(e){
+  var F=DS_FLOWS[e.ds], done=e.status==='완료', steps=e.steps||[], bases=e.bases||{}, today=ymd(), late=0;
+  var dc=steps.filter(function(s){ return s&&s.done; }).length;
+  var rows=F.steps.map(function(fs,i){
+    var st=steps[i]||{}, due=dsDue(fs[2],bases), ds=dsDueState(due,today,!!st.done);
+    if(ds&&ds.cls==='dg') late++;
+    return '<tr'+(st.done?' style="opacity:.55"':'')+'><td class="ckcol"><input type="checkbox"'+(st.done?' checked':'')+(done?' disabled':'')
+      +' onchange="toggleStep(\''+e._id+'\','+i+',this.checked)"></td><td class="muted" style="font-size:11.5px">'+(i+1)+'</td>'
+      +'<td style="font-size:12.5px'+(st.done?';text-decoration:line-through':'')+'">'+esc(fs[0])+' <span class="muted" style="font-size:10.5px">'+esc(fs[1])+'</span></td>'
+      +'<td style="white-space:nowrap;font-size:11.5px">'+(due?'<b>'+esc(due)+'</b><br>':'')+'<span class="muted" style="font-size:10.5px">'+esc(dsDueText(F,fs[2]))+'</span></td>'
+      +'<td>'+(st.done?'<span class="chip ok">완료</span>':(ds?'<span class="chip '+ds.cls+'">'+esc(ds.txt)+'</span>':''))+'</td>'
+      +'<td>'+dsDocBtn(fs,'event')+'</td></tr>'; }).join('');
+  var bh='<div class="row" style="gap:12px;flex-wrap:wrap;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:8px 10px;margin:8px 0">'
+    +F.bases.map(function(b){ return '<label class="muted" style="font-size:11.5px">'+esc(b[1])+'<br><input type="date" value="'+esc(bases[b[0]]||'')+'"'+(done?' disabled':'')
+      +' onchange="evBase(\''+e._id+'\',\''+b[0]+'\',this.value)" style="padding:3px 6px;border:1px solid var(--line);border-radius:6px"></label>'; }).join('')
+    +dsHelp(e.ds)+'</div>';
+  return '<div class="panel" style="border-left:3px solid '+(done?'var(--line)':'var(--warn)')+'"><div class="row"><b>'+esc(F.label)+'</b><span class="muted">'+esc(e.title||'')+'</span>'
+    +(done?'<span class="chip ok">완료</span>':'<span class="chip warn">진행 '+dc+'/'+F.steps.length+'</span>')
+    +(late&&!done?'<span class="chip dg">기한 지남 '+late+'</span>':'')+'<span style="flex:1"></span>'
+    +(done?'<button onclick="setEv(\''+e._id+'\',\'진행\')">되돌리기</button>':'<button class="primary" onclick="setEv(\''+e._id+'\',\'완료\')">완료</button>')
+    +'<button onclick="delEv(\''+e._id+'\')" style="color:var(--danger)">삭제</button></div>'
+    +bh+'<div style="overflow-x:auto"><table><thead><tr><th class="ckcol">□</th><th>#</th><th>단계</th><th>기한</th><th>상태</th><th>서식·바로가기</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>';
+}
+function evBase(eid,k,v){
+  fbDb.ref(NS+'/events/'+S.fundId+'/'+eid+'/bases/'+k).set(v||null).then(function(){ S.evFor=null; renderFund(); })
+    .catch(function(e){ toast('저장 실패: '+e.message,'err'); renderFund(); });
+}
 function createEvent(){
   var kind=$('ev-kind').value, meta=EVENT_KINDS[kind];
   var o={kind:kind,kind_label:meta.label,title:$('ev-title').value.trim(),status:'진행',started_date:ymd(),steps:meta.steps.map(function(l){return {label:l,done:false};})};
+  if(meta.ds) o.ds=meta.ds;
   fbDb.ref(NS+'/events/'+S.fundId).push().set(o).then(function(){S.evFor=null;renderFund();}).catch(function(e){toast('실패: '+e.message,'err');});
 }
 function toggleStep(eid,i,on){ fbDb.ref(NS+'/events/'+S.fundId+'/'+eid+'/steps/'+i+'/done').set(on).then(function(){S.evFor=null;renderFund();}).catch(function(e){toast('저장 실패: '+e.message,'err');renderFund();}); }
@@ -22532,6 +22701,20 @@ var HELP={
    +'<p>은행에서 받은 <b>이자소득 원천징수영수증</b>(1.1~12.31 전체)의 법인세·지방소득세 합계를 넣으세요. 결산 때 <b>(차) 선납세금 / (대) 이자수익</b>으로 얹어 이자를 총액으로 만듭니다.</p>'
    +'<p>선납세금은 <b>법인세(3/31)·법인지방소득세(4/30)를 기한 안에 신고해야</b> 돌려받습니다. 환급금이 들어오면 선납세금을 줄이는 쪽으로 분개합니다(잡이익 아님).</p>'
    +'<p>통장에 원천징수가 <b>따로 출금 줄로</b> 찍히는 기금은 이미 총액이 들어와 있으니 칸을 비우고, 그 출금 줄을 선납세금으로 분개하세요.</p>'},
+ 'ds.law':{t:'해산·탈퇴 — 법의 큰 줄기',h:'<p><b>해산 사유는 법에 정한 것뿐</b>입니다 — 사내기금은 사업 폐지·합병·분할·공동기금 참여(근로복지기본법 제70조), 공동기금은 과반수 사업주의 폐지·탈퇴·합병·분할(제86조의11). «운영이 어려워서»는 해산할 수 없습니다(고용노동부 퇴직연금복지과-649, 2019-02-08).</p>'
+   +'<p>청산은 민법의 재단법인 규정을 따릅니다(법 제80조) — 청산인 취임 → <b>3주 안에</b> 해산등기·해산통지(별지 제14호) → 채권신고 공고 → 변제 → 잔여재산 → <b>3주 안에</b> 청산종결 등기·신고.</p>'
+   +'<p>2026-08-25부터 공동기금 <b>탈퇴는 3주 안에 보고</b>합니다(시행령 제55조의5⑤, 별지 제14호의2).</p>'
+   +'<p><small>근거 원문·행정해석 요지: 01_계획·설계/기금해산·탈퇴_절차·서식_정리_20261018.md. 실제 사건은 담당 노무사·법무사(등기)·세무사(법인세) 확인이 필요합니다.</small></p>'},
+ 'ds.dis_in':{t:'사내기금 해산',h:'<p><b>사업 폐지</b>(제70조1호): 재산은 ① 미지급 임금·퇴직금(사업주가 청산할 능력이 없음을 증명 — 영 제53조) → ② 남은 것의 50% 이내 소속 근로자 전체 생활안정자금 → ③ <b>정관에서 지정한 자</b>(협의회 의결로 정한다는 간접 지정도 유효 — 다른 기금법인 가능, 해석 1453) → 없으면 근로복지진흥기금(3주 안에 잔여재산 목록 제출).</p>'
+   +'<p><b>공동기금 참여</b>(제70조4호): 재산은 그 공동기금에 <b>귀속</b> — 출연이 아니므로 기본재산은 기본재산으로, 준비금은 준비금으로 <b>나눠 넘깁니다</b>(해석 퇴직연금복지과-3866). 이 경우 노동부는 청산을 «해산등기 → 해산통지 → 현존사무 종결 → 잔여재산 인도»로 안내했습니다(국민신문고 2024-10-10). 채권신고 공고가 필요한지는 채무가 있는지에 따라 [확인 필요].</p>'
+   +'<p>흡수합병된 회사는 «사업 폐지»가 아닙니다 — 기금 합병으로 가야 합니다(해석 2308). 위원이 모두 퇴사했으면 그때 위원이 직무를 계속합니다.</p>'},
+ 'ds.leave':{t:'공동기금 탈퇴',h:'<p>탈퇴 사유는 넷뿐입니다(시행령 제55조의5①) — 도급 관계 종료 · 개별 도급 관계 종료 · 미출연 3회 이상+재고 50%↑/생산·매출 15%↓ · 근로자 과반수(노조)의 탈퇴 요구.</p>'
+   +'<p>신청부터 <b>3개월 안에</b> 협의회가 정합니다 — 탈퇴하는 회사의 위원은 의결권이 없고, 기한을 넘기면 탈퇴를 정한 것으로 봅니다.</p>'
+   +'<p>배분받은 사업주는 그 재산으로 <b>사내기금을 설치하거나 출연</b>해야 합니다(출연금으로 처리). 근로자가 없어 설치가 안 되면 — 사업 폐지면 공동기금 귀속, 계속 영위면 다른 사내기금에 제3자 출연(노동부 국민신문고 답변 2024-03-22).</p>'
+   +'<p>2곳 중 1곳이 폐업해 1곳만 남은 공동기금은 실질 사내기금이라 지원 대상이 아니고, 남은 곳은 탈퇴할 수 없습니다(해석 3961). 2곳 모두 탈퇴 사유가 생기면 과반수라 해산할 수 있습니다(국민신문고 2025-01-14).</p>'},
+ 'ds.bizclose':{t:'공동기금 참여사 폐업',h:'<p>과반수가 아닌 한 곳의 사업 폐지는 탈퇴와 다릅니다(법 제86조의9). 그 사업주 몫(탈퇴와 같은 산식)을 미지급 임금 등에 먼저 쓰고, 남은 것의 50% 이내를 그 회사 근로자 생활안정자금으로 줄 수 있으며, <b>그래도 남은 것은 공동기금에 귀속</b>합니다 — 사업주에게 돌아가지 않습니다.</p><p>탈퇴 보고(별지 제14호의2)를 이때도 내야 하는지는 [확인 필요 — 관할 지청].</p>'},
+ 'ds.dis_gong':{t:'공동기금 해산',h:'<p>과반수 사업주의 폐지·탈퇴로 해산하면 재산은 <b>출연한 비율로 참여 사업주에게 배분</b>하고, 남는 것은 정관대로 처리합니다(법 제86조의12). 청산 순서는 사내기금 해산과 같습니다(해산통지 별지 제14호 — 영 제55조의6이 제52조 준용).</p><p>정부 지원금 정산·반환은 근로복지공단 기준을 확인하세요(운영규정 제11·14조) [확인 필요].</p>'},
+ 'ds.calc':{t:'재산배분 계산',h:'<p>시행규칙 제29조의2 — <b>탈퇴(폐업) 당시 공동기금 재산가액 × 그 사업주가 출연한 재산가액 ÷ 법 제86조의2로 조성된 공동기금</b>.</p><p>재산가액은 그날 기준 결산(자산 − 부채)으로 봅니다. «조성된 공동기금»에 정부·지자체 지원금을 넣는지는 [확인 필요 — 근로복지공단·관할 지청]. 계산은 저장하지 않습니다.</p>'},
  'close.rsvshort':{t:'설정액이 한도보다 적으면 왜 문제인가',h:'<p>그해 출연금 중 <b>쓸 수 있는 몫(공동 90% · 사내 80%)</b>을 다음 해에도 쓰려면, <b>그해 결산에서 준비금2로 설정</b>해 두어야 합니다.</p>'
    +'<p>설정하지 않은 몫은 <b>기본재산으로 굳고 소급 설정이 되지 않습니다</b>(결산 실무 해석 — 세무사 확인). 나중에 그 돈을 쓰면 기본재산 잠식이 됩니다(사내기금 근로복지기본법 제62조, 공동기금 같은 법 제86조의6·시행령 제55조의4 — 사용할 수 있는 몫은 그해 출연금의 100분의 90 이내에서 협의회가 정하는 범위).</p>'
    +'<p>그래서 <b>한도 전액으로 채우는 것</b>이 기본입니다. 이미 세무사가 신고한 결산을 그대로 옮겨야 하는 등 사정이 있으면 이유를 적고 확정하세요 — 이유는 결산 기록에 남습니다. 세무 판단의 최종 확정은 담당 세무사 확인이 필요합니다.</p>'},
