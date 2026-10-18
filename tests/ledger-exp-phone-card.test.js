@@ -92,19 +92,23 @@ test('★★ 「출금 N건 등록」은 «센 그 목록»을 등록한다 — 
 });
 
 test('★ 등록은 한 벌(registerExpRows) — 넘겨받은 줄 가운데 «카테고리 있고 미처리»만', () => {
-  const at = FL.indexOf('function registerExpRows(list){');
+  const at = FL.indexOf('function registerExpRows(');
   assert.ok(at > 0, 'registerExpRows 를 못 찾았습니다');
   let d = 0, i = FL.indexOf('{', at);
   for (; i < FL.length; i++) { if (FL[i] === '{') d++; else if (FL[i] === '}' && --d === 0) break; }
   const src = FL.slice(at, i + 1);
-  const saved = [], learned = [], marked = [], removed = [];
+  const saved = [], learned = [], marked = [], removed = [], calls = { learn: 0, mark: 0 };
   const ctx = {
-    expCat: { a: 'exp-salary', b: '', c: 'exp-rent' },
+    expCat: { a: 'exp-salary', b: '', c: 'exp-rent', d: 'exp-rent' },
     EXP_CATS: [{ code: 'exp-salary', name: '급여' }, { code: 'exp-rent', name: '임차료' }],
-    saveExpense: (r, c) => saved.push(r._k + ':' + c),
-    erpLearnExpenseCat: (m, c) => learned.push(m + ':' + c),
-    erpMarkBankRowProcessed: (r, k, n) => marked.push(r._k + ':' + n),
+    saveExpense: (r, c) => { if (r._k === 'd') throw new Error('저장 실패'); saved.push(r._k + ':' + c); },
+    /* ★ 배우기·처리 표시는 «한 번»에 간다(2026-10-18 「동기화 충돌 의심」) — 줄마다 부르면 이 둘이 실패한다 */
+    erpLearnExpenseCat: () => { throw new Error('줄마다 배우면 표가 줄 수만큼 바뀐다'); },
+    erpMarkBankRowProcessed: () => { throw new Error('줄마다 표시하면 표가 줄 수만큼 바뀐다'); },
+    erpLearnExpenseCatMany: (ps) => { calls.learn++; ps.forEach((p) => learned.push(p.memo + ':' + p.category)); return ps.length; },
+    erpMarkBankRowsProcessed: (ms) => { calls.mark++; ms.forEach((m) => marked.push(m.row._k + ':' + m.kind + ':' + m.label)); return ms.length; },
     removeRow: (k) => removed.push(k),
+    window: { _erpErrLog: () => {} },               // 저장 실패를 기록만 하고 다음 줄로 간다
   };
   vm.createContext(ctx);
   vm.runInContext(src + '; this.f = registerExpRows;', ctx);
@@ -112,12 +116,18 @@ test('★ 등록은 한 벌(registerExpRows) — 넘겨받은 줄 가운데 «�
     { _k: 'a', memo: '급여 홍길동' },
     { _k: 'b', memo: '아직 안 고름' },             // 카테고리 없음 → 안 한다
     { _k: 'c', memo: '임대료', _dup: true },        // 이미 처리 → 안 한다
+    { _k: 'd', memo: '임대료 10월' },               // 저장 실패 → 처리 표시도 안 한다(다시 등록할 길을 남긴다)
   ]);
   assert.equal(n, 1);
   assert.deepEqual(saved, ['a:exp-salary']);
   assert.deepEqual(learned, ['급여 홍길동:exp-salary'], '★ 등록하며 배우지 않으면 다음 달에 또 골라야 한다');
-  assert.deepEqual(marked, ['a:급여'], '★ 처리 표시가 없으면 같은 줄을 또 등록한다');
+  assert.deepEqual(marked, ['a:expense:급여'], '★ 처리 표시가 없으면 같은 줄을 또 등록한다 · 저장 못 한 줄에 표시하면 다시 못 한다');
+  assert.deepEqual(calls, { learn: 1, mark: 1 }, '★★ 배우기·처리 표시는 «한 번»씩이어야 한다');
   assert.deepEqual(removed, ['a']);
+  /* 고르는 «그 자리»에서는 아직 화면에 안 들어간 새 값을 넘긴다(catMap) */
+  saved.length = 0;
+  assert.equal(ctx.f([{ _k: 'b', memo: '아직 안 고름' }], { b: 'exp-rent' }), 1);
+  assert.deepEqual(saved, ['b:exp-rent'], 'catMap 을 안 쓴다');
   assert.equal(ctx.f(null), 0, '빈 목록에서 죽지 않는다');
   /* 두 단추가 모두 이 한 벌을 쓴다 — 저마다 등록하면 언젠가 한쪽만 고친다 */
   assert.ok((F.match(/registerExpRows\(/g) || []).length >= 3, '「출금 N건 등록」·「고른 것 등록」이 한 벌을 쓰지 않는다');

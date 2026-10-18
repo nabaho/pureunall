@@ -1259,3 +1259,18 @@ input[type="search"]::-webkit-search-cancel-button{
 @media (pointer:coarse){
   input[type="search"]::-webkit-search-cancel-button{ height:19px; width:19px; background-size:19px; }
 }
+
+/* ══ 데이터 감시 알림(erpAlert) — 폰에서는 한 치수 작게 (대표 폰 화면 2026-10-18) ══
+   「⚠ 동기화 충돌 의심」 경보 둘이 겹쳐 뜨자 한 장에 260px 남짓, 둘이 화면을 거의 다 덮었다.
+   ⚠ 말은 버리지 않는다 — 제목·대응책·닫기는 그대로, 설명은 석 줄까지(넘치면 …), 시각만 접는다
+     (시각은 기록 erpAlerts() 에 남는다). 넓은 화면은 그대로다. */
+@media (max-width:640px){
+  #erp-alert-wrap{ gap:5px !important; }
+  .erp-alert{ padding:8px 10px !important; font-size:12.5px !important; line-height:1.4 !important; }
+  .erp-alert-t{ font-size:13px !important; }
+  .erp-alert-d{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .erp-alert-a{ margin-top:4px !important; padding:4px 7px !important; }
+  .erp-alert-tm{ display:none !important; }
+  .erp-alert-bar{ margin-top:5px !important; }
+  .erp-alert-bar button{ min-height:30px; padding:3px 12px !important; }
+}
