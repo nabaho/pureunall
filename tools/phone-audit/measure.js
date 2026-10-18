@@ -5,7 +5,8 @@
  * 재는 것 (모두 «사람이 폰에서 겪는 일» 로 고른 것이다):
  *   overflowX  — 페이지가 옆으로 밀린다(문서 폭 > 화면 폭)
  *   offscreen  — 화면 밖으로 나가 «못 누르는/못 읽는» 것 (옆 스크롤 상자 안은 뺀다 — 일부러 민다)
- *   vertical   — 칸이 좁아 글자가 «한 글자씩 세로로» 깨진 것
+ *   vertical   — 칸이 좁아 글자가 «한두 글자씩 세로로» 깨진 것
+ *   squeezed   — 네 글자 넘는 말이 글자 세 개 폭도 안 되는 칸에 «…» 로 잘린 것
  *   wrapBtn    — 단추·탭 글자가 두 줄로 접힌 것
  *   smallTap   — 누를 것이 너무 작다(가로·세로 모두 24px 미만)
  *   smallInput — 입력칸 글씨 16px 미만(아이폰이 누를 때 화면을 키운다)
@@ -84,7 +85,7 @@ function __paMeasure(opts) {
   }
 
   var all = Array.prototype.slice.call(document.body ? document.body.querySelectorAll('*') : []);
-  var offscreen = [], vertical = [], wrapBtn = [], smallTap = [], smallInput = [], fixed = [];
+  var offscreen = [], vertical = [], wrapBtn = [], smallTap = [], smallInput = [], fixed = [], squeezed = [];
   var seenOff = new Set();
   var TAP = 'button,a[href],[onclick],[role=button],[role=tab],input[type=checkbox],input[type=radio],select,summary,label[for]';
 
@@ -117,8 +118,15 @@ function __paMeasure(opts) {
     var fs = parseFloat(cs.fontSize) || 14;
     var lh = parseFloat(cs.lineHeight) || fs * 1.4;
     var ot = ownText(el);
-    if (ot.length >= 3 && r.width < fs * 2.2 && r.height > lh * 2.5 && !/vertical/.test(cs.writingMode)) {
+    /* 한 줄에 두 글자 이하로 여러 줄 — 「점/검/누/리」·「점검/누리」 모두 잡는다 */
+    var ln = (ot.length >= 3 && r.width < fs * 3.2) ? lines(el, fs) : 0;
+    if (ln >= 2 && ot.length / ln <= 2.2 && !/vertical/.test(cs.writingMode)) {
       vertical.push({ sel: sel(el), text: ot.slice(0, 20), w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) });
+    }
+
+    // 짓눌린 칸 — 네 글자 넘는 말이 글자 세 개 폭도 안 되는 칸에 «…» 로 잘려 있다(옆으로 미는 표 안의 이름 칸 46px 등)
+    if (ot.length >= 4 && el.clientWidth > 0 && el.clientWidth < fs * 3.5 && el.scrollWidth > el.clientWidth + 2) {
+      squeezed.push({ sel: sel(el), text: ot.slice(0, 20), w: Math.round(r.width), top: Math.round(r.top) });
     }
 
     // 단추·탭 글자가 두 줄로
@@ -152,6 +160,7 @@ function __paMeasure(opts) {
   }, 0);
   out.offscreen = offscreen.slice(0, 30); out.offscreenN = offscreen.length;
   out.vertical = vertical.slice(0, 30); out.verticalN = vertical.length;
+  out.squeezed = squeezed.slice(0, 30); out.squeezedN = squeezed.length;
   out.wrapBtn = wrapBtn.slice(0, 30); out.wrapBtnN = wrapBtn.length;
   out.smallTap = smallTap.slice(0, 30); out.smallTapN = smallTap.length;
   out.smallInput = smallInput.slice(0, 10); out.smallInputN = smallInput.length;

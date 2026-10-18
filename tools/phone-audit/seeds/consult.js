@@ -99,10 +99,11 @@ module.exports = {
     /* 첫 화면에 «종료 확인 사업장» 창이 뜬다(내 담당 가운데 다 끝난 곳) — 갈무리는 첫 화면이 맡고, 여기서 닫는다 */
     { name: 'prog-all', run: async (p) => { await p.evaluate(() => closeModal('mbEndConfirm')); await p.click('#viewProg .mp-tab[data-mine="0"]'); } },
     { name: 'prog-open', run: async (p) => { await p.click('#mpList .mp-row >> nth=1'); } },
-    { name: 'cal', run: async (p) => { await p.click('#tabMain'); } },
+    { name: 'cal', run: async (p) => { await p.evaluate(() => closeModal('mbEndConfirm')); await p.click('#tabMain'); } },
     { name: 'week', run: async (p) => { await p.click('#calControls .mode-btn[data-mode="week"]'); } },
     { name: 'day', run: async (p) => { await p.click('#calControls .mode-btn[data-mode="day"]'); } },
-    { name: 'sheet', run: async (p) => { await p.click('#calControls .mode-btn[data-mode="month"]'); await p.click('#dashMToggle'); },
+    /* --view=sheet 처럼 혼자 돌 때도 되게 — 종료 확인 창을 닫고 달력으로 */
+    { name: 'sheet', run: async (p) => { await p.evaluate(() => { closeModal('mbEndConfirm'); showTab('main'); }); await p.click('#calControls .mode-btn[data-mode="month"]'); await p.click('#dashMToggle'); },
       back: async (p) => { await p.click('#dashMToggle'); } },
     { name: 'more', run: async (p) => { await p.click('.hdr-more'); }, back: async (p) => { await p.click('.hdr-more'); } },
     { name: 'timeline', run: async (p) => { await p.click('#tabTimeline'); } },

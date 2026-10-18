@@ -37,7 +37,7 @@ function cell(rows, w) {
   const ox = Math.max(...r.map(x => (x.m && x.m.overflowX) || 0));
   const parts = [];
   if (ox) parts.push('옆넘침 ' + ox + 'px');
-  [['offscreenN', '화면밖'], ['verticalN', '세로깨짐'], ['wrapBtnN', '두줄단추'], ['smallTapN', '작은단추'], ['smallInputN', '작은입력']]
+  [['offscreenN', '화면밖'], ['verticalN', '세로깨짐'], ['squeezedN', '짓눌림'], ['wrapBtnN', '두줄단추'], ['smallTapN', '작은단추'], ['smallInputN', '작은입력']]
     .forEach(([k, label]) => { const n = sum(k); if (n) parts.push(label + ' ' + n); });
   const bad = r.filter(x => x.navErr || (x.m && x.m.gate)).length;
   if (bad) parts.push('⚠못연화면 ' + bad);
