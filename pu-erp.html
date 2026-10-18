@@ -30,6 +30,8 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 (function(){ try{
   var a = (location.search.match(/(?:^|[?&])app=(hr|fin)(?:&|$)/) || [])[1];
   if(!a) return;
+  /* 앱 표식 — 폰에서 그 앱만 바깥 여백을 걷는 등(css/pu-erp.css «html.pu-app-hr») 앱별 겉모양을 가를 때 쓴다 */
+  document.documentElement.classList.add('pu-app-' + a);
   var info = a === 'hr' ? { title:'인사관리', emo:'👥', mf:'pu-hr-manifest.json', png:'icon-hr-192.png' }
                         : { title:'재무관리',    emo:'📒', mf:'pu-fin-manifest.json', png:'icon-fin-192.png' };
   document.title = info.title;
@@ -173,7 +175,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=20">
+<link rel="stylesheet" href="css/pu-erp.css?v=21">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
@@ -37423,15 +37425,19 @@ function UserWithRateSection(){
       h('div', { style:{ flex:1 } })
     ),
     h('div', null,
+    /* 폰 — 「ⓘ · 검색 · 시드 복원」 한 줄, 거르개 칩은 그 아래 한 줄 (2026-10-18). 예전에는 안내 글·검색·칩·단추가
+       제각기 꺾여 네 줄(150px)이었다. 「신규 등록은 근로자명부에서」는 ⓘ 안에 같은 말이 있어 폰에서는 접는다. */
     h('div', { className:'dt-toolbar', style: window.innerWidth <= 768 ? { flexWrap:'wrap', gap:'6px' } : undefined },
       /* 설명은 ⓘ 팝업으로 (대표 지시 2026-09-29 「환경설정 전체 설명은 팝업형태로」, 목업 settings-all-infopop) */
       h(InfoPop, { title:'👤 사용자', text:'계정·권한·성과%를 관리합니다. 성과%는 입금이 확정될 때 저절로 나눠집니다. 새 직원은 근로자명부에서 등록합니다.' }),
-      h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginRight:'4px', whiteSpace:'nowrap', flexShrink:0 }, title:'신규 직원은 근로자명부에서 등록하세요' }, window.innerWidth <= 768 ? '신규 등록은 근로자명부에서' : '👤 신규 등록 → 근로자명부'),   // 폰에서 한 글자씩 세로로 쌓이던 것 (2026-10-12)
-      h('input', { type:'search', className:'dt-search', placeholder:'🔍 사번·이름·직책 검색', value:query, onChange:function(e){ setQuery(e.target.value); } }),
+      h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginRight:'4px', display: window.innerWidth <= 768 ? 'none' : undefined, whiteSpace:'nowrap', flexShrink:0 }, title:'신규 직원은 근로자명부에서 등록하세요' }, window.innerWidth <= 768 ? '신규 등록은 근로자명부에서' : '👤 신규 등록 → 근로자명부'),   // 폰에서 한 글자씩 세로로 쌓이던 것 (2026-10-12)
+      h('input', { type:'search', className:'dt-search', placeholder:'🔍 사번·이름·직책 검색', value:query, onChange:function(e){ setQuery(e.target.value); },
+        style: window.innerWidth <= 768 ? { flex:'1 1 0', minWidth:0, width:'auto' } : undefined }),
       // 필터 토글
       /* 칩은 «한 줄 글자»로, 모자라면 칩째 다음 줄로 (폰화면관리 2026-10-18) — 폰에서 「관리/자 (1)」「노무/사 (9)」
          처럼 칩 «안»의 글자가 두 줄로 꺾였다. 넓은 화면은 한 줄에 다 들어가 그대로다. */
-      h('div', { style:{ display:'inline-flex', gap:'4px', marginLeft:'8px', flexWrap:'wrap' } },
+      h('div', { style:{ display:'inline-flex', gap:'4px', marginLeft: window.innerWidth <= 768 ? 0 : '8px', flexWrap:'wrap',
+          order: window.innerWidth <= 768 ? 2 : undefined, width: window.innerWidth <= 768 ? '100%' : undefined } },
         [
           { v:'all',    label:'전체',   count: activeUsers.length, color:'#475569' },
           { v:'admin',  label:'👑 관리자', count: adminCount,  color:'#dc2626' },
@@ -37458,8 +37464,9 @@ function UserWithRateSection(){
           );
         })
       ),
-      h('div', { className:'sp' }),
-      h('button', { className:'btn-secondary', onClick:reseed, title:'시드 12명 + 성과율로 복원' }, '시드 복원')
+      window.innerWidth > 768 && h('div', { className:'sp' }),
+      h('button', { className:'btn-secondary', onClick:reseed, title:'시드 12명 + 성과율로 복원',
+        style: window.innerWidth <= 768 ? { order:1, flexShrink:0, padding:'4px 8px', fontSize:'12px' } : undefined }, '시드 복원')
     ),
     h('table', { className:'dt user-tbl' },
       h('thead', null, h('tr', null,
@@ -47776,7 +47783,7 @@ function EnvSettings(){
         })
       )
     ),
-    h('div', { style:{ display:'flex', justifyContent:'flex-end', alignItems:'center', padding:'2px 2px 6px', minHeight:'18px' } },
+    h('div', { className:'env-save-row', style:{ display:'flex', justifyContent:'flex-end', alignItems:'center', padding:'2px 2px 6px', minHeight:'18px' } },
       h(SaveIndicator, null)
     ),
     tab === 'company'
@@ -67593,8 +67600,8 @@ function Certificate(){
 
       // ── 좌: 발급 폼 ──
       h('div', null,
-        // 입력 폼
-        h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px', marginBottom:'10px' } },
+        // 입력 폼 — cert-form: 인사관리 폰에서 이름표를 칸 왼쪽에 붙인다(css/pu-erp.css)
+        h('div', { className:'cert-form', style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'10px', padding:'10px', marginBottom:'10px' } },
           /* ★ 세로로 쌓는다 — 왼쪽 칸이 좁아 가로로 두면 글이 잘린다 */
           h('div', { style:{ display:'grid', gridTemplateColumns:'1fr', gap:'6px' } },
             h('div', null,
@@ -74421,7 +74428,9 @@ function PerfManagement(props){
   var kpiBox = function(bg,c,text){ var _m=window.innerWidth<=768; return h('div',{style:{background:bg,borderRadius:'6px',padding:_m?'5px 8px':'6px 14px',fontSize:_m?'11px':'11.5px',color:c,fontWeight:700,whiteSpace:'nowrap'}},text); };
   var tabS = function(a){ var _m=window.innerWidth<=768; return {padding:_m?'6px 10px':'9px 14px',border:_m?'1px solid '+( a?'#1e40af':'#cbd5e1'):'none',borderRadius:_m?'20px':'5px',cursor:'pointer',fontWeight:a?700:600,fontSize:_m?'11.5px':'12.5px',background:a?'#1e40af':'transparent',color:a?'#fff':'#475569',whiteSpace:'nowrap',flexShrink:0}; };
 
-  return h('div',{style:{padding:window.innerWidth<=768?'10px':'20px'}},
+  /* 폰 — 다른 인사 화면(.page)과 같은 흰 판 · 양옆 12px (2026-10-18 대표 「양 끝 공백 안 둬도 되니까」) */
+  var _pfM = window.innerWidth <= 768;
+  return h('div',{style:{padding:_pfM?'6px 12px 10px':'20px',background:_pfM?'#fff':undefined}},
     // 성과급 확인 발행 창
     pubOpen && h(PerfPublishModal, {
       ym: selYm, users: users, empPerfs: empPerfs,
@@ -74430,12 +74439,15 @@ function PerfManagement(props){
     }),
     // 헤더 + 탭
     h('div',{style:{display:'flex',flexDirection:'column',gap:'6px',marginBottom:window.innerWidth<=768?'8px':'16px'}},
-      h('label',{style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',color:!showRetired?'#dc2626':'#94a3b8',cursor:'pointer',userSelect:'none',padding:'4px 10px',borderRadius:'10px',background:!showRetired?'#fef2f2':'#f8fafc',fontWeight:600,border:'1px solid '+(!showRetired?'#fecaca':'#e2e8f0')}},
+      /* 폰 — 「퇴사자 제외」와 「조회 전용」 상자가 세 줄(98px)을 먹었다. 한 줄에 늘어놓고 넘치면 옆으로 민다.
+         넓은 화면은 겹을 없애(contents) 예전처럼 위아래 두 줄이다 */
+      h('div',{style:_pfM?{display:'flex',alignItems:'center',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:'2px'}:{display:'contents'}},
+      h('label',{style:{display:'inline-flex',alignItems:'center',gap:'4px',fontSize:'13px',color:!showRetired?'#dc2626':'#94a3b8',cursor:'pointer',userSelect:'none',padding:'4px 10px',borderRadius:'10px',background:!showRetired?'#fef2f2':'#f8fafc',fontWeight:600,border:'1px solid '+(!showRetired?'#fecaca':'#e2e8f0'),whiteSpace:_pfM?'nowrap':undefined,flexShrink:_pfM?0:undefined}},
         h('input',{type:'checkbox',checked:!showRetired,onChange:function(e){setShowRetired(!e.target.checked);},style:{width:'12px',height:'12px',cursor:'pointer',margin:0}}),
         h('span',null,'🚪 퇴사자 제외')
       ),
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', padding:window.innerWidth<=768?'5px 8px':'6px 12px',
-        background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', marginBottom:'4px' } },
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', padding:window.innerWidth<=768?'3px 6px':'6px 12px',
+        background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'8px', marginBottom:_pfM?0:'4px', flexShrink:_pfM?0:undefined } },
         h('span', { style:{ fontSize:'13px', color:'#1e40af', fontWeight:700 } }, '👁 조회 전용'),
         window.innerWidth > 768 && h('span', { style:{ fontSize:'13px', color:'#2563eb', flex:1 } }, '금액 수정은 입금관리에서 확정하면 자동으로 반영됩니다'),
         h('button', { onClick:function(){ onNav('fin/income'); },
@@ -74449,6 +74461,7 @@ function PerfManagement(props){
         h('button', { onClick:clearIncentive,
           style:{ fontSize:'13px', padding:'3px 12px', borderRadius:'6px', background:'#fff', color:'#dc2626',
             border:'1px solid #fecaca', cursor:'pointer', fontWeight:700, whiteSpace:'nowrap' } }, '🗑 인센티브 초기화')
+      )
       ),
       h('div',{style:{display:'flex',gap:'4px',overflowX:'auto',WebkitOverflowScrolling:'touch',paddingBottom:'2px'}},
         tabOrder.map(function(key){
@@ -74690,7 +74703,8 @@ function PerfManagement(props){
             kpiBox('#fffbeb','#854d0e','📌 '+allMonthIncomes.filter(function(fi){return fi.isPersonalIncome;}).reduce(function(s,fi){return s+(fi.amount||0);},0).toLocaleString()+'원'),
             kpiBox('#fef2f2','#dc2626','⚠️ 미반영 '+allMonthIncomes.filter(function(fi){return !fi.isPersonalIncome && ((fi.perfShares||[]).length===0 || fi.perfExclude);}).length+'건')
           ),
-          h('div',{style:{marginLeft:'auto'}}, zoomControl(perfZoom, setPerfZoom))
+          /* 폰은 손가락으로 벌려 키운다(확대를 막지 않는다) — 확대 단추가 한 줄을 따로 먹었다 */
+          !_pfM && h('div',{style:{marginLeft:'auto'}}, zoomControl(perfZoom, setPerfZoom))
         )
       ),
       allMonthIncomes.length===0
@@ -74701,7 +74715,7 @@ function PerfManagement(props){
                 h('th',{style:Object.assign({},thS,{width:'32px',textAlign:'center'})},'#'),
                 h('th',{style:Object.assign({},thS,{width:'86px',whiteSpace:'nowrap'})},'입금일'),
                 h('th',{style:Object.assign({},thS,{minWidth:'100px',maxWidth:'160px'})},'업체'),
-                h('th',{style:Object.assign({},thS,{width:'42px',textAlign:'center'})},'개인'),
+                h('th',{style:Object.assign({},thS,{width:'42px',textAlign:'center'},_pfM?{whiteSpace:'nowrap'}:null)},'개인'),
                 h('th',{style:Object.assign({},thS,{minWidth:'110px',whiteSpace:'nowrap'})},'구분'),
                 h('th',{style:Object.assign({},thS,{width:'68px',whiteSpace:'nowrap'})},'유형'),
                 h('th',{style:Object.assign({},thS,{width:'100px',textAlign:'center',whiteSpace:'nowrap'})},'제외사유'),
@@ -77324,14 +77338,16 @@ function AttendanceManagement(){
               var label = empName+t.icon+' '+t.label+periodSfx(r)+(r.type==='leave-hour'?' '+(r.hours||0)+'h':'')+(r.note?' ('+r.note+')':'');
               var isDragging = dragId===r.id;
               var isAllView = selSid === 'all';
+              /* 폰 개별 보기 — 칸이 40px 남짓이라 「🏖️ 연차」가 「🏖…」로만 보였다. 그림만 또렷이 두고 전문은 title 로 */
+              var _chipIcon = window.innerWidth <= 768 && !isAllView;
               return h('div',{key:ri,draggable:!isAllView,
                 onDragStart:function(e){ if(isAllView){ e.preventDefault(); return; } e.stopPropagation(); setDragId(r.id); e.dataTransfer.effectAllowed='move'; },
                 onDragEnd:function(){ setDragId(null); setDragOver(null); },
                 onClick:async function(e){ e.stopPropagation(); if(isAllView){ showToast('전체 보기에서는 삭제/이동 불가 (개별 직원 선택)'); return; } if(await popConfirm(label+'\n\n삭제하시겠습니까?')) delRecord(r.id); },
                 title:label+(isAllView?'\n전체 보기 (개별 직원 선택 후 편집 가능)':'\n클릭: 삭제 / 드래그: 날짜 이동'),
                 style:{fontSize:'12.5px',background:isDragging?'#94a3b8':t.color,color:'#fff',
-                  padding:'2px 5px',borderRadius:'8px',marginTop:'1px',whiteSpace:'nowrap',overflow:'hidden',
-                  textOverflow:'ellipsis',fontWeight:600,cursor:isAllView?'default':'grab',opacity:isDragging?0.5:1,userSelect:'none'}},label);
+                  padding:_chipIcon?'1px 2px':'2px 5px',textAlign:_chipIcon?'center':undefined,borderRadius:'8px',marginTop:'1px',whiteSpace:'nowrap',overflow:'hidden',
+                  textOverflow:'ellipsis',fontWeight:600,cursor:isAllView?'default':'grab',opacity:isDragging?0.5:1,userSelect:'none'}},_chipIcon ? t.icon : label);
             }),
             recs.length>4&&h('div',{style:{fontSize:'12px',color:'#94a3b8',marginTop:'1px'}},'+'+( recs.length-4)+'건')
           );
@@ -77370,8 +77386,8 @@ function AttendanceManagement(){
           })
         )
       ),
-      // 달력 (전체 폭)
-      h('div', {style:{background:'#fff',border:'1px solid #e2e8f0',borderRadius:'8px',padding:'8px',marginBottom:'8px'}},
+      // 달력 (전체 폭) — 흰 판 안에 테두리 상자를 한 겹 더 두면 양옆 9px 씩 칸이 좁아진다. 폰은 판에 바로 앉힌다 (2026-10-18)
+      h('div', {style:{background:'#fff',marginBottom:'8px'}},
         renderPersonCalendar()
       ),
       // 입력폼 (개별 직원 선택 시만)
@@ -79607,7 +79623,9 @@ function LeaveManagement(){
 
   return h('div',{className:'page',style:{overflowX:'hidden'}},
     // 헤더
-    h('div',{style:{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'5px',gap:'4px',flexWrap:_lvM?'wrap':'nowrap'}},
+    /* 폰 — 오른쪽 묶음은 겹을 없애(contents) 낱개로 꺾는다. 묶음째 제 폭을 고집해 「⚠️ 재산정 미완료」가
+       판 밖에서 잘렸다(411px 실측 2026-10-18). 낱개가 되면 연도 옆 빈자리부터 채우고 넘치면 다음 줄로 간다. */
+    h('div',{style:{display:'flex',justifyContent:_lvM?'flex-start':'space-between',alignItems:'center',marginBottom:'5px',gap:'4px',flexWrap:_lvM?'wrap':'nowrap'}},
       h('div',{style:{display:'flex',alignItems:'center',gap:'6px',minWidth:0,flexShrink:0,whiteSpace:'nowrap'}},
         (function(){
           var isFiscal = policy.basis === 'fiscalYear';
@@ -79626,7 +79644,7 @@ function LeaveManagement(){
         h('span',{style:{fontWeight:700,fontSize:'13px',minWidth:'40px',textAlign:'center'}},selYear+'년'),
         h('button',{onClick:function(){setSelYear(String(parseInt(selYear)+1));},style:{border:'1px solid #cbd5e1',background:'#fff',borderRadius:'4px',padding:'2px 7px',cursor:'pointer',fontSize:'13px'}},'▶')
       ),
-      h('div',{style:{display:'flex',gap:'3px',alignItems:'center',flexShrink:0,flexWrap:_lvM?'wrap':'nowrap'}},
+      h('div',{style:{display:_lvM?'contents':'flex',gap:'3px',alignItems:'center',flexShrink:0,flexWrap:_lvM?'wrap':'nowrap'}},
         // 보는 기준 — 지금(이번 연차 기간) / 연도별(달력 1~12월)
         _isAdminView && h('div',{style:{display:'inline-flex',border:'1px solid #cbd5e1',borderRadius:'7px',overflow:'hidden',marginRight:'6px'}},
           [{v:'now',l:'지금 기준'},{v:'year',l:'연도별'}].map(function(o){
@@ -79692,7 +79710,9 @@ function LeaveManagement(){
         h('div',{style:{fontWeight:700,fontSize:'15px',color:'#1e293b',marginBottom:'6px'}},'👥 직원별 연차 현황'),
         h('input',{type:'search',value:query,placeholder:'이름 검색 (퇴사자 포함)',onInput:function(e){setQuery(e.target.value);},style:{width:'100%',padding:'4px 8px',border:'1px solid #cbd5e1',borderRadius:'6px',fontSize:'13.5px',marginBottom:'5px',boxSizing:'border-box'}}),
         h('div',{style:{border:'1px solid #e2e8f0',borderRadius:'8px',overflow:'hidden'}},
-          h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'15px'}},
+          /* 폰은 칸이 다섯뿐이라 화면에 다 든다 — 폰 공통 규칙(.page table → display:block, 옆으로 밀기)이
+             표를 제 글자 폭으로 줄여 오른쪽 1/4 이 비었다. 이 표만 다시 «표»로 펴 폭을 채운다 */
+          h('table',{style:{width:'100%',borderCollapse:'collapse',fontSize:'15px',display:_lvM?'table':undefined}},
             h('thead',null,
               h('tr',null,
                 (_lvM
@@ -80925,6 +80945,9 @@ function RetirementSettlement(){
   var TYPE_LABEL = { DC:'DC형', DB:'DB형', NONE:'미가입' };
   var TYPE_COLOR = { DC:'#1e40af', DB:'#2563eb', NONE:'#dc2626' };
   var TYPE_BG = { DC:'#eff6ff', DB:'#eff6ff', NONE:'#fef2f2' };
+  /* 폰 — 탭 줄 옆 「적립금 엑셀 — 끌어다 놓거나 클릭」 띠(220px)가 탭을 1.5개로 눌렀다(2026-10-18).
+     폰은 끌어다 놓을 일이 없으니 띠 글자를 줄이고(설명은 title 그대로), 탭 알약도 한 치수 줄인다 */
+  var _rsM = window.innerWidth <= 768;
 
   return h('div', { className:'page' },
     /* ── ① 숫자와 도구 — 한 줄 (2026-09-05 대표 지시: 「콤팩트하게, 2줄로」) ──
@@ -80958,7 +80981,7 @@ function RetirementSettlement(){
     ),
 
     // ② 탭 + 엑셀 가져오기 — 한 줄
-    h('div', { style:{ display:'flex', alignItems:'flex-end', gap:'8px', marginBottom:'12px' } },
+    h('div', { style:{ display:'flex', alignItems:'flex-end', gap:_rsM?'6px':'8px', marginBottom:_rsM?'8px':'12px' } },
     h('div', { style:{ display:'flex', gap:'4px', flex:1, minWidth:0, borderBottom:'2px solid #e2e8f0', overflowX:'auto', overflowY:'hidden', cursor:'grab', userSelect:'none', scrollbarWidth:'thin', WebkitOverflowScrolling:'touch', flexWrap:'nowrap' },
       ref: function(el){
         if(!el || el._dragInit) return;
@@ -80995,7 +81018,7 @@ function RetirementSettlement(){
       ].map(function(x){
         var on = tab === x.v;
         return h('button', { key:x.v, onClick:function(){setTab(x.v);},
-          style:{ padding:'9px 14px', borderRadius:'5px', fontSize:'14px', cursor:'pointer', fontWeight:on?700:500,
+          style:{ padding:_rsM?'6px 10px':'9px 14px', borderRadius:'5px', fontSize:_rsM?'13px':'14px', cursor:'pointer', fontWeight:on?700:500,
             background: on?'#1e40af':'transparent', color: on?'#fff':'#475569',
             border:'none', borderBottom:'none',
             marginBottom:'0', flexShrink:0, whiteSpace:'nowrap' } }, x.label);
@@ -81012,7 +81035,7 @@ function RetirementSettlement(){
           style:{ flexShrink:0, marginBottom:'4px', border:'1px dashed #bfdbfe', background:'#eff6ff',
             color:'#1e40af', borderRadius:'6px', padding:'5px 11px', fontSize:'11.5px', fontWeight:700,
             whiteSpace:'nowrap', cursor:'pointer' } },
-        '📥 적립금 엑셀 — 끌어다 놓거나 클릭',
+        _rsM ? '📥 엑셀' : '📥 적립금 엑셀 — 끌어다 놓거나 클릭',
         h('input', { id:'dcImpFile', type:'file', accept:'.xlsx,.xls,.csv', style:{ display:'none' },
           onChange:function(e){ pickDCFile(e.target.files && e.target.files[0]); e.target.value=''; } })
       )
@@ -82053,13 +82076,17 @@ function PayrollManagement(props){
     setDragV(null);
   }
 
+  /* 폰은 안내를 «한 줄»로 — 설명 문장이 둘째 줄을 차지해 안내 상자만 66px 이었다(2026-10-18 대표 「한눈에」).
+     설명은 버리지 않고 상자의 title 로 옮긴다. 넓은 화면은 그대로다. */
+  var _pmM = window.innerWidth <= 768;
   return h('div', { className:'page' },
     // 지급 흐름 안내
-    h('div', { style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding:'8px 14px', marginBottom:'12px', fontSize:'12px', color:'#1e40af', display:'flex', alignItems:'center', gap:'10px', flexWrap:'wrap' } },
+    h('div', { title: _pmM ? '화면의 월(ym)은 근무월. 지급은 다음달입니다.' : undefined,
+      style:{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:'6px', padding: _pmM ? '4px 10px' : '8px 14px', marginBottom: _pmM ? '6px' : '12px', fontSize:'12px', color:'#1e40af', display:'flex', alignItems:'center', gap: _pmM ? '6px' : '10px', flexWrap: _pmM ? 'nowrap' : 'wrap', whiteSpace: _pmM ? 'nowrap' : undefined } },
       h('span', { style:{ fontWeight:700 } }, '📌 '+selYM+' 근무분'),
       h('span', { style:{ color:'#2563eb' } }, '→'),
       h('span', { style:{ fontWeight:700, color:'#1e40af' } }, payYM+' 지급'),
-      h('span', { style:{ color:'#64748b', fontSize:'13px', marginLeft:'auto' } }, '※ 화면의 월(ym)은 근무월. 지급은 다음달입니다.')
+      !_pmM && h('span', { style:{ color:'#64748b', fontSize:'13px', marginLeft:'auto' } }, '※ 화면의 월(ym)은 근무월. 지급은 다음달입니다.')
     ),
     h('div', { style:{ display:'flex', gap: window.innerWidth<=768?'5px':'4px', marginBottom:'10px',
       borderBottom:'2px solid #e2e8f0', overflowX: window.innerWidth<=768?'auto':'visible',
@@ -83385,11 +83412,12 @@ function PayrollLedger(props){
           { bg:'#fffbeb', bd:'#fde68a', fg:'#854d0e', label:'📉 공제', val:totals.deduct.toLocaleString()+'원' },
           { bg:'#bfdbfe', bd:'#bfdbfe', fg:'#2563eb', label:'✅ 실지급', val:totals.net.toLocaleString()+'원' }
         ].map(function(k,i){
-          return h('div', { key:i,
-            style:{ flexShrink:0, minWidth:'72px', background:k.bg, border:'1px solid '+k.bd,
-              borderRadius:'6px', padding:'5px 6px' } },
-            h('div', { style:{ fontSize:'12px', color:k.fg, fontWeight:700, marginBottom:'1px', whiteSpace:'nowrap' } }, k.label),
-            h('div', { style:{ fontSize:'12px', fontWeight:800, color:k.fg, fontFamily:'monospace', wordBreak:'break-all' } }, k.val)
+          /* 폰 — 이름과 값을 한 줄 칩에 나란히 (2026-10-18 대표 「한눈에」). 두 줄 상자는 44px, 칩은 24px 이다 */
+          return h('span', { key:i,
+            style:{ display:'inline-flex', alignItems:'baseline', gap:'4px', flexShrink:0, background:k.bg, border:'1px solid '+k.bd,
+              borderRadius:'12px', padding:'3px 9px', fontSize:'12px', color:k.fg, fontWeight:700, whiteSpace:'nowrap' } },
+            k.label,
+            h('b', { style:{ fontWeight:800, fontFamily:'monospace', fontVariantNumeric:'tabular-nums' } }, k.val)
           );
         })
       )
@@ -83437,7 +83465,9 @@ function PayrollLedger(props){
               style:{padding:'6px 10px',background:'#fff',color:'#475569',border:'1px solid #cbd5e1',borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:600,whiteSpace:'nowrap'} }, '🔓 마감 잠금')
       ),
       // ── 보조액션 + 확정 (월이동 옆 같은 줄) ──
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap', flex:1, minWidth:0 } },
+      /* 폰은 flex 바탕 폭을 «제 내용»으로(1 1 auto) — flex:1(바탕 0)이면 앞 줄에 틈이 조금만 있어도 0px 로
+         끼어 앉아 「도구·확정」이 화면 밖으로 나갔다(411px 실측, 2026-10-18). 바탕이 제 폭이면 모자랄 때 다음 줄로 간다. */
+      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap: IS_M?'wrap':'nowrap', flex: IS_M?'1 1 auto':1, minWidth:0 } },
         IS_M && h('button', { onClick:function(){ setToolsOpen(!toolsOpen); },
           style:{padding:'6px 10px',background:toolsOpen?'#1e40af':'#f8fafc',color:toolsOpen?'#fff':'#475569',border:'1px solid '+(toolsOpen?'#1e40af':'#cbd5e1'),borderRadius:'6px',cursor:'pointer',fontSize:'12px',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, toolsOpen?'도구 ▴':'🛠 도구 ▾'),
         h('div', { style:{ display: (IS_M && !toolsOpen)?'none':'flex', gap:'4px', alignItems:'center', flexWrap: IS_M?'wrap':'nowrap', flex:1, paddingBottom:'2px', minWidth:0, width: IS_M?'100%':'auto', order: IS_M?3:0 } },
@@ -83606,8 +83636,11 @@ function PayrollLedger(props){
           style:{padding:'8px 14px',background:'#16a34a',color:'#fff',border:'none',borderRadius:'8px',cursor:'pointer',fontSize:'13px',fontWeight:800,whiteSpace:'nowrap',flexShrink:0,boxShadow:'0 2px 6px rgba(5,150,105,0.3)'} }, '✅ 확정')
       )
     ),
+    /* 폰 — 한 사람 «두 줄 카드» (2026-10-18 대표 「깔끔하고 한눈에」). 예전 카드는 이름 줄 + 색 상자 셋이라
+       한 사람이 95px, 첫 화면에 넷이었다. 1줄 번호·이름·직책·«실지급»(핵심값), 2줄 지급·공제·상태.
+       ⚠ 실지급을 둘째 줄 끝에 두면 천만 원대 금액 셋이 360px 에 안 들어간다 — 첫 줄은 직책이 줄어들며 자리를 낸다. */
     IS_M
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px' } },
+    ? h('div', { style:{ display:'flex', flexDirection:'column', background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', overflow:'hidden' } },
         users.map(function(u, idx){
           var rec = getRec(u.sid);
           var calc = calcPayroll(rec);
@@ -83615,30 +83648,22 @@ function PayrollLedger(props){
           var stBg = st==='confirmed'?'#f0fdf4':st==='paid'?'#bfdbfe':'#fffbeb';
           var stFg = st==='confirmed'?'#166534':st==='paid'?'#2563eb':'#854d0e';
           var stLb = st==='confirmed'?'확정':st==='paid'?'지급':'대기';
+          var money = { fontFamily:'monospace', fontWeight:800, fontVariantNumeric:'tabular-nums' };
           return h('div', { key:u.sid, onClick:function(){ props.onSelect(u.sid); },
-            style:{ background:'#fff', border:'1px solid #e2e8f0', borderLeft:'4px solid '+stFg,
-              borderRadius:'8px', padding:'10px 12px', cursor:'pointer', boxShadow:'0 1px 3px rgba(0,0,0,0.05)' } },
-            h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', marginBottom:'6px' } },
-              h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'12px', background:'#475569', borderRadius:'4px', padding:'1px 5px', flexShrink:0 } }, idx+1),
-              h('span', { style:{ fontWeight:700, color:'#1e293b', fontSize:'13px', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, u.name),
+            style:{ borderLeft:'3px solid '+stFg, borderBottom:'1px solid #e2e8f0', padding:'6px 8px', cursor:'pointer', whiteSpace:'nowrap' } },
+            h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 } },
+              h('span', { style:{ width:'20px', textAlign:'right', color:'#94a3b8', fontSize:'12px', fontVariantNumeric:'tabular-nums', flexShrink:0 } }, idx+1),
+              h('span', { style:{ fontWeight:800, color:'#1e293b', fontSize:'14px', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 } }, u.name),
               erpEmpStatusAt(u, (rec.ym || todayYMD().slice(0,7)) + '-15') === 'leave' && h('span', { style:{ fontSize:'12px', background:'#fffbeb', color:'#854d0e', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '휴직'),
               (u.status==='resigned'||u.status==='retired') && h('span', { style:{ fontSize:'12px', background:'#fef2f2', color:'#991b1b', padding:'1px 5px', borderRadius:'8px', fontWeight:700, flexShrink:0 } }, '퇴사'),
-              u.title && h('span', { style:{ fontSize:'12px', color:'#64748b', flexShrink:0 } }, u.title),
-              h('span', { style:{ fontSize:'12px', background:stBg, color:stFg, padding:'1px 7px', borderRadius:'10px', fontWeight:700, flexShrink:0 } }, stLb)
+              u.title && h('span', { style:{ fontSize:'12px', color:'#94a3b8', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 } }, u.title),
+              h('span', { style:{ marginLeft:'auto', fontSize:'12px', color:'#64748b', flexShrink:0 } }, '실지급 ',
+                h('span', { style:Object.assign({ color: calc.netPay < 0 ? '#dc2626' : '#1e40af', fontSize:'14px' }, money) }, calc.netPay.toLocaleString()))
             ),
-            h('div', { style:{ display:'flex', gap:'6px' } },
-              h('div', { style:{ flex:1, background:'#f0fdf4', borderRadius:'6px', padding:'5px 7px', textAlign:'center' } },
-                h('div', { style:{ fontSize:'12px', color:'#166534', fontWeight:700, marginBottom:'1px' } }, '지급액'),
-                h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#166534', fontFamily:'monospace' } }, calc.grossPay.toLocaleString())
-              ),
-              h('div', { style:{ flex:1, background:'#fffbeb', borderRadius:'6px', padding:'5px 7px', textAlign:'center' } },
-                h('div', { style:{ fontSize:'12px', color:'#854d0e', fontWeight:700, marginBottom:'1px' } }, '공제'),
-                h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#854d0e', fontFamily:'monospace' } }, calc.totalDeduct.toLocaleString())
-              ),
-              h('div', { style:{ flex:1, background:'#eff6ff', borderRadius:'6px', padding:'5px 7px', textAlign:'center' } },
-                h('div', { style:{ fontSize:'12px', color:'#2563eb', fontWeight:700, marginBottom:'1px' } }, '실지급'),
-                h('div', { style:{ fontSize:'12px', fontWeight:800, color:'#2563eb', fontFamily:'monospace' } }, calc.netPay.toLocaleString())
-              )
+            h('div', { style:{ display:'flex', alignItems:'center', gap:'10px', paddingLeft:'26px', marginTop:'1px', fontSize:'12px', color:'#64748b', minWidth:0 } },
+              h('span', null, '지급 ', h('span', { style:Object.assign({ color:'#166534' }, money) }, calc.grossPay.toLocaleString())),
+              h('span', null, '공제 ', h('span', { style:Object.assign({ color:'#854d0e' }, money) }, calc.totalDeduct.toLocaleString())),
+              h('span', { style:{ marginLeft:'auto', fontSize:'12px', background:stBg, color:stFg, padding:'0 7px', borderRadius:'10px', fontWeight:700, flexShrink:0 } }, stLb)
             )
           );
         })
@@ -86936,11 +86961,18 @@ function StaffRoster(){
   var contractColor = { '정규직':'#1e40af', '계약직':'#854d0e', '파트타임':'#16a34a', '일용직':'#1e40af' };
   var contractBg    = { '정규직':'#eff6ff', '계약직':'#fffbeb', '파트타임':'#f0fdf4', '일용직':'#eff6ff' };
 
+  /* 폰 — 숫자 칩과 상태 탭이 같은 일(재직·휴직·퇴직 거르기)을 두 줄에서 했다. 숫자를 탭에 얹어 한 줄로 합친다
+     (2026-10-18 대표 「깔끔하고 한눈에」). 넓은 화면은 숫자 카드 + 탭 그대로다. */
+  var _rM = window.innerWidth <= 768;
+  function _roleN(r){ return users.filter(function(u){ return (statusTab === 'all' || effStatus(u) === statusTab) && roleOf(u) === r; }).length; }
+  /* 알림 상자(입사예정·계약 만료) — 폰은 여백·글씨를 한 치수 줄이고 날짜는 월-일만 */
+  var _abx = _rM ? { marginBottom:'6px', padding:'6px 8px' } : null;
+  var _ahd = _rM ? { marginBottom:'4px', gap:'6px', whiteSpace:'nowrap', overflow:'hidden' } : null;
+  var _ach = _rM ? { padding:'3px 8px', fontSize:'13px', gap:'5px' } : null;
+  function _aDay(d){ return _rM ? String(d || '').slice(5) : d; }
   return h('div', { className:'page' },
-    // KPI — 4열 2행 grid (모바일/PC 공통)
-    h('div', { className: window.innerWidth <= 768 ? '' : 'staff-kpi', style: window.innerWidth <= 768
-        ? { display:'flex', gap:'5px', overflowX:'auto', marginBottom:'8px', paddingBottom:'2px', WebkitOverflowScrolling:'touch' }
-        : { display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'4px', marginBottom:'8px' } },
+    // KPI — 넓은 화면: 6칸 카드 / 폰: 아래 툴바의 상태 칩에 숫자를 얹는다
+    !_rM && h('div', { className:'staff-kpi', style:{ display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'4px', marginBottom:'8px' } },
         [
           { bg:'#f0fdf4', bd:'#bbf7d0', fg:'#166534', label:'✓ 재직', val:activeCount, sub:'명', fn:function(){setStatusTab('active');setRoleTab('all');} },
           { bg:'#fffbeb', bd:'#fde68a', fg:'#854d0e', label:'🏠 휴직', val:leaveCount, sub:'명', fn:function(){setStatusTab('leave');setRoleTab('all');} },
@@ -86949,11 +86981,6 @@ function StaffRoster(){
           { bg:'#eff6ff', bd:'#bfdbfe', fg:'#2563eb', label:'⚖️ 노무사', val:lawyerCount, sub:'재직', fn:function(){setStatusTab('active');setRoleTab('lawyer');} },
           { bg:'#fffbeb', bd:'#fde68a', fg:'#d97706', label:'🗂️ 직원', val:staffCount, sub:'재직', fn:function(){setStatusTab('active');setRoleTab('staff');} }
         ].map(function(k,i){
-          /* 폰 — 카드 6개가 두 줄로 첫 화면 절반을 차지했다. 한 줄 칩으로 (2026-10-12 시안 «한 화면에») */
-          if(window.innerWidth <= 768) return h('span', { key:i, onClick:k.fn||undefined,
-            style:{ display:'inline-flex', alignItems:'baseline', gap:'3px', background:k.bg, border:'1px solid '+k.bd, color:k.fg,
-              borderRadius:'12px', padding:'3px 9px', fontSize:'12px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0, cursor:k.fn?'pointer':'default' } },
-            k.label.replace(/^[^가-힣]+/, ''), h('b', { style:{ fontSize:'13px' } }, k.val));
           return h('div', { key:i, onClick:k.fn||undefined,
             style:{ background:k.bg, border:'1px solid '+k.bd,
               borderRadius:'6px', padding:'6px 5px', cursor:k.fn?'pointer':'default', textAlign:'center' } },
@@ -86966,8 +86993,8 @@ function StaffRoster(){
 
     // 📅 입사예정 → 재직 자동전환 알림
     autoActivated.length > 0 && h('div', {
-      style:{ marginBottom:'12px', background:'#f0fdf4', border:'1px solid #bbf7d0',
-        borderRadius:'8px', padding:'10px 16px', display:'flex', alignItems:'center', gap:'10px' } },
+      style:Object.assign({ marginBottom:'12px', background:'#f0fdf4', border:'1px solid #bbf7d0',
+        borderRadius:'8px', padding:'10px 16px', display:'flex', alignItems:'center', gap:'10px' }, _abx) },
       h('span', { style:{ fontSize:'13px', fontWeight:700, color:'#166534' } }, '✅ 입사 처리 완료'),
       h('span', { style:{ fontSize:'12px', color:'#166534' } },
         autoActivated.map(function(u){ return u.name; }).join(', ') +
@@ -86976,9 +87003,9 @@ function StaffRoster(){
 
     // ⏰ 근로계약 만료 임박 알림 (1개월 이내)
     expiringContracts.length > 0 && h('div', {
-      style:{ marginBottom:'14px', background:'#fffbeb', border:'1px solid #fde68a',
-        borderRadius:'8px', padding:'12px 18px' } },
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
+      style:Object.assign({ marginBottom:'14px', background:'#fffbeb', border:'1px solid #fde68a',
+        borderRadius:'8px', padding:'12px 18px' }, _abx) },
+      h('div', { style:Object.assign({ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }, _ahd) },
         h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#854d0e' } }, '⏰ 근로계약 만료 임박'),
         h('div', { style:{ fontSize:'12.5px', color:'#854d0e' } },
           expiringContracts.length + '건 · 1개월 이내 · 갱신 여부 확인 필요')),
@@ -86988,12 +87015,12 @@ function StaffRoster(){
           var dleft = Math.ceil((new Date(c.endDate) - today) / 86400000);
           return h('div', { key:c.id,
             onClick:function(){ if(u) setContractModal(u); },
-            style:{ cursor:'pointer', padding:'6px 12px',
+            style:Object.assign({ cursor:'pointer', padding:'6px 12px',
               background:'#fff', color:'#854d0e', border:'1px solid #fde68a',
               borderRadius:'5px', fontSize:'13.5px', fontWeight:600,
-              display:'inline-flex', gap:'8px', alignItems:'center' } },
+              display:'inline-flex', gap:'8px', alignItems:'center' }, _ach) },
             h('span', { style:{ fontWeight:700 } }, (u?u.name:c.sid)),
-            h('span', { style:{ fontSize:'12.5px', color:'#854d0e' } }, c.endDate),
+            h('span', { style:{ fontSize:'12.5px', color:'#854d0e' } }, _aDay(c.endDate)),
             h('span', { style:{ background:'#dc2626', color:'#fff', padding:'1px 6px',
               borderRadius:'8px', fontSize:'12px', fontWeight:700 } }, 'D-'+dleft));
         })
@@ -87014,8 +87041,8 @@ function StaffRoster(){
         return Object.assign({}, u, { _daysLeft: d });
       }).sort(function(a,b){ return a._daysLeft - b._daysLeft; });
       if(expEmp.length === 0) return null;
-      return h('div', { style:{ marginBottom:'14px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'12px 18px' } },
-        h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
+      return h('div', { style:Object.assign({ marginBottom:'14px', background:'#fffbeb', border:'1px solid #fde68a', borderRadius:'8px', padding:'12px 18px' }, _abx) },
+        h('div', { style:Object.assign({ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }, _ahd) },
           h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#854d0e' } }, '🗓️ 고용계약 만료 예정 직원'),
           h('div', { style:{ fontSize:'12.5px', color:'#854d0e' } }, expEmp.length + '명 · 60일 이내 · 갱신/종료 확인 필요')),
         h('div', { style:{ display:'flex', gap:'6px', flexWrap:'wrap' } },
@@ -87024,11 +87051,11 @@ function StaffRoster(){
             var badge = d <= 7 ? '#dc2626' : d <= 30 ? '#d97706' : '#d97706';
             return h('div', { key:u.sid,
               onClick:function(){ setDetailModal(u); },
-              style:{ cursor:'pointer', padding:'6px 12px', background:'#fff',
+              style:Object.assign({ cursor:'pointer', padding:'6px 12px', background:'#fff',
                 color:'#854d0e', border:'1px solid #fde68a', borderRadius:'5px',
-                fontSize:'13.5px', fontWeight:600, display:'inline-flex', gap:'8px', alignItems:'center' } },
+                fontSize:'13.5px', fontWeight:600, display:'inline-flex', gap:'8px', alignItems:'center' }, _ach) },
               h('span', { style:{ fontWeight:700 } }, u.name),
-              h('span', { style:{ fontSize:'12px', color:'#854d0e' } }, u.contractType + ' · ' + u.contractEnd),
+              h('span', { style:{ fontSize:'12px', color:'#854d0e' } }, _rM ? _aDay(u.contractEnd) : u.contractType + ' · ' + u.contractEnd),
               h('span', { style:{ background:badge, color:'#fff', padding:'1px 6px', borderRadius:'8px', fontSize:'12px', fontWeight:700 } }, 'D-'+d));
           })
         )
@@ -87049,19 +87076,19 @@ function StaffRoster(){
         return { u:u, diff:diff };
       }).sort(function(a,b){ return a.diff - b.diff; });
       if(!upcoming.length) return null;
-      return h('div', { style:{ marginBottom:'14px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px', padding:'12px 18px' } },
-        h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' } },
+      return h('div', { style:Object.assign({ marginBottom:'14px', background:'#f0fdf4', border:'1px solid #bbf7d0', borderRadius:'8px', padding:'12px 18px' }, _abx) },
+        h('div', { style:Object.assign({ display:'flex', alignItems:'center', gap:'8px', marginBottom:'8px' }, _ahd) },
           h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#166534' } }, '📅 입사 예정자 (30일 이내)'),
           h('div', { style:{ fontSize:'12.5px', color:'#166534' } }, upcoming.length + '명 · 입사일 임박')),
         h('div', { style:{ display:'flex', gap:'8px', flexWrap:'wrap' } },
           upcoming.map(function(item){
             return h('div', { key:item.u.sid,
               onClick:function(){ setDetailModal(item.u); },
-              style:{ cursor:'pointer', padding:'6px 14px', background:'#fff', color:'#166534',
+              style:Object.assign({ cursor:'pointer', padding:'6px 14px', background:'#fff', color:'#166534',
                 border:'1px solid #bbf7d0', borderRadius:'6px', fontSize:'13.5px', fontWeight:600,
-                display:'inline-flex', gap:'8px', alignItems:'center' } },
+                display:'inline-flex', gap:'8px', alignItems:'center' }, _ach) },
               h('span', { style:{ fontWeight:700 } }, item.u.name),
-              h('span', { style:{ fontSize:'12.5px', color:'#64748b' } }, item.u.hireDate),
+              h('span', { style:{ fontSize:'12.5px', color:'#64748b' } }, _aDay(item.u.hireDate)),
               h('span', { style:{ background: item.diff===0?'#16a34a':'#16a34a', color:'#fff',
                 padding:'1px 6px', borderRadius:'8px', fontSize:'12px', fontWeight:700 } },
                 item.diff === 0 ? 'D-Day' : 'D-'+item.diff));
@@ -87090,23 +87117,31 @@ function StaffRoster(){
             style:{ padding:'9px 12px', background:'#1e40af', color:'#fff', border:'none',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0 } }, '+ 등록')
         ),
-        // 상태탭 + 역할탭 가로 스크롤
+        // 상태 칩(숫자를 얹은 탭) + 역할 칩 — 한 줄, 넘치면 옆으로 민다 (2026-10-18 숫자 칩 줄과 합침)
         h('div', { style:{ display:'flex', gap:'4px', overflowX:'auto', WebkitOverflowScrolling:'touch', paddingBottom:'2px', alignItems:'center' } },
-          h('div', { style:{ display:'inline-flex', gap:'3px', flexShrink:0, background:'#f8fafc', borderRadius:'8px', padding:'2px' } },
-            [{v:'active',label:'재직'},{v:'leave',label:'🏠 휴직'},{v:'retired',label:'퇴직'},{v:'all',label:'전체'}].map(function(t){
-              var on = statusTab === t.v;
-              return h('button', { key:t.v, onClick:function(){ setStatusTab(t.v); },
-                style:{ padding:'5px 10px', borderRadius:'6px', fontSize:'13px', cursor:'pointer', fontWeight:on?700:500,
-                  background:on?'#1e40af':'transparent', color:on?'#fff':'#64748b', border:'none', whiteSpace:'nowrap' } }, t.label);
-            })
-          ),
+          [
+            { v:'active',    label:'재직',     n:activeCount,    fg:'#166534', bg:'#f0fdf4', bd:'#bbf7d0' },
+            { v:'leave',     label:'휴직',     n:leaveCount,     fg:'#854d0e', bg:'#fffbeb', bd:'#fde68a' },
+            { v:'retired',   label:'퇴직',     n:retiredCount,   fg:'#dc2626', bg:'#fef2f2', bd:'#fecaca' },
+            { v:'scheduled', label:'입사예정', n:scheduledCount, fg:'#166534', bg:'#f0fdf4', bd:'#bbf7d0' },
+            { v:'all',       label:'전체',     n:users.length,   fg:'#1e40af', bg:'#eff6ff', bd:'#bfdbfe' }
+          ].map(function(t){
+            var on = statusTab === t.v;
+            return h('button', { key:t.v, onClick:function(){ setStatusTab(t.v); },
+              style:{ display:'inline-flex', alignItems:'baseline', gap:'3px', padding:'5px 10px', borderRadius:'14px', fontSize:'13px', fontWeight:700,
+                cursor:'pointer', whiteSpace:'nowrap', flexShrink:0,
+                background:on?t.fg:t.bg, color:on?'#fff':t.fg, border:'1px solid '+(on?t.fg:t.bd) } },
+              t.label, h('span', { style:{ fontVariantNumeric:'tabular-nums' } }, t.n));
+          }),
           h('div', { style:{ width:'1px', height:'20px', background:'#e2e8f0', flexShrink:0 } }),
-          [{v:'all',label:'전체'},{v:'lawyer',label:'⚖️ 노무사'},{v:'staff',label:'🗂️ 직원'}].map(function(t){
+          /* 역할은 «한 번 더 누르면 풀린다» — 「전체」 칩을 따로 두면 상태 「전체」와 헷갈린다 */
+          [{v:'lawyer',label:'⚖️ 노무사'},{v:'staff',label:'🗂️ 직원'}].map(function(t){
             var on = roleTab === t.v;
-            return h('button', { key:t.v, onClick:function(){ setRoleTab(t.v); },
-              style:{ padding:'5px 10px', borderRadius:'20px', fontSize:'13px', cursor:'pointer', fontWeight:on?700:500,
+            return h('button', { key:t.v, onClick:function(){ setRoleTab(on ? 'all' : t.v); }, title: on ? '다시 누르면 노무사·직원 모두' : undefined,
+              style:{ display:'inline-flex', alignItems:'baseline', gap:'3px', padding:'5px 10px', borderRadius:'14px', fontSize:'13px', cursor:'pointer', fontWeight:on?700:500,
                 background:on?'#475569':'#f8fafc', color:on?'#fff':'#64748b',
-                border:'1px solid '+(on?'#475569':'#e2e8f0'), flexShrink:0, whiteSpace:'nowrap' } }, t.label);
+                border:'1px solid '+(on?'#475569':'#e2e8f0'), flexShrink:0, whiteSpace:'nowrap' } },
+              t.label, h('span', { style:{ fontVariantNumeric:'tabular-nums', fontWeight:700 } }, _roleN(t.v)));
           })
         )
       )
