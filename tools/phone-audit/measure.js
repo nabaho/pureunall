@@ -21,6 +21,15 @@ function __paMeasure(opts) {
   var W = opts.width || document.documentElement.clientWidth, H = window.innerHeight;
   var out = { w: W, h: H, docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight, layoutW: window.innerWidth };
   out.overflowX = Math.max(0, Math.max(out.docW, out.layoutW) - W);
+  /* 본문 상자가 «페이지 노릇»을 하는 앱(이알피 main{overflow:auto})은 문서 폭이 멀쩡해도 그 상자 안에서 화면 전체가 옆으로 구른다.
+     화면 거의 전부를 차지하는 미는 상자가 제 폭보다 넓으면 그것도 옆넘침으로 센다(2026-10-18 이알피 계약관리 498px). */
+  Array.prototype.forEach.call(document.querySelectorAll('body *'), function (el) {
+    if (el.clientWidth < W * 0.8 || el.clientHeight < window.innerHeight * 0.5) return;
+    var ox = getComputedStyle(el).overflowX;
+    if (ox !== 'auto' && ox !== 'scroll') return;
+    var over = el.scrollWidth - el.clientWidth;
+    if (over > 2 && over > out.overflowX) { out.overflowX = over; out.overflowIn = el.tagName.toLowerCase() + (el.id ? '#' + el.id : el.className && typeof el.className === 'string' ? '.' + el.className.trim().split(/\s+/)[0] : ''); }
+  });
 
   function visible(el) {
     var cs = getComputedStyle(el);

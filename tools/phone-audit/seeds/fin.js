@@ -5,6 +5,9 @@ module.exports = {
   data: erp.data,
   views: [
     erp.메뉴('fin/income', 3000),
+    /* 입금관리 안의 탭 둘 — 기간 탭(월별·연도별·전체)이 따로 그려진다 */
+    { name: 'income-list', wait: 2000, run: async (page) => { await page.locator('main').getByText('입금 리스트').first().click(); } },
+    { name: 'income-co', wait: 2000, run: async (page) => { await page.locator('main').getByText('업체입금').first().click(); } },
     erp.메뉴('fin/expense', 3000),
     erp.메뉴('fin/pnl'),
     erp.메뉴('fin/invoice'),

@@ -125,7 +125,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=11"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 // CommonJS/AMD 환경 가드 (모바일 WebView 호환)
@@ -177,7 +177,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=31"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -30253,7 +30253,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               var tc = typeColors[co.typeCode||'자문'] || typeColors['자문'];
               var picked = selIds.has(co.id);
               return h('div', { key:co.id, onClick:function(){setDetailModal(co);},
-                style:{ background: picked?'#eff6ff':(suspended?'#fffbeb':'#fff'), border:'1px solid '+(picked?'#93c5fd':(suspended?'#fde68a':(expiring?'#fbbf24':'#e2e8f0'))),
+                style:{ background: picked?'#eff6ff':(suspended?'#fffbeb':'#fff'), border:'1px solid '+(picked?'#2563eb':(suspended?'#fde68a':(expiring?'#fbbf24':'#e2e8f0'))),
                   borderLeft:'4px solid '+(suspended?'#fbbf24':(expiring?'#fbbf24':tc[1])),
                   borderRadius:'8px', padding:'8px 12px 8px 6px', cursor:'pointer',
                   boxShadow:'0 1px 3px rgba(0,0,0,0.05)' } },
@@ -57598,7 +57598,7 @@ function IncomePendingTab(props){
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 } },
                 h('span', { style:{ width:'22px', textAlign:'right', color:'#94a3b8', fontSize:'12px', fontFamily:'monospace',
                   fontVariantNumeric:'tabular-nums', flexShrink:0 } }, idx + 1),
-                h('span', { style:{ background:p.store.bg, color:p.store.color, padding:'1px 6px', borderRadius:'8px', fontSize:'11px',
+                h('span', { style:{ background:p.store.bg, color:p.store.color, padding:'1px 6px', borderRadius:'8px', fontSize:'12px',
                   fontWeight:700, flexShrink:0, whiteSpace:'nowrap' } }, p.store.icon + ' ' + p.store.label),
                 h('span', { title:coName || undefined, style:{ flex:1, minWidth:0, fontWeight:700, color:'#1e293b', fontSize:'13px',
                   whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, coName || '-'),
@@ -57607,9 +57607,9 @@ function IncomePendingTab(props){
               ),
               h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0, marginTop:'3px' } },
                 h('span', { style:{ background:fee?'#eff6ff':'#fffbeb', color:fee?'#1e40af':'#854d0e', padding:'1px 6px',
-                  borderRadius:'8px', fontSize:'11px', fontWeight:700, flexShrink:0, whiteSpace:'nowrap', marginLeft:'28px' } }, p.kindLabel),
+                  borderRadius:'8px', fontSize:'12px', fontWeight:700, flexShrink:0, whiteSpace:'nowrap', marginLeft:'28px' } }, p.kindLabel),
                 h('span', { title:info.join(' · ') + (hit ? '\n통장 적요 「' + (hit.row.memo || '-') + '」' : ''),
-                  style:{ flex:1, minWidth:0, fontSize:'11.5px', color:ok?'#166534':'#64748b', whiteSpace:'nowrap',
+                  style:{ flex:1, minWidth:0, fontSize:'12px', color:ok?'#166534':'#64748b', whiteSpace:'nowrap',
                     overflow:'hidden', textOverflow:'ellipsis' } }, info.join(' · ')),
                 h('button', { onClick:function(){
                     if(hit){ openFromBank(p, hit); return; }
@@ -71156,7 +71156,9 @@ function ClosedManagement(){
               color: on ? '#fff' : (hasData ? '#2563eb' : '#cbd5e1'),
               border:'1px solid '+(on ? '#2563eb' : (hasData ? '#bfdbfe' : '#f8fafc')),
               fontWeight: on||hasData ? 700 : 400 } },
-            h('div', { style:{ fontSize:'9px', opacity:0.85 } }, MONTH_NAMES[i]),
+            /* 폰에서는 「10/월」 처럼 두 줄로 꺾이지 않게 한 줄 + 자간만 좁힌다 (폰화면관리 2026-10-18) */
+            h('div', { style: Object.assign({ fontSize:'9px', opacity:0.85 },
+              window.innerWidth <= 768 ? { whiteSpace:'nowrap', letterSpacing:'-0.5px' } : {}) }, MONTH_NAMES[i]),
             h('div', { style:{ fontSize:'12.5px', fontFamily:'monospace', fontWeight:700 } }, cnt)
           );
         })
@@ -71314,8 +71316,10 @@ function ClosedManagement(){
     if(colAmt === 'desc') allRows = allRows.slice().sort(function(a,b){ return (b.amount||0)-(a.amount||0); });
     else if(colAmt === 'asc') allRows = allRows.slice().sort(function(a,b){ return (a.amount||0)-(b.amount||0); });
     var P = clPage(allRows);
+    /* ⚠ flexWrap:'nowrap' — 폰 공통 규칙이 이 세로 상자까지 접어(flex-wrap:wrap) 줄 폭이 «가장 긴 카드»로 정해졌다.
+       카드가 상자보다 34px 넓어 오른쪽 테두리가 잘려 보였다(실측 카드 326 · 상자 292, 폰화면관리 2026-10-18). */
     return window.innerWidth <= 768
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px' } },
+    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', flexWrap:'nowrap' } },
         allRows.length === 0
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } }, '등록된 데이터가 없습니다')
           : P.paged.map(function(row, idx){

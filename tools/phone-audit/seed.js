@@ -38,7 +38,9 @@ const dir = path.join(__dirname, 'seeds');
 if (fs.existsSync(dir)) {
   for (const f of fs.readdirSync(dir)) {
     if (!/\.js$/.test(f)) continue;
-    apps[f.replace(/\.js$/, '')] = require(path.join(dir, f));
+    /* 한 앱의 자료 파일이 깨져도 나머지 앱 점검은 돈다 — 깨진 것은 크게 알린다 */
+    try { apps[f.replace(/\.js$/, '')] = require(path.join(dir, f)); }
+    catch (e) { console.error('⚠ 점검 자료 seeds/' + f + ' 를 못 읽었습니다(그 앱은 빈 자료로 잽니다): ' + e.message); }
   }
 }
 
