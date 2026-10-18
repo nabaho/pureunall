@@ -90,6 +90,9 @@ function __paMeasure(opts) {
 
   all.forEach(function (el) {
     if (el.closest('script,style,svg,noscript,template')) return;
+    /* 닫힌 <details> 속(요약줄 말고)은 화면에 없다 — 재면 헛경고가 난다 */
+    var shut = el.closest('details:not([open])');
+    if (shut && !el.closest('summary')) return;
     if (!visible(el)) return;
     var r = el.getBoundingClientRect();
     var cs = getComputedStyle(el);
@@ -129,7 +132,10 @@ function __paMeasure(opts) {
     }
 
     // 누를 것이 작다
-    if (interactive && r.width < 24 && r.height < 24 && !(el.tagName === 'LABEL')) {
+    /* ☐ 를 label 로 감싸 누르는 자리를 넓혔으면 그 label 크기로 본다(손가락은 label 을 누른다) */
+    var tapR = r;
+    if (el.tagName === 'INPUT' && /^(checkbox|radio)$/i.test(el.type) && el.closest('label')) tapR = el.closest('label').getBoundingClientRect();
+    if (interactive && tapR.width < 24 && tapR.height < 24 && !(el.tagName === 'LABEL')) {
       smallTap.push({ sel: sel(el), text: txt(el).slice(0, 12), w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) });
     }
 
