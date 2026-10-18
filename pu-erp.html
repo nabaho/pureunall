@@ -57559,7 +57559,7 @@ function IncomePendingTab(props){
         style:{padding:'5px 10px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',color:'#64748b'} },
         '✕ 초기화'),
       h('span', { style:{flex:1} }),
-      h('span', { style:{fontSize:'13px',color:'#475569',fontWeight:700} }, '결과 ' + filtered.length + '건'),
+      h('span', { style:{fontSize:'13px',color:'#475569',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, '결과 ' + filtered.length + '건'),
       h(PageSizeSelector, { pageSize:pendPageSize, setPageSize:setPendPageSize, setPage:pendPg.setPage })
     )),   // ↑ 안내띠+검색줄 sticky 덩어리 닫음
 
@@ -68629,7 +68629,9 @@ function FinanceReceivable(props){
       gradeStats.map(function(g){
         var sel = selGrade === g.idx;
         var bg = sel ? g.color : g.bg;
-        var fg = sel ? '#fff' : g.color;
+        /* ⚠ 「장기」는 바탕이 짙은 빨강(#991b1b)이라 글자도 같은 빨강이면 «빈 빨간 칸»으로 보였다(폰화면관리 2026-10-18 발견,
+           넓은 화면도 같았다). invertText 표시는 적혀만 있고 쓰이지 않았다 — 이제 흰 글자로 읽힌다. */
+        var fg = (sel || g.invertText) ? '#fff' : g.color;
         return h('div',{key:g.idx,onClick:function(){setSelGrade(sel?-1:g.idx);},
           style:{background:bg,color:fg,border:'1px solid '+(sel?g.color:g.border),borderRadius:'8px',padding:'10px 12px',cursor:'pointer'}},
           h('div',{style:{fontSize:'12.5px',fontWeight:600}},g.label),
@@ -74400,7 +74402,7 @@ function PerfManagement(props){
                         cat==='personal'
                           ? h('span',{style:{fontSize:'12px',color:'#94a3b8'}},'-')
                           : h('button',{onClick:function(e){e.stopPropagation();unconfirmPerfItem(it);},
-                              style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}},'↺ 복원'))
+                              style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer',whiteSpace: window.innerWidth <= 768 ? 'nowrap' : undefined}},'↺ 복원'))
                     );
                   }),
                   h('tr',{style:{background:'#eff6ff',borderTop:'2px solid #2563eb'}},
@@ -74599,7 +74601,9 @@ function PerfManagement(props){
                       h('button',{
                         onClick:function(){ unconfirmPerfItem({ fiId:fi.id, companyName:fi.companyName, kind:fi.kind, baseAmount:fi.amount }); },
                         title:'입금확정 해제 + 성과 항목 복원',
-                        style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}
+                        /* 폰에서는 한 줄 (폰화면관리 2026-10-18) — 「↺ / 복원」 두 줄로 꺾여 그 줄만 57px 로 높아졌다.
+                           ⚠ 넓은 화면은 손대지 않는다 — 거기서 한 줄로 묶으면 표가 35px 넓어져 옆으로 구른다(재 봄). */
+                        style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer',whiteSpace: window.innerWidth <= 768 ? 'nowrap' : undefined}
                       },'↺ 복원'))
                   );
                 }),

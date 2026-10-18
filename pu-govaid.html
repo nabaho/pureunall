@@ -155,7 +155,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
 /* ══ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 폰 폭(760px 이하)에서만. PC 는 그대로 ══
    ① 머리가 «여섯 줄»(이름·부제·나/단추·탭 세 줄)로 늘 붙어 다니며 화면의 1/4(218px)을 먹었다
      → 이름·나·단추 한 줄(부제는 숨김) + 탭은 «옆으로 미는 한 줄»(★ 노무사 직접 사업만 스위치는 탭 끝).
-   ② ☐ 고르기 칸이 11~13px — 손가락으로 못 누른다. 20px 로(목록 칸도 그만큼 넓힌다).
+   ② ☐ 고르기 칸이 11~13px — 손가락으로 못 누른다. 손가락 크기로(목록 칸도 그만큼 넓힌다). ☆(노무사 직접 사업 표시)도.
    ③ 찾기 칸이 고르기 칸에 눌려 한 글자 폭(「⏳ 확인할 조건」)이었다 → 찾기는 한 줄을 다 쓰고, 고르기는 둘씩.
    ④ 한눈 표 — 왼쪽에 붙는 사업장 칸이 폭을 다 먹어 사업 칸(● 후보)이 화면 밖이었다 → 사업장 칸을 줄인다(… + 말풍선).
    ⑤ 목록과 상세가 위아래로 쌓이는 폭(860px 이하)에서는 고른 회사·사업으로 내려 준다(pickedShow) — 상세가 목록 아래
@@ -172,8 +172,9 @@ table.mx td.dot.yes{background:var(--green-bg)}
   .tabs button{flex-shrink:0;padding:8px 9px}
   .tabs .starsw{flex-shrink:0;margin-left:8px;padding-right:6px}
   main{padding:10px 8px 40px}
-  .co-head,.li.co-row{grid-template-columns:24px 26px minmax(0,1fr) 42px 34px}
-  #coList input[type=checkbox],table.t th.c input[type=checkbox],table.t td.c input[type=checkbox]{width:20px;height:20px;margin:0}
+  .co-head,.li.co-row{grid-template-columns:26px 26px minmax(0,1fr) 42px 34px}
+  #coList input[type=checkbox],table.t th.c input[type=checkbox],table.t td.c input[type=checkbox]{width:24px;height:24px;margin:0}
+  button.star{min-width:26px;min-height:26px;font-size:16px}
   .bar input[type=search]{flex:1 1 100%!important;max-width:none!important;min-width:0}
   .bar select{flex:1 1 40%;min-width:0}
   table.mx .stk{max-width:112px}
