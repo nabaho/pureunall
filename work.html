@@ -26,7 +26,7 @@
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=11"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 옵시디언 금고로 내보낼 때 주민번호를 지운다. 없으면 내보내기가 «멈춘다» -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
@@ -713,12 +713,25 @@
     border-radius:999px;padding:4px 10px;font-weight:700;white-space:nowrap;cursor:pointer}
   .phic{width:29px;height:29px;border:1px solid var(--line);border-radius:9px;display:flex;
     align-items:center;justify-content:center;font-size:13px;background:#fff;cursor:pointer;flex:0 0 auto}
+  .phgb .pre{font-style:normal}
+  /* 묶기를 고르면 단추 글이 길어진다(「묶기 · 사업장 ▾」) — 360px 폰에서 그만큼 조종칸이 넘쳐
+     오른쪽 끝 ⚙ 가 화면 밖으로 반쯤 밀렸다(2026-10-18 폰화면관리).
+     ① 좁은 폰은 앞의 「묶기 · 」를 접는다 — «무엇으로 묶었는지»(사업장)가 남는다
+     ② 그래도 넘치면 묶기 단추 글이 … 로 줄고 🔍 · ⚙ 는 늘 제자리에 있다 */
+  @media (max-width:560px){
+    .phbar .phgb{min-width:0;overflow:hidden;text-overflow:ellipsis}
+    .phbar .r{flex:0 0 auto}
+  }
+  @media (max-width:400px){ .phbar .phgb .pre{display:none} }
   .phl{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
   .phr{display:flex;align-items:center;gap:7px;padding:8px 10px;border-bottom:1px solid var(--line);
     font-size:12.5px;cursor:pointer}
   .phr:last-child{border-bottom:0}
   .phr:active{background:var(--bg)}
   .phr .ck{width:17px;flex:0 0 17px;margin:0}
+  /* ☐ 의 누르는 자리 — 줄 위아래·왼쪽 여백까지 덮는다(상자 모양은 그대로 17px) */
+  .phr .ckw{display:flex;align-items:center;align-self:stretch;flex:0 0 auto;cursor:pointer;
+    margin:-8px 0 -8px -10px;padding:0 5px 0 10px}
   .phr .no{font-size:10.5px;color:var(--faint);width:19px;flex:0 0 19px;text-align:right;
     font-variant-numeric:tabular-nums}
   .phr .co{font-weight:700;flex:0 0 auto;max-width:112px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -748,6 +761,14 @@
   .phsh .o.on .k::before{content:'✓ '}
   /* 폰 입력칸은 16px 이상 — 작으면 누를 때마다 아이폰이 화면을 키운다 */
   @media (max-width:560px){ #qbar input,#qbar textarea{font-size:16px} }
+  /* ── 📱 빠른 기록 바가 화면 폭 안에 들어온다 (2026-10-18 폰화면관리) ──
+     입력칸이 제 «타고난 폭»(글자 스무 자 남짓)을 고집해 줄지 않았다 — 360px 폰에서
+     「🎤 말로」가 오른쪽 끝에 반쯤 걸리고 「/ 기록 · ? 단축키」는 통째로 화면 밖이었다.
+     ⚠ min-width:0 이 있어야 입력칸이 «남는 자리만» 쓴다(flex 의 기본 최소폭은 내용 폭이다).
+     ⚠ 단축키 안내(/ · ?)는 폰에서 뺀다 — 폰에는 자판이 없어 누를 수 없는 단축키다.
+       「🎤 말로」는 남긴다 — 폰에서 오히려 더 쓰는 길이다. 넓은 화면은 그대로다. */
+  @media (max-width:760px){ #qbar input{min-width:0} }
+  @media (max-width:560px){ #qbar .kh{display:none} }
   /* 🧹 치울 것 — 고르기 칸과 번호는 «모든 목록»의 맨 왼쪽 (대표 지시 2026-10-05).
      좁게 둔다(고르기 28px · 번호 36px) — 「한 칸은 한 줄」과 함께 지킨다. */
   th.wsck,td.wsck{width:28px;text-align:center;padding:6px 0}
@@ -866,6 +887,15 @@
   #drawer .dcomp .dinput{margin:0;width:auto;flex:1;min-width:0}
   #drawer .dcomp select{flex-shrink:1;min-width:0;max-width:112px;border:1px solid #fecaca;background:#fff;color:#991b1b;border-radius:8px;padding:6px 6px;font-size:12px;font-weight:700}
   #drawer .dcomp .vo{flex-shrink:0;font-size:12px;padding:6px 9px}
+  /* ── 📱 폰: 「다음 할 일」 글칸이 날짜칸에 밀려 «다섯 글자»만 보이던 것 (2026-10-18 폰화면관리) ──
+     폰은 입력칸 글씨가 16px 이라(확대 막기) 날짜칸이 150px 을 먹고, 360px 폰에서 글칸은 52px 이었다.
+     옆 여백·틈을 줄이고 날짜칸에 한도를 둬 글칸에 자리를 돌려준다(한 줄은 그대로 — 세 줄로 접히던 옛 모양으로 안 돌아간다).
+     ⚠ 날짜칸 한도는 «날짜가 다 보이는» 폭이다 — 더 줄이면 날짜 끝자리가 잘린다. 넓은 화면은 그대로다. */
+  @media (max-width:560px){
+    #drawer .dcomp,#drawer .dfoot{padding-left:12px;padding-right:12px}
+    #drawer .dcomp .nextbox{padding:5px 8px;gap:5px}
+    #drawer .dcomp .nextbox input[type=date]{max-width:8.4em}
+  }
   #drawer .dh{padding:14px 18px 11px;border-bottom:1px solid var(--line)}
   #drawer .dh .row1{display:flex;align-items:center;gap:8px}
   #drawer .dh .ttl{font-size:14px;font-weight:800;flex:1}
@@ -1073,6 +1103,17 @@
   .fld label{font-size:11.5px;color:var(--sub);font-weight:600}
   .fld input,.fld select{padding:7px 10px;border:1px solid var(--line);border-radius:8px;font-size:13px}
   .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+  /* ── 📱 「＋ 새 업무」·「✏️ 업무 수정」 창은 폰에서 «한 칸씩» (2026-10-18 폰화면관리) ──
+     두 칸 그대로 두면 입력칸이 제 폭(16px 글씨 스무 자)을 고집해 창 안이 576px 로 벌어졌다 —
+     360px 폰에서 「기한」·「상대기관」·「부담당」이 오른쪽에 잘려 창 안을 옆으로 밀어야 보였다.
+     ⚠ minmax(0,1fr) — 그냥 1fr 은 «내용보다 좁아지지 않아» 같은 일이 되풀이된다.
+     ⚠ 창 상자도 min-width:0 — flex 안의 상자는 기본이 «내용 폭 이상»이라 창째 화면 밖으로 넓어진다.
+     넓은 화면은 두 칸 그대로다. */
+  @media (max-width:560px){
+    .grid2{grid-template-columns:minmax(0,1fr)}
+    .grid2 .fld input,.grid2 .fld select{min-width:0;width:100%;box-sizing:border-box}
+    #modalbg > div{min-width:0}
+  }
   .chipbtn{font-size:12px;border:1px solid var(--line);background:#fff;color:var(--sub);border-radius:14px;padding:3px 11px;cursor:pointer;user-select:none}
   .chipbtn.on{background:var(--acc2);border-color:var(--acc2);color:#fff}
   /* 지금 눌러도 달라질 것이 없는 버튼 — 눌리지 않게 하고 옅게 둔다 */
@@ -1203,6 +1244,13 @@
        ⚠ .panel.tbl 은 이미 overflow:auto 라 미는 것은 표 안에서만 일어난다 —
          쪽 전체가 좌우로 흔들리지 않는다. */
     .panel.tbl table{min-width:640px}
+    /* ── 「종료」 표는 폰에서도 «한 칸은 한 줄» (2026-10-18 폰화면관리) ──
+       업무 이름이 긴 줄이 하나라도 있으면 그 칸이 글자 폭만큼(370px) 벌어지고, 남은 「마지막 기록」
+       칸이 손가락 하나 폭으로 눌려 «한 줄이 180px» 이 됐다 — 360px 폰 한 화면에 네 줄.
+       칸마다 한도를 두고 넘치면 … (전문은 줄을 눌러 서랍에서 본다). 표는 그대로 옆으로 민다. */
+    #artbl td{white-space:nowrap}
+    #artbl .cut{max-width:11em}
+    #artbl .last{display:block;max-width:14em;overflow:hidden;text-overflow:ellipsis}
 
 
     /* ── 업무량은 «담당마다 카드» 로 세운다 (대표 지시 2026-08-20 "컴팩트하게 … 카드") ──
@@ -1271,7 +1319,7 @@
 }
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=31"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -1682,7 +1730,7 @@ function shell(){
     +'<input id="qb" placeholder="빠른 기록 — 기업명·업무명 몇 글자 + 한 일  (예: 새롬 설문 정리)" autocomplete="off">'
     +'<span class="k mic" onclick="qvStart()" title="말로 기록 — 여러 업무를 이어서 말해도 업무별로 갈라 담습니다">🎤 말로</span>'
     +'<span class="k home" onclick="qbarReset()" title="원래 자리(화면 아래)로 되돌립니다">⤺ 제자리</span>'
-    +'<span class="k" onclick="keysModal()" title="단축키 보기">/ 기록 · ? 단축키</span></div></div>';
+    +'<span class="k kh" onclick="keysModal()" title="단축키 보기">/ 기록 · ? 단축키</span></div></div>';
 }
 /* ── 폰 메뉴 서랍 ──
    PC 의 왼쪽 메뉴(#side)를 **그대로** 밀어 넣는다. 폰용 메뉴를 따로 만들지 않는다 —
@@ -6482,8 +6530,11 @@ function phDue(it){
    ⚠ hideCo 는 «사업장으로 묶었을 때»만 참이다 — 머리줄이 이미 회사를 말하므로
      같은 말을 두 번 하지 않는다. */
 function phRowHTML(it,no,hideCo){
+  /* ☐ 는 «누르는 자리»를 줄 높이만큼 넓힌다(label) — 17px 상자만 누르게 두면 손가락이 조금만 어긋나도
+     고르기 대신 서랍이 열렸다(대표 지시 2026-10-05 「고르기 칸은 손가락으로 누를 만큼 넉넉하게」).
+     ⚠ label 에도 stopPropagation — 없으면 ☐ 옆을 누를 때 줄(서랍 열기)까지 눌린다. */
   return '<div class="phr'+(hideCo?' ind':'')+'" data-i="'+esc(it._id)+'" onclick="openDrawer(\''+escJ(it._id)+'\')">'
-    +'<input type="checkbox" class="ck" onclick="event.stopPropagation()">'
+    +'<label class="ckw" onclick="event.stopPropagation()"><input type="checkbox" class="ck" onclick="event.stopPropagation()"></label>'
     +'<span class="no">'+no+'</span>'
     +(hideCo?'':'<span class="co">'+esc(it.company||it.client||'—')+'</span>')
     +'<span class="tt">'+esc(itemName(it)||String(it.cat||''))+'</span>'
@@ -6580,7 +6631,8 @@ function phHeadHTML(nOpen,nDone,nClean){
   return '<div class="phbar">'
     +'<span class="phseg"><b>진행 '+nOpen+'</b><i>완료 '+nDone+'</i></span>'
     +(nClean?'<span class="phd s" onclick="go(\'clean\')" style="cursor:pointer">🧹 '+nClean+'</span>':'')
-    +'<span class="phgb" onclick="phGroupSheet()">묶기'+(g?' · '+esc(lab):'')+' ▾</span>'
+    /* 묶었으면 「묶기 · 사업장」 — 좁은 폰에서는 앞의 「묶기 · 」만 접어 «무엇으로 묶었는지»가 남게 한다 */
+    +'<span class="phgb" onclick="phGroupSheet()">'+(g?'<i class="pre">묶기 · </i>'+esc(lab):'묶기')+' ▾</span>'
     +'<span class="r"><span class="phic" onclick="phFind()" title="찾기">🔍</span>'
     +'<span class="phic" onclick="phMoreSheet()" title="보기">⚙</span></span></div>';
 }
@@ -6597,8 +6649,14 @@ function setMyMode(v){
 }
 function myModeSeg(){
   var m=myMode();
+  var segs=[['table','표'],['board','보드'],['timeline','타임라인']];
+  /* 📱 폰에서는 「목록」(폰 보기)으로 돌아오는 길을 맨 앞에 둔다 (2026-10-18 폰화면관리).
+     ⚠ 이것이 없으면 폰에서 ⚙ 로 표·보드·타임라인을 한 번 고른 사람은 «돌아올 길이 없었다» —
+       ⚙ 는 폰 목록 머리에만 있고, 이 머리(넓은 화면 머리)에는 표·보드·타임라인 셋뿐이었다.
+     ⚠ typeof 로 본다 — 검사가 이 함수만 떼어 상자에 넣고 돌 때 isPhone 이 없다(넓은 화면과 같다). */
+  if(typeof isPhone==='function'&&isPhone()) segs.unshift(['phone','목록']);
   return '<span class="vseg" style="margin-left:auto">'
-    +[['table','표'],['board','보드'],['timeline','타임라인']].map(function(x){
+    +segs.map(function(x){
         return '<span class="'+(m===x[0]?'on':'')+'" onclick="setMyMode(\''+x[0]+'\')" '
           +'title="'+esc(x[1]+' 모양으로 봅니다')+'">'+x[1]+'</span>';
       }).join('')

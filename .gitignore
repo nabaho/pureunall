@@ -124,3 +124,4 @@ hana-mod.patch
 
 # 이 컴퓨터에서만 쓰는 설정 (사람마다 다르다)
 .claude/settings.local.json
+tools/phone-audit/out/

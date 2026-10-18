@@ -4714,7 +4714,8 @@ test('154 정적 — 순서 쓰기는 GR_BIZ.orderNode·orderKey 한 자리 .set
   calls.forEach((c) => assert.ok(c.includes('order:GR.bizOrder'), c));
   /* 새 CSS 는 색을 직접 지정하지 않는다 */
   const css = SRC.match(/\.bz\.drop-before[^}]*\}|\.bz\.drop-after[^}]*\}|\.bz-hint[^}]*\}/g) || [];
-  assert.equal(css.length, 3, '놓을 자리 표시 둘 · 안내 한 줄');
+  /* ≥ 3 — 폰 덩이가 안내 줄을 숨기는 규칙(.bz-hint{display:none})을 더할 수 있다(2026-10-18 폰화면관리). 개수가 아니라 «셋이 다 있고 색을 안 쓴다»를 본다 */
+  assert.ok(css.length >= 3, '놓을 자리 표시 둘 · 안내 한 줄');
   css.forEach((c) => assert.doesNotMatch(c, /#[0-9a-fA-F]{3,8}\b|rgba?\(/, c));
 });
 
@@ -5028,7 +5029,8 @@ test('165 화면 전체 폭 — main 폭 제한 없음 · 3열 격자는 clamp �
   assert.ok(at('@media (max-width:1500px)') < at('@media (max-width:1100px)') && at('@media (max-width:1100px)') < at('@media (max-width:900px)'), '1500 → 1100 → 900 차례(뒤 규칙이 앞 규칙을 덮는다)');
   assert.ok(at('.grid{') < at('@media (max-width:1500px)'), '기본 격자가 먼저');
   assert.match(cssBlock('@media (max-width:1100px)'), /\.grid\{grid-template-columns:\s*220px minmax\(0,\s*1fr\)\}/, '1100px 규칙은 그대로');
-  assert.match(cssBlock('@media (max-width:900px)'), /\.grid\{grid-template-columns:\s*1fr\}/, '900px 규칙은 그대로');
+  /* 900px 이하는 한 칸 — minmax(0,1fr) 이어야 한다. 그냥 1fr 은 «가장 넓은 표만큼» 늘어나 폰(360px)에서 칸이 1052px 이 되고 페이지가 옆으로 밀렸다(2026-10-18 폰화면관리) */
+  assert.match(cssBlock('@media (max-width:900px)'), /\.grid\{grid-template-columns:\s*minmax\(0,\s*1fr\)\}/, '900px 이하는 한 칸(minmax(0,1fr))');
   /* 왼쪽 패널 — 머리 아래에 붙어 따라온다 */
   const bizp = cssBlock('.bizp');
   assert.match(bizp, /position:\s*sticky/); assert.match(bizp, /top:\s*calc\(var\(--head-h\)/); assert.match(bizp, /max-height:\s*calc\(100vh - var\(--head-h\)/); assert.match(bizp, /overflow:\s*auto/);

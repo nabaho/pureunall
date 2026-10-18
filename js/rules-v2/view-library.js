@@ -247,7 +247,8 @@
       return rows;
     }).join('');
     if (!body) body = '<tr><td colspan="9" class="empty" title="">' + (M.items.length ? '거른 조건에 맞는 자료가 없습니다' : '아직 모은 자료가 없습니다 — 서버가 매일 새벽 5시에 모읍니다') + '</td></tr>';
-    return '<table class="lib"><colgroup><col style="width:36px"><col style="width:48px"><col style="width:92px"><col><col style="width:150px"><col style="width:84px"><col style="width:130px"><col style="width:120px"><col style="width:58px"></colgroup>'
+    /* lmail — 폰(900px 이하)에서 이 표만 «두 줄 카드»로 접는 이름표(rules-v2.html). 사업장별·정리하기 표는 칸이 달라 그대로 옆으로 민다 */
+    return '<table class="lib lmail"><colgroup><col style="width:36px"><col style="width:48px"><col style="width:92px"><col><col style="width:150px"><col style="width:84px"><col style="width:130px"><col style="width:120px"><col style="width:58px"></colgroup>'
       + '<thead><tr><th class="c"><input type="checkbox" data-act="pickAll" title="보이는 것 모두 고르기"></th><th class="c">번호</th><th>갈래</th><th>파일</th><th>사업장</th><th>판</th><th>최종본</th><th>가린 것</th><th>상태</th></tr></thead>'
       + '<tbody>' + body + '</tbody></table>';
   }

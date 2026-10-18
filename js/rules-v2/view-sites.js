@@ -243,7 +243,10 @@
     var hist = row.groups.map(roundHtml).join('');
     if (row.cand) hist += candHtml(st, row);
     if (!hist) hist = '<div class="none">아직 이 사업장의 취업규칙 자료가 없습니다.</div>';
+    /* 「← 목록」 — 폰(900px 이하)에서만 보인다. 폰에서는 이 칸이 화면을 덮는 판으로 뜨므로 닫을 길이 있어야 한다
+       (PC 는 왼쪽 표가 늘 보여 다른 줄을 누르면 된다 — CSS 가 숨긴다). 고른 것을 비우는 손잡이(siteSel)를 그대로 쓴다 */
     return '<div class="sside">'
+      + '<button class="lnk sback" data-act="siteSel" data-co="" title="사업장 목록으로 돌아갑니다">← 목록</button>'
       + '<h3 title="' + esc(row.name) + '">' + esc(row.name) + '</h3>'
       + '<div class="sub" title="' + esc(sub) + '">' + esc(sub || '사업자번호·인원 모름') + '</div>'
       + startHtml(st, row) + hist + '</div>';

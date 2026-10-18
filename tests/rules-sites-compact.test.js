@@ -8,7 +8,8 @@
 
    ★ 못 박는 것은 규칙이다(값이 아니다):
      ① 표의 min-width − 다른 칸 폭 합 ≥ 이름 한 칸 몫(회사 이름이 읽히는 폭)
-     ② 이름 칸 고정(sticky)의 left 는 # 칸 폭과 같다 — 다르면 겹치거나 틈이 난다
+     ② (PC 표) 이름 칸 고정(sticky)의 left 는 # 칸 폭과 같다 — 다르면 겹치거나 틈이 난다.
+        폰(900px 이하)은 두 줄 카드(CLAUDE.md 「폰 화면」)라 고정을 걸지 않는다
      ③ 폰에서 새로고침은 ↻ 만 남는다(글자는 접을 뿐 title 에 있다)
      ④ 「새로보기」 단추는 이 앱 폰 화면에서 공용 높이보다 낮다 — 공용 값은 건드리지 않는다
    실행: node --test tests/rules-sites-compact.test.js */
@@ -32,13 +33,13 @@ const NAME_MIN = 140;   // 「(주)가나다라상사」 정도가 13px 굵은 �
 
 const st = () => ({ data: { docs: {}, human: {}, rounds: {} }, companies: [], sites: { f: 'all', q: '', sel: '' }, busy: '' });
 /* @media (max-width:N) 묶음마다 안쪽 글 — 한 줄짜리든 여러 줄이든 괄호를 세어 끝을 찾는다 */
-function mediaBlocks(css) {
-  const out = [], re = /@media\s*\(max-width:\s*(\d+)px\)\s*\{/g;
+function mediaBlocks(css, kind) {
+  const out = [], re = new RegExp('@media\\s*\\(' + (kind || 'max') + '-width:\\s*(\\d+)px\\)\\s*\\{', 'g');
   let m;
   while ((m = re.exec(css))) {
     let d = 1, i = re.lastIndex;
     for (; i < css.length && d > 0; i++) { if (css[i] === '{') d++; else if (css[i] === '}') d--; }
-    out.push({ max: Number(m[1]), body: css.slice(re.lastIndex, i - 1) });
+    out.push({ w: Number(m[1]), body: css.slice(re.lastIndex, i - 1) });
   }
   return out;
 }
@@ -65,16 +66,20 @@ test('① 사업장 이름 칸이 «읽히는 폭»을 받는다 — 표 min-wid
     + '.sites 의 min-width 를 «다른 칸 합(' + fixed + ') + ' + NAME_MIN + '» 이상으로 올리거나 다른 칸을 줄일 것');
 });
 
-test('② 옆으로 밀어도 # · 이름은 남는다 — 이름 칸 left 는 # 칸 폭과 같다', () => {
+test('② PC 표를 옆으로 밀어도 # · 이름은 남는다 — 이름 칸 left 는 # 칸 폭과 같고, 폰 카드에는 안 건다', () => {
   const c = cols();
   assert.ok(c[0] > 0 && c[1] === null, '첫 칸은 #(폭 있음), 둘째 칸은 이름(폭 없음)이어야 한다');
-  const first = CSS.match(/\.sites td:nth-child\(1\),\.sites th:nth-child\(1\)\{([^}]*)\}/);
-  const second = CSS.match(/\.sites td:nth-child\(2\),\.sites th:nth-child\(2\)\{([^}]*)\}/);
+  const pc = mediaBlocks(CSS, 'min').filter((b) => b.w >= 901).map((b) => b.body).join('\n');
+  const first = pc.match(/\.sites td:nth-child\(1\),\.sites th:nth-child\(1\)\{([^}]*)\}/);
+  const second = pc.match(/\.sites td:nth-child\(2\),\.sites th:nth-child\(2\)\{([^}]*)\}/);
   assert.ok(first && second, '# · 이름 칸 고정 규칙이 없다');
   assert.match(first[1], /position:sticky/); assert.match(first[1], /left:0/);
   assert.match(second[1], /position:sticky/);
   const left = Number((second[1].match(/left:\s*(\d+)px/) || [])[1]);
   assert.equal(left, c[0], '★ 이름 칸 left(' + left + ')와 # 칸 폭(' + c[0] + ')이 다르다 — 겹치거나 틈이 난다');
+  // 폰 카드에 고정이 새면 카드 안에 세로 줄금이 그어진다 — 묶음 밖(모든 폭)에 두지 않는다
+  const outside = mediaBlocks(CSS, 'min').concat(mediaBlocks(CSS, 'max')).reduce((t, b) => t.split(b.body).join(''), CSS);
+  assert.doesNotMatch(outside, /\.sites td:nth-child\(2\)[^{]*\{[^}]*position:sticky/, '이름 칸 고정이 폰 카드에도 걸린다');
   // collapse 면 고정 칸의 줄금이 따라오지 않는다
   assert.doesNotMatch(CSS.match(/\.sites\{[^}]*\}/)[0], /border-collapse:\s*collapse/);
 });
@@ -85,10 +90,8 @@ test('③ 폰 거르개 — 새로고침은 ↻ 만, 글자는 접고 title 에 
   assert.ok(b, '새로고침 단추가 없다');
   assert.match(b[0], /title="새로고침"/);
   assert.match(b[0], /<span class="rl-t">[^<]*새로고침<\/span>/);
-  const phone = mediaBlocks(CSS).filter((b) => b.max <= 768).map((b) => b.body).join('\n');
+  const phone = mediaBlocks(CSS).filter((b) => b.w <= 768).map((b) => b.body).join('\n');
   assert.match(phone, /#sites \.flt \.rl-t\{display:none\}/, '폰에서 「새로고침」 글자를 안 접는다');
-  // 찾기 칸이 폰에서 한 줄을 통째로 먹지 않는다(담당·↻ 와 한 줄)
-  assert.doesNotMatch(CSS, /#sites \.flt \.q\{width:100%/, '찾기 칸이 폰에서 한 줄을 통째로 먹는다');
 });
 
 test('④ 「새로보기」 단추 — 이 앱 폰 화면에서만 공용 높이보다 낮다', () => {

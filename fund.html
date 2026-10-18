@@ -18,7 +18,7 @@
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=11"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
@@ -398,6 +398,66 @@
     .chip{font-size:10px;padding:1px 6px}
     .stat{font-size:10.5px;padding:2px 8px}
     .tabbar{margin:8px 0 10px}
+    /* ══ 폰화면관리 (2026-10-18) — 지어낸 기금 32개·사업장 28곳·거래 40줄로 360·411px 에서 잰 것 ══
+       ① 상단바가 넘쳐 「로그아웃」이 화면 밖으로 잘렸다(360px) · 두 줄로 접혔다(411px).
+          저장 알림은 점만(실패일 때는 글씨까지 — 놓치면 안 되는 알림이다), 이름 칸을 조금 줄이고, 로그아웃은 한 줄. */
+    #saveState{font-size:0;gap:0;padding:5px}
+    #saveState.failed{font-size:11px;gap:5px;padding:4px 8px}
+    #topuser{max-width:24vw}
+    #logoutbtn{white-space:nowrap}
+    /* ①-2 «지금 어느 화면인지»(#crumb)가 19px 로 짓눌려 「기…」 만 남았다(2026-10-18 전수점검) — 이름 칸이 먼저 줄고 화면 이름은 네 글자를 지킨다 */
+    #crumb{flex:1 1 auto;min-width:4.5em}
+    #topright{min-width:0}
+    #topuser{min-width:0;flex:0 1 auto}
+    /* ② 기금 머리 — 이름·딱지·상태·담당을 한 줄에 우겨 넣어 「공/동」 딱지가 세로로 쌓이고 「🔖 상태 👤 담당」이 화면 밖으로 잘렸다.
+          1줄 = ‹ › · 기금명(넘치면 …) · 딱지, 2줄 = 식별번호(옆으로 밀기) · 상태·담당. */
+    .fhead{flex-wrap:wrap;row-gap:2px}
+    .fhead::before{content:'';order:1;flex-basis:100%;height:0}
+    .fhead h1{min-width:0;flex:0 1 auto;overflow:hidden;text-overflow:ellipsis}
+    .fhead .tag,.fhead .chip{flex:none;white-space:nowrap}
+    .fhead .fid{order:2}
+    .fhead .fact{order:3;margin-left:auto}
+    /* ③ 고르는 알약(협력·사용자대표 없음…)이 «협/력» 처럼 두 줄로 접혔다 — 알약은 한 줄, 넘치면 옆으로 민다.
+          참여사업장 찾기칸은 줄마다 박힌 폭(210px)이라 화면 밖으로 잘렸다 — 남는 폭을 쓴다. */
+    .seg{white-space:nowrap}
+    .segbar{max-width:100%;overflow-x:auto;scrollbar-width:none}
+    .segbar::-webkit-scrollbar{display:none}
+    #siteQ{width:auto!important;flex:1 1 150px;min-width:0}
+    /* ④ 거래·분개입력 표(거르기 줄 바로 뒤 .ledgerwrap) — 열두 칸이라 폰에서는 ☐·번호·일자·적요까지만 보이고 «금액»이 화면 밖이었다.
+          1줄 = ☐ · 번호 · 일자 · 적요(넘치면 …) · 금액 / 2줄 = 차변·대변 · 승인 · 증빙 · ✂× · 손볼 것.
+          조각낸 줄은 차변·대변 자리가 한 칸(colspan)이라 뒤쪽 넷은 «끝에서부터»(nth-last-child) 센다. */
+    .ledchips+.ledgerwrap{overflow-x:visible}
+    .ledchips+.ledgerwrap table,.ledchips+.ledgerwrap thead,.ledchips+.ledgerwrap tbody{display:block}
+    .ledchips+.ledgerwrap tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 6px;padding:6px 4px;border-bottom:1px solid var(--line)}
+    .ledchips+.ledgerwrap th,.ledchips+.ledgerwrap td{display:block;padding:0;border:0;min-width:0}
+    .ledchips+.ledgerwrap thead tr{background:#f8fafc}
+    .ledchips+.ledgerwrap th:nth-child(n+4){display:none}
+    .ledchips+.ledgerwrap th:nth-child(1),.ledchips+.ledgerwrap td:nth-child(1){order:1;flex:0 0 28px;width:auto!important;text-align:center}
+    .ledchips+.ledgerwrap th:nth-child(2),.ledchips+.ledgerwrap td:nth-child(2){order:2;flex:none;min-width:20px;width:auto!important}
+    .ledchips+.ledgerwrap th:nth-child(3),.ledchips+.ledgerwrap td:nth-child(3){order:3;flex:none}
+    .ledchips+.ledgerwrap td:nth-child(4){order:4;flex:1 1 0;max-width:none!important}
+    .ledchips+.ledgerwrap td:nth-child(5),.ledchips+.ledgerwrap td:nth-child(6){order:5;flex:none;font-weight:700;font-variant-numeric:tabular-nums}
+    .ledchips+.ledgerwrap td:nth-child(5):empty,.ledchips+.ledgerwrap td:nth-child(6):empty{display:none}
+    .ledchips+.ledgerwrap tbody tr::after{content:'';order:6;flex-basis:100%;height:0}
+    .ledchips+.ledgerwrap td:nth-child(n+7):nth-last-child(n+5){order:7;flex:none}
+    .ledchips+.ledgerwrap td:nth-last-child(4){order:8;flex:none}
+    .ledchips+.ledgerwrap td:nth-last-child(3){order:9;flex:none}
+    .ledchips+.ledgerwrap td:nth-last-child(2){order:10;flex:none}
+    .ledchips+.ledgerwrap td:nth-last-child(1){order:11;flex:1 1 0;max-width:max-content;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    .ledchips+.ledgerwrap td:nth-last-child(1):empty{display:none}
+    .ledchips+.ledgerwrap td:only-child{order:1;flex:1 1 100%}
+    /* 카드에서는 고르기·승인 칸과 ✂·× 를 손가락 크기로 (13px 상자·20px 단추였다) */
+    .ledchips+.ledgerwrap input[type=checkbox]{width:24px;height:24px}
+    .ledchips+.ledgerwrap td button{min-width:28px;min-height:28px;padding:2px 5px!important}
+  }
+  /* ⑤ 기금 현황 표 머리가 줄 «사이»에 떠서 셋째 줄을 가렸다(폰화면관리 2026-10-18 · 411px 실측: 머리가 284px 에, 그 자리의 3번 기금이 안 보였다).
+       까닭: 폰(860px 이하)에서는 .panel 이 가로 스크롤 상자(overflow-x:auto)라, 붙어 있는 머리(sticky)가 «화면»이 아니라
+       «그 상자» 기준으로 상단바+머리줄 높이(128px)만큼 내려가 앉았다. 표를 담은 상자는 스크롤 상자를 풀어 머리가 화면 기준으로 붙게 하고
+       (표가 넘치면 .tblwrap.scrollx 가 제 상자에서 민다), :has 를 모르는 브라우저에서는 붙이기를 끈다(가리는 것보다 낫다). */
+  @media (max-width:860px){
+    .tblwrap thead th{position:static;box-shadow:none}
+    .panel:has(.tblwrap){overflow-x:visible}
+    .panel:has(.tblwrap) .tblwrap:not(.scrollx) thead th{position:sticky;box-shadow:0 1px 0 var(--line)}
   }
   /* 서식 안내 — 용지 «밖»에 띄운다(2026-09-20 「캡쳐2 내용 삭제」).
      여태 A4 첫 장 맨 위에 찍혀 제출 서류에 인쇄되고 저장본에까지 박혔다.
@@ -438,7 +498,7 @@
 }
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=31"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -20751,7 +20811,8 @@ function _ledTags(iss){ return (iss||[]).filter(function(c){ return LED_TAG[c]; 
   return '<span class="chip'+(t[1]?' '+t[1]:'')+'" style="font-size:10px;padding:0 6px">'+t[0]+'</span>'; }).join(' '); }
 function _ledChips(){
   var c=S._ledCnt||{}, cur=S.ledFilter||'all';
-  return '<div class="row" style="gap:6px;flex-wrap:wrap;margin:0 0 8px"><b style="font-size:12.5px">거르기</b>'+hlp('led.filter')
+  /* ledchips — 폰(600px 이하)에서 바로 뒤 거래표(.ledchips+.ledgerwrap)를 «두 줄 카드»로 접는 손잡이(@media ④) */
+  return '<div class="row ledchips" style="gap:6px;flex-wrap:wrap;margin:0 0 8px"><b style="font-size:12.5px">거르기</b>'+hlp('led.filter')
     +LED_KINDS.map(function(k){ var n=c[k[0]]||0;
       if(!n&&k[0]!=='all'&&k[0]!=='issues'&&cur!==k[0]) return '';
       if(k[0]==='issues'&&!n) return '<span class="chip ok" style="font-size:11.5px">✅ 문제 없음</span>';
@@ -20903,6 +20964,8 @@ function closingTab(f){
   var _vis=arr.filter(function(x){ return _ledMatch(x._iss,_lf); });
   S._ledVis=_vis.filter(function(x){ return !(_yl||monthLocked(_monthOf(x.date))); }).map(function(x){ return x._id; });
   S.ledSel=S.ledSel||{}; Object.keys(S.ledSel).forEach(function(id){ if(S._ledVis.indexOf(id)<0) delete S.ledSel[id]; });
+  /* ⚠ 폰(600px 이하)에서 이 거래표는 «두 줄 카드»로 접힌다(.ledchips+.ledgerwrap — 거르기 줄 바로 뒤 표만). 분개장·계정별원장 표는 그대로 옆으로 민다.
+     칸 차례에 기대므로 칸을 더하거나 빼면 @media ④ 의 nth-child·nth-last-child 를 함께 고친다(tests/fund-phone-screens.test.js) */
   var rows=_vis.length?_vis.map(function(x,_i){
     var sp=_splitsOf(x), lk=_yl||monthLocked(_monthOf(x.date)), dis=lk?' disabled':'';
     /* 쪼갠 거래는 차·대 선택 대신 조각을 그대로 보여 준다 — 무엇이 얼마인지가 그 줄의 정보다 */
