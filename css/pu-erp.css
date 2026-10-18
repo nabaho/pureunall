@@ -1311,6 +1311,8 @@ input[type="search"]::-webkit-search-cancel-button{
   /* 환경설정 탭띠 — 흰 판 안 여백(16px)만큼 음수 여백으로 «판 끝까지» 펴던 것. 판 여백을 줄였으니 같이 줄인다
      (안 줄이면 띠가 화면보다 10px 넓어 본문이 옆으로 구른다). */
   .env-tabs-wrap{ top:-6px; margin:-2px -6px 10px; padding:6px 6px 0; }
+  /* .page 밖에 서는 화면(손익계산서) — 본문 겉 여백을 걷었으니 제 여백을 흰 판과 같은 6px 로 */
+  .fin-pnl{ padding:4px 6px !important; }
 }
 
 /* ══ 데이터 감시 알림(erpAlert) — 폰에서는 한 치수 작게 (대표 폰 화면 2026-10-18) ══

@@ -53249,7 +53249,8 @@ function FinanceLedger(props){
         borderRadius:'14px',padding:'3px 10px',whiteSpace:'nowrap'}}, txt);
   }
 
-  return h('div',{style:{padding:'0 2px'}},
+  /* 폰 좌우 6px — 이 화면은 .page 밖이라 본문 겉 여백(지금 0)이 곧 화면 끝 여백이다(폰화면관리 2026-10-18) */
+  return h('div',{style:{padding: window.innerWidth <= 768 ? '0 6px' : '0 2px'}},
 
     /* ══ 입금 사업장 확인 창 — 촘촘하게 (대표 지시 2026-10-17 「팝업창 너무 크게 나온다」) ══
        폰에서 한 건이 화면 ⅓(약 330px)을 먹어 83건 가운데 한 건 반만 보였다. 까닭이 셋이었다 —
