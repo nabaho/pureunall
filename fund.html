@@ -784,16 +784,16 @@ var DS_LIQ_BASES=[['occur','해산 사유 발생일'],['liq','청산인 취임�
 var DS_FLOWS={
   dis_in:{label:'사내기금 해산', type:'사내', sub:'사업 폐지 · 합병 · 분할 · 공동기금 참여(법 §70)', bases:DS_LIQ_BASES, steps:[
     ['해산 사유 확인·증빙 — 폐업사실증명 / 합병·분할 계약 / 공동기금 설립인가증','법 §70 · 지침 §24②','','','',''],
-    ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57(회의록 10년)','','ops_minutes_use','별지 13호 회의록',''],
-    ['청산인 취임 — 취임승낙서','민법 §82','','reg_accept','취임승낙서',''],
-    ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','reg_apply','해산·청산인 취임 등기신청서',''],
+    ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57(회의록 10년)','','dis_minutes','별지 13호 회의록',''],
+    ['청산인 취임 — 취임승낙서','민법 §82','','dis_accept','취임승낙서',''],
+    ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','dis_reg','해산·청산인 취임 등기신청서',''],
     ['해산통지서 + 첨부 4종(해산 증명·정관·재산목록·처분계획서) — 지방노동관서','영 §52 · 규칙 §28 · 민법 §86','liq+21d','dis_notice','별지 14호 해산통지서',''],
     ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
     ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
     ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
-    ['잔여재산 처리 — 폐지: 미지급 임금 → 50% 이내 생활안정자금 → 정관 지정자·진흥기금 / 공동기금 참여: 그 공동기금에 귀속(기본재산·준비금 구분 승계)','법 §71 · 영 §53 · 해석 3866','','','재산 처분계획서','closing'],
+    ['잔여재산 처리 — 폐지: 미지급 임금 → 50% 이내 생활안정자금 → 정관 지정자·진흥기금 / 공동기금 참여: 그 공동기금에 귀속(기본재산·준비금 구분 승계)','법 §71 · 영 §53 · 해석 3866','','dis_plan','재산 처분계획서','closing'],
     ['법인세 — 준비금 잔액 익금산입(포괄 양도면 승계 가능), 해산 사업연도 신고(세무사)','법인세법 §29④⑤','','','','closing'],
-    ['청산종결 등기 + 노동관서 신고','민법 §94','closeDay+21d','','청산종결 등기신청서',''],
+    ['청산종결 등기 + 노동관서 신고','민법 §94','closeDay+21d','dis_close_reg','청산종결 등기신청서',''],
     ['(진흥기금 귀속일 때만) 잔여재산 목록 제출·인도','영 §54','closeDay+21d','','잔여재산 목록',''],
     ['고유번호 폐지·계좌 해지·서류 보관 → 기금 «기록보관»','법 §57·§65','','','','info']]},
   leave:{label:'공동기금 탈퇴', type:'공동', sub:'참여 사업주 한 곳이 나감 — 2026-08-25 탈퇴 보고 신설', bases:[['apply','탈퇴 신청일'],['leaveDay','탈퇴일']], steps:[
@@ -816,17 +816,17 @@ var DS_FLOWS={
     ['참여사업장 «탈퇴·폐업» 처리','','','','','sites']]},
   dis_gong:{label:'공동기금 해산', type:'공동', sub:'과반수 폐지·탈퇴 · 합병 · 분할(법 §86의11)', bases:DS_LIQ_BASES, steps:[
     ['해산 사유 확인·증빙 — 과반수 사업주의 폐지·탈퇴 / 합병 / 분할','법 §86의11 · 지침 §24②','','','',''],
-    ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57','','ops_minutes_use','별지 13호 회의록',''],
-    ['청산인 취임 — 취임승낙서','민법 §82','','reg_accept','취임승낙서',''],
-    ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','reg_apply','해산·청산인 취임 등기신청서',''],
+    ['협의회 의결 — 해산·청산인 선임·재산 처분계획','민법 §82 · 법 §57','','dis_minutes','별지 13호 회의록',''],
+    ['청산인 취임 — 취임승낙서','민법 §82','','dis_accept','취임승낙서',''],
+    ['해산·청산인 취임 등기(법무사)','민법 §85','liq+21d','dis_reg','해산·청산인 취임 등기신청서',''],
     ['해산통지서 + 첨부 4종 — 지방노동관서','영 §55의6→§52 · 규칙 §28','liq+21d','dis_notice','별지 14호 해산통지서',''],
     ['채권신고 공고 3회 이상(신고기간 2개월 이상)','민법 §88','liq+2m','','채권신고 공고문',''],
     ['아는 채권자에게 개별 최고','민법 §89','liq+2m','','채권신고 최고서',''],
     ['채무 변제 — 신고기간 안에는 변제 금지','민법 §90~92','credEnd+0d','','',''],
-    ['재산 배분 — 출연한 비율로 참여 사업주에게, 잔여재산은 정관대로','법 §86의12','','','재산배분 계산서','closing'],
+    ['재산 배분 — 출연한 비율로 참여 사업주에게, 잔여재산은 정관대로','법 §86의12','','dis_plan','재산 처분계획서','closing'],
     ['정부 지원금 정산·반환 확인(근로복지공단)','운영규정 §11·§14','','','',''],
     ['법인세 — 준비금 잔액 익금산입, 해산 사업연도 신고(세무사)','법인세법 §29⑤','','','','closing'],
-    ['청산종결 등기 + 노동관서 신고','민법 §94','closeDay+21d','','청산종결 등기신청서',''],
+    ['청산종결 등기 + 노동관서 신고','민법 §94','closeDay+21d','dis_close_reg','청산종결 등기신청서',''],
     ['고유번호 폐지·계좌 해지·서류 보관 → 기금 «기록보관»','법 §57·§65','','','','info']]}
 };
 Object.keys(DS_FLOWS).forEach(function(k){ var F=DS_FLOWS[k];
@@ -5401,7 +5401,8 @@ var HWP_TPL_KINDS={minutes:'공동', bizplan:'공동', inka:'공동', inka_annex
   reg_proxy:'공동', reg_license:'공동', tax_bizreg:'공동', tax_sublease:'공동', tax_lease:'공동', tax_hometax:'공동',
   ops_asset_change:'공동', ops_minutes_scope:'공동', ops_minutes_use:'공동', ops_audit:'공동', ops_minutes_close:'공동',
   sub_required:'공동', subsidy:'공동', sub_welfare_plan:'공동', sub_assets:'공동', sub_payment:'공동',
-  sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동', dis_notice:'공동', dis_leave:'공동'};   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
+  sub_checklist:'공동', sub_contrib:'공동', sub_oath:'공동', dis_notice:'공동', dis_leave:'공동',
+  dis_minutes:'사내', dis_accept:'사내', dis_reg:'사내', dis_plan:'사내', dis_close_reg:'사내'};   // 해산 절차 다섯은 2024 사내기금 작성본 — 공동이면 말을 바꾼다   // 틀을 받는 서식 → 그 틀에 쓰인 말(공동/사내). 하나씩 늘린다
 /* 서식 → 값 함수 (함수 선언은 끌어올려지므로 여기서 이름만 잇는다) */
 var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpInkaValues, inka_annex:_hwpInkaAnnexValues,
   agreement:_hwpAgreementValues, charter:_hwpCharterValues, charter_sane:_hwpCharterSaneValues, contrib:_hwpContribValues,
@@ -5412,7 +5413,8 @@ var HWP_TPL_VALUES={minutes:_hwpTplValues, bizplan:_hwpBizplanValues, inka:_hwpI
   ops_audit:_hwpAuditValues, ops_minutes_close:_hwpCloseValues,
   sub_required:_hwpSubValues, subsidy:_hwpSubValues, sub_welfare_plan:_hwpSubValues, sub_assets:_hwpSubValues,
   sub_payment:_hwpSubValues, sub_checklist:_hwpSubValues, sub_contrib:_hwpSubValues, sub_oath:_hwpSubValues,
-  dis_notice:_hwpDisValues, dis_leave:_hwpDisValues};
+  dis_notice:_hwpDisValues, dis_leave:_hwpDisValues, dis_minutes:_hwpDisValues, dis_accept:_hwpDisValues,
+  dis_reg:_hwpDisValues, dis_plan:_hwpDisValues, dis_close_reg:_hwpDisValues};
 /* 틀 유형이 기금 유형과 «같을 때만» 쓰는 서식 — 정관은 공동·사내가 아예 다른 문서다 */
 var HWP_TPL_STRICT={charter:1};
 /* ★ 2026-09-27 사내 정관도 원본 한글 틀로 — 서식 이름(charter)은 하나, 틀만 기금 유형으로 고른다.
@@ -5775,6 +5777,20 @@ function _hwpTaxValues(f,sites){
    · 해산통지서: 해산일·사유 = [기금 정보] 계약관계의 종료일·사유(기록보관), 청산인 = 대표 이사(민법 §82 — 정관·협의회가 달리 정하면 고친다)
    · 탈퇴 보고서: «가장 최근에 탈퇴한» 참여사업장(탈퇴일 기준) — _docExtra 가 탈퇴한 곳까지 읽어 둔다(S._dsLeave). 탈퇴 사유는 손으로.
    ⚠ «[ ] 사내 / [ ] 공동» 체크 줄이 있어 공동↔사내 말 바꾸기를 하지 않는다(FTYPE_SKIP). */
+/* 해산 사유 — [기금 정보] 종료 사유 글에서 «법 조·호»와 귀속처(공동기금 이름)를 읽는다. 순수
+   ⚠ 글에 조·호가 없으면 code '' — 서식은 일반 문장으로 나간다(지어내지 않는다). */
+var DS_REASON={'1':['근로복지기본법 제70조제1호','해당 사업주의 사업 폐지'],'2':['근로복지기본법 제70조제2호','기금법인의 합병'],
+  '3':['근로복지기본법 제70조제3호','기금법인의 분할·분할합병'],'4':['근로복지기본법 제70조제4호','해당 사업주의 공동근로복지기금의 조성 참여 또는 중간 참여'],
+  g1:['근로복지기본법 제86조의11제1호','참여 사업주 중 과반수 사업주의 사업 폐지나 탈퇴'],g2:['근로복지기본법 제86조의11제2호','공동기금법인의 합병'],
+  g3:['근로복지기본법 제86조의11제3호','공동기금법인의 분할·분할합병']};
+function _dsReasonOf(f){
+  var r=String((f&&f.end_reason)||''), code='', m;
+  if((m=/86\s*조\s*의\s*11\s*제?\s*(\d)/.exec(r))) code='g'+m[1];
+  else if((m=/70\s*조\s*제?\s*(\d)\s*호/.exec(r))) code=m[1];
+  var names=r.replace(/\(FUND-\d+\)/g,'').match(/[가-힣A-Za-z0-9·]+공동근로복지기금(?:\d+호)?/g)||[];
+  var t=DS_REASON[code]||null;
+  return {code:t?code:'', basis:t?t[0]:'', text:t?t[1]:'', to:code==='4'?(names[names.length-1]||''):''};
+}
 function _hwpDisValues(f,sites,kind){
   f=f||{};
   var b=_boss(f), sane=f.fund_type==='사내';
@@ -5794,6 +5810,39 @@ function _hwpDisValues(f,sites,kind){
   V.해산일=f.end_date?_hwpKoDate(f.end_date):'';
   V.해산사유=String(f.end_reason||'').replace(/^해산\s*[—-]\s*/,'');
   V.청산인=String(b.name||f.chairman||''); V.청산인생년월일=String(b.birth||''); V.청산인직책=String(b.title||f.rep_position||'');
+  /* ── 해산 절차 서식(결의 회의록·취임승낙서·등기신청서·처분계획서·청산종결) — 2024 참살이 작성본에서 만든 틀 ── */
+  var R=_dsReasonOf(f), nm=V.기금명, to=R.to||'조성 참여 예정인 공동근로복지기금법인', ed=String(f.end_date||''), md=/^(\d{4})-(\d{2})-(\d{2})/.exec(ed);
+  if(R.basis) V.해산사유=R.basis+'('+R.text+')';
+  V.해산근거=R.basis||'근로복지기본법 제70조';
+  V.결의일=md?_hwpKoDate(ed):'      년    월    일'; V.결의일점=md?md[1]+'. '+md[2]+'. '+md[3]+'.':'    .   .   .';
+  V.결의일2=md?_hwpKoDate2(ed,['   ','   ']):'      년    월    일'; V.기준일=md?_dotDate(ed):'    .   .   .';
+  V.신청일=_hwpKoDate(_hwpTodayIso(),['    ','    ']); V.기금소재지=V.소재지; V.청산인주소=String(b.addr||'');
+  V.등기번호=String(f.reg_no||''); V.등기소=String(f.registry_office||'')||'            지방법원            등기소';
+  V.회의장소=''; V.청산종결='';
+  V.근위원=_prepCommittee(f,'근로자측',sites||[]).map(function(o){ return String(o.name||''); });
+  V.사위원=_prepCommittee(f,'사용자측',sites||[]).map(function(o){ return String(o.name||''); });
+  if(R.code==='4'){
+    V.잔여처리=to+'에 귀속(근로복지기본법 제71조제3항)';
+    V.처분목적='근로복지기본법 제86조의2에 따른 공동근로복지기금의 조성을 위하여 '+nm+' 해산 후 잔여 재산을 처분함';
+    V.처분방법=nm+'의 잔여 재산은 '+to+'에 귀속함 — 기본재산은 기본재산으로, 고유목적사업준비금은 목적사업준비금으로 나눠 넘김';
+    V.계획다=to+' 설립(또는 참여)'; V.계획다1=to+' 설립을 위한 협의회 구성'; V.계획다2=to+' 관할 지방고용노동관서 인가';
+    V.계획다3=to+' 설립 등기'; V.계획다4=to+' 사업 운영을 위한 통장 개설'; V.계획라=nm+' 잔여 재산 이관'; V.계획라1='잔여 재산 '+to+' 통장으로 이관';
+  } else if(R.code==='g1'){
+    V.잔여처리='출연한 비율에 따라 참여 사업주에게 배분하고, 잔여재산은 정관에 따라 처리';
+    V.처분목적='참여 사업주 과반수의 사업 폐지·탈퇴로 '+nm+' 해산 후 근로복지기본법 제86조의12에 따라 재산을 처분함';
+    V.처분방법='출연한 비율에 따라 참여 사업주에게 배분하고, 잔여재산은 정관에 따라 처리함';
+    V.계획다='참여 사업주별 배분액 산정·배분'; V.계획다1='해산 당시 재산가액과 사업주별 출연액 확정'; V.계획다2='출연 비율에 따른 배분액 산정·지급';
+    V.계획다3='정부 지원금 정산·반환 여부 확인(근로복지공단)'; V.계획다4='채권신고 공고 후 채무 변제(민법 제88조~제92조)';
+    V.계획라='잔여재산 처리'; V.계획라1='정관에서 정한 바에 따라 처리';
+  } else {
+    V.잔여처리='미지급 금품 지급 후 잔여의 100분의 50 이내 생활안정자금 지원, 나머지는 정관에서 지정한 자에게 귀속';
+    V.처분목적=(R.code==='1'?'해당 사업주의 사업 폐지로 ':'')+nm+' 해산 후 근로복지기본법 제71조에 따라 잔여 재산을 처분함';
+    V.처분방법='사업주의 미지급 임금·퇴직금 등에 우선 사용하고, 잔여의 100분의 50 이내에서 소속 근로자 생활안정자금으로 지원하며, 나머지는 정관에서 지정한 자(없으면 근로복지진흥기금)에 귀속함';
+    V.계획다='미지급 금품 지급·생활안정자금 지원'; V.계획다1='사업주의 미지급 임금·퇴직금 등 확인(사업주가 청산할 능력이 없음을 증명 — 시행령 제53조)';
+    V.계획다2='재산이 부족하면 협의회가 지급률·지급방법 결정'; V.계획다3='잔여재산의 100분의 50 이내 소속 근로자 생활안정자금 지원(정관)';
+    V.계획다4='채권신고 공고(2개월 이내 3회 이상) 후 채무 변제(민법 제88조~제92조)';
+    V.계획라='잔여재산 귀속'; V.계획라1='정관에서 지정한 자에게 귀속(없으면 근로복지진흥기금 — 청산 종결 후 3주 이내 목록 제출)';
+  }
   V._note='청산인은 대표 이사로 채웠습니다(민법 제82조 — 정관·협의회가 달리 정했으면 고치세요) · 해산일·사유는 [기금 정보] 계약관계의 종료일·사유';
   return V;
 }
@@ -5810,6 +5859,13 @@ function _dsLeaveLoad(f){
 /* 틀이 없을 때·샘플일 때의 HTML 미리보기 — 같은 값 함수에서 */
 function _dsDocHTML(kind,f,sites){
   var V=_hwpDisValues(f,sites,kind), R=function(k,v){ return '<tr><th style="width:150px">'+k+'</th><td>'+dgV(v,14)+'</td></tr>'; };
+  if(kind!=='dis_leave'&&kind!=='dis_notice'){
+    var T={dis_minutes:'해산 결의 협의회 회의록',dis_accept:'청산인 취임승낙서',dis_reg:'해산 및 청산인 취임 등기신청서',dis_plan:'재산 처분계획서',dis_close_reg:'청산종결 등기신청서'}[kind]||docLabel(kind);
+    return "<p class='note docnote'>※ 초안 — 원본 한글 틀로 보면 2024 제출본 모양 그대로입니다. 밑줄 공란은 수기 기입.</p><h1>"+esc(T)+'</h1><table>'
+      +R('기금법인',V.기금명)+R('주사무소',V.기금소재지)+R('해산 결의일',V.결의일)+R('해산 사유',V.해산사유)+R('청산인',V.청산인+(V.청산인직책?' ('+V.청산인직책+')':''))
+      +(kind==='dis_plan'?R('처분 목적',V.처분목적)+R('처분 방법',V.처분방법):'')+(kind==='dis_minutes'?R('잔여재산',V.잔여처리)+R('근로자위원',V.근위원.join(', '))+R('사용자위원',V.사위원.join(', ')):'')
+      +'</table>';
+  }
   var note="<p class='note docnote'>※ 법정서식(근로복지기본법 시행규칙) 초안 — 원본 한글 틀로 보면 원본 모양 그대로입니다. 밑줄 공란은 수기 기입.</p>";
   if(kind==='dis_leave') return note+'<h1>공동근로복지기금법인의 탈퇴 보고서</h1><p style="font-size:11px">[별지 제14호의2서식] &lt;신설 2026. 8. 25.&gt;</p><table>'
     +R('탈퇴 연월일',V.탈퇴일)+R('공동기금법인 명칭',V.기금명)+R('인가번호',V.인가번호)+R('주사무소 소재지',V.소재지)
@@ -6440,7 +6496,8 @@ var DOC_SUB=[['sub_required','지원금 신청 시 필요서류(안내)','공동
   ['sub_assets','재산목록표','공동'],['sub_payment','지원금 지급신청서(계좌)','공동']];
 /* ⑥ 인센티브(비용청구서) 단계는 뗐다(2026-09-06, 대표 지시 「불필요하다」). */
 // ⑥ 해산·탈퇴 법정서식(2026-10-18) — 절차·기한은 dsLibHTML
-var DOC_DIS=[['dis_notice','해산통지서(별지 제14호)'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동']];
+var DOC_DIS=[['dis_minutes','해산 결의 협의회 회의록(별지 제13호)'],['dis_accept','청산인 취임승낙서'],['dis_reg','해산·청산인 취임 등기신청서'],
+  ['dis_notice','해산통지서(별지 제14호)'],['dis_plan','재산 처분계획서'],['dis_close_reg','청산종결 등기신청서'],['dis_leave','공동기금 탈퇴 보고서(별지 제14호의2)','공동']];
 var DOC_ALL=[].concat(DOC_KINDS,DOC_REG,DOC_TAX,DOC_OPS,DOC_SUB,DOC_DIS);
 /* 서식이 «어느 단계에» 사는지 — 목록에서 직접 찾는다.
    따로 적어 두면 서식을 옮겼을 때 표만 옛말이 되어, 눌러도 엉뚱한 단계가 열린다.
@@ -9131,7 +9188,7 @@ function docBody(kind,f,sites){
   /* 설립 서류(_estabKind 와 같은 규칙)만 탈퇴한 곳도 — 그 밖은 뺀다 */
   if(!/^(inka|inka_annex|agreement|charter|charter_sane|minutes|contrib|reg_[a-z]+|tax_[a-z]+)$/.test(String(kind||''))) sites=sites.filter(function(s){ return s&&(s.status||'active')!=='closed'; });
   var _real=hwpFormHTML(kind,f,sites); if(_real) return _real;   // 원본 변환본 우선
-  if(kind==='dis_notice'||kind==='dis_leave') return _dsDocHTML(kind,f,sites);
+  if(/^dis_/.test(String(kind||''))) return _dsDocHTML(kind,f,sites);
   var fname=esc(f.name||''), chairman=(f.chairman||''), ftype=f.fund_type||'공동';
   var officers=(Array.isArray(f.officers)&&f.officers.length)?f.officers:[{role:'이사장',name:chairman}];
   var note="<p class='note docnote'>※ 초안 자동생성본 — 제출 전 담당자 검토 필수. 밑줄 공란은 수기 기입. 이 창에서 바로 수정할 수 있습니다.</p>";
