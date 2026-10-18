@@ -248,6 +248,64 @@
     return y;
   }
 
+  /* ══ 폰: 떠 있는 것은 «손잡이 하나»만 (대표 지시 2026-10-18 「폰화면관리」) ══════════
+     폰 전수점검(tools/phone-audit)에서 재 보니 거의 모든 앱에서 «떠 있는 단추 셋»이 목록을 덮었다 —
+       · 「즐겨찾기」 손잡이(오른쪽 가운데, 25×78) — 줄 끝의 금액·기한·남은 날을 덮는다
+       · 「최신」(오른쪽 아래, 62×29) · 「백업·복구」(왼쪽 아래, 78×32, 관리자) — 목록 아래쪽 줄과 ＋단추 옆을 덮는다
+     하루에 한 번도 안 누르는 둘이 화면을 늘 차지하고 있었다.
+     ★ 그래서 폰에서는 «최신·백업·복구»를 손잡이 목록 맨 아래 두 줄로 옮기고, 손잡이는 가늘게 한다.
+       포털이 같은 둘을 ⋯ 안으로 넣은 것(enter.html moreDock)·정부사업일정 ⋯ 메뉴와 같은 길이다.
+     ⚠ 새 버전이 «있을 때»(data-state="has")와 확인 중·결과를 알리는 동안은 「최신」을 그대로 띄운다 —
+       눌러야 할 일이 생기면 눈에 띄어야 한다(pu-version.js 가 state 를 적는다).
+     ⚠ PC 는 그대로다 — 자리가 넉넉하다.
+     ⚠ 단추를 지우지 않고 «숨기기만» 한다 — 목록의 줄이 그 단추를 눌러 준다(같은 일을 두 벌 만들지 않는다).
+     ⚠ 이 규칙은 앱바를 싣는 앱에만 걸린다. 포털(enter.html)은 앱바를 안 싣고 제 ⋯ 를 쓴다. */
+  var PHONE_MQ = '(max-width:640px)';
+  function isPhone() {
+    try { return !!(global.matchMedia && global.matchMedia(PHONE_MQ).matches); } catch (e) { return false; }
+  }
+  function phoneCss() {
+    try { phoneCssNow(); } catch (e) { /* 꾸밈 한 벌이 안 붙어도 손잡이·이동은 그대로 돈다 */ }
+  }
+  function phoneCssNow() {
+    if (!document.head || document.getElementById('pu-appbar-phone-css')) return;
+    var st = document.createElement('style');
+    st.id = 'pu-appbar-phone-css';
+    st.textContent = '@media ' + PHONE_MQ + '{' +
+      /* 손잡이를 가늘게 — 글자는 그대로 «즐겨찾기»(어느 앱에서나 같은 자리·같은 말) */
+      '[data-pu-appbar-tab]{padding:9px 2px!important;font-size:10px!important;letter-spacing:0!important;opacity:.6!important}' +
+      'body>#pu-version-fab[data-state="ok"]{display:none!important}' +
+      'body>#pu-backup-admin-button{display:none!important}' +
+      '}';
+    document.head.appendChild(st);
+  }
+  /* 폰에서만 목록 맨 아래에 붙는 두 줄 — 숨긴 단추를 대신 눌러 준다 */
+  function phoneRows(pop) {
+    if (!isPhone()) return;
+    var acts = [
+      { id: 'pu-version-fab', label: '🔄 새 버전 확인', key: 'version' },
+      { id: 'pu-backup-admin-button', label: '🗄 백업·복구', key: 'backup' }
+    ];
+    var box = null;
+    acts.forEach(function (a) {
+      var target = document.getElementById(a.id);
+      if (!target) return;                       // 백업·복구는 관리자에게만 생긴다
+      if (!box) {
+        box = document.createElement('div');
+        box.style.cssText = 'display:flex;gap:6px;padding:6px 10px;border-top:1px solid #eef2f6;background:#fff';
+        pop.appendChild(box);
+      }
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('data-pu-phone-act', a.key);
+      b.textContent = a.label;
+      b.style.cssText = 'flex:1;min-width:0;white-space:nowrap;border:1px solid #cbd5e1;background:#f8fafc;color:#334155;' +
+        'border-radius:7px;padding:8px 6px;font:700 12px/1.2 -apple-system,"Malgun Gothic",sans-serif;cursor:pointer';
+      b.addEventListener('click', function () { closePop(); try { target.click(); } catch (e) {} });
+      box.appendChild(b);
+    });
+  }
+
   function openPop(btn) {
     if (_pop) { closePop(); return; }
     var r = btn.getBoundingClientRect();
@@ -353,6 +411,7 @@
     home.addEventListener('click', function () { closePop(); navTo('enter.html?' + bust(), null); });
     foot.appendChild(home);
     pop.appendChild(foot);
+    phoneRows(pop);
 
     document.body.appendChild(pop);
     _pop = pop;
@@ -483,6 +542,7 @@
        앱이 mount({current}) 로 알려 준 것을 빈 값으로 지워 버리면
        「보던 화면」이 어느 앱 것인지 몰라 기록이 안 남는다. */
     _me = whoAmI() || _me;
+    phoneCss();
     if (document.querySelector('[data-pu-appbar-btn]')) return;   // 두 번 붙지 않게
     if (!document.body) return;
     document.body.appendChild(makeTab());

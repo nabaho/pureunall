@@ -57,7 +57,6 @@ const widths = String(opt.widths || '360,411').split(',').map(Number);
 const outDir = path.resolve(opt.out || path.join(here, 'out'));
 const waitMs = Number(opt.wait || 6000);
 const onlyView = opt.view || '';
-fs.mkdirSync(outDir, { recursive: true });
 
 const seed = require('./seed.js');
 const fakeSrc = fs.readFileSync(path.join(here, 'fake-firebase.js'), 'utf8');
@@ -165,6 +164,7 @@ function line(r) {
 }
 
 async function main() {
+  fs.mkdirSync(outDir, { recursive: true });
   const { chromium } = await loadPlaywright();
   const srv = await serve();
   const base = `http://127.0.0.1:${srv.address().port}`;
