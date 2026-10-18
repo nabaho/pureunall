@@ -8,9 +8,13 @@ const path = require('node:path');
 const { stripJs } = require('./strip-comments.js');
 const SRC = stripJs(fs.readFileSync(path.join(__dirname, '..', 'pu-erp.html'), 'utf8').replace(/\r\n/g, '\n'));
 
-test('근로자명부 폰: 숫자 카드는 한 줄 칩(가로 넘김) · 사람은 한 줄 · 옛 카드(입사 … 줄)는 없다', () => {
-  assert.match(SRC, /className: window\.innerWidth <= 768 \? '' : 'staff-kpi'/);
-  assert.match(SRC, /\{ display:'flex', gap:'5px', overflowX:'auto'/);
+test('근로자명부 폰: 숫자 카드(두 줄 6칸)는 넓은 화면에만 · 폰은 숫자를 상태 칩에 얹어 한 줄 · 옛 카드(입사 … 줄)는 없다', () => {
+  /* 2026-10-12 «숫자 칩 한 줄» → 2026-10-18 그 칩 줄과 상태 탭 줄을 «한 줄»로 합쳤다(같은 일을 두 줄에서 했다) */
+  assert.match(SRC, /!_rM && h\('div', \{ className:'staff-kpi'/, '★ 폰에서 숫자 카드(staff-kpi)가 다시 그려집니다');
+  const at = SRC.indexOf("{ v:'scheduled', label:'입사예정', n:scheduledCount");
+  assert.ok(at > 0, '★ 폰 상태 칩에 숫자(n)가 안 얹혔습니다 — 숫자 줄을 따로 두면 두 줄이 됩니다');
+  const row = SRC.slice(SRC.lastIndexOf("h('div', {", at), at);
+  assert.match(row, /overflowX:'auto'/, '★ 칩 줄은 한 줄로 두고 넘치면 옆으로 밀어야 합니다');
   assert.doesNotMatch(SRC, /h\('span', null, u\.hireDate \? '입사 '\+u\.hireDate : ''\)/, '폰 카드의 «입사 …» 줄이 남았습니다');
 });
 

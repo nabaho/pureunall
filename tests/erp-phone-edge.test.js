@@ -129,7 +129,8 @@ test('★ 월말 마감·휴가 표·거래내역 — 폰에서 바깥 상자의
 
 test('★ .page 밖에 서는 화면 — 본문 겉 여백을 걷었으니 «제 여백»이 화면 끝 여백이다(폰에서 넓은 화면보다 작게)', () => {
   [['function FinanceAuto(props)', /return h\('div', \{ style:\{ padding: window\.innerWidth <= 768 \? '(\d+)px' : '(\d+)px' \} \}/],
-   ['function PerfManagement(props)', /return h\('div',\{style:\{padding:window\.innerWidth<=768\?'(\d+)px':'(\d+)px'\}\}/],
+   /* 성과관리(PerfManagement)는 뺀다 — 인사관리 창은 다른 방이 «흰 판 · 양옆 12px»로 다시 정리했고(#2658, html.pu-app-hr)
+      그쪽 검사(tests/hr-phone-edge.test.js)가 지킨다. 같은 자리를 두 검사가 다른 값으로 붙들면 하나는 늘 빨갛다. */
    ['function FinanceLedger(props)', /return h\('div',\{style:\{padding: window\.innerWidth <= 768 \? '0 (\d+)px' : '0 (\d+)px'\}\}/]
   ].forEach(function (x) {
     const m = fnBody(x[0]).match(x[1]);
