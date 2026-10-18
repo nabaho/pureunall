@@ -126,7 +126,7 @@ test('③ 앱 화면은 이 단추 자리를 따로 박지 않는다 — 앱바 
 });
 
 test('④ 단추 상태가 바뀔 때·스크롤·폭 바뀜에 다시 잰다', () => {
-  const w = /function fabWatch\(\)[\s\S]*?\n  }\n/.exec(앱바);
+  const w = /function fabWatch\(\)[\s\S]*?\r?\n  }\r?\n/.exec(앱바);
   assert.ok(w, 'fabWatch 가 없다');
   assert.match(w[0], /MutationObserver[\s\S]*attributeFilter:\s*\['data-state'\]/, '새 버전을 찾았을 때(상태 바뀜) 다시 안 잰다');
   assert.match(w[0], /addEventListener\('scroll'/, '스크롤하면 막대가 생기고 없어지는데 다시 안 잰다');
