@@ -165,8 +165,12 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
   .dt td{white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important}
   .dt td::before{content:attr(data-label);flex:0 0 66px;color:var(--text-mute);
     font-size:11px;font-weight:700;line-height:1.5;white-space:nowrap}
-  /* 번호·빈 칸은 접는다 — 카드에서 빈 줄이 쌓이면 컴팩트한 뜻이 없다 */
-  .dt td.rownum,.dt td[data-empty]{display:none}
+  /* 빈 칸은 접는다 — 카드에서 빈 줄이 쌓이면 컴팩트한 뜻이 없다.
+     ⚠ 번호 칸(☐ + №)은 «접지 않는다» (대표 지시 2026-10-05 「모든 프로그램에 가장 왼쪽에 ㅁ 표시와
+       넘버링」 — 폰에서도 빼지 않는다). 2026-08-17 에는 번호만 든 칸이라 접었는데, 그 뒤 ☐ 가 같은
+       칸에 들어와 폰에서는 고를 길이 아예 없었다(폰화면관리 2026-10-18 실측). 아래 «카드 첫 줄»에서
+       ID·번호와 한 줄로 세운다 — 카드가 한 줄도 안 길어진다. */
+  .dt td[data-empty]{display:none}
   /* ── 관리 단추는 카드 «오른쪽» 에 세로로 (대표 지시 2026-08-20
        "첨부 삭제등 셀을 아래 말고 오른쪽으로") ──
      아래에 깔면 카드마다 줄이 하나씩 더 붙어, 스무 장이면 스무 줄이 늘어난다.
@@ -176,12 +180,25 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
        단추 칸이 첫 줄 높이에만 붙는다. 그래서 repeat(16,auto) 로 넉넉히 적어 둔다 —
        빈 줄은 auto 라 높이가 0 이고 사이도 0(row-gap 없음)이라 카드가 안 늘어난다.
      ⚠ 단추는 안쪽 style=inline-flex 로 감싸여 있어 !important 로 세워야 한다. */
-  .dt tr{display:grid!important;grid-template-columns:minmax(0,1fr) minmax(72px,auto);
+  /* 칸은 셋 — [이름표 66px][값][단추]. 이름표 칸은 «이름표 폭과 같다» — 보통 줄은 앞 두 칸을
+     가로질러(td 안의 ::before 66px + 틈 8px) 쓰고, 첫 줄만 ☐ № 가 이름표 자리에 선다.
+     그래서 첫 줄 값(ID·번호)이 아래 줄 값들과 세로로 맞는다. */
+  .dt tr{display:grid!important;grid-template-columns:66px minmax(0,1fr) minmax(72px,auto);
     /* 72px 아래로는 안 준다 — 카드마다 단추 폭이 제각각이면 나누는 줄이
        들쭉날쭉해 목록이 어수선해 보인다 */
     grid-template-rows:repeat(16,auto);column-gap:8px;row-gap:0;align-items:start}
-  .dt td{grid-column:1}
-  .dt td:last-child{grid-column:2;grid-row:1/-1;align-self:stretch;
+  .dt td{grid-column:1 / 3}
+  /* ── 카드 첫 줄: ☐ № · ID (폰화면관리 2026-10-18) ──
+     ☐ № 는 이름표 칸에, 바로 뒤 칸(ID·번호 — 스스로 무엇인지 말하는 값)은 값 칸에 같은 줄로.
+     ⚠ 뒤 칸의 이름표(ID·번호)만 감춘다 — 값은 그대로 보인다. 다른 줄 이름표는 그대로다. */
+  .dt td.rownum{grid-column:1;grid-row:1;display:flex;align-items:center;overflow:visible!important}
+  .dt td.rownum::before{content:none}
+  .dt td.rownum + td{grid-column:2;grid-row:1}
+  .dt td.rownum + td::before{content:none}
+  /* ☐ 는 손가락으로 누를 만큼(PC 의 14px 로는 폰에서 안 맞는다). 번호 글자까지 label 이라 그것을 눌러도 골라진다 */
+  .dt td.rownum input[type=checkbox]{width:24px;height:24px}
+  .dt td.rownum label.rn-chk span{font-size:11.5px;font-variant-numeric:tabular-nums}
+  .dt td:last-child{grid-column:3;grid-row:1/-1;align-self:stretch;
     display:flex;flex-direction:column;justify-content:center;gap:4px;
     border-top:none!important;border-left:1px dashed var(--border-soft)!important;
     margin:0!important;padding:0 0 0 8px!important}
@@ -226,6 +243,27 @@ body.has-gtabs #main{padding-bottom:var(--gtabH,56px)}
   /* 홈 위쪽 여백도 줄인다 */
   .kpi-grid{gap:6px!important}
   .kpi-grid > .card{padding:9px 10px!important}
+
+  /* ── 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) ── */
+  /* ① 머리줄 — 「🚪 로그아웃」이 화면 밖으로 밀렸다(360px 실측: 「서류 보관함」·「프로필 1장」에서 364~400px).
+       머리줄은 모든 칸이 줄지 않게(.topbar>*{flex-shrink:0}) 되어 있어, 긴 화면 이름이면 맨 끝 단추가
+       옆으로 밀어야만 보이는 자리로 나갔다. «로그인한 사람» 글만 줄어들게 한다 — 넘치면 … 이고
+       전문은 PC 와 같다. 단추와 화면 이름은 그대로다. */
+  .topbar>.kc-who{flex-shrink:1;min-width:0}
+  /* ② 프로필 1장 — 설정 칸이 500px 로 박혀 있어(인라인·p1SideApply) 폰에서는 옆으로 밀리고,
+       그림(A4) 칸은 폭 0 이 되어 «아예 안 보였다». 폰에서는 위아래로 쌓는다 — 설정 위, 그림 아래.
+       설정 칸의 붙박이(sticky)·높이 한도도 푼다 — 쌓이면 붙을 자리가 없고, 한도가 있으면 칸 안에서 또 구른다.
+       ⚠ 인라인 style 을 이겨야 해서 !important 다. 접기(◀ 설정 접기)는 그대로 듣는다(display:none). */
+  .p1-wrap{grid-template-columns:minmax(0,1fr)!important}
+  #p1Side{position:static!important;max-height:none!important;overflow:visible!important}
+  /* ③ 목록 툴바 — 폰에서는 줄 수가 곧 «틀고정 높이»다(360px 실측: 위촉장 6줄 179px · 컨설팅 11줄 387px).
+       아무것도 감추지 않고, 단추의 숨(여백·글씨)만 줄여 한 줄에 둘씩 앉게 한다.
+       ⚠ 틀고정(sticky) 자체는 그대로다 — 2026-08-29 「① 툴바 틀고정」. 폰에서 풀지는 대표가 정한다. */
+  .toolbar{padding:6px 8px!important}
+  .toolbar > .btn,.toolbar > .more-wrap > .btn,.toolbar .tb-extra .btn{padding:5px 8px;font-size:11.5px}
+  /* ④ 백업 재촉 띠의 「💾 지금 백업」이 줄 끝에서 «💾 / 지금 백업» 으로 갈라졌다 — 단추 이름은 한 덩이로.
+       (띠 자체는 그대로다 — js/kcareer-notices.js 「함부로 줄이지 않는다」) */
+  #bkNotice a{white-space:nowrap}
 }
 @media (max-width:780px){ .scroll-hint{display:block;text-align:center;font-size:11px;color:var(--text-mute);margin-top:6px} }
 .field-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}

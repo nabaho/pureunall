@@ -851,6 +851,30 @@ main{flex:1;min-height:0;width:100%;padding:10px 12px;
   /* 줄바꿈만 만들던 빈 칸 — 폰에서는 그 한 줄이 아깝다 */
   .eft > span[style]:empty{display:none}
   .band{padding:7px 10px;font-size:12.5px;line-height:1.5;margin-bottom:6px}
+  /* ── 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) ──
+     ① 위 띠의 ⋯ 칸이 «화면 왼쪽 밖»으로 펴졌다(360px 실측: 칸 왼끝 -155px).
+        띠가 세 줄로 접혀 ⋯ 가 둘째 줄 «왼쪽 끝»에 오는데, 칸은 ⋯ 의 오른끝에 맞춰
+        왼쪽으로 펴서 「채우기 단추 넣기」·「바뀐 기록」을 아무도 못 눌렀다.
+        ⋯ 가 어느 줄·어느 자리에 오든 안 나가게, 폰에서는 칸을 «띠 전체»에 걸어
+        띠 바로 아래 양옆 여백 안에 편다. (PC 는 ⋯ 밑에 그대로 편다.) */
+  .appbar{position:relative}
+  .appbar .more{position:static}
+  .appbar .morebox{left:10px;right:10px;top:100%}
+  /* 닫힌 ⋯ 의 칸은 자리도 안 잡게 한다 — 닫힌 칸은 띠가 아니라 ⋯ 를 기준으로 재어져
+     (점검 도구가) 화면 밖에 있는 것처럼 읽는다. 열면 위 규칙대로 띠 아래에 편다. */
+  .more:not([open]) > .morebox{display:none}
+  /* ② 접는 안내 한 줄(.note1) — 이름표(<b>)가 «한 글자씩» 접혔다(「줄을/하나/씩」 세 줄).
+        flex 줄에서 이름표·풀이·「왜」 단추가 폭을 셋으로 나눠 가진 탓이다.
+        폰에서는 글처럼 흘려 쓰고 「왜」 단추는 글 끝에 붙인다 — 접기·펴기는 그대로다. */
+  .note1 > summary{display:block}
+  .note1 .more{display:inline-block;margin-left:6px}
+  /* ③ 쪽 차례 ▲▼ — 20×13px 라 손가락으로 못 누른다. 줄 높이 안에서 위아래로 키운다.
+        (폰은 끌기가 잘 안 먹어 ▲▼ 가 차례를 바꾸는 유일한 길이다 — 빼지 않는다) */
+  .ord{gap:2px}
+  .ob{width:30px;height:22px;font-size:11px}
+  /* ④ 목록 이름은 «한 줄» — 긴 업체명이 두 줄로 접혀 줄마다 키가 커졌다.
+        넘치면 … 로 끝내고 전문은 title 과 편집칸 머리에 있다. */
+  .list .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
@@ -6819,7 +6843,7 @@ function rowsHtml() {
     const line = joinOnce([r.desc, r.kept ? (r.keptWhy || '(사유 없음)') : '', 명부말, r.reason]);
     return '<div class="r ' + (r.key === App.pick ? 'on' : '') + '" onclick="App.select(\'' + esc(r.key) + '\')">'
       + '<span class="num">' + (r._no || (i + 1)) + '</span>'
-      + '<div class="who"><div class="nm">' + esc(r.name) + '</div>'
+      + '<div class="who"><div class="nm" title="' + esc(r.name) + '">' + esc(r.name) + '</div>'
       + '<div class="po" title="' + esc(line) + '">' + esc(line) + '</div></div>'
       /* 딱지 둘 — 위가 명부 딱지(늘 붙는다), 아래가 대조 딱지(확인을 누를 때만 새로 붙는다).
          ★ 자문사 줄은 대조 딱지 자리에 «사람이 표시한 값»이 온다. 「확인 전」이라고 적으면

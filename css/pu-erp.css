@@ -1127,3 +1127,37 @@ input[type="search"]::-webkit-search-cancel-button{
 @media (pointer:coarse){
   input[type="search"]::-webkit-search-cancel-button{ height:19px; width:19px; background-size:19px; }
 }
+
+/* ══════ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 이알피·인사관리·재무관리 세 앱 공통 ══════
+   가짜 파이어베이스로 360·411px 에서 «로그인한 채» 그려 재고 고친 것 (tools/phone-audit, seeds/erp·hr·fin).
+   ⚠ 넓은 화면은 하나도 안 바뀐다 — 새로 낸 «겹»(.mkh-extra)은 넓은 화면에서 display:contents 라 없는 것과 같다.
+   ⚠ 「본문 전체가 옆으로 구른다」는 문서 폭이 아니라 «본문(main) 상자» 안에서 났다 — 문서 폭만 재면 0 으로 나온다. */
+.mkh-extra{ display:contents; }
+@media (max-width:768px){
+  /* ① 모든 화면 왼쪽 가장자리의 회색 띠 — 접힌 옆줄의 «그림자»였다.
+       옆줄은 translateX(-100%) 로 화면 밖에 접어 두는데 그림자(4px 0 20px)는 오른쪽으로 24px 삐져나와
+       늘 화면 왼쪽을 회색으로 칠했다. 접혔을 때만 걷는다 — 펼치면 그림자는 그대로 돌아온다. */
+  .sb.collapsed{ box-shadow:none; }
+  /* ② 「◀ 뒤로」 — 글자는 .hd-lbl 로 접고(그림만) 여백도 줄인다. 68px 이 제목을 0px 로 밀어
+       «여기가 어디인지»를 잃었고, 360px 에서는 ⋯ 가 화면 밖으로 16px 나갔다. */
+  .hd-back{ padding:5px 9px !important; margin-right:2px !important; flex-shrink:0; }
+  /* ③ 월 이동줄 — 「2026년 10월」 이 두 줄로 꺾이지 않게, 오른쪽 단추 묶음은 그 줄 «안에서» 민다.
+       계약관리는 단추 넷이 줄을 474px 로 늘려 본문 전체가 옆으로 굴렀다(본문 498px · 화면 360px). */
+  .mkh-label{ white-space:nowrap; }
+  .mkh-extra{ display:flex; align-items:center; gap:4px; overflow-x:auto; min-width:0; flex:0 1 auto;
+              -webkit-overflow-scrolling:touch; }
+  .mkh-extra > *{ flex-shrink:0; }
+  /* ④ 증명서 — 「입력 300px · 문서」 두 칸을 폰에서는 한 칸으로(문서는 입력 아래).
+       옆에 앉은 A4(794px)가 본문을 1,142px 로 밀었다. 다른 화면의 240·280px 두 칸과 같은 규칙이다. */
+  [style*="grid-template-columns: 300px 1fr"]{ grid-template-columns:minmax(0,1fr) !important; }
+  /* ⑤ 「칸 + 단추」 두 칸 줄 — 입력칸이 제 글자 폭을 고집해 단추를 화면 밖으로 밀었다
+       (근태관리 「+ 등록」 이 20px 밖 → 본문이 옆으로 굴렀다). 칸이 줄어들게 푼다. */
+  [style*="grid-template-columns: 1fr auto"]{ grid-template-columns:minmax(0,1fr) auto !important; }
+  [style*="grid-template-columns: 1fr auto"] > input{ min-width:0; width:100%; }
+  /* ⑥ 인사관리기준 › 사용자표의 상태 고르개 — 글씨는 16px(환경설정 규칙, 2026-10-04)인데 폭은 54px 에
+       묶여 「재직」이 「재즈」로 잘렸다. 글씨는 그대로 두고 폭만 글씨에 맞춘다. */
+  .env-section .user-tbl select{ max-width:none !important; min-width:70px; }
+  /* ⑦ 손익계산서 — 이 화면은 .page 밖이라 위의 «.page table 한 줄» 규칙이 안 닿았다.
+       칸이 좁아 「1/월」처럼 달 칸이 두 줄로 꺾여 줄마다 높이가 두 배였다. 표는 제 상자 안에서 옆으로 민다. */
+  .fin-pnl table th, .fin-pnl table td{ white-space:nowrap; }
+}
