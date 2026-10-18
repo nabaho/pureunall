@@ -19934,10 +19934,18 @@ function erpXferFixFor(why){
   if(/검증 모듈/.test(w)) return '화면을 새로고침(Ctrl+Shift+R)한 뒤 다시 이관하세요.';
   return '새로고침(Ctrl+Shift+R) 후 다시 이관해 보세요. 같은 사유가 반복되면 위 사유 글을 그대로 알려 주세요.';
 }
+/* ⚠★ 막힘 창은 «알림창»(단추 하나 — window.showAlert)이다. 고르는 창(popConfirm)을 쓰지 않는다.
+     까닭(온톨로지 규칙): 번호만 남은 기록·일부 이관처럼 «확인 안 된» 상태에서는 완료를 묻는 창을 열지 않는다.
+       popConfirm 은 「확인/취소」를 돌려주는 «고르기» 창이라, 같은 doTransfer 안의
+       「이관완료로 정리하시겠습니까?」와 모양이 같다 — 「확인」을 누르면 정리된 줄 안다.
+       돌려받는 값이 있으면 언젠가 그 값으로 이어 가는 길이 생긴다. 알림창은 돌려주는 것이 없다.
+   ★ 알림 한 줄도 그대로 남긴다 — 창을 못 띄우는 자리(검사·옛 화면)에서도 막힌 까닭이 사라지지 않게. */
 async function erpXferBlockedPopup(ct, why, title){
   var head = (title || '⚠ 이관되지 않았습니다') + ' — ' + ((ct && ct.contractNo) || '') + ' ' + ((ct && ct.companyName) || '');
-  await popConfirm(head + '\n\n사유: ' + String(why || '알 수 없음').replace(/^[⚠❌✓\s]+/, '') + '\n\n해결: ' + erpXferFixFor(why),
-    { okText:'확인', cancelText:'닫기', danger:false });
+  var reason = String(why || '알 수 없음').replace(/^[⚠❌✓\s]+/, '');
+  if(typeof showToast === 'function') showToast((title || '⚠ 이관되지 않았습니다') + ' — ' + reason);
+  if(typeof window.showAlert === 'function')
+    await window.showAlert('사유: ' + reason + '\n\n해결: ' + erpXferFixFor(why), { title:head, okText:'닫기' });
 }
 /* 이관 처리 중 뜬 알림 글을 «모아» 둔다 — 막힌 까닭이 알림으로만 나오는 옛 경로(검증 함수들)를 팝업으로 옮기려고. */
 function erpXferToastCapture(){

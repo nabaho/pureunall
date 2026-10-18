@@ -3,7 +3,9 @@
    규칙: ① 연결 방식이 비면 사유 글이 나온다 ② 연결 보류(신규)·업체 연결이면 막지 않는다
         ③ 막히는 «모든» 경우 — 사유마다 푸는 길이 붙는다
         ④ 검증 함수들이 알림으로만 알리던 글도 모아 팝업으로 다시 보인다
-        ⑤ doTransfer·재이관은 알림 한 줄로만 끝나지 않는다. */
+        ⑤ doTransfer·재이관은 알림 한 줄로만 끝나지 않는다.
+        ⑥ 막힘 창은 «알림창»(단추 하나)이다 — 확인 안 된 상태에서 고르는 창(popConfirm)을 열지 않는다
+           (온톨로지 규칙: 부분 이관·번호 단독 연결을 완료 근거로 삼지 않는다 — tests/ontology-intake.test.js). */
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
@@ -21,7 +23,9 @@ function build(companies) {
   vm.runInContext(cutFn('function erpDropDeadCoLink(') + '\n' + cutFn('function erpTransferBlockReason('), ctx);
   return ctx;
 }
-const base = { id: 'ct-x', contractNo: '계약-2026-900', companyName: '새로운(주)', bizNo: '1112233334', kinds: ['consulting'], company: { name: '새로운(주)', bizNo: '1112233334' } };
+/* 사업자번호는 «123-» 으로 시작하는 가짜만 쓴다 — 저장소가 공개라 실제 사업장을 가리키면 안 된다
+   (tests/no-real-client-data.test.js) */
+const base = { id: 'ct-x', contractNo: '계약-2026-900', companyName: '새로운(주)', bizNo: '1234567890', kinds: ['consulting'], company: { name: '새로운(주)', bizNo: '1234567890' } };
 
 test('연결 방식이 비어 있으면 사유 글이 나온다', () => {
   const ctx = build([]);
@@ -35,7 +39,7 @@ test('신규 업체 «연결 보류» 이면 막지 않는다', () => {
 });
 
 test('업체 ID 로 연결돼 있으면 막지 않는다', () => {
-  const co = { id: 'co-1', name: '새로운(주)', bizNo: '111-22-33334', typeCode: '자문', status: 'active' };
+  const co = { id: 'co-1', name: '새로운(주)', bizNo: '123-45-67890', typeCode: '자문', status: 'active' };
   const ctx = build([co]);
   const c = Object.assign({}, base, { companyId: 'co-1', companyLinkStatus: 'linked', company: Object.assign({}, base.company, { companyId: 'co-1' }) });
   assert.equal(ctx.erpTransferBlockReason(c), '');
@@ -77,4 +81,24 @@ test('doTransfer 는 이관 처리 전에 사유를 보고, 막힘을 알림 한
   assert.doesNotMatch(head, /showToast\('(계약유형 없음|⚠ '\+_unverifiedT|⚠ 일부 업무만)/, '막힘 알림 한 줄이 남아 있다');
   assert.match(src.slice(b, b + 2500), /erpXferBlockedPopup\(ct, _tmsgs/, '검증 함수가 알린 글을 팝업으로 다시 보인다');
   assert.match(src, /erpXferBlockedPopup\(ct, _rmsgs/, '종료관리 재이관도 팝업');
+});
+
+test('막힘 창은 알림창이다 — 고르는 창(popConfirm)을 열지 않고, 알림 한 줄에도 사유를 남긴다', async () => {
+  const toasts = [], alerts = [];
+  const ctx = { window: {}, String, Promise,
+    popConfirm: async () => { throw new Error('막힘을 알리는데 고르는 창을 열었다'); },
+    showToast: (m) => toasts.push(String(m)) };
+  ctx.window.showAlert = async (m, o) => { alerts.push({ m: String(m), o: o || {} }); };
+  vm.createContext(ctx);
+  vm.runInContext(cutFn('function erpXferFixFor(') + '\n' + cutFn('async function erpXferBlockedPopup('), ctx);
+  const why = '일부 업무만 이관된 기록이 있습니다. 계약은 완료 처리하지 않았습니다.';
+  const ret = await ctx.erpXferBlockedPopup(base, why);
+  assert.equal(ret, undefined, '알림창은 «고른 값»을 돌려주지 않는다 — 돌려주면 그 값으로 이어 가는 길이 생긴다');
+  assert.ok(alerts.length >= 1, '창을 띄우지 않았다');
+  assert.ok(alerts[0].m.includes(why) && alerts[0].m.includes(ctx.erpXferFixFor(why)), '창에 사유와 푸는 길이 함께 있어야 함');
+  assert.ok(String(alerts[0].o.title || '').includes(base.contractNo), '어느 계약인지 창 머리에 보여야 함');
+  assert.ok(toasts.some((t) => t.includes(why)), '알림 한 줄에도 사유가 남아야 함');
+  delete ctx.window.showAlert;
+  await ctx.erpXferBlockedPopup(base, why);
+  assert.ok(toasts.filter((t) => t.includes(why)).length >= 2, '알림창이 없는 자리에서도 사유는 알림으로 남는다');
 });
