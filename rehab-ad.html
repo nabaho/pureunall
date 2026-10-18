@@ -296,7 +296,11 @@ td.mm{display:none}
   .tbl thead th:not(.ck):not(.sr):not(.no):not(.co){display:none}
   #rows tr{padding:6px 4px 6px 0;row-gap:2px}
   #rows td.stg,#rows td.ceo,#rows td.trd,#rows td.rg,#rows td.ct,#rows td.lg,#rows td.st-new{display:none}
-  td.ck input,th.ck input{width:22px;height:22px}
+  td.ck input,th.ck input{width:24px;height:24px}
+  /* 입력칸 글씨 16px — 위 «input,select,textarea{16px}» 보다 센 규칙(.bar select · .moreF select · 상세 .f input)이
+     12.5px 로 되돌리고 있었다(2026-10-18 폰화면관리 실측: 거르개 셋·필터 여섯·상세 입력 여섯). 아이폰이 누를 때마다 화면을 키운다 */
+  .bar select,.moreF select,.f input,.f textarea{font-size:16px}
+  #fDays,#fType,#fSort{padding-left:4px;padding-right:0}
   td.co{font-size:14px}
   #rows td.kd,#rows td.st{padding-left:2px}
   #rows td.mm{display:flex;grid-column:4 / -1;grid-row:2;flex-wrap:wrap;align-items:center;gap:2px 7px;font-size:12px;color:var(--ink2);white-space:normal}
