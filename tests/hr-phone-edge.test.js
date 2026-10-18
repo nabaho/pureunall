@@ -67,23 +67,16 @@ test('★ 앱 표식 — <head> 첫 스크립트가 ?app= 앱을 html 에 단다
     '★ html 에 pu-app-<앱> 표식이 없으면 인사관리만 고른 폰 규칙이 안 걸립니다');
 });
 
-test('★ 인사관리 폰 — 바깥(main) 양옆 여백은 0, 흰 판 안쪽만 조금 · PC 에는 안 샌다', () => {
-  const main = rule('html.pu-app-hr main.main');
-  assert.ok(main, '★ 인사관리 폰에서 본문 상자(main) 여백을 걷는 규칙이 없습니다 — 양옆 24px 이 그대로 빕니다');
-  const mp = main.match(/padding:\s*([^;!]+)/);
-  assert.ok(mp, 'main 여백 선언을 못 찾았습니다');
-  const parts = mp[1].trim().split(/\s+/);
-  const side = parts.length >= 2 ? parts[1] : parts[0];
-  assert.equal(px(side), 0, '★ 폰에서 main 양옆 여백이 남아 있습니다(«양 끝에 화면 공백 안 둬도 된다»)');
-
-  const page = rule('html.pu-app-hr .page');
-  assert.ok(page, '★ 인사관리 폰 흰 판(.page) 규칙이 없습니다');
-  const pp = page.match(/padding:\s*([^;!]+)/)[1].trim().split(/\s+/);
-  const pageSide = pp.length >= 2 ? pp[1] : pp[0];
-  assert.ok(px(pageSide) > 0, '흰 판 안쪽 여백이 0 이면 글자가 화면 끝에 붙고 「즐겨찾기」 손잡이에 가립니다');
-  assert.ok(px(pageSide) <= 16, '★ 흰 판 안쪽 여백이 예전(main 24 + 판 10)만큼 넓어지면 걷은 뜻이 없습니다');
-  assert.match(page, /border-radius:\s*0/, '판을 화면 끝까지 펴면 둥근 모서리가 회색 틈을 남깁니다');
-
+test('★ 인사관리 폰 — 양옆 여백은 세 앱(이알피·인사·재무) 공통을 따른다 · 인사관리만 넓히지 않는다 · PC 에는 안 샌다', () => {
+  /* 2026-10-18 처음엔 인사관리만 판 안쪽 12px 를 따로 두었다. 그 뒤 세 앱 공통 «양옆 빈자리»(6px)가 들어오자
+     인사관리 규칙이 더 구체적이라 이겨서 인사관리만 여백이 오히려 넓었다 → 대표 「이알피 재무도 여백 걷어라」.
+     공통 여백 값 자체는 tests/erp-phone-edge.test.js 가 본다. 여기서는 «인사관리가 따로 덮지 않는가»만 본다. */
+  ['main', '.main', 'main.main', '.page', '.env-tabs-wrap'].forEach(function (sel) {
+    const r = rule('html.pu-app-hr ' + sel);
+    assert.ok(!r || !/padding|margin/.test(r),
+      '★ 인사관리만 ' + sel + ' 여백을 따로 정했습니다 — 이알피·재무와 모양이 달라집니다(공통 «양옆 빈자리» 규칙을 따르십시오)');
+  });
+  assert.ok(rule('.main') && rule('.page'), '이 검사의 전제(폰 공통 .main·.page 규칙)가 없어졌습니다');
   assert.doesNotMatch(outsideMedia(), /pu-app-hr/, '★ 인사관리 표식 규칙이 폰 구간 밖에 있습니다 — PC 화면까지 바뀝니다');
 });
 
