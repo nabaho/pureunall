@@ -217,7 +217,12 @@ function __paMeasure(opts) {
       if (ot.length < 2 && !el.matches('button,input,select,textarea')) return;
       var r = el.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0 || r.top < 60 || r.top > H) return;
-      for (var e = el; e && e !== document.body; e = e.parentElement) if (getComputedStyle(e).position === 'fixed') return;
+      /* 떠 있는 «작은» 것(단추·띠) 안은 뺀다. 화면 거의 전부를 덮는 fixed 덩어리(메일 .dmm 처럼 앱 몸통이 fixed)는 본문이다 */
+      for (var e = el; e && e !== document.body; e = e.parentElement) {
+        if (getComputedStyle(e).position !== 'fixed') continue;
+        var fr = e.getBoundingClientRect();
+        if (fr.width * fr.height < W * H * 0.6) return;
+      }
       if (r.left < -1 || r.right > W + 1) return;
       lefts.push(r.left); rights.push(W - r.right);
       var d = 0; for (var p = el.parentElement; p && p !== document.body; p = p.parentElement) if (boxed(p)) d++;

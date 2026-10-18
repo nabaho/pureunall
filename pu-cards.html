@@ -321,14 +321,7 @@ html.mailview #tabs,html.mailview #subbar{display:none}
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px}
 /* 폰: 칸 이름은 «한 줄» (폰화면관리 2026-10-18) — 360px 에서 「새 등록 / 증」·「엑셀로 내보내 / 기」로
    낱말 가운데서 접혔다. 줄어드는 것은 오른쪽 설명(.msub — … 으로 줄어든다) 하나뿐이어야 한다. */
-@media(max-width:760px){
-  #menuM .sheetbtn{white-space:nowrap}
-  /* 양옆 채우기 — 창 여백(18)과 칸 여백(10)이 겹쳐 글이 28px 에 섰다. 둘 다 줄여 칸은 8px, 글은 14px 에서 시작한다.
-     붙박이 머리줄은 창 끝까지 덮게 함께 맞춘다 */
-  body:not(.pc) #menuM{padding-left:8px;padding-right:8px}
-  body:not(.pc) #menuM .sheetbtn{padding-left:6px;padding-right:6px}
-  body:not(.pc) #menuM>.mhead{margin-left:-8px;margin-right:-8px;padding-left:14px;padding-right:14px}
-}
+@media(max-width:760px){ #menuM .sheetbtn{white-space:nowrap} }
 /* 묶음 이름표 — 여백으로 가르던 것을 가는 줄로 가른다(여백보다 덜 먹고 더 또렷하다) */
 #menuM .mgrp{font-size:11px;font-weight:800;color:#94a3b8;letter-spacing:.02em;
   padding:9px 6px 3px;margin-top:5px;border-top:1px solid #1e293b}
@@ -341,6 +334,14 @@ body.pc #menuM .mgrp{border-top-color:#e2e8f0}
 #menuM>.mhead{position:sticky;top:0;z-index:2;background:#1e293b;
   margin:0 -18px 6px;padding:15px 18px 9px;border-bottom:1px solid #1e293b}
 body.pc #menuM>.mhead{background:#fff;border-bottom-color:#e2e8f0}
+/* 폰 양옆 채우기(2026-10-18) — 창 여백(18)과 칸 여백(10)이 겹쳐 칸 이름이 28px 에 섰다. 둘 다 줄여 칸은 8px, 글은 14px 에서
+   시작한다. 붙박이 머리줄은 창 끝까지 덮게 함께 맞춘다.
+   ⚠ 위 기본 규칙들 «뒤»에 둔다 — 검사들이 «첫 규칙»을 읽어 기본 값을 확인한다. */
+@media(max-width:760px){
+  body:not(.pc) #menuM{padding-left:8px;padding-right:8px}
+  body:not(.pc) #menuM .sheetbtn{padding-left:6px;padding-right:6px}
+  body:not(.pc) #menuM > .mhead{margin-left:-8px;margin-right:-8px;padding-left:14px;padding-right:14px}
+}
 /* 위험 구역 — 여백만 조인다. 빛깔과 「복구 불가」는 그대로 둔다(겁내야 하는 자리다) */
 #menuM .mdanger{border:1px solid #fecaca;background:#f8fafc;border-radius:10px;
   padding:7px 9px;margin-top:12px}
@@ -3080,22 +3081,6 @@ body.pc #pcDetail{display:flex}
 @media(max-width:760px){
   body:not(.pc) #pcDetail.open{display:flex;position:fixed;inset:0;width:100%;max-width:100%;height:100%;
     transform:none;border-left:none;box-shadow:none}
-  /* 양옆 채우기(2026-10-18) — 겉 여백 18px + 상자 안 여백 10~11px 이 겹쳐 글이 화면 끝에서 30px 에 섰다.
-     겉 여백을 6px 로 줄이고, 안쪽 상자(접는 칸·근로자 수 띠·한 일 줄)는 옆 테두리·둥근 모서리를 걷어
-     위아래 줄로만 가른다(한 겹). 상자 안 여백도 8px 로 — 글은 화면 끝에서 14px 안에서 시작한다. */
-  body:not(.pc) #pcDetail .pdhead{padding-left:10px;padding-right:10px}
-  body:not(.pc) #pcDetail .pdbody{padding-left:6px;padding-right:6px}
-  body:not(.pc) #pcDetail .pdbody>.pdname,
-  body:not(.pc) #pcDetail .pdbody>.pdsub,
-  body:not(.pc) #pcDetail .pdsec{padding-left:4px;padding-right:4px}
-  body:not(.pc) #pcDetail .cocard,
-  body:not(.pc) #pcDetail .pdbody>.coerppin,
-  body:not(.pc) #pcDetail .cohist-row{border-left:0;border-right:0;border-radius:0}
-  body:not(.pc) #pcDetail .cocard>.h,
-  body:not(.pc) #pcDetail .cocard>.b,
-  body:not(.pc) #pcDetail .pdbody>.coerppin,
-  body:not(.pc) #pcDetail .cohist-row{padding-left:8px;padding-right:8px}
-  body:not(.pc) #pcDetail .cohist-row{background:transparent}
 }
 #pcDetail .pdhead{display:flex;align-items:center;justify-content:space-between;padding:16px 20px;border-bottom:1px solid #e2e8f0;position:sticky;top:0;background:#fff;z-index:1}
 #pcDetail .pdhead .ttl{font-size:13px;color:#64748b;font-weight:700}
@@ -3531,6 +3516,26 @@ body.pc #pcDetail{display:flex}
 .coerppin.on button:hover{background:#166534;color:#ffffff}
 .coerppin.bad{background:#fef2f2;border-color:#fecaca;color:#991b1b}
 .coerppin.bad b{color:#991b1b}
+/* 폰 🏢 기업 상세 — 양옆 채우기(2026-10-18, 대표 「양옆 빈공백이 많다」)
+   겉 여백 18px + 상자 안 여백 10~11px 이 겹쳐 글이 화면 끝에서 30px 에 섰다.
+   겉 여백을 6px 로 줄이고, 안쪽 상자(접는 칸·근로자 수 띠·한 일 줄)는 옆 테두리·둥근 모서리를 걷어
+   위아래 줄로만 가른다(한 겹). 상자 안 여백도 8px 로 — 글은 화면 끝에서 14px 안에서 시작한다.
+   ⚠ 이 상자들의 기본 규칙(.pdbody·.cohist-row·.cocard·.coerppin) «뒤»에 둔다 — 검사들이 «첫 규칙»을 읽는다. */
+@media(max-width:760px){
+  body:not(.pc) #pcDetail .pdhead{padding-left:10px;padding-right:10px}
+  body:not(.pc) #pcDetail .pdbody{padding-left:6px;padding-right:6px}
+  body:not(.pc) #pcDetail .pdbody>.pdname,
+  body:not(.pc) #pcDetail .pdbody>.pdsub,
+  body:not(.pc) #pcDetail .pdsec{padding-left:4px;padding-right:4px}
+  body:not(.pc) #pcDetail .cocard,
+  body:not(.pc) #pcDetail .pdbody>.coerppin,
+  body:not(.pc) #pcDetail .cohist-row{border-left:0;border-right:0;border-radius:0}
+  body:not(.pc) #pcDetail .cocard>.h,
+  body:not(.pc) #pcDetail .cocard>.b,
+  body:not(.pc) #pcDetail .pdbody>.coerppin,
+  body:not(.pc) #pcDetail .cohist-row{padding-left:8px;padding-right:8px}
+  body:not(.pc) #pcDetail .cohist-row{background:transparent}
+}
 .coerppin.bad button{color:#991b1b;background:#fecaca}
 .coerppin.bad button:hover{background:#991b1b;color:#ffffff}
 /* 업체 고르기 창 */
