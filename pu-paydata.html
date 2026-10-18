@@ -418,6 +418,10 @@ h1{font-size:18px;margin-bottom:4px}
   .grp{padding:9px 10px;gap:6px}
   .gl{padding:7px 10px 7px 30px}
   .gdet{padding:6px 10px 10px 30px}
+  /* 확인 대기 줄 — 「사업장·달·종류 ?」 딱지와 「서랍으로」가 자리를 먹어 파일 이름이 「Kaka…」 4글자만 남았다(2026-10-18 전수점검).
+     파일 이름이 줄의 주인이다 — 이름이 줄의 4할을 지키고, 모자란 몫은 딱지가 «…» 로 줄어든다(전문은 눌러서 고치는 칸에 그대로). */
+  .gl .gt{min-width:38%}
+  .gl .tg{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 }
 /* ── 막힌 자리를 이 줄에서 잇기 (대표 결정 2026-08-27) ──
    고치는 단추는 「내가 맡기」와 **색을 갈라 둔다** — 맡기는 내 일이고,

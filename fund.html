@@ -405,6 +405,10 @@
     #saveState.failed{font-size:11px;gap:5px;padding:4px 8px}
     #topuser{max-width:24vw}
     #logoutbtn{white-space:nowrap}
+    /* ①-2 «지금 어느 화면인지»(#crumb)가 19px 로 짓눌려 「기…」 만 남았다(2026-10-18 전수점검) — 이름 칸이 먼저 줄고 화면 이름은 네 글자를 지킨다 */
+    #crumb{flex:1 1 auto;min-width:4.5em}
+    #topright{min-width:0}
+    #topuser{min-width:0;flex:0 1 auto}
     /* ② 기금 머리 — 이름·딱지·상태·담당을 한 줄에 우겨 넣어 「공/동」 딱지가 세로로 쌓이고 「🔖 상태 👤 담당」이 화면 밖으로 잘렸다.
           1줄 = ‹ › · 기금명(넘치면 …) · 딱지, 2줄 = 식별번호(옆으로 밀기) · 상태·담당. */
     .fhead{flex-wrap:wrap;row-gap:2px}

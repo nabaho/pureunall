@@ -183,6 +183,13 @@ button{font:inherit;cursor:pointer}
 #topics .who div span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 #topics .who .w{margin-left:auto;flex-shrink:0}
 @media (max-width:900px){#topics .tpx{grid-template-columns:1fr}#topics .left{position:static;max-height:40vh;border-right:0;border-bottom:1px solid #e2e8f0}}
+/* 폰: 조별 문안 카드 머리 — 한 줄에 우겨 넣어 「📋 복사」·「쓴 회사」 단추가 오른쪽 밖으로 잘리고 「A 와 다른 곳」 딱지는 18px 로 짓눌렸다(2026-10-18 전수점검).
+   머리를 접는다: 1줄 문안·곳·최종본·최근 / (다른 곳 딱지) / 단추 줄. 넓은 화면은 그대로 한 줄. */
+@media (max-width:640px){
+  #topics .ch2{flex-wrap:wrap;row-gap:6px}
+  #topics .ch2 .diff{flex:1 1 100%}
+  #topics .ch2 .r{margin-left:0;flex:1 1 100%}
+}
 @media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}}
 /* ── 「🏢 사업장」 (③-ⓐⓑ 목업 승인본) — 왼쪽 거래처 표, 오른쪽 그 사업장의 이력·개정 시작.
    표의 칸은 한 줄, 넘치면 … 과 title. 이름은 .side·.flow 와 겹치지 않게 따로 짓는다(📥 와 한 파일이다) ── */

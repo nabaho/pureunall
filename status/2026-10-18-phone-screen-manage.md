@@ -34,6 +34,18 @@
 | 기금·급여관리·취업규칙 | 기금 360px 옆넘침 16~71px · 표 머리가 셋째 기금을 가림 · 급여 근태표 세로깨짐 18 · 취업규칙 사업장 이름 칸 46px |
 | 정부사업신청·회생광고·전광판·계약서 | 전광판 첫 폰 정리(표 1039px → 두 줄 카드) · 회생광고 입력칸 12.5px |
 
+손댄 화면 파일(폰 구간): `pu-erp.html` · `pu-cards.html` · `pu-photos.html` · `pu-paydata.html` · `gov-consulting.html` · `gov-report.html` ·
+`pu-govaid.html` · `work.html` · `pu-cal.html` · `kcareer.html` · `pu-home.html` · `pu-news.html` · `fund.html` · `payroll-os.html` ·
+`rules-v2.html` · `rules.html` · `gov.html` · `rehab-ad.html` · `pu-signboard.html` · `docs-esign.html` (+ `enter.html` 는 점검만).
+나머지 html 은 공용 `pu-appbar.js`·`pu-version.js` 캐시 번호만 올렸다.
+
+### 마지막 판 (전수 측정을 한 번 더 돌려 찾은 것)
+- 경력관리 환경설정 입력칸 130px 화면 밖 · 서류 만들기 탭 줄 29px — 본문(main) 상자가 옆으로 굴렀다.
+- 정부사업일정 월 달력 「+3건」 과 날짜 숫자가 겹침 · 정부사업신청 발주 예정 둘째 줄 끝의 금액 잘림.
+- 기금 상단바 화면 이름 「기…」 · 급여데이터함 확인 대기 파일 이름 「Kaka…」 · 취업규칙 문안 카드 「📋 복사」 잘림.
+- 고친 뒤 420화면(23앱 × 360·411px) 모두 **옆넘침 0 · 화면밖 0**. 남은 「짓눌림」은 일부러 «…» 로 줄인 자리(달력 칩·담당 이름표 등)이고,
+  「작은단추」는 앞선 방이 정한 20px ☐ 등이다 — 현황판 «남은 일» 칸 참고.
+
 ### PC 도 바뀐 것 (일부러)
 - 메일 첫 화면(위 흠을 고친 결과 — 원래 뜻대로 전체메일이 열린다).
 - 사진첩 서류 카드(미리보기가 카드를 덮던 결함 — 원래 설계대로 종이 카드).
