@@ -1222,7 +1222,7 @@
     + '.pcf-menu .pcf-mob{display:none}'
     + '@media(max-width:700px){'
     + '.pcf-lbody{max-height:none;overflow:visible}.pcf-lt{min-width:0}.pcf-lt thead th{position:static}'
-    + '.pcf-lt td{padding:9px 4px;font-size:13.5px}.pcf-lt .pcf-lc{width:34px}.pcf-lt .pcf-lc input{width:20px;height:20px}'
+    + '.pcf-lt td{padding:9px 4px;font-size:13.5px}.pcf-lt .pcf-lc{width:34px}.pcf-lt .pcf-lc input{width:24px;height:24px}'
     + '.pcf-lt .pcf-ln2{font-variant-numeric:tabular-nums}.pcf-grip{display:none}'
     + '.pcf-msel{margin-bottom:8px}.pcf-lh{gap:6px}.pcf-lh .pcf-crow{gap:6px}.pcf-seg button{padding:7px 4px}'
     + '.pcf-stepbox.in{flex-direction:row;align-items:center;gap:8px}.pcf-stepbox.in .pcf-seg{flex:1;min-width:0}'
@@ -1238,11 +1238,13 @@
     + '.pcf-mbg{padding:0;align-items:stretch}.pcf-m{width:100%!important;max-width:100%;max-height:none;height:100%;border-radius:0}'
     + '.pcf-mh{flex-wrap:wrap;gap:2px 8px;padding:10px 12px}.pcf-mh>span{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
     + '.pcf-mh>small{order:3;flex:1 1 100%;margin:0!important;font-size:11.5px}'
+    /* 창 «×» 닫기 — 글자 하나 폭(12px)이라 손가락으로 잘 안 눌렸다(2026-10-18 폰화면관리 실측 12×23). 누르는 자리만 넓힌다 */
+    + '.pcf-mh>button[aria-label="닫기"]{min-width:40px;min-height:36px;margin:-6px -8px -6px 0}'
     + '.pcf-mb{padding:12px}'
     + '.pcf-mf{flex-wrap:wrap;justify-content:stretch;gap:6px;padding:8px 10px}.pcf-mf>*{flex:1 1 auto;justify-content:center}'
     + '.pcf-mf>.pcf-muted{order:-2;flex-basis:100%;margin:0!important;font-size:11.5px}.pcf-mf select{flex-basis:100%}'
     + '.pcf-mf .pcf-b{padding:9px 8px;font-size:12.5px}.pcf-mf .pcf-go{order:-1;flex-basis:100%;padding:12px;font-size:15px;border-radius:8px}.pcf-mf .pcf-mclose{display:none}'
-    + '.pcf-vrow{grid-template-columns:22px 18px 84px minmax(0,1fr) 54px}.pcf-vrow input[type=checkbox]{width:18px;height:18px;margin:0}'
+    + '.pcf-vrow{grid-template-columns:24px 18px 82px minmax(0,1fr) 54px}.pcf-vrow input[type=checkbox]{width:24px;height:24px;margin:0}'
     + '}';
 
   var _toastT = null;

@@ -114,9 +114,9 @@ test('③ 둘째 줄은 «말을 하는 값»만 — 기관·금액·마감이 �
   r.api.draw();
   const h = r.el('tb').innerHTML;
   const A = rowOf(h, '노무 진단 용역'), B = rowOf(h, '빈 칸 공고'), C = rowOf(h, '지원한 공고'), D = rowOf(h, '지난 공고');
-  /* 1줄: 이름 다음에 남은 날 · 2줄: 기관·금액 */
+  /* 1줄: 이름 다음에 남은 날 · 2줄: 금액·기관 (2026-10-18 — 줄이 넘치면 끝이 잘리므로 잘려도 되는 기관을 뒤로) */
   assert.match(A, /<b>노무 진단 용역<\/b><span class="m-only mdd"><span class="tag[^"]*">D-\d+<\/span><\/span>/);
-  assert.match(msubOf(A), /<span class="mog">한국가나다공단<\/span><span>4,500만원<\/span>/);
+  assert.match(msubOf(A), /<span class="mpr">4,500만원<\/span><span class="mog">한국가나다공단<\/span>/);
   assert.doesNotMatch(msubOf(A), /새 공고/, '기본 상태(새 공고)는 둘째 줄을 채우지 않는다');
   /* 없는 값은 안 그린다 — 자리만 먹는 「-」를 두지 않는다 */
   assert.doesNotMatch(B, /class="m-only mdd"/, '마감을 모르는데 남은 날 자리를 그렸습니다');
@@ -152,7 +152,7 @@ test('③-3 발주 예정 — 1줄 끝은 예정월, 둘째 줄 상태는 짧게
   const m = /<span class="tag [a-z]+ mst" title="([^"]*)">([^<]*)<\/span>/.exec(msubOf(row));
   assert.ok(m, '둘째 줄에 상태가 없습니다');
   assert.ok(m[2].length < m[1].length && m[1].indexOf(m[2]) === 0, '폰 상태는 전문의 앞부분이어야 합니다: ' + m[2] + ' / ' + m[1]);
-  assert.match(msubOf(row), /수의계약[\s\S]*<span class="mog">가나다구청<\/span><span>1,200만원<\/span>/);
+  assert.match(msubOf(row), /수의계약[\s\S]*<span class="mpr">1,200만원<\/span><span class="mog">가나다구청<\/span>/);
 });
 
 test('④ 거르개 세 줄 — 검색·별표 → (끊기) → 거르개 → (끊기) → 건수·표시·받기', () => {

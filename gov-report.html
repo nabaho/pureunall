@@ -252,7 +252,75 @@ button.td-biz.td-ok{border-left-color:var(--green)}
 #alerts a{color:var(--blue-ink)}
 @media (max-width:1500px){ .grid{grid-template-columns:clamp(280px,24vw,360px) minmax(0,1fr)} .side{grid-column:1 / -1;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:12px} .side section{margin-bottom:0} }
 @media (max-width:1100px){ .grid{grid-template-columns:220px minmax(0,1fr)} .side{grid-column:1 / -1} }
-@media (max-width:900px){ .grid{grid-template-columns:1fr} .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} .bizp{position:static;max-height:none;overflow:visible} }
+/* ⚠ minmax(0,1fr) — 그냥 1fr 은 «가장 넓은 표만큼» 칸이 늘어난다. 폰(360px)에서 칸이 1052px 로 늘어 페이지 전체가 옆으로 밀렸다(2026-10-18 폰화면관리) */
+@media (max-width:900px){ .grid{grid-template-columns:minmax(0,1fr)} .kpis{grid-template-columns:repeat(3,minmax(0,1fr))} .bizp{position:static;max-height:none;overflow:visible} }
+/* ══ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 폰 폭(760px 이하)에서만. PC 는 그대로 ══
+   ① 머리 한 줄 — 이름·나·로그아웃(두 줄이던 것)
+   ② 왼쪽 «사업 대시보드»가 폰에서는 맨 위에 세로로 쌓여 첫 화면을 통째로(800px) 먹었다 →
+     사업 카드는 «옆으로 미는 한 줄»(요약 숫자가 맨 앞). 끌어서 순서 바꾸기는 폰에서 안 되므로 그 안내도 숨긴다.
+   ③ 숫자 칸 여섯 — 두 줄 높은 상자 → 한 줄 딱지(숫자·이름 나란히). 누르면 거르는 것은 그대로.
+   ④ 현황판 표(9칸, 폰에서 1050px) → 줄마다 «두 줄 카드»
+       1줄: □·번호·업체 … 상태 딱지(초안 N일 전·종료 N일 등)
+       2줄: 사업 · 담당 · 회차 … [작성][목차]
+     연도 칸은 위 연도 단추와 같은 값이라, 단계 막대는 상태 딱지와 같은 말이라 폰에서는 뺀다(말 없는 값은 안 그림).
+     마지막 고침은 상태 딱지의 «N일 전»이 같은 말을 한다.
+   ⑤ 거르개 — 고르기 셋이 한 줄, 찾기 칸 16px(아이폰이 누를 때 화면을 키우지 않게 — .filters 규칙이 16px 규칙보다 셌다)
+   ⑥ 서류 체크표(사업을 고르면) — 옆으로 밀어도 업체 칸은 왼쪽에 붙어 있다
+   ⑦ 사업 대시보드 숫자 넷·단계 막대 칸이 2열로 쌓여 업체 목록이 500px 아래로 밀렸다 → 한 줄 딱지·옆으로 미는 한 줄
+   ⑧ 목차·칸 창 머리의 단추(복사·닫기)가 «복/사» 두 줄로 접혔다
+   tests/govreport-phone.test.js 가 지킨다. */
+@media (max-width:760px){
+  .top{flex-wrap:nowrap;gap:8px;padding:8px 12px}
+  .top h1{font-size:15px;white-space:nowrap;flex-shrink:0}
+  #who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  #outBtn{flex-shrink:0;padding:5px 10px}
+  main{padding:10px 10px 60px}
+  .bizp section{padding:10px}
+  .bz-hint{display:none}
+  .bizp div.bz-g+div.bz-g{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px}
+  .bizp div.bz-g+div.bz-g>.bz-sum{flex:0 0 auto;flex-direction:column;flex-wrap:nowrap;justify-content:center;gap:2px;margin:0;padding:0 2px;white-space:nowrap}
+  .bizp div.bz-g+div.bz-g>.days{flex:1 0 100%}
+  .bizp .bz-card{flex:0 0 min(64%,200px);margin:0}
+  .kpis{gap:6px;margin-bottom:10px}
+  .kpi{display:flex;align-items:baseline;gap:5px;min-width:0;padding:5px 8px;white-space:nowrap;overflow:hidden}
+  .kpi b{display:inline;font-size:16px}
+  .kpi span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .filters{gap:6px}
+  .filters select{flex:1 1 28%;min-width:0}
+  .filters select,.filters input[type=search]{font-size:16px}
+  .filters input[type=search]{flex:1 1 140px;min-width:0}
+  #tbl{background:transparent;border:0;overflow:visible}
+  #tbl table,#tbl tbody{display:block}
+  #tbl thead{display:none}
+  #rows tr{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:6px}
+  #rows tr.ng{margin-top:12px}
+  #rows tr::after{content:"";order:3;flex:0 0 100%;height:0}
+  #rows td{display:block;padding:0;border:0;min-width:0}
+  #rows td:empty{display:none}
+  #rows td.co{order:1;flex:1 1 0;max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #rows td:nth-child(6){order:2;flex:0 1 auto;max-width:58%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #rows td.ty{order:4;flex:0 1 auto;max-width:32%;font-size:12px;color:var(--mute)}
+  #rows td:nth-child(4){order:5;flex:1 1 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;color:var(--mute)}
+  #rows td.num{order:6;font-size:12px}
+  #rows td:nth-child(3),#rows td:nth-child(7),#rows td:nth-child(8){display:none}
+  #rows td:nth-child(9){order:9;display:flex;gap:4px;flex-shrink:0;margin-left:auto}
+  .docs{padding:8px}
+  .docs table td.co,.docs table thead th:first-child{position:sticky;left:0;z-index:1;background:var(--card);max-width:120px}
+  .docs table thead th:first-child{background:var(--bg)}
+  /* ⑦ 사업 대시보드(사업을 고르면) — 숫자 넷은 한 줄 딱지, 단계 막대 칸은 옆으로 미는 한 줄. 업체 점 줄은 이름을 줄여 한 줄에 */
+  .dsh{padding:8px}
+  .dsh-ks{gap:6px}
+  .dsh-k{display:flex;align-items:baseline;gap:5px;min-width:0;padding:5px 8px;white-space:nowrap;overflow:hidden}
+  .dsh-k b{display:inline;font-size:16px}
+  .dsh-k span{min-width:0;overflow:hidden;text-overflow:ellipsis}
+  .dsh-p{display:flex;overflow-x:auto;padding-bottom:4px}
+  .dsh-pc{flex:0 0 min(46%,170px)}
+  .dsh-c{min-width:0;max-width:36%}
+  /* ⑧ 창 머리 단추(복사·닫기)가 긴 업체 이름에 눌려 «복/사» 두 줄로 접혔다 */
+  .toc{padding:16px 8px}
+  .toc-top>b{min-width:0}
+  .toc-top>button{flex-shrink:0;white-space:nowrap}
+}
 @media (max-width:640px){ input,select{font-size:16px} }
 /* 폰에서 입력칸을 누를 때 화면이 확대되지 않게(tests/phone-input-zoom) */
 @media (max-width:768px){ input,select,textarea{font-size:16px} }
@@ -325,7 +393,7 @@ button.td-biz.td-ok{border-left-color:var(--green)}
      (레코드 모양이 아니라 관문을 지난다 — 부분 update 도 관문이 막으므로 쓰지 않는다). -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=30"></script>
+<script src="js/pu-appbar.js?v=31"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
 <script>

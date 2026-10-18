@@ -324,7 +324,8 @@ table.cmp td{white-space:nowrap}
   #pgFeed .stc,#pgPlan .stc{flex:0 0 28px;width:auto}
   #pgFeed .chk,#pgPlan .chk{flex:0 0 32px;width:auto}
   #pgFeed .rn,#pgPlan .rn{flex:0 0 26px;width:auto;padding-right:5px}
-  .row-chk,#fSelAll,#pSelAll{width:20px;height:20px}
+  /* ☐ 는 손끝 크기로(2026-10-18 폰화면관리 — 20px 였고, 컨설턴트 모집 머리 ☐ 는 이름표가 없어 13px 그대로였다) */
+  .row-chk,#fSelAll,#pSelAll,th.chk>input[type=checkbox]{width:24px;height:24px}
   #pgFeed thead th:nth-child(n+4):not(:nth-child(6)),#pgPlan thead th:nth-child(n+4):not(:nth-child(6)){display:none}
   #pgFeed thead th:nth-child(6),#pgPlan thead th:nth-child(6){flex:1 1 0}
   #pgFeed tr.fr>td:not(.stc):not(.chk):not(.rn):not(.nm),#pgPlan tr.fr>td:not(.stc):not(.chk):not(.rn):not(.nm){display:none}
@@ -333,7 +334,7 @@ table.cmp td{white-space:nowrap}
   td.nm>.tag,td.nm>.orgrec,td.nm>.kwt{display:none}
   td.nm>b{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px}
   td.nm>.mdd{display:inline-flex;flex:none;font-size:11.5px}
-  td.nm>.msub{display:flex;flex:1 0 100%;min-width:0;align-items:center;gap:6px;overflow:hidden;font-size:11.5px;color:var(--text-mute)}
+  td.nm>.msub{display:flex;flex:1 0 100%;min-width:0;align-items:center;gap:4px;overflow:hidden;font-size:11.5px;color:var(--text-mute)}   /* 간격 4px — 딱지 둘 + 금액 + 기관이 360px 에서 5~19px 넘쳤다(2026-10-18 실측) */
   .msub>*{flex:none}
   .msub .mog,.msub .mst{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .msub .mog{flex-shrink:9;min-width:2.5em}   /* 넘치면 기관이 먼저 줄어든다(전문은 줄을 눌러 상세) */
@@ -512,7 +513,7 @@ table.cmp td{white-space:nowrap}
      ⚠ pu-back 은 «싣기만» 하면 없는 것과 같다 — 아래에서 guard 로 «등록»해야 한다. -->
 <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=30"></script>
+<script src="js/pu-appbar.js?v=31"></script>
 <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <!-- 상단에 «로그인한 사람 이름» — 머리줄 #who 자리에 그린다 (대표 지시 2026-09-29 「로그인시 모든 앱 상단에 본인의 이름이 나와야 된다」) -->
@@ -895,8 +896,9 @@ function planMobile(r, st, stc, lk){
   var short = String(st.label).replace(/ 발주 예정$/,'').replace(/ · 아직 공고 없음$/,'');
   return (when ? '<span class="m-only mdd sml">'+esc(when)+'</span>' : '')
     +'<div class="m-only msub"><span class="tag '+stc+' mst" title="'+esc(st.label)+'">'+esc(short)+'</span>'+soleTag(r)
+    /* 금액을 기관보다 «앞»에 — 줄이 넘치면 끝이 잘리는데, 잘려도 되는 것은 기관(전문은 상세)이고 금액은 아니다 (폰화면관리 2026-10-18) */
+    +(r.prc ? '<span class="mpr">'+Math.round(r.prc/10000).toLocaleString()+'만원</span>' : '')
     +(r.org ? '<span class="mog">'+esc(r.org)+'</span>' : '')
-    +(r.prc ? '<span>'+Math.round(r.prc/10000).toLocaleString()+'만원</span>' : '')
     +(lk.length ? '<button class="btn sm" onclick="planGoFeed(\''+esc(lk[0].id)+'\')">공고 보기</button>' : '')+'</div>';
 }
 /* 별표만 보기 — 보기 고르개(pView)의 「★ 관심」을 켜고 끈다(한 값). 끄면 처음 보기(공고 전 · 앞으로)로 */
@@ -1037,8 +1039,8 @@ function feedMobile(r, mt){
     : (r.type && r.type!=='새 공고' && r.type!=='관심' && !(r.type==='지나감' && past) ? '<span class="tag">'+esc(r.type)+'</span>' : '');
   return (d!=null ? '<span class="m-only mdd">'+dchip(r)+'</span>' : '')
     +'<div class="m-only msub">'+st+soleTag(r)
+    +(r.prc ? '<span class="mpr">'+_won(r.prc)+'</span>' : '')      // 금액이 기관보다 앞 — 넘치면 기관이 잘린다(위 planMobile 과 같다)
     +(r.org ? '<span class="mog">'+esc(r.org)+'</span>' : '')
-    +(r.prc ? '<span>'+_won(r.prc)+'</span>' : '')
     +matchChip(mt)+orgRecTag(r)+'</div>';
 }
 /* 공고 목록 — 대표 지시 2026-10-03

@@ -152,6 +152,35 @@ table.mx td.dot.yes{background:var(--green-bg)}
 #lock p{color:var(--mute);font-size:13px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
 #toast.on{opacity:1}
+/* ══ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 폰 폭(760px 이하)에서만. PC 는 그대로 ══
+   ① 머리가 «여섯 줄»(이름·부제·나/단추·탭 세 줄)로 늘 붙어 다니며 화면의 1/4(218px)을 먹었다
+     → 이름·나·단추 한 줄(부제는 숨김) + 탭은 «옆으로 미는 한 줄»(★ 노무사 직접 사업만 스위치는 탭 끝).
+   ② ☐ 고르기 칸이 11~13px — 손가락으로 못 누른다. 손가락 크기로(목록 칸도 그만큼 넓힌다). ☆(노무사 직접 사업 표시)도.
+   ③ 찾기 칸이 고르기 칸에 눌려 한 글자 폭(「⏳ 확인할 조건」)이었다 → 찾기는 한 줄을 다 쓰고, 고르기는 둘씩.
+   ④ 한눈 표 — 왼쪽에 붙는 사업장 칸이 폭을 다 먹어 사업 칸(● 후보)이 화면 밖이었다 → 사업장 칸을 줄인다(… + 말풍선).
+   ⑤ 목록과 상세가 위아래로 쌓이는 폭(860px 이하)에서는 고른 회사·사업으로 내려 준다(pickedShow) — 상세가 목록 아래
+     화면 밖에 그려져, 눌러도 아무 일 없는 것처럼 보였다.
+   tests/govaid-phone.test.js 가 지킨다. */
+@media (max-width:760px){
+  .top{flex-wrap:nowrap;gap:8px;padding:8px 12px}
+  .top h1{font-size:15px;white-space:nowrap;flex-shrink:0}
+  .top .sub{display:none}
+  #who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .top button{flex-shrink:0}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;gap:0;padding:0 6px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex-shrink:0;padding:8px 9px}
+  .tabs .starsw{flex-shrink:0;margin-left:8px;padding-right:6px}
+  main{padding:10px 8px 40px}
+  .co-head,.li.co-row{grid-template-columns:26px 26px minmax(0,1fr) 42px 34px}
+  #coList input[type=checkbox],table.t th.c input[type=checkbox],table.t td.c input[type=checkbox]{width:24px;height:24px;margin:0}
+  button.star{min-width:26px;min-height:26px;font-size:16px}
+  .bar input[type=search]{flex:1 1 100%!important;max-width:none!important;min-width:0}
+  .bar select{flex:1 1 40%;min-width:0}
+  table.mx .stk{max-width:112px}
+  #coDetail,#pDetail{scroll-margin-top:96px}
+}
+@media (min-width:761px) and (max-width:860px){ #coDetail,#pDetail{scroll-margin-top:150px} }
 </style>
 </head>
 <body>
@@ -263,7 +292,7 @@ table.mx td.dot.yes{background:var(--green-bg)}
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=30"></script>
+<script src="js/pu-appbar.js?v=31"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
 <script>
@@ -977,9 +1006,14 @@ function clickReview(t){
   if((b=t.closest('[data-foldoth]'))){ OPEN_OTH=!OPEN_OTH; drawCoDetail(); drawBulk(); return true; }
   if((b=t.closest('[data-foldno]'))){ OPEN_NO=!OPEN_NO; drawCoDetail(); drawBulk(); return true; }
   /* 회사·사업을 바꾸면 그 화면 표의 고르기를 푼다 — 고르기 열쇠에 회사·사업이 없어, 남겨 두면 새 화면의 쌍에 저장된다 */
-  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; OPEN_OTH=false; draw(); return true; }
-  if((b=t.closest('[data-pg]'))){ dropPicked(['progCand','progUnk']); CUR_PROG=b.getAttribute('data-pg'); draw(); return true; }
+  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; OPEN_OTH=false; draw(); pickedShow('coDetail'); return true; }
+  if((b=t.closest('[data-pg]'))){ dropPicked(['progCand','progUnk']); CUR_PROG=b.getAttribute('data-pg'); draw(); pickedShow('pDetail'); return true; }
   return false;
+}
+/* 폰(860px 이하 — 목록과 상세가 위아래로 쌓인다): 고른 회사·사업의 상세는 목록 «아래 화면 밖»에 그려진다.
+   그대로 두면 눌러도 아무 일 없는 것처럼 보였다(2026-10-18 폰화면관리) → 상세로 내려 준다. 넓은 화면은 옆에 있으니 그대로 */
+function pickedShow(id){
+  try{ if(!window.matchMedia||!window.matchMedia('(max-width:860px)').matches) return; var el=$(id); if(el&&el.scrollIntoView) el.scrollIntoView({block:'start'}); }catch(e){}
 }
 function rowClick(name,id){
   if(name==='dict'){ openEditor(id); return; }

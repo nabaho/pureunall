@@ -443,9 +443,14 @@
     try { return window.sessionStorage.getItem(SESSION_KEY) || ''; } catch (_) { return ''; }
   }
 
+  /* state — ok(평소) · busy(확인 중) · done(누른 뒤 결과를 잠깐 알림) · has(새 버전 있음).
+     ★ 폰에서는 앱바(js/pu-appbar.js)가 «ok» 일 때만 이 단추를 숨기고 손잡이 목록의 「🔄 새 버전 확인」 줄로 대신한다
+       (대표 지시 2026-10-18 「폰화면관리」). 그래서 상태를 data-state 로 «겉에» 적는다 —
+       확인 중·결과·새 버전은 숨기면 안 된다(눌렀는데 아무 반응 없는 화면이 된다). */
   function setFab(state, text) {
     if (!fab) return;
     fabState = state;
+    fab.setAttribute('data-state', state);
     var color = state === 'has' ? '#1e40af' : (state === 'busy' ? '#64748b' : '#15803d');
     var bg = state === 'has' ? '#1e40af' : 'rgba(255,255,255,.94)';
     var fg = state === 'has' ? '#fff' : '#475569';
@@ -466,11 +471,11 @@
         if (!applyNow()) setFab('has', '저장 끝나면 바로');   // 저장 중이면 기다린다
         return;
       }
-      setFab('ok', '최신입니다');
-      window.setTimeout(function () { if (fabState === 'ok') setFab('ok', '최신'); }, 1600);
+      setFab('done', '최신입니다');
+      window.setTimeout(function () { if (fabState === 'done') setFab('ok', '최신'); }, 1600);
     }).catch(function () {
-      setFab('ok', '확인 실패');
-      window.setTimeout(function () { if (fabState === 'ok') setFab('ok', '최신'); }, 1600);
+      setFab('done', '확인 실패');
+      window.setTimeout(function () { if (fabState === 'done') setFab('ok', '최신'); }, 1600);
     });
   }
 

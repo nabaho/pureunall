@@ -24,6 +24,8 @@
   function hm(ms) { return new Date(ms + 9 * 3600e3).toISOString().slice(5, 16).replace('T', ' '); }
 
   /* ── ① 광고 표 ── */
+  /* 칸마다 data-k(칸 이름)를 단다 — 폰(pu-signboard.html 의 640px 이하)에서 표를 «줄마다 두 줄 카드»로 펴는 손잡이다
+     (대표 지시 2026-10-18 「폰화면관리」). class 는 그대로 둔다(nw = 한 줄·말줄임). 표마다 data-name 도 같은 뜻. */
   /* 이 광고가 «올린 판»에 어떻게 올라가 있나 */
   function publishState(ad, pubById) {
     var snap = C.snapshotAd(ad), was = pubById[ad.id], enabled = ad.enabled !== false;
@@ -45,12 +47,12 @@
       h += '<tr data-id="' + esc(a.id) + '"><td class="c"><input type="checkbox" data-ck="' + esc(a.id) + '"' + (sel[a.id] ? ' checked' : '') + '></td>'
         + '<td class="n">' + (i + 1) + '</td>'
         + '<td class="ti"><a href="#" data-edit="' + esc(a.id) + '" title="' + esc(a.title) + '">' + esc(a.title || '(제목 없음)') + '</a></td>'
-        + '<td class="nw">' + esc(C.KINDS[a.kind] || '?') + '</td>'
-        + '<td class="nw" title="' + esc(period) + '">' + esc(period) + '</td>'
-        + '<td class="nw"><span class="pill st-' + st + '">' + esc(C.STATUS_KO[st]) + '</span></td>'
-        + '<td class="nw"><span class="pill ps-' + ps.k + '">' + esc(ps.t) + '</span></td>'
-        + '<td class="nw"><button class="sm" data-mv="up:' + esc(a.id) + '"' + (i === 0 ? ' disabled' : '') + '>▲</button> <button class="sm" data-mv="down:' + esc(a.id) + '"' + (i === list.length - 1 ? ' disabled' : '') + '>▼</button></td>'
-        + '<td class="nw"><label class="ck" title="켜면 전광판에 낸다 · 끄면 내린다"><input type="checkbox" data-en="' + esc(a.id) + '"' + (a.enabled !== false ? ' checked' : '') + '></label></td></tr>';
+        + '<td class="nw" data-k="kind">' + esc(C.KINDS[a.kind] || '?') + '</td>'
+        + '<td class="nw" data-k="per" title="' + esc(period) + '">' + esc(period) + '</td>'
+        + '<td class="nw" data-k="st"><span class="pill st-' + st + '">' + esc(C.STATUS_KO[st]) + '</span></td>'
+        + '<td class="nw" data-k="pub"><span class="pill ps-' + ps.k + '">' + esc(ps.t) + '</span></td>'
+        + '<td class="nw" data-k="mv"><button class="sm" data-mv="up:' + esc(a.id) + '"' + (i === 0 ? ' disabled' : '') + '>▲</button> <button class="sm" data-mv="down:' + esc(a.id) + '"' + (i === list.length - 1 ? ' disabled' : '') + '>▼</button></td>'
+        + '<td class="nw" data-k="en"><label class="ck" title="켜면 전광판에 낸다 · 끄면 내린다"><input type="checkbox" data-en="' + esc(a.id) + '"' + (a.enabled !== false ? ' checked' : '') + '></label></td></tr>';
     });
     return h + '</tbody></table></div>';
   }
@@ -163,12 +165,12 @@
   function historyTable(list, currentVersion) {
     var rows = C.toArr(list).filter(Boolean).sort(function (a, b) { return Number(b.version) - Number(a.version); });
     if (!rows.length) return '<div class="empty">아직 올린 기록이 없습니다.</div>';
-    var h = '<div class="scroll"><table class="t" data-viewonly="1"><thead><tr><th>판</th><th>올린 사람</th><th>올린 때</th><th>광고 수</th><th>메모</th><th></th></tr></thead><tbody>';
+    var h = '<div class="scroll"><table class="t" data-viewonly="1" data-name="hist"><thead><tr><th>판</th><th>올린 사람</th><th>올린 때</th><th>광고 수</th><th>메모</th><th></th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var cur = Number(r.version) === Number(currentVersion);
-      h += '<tr><td class="nw">' + esc(r.version) + '번' + (cur ? ' <span class="pill ps-ok">지금</span>' : '') + '</td><td class="nw">' + esc(r.publishedBy || '') + '</td><td class="nw">' + esc(hm(r.publishedAt)) + '</td>'
-        + '<td class="nw">' + C.toArr(r.ads).length + '</td><td class="nw" title="' + esc(r.note || '') + '">' + esc(r.note || '') + '</td>'
-        + '<td class="nw"><button class="sm" data-hist-view="' + esc(r.version) + '">광고 내용</button>' + (cur ? '' : ' <button class="sm" data-rollback="' + esc(r.version) + '">이 판으로 되돌리기</button>') + '</td></tr>';
+      h += '<tr><td class="nw" data-k="ver">' + esc(r.version) + '번' + (cur ? ' <span class="pill ps-ok">지금</span>' : '') + '</td><td class="nw" data-k="by">' + esc(r.publishedBy || '') + '</td><td class="nw" data-k="at">' + esc(hm(r.publishedAt)) + '</td>'
+        + '<td class="nw" data-k="cnt">' + C.toArr(r.ads).length + '</td><td class="nw" data-k="memo" title="' + esc(r.note || '') + '">' + esc(r.note || '') + '</td>'
+        + '<td class="nw" data-k="act"><button class="sm" data-hist-view="' + esc(r.version) + '">광고 내용</button>' + (cur ? '' : ' <button class="sm" data-rollback="' + esc(r.version) + '">이 판으로 되돌리기</button>') + '</td></tr>';
     });
     return h + '</tbody></table></div>';
   }
@@ -184,26 +186,26 @@
   function logTable(list) {
     var rows = C.toArr(list);
     if (!rows.length) return '<div class="empty">조건에 맞는 기록이 없습니다.</div>';
-    var h = '<div class="scroll"><table class="t" data-viewonly="1"><thead><tr><th>시각</th><th>누가</th><th>무엇을</th><th>광고</th><th>내용</th><th></th></tr></thead><tbody>';
+    var h = '<div class="scroll"><table class="t" data-viewonly="1" data-name="log"><thead><tr><th>시각</th><th>누가</th><th>무엇을</th><th>광고</th><th>내용</th><th></th></tr></thead><tbody>';
     rows.forEach(function (r) {
       var content = r.after ? C.adSummary(r.after) : (r.version != null ? r.version + '번 판' + (r.count != null ? ' · 광고 ' + r.count + '건' : '') + (r.note ? ' · ' + r.note : '') : s(r.note));
       var who = r.byName ? r.byName + ' (' + s(r.by) + ')' : s(r.by);
-      h += '<tr><td class="nw">' + esc(C.kstText(r.at)) + '</td><td class="nw" title="' + esc(who) + '">' + esc(r.byName || r.by || '') + '</td>'
-        + '<td class="nw"><span class="pill act-' + esc(r.action) + '">' + esc(C.ACTION_KO[r.action] || r.action) + '</span></td>'
-        + '<td class="nw" title="' + esc(r.title) + '">' + esc(r.title) + '</td><td class="nw" title="' + esc(content) + '">' + esc(content) + '</td>'
-        + '<td class="nw">' + (r.after ? '<button class="sm" data-log-view="' + esc(r.id) + '">그때 내용</button>' : (r.version != null ? '<button class="sm" data-hist-view="' + esc(r.version) + '">그 판 내용</button>' : '')) + '</td></tr>';
+      h += '<tr><td class="nw" data-k="at">' + esc(C.kstText(r.at)) + '</td><td class="nw" data-k="by" title="' + esc(who) + '">' + esc(r.byName || r.by || '') + '</td>'
+        + '<td class="nw" data-k="act"><span class="pill act-' + esc(r.action) + '">' + esc(C.ACTION_KO[r.action] || r.action) + '</span></td>'
+        + '<td class="nw" data-k="ti" title="' + esc(r.title) + '">' + esc(r.title) + '</td><td class="nw" data-k="body" title="' + esc(content) + '">' + esc(content) + '</td>'
+        + '<td class="nw" data-k="btn">' + (r.after ? '<button class="sm" data-log-view="' + esc(r.id) + '">그때 내용</button>' : (r.version != null ? '<button class="sm" data-hist-view="' + esc(r.version) + '">그 판 내용</button>' : '')) + '</td></tr>';
     });
     return h + '</tbody></table></div>';
   }
   function deletedTable(ads) {
     var rows = C.deletedAds(ads);
     if (!rows.length) return '<div class="empty">지운 광고가 없습니다.</div>';
-    var h = '<div class="scroll"><table class="t" data-viewonly="1"><thead><tr><th>광고 이름</th><th>종류</th><th>내용</th><th>지운 때</th><th>지운 사람</th><th></th></tr></thead><tbody>';
+    var h = '<div class="scroll"><table class="t" data-viewonly="1" data-name="del"><thead><tr><th>광고 이름</th><th>종류</th><th>내용</th><th>지운 때</th><th>지운 사람</th><th></th></tr></thead><tbody>';
     rows.forEach(function (a) {
       var sm = C.adSummary(a);
-      h += '<tr><td class="ti" title="' + esc(a.title) + '">' + esc(a.title || '(이름 없음)') + '</td><td class="nw">' + esc(C.KINDS[a.kind] || '?') + '</td><td class="nw" title="' + esc(sm) + '">' + esc(sm) + '</td>'
-        + '<td class="nw">' + esc(a.deletedAt ? C.kstText(a.deletedAt) : '') + '</td><td class="nw">' + esc(a.deletedBy) + '</td>'
-        + '<td class="nw"><button class="sm" data-ad-view="' + esc(a.id) + '">내용</button> <button class="sm" data-restore="' + esc(a.id) + '">되살리기</button></td></tr>';
+      h += '<tr><td class="ti" title="' + esc(a.title) + '">' + esc(a.title || '(이름 없음)') + '</td><td class="nw" data-k="kind">' + esc(C.KINDS[a.kind] || '?') + '</td><td class="nw" data-k="body" title="' + esc(sm) + '">' + esc(sm) + '</td>'
+        + '<td class="nw" data-k="at">' + esc(a.deletedAt ? C.kstText(a.deletedAt) : '') + '</td><td class="nw" data-k="by">' + esc(a.deletedBy) + '</td>'
+        + '<td class="nw" data-k="btn"><button class="sm" data-ad-view="' + esc(a.id) + '">내용</button> <button class="sm" data-restore="' + esc(a.id) + '">되살리기</button></td></tr>';
     });
     return h + '</tbody></table></div>';
   }

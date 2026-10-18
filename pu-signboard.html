@@ -103,6 +103,92 @@ main{padding:12px 16px 40px}
 #lock p{color:var(--mute);font-size:13px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60;max-width:90vw}
 #toast.on{opacity:1}
+/* ── 폰: 한 화면에 (대표 지시 2026-10-18 「폰화면관리」) ──
+   고치기 전(360·411px 실측, 가짜 광고 26건·올린 판 12·활동 기록 40건):
+     머리(세 줄)·올리기 띠(두 줄)·탭(두 줄)이 첫 화면 절반(목록 시작 약 360px)을 먹었고,
+     표 넷(광고·올린 기록·지운 광고·활동 기록)이 모두 옆으로 미는 상자라 ☐·번호·제목만 보였다 —
+     켜기·상태·전광판 반영·되돌리기·되살리기·«그때 내용» 단추는 옆으로 밀어야 보였다.
+   ★ 고친 방식 — 줄마다 «두 줄 카드». 칸 손잡이는 js/pu-signboard-view.js 가 다는 data-k(칸 이름)다.
+     광고: 1줄 ☐ · 번호 · 제목 · ▲▼ · 켜기 / 2줄 상태 · 전광판 반영 · 종류 · 기간(넘치면 … , 전문은 title)
+     올린 기록: 1줄 판(지금) · 올린 때 · 올린 사람 · 광고 N건 / 2줄 메모 · 단추
+     활동 기록: 1줄 시각 · 무엇을 · 광고 / 2줄 누가 · 내용 · 단추      지운 광고: 1줄 이름 · 단추 / 2줄 종류 · 내용 · 지운 때·사람
+   ⚠ 광고 표의 ☐ 고르기 칸과 번호는 폰에서도 뺄 수 없다(CLAUDE.md «자료 목록의 맨 왼쪽» 규칙).
+   ⚠ 탭은 한 줄 — 넘치면 옆으로 민다(접지 않는다). 숨긴 칸은 없다 — 머리줄(th)만 접는다. */
+.phone-only{display:none}
+@media (max-width:640px){
+  .phone-only{display:inline}
+  .wide-only{display:none}
+  .top{padding:7px 12px;gap:6px;flex-wrap:nowrap}
+  .top h1{font-size:16px;white-space:nowrap}
+  .top .sub,.top .sp{display:none}
+  #who{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .top button{flex:0 0 auto}
+  #pendBar{flex-wrap:nowrap;gap:8px;padding:6px 12px}
+  #pendBar .sp{display:none}
+  #pendTxt{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12.5px}
+  #pendBar button{flex:0 0 auto}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;gap:0;padding:0 6px}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex:0 0 auto;padding:8px 6px;font-size:13px}
+  main{padding:10px 10px 60px}
+  .bar{padding:8px}
+  .bar .hint{flex:1 1 0;min-width:0}
+  .bulk{flex-wrap:wrap}
+  /* 표 → 줄마다 카드 (머리줄 th 는 접는다 — 광고 표만 ☐(보이는 것 모두)·번호를 남긴다) */
+  .t[data-name],.t[data-name] thead,.t[data-name] tbody{display:block;width:100%}
+  .t[data-name] thead{display:none}
+  .t[data-name=ads] thead{display:block}
+  .t[data-name=ads] thead tr{display:flex;align-items:center}
+  .t[data-name=ads] thead th{display:none}
+  .t[data-name=ads] thead th.c{display:block;width:36px;padding:6px 0}
+  .t[data-name=ads] thead th.n{display:block;width:auto;text-align:left;padding:6px 0}
+  .t[data-name] tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;position:relative;padding:7px 10px;border-bottom:1px solid var(--line)}
+  .t[data-name] tbody tr::after{content:'';flex:0 0 100%;height:0;order:5}
+  .t[data-name] tbody td{border:0;padding:0;max-width:none}
+  .t[data-name] tbody td[data-k="ti"],.t[data-name] tbody td.ti{order:3;flex:1 1 0;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis}
+  .t[data-name] tbody td[data-k="body"],.t[data-name] tbody td[data-k="memo"],.t[data-name] tbody td[data-k="per"]{order:7;flex:1 1 0;min-width:0;color:var(--ink2);overflow:hidden;text-overflow:ellipsis}
+  .t[data-name] tbody td[data-k="btn"],.t[data-name] tbody td[data-k="act"]{order:8}
+  .t[data-name] input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}
+  /* 광고 */
+  .t[data-name=ads] tbody tr{padding-left:66px;min-height:46px}
+  .t[data-name=ads] tbody td.c{position:absolute;left:0;top:7px;width:36px;text-align:center}
+  .t[data-name=ads] tbody td.n{position:absolute;left:36px;top:10px;width:24px;text-align:right}
+  .t[data-name=ads] tbody td[data-k="mv"]{order:4}
+  .t[data-name=ads] tbody td[data-k="mv"] button{padding:4px 9px}
+  .t[data-name=ads] tbody td[data-k="en"]{order:4}
+  .t[data-name=ads] tbody td[data-k="en"] .ck{margin-right:0}
+  .t[data-name=ads] tbody td[data-k="st"],.t[data-name=ads] tbody td[data-k="pub"],.t[data-name=ads] tbody td[data-k="kind"]{order:6;color:var(--ink2)}
+  .t[data-name=ads] .ps-none{display:none}
+  /* 올린 기록 */
+  .t[data-name=hist] tbody td[data-k="ver"]{order:1;font-weight:700}
+  .t[data-name=hist] tbody td[data-k="at"],.t[data-name=hist] tbody td[data-k="by"]{order:2;color:var(--ink2)}
+  .t[data-name=hist] tbody td[data-k="cnt"]{order:4;color:var(--ink2)}
+  .t[data-name=hist] tbody td[data-k="cnt"]::before{content:'광고 '}
+  .t[data-name=hist] tbody td[data-k="cnt"]::after{content:'건'}
+  .t[data-name=hist] tbody td[data-k="act"]{margin-left:auto}
+  /* 활동 기록 */
+  .t[data-name=log] tbody td[data-k="at"]{order:1;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .t[data-name=log] tbody td[data-k="act"]{order:2}
+  .t[data-name=log] tbody td[data-k="by"]{order:6;color:var(--ink2)}
+  /* 지운 광고 */
+  .t[data-name=del] tbody td.ti{order:1}
+  .t[data-name=del] tbody td[data-k="btn"]{order:2}
+  .t[data-name=del] tbody td[data-k="kind"],.t[data-name=del] tbody td[data-k="at"],.t[data-name=del] tbody td[data-k="by"]{order:6;color:var(--ink2)}
+  .t[data-name=del] tbody td[data-k="at"],.t[data-name=del] tbody td[data-k="by"]{order:8}
+  /* 편집 창 — 화면 전체, 머리·아래 단추는 붙어 있다. 칸 이름은 위, 값은 아래(좁은 폭을 값에 다 준다) */
+  .modal{padding:0}
+  .mbox{border-radius:0;min-height:100%}
+  .mhead{position:sticky;top:0;z-index:2;background:var(--card)}
+  .mfoot{position:sticky;bottom:0;z-index:2;background:var(--card)}
+  .fr{flex-direction:column;align-items:stretch;gap:4px;padding:6px 12px}
+  .fv input[type=date]{flex:1 1 0;min-width:0}
+  .trs .tr{display:flex;align-items:center;gap:6px}
+  .trs input{flex:1 1 0;min-width:0}
+  .fr>label{width:auto;padding-top:0}
+  .fv input[type=number]{width:84px}
+  .fv .ck input{width:20px;height:20px}
+  .pvwrap{padding:8px 12px 12px}
+}
 </style>
 </head>
 <body>
@@ -112,7 +198,7 @@ main{padding:12px 16px 40px}
     <span class="sub">외부 전광판 광고 — 만들고, 기간을 정하고, 올립니다</span>
     <span id="who"></span>
     <span class="sp"></span>
-    <button class="sm" onclick="reload()">새로고침</button>
+    <button class="sm" onclick="reload()" title="새로고침"><span class="phone-only">↻</span><span class="wide-only">새로고침</span></button>
     <button class="sm" id="outBtn" style="display:none" onclick="firebase.auth().signOut()">로그아웃</button>
   </div>
   <div id="pendBar"><b id="pendTxt"></b><span class="sp"></span><button class="pri" id="pubBtn">전광판에 올리기</button></div>
@@ -152,7 +238,7 @@ main{padding:12px 16px 40px}
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=30"></script>
+<script src="js/pu-appbar.js?v=31"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
 <script>
@@ -162,7 +248,7 @@ main{padding:12px 16px 40px}
 <script src="js/pu-back.js?v=2"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
 <script src="js/pu-signboard-core.js?v=2"></script>
-<script src="js/pu-signboard-view.js?v=1"></script>
+<script src="js/pu-signboard-view.js?v=2"></script>
 <script>
 var FB_CONFIG={apiKey:'AIzaSyDkZz5QlKSoqMOYByp5YGeMNLNDrIghliA',authDomain:'pureun-erp.firebaseapp.com',databaseURL:'https://pureun-erp-default-rtdb.asia-southeast1.firebasedatabase.app',projectId:'pureun-erp',appId:'1:936817166182:web:9bd31f70d0afdf5fca2aa7',messagingSenderId:'936817166182'};
 var fbDb=null, gate=null, bucket=null, ME={sid:''};
@@ -213,6 +299,7 @@ function drawPend(){
   bar.className=df.total?'on':'';
   var parts=[]; if(df.added) parts.push('새 광고 '+df.added); if(df.changed) parts.push('고침 '+df.changed); if(df.removed) parts.push('내림·지움 '+df.removed); if(df.reordered) parts.push('순서 바뀜');
   $('pendTxt').textContent='올리지 않은 변경 '+df.total+'건 ('+parts.join(' · ')+')';
+  $('pendTxt').title=$('pendTxt').textContent;   /* 폰에서는 한 줄로 줄인다 — 다 못 보이면 누르고 있으면 보인다 */
 }
 function drawState(){ $('stateBox').innerHTML=V.stateCards(D.state, D.ctl, Date.now()); }
 function drawHist(){

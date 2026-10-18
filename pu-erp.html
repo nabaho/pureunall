@@ -107,7 +107,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <!-- 푸른 공통 한글 엔진: 모든 ERP 한글 열기·미리보기·HWPX 저장을 한 경로로 처리 -->
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <!-- 계약서 양식의 칸 목록·기본 양식 — 문서관리와 «같은 파일»을 읽는다(2026-09-26 양식 화면을 문서관리로 옮김) -->
-<script src="js/pu-contract-forms.js?v=61"></script>
+<script src="js/pu-contract-forms.js?v=62"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
 <!-- 사업장 «원본 서식»(.hwpx) 채우기 — 칸·표·도장 자리는 그대로 두고 글자만 바꾼다.
@@ -125,7 +125,7 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-conflict.js?v=2"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=11"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script>
 // CommonJS/AMD 환경 가드 (모바일 WebView 호환)
@@ -173,11 +173,11 @@ if('serviceWorker' in navigator && location.protocol === 'https:'){
   if(window.React){ g.React = window.React; g.ReactDOM = window.ReactDOM; }
 })();
 </script>
-<link rel="stylesheet" href="css/pu-erp.css?v=19">
+<link rel="stylesheet" href="css/pu-erp.css?v=20">
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=31"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -13777,7 +13777,7 @@ function MonthKpiHeader(props){
         onMouseEnter:function(e){ e.currentTarget.style.background='#f8fafc'; },
         onMouseLeave:function(e){ e.currentTarget.style.background='transparent'; } },
         /* 폰에서는 88 → 74 로 줄인다. 이 14px 때문에 「이번 달만」이 아랫줄로 넘어갔다 */
-        h('span', { style:{ fontWeight:700, fontSize:'13px', color:'#1e293b', minWidth: winW<=768?'74px':'88px', textAlign:'center' } }, label),
+        h('span', { className:'mkh-label', style:{ fontWeight:700, fontSize:'13px', color:'#1e293b', minWidth: winW<=768?'74px':'88px', textAlign:'center' } }, label),
         h('span', { style:{ fontSize:'11px', color:'#94a3b8' } }, '▼'),
         // 숨겨진 month picker (라벨 영역 전체에 깔림)
         h('input', { type:'month', value:ym, ref:pickerRef,
@@ -13793,7 +13793,11 @@ function MonthKpiHeader(props){
       inlineKpi
         ? h('div', { style:{ flex:1, minWidth:0, margin:'0 8px' } }, kpiGrid)
         : h('div', { style:{ flex:1 } }),
-      props.extra
+      /* 오른쪽 단추 묶음 — 폰에서는 이 줄 «안에서» 옆으로 민다 (폰화면관리 2026-10-18).
+         계약관리는 단추가 넷이라 줄이 474px 로 늘어 «화면 전체»가 옆으로 굴렀다(본문 498px · 화면 360px)
+         「2026년 10월」도 두 줄로 꺾였다. ⚠ 넓은 화면은 .mkh-extra 가 display:contents — 겹이 없는 것과 같다.
+         ⚠ kpiOwnRow(출금관리)는 도구줄이 제 줄을 통째로 쓰며 접혀 내려가는 설계라 감싸지 않는다. */
+      (props.extra && !props.kpiOwnRow) ? h('div', { className:'mkh-extra' }, props.extra) : props.extra
     ),
     // 좁을 때: 예전처럼 아랫줄에
     !inlineKpi && kpiGrid
@@ -15099,11 +15103,13 @@ function Header(props){
       style:{ marginLeft:'2px', padding:'5px 10px', fontSize:'12.5px', cursor:'pointer', background:'#fef2f2', border:'1px solid #fecaca', borderRadius:'5px', color:'#dc2626', fontWeight:700, flexShrink:0, whiteSpace:'nowrap' } },
       '🚪', h('span',{className:'hd-lbl'},' 로그아웃')),
     props.onBack && h('button', {
-      onClick: props.onBack, title:'이전 메뉴로 돌아가기',
+      onClick: props.onBack, title:'이전 메뉴로 돌아가기', className:'hd-back',
       /* ⚠ 흰 머리줄에 흰 글씨 — 「◀ 뒤로」도 글자가 안 보였다(시작화면 지정과 같은 흠).
          짙은 머리줄이던 시절의 색이 그대로 남아 있던 것이다. */
       style:{ background:'#f8fafc', border:'1px solid #e2e8f0', color:'#475569', padding:'5px 12px', borderRadius:'5px', fontSize:'13px', fontWeight:600, cursor:'pointer', marginRight:'8px' }
-    }, '◀ 뒤로'),
+    /* 폰에서는 «그림만» (폰화면관리 2026-10-18) — 「뒤로」 68px 이 제목을 0px 로 밀고 360px 에서 ⋯ 를
+       화면 밖으로 내보냈다. 왼쪽 단추들(🔄·🚪)과 같은 .hd-lbl 규칙이다. 넓은 화면은 「◀ 뒤로」 그대로. */
+    }, '◀', h('span', { className:'hd-lbl' }, ' 뒤로')),
     h('div', { className:'hd-title' }, title),
     h('div', { className:'hd-spacer' }),
     h(GlobalSearch, { onNavigate:onNavigate }),
@@ -15518,7 +15524,10 @@ function FirebaseStatus(){
 
   var color = connected ? (authed ? '#16a34a' : '#fbbf24') : '#dc2626';
   var label = !connected ? '🔴 끊김' : !authed ? '🟡 인증중' : '🟢 연결됨';
-  return h('div',{style:{position:'relative'}},
+  /* 폰 머리줄에서는 «멀쩡할 때»(🟢 연결됨)만 접는다 (폰화면관리 2026-10-18).
+     css 의 .hd-fb 규칙(「연결상태는 폰에서 불필요」)이 오프라인 갈래에만 붙어 있어 🟢 연결됨 65px 이
+     폰에서 늘 떠 제목을 밀었다. ⚠ 🔴 끊김 · 🟡 인증중 은 «알려야 할 것»이라 폰에서도 그대로 보인다. */
+  return h('div',{className:(connected && authed) ? 'hd-fb' : '', style:{position:'relative'}},
     h('button',{ onClick:function(){setOpen(!open);}, title:'클라우드 동기화 상태',
       style:{padding:'3px 8px',fontSize:'10.5px',background:'transparent',border:'1px solid '+color+'33',borderRadius:'5px',cursor:'pointer',color:color,fontWeight:600}},
       label),
@@ -21948,10 +21957,14 @@ function ContractModal(props){
   // ====== 렌더 ======
   function tabBtn(v, label, icon){
     var on = tab === v;
-    return h('button', { onClick:function(){ setTab(v); },
-      style:{ flex:1, padding:'10px 14px', background: on ? '#fff' : '#f8fafc',
+    /* 폰에서는 탭 글자를 «한 줄»로 (폰화면관리 2026-10-18) — 「👤 담당자 · 일 / 지」 처럼 셋째 탭이 두 줄로
+       꺾여 탭 줄 높이가 두 배가 됐다. 좌우 여백을 줄이고, 그래도 넘치면 … 로 끝낸다(title 에 전문). */
+    var _tbM = window.innerWidth <= 768;
+    return h('button', { onClick:function(){ setTab(v); }, title: _tbM ? (icon + ' ' + label) : undefined,
+      style:Object.assign({ flex:1, padding:'10px 14px', background: on ? '#fff' : '#f8fafc',
         color: on ? '#1e40af' : '#64748b', border:0, borderBottom: on ? '3px solid #1e40af' : '3px solid transparent',
-        fontSize:'13px', fontWeight: on ? 700 : 500, cursor:'pointer' } },
+        fontSize:'13px', fontWeight: on ? 700 : 500, cursor:'pointer' },
+        _tbM ? { padding:'10px 4px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 } : {}) },
       icon + ' ' + label);
   }
 
@@ -29945,10 +29958,12 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     mgrReqOpen && h(CoMgrReqModal, { onClose:function(){ setMgrReqOpen(false); }, onChange: refreshCompanies }),
     // 통합 필터 — 모바일 compact / PC 기존
     window.innerWidth <= 768
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px' } },
-        // 줄1: 검색 + 엑셀
-        h('div', { style:{ display:'flex', gap:'6px', alignItems:'center' } },
-          h('div', { style:{ position:'relative', flex:1 } },
+    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', marginBottom:'10px', flexWrap:'nowrap' } },
+        // 줄1: 검색 + 엑셀 + 정리 도구 — «한 줄», 도구는 이 줄 안에서 옆으로 민다 (폰화면관리 2026-10-18)
+        //   전: 검색칸이 70px 로 눌려 「🔍 업체」만 보였고, 정리 도구 다섯이 줄을 세 줄로 꺾어 목록을 90px 아래로 밀었다.
+        h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', overflowX:'auto',
+            WebkitOverflowScrolling:'touch', paddingBottom:'2px' } },
+          h('div', { style:{ position:'relative', flex:'1 0 150px', minWidth:'150px' } },
             h('input', { className:'dt-search', placeholder:'🔍 업체명·담당자',
               value:query, onChange:function(e){ setQuery(e.target.value); },
               style:{ width:'100%', fontSize:'14px', padding:'9px 12px', paddingRight: query?'55px':'12px',
@@ -29992,12 +30007,19 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
             className:'erp-tip', 'data-tip':CO_VAT_ALL_TIP,
             style:{ padding:'9px 12px', background:'#eff6ff', color:'#1e40af', border:'1px solid #bfdbfe',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' } },
-            '🧾 부가세 포함 일괄 ' + vatPend.total),
+            '🧾 부가세 포함 일괄 ' + vatPend.total)
+        ),
+        /* 줄1-2: 고른 뒤 할 일 — 고른 것이 있을 때만 (자료 목록 규칙 「N건 선택」과 할 수 있는 일).
+           ⚠ 폰 카드에 ☐ 가 없어 이 단추들은 여태 «닿을 길이 없었다». 줄1 끝에 두면 옆으로 밀어야 보인다. */
+        selIds.size > 0 && h('div', { style:{ display:'flex', gap:'6px', alignItems:'center', overflowX:'auto',
+            WebkitOverflowScrolling:'touch', paddingBottom:'2px' } },
+          h('span', { style:{ fontSize:'12px', fontWeight:800, color:'#1e40af', whiteSpace:'nowrap', flexShrink:0 } },
+            selIds.size + '건 선택'),
           selIds.size > 0 && h('button', {
             onClick:function(){ setBulkMgrModal(true); },
             style:{ padding:'9px 14px', background:'#2563eb', color:'#fff', border:'none',
               borderRadius:'8px', fontSize:'12px', fontWeight:700, cursor:'pointer', flexShrink:0, whiteSpace:'nowrap' }
-          }, '👤 ' + selIds.size + '개 선택 · 주담당 배정'),
+          }, '👤 주담당 배정'),
           selIds.size > 0 && h('button', {
             onClick:function(){
               var d = window.prompt('난이도 (1 쉬움 ~ 5 어려움, 비우면 해제)', '');
@@ -30023,6 +30045,15 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
         // 줄2: 상태 탭(세그먼트) + 유형칩 + 담당자 — 가로 스크롤 1줄
         h('div', { style:{ display:'flex', gap:'4px', overflowX:'auto', paddingBottom:'2px',
           WebkitOverflowScrolling:'touch', alignItems:'center' } },
+          /* ☐ 전체 — 표의 머리 ☐ 자리. «지금 보이는 쪽»(거른 결과의 이 쪽)만 고른다(폰화면관리 2026-10-18) */
+          h('label', { title:'지금 보이는 업체 모두 고르기',
+            style:{ display:'inline-flex', alignItems:'center', gap:'4px', flexShrink:0, padding:'0 4px 0 2px',
+              fontSize:'11px', fontWeight:700, color:'#475569', cursor:'pointer', whiteSpace:'nowrap', minHeight:'28px' } },
+            h('input', { type:'checkbox', 'aria-label':'지금 보이는 업체 모두 고르기',
+              checked: pg.paged.length > 0 && pg.paged.every(function(c){ return selIds.has(c.id); }),
+              onChange:function(e){ e.target.checked ? selectAll() : clearSel(); },
+              style:{ width:'20px', height:'20px', margin:0, cursor:'pointer' } }),
+            '전체'),
           // 세그먼트: 활성 | 사무대행
           h('div', { style:{ display:'inline-flex', flexShrink:0, background:'#f8fafc', borderRadius:'8px', padding:'2px' } },
             h('button', { onClick:function(){ setStatusTab('active'); },
@@ -30264,7 +30295,9 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
     ),
     // 테이블 (모바일: 카드 뷰 / PC: 기존 테이블)
     window.innerWidth <= 768
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px' } },
+    /* ⚠ flexWrap:'nowrap' — 폰 공통 규칙([style*="display: flex"][style*="gap"]{flex-wrap:wrap})이 세로 상자까지 접으면
+       줄 폭이 «가장 긴 카드»로 정해져, 업체명을 한 줄로 둔 카드가 화면보다 넓어진다(434px · 화면 360px). */
+    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'4px', flexWrap:'nowrap' } },
         filtered.length === 0
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } }, '등록된 데이터가 없습니다')
           : pg.paged.map(function(co, idx){
@@ -30274,14 +30307,25 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
               var suspended = !!co.suspended;
               var typeColors = { '자문':['#eff6ff','#1e40af'], '급여':['#f0fdf4','#166534'], '노조':['#eff6ff','#2563eb'], '기금':['#fffbeb','#854d0e'] };
               var tc = typeColors[co.typeCode||'자문'] || typeColors['자문'];
+              var picked = selIds.has(co.id);
               return h('div', { key:co.id, onClick:function(){setDetailModal(co);},
-                style:{ background: suspended?'#fffbeb':'#fff', border:'1px solid '+(suspended?'#fde68a':(expiring?'#fbbf24':'#e2e8f0')),
+                style:{ background: picked?'#eff6ff':(suspended?'#fffbeb':'#fff'), border:'1px solid '+(picked?'#2563eb':(suspended?'#fde68a':(expiring?'#fbbf24':'#e2e8f0'))),
                   borderLeft:'4px solid '+(suspended?'#fbbf24':(expiring?'#fbbf24':tc[1])),
-                  borderRadius:'8px', padding:'10px 12px', cursor:'pointer',
+                  borderRadius:'8px', padding:'8px 12px 8px 6px', cursor:'pointer',
                   boxShadow:'0 1px 3px rgba(0,0,0,0.05)' } },
-                h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px' } },
-                  h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'10.5px', fontFamily:'monospace', flexShrink:0, background:'#475569', borderRadius:'4px', padding:'1px 5px', marginRight:'6px' } }, (pg.page-1)*coPageSize+idx+1),
-                  h('span', { style:{ fontWeight:700, color:'#1e293b', fontSize:'13.5px', flex:1, marginRight:'8px', lineHeight:'1.3' } }, co.name),
+                /* 1줄 — ☐ · № · 업체명(한 줄, 넘치면 … + title) · 딱지 (폰화면관리 2026-10-18)
+                   ⚠ ☐ 는 자료 목록 규칙(맨 왼쪽 고르기 칸 + 번호)이다 — 표에는 있고 폰 카드에만 빠져 있었다.
+                     누르는 자리는 28px 로 넉넉히, 카드를 여는 손짓과 섞이지 않게 막는다(stopPropagation).
+                   ⚠ 업체명이 두 줄로 꺾여 카드마다 18px 이 늘었다 — 한 칸은 한 줄. */
+                h('div', { style:{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'3px', minWidth:0 } },
+                  h('label', { onClick:function(e){ e.stopPropagation(); }, title:'고르기',
+                    style:{ display:'inline-flex', alignItems:'center', justifyContent:'center', width:'28px', height:'28px',
+                      flexShrink:0, cursor:'pointer', marginRight:'2px' } },
+                    h('input', { type:'checkbox', checked:picked, onChange:function(){ toggleSel(co.id); },
+                      'aria-label':(co.name||'') + ' 고르기', style:{ width:'20px', height:'20px', margin:0, cursor:'pointer' } })),
+                  h('span', { style:{ fontWeight:800, color:'#fff', fontSize:'10.5px', fontFamily:'monospace', fontVariantNumeric:'tabular-nums', flexShrink:0, background:'#475569', borderRadius:'4px', padding:'1px 5px', marginRight:'6px' } }, (pg.page-1)*coPageSize+idx+1),
+                  h('span', { title:co.name || '', style:{ fontWeight:700, color:'#1e293b', fontSize:'13.5px', flex:1, minWidth:0, marginRight:'8px', lineHeight:'1.3',
+                    whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, co.name),
                   h('div', { style:{ display:'flex', gap:'4px', alignItems:'center', flexShrink:0 } },
                     suspended && h('span', { style:{ fontSize:'10px', background:'#fbbf24', color:'#fff', padding:'2px 7px', borderRadius:'10px', fontWeight:700, whiteSpace:'nowrap' } }, '⏸ 중단'),
                     expiring && h('span', { style:{ fontSize:'10px', color:'#d97706', fontWeight:700 } }, '⚠'),
@@ -30289,10 +30333,11 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
                       padding:'2px 8px', borderRadius:'10px', fontWeight:700 } }, co.typeCode||'자문')
                   )
                 ),
-                h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color:'#64748b' } },
-                  h('span', { style:{ fontWeight:600, color: mgrU?'#1e293b':'#94a3b8' } },
+                // 2줄 — 담당 · 부담당 (☐ 칸만큼 들여 업체명과 줄을 맞춘다)
+                h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', fontSize:'12px', color:'#64748b', paddingLeft:'30px', minWidth:0 } },
+                  h('span', { style:{ fontWeight:600, color: mgrU?'#1e293b':'#94a3b8', whiteSpace:'nowrap', flexShrink:0 } },
                     '👤 ' + (mgrU?mgrU.name:'담당자 미지정')),
-                  subNames.length > 0 && h('span', { style:{ color:'#94a3b8', fontSize:'11px' } },
+                  subNames.length > 0 && h('span', { style:{ color:'#94a3b8', fontSize:'11px', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', minWidth:0 } },
                     '· ' + subNames.join(' · '))
                 )
               );
@@ -37384,7 +37429,9 @@ function UserWithRateSection(){
       h('span', { style:{ fontSize:'11px', color:'#94a3b8', marginRight:'4px', whiteSpace:'nowrap', flexShrink:0 }, title:'신규 직원은 근로자명부에서 등록하세요' }, window.innerWidth <= 768 ? '신규 등록은 근로자명부에서' : '👤 신규 등록 → 근로자명부'),   // 폰에서 한 글자씩 세로로 쌓이던 것 (2026-10-12)
       h('input', { type:'search', className:'dt-search', placeholder:'🔍 사번·이름·직책 검색', value:query, onChange:function(e){ setQuery(e.target.value); } }),
       // 필터 토글
-      h('div', { style:{ display:'inline-flex', gap:'4px', marginLeft:'8px' } },
+      /* 칩은 «한 줄 글자»로, 모자라면 칩째 다음 줄로 (폰화면관리 2026-10-18) — 폰에서 「관리/자 (1)」「노무/사 (9)」
+         처럼 칩 «안»의 글자가 두 줄로 꺾였다. 넓은 화면은 한 줄에 다 들어가 그대로다. */
+      h('div', { style:{ display:'inline-flex', gap:'4px', marginLeft:'8px', flexWrap:'wrap' } },
         [
           { v:'all',    label:'전체',   count: activeUsers.length, color:'#475569' },
           { v:'admin',  label:'👑 관리자', count: adminCount,  color:'#dc2626' },
@@ -37405,7 +37452,7 @@ function UserWithRateSection(){
               border: '1px solid '+o.color,
               padding:'3px 7px', borderRadius:'4px',
               marginLeft: o.gap ? '8px' : undefined,   // 재직 무리와 눈으로 끊어 준다
-              fontSize:'10.5px', fontWeight:600, cursor:'pointer'
+              fontSize:'10.5px', fontWeight:600, cursor:'pointer', whiteSpace:'nowrap'
             } },
             o.label + ' (' + o.count + ')'
           );
@@ -57703,7 +57750,8 @@ function IncomePendingTab(props){
       h('input', { type:'text', value:query, onChange:function(e){setQuery(e.target.value);},
         placeholder:'🔍 업체·번호·담당',
         style:{padding:'3px 6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12.5px',width:'110px',flexShrink:0} }),
-      h('span', { style:{fontSize:'12px',color:'#64748b',fontWeight:600} }, '금액:'),
+      /* 이름표는 꺾지 않는다 — 폰에서 이 줄이 좁아지면 「금/액:」「시/작/일:」 이 한 글자씩 세로로 쌓였다(폰화면관리 2026-10-18) */
+      h('span', { style:{fontSize:'12px',color:'#64748b',fontWeight:600,whiteSpace:'nowrap',flexShrink:0} }, '금액:'),
       h('input', { type:'number', value:amtFilter.min, onChange:function(e){setAmtFilter(Object.assign({},amtFilter,{min:e.target.value}));},
         placeholder:'최소',
         style:{padding:'3px 5px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12.5px',width:'58px',fontFamily:'monospace',flexShrink:0} }),
@@ -57711,7 +57759,7 @@ function IncomePendingTab(props){
       h('input', { type:'number', value:amtFilter.max, onChange:function(e){setAmtFilter(Object.assign({},amtFilter,{max:e.target.value}));},
         placeholder:'최대',
         style:{padding:'3px 5px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'12.5px',width:'58px',fontFamily:'monospace',flexShrink:0} }),
-      h('span', { style:{fontSize:'12px',color:'#64748b',fontWeight:600} }, '시작일:'),
+      h('span', { style:{fontSize:'12px',color:'#64748b',fontWeight:600,whiteSpace:'nowrap',flexShrink:0} }, '시작일:'),
       h('input', { type:'date', value:dateFilter.from, onChange:function(e){setDateFilter(Object.assign({},dateFilter,{from:e.target.value}));},
         style:{padding:'4px 6px',border:'1px solid #cbd5e1',borderRadius:'4px',fontSize:'13px',fontFamily:'monospace'} }),
       h('span', { style:{fontSize:'12px',color:'#94a3b8'} }, '~'),
@@ -57722,7 +57770,7 @@ function IncomePendingTab(props){
         style:{padding:'5px 10px',background:'#fff',border:'1px solid #cbd5e1',borderRadius:'4px',cursor:'pointer',fontSize:'12.5px',color:'#64748b'} },
         '✕ 초기화'),
       h('span', { style:{flex:1} }),
-      h('span', { style:{fontSize:'13px',color:'#475569',fontWeight:700} }, '결과 ' + filtered.length + '건'),
+      h('span', { style:{fontSize:'13px',color:'#475569',fontWeight:700,whiteSpace:'nowrap',flexShrink:0} }, '결과 ' + filtered.length + '건'),
       h(PageSizeSelector, { pageSize:pendPageSize, setPageSize:setPendPageSize, setPage:pendPg.setPage })
     )),   // ↑ 안내띠+검색줄 sticky 덩어리 닫음
 
@@ -57732,6 +57780,67 @@ function IncomePendingTab(props){
           h('div', { style:{fontSize:'48px',marginBottom:'10px'} }, '✓'),
           h('div', { style:{fontWeight:700,fontSize:'14px',color:'#166534',marginBottom:'4px'} }, '미입금 대기 없음'),
           h('div', { style:{fontSize:'13.5px',color:'#166534'} }, '모든 사무관리 항목이 입금확정 처리되었습니다.'))
+      /* ══ 폰: 줄마다 «두 줄 카드» (폰화면관리 2026-10-18) ══
+         표는 열셋 칸이라 폰에서 옆으로 밀어야 업체명 뒤의 금액·입금확정이 보였다(업체명도 「(주)머버건설엔지니…」).
+         1줄 № · 종류 · 업체명(한 줄, … + title) · 금액 / 2줄 항목 · 통장·번호·담당·종료(말이 있는 것만) · 단추.
+         ⚠ 셈·판단은 표와 «같은 함수»(hitOf·itemClosedInfo·openFromBank·erpConfirmInit)를 부른다 — 따로 셈하지 않는다.
+         ⚠ 넓은 화면(769px~)은 아래 표 그대로다. */
+      : window.innerWidth <= 768
+      ? h('div', { className:'inc-pend-cards', style:{ display:'flex', flexDirection:'column', gap:'4px', flexWrap:'nowrap' } },
+          pendPg.paged.map(function(p, idx){
+            var coName = p.item.companyName || '';
+            var isClosed = !!closedCompanyNames[coName];
+            var ci = itemClosedInfo(p);
+            var hit = hitOf(p);
+            var ok = !!(hit && hit.state === 'exact');
+            var left = Math.max(0, p.amount - (p.paidSoFar || 0));
+            var info = [
+              hit ? ('💰 ' + String(hit.row.date || '').slice(5, 10) + (ok ? ' 일치' : ' ◐')) : '',
+              (p.paidSoFar > 0) ? ('◐ ' + left.toLocaleString() + ' 남음') : '',
+              p.item.caseNo || p.item.no || '',
+              userName(p.item.managerMain) || '',
+              ci.closed ? ('🏁 ' + ci.label + (ci.date ? ' ' + ci.date.slice(5) : '')) : '',
+              isClosed ? '🏛️ 업체종료' : ''
+            ].filter(function(x){ return x && x !== '-'; });
+            var fee = p.kind==='contract'||p.kind==='retainer';
+            return h('div', { key:p.itemId+'-'+p.kind,
+                style:{ background:(isClosed||ci.closed)?'#fffbeb':'#fff', border:'1px solid #e2e8f0', borderRadius:'8px',
+                  padding:'6px 8px', minWidth:0 } },
+              h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0 } },
+                h('span', { style:{ width:'22px', textAlign:'right', color:'#94a3b8', fontSize:'12px', fontFamily:'monospace',
+                  fontVariantNumeric:'tabular-nums', flexShrink:0 } }, idx + 1),
+                h('span', { style:{ background:p.store.bg, color:p.store.color, padding:'1px 6px', borderRadius:'8px', fontSize:'12px',
+                  fontWeight:700, flexShrink:0, whiteSpace:'nowrap' } }, p.store.icon + ' ' + p.store.label),
+                h('span', { title:coName || undefined, style:{ flex:1, minWidth:0, fontWeight:700, color:'#1e293b', fontSize:'13px',
+                  whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' } }, coName || '-'),
+                h('span', { style:{ fontFamily:'monospace', fontWeight:700, color:'#dc2626', fontSize:'13px', flexShrink:0,
+                  whiteSpace:'nowrap', fontVariantNumeric:'tabular-nums' } }, p.amount.toLocaleString())
+              ),
+              h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', minWidth:0, marginTop:'3px' } },
+                h('span', { style:{ background:fee?'#eff6ff':'#fffbeb', color:fee?'#1e40af':'#854d0e', padding:'1px 6px',
+                  borderRadius:'8px', fontSize:'12px', fontWeight:700, flexShrink:0, whiteSpace:'nowrap', marginLeft:'28px' } }, p.kindLabel),
+                h('span', { title:info.join(' · ') + (hit ? '\n통장 적요 「' + (hit.row.memo || '-') + '」' : ''),
+                  style:{ flex:1, minWidth:0, fontSize:'12px', color:ok?'#166534':'#64748b', whiteSpace:'nowrap',
+                    overflow:'hidden', textOverflow:'ellipsis' } }, info.join(' · ')),
+                h('button', { onClick:function(){
+                    if(hit){ openFromBank(p, hit); return; }
+                    setConfirmModal(erpConfirmInit(p, {p:p, date:todayYMD(), deductions:erpInitDeductions(p.item, getVatType(p))}));
+                  },
+                  title:hit ? ('통장 '+String(hit.row.date||'').slice(0,10)+' · '+hit.row.amount.toLocaleString()+'원으로 채워 엽니다')
+                            : '입금일을 손으로 넣어야 합니다 — 통장에서 찾지 못했습니다',
+                  style:{ padding:'4px 9px', background:hit?'#16a34a':'#1e40af', color:'#fff', border:'none', borderRadius:'5px',
+                    cursor:'pointer', fontSize:'12px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } },
+                  (hit ? '✅ ' : '') + '입금확정'),
+                (p.paidSoFar > 0) && h('button', { onClick:function(){ setCloseReason(''); setFinModal(p); },
+                  title:'남은 ' + left.toLocaleString() + '원을 어떻게 할지 정합니다',
+                  style:{ padding:'4px 8px', background:'#fffbeb', color:'#854d0e', border:'1px solid #fde68a', borderRadius:'5px',
+                    cursor:'pointer', fontSize:'12px', fontWeight:700, whiteSpace:'nowrap', flexShrink:0 } }, '마무리'),
+                h('button', { onClick:function(){ deletePendingItem(p); }, title:'휴지통으로 이동 (복원 가능)', 'aria-label':'휴지통으로',
+                  style:{ padding:'4px 7px', background:'#fef2f2', color:'#991b1b', border:'1px solid #fecaca', borderRadius:'5px',
+                    cursor:'pointer', fontSize:'12px', flexShrink:0 } }, '🗑️')
+              )
+            );
+          }))
       : h('div', { ref:_pbFill.ref, style:_pbBox },
           h('table', { style:{width:'100%',borderCollapse:'collapse',fontSize:'13.5px'} },
             h('thead', { style:{position:'sticky',top:0,zIndex:2} }, h('tr', null,
@@ -63788,7 +63897,9 @@ function FinanceInvoice(){
               else if(m === 'quarter') setMonthFilter(thisQ);
               else setMonthFilter(thisYM);
             },
-            style:{ padding:'7px 14px', border:'none',
+            /* 탭 글자는 한 줄 (폰화면관리 2026-10-18) — 폰에서 「월/별」「분기/별」「전/체」 로 네 탭이 다 두 줄이었다.
+               폰은 좌우 여백만 줄여 넷이 한 줄에 앉는다. 넓은 화면은 여백 그대로. */
+            style:{ padding: window.innerWidth <= 768 ? '7px 9px' : '7px 14px', border:'none', whiteSpace:'nowrap',
               background:on?'#1e40af':'transparent', color:on?'#fff':'#64748b',
               borderRadius:'5px', fontSize:'12px', fontWeight:on?700:500, cursor:'pointer' } }, label);
         }
@@ -67042,6 +67153,9 @@ function Certificate(){
       setCertDocH(natural);
       if(!certFit){ setCertZoom(1); return; }
       var roomH = window.innerHeight - box.getBoundingClientRect().top - 24;
+      /* 폰에서는 문서가 입력 «아래»에 한 칸으로 선다(css 폰 규칙) — 화면 아래에 있으니 남은 높이가 음수라
+         늘 바닥(30%)까지 줄었다. 폰은 «폭에만» 맞춘다(폰화면관리 2026-10-18). 넓은 화면은 그대로. */
+      if(window.innerWidth <= 768) roomH = Infinity;
       /* ⚠ A4 실제 크기(210mm)로 고정한 뒤로는 화면 폭도 넘칠 수 있다 —
          높이만 보던 배율에 «폭」도 함께 넣는다(더 좁게 줄이는 쪽을 따른다). */
       var roomW = box.clientWidth;
@@ -68304,7 +68418,9 @@ function FinancePnL(){
   var thS = {padding:'5px 7px',textAlign:'left',fontWeight:700,color:'#475569',fontSize:'12.5px',background:'#f8fafc',borderBottom:'1px solid #e2e8f0'};
   var tdS = {padding:'5px 7px',borderBottom:'1px solid #f8fafc',fontSize:'13px'};
 
-  return h('div',{style:{padding:'4px 2px',maxWidth:'1100px',margin:'0 auto'}},
+  /* className 'fin-pnl' — 폰에서 표 칸을 한 줄로 묶는 손잡이(css 폰화면관리 ⑦). 이 화면은 .page 밖이라
+     «.page table» 한 줄 규칙이 안 닿아 「1/월」처럼 달 칸이 두 줄로 꺾였다. */
+  return h('div',{className:'fin-pnl', style:{padding:'4px 2px',maxWidth:'1100px',margin:'0 auto'}},
 
     /* ── 세 줄(연도네비 · KPI · 탭)을 한 줄로 + 틀고정 (2026-08-14 대표 지시) ──
        KPI 카드를 알약으로 줄여 옆으로 붙이고, 탭도 같은 줄에 둔다.
@@ -68724,7 +68840,9 @@ function FinanceReceivable(props){
       gradeStats.map(function(g){
         var sel = selGrade === g.idx;
         var bg = sel ? g.color : g.bg;
-        var fg = sel ? '#fff' : g.color;
+        /* ⚠ 「장기」는 바탕이 짙은 빨강(#991b1b)이라 글자도 같은 빨강이면 «빈 빨간 칸»으로 보였다(폰화면관리 2026-10-18 발견,
+           넓은 화면도 같았다). invertText 표시는 적혀만 있고 쓰이지 않았다 — 이제 흰 글자로 읽힌다. */
+        var fg = (sel || g.invertText) ? '#fff' : g.color;
         return h('div',{key:g.idx,onClick:function(){setSelGrade(sel?-1:g.idx);},
           style:{background:bg,color:fg,border:'1px solid '+(sel?g.color:g.border),borderRadius:'8px',padding:'10px 12px',cursor:'pointer'}},
           h('div',{style:{fontSize:'12.5px',fontWeight:600}},g.label),
@@ -71249,7 +71367,9 @@ function ClosedManagement(){
               color: on ? '#fff' : (hasData ? '#2563eb' : '#cbd5e1'),
               border:'1px solid '+(on ? '#2563eb' : (hasData ? '#bfdbfe' : '#f8fafc')),
               fontWeight: on||hasData ? 700 : 400 } },
-            h('div', { style:{ fontSize:'9px', opacity:0.85 } }, MONTH_NAMES[i]),
+            /* 폰에서는 「10/월」 처럼 두 줄로 꺾이지 않게 한 줄 + 자간만 좁힌다 (폰화면관리 2026-10-18) */
+            h('div', { style: Object.assign({ fontSize:'9px', opacity:0.85 },
+              window.innerWidth <= 768 ? { whiteSpace:'nowrap', letterSpacing:'-0.5px' } : {}) }, MONTH_NAMES[i]),
             h('div', { style:{ fontSize:'12.5px', fontFamily:'monospace', fontWeight:700 } }, cnt)
           );
         })
@@ -71407,8 +71527,10 @@ function ClosedManagement(){
     if(colAmt === 'desc') allRows = allRows.slice().sort(function(a,b){ return (b.amount||0)-(a.amount||0); });
     else if(colAmt === 'asc') allRows = allRows.slice().sort(function(a,b){ return (a.amount||0)-(b.amount||0); });
     var P = clPage(allRows);
+    /* ⚠ flexWrap:'nowrap' — 폰 공통 규칙이 이 세로 상자까지 접어(flex-wrap:wrap) 줄 폭이 «가장 긴 카드»로 정해졌다.
+       카드가 상자보다 34px 넓어 오른쪽 테두리가 잘려 보였다(실측 카드 326 · 상자 292, 폰화면관리 2026-10-18). */
     return window.innerWidth <= 768
-    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px' } },
+    ? h('div', { style:{ display:'flex', flexDirection:'column', gap:'6px', flexWrap:'nowrap' } },
         allRows.length === 0
           ? h('div', { style:{ textAlign:'center', color:'#94a3b8', padding:'40px', fontSize:'12px' } }, '등록된 데이터가 없습니다')
           : P.paged.map(function(row, idx){
@@ -71428,14 +71550,19 @@ function ClosedManagement(){
                 ),
                 h('div', { style:{ fontSize:'13px', fontWeight:700, color:'#1e293b', marginBottom:'4px',
                   overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' } }, row.company||'-'),
-                h('div', { style:{ display:'flex', gap:'8px', fontSize:'11.5px', color:'#475569',
-                  marginBottom: row.amountLabel?'3px':0 } },
-                  h('span', null, '👤 '+(row.manager||'-')),
-                  row.sub && h('span', { style:{ color:'#94a3b8' } }, '+ '+row.sub)
+                /* 담당 · 유형 … [해제] 한 줄 (폰화면관리 2026-10-18)
+                   ⚠ row.sub 는 «글자»가 아니라 그려 둔 조각(유형·결과 딱지)이다. '+ '+row.sub 로 이어 붙여
+                     「+ [object Object]」 가 찍혔다 — 조각은 자식으로 넣는다.
+                   ⚠ 「해제」가 제 줄을 따로 써 카드마다 44px 이 늘었다 — 이 줄 오른쪽 끝으로 옮긴다. */
+                h('div', { style:{ display:'flex', alignItems:'center', gap:'8px', fontSize:'11.5px', color:'#475569',
+                  marginBottom: row.amountLabel?'3px':0, minWidth:0 } },
+                  h('span', { style:{ flexShrink:0, whiteSpace:'nowrap' } }, '👤 '+(row.manager||'-')),
+                  row.sub && h('span', { style:{ color:'#94a3b8', minWidth:0, overflow:'hidden', whiteSpace:'nowrap',
+                    display:'inline-flex', alignItems:'center' } }, row.sub),
+                  row.action && h('span', { style:{ marginLeft:'auto', flexShrink:0 } }, row.action)
                 ),
                 row.amountLabel && h('div', { style:{ fontSize:'11px', color:'#2563eb', fontWeight:600 } },
-                  '💰 '+row.amountLabel),
-                row.action && h('div', { style:{ marginTop:'6px' } }, row.action)
+                  '💰 '+row.amountLabel)
               );
             })
       )
@@ -74490,7 +74617,7 @@ function PerfManagement(props){
                         cat==='personal'
                           ? h('span',{style:{fontSize:'12px',color:'#94a3b8'}},'-')
                           : h('button',{onClick:function(e){e.stopPropagation();unconfirmPerfItem(it);},
-                              style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}},'↺ 복원'))
+                              style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer',whiteSpace: window.innerWidth <= 768 ? 'nowrap' : undefined}},'↺ 복원'))
                     );
                   }),
                   h('tr',{style:{background:'#eff6ff',borderTop:'2px solid #2563eb'}},
@@ -74689,7 +74816,9 @@ function PerfManagement(props){
                       h('button',{
                         onClick:function(){ unconfirmPerfItem({ fiId:fi.id, companyName:fi.companyName, kind:fi.kind, baseAmount:fi.amount }); },
                         title:'입금확정 해제 + 성과 항목 복원',
-                        style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer'}
+                        /* 폰에서는 한 줄 (폰화면관리 2026-10-18) — 「↺ / 복원」 두 줄로 꺾여 그 줄만 57px 로 높아졌다.
+                           ⚠ 넓은 화면은 손대지 않는다 — 거기서 한 줄로 묶으면 표가 35px 넓어져 옆으로 구른다(재 봄). */
+                        style:{padding:'3px 8px',background:'#fef2f2',color:'#991b1b',border:'1px solid #fecaca',borderRadius:'4px',fontSize:'12.5px',fontWeight:700,cursor:'pointer',whiteSpace: window.innerWidth <= 768 ? 'nowrap' : undefined}
                       },'↺ 복원'))
                   );
                 }),
@@ -83286,7 +83415,10 @@ function PayrollLedger(props){
     ),
     h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexWrap:'wrap', marginBottom:'6px' } },
       // ── 월 이동 + 잠금 (한 줄 통합) ──
-      h('div', { style:{ display:'flex', alignItems:'center', gap:'6px', flexShrink:0 } },
+      /* 폰에서는 이 겹을 «없앤다»(display:contents) — 월 이동·퇴사자 제외·마감 잠금이 바깥 줄의 낱개가 되어
+         도구·확정과 함께 자리대로 꺾인다(폰화면관리 2026-10-18). 한 덩어리로 제 폭(367px)을 고집해 360px 폰에서
+         「🔓 마감 잠금」이 화면 밖으로 나가고 본문 전체가 옆으로 굴렀다(401px). 넓은 화면은 그대로 한 줄. */
+      h('div', { style:{ display: IS_M ? 'contents' : 'flex', alignItems:'center', gap:'6px', flexShrink:0 } },
         h(MonthNav, { onPrev:function(){changeMonth(-1);}, onNext:function(){changeMonth(1);}, label:props.selYM, onToday:function(){props.setSelYM(todayYM());}, todayActive: props.selYM===todayYM() }),
         h('label', { style:{ display:'flex', alignItems:'center', gap:'3px', fontSize:'13px', color:'#64748b', cursor:'pointer', whiteSpace:'nowrap' } },
           h('input', { type:'checkbox', checked:!showResigned, onChange:function(e){ setShowResigned(!e.target.checked); } }), '퇴사자 제외'),

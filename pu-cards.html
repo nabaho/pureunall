@@ -51,7 +51,7 @@
 <script src="js/pu-mail-fill-core.js?v=2"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=11"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <!-- 사건 근로자 주민번호 — 그 사건의 담당자와 대표만 (2026-10-15) -->
 <script src="js/pu-worker-secret.js?v=2"></script>
@@ -314,6 +314,9 @@ html.mailview #tabs,html.mailview #subbar{display:none}
 #menuM .sheetbtn{padding:9px 10px;font-size:14.5px;gap:9px;min-width:0}
 #menuM .sheetbtn .msub{margin-left:auto;color:var(--sub);font-size:11.5px;font-weight:600;
   min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding-left:8px}
+/* 폰: 칸 이름은 «한 줄» (폰화면관리 2026-10-18) — 360px 에서 「새 등록 / 증」·「엑셀로 내보내 / 기」로
+   낱말 가운데서 접혔다. 줄어드는 것은 오른쪽 설명(.msub — … 으로 줄어든다) 하나뿐이어야 한다. */
+@media(max-width:760px){ #menuM .sheetbtn{white-space:nowrap} }
 /* 묶음 이름표 — 여백으로 가르던 것을 가는 줄로 가른다(여백보다 덜 먹고 더 또렷하다) */
 #menuM .mgrp{font-size:11px;font-weight:800;color:#94a3b8;letter-spacing:.02em;
   padding:9px 6px 3px;margin-top:5px;border-top:1px solid #1e293b}
@@ -418,6 +421,17 @@ body:has(.mck-dim) #pu-version-fab{display:none!important}
 #selbar{position:fixed;left:0;right:0;bottom:0;display:none;align-items:center;gap:8px;
   background:#1e293b;border-top:1px solid var(--line);padding:12px 16px calc(12px + env(safe-area-inset-bottom));z-index:60}
 #selbar .btn{flex:none;padding:10px 16px}
+/* ── 폰: 고른 뒤 띠는 «한 줄» (폰화면관리 2026-10-18) ──
+   360px 폰에서 「1개 선택」이 한 글자씩 세로로 쌓이고(「1 / 개 / 선 / 택」) 「삭제」가 화면 밖으로 나갔다.
+   글자 칸이 줄어들 수 있어서 단추 넷에게 자리를 다 내준 탓이다.
+   ⚠ 글자는 접지 않는다(한 칸은 한 줄) — 단추 여백을 조이고, 그래도 좁은 폰이면 띠 안에서 옆으로 민다.
+   ⚠ #selbar 는 폰에만 뜬다(body.pc 에서는 숨는다) — PC 는 그대로다. */
+@media(max-width:760px){
+  #selbar{gap:6px;padding-left:12px;padding-right:12px;overflow-x:auto;scrollbar-width:none}
+  #selbar::-webkit-scrollbar{display:none}
+  #selbar>span{flex:none;white-space:nowrap;font-size:13px}
+  #selbar .btn{white-space:nowrap;padding:10px 9px;font-size:13.5px}
+}
 .row .fav{color:var(--orange);font-size:14px;margin-right:4px}
 /* ── 인앱 카메라는 여기 없다 (대표 지시 2026-08-09: "카메라 하나로 통일") ──
    촬영 화면·초점·명함틀 코드가 사진첩(pu-photos.html)과 두 벌이었다. 한쪽만
@@ -902,6 +916,17 @@ body:not(.pc) .cn-t.todo col:nth-child(5){width:0}
 body:not(.pc) .cn-t.todo td.sj,body:not(.pc) .cn-t.todo th:nth-child(5){font-size:0;padding:0}
 body:not(.pc) .cn-t button{padding:3px 7px}
 body:not(.pc) .cn-t button .lb{display:none}   /* 폰: 「🔍 다른 업체」는 🔍 하나로 — 안 그러면 🙈 가 칸 밖으로 밀린다 */
+/* 폰(폰화면관리 2026-10-18) — 360px 폰에서는 칸 너비를 다 더하면(364px) 화면보다 넓어 맨 오른쪽 🙈 가
+   반쯤 잘렸다. 좁은 폰에서만 이름 칸을 조금 줄이고 단추 칸이 «남는 자리»를 갖는다(411px 폭과 같은 단추 자리).
+   ☐ 고르기 칸은 손가락으로 누를 만큼 키운다 — 칸 여백을 줄여 그 안에 들인다(CLAUDE.md 「☐ 고르기 칸 + 번호」). */
+@media(max-width:400px){
+  body:not(.pc) .cn-t col.nm{width:80px}
+  body:not(.pc) .cn-t col.act{width:auto}
+}
+@media(max-width:760px){
+  body:not(.pc) .cn-t td.ck,body:not(.pc) .cn-t th.ck{padding:0 2px;text-align:center}
+  body:not(.pc) .cn-t .ck input{width:18px;height:18px;margin:0;vertical-align:middle}
+}
 
 /* ── 숨겨 둔 칸 되돌리는 자리 (대표 지시 2026-08-26) ──
    ⚠ 되돌릴 길이 없으면 아무도 숨기기를 못 누른다. 숨기기와 «같은 화면»에 둔다. */
@@ -1608,6 +1633,37 @@ table.mstab2 tr:last-child td{border-bottom:none}
   .dm-row .who{width:102px}
   .dm-row .box{display:none}
   .dm-search{width:100%}
+}
+/* ══ 폰 메일함 — 폰화면관리 (2026-10-18, 폰 폭으로 실제로 그려 재 보고 고친 셋) ══ */
+@media(max-width:760px){
+  /* ① 기업정보함의 주황 ＋(명함 촬영)가 메일 «쓰기» ✏️ 를 정확히 덮고 있었다 — 같은 자리(오른쪽 아래)라
+       ✏️ 를 누르면 사진첩 카메라가 열렸다. 메일 화면에서는 명함 촬영이 할 일이 아니다.
+       ⚠ html.mailview 를 함께 적는다 — <head> 가 미리 붙이는 것은 <html> 이다(#tabs 와 같은 까닭). */
+  body.mailview #fab,html.mailview #fab{display:none}
+  /* ② 고르기 칸·체크 칸이 «줄 너비만큼» 늘어났다 — #mmBody input{width:100%}(번호 선택자)가 다 이겼다.
+       ☑ 모드의 고르기 칸은 보낸이 이름 한가운데 떠 있었고, 쓰기 창의 「한명씩 발송」은
+       칸이 다 먹은 나머지 자리에 「한명 / 씩 발 / 송」으로 세로로 쌓였다. 체크 칸은 제 크기로 둔다. */
+  #mmBody input[type=checkbox],#mmBody input[type=radio]{width:auto;min-width:0;flex:none}
+  #mmBody input.dmm-chk{width:22px;min-width:22px;height:22px}
+  /* ③ 메일함 밖의 메일 화면(읽기·쓰기·보낸·수신기록·사업장별)은 PC 화면을 «그대로» 그린다(renderMailMobile).
+       그 차림은 흰 종이 위에 맞춰 짙은 글씨를 박아 두었는데 폰 바탕은 검정이라
+       메일 «제목·본문»(검정)과 보내는사람·임시저장 같은 글이 바탕에 묻혀 안 보였다.
+       PC 와 «같은 종이»를 깐다 — 색 변수도 PC 창(body.pc .modal)과 같은 값으로 돌린다.
+       ⚠ 메일함 목록(.dmm)은 제 빛깔(다음 앱 차림)을 스스로 정하므로 그대로다. */
+  body.mailview #listwrap{background:#fff}
+  body.mailview #mmBody{--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;--bg2:#f8fafc;--row:#fff;color:#1e293b}
+  /* ④ 읽기 화면 단추가 네 줄로 접혀 제목이 화면 3분의 1 아래에서 시작했다 —
+       이 메일에 하는 일은 한 줄로 두고 옆으로 민다(목록·위·아래 줄은 그대로 보인다). */
+  #mmBody .dm-read .rtop .lft{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;max-width:100%;padding-bottom:2px}
+  #mmBody .dm-read .rtop .lft::-webkit-scrollbar{display:none}
+  #mmBody .dm-read .rtop .lft>*{flex:none;white-space:nowrap}
+  /* ⑤ 📎 자료함 — 폰에서도 이제 그린다(renderMatMobile). PC 자리(#pcMat)와 같은 종이·같은 색 변수를 깐다.
+       명함 갈래 줄·거르개 줄·＋ 는 이 화면 것이 아니라 접는다(메일 화면과 같은 까닭). */
+  body.matview #tabs,body.matview #subbar,body.matview #fab{display:none}
+  body.matview #listwrap{background:#fff}
+  #matM{padding:12px 12px 90px;--ink:#1e293b;--sub:#64748b;--line:#e2e8f0;color:#1e293b}
+  /* ☐ 고르기 칸은 손가락으로 누를 만큼(CLAUDE.md 「☐ 고르기 칸 + 번호」) — PC 의 16px 는 폰 손끝에 작다 */
+  #matM .matpk input,#matM .matpkhead input{width:22px;height:22px}
 }
 
 /* ══════════ 폰 메일함 — 다음메일 «앱»과 같은 차림 (대표 화면 2026-08-24) ══════════
@@ -3589,6 +3645,15 @@ body.pc #pcDetail{display:flex}
 /* 폰 — 같은 표를 옆으로 굴려 본다(칸을 두 줄로 접지 않는다) */
 .wkmob{padding:10px 8px 40px}
 .wkmob .tblbox{overflow-x:auto}
+/* 폰(폰화면관리 2026-10-18) — .wkmob 은 폰에만 있다.
+   ① 제목 「👷 근로자 N명」이 PC 의 짙은 글씨(#1e293b) 그대로라 검은 폰 바탕에 묻혀 거의 안 보였다.
+   ② 부제가 두 줄로 접혀 표를 밀어 내렸다 — 한 줄로 두고 넘치면 … 로 줄인다(한 칸은 한 줄).
+   ③ 집단 줄을 펴는 ▸ 는 16px 짜리라 손끝이 자꾸 옆 칸을 눌렀다 — 줄 높이는 그대로 두고 누를 자리만 넓힌다. */
+@media(max-width:760px){
+  .wkmob .wkbar b{color:var(--ink)}
+  .wkmob .wkhint{flex:1 1 100%;margin-left:0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .wkmob .wkfold{width:28px;padding:6px 0;margin:-6px 0;text-align:center}
+}
 /* ── 폰: 입력칸 글씨 16px — 아이폰이 «손댈 때 화면을 확대»하는 것을 막는다 ──
      (2026-10-04 폰 화면 점검 · 대표 지시 「폰화면에서 오류나 문제 있는지 검토해달라」)
    ⚠ 글씨가 16px 보다 작으면 사파리는 그 칸에 손을 댈 때마다 화면을 키운다 —
@@ -3602,7 +3667,7 @@ body.pc #pcDetail{display:flex}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=31"></script>
   <script src="js/pu-handoff.js?v=1"></script>
   <script src="js/pu-doc-pick.js?v=1"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -4676,7 +4741,11 @@ const Store = {
                ⚠ 「연락처 정리」는 메일함 자료를 쓴다 — openCntPage 가 폴더·쪽지를 스스로
                  불러온다(이 자리에서 또 읽으면 두 벌이 된다). */
             if(!urlWantsMail() && typeof cntFromUrl === 'function' && cntFromUrl()){
-              try{ openCntPage(); }catch(_){ }
+              /* ⚠ openCntPage 도 맨 아래 덩어리에 있다 — 페이지를 다 읽기 전이면 try 가 「없다」를 삼켜
+                   조용히 아무것도 안 열렸다(restoreLastScreen 머리글과 같은 까닭). 다 읽은 뒤에 연다. */
+              const _cnt = function(){ try{ openCntPage(); }catch(_){ } };
+              if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', _cnt, { once:true });
+              else _cnt();
             }
             /* 취업규칙 이력 색인을 미리 받아 둔다 — 회사를 열 때 기다리지 않게.
                못 읽어도(권한·그물) 그 칸만 빠지고 기업정보함은 그대로 뜼다. */
@@ -7428,8 +7497,21 @@ function openMatPage(){ _matFrom = (state.view==='mail') ? 'mail' : 'list';
   try{ document.getElementById('pcMain').scrollTop=0; }catch(_){}
   loadMaterials(()=>{ if(state.view==='mat') renderMatPage(); }); }
 function closeMatPage(){ state.view=_matFrom; render(); }
+/* ── 폰 📎 자료함 (폰화면관리 2026-10-18) ──
+   메일 서랍·쓰기 창의 「📎 자료함」을 누르면 폰에서는 «명함 목록»이 떴다 — 자료함은 PC 자리(#pcMat)에만
+   그렸고, 폰 render() 에는 'mat' 갈래가 없어 명함 목록으로 흘렀다. 이제 폰은 목록 자리(#list)에 그린다.
+   ⚠ 그리는 몸은 PC 와 «한 벌»이다(renderMatPage) — 그릴 자리만 matHost() 가 가른다. */
+function renderMatMobile(){
+  const el=$('list'); if(!el) return;
+  if(!$('matM')) el.innerHTML = '<div id="matM"></div>';
+  renderMatPage();
+}
+function matHost(){
+  try{ if(!document.body.classList.contains('pc')){ const m=$('matM'); if(m) return m; } }catch(_){}
+  return $('pcMat');
+}
 function renderMatPage(){
-  const el=$('pcMat'); if(!el) return;
+  const el=matHost(); if(!el) return;
   const cat = state.matCat || 'all';
   const cats = MAT_CATS_NOW();
   const all  = matList();
@@ -10962,7 +11044,10 @@ function render(){ if(_quiet) return; saveLastScreen(); syncMobileTabs(); syncMo
   /* <head> 에서 미리 붙여 둔 것을 여기서 이어받는다 — 「‹ 목록」으로 명함으로 가면
      떼어 줘야 갈래 줄이 다시 나온다. */
   try{ document.documentElement.classList.toggle('mailview', state.view==='mail'); }catch(_){}
+  /* 📎 자료함도 갈래 줄·거르개 줄·＋ 를 접는다 — 메일 서랍·쓰기 창에서 들어오는 메일 도구다 */
+  try{ document.body.classList.toggle('matview', state.view==='mat'); }catch(_){}
   if(state.view==='mail') return renderMailMobile();
+  if(state.view==='mat') return renderMatMobile();
   if(state.view==='co') return renderCoMobileList();
   if(state.view==='wk') return renderWkMobile();
   if(state.view==='cnt') return renderCntPage();   /* 📥 연락처 정리 — 폰도 이 창 안에(목업 ㉮ 2026-10-07) */
@@ -11122,6 +11207,26 @@ let _lastScreenDone = false;
 function restoreLastScreen(){
   if(_lastScreenDone) return;
   if(!myUid && !myEmail) return;       // 아직 누구인지 모른다 — 다음 기회에
+  /* ★★ 페이지를 «다 읽기 전»이면 다 읽은 뒤로 미룬다 (폰화면관리 2026-10-18)
+     ── 무엇이 있었나
+       메일 문(?view=mail)이 「읽고 있습니다…」에서 영영 멈췄다 — 오류 「openMailBox is not defined」.
+       이 함수는 로그인이 확인되자마자 불린다(메일 문은 명함을 안 기다리고 «지금» 연다).
+       그런데 여기서 부르는 openMailBox·switchTab·openWhoPage·openMnewPage 는 «맨 아래 큰 덩어리»에 있고,
+       함수 끌어올림은 자기 <script> 안에서만 된다(allItems·syncPcSearchFor 가 겪은 그 일).
+       페이지가 2.7MB 라 폰에서는 그 덩어리를 다 읽기 «전»에 로그인 답이 먼저 올 수 있다.
+       ⚠ 더 나빴던 것 — _lastScreenDone 을 먼저 세운 뒤 터져서, 명함이 다 와서 다시 불러도
+         그냥 지나갔다. 그래서 «잠깐» 이 아니라 «영영» 빈 화면이었다.
+     ── 어떻게
+       아직 읽는 중(loading)이면 표를 세우지 않고 DOMContentLoaded 에 한 번 더 부른다.
+       다 읽은 뒤라면 예전 그대로 바로 연다 — 늦어지는 것이 없다.
+     ⚠ typeof document — 이 함수만 떠서 돌리는 검사(vm)에는 document 가 없다. */
+  if(typeof document !== 'undefined' && document.readyState === 'loading'){
+    if(!restoreLastScreen._wait){
+      restoreLastScreen._wait = true;
+      document.addEventListener('DOMContentLoaded', function(){ restoreLastScreen._wait = false; restoreLastScreen(); });
+    }
+    return;
+  }
   _lastScreenDone = true;
   /* ★ 「푸른 메일」 아이콘으로 들어왔으면 주소가 이긴다 — 저장된 마지막 화면보다 앞선다.
      안 그러면 메일 아이콘을 눌렀는데 «마지막에 보던 명함 목록»이 열린다.

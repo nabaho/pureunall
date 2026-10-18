@@ -19,7 +19,7 @@
 <!-- 큰 작업본(올린 원본 포함)·보관함 사본은 IndexedDB 로 — localStorage 5MB 를 통합 프로그램 전부가 나눠 쓴다 (2026-10-07) -->
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=11"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-rules-history.js?v=3"></script>
@@ -194,6 +194,10 @@ select,input[type=date]{font-family:inherit;font-size:13px;height:36px;padding:0
 .pane{background:var(--card);border:1px solid var(--card-bd);border-radius:16px;box-shadow:0 8px 30px rgba(30,58,138,.06);overflow:hidden;display:flex;flex-direction:column;min-height:460px}
 .pane h3{margin:0;padding:13px 18px;font-size:14px;font-weight:600;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.4)}
 .pane h3 .tag{margin-left:auto;font-size:11px;color:var(--mute);font-weight:500;display:flex;gap:8px;align-items:center}
+/* 폰 — 판 머리(원본 미리보기 · 검토 결과)는 «접어 내린다» (폰화면관리 2026-10-18)
+   한 줄(nowrap)에 제목·딱지·단추 넷을 우겨 넣어, 제목은 「원/본/미/리/보/기」 한 글자씩,
+   단추는 「전체/보기」 두 글자씩 세로로 쌓였다. 접어 내리면 제목도 단추도 제 글자대로 한 줄이다. PC 는 그대로. */
+@media(max-width:760px){.pane h3{flex-wrap:wrap;padding:10px 12px;gap:6px}.pane h3 .btn{flex:none;white-space:nowrap}}
 .preview{padding:16px 18px;overflow:auto;flex:1;min-height:0;white-space:pre-wrap;font-size:12.5px;line-height:1.7;color:#1e293b;max-height:560px;font-family:"Noto Sans KR",sans-serif}
 /* 검토 결과 요약 — 제목줄 오른쪽에 붙인 한 줄 바(칸 클릭 = 해당 상태만 필터).
    따로 한 줄을 차지하지 않으므로 그만큼 검토 목록이 길게 보인다. */
@@ -874,7 +878,7 @@ table.daejo td.dj2{padding:0}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=31"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
