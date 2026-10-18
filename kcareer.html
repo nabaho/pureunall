@@ -5103,6 +5103,7 @@ function openSubmissionFiles(id){
     + '<input type="date" class="tb-input" style="width:140px" value="' + escapeHtml(String(s.sentAt||'').slice(0,10)) + '" onchange="subSetField(\'' + _jsAttr(s.id) + '\',\'sentAt\',this.value)">'
     + '<input class="tb-input" style="width:110px" placeholder="메일·방문·우편" value="' + escapeHtml(s.sentHow||'') + '" onchange="subSetField(\'' + _jsAttr(s.id) + '\',\'sentHow\',this.value)">'
     + '<span style="color:var(--text-mute);margin-left:6px">결과</span>' + subResultSel(s)
+    + ((s.files||[]).some(function(f){ return !_subInDocbox(f.relPath); }) ? '<div style="margin-bottom:8px"><button class="btn sm primary" type="button" onclick="subToDocbox(\'' + _jsAttr(s.id) + '\')" title="이 건에 낸 서류를 이력서관리 › 서류 보관함(위원·위촉 제출용)에 한 번에 담습니다 — 이미 있는 것은 건너뜁니다">📁 이 건 서류 모두 서류 보관함으로</button></div>' : '')
     + '</div>';
   var list = (s.files || []).map(function(f){
     var isP = promoted.indexOf(f.relPath) >= 0;
@@ -5110,6 +5111,8 @@ function openSubmissionFiles(id){
       + '<span style="flex:1;min-width:140px;word-break:break-all">' + escapeHtml(f.name) + '</span>'
       + '<span style="color:var(--text-mute);white-space:nowrap">' + Math.round((f.size || 0) / 1024) + 'KB</span>'
       + '<button class="btn sm" onclick="openLocalOriginal(\'' + _jsAttr(f.relPath) + '\')">📄 원본</button>'
+      + (_subInDocbox(f.relPath) ? '<span style="color:var(--teal);font-size:11px;white-space:nowrap" title="이력서관리 › 서류 보관함에 있습니다">✅ 보관함에 있음</span>'
+             : '<button class="btn sm" type="button" onclick="subToDocbox(\'' + _jsAttr(s.id) + '\',\'' + _jsAttr(f.relPath) + '\')" title="이력서관리 › 서류 보관함(위원·위촉 제출용)에 담습니다">📁 서류 보관함으로</button>')
       + (isP ? '<span style="color:var(--teal);font-size:11px;white-space:nowrap">✅ 승격됨</span>'
              : '<button class="btn sm primary" onclick="promoteSubmissionFile(\'' + _jsAttr(s.id) + '\',\'' + _jsAttr(f.relPath) + '\')">⬆ 위촉장으로</button>')
       + '</div>';
@@ -5118,6 +5121,51 @@ function openSubmissionFiles(id){
   $('modalSub').classList.add('open');
 }
 function closeSub(){ $('modalSub').classList.remove('open'); }
+/* ★ 「낸 서류」는 이력서관리 › 서류 보관함에도 있어야 한다 (대표 지시 2026-10-18 「이부분 이력서 관리에 있어야 된다 — 서류보관함으로 정리」)
+   제출서류(실적관리)는 «이 건에 무엇을 냈나»를 보는 곳이고, 서류 보관함은 «낸 서류를 다시 쓰는» 곳이다 — 둘 다 있어야 한다.
+   ⚠ 「지난 제출 이력서 모으기」는 이름에 이력서·프로필이 든 것만 모은다(신청서·지원서·후보자 서류는 안 들어온다). 이 길은 «사람이 건을 열어 고르는 것»이라 이름과 상관없이 담는다.
+   ⚠ 같은 파일(srcRel)은 두 번 담지 않는다. 원본은 이 기기 서류 폴더 → 없으면 클라우드 사본에서 읽는다(openLocalOriginal 과 같은 길). */
+function _subInDocbox(relPath){
+  return !!relPath && (get('resume')||[]).concat(get('profile')||[]).some(function(r){ return r && r.srcRel===relPath; });
+}
+async function subToDocbox(subId, relPath){
+  var subs=get('submission'), s=subs.find(function(x){ return x.id===subId; });
+  if(!s){ toast('건을 찾을 수 없습니다'); return; }
+  var 대상=(s.files||[]).filter(function(f){ return (!relPath || f.relPath===relPath) && !_subInDocbox(f.relPath); });
+  if(!대상.length){ toast('이미 모두 서류 보관함에 있습니다'); return; }
+  kcBusy(true);
+  var now=new Date().toISOString(), 담음=[], 창고=0, 못=[];
+  var 종류=(kindsOf('resume').indexOf('위원·위촉 제출용')>=0)?'위원·위촉 제출용':kindsOf('resume')[0];
+  try{
+    for(var i=0;i<대상.length;i++){
+      var f=대상[i];
+      try{
+        toast('⏳ '+(i+1)+' / '+대상.length+' 담는 중… '+f.name, 2500);
+        var bytes=null, ext=(f.name.split('.').pop()||'').toLowerCase();
+        try{ var file=await _fsFileOf(f.relPath); if(file) bytes=new Uint8Array(await file.arrayBuffer()); }catch(e0){ bytes=null; }
+        if(!bytes){ var cf=await _fsCloudFile(f.relPath); if(cf && cf.buf) bytes=new Uint8Array(cf.buf); }
+        if(!bytes) throw new Error('원본을 못 읽었습니다(서류 폴더 연결 확인)');
+        var id='resume_'+Date.now()+'_'+i, b64=abToB64(bytes);
+        if(!(await saveFileWait(id,{ id:id, name:f.name, ext:ext, size:bytes.length, base64:b64, savedAt:now }, { noCache:true }))) throw new Error('이 PC 보관함에 못 담았습니다');
+        var st=bytes.length<25*1024*1024 ? await kcFormUpload(id, b64, ext) : ''; if(st) 창고++;
+        bytes=null; b64=null;
+        var e={ id:id, kind:종류, year:s.year||'', org:s.org||'', memo:'📂 7번 «'+String(s.title||s.caseDir||'').slice(0,40)+'»에 낸 것',
+          genFileId:id, genName:f.name, origFileId:null, origName:null,
+          submits:(s.sentAt?[{ date:String(s.sentAt).slice(0,10), method:s.sentHow||'' }]:[]),
+          savedAt:now, fileMtime:f.mtime, srcRel:f.relPath, caseDir:s.caseDir||'', pastSubmit:true };
+        if(st) e.genStPath=st;
+        담음.push(e);
+      }catch(err){ console.warn('서류 보관함으로', f.name, err); 못.push(f.name+' — '+((err&&err.message)||'못 읽음')); }
+    }
+  }finally{
+    if(담음.length) set('resume', 담음.concat(get('resume')||[]));
+    kcBusy(false);
+  }
+  _safe(function(){ renderDocStore('resume'); });
+  openSubmissionFiles(subId);
+  toast((담음.length?('✅ 서류 보관함(위원·위촉 제출용)에 '+담음.length+'개 담았습니다'+(창고===담음.length?' — 다른 PC 에서도 열립니다':'')):'담은 것이 없습니다')
+    +(못.length?' · ⚠ '+못.length+'개: '+못.slice(0,2).join(' / '):''), 못.length?12000:6000);
+}
 
 /* ═══ 📥 새 지원 건 자동 알아보기 (대표 승인 2026-10-05 목업 ①) ═══
    7. 컨설턴트,위원신청등 › 연도 › 건 폴더만 본다. 새 건이면 띠를 띄우고, 누르면 «그 건만» 넣는다.
