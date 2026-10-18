@@ -181,6 +181,10 @@ body{min-height:100vh;background:var(--bg);color:var(--ink);
 /* 포털(앱 타일) 화면일 때만 상단 정렬 — 로그인 화면은 중앙 유지 */
 body.portal-mode .wrap{justify-content:flex-start;padding-top:clamp(32px,8vh,80px);}
 @media (max-width:520px){ body.portal-mode .wrap{padding-top:24px;} }
+/* 폰: 양옆 빈자리를 없앤다 (대표 지시 2026-10-18 「양옆 빈공백 … 좌우 옆공간 모두 채워서」).
+   겉 여백 16px 이 머리 카드·타일 줄 양옆을 늘 비워 두었다 — 6px 로 줄여 타일 네 칸이 화면 폭을 다 쓴다.
+   ⚠ 로그인 화면(가운데 정렬)은 그대로다 — 포털(타일) 화면에서만. */
+@media (max-width:520px){ body.portal-mode .wrap{padding-left:6px;padding-right:6px;} }
 
 /* ---------- 로그인 화면 ---------- */
 #loginView{display:flex;flex-direction:column;align-items:center;width:100%;max-width:520px;margin:0 auto;}

@@ -50,13 +50,20 @@ function cell(rows, w) {
   return parts.length ? parts.join(' · ') : '깨끗';
 }
 
+/* 양옆 빈자리 — 360px 화면들의 «글 시작·끝 여백 중 큰 쪽»의 가운데 값과 가장 나쁜 값(목표 8~14px) */
+function side(rows) {
+  const v = rows.filter(x => x.width === 360 && x.m && x.m.sideL != null && x.m.sideR != null).map(x => Math.max(x.m.sideL, x.m.sideR)).sort((a, b) => a - b);
+  if (!v.length) return '—';
+  return v[Math.floor(v.length / 2)] + 'px (최대 ' + v[v.length - 1] + ')';
+}
+
 const lines = [];
 lines.push(START);
 lines.push('');
-lines.push(`측정: ${measuredAt.toISOString().slice(0, 10)} · 폭 360·411px · 화면 수는 첫 화면 + seeds 의 views · 숫자는 그 화면들의 합`);
+lines.push(`측정: ${measuredAt.toISOString().slice(0, 10)} · 폭 360·411px · 화면 수는 첫 화면 + seeds 의 views · 숫자는 그 화면들의 합 · 양옆은 글이 화면 끝에서 떨어진 px(가운데 값, 목표 8~14)`);
 lines.push('');
-lines.push('| 앱 | 화면 수 | 360px | 411px | 폰 검사 | 마지막 폰 정리 기록 |');
-lines.push('|---|---|---|---|---|---|');
+lines.push('| 앱 | 화면 수 | 양옆(360) | 360px | 411px | 폰 검사 | 마지막 폰 정리 기록 |');
+lines.push('|---|---|---|---|---|---|---|');
 for (const app of portalApps()) {
   const rows = results.filter(x => x.key === app.key);
   const file = app.url.split('?')[0];
@@ -64,7 +71,7 @@ for (const app of portalApps()) {
   const myNotes = notes.filter(f => noteSrc[f].includes(file) && /폰|모바일|mobile|phone/i.test(noteSrc[f] + f));
   const last = myNotes.length ? myNotes[myNotes.length - 1] : '';
   const views = new Set(rows.map(x => x.view)).size;
-  lines.push(`| ${app.name} (\`${app.key}\`) | ${views || '—'} | ${cell(rows, 360)} | ${cell(rows, 411)} | ${myTests.length} | ${last ? '`status/' + last + '`' : '—'} |`);
+  lines.push(`| ${app.name} (\`${app.key}\`) | ${views || '—'} | ${side(rows)} | ${cell(rows, 360)} | ${cell(rows, 411)} | ${myTests.length} | ${last ? '`status/' + last + '`' : '—'} |`);
 }
 lines.push('');
 lines.push(END);
