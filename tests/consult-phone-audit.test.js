@@ -131,3 +131,30 @@ test('⑥ 「🏠 캘린더」 탭 — 폰에서는 눌렸을 때만 칠한다(P
   phoneHas(/\.hdr-home:not\(\.active\)/, /background:\s*transparent/, '폰에서 캘린더 탭이 늘 칠해져 «눌린 탭이 둘»로 보입니다');
   assert.match(TOP, /\.hdr-home\{[^}]*background:var\(--accent\)/, 'PC 의 집 단추 칠이 사라졌습니다');
 });
+
+/* ⑦ 월 달력 칸 머리 (2026-10-18 전수점검 뒤 덧붙임) — 「+3건」 이 날짜 숫자와 겹쳤다 */
+test('⑦ 폰 월 달력 칸의 「더 보기」는 «건» 을 접어 날짜와 겹치지 않는다', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const html = fs.readFileSync(path.join(__dirname, '..', 'gov-consulting.html'), 'utf8').replace(/\r\n/g, '\n');
+  /* 「건」 을 따로 감싸야 폰에서 접을 수 있다 */
+  assert.match(html, /class="mc-more-btn"[^>]*>\+\$\{moreCount\}<span class="mc-gun">건<\/span>/, '「건」 을 따로 감싸지 않았습니다');
+  /* 「건」 을 접는 규칙은 모두 폰 구간(max-width ≤ 768px) «안»에 있어야 한다 — PC 는 「+3건」 그대로 */
+  const 접기 = [...html.matchAll(/\.mc-gun\{display:none/g)];
+  assert.ok(접기.length >= 1, '폰에서 「건」 을 접지 않습니다');
+  for (const m of 접기) {
+    /* 그 자리를 감싼 가장 가까운 여는 괄호를 괄호 깊이로 거슬러 찾는다 */
+    let 깊이 = 0, 감싼 = null;
+    for (let i = m.index; i >= 0; i--) {
+      if (html[i] === '}') 깊이++;
+      else if (html[i] === '{') {
+        if (깊이 > 0) { 깊이--; continue; }
+        감싼 = html.slice(html.lastIndexOf('\n', i) + 1, i);
+        break;
+      }
+    }
+    assert.ok(감싼 && /@media/.test(감싼), '「건」 접기가 @media 밖에 있습니다 — PC 에서도 접힙니다');
+    const 폭 = (/max-width\s*:\s*(\d+)px/.exec(감싼) || [])[1];
+    assert.ok(폭 && Number(폭) <= 768, '「건」 접기가 폰 구간이 아닌 곳에 있습니다: ' + 감싼);
+  }
+});

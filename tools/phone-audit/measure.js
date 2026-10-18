@@ -25,6 +25,9 @@ function __paMeasure(opts) {
      화면 거의 전부를 차지하는 미는 상자가 제 폭보다 넓으면 그것도 옆넘침으로 센다(2026-10-18 이알피 계약관리 498px). */
   Array.prototype.forEach.call(document.querySelectorAll('body *'), function (el) {
     if (el.clientWidth < W * 0.8 || el.clientHeight < window.innerHeight * 0.5) return;
+    /* «페이지 노릇»을 하는 상자만 — 본문(main)·앱 뿌리(#app·#root·#main)·body 바로 밑.
+       표·칸반·간트·한눈 격자처럼 «일부러 옆으로 미는» 상자는 세지 않는다(그건 설계다). */
+    if (!(el.tagName === 'MAIN' || el.parentElement === document.body || /^(main|app|root|content)$/i.test(el.id || ''))) return;
     var ox = getComputedStyle(el).overflowX;
     if (ox !== 'auto' && ox !== 'scroll') return;
     var over = el.scrollWidth - el.clientWidth;
@@ -123,7 +126,9 @@ function __paMeasure(opts) {
         if (cox === 'auto' || cox === 'scroll') break;           // 미는 상자 — 밀면 보인다
         if (cox === 'hidden' || cox === 'clip') {
           var cr = cp.getBoundingClientRect();
-          if (r.right > cr.right + 2 || r.left < cr.left - 2) {
+          /* 얼마나 보이나 — 긴 제목 링크가 «…» 로 조금 잘린 것은 눌린다. 단추는 15% 넘게, 링크는 절반 넘게 가려지면 센다 */
+          var vis = Math.max(0, Math.min(r.right, cr.right) - Math.max(r.left, cr.left)) / Math.max(1, r.width);
+          if ((r.right > cr.right + 2 || r.left < cr.left - 2) && vis < (el.tagName === 'A' ? 0.5 : 0.85)) {
             offscreen.push({ sel: sel(el), text: txt(el), left: Math.round(r.left), right: Math.round(r.right), top: Math.round(r.top), clipped: true });
           }
           break;

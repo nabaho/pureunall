@@ -334,7 +334,7 @@ table.cmp td{white-space:nowrap}
   td.nm>.tag,td.nm>.orgrec,td.nm>.kwt{display:none}
   td.nm>b{flex:1 1 0;min-width:0;overflow:hidden;text-overflow:ellipsis;font-size:13px}
   td.nm>.mdd{display:inline-flex;flex:none;font-size:11.5px}
-  td.nm>.msub{display:flex;flex:1 0 100%;min-width:0;align-items:center;gap:6px;overflow:hidden;font-size:11.5px;color:var(--text-mute)}
+  td.nm>.msub{display:flex;flex:1 0 100%;min-width:0;align-items:center;gap:4px;overflow:hidden;font-size:11.5px;color:var(--text-mute)}   /* 간격 4px — 딱지 둘 + 금액 + 기관이 360px 에서 5~19px 넘쳤다(2026-10-18 실측) */
   .msub>*{flex:none}
   .msub .mog,.msub .mst{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
   .msub .mog{flex-shrink:9;min-width:2.5em}   /* 넘치면 기관이 먼저 줄어든다(전문은 줄을 눌러 상세) */
@@ -896,8 +896,9 @@ function planMobile(r, st, stc, lk){
   var short = String(st.label).replace(/ 발주 예정$/,'').replace(/ · 아직 공고 없음$/,'');
   return (when ? '<span class="m-only mdd sml">'+esc(when)+'</span>' : '')
     +'<div class="m-only msub"><span class="tag '+stc+' mst" title="'+esc(st.label)+'">'+esc(short)+'</span>'+soleTag(r)
+    /* 금액을 기관보다 «앞»에 — 줄이 넘치면 끝이 잘리는데, 잘려도 되는 것은 기관(전문은 상세)이고 금액은 아니다 (폰화면관리 2026-10-18) */
+    +(r.prc ? '<span class="mpr">'+Math.round(r.prc/10000).toLocaleString()+'만원</span>' : '')
     +(r.org ? '<span class="mog">'+esc(r.org)+'</span>' : '')
-    +(r.prc ? '<span>'+Math.round(r.prc/10000).toLocaleString()+'만원</span>' : '')
     +(lk.length ? '<button class="btn sm" onclick="planGoFeed(\''+esc(lk[0].id)+'\')">공고 보기</button>' : '')+'</div>';
 }
 /* 별표만 보기 — 보기 고르개(pView)의 「★ 관심」을 켜고 끈다(한 값). 끄면 처음 보기(공고 전 · 앞으로)로 */
@@ -1038,8 +1039,8 @@ function feedMobile(r, mt){
     : (r.type && r.type!=='새 공고' && r.type!=='관심' && !(r.type==='지나감' && past) ? '<span class="tag">'+esc(r.type)+'</span>' : '');
   return (d!=null ? '<span class="m-only mdd">'+dchip(r)+'</span>' : '')
     +'<div class="m-only msub">'+st+soleTag(r)
+    +(r.prc ? '<span class="mpr">'+_won(r.prc)+'</span>' : '')      // 금액이 기관보다 앞 — 넘치면 기관이 잘린다(위 planMobile 과 같다)
     +(r.org ? '<span class="mog">'+esc(r.org)+'</span>' : '')
-    +(r.prc ? '<span>'+_won(r.prc)+'</span>' : '')
     +matchChip(mt)+orgRecTag(r)+'</div>';
 }
 /* 공고 목록 — 대표 지시 2026-10-03

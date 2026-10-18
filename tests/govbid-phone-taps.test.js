@@ -55,3 +55,18 @@ test('폰에서 «모든» 머리 ☐ 가 손끝 크기 이상 — 이름이 있
     assert.ok(ok, '폰에서 작게 남는 머리 ☐: ' + (id ? '#' + id : '(이름 없음)' + a.slice(0, 60)) + ' — th.chk 로 받는 규칙을 더하세요');
   }
 });
+
+/* 2026-10-18 전수점검 뒤 덧붙임 — 폰 둘째 줄이 넘치면 «끝»이 잘린다. 잘려도 되는 것은 기관(전문은 상세)이고 금액은 아니다. */
+test('폰 둘째 줄: 금액은 기관보다 앞에 — 넘치면 기관이 잘린다', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const src = fs.readFileSync(path.join(__dirname, '..', 'gov.html'), 'utf8').replace(/\r\n/g, '\n');
+  for (const fn of ['function feedMobile(', 'function planMobile(']) {
+    const at = src.indexOf(fn);
+    assert.ok(at >= 0, fn + ' 를 못 찾았습니다');
+    const body = src.slice(at, src.indexOf('\n}\n', at));
+    const 금액 = body.indexOf('class="mpr"'), 기관 = body.indexOf('class="mog"');
+    assert.ok(금액 > 0 && 기관 > 0, fn + ' — 금액(mpr)·기관(mog) 조각이 없습니다');
+    assert.ok(금액 < 기관, fn + ' — 기관이 금액보다 앞이면 줄이 넘칠 때 금액 끝이 잘립니다');
+  }
+});
