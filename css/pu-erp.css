@@ -1292,6 +1292,17 @@ input[type="search"]::-webkit-search-cancel-button{
   /* ⑦ 손익계산서 — 이 화면은 .page 밖이라 위의 «.page table 한 줄» 규칙이 안 닿았다.
        칸이 좁아 「1/월」처럼 달 칸이 두 줄로 꺾여 줄마다 높이가 두 배였다. 표는 제 상자 안에서 옆으로 민다. */
   .fin-pnl table th, .fin-pnl table td{ white-space:nowrap; }
+
+  /* ⑧ 양옆 빈자리 — 화면 폭을 다 쓴다 (대표 지시 2026-10-18 「양옆 빈공백이 많다, 좌우 옆공간 모두 채워서」)
+       411px 폰에서 글이 화면 끝에서 37~57px 안쪽에서 시작했다. 본문 겉 여백(.main 24px) 위에
+       흰 판(.page — 둥근 상자 + 안 여백 10px), 그 안에 다시 칸·카드 상자가 겹겹이 쌓인 탓이다.
+       ■ 겉 여백을 걷고, 흰 판은 «상자»가 아니라 «바닥»으로 둔다 — 남는 상자는 카드 한 겹이다.
+       ⚠ 넓은 화면(769px~)은 그대로 — 24px 여백과 흰 판이 그대로 있다. */
+  .main{ padding:6px 0 !important; }
+  .page{ background:transparent !important; border-radius:0 !important; padding:2px 8px 8px !important; min-height:0 !important; }
+  /* 창(모달)은 화면 폭 그대로 — 양옆 3%(12px)씩 비어 있었다 */
+  .modal{ width:100vw !important; max-width:100vw !important; border-radius:0 !important; }
+  .modal-b{ padding:10px !important; }
 }
 
 /* ══ 데이터 감시 알림(erpAlert) — 폰에서는 한 치수 작게 (대표 폰 화면 2026-10-18) ══
