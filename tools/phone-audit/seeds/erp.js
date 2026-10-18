@@ -196,6 +196,10 @@ module.exports = {
     메뉴('biz/consulting'),
     메뉴('biz/fund'),
     메뉴('biz/other'),
+    /* 재무관리 > 입금관리 — 대표(관리자)만 폰에서 본다. 「입금 리스트」·「업체입금」 두 탭 */
+    메뉴('fin/income', 3000),
+    { name: 'income-list', wait: 2000, run: async (page) => { await page.evaluate(() => window.navigateTo('fin/income')); await page.waitForTimeout(2500); await page.locator('main').getByText('입금 리스트', { exact: false }).first().click({ timeout: 5000 }); } },
+    { name: 'income-company', wait: 2000, run: async (page) => { await page.evaluate(() => window.navigateTo('fin/income')); await page.waitForTimeout(2500); await page.locator('main').getByText('업체입금', { exact: false }).first().click({ timeout: 5000 }); } },
     메뉴('biz/closed'),
     { name: 'menu', run: async (page) => { await page.click('.hd-burger'); }, back: async (page) => { await page.click('.sb-overlay').catch(() => {}); } },
   ],

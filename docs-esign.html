@@ -84,6 +84,17 @@
        폰에서는 카드를 화면 폭 그대로(둥근 모서리·그림자 없이 위아래 줄로만), 카드 안 상자(양식 목록·고른 양식 막대·종이 바탕)의
        옆 테두리·둥근 모서리·옆 여백을 걷어 «한 겹»으로 — 안쪽 여백은 줄마다 8~10px 하나만 남긴다.
        ⚠ 양식 모듈(js/pu-contract-forms.js)은 이알피도 싣는다 — 여기서 #paneForms 로 좁혀 이 화면에만 건다 */
+    /* 집단체불 사건 목록 — 폰에서는 줄마다 «두 줄 카드» (옆으로 밀어야 제출·상태·생성일이 보이던 640px 표를 푼다, 대표 「좌우 옆공간 모두 채워서」 2026-10-18)
+       1줄 사건명(…) · 상태 · 🔗 링크 / 2줄 회사(…) · 제출 N명 · 생성일.  ⚠ 폰(≤700px)에서만 — 넓은 화면은 그대로 표다 */
+    #viewList table{min-width:0;display:block}#viewList thead{display:none}#viewList tbody{display:block}
+    #viewList tbody tr{display:grid;grid-template-columns:minmax(0,1fr) auto auto;column-gap:8px;row-gap:2px;align-items:center;padding:7px 0;border-bottom:1px solid #e2e8f0}
+    #viewList tbody td{display:block;padding:0;border:0;min-width:0;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #viewList tbody td:nth-child(1){grid-area:1/1;font-size:14px}#viewList tbody td:nth-child(4){grid-area:1/2}#viewList tbody td:nth-child(6){grid-area:1/3}
+    #viewList tbody td:nth-child(2){grid-area:2/1;color:#64748b}#viewList tbody td:nth-child(3){grid-area:2/2;color:#64748b}#viewList tbody td:nth-child(5){grid-area:2/3;color:#64748b}
+    #viewList tbody td[colspan]{grid-area:auto;grid-column:1/-1;white-space:normal}
+    #viewList tbody td a{display:block;overflow:hidden;text-overflow:ellipsis}
+    /* 원본 보관함 표는 폰 폭에 맞게 접는다(js/pu-office-docs.js 의 .cp 꼴) — 위 table 최소폭 640px 에서 뺀다 */
+    #paneArc .pod-arc-scroll table{min-width:0}
     .shell .main{margin:6px 0;padding:0}
     .card{border-radius:0;box-shadow:none;border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:10px}
     #paneForms .card{padding:8px 0}
@@ -241,7 +252,7 @@
 <script src="js/pu-office-store.js?v=10"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
 <script src="js/pu-co-roster.js?v=2"></script>
-<script src="js/pu-office-docs.js?v=19"></script>
+<script src="js/pu-office-docs.js?v=20"></script>
 <script src="js/pu-form-library.js?v=1"></script>
 <script>
 'use strict';
@@ -1047,7 +1058,7 @@ function renderCaseList() {
     var c = casesCache[id], m = c.meta || {};
     var n = Object.keys(c.submissions || {}).length;
     return '<tr>'
-      + '<td><a href="javascript:void(0)" onclick="openCase(\'' + id + '\')" style="color:#1e40af;font-weight:700">' + EsignDocs.esc(m.title || '(제목 없음)') + '</a></td>'
+      + '<td><a href="javascript:void(0)" onclick="openCase(\'' + id + '\')" title="' + EsignDocs.esc(m.title || '(제목 없음)') + '" style="color:#1e40af;font-weight:700">' + EsignDocs.esc(m.title || '(제목 없음)') + '</a></td>'
       + '<td>' + EsignDocs.esc(m.company || '') + '</td>'
       + '<td><b>' + n + '</b>명</td>'
       + '<td><span class="badge b-' + (m.status === 'active' ? 'active' : 'closed') + '">' + EsignDocs.esc(m.status || '') + '</span></td>'

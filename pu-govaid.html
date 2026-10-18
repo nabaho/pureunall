@@ -189,6 +189,22 @@ table.mx td.dot.yes{background:var(--green-bg)}
   .bar select{flex:1 1 40%;min-width:0}
   table.mx .stk{max-width:112px}
   #coDetail,#pDetail{scroll-margin-top:96px}
+  /* ⑦ 값이 여러 칸인 표(사업 사전·후보·정보 부족·안 맞음·공고) — 옆으로 밀어야 «담당기관·조건·검토»가 보였다(대표 「좌우 옆공간 모두 채워서」 2026-10-18).
+     폰에서는 줄마다 «카드»: ☐·번호는 왼쪽 끝에 두고, 첫 값(사업명·회사)은 한 줄, 나머지 값은 그 밑에 이어 붙는다(넘치면 줄바꿈).
+     머리줄은 «☐ 전체 선택» 한 줄만 남긴다. ⚠ 폰 구간에서만 — PC 는 그대로 표다. tests/govaid-phone.test.js */
+  table.t[data-name]{display:block}
+  table.t[data-name] thead,table.t[data-name] tbody{display:block}
+  table.t[data-name] thead tr{display:flex;align-items:center;padding:2px 8px;border-bottom:1px solid var(--line);background:var(--bg)}
+  table.t[data-name] thead th{display:none;border:0;padding:0}
+  table.t[data-name] thead th.c{display:flex;align-items:center;gap:8px;width:auto}
+  table.t[data-name] thead th.c::after{content:'전체 선택';font-size:12px;font-weight:600;color:var(--mute)}
+  table.t[data-name] tbody tr[data-row]{display:block;position:relative;padding:7px 8px 7px 72px;border-bottom:1px solid var(--line)}
+  table.t[data-name] tbody tr.cur{background:var(--blue-bg)}
+  table.t[data-name] tbody td{display:inline-block;max-width:100%;vertical-align:middle;padding:0 10px 0 0;border:0;background:none!important}
+  table.t[data-name] tbody td:empty{display:none}
+  table.t[data-name] tbody td.c{position:absolute;left:8px;top:7px;width:auto;padding:0}
+  table.t[data-name] tbody td.n{position:absolute;left:36px;top:10px;width:30px;padding:0;text-align:right}
+  table.t[data-name] tbody td:nth-child(3){display:block;max-width:none;margin-bottom:2px;font-size:14px;font-weight:600;white-space:nowrap}
 }
 @media (min-width:761px) and (max-width:860px){ #coDetail,#pDetail{scroll-margin-top:150px} }
 </style>

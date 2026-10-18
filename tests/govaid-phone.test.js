@@ -143,3 +143,16 @@ test('⑥ 양옆 빈자리 — 겉 여백·목록 줄·창 여백이 PC 보다 �
   /* PC 는 그대로 — 덩이 밖 main 여백은 넓은 화면 값 그대로 */
   assert.ok(sidePad(pcRule('main', /padding/)) > sidePad(lastPhone('main', /padding/)));
 });
+
+/* ⑦ 값이 여러 칸인 표 — 폰에서는 줄마다 «카드»(옆으로 밀지 않는다). ☐·번호는 왼쪽 끝에 그대로, 머리줄은 «전체 선택»만 남는다 */
+test('⑦ 여러 칸 표(사업 사전·후보·정보 부족·공고) — 폰에서는 카드로, ☐·번호는 왼쪽 끝에 남는다', () => {
+  phoneHas(/^table\.t\[data-name\]$/, /display:\s*block/, '폰에서 값 여러 칸 표를 카드로 풀지 않았습니다 — 「담당기관·조건·검토」가 옆으로 밀어야 보입니다');
+  phoneHas(/^table\.t\[data-name\] tbody tr\[data-row\]$/, /display:\s*block/, '폰 표 줄(tr)이 카드(block)가 아닙니다');
+  /* ☐ 고르기 칸 + 번호는 카드가 돼도 빼지 않는다(CLAUDE.md 「자료 목록의 맨 왼쪽」) — 왼쪽 끝에 붙인다 */
+  phoneHas(/^table\.t\[data-name\] tbody td\.c$/, /position:\s*absolute[^;]*;[^}]*left:\s*\d/, '카드에서 ☐ 고르기 칸이 왼쪽 끝에 붙어 있지 않습니다');
+  phoneHas(/^table\.t\[data-name\] tbody td\.n$/, /position:\s*absolute[^;]*;[^}]*left:\s*\d/, '카드에서 번호가 왼쪽 끝에 붙어 있지 않습니다');
+  /* 머리줄을 통째로 숨기면 «보이는 줄 전체 고르기» ☐ 가 사라진다 */
+  phoneHas(/^table\.t\[data-name\] thead th\.c$/, /display:\s*flex/, '폰 머리줄의 전체 고르기 ☐ 가 숨었습니다 — 보이는 줄 전체를 고르는 길이 없어집니다');
+  /* 넓은 화면은 그대로 표 — 카드 규칙이 폰 덩이 밖에 새면 안 된다 */
+  topLacks(/^table\.t\[data-name\]/, /display:\s*block/, '카드 규칙이 폰 구간 밖에 있습니다 — PC 표가 깨집니다');
+});

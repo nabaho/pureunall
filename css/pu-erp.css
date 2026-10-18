@@ -1349,3 +1349,29 @@ input[type="search"]::-webkit-search-cancel-button{
   html.pu-app-hr .cert-form div > label[style*="display: block"]:first-child:nth-last-child(2){
     margin:0 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 }
+
+/* ══ 입금 리스트 표 — 폰에서는 줄마다 «카드» (대표 지시 2026-10-18 「좌우 옆공간 모두 채워서」) ══
+   여덟 칸(# · 입금일 · 출처 · 관련번호 · 업체명 · 유형 · 입금액 · 관리) 표라 폰에서는 «업체명»이 잘리고
+   유형·입금액·관리는 옆으로 밀어야 보였다.
+   1줄 № · 업체명(…) · 입금액 / 2줄 입금일 · 출처 · 관련번호 · 유형 · 수정/삭제(넘치면 줄바꿈).
+   머리줄은 «정렬 줄» 로 남긴다 — 입금일·업체명·유형(깔때기)·입금액 이름표를 눌러 정렬한다(기능을 잃지 않는다).
+   ⚠ 폰(640px 이하)에서만 — 넓은 화면은 표 그대로. 칸 위치(nth-child)는 IncomeListTab 의 열 순서를 따른다.
+   tests/erp-phone-income-list.test.js */
+@media (max-width:640px){
+  /* ⚠ 위쪽 `.dt td{ padding/font-size … !important }` (≈ 830행)가 있어 여기도 !important 로 맞서야 한다 */
+  .dt.inc-tb, .dt.inc-tb thead, .dt.inc-tb tbody{ display:block; }
+  .dt.inc-tb thead tr{ display:flex; align-items:center; gap:4px; padding:2px 8px !important; }
+  .dt.inc-tb thead th{ display:none; position:static; border:0; padding:6px 4px !important; white-space:nowrap; }
+  .dt.inc-tb thead th:nth-child(2), .dt.inc-tb thead th:nth-child(5), .dt.inc-tb thead th:nth-child(6){ display:block; }
+  .dt.inc-tb thead th:nth-child(7){ display:block; margin-left:auto; }
+  .dt.inc-tb tbody tr{ display:flex; flex-wrap:wrap; align-items:center; position:relative; padding:7px 8px 7px 38px !important; border-bottom:1px solid #eef2f7; }
+  .dt.inc-tb tbody td{ display:inline-block; vertical-align:middle; padding:0 8px 0 0 !important; border:0; max-width:100%; font-size:12px !important; white-space:nowrap; }
+  .dt.inc-tb tbody td:nth-child(1){ position:absolute; left:6px; top:9px; width:26px; padding:0 !important; text-align:right; }
+  /* 업체명은 DOM 순서가 다섯째지만 카드 첫 줄 — order 로 맨 앞에 세우고 한 줄을 다 쓴다 */
+  .dt.inc-tb tbody td:nth-child(5){ order:-1; flex:0 0 100%; box-sizing:border-box; padding:0 112px 3px 0 !important; font-size:14px !important; overflow:hidden; text-overflow:ellipsis; }
+  .dt.inc-tb tbody td:nth-child(7){ position:absolute; right:8px; top:7px; padding:0 !important; font-size:14px !important; }
+  /* 수정·삭제는 둘째 줄 오른쪽 끝 — 자리가 모자라면 그 밑 줄로 내려가되 오른쪽 끝에 붙는다 */
+  .dt.inc-tb tbody td:nth-child(8){ margin-left:auto; padding-right:0 !important; }
+  /* 「등록된 데이터가 없습니다」 한 줄(colSpan) — 카드 규칙에서 뺀다 */
+  .dt.inc-tb tbody td[colspan]{ display:block; position:static; width:auto; padding:28px 8px !important; text-align:center; }
+}

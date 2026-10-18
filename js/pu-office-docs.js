@@ -328,6 +328,12 @@
     + '.pod-fold:not(.open) .pod-fbody{display:none}'
     + '.pod-co .pod-rt{min-width:0}'
     + '.pod .pod-recs th:nth-child(5),.pod .pod-recs td:nth-child(5){display:table-cell}.pod .pod-recs th:nth-child(n+6),.pod .pod-recs td:nth-child(n+6){display:none}'
+    /* 원본 보관함(좁은 꼴) — 5번째 칸은 크기가 아니라 📥 이므로 폰에서도 보인다. ☐ 는 손가락만 하게(24px), 칸은 한 줄(…) */
+    + '.pod-arc-scroll.cp th:nth-child(5),.pod-arc-scroll.cp td:nth-child(5){display:table-cell}'
+    + '.pod-arc-scroll.cp{overflow-x:hidden;border-left:0;border-right:0;border-radius:0;margin:0 -10px}.pod-arc-scroll.cp table{table-layout:fixed}'
+    + '.pod-arc-scroll.cp th:nth-child(1){width:40px!important}.pod-arc-scroll.cp th:nth-child(2){width:30px!important}.pod-arc-scroll.cp th:nth-child(4){width:76px!important}.pod-arc-scroll.cp th:nth-child(5){width:54px!important}'
+    + '.pod-arc-scroll.cp th,.pod-arc-scroll.cp td{padding-left:4px;padding-right:4px}.pod-arc-scroll.cp th:first-child,.pod-arc-scroll.cp td:first-child{padding-left:8px}.pod-arc-scroll.cp th:last-child,.pod-arc-scroll.cp td:last-child{padding-right:8px}'
+    + '.pod-arc-scroll.cp input[type=checkbox]{width:24px;height:24px;margin:0;vertical-align:middle}'
     + '.pod .pod-docs{table-layout:fixed}.pod .pod-docs th:nth-child(2){width:30px!important}.pod .pod-docs th:nth-child(4){width:84px!important}.pod .pod-docs th:nth-child(6){width:46px!important}.pod-docs .pod-ed{display:none}.pod-docs td .pod-b{padding:4px 8px}'
     + '}';
   function css() {
@@ -667,8 +673,9 @@
         var all = el('input', { type: 'checkbox', 'aria-label': '보이는 것 모두 고르기', checked: rows.every(function (r) { return S.picked[r.id]; }) });
         all.addEventListener('change', function () { rows.forEach(function (r) { S.picked[r.id] = all.checked; }); drawTable(); });
         /* 미리보기가 열려 있으면 표가 좁아진다 — 칸을 줄이고 «연결»은 파일 이름 밑 작은 줄로 */
-        var compact = !!S.sel;
-        tableBox.appendChild(el('div', { 'class': 'pod-arc-scroll' }, [el('table', null, [
+        /* 📱 폰(≤700px)에서도 같은 좁은 꼴 — 넓은 표(8칸)는 옆으로 밀어야 «올린 날·📥» 가 보였다 (대표 「좌우 옆공간 모두 채워서」 2026-10-18) */
+        var compact = !!S.sel || !!(w.matchMedia && w.matchMedia('(max-width:700px)').matches);
+        tableBox.appendChild(el('div', { 'class': compact ? 'pod-arc-scroll cp' : 'pod-arc-scroll' }, [el('table', null, [
           el('thead', null, [el('tr', null, compact
             ? [el('th', { style: 'width:34px' }, [all]), el('th', { style: 'width:38px', text: '#' }), el('th', { text: '파일 · 연결' }),
               el('th', { style: 'width:88px', text: '올린 날' }), el('th', { style: 'width:52px', text: '' })]
@@ -682,7 +689,7 @@
             var dl = el('button', { type: 'button', 'class': 'pod-b', title: '내려받기', 'aria-label': r.name + ' 내려받기', text: '📥' });
             dl.addEventListener('click', function (e) { e.stopPropagation(); host.download(r.id, r.name); });
             var pick = function () { S.sel = r; draw(); };
-            if (compact) return el('tr', { 'class': S.sel.id === r.id ? 'on' : null, title: '눌러서 오른쪽에 미리보기', onclick: pick }, [
+            if (compact) return el('tr', { 'class': S.sel && S.sel.id === r.id ? 'on' : null, title: '눌러서 오른쪽에 미리보기', onclick: pick }, [
               el('td', { style: 'overflow:visible' }, [cb]), el('td', { style: 'color:#94a3b8', text: String(i + 1) }),
               el('td', { title: r.name + (r.link ? '\n' + r.link : '') }, [el('div', { style: 'overflow:hidden;text-overflow:ellipsis', text: (r.secret ? '🔒 ' : '📄 ') + r.name }),
                 r.link ? el('div', { 'class': r.gone ? 'gone' : null, style: 'overflow:hidden;text-overflow:ellipsis;font-size:11px;color:' + (r.gone ? '#b45309' : '#94a3b8'), text: r.link }) : null]),
