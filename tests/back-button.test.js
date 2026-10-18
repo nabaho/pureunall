@@ -93,7 +93,7 @@ function 판만들기() {
   const ctx = {
     console: { warn() {} },
     setTimeout() {},
-    location: { href: 'app.html', replace() {} },
+    location: { href: 'app.html', replace(u) { ctx.간곳 = u; } },
     history: {
       pushState(st) { 기록.push(st); },
       back() { 기록.pop(); ctx.간것 = (ctx.간것 || 0) + 1; }
@@ -124,7 +124,8 @@ test('★ 층은 «맨 위부터» 닫히고, 다 닫힌 뒤에야 앱을 나간
   assert.equal(ctx.간것 || 0, 0, '★ 창이 열려 있는데 앱을 나갔습니다');
 
   뒤로();
-  assert.equal(ctx.간것, 1, '★ 다 닫혔는데도 앱에 남아 있습니다 — 뒤로가기가 먹통이 됩니다');
+  assert.equal(ctx.간곳, 'enter.html', '★ 다 닫힌 뒤에는 포털로 돌아가야 합니다');
+  assert.equal(ctx.간것 || 0, 0, '★ 앱 밖 방문기록을 다시 밟으면 카카오 로그인으로 돌아갈 수 있습니다');
 });
 
 test('★ 빈 걸음은 «하나»만 심는다 — 열 개 열었다고 열 번 눌러야 하면 안 된다', () => {
@@ -141,7 +142,8 @@ test('X 로 닫은 층은 목록에서 빠진다 — 뒤로가기가 헛돌지 �
   assert.equal(PuBack.depth(), 0);
   뒤로();
   assert.equal(닫혔나, 0, '이미 닫은 창을 또 닫으려 합니다');
-  assert.equal(ctx.간것, 1, '★ 뒤로가기가 아무 일도 안 하는 단추가 됐습니다');
+  assert.equal(ctx.간곳, 'enter.html', '★ 뒤로가기가 포털로 돌아가야 합니다');
+  assert.equal(ctx.간것 || 0, 0, '★ 카카오 방문기록으로 되돌아가면 안 됩니다');
 });
 
 test('제 화면 기록을 쓴 걸음에는 비켜선다', () => {

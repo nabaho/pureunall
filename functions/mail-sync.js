@@ -1853,7 +1853,7 @@ module.exports = function build(deps) {
 
     /* ══════ 첨부를 «급여데이터함으로» 바로 넘기기 (대표 결정 2026-08-30) ══════
        급여자료가 메일로 오면 여태 «내려받아 → 급여데이터함을 열어 → 다시 올리는»
-       세 걸음이었다. 서버가 10분마다 스스로 훑는 길(receivePaydataMail)은 이미
+       세 걸음이었다. 서버가 30분마다 스스로 훑는 길(receivePaydataMail)은 이미
        있지만 그것은 «아는 곳에서 온 것»만 담는다 — 모르는 주소로 온 자료, 지난
        메일에서 뒤늦게 찾은 자료는 사람이 손으로 옮겨야 했다.
 
@@ -1901,8 +1901,11 @@ module.exports = function build(deps) {
           contentType: got.mime, size: got.buf.length,
         }, { from: String(b.from || ''), subject: String(b.subject || ''), box: slug });
 
+        /* filed·filedTo — 다섯 잣대를 다 통과하면 대기 칸을 건너뛰고 서랍으로 간다
+           (payMailStoreOne → sureFor). 그것을 화면에 넘겨야 «어디로 갔는지» 바로 말한다. */
         reply(res, 200, { ok: true, id: r.id, seat: r.seat, shared: r.shared,
-          why: r.why, name: got.name, bytes: got.buf.length });
+          why: r.why, name: got.name, bytes: got.buf.length,
+          filed: !!r.filed, filedTo: r.filedTo || null });
       })),
 
     /* ══════ 본문까지 찾기 (대표 결정 2026-08-30) ══════

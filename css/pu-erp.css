@@ -190,6 +190,15 @@ button { font-family: inherit; cursor: pointer; border: 0; background: transpare
   border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; margin-top: 8px;
   display: flex; align-items: center; gap: 6px; }
 .pu-g6-sec .hint { font-weight: 500; color: #94a3b8; font-size: 10px; margin-left: auto; }
+/* 부담당 자리 — 「부담당 N ✕」 이름표를 칸 «테두리 위»에 얹는다 (대표 지시 2026-10-17
+   「부담당 줄 이상하다 줄일치시켜달라」). 이름표가 칸 위에 한 줄을 차지하면 이 칸만
+   아래로 처져 주담당·「+ 부담당 추가」와 줄이 어긋난다.
+   ⚠ position:absolute 를 빼지 말 것 — 빼는 순간 다시 처진다(tests/contract-4col-order.test.js).
+   ⚠ 위로 뜬 만큼은 .pu-g6 의 row-gap 안에 든다 — 윗줄을 덮지 않는다. */
+.pu-n6.pu-sub-slot { position: relative; }
+.pu-sub-slot > label { position: absolute; top: -7px; left: 6px; z-index: 1;
+  padding: 0 3px; background: #fff; line-height: 13px; white-space: nowrap;
+  font-size: 9.5px; font-weight: 700; color: #475569; }
 @media (max-width: 980px) {
   .pu-g6 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pu-n6-4, .pu-n6-6 { grid-column: span 3; }
@@ -932,13 +941,25 @@ button{ font-family:inherit !important; }
      흘려 놓으면 폭이 좁을 때 「⚙ 도구」가 혼자 한 줄을 쓴다(대표 화면 2026-08-20).
      칸을 셋으로 고르게 나누면 탭 둘과 ⚙ 가 늘 한 줄에 앉고, 큰 초록 단추가
      그 아래 한 줄을 통째로 쓴다 — 폭이 얼마든 두 줄이다. */
-  /* ⚙ 는 제 몸집만큼만(auto) — 셋을 똑같이 나누면 탭의 「미처리 232」가 잘린다 */
+  /* ★ 첫 줄 = 「📆 오늘(있을 때만) · 입금 · 출금 · ⚙」, 나머지는 저마다 제 줄을 통째로
+       (대표 지시 2026-10-17 「컴팩트하고 깔끔하게 한눈에」).
+     예전에는 칸 셋에 «흘려» 넣어 출금 탭에서 일곱 개가 석 줄을 먹었다 —
+     안 눌리는 흐린 「📆 오늘」이 탭 한 칸을 차지하고, ⚙ 가 혼자 셋째 줄에 앉았다.
+     ⚠ 탭은 제 글자만큼(max-content), 모자라면 줄어든다(0) — 똑같이 나누면 「미처리 269」가 잘린다.
+     ⚠ ⚙ 칸이 남는 자리를 먹고(1fr) ⚙ 는 그 끝에 선다 — 탭 사이가 벌어지지 않게. */
   .ld-bar:not(.on){ display:grid !important;
-                    grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:5px !important; }
+                    grid-template-columns:auto minmax(0,max-content) minmax(0,max-content) minmax(max-content,1fr);
+                    gap:5px !important; }
   .ld-bar:not(.on) > *{ min-width:0; }
+  .ld-bar:not(.on) .ld-bar-today{ grid-row:1; grid-column:1; }
+  .ld-bar:not(.on) .ld-tab{ grid-row:1; }
+  .ld-bar:not(.on) .ld-tools-btn{ grid-row:1; grid-column:4; justify-self:end; }
+  .ld-bar:not(.on) > :not(.ld-tab):not(.ld-tools-btn):not(.ld-bar-today){ grid-column:1 / -1; }
   .ld-bar:not(.on) .ld-bar-go{ grid-column:1 / -1; }
   .ld-bar:not(.on) .ld-tab,.ld-bar:not(.on) .ld-tools-btn{
     overflow:hidden; text-overflow:ellipsis; }
+  /* 오늘 것이 없으면 안 눌리는 단추다 — 폰에서는 자리째 접는다(있으면 숫자와 함께 선다) */
+  .ld-bar:not(.on) .ld-bar-today.off{ display:none !important; }
 
   /* ── 접힘(기본) ── */
   /* .ld-up:not(.on) 접기는 위로 옮겼다 — 이제 모든 화면에서 접힌다 */
@@ -968,8 +989,10 @@ button{ font-family:inherit !important; }
   .ld-bar{ gap:4px 6px !important; padding:5px 7px !important; margin-bottom:6px !important;
            flex-wrap:wrap !important; }
   .ld-bar button{ font-size:10.5px !important; padding:4px 8px !important; }
-  /* 접었을 때는 탭 둘과 ⚙ 가 한 줄에 들어가야 한다 — 한 치수 줄인다 */
-  .ld-bar:not(.on) .ld-tab{ font-size:10px !important; padding:3px 7px !important; }
+  /* 접었을 때는 탭 둘과 ⚙ 가 한 줄에 들어가야 한다.
+     ⚠ 옛 10px 은 칸 셋에 일곱 개를 넣던 때 값이다 — 이제 첫 줄에 넷뿐이라 12px(재무 글자 하한,
+       대표 지시 2026-10-12)로 올린다. */
+  .ld-bar:not(.on) .ld-tab{ font-size:12px !important; padding:3px 8px !important; }
   .ld-bar select{ font-size:11.5px !important; padding:3px 6px !important; }
   .ld-bar .ld-bar-nav button{ height:26px !important; padding:0 7px !important; }
   .ld-bar .ld-bar-prog{ flex:1 1 60px !important; min-width:56px !important; }
@@ -1084,6 +1107,124 @@ button{ font-family:inherit !important; }
   .ld-kb{ display:none !important; }
 }
 
+/* ══════════════════════════════════════════════════════════════════════════
+   거래내역 — 폰 위쪽 한 줄 · 출금 표 카드 (대표 지시 2026-10-17
+   「재무관리 폰 화면이다. 컴팩트하고 깔끔하게 한눈에 볼 수 있게 정리해달라」)
+
+   대표 화면(412px)에서 목록이 화면 «절반 아래»에서야 시작했고, 그 목록마저
+   일곱 칸이 옆으로 밀려 금액·카드·적요 셋만 보였다. 입금 표는 2026-08-23 에 카드로
+   바꿨는데 출금 표만 그대로였다.
+
+   ① 통장·카드·CMS — 라디오 동그라미를 감추고 알약으로, 긴 말(.ld-lw)을 접어 «한 줄»
+   ② 출금 표 — 줄 하나 = 카드 두 줄. 짧은 값과 고르개만 남기고 칸을 «없애지» 않는다.
+        ☐ 번호 │ 날짜  적요 ······························ 금액
+               │ 카드  [카테고리 고르개 ··············]  등록
+   ⚠ 넓은 화면은 하나도 안 바뀐다 — 이 구간 밖 규칙은 「폰 전용 손잡이를 감추는 것」뿐이다.
+   ⚠ 값을 겹쳐 놓지 않는다. 한 칸 = 한 자리 — 적요가 길면 «…» (CLAUDE.md 「한 칸은 한 줄」).
+   ══════════════════════════════════════════════════════════════════════════ */
+.ld-xt .ld-x-allm > input{ display:none; }   /* 폰 전용 「☐ 전체」 — 넓은 화면은 이름표 줄에 있다 */
+@media (max-width:640px){
+  /* 긴 말은 접는다 — 뜻은 남은 말(통장·CMS·입금 83)과 title 이 말한다 */
+  .ld-lw{ display:none !important; }
+
+  /* ① 보는 종류 — 알약 */
+  .ld-src-row{ gap:5px !important; margin-bottom:6px !important; }
+  .ld-src{ position:relative; padding:4px 10px; border:1px solid #e2e8f0; border-radius:99px;
+           background:#ffffff; font-size:12.5px !important; gap:0 !important; }
+  .ld-src.on{ background:#eff6ff; border-color:#93c5fd; }
+  .ld-src input[type='radio']{ position:absolute; opacity:0; width:1px !important; height:1px !important;
+                               margin:0; pointer-events:none; }
+  .ld-src-alert{ font-size:12.5px !important; padding:4px 9px !important; }
+
+  /* 출금 머리 — 「💸 출금 내역 ··· N건 · 합계」 한 줄. 카드 칩이 있으면 그 칩만 둘째 줄로 */
+  .ld-exp-head{ flex-wrap:wrap; gap:4px 8px !important; padding:4px 8px !important; }
+  .ld-exp-head .ld-exp-sum{ order:2; }
+  .ld-exp-head .ld-exp-cards{ order:3; flex-basis:100%; margin-left:0 !important; }
+  .ld-exp-head button{ min-height:26px; }
+
+  /* ② 출금 표 */
+  .ld-xt, .ld-xt thead, .ld-xt tbody, .ld-xt tfoot{ display:block; }
+  /* 이름표 줄은 접는다 — 카드에는 붙을 자리가 없다. 거르는 줄이 머리(☐ 전체)를 겸한다 */
+  .ld-xt thead tr:first-child{ display:none !important; }
+  .ld-xt .ld-x-filter{ display:flex !important; align-items:center; gap:6px; padding:5px 8px;
+                       position:sticky; top:0; z-index:3; border-bottom:1px solid #e2e8f0; }
+  .ld-xt .ld-x-filter td{ display:block; padding:0 !important; border:none !important; }
+  .ld-xt .ld-x-allm > input{ display:inline-block; }
+  .ld-xt .ld-x-q{ flex:1 1 auto; min-width:0; }
+  .ld-xt .ld-x-q input{ width:100% !important; }
+  /* ⚠ 찾기 칸(input)은 글씨 16px 그대로 — 내리면 아이폰이 누를 때마다 화면을 확대한다
+     (tests/phone-input-zoom). 높이만 줄이고, 글씨는 고르개(select)만 줄인다 */
+  .ld-xt .ld-x-filter input[type='search']{ min-height:32px !important; padding:2px 8px !important; }
+  .ld-xt .ld-x-filter select{ font-size:13px !important; min-height:32px !important; }
+  .ld-xt .ld-x-catf select{ max-width:128px !important; }
+  .ld-xt .ld-x-clr:empty{ display:none; }
+
+  /* ⚠ 금액 칸은 «최소 84px» — 줄마다 금액 폭이 달라 고르개 오른쪽 끝이 들쭉날쭉했다 */
+  .ld-xt tbody tr{ display:grid !important;
+                   grid-template-columns:24px 24px auto minmax(0,1fr) minmax(84px,max-content);
+                   align-items:center; column-gap:6px; row-gap:2px;
+                   padding:5px 8px; border-bottom:1px solid #eef2f7; }
+  .ld-xt tbody td{ display:block; padding:0 !important; border:none !important;
+                   min-width:0; max-width:none !important; }
+  .ld-xt .ld-x-chk { grid-column:1; grid-row:1 / 3; text-align:center; }
+  .ld-xt .ld-x-no  { grid-column:2; grid-row:1 / 3; font-size:12px !important; }
+  /* 줄1 — 날짜 · 적요 · 금액 */
+  .ld-xt .ld-x-date{ grid-column:3; grid-row:1; font-size:12px !important; color:#94a3b8; }
+  .ld-xt .ld-x-memo{ grid-column:4; grid-row:1; font-size:13px !important; }
+  .ld-xt .ld-x-amt { grid-column:5; grid-row:1; text-align:right; font-size:13.5px !important; }
+  /* 줄2 — 카드 · 고르개 · 등록 (고르개가 적요 바로 아래 선다) */
+  .ld-xt .ld-x-card{ grid-column:3; grid-row:2; }
+  .ld-xt .ld-x-cat { grid-column:4; grid-row:2; }
+  .ld-xt .ld-x-act { grid-column:5; grid-row:2; text-align:right; }
+  /* 적요 뒤 딱지(취소 짝·이미 처리됨·인사 급여)가 길어도 칸 밖으로 안 넘친다 */
+  .ld-xt .ld-x-memo > div{ overflow:hidden; }
+  /* ⚠ 칸 안 flex 는 «접지 않는다» — 480px 아래 공용 규칙([style*="display: flex"][style*="gap"]
+     { flex-wrap:wrap })이 「학습됨」을 고르개 아래로, 「승인」을 카드 번호 아래로 내려 두 줄을 만들었다 */
+  .ld-xt .ld-x-memo > div, .ld-xt .ld-x-cat > div, .ld-xt .ld-x-card > div{ flex-wrap:nowrap !important; }
+  /* 고르개는 16px·42px(아이폰 확대 막기) 대신 13px·30px — 고르기만 하는 칸이라 확대되지 않는다.
+     42px 이면 줄마다 고르개 하나가 카드 키를 다 먹는다 */
+  .ld-xt .ld-x-cat select{ font-size:13px !important; min-height:28px !important; height:28px;
+                           padding:1px 6px !important; }
+  .ld-xt .ld-x-act button{ min-height:28px; padding:2px 9px !important; font-size:12.5px !important; }
+  /* 「선택 필요」는 옆 고르개가 이미 말한다 · ✕ 는 좁은 자리에서 실수로 누르기 쉽다(입금 표와 같다) ·
+     카드 「승인」은 거의 모든 줄이 같은 말이다(「취소」는 남는다) */
+  .ld-xt .ld-x-need, .ld-xt .ld-act-x, .ld-xt .ld-x-cardst:not(.c){ display:none !important; }
+
+  /* 합계·더 보기 — 칸 이어붙임(colSpan)이라 격자에 안 맞는다. 한 줄로 늘어놓는다 */
+  .ld-xt tfoot tr{ display:flex !important; align-items:center; gap:6px; justify-content:flex-end;
+                   flex-wrap:wrap; padding:6px 8px; }
+  .ld-xt tfoot td{ display:block; border:none !important; padding:2px 4px !important; }
+  .ld-xt tfoot td:empty{ display:none; }
+
+  /* 고른 것 띠 — 고르개를 한 치수 줄여 한 줄에 */
+  .ld-x-sel select{ font-size:12.5px !important; min-height:32px !important; }
+
+  /* ── 떠 있는 공용 단추를 «피한다» (대표 2026-10-17 「이상한 곳 찾고 한 화면에 모두 보이게」) ──
+     오른쪽 가장자리 「즐겨찾기」 손잡이(폭 25px, 화면 세로 한가운데)가 줄 끝 금액을 13px 가렸고,
+     오른쪽 아래 「● 최신」 단추가 목록 맨 끝 줄을 덮었다(412px 실측).
+     ⚠ 두 단추는 24개 앱 공용이라 자리를 옮기지 않는다 — 이 목록이 비켜 선다.
+       오른쪽 여백 14px(손잡이가 가리는 만큼) · 맨 끝에 46px(최신 단추 높이 + 틈). */
+  .ld-xt tbody tr, .ld-tb tbody tr{ padding-right:14px !important; }
+  .ld-xt tfoot, .ld-tb tfoot{ margin-bottom:46px; }
+}
+/* 폰 첫 줄(📆 오늘 · 입금 · 출금 · ⚙)이 «한 줄»에 앉도록, 좁은 만큼 차례로 접는다.
+   412px 에서 「📆 오늘 3 · 입금 206 · 미처리 12 · 출금 304 · 미처리 269 · ⚙ 도구」는 넘쳤다(실측).
+   ⚠ 숫자는 끝까지 접지 않는다 — 접는 것은 그림·낱말뿐이고 뜻은 title 에 남는다. */
+@media (max-width:440px){
+  /* 보는 종류 줄도 «한 줄» — 360px 에서 「📱」 칩이 둘째 줄로 떨어졌다(실측) */
+  .ld-src-row{ gap:4px !important; }
+  .ld-src{ padding:4px 8px; }
+  .ld-src-alert{ padding:4px 7px !important; }
+  .ld-bar:not(.on){ gap:4px !important; }
+  .ld-bar:not(.on) .ld-tools-w,
+  .ld-bar:not(.on) .ld-tab-ico{ display:none; }
+  .ld-bar:not(.on) .ld-tab{ padding:3px 6px !important; }
+}
+/* 아주 좁은 폰(≤380px · 글자를 키워 둔 폰도 여기 든다) — 「미처리」 낱말까지 접는다(「출금 304 · 269」) */
+@media (max-width:380px){
+  .ld-bar:not(.on) .ld-tab-todo-w{ display:none; }
+}
+
 /* ── 요약 줄의 「⋯」 (대표 지시 2026-08-23 「셀로 여러 가지 정렬해 놓은 거 깔끔하게」) ──
    거르개 칩(확정 가능·확인 필요·후보 없음)과 «다른 화면으로 가는 문»(보류함·찾기·
    확정 이력)이 한 줄에 섞여 있어 같은 것처럼 보였고, 그래서 요약이 두 줄이 됐다.
@@ -1117,4 +1258,120 @@ input[type="search"]::-webkit-search-cancel-button{
 /* 손가락으로 누르는 화면에서는 조금 크게 — 15px 은 폰에서 너무 작다 */
 @media (pointer:coarse){
   input[type="search"]::-webkit-search-cancel-button{ height:19px; width:19px; background-size:19px; }
+}
+
+/* ══════ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 이알피·인사관리·재무관리 세 앱 공통 ══════
+   가짜 파이어베이스로 360·411px 에서 «로그인한 채» 그려 재고 고친 것 (tools/phone-audit, seeds/erp·hr·fin).
+   ⚠ 넓은 화면은 하나도 안 바뀐다 — 새로 낸 «겹»(.mkh-extra)은 넓은 화면에서 display:contents 라 없는 것과 같다.
+   ⚠ 「본문 전체가 옆으로 구른다」는 문서 폭이 아니라 «본문(main) 상자» 안에서 났다 — 문서 폭만 재면 0 으로 나온다. */
+.mkh-extra{ display:contents; }
+@media (max-width:768px){
+  /* ① 모든 화면 왼쪽 가장자리의 회색 띠 — 접힌 옆줄의 «그림자»였다.
+       옆줄은 translateX(-100%) 로 화면 밖에 접어 두는데 그림자(4px 0 20px)는 오른쪽으로 24px 삐져나와
+       늘 화면 왼쪽을 회색으로 칠했다. 접혔을 때만 걷는다 — 펼치면 그림자는 그대로 돌아온다. */
+  .sb.collapsed{ box-shadow:none; }
+  /* ② 「◀ 뒤로」 — 글자는 .hd-lbl 로 접고(그림만) 여백도 줄인다. 68px 이 제목을 0px 로 밀어
+       «여기가 어디인지»를 잃었고, 360px 에서는 ⋯ 가 화면 밖으로 16px 나갔다. */
+  .hd-back{ padding:5px 9px !important; margin-right:2px !important; flex-shrink:0; }
+  /* ③ 월 이동줄 — 「2026년 10월」 이 두 줄로 꺾이지 않게, 오른쪽 단추 묶음은 그 줄 «안에서» 민다.
+       계약관리는 단추 넷이 줄을 474px 로 늘려 본문 전체가 옆으로 굴렀다(본문 498px · 화면 360px). */
+  .mkh-label{ white-space:nowrap; }
+  .mkh-extra{ display:flex; align-items:center; gap:4px; overflow-x:auto; min-width:0; flex:0 1 auto;
+              -webkit-overflow-scrolling:touch; }
+  .mkh-extra > *{ flex-shrink:0; }
+  /* ④ 증명서 — 「입력 300px · 문서」 두 칸을 폰에서는 한 칸으로(문서는 입력 아래).
+       옆에 앉은 A4(794px)가 본문을 1,142px 로 밀었다. 다른 화면의 240·280px 두 칸과 같은 규칙이다. */
+  [style*="grid-template-columns: 300px 1fr"]{ grid-template-columns:minmax(0,1fr) !important; }
+  /* ⑤ 「칸 + 단추」 두 칸 줄 — 입력칸이 제 글자 폭을 고집해 단추를 화면 밖으로 밀었다
+       (근태관리 「+ 등록」 이 20px 밖 → 본문이 옆으로 굴렀다). 칸이 줄어들게 푼다. */
+  [style*="grid-template-columns: 1fr auto"]{ grid-template-columns:minmax(0,1fr) auto !important; }
+  [style*="grid-template-columns: 1fr auto"] > input{ min-width:0; width:100%; }
+  /* ⑥ 인사관리기준 › 사용자표의 상태 고르개 — 글씨는 16px(환경설정 규칙, 2026-10-04)인데 폭은 54px 에
+       묶여 「재직」이 「재즈」로 잘렸다. 글씨는 그대로 두고 폭만 글씨에 맞춘다. */
+  .env-section .user-tbl select{ max-width:none !important; min-width:70px; }
+  /* ⑦ 손익계산서 — 이 화면은 .page 밖이라 위의 «.page table 한 줄» 규칙이 안 닿았다.
+       칸이 좁아 「1/월」처럼 달 칸이 두 줄로 꺾여 줄마다 높이가 두 배였다. 표는 제 상자 안에서 옆으로 민다. */
+  .fin-pnl table th, .fin-pnl table td{ white-space:nowrap; }
+
+  /* ⑧ 양옆 빈자리 — 화면 폭을 다 쓴다 (대표 지시 2026-10-18 「양옆 빈공백이 많다, 좌우 옆공간 모두 채워서」)
+       411px 폰에서 글이 화면 끝에서 37~57px 안쪽에서 시작했다. 본문 겉 여백(.main 24px) 위에
+       흰 판(.page — 둥근 상자 + 안 여백 10px), 그 안에 다시 칸·카드 상자가 겹겹이 쌓인 탓이다.
+       ■ 겉 여백을 걷고, 흰 판은 «상자»가 아니라 «바닥»으로 둔다 — 남는 상자는 카드 한 겹이다.
+       ⚠ 넓은 화면(769px~)은 그대로 — 24px 여백과 흰 판이 그대로 있다. */
+  .main{ padding:6px 0 !important; }
+  .page{ background:transparent !important; border-radius:0 !important; padding:2px 6px 8px !important; min-height:0 !important; }
+  /* 창(모달)은 화면 폭 그대로 — 양옆 3%(12px)씩 비어 있었다 */
+  .modal{ width:100vw !important; max-width:100vw !important; border-radius:0 !important; }
+  .modal-b{ padding:10px !important; }
+  /* 폰 목록 카드(업체·사건·컨설팅/기금/기타·종료·급여·퇴직정산 — className 'm-card') — 왼쪽은 색 띠(4px)가
+     이미 줄을 가르므로 안 여백을 줄인다. 글이 화면 끝에서 14px 안쪽에 선다(전 22~29px). */
+  .m-card{ padding-left:4px !important; padding-right:7px !important; }
+  /* 입력 상자(근태 입력·증명서 발급 — className 'm-box') — 화면 끝 ~ 상자 6px, 상자 ~ 칸 7px */
+  .m-box{ padding-left:7px !important; padding-right:7px !important; }
+  /* 환경설정 탭띠 — 흰 판 안 여백(16px)만큼 음수 여백으로 «판 끝까지» 펴던 것. 판 여백을 줄였으니 같이 줄인다
+     (안 줄이면 띠가 화면보다 10px 넓어 본문이 옆으로 구른다). */
+  .env-tabs-wrap{ top:-6px; margin:-2px -6px 10px; padding:6px 6px 0; }
+  /* .page 밖에 서는 화면(손익계산서) — 본문 겉 여백을 걷었으니 제 여백을 흰 판과 같은 6px 로 */
+  .fin-pnl{ padding:4px 6px !important; }
+}
+
+/* ══ 데이터 감시 알림(erpAlert) — 폰에서는 한 치수 작게 (대표 폰 화면 2026-10-18) ══
+   「⚠ 동기화 충돌 의심」 경보 둘이 겹쳐 뜨자 한 장에 260px 남짓, 둘이 화면을 거의 다 덮었다.
+   ⚠ 말은 버리지 않는다 — 제목·대응책·닫기는 그대로, 설명은 석 줄까지(넘치면 …), 시각만 접는다
+     (시각은 기록 erpAlerts() 에 남는다). 넓은 화면은 그대로다. */
+@media (max-width:640px){
+  #erp-alert-wrap{ gap:5px !important; }
+  .erp-alert{ padding:8px 10px !important; font-size:12.5px !important; line-height:1.4 !important; }
+  .erp-alert-t{ font-size:13px !important; }
+  .erp-alert-d{ display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
+  .erp-alert-a{ margin-top:4px !important; padding:4px 7px !important; }
+  .erp-alert-tm{ display:none !important; }
+  .erp-alert-bar{ margin-top:5px !important; }
+  .erp-alert-bar button{ min-height:30px; padding:3px 12px !important; }
+}
+
+/* ══ 인사관리 폰 — 인사관리 창에만 있는 화면 손질 (대표 지시 2026-10-18 「양 끝에 화면 공백 안 둬도 되니까 … 한눈에」) ══
+   ⚠ 양옆 여백(main·.page)은 여기서 따로 정하지 않는다 — 위 ⑧ «양옆 빈자리»(이알피·인사·재무 공통)를 그대로 따른다.
+     처음엔 인사관리만 판 안쪽 12px 를 따로 두었는데, 그 뒤 세 앱 공통 6px 이 들어오자 인사관리만 오히려
+     여백이 넓었다(411px 실측 상자 12px vs 6px). 대표 지시 「이알피 재무도 여백 걷어라」 — 세 앱을 한 모양으로.
+   표식 html.pu-app-hr 는 <head> 첫 스크립트가 단다(?app=hr). ⚠ 폰 구간에서만 — PC 는 그대로. */
+@media (max-width:768px){
+  /* 환경설정 — 인사관리 창의 설정 탭은 «인사관리기준» 하나뿐이라, 바로 아래 제목(h3)과 같은 말이 한 줄 더 있었다.
+     탭이 하나일 때만 탭 줄을 접고, 「자동 저장」 표시는 제목 줄 오른쪽에 띄운다(두 줄 → 0줄). */
+  html.pu-app-hr .env-tabs-wrap:has(.env-tab:only-child){ display:none !important; }
+  html.pu-app-hr .env-save-row{ float:right; padding:0 !important; min-height:0 !important; margin-top:2px; }
+  /* 증명서 입력 — 폰은 칸이 화면 폭을 다 쓰니 «이름표 위 · 칸 아래» 두 줄일 까닭이 없다. 이름표를 칸 왼쪽에 둔다
+     (한 칸 = 한 줄, 입력 열 줄이 약 2/3 길이). 이름표+칸 «둘만» 든 줄에만 건다 — 고르기 줄·단추 줄은 그대로.
+     흰 판 안의 테두리 상자도 걷는다(양옆 11px 씩 칸이 넓어진다). */
+  html.pu-app-hr .cert-form{ border:none !important; padding:0 !important; }
+  html.pu-app-hr .cert-form div:has(> label[style*="display: block"]:first-child:nth-last-child(2)){
+    display:grid; grid-template-columns:88px minmax(0,1fr); align-items:center; column-gap:6px; }
+  html.pu-app-hr .cert-form div > label[style*="display: block"]:first-child:nth-last-child(2){
+    margin:0 !important; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+}
+
+/* ══ 입금 리스트 표 — 폰에서는 줄마다 «카드» (대표 지시 2026-10-18 「좌우 옆공간 모두 채워서」) ══
+   여덟 칸(# · 입금일 · 출처 · 관련번호 · 업체명 · 유형 · 입금액 · 관리) 표라 폰에서는 «업체명»이 잘리고
+   유형·입금액·관리는 옆으로 밀어야 보였다.
+   1줄 № · 업체명(…) · 입금액 / 2줄 입금일 · 출처 · 관련번호 · 유형 · 수정/삭제(넘치면 줄바꿈).
+   머리줄은 «정렬 줄» 로 남긴다 — 입금일·업체명·유형(깔때기)·입금액 이름표를 눌러 정렬한다(기능을 잃지 않는다).
+   ⚠ 폰(640px 이하)에서만 — 넓은 화면은 표 그대로. 칸 위치(nth-child)는 IncomeListTab 의 열 순서를 따른다.
+   tests/erp-phone-income-list.test.js */
+@media (max-width:640px){
+  /* ⚠ 위쪽 `.dt td{ padding/font-size … !important }` (≈ 830행)가 있어 여기도 !important 로 맞서야 한다 */
+  .dt.inc-tb, .dt.inc-tb thead, .dt.inc-tb tbody{ display:block; }
+  .dt.inc-tb thead tr{ display:flex; align-items:center; gap:4px; padding:2px 8px !important; }
+  .dt.inc-tb thead th{ display:none; position:static; border:0; padding:6px 4px !important; white-space:nowrap; }
+  .dt.inc-tb thead th:nth-child(2), .dt.inc-tb thead th:nth-child(5), .dt.inc-tb thead th:nth-child(6){ display:block; }
+  .dt.inc-tb thead th:nth-child(7){ display:block; margin-left:auto; }
+  .dt.inc-tb tbody tr{ display:flex; flex-wrap:wrap; align-items:center; position:relative; padding:7px 8px 7px 38px !important; border-bottom:1px solid #eef2f7; }
+  .dt.inc-tb tbody td{ display:inline-block; vertical-align:middle; padding:0 8px 0 0 !important; border:0; max-width:100%; font-size:12px !important; white-space:nowrap; }
+  .dt.inc-tb tbody td:nth-child(1){ position:absolute; left:6px; top:9px; width:26px; padding:0 !important; text-align:right; }
+  /* 업체명은 DOM 순서가 다섯째지만 카드 첫 줄 — order 로 맨 앞에 세우고 한 줄을 다 쓴다 */
+  .dt.inc-tb tbody td:nth-child(5){ order:-1; flex:0 0 100%; box-sizing:border-box; padding:0 112px 3px 0 !important; font-size:14px !important; overflow:hidden; text-overflow:ellipsis; }
+  .dt.inc-tb tbody td:nth-child(7){ position:absolute; right:8px; top:7px; padding:0 !important; font-size:14px !important; }
+  /* 수정·삭제는 둘째 줄 오른쪽 끝 — 자리가 모자라면 그 밑 줄로 내려가되 오른쪽 끝에 붙는다 */
+  .dt.inc-tb tbody td:nth-child(8){ margin-left:auto; padding-right:0 !important; }
+  /* 「등록된 데이터가 없습니다」 한 줄(colSpan) — 카드 규칙에서 뺀다 */
+  .dt.inc-tb tbody td[colspan]{ display:block; position:static; width:auto; padding:28px 8px !important; text-align:center; }
 }

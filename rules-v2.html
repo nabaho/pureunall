@@ -18,7 +18,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <!-- ⚠ 저장 관문은 Firebase 초기화 «전»에 싣는다.
      data-mode="observe" 는 공용 검사(ontology-write-gate)가 모든 화면에 요구하는 표시일 뿐이다 —
      rulesv2 는 LEGACY_OBSERVE_PROGRAMS 에 없어 표시와 상관없이 «강제»로 돈다(runtimeMode). -->
@@ -27,7 +27,7 @@
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script>
 /* 화면 가르기 — 주소가 #topics 면 「📚 조별 문안」, #lib 면 「📥 모은 자료」, 그 밖(빈 것·#sites)은 「🏢 사업장」.
    ⚠ 이 손잡이는 pu-back.js «앞»에 단다 — 뒤로가기(popstate)를 공통 층보다 먼저 받아야
@@ -41,16 +41,16 @@ window.addEventListener('popstate', function () {
 });
 window.addEventListener('hashchange', function () { if (window.rv2Route) window.rv2Route(); });
 </script>
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script src="js/pu-rules-filecmp.js?v=1"></script>
 <script src="js/rules-v2/lib-order.js?v=2"></script>
 <!-- 「🏢 사업장」 — 줄 셈(lib-sites)은 실을 때 PuRulesV2Order 를 찾는다: 반드시 lib-order «뒤»에 -->
 <script src="js/rules-v2/lib-sites.js?v=2"></script>
 <script src="js/rules-v2/store.js?v=4"></script>
-<script src="js/rules-v2/view-library.js?v=3"></script>
+<script src="js/rules-v2/view-library.js?v=4"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=7"></script>
+<script src="js/rules-v2/view-sites.js?v=9"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -183,6 +183,13 @@ button{font:inherit;cursor:pointer}
 #topics .who div span{overflow:hidden;text-overflow:ellipsis;min-width:0}
 #topics .who .w{margin-left:auto;flex-shrink:0}
 @media (max-width:900px){#topics .tpx{grid-template-columns:1fr}#topics .left{position:static;max-height:40vh;border-right:0;border-bottom:1px solid #e2e8f0}}
+/* 폰: 조별 문안 카드 머리 — 한 줄에 우겨 넣어 「📋 복사」·「쓴 회사」 단추가 오른쪽 밖으로 잘리고 「A 와 다른 곳」 딱지는 18px 로 짓눌렸다(2026-10-18 전수점검).
+   머리를 접는다: 1줄 문안·곳·최종본·최근 / (다른 곳 딱지) / 단추 줄. 넓은 화면은 그대로 한 줄. */
+@media (max-width:640px){
+  #topics .ch2{flex-wrap:wrap;row-gap:6px}
+  #topics .ch2 .diff{flex:1 1 100%}
+  #topics .ch2 .r{margin-left:0;flex:1 1 100%}
+}
 @media (max-width:900px){.wrap.two{grid-template-columns:1fr}.side{position:static;max-height:none;border-left:0;border-top:1px solid #e2e8f0}}
 /* ── 「🏢 사업장」 (③-ⓐⓑ 목업 승인본) — 왼쪽 거래처 표, 오른쪽 그 사업장의 이력·개정 시작.
    표의 칸은 한 줄, 넘치면 … 과 title. 이름은 .side·.flow 와 겹치지 않게 따로 짓는다(📥 와 한 파일이다) ── */
@@ -194,7 +201,10 @@ button{font:inherit;cursor:pointer}
 #sites .flt select.who{height:28px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font:inherit;font-size:12px;color:#1e293b;background:#ffffff;margin-left:6px}
 #sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
 #sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
-.sites{width:100%;border-collapse:collapse;table-layout:fixed;min-width:800px}
+.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:880px}
+/* ↑ min-width 는 «다른 칸 폭의 합 + 이름 칸 몫»이다 — 칸 폭은 view-sites.js 의 colgroup.
+     800 이던 때 다른 칸 합이 754 라 이름 칸이 46px 만 남아 폰·좁은 PC 에서 「삼…」 한 글자만 보였다(2026-10-18).
+   ⚠ separate(+간격 0)인 까닭 — collapse 이면 아래 «이름 칸 고정»의 줄금이 옆으로 밀 때 따라오지 않는다 */
 .sites th{font-size:11.5px;color:#475569;font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
 .sites th.c{text-align:center}
 .sites td{padding:8px;border-bottom:1px solid #e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;background:#ffffff}
@@ -248,7 +258,7 @@ button{font:inherit;cursor:pointer}
 #sites .cact .tag{display:inline-flex;gap:3px;align-items:center;background:#ffffff;border:1px solid #bfdbfe;border-radius:10px;padding:1px 4px 1px 9px}
 #sites .cact .tag button{border:0;background:none;color:#1e40af;padding:0 4px}
 #sites .cact .clr{margin-left:auto;border:0;background:none;color:#1e40af;text-decoration:underline}
-#sites .pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0}
+#sites .pager{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:8px 14px;background:#ffffff;border-top:1px solid #e2e8f0;position:sticky;bottom:0;left:0}
 #sites .pager .info{color:#475569;font-size:12px;flex:1 1 auto}#sites .pager .info b{color:#1e293b}
 @media (max-width:900px){#sites .pager .info{flex-basis:100%}}
 #sites .pg{min-width:28px;height:26px;padding:0 8px;border:1px solid #cbd5e1;border-radius:7px;background:#f8fafc;color:#475569;font-size:12px;white-space:nowrap}
@@ -265,7 +275,119 @@ button{font:inherit;cursor:pointer}
 #sites .items .why{color:#854d0e;overflow:hidden;text-overflow:ellipsis;min-width:0;max-width:40%}
 #sites .items .lnk{flex-shrink:0}
 #sites .none{padding:10px 2px;color:#475569}
+/* 폰 거르개 — 칩 셋을 한 줄에, 새로고침은 ↻ 만 (대표 지시 2026-10-18 「UI 컴팩트하게 다시 정리해라. 글자 너무 안 보인다」)
+   칩 글자를 줄이고(「취업규칙」은 이 앱 이름이라 뺐다 — view-sites.js) 안쪽 여백을 줄여 412px 에서 칩 셋이 한 줄,
+   담당·찾기·↻ 가 한 줄 — 거르개 네 줄(150px)이 두 줄(73px)이 된다. 글씨 크기는 줄이지 않는다 */
+@media (max-width:760px){
+  #sites .flt{padding:7px 8px;gap:5px}
+  #sites .flt .chip{padding:3px 8px}
+  #sites .flt select.who{margin-left:0;max-width:42%}
+  #sites .flt .btn{height:28px;padding:0 10px;margin-left:0}
+  #sites .flt .rl-t{display:none}
+}
 @media (max-width:900px){#sites .swrap{grid-template-columns:1fr}#sites .stbl{border-right:0;border-bottom:1px solid #e2e8f0}#sites .flt .q{width:100%;margin-left:0}}
+/* ── 폰(900px 이하) 🏢 사업장 — 표를 «두 줄 카드»로 (폰화면관리 2026-10-18) ──
+   ⚠ 표가 min-width:800px 이라, 폰에서는 다른 칸 폭을 다 빼고 남은 «사업장» 칸이 46px 남짓이었다 —
+     머리는 「사···」, 이름은 「(주…」 로만 보였다. 가장 중요한 칸이 가장 좁았다.
+   ⚠ 줄을 누르면 이력이 표 «아래»(최대 50줄 뒤)에 그려져, 폰에서는 눌러도 아무 일이 없는 것처럼 보였다.
+   처방(PC 는 그대로):
+     · 줄 = 두 줄 카드 — 1줄 번호·사업장·취업규칙 자료 / 2줄 최근·★최종본·담당·규모·업태(작은 글씨, 넘치면 …).
+       2줄 칸은 «바탕 0 + 내용 폭까지만 자람»(flex:1 1 0 · max-width:max-content)이라 자리가 모자라도 셋째 줄로 안 접힌다.
+       「—」만 든 칸(말 없는 값)은 안 그린다. 「✓ 이 회사 자료 맞음」은 판에서 누른다 — 근거(후보 자료)를 보고 누르는 자리다.
+     · 머리줄(거르기·순서 단추)은 옆으로 미는 한 줄.
+     · 고른 사업장의 이력은 화면을 덮는 판으로 — 「← 목록」·폰 뒤로가기로 닫는다(목록은 보던 자리 그대로).
+     · 바깥 상자 좌우 여백 22px → 6px (360px 폰에서 44px 이 그냥 빈자리였다). */
+@media (max-width:900px){
+  /* 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 … 좌우 옆공간 모두 채워서」) —
+     회색 바탕 위 바깥 상자(여백·테두리·둥근 모서리) 안에 흰 줄·흰 카드가 또 겹쳐, 사업장 이름이 화면 끝에서 45px 안쪽에서 시작했다.
+     폰에서는 바깥 상자를 «없는 셈»으로(여백·테두리·바탕 0) 두고, 안쪽 띠·줄이 화면 폭 그대로 한 겹이 된다. 글은 화면 끝에서 8~10px. */
+  #lib,#topics,#sites{margin:0 0 16px;border:0;border-radius:0;background:transparent}
+  #sites .stbl{overflow-x:visible}
+  #sites .sites{min-width:0;display:block}
+  #sites .sites colgroup{display:none}
+  #sites .sites thead{display:block}
+  #sites .sites thead tr{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;background:#f8fafc;border-bottom:1px solid #e2e8f0;scrollbar-width:none}
+  #sites .sites thead tr::-webkit-scrollbar{display:none}
+  #sites .sites thead th{display:block;flex:none;padding:0;border:0;background:none}
+  #sites .sites thead th:first-child{display:none}
+  #sites th.ch .h{height:32px;border:1px solid #cbd5e1;border-radius:16px;background:#ffffff;padding:0 11px}
+  #sites .sites tbody{display:block}
+  #sites .sites tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px;border-bottom:1px solid #e2e8f0;background:#ffffff}
+  #sites .sites tbody tr.sel{background:#eff6ff}
+  #sites .sites tbody tr::after{content:'';order:4;flex-basis:100%;height:0}
+  #sites .sites td{display:block;padding:0;border:0;background:none;min-width:0}
+  #sites .sites tr.sel td{background:none}
+  #sites .sites td:nth-child(1){order:1;flex:0 0 22px}
+  #sites .sites td:nth-child(2){order:2;flex:1 1 0}
+  #sites .sites td:nth-child(6){order:3;flex:none}
+  #sites .sites td:nth-child(6) .btn{display:none}
+  #sites .sites td:nth-child(n+3):not(:nth-child(6)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
+  #sites .sites td:nth-child(7){order:5;margin-left:30px}
+  #sites .sites td:nth-child(8){order:6}
+  #sites .sites td:nth-child(5){order:7}
+  #sites .sites td:nth-child(3){order:8}
+  #sites .sites td:nth-child(4){order:9}
+  #sites .sites td:is(:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(8)):has(> .k.none:only-child){display:none}
+  #sites .sites td.empty{flex:1 1 100%;padding:30px 10px;white-space:normal}
+  #sites .sside.empty{display:none}
+  #sites .sside:not(.empty){position:fixed;inset:0;z-index:40;overflow-y:auto;overscroll-behavior:contain;padding:10px 10px 40px}
+  #sites .sside .sback{display:inline-flex;align-items:center;min-height:36px;margin-bottom:4px;font-weight:700}
+  /* 찾기칸 옆에 「새로고침」 — 찾기칸이 한 줄을 통째로 먹어 새로고침이 넷째 줄로 혼자 내려갔다 */
+  #sites .flt .q{width:auto;flex:1 1 160px;min-width:0}
+  /* 머리줄 로그인 이름은 한 줄 — 「점검대표 / admin · P- / 001」 석 줄로 쌓여 머리줄이 64px 이 됐다 */
+  .top .r{min-width:0;flex:0 1 auto}
+  .top #whoslot{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  /* ── 📥 모은 자료 ──
+     · 맨 위 요약은 간격만 줄인다(다섯 줄 → 셋).
+     · 거르개(보기 셋·갈래 칩 여섯·딱지 넷·찾기)는 «옆으로 미는 한 줄» — 여섯 줄(약 200px)이 첫 화면을 먹었다. 찾기칸을 맨 앞에 둔다.
+     · 메일 순 표(.lmail)는 두 줄 카드 — 1줄 ☐·번호·갈래·파일 / 2줄 사업장·판·최종본·상태·가린 것.
+       사업장·판·최종본이 화면 밖(옆으로 밀어야 보임)에 있었다. 메일 머리 줄은 한 줄(제목만 …).
+     · ☐ 는 손가락 크기(15px → 24px). 머리 ☐(보이는 것 모두 고르기)는 그대로 둔다. */
+  #lib .run{gap:4px 12px;padding:8px 10px}
+  #lib>.flt{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding:8px 10px}
+  #lib>.flt::-webkit-scrollbar{display:none}
+  #lib>.flt>*{flex:none}
+  #lib>.flt .q{order:-1;width:150px;margin-left:0}
+  #lib .lmail{min-width:0;display:block}
+  #lib .lmail colgroup{display:none}
+  #lib .lmail thead,#lib .lmail tbody{display:block}
+  #lib .lmail tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 6px;padding:6px 10px 6px 0;border-bottom:1px solid #e2e8f0;background:#ffffff}
+  #lib .lmail td,#lib .lmail th{display:block;padding:0;border:0;background:none;min-width:0}
+  #lib .lmail thead tr{background:#f8fafc}
+  #lib .lmail th:nth-child(n+5){display:none}
+  #lib .lmail tr.ck{background:#eff6ff}#lib .lmail tr.hold{background:#fffbeb}#lib .lmail tr.fin{background:#f0fdf4}
+  #lib .lmail tr.ck td,#lib .lmail tr.hold td,#lib .lmail tr.fin td{background:none}
+  #lib .lmail input[type=checkbox]{width:24px;height:24px}
+  #lib .lmail tbody tr:not(.mail)::after{content:'';order:4;flex-basis:100%;height:0}
+  #lib .lmail td:nth-child(1),#lib .lmail th:nth-child(1){order:1;flex:0 0 40px;text-align:center}
+  #lib .lmail td:nth-child(2),#lib .lmail th:nth-child(2){order:2;flex:none;min-width:22px}
+  #lib .lmail td:nth-child(3),#lib .lmail th:nth-child(3){order:3;flex:none}
+  #lib .lmail td:nth-child(4),#lib .lmail th:nth-child(4){order:3;flex:1 1 0}
+  #lib .lmail td:nth-child(n+5){order:5;flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
+  #lib .lmail td:nth-child(5){margin-left:46px}
+  #lib .lmail td:nth-child(9){order:6}
+  #lib .lmail td.fin0,#lib .lmail td.pii:has(> .none:only-child){display:none}
+  #lib .lmail tr.mail{padding:5px 10px;background:#f8fafc}
+  #lib .lmail tr.mail td:first-child{display:none}
+  #lib .lmail tr.mail td:last-child{flex:1 1 100%;display:flex;align-items:center;gap:4px;white-space:nowrap;margin-left:0;max-width:none}
+  #lib .lmail tr.mail td:last-child b{min-width:0;overflow:hidden;text-overflow:ellipsis;flex:0 1 auto}
+  #lib .lmail tr.mail td:last-child .btn{flex:none;margin-left:auto}
+  #lib .lmail td.empty{flex:1 1 100%;padding:30px 10px;white-space:normal;max-width:none;margin-left:0}
+  /* 📚 조별 문안 — 문안 카드가 바깥 상자·본문 칸(좌우 22px) 안에 또 둥근 카드(14px)로 앉아 글이 44px 안쪽이었다.
+     폰에서는 본문 칸을 흰 띠 하나로 펴고, 카드는 옆 테두리·둥근 모서리·바탕을 걷어 위아래 선으로만 가른다(한 겹) */
+  #topics .main{padding:10px 0;background:#ffffff}
+  #topics .main>.head,#topics .main>.lead,#topics .main>.fail,#topics .main>.msg{margin-left:10px;margin-right:10px}
+  #topics .card{border-left:0;border-right:0;border-radius:0;background:transparent;margin-bottom:8px}
+  #topics .ch2,#topics .txt{padding-left:10px;padding-right:10px}
+  #topics .warn{padding:0 10px 10px}
+  #topics .who{padding:6px 10px 10px}
+  /* 조 주제 목록 — 장 제목 16px·주제 22px 안쪽에서 시작했다. 목록 띠에 6px 를 두고 줄 안 여백을 6px 로(글은 12px) */
+  #topics .left{padding:0 6px 8px}
+  #topics .tq{margin:10px 0;width:100%}
+  #topics .ch{padding:8px 6px 4px}
+  #topics .tp{padding:6px;border-radius:8px}
+}
+#sites .sback{display:none}
 /* ── 틀 고정 (대표 지시 2026-10-04 「틀고정」·「대시보드 고정」) ──
    엑셀의 틀 고정처럼: 위쪽(모으기 요약·거르개·표 머리)과 📚 의 조 주제 목록은 «서 있고»,
    목록·오른쪽 칸만 «제 상자 안에서» 스크롤한다.
@@ -282,6 +404,12 @@ button{font:inherit;cursor:pointer}
   #sites>.swrap{flex:1 1 auto;min-height:0;grid-template-rows:minmax(0,1fr)}
   #sites .stbl{overflow:auto;min-height:0}
   #sites .sites th{position:sticky;top:0;z-index:2}
+  /* # · 사업장 이름 칸 고정 — 좁은 PC 에서 표를 옆으로 밀어도 «어느 회사 줄인지»가 남는다(2026-10-18).
+     ⚠ 이름 칸의 left 는 # 칸 폭(view-sites.js colgroup 첫 칸)과 같아야 한다 — 다르면 겹치거나 틈이 난다.
+     PC(표 모양)에서만 — 폰(900px 이하)은 두 줄 카드라 옆으로 밀 일이 없고, 걸면 카드 안에 세로 줄금이 그어진다 */
+  .sites td:nth-child(1),.sites th:nth-child(1){position:sticky;left:0;z-index:1}
+  .sites td:nth-child(2),.sites th:nth-child(2){position:sticky;left:36px;z-index:1;box-shadow:inset -1px 0 0 #e2e8f0}
+  #sites .sites th:nth-child(-n+2){z-index:3}
   #sites .sside{overflow:auto;min-height:0}
   #lib>.run,#lib>.flt,#lib>.bulk{flex:0 0 auto}
   #lib>.wrap{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
@@ -326,7 +454,7 @@ button{font:inherit;cursor:pointer}
 .tflow i.f{background:#fffbeb;border-color:#fde68a;color:#854d0e;font-weight:700}
 .tflow i.rep{background:#f0fdf4;border-color:#bbf7d0;color:#166534}
 </style>
-<link rel="stylesheet" href="css/rules-shell.css?v=2">
+<link rel="stylesheet" href="css/rules-shell.css?v=4">
 </head>
 <body>
 <div class="top rs-head">
@@ -345,7 +473,7 @@ button{font:inherit;cursor:pointer}
 <div id="lib" style="display:none"><div class="msg">불러오는 중…</div></div>
 <div id="topics" style="display:none"><div class="msg">불러오는 중…</div></div>
 
-<script src="js/pu-appbar.js?v=30"></script>
+<script src="js/pu-appbar.js?v=33"></script>
 <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 · 상단 우측에 「지금 로그인한 사람」 -->
 <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
@@ -857,6 +985,11 @@ try {
 <script>/* 「지금 로그인한 사람」은 머리줄 자리에 — 안 알려 주면 부품이 떠 있는 표를 따로 띄워 겹친다 */
 try { PuWhoami.mount('#whoslot'); } catch (e) {}</script>
 <script>try { PuAppBar.mount('#appslot', { current: 'rules' }); } catch (e) {}</script>
-<script>try { PuBack.guard(function () { return false; }); } catch (e) {}</script>
+<script>/* 폰 뒤로가기 — 🏢 사업장의 이력 판(폰에서는 화면을 덮는다)이 떠 있으면 그 판만 닫는다 (폰화면관리 2026-10-18).
+   판이 없으면 false — 예전처럼 공통 층(pu-back)이 앱을 나간다. PC 는 판이 아니라 오른쪽 칸이라 건드리지 않는다. */
+try { PuBack.guard(function () {
+  if (window.__rv2Mode === 'sites' && ST.sites.sel && window.matchMedia && window.matchMedia('(max-width:900px)').matches) { H.siteSel({ co: '' }); return true; }
+  return false;
+}); } catch (e) {}</script>
 </body>
 </html>

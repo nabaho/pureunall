@@ -35,3 +35,6 @@
      inline-flex 로 세우고 가운데 맞춘다(배포본에서 재서 넣었다: 29 → 38,
      띠 31 → 40, 줄 수 그대로 1줄, 가로 넘침 0). */
 @media(max-width:768px){.rmode a{min-height:38px;display:inline-flex;align-items:center}}
+
+/* 「새 버전 있음 · 누르기」 단추의 폰 자리는 이 파일에 두지 않는다 — 모든 앱 한 곳(js/pu-appbar.js fabLift)에서 정한다.
+   (2026-10-18 한때 여기서 24px 로 박았더니 폰 쪽 막대(sticky)를 덮었다 — 막대 높이를 재서 비키는 일은 앱바가 한다) */

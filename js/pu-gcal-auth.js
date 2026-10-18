@@ -136,6 +136,34 @@
     });
   }
 
+  /* 공용 달력 «읽기» — 열쇠(API key) 하나로 된다(로그인 불필요). 쪽을 넘기며 다 받는다 (2026-10-17 이알피 근태 연동).
+     ⚠ 시간 제한은 apiCall 과 같다(쪽마다 20초) · 실패는 «거절»로 넘긴다. */
+  function listEvents(calId, key, timeMin, timeMax, opt) {
+    var o = opt || {};
+    var f = o.fetch || (typeof fetch !== 'undefined' ? fetch : null);
+    if (!f) return Promise.reject(new Error('부를 길이 없습니다'));
+    var 제한 = o.timeoutMs || TIMEOUT_MS, 모두 = [];
+    var 주소 = BASE + '/calendars/' + encodeURIComponent(calId) + '/events?key=' + encodeURIComponent(key)
+      + '&timeMin=' + encodeURIComponent(timeMin) + '&timeMax=' + encodeURIComponent(timeMax) + '&singleEvents=true&maxResults=2500';
+    function 한쪽(쪽표) {
+      var 끊개 = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+      var 시계 = 끊개 ? setTimeout(function () { 끊개.abort(); }, 제한) : null;
+      return f(주소 + (쪽표 ? '&pageToken=' + encodeURIComponent(쪽표) : ''), 끊개 ? { signal: 끊개.signal } : {}).then(function (r) {
+        if (시계) clearTimeout(시계);
+        return r.json().then(function (j) {
+          if (!r.ok || (j && j.error)) throw new Error((j && j.error && j.error.message) || ('HTTP ' + r.status));
+          모두 = 모두.concat((j && j.items) || []);
+          return (j && j.nextPageToken) ? 한쪽(j.nextPageToken) : 모두;
+        });
+      }, function (e) {
+        if (시계) clearTimeout(시계);
+        if (e && e.name === 'AbortError') throw new Error(Math.round(제한 / 1000) + '초 안에 구글이 답하지 않았습니다');
+        throw e;
+      });
+    }
+    return 한쪽('');
+  }
+
   /* 구글 일정을 «다른 날로» 옮긴다 (2026-09-21, 끌어 옮기기).
      ★ 먼저 그 일정을 받아 와야 한다 — 시각을 그대로 두고 «날짜만» 바꾸려면
        지금 몇 시인지 알아야 하기 때문이다. 종일 일정이면 날짜만 있다.
@@ -421,7 +449,7 @@
 
   return {
     hasToken: hasToken, token: token, capture: capture,
-    signInUrl: signInUrl, apiCall: apiCall, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent,
+    signInUrl: signInUrl, apiCall: apiCall, listEvents: listEvents, deleteEvent: deleteEvent, moveEvent: moveEvent, createEvent: createEvent, updateEvent: updateEvent,
     getEvent: getEvent, bodyOf: 몸만들기, callServer: 서버,   /* callServer — gcalEdit(고치기·지우기 대신) 부르기 */   /* bodyOf — 서버 대신 넣기와 «같은 셈»인지 검사가 맞대 본다 */
     fromServer: fromServer, linkStart: linkStart, captureCode: captureCode, linkFinish: linkFinish,
     unlink: unlink, email: email, keepAlive: keepAlive

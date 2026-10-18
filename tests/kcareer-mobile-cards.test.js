@@ -48,7 +48,12 @@ test('머리글이 사라지므로 칸마다 이름표를 적어 둔다', () => 
 
 test('빈 칸은 접는다 — 값 없는 줄이 쌓이면 컴팩트한 뜻이 없다', () => {
   assert.match(kc, /td\.setAttribute\('data-empty','1'\)/);
-  assert.match(phone, /\.dt td\.rownum,\.dt td\[data-empty\]\{display:none\}/);
+  assert.match(phone, /\.dt td\[data-empty\]\{display:none\}/);
+  /* ⚠ 번호 칸(☐ + №)은 접지 않는다 — 대표 지시 2026-10-05 「모든 프로그램에 가장 왼쪽에 ㅁ 표시와
+     넘버링」(폰에서도 빼지 않는다). 2026-08-17 에는 번호만 든 칸이라 접었지만 지금은 ☐ 가 같은 칸에 있다.
+     자세한 규칙은 tests/career-phone-select.test.js */
+  assert.doesNotMatch(phone, /td\.rownum[^{}]*\{[^}]*display:none/,
+    '★ 폰에서 번호 칸(☐ + №)을 접으면 폰에서는 고를 길이 없습니다');
 });
 
 /* ── 한 줄에 한 칸씩 (대표 지시 2026-08-17 두 번째)
@@ -100,8 +105,13 @@ test('관리 단추는 카드 아래가 아니라 오른쪽에 세로로 선다'
   }
   const b = kc.slice(at, i + 1);
 
-  assert.match(b, /\.dt tr\{display:grid!important;grid-template-columns:minmax\(0,1fr\)/);
-  assert.match(b, /\.dt td:last-child\{[^}]*grid-column:2/);
+  /* 값 칸은 줄어들 수 있어야 하고(minmax(0,1fr)), 단추 칸은 «맨 끝 칸»이다.
+     ⚠ 칸 수는 박지 않는다 — 2026-10-18 에 ☐ № 를 이름표 자리에 세우며 셋이 됐다. */
+  const 판 = (b.match(/\.dt tr\{display:grid!important;grid-template-columns:([^;]*);/) || [])[1];
+  assert.ok(판 && /minmax\(0,1fr\)/.test(판), '카드가 격자가 아니거나 값 칸이 줄지 못합니다');
+  const 칸수 = 판.trim().split(/\s+(?![^(]*\))/).length;
+  assert.match(b, new RegExp('\\.dt td:last-child\\{[^}]*grid-column:' + 칸수 + '[;}]'),
+    '★ 단추 칸이 맨 끝 칸(' + 칸수 + '번째)이 아닙니다');
   assert.match(b, /\.dt td:last-child\{[^}]*grid-row:1\/-1/,
     '★ 단추 칸이 모든 줄을 가로지르지 않으면 첫 줄 옆에만 붙습니다.');
   /* ★ grid-row:1/-1 은 «명시한» 줄만 셈한다 — 줄 수를 안 적으면 -1 이 1이 되어

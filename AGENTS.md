@@ -11,7 +11,7 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 
 ---
 
-## ★ 어기면 되돌려지는 것 일곱
+## ★ 어기면 되돌려지는 것 여덟
 
 ### ① 검사는 「지금 값」이 아니라 「규칙」을 박는다
 `maxHeight:'calc(100vh - 340px)'` 가 아니라 «높이 한도가 있는가»,
@@ -69,6 +69,24 @@ GitHub Pages 로 배포하고, 뒤는 Firebase(RTDB·Functions)가 받는다.
 예외는 보기 전용(요약 숫자 상자·달력 칸·그래프·설정 한 줄)뿐이고, 애매하면 넣는다.
 자세한 표는 CLAUDE.md 같은 이름의 절. ⚠ 아직 기계로 지키는 검사는 없다.
 
+### ⑧ 모든 앱은 폰에서 «한 화면에 보이게» (대표 지시 2026-10-18 「폰화면관리」)
+대표는 주로 폰으로 쓴다. **폰 구간(`@media (max-width:…)`)에서만** 바꾸고 PC 는 그대로 둔다.
+넓은 표는 폰에서 줄마다 «두 줄 카드»(1줄 ☐·№·이름·핵심값, 2줄 말하는 값만), 탭은 한 줄,
+머리 한 줄, 입력칸 16px 이상(확대는 막지 않는다), 양옆 빈자리 없이(글은 화면 끝 8~14px 안, 상자는 한 겹). 떠 있는 단추를 앱마다 새로 만들지 않는다 —
+폰에서는 공용 앱바가 「최신」·「백업·복구」를 손잡이 목록 안으로 옮긴다(`js/pu-appbar.js` `phoneRows`).
+「새 버전 있음」 단추의 폰 자리도 앱바가 정한다 — 바닥 가까이, 바닥 막대가 있으면 재서 그 위로(`fabLift`). 앱에서 그 `bottom` 을 따로 박지 않는다.
+확인은 `node tools/phone-audit/run.mjs <앱 key>`(가짜 파이어베이스로 로그인한 채 360·411px 에서 재고 갈무리).
+**새 앱은 `tools/phone-audit/seeds/<key>.js`(지어낸 자료만)를 함께 만든다.** 앱별 상태는 `docs/폰화면-현황.md`.
+→ `tests/phone-screen-rules.test.js` · `tests/phone-input-zoom.test.js` · `tests/version-fab-phone-low.test.js`
+
+---
+
+## 만들기 전에 «이미 있는 것»부터 찾는다 (2026-10-18)
+
+- 새 함수·화면·검사·스크립트를 만들기 전에 저장소 안에 같은 일을 하는 것이 있는지 먼저 찾는다
+  (`rg`, `STATUS.md` 「4. 이 저장소에서 되풀이된 실수」, `status/`). 있으면 그 길을 탄다.
+- 찾지 못한 곳은 «못 찾았다»고 밝힌다 — 검색 길이 막혔는데 「없습니다」라고 보고하지 않는다.
+
 ---
 
 ## 반드시 돌리는 것
@@ -89,8 +107,8 @@ GitHub Pages 는 저장소를 통째로 올리므로, 여기 없는 새 폴더�
 
 ```
 지움: tests fund-erp docs harness scripts engine app tools reference functions
-      _scan_out node_modules status .github .claude .agents .githooks .superpowers .codex-worktrees
-      최상위 *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json
+      _scan_out node_modules status android .github .claude .agents .githooks .superpowers .codex-worktrees
+      최상위 *.md *.bat firebase.json .firebaserc .mcp.json package-lock.json .gitignore firebase.database.json
 남김: js css vendor 최상위 *.html *.js *.png manifest*.json hana-bridge.apk
 ```
 
@@ -113,6 +131,9 @@ GitHub Pages 는 저장소를 통째로 올리므로, 여기 없는 새 폴더�
   ⚠ `STATUS.md` 의 「2. 지금 손이 필요한 것」 은 **그대로 그 파일에 고친다** — 거기서
     부딪히는 것은 «뜻이 있는» 부딪힘이라 사람이 봐야 한다.
 - 커밋 메시지는 한국어로, **무엇을 왜 고쳤는지**를 적는다.
+- ★ **검사가 통과하면 PR 은 묻지 않고 만든다** (대표 지시 2026-10-17 「묻지말고 항상 만들어라」).
+  합치기는 자동 병합(`auto-merge.yml`)이 한다. 검사가 빨가면 만들지 말고 먼저 고친다.
+  사람이 보고 합칠 것은 제목에 `[보류]`. 자세한 것은 `CLAUDE.md` 의 같은 절.
 
 ---
 

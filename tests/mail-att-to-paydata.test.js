@@ -1,7 +1,7 @@
 /* 푸른 메일 — 첨부를 «급여데이터함으로» 바로 (대표 결정 2026-08-30)
 
    급여자료가 메일로 오면 여태 내려받아 → 급여데이터함을 열어 → 다시 올리는 세
-   걸음이었다. 서버가 10분마다 스스로 훑는 길은 «아는 곳에서 온 것»만 담는다.
+   걸음이었다. 서버가 30분마다 스스로 훑는 길은 «아는 곳에서 온 것»만 담는다.
 
    지키는 것.
    ① 첨부마다 「→ 급여데이터함」이 있다
@@ -171,6 +171,31 @@ test('★★ 공용 칸에 남았으면 «그 까닭»까지 말한다', async (
   const said = c._held.toasts.join(' | ');
   assert.ok(said.indexOf('공용') >= 0, '공용 칸이라고 안 말합니다: ' + said);
   assert.ok(said.indexOf('업체를 못 찾았습니다') >= 0, '까닭을 안 말합니다: ' + said);
+});
+
+test('★★ 서랍으로 «바로» 들어갔으면 그렇다고 말한다 — 대기 칸에서 찾게 하면 안 된다', async () => {
+  /* 다섯 잣대를 다 통과하면 서버가 대기 칸을 건너뛴다(sureFor). 그때도 「대기 칸 ·
+     골라 주세요」라고 하면 이미 들어간 자료를 대기 칸에서 찾다 「안 들어왔다」고 여긴다. */
+  const c = load({ reply:{ ok:true, id:'x3', seat:'s01', shared:false, why:'', name:'9월 급여대장.xlsx',
+                           bytes:1, filed:true, filedTo:{ companyName:'가나상사', month:'2026-09', kind:'ledger' } } });
+  c.mbAttToPay(0);
+  await flush();
+  const said = c._held.toasts.join(' | ');
+  assert.ok(said.indexOf('서랍') >= 0, '서랍에 들어간 것을 안 말합니다: ' + said);
+  assert.ok(said.indexOf('골라 주세요') < 0, '이미 들어갔는데 골라 달라고 합니다: ' + said);
+  assert.ok(said.indexOf('가나상사') >= 0 && said.indexOf('2026-09') >= 0,
+    '«어느» 서랍인지 안 말합니다: ' + said);
+  assert.ok(said.indexOf('ledger') < 0, '종류를 사람 말로 안 바꾸고 그대로 보입니다: ' + said);
+});
+
+test('★★ 서버가 «서랍으로 갔다»는 표를 화면에 넘긴다 — 안 넘기면 화면이 알 길이 없다', () => {
+  const seg = fnPart();
+  assert.ok(/filed\s*:/.test(seg), '응답에 서랍 여부(filed)가 없습니다');
+  assert.ok(/filedTo\s*:/.test(seg), '응답에 어느 서랍인지(filedTo)가 없습니다');
+  const i = idx.indexOf('async function payMailStoreOne(');
+  assert.ok(i > 0, 'payMailStoreOne 을 찾지 못했습니다');
+  const body = idx.slice(i, idx.indexOf('\n}\n', i));
+  assert.ok(/return\s*\{[^}]*filedTo/.test(body), '담는 길이 어느 서랍인지 돌려주지 않습니다');
 });
 
 test('★ 안 되면 «안 됐다고» 말한다 — 조용하면 담긴 줄 안다', async () => {

@@ -1218,6 +1218,94 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
     background:#2563eb;color:#fff;font-size:24px;align-items:center;justify-content:center;box-shadow:0 6px 16px rgba(37,99,235,.4);cursor:pointer;}
   body.m-sheet-open #mAddFab{display:none;}
 }
+/* ══ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 폰 폭에서 그려 보고 찾은 여섯 ══
+   ① 탭·단추를 «누르면» 설명 풍선(data-tip)이 붙은 채 남아 바로 아래 칸(월·주·일, 담당 고르기)을 덮었다.
+     손가락에는 «올려 두기»가 없다 — 누른 자리가 :hover 로 남는다. 머리줄·고르는 칸에서만 풍선을 끈다
+     (칸 안의 까닭 풍선 — 일괄 등록 날짜 칸 등 — 은 그대로 둔다).
+   ② 주·일 보기에서 «날짜 직접 고르기» 칸이 180px 를 먹어 담당·사업 고르기가 10px 로 눌렸다(글자 없이 ⌄ 만).
+     폰에서는 그 칸을 숨기고, 월 보기의 연도처럼 「10/12 ~ 10/18」 글자를 누르면 고르개가 열린다(bindCalNav).
+   ③ 사업장 목록 판 — 부담당 이름표가 줄을 밀어 «종료»·«▾ 펼치기» 단추가 화면 밖으로 나갔다(누를 수 없었다).
+     이름표가 줄어들고(…), 단추는 줄지 않는다. ☆·✏️ 는 손가락 크기로.
+   ④ 📈 진행 줄의 업체 이름이 92px(「(주)가나다라…」)에 갇혀 서로 구분이 안 됐다 — 화면 폭에 맞춰 넓힌다.
+   ⑤ 타임라인 머리(제목·거르개·찾기·범례)가 다섯 줄로 첫 화면 1/3 을 먹었다 → 세 줄. 왼쪽 칸의 사업 이름이 한 글자로 접히던 것도.
+   ⑥ 「🏠 캘린더」 탭이 늘 칠해져 있어 다른 탭을 눌러도 «눌린 탭이 둘»로 보였다.
+   ⑦ 월 달력 칸 머리 — 「+3건」(33px)과 날짜 숫자가 50px 칸에 안 들어가 「6+2건」처럼 겹치고 잘렸다 → 「+3」 만, 글씨 한 치수 작게.
+   ⚠ PC(769px~)는 그대로 — 아래는 모두 768px 이하에서만 산다. tests/consult-phone-audit.test.js 가 지킨다. */
+@media (max-width:768px) and (hover:none){
+  .hdr [data-tip]::after,.hdr [data-tip]::before,
+  #mobileCtrlBar [data-tip]::after,#mobileCtrlBar [data-tip]::before{display:none!important;}
+}
+@media (max-width:768px){
+  /* ⑦ 월 달력 칸 머리 — 「+N」 만 (건은 title·창에 있다) */
+  .mc-date-wrap{gap:1px;min-width:0;}
+  .mc-more-btn{font-size:10.5px;padding:0 1px;flex:none;}
+  .mc-more-btn .mc-gun{display:none;}
+  /* ② 날짜 직접 고르기 — 자리는 비우고, 제목 글자가 대신 연다(.m-open 일 때만 화면 밖에 잠깐 그린다 — 고르개는 그려진 칸만 연다) */
+  #calControls .pick-wrap{display:none!important;}
+  #calControls .pick-wrap.m-open{display:inline-flex!important;position:fixed;left:-9999px;}
+  /* ③ 사업장 카드 머리줄 — 이름표만 줄어든다 */
+  .dash .dcard-meta{min-width:0;gap:6px;}
+  .dash .dcard-meta .att-label{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .dash .dcard-meta .att-label[title="주담당"]{flex-shrink:0;}   /* 주담당은 다 보이고, 부담당(+이름)이 먼저 줄어든다 */
+  .dash .dcard-meta>button{flex-shrink:0;}
+  .dash .dcard-meta .co-fav-btn,.dash .dcard-meta>button[title="수정"]{min-width:30px;min-height:30px;font-size:15px!important;}
+  .dash .dcard-meta .dcard-open-btn{width:30px;height:30px;}
+  /* 넓은 폰(380px~)에서는 이름과 머리줄이 한 줄 — 머리줄이 이름을 다 밀어내지 않게 이름에 자리를 남긴다 */
+  #viewMain.dash-wide .dcard-meta{flex-shrink:1;}
+  #viewMain.dash-wide .dcard-name{min-width:96px;}
+  /* ④ 진행 줄 이름 폭 */
+  .mp-row .nm{width:clamp(92px,34vw,150px);}
+  /* ⑤ 타임라인 머리 — 제목+내 담당 / 고르기 셋 / 찾기·건수·범례 */
+  .tl-head{gap:6px!important;margin-bottom:8px!important;}
+  .tl-head h2{font-size:14px!important;}
+  .tl-head select{flex:1 1 28%;min-width:0!important;}
+  .tl-head .tl-filter-input{flex:1 1 90px;min-width:0;width:auto!important;}
+  .tl-head .tl-legend{margin-left:0!important;gap:6px!important;}
+  .gantt-type>span{flex-shrink:0;}
+  .gantt-type-name{max-width:52px;}
+  .gantt-type>span:nth-child(3){flex-shrink:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}   /* 담당 이름이 먼저 줄어든다 — 사업·회차는 남긴다 */
+  /* ⑥ 머리 탭 — 「🏠 캘린더」는 PC 에서 늘 칠한 «집» 단추라, 폰의 똑같은 탭 넷 사이에서는 «눌린 탭이 둘»로 보였다. 폰에서는 눌린 탭만 칠한다 */
+  .hdr .hdr-home:not(.active){background:transparent;color:var(--hdr-t2);border-color:var(--hdr-border);box-shadow:none;}
+  /* ⑧ 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」)
+     겉 여백(달력 16·타임라인 20·종료 사업장 14·진행 목록 10·창 16px)에 상자 안 여백이 겹겹이 쌓여
+     글이 화면 끝에서 28~48px 안쪽에서 시작했다 → 겉 여백 0~6px, 상자는 한 겹, 안쪽 여백 8~10px.
+     화면(보기) 바탕은 body 와 같은 색이라 폰에서는 투명 — 같은 색 상자가 한 겹 더 쌓인 셈이었다. */
+  #viewProg,#viewTimeline,#viewEnded{background:transparent!important;}
+  .mp-list{padding:0 4px 16px;}
+  .mp-row{padding:8px;}
+  .mp-grp{margin-left:8px;margin-right:8px;}
+  .cal-body{padding:0 2px 10px;}
+  .cal-body .mg,.cal-body .wg{border-radius:0;border-left:0;border-right:0;}
+  .dv{border-radius:0!important;border-left:0!important;border-right:0!important;}
+  .dv-hd{padding:10px 8px!important;}
+  .dv-it{padding:10px 8px 10px 2px!important;gap:6px!important;}
+  .timeline-page{padding:8px 4px 16px;}
+  .gantt-info,.gantt-info-hd{padding-left:8px;padding-right:6px;}
+  .ended-page{padding:10px 4px;}
+  .ended-page .set-page-hd,.ended-page .ended-col-title{padding-left:6px;padding-right:6px;}
+  .ended-card{padding:10px 8px;}
+  .ended-row{background:transparent;border-radius:0;padding:6px 0;margin-bottom:0;border-top:1px dashed var(--border);}
+  /* 사업장 목록 판 — 판 안 여백·카드 머리·줄 여백 */
+  .dash-top{padding:8px;}
+  .dash-body{padding:10px 4px;}
+  .dcard-hd{padding-left:8px!important;padding-right:8px!important;}
+  .drow{padding-left:4px;padding-right:6px;}
+  /* 창 — 양옆 6px, 머리·몸·발 안쪽 10px. 종료 확인 줄은 상자를 걷고 위 줄로만 가른다 */
+  .mb{padding:6px;}
+  .modal{width:100%!important;max-width:none!important;}
+  .mhdr{padding:12px 10px 10px;}
+  .mbody{padding:10px;}
+  .mfoot{padding:10px;}
+  .end-confirm-item{background:transparent;border:0;border-top:1px solid var(--border);border-radius:0;padding:10px 0;}
+  .day-detail-hd{padding:12px 10px 10px;}
+  .day-detail-body{padding:10px;}
+  /* 보고서 창·사업장 일정 크게 보기 — 창 안 여백 10px, 칸 상자(① 기업 정보 …)는 걷고 위 줄로만 가른다 */
+  .grp-top,.tz-head,.tz-sum,.tz-next{padding-left:10px;padding-right:10px;}
+  .grp-warn{padding-left:10px;padding-right:10px;}
+  .grp-note{margin-left:10px;margin-right:10px;}
+  .grp-scroll{padding:8px 10px 14px;}
+  .grp-card{border:0;border-top:1px solid var(--border);border-radius:0;padding:10px 0;margin-bottom:4px;}
+}
 /* ===== 풀스크린 로그인 화면 ===== */
 #mbLogin{z-index:1000;}
 .login-screen{position:fixed;inset:0;overflow:auto;display:flex;flex-direction:column;font-family:inherit;}
@@ -1300,14 +1388,15 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-resilience.js?v=3"></script>
+<script src="js/pu-visit-sms.js?v=2"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <!-- 푸른사진첩에서 사진을 끌어다 놓을 수 있게 하는 공용 조각 -->
@@ -1322,7 +1411,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <script src="js/pu-doc-read.js?v=50"></script>
 <script src="js/pu-doc-file.js?v=37"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=33"></script>
   <!-- 로그아웃·사람 바뀜을 모든 프로그램에 퍼뜨린다 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
   <script src="js/pu-authsync.js?v=4"></script><script src="js/pu-logout-why.js?v=1"></script>
   <!-- 상단 우측에 「지금 로그인한 사람」 (2026-08-16) — 로그인 화면·공개 화면에는 넣지 않는다 -->
@@ -1371,8 +1460,8 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
     <span class="flt-wrap" data-tip="담당 노무사별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="attFilter"></select></span>
     <span class="flt-wrap" data-tip="사업(컨설팅 종류)별로 일정 필터" style="display:inline-flex;"><select class="att-filter" id="typeFilter"></select></span>
     <span class="year-wrap" data-tip="연도 이동 — 선택한 해로 점프" style="display:inline-flex;"><select class="att-filter" id="yearSel"></select></span>
-    <span data-tip="날짜 직접 선택" style="display:inline-flex;"><input type="date" id="calDayPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
-    <span data-tip="주 직접 선택" style="display:inline-flex;"><input type="week" id="calWeekPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
+    <span class="pick-wrap" data-tip="날짜 직접 선택" style="display:inline-flex;"><input type="date" id="calDayPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
+    <span class="pick-wrap" data-tip="주 직접 선택" style="display:inline-flex;"><input type="week" id="calWeekPicker" style="display:none;padding:5px 8px;border:1.5px solid var(--dash-border);border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;background:var(--dash-sf);color:var(--dash-text);outline:none;cursor:pointer;"></span>
   </div>
   <div class="hdr-r">
     <span id="hdrLogout" style="display:flex;align-items:center;"></span>
@@ -1485,6 +1574,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
         </div>
       </div>
     </div>
+    <div id="visitSmsBar"></div><!-- 방문 사업장 안내 문자 승인 띠(js/pu-visit-sms.js) — 오늘 목록이 있을 때만 보인다 -->
     <div class="dash-body" id="dashList"></div>
     <button class="dash-settings" id="dashSettingsBtn">⚙️ 환경설정</button>
   </aside>
@@ -1636,7 +1726,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
 <!-- TIMELINE VIEW -->
 <div id="viewTimeline" style="display:none;flex:1;overflow:auto;background:var(--bg);">
   <div class="timeline-page">
-    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
+    <div class="tl-head" style="display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap;">
       <h2 style="font-size:16px;font-weight:900;">📊 컨설팅 타임라인</h2>
       <button class="tl-toggle" id="tlMineToggle" aria-pressed="false" title="내가 주담당·부담당인 컨설팅만 봅니다">👤 내 담당만</button>
       <select class="att-filter" id="tlStatusFilter" style="font-size:11px;">
@@ -1648,7 +1738,7 @@ textarea.grp-in{resize:vertical;min-height:60px;line-height:1.5;}
       <select class="att-filter" id="tlTypeFilter" style="font-size:11px;min-width:180px;"></select>
       <input class="tl-filter-input" id="tlGeneralSearch" placeholder="일반 검색...">
       <span class="tl-hint" id="tlCount"></span>
-      <div style="margin-left:auto;display:flex;gap:10px;font-size:10px;font-weight:700;color:var(--t2);align-items:center;">
+      <div class="tl-legend" style="margin-left:auto;display:flex;gap:10px;font-size:10px;font-weight:700;color:var(--t2);align-items:center;">
         <span>● 방문</span><span>○ 사무실</span>
         <span style="background:#cbd5e1;color:#fff;padding:2px 8px;border-radius:8px;">종료(흐림)</span>
       </div>
@@ -2698,6 +2788,8 @@ function fbInit(){
         fbUnsubscribeAll();
         FB_READY=true; _fbAuthUid=u.uid;
         if(typeof pubHolidaysLoad==='function')pubHolidaysLoad();
+        /* 방문 사업장 안내 문자 승인 띠 — 오늘 목록은 서버가 09:00 에 만든다(한 번만 건다) */
+        if(window.PuVisitSms&&!window._vsmsOn){ window._vsmsOn=true; try{ PuVisitSms.init({db:_fbDB,auth:()=>firebase.auth(),me:()=>({id:myId(),isAdmin:isAdmin()})}); }catch(e){} }
         /* ★ 밀린 저장을 «먼저» 올린다 — 내려받기가 이 기기를 클라우드 옛 값으로 덮기 전에.
            (2026-10-05: 연결 전에 한 저장이 여기서 조용히 사라지던 길) */
         fbFlushDirty();
@@ -5206,7 +5298,12 @@ window.mMenu=mMenu;
 function bindCalNav(){
   const p=q('#calPrev'),n=q('#calNext'),t=q('#calTodayBtn');
   /* 폰: 연도 칸을 따로 두지 않는다 — 「2026년 10월」 글자를 누르면 연도 고르개가 열린다 */
-  const ct=q('#calTitle'); if(ct&&!ct._yr){ ct._yr=1; ct.onclick=()=>{ if(window.innerWidth>768) return; const ys=q('#yearSel'), w=q('.year-wrap'); if(!ys) return;
+  /* 주·일 보기도 같다 — 폰에서는 «날짜 직접 고르기» 칸을 숨기고(담당·사업 고르기를 눌렀다), 「10/12 ~ 10/18」 글자가 그 고르개를 연다 (2026-10-18) */
+  const ct=q('#calTitle'); if(ct&&!ct._yr){ ct._yr=1; ct.onclick=()=>{ if(window.innerWidth>768) return;
+    if(S.calMode==='week'||S.calMode==='day'){ const pk=q(S.calMode==='week'?'#calWeekPicker':'#calDayPicker'), pw=pk&&pk.closest('.pick-wrap'); if(!pk) return;
+      if(pw) pw.classList.add('m-open'); try{ pk.showPicker(); }catch(e){ pk.focus(); }
+      pk.addEventListener('change',()=>{ if(pw) pw.classList.remove('m-open'); },{once:true}); return; }
+    const ys=q('#yearSel'), w=q('.year-wrap'); if(!ys) return;
     if(w) w.classList.add('m-open'); try{ ys.showPicker(); }catch(e){ ys.focus(); }
     ys.addEventListener('change',()=>{ if(w) w.classList.remove('m-open'); },{once:true}); }; }
   if(p)p.onclick=()=>{
@@ -7207,6 +7304,7 @@ function bindProg(){
 }
 
 function renderDash(){
+  if(window.PuVisitSms)PuVisitSms.paint();   // 로그인 정보(내 id)가 뒤늦게 와도 띠가 따라온다
   refreshStaffDropdowns();
   if(q('#viewProg')?.style.display==='flex')renderProg();   // 자료가 바뀌면 진행 보기도 함께
   const search=S.dashSearch;
@@ -9175,10 +9273,11 @@ function renderDay(){
   const ds=S.calDay,today=todayStr();
   const sc=getFilteredScheds(ds);
   const hol=getHoliday(ds);
-  let html=`<div style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);overflow:hidden;">`;
+  /* dv·dv-hd·dv-it — 폰에서 양옆 여백을 걷는 이름표(2026-10-18 폰 양옆 빈자리). PC 모양은 아래 인라인 그대로 */
+  let html=`<div class="dv" style="background:var(--surface);border-radius:var(--r);border:1px solid var(--border);overflow:hidden;">`;
   // 날짜 헤더
   const dWarn=dayConflictMsg(ds);
-  html+=`<div style="padding:14px 16px;border-bottom:1px solid var(--border);background:var(--sf2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+  html+=`<div class="dv-hd" style="padding:14px 16px;border-bottom:1px solid var(--border);background:var(--sf2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
     <div style="font-size:22px;font-weight:900;color:${ds===today?'var(--accent)':'var(--text)'};">${ds.slice(5).replace('-','/')}</div>
     ${hol?`<span style="font-size:12px;font-weight:900;color:var(--hol);">🔴 ${hol}</span>`:''}
     <span style="font-size:12px;font-weight:700;color:var(--t2);">${sc.length}건</span>
@@ -9202,7 +9301,7 @@ function renderDay(){
       const cardStyle=endedDate?'opacity:.68;background:#f8fafc;cursor:not-allowed;':mine?'':'opacity:.55;background:rgba(0,0,0,.02);';
       const restBg=endedDate?'#f8fafc':mine?'':'rgba(0,0,0,.02)';
       const hoverTitle=scheduleHoverTitle(s,co,ty,att,coAtts,hasPh);
-      html+=`<div onclick="openEditModal('${s.id}')" title="${escAttr(hoverTitle)}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--sf2);cursor:${endedDate?'not-allowed':'pointer'};transition:background .1s;${cardStyle}" onmouseover="this.style.background='${endedDate?'#f8fafc':'rgba(21,101,192,.04)'}'" onmouseout="this.style.background='${restBg}'">
+      html+=`<div class="dv-it" onclick="openEditModal('${s.id}')" title="${escAttr(hoverTitle)}" style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid var(--sf2);cursor:${endedDate?'not-allowed':'pointer'};transition:background .1s;${cardStyle}" onmouseover="this.style.background='${endedDate?'#f8fafc':'rgba(21,101,192,.04)'}'" onmouseout="this.style.background='${restBg}'">
         <div style="width:4px;height:48px;border-radius:2px;background:${endedDate?'#7b8089':ty?.color||'#cbd5e1'};flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:15px;font-weight:900;">${co?.name||'?'}${endedDate?` <span style="font-size:10px;color:#fff;background:#7b8089;border-radius:10px;padding:2px 7px;font-weight:800;">🔒 종료 ${endedDate}</span>`:mine?'':' <span style="font-size:10px;color:var(--t2);font-weight:700;">🔒</span>'}</div>
@@ -9256,7 +9355,8 @@ function renderMonth(){
     const MAX=4;
     const chips=sc.slice(0,MAX).map(chipHtml).join('');
     const moreCount=sc.length-MAX;
-    const moreBtn=moreCount>0?`<button class="mc-more-btn" data-date="${ds}">+${moreCount}건</button>`:'';
+    /* 「건」은 따로 감싼다 — 폰의 좁은 칸(약 50px)에서는 「+3」 만 남겨 날짜 숫자와 겹치지 않게(폰화면관리 2026-10-18) */
+    const moreBtn=moreCount>0?`<button class="mc-more-btn" data-date="${ds}" title="${moreCount}건 더 보기">+${moreCount}<span class="mc-gun">건</span></button>`:'';
     const dc=`mc-date${isToday?' today-c':(sun||isHol)?' hol-c':sat?' sat-c':''}`;
     /* 공휴일 이름은 «날짜 줄»에 붙인다(대표 결정 2026-08-30 「㉮ 날짜 옆 글씨」).
        예전에는 일정 칩과 똑같은 «알약»이라 광복절이 일정으로 읽혔고,
@@ -13919,7 +14019,7 @@ init();
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return closeTopOverlay() === true || PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

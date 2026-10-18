@@ -16,13 +16,13 @@
 <meta name="apple-mobile-web-app-title" content="푸른사진첩">
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script src="js/pu-version.js?v=12"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
 <script src="js/pu-photo-store.js?v=34"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
@@ -181,7 +181,18 @@ button{font-family:inherit;cursor:pointer}
   #ownerSel{padding:6px 8px;font-size:12.5px}
   .sidefill{min-height:2px}
   .setbtn{margin-top:6px;padding:7px;font-size:12.5px}
-  #main{padding:0 12px 12px}
+  /* ── 양옆 빈자리 걷기 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서」) ──
+     격자·윗줄이 화면 끝에서 12px 안쪽에 서고, 서류 카드 글은 거기서 또 8px 안쪽이라 20px 이 비었다.
+     폰에서는 격자를 화면 끝 6px 까지 넓힌다 — 사진 칸이 그만큼 커지고 카드 글은 14px 에서 시작한다. */
+  #main{padding:0 6px 12px}
+  #side{padding-left:6px;padding-right:6px}
+  /* 설정 카드 — 화면 끝 12px + 카드 안 14px 로 글이 27px 에서 시작했다. 폰에서는 화면 폭을 다 쓰고
+     옆 테두리·둥근 모서리를 걷어 위아래 줄로만 가른다(상자 안 여백 10px). */
+  /* ⚠ #main 을 앞에 붙인다 — 바탕 규칙(#backBar·#viewSettings .card)이 이 덩어리보다 «뒤»에 있어
+       같은 힘이면 그쪽이 이긴다. */
+  #main #viewSettings .card,#main #backBar{margin-left:-6px;margin-right:-6px;border-left:0;border-right:0;border-radius:0}
+  #main #viewSettings .card{padding:12px 10px}
+  #main #backBar{padding-left:10px;padding-right:10px}
 }
 
 /* 파일을 끌고 오는 동안 */
@@ -1145,6 +1156,12 @@ body.phsheet #pu-version-fab{display:none!important}
   background:#fff;color:#64748b;font-size:11px;font-weight:800;font-family:inherit;
   display:inline-flex;align-items:center;justify-content:center;margin-right:6px;padding:0;flex:none}
 #grid .day .dayck:hover{border-color:var(--blue);color:var(--blue)}
+/* 폰 — 「이 날 전부 고르기」·「고른 것 풀기 ✕」는 20px 남짓이라 손가락이 자주 빗나간다
+   (2026-10-18 폰화면관리). 보이는 동그라미는 그대로 두고 «누르는 자리»만 둘레로 넓힌다. */
+@media (max-width:820px){
+  #grid .day .dayck,#gridBar #gridCount .x{position:relative}
+  #grid .day .dayck::after,#gridBar #gridCount .x::after{content:'';position:absolute;inset:-8px}
+}
 #backBar button{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:8px;
   padding:6px 12px;font-size:12.5px;font-weight:700;font-family:inherit}
 
@@ -1654,6 +1671,20 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
 #viewer .bar #viewerInfo .s{display:block;font-size:12px;opacity:.72;margin-top:3px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:520px){ #viewer .bar #viewerInfo .d{font-size:15.5px} }
+/* ── 폰 — 크게 보기 윗줄은 «한 줄» (2026-10-18 폰화면관리) ──
+   360px 에서 「← 돌아가기 · 📋 복사 · 닫기 ✕」가 자리를 먹어 가운데 날짜가
+   「2026년 10월 18 / 일 (오늘)」로 낱말 가운데서 두 줄로 꺾였다.
+   ⚠ 단추를 «지우지 않는다» — 글씨만 접고 그림을 남긴다(이름은 aria-label·title 에 그대로).
+     「← 돌아가기」는 글씨째 둔다(대표 지시 2026-08-13 「백 버튼이 있으면 좋겠다」). */
+@media (max-width:520px){
+  #viewer .bar{gap:6px;padding-left:10px;padding-right:10px}
+  #viewer .bar button.vback{padding:8px 10px}   /* 아래 바탕 규칙(.vback)보다 앞에 있으므로 button 을 더해 이긴다 */
+  #viewer .bar #viewerCopy,#viewer .bar #viewerOrig,#viewer .bar .vx{font-size:0;padding:6px 5px;flex:none;line-height:1}
+  #viewer .bar #viewerCopy::before{content:'📋';font-size:18px}
+  #viewer .bar #viewerOrig::before{content:'📄';font-size:18px}
+  #viewer .bar .vx::before{content:'✕';font-size:18px}
+  #viewer .bar #viewerInfo .d{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
 #viewer .bar button{background:none;border:none;color:#fff;font-size:14px;font-weight:700;padding:6px}
 /* ← 돌아가기 — 닫는 길이 셋(바깥·Esc·✕)이나 있었지만 **눈에 보이는** 것이 없었다
    (대표 지시 2026-08-13). 왼쪽 위, 어느 화면에서나 뒤로 가기가 있는 그 자리다. */
@@ -1909,7 +1940,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
   <!-- 로그아웃 화면은 푸른 통합이 «모두 같은 것»을 쓴다 (대표 지시 2026-09-14) -->
   <script src="js/pu-gate.js?v=3"></script>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
-  <script src="js/pu-appbar.js?v=30"></script>
+  <script src="js/pu-appbar.js?v=33"></script>
   <script src="js/pu-handoff.js?v=1"></script>
   <!-- «지금 쓰고 있다»를 모든 앱이 함께 적는다 — 없으면 이 앱에서 일해도 60분 뒤 뒤에 있던 창이 전체 로그아웃을 건다 (2026-09-30) -->
   <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
@@ -2732,7 +2763,7 @@ body.cam-open [data-pu-appbar-pop]{display:none!important}
     <!-- 📋 복사 — 끌어다 놓기를 한글이 안 받아 주는 일이 있다(대표 보고 2026-08-25).
          그때 확실한 길이 이것이다: 눌러서 복사한 뒤 한글에서 Ctrl+V.
          ⚠ 격자 도구줄의 「📋 복사」와 **같은 함수**를 부른다 — 두 벌이 되면 한쪽만 고쳐진다. -->
-    <div class="bar"><button class="vback" onclick="closeViewer()">← 돌아가기</button><span id="viewerInfo"></span><button id="viewerOrig" onclick="downloadViewerOriginal()" style="display:none" title="한글에서 열 수 있는 원본 파일을 받습니다 — 보이는 쪽은 글자만 옮겨 그린 것입니다">📄 한글 원본</button><button id="viewerCopy" onclick="copyViewerImage()" title="복사한 뒤 한글·워드·메일에서 Ctrl+V (Ctrl+C 로도 됩니다)">📋 복사</button><button onclick="closeViewer()">닫기 ✕</button></div>
+    <div class="bar"><button class="vback" onclick="closeViewer()">← 돌아가기</button><span id="viewerInfo"></span><button id="viewerOrig" onclick="downloadViewerOriginal()" style="display:none" title="한글에서 열 수 있는 원본 파일을 받습니다 — 보이는 쪽은 글자만 옮겨 그린 것입니다" aria-label="한글 원본">📄 한글 원본</button><button id="viewerCopy" onclick="copyViewerImage()" title="복사한 뒤 한글·워드·메일에서 Ctrl+V (Ctrl+C 로도 됩니다)" aria-label="복사">📋 복사</button><button class="vx" aria-label="닫기" onclick="closeViewer()">닫기 ✕</button></div>
     <div id="viewerBody">
       <!-- 사진을 누르면 원본 크기, 사진 바깥(어두운 곳)을 누르면 닫힌다 -->
       <!-- draggable="false": 이 그림을 끌면 창이 남의 파일로 오해해 같은 사진을
@@ -11388,7 +11419,13 @@ function paintThumb(it) {
   img.src = src;
   img.alt = '';
   img.draggable = false;
-  cell.insertBefore(img, cell.firstChild);
+  /* ⚠ 서류 카드(.cell.doc)는 그림이 위쪽 띠(.strip) «안»에 들어가야 한다 — renderGrid 가
+       처음부터 그림을 알 때 넣는 자리와 같다. 칸 맨 앞에 끼우면 그림이 칸을 통째로
+       덮어(높이 100%) 제목·업체 글자가 밀려 안 보인다. 목록을 처음 받으면 미리보기가
+       «나중에» 오므로(itemsToGrid 는 thumb 없이 시작한다) 서류 카드가 전부 맨 사진으로
+       보였다 — 다른 일로 격자를 다시 그릴 때까지(2026-10-18 폰화면관리 점검에서 찾음). */
+  const host = cell.querySelector('.strip') || cell;
+  host.insertBefore(img, host.firstChild);
 }
 
 /* 이 사진이 누구 자리에 있나 — 「전체 근로자」 화면은 여러 사람 것이 섞여 있다 */
@@ -22178,7 +22215,7 @@ function runProbe() {
      「백 버튼 누르면 무조건 통합시스템 화면으로 돌아간다. 모든 프로그램이 다 똑같다」
      ⚠ 이 두 줄을 지우면 이 앱에서만 뒤로가기가 다시 통째로 나간다.
         tests/back-button.test.js 가 포털에 실린 앱 전부에서 이것을 확인한다. -->
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 </body>
 </html>

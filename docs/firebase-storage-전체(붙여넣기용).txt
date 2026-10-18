@@ -376,10 +376,16 @@ service firebase.storage {
     //    ⚠ 정규식의 함정 둘을 일부러 피했다 —
     //      ① 점을 [.] 로 묶는다(안 묶으면 `pureunXkr` 도 맞는다).
     //      ② ^…$ 로 끝을 박는다(안 박으면 `나@pureun.kr.남의집.com` 이 통과한다).
-    //    ▶ 더 단단하게 하려면 구름함수로 «직원이다»를 계정에 새기고(custom claim)
-    //      여기서 그것을 보면 된다. 지금은 그 표식이 저장소 어디에도 없다.
+    //    ★★ 2026-10-14 — 도메인만으로는 «모자랐다». 메일 인증을 안 보므로 누구나
+    //      아무개@pureun.kr 로 «가입»할 수 있었다(그 메일함이 없어도). 그래서 구름함수가
+    //      uid_roles 재직자에게만 로그인 증표에 staff:true 를 새기고(functions/staff-claim.js),
+    //      여기서 그것을 «함께» 본다. 그 표시는 서버(관리자 SDK)만 새길 수 있다.
+    //      도메인 확인은 그대로 둔다 — 표시가 잘못 새겨져도 바깥 주소는 못 지나가게(문 둘).
+    //    ⚠ 새 직원은 uid_roles 가 생긴 뒤 «길어야 한 시간» 뒤에 창고가 열린다 —
+    //      증표를 한 시간마다 새로 받을 때 표시가 실린다. 급하면 로그아웃 뒤 다시 로그인.
     function isStaff() {
       return request.auth != null
+          && request.auth.token.staff == true
           && request.auth.token.email != null
           && request.auth.token.email.matches('^[^@]+@pureun[.]kr$');
     }

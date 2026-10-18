@@ -81,7 +81,7 @@ test('CLAUDE.md 와 «같은 것»을 가리킨다 — 한쪽만 고치면 다�
   const claude = 읽기('CLAUDE.md');
   /* 두 문이 같은 문지기를 대는가. 이름이 아니라 «가리키는 검사»로 견준다. */
   for (const f of ['tests/test-pin-guard.test.js', 'tests/one-line-cells.test.js',
-    'tests/ontology-contract.test.js']) {
+    'tests/ontology-contract.test.js', 'tests/phone-screen-rules.test.js']) {
     assert.ok(claude.indexOf(f) > 0, 'CLAUDE.md 가 ' + f + ' 를 안 답니다');
     assert.ok(agents.indexOf(f) > 0,
       '★ CLAUDE.md 에만 있는 규칙입니다(' + f + ') — Codex 는 그것을 모른 채 고칩니다');

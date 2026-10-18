@@ -115,7 +115,11 @@ test('ⓔ 기록 길 — 계약서등관리 계약서만 대기에, 받기는 �
   assert.match(f, /PuOfficeStore\.markAwait\(/);
   assert.match(html, /contractList: formContractList,\s+\/\* 📎 서명본 올리기/);
   const cf = read('js/pu-contract-forms.js');
-  assert.match(cf, /host\.mail\.record\(o\.row, V, \{ kind: kind, names: .*await: true \}\)/, '✉ 보내기도 대기에');
+  /* ⚠ 칸 차례에 매이지 않는다 — await 뒤에 새 칸(계약 ID contract 등)이 붙어도 깨지지 않게, «같은 { } 안에 await: true 가 있는가»만 본다(2026-10-18) */
+  const sends = cf.split('\n').filter((l) => /host\.mail\.record\(o\.row, V, \{ kind: kind, names: /.test(l));
+  assert.ok(sends.length >= 1, '✉ 보내기 기록 길(host.mail.record(o.row, V, …))을 못 찾았다');
+  assert.ok(sends.some((l) => /\bawait: true(?:, [^{}\n]*)? \}\)/.test(l)), '✉ 보내기도 대기에');
+  assert.ok(sends.every((l) => /\bawait: (?!false\b)/.test(l)), '✉ 보내기 기록마다 await 를 넘긴다 — 빠지면 서명본 대기에 안 오른다');
 });
 
 test('ⓕ 채워서 받기도 기록 — 한 장·묶음, 회사를 골랐을 때만', () => {

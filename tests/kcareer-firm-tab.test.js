@@ -34,6 +34,8 @@ function 세상(이알피, 여기) {
     toast: (m) => 알림.push(String(m)),
     /* 🏢 법인 도장 칸은 이 검사 밖 — kcareer-own-files.test.js 가 본다 */
     _safe: (f) => f(), renderFirmSeal: () => {},
+    /* 📮 우편번호 저절로 넣기도 이 검사 밖 — tests/auto-zip-apps.test.js 가 본다 */
+    firmAutoZip: () => {},
     escapeHtml: (x) => String(x == null ? '' : x), _jsAttr: (x) => String(x == null ? '' : x),
     document: {
       getElementById: (id) => (id === 'firmGrid' ? grid : id === 'firmState' ? state : null),

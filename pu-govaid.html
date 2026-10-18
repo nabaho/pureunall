@@ -64,6 +64,13 @@ main{padding:12px 16px 40px}
 .li .nm{font-weight:600;overflow:hidden;text-overflow:ellipsis;flex:0 0 auto;max-width:62%}
 .li .nm.full{flex:1 1 auto;max-width:none;min-width:0}
 .list .sec{position:sticky;top:0;z-index:1}
+/* 회사 목록 — 열 맞춤(대표 지시 2026-10-13 「주소등 뒤에 불필요한것은 안보여도 된다. 그리고 열정리해라」): ☐·번호·사업장·구분·후보 */
+.co-head,.li.co-row{display:grid;grid-template-columns:18px 26px minmax(0,1fr) 42px 34px;gap:6px;align-items:center}
+.co-head{padding:6px 10px;font-size:11.5px;font-weight:600;color:var(--mute);background:var(--bg);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:1;white-space:nowrap}
+.co-head .r,.li.co-row .r{text-align:right}
+.li.co-row .nm{max-width:none;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;min-width:0}
+.li.co-row .chip{margin:0;justify-self:start}
+.li.co-row .r{font-size:12px;color:var(--ink2)}
 .li .meta{font-size:11.5px;color:var(--mute);overflow:hidden;text-overflow:ellipsis;flex:1 1 0;min-width:0}
 .scroll{overflow:auto}
 table.t{width:100%;border-collapse:collapse}
@@ -145,6 +152,61 @@ table.mx td.dot.yes{background:var(--green-bg)}
 #lock p{color:var(--mute);font-size:13px}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--ink);color:#ffffff;border-radius:10px;padding:10px 16px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:60}
 #toast.on{opacity:1}
+/* ══ 폰화면관리 (대표 지시 2026-10-18 「폰화면관리」) — 폰 폭(760px 이하)에서만. PC 는 그대로 ══
+   ① 머리가 «여섯 줄»(이름·부제·나/단추·탭 세 줄)로 늘 붙어 다니며 화면의 1/4(218px)을 먹었다
+     → 이름·나·단추 한 줄(부제는 숨김) + 탭은 «옆으로 미는 한 줄»(★ 노무사 직접 사업만 스위치는 탭 끝).
+   ② ☐ 고르기 칸이 11~13px — 손가락으로 못 누른다. 손가락 크기로(목록 칸도 그만큼 넓힌다). ☆(노무사 직접 사업 표시)도.
+   ③ 찾기 칸이 고르기 칸에 눌려 한 글자 폭(「⏳ 확인할 조건」)이었다 → 찾기는 한 줄을 다 쓰고, 고르기는 둘씩.
+   ④ 한눈 표 — 왼쪽에 붙는 사업장 칸이 폭을 다 먹어 사업 칸(● 후보)이 화면 밖이었다 → 사업장 칸을 줄인다(… + 말풍선).
+   ⑤ 목록과 상세가 위아래로 쌓이는 폭(860px 이하)에서는 고른 회사·사업으로 내려 준다(pickedShow) — 상세가 목록 아래
+     화면 밖에 그려져, 눌러도 아무 일 없는 것처럼 보였다.
+   ⑥ 양옆 빈자리 (대표 지시 2026-10-18 「양옆 빈공백이 많다 — 좌우 옆공간 모두 채워서 쓰게」)
+     겉 여백 8 + 상자 안 여백 10~12px 가 쌓여 글이 화면 끝에서 17~19px 안쪽에서 시작했다 → 겉 5px, 상자 안 8px. 창은 양옆 6px.
+   tests/govaid-phone.test.js 가 지킨다. */
+@media (max-width:760px){
+  .top{flex-wrap:nowrap;gap:8px;padding:8px 12px}
+  .top h1{font-size:15px;white-space:nowrap;flex-shrink:0}
+  .top .sub{display:none}
+  #who{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px}
+  .top button{flex-shrink:0}
+  .tabs{flex-wrap:nowrap;overflow-x:auto;gap:0;padding:0 6px;scrollbar-width:none}
+  .tabs::-webkit-scrollbar{display:none}
+  .tabs button{flex-shrink:0;padding:8px 9px}
+  .tabs .starsw{flex-shrink:0;margin-left:8px;padding-right:6px}
+  main{padding:8px 5px 40px}
+  .bar{padding:8px}
+  .li{padding:8px}
+  .co-head{padding:6px 8px}
+  .sec{padding:8px}
+  .prof{padding:8px}
+  .modal{padding:10px 6px}
+  .mhead,.mfoot{padding:10px}
+  .ed{padding:8px}
+  .co-head,.li.co-row{grid-template-columns:26px 26px minmax(0,1fr) 42px 34px}
+  #coList input[type=checkbox],table.t th.c input[type=checkbox],table.t td.c input[type=checkbox]{width:24px;height:24px;margin:0}
+  button.star{min-width:26px;min-height:26px;font-size:16px}
+  .bar input[type=search]{flex:1 1 100%!important;max-width:none!important;min-width:0}
+  .bar select{flex:1 1 40%;min-width:0}
+  table.mx .stk{max-width:112px}
+  #coDetail,#pDetail{scroll-margin-top:96px}
+  /* ⑦ 값이 여러 칸인 표(사업 사전·후보·정보 부족·안 맞음·공고) — 옆으로 밀어야 «담당기관·조건·검토»가 보였다(대표 「좌우 옆공간 모두 채워서」 2026-10-18).
+     폰에서는 줄마다 «카드»: ☐·번호는 왼쪽 끝에 두고, 첫 값(사업명·회사)은 한 줄, 나머지 값은 그 밑에 이어 붙는다(넘치면 줄바꿈).
+     머리줄은 «☐ 전체 선택» 한 줄만 남긴다. ⚠ 폰 구간에서만 — PC 는 그대로 표다. tests/govaid-phone.test.js */
+  table.t[data-name]{display:block}
+  table.t[data-name] thead,table.t[data-name] tbody{display:block}
+  table.t[data-name] thead tr{display:flex;align-items:center;padding:2px 8px;border-bottom:1px solid var(--line);background:var(--bg)}
+  table.t[data-name] thead th{display:none;border:0;padding:0}
+  table.t[data-name] thead th.c{display:flex;align-items:center;gap:8px;width:auto}
+  table.t[data-name] thead th.c::after{content:'전체 선택';font-size:12px;font-weight:600;color:var(--mute)}
+  table.t[data-name] tbody tr[data-row]{display:block;position:relative;padding:7px 8px 7px 72px;border-bottom:1px solid var(--line)}
+  table.t[data-name] tbody tr.cur{background:var(--blue-bg)}
+  table.t[data-name] tbody td{display:inline-block;max-width:100%;vertical-align:middle;padding:0 10px 0 0;border:0;background:none!important}
+  table.t[data-name] tbody td:empty{display:none}
+  table.t[data-name] tbody td.c{position:absolute;left:8px;top:7px;width:auto;padding:0}
+  table.t[data-name] tbody td.n{position:absolute;left:36px;top:10px;width:30px;padding:0;text-align:right}
+  table.t[data-name] tbody td:nth-child(3){display:block;max-width:none;margin-bottom:2px;font-size:14px;font-weight:600;white-space:nowrap}
+}
+@media (min-width:761px) and (max-width:860px){ #coDetail,#pDetail{scroll-margin-top:150px} }
 </style>
 </head>
 <body>
@@ -250,20 +312,20 @@ table.mx td.dot.yes{background:var(--green-bg)}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=72"></script>
+<script src="js/pu-ontology.js?v=73"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <!-- ⚠ data-mode="observe" 는 «관문을 실었다»는 표시일 뿐이다(tests/ontology-write-gate 가 이 꼴을 본다). 이 앱은 유예 목록
      (LEGACY_OBSERVE_PROGRAMS)에 없으므로 관문이 «강제»(enforce)로 돈다(runtimeMode). 화면 저장은 아래 gate(createGateway enforce)로만 한다. -->
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
 <script src="js/pu-gate.js?v=3"></script>
-<script src="js/pu-appbar.js?v=30"></script>
+<script src="js/pu-appbar.js?v=33"></script>
 <script src="js/pu-active.js?v=1"></script><script src="js/pu-logout-why.js?v=1"></script>
 <script src="js/pu-whoami.js?v=3"></script>
 <script>
 (function(){ function go(){ try{ if(window.PuWhoami && document.getElementById('who')){ PuWhoami.mount('#who'); return true; } }catch(e){} return false; }
   if(!go()) document.addEventListener('DOMContentLoaded', go); })();
 </script>
-<script src="js/pu-back.js?v=2"></script>
+<script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible('#modal'); }); }catch(e){}</script>
 <script src="js/pu-govaid-match.js?v=7"></script>
 <script src="js/pu-govaid-view.js?v=6"></script>
@@ -467,10 +529,10 @@ function drawCo(){
   var q=$('coQ').value.trim().toLowerCase(), k=$('coKind').value;
   var view=PROFILES.filter(function(pf){ return kindOk(pf,k) && (!q || (pf.name+' '+pf.bizno).toLowerCase().indexOf(q.replace(/-/g,''))>=0); });
   $('coCount').textContent=view.length+'곳';
-  $('coList').innerHTML = view.length ? view.map(function(pf,i){
-    var g=GovaidView.forSubject(pf, VP(), YEAR), sk='coList|'+pf.key, v=pf.vals;
-    var meta=[v.region.v||'지역 모름', v.headcount.v==null?'인원 모름':v.headcount.v+'명', '후보 '+g.candidate.length, g.unknown.length?'확인 '+g.unknown.length:''].filter(Boolean).join(' · ');
-    return '<div class="li'+(pf.key===CUR_CO?' cur':'')+'" data-co="'+esc(pf.key)+'"><input type="checkbox" data-ck="'+esc(sk)+'"'+(SEL[sk]?' checked':'')+'><span class="n">'+(i+1)+'</span><div class="body"><span class="nm">'+esc(pf.name||'(이름 없음)')+'</span>'+kindChip(pf)+'<span class="meta">'+esc(meta)+'</span></div></div>';
+  /* 열 맞춤 — 회사명 뒤에 지역·인원을 붙이지 않는다(그건 오른쪽 상세에 있다). 후보 수만 오른쪽 열에 */
+  $('coList').innerHTML = view.length ? '<div class="co-head"><span></span><span class="r">번호</span><span>사업장</span><span>구분</span><span class="r">후보</span></div>' + view.map(function(pf,i){
+    var g=GovaidView.forSubject(pf, VP(), YEAR), sk='coList|'+pf.key;
+    return '<div class="li co-row'+(pf.key===CUR_CO?' cur':'')+'" data-co="'+esc(pf.key)+'" title="'+esc((pf.name||'')+(pf.bizno?' · '+pf.bizno:''))+'"><input type="checkbox" data-ck="'+esc(sk)+'"'+(SEL[sk]?' checked':'')+'><span class="n">'+(i+1)+'</span><span class="nm">'+esc(pf.name||'(이름 없음)')+'</span>'+kindChip(pf)+'<span class="r" title="후보 '+g.candidate.length+' · 정보 부족 '+g.unknown.length+'">'+g.candidate.length+'</span></div>';
   }).join('') : '<div class="empty">'+(D.companies==null?'업체관리를 읽지 못했습니다':'회사가 없습니다')+'</div>';
   drawCoDetail();
 }
@@ -970,9 +1032,14 @@ function clickReview(t){
   if((b=t.closest('[data-foldoth]'))){ OPEN_OTH=!OPEN_OTH; drawCoDetail(); drawBulk(); return true; }
   if((b=t.closest('[data-foldno]'))){ OPEN_NO=!OPEN_NO; drawCoDetail(); drawBulk(); return true; }
   /* 회사·사업을 바꾸면 그 화면 표의 고르기를 푼다 — 고르기 열쇠에 회사·사업이 없어, 남겨 두면 새 화면의 쌍에 저장된다 */
-  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; OPEN_OTH=false; draw(); return true; }
-  if((b=t.closest('[data-pg]'))){ dropPicked(['progCand','progUnk']); CUR_PROG=b.getAttribute('data-pg'); draw(); return true; }
+  if((b=t.closest('[data-co]'))){ dropPicked(['coCand','coUnk','coNo']); CUR_CO=b.getAttribute('data-co'); OPEN_NO=false; OPEN_OTH=false; draw(); pickedShow('coDetail'); return true; }
+  if((b=t.closest('[data-pg]'))){ dropPicked(['progCand','progUnk']); CUR_PROG=b.getAttribute('data-pg'); draw(); pickedShow('pDetail'); return true; }
   return false;
+}
+/* 폰(860px 이하 — 목록과 상세가 위아래로 쌓인다): 고른 회사·사업의 상세는 목록 «아래 화면 밖»에 그려진다.
+   그대로 두면 눌러도 아무 일 없는 것처럼 보였다(2026-10-18 폰화면관리) → 상세로 내려 준다. 넓은 화면은 옆에 있으니 그대로 */
+function pickedShow(id){
+  try{ if(!window.matchMedia||!window.matchMedia('(max-width:860px)').matches) return; var el=$(id); if(el&&el.scrollIntoView) el.scrollIntoView({block:'start'}); }catch(e){}
 }
 function rowClick(name,id){
   if(name==='dict'){ openEditor(id); return; }

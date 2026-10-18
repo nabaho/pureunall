@@ -1091,7 +1091,7 @@
     + '.pcf-cols .pcf-sheetwrap{flex:1;min-width:0;height:100%;overflow-y:auto}'
     + '.pcf-list{width:250px;flex:none;border:1px solid #e2e8f0;border-top:none;border-right:none;background:#fff;height:100%;overflow-y:auto;padding:4px}'
     + '.pcf-lg{font-size:12px;color:#fff;background:#334155;padding:6px 10px;font-weight:700;letter-spacing:.2px}.pcf-lgn{float:right;font-weight:400;opacity:.8;font-size:11px}'
-    + '.pcf-lt .pcf-lnm.col{flex-direction:column;align-items:stretch;gap:1px}.pcf-l1{display:flex;align-items:center;gap:4px;min-width:0}.pcf-lsub{font-size:10.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
+    + '.pcf-l1{display:flex;align-items:center;gap:4px;min-width:0}.pcf-lsub{font-size:10.5px;color:#64748b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
     + '.pcf-li{display:flex;align-items:center;gap:6px;width:100%;background:none;border:none;border-radius:6px;padding:6px 8px;font-size:12.5px;color:#334155;cursor:pointer;text-align:left;font-family:inherit}'
     + '.pcf-li:hover{background:#eff6ff}.pcf-li.on{background:#dbeafe;color:#1e40af;font-weight:700}.pcf-li.off .pcf-ln{color:#94a3b8;text-decoration:line-through}.pcf-li.add{color:#2563eb;font-size:12px}'
     + '.pcf-ln{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}'
@@ -1168,7 +1168,7 @@
     + '.pcf-lt .pcf-lc{width:26px;text-align:center}.pcf-lt .pcf-lc input{cursor:pointer;margin:0}'
     + '.pcf-lt .pcf-ln2{width:28px;color:#94a3b8;font-size:11.5px}'
     + '.pcf-lt .pcf-lsrc{width:46px;font-size:11px;color:#64748b}.pcf-lt td.pcf-lsrc.hwp{color:#1e40af}.pcf-lt td.pcf-lsrc.xlsx{color:#166534}.pcf-lt td.pcf-lsrc.pdf{color:#991b1b}'
-    + '.pcf-lt .pcf-lnm{display:flex;align-items:center;gap:4px;min-width:0}.pcf-lt .pcf-lnm .pcf-ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
+    + '.pcf-lt .pcf-lnm .pcf-ln{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}'
     + '.pcf-dtop td,.pcf-dtop{box-shadow:inset 0 2px 0 #2563eb}.pcf-dbot td,.pcf-dbot{box-shadow:inset 0 -2px 0 #2563eb}.pcf-dsrc{opacity:.5}'
     + '.pcf-bchip{display:inline-block;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:99px;padding:1px 8px;margin:1px 2px;cursor:grab;white-space:nowrap}'
     + '.pcf-grip{color:#94a3b8;cursor:grab;user-select:none;padding-right:2px}'
@@ -1193,7 +1193,7 @@
     + '.pcf-top .pcf-strip{flex:0 1 auto}.pcf-top b{max-width:46%}'
     + '.pcf-morew{position:relative;margin-left:auto}.pcf-more{font-size:15px;line-height:1;padding:3px 10px}'
     + '.pcf-menu{position:absolute;right:0;top:110%;z-index:30;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px rgba(15,23,42,.15);padding:4px;min-width:220px;display:flex;flex-direction:column}'
-    + '.pcf-menu[hidden]{display:none}.pcf-menu button{background:none;border:none;text-align:left;padding:7px 10px;border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;color:#1e293b}'
+    + '.pcf-menu.up{top:auto;bottom:110%}.pcf-menu[hidden]{display:none}.pcf-menu button{background:none;border:none;text-align:left;padding:7px 10px;border-radius:6px;font:inherit;font-size:12.5px;cursor:pointer;color:#1e293b}'
     + '.pcf-menu button:hover{background:#eff6ff}.pcf-menu hr{border:none;border-top:1px solid #e2e8f0;margin:4px 0}'
     + '@media(max-width:700px){.pcf-lp{width:auto;border-right:1px solid #e2e8f0;border-radius:8px}.pcf-lbody{max-height:40vh}.pcf-vp .pcf-top{border-radius:8px 8px 0 0;margin-top:8px}}'
     + '.pcf-mk-kinds{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:6px}'
@@ -1210,7 +1210,42 @@
     + '.pcf-cols{height:auto}.pcf-list{width:auto;height:auto;max-height:40vh;border-right:1px solid #e2e8f0}.pcf-cols .pcf-sheetwrap{height:auto;overflow:visible}.pcf-cards{height:auto}.pcf-tools{margin-left:0}.pcf-top b{max-width:none;flex:1 1 100%}'
     + '.pcf-crow{flex-wrap:nowrap;overflow-x:auto}.pcf-lh .pcf-crow{overflow-x:visible}.pcf-q{max-width:none}'
     + '.pcf-cards{grid-template-columns:repeat(2,minmax(0,1fr));padding:8px}'
-    + '.pcf-sheetwrap{padding:8px}.pcf-sheet{padding:24px 18px;min-height:0}.pcf-body{font-size:12.5px}}';
+    + '.pcf-sheetwrap{padding:8px}.pcf-sheet{padding:24px 18px;min-height:0}.pcf-body{font-size:12.5px}}'
+    /* ── 📱 폰 한눈에 (대표 지시 2026-10-17 「폰에서 바로 사업장에 계약서·견적서를 보낼 수 있게 … 한눈에 볼 수 있게 깔끔하게」) ──
+       ① 목록은 안쪽 스크롤 없이 페이지 하나로 — 목록 상자(40vh) 안에서 한 번, 페이지에서 또 한 번 굴려야 했다
+       ② 고른 양식 막대(이름 · 📝 찾아서 채우기 · ⋯)는 «늘 보이는 한 줄» — 목록을 볼 땐 화면 아래, 종이를 읽을 땐 위에 붙는다.
+          전에는 목록 밑에 있어 줄을 눌러도 아무 일이 안 난 것처럼 보였다(단추가 화면 밖). .pcf-vp 를 contents 로 풀어야
+          막대가 목록 칸까지 따라 붙는다(sticky 는 부모 상자 밖으로 못 나간다)
+       ③ 고른 묶음 막대(N개 골랐습니다)는 위에 붙는다 — 아래 막대와 겹치지 않게
+       ④ 창(채우기·보내기·서명)은 화면 전체 — 아래 단추는 감아서 «다» 보이게, 보내기는 맨 위 한 줄 전체
+       ⚠ 넓은 화면은 손대지 않는다 — 모두 700px 아래에서만. tests/docs-phone-compact.test.js 가 지킨다 */
+    + '.pcf-menu .pcf-mob{display:none}'
+    + '@media(max-width:700px){'
+    + '.pcf-lbody{max-height:none;overflow:visible}.pcf-lt{min-width:0}.pcf-lt thead th{position:static}'
+    + '.pcf-lt td{padding:9px 4px;font-size:13.5px}.pcf-lt .pcf-lc{width:34px}.pcf-lt .pcf-lc input{width:24px;height:24px}'
+    + '.pcf-lt .pcf-ln2{font-variant-numeric:tabular-nums}.pcf-grip{display:none}'
+    + '.pcf-msel{margin-bottom:8px}.pcf-lh{gap:6px}.pcf-lh .pcf-crow{gap:6px}.pcf-seg button{padding:7px 4px}'
+    + '.pcf-stepbox.in{flex-direction:row;align-items:center;gap:8px}.pcf-stepbox.in .pcf-seg{flex:1;min-width:0}'
+    + '.pcf-vp{display:contents}'
+    + '.pcf-vp .pcf-top{position:sticky;top:0;bottom:0;z-index:20;margin-top:8px;flex-wrap:nowrap;gap:6px;padding:8px 10px;background:#fff;border-color:#cbd5e1;border-radius:10px 10px 0 0;box-shadow:0 -4px 14px rgba(15,23,42,.12)}'
+    + '.pcf-vp .pcf-top b{flex:1 1 auto;min-width:0;max-width:none}'
+    + '.pcf-vp .pcf-top div.pcf-strip,.pcf-vp .pcf-top .pcf-vwchips,.pcf-vp .pcf-top .pcf-printb{display:none}'
+    + '.pcf-vp .pcf-top .pcf-fillbig{padding:9px 14px;font-size:14px}'
+    + '.pcf-vp .pcf-top .pcf-morew{margin-left:0}.pcf-vp .pcf-top .pcf-more{padding:8px 12px}'
+    + '.pcf-menu .pcf-mob{display:block}.pcf-menu{max-height:70vh;overflow-y:auto}.pcf-menu button{padding:10px 12px}'
+    + '.pcf-bbar{position:sticky;top:0;z-index:21;border-top:1px solid #bfdbfe;border-radius:8px;margin-bottom:8px;padding:8px}'
+    + '.pcf-bbar .pcf-bnames{display:none}.pcf-bbar .pcf-go{order:9;flex:1 1 100%;padding:10px;font-size:14px;border-radius:8px}'
+    + '.pcf-mbg{padding:0;align-items:stretch}.pcf-m{width:100%!important;max-width:100%;max-height:none;height:100%;border-radius:0}'
+    + '.pcf-mh{flex-wrap:wrap;gap:2px 8px;padding:10px 12px}.pcf-mh>span{flex:1 1 0;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}'
+    + '.pcf-mh>small{order:3;flex:1 1 100%;margin:0!important;font-size:11.5px}'
+    /* 창 «×» 닫기 — 글자 하나 폭(12px)이라 손가락으로 잘 안 눌렸다(2026-10-18 폰화면관리 실측 12×23). 누르는 자리만 넓힌다 */
+    + '.pcf-mh>button[aria-label="닫기"]{min-width:40px;min-height:36px;margin:-6px -8px -6px 0}'
+    + '.pcf-mb{padding:12px}'
+    + '.pcf-mf{flex-wrap:wrap;justify-content:stretch;gap:6px;padding:8px 10px}.pcf-mf>*{flex:1 1 auto;justify-content:center}'
+    + '.pcf-mf>.pcf-muted{order:-2;flex-basis:100%;margin:0!important;font-size:11.5px}.pcf-mf select{flex-basis:100%}'
+    + '.pcf-mf .pcf-b{padding:9px 8px;font-size:12.5px}.pcf-mf .pcf-go{order:-1;flex-basis:100%;padding:12px;font-size:15px;border-radius:8px}.pcf-mf .pcf-mclose{display:none}'
+    + '.pcf-vrow{grid-template-columns:24px 18px 82px minmax(0,1fr) 54px}.pcf-vrow input[type=checkbox]{width:24px;height:24px;margin:0}'
+    + '}';
 
   var _toastT = null;
   function toast(msg, undo) {
@@ -2114,8 +2149,10 @@
         note]),
         prevBox
       ]),
+      /* 📱 폰에서는 단추가 여러 줄로 감긴다 — 한 줄로 두면 왼쪽 단추(닫기·본문 복사·미리보기)가 화면 밖으로 잘려 못 눌렀다(2026-10-17).
+         pcf-go = 이 창의 «주 단추»(메일로 보내기) — 폰에서는 맨 위 한 줄 전체. pcf-mclose = 위 × 와 같은 닫기라 폰에서는 뺀다 */
       el('div', { 'class': 'pcf-mf' }, [
-        el('button', { type: 'button', 'class': 'pcf-b', text: '닫기', onclick: close }),
+        el('button', { type: 'button', 'class': 'pcf-b pcf-mclose', text: '닫기', onclick: close }),
         one && fm0.body ? el('button', { type: 'button', 'class': 'pcf-b', text: '본문 복사', onclick: copyText }) : null,
         pickSel,
         btnPrev = el('button', { type: 'button', 'class': 'pcf-b', onclick: doPreview }),
@@ -2123,8 +2160,8 @@
           text: '✍ 서명 받기', onclick: function () { if (!conflictsOkToGo()) return; openSignReq(items.map(function (x) { return x.fm; }), values(), host, one ? nameOf(items[0]) : title); } }) : null,
         host.hwpShow ? el('button', { type: 'button', 'class': 'pcf-b', title: '지금 값으로 채워(비운 칸은 ＿＿＿ 밑줄) 인쇄합니다. 회사를 고르지 않으면 빈 양식으로 나옵니다.', text: one ? '🖨 인쇄' : '🖨 ' + items.length + '개 한 번에 인쇄', onclick: doPrint }) : null,
         (one && items[0].src && !isXl(items[0]) && host.hwpEdit) ? el('button', { type: 'button', 'class': 'pcf-b', text: '✏ 한글처럼 손보기', onclick: doEdit }) : null,
-        (one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ 메일로 보내기 →', onclick: doMail }) : null,
-        (!one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff', text: '✉ ' + items.length + '개 메일로 보내기 →', title: '모두 채워 메일 한 통에 붙입니다', onclick: doMailAll }) : null,
+        (one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b pcf-go', style: 'background:#166534;color:#fff', text: '✉ 메일로 보내기 →', onclick: doMail }) : null,
+        (!one && host.mail) ? el('button', { type: 'button', 'class': 'pcf-b pcf-go', style: 'background:#166534;color:#fff', text: '✉ ' + items.length + '개 메일로 보내기 →', title: '모두 채워 메일 한 통에 붙입니다', onclick: doMailAll }) : null,
         btnDown = (one && !items[0].src) ? null : el('button', { type: 'button', 'class': 'pcf-b b', style: 'background:#1e40af;color:#fff', onclick: doDownload })
       ])
     ]);
@@ -2204,7 +2241,7 @@
     /* 회사를 고르지 않았으면 보관할 곳이 없다 — 끄고 막는다(「(회사명 없음)」 카드를 만들지 않게) */
     var keepCk = el('input', { type: 'checkbox', checked: !!V.회사명, disabled: !V.회사명, 'aria-label': '사본 보관' });
     var note = el('div', { 'class': 'pcf-fnote' });
-    var btnSend = el('button', { type: 'button', 'class': 'pcf-b', style: 'background:#166534;color:#fff;font-weight:700', text: '✉ 보내기', onclick: send });
+    var btnSend = el('button', { type: 'button', 'class': 'pcf-b pcf-go', style: 'background:#166534;color:#fff;font-weight:700', text: '✉ 보내기', onclick: send });
     function toAddr() { return String(toSel.value || toIn.value || '').trim(); }
     function pdfName() { return o.name.replace(/\.[^.]+$/, '') + '.pdf'; }
     function files() {
@@ -3058,10 +3095,12 @@
        드물게 쓰는 것(수정·복제·삭제·바꿀 자리·올리기·계약 여러 건·rhwp)은 ⋯ 하나에 접는다 */
     function moreMenu(items) {
       var box = el('div', { 'class': 'pcf-menu', hidden: true, role: 'menu' });
-      items.filter(Boolean).forEach(function (it) { box.appendChild(it.nodeType ? it : el('button', { type: 'button', role: 'menuitem', title: it.title || '', text: it.t,
+      items.filter(Boolean).forEach(function (it) { box.appendChild(it.nodeType ? it : el('button', { type: 'button', role: 'menuitem', 'class': it.cls || null, title: it.title || '', text: it.t,
         onclick: function () { box.hidden = true; it.fn(); } })); });
       var btn = el('button', { type: 'button', 'class': 'pcf-b pcf-more', 'aria-label': '더 보기', 'aria-haspopup': 'menu', text: '⋯', onclick: function (e) {
         e.stopPropagation(); box.hidden = !box.hidden;
+        /* 아래가 좁으면 위로 연다 — 폰에서는 이 막대가 화면 아래에 붙어 있다(2026-10-17) */
+        if (!box.hidden) { var r = btn.getBoundingClientRect(); box.classList.toggle('up', r.top > w.innerHeight - r.bottom); }
         if (!box.hidden) setTimeout(function () { document.addEventListener('click', function off(ev) { if (!box.contains(ev.target)) { box.hidden = true; document.removeEventListener('click', off); } }); }, 0);
       } });
       return el('span', { 'class': 'pcf-morew' }, [btn, box]);
@@ -3103,17 +3142,23 @@
       var hasOrig = !!(previewPdfOf(fm) || (hwpOrigOf(fm) && w.PureunHwp));
       var view = hasOrig && S.paperView !== 'text' ? 'orig' : 'text';
       var hwpAtt = (fm.attachments || []).filter(function (a) { return /\.(hwp|hwpx)$/i.test(a.name || '') && attSrc(fm, a); })[0];
+      var canEdit = !!(host.hwpEdit && hwpOrigOf(fm)), canBlank = !!(host.hwpShow && hwpSources(fm).some(function (x) { return !isXlsxName(x.name); }));
       return el('div', { 'class': 'pcf-top' }, [
         el('b', { title: fm.name }, [el('span', { style: 'color:' + k.color, text: k.icon + ' ' }), fm.name]),
         strip,
-        hasOrig ? el('span', { 'class': 'pcf-cgrp', role: 'group', 'aria-label': '보기' }, [
+        hasOrig ? el('span', { 'class': 'pcf-cgrp pcf-vwchips', role: 'group', 'aria-label': '보기' }, [
           chip('📄 원본 모양', view === 'orig', function () { S.paperView = 'orig'; drawBody(); }),
           chip('🔤 글자 본문', view === 'text', function () { S.paperView = 'text'; drawBody(); })]) : null,
-        (host.hwpEdit && hwpOrigOf(fm)) ? el('button', { type: 'button', 'class': 'pcf-printb', title: '한글 원본의 글자를 한글처럼 직접 고칩니다. 저장하면 새 원본이 되고 이전 원본은 🗄 원본 보관함에 남습니다.', text: '✏ 내용 고치기', onclick: function () { editOriginal(fm); } }) : null,
-        host.hwpShow && hwpSources(fm).some(function (x) { return !isXlsxName(x.name); })
+        canEdit ? el('button', { type: 'button', 'class': 'pcf-printb', title: '한글 원본의 글자를 한글처럼 직접 고칩니다. 저장하면 새 원본이 되고 이전 원본은 🗄 원본 보관함에 남습니다.', text: '✏ 내용 고치기', onclick: function () { editOriginal(fm); } }) : null,
+        canBlank
           ? el('button', { type: 'button', 'class': 'pcf-printb', title: '당사자 칸을 비운 채(＿＿＿ 밑줄) 바로 인쇄합니다 — 손으로 적을 때', text: '🖨 빈 양식 인쇄', onclick: function () { printBlank(withPower([fm])); } }) : null,
         host.cards ? el('button', { type: 'button', 'class': 'pcf-fillbig', title: 'ERP 업체관리와 기업정보함에서 회사·담당자·근로자를 찾아 채웁니다. 없는 값만 직접 입력합니다. 채운 뒤 내려받거나 보냅니다.', text: '📝 찾아서 채우기', onclick: function () { openFill(withPower([fm]), host); } }) : null,
+        /* 📱 폰에서는 이 막대가 화면 아래에 붙는 «한 줄»이다 (대표 2026-10-17 「폰 화면 한눈에」) —
+           옆으로 늘어선 보기 칩·내용 고치기·빈 양식 인쇄는 숨기고, 같은 일을 ⋯ 안에 둔다(pcf-mob = 폰에서만 보이는 줄) */
         moreMenu([
+          hasOrig ? { t: view === 'orig' ? '🔤 글자 본문으로 보기' : '📄 원본 모양으로 보기', cls: 'pcf-mob', fn: function () { S.paperView = view === 'orig' ? 'text' : 'orig'; drawBody(); } } : null,
+          canEdit ? { t: '✏ 내용 고치기', cls: 'pcf-mob', fn: function () { editOriginal(fm); } } : null,
+          canBlank ? { t: '🖨 빈 양식 인쇄', cls: 'pcf-mob', fn: function () { printBlank(withPower([fm])); } } : null,
           { t: '✏ 수정', fn: function () { modal({ kind: fm.kind, cur: fm, onSave: save }); } },
           { t: '⧉ 복제', fn: function () { copy(fm); } },
           (host.hwpMark && hwpSources(fm).some(function (x) { return /\.(hwp|hwpx)$/i.test(x.name || ''); }))
@@ -3162,7 +3207,7 @@
       return new Promise(function (res, rej) {
         _ensurePdfjs2(function (err) {
           if (err) { rej(new Error(err)); return; }
-          w.pdfjsLib.getDocument({ data: u8 }).promise.then(function (pdf) {
+          w.pdfjsLib.getDocument({ isEvalSupported: false, data: u8 }).promise.then(function (pdf) {
             var chain = Promise.resolve();
             for (var i = 1; i <= pdf.numPages; i++) (function (n) {
               chain = chain.then(function () {
@@ -3249,8 +3294,9 @@
       var q = el('input', { type: 'search', 'class': 'pcf-q', placeholder: '양식 찾기', 'aria-label': '양식 이름 찾기', value: S.q });
       /* 글자를 칠 때마다 목록만 다시 그린다 — 머리까지 그리면 찾기 칸 커서가 사라진다 */
       q.addEventListener('input', function () { S.q = q.value; drawList(); });
-      function seg(label, items, curV, onPick) {
-        return el('div', { 'class': 'pcf-stepbox' }, [
+      /* inline — 짧은 이름표(「종류」)는 폰에서 단추와 «한 줄»에 (물음 꼴인 ①·② 는 그대로 위에) */
+      function seg(label, items, curV, onPick, inline) {
+        return el('div', { 'class': 'pcf-stepbox' + (inline ? ' in' : '') }, [
           el('div', { 'class': 'pcf-step', text: label }),
           el('div', { 'class': 'pcf-seg', role: 'group', 'aria-label': label }, items.map(function (it) {
             return el('button', { type: 'button', 'class': curV === it.v ? 'on' : '', 'aria-pressed': curV === it.v ? 'true' : 'false', title: it.title || '', onclick: function () { onPick(it.v); } },
@@ -3296,7 +3342,7 @@
         var ff = facetCounts(S.forms, kind);
         row.push(seg('종류', [{ v: 'all', label: '전체', n: ff.sides.all }].concat(ff.groups.map(function (g) {
           return { v: g.name, label: g.name.replace('제안서·견적서', '견적서'), n: g.count };
-        })), S.grp, function (v) { setFilter({ grp: v }); }));
+        })), S.grp, function (v) { setFilter({ grp: v }); }, true));
       }
       /* 원본 형식 · 사용 여부 (원본 보관함과 같은 걸러 보기) — 접어 둔다 */
       function pick(label, val, opts, key) {
@@ -3473,7 +3519,7 @@
       b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', text: '선택 풀기', onclick: function () { S.checked = []; S.setId = null; drawMain(); } }));
       if (host.hwpShow) b.appendChild(el('button', { type: 'button', 'class': 'pcf-b', title: '고른 양식을 당사자 칸을 비운 채 한 번에 인쇄합니다(엑셀 양식은 건너뜀)', text: '🖨 빈 양식 ' + fms.length + '개 인쇄',
         onclick: function () { printBlank(withPower(checkedForms())); } }));
-      if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
+      if (host.cards) b.appendChild(el('button', { type: 'button', 'class': 'pcf-act pcf-go', style: 'background:#1e40af', text: '📦 ' + fms.length + '개 채워서 받기',
         onclick: function () { openFill(withPower(checkedForms()), host, st ? st.name : (host.contractCtx ? host.contractCtx.label : '고른 양식')); } }));
       fitHeight();
     }
@@ -3508,7 +3554,8 @@
             var kids = [el('span', { 'class': 'pcf-ln', title: f.name, text: shownName(f) }),
             (S.setView || S.quote) ? el('span', { 'class': 'pcf-sd both', text: kindInfo(f.kind).label }) : S.kind === '_closed' ? el('span', { 'class': 'pcf-sd both', title: (f.closedAt || '') + ' 종료', text: kindInfo(f.kind).label }) : (sd && S.side === 'all' ? el('span', { 'class': 'pcf-sd ' + sd, text: sideShort(sd) }) : null)];
             var sub = (S.kind === 'case' && !S.setView) ? caseParts(f) : '';
-            if (!sub) return el('td', { 'class': 'pcf-lnm' }, kids);
+            /* ⚠ 칸(td)에 flex 를 걸지 않는다 — 표 칸이 깨져 고른 줄 바탕·줄 선이 이름 칸에서만 어긋났다(2026-10-17). 안쪽 div 가 한 줄을 맡는다 */
+            if (!sub) return el('td', { 'class': 'pcf-lnm' }, [el('div', { 'class': 'pcf-l1' }, kids)]);
             return el('td', { 'class': 'pcf-lnm col' }, [el('div', { 'class': 'pcf-l1' }, kids), el('div', { 'class': 'pcf-lsub', text: sub })]);
           })(),
           el('td', { 'class': 'pcf-lsrc ' + st, text: srcLabel(st) })]);

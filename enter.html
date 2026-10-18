@@ -133,17 +133,25 @@ window.__puLoginNavAt = (typeof performance !== 'undefined' && performance.timeO
 <link rel="preconnect" href="https://asia-northeast3-pureun-erp.cloudfunctions.net" crossorigin>
 <!-- 외부 글꼴 CSS가 느려도 인증 스크립트와 카카오 복귀를 막지 않는다. -->
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&family=Noto+Serif+KR:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
 <!-- 왜 로그아웃됐나 — 이 기기에 적고 로그인 화면에 한 줄 (대표 보고 2026-10-05 「폰에서 🏠 누르면 로그인 화면이 계속 나온다」) -->
 <script src="js/pu-logout-why.js?v=1"></script>
 <!-- 2단계 인증 모듈은 필요한 순간에만 불러온다. 카카오 복귀 시 두 번째 Auth 인스턴스를 만들지 않는다. -->
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-messaging-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-messaging-compat.js"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-health.js?v=6"></script>
-<script src="js/pu-version.js?v=9"></script>
+<script>
+/* 카카오 복귀 문서는 이미 인증 중이다. 버전 확인보다 먼저 표시하여 콜백 중 자동 새로고침을 막는다.
+   이 문서에서 인증을 마친 직후에도 자동 교체하지 않는다 — 포털→진행 화면→포털 왕복 방지. */
+if (/[?&]code=/.test(location.search) && /[?&]state=/.test(location.search)) {
+  window.__kkReturning = true;
+  window.__puKakaoReturnPage = true;
+}
+</script>
+<script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-rrn-seal.js?v=2"></script>
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-dev-automation.js?v=1"></script>
@@ -173,6 +181,10 @@ body{min-height:100vh;background:var(--bg);color:var(--ink);
 /* 포털(앱 타일) 화면일 때만 상단 정렬 — 로그인 화면은 중앙 유지 */
 body.portal-mode .wrap{justify-content:flex-start;padding-top:clamp(32px,8vh,80px);}
 @media (max-width:520px){ body.portal-mode .wrap{padding-top:24px;} }
+/* 폰: 양옆 빈자리를 없앤다 (대표 지시 2026-10-18 「양옆 빈공백 … 좌우 옆공간 모두 채워서」).
+   겉 여백 16px 이 머리 카드·타일 줄 양옆을 늘 비워 두었다 — 6px 로 줄여 타일 네 칸이 화면 폭을 다 쓴다.
+   ⚠ 로그인 화면(가운데 정렬)은 그대로다 — 포털(타일) 화면에서만. */
+@media (max-width:520px){ body.portal-mode .wrap{padding-left:6px;padding-right:6px;} }
 
 /* ---------- 로그인 화면 ---------- */
 #loginView{display:flex;flex-direction:column;align-items:center;width:100%;max-width:520px;margin:0 auto;}
@@ -1278,8 +1290,8 @@ body.portal-mode #moreFab{display:flex;}
         <span class="z0">회색 0</span> 새 알림에서 차이가 없다 ·
         <span class="unk">—</span> 소식이 없어 «모른다»(0원이 아니다) ·
         <b>접속 참고</b> 알림 도착 무렵의 접속 기록일 뿐 비용 원인이 아닙니다. 「기록 없음」도 자동 작업이 원인이었다는 뜻은 아닙니다.
-        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
-        — 하루 <b>512번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
+        (메일 받기 07~21시 3분 · 메일 보내기 15분 · 급여자료 30분마다 · 홈페이지 뉴스 모으기 하루 한 번 · 발간자료·판례 모으기 하루 한 번 · 지역뉴스 후보 모으기 하루 한 번 · 취업규칙 법 개정 확인 하루 한 번 · 취업규칙 모으기 30분마다 확인 · 컨설턴트 모집 감시 하루 한 번 · 회생광고 수집 하루 한 번 · 공고 모으기 하루 한 번 · 정부지원금 공고 감시 하루 한 번 · 공인노무사회 자료 하루 한 번 · 뉴스레터 반송 확인 하루 한 번 · 안내문 대장 정리 하루 한 번 · 안내문 원문 보관 하루 한 번 · 방문 사업장 안내 문자 하루 한 번 · 주간 브리핑 월요일 한 번 · 거래처 뉴스레터 월요일 한 번(새벽 6:00) · 거래처 뉴스레터 금요일 준비 한 번(AI 정리) · 뉴스레터 감시꾼 3시간마다 · 뉴스레터 일요일 보충 한 번 · 뉴스레터 일요일 점검 한 번 · 뉴스레터 월요일 전달 확인 한 번
+        — 하루 <b>513번</b> · 여기에 <b>메일 열기 따뜻하게 두기</b>가 업무 시간(월~토 8~20시)에만
         3분마다 하루 <b>240번</b> 더 돕니다 — 메일을 빨리 열리게 하려고 서버를 깨워 두는 것이고, 요금은 무료 몫 안입니다) ·
         <b>합계</b> 맨 아래 줄 — 「전체」는 마지막으로 아는 누적액이고
         <span class="up">+증가</span>는 이 표에 있는 줄들을 다 더한 값이다
@@ -2017,6 +2029,9 @@ body.portal-mode #moreFab{display:flex;}
   var _portalUid = '';
   var _portalReady = false;
   var _authRecheckTimer = null;
+  /* 모바일 저장소 복원 중 인증이 잠깐 비어도 로그인 화면으로 재진입하지 않는다.
+     명시적인 로그아웃은 아래에서 지체 없이 처리하고, 그 외에는 화면을 가린 채 기다린다. */
+  var AUTH_RECOVERY_MS = 15000;
   /* 방금 아이디를 «쳐서» 들어왔는가, 남아 있던 세션으로 «저절로» 들어왔는가.
      저절로 들어온 것이면 그렇게 말해 줘야 한다 — 전 사람 세션이 남은 폰에서
      포털이 말없이 열리면, 본인은 자기가 로그인한 줄 안다. */
@@ -2131,7 +2146,7 @@ body.portal-mode #moreFab{display:flex;}
           try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
           try { location.replace(location.pathname + '?v=' + Date.now()); }
           catch(_) { location.reload(); }
-        }, logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt ? 0 : 2500);
+        }, logoutAt && window._puAuthAt && logoutAt >= window._puAuthAt ? 0 : AUTH_RECOVERY_MS);
       } else {
         // 미로그인 확정 → 스플래시 내리고 로그인 화면 표시
         try { sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(_e){}
@@ -2766,6 +2781,7 @@ body.portal-mode #moreFab{display:flex;}
   // ── 포털 진입: 로그인된 사용자의 계정 정보 조회 후 타일 렌더 ──
   function enterPortal(user, verifiedProfile){
     if(_returnToApp(user)) return;     // 로그아웃으로 밀려났던 앱 탭 — 하던 앱으로 돌아간다
+    window.__puPortalEntering = true; // 인증·타일 준비 중 새 버전 자동 교체를 미룬다
     var portalEntryAt = Date.now();
     _portalUid = user.uid || '';
     _portalReady = false;
@@ -2806,6 +2822,7 @@ body.portal-mode #moreFab{display:flex;}
           profileAndTilesMs:Date.now()-portalEntryAt, totalMs:Date.now()-navAt});
       }
       _rmBootSplash();   // 타일까지 그린 뒤 스플래시 제거 (번쩍임 없음)
+      window.__puPortalEntering = false;
     }
     /* 이 정보는 카카오 인가코드·재직 확인을 마친 서버가 같은 응답으로 보낸 것만 쓴다.
        Firebase가 실제로 연 계정 이메일과 사번이 다르면 기존 명부 조회로 돌아간다. */
@@ -4116,6 +4133,7 @@ body.portal-mode #moreFab{display:flex;}
     } catch(e){}
   }
   $('logoutBtn').addEventListener('click', function(){
+    try { window.PuLogoutWhy && PuLogoutWhy.why('로그아웃 단추 누름'); } catch(_w){}
     /* 같은 탭에서 다시 로그인하면 반드시 포털 선택 화면에 머문다. */
     stopPortalHanaAlerts();
     try { sessionStorage.setItem('pu_skip_home','1'); sessionStorage.removeItem('pu_auth_hint'); localStorage.removeItem('pu_auth_hint'); } catch(e){}
