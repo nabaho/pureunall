@@ -13,9 +13,12 @@
  */
 function __paMeasure(opts) {
   opts = opts || {};
-  var W = window.innerWidth, H = window.innerHeight;
-  var out = { w: W, h: H, docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight };
-  out.overflowX = Math.max(0, out.docW - W);
+  /* ⚠ 기준 폭은 «폰 화면 폭»(run.mjs 가 넘긴 값)이다 — window.innerWidth 가 아니다.
+     내용이 넘치면 폰 브라우저는 화면을 «넓혀 잡고»(축소해 보여 주고) innerWidth 도 함께 커진다.
+     그 값을 기준으로 재면 넘친 화면도 옆넘침 0 으로 나온다(급여데이터함 360px 에서 innerWidth 472 · 2026-10-18 실측). */
+  var W = opts.width || document.documentElement.clientWidth, H = window.innerHeight;
+  var out = { w: W, h: H, docW: document.documentElement.scrollWidth, docH: document.documentElement.scrollHeight, layoutW: window.innerWidth };
+  out.overflowX = Math.max(0, Math.max(out.docW, out.layoutW) - W);
 
   function visible(el) {
     var cs = getComputedStyle(el);
@@ -68,6 +71,18 @@ function __paMeasure(opts) {
     return t.replace(/\s+/g, '');
   }
 
+  /* 글자 줄 수 — 글자 조각들의 세로 가운데가 글자 크기의 0.8 배 넘게 벌어지면 다른 줄이다 */
+  function lines(el, fs) {
+    var rg = document.createRange(); rg.selectNodeContents(el);
+    var mids = [];
+    Array.prototype.forEach.call(rg.getClientRects(), function (rc) {
+      if (rc.width < 1 || rc.height < 1) return;
+      var c = rc.top + rc.height / 2;
+      if (!mids.some(function (x) { return Math.abs(x - c) < fs * 0.8; })) mids.push(c);
+    });
+    return mids.length;
+  }
+
   var all = Array.prototype.slice.call(document.body ? document.body.querySelectorAll('*') : []);
   var offscreen = [], vertical = [], wrapBtn = [], smallTap = [], smallInput = [], fixed = [];
   var seenOff = new Set();
@@ -104,8 +119,10 @@ function __paMeasure(opts) {
     }
 
     // 단추·탭 글자가 두 줄로
+    /* 두 줄인가 — 높이로 어림하지 않고 «글자가 실제로 몇 줄에 놓였나»를 센다.
+       높이로 보면 여백·min-height 가 큰 한 줄 단추(38px)를 두 줄로 셌다(2026-10-18). */
     if (interactive && el.tagName !== 'SELECT' && el.tagName !== 'INPUT' && el.tagName !== 'LABEL' && txt(el).length >= 2 && txt(el).length <= 16 &&
-        cs.whiteSpace !== 'nowrap' && r.height > lh * 1.8 && r.width < W * 0.6 && el.children.length <= 2) {
+        cs.whiteSpace !== 'nowrap' && r.width < W * 0.6 && el.children.length <= 2 && lines(el, fs) >= 2) {
       // 안에 줄바꿈(<br>)·덩어리 자식이 없는데 두 줄이면 «접힌» 것
       var block = Array.prototype.some.call(el.children, function (c) { var d = getComputedStyle(c).display; return d === 'block' || d === 'flex' || c.tagName === 'BR'; });
       if (!block) wrapBtn.push({ sel: sel(el), text: txt(el), w: Math.round(r.width), h: Math.round(r.height), top: Math.round(r.top) });

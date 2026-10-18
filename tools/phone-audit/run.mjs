@@ -90,7 +90,7 @@ async function snapOne(page, key, view, width) {
   let m = null, err = null;
   try {
     await page.addScriptTag({ content: measureSrc });
-    m = await page.evaluate(() => __paMeasure());
+    m = await page.evaluate((w) => __paMeasure({ width: w }), width);
     m.missing = await page.evaluate(() => (window.__PA_LOG__ && window.__PA_LOG__.missing || []).slice(0, 60));
   } catch (e) { err = String(e.message).slice(0, 200); }
   const name = view === 'home' ? `${key}-${width}` : `${key}-${view}-${width}`;
