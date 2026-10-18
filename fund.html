@@ -507,6 +507,11 @@
 @media (max-width: 760px){
   input, select, textarea{ font-size: 16px !important; }
 }
+  /* 📚 기금 자료실 — 왼쪽 분류·오른쪽 목록 */
+  .libwrap{display:grid;grid-template-columns:240px minmax(0,1fr);gap:12px;align-items:start}
+  @media(max-width:900px){.libwrap{grid-template-columns:1fr}}
+  .libnav>div{padding:6px 9px;border-radius:8px;cursor:pointer;font-size:12.5px;display:flex;justify-content:space-between;align-items:center;gap:6px}
+  .libnav>div.on{background:var(--acc-soft);color:var(--acc)}
 </style>
   <!-- 프로그램 사이 이동 (공용 앱바) -->
   <script src="js/pu-appbar.js?v=33"></script>
@@ -1069,6 +1074,7 @@ function shell(){
     /* 서식 현황·결산 대장은 기금 현황과 같은 42개 목록이라 별도 메뉴를 없앴다.
        기금 현황의 [보기] 전환으로 들어간다(같은 목록, 열만 교체). */
     +'<div class="sitem" data-nav="1" id="nav-forms" onclick="S.formsCtx=\'library\';S.formsHost=null;S._sideKind=null;go(\'forms\')" title="전사 표준서식 관리(견본 편집·원본 등록·공통 저장) · 드래그로 순서 변경"><span class="gr">⋮⋮</span>서식 자료실</div>'
+    +'<div class="sitem" data-nav="1" id="nav-library" onclick="go(\'library\')" title="홍보·설명자료·정부자료·지역공동기금 자료 모음 · 드래그로 순서 변경"><span class="gr">⋮⋮</span>기금 자료실</div>'
     +'</div>'
     +'<div style="margin-top:auto;font-size:11px;color:var(--faint);padding:8px">Firebase판 · 통합운영<br>서식 채움 지원</div>'
     +'</div>'
@@ -1385,7 +1391,7 @@ function route(){
   // 없어진 메뉴(docsboard/closeboard)로 들어오면 기금 현황의 해당 보기로 돌린다(옛 링크·기록 호환)
   if(S.view==='docsboard'){ S.view='home'; S.homeView='docs'; }
   if(S.view==='closeboard'){ S.view='home'; S.homeView='close'; }
-  ['home','billing','forms','review','setup'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
+  ['home','billing','forms','review','setup','library'].forEach(function(v){var n=$('nav-'+v);if(n)n.className='sitem'+(S.view===v?' on':'');});
   if(S.view!=='review'&&typeof RV!=='undefined') RV.page='';   // 확인함을 떠나면 다음엔 첫 화면(🛡 자동 규칙 말고)
   if(S.view!=='fund'&&S.formsHost==='fundDocsHost') S.formsHost=null;   // 기금 밖으로 나가면 임베드 해제
   if(S.view==='fund'&&S.fundId&&funds[S.fundId]) renderFund();
@@ -1393,10 +1399,218 @@ function route(){
   else if(S.view==='review') renderReview();
   else if(S.view==='setup') renderSetupDash();
   else if(S.view==='forms') renderForms();
+  else if(S.view==='library') renderLibrary();
   else { S.view='home'; renderHome(); return; }   // 홈은 renderHome 안에서 사이드바까지 그린다
   renderNav();   // 다른 화면에서도 사이드바 개수는 최신으로(기금이 바뀌면 숫자도 바뀐다)
 }
 
+/* ══ 📚 기금 자료실 (대표 지시 2026-10-18 「푸른노무법인 홍보·자료·정부자료·지역공동기금 ppt 등 별도 대시보드로 정리 — 추후 확인·변경·사용 가능하게, 제목 정렬」 · 목업 승인 「네」) ══
+   서식 자료실 = «채워 내는 서식», 기금 자료실 = «참고·발표·홍보 자료».
+   · 목록: fund_erp/library/items/{id} = {cat, sub, title, year, ver, use, name, ext, size, sha1, url, key, oyear, at, by, path?, old:{…}}
+   · 파일: 사진첩과 같은 원본 창고(PuPhotoStore.putOriginal) — 토큰 주소라 직원 누구나 받는다.
+   · 처음 모으기: PC 의 04_자료모음 폴더(분류별 사본 + 자료목록.json)를 [📁 자료모음 폴더 가져오기]로 한 번에. 같은 내용(sha1)은 다시 안 올린다.
+   · 교체: 새 판을 올리면 지금 것은 old 로 내려가고 지우지 않는다.
+   · 큰 파일(25MB 넘음)·근로복지넷 컨설팅 폴더는 «PC 위치»만 적는다(회사별 자료가 섞여 있어 옮기지 않는다). */
+var LIB_CATS=[['pureun','푸른노무법인 제작'],['gov','정부·공단 자료'],['region','지역공동기금 공통'],['net','근로복지넷 컨설팅']];
+var LIB_SUBS={pureun:[['slides','설명자료(PPT)'],['talks','강의·사례발표'],['proposal','제안서·견적서'],['docs','계약서·안내문·설문']],
+  gov:[['law','법령·규정·지침'],['annual','연도별 지원사업 안내'],['manual','매뉴얼·사례집'],['forms','공단 서식파일'],['interp','행정해석·민원 답변']],
+  region:[['region','지역공동기금 공통']], net:[['net','근로복지넷 컨설팅']]};
+var LIB_MAXMB=25;
+/* 정렬 — 분류 → 세부 → 제목 → 연도(최신 먼저) → 판. 순수 */
+function libSort(arr){
+  var ci=function(c){ for(var i=0;i<LIB_CATS.length;i++) if(LIB_CATS[i][0]===c) return i; return 99; };
+  var si=function(c,s){ var L=LIB_SUBS[c]||[]; for(var i=0;i<L.length;i++) if(L[i][0]===s) return i; return 99; };
+  var yr=function(y){ return /^\d{4}$/.test(String(y||''))?+y:0; };
+  return arr.slice().sort(function(a,b){
+    return ci(a.cat)-ci(b.cat) || si(a.cat,a.sub)-si(b.cat,b.sub) || String(a.title||'').localeCompare(String(b.title||''),'ko')
+      || yr(b.year)-yr(a.year) || String(a.ver||'').localeCompare(String(b.ver||''),'ko') || String(a.ext||'').localeCompare(String(b.ext||''));
+  });
+}
+/* 같은 제목끼리 묶는다 — 첫째가 «최신», 나머지는 «이전 판». 순수 */
+function libGroups(sorted){
+  var out=[], cur=null;
+  sorted.forEach(function(it){
+    var k=it.cat+'|'+it.sub+'|'+it.title;
+    if(!cur||cur.k!==k){ cur={k:k, head:it, rest:[]}; out.push(cur); } else cur.rest.push(it);
+  });
+  return out;
+}
+/* 폴더째 고른 파일의 «자료모음 안 경로» — 맨 앞 폴더 이름을 떼고 / 로. 순수 */
+function libRelOf(p){ return String(p||'').replace(/\\/g,'/').split('/').slice(1).join('/'); }
+/* 가져오기 계획 — 목록(자료목록.json)의 항목마다 올릴지·건너뛸지·위치만 적을지. 순수 */
+function libPlan(man,files,existing){
+  var byRel={}; (files||[]).forEach(function(f){ byRel[libRelOf(f.rel)]=f; });
+  var have={}; Object.keys(existing||{}).forEach(function(id){ var e=existing[id]; if(e&&e.sha1) have[e.sha1]=1; if(e&&e.path) have['p:'+e.path]=1; });
+  var plan={up:[], link:[], skip:[], miss:[]};
+  ((man&&man.items)||[]).forEach(function(it){
+    var path=String(it.src||'');
+    if(it.link_only){ if(have['p:'+path]) plan.skip.push(it); else plan.link.push(it); return; }
+    if(it.sha1&&have[it.sha1]){ plan.skip.push(it); return; }
+    var f=byRel[String(it.copy||'').replace(/\\/g,'/')];
+    if(!f){ plan.miss.push(it); return; }
+    if((f.size||0)>LIB_MAXMB*1048576){ plan.link.push(it); return; }
+    plan.up.push({it:it, file:f});
+  });
+  return plan;
+}
+function _libFmt(ext){ return String(ext||'').replace(/^\./,'').toUpperCase()||'—'; }
+function _libSize(n){ n=+n||0; return n>=1048576?(n/1048576).toFixed(1)+'MB':Math.max(1,Math.round(n/1024))+'KB'; }
+function _libRow(it,no,isOld,gk,nOld){
+  var id=it._id, view=/\.(pdf|png|jpe?g)$/i.test(String(it.ext||it.name||''));
+  var act=it.url
+    ? (view?'<button onclick="libView(\''+id+'\')" style="padding:2px 8px;font-size:11px">👁 보기</button> ':'')
+      +'<button onclick="libDown(\''+id+'\')" style="padding:2px 8px;font-size:11px" title="받기">⬇</button> '
+      +'<button onclick="libReplace(\''+id+'\')" style="padding:2px 8px;font-size:11px" title="새 판 올리기 — 지금 것은 이전 판으로 남습니다">교체</button> '
+    : '<span class="chip" style="font-size:10.5px" title="'+esc(it.path||'')+'">PC에만</span> <button onclick="libCopyPath(\''+id+'\')" style="padding:2px 8px;font-size:11px">위치 복사</button> ';
+  act+='<button onclick="libEdit(\''+id+'\')" style="padding:2px 8px;font-size:11px" title="제목·분류·연도 고치기">✏</button>';
+  var oldN=Object.keys(it.old||{}).length;
+  return '<tr'+(isOld?' style="color:var(--sub)"':'')+'>'+_ckTd()+'<td class="muted" style="font-size:11.5px">'+(isOld?'└':no)+'</td>'
+    +'<td><span style="'+(isOld?'':'font-weight:600')+'">'+esc(it.title||'')+(it.ver?' <span class="muted" style="font-weight:400">· '+esc(it.ver)+'</span>':'')+'</span>'
+    +(it.name?'<div class="muted" style="font-size:10.5px">'+esc(it.name)+(oldN?' · 교체 '+oldN+'번':'')+'</div>':'')+'</td>'
+    +'<td style="white-space:nowrap">'+esc(it.year||'—')+'</td>'
+    +'<td style="white-space:nowrap">'+(isOld?'<span class="muted" style="font-size:11px">이전</span>'
+        :(/옛 판/.test(it.ver||'')?'<span class="chip warn" style="font-size:10px">옛 판</span>':'<span class="chip ok" style="font-size:10px">최신</span>')
+          +(nOld?' <a href="javascript:void 0" onclick="libToggle(\''+esc(gk)+'\')" style="font-size:11px">이전 '+nOld+(S.libOpen&&S.libOpen[gk]?' ▾':' ▸')+'</a>':''))+'</td>'
+    +'<td style="white-space:nowrap;font-size:11.5px">'+_libFmt(it.ext)+(it.size?' <span class="muted">'+_libSize(it.size)+'</span>':'')+'</td>'
+    +'<td style="font-size:11.5px">'+esc(it.use||'')+'</td><td style="white-space:nowrap">'+act+'</td></tr>';
+}
+function renderLibrary(){
+  $('crumb').textContent='기금 자료실';
+  var H=$('app');
+  if(S.lib==null){
+    if(!S._libLoading){ S._libLoading=true;
+      fbDb.ref(NS+'/library/items').once('value').then(function(sn){ S.lib=sn.val()||{}; },function(e){ S.lib={}; toast('자료실을 못 읽었습니다: '+e.message,'err'); })
+        .then(function(){ S._libLoading=false; if(S.view==='library') renderLibrary(); }); }
+    H.innerHTML='<div class="panel">'+loadingHTML()+'</div>'; return;
+  }
+  var all=Object.keys(S.lib).map(function(k){ var o=Object.assign({},S.lib[k]); o._id=k; return o; });
+  var q=String(S.libQ||'').trim(), sel=String(S.libCat||''), yr=String(S.libYear||'');
+  var hit=all.filter(function(it){
+    if(sel){ var p=sel.split('/'); if(it.cat!==p[0]) return false; if(p[1]&&it.sub!==p[1]) return false; }
+    if(yr&&String(it.year||'')!==yr) return false;
+    if(q){ var s=(it.title+' '+(it.ver||'')+' '+(it.use||'')+' '+(it.name||'')).toLowerCase(); if(s.indexOf(q.toLowerCase())<0) return false; }
+    return true; });
+  var groups=libGroups(libSort(hit)), cnt=function(c,s){ return all.filter(function(it){ return it.cat===c&&(!s||it.sub===s); }).length; };
+  var nav='<div class="libnav">'
+    +'<div class="'+(sel?'':'on')+'" onclick="S.libCat=\'\';renderLibrary()">전체 <span class="chip">'+all.length+'</span></div>'
+    +LIB_CATS.map(function(c){ var subs=LIB_SUBS[c[0]]||[];
+      return '<div class="'+(sel===c[0]?'on':'')+'" onclick="S.libCat=\''+c[0]+'\';renderLibrary()"><b>'+esc(c[1])+'</b> <span class="chip">'+cnt(c[0])+'</span></div>'
+        +(subs.length>1?subs.map(function(s){ var k=c[0]+'/'+s[0];
+          return '<div class="'+(sel===k?'on':'')+'" style="padding-left:20px" onclick="S.libCat=\''+k+'\';renderLibrary()">'+esc(s[1])+' <span class="chip">'+cnt(c[0],s[0])+'</span></div>'; }).join(''):''); }).join('')
+    +'</div>';
+  var years=Object.keys(all.reduce(function(m,it){ if(it.year) m[it.year]=1; return m; },{})).sort().reverse();
+  var rows='', no=0, lastSub='';
+  groups.forEach(function(g){
+    var subK=g.head.cat+'/'+g.head.sub;
+    if(subK!==lastSub){ lastSub=subK; var sn=((LIB_SUBS[g.head.cat]||[]).filter(function(s){ return s[0]===g.head.sub; })[0]||['',g.head.sub])[1];
+      var cn=((LIB_CATS.filter(function(c){ return c[0]===g.head.cat; })[0])||['',''])[1];
+      rows+='<tr><td colspan="8" style="background:var(--bg);font-weight:700;color:var(--sub);font-size:12px">'+esc(cn)+' › '+esc(sn)+'</td></tr>'; }
+    rows+=_libRow(g.head,++no,false,g.k,g.rest.length);
+    if(g.rest.length&&S.libOpen&&S.libOpen[g.k]) g.rest.forEach(function(it){ rows+=_libRow(it,0,true,g.k,0); });
+  });
+  H.innerHTML='<div class="panel" style="padding:11px 14px"><div class="row"><h1 style="font-size:18px">📚 기금 자료실</h1>'
+      +'<span class="chip">'+all.length+'건</span>'+hlp('lib.main')+'<span style="flex:1"></span>'
+      +'<button onclick="libImport()" title="PC 의 04_자료모음 폴더를 통째로 고르면 자료목록대로 한꺼번에 올립니다">📁 자료모음 폴더 가져오기</button> '
+      +'<button class="primary" onclick="libAdd()">＋ 자료 올리기</button></div></div>'
+    +'<div class="libwrap"><div class="panel">'+nav+'</div><div class="panel">'
+    +'<div class="row" style="margin-bottom:8px"><input id="lib-q" value="'+esc(q)+'" placeholder="🔍 제목·쓰는 곳 찾기" oninput="S.libQ=this.value;clearTimeout(window._libT);window._libT=setTimeout(function(){renderLibrary();var e=$(\'lib-q\');if(e){e.focus();e.setSelectionRange(e.value.length,e.value.length);}},250)" style="width:220px;padding:5px 8px;border:1px solid var(--line);border-radius:8px">'
+    +'<select onchange="S.libYear=this.value;renderLibrary()" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px"><option value="">연도 전체</option>'
+    +years.map(function(y){ return '<option'+(y===yr?' selected':'')+'>'+esc(y)+'</option>'; }).join('')+'</select>'
+    +'<span class="muted" style="font-size:11.5px">'+groups.length+'가지 · 정렬: 분류 → 제목 → 연도</span></div>'
+    +(all.length?'<div style="overflow-x:auto"><table><thead><tr>'+_ckTh()+'<th>#</th><th>제목</th><th>연도</th><th>판</th><th>형식</th><th>쓰는 곳</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>'
+      :'<div class="muted" style="padding:24px;text-align:center">아직 자료가 없습니다 — [📁 자료모음 폴더 가져오기]로 PC 의 <b>04_자료모음</b> 폴더를 고르세요.</div>')
+    +'</div></div>';
+}
+/* 창고 파일은 «받기»로 저장돼 주소를 열면 내려받아진다 — PDF·그림은 받아서 새 창에 띄운다 */
+function libView(id){ var it=(S.lib||{})[id]; if(!it||!it.url) return;
+  var w=window.open('','_blank'); if(w) w.document.write('<p style="font-family:sans-serif">불러오는 중…</p>');
+  var ty=/\.pdf$/i.test(it.ext||it.name)?'application/pdf':(/\.png$/i.test(it.ext||it.name)?'image/png':'image/jpeg');
+  fetch(it.url).then(function(r){ if(!r.ok) throw new Error('창고 응답 '+r.status); return r.blob(); })
+    .then(function(b){ var u=URL.createObjectURL(new Blob([b],{type:ty})); if(w) w.location.href=u; else window.open(u,'_blank'); })
+    .catch(function(e){ if(w) w.close(); toast('못 열었습니다: '+e.message,'err'); }); }
+function libDown(id){ var it=(S.lib||{})[id]; if(!it||!it.url) return; window.open(it.url,'_blank'); }
+function libToggle(k){ S.libOpen=S.libOpen||{}; S.libOpen[k]=!S.libOpen[k]; renderLibrary(); }
+function libCopyPath(id){ var it=(S.lib||{})[id]||{}, p='OneDrive › 바탕 화면 › 8. 공동기금 › '+String(it.path||'').replace(/\\/g,' › ');
+  (navigator.clipboard?navigator.clipboard.writeText(p):Promise.reject()).then(function(){ toast('위치를 복사했습니다'); },function(){ prompt('위치',p); }); }
+function _libPut(file){
+  if(!photoStoreReady()||!PuPhotoStore.putOriginal) return Promise.reject(new Error('파일 창고와 연결되지 않았습니다 — 로그인을 확인하세요'));
+  var now=Date.now(); return PuPhotoStore.putOriginal(PuPhotoStore.newId(),PuPhotoStore.yearOf(now),file,file.name);
+}
+function _libSave(id,rec){ return fbDb.ref(NS+'/library/items/'+id).set(rec).then(function(){ S.lib=S.lib||{}; S.lib[id]=rec; }); }
+function _libSel(name,list,v){ return '<select id="'+name+'" style="padding:5px 8px;border:1px solid var(--line);border-radius:8px">'+list.map(function(x){ return '<option value="'+esc(x[0])+'"'+(x[0]===v?' selected':'')+'>'+esc(x[1])+'</option>'; }).join('')+'</select>'; }
+function _libSubOpts(){ var o=[]; LIB_CATS.forEach(function(c){ (LIB_SUBS[c[0]]||[]).forEach(function(s){ o.push([c[0]+'/'+s[0],c[1]+' › '+s[1]]); }); }); return o; }
+function _libForm(it,okLabel,onok){
+  showModal('<h2 style="margin:0 0 10px;font-size:16px">'+(it._id?'✏ 자료 고치기':'＋ 자료 올리기')+'</h2>'
+    +'<div class="grid">'
+    +'<div class="fld" style="grid-column:1/-1"><label>분류</label>'+_libSel('lib-cs',_libSubOpts(),(it.cat||'pureun')+'/'+(it.sub||'slides'))+'</div>'
+    +'<div class="fld" style="grid-column:1/-1"><label>제목</label><input id="lib-t" value="'+esc(it.title||'')+'" placeholder="예: 공동근로복지기금 설명자료"></div>'
+    +'<div class="fld"><label>연도</label><input id="lib-y" value="'+esc(it.year||'')+'" placeholder="2026"></div>'
+    +'<div class="fld"><label>판·갈래</label><input id="lib-v" value="'+esc(it.ver||'')+'" placeholder="근로자용 · 옛 판 …"></div>'
+    +'<div class="fld" style="grid-column:1/-1"><label>쓰는 곳</label><input id="lib-u" value="'+esc(it.use||'')+'" placeholder="기업 설명회"></div></div>'
+    +'<div class="row" style="justify-content:flex-end;gap:8px;margin-top:14px">'+(it._id?'<button onclick="libDel(\''+it._id+'\')" style="color:var(--danger)">목록에서 빼기</button><span style="flex:1"></span>':'')
+    +'<button onclick="closeM()">취소</button><button class="primary" id="lib-ok">'+okLabel+'</button></div>',{width:560});
+  $('lib-ok').onclick=function(){
+    var cs=($('lib-cs').value||'pureun/slides').split('/'), t=String($('lib-t').value||'').trim();
+    if(!t){ toast('제목을 적어 주세요','warn'); return; }
+    onok({cat:cs[0], sub:cs[1], title:t, year:String($('lib-y').value||'').trim(), ver:String($('lib-v').value||'').trim(), use:String($('lib-u').value||'').trim()});
+  };
+}
+function libEdit(id){ var it=Object.assign({_id:id},(S.lib||{})[id]||{});
+  _libForm(it,'저장',function(v){ var rec=Object.assign({},S.lib[id],v,{at:_nowStamp(),by:(S.user||'')});
+    _libSave(id,rec).then(function(){ closeM(); toast('고쳤습니다'); renderLibrary(); }).catch(function(e){ toast('저장 실패: '+e.message,'err'); }); }); }
+function libDel(id){ confirmM('목록에서 뺄까요?\n창고의 파일은 그대로 남습니다.',{ok:'빼기',danger:true}).then(function(ok){ if(!ok) return;
+  fbDb.ref(NS+'/library/items/'+id).remove().then(function(){ delete S.lib[id]; closeM(); toast('목록에서 뺐습니다'); renderLibrary(); }).catch(function(e){ toast('실패: '+e.message,'err'); }); }); }
+function libAdd(dropped){
+  var inp=document.createElement('input'); inp.type='file';
+  inp.onchange=function(){ var file=inp.files&&inp.files[0]; if(!file) return;
+    if(file.size>LIB_MAXMB*1048576){ toast(LIB_MAXMB+'MB 넘는 파일은 올리지 않습니다 — PC 폴더에 두세요','warn'); return; }
+    _libForm({title:file.name.replace(/\.[^.]+$/,'')},'올리기',function(v){
+      toast('올리는 중…');
+      _libPut(file).then(function(o){ var id=fbDb.ref(NS+'/library/items').push().key;
+        return _libSave(id,Object.assign(v,{name:file.name, ext:(file.name.match(/\.[^.]+$/)||[''])[0].toLowerCase(), size:file.size, url:o.url, key:o.key, oyear:o.year, at:_nowStamp(), by:(S.user||'')})); })
+        .then(function(){ closeM(); toast('올렸습니다'); renderLibrary(); }).catch(function(e){ toast('실패: '+e.message,'err'); });
+    }); };
+  _pickGo(inp,dropped);
+}
+function libReplace(id){
+  var inp=document.createElement('input'); inp.type='file';
+  inp.onchange=function(){ var file=inp.files&&inp.files[0]; if(!file) return; var it=S.lib[id]; if(!it) return;
+    confirmM('「'+it.title+'」의 새 판으로 올립니다.\n지금 파일('+(it.name||'')+')은 이전 판으로 남습니다.',{ok:'새 판 올리기'}).then(function(ok){ if(!ok) return;
+      toast('올리는 중…');
+      _libPut(file).then(function(o){
+        var old=Object.assign({},it.old||{}), k='v'+Date.now().toString(36);
+        old[k]={name:it.name||'', url:it.url||'', size:it.size||0, at:it.at||'', by:it.by||''};
+        return _libSave(id,Object.assign({},it,{name:file.name, ext:(file.name.match(/\.[^.]+$/)||[''])[0].toLowerCase(), size:file.size, url:o.url, key:o.key, oyear:o.year, sha1:null, old:old, at:_nowStamp(), by:(S.user||'')}));
+      }).then(function(){ toast('새 판을 올렸습니다'); renderLibrary(); }).catch(function(e){ toast('실패: '+e.message,'err'); }); }); };
+  inp.click();
+}
+/* 04_자료모음 폴더 통째로 — 자료목록.json 대로 */
+function libImport(){
+  var inp=document.createElement('input'); inp.type='file'; inp.multiple=true; inp.setAttribute('webkitdirectory','');
+  inp.onchange=function(){
+    var fl=Array.prototype.slice.call(inp.files||[]), mf=fl.filter(function(f){ return /(^|\/)자료목록\.json$/.test(f.webkitRelativePath||f.name); })[0];
+    if(!mf){ toast('폴더 안에 자료목록.json 이 없습니다 — 04_자료모음 폴더를 고르세요','warn'); return; }
+    mf.text().then(function(txt){
+      var man=JSON.parse(txt), files=fl.map(function(f){ return {rel:f.webkitRelativePath||f.name, size:f.size, f:f}; });
+      var P=libPlan(man,files,S.lib||{});
+      return confirmM('자료목록 '+((man.items||[]).length)+'건을 봤습니다.\n\n· 올림 '+P.up.length+'건\n· PC 위치만 적음 '+P.link.length+'건(큰 파일·컨설팅 폴더)\n· 이미 있음 '+P.skip.length+'건'
+        +(P.miss.length?'\n· 폴더에 파일이 없음 '+P.miss.length+'건':'')+'\n\n올릴까요?',{ok:'가져오기'}).then(function(ok){ if(!ok) return;
+        var done=0, fail=0, at=_nowStamp(), by=(S.user||'');
+        var base=function(it){ return {cat:it.cat, sub:it.sub, title:it.title, year:it.year||'', ver:it.ver||'', use:it.use||'', ext:it.ext||'', sha1:it.sha1||null, at:at, by:by}; };
+        var chain=Promise.resolve();
+        P.link.forEach(function(it){ chain=chain.then(function(){ var id=fbDb.ref(NS+'/library/items').push().key;
+          return _libSave(id,Object.assign(base(it),{name:it.orig_name||'', size:it.size||0, path:it.src||''})).then(function(){ done++; },function(){ fail++; }); }); });
+        P.up.forEach(function(u){ chain=chain.then(function(){
+          toast('올리는 중… '+(done+1)+' / '+(P.up.length+P.link.length));
+          return _libPut(u.file.f).then(function(o){ var id=fbDb.ref(NS+'/library/items').push().key;
+            return _libSave(id,Object.assign(base(u.it),{name:u.it.orig_name||u.file.f.name, size:u.file.size, url:o.url, key:o.key, oyear:o.year, src:u.it.src||''})); })
+            .then(function(){ done++; },function(){ fail++; }); }); });
+        return chain.then(function(){ toast('가져오기 끝 — '+done+'건'+(fail?' · 실패 '+fail+'건(다시 누르면 남은 것만)':''),fail?'warn':''); renderLibrary(); });
+      });
+    }).catch(function(e){ toast('목록을 못 읽었습니다: '+e.message,'err'); });
+  };
+  inp.click();
+}
 function mgrText(f){
   if(_hasMgrStruct(f)){
     var main=(f.mgr_main&&f.mgr_main.name)||'';
@@ -22774,6 +22988,10 @@ var HELP={
  'ds.bizclose':{t:'공동기금 참여사 폐업',h:'<p>과반수가 아닌 한 곳의 사업 폐지는 탈퇴와 다릅니다(법 제86조의9). 그 사업주 몫(탈퇴와 같은 산식)을 미지급 임금 등에 먼저 쓰고, 남은 것의 50% 이내를 그 회사 근로자 생활안정자금으로 줄 수 있으며, <b>그래도 남은 것은 공동기금에 귀속</b>합니다 — 사업주에게 돌아가지 않습니다.</p><p>탈퇴 보고(별지 제14호의2)를 이때도 내야 하는지는 [확인 필요 — 관할 지청].</p>'},
  'ds.dis_gong':{t:'공동기금 해산',h:'<p>과반수 사업주의 폐지·탈퇴로 해산하면 재산은 <b>출연한 비율로 참여 사업주에게 배분</b>하고, 남는 것은 정관대로 처리합니다(법 제86조의12). 청산 순서는 사내기금 해산과 같습니다(해산통지 별지 제14호 — 영 제55조의6이 제52조 준용).</p><p>정부 지원금 정산·반환은 근로복지공단 기준을 확인하세요(운영규정 제11·14조) [확인 필요].</p>'},
  'ds.calc':{t:'재산배분 계산',h:'<p>시행규칙 제29조의2 — <b>탈퇴(폐업) 당시 공동기금 재산가액 × 그 사업주가 출연한 재산가액 ÷ 법 제86조의2로 조성된 공동기금</b>.</p><p>재산가액은 그날 기준 결산(자산 − 부채)으로 봅니다. «조성된 공동기금»에 정부·지자체 지원금을 넣는지는 [확인 필요 — 근로복지공단·관할 지청]. 계산은 저장하지 않습니다.</p>'},
+ 'lib.main':{t:'기금 자료실',h:'<p>푸른노무법인이 만든 <b>설명자료·제안서·강의안</b>, <b>정부·공단 규정·지원사업 안내·매뉴얼·서식</b>, <b>지역공동기금 공통 자료</b>를 모아 둔 곳입니다. 서식 자료실은 «채워 내는 서식», 여기는 «참고·발표·홍보 자료»입니다.</p>'
+   +'<p><b>정렬</b>: 분류 → 제목 → 연도(최신 먼저). 같은 제목은 한 줄로 묶고 이전 판은 «이전 N ▸»로 펼칩니다. 현행이 아닌 규정은 «옛 판».</p>'
+   +'<p><b>교체</b>: 새 판을 올리면 지금 파일은 이전 판으로 남습니다(지우지 않음). <b>✏</b>로 제목·분류·연도를 고칩니다.</p>'
+   +'<p><b>처음 모으기</b>: PC 의 <b>04_자료모음</b> 폴더(분류별 사본 + 자료목록.json)를 [📁 자료모음 폴더 가져오기]로 고르면 목록대로 올라갑니다. 이미 올린 것은 건너뜁니다. 25MB 넘는 파일과 근로복지넷 컨설팅 폴더는 «PC 위치»만 적습니다.</p>'},
  'close.rsvshort':{t:'설정액이 한도보다 적으면 왜 문제인가',h:'<p>그해 출연금 중 <b>쓸 수 있는 몫(공동 90% · 사내 80%)</b>을 다음 해에도 쓰려면, <b>그해 결산에서 준비금2로 설정</b>해 두어야 합니다.</p>'
    +'<p>설정하지 않은 몫은 <b>기본재산으로 굳고 소급 설정이 되지 않습니다</b>(결산 실무 해석 — 세무사 확인). 나중에 그 돈을 쓰면 기본재산 잠식이 됩니다(사내기금 근로복지기본법 제62조, 공동기금 같은 법 제86조의6·시행령 제55조의4 — 사용할 수 있는 몫은 그해 출연금의 100분의 90 이내에서 협의회가 정하는 범위).</p>'
    +'<p>그래서 <b>한도 전액으로 채우는 것</b>이 기본입니다. 이미 세무사가 신고한 결산을 그대로 옮겨야 하는 등 사정이 있으면 이유를 적고 확정하세요 — 이유는 결산 기록에 남습니다. 세무 판단의 최종 확정은 담당 세무사 확인이 필요합니다.</p>'},
