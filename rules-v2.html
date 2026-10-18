@@ -50,7 +50,7 @@ window.addEventListener('hashchange', function () { if (window.rv2Route) window.
 <script src="js/rules-v2/store.js?v=4"></script>
 <script src="js/rules-v2/view-library.js?v=4"></script>
 <script src="js/rules-v2/lib-sitecols.js?v=1"></script>
-<script src="js/rules-v2/view-sites.js?v=9"></script>
+<script src="js/rules-v2/view-sites.js?v=10"></script>
 <!-- 「🧹 정리하기」(📥 의 세 번째 보기) — 셈(lib-tidy)은 lib-order·lib-topics 를, 그리기(view-tidy)는 view-library 를 쓴다(설계 §10) -->
 <script src="js/rules-v2/lib-tidy.js?v=2"></script>
 <script src="js/rules-v2/view-tidy.js?v=2"></script>
@@ -201,8 +201,9 @@ button{font:inherit;cursor:pointer}
 #sites .flt select.who{height:28px;border:1px solid #cbd5e1;border-radius:8px;padding:0 8px;font:inherit;font-size:12px;color:#1e293b;background:#ffffff;margin-left:6px}
 #sites .swrap{display:grid;grid-template-columns:minmax(0,1fr) 430px}
 #sites .stbl{min-width:0;overflow-x:auto;border-right:1px solid #e2e8f0}
-.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:880px}
+.sites{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed;min-width:886px}
 /* ↑ min-width 는 «다른 칸 폭의 합 + 이름 칸 몫»이다 — 칸 폭은 view-sites.js 의 colgroup.
+     ☐ 칸(28)을 더하며 886 — 1366px 노트북에서 표 자리가 약 889px 라, 그보다 넓으면 ★최종본 칸이 잘려 옆으로 밀어야 한다(2026-10-18 실측).
      800 이던 때 다른 칸 합이 754 라 이름 칸이 46px 만 남아 폰·좁은 PC 에서 「삼…」 한 글자만 보였다(2026-10-18).
    ⚠ separate(+간격 0)인 까닭 — collapse 이면 아래 «이름 칸 고정»의 줄금이 옆으로 밀 때 따라오지 않는다 */
 .sites th{font-size:11.5px;color:#475569;font-weight:600;text-align:left;padding:7px 8px;border-bottom:1px solid #e2e8f0;background:#f8fafc;white-space:nowrap}
@@ -213,6 +214,14 @@ button{font:inherit;cursor:pointer}
 .sites tbody tr{cursor:pointer}
 .sites tbody tr:hover td{background:#f8fafc}
 .sites tr.sel td{background:#eff6ff}
+/* ☐ 고르기 칸 — 칸 전체가 누를 자리(label). 고른 줄은 연한 파랑 */
+.sites td.pk,.sites th.pk{padding:0;text-align:center}
+.sites td.pk label,.sites th.pk label{display:flex;align-items:center;justify-content:center;min-height:32px;cursor:pointer}
+.sites th.pk .pk-t{display:none}
+.sites tr.ck td{background:#eff6ff}
+#sites .sbulk{display:flex;align-items:center;gap:8px;padding:7px 16px;background:#eff6ff;border-bottom:1px solid #bfdbfe;color:#1e40af;font-size:12.5px;flex-wrap:wrap}
+#sites .sbulk .hint{margin-left:auto;font-size:11.5px;color:#475569}
+#sites .sbulk .btn[disabled]{opacity:.45;cursor:default}
 #sites .k{font-size:11px;padding:1px 7px;border-radius:8px;white-space:nowrap}
 #sites .k.ok{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0}
 #sites .k.cand{background:#fffbeb;color:#854d0e;border:1px solid #fde68a}
@@ -309,25 +318,34 @@ button{font:inherit;cursor:pointer}
   #sites .sites thead tr{display:flex;gap:6px;overflow-x:auto;padding:6px 8px;background:#f8fafc;border-bottom:1px solid #e2e8f0;scrollbar-width:none}
   #sites .sites thead tr::-webkit-scrollbar{display:none}
   #sites .sites thead th{display:block;flex:none;padding:0;border:0;background:none}
-  #sites .sites thead th:first-child{display:none}
+  /* 머리 ☐(보이는 줄 모두)는 칸 거르기 칩 줄의 맨 앞 칩으로 · # 머리는 숨긴다 */
+  #sites .sites thead th:nth-child(2){display:none}
+  #sites .sites thead th.pk label{height:32px;padding:0 11px 0 8px;border:1px solid #cbd5e1;border-radius:16px;background:#ffffff;white-space:nowrap;gap:4px}
+  #sites .sites thead th.pk .pk-t{display:inline}
   #sites th.ch .h{height:32px;border:1px solid #cbd5e1;border-radius:16px;background:#ffffff;padding:0 11px}
   #sites .sites tbody{display:block}
-  #sites .sites tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px;border-bottom:1px solid #e2e8f0;background:#ffffff}
+  #sites .sites tbody tr{display:flex;flex-wrap:wrap;align-items:center;gap:3px 8px;padding:8px 10px 8px 4px;border-bottom:1px solid #e2e8f0;background:#ffffff}
   #sites .sites tbody tr.sel{background:#eff6ff}
   #sites .sites tbody tr::after{content:'';order:4;flex-basis:100%;height:0}
   #sites .sites td{display:block;padding:0;border:0;background:none;min-width:0}
   #sites .sites tr.sel td{background:none}
-  #sites .sites td:nth-child(1){order:1;flex:0 0 22px}
-  #sites .sites td:nth-child(2){order:2;flex:1 1 0}
-  #sites .sites td:nth-child(6){order:3;flex:none}
-  #sites .sites td:nth-child(6) .btn{display:none}
-  #sites .sites td:nth-child(n+3):not(:nth-child(6)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
-  #sites .sites td:nth-child(7){order:5;margin-left:30px}
-  #sites .sites td:nth-child(8){order:6}
-  #sites .sites td:nth-child(5){order:7}
-  #sites .sites td:nth-child(3){order:8}
-  #sites .sites td:nth-child(4){order:9}
-  #sites .sites td:is(:nth-child(3),:nth-child(4),:nth-child(5),:nth-child(8)):has(> .k.none:only-child){display:none}
+  /* 1줄 ☐ · № · 사업장 · 취업규칙 자료 / 2줄 최근 · ★최종본 · 담당 · 규모 · 업태 (☐ 칸이 맨 앞이라 칸 번호가 하나씩 밀렸다) */
+  #sites .sites tbody tr.ck{background:#eff6ff}
+  #sites .sites tr.ck td{background:none}
+  #sites .sites td:nth-child(1){order:0;flex:0 0 30px}
+  #sites .sites td.pk label{min-height:30px}
+  #sites .sites td.pk input{width:22px;height:22px;margin:0}
+  #sites .sites td:nth-child(2){order:1;flex:0 0 22px}
+  #sites .sites td:nth-child(3){order:2;flex:1 1 0}
+  #sites .sites td:nth-child(7){order:3;flex:none}
+  #sites .sites td:nth-child(7) .btn{display:none}
+  #sites .sites td:nth-child(n+4):not(:nth-child(7)){flex:1 1 0;max-width:max-content;font-size:12px;color:#475569}
+  #sites .sites td:nth-child(8){order:5;margin-left:68px}
+  #sites .sites td:nth-child(9){order:6}
+  #sites .sites td:nth-child(6){order:7}
+  #sites .sites td:nth-child(4){order:8}
+  #sites .sites td:nth-child(5){order:9}
+  #sites .sites td:is(:nth-child(4),:nth-child(5),:nth-child(6),:nth-child(9)):has(> .k.none:only-child){display:none}
   #sites .sites td.empty{flex:1 1 100%;padding:30px 10px;white-space:normal}
   #sites .sside.empty{display:none}
   #sites .sside:not(.empty){position:fixed;inset:0;z-index:40;overflow-y:auto;overscroll-behavior:contain;padding:10px 10px 40px}
@@ -405,11 +423,12 @@ button{font:inherit;cursor:pointer}
   #sites .stbl{overflow:auto;min-height:0}
   #sites .sites th{position:sticky;top:0;z-index:2}
   /* # · 사업장 이름 칸 고정 — 좁은 PC 에서 표를 옆으로 밀어도 «어느 회사 줄인지»가 남는다(2026-10-18).
-     ⚠ 이름 칸의 left 는 # 칸 폭(view-sites.js colgroup 첫 칸)과 같아야 한다 — 다르면 겹치거나 틈이 난다.
+     ⚠ 칸마다 left 는 «앞 칸 폭의 합»(view-sites.js colgroup — ☐ 28 · # 36)과 같아야 한다 — 다르면 겹치거나 틈이 난다.
      PC(표 모양)에서만 — 폰(900px 이하)은 두 줄 카드라 옆으로 밀 일이 없고, 걸면 카드 안에 세로 줄금이 그어진다 */
   .sites td:nth-child(1),.sites th:nth-child(1){position:sticky;left:0;z-index:1}
-  .sites td:nth-child(2),.sites th:nth-child(2){position:sticky;left:36px;z-index:1;box-shadow:inset -1px 0 0 #e2e8f0}
-  #sites .sites th:nth-child(-n+2){z-index:3}
+  .sites td:nth-child(2),.sites th:nth-child(2){position:sticky;left:28px;z-index:1}
+  .sites td:nth-child(3),.sites th:nth-child(3){position:sticky;left:64px;z-index:1;box-shadow:inset -1px 0 0 #e2e8f0}
+  #sites .sites th:nth-child(-n+3){z-index:3}
   #sites .sside{overflow:auto;min-height:0}
   #lib>.run,#lib>.flt,#lib>.bulk{flex:0 0 auto}
   #lib>.wrap{flex:1 1 auto;min-height:0;display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:minmax(0,1fr)}
@@ -500,7 +519,9 @@ var ST = { data: { docs: {}, human: {}, rounds: {}, run: null }, view: 'mail', f
   /* 🏢 사업장 — 거르개(has·wait·all)·찾기·고른 사업장 id. 다시 읽어도(reload) 그대로 둔다 */
   sites: { f: 'has', q: '', sel: '', who: '',
     /* 머리줄 거르기·순서·쪽(설계 §12) — 저장하지 않는다. cols={band:[…],biz:[…],docs:[…],last:[…],fin:[…]} · pop=열린 창의 칸 */
-    cols: {}, sort: null, page: 1, pop: '', popq: '', popPos: null },
+    cols: {}, sort: null, page: 1, pop: '', popq: '', popPos: null,
+    /* ☐ 고른 사업장(업체 id) — 저장하지 않는다. 걸러져 안 보이면 그리는 쪽이 빼고, 다른 갈래로 가면 비운다 */
+    picked: new Set() },
   /* 담당 거르기 — 명부(사번→이름)·로그인한 사람의 사번. 사번은 「P-001」 꼴로 맞춘다(업체관리 managerMain 과 같은 꼴) */
   staff: {}, me: '' };
 var S = null, qTimer = 0, cqTimer = 0;
@@ -876,6 +897,34 @@ var H = {
     var t = $sites.querySelector('.stbl'); if (t) t.scrollTop = 0;
     var w = $sites.querySelector('.swrap'); if (w && w.scrollIntoView && w.getBoundingClientRect().top < 0) w.scrollIntoView();
   },
+  /* ☐ 고르기 — 고르기만으로는 아무것도 안 바뀐다(위에 「N곳 골랐습니다」 띠만 뜬다) */
+  sitePick: function (id, on) { if (on) ST.sites.picked.add(id); else ST.sites.picked.delete(id); draw(); },
+  // 머리 ☐ — «지금 보이는 줄»(이 쪽에 그려진 ☐)만. 다른 쪽·걸러진 줄은 건드리지 않는다
+  sitePickAll: function (on) {
+    $sites.querySelectorAll('input[data-pick]').forEach(function (c) { if (on) ST.sites.picked.add(c.dataset.pick); else ST.sites.picked.delete(c.dataset.pick); });
+    draw();
+  },
+  siteUnpick: function () { ST.sites.picked.clear(); draw(); },
+  /* ☐ 일괄 «자료 맞음» — 고른 곳 가운데 후보가 있는 곳만, 각 사업장의 열린 후보 전부를 그 업체 id 로 잇는다(한 곳 단추 siteLink 와 같은 일).
+     ⚠ 건수를 먼저 묻는다 · 쓰기 전에 업체 id 를 «전부» 먼저 검사한다(하나라도 틀리면 아무것도 안 쓴다).
+     ⚠ 저장은 관문(gateway.save, revision 트랜잭션)으로 한 건씩 — 🧹 정리하기의 tLinkMany 를 그대로 탄다
+       (진행 n/m · 멈추면 «몇 건 저장했는지» 알림 · 📥 → 🧹 정리하기 「방금 한 일」에서 되돌리기). */
+  siteBulkLink: function () {
+    var rows = PuRulesV2Sites.model(ST.data, ST.companies).filter(function (r) { return ST.sites.picked.has(r.id) && r.cand > 0; });
+    if (!rows.length) return;
+    var docs = 0, mails = 0, skip = ST.sites.picked.size - rows.length;
+    rows.forEach(function (r) { docs += r.cand; mails += r.candMails; });
+    var bad = rows.filter(function (r) { return !PuOntology.validateCompanyLink({ companyId: r.id }, ST.companies).ok; });
+    if (bad.length) { alert('업체관리에서 찾을 수 없는 사업장이 있어 아무것도 확정하지 않았습니다: ' + bad.map(function (r) { return r.name; }).join(', ')); return; }
+    if (!confirm(rows.length + '곳 · 후보 ' + docs + '건(메일 ' + mails + '통)을 각 사업장 자료로 확정합니다.'
+      + (skip ? '\n(후보가 없는 ' + skip + '곳은 건너뜁니다)' : ''))) return;
+    tLinkMany(rows.map(function (r) { return { ids: r.candIds, co: r.id }; }), '🏢 고른 ' + rows.length + '곳').then(function () {
+      // 다 된 곳은 후보가 0 이 되어 빠지고, 멈춰서 남은 곳만 골라진 채로 둔다(다시 누르면 이어서)
+      var left = {}; PuRulesV2Sites.model(ST.data, ST.companies).forEach(function (r) { if (r.cand > 0) left[r.id] = 1; });
+      ST.sites.picked.forEach(function (id) { if (!left[id]) ST.sites.picked.delete(id); });
+      draw();
+    });
+  },
   /* 후보를 한 번에 확정 — 그 사업장의 열린 후보 «전부»(메일 단위로 모인 것)를 이 업체 id 로 잇는다 */
   siteLink: function (d) {
     var row = siteRow(d.co);
@@ -903,6 +952,8 @@ var $topics = document.getElementById('topics'), topicsCtl = null, FIX_LOAD = nu
 function rv2Route() {
   var mode = window.RV2_MODE(location.hash), was = window.__rv2Mode;
   window.__rv2Mode = mode;
+  // 화면을 떠나면 고른 것을 비운다 — 돌아왔을 때 모르는 것이 골라져 있으면 안 된다(CLAUDE.md ☐ 규칙)
+  if (mode !== 'sites' && ST.sites.picked) ST.sites.picked.clear();
   $sites.style.display = mode === 'sites' ? '' : 'none';
   $lib.style.display = mode === 'lib' ? '' : 'none';
   $topics.style.display = mode === 'topics' ? '' : 'none';

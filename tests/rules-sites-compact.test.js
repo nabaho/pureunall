@@ -8,7 +8,7 @@
 
    ★ 못 박는 것은 규칙이다(값이 아니다):
      ① 표의 min-width − 다른 칸 폭 합 ≥ 이름 한 칸 몫(회사 이름이 읽히는 폭)
-     ② (PC 표) 이름 칸 고정(sticky)의 left 는 # 칸 폭과 같다 — 다르면 겹치거나 틈이 난다.
+     ② (PC 표) 이름까지의 앞 칸(☐ · #) 고정(sticky) — 칸마다 left 는 앞 칸 폭의 합. 다르면 겹치거나 틈이 난다.
         폰(900px 이하)은 두 줄 카드(CLAUDE.md 「폰 화면」)라 고정을 걸지 않는다
      ③ 폰에서 새로고침은 ↻ 만 남는다(글자는 접을 뿐 title 에 있다)
      (「새 버전」 단추를 폰에서 낮게 — 처음엔 여기서 박았으나 쪽 막대를 덮어 모든 앱 한 곳으로 옮겼다:
@@ -66,22 +66,26 @@ test('① 사업장 이름 칸이 «읽히는 폭»을 받는다 — 표 min-wid
     + '.sites 의 min-width 를 «다른 칸 합(' + fixed + ') + ' + NAME_MIN + '» 이상으로 올리거나 다른 칸을 줄일 것');
 });
 
-test('② PC 표를 옆으로 밀어도 # · 이름은 남는다 — 이름 칸 left 는 # 칸 폭과 같고, 폰 카드에는 안 건다', () => {
+test('② PC 표를 옆으로 밀어도 앞 칸들(☐ · # · 이름)은 남는다 — 칸마다 left 는 앞 칸 폭의 합, 폰 카드에는 안 건다', () => {
   const c = cols();
-  assert.ok(c[0] > 0 && c[1] === null, '첫 칸은 #(폭 있음), 둘째 칸은 이름(폭 없음)이어야 한다');
+  const name = c.indexOf(null);                                     // 폭 없는 칸 = 사업장 이름
+  assert.ok(name >= 1 && c.slice(0, name).every((w) => w > 0), '이름 앞 칸들은 폭이 있어야 고정 자리를 셀 수 있다');
   const pc = mediaBlocks(CSS, 'min').filter((b) => b.w >= 901).map((b) => b.body).join('\n');
-  const first = pc.match(/\.sites td:nth-child\(1\),\.sites th:nth-child\(1\)\{([^}]*)\}/);
-  const second = pc.match(/\.sites td:nth-child\(2\),\.sites th:nth-child\(2\)\{([^}]*)\}/);
-  assert.ok(first && second, '# · 이름 칸 고정 규칙이 없다');
-  assert.match(first[1], /position:sticky/); assert.match(first[1], /left:0/);
-  assert.match(second[1], /position:sticky/);
-  const left = Number((second[1].match(/left:\s*(\d+)px/) || [])[1]);
-  assert.equal(left, c[0], '★ 이름 칸 left(' + left + ')와 # 칸 폭(' + c[0] + ')이 다르다 — 겹치거나 틈이 난다');
-  // 폰 카드에 고정이 새면 카드 안에 세로 줄금이 그어진다 — 묶음 밖(모든 폭)에 두지 않는다
-  const outside = mediaBlocks(CSS, 'min').concat(mediaBlocks(CSS, 'max')).reduce((t, b) => t.split(b.body).join(''), CSS);
-  assert.doesNotMatch(outside, /\.sites td:nth-child\(2\)[^{]*\{[^}]*position:sticky/, '이름 칸 고정이 폰 카드에도 걸린다');
+  let sum = 0;
+  for (let i = 0; i <= name; i++) {
+    const n = i + 1;
+    const m = pc.match(new RegExp('\\.sites td:nth-child\\(' + n + '\\),\\.sites th:nth-child\\(' + n + '\\)\\{([^}]*)\\}'));
+    assert.ok(m, n + '째 칸 고정 규칙이 없다 — 이름까지의 앞 칸은 모두 고정해야 옆으로 밀 때 이름이 남는다');
+    assert.match(m[1], /position:sticky/);
+    const left = Number((m[1].match(/left:\s*(\d+)(px)?/) || [])[1]);
+    assert.equal(left, sum, '★ ' + n + '째 칸 left(' + left + ')가 앞 칸 폭의 합(' + sum + ')과 다르다 — 겹치거나 틈이 난다');
+    sum += c[i] || 0;
+  }
   // collapse 면 고정 칸의 줄금이 따라오지 않는다
   assert.doesNotMatch(CSS.match(/\.sites\{[^}]*\}/)[0], /border-collapse:\s*collapse/);
+  // 폰 카드에 고정이 새면 카드 안에 세로 줄금이 그어진다 — 묶음 밖(모든 폭)에 두지 않는다
+  const outside = mediaBlocks(CSS, 'min').concat(mediaBlocks(CSS, 'max')).reduce((t, b) => t.split(b.body).join(''), CSS);
+  assert.doesNotMatch(outside, /\.sites td:nth-child\(\d\)[^{]*\{[^}]*position:sticky/, '앞 칸 고정이 폰 카드에도 걸린다');
 });
 
 test('③ 폰 거르개 — 새로고침은 ↻ 만, 글자는 접고 title 에 남긴다', () => {
