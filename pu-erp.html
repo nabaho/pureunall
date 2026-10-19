@@ -29782,7 +29782,10 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
        373곳 어디에도 한 번도 켜진 적이 없다(실측 0곳). 폐업한 곳은 이제
        ⋯ → 「종료 처리」에서 사유를 「업체 폐업」으로 골라 종료관리로 넘긴다.
        ★ 다시 만들지 말 것 — 쓰이지 않은 채 탭 하나와 대시보드 칸 하나를 차지했다. */
-    if(statusTab === 'active') return co.status === 'active';
+    /* ⚠ 휴지통(_deleted) 업체는 활성 탭에도 안 나온다 — 사무대행·중단 탭과 같은 erpCoAlive (2026-10-19).
+       지움 표시만 하고 줄은 남기는 업체(중복 합치기)가 «+ 지정» 빈 줄로 맨 위에 떠 있었고,
+       활성·유형 건수도 그만큼 부풀었다(실측: 활성 221 중 지운 줄 2). */
+    if(statusTab === 'active') return erpCoAlive(co) && co.status === 'active';
     return co.status === statusTab;
   }
   // 필터
@@ -29890,7 +29893,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
   }
 
   // 카운트
-  var activeCount = companies.filter(function(c){return c.status==='active';}).length;
+  var activeCount = companies.filter(function(c){return erpCoAlive(c) && c.status==='active';}).length;
   var subofficeCount = companies.filter(function(c){return erpCoAlive(c) && (c.status==='suboffice' || c.isSuboffice);}).length;
   var suspendedCount = companies.filter(function(c){return erpCoAlive(c) && !!c.suspended;}).length;
   /* ★ 계약 중단한 업체는 그 달 자문료에서 뺀다 (대표 지시 2026-09-08).
@@ -30017,7 +30020,7 @@ try{ if(typeof PuGcalAuth !== "undefined") PuGcalAuth.capture(); }catch(e){}
       onMonthChange: function(ym){ setSelYM(ym); },  // monthOnly 자동 활성화 제거 (다른 달 계약 사라지는 버그 수정)
       kpis: [
         { label:'🏢 운영 업체', value:companies.filter(erpCoAlive).length+'개', bg:'#f8fafc', fg:'#1e293b', color:'#1e293b', border:'#e2e8f0' },
-        { label:'💼 활성 자문', value:companies.filter(function(c){return c.status==='active';}).length+'개', bg:'#eff6ff', fg:'#1e40af', color:'#1e40af', border:'#bfdbfe' },
+        { label:'💼 활성 자문', value:activeCount+'개', bg:'#eff6ff', fg:'#1e40af', color:'#1e40af', border:'#bfdbfe' },
         { label:'🏛️ 사무대행', value:subofficeCount+'개', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a' },
         { label:'💰 월 자문료', value:totalAdvisoryFee.toLocaleString()+'원', bg:'#fffbeb', fg:'#854d0e', color:'#d97706', border:'#fde68a',
           sub: suspendedFee > 0 ? '중단 ' + suspendedFee.toLocaleString() + '원 제외' : null },
