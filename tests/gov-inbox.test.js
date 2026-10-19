@@ -62,3 +62,54 @@ test('★★ 서버가 알아낸 지역·업종 제한(rgn·ind·indY·jnt·lk)�
   assert.equal(a.rgn, '충청남도'); assert.equal(a.ind, '정보통신공사업'); assert.equal(a.indY, 'Y'); assert.equal(a.jnt, '대전'); assert.equal(a.lk, '1');
   ['rgn', 'ind', 'indY', 'jnt', 'lk'].forEach((k) => assert.equal(k in b, false, k));
 });
+
+/* ── 출처별 «받은 기록» — 나라장터·알리오·기업마당이 계속 들어오는지 (대표 지시 2026-10-19) ── */
+const T1 = '2026-10-19T01:59:00.000Z';   // 서울 10.19 10:59
+test('★ newestOf — 받은 «전체» 중 가장 최근 게시일(걸러진 것이 아니라) · 모르는 꼴은 건너뛴다', () => {
+  assert.equal(I.newestOf([{ openDt: '2026-10-17 09:00:00' }, { openDt: '2026-10-19 08:30:00' }, { openDt: '2026-10-01' }, { openDt: '' }, null, {}]), '2026-10-19');
+  assert.equal(I.newestOf([]), ''); assert.equal(I.newestOf(null), '');
+});
+test('★★ noteFetch — 출처마다 한 줄 + 하루 한 줄 기록 · 옛 기록은 안 고친다 · 못 받은 날은 «받았다»로 덮지 않는다', () => {
+  const s0 = {}; const s1 = I.noteFetch(s0, 'g2b', { n: 3077, newest: '2026-10-19', err: '' }, T1);
+  assert.deepEqual(s0, {}, '옛 기록을 고쳤다');
+  assert.equal(s1.cur.g2b.n, 3077); assert.equal(s1.cur.g2b.okAt, T1); assert.equal(s1.hist[0].d, '2026-10-19'); assert.equal(s1.hist[0].g2b.n, 3077);
+  const s2 = I.noteFetch(s1, 'g2b', { n: 0, newest: '', err: '인증키 오류' }, '2026-10-19T05:00:00.000Z');
+  assert.equal(s2.cur.g2b.err, '인증키 오류'); assert.equal(s2.cur.g2b.okAt, T1, '마지막 성공 시각을 지웠다');
+  assert.equal(s2.hist[0].g2b.e, 0, '같은 날 잘 받은 뒤 한 번 못 받았다고 그날을 실패로 바꾸면 안 된다');
+  const s3 = I.noteFetch({}, 'alio', { n: 0, newest: '', err: '쪽 오류' }, T1);
+  assert.equal(s3.hist[0].alio.e, 1, '그날 한 번도 못 받았으면 실패로 남긴다');
+  const s4 = I.noteFetch(s1, 'alio', { n: 525, newest: '2026-10-12', err: '' }, T1);
+  assert.equal(s4.hist.length, 1, '같은 날 두 출처는 한 줄'); assert.ok(s4.hist[0].g2b && s4.hist[0].alio);
+});
+test('★ 기록은 21일치만 — 오래된 날부터 덜어낸다 · 날짜 차례로', () => {
+  let st = {};
+  for (let d = 1; d <= 25; d++) st = I.noteFetch(st, 'g2b', { n: d, newest: '', err: '' }, '2026-09-' + String(d).padStart(2, '0') + 'T03:00:00.000Z');
+  assert.equal(st.hist.length, 21); assert.equal(st.hist[0].d, '2026-09-05'); assert.equal(st.hist[20].d, '2026-09-25');
+});
+test('★★★ summarize — 정상 / 이틀 넘게 안 받음 / 못 받음(마지막 성공 같이) / 나라장터 최근 게시가 옛것 / 기록 없음', () => {
+  const today = '2026-10-19';
+  let st = I.noteFetch({}, 'g2b', { n: 3077, newest: '2026-10-17', err: '' }, T1);
+  st = I.noteFetch(st, 'alio', { n: 525, newest: '2026-10-12', err: '' }, T1);
+  let sm = I.summarize(st, today);
+  assert.deepEqual(sm.map((x) => x.k), ['ok', 'ok', 'none']);
+  assert.match(sm[0].text, /10\.19 10:59 받음 · 3,077건 · 최근 게시 10\.17/); assert.match(sm[2].text, /아직 받은 기록이 없습니다/);
+  assert.equal(I.summarize(st, '2026-10-21')[0].k, 'late', '이틀 넘게 안 받으면 노랑');
+  assert.match(I.summarize(st, '2026-10-21')[0].text, /2일째 새로 안 받았습니다/);
+  assert.equal(I.summarize(st, '2026-10-20')[0].k, 'ok', '하루는 정상(주말·아침 전)');
+  const stale = I.noteFetch({}, 'g2b', { n: 3000, newest: '2026-10-10', err: '' }, T1);
+  assert.equal(I.summarize(stale, today)[0].k, 'late'); assert.match(I.summarize(stale, today)[0].text, /최근 게시가 9일 전/);
+  assert.equal(I.summarize(I.noteFetch({}, 'alio', { n: 525, newest: '2026-09-01', err: '' }, T1), today)[0].k, 'none');
+  assert.equal(I.summarize(I.noteFetch({}, 'alio', { n: 525, newest: '2026-09-01', err: '' }, T1), today)[1].k, 'ok', '알리오는 «진행 중» 공고라 옛 게시일이어도 정상');
+  const bad = I.noteFetch(st, 'g2b', { n: 0, newest: '', err: 'SERVICE_ACCESS_DENIED' }, '2026-10-19T05:00:00.000Z');
+  sm = I.summarize(bad, today); assert.equal(sm[0].k, 'bad'); assert.match(sm[0].text, /못 받음 — SERVICE_ACCESS_DENIED · 마지막 성공 10\.19 10:59/);
+  assert.match(I.summarize(I.noteFetch({}, 'g2b', { n: 0, err: 'x' }, T1), today)[0].text, /아직 성공한 적 없음/);
+  assert.equal(I.summarize(null, today).length, 3); assert.ok(I.summarize(undefined, today).every((x) => x.k === 'none'));
+});
+test('★ history — 최근 날부터 · 칸 글(건수·최근 게시 / ⚠ 못 받음 / —)', () => {
+  let st = I.noteFetch({}, 'g2b', { n: 3077, newest: '2026-10-18', err: '' }, '2026-10-18T03:00:00.000Z');
+  st = I.noteFetch(st, 'alio', { n: 0, err: 'e' }, '2026-10-19T03:00:00.000Z');
+  const h = I.history(st);
+  assert.deepEqual(h.map((x) => x.day), ['10.19', '10.18']);
+  assert.equal(h[0].cells.alio, '⚠ 못 받음'); assert.equal(h[0].cells.g2b, '—'); assert.equal(h[1].cells.g2b, '3,077건 · 최근 게시 10.18');
+  assert.deepEqual(I.history(null), []);
+});

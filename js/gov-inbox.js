@@ -52,7 +52,71 @@
     return { k: 'ok', text: body };
   }
 
-  const api = { merge: merge, status: status };
+  /* ── 출처별 «받은 기록» — 나라장터·알리오·기업마당이 «계속 새로 들어오는지» 눈으로 보려고 (대표 지시 2026-10-19) ──
+     화면이 「새로 받기」를 마칠 때마다 출처마다 한 줄을 남긴다(noteFetch). 하루 한 줄씩 21일치(hist)도 쌓는다.
+     ⚠ «받은 건수»는 걸러내기 «전» 건수다 — 걸린 공고는 드물어서 목록의 최근 공고일은 «수집이 멈췄다»는 증거가 못 된다.
+        그래서 받은 «전체» 중 가장 최근 게시일(newest)을 따로 적는다.
+     ⚠ 못 받은 날(err)은 «받았다»로 덮지 않는다 — 마지막으로 «잘» 받은 때(okAt)를 따로 둔다. */
+  var SRCS = [{ k: 'g2b', label: '나라장터', late: 6 }, { k: 'alio', label: '알리오', late: 0 }, { k: 'biz', label: '기업마당', late: 0 }];
+  var HIST_DAYS = 21;
+  function seoulDay(iso) { var t = Date.parse(iso); return isNaN(t) ? '' : new Date(t + 9 * 3600e3).toISOString().slice(0, 10); }
+  function seoulStamp(iso) { var t = Date.parse(iso); return isNaN(t) ? '' : new Date(t + 9 * 3600e3).toISOString().slice(5, 16).replace('T', ' ').replace('-', '.'); }
+  function mmdd(ymd) { return /^\d{4}-\d{2}-\d{2}/.test(s(ymd)) ? s(ymd).slice(5, 10).replace('-', '.') : ''; }
+  function daysBetween(a, b) { var x = Date.parse(a), y = Date.parse(b); return isNaN(x) || isNaN(y) ? null : Math.round((y - x) / 86400000); }
+  /* rows → 가장 최근 게시일(YYYY-MM-DD) */
+  function newestOf(rows) {
+    var best = '';
+    (rows || []).forEach(function (r) { var d = s(r && r.openDt).slice(0, 10); if (/^\d{4}-\d{2}-\d{2}$/.test(d) && d > best) best = d; });
+    return best;
+  }
+  /* stat(옛 기록) + 이번에 받은 결과 → 새 stat (옛 것은 안 고친다). info = { n, newest, err } */
+  function noteFetch(stat, key, info, nowIso) {
+    var st = stat && typeof stat === 'object' ? JSON.parse(JSON.stringify(stat)) : {};
+    st.cur = st.cur && typeof st.cur === 'object' ? st.cur : {};
+    st.hist = Array.isArray(st.hist) ? st.hist : [];
+    info = info || {};
+    var prev = st.cur[key] || {}, err = s(info.err).slice(0, 120);
+    var rec = { at: nowIso, n: Number(info.n) || 0, newest: s(info.newest), err: err, okAt: err ? s(prev.okAt) : nowIso };
+    st.cur[key] = rec;
+    var d = seoulDay(nowIso);
+    if (d) {
+      var row = st.hist.filter(function (h) { return h && h.d === d; })[0];
+      if (!row) { row = { d: d }; st.hist.push(row); }
+      /* 같은 날 잘 받은 뒤 한 번 못 받아도 그날을 «못 받음»으로 바꾸지 않는다 */
+      if (!(row[key] && !row[key].e && err)) row[key] = { n: rec.n, newest: rec.newest, e: err ? 1 : 0 };
+    }
+    st.hist.sort(function (a, b) { return a.d < b.d ? -1 : a.d > b.d ? 1 : 0; });
+    if (st.hist.length > HIST_DAYS) st.hist = st.hist.slice(st.hist.length - HIST_DAYS);
+    return st;
+  }
+  /* 출처마다 한 줄 요약 — k: ok / late / bad / none, todayYmd = 서울 날짜 */
+  function summarize(stat, todayYmd) {
+    return SRCS.map(function (sr) {
+      var c = stat && stat.cur && stat.cur[sr.k];
+      if (!c) return { key: sr.k, label: sr.label, k: 'none', text: '아직 받은 기록이 없습니다' };
+      var okDay = seoulDay(c.okAt || ''), age = okDay && todayYmd ? daysBetween(okDay, todayYmd) : null;
+      var newestAge = c.newest && todayYmd ? daysBetween(c.newest, todayYmd) : null;
+      var got = seoulStamp(c.at) + ' 받음 · ' + (Number(c.n) || 0).toLocaleString('ko-KR') + '건' + (c.newest ? ' · 최근 게시 ' + mmdd(c.newest) : '');
+      if (c.err) return { key: sr.k, label: sr.label, k: 'bad', text: '못 받음 — ' + s(c.err) + (c.okAt ? ' · 마지막 성공 ' + seoulStamp(c.okAt) : ' · 아직 성공한 적 없음') };
+      if (age != null && age >= 2) return { key: sr.k, label: sr.label, k: 'late', text: age + '일째 새로 안 받았습니다 — 마지막 ' + seoulStamp(c.okAt) };
+      if (sr.late && newestAge != null && newestAge > sr.late) return { key: sr.k, label: sr.label, k: 'late', text: got + ' — ⚠ 받은 공고 중 가장 최근 게시가 ' + newestAge + '일 전입니다. 새 공고가 안 오는지 확인해 주세요' };
+      return { key: sr.k, label: sr.label, k: 'ok', text: got };
+    });
+  }
+  /* 하루 한 줄 기록 → 표 줄(최근 날부터) — 칸 글: 「3,077건 · 최근 게시 10.17」·「⚠ 못 받음」·「—」 */
+  function history(stat) {
+    var list = (stat && Array.isArray(stat.hist) ? stat.hist : []).slice().reverse();
+    return list.map(function (h) {
+      var cells = {};
+      SRCS.forEach(function (sr) {
+        var c = h[sr.k];
+        cells[sr.k] = !c ? '—' : (c.e ? '⚠ 못 받음' : (Number(c.n) || 0).toLocaleString('ko-KR') + '건' + (c.newest ? ' · 최근 게시 ' + mmdd(c.newest) : ''));
+      });
+      return { d: h.d, day: mmdd(h.d), cells: cells };
+    });
+  }
+
+  const api = { merge: merge, status: status, noteFetch: noteFetch, summarize: summarize, history: history, newestOf: newestOf, SRCS: SRCS, HIST_DAYS: HIST_DAYS };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovInbox = api;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -35,6 +35,9 @@ body{margin:0;font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic',sans-
 #top .sub{font-size:11px;color:var(--text-mute)}
 .sp{flex:1}
 /* 같은 기관의 모집 글 딱지 — 공고명 «앞»에 둔다(뒤에 두면 긴 이름 줄임표에 잘려 안 보인다) */
+.health{margin-top:2px;line-height:1.7}
+.hc{display:inline-block;margin-right:14px}
+.hc.ok b{color:var(--teal)} .hc.late b{color:var(--amber)} .hc.bad,.hc.bad b{color:var(--red)} .hc.none{color:var(--text-mute)}
 .orgrec{border:1px solid var(--amber);background:var(--bg);color:var(--amber);border-radius:10px;padding:0 7px;font-size:11px;font-weight:700;cursor:pointer;margin-right:4px;line-height:18px}
 /* ★ 별표 — 줄 왼쪽(№ 옆)에 늘 보인다. 예전엔 맨 오른쪽 「관리」 칸에 있어 넓지 않은 화면에선 아예 안 보였다(대표 지시 2026-10-11 「별표표시 하게」) */
 .stc{width:30px;text-align:center}
@@ -538,10 +541,10 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-bizinfo.js?v=3"></script>
 <script src="js/gov-recruit.js?v=6"></script>
 <script src="js/gov-submit.js?v=3"></script>
-<script src="js/gov-sync.js?v=7"></script>
+<script src="js/gov-sync.js?v=8"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
-<script src="js/gov-inbox.js?v=2"></script>
+<script src="js/gov-inbox.js?v=3"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script>
@@ -682,32 +685,36 @@ async function _fetchAll(){
   if(!kd && !kb){ readyNote(); toast('인증키를 먼저 넣어 주세요'); return; }
   note('⏳ 받는 중…'); _planSum=null;
   var today=new Date().toISOString().slice(0,10);
-  var got=[], errs=[];
+  var got=[], errs=[], bizRows=[], hs=healthStat(), hNow=new Date().toISOString();
   var to=new Date(), from=new Date(Date.now()-7*86400000);
   if(kd){
     var g=await pullAll('나라장터', function(p){ return GovG2b.buildUrl({key:kd,from:from,to:to,page:p,rows:999}); },
                         GovG2b.parse, PAGE_MAX.g2b);
     got=got.concat(g.rows); errs=errs.concat(g.errs);
+    hs=GovInbox.noteFetch(hs,'g2b',{n:g.rows.length, newest:GovInbox.newestOf(g.rows), err:healthErr(g.errs)},hNow);
     var a=await pullAll('알리오', function(p){ return GovAlio.buildUrl({key:kd,page:p,rows:100,ongoingOnly:true}); },
                         GovAlio.parse, PAGE_MAX.alio);
     got=got.concat(a.rows); errs=errs.concat(a.errs);
+    hs=GovInbox.noteFetch(hs,'alio',{n:a.rows.length, newest:GovInbox.newestOf(a.rows), err:healthErr(a.errs)},hNow);
     var pl=await planFetch(kd); errs=errs.concat(pl.errs); _planSum=pl;
   }
   if(kb){
     for(var i=0;i<GovBizinfo.FIELDS_DEFAULT.length;i++){
       try{ var b=GovBizinfo.parse(await pull(GovBizinfo.buildUrl({key:kb,
              field:GovBizinfo.FIELDS_DEFAULT[i], regions:GovBizinfo.REGIONS_DEFAULT, count:200})));
-        if(b.ok) got=got.concat(b.rows); else { errs.push('기업마당: '+b.err); break; } }
+        if(b.ok){ got=got.concat(b.rows); bizRows=bizRows.concat(b.rows); } else { errs.push('기업마당: '+b.err); break; } }
       catch(e){ errs.push('기업마당: 받지 못했습니다'); break; }
     }
     /* 전국 공고도 한 번 더 — 「한국콘텐츠진흥원 노무 컨설팅」처럼 지역 태그가 없는 전국 공고가 위 지역 거르기에 빠졌다(대표 지시 2026-10-11).
        ⚠ 이 둘째 길은 «덤»이다 — 실패해도 위 결과·오류 표시에 영향 없이 조용히 넘어간다. 걸러내기(judgeBiz)가 노무 말을 가린다. */
     for(var j=0;j<GovBizinfo.FIELDS_DEFAULT.length;j++){
       try{ var nb=GovBizinfo.parse(await pull(GovBizinfo.buildUrl({key:kb, field:GovBizinfo.FIELDS_DEFAULT[j], count:GovBizinfo.NATION_COUNT})));
-        if(nb.ok) got=got.concat(nb.rows); }
+        if(nb.ok){ got=got.concat(nb.rows); bizRows=bizRows.concat(nb.rows); } }
       catch(e){}
     }
   }
+  if(kb) hs=GovInbox.noteFetch(hs,'biz',{n:bizRows.length, newest:GovInbox.newestOf(bizRows), err:healthErr(errs.filter(function(e){ return /^기업마당/.test(e); }))},hNow);
+  lsSet('src_stat', JSON.stringify(hs));   /* 나라장터·알리오·기업마당이 «계속 들어오는지» 보는 기록(수집 상태 줄) */
   var buf=get('feed');   /* ⚠ 다 받은 «뒤»에 읽는다(검토 2026-10-04) */
   var m=GovG2b.merge(buf, got, kws(), today);
   /* 지역·업종 제한 — 걸린 공고와 아직 열려 있는 옛 공고(20건씩)에 붙인다. 실패해도(승인 전) 공고는 그대로.
@@ -1139,6 +1146,32 @@ function _pager(p, pages, from, shown, n, fn){
    ⚠ 숨긴 것도 센다 — 「전체 0건 · 숨김 32건」일 때 범위가 비면 «받은 게 없다»로 읽힌다.
    ⚠ 나라장터는 받을 때마다 «지난 7일치»만 온다(fetchAll) — 그 앞은 쌓인 것이다. 그렇게 밝힌다. */
 function ymdOf(d){ var x=new Date(d); return isNaN(x)?'':x.getFullYear()+'-'+String(x.getMonth()+1).padStart(2,'0')+'-'+String(x.getDate()).padStart(2,'0'); }
+/* ═══ 📡 수집 상태 — 나라장터·알리오·기업마당이 «계속 새로 들어오는지» (대표 지시 2026-10-19) ═══
+   출처마다 마지막으로 받은 때·건수·받은 «전체» 중 가장 최근 게시일(걸러진 공고가 아니라 받은 전체 — 걸린 건 드물어 목록 날짜로는 못 안다).
+   ⚠ 못 받은 것은 «받았다»로 덮지 않는다 · 이틀 넘게 안 받으면 노랗게 · 나라장터는 최근 게시가 6일 넘게 옛것이어도 노랗게. 기록은 하루 한 줄씩 21일치(📊). */
+function healthStat(){ try{ var v=JSON.parse(lsGet('src_stat')||'null'); return v&&typeof v==='object'?v:{}; }catch(e){ return {}; } }
+function healthErr(list){ return (list||[]).filter(function(e){ return !/쪽 뚜껑/.test(e); }).map(function(e){ return String(e).replace(/^(나라장터|알리오|기업마당): /,''); }).join(' · '); }
+function seoulToday(){ return new Date(Date.now()+9*3600e3).toISOString().slice(0,10); }
+function healthHtml(){
+  var sm=GovInbox.summarize(healthStat(), seoulToday());
+  if(!sm.some(function(x){ return x.k!=='none'; }) && !(keyData()||keyBiz())) return '';
+  var dot={ok:'●',late:'▲',bad:'✖',none:'○'};
+  return '<div class="health sml">📡 <b>수집 상태</b> '
+    +sm.map(function(x){ return '<span class="hc '+x.k+'" title="'+esc(x.label+' — '+x.text)+'"><b>'+dot[x.k]+' '+esc(x.label)+'</b> '+esc(x.text)+'</span>'; }).join('')
+    +'<a href="#" onclick="healthPop();return false">📊 날짜별 기록</a></div>';
+}
+function healthPop(){
+  var rows=GovInbox.history(healthStat());
+  var body='<div class="sml" style="margin-bottom:8px">「🔄 새로 받기」를 마칠 때마다 남는 기록입니다 — 하루에 여러 번 받아도 한 줄(그날의 마지막 값). '
+    +'<b>건수는 걸러내기 «전»에 받은 전체</b>이고 «최근 게시»는 그중 가장 최근 공고일입니다. 날짜가 매일 이어지고 최근 게시가 따라 올라오면 새 공고가 계속 들어오는 것입니다.</div>';
+  body+= rows.length
+    ? '<div class="scroll"><table class="cmp"><thead><tr><th>날짜</th><th>나라장터</th><th>알리오</th><th>기업마당</th></tr></thead><tbody>'
+      +rows.map(function(r){ return '<tr><td class="dt">'+esc(r.day)+'</td>'+['g2b','alio','biz'].map(function(k){ var c=r.cells[k]; return '<td'+(/못 받음/.test(c)?' style="color:var(--red)"':'')+'>'+esc(c)+'</td>'; }).join('')+'</tr>'; }).join('')
+      +'</tbody></table></div>'
+    : '<div class="sml">아직 기록이 없습니다 — 🔄 새로 받기를 누르면 남기 시작합니다.</div>';
+  body+=feedSrvHtml();
+  popOpen('📡 수집 상태 — 날짜별 기록', body);
+}
 function feedPeriod(rows, lastAt, lastDay){
   var open=[], close=[];
   (rows||[]).forEach(function(r){ if(!r) return;
@@ -1168,7 +1201,7 @@ function draw(){
   matchEnsure();
   var mnf=$('matchNoteF'); if(mnf) mnf.innerHTML=matchNoteHtml();
   var v=feedVisible(), all=v.all, rows=v.rows;
-  var pdv=$('period'); if(pdv) pdv.innerHTML=periodHtml()+feedSrvHtml();
+  var pdv=$('period'); if(pdv) pdv.innerHTML=periodHtml()+healthHtml()+feedSrvHtml();
   var vis={}; rows.forEach(function(r){ vis[r.id]=1; });
   Object.keys(_feedSel).forEach(function(id){ if(!vis[id]) delete _feedSel[id]; });
   var sn=Object.keys(_feedSel).length, hiddenN=v.every.length-all.length;
