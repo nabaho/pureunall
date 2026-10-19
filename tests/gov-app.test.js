@@ -139,7 +139,7 @@ function runApp(seed) {
     + 'setTab,careerPull,matchEnsure,matchNoteHtml,getMat:function(){ return _mat; },srcBackfill,rejudge,pullAll,PAGE_MAX,'
     + 'feedTog,feedSelAll,feedBulk,expCsv,feedPer,feedPageTo,feedPop,feedRowClick,unhide,popClose,'
     + 'feedMthd,isSole,planFetchNow,planDraw,planTog,planSelAll,planBulk,planStar,planHide,planGoFeed,planMthd,planPop,planRowClick,planSince,PLAN_PAGE_MAX,planPer,planPageTo,planView,planInView,planStarOnly,planStarBtn,'
-    + 'fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
+    + 'healthPop,healthHtml,healthStat,healthErr,fetchAll,setMat:function(m){_mat=m;},setFb:function(db,uid){fbDb=db;fbUid=uid;},setPull:function(f){pull=f;}};', ctx);
   return { api: ctx.__api, el, store, setBlob: (f) => { hooks.blob = f; } };
 }
 
@@ -1108,4 +1108,64 @@ test('★ 덩어리 높이는 «재서» 알린다 — 보이는 덩어리만 ·
   const st = src.slice(src.indexOf('function setTab'), src.indexOf("lsSet('tab', t)"));
   assert.match(st, /\n  recStickySync\(\);/, '탭마다 다시 재야 한다(공고 79px ↔ 발주 46px)');
   assert.doesNotMatch(st, /if\(t==='rec'\)\{[^}]*recStickySync/, '컨설턴트 모집 탭에서만 재면 다른 탭이 옛 높이를 쓴다');
+});
+
+/* ═══ 📡 수집 상태 — 나라장터·알리오가 계속 들어오는지 (대표 지시 2026-10-19) ═══ */
+const G_OK = (rows) => ({ response: { header: { resultCode: '00' }, body: { totalCount: rows.length, items: rows } } });
+test('★★★ 새로 받기를 마치면 출처마다 «받은 기록»이 남는다 — 건수·가장 최근 게시일(받은 전체 기준)·하루 한 줄', async () => {
+  const r = runApp({ feed: [], key_data: 'K' });
+  r.api.setPull(async (u) => {
+    if (/getBidPblancListInfoServc/.test(u)) return G_OK([{ bidNtceNo: 'A1', bidNtceOrd: '000', bidNtceNm: '수출 마케팅 용역', ntceInsttNm: 'x', bidNtceDt: '2026-10-17 09:00:00', bidClseDt: '2099-12-31 10:00' },
+      { bidNtceNo: 'A2', bidNtceOrd: '000', bidNtceNm: '청소 용역', ntceInsttNm: 'y', bidNtceDt: '2026-10-19 08:00:00', bidClseDt: '2099-12-31 10:00' }]);
+    if (/recruitment\/list/.test(u)) return { response: { body: { items: { item: [] }, totalCount: 0 } } };
+    return G_OK([]);
+  });
+  await r.api.fetchAll();
+  const st = r.api.healthStat();
+  assert.equal(st.cur.g2b.n, 2, '걸러내기 전 «받은 전체» 건수'); assert.equal(st.cur.g2b.newest, '2026-10-19', '걸린 것(0건)이 아니라 받은 전체 중 최근 게시일');
+  assert.equal(st.cur.g2b.err, ''); assert.ok(st.cur.g2b.okAt);
+  assert.equal(st.cur.alio.n, 0); assert.equal(st.cur.biz, undefined, '기업마당 키가 없으면 기록하지 않는다');
+  assert.equal(st.hist.length, 1);
+  assert.ok(r.store.gov3_src_stat, '이 기기 저장소에 남는다(lsSet 한 길)');
+});
+test('★★ 받다 실패하면 «못 받음»으로 남는다 — 이전 성공 시각은 지키고 · 목록에 노랗게/빨갛게 보인다', async () => {
+  const r = runApp({ feed: [], key_data: 'K' });
+  r.api.setPull(async () => ({ OpenAPI_ServiceResponse: { cmmMsgHeader: { returnAuthMsg: 'SERVICE_ACCESS_DENIED_ERROR' } } }));
+  await r.api.fetchAll();
+  const st = r.api.healthStat();
+  assert.match(st.cur.g2b.err, /SERVICE_ACCESS_DENIED_ERROR/); assert.doesNotMatch(st.cur.g2b.err, /^나라장터: /, '출처 이름 꼬리를 뗀다');
+  r.api.draw();
+  const h = r.el('period').innerHTML;
+  assert.match(h, /class="hc bad"[^>]*><b>✖ 나라장터<\/b> 못 받음 — SERVICE_ACCESS_DENIED_ERROR/);
+});
+test('★★ 수집 상태 줄 — 기록·키가 없으면 안 그리고, 있으면 출처마다 점·글 + 「날짜별 기록」 · 팝업은 하루 한 줄 표', () => {
+  const none = runApp({ feed: [] }); none.api.draw();
+  assert.doesNotMatch(none.el('period').innerHTML, /수집 상태/, '키도 기록도 없는데 줄을 그린다');
+  const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
+  const at = new Date().toISOString();
+  const stat = { cur: { g2b: { at, n: 3077, newest: today, err: '', okAt: at }, alio: { at, n: 525, newest: '', err: '', okAt: at } },
+    hist: [{ d: today, g2b: { n: 3077, newest: today, e: 0 }, alio: { n: 525, newest: '', e: 0 } }] };
+  const r = runApp({ feed: [], key_data: 'K', src_stat: stat }); r.api.draw();
+  const h = r.el('period').innerHTML;
+  assert.match(h, /📡 <b>수집 상태<\/b>/); assert.match(h, /class="hc ok"[^>]*><b>● 나라장터<\/b>/); assert.match(h, /class="hc ok"[^>]*><b>● 알리오<\/b>/);
+  assert.match(h, /class="hc none"[^>]*><b>○ 기업마당<\/b> 아직 받은 기록이 없습니다/);
+  assert.match(h, /onclick="healthPop\(\);return false">📊 날짜별 기록/);
+  r.api.healthPop();
+  const p = r.el('popBody').innerHTML;
+  assert.match(p, /<th>날짜<\/th><th>나라장터<\/th><th>알리오<\/th><th>기업마당<\/th>/); assert.match(p, /3,077건/); assert.match(p, /525건/);
+  assert.match(p, /걸러내기 «전»/);
+  const empty = runApp({ feed: [], key_data: 'K' }); empty.api.healthPop();
+  assert.match(empty.el('popBody').innerHTML, /아직 기록이 없습니다/);
+});
+test('★ 수집 상태 기록은 폰·PC 가 함께 본다(동기화 칸) · 쓰기는 lsSet 한 길', () => {
+  const S = require('../js/gov-sync.js');
+  const f = S.field('src_stat'); assert.ok(f, 'src_stat 가 칸 목록에 없다'); assert.equal(f.kind, 'whole');
+  assert.doesNotMatch(src, /localStorage\.setItem\(NS\+'src_stat'/);
+  assert.match(src, /lsSet\('src_stat', JSON\.stringify\(hs\)\)/);
+});
+test('★ 쪽 뚜껑 안내는 «오류»가 아니다 — 받은 것은 받은 것이다 · 출처 이름 꼬리를 뗀다', () => {
+  const r = runApp({});
+  assert.equal(r.api.healthErr(['나라장터: 5000건 중 3996건만 받았습니다(쪽 뚜껑)']), '');
+  assert.equal(r.api.healthErr(['나라장터: 받지 못했습니다 (2쪽)', '나라장터: 5000건 중 3996건만 받았습니다(쪽 뚜껑)']), '받지 못했습니다 (2쪽)');
+  assert.equal(r.api.healthErr([]), '');
 });
