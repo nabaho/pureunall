@@ -44,7 +44,7 @@
 <script src="js/pu-hwp-edit.js?v=1"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=73"></script>
+<script src="js/pu-ontology.js?v=74"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -5117,8 +5117,8 @@ const ErpMatch = {
   /* ── 이름 열쇠가 «몇 곳»을 가리키나 (대표 지시 2026-09-05 메일 속 읽기) ──
      byName 은 같은 이름에서 «먼저 만난 하나»만 들고 있다. 그 표만 보고 이름으로 짚으면
      겹치는 이름에서 «남의 회사» 담당자가 붙는다. 그래서 몇 곳인지를 따로 세어 둔다 —
-     둘 이상이면 아예 안 짚는다(실측 2026-09-05: 다온에프에스·나루오엠·행복한e치과의원·
-     가온바이오 네 쌍). */
+     둘 이상이면 아예 안 짚는다(실측 2026-09-05: 가나에프에스·다라오엠·새별e치과의원·
+     한빛바이오 네 쌍). */
   nameN:{},
   /* ⚠ 푸른이알피가 떼는 것을 «다» 떼야 한다 (점검 C3, 2026-08-30).
      예전에는 「(유)·주)·농업회사법인」을 안 뗐다. 그래서 업체관리에 「(유)다온」으로
@@ -15911,12 +15911,12 @@ function parseVcf(text){
 
 /* ══════ 가져오기 전 다듬기 (대표 지시 2026-10-09 「고쳐라」) ══════
    다음 주소록 1,039장을 가져온 뒤 드러난 것 — 주소록의 «표시 이름»에 회사가 붙어 있었다.
-     「TTT_김원미」(회사 칸 빔) · 「동원정윤성인」(회사 칸 ㈜동원정) · 「EVOLVE soft전석정」(회사 칸은 «다른» 회사)
+     「QQQ_홍길순」(회사 칸 빔) · 「새별정홍길동」(회사 칸 ㈜새별정) · 「SAMPLE soft홍길동」(회사 칸은 «다른» 회사)
    그래서 ① 회사 칸이 비거나 같은 회사면 이름과 회사를 가르고, ② 회사 칸이 «다른» 회사면 가르지 않고
    메모에 「[가져오기 확인]」을 단다 — 한 칸에 두 사람이 섞인 줄이다(사람이 본다, 기계가 고르지 않는다).
    ⚠ 「_」·「-」로 가른다 — 「/」는 두 회사를 잇는 데도 쓴다(「제이원인스트루먼트/지앤지」). 「-」는 한쪽이 사람 이름 모양일 때만.
-   ⚠ 「3호_소망상사」(번호 꼬리표 + 가게)는 회사 칸으로 옮기고 꼬리표는 메모에(2026-10-10 「추천대로」).
-     「서독안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
+   ⚠ 「3호_라온상사」(번호 꼬리표 + 가게)는 회사 칸으로 옮기고 꼬리표는 메모에(2026-10-10 「추천대로」).
+     「다라안경원_사무실」(직함·자리) 은 사람 이름이 아니라 안 가른다. */
 const IMP_ROLE_TAIL = /(담당|사무실|소개|대표|사장|팀장|과장|부장|이사|실장|센터|본부|경리|총무|회계|직원|원장|상사|푸드|누리|산업|건설|물산|상회|식품|기업|테크|전자|공업|상점|마트|약국|병원|의원)$/;
 const IMP_FLAG = '[가져오기 확인] 이름 앞의 회사와 회사 칸이 다릅니다 — 한 칸에 두 사람이 섞였을 수 있습니다';
 /* 회사 이름 견주기는 «맞출 때» 쓰는 다듬개(ErpMatch._norm) 하나로 — 새 다듬개를 만들지 않는다(tests/cards-norm-align) */
@@ -15968,13 +15968,13 @@ function importTidyRow(r){
   /* ①″ 「김철수노무사」 — 이름에 직함만 붙은 것 */
   const pt = impPerson(name);
   if(pt && pt.title) return Object.assign({}, r, String(r.title || '').trim() ? { name: pt.name } : { name: pt.name, title: pt.title });
-  /* ② 영문 회사가 붙은 「EVOLVE soft전석정」 */
+  /* ② 영문 회사가 붙은 「SAMPLE soft홍길동」 */
   m = name.match(/^([A-Za-z][A-Za-z0-9 .&-]{1,30}?)\s*([가-힣]{2,4})$/);
   if(m && !IMP_ROLE_TAIL.test(m[2])){
     if(!same(m[1])) return flag();
     return Object.assign({}, r, { name: m[2], company: co || m[1].trim() });
   }
-  /* ③ 회사 칸의 회사가 이름 앞에 붙은 「동원정윤성인」 */
+  /* ③ 회사 칸의 회사가 이름 앞에 붙은 「새별정홍길동」 */
   const nn = impCo(name);
   if(nc.length >= 2 && nn.length > nc.length && nn.indexOf(nc) === 0){
     const rest = nn.slice(nc.length);
