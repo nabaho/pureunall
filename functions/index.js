@@ -1090,15 +1090,22 @@ exports.rulesLawWatch = functions
    ⚠ 보는 사람: 관리자만(scripts/make-firebase-rules.js › gov_watch). 화면은 정부사업신청 › 컨설턴트 모집.
    07:20 — 다른 아침 일들(06:00 법 감시·07:00·07:10)과 겹치지 않게. */
 /* 컨설턴트 모집 감시 — fetch(undici) 가 못 열 때 쓰는 «다른 길»(node https · IPv4 · 넘김 셋까지) */
-function 모집다른길(u, raw, 넘김) {
+function 모집다른길(u, raw, 넘김, 브라우저) {
   return new Promise((ok, no) => {
+    /* 브라우저 판 — 서버(클라우드 주소)를 봇으로 막는 곳(충청북도·충북연구원, 2026-10-13~)을 위해 «보통 사람 브라우저»처럼 머리를 단다.
+       ⚠ 속이려는 것이 아니라 공개 게시판 «글 목록»을 읽을 뿐이다 — 로그인·우회·반복 호출은 없다(게시판마다 하루 한 번). */
+    const 머리 = 브라우저
+      ? { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8", "Accept-Language": "ko-KR,ko;q=0.9,en;q=0.8",
+          "Referer": new URL(u).origin + "/", "Upgrade-Insecure-Requests": "1" }
+      : { "User-Agent": RecruitWatch.UA, "Accept": "text/html,application/xhtml+xml,*/*", "Accept-Language": "ko-KR,ko;q=0.9" };
     /* ca — 중간 인증서를 빠뜨리는 서버(지방공기업평가원)를 위해 «더해서» 검증한다(recruit-watch.js EXTRA_CA) */
     const req = require("https").get(u, { family: 4, timeout: 30000, ca: RecruitWatch.caList(),
-      headers: { "User-Agent": RecruitWatch.UA, "Accept": "text/html,application/xhtml+xml,*/*", "Accept-Language": "ko-KR,ko;q=0.9" } }, (res) => {
+      headers: 머리 }, (res) => {
       const s = res.statusCode || 0;
       if (s >= 300 && s < 400 && res.headers.location && 넘김 < 3) {
         res.resume();
-        return 모집다른길(new URL(res.headers.location, u).href, raw, 넘김 + 1).then(ok, no);
+        return 모집다른길(new URL(res.headers.location, u).href, raw, 넘김 + 1, 브라우저).then(ok, no);
       }
       if (s !== 200) { res.resume(); return no(new Error("HTTP " + s)); }
       const 조각 = [];
@@ -1158,20 +1165,26 @@ exports.recruitWatch = functions
     const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);   // 서울 날짜
     const fetchText = RecruitWatch.makeFetcher({
       plain: async (u, raw) => {
-        let res;
+        let res, 첫말 = "";
         /* ⚠ 「fetch failed」 한 줄로는 왜인지 모른다 — 까닭 코드를 붙인다(지방공기업평가원이 날마다 이것으로 빠진다, 2026-10-09) */
         try { res = await fetch(u, { headers: { "User-Agent": RecruitWatch.UA }, signal: AbortSignal.timeout(30000) }); }
         catch (e) {
           const 까닭 = e && e.cause && (e.cause.code || e.cause.message);
-          const 첫말 = String((e && e.message) || e) + (까닭 ? " [" + String(까닭).slice(0, 60) + "]" : "");
-          /* ★ 다른 길로 한 번 더 — 지방공기업평가원은 이 PC·해외 8곳에선 열리는데 서버에서만 날마다 「fetch failed」(2026-10-05~).
-               undici(fetch) 대신 node https · IPv4 로 다시 부른다. 그래도 안 되면 두 까닭을 다 남긴다. */
-          try { return await 모집다른길(u, raw, 0); }
-          catch (e2) { throw new Error((첫말 + " / 다시: " + String((e2 && (e2.code || e2.message)) || e2)).slice(0, 160)); }
+          첫말 = String((e && e.message) || e) + (까닭 ? " [" + String(까닭).slice(0, 60) + "]" : "");
         }
-        if (!res.ok) throw new Error("HTTP " + res.status);
-        if (raw) return new Uint8Array(await res.arrayBuffer());
-        return RecruitWatch.decode(new Uint8Array(await res.arrayBuffer()), res.headers.get("content-type"));
+        if (res && res.ok) {
+          if (raw) return new Uint8Array(await res.arrayBuffer());
+          return RecruitWatch.decode(new Uint8Array(await res.arrayBuffer()), res.headers.get("content-type"));
+        }
+        if (res) 첫말 = "HTTP " + res.status;   // ★ 거절(403 등)도 아래 다른 길로 — 예전엔 여기서 바로 포기했다(충북연구원 403, 2026-10-13~)
+        /* ★ 다른 길 둘 — ①node https · IPv4 (지방공기업평가원: undici 만 못 열었다) ②«브라우저 머리»(충청북도 ECONNRESET·충북연구원 403 은
+             봇 머리를 막는 곳). 어느 하나라도 열리면 그 글을 쓴다. 다 안 되면 세 까닭을 다 남긴다. */
+        const 까닭들 = [첫말];
+        for (const 브라우저 of [false, true]) {
+          try { return await 모집다른길(u, raw, 0, 브라우저); }
+          catch (e2) { 까닭들.push((브라우저 ? "브라우저 머리: " : "https: ") + String((e2 && (e2.code || e2.message)) || e2)); }
+        }
+        throw new Error(까닭들.join(" / ").slice(0, 200));
       },
       /* 공인노무사회 로그인 — 뉴스레터의 노무사회로그인 ①② 걸음만 쓴다(ilabor 로 넘어가지 않는다) */
       login: async () => {

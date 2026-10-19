@@ -1207,6 +1207,24 @@ test('★★★ 여러 날 못 읽는 게시판은 크게 — 언제부터·며�
   assert.doesNotMatch(w, /다음 날 다시 읽습니다/, '닷새째인데 「다음 날 다시」라고 한다');
   assert.ok(w.indexOf('5일째') < w.indexOf('rec-stick'), '띠는 고정 줄 위에');
 });
+test('★★★ 못 읽는 곳이 «둘 이상»이면 노란 줄을 쌓지 않고 한 줄로 접는다 — 열면 곳마다 링크·까닭(2026-10-19 넷이 쌓였다)', async () => {
+  const urlOf = (id) => 'https://example.go.kr/' + id;
+  const ws = watchStuck(5, ERC_URL);
+  ['cb', 'cb2', 'cri'].forEach((id, i) => {
+    ws.last.errors.push({ board: id, why: 'HTTP 403 / https: HTTP 403', name: '게시판' + id, url: urlOf(id) });
+    ws.fails[id] = { since: '2026-10-13', n: 6 + i, last: '2026-10-19', why: 'HTTP 403', name: '게시판' + id, url: urlOf(id) };
+  });
+  const r = runApp({}, { Date: FixedDate('2026-10-19T09:00:00') });
+  r.api.setFb(fbWith(ws), 'U1');
+  await r.api.recWatchPull();
+  const w = r.el('recWatch').innerHTML;
+  assert.equal((w.match(/<details class="recban">/g) || []).length, 1, '접는 안내가 하나여야 한다');
+  assert.match(w, /<summary>⚠ 서버가 게시판 <b>4곳<\/b>을 며칠째 못 읽고 있습니다/);
+  assert.equal((w.match(/<div class="recban">/g) || []).length, 0, '줄마다 노란 띠를 또 쌓는다');
+  ['cb', 'cb2', 'cri'].forEach((id) => assert.ok(w.indexOf('<a href="' + urlOf(id) + '"') > 0, id + ' 직접 열기 링크가 안에 없다'));
+  assert.ok(w.indexOf('<a href="' + ERC_URL.replace(/&/g, '&amp;') + '"') > 0, '첫 곳 링크가 없다');
+  assert.ok(w.indexOf('</details>') < w.indexOf('rec-stick'), '접는 안내는 고정 줄 위에');
+});
 test('★★ 하루 실패는 예전처럼 작게 — 「다음 날 다시 읽습니다」, 큰 띠 없음', async () => {
   const r = runApp({}, { Date: FixedDate('2026-10-10T09:00:00') });
   r.api.setFb(fbWith(watchStuck(1, ERC_URL)), 'U1');
