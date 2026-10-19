@@ -156,7 +156,8 @@ test('★★ 큰 파일은 «먼저 여쭙는다»', () => {
 test('★★ PC 와 폰 «둘 다» 그린다 — 한쪽만 달면 그 화면에서는 눌러도 아무 일이 없다', () => {
   assert.match(bare, /\$\{mbPvHtml\(\)\}/, 'PC 화면이 미리보기 창을 안 그립니다');
   const m = sliceFn(app, 'function mbMobileHtml(').replace(/\/\*[\s\S]*?\*\//g, ' ');
-  assert.match(m, /mbReadHtml\(\)\s*\+\s*mbPvHtml\(\)/, '폰 화면이 미리보기 창을 안 그립니다');
+  /* 2026-10-19: 읽기는 «덮개(.dmr)»에 담겨 mbReadHtml() 뒤에 닫는 꼬리표가 끼인다 — 지킬 것은 «그리는가»이지 «붙어 있는가»가 아니다 */
+  assert.match(m, /mbReadHtml\(\)[^;]*?\+\s*mbPvHtml\(\)/, '폰 화면이 미리보기 창을 안 그립니다');
   /* PDF 는 화면이 그려진 «뒤»에 그려야 한다 — 두 화면 모두 */
   const n = (bare.match(/mbPvAfter\(\)/g) || []).length;
   assert.ok(n >= 3, 'PDF 를 그리라고 부르는 자리가 ' + n + '곳뿐입니다(만드는 자리 + PC + 폰)');
@@ -216,5 +217,5 @@ test('★★★ 메일을 연 채로 👁·❓ 창이 «보기마다 꼭 한 번
 });
 test('★★ 폰도 «같은 두 창»을 그린다', () => {
   const m = sliceFn(app, 'function mbMobileHtml(').replace(/\/\*[\s\S]*?\*\//g, ' ');
-  assert.match(m, /mbReadHtml\(\)\s*\+\s*mbPvHtml\(\)\s*\+\s*mbNewHtml\(\)/, '★★ 폰에서 「처음 보는 주소」 등록 창이 안 뜹니다');
+  assert.match(m, /mbReadHtml\(\)[^;]*?\+\s*mbPvHtml\(\)\s*\+\s*mbNewHtml\(\)/, '★★ 폰에서 「처음 보는 주소」 등록 창이 안 뜹니다');
 });
