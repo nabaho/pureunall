@@ -2093,7 +2093,8 @@ function 제목시각(title, 구글시각){
   var m = /^\s*([01]\d|2[0-3]):?([0-5]\d)(?![\d년.\/]|-\d{1,2}(?!\d))/.exec(String(title || ""));
   return m ? m[1] + ":" + m[2] : "";
 }
-/* 구글 일정의 담당 번호 — shared.puSid, 없으면 설명의 「푸른 담당: 이름 (P-005)」. 명부에 있는 번호만 */
+/* 구글 일정의 담당 번호 — shared.puSid, 없으면 옛 일정 설명의 「푸른 담당: 이름 (P-005)」. 명부에 있는 번호만
+   (2026-10-19 부터 새 일정 설명에는 사번을 안 적는다 — 구글에넣기 참고) */
 function 일정담당(ev){
   var sp = ev && ev.extendedProperties && ev.extendedProperties.shared && ev.extendedProperties.shared.puSid;
   var m = /푸른 담당:[^\n(<]*\(([A-Z]-\d{3})\)/.exec(String((ev && ev.description) || ""));
@@ -4565,8 +4566,10 @@ function 구글에넣기(m){
   if(String(m.contact||"").trim()) 설명.push("담당자: " + String(m.contact).trim());
   if(String(m.note||"").trim()) 설명.push(String(m.note).trim());
   var 사람 = nameOf(m.sid);
-  /* 담당 번호를 함께 — 구글에는 만든이가 «넣은 사람»으로 찍혀, 대표가 직원 일정을 넣으면 대표 것으로 보였다(2026-10-10) */
-  if(사람) 설명.push("푸른 담당: " + 사람 + (/^[A-Z]-\d{3}$/.test(String(m.sid||"")) ? " (" + m.sid + ")" : ""));
+  /* 담당 «이름»을 함께 — 구글에는 만든이가 «넣은 사람»으로 찍혀, 대표가 직원 일정을 넣으면 대표 것으로 보였다(2026-10-10) */
+  /* ⚠ 사번은 설명 글에 안 적는다(대표 지시 2026-10-19) — 공용 달력이라 바깥 참석자의 구글 캘린더에도 보인다.
+       담당 번호는 아래 puSid(구글의 숨은 칸)로 따로 간다 — 일정담당()이 그것을 먼저 읽는다. */
+  if(사람) 설명.push("푸른 담당: " + 사람);
   S.busy = true; m.err = ""; render();
   PuGcalAuth.createEvent(GCAL_CAL_ID, {
     repeat: String(m.repeat||""), remindMin: m.timed ? (+m.remind || 0) : 0,

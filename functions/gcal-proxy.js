@@ -10,8 +10,10 @@
  *   푸른 캘린더는 옮긴 줄을 안 그리고 구글 것을 그리므로 «두 번» 뜨지 않는다.
  *   ⚠ 지우지(_deleted) 않는다 — 이알피(이번주 일정 등)는 구글을 안 읽고 이 표만 읽는다. 지우면 거기서 사라진다.
  * ★ 구글에는 «만든이 = 대표 계정»으로 찍힌다. 그래서 담당자를 일정에 «번호로» 남긴다 —
- *   extendedProperties.shared.puSid + 설명 끝줄 「푸른 담당: 이름 (P-005)」. 화면(gcalToEvent)과
- *   출장 알림(trip-remind)은 이것을 만든이 메일보다 «먼저» 본다.
+ *   extendedProperties.shared.puSid + 설명 끝줄 「푸른 담당: 이름」. 화면(gcalToEvent)과
+ *   출장 알림(trip-remind)은 puSid 를 만든이 메일보다 «먼저» 본다.
+ *   ⚠ 설명 글에는 사번을 안 적는다(대표 지시 2026-10-19 — 공용 달력은 바깥 참석자도 본다).
+ *     옛 일정에 남은 「이름 (P-005)」은 ownerOf 가 그대로 읽는다(puSid 가 없을 때만).
  *
  * ⚠ 새로 생긴 것만(onCreate 와 같은 뜻 — 이전 값이 없을 때). 고치기·지우기는 건드리지 않는다.
  * ⚠ 외부 협력자 일정(externalId)은 원래 구글로 안 보낸다 — 그대로 둔다.
@@ -86,7 +88,7 @@ function eventOf(rec, id, nameOf) {
   if (s(rec.contact).trim()) 설명.push('담당자: ' + s(rec.contact).trim());
   if (s(rec.note).trim()) 설명.push(s(rec.note).trim());
   const sid = SID_RE.test(s(rec.sid)) ? s(rec.sid) : '';
-  if (sid) 설명.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid) + ' (' + sid + ')');
+  if (sid) 설명.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid));   // 사번은 puSid 로만 — 설명 글엔 안 적는다
   return {
     date: s(rec.date), endDate: /^\d{4}-\d{2}-\d{2}$/.test(s(rec.endDate)) ? s(rec.endDate) : '', time: 시각,
     repeat: /^(DAILY|WEEKLY|MONTHLY|YEARLY)$/.test(s(rec.repeat)) ? s(rec.repeat) : '',
@@ -102,12 +104,12 @@ function eventOf(rec, id, nameOf) {
 
 /* ── 고치기·지우기(2026-10-10 「23 연동」) 가 함께 쓰는 셈 ───────────────────────── */
 
-/* 우리가 구글 설명에 적는 꼴 — 「담당자: …」 · 메모 · 「푸른 담당: 이름 (P-005)」 */
+/* 우리가 구글 설명에 적는 꼴 — 「담당자: …」 · 메모 · 「푸른 담당: 이름」 (사번은 puSid 로만, 2026-10-19) */
 function descOf(contact, note, sid, nameOf) {
   const 줄 = [];
   if (s(contact).trim()) 줄.push('담당자: ' + s(contact).trim());
   if (s(note).trim()) 줄.push(s(note).trim());
-  if (SID_RE.test(s(sid))) 줄.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid) + ' (' + sid + ')');
+  if (SID_RE.test(s(sid))) 줄.push('푸른 담당: ' + ((nameOf && nameOf(sid)) || sid));
   return 줄.join('\n');
 }
 /* 구글 설명 → { contact, note } — descOf 의 거꾸로. 「푸른 담당」 줄은 뺀다(담당은 sid 로 따로 온다) */
@@ -121,7 +123,7 @@ function splitDesc(desc) {
   });
   return { contact, note: 남음.join('\n').trim() };
 }
-/* 일정의 주인 번호 — 담당 번호(puSid·설명) → 만든이 메일(계정 잇기) */
+/* 일정의 주인 번호 — 담당 번호(puSid → 옛 일정 설명의 「(P-005)」) → 만든이 메일(계정 잇기) */
 function ownerOf(ev, mailSid) {
   const sp = ev && ev.extendedProperties && ev.extendedProperties.shared && ev.extendedProperties.shared.puSid;
   if (SID_RE.test(s(sp))) return s(sp);
