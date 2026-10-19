@@ -82,3 +82,29 @@ test('종료할 때 isSuboffice·suspended 를 지우지 않는다 — 복원 �
   assert.equal(/isSuboffice\s*:/.test(fn), false, '★ 종료가 사무대행 표시를 지웁니다 — 복원하면 사무대행이 사라집니다');
   assert.equal(/suspended\s*:/.test(fn), false, '★ 종료가 계약 중단 표시를 지웁니다');
 });
+
+/* ── 2026-10-19: 활성 탭·활성 숫자도 같은 판정 ──
+   중복 합치기로 «지움 표시»만 한 업체가 활성 탭 맨 위에 «+ 지정» 빈 줄로 떠 있었고
+   활성·유형 건수(💼 전체 활성·대시보드 활성 자문·자문/급여 칩)도 그만큼 부풀었다.
+   사무대행·중단 탭은 10/11 에 막았는데 활성 탭만 status 하나를 보고 있었다. */
+test('활성 탭 — 휴지통 업체는 안 나오고, 산 업체·종료 구분은 그대로', () => {
+  const C = ctxWith('var statusTab = "active";\n' + cutFn(src, 'function coInTab(')
+    + '\nthis.coInTab = coInTab; this.setTab = function(t){ statusTab = t; };');
+  C.setTab('active');
+  assert.equal(C.coInTab({ status: 'active' }), true);
+  assert.equal(C.coInTab({ status: 'active', _deleted: true }), false, '★ 지운 업체가 활성 목록에 «+ 지정» 빈 줄로 뜹니다');
+  assert.equal(C.coInTab({ status: 'closed' }), false);
+  assert.equal(C.coInTab({ status: 'suboffice' }), false, '사무대행 전용 줄은 사무대행 탭에서 본다');
+});
+
+test('활성을 세는 자리마다 erpCoAlive 를 먼저 거친다 — 탭과 숫자가 어긋나지 않게', () => {
+  /* status==='active' 로 업체를 세는 거르기 식 — 자리 수가 늘어도 규칙은 같다 */
+  const actFilters = CM.match(/companies\.filter\(function\((\w+)\)\{[^}]*status\s*===\s*'active'[^}]*\}\)/g) || [];
+  assert.ok(actFilters.length >= 1, '활성 건수 자리를 못 찾음');
+  actFilters.forEach((f) => assert.match(f, /erpCoAlive\(/, '★ 지운 업체까지 활성으로 세는 자리: ' + f.slice(0, 80)));
+  /* 대시보드 「활성 자문」 칸이 따로 세지 않고 같은 숫자를 쓰거나, 세더라도 위 규칙을 지난다 */
+  const i = CM.indexOf("label:'💼 활성 자문'");
+  assert.ok(i > 0, '대시보드 칸을 못 찾음');
+  const cell = CM.slice(i, CM.indexOf('\n', i));
+  assert.ok(/activeCount|erpCoAlive\(/.test(cell), '★ 대시보드 활성 자문이 지운 업체까지 셉니다: ' + cell.slice(0, 120));
+});
