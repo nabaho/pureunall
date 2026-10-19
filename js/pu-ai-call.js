@@ -32,7 +32,7 @@
 
   /* 서버에 판독을 맡긴다.
        parts : [{ inline_data:{mime_type,data} } | { text }]  — 구글이 받는 그 모양
-       opts  : { auth, fetch, generationConfig, app, manual }
+       opts  : { auth, fetch, generationConfig, app, manual, freeFirst }   (freeFirst:false = 사진을 그림 그대로 읽는다)
      돌려주는 것은 **구글 응답 그대로**다 — 부르는 쪽이 제 방식으로 뜯어 쓴다.
      ⚠ 실패하면 status 를 담아 던진다. 429(잠시 바쁨)·403(열쇠 문제)에 따라
        부르는 쪽의 대응이 갈리므로 숫자를 뭉개면 안 된다.
@@ -50,6 +50,9 @@
       if (opts.app) body.app = String(opts.app);
       if (opts.generationConfig) body.generationConfig = opts.generationConfig;
       if (opts.manual === true) body.manual = true;
+      /* freeFirst:false — 서버의 「무료로 글자 먼저」(사진을 버리고 뽑은 글자만 보냄)를 끈다(2026-10-15).
+         화면 배치가 뜻인 사진(대화 캡처: 누가·언제 말했나)은 그림 그대로 읽어야 한다. 안 실으면 서버 기본(켬) 그대로다. */
+      if (opts.freeFirst === false) body.freeFirst = false;
       return f(URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + t },

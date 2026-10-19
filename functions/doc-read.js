@@ -85,7 +85,7 @@ function validate(body) {
    ⚠ 이름만 센다 — 사진·글·사람 이름은 «한 글자도» 안 담는다. 숫자뿐이다. */
 /* ⚠ portal — 건의 답변 도움(2026-09-11). 사진첩 판독과 «갈라» 센다:
      한 숫자에 섞으면 요금이 튀었을 때 어느 쪽이 태웠는지 알 수가 없다. */
-const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal"];
+const APPS = ["photos", "cards", "kcareer", "payroll", "rules", "fund", "erp", "news", "portal", "cal"];
 function appOf(v) {
   const s = String(v == null ? "" : v).trim().toLowerCase();
   return APPS.indexOf(s) >= 0 ? s : "other";
