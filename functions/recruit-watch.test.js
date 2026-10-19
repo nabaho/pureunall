@@ -747,7 +747,13 @@ test('★★ 서버 — fetch 가 못 열면 node https(IPv4)로 한 번 더 · 
   assert.ok(i > 0, '다른 길이 없다');
   assert.match(body, /require\("https"\)\.get\(u, \{ family: 4, timeout: 30000/);
   assert.match(body, /넘김 < 3/);
-  assert.match(body, /catch \(e\) \{[\s\S]*?return await 모집다른길\(u, raw, 0\)/, 'fetch 실패 뒤에 다른 길을 안 부른다');
+  assert.match(body, /for \(const 브라우저 of \[false, true\]\) \{\s*try \{ return await 모집다른길\(u, raw, 0, 브라우저\); \}/, 'fetch 실패 뒤에 다른 길 둘(https → 브라우저 머리)을 안 부른다');
+  /* ★ 거절 응답(403 등)도 다른 길로 — 예전엔 res.ok 가 아니면 곧바로 던져 충북연구원(403)이 다른 길을 한 번도 못 탔다 */
+  assert.match(body, /if \(res\) 첫말 = "HTTP " \+ res\.status;/, '거절 응답에서 다른 길로 안 간다');
+  assert.doesNotMatch(body, /if \(!res\.ok\) throw new Error\("HTTP "/, '거절 응답에서 바로 던지면 다른 길이 소용없다');
+  assert.match(body, /브라우저 머리: /, '어느 길의 까닭인지 안 남긴다');
+  assert.match(body, /Chrome\/\d+/, '브라우저 판 머리가 없다');
+  assert.doesNotMatch(body, /rejectUnauthorized/, '검증을 끄면 안 된다');
   assert.match(body, /root\.child\("fails"\)\.once\("value"\)/);
   assert.match(body, /RecruitWatch\.updatesOf\(result, existing, nowIso, \{ fails, today \}\)/);
 });

@@ -1977,12 +1977,17 @@ function recWatchHtml(grp){
   /* ⚠ 여러 날 못 읽는 곳은 「다음 날 다시 읽습니다」로 넘기지 않는다 — 새 모집 글을 놓친다(지방공기업평가원 2026-10-05~) */
   var fails=_recWatch.fails||{}, stuck=errs.filter(function(e){ var f=fails[e.board]; return f && (f.n||0)>=2; });
   var errName=function(e){ var f=fails[e.board]||{}; return e.name||f.name||recOrgName(e.board)||e.board; };
-  var stuckHtml=stuck.map(function(e){
+  /* ★ 한 곳이면 한 줄 안내, «둘 이상»이면 한 줄로 접는다 — 네 곳이 막히면 노란 줄 넷이 표 위를 다 덮었다(2026-10-19). 열면 곳마다 링크·까닭 */
+  var stuckOne=function(e, tag){
     var f=fails[e.board], u=String(e.url||f.url||'');
-    return '<div class="recban">⚠ 서버가 <b>'+esc(errName(e))+'</b> 게시판을 '+esc(String(f.since||'').slice(5).replace('-','.'))+'부터 <b>'+(f.n||2)+'일째</b> 못 읽고 있습니다 — 새 모집 글을 놓칠 수 있으니 직접 확인해 주세요. '
+    return '<'+tag+(tag==='div'?' class="recban"':'')+'>⚠ 서버가 <b>'+esc(errName(e))+'</b> 게시판을 '+esc(String(f.since||'').slice(5).replace('-','.'))+'부터 <b>'+(f.n||2)+'일째</b> 못 읽고 있습니다 — 새 모집 글을 놓칠 수 있으니 직접 확인해 주세요. '
       +(/^https:\/\//.test(u)?'<a href="'+esc(u)+'" target="_blank" rel="noopener">🔗 게시판 직접 열기</a>':'')
-      +' <span class="sml" title="'+esc(e.why||f.why||'')+'">(까닭: '+esc(String(e.why||f.why||'').slice(0,60))+')</span></div>';
-  }).join('');
+      +' <span class="sml" title="'+esc(e.why||f.why||'')+'">(까닭: '+esc(String(e.why||f.why||'').slice(0,60))+')</span></'+tag+'>';
+  };
+  var stuckHtml=stuck.length>=2
+    ? '<details class="recban"><summary>⚠ 서버가 게시판 <b>'+stuck.length+'곳</b>을 며칠째 못 읽고 있습니다 — '+esc(stuck.map(errName).join(' · '))+' <span class="sml">(눌러서 곳마다 보기)</span></summary>'
+      +stuck.map(function(e){ return stuckOne(e,'div').replace('<div class="recban">','<div style="margin-top:6px">'); }).join('')+'</details>'
+    : stuck.map(function(e){ return stuckOne(e,'div'); }).join('');
   var fresh=all.filter(function(x){ return !seen[x.key]; });
   /* 서버 안내는 «작은 시각»으로 — 전체 문장은 마우스를 올리면(title). 못 읽은 곳만 빨갛게 드러낸다 */
   var atTxt=last.at?(function(d){ return (d.getMonth()+1)+'.'+String(d.getDate()).padStart(2,'0')+' '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); })(new Date(last.at)):'아직 안 돎';
