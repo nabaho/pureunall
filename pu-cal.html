@@ -36,6 +36,7 @@
 <script src="js/pu-cal-map.js?v=2"></script>
 <script src="js/pu-ai-call.js?v=5"></script>
 <script src="js/pu-cal-capture.js?v=1"></script>
+<script src="js/pu-cal-card.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -551,6 +552,16 @@
   .gform .gcap .gcappick{display:block;width:100%;text-align:left;margin:4px 0 0;padding:8px 10px;border:1px solid var(--gline);border-radius:6px;background:transparent;color:var(--gtext);font:inherit;font-size:14px;cursor:pointer}
   .gform .cpull{flex:1;margin-bottom:0;border:none;background:transparent;padding:0}
   .gform .gbody > #cardres{flex-basis:100%}
+  /* 담당자 이름 찾기 목록 · 주소 확인 안내 (2026-10-19) — 목록은 위 .cres/.crow 를 그대로 쓴다 */
+  .gform .gbody > #contactres, .gform .gbody > #addrcheck{flex-basis:100%}
+  .gform .gaddr{padding:4px 0 6px;color:var(--gtext);line-height:1.6}
+  .gform .gaddr.ok{color:var(--gsub)}
+  .gform .gaddr .glink{padding:4px 10px;font-size:13px}
+  .gform .gphone{padding:4px 0 6px;font-weight:600;color:var(--gtext)}
+  /* 폰 폭에서 한 줄로 넘치지 않게 — 이름·업체 / 전화·주소를 두 줄로 */
+  .gform #contactres .cres{margin:2px 0 6px}
+  .gform #contactres .crow{flex-wrap:wrap;white-space:normal;row-gap:2px}
+  .gform #contactres .crow .cm{flex-basis:100%;color:var(--gsub);font-size:12px}
   .gform .mbtns{margin-top:10px}  .gform .mbtns{margin-top:10px}
   /* 넓게 — 구글의 큰 편집 화면: 위에 제목·저장, 왼쪽 세부, 오른쪽 달력·누구 */
   .modal.gform.full{left:0;top:0;transform:none;width:100vw;height:100vh;max-height:none;border-radius:0;
@@ -3590,7 +3601,7 @@ function openGcalEdit(gid){
   var 끝날 = e.gEnd ? new Date(Date.parse(e.gEnd) + 9 * 3600000).toISOString().slice(0, 10) : (e.end || e.date);
   S.detail = null;
   S.modal = { mode:"edit", store:"gcal", id:gid, gid:gid, kind:"sch", date:e.date, endDate:끝날 > e.date ? 끝날 : e.date, sid:e.mailSid || "",
-    title:e.text || "", note:남음.join("\n").trim(), time:시작, endTime:끝, place:e.place || "", contact:담당자,
+    title:e.text || "", note:남음.join("\n").trim(), time:시작, endTime:끝, place:e.place || "", contact:담당자, contact0:담당자,
     vis:"shared", timed:!!시작, recur:!!e.recur, type:"leave", hours:1 };
   render();
 }
@@ -3633,7 +3644,7 @@ function openEdit(store, id){
   if(!r){ toast("그 건을 못 찾았습니다 — 새로 받아 오는 중일 수 있습니다"); return; }
   S.modal = { mode:"edit", store:store, id:id, kind:((store==="my_schedules"||store==="cal_private")?"sch":"att"),
     date:r.date||"", sid:r.sid||"", type:r.type||"leave", title:r.title||"", note:r.note||"",
-    time:String(r.time||"").slice(0,5), endTime:String(r.endTime||"").slice(0,5), place:r.place||"", contact:r.contact||"",
+    time:String(r.time||"").slice(0,5), endTime:String(r.endTime||"").slice(0,5), place:r.place||"", contact:r.contact||"", contact0:r.contact||"",
     vis:(store === "cal_private" ? "private" : "shared"), timed:!!r.time,
     hours:r.hours||1, prev:r };
   if(옛방식표(store)) S.modal.err = 옛방식안내(store);
@@ -4248,8 +4259,12 @@ function modalHtml(){
     +   (일정 && 새것 ? 줄("business", 명함칸Html(m), "기업정보함에서 불러오기") : '')
     +   (일정 ? 줄("place", '<input data-m="place" value="' + esc(m.place||"") + '" placeholder="위치 추가">'
           /* 적힌 주소를 지도로 — 누르는 순간의 칸 값을 읽는다(2026-10-09) */
-          + (typeof PuCalMap !== "undefined" ? '<button class="gmapbtn" data-map="form" title="지도 보기">' + 아이콘("map") + '</button>' : ''), "장소") : '')
-    +   (일정 ? 줄("person", '<input data-m="contact" value="' + esc(m.contact||"") + '" placeholder="담당자 추가 (이름 · 전화)">', "담당자") : '')
+          + (typeof PuCalMap !== "undefined" ? '<button class="gmapbtn" data-map="form" title="지도 보기">' + 아이콘("map") + '</button>' : '')
+          /* 정보함 주소가 그대로 들어갔거나 다르면 «확인하세요» — 업체는 이전이 잦다(2026-10-19) */
+          + '<div id="addrcheck">' + 주소확인Html(m) + '</div>', "장소", true) : '')
+    +   (일정 ? 줄("person", '<input data-m="contact" value="' + esc(m.contact||"") + '" placeholder="담당자 이름을 치면 기업정보함에서 찾습니다 (이름 · 전화)" autocomplete="off">'
+          /* 이름을 치면 정보함에서 찾아 이름·직함·전화·주소를 채운다. 전화번호가 없으면 안내(2026-10-19) */
+          + '<div id="contactres">' + 연락처결과Html(m) + '</div>', "담당자", true) : '')
     +   줄("notes", '<textarea data-m="note" rows="1" placeholder="설명 추가">' + esc(m.note||"") + '</textarea>', "설명", true)
     + '</div><div class="gside">'
     +   줄("badge", 누가, "담당 직원")
@@ -4278,7 +4293,7 @@ function 명함받기(){
     var v = s.val() || {};
     명함.list = Object.keys(v).map(function(k){
       var x = v[k] || {};
-      return { k:k, c:x.c||"", n:x.n||"", ti:x.ti||"", m:x.m||"", t:x.t||"", ct:x.ct||"", ad:x.ad||"" };
+      return { k:k, c:x.c||"", n:x.n||"", ti:x.ti||"", m:x.m||"", t:x.t||"", ct:x.ct||"", ad:x.ad||"", kind:x.k||"" };
     }).filter(function(x){ return x.c || x.n; });
     명함.loading = false; 명함목록고침();
   })["catch"](function(e){
@@ -4341,12 +4356,103 @@ function 명함고르기(k){
   m.card = x; m.cq = "";
   if(!String(m.title || "").trim()) m.title = (x.c || x.n) + " 미팅";
   if(!String(m.place || "").trim()) m.place = x.ad;
+  if(typeof PuCalCard !== "undefined") PuCalCard.addrState(m, x);   /* 정보함 주소가 그대로 들어갔는지·다른지 — 안내 줄이 그린다 */
   if(!String(m.contact || "").trim()){
     var 전화 = x.m || x.t || x.ct;
     m.contact = [x.n + (x.ti ? " " + x.ti : ""), 전화].filter(function(v){ return String(v).trim(); }).join(" · ");
   }
   render();
 }
+/* ── 담당자 이름으로 기업정보함 찾기 · 주소 확인 · 연락처 남기기 (2026-10-19) ─────────────
+   대표 지시 「사람 이름 검색 시에 정보함에 이름·주소 등을 모두 찾아서 자동으로 넣게」
+            「주소가 바뀌는 경우가 많으니 주소 체크하게」 「담당자 연락처도 항상 남기게 — 방문 시 전화해야 한다」.
+   ★ 규칙은 js/pu-cal-card.js(PuCalCard) 한 곳 — 여기서는 그리기와 단추만.
+   ★ 새 일정·고치기(구글 일정 포함) 둘 다 쓴다. 정보함은 «읽기만» 한다(고치지 않는다).
+   ⚠ 담당자 칸을 치는 도중에는 창 전체를 다시 그리지 않는다 — 한글 조합이 끊긴다(명함결과Html 머리글).
+   ⚠ 저장은 막지 않고 «묻는다»(doSave). 주소는 정보함 그대로면, 연락처는 전화번호가 없으면. */
+function 연락처결과Html(m){
+  if(!m || typeof PuCalCard === "undefined") return "";
+  var 글 = String(m.contact || "").trim(), h = "";
+  if(m.cres && 글){
+    var 결과 = 명함.list ? PuCalCard.rank(명함.list, 글) : [];
+    h += '<div class="cres">'
+      + (명함.err ? '<div class="cmsg">기업정보함을 못 읽었습니다 — ' + esc(명함.err) + '</div>'
+        : !명함.list ? '<div class="cmsg">기업정보함을 불러오는 중…</div>'
+        : !결과.length ? '<div class="cmsg">기업정보함에 맞는 사람이 없습니다 — 이름과 전화번호를 직접 적어 주세요</div>'
+        : 결과.map(function(x){
+            return '<button class="crow" data-cpick="' + esc(x.k) + '"><b>' + esc(x.n || x.c || "") + (x.n && x.ti ? ' ' + esc(x.ti) : '') + '</b>'
+              + '<span>' + esc(x.n ? (x.c || "") : "(업체)") + '</span>'
+              + '<span class="cm">' + esc([PuCalCard.phoneOf(x) || x.ct, x.ad].filter(Boolean).join(" · ")) + '</span></button>';
+          }).join(""))
+      + '</div>';
+  }
+  if(글 && !PuCalCard.hasPhone(글))
+    h += '<div class="ghint gphone">📞 전화번호가 없습니다 — 방문 때 걸 수 있게 «이름 · 010-0000-0000» 으로 남겨 주세요</div>';
+  return h;
+}
+function 연락처고침(){
+  var 칸 = document.getElementById("contactres");
+  if(칸 && S.modal) 칸.innerHTML = 연락처결과Html(S.modal);
+}
+function 주소확인Html(m){
+  if(!m || typeof PuCalCard === "undefined") return "";
+  var h = PuCalCard.addrHints(m, 명함.list || []);
+  if(!h) return "";
+  var 줄 = "";
+  if(h.fromCard) 줄 += h.ok
+    ? '<div class="ghint gaddr ok">✔ 주소를 확인했습니다</div>'
+    : '<div class="ghint gaddr">📍 기업정보함에 적힌 주소입니다 — 업체는 이전하는 일이 많습니다. <b>현재 주소가 맞는지 확인하세요.</b> '
+      + '<button class="glink" data-addr="ok">✔ 맞습니다</button><button class="glink" data-map="form">🗺 지도로 보기</button></div>';
+  if(h.diff) 줄 += '<div class="ghint gaddr">⚠ 적어 둔 위치와 기업정보함 주소가 다릅니다 — 정보함: <b>' + esc(h.diff) + '</b> '
+    + '<button class="glink" data-addr="card">정보함 주소로 바꾸기</button><button class="glink" data-addr="keep">지금 위치가 맞음</button></div>';
+  if(h.alts.length) 줄 += '<div class="ghint gaddr">⚠ 같은 업체에 다른 주소가 더 있습니다(이전·지점일 수 있습니다). 어느 곳입니까? '
+    + h.alts.map(function(a, i){ return '<button class="glink" data-addr="alt" data-ai="' + i + '">' + esc(a.ad) + ' (' + esc(a.who) + ')</button>'; }).join("") + '</div>';
+  return 줄;
+}
+function 주소눌림(뜻, i){
+  var m = S.modal; if(!m || typeof PuCalCard === "undefined") return;
+  modalRead();
+  if(뜻 === "ok") m.addrOk = true;
+  else if(뜻 === "keep") m.addrKeep = true;
+  else if(뜻 === "card" && m.card){ m.place = m.card.ad; m.addrKeep = false; PuCalCard.addrState(m, m.card); }
+  else if(뜻 === "alt"){
+    var h = PuCalCard.addrHints(m, 명함.list || []), a = h && h.alts[+i];
+    if(a){ m.place = a.ad; m.addrOk = true; m.addrKeep = true; }
+  }
+  render();
+}
+/* 담당자 칸에서 고른 사람 — 이름·직함·전화(휴대폰 먼저, 회사 전화도)와 주소를 채운다. 친 글(이름)은 연락처 글로 바뀐다 */
+function 연락처고르기(k){
+  var m = S.modal; if(!m || !명함.list || typeof PuCalCard === "undefined") return;
+  modalRead();
+  var x = null;
+  for(var i = 0; i < 명함.list.length; i++){ if(명함.list[i].k === k){ x = 명함.list[i]; break; } }
+  if(!x) return;
+  var r = PuCalCard.fill(m, x, { overwriteContact:true });
+  m.cres = false; m.addrKeep = false;
+  render();
+  toast("📇 기업정보함에서 채웠습니다(" + (r.filled.join("·") || "변경 없음") + ")" + (m.addrFromCard ? " — 주소가 맞는지 확인하세요" : ""));
+}
+/* 담당자·위치 칸을 칠 때 — 이 칸 «아래 목록만» 갈아 끼운다(창 전체를 다시 그리지 않는다) */
+document.addEventListener('input', function(e){
+  if(!S.modal || !e.target || !e.target.getAttribute) return;
+  var f = e.target.getAttribute('data-m');
+  if(f === 'contact'){
+    S.modal.contact = e.target.value; S.modal.cres = true;
+    명함받기(); 연락처고침();
+  } else if(f === 'place'){
+    S.modal.place = e.target.value;
+    var 주소 = document.getElementById('addrcheck');
+    if(주소) 주소.innerHTML = 주소확인Html(S.modal);
+  }
+});
+/* 목록 밖을 누르면 목록을 접는다 */
+document.addEventListener('click', function(e){
+  if(!S.modal || !S.modal.cres) return;
+  var el = e.target && e.target.closest ? e.target : null;
+  if(el && (el.closest('#contactres') || el.closest("[data-m='contact']"))) return;
+  S.modal.cres = false; 연락처고침();
+});
 /* ── 🔒 나만 보기 일정 (cal_private/{uid}) ──────────────────────────────
    서버 규칙이 본인 로그인만 읽게 막는다 — 남의 칸은 읽으려 해도 거절된다(관리자도).
    ⚠ 지운 것은 삭제표시(_deleted)로 남는다 — 받을 때 뺀다. */
@@ -4445,8 +4551,13 @@ function 시각범위(시작, 끝){
 /* 목록 칸만 갈아 끼운다 — 입력칸(한글 조합 중일 수 있다)은 건드리지 않는다 */
 function 명함목록고침(){
   var box = document.getElementById("cardres");
-  if(box && S.modal) box.innerHTML = 명함결과Html(S.modal.cq || "");
-  else render();
+  var 칸 = document.getElementById("contactres"), 주소 = document.getElementById("addrcheck");
+  if(!S.modal) return;
+  /* ⚠ 담당자 칸을 치는 «도중»에 색인이 도착하면 창 전체를 다시 그리면 한글 조합이 끊긴다 — 있는 칸만 갈아 끼운다 */
+  if(box) box.innerHTML = 명함결과Html(S.modal.cq || "");
+  if(칸) 칸.innerHTML = 연락처결과Html(S.modal);
+  if(주소) 주소.innerHTML = 주소확인Html(S.modal);
+  if(!box && !칸 && !주소) render();
 }
 /* 구글 공용 달력에 넣는다 — 폰 구글 캘린더 위젯에 뜨는 길 */
 function 구글에넣기(m){
@@ -4714,6 +4825,18 @@ function doSave(){
        그리므로 두 곳에 똑같이 뜨고, 두 번 들어가지도 않는다.
      ⚠ 로그인이 안 돼 있으면 우리 표(my_schedules)에 넣고 «폰 위젯에는 안 뜬다»고 말한다. */
   if(일정 && !m.timed){ m.time = ""; m.endTime = ""; }
+  /* 📇 주소·연락처 확인 (2026-10-19) — 막지 않고 «묻는다». 취소하면 저장하지 않고 돌아간다.
+       주소: 기업정보함에 적힌 그대로인데 확인 안 했을 때 · 연락처: 전화번호가 없을 때(방문 때 전화해야 한다) */
+  if(일정 && typeof PuCalCard !== "undefined"){
+    var _경고 = PuCalCard.saveWarnings(m);
+    for(var _i = 0; _i < _경고.length; _i++){
+      if(!confirm(_경고[_i].msg)){
+        m.err = _경고[_i].kind === "addr" ? "주소를 확인한 뒤 저장해 주세요 — 위치 칸 아래 «맞습니다»를 눌러도 됩니다" : "담당자 연락처(전화번호)를 적은 뒤 저장해 주세요";
+        render(); return;
+      }
+      if(_경고[_i].kind === "addr") m.addrOk = true;
+    }
+  }
   /* ✏️ 구글 일정 고치기 — 서버가 대신(gcalEdit) */
   if(m.store === "gcal"){ 구글고치기(m); return; }
   /* 🔒 나만 보기 — 구글에도 우리 공용 표에도 안 넣고 «내 칸»에만(PuCalWrite.savePrivate) */
@@ -5160,7 +5283,7 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap],[data-cpick],[data-addr]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
@@ -5279,6 +5402,8 @@ document.addEventListener('click', function(e){
   if(t.hasAttribute('data-dreload')){ S.drawer = false; render(); if(typeof gcalLoad === 'function') gcalLoad(true); return; }
   if(t.hasAttribute('data-dmore')){ S.drawer = false; S.mobMenu = !S.mobMenu; render(); return; }
   if(t.hasAttribute('data-cardpick')){ 명함고르기(t.getAttribute('data-cardpick')); return; }
+  if(t.hasAttribute('data-cpick')){ 연락처고르기(t.getAttribute('data-cpick')); return; }
+  if(t.hasAttribute('data-addr')){ 주소눌림(t.getAttribute('data-addr'), t.getAttribute('data-ai')); return; }
   if(t.hasAttribute('data-cardclear')){ modalRead(); S.modal.card = null; render(); return; }
   if(t.hasAttribute('data-gotoday')){ S.date = t.getAttribute('data-gotoday'); S.ym = S.date.slice(0,7); S.view = 'day'; S.gridScroll = true; render(); return; }
   if(t.hasAttribute('data-meet')){ modalRead(); if(S.modal){ S.modal.meet = !S.modal.meet; render(); } return; }
