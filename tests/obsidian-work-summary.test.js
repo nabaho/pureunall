@@ -50,7 +50,8 @@ test('옵시디언 문서는 연결·할 일·원본 링크를 만들고 민감 
 });
 
 test('오늘 문서를 덮어써 중복 문서가 쌓이지 않는다', () => {
-  assert.match(source, /obsidian:\/\/new\?file=/);
+  assert.match(source, /obsidian:\/\/new\?/); // 새 메모를 여는 주소(보관함 이름이 앞에 붙어도 된다)
+  assert.match(source, /[?&']file=/);
   assert.match(source, /&overwrite=true/);
   assert.match(source, /자동 요약 저장/);
 });
@@ -74,4 +75,14 @@ test('★★ 이알피 메뉴 바닥에서 연다 — 환경설정 바로 위, �
   assert.ok(erp.slice(at - 600, at).includes('window.PuObsidian.show()'), '★★ 눌러도 창이 안 열립니다');
   assert.ok(erp.includes("(isMenuPermitted(CURRENT_USER, 'env/settings') || window.PuObsidian) && h('div'"),
     '★ 환경설정 권한이 없는 직원에게는 옵시디언 줄도 사라집니다');
+});
+
+/* 2026-10-19 — 이알피 업무요약을 «옵시디언 자동 정리» 보관함(tools/obsidian-sync)과 한 보관함으로 합쳤다. */
+test('이알피 요약은 AI 기록과 같은 보관함의 raw/erp 로 간다 — 보관함 이름을 주소에 싣는다', () => {
+  const o = load();
+  const n = o.note({ data: { owner: '권형하', tasks: [] } });
+  assert.match(n.file, /^raw\/erp\//, '원자료 자리(raw/erp)가 아닙니다 — 위키 정리 대기 목록에 안 잡힙니다');
+  assert.match(o.allNote({ groups: [] }).file, /^raw\/erp\//);
+  assert.match(source, /obsidian:\/\/new\?vault=/, '보관함 이름이 없으면 «마지막에 연 보관함» 으로 가 버립니다');
+  assert.equal((source.match(/obsidian:\/\/new\?/g) || []).length, 1, '주소 조립이 두 벌로 갈라졌습니다 — noteUri 하나만');
 });

@@ -11,6 +11,7 @@
      · 챗지피티     «설정 → 데이터 제어 → 내보내기» 로 받은 conversations.json 또는 zip (--chatgpt)
    쓰는 곳(보관함 안만)
      raw/sessions/<원본>/날짜 제목 id.md   원자료(민감정보 가림)
+     raw/erp/…                            푸른이알피 업무요약(이알피 단추가 만든다 — 여기서는 읽기만)
      daily/날짜.md                        그날 작업 목록(표시 사이만 갱신, 손글씨는 보존)
      wiki/_pending.md                     아직 위키로 정리 안 된 원자료 목록
      CLAUDE.md · AGENTS.md · wiki/index.md · wiki/log.md   없을 때만 틀을 만든다(있으면 안 건드린다)
@@ -127,9 +128,20 @@ function scaffold(vault) {
   return made;
 }
 
+/* 푸른이알피 업무요약(raw/erp) — 브라우저(js/pu-obsidian.js)가 obsidian:// 로 만든 노트.
+   노트 머리말의 created: 날짜로 하루 목록에 건다. 읽기만 한다. */
+function erpEntries(vault) {
+  return walk(path.join(vault, 'raw', 'erp'), '.md').map((f) => {
+    const m = /^created:\s*(\d{4}-\d{2}-\d{2})/m.exec(readOr(f, '').slice(0, 600));
+    if (!m) return null;
+    const rel = path.relative(vault, f).split(path.sep).join('/');
+    return { source: 'erp', project: '', noTime: true, title: path.basename(f, '.md'), start: m[1] + 'T12:00:00+09:00', link: rel.replace(/\.md$/, '') };
+  }).filter(Boolean);
+}
+
 function writePending(vault) {
   const log = readOr(path.join(vault, 'wiki', 'log.md'), '');
-  const rawRoot = path.join(vault, 'raw', 'sessions');
+  const rawRoot = path.join(vault, 'raw');
   const pend = walk(rawRoot, '.md').map((f) => path.relative(vault, f).split(path.sep).join('/'))
     .filter((rel) => !log.includes(rel.replace(/\.md$/, '')) && !log.includes(rel))
     .sort().reverse();
@@ -170,9 +182,12 @@ function main() {
 
   if (!a.dryRun) {
     const made = scaffold(vault);
+    const erp = erpEntries(vault);
+    erp.forEach((e) => touched.add(L.dateOf(e.start)));
     touched.forEach((date) => {
       const entries = Object.values(state.sessions).filter((e) => L.dateOf(e.start) === date)
-        .map((e) => ({ source: e.source, project: e.project, title: e.title, start: e.start, link: e.file.replace(/\.md$/, '') }));
+        .map((e) => ({ source: e.source, project: e.project, title: e.title, start: e.start, link: e.file.replace(/\.md$/, '') }))
+        .concat(erp.filter((e) => L.dateOf(e.start) === date));
       const dp = path.join(vault, 'daily', date + '.md');
       fs.writeFileSync(dp, L.upsertDaily(readOr(dp, ''), date, L.renderDailyBlock(date, entries)));
     });

@@ -159,7 +159,7 @@ function parseChatGPTExport(json) {
 
 /* ── 4. 마크다운 만들기 ────────────────────────────────────────── */
 const MAX_TURN = 6000; /* 한 마디가 너무 길면(붙여넣은 문서 등) 잘라 노트가 터지지 않게 */
-const SRC_LABEL = { 'claude-code': '클로드 코드', codex: '코덱스', chatgpt: '챗지피티' };
+const SRC_LABEL = { 'claude-code': '클로드 코드', codex: '코덱스', chatgpt: '챗지피티', erp: '푸른이알피' };
 
 function noteFileName(s) {
   return dateOf(s.start) + ' ' + slug(maskSensitive(oneLine(s.title, 60)), 50) + ' ' + String(s.id).slice(0, 8) + '.md';
@@ -200,9 +200,9 @@ const DAILY_END = '<!-- obsidian-sync:end -->';
 
 function renderDailyBlock(date, entries) {
   const rows = entries.slice().sort((a, b) => String(a.start).localeCompare(String(b.start))).map((e) =>
-    '- ' + hhmm(e.start) + ' · ' + (SRC_LABEL[e.source] || e.source) + (e.project ? ' · ' + e.project : '') +
+    '- ' + (e.noTime ? '' : hhmm(e.start) + ' · ') + (SRC_LABEL[e.source] || e.source) + (e.project ? ' · ' + e.project : '') +
     ' — [[' + e.link + '|' + oneLine(e.title, 60).replace(/[|[\]]/g, ' ') + ']]');
-  return DAILY_BEGIN + '\n## AI 작업 기록 (' + entries.length + '건)\n\n' + rows.join('\n') + '\n' + DAILY_END;
+  return DAILY_BEGIN + '\n## 작업 기록 (' + entries.length + '건)\n\n' + rows.join('\n') + '\n' + DAILY_END;
 }
 
 function upsertDaily(existing, date, block) {

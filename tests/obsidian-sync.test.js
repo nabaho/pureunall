@@ -123,6 +123,13 @@ test('끝에서 끝까지: 만들고 · 다시 돌려도 안 늘고 · 바뀐 �
   run();
   assert.ok(!fs.readFileSync(path.join(vault, 'wiki/_pending.md'), 'utf8').includes(rawFiles()[0].replace(/\.md$/, '')));
 
+  /* 이알피 단추가 만든 raw/erp 노트는 하루 목록과 위키 대기 목록에 함께 잡힌다 */
+  fs.mkdirSync(path.join(vault, 'raw/erp'), { recursive: true });
+  fs.writeFileSync(path.join(vault, 'raw/erp/2026-10-18 이알피 요약.md'), '---\nsource: 푸른이알피\ncreated: 2026-10-18\n---\n# 요약\n');
+  run();
+  assert.ok(fs.readFileSync(path.join(vault, 'daily/2026-10-18.md'), 'utf8').includes('raw/erp/2026-10-18 이알피 요약'), '하루 목록에 이알피 요약이 없다');
+  assert.ok(fs.readFileSync(path.join(vault, 'wiki/_pending.md'), 'utf8').includes('raw/erp/2026-10-18 이알피 요약'), '대기 목록에 이알피 요약이 없다');
+
   /* 원본은 그대로다 */
   assert.ok(fs.readFileSync(src, 'utf8').includes(FAKE.mobile));
   /* 모의 실행은 아무것도 안 쓴다 */
