@@ -113,7 +113,7 @@ test('★★ run — 새 공고만 gov_feed/rows 에 담고 last 에 건수·시
 test('★★★ run 은 gov_feed 밖에 «아무것도» 안 쓴다 — 쓰는 칸이 rows/* 와 last 뿐이고, 대표의 목록(gov/{uid}/feed)은 건드리지 않는다', async () => {
   const x = adapters();
   await C.run(x.a);
-  Object.keys(x.written[0]).forEach((p) => assert.ok(/^rows\/[^/]+$/.test(p) || p === 'last', '엉뚱한 칸에 쓴다: ' + p));
+  Object.keys(x.written[0]).forEach((p) => assert.ok(/^rows\/[^/]+(\/(rgn|ind|lk))?$/.test(p) || p === 'last', '엉뚱한 칸에 쓴다: ' + p));
   const fn = INDEX.slice(INDEX.indexOf('exports.govFeedCollect'));
   assert.doesNotMatch(fn, /db\.ref\("gov\/"[^)]*\)\.(set|update|push|remove)|child\("feed"\)\.(set|update)/, '대표 목록에 쓰는 코드가 있다');
   assert.match(fn, /write: \(updates\) => feed\.update\(updates\)/);
@@ -165,4 +165,45 @@ test('★ 예약 — 매일 07:40(서울), 컨설턴트 모집 감시(07:20) 뒤
   assert.doesNotMatch(fn.slice(0, fn.indexOf('.onRun')), /secrets:/);
   assert.match(fn, /timeoutSeconds: 300/);
   assert.match(INDEX, /const GovFeedCollect = require\("\.\/gov-feed-collect"\)/);
+});
+
+/* ── 지역·업종 제한 붙이기 (대표 지시 2026-10-19) ── */
+const detailResp = (u) => /PsblRgn/.test(u) ? g2bResp([{ prtcptPsblRgnNm: '충청남도' }]) : g2bResp([{ lcnsLmtNm: '정보통신공사업' }]);
+function fakeWithDetail() {
+  const f = fake(); const base = f.getJson;
+  return { calls: f.calls, getJson: async (u) => (/getBidPblancListInfo(PrtcptPsblRgn|LicenseLimit)/.test(u) ? (f.calls.push(u), detailResp(u)) : base(u)) };
+}
+test('★★ run — 새로 걸린 나라장터 공고에 참가 가능 지역·면허 제한을 붙여 받은 함에 담는다', async () => {
+  const x = adapters({ fake: fakeWithDetail() });
+  await C.run(x.a);
+  const u = x.written[0], k = C.safeKey('R1-000');
+  assert.equal(u['rows/' + k].rgn, '충청남도'); assert.equal(u['rows/' + k].ind, '정보통신공사업'); assert.equal(u['rows/' + k].lk, '1');
+  assert.equal(x.calls.filter((c) => /PrtcptPsblRgn/.test(c)).length, 1, '공고마다 지역 한 번');
+  assert.ok(x.calls.some((c) => /LicenseLimit/.test(c)));
+  const biz = Object.keys(u).filter((p) => p.startsWith('rows/') && u[p] && u[p].src === '기업마당')[0];
+  assert.ok(biz, '기업마당 줄은 그대로'); assert.equal(u[biz].lk, undefined, '기업마당에는 나라장터 상세를 부르지 않는다');
+  assert.ok(u.last.restrict && u.last.restrict.fresh.done >= 1, 'last 에 건수를 남긴다');
+});
+test('★★ run — 승인 전이라 상세를 못 받아도 공고 모으기는 그대로다(던지지 않는다) · lk 도 안 남긴다', async () => {
+  const f = fake(); const base = f.getJson;
+  const getJson = async (u) => { if (/getBidPblancListInfo(PrtcptPsblRgn|LicenseLimit)/.test(u)) return { OpenAPI_ServiceResponse: { cmmMsgHeader: { returnAuthMsg: 'SERVICE_ACCESS_DENIED_ERROR' } } }; return base(u); };
+  const x = adapters({ fake: { calls: f.calls, getJson } });
+  const r = await C.run(x.a);
+  assert.equal(r.ok, true);
+  const k = C.safeKey('R1-000'); assert.ok(x.written[0]['rows/' + k], '공고는 담긴다'); assert.equal(x.written[0]['rows/' + k].lk, undefined);
+});
+test('★★ run — 예전에 받아 둔 열린 공고(lk 없음)는 조금씩 채운다 — 자식 칸만 쓰고 줄 전체를 덮지 않는다 · 닫힌 공고는 안 부른다', async () => {
+  const open = C.safeKey('OLD-1'), shut = C.safeKey('OLD-2');
+  const x = adapters({ fake: fakeWithDetail(), existing: {
+    [open]: { no: 'OLD-1', src: '나라장터', nm: '옛 열린 공고', closeDt: '2026-10-30 10:00:00', at: '2026-10-11T00:00:00.000Z' },
+    [shut]: { no: 'OLD-2', src: '나라장터', nm: '옛 닫힌 공고', closeDt: '2026-10-01 10:00:00', at: '2026-10-05T00:00:00.000Z' } } });
+  await C.run(x.a);
+  const u = x.written[0];
+  assert.equal(u['rows/' + open + '/rgn'], '충청남도'); assert.equal(u['rows/' + open + '/lk'], '1');
+  assert.equal(u['rows/' + open], undefined, '줄 전체를 덮어쓰면 안 된다');
+  assert.equal(u['rows/' + shut + '/lk'], undefined, '마감 지난 공고는 안 부른다');
+  assert.ok(!x.calls.some((c) => /bidNtceNo=OLD-2/.test(c)));
+});
+test('★ 하루 상한 — 새 공고 40 · 옛 공고 20 (하루 1,000회 제한 안에서 공고마다 두 번씩)', () => {
+  assert.deepEqual(C.RESTRICT_MAX, { fresh: 40, backfill: 20 });
 });

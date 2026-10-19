@@ -56,3 +56,9 @@ test('★ 상태 — 안 돌았음 / 오류 / 정상(서울 시각·출처별 �
   assert.equal(late.k, 'late'); assert.match(late.text, /2일째 새로 안 돌았습니다/);
   assert.equal(I.status({ at: '2026-10-10T22:40:00.000Z', today: '2026-10-11', counts: {}, added: 0 }, '2026-10-12').k, 'ok', '하루 늦은 것은 정상(아침 7시 40분 전에 열면 어제 것)');
 });
+test('★★ 서버가 알아낸 지역·업종 제한(rgn·ind·indY·jnt·lk)을 새 줄에 «있을 때만» 데려간다', () => {
+  const m = I.merge([], { a: row('A', '제한 있는 용역', { rgn: '충청남도', ind: '정보통신공사업', indY: 'Y', jnt: '대전', lk: '1' }), b: row('B', '제한 모르는 용역') }, O);
+  const a = m.adds.find((x) => x.no === 'A'), b = m.adds.find((x) => x.no === 'B');
+  assert.equal(a.rgn, '충청남도'); assert.equal(a.ind, '정보통신공사업'); assert.equal(a.indY, 'Y'); assert.equal(a.jnt, '대전'); assert.equal(a.lk, '1');
+  ['rgn', 'ind', 'indY', 'jnt', 'lk'].forEach((k) => assert.equal(k in b, false, k));
+});

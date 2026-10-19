@@ -1597,3 +1597,52 @@ test('★ 불러오기는 로그인 뒤 cloudPull «다음», 규칙(rejudge) «
   assert.match(src, /await cloudPull\(\); await inboxPull\(\); srcBackfill\(\); rejudge\(\);/);
   assert.match(src, /<script src="js\/gov-inbox\.js\?v=\d+"><\/script>/, '화면이 모듈을 싣는다');
 });
+
+/* ═══ 📍🏭 지역·업종 제한 표시 (대표 지시 2026-10-19 「지역제한이나 업종제한이 있는 경우 표시해달라」) ═══ */
+const RESTR = () => [
+  { id: 'R1', src: '나라장터', type: '새 공고', no: 'RR1-000', nm: '노무 컨설팅 용역', org: '갑기관', rgn: '충청남도 · 세종특별자치시 · 대전광역시', ind: '정보통신공사업', lk: '1', savedAt: '2026-10-05T01:37:00Z' },
+  { id: 'R2', src: '나라장터', type: '새 공고', no: 'RR2-000', nm: '인사 컨설팅 용역', org: '을기관', indY: 'Y', savedAt: '2026-10-06T01:37:00Z' },
+  { id: 'R3', src: '기업마당', type: '새 공고', no: 'RB3', nm: '일터혁신 컨설팅 지원', org: '병기관', rgn: '충남', savedAt: '2026-10-07T01:37:00Z' },
+  { id: 'R4', src: '나라장터', type: '새 공고', no: 'RR4-000', nm: '임금체계 용역', org: '정기관', lk: '1', savedAt: '2026-10-08T01:37:00Z' }
+];
+test('★★★ 목록에 📍지역·🏭업종제한 딱지 — 있는 공고에만, 공고명 «앞»에 · 제한 없음(lk 만 있음)은 아무것도 안 그린다', () => {
+  const r = runApp({ feed: RESTR() }, { Date: FixedDate('2026-10-19T09:00:00') });
+  r.api.draw();
+  const tb = r.el('tb').innerHTML, row = (nm) => tb.split('<tr').find((x) => x.indexOf(nm) >= 0) || '';
+  assert.match(row('노무 컨설팅 용역'), /<td class="nm"[^>]*><span class="tag amber"[^>]*>📍 충청남도·세종특별자치시 외 1<\/span> <span class="tag amber"[^>]*>🏭 업종제한<\/span> <b>노무 컨설팅 용역<\/b>/);
+  assert.match(row('노무 컨설팅 용역'), /title="참가 가능 지역 — 충청남도 · 세종특별자치시 · 대전광역시"/, '풍선에 전체 지역');
+  assert.match(row('인사 컨설팅 용역'), /🏭 업종제한<\/span> <b>인사 컨설팅 용역<\/b>/, '이름을 모르는 업종제한도 표시');
+  assert.doesNotMatch(row('인사 컨설팅 용역'), /📍/);
+  assert.match(row('일터혁신 컨설팅 지원'), /title="지역\(해시태그·제목 기준\) — 충남">📍 충남<\/span>/);
+  assert.doesNotMatch(row('임금체계 용역'), /📍|🏭/, '확인했는데 제한이 없는 공고에 딱지를 달면 안 된다');
+});
+test('★★ 상세 팝업 — 참가 가능 지역·업종·면허 이름을 «있을 때만» 보인다', () => {
+  const r = runApp({ feed: RESTR() }, { Date: FixedDate('2026-10-19T09:00:00') });
+  r.api.draw(); r.api.feedPop('R1');
+  let h = r.el('popBody').innerHTML;
+  assert.match(h, /참가 가능 지역[\s\S]{0,120}충청남도 · 세종특별자치시 · 대전광역시/); assert.match(h, /업종·면허 제한[\s\S]{0,120}정보통신공사업/);
+  r.api.feedPop('R2'); h = r.el('popBody').innerHTML;
+  assert.match(h, /업종 제한[\s\S]{0,160}원문 공고에서 확인/); assert.doesNotMatch(h, /참가 가능 지역/);
+  r.api.feedPop('R3'); h = r.el('popBody').innerHTML;
+  assert.match(h, /<th[^>]*>지역<\/th>|>지역</); assert.doesNotMatch(h, /참가 가능 지역/);
+  r.api.feedPop('R4'); h = r.el('popBody').innerHTML;
+  assert.doesNotMatch(h, /참가 가능 지역|업종·면허 제한|업종 제한|공동수급/);
+});
+test('★★★ 서버 받은 함 — 이미 내 목록에 있는 공고에도 지역·업종 제한을 «빈 칸에만» 옮긴다 · 숨김·별표는 그대로', async () => {
+  const r = runApp({ feed: [{ id: 'G0001', no: 'S1', nm: '2026년 노무 컨설팅 용역', src: '나라장터', type: '관심', hidden: false }, { id: 'G0002', no: 'S9', nm: '노무 용역', src: '나라장터', lk: '1', rgn: '내가본값' }] }, { Date: FixedDate('2026-10-12T09:00:00') });
+  const inbox = { last: INBOX.last, rows: { s1: Object.assign({}, INBOX.rows.s1, { rgn: '충청남도', ind: '정보통신공사업', lk: '1' }), s9: { no: 'S9', nm: '노무 용역', src: '나라장터', rgn: '서버값', lk: '1', at: '2026-10-11T22:40:00.000Z' } } };
+  r.api.setFb(fbInbox(inbox).db, 'U1');
+  await r.api.inboxPull();
+  const f = r.api.get('feed'), a = f.find((x) => x.no === 'S1'), b = f.find((x) => x.no === 'S9');
+  assert.equal(a.rgn, '충청남도'); assert.equal(a.ind, '정보통신공사업'); assert.equal(a.lk, '1'); assert.equal(a.type, '관심', '내 표시를 덮었다');
+  assert.equal(b.rgn, '내가본값', '이미 본 공고(lk)는 서버가 덮지 않는다');
+});
+test('★★ 새로 받기 — 걸린 공고·열린 옛 공고에 제한을 붙이는 길(restrictFill)이 «저장 앞에» 있다 · 실패해도 공고는 남는다', () => {
+  const fa = src.slice(src.indexOf('async function _fetchAll'), src.indexOf('/* ═══ 📅 발주 예정'));
+  assert.match(fa, /if\(kd\)\{ try\{ rFill=await restrictFill\(buf, kd, m\.adds\); \}catch\(e\)\{ rFill=null; \} \}\s*\n\s*buf=get\('feed'\);/, '기다린 «뒤»에 목록을 다시 읽어야 대표가 그사이 누른 ★ 이 안 덮인다');
+  assert.match(fa, /buf=get\('feed'\);[\s\S]*?fresh\.forEach\([\s\S]*?patches\.forEach[\s\S]*?if\(fresh\.length \|\| patched\) set\('feed',buf\);/, '다시 읽은 목록에 합쳐 저장');
+  assert.doesNotMatch(fa.slice(0, fa.indexOf('restrictFill(buf')), /m\.adds\.forEach\(function\(r\)\{ r\.id=nextId/, '기다리기 «전»에 옛 목록에 줄을 넣으면 안 된다');
+  const rf = src.slice(src.indexOf('async function restrictFill'), src.indexOf('var _fetching=false'));
+  assert.match(rf, /GovG2b\.enrich\(todo, pull, \{key:kd, max:60\}\)/); assert.match(rf, /\.slice\(0,20\)/, '옛 공고는 20건씩만');
+  assert.match(rf, /GovG2b\.dday\(r\.closeDt\)/, '마감 지난 공고는 안 부른다');
+});
