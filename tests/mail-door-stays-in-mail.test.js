@@ -76,13 +76,43 @@ test('★★ ① 덮개(.dmr)는 목록(.dmm)과 «같은 틀» — 화면 전�
 });
 
 /* ── ② 맨 위 줄은 붙어 있다 ── */
-test('★ ② 읽기 덮개의 맨 위(‹ 목록 · ▲ · ▼)는 스크롤해도 따라온다 — 돌아갈 길이 안 사라진다', () => {
-  const r = rules(css, /^\.dmr\s+\.dm-read\s+\.rtop$/).filter((x) => /position:sticky/.test(x.body) && /top:0/.test(x.body));
-  assert.ok(r.length, '★ 맨 위 줄이 붙어 있지 않습니다 — 긴 메일을 내리면 「‹ 목록」이 사라져 갇힙니다');
-  assert.ok(/background:/.test(r[0].body), '붙는 줄에 바탕이 없습니다 — 본문 글자가 비쳐 뒤섞입니다');
-  /* 오가는 길을 «첫 줄»로 — 답장·삭제 같은 이 메일에 하는 일보다 위 */
-  assert.ok(rules(css, /^\.dmr\s+\.dm-read\s+\.rtop\s+\.rgt$/).some((x) => /order:-1/.test(x.body)),
-    '오가는 길(목록·위·아래)이 첫 줄이 아닙니다 — 단추 줄이 길면 목록 단추가 두 번째 줄로 밀립니다');
+test('★ ② 읽기 덮개의 맨 위 «한 줄»(‹ 목록 · ▲ · ▼)만 스크롤해도 따라온다 — 돌아갈 길은 남고 화면은 안 막힌다', () => {
+  /* 붙는 것이 두 줄(오가는 길 + 답장·전달…)이면 내릴수록 화면의 1/9 이 막힌다(대표 캡처 2026-10-19 「깔끔하게」).
+     sticky 는 «부모 상자 안»에서만 붙으므로 .rtop 을 풀어(display:contents) .rgt 가 .dm-read 의 직접 자식이 되게 한다. */
+  assert.ok(rules(css, /^\.dmr\s+\.dm-read\s+\.rtop$/).some((x) => /display:contents/.test(x.body)),
+    '★ .rtop 이 안 풀렸습니다 — .rgt 가 키 작은 .rtop 안에 갇혀 스크롤하면 같이 사라집니다');
+  const rgt = rules(css, /^\.dmr\s+\.dm-read\s+\.rtop\s+\.rgt$/).filter((x) => /position:sticky/.test(x.body) && /top:0/.test(x.body));
+  assert.ok(rgt.length, '★ 오가는 길 줄이 붙어 있지 않습니다 — 긴 메일을 내리면 「‹ 목록」이 사라져 갇힙니다');
+  assert.ok(/background:/.test(rgt[0].body), '붙는 줄에 바탕이 없습니다 — 본문 글자가 비쳐 뒤섞입니다');
+  /* 이 메일에 하는 일(.lft)은 붙지 않는다 — 붙이면 다시 두 줄이 된다 */
+  assert.ok(!rules(css, /^\.dmr\s+\.dm-read\s+\.rtop\s+\.lft$/).some((x) => /position:sticky/.test(x.body)),
+    '★ 답장·전달 줄까지 붙어 있습니다 — 화면 위가 두 줄 막힙니다');
+  /* 순서 — 오가는 길이 첫 줄, 이 메일에 하는 일이 그 다음 */
+  const ord = (r) => { const m = /order:(-?\d+)/.exec(r.map((x) => x.body).join(';')); return m ? Number(m[1]) : null; };
+  const o1 = ord(rgt), o2 = ord(rules(css, /^\.dmr\s+\.dm-read\s+\.rtop\s+\.lft$/));
+  assert.ok(o1 !== null && o2 !== null && o1 < o2, '오가는 길이 이 메일에 하는 일보다 «위»가 아닙니다 — 단추 줄이 길면 목록 단추가 밀립니다');
+});
+
+/* ── ②-1 첨부는 «카드 한 장» ── */
+test('★★ ②-1 폰 읽기의 첨부는 카드 — 파일 이름 «통째로», 단추는 가로로 넘친 줄은 다음 줄로 (글자가 세로로 쌓이지 않는다)', () => {
+  const card = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attone$/);
+  assert.ok(card.some((x) => /display:flex/.test(x.body) && /flex-wrap:wrap/.test(x.body)),
+    '★★ 첨부 칸이 줄바꿈하는 카드가 아닙니다 — 좁은 폰 폭에서 「미 리 보 기」처럼 글자가 세로로 쌓입니다');
+  const name = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attone>button:first-child$/);
+  /* rules() 는 공백을 걷어 내므로 「flex:1 0 100%」는 「flex:10100%」로 읽힌다 */
+  assert.ok(name.some((x) => /flex:10100%|flex-basis:100%|width:100%/.test(x.body)),
+    '파일 이름이 한 줄 전체를 쓰지 않습니다 — 단추들과 한 줄에 눌려 4줄로 접힙니다');
+  const btn = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attone\s+\.(peek|topay)$/);
+  assert.ok(btn.some((x) => /white-space:nowrap/.test(x.body)),
+    '★★ 첨부 단추가 줄바꿈될 수 있습니다 — 글자가 한 글자씩 세로로 쌓입니다');
+});
+
+/* ── ②-2 떠다니는 것은 읽는 동안 비킨다 ── */
+test('★ ②-2 읽는 동안 떠다니는 🏠·즐겨찾기 손잡이가 본문 글자를 덮지 않는다', () => {
+  const hide = rules(css, /^body:has\(\.dmr\)\s+\[data-pu-appbar-btn\]$/).filter((x) => /display:none!important/.test(x.body));
+  assert.ok(hide.length, '★ 읽는 동안 🏠·즐겨찾기를 안 비킵니다 — 본문 글자를 덮습니다(대표 캡처)');
+  /* 목록(.dmm)에서는 그대로 — 읽기를 나가면 도로 나온다 */
+  assert.ok(!rules(css, /^body:has\(\.dmm\)\s+\[data-pu-appbar-btn\]$/).length, '목록에서도 🏠 를 치웠습니다 — 포털로 갈 길이 사라집니다');
 });
 
 /* ── ③ 머리줄 이름 ── */
