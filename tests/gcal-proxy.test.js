@@ -5,7 +5,7 @@
    ★ 이 검사가 지키는 것
      ① 새로 생긴 직원 일정만 보낸다 — 외부 협력자·이미 이어진 것·지운 것·제목 없는 것은 안 보낸다
      ② 구글에 보내는 몸은 화면(js/pu-gcal-auth.js 몸만들기)과 «같은 셈»이다
-     ③ 담당 번호를 남긴다(shared.puSid + 설명 「푸른 담당: 이름 (P-005)」)
+     ③ 담당 번호를 남긴다(shared.puSid) — 설명 글에는 «이름»만, 사번은 안 적는다(대표 지시 2026-10-19)
      ④ 성공하면 movedToGcal·gcalEventId 표를 달고 «지우지 않는다»(이알피가 이 표만 읽는다)
      ⑤ 실패하면 우리 기록을 그대로 두고 gcalProxyErr 만 적는다
      ⑥ 화면: 옮긴 줄은 안 그리고(구글 것이 뜬다), 구글 일정의 담당 번호가 만든이 메일을 이긴다
@@ -40,7 +40,8 @@ test('① 보낼 것만 고른다', () => {
 
 test('② 몸은 화면과 같은 셈 · ③ 담당 번호', () => {
   const ev = P.eventOf(줄(), 'sch_1', 이름);
-  assert.match(ev.description, /담당자: 김과장 010\n자료 지참\n푸른 담당: 박한별 \(P-005\)$/);
+  assert.match(ev.description, /담당자: 김과장 010\n자료 지참\n푸른 담당: 박한별$/);
+  assert.doesNotMatch(ev.description, /[A-Z]-\d{3}/, '★ 설명 글에 사번이 나갔다 — 공용 달력은 바깥 참석자도 본다');
   const 서버 = P.bodyOf(ev), 화면 = AUTH.bodyOf(ev);
   assert.deepStrictEqual(서버, 화면);
   assert.deepStrictEqual(서버.extendedProperties.shared, { puSid: 'P-005' });
@@ -150,10 +151,10 @@ test('⑦ 출장 알림 — 대표 계정이 대신 넣은 직원 일정은 대�
 
 test('⑧ 설명 왕복 · 주인 · 나머지 보존', () => {
   const d = P.descOf('김과장 010', '자료 지참\n둘째 줄', 'P-005', 이름);
-  assert.strictEqual(d, '담당자: 김과장 010\n자료 지참\n둘째 줄\n푸른 담당: 박한별 (P-005)');
+  assert.strictEqual(d, '담당자: 김과장 010\n자료 지참\n둘째 줄\n푸른 담당: 박한별');
   assert.deepStrictEqual(P.splitDesc(d), { contact: '김과장 010', note: '자료 지참\n둘째 줄' });
   assert.strictEqual(P.ownerOf({ extendedProperties: { shared: { puSid: 'P-003' } }, creator: { email: 'boss@x.com' } }, { 'boss@x,com': 'P-001' }), 'P-003');
-  assert.strictEqual(P.ownerOf({ description: '푸른 담당: 홍 (A-002)' }, {}), 'A-002');
+  assert.strictEqual(P.ownerOf({ description: '푸른 담당: 홍 (A-002)' }, {}), 'A-002', '★ 옛 일정 설명의 (사번)을 못 읽는다 — puSid 없는 옛 일정의 주인을 잃는다');
   assert.strictEqual(P.ownerOf({ creator: { email: 'Boss@X.com' } }, { 'boss@x,com': 'P-001' }), 'P-001');
   assert.strictEqual(P.ownerOf({ creator: { email: 'who@x.com' } }, {}), '');
   const cur = { id: 'G', summary: '옛', location: '옛곳', attendees: [{ email: 'a@b.c' }], reminders: { useDefault: false },
@@ -211,7 +212,8 @@ test('⑨ 본인 일정만 · 관리자는 모두 · 담당 바꾸기는 관리�
   const put = a.sent.find((x) => x.opt.method === 'PUT');
   const body = JSON.parse(put.opt.body);
   assert.deepStrictEqual(body.attendees, [{ email: 'a@b.c' }], '참석자가 날아갔다');
-  assert.match(body.description, /새 메모\n푸른 담당: 박한별 \(P-005\)/);
+  assert.match(body.description, /새 메모\n푸른 담당: 박한별$/);
+  assert.doesNotMatch(body.description, /[A-Z]-\d{3}/, '★ 고친 일정 설명에 사번이 다시 붙었다');
 });
 
 test('⑩ 이어진 이알피 줄도 함께 — 고치면 같은 칸, 지우면 삭제표시', async () => {
@@ -340,4 +342,16 @@ test('첨부파일 — 구글 드라이브 링크만, 화면·서버 몸이 같�
   assert.deepStrictEqual(서버.attachments, [{ fileUrl: 'https://drive.google.com/file/d/abc/view', title: '첨부파일' }]);
   assert.deepStrictEqual(서버, AUTH.bodyOf(ev));
   assert.strictEqual(P.bodyOf({ summary: 'a', date: '2026-10-20' }).attachments, undefined);
+});
+
+test('⑬★ 화면이 바로 넣는 일정도 설명 글에 사번을 안 적고, 담당 번호는 숨은 칸(puSid)으로 보낸다 (2026-10-19)', () => {
+  /* 대표 지시 2026-10-19 「모든곳에 권형하를 넣으면 p001 이 나온다」 → 공용 달력 설명에서 사번을 뺀다.
+     ⚠ 이름은 남긴다 — work.html 주간 업무 잇기가 설명의 「푸른 담당: 이름」으로 담당을 가른다. */
+  const at = 캘린더.indexOf('function 구글에넣기(m){');
+  assert.ok(at > 0, '구글에넣기를 못 찾았다');
+  const 몸 = 캘린더.slice(at, 캘린더.indexOf('PuGcalAuth.createEvent', at) + 1200);
+  const 줄 = 몸.split('\n').filter((x) => /설명\.push\("푸른 담당/.test(x));
+  assert.strictEqual(줄.length, 1, '「푸른 담당」 줄을 못 찾았다');
+  assert.doesNotMatch(줄[0], /m\.sid/, '★ 설명 글에 사번을 붙인다 — 바깥 참석자의 구글 캘린더에 사번이 보인다');
+  assert.match(몸, /puSid: String\(m\.sid\|\|""\)/, '★ 담당 번호를 숨은 칸으로 안 보낸다 — 대표가 넣은 직원 일정이 대표 것으로 보인다');
 });
