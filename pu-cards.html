@@ -28342,7 +28342,7 @@ function mbReadHtml(){
     ${(o.atts&&o.atts.length) ? `<div class="atts">${o.atts.map((a,i)=>{
       const can = mbPvKind(a.name, a.mime);
       return `<span class="attone"><button onclick="mbAtt(${i})" title="내려받기">📎 ${esc(a.name||'첨부')}${a.size?' · '+fmtMB(a.size):''}</button>
-        ${can ? `<button class="peek" onclick="mbAttPeek(${i})"
+        ${can ? `<button class="peek" onclick="mbAttPeek(${i})" onmouseenter="mbAttPeekHover(${i})" onmouseleave="mbAttPeekHoverCancel()" ontouchstart="mbAttPeekHover(${i})"
             title="내려받지 않고 «열지도 않고» 무엇인지만 봅니다 — 한글·워드는 글자만 뽑아 그립니다">👁 미리보기</button>`
               : `<button class="peek off" disabled
             title="이 종류는 브라우저가 못 그립니다 — 내려받아 여시거나 급여데이터함으로 담으십시오">미리보기 없음</button>`}
@@ -28605,16 +28605,90 @@ function mbPvKind(name, mime){
   return '';
 }
 /* 필요한 판독기를 «그때» 불러온다 — 메일함을 열 때 미리 싣지 않는다 */
+const _mbPvLibWait = {};
 function mbPvLib(src, ready){
   if(ready()) return Promise.resolve();
-  return new Promise((ok, no)=>{
+  if(_mbPvLibWait[src]) return _mbPvLibWait[src];
+  const p = new Promise((ok, no)=>{
     const s = document.createElement('script');
     s.src = src;
     s.onload = ()=> ready() ? ok() : no(new Error(src + ' 를 읽었지만 쓸 수가 없습니다'));
     s.onerror = ()=> no(new Error(src + ' 를 불러오지 못했습니다'));
     document.head.appendChild(s);
   });
+  _mbPvLibWait[src] = p;
+  const clear = ()=>{ delete _mbPvLibWait[src]; };
+  p.then(clear, clear);
+  return p;
 }
+/* ══════ ⚡ 미리보기를 «누르기 전에» 준비한다 (대표 지시 2026-10-19 「미리보기 화면이 너무 늦게 읽힌다」) ══════
+   ★ 재 보니 늦은 곳은 둘이었다. ① 서버 — 첨부는 메일 열기와 «다른 그릇»이라 따뜻하게 두기가 안 닿아 매번
+     새로 붙었다(connect 428~542ms · 전체 약 2초, readMailAttachment MB_TIME). ② 화면 — 파일을 다 받은
+     «뒤에야» 판독기(pako → hwp_extract → 옛 한글이면 xlsx 900KB)를 차례로 불렀다.
+   ★ 그래서 ① 서버도 따뜻하게 두고 ② 판독기와 파일 받기를 «나란히» 시작하고 ③ 단추에 마우스를 올리는
+     순간(150ms 머물면)부터 «미리» 받아 둔다 — 누르면 이미 와 있다(메일 줄 미리 받기 mbHoverPeek 과 같은 길).
+   ⚠ 스쳐 지나가는 것으로는 안 받는다 · 3MB 넘는 것은 안 받는다 · 지난 메일(POP3)은 안 받는다
+     (한 첨부를 받으려고 메일 «통째»를 받아야 한다).
+   ⚠ 받아 둔 것은 네 개까지만 들고 있고 8MB 넘는 것은 안 담는다 — 메모리를 먹지 않게. */
+const MB_ATT_KEEP = 4;
+const MB_ATT_KEEP_MAX = 8 * 1024 * 1024;
+const MB_ATT_HOVER_MAX = 3 * 1024 * 1024;
+const MB_ATT_HOVER_MS = 150;
+let _mbAttBuf = {}, _mbAttOrder = [], _mbAttWait = {}, _mbAttHoverT = 0;
+function mbAttKey(o, i){ return String(o.slug) + '|' + String(o.uid) + '|' + String(i); }
+function mbPvLibsFor(kind, name){
+  if(kind === 'pdf') return mbPvLib('vendor/pdf.min.js?v=1', ()=>!!window.pdfjsLib);
+  if(kind === 'xls') return mbPvLib('vendor/xlsx.full.min.js?v=1', ()=>!!window.XLSX);
+  if(kind === 'doc'){
+    const jobs = [ mbPvLib('vendor/pako.min.js?v=1', ()=>!!window.pako)
+      .then(()=>mbPvLib('hwp_extract.js?v=5', ()=>typeof extractDocText === 'function')) ];
+    /* 옛 한글(.hwp)은 CFB 라 xlsx 판독기가 있어야 한다 — 그 확장자일 때만 */
+    if(mbPvExt(name) === 'hwp') jobs.push(mbPvLib('vendor/xlsx.full.min.js?v=1', ()=>!!window.XLSX));
+    return Promise.all(jobs);
+  }
+  return Promise.resolve();
+}
+/* 첨부 한 개의 바이트 — 받아 둔 것이 있으면 서버를 안 부른다. 받는 중이면 그것을 기다린다. */
+function mbAttBytes(o, i, a){
+  const k = mbAttKey(o, i);
+  if(_mbAttBuf[k]) return Promise.resolve(_mbAttBuf[k]);
+  if(_mbAttWait[k]) return _mbAttWait[k];
+  const u = firebase.auth && firebase.auth().currentUser;
+  if(!u) return Promise.reject(new Error('로그인이 필요합니다'));
+  const req = mbAttReq(o, i, a);
+  const p = u.getIdToken()
+    .then(tok=>fetch(MB_FN+req.fn, { method:'POST',
+      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
+      body: JSON.stringify(req.body) }))
+    .then(r=>r.json().catch(()=>({})))
+    .then(j=>{
+      if(!j.ok) throw new Error(j.error||'가져오지 못했습니다');
+      const bin = atob(j.b64||'');
+      const buf = new Uint8Array(bin.length);
+      for(let q=0;q<bin.length;q++) buf[q]=bin.charCodeAt(q);
+      if(buf.length <= MB_ATT_KEEP_MAX){
+        _mbAttBuf[k] = buf; _mbAttOrder.push(k);
+        while(_mbAttOrder.length > MB_ATT_KEEP) delete _mbAttBuf[_mbAttOrder.shift()];
+      }
+      return buf;
+    });
+  _mbAttWait[k] = p;
+  const clear = ()=>{ delete _mbAttWait[k]; };
+  p.then(clear, clear);
+  return p;
+}
+function mbAttPeekHover(i){
+  clearTimeout(_mbAttHoverT);
+  const o = state.mbOpen||{}; const a = (o.atts||[])[i]; if(!a) return;
+  if(String(o.slug||'') === MB_OLD_ID) return;                 /* 지난 메일은 한 첨부에 메일 «통째» */
+  const kind = mbPvKind(a.name, a.mime); if(!kind) return;
+  if(Number(a.size||0) > MB_ATT_HOVER_MAX) return;
+  _mbAttHoverT = setTimeout(()=>{
+    mbPvLibsFor(kind, a.name).catch(()=>{});
+    mbAttBytes(o, i, a).catch(()=>{});
+  }, MB_ATT_HOVER_MS);
+}
+function mbAttPeekHoverCancel(){ clearTimeout(_mbAttHoverT); }
 function mbPvClose(){
   const u = state.mbPv && state.mbPv.url;
   if(u){ try{ URL.revokeObjectURL(u); }catch(_){ } }   /* 창을 닫으면 그 파일은 사라진다 */
@@ -28632,19 +28706,9 @@ function mbAttPeek(i){
   renderMailPage();
   const u = firebase.auth().currentUser;
   if(!u){ state.mbPv.loading=false; state.mbPv.err='로그인이 필요합니다'; return renderMailPage(); }
-  const req = mbAttReq(o, i, a);
-  u.getIdToken()
-    .then(tok=>fetch(MB_FN+req.fn, { method:'POST',
-      headers:{ 'Content-Type':'application/json', Authorization:'Bearer '+tok },
-      body: JSON.stringify(req.body) }))
-    .then(r=>r.json().catch(()=>({})))
-    .then(j=>{
-      if(!j.ok) throw new Error(j.error||'가져오지 못했습니다');
-      const bin = atob(j.b64||'');
-      const buf = new Uint8Array(bin.length);
-      for(let k=0;k<bin.length;k++) buf[k]=bin.charCodeAt(k);
-      return mbPvDraw(kind, buf, a);
-    })
+  /* ⚡ 파일 받기와 판독기 싣기를 «나란히» — 예전에는 다 받은 뒤에 판독기를 차례로 불렀다 */
+  Promise.all([ mbAttBytes(o, i, a), mbPvLibsFor(kind, a.name) ])
+    .then(r=>mbPvDraw(kind, r[0], a))
     .then(got=>{
       if(!state.mbPv || state.mbPv.i !== i) return;      /* 그새 닫았거나 딴 것을 열었다 */
       Object.assign(state.mbPv, { loading:false }, got);
@@ -28665,7 +28729,7 @@ function mbPvDraw(kind, buf, a){
     return mbPvLib('vendor/pdf.min.js?v=1', ()=>!!window.pdfjsLib)
       .then(()=>{
         try{ pdfjsLib.GlobalWorkerOptions.workerSrc = 'vendor/pdf.worker.min.js?v=1'; }catch(_){ }
-        return pdfjsLib.getDocument({ isEvalSupported: false, data: buf }).promise;
+        return pdfjsLib.getDocument({ isEvalSupported: false, data: buf.slice() }).promise;   /* ⚠ 사본 — 받아 둔 바이트를 못 쓰게 되면 두 번째 미리보기가 빈다 */
       })
       .then(doc=>({ pdf: doc, page: 1, pages: Number(doc.numPages || 1) }));
   }

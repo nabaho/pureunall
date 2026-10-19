@@ -1608,15 +1608,18 @@ module.exports = function build(deps) {
         const sig = warmSig();
         if (!sig) { console.warn('mailKeepWarm 비밀값이 없습니다'); return null; }
         const project = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT || 'pureun-erp';
-        const url = 'https://' + REGION + '-' + project + '.cloudfunctions.net/readMailMessage';
-        try {
-          const r = await fetch(url, { method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'x-pu-warm': sig },
-            body: JSON.stringify({ warm: 1 }) });
-          const j = await r.json().catch(() => ({}));
-          console.log('mailKeepWarm', r.status, JSON.stringify(j));
-        } catch (e) {
-          console.warn('mailKeepWarm 두드리지 못했습니다:', String((e && e.message) || e).slice(0, 200));
+        /* 메일 열기 + 첨부 받기 «둘 다» 두드린다 — 둘은 다른 그릇이다(2026-10-19). 하나가 실패해도 다른 하나는 간다. */
+        for (const name of ['readMailMessage', 'readMailAttachment']) {
+          const url = 'https://' + REGION + '-' + project + '.cloudfunctions.net/' + name;
+          try {
+            const r = await fetch(url, { method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'x-pu-warm': sig },
+              body: JSON.stringify({ warm: 1 }) });
+            const j = await r.json().catch(() => ({}));
+            console.log('mailKeepWarm', name, r.status, JSON.stringify(j));
+          } catch (e) {
+            console.warn('mailKeepWarm 두드리지 못했습니다:', name, String((e && e.message) || e).slice(0, 200));
+          }
         }
         return null;
       }),
@@ -2261,7 +2264,10 @@ module.exports = function build(deps) {
     readMailAttachment: F
       .region(REGION)
       .runWith({ secrets: ['DAUM_MAIL_PASSWORD'], timeoutSeconds: 300, memory: '1GB' })
-      .https.onRequest((req, res) => gate(req, res, async () => {
+      /* ☕ 이 함수도 «따뜻하게 둔다» (2026-10-19, 대표 지시 「미리보기 화면이 너무 늦게 읽힌다」).
+         첨부는 메일 열기(readMailMessage)와 «다른 함수 = 다른 그릇»이라 따뜻하게 두기가 안 닿았다 —
+         실측 MB_TIME connect 428~542ms · reused:false · 전체 약 2초. 서명 붙은 두드림만 문지기 앞에서 받는다. */
+      .https.onRequest((req, res) => warmAsked(req) ? warmReply(req, res) : gate(req, res, async () => {
         const b = req.body || {};
         const slug = String(b.slug || '');
         const uid = String(b.uid || '');
