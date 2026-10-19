@@ -16478,6 +16478,13 @@ var CLINIC_PLAN_STATUS = ['consult','review','negotiate','confirmed','signed','p
 /* 「미수행 종료」 — 컨설팅을 하지 않고 끝난 건(대표 지시 2026-10-04). 이 사유면 수행 건수·일수에서 뺀다.
    ⚠ 다른 사유(계약 해지·중도 해지 등)는 «했는지 안 했는지»를 말하지 않으므로 그대로 센다. */
 var CLINIC_SKIP_REASON = '미수행 종료';
+/* 📈 「성과추적관리」 — 중진공 현장클리닉 가운데 «성과추적관리»로 신청된 건 (대표 지시 2026-10-19
+   「성과추적관리 사업의 경우 년간 수행일수에 포함되지 않는다 … 체크표시 할 수 있게 하고 카운팅에 들어가지 않게」).
+   계약·컨설팅 기록의 perfTrack:true 로 표시한다 — 사람이 체크하거나, 중진공 「신청경로」 칸 글자가 정확히 이 글자일 때.
+   ★ 셈에서만 뺀다 — 기록·일수·금액은 그대로 두고, 목록에는 «성과추적 · 셈 제외» 꼬리표로 남긴다(숨기지 않는다).
+   ★ 현장클리닉 사업의 표시다 — 유형이 현장클리닉이 아니면 켜져 있어도 셈에 손대지 않는다(기술보호와 합치지 않는다). */
+var CLINIC_PERF_ROUTE = '성과추적관리';
+function clinicIsPerf(rec, code, types){ return !!(rec && rec.perfTrack) && clinicIsType(code, types); }
 function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnits){
   var out = { total:{ days:0, cnt:0, est:0, planDays:0, planCnt:0 }, by:{} };
   if(!fy) return out;
@@ -16485,10 +16492,10 @@ function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnit
   var isType = isTypeFn || clinicIsType;
   function inFy(d){ d = String(d || '').slice(0, 10); return !!d && d >= fy.start && d <= fy.end; }
   /* done = 끝난 건(컨설팅관리 표에는 안 나오고 「📦 종료 보기」에 나온다) · odd = 일수와 금액이 안 맞는 건 · zero = 일수를 못 셈
-     skip = 「미수행 종료」로 빼낸 건 · check = 사람이 한 번 봐야 할 건(아래) */
+     skip = 「미수행 종료」로 빼낸 건 · perf = 📈 성과추적관리로 빼낸 건(수행·예정 모두) · check = 사람이 한 번 봐야 할 건(아래) */
   /* rows = 그 사람의 건 목록(계약관리 «담당자별 한 해 목록»용) — 번호·업체·구분·시작일·일수만. 금액은 넣지 않는다(대표 2026-10-05). */
-  function slot(sid){ return out.by[sid] || (out.by[sid] = { sid:sid, days:0, cnt:0, est:0, planDays:0, planCnt:0, done:0, skip:0, odd:[], zero:[], rows:[] }); }
-  out.total.done = 0; out.total.skip = 0; out.total.odd = []; out.total.zero = [];
+  function slot(sid){ return out.by[sid] || (out.by[sid] = { sid:sid, days:0, cnt:0, est:0, planDays:0, planCnt:0, done:0, skip:0, perf:0, odd:[], zero:[], rows:[] }); }
+  out.total.done = 0; out.total.skip = 0; out.total.perf = 0; out.total.odd = []; out.total.zero = [];
   out.check = [];
   (items || []).forEach(function(c){
     if(!c || c._deleted || !c.managerMain) return;
@@ -16499,6 +16506,12 @@ function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnit
       return;
     }
     var r = clinicDaysOf(c, dayFeeOf ? dayFeeOf(c.typeCode) : 0, maxUnits), s = slot(c.managerMain);
+    /* 📈 성과추적관리 — 건수·일수·「⚠ 확인 필요」에서 모두 뺀다. 목록에는 일수와 함께 «셈 제외»로 남긴다. */
+    if(clinicIsPerf(c, c.typeCode, types)){
+      s.perf++; out.total.perf++;
+      s.rows.push({ id:c.id, no:c.no || c.id, co:c.companyName || '', start:String(c.startDate || '').slice(0, 10), st:'perf', days:r.days, est:r.est });
+      return;
+    }
     s.rows.push({ id:c.id, no:c.no || c.id, co:c.companyName || '', start:String(c.startDate || '').slice(0, 10),
       st: c.status === 'closed' ? 'end' : 'do', days:r.days, est:r.est, feeDays:r.feeDays });
     /* ⚠ 확인 필요 — 끝났는데 ① 종료 사유가 없거나 ② 일수를 아무도 안 적어 금액으로만 짐작한 건.
@@ -16522,6 +16535,12 @@ function clinicDayCards(items, contracts, types, fy, dayFeeOf, isTypeFn, maxUnit
     if(!isType((k.typeCodes || {}).consulting, types)) return;
     if(!inFy(k.startDate || k.signDate)) return;
     var d = parseInt(k.consultDays, 10) || 0, s = slot(k.managerMain);
+    if(clinicIsPerf(k, (k.typeCodes || {}).consulting, types)){
+      s.perf++; out.total.perf++;
+      s.rows.push({ id:k.id, no:k.contractNo || k.id, co:k.companyName || (k.company && k.company.name) || '',
+        start:String(k.startDate || k.signDate || '').slice(0, 10), st:'perf', days:d });
+      return;
+    }
     s.planCnt++; s.planDays += d;
     s.rows.push({ id:k.id, no:k.contractNo || k.id, co:k.companyName || (k.company && k.company.name) || '',
       start:String(k.startDate || k.signDate || '').slice(0, 10), st:'plan', days:d });
@@ -20337,6 +20356,7 @@ function erpBlankContractForm(){
        dayCalc 는 «어떻게 나온 숫자인지»를 남긴다 — 나중에 「이 1,155,000 어디서 왔나」에 답한다. */
     consultDays:0,
     dayCalc:null,                       // {dayFee, days, net, vat, total}
+    perfTrack:false,                    // 📈 현장클리닉 성과추적관리 — 연간 수행일수·건수 셈에서 뺀다(2026-10-19)
     payerName:'',                       // 입금자(예금주) — 업체명과 다르게 입금될 때만 사용
     vatType:'separate',                 // 'separate'(별도) | 'inclusive'(포함)
     journals:[],                        // 활동 일지 [{id, date, by, content}]
@@ -24838,6 +24858,8 @@ function transferContract(contract, opt){
          「3일이라는데 지금 3회차가 맞나」를 알린다. 컨설팅에만 뜻이 있다. */
       consultDays: (kindV === 'consulting') ? (parseInt(contract.consultDays, 10) || 0) : 0,
       dayCalc: (kindV === 'consulting' && contract.dayCalc) ? contract.dayCalc : null,
+      /* 📈 성과추적관리 표시도 함께 — 안 넘기면 이관하는 순간 연간 셈에 다시 들어간다(대표 지시 2026-10-19) */
+      perfTrack: kindV === 'consulting' && !!contract.perfTrack,
       status: 'pending',
       brief: brief,                               // 업무 요약 — 계약에서 승계
       personalDeposit: !!contract.personalDeposit, // 👤 개인입금 승계 — 안 넘기면 입금확정이 못 본다
@@ -25591,6 +25613,7 @@ function ContractManagement(props){
         + (sm.region ? '\n컨설팅지역 ' + sm.region : '')
         + (sm.workers ? ' · 상시근로자 ' + sm.workers + '명' : '')
         + (sm.sales ? ' · 매출 ' + sm.sales : '')
+        + (sm.route ? '\n신청경로 「' + sm.route + '」' : '')
         + (ty ? '\n유형 「' + (ty.name || '') + '」 으로 등록했습니다' : '');
     }
     return form;
@@ -25604,6 +25627,12 @@ function ContractManagement(props){
        예정 일수는 이관 전 현장클리닉의 «예정»으로 셈에 들어간다(clinicDayCards ③). */
   function ctReqHumanFill(form, req){
     if(!req || req.source !== 'smes') return form;
+    /* 📈 중진공 «신청경로» 칸이 「성과추적관리」면 표시를 켠다(대표 지시 2026-10-19).
+       ⚠ 칸 글자가 «정확히» 같을 때만 — 「성과추적」이 들어 있다고 켜지 않는다(이름 짐작 금지). 띄어쓰기만 무시한다. */
+    if(String((req.smes || {}).route || '').replace(/\s+/g, '') === CLINIC_PERF_ROUTE){
+      form.perfTrack = true;
+      form.note = (form.note ? form.note + '\n' : '') + '📈 성과추적관리 — 연간 수행일수·건수 셈에서 뺍니다';
+    }
     var d = String(req.startDate || '');
     if(/^\d{4}-\d{2}-\d{2}$/.test(d)){ form.signDate = d; form.startDate = d; }
     var nd = parseInt(req.consultDays, 10) || 0;
@@ -69571,8 +69600,10 @@ function clinicContractHint(f, types){
   var r = clinicDayCards(dbGet('consultings', []), others, types, fy, consTypeDayFee, prog.isType, prog.max);
   var s = r.by[f.managerMain] || { cnt:0, days:0, planCnt:0, planDays:0 };
   var mine = parseInt(f.consultDays, 10) || 0;
-  return { prog:prog, fyYear:fy.year, cnt:s.cnt, days:s.days, planCnt:s.planCnt, planDays:s.planDays,
-    nextCnt: s.cnt + s.planCnt + 1, nextDays: s.days + s.planDays + mine };
+  /* 📈 이 계약이 성과추적관리면 «이 계약까지»에 더하지 않는다 — 셈에 안 드는 계약이다(대표 지시 2026-10-19) */
+  var perf = clinicIsPerf(f, code, types);
+  return { prog:prog, fyYear:fy.year, cnt:s.cnt, days:s.days, planCnt:s.planCnt, planDays:s.planDays, perf:perf,
+    nextCnt: s.cnt + s.planCnt + (perf ? 0 : 1), nextDays: s.days + s.planDays + (perf ? 0 : mine) };
 }
 /* ⚠ 현장클리닉 확인 필요 (대표 지시 2026-10-04 「날짜와 진행 일수가 안 맞다 · 수행 안 하고 종료된 것도」 →
    목업 + 「담당자들이 정부사업일정에 사진이나 일정 안 넣고 진행하는 경우도 많다 — 반영해라」).
