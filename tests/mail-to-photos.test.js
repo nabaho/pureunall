@@ -137,7 +137,8 @@ test('묵은 것은 «없는 것»으로 친다 — 반나절 지난 열쇠', as
 
 test('★ 메일함의 「→ 사진첩」이 통로와 공용 이동층을 쓴다 (창은 하나)', () => {
   const 카드 = 읽기('pu-cards.html');
-  assert.match(카드, /onclick="mbAttToPhoto\(/, '첨부 줄에 사진첩 단추가 없다');
+  /* 2026-10-20: 첨부 줄의 단추가 「보내기 ▾」 메뉴 안으로 들어갔다 — 메뉴를 닫고 부른다 */
+  assert.match(카드, /onclick="(?:mbAttMenuClose\(\);)?mbAttToPhoto\(/, '첨부 줄에 사진첩 단추가 없다');
   const 시작 = 카드.indexOf('function mbAttToPhoto');
   assert.ok(시작 > 0, 'mbAttToPhoto 가 없다');
   /* 함수 몸만 떼어 본다 — 뒤에 붙은 다른 함수까지 보면 「있는 것처럼」 보인다 */

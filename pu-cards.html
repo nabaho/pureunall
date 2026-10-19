@@ -1162,22 +1162,43 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dm-search input{flex:1;min-width:0;border:none;outline:none;font-family:inherit;font-size:13px;
   color:#000000;background:none;padding:0}
 .dm-search input:focus{outline:none;box-shadow:none;border:none}
-/* 첨부 한 개 = 내려받기 + 급여데이터함으로. 둘을 «붙여» 한 덩이로 보이게 한다 —
-   떨어뜨려 두면 어느 첨부의 단추인지 헷갈린다(첨부가 여럿일 때 실제로 그렇다). */
-.atts .attone{display:inline-flex;align-items:stretch;margin:0 6px 6px 0}
-.atts .attone .topay{border-left:none;border-radius:0 6px 6px 0;
-  color:#166534;background:#f8fafc;border-color:#bbf7d0;font-size:12px}
-.atts .attone .topay:hover{background:#bbf7d0}
-.atts .attone>button:first-child{border-radius:6px 0 0 6px;margin:0}
-/* 👁 미리보기 — 가운데 칸. 못 그리는 종류는 «흐린 채로» 남긴다(감추지 않는다) */
-.atts .attone .peek{border-left:none;border-right:none;border-radius:0;
-  color:#1e40af;background:#f8fafc;font-size:12px;font-weight:600}
-.atts .attone .peek:hover{background:#bfdbfe}
-/* ⚠ 흐리게 두되 «읽히게» 둔다 — #94a3b8 을 흰 바탕에 얹으면 2.6:1 이라 안 읽힌다
-   (tests/color-palette-apps.test.js 가 그 자리에서 잡았다). 못 누른다는 것은
-   굵기·손 모양·hover 없음이 말한다. */
-.atts .attone .peek.off{color:#64748b;font-weight:400;cursor:default;background:#fff}
-.atts .attone .peek.off:hover{background:#fff}
+/* ══ 첨부 — «한 파일 = 한 줄» (대표 승인 목업 2026-10-20 「목업대로」, 다음메일 모양) ══
+   예전에는 첨부 하나가 단추 다섯(내려받기·미리보기·급여데이터함·기업별 계약서·사진첩)이라 파일마다
+   두 줄로 꺾이고, 어느 것이 «받기»인지 눈에 안 들어왔다. 이제 ⬇ 가 내려받기, 이름 옆에 크기,
+   「미리보기」는 글자 링크, 담는 길 셋은 「보내기 ▾」 하나로 접는다(기능은 그대로 다 남는다).
+   ⚠ 한 줄이다 — 이름이 길면 …로 자르고 title 에 전문. 줄바꿈은 폰 폭(.dmr)에서만 허락한다. */
+.atts .atthd{display:flex;align-items:center;gap:8px;padding:4px 0 6px;font-size:13px;color:#1e293b}
+.atts .atthd b{font-weight:800}
+.atts .atthd .sz{color:#64748b}
+.atts .atthd .all{border:0;background:none;color:#1e40af;font-family:inherit;font-size:13px;cursor:pointer;padding:0}
+.atts .atthd .all:hover{text-decoration:underline}
+.atts .attrow{display:flex;align-items:center;gap:8px;padding:4px 0;white-space:nowrap;position:relative;font-size:13px}
+.atts .attrow .dl{flex:none;width:24px;height:24px;padding:0;border:1px solid #cbd5e1;border-radius:4px;
+  background:#fff;color:#1e293b;cursor:pointer;line-height:1;font-size:13px;font-family:inherit}
+.atts .attrow .dl:hover{background:#e2e8f0}
+.atts .attrow .ic{flex:none;width:20px;text-align:center}
+.atts .attrow .nm{min-width:0;overflow:hidden;text-overflow:ellipsis;color:#1e293b;cursor:pointer}
+.atts .attrow .nm:hover{text-decoration:underline}
+.atts .attrow .z{flex:none;color:#64748b;font-size:12.5px}
+/* 👁 미리보기 — 글자 링크. 못 그리는 종류는 «흐린 채로» 남긴다(감추지 않는다).
+   ⚠ 흐리게 두되 «읽히게» 둔다 — #94a3b8 을 흰 바탕에 얹으면 2.6:1 이라 안 읽힌다
+     (tests/color-palette-apps.test.js 가 그 자리에서 잡았다). 못 누른다는 것은 색·손 모양이 말한다. */
+.atts .attrow .peek{flex:none;border:0;background:none;padding:0 2px;font-family:inherit;font-size:12.5px;
+  color:#1e40af;cursor:pointer}
+.atts .attrow .peek:hover{text-decoration:underline}
+.atts .attrow .peek.off{color:#64748b;cursor:default;text-decoration:none}
+.atts .attrow .sp{flex:1}
+.atts .attrow .send{flex:none;border:1px solid #bfdbfe;background:#fff;color:#1e40af;border-radius:12px;
+  padding:1px 10px;font-family:inherit;font-size:12px;cursor:pointer}
+.atts .attrow .send:hover{background:#eff6ff}
+.atts .attmenu{display:none;position:absolute;right:0;top:100%;z-index:20;background:#fff;
+  border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 6px 18px rgba(15,23,42,.12);
+  padding:4px;min-width:250px;white-space:normal}
+.atts .attmenu.open{display:block}
+.atts .attmenu button{display:block;width:100%;text-align:left;border:0;background:none;padding:7px 10px;
+  border-radius:6px;cursor:pointer;font-family:inherit;font-size:13px;color:#1e293b}
+.atts .attmenu button:hover{background:#eff6ff}
+.atts .attmenu small{display:block;color:#64748b;font-size:11.5px;margin-top:1px}
 /* 「본문까지 찾기」 — 찾는 말이 있을 때만 나온다(대표 결정 2026-08-30) */
 .dm-findbtn{height:32px;padding:0 11px;margin-left:8px;border:1px solid #bfdbfe;
   border-radius:4px;background:#f8fafc;color:#1e40af;font-size:12.5px;font-weight:600;cursor:pointer}
@@ -1636,10 +1657,7 @@ table.mstab2 tr:last-child td{border-bottom:none}
   border-top:1px solid #e2e8f0;border-bottom:1px solid #e2e8f0;padding:10px 2px}
 .dm-read .meta b{color:#1e293b;font-weight:700}
 .dm-read .meta .addr{font-style:normal;color:#94a3b8;font-size:11.5px;margin-left:4px}
-.dm-read .atts{display:flex;flex-wrap:wrap;gap:7px;padding:11px 2px 0}
-.dm-read .atts button{font-family:inherit;font-size:12px;color:#1e293b;background:#f8fafc;
-  border:1px solid #e2e8f0;border-radius:4px;padding:5px 10px;cursor:pointer}
-.dm-read .atts button:hover{background:#e2e8f0}
+.dm-read .atts{display:block;padding:8px 2px 4px;border-top:1px solid #e2e8f0}
 .dm-read .body{padding:16px 2px;font-size:13.5px;line-height:1.75;color:#000000;
   word-break:break-word;overflow-x:auto}
 .dm-read .body img{max-width:100%;height:auto}
@@ -1747,19 +1765,18 @@ table.mstab2 tr:last-child td{border-bottom:none}
 .dmr .dm-read .dm-hint>span{white-space:nowrap;margin-right:0}
 .dmr .dm-read h3{font-size:17px;line-height:1.4;margin:8px 0 10px}
 .dmr .dm-read .body{padding-left:0;padding-right:0}
-/* 첨부 한 개 = «카드 한 장» — 위에 파일 이름(통째로), 아래에 단추들(가로, 줄이 넘치면 다음 줄).
-   PC 는 한 덩이 막대(내려받기+미리보기+담기)지만 폰 폭에서는 칸이 좁아 글자가 세로로 쌓였다. */
-.dmr .dm-read .atts{flex-direction:column;gap:8px;padding:10px 0 0}
-.dmr .dm-read .atts .attone{display:flex;flex-wrap:wrap;gap:6px;margin:0;padding:10px;
-  border:1px solid #e2e8f0;border-radius:10px;background:#f8fafc}
-.dmr .dm-read .atts .attone>button:first-child{flex:1 0 100%;text-align:left;border:0;background:none;
-  padding:0 0 4px;border-radius:0;font-size:13px;line-height:1.45;color:#1e293b;word-break:break-all}
-.dmr .dm-read .atts .attone .peek,
-.dmr .dm-read .atts .attone .topay{flex:1 1 auto;margin:0;border:1px solid #cbd5e1;border-radius:8px;
-  padding:8px 10px;font-size:12.5px;white-space:nowrap;background:#fff}
-.dmr .dm-read .atts .attone .peek{color:#1e40af;border-color:#bfdbfe}
-.dmr .dm-read .atts .attone .peek.off{color:#64748b;border-color:#e2e8f0}
-.dmr .dm-read .atts .attone .topay{color:#166534;border-color:#bbf7d0}
+/* 첨부 한 개 = «두 줄» — 첫 줄은 ⬇·그림·이름(통째로), 아래 줄에 크기·미리보기·보내기 ▾ (대표 승인 목업 2026-10-20).
+   PC 는 한 줄이지만 폰 폭에서는 이름이 잘려 무슨 파일인지 모른다 — 폰에서만 줄바꿈을 허락한다. */
+.dmr .dm-read .atts{padding:10px 0 4px}
+.dmr .dm-read .atts .attrow{flex-wrap:wrap;white-space:normal;row-gap:3px;padding:6px 0}
+.dmr .dm-read .atts .attrow .nm{flex:1 1 calc(100% - 60px);white-space:normal;overflow-wrap:anywhere;
+  overflow:visible;line-height:1.45}
+.dmr .dm-read .atts .attrow .z,
+.dmr .dm-read .atts .attrow .peek,
+.dmr .dm-read .atts .attrow .send{white-space:nowrap}
+.dmr .dm-read .atts .attrow .sp{display:none}
+.dmr .dm-read .atts .attrow .send{margin-left:auto;padding:5px 12px;font-size:12.5px}
+.dmr .dm-read .atts .attrow .peek{padding:5px 6px;font-size:13px}
 /* 읽는 동안 떠다니는 🏠·즐겨찾기·백업·「새 버전」을 비켜 둔다 — 본문 글자를 덮는다. 목록으로 나가면 도로 나온다(.dmm 엔 안 건다).
    ⚠ 같은 자리에서 쓰는 방식은 위 «시트가 떠 있는 동안» 과 같다 */
 body:has(.dmr) [data-pu-appbar-btn],
@@ -28201,6 +28218,106 @@ function taxSaveHtml(){
   </div>`;
 }
 
+/* ══════ 첨부 «한 파일 = 한 줄» (대표 승인 목업 2026-10-20 「목업대로」) ══════
+   ★ 다음메일처럼 — ⬇ 내려받기 · 종류 그림 · 이름 · 크기 · 미리보기 링크 · 「보내기 ▾」.
+     급여데이터함·기업별 계약서·사진첩은 단추 셋 대신 「보내기 ▾」 하나로 접는다. 기능은 그대로.
+   ⚠ 못 그리는 파일에는 «흐린 「미리보기 없음」»을 둔다 — 감추면 「왜 어떤 것은 있고 어떤 것은 없지」가 된다.
+   ⚠ 「모두저장」은 첨부를 «하나의 zip»으로 묶어 한 번에 받는다 — 파일을 여러 번 받으면 브라우저가
+     「여러 파일 다운로드 — 차단/허용」을 묻고, 「차단」을 누르면 그 주소로 영영 못 받는다
+     (browser-blocks-second-download). 지난 메일(POP3)은 첨부마다 메일 «통째»를 다시 받아야 해 넣지 않는다.
+   ⚠ 첨부가 하나뿐이면 「모두저장」은 숨긴다. */
+function mbAttIcon(name, mime){
+  const k = mbPvKind(name, mime);
+  const e = mbPvExt(name);
+  if(k === 'img') return '🖼';
+  if(k === 'xls') return '📊';
+  if(k === 'pdf' || k === 'doc' || k === 'txt') return '📄';
+  if(/^(zip|alz|7z|rar|tar|gz)$/.test(e)) return '🗜';
+  return '📎';
+}
+function mbAttsHtml(o){
+  const atts = o.atts || [];
+  const old = String(o.slug||'') === MB_OLD_ID;
+  const total = atts.reduce((n,a)=>n + Number((a&&a.size)||0), 0);
+  const all = (atts.length >= 2 && !old)
+    ? `<button type="button" class="all" onclick="mbAttAll()" title="첨부를 하나의 zip 으로 묶어 한 번에 받습니다">모두저장</button>` : '';
+  const rows = atts.map((a,i)=>{
+    const can = mbPvKind(a.name, a.mime);
+    const nm = esc(a.name||'첨부');
+    return `<div class="attrow">
+      <button type="button" class="dl" onclick="mbAtt(${i})" title="내려받기">⬇</button>
+      <span class="ic">${mbAttIcon(a.name, a.mime)}</span>
+      <span class="nm" onclick="mbAtt(${i})" title="${nm}">${nm}</span>
+      ${a.size ? `<span class="z">${fmtMB(a.size)}</span>` : ''}
+      ${can ? `<button class="peek" onclick="mbAttPeek(${i})" onmouseenter="mbAttPeekHover(${i})" onmouseleave="mbAttPeekHoverCancel()" ontouchstart="mbAttPeekHover(${i})"
+          title="내려받지 않고 «열지도 않고» 무엇인지만 봅니다 — 한글·워드는 글자만 뽑아 그립니다">미리보기</button>`
+            : `<button class="peek off" disabled
+          title="이 종류는 브라우저가 못 그립니다 — 내려받아 여시거나 「보내기」로 담으십시오">미리보기 없음</button>`}
+      <span class="sp"></span>
+      <button type="button" class="send" onclick="mbAttMenu(${i}, event)" title="이 첨부를 다른 곳으로 담습니다">보내기 ▾</button>
+      <div class="attmenu" id="mbAttMenu${i}" onclick="event.stopPropagation()">
+        <button type="button" onclick="mbAttMenuClose();mbAttToPay(${i})"
+          title="급여데이터함 «대기 칸»으로 담습니다 — 사업장·귀속월은 거기서 고르십니다">→ 급여데이터함<small>급여데이터함 «대기 칸»으로 담습니다</small></button>
+        <button type="button" onclick="mbAttMenuClose();mbAttToCo(${i})"
+          title="받은 계약서·서명본을 그 회사 «기업별 계약서»에 🔒 서명본으로 담습니다 — 회사·종류·날짜는 확인 창에서 고르십니다">→ 기업별 계약서<small>받은 계약서·서명본을 그 회사 계약서 칸에</small></button>
+        <button type="button" onclick="mbAttMenuClose();mbAttToPhoto(${i})"
+          title="사진첩으로 담습니다 — 사업자등록증·명함이면 거기서 판독해 「📇 기업정보함으로」 보낼 수 있습니다">→ 사진첩<small>사업자등록증·명함이면 판독해 기업정보함으로</small></button>
+      </div>
+    </div>`;
+  }).join('');
+  return `<div class="atts"><div class="atthd">📎 <b>첨부파일 ${atts.length}개</b>${total ? ` <span class="sz">(${fmtMB(total)})</span>` : ''} ${all}</div>${rows}</div>`;
+}
+/* 「보내기 ▾」 — 한 번에 하나만 열린다. 바깥을 누르면 닫힌다(문서에 한 번만 건다). */
+function mbAttMenuClose(){
+  try{ document.querySelectorAll('.atts .attmenu.open').forEach(e=>e.classList.remove('open')); }catch(_){ }
+}
+function mbAttMenu(i, ev){
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  const m = document.getElementById('mbAttMenu' + i);
+  const was = !!(m && m.classList.contains('open'));
+  mbAttMenuClose();
+  if(m && !was) m.classList.add('open');
+}
+try{ document.addEventListener('click', mbAttMenuClose); }catch(_){ }
+/* 「모두저장」 — 한 통의 첨부를 zip 하나로 묶어 «한 번에» 받는다 */
+const MB_ATT_ALL_WARN = 50 * 1024 * 1024;
+let _mbAttAllBusy = false;
+function mbAttAll(){
+  const o = state.mbOpen || {}; const atts = o.atts || [];
+  if(atts.length < 2 || _mbAttAllBusy) return;
+  if(String(o.slug||'') === MB_OLD_ID) return toast('지난 메일은 첨부를 하나씩 받아 주세요', 6000);
+  const total = atts.reduce((n,a)=>n + Number((a&&a.size)||0), 0);
+  if(total > MB_ATT_ALL_WARN && !confirm('첨부가 모두 ' + fmtMB(total) + ' 입니다.\n묶어 받는 데 오래 걸립니다. 그래도 받으시겠습니까?')) return;
+  _mbAttAllBusy = true;
+  toast('첨부 ' + atts.length + '개를 가져오고 있습니다…', 4000);
+  const used = {};
+  const uniq = (n)=>{
+    let name = String(n||'첨부'); let k = name; let c = 1;
+    while(used[k]){ const m = name.match(/^(.*?)(\.[^.]*)?$/); k = (m[1]||name) + ' (' + (++c) + ')' + (m[2]||''); }
+    used[k] = 1; return k;
+  };
+  const uid = String(o.uid);
+  mbPvLib('vendor/jszip.min.js?v=1', ()=>!!window.JSZip)
+    .then(async ()=>{
+      const zip = new JSZip();
+      for(let i=0;i<atts.length;i++){            /* 차례로 — 서버 그릇을 한꺼번에 깨우지 않는다 */
+        const buf = await mbAttBytes(o, i, atts[i]);
+        zip.file(uniq(atts[i].name), buf);
+      }
+      return zip.generateAsync({ type:'blob' });
+    })
+    .then(blob=>{
+      const url = URL.createObjectURL(blob);
+      const el = document.createElement('a');
+      el.href = url; el.download = '첨부파일(' + atts.length + '개).zip';
+      document.body.appendChild(el); el.click();
+      puExport('mail-att', atts.length, '메일 첨부 모두저장 · ' + atts.length + '개');
+      setTimeout(()=>{ URL.revokeObjectURL(url); el.remove(); }, 1500);
+      toast('📥 첨부 ' + atts.length + '개를 zip 하나로 내려받았습니다');
+    })
+    .catch(e=>toast('모두 받지 못했습니다 — ' + ((e&&e.message)||e), 8000))
+    .then(()=>{ _mbAttAllBusy = false; });
+}
 /* 📦 큰 지난 메일 — 글 앞부분만 먼저 보인 것을 말하고, 통째로 받는 단추를 둔다 (2026-10-10)
    다음메일 옛 메일 받기(POP3)는 1초에 60KB 쯤이라 12MB 가 195초다. 그래서 글(맨 앞)만 먼저 보여 준다.
    ⚠ 첨부 목록도 앞부분에서 «보인 것까지만»이다 — 전체를 받으면 완전해진다. */
@@ -28339,20 +28456,7 @@ function mbReadHtml(){
     ${/* ── 👁 미리보기 (대표 승인 목업 2026-09-05) ──
          ⚠ 못 그리는 파일에는 «흐린 단추»를 둔다. 감추면 「왜 어떤 것은 있고 어떤 것은
            없지」가 되고, 켜 두면 눌러 놓고 아무 일도 안 일어난다. */''}
-    ${(o.atts&&o.atts.length) ? `<div class="atts">${o.atts.map((a,i)=>{
-      const can = mbPvKind(a.name, a.mime);
-      return `<span class="attone"><button onclick="mbAtt(${i})" title="내려받기">📎 ${esc(a.name||'첨부')}${a.size?' · '+fmtMB(a.size):''}</button>
-        ${can ? `<button class="peek" onclick="mbAttPeek(${i})" onmouseenter="mbAttPeekHover(${i})" onmouseleave="mbAttPeekHoverCancel()" ontouchstart="mbAttPeekHover(${i})"
-            title="내려받지 않고 «열지도 않고» 무엇인지만 봅니다 — 한글·워드는 글자만 뽑아 그립니다">👁 미리보기</button>`
-              : `<button class="peek off" disabled
-            title="이 종류는 브라우저가 못 그립니다 — 내려받아 여시거나 급여데이터함으로 담으십시오">미리보기 없음</button>`}
-        <button class="topay" onclick="mbAttToPay(${i})"
-          title="급여데이터함 «대기 칸»으로 담습니다 — 사업장·귀속월은 거기서 고르십니다">→ 급여데이터함</button>
-        <button class="topay" onclick="mbAttToCo(${i})"
-          title="받은 계약서·서명본을 그 회사 «기업별 계약서»에 🔒 서명본으로 담습니다 — 회사·종류·날짜는 확인 창에서 고르십니다">→ 기업별 계약서</button>
-        <button class="topay" onclick="mbAttToPhoto(${i})"
-          title="사진첩으로 담습니다 — 사업자등록증·명함이면 거기서 판독해 「📇 기업정보함으로」 보낼 수 있습니다">→ 사진첩</button></span>`;
-    }).join('')}</div>` : ''}
+    ${(o.atts&&o.atts.length) ? mbAttsHtml(o) : ''}
     ${/* ⚠ 여기 있던 「🖼 바깥에서 오는 그림 N개를 막았습니다 · 그림 보기」 띠를
          2026-09-06 에 없앴다 — 대표 지시 「자꾸 나온다」. 되살리지 말 것.
          까닭은 mbCleanHtml 의 그림 대목에 실측과 함께 적어 두었다(보낸이 185명). */''}

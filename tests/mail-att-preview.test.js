@@ -75,7 +75,9 @@ test('★★ 확장자가 없어도 «메일이 적어 온 종류»로 한 번 �
 });
 
 test('★★ 못 그리는 첨부에는 «흐린 단추»를 둔다 — 감추지도, 켜 두지도 않는다', () => {
-  const rd = sliceFn(app, 'function mbReadHtml(').replace(/\/\*[\s\S]*?\*\//g, ' ');
+  /* 2026-10-20: 첨부 줄 마크업이 mbReadHtml 안에서 mbAttsHtml 로 나왔다(다음메일 모양) — 둘 다 본다 */
+  const rd = (sliceFn(app, 'function mbReadHtml(') + '\n' + sliceFn(app, 'function mbAttsHtml(')).replace(/\/\*[\s\S]*?\*\//g, ' ');
+  assert.match(rd, /mbAttsHtml\(o\)/, '읽는 화면이 첨부 줄을 안 그립니다');
   assert.match(rd, /mbPvKind\(a\.name,\s*a\.mime\)/, '첨부 줄이 그릴 수 있는지 안 묻습니다');
   assert.match(rd, /미리보기 없음/, '못 그리는 것을 그냥 감춥니다 — 왜 없는지 알 길이 없습니다');
   assert.match(rd, /peek off[\s\S]{0,80}disabled/,
