@@ -18,7 +18,8 @@ const C = rd('pu-cards.html'), D = rd('docs-esign.html');
 const S = stripJs(C);
 
 test('ⓐ 단추 — 첨부 줄과 미리보기 창 모두에 「→ 기업별 계약서」', () => {
-  assert.ok((S.match(/onclick="mbAttToCo\(/g) || []).length >= 2, '첨부 줄·미리보기 창 두 곳에 단추가 있어야 합니다');
+  /* 2026-10-20: 첨부 줄의 단추가 「보내기 ▾」 메뉴 안으로 들어갔다 — 누르면 메뉴를 닫고 부른다(mbAttMenuClose();) */
+  assert.ok((S.match(/onclick="(?:mbAttMenuClose\(\);)?mbAttToCo\(/g) || []).length >= 2, '첨부 줄·미리보기 창 두 곳에 단추가 있어야 합니다');
 });
 test('ⓐ 가져오기는 내려받기와 같은 길 — 새 서버 함수 없음', () => {
   const f = cutFn(S, 'function mbAttFetch(');

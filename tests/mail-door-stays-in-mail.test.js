@@ -94,15 +94,16 @@ test('★ ② 읽기 덮개의 맨 위 «한 줄»(‹ 목록 · ▲ · ▼)만 
 });
 
 /* ── ②-1 첨부는 «카드 한 장» ── */
-test('★★ ②-1 폰 읽기의 첨부는 카드 — 파일 이름 «통째로», 단추는 가로로 넘친 줄은 다음 줄로 (글자가 세로로 쌓이지 않는다)', () => {
-  const card = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attone$/);
-  assert.ok(card.some((x) => /display:flex/.test(x.body) && /flex-wrap:wrap/.test(x.body)),
-    '★★ 첨부 칸이 줄바꿈하는 카드가 아닙니다 — 좁은 폰 폭에서 「미 리 보 기」처럼 글자가 세로로 쌓입니다');
-  const name = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attone>button:first-child$/);
-  /* rules() 는 공백을 걷어 내므로 「flex:1 0 100%」는 「flex:10100%」로 읽힌다 */
-  assert.ok(name.some((x) => /flex:10100%|flex-basis:100%|width:100%/.test(x.body)),
-    '파일 이름이 한 줄 전체를 쓰지 않습니다 — 단추들과 한 줄에 눌려 4줄로 접힙니다');
-  const btn = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attone\s+\.(peek|topay)$/);
+test('★★ ②-1 폰 읽기의 첨부는 «두 줄» — 파일 이름 «통째로», 크기·미리보기·보내기는 아래 줄 (글자가 세로로 쌓이지 않는다)', () => {
+  /* 2026-10-20 다음메일 모양(한 파일 = 한 줄)으로 바꾸면서 카드(.attone)를 줄(.attrow)로 바꿨다.
+     PC 는 한 줄이지만 폰 폭에서는 이름이 잘려 무슨 파일인지 모른다 — 폰에서만 줄바꿈을 허락한다. */
+  const row = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attrow$/);
+  assert.ok(row.some((x) => /flex-wrap:wrap/.test(x.body)),
+    '★★ 첨부 줄이 줄바꿈하지 않습니다 — 좁은 폰 폭에서 이름이 …로 잘려 무슨 파일인지 모릅니다');
+  const name = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attrow\s+\.nm$/);
+  assert.ok(name.some((x) => /white-space:normal/.test(x.body) && /flex:11calc\(100%-\d+px\)|flex-basis:calc\(100%/.test(x.body)),
+    '파일 이름이 통째로 안 보입니다 — 단추들과 한 줄에 눌려 잘립니다');
+  const btn = rules(css, /^\.dmr\s+\.dm-read\s+\.atts\s+\.attrow\s+\.(z|peek|send)$/);
   assert.ok(btn.some((x) => /white-space:nowrap/.test(x.body)),
     '★★ 첨부 단추가 줄바꿈될 수 있습니다 — 글자가 한 글자씩 세로로 쌓입니다');
 });
