@@ -2029,6 +2029,24 @@ body.portal-mode #moreFab{display:flex;}
   var _portalUid = '';
   var _portalReady = false;
   var _authRecheckTimer = null;
+  /* 카카오 인증을 마친 탭의 바로 앞 방문기록은 외부 카카오 계정·동의 화면일 수 있다.
+     앱에서 포털로 돌아온 뒤 한 번 더 뒤로 가도 그 기록을 다시 밟지 않도록,
+     포털 안에만 한 걸음을 둔다. 이 표는 탭이 닫히면 사라지고 인증 정보가 아니다. */
+  var KK_HISTORY_GUARD_KEY = 'pu_kakao_portal_history_guard';
+  var _kkHistoryArmed = false;
+  function armKakaoPortalHistory(){
+    if(_kkHistoryArmed) return;
+    try {
+      if(sessionStorage.getItem(KK_HISTORY_GUARD_KEY) !== '1') return;
+      if(!(history.state && history.state.puKakaoPortalGuard))
+        history.pushState({puKakaoPortalGuard:1}, '', location.href);
+      _kkHistoryArmed = true;
+    } catch(_e){}
+  }
+  window.addEventListener('popstate', function(ev){
+    if(!_kkHistoryArmed || (ev.state && ev.state.puKakaoPortalGuard)) return;
+    try { history.pushState({puKakaoPortalGuard:1}, '', location.href); } catch(_e){}
+  });
   /* 모바일 저장소 복원 중 인증이 잠깐 비어도 로그인 화면으로 재진입하지 않는다.
      명시적인 로그아웃은 아래에서 지체 없이 처리하고, 그 외에는 화면을 가린 채 기다린다. */
   var AUTH_RECOVERY_MS = 15000;
@@ -2294,6 +2312,7 @@ body.portal-mode #moreFab{display:flex;}
           totalMs:Date.now()-kkStarted
         })); } catch(_t){}
         window.__kkReturning = false;   // 들어왔다 — 이제 스플래시는 포털이 걷는다
+        try { sessionStorage.setItem(KK_HISTORY_GUARD_KEY, '1'); } catch(_e){}
         kkMarkUsed();
         /* signIn 성공 결과를 이미 받았다. 인증 상태 알림이 한 번 더 올 때까지 기다리지 않고
            곧바로 포털을 연다(알림이 먼저 왔으면 _handled가 중복 진입을 막는다). */
@@ -2764,7 +2783,9 @@ body.portal-mode #moreFab{display:flex;}
     function go(){
       try { if(/^(pureun-|pu_)[\w-]+$/.test(String(t.name || ''))) window.name = t.name; } catch(e){}
       try { _loginGuard.cover(); } catch(e){}      // 떠나는 동안 로그인 화면이 비치지 않게
-      location.replace(to.href);
+      /* 포털 기록을 지우면 이 앱의 바로 앞 기록이 카카오 계정·동의 화면이 된다.
+         특히 다시 로그인한 앱 탭은 콜백 포털을 거치므로 반드시 한 걸음 남긴다. */
+      try { location.assign(to.href); } catch(e){ location.href = to.href; }
     }
     if(document.hidden){
       document.addEventListener('visibilitychange', function once(){
@@ -2799,6 +2820,7 @@ body.portal-mode #moreFab{display:flex;}
       renderPortal(m.acct, { email:(user.email||''), all:m.all, via:_via });
       $('portalView').style.display = 'block';
       _portalReady = true;
+      armKakaoPortalHistory();
       try {
         var timing = JSON.parse(sessionStorage.getItem('pu_kakao_last_timing') || 'null');
         if(_via === 'login' && timing && timing.totalMs && !timing.portalMs){
