@@ -146,6 +146,33 @@ test('X 로 닫은 층은 목록에서 빠진다 — 뒤로가기가 헛돌지 �
   assert.equal(ctx.간것 || 0, 0, '★ 카카오 방문기록으로 되돌아가면 안 됩니다');
 });
 
+test('카카오 로그인 뒤 포털에서 다시 뒤로 가도 외부 동의 화면으로 가지 않는다', () => {
+  const enter = 읽기('enter.html');
+  const start = enter.indexOf("var KK_HISTORY_GUARD_KEY =");
+  const end = enter.indexOf('/* 모바일 저장소 복원 중', start);
+  assert.ok(start > 0 && end > start, '포털의 카카오 방문기록 보호 코드를 못 찾았습니다');
+  assert.match(enter, /sessionStorage\.setItem\(KK_HISTORY_GUARD_KEY, '1'\)/,
+    '카카오 인증이 끝난 탭을 기억해야 합니다');
+  assert.match(enter, /_portalReady = true;\s*armKakaoPortalHistory\(\)/,
+    '포털을 다 그린 뒤 보호 걸음을 놓아야 합니다');
+  let pop = null, pushes = 0;
+  const history = { state: null, pushState(state) { this.state = state; pushes++; } };
+  const ctx = {
+    sessionStorage: { getItem() { return '1'; } }, history,
+    location: { href: 'https://example.test/enter.html' },
+    window: { addEventListener(name, fn) { if(name === 'popstate') pop = fn; } }
+  };
+  vm.createContext(ctx);
+  vm.runInContext(enter.slice(start, end), ctx);
+  ctx.armKakaoPortalHistory();
+  assert.equal(pushes, 1, '인증 뒤 포털에 한 걸음을 두어야 합니다');
+  history.state = null;
+  pop({ state: null });
+  assert.equal(pushes, 2, '뒤로 가기 후 카카오 기록을 밟기 전에 포털 걸음을 다시 놓아야 합니다');
+  pop({ state: history.state });
+  assert.equal(pushes, 2, '이미 보호된 기록에는 걸음을 중복해서 쌓지 않아야 합니다');
+});
+
 test('제 화면 기록을 쓴 걸음에는 비켜선다', () => {
   const { PuBack, 뒤로, ctx } = 판만들기();
   let 닫혔나 = 0;

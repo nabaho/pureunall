@@ -96,7 +96,8 @@ function portal(t, opt) {
     URL, JSON, Date, Number, String,
     sessionStorage: { getItem: (k) => (k in session ? session[k] : null), removeItem: (k) => { delete session[k]; } },
     location: { href: 'https://nabaho.github.io/pureunall/enter.html?v=1', origin: 'https://nabaho.github.io', pathname: '/pureunall/enter.html',
-      replace: (u) => { c._went = u; } },
+      assign: (u) => { c._went = u; c._navMode = 'assign'; },
+      replace: (u) => { c._went = u; c._navMode = 'replace'; } },
     document: { hidden: !!opt.hidden, addEventListener: (n, fn) => { if (n === 'visibilitychange') vis.push(fn); }, removeEventListener: (n, fn) => { const i = vis.indexOf(fn); if (i >= 0) vis.splice(i, 1); } },
     window: { name: 'pureun-portal' },
     auth: { currentUser: opt.current === undefined ? { uid: 'UID-A' } : opt.current },
@@ -114,6 +115,7 @@ test('②★ 같은 사람이 들어오면 하던 앱으로 돌아가고 창 이
   const c = portal(T());
   assert.equal(c._returnToApp({ uid: 'UID-A' }), true);
   assert.equal(c._went, 'https://nabaho.github.io/pureunall/pu-erp.html?sso=1#menu=fin/ledger');
+  assert.equal(c._navMode, 'assign', '포털 기록을 없애면 앱에서 뒤로 갈 때 카카오 동의 화면으로 갑니다');
   assert.equal(c.window.name, 'pureun-erp', '창 이름을 안 되돌리면 포털 타일이 같은 앱을 두 창으로 연다');
   assert.equal(c._covered, true, '떠나는 동안 로그인 화면이 비친다');
   assert.equal(c._session.pu_return_app, undefined, '표를 안 지우면 다음 로그인 때 또 끌려간다');
