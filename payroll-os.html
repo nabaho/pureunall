@@ -13,7 +13,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=73"></script>
+<script src="js/pu-ontology.js?v=74"></script>
 <script src="js/pu-pubdata.js?v=1"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-dnd.js?v=1"></script>
@@ -25,7 +25,7 @@
 <script src="js/pu-backup.js?v=2"></script>
 <script src="js/pu-labor-core.js?v=6"></script>
 <script src="js/pu-simpletax.js?v=1"></script>
-<script src="js/pu-site-staff.js?v=4"></script>
+<script src="js/pu-site-staff.js?v=5"></script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
 <script src="hwpx_gen.js?v=14"></script>
 <script src="hwpx_doc.js?v=2"></script>
@@ -3295,7 +3295,7 @@ function screenAttend() {
      계산은 전부 코어(LC.monthlyPayroll)가 한다. 화면은 표만 그린다.
      ⚠ 확정이 아니라 **미리보기**다. 급여 확정은 급여 처리 화면에서 사람이 한다. */
   var TT = taxTableFor(App.month);
-  /* '25.05 늘봄반찬' 같은 두 자리 연도 시트도 그 해 최저임금으로 본다. */
+  /* '25.05 새별반찬' 같은 두 자리 연도 시트도 그 해 최저임금으로 본다. */
   var mwY = laborYearOfMonth(App.month);
   var mwH = minWageOf(mwY);
   h2 += '<h2 style="margin:18px 0 8px;font-size:15px">근태 반영 급여 미리보기</h2>';

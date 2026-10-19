@@ -18,8 +18,8 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-check-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
-<script src="js/pu-ontology.js?v=73"></script>
-<script src="js/pu-kakao-work.js?v=1"></script>
+<script src="js/pu-ontology.js?v=74"></script>
+<script src="js/pu-kakao-work.js?v=2"></script>
 <script src="js/pu-ls-guard.js?v=4"></script>
 <script src="js/pu-big-store.js?v=3"></script>
 <script src="js/pu-ontology-write.js?v=6" data-mode="observe"></script>
@@ -5787,8 +5787,8 @@ var AL_CAT_WORDS=[
   ['사건', /구제신청|부당|괴롭힘|진정|사건|고충/]
 ];
 /* 보낸 주소 하나가 두 회사에 걸려 있을 때(같은 사무장·세무사무소) — 제목이 «한 회사만» 부르면 그 회사.
-   실측: 「대성피앤티도장_자문계약서 송부의 건」이 대성피앤티·제일산업 둘에 걸렸다.
-   ⚠ 회사 이름은 «통째로»(MLK_MIN_MATCH 자 이상) 나와야 한다. 둘 다 나오면(「정일제지,신화제지」) 그대로 둔다. */
+   실측: 「마루피앤티도장_자문계약서 송부의 건」이 마루피앤티·한빛산업 둘에 걸렸다.
+   ⚠ 회사 이름은 «통째로»(MLK_MIN_MATCH 자 이상) 나와야 한다. 둘 다 나오면(「소담제지,누리제지」) 그대로 둔다. */
 function alCoNarrow(ids,text){
   if(ids.length<2) return ids;
   var hay=_normCo(text), cos={};

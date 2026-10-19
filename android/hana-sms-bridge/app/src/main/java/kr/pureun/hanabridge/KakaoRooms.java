@@ -50,7 +50,7 @@ final class KakaoRooms {
         return out;
     }
 
-    /* 방 이름이 «정확히» 같을 때만 — 「천성」과 「천성가축약품」은 다른 곳이다. */
+    /* 방 이름이 «정확히» 같을 때만 — 「한솔」과 「한솔가축약품」은 다른 곳이다. */
     static boolean allowed(Context context, String room) {
         String r = KakaoNotice.normRoom(room);
         if (r.isEmpty()) return false;
