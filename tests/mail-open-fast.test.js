@@ -215,9 +215,10 @@ test('★★★ mailKeepWarm 은 서명을 붙여 readMailMessage 를 두드린�
   const 부름 = [];
   global.fetch = async (url, o) => { 부름.push({ url, o }); return { status: 200, json: async () => ({ ok: true }) }; };
   try { await api.mailKeepWarm(); } finally { global.fetch = 진짜; }
-  assert.equal(부름.length, 1, '★★★ 두드리지 않습니다');
+  /* 2026-10-19: 첨부 받기(readMailAttachment)도 «다른 그릇»이라 함께 두드린다 — 메일 열기가 첫째다 */
+  assert.ok(부름.length >= 1, '★★★ 두드리지 않습니다');
   assert.match(부름[0].url, /^https:\/\/asia-northeast3-[\w-]+\.cloudfunctions\.net\/readMailMessage$/, '★ 엉뚱한 곳을 두드립니다');
-  assert.equal(부름[0].o.headers['x-pu-warm'], sigOf('pw-secret'), '★★ 서명이 틀립니다 — 늘 403 입니다');
+  부름.forEach((x) => assert.equal(x.o.headers['x-pu-warm'], sigOf('pw-secret'), '★★ 서명이 틀립니다 — 늘 403 입니다'));
 });
 
 test('★★ 두드리는 사이가 «붙어 둔 연결을 버리는 잣대»보다 짧다 — 길면 매번 새로 붙는다', () => {
