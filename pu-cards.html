@@ -33,6 +33,9 @@
   var t = document.querySelector('meta[name=theme-color]'); if(t) t.content = '#1e40af';
   var i = document.querySelector('link[rel=icon]');
   if(i) i.href = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='80' font-size='80'>\uD83D\uDCE7</text></svg>";
+  /* 「이 창은 메일 문」 — mailview 는 화면(render)이 떼었다 붙이지만 이것은 «문»이라 떼지 않는다. 자료함·환경설정처럼
+     state.view 가 mail 이 아닌 화면에서도 머리줄 이름이 안 바뀐다. ⚠ 탭 그림 갈아 달기 «뒤»에 둔다(app-icons 검사가 그 앞뒤를 읽는다). */
+  document.documentElement.classList.add('maildoor');
 }catch(e){} })();
 </script>
 <script src="js/pu-hwp-engine.js?v=21"></script>
@@ -1707,6 +1710,32 @@ table.mstab2 tr:last-child td{border-bottom:none}
 @media(prefers-color-scheme:light){
   .dmm{--bg:#fff;--panel:#fff;--line:#e2e8f0;--ink:#000000;--sub:#1e293b;--dim:#64748b}
 }
+/* ══ 폰 메일 «읽기» — 목록(.dmm)과 «같은 전체 화면 틀» (대표 지적 2026-10-19) ══
+   「메일함에서 메일을 눌렀는데 왜 기업정보함으로 들어가서 화면이 바뀌냐」
+   ★ 왜 그랬나 — 목록(.dmm)은 화면을 통째로 덮는 앱 차림(검정 바탕·position:fixed)인데,
+     읽기 화면은 PC 것(.dm-read)을 «흐름 속에» 그려 그 «아래»에 깔렸다. 그래서 누르는 순간
+     덮개가 걷히며 기업정보함 머리줄(「기업정보함 · 이름 · 🔍🚪☰」)과 흰 바탕이 드러났다.
+   ★ 고친 결 — 읽기도 같은 덮개(.dmr)에 담는다. 머리줄이 안 드러나고, 돌아가는 길(‹ 목록)은
+     덮개 맨 위에 붙어 스크롤해도 따라온다. 본문은 남의 HTML 이라 흰 종이를 그대로 둔다.
+   ⚠ 목록(.dmm)과 z-index 를 «같게» 둔다 — 팝업(.mck-dim 70)·메뉴(80)가 그 위에 뜬다. */
+.dmr{position:fixed;inset:0;z-index:40;background:#fff;color:#1e293b;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  padding:0 12px calc(24px + env(safe-area-inset-bottom));
+  font-family:-apple-system,BlinkMacSystemFont,'Malgun Gothic','맑은 고딕',sans-serif}
+.dmr .dm-read{padding-top:0}
+.dmr .dm-read .rtop{position:sticky;top:0;z-index:3;background:#fff;
+  margin:0 -12px 6px;padding:calc(8px + env(safe-area-inset-top)) 12px 8px;
+  border-bottom:1px solid #e2e8f0}
+/* 오가는 길(‹ 목록 · ▲ · ▼ · 🖨)을 «첫 줄»로 — 이 메일에 하는 일(답장…)은 그 아래 옆으로 민다 */
+.dmr .dm-read .rtop .rgt{order:-1;margin-left:0;width:100%}
+/* ══ 메일 문의 머리줄 이름은 「푸른 메일」 (대표 지적 2026-10-19 「메일함인데 기업정보함이라고 뜬다」) ══
+   탭 제목·홈 화면 이름이 이미 「푸른 메일」이다 — 머리줄만 혼자 「기업정보함」이었다.
+   ⚠ 글자를 바꾸는 스크립트를 마크업 사이에 끼우지 않는다 — 2.7MB 를 다 읽을 때까지 이름이 틀린 채 보이고,
+     본문 마크업을 훑는 검사(cards-co-panel-layer)도 그 스크립트에서 끊긴다. <head> 가 붙이는 html.maildoor 로 한다.
+   ⚠ 「기업정보함」 글자는 마크업에 그대로 둔다(이름 검사·기업정보함 문). 여기서는 «보이는 것»만 바꾼다. */
+html.maildoor #appbar .logo{font-size:0}
+html.maildoor #appbar .logo::after{content:'푸른 메일';font-size:23px}
+@media(max-width:760px){ html.maildoor #appbar .logo::after{font-size:19px} }
 /* ── 맨 위 줄 ── */
 .dmm-top{display:flex;align-items:center;gap:4px;height:52px;flex:none;
   padding:0 6px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -8388,7 +8417,7 @@ function schedBoxHtml(){
     : `<tr><td colspan="6" class="none">예약해 둔 메일이 없습니다.</td></tr>`;
   return `
     <div class="mboxbar">
-      <button class="setback" onclick="closeMailPage()">← 목록으로</button>
+      <button class="setback" onclick="mailBack()">← 목록으로</button>
       <b>⏰ 예약한 메일</b>
       <span class="n">${rows.length}통</span>
       <span style="flex:1"></span>
@@ -8434,7 +8463,27 @@ function openSentBox(){ state.view='mail'; state.mailSent=true; render();
   /* 목록이 오면 왼쪽 폴더(갈래별·사람별 개수)도 함께 다시 그린다 — 한쪽만 그리면
      본문에는 20통인데 왼쪽은 0으로 남는다 */
   loadSentBox(()=>{ if(state.view==='mail' && state.mailSent){ renderPCSide(); renderMailPage(); } }); }
-function closeMailPage(){ state.view='list'; render(); }
+/* 「‹ 목록」 — «어느 문으로 들어왔나»에 따라 목록이 다르다 (대표 지적 2026-10-19).
+   · 기업정보함 문: 명함 목록(예전 그대로).
+   · 메일 문(?view=mail): 메일함. 명함 목록이 아니다 — 명함 목록으로 가면 머리줄·바탕이 기업정보함으로 바뀐다.
+   ⚠ 「기업정보함으로」 단추(서랍·옆줄)는 이 함수가 아니라 closeMailPage — 나가는 길은 따로 둔다. */
+function mailBack(){
+  if(urlWantsMail() && typeof openMailBox === 'function'){ openMailBox(mbNow()); return; }
+  closeMailPage();
+}
+/* 메일 화면에서 «기업정보함으로» 나간다.
+   · 메일 문(?view=mail)에서는 «문을 바꾼다» — 같은 창에서 화면만 명함으로 갈아 끼우면 주소는 메일(제목·아이콘·머리줄
+     이름이 「푸른 메일」)인데 내용은 명함이라 두 문이 섞인다. 쓰던 편지는 임시저장하고 나간다.
+   · 기업정보함 문에서는 예전 그대로 화면만 바꾼다. */
+function closeMailPage(){
+  const door = urlWantsMail();
+  if(door){
+    try{ if(typeof _compose !== 'undefined' && _compose && composeTouched(_compose)) saveDraft(true); }catch(_){}
+    location.href = 'pu-cards.html';
+    return;
+  }
+  state.view='list'; render();
+}
 function renderMailPage(){
   mbMemoClear();   /* 그리는 «동안»만 사는 셈을 버린다 — 낡을 틈을 안 준다 */
   if(state.view === 'cnt') return renderCntPage();   /* 📥 연락처 정리는 기업정보함 화면이다 — 같은 칸(#pcMail)에 그린다 */
@@ -8493,7 +8542,7 @@ function renderMailMobile(){
     return;
   }
   el.innerHTML = `<div class="mmbar">
-      <button class="mmback" onclick="closeMailPage()" title="명함 목록으로">‹ 목록</button>
+      <button class="mmback" onclick="mailBack()" title="${urlWantsMail()?'메일함으로':'명함 목록으로'}">‹ 목록</button>
       ${tab("openMailBox(mbNow())",'📥 메일함', state.mailSent==='box')}
       ${tab('openInbox()','🧾 수신기록', state.mailSent==='inbox')}
       ${tab('openCoThread()','🏢 사업장별', state.mailSent==='co')}
@@ -8606,7 +8655,7 @@ function mailWriteHtml(){
         <input type="checkbox" ${c.oneByOne?'checked':''} ${multi?'':'disabled'}
           onchange="setComposeFlag('oneByOne',this.checked)"> 한명씩 발송</label>`}
       <span class="mauto">${state.draftAt?'자동저장 '+state.draftAt:''}</span>
-      <button class="setback" onclick="closeMailPage()">← 목록으로</button>
+      <button class="setback" onclick="mailBack()">← 목록으로</button>
     </div>
         <div class="cprow"><span class="cpk">보내는사람</span>
           <span class="cpfrom">푸른노무법인 &lt;${esc(from)}&gt;</span>
@@ -9992,7 +10041,7 @@ function sentBoxHtml(){
     : `<tr><td colspan="6" class="none">${q||mine?'찾은 메일이 없습니다.':'아직 보낸 메일이 없습니다.'}</td></tr>`;
   return `
     <div class="mboxbar">
-      <button class="setback" onclick="closeMailPage()">← 목록으로</button>
+      <button class="setback" onclick="mailBack()">← 목록으로</button>
       <b>📤 보낸 메일</b>
       <span class="n">${rows.length}통${
         state.sentCat?` · ${esc(state.sentCat==='__none'?'자료 없이':state.sentCat)}`:''}${
@@ -25372,7 +25421,7 @@ function mbPickMode(){
 function mbMobileHtml(){
   /* ⚠ 읽는 화면은 PC 것을 그대로 쓴다 — 그래서 «미리보기 창»도 함께 달아야 한다.
        PC 쪽에만 달면 폰에서 [👁 미리보기]를 눌러도 아무 일이 안 일어난다. */
-  if(state.mbOpen) return mbReadHtml() + mbPvHtml() + mbNewHtml();   /* PC 와 같은 창 둘 — mbReadPopsHtml */
+  if(state.mbOpen) return '<div class="dmr">' + mbReadHtml() + '</div>' + mbPvHtml() + mbNewHtml();   /* PC 와 같은 창 둘 — mbReadPopsHtml */
   const rows = mbVisibleRows();
   const sel = pickOf('mbox');
   const nPick = pickList(sel, rows.map(v=>v._key)).length;
@@ -25581,7 +25630,7 @@ function mbDrawerHtml(){
     <button class="dmm-out" onclick="openCoThread()">🏢 사업장별</button>
     <button class="dmm-out" onclick="addMailIcon()">📲 바탕화면에 메일 아이콘</button>
     <button class="dmm-out" onclick="closeMailPage()">‹ 기업정보함으로</button>
-    <button class="dmm-out" onclick="openSettingsPage()">⚙️ 환경설정</button>`;
+    <button class="dmm-out" onclick="openMailSetPage()" title="메일함 설정 — 보기·보내기·단축키, 그리고 다음메일에서 하실 것">⚙️ 환경설정</button>`;
   return h;
 }
 /* 서랍에서 칸을 고르면 서랍은 닫힌다 — 고르고 나서 또 닫아야 하면 두 번 손이 간다 */

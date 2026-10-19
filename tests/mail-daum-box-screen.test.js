@@ -877,7 +877,10 @@ test('★ 폰 서랍 맨 아래로 나갈 길이 남아 있다 — 없으면 메
   const c = load({ folders: FOLDERS, msgs: MSGS });
   const h = c.mbDrawerHtml();
   assert.ok(h.indexOf('closeMailPage()') > 0, '기업정보함으로 나갈 길이 없다');
-  assert.ok(h.indexOf('openSettingsPage()') > 0, '환경설정으로 갈 길이 없다');
+  /* 2026-10-19: 폰 서랍의 ⚙️ 환경설정은 «메일» 설정으로 간다(PC 옆줄과 같다 — 2026-08-29 대표 보고).
+     예전엔 명함(기업정보함) 설정으로 가서, 메일을 보다 누르면 화면이 통째로 기업정보함이 되었다. */
+  assert.ok(h.indexOf('openMailSetPage()') > 0, '환경설정으로 갈 길이 없다');
+  assert.ok(h.indexOf('openSettingsPage()') < 0, '★ 메일 서랍의 환경설정이 기업정보함 설정으로 샙니다');
   assert.ok(h.indexOf('openMatPage()') > 0, '자료함으로 갈 길이 없다');
 });
 

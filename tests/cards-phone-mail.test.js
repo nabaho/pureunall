@@ -43,7 +43,9 @@ test('★ 메일 화면들로 가는 길은 메일함 서랍에 다 있다 — �
   /* 쓰기는 메일함 화면의 ✏️ 떠 있는 단추가 연다 */
   assert.match(cards, /dmm-fab[^\n]*openMailPage\(\)|openMailPage\(\)[^\n]*dmm-fab/, '★ 메일함에서 새 편지를 쓸 길이 없습니다');
   /* 나올 길 — 메일 화면 위 「‹ 목록」 */
-  assert.match(cards, /class="mmback" onclick="closeMailPage\(\)"/,
+  /* 2026-10-19: 「‹ 목록」은 mailBack — 메일 문에서는 메일함으로, 기업정보함 문에서는 closeMailPage 로 간다.
+     지킬 것은 «돌아갈 단추가 있는가»이지 함수 이름이 아니다. */
+  assert.match(cards, /class="mmback" onclick="(?:closeMailPage|mailBack)\(\)"/,
     '★ 돌아갈 길이 없으면 메일 화면에 갇힙니다.');
 });
 
