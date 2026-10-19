@@ -5,6 +5,16 @@
   if (w.PuObsidian) return;
 
   var MAX = 4000;
+  /* 보관함 이름 — 이 PC 의 «옵시디언 자동 정리»(tools/obsidian-sync)와 같은 보관함이다.
+     여러 보관함을 쓰면 «마지막에 연 보관함» 으로 가 버리므로 이름을 박는다. 다르면 localStorage pu_obsidian_vault 로 바꾼다. */
+  var VAULT = '푸른업무';
+  function vaultName() {
+    try { return String(w.localStorage.getItem('pu_obsidian_vault') || VAULT); } catch (_) { return VAULT; }
+  }
+  function noteUri(n) {
+    return 'obsidian://new?vault=' + encodeURIComponent(vaultName()) + '&file=' + encodeURIComponent(n.file) +
+      '&content=' + encodeURIComponent(n.body) + '&overwrite=true';
+  }
   var STORE_DEF = [
     ['contracts', '계약'], ['cases', '사건'], ['consultings', '컨설팅'],
     ['funds', '기금'], ['other_projects', '기타사업'], ['companies', '자문']
@@ -130,7 +140,7 @@
     if (tasks.length > 30) body.push('> 나머지 ' + (tasks.length - 30) + '건은 ERP에서 확인하세요.', '');
     body.push('## 원본', '', '- [푸른이알피 열기](' + (esc(fields.url) || esc(w.location && w.location.href)) + ')', '',
       '> ERP의 경량 업무 정보로 자동 생성했습니다. 주민번호·계좌·연락처·첨부파일·문서 본문은 포함하지 않습니다.');
-    return { title: title, file: '푸른업무/' + title + '.md', body: body.join('\n'), count: tasks.length };
+    return { title: title, file: 'raw/erp/' + title + '.md', body: body.join('\n'), count: tasks.length };
   }
   function allNote(data) {
     var today = day(), body = ['---', 'source: 푸른이알피', 'created: ' + today, 'updated: ' + today,
@@ -146,11 +156,11 @@
     });
     if (!data.groups || !data.groups.length) body.push('- 담당자 연결 업무가 없습니다.', '');
     body.push('> ERP의 경량 업무 정보로 자동 생성했습니다. 민감정보·첨부파일·문서 본문은 포함하지 않습니다.');
-    return { title: '담당자별 ERP 업무 요약', file: '푸른업무/담당자별 ERP 업무 요약.md', body: body.join('\n'), count: (data.groups || []).reduce(function (n, g) { return n + g.tasks.length; }, 0) };
+    return { title: '담당자별 ERP 업무 요약', file: 'raw/erp/담당자별 ERP 업무 요약.md', body: body.join('\n'), count: (data.groups || []).reduce(function (n, g) { return n + g.tasks.length; }, 0) };
   }
   function openNote(fields) {
     var n = note(fields);
-    var uri = 'obsidian://new?file=' + encodeURIComponent(n.file) + '&content=' + encodeURIComponent(n.body) + '&overwrite=true';
+    var uri = noteUri(n);
     var a = d.createElement('a');
     a.href = uri; a.rel = 'noopener'; a.style.display = 'none';
     d.body.appendChild(a); a.click(); a.remove();
@@ -158,7 +168,7 @@
   }
   function openAllNote() {
     var n = allNote(collectAll());
-    var uri = 'obsidian://new?file=' + encodeURIComponent(n.file) + '&content=' + encodeURIComponent(n.body) + '&overwrite=true';
+    var uri = noteUri(n);
     var a = d.createElement('a'); a.href = uri; a.rel = 'noopener'; a.style.display = 'none'; d.body.appendChild(a); a.click(); a.remove(); return n;
   }
   function copy(text) {
