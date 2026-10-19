@@ -174,14 +174,15 @@ test('훅: 로그인 들어옴·로그인 없음 갈래가 지킴이를 부른�
   assert.match(area, /_rmBootSplash\(\);\s*try \{ if\(!window\.__kkReturning\) _loginGuard\.shown\(/, '로그인 화면을 드러낸 직후 알린다');
 });
 
-/* ⑥ 부팅 스크립트의 40초 안전망 — 가짜 시계로 돌린다 */
-test('⑥ 40초 안전망은 숨은 탭에서 걷지 않고, 보이면 그때 걷는다', () => {
+/* ⑥ 40초가 지나도 인증 결과가 없다면 자동으로 걷지 않는다 — 가짜 시계로 돌린다 */
+test('⑥ 인증 복원이 오래 걸려도 숨은 탭·보이는 탭 모두 자동으로 로그인 화면을 드러내지 않는다', () => {
   const a = enter.indexOf("(function(){\n  var s=document.getElementById('pu-boot-splash');");
   assert.ok(a > 0);
   const BOOT = enter.slice(a, enter.indexOf('})();', a) + 5);
   const timers = [];
   let now = 0;
-  const splash = { style: {}, removed: false, remove() { this.removed = true; }, appendChild() {} };
+  let button = null;
+  const splash = { style: {}, removed: false, remove() { this.removed = true; }, appendChild(el) { button = el; } };
   const doc = {
     hidden: true,
     getElementById: (id) => (id === 'pu-boot-splash' ? (splash.removed ? null : splash) : id === 'pu-boot-msg' ? { style: {} } : null),
@@ -204,5 +205,8 @@ test('⑥ 40초 안전망은 숨은 탭에서 걷지 않고, 보이면 그때 �
   assert.equal(splash.removed, false, '★ 숨은 탭에서 걷으면 그 탭이 앞으로 나올 때 로그인 화면이 번쩍인다');
   doc.hidden = false;
   tick(95000);
-  assert.equal(splash.removed, true, '보이면 그때 걷는다 — 갇히지 않는다');
+  assert.equal(splash.removed, false, '보이는 탭도 인증 복원 중이면 로그인 화면을 자동으로 드러내면 안 된다');
+  assert.ok(button && typeof button.onclick === 'function', 'SDK가 멎었을 때 사람이 직접 여는 길은 있어야 한다');
+  button.onclick();
+  assert.equal(splash.removed, true);
 });

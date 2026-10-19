@@ -981,8 +981,8 @@ body.portal-mode #moreFab{display:flex;}
        실측 10/7: 대표 폰 실제 로그인은 그날 12:15 한 번뿐 — 튕긴 것들은 로그아웃이 아니었다.
      ■ 로그인이 «없는» 기기는 이 길에 안 온다 — 저장된 로그인이 없으면 서버에 안 묻고 바로 «없음»이
        나와 onAuthStateChanged 가 곧장 로그인 화면을 연다. 8초를 넘기는 것은 «있는 로그인을 확인 중»뿐이다.
-     ■ 그래서 가림막은 두고 «느리다»고 말한다. 기다리기 싫으면 누를 단추를 준다(들어올 길은 늘 열려 있다).
-       구글 요청은 늦어도 30초 안에 끝나고(끊겨도 로그인은 남는다) — 마지막 안전망은 40초다.
+     ■ 그래서 인증 결과가 나오기 전에는 가림막을 자동으로 걷지 않는다. 이전 휴대전화 실측에서는
+       저장 로그인 복원이 40초를 훨씬 넘었다. 기다리기 싫으면 사람이 직접 로그인 화면을 여는 단추를 둔다.
      ⚠ 인증 도구가 아예 안 실렸으면(firebase 없음) 기다릴 것이 없다 — 곧바로 연다. */
   setTimeout(function(){
     var s2=document.getElementById('pu-boot-splash'); if(!s2) return;
@@ -1009,14 +1009,9 @@ body.portal-mode #moreFab{display:flex;}
     b.style.cssText='margin-top:4px;padding:10px 16px;min-height:44px;border:1px solid #cbd5e1;border-radius:10px;background:#fff;color:#1e40af;font:600 14px sans-serif;cursor:pointer';
     b.onclick=function(){ var s3=document.getElementById('pu-boot-splash'); if(s3) s3.remove(); };
     s2.appendChild(b);
-    /* 8초 + 32초 = 40초. ⚠ 숨은 탭에서는 걷지 않는다 (대표 지시 2026-10-09 「앱을 클릭하면 잠깐 카카오 로그인
-       화면이 나온다」) — 숨은 탭은 인증 확인이 느려 40초를 넘기기 쉽고, 거기서 걷어 둔 로그인 화면이
-       그 탭이 다시 앞으로 나올 때 번쩍인다. 보일 때까지 미뤘다가 걷는다. */
-    setTimeout(function s4go(){
-      var s4=document.getElementById('pu-boot-splash'); if(!s4) return;
-      if(document.hidden){ setTimeout(s4go, 2000); return; }
-      s4.remove();
-    }, 32000);
+    /* 자동 제한시간으로 걷지 않는다. 인증이 40초 넘게 걸리는 폰에서 노란 로그인 화면이
+       잠깐 보였다가 같은 계정으로 다시 들어가는 문제가 바로 이 제한시간 때문에 생겼다.
+       실제 미로그인은 onAuthStateChanged가 즉시 걷고, SDK가 멎으면 위 단추로 직접 열 수 있다. */
   }, kk ? 20000 : 8000);
 })();
 </script>
@@ -2064,7 +2059,7 @@ body.portal-mode #moreFab{display:flex;}
           뒤에 숨은 채 로그인 화면을 «그려 둔» 상태로 남는다. 다시 로그인한 뒤 그 탭이 앞으로 나오면
           브라우저는 예전에 그려 둔 로그인 화면부터 보이고, 그다음에야 파이어베이스가 다른 탭의 로그인을
           알아채 포털로 바뀐다 = 노란 카카오 단추가 있는 화면이 잠깐 번쩍. 앱마다 한 번씩인 까닭이다.
-       ② 숨은 탭에서 40초 안전망이 가림막을 걷는다 — 숨은 탭은 인증 확인이 느리다(아래 부팅 스크립트).
+       ② 예전에는 40초 제한시간도 가림막을 걷었다 — 느린 휴대전화에서는 인증 복원이 그보다 길었다.
        ③ 숨은 동안 «로그인 없음»이 잡혔다가 다른 탭의 로그인이 뒤따라 들어온다.
      ■ 그래서 — 탭이 숨을 때 로그인 화면 위에 가림막을 «다시» 세운다. 다시 보일 때는 파이어베이스가
        다른 탭의 로그인을 알아챌 시간(약 0.8초마다 저장소를 다시 읽는다)을 준 뒤, 그래도 없을 때만 걷는다.
