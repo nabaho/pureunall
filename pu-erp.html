@@ -23566,6 +23566,13 @@ function ContractModal(props){
                 h('select', { className:'pu-w-type', value: f.typeCodes[kindV] || (typesArr[0] ? typesArr[0].code : ''),
                   onChange:setTypeCodeFor(kindV) },
                   typesArr.map(function(t){ return h('option', { key:t.code, value:t.code }, '['+t.short+'] '+t.name); })),
+                /* 📈 성과추적관리 — 현장클리닉일 때만, 유형 바로 옆 알약 하나(대표 지시 2026-10-19, 목업 승인).
+                   켜면 담당자 연간 수행일수·건수 셈에서 빠진다(clinicIsPerf). 일수·금액은 그대로 적는다. */
+                isConsulting && clinicIsType(_selType, typesArr) && h('label', { className:'pu-vatpill' + (f.perfTrack ? ' on' : ''),
+                    title:'중진공 「신청경로」가 성과추적관리인 건 — 담당자 연간 수행일수·건수에서 뺍니다' },
+                  h('input', { type:'checkbox', checked:!!f.perfTrack, style:{ display:'none' },
+                    onChange:function(e){ var on = e.target.checked; setF(function(prev){ return Object.assign({}, prev, { perfTrack:on }); }); } }),
+                  h('span', null, '📈 성과추적관리')),
                 briefInput(kindV),
                 kEnd(
                   kLabel(isConsulting ? '계약금' : '착수금'),
@@ -23791,9 +23798,11 @@ function ContractModal(props){
             padding:'5px 10px', fontSize:'12px', color: over ? '#991b1b' : '#1e40af', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' },
             title:'주담당 기준 · 회계연도 · 컨설팅관리에 들어온 건 = 수행 / 계약관리 이관 전 = 예정 (이 계약은 빼고 셈)' },
           hint.prog.icon + ' ' + (u0 ? u0.name : f.managerMain) + ' · ' + hint.fyYear + ' 회계연도 — ',
-          h('b', null, (hint.cnt + hint.planCnt) + '건 · ' + (hint.days + hint.planDays) + un),
-          ' (수행 ' + hint.cnt + ' · 예정 ' + hint.planCnt + ') · 이 계약까지 ',
-          h('b', null, hint.nextCnt + '건 · ' + hint.nextDays + (cap ? '/' + cap : '') + un),
+          /* 📈 이 계약이 성과추적관리면 «이 계약까지»를 안 보이고, 빠진 까닭을 그 자리에 적는다(2026-10-19) */
+          h('b', null, (hint.cnt + hint.planCnt) + '건 · ' + (hint.days + hint.planDays) + (hint.perf && cap ? '/' + cap : '') + un),
+          ' (수행 ' + hint.cnt + ' · 예정 ' + hint.planCnt + ') · ',
+          hint.perf ? h('b', null, '이 계약은 📈 성과추적관리 · 셈 제외') : '이 계약까지 ',
+          hint.perf ? null : h('b', null, hint.nextCnt + '건 · ' + hint.nextDays + (cap ? '/' + cap : '') + un),
           over ? ' ⚠ 한 해 최대 ' + cap + un + '을(를) ' + (hint.nextDays - cap) + un + ' 넘습니다' : null);
       })(),
       /* 부담당 — 사람마다 칸 하나. 자리마다 select 를 두어 «그 자리»만 바꾼다.
@@ -69504,6 +69513,7 @@ function ClinicDayCards(props){
     if(s.est) lines.push('≈ ' + s.est + '건은 ' + cnt + '가 안 적혀 잔금으로 셈(' + feeNote + ')');
     if(s.done) lines.push('📦 끝난 ' + s.done + '건은 아래 표가 아니라 「📦 종료 보기」에 있습니다');
     if(s.skip) lines.push('「미수행 종료」 ' + s.skip + '건은 셈에서 뺐습니다');
+    if(s.perf) lines.push('📈 성과추적관리 ' + s.perf + '건은 연간 셈에서 뺐습니다');
     if(s.odd && s.odd.length) lines.push('⚠ ' + cnt + '와 금액이 다른 건: ' + s.odd.map(function(o){ return o.no + '(' + o.days + u + ' · 금액은 ' + o.feeDays + u + ')'; }).join(', '));
     if(s.zero && s.zero.length) lines.push('⚠ ' + cnt + '를 못 센 건: ' + s.zero.join(', ') + ' — ' + cnt + '를 적어 주세요');
     lines.push(props.listMode
@@ -69531,12 +69541,15 @@ function ClinicDayCards(props){
             return h('span', { style:{ color: on ? '#fff' : (over ? '#dc2626' : '#166534'), fontWeight:700 } },
               (over ? '⚠ ' : '') + s.days + (cap ? '/' + cap : '') + u);
           })(),
-      s.planCnt ? h('span', { style:{ color: on ? '#fff' : '#d97706', fontSize:'11px', fontWeight:700 } }, (isTotal ? '+예정 ' : '예정 ') + s.planCnt) : null);
+      s.planCnt ? h('span', { style:{ color: on ? '#fff' : '#d97706', fontSize:'11px', fontWeight:700 } }, (isTotal ? '+예정 ' : '예정 ') + s.planCnt) : null,
+      /* 📈 셈에서 뺀 성과추적관리 — 숨기지 않고 칩 꼬리에 (대표 지시 2026-10-19, 목업 승인) */
+      s.perf ? h('span', { style:{ color: on ? '#fff' : '#1e40af', fontSize:'11px', fontWeight:700 } }, isTotal ? '· 📈 성과추적 ' + s.perf + ' 제외' : '📈' + s.perf) : null);
   }
   var navS = { border:'1px solid #cbd5e1', background:'#fff', borderRadius:'5px', padding:'0 7px', cursor:'pointer', color:'#475569', flex:'0 0 auto', lineHeight:'20px' };
   /* 담당자별 한 해 목록 (listMode) — 번호·업체·구분·시작일·일수. 금액은 넣지 않는다(대표 2026-10-05). */
   var openSlot = props.listMode && openSid ? r.by[openSid] : null;
-  var ST_TAG = { 'do':['수행','#f0fdf4','#166534'], end:['종료','#f8fafc','#64748b'], plan:['예정','#fffbeb','#854d0e'], skip:['미수행 종료','#fef2f2','#991b1b'] };
+  var ST_TAG = { 'do':['수행','#f0fdf4','#166534'], end:['종료','#f8fafc','#64748b'], plan:['예정','#fffbeb','#854d0e'], skip:['미수행 종료','#fef2f2','#991b1b'],
+    perf:['📈 성과추적 · 셈 제외','#eff6ff','#1e40af'] };
   var thS = { textAlign:'left', padding:'4px 6px', background:'#f8fafc', color:'#64748b', fontWeight:600, borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap' };
   var tdS = { padding:'4px 6px', borderBottom:'1px solid #e2e8f0', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis' };
   var listBox = openSlot && h('div', { style:{ background:'#fff', border:'1px solid #e2e8f0', borderRadius:'8px', padding:'6px 10px', marginTop:'-4px', marginBottom:'8px' } },
@@ -69549,7 +69562,7 @@ function ClinicDayCards(props){
       h('button', { onClick:function(){ setOpenSid(''); }, title:'목록 닫기', style:navS }, '✕')),
     h('table', { style:{ width:'100%', borderCollapse:'collapse', tableLayout:'fixed', fontSize:'12px', marginTop:'4px' } },
       h('thead', null, h('tr', null, ['번호', '업체', '구분', '계약 시작', u === '일' ? '일수' : '회차'].map(function(t, i){
-        return h('th', { key:i, style: i === 4 ? Object.assign({}, thS, { textAlign:'right', width:'70px' }) : (i === 1 ? thS : Object.assign({}, thS, { width: i === 2 ? '90px' : '130px' })) }, t); }))),
+        return h('th', { key:i, style: i === 4 ? Object.assign({}, thS, { textAlign:'right', width:'70px' }) : (i === 1 ? thS : Object.assign({}, thS, { width: i === 2 ? '140px' : '130px' })) }, t); }))),   /* 구분 140px — 「📈 성과추적 · 셈 제외」가 한 줄에 들게(2026-10-19) */
       h('tbody', null, openSlot.rows.slice().sort(function(a, b){ return String(b.start).localeCompare(String(a.start)); }).map(function(x){
         var tg = ST_TAG[x.st] || ST_TAG['do'];
         var odd = x.feeDays && !x.est && x.feeDays !== x.days;
@@ -69558,8 +69571,9 @@ function ClinicDayCards(props){
           h('td', { style:tdS, title:x.co }, x.co || '-'),
           h('td', { style:tdS }, h('span', { style:{ borderRadius:'4px', padding:'0 6px', fontSize:'11px', fontWeight:700, background:tg[1], color:tg[2] } }, tg[0])),
           h('td', { style:tdS }, x.start || '-'),
-          h('td', { style:Object.assign({}, tdS, { textAlign:'right', color: odd ? '#991b1b' : '#1e293b' }),
-            title: x.est ? (u === '일' ? '일수' : '회차') + '가 안 적혀 금액으로 짐작' : (odd ? '금액으로 보면 ' + x.feeDays + u : '') },
+          /* 📈 성과추적관리 줄은 일수를 흐리게 — 적힌 것은 보여 주되 셈에 안 든다는 뜻 */
+          h('td', { style:Object.assign({}, tdS, { textAlign:'right', color: x.st === 'perf' ? '#94a3b8' : (odd ? '#991b1b' : '#1e293b') }),
+            title: x.st === 'perf' ? '연간 셈에서 뺌' : (x.est ? (u === '일' ? '일수' : '회차') + '가 안 적혀 금액으로 짐작' : (odd ? '금액으로 보면 ' + x.feeDays + u : '')) },
             x.st === 'skip' ? '-' : ((x.est ? '≈ ' : '') + (x.days || 0) + u + (odd ? ' ⚠' : ''))));
       }))));
   return h('div', null,
@@ -70953,6 +70967,14 @@ function ProjectEditModal(props){
           h('div', { className:'fld' }, h('label', null, '유형 (변경 시 관리번호 자동 갱신)'),
             h('select', { value:f.typeCode || '', onChange:setTypeCode },
               props.types.map(function(t){ return h('option', { key:t.code, value:t.code }, t.name); }))),
+          /* 📈 성과추적관리 — 현장클리닉일 때만(대표 지시 2026-10-19, 목업 승인). 계약에서 켠 것은 이관 때 넘어온다.
+             켜면 연간 수행일수·건수 셈(clinicDayCards)에서 빠진다 — 기록·일수·금액은 그대로. */
+          clinicIsType(f.typeCode, props.types) && h('div', { className:'fld' }, h('label', null, '성과추적관리'),
+            h('label', { style:{ display:'flex', alignItems:'center', gap:'6px', fontSize:'12.5px', cursor:'pointer', whiteSpace:'nowrap' } },
+              h('input', { type:'checkbox', checked:!!f.perfTrack, style:{ margin:0, width:'14px', height:'14px', cursor:'pointer' },
+                onChange:function(e){ var on = e.target.checked; setF(function(prev){ return Object.assign({}, prev, { perfTrack:on }); }); } }),
+              h('span', null, '📈 성과추적관리'),
+              h('span', { style:{ fontSize:'11.5px', color:'#64748b' } }, '— 연간 수행일수·건수 셈에서 뺍니다'))),
           h('div', { className:'fld' }, h('label', null, '관리번호'),
             h('div', { style:{ padding:'7px 10px', background:'#f8fafc', border:'1px solid #e2e8f0', borderRadius:'4px', fontFamily:'monospace', fontSize:'12.5px', fontWeight:700, color:'#1e293b' } },
               f.no || '-'

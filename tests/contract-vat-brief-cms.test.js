@@ -71,6 +71,8 @@ function kboxCtx(kindV, extraF){
     consTypeDayFee(){ return 0; },
     consDayAmount(){ return null; },
     consDayMayFill(){ return true; },
+    /* 📈 성과추적관리 알약(2026-10-19)은 현장클리닉일 때만 — 위 유형(t1 「이름」)은 현장클리닉이 아니다 */
+    clinicIsType(){ return false; },
     h(tag, props){
       const kids = Array.prototype.slice.call(arguments, 2);
       return { tag, props: props || {}, kids };

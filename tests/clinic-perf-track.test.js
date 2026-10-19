@@ -204,3 +204,77 @@ test('⑧ 보내기 창 — 같은 글자로 판단하고, 옛 단추면 «신�
   assert.match(js, /route: S\.data\.route/, '보낼 때 신청경로를 안 싣습니다');
   assert.ok(!/\/\//.test(cutFn(INTAKE_RAW, 'function smesClip(')), '북마클릿에 줄 주석(//)이 있으면 뒤가 통째로 주석이 됩니다');
 });
+
+/* ══ 화면 (목업 https://claude.ai/artifact/DN7amujqijNxJKpyDDNnDu 승인 — 대표 「목업대로 진행해라」 2026-10-19) ══ */
+
+/* 🏥 띠를 «실제로 그려» 본다 — h 를 흉내 내어 나무를 글자로 펼친다. 세 번째 useState(목록을 연 사람)만 P-1 로 연다. */
+function 띠를그린다(items, contracts) {
+  const store = { app_settings: { fiscalYearStart: '01-01' }, contracts: contracts || [] };
+  let n = 0;
+  const w = Object.assign(ctx, {
+    dbGet: (k, d) => (k in store ? store[k] : d), todayYMD: () => '2026-10-19',
+    consTypeDayFee: fee, consTypeDayOpt: () => ({ fee: 350000, unit: '일', noVat: false }),
+    useState: (v) => [++n === 3 ? 'P-1' : v, () => {}],
+    h(tag, props) { return { tag, props: props || {}, kids: Array.prototype.slice.call(arguments, 2) }; },
+  });
+  vm.runInContext(ERP_RAW.slice(ERP_RAW.indexOf('var UNIT_PROGS = {'), ERP_RAW.indexOf('function ClinicDayCards(')) + '\n'
+    + cutFn(ERP, 'function ClinicDayCards('), w);
+  w.__props = { items, types: TYPES, userName: () => '홍길동', listMode: true, onPick() {}, onPatch() {} };
+  return JSON.stringify(vm.runInContext('ClinicDayCards(__props)', w));
+}
+
+test('⑨ 🏥 띠 — 칩에 «📈 성과추적 N 제외», 말풍선에 까닭, 목록에 꼬리표 (숨기지 않는다)', () => {
+  const html = 띠를그린다([
+    C({ id: 'a', no: '현클-1', companyName: '가나산업', consultDays: 3 }),
+    C({ id: 'b', no: '현클-2', companyName: '다라전자', consultDays: 2, perfTrack: true }),
+  ]);
+  assert.match(html, /📈 성과추적 1 제외/, '전체 칩에 뺀 건수가 안 보입니다');
+  assert.match(html, /📈 성과추적관리 1건은 연간 셈에서 뺐습니다/, '말풍선에 까닭이 없습니다');
+  assert.match(html, /📈 성과추적 · 셈 제외/, '목록에 빠진 건의 꼬리표가 없습니다');
+  assert.match(html, /현클-2/, '빠진 건이 목록에서 사라졌습니다');
+  assert.match(html, /연간 셈에서 뺌/, '빠진 건의 일수 칸에 까닭(말풍선)이 없습니다');
+  assert.match(html, /"3\/30일"|3\/30일/, '연간 셈은 3일 — 성과추적관리 2일이 더해지면 안 됩니다');
+  /* 표시가 없으면 아무것도 안 붙는다 — 잔소리를 만들지 않는다 */
+  const plain = 띠를그린다([C({ id: 'a', no: '현클-1', consultDays: 3 })]);
+  assert.doesNotMatch(plain, /성과추적/);
+});
+
+test('⑨ 띠 목록의 「구분」 칸은 꼬리표가 한 줄에 들 만큼 넓다(한 칸 한 줄)', () => {
+  const ui = cutFn(ERP, 'function ClinicDayCards(');
+  const w = ui.match(/width: i === 2 \? '(\d+)px'/);
+  assert.ok(w, '구분 칸의 폭을 못 찾았습니다');
+  /* 11px 글씨 「📈 성과추적 · 셈 제외」 + 꼬리표 안쪽 여백 ≈ 125px — 그보다 좁으면 … 로 잘린다 */
+  assert.ok(Number(w[1]) >= 125, '구분 칸 ' + w[1] + 'px — 성과추적 꼬리표가 잘립니다');
+});
+
+test('⑩ 계약창 — 현장클리닉 유형일 때만 유형 고르개 «바로 옆» 알약으로 켜고 끈다', () => {
+  const cm = cutFn(ERP, 'function ContractModal(');
+  const a = cm.indexOf("className:'pu-w-type'"), b = cm.indexOf('briefInput(kindV)', a);
+  assert.ok(a >= 0 && b > a, '컨설팅 첫 줄(유형 고르개 → 업무 요약)을 못 찾았습니다');
+  const row = cm.slice(a, b);
+  assert.match(row, /clinicIsType\(_selType, typesArr\) && h\('label'/, '알약이 유형 옆에 없거나, 현장클리닉이 아닐 때도 뜹니다');
+  assert.match(row, /checked:!!f\.perfTrack/, '알약이 perfTrack 을 보여 주지 않습니다');
+  assert.match(row, /perfTrack:on/, '알약을 눌러도 perfTrack 이 바뀌지 않습니다');
+  assert.match(row, /성과추적관리/);
+});
+
+test('⑩ 계약창 실적 줄 — 성과추적관리 계약이면 «이 계약까지» 대신 까닭을 적는다', () => {
+  const cm = cutFn(ERP, 'function ContractModal(');
+  const at = cm.indexOf('clinicContractHint(f,');
+  assert.ok(at >= 0);
+  const hintUi = cm.slice(at, cm.indexOf('})(),', at));
+  assert.match(hintUi, /hint\.perf \?[^:]*이 계약은 📈 성과추적관리 · 셈 제외/, '빠진 까닭이 실적 줄에 없습니다');
+  assert.match(hintUi, /hint\.perf \? null : h\('b', null, hint\.nextCnt/, '성과추적관리 계약인데 «이 계약까지» 숫자를 보입니다');
+});
+
+test('⑪ 컨설팅 수정창 — 현장클리닉일 때만 체크 칸이 있고 perfTrack 을 켜고 끈다', () => {
+  const pe = cutFn(ERP, 'function ProjectEditModal(');
+  const at = pe.indexOf('clinicIsType(f.typeCode, props.types) && h(');
+  assert.ok(at >= 0, '컨설팅 수정창에 성과추적관리 칸이 없거나 현장클리닉 조건이 없습니다(기금·기타에도 뜹니다)');
+  const fld = pe.slice(at, pe.indexOf("'관리번호'", at));
+  assert.match(fld, /type:'checkbox', checked:!!f\.perfTrack/);
+  assert.match(fld, /perfTrack:on/);
+  assert.match(fld, /연간 수행일수·건수 셈에서 뺍니다/, '무엇이 바뀌는지 칸 옆에 적는다');
+  const typeAt = pe.indexOf("'유형 (변경 시");
+  assert.ok(typeAt >= 0 && typeAt < at, '체크 칸은 유형 고르개 아래에 둔다');
+});
