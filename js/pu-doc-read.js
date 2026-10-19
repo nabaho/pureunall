@@ -52,7 +52,7 @@
      ⚠ 사진첩 화면에 이 표를 두면 안 된다 — 거기에 다른 앱 이름을 글자로 적으면
        「다른 앱의 클라우드 루트를 건드리지 않는다」 검사가 걸린다(그 검사가 옳다). */
   var APP_KO = { photos: '사진첩', cards: '기업정보함', kcareer: '경력관리',
-    payroll: '급여', rules: '취업규칙', fund: '기금', erp: '푸른이알피', other: '그 밖' };
+    payroll: '급여', rules: '취업규칙', fund: '기금', erp: '푸른이알피', cal: '푸른캘린더', other: '그 밖' };
   function appName() {
     if (deps.app) return deps.app;
     var p = '';

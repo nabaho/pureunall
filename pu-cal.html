@@ -34,6 +34,8 @@
 <script src="js/pu-cal-recruit.js?v=1"></script>
 <script src="js/pu-cal-write.js?v=9"></script>
 <script src="js/pu-cal-map.js?v=2"></script>
+<script src="js/pu-ai-call.js?v=5"></script>
+<script src="js/pu-cal-capture.js?v=1"></script>
 <style>
   :root{--acc:#2563eb;--acc2:#1e40af;--acc-soft:#eff6ff;--ink:#1e293b;--sub:#475569;--faint:#94a3b8;
     --line:#e2e8f0;--panel:#ffffff;--bg:#f8fafc;--ok:#166534;--warn:#854d0e;--warn-bg:#fffbeb;
@@ -540,6 +542,13 @@
   :root[data-theme="dark"] .gform .gmeet{color:#131314}
   .gform .gmeet.on{background:transparent;color:var(--gtoday);border:1px solid var(--gline)}
   .gform .ghint{flex-basis:100%;font-size:12px;color:var(--gsub);padding:0 0 8px}
+  /* 📷 캡처 · 🎤 말로 채우기 — 단추 줄은 위 .gtabs 를 그대로 쓴다 */
+  .gform .gcapwarn{padding-left:56px;font-weight:600;color:var(--gtext)}
+  .gform .gcap{margin:0 0 8px 56px;padding:10px 12px;border:1px solid var(--gline);border-radius:8px}
+  .gform .gcap textarea{width:100%;box-sizing:border-box;border:1px solid var(--gline);border-radius:6px;background:transparent;color:var(--gtext);font:inherit;font-size:14px;padding:8px;resize:vertical}
+  .gform .gcap .ghint{padding:6px 0 0}
+  .gform .gcap .gcapbtns{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .gform .gcap .gcappick{display:block;width:100%;text-align:left;margin:4px 0 0;padding:8px 10px;border:1px solid var(--gline);border-radius:6px;background:transparent;color:var(--gtext);font:inherit;font-size:14px;cursor:pointer}
   .gform .cpull{flex:1;margin-bottom:0;border:none;background:transparent;padding:0}
   .gform .gbody > #cardres{flex-basis:100%}
   .gform .mbtns{margin-top:10px}  .gform .mbtns{margin-top:10px}
@@ -4228,6 +4237,7 @@ function modalHtml(){
                 + esc(t.icon + " " + PuWork.labelFor(t.code, "calendar")) + '</option>'; }).join("") + '</select>')
     + (새것 ? '<div class="gtabs"><button data-mk="sch"' + (일정 ? ' class="on"' : '') + '>일정</button>'
         + '<button data-mk="att"' + (일정 ? '' : ' class="on"') + '>연차·근태</button></div>' : '')
+    + (일정 && 새것 && m.store !== "gcal" ? 캡처줄Html(m) : '')
     /* ★ 폰 — 구글 앱 입력 화면의 «캘린더 칩 줄»(내 캘린더 / 가족 / 업무처리 — 캡처 2026-10-11). 우리는 「푸른노무법인 · 공용」과 「나만 보기」 둘 */
     + ((typeof 폰 === "function" && 폰() && 일정 && m.store !== "gcal")
         ? '<div class="gtabs gcalchips">' + [["shared","푸른노무법인 · 공용","var(--gtoday)"],["private","나만 보기","var(--gsub)"]].map(function(c){
@@ -4465,6 +4475,184 @@ function 구글에넣기(m){
     render();
   });
 }
+
+/* ══ 캡처·말로 채우기 시작 ═══════════════════════════════════════════════
+   대표 지시 2026-10-15 「폰에서 화면 캡처를 넣으면 장소·주소·시간을 자동으로 넣게」
+                       「폰에서 말로 미팅 시간·장소를 저장하고 싶다」.
+   ★ 캡처(사진)와 말(글자)은 «같은 엔진»(js/pu-cal-capture.js)이다 — AI 가 일정 «초안»을 만들면
+     새 일정 창의 칸에 채운다. 판독은 기존 창구(readDoc)를 PuAiCall 로 부른다(앱 이름 cal).
+   ★★ 여기서는 «저장하지 않는다.» 칸만 채우고, 저장은 사람이 «저장»을 눌러야 한다(기존 길 그대로).
+      AI 가 읽은 시간·주소가 한 글자만 틀려도 미팅을 놓친다 — 채운 뒤 «확인하세요» 줄을 띄운다.
+   ⚠ 사진·말은 이 화면에 «남기지 않는다»(저장소에 쓰지 않는다). 읽은 뒤 버린다.
+   ⚠ 이번 달 AI 한도에 걸리면 «그래도 읽을까요?»를 묻고, 사람이 승낙한 때만 manual 로 다시 부른다.
+   ⚠ 새 일정에서만 — 있는 일정을 고치는 창에는 단추가 없다(있는 내용을 덮어쓰면 안 된다). */
+var 캡처듣기 = null;      /* 말 듣기 손잡이 — 창이 닫히면 멈춘다 */
+var 캡처입력 = null;      /* 사진 고르는 숨은 입력 — 한 번만 만든다 */
+
+function 캡처줄Html(m){
+  var 경고 = (m.capWarn && m.capWarn.length)
+    ? '<div class="ghint gcapwarn">⚠ 확인하세요 — ' + m.capWarn.map(function(w){ return esc(w); }).join(' · ') + '</div>' : '';
+  return '<div class="gtabs gcapbar"><button data-cap="photo" title="문자·카톡 화면 캡처에서 일정을 읽어 채웁니다"' + ((S.cap && S.cap.busy) ? ' disabled' : '') + '>📷 캡처로 채우기</button>'
+    + '<button data-cap="voice" title="말하거나 적은 내용에서 일정을 읽어 채웁니다"' + ((S.cap && S.cap.busy) ? ' disabled' : '') + '>🎤 말로 채우기</button></div>'
+    + 경고 + 캡처창Html();
+}
+function 캡처창Html(){
+  var c = S.cap; if(!c) return "";
+  var h = '<div class="gcap">';
+  if(c.busy){
+    h += '<div class="ghint">⏳ ' + esc(c.msg || "읽는 중…") + '</div>';
+  } else {
+    if(c.mode === "voice"){
+      h += '<textarea id="capText" rows="3" placeholder="예) 다음 주 화요일 오후 3시 서천 에덴재가복지센터 방문 미팅, 담당자 김○○ 010-0000-0000">'
+        + esc(PuCalCapture.joinText(c.text, c.live)) + '</textarea>'
+        + '<div class="gcapbtns">'
+        + (PuCalCapture.speechSupported() ? '<button class="glink" data-cap="mic">' + (c.listening ? '■ 멈춤' : '🎤 말하기') + '</button>' : '')
+        + '<button class="glink" data-cap="go">읽어서 채우기</button><button class="glink" data-cap="close">닫기</button></div>';
+    } else {
+      h += '<div class="gcapbtns"><button class="glink" data-cap="photo">📷 다른 사진 고르기</button><button class="glink" data-cap="close">닫기</button></div>';
+    }
+    if(c.msg) h += '<div class="ghint">' + esc(c.msg) + '</div>';
+    if(c.drafts) h += c.drafts.map(function(d, i){
+      return '<button class="gcappick" data-cap="pick" data-ci="' + i + '">' + esc(PuCalCapture.summary(d)) + '</button>'; }).join("");
+  }
+  h += '<div class="ghint">※ 사진·말은 AI 서비스(구글 Gemini)로 전송되어 읽습니다. 이 앱은 저장하지 않으며 주민번호·계좌번호는 옮기지 않습니다. 채운 뒤 내용을 꼭 확인하세요.</div>';
+  return h + '</div>';
+}
+function 캡처듣기끝(){
+  if(캡처듣기){ try{ 캡처듣기.stop(); }catch(_){} 캡처듣기 = null; }
+}
+function 캡처정리(){ 캡처듣기끝(); S.cap = null; }
+function 캡처깔끔(){ var el = document.getElementById("capText"); if(el && S.cap) S.cap.text = el.value; }
+
+function 캡처누름(t){
+  if(!S.modal || S.modal.mode !== "new") return;
+  modalRead();                          /* 적던 글이 다시 그릴 때 날아가지 않게 */
+  var 뜻 = t.getAttribute("data-cap");
+  if(뜻 === "photo") 캡처사진고르기();
+  else if(뜻 === "voice") 캡처말열기();
+  else if(뜻 === "mic") 캡처마이크();
+  else if(뜻 === "go") 캡처글읽기();
+  else if(뜻 === "pick"){ var d = S.cap && S.cap.drafts && S.cap.drafts[+t.getAttribute("data-ci")]; if(d) 캡처채우기(d); }
+  else if(뜻 === "close"){ 캡처정리(); render(); }
+}
+function 캡처묶음(manual){
+  var u = null; try{ u = firebase.auth(); }catch(_){}
+  return { ai: (typeof PuAiCall !== "undefined" ? PuAiCall : null), auth: u, today: todayYMD(), manual: manual === true };
+}
+/* 읽는다 — 한도에 걸렸다는 답이 오면 캡처결과가 «그래도?»를 묻고 manual 로 다시 부른다 */
+function 캡처읽기(last, manual){
+  var cap = S.cap, 묶음 = 캡처묶음(manual);
+  var p = last.kind === "img" ? PuCalCapture.readImages(last.data, 묶음) : PuCalCapture.readText(last.data, 묶음);
+  return p.then(function(r){ if(S.cap === cap) 캡처결과(r); });
+}
+function 캡처결과(r){
+  var cap = S.cap; if(!cap || !S.modal) return;
+  cap.busy = false;
+  if(!r.ok){
+    if(r.overBudget && cap.last && confirm(r.why + "\n\n그래도 이번 한 번만 읽을까요? (요금이 더 나갑니다)")){
+      cap.busy = true; cap.msg = "🔎 AI 가 일정을 읽는 중…"; render();
+      캡처읽기(cap.last, true);
+      return;
+    }
+    cap.msg = "⚠ " + (r.why || "읽지 못했습니다"); render(); return;
+  }
+  if(!r.drafts.length){
+    cap.msg = "일정으로 보이는 내용을 찾지 못했습니다" + (r.unreadable ? " — " + r.unreadable : "") + ". 직접 적거나 다른 사진을 골라 주세요";
+    render(); return;
+  }
+  if(r.drafts.length === 1){ 캡처채우기(r.drafts[0]); return; }
+  cap.drafts = r.drafts; cap.msg = "일정이 " + r.drafts.length + "건 보입니다 — 하나를 고르세요"; render();
+}
+/* 칸만 채운다 — 저장은 사람이 «저장»을 누를 때 기존 길(doSave)이 한다 */
+function 캡처채우기(d){
+  var m = S.modal; if(!m) return;
+  var r = PuCalCapture.applyDraft(m, d);
+  캡처정리();
+  toast("✅ 채웠습니다(" + r.filled.join("·") + ") — 내용을 확인하고 «저장»을 눌러 주세요");
+}
+
+/* 📷 사진 — 갤러리에서 캡처를 고른다(여러 장이면 한 일정의 여러 쪽으로 본다) */
+function 캡처사진고르기(){
+  if(S.cap && S.cap.busy) return;
+  if(!캡처입력){
+    캡처입력 = document.createElement("input");
+    캡처입력.type = "file"; 캡처입력.accept = "image/*"; 캡처입력.multiple = true; 캡처입력.style.display = "none";
+    캡처입력.addEventListener("change", function(){
+      var 파일들 = Array.prototype.slice.call(캡처입력.files || [], 0, PuCalCapture.LIMIT.images);
+      캡처입력.value = "";              /* 같은 사진을 다시 골라도 change 가 나게 */
+      if(파일들.length) 캡처사진읽기(파일들);
+    });
+    document.body.appendChild(캡처입력);
+  }
+  캡처입력.click();
+}
+function 캡처사진읽기(파일들){
+  if(!S.modal || S.modal.mode !== "new") return;
+  캡처듣기끝();
+  var cap = S.cap = { mode:"photo", busy:true, msg:"📷 사진을 줄이는 중…", drafts:null };
+  render();
+  Promise.all(파일들.map(function(f){ return PuCalCapture.shrinkImage(f); })).then(function(그림들){
+    if(S.cap !== cap) return;
+    cap.last = { kind:"img", data:그림들 }; cap.msg = "🔎 AI 가 일정을 읽는 중…"; render();
+    return 캡처읽기(cap.last, false);
+  })["catch"](function(e){
+    if(S.cap === cap) 캡처결과({ ok:false, why:(e && e.message) || "사진을 읽지 못했습니다" });
+  });
+}
+
+/* 🎤 말 — 폰의 음성 인식으로 받아 적고, 고칠 수 있게 보여 준 뒤 읽는다.
+   ⚠ 음성 인식이 안 되는 기기는 «키보드의 🎤 버튼»으로 물러선다(칸은 그대로 쓴다) */
+function 캡처말열기(){
+  캡처듣기끝();
+  var cap = S.cap = { mode:"voice", text:"", live:"", listening:false, busy:false, msg:"", drafts:null };
+  render();
+  if(PuCalCapture.speechSupported()) 캡처듣기시작();
+  else {
+    cap.msg = "이 기기는 앱 안의 음성 인식을 쓸 수 없습니다 — 아래 칸을 누르고 키보드의 🎤 버튼으로 말해 주세요";
+    render();
+    var el = document.getElementById("capText"); if(el) el.focus();
+  }
+}
+function 캡처듣기시작(){
+  var cap = S.cap; if(!cap) return;
+  캡처깔끔(); 캡처듣기끝();
+  cap.live = ""; cap.msg = "";
+  캡처듣기 = PuCalCapture.listen({
+    onText: function(글, 끝났나){
+      if(S.cap !== cap) return;
+      if(끝났나){ cap.text = PuCalCapture.joinText(cap.text, 글); cap.live = ""; } else cap.live = 글;
+      var el = document.getElementById("capText");            /* 칸만 갈아 끼운다 — 전체를 다시 그리면 한글 조합이 끊긴다 */
+      if(el) el.value = PuCalCapture.joinText(cap.text, cap.live);
+    },
+    onEnd: function(){
+      if(S.cap !== cap) return;
+      캡처듣기 = null; cap.listening = false;
+      if(cap.live){ cap.text = PuCalCapture.joinText(cap.text, cap.live); cap.live = ""; }
+      render();
+    },
+    onError: function(안내){ if(S.cap === cap) cap.msg = 안내; }   /* 곧 이어서 onEnd 가 그린다 */
+  });
+  if(캡처듣기){ cap.listening = true; render(); }
+  else { cap.msg = "음성 인식을 시작하지 못했습니다 — 키보드의 🎤 버튼으로 말해 주세요"; render(); }
+}
+function 캡처마이크(){
+  if(!S.cap) return;
+  if(캡처듣기){ 캡처듣기.stop(); return; }      /* onEnd 가 다시 그린다 */
+  캡처듣기시작();
+}
+function 캡처글읽기(){
+  var cap = S.cap; if(!cap) return;
+  캡처깔끔(); 캡처듣기끝();
+  if(!String(cap.text || "").trim()){ cap.msg = "말하거나 적은 내용이 없습니다"; render(); return; }
+  cap.busy = true; cap.drafts = null; cap.msg = "🔎 AI 가 일정을 읽는 중…"; cap.last = { kind:"text", data:cap.text };
+  render();
+  캡처읽기(cap.last, false);
+}
+/* 칸에 직접 적거나 고친 글을 담아 둔다 — 다시 그려도 안 날아가게 */
+document.addEventListener("input", function(e){
+  if(e.target && e.target.id === "capText" && S.cap){ S.cap.text = e.target.value; S.cap.live = ""; }
+});
+/* ══ 캡처·말로 채우기 끝 ═════════════════════════════════════════════════ */
 
 /* 창에서 무엇을 고쳤는지 그때그때 담아 둔다 — 다시 그려도 안 날아가게 */
 function modalRead(){
@@ -4811,6 +4999,7 @@ function 창도구Html(){
 }
 
 function render(){
+  if(!S.modal && S.cap) 캡처정리();   /* 창이 닫히면 듣기도 멈춘다 — 어느 길로 닫혔든 여기서 한 번에 */
   renderTabs();
   var tab = TABS.filter(function(t){ return t.v===S.tab; })[0] || TABS[0];
   var html;
@@ -4971,13 +5160,14 @@ document.addEventListener('click', function(e){
     var q = document.getElementById('calq'); if(q) q.focus();
     return;
   }
-  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet]') : null;
+  var t = e.target.closest ? e.target.closest('[data-t],[data-mv],[data-f],[data-erp],[data-close],[data-mmopen],[data-copen-all],[data-copen],[data-cset],[data-mycol],[data-myfilter],[data-dupclose],[data-pub],[data-newkey],[data-note-open],[data-noteact],[data-glogin],[data-glinkclose],[data-glretry],[data-gunlink],[data-act],[data-ev],[data-holday],[data-dgo],[data-day],[data-scope],[data-left],[data-copy],[data-open],[data-view],[data-toggle],[data-more],[data-popclose],[data-cardpick],[data-cardclear],[data-mnew],[data-mmenu],[data-mf],[data-mk],[data-mtime],[data-mfull],[data-gone],[data-map],[data-mapcopy],[data-route],[data-rpick],[data-rall],[data-rmap],[data-rcopy],[data-rtext],[data-tripgo],[data-tripmap],[data-mapgen],[data-gedit],[data-gdel],[data-sheetclose],[data-vmenu],[data-vclose],[data-sback],[data-mavatar],[data-dcal],[data-dmono],[data-mvis],[data-dclose],[data-dreload],[data-dmore],[data-gotoday],[data-meet],[data-cap]') : null;
   if(!t) return;
   /* 🗺 지도 · 🚗 동선 (2026-10-09) — 상세 창 «위» 창이라 닫기도 여기서 먼저 받는다 */
   if(t.hasAttribute('data-close') && (S.map || S.route || S.trip)){
     if(S.map) S.map = null; else if(S.route) S.route = null; else { 출장닫기(); return; }
     render(); return;
   }
+  if(t.hasAttribute('data-cap')){ 캡처누름(t); return; }
   if(t.hasAttribute('data-gedit')){ if(S.detail && S.detail.gid) openGcalEdit(S.detail.gid); return; }
   if(t.hasAttribute('data-gdel')){ if(S.detail && S.detail.gid) 구글지우기(S.detail.gid, S.detail.title); return; }
   if(t.hasAttribute('data-tripgo')){ var _tx = 출장하나(); if(_tx) 제네시스로(_tx.place); return; }
