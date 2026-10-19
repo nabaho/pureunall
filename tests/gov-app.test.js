@@ -534,7 +534,8 @@ test('★★ 받는 사이 누른 ★ 이 되돌아가지 않는다 · 두 번 �
     key_data: 'K' });
   let release; const gate = new Promise((res) => { release = res; });
   let calls = 0;
-  r.api.setPull(async () => { calls++; await gate;
+  let detail = 0;   // 지역·업종 제한 상세 조회(공고마다 따로)는 «받기 횟수»에 안 센다 — 두 번 눌렀을 때 중복 받기가 없는지만 본다
+  r.api.setPull(async (u) => { if (/PrtcptPsblRgn|LicenseLimit/.test(String(u || ''))) detail++; else calls++; await gate;
     return { response: { header: { resultCode: '00' }, body: { totalCount: 1,
       items: [{ bidNtceNo: 'NEW-1', bidNtceOrd: '000', bidNtceNm: '임금체계 개편 노무 컨설팅 용역', ntceInsttNm: 'B', bidClseDt: '2099-12-31 10:00' }] } } }; });
   const p1 = r.api.fetchAll();
@@ -551,6 +552,30 @@ test('★★ 받는 사이 누른 ★ 이 되돌아가지 않는다 · 두 번 �
   await one.api.fetchAll();
   assert.ok(calls1 >= 3, '발주계획·사전규격도 부른다');
   assert.equal(calls, calls1, '두 번 눌렀더니 더 불렀다');
+  assert.ok(detail > 0 && detail % 2 === 0, '새 공고·열린 옛 공고에 지역·면허 조회를 한다(공고마다 둘씩)');
+  assert.ok(detail <= 16, '두 번 눌러도 같은 공고를 또 조회하면 안 된다: ' + detail);
+});
+test('★★★ 지역·업종 조회를 «기다리는 사이» 누른 ★·숨김도 되돌아가지 않는다 — 기다린 뒤 목록을 다시 읽어 합친다', async () => {
+  const r = runApp({ feed: [{ id: 'G0001', src: '나라장터', type: '새 공고', no: 'OLD-1', nm: '노무자문 용역', org: 'A', closeDt: '2099-12-31' }], key_data: 'K' });
+  let release; const gate = new Promise((res) => { release = res; }); let waiting = 0;
+  r.api.setPull(async (u) => {
+    if (/PrtcptPsblRgn|LicenseLimit/.test(String(u || ''))) {
+      waiting++; await gate;
+      return { response: { header: { resultCode: '00' }, body: { items: /PsblRgn/.test(u) ? [{ prtcptPsblRgnNm: '충청남도' }] : [] } } };
+    }
+    return { response: { header: { resultCode: '00' }, body: { totalCount: 1,
+      items: [{ bidNtceNo: 'NEW-1', bidNtceOrd: '000', bidNtceNm: '임금체계 개편 노무 컨설팅 용역', ntceInsttNm: 'B', bidClseDt: '2099-12-31 10:00' }] } } };
+  });
+  const p = r.api.fetchAll();
+  for (let i = 0; i < 200 && !waiting; i++) await new Promise((res) => setTimeout(res, 5));
+  assert.ok(waiting > 0, '상세 조회까지 갔는지');
+  r.api.star('G0001');                       // 지역·업종 조회를 기다리는 사이 ★
+  release(); await p;
+  const feed = JSON.parse(r.store.gov3_feed);
+  const old = feed.find((x) => x.no === 'OLD-1'), neu = feed.find((x) => x.no === 'NEW-1-000');
+  assert.equal(old.type, '관심', '기다리는 사이 누른 ★ 이 지워졌다');
+  assert.equal(old.rgn, '충청남도', '옛 공고에도 지역이 붙는다'); assert.equal(old.lk, '1');
+  assert.ok(neu && neu.rgn === '충청남도', '새 공고에도 지역이 붙는다');
 });
 
 /* ═══════ 수의계약 — 표시하고, 빼고 볼 수 있게 (대표 지시 2026-10-09) ═══════ */

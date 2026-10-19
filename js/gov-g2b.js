@@ -120,8 +120,102 @@
       closeDt: s(it.bidClseDt) || s(it.opengDt),
       prc:   Number(String(it.presmptPrce || it.asignBdgtAmt || '').replace(/[^0-9]/g, '')) || 0,
       mthd:  s(it.cntrctCnclsMthdNm),
-      url:   s(it.bidNtceDtlUrl)
+      url:   s(it.bidNtceDtlUrl),
+      /* 제한 표시 — 목록에 있는 것만(참가 가능 지역·면허 이름은 따로 불러야 한다: detailUrl). 있을 때만 담는다 */
+      indY:  s(it.indstrytyLmtYn) === 'Y' ? 'Y' : '',
+      jnt:   [s(it.jntcontrctDutyRgnNm1), s(it.jntcontrctDutyRgnNm2), s(it.jntcontrctDutyRgnNm3)].filter(Boolean).join(' · ')
     };
+  }
+
+  /* ── 지역·업종 제한 (대표 지시 2026-10-19 「지역제한이나 업종제한이 있는 경우 표시」) ──
+     나라장터 용역 공고 목록은 «제한이 있다/없다»만 주고 이름은 따로 부르는 두 서비스에 있다:
+       참가가능지역 getBidPblancListInfoPrtcptPsblRgn → prtcptPsblRgnNm
+       면허제한      getBidPblancListInfoLicenseLimit    → lcnsLmtNm · permsnIndstrytyList · indstrytyMfrcFldList
+     ⚠ 이 둘은 «공고마다 한 번씩» 부른다(하루 1,000회) — 걸러낸 공고에만, 한 번 본 공고는 lk 표시로 다시 안 부른다.
+     ⚠ 열쇠는 같아도 활용신청은 서비스마다 따로다 — 승인 전이면 못 받는다. 못 받아도 공고 자체는 그대로(조용히 건너뛴다).
+     ⚠ 조회구분(inqryDiv) 값은 문서에 풀이가 없다 — 2(공고번호)를 먼저, 비면 3 을 한 번 더 본다(enrich). */
+  var DETAIL_BASE = 'https://apis.data.go.kr/1230000/ad/BidPublicInfoService/';
+  var DETAIL_OP = { rgn: 'getBidPblancListInfoPrtcptPsblRgn', lic: 'getBidPblancListInfoLicenseLimit' };
+  function bidNo(no) { return s(no).split('-')[0]; }
+  function detailUrl(o) {
+    o = o || {};
+    var q = [
+      'serviceKey=' + encKey(o.key), 'type=json',
+      'inqryDiv=' + (o.div || 2), 'bidNtceNo=' + encodeURIComponent(bidNo(o.no)),
+      'pageNo=1', 'numOfRows=100'
+    ];
+    return DETAIL_BASE + DETAIL_OP[o.kind === 'lic' ? 'lic' : 'rgn'] + '?' + q.join('&');
+  }
+  function uniq(list) { var seen = {}; return list.filter(function (x) { if (!x || seen[x]) return false; seen[x] = 1; return true; }); }
+  /* 응답 → { ok, err, names[] } — kind 'rgn' 은 지역 이름, 'lic' 는 면허·업종 이름 */
+  function parseDetail(json, kind) {
+    if (!json) return { ok: false, err: '빈 응답', names: [] };
+    var bad = json.OpenAPI_ServiceResponse && json.OpenAPI_ServiceResponse.cmmMsgHeader;
+    if (bad) return { ok: false, err: String(bad.returnAuthMsg || bad.errMsg || '알 수 없는 오류'), names: [] };
+    var r = json.response || {}, code = r.header && String(r.header.resultCode || '');
+    if (code && code !== '00' && code !== '0') return { ok: false, err: String((r.header && r.header.resultMsg) || ('오류 코드 ' + code)), names: [] };
+    var items = (r.body || {}).items;
+    if (!items) items = [];
+    if (!Array.isArray(items)) items = (items.item ? (Array.isArray(items.item) ? items.item : [items.item]) : [items]);
+    var names = [];
+    items.forEach(function (it) {
+      if (!it) return;
+      if (kind === 'lic') ['lcnsLmtNm', 'permsnIndstrytyList', 'indstrytyMfrcFldList'].forEach(function (k) { if (s(it[k])) names.push(s(it[k]).slice(0, 80)); });
+      else if (s(it.prtcptPsblRgnNm)) names.push(s(it.prtcptPsblRgnNm));
+    });
+    return { ok: true, err: '', names: uniq(names) };
+  }
+  /* 목록 줄에 지역·업종 제한을 «붙인다» (통신은 getJson 으로 받는다 — 이 모듈은 통신을 모른다)
+     rows: 줄 배열(no 가 있는 나라장터 줄) — 제자리에서 rgn·ind·lk 를 채운다. o = { key, max(기본 60), pool(기본 3) }
+     ⚠ 이미 lk 가 있는 줄·나라장터가 아닌 줄은 건너뛴다. 둘 다 승인 전이어 «전부» 실패하면 lk 를 안 남긴다(승인 뒤 다시 본다). */
+  function enrich(rows, getJson, o) {
+    o = o || {};
+    var todo = (rows || []).filter(function (r) { return r && r.no && !r.lk && (r.src || guessSrc(r.no)) === '나라장터'; }).slice(0, o.max || 60);
+    var div = 2, hadData = false, tried = 0, done = 0, failed = 0, idx = 0;
+    function one(r) {
+      function ask(kind, d) {
+        return Promise.resolve().then(function () { return getJson(detailUrl({ key: o.key, no: r.no, kind: kind, div: d })); })
+          .then(function (j) { return parseDetail(j, kind); }, function () { return { ok: false, err: '받지 못했습니다', names: [] }; });
+      }
+      return Promise.all([ask('rgn', div), ask('lic', div)]).then(function (res) {
+        if (res[0].ok && res[1].ok && !res[0].names.length && !res[1].names.length && !hadData && tried < 6 && div === 2) {
+          /* 둘 다 «빈 성공» — 조회구분이 틀렸을 수 있다. 3 으로 한 번 더 */
+          tried++;
+          return Promise.all([ask('rgn', 3), ask('lic', 3)]).then(function (res2) {
+            if (res2[0].names.length || res2[1].names.length) { div = 3; hadData = true; return res2; }
+            return res;
+          });
+        }
+        return res;
+      }).then(function (res) {
+        if (res[0].names.length || res[1].names.length) hadData = true;
+        if (!res[0].ok && !res[1].ok) { failed++; return; }
+        if (res[0].ok && res[0].names.length) r.rgn = res[0].names.join(' · ');
+        if (res[1].ok && res[1].names.length) r.ind = res[1].names.join(' · ');
+        if (res[0].ok && res[1].ok) { r.lk = '1'; done++; }
+      });
+    }
+    function worker() {
+      if (idx >= todo.length) return Promise.resolve();
+      return one(todo[idx++]).then(worker);
+    }
+    var pool = []; for (var i = 0; i < Math.min(o.pool || 3, todo.length); i++) pool.push(worker());
+    return Promise.all(pool).then(function () { return { asked: todo.length, done: done, failed: failed }; });
+  }
+
+  /* 기업마당 — 지역은 해시태그·제목 앞 [대괄호]에서 읽는다(지역 칸이 따로 없다). 지어내지 않고 «그 말이 있을 때만» */
+  var SIDO = ['서울', '부산', '대구', '인천', '광주', '대전', '울산', '세종', '경기', '강원', '충북', '충남', '전북', '전남', '경북', '경남', '제주'];
+  var SIDO_FULL = { '서울특별시': '서울', '부산광역시': '부산', '대구광역시': '대구', '인천광역시': '인천', '광주광역시': '광주', '대전광역시': '대전', '울산광역시': '울산',
+    '세종특별자치시': '세종', '경기도': '경기', '강원도': '강원', '강원특별자치도': '강원', '충청북도': '충북', '충청남도': '충남', '전라북도': '전북', '전북특별자치도': '전북',
+    '전라남도': '전남', '경상북도': '경북', '경상남도': '경남', '제주특별자치도': '제주' };
+  function sidoOf(word) { word = s(word); return SIDO.indexOf(word) >= 0 ? word : (SIDO_FULL[word] || ''); }
+  function bizRegion(tags, nm) {
+    var out = [];
+    s(tags).split(/[,#\s]+/).forEach(function (w) { var k = sidoOf(w); if (k) out.push(k); });
+    var m = /^\s*[\[\(（【]([^\]\)）】]{1,12})[\]\)）】]/.exec(s(nm));
+    if (m) m[1].split(/[,\/·ㆍ\s]+/).forEach(function (w) { var k = sidoOf(w); if (k) out.push(k); });
+    out = uniq(out);
+    return out.length >= 6 ? '' : out.join(' · ');   /* 여러 시도가 줄줄이면 사실상 전국 — 제한이 아니다 */
   }
 
   /* ── 낱말 걸러내기 ──
@@ -253,6 +347,9 @@
         dday: dday(r.closeDt, today),
         type: '새 공고'                       /* 상태 — 목록 툴바의 「유형」으로 거른다 */
       });
+      var last = adds[adds.length - 1];
+      ['indY', 'jnt', 'rgn', 'ind', 'lk'].forEach(function (k) { if (r[k]) last[k] = r[k]; });
+      if ((last.src === '기업마당') && !last.rgn) { var br = bizRegion(r.tags, r.nm); if (br) last.rgn = br; }
     });
     return { adds: adds, skipped: skipped, unmatched: unmatched };
   }
@@ -260,6 +357,7 @@
   var api = { BASE: BASE, KEYWORDS_DEFAULT: KEYWORDS_DEFAULT, encKey: encKey,
               buildUrl: buildUrl, parse: parse, matched: matched, dday: dday, merge: merge,
               guessSrc: guessSrc, judge: judge,
+              detailUrl: detailUrl, parseDetail: parseDetail, enrich: enrich, bizRegion: bizRegion,
               toggleKw: toggleKw };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   else root.GovG2b = api;

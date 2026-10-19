@@ -32,6 +32,8 @@
         year: s(r.openDt).slice(0, 4), dday: o.dday ? o.dday(r.closeDt, o.today) : null,
         type: '새 공고', savedAt: s(r.at)
       });
+      /* 지역·업종 제한 — 있을 때만(서버가 나라장터 상세에서 읽은 것). 아래 칸 이름은 gov-g2b.js 와 같다 */
+      ['rgn', 'ind', 'indY', 'jnt', 'lk'].forEach(function (k) { if (s(r[k])) adds[adds.length - 1][k] = s(r[k]); });
     });
     return { adds: adds, skipped: skipped, dropped: dropped };
   }

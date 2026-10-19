@@ -532,7 +532,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/pu-back.js?v=3"></script>
 <script>try{ PuBack.guard(function(){ return PuBack.closeTopVisible(); }); }catch(e){}</script>
 <script src="js/gov-career.js?v=2"></script>
-<script src="js/gov-g2b.js?v=8"></script>
+<script src="js/gov-g2b.js?v=9"></script>
 <script src="js/gov-plan.js?v=4"></script>
 <script src="js/gov-alio.js?v=2"></script>
 <script src="js/gov-bizinfo.js?v=3"></script>
@@ -541,7 +541,7 @@ table.cmp td{white-space:nowrap}
 <script src="js/gov-sync.js?v=7"></script>
 <script src="js/gov-match.js?v=2"></script>
 <script src="js/gov-orgrec.js?v=1"></script>
-<script src="js/gov-inbox.js?v=1"></script>
+<script src="js/gov-inbox.js?v=2"></script>
 <!-- 한글·워드 글자 읽개(제출 전 점검) — 1.4MB 묶음은 «파일을 고를 때» 처음 한 번만 싣는다 -->
 <script src="js/pu-kordoc-text.js?v=3"></script>
 <script>
@@ -663,6 +663,14 @@ async function pullAll(name, urlOf, parse, max){
   }
   return {rows:rows, errs:errs, total:total};
 }
+/* 나라장터 공고에 «참가 가능 지역·면허 제한»을 붙인다 — 공고마다 서비스 둘을 부른다(하루 1,000회 제한 안에서 60건까지, 한 번 본 공고는 lk 로 건너뜀) */
+async function restrictFill(buf, kd, adds){
+  var open=buf.filter(function(r){ if(!r||r.lk||r.src!=='나라장터'||adds.indexOf(r)>=0) return false; var d=GovG2b.dday(r.closeDt); return d==null||d>=0; }).slice(0,20);
+  var copies=open.map(function(r){ return {no:r.no, src:'나라장터'}; });   // 옛 줄은 복사본에만 붙인다 — 부른 뒤 번호로 찾아 합친다
+  var todo=adds.filter(function(r){ return r.src==='나라장터'; }).concat(copies);
+  var sum=await GovG2b.enrich(todo, pull, {key:kd, max:60});
+  return {sum:sum, patches:copies.filter(function(c){ return c.lk||c.rgn||c.ind; })};
+}
 var _fetching=false;
 async function fetchAll(){
   if(_fetching){ toast('받고 있습니다 — 잠시만 기다려 주세요'); return; }
@@ -702,8 +710,18 @@ async function _fetchAll(){
   }
   var buf=get('feed');   /* ⚠ 다 받은 «뒤»에 읽는다(검토 2026-10-04) */
   var m=GovG2b.merge(buf, got, kws(), today);
-  m.adds.forEach(function(r){ r.id=nextId(buf); r.savedAt=new Date().toISOString(); buf.unshift(r); });
-  if(m.adds.length) set('feed',buf);
+  /* 지역·업종 제한 — 걸린 공고와 아직 열려 있는 옛 공고(20건씩)에 붙인다. 실패해도(승인 전) 공고는 그대로.
+     ⚠★ 이 조회는 «기다림»이 길다 — 그 사이 대표가 누른 ★·숨김이 저장에 덮이지 않도록, 기다린 뒤 목록을 «다시 읽어» 거기에 합친다
+        (옛 줄은 복사본에만 붙이고 번호로 찾아 빈 칸만 채운다). 새 줄은 아직 목록에 없으니 그대로 붙인다. */
+  var rFill=null; if(kd){ try{ rFill=await restrictFill(buf, kd, m.adds); }catch(e){ rFill=null; } }
+  buf=get('feed');
+  var have={}; buf.forEach(function(r){ if(r&&r.no!=null) have[String(r.no)]=1; });
+  var fresh=m.adds.filter(function(r){ return !have[String(r.no)]; });
+  fresh.forEach(function(r){ r.id=nextId(buf); r.savedAt=new Date().toISOString(); buf.unshift(r); });
+  var patched=0;
+  if(rFill) rFill.patches.forEach(function(pt){ var row=buf.find(function(r){ return r && String(r.no)===String(pt.no); });
+    if(row && !row.lk){ ['rgn','ind','lk'].forEach(function(f){ if(pt[f]) row[f]=pt[f]; }); patched++; } });
+  if(fresh.length || patched) set('feed',buf);
   /* 받은 때·범위를 남긴다 — 화면이 「언제까지의 공고인가」를 말할 수 있게(feedPeriod) */
   lsSet('last_at', new Date().toISOString());
   lsSet('last_win', ymdOf(from)+'~'+ymdOf(to));
@@ -1018,8 +1036,13 @@ async function inboxPull(){
     var buf=get('feed'), kw=kws(), today=new Date().toISOString().slice(0,10);
     var m=GovInbox.merge(buf, v.rows||{}, { today:today, dday:GovG2b.dday, keep:function(r){ return GovG2b.judge(r, kw).length>0; } });
     m.adds.forEach(function(r){ r.id=nextId(buf); buf.unshift(r); });
+    /* 이미 내 목록에 있는 공고에는 서버가 새로 알아낸 지역·업종 제한만 «빈 칸에» 옮긴다(숨김·별표 같은 내 표시는 안 건드린다) */
+    var carried=0, byNo={}; buf.forEach(function(r){ if(r&&r.no!=null) byNo[String(r.no)]=r; });
+    Object.keys(v.rows||{}).forEach(function(k){ var sv=v.rows[k], l=sv&&byNo[String(sv.no)];
+      if(l && !l.lk && sv.lk){ ['rgn','ind','indY','jnt','lk'].forEach(function(f){ if(sv[f]) l[f]=String(sv[f]); }); carried++; } });
     if(m.adds.length){ set('feed',buf); ageOut(); _feedMerged+=m.adds.length;
       toast('🛰 서버가 매일 모은 공고 '+m.adds.length+'건을 목록에 합쳤습니다'); }
+    else if(carried){ set('feed',buf); }
   }catch(e){ _feedSrv=null; }
 }
 function feedSrvHtml(){
@@ -1045,7 +1068,7 @@ function feedMobile(r, mt){
   var st=r.hidden ? '<span class="tag red">'+(r.ruleOut?'숨김·규칙':'숨김')+'</span>'
     : (r.type && r.type!=='새 공고' && r.type!=='관심' && !(r.type==='지나감' && past) ? '<span class="tag">'+esc(r.type)+'</span>' : '');
   return (d!=null ? '<span class="m-only mdd">'+dchip(r)+'</span>' : '')
-    +'<div class="m-only msub">'+st+soleTag(r)
+    +'<div class="m-only msub">'+st+soleTag(r)+restrictTags(r)
     +(r.prc ? '<span class="mpr">'+_won(r.prc)+'</span>' : '')      // 금액이 기관보다 앞 — 넘치면 기관이 잘린다(위 planMobile 과 같다)
     +(r.org ? '<span class="mog">'+esc(r.org)+'</span>' : '')
     +matchChip(mt)+orgRecTag(r)+'</div>';
@@ -1075,6 +1098,17 @@ function feedPageTo(p){ _feedPage=p; draw(); }
    ⚠ 거르개는 «보이는 것»만 바꾼다 — 공고를 숨기거나 지우지 않는다. 고른 것은 이 기기만 기억한다(feed_mthd). */
 function isSole(r){ return /수의/.test(String(r&&r.mthd||'')); }
 function soleTag(r){ return isSole(r)?'<span class="tag amber" title="수의계약 — 경쟁 없이 기관이 정한 곳과 직접 계약하는 경우가 많습니다'+(r.mthd?' ('+esc(r.mthd)+')':'')+'">수의계약</span> ':''; }
+/* 지역·업종 제한 표시 (대표 지시 2026-10-19) — 있을 때만 그린다. 나라장터 = 참가 가능 지역(rgn)·면허/업종 이름(ind)·업종제한 여부(indY),
+   기업마당 = 해시태그·제목에서 읽은 지역(rgn). ⚠ 「제한 없음」은 그리지 않는다 — 못 읽은 것과 없는 것을 구분 못 하면 거짓 안심이 된다. */
+function _rgShort(v){ var a=String(v||'').split(' · '); return a.slice(0,2).join('·')+(a.length>2?' 외 '+(a.length-2):''); }
+function restrictTags(r){
+  if(!r) return '';
+  var h='';
+  if(r.rgn) h+='<span class="tag amber" title="'+esc((r.src==='기업마당'?'지역(해시태그·제목 기준) — ':'참가 가능 지역 — ')+r.rgn)+'">📍 '+esc(_rgShort(r.rgn))+'</span> ';
+  if(r.ind) h+='<span class="tag amber" title="'+esc('업종·면허 제한 — '+r.ind)+'">🏭 업종제한</span> ';
+  else if(r.indY==='Y') h+='<span class="tag amber" title="업종 제한이 있는 공고입니다 — 어떤 업종인지는 원문 공고에서 확인해 주세요">🏭 업종제한</span> ';
+  return h;
+}
 function feedMthd(v){ lsSet('feed_mthd', v==='sole'||v==='nosole'?v:''); if($('pMthd')) $('pMthd').value=lsGet('feed_mthd'); _feedPage=0; draw(); }
 function feedVisible(){
   var q=($('q').value||'').toLowerCase(), fs=$('fSrc').value, ft=$('fSt').value;
@@ -1164,7 +1198,7 @@ function draw(){
       +'<td class="rn">'+(from+i+1)+'</td>'
       +'<td><span class="tag navy">'+esc(r.src||'-')+'</span></td>'
       +'<td>'+st+'</td>'
-      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
+      +'<td class="nm" title="'+esc(r.nm||'')+(isSole(r)?' · 수의계약':'')+'">'+soleTag(r)+restrictTags(r)+orgRecTag(r)+'<b>'+esc(r.nm||'-')+'</b>'+(r.kw?' <span class="kwt">'+esc(r.kw)+'</span>':'')+feedMobile(r, mt)+'</td>'
       +'<td class="og" title="'+esc(r.org||'')+'">'+esc(r.org||'-')+'</td>'
       +matchCell(mt)
       +'<td class="dt">'+esc((r.savedAt||'').slice(0,10)||'-')+'</td>'
@@ -1240,7 +1274,11 @@ function feedPop(id){
     +_kv('걸린 낱말',esc(r.kw||''))
     +_kv('공고일',esc((r.openDt||'').slice(0,16)))+_kv('마감',esc((r.closeDt||'').slice(0,16))+' '+dchip(r))
     +_kv('추정가격',r.prc?_won(r.prc)+' <span class="sml">('+Number(r.prc).toLocaleString()+'원)</span>':'')
-    +_kv('계약방법',soleTag(r)+esc(r.mthd||''))+_kv('받은 날',esc((r.savedAt||'').slice(0,16).replace('T',' ')))
+    +_kv('계약방법',soleTag(r)+esc(r.mthd||''))
+    +(r.rgn?_kv(r.src==='기업마당'?'지역':'참가 가능 지역','<span class="tag amber">📍</span> '+esc(r.rgn)):'')
+    +(r.ind?_kv('업종·면허 제한','<span class="tag amber">🏭</span> '+esc(r.ind)):(r.indY==='Y'?_kv('업종 제한','<span class="tag amber">🏭</span> 있음 <span class="sml">(어떤 업종인지는 원문 공고에서 확인)</span>'):''))
+    +(r.jnt?_kv('공동수급 의무지역',esc(r.jnt)):'')
+    +_kv('받은 날',esc((r.savedAt||'').slice(0,16).replace('T',' ')))
     +'</table>'
     +'<div class="bar" style="margin:12px 0">'
     +'<button class="btn sm" onclick="star(\''+esc(r.id)+'\');feedPop(\''+esc(r.id)+'\')">'+(r.type==='관심'?'★ 관심 끄기':'☆ 관심')+'</button>'
