@@ -264,7 +264,8 @@ ERP 자동 동기화에서 보관함과 그 메타를 제외했다. 원본 자�
 
 - 메일이 «들어올 때» 폰으로 알리는 길 둘(📬 내 담당 메일 · 📥 새 문의) 위에 **전체 스위치** `pucards/config/mailPushMaster = {off:true}` 를 두고 **꺼 두었다.**
   띠·기록·메일 받기는 그대로, 폰만 안 울린다. 건의·방문 문자·출장·달력 알림은 그대로다.
-- **다시 켜기**: `firebase database:set /pucards/config/mailPushMaster --data "{\"off\":false}" --project pureun-erp --force` (또는 `database:remove`).
+- **다시 켜기**(PowerShell 에서 실제로 돌려 확인한 모양): `firebase database:remove /pucards/config/mailPushMaster --project pureun-erp --force` — 안 적히면 켜진 것이다.
+  (`database:set … --data '{\"off\":false}'` 도 된다. ⚠ 안쪽 따옴표 앞에 `\` 가 없으면 PowerShell 이 벗겨 `HTTP 400` 이 난다.)
   켜기 전에 아래 「직원 폰 알림」 절(동의·기기 등록)을 먼저 읽을 것.
 - 상세·명령 모음·점검 결과: `status/2026-10-20-mail-push-master.md`
 
