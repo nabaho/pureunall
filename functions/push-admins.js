@@ -74,6 +74,29 @@ async function pushAdmins(db, messaging, payload, opt) {
   return sendTo(db, messaging, uids, payload);
 }
 
+/* ══════ 📵 받은 메일 폰 알림의 «전체 스위치» (대표 지시 2026-10-20) ══════
+   「푸른메일함에 받은 메일 폰에서 자동으로 알림기능 중단시켜 달라 … 다음에 활용할 수 있게 기록해 두고
+     온오프 장치도 체크해 달라」
+   ★ 메일이 «들어올 때» 폰으로 알리는 길은 둘이다 — 📬 내 담당 메일(mail-owner, 담당자 폰)과
+     📥 새 문의(mail-new-inquiry, 관리자 폰). 사람마다 끄는 스위치(config/mailPush/{사번})는
+     앞의 것에만 있었고, 새 문의에는 아무 스위치도 없었다. 그래서 둘 위에 «하나»를 둔다.
+   ★ 자리: pucards/config/mailPushMaster = { off:true, at, by, why } — off 가 true 일 «때만» 꺼진다.
+     안 적혀 있으면 켜진 것이다(빈 값을 「꺼짐」으로 읽으면 만들어 놓고 아무 일도 안 하는 기능이 된다).
+   ⚠ 읽다가 «실패하면 꺼진 것으로» 본다 — 대표가 끄라고 하셨는데 DB 가 흔들렸다고 폰이 울리면 안 된다.
+     알림은 덤이고, 화면의 띠(📬·📥)는 그대로 보인다.
+   ⚠ 끄는 것은 «폰 알림»뿐이다 — 메일 받기·분류·띠·기록(mailbox/inq)은 그대로 돈다.
+   ⚠ 다시 켜려면 off 를 false 로 하거나 이 자리를 지우면 된다(docs: status/2026-10-20-mail-push-master.md). */
+const MAIL_PUSH_MASTER = "pucards/config/mailPushMaster";
+async function mailPushOff(db) {
+  try {
+    const v = (await db.ref(MAIL_PUSH_MASTER).once("value")).val();
+    return !!(v && v.off === true);
+  } catch (e) {
+    console.warn("mailPushMaster 를 못 읽었습니다(꺼진 것으로 봅니다):", String((e && e.message) || e).slice(0, 160));
+    return true;
+  }
+}
+
 /* 「이 사람 하나」에게 (2026-10-05, 📬 내 담당 메일 알림).
    ⚠ 등록한 기기가 없으면 아무 일도 안 한다 — targets 0 으로 돌려주어 부르는 쪽이
      「폰이 없어서 못 갔다」와 「보냈다」를 가릴 수 있게 한다(지금 등록된 폰은 0대다). */
@@ -81,4 +104,4 @@ async function pushOne(db, messaging, uid, payload) {
   return sendTo(db, messaging, [String(uid || "")].filter(Boolean), payload);
 }
 
-module.exports = { pushAdmins, pushOne, sendTo, adminUids, DEAD_CODES };
+module.exports = { pushAdmins, pushOne, sendTo, adminUids, DEAD_CODES, mailPushOff, MAIL_PUSH_MASTER };

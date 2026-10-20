@@ -331,6 +331,8 @@ async function notifyOwners(deps, opts) {
   out.ran = true; out.rows = rows.length;
 
   const db = deps.getDatabase();
+  /* 📵 받은 메일 폰 알림 «전체 스위치»가 꺼져 있으면 여기서 끝 — 담당 계산도 기기 찾기도 안 한다(2026-10-20) */
+  if (await PUSH.mailPushOff(db)) { out.off = true; return out; }
   const T = o.readTables ? await o.readTables() : await loadTables(db, o.readCompanies);
 
   /* 사람마다 모은다 — 회차에 한 번만 울린다 */
