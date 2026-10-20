@@ -70,7 +70,7 @@ test('③★ 정부사업일정 — 🔗 배지·잇기 알림·직원 추가 �
   assert.doesNotMatch(GOV, /사번 \$\{sid\} 연결됨/, '★ 잇기 알림에 사번이 찍힌다');
   assert.doesNotMatch(GOV, /\[u\.title,\s*u\.branch,\s*u\.sid\]/, '★ 직원 추가 목록에 사번이 늘 찍힌다 — 같은 이름일 때만');
   assert.match(GOV, /dupN\[String\(u\.name\|\|''\)\.trim\(\)\]\?u\.sid:''/, '같은 이름일 때 사번으로 가르는 길이 없다');
-  assert.match(GOV, /made\.push\(window\.PuStaffLabel\?PuStaffLabel\.label\(u,ERP\.dir\|\|\[\]\):u\.name\)/, '★ 새로 더한 사람 알림에 사번이 붙는다');
+  assert.match(GOV, /made\.push\(typeof PuStaffLabel!=='undefined'\?PuStaffLabel\.label\(u,ERP\.dir\|\|\[\]\):u\.name\)/, '★ 새로 더한 사람 알림에 사번이 붙는다');
 });
 
 test('③-2 사진첩 — 로그인 안 한 담당자는 «이름»으로 알리고, 이름을 못 찾을 때만 사번', () => {

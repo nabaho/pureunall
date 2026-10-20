@@ -6782,7 +6782,7 @@ function renderStaffAdd(){
     updateStaffAddCount();
     return;
   }
-  const dupN=window.PuStaffLabel?PuStaffLabel.dupNames(dir):{};
+  const dupN=typeof PuStaffLabel!=='undefined'?PuStaffLabel.dupNames(dir):{};
   body.innerHTML=rows.map(u=>{
     const done=has(u);
     /* 사번은 같은 이름이 둘 이상일 때만 (대표 지시 2026-10-19, js/pu-staff-label.js) — 찾기(kw)는 여전히 사번으로도 된다 */
@@ -11063,7 +11063,7 @@ function erpSubStaffId(sid,staff,made){
   const rec={id:uid(),name:u.name,
     color:STAFF_COLORS[staff.length%STAFF_COLORS.length],erpSid:sid};
   staff.push(rec);
-  made.push(window.PuStaffLabel?PuStaffLabel.label(u,ERP.dir||[]):u.name);   // 이름만 — 같은 이름일 때만 사번(2026-10-19)
+  made.push(typeof PuStaffLabel!=='undefined'?PuStaffLabel.label(u,ERP.dir||[]):u.name);   // 이름만 — 같은 이름일 때만 사번(2026-10-19)
   return rec.id;
 }
 function erpSyncSubsDown(){
