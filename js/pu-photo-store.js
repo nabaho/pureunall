@@ -2225,6 +2225,18 @@
      ⚠ 이름표만 얻는다 — 남의 사진이 열리는 것이 아니다. 사진 자물쇠(u/{주인})는 그대로다. */
   function normSid(sid) { return String(sid == null ? '' : sid).toLowerCase().replace(/-/g, ''); }
 
+  /* 사번들 → 이름들(못 찾으면 빈 글자). 공개 명부 data/user_dir 하나만 읽는다.
+     (대표 지시 2026-10-19 「모든곳에 권형하를 넣으면 p001 이 나온다」 — 화면 글자는 사번 대신 이름) */
+  function namesOfSids(sids) {
+    var list = (sids || []).map(String);
+    var blank = function () { return list.map(function () { return ''; }); };
+    if (!deps.db || !list.length) return Promise.resolve(blank());
+    return readRoster('data/user_dir', deps.db).then(function (dir) {
+      var m = sidNameMap(dir);
+      return list.map(function (s) { return m[normSid(s)] || ''; });
+    }).catch(blank);
+  }
+
   function sidNameMap(list) {
     var arr = list, out = {};
     if (!Array.isArray(arr) && arr && typeof arr === 'object') {
@@ -2604,6 +2616,7 @@
     setShare: setShare,
     addShare: addShare,
     uidBySid: uidBySid,
+    namesOfSids: namesOfSids,
     /* 정부사업일정 — 그 날 그 일정의 담당끼리 (govBuild·govPlan 은 검사가 쓴다) */
     govShare: govShare,
     govBuild: govBuild,

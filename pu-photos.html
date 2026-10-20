@@ -24,7 +24,7 @@
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=12"></script>
 <!-- ?v= 저장 층을 고치면 반드시 올린다 — 캐시에 묵으면 고친 것이 통째로 묻힌다. -->
-<script src="js/pu-photo-store.js?v=34"></script>
+<script src="js/pu-photo-store.js?v=35"></script>
 <!-- 주민번호 가림 — 계산 층과, 급여데이터함과 나눠 쓰는 긋기 층 -->
 <script src="js/pu-rrn-mask.js?v=5"></script>
 <script src="js/pu-rrn-mask-ui.js?v=3"></script>
@@ -13696,7 +13696,10 @@ function coMgrsFor(coName) {
         if (uid) { if (uids.indexOf(uid) < 0) uids.push(uid); }
         else noAcct.push(sid);
       });
-      return { co: hit.rec, sids: sids, uids: uids, noAcct: noAcct };
+      const out = { co: hit.rec, sids: sids, uids: uids, noAcct: noAcct, noAcctNames: [] };
+      /* 로그인 안 한 담당자는 «이름»으로 알린다 — 공개 명부에서 찾는다(못 찾으면 화면이 사번을 쓴다) */
+      if (!noAcct.length || !PuPhotoStore.namesOfSids) return out;
+      return PuPhotoStore.namesOfSids(noAcct).then(function (nm) { out.noAcctNames = nm || []; return out; });
     });
   }).catch(function (e) {
     console.warn('[업체 담당자]', e);
@@ -13748,8 +13751,10 @@ function autoShareByCo(ids, coName) {
     if (!uids.length) {
       /* 담당자 «칸이 비어 있는» 것과 «계정이 없는» 것은 손쓰는 데가 다르다 —
          앞은 업체관리에서 담당을 정해야 하고, 뒤는 그 사람이 한 번 들어오면 된다. */
+      /* 누구인지는 «이름»으로 — 이름을 못 찾았을 때만 사번 (대표 지시 2026-10-19) */
       toast(m.noAcct && m.noAcct.length
-        ? coName + ' 담당자(사번 ' + m.noAcct.join('·') + ')는 아직 로그인한 적이 없어 못 열어 드렸습니다'
+        ? coName + ' 담당자(' + m.noAcct.map(function (s, i) { return (m.noAcctNames && m.noAcctNames[i]) || s; }).join('·')
+          + ')는 아직 로그인한 적이 없어 못 열어 드렸습니다'
         : '🏢 업체는 달았지만 ' + coName + ' 에 담당자가 지정돼 있지 않습니다 — 업체관리에서 정해 주세요');
       return;
     }
@@ -14066,11 +14071,11 @@ function openSharePeople(ids, host, note) {
         if (uid) role[uid] = coName + (i === 0 ? ' 주담당' : ' 부담당');
       });
     }
-    /* ⚠ 이 앱에는 «사번 → 이름» 표가 없다(브라우저에서 돌려 보고 알았다 — 처음에는
-       있지도 않은 staffNameBySid 를 불러 「s9님은…」이라고 적고 있었다).
-       그래서 이름인 척하지 않고 **사번 그대로** 적는다 — 사무실에서 쓰는 번호라
-       「1명은 못 고릅니다」보다는 짚을 데가 있다. */
-    const noAcct = ((m && m.noAcct) || []).map(String);
+    /* ⚠ 이 앱에는 «사번 → 이름» 표가 없다(처음에는 있지도 않은 staffNameBySid 를 불러
+       「s9님은…」이라고 적고 있었다). 그래서 coMgrsFor 가 공개 명부(PuPhotoStore.namesOfSids)로
+       이름을 함께 찾아 온다(대표 지시 2026-10-19 — 화면 글자는 사번 대신 이름).
+       이름을 못 찾은 사람만 **사번 그대로** 적는다 — 「1명은 못 고릅니다」보다는 짚을 데가 있다. */
+    const noAcct = ((m && m.noAcct) || []).map(function (s, i) { return String((m.noAcctNames && m.noAcctNames[i]) || s); });
     _sharePick = { ids: can, pre: pre, has: has, mayDrop: mayDrop, role: role,
       coName: coName, host: host, title: title, skipped: skipped, note: note || null };
     const box = $(host);
@@ -14188,11 +14193,11 @@ function sharePeopleHtml(others, noAcct) {
   h += grp('그 밖 직원 ' + rest.length, rest.length) +
     rest.map(function (u) { return row(u); }).join('');
 
-  /* ⚠ 「1명은 못 고릅니다」로는 손쓸 데가 없다 — **어느 사번인지**까지 적는다 */
+  /* ⚠ 「1명은 못 고릅니다」로는 손쓸 데가 없다 — **누구인지**(이름, 모르면 사번)까지 적는다 */
   if (noAcct && noAcct.length) {
     h += '<p class="hint" style="margin:9px 0 0;font-size:11.5px;color:#854d0e">' +
       '담당자 ' + noAcct.length + '명은 아직 한 번도 로그인한 적이 없어 고를 수 없습니다' +
-      ' (사번 ' + esc(noAcct.join('·')) + ').</p>';
+      ' (' + esc(noAcct.join('·')) + ').</p>';
   }
   if (!p.mayDrop) {
     h += '<p class="hint" style="margin:9px 0 0;font-size:11.5px;color:var(--sub)">' +

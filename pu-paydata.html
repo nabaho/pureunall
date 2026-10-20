@@ -29,6 +29,7 @@
 <script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-storage-compat.js"></script>
 <script src="js/pu-resilience.js?v=3"></script>
 <script src="js/pu-gate.js?v=3"></script>
+<script src="js/pu-staff-label.js?v=1"></script>
 <script src="js/pu-health.js?v=6"></script>
 <script src="js/pu-version.js?v=12"></script>
 <script src="js/pu-paydata-store.js?v=12"></script>
@@ -3367,9 +3368,15 @@ function fixPeople() {
   return ((roster && roster.people) || []).filter(p => p && !p.badSid && p.sid);
 }
 
+/* 👤 이름표 — 이름만, 같은 이름이 둘 이상일 때만 사번 (대표 지시 2026-10-19, js/pu-staff-label.js).
+   ⚠ 고르는 값(value)은 그대로 사번이다 — 보이는 글자만 바꾼다. */
+function staffLbl(p, people) {
+  return window.PuStaffLabel ? PuStaffLabel.label(p, people) : String((p && (p.name || p.sid)) || '');
+}
 function ownerLabel(sid) {
-  const p = fixPeople().filter(x => x.sid === sid)[0];
-  return p ? (p.name + ' (' + sid + ')') : String(sid || '');
+  const people = fixPeople();
+  const p = people.filter(x => x.sid === sid)[0];
+  return p ? staffLbl(p, people) : String(sid || '');
 }
 
 /* 고르는 서랍. 화면 위에 얹는다 — 목록을 떠나면 어느 줄을 고치던 것인지 잊는다. */
@@ -3384,7 +3391,7 @@ function fixHtml() {
       + '<div class="fxr"><label>주담당</label><select onchange="fixSet(\'sid\',this.value)">'
       + '<option value="">— 직원 —</option>'
       + people.map(p => '<option value="' + esc(p.sid) + '"' + (f.sid === p.sid ? ' selected' : '') + '>'
-        + esc(p.name) + ' (' + esc(p.sid) + ')</option>').join('')
+        + esc(staffLbl(p, people)) + '</option>').join('')
       + '</select></div>';
   } else {
     /* 두 갈래로 열린다. 메일 줄에서 열면 **보낸이가 정해져 있고 사업장을 고른다**.

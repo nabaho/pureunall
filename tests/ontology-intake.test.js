@@ -17,7 +17,12 @@ function context(){
     dbRemove:(k,id)=>{calls.removes.push({k,id});data[k]=data[k].filter(x=>x.id!==id);return true;},
     getUserAssignStatus:()=>({assignable:true}),getLoaStatus:()=>null,
     h:(type,props,...children)=>({type,props:props||{},children:children.flat(Infinity).filter(Boolean)})};
-  vm.createContext(ctx);new vm.Script(helpers).runInContext(ctx);return {ctx,data,calls};
+  vm.createContext(ctx);new vm.Script(helpers).runInContext(ctx);
+  /* 2026-10-19: 담당자 이름표는 공용 erpStaffLabel(이름만, 같은 이름일 때만 사번 — js/pu-staff-label.js)을 거친다.
+     흉내내지 않고 진짜 함수를 싣는다 — 동명이인을 사번으로 가르는지가 이 검사의 뜻이다. */
+  ctx.window.PuStaffLabel=require('../js/pu-staff-label.js');
+  {const at=erp.indexOf('function erpStaffLabel(u, list){');new vm.Script(erp.slice(at,erp.indexOf('\n}',at)+2)).runInContext(ctx);}
+  return {ctx,data,calls};
 }
 
 test('배치는 이름·중복/불법 ID·기존 ID 덮기·삭제된 ID 재생성을 모두 거부하고 입력을 보존한다',()=>{
